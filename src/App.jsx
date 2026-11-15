@@ -57482,10 +57482,11 @@ function LigneVerifCarton({ it, fiche, preuve, reserve = '', onConfirmer, onCorr
           {it._vrmMasquee ? <> · <span data-verif-masquee>{tr('annonces.masqueeVinted')}</span></> : null}
           {preuve ? <> · <span data-verif-preuve>{preuve}</span></> : null}
         </div>
+        {/* (15 nov., #4) SON second choix, sous la phrase (la rangée des gestes est pleine sur un téléphone). */}
+        {reserve && onPrendreReserve ? <div style={{ marginTop: 8 }}><button type="button" className="sb-touche" data-verif-prendre-reserve={String(reserve)} disabled={occupe} onClick={() => agir(() => onPrendreReserve(it, reserve))} style={{ minHeight: 44, whiteSpace: 'nowrap' }}>{tr('annonces.reserveCarton', { reserve: String(reserve) })}</button></div> : null}
       </div>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
         <button type="button" disabled={occupe} onClick={() => agir(() => onConfirmer(it))} style={{ padding: '7px 10px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{trj('annonces.bien', { numero: fiche.numero })}</button>
-        {reserve && onPrendreReserve ? <button type="button" data-verif-prendre-reserve={String(reserve)} disabled={occupe} onClick={() => agir(() => onPrendreReserve(it, reserve))} style={{ padding: '7px 10px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap' }}>{tr('annonces.reserveCarton', { reserve: String(reserve) })}</button> : null}
         <input className="vrm-autre-num" value={v} onChange={(e) => setV(e.target.value)} inputMode="numeric" placeholder={tr('annonces.autre')} aria-label={tr('annonces.numeroEcritEtiquette', { title: String(it.title) })}
           onKeyDown={(e) => { if (e.key === 'Enter' && v.trim()) agir(() => onCorriger(it, v)); }}
           style={{ width: 118, padding: '7px 9px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 13 }}/>
