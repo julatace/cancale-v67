@@ -12,7 +12,7 @@ export default {
   "fiab.ctl.l.comptes-48h": {"one": "{n} account not read for 48 h", "other": "{n} accounts not read for 48 h"},
   "fiab.ctl.l.emails-quarantaine": {"one": "{n} email without a seller", "other": "{n} emails without a seller"},
   "fiab.ctl.l.stripe": {"one": "{n} inconsistent Stripe subscription", "other": "{n} inconsistent Stripe subscriptions"},
-  "fiab.ctl.d.numeros-double": "Two pairs under the same N°: write another N° on one of the boxes.",
+  "fiab.ctl.d.numeros-double": "Two items under the same N°: write another N° on one of the boxes.",
   "fiab.ctl.d.vente-sans-numero": "Give it its N° to find the box.",
   "fiab.ctl.d.pool-retreci": "Nothing was changed. Reload the app on the device where you number.",
   "fiab.ctl.d.enligne-24h": "Open Vinted on this account, in the browser where the VRM extension is.",

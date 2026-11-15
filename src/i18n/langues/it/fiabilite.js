@@ -12,7 +12,7 @@ export default {
   "fiab.ctl.l.comptes-48h": {"one": "{n} account non letto da 48 h", "other": "{n} account non letti da 48 h"},
   "fiab.ctl.l.emails-quarantaine": {"one": "{n} e-mail senza venditore", "other": "{n} e-mail senza venditore"},
   "fiab.ctl.l.stripe": {"one": "{n} abbonamento Stripe incoerente", "other": "{n} abbonamenti Stripe incoerenti"},
-  "fiab.ctl.d.numeros-double": "Due paia con lo stesso N°: scrivi un altro N° su una delle scatole.",
+  "fiab.ctl.d.numeros-double": "Due articoli con lo stesso N°: scrivi un altro N° su una delle scatole.",
   "fiab.ctl.d.vente-sans-numero": "Dagli il suo N° per ritrovare la scatola.",
   "fiab.ctl.d.pool-retreci": "Non è stato cambiato nulla. Ricarica l’app sul dispositivo dove numeri.",
   "fiab.ctl.d.enligne-24h": "Apri Vinted su questo account, nel browser dove c’è l’estensione VRM.",

@@ -108,10 +108,27 @@ lot du 11 nov.) est encore une carte — à replier dans la ligne si Julien le v
   règle (1 personne / 2 personnes + propriétaire : rien ; la 3ᵉ : une notification ; ouverture
   bloquée : une ; la veille du matin dit le type à dire en attente). Reste 1 rouge AVANT ce lot :
   « Réglages pose le sien » (Reglages.jsx non touché ici).
-- Banc `scripts/bancs/fiabilite-auto.cjs` (390 tactile / 1512, clair / sombre) : voir le rapport
-  de la session pour les captures.
+- `node scripts/audit-fiabilite-auto.cjs` : 74 verts après l'ajout de la ligne de fraîcheur
+  (D16-D17) ; `--prouve` 15/15 à la mesure faite (la 16ᵉ mutation, « l'extension d'ici dite deux
+  fois », ajoutée ensuite).
+- Banc `scripts/bancs/fiabilite-auto.cjs` (390 tactile / 1512, clair / sombre, 8 parcours) :
+  **114 verts**. Captures regardées : feuille santé à 1512 en deux colonnes coupait le nom
+  (« secon… ») ⇒ une colonne ; le parcours de premier lancement (« Tu vends quoi ? ») couvrait
+  l'écran du banc ⇒ posé comme fait dans le banc.
+- Banc `veille` : scénarios B et F réécrits (le contrôle et « à dater » ne sont plus dans Ma
+  journée). ⚠️ Lui et le banc `tout-va-bien` tombent aujourd'hui sur le même parcours de premier
+  lancement qui couvre l'écran (clic bloqué 30 s) — défaut de ces bancs, d'avant ce lot (le
+  parcours n'est pas de ce lot) ; à corriger en posant `vrm_je_vends` / `vrm_configuration` /
+  `vrm_parcours_plus_tard` comme dans `fiabilite-auto.cjs`.
 - Audits verts : traduction, quoi-de-neuf, fonctions-api (12), tdz, variables, identite, studio,
-  csp, veille (59), alertes-production (37).
+  csp, veille (59), alertes-production (37), notifications, notifs-redaction, cibles-notif,
+  conseils, mesures-terrain, purge-mesures, mois-boucle, garde-ecrans, sante-donnees,
+  veille-plantages, morceau-perime, coherence, icones, retours-suivi, versement-sources (la
+  vérification « Ma journée dit la phrase des ventes à dater » inversée : décision de Julien).
+- Rouges d'AVANT ce lot (fichiers non touchés) : fraicheur-unique (App.jsx monte la ligne deux
+  fois), safari (lookbehind existants), stockage-sur, vocabulaire-article (App.jsx, extension),
+  secrets (src/exempleDonnees.js), textes-courts (Ebay.jsx), aide-signalement « Réglages pose
+  le sien ».
 
 ## Gestes de Julien
 
