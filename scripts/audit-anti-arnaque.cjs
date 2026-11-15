@@ -204,11 +204,22 @@ async function verifier(F, { silence = false } = {}) {
       const rouges = r.P.filter((p) => p.attendu === m.id && !p.ok).length;
       dit(rouges > 0, `--prouve · ${m.id} désactivé ⇒ ${rouges} vrai(s) positif(s) rouge(s)`);
     }
+    // (15 nov.) Mutation « français seulement » : les motifs des quatre autres langues retirés ⇒ leurs vrais positifs rougissent.
+    const fr = code.replace('const ENVOIE_DABORD_AILLEURS = UNE(', 'const ENVOIE_DABORD_AILLEURS = () => false; const _e = UNE(')
+      .replace('const TRANSPORTEUR_AILLEURS = UNE(', 'const TRANSPORTEUR_AILLEURS = () => false; const _t = UNE(');
+    if (fr === code) dit(false, '--prouve · français seulement : point de mutation introuvable');
+    else {
+      const f3 = path.join(dir, 'francais.mjs'); fs.writeFileSync(f3, fr);
+      const r3 = await verifier(await import(f3), { silence: true });
+      const rouges3 = r3.P.filter((p) => !p.ok && /^(Ship|Te pago|Ti pago|Ich zahle|My courier|Il mio corriere)/.test(p.t)).length;
+      dit(rouges3 >= 6, `--prouve · motifs étrangers retirés ⇒ ${rouges3} vrai(s) positif(s) en en/es/it/de rouge(s)`);
+    }
     // Mutation « qui a écrit » : lire aussi SES messages ⇒ M doit rougir.
     const mute2 = code.replace("if (!m || m.deMoi !== false) continue;", 'if (!m) continue;');
     const f2 = path.join(dir, 'auteur.mjs'); fs.writeFileSync(f2, mute2);
     const H = await import(f2);
     dit(H.alerteArnaque([{ t: 'Ajoute-moi sur WhatsApp', deMoi: true }]) !== null, '--prouve · lire SES messages ⇒ le contrôle M rougirait');
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}   // (15 nov.) les copies mutées ne restent pas sur le disque
   }
   console.log(ko ? `\n${ko} contrôle(s) rouge(s)` : '\nTout est vert.');
   process.exit(ko ? 1 : 0);
