@@ -4067,8 +4067,11 @@ function NumeroEcritSetting({ onAnnonces }) {
     const n = { ...r, actif: !r.actif, depuis: new Date().toISOString() };
     setR(n); save(CLE_NUMERO_ECRIT, n);
     try { window.dispatchEvent(new Event('vrm-numero-ecrit')); } catch (_) {}
-    toast(n.actif ? 'C’est noté : VRM ne donne plus de numéro tout seul, il lit le tien.' : 'VRM redonne un numéro aux annonces qui n’en ont pas.');
+    toast(n.actif ? tr('nn.reglage.toast.moi') : tr('nn.reglage.toast.vrm'));
   };
+  // (15 nov., src/numerosNouvelles.js) « QUI NUMÉROTE ? VRM · MOI » : le même réglage synchronisé
+  // (`vrm_numero_ecrit`), en deux choix ; toucher le choix déjà pris ne change rien.
+  const choisir = (moi) => { if (moi !== !!r.actif) basculer(); };
   // (9 nov.) « Où est ton numéro ? » : plusieurs cochables, jamais zéro (`basculerOu`).
   const cocher = (cle) => {
     touche.current = true;
@@ -4171,19 +4174,16 @@ function NumeroEcritSetting({ onAnnonces }) {
   };
   const zv = resumeApercu(vinted);
   return (
-    <section data-numero-ecrit={r.actif ? 'actif' : 'eteint'} aria-label="Je numérote moi-même dans mes annonces" style={{marginBottom:16,paddingBottom:14,borderBottom:`1px solid ${C.border}`}}>
-      <div style={{display:'flex',alignItems:'center',gap:12}}>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontSize:15,fontWeight:700,color:C.text}}>Je numérote moi-même dans mes annonces</div>
-          <div style={{fontSize:13,color:C.muted,marginTop:3,lineHeight:1.5}}>{r.actif ? 'VRM lit ton numéro dans l’annonce. Il n’en donne plus tout seul.' : 'Éteint : VRM donne un numéro aux annonces qui n’en ont pas.'}</div>
-        </div>
-        <button type="button" role="switch" aria-checked={r.actif} aria-label="Je numérote moi-même dans mes annonces" data-numero-ecrit-bascule={r.actif ? 'on' : 'off'} onClick={basculer}
-          style={{flexShrink:0,width:51,minHeight:44,padding:0,border:'none',background:'transparent',cursor:'pointer',display:'flex',alignItems:'center'}}>
-          <span aria-hidden="true" style={{position:'relative',display:'block',width:51,height:31,borderRadius:999,background:r.actif?C.accent:C.border,transition:'background .2s'}}>
-            <span style={{position:'absolute',top:2,left:r.actif?22:2,width:27,height:27,borderRadius:999,background:'#fff',boxShadow:'0 1px 3px rgba(0,0,0,.25)',transition:'left .2s'}}/>
-          </span>
-        </button>
+    <section data-numero-ecrit={r.actif ? 'actif' : 'eteint'} aria-label={tr('nn.reglage.titre')} style={{marginBottom:16,paddingBottom:14,borderBottom:`1px solid ${C.border}`}}>
+      {/* (15 nov.) « Qui numérote ? » en deux choix, et ce que fait celui qui est pris (une phrase). */}
+      <div style={{fontSize:15,fontWeight:700,color:C.text}} id="vrm-qui-numerote-t">{tr('nn.reglage.titre')}</div>
+      <div role="radiogroup" aria-labelledby="vrm-qui-numerote-t" data-qui-numerote={r.actif ? 'moi' : 'vrm'} data-numero-ecrit-bascule={r.actif ? 'on' : 'off'} style={{display:'flex',gap:8,marginTop:8}}>
+        {[['vrm', false], ['moi', true]].map(([cle, moi]) => (
+          <button key={cle} type="button" role="radio" aria-checked={!!r.actif === moi} className={'sb-touche' + (!!r.actif === moi ? ' is-actif' : '')} data-qui-numerote-choix={cle} onClick={() => choisir(moi)}
+            style={{flex:1,minHeight:44,fontWeight:700}}>{tr(`nn.reglage.${cle}`)}</button>
+        ))}
       </div>
+      <div data-qui-numerote-phrase={r.actif ? 'moi' : 'vrm'} style={{fontSize:13,color:C.muted,marginTop:8,lineHeight:1.5}}>{tr(r.actif ? 'nn.reglage.moi.phrase' : 'nn.reglage.vrm.phrase')}</div>
       {r.actif && <fieldset data-numero-ou={r.ou.join(',')} style={{border:'none',margin:'12px 0 0',padding:0}}>
         <legend style={{fontSize:13,fontWeight:700,color:C.text,padding:0,marginBottom:4}}>Où est ton numéro ?</legend>
         {OU_NUMERO.map((k) => (

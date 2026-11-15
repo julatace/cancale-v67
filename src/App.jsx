@@ -975,7 +975,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.378.0';
+const EXT_ATTENDUE = '5.379.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -1402,7 +1402,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
+const EXT_CAPACITES = { numerotes: '5.379.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -3711,6 +3711,8 @@ function AskTextSheet({ q, close }) {
   const { titre, corps } = sheetTexte(q, 'Saisir');
   return (
     <SheetShell onClose={garderEtFermer} z={Z_CONFIRMATION} className="vrm-confirmation" aria-label={String(titre)}>
+      {/* (15 nov.) L'article dont on parle (la feuille « Quel N° pour cet article ? ») : sa photo, en tête. */}
+      {q.photo !== undefined ? <div data-ask-photo="" style={{marginBottom:10}}>{q.photo ? <PhotoVinted src={q.photo} alt="" style={{width:64,height:64,borderRadius:12,objectFit:'cover',display:'block'}}/> : <PhotoVide taille={64} rayon={12}/>}</div> : null}
       <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{titre}</div>
       {corps.length > 0 && (
         <div style={{fontSize:13,color:C.muted,marginTop:6,lineHeight:1.55,whiteSpace:'pre-wrap'}}>{corps.join('\n')}</div>
@@ -3834,6 +3836,42 @@ function ConfirmHost() {
         <Bouton variante="primaire" autoFocus onClick={() => close(true)} style={{flex:2}}>
           {q.ok || 'Confirmer'}
         </Bouton>
+      </div>
+    </SheetShell>, document.body
+  );
+}
+
+// (15 nov., src/numerosNouvelles.js) « NOUVEAUX N° À ÉCRIRE SUR TES CARTONS » : la feuille ouverte
+// par Ma journée (mode « VRM numérote »). Une ligne par article (photo, N° gravé, titre) et SON
+// « C'est écrit » ; « Tout est écrit » en bas. L'écriture est celle de l'appelant (`onEcrit(ids)` :
+// la marque `nouveau.ecrit` seule, jamais le N°) ; la ligne écrite sort de la feuille.
+let _nnListener = null;
+const ouvrirNouveauxNumeros = (opts) => { if (_nnListener) _nnListener(opts || null); };
+function NouveauxNumerosHost() {
+  const [q, setQ] = React.useState(null);
+  React.useEffect(() => { _nnListener = setQ; return () => { if (_nnListener === setQ) _nnListener = null; }; }, []);
+  if (!q || !Array.isArray(q.lignes)) return null;
+  const fermer = () => setQ(null);
+  const ecrire = (ids) => { try { q.onEcrit(ids); } catch (_) {} const reste = q.lignes.filter((l) => !ids.includes(l.id)); setQ(reste.length ? { ...q, lignes: reste } : null); };
+  return createPortal(
+    <SheetShell onClose={fermer} z={Z_CONFIRMATION} className="vrm-confirmation" aria-label={tr('nn.feuille.titre')}>
+      <div data-nn-feuille={q.lignes.length}>
+        <div style={{fontSize:17,fontWeight:700,color:C.text,letterSpacing:'-0.02em',lineHeight:1.35}}>{tr('nn.feuille.titre')}</div>
+        <div style={{fontSize:13,color:C.muted,marginTop:6,lineHeight:1.5}}>{tr(`nn.feuille.sous.${q.vend === 'sneakers' ? 'sneakers' : 'autre'}`)}</div>
+        <div style={{marginTop:12,display:'flex',flexDirection:'column',maxHeight:'52vh',overflowY:'auto'}}>
+          {q.lignes.map((l) => (
+            <div key={l.id} data-nn-ligne={l.id} data-nn-num={l.numero} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderTop:`1px solid ${C.border}`}}>
+              {l.photo ? <PhotoVinted src={l.photo} alt="" loading="lazy" style={{width:44,height:44,borderRadius:12,objectFit:'cover',flexShrink:0}}/> : <PhotoVide taille={44} rayon={12}/>}
+              <span style={{flexShrink:0}}><Numero n={l.numero}/></span>
+              <span style={{flex:1,minWidth:0,fontSize:13,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{l.titre || '—'}</span>
+              <button type="button" className="sb-touche" data-nn-ecrit={l.id} onClick={() => ecrire([l.id])} style={{flexShrink:0,minHeight:44}}>{tr('nn.feuille.cestEcrit')}</button>
+            </div>
+          ))}
+        </div>
+        <div style={{display:'flex',gap:9,marginTop:12}}>
+          <Bouton variante="discret" onClick={fermer} style={{flex:1}}>{tr('nn.feuille.fermer')}</Bouton>
+          {q.lignes.length > 1 ? <Bouton variante="primaire" data-nn-tout="" onClick={() => ecrire(q.lignes.map((l) => l.id))} style={{flex:2}}>{tr('nn.feuille.toutEcrit')}</Bouton> : null}
+        </div>
       </div>
     </SheetShell>, document.body
   );
@@ -37889,6 +37927,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // Une paire REPUBLIÉE (`recreeDe`) garde le N° de son carton : rien à proposer.
       if (!f || !String(f.numero || '').trim() || f.auto === false || f.manuelAt || f.reattribue || f.repriseAt || f.recreeDe) return false;
       if (neufsVus[it.id] && neufsVus[it.id] === cleNum(f.numero)) return false;
+      if (f.nouveau && f.nouveau.ecrit) return false;   // (15 nov.) « C'est écrit » dit dans Ma journée (synchronisé)
       const t = Date.parse(f.numberedAt || ''); if (!isFinite(t) || t < lim) return false;
       // Une annonce publiée il y a longtemps, numérotée aujourd'hui (premier
       // passage dans VRM) n'est pas « une mise en ligne » : pas ici.
@@ -40714,6 +40753,49 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // montre ce que VRM lirait AVANT qu'il l'allume.
   const [ecritOnUi, setEcritOnUi] = useState(() => numeroEcritActif());
   useEffect(() => { const f = () => setEcritOnUi(numeroEcritActif()); window.addEventListener('vrm-numero-ecrit', f); const off = onCloudReady(f); return () => { window.removeEventListener('vrm-numero-ecrit', f); if (typeof off === 'function') off(); }; }, []);
+  // ── (15 nov., src/numerosNouvelles.js) LES NOUVELLES ANNONCES SANS N° ─────────
+  // « VRM numérote » : les N° neufs donnés tout seuls (`nouveau`, synchronisé), à écrire sur leurs
+  // cartons jusqu'à « C'est écrit » — Ma journée en tête, la feuille `NouveauxNumerosHost`.
+  // « Je numérote moi-même » : les annonces en ligne (lecture complète) sans N° ni N° écrit, DEMANDÉES
+  // une par une (le champ pré-rempli avec la proposition, SA validation par `poserNumero`).
+  const modeNum = ecritOnUi ? 'moi' : 'vrm';
+  const nouveauxAEcrire = useMemo(() => aEcrireNouveaux(annoncesPresentes, numeros), [annoncesPresentes, numeros]);
+  const numerosADemander = useMemo(() => demandesNumero({ items: listings.items, fiches: numeros, listings, mode: modeNum,
+    numerotable: (it) => annonceNumerotable(it, listingDates), lectureEcrite: lectureEcriteVinted }),
+  [listings, numeros, modeNum, listingDates]);
+  const vendMots = () => (motsVendeur().nom === 'paire' ? 'sneakers' : 'autre');
+  const ecrireNouveaux = (ids) => {
+    const at = new Date().toISOString();
+    const ops = ids.map((id) => { const f = numeros[String(id)] || {}; return { k: 'vinted_annonce_numeros', type: 'champs', id: String(id), apres: { nouveau: { ...(f.nouveau || {}), ecrit: at }, cartonVerifie: at }, avant: { nouveau: f.nouveau, cartonVerifie: f.cartonVerifie } }; });
+    if (!ops.length) return;
+    const n1 = numeros[String(ids[0])] || {};
+    gesteVrm(ids.length === 1 ? tr('nn.geste.ecrit', { numero: String(n1.numero || '') }) : tr('nn.geste.tous', { n: ids.length }), ops, { vinted_annonce_numeros: setNumeros });
+  };
+  const ouvrirAEcrire = () => ouvrirNouveauxNumeros({ vend: vendMots(), lignes: nouveauxAEcrire, onEcrit: ecrireNouveaux });
+  const demanderNumerosManquants = async () => {
+    const liste = numerosADemander.slice(0, 30);
+    const deja = []; let faits = 0;
+    const pris = new Set(takenNums), prisK = new Set(takenCles); ajouterNumerosHorsEcran(pris, prisK);
+    const rappel = (ouNumeroEcrit() || ['description']).includes('description');
+    for (let i = 0; i < liste.length; i++) {
+      const it = liste[i];
+      let prop = propositionNumero({ pris, prisCles: prisK, pref: prefNum, prochainLibre, deja });
+      for (;;) {
+        const desc = [`« ${String(it.title || '—')} »`, tr('nn.demande.proposition', { numero: prop }), rappel ? tr('nn.demande.rappel', { numero: prop }) : ''].filter(Boolean).join('\n');
+        const rep = await askText({ title: tr(`nn.demande.titre.${vendMots()}`, { i: i + 1, n: liste.length }), desc, value: prop, numeric: clavierNum() === 'numeric', data: 'numero-demande', ok: tr('nn.demande.ok'), cancel: tr('nn.demande.plusTard'), photo: it.photo || null });
+        if (rep == null || typeof rep !== 'string' || !rep.trim()) { if (faits) toast(tr('nn.demande.fini', { n: faits }), 'ok'); return; }
+        const k = cleNum(rep);
+        if (deja.some((d) => cleNum(d) === k)) { toast(tr('nn.demande.dejaDonne', { numero: k })); prop = propositionNumero({ pris, prisCles: prisK, pref: prefNum, prochainLibre, deja }); continue; }
+        await poserNumero(it, rep, '');
+        // L'écriture passe par la sauvegarde (500 ms) : on relit l'appareil juste après elle.
+        await new Promise((r) => setTimeout(r, 700));
+        const f = (load('vinted_annonce_numeros', {}) || {})[String(it.id)];
+        if (f && String(f.numero || '').trim()) { deja.push(String(f.numero)); faits++; }
+        break;
+      }
+    }
+    if (faits) toast(tr('nn.demande.fini', { n: faits }), 'ok');
+  };
   const apercuEcrit = useMemo(() => {
     if (!Array.isArray(listings.items)) return null;
     const lignes = listings.items.map((it) => {
@@ -46602,6 +46684,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // en ligne n'est pas à remettre : pas su ⇒ rien). Neutre : aucun argent ne presse.
         { const lj = Array.isArray(listings.items) ? ligneAnnuleesJournee(annulChez) : null;
           if (lj) jobs.push({ id: 'remettre-en-vente', n: lj.n, icon: 'restore', color: C.text, court: lj.court, detail: lj.detail, title: lj.court, photos: lj.photos.length ? lj.photos : null, tab: 'cat_ventes', prio: 2.6, avant: () => demanderVue('annulees') }); }
+        // (15 nov., src/numerosNouvelles.js) LES NOUVELLES ANNONCES SANS N°, en tête. « VRM numérote » :
+        // « 3 nouvelles paires numérotées · N°216, 217, 218 » ⇒ la feuille « à écrire sur tes cartons ».
+        // « Je numérote moi-même » : « 3 articles sans numéro · Donne-leur un N° » ⇒ une feuille par article.
+        if (modeNum === 'vrm' && nouveauxAEcrire.length) {
+          const court = `${tr(`nn.notif.${vendMots()}`, { n: nouveauxAEcrire.length })} · ${listeNumeros(nouveauxAEcrire.map((l) => l.numero))}`;
+          jobs.push({ id: 'numeros-nouveaux', n: nouveauxAEcrire.length, icon: 'pencil', color: C.text, court, detail: tr('nn.job.detail'), title: court, photos: nouveauxAEcrire.map((l) => l.photo), tab: null, prio: 0.3, action: tr('nn.job.action'), avant: ouvrirAEcrire });
+        }
+        if (modeNum === 'moi' && numerosADemander.length) {
+          const court = tr(`nn.demande.court.${vendMots()}`, { n: numerosADemander.length });
+          jobs.push({ id: 'numeros-a-donner', n: numerosADemander.length, icon: 'pencil', color: C.warn, court, detail: tr('nn.demande.detail'), title: court, photos: numerosADemander.map((it) => it.photo || null), tab: null, prio: 0.3, action: tr('nn.demande.action'), avant: () => { demanderNumerosManquants(); } });
+        }
         // (6 nov., vague 2 · point 4) Les annonces numérotées sans achat relié : le nombre, une fois ;
         // « Voir » ouvre Annonces sur « Sans achat relié » (une suggestion par annonce, SON tap relie).
         // (6 nov., prix au numérotage) C'est AUSSI la carte des paires numérotées TOUTES SEULES par
@@ -46950,7 +47043,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </span>
         </>);
         const tacheSimple = (j, i) => { const x = decouper(j); const plein = x.plein ? `${x.court}\n${x.detail ? x.detail + '\n' : ''}${x.plein}` : x.detail ? `${x.court}\n${x.detail}` : x.court; return (
-          <button className={'vrm-day-task' + (j.urgent ? ' is-urgent' : '')} key={(j.id||'j')+i} type="button" title={plein} data-plein={plein.replace(/\n/g, ' — ')} data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-n-relier={j.nRelier!=null?j.nRelier:undefined} data-limite-heure={j.limiteHeure!=null?j.limiteHeure:undefined} data-urssaf-echeance={j.urssaf?j.urssaf.dueIso:undefined} data-urssaf-apayer={j.urssaf?(j.urssaf.apayer==null?'':String(j.urssaf.apayer)):undefined} data-urssaf-partiel={j.urssaf&&j.urssaf.partiel?'1':undefined} {...(j.attrs||{})} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }}>
+          <button className={'vrm-day-task' + (j.urgent ? ' is-urgent' : '')} key={(j.id||'j')+i} type="button" title={plein} data-plein={plein.replace(/\n/g, ' — ')} data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-n-relier={j.nRelier!=null?j.nRelier:undefined} data-limite-heure={j.limiteHeure!=null?j.limiteHeure:undefined} data-urssaf-echeance={j.urssaf?j.urssaf.dueIso:undefined} data-urssaf-apayer={j.urssaf?(j.urssaf.apayer==null?'':String(j.urssaf.apayer)):undefined} data-urssaf-partiel={j.urssaf&&j.urssaf.partiel?'1':undefined} {...(j.attrs||{})} onClick={()=>{ if (j.avant) j.avant(); if (onNav && j.tab) onNav(j.tab); }}>
             {corpsTache(j, x, plein.replace(/\n/g, ' — '))}
             <span className="vrm-day-task-action" style={j.urgent ? {color:j.color} : undefined}><span className="vrm-day-task-action-mot">{j.action || VERBES.voir}</span><span aria-hidden="true">›</span></span>
           </button>
@@ -46976,7 +47069,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const saitSupprLbc = !!(__vmrEtat && __vmrEtat.lbcSupprime === true) && vmrExtPresent();
         const tacheLbc = (j, i) => { const x = decouper(j); const plein = x.detail ? `${x.court}\n${x.detail}` : x.court; return (
           <div className={'vrm-day-task is-groupe' + (j.urgent ? ' is-urgent' : '')} key={(j.id||'j')+i} role="group" data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} title={plein}>
-            <button type="button" className="vrm-day-task-ouvrir" aria-label={plein.replace(/\n/g, ' — ')} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }}>
+            <button type="button" className="vrm-day-task-ouvrir" aria-label={plein.replace(/\n/g, ' — ')} onClick={()=>{ if (j.avant) j.avant(); if (onNav && j.tab) onNav(j.tab); }}>
               {corpsTache(j, x)}
             </button>
             <Bouton variante="secondaire" className="vrm-b-petit vrm-day-task-geste" title={tr('journee.supprimerLeboncoin')} aria-label={tr('journee.supprimerLeboncoin')} data-lbc-supprimer-journee={j.lbcSuppr.map((r) => r.id).join(' ')} disabled={!!lbcSupprEnVol} onClick={() => supprimerLbcJournee(j.lbcSuppr)}>
@@ -47001,7 +47094,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const x = decouper(j); const plein = x.plein ? `${x.court}\n${x.detail ? x.detail + '\n' : ''}${x.plein}` : x.detail ? `${x.court}\n${x.detail}` : x.court;
           return (
           <div className="vrm-day-task is-groupe" key={(j.id||'j')+i} role="group" data-job={j.id||undefined} data-n={j.n!=null?j.n:undefined} data-urssaf-echeance={j.urssaf.dueIso} data-urssaf-apayer={j.urssaf.apayer==null?'':String(j.urssaf.apayer)} data-urssaf-partiel={j.urssaf.partiel?'1':undefined} title={plein}>
-            <button type="button" className="vrm-day-task-ouvrir" aria-label={plein.replace(/\n/g, ' — ')} onClick={()=>{ if (j.avant) j.avant(); if (onNav) onNav(j.tab); }}>
+            <button type="button" className="vrm-day-task-ouvrir" aria-label={plein.replace(/\n/g, ' — ')} onClick={()=>{ if (j.avant) j.avant(); if (onNav && j.tab) onNav(j.tab); }}>
               {corpsTache(j, x)}
             </button>
             {(() => { const lib = j.urssaf.mois && j.urssaf.mois.length > 1 ? `Noter ma déclaration — ${(() => { const [y, m] = j.urssaf.aNoter[0].split('-'); return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('fr-FR', { month: 'long' }); })()}` : 'Noter ma déclaration'; return (
@@ -62489,6 +62582,7 @@ function AppCoeur() {
       {/* Fenêtre de confirmation maison (askConfirm). Sans ce montage, l'app
           retomberait silencieusement sur la boîte grise du navigateur. */}
       <ConfirmHost/>
+      <NouveauxNumerosHost/>
       {/* (11 nov., lot suivi-travail) VRM figé pendant un travail long : détail, barre, pause / arrêt. */}
       <SuiviTravailCoque/>
       <FileReseauExt/>{/* (12 nov., ext. 5.371) gestes en attente de réseau, avec « Annuler » */}
