@@ -1935,3 +1935,9 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 <!-- déplacé tel quel de CLAUDE.md §9 le 15 nov. 2026 -->
 - **14 nov. · Studio bleu clair : Paires (Annonces, Stock, la fiche)** : rangées 64 px sur plan de verre (plaque N° · vignette · titre/méta · prix), la paire touchée MONTE à sa place (prix, acheté, jours, favoris, Baisser · Republier · ⋯ ⇒ la fiche), ordinateur : fiche en plan à droite ; grille au choix ; aucun geste perdu (inventaire). `docs/passation/2026-11-14-studio-paires.md`, banc `studio-paires`.
+
+<!-- déplacé tel quel de CLAUDE.md §9 le 15 nov. 2026 -->
+- **14 nov. · Studio bleu clair, écrans « reste »** : Argent (Bento), Messages, Paramètres, Communauté, E-mails, connexion, accueil, tarifs, feuilles ; 4 formes de bouton, rien retiré (sauf un doublon). `2026-11-14-studio-reste.md`.
+
+<!-- déplacé tel quel de CLAUDE.md §9 le 15 nov. 2026 -->
+- **14 nov. · Studio bleu clair — la fondation** : jetons `--sb-*`, quatre formes de bouton, coque (lumière, barre en verre, pastille enfoncée + diode, disque « + » ⇒ Chercher · Scanner · Publier · Imprimer N), polices Urbanist/Inter embarquées, `src/ui` migré ; `docs/passation/2026-11-14-studio-fondation.md`. Geste : regarder sur iPhone, dire ce qui gêne.
