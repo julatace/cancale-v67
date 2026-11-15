@@ -44688,7 +44688,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // un bordereau qui manque au PDF est NOMMÉ dans la feuille d'après, avec sa raison.
   const [imprEtat, setImprEtat] = useState(null);       // la feuille d'après : { res, sig, voie, etape, manque, corrige, absents, tamponCorrige }
   const [choixPapier, setChoixPapier] = useState(null); // { puis: null | [cles] } — la question du papier
+  const imprAccRef = React.useRef(null);   // la pilule « pendant » de l'impression en cours (accompagner)
   const [imprBusy, setImprBusy] = useState(null);       // null | { fait, total } : le bouton plein reste enfoncé, « Préparation… »
+  React.useEffect(() => { const a = imprAccRef.current; if (a && imprBusy) a.pendant(imprBusy.fait || 0); }, [imprBusy]);   // la pilule suit la lecture des PDF
   const [tamponsPerso, setTamponsPerso] = useState({}); // cle → tampon choisi APRÈS, pour CE bordereau (cette séance)
   const [, setPrepVu] = useState(0);
   const prepsRef = React.useRef(new Map());              // signature → { etat: 'encours'|'pret'|'vide'|'echec', res, promesse }
@@ -44842,6 +44844,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Sur ordinateur, la visionneuse s'ouvre AU TOUCHER (« Préparation… ») : il voit tout de suite que ça part.
     if (!mobile) reserverOngletPdf();
     setImprBusy({ fait: 0, total: choisies.length });
+    // (15 nov., version studio) Les moments du geste (src/accompagnement.js §9) : la pilule « pendant » suit la lecture
+    // des PDF (`imprBusy`, effet plus bas) ; un échec est DIT avec sa raison et « Réessayer » (plus un message qui file) ;
+    // l'« après » est la feuille « Tout est sorti ? » (`data-acc-apres` sur sa phrase). Une question annulée n'est pas un échec.
+    const acc = accompagner('colis.imprimer', { total: choisies.length, arretable: false }).pendant(0);
+    imprAccRef.current = acc;
+    const reessayer = () => attendrePuisOuvrir(sig, choisies, numeros, fabrique, garder);
     (async () => {
       try {
         if (numeros.some(Boolean) && !(await assurerVersionNumerotation())) throw new Error(NUMEROS_PERIMES_IMPRESSION);
@@ -44850,16 +44858,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const e = preparer(sig, fabrique);
         await e.promesse;
         if ((AUTH.user?.id || null) !== proprio) throw new Error(tr('impr.change'));
-        if (e.etat === 'vide') { libererOngletPdf(); toast(e.res && e.res.raisons && Object.values(e.res.raisons).every((r) => r === 'pasLu') ? tr('impr.basePasLue') : tr('impr.vide')); return; }
+        if (e.etat === 'vide') { libererOngletPdf(); const toutPasLu = e.res && e.res.raisons && Object.values(e.res.raisons).every((r) => r === 'pasLu'); if (toutPasLu && prepsRef.current.get(sig) === e) prepsRef.current.delete(sig); acc.echec(toutPasLu ? { acc: 'serveur' } : { message: tr('impr.vide') }, { reessayer: toutPasLu ? reessayer : null }); return; }
         if (e.etat !== 'pret') throw (e.err || new Error('PDF'));
         // Rien n'a bougé pendant l'attente (le N°, l'état, le compte de chaque bordereau) : sinon rien ne s'ouvre.
         const maintenant = new Map(lignesLotTous().map((l) => [l.cle, sigLigneLot(l)]));
         if (choisies.some((l) => maintenant.get(l.cle) !== sigLigneLot(l))) throw new Error(tr('impr.change'));
+        acc.oublier();
         montrerApres(e.res, mobile ? 'bouton' : ouvrirPdfLot(e.res, { geste: false, titre: tr('impr.titrePdf') }), sig, garder);
       } catch (err) {
         libererOngletPdf();
-        if (!estTamponAnnule(err)) toast(err && (err.message === NUM_A_VERIFIER_ANNULE || err.message === NUMEROS_PERIMES_IMPRESSION || err.message === tr('impr.change')) ? err.message : tr('impr.erreur', { raison: String((err && err.message) || err).slice(0, 120) }));
-      } finally { setImprBusy(null); }
+        const annule = estTamponAnnule(err) || (err && err.message === NUM_A_VERIFIER_ANNULE);
+        if (annule) acc.oublier();
+        else if (err && (err.message === NUMEROS_PERIMES_IMPRESSION || err.message === tr('impr.change'))) acc.echec({ message: err.message });
+        else acc.echec(err, { reessayer });
+        if (err && err.message === NUM_A_VERIFIER_ANNULE) toast(err.message);
+      } finally { setImprBusy(null); if (imprAccRef.current === acc) imprAccRef.current = null; }
     })();
   };
   // « Ouvrir le PDF » (téléphone, PDF pas prêt au premier toucher) : CE toucher est le geste.

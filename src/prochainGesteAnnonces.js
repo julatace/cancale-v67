@@ -29,7 +29,7 @@ export function prochainGesteAnnonces({ aVerifier, sansNum, prixConnus, prixTota
     // dit jamais sans rien de connu. 0 prix connu ⇒ le bénéfice est « — » et le manque est NOMMÉ ;
     // k connus ⇒ « au moins », avec la couverture. « Compléter » ouvre la saisie en série.
     const texte = prixConnus === 0
-      ? `Bénéfice — : prix d’achat 0/${prixTotal} connus.`
+      ? `Bénéfice : — (prix d’achat 0/${prixTotal} connus).`   // (15 nov.) « Bénéfice — : » se lisait mal
       : `Bénéfice au moins : prix d’achat ${prixConnus}/${prixTotal} connus.`;
     return { cle: 'prix', n: manque, texte, bouton: 'Compléter' };
   }

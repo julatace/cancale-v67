@@ -67,7 +67,7 @@ export function FeuilleImpression({ Feuille, Bouton, etat, dessiner, occupe = fa
   const phrase = etape === 'manque' ? tr('impr.manque.phrase') : ouvert ? tr(`impr.voie.${voie}`) : tr('impr.voie.bouton');
   return (
     <Feuille onClose={onFermer} maxWidth={620} z={9000} titre={tr('impr.feuille.titre', { n })} data-impr-feuille={etape} data-impr-voie={voie || 'bouton'} data-impr-n={n} data-noswipe="1" className="vrm-impr-feuille">
-      <p className="vrm-impr-phrase" data-impr-phrase="">{phrase}</p>
+      <p className="vrm-impr-phrase" data-impr-phrase="" data-acc-apres={etape === 'manque' ? undefined : 'colis.imprimer'}>{phrase}</p>
       {res.planche ? <p className="vrm-impr-sous" data-planche-resultat={`${res.planche.etiquettes}/${res.planche.feuilles}/${res.planche.echelle}`}>{tr('cp.planche.resultat', { etiquettes: res.planche.etiquettes, feuilles: res.planche.feuilles, echelle: res.planche.echelle })}</p> : null}
       {entiers ? <p className="vrm-impr-sous" data-impr-entiers={entiers}>{tr('impr.entiers', { n: entiers })}</p> : null}
       {absents.length ? <div className="vrm-impr-absents" data-impr-absents={absents.length}>
