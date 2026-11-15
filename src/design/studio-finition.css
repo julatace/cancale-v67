@@ -156,4 +156,20 @@
 .vrm-rpf-lieu { display: block !important; text-align: right !important; background: none !important; box-shadow: none !important; padding: 0 !important; border-radius: 0 !important; white-space: normal !important; }
 .vrm-rpf-lieu-nom { display: block !important; font-weight: 600 !important; }
 .vrm-rpf-lieu-adr { display: block !important; margin-top: 2px !important; font-size: 13px !important; font-weight: 500 !important; color: var(--sb-encre-2, #4A5A6E) !important; overflow-wrap: anywhere !important; }
+
+/* ── 21. VENTES À L'ORDINATEUR (Julien : « améliore le visuel, ça peut être beaucoup mieux ») ─────────────────────
+   · la barre collée du haut (recherche + île des sites) : un VERRE presque plein — les filtres qui passaient dessous
+     se lisaient à travers (« Tous 39 · 23 · 13 » fantômes sous la recherche) ;
+   · « Envoyés » : la légende sous la frise (« En route ») redisait l'état de la méta (« En route · vendue il y a… ») ;
+     elle reste au lecteur d'écran (la frise dit chaque étape) ; sans geste à droite, la frise prend la colonne vide ;
+   · « N colis sans transporteur lu » : le nombre reste, ses raisons dans l'infobulle et au lecteur d'écran ;
+   · « À envoyer » : l'échéance au bout de la rangée, alignée à droite d'une rangée à l'autre (elle flottait au milieu). */
+@media (min-width: 1024px) {
+  :root body .vrm-app-shell .vrm-main > .vrm-barre-haut { background: color-mix(in oklab, var(--sb-haut, #EAF3FB) 94%, transparent) !important; box-shadow: 0 -32px 0 0 var(--sb-haut, #EAF3FB), 0 10px 24px -22px rgb(var(--sb-o, 20 40 70) / .45) !important; }
+  .vrm-colis-grille .vrm-colis-carte.vrm-colis-envoye:not(:has(> .vrm-colis-actions > *)) > .vrm-colis-frise { grid-column: 2 / -1 !important; }
+  .vrm-tache[data-espace="ventes"] .vrm-colis-grille .vrm-colis-carte[data-bord-card]:has(.sb-echeance) { position: relative !important; padding-right: 160px !important; }
+  .vrm-tache[data-espace="ventes"] .vrm-colis-grille .vrm-colis-carte[data-bord-card] .sb-echeance { position: absolute !important; right: 24px !important; top: 50% !important; transform: translateY(-50%) !important; min-width: 0 !important; margin: 0 !important; text-align: right !important; justify-content: flex-end !important; }
+}
+.vrm-colis-envoye > .vrm-colis-frise .vrm-fu-legende { position: absolute !important; width: 1px !important; height: 1px !important; margin: -1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; clip-path: inset(50%) !important; white-space: nowrap !important; }
+.vrm-env-inc-raisons { position: absolute !important; width: 1px !important; height: 1px !important; margin: -1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; clip-path: inset(50%) !important; white-space: nowrap !important; }
 }

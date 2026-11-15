@@ -249,6 +249,27 @@ function mesurerPage({ tactile, zone, surveilles }) {
   for (const k of ['deborde', 'chevauche', 'coupes', 'coupesAutres', 'cibles', 'typo']) out[k] = [...new Set(out[k])];
   return out;
 }
+// G (15 nov., Julien, capture ORDINATEUR de Ventes) : la barre collée du haut a un FOND (rien ne se lit au travers),
+// aucune rangée de colis ne garde une colonne vide de plus de 240 px à droite, chaque photo reste dans sa rangée.
+async function grilleOrdi(pg) {
+  await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); for (const d of [document.scrollingElement, m]) if (d) d.scrollTop = 420; });
+  await pg.waitForTimeout(500);
+  return pg.evaluate(() => {
+    const out = [];
+    const bar = document.querySelector('.vrm-main > .vrm-barre-haut');
+    // l'opacité du fond, quelle que soit l'écriture du navigateur (rgba(…, a), oklab(… / a), color(srgb … / a))
+    if (bar) { const c = getComputedStyle(bar).backgroundColor; let a = '1'; const sl = c.match(/\/\s*([\d.]+%?)\s*\)$/); const rg = c.match(/^rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\)$/); if (sl) a = sl[1]; else if (rg) a = rg[1]; else if (c === 'transparent' || /^rgba\(0, 0, 0, 0\)$/.test(c)) a = '0'; const al = String(a).endsWith('%') ? parseFloat(a) / 100 : parseFloat(a);
+      if (!(al >= 0.9)) out.push(`barre collée : fond ${c} (opacité ${al}) — ce qui défile dessous se lit au travers`); }
+    for (const c of document.querySelectorAll('.vrm-colis-carte[data-bord-card], .vrm-colis-carte.vrm-colis-envoye')) {
+      const r = c.getBoundingClientRect(); if (r.width < 300 || r.bottom < 0 || r.top > innerHeight) continue;
+      let droite = r.left;
+      for (const e of c.querySelectorAll('*')) { const q = e.getBoundingClientRect(); if (q.width < 1 || q.height < 1) continue; const cs = getComputedStyle(e); if (cs.visibility === 'hidden' || cs.clipPath === 'inset(50%)') continue; if ([...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()) || e.matches('img, svg, button, a, i')) droite = Math.max(droite, q.right); }
+      if (r.right - droite > 240) out.push(`rangée ${c.getAttribute('data-tx-colis') || c.getAttribute('data-colis-envoye') || ''} : ${Math.round(r.right - droite)} px vides à droite`);
+      for (const ph of c.querySelectorAll('.vrm-colis-photo')) { const q = ph.getBoundingClientRect(); if (q.left < r.left - 1 || q.right > r.right + 1) out.push(`photo hors de sa rangée (${Math.round(q.left)} < ${Math.round(r.left)})`); }
+    }
+    return [...new Set(out)];
+  });
+}
 // B : mené tout en bas, ce qui est écrit en dernier finit-il AU-DESSUS de la barre du bas ?
 async function sousLaBarre(pg) {
   await pg.evaluate(() => { for (const d of [document.scrollingElement, ...document.querySelectorAll('*')]) if (d && d.scrollHeight > d.clientHeight + 20 && (d === document.scrollingElement || /(auto|scroll)/.test(getComputedStyle(d).overflowY))) d.scrollTop = d.scrollHeight; });
@@ -299,6 +320,7 @@ async function sousLaBarre(pg) {
         dit(!m.typo.length, `${tag} : F espaces insécables avant « : ; ? ! », « € », « N° »`, m.typo.slice(0, 6).join(' · '));
         dit(!m.doubles.length, `${tag} : N un même fait n'est pas écrit deux fois dans une carte ouverte`, m.doubles.join(' · '));
         dit(!m.vignettesVides.length, `${tag} : V aucune vignette vide (la photo par identité, sinon le logo du transporteur)`, m.vignettesVides.slice(0, 4).join(' · '));
+        if (!o.tel && /^ventes(-envoyes)?$/.test(e.nom)) { const g = await grilleOrdi(o.pg); dit(!g.length, `${tag} : G barre collée pleine, rangées sans colonne vide, photos dans leur rangée`, g.slice(0, 6).join(' · ')); }
         if (o.tel && !e.zone && e.nom !== 'journee-retirer') { const sb = await sousLaBarre(o.pg); dit(!sb.length, `${tag} : B rien ne reste caché sous la barre du bas (mené tout en bas)`, sb.join(' · ')); }
         if (m.coupesAutres.length) autres.push(`${tag} : ${m.coupesAutres.length} coupe(s) hors passe — ${m.coupesAutres.slice(0, 4).join(' · ')}`);
       } catch (err) { dit(false, `${tag} : l'écran s'ouvre`, String(err && err.message || err).slice(0, 300)); }

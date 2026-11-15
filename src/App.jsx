@@ -53619,8 +53619,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 if (!inc.length) return null;
                 const et = pdfEtiquettesParTx() || {}, vus = pdfVusParTx() || {};
                 const raisons = compterRaisons(inc.map((x) => { const t = String((x.b && x.b.transaction) || (x.o && x.o.transaction_id) || ''); return raisonInconnu({ bord: x.b || null, pdf: et[t] || null, vu: vus[t] || null }); }));
-                return <p className="vrm-colis-envoyes-inconnus" data-envoyes-inconnus={inc.length} style={{margin:'0 0 8px',fontSize:12,color:C.muted,lineHeight:1.4}}>
-                  {inc.length} colis sans transporteur lu : {raisons.map((r, i) => <React.Fragment key={r.cle}>{i ? ' · ' : ''}<span data-inconnu-raison={r.cle} data-inconnu-n={r.n}>{r.n} {r.texte}</span></React.Fragment>)}.
+                // (15 nov., finition — Julien : « trop d'écritures ») Le NOMBRE reste à l'écran (une couverture, §5) ; les raisons
+                // (« 3 étiquettes qui nomment deux transporteurs ») passent dans l'infobulle et au lecteur d'écran, même texte.
+                const phraseInc = `${inc.length} colis sans transporteur lu : ${raisons.map((r) => `${r.n} ${r.texte}`).join(' · ')}.`;
+                return <p className="vrm-colis-envoyes-inconnus" data-envoyes-inconnus={inc.length} title={phraseInc} style={{margin:'0 0 8px',fontSize:12,color:C.muted,lineHeight:1.4}}>
+                  {inc.length} colis sans transporteur lu<span className="vrm-env-inc-raisons"> : {raisons.map((r, i) => <React.Fragment key={r.cle}>{i ? ' · ' : ''}<span data-inconnu-raison={r.cle} data-inconnu-n={r.n}>{r.n} {r.texte}</span></React.Fragment>)}.</span>
                 </p>;
               })()}
               <div className="vrm-colis-grille" style={{display:'flex',flexDirection:'column',gap:6}}>
