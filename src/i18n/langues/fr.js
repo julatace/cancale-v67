@@ -38,8 +38,10 @@ import ecran_accompagnement from './fr/accompagnement.js';   // (14 nov.) les qu
 import ecran_argentprix from './fr/argentprix.js';   // (14 nov., argent-prix)
 import ecran_rechliste from './fr/rechliste.js';
 import ecran_studio_paires from './fr/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
+import ecran_etageres from './fr/etageres.js';   // (15 nov.) le Stock en étagères
 export default {
   ...ecran_studio_paires,
+  ...ecran_etageres,
   ...ecran_accueilReste,
   ...ecran_refonte_ms,
   ...ecran_studio_journee,
