@@ -152,7 +152,11 @@ const attendrePartie = async (pg, ms) => { const vu = []; for (let t = 0; t < ms
     await pg.waitForTimeout(800);
     const r = await pg.evaluate(() => {
       const lignes = [...document.querySelectorAll('[data-stock-annonce]')].map((e) => ({ k: e.getAttribute('data-stock-annonce'), p: e.getAttribute('data-stock-annonce-plats'), e: e.getAttribute('data-stock-annonce-etat'),
-        sites: [...e.querySelectorAll('[data-site]')].map((x) => x.getAttribute('data-site')).join(','), t: (e.querySelector('.vrm-s2d-txt-t') || {}).textContent || '' }));
+        // (15 nov., rouges-connus) Depuis la refonte du Stock du 14 nov. (« la liste d'abord, dense », 1 000 rangées : le moins
+        // de nœuds possible — src/ecrans/Stock.jsx, docs/passation/2026-11-14-refonte-listes.md) les sites d'une rangée sont
+        // UNE sous-ligne en texte (`data-stock-sites`), plus une pastille par site. La règle : une ligne, chaque site dit.
+        sites: ((e.querySelector('[data-stock-sites]') || { getAttribute: () => null }).getAttribute('data-stock-sites') || [...e.querySelectorAll('[data-site]')].map((x) => x.getAttribute('data-site')).join(',')),
+        sitesTxt: (e.querySelector('[data-stock-sites]') || {}).textContent || '', t: (e.querySelector('.vrm-s2d-txt-t') || {}).textContent || '' }));
       const aPart = Object.fromEntries([...document.querySelectorAll('[data-stock-repli]')].map((d) => [d.getAttribute('data-stock-repli'), [...d.querySelectorAll('[data-stock-a-part]')].map((x) => x.getAttribute('data-stock-a-part')).join(',')]));
       return { n: document.querySelector('[data-stock-actuelles]').getAttribute('data-stock-actuelles'), lignes, aPart,
         large: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth) };
@@ -161,7 +165,7 @@ const attendrePartie = async (pg, ms) => { const vu = []; for (let t = 0; t < ms
     const k12 = r.lignes.filter((l) => l.k === '12');
     const meme = r.lignes.filter((l) => /Nike Dunk Low Panda/.test(l.t));
     dit(r.n === '51', `S ${nom} : 51 paires en ligne (N°12 une fois + 50 au même titre)`, r.n);
-    dit(k12.length === 1 && k12[0].sites === 'vinted,leboncoin,vestiaire', `S ${nom} : N°12 = UNE ligne, une pastille par site (Vinted, Leboncoin, Vestiaire)`, JSON.stringify(k12));
+    dit(k12.length === 1 && k12[0].sites === 'vinted,leboncoin,vestiaire' && /Vinted/.test(k12[0].sitesTxt) && /Leboncoin/.test(k12[0].sitesTxt) && /Vestiaire/.test(k12[0].sitesTxt), `S ${nom} : N°12 = UNE ligne, chaque site dit (Vinted, Leboncoin, Vestiaire)`, JSON.stringify(k12));
     dit(meme.length === 50 && new Set(meme.map((l) => l.k)).size === 50, `S ${nom} : 50 paires au même titre ⇒ 50 lignes, 50 N° (aucune fusion par le titre)`, `${meme.length} lignes, ${new Set(meme.map((l) => l.k)).size} N°`);
     dit(r.lignes.every((l) => l.e === 'enligne') && !r.lignes.some((l) => ['7', '40', '60'].includes(l.k)), `S ${nom} : la liste = en ligne seulement (ni N°7 vieille, ni N°40 masquée, ni N°60 supprimée)`, JSON.stringify(r.lignes.filter((l) => l.e !== 'enligne' || ['7', '40', '60'].includes(l.k))));
     dit(r.aPart.aconfirmer === '7' && r.aPart.masquees === '40', `S ${nom} : à part : N°7 « à confirmer » (lu il y a 90 j), N°40 « masquée »`, JSON.stringify(r.aPart));
