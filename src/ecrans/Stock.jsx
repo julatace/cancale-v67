@@ -779,7 +779,15 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     const piles = colonnesEnPile(m);
     const desc = !apercu && descente && descente.m === String(m.id) ? descente : null;
     const libres = T - filled;
-    const ligneBoard = (r) => <span key={'b' + r} data-planche={casesPl.size && planchesRangees(casesPl, m.cols, m.rows).includes(r) ? r : undefined} aria-hidden="true" className="vrm-m4-pl" style={{ gridColumn: '1 / -1' }} />;
+    // La planche sous une rangée de cartons (la maquette v4), colonne par colonne : dans une colonne EN PILE, pas de
+    // planche entre deux rangées (les cartons sont posés les uns sur les autres) — sauf une planche RÉELLE posée là
+    // (l'éditeur : une barrière que la pile ne traverse pas, `planches`). La planche du bas est toujours là.
+    const rangeesPl = casesPl.size ? planchesRangees(casesPl, m.cols, m.rows) : [];
+    const ligneBoard = (r) => (
+      <span key={'b' + r} data-planche={rangeesPl.includes(r) ? r : undefined} aria-hidden="true" className="vrm-m4-pl" style={{ gridColumn: '1 / -1' }}>
+        <i className="vrm-m4-pl-bord" />
+        {Array.from({ length: m.cols }, (_, c) => { const k = r + ':' + (c + 1); const reelle = casesPl.has(k); return <i key={c} data-planche-case={reelle && !rangeesPl.includes(r) ? k : undefined} className={piles.has(c + 1) && r < m.rows && !reelle ? 'is-pile' : undefined} />; })}
+      </span>);
     return (
       <section key={m.id} data-meuble={apercu ? undefined : m.id} data-meuble-apercu={apercu ? m.id : undefined} data-meuble-type={typeM} data-forme-pile={formePile ? '' : undefined} data-couleur={coulM} data-couleur-meuble={couleurMeuble(m)}
         data-affichage={reg.affichage} data-densite={reg.densite} data-teinte={reg.teinte} data-meuble-ici={cherche ? nIci : undefined} className="vrm-s2d-meuble vrm-etag vrm-m4" data-replie={replie ? '1' : undefined} data-choisi={!apercu && meubleChoisi === String(m.id) ? '' : undefined}>
