@@ -240,10 +240,11 @@ function mesurer() {
   let hors = 0; const horsNoms = [];
   if (main) for (const el of main.querySelectorAll('*')) {
     const r0 = el.getBoundingClientRect(); if (r0.width < 2 || r0.height < 2 || (r0.right <= innerWidth + 2 && r0.left >= -2)) continue;
-    // ce qu'on VOIT de l'élément : son rectangle coupé par chaque ancêtre qui rogne (une rangée en points de suspension)
-    const r = { left: r0.left, right: r0.right };
-    for (let a = el.parentElement; a && a !== main; a = a.parentElement) { const c = getComputedStyle(a); if (/hidden|clip/.test(c.overflowX)) { const q = a.getBoundingClientRect(); r.left = Math.max(r.left, q.left); r.right = Math.min(r.right, q.right); } }
-    if (r.right <= innerWidth + 2 && r.left >= -2) continue;
+    // une rangée de liste qui coupe son texte en points de suspension, c'est la règle des listes (pas un débordement)
+    if (el.closest('li, [role="listitem"], [role="row"], .sb-rangee, [class*="rangee"], [class*="-row"], [class*="ligne"]')) continue;
+    let suspendu = false; for (let a = el; a && a !== main; a = a.parentElement) if (getComputedStyle(a).textOverflow === 'ellipsis') { suspendu = true; break; }
+    if (suspendu) continue;
+    const r = r0;
     let defile = false; for (let a = el.parentElement; a && a !== main; a = a.parentElement) { const c = getComputedStyle(a); if (/auto|scroll/.test(c.overflowX)) { defile = true; break; } }
     if (defile || getComputedStyle(el).visibility === 'hidden' || el.closest('[aria-hidden="true"], .vrm-sr-seul')) continue;
     hors++; if (horsNoms.length < 4) horsNoms.push(`${nom(el)} [${Math.round(r.left)}→${Math.round(r.right)}]`); if (hors > 20) break;
