@@ -297,7 +297,10 @@ export default function FavorisVinted({uid,owner,ownerActuel,base,headers,nomCom
   // Arrivé depuis Ma journée (« Envoyer une offre ») : les favoris arrivés depuis le dernier envoi sont cochés, rien ne part.
   const prepare=React.useRef(false);
   React.useEffect(()=>{if(prepare.current||!data||!uid)return;let v=null;try{v=JSON.parse(sessionStorage.getItem('vrm_favoris_prepare')||'null');}catch{}
-    if(v&&String(v.uid)===String(uid)&&Date.now()-Number(v.at)<600000){prepare.current=true;try{sessionStorage.removeItem('vrm_favoris_prepare');}catch{}setChoisis(liste.lignes.filter(r=>r.parDefaut&&(depuisEnvoi==null||(r.date!=null&&r.date>depuisEnvoi))).map(r=>r.id));}},[data,uid]);
+    if(v&&String(v.uid)===String(uid)&&Date.now()-Number(v.at)<600000){prepare.current=true;try{sessionStorage.removeItem('vrm_favoris_prepare');}catch{}
+      // (15 nov., vendre plus) « Relancer au bon moment » : les favoris de CETTE annonce, pas encore contactés.
+      if(v.item){setChoisis(favorisAContacter(liste.lignes,v.item,id=>ligneParId.get(id)?.identiteNotification||null).ids);return;}
+      setChoisis(liste.lignes.filter(r=>r.parDefaut&&(depuisEnvoi==null||(r.date!=null&&r.date>depuisEnvoi))).map(r=>r.id));}},[data,uid]);
   const offreChoixClair=offreChoix==='fixer'?'prix':offreChoix==='diminuer'?typeDim:'aucune';
   const setOffreChoixClair=v=>{if(v==='aucune')setOffreChoix('aucune');else if(v==='prix')setOffreChoix('fixer');else{setOffreChoix('diminuer');setTypeDim(v);}change();};
   const choisies=choix.annonces.map(k=>annonceDe(k.slice(5)));

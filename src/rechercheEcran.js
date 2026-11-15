@@ -159,10 +159,11 @@ export function motPastille(r) {
     case 'commande': return `Commande ${r.valeur}`;
     case 'montant': return Number.isFinite(r.valeur) ? eur(r.valeur) : '';
     case 'numero': return r.valeur ? `N°${r.valeur}` : '';
+    case 'rangement': return str(r.valeur);   // (15 nov.) le lieu de rangement trouvé (« Étagère B · case 3 »)
     default: return '';
   }
 }
-export const MOTIFS = { pseudo: 'Pseudo correspondant', suivi: 'Numéro de suivi correspondant', code: 'Code de retrait correspondant', transaction: 'Transaction correspondante', facture: 'Numéro de facture correspondant', montant: 'Montant exact', commande: 'Numéro de commande correspondant', numero: 'Numéro VRM correspondant', titre: 'Titre, marque ou taille correspondants', recent: 'Vente récente' };
+export const MOTIFS = { pseudo: 'Pseudo correspondant', suivi: 'Numéro de suivi correspondant', code: 'Code de retrait correspondant', transaction: 'Transaction correspondante', facture: 'Numéro de facture correspondant', montant: 'Montant exact', commande: 'Numéro de commande correspondant', numero: 'Numéro VRM correspondant', titre: 'Titre, marque ou taille correspondants', recent: 'Vente récente', rangement: 'Lieu de rangement correspondant' };
 
 // ── LES RÉCENTS (sur cet appareil) ──────────────────────────────────────────
 export const CLE_RECENTS = 'vrm_recherche_recents';

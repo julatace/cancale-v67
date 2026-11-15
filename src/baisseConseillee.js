@@ -29,7 +29,7 @@
 // scripts/audit-baisse-conseillee.cjs (mutations comprises).
 import { centimes, prixMiniPalier, AGE_MIN_J, ECART_J } from './conseilPrix.js';
 import { delaisPar, tranchePrix } from './statsVentes.js';
-import { modeleSur } from './ceQuiRapporte.js';
+import { modeleSur, eclaterReleveLots } from './ceQuiRapporte.js';
 
 export const SEUIL_COMPARABLES = 5;     // au moins 5 ventes datées pour parler d'un « délai habituel »
 export const RETARD_MIN = 1.5;          // pas en retard avant 1,5 × son délai habituel
@@ -67,6 +67,28 @@ export function indexComparables(ventes) {
     tranche: carte(delaisPar(L, (l) => l.tranche)),
     noms,
   };
+}
+
+// SES ventes datées, depuis le relevé de l'écran Ventes (`vrm_stats_ventes`, une ligne par vente,
+// une par article d'un lot — `eclaterReleveLots`) et la lecture partagée de Statistiques
+// (`lireExtrasRepartition` : transaction → annonce, annonces lues, dates « Ajouté il y a… »).
+// L'annonce d'une vente se trouve par SA transaction (une identité, §5) ; la marque est celle LUE
+// sur cette annonce. Vinted seulement (la date de mise en ligne n'est lue que là).
+// `dateMiseEnLigne(it, dates)` : la règle de l'app (`dateMiseEnLigneMs`).
+export function ventesComparablesDuReleve(releve, extras, dateMiseEnLigne) {
+  if (!releve || !Array.isArray(releve.l) || !extras || !extras.txn || !extras.items) return null;
+  const out = [];
+  for (const r of eclaterReleveLots(releve.l)) {
+    if (!Array.isArray(r) || r[0] !== 'Vinted') continue;
+    const ts = Number(r[3]); if (!Number.isFinite(ts)) continue;
+    const itemLot = typeof r[10] === 'string' && r[10] ? r[10] : null;
+    const t = r[2] ? extras.txn[String(r[2])] : null;
+    const it = itemLot ? extras.items[itemLot] || null : (t && t.item ? extras.items[t.item] || null : null);
+    if (!it) continue;
+    const en = typeof dateMiseEnLigne === 'function' ? dateMiseEnLigne(it, extras.dates || null) : null;
+    out.push({ ts, enLigne: en, marque: it.brand || '', titre: String(r[7] || it.title || ''), eur: Number(r[4]) });
+  }
+  return out;
 }
 
 // Le groupe le plus PROCHE qui a assez de ventes datées : modèle, puis marque, puis

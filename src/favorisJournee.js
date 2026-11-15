@@ -45,10 +45,14 @@ export function useNouveauxFavoris({ uid, owner, ownerActuel, base, headers, act
     const t = setInterval(lire, 30 * 60000);
     return () => { mort = true; clearInterval(t); };
   }, [uid, owner, actif]);
-  return React.useMemo(() => (res === undefined ? undefined : res === null ? null : nouveauxFavoris(res, { vendus: vendus || new Set() })), [res, vendus]);
+  // (15 nov., vendre plus) + `lignes` : les favoris lus eux-mêmes (datés), pour « Relancer au bon moment »
+  // (src/relanceFavoris.js) — la MÊME lecture, aucune requête de plus.
+  return React.useMemo(() => (res === undefined ? undefined : res === null ? null : { ...nouveauxFavoris(res, { vendus: vendus || new Set() }), lignes: res }), [res, vendus]);
 }
 
 // Le geste de la carte : marquer l'envoi « préparé » (lu par FavorisVinted, 10 min).
-export function preparerEnvoiFavoris(uid, stockage = (typeof sessionStorage !== 'undefined' ? sessionStorage : null)) {
-  try { stockage && stockage.setItem(CLE_PREPARE, JSON.stringify({ uid: String(uid), at: Date.now() })); } catch (_) {}
+// (15 nov., vendre plus) `item` : l'annonce de « Relancer au bon moment » — Messages → Favoris coche
+// alors les favoris de CETTE annonce pas encore contactés (`favorisAContacter`), rien de plus.
+export function preparerEnvoiFavoris(uid, stockage = (typeof sessionStorage !== 'undefined' ? sessionStorage : null), item = null) {
+  try { stockage && stockage.setItem(CLE_PREPARE, JSON.stringify({ uid: String(uid), at: Date.now(), ...(item && /^\d{1,20}$/.test(String(item)) ? { item: String(item) } : {}) })); } catch (_) {}
 }
