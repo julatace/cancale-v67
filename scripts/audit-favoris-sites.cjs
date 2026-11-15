@@ -56,9 +56,18 @@ if (process.argv.includes('--prouve')) {
     ['fondDeuxFois', 'src', "    const personnes = Object.keys(aimes[produit] || {}).filter((k) => k !== compte && !faits[produit + '|' + k]);", "    const personnes = Object.keys(aimes[produit] || {}).filter((k) => k !== compte);"],
     ['fondPrixHaut', 'src', "!(prix >= 100) || !(prix < avant) || avant > 1e8) return { accepte: false, code: 'invalide', raison: 'article ou montant invalide (l’offre doit être sous ton prix", "!(prix >= 100) || avant > 1e8) return { accepte: false, code: 'invalide', raison: 'article ou montant invalide (l’offre doit être sous ton prix"],
     ['fondPrixAvant', 'src', "    if (lu !== avant) return { accepte: false, code: 'prix-change', prixVu: lu / 100, raison: `le prix lu n'est plus celui de l'aperçu (${(lu / 100).toFixed(2).replace('.', ',')} €) — rien n'est parti` };\n    const compte = String(it.compte || '');\n    if (!compte) return { accepte: false, code: 'session', raison: \"je ne sais pas à quel compte Vestiaire appartient cet article", "    const compte = String(it.compte || '');\n    if (!compte) return { accepte: false, code: 'session', raison: \"je ne sais pas à quel compte Vestiaire appartient cet article"],
-    ['fondSansEcart', 'src', "          if (i > 0) await attendreVc(ecartAimesVc());\n", ''],
-    ['fondPlafond', 'src', "          const cpt = await compterAction('vc:' + ot.compte, ACTIONS_MAX_HEURE - RESERVE_GESTES);\n          if (!cpt.ok) { suivi.fin = 'arret';", "          const cpt = { ok: true, at: Date.now() };\n          if (!cpt.ok) { suivi.fin = 'arret';"],
-    ['fondPause429', 'src', "          if (statut === 429 || statut === 403) { await poserPauseVc(statut, rep.ra); await noter('refusee'); suivi.fin = 'arret'; suivi.raison = `Vestiaire a refusé (${statut}) — pause de 30 min`; break; }", "          if (statut === 429 || statut === 403) { await noter('refusee'); continue; }"],
+    ['fondSansEcart', 'src', "      const att = await tenirAttenteAimeVc(compte, f.prochain);", "      const att = { ok: true };"],
+    ['delaiFixe', 'src', "      const s = await tirerSansRepeter(VC_AIMES_ECART_DERNIER, VC_AIMES_ECART_S[0], VC_AIMES_ECART_S[1]);", '      const s = 12;'],
+    ['memeValeurDeuxFois', 'src', "  if (s === der) s = a + ((s - a + 1 + Math.floor(Math.random() * (b - a))) % (b - a + 1));\n", ''],
+    ['fondPlafond', 'src', "      const cpt = await compterAction('vc:' + ot.compte, ACTIONS_MAX_HEURE - RESERVE_GESTES);\n      if (!cpt.ok) {", "      const cpt = { ok: true, at: Date.now() };\n      if (!cpt.ok) {"],
+    ['plafondFavorisIgnore', 'src', "      const p = await porteDiscretion('vc:' + ot.compte, 'favori');\n      if (p) { await finir('arret', p.error); break; }", "      const p = null;\n      if (p) { await finir('arret', p.error); break; }"],
+    ['porteAuToucherIgnoree', 'src', "    { const p = await porteDiscretion('vc:' + ot.compte, 'favori'); if (p) return", "    { const p = null; if (p) return"],
+    ['ouvertureIgnoree', 'src', "  if (/^\\d{1,20}$/.test(String(id))) { try { await noterOuvertureVinted('vc:' + String(id)); } catch (_) {} }", ''],
+    ['autreCompteIgnore', 'src', "      const ot = await ongletVestiaire(compte);\n      if (!ot.ok) { await finir('arret', ot.raison); break; }\n      // Les MÊMES portes", "      const ot = await ongletVestiaire(null);\n      if (!ot.ok) { await finir('arret', ot.raison); break; }\n      // Les MÊMES portes"],
+    ['attenteSansVerif', 'src', "    const non = await arretAvantOffreAimeVc(compte);\n    if (non) return { ok: false, raison: non };", "    const non = '';\n    if (non) return { ok: false, raison: non };"],
+    ['repriseAbsente', 'src', "lance('vcaimes', () => reprendreOffresAimesVc());", ''],
+    ['fondPause429', 'src', "      if (statut === 429 || statut === 403) { await poserPauseVc(statut, rep.ra); await noter('refusee'); await finir('arret', `Vestiaire a refusé (${statut}) — pause de 30 min`); break; }", "      if (statut === 429 || statut === 403) { await noter('refusee'); continue; }"],
+    ['journalAbsent', 'src', "f.suivi.faites++; n++; await noterJournal('vc:' + ot.compte, 'favori', {}); }", "f.suivi.faites++; n++; }"],
     ['fondParToucher', 'src', "    const lot = personnes.slice(0, VC_AIMES_PAR_TOUCHER);", '    const lot = personnes;'],
     ['regleMontant', 'regle', "  if (!(c >= 100) || !(Number.isInteger(prixCents) && c < prixCents)) return null;", '  if (!(c >= 100)) return null;'],
     ['regleNonLu', 'regle', "    if (!it) continue;                                   // pas lu dans « Mes articles » : rien proposé\n", "    if (!it) { lignes.push({ produit: String(x.produit), n, prevenues: 0, aPrevenir: n, dernier: '', titre: '', photo: '', prixCents: null, compte: '', numero: '' }); continue; }\n"],
@@ -193,10 +202,17 @@ function systeme() {
   let fond = null;
   const ch = chrome2((m) => { if (fond) fond.envoyer(m, { tab: { id: 41, url: ORIGINE + '/chat/' }, frameId: 0 }); });
   fond = faireFond({ src: F.src, onglets: [{ id: 41, url: ORIGINE + '/chat/', active: true, status: 'complete' }] });
-  const ordres = [], delais = [];
+  const ordres = [];
+  // Une horloge VIRTUELLE dans le fond : chaque attente demandée (écart entre deux offres, espacement de la
+  // sécurité des comptes…) avance l'heure de l'extension d'autant, sans faire attendre l'audit.
+  let decal = 0; const RD = Date;
+  class Dv extends RD { constructor(...a) { if (a.length) super(...a); else super(RD.now() + decal); } static now() { return RD.now() + decal; } }
+  fond.ctx.Date = Dv;
   const st = fond.ctx.setTimeout;
-  // L'écart ENTRE deux offres (`attendreVc`, reconnu à sa pile d'appel) — pas les autres attentes de l'extension.
-  fond.ctx.setTimeout = (f, ms) => { if (ms >= 1000 && ms < 60000 && /attendreVc/.test(String(new Error().stack))) delais.push(ms); return st(f, ms); };
+  fond.ctx.setTimeout = (f, ms) => { if (Number(ms) > 0) decal += Number(ms); return st(f, ms); };
+  // Les écarts TIRÉS entre deux offres (`vcaimes:ecart`, la même trace que les attentes des favoris Vinted).
+  fond.ctx.__vrmPausesVues = [];
+  const delais = { get vus() { return fond.ctx.__vrmPausesVues.filter((x) => x[0] === 'vcaimes:ecart').map((x) => x[1]); } };
   fond.ctx.chrome.tabs.sendMessage = (id, m, o, cb) => {
     if (m && m.__vmrEvt) { fond.j.evts.push(m.evt); if (typeof cb === 'function') cb(); return Promise.resolve(); }
     ordres.push({ id, m: copie(m) });
@@ -205,11 +221,14 @@ function systeme() {
   const cmd = (msg) => fond.envoyer(Object.assign({ from: 'vmr-bridge', action: 'cmd' }, msg), { origin: 'https://vrm.center', url: 'https://vrm.center/' });
   return { ch, fond, ordres, cmd, delais };
 }
-const pret = async (S, { personnes = [P1, P2, P3], prix = 24900 } = {}) => {
+const pret = async (S, { personnes = [P1, P2, P3], prix = 24900, ouvert = true } = {}) => {
   await S.ch.appel('GET', `${API}/users/me${Q}`, { data: { id: MOI, type: 'user' } }); await attendre(30);
   await S.ch.appel('GET', URL_LISTE, liste([prix])); await attendre(60);
   await S.ch.appel('GET', URL_NOTIFS, { data: personnes.map((p) => carteAime(p, ART)), meta: { count: personnes.length } }); await attendre(60);
+  if (ouvert) vieillirOuverture(S);
 };
+// vestiairecollective.com ouvert il y a 10 min (l'attente de 2 à 6 min après l'ouverture est passée).
+const vieillirOuverture = (S) => { const o = S.fond.store.vrmOuverture && S.fond.store.vrmOuverture['vc:' + MOI]; if (o) { o.depuis = Date.now() - 10 * 60000; o.vu = Date.now(); } };
 const apprendre = (S, rec = capt.rec) => S.fond.envoyer({ from: 'cancale-vc', action: 'vcOffreAppris', recette: rec }, { tab: { id: 41, url: ORIGINE + '/chat/' } });
 // Vestiaire répond à une offre par la négociation de CETTE personne (sa forme mesurée).
 const repondre = (S, statut = 200, toutes = null) => { let n = 0; S.ch.routes[`POST ${URL_NEGO}`] = (init) => { n++; const b = JSON.parse(init.body || '{}'); const s = typeof statut === 'function' ? statut(n) : statut; return s >= 200 && s < 300 ? { status: s, body: nego('91' + String(n).padStart(7, '0'), String(b.buyerId), [ev('offer', 'seller', b.price && b.price.cents)]) } : { status: s, body: { message: 'non' } }; }; };
@@ -248,8 +267,14 @@ async function a2a6() {
   dit(posts(S).every((a) => a.h['x-vc-auth'] === SECRET), 'A5 · les en-têtes repris DANS la page (le fond n’en connaît aucune valeur)');
   dit(!!e5 && e5.fin === 'fini' && e5.faites === 3 && e5.incertaines === 0, 'A5 · « 3 sur 3 » seulement parce que Vestiaire a renvoyé chaque offre', JSON.stringify(e5));
   // Les écarts tirés au hasard (jamais ronds, à la différence des délais fixes de l'extension : 8 000, 12 000…).
-  const ecarts = S.delais.filter((ms) => ms >= 8000 && ms < 20000);
-  dit(S.delais.length === 2 && ecarts.length === 2 && new Set(ecarts).size === 2, 'A5 · 8 à 20 s au hasard entre deux offres (jamais deux fois le même écart)', JSON.stringify(S.delais));
+  const ecarts = S.delais.vus;
+  dit(ecarts.length === 3 && ecarts.every((ms) => ms >= 8000 && ms <= 20000 && ms % 1000 === 0) && ecarts.every((ms, i) => i === 0 || ms !== ecarts[i - 1]), 'A5 · après chaque offre, 8 à 20 s tirées au hasard, jamais deux fois de suite la même valeur (le tirage des favoris Vinted)', JSON.stringify(ecarts));
+  dit(S.fond.store.vrmVcAimesEcartDernier && ecarts[ecarts.length - 1] === S.fond.store.vrmVcAimesEcartDernier.s * 1000, 'A5 · la dernière valeur est gardée dans le stockage de l’extension (un worker neuf ne la répète pas)', JSON.stringify(S.fond.store.vrmVcAimesEcartDernier));
+  const serieV = [];
+  for (let i = 0; i < 300; i++) serieV.push(await S.fond.ctx.tirerSansRepeter('banc', 8, 20));
+  dit(serieV.every((x, i) => i === 0 || x !== serieV[i - 1]) && new Set(serieV).size >= 10, 'A5 · 300 tirages : jamais deux fois de suite la même valeur, et bien répartis', JSON.stringify(serieV.slice(0, 12)));
+  const jr = (((S.fond.store.vrmJournal || {})) && JSON.stringify(S.fond.store)) || '';
+  dit(/"s":"favori"/.test(jr), 'A5 · chaque offre faite va au journal « Ce que VRM a fait » (sorte « favori »)', jr.slice(0, 200));
   dit(((S.fond.store.vrmActions || {})['vc:' + MOI] || []).length === 3, 'A5 · trois actions comptées sous le compte Vestiaire', JSON.stringify(S.fond.store.vrmActions));
   const n5 = posts(S).length;
   const r52 = await S.cmd({ cmd: 'vcOffreAimes', produit: ART, avantCents: 24900, prixCents: 22000 });
@@ -291,6 +316,58 @@ async function a2a6() {
   await B.cmd({ cmd: 'vcOffreAimes', produit: ART, avantCents: 24900, prixCents: 23700 });
   const eB = await finEnvoi(B);
   dit(posts(B).length === 0 && eB && eB.fin === 'arret' && eB.faites === 0, 'A6 · la page montre un autre compte que celui attendu : la PAGE n’envoie rien, la série s’arrête', JSON.stringify({ n: posts(B).length, eB }));
+  // A8 — LES MÊMES PORTES QUE LES FAVORIS VINTED.
+  // Ouverture : vestiairecollective.com vient d'être ouvert ⇒ 2 à 6 min avant d'agir seul.
+  const O = systeme(); await pret(O, { ouvert: false }); await apprendre(O); repondre(O);
+  const ouvO = O.fond.store.vrmOuverture && O.fond.store.vrmOuverture['vc:' + MOI];
+  dit(!!ouvO && ouvO.attente >= 2 * 60000 && ouvO.attente <= 6 * 60000, 'A8 · l’ouverture de vestiairecollective.com est notée (attente tirée entre 2 et 6 min)', JSON.stringify(ouvO));
+  if (ouvO) { ouvO.depuis = O.fond.ctx.Date.now(); ouvO.vu = ouvO.depuis; }   // ouvert à l'instant
+  const o1 = await O.cmd({ cmd: 'vcOffreAimes', produit: ART, avantCents: 24900, prixCents: 23700 });
+  dit(o1 && o1.accepte === false && o1.code === 'discretion' && /Vestiaire vient d’être ouvert/.test(o1.raison) && posts(O).length === 0, 'A8 · le site vient d’être ouvert : VRM attend (2 à 6 min, comme vinted.fr), rien ne part', JSON.stringify(o1));
+  // 15/h messages aux favoris (le réglage commun) : la 16e ne part pas.
+  const H = systeme(); await pret(H); await apprendre(H); repondre(H);
+  H.fond.store.vrmSortes = { ['vc:' + MOI]: { favori: Array.from({ length: 15 }, () => Date.now() - 60000), at: Date.now() } };
+  const h1 = await H.cmd({ cmd: 'vcOffreAimes', produit: ART, avantCents: 24900, prixCents: 23700 });
+  dit(h1 && h1.accepte === false && /15 messages aux favoris cette heure/.test(h1.raison || '') && posts(H).length === 0, 'A8 · 15 favoris cette heure : refus (le plafond des favoris Vinted), rien ne part', JSON.stringify(h1));
+  const H2 = systeme(); await pret(H2); await apprendre(H2); repondre(H2);
+  H2.fond.store.vrmSortes = { ['vc:' + MOI]: { favori: Array.from({ length: 14 }, () => Date.now() - 60000), at: Date.now() } };
+  await H2.cmd({ cmd: 'vcOffreAimes', produit: ART, avantCents: 24900, prixCents: 23700 });
+  const eH2 = await finEnvoi(H2);
+  dit(posts(H2).length === 1 && eH2 && eH2.fin === 'arret' && /15 messages aux favoris/.test(eH2.raison), 'A8 · 14 déjà cette heure : UNE offre part, puis la série s’arrête au 15e (dit)', JSON.stringify({ n: posts(H2).length, eH2 }));
+  // « Tout arrêter » : rien ne part.
+  const T2 = systeme(); await pret(T2); await apprendre(T2); repondre(T2);
+  T2.fond.store.vrmToutArrete = { on: true, at: Date.now() };
+  const t21 = await T2.cmd({ cmd: 'vcOffreAimes', produit: ART, avantCents: 24900, prixCents: 23700 });
+  dit(t21 && t21.accepte === false && t21.code === 'tout-arrete' && posts(T2).length === 0, 'A8 · « Tout arrêter » : rien ne part', JSON.stringify(t21));
+  // Un autre compte Vestiaire vient d'agir dans ce navigateur ⇒ un compte à la fois (et Vinted ne retient pas Vestiaire).
+  const U = systeme(); await pret(U); await apprendre(U); repondre(U);
+  U.fond.store.vrmVerrouCompteVc = { uid: 'vc:99990000', jusqua: Date.now() + 5 * 60000, at: Date.now() };
+  U.fond.store.vrmVerrouCompte = { uid: '123456', jusqua: Date.now() + 5 * 60000, at: Date.now() };
+  const u1 = await U.cmd({ cmd: 'vcOffreAimes', produit: ART, avantCents: 24900, prixCents: 23700 });
+  dit(u1 && u1.accepte === false && /Un autre compte vient d’agir/.test(u1.raison || '') && posts(U).length === 0, 'A8 · un autre compte Vestiaire vient d’agir : un compte à la fois, rien ne part', JSON.stringify(u1));
+  const U2 = systeme(); await pret(U2); await apprendre(U2); repondre(U2);
+  U2.fond.store.vrmVerrouCompte = { uid: '123456', jusqua: Date.now() + 5 * 60000, at: Date.now() };
+  await U2.cmd({ cmd: 'vcOffreAimes', produit: ART, avantCents: 24900, prixCents: 23700 });
+  await finEnvoi(U2);
+  dit(posts(U2).length === 3, 'A8 · … un compte VINTED qui vient d’agir ne retient pas Vestiaire (site par site)', String(posts(U2).length));
+  // L'onglet passe sur un autre compte PENDANT la série : la suite ne part pas, c'est dit.
+  const W = systeme(); await pret(W); await apprendre(W);
+  // Dès la 1re offre partie, la page ET l'onglet passent sur le compte 77778888 (avant la 2e).
+  repondre(W, (n) => { if (n === 1) { W.ch.appel('GET', `${API}/users/me${Q}`, { data: { id: '77778888', type: 'user' } }); W.fond.ctx.noterSessionVc('77778888', 41, []); } return 200; });
+  await W.cmd({ cmd: 'vcOffreAimes', produit: ART, avantCents: 24900, prixCents: 23700 });
+  const eW = await finEnvoi(W);
+  dit(posts(W).length === 1 && eW && eW.fin === 'arret' && /autre compte/.test(eW.raison), 'A8 · l’onglet passe sur un AUTRE compte pendant la série : la suite ne part pas, dit', JSON.stringify({ n: posts(W).length, eW }));
+  // Un worker NEUF reprend la file (§4.9) ; trop tard ⇒ rien ne part.
+  const N = systeme(); await pret(N); await apprendre(N); repondre(N);
+  N.fond.store.vrmVcAimesFile = { produit: ART, compte: MOI, cents: 23700, reste: [P2, P3], prochain: Date.now(), suivi: { produit: ART, at: new Date().toISOString(), cents: 23700, n: 3, faites: 1, incertaines: 0, fin: '', raison: '' }, v: '5.392.0' };
+  const nN = await N.fond.ctx.reprendreOffresAimesVc();
+  dit(nN === 2 && posts(N).length === 2 && !N.fond.store.vrmVcAimesFile && N.fond.lignes.vc_aimes.envoi.faites === 3 && N.fond.lignes.vc_aimes.envoi.fin === 'fini', 'A8 · un worker neuf REPREND la file (état dans le stockage de l’extension) : les 2 restantes partent, « 3 sur 3 »', JSON.stringify({ nN, n: posts(N).length, e: N.fond.lignes.vc_aimes && N.fond.lignes.vc_aimes.envoi }));
+  const N2 = systeme(); await pret(N2); await apprendre(N2); repondre(N2);
+  N2.fond.store.vrmVcAimesFile = { produit: ART, compte: MOI, cents: 23700, reste: [P2], prochain: Date.now() - 11 * 60000, suivi: { produit: ART, at: new Date().toISOString(), cents: 23700, n: 2, faites: 1, incertaines: 0, fin: '', raison: '' }, v: '5.392.0' };
+  await N2.fond.ctx.reprendreOffresAimesVc();
+  dit(posts(N2).length === 0 && N2.fond.lignes.vc_aimes.envoi.fin === 'arret' && /trop longtemps/.test(N2.fond.lignes.vc_aimes.envoi.raison), 'A8 · reprise 11 min trop tard : rien ne part, c’est dit', JSON.stringify(N2.fond.lignes.vc_aimes && N2.fond.lignes.vc_aimes.envoi));
+  const srcFond = fs.readFileSync(F.src, 'utf8');
+  dit(/lance\('vcaimes', \(\) => reprendreOffresAimesVc\(\)\)/.test(srcFond), 'A8 · le réveil `vrm-offres` (1 min) relance la reprise');
   const etat = await S.fond.envoyer({ from: 'vmr-bridge', action: 'etat' }, { origin: 'https://vrm.center', url: 'https://vrm.center/' });
   dit(etat && etat.vcOffreAimes === true, 'A6 · l’état de l’extension dit `vcOffreAimes: true`', JSON.stringify(etat && Object.keys(etat)));
   // L'ancienne réponse aux offres reçues n'accepte JAMAIS le geste « favori ».
