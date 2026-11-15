@@ -1324,3 +1324,7 @@ Chantier choisi par Julien. Jusqu'ici l'extension ne relevait que le NOMBRE de n
   si une réponse de forme reconnaissable passe dans un onglet où le compte privé est lu.
 - **Julien** : installer la 5.318.0 ; sur leboncoin.fr (connecté, dans ce Chrome),
   ouvrir une conversation puis envoyer UNE réponse à la main : la recette s'apprend.
+
+
+### 15 nov. — « À retirer ailleurs » : un endroit en tête de Ma journée, un geste par site
+Récit complet : `docs/passation/2026-11-15-retrait-ailleurs.md`. « Retirer de Leboncoin » (extension, confirmation existante une fois), « Ouvre leboncoin.fr » puis reprise SEULE, sans extension : l’annonce + « C’est retiré » ; eBay (route ou retrait automatique), Vestiaire / Vinted à la main ; « Tout retirer (N) » ; commande Vinted sans état ⇒ « peut-être vendue · à vérifier » ; la notification « N°x vendue sur Vinted · à retirer de Leboncoin » ouvre le bloc.
