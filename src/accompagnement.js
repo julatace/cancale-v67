@@ -348,6 +348,8 @@ export const GESTES_ACC = {
   'prix.baisserLbc':  { ecran: 'leboncoin', ensuite: { lien: '?tab=plat_leboncoin' } },
   'prix.baisserVc':   { ecran: 'vestiaire', sorte: 'baisse-prix-vestiaire', ensuite: { lien: '?tab=plat_vestiaire' } },
   'republier':        { ecran: 'annonces',  ensuite: { lien: '?tab=annonces' } },
+  'republier.main':   { ecran: 'annonces',  ensuite: null },   // (15 nov.) le parcours guidé à la main : chaque étape dit sa suite elle-même
+  'publier.main':     { ecran: 'annonces',  ensuite: null },
   'republier.lbc':    { ecran: 'leboncoin', sorte: 'republier-lbc',         ensuite: { lien: '?tab=plat_leboncoin' } },
   'publier.lbc':      { ecran: 'leboncoin', sorte: 'publier-lbc',           ensuite: { lien: '?tab=plat_leboncoin' } },
   'publier.vinted':   { ecran: 'annonces',  sorte: 'publier-fiche-vinted',  ensuite: { lien: '?tab=annonces' } },

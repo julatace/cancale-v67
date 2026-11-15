@@ -1,0 +1,25 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   REPUBLIER / PUBLIER À LA MAIN, GUIDÉS (15 nov.) — Studio bleu clair
+   ═══════════════════════════════════════════════════════════════════════════
+   S'ajoute à src/republier-main.css (la feuille, les champs, la progression).
+   Jetons `--sb-*` seulement (clair et sombre) ; un plein par étape visible ; cibles 44 px.
+   Les replis (présentation des photos, prix et titre) : une ligne de verre, jamais une alerte. */
+.vrm-rg-feuille .vrm-rg-avant { margin: 0; font: 400 14px/1.45 var(--sb-police-texte, inherit); color: var(--sb-encre, #0C1D30); }
+.vrm-rg-feuille .vrm-rg-avant .vrm-acc-pas { color: var(--sb-encre-2, #3F5468); }
+.vrm-rg-feuille .vrm-rg-etapes { margin-top: 2px; }
+.vrm-rg-feuille .vrm-rg-repli {
+  border-radius: var(--sb-r-plateau, 16px); background: var(--sb-porcelaine-degrade, #fff);
+  box-shadow: var(--sb-ombre-pose, 0 1px 2px rgba(0,0,0,.12)); padding: 0 14px;
+}
+.vrm-rg-feuille .vrm-rg-repli > summary {
+  min-height: 44px; display: flex; align-items: center; cursor: pointer; list-style: none;
+  font: 600 14px/1.3 var(--sb-police-texte, inherit); color: var(--sb-lien, #0055B8);
+  -webkit-tap-highlight-color: transparent;
+}
+.vrm-rg-feuille .vrm-rg-repli > summary::-webkit-details-marker { display: none; }
+.vrm-rg-feuille .vrm-rg-repli[open] { padding-bottom: 14px; display: block; }
+.vrm-rg-feuille .vrm-rg-repli[open] > :not(summary) + :not(summary) { margin-top: 10px; }
+.vrm-rg-feuille .vrm-rg-champ .vrm-main-valeur { font-variant-numeric: tabular-nums; }
+.vrm-rg-feuille [data-rg-ancienne] p { margin: 0; }
+.vrm-rg-feuille [data-rg-fin] p { margin: 0; }
+.vrm-rg-feuille .vrm-acc-apres, .vrm-rg-feuille .vrm-acc-echec { margin: 0; }
