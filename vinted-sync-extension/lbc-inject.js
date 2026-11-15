@@ -12,19 +12,54 @@
   // pas de `document.currentScript`. Dans ce cas on se pose dans la page par
   // une balise <script> (ressource web-accessible), comme inject.js sur Vinted.
   // Sur Chrome et Firefox (monde MAIN honoré) rien ne change.
+  // ⚠️ 5.379 (15 nov., Julien sur Orion iPhone : « Leboncoin marche pas », la page reste
+  //    noire) — INOFFENSIF PAR CONSTRUCTION, trois portes AVANT tout le reste :
+  //  1. un cadre dont un parent n'est pas leboncoin.fr (pub, paiement, captcha posés par
+  //     un autre site) : rien du tout ;
+  //  2. « VRM s'est mis de côté » sur CET onglet (le disjoncteur de lbc-relay.js :
+  //     `vrm_lbc_de_cote` dans le sessionStorage de l'onglet, 30 min) : rien du tout, la
+  //     page se charge exactement comme sans VRM ;
+  //  3. le repli Orion (monde isolé) pose la balise et S'ARRÊTE TOUJOURS. Avant : si la
+  //     racine du document n'existait pas encore, `appendChild` levait, l'erreur était
+  //     avalée et TOUT le capteur tournait dans le monde isolé — il offrait au relais
+  //     un faux canal privé (le premier arrivé gagne) et les ordres du fond partaient
+  //     vers une copie qui ne voyait aucun compte. Et une balise refusée par la page
+  //     (règle de sécurité) restait plantée dans <html> : elle se retire désormais aussi
+  //     sur erreur.
+  {
+    let ici = true;
+    try {
+      const t = window.top;
+      if (t && typeof t === 'object' && t !== window) {
+        const ao = location.ancestorOrigins;
+        if (ao && typeof ao.length === 'number' && ao.length) { for (let i = 0; i < ao.length; i++) if (!/^https:\/\/([a-z0-9-]+\.)*leboncoin\.fr$/i.test(String(ao[i]))) ici = false; }
+        else if (!/(^|\.)leboncoin\.fr$/i.test(String(t.location.hostname))) ici = false;
+      }
+    } catch (_) { ici = false; }
+    if (!ici) return;
+    try { const v = JSON.parse(sessionStorage.getItem('vrm_lbc_de_cote') || 'null'); const age = Date.now() - Number(v && v.t); if (v && typeof v === 'object' && age >= 0 && age < 1800000) return; } catch (_) {}
+  }
+  let isole = false, rtIsole = null;
   try {
     const rt = (typeof chrome !== 'undefined' && chrome && chrome.runtime) || null;
-    if (!document.currentScript && rt && rt.id && typeof rt.getURL === 'function') {
-      const s = document.createElement('script');
-      s.src = rt.getURL('lbc-inject.js');
-      s.onload = function () { this.remove(); };
-      (document.head || document.documentElement).appendChild(s);
-      return;
-    }
+    if (!document.currentScript && rt && rt.id && typeof rt.getURL === 'function') { isole = true; rtIsole = rt; }
   } catch (_) {}
+  if (isole) {
+    try {
+      const poser = () => {
+        const racine = document.head || document.documentElement; if (!racine) return false;
+        const s = document.createElement('script');
+        s.src = rtIsole.getURL('lbc-inject.js');
+        s.onload = s.onerror = function () { try { this.remove(); } catch (_) {} };
+        racine.appendChild(s); return true;
+      };
+      if (!poser()) { const mo = new MutationObserver(() => { try { if (poser()) mo.disconnect(); } catch (_) { mo.disconnect(); } }); mo.observe(document, { childList: true, subtree: true }); }
+    } catch (_) {}
+    return;   // jamais le capteur dans le monde isolé
+  }
   if (window.__vrmLbcInjected) return; window.__vrmLbcInjected = true;
   const TAG = 'CANCALE_LBC';
-  const CAPTEUR_VERSION='5.379.0';
+  const CAPTEUR_VERSION='5.381.0';
   // ⚠️⚠️ 5.362 (revue, moyennes 60 et 63) — UN CANAL PRIVÉ AVEC lbc-relay.js POUR
   //    LES ORDRES. Les ordres du fond (pause, suppression, réponse — leur jeton, le
   //    texte du message) et leurs résultats passaient par `window.postMessage(…,'*')` :
@@ -1015,19 +1050,46 @@
       handle(url,JSON.stringify(p.transactions),'application/json',200);
     }
   };
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',lireDocumentInitial,{once:true});else lireDocumentInitial();
+  // 5.379 : jamais une exception qui sort d'ici (inoffensif par construction).
+  const lireDocumentInitialSur=()=>{try{lireDocumentInitial();}catch(_){}};
+  try{if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',lireDocumentInitialSur,{once:true});else lireDocumentInitialSur();}catch(_){}
 
+  // ⚠️ 5.379 (15 nov., Orion iPhone, page Leboncoin noire) — LES ENVELOPPES NE CHANGENT RIEN
+  //    POUR LA PAGE. Le `fetch` / XHR d'origine est appelé TOUJOURS une fois, avec ses
+  //    arguments et son `this`, et la page reçoit SA promesse, inchangée ; tout ce que VRM
+  //    fait avant ou après est dans un try. La copie (`clone()`) n'est lue QUE si la réponse
+  //    peut servir (`lisible` : Leboncoin, 2xx, JSON ou sans type, moins de 8 Mo) — avant,
+  //    CHAQUE réponse était copiée et lue en entier : images, flux de la page (Next.js
+  //    diffuse ses écrans en continu), tout, jusqu'au bout, dans la mémoire du téléphone.
+  //    Et l'enveloppe garde le nom, la longueur et le texte (`toString`) de l'original :
+  //    un script qui vérifie que `fetch` est celui du navigateur n'y voit pas de différence.
+  const commeNatif = (f, orig) => {
+    try {
+      for (const k of ['name', 'length']) Object.defineProperty(f, k, { value: orig[k], configurable: true });
+      const texte = Function.prototype.toString.call(orig);
+      Object.defineProperty(f, 'toString', { value: function toString() { return texte; }, configurable: true, writable: true });
+    } catch (_) {}
+    return f;
+  };
+  const lisible = (url, statut, ct, taille) => {
+    try {
+      if (!(statut >= 200 && statut < 300) || NOISE.test(url) || !DE_LEBONCOIN(url)) return false;
+      if (ct && !/json/i.test(ct)) return false;
+      return !(Number(taille) > 8000000);
+    } catch (_) { return false; }
+  };
   const origFetch = window.fetch;
   if (origFetch) {
-    window.fetch = function (input, init) {
-      const url = (typeof input === 'string') ? input : (input instanceof URL ? input.href : (input && input.url) || '');
-      const meth = (init && init.method) || (typeof input === 'object' && input && input.method) || 'GET';
+    window.fetch = commeNatif(function (input, init) {
+      let url = '', meth = 'GET', corpsReq = null, corpsRetrait = null;
+      try {
+        url = (typeof input === 'string') ? input : (input instanceof URL ? input.href : (input && input.url) || '');
+        meth = (init && init.method) || (typeof input === 'object' && input && input.method) || 'GET';
+      } catch (_) {}
       try { if (MODIFIE.test(meth)) noteEnvoi(url, init && init.body, meth); } catch (_) {}
       // La liste d'un vendeur : son corps de requête dit si elle peut DÉCIDER (22 oct.).
-      let corpsReq = null;
       try { if (init && typeof init.body === 'string' && LISTE_VENDEUR(url)) corpsReq = init.body; } catch (_) {}
       try { noterEntetes(url, init && init.headers); } catch (_) {}
-      let corpsRetrait = null;
       try { if (init && typeof init.body === 'string' && RETRAIT_PAGE.test(url)) corpsRetrait = init.body; } catch (_) {}
       // En-têtes d'une requête du SITE vers ses transactions : on les réutilise
       // tels quels pour lire le détail (restent dans la page, jamais envoyés ailleurs).
@@ -1041,26 +1103,26 @@
       try {
         p.then((res) => {
           try {
-            const ct = res.headers && res.headers.get && res.headers.get('content-type');
             if (/vinted|supabase/i.test(url)) return; // ne touche pas aux autres domaines
+            const ct = res.headers && res.headers.get && res.headers.get('content-type');
             noteSeen(url, meth, res.status, ct);
             if (corpsRetrait) noterRetraitPage(url, meth, corpsRetrait, res.status);
             if (MODIFIE.test(meth) && /\/messaging\//i.test(url)) noteEnvoiMsgLbc(url, meth, res.status, init && typeof init.body === 'string' ? init.body : null, init && init.headers);
             else if (MODIFIE.test(meth)) noteEnvoiPrixLbc(url, meth, res.status, init && typeof init.body === 'string' ? init.body : null, init && init.headers);
-            res.clone().text().then((t) => handle(url, t, ct, res.status, corpsReq)).catch(() => {});
+            if (lisible(url, res.status, ct, res.headers && res.headers.get && res.headers.get('content-length'))) res.clone().text().then((t) => handle(url, t, ct, res.status, corpsReq)).catch(() => {});
           } catch (_) {}
-        }).catch(() => {});
+        }, () => {});
       } catch (_) {}
       return p;
-    };
+    }, origFetch);
   }
 
   const OX = window.XMLHttpRequest;
   if (OX) {
     const origOpen = OX.prototype.open, origSend = OX.prototype.send, origSetH = OX.prototype.setRequestHeader;
-    OX.prototype.open = function (method, url) { this.__lbcUrl = url; this.__lbcMeth = method; this.__lbcH = null; return origOpen.apply(this, arguments); };
-    if (origSetH) OX.prototype.setRequestHeader = function (k, v) { try { (this.__lbcH = this.__lbcH || {})[String(k)] = String(v); } catch (_) {} return origSetH.apply(this, arguments); };
-    OX.prototype.send = function (corps) {
+    OX.prototype.open = commeNatif(function (method, url) { try { this.__lbcUrl = url; this.__lbcMeth = method; this.__lbcH = null; } catch (_) {} return origOpen.apply(this, arguments); }, origOpen);
+    if (origSetH) OX.prototype.setRequestHeader = commeNatif(function (k, v) { try { (this.__lbcH = this.__lbcH || {})[String(k)] = String(v); } catch (_) {} return origSetH.apply(this, arguments); }, origSetH);
+    OX.prototype.send = commeNatif(function (corps) {
       try { if (MODIFIE.test(this.__lbcMeth || '')) noteEnvoi(this.__lbcUrl || '', corps, this.__lbcMeth); } catch (_) {}
       try { this.__lbcCorpsMsg = (typeof corps === 'string' && /\/messaging\//i.test(this.__lbcUrl || '')) ? corps : null; } catch (_) {}
       try { this.__lbcCorpsPrix = (typeof corps === 'string' && corps.length < 4000 && MODIFIE.test(this.__lbcMeth || '')) ? corps : null; } catch (_) {}
@@ -1068,20 +1130,21 @@
       try {
         this.addEventListener('load', function () {
           try {
-            const url = this.__lbcUrl || '';
+            const url = String(this.__lbcUrl || '');
             if (/vinted|supabase/i.test(url)) return;
             const ct = this.getResponseHeader && this.getResponseHeader('content-type');
             noteSeen(url, this.__lbcMeth, this.status, ct);
             if (this.__lbcRetrait) noterRetraitPage(url, this.__lbcMeth, this.__lbcRetrait, this.status);
             if (MODIFIE.test(this.__lbcMeth || '') && /\/messaging\//i.test(url)) noteEnvoiMsgLbc(url, this.__lbcMeth, this.status, this.__lbcCorpsMsg, this.__lbcH);
             else if (MODIFIE.test(this.__lbcMeth || '')) noteEnvoiPrixLbc(url, this.__lbcMeth, this.status, this.__lbcCorpsPrix, this.__lbcH);
+            if (!lisible(url, this.status, ct, 0)) return;   // 5.379 : rien n'est relu (ni recopié) qui ne puisse servir
             const t = this.responseType === 'json' ? JSON.stringify(this.response) : (this.responseType === '' || this.responseType === 'text') ? this.responseText : null;
             if (t) handle(url, t, ct, this.status, this.__lbcCorps || null);
           } catch (_) {}
         });
       } catch (_) {}
       return origSend.apply(this, arguments);
-    };
+    }, origSend);
   }
 
   // ── METTRE EN PAUSE, SUR SON CLIC (22 octobre — proposition 6) ─────────────

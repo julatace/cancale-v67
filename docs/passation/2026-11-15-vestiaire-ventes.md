@@ -1,6 +1,6 @@
 # 15 nov. — Ventes Vestiaire justes (état le plus frais, état en mots, prix de vente)
 
-Branche `claude/vestiaire-ventes` (depuis `origin/main`). Extension **5.379.0**.
+Branche `claude/vestiaire-ventes` (depuis `origin/main`). Extension **5.381.0**.
 
 ## Ce que Julien a envoyé (iPhone, 14 h 11)
 
@@ -40,7 +40,7 @@ Branche `claude/vestiaire-ventes` (depuis `origin/main`). Extension **5.379.0**.
   `shipmentInProgress` (l'état mesuré d'une vente À ENVOYER) ne prouvent rien. Datée par `etapesAt`.
 - `aExpedierVc(v, lectures)` : pas de `aExpedier: true` ⇒ non ; pas de preuve ⇒ oui (« pas su » reste « pas su ») ;
   preuve ET liste « à expédier », les deux DATÉES ⇒ la plus fraîche gagne ; une des deux sans date (lignes d'avant la
-  5.379) ⇒ la preuve gagne (Vestiaire n'écrit « envoi fait » qu'après l'envoi et ne range dans « à expédier »
+  5.381) ⇒ la preuve gagne (Vestiaire n'écrit « envoi fait » qu'après l'envoi et ne range dans « à expédier »
   qu'avant). Heure de la liste : `aExpedierAt` sur la vente, sinon `lectures['a-expedier']` (`at`, `partielleAt`).
 - `venteVcFraiche(v, lectures)` : la vente telle que les écrans la lisent (`aExpedier` = la règle, le mot rangé dans
   `aExpedierLu`, idempotente) ; `ventesVcDe` l'applique (totaux, stock, coque).
@@ -51,7 +51,7 @@ Branche `claude/vestiaire-ventes` (depuis `origin/main`). Extension **5.379.0**.
 - **Non touché exprès** : `numerosVestiaire.produitsANumeroter` (« doit porter un N° », pas « à expédier ») et
   `depart-colis.sortantsDuVendeur` (quels n° de suivi lire) gardent `aExpedier` brut — rien n'y est perdu.
 
-### L'extension 5.379.0 (`background.js`)
+### L'extension 5.381.0 (`background.js`)
 
 `rangerVcVentes` pose `aExpedierAt` à chaque lecture de « à expédier » qui LISTE la vente et garde `etapesAt` ;
 `rangerVcTimeline` pose `etapesAt` quand la frise (ou le statut) est lue. Rien n'est remis à faux par l'extension :
@@ -102,5 +102,5 @@ moyen) lisent tous **`montantRecuVc`** (= `sellerEarning`, ce que Vestiaire vers
 
 ## Geste de Julien
 
-Installer l'extension **5.379.0** (remplacer le dossier, ⟳ ; Orion : `VRM-Orion-dossier.zip`). Sans elle, le cabas
+Installer l'extension **5.381.0** (remplacer le dossier, ⟳ ; Orion : `VRM-Orion-dossier.zip`). Sans elle, le cabas
 s'affiche déjà juste (la frise rangée gagne) ; avec elle, chaque fait est daté.

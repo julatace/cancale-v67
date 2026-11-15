@@ -182,12 +182,13 @@ async function principal() {
     const f = monter();
     const e = await f.envoyer({ from: 'vrm-badge', action: 'etat' }, { tab: { id: 7, url: 'https://www.vinted.fr/catalog?search_text=nike' } });
     const liens = (e && e.liens) || [];
-    dit(liens.length === 3 && liens.map((l) => l.cle).join(',') === 'ventes,messages,dressing', 'Vinted : Mes ventes · Messages · Mon dressing', JSON.stringify(liens));
+    // 5.379 : « Mes ventes » (/my_orders/sold) menait à « Page not found » chez Vinted (capture de Julien) : retirée.
+    dit(liens.length === 2 && liens.map((l) => l.cle).join(',') === 'messages,dressing' && !liens.some((l) => /my_orders/.test(l.url)), 'Vinted : Messages · Mon dressing (plus de /my_orders/sold, 404 chez Vinted)', JSON.stringify(liens));
     dit(liens.every((l) => new URL(l.url).origin === 'https://www.vinted.fr'), 'chaque lien est sur le MÊME site que l’onglet (www.vinted.fr)', JSON.stringify(liens.map((l) => l.url)));
     dit(liens.some((l) => l.url === 'https://www.vinted.fr/member/111'), 'le dressing est celui du compte connecté dans l’onglet (111)', JSON.stringify(liens.map((l) => l.url)));
     dit(!JSON.stringify(e || {}).includes('vrm.center/?') && liens.every((l) => !/vrm\.center/.test(l.url)), 'aucun lien vers vrm.center', JSON.stringify(liens));
     const it = await f.envoyer({ from: 'vrm-badge', action: 'etat' }, { tab: { id: 8, url: 'https://www.vinted.it/' } });
-    dit((it.liens || []).length === 3 && it.liens.every((l) => new URL(l.url).origin === 'https://www.vinted.it'), 'sur vinted.it, les liens restent sur vinted.it', JSON.stringify(it.liens));
+    dit((it.liens || []).length === 2 && it.liens.every((l) => new URL(l.url).origin === 'https://www.vinted.it'), 'sur vinted.it, les liens restent sur vinted.it', JSON.stringify(it.liens));
   });
   await essai('A2', async () => {
     const f = monter();
@@ -371,7 +372,7 @@ const MUTATIONS = [
   ['vinted-sync-extension/background.js', "      if (!(tabs || []).some((t) => ongletDuDomaine(t, st.dom || 'www.vinted.fr'))) return attendre('onglet');\n", '', 'tour sans onglet Vinted'],
   ['api/_lib/favoris-carte.js', "    if (annonce) { ecartes++; continue; }", "    if (false) { ecartes++; continue; }", 'aperçu : article vendu proposé'],
   ['api/_lib/favoris-carte.js', "    if (!prouve(String(l.id))) { nonProuves++; continue; }", "", 'aperçu : destinataire non prouvé proposé'],
-  ['api/_lib/favoris-carte.js', "  if (ed) return { etat: 'bloque', raison: ed, file };", '', 'aperçu : dressing ancien accepté'],
+  ['api/_lib/favoris-carte.js', "  if (ed) return { etat: 'bloque', raison: ed, lus, totalLus: lignes.length, file };", '', 'aperçu : dressing ancien accepté'],
   ['vinted-sync-extension/background.js', "  const c = await compterAction(String(uid), ACTIONS_MAX_HEURE - reserve, nA);", "  const c = { ok: true };", 'plafond horaire retiré'],
 ];
 // Seulement ce que l'audit exécute (le disque des bancs est compté) : api, src,

@@ -26,8 +26,12 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
-  // (15 nov., extension 5.379) Ventes Vestiaire : l'état le plus frais gagne, l'état en mots, le prix de vente.
+  // (15 nov., extension 5.381) Ventes Vestiaire : l'état le plus frais gagne, l'état en mots, le prix de vente.
   { id: 'vestiaire-ventes-justes', date: '2026-11-15', titre: 'Ventes Vestiaire : le vrai état, le vrai prix', phrase: 'Expédiée, en livraison, payée : plus de code ni de faux retard.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (15 nov., extension 5.380, captures de Julien) La carte du logo sur vinted.fr : docs/passation/2026-11-15-carte-extension.md
+  { id: 'carte-extension-studio', date: '2026-11-15', titre: 'La carte VRM sur Vinted, refaite', phrase: 'Favoris en liste, ventes sans tiret, liens qui marchent, bleu clair.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  // (15 nov., extension 5.379, Julien sur Orion iPhone : « Leboncoin marche pas ») docs/passation/2026-11-15-lbc-orion.md
+  { id: 'lbc-orion-de-cote', date: '2026-11-15', titre: 'Leboncoin vide sur iPhone : VRM s’écarte', phrase: 'Page vide ? VRM se met de côté et le dit.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (15 nov., extension 5.378) Dates de versement : relevé vérifié avant de dater, délai en heures de Vinted ouvert.
   { id: 'versements-releve-verifie', date: '2026-11-15', titre: 'Dates de versement : relevé vérifié, délai honnête', phrase: 'Le relevé ne date rien avant cinq accords ; délai en heures.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « horriblement moche », « ne mets pas paires, tu mets annonces ») docs/passation/2026-11-15-annonces-propre.md
