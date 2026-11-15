@@ -92,7 +92,7 @@ async function preparer(b, vp, sombre) {
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.addInitScript((sombre) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_langue', 'fr'); localStorage.setItem('vinted_dark', JSON.stringify(!!sombre)); localStorage.setItem('vrm_visite_vue', 'true'); } catch (_) {} }, sombre);
-  await pg.addInitScript(PONT, { version: '5.382.0' });
+  await pg.addInitScript(PONT, { version: '5.383.0' });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => {
     if (/images\.vestiairecollective\.com/.test(r.request().url())) return r.fulfill({ status: 200, contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300"><rect width="300" height="300" fill="#b9a27e"/></svg>' });
     return r.fulfill({ status: 404, body: '' });

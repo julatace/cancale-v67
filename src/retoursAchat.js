@@ -54,24 +54,136 @@ export function avecRemboursementsProuves(achats, remb, montantDe) {
 
 const jourCourt = (iso) => { const t = Date.parse(str(iso)); if (!isFinite(t)) return null; try { return new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' }); } catch (_) { return null; } };
 
-// bords  : lignes `email_bordretour_*` projetées ({ tx, suivi, dateLimiteIso, article, uid, account, at, pdf })
-// achats : ses achats Vinted (`undefined` pas lu · `null` pas su)
-// remb   : lignes `email_rembachat_*` ({ tx, montant, estime, at }) — mêmes trois états
-// transp : Map n° de suivi → { libelle } (`undefined` en cours · `null` pas su)
+// ════════════════════════════════════════════════════════════════════════════
+//  (15 nov., lot retours) « À RENVOYER » : UNE RÈGLE, UNE CARTE PAR RETOUR
+// ════════════════════════════════════════════════════════════════════════════
+// Julien : « j'ai un retour sur shop_cancale, je te laisse regarder pour bien le gérer »,
+// puis « c'est vraiment pas ouf » (Ma journée : deux lignes « Retour · Renvoyer ↗ » sans
+// nom ni heure, éparpillées). Un retour d'ACHAT (il renvoie) se voit par trois sources :
+//   1. le BORDEREAU reçu par e-mail (`email_bordretour_{tx}`, ou encore gardé « inconnu »
+//      avant son reclassement : son corps est relu ici par LA règle du serveur) — identité :
+//      le n° de transaction ; il porte la date et l'HEURE limites et le PDF ;
+//   2. l'AVIS « Retourne ta commande d'ici le … » (`email_retourdemande_*`) — AUCUNE identité
+//      (mesuré) : l'article n'est qu'un libellé, la date est le jour du sujet (sans heure) ;
+//   3. l'ACHAT Vinted lui-même (« Retour initié / en cours / demandé », `ACHAT_A_RENVOYER`) —
+//      identité : son n° de transaction (et sa conversation).
+// Une carte PAR RETOUR : bordereau et achat se rejoignent par le n° ; un avis rejoint l'achat
+// par SA conversation (identité). Un avis sans identité ne rejoint un bordereau QUE pour
+// l'affichage (jamais un N°, jamais une écriture) et seulement si TOUT concorde et qu'il n'y a
+// qu'UN candidat de chaque côté : même compte (quand les deux le disent), même jour limite,
+// même libellé. Deux candidats ⇒ deux cartes (jamais une cachée : un retour caché est un
+// retour perdu). Le sens « achat » est PROUVÉ côté serveur (api/_lib/retour-email.js) ; un n°
+// qui est une de SES VENTES contredit l'e-mail ⇒ la carte le dit et n'imprime rien.
+export const ACHAT_A_RENVOYER = /retour\s*initi|retour\s+en\s+cours|retour\s+demand/i;
+const RE_ARRIVE_VENDEUR = /livr[ée]|distribu[ée]|remis au destinataire|re[çc]u par le vendeur/i;
+const RE_EN_ROUTE = /d[ée]pos[ée]|pris en charge|achemin|transit|en cours de livraison|en route/i;
+const norme = (s) => str(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+// L'heure limite en clair (Paris) : « 10 h », « 23 h 59 » ; '' si la source n'a pas d'heure.
+export function heureParis(iso) {
+  const t = Date.parse(str(iso)); if (!isFinite(t)) return '';
+  try {
+    const p = Object.fromEntries(new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(t)).map((x) => [x.type, x.value]));
+    const h = String(Number(p.hour)), m = p.minute;
+    return m === '00' ? `${h} h` : `${h} h ${m}`;
+  } catch (_) { return ''; }
+}
+// Le jour (Paris) d'un instant : 'AAAA-MM-JJ'.
+export function jourParis(ms) {
+  try { const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(ms)).map((x) => [x.type, x.value])); return `${p.year}-${p.month}-${p.day}`; } catch (_) { return ''; }
+}
+// « Quand » en mots, pour l'écran : { cle: 'passee' | 'auj' | 'demain' | 'date', jour: 'AAAA-MM-JJ', heure }.
+export function quandLimite(c, now) {
+  if (!c || !c.limiteIso) return null;
+  const lm = Date.parse(c.limiteIso);
+  const jour = c.limiteJour || jourParis(lm);
+  const auj = jourParis(now), demain = jourParis(now + 86400000);
+  const cle = now > lm ? 'passee' : jour === auj ? 'auj' : jour === demain ? 'demain' : 'date';
+  return { cle, jour, heure: c.heure || '' };
+}
+
+// Un bordereau gardé « inconnu » (pas encore reclassé) : son corps est relu par LA règle du
+// serveur (`lireBordereauRetour`, passée par l'appelant). Rend la ligne projetée d'un
+// bordereau rangé, avec le PDF du corps gardé (`pdfGarde`), ou null.
+export function bordereauDuGarde(row, lireBordereauRetour) {
+  if (!row || typeof lireBordereauRetour !== 'function') return null;
+  let j = null; try { j = JSON.parse(str(row.brut)); } catch (_) { return null; }
+  if (!j || typeof j !== 'object') return null;
+  const atts = (Array.isArray(j.attachments) ? j.attachments : []).map((a) => ({ filename: (a && (a.filename || a.name)) || '', contentType: (a && (a.contentType || a.type)) || '', contentB64: (a && (a.contentB64 || a.content || a.data)) || '' }));
+  const lu = lireBordereauRetour({ subject: j.subject || row.subject, text: j.text || '', attachments: atts });
+  if (!lu || !lu.ok) return null;
+  return { tx: lu.transaction, suivi: lu.suivi, dateLimite: lu.dateLimite, dateLimiteIso: lu.dateLimiteIso, article: lu.article, at: row.receivedAt || '', pdf: true, pdfGarde: lu.pdf.contentB64, emailId: str(row.id), garde: true };
+}
+
+// bords   : lignes `email_bordretour_*` projetées ({ tx, suivi, dateLimiteIso, article, uid, account, at, pdf })
+//           (+ celles de `bordereauDuGarde` ; même n° : la ligne rangée gagne)
+// demandes: avis « Retourne ta commande » ({ id, article, limiteIso, limiteJour, conv, uid, account, recuLe })
+//           (`undefined` en cours · `null` pas su)
+// achats  : ses achats Vinted (`undefined` pas lu · `null` pas su)
+// remb    : lignes `email_rembachat_*` ({ tx, montant, estime, at }) — mêmes trois états
+// transp  : Map n° de suivi → { libelle } (`undefined` en cours · `null` pas su)
+// deposes : { [cle]: iso } — « Déposé » posé par SON clic
+// ventesTx: Set des n° de SES ventes (un n° de vente contredit un bordereau d'achat)
 // numeroDe(tx) : le N° de la paire reliée à CET achat (par SON clic), ou ''
 // montantDe(o) : ce qu'il a payé, ou null
-export function retoursAchat({ bords, achats, remb, transp, numeroDe = null, montantDe = null, maintenant } = {}) {
+export function retoursAchat({ bords, demandes = [], achats, remb, transp, deposes = null, ventesTx = null, numeroDe = null, montantDe = null, maintenant } = {}) {
   const now = isFinite(maintenant) ? maintenant : Date.now();
-  if (bords === undefined) return { etat: 'encours', cartes: [], anciennes: [], manques: [] };
-  if (bords === null) return { etat: 'passu', cartes: [], anciennes: [], manques: ['tes bordereaux de retour'] };
+  if (bords === undefined) return { etat: 'encours', cartes: [], anciennes: [], aRenvoyer: [], manques: [] };
+  if (bords === null && !Array.isArray(achats)) return { etat: 'passu', cartes: [], anciennes: [], aRenvoyer: [], manques: ['tes bordereaux de retour'] };
   const manques = [];
+  if (bords === null) manques.push('tes bordereaux de retour');
   if (achats === null) manques.push('tes achats Vinted');
   if (remb === null) manques.push('les e-mails de remboursement');
+  if (demandes === null) manques.push('les e-mails « Retourne ta commande »');
   const parTx = remboursementsParTx(remb);
   const A = new Map();
   for (const o of (Array.isArray(achats) ? achats : [])) if (o && o.transaction_id != null) A.set(str(o.transaction_id), o);
+  const dep = deposes && typeof deposes === 'object' ? deposes : {};
   const vus = new Set(), cartes = [], anciennes = [];
-  const tries = [...bords].filter(Boolean).sort((a, b) => str(b.at || b.receivedAt).localeCompare(str(a.at || a.receivedAt)));
+  const tries = [...(Array.isArray(bords) ? bords : [])].filter(Boolean).sort((a, b) => ((a.garde ? 1 : 0) - (b.garde ? 1 : 0)) || str(b.at || b.receivedAt).localeCompare(str(a.at || a.receivedAt)));
+  const etatSuivi = (suivi) => {
+    if (!suivi) return { etat: 'aucun' };
+    if (transp === undefined) return { etat: 'encours', n: suivi };
+    if (transp === null) return { etat: 'passu', n: suivi };
+    const t = transp && typeof transp.get === 'function' ? transp.get(suivi) : null; const l = t ? str(t.libelle).trim() : '';
+    return { etat: 'ok', n: suivi, libelle: l };
+  };
+  const remboursement = (tx, o) => {
+    const r = parTx instanceof Map && tx ? parTx.get(tx) : null;
+    const paye = o && typeof montantDe === 'function' ? montantDe(o) : null;
+    if (r) return { etat: 'oui', montant: r.montant, source: 'email', at: r.at, estime: r.estime || '', partiel: paye != null && isFinite(paye) && r.montant + 0.005 < paye };
+    if (o && RE_REMB.test(str(o.status))) return { etat: 'oui', montant: null, source: 'statut', partiel: false };
+    if (remb === null || (achats === null && !o)) return { etat: 'passu' };
+    return { etat: 'non' };
+  };
+  const dates = (c) => {
+    const lm = Date.parse(str(c.limiteIso));
+    c.depassee = isFinite(lm) && now > lm;
+    c.presse = isFinite(lm) && !c.depassee && lm - now < RETOUR_PRESSE_H * 3600000;
+  };
+  const etape = (c) => {
+    c.depose = dep[c.cle] ? { le: str(dep[c.cle]) } : null;
+    const lib = c.statut && c.statut.etat === 'ok' ? str(c.statut.libelle) : '';
+    // L'étape : PROUVÉE (remboursement lu, transporteur lu), sinon SON clic « Déposé ».
+    c.etape = c.rembourse.etat === 'oui' ? 'rembourse'
+      : RE_ARRIVE_VENDEUR.test(lib) ? 'recu-vendeur'
+      : RE_EN_ROUTE.test(lib) ? 'en-route'
+      : c.depose ? 'depose' : 'a-deposer';
+  };
+  const finir = (c, recuLe) => {
+    dates(c); etape(c);
+    // Un n° qui est une de SES ventes : l'e-mail (« tu renvoies ») est contredit ⇒ rien n'est imprimé.
+    c.contredit = !!(c.tx && ventesTx && typeof ventesTx.has === 'function' && ventesTx.has(c.tx) && !A.has(c.tx));
+    if (c.contredit) c.pdf = false;
+    c.sansPdf = c.pdf ? null : c.contredit ? { raison: 'contredit' }
+      : c.source === 'bordereau' ? { raison: 'pdf-absent', emailLe: str(recuLe) }
+      : { raison: 'pas-recu' };
+    c.vinted = c.tx ? `https://www.vinted.fr/member/transactions/${encodeURIComponent(c.tx)}` : c.conv ? `https://www.vinted.fr/inbox/${encodeURIComponent(c.conv)}` : 'https://www.vinted.fr/inbox';
+    c._recuLe = str(recuLe);
+    return c;
+  };
+  // 1. Les bordereaux (identité : le n°).
+  const cartesBord = [];
   for (const b of tries) {
     const tx = str(b.tx || b.transaction).trim();
     if (!tx || vus.has(tx)) continue;
@@ -79,36 +191,67 @@ export function retoursAchat({ bords, achats, remb, transp, numeroDe = null, mon
     const o = A.get(tx) || null;
     const lm = Date.parse(str(b.dateLimiteIso));
     const limiteIso = isFinite(lm) ? new Date(lm).toISOString() : null;
-    const depassee = limiteIso != null && now > lm;
-    const presse = limiteIso != null && !depassee && lm - now < RETOUR_PRESSE_H * 3600000;
     const suivi = str(b.suivi).trim();
-    let statut;
-    if (!suivi) statut = { etat: 'aucun' };
-    else if (transp === undefined) statut = { etat: 'encours', n: suivi };
-    else if (transp === null) statut = { etat: 'passu', n: suivi };
-    else { const t = transp && typeof transp.get === 'function' ? transp.get(suivi) : null; const l = t ? str(t.libelle).trim() : ''; statut = l ? { etat: 'ok', n: suivi, libelle: l } : { etat: 'ok', n: suivi, libelle: '' }; }
-    // Le remboursement : PROUVÉ (e-mail du même n°, puis statut de l'achat), sinon pas encore.
-    let rembourse;
-    const r = parTx instanceof Map ? parTx.get(tx) : null;
-    const paye = o && typeof montantDe === 'function' ? montantDe(o) : null;
-    if (r) rembourse = { etat: 'oui', montant: r.montant, source: 'email', at: r.at, estime: r.estime || '', partiel: paye != null && isFinite(paye) && r.montant + 0.005 < paye };
-    else if (o && RE_REMB.test(str(o.status))) rembourse = { etat: 'oui', montant: null, source: 'statut', partiel: false };
-    else if (remb === null || (achats === null && !o)) rembourse = { etat: 'passu' };
-    else rembourse = { etat: 'non' };
     const num = typeof numeroDe === 'function' ? str(numeroDe(tx)).trim() : '';
-    const c = {
-      cle: 'r:' + tx, tx, achat: o, titre: str((o && o.title) || b.article), num,
-      limiteIso, limiteTexte: jourCourt(limiteIso), heure: str(b.dateLimite).split(' ').slice(1).join(' ').trim(), presse, depassee,
-      suivi, statut, rembourse, uid: str(b.uid || (o && o._acc && o._acc.vinted_user_id) || ''), compte: str(b.account || ''),
-      pdf: b.pdf !== false, relie: !!o,
-    };
-    const age = (now - (Date.parse(str(b.at || b.receivedAt)) || now)) / 86400000;
-    (rembourse.etat === 'oui' && age > RETOUR_ANCIEN_J ? anciennes : cartes).push(c);
+    cartesBord.push(finir({
+      cle: 'r:' + tx, source: 'bordereau', tx, achat: o, titre: str((o && o.title) || b.article), num, conv: o ? str(o.conversation_id || '') : '',
+      limiteIso, limiteJour: limiteIso ? jourParis(lm) : '', limiteTexte: jourCourt(limiteIso), heure: limiteIso && /\d\s*h/.test(str(b.dateLimite)) ? heureParis(limiteIso) : '',
+      suivi, statut: etatSuivi(suivi), rembourse: remboursement(tx, o), uid: str(b.uid || (o && o._acc && o._acc.vinted_user_id) || ''), compte: str(b.account || ''),
+      pdf: b.pdf !== false, pdfGarde: b.pdfGarde || '', garde: !!b.garde, emailId: str(b.emailId || ''), relie: !!o, avis: null,
+    }, b.at || b.receivedAt));
   }
-  // À déposer d'abord (date la plus proche), puis remboursés.
-  const rang = (c) => (c.rembourse.etat === 'oui' ? 2e15 : 0) + (c.depassee ? 1e15 : 0) + (c.limiteIso ? Date.parse(c.limiteIso) : 1e14);
+  // 2. Les achats « à renvoyer » sans bordereau (identité : le n°).
+  const cartesAchat = [];
+  for (const [tx, o] of A) {
+    if (vus.has(tx) || !ACHAT_A_RENVOYER.test(str(o.status))) continue;
+    vus.add(tx);
+    const num = typeof numeroDe === 'function' ? str(numeroDe(tx)).trim() : '';
+    cartesAchat.push(finir({ cle: 'r:' + tx, source: 'achat', tx, achat: o, titre: str(o.title), num, conv: str(o.conversation_id || ''),
+      limiteIso: null, limiteJour: '', limiteTexte: null, heure: '', suivi: '', statut: { etat: 'aucun' }, rembourse: remboursement(tx, o),
+      uid: str((o._acc && o._acc.vinted_user_id) || ''), compte: '', pdf: false, relie: true, avis: null }, o.date || ''));
+  }
+  // 3. Les avis : par SA conversation vers un achat (identité), sinon le regroupement d'affichage, sinon seuls.
+  const D = (Array.isArray(demandes) ? demandes : []).filter((d) => d && d.limiteIso);
+  const dejaD = new Set();
+  const poserAvis = (c, d) => {
+    c.avis = { id: str(d.id), recuLe: str(d.recuLe) };
+    if (!c.limiteIso) { c.limiteIso = d.limiteIso; c.limiteJour = d.limiteJour || jourParis(Date.parse(d.limiteIso)); c.limiteTexte = jourCourt(d.limiteIso); dates(c); }
+    if (!c.compte && d.account) c.compte = str(d.account);
+    dejaD.add(d);
+  };
+  for (const d of D) {
+    const conv = str(d.conv).toLowerCase(); if (!conv) continue;
+    const l = [...cartesBord, ...cartesAchat].filter((c) => c.conv && c.conv.toLowerCase() === conv);
+    if (l.length === 1) poserAvis(l[0], d);
+  }
+  const memeRetour = (c, d) => !!c.limiteJour && c.limiteJour === (d.limiteJour || jourParis(Date.parse(d.limiteIso)))
+    && !!norme(c.titre) && norme(c.titre) === norme(d.article) && !(c.uid && d.uid && str(c.uid) !== str(d.uid));
+  const libres = D.filter((d) => !dejaD.has(d));
+  for (const d of libres) {
+    const cands = cartesBord.filter((c) => !c.avis && memeRetour(c, d));
+    if (cands.length !== 1) continue;
+    const rivaux = libres.filter((x) => memeRetour(cands[0], x));
+    const autresBords = cartesBord.filter((c) => memeRetour(c, d));
+    if (rivaux.length === 1 && autresBords.length === 1) poserAvis(cands[0], d);
+  }
+  const cartesAvis = [];
+  for (const d of D) {
+    if (dejaD.has(d)) continue;
+    cartesAvis.push(finir({ cle: 'd:' + str(d.id), source: 'avis', tx: '', achat: null, titre: str(d.article), num: '', conv: str(d.conv || ''),
+      limiteIso: d.limiteIso, limiteJour: d.limiteJour || jourParis(Date.parse(d.limiteIso)), limiteTexte: jourCourt(d.limiteIso), heure: '',
+      suivi: '', statut: { etat: 'aucun' }, rembourse: { etat: 'non' }, uid: str(d.uid || ''), compte: str(d.account || ''), pdf: false, relie: false,
+      avis: { id: str(d.id), recuLe: str(d.recuLe) } }, d.recuLe));
+  }
+  for (const c of [...cartesBord, ...cartesAchat, ...cartesAvis]) {
+    const age = (now - (Date.parse(c._recuLe) || now)) / 86400000;
+    delete c._recuLe;
+    (c.rembourse.etat === 'oui' && age > RETOUR_ANCIEN_J ? anciennes : cartes).push(c);
+  }
+  // À déposer d'abord (date la plus proche), puis en route, puis remboursés.
+  const poids = { 'a-deposer': 0, depose: 1, 'en-route': 1, 'recu-vendeur': 2, rembourse: 3 };
+  const rang = (c) => (poids[c.etape] || 0) * 1e15 + (c.depassee ? -1e14 : 0) + (c.limiteIso ? Date.parse(c.limiteIso) : 1e14);
   cartes.sort((a, b) => rang(a) - rang(b));
-  return { etat: 'lu', cartes, anciennes, manques };
+  return { etat: 'lu', cartes, anciennes, aRenvoyer: cartes.filter((c) => c.etape === 'a-deposer'), manques };
 }
 
 // Ce que le tampon écrit sur le bordereau de retour (une règle, imprimée et testée).

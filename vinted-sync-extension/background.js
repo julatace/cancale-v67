@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.382.0';
+const CODE_VERSION = '5.383.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -23900,7 +23900,7 @@ async function rangerVcVentesMaintenant(m) {
       // 5.316 : le titre affiché et la photo ; et ce que la page « suivi » a appris (gardé).
       titre: x.titre || prev.titre || '', photo: x.photo || prev.photo || '',
       ...(prev.bordereau ? { bordereau: prev.bordereau } : {}), ...(prev.statutVc ? { statutVc: prev.statutVc } : {}), ...(prev.paiementEstime ? { paiementEstime: prev.paiementEstime } : {}), ...(prev.etapesVc ? { etapesVc: prev.etapesVc } : {}),
-      // 5.382 (15 nov.) — L'ÉTAT LE PLUS FRAIS GAGNE (§5) : chaque fait porte SON heure. `aExpedierAt` = la
+      // 5.383 (15 nov.) — L'ÉTAT LE PLUS FRAIS GAGNE (§5) : chaque fait porte SON heure. `aExpedierAt` = la
       // dernière lecture de « à expédier » qui la LISTAIT ; `etapesAt` (posé par la frise, `rangerVcTimeline`)
       // gardé. L'app (api/_lib/vestiaire-regle.js `aExpedierVc`) compare les deux : une frise « envoi fait »
       // plus fraîche l'emporte sur un « à expédier » plus ancien, et l'inverse. Rien n'est remis à faux ici.
@@ -24135,7 +24135,7 @@ async function rangerVcTimeline(m, compte) {
     ventes[pid] = { ...prev, productId: pid,
       transporteur: m.transporteur || prev.transporteur || '', suivi: m.suivi || prev.suivi || '',
       statutVc: m.statut || prev.statutVc || '', etapesVc: m.etapes && Object.keys(m.etapes).length ? m.etapes : (prev.etapesVc || null),
-      // 5.382 : l'heure où CETTE frise a été lue (comparée à `aExpedierAt` par l'app : l'état le plus frais gagne).
+      // 5.383 : l'heure où CETTE frise a été lue (comparée à `aExpedierAt` par l'app : l'état le plus frais gagne).
       ...((m.etapes && Object.keys(m.etapes).length) || m.statut ? { etapesAt: new Date().toISOString() } : {}),
       paiementEstime: m.paiementEstime || prev.paiementEstime || '',
       ...(bord ? { bordereau: bord } : {}),

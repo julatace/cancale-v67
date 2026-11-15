@@ -5,6 +5,7 @@ import ecran_studio from './it/studio.js';   // (14 nov.) Studio bleu clair : le
 import ecran_correspondances from './it/correspondances.js';   // (15 nov.) Publier partout : catégories qui correspondent
 import ecran_capte from './it/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_vcventes from './it/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
+import ecran_renvoyer from './it/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_idees from './it/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './it/ventes.js';
 import ecran_commun from './it/commun.js';
@@ -2260,4 +2261,5 @@ export default {
   ...ecran_capte,
   ...ecran_vcventes,
   ...ecran_correspondances,
+  ...ecran_renvoyer,
 };

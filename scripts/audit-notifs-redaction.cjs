@@ -213,10 +213,12 @@ function serviceWorker() {
   });
 
   // ── 3. « Bordereau de retour reçu » — la vraie route /api/email-inbound ──
+  // (15 nov., lot retours) Le corps dit QUI renvoie (« retourner la commande au vendeur ») : la route le lit
+  // (`sensDuBordereau`) et garde « à vérifier » un bordereau qui ne le dit pas.
   await essaie('3 bordereau de retour', async () => {
     remettre(base());
     const r = await appelEmail({ subject: 'Bordereau de retour - Autry donna - à utiliser avant le 23/11/2026 10:00',
-      text: `Bonjour,\nVoici ton bordereau de retour.\nArticle : Autry donna\nNuméro de transaction : ${TX_RETOUR}\nNuméro de suivi : 1A2B3C4D5E6F\nDate limite d'envoi : 23/11/2026 10:00\n`,
+      text: `Bonjour,\nVoici ton bordereau de retour pour retourner la commande au vendeur.\nArticle : Autry donna\nNuméro de transaction : ${TX_RETOUR}\nNuméro de suivi : 1A2B3C4D5E6F\nDate limite d'envoi : 23/11/2026 10:00\n`,
       attachments: [{ filename: `Bon-Retour-Vinted-${TX_RETOUR}.pdf`, contentType: 'application/pdf', contentB64: Buffer.from('%PDF-1.4 bordereau de banc ' + 'x'.repeat(80)).toString('base64') }] });
     const p = pushes[0] || {};
     CAPTURE.push(['bordereau de retour', p.title, p.body]);

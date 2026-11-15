@@ -26,8 +26,10 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
-  // (15 nov., extension 5.382) Ventes Vestiaire : l'état le plus frais gagne, l'état en mots, le prix de vente.
+  // (15 nov., extension 5.383) Ventes Vestiaire : l'état le plus frais gagne, l'état en mots, le prix de vente.
   { id: 'vestiaire-ventes-justes', date: '2026-11-15', titre: 'Ventes Vestiaire : le vrai état, le vrai prix', phrase: 'Expédiée, en livraison, payée : plus de code ni de faux retard.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (15 nov., lot retours) docs/passation/2026-11-15-retours.md — « À renvoyer » : une carte par retour d'achat.
+  { id: 'retours-a-renvoyer', date: '2026-11-15', titre: 'Retours : bordereau, date et heure, une carte', phrase: 'En tête de Ma journée : imprime, dépose, suis le remboursement.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « fais de plus belles notifications ») docs/passation/2026-11-15-notifications-belles.md
   { id: 'notifications-belles', date: '2026-11-15', titre: 'Des notifications courtes, la paire nommée', phrase: 'Dates en clair, sans pseudo d’acheteur, le toucher ouvre le bon écran.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (15 nov., extension 5.381) docs/passation/2026-11-15-publier-partout-categories.md — src/correspondances.js
