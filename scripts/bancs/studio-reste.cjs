@@ -110,18 +110,32 @@ function mesurer({ racine, tactile }) {
       const c = cAv && cAv.a >= 0.5 ? cAv : rgbs(cs.backgroundColor)[0];
       const g = cs.backgroundImage && cs.backgroundImage !== 'none' ? rgbs(cs.backgroundImage).filter((k) => k.a >= 0.5) : [];
       pile.push({ c, g });
-      if ((c && c.a >= 0.99) || g.length) break;
+      // (15 nov., « Verre dépoli ») un dégradé TRANSLUCIDE (le verre : .80 le jour, .62 la nuit) laisse voir ce qui est
+      // dessous : on continue de remonter ; seul un fond opaque arrête.
+      if ((c && c.a >= 0.99) || (g.length && g.every((k) => k.a >= 0.99))) break;
     }
-    let bases = [{ r: 255, g: 255, b: 255, a: 1 }];
+    // Rien d'opaque jusqu'en haut : le FOND de l'app. (15 nov., « Verre dépoli », docs/passation/2026-11-15-verre-depoli.md
+    // « La preuve ») Il se lit sur les jetons rendus — le haut éclairé de ses reflets, l'aplat, le bas — et le texte est
+    // jugé sur le pire (la règle de verre.cjs V3) ; il n'est plus figé en blanc (jour) / noir (nuit), l'hypothèse
+    // du studio d'hier. Sans jetons lisibles : ce blanc / ce noir.
     const sombre = document.documentElement.getAttribute('data-theme') === 'dark';
-    if (sombre) bases = [{ r: 0, g: 0, b: 0, a: 1 }];
+    let bases = fondApp.length ? fondApp.slice() : [sombre ? { r: 0, g: 0, b: 0, a: 1 } : { r: 255, g: 255, b: 255, a: 1 }];
+    if (pile.length && ((pile[pile.length - 1].c && pile[pile.length - 1].c.a >= 0.99) || (pile[pile.length - 1].g.length && pile[pile.length - 1].g.every((k) => k.a >= 0.99)))) bases = [bases[0]];
     for (let i = pile.length - 1; i >= 0; i--) {
       const { c, g } = pile[i];
-      if (g.length) bases = g.map((k) => melange(k, bases[0]));
       if (c && c.a > 0) bases = bases.map((b) => melange(c, b));
+      if (g.length) bases = g.flatMap((k) => bases.map((b) => melange(k, b))).slice(0, 24);
     }
     return bases;
   };
+  const fondApp = (() => {
+    const coque = document.querySelector('.vrm-app-shell[data-espace]') || document.querySelector('.vrm-app-shell') || document.documentElement;
+    const tok = (n) => { const v = getComputedStyle(coque).getPropertyValue(n).trim(); const h = /^#([0-9a-f]{6})$/i.exec(v); return h ? { r: parseInt(h[1].slice(0, 2), 16), g: parseInt(h[1].slice(2, 4), 16), b: parseInt(h[1].slice(4, 6), 16), a: 1 } : rgbs(v)[0] || null; };
+    let haut = tok('--sb-haut'); const aplat = tok('--sb-aplat'), bas = tok('--sb-bas'), reflet = tok('--sv-reflet'), reflet2 = tok('--sv-reflet-2');
+    if (haut && reflet2) haut = melange(reflet2, haut);
+    if (haut && reflet) haut = melange(reflet, haut);
+    return [haut, aplat, bas].filter((k) => k && k.a >= 0.99);
+  })();
   const nom = (el) => {
     const c = typeof el.className === 'string' ? el.className.split(/\s+/).filter(Boolean).slice(0, 2).join('.') : '';
     const d = [...el.attributes].filter((a) => a.name.startsWith('data-')).slice(0, 1).map((a) => `[${a.name}]`).join('');
@@ -134,7 +148,9 @@ function mesurer({ racine, tactile }) {
   const R = roots[0];
   out.matiere.espace = !!R.closest('[data-espace]') || !!R.querySelector('[data-espace], .vrm-tache[data-tache="messages"]') || R.hasAttribute('data-espace') || R.matches('.vrm-chat-panel');
   const fondMain = getComputedStyle(document.querySelector('.vrm-main') || R).backgroundImage;
-  out.matiere.fondBleu = /gradient/.test(fondMain) || /gradient/.test(getComputedStyle(document.querySelector('.vrm-app-shell') || R).backgroundImage) || /gradient/.test(getComputedStyle(R).backgroundImage) || /gradient/.test(getComputedStyle(document.querySelector('.vrm-cx') || R).backgroundImage);
+  // (15 nov., « Verre dépoli ») la lumière peut être portée par le ::before fixe de la coque (règle de studio-coque F).
+  const avantCoque = document.querySelector('.vrm-app-shell') ? getComputedStyle(document.querySelector('.vrm-app-shell'), '::before') : null;
+  out.matiere.fondBleu = (!!avantCoque && avantCoque.content !== 'none' && avantCoque.position === 'fixed' && /gradient/.test(avantCoque.backgroundImage)) || /gradient/.test(fondMain) || /gradient/.test(getComputedStyle(document.querySelector('.vrm-app-shell') || R).backgroundImage) || /gradient/.test(getComputedStyle(R).backgroundImage) || /gradient/.test(getComputedStyle(document.querySelector('.vrm-cx') || R).backgroundImage);
   // ── Les boutons et leurs formes ──
   const sel = 'button, a[href], [role="button"], summary, [role="tab"]';
   const tous = [...new Set(roots.flatMap((r) => [...r.querySelectorAll(sel)]))];
