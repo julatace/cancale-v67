@@ -101,7 +101,22 @@ cache HTTP et fausse le mode de cache que voit le service worker).
   Safari n'a pas été observé ; le correctif (oublier la coquille avant de relire) ne dépend plus de lui.
 - iOS choisit l'image de lancement claire/sombre selon le thème du SYSTÈME (pas `vinted_dark`).
 
-## Temps jusqu'à Ma journée
+## Mesures — temps jusqu'à Ma journée
 
-Voir la section « Mesures » ci-dessous (`_mesure-demarrage.cjs`, 390 tactile, 4G, processeur ×4, base
-inventée au poids réel + 1 000 annonces, `ANNONCES=1000`).
+`TABS=journee ANNONCES=1000 node scripts/bancs/_mesure-demarrage.cjs <dist>` : ouverture à FROID (sans
+service worker), 390 tactile, 4G (9 Mb/s, 60 ms), processeur ×4, base inventée au poids réel + 1 000
+annonces. Machine partagée très chargée (charge 45-50 sur 4 cœurs) : à lire comme « pas de régression ».
+
+| build | prêt (ms) | tâches longues (ms) | plus longue (ms) | JS (Ko compressés) |
+|---|---|---|---|---|
+| départ (3ac51daf) | 12 726 · 14 417 | 14 565 · 16 744 | 2 091 · 2 273 | 2 249 |
+| ouverture | 12 889 · 13 990 | 17 262 · 16 227 | 2 146 · 2 170 | 2 252 |
+
+Après une mise en ligne (banc ouverture, 2c, réseau à 300 ms par fichier) : départ = 3 chargements,
+Ma journée à ~8,2 s ; ouverture = 2 chargements, Ma journée à ~7,3 s, et le seul rechargement a lieu sous
+l'écran de démarrage (l'ancienne Ma journée n'est jamais montrée).
+
+**Le gros morceau qui bloque l'ouverture (dit, pas entrepris)** : `App-*.js` = 5,2 Mo (1,7 Mo
+compressés) analysé et exécuté d'un bloc avant le premier écran — ~15 s de tâches longues au processeur ×4,
+la plus longue ≈ 2,1 s ; et `App-*.css` = 1,98 Mo (287 Ko compressés), une feuille énorme pour chaque
+recalcul de styles. C'est là qu'est le temps, pas dans le réseau ni dans l'écran de chargement.
