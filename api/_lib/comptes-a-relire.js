@@ -89,22 +89,32 @@ export function comptesARelire({ comptes, captures, masques, panneau, etats, sup
 // compté. ⚠️ Jamais « Chrome » : le navigateur où est l'extension peut être
 // Edge, Brave, Opera, Orion… (audit-chrome-en-dur).
 const NOMS_MAX = 4;
+// (15 nov., Julien : « de plus belles notifications ») Le corps tient en 90 caractères
+// (api/_lib/notif-redaction.js) avec LE geste en entier : les noms qui ne tiennent pas
+// sont comptés (« et 2 autres »), jamais coupés au milieu.
+const CORPS_MAX_RELIRE = 90;
 export function texteComptesARelire(liste) {
   const l = Array.isArray(liste) ? liste.filter((x) => x && x.nom) : [];
   if (!l.length) return null;
-  const geste = 'dans le navigateur où est l’extension VRM';
   if (l.length === 1) {
     const c = l[0];
     return {
       title: `Compte Vinted pas relu : ${c.nom}`,
-      body: `Dernière lecture ${c.age || 'il y a plus de 24 h'}. Ouvre vinted.fr connecté sur ce compte, ${geste}.`,
+      body: `Lu ${c.age || 'il y a plus de 24 h'} · ouvre vinted.fr sur ce compte, là où est l’extension VRM.`,
     };
   }
-  const montres = l.slice(0, NOMS_MAX).map((c) => (c.age ? `${c.nom} (${c.age.replace(/^il y a /, '')})` : c.nom));
-  const reste = l.length - montres.length;
+  const geste = ' : ouvre vinted.fr sur chacun, là où est l’extension VRM.';
+  const autres = (k) => (k > 0 ? ` et ${k} autre${k > 1 ? 's' : ''}` : '');
+  // Avec l'âge de chaque lecture si tout tient ; sinon les noms seuls (plus de noms dits).
+  const tenir = (noms) => { let n = Math.min(NOMS_MAX, noms.length); while (n > 1 && (noms.slice(0, n).join(', ') + autres(noms.length - n) + geste).length > CORPS_MAX_RELIRE) n -= 1; return n; };
+  const avecAge = l.map((c) => (c.age ? `${c.nom} (${c.age.replace(/^il y a /, '')})` : c.nom));
+  const nus = l.map((c) => c.nom);
+  const nA = tenir(avecAge), nN = tenir(nus);
+  const noms = nA >= Math.min(NOMS_MAX, l.length) || nA >= nN ? avecAge : nus;
+  const n = noms === avecAge ? nA : nN;
   return {
     title: `${l.length} comptes Vinted pas relus`,
-    body: `${montres.join(', ')}${reste > 0 ? ` et ${reste} autre${reste > 1 ? 's' : ''}` : ''} : ouvre vinted.fr connecté sur chacun, ${geste}.`,
+    body: `${noms.slice(0, n).join(', ')}${autres(noms.length - n)}${geste}`,
   };
 }
 

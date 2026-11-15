@@ -395,7 +395,7 @@ function chargeApp(noms, injecte) {
     const p1 = retraitDe();
     const tags = p1.map((p) => p.tag).sort();
     const dm = p1.find((p) => p.tag === 'retrait-demain-30000026') || {};
-    dit(/^(📍 )?Demain dernier jour\b/.test(dm.title || '') && /Baskets cuir camel 42/.test(`${dm.title} ${dm.body}`) && /À retirer demain · Bar Test · code 512345 · Mondial Relay n°30000026/.test(dm.body || '') && !p1.some((p) => /3000002[78]/.test(p.tag || '')),
+    dit(/^(📍 )?Demain dernier jour\b/.test(dm.title || '') && /Baskets cuir/.test(`${dm.title} ${dm.body}`) && (dm.body || '').length <= 90 && /À retirer demain · Bar Test · code 512345 · Mondial Relay n°30000026/.test(dm.body || '') && !p1.some((p) => /3000002[78]/.test(p.tag || '')),
       'cron : la VEILLE (date limite lue demain) — « Demain dernier jour · <article> », point, code, n° ; jamais pour un retiré ni sans date limite lue (13 nov.)', `${dm.title} | ${dm.body} | ${tags.join(' · ')}`);
     dit(JSON.stringify(tags.filter((t) => !/demain/.test(t))) === JSON.stringify(['retrait-dernier-30000021', 'retrait-dernier-VGS12345678027']),
       'cron : « dernier jour » (dont le n° lu dans le sujet) — « à vérifier » ne sonne plus (3 nov. : un délai passé n\'est pas un fait) — jamais le colis retiré ailleurs, coché, ni fini pour l\'app', `HTTP ${r1.code} · ${tags.join(' · ')}`);

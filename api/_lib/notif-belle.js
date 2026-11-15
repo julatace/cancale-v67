@@ -32,55 +32,66 @@
 // ────────────────────────────────────────────────────────────────────────────
 import { familleDe, FAMILLES } from './notif-textes.js';
 import { DESTINATIONS, lienNotif } from './lien-notif.js';
+// (15 nov.) LA RÈGLE DE RÉDACTION (api/_lib/notif-redaction.js) : titre ≤ 40, corps ≤ 90,
+// coupe sur un mot, aucun identifiant technique ; le texte d'un regroupement dans la
+// langue du vendeur.
+import { TITRE_MAX as TITRE_R, CORPS_MAX as CORPS_R, couperMot, couperPhrases, sansIdentifiant, titreGroupe, corpsGroupe } from './notif-redaction.js';
 
 export const ICONE_NOTIF = '/vrm-icon-v5-192.png';
 // Monochrome (blanc sur transparent, 96 px) : Android le dessine dans la barre d'état.
 export const BADGE_NOTIF = '/vrm-badge-96.png';
-export const TITRE_MAX = 40;
-export const CORPS_MAX = 170;
+export const TITRE_MAX = TITRE_R;
+// (15 nov.) 170 ⇒ 90 : sur l'écran verrouillé d'un iPhone, quatre lignes au plus.
+export const CORPS_MAX = CORPS_R;
 
 // Tout pictogramme (emoji, ⚠ ✅ ↩ ⏰ ❤ …), les sélecteurs de variante et les
 // jointures. Les lettres, chiffres, « € », « N° », « · » restent.
 const PICTO = /[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{1F3FB}-\u{1F3FF}︎️‍⃣]/gu;
 export function sansEmoji(s) {
-  return String(s == null ? '' : s).replace(PICTO, ' ').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ')
+  return String(s == null ? '' : s).replace(PICTO, ' ').replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/[^\S\u00a0\u202f]+/g, ' ')
     .replace(/^[\s·:—–-]+/, '').replace(/[\s·:—–-]+$/, '').trim();
 }
-export const couper = (s, n) => { const x = String(s || ''); return x.length > n ? x.slice(0, n - 1).trimEnd() + '…' : x; };
+// (15 nov.) Coupé sur un MOT (« … »), jamais au milieu.
+export const couper = (s, n) => couperMot(s, n);
 const majuscule = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
 // Le texte d'une notification, propre : `{ title, body }`.
 export function embellir({ title = '', body = '' } = {}, cat = null) {
-  let t = sansEmoji(title);
-  let b = sansEmoji(body);
+  // (15 nov.) Aucun identifiant technique (n° de compte, de transaction, uuid, clé de ligne).
+  let t = sansIdentifiant(sansEmoji(title));
+  let b = sansIdentifiant(sansEmoji(body));
   if (t.length > TITRE_MAX) {
     // Couper sur un séparateur : la suite descend dans le corps, rien ne se perd.
     // « : » ne coupe que si ce qui précède dit déjà un fait (3 mots au moins) :
     // « Chronopost : ton colis… » ne doit pas devenir le titre « Chronopost ».
     const m = /^(.{6,}?)\s+(?:·|—|–|-)\s+(.+)$/.exec(t) || ((x) => (x && x[1].trim().split(/\s+/).length >= 3 ? x : null))(/^(.{6,}?)\s*:\s+(.+)$/.exec(t));
     const tete = m && m[1].length <= TITRE_MAX ? m[1] : null;
-    if (tete) { b = [majuscule(m[2]), b].filter(Boolean).join(' · '); t = tete; }
+    // (15 nov.) Corps ≤ 90 : la suite du titre passe en tête ; si le tout ne tient pas, elle
+    // passe en QUEUE (c'est elle qui sera coupée, jamais le lieu, le code ou le n° du corps).
+    if (tete) { const devant = [majuscule(m[2]), b].filter(Boolean).join(' · '); b = devant.length <= CORPS_MAX || !b ? devant : [b, m[2]].join(' · '); t = tete; }
     else { if (!b) b = t; t = couper(t, TITRE_MAX); }
   }
   if (!t) {
     const f = FAMILLES.find((x) => x.id === familleDe(cat));
     t = f ? f.titre : 'VRM';
   }
-  return { title: t, body: couper(b, CORPS_MAX) };
+  // (15 nov.) Corps ≤ 90 : les phrases entières qui tiennent, jamais une phrase coupée au milieu.
+  return { title: t, body: couperPhrases(b, CORPS_MAX) };
 }
 
 // ── LES GENRES : ce qui se regroupe, et comment ────────────────────────────
 // `re` : l'étiquette posée par l'émetteur (une par objet) ; `titre(k)` : la
 // notification regroupée ; `url` : l'écran de la liste ; `action` : le geste.
 export const GENRES = [
-  { id: 'bordereau', sansTitre: true, re: /^bord-/, titre: (k) => `${k} bordereaux prêts à imprimer`, url: DESTINATIONS.colis({}), action: { action: 'voir', title: 'Imprimer' } },
-  { id: 'vente', re: /^(sale|vc-vente)-/, titre: (k) => `${k} ventes`, url: lienNotif('ventes'), action: { action: 'voir', title: 'Voir la vente' } },
-  { id: 'argent', re: /^final-/, titre: (k) => `${k} versements reçus`, url: lienNotif('ventes', { site: 'vinted' }), action: null },
-  { id: 'arrivee', re: /^(relais|retrait-code)-/, titre: (k) => `${k} colis t'attendent`, url: DESTINATIONS.retrait({}), action: { action: 'voir', title: 'Voir le code' } },
-  { id: 'offre', re: /^offer-/, titre: (k) => `${k} offres à trancher`, url: DESTINATIONS.offres(), action: { action: 'voir', title: 'Répondre' } },
+  // (15 nov.) `titre(k, langue)` : le texte vient de la règle de rédaction (5 langues).
+  { id: 'bordereau', sansTitre: true, re: /^bord-/, titre: (k, l) => titreGroupe('bordereau', k, l), url: DESTINATIONS.colis({}), action: { action: 'voir', title: 'Imprimer' } },
+  { id: 'vente', re: /^(sale|vc-vente)-/, titre: (k, l) => titreGroupe('vente', k, l), url: lienNotif('ventes'), action: { action: 'voir', title: 'Voir la vente' } },
+  { id: 'argent', re: /^final-/, titre: (k, l) => titreGroupe('argent', k, l), url: lienNotif('ventes', { site: 'vinted' }), action: null },
+  { id: 'arrivee', re: /^(relais|retrait-code)-/, titre: (k, l) => titreGroupe('arrivee', k, l), url: DESTINATIONS.retrait({}), action: { action: 'voir', title: 'Voir le code' } },
+  { id: 'offre', re: /^offer-/, titre: (k, l) => titreGroupe('offre', k, l), url: DESTINATIONS.offres(), action: { action: 'voir', title: 'Répondre' } },
   // (11 nov.) Les rappels posés par le vendeur (« Me le rappeler ») : plusieurs ⇒ « 3 rappels », Ma journée.
-  { id: 'rappel', re: /^rappel-/, titre: (k) => `${k} rappels`, url: lienNotif('journee'), action: { action: 'voir', title: 'Ouvrir' } },
-  { id: 'message', re: /^msg-/, titre: (k) => `${k} nouveaux messages`, url: lienNotif('messages', { site: 'vinted' }), action: { action: 'voir', title: 'Répondre' } },
+  { id: 'rappel', re: /^rappel-/, titre: (k, l) => titreGroupe('rappel', k, l), url: lienNotif('journee'), action: { action: 'voir', title: 'Ouvrir' } },
+  { id: 'message', re: /^msg-/, titre: (k, l) => titreGroupe('message', k, l), url: lienNotif('messages', { site: 'vinted' }), action: { action: 'voir', title: 'Répondre' } },
 ];
 // Le genre d'une notification (par son étiquette), ou `null` (elle ne se regroupe pas :
 // double vente, rappels, dernier jour d'un retrait — chacun compte seul).
@@ -108,11 +119,13 @@ export const etiquette = ({ tag, cat }) => String(tag || '').replace(/[^A-Za-z0-
 export const etiquetteGroupe = (genre) => `vrm-${genre.id}`;
 
 // Le texte regroupé : `k` notifications NON LUES de ce genre (celle-ci comprise).
-// k ≤ 1 ⇒ inchangé. Le corps dit la dernière (son titre, puis son corps).
-export function texteGroupe(n, genre, k) {
+// k ≤ 1 ⇒ inchangé. (15 nov.) Le corps dit LA PLUS RÉCENTE en une ligne courte :
+// sa `ligne` quand la règle de rédaction l'a faite (« 9060 vert/blanc T38, expire
+// dans 24 h »), sinon son titre puis son corps. Dans la langue du vendeur.
+export function texteGroupe(n, genre, k, langue = 'fr') {
   if (!genre || !(k > 1)) return n;
-  const derniere = (genre.sansTitre && n.body ? [n.body] : [n.title, n.body]).filter(Boolean).join(' · ');
-  return { title: couper(genre.titre(k), TITRE_MAX), body: couper(`Dernier : ${derniere}`, CORPS_MAX), url: genre.url };
+  const derniere = n.ligne ? n.ligne : (genre.sansTitre && n.body ? [n.body] : [n.title, n.body]).filter(Boolean).join(' · ');
+  return { title: couper(genre.titre(k, langue), TITRE_MAX), body: corpsGroupe(derniere, langue), url: genre.url };
 }
 
 // La photo : seulement prouvée (même e-mail que la vente) et servie par Vinted.

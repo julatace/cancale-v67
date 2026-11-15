@@ -2,8 +2,9 @@
 import ecran_journee from './en/journee.js';
 import ecran_confort from './en/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_studio from './en/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
-import ecran_capte from './en/capte.js';
-import ecran_retrait_ailleurs from './en/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »   // (14 nov., extension 5.377) « L'extension a capté »
+import ecran_correspondances from './en/correspondances.js';   // (15 nov.) Publier partout : catégories qui correspondent
+import ecran_capte from './en/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
+import ecran_retrait_ailleurs from './en/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
 import ecran_idees from './en/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './en/ventes.js';
 import ecran_commun from './en/commun.js';
@@ -31,6 +32,7 @@ import ecran_accueilReste from './en/accueilReste.js';
 import ecran_fraiscarte from './en/fraiscarte.js';   // (14 nov., frais-carte)
 import ecran_atelier from './en/atelier.js';
 import ecran_accompagnement from './en/accompagnement.js';   // (14 nov.) les quatre moments d'un geste
+import ecran_partenaires from './en/partenaires.js';   // (15 nov.) programme partenaire
 import ecran_argentprix from './en/argentprix.js';   // (14 nov., argent-prix)
 import ecran_rechliste from './en/rechliste.js';
 import ecran_studio_paires from './en/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
@@ -50,6 +52,7 @@ export default {
   ...ecran_accompagnement,
   ...ecran_plus,
   ...ecran_argentprix,
+  ...ecran_partenaires,
   ...ecran_plateformes,
   ...ecran_idees,
   ...ecran_compta,
@@ -378,14 +381,14 @@ export default {
   "auth.moyens.chargement": "Loading other sign-in options… You can already use your email.",
   "auth.moyens.erreur": "The other sign-in options couldn’t load. Email is still available.",
   "auth.moyens.reessayer": "Retry sign-in options",
-  "auth.ouEmail": "or with email",
+  "auth.ou": "or",
   "auth.oublie": "Forgot password?",
   "auth.perime.1": "Over 10 minutes: the extension isn’t connected.",
   "auth.perime.2": "Sign in, then click “Continue with Google” (or Discord) in the extension again.",
   "auth.pied": "We never ask for your Vinted password.",
   "auth.point1.texte": ", in the right order, with their labels.",
   "auth.point1.titre": "Today’s parcels",
-  "auth.point2.texte": ": Vinted, Leboncoin and eBay in one place.",
+  "auth.point2.texte": ": Vinted, Leboncoin, eBay and Vestiaire in one place.",
   "auth.point2.titre": "Sold here, remove elsewhere",
   "auth.point3.texte": ", ready for URSSAF, month by month.",
   "auth.point3.titre": "Your numbers",
@@ -2256,4 +2259,5 @@ export default {
   ...ecran_studio,
   ...ecran_capte,
   ...ecran_retrait_ailleurs,
+  ...ecran_correspondances,
 };

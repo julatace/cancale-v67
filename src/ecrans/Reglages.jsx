@@ -128,6 +128,7 @@ import { TableauProprietaire } from "../composants/TableauProprietaire.jsx";
 import { SimulationCompte } from "../SimulationCompte.jsx";
 import { OuvrirPaiements } from "../composants/OuvrirPaiements.jsx";   // (12 nov.) propriétaire seul
 import { GroupeIos, RangeeIos } from '../composants/Ios.jsx';
+import Partenaires from '../partenaires/Partenaires.jsx';   // (15 nov.) le programme partenaire, Julien seul
 import { etatAbonnement, lienParrainage, lectureSeuleActive, EXPORT_FERME } from '../abonnement/etatAbonnement.js';
 import { PHRASE_PARRAINAGE, TEXTE_PARTAGE, texteEtatFilleul, jourCourt, moisGagnes, offertPar, prendreDemandeParrainage } from '../parrainage/parrainage.js';   // (13 nov., lot 54)
 import { nomEcran as nomEcranVeille } from "../../api/_lib/veille-plantages.js";
@@ -2336,7 +2337,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   ];
   // L'onglet Abonnement : la carte de l'abonnement, d'un bloc (statut, prix,
   // carte, factures, résilier) — le MÊME composant qu'avant (§11).
-  const GROUPES_ABONNEMENT = [{ id:'abonnement', titre:null, brut:true, items:[{ id:'abonnement', type:'el', el:<div key="abonnement" data-onglet-abonnement=""><MonAbonnement/>{proprioInst === true ? null : <Parrainage/>}</div> }] }];
+  const GROUPES_ABONNEMENT = [{ id:'abonnement', titre:null, brut:true, items:[{ id:'abonnement', type:'el', el:<div key="abonnement" data-onglet-abonnement=""><MonAbonnement/>{proprioInst === true ? <Partenaires enTete={enTeteSession} toast={toast}/> : <Parrainage/>}</div> }] }];
   const groupes = [...(voirCompte ? GROUPES_COMPTE : []), ...(voirReglages ? GROUPES_REGLAGES : []), ...(voirAbonnement ? GROUPES_ABONNEMENT : [])].filter(Boolean)
     .map((g) => ({ ...g, items: g.items.filter(Boolean) }));
   const panneaux = groupes.flatMap((g) => g.items.filter((it) => it.type === 'panneau'));

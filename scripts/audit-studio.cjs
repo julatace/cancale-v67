@@ -37,6 +37,7 @@ const MIGRES = [
   'src/ui/Filtres.jsx', 'src/ui/BarreOutils.jsx', 'src/ui/MenuCompte.jsx', 'src/ui/Feuille.jsx',
   'src/ui/LigneAFaire.jsx', 'src/ui/AFaire.jsx', 'src/ui/Ligne.jsx', 'src/ui/BandeChiffres.jsx',
   'src/ARetirerAilleurs.jsx',   // (15 nov., retrait-ailleurs)
+  'src/partenaires/Partenaires.jsx', 'src/VuePartenaire.jsx',   // (15 nov.) le programme partenaire
 ];
 const FORMES = /\bsb-(btn-plein|touche|rond|lien|rangee|tuile|lame)\b/;
 

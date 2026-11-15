@@ -32,7 +32,7 @@ export function lienNotif(tab, o = {}) {
   }
   // Une cible dont l'identité manque n'est pas une cible.
   const garde = (cible, ...cles) => (o.cible === cible && !cles.some((c) => propre(p[c]))) ;
-  if (garde('conv', 'conv') || garde('offre', 'conv') || garde('vcvente', 'vc') || garde('vente', 'tx') || garde('colis', 'tx') || garde('achat', 'tx') || garde('retrait', 'tx', 'suivi')) {
+  if (garde('conv', 'conv') || garde('offre', 'conv') || garde('vcvente', 'vc') || garde('vente', 'tx') || garde('colis', 'tx') || garde('achat', 'tx') || garde('retour', 'tx') || garde('retrait', 'tx', 'suivi')) {
     return '/?' + parts.filter((x) => /^(tab|site|section|vue|compte)=/.test(x)).join('&');
   }
   return '/?' + parts.join('&');
@@ -61,6 +61,9 @@ export const DESTINATIONS = {
   // Achats (la liste complète) · la ligne de l'achat.
   // (11 nov.) L'écran Achats lui-même (`cat_achats` mène désormais à « À retirer », src/colisPlace.js).
   achat: ({ tx } = {}) => lienNotif('achats', { vue: 'achats', ...(tx ? { cible: 'achat', tx } : {}) }),
+  // (15 nov.) Le bordereau de retour d'un ACHAT : Achats, LA CARTE de ce retour (par SON
+  // n° de transaction, `data-cible="retour:<tx>"` sur la carte, src/RetoursLitiges.jsx).
+  retour: ({ tx } = {}) => lienNotif('achats', { vue: 'achats', ...(tx ? { cible: 'retour', tx } : {}) }),
   // Comptabilité · « Ta déclaration URSSAF ».
   urssaf: () => lienNotif('compta', { cible: 'urssaf' }),
   // (13 nov., point 17) La veille de l'échéance : Argent → « Déclarer », la section URSSAF

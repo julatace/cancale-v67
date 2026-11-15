@@ -39,6 +39,7 @@ const MIGRES = [
   ['src/ARetirerAilleurs.jsx', ['*']],   // (15 nov., retrait-ailleurs) « À retirer ailleurs »
   ['src/ui/Accompagne.jsx', ['*']],   // (14 nov., lot accompagnement) la brique commune des quatre moments
   ['src/ImpressionSimple.jsx', ['*']],   // (14 nov., impression-simple) « Imprimer » en un toucher : les deux feuilles
+  ['src/partenaires/Partenaires.jsx', ['*']], ['src/VuePartenaire.jsx', ['*']],   // (15 nov.) le programme partenaire
   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure.
   ['src/paireHistoire/LigneDeTemps.jsx', ['*']], ['src/meilleureHeure/MeilleureHeure.jsx', ['*']],
   ['src/autreTaille/AutreTaille.jsx', ['*']], ['src/autreTaille/OutilsFiche.jsx', ['*']],
@@ -54,6 +55,7 @@ const MIGRES = [
   ['src/GuideDemarrage.jsx', ['BandeauExemple', 'CadreExemple']],   // (14 nov.) le bandeau et le cadre du mode exemple
   ['src/i18n/ChoixLangue.jsx', ['*']],
   ['src/PublierPartout.jsx', ['*']],
+  ['src/CorrespondancesPartout.jsx', ['*']],   // (15 nov.) catégories qui correspondent d'un site à l'autre
   ['src/main.jsx', ['DernierFilet']],
   ['src/App.jsx', ['AuthScreen', 'CaptchaConnexion', 'LiensLegaux', 'titreEcran', 'SideBar']],
   ['src/ecrans/Reglages.jsx', ['LangueSetting', 'SettingsScreen:groupes', 'ImpressionBordereaux', 'nomPapier']],
