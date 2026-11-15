@@ -22,7 +22,7 @@ const B = require('./_base-messages-stock.cjs');
 
 const SHOTS = process.env.SHOTS || path.join(require('os').tmpdir(), 'banc-securite-ventes');
 const VUES = process.env.VUES ? process.env.VUES.split(',') : null;
-const DSF = Number(process.env.DSF || 1);
+const DSF = Number(process.env.DSF || 1);   // (appliqué au 390 seulement : une capture 1512 à ×2 dépasse le temps d'une machine chargée)
 fs.mkdirSync(SHOTS, { recursive: true });
 let ok = 0, ko = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
@@ -64,7 +64,7 @@ const ROUGE = `(c) => { const m = String(c).match(/\\d+(\\.\\d+)?/g); if (!m) re
 
       // ── A. Messages ──
       await essaie(`A ${nom}`, async () => {
-        const o = await P.ouvrir(nav, { W, sombre, b: base(), url: '/?tab=messages&site=vinted', api: B.apiVolume, dsf: DSF });
+        const o = await P.ouvrir(nav, { W, sombre, b: base(), url: '/?tab=messages&site=vinted', api: B.apiVolume, dsf: W < 600 ? DSF : 1 });
         try {
           await P.pret(o.pg);
           await o.pg.waitForSelector('[data-conv="51000000000"]', { timeout: 20000 });
@@ -77,7 +77,7 @@ const ROUGE = `(c) => { const m = String(c).match(/\\d+(\\.\\d+)?/g); if (!m) re
           dit(i && i.m === 'fauxPaiement' && /Attention/.test(i.t) && /Vinted/.test(i.t) && /N’envoie rien|n’envoie rien/i.test(i.t), 'A · « I have already paid, check your email » ⇒ UNE bannière « Attention », le risque et le geste, Vinted nommé', JSON.stringify(i && { m: i.m, t: i.t }));
           dit(i && !i.rouge && i.l >= 0 && i.rr <= i.w, 'A · bannière ambre, jamais rouge ; dans l’écran', JSON.stringify(i && { fond: i.fond, rouge: i.rouge, l: i.l, r: i.rr }));
           if (ban) await ban.screenshot({ path: path.join(SHOTS, `arnaque-banniere-${nom}.png`) }).catch(() => {});
-          await o.pg.screenshot({ path: path.join(SHOTS, `arnaque-fil-${nom}.png`) });
+          await o.pg.screenshot({ path: path.join(SHOTS, `arnaque-fil-${nom}.png`), timeout: 90000 }).catch((e) => console.log('   (capture manquée : ' + String(e.message).slice(0, 60) + ')'));
           dit(await deborde(o.pg) <= 1, 'A · rien ne déborde', String(await deborde(o.pg)));
           // une conversation normale (i = 2 : « Je vous propose 45 € livraison comprise »)
           if (W < 600) { await o.pg.locator('.vrm-chat-panel .vrm-chat-back').first().click().catch(() => {}); await o.pg.waitForTimeout(700); }
@@ -93,7 +93,7 @@ const ROUGE = `(c) => { const m = String(c).match(/\\d+(\\.\\d+)?/g); if (!m) re
 
       // ── B. Fiche N°1205 : « Où vendre ? » ──
       await essaie(`B ${nom}`, async () => {
-        const o = await P.ouvrir(nav, { W, sombre, b: base(), url: '/?tab=journee', api: B.apiVolume, dsf: DSF });
+        const o = await P.ouvrir(nav, { W, sombre, b: base(), url: '/?tab=journee', api: B.apiVolume, dsf: W < 600 ? DSF : 1 });
         try {
           await P.pret(o.pg);
           await o.pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: '1205' })));
@@ -119,7 +119,7 @@ const ROUGE = `(c) => { const m = String(c).match(/\\d+(\\.\\d+)?/g); if (!m) re
           await sec.scrollIntoViewIfNeeded().catch(() => {});
           await o.pg.waitForTimeout(300);
           await sec.screenshot({ path: path.join(SHOTS, `ou-vendre-${nom}.png`) }).catch(() => {});
-          await o.pg.screenshot({ path: path.join(SHOTS, `fiche-ou-vendre-${nom}.png`) });
+          await o.pg.screenshot({ path: path.join(SHOTS, `fiche-ou-vendre-${nom}.png`), timeout: 90000 }).catch((e) => console.log('   (capture manquée : ' + String(e.message).slice(0, 60) + ')'));
           const ch = o.pg.locator('[data-ou-vendre-saisie]').first();
           await ch.fill('120');
           await o.pg.waitForTimeout(300);
@@ -135,7 +135,7 @@ const ROUGE = `(c) => { const m = String(c).match(/\\d+(\\.\\d+)?/g); if (!m) re
 
       // ── C. Ma journée : l'anneau ──
       await essaie(`C ${nom}`, async () => {
-        const o = await P.ouvrir(nav, { W, sombre, b: base(), url: '/?tab=journee', api: B.apiVolume, dsf: DSF });
+        const o = await P.ouvrir(nav, { W, sombre, b: base(), url: '/?tab=journee', api: B.apiVolume, dsf: W < 600 ? DSF : 1 });
         try {
           await P.pret(o.pg);
           const an = await o.pg.waitForSelector('[data-objectif-anneau]', { timeout: 20000 }).catch(() => null);
@@ -156,8 +156,13 @@ const ROUGE = `(c) => { const m = String(c).match(/\\d+(\\.\\d+)?/g); if (!m) re
             dit(Number(x.reste) === reste && Number(x.parJour) === pj && /^encore .+ · ≈ .+ par jour jusqu’au \d{1,2} nov\.$/.test(x.phrase.replace(/\s/g, ' ')), `C · « encore ${reste / 100} € · ≈ ${pj / 100} € par jour jusqu’au … »`, JSON.stringify({ reste: x.reste, parJour: x.parJour, jours: x.jours, phrase: x.phrase }));
           }
           dit(x.bouton && x.h >= 44, 'C · l’anneau se touche (44 px) et ouvre le réglage', JSON.stringify({ bouton: x.bouton, h: x.h }));
-          await an.screenshot({ path: path.join(SHOTS, `anneau-${nom}.png`) }).catch(() => {});
-          await o.pg.screenshot({ path: path.join(SHOTS, `journee-anneau-${nom}.png`) });
+          // La tuile du mois entière (l'anneau dans son contexte), découpée dans l'écran après défilement.
+          await an.evaluate((e) => (e.closest('.sb-tuile, [data-carte-stats]') || e).scrollIntoView({ block: 'center', behavior: 'instant' }));
+          await o.pg.waitForTimeout(700);
+          const clip = await an.evaluate((e) => { const r = (e.closest('.sb-tuile, [data-carte-stats]') || e).getBoundingClientRect();
+            return { x: Math.max(0, r.left - 8), y: Math.max(0, r.top - 8), width: Math.min(innerWidth - Math.max(0, r.left - 8), r.width + 16), height: Math.min(innerHeight - Math.max(0, r.top - 8), r.height + 16) }; });
+          await o.pg.screenshot({ path: path.join(SHOTS, `anneau-${nom}.png`), clip, timeout: 90000 }).catch(() => {});
+          await o.pg.screenshot({ path: path.join(SHOTS, `journee-anneau-${nom}.png`), timeout: 90000 }).catch((e) => console.log('   (capture manquée : ' + String(e.message).slice(0, 60) + ')'));
           dit(await pleins(o.pg) <= 1, 'D · Ma journée : un plein au plus', String(await pleins(o.pg)));
           dit(await deborde(o.pg) <= 1, 'D · Ma journée : rien ne déborde', String(await deborde(o.pg)));
           await an.click();

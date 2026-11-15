@@ -15,13 +15,14 @@ const eur = (c) => { const n = c / 100; return monnaie(n, 'EUR', c % 100 ? undef
 const pc = (x) => String(x).replace('.', tr('ov.virgule'));
 
 // La ligne grise d'un site (une seule phrase courte).
+// Le détail d'une estimation (« 15 à 19 % ») : au survol et pour les lecteurs d'écran, pas dans la ligne (moins d'écriture).
+export const detailEstime = (l) => (l.etat === 'estime' && l.pctMin != null && l.pctMax != null && l.pctMin !== l.pctMax
+  ? tr('ov.estimeEcart', { pct: pc(l.pct), min: pc(l.pctMin), max: pc(l.pctMax), n: l.n }) : undefined);
 export function sousLigne(l) {
   if (l.etat === 'pasRelie') return tr('ov.pasRelie');
   if (l.etat === 'connu') return tr(l.site === 'leboncoin' ? 'ov.aucunFraisLbc' : 'ov.aucunFraisVinted');
   if (l.etat === 'estime') {
-    const base = l.pctMin != null && l.pctMax != null && l.pctMin !== l.pctMax
-      ? tr('ov.estimeEcart', { pct: pc(l.pct), min: pc(l.pctMin), max: pc(l.pctMax), n: l.n })
-      : tr('ov.estime', { pct: pc(l.pct), n: l.n });
+    const base = tr('ov.estime', { pct: pc(l.pct), n: l.n });
     return l.site === 'ebay' ? `${base} · ${tr('ov.portAcheteur')}` : base;
   }
   switch (l.raison) {
@@ -62,7 +63,7 @@ export default function OuVendre({ prixDepart = null, sites }) {
             <span className="vrm-ov-marque" aria-hidden="true"><MarquePlateforme site={l.site} taille={22} carre/></span>
             <span className="vrm-ov-txt">
               <span className="vrm-ov-nom">{NOMS[l.site]}</span>
-              <span className="vrm-ov-sous">{sousLigne(l)}</span>
+              <span className="vrm-ov-sous" title={detailEstime(l)}>{sousLigne(l)}</span>
             </span>
             <span className="vrm-ov-droite">
               {l.etat === 'pasRelie' ? null : <b className="vrm-ov-montant">{l.cTouche == null ? '—' : <>{l.etat === 'estime' ? '≈ ' : ''}{eur(l.cTouche)}</>}</b>}
