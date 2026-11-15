@@ -34,6 +34,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'finition-ecrans', date: '2026-11-15', titre: 'Chaque écran repassé : rien ne déborde', phrase: 'Moins de phrases, plus rien de coupé, des cibles au doigt.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « le retrait sur Leboncoin… hyper intuitif, accompagné ») docs/passation/2026-11-15-retrait-ailleurs.md
   { id: 'retrait-ailleurs', date: '2026-11-15', titre: 'Vendue ? Retire-la ailleurs en un toucher', phrase: 'En tête de Ma journée : un bouton par site, VRM suit tout.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (15 nov., Julien : « le nombre de cases que l'on veut, des couleurs, la règle des piles ») docs/passation/2026-11-15-stock-etageres.md
+  { id: 'stock-etageres', date: '2026-11-15', titre: 'Ton stock en étagères colorées et piles', phrase: 'Autant de cases que tu veux ; une pile se tasse toute seule.', tab: 'garage', pour: 'tous', mode: 'tous' },
   // (15 nov., lot retours) docs/passation/2026-11-15-retours.md — « À renvoyer » : une carte par retour d'achat.
   { id: 'retours-a-renvoyer', date: '2026-11-15', titre: 'Retours : bordereau, date et heure, une carte', phrase: 'En tête de Ma journée : imprime, dépose, suis le remboursement.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « fais de plus belles notifications ») docs/passation/2026-11-15-notifications-belles.md
