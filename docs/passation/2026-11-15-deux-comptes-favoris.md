@@ -102,8 +102,14 @@ Extension **5.392.0** (zips régénérés). Aucune donnée réelle dans le dép�
 - Audits voisins verts : en-ligne-deux-fois, photos-comptes, retirer-ailleurs, a-retirer-ailleurs, meme-photo,
   fusion-fiches, vc-offres (O3 mis à jour : l'offre spontanée n'est jamais une recette de RÉPONSE), vc-prix,
   vc-messages, traduction, quoi-de-neuf, coherence, extension-zip.
-- Banc `scripts/bancs/deux-comptes.cjs` (390 tactile ×2 et 1512, clair et sombre) ; banc `en-ligne-deux-fois.cjs`
-  mis à jour (la même paire sur deux comptes a sa carte à elle).
+- Banc `scripts/bancs/deux-comptes.cjs` (390 tactile ×2 et 1512, clair et sombre) : **120 verts, 0 rouge**
+  (`VUES=390-clair` pour un seul rendu ; `CAPTURES=dossier`). Banc `en-ligne-deux-fois.cjs` mis à jour (la même
+  paire sur deux comptes a sa carte à elle ; `X` = l'ancien scénario à deux comptes) : **56 verts**.
+- ⚠️ Constat (pas de ce lot) : `scripts/bancs/vestiaire-messages.cjs` est rouge sur ce build — il ne sert pas la
+  requête `id=in.(…)` qui dit à l'app que Vestiaire est relié, donc l'onglet Vestiaire n'apparaît pas (le banc
+  deux-comptes la sert).
+- Captures (données inventées) : `docs/design/avant-apres/deux-comptes-apres.png`,
+  `deux-comptes-verifier-sombre-apres.png`, `vestiaire-aimes-apres.png`.
 
 ## Gestes de Julien
 1. Installer l'extension **5.392.0** (remplacer le dossier, ⟳ dans chaque Chrome).
