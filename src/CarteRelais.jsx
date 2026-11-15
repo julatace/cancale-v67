@@ -43,6 +43,9 @@ import { NOMS_SOURCES, texteVerifie, verifieAncien, texteNonConfirme } from './s
 import Pourquoi from './composants/PourquoiReplie.jsx';
 import { lienItineraire, appareilApple } from './relaisChange.js';
 import { horairesDuPoint, texteHoraires, etatOuverture, phraseOuverture } from '../api/_lib/horaires-relais.js';   // (13 nov.) les horaires du point, lus dans l'e-mail
+import { CodeComptoir } from './ventes/AchatsVerre.jsx';   // (15 nov., Achats « Verre dépoli ») le code au comptoir, en très grand
+import { IconeV } from './ventes/VentesVerre.jsx';
+import { tr as trVA } from './i18n/index.js';
 
 // (5 nov.) Le crochet d'une notification (`data-cible`, src/cibleNotif.js) : la clé
 // de la ligne EST son identité — « r:v:<tx> » / « r:c:<tx> » (achat Vinted),
@@ -412,6 +415,8 @@ export function BarreDelai({ d, enTete = false }) {
 }
 function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C = null, avecTransp = false, titreDe = null, delai = null, delaiEnTete = false, suiviDe = null, qrDe = null }) {
   const [ouvert, setOuvert] = React.useState(false);
+  // (15 nov., Achats « Verre dépoli ») La feuille « Montre ce code au comptoir » (maquette validée).
+  const [comptoir, setComptoir] = React.useState(false);
   const ouvrirFicheRef = React.useRef(() => setOuvert(true));
   const detailId = React.useId();
   const [copie,setCopie]=React.useState(false);
@@ -503,6 +508,7 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
               est une clé ») CE QU'IL FAUT AU COMPTOIR, sans toucher : le code (gros), le n° de suivi, l'échéance.
               Plus de ligne de sources (« Vinted · e-mail · message · vérifié à… ») : elles restent en data-*. */}
           <span className="vrm-rpf-comptoir" data-rp-comptoir="">
+            {x.code && !desaccord ? <span className="va-code-lib">{trVA('va.code.lib')}</span> : null}
             {desaccord ? <span className="vrm-rpf-code-gros is-ambre" data-rp-code-visible="desaccord" data-rp-code-desaccord="">2 codes</span>
               : x.code ? <span className="vrm-rpf-code-gros sb-plaque sb-plaque--grande" data-rp-code-visible={x.code}>{x.code}{x.code2 ? <span className="vrm-rpf-code2"> · {x.code2}</span> : null}</span>
               : (x.qr ? <span className="vrm-rpf-code-gros is-qr" data-rp-code-visible="qr">QR</span>
@@ -525,8 +531,13 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
         </button>
         {/* (11 nov.) Le code est écrit sur la ligne : plus de bouton « Code » (toucher la ligne ouvre le détail ;
             glisser à gauche le copie toujours). */}
+        {/* (15 nov., Achats « Verre dépoli ») Le code en très grand pour le comptoir (un code lu, sans désaccord). */}
+        {x.code && !desaccord ? <button type="button" className="va-rond-code" data-va-code-grand={x.code} aria-label={trVA('va.code.grand')} title={trVA('va.code.grand')} onClick={(ev) => { ev.stopPropagation(); setComptoir(true); }}><IconeV nom="scan" taille={20} trait={1.9}/></button> : null}
         {retirer ? <button type="button" className="vrm-rpf-retire" data-colis-retire="" aria-label="J’ai retiré ce colis" onClick={(ev) => { ev.stopPropagation(); retirer(x); }}>J’ai retiré</button> : null}
       </div>
+      {comptoir && x.code ? <CodeComptoir code={x.code} lieu={x.lieuNom || ''} adresse={x.lieuAdresse || ''} plan={lienItineraire([x.lieuNom, x.lieuAdresse].filter(Boolean).join(', '), appareilApple()) || null}
+        transporteur={nomAffiche || ''} echeance={dl4 && dl4.texte ? dl4.texte : ''} echeanceAmbre={!!(dl4 && dl4.ambre)} titre={titreSansArticle ? '' : titreAffiche} photo={ph} sous={x.num ? `N°${x.num}` : ''}
+        onRetire={retirer ? () => retirer(x) : null} onFermer={() => setComptoir(false)}/> : null}
       {/* La barre hors du bouton de la ligne (un bouton rend ses enfants muets pour un lecteur d'écran). */}
       {fl['data-fiche-ligne'] || ouvert ? <DansFiche cle={fl['data-fiche-ligne']} place="contexte" seulementFiche={!ouvert}><div className="vrm-rpf-detail" id={detailId} data-rp-detail="">
         {desaccord ? <div className="vrm-rpf-desaccord" data-rp-desaccord="" role="note">

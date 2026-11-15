@@ -1,4 +1,5 @@
 // DEUTSCH — Übersetzung von fr.js (der Quelle). Gleiche Schlüssel, gleiche {Variablen}.
+import ecran_ventesVerre from './de/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
 import ecran_journee from './de/journee.js';
 import ecran_confort from './de/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_studio from './de/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
@@ -44,6 +45,7 @@ import ecran_republier_guide from './de/republierGuide.js';   // (15 nov.) repub
 import ecran_memePhoto from './de/memePhoto.js';   // (15 nov., lot meme-photo)
 import ecran_etageres from './de/etageres.js';   // (15 nov.) le Stock en étagères
 export default {
+  ...ecran_ventesVerre,
   ...ecran_studio_paires,
   ...ecran_republier_guide,
   ...ecran_etageres,

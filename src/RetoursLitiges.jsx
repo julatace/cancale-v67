@@ -20,6 +20,8 @@ import { BoutonBase } from './composants/Bouton.jsx';
 import './styles-retours.css';
 import { motsVendeur } from './profilVendeur.js';
 import { attrCible } from './cibleNotif.js';   // (15 nov.) la notification « À renvoyer » ouvre CETTE carte
+import { etapesRetour } from './ventesVerre.js';   // (15 nov., Achats « Verre dépoli ») les étapes d'un retour, prouvées
+import { EtapesVente } from './ventes/VentesVerre.jsx';
 // (intégration g1) retours-litiges × vocabulaire-article : les textes qui nomment l'article ont une variante
 // `.art` (« l’article ») hors Sneakers ; un vendeur Sneakers garde « la paire » mot pour mot.
 const AVEC_ART = new Set(['pap.verifier', 'pap.etape.recevoir', 'pap.etape.fait', 'pap.revenue', 'pap.revenueN', 'pap.contester']);
@@ -162,6 +164,11 @@ export function CarteRenvoyer({ c, onImprimer, onDepose = null, Photo = null, no
           {c.suiviPartage ? <span className="vrm-ret-ligne" data-retour-suivi-partage="">{tr('renv.suiviPartage')}</span> : c.faitsPasSu ? <span className="vrm-ret-ligne" data-retour-suivi-pas-su="">{tr('renv.suiviPasLu')}</span> : null}
           {c.etape !== 'rembourse' && c.etape !== 'a-deposer' ? <span className="vrm-ret-ligne" data-retour-phrase-remb="">{phraseRemb(c.rembourse)}</span> : null}
         </div>) : null}
+      {/* (15 nov., Achats « Verre dépoli » — maquette « À renvoyer ») Les étapes jusqu'au remboursement, PROUVÉES (src/ventesVerre.js
+          `etapesRetour`, de l'étape de src/retoursAchat.js) ; sur Achats seulement (Ma journée garde la carte compacte). */}
+      {!compact && etapesRetour(c) ? <div className="vv-fiche-st vv-ret-st" data-vv-retour-etapes={c.cle}><EtapesVente etapes={etapesRetour(c)}
+        libelles={{ accepte: tr('va.retour.accepte'), bordereau: tr('va.retour.bordereau'), adeposer: tr('va.retour.adeposer'), enroute: tr('va.retour.enroute'), rembourse: tr('va.retour.rembourse') }}
+        details={{ adeposer: montrerLimite ? phraseQuand(c, now) : '', rembourse: c.rembourse && c.rembourse.montant != null ? monnaie(c.rembourse.montant) : '' }}/></div> : null}
       <LigneSuiviRetour c={c}/>
       <SansPdf c={c}/>
       <div className="vrm-ret-gestes">

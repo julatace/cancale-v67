@@ -4,6 +4,7 @@
 // absente d'une langue, une variable `{x}` qui n'est pas la même partout, ou un pluriel
 // sans `other`. Clés : `<écran>.<élément>[.<précision>]`, jamais le texte lui-même.
 // Pluriel : { one: '…', other: '…' } choisi par `n` (Intl.PluralRules).
+import ecran_ventesVerre from './fr/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
 import ecran_journee from './fr/journee.js';
 import ecran_confort from './fr/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_studio from './fr/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
@@ -49,6 +50,7 @@ import ecran_republier_guide from './fr/republierGuide.js';   // (15 nov.) repub
 import ecran_memePhoto from './fr/memePhoto.js';   // (15 nov., lot meme-photo)
 import ecran_etageres from './fr/etageres.js';   // (15 nov.) le Stock en étagères
 export default {
+  ...ecran_ventesVerre,
   ...ecran_studio_paires,
   ...ecran_republier_guide,
   ...ecran_etageres,

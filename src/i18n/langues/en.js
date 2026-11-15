@@ -1,4 +1,5 @@
 // ENGLISH — translation of fr.js (the source). Same keys, same {variables}.
+import ecran_ventesVerre from './en/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
 import ecran_journee from './en/journee.js';
 import ecran_confort from './en/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_studio from './en/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
@@ -44,6 +45,7 @@ import ecran_republier_guide from './en/republierGuide.js';   // (15 nov.) repub
 import ecran_memePhoto from './en/memePhoto.js';   // (15 nov., lot meme-photo)
 import ecran_etageres from './en/etageres.js';   // (15 nov.) le Stock en étagères
 export default {
+  ...ecran_ventesVerre,
   ...ecran_studio_paires,
   ...ecran_republier_guide,
   ...ecran_etageres,
