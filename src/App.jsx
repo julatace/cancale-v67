@@ -16907,7 +16907,7 @@ function AchatsARelier({ file, vendus = null, liaison, achats, propositionDe, on
           const payeTxt = t ? (t.lot ? 'lot : le prix de cet article te sera demandé' : t.proposition ? tr('liaison.paye', { prix: montant(t.proposition.centimes / 100) }) : (t.prixLu != null ? tr('liaison.paye', { prix: montant(t.prixLu) }) : '')) : '';
           const sousAchat = lu ? [lu.taille ? tr('liaison.taille', { taille: lu.taille.replace('.', ',') }) : '', lu.couleurs.map(motCouleur).filter(Boolean).slice(0, 2).join(' / '), recu, payeTxt, compteDe(a)].filter(Boolean).join(' · ') : '';
           return (
-            <li key={l.key} className="vrm-aar-carte" data-ar-ligne={l.genre === 'vente' ? l.key : l.id} data-ar-genre={l.genre} data-ar-plus-tard={l.plusTard ? '1' : undefined} data-ar-reportee={l.reporteLe ? String(l.reporteLe).slice(0, 10) : undefined}
+            <li key={l.key} className={p ? 'vrm-aar-carte' : 'vrm-aar-carte vrm-aar-carte-seule'} data-ar-ligne={l.genre === 'vente' ? l.key : l.id} data-ar-genre={l.genre} data-ar-plus-tard={l.plusTard ? '1' : undefined} data-ar-reportee={l.reporteLe ? String(l.reporteLe).slice(0, 10) : undefined}
               data-ar-sugg-tx={a ? String(a.transaction_id) : ''} data-ar-niveau={p ? p.niveau : ''} data-ar-plus-ouvert={ouvert ? '1' : undefined}>
               <div className="vrm-aar-duo">
                 <div className="vrm-aar-cote" data-ar-cote="article">

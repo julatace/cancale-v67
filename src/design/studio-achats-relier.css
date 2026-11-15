@@ -144,3 +144,12 @@
 .vrm-buy-propose .sb-lien { flex: none; min-height: 44px; }
 .vrm-buy-propose .vrm-buy-propose-non { flex: none; background: transparent; box-shadow: none; color: var(--sb-encre-2, #3F5468); }
 @media (max-width: 520px) { .vrm-buy-propose { margin-left: 12px; } }
+
+/* Sans achat proposé : l'article en UNE rangée (vignette · titre · détails), « Aucune suggestion » en une ligne
+   dessous — jamais une colonne vide à côté. */
+.vrm-aar-carte-seule .vrm-aar-duo { grid-template-columns: minmax(0, 1fr); }
+.vrm-aar-carte-seule .vrm-aar-trait { display: none; }
+.vrm-aar-carte-seule [data-ar-cote="article"] { display: grid; grid-template-columns: 56px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 12px; row-gap: 2px; align-items: start; padding: 0; }
+.vrm-aar-carte-seule [data-ar-cote="article"] > .vrm-aar-photo { grid-row: 1 / span 2; width: 56px; height: 56px; border-radius: 14px; margin: 0; }
+.vrm-aar-carte-seule .vrm-aar-cote-vide { flex-direction: row; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 12px; margin-top: 8px; }
+.vrm-aar-carte-seule .vrm-aar-cote-vide > .vrm-aar-photo-ico { display: none; }
