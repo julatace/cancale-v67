@@ -26,6 +26,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (15 nov., extension 5.378) Dates de versement : relevé vérifié avant de dater, délai en heures de Vinted ouvert.
+  { id: 'versements-releve-verifie', date: '2026-11-15', titre: 'Dates de versement : relevé vérifié, délai honnête', phrase: 'Le relevé ne date rien avant cinq accords ; délai en heures.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (14 nov., décision de Julien) Studio bleu clair : la fondation (coque, barre, disque, quatre formes de bouton).
   { id: 'studio-bleu-clair', date: '2026-11-14', titre: 'VRM en bleu clair, un disque en bas', phrase: 'Touche le « + » : chercher, scanner, publier, imprimer.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'studio-paires', date: '2026-11-14', titre: 'Tes paires : touche-en une, elle monte', phrase: 'Liste en rangées, prix, acheté, jours, favoris ; Baisser ou Republier.', tab: 'annonces', pour: 'tous', mode: 'tous' },

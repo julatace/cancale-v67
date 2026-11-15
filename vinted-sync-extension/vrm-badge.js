@@ -1085,8 +1085,12 @@
     // 5.351 : une carte de PROGRESSION, visible sous le message principal (jamais
     // repliée : c'est ce qui avance pendant qu'il laisse Vinted ouvert).
     const dt = e.capte && !ignore && e.plateforme === 'vinted' && e.site && e.site.dates;
-    const progression = dt && Number(dt.reste) > 0
-      ? `<div class="progres val gris" data-dates-versement="${Number(dt.reste)}">Dates de versement en cours de lecture · ${Number(dt.reste).toLocaleString('fr-FR')} restantes · environ ${Number(dt.jours)} jour${Number(dt.jours) > 1 ? 's' : ''}, Vinted ouvert</div>` : '';
+    // 5.378 : l'estimation en HEURES de Vinted ouvert sur ce compte (plus des jours de 24 h) ;
+    // et, si Vinted liste des mois de relevé que VRM ne sait pas encore lire, le geste.
+    const progression = (dt && Number(dt.reste) > 0
+      ? `<div class="progres val gris" data-dates-versement="${Number(dt.reste)}" data-dates-heures="${Number(dt.heures) || 0}">Dates de versement en cours de lecture · ${Number(dt.reste).toLocaleString('fr-FR')} restantes · environ ${Number(dt.heures) || 1} h avec Vinted ouvert sur ce compte</div>` : '')
+      + (dt && Number(dt.releveSansRecette) > 0
+        ? `<div class="progres val gris" data-releve-sans-recette="${Number(dt.releveSansRecette)}">Relevé du porte-monnaie : ${Number(dt.releveSansRecette)} mois à lire · ouvre une fois Porte-monnaie → Historique → un mois passé, VRM apprend la page</div>` : '');
 
     // 5.243 : sur Vestiaire, ce qui est capté, famille par famille.
     if (e.plateforme === 'vestiaire' && e.vcCapte) {
