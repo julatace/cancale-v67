@@ -56,6 +56,10 @@ const MUTATIONS = {
   'garder-ignore': ['src/stockSortie.js', "    if (garder && garder[k]) continue;\n", ""],
   'tout-le-meuble': ['src/stockEtageres.js', "  for (const x of (Array.isArray(m.piles) ? m.piles : [])) { const c = Math.floor(Number(x)); if (c >= 1 && c <= cols) out.add(c); }", "  if (Array.isArray(m.piles) && m.piles.length) for (let c = 1; c <= cols; c++) out.add(c);"],
   'pose-dite-descente': ['src/stockEtageres.js', "descentes: r.descentes.filter((d) => !pose(d.cle)),", "descentes: r.descentes,"],
+  'sites-par-titre': ['src/stockAnnonces.js', "    if (p.cle) cles.push('n:' + p.cle);", "    if (p.cle) cles.push('n:' + p.cle); if (p.titre) cles.push('t:' + p.titre);"],
+  'pseudo-identifiant': ['src/stockAnnonces.js', "return t && !/^(#|n°\\s)/i.test(t) && !/^\\d{5,}$/.test(t) ? t.slice(0, 40) : '';", "return t;"],
+  'pseudo-uid': ['src/ecrans/Stock.jsx', "pseudo: String(acc.login || acc.username || ''),", "pseudo: String(acc.login || acc.username || uid),"],
+  'ebay-vieux-en-ligne': ['src/stockAnnonces.js', "const etat = p.frais === false && p.etat === 'enligne' ? 'aconfirmer' : p.etat;", "const etat = p.etat;"],
   'annuler-partiel': ['src/stockEtageres.js', "  for (const d of r.descentes) ops.push(", "  for (const d of []) ops.push("],
   'ordre-ignore': ['src/stockEtageres.js', "    .sort((a, b) => (a[1] - b[1]) || (a[2] - b[2])).map((x) => x[0]);", "    .map((x) => x[0]);"],
   'deplacer-recopie': ['src/stockEtageres.js', "place.has(String(m.id)) ? { ...m, ordre: place.get(String(m.id)) } : m));", "place.has(String(m.id)) ? { id: m.id, name: m.name, cols: m.cols, rows: m.rows, ordre: place.get(String(m.id)) } : m));"],
@@ -87,7 +91,10 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { ko++; n++; con
   // Les règles, copiées dans un dossier (la mutation y est posée).
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'etag-'));
   fs.mkdirSync(path.join(dir, 'src', 'ecrans'), { recursive: true });
-  const FICHIERS = ['src/stockEtageres.js', 'src/stockRegles.js', 'src/stockSortie.js', 'src/cycleArticle.js', 'src/gesteAnnulable.js', 'src/ecrans/Stock.jsx'];
+  const FICHIERS = ['src/stockEtageres.js', 'src/stockRegles.js', 'src/stockSortie.js', 'src/cycleArticle.js', 'src/gesteAnnulable.js', 'src/ecrans/Stock.jsx', 'src/stockAnnonces.js'];
+  // (15 nov., sites sur la case) La règle de Vestiaire importée par stockAnnonces.js : api/_lib copié tel quel.
+  fs.mkdirSync(path.join(dir, 'api', '_lib'), { recursive: true });
+  for (const f of fs.readdirSync(path.join(R, 'api', '_lib'))) if (f.endsWith('.js')) fs.copyFileSync(path.join(R, 'api', '_lib', f), path.join(dir, 'api', '_lib', f));
   const texte = {};
   for (const f of FICHIERS) { const p = path.join(R, f); texte[f] = fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : null; }
   if (mut) {
@@ -98,6 +105,7 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { ko++; n++; con
   for (const f of FICHIERS) if (texte[f] != null && f.endsWith('.js')) fs.writeFileSync(path.join(dir, f), texte[f]);
   const imp = async (f) => { if (texte[f] == null) return { __absent: true }; try { return await import(pathToFileURL(path.join(dir, f)).href); } catch (e) { return { __erreur: String(e && e.message || e) }; } };
   const E = await imp('src/stockEtageres.js'), S = await imp('src/stockSortie.js'), Y = await imp('src/cycleArticle.js'), G = await imp('src/gesteAnnulable.js');
+  const A = await imp('src/stockAnnonces.js');
   dit(!E.__absent && !E.__erreur && typeof E.tasserPiles === 'function', 'la règle des étagères existe et se charge (src/stockEtageres.js)', E.__erreur || (E.__absent ? 'absente' : undefined));
   dit(typeof S.libererCasesPartis === 'function', 'la sortie automatique se charge (src/stockSortie.js)', S.__erreur);
   const stock = texte['src/ecrans/Stock.jsx'] || '';
@@ -228,6 +236,34 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { ko++; n++; con
     const sl = { 'a': { m: 'mx', i: 6 }, 'b': { m: 'mx', i: 3 }, 'c': { m: 'mx', i: 7 }, 'd': { m: 'mx', i: 4 }, 'e': { m: 'mx', i: 1 } };
     const r = E.sortirDeCases({ slots: sl, meubles: [M], cles: ['a', 'c'] });
     dit(r.slots['b'].i === 3 && r.slots['d'].i === 7 && r.slots['e'].i === 4, 'P7 · seule la colonne 2 (en pile) se tasse ; la colonne 1 garde son trou', r.slots);
+  });
+
+  // ── S : LES SITES ET LE COMPTE SUR LA CASE, PAR IDENTITÉ ────────────────────
+  await essaie('S', async () => {
+    dit(typeof A.annoncesActuelles === 'function' && typeof A.sitesDe === 'function', 'S · la règle des sites d’une paire existe (src/stockAnnonces.js `sitesDe`)', A.__erreur);
+    const numeros = { '501': { numero: '12', title: 'Air Max 90 blanche 42' }, '502': { numero: '13', title: 'Air Max 90 blanche 42' } };
+    const r = A.annoncesActuelles({
+      vinted: [{ uid: '111', nom: 'boutique_nord', pseudo: 'boutique_nord', ok: true, enLigne: [{ id: '501', title: 'Air Max 90 blanche 42', price: { amount: '80.0' } }], aConfirmer: [], masquees: [] },
+               { uid: '222', nom: '222', pseudo: '', ok: true, enLigne: [], aConfirmer: [], masquees: [{ id: '502', title: 'Air Max 90 blanche 42' }] }],
+      numeros, cle: (x) => String(x),
+      // Leboncoin : une annonce au MÊME titre que N°12, mais portant le N°13 (sa référence) ; eBay : N°12 par SKU, lu il y a 3 jours.
+      lbc: [{ numero: '13', title: 'Air Max 90 blanche 42', etat: 'enligne', pseudo: 'nord_lbc' }],
+      ebay: { liste: [{ numero: '12', title: 'Autre titre', pseudo: 'nord_ebay', frais: false }], illisibles: [] },
+      vestiaire: undefined,
+    });
+    const a12 = r.articles.find((x) => x.cle === '12') || {}, a13 = r.articles.find((x) => x.cle === '13') || {};
+    const s12 = (a12.sites || []).map((x) => x.plat + ':' + x.etat + ':' + x.pseudo).join(',');
+    const s13 = (a13.sites || []).map((x) => x.plat + ':' + x.etat + ':' + x.pseudo).join(',');
+    dit(s12 === 'vinted:enligne:boutique_nord,ebay:aconfirmer:nord_ebay', 'S1 · N°12 : Vinted en ligne (boutique_nord) et eBay par son SKU — lu il y a plus de 24 h ⇒ « à confirmer »', s12);
+    dit(!/leboncoin/.test(s12), 'S2 · une annonce Leboncoin au MÊME titre mais d’une autre paire (N°13) ne s’ajoute pas à N°12', s12);
+    dit(/leboncoin:enligne:nord_lbc/.test(s13) && /vinted:masquee:/.test(s13), 'S2 · N°13 : Leboncoin (sa référence) et Vinted « masquée par Vinted » (présente, pas en ligne)', s13);
+    const v13 = (a13.sites || []).find((x) => x.plat === 'vinted') || {};
+    dit(v13.pseudo === '', 'S3 · pseudo inconnu (compte sans login) ⇒ rien, jamais l’identifiant « 222 »', v13);
+    dit(a12.etat === 'enligne' && (a12.sites || []).find((x) => x.plat === 'vinted').prix === 80, 'S4 · l’état de l’article ne change pas ; le prix lu est rendu (80)', a12);
+    const r2 = A.annoncesActuelles({ vinted: [{ uid: '9', nom: '#9', pseudo: '#123456', ok: true, enLigne: [{ id: '501' }], aConfirmer: [], masquees: [] }], numeros, cle: (x) => String(x), lbc: [], ebay: { liste: [], illisibles: [] } });
+    dit(((r2.articles[0] || {}).sites || [])[0] && r2.articles[0].sites[0].pseudo === '', 'S3 · un « pseudo » qui est un identifiant (« #123456 ») n’est jamais écrit', r2.articles[0]);
+    const lit = /pseudo: String\(acc\.login \|\| acc\.username \|\| ''\)/.test(sansCom);
+    dit(lit, 'S3 · l’écran prend le login du compte Vinted, jamais son uid, comme pseudo');
   });
 
   // ── M : LA REPRISE DE L'ANCIENNE FORME ──────────────────────────────────────
