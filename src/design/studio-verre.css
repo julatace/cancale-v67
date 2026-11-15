@@ -121,6 +121,9 @@
   --sb-puits: rgb(255 255 255 / .92) !important;
   --sb-lien: var(--sv-lien) !important;
   --sb-ombre-plan: var(--sv-ombre) !important;
+  /* Les cartes des familles d'avant, que la nuit reposait en gris neutre (#1C1C1E, styles-premium.css, fusion.css) : le verre. */
+  --d-carte: var(--sv-verre) !important; --fu-carte: var(--sv-verre) !important; --p-carte: var(--sv-verre) !important;
+  --w-carte: var(--sv-verre) !important; --vrm-surface: var(--sv-verre) !important;
   --sb-ombre-avant: inset 0 1px 0 rgb(255 255 255 / .9), 0 0 0 .5px rgb(255 255 255 / .6), 0 34px 60px -26px rgb(8 26 50 / .7) !important;
 }
 :root:root:root:root[data-theme="dark"] {
@@ -343,6 +346,24 @@ html:has(.vrm-app-shell[data-espace]), html:has(.vrm-app-shell[data-espace]) bod
 :root:root:root:root body .vrm-app-shell .vrm-finance-page .vrm-compta-carte .vrm-compta-phrase a { color: var(--sv-lien) !important; text-decoration-color: currentColor !important; }
 /* Stock (ordinateur) : « dans la liste » sous la bande, un gris d'avant (#6E6E73) qui tombait à 2,9:1 sur le verre. */
 :root:root:root:root body .vrm-main .vrm-s2d-bande-reste small { color: var(--sb-encre-2) !important; }
+/* Le « ? » ne colle jamais au titre : 8 px au moins entre le dernier mot et son cercle (la boîte de 44 garde sa cible). */
+:root:root:root:root body .vrm-app-shell[data-espace] .vrm-aide-bouton { margin-left: 2px !important; }
+/* Ma journée, le mois : une sous-ligne (« prix d'achat manquants ») passe à la ligne, jamais coupée au milieu d'un mot. */
+:root:root:root:root body .sj-journee .sj-t-mois .vrm-fu-case > :is(span:not(.vrm-sr-seul), small) {
+  white-space: normal !important; overflow: visible !important; text-overflow: clip !important; overflow-wrap: normal !important; word-break: normal !important; hyphens: manual !important;
+}
+/* « Mis à jour à 18:11 » (VeilleTempsReel) au téléphone : dans la TÊTE, à gauche (les ronds sont à droite) — plus au-dessus
+   de la barre du bas, où elle couvrait les tuiles. Le temps qu'elle est là, le titre de la tête (au défilement) s'efface. */
+@media (max-width: 760px) {
+  :root:root:root:root body .vrm-neuf-hote { top: calc(env(safe-area-inset-top, 0px) + 14px) !important; bottom: auto !important; left: 16px !important; right: auto !important; height: 0 !important; justify-content: flex-start !important; z-index: 60 !important; }
+  :root:root:root:root body:has(.vrm-neuf) .vrm-app-header .vrm-hdr-titre { visibility: hidden !important; }
+}
+:root:root:root:root body .vrm-neuf { background: var(--sv-verre-barre) !important; color: var(--sv-encre-2) !important; -webkit-backdrop-filter: var(--sv-flou) !important; backdrop-filter: var(--sv-flou) !important; }
+:root:root:root:root body .vrm-neuf .vrm-neuf-point { background: var(--sv-encre-2) !important; }
+/* La recherche collée du Stock (claude/stock-etageres : `[data-stock-recherche]`, fond et champ en ligne) : 100 % opaque. */
+:root:root:root:root:root:root body .vrm-main [data-stock-recherche] { background: var(--sv-colle) !important; }
+:root:root:root:root:root:root body .vrm-main [data-stock-recherche] input { background: var(--sb-puits) !important; color: var(--sv-encre) !important; border-color: transparent !important; }
+:root:root:root:root:root:root body .vrm-main [data-stock-recherche] input::placeholder { color: var(--sv-encre-2) !important; }
 /* Le nombre d'une vue (« Toutes 1 024 ») : plein, pas estompé — il se lit sur le champ. */
 :root:root:root body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button .vrm-of-n { opacity: 1 !important; }
 

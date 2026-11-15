@@ -15,7 +15,10 @@
 //       clair) — AA : 4,5:1, 3:1 pour un gros texte (≥ 24 px, ou ≥ 18,66 px en 700) ;
 //    V4 le FLOU, borné : au plus FLOU_MAX éléments à `backdrop-filter` par écran, aucun dans une rangée ;
 //    V5 un PLEIN au plus (`.sb-btn-plein` visible hors feuille) ;
-//    V6 rien ne déborde à l'horizontale (page et .vrm-main).
+//    V6 rien ne déborde à l'horizontale (page et .vrm-main) ;
+//    V7 le « ? » d'un titre est à 8 px au moins de tout texte de sa ligne (il ne chevauche pas le titre) ;
+//    V8 aucun texte coupé au milieu d'un mot (points de suspension) hors d'une rangée de liste ;
+//    V9 la pastille « Mis à jour à … » (quand elle est là) ne recouvre aucun texte.
 //  Un banc ne meurt pas, il rapporte : chaque ✗ dit l'écran, l'élément et le chiffre.
 //  `ECRANS=journee,annonces` `LARGEURS=390` `THEMES=clair` pour un sous-ensemble ; `DETAIL=12` ; `SHOTS=<dossier>`.
 //  `BANC_DIST=<dist>` pour juger un autre arbre (l'arbre de départ : il doit être ROUGE).
@@ -177,6 +180,39 @@ function mesurer() {
   }
   // V5 — un plein au plus (hors feuille)
   out.pleins = [...document.querySelectorAll('.vrm-app-shell[data-espace] .sb-btn-plein')].filter((el) => vis(el) && !el.closest('.vrm-fs, [role="dialog"], .sb-eventail')).filter((el) => { const r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; }).length;
+  // V7 — le « ? » d'un titre ne touche pas le titre : 8 px au moins entre son cercle dessiné et tout texte de la ligne.
+  out.colle = [];
+  const textesVus = [...document.querySelectorAll('.vrm-app-shell[data-espace] .vrm-main *')].filter((x) => { if (x.closest('svg, .vrm-aide-bouton')) return false; let t = ''; for (const n of x.childNodes) if (n.nodeType === 3) t += n.nodeValue; return t.trim() && vis(x); });
+  const rectsTexte = (x) => { const rs = []; for (const n of x.childNodes) if (n.nodeType === 3 && n.nodeValue.trim()) { const g = document.createRange(); g.selectNodeContents(n); rs.push(...g.getClientRects()); } return rs; };
+  for (const b of document.querySelectorAll('.vrm-app-shell[data-espace] .vrm-main .vrm-aide-bouton')) {
+    const sv = b.querySelector('svg'); if (!sv || !vis(b)) continue;
+    const r = sv.getBoundingClientRect();
+    for (const x of textesVus) for (const t of rectsTexte(x)) {
+      const vert = t.bottom > r.top + 2 && t.top < r.bottom - 2;
+      const ecart = t.right <= r.left ? r.left - t.right : t.left >= r.right ? t.left - r.right : -1;
+      if (vert && ecart < 8) { out.colle.push(`${nom(x).split(' > ').pop()} « ${x.textContent.trim().slice(0, 20)} » à ${Math.round(ecart)} px`); break; }
+    }
+  }
+  // V8 — un texte coupé au milieu d'un mot (points de suspension) hors d'une rangée de liste (un titre d'article dans une
+  // rangée se coupe, c'est la règle des listes de 1 000 ; une phrase, un libellé, un chiffre, jamais).
+  out.coupes = [];
+  for (const x of textesVus) {
+    const c = getComputedStyle(x);
+    if (c.textOverflow !== 'ellipsis' || x.scrollWidth <= x.clientWidth + 1) continue;
+    if (x.closest('li, [role="listitem"], [role="row"], .sb-rangee, [class*="rangee"], [class*="-row"], [class*="ligne"], [class*="titre"], .sb-plan, [class*="liste"], [class*="list"], select, option')) continue;
+    out.coupes.push(`${nom(x).split(' > ').slice(-2).join(' > ')} « ${x.textContent.trim().slice(0, 30)} »`);
+  }
+  // V9 — la pastille « Mis à jour à … » ne recouvre aucun texte.
+  out.pastille = [];
+  const pn = document.querySelector('.vrm-neuf');
+  if (pn && vis(pn)) {
+    const r = pn.getBoundingClientRect();
+    for (const x of document.querySelectorAll('.vrm-app-shell[data-espace] :is(.vrm-main, .vrm-app-header) *')) {
+      if (x.closest('.vrm-neuf-hote') || !vis(x)) continue;
+      for (const t of rectsTexte(x)) if (t.right > r.left && t.left < r.right && t.bottom > r.top && t.top < r.bottom) { out.pastille.push(`« ${x.textContent.trim().slice(0, 24)} »`); break; }
+      if (out.pastille.length > 4) break;
+    }
+  }
   // V6 — débordement
   const se = document.scrollingElement, main = document.querySelector('.vrm-app-shell[data-espace] .vrm-main');
   out.deborde = { page: se.scrollWidth - innerWidth, main: main ? main.scrollWidth - main.clientWidth : 0 };
@@ -229,6 +265,9 @@ if (require.main === module) (async () => {
         dit(m.flous.length <= FLOU_MAX && !m.flous.some((x) => x.rangee), `V4 ${suf} : flou borné`, `${m.flous.length} élément(s) flouté(s)${m.flous.some((x) => x.rangee) ? ' dont dans une rangée : ' + m.flous.filter((x) => x.rangee).map((x) => x.el).slice(0, 3).join(' | ') : ''}`);
         dit(m.pleins <= 1, `V5 ${suf} : un plein au plus`, `${m.pleins}`);
         dit(m.deborde.page <= 1 && m.deborde.main <= 1, `V6 ${suf} : rien ne déborde`, `page +${m.deborde.page} · main +${m.deborde.main}`);
+        dit(m.colle.length === 0, `V7 ${suf} : le « ? » ne colle à aucun titre (≥ 8 px)`, m.colle.slice(0, DETAIL).join(' | '));
+        dit(m.coupes.length === 0, `V8 ${suf} : aucun texte coupé au milieu d'un mot hors des rangées`, m.coupes.slice(0, DETAIL).join(' | '));
+        dit(m.pastille.length === 0, `V9 ${suf} : la pastille « Mis à jour » ne recouvre aucun texte`, m.pastille.join(' | '));
         if (o.erreurs.length) console.log(`   (erreurs de page : ${o.erreurs.slice(0, 2).join(' | ')})`);
       } catch (err) { dit(false, `${suf} : ouverture`, String(err.message || err).slice(0, 200)); }
       finally { if (o) await o.ctx.close().catch(() => {}); }
