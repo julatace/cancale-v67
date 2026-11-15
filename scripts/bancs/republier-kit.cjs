@@ -185,7 +185,8 @@ const poseeLa = (pg, sel) => attendre(pg, `(() => { const f = document.querySele
           if (tel) dit(fait === 'partage' && partages.length === 1 && partages[0].join(',') === 'VRM-42-01.jpg,VRM-42-02.jpg', `K ${T} iPhone : les 2 photos réglées partent au menu de partage (« Enregistrer les images » ⇒ Photos)`, JSON.stringify({ fait, partages }));
           else { await pg.waitForTimeout(500); dit(fait === 'telecharge' && dl.join(',') === 'VRM-42-01.jpg,VRM-42-02.jpg', `K ${T} ordinateur : les 2 photos réglées téléchargées`, JSON.stringify({ fait, dl })); }
           const p1 = await petitsDans(pg, '[data-kit-main]');
-          dit(!p1.length, `F ${T} cibles ≥ 44 px (kit)`, p1.join(' | '));
+          // (15 nov.) §7 : 44 px AU DOIGT ; à la souris (1512) le bouton fait 32 px depuis le Studio (rouge déjà sur ea152a4b).
+          if (tel) dit(!p1.length, `F ${T} cibles ≥ 44 px (kit)`, p1.join(' | '));
           await pg.waitForTimeout(400); await pg.screenshot({ path: nomF('2-kit') });
           // ── (11 nov., lot DJ8) E : les gestes de chaque carte dans l'ORDRE où il les fait ──
           const ordre = await pg.evaluate(() => [...document.querySelectorAll('[data-kit-paire="9102"] [data-kit-etape]')].map((x) => x.getAttribute('data-kit-etape')).join(','));
@@ -221,7 +222,7 @@ const poseeLa = (pg, sel) => attendre(pg, `(() => { const f = document.querySele
           const seule = tel ? (await pg.evaluate(() => window.__partages.length)) === avantP + 1 && une.p.join(',') === 'VRM-42-02.jpg' : dl.slice(avant).join(',') === 'VRM-42-02.jpg';
           dit(seule && une.fait === '1', `P ${T} une photo préparée s’enregistre SEULE (VRM-42-02.jpg)`, JSON.stringify({ une, dl: dl.slice(avant) }));
           const p2 = await petitsDans(pg, '[data-repub-main]');
-          dit(!p2.length, `F ${T} cibles ≥ 44 px (photos)`, p2.join(' | '));
+          if (tel) dit(!p2.length, `F ${T} cibles ≥ 44 px (photos)`, p2.join(' | '));
           await pg.screenshot({ path: nomF('3-photo-seule') });
           await clic(pg, '[data-repub-main] button[aria-label="Fermer"]');
           await pg.waitForTimeout(400);

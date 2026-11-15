@@ -21,7 +21,7 @@ import { EncartPhotosAutresComptes } from '../PhotosEntreComptes.jsx';   // (11 
 import { Numero } from '../composants/Numero.jsx';
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, lireReglageEtiquette } from '../etiquetteNumero.js';
 // (15 nov.) Le parcours guidé « à la main » (republier, remettre en vente, publier) : sa règle.
-import { etapesGuide, etatsEtapes, nFaites, champsAnnonce, couvertureCopie, resultatFin, travailFait } from '../republierGuide.js';
+import { etapesGuide, etatsEtapes, nFaites, champsAnnonce, couvertureCopie, resultatFin, travailFait, photosDeLAnnonce, photosChoisies } from '../republierGuide.js';
 import { CLE_NUMERO_ECRIT } from '../numeroEcrit.js';
 import { texteAnnonceVinted } from '../annonceVinted.js';
 import { useLangue } from '../i18n/react.js';
@@ -958,36 +958,122 @@ function ChampACopier({ k, valeur, copie, copies, copier, multi = false }) {
     </div>
   );
 }
-// LES PHOTOS DANS LA GALERIE : l'aperçu réglé, UN bouton (préparées d'avance), le résultat dit.
-// `regsPhoto` : le réglage de présentation (null = telles quelles) ; `reglage` : le repli qui le règle.
-function SectionPhotos({ photos, numero = "", regsPhoto, ph, pretes, enregistrer, enregistrerUne, libelle, fait, reglage = null, mode }) {
+// LES PHOTOS DANS LA GALERIE : TOUTES les photos de l'annonce (l'ordre de Vinted, la 1re = la
+// couverture), chacune touchable pour la retirer / la remettre, l'aperçu réglé sur chacune (le MÊME
+// réglage pour toutes) ; UN bouton (préparées d'avance) ; le résultat dit ; s'il en manque, le geste.
+// `photos` : toutes ; `choisies` : celles qui partent (dans l'ordre) ; `lecture` : { source, manque, attendu }.
+function SectionPhotos({ photos, choisies = null, onBasculer = null, lecture = null, lienAnnonce = '', onRelirePhotos = null, numero = "", regsPhoto, ph, pretes, enregistrer, enregistrerUne, libelle, fait, reglage = null, mode }) {
   const nPh = photos.length;
+  const ch = Array.isArray(choisies) ? choisies : photos;
+  const nCh = ch.length;
   const cssPh = { width: '100%', height: '100%', objectFit: 'cover', ...cssApercuPhoto(regsPhoto || PHOTO_NEUTRE) };
   const neutre = photoNeutre(regsPhoto || PHOTO_NEUTRE);
   const envoyees = ph && ph.envoyees ? ph.envoyees : 0;
+  const manque = lecture ? lecture.manque : 0;
   return (<>
-    {nPh ? <p className="vrm-acc-avant vrm-rg-avant" data-acc-avant="republier.main">{trN(neutre ? 'rg.photos.avantNeutre' : 'rg.photos.avant', nPh)} <span className="vrm-acc-pas">{tr('rg.photos.pas')}</span></p>
+    {nCh ? <p className="vrm-acc-avant vrm-rg-avant" data-acc-avant="republier.main">{trN(neutre ? 'rg.photos.avantNeutre' : 'rg.photos.avant', nCh)} <span className="vrm-acc-pas">{tr('rg.photos.pas')}</span></p>
+      : nPh ? <div className="vrm-rm-note vrm-rm-ambre" data-rg-aucune-choisie="">{tr('rg.photos.aucuneChoisie')}</div>
       : <div className="vrm-rm-note" data-main-sans-photo="">{tr(mode === 'publier' ? 'rg.photos.aucunePublier' : 'rg.photos.aucune')}</div>}
-    {nPh ? <div className="vrm-main-photos" data-main-photos={nPh}>{photos.map((u, i) => <div key={i} className="vrm-rm-photo">
-      <PhotoVinted src={u} alt={tr('rg.photos.alt', { i: i + 1 })} style={cssPh}/>
-      {pretes && ph.parIndice[i] ? <button type="button" className="vrm-rm-photo-une" data-main-photo-une={i} data-main-photo-une-fait={ph.unes.has(i) ? '1' : undefined} aria-label={tr('rg.photos.une', { i: i + 1 })} onClick={() => enregistrerUne(i)}><Icon name={ph.unes.has(i) ? 'check' : 'save'} size={18}/></button> : null}
-    </div>)}</div> : null}
-    {nPh > 0 && <div className="vrm-b-rangee vrm-rm-gauche">
-      <Bouton variante={fait ? 'secondaire' : 'primaire'} icone={fait ? 'check' : 'image'} data-main-telecharger={nPh} data-rg-photos-pretes={pretes ? ph.fichiers.length : 0} occupe={!!(ph && ph.encours)} disabled={!!(ph && ph.encours) || !(ph && ph.fichiers && ph.fichiers.length) && !!(ph && !ph.encours && ph.rate)} onClick={enregistrer}>{libelle}</Bouton>
+    {/* (15 nov., capture de Julien : « une seule photo ») Il en manque, ou VRM n'a que la couverture : dit, avec le geste. */}
+    {nPh > 0 && (manque === null || manque > 0) ? <div className="vrm-rm-note vrm-rm-ambre vrm-rg-manque" data-rg-photos-manque={manque === null ? 'couverture' : manque}>
+      <span>{manque === null ? tr('rg.photos.seuleCouverture') : tr('rg.photos.manque', { n: nPh, m: lecture.attendu })}</span>
+      <div className="vrm-b-rangee vrm-rm-gauche">
+        {lienAnnonce ? <Bouton variante="secondaire" data-rg-ouvrir-annonce="" href={lienAnnonce} target="_blank" rel="noopener noreferrer">{tr('rg.photos.ouvrirAnnonce')}</Bouton> : null}
+        {onRelirePhotos ? <Bouton variante="discret" data-rg-relire-photos="" onClick={onRelirePhotos}>{tr('rg.photos.relire')}</Bouton> : null}
+      </div>
+    </div> : null}
+    {nPh ? <div className="vrm-main-photos vrm-rg-grille" data-main-photos={nPh} data-rg-photos-choisies={nCh}>{photos.map((u, i) => {
+      const j = ch.indexOf(u); const garde = j >= 0;
+      return (
+        <div key={u + i} className="vrm-rm-photo vrm-rg-photo" data-rg-photo={i} data-rg-photo-gardee={garde ? '1' : '0'}>
+          <button type="button" className="vrm-rg-tuile" data-rg-photo-choix={i} aria-pressed={garde} disabled={!onBasculer} aria-label={tr(garde ? 'rg.photos.retirer' : 'rg.photos.remettre', { i: i + 1 })} onClick={() => onBasculer && onBasculer(u)}>
+            <PhotoVinted src={u} alt={tr('rg.photos.alt', { i: i + 1 })} style={cssPh}/>
+            {garde && j === 0 ? <span className="vrm-rg-couverture">{tr('rg.photos.couverture')}</span> : null}
+            <span className="vrm-rg-coche" aria-hidden="true">{garde ? <Icon name="check" size={14}/> : null}</span>
+          </button>
+          {garde && pretes && ph.parIndice[j] ? <button type="button" className="vrm-rm-photo-une" data-main-photo-une={j} data-main-photo-une-fait={ph.unes.has(j) ? '1' : undefined} aria-label={tr('rg.photos.une', { i: i + 1 })} onClick={() => enregistrerUne(j)}><Icon name={ph.unes.has(j) ? 'check' : 'save'} size={18}/></button> : null}
+        </div>
+      );
+    })}</div> : null}
+    {nPh > 1 ? <p className="vrm-rm-muet" data-rg-photos-compte={`${nCh}/${nPh}`}>{tr('rg.photos.choix', { n: nCh, m: nPh })}</p> : null}
+    {nCh > 0 && <div className="vrm-b-rangee vrm-rm-gauche">
+      <Bouton variante={fait ? 'secondaire' : 'primaire'} icone={fait ? 'check' : 'image'} data-main-telecharger={nCh} data-rg-photos-pretes={pretes ? ph.fichiers.length : 0} occupe={!!(ph && ph.encours)} disabled={!!(ph && ph.encours) || !(ph && ph.fichiers && ph.fichiers.length) && !!(ph && !ph.encours && ph.rate)} onClick={enregistrer}>{libelle}</Bouton>
     </div>}
     {ph && ph.envoi === 'partage' && envoyees > 0 ? <AccApres geste="republier.main" ensuite={null} texte={trN('rg.photos.apresGalerie', envoyees)}/> : null}
     {ph && ph.envoi === 'telecharge' && envoyees > 0 ? <AccApres geste="republier.main" ensuite={null} texte={trN('rg.photos.apresTelecharge', envoyees)}/> : null}
     {ph && !ph.encours && ph.rate ? <AccEchec geste="republier.main" lu={{ code: 'pasSu', texte: tr('rg.photos.rate', { n: ph.rate }) }} gesteTexte={tr('rg.photos.rateGeste')}/> : null}
     {ph && ph.erreur ? <AccEchec geste="republier.main" lu={{ code: 'inconnu', texte: tr('rg.photos.refusPartage') }} gesteTexte={tr('rg.photos.refusGeste')}/> : null}
-    {nPh > 0 && pretes ? <p className="vrm-rm-muet" data-main-dl-fait={ph.fait} data-main-dl-rate={ph.rate}>{tr(partageFichiersPossible() ? 'rg.photos.ouUne' : 'rg.photos.noms', { nom: nomPhotoReglee(numero, 0) })}</p> : null}
+    {nCh > 0 && pretes ? <p className="vrm-rm-muet" data-main-dl-fait={ph.fait} data-main-dl-rate={ph.rate}>{tr(partageFichiersPossible() ? 'rg.photos.ouUne' : 'rg.photos.noms', { nom: nomPhotoReglee(numero, 0) })}</p> : null}
     {reglage}
   </>);
+}
+// LA PRÉSENTATION, UN RÉGLAGE POUR TOUTES (15 nov., Julien : « je veux que les barres pour modifier les
+// photos soient beaucoup mieux ») — Studio : chaque barre a son nom et sa valeur en clair (« +10 % »,
+// « +2° », « ×1,20 »), une prise de 44 px au doigt, un double-toucher la remet à zéro ; l'aperçu
+// change tout de suite sur la couverture et sur la grille ; « Réinitialiser » en lien. Les bornes
+// sont celles de l'atelier et de l'extension (`CURSEURS_PHOTO`). Aucun hasard, aucun réglage par photo.
+const valeurCurseur = (cle, v) => {
+  const n = Number(v) || 0;
+  if (cle === 'rot') return n === 0 ? '0°' : `${n > 0 ? '+' : '−'}${String(Math.abs(n)).replace('.', ',')}°`;
+  if (cle === 'zoom') return n <= 1 ? '×1' : `×${n.toFixed(2).replace('.', ',')}`;
+  const p = Math.round((n - 1) * 100);
+  return p === 0 ? '0 %' : `${p > 0 ? '+' : '−'}${Math.abs(p)} %`;
+};
+function CurseursPresentation({ regs, poserRegs, presets = [], couverture = '', mode }) {
+  const derniers = React.useRef({});
+  const neutreCle = (cle) => poserRegs((x) => ({ photo: { ...x.photo, [cle]: PHOTO_NEUTRE[cle] } }));
+  // Le double-toucher (iPhone ne rend pas toujours `dblclick` sur une barre) : deux relâchés en 350 ms.
+  const relache = (cle) => { const t = Date.now(); const a = derniers.current[cle] || 0; derniers.current[cle] = t; if (t - a < 350) { derniers.current[cle] = 0; neutreCle(cle); } };
+  const regNeutre = photoNeutre(regs.photo);
+  return (
+    <div className="vrm-rg-pres" data-rg-presentation="">
+      <div className="vrm-rg-pres-tete">
+        <span className="vrm-rg-pres-couv">{couverture ? <PhotoVinted src={couverture} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', ...cssApercuPhoto(regs.photo) }}/> : <PhotoVide remplir/>}</span>
+        <div className="vrm-rg-pres-texte">
+          <b>{tr('rg.pres.titre')}</b>
+          <span>{tr('rg.pres.aide')}</span>
+          {!regNeutre ? <Bouton variante="discret" data-main-neutre="" onClick={() => poserRegs({ photo: { ...PHOTO_NEUTRE } })}>{tr('rg.pres.reinit')}</Bouton> : null}
+        </div>
+      </div>
+      {presets.length > 0 && <div className="vrm-rm-puces">{presets.map((x) => <Bouton key={x.nom} variante="secondaire" data-main-preset={x.nom} onClick={() => poserRegs({ photo: { ...PHOTO_NEUTRE, ...x.r } })}>{x.nom}</Bouton>)}</div>}
+      {CURSEURS_PHOTO.map((c) => {
+        const v = regs.photo[c.cle]; const id = `vrm-rg-c-${mode || 'm'}-${c.cle}`;
+        const pct = ((Number(v) - c.min) / (c.max - c.min)) * 100, zero = ((PHOTO_NEUTRE[c.cle] - c.min) / (c.max - c.min)) * 100;
+        return (
+          <div key={c.cle} className="vrm-rg-curseur" data-rg-curseur={c.cle} data-rg-curseur-neutre={v === PHOTO_NEUTRE[c.cle] ? '1' : undefined}>
+            <div className="vrm-rg-curseur-tete"><label htmlFor={id}>{tr(`rg.curseur.${c.cle}`)}</label><output htmlFor={id} data-rg-valeur={c.cle}>{valeurCurseur(c.cle, v)}</output></div>
+            <input id={id} type="range" min={c.min} max={c.max} step={c.pas} value={v} data-main-reglage={c.cle}
+              style={{ '--rg-pos': `${pct}%`, '--rg-zero': `${zero}%` }}
+              onChange={(ev) => { const n = Number(ev.target.value); poserRegs((x) => ({ photo: { ...x.photo, [c.cle]: n } })); }}
+              onPointerUp={() => relache(c.cle)} onDoubleClick={() => neutreCle(c.cle)}/>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 function RepublierALaMain({ paire, suivi, candidats, etatSuivi, ancienne, onDebut, onLier, onDelier, onRelire, onFini, onClose, onToutes = null, rang = null, onSuivante = null, encours = null }) {
   useLangue();
   const mode = paire.annulee ? 'remettre' : 'republier';
   const [fiche, setFiche] = useState(undefined);   // undefined lecture · null pas su · objet lu (vide si rien rangé)
+  // (15 nov., « je veux TOUTES les photos ») Les photos de la fiche lue sur la page de l'annonce
+  // (`vinted_item_details[id].photos`, projection de CETTE annonce seulement) : undefined · null pas su · tableau.
+  const [detail, setDetail] = useState(undefined);
+  const [relu, setRelu] = useState(0);
+  useEffect(() => {
+    let vivant = true;
+    (async () => {
+      try {
+        if (!/^\d{4,15}$/.test(String(paire.id || ''))) { if (vivant) setDetail([]); return; }
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_item_details&select=ph:data->${encodeURIComponent('"' + paire.id + '"')}->photos`, { headers: sbAuth() });
+        if (!r.ok) throw new Error('lecture');
+        const j = await r.json(); if (!Array.isArray(j)) throw new Error('forme');
+        if (vivant) setDetail(j[0] && Array.isArray(j[0].ph) ? j[0].ph : []);
+      } catch (_) { if (vivant) setDetail(null); }
+    })();
+    return () => { vivant = false; };
+  }, [paire.id, relu]);
   useEffect(() => {
     let vivant = true;
     (async () => {
@@ -1000,7 +1086,7 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, ancienne, onDebu
       } catch (_) { if (vivant) setFiche(null); }
     })();
     return () => { vivant = false; };
-  }, [paire.uid, paire.id]);
+  }, [paire.uid, paire.id, relu]);
   // LES réglages de l'atelier (une source) et l'endroit du N° (Réglages → Numéros).
   const [regs, poserRegs] = useReglagesRepub(encours);
   const [etq, numEcrit] = useReglagesNumero();
@@ -1010,7 +1096,13 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, ancienne, onDebu
   const [copie, copies, copier] = useCopies();
   const presets = (() => { const p = load('vrm_photo_presets', []); return Array.isArray(p) ? p.filter((x) => x && x.nom && x.r) : []; })();
   const f = fiche || {};
-  const photos = (Array.isArray(f.photos) && f.photos.length ? f.photos : (paire.photo ? [paire.photo] : [])).map((p) => (typeof p === 'string' ? p : (p && (p.url || p.full_size_url)) || '')).filter(Boolean).slice(0, 20);
+  // TOUTES les photos de l'annonce (src/republierGuide.js, `photosDeLAnnonce`) : coffre, fiche de la page,
+  // dressing, la vignette en dernier — la source qui en porte le plus ; s'il en manque, l'écran le dit.
+  const lecturePh = photosDeLAnnonce({ coffre: f.photos, detail, liste: paire.photos, couverture: paire.photo, attendu: paire.nPhotos != null ? paire.nPhotos : (paire.verif && paire.verif.nPhotos) });
+  const photos = lecturePh.photos;
+  const [exclues, setExclues] = useState(() => new Set());   // les adresses qu'il a retirées (ses touchers)
+  const basculerPhoto = (u) => setExclues((e) => { const n = new Set(e); if (n.has(u)) n.delete(u); else n.add(u); return n; });
+  const choisies = photosChoisies(photos, exclues);
   const prixLu = f.price != null && f.price !== '' && Number(f.price) > 0 ? Number(f.price) : (paire.prix != null && Number(paire.prix) > 0 ? Number(paire.prix) : null);
   const titreLu = String(f.title || paire.titre || '');
   // L'annonce TELLE QU'ELLE PARTIRA : la règle de l'atelier, puis le N° (src/republierReglages.js).
@@ -1020,8 +1112,8 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, ancienne, onDebu
   const cvC = couvertureCopie(champs, copies);
   const placeN = (PLACES_ETIQUETTE.find((x) => x.v === etq.place) || PLACES_ETIQUETTE[0]);
   // ── Les photos : le MÊME dessin que l'atelier (`dessinerPhotoReglee`), préparées dès que la fiche est lue.
-  const nPh = photos.length;
-  const { ph, pretes, enregistrer, enregistrerUne, libelle: libellePhotos } = usePhotosReglees(photos, regs.photo, paire.numero, { auto: fiche !== undefined });
+  const nPh = choisies.length;
+  const { ph, pretes, enregistrer, enregistrerUne, libelle: libellePhotos } = usePhotosReglees(choisies, regs.photo, paire.numero, { auto: fiche !== undefined && detail !== undefined });
   // ── Ce qui est fait (la progression en tête) : un geste fait ou une preuve lue, jamais deviné.
   const nouvelle = etatSuivi === 'fait' && (paire.numero || paire.annulee) ? 'fait' : etatSuivi === 'lie' ? 'lie' : 'attente';
   const etats = etatsEtapes(mode, { photos: { n: nPh, pretes: pretes ? ph.fichiers.length : 0, envoyees: ph && ph.envoyees ? ph.envoyees : 0 }, ancienne, ancienneOuverte: ouvertes.has('ancienne'), copies: cvC.faits, vintedOuvert: ouvertes.has('vinted'), nouvelle });
@@ -1062,21 +1154,13 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, ancienne, onDebu
   const fin = resultatFin(mode, { etatSuivi: nouvelle === 'fait' ? 'fait' : nouvelle, numero: paire.numero, nCandidats: Array.isArray(candidats) ? candidats.length : null });
   const section = (k, enfants) => { const i = l.indexOf(k); return <section className="vrm-rm-section" data-main-section={k} hidden={etape !== k} aria-labelledby={`vrm-rm-t-${k}`}><h3 className="vrm-rm-titre" id={`vrm-rm-t-${k}`}>{i + 1}. {tr(`rg.titre.${k}.${mode}`)}</h3>{enfants}</section>; };
   // Le repli « Présentation des photos » : un réglage pour toutes (aucun « Varier », aucun réglage par annonce).
-  const reglagePhotos = nPh > 0 ? (
+  const reglagePhotos = photos.length > 0 ? (
     <details className="vrm-repli vrm-rg-repli" data-main-reglages="">
       <summary>{tr(regNeutre ? 'rg.pres.resumeNeutre' : 'rg.pres.resume')}</summary>
       <div className="vrm-rm-memes" data-main-memes-reglages={resumeGardes(regs).join(' · ')}>
         <b>{tr('rg.memes')}</b> {tr('rg.memes.pas')}
       </div>
-      {presets.length > 0 && <div className="vrm-rm-puces">{presets.map((x) => <Bouton key={x.nom} variante="secondaire" data-main-preset={x.nom} onClick={() => poserRegs({ photo: { ...PHOTO_NEUTRE, ...x.r } })}>{x.nom}</Bouton>)}</div>}
-      {CURSEURS_PHOTO.map((c) => (
-        <label key={c.cle} className="vrm-rm-curseur">
-          <span>{c.l}</span>
-          <input type="range" min={c.min} max={c.max} step={c.pas} value={regs.photo[c.cle]} data-main-reglage={c.cle} onChange={(ev) => { const v = Number(ev.target.value); poserRegs((x) => ({ photo: { ...x.photo, [c.cle]: v } })); }}/>
-          <span className="vrm-rm-val">{c.cle === 'rot' ? `${regs.photo.rot}°` : `${Math.round(regs.photo[c.cle] * 100)} %`}</span>
-        </label>
-      ))}
-      {!regNeutre && <Bouton variante="discret" data-main-neutre="" onClick={() => poserRegs({ photo: { ...PHOTO_NEUTRE } })}>{tr('rg.pres.origine')}</Bouton>}
+      <CurseursPresentation regs={regs} poserRegs={poserRegs} presets={presets} couverture={choisies[0] || photos[0] || ''} mode={mode}/>
     </details>) : null;
   // Le gros geste de chaque étape est le SEUL plein tant qu'il n'est pas fait ; fait, c'est « Suivant » qui devient plein.
   const faitIci = etats[etape] === 'fait' || etats[etape] === 'sans';
@@ -1097,7 +1181,7 @@ function RepublierALaMain({ paire, suivi, candidats, etatSuivi, ancienne, onDebu
       {fiche === undefined && <div className="vrm-rm-muet" data-main-lecture="">{tr('rg.lecture')}</div>}
       {fiche === null && <div className="vrm-rm-note" data-main-passu="">{tr('rg.ficheRatee')}</div>}
 
-      {section('photos', <SectionPhotos photos={photos} numero={paire.numero} regsPhoto={regs.photo} ph={ph} pretes={pretes} enregistrer={enregistrer} enregistrerUne={enregistrerUne} libelle={libellePhotos} fait={faitIci && etape === 'photos'} reglage={reglagePhotos} mode={mode}/>)}
+      {section('photos', <SectionPhotos photos={photos} choisies={choisies} onBasculer={basculerPhoto} lecture={lecturePh} lienAnnonce={`https://${paire.domain || 'www.vinted.fr'}/items/${encodeURIComponent(String(paire.id))}`} onRelirePhotos={() => setRelu((x) => x + 1)} numero={paire.numero} regsPhoto={regs.photo} ph={ph} pretes={pretes} enregistrer={enregistrer} enregistrerUne={enregistrerUne} libelle={libellePhotos} fait={faitIci && etape === 'photos'} reglage={reglagePhotos} mode={mode}/>)}
 
       {mode === 'republier' && section('supprimer', <>
         <p className="vrm-acc-avant vrm-rg-avant" data-acc-avant="republier.main">{tr('rg.supprimer.avant', { compte: paire.compte || '' })} <span className="vrm-acc-pas">{tr('rg.supprimer.pas')}</span></p>
@@ -1298,11 +1382,13 @@ function PublierALaMain({ fiche, vue, onFini, onClose }) {
   const [etape, setEtape] = useState('photos');
   const [ouvert, setOuvert] = useState(false);
   const photos = (Array.isArray(f.photos) ? f.photos : []).filter((u) => typeof u === 'string' && u).slice(0, 20);
-  const nPh = photos.length;
+  const [exclues, setExclues] = useState(() => new Set());
+  const choisies = photosChoisies(photos, exclues);
+  const nPh = choisies.length;
   const texte = texteAnnonceVinted(f, { etiquette: etq, numeroEcrit: numEcrit });
   const champs = champsAnnonce({ titre: texte.ok ? texte.titre : f.titre, description: texte.ok ? texte.description : f.description, prix: f.prix, categorie: f.categorie, marque: f.marque, taille: f.taille, etat: f.etat, couleur: f.couleur });
   const cvC = couvertureCopie(champs, copies);
-  const { ph, pretes, enregistrer, enregistrerUne, libelle } = usePhotosReglees(photos, null, f.numero, { auto: true });
+  const { ph, pretes, enregistrer, enregistrerUne, libelle } = usePhotosReglees(choisies, null, f.numero, { auto: true });
   const etats = etatsEtapes(mode, { photos: { n: nPh, pretes: pretes ? ph.fichiers.length : 0, envoyees: ph && ph.envoyees ? ph.envoyees : 0 }, copies: cvC.faits, vintedOuvert: ouvert, nouvelle: vue === true ? 'vue' : 'attente' });
   const l = etapesGuide(mode);
   const iE = Math.max(0, l.indexOf(etape));
@@ -1321,7 +1407,7 @@ function PublierALaMain({ fiche, vue, onFini, onClose }) {
         </div>
       </div>
       <EtapesGuide mode={mode} etape={etape} etats={etats} aller={setEtape}/>
-      {section('photos', <SectionPhotos photos={photos} numero={f.numero} regsPhoto={null} ph={ph} pretes={pretes} enregistrer={enregistrer} enregistrerUne={enregistrerUne} libelle={libelle} fait={faitIci && etape === 'photos'} mode={mode}/>)}
+      {section('photos', <SectionPhotos photos={photos} choisies={choisies} onBasculer={(u) => setExclues((e) => { const n = new Set(e); if (n.has(u)) n.delete(u); else n.add(u); return n; })} numero={f.numero} regsPhoto={null} ph={ph} pretes={pretes} enregistrer={enregistrer} enregistrerUne={enregistrerUne} libelle={libelle} fait={faitIci && etape === 'photos'} mode={mode}/>)}
       {section('creer', <>
         <p className="vrm-acc-avant vrm-rg-avant" data-acc-avant="publier.main">{tr('rg.publier.avant')} <span className="vrm-acc-pas">{tr('rg.creer.pas')}</span></p>
         {!texte.ok ? <div className="vrm-rm-note vrm-rm-ambre" data-rg-texte-refus="">{tr('rg.publier.refus', { raison: texte.raison || '' })}</div> : null}

@@ -58,6 +58,12 @@ const MUTATIONS = {
   partage_hors_geste: { f: 'ecran', m: (s) => s.replace("useEffect(() => { if (auto && photos.length && !ph) preparer(); }", "useEffect(() => { if (false && auto && photos.length && !ph) preparer(); }") },
   envoi_vinted: { f: 'ecran', m: (s) => s.replace("onClick={() => { debut(); setOuvertes((o) => new Set(o).add('ancienne')); }}", "onClick={() => { debut(); setOuvertes((o) => new Set(o).add('ancienne')); vmrCmd({ cmd: 'supprimerVinted', id: paire.id }); }}") },
   texte_en_dur: { f: 'ecran', m: (s) => s.replace("{tr('rg.supprimer.ouvrir')}", 'Ouvrir l’ancienne annonce ↗') },
+  // (15 nov.) « une seule photo » : la vignette par défaut, une source qui ne prend pas la plus longue, le double-toucher retiré.
+  vignette_seule: { f: 'ecran', m: (s) => s.replace('const lecturePh = photosDeLAnnonce({ coffre: f.photos, detail, liste: paire.photos, couverture: paire.photo,', "const lecturePh0 = { photos: (Array.isArray(f.photos) && f.photos.length ? f.photos : (paire.photo ? [paire.photo] : [])), manque: 0 }; const lecturePh = photosDeLAnnonce({ coffre: lecturePh0.photos, couverture: paire.photo,") },
+  source_courte: { f: 'guide', m: (s) => s.replace('(x[1].length > m[1].length ? x : m)', '(m[1].length ? m : x)') },
+  manque_tu: { f: 'guide', m: (s) => s.replace("const manque = connu ? Math.max(0, n - photos.length) : (source === 'couverture' ? null : 0);", 'const manque = 0;') },
+  sans_double_toucher: { f: 'ecran', m: (s) => s.replace('onPointerUp={() => relache(c.cle)} onDoubleClick={() => neutreCle(c.cle)}', '') },
+  hasard_curseur: { f: 'ecran', m: (s) => s.replace("const neutreCle = (cle) => poserRegs((x) => ({ photo: { ...x.photo, [cle]: PHOTO_NEUTRE[cle] } }));", "const neutreCle = (cle) => poserRegs((x) => ({ photo: { ...x.photo, [cle]: PHOTO_NEUTRE[cle] + (Math.random() - 0.5) / 100 } }));") },
   cle_absente_it: { f: 'rg_it', m: (s) => s.replace(/\s*"rg\.supprimer\.ouvrir": "[^"]*",/, '') },
 };
 
@@ -112,6 +118,18 @@ async function auditer(src) {
       'A8 « C’est republié / publié » seulement relu ; pas vu ⇒ « pas su », jamais deviné');
     dit(G.travailFait('republier', {}) === null && G.travailFait('publier', { id: 'f1', numero: '45' }).sorte === 'publier-main' && G.travailFait('republier', { id: '9102', nouvelId: '9201', numero: '42' }).article.id === '9201',
       'A9 « Ce que VRM a fait » : une identité (la nouvelle annonce, la fiche), sinon rien');
+    // (15 nov., capture de Julien : « on me propose qu'une seule photo… je veux TOUTES les photos »)
+    if (typeof G.photosDeLAnnonce !== 'function') dit(false, 'A10 `photosDeLAnnonce` existe (toutes les photos de l’annonce)');
+    else {
+      const H = Array.from({ length: 8 }, (_, i) => `u${i + 1}`);
+      const a1 = G.photosDeLAnnonce({ coffre: [], detail: H, liste: [], couverture: 'u1', attendu: 8 });
+      const a2 = G.photosDeLAnnonce({ coffre: ['u1', 'u2'], detail: H, couverture: 'u1' });
+      const a3 = G.photosDeLAnnonce({ couverture: 'u1' });
+      const a4 = G.photosDeLAnnonce({ coffre: ['u1', 'u2', 'u2', { full_size_url: 'u3' }], couverture: 'u1', attendu: 8 });
+      dit(a1.photos.join() === H.join() && a1.manque === 0 && a2.photos.length === 8 && a2.source === 'detail' && a3.photos.join() === 'u1' && a3.manque === null && a4.photos.join() === 'u1,u2,u3' && a4.manque === 5,
+        'A10 TOUTES les photos par l’identité de l’annonce : la source qui en porte le plus, dans l’ordre de Vinted, sans doublon ; la vignette seule ⇒ « pas su », il en manque ⇒ dit', JSON.stringify({ a1: a1.photos.length, a2: a2.source, a3: a3.manque, a4: [a4.photos.join(), a4.manque] }));
+      dit(G.photosChoisies(H, new Set(['u3'])).length === 7 && G.photosChoisies(H, new Set(['u3']))[2] === 'u4' && G.photosChoisies(H, new Set()).length === 8, 'A11 une photo retirée par lui ⇒ les autres, dans l’ordre');
+    }
   }
   // ── B : les mots ──
   const textes = {};
@@ -142,9 +160,10 @@ async function auditer(src) {
   const regleSans = sansCommentaires(src.regle || '');
   const ecranSans = sansCommentaires(src.ecran || '');
   const corpsPhotos = [...fonctions(regleSans, ['export function bornerPhoto', 'export function filtrePhoto', 'export function cssApercuPhoto', 'export function dessinerPhotoReglee', 'export function appliquerCouleursPixels', 'export const CURSEURS_PHOTO']),
-    ...fonctions(ecranSans, ['function usePhotosReglees', 'function SectionPhotos'])];
+    ...fonctions(ecranSans, ['function usePhotosReglees', 'function SectionPhotos', 'function CurseursPresentation', 'const valeurCurseur'])];
   const absentes = corpsPhotos.filter((x) => !x.corps).map((x) => x.n);
-  const hasard = corpsPhotos.filter((x) => x.corps && /Math\.random|getRandomValues|randomUUID|Date\.now\(\)|performance\.now|tirerLettre|alea/i.test(x.corps)).map((x) => x.n);
+  // L'horloge ne sert qu'au double-toucher des barres (une interface) : interdite partout ailleurs.
+  const hasard = corpsPhotos.filter((x) => x.corps && (/Math\.random|getRandomValues|randomUUID|tirerLettre|alea/i.test(x.corps) || (!/CurseursPresentation/.test(x.n) && /Date\.now\(\)|performance\.now/.test(x.corps)))).map((x) => x.n);
   dit(!absentes.length && !hasard.length, 'C1 la retouche des photos n’a AUCUN hasard (dessin, couleurs, bornes, aperçu, préparation des fichiers)', [...absentes.map((n) => `${n} introuvable`), ...hasard.map((n) => `${n} : hasard`)].join(' ; '));
   let R = null; try { R = await charger(src.regle, 'republierReglages'); } catch (e) { dit(false, 'C0 src/republierReglages.js se charge', e.message); }
   if (R) {
@@ -173,7 +192,13 @@ async function auditer(src) {
   const iM = ecran.indexOf('function RepublierALaMain'), jM = ecran.indexOf('\nfunction CarteKit');
   const main = iM >= 0 ? ecran.slice(iM, jM < 0 ? undefined : jM) : '';
   dit(/onALaMain=\{\(choisies\)=>\{[\s\S]{0,900}?setRepubMainOuvert\(choisies\[0\]\)/.test(app) && !/onALaMain=\{\(choisies\)=>\{[\s\S]{0,900}?setKitMain\(choisies/.test(app), 'D1 « À la main » ouvre la feuille guidée tout de suite (le kit reste à un toucher dedans)');
-  dit(/navigator\.share\(\{ files/.test(main) && /usePhotosReglees\(photos, regs\.photo, paire\.numero, \{ auto: fiche !== undefined \}\)/.test(main) && /if \(auto && photos\.length && !ph\) preparer\(\);/.test(main), 'D2 les photos préparées d’avance, puis UN toucher ouvre le partage de fichiers dans le geste');
+  dit(/navigator\.share\(\{ files/.test(main) && /usePhotosReglees\(choisies, regs\.photo, paire\.numero, \{ auto: fiche !== undefined && detail !== undefined \}\)/.test(main) && /if \(auto && photos\.length && !ph\) preparer\(\);/.test(main), 'D2 les photos préparées d’avance, puis UN toucher ouvre le partage de fichiers dans le geste');
+  dit(/const lecturePh = photosDeLAnnonce\(\{ coffre: f\.photos, detail, liste: paire\.photos, couverture: paire\.photo/.test(main) && /id=eq\.vinted_item_details&select=ph:data->/.test(main) && !/select=data[&`]/.test(main)
+    && /const choisies = photosChoisies\(photos, exclues\)/.test(main) && !/paire\.photo \? \[paire\.photo\]/.test(main) && /photos: \(Array\.isArray\(it\.photosDetail\)/.test(app),
+    'D6 la feuille prend TOUTES les photos (coffre, fiche de la page en projection, dressing), plus jamais la vignette seule par défaut ; il peut en retirer');
+  { const iC = ecran.indexOf('function CurseursPresentation'); const cur = iC >= 0 ? ecran.slice(iC, ecran.indexOf('\nfunction ', iC + 10)) : '';
+    dit(/CURSEURS_PHOTO\.map/.test(cur) && /onDoubleClick=\{\(\) => neutreCle\(c\.cle\)\}/.test(cur) && /onPointerUp=\{\(\) => relache\(c\.cle\)\}/.test(cur) && /data-rg-valeur=/.test(cur) && /data-main-neutre/.test(cur) && /<CurseursPresentation regs=\{regs\}/.test(main) && !/regs\.photo\[\s*(?:i|j|u|photo)/.test(cur),
+      'D7 les barres : une pour toutes les photos, valeur dite, double-toucher = zéro, « Réinitialiser » ; jamais un réglage par photo'); }
   dit(main && !/vmrCmd|executerCommande|method:\s*'(POST|PUT|DELETE)'/.test(main), 'D3 rien ne part chez Vinted depuis le parcours guidé (c’est lui qui supprime et publie)');
   const enDur = [];
   const iP = ecran.indexOf('function EtapesGuide'), jP = ecran.indexOf('\nfunction usePhotosReglees');

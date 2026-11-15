@@ -128,3 +128,33 @@ export function travailFait(mode, { id, numero = '', titre = '', compte = '', no
     compte: String(compte || ''),
   };
 }
+
+// TOUTES LES PHOTOS DE L'ANNONCE (15 nov., capture de Julien : « on me propose qu'une seule photo,
+// ce n'est pas possible, je veux TOUTES les photos »). Mesuré dans le code : la feuille ne lisait
+// que le coffre (`coffre_{uid}_{id}`, écrit par l'atelier) puis retombait sur la VIGNETTE du
+// dressing — une annonce jamais passée par l'atelier (une vente retournée, surtout) n'avait qu'UNE
+// photo. Les sources, toutes par l'IDENTITÉ de l'annonce, jamais par ressemblance :
+//   coffre     — ce que l'atelier a rangé ;
+//   detail     — `vinted_item_details[id].photos` : la fiche lue sur la page de l'annonce ;
+//   liste      — les photos portées par la lecture du dressing (`photos` / `photosDetail`) ;
+//   couverture — la vignette seule.
+// La source qui en porte LE PLUS gagne (à égalité : coffre, puis fiche, puis dressing) ; l'ordre
+// est celui de Vinted (la 1re = la couverture), doublons retirés. `attendu` (le nombre que Vinted
+// annonce, `nPhotos`) : s'il en manque, `manque` le dit ; la vignette seule ⇒ `manque` null
+// (« pas su » : combien en a-t-elle ?) — l'écran dit le geste pour les avoir toutes.
+const urlPhoto = (p) => (typeof p === 'string' ? p : (p && (p.full_size_url || p.url)) || '');
+export function photosDeLAnnonce({ coffre = null, detail = null, liste = null, couverture = '', attendu = null } = {}) {
+  const net = (l) => { const vus = new Set(); return (Array.isArray(l) ? l : []).map(urlPhoto).filter((u) => u && !vus.has(u) && vus.add(u)).slice(0, 20); };
+  const sources = [['coffre', net(coffre)], ['detail', net(detail)], ['liste', net(liste)]];
+  let [source, photos] = sources.reduce((m, x) => (x[1].length > m[1].length ? x : m), ['', []]);
+  if (!photos.length && couverture) { source = 'couverture'; photos = [String(couverture)]; }
+  const n = Number(attendu);
+  const connu = attendu != null && attendu !== '' && Number.isFinite(n) && n > 0;
+  const manque = connu ? Math.max(0, n - photos.length) : (source === 'couverture' ? null : 0);
+  return { photos, source, attendu: connu ? n : null, manque };
+}
+// Les photos CHOISIES (il peut en décocher) : l’ordre de l’annonce, sans celles qu’il a retirées (par adresse ou rang).
+export function photosChoisies(photos, exclues) {
+  const ex = exclues instanceof Set ? exclues : new Set(Array.isArray(exclues) ? exclues : []);
+  return (Array.isArray(photos) ? photos : []).filter((u, i) => !ex.has(i) && !ex.has(u));
+}

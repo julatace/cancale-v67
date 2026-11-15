@@ -45,6 +45,10 @@ const PNG = (() => {
 })();
 const ann = (id, o) => Object.assign({ id, price: { amount: '49.0', currency_code: 'EUR' }, is_closed: false, is_draft: false, is_hidden: false, photo: null, brand_title: 'Nike', size_title: '42', status: 'Très bon état', view_count: 10, favourite_count: 1, nPhotos: 2, descLen: 60, color1: 'Blanc', catalog_id: 1242, created_at_ts: s - 40 * 86400 }, o);
 const ANCIENNE = ann(9102, { title: 'Salomon XT-6 blanc taille 40', brand_title: 'Salomon', size_title: '40' });
+// (15 nov., capture de Julien : « on me propose qu'une seule photo ») Une annonce de 8 photos jamais passée
+// par l'atelier : pas de coffre, la vignette seule dans le dressing, les 8 dans la fiche lue sur sa page.
+const HUIT = Array.from({ length: 8 }, (_, i) => `https://images1.vinted.net/t/h/f800/${i + 1}.jpeg`);
+const OCTO = ann(9104, { title: 'Nike Air Max 1 blanc rouge taille 43', brand_title: 'Nike', size_title: '43', photo: HUIT[0], photoCount: 8 });
 const AUTRE = ann(9103, { title: 'Adidas Spezial noir taille 38', brand_title: 'Adidas', size_title: '38', price: { amount: '60.0', currency_code: 'EUR' } });
 const ACCS = [{ id: 1, vinted_user_id: '111', login: 'compte_test', domain: 'www.vinted.fr', updated_at: auj.toISOString() }];
 const FICHE = { id: 'fiche-banc-1', numero: '45', titre: 'Asics Gel-1130 argent taille 41', prix: 70, description: 'Neuves, jamais portées.', marque: 'Asics', taille: '41', etat: 'Neuf avec étiquette', couleur: 'Argent', photos: ['https://images1.vinted.net/t/c/f800/1.jpeg'], creeAt: auj.toISOString(), origine: 'dupliquer' };
@@ -52,10 +56,11 @@ const MAIN = { vinted_annonce_numeros: { 9102: { numero: '42' }, 9103: { numero:
 // L'état du serveur : la vraie suite chez lui. Phase 'avant' : l'ancienne en ligne ; 'apres' : il l'a
 // supprimée sur Vinted et publié la nouvelle (9201, lue par l'extension, encore sans N°).
 const etat = { phase: 'avant' };
-const items = () => (etat.phase === 'avant' ? [ANCIENNE, AUTRE] : [AUTRE, ann(9201, { title: 'Salomon XT-6 blanc taille 40', brand_title: 'Salomon', size_title: '40', created_at_ts: Math.floor(Date.now() / 1000) - 30 })]);
+const items = () => (etat.phase === 'avant' ? [ANCIENNE, AUTRE, OCTO] : [AUTRE, OCTO, ann(9201, { title: 'Salomon XT-6 blanc taille 40', brand_title: 'Salomon', size_title: '40', created_at_ts: Math.floor(Date.now() / 1000) - 30 })]);
 const lignes = () => [
   { id: 'main', data: MAIN },
   { id: 'harvest_111_listings', data: { capturedAt: new Date().toISOString(), payload: { items: items(), pagination: { total_entries: items().length } } } },
+  { id: 'vinted_item_details', data: { 9104: { description: 'Air Max 1 portées trois fois.', photos: HUIT } } },
   { id: 'coffre_111_9102', data: { title: 'Salomon XT-6 blanc taille 40', desc: 'Salomon XT-6 portées deux fois, boîte d’origine.', brand: 'Salomon', size: '40', etat: 'Très bon état', price: 49, photos: ['https://images1.vinted.net/t/a/f800/1.jpeg', 'https://images1.vinted.net/t/a/f800/2.jpeg'] } },
 ];
 const VERSION = (/EXT_ATTENDUE = '([\d.]+)'/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8')) || [])[1] || '5.322.0';
@@ -94,7 +99,7 @@ const projette = (row, sel) => {
     const src = m[2], alias = m[1] || src.split(/->>|->/).pop();
     if (src === 'id') { out[alias] = row.id; continue; }
     if (src === 'data') { out[alias] = row.data; continue; }
-    let v = row.data; for (const seg of src.replace(/^(data|meta)(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg];
+    let v = row.data; for (const seg of src.replace(/^(data|meta)(->>|->)/, '').split(/->>|->/)) v = v == null ? null : v[seg.replace(/^"|"$/g, '')];
     out[alias] = v == null ? null : (src.includes('->>') && typeof v === 'object' ? JSON.stringify(v) : v);
   }
   return out;
@@ -249,6 +254,64 @@ const premierPlan = (pg) => pg.evaluate(() => document.dispatchEvent(new Event('
           if (tel) dit(!p1.length, `F ${T} cibles au doigt ≥ 44 px (feuille guidée)`, p1.join(" | "));
           await clic(pg, `${F} [data-main-terminer]`, false);
           await pg.waitForTimeout(400);
+          // ── G : TOUTES les photos (8), le même réglage sur les 8, en retirer une ⇒ 7 ──
+          touchers = 0;
+          await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces&vue=republier`, { waitUntil: 'domcontentloaded' });
+          await pg.waitForSelector('[data-selection-annonce="9104"]', { timeout: 20000 });
+          await clic(pg, '[data-selection-annonce="9104"] input');
+          await attendre(pg, () => (document.querySelector('[data-republier-main-lancer]') ? 1 : null));
+          await clic(pg, '[data-republier-main-lancer]');
+          const FG = '[data-repub-main="9104"]';
+          await pg.waitForSelector(FG, { timeout: 8000 }); await poseeLa(pg, FG);
+          const huit = await attendre(pg, () => { const x = document.querySelector('[data-repub-main] [data-main-telecharger]'); return x && x.getAttribute('data-rg-photos-pretes') === '8' ? 8 : null; }, 20000);
+          const grille = await pg.evaluate(() => { const g = document.querySelector('[data-repub-main] [data-main-photos]'); return g ? { n: g.getAttribute('data-main-photos'), ch: g.getAttribute('data-rg-photos-choisies'), srcs: [...g.querySelectorAll('img')].map((i) => i.getAttribute('src') || '').map((u) => (u.match(/\/(\d)\.jpeg/) || [])[1] || u.slice(0, 20)).join(','), couv: !!g.querySelector('[data-rg-photo="0"] .vrm-rg-couverture') } : null; });
+          dit(huit === 8 && grille && grille.n === '8' && grille.ch === '8' && grille.couv, `G ${T} une annonce de 8 photos (vignette seule au dressing) : les 8, la 1re en couverture, toutes préparées`, grille);
+          dit(!(await pg.$(`${FG} [data-rg-photos-manque]`)), `G ${T} rien ne manque : aucune mise en garde`);
+          // Le même réglage pour toutes : la barre « Luminosité », puis « Recadrer ».
+          await clic(pg, `${FG} [data-main-reglages] > summary`, false);
+          const poser = (cle, v) => pg.evaluate(([cle, v]) => { const i = document.querySelector(`[data-repub-main] [data-main-reglage="${cle}"]`); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(i, String(v)); i.dispatchEvent(new Event('input', { bubbles: true })); i.dispatchEvent(new Event('change', { bubbles: true })); }, [cle, v]);
+          await poser('bright', 1.1); await poser('zoom', 1.25); await pg.waitForTimeout(300);
+          const styles = await pg.evaluate(() => [...document.querySelectorAll('[data-repub-main] [data-main-photos] img')].map((i) => `${i.style.filter}|${i.style.transform}`));
+          const valeurs = await pg.evaluate(() => ({ b: (document.querySelector('[data-repub-main] [data-rg-valeur="bright"]') || {}).textContent, z: (document.querySelector('[data-repub-main] [data-rg-valeur="zoom"]') || {}).textContent, couv: ((document.querySelector('[data-repub-main] .vrm-rg-pres-couv img') || {}).style || {}).transform }));
+          dit(styles.length === 8 && new Set(styles).size === 1 && /brightness\(1\.1\)/.test(styles[0]) && /scale\(1\.25\)/.test(styles[0]) && /scale\(1\.25\)/.test(valeurs.couv || ''), `G ${T} le MÊME réglage sur les 8 (aperçu de la grille et de la couverture)`, { s: styles[0], n: new Set(styles).size, couv: valeurs.couv });
+          dit(valeurs.b === '+10 %' && valeurs.z === '×1,25', `G ${T} chaque barre dit sa valeur en clair (« +10 % », « ×1,25 »)`, valeurs);
+          const pouces = await pg.$eval('[data-repub-main] [data-main-reglage]', (l) => l.map((x) => Math.round(x.getBoundingClientRect().height)));
+          dit(pouces.length === 5 && pouces.every((h) => h >= 44), `G ${T} cinq barres, chacune une prise de 44 px`, pouces);
+          await pg.dblclick(`${FG} [data-main-reglage="bright"]`).catch(() => {}); await pg.waitForTimeout(250);
+          dit((await pg.evaluate(() => (document.querySelector('[data-repub-main] [data-rg-valeur="bright"]') || {}).textContent)) === '0 %', `G ${T} double-toucher une barre la remet à zéro`);
+          await pg.screenshot({ path: nomF('8-huit-photos-reglage') });
+          await clic(pg, `${FG} [data-main-reglages] > summary`, false);
+          await attendre(pg, () => { const x = document.querySelector('[data-repub-main] [data-main-telecharger]'); return x && x.getAttribute('data-rg-photos-pretes') === '8' ? 1 : null; }, 20000);
+          const avG = await pg.evaluate(() => window.__partages.length), dG = dl.length;
+          await clic(pg, `${FG} [data-main-telecharger]`);
+          await pg.waitForTimeout(600);
+          const p8 = await pg.evaluate(() => window.__partages.slice(-1)[0] || null);
+          if (tel) dit((await pg.evaluate(() => window.__partages.length)) === avG + 1 && p8 && p8.noms.length === 8 && /-08\.jpg$/.test(p8.noms[7]) && p8.geste, `G ${T} UN toucher : le partage avec les 8 fichiers, dans le geste`, p8);
+          else dit(dl.length - dG === 8, `G ${T} UN toucher : les 8 photos téléchargées`, dl.slice(dG));
+          // Retirer la 3e : 7 photos partent, renommées dans l'ordre.
+          await clic(pg, `${FG} [data-rg-photo-choix="2"]`);
+          const sept = await attendre(pg, () => { const x = document.querySelector('[data-repub-main] [data-main-telecharger]'); return x && x.getAttribute('data-rg-photos-pretes') === '7' ? 7 : null; }, 20000);
+          dit(sept === 7 && (await pg.getAttribute(`${FG} [data-rg-photo-choix="2"]`, 'aria-pressed')) === 'false' && (await pg.getAttribute(`${FG} [data-main-photos]`, 'data-rg-photos-choisies')) === '7', `G ${T} une photo retirée d’un toucher ⇒ 7 prêtes`);
+          const avG2 = await pg.evaluate(() => window.__partages.length), dG2 = dl.length;
+          await clic(pg, `${FG} [data-main-telecharger]`);
+          await pg.waitForTimeout(600);
+          const p7 = await pg.evaluate(() => window.__partages.slice(-1)[0] || null);
+          if (tel) dit((await pg.evaluate(() => window.__partages.length)) === avG2 + 1 && p7 && p7.noms.length === 7 && p7.geste, `G ${T} le partage suivant porte 7 fichiers`, p7);
+          else dit(dl.length - dG2 === 7, `G ${T} 7 photos téléchargées`, dl.slice(dG2));
+          const ap7 = await attendre(pg, () => { const a = document.querySelector('[data-repub-main] [data-acc-apres="republier.main"]'); return a ? a.textContent : null; });
+          dit(ap7 && /7 photos/.test(ap7), `G ${T} après : « 7 photos … »`, ap7);
+          await pg.screenshot({ path: nomF('9-sept-photos') });
+          await clic(pg, `${FG} button[aria-label="Fermer"]`, false); await pg.waitForTimeout(300);
+          // Une annonce dont VRM n'a que la vignette (9103) : dit, avec le lien de l'annonce et « Relire ».
+          await pg.goto(`http://localhost:${PORT}/?tab=cat_annonces&vue=republier`, { waitUntil: 'domcontentloaded' });
+          await pg.waitForSelector('[data-selection-annonce="9103"]', { timeout: 20000 });
+          await clic(pg, '[data-selection-annonce="9103"] input', false);
+          await attendre(pg, () => (document.querySelector('[data-republier-main-lancer]') ? 1 : null));
+          await clic(pg, '[data-republier-main-lancer]', false);
+          const couvSeule = await attendre(pg, () => { const x = document.querySelector('[data-repub-main="9103"] [data-rg-photos-manque]'); return x ? { m: x.getAttribute('data-rg-photos-manque'), lien: (x.querySelector('[data-rg-ouvrir-annonce]') || {}).getAttribute ? x.querySelector('[data-rg-ouvrir-annonce]').getAttribute('href') : null, relire: !!x.querySelector('[data-rg-relire-photos]') } : null; }, 12000);
+          dit(couvSeule && couvSeule.lien === 'https://www.vinted.fr/items/9103' && couvSeule.relire && (couvSeule.m === 'couverture' || Number(couvSeule.m) > 0), `G ${T} VRM n’a pas toutes les photos : il le dit, avec le lien de l’annonce et « Relire les photos »`, couvSeule);
+          await pg.screenshot({ path: nomF('10-photos-manquent') });
+          await clic(pg, '[data-repub-main] button[aria-label="Fermer"]', false); await pg.waitForTimeout(300);
           // ── P : publier à la main, une fiche « À publier » ──
           touchers = 0;
           const poolAvant = JSON.stringify(await ls(pg, 'vinted_used_numeros'));

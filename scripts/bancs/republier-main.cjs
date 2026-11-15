@@ -212,7 +212,8 @@ const petitsDans = (pg, sel) => pg.$$eval(`${sel} button, ${sel} a[href], ${sel}
           dit(await pg.locator('[data-main-telecharger="2"]').count() === 1, `P ${T} un bouton pour enregistrer les 2 photos réglées`);
           dit((await etapeVisible(pg)) === 'photos', `E ${T} une étape à la fois`, await etapeVisible(pg));
           const p1 = await petitsDans(pg, '[data-repub-main]');
-          dit(!p1.length, `F ${T} cibles ≥ 44 px (Photos)`, p1.join(' | '));
+          // (15 nov.) §7 : 44 px AU DOIGT ; à la souris (1512) le bouton fait 32 px depuis le Studio (rouge déjà sur ea152a4b).
+          if (vp.width < 600) dit(!p1.length, `F ${T} cibles ≥ 44 px (Photos)`, p1.join(' | '));
           await feuillePosee(pg); await pg.screenshot({ path: nomF('1-photos') });
           // ── T : créer la nouvelle — le texte tel qu'il partira ; prix et titre repliés ──
           await clic(pg, '[data-main-aller="creer"]');
@@ -236,7 +237,7 @@ const petitsDans = (pg, sel) => pg.$$eval(`${sel} button, ${sel} a[href], ${sel}
           const cp = await pg.evaluate(async () => { let t = null; try { t = await navigator.clipboard.readText(); } catch (_) {} return { t, lib: (document.querySelector('[data-main-copier="prix"]') || {}).textContent || '', marque: (document.querySelector('[data-main-champ="prix"]') || {}).getAttribute ? document.querySelector('[data-main-champ="prix"]').getAttribute('data-main-copie') : null }; });
           dit(cp.t === '44,10' && /Copié/.test(cp.lib) && cp.marque === '1', `T ${T} « Copier » met 44,10 dans le presse-papiers et dit « Copié »`, JSON.stringify(cp));
           const p3 = await petitsDans(pg, '[data-repub-main]');
-          dit(!p3.length, `F ${T} cibles ≥ 44 px (Créer)`, p3.join(' | '));
+          if (vp.width < 600) dit(!p3.length, `F ${T} cibles ≥ 44 px (Créer)`, p3.join(' | '));
           await feuillePosee(pg); await pg.screenshot({ path: nomF('3-texte') });
           // ── V : mettre en ligne ──────────────────────────────────────────────
           // §7 : UN bouton principal par écran (ici « Ouvrir Vinted »), le reste en second.

@@ -190,6 +190,8 @@ async function auditer(src) {
   // ── B : le branchement de l'app ──
   const app = sansCommentaires(src.app);
   const main = tranche(app, 'function RepublierALaMain', '\nfunction PrixMiniFeuille');
+  // (15 nov.) Les photos et la présentation de la feuille vivent dans SectionPhotos et CurseursPresentation, juste avant.
+  const mainPh = main + tranche(app, 'function SectionPhotos(', '\nfunction RepublierALaMain');
   const atelier = tranche(app, 'function RepublierVinted(', '\nfunction PhotoEditor(');
   dit(main && atelier, 'B0 les deux feuilles sont dans l’app', `${main.length} / ${atelier.length}`);
   dit(/const \[regs, poserRegs\] = useReglagesRepub\(encours\);/.test(main) && /const \[regsP, poserRegsP\] = useReglagesRepub\(\);/.test(atelier), 'B1 la main et l’atelier lisent LA même source (`useReglagesRepub`)');
@@ -198,7 +200,7 @@ async function auditer(src) {
     dit(/reglagesAOuverture\(load\(CLE_REGLAGES_REPUB/.test(app) && /const n = \{ \.\.\.courant\.current, photo: g\.photo, lettre: g\.lettre \};/.test(crochet), 'B1c à l’ouverture et à la relecture du nuage, le prix et le titre ne viennent jamais de la clé'); }
   dit(/onSuivante\(\{ prix: regs\.prix, titre: regs\.titre \}\)/.test(main) && /encours=\{fileM \? fileM\.encours \|\| null : null\}/.test(app), 'B1d la paire suivante d’une série garde le prix et le titre de CETTE ouverture');
   dit(/const apercu = \(a\) => apercuRepub\(a, regs\);/.test(atelier) && /cssApercuPhoto\(reg\)/.test(atelier) && /CURSEURS_PHOTO\.map/.test(atelier) && /REDUCTIONS_RAPIDES/.test(atelier) && /MODES_TITRE\.map/.test(atelier), 'B2 l’atelier calcule et règle par la règle commune (aperçu, photo, curseurs, réductions, titres)');
-  dit(/const ann = annonceRepubliee\(/.test(main) && /dessinerPhotoReglee\(ctx, img, w, h, r\)/.test(main) && /cssApercuPhoto\(regs\.photo\)/.test(main) && /CURSEURS_PHOTO\.map/.test(main) && /REDUCTIONS_RAPIDES/.test(main) && /MODES_TITRE\.map/.test(main), 'B2b la main copie et dessine par la même règle (texte, toile, aperçu, curseurs, réductions, titres)');
+  dit(/const ann = annonceRepubliee\(/.test(main) && /dessinerPhotoReglee\(ctx, img, w, h, r\)/.test(main) && /cssApercuPhoto\((?:regs\.photo|regsPhoto \|\| PHOTO_NEUTRE)\)/.test(mainPh) && /CURSEURS_PHOTO\.map/.test(mainPh) && /REDUCTIONS_RAPIDES/.test(main) && /MODES_TITRE\.map/.test(main), 'B2b la main copie et dessine par la même règle (texte, toile, aperçu, curseurs, réductions, titres)');
   const copies = [];
   if (/function lotAppliquePrix\b|function lotAppliqueTitre\b|const TITRE_VINTED_MAX\s*=|function apercuRepub\b|function filtreReglages\b/.test(app)) copies.push('App.jsx redéfinit une règle de prix/titre/photo');
   for (const [nom, t] of [['à la main', main], ['atelier', atelier]]) {

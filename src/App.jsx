@@ -38191,6 +38191,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const nph = i && i.nph != null && i.nph !== '' ? Number(i.nph) : (Number.isFinite(it.photoCount) ? it.photoCount : undefined);
       out.push({ id, uid, compte: nomAcc(it._acc, uid), domain: (it._acc && it._acc.domain) || 'www.vinted.fr', etat,
         raisonPas: raisonPasSelectionnable(etat), titre, prix, photo: it.photo || '', numero: e.numero ? String(e.numero) : '',
+        // (15 nov., « je veux TOUTES les photos ») Les photos que la lecture porte (fiche de la page d'abord),
+        // et combien Vinted en annonce : « Republier à la main » les prend toutes, et dit s'il en manque.
+        photos: (Array.isArray(it.photosDetail) && it.photosDetail.length ? it.photosDetail : (Array.isArray(it.photos) ? it.photos : [])).map((p) => (typeof p === 'string' ? p : ((p && (p.full_size_url || p.url)) || ''))).filter(Boolean).slice(0, 20),
+        ...(nph !== undefined && Number.isFinite(nph) ? { nPhotos: nph } : {}),
         taille: it.size || '', marque: it.brand || '', condition: it.condition || '', createdTs: it.createdTs || null,
         place: it._place || '', brEtat: it._etat || '',
         // Ce que « vérifier avant » peut juger : ce qui a été LU (trois états, §5).
