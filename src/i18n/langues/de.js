@@ -43,6 +43,7 @@ import ecran_studio_paires from './de/studio-paires.js';   // (14 nov., Studio b
 import ecran_republier_guide from './de/republierGuide.js';   // (15 nov.) republier / publier à la main, guidés
 import ecran_memePhoto from './de/memePhoto.js';   // (15 nov., lot meme-photo)
 import ecran_deuxComptes from './de/deuxComptes.js';   // (15 nov., lot deux-comptes)
+import ecran_favorisSites from './de/favorisSites.js';   // (15 nov., lot favoris-sites)
 export default {
   ...ecran_studio_paires,
   ...ecran_republier_guide,
@@ -2270,6 +2271,7 @@ export default {
   ...ecran_vcventes,
   ...ecran_memePhoto,
   ...ecran_deuxComptes,
+  ...ecran_favorisSites,
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_finition,
