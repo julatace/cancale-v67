@@ -51,7 +51,7 @@
 :root:root:root:root:root:root:root:root body .vv-seg-b.is-on { background: var(--vv-seg-on) !important; color: #0C1D30 !important; box-shadow: 0 4px 10px -4px rgb(8 26 50 / .45) !important; }
 :root:root:root:root:root:root:root:root body .vv-seg-n {
   font-style: normal !important; font-size: 11.5px !important; font-weight: 750 !important; min-width: 20px !important; height: 20px !important; padding: 0 6px !important; border-radius: 10px !important;
-  display: inline-grid !important; place-items: center !important; background: rgb(255 255 255 / .20) !important; color: inherit !important; font-variant-numeric: tabular-nums;
+  display: inline-grid !important; place-items: center !important; background: rgb(255 255 255 / .13) !important; color: inherit !important; font-variant-numeric: tabular-nums;
 }
 :root:root:root:root:root:root:root:root body .vv-seg-b.is-on .vv-seg-n { background: rgb(12 29 48 / .08) !important; }
 :root:root:root:root:root:root:root:root body .vv-seg-n.is-ambre { background: #FFE2B8 !important; color: #5E3900 !important; }
@@ -328,4 +328,7 @@
 :root:root:root:root:root:root:root:root body .vv-filtres .sb-tuile { background: var(--sv-verre) !important; box-shadow: var(--sv-ombre) !important; }
 :root:root:root:root:root:root:root:root body .vv-filtres .sb-tuile.is-actif { background: var(--vv-seg-on) !important; box-shadow: inset 0 2px 6px rgb(8 26 50 / .28) !important; }
 :root:root:root:root:root:root:root:root body .vv-filtres .sb-tuile.is-actif :is(.sb-tuile-lib, .sb-tuile-chiffre, .sb-tuile-unite) { color: #0C1D30 !important; }
+
+/* Le lien « Vinted » d'une carte « À renvoyer » est posé sur le VERRE : l'encre du lien, plus le blanc du fond (4,5:1). */
+:root:root:root:root:root:root:root:root body .vrm-ret-carte .vrm-ret-lien { color: var(--sv-lien) !important; }
 }
