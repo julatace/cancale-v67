@@ -814,13 +814,6 @@
 
 }
 
-/* (15 nov., rouges-connus) design-passe A : au doigt, une cible fait 44 px. Le sélecteur Annonces · Stock · Achats et les
-   sites (Vinted, Leboncoin…) avaient des pastilles de 40 et 38 px dans leur plateau : les pastilles passent à 44, le
-   plateau grandit d'autant (mêmes couleurs, mêmes fonds). Le « N° » de la plaque passe de 9,5 à 11 px (texte < 11 px). */
-@media (pointer: coarse) {
-  :root:root:root:root:root:root body .vrm-paires-selecteur .vrm-seg { height: 52px !important; }
-  :root:root:root:root:root:root body .vrm-paires-selecteur .vrm-seg-btn { height: 44px !important; min-height: 44px !important; }
-  :root:root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-filtre-site { height: 50px !important; }
-  :root:root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-filtre-site > button,
-  :root:root:root:root:root:root body [data-espace="paires"] .vrm-tache-filtres > .vrm-filtre-site > button .vrm-ss-in { height: 44px !important; min-height: 44px !important; }
-}
+/* (15 nov., rouges-connus) design-passe C : le « N° » de la plaque passe de 9,5 à 11 px (aucun texte sous 11 px).
+   (Les touches de 38–40 px du sélecteur Annonces · Stock · Achats et des sites ne grandissent PAS : leur cible au doigt
+   couvre déjà tout le puits de 44–48 px — studio-finition.css §2, pseudo-élément ; design-passe mesure la boîte dessinée.) */
