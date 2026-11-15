@@ -145,7 +145,7 @@ const plus = (iso, min) => new Date(Date.parse(iso) + min * 60e3).toISOString();
     const s = pushes[1] || {};
     dit(apres.code === 200 && pushes.length === 2, 'G6 après la fin de la fenêtre : UNE notification (la route EXÉCUTÉE)', `${apres.code} · ${pushes.length} · ${JSON.stringify(apres.corps).slice(0, 200)}`);
     dit(s.title === '1 colis à poster · 1 colis à retirer', 'G7 elle les dit toutes : « 1 colis à poster · 1 colis à retirer »', s.title);
-    dit(/^Dernier : Ton colis Mondial Relay/.test(s.body || ''), 'G8 le corps dit la dernière', s.body);
+    dit(/^La plus récente : Ton colis Mondial Relay/.test(s.body || ''), 'G8 le corps dit la plus récente (15 nov.)', s.body);
     dit(s.url === L.DESTINATIONS.colis({}) && Array.isArray(s.actions) && s.actions.length === 2 && s.actions[0].url === L.DESTINATIONS.colis({}) && s.actions[1].url === L.DESTINATIONS.retrait({}),
       'G9 elle ouvre Ventes « À expédier » ; un geste par genre (Achats « À retirer »)', JSON.stringify([s.url, s.actions]));
     dit(/bordereau:envoyee,bordereau:groupee,arrivee:groupee$/.test(etats()) && !journal().attenteJusqua, 'G10 la cloche les dit « dans un résumé » ; la fenêtre est vidée', etats());

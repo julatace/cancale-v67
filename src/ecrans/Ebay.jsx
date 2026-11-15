@@ -642,7 +642,7 @@ function catDepuisPubinfoEbay(j, nomForce) {
 // un brouillon de la même paire (même identifiant d'annonce) ⇒ pas de second.
 // p : la paire (`useEbayPaires`) ; { prix, titre } : ce que la feuille a réglé.
 // Rend { accepte, etape: 'brouillon', complet, manque, brouillonId, deja } ou { accepte:false, code, raison }.
-async function preparerBrouillonPartout(p, { prix, titre } = {}) {
+async function preparerBrouillonPartout(p, { prix, titre, categorie } = {}) {
   const pairId = String((p && p.id) || '');
   const numero = p && p.num ? cleNum(p.num) : '';
   if (!pairId || !numero || !skuEbayDe(numero)) return { accepte: false, code: 'numero', raison: 'pas de N° lisible : aucune identité, rien n’est enregistré' };
@@ -654,8 +654,17 @@ async function preparerBrouillonPartout(p, { prix, titre } = {}) {
   const dejaLa = (b) => ({ accepte: true, etape: 'brouillon', deja: true, brouillonId: b.id || null, complet: !(b.etatBrouillon && b.etatBrouillon !== 'brouillon') && !itemDeBrouillon(b).err, manque: [] });
   { const d = memePaire(cur); if (d) return dejaLa(d); }
   const t = String(titre || (p && p.title) || '').trim();
+  // (15 nov.) LA catégorie eBay qu'il a choisie dans Publier partout, parmi celles qu'eBay propose
+  // (src/correspondances.js, retenue par catégorie Vinted). Aucune ⇒ AUCUNE devinée : la première
+  // suggestion d'eBay pour le titre envoyait des chaussures de randonnée en « Baskets » ; le brouillon
+  // l'attend (« la catégorie » manque) et se règle dans tes brouillons eBay.
   let cat = null;
-  try { const { j } = await appelEbay({ action: 'pubinfo', title: t }); cat = catDepuisPubinfoEbay(j); } catch (_) { cat = null; }
+  const catChoisie = categorie && /^\d{1,9}$/.test(String(categorie.id || '')) ? { id: String(categorie.id), nom: String(categorie.nom || '') } : null;
+  if (catChoisie) {
+    try { const { j } = await appelEbay({ action: 'pubinfo', title: t, categoryId: catChoisie.id }); cat = catDepuisPubinfoEbay(j, catChoisie.nom || ''); } catch (_) { cat = null; }
+    if (cat && String(cat.categoryId) !== catChoisie.id) cat = null;          // jamais une autre que la sienne
+    if (!cat) cat = { categoryId: catChoisie.id, categoryName: catChoisie.nom || catChoisie.id, required: [], attributs: [], cats: [], conditions: null };
+  }
   let genre = '';
   try { if (p.catalogId != null && p.catalogId !== '') genre = familleArticle({ chemin: await cheminVintedApp(p.catalogId) }).genre || ''; } catch (_) { genre = ''; }
   const aspects = cat ? autoRemplirAttributs(cat.attributs, { titre: p.title || '', marque: p.marque || extractBrand(p.title || '') || '', taille: p.taille || extractSize(p.title || '') || '',

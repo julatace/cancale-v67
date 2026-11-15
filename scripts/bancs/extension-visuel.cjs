@@ -113,7 +113,8 @@ const lire = (pg) => pg.evaluate(() => {
     ecrans: Array.from(r.querySelectorAll('[data-ouvrir-ecran]')).map((b) => b.getAttribute('data-ouvrir-ecran')),
     ouvrirVrm: !!q('[data-ouvrir-vrm]'),
     hauteursRaccourcis: Array.from(r.querySelectorAll('[data-ouvrir-ecran]')).map((b) => Math.round(b.getBoundingClientRect().height)),
-    fond: carte ? getComputedStyle(carte).backgroundColor : '',
+    // 5.379 (Studio bleu clair) : le fond de la carte est un DÉGRADÉ opaque ; sa première couleur fait foi.
+    fond: carte ? (() => { const s = getComputedStyle(carte), c = s.backgroundColor; if (!/^rgba\(0, 0, 0, 0\)$/.test(c)) return c; const m = /rgba?\([^)]*\)/.exec(s.backgroundImage || ''); return m ? m[0] : c; })() : '',
     animation: carte ? getComputedStyle(carte).animationName : '',
     theme: h.getAttribute('data-theme'), mini: h.hasAttribute('data-mini'), haut: h.hasAttribute('data-haut'), gauche: h.hasAttribute('data-gauche'),
     progres: !!(q('[data-dates-versement]') && q('[data-dates-versement]').offsetParent),

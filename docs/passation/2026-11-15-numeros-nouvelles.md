@@ -72,7 +72,7 @@ Règle : `src/numerosNouvelles.js` (JS pur). Texte : `src/i18n/langues/*/numeros
 3. **Réglages → Numéros** : « Qui numérote ? **VRM · Moi** » (deux choix, `sb-touche`,
    `role="radiogroup"`) et la phrase de ce que fait le choix pris ; même réglage synchronisé
    `vrm_numero_ecrit` (rien sur le navigateur seul).
-4. **Extension 5.379.0** (`numerotes` dans `EXT_CAPACITES`) : l'app envoie par le canal
+4. **Extension 5.382.0** (`numerotes` dans `EXT_CAPACITES`) : l'app envoie par le canal
    adressé `{ type: 'numerotes', uid, ids: ['id:N°'] }` ; `annoncerNumerotes` (background.js)
    pose un lot « numérotés » (une fois par identité, `annoncerCapte`, événement) ; la carte
    près du logo dit **« VRM a numéroté · 3 paires numérotées »** (le mot du profil,
@@ -114,7 +114,7 @@ Règle : `src/numerosNouvelles.js` (JS pur). Texte : `src/i18n/langues/*/numeros
   après coup — la phrase est maintenant écrite en entier) et la ligne de la cloche
   « 2 annonces sans numéro » dite en plus, déjà fausse (les deux venaient d'être numérotées).
 - Audits verts : identite, numero-ecrit, accueil-reste, fusion-nuage, numerotation-lecteurs,
-  garde-numeros-rapide, renum-b, coherence (capacité `numerotes`), extension-zip (5.379.0
+  garde-numeros-rapide, renum-b, coherence (capacité `numerotes`), extension-zip (5.382.0
   neuve), traduction, tdz, variables, studio, quoi-de-neuf, et les ~60 audits qui lisent
   `prochainLibre` / `vinted_annonce_numeros`. Rouges identiques sur `origin/main` :
   audit-benefice (App.jsx ne se lit pas : `partageFichiersPossible` déclaré deux fois),
@@ -130,4 +130,4 @@ Règle : `src/numerosNouvelles.js` (JS pur). Texte : `src/i18n/langues/*/numeros
 ## Geste de Julien
 
 Aucun pour que ça marche (il est déjà en « VRM numérote »). Installer l'extension
-**5.379.0** pour que la carte du logo dise aussi « VRM a numéroté ».
+**5.382.0** pour que la carte du logo dise aussi « VRM a numéroté ».

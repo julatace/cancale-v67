@@ -220,6 +220,11 @@ self.addEventListener('push', event => {
     },
   };
   if (actions.length) opts.actions = actions.map((x) => ({ action: x.action, title: x.title }));
+  // (15 nov.) La langue du texte (celle du compte, api/_lib/notif-redaction.js) : le
+  // lecteur d'écran prononce juste. ⚠️ Le « from VRM » qu'iOS écrit sous le titre n'est
+  // PAS dans cette charge : iOS l'ajoute à toute notification d'une app web de l'écran
+  // d'accueil (le nom vient du manifeste ou de celui choisi à l'ajout), en anglais.
+  if (typeof data.lang === 'string' && /^(fr|en|es|it|de)$/.test(data.lang)) opts.lang = data.lang;
   if (typeof data.image === 'string' && /^https:\/\/images\d*\.vinted\.net\//.test(data.image)) opts.image = data.image;
   event.waitUntil((async () => {
     if (data.tagGroupe && genre && self.registration.getNotifications) {

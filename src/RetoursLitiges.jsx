@@ -16,6 +16,7 @@ import { tr, monnaie } from './i18n/index.js';
 import { BoutonBase } from './composants/Bouton.jsx';
 import './styles-retours.css';
 import { motsVendeur } from './profilVendeur.js';
+import { attrCible } from './cibleNotif.js';   // (15 nov.) la notification « À renvoyer » ouvre CETTE carte
 // (intégration g1) retours-litiges × vocabulaire-article : les textes qui nomment l'article ont une variante
 // `.art` (« l’article ») hors Sneakers ; un vendeur Sneakers garde « la paire » mot pour mot.
 const AVEC_ART = new Set(['pap.verifier', 'pap.etape.recevoir', 'pap.etape.fait', 'pap.revenue', 'pap.revenueN', 'pap.contester']);
@@ -63,7 +64,7 @@ function CarteRetour({ c, onImprimer, Photo, Bouton }) {
   const ph = c.photo || '';
   const tuile = <span className="vrm-ret-tuile" aria-hidden="true">{ICONE_RETOUR}</span>;
   return (
-    <article className="vrm-ret-carte" data-retour-achat={c.tx} data-retour-num={c.num || ''} data-retour-limite={c.limiteIso || ''}
+    <article className="vrm-ret-carte" data-cible={attrCible(['retour', c.tx], ['achat', c.tx])} data-retour-achat={c.tx} data-retour-num={c.num || ''} data-retour-limite={c.limiteIso || ''}
       data-retour-presse={c.presse ? '1' : '0'} data-retour-rembourse={c.rembourse.etat} data-retour-montant={c.rembourse.montant != null ? String(c.rembourse.montant) : ''}
       data-retour-relie={c.relie ? '1' : '0'}>
       <div className="vrm-ret-haut">

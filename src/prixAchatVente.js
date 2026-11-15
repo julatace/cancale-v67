@@ -16,6 +16,8 @@
 // Module PUR : la coque (src/DemandePrixAchat.jsx), le serveur et
 // `scripts/audit-prix-achat-vente.cjs` l'exécutent tel quel.
 
+import { rediger } from '../api/_lib/notif-redaction.js';
+
 // Une vente de moins de 3 jours seulement : « le jour de la vente », pas l'arriéré
 // (l'arriéré a déjà sa porte : « Coût d'achat · 1/184 renseigné »).
 export const FENETRE_MS = 3 * 86400000;
@@ -70,27 +72,25 @@ export function ventesSansPrix({ paires, ventes, fiches, prixDe, annulee, montan
     if (prixConnu(f, prixDe)) continue;
     const eur = typeof montant === 'function' ? montant(o) : null;
     vus.add(tx);
-    out.push({ tx, uid: str(p.uid), item, num: str(f.numero), eur: eur != null && Number.isFinite(Number(eur)) ? Number(eur) : null, ts });
+    // (15 nov.) Le nom de la paire pour la notification (« Vendu 62 € · Nike Air Max 1 ») :
+    // la FICHE de cette annonce (par identité), sinon le titre de CETTE commande (même n°).
+    const titre = str(f.title || f.titre || o.title || '').replace(/[\u0000-\u001f\u007f]+/g, ' ').slice(0, 80);
+    out.push({ tx, uid: str(p.uid), item, num: str(f.numero), eur: eur != null && Number.isFinite(Number(eur)) ? Number(eur) : null, ts, titre });
   }
   return out.sort((a, b) => b.ts - a.ts);
 }
 
-const eurTexte = (n) => {
-  if (n == null || !Number.isFinite(Number(n))) return '';
-  const c = Math.round(Number(n) * 100);
-  return (c % 100 === 0 ? String(c / 100) : (c / 100).toFixed(2).replace('.', ',')) + ' €';
-};
-
 // Le texte de la notification (et de la carte) : une vente, ou plusieurs.
+// (15 nov.) La règle de rédaction (api/_lib/notif-redaction.js) : « Vendu 62 € · Nike
+// Air Max 1 » / « N°215 · touche pour saisir ton prix d'achat. » ; `redaction` le fait
+// refaire dans la langue du compte au moment d'envoyer.
 export function texteDemande(liste) {
   const l = Array.isArray(liste) ? liste.filter(Boolean) : [];
   if (!l.length) return null;
-  if (l.length === 1) {
-    const v = l[0]; const e = eurTexte(v.eur);
-    return { title: `${e ? `Vendu ${e}` : 'Vendu'} · N°${v.num}`, body: 'Combien tu l’avais payée ?' };
-  }
-  const nums = l.slice(0, 3).map((v) => `N°${v.num}`).join(', ') + (l.length > 3 ? '…' : '');
-  return { title: `${l.length} ventes sans prix d’achat`, body: `${nums} : combien tu les avais payées ?` };
+  const redaction = { sorte: 'prixAchat', ventes: l.slice(0, MAX_GROUPE).map((v) => ({ num: str(v.num), eur: v.eur != null && Number.isFinite(Number(v.eur)) ? Number(v.eur) : null, titre: str(v.titre).slice(0, 80) })) };
+  if (l.length > MAX_GROUPE) redaction.ventes.push(...l.slice(MAX_GROUPE).map((v) => ({ num: str(v.num), eur: null, titre: '' })));
+  const r = rediger(redaction);
+  return r ? { title: r.title, body: r.body, redaction } : null;
 }
 
 // L'adresse ouverte par le toucher : Ma journée, la feuille des prix de CES ventes
@@ -108,7 +108,7 @@ export function txsDuLien(search) {
 
 // Ce que l'app envoie au serveur (rien d'autre : le serveur relit la transaction).
 export function corpsDemande(liste) {
-  return { action: 'prixachat', ventes: (Array.isArray(liste) ? liste : []).slice(0, 20).map((v) => ({ tx: str(v.tx), uid: str(v.uid), num: str(v.num).slice(0, 12), eur: v.eur != null && Number.isFinite(Number(v.eur)) ? Math.round(Number(v.eur) * 100) / 100 : null })) };
+  return { action: 'prixachat', ventes: (Array.isArray(liste) ? liste : []).slice(0, 20).map((v) => ({ tx: str(v.tx), uid: str(v.uid), num: str(v.num).slice(0, 12), eur: v.eur != null && Number.isFinite(Number(v.eur)) ? Math.round(Number(v.eur) * 100) / 100 : null, ...(str(v.titre) ? { titre: str(v.titre).slice(0, 80) } : {}) })) };
 }
 
 // La mémoire « déjà demandée » : { demandes: { [tx]: iso } }. Ce qui reste à demander.

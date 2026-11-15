@@ -47,6 +47,7 @@ const ast = parser.parse(app, { sourceType: 'module', plugins: ['jsx'], errorRec
       writeSession: () => {}, sessionFrom: (x) => x, encodeURIComponent, JSON, String, Promise,
       // src/captcha.js tel qu'il est livré (clé de site vide : rien ne change)
       langueNavigateur: () => 'fr', // src/langueCompte.js (8 nov.) : importé par App.jsx
+      codePartenaireGarde: () => '', // (15 nov.) src/partenaires/lien.js : importé par App.jsx (aucun code partenaire gardé)
       captchaActif: () => false, routeProtegee: () => false, jetonCaptcha: () => null, etatCaptcha: () => ({ statut: 'inactif' }),
       consommerCaptcha: () => {}, corpsAvecCaptcha: (p, b) => b, MSG_CAPTCHA_ATTENTE: '', MSG_CAPTCHA_REFUS: '', MSG_CAPTCHA_ERREUR: '',
       window: { location: { origin: 'https://vrm.center', pathname: '/' } },
