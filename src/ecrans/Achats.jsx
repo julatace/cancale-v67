@@ -2,7 +2,8 @@
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { DEMANDE_OUVRIR_ACHAT } from '../pasEnLigne.js';   // (11 nov., lot pas-en-ligne)
 import { prixAchatSaisi } from '../prixAuNumerotage.js';
-import { suggestionsAchat, tousAchatsLibres, tousAchatsLibresDetail, filtresAchats, etiquetteLot } from '../suggestionsAchat.js';
+import { tousAchatsLibres, tousAchatsLibresDetail, filtresAchats, etiquetteLot } from '../suggestionsAchat.js';
+import { propositionsArticle } from '../liaisonAchat.js';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { tr } from '../i18n/index.js';
 import { createPortal } from 'react-dom';
@@ -724,7 +725,9 @@ function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, recep
   const [recuAu, setRecuAu] = useState('');
   const [marque, setMarque] = useState('');
   const [taille, setTaille] = useState('');
-  const sugg = useMemo(() => (Array.isArray(achats) ? suggestionsAchat({ cible, achats, liens, marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel }) : []), [cible, achats, liens]);
+  // (15 nov., liaison) La MÊME règle que Annonces → « Sans achat relié » : `propositionsArticle` (src/liaisonAchat.js) —
+  // mots du modèle, taille et couleur quand elles sont écrites, jours entre le retrait (lu) et la mise en ligne.
+  const sugg = useMemo(() => (Array.isArray(achats) ? propositionsArticle({ cible, achats, liens, marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel, receptionDe }) : []), [cible, achats, liens, receptionDe]);
   const voirTous = tous || !!autre || (Array.isArray(achats) && !sugg.length);
   // (relecture du 5 nov.) Les dates de réception se lisent à la demande (son tap sur
   // « Filtres ») : tant qu'elles arrivent, le filtre de date attend — il n'écarte rien
