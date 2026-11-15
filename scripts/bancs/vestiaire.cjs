@@ -31,7 +31,10 @@ srv.listen(PORT);
       const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
       const pg = await ctx.newPage();
       const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
-      await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+      // (15 nov., rouges-connus) Depuis le 8 nov. un site n'est montré que s'il est CHOISI (« Mes plateformes »,
+      // `vrm_plateformes_affichees`) ou relié par preuve (docs/passation/2026-11-08-navigation-plateformes.md) ;
+      // ici rien n'est relié (« jamais », « panne ») : le vendeur a CHOISI Vestiaire, comme il le ferait.
+      await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_plateformes_affichees', JSON.stringify({ sites: ['vinted', 'vestiaire'], at: 1 })); } catch (_) {} });
       await pg.route('**/rest/v1/**', (route) => {
         const u = decodeURIComponent(metaVersData(route.request().url()));
         const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
@@ -85,7 +88,10 @@ srv.listen(PORT);
       if (etat === 'lu') {
         dit(ac && ac.etat === 'lu' && /Nike Dunk Low/.test(ac.t) && /shipped/.test(ac.t) && /suivi XW123456789FR/.test(ac.t), 'achats : le nom de l’article, l’état de Vestiaire, le n° de suivi', ac && ac.t.slice(0, 160));
         dit(ac && /chronopost\.fr/.test(ac.suivre) && ac.h >= 44, 'le colis se suit sur le site du transporteur (44 px)', ac && ac.suivre);
-        dit(ac && /aucun prix d.achat/.test(ac.t), 'le montant n’entre dans aucun prix d’achat (c’est toi qui les saisis), et c’est dit', ac && ac.t.slice(0, 200));
+        // (15 nov., rouges-connus) Phrase raccourcie le 10 nov. (« Textes courts », 975435ad,
+        // docs/passation/2026-11-10-textes-courts-suite.md) : « Hors totaux : tes prix d'achat, tu les saisis. »
+        // La règle jugée : la carte DIT que ce montant reste hors des prix d'achat, que c'est lui qui les saisit.
+        dit(ac && /prix d.achat/i.test(ac.t) && /(hors totaux|aucun)/i.test(ac.t) && /saisi/i.test(ac.t), 'le montant n’entre dans aucun prix d’achat (c’est toi qui les saisis), et c’est dit', ac && ac.t.slice(0, 200));
       }
       if (etat === 'jamais') dit(ac && ac.etat === 'jamais' && /panier n'est jamais lu/.test(ac.t), 'achats jamais lus : le geste', ac && ac.t.slice(0, 120));
       if (etat === 'panne') dit(ac && ac.etat === 'pas-su' && !/achat vu/.test(ac.t), 'achats illisibles : « pas su », aucune liste', ac && ac.t.slice(0, 120));
