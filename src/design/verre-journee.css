@@ -372,4 +372,40 @@
   :root:root:root:root:root:root body .sj-journee .vrm-so-carte .vrm-so-ph { height: 200px !important; }
 }
 
+/* ══ 6. « RETOURS ET LITIGES » (achat + vente + litiges, une ligne par article) · « TOUT VA BIEN ? » (une ligne) ══ */
+:root:root:root:root:root:root body .sj-journee .vrm-rl {
+  --sb-encre: var(--sv-encre) !important; --sb-encre-2: var(--sv-encre-2) !important; --sb-ambre: var(--sv-ambre) !important;
+  margin: 14px 0 0 !important; padding: 12px 16px 8px !important; border-radius: 22px !important; color: var(--sv-encre) !important;
+  background: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; box-shadow: var(--sv-ombre) !important;
+}
+:root:root:root:root:root:root body .sj-journee .sj-col .vrm-rl { margin: 0 !important; }
+:root:root:root:root:root:root body .sj-journee .vrm-rl-h2 { font: 750 16px/1.25 Inter, system-ui, sans-serif !important; letter-spacing: -.015em !important; color: var(--sv-encre) !important; margin: 0 0 4px !important; }
+:root:root:root:root:root:root body .sj-journee .vrm-rl-h2 > span { color: var(--sv-encre) !important; font-weight: 750 !important; }
+:root:root:root:root:root:root body :is(.sj-journee, .vrm-main) :is(.vrm-rl-ligne, .vrm-ret-verif-ligne) { display: flex !important; align-items: center !important; gap: 12px !important; min-height: 64px !important; padding: 8px 0 !important; }
+:root:root:root:root:root:root body .sj-journee .vrm-rl-ligne + .vrm-rl-ligne { border-top: 1px solid rgb(12 29 48 / .10) !important; }
+:root:root:root:root:root:root body :is(.sj-journee, .vrm-main) .vrm-rl-ph { width: 44px !important; height: 44px !important; border-radius: 11px !important; overflow: hidden !important; flex: none !important; background: var(--vj-touche) !important; }
+:root:root:root:root:root:root body :is(.sj-journee, .vrm-main) .vrm-rl-ph > img { width: 100% !important; height: 100% !important; object-fit: cover !important; }
+:root:root:root:root:root:root body :is(.sj-journee, .vrm-main) .vrm-rl-mid { flex: 1 !important; min-width: 0 !important; display: block !important; }
+:root:root:root:root:root:root body :is(.sj-journee, .vrm-main) .vrm-rl-l1 { display: flex !important; align-items: center !important; gap: 8px !important; min-width: 0 !important; }
+:root:root:root:root:root:root body :is(.sj-journee, .vrm-main) .vrm-rl-l1 > b { font: 650 14px/1.25 Inter, system-ui, sans-serif !important; color: var(--sv-encre) !important; white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; min-width: 0 !important; }
+:root:root:root:root:root:root body :is(.sj-journee, .vrm-main) .vrm-rl-l2 { display: block !important; font: 550 12.5px/1.3 Inter, system-ui, sans-serif !important; color: var(--sv-encre-2) !important; margin-top: 3px !important; }
+:root:root:root:root:root:root body :is(.sj-journee, .vrm-main) .vrm-rl-l2.is-ambre { color: var(--sv-ambre) !important; font-weight: 700 !important; }
+:root:root:root:root:root:root body :is(.sj-journee, .vrm-main) .vrm-rl-sens { font-weight: 700 !important; }
+:root:root:root:root:root:root body :is(.sj-journee, .vrm-main) :is(.vrm-rl-geste, .vrm-ret-verif-gestes .sb-touche) {
+  flex: none !important; height: 44px !important; min-height: 44px !important; padding: 0 14px !important; border-radius: 14px !important; font: 600 13.5px/1 Inter, system-ui, sans-serif !important;
+  background: var(--vj-touche) !important; background-image: none !important; border: 1px solid var(--vj-touche-bord) !important; box-shadow: none !important; color: var(--sv-encre) !important;
+}
+:root:root:root:root:root:root body :is(.sj-journee, .vrm-main) .vrm-ret-verif-gestes { display: flex !important; align-items: center !important; gap: 10px !important; flex: none !important; }
+:root:root:root:root:root:root body .sj-journee .vrm-tvb-ligne { display: flex !important; align-items: center !important; min-height: 44px !important; margin: 10px 4px 0 !important; padding: 0 !important; background: none !important; border: 0 !important; box-shadow: none !important; font: 600 14px/1.2 Inter, system-ui, sans-serif !important; color: var(--sv-clair) !important; }
+:root:root:root:root:root:root body .vrm-fs[data-feuille-tvb] .vrm-tvb-cartes { margin-bottom: 12px !important; }
+:root:root:root:root:root:root body .vrm-fs[data-feuille-tvb] .vrm-tvb-cartes { display: flex !important; flex-direction: column !important; gap: 8px !important; }
+:root:root:root:root:root:root body .vrm-fs[data-feuille-tvb] .vrm-tvb-cartes :is(.vrm-day-task, .vrm-at-journee > .vrm-day-task-list > .vrm-day-task) {
+  display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: flex-start !important; gap: 12px !important; text-align: left !important;
+  width: 100% !important; min-height: 64px !important; padding: 10px 12px !important; border-radius: 16px !important;
+}
+:root:root:root:root:root:root body .vrm-fs[data-feuille-tvb] .vrm-tvb-cartes .vrm-day-task-textes { display: flex !important; flex-direction: column !important; align-items: flex-start !important; flex: 1 !important; min-width: 0 !important; text-align: left !important; }
+:root:root:root:root:root:root body .vrm-fs[data-feuille-tvb] .vrm-tvb-cartes .vrm-day-task-title { font: 650 15px/1.25 Inter, system-ui, sans-serif !important; color: var(--sv-encre) !important; }
+:root:root:root:root:root:root body .vrm-fs[data-feuille-tvb] .vrm-tvb-cartes .vrm-day-task-note { font: 550 12.5px/1.3 Inter, system-ui, sans-serif !important; color: var(--sv-encre-2) !important; white-space: normal !important; }
+:root:root:root:root:root:root body .vrm-fs[data-feuille-tvb] .vrm-tvb-cartes .vrm-day-task-action { flex: none !important; margin-left: auto !important; }
+
 } /* fin de @layer vrm-verre */
