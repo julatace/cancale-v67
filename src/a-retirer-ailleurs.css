@@ -54,6 +54,9 @@
   .rx-gestes > .rx-lien { flex: 0 1 auto; }
   .rx-tout { width: 100%; }
 }
-/* Un lien de Ma journée prend sinon la couleur de la carte sombre d’à côté (mesuré au banc : illisible en clair). */
-.rx a.rx-lien { color: var(--sb-lien, #0055B8) !important; }
-.rx a.sb-touche.rx-geste { color: var(--sb-encre, #0C1D30) !important; text-decoration: none; }
+/* Le bloc vit dans la tête de Ma journée (`.vrm-fu-carte`) : jetons.css y peint chaque lien en BLANC
+   (`:root:root body .vrm-app-shell :is(.vrm-fu-carte, .vrm-fu-tete) :is(a, …) { color: #fff !important }`,
+   pensé pour l'ancienne carte sombre) — mesuré au banc : « Ouvrir Vestiaire ↗ » blanc sur porcelaine.
+   Ici la matière est claire (porcelaine) : le lien reprend sa couleur, plus spécifique. */
+:root:root:root body .rx a.rx-lien { color: var(--sb-lien, #0055B8) !important; }
+:root:root:root body .rx a.sb-touche.rx-geste { color: var(--sb-encre, #0C1D30) !important; text-decoration: none; }

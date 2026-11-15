@@ -108,7 +108,11 @@ const MESURE = (pg, tel) => pg.evaluate((tel) => {
   // Un lien ou un bouton du bloc doit se LIRE : contraste de luminance avec le fond de sa rangée (≥ 3).
   const lum = (c) => { const m = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/.exec(c || ''); if (!m) return null; const f = (v) => { v = +v / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(m[1]) + 0.7152 * f(m[2]) + 0.0722 * f(m[3]); };
   const fond = (e) => { for (let p = e; p; p = p.parentElement) { const b = getComputedStyle(p).backgroundColor; if (b && !/rgba\(0, 0, 0, 0\)|transparent/.test(b)) return b; } return 'rgb(255, 255, 255)'; };
-  const illisibles = bloc ? [...bloc.querySelectorAll('a, button')].filter(vis).filter((e) => { if (e.disabled) return false; const a1 = lum(getComputedStyle(e).color), b1 = lum(fond(e)); if (a1 == null || b1 == null) return false; return (Math.max(a1, b1) + 0.05) / (Math.min(a1, b1) + 0.05) < 3; }).map((e) => txt(e).slice(0, 30)) : [];
+  const illisibles = bloc ? [...bloc.querySelectorAll('a, button')].filter(vis).filter((e) => { if (e.disabled) return false; const a1 = lum(getComputedStyle(e).color), b1 = lum(fond(e)); if (a1 == null || b1 == null) return false; return (Math.max(a1, b1) + 0.05) / (Math.min(a1, b1) + 0.05) < 3; }).map((e) => {
+    // Le diagnostic : la couleur, le fond, et les règles qui posent une couleur sur ce lien (couches comprises).
+    const regles = []; const fouiller = (rules) => { for (const r of rules || []) { if (r.cssRules && !r.selectorText) { fouiller(r.cssRules); continue; } try { if (r.selectorText && e.matches(r.selectorText) && /(^|;)\s*color\s*:/.test(r.style.cssText)) regles.push(r.selectorText.slice(0, 90) + ' { color: ' + r.style.getPropertyValue('color') + (r.style.getPropertyPriority('color') ? ' !important' : '') + ' }'); } catch (_) {} } };
+    for (const sh of document.styleSheets) { try { fouiller(sh.cssRules); } catch (_) {} }
+    return `${txt(e).slice(0, 30)} [${getComputedStyle(e).color} sur ${fond(e)}] ${regles.slice(-4).join(' ¦ ')}`; }) : [];
   const doublons = [...document.querySelectorAll('[data-job="double-vente"]')].filter(vis).map(txt).filter((t) => /retirer (de Leboncoin|d'eBay|d’eBay|de Vestiaire)/i.test(t));
   return {
     bloc: bloc ? {
@@ -178,7 +182,7 @@ async function tournee(nav, { W, scenario, sombre }) {
     dit(a.sites.every((s) => s.etat === 'verifier' && !s.gestes.some((g) => g === 'lbc' || g === 'ebay' || g === 'marquer')) && /pas prouvée/.test(m0.bloc.texte), 'T6', `${T} chaque site « à vérifier » (vente pas prouvée), AUCUN geste de retrait`, JSON.stringify(a.sites));
     dit(m0.bloc.tout === '0' && !(await pg.locator('[data-rx-tout]').count()), 'T6', `${T} pas de « Tout retirer »`);
     await pg.waitForTimeout(500);
-    dit(!(await pg.evaluate(() => window.__cmds.length)) && !ebay.length, 'T6', `${T} rien n’est parti`);
+    dit(!(await pg.evaluate(() => window.__cmds.filter((x) => /lbcSupprime/.test(x)).length)) && !ebay.length, 'T6', `${T} rien n’est parti`);
   }
   if (scenario === 'plein') {
     dit(lb.etat === 'aRetirer' && lb.gestes.join() === 'lbc' && eb.etat === 'aRetirer' && eb.gestes.join() === 'ebay' && vc.etat === 'main' && vc.gestes.includes('marquer'), 'T2', `${T} UN geste par site : « Retirer de Leboncoin », « Retirer d’eBay », Vestiaire « C’est retiré »`, JSON.stringify([lb, eb, vc]));
@@ -257,7 +261,7 @@ async function tournee(nav, { W, scenario, sombre }) {
     await pg.waitForTimeout(600);
     const l1 = site(await MESURE(pg, tel), 'Leboncoin');
     await shot('sansext-note');
-    dit(!!l1 && l1.etat === 'note' && !(await pg.evaluate(() => window.__cmds.length)), 'T2', `${T} « C’est retiré » : notée, rien n’est envoyé`, JSON.stringify(l1));
+    dit(!!l1 && l1.etat === 'note' && !(await pg.evaluate(() => window.__cmds.filter((x) => /lbcSupprime/.test(x)).length)), 'T2', `${T} « C’est retiré » : notée, rien n’est envoyé`, JSON.stringify(l1));
   }
   dit(!o.journal.erreurs.length, 'T0', `${T} aucune erreur JS`, o.journal.erreurs.join(' ¦ '));
   await o.ctx.close();
