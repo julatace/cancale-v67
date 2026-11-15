@@ -60,7 +60,7 @@ async function un(nav, W) {
         garde: /n'a pas pu s'afficher|n’a pas pu s’afficher|Cannot access|is not defined/.test(document.body.innerText),
       };
     });
-    if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); const e = await o.pg.$('[data-bord-supprime]'); if (e) await e.scrollIntoViewIfNeeded().catch(() => {}); await o.pg.screenshot({ path: path.join(SHOTS, `bord-supprime-${W}.png`) }).catch(() => {}); }
+    if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await o.pg.evaluate(() => { const e = document.querySelector('[data-bord-supprime]'); if (e) e.scrollIntoView({ block: 'center' }); }).catch(() => {}); await attendre(400); await o.pg.screenshot({ path: path.join(SHOTS, `bord-supprime-${W}.png`) }).catch(() => {}); }
     dit(r.faits === 2, 'S1', `${T} deux bordereaux déjà traités`, JSON.stringify(r));
     dit(r.supprimes.length === 1 && r.supprimes[0].raison === 'versement' && !r.supprimes[0].bouton && /Asics/.test(r.supprimes[0].titre), 'S1', `${T} 62002 : « supprimé après le versement », aucun bouton d’impression`, JSON.stringify(r.supprimes));
     dit(r.reimprimer.length === 1 && /Samba/.test(r.reimprimer[0]), 'S1', `${T} 62001 garde « Réimprimer »`, JSON.stringify(r.reimprimer));

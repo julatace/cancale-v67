@@ -54131,7 +54131,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   </div>
                   {b.hasPdf && <button type="button" data-imprime="1" onClick={async ()=>{ const lu=await lirePdfLigne(b._row); if(!lu||!lu.octets){libererOngletPdf();toast(messagePdfManquant(lu));return;} processBordereau(numForBord(b), b.modele||b.article||'', lu.octets); }} style={{flexShrink:0,border:`1px solid ${C.border}`,background:'transparent',color:C.muted,borderRadius:12,padding:'6px 10px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:'inherit'}}><Icon name="printer" size={14} style={{verticalAlign:'-2px',marginRight:6}}/>Réimprimer</button>}
                   {/* (15 nov.) PDF retiré par le serveur (vente finalisée + argent reçu) : le dire, pas de bouton mort. */}
-                  {!b.hasPdf && b.pdfSupprime === 'versement' && <span data-bord-supprime="versement" style={{flexShrink:0,fontSize:12,color:C.muted}}>{tr('colis.bordSupprimeVersement')}</span>}
+                  {!b.hasPdf && b.pdfSupprime === 'versement' && <span data-bord-supprime="versement" style={{flex:'0 1 132px',minWidth:0,fontSize:12,lineHeight:1.3,color:C.muted,textAlign:'right'}}>{tr('colis.bordSupprimeVersement')}</span>}
                 </div>
               ))}
           </div>
