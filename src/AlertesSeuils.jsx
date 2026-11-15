@@ -26,6 +26,7 @@ export function AlertesSeuils({ ligne, regime, activite = 'vente', vues, onCompr
   const l = langueCourante();
   return (
     <section className="vrm-surface vrm-seuils-alertes" data-alertes-seuils={liste.length} data-cible={attrCible(['seuils'])} aria-label={tr('argentPlus.seuils.titre')}>
+      <div className="vrm-seuils-int">
       <h2 className="vrm-seuils-titre">{tr('argentPlus.seuils.titre')}</h2>
       {liste.map((a) => {
         const t = texteSeuil(a, l);
@@ -41,6 +42,7 @@ export function AlertesSeuils({ ligne, regime, activite = 'vente', vues, onCompr
           </article>
         );
       })}
+      </div>
     </section>
   );
 }

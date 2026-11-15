@@ -113,9 +113,32 @@ d'un article, un total de liste honnête, et une sauvegarde faite dans le naviga
   régime ignoré, deux fois la même alerte, eBay au prix au lieu du versé, liste jamais « au plus », fiche eBay
   sans frais saisis, owner retiré, motif lourd oublié, page ratée tue, envoi sans mémo). Sur l'arbre de départ
   (`git archive 3093d6f0`), l'audit est rouge (les modules n'existent pas).
-- Banc `scripts/bancs/argent-plus.cjs` (données inventées, 390 tactile clair + 1512 sombre, statut micro et
-  statut jamais choisi) : voir le résultat ci-dessous et les captures.
-- Audits voisins relancés : voir ci-dessous.
+- Banc `scripts/bancs/argent-plus.cjs` (données inventées, base servie par le banc de `nouveau-vendeur`, 390
+  tactile clair + 1512 sombre, statut micro ET statut jamais choisi) : **116 verts**. S1 l'alerte en tête
+  d'Argent (TVA dépassée, TVA majorée à 80 %, DAC7 Vinted atteint ; plafond micro à 44 % muet ; sans régime :
+  DAC7 seul), sources officielles en lien, « Compris » écrit `vrm_seuils_vus` dans la base et l'alerte ne
+  revient pas au rechargement ; S2 la cible de la notification ouvre le Bilan du mois écoulé : URSSAF du mois
+  = 30 000 € × 12,4 % = 3 720 € (ou « — » + « Choisir mon régime »), 5 articles qui dorment, le tableur
+  téléchargé dit les MÊMES valeurs que la carte, le PDF est un PDF ; S3 Ventes : « Après frais de vente 36 € ·
+  sur 1 vente de 4 » (68 − 2 − 30), le manque pas redit sous le bandeau qui le dit déjà ; S4 « Télécharger
+  toutes mes données » : un zip, UN dossier, JSON par catégorie, les 3 tableaux (12 annonces), le PDF du
+  bordereau, aucun jeton, chaque lecture DE LA SAUVEGARDE porte `owner=eq.`, jamais `select=data` lourd, aucune
+  écriture ; S5 aucune erreur JS, rien ne déborde. Captures : `docs/passation/captures-argent-plus/`.
+  ⚠️ Les tableaux ventes/achats réutilisent les lecteurs d'« Exporter mes données » (RLS seule, sans
+  `owner=eq.`, comme toutes les lectures de l'app) : le banc l'a vu ; laissé tel quel (une règle).
+  Non fait : le banc sur le build de l'arbre de départ (disque à 95 %, machine saturée) — ses contrôles
+  portent sur des `data-*` que l'arbre de départ n'avait pas ; l'audit, lui, a été lancé sur l'arbre de départ.
+- Audits voisins relancés, verts : `audit-rappel-urssaf`, `audit-urssaf`, `audit-une-regle` (9 verts),
+  `audit-chiffres`, `audit-bilan-mois` (51 — son contrôle du branchement suit les lectures partagées),
+  `audit-chantier-f` (24), `audit-quoi-de-neuf`, `audit-fonctions-api` (12/12), `audit-traduction` (45),
+  `audit-variables`, `audit-tdz`, `audit-export-rgpd` (25), `audit-export-donnees` (19), `audit-seuils-annee`
+  (20), `audit-pas-su` (17), `audit-benefice-unique` (56), `audit-coherence`. `npm run build` vert.
+
+## Vu en passant (pas corrigé ici)
+
+- `src/i18n/langues/fr.js` porte DEUX fois la clé `reglages.securite.lib` (« Sécurité des données » puis
+  « Sécurité des comptes ») : le panneau Sécurité des données s'intitule « Sécurité des comptes » à l'écran.
+  À trancher par le chantier Paramètres (`claude/ecrans-verre-2` le refait).
 
 ## Gestes de Julien
 

@@ -47,7 +47,7 @@ export default {
   "argentPlus.svg.etape.lignes": "I tuoi dati",
   "argentPlus.svg.etape.resumes": "Riepiloghi delle righe pesanti",
   "argentPlus.svg.etape.bordereaux": "Etichette di spedizione",
-  "argentPlus.svg.fini": "{nom} scaricato: {n} file, di cui {p} etichette.",
+  "argentPlus.svg.fini": "{nom} scaricato: {n} file (etichette: {p}).",
   "argentPlus.svg.incomplet": "Zip scaricato, ma incompleto — manca: {manques}. Riprova tra poco.",
   "argentPlus.svg.echec": "Impossibile creare lo zip. Nulla è stato scaricato: riprova tra poco.",
 };

@@ -47,7 +47,7 @@ export default {
   "argentPlus.svg.etape.lignes": "Tes données",
   "argentPlus.svg.etape.resumes": "Les résumés des lignes lourdes",
   "argentPlus.svg.etape.bordereaux": "Les bordereaux",
-  "argentPlus.svg.fini": "{nom} téléchargé : {n} fichiers, dont {p} bordereaux.",
+  "argentPlus.svg.fini": "{nom} téléchargé : {n} fichiers (bordereaux : {p}).",
   "argentPlus.svg.incomplet": "Zip téléchargé, mais incomplet — pas dedans : {manques}. Relance dans un instant.",
   "argentPlus.svg.echec": "Le zip n’a pas pu être fait. Rien n’a été téléchargé : réessaie dans un instant.",
 };

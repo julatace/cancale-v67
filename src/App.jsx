@@ -48964,7 +48964,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {Array.isArray(sales.items) && !sales.error && ventesAffichees.length > 0 && <BeneficeListeResume s={beneficeListe(ventesAffichees.filter(o => o && !isHidden(o)).map(o => {
           const devise = o.price && o.price.currency_code;
           return beneficeArticle({ plateforme: 'Vinted', vente: o.price?.amount, entree: effEntry(o), annulee: classifyOrderStatus(o.status) === 'cancelled', autreDevise: !!(devise && devise !== 'EUR') });
-        }))}/>}
+        }))} sansAchat />}
         <RaisonBordereauxGrises ventes={ventesAffichees.filter(o=>o && o.transaction_id!=null && !isHidden(o) && classifyOrderStatus(o.status)!=='cancelled' && aExpedier(o) && !estParti(o) && !labelsCaptes[String(o.transaction_id)] && !bordParTx[String(o.transaction_id)])}/>
         {/* (9 nov.) Solo : les ventes des comptes d'achat, en aperçu (3 nettes, le reste flouté, aucun geste), jamais supprimées. */}
         {!dansPlateforme && <VentesHorsPlan ventes={Array.isArray(sales.items) ? sales.items.filter(o => o && !acctOffOf(o) && classifyOrderStatus(o.status) !== 'cancelled') : null}

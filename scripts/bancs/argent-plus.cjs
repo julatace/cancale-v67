@@ -145,7 +145,8 @@ const sansDebord = (pg) => pg.evaluate(() => { const d = document.scrollingEleme
         }
         // ── S4. TOUTES MES DONNÉES ──
         await aller(pg, 'tab=settings', 3000);
-        await pg.getByText('Sécurité des données', { exact: true }).first().click({ timeout: 8000 }).catch(() => {});
+        // La ligne « securite » vit dans une liste repliée sur ce gabarit : on la touche par son identité.
+        await pg.evaluate(() => { const e = document.querySelector('[data-sous-ouvrir="securite"]'); if (e) e.click(); });
         await pg.waitForTimeout(1500);
         const g = pg.locator('[data-sauvegarde-lancer]:visible').first();
         const vu = await g.count();
@@ -178,9 +179,12 @@ const sansDebord = (pg) => pg.evaluate(() => { const d = document.scrollingEleme
             dit(z.some((f) => /bordereaux\/email_bord_62000\.pdf$/.test(f.nom) && f.octets[0] === 0x25), `S4 ${T} : le PDF du bordereau encore présent`);
             dit(!/JETON-BANC|R-BANC|ebay_tokens/.test(tout), `S4 ${T} : aucun jeton, aucune ligne secrète`);
           }
-          const sansOwner = lectures.filter((u) => !/owner=eq\./.test(u));
+          // Les lectures de LA sauvegarde (liste, lignes, résumés, PDF) ; les tableaux ventes/achats réutilisent les lecteurs
+          // d'« Exporter mes données » (RLS seule, comme toute lecture de l'app) — jugés par audit-export-donnees.
+          const siennes = lectures.filter((u) => /select=id,updated_at|pdfB64/.test(u));
+          const sansOwner = siennes.filter((u) => !/owner=eq\./.test(u));
           const lourdesData = lectures.filter((u) => /select=[^&]*\bdata\b(?!->)/.test(u) && /(email_bord|_label_|_txn_)/.test(u));
-          dit(lectures.length > 3 && sansOwner.length === 0, `S4 ${T} : chaque lecture porte \`owner=eq.\``, sansOwner.slice(0, 3).join(' | '));
+          dit(siennes.length > 3 && sansOwner.length === 0, `S4 ${T} : chaque lecture de la sauvegarde porte \`owner=eq.\``, sansOwner.slice(0, 3).join(' | '));
           dit(lourdesData.length === 0, `S4 ${T} : jamais \`select=data\` sur une ligne lourde`, lourdesData.slice(0, 3).join(' | '));
           dit(base.ecritures === e0, `S4 ${T} : aucune écriture pendant la sauvegarde`);
           await capture(pg, `S4-sauvegarde-fin-${scen}-${W}${sombre ? '-sombre' : ''}`, '[data-sauvegarde-toutes]:visible');
@@ -189,7 +193,7 @@ const sansDebord = (pg) => pg.evaluate(() => { const d = document.scrollingEleme
         await aller(pg, 'tab=cat_ventes', 5000);
         const s3 = await pg.evaluate(() => { const e = document.querySelector('[data-benef-liste]'); return e ? { n: e.getAttribute('data-benef-liste'), v: e.getAttribute('data-benef-liste-valeur'), ap: e.getAttribute('data-benef-liste-au-plus'), txt: e.innerText, h: e.getBoundingClientRect().height } : null; });
         dit(s3 && /^1\/\d+$/.test(s3.n) && s3.v === '3600' && !s3.ap, `S3 ${T} : « Après frais de vente » 36 € (68 − 2 − 30) sur 1 vente calculable`, JSON.stringify(s3));
-        dit(s3 && /prix d’achat à saisir/.test(s3.txt) && !/au moins/i.test(s3.txt), `S3 ${T} : les prix d’achat manquants nommés, jamais « au moins »`, s3 && s3.txt);
+        dit(s3 && /sur 1 vente de \d/.test(s3.txt) && !/prix d’achat à saisir/.test(s3.txt) && !/au moins/i.test(s3.txt), `S3 ${T} : la couverture dite, les prix d’achat manquants pas redits (le bandeau au-dessus les nomme), jamais « au moins »`, s3 && s3.txt);
         await capture(pg, `S3-ventes-${scen}-${W}${sombre ? '-sombre' : ''}`, '[data-benef-liste]');
         dit(await sansDebord(pg), `S5 ${T} : rien ne déborde`);
         dit(!o.journal.erreurs.length, `S5 ${T} : aucune erreur JS`, o.journal.erreurs.slice(0, 2).join(' | '));

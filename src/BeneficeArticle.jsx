@@ -38,14 +38,17 @@ export function BeneficeArticleDetail({ b, seulement = null }) {
   );
 }
 
-export function BeneficeListeResume({ s }) {
+// `sansAchat` : la liste dit déjà « N prix d'achat à saisir » au-dessus (une phrase se dit UNE fois, §7).
+export function BeneficeListeResume({ s, sansAchat = false }) {
   if (!s || !s.n) return null;
-  const manques = manquesListe(s, tr);
+  const manques = manquesListe(sansAchat ? { ...s, manque: { ...s.manque, achat: 0 } } : s, tr);
   return (
     <div className="vrm-surface vrm-bl" role="status" data-benef-liste={`${s.nCompte}/${s.n}`} data-benef-liste-valeur={s.somme == null ? '' : String(s.somme)} data-benef-liste-au-plus={s.auPlus ? '1' : undefined}>
-      <span className="vrm-bl-nom">{NOM_APRES_FRAIS}</span>
-      <span className="vrm-bl-v">{s.somme == null ? '—' : `${s.auPlus ? tr('argentPlus.ba.auPlus') + ' ' : ''}${eur(s.somme)}`}</span>
-      <span className="vrm-bl-sous">{[tr('argentPlus.bl.sur', { n: s.nCompte, m: s.n }), ...manques].join(' · ')}</span>
+      <div className="vrm-bl-int">
+        <span className="vrm-bl-nom">{NOM_APRES_FRAIS}</span>
+        <span className="vrm-bl-v">{s.somme == null ? '—' : `${s.auPlus ? tr('argentPlus.ba.auPlus') + ' ' : ''}${eur(s.somme)}`}</span>
+        <span className="vrm-bl-sous">{[tr('argentPlus.bl.sur', { n: s.nCompte, m: s.n }), ...manques].join(' · ')}</span>
+      </div>
     </div>
   );
 }

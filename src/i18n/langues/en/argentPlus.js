@@ -47,7 +47,7 @@ export default {
   "argentPlus.svg.etape.lignes": "Your data",
   "argentPlus.svg.etape.resumes": "Summaries of heavy rows",
   "argentPlus.svg.etape.bordereaux": "Shipping labels",
-  "argentPlus.svg.fini": "{nom} downloaded: {n} files, {p} of them labels.",
+  "argentPlus.svg.fini": "{nom} downloaded: {n} files (labels: {p}).",
   "argentPlus.svg.incomplet": "Zip downloaded, but incomplete — missing: {manques}. Try again in a moment.",
   "argentPlus.svg.echec": "The zip could not be made. Nothing was downloaded: try again in a moment.",
 };

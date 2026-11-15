@@ -47,7 +47,7 @@ export default {
   "argentPlus.svg.etape.lignes": "Deine Daten",
   "argentPlus.svg.etape.resumes": "Zusammenfassungen großer Zeilen",
   "argentPlus.svg.etape.bordereaux": "Versandetiketten",
-  "argentPlus.svg.fini": "{nom} heruntergeladen: {n} Dateien, davon {p} Etiketten.",
+  "argentPlus.svg.fini": "{nom} heruntergeladen: {n} Dateien (Etiketten: {p}).",
   "argentPlus.svg.incomplet": "Zip heruntergeladen, aber unvollständig — fehlt: {manques}. Gleich noch einmal versuchen.",
   "argentPlus.svg.echec": "Das Zip konnte nicht erstellt werden. Nichts wurde heruntergeladen: gleich noch einmal versuchen.",
 };
