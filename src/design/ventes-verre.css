@@ -323,4 +323,9 @@
 :root:root:root:root:root:root:root:root body .vv-liste .vv-l1 .vrm-num { font-size: 11.5px !important; height: 19px !important; min-height: 19px !important; padding: 0 6px !important; line-height: 19px !important; }
 
 :root:root:root:root:root:root:root:root body .sb-btn-plein.vv-plein .sb-btn-plein-mot { width: auto !important; max-width: none !important; min-width: 0 !important; flex: none !important; overflow: visible !important; }
+
+/* Les tuiles-filtres derrière « … » : la posée est ENFONCÉE (porcelaine, ombre en creux) et sa diode s'allume. */
+:root:root:root:root:root:root:root:root body .vv-filtres .sb-tuile { background: var(--sv-verre) !important; box-shadow: var(--sv-ombre) !important; }
+:root:root:root:root:root:root:root:root body .vv-filtres .sb-tuile.is-actif { background: var(--vv-seg-on) !important; box-shadow: inset 0 2px 6px rgb(8 26 50 / .28) !important; }
+:root:root:root:root:root:root:root:root body .vv-filtres .sb-tuile.is-actif :is(.sb-tuile-lib, .sb-tuile-chiffre, .sb-tuile-unite) { color: #0C1D30 !important; }
 }

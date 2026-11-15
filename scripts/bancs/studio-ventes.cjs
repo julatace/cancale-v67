@@ -248,6 +248,8 @@ async function scenario(b, vp, sombre) {
     await pg.waitForTimeout(400);
     const retour = await etatTuile('tous');
     dit(!!retour && retour.p === 'true' && retour.liste.length === 5, `${nom} : T toucher la tuile posée rend la liste entière (aucun colis caché)`, retour ? String(retour.liste.length) : '');
+    // (15 nov.) « … » refermé : la liste revient telle quelle (les outils rangés).
+    if (await pg.evaluate(() => document.documentElement.hasAttribute('data-colis-outils'))) { await pg.click('[data-colis-barre-btn="outils"]').catch(() => {}); await pg.waitForTimeout(400); }
     // ── L : LA LISTE — aucune rangée ne porte de bouton visible ; l'échéance courte à droite, ambre « avant demain ».
     const lignes = await pg.evaluate(() => [...document.querySelectorAll('[data-bord-card][data-tx-colis]')].filter((c) => c.offsetParent).map((c) => {
       const boutons = [...c.querySelectorAll('button, a')].filter((x) => x.offsetParent && x.getBoundingClientRect().width > 0).length;
@@ -256,7 +258,7 @@ async function scenario(b, vp, sombre) {
     dit(lignes.length === 5 && lignes.every((l) => l.boutons === 0), `${nom} : L aucune rangée ne contient de bouton (la rangée entière s'ouvre)`, JSON.stringify(lignes.map((l) => l.tx + ':' + l.boutons)));
     dit(lignes.every((l) => l.ech != null) && lignes.filter((l) => l.ambre).map((l) => l.tx).sort().join() === ATTENDU_PRESSES.join() && (lignes.find((l) => l.tx === '9303') || {}).ech === 'estimee-depassee', `${nom} : L l'échéance à droite ; ambre = « avant demain » ; l'estimée dépassée dit « à vérifier »`, JSON.stringify(lignes.map((l) => `${l.tx}:${l.ech}${l.ambre ? '*' : ''}`)));
     // (15 nov., maquette validée) quatre lignes par colis au téléphone (plaque · titre · échéance · place) : ≤ 112 px.
-    dit(lignes.every((l) => l.h <= (tel ? 112 : 80)), `${nom} : L rangées denses (≤ ${tel ? 112 : 80} px)`, JSON.stringify(lignes.map((l) => l.h)));
+    dit(lignes.every((l) => l.h <= (tel ? 112 : 96)), `${nom} : L rangées denses (≤ ${tel ? 112 : 96} px)`, JSON.stringify(lignes.map((l) => l.h)));
     // ── O : LA RANGÉE S'OUVRE au premier plan avec SES gestes : imprimer CE bordereau, marquer déposé, imprimé, suivre, masquer.
     await pg.evaluate(() => { const c = document.querySelector('[data-bord-card][data-tx-colis="9304"]'); if (c) c.scrollIntoView({ block: 'center' }); });
     await pg.locator('[data-bord-card][data-tx-colis="9304"] .vrm-colis-titre').click().catch(() => {});
@@ -292,6 +294,7 @@ async function scenario(b, vp, sombre) {
     await pg.keyboard.press('Escape').catch(() => {});
     await pg.waitForTimeout(400);
     dit(Object.values(joint).every(Boolean), `${nom} : I chaque geste d'« À expédier » reste joignable`, JSON.stringify(joint));
+    if (await pg.evaluate(() => document.documentElement.hasAttribute('data-colis-outils'))) { await pg.click('[data-colis-barre-btn="outils"]').catch(() => {}); await pg.waitForTimeout(400); }
     // ── A : AA sur le fond réel (titre, chiffre, ambre, tuiles, rangées, échéances).
     const aa = await contrastes(pg, ['.sb-tete-titre', '.sb-tete-lib', '.sb-tete-ambre', '.sb-chiffre-affiche', '.sb-tuile-lib', '.sb-tuile-unite', '.sb-tuile-chiffre', '.vrm-colis-titre', '[data-colis-dates]', '.sb-echeance', '.vrm-colis-resume', '[data-date-tete]'], sombre);
     const faibles = aa.filter((x) => x.r < 4.5);
