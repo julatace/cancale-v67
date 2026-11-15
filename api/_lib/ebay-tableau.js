@@ -272,6 +272,8 @@ export function violationsEbay(d) {
       suggestions: liste(v && v.correctiveRecommendations && v.correctiveRecommendations.aspectRecommendations)
         .map((a) => ({ nom: String((a && a.localizedAspectName) || '').slice(0, 60), valeurs: liste(a && a.suggestedValues).map((x) => String(x).slice(0, 60)).slice(0, 5) })).filter((a) => a.nom).slice(0, 8),
       etat: String((v && v.complianceState) || '').toUpperCase(),
+      // (2e tour) Le produit du catalogue que eBay propose (PRODUCT_ADOPTION), s'il y en a un.
+      epid: /^\d{1,20}$/.test(String((v && v.correctiveRecommendations && v.correctiveRecommendations.productRecommendation && v.correctiveRecommendations.productRecommendation.epid) || '')) ? String(v.correctiveRecommendations.productRecommendation.epid) : '',
     })),
   })).filter((l) => l.itemId);
 }
@@ -482,6 +484,10 @@ export function creerTableauEbay({ accessToken, tradingCall, lireXml, apiOrigin 
       lireMessages ? lireMessages(ctx).catch(() => undefined) : Promise.resolve(undefined),
     ]);
     const enLigne = lire ? await lire(ctx).catch(() => undefined) : undefined;
+    // (15 nov., 2e tour) Le calendrier des versements de Ma journée lit la ligne rangée : le
+    // tableau y range les versements et le solde LUS (jamais une lecture ratée ; les dates par
+    // commande ne sont pas touchées).
+    if (ranger && !ar.raison && Array.isArray(ar.versements)) await ranger(ctx, (avant) => ({ ...(avant && typeof avant === 'object' ? avant : {}), versements: ar.versements.slice(0, 60), solde: ar.solde || null, versementsLusA: maintenant(), capturedAt: maintenant() })).catch(() => null);
     return { status: 200, body: {
       ok: true,
       argent: ar.raison ? { ko: { raison: ar.raison, erreur: ar.erreur }, solde: ar.solde, versements: ar.versements } : { solde: ar.solde, versements: ar.versements },

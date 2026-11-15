@@ -41,6 +41,7 @@ import { televerserPhotoEbay } from './_lib/ebay-photo.js';
 import { creerRemisesEbay } from './_lib/ebay-remises.js';
 // (15 nov., eBay complet 2) L'argent réel (Finances, signé), le trafic, la santé du compte, les litiges.
 import { creerTableauEbay } from './_lib/ebay-tableau.js';
+import { creerGestesEbay } from './_lib/ebay-gestes.js';   // (15 nov., 2e tour) corriger, relier au catalogue, photos — sur SON clic
 import { cleSignature } from './_lib/ebay-signature.js';
 import { optionsPublication, aspectsPropres, xmlOptions, appelTrading, lireAspects, lireConditions, lirePolitiques, lireEmplacements, lirePolitiquesActivees, lireCategories, etatJeton } from './_lib/ebay-parametres.js';
 import { sbCle } from './_lib/cle.js';
@@ -2068,6 +2069,10 @@ const tableauEbay=creerTableauEbay({accessToken:jetonDe,tradingCall,lireXml:lire
   lireMessages:async(ctx)=>{const d=await lireDonnee(ligneDe('ebay_messages',ctx),ctx.owner);return d&&typeof d==='object'?{nonLus:d.nonLus,complet:d.complet,capturedAt:d.capturedAt}:undefined;},
   lire:async(ctx)=>{const d=await lireDonnee(ligneDe('ebay_listings',ctx),ctx.owner);if(d===undefined)return undefined;return Array.isArray(d?.items)?d.items.map(x=>({itemId:String(x.itemId||''),debut:x.depuis||'',photo:x.photo||'',sku:x.sku||'',titre:x.title||''})).filter(x=>x.itemId):[];}});
 
+// (15 nov., eBay complet 3) Les GESTES sur une annonce (diagnostic en lecture ; caractéristiques,
+// produit du catalogue, photos en écriture, confirmées, relues avant et après, journalisées).
+const gestesEbay=creerGestesEbay({accessToken:jetonDe,tradingCall,lireXml:lireXmlEbay,jetonApplication,apiOrigin:EBAY_API,marketplace:()=>marcheCourant().marketplace});
+
 const rechercheEbay = creerRechercheEbay({ jetonApplication, oublierJetonApplication, modifierDonnee });
 // (11 nov., lot alertes-ebay) La liste « Nouvelles annonces pour tes recherches » : lecture projetée, « écarter ».
 const alertesEbay = creerRouteAlertes({ lireProjection: lectureProjetee({ portee: porteeEbay, cle: () => process.env.SUPABASE_SERVICE_KEY || '', sbCle }), modifierDonnee });
@@ -2293,6 +2298,11 @@ async function handleApp(req, res) {
       evaluationsrecues: (ctx) => tableauEbay.evaluationsrecues(b, ctx),
       litiges: (ctx) => tableauEbay.litiges(b, ctx),
       tableau: (ctx) => tableauEbay.tableau(b, ctx),
+      // (15 nov., eBay complet 3) api/_lib/ebay-gestes.js
+      diagnostic: (ctx) => gestesEbay.diagnostic(b, ctx),
+      corrigeraspects: (ctx) => gestesEbay.corrigerAspects(b, ctx),
+      lierproduit: (ctx) => gestesEbay.lierProduit(b, ctx),
+      ajouterphotos: (ctx) => gestesEbay.ajouterPhotos(b, ctx),
       publish: (ctx) => handlePublish(b, ctx),
       // (5 nov.) Une photo prise ou choisie sur le téléphone, confiée à
       // l'hébergement d'images d'eBay : rend son adresse i.ebayimg.com, que
@@ -2331,7 +2341,7 @@ async function handleApp(req, res) {
         :'Je n\'ai pas pu relire sur quel site eBay ton compte est inscrit — rien n\'a été envoyé. Réessaie dans un moment.'});
       return;
     }
-    const commerciales=new Set(['poserremise','retirerremise','expedier','messageacheteur','repondre','repondreoffre','modifierannonce','terminerannonce','evaluer','deciderretour','rembourserretour','decannulation','promouvoir','changertaux','arreterpromo']);
+    const commerciales=new Set(['corrigeraspects','lierproduit','ajouterphotos','poserremise','retirerremise','expedier','messageacheteur','repondre','repondreoffre','modifierannonce','terminerannonce','evaluer','deciderretour','rembourserretour','decannulation','promouvoir','changertaux','arreterpromo']);
     // (2 nov., audit « plateformes » P12) Publier et changer un prix ENGAGENT
     // (une annonce mise en vente, un prix qui vend) : comme `programmer`,
     // `retirer`, `regleoffre` et `modifierannonce`, le serveur exige la
