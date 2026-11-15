@@ -102,11 +102,24 @@ sans eux reçoit un 403 que l'écran dit « Reconnecter eBay » pour CETTE parti
 ## Preuves
 - `scripts/audit-ebay-tableau.cjs` — EXÉCUTE `api/ebay.js` contre un faux eBay à la forme de la doc ;
   le faux eBay **vérifie la signature** Ed25519 avec la clé publique : **44 verts** ; `--prouve` **16/16
-  mutations rougies** ; `--avant` (arbre de départ) **32 rouges**.
+  mutations rougies** ; `--avant` (arbre de départ 7c5ddaf5) **34 rouges**.
 - `scripts/audit-ebay-tableau-app.cjs` — règles du tableau + CA daté au versement (miroir) : **17 verts**,
-  **8/8 mutations**.
-- `scripts/bancs/ebay-tableau.cjs` — rendu réel, 390 tactile clair + 1512 sombre, 1 000 annonces : voir
-  la ligne « ÉTAT » ci-dessous ; captures `scripts/bancs/captures/ebay-tableau-*.png`.
+  **9/9 mutations** (dont le mois de Paris : un versement du 1er à 0 h 30 compte dans le bon mois).
+- `scripts/bancs/ebay-tableau.cjs` — rendu réel, 390 tactile clair + 1512 sombre, 1 002 annonces :
+  **32 verts** (bande, À faire, cartes, Argent par vente, mises à part, Trafic, Santé, pannes « scope » et
+  « signature », aucun débordement, aucun libellé coupé, 44 px, un plein au plus, 40 rangées dessinées sur
+  1 002). Le contrôle « libellé coupé » (V8) était ROUGE sur la première version (« 145,40 € ver… ») :
+  la bande passe en deux rangées au téléphone. Captures `scripts/bancs/captures/ebay-tableau-*.png`.
+- Audits verts : ebay-route (547), offres-auto (26), fonctions-api (12 max), identite, urssaf, traduction
+  (45), variables, tdz, studio, csp, icones, coherence, quoi-de-neuf, bilan-semaine (57, miroir refabriqué).
+  Rouges HÉRITÉS (les mêmes sur l'arbre de départ) : audit-secrets (une adresse dans src/exempleDonnees.js),
+  audit-dates-paris (achatMemeAnnonce, recherchePhrase, soldes — la ligne de src/ebay/tableau.js a été
+  retirée), audit-comptes-exclus (module src/versementReleve.js absent de sa copie).
+- Bancs eBay voisins, l'arbre de départ (7c5ddaf5, construit à part) puis ce lot, l'un après l'autre :
+  ebay-comptes 2 KO / 2 KO (mêmes libellés), ebay-apres-vente-ecran 7 KO / 7 KO (mêmes libellés ; la
+  machine est saturée, les clics « Promotion », « Achats » expirent des deux côtés). Un premier passage
+  avait rougi ebay-comptes (« Tous les comptes : ventes ») : `?tab=plat_ebay` ouvrait le Tableau ⇒ un
+  ancien lien vers l'espace eBay mène de nouveau aux Commandes (le Tableau s'ouvre par le filtre des sites).
 
 ## Gestes de Julien
 1. **Clé de signature** (sinon l'Argent eBay reste « eBay demande une signature ») : une session lance
