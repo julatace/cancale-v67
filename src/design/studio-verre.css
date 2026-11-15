@@ -195,9 +195,9 @@ html:has(.vrm-app-shell[data-espace]), html:has(.vrm-app-shell[data-espace]) bod
 :root:root:root body .vrm-app-shell[data-espace] :is(
   .sj-tete, .sj-affiche, .vrm-screen-head, .vrm-tete-row, .sb-tete, .sb-surtitre, .sb-ecran-titre, .vrm-fu-date-tete, .vrm-tache-tete,
   .vrm-market-heading, .vrm-set-tete, .vrm-day-greeting, .vrm-app-header:not(.is-defile) .vrm-hdr-titre, .sb-bande, .vrm-ui-bande, .vrm-fu-bande,
-  .vrm-fu-titre-section, .vrm-set-groupe > .vrm-set-titre, .vrm-set-groupe > .vrm-set-pied, .vrm-ms-h2, .vrm-ms-plus, .vrm-ap-ligne, .vrm-fraicheur-hote,
-  .vrm-market-space > div > .vrm-ui-afaire-capsule, .vrm-ui-afaire.sb-lien, .vrm-impr-ligne, .vrm-lu-seulement, .vrm-toutes-repli,
-  .vrm-pf-set-avances > summary, .vrm-finance-page > div:not([class]), .vrm-fu-carte.a-action, .vrm-achats-barre, .vrm-cm-entete,
+  .vrm-fu-titre-section, .vrm-set-groupe > .vrm-set-titre, .vrm-set-groupe:not(.vrm-compta-groupe) > .vrm-set-pied, .vrm-ms-h2, .vrm-ms-plus,
+  .vrm-ap-ligne, .vrm-fraicheur-hote, .vrm-market-space > div > .vrm-ui-afaire-capsule, .vrm-ui-afaire.sb-lien, .vrm-impr-ligne, .vrm-lu-seulement,
+  .vrm-toutes-repli, .vrm-pf-set-avances > summary, .vrm-finance-page > div:not([class]), .vrm-fu-carte.a-action, .vrm-achats-barre, .vrm-cm-entete,
   .vrm-colis-section-tete, .vrm-colis-section > div:not([class]), .vrm-colis-resume
 ) {
   --sb-encre: var(--sv-clair) !important; --d-encre: var(--sv-clair) !important; --vrm-ink: var(--sv-clair) !important; --vrm-text: var(--sv-clair) !important;
@@ -234,27 +234,27 @@ html:has(.vrm-app-shell[data-espace]), html:has(.vrm-app-shell[data-espace]) bod
 :root:root:root body .vrm-app-shell[data-espace] :is(
   .sj-tete, .sj-affiche, .vrm-screen-head, .vrm-tete-row, .sb-tete, .sb-surtitre, .sb-ecran-titre, .vrm-fu-date-tete, .vrm-tache-tete,
   .vrm-market-heading, .vrm-set-tete, .vrm-day-greeting, .vrm-app-header:not(.is-defile) .vrm-hdr-titre, .sb-bande, .vrm-ui-bande, .vrm-fu-bande,
-  .vrm-fu-titre-section, .vrm-set-groupe > .vrm-set-titre, .vrm-set-groupe > .vrm-set-pied, .vrm-ms-h2, .vrm-ms-plus, .vrm-ap-ligne, .vrm-fraicheur-hote,
-  .vrm-market-space > div > .vrm-ui-afaire-capsule, .vrm-ui-afaire.sb-lien, .vrm-impr-ligne, .vrm-lu-seulement, .vrm-toutes-repli,
-  .vrm-pf-set-avances > summary, .vrm-finance-page > div:not([class]), .vrm-fu-carte.a-action, .vrm-achats-barre, .vrm-cm-entete,
+  .vrm-fu-titre-section, .vrm-set-groupe > .vrm-set-titre, .vrm-set-groupe:not(.vrm-compta-groupe) > .vrm-set-pied, .vrm-ms-h2, .vrm-ms-plus,
+  .vrm-ap-ligne, .vrm-fraicheur-hote, .vrm-market-space > div > .vrm-ui-afaire-capsule, .vrm-ui-afaire.sb-lien, .vrm-impr-ligne, .vrm-lu-seulement,
+  .vrm-toutes-repli, .vrm-pf-set-avances > summary, .vrm-finance-page > div:not([class]), .vrm-fu-carte.a-action, .vrm-achats-barre, .vrm-cm-entete,
   .vrm-colis-section-tete, .vrm-colis-section > div:not([class]), .vrm-colis-resume
-) [style*="color"]:not(:is(.sb-touche:not(.vrm-ui-afaire-capsule), .sb-rond, .sb-segment, .sb-tuile, .sb-plan, .sb-champ, .sb-btn-plein, .vrm-b:not(.vrm-b-discret), .vrm-seg:not(.vrm-seg-plein), .vrm-sel-sites, .vrm-ui-menu-compte, .vrm-icon-control, .sj-alertes, .vrm-ios-carte, .vrm-reglages-groupe, .vrm-set-liste, .vrm-fu-panneau, input, select, textarea, .vrm-compta-carte, .vrm-toutes-liste, .vrm-day-task-list, .vrm-buy-list, .vrm-msg-list, .vrm-colis-carte, .vrm-a-venir, .vrm-colis-prochain, .vrm-ann-geste, details.vrm-quick-settings, .vrm-ann-card, .vrm-settings-todo, .vrm-sv-tuile, .vrm-sv-carte, .vrm-onglet-manque, .vrm-d7-carte, .vrm-fp-section, .vrm-boite-liste-col, .vrm-rpf-point, .vrm-sx, .vrm-pa-carte, .vrm-carte-mfa, .vrm-sp-rec, .vrm-compta-replis, .vrm-argent-w, .vrm-at-carte, .vrm-aide-bouton), :is(.sb-touche:not(.vrm-ui-afaire-capsule), .sb-rond, .sb-segment, .sb-tuile, .sb-plan, .sb-champ, .sb-btn-plein, .vrm-b:not(.vrm-b-discret), .vrm-seg:not(.vrm-seg-plein), .vrm-sel-sites, .vrm-ui-menu-compte, .vrm-icon-control, .sj-alertes, .vrm-ios-carte, .vrm-reglages-groupe, .vrm-set-liste, .vrm-fu-panneau, input, select, textarea, .vrm-compta-carte, .vrm-toutes-liste, .vrm-day-task-list, .vrm-buy-list, .vrm-msg-list, .vrm-colis-carte, .vrm-a-venir, .vrm-colis-prochain, .vrm-ann-geste, details.vrm-quick-settings, .vrm-ann-card, .vrm-settings-todo, .vrm-sv-tuile, .vrm-sv-carte, .vrm-onglet-manque, .vrm-d7-carte, .vrm-fp-section, .vrm-boite-liste-col, .vrm-rpf-point, .vrm-sx, .vrm-pa-carte, .vrm-carte-mfa, .vrm-sp-rec, .vrm-compta-replis, .vrm-argent-w, .vrm-at-carte, .vrm-aide-bouton) *) { color: var(--sv-clair-2) !important; }
+) [style*="color"]:not(:is(.sb-touche:not(.vrm-ui-afaire-capsule), .sb-rond, .sb-segment, .sb-tuile, .sb-plan, .sb-champ, .sb-btn-plein, .vrm-b:not(.vrm-b-discret), .vrm-seg:not(.vrm-achats-barre .vrm-seg), .vrm-sel-sites, .vrm-ui-menu-compte, .vrm-icon-control, .sj-alertes, .vrm-ios-carte, .vrm-reglages-groupe, .vrm-set-liste, .vrm-fu-panneau, input, select, textarea, .vrm-compta-carte, .vrm-toutes-liste, .vrm-day-task-list, .vrm-buy-list, .vrm-msg-list, .vrm-colis-carte, .vrm-a-venir, .vrm-colis-prochain, .vrm-ann-geste, details.vrm-quick-settings, .vrm-ann-card, .vrm-settings-todo, .vrm-sv-tuile, .vrm-sv-carte, .vrm-onglet-manque, .vrm-d7-carte, .vrm-fp-section, .vrm-boite-liste-col, .vrm-rpf-point, .vrm-sx, .vrm-pa-carte, .vrm-carte-mfa, .vrm-sp-rec, .vrm-compta-replis, .vrm-argent-w, .vrm-at-carte, .vrm-aide-bouton, .vrm-compta-groupe), :is(.sb-touche:not(.vrm-ui-afaire-capsule), .sb-rond, .sb-segment, .sb-tuile, .sb-plan, .sb-champ, .sb-btn-plein, .vrm-b:not(.vrm-b-discret), .vrm-seg:not(.vrm-achats-barre .vrm-seg), .vrm-sel-sites, .vrm-ui-menu-compte, .vrm-icon-control, .sj-alertes, .vrm-ios-carte, .vrm-reglages-groupe, .vrm-set-liste, .vrm-fu-panneau, input, select, textarea, .vrm-compta-carte, .vrm-toutes-liste, .vrm-day-task-list, .vrm-buy-list, .vrm-msg-list, .vrm-colis-carte, .vrm-a-venir, .vrm-colis-prochain, .vrm-ann-geste, details.vrm-quick-settings, .vrm-ann-card, .vrm-settings-todo, .vrm-sv-tuile, .vrm-sv-carte, .vrm-onglet-manque, .vrm-d7-carte, .vrm-fp-section, .vrm-boite-liste-col, .vrm-rpf-point, .vrm-sx, .vrm-pa-carte, .vrm-carte-mfa, .vrm-sp-rec, .vrm-compta-replis, .vrm-argent-w, .vrm-at-carte, .vrm-aide-bouton, .vrm-compta-groupe) *) { color: var(--sv-clair-2) !important; }
 
 /* ══ 7. LES SURFACES REMETTENT L'ENCRE SOMBRE (une touche, une carte dans une tête claire reste lisible) ══ */
 :root:root:root body .vrm-app-shell[data-espace] :is(
   .sj-tete, .sj-affiche, .vrm-screen-head, .vrm-tete-row, .sb-tete, .sb-surtitre, .sb-ecran-titre, .vrm-fu-date-tete, .vrm-tache-tete,
   .vrm-market-heading, .vrm-set-tete, .vrm-day-greeting, .vrm-app-header:not(.is-defile) .vrm-hdr-titre, .sb-bande, .vrm-ui-bande, .vrm-fu-bande,
-  .vrm-fu-titre-section, .vrm-set-groupe > .vrm-set-titre, .vrm-set-groupe > .vrm-set-pied, .vrm-ms-h2, .vrm-ms-plus, .vrm-ap-ligne, .vrm-fraicheur-hote,
-  .vrm-market-space > div > .vrm-ui-afaire-capsule, .vrm-ui-afaire.sb-lien, .vrm-impr-ligne, .vrm-lu-seulement, .vrm-toutes-repli,
-  .vrm-pf-set-avances > summary, .vrm-finance-page > div:not([class]), .vrm-fu-carte.a-action, .vrm-achats-barre, .vrm-cm-entete,
+  .vrm-fu-titre-section, .vrm-set-groupe > .vrm-set-titre, .vrm-set-groupe:not(.vrm-compta-groupe) > .vrm-set-pied, .vrm-ms-h2, .vrm-ms-plus,
+  .vrm-ap-ligne, .vrm-fraicheur-hote, .vrm-market-space > div > .vrm-ui-afaire-capsule, .vrm-ui-afaire.sb-lien, .vrm-impr-ligne, .vrm-lu-seulement,
+  .vrm-toutes-repli, .vrm-pf-set-avances > summary, .vrm-finance-page > div:not([class]), .vrm-fu-carte.a-action, .vrm-achats-barre, .vrm-cm-entete,
   .vrm-colis-section-tete, .vrm-colis-section > div:not([class]), .vrm-colis-resume
 ) :is(
   .sb-touche:not(.vrm-ui-afaire-capsule), .sb-rond, .sb-segment, .sb-tuile, .sb-plan, .sb-champ, .sb-btn-plein, .vrm-b:not(.vrm-b-discret),
-  .vrm-seg:not(.vrm-seg-plein), .vrm-sel-sites, .vrm-ui-menu-compte, .vrm-icon-control, .sj-alertes, .vrm-ios-carte, .vrm-reglages-groupe,
+  .vrm-seg:not(.vrm-achats-barre .vrm-seg), .vrm-sel-sites, .vrm-ui-menu-compte, .vrm-icon-control, .sj-alertes, .vrm-ios-carte, .vrm-reglages-groupe,
   .vrm-set-liste, .vrm-fu-panneau, input, select, textarea, .vrm-compta-carte, .vrm-toutes-liste, .vrm-day-task-list, .vrm-buy-list, .vrm-msg-list,
   .vrm-colis-carte, .vrm-a-venir, .vrm-colis-prochain, .vrm-ann-geste, details.vrm-quick-settings, .vrm-ann-card, .vrm-settings-todo, .vrm-sv-tuile,
   .vrm-sv-carte, .vrm-onglet-manque, .vrm-d7-carte, .vrm-fp-section, .vrm-boite-liste-col, .vrm-rpf-point, .vrm-sx, .vrm-pa-carte, .vrm-carte-mfa,
-  .vrm-sp-rec, .vrm-compta-replis, .vrm-argent-w, .vrm-at-carte, .vrm-aide-bouton
+  .vrm-sp-rec, .vrm-compta-replis, .vrm-argent-w, .vrm-at-carte, .vrm-aide-bouton, .vrm-compta-groupe
 ) {
   --sb-encre: var(--sv-encre) !important; --d-encre: var(--sv-encre) !important; --vrm-ink: var(--sv-encre) !important; --vrm-text: var(--sv-encre) !important;
   --p-encre: var(--sv-encre) !important; --w-encre: var(--sv-encre) !important; --fu-encre: var(--sv-encre) !important; --bx-encre: var(--sv-encre) !important;
@@ -282,6 +282,20 @@ html:has(.vrm-app-shell[data-espace]), html:has(.vrm-app-shell[data-espace]) bod
   --s-ambre: var(--sv-ambre) !important; --bx-ambre: var(--sv-ambre) !important; --ia-ambre: var(--sv-ambre) !important; --id-ambre: var(--sv-ambre) !important;
   --ret-ambre: var(--sv-ambre) !important; --sbp-ambre: var(--sv-ambre) !important; --vrm-warn: var(--sv-ambre) !important;
 }
+/* Une CARTE (pas un bouton : un bouton garde la couleur de sa forme) remet aussi la couleur héritée. */
+:root:root:root body .vrm-app-shell[data-espace] :is(
+  .sj-tete, .sj-affiche, .vrm-screen-head, .vrm-tete-row, .sb-tete, .sb-surtitre, .sb-ecran-titre, .vrm-fu-date-tete, .vrm-tache-tete,
+  .vrm-market-heading, .vrm-set-tete, .vrm-day-greeting, .vrm-app-header:not(.is-defile) .vrm-hdr-titre, .sb-bande, .vrm-ui-bande, .vrm-fu-bande,
+  .vrm-fu-titre-section, .vrm-set-groupe > .vrm-set-titre, .vrm-set-groupe:not(.vrm-compta-groupe) > .vrm-set-pied, .vrm-ms-h2, .vrm-ms-plus,
+  .vrm-ap-ligne, .vrm-fraicheur-hote, .vrm-market-space > div > .vrm-ui-afaire-capsule, .vrm-ui-afaire.sb-lien, .vrm-impr-ligne, .vrm-lu-seulement,
+  .vrm-toutes-repli, .vrm-pf-set-avances > summary, .vrm-finance-page > div:not([class]), .vrm-fu-carte.a-action, .vrm-achats-barre, .vrm-cm-entete,
+  .vrm-colis-section-tete, .vrm-colis-section > div:not([class]), .vrm-colis-resume
+) :is(
+  .sj-alertes, .vrm-ios-carte, .vrm-reglages-groupe, .vrm-set-liste, .vrm-fu-panneau, .vrm-compta-carte, .vrm-toutes-liste, .vrm-day-task-list,
+  .vrm-msg-list, .vrm-colis-carte, .vrm-a-venir, .vrm-colis-prochain, .vrm-ann-geste, details.vrm-quick-settings, .vrm-ann-card, .vrm-settings-todo,
+  .vrm-sv-tuile, .vrm-sv-carte, .vrm-onglet-manque, .vrm-d7-carte, .vrm-fp-section, .vrm-rpf-point, .vrm-sx, .vrm-pa-carte, .vrm-carte-mfa, .vrm-sp-rec,
+  .vrm-compta-replis, .vrm-argent-w, .vrm-at-carte, .vrm-compta-groupe
+) { color: var(--sv-encre) !important; }
 
 /* ══ 8. LA COQUE : la barre du bas (verre clair), la tête, la navigation de l'ordinateur ══ */
 :root:root:root body .vrm-app-shell .vrm-tabbar.vrm-tabbar {
@@ -310,10 +324,10 @@ html:has(.vrm-app-shell[data-espace]), html:has(.vrm-app-shell[data-espace]) bod
 /* La tête d'un écran de liste (Ventes « À expédier », Achats « À retirer ») : posée SUR le fond, à toute largeur
    (sur l'ordinateur elle était une carte) — le chiffre flotte en blanc, comme celui du jour. */
 :root:root:root:root body .vrm-app-shell[data-espace] .sb-tete { background: none !important; background-image: none !important; box-shadow: none !important; border: 0 !important; }
+/* Le « ? » à côté d'un titre : un rond posé (sur le fond comme dans une carte, il se voit et se lit). */
+:root:root:root:root body .vrm-app-shell[data-espace] .vrm-aide-bouton { background-color: transparent !important; background-image: var(--sb-touche-fond) !important; box-shadow: var(--sb-touche-ombre) !important; color: var(--sv-encre) !important; }
 /* Un bouton secondaire est TOUJOURS une touche posée (sur le fond, un secondaire sans matière se perdait). */
 :root:root:root:root body :is(.vrm-app-shell, .vrm-fs) .vrm-b:is(.vrm-b-secondaire, .vrm-b-danger) { background-image: var(--sb-touche-fond) !important; box-shadow: var(--sb-touche-ombre) !important; }
-/* Le choix enfoncé d'un segment plein (Achats « Tous ») : l'encre du plein, pas la couleur (translucide) du verre. */
-:root:root:root:root body .vrm-main .vrm-seg.vrm-seg-plein > :is([aria-pressed="true"], .is-actif) { color: var(--sb-plein-encre, #FFFFFF) !important; }
 /* Ma journée au téléphone, comme la maquette : sous le chiffre du jour (blanc, sur le fond), le MOIS — ses trois
    chiffres — est le premier verre ; puis « À envoyer » et son geste. (L'ordre du DOM ne change pas.) */
 @media (max-width: 743px) {
