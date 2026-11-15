@@ -305,4 +305,22 @@
 :root:root:root:root:root:root:root:root[data-theme="dark"] body .va-fc-duo .vv-touche { background: rgb(255 255 255 / .08) !important; }
 /* Un retour : les étapes jusqu'au remboursement (dans la carte « À renvoyer » d'Achats). */
 :root:root:root:root:root:root:root:root body .vv-ret-st { margin-top: 10px !important; }
+
+/* ── 9. RACCORDS (mesurés au banc) ── */
+:root:root:root:root:root:root:root:root body .vv-liste .vrm-colis-carte { display: block !important; }
+:root:root:root:root:root:root:root:root body .vv-liste .vv-rang-l { width: 100% !important; }
+:root:root:root:root:root:root:root:root body .sb-btn-plein.vv-plein::before, :root:root:root:root:root:root:root:root body .sb-btn-plein.vv-plein::after { content: none !important; display: none !important; }
+:root:root:root:root:root:root:root:root body .sb-btn-plein.vv-plein > * { position: static !important; margin: 0 !important; transform: none !important; inset: auto !important; }
+/* « Préparer mes colis », « Je dépose », la tournée : derrière « … » (à l'ordinateur aussi), comme les filtres. */
+:root:root:root:root:root:root:root:root body .vrm-tache[data-tache="ventes"] .vrm-colis-section :is([data-preparer-rangee], *:has(> [data-tournee-ouvrir])) { display: none !important; }
+:root:root:root:root:root:root:root:root[data-colis-outils] body .vrm-tache[data-tache="ventes"] .vrm-colis-section [data-preparer-rangee] { display: flex !important; }
+:root:root:root:root:root:root:root:root[data-colis-outils] body .vrm-tache[data-tache="ventes"] .vrm-colis-section *:has(> [data-tournee-ouvrir]) { display: flex !important; }
+
+:root:root:root:root:root:root:root:root body .sb-tete[data-sb-tete="achats"] .sb-tete-titre { white-space: nowrap !important; flex: none !important; }
+:root:root:root:root:root:root:root:root body .sb-tete[data-sb-tete="achats"] .sb-tete-lib { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip-path: inset(50%) !important; white-space: nowrap !important; }
+:root:root:root:root:root:root:root:root body .vrm-rpf-comptoir { height: auto !important; max-height: none !important; min-height: 0 !important; overflow: visible !important; display: flex !important; align-items: baseline !important; column-gap: 8px !important; }
+:root:root:root:root:root:root:root:root body .vv-liste .vv-l1 { gap: 6px !important; }
+:root:root:root:root:root:root:root:root body .vv-liste .vv-l1 .vrm-num { font-size: 11.5px !important; height: 19px !important; min-height: 19px !important; padding: 0 6px !important; line-height: 19px !important; }
+
+:root:root:root:root:root:root:root:root body .sb-btn-plein.vv-plein .sb-btn-plein-mot { width: auto !important; max-width: none !important; min-width: 0 !important; flex: none !important; overflow: visible !important; }
 }

@@ -171,7 +171,9 @@ async function scenario(b, vp, sombre) {
     await pg.waitForSelector('[data-ventes-seg]', { timeout: 20000 }).catch(() => {});
     await enHaut(pg); await pg.waitForTimeout(500);
     await shot(pg, `ventes-verre-${nom}-expedier`);
-    if (process.env.BANC_SONDE) console.log(await pg.evaluate((sel) => { const c = document.querySelector('[data-bord-card][data-tx-colis="9110"]'); if (!c) return 'pas de carte';
+    if (process.env.BANC_SONDE) console.log(await pg.evaluate((sel) => { const racine = document.querySelector(sel.split('@')[0]) ; if (!racine) return 'pas de racine';
+      return [...racine.querySelectorAll(sel.split('@')[1])].map((x) => { const s = getComputedStyle(x); const q = x.getBoundingClientRect(); return `${x.tagName}.${String(x.className).slice(0, 50)} [${[...x.attributes].map((a) => a.name).filter((n) => n.startsWith('data-')).slice(0, 3).join(',')}] d=${s.display} w=${Math.round(q.width)} x=${Math.round(q.left)} y=${Math.round(q.top)} pl=${s.paddingLeft} jc=${s.justifyContent} fl=${s.flex} mw=${s.minWidth} wcss=${s.width}`; }).join('\n'); }, process.env.BANC_SONDE));
+    if (false) console.log(await pg.evaluate((sel) => { const c = document.querySelector('[data-bord-card][data-tx-colis="9110"]'); if (!c) return 'pas de carte';
       return [...c.querySelectorAll(sel)].map((x) => { const s = getComputedStyle(x); const q = x.getBoundingClientRect(); return `${x.tagName}.${String(x.className).slice(0, 50)} d=${s.display} fd=${s.flexDirection} fw=${s.flexWrap} w=${Math.round(q.width)} h=${Math.round(q.height)} x=${Math.round(q.left)} y=${Math.round(q.top)}`; }).join('\n'); }, process.env.BANC_SONDE));
     // ── S : le segment
     const seg = await pg.evaluate(() => { const s = document.querySelector('[data-ventes-seg]'); if (!s) return null; const cs = getComputedStyle(s);
