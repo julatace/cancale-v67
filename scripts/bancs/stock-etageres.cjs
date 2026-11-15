@@ -34,8 +34,11 @@ for (let k = 1; k <= N; k++) {
   fiches[id] = { numero: String(k), title: `Basket inventée ${k} taille ${36 + (k % 10)}`, accountId: '111' };
   enLigne.push({ id, title: fiches[id].title, is_closed: false, is_hidden: false, is_draft: false, price: { amount: String(30 + (k % 50)) + '.0' } });
 }
+// N°9999 : la fiche d'un compte MASQUÉ (222) — sa paire n'est pas montrée dans le Stock, son carton est dans la pile d'hier.
+fiches['8009999'] = { numero: '9999', title: 'Basket d’un compte masqué', accountId: '222' };
 const MAIN = {
   vinted_annonce_numeros: fiches,
+  vinted_accounts_hidden: ['222'],
   vinted_used_numeros: Array.from({ length: N }, (_, k) => String(k + 1)),
   // La forme MESURÉE : deux meubles d'hier, une case prise (rangée 4, colonne 2 du 7×10).
   vrm_meubles: [{ id: 'mA', name: 'Garage', cols: 4, rows: 8 }, { id: 'mB', name: 'Bureau', cols: 7, rows: 10, gravite: false, planches: [] },
@@ -188,7 +191,7 @@ async function retirerCase(pg, n) {
         const desc = await pg.evaluate((P) => { const d = document.querySelector(`[data-meuble="${P}"] [data-descente]`); return d ? { cles: d.getAttribute('data-descente'), texte: d.textContent } : null; }, P);
         dit(!!desc && desc.cles === `${aRanger[1]},${aRanger[2]}` && desc.texte.includes('N°' + aRanger[1]) && desc.texte.includes('N°' + aRanger[2]), `${t} · E : c'est DIT sur la pile (« N°… et N°… sont descendus d'un cran »)`, desc);
         const fichesApres = await pg.evaluate(() => { try { const f = JSON.parse(localStorage.getItem('vinted_annonce_numeros')); return Object.values(f).filter((x) => x && x.numero).length; } catch (_) { return -1; } });
-        dit(fichesApres === N, `${t} · E : aucun N° touché (1 000 fiches, mêmes numéros)`, fichesApres);
+        dit(fichesApres === N + 1, `${t} · E : aucun N° touché (1 001 fiches, mêmes numéros)`, fichesApres);
         if (CAPT) { await pg.evaluate((P) => document.querySelector(`[data-meuble="${P}"]`).scrollIntoView({ block: 'center' }), P); await pg.screenshot({ path: path.join(CAPT, `etag-${v}-5-descente.png`) }); }
         // ── F : la pile d'hier, le haut retiré : le N° pas montré garde sa case ──
         await retirerCase(pg, '62');
