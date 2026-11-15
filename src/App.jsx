@@ -5786,7 +5786,7 @@ const publierAnnoncesAchetees = (carte) => {
 const appelerCatalogue = async (methode, corps) => {
   try {
     const r = await fetch('/api/compte?mode=catalogue', { method: methode, cache: 'no-store', headers: { ...enTeteSession(), ...(corps ? { 'Content-Type': 'application/json' } : {}) },
-      body: corps ? JSON.stringify(corps) : undefined, ...(typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? { signal: AbortSignal.timeout(30000) } : {}) });
+      body: corps ? JSON.stringify(corps) : undefined, signal: signalDelai(30000) });
     const body = await r.json().catch(() => null);
     return { ok: r.ok, status: r.status, body };
   } catch (_) { return { ok: false, status: 0, body: null }; }
@@ -14455,7 +14455,7 @@ const ouvrirPdfLot = (pret, { geste = true, titre = '' } = {}) => {
   const f = ios || android ? fichierPdf(pret) : null;
   const voie = voieOuverture({ ios, android, partageFichiers: partageFichiersPossible(f), pret: true, geste });
   try {
-    if (voie === 'partage') { const p = navigator.share({ files: [f], title: titre || pret.filename }); if (p && p.catch) p.catch(() => {}); return 'partage'; }
+    if (voie === 'partage' && typeof navigator.share === 'function') { const p = navigator.share({ files: [f], title: titre || pret.filename }); if (p && p.catch) p.catch(() => {}); return 'partage'; }
     if (voie === 'onglet') { const w = window.open(pret.url, '_blank'); return w ? 'onglet' : 'bouton'; }
     if (voie === 'visionneuse') { _poserVisionneuse({ url: pret.url, nom: pret.filename || 'bordereaux.pdf', titre: titre || '', auto: true, at: Date.now() }); return 'visionneuse'; }
   } catch (_) {}

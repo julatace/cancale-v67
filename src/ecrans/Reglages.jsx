@@ -3684,7 +3684,7 @@ function Parrainage() {
     try { await navigator.clipboard.writeText(lien); toast('Lien copié'); } catch (_) { toast('Copie impossible ici — sélectionne le lien'); }
   };
   const partager = async () => {
-    try { await navigator.share({ title: 'VRM — 1 mois offert', text: TEXTE_PARTAGE, url: lien }); } catch (e) { if (!(e && e.name === 'AbortError')) copier(); }
+    try { if (!peutPartager) { copier(); return; } await navigator.share({ title: 'VRM — 1 mois offert', text: TEXTE_PARTAGE, url: lien }); } catch (e) { if (!(e && e.name === 'AbortError')) copier(); }
   };
   return (
     <div ref={racine} data-parrainage="ouvert" data-inscrits={s.inscrits} data-payes={s.payes} data-mois-gagnes={gagnes == null ? '' : gagnes} data-parrainage-test={p.modeTest ? '1' : undefined} style={{ scrollMarginTop: 72 }}>

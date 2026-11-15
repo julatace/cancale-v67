@@ -51,7 +51,7 @@ export default function CataloguePrive({ annonces = [], preselection = [], appel
     try { const r = await appeler('POST', { action: 'revoquer', cid }); if (r && r.ok) relire(); } catch (_) {}
   };
   const copier = async (url) => { try { await navigator.clipboard.writeText(url); setCopie(url); setTimeout(() => setCopie(''), 2000); } catch (_) {} };
-  const partager = async (url) => { try { await navigator.share({ url, title: nom.trim() || tr('plus.cat.titre') }); } catch (_) {} };
+  const partager = async (url) => { try { if (typeof navigator.share === 'function') await navigator.share({ url, title: nom.trim() || tr('plus.cat.titre') }); } catch (_) {} };
   const actifs = Array.isArray(liens) ? liens.filter((l) => l.etat === 'actif') : [];
   return (
     <Feuille titre={tr('plus.cat.titre')} onClose={onClose} data-catalogue-feuille={etat.k} className="vrm-ui-feuille vrm-plus-feuille">

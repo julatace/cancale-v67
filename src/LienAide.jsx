@@ -87,7 +87,7 @@ export function ReglageLienAide({ uid, entetes, toast = () => {} }) {
     charger();
   };
   const partager = async () => {
-    try { if (navigator.share) { await navigator.share({ title: tr('confort.aide.partageTitre'), url: neuf }); return; } } catch (_) { return; }
+    try { if (typeof navigator.share === 'function') { await navigator.share({ title: tr('confort.aide.partageTitre'), url: neuf }); return; } } catch (_) { return; }
     try { await navigator.clipboard.writeText(neuf); toast(tr('confort.aide.copie')); } catch (_) {}
   };
   return (

@@ -52,7 +52,10 @@ export function couperMot(s, n) {
 export function couperPhrases(s, n) {
   const x = espaces(s);
   if (x.length <= n) return x;
-  const phrases = x.split(/(?<=[.!?])\s+/);
+  // (15 nov., rouges-connus) SANS « lookbehind » `(?<=…)` : ce fichier est aussi dans le paquet de l'app,
+  // et Safari < 16.4 refuse de LIRE un paquet qui en contient un (audit-safari). Même découpe : après
+  // . ! ? suivi d'espaces, les espaces retirés.
+  const phrases = x.replace(/([.!?])\s+/g, '$1\u0000').split('\u0000');
   let out = '';
   for (const p of phrases) { const t = out ? `${out} ${p}` : p; if (t.length > n - 2) break; out = t; }
   return out && out.length >= n * 0.4 ? `${out} …` : couperMot(x, n);
@@ -74,15 +77,17 @@ const RE_IDS = [
 ];
 const RE_IDS_STRICTS = [
   /\bn[°ºo]\s*\d{6,}\b/gi,
-  /(?<![\w,.])\d{9,}(?![\w,.])/g,
+  // Un nombre nu de 9 chiffres ou plus, sans lettre, virgule ni point collés. Le caractère d'avant est
+  // PRIS dans `$1` et rendu tel quel (Safari < 16.4 ne lit pas `(?<!…)`, voir `couperPhrases`).
+  [/(^|[^\w,.])\d{9,}(?![\w,.])/g, '$1 '],
 ];
 export function sansIdentifiant(s, { strict = false } = {}) {
   let x = str(s);
-  for (const re of strict ? [...RE_IDS, ...RE_IDS_STRICTS] : RE_IDS) x = x.replace(re, ' ');
+  for (const e of strict ? [...RE_IDS, ...RE_IDS_STRICTS] : RE_IDS) { const [re, par] = Array.isArray(e) ? e : [e, ' ']; x = x.replace(re, par); }
   return x.replace(/\(\s*\)/g, ' ').replace(/(?:\s*·\s*){2,}/g, ' · ').replace(/\s+,/g, ',')
     .replace(BLANCS, ' ').replace(/^[\s·:—–-]+/, '').replace(/[\s·:—–-]+$/, '').trim();
 }
-export const aUnIdentifiant = (s, { strict = true } = {}) => (strict ? [...RE_IDS, ...RE_IDS_STRICTS] : RE_IDS).some((re) => { re.lastIndex = 0; const ok = re.test(str(s)); re.lastIndex = 0; return ok; });
+export const aUnIdentifiant = (s, { strict = true } = {}) => (strict ? [...RE_IDS, ...RE_IDS_STRICTS] : RE_IDS).some((e) => { const re = Array.isArray(e) ? e[0] : e; re.lastIndex = 0; const ok = re.test(str(s)); re.lastIndex = 0; return ok; });
 
 // ── LES MONTANTS ────────────────────────────────────────────────────────────
 // « 62 € », « 61,20 € » (« €62 » en anglais). Illisible ⇒ '' (jamais « 0 € »).
