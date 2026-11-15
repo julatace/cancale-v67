@@ -9,6 +9,7 @@ import ecran_renvoyer from './es/renvoyer.js';   // (15 nov., lot retours) « À
 import ecran_retrait_ailleurs from './es/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
 import ecran_finition from './es/finition.js';   // (15 nov.) la finition écran par écran
 import ecran_numeros_nouvelles from './es/numeros-nouvelles.js';   // (15 nov.) Les nouvelles annonces sans N°
+import ecran_securite_ventes from './es/securite-ventes.js';   // (15 nov.) Sécurité des ventes : arnaque, où vendre, anneau
 import ecran_idees from './es/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './es/ventes.js';
 import ecran_commun from './es/commun.js';
@@ -2274,4 +2275,5 @@ export default {
   ...ecran_renvoyer,
   ...ecran_finition,
   ...ecran_numeros_nouvelles,
+  ...ecran_securite_ventes,
 };

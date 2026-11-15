@@ -539,7 +539,9 @@ import { candidatsVenteSansAnnonce } from "./candidatsVente.js";
 import { fusionnerConversation } from "./conversations.js";
 import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import {colisEbay} from '../api/_lib/ebay-a-expedier.js';
-import {annoncesVcEnLigne,stockVestiaire,retraitsVestiaire,VC_VENTE_ETAPES,VC_ANNONCE_ETATS,etapeMotVc,vcVenteAnnulee,vcVentePartie,numVcVente,numVcAnnonce,numerosVcAvecLiens,montantRecuVc,dateVersementVc,dateVenteVc,tempsVc,ventesVcDe,colisVcAPoster,colisVcPartisLus,departsVc,resumeColisVc,etatAnnonceVcBrut,aExpedierVc,expeditionVc} from '../api/_lib/vestiaire-regle.js';
+import {annoncesVcEnLigne,stockVestiaire,retraitsVestiaire,VC_VENTE_ETAPES,VC_ANNONCE_ETATS,etapeMotVc,vcVenteAnnulee,vcVentePartie,numVcVente,numVcAnnonce,numerosVcAvecLiens,montantRecuVc,dateVersementVc,dateVenteVc,tempsVc,ventesVcDe,colisVcAPoster,colisVcPartisLus,departsVc,resumeColisVc,etatAnnonceVcBrut,aExpedierVc,expeditionVc,fraisVc} from '../api/_lib/vestiaire-regle.js';
+import OuVendre from './OuVendre.jsx';   // (15 nov., lot securite-ventes) « Où vendre cet article ? » sur la fiche
+import { fraisVintedSelon, statutVinted, tauxEbay, tauxVestiaire } from './ouVendre.js';
 import { etatVenteVc } from './etatVenteVc.js';   // (15 nov.) l'état d'une vente Vestiaire en mots (jamais « IN_PROGRESS »)
 import { texteEtatVc } from './etatVenteVcTexte.js';
 import {SELECT_DEPART_META,departsParSuivi,txVintedParties} from '../api/_lib/depart-colis.js';
@@ -5801,6 +5803,34 @@ function useInfosPaire(paire) {
 }
 const paireIdentifiable = (numero, itemId) => !!(String(numero || '').trim() || /^\d{3,}$/.test(String(itemId || '')));
 // La ligne de la fiche paire, et sa feuille.
+// (15 nov., lot securite-ventes) « OÙ VENDRE CET ARTICLE ? » — la coque lit ce que la règle pure
+// (src/ouVendre.js) demande : les sites reliés (le profil du vendeur, `relies`), le statut Pro du ou des
+// comptes Vinted de l'article (`lecturePrixPro`, lu, jamais deviné), les frais LUS de ses commandes eBay et
+// de ses ventes Vestiaire (les mêmes listes que « Frais par site »). Lecture seule, aucun geste.
+function OuVendreCoque({ annonces = [], comptes = null, ebay, vc }) {
+  const profil = useProfilVendeur();
+  const relies = (profil && profil.relies) || {};
+  const prix = (() => { const a = (annonces || []).find((x) => x && x.etat === 'en-ligne' && x.price != null) || (annonces || []).find((x) => x && x.price != null);
+    const v = a ? (typeof a.price === 'object' ? a.price.amount : a.price) : null; const n = Number(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null; })();
+  const uids = (() => { const d = [...new Set((annonces || []).map((a) => a && a.accountId).filter(Boolean).map(String))];
+    return d.length ? d : (Array.isArray(comptes) ? comptes.map((a) => String(a.vinted_user_id || '')).filter(Boolean).slice(0, 12) : []); })();
+  const cle = uids.join(',');
+  const [statuts, setStatuts] = useState(undefined);
+  useEffect(() => {
+    let mort = false;
+    if (!uids.length) { setStatuts(null); return undefined; }
+    Promise.all(uids.map((u) => lecturePrixPro(u).then((x) => (x && typeof x.pro === 'boolean' ? x.pro : null), () => null)))
+      .then((l) => { if (!mort) setStatuts(l); }, () => { if (!mort) setStatuts(null); });
+    return () => { mort = true; };
+  }, [cle]);
+  const sites = React.useMemo(() => ({
+    vinted: { relie: relies.vinted, frais: fraisVintedSelon(statutVinted(statuts)) },
+    leboncoin: { relie: relies.leboncoin, frais: { regle: 'aucune' } },
+    ebay: { relie: relies.ebay, frais: tauxEbay(Array.isArray(ebay) ? ebay : null, commandeEbayEngagee) },
+    vestiaire: { relie: relies.vestiaire, frais: tauxVestiaire(Array.isArray(vc) ? vc : null, fraisVc) },
+  }), [relies.vinted, relies.leboncoin, relies.ebay, relies.vestiaire, statuts, ebay, vc]);
+  return <OuVendre prixDepart={prix} sites={sites}/>;
+}
 function InfosPaireCoque({ numero = '', itemId = '', recreeDe = '' }) {
   const paire = { numero, itemId, recreeDe };
   const infos = useInfosPaire(paire);
@@ -63190,7 +63220,7 @@ function AppCoeur() {
             journal: load(CLE_JOURNAL_NUMEROS, []) || [], marqueur: marqueurNumerotation(), sortieStock: (load('vrm_stock_sortis', {}) || {})[rn.cle] || null,
             estArchive: (n) => estArchive(n), cleNum }) : null;
           const fermer = fermerF;
-          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={numF} lecture={!numData} note={p && p.num && !p.ancienNumero ? <>{questionChezToiFiche(p.num)}{blocVenduAilleurs(p, rn, etat)}<BlocARetirerAilleurs numero={p.num} PhotoVinted={PhotoVinted}/><LigneMemePhotoNumero numero={p.num} cle={cleNum} charger={chargerMemePhotoUI}/><NotePaireCoque numero={p.num} variante="bloc" ajout dicter/><InfosPaireCoque numero={p.num}/><AtelierPaireCoque num={p.num} idFiche={p.idFiche || ''} itemId={(rn.annonces || []).length === 1 ? String(rn.annonces[0].id || '') : ''}/><BlocHistoriqueRepub ids={(rn.annonces || []).map((x) => String(x.id))} d={{ numeros, stats: Object.fromEntries((rn.annonces || []).map((x) => [String(x.id), { favoris: Number.isFinite(x.favourites) ? x.favourites : null, vues: Number.isFinite(x.views) ? x.views : null }])) }}/><BoutonRappel cible={{ sorte: 'article', num: p.num, item: (rn.annonces || []).length === 1 ? String(rn.annonces[0].id || '') : '' }} libelle={`N°${p.num}`}/></> : null} onFermer={fermer} onRetour={depuis ? fermer : ()=>{ fermer(); setGsQ(String((p && p.num) || numF)); setGsOpen(true); }}
+          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={numF} lecture={!numData} note={p && p.num && !p.ancienNumero ? <>{questionChezToiFiche(p.num)}{blocVenduAilleurs(p, rn, etat)}<BlocARetirerAilleurs numero={p.num} PhotoVinted={PhotoVinted}/><LigneMemePhotoNumero numero={p.num} cle={cleNum} charger={chargerMemePhotoUI}/><NotePaireCoque numero={p.num} variante="bloc" ajout dicter/><InfosPaireCoque numero={p.num}/>{/* (15 nov.) Une paire déjà VENDUE (une vente lue sous ce N°, jamais réattribué) n'a plus à choisir où se vendre. */}{!(rn.ventes && [rn.ventes.vinted, rn.ventes.lbc, rn.ventes.ebay].some((l) => Array.isArray(l) && l.length)) ? <OuVendreCoque annonces={rn.annonces || []} comptes={vintedAccounts} ebay={ebayCommandes} vc={ventesVcCoque}/> : null}<AtelierPaireCoque num={p.num} idFiche={p.idFiche || ''} itemId={(rn.annonces || []).length === 1 ? String(rn.annonces[0].id || '') : ''}/><BlocHistoriqueRepub ids={(rn.annonces || []).map((x) => String(x.id))} d={{ numeros, stats: Object.fromEntries((rn.annonces || []).map((x) => [String(x.id), { favoris: Number.isFinite(x.favourites) ? x.favourites : null, vues: Number.isFinite(x.views) ? x.views : null }])) }}/><BoutonRappel cible={{ sorte: 'article', num: p.num, item: (rn.annonces || []).length === 1 ? String(rn.annonces[0].id || '') : '' }} libelle={`N°${p.num}`}/></> : null} onFermer={fermer} onRetour={depuis ? fermer : ()=>{ fermer(); setGsQ(String((p && p.num) || numF)); setGsOpen(true); }}
             onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}
             onEmballer={()=>{ fermer(); setGsOpen(false); DEMANDE_EMBALLAGE.at = Date.now(); setTab('cat_bord'); try { window.dispatchEvent(new Event('vrm:emballer')); } catch (_) {} }}
             onPrix={(n)=>setPrixNum(String(n))} onPublierAilleurs={(n)=>setPubAil({ num: String(n), site: null })} neuve={neuve}

@@ -17,6 +17,7 @@ import './aideCarte.css';
 import { AIDE_CHIFFRES, CHIFFRES, NOM_PERIODE, PAGES_CARTE, PLAGE_IDS, clePeriode, maxCases, chiffresProposes, courbeVendu, defDe, horsSelection, libelleCase, nomPeriode, periodeDefaut, raisonCourte, reglageAEnregistrer, reglageDePage, valeursCarte, valeurChiffre, valeurObjectif, valeurObjectifMois } from './carteChiffres.js';
 import { TYPES_OBJECTIF, estEuros, lireSaisieObjectif, objectifAEnregistrer, objectifSurPage, progressionObjectif, resteObjectif, phraseResteObjectif, rythmeObjectif, phraseRythme, propositionObjectif, moisPleinsAvant, moisPasse, objectifDuMoisYm, bilanMoisPasse, phraseBilan } from '../objectifMois.js';
 import ChoixPeriode from '../ChoixPeriode.jsx';
+import AnneauObjectif from './AnneauObjectif.jsx';   // (15 nov., lot securite-ventes) Ma journée : l'anneau
 import { raccourcisCarte, etiquettePlage, cleJour } from '../periodeCalendrier.js';
 
 // ── LA PÉRIODE D'UNE PLACE ↔ LA VALEUR DU CALENDRIER (3 nov., Julien : « fais un calendrier ») ──
@@ -240,7 +241,11 @@ export default function CarteStats({ owner = '', page, sel, sources, regles, reg
           onClick: aller(x),
           attrs: { ...attrsDeValeur(x, page), ...(x.attrs || {}), ...(x.def && x.def.local && x.def.attrs ? x.def.attrs : {}), ...(plus(x) || {}) },
         }))}>
-        {prog ? <BarreObjectif prog={prog} fmt={fmt} onOuvrir={poserObjectif ? () => { setObjOuvert(true); setOuvert(true); } : null} /> : null}
+        {/* (15 nov., lot securite-ventes — proposition 14) Ma journée : l'ANNEAU (la part, la cible, ce qui reste) ;
+            les autres cartes gardent la barre fine. Mêmes attributs, même règle (`progressionObjectif`). */}
+        {prog ? (page === 'journee'
+          ? <AnneauObjectif prog={prog} onOuvrir={poserObjectif ? () => { setObjOuvert(true); setOuvert(true); } : null} />
+          : <BarreObjectif prog={prog} fmt={fmt} onOuvrir={poserObjectif ? () => { setObjOuvert(true); setOuvert(true); } : null} />) : null}
         {bilan ? <BilanObjectif bilan={bilan} fmt={fmt} onVu={() => { const n = objectifAEnregistrer(objectifBrut, { bilanVu: bilan.ym }); if (n) poserObjectif(n); }} /> : null}
       </CarteMois>
       {aide && aideOuverte ? <FeuilleAide page={page} places={[g, ...V.c]} fmt={fmt} fermer={() => setAideOuverte(false)} FermeAuRetour={FermeAuRetour} surtitre={V.perimetre} /> : null}

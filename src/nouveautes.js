@@ -26,6 +26,10 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (15 nov., Julien : « vas-y fais tout ») docs/passation/2026-11-15-securite-ventes.md — trois lignes, trois écrans.
+  { id: 'alerte-arnaque-langues', date: '2026-11-15', titre: 'Alerte arnaque dans tes messages, cinq langues', phrase: 'Une phrase dit le risque et quoi faire, rien n’est envoyé.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  { id: 'ou-vendre-fiche', date: '2026-11-15', titre: 'Où vendre ? Ce que tu touches par site', phrase: 'Sur la fiche, frais déduits, le meilleur mis en avant.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'objectif-anneau', date: '2026-11-15', titre: 'Ton objectif du mois en anneau', phrase: 'Ma journée dit ce qui reste et le rythme par jour.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « J'aime la 9 ») docs/passation/2026-11-15-verre-depoli.md — le thème « Verre dépoli ».
   { id: 'verre-depoli', date: '2026-11-15', titre: 'Nouveau thème : verre dépoli sur bleu profond', phrase: 'Le chiffre du jour en blanc, tout se lit sur le verre.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « c'est moche et il y a des bugs ») docs/passation/2026-11-15-annonces-achats.md

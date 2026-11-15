@@ -56,6 +56,37 @@ const POSITIFS = [
   ['Appelle-moi au 06 12 34 56 78', 'horsPlateforme'],
   ['Mon numéro +33 7 12 34 56 78', 'horsPlateforme'],
   ['wa.me/33612345678', 'horsPlateforme'],
+  // (15 nov., lot securite-ventes) Le faux « j'ai payé, vérifie ton mail », « hors de Vinted », et les QUATRE autres langues.
+  ['J’ai payé, vérifie ton mail', 'fauxPaiement'],
+  ['C’est payé ! Regarde tes e-mails, tu as reçu la confirmation de Vinted', 'fauxPaiement'],
+  ['Paiement effectué. Consulte ta boîte mail stp', 'fauxPaiement'],
+  ['Paie-moi hors de Vinted, c’est plus rapide', 'paiementHors'],
+  ['On continue en dehors de Vinted ?', 'horsPlateforme'],
+  ['I have already paid, check your email', 'fauxPaiement'],
+  ['Ya te he pagado, revisa tu correo', 'fauxPaiement'],
+  ['Ho già pagato, controlla la tua email', 'fauxPaiement'],
+  ['Ich habe schon bezahlt, schau in dein Postfach', 'fauxPaiement'],
+  ['Send me the code you got by SMS please', 'codeSms'],
+  ['Pásame el código de verificación', 'codeSms'],
+  ['Mandami il codice che hai ricevuto via SMS', 'codeSms'],
+  ['Schick mir den Code per SMS', 'codeSms'],
+  ['Your payment is on hold, click the link to confirm', 'fauxBlocage'],
+  ['Il pagamento è bloccato, clicca qui per confermare', 'fauxBlocage'],
+  ['Ship it first and I will pay after', 'envoieDabord'],
+  ['Te pago cuando lo reciba', 'envoieDabord'],
+  ['Ti pago alla consegna', 'envoieDabord'],
+  ['Ich zahle bei Erhalt', 'envoieDabord'],
+  ['Can I pay by bank transfer?', 'paiementHors'],
+  ['Te pago por Bizum', 'paiementHors'],
+  ['Ti faccio un bonifico', 'paiementHors'],
+  ['PayPal Freunde und Familie?', 'paiementHors'],
+  ['My courier will pick it up tomorrow', 'transporteurPerso'],
+  ['Il mio corriere passerà a ritirarlo', 'transporteurPerso'],
+  ['Text me on +44 7700 900123', 'horsPlateforme'],
+  ['Escríbeme al 612 34 56 78, mi número', 'horsPlateforme'],
+  ['Scrivimi su WhatsApp', 'horsPlateforme'],
+  ['Meine Handynummer ist 0151 2345678', 'horsPlateforme'],
+  ['Confirm here: https://vinted-pay-secure.com/de', 'lienImite'],
 ];
 // Les messages NORMAUX : rien ne doit se déclencher.
 const NEGATIFS = [
@@ -87,6 +118,16 @@ const NEGATIFS = [
   'Elle est en très bon état ?',
   'Code promo VINTED10 ça marche ?',
   'Ok je valide l’achat sur Vinted',
+  // (15 nov.) Les messages NORMAUX demandés par Julien, et leurs pareils dans les quatre autres langues.
+  'toujours dispo ?',
+  'tu fais 50 € ?',
+  'J’ai payé, merci !',
+  'J’ai payé sur Vinted, tu as dû recevoir la notification',
+  'Tu recevras un mail de Vinted quand j’aurai payé',
+  'Is it still available?', 'Would you take 50?', 'I paid via Vinted, thanks', 'Payment made on Vinted, thanks', 'Can you send it today?', 'Tracking number 6A12345678901', 'My order number is 12345',
+  '¿Sigue disponible?', '¿Me lo dejas en 50 €?', 'He pagado por Vinted', 'Envíamelo cuando puedas', 'Mi número de seguimiento es 6A12345678901',
+  'Ancora disponibile? Fai 50?', 'Ho pagato su Vinted', 'Puoi spedire con Mondial Relay?', 'Il mio numero di ordine è 55',
+  'Noch verfügbar? Würdest du 50 € nehmen?', 'Ich habe über Vinted bezahlt', 'Kannst du es heute verschicken?', 'Meine Sendungsnummer ist 6A12345678901',
 ];
 
 async function verifier(F, { silence = false } = {}) {
@@ -123,8 +164,13 @@ async function verifier(F, { silence = false } = {}) {
   const langues = {};
   for (const l of ['fr', 'en', 'es', 'it', 'de']) langues[l] = (await import(path.join(__dirname, '..', 'src', 'i18n', 'langues', l + '.js'))).default;
   const cles = new Set();
-  for (const m of F.MOTIFS_ARNAQUE) { cles.add(m.raison); cles.add(m.geste); }
-  for (const c of ['antiArnaque.titre', 'antiArnaque.signaler', 'antiArnaque.autres', 'antiArnaque.compteur', 'antiArnaque.ligne', 'antiArnaque.rienFait', 'antiArnaque.separateur']) cles.add(c);
+  for (const m of F.MOTIFS_ARNAQUE) { cles.add(m.raison); cles.add(m.geste); cles.add(m.phrase); }
+  for (const c of ['antiArnaque.titre', 'antiArnaque.signaler', 'antiArnaque.autres', 'antiArnaque.compteur', 'antiArnaque.ligne', 'antiArnaque.rienFait', 'antiArnaque.separateur', 'antiArnaque.attention', 'antiArnaque.laPlateforme', 'antiArnaque.ouvrirSur']) cles.add(c);
+  // (15 nov.) UNE phrase par motif : le risque ET le geste, le site nommé ({site}) quand elle parle de la plateforme.
+  const sansSite = F.MOTIFS_ARNAQUE.filter((m) => !m.phrase || (!/\{site\}/.test(langues.fr[m.phrase] || '') && !['codeSms', 'lienRaccourci'].includes(m.id)));
+  dit(!sansSite.length, 'T · chaque motif a SA phrase (risque + geste), le site nommé', sansSite.map((m) => m.id).join(','));
+  const deuxPhrases = F.MOTIFS_ARNAQUE.filter((m) => ((langues.fr[m.phrase] || '').match(/[.!?](\s|$)/g) || []).length > 2);
+  dit(!deuxPhrases.length, 'T · la bannière tient en une phrase courte (au plus deux propositions)', deuxPhrases.map((m) => m.id).join(','));
   const manquent = [];
   for (const c of cles) for (const l of Object.keys(langues)) if (langues[l][c] == null) manquent.push(l + ':' + c);
   dit(!manquent.length, 'T · raisons, gestes et libellés présents en fr, en, es, it, de', manquent.join(' '));
@@ -134,6 +180,10 @@ async function verifier(F, { silence = false } = {}) {
   const app = require('./_source-app.cjs').sourceAppDe(path.join(__dirname, '..', 'src', 'App.jsx'));
   const ban = lire('src/AlerteArnaque.jsx').replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
   dit(!/vmrCmd|fetch\(|save\(|signalerVc|withOwner|lireBaseRelue/.test(ban), 'B · la bannière n’agit jamais (aucune commande, aucune écriture, aucune lecture)');
+  // (15 nov.) Sobre : jamais de rouge (le rouge = doublon de N°, §7) — ni dans le composant ni dans sa feuille.
+  const css = lire('src/design/arnaque.css').replace(/\/\*[\s\S]*?\*\//g, '');
+  dit(!/doublon|#D70015|#FF3B30|#FF453A|\bred\b|--vrm-danger|--vrm-red/i.test(ban + css), 'B · la bannière n’est jamais rouge (ambre seulement)');
+  dit(/tr\(a\.phrase/.test(ban) && /data-arnaque-phrase/.test(ban), 'B · la bannière dit UNE phrase (la clé `phrase` du motif)');
   dit(/<AlerteArnaque\b/.test(app) && /<CompteurArnaque\b/.test(app) && /<PastilleArnaque\b/.test(app), 'B · Messages Vinted : bannière sur la conversation + compteur');
   dit(/<AlerteArnaque\b/.test(lire('src/ecrans/MessagesLeboncoin.jsx')), 'B · Leboncoin : bannière');
   dit(/<AlerteArnaque\b/.test(lire('src/ecrans/Vestiaire.jsx')), 'B · Vestiaire : bannière');
