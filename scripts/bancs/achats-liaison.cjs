@@ -230,6 +230,9 @@ async function passe(b, nom, ctxOpts, sombre) {
   await pg.waitForTimeout(2500);
   const pa = await pg.evaluate(() => [...document.querySelectorAll('[data-achat-propose]')].map((e) => ({ k: e.getAttribute('data-achat-propose'), n: e.getAttribute('data-niveau'), tx: e.closest('[data-achat-tx]') ? '' : (e.previousElementSibling && e.previousElementSibling.getAttribute('data-achat-tx')) })));
   await capture(pg, nom, 'achats');
+  await pg.locator('[data-achat-propose]').first().evaluate((e) => e.scrollIntoView({ block: 'center' })).catch(() => {});
+  await pg.waitForTimeout(500);
+  await capture(pg, nom, 'achats-propose');
   // (les liens posés plus haut restent dans l'appareil : l'achat décoché, 93000011, reste à relier ⇒ « N°209 » proposé ;
   //  les trois Air Force identiques ⇒ « possible »)
   dit(pa.some((x) => x.tx === decoche && x.k === 'a:81009' && x.n === 'tres-probable') && pa.filter((x) => /^9300000[567]$/.test(x.tx)).every((x) => x.n === 'possible'), `${nom} · achats · sous un achat sans article : l'article proposé (et son niveau)`, JSON.stringify(pa.slice(0, 6)));

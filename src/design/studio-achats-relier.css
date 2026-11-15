@@ -96,20 +96,20 @@
 .vrm-aar-liste { grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr)); }
 .vrm-aar-carte { gap: 10px; padding: 12px; border-radius: 22px; }
 .vrm-aar-duo { display: grid; grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr); align-items: start; gap: 0 4px; min-width: 0; }
-.vrm-aar-cote { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.vrm-aar-cote { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; padding: 8px 0; }
 .vrm-aar-cote > .vrm-aar-photo { width: 64px; height: 64px; border-radius: 16px; object-fit: cover; flex: none; display: block; margin-bottom: 2px; }
 .vrm-aar-photo-ico { display: grid; place-items: center; color: var(--sb-encre-2, #3F5468); background: var(--sb-creux, #E4EEF7); box-shadow: var(--sb-enfonce, inset 0 1px 2px rgb(18 52 96 / .14)); }
 .vrm-aar-cote .vrm-aar-titre { font-size: 14px; line-height: 18px; }
 .vrm-aar-cote .vrm-aar-sous { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; font-size: 12px; line-height: 16px; overflow-wrap: anywhere; }
 /* L'achat : la même colonne, posée dans un puits (on lit « proposé », pas « acquis »). */
 .vrm-aar-cote.vrm-aar-sugg, .vrm-aar-cote-vide {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 8px; margin: -8px -8px -8px 0; border-radius: 16px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 8px; margin: 0; border-radius: 16px;
   background: var(--sbp-puits, rgb(255 255 255 / .46)); box-shadow: var(--sbp-puits-sh, inset 0 1px 2px rgb(18 52 96 / .13), inset 0 0 0 .5px rgb(18 52 96 / .08));
 }
 .vrm-aar-cote.vrm-aar-sugg > .vrm-aar-photo { width: 64px; height: 64px; }
 .vrm-aar-cote .vrm-aar-sugg-titre { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; font: 600 14px/18px var(--sb-police-texte, inherit); }
 .vrm-aar-cote-vide .vrm-aar-sans { font: 500 13px/17px var(--sb-police-texte, inherit); color: var(--sb-encre-2, #3F5468); }
-.vrm-aar-trait { display: grid; place-items: center; height: 64px; color: var(--sb-encre-2, #3F5468); opacity: .75; }
+.vrm-aar-trait { display: grid; place-items: center; height: 64px; margin-top: 8px; color: var(--sb-encre-2, #3F5468); opacity: .75; }
 
 /* Le niveau et POURQUOI : une plaque + une ligne (deux au plus). */
 .vrm-aar-pourquoi { margin: 0; display: flex; align-items: baseline; gap: 8px; min-width: 0; font: 500 12.5px/17px var(--sb-police-texte, inherit); color: var(--sb-encre-2, #3F5468); }
