@@ -75,7 +75,7 @@ import { creerBrouillonsReglages, dateImportValide } from './brouillonsReglages.
 // ⟦→ ecrans/Reglages.jsx #2⟧
 // (6 nov., vitesse 2) FavorisVinted : chargé à la demande (voir `aLaDemande`).
 import PiloteFavorisAuto from './PiloteFavorisAuto.jsx';
-import { suivi as suiviTravail, lancerTravail as lancerTravailCV } from './suiviTravail.js';   // (11 nov., lot suivi-travail) un travail long suivi (Republier, publier ailleurs, baisse, vacances)
+import { suivi as suiviTravail, lancerTravail as lancerTravailCV, noterGesteFait } from './suiviTravail.js';   // (11 nov., lot suivi-travail) un travail long suivi (Republier, publier ailleurs, baisse, vacances)
 // (11 nov., lot republier-programme) Republier à SON heure (veille du départ, carte) et l'historique par annonce.
 import { ProgrammeRepubVeille, ProgrammesRepubCarte, useProgrammesRepub, prendreDemandeProgramme, ctxLigne } from './RepubProgramme.jsx';
 import { useJournalRepub, BlocHistoriqueRepub } from './HistoriqueRepub.jsx';
@@ -167,6 +167,7 @@ import { annulationsParCompte } from './annulationsCompte.js';
 import { toutSurLeNumero, lireNumeroCherche } from "./rechercheNumero.js";
 import { repriseNumerosRecreation, tableRecrees, archivesAEcrire } from "./repriseNumero.js";
 import { etatAnnonceVinted, enVerificationVinted, raisonPasSelectionnable, actionsPossibles, raisonCommune, ACTIONS_TUILES, ETATS_ANNONCE, liensRepubMain, fusionLiensRecrees, lusDuDressing, candidatsNouvelle, etatSuiviMain, minisSelection, ecritureMini } from "./annoncesActions.js";
+import { etatAncienne } from "./republierGuide.js";   // (15 nov.) « Republier à la main » guidé : l'ancienne encore en ligne ?
 // ⟦→ ecrans/Republier.jsx #1⟧
 // (6 nov., vague 2) Remettre en vente une vente annulée avant l'envoi ; relier l'achat des annonces numérotées.
 import { annuleesChezToi, paireARemettre, fichesAnciennesAnnulees, ligneJournee as ligneAnnuleesJournee, etatRemise, VERDICT_MOTEUR as VERDICT_REMISE } from "./annuleesChezToi.js";
@@ -433,6 +434,7 @@ const AtelierLots = aLaDemande(() => import('./ecrans/Republier.jsx').then((m) =
 const AtelierBrouillon = aLaDemande(() => import('./ecrans/Republier.jsx').then((m) => ({ default: m.AtelierBrouillon })));
 const RepublierALaMain = aLaDemande(() => import('./ecrans/Republier.jsx').then((m) => ({ default: m.RepublierALaMain })));
 const PreparerALaMain = aLaDemande(() => import('./ecrans/Republier.jsx').then((m) => ({ default: m.PreparerALaMain })));
+const PublierALaMain = aLaDemande(() => import('./ecrans/Republier.jsx').then((m) => ({ default: m.PublierALaMain })));   // (15 nov.) une fiche « À publier », guidée
 const BrouillonsVinted = aLaDemande(() => import('./ecrans/Republier.jsx').then((m) => ({ default: m.BrouillonsVinted })));
 const BrouillonsARefaire = aLaDemande(() => import('./ecrans/Republier.jsx').then((m) => ({ default: m.BrouillonsARefaire })));
 const PublierVestiaire = aLaDemande(() => import('./ecrans/Vestiaire.jsx').then((m) => ({ default: m.PublierVestiaire })));
@@ -4288,6 +4290,9 @@ function FichesNeuves({ annonces = null }) {
   // (11 nov., lot annonce-vinted) « Créer sur Vinted » : la sélection et la feuille ouverte.
   const [sel, setSel] = React.useState(() => new Set());
   const [ouvert, setOuvert] = React.useState(null);
+  // (15 nov.) « Publier à la main » guidé : la fiche ouverte (gardée même quand elle sort de la liste,
+  // pour dire « C'est publié »).
+  const [mainF, setMainF] = React.useState(null);
   const toutes0 = load('vrm_fiches_neuves', {}) || {};
   // Le brouillon créé DEPUIS une fiche porte le N° de cette fiche (par l'identifiant rendu
   // par Vinted) : il ne la fait pas sortir de la liste — elle y reste « Brouillon sur Vinted ».
@@ -4297,7 +4302,10 @@ function FichesNeuves({ annonces = null }) {
   for (const n of Object.values(load('vrm_lbc_liens', {}) || {})) if (n) portes.add(cleNum(n));
   for (const n of Object.values(carteNumerosVc(vcCarte('vrm_vc_numeros')))) if (n) portes.add(cleNum(n));
   const liste = fichesAPublier(toutes0, portes, cleNum).filter((f) => etatFicheVinted(f, annonces) !== 'en-ligne');
-  if (!liste.length && !ouvert) return null;
+  if (!liste.length && !ouvert && !mainF) return null;
+  // (15 nov.) La fiche ouverte « à la main » est VUE en ligne quand une annonce lue porte son N°
+  // (la preuve qui la fait sortir de « À publier »), ou quand son brouillon VRM est publié.
+  const vueMain = mainF ? (portes.has(cleNum(mainF.numero)) || etatFicheVinted(mainF, annonces) === 'en-ligne') : false;
   // (10 nov., lot Y) « Retirer » range la fiche (le N° reste servi, §5) ET la met à la corbeille 30 jours :
   // pilule « Annuler » 5 s, puis Paramètres → Corbeille la remet « À publier », même N°.
   const retirer = (f) => {
@@ -4338,6 +4346,7 @@ function FichesNeuves({ annonces = null }) {
           {etatV === 'brouillon'
             ? <button type="button" className="vrm-ao-second" data-fiche-neuve-publier={f.numero} onClick={() => publier(f)}>{tr('creerVinted.publier')}</button>
             : <button type="button" className="vrm-ao-second" data-fiche-neuve-creer={f.numero} onClick={() => setOuvert([f])}>{tr('creerVinted.bouton')}</button>}
+          {etatV === 'a-creer' ? <button type="button" className="vrm-ao-second" data-fiche-neuve-main={f.numero} onClick={() => setMainF(f)}>{tr('rg.publier.bouton')}</button> : null}
           <button type="button" className="vrm-ao-second" data-fiche-neuve-copier={f.numero} onClick={async () => { try { await navigator.clipboard.writeText(texteAColler(f)); toast('Texte copié'); } catch (_) { toast('Copie impossible ici'); } }}>Copier</button>
           <button type="button" className="vrm-ao-second" aria-label={`Retirer la fiche N°${f.numero}`} data-fiche-neuve-retirer={f.numero} onClick={() => retirer(f)}>×</button>
         </div>
@@ -4345,6 +4354,8 @@ function FichesNeuves({ annonces = null }) {
       })}
       {coches.length > 1 && <div className="vrm-ao-neuve-serie"><button type="button" className="vrm-ao-second" data-fiche-neuve-serie={coches.length} onClick={() => setOuvert(coches)}>{tr('creerVinted.lancer', { n: coches.length })}</button></div>}
       {ouvert && <FeuilleCreerVinted fiches={ouvert} saisie onFait={maj} onFermer={() => { setOuvert(null); setSel(new Set()); }}/>}
+      {mainF && <PublierALaMain fiche={mainF} vue={vueMain} onClose={() => setMainF(null)}
+        onFini={(w) => noterGesteFait({ sorte: w.sorte, titre: tr(w.cle, { num: w.article.num || '' }), article: w.article, texte: '' })}/>}
     </section>
   );
 }
@@ -38267,6 +38278,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const nph = i && i.nph != null && i.nph !== '' ? Number(i.nph) : (Number.isFinite(it.photoCount) ? it.photoCount : undefined);
       out.push({ id, uid, compte: nomAcc(it._acc, uid), domain: (it._acc && it._acc.domain) || 'www.vinted.fr', etat,
         raisonPas: raisonPasSelectionnable(etat), titre, prix, photo: it.photo || '', numero: e.numero ? String(e.numero) : '',
+        // (15 nov., « je veux TOUTES les photos ») Les photos que la lecture porte (fiche de la page d'abord),
+        // et combien Vinted en annonce : « Republier à la main » les prend toutes, et dit s'il en manque.
+        photos: (Array.isArray(it.photosDetail) && it.photosDetail.length ? it.photosDetail : (Array.isArray(it.photos) ? it.photos : [])).map((p) => (typeof p === 'string' ? p : ((p && (p.full_size_url || p.url)) || ''))).filter(Boolean).slice(0, 20),
+        ...(nph !== undefined && Number.isFinite(nph) ? { nPhotos: nph } : {}),
         taille: it.size || '', marque: it.brand || '', condition: it.condition || '', createdTs: it.createdTs || null,
         place: it._place || '', brEtat: it._etat || '',
         // Ce que « vérifier avant » peut juger : ce qui a été LU (trois états, §5).
@@ -45596,7 +45611,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if(c.length>1){ toast(tr('ergonomie.republierPlusieurs', { n })); return; }
       const r=actionsPossibles({ selection: c.map(a=>({ id:a.id, uid:a.uid, etat:a.etat })), chrome: undefined, capOk: ()=>true }).find(x=>x.k==='main');
       if(!r || !r.ok){ toast((r && r.raison) || tr('annonces.mainPossibleSelection')); return; }
-      setKitMain(c.map(a=>{ const fl = prixAchatDe(numeros[a.id]||{}, buyByNum); return { ...a, floor: fl!=null && !isNaN(fl) ? Number(fl) : null }; }));
+      // (15 nov.) Le parcours guidé tout de suite (photos, supprimer, créer, c'est republié).
+      setRepubMainFile(null); setRepubMainOuvert(c[0]);
     };
     appliquer();
     const f=()=>setTimeout(appliquer,0);
@@ -51003,7 +51019,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // (10 nov., lot AP) « À la main » : la règle de la tuile « Republier à la main » (chaque paire SON compte connu).
               const r = actionsPossibles({ selection: choisies.map(a=>({ id:a.id, uid:a.uid, etat:a.etat })), chrome: undefined, capOk: ()=>true }).find(x=>x.k==='main');
               if (!r || !r.ok) { toast((r && r.raison) || tr('annonces.mainPossibleSelection')); return; }
-              setKitMain(choisies.map(a=>{ const fl = prixAchatDe(numeros[a.id]||{}, buyByNum); return { ...a, floor: fl!=null && !isNaN(fl) ? Number(fl) : null }; })); }} suivis={suivisMainVisibles} onSuivi={(a)=>setRepubMainOuvert(a)}
+              // (15 nov., parcours guidé) Une feuille par paire, tout de suite : « Paire 1/N », photos, supprimer,
+              // créer, c'est republié. Le kit (toutes d'un coup) reste à un toucher dans la feuille (« Les N d'un coup »).
+              setRepubMainFile(choisies.length>1 ? { liste:choisies, i:0 } : null); setRepubMainOuvert(choisies[0]); }} suivis={suivisMainVisibles} onSuivi={(a)=>setRepubMainOuvert(a)}
             onDetailBrouillons={()=>setBrouillonsOpen(true)}/>
         ) : annSort==='sansachat' ? (
           <AchatsARelier file={fileAchat} achats={fillBuyAchats.loading && !fillBuyAchats.items ? undefined : (fillBuyAchats.items || (accounts.length ? undefined : []))} liens={liensAchats}
@@ -55476,7 +55494,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const fermerM = ()=>{ setRepubMainOuvert(null); setRepubMainFile(null); };
         // La paire suivante garde le prix et le titre choisis dans CETTE ouverture (pas au-delà).
         const suivanteM = fileM && fileM.i < fileM.liste.length-1 ? (encours)=>{ const j=fileM.i+1; setRepubMainFile({ ...fileM, i:j, encours: encours||null }); setRepubMainOuvert(fileM.liste[j]); } : null;
-        return <RepublierALaMain key={paire.uid+':'+paire.id} paire={paireM} rang={rangM} onSuivante={suivanteM} encours={fileM ? fileM.encours || null : null} suivi={s} candidats={cands} etatSuivi={etatS} onDebut={debut} onClose={fermerM} onRelire={()=>loadListings(true)}
+        // (15 nov., parcours guidé) L'ancienne annonce, d'après la lecture de ses annonces (la même que la reprise du N°) :
+        // 'en-ligne' · 'partie' · undefined (pas su). « C'est republié » relu ⇒ une ligne dans « Ce que VRM a fait ».
+        const ancienneM = paire.annulee ? undefined : etatAncienne(paire.id, Array.isArray(listings.items) ? listings.items : null, { erreur: !!listings.error });
+        const finiM = (w)=>{ noterGesteFait({ sorte:w.sorte, titre:tr(w.cle, { num:w.article.num||'' }), article:w.article, texte:tr('rg.journal.texte', { compte:w.compte||'' }) }); };
+        const toutesM = fileM ? ()=>{ const l=fileM.liste.map(a=>{ const fl = prixAchatDe(numeros[a.id]||{}, buyByNum); return { ...a, floor: fl!=null && !isNaN(fl) ? Number(fl) : null }; }); setRepubMainOuvert(null); setRepubMainFile(null); setKitMain(l); } : null;
+        return <RepublierALaMain key={paire.uid+':'+paire.id} paire={paireM} rang={rangM} onSuivante={suivanteM} encours={fileM ? fileM.encours || null : null} suivi={s} candidats={cands} etatSuivi={etatS} ancienne={ancienneM} onFini={finiM} onToutes={toutesM} onDebut={debut} onClose={fermerM} onRelire={()=>loadListings(true)}
           onDelier={()=>poserRepubMain(paire.id, { nouvelId:null, nouveauTitre:null, lieAt:null })}
           onLier={async (c)=>{ const ok = await askConfirm({ title:`C’est bien ${motsVendeur().meme} ?`, desc:`« ${c.titre||'Sans titre'} » est la nouvelle annonce de « ${paire.titre||'l’ancienne'} ».${paire.numero?`\nLe N°${paire.numero} passera dessus dès que l’ancienne ne sera plus du tout sur Vinted.`:''}`, ok:'Oui, c’est elle' });
             if (!ok) return; if (!s) debut(); poserRepubMain(paire.id, { uid:paire.uid, num:paire.numero||'', titre:paire.titre||'', nouvelId:String(c.id), nouveauTitre:c.titre||'', lieAt:new Date().toISOString(), ...marque, ...(s?{}:{ at:new Date().toISOString() }) }); }}/>;

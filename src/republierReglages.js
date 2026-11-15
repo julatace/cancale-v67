@@ -32,6 +32,7 @@
 // (scripts/audit-republier-main.cjs exécute ce module et vérifie qu'aucun des deux n'en
 // garde une copie).
 import { poserEtiquette, lireReglageEtiquette } from './etiquetteNumero.js';
+import { lireReglageNumeroEcrit, lireNumeroTexte, cleNumero } from './numeroEcrit.js';
 
 export const CLE_REGLAGES_REPUB = 'vrm_republier_reglages';
 // Vinted refuse un titre de plus de 100 caractères : on SIGNALE, on ne coupe JAMAIS.
@@ -237,7 +238,10 @@ export function descriptionAvecLettre(desc, lettre) {
 // Rend { titre, description, prix, prixAvant, plancher, tropLong, invalide, etiquette }.
 // « Pas su » reste « pas su » : un prix pas lu reste null (jamais 0), une
 // description absente reste '' (dite par l'écran).
-export function annonceRepubliee(a, reg, { lettre = '', etiquette = null } = {}) {
+// (15 nov., parcours guidé) `numeroEcrit` : « Je numérote moi-même » (`vrm_numero_ecrit`) allumé avec
+// « à la fin de la description » ⇒ le N° en dernière ligne (avant la lettre), sauf s'il y est déjà —
+// la règle de « Créer sur Vinted » (src/annonceVinted.js), pour que la relecture de VRM le retrouve.
+export function annonceRepubliee(a, reg, { lettre = '', etiquette = null, numeroEcrit = null } = {}) {
   const r = reg || REGLAGES_DEFAUT;
   const prixAvant = a.prix != null && Number(a.prix) > 0 ? Number(a.prix) : null;
   const ap = apercuRepub({ titre: String(a.titre || ''), prix: prixAvant, floor: a.floor == null ? null : Number(a.floor) }, r);
@@ -245,9 +249,18 @@ export function annonceRepubliee(a, reg, { lettre = '', etiquette = null } = {})
   const desc0 = descriptionAvecLettre(a.description, r.lettre ? lettre : '');
   const e = poserEtiquette({ titre: titre0, description: desc0 }, a.numero, lireReglageEtiquette(etiquette));
   const titre = e.pose ? e.titre : titre0;
-  const description = e.pose ? e.description : desc0;
+  let description = e.pose ? e.description : desc0;
+  let numeroEcritPose = false;
+  const nE = lireReglageNumeroEcrit(numeroEcrit);
+  if (nE.actif && nE.ou.includes('description') && String(a.numero || '').trim()) {
+    const lu = lireNumeroTexte(description, 'description');
+    if (!(lu && lu.etat === 'lu' && lu.cle === cleNumero(a.numero))) {
+      const f = poserEtiquette({ titre, description }, a.numero, { place: 'desc_fin', forme: 'numero' });
+      if (f.pose) { description = f.description; numeroEcritPose = true; }
+    } else numeroEcritPose = !e.pose;
+  }
   return {
-    titre, description,
+    titre, description, numeroEcritPose,
     prix: ap.prix != null ? ap.prix : prixAvant, prixAvant,
     plancher: ap.plancher, tropLong: titre.length > TITRE_VINTED_MAX, invalide: ap.invalide,
     etiquette: { pose: !!e.pose, place: e.place, refus: e.refus || '', texte: e.etiquette || '' },

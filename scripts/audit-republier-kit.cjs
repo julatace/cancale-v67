@@ -65,11 +65,13 @@ async function auditer(src) {
   const kit = tranche(app, 'function CarteKit(', '\nfunction RepublierVinted(');
   const hook = tranche(app, 'function usePhotosReglees(', '\nfunction CarteKit(');
   const main = tranche(app, 'function RepublierALaMain(', '\nfunction usePhotosReglees(');
+  // (15 nov., parcours guidé) Les photos de la feuille vivent dans `SectionPhotos` (partagée avec « Publier à la main »).
+  const photosMain = tranche(app, 'function SectionPhotos(', '\nfunction RepublierALaMain(');
   dit(vue && kit && hook && main, 'B0 la vue, le kit, les photos et la feuille pas à pas sont dans l’app', `${vue.length}/${kit.length}/${hook.length}/${main.length}`);
   dit(/data-republier-conseil="main"/.test(vue) && /<Bouton variante="primaire" icone="shield" data-republier-main-lancer/.test(vue) && /<Bouton variante="secondaire" data-republier-lancer/.test(vue), 'B1 vue Republier : « À la main » conseillé, bouton principal ; « Par VRM » en second');
   dit(/const annK = annonceRepubliee\(/.test(kit) && /ann: annK/.test(kit) && !/lotAppliquePrix\(|lotAppliqueTitre\(|brightness\(|\.rotate\(/.test(kit), 'B2 le kit écrit chaque texte par LA règle de l’atelier (aucune copie)');
-  dit(/usePhotosReglees\(photos, regs\.photo, p\.numero\)/.test(kit) && /usePhotosReglees\(photos, regs\.photo, paire\.numero\)/.test(main) && /dessinerPhotoReglee\(ctx, img, w, h, r\)/.test(hook) && /navigator\.share\(\{ files/.test(hook), 'B3 les photos du kit et du pas à pas : LE même dessin, menu de partage avec fichiers');
-  dit(/enregistrerUne/.test(hook) && /data-main-photo-une=\{i\}/.test(main) && /onClick=\{\(\) => enregistrerUne\(i\)\}/.test(main), 'B4 une photo préparée s’enregistre aussi seule');
+  dit(/usePhotosReglees\(photos, regs\.photo, p\.numero\)/.test(kit) && /usePhotosReglees\((?:photos|choisies), regs\.photo, paire\.numero[,)]/.test(main) && /dessinerPhotoReglee\(ctx, img, w, h, r\)/.test(hook) && /navigator\.share\(\{ files/.test(hook), 'B3 les photos du kit et du pas à pas : LE même dessin, menu de partage avec fichiers');
+  dit(/enregistrerUne/.test(hook) && /data-main-photo-une=\{[ij]\}/.test(main + photosMain) && /onClick=\{\(\) => enregistrerUne\([ij]\)\}/.test(main + photosMain), 'B4 une photo préparée s’enregistre aussi seule');
   dit(/data-kit-copier-num/.test(kit) && /data-kit-copier-desc/.test(kit) && /copier\('tout', texteKit\(kit\)\)/.test(kit) && /description: x\.lue === true \? x\.ann\.description : ''/.test(kit), 'B5 N° et description à copier, une à une ou toutes (une description pas lue n’est pas copiée)');
   dit(!/vmrCmd|executerCommande|method:\s*'(POST|PUT|DELETE|PATCH)'/.test(kit + hook), 'B6 rien ne part chez Vinted depuis le kit (c’est lui qui publie)');
   dit(/select=title:data->>title,desc:data->>desc,price:data->>price,photos:data->photos/.test(kit) && !/select=data[&`]/.test(kit), 'B7 la fiche se lit en projection (jamais select=data)');

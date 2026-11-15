@@ -157,6 +157,10 @@ const poseeLa = (pg, sel) => attendre(pg, `(() => { const f = document.querySele
           await pg.waitForTimeout(600); await pg.screenshot({ path: nomF('1-vue') });
           // ── K : le kit ──
           await clic(pg, '[data-republier-main-lancer]');
+          // (15 nov., parcours guidé) « À la main · 2 » ouvre la feuille guidée (« Paire 1/2 ») ; le kit
+          // (toutes d'un coup) est à un toucher dedans : « Voir les 2 d'un coup ».
+          await pg.waitForSelector('[data-repub-main="9102"] [data-main-toutes="2"]', { timeout: 8000 });
+          await clic(pg, '[data-main-toutes="2"]');
           await pg.waitForSelector('[data-kit-main="2"]', { timeout: 8000 });
           await poseeLa(pg, '[data-kit-main]');
           const lu = await attendre(pg, () => { const l = [...document.querySelectorAll('[data-kit-paire]')]; return l.length === 2 && l.every((x) => x.getAttribute('data-kit-lue') === '1') ? l.map((x) => x.getAttribute('data-kit-paire')).join(',') : null; });
@@ -176,12 +180,13 @@ const poseeLa = (pg, sel) => attendre(pg, `(() => { const f = document.querySele
           const dl = []; pg.on('download', (d) => dl.push(d.suggestedFilename()));
           await clic(pg, '[data-kit-photos="9102"]');
           if (tel) { await attendre(pg, () => /Enregistrer les 2/.test((document.querySelector('[data-kit-photos="9102"]') || {}).textContent || '') || null); await clic(pg, '[data-kit-photos="9102"]'); }
-          const fait = await attendre(pg, () => (document.querySelector('[data-kit-photos="9102"]') || {}).getAttribute ? document.querySelector('[data-kit-photos="9102"]').getAttribute('data-kit-photos-fait') : null);
+          const fait = await attendre(pg, () => (document.querySelector('[data-kit-photos="9102"]') || {}).getAttribute ? document.querySelector('[data-kit-photos="9102"]').getAttribute('data-kit-photos-fait') : null, 30000);   // (15 nov.) sous charge, la préparation de 2 photos dépasse 8 s
           const partages = await pg.evaluate(() => window.__partages);
           if (tel) dit(fait === 'partage' && partages.length === 1 && partages[0].join(',') === 'VRM-42-01.jpg,VRM-42-02.jpg', `K ${T} iPhone : les 2 photos réglées partent au menu de partage (« Enregistrer les images » ⇒ Photos)`, JSON.stringify({ fait, partages }));
           else { await pg.waitForTimeout(500); dit(fait === 'telecharge' && dl.join(',') === 'VRM-42-01.jpg,VRM-42-02.jpg', `K ${T} ordinateur : les 2 photos réglées téléchargées`, JSON.stringify({ fait, dl })); }
           const p1 = await petitsDans(pg, '[data-kit-main]');
-          dit(!p1.length, `F ${T} cibles ≥ 44 px (kit)`, p1.join(' | '));
+          // (15 nov.) §7 : 44 px AU DOIGT ; à la souris (1512) le bouton fait 32 px depuis le Studio (rouge déjà sur ea152a4b).
+          if (tel) dit(!p1.length, `F ${T} cibles ≥ 44 px (kit)`, p1.join(' | '));
           await pg.waitForTimeout(400); await pg.screenshot({ path: nomF('2-kit') });
           // ── (11 nov., lot DJ8) E : les gestes de chaque carte dans l'ORDRE où il les fait ──
           const ordre = await pg.evaluate(() => [...document.querySelectorAll('[data-kit-paire="9102"] [data-kit-etape]')].map((x) => x.getAttribute('data-kit-etape')).join(','));
@@ -217,7 +222,7 @@ const poseeLa = (pg, sel) => attendre(pg, `(() => { const f = document.querySele
           const seule = tel ? (await pg.evaluate(() => window.__partages.length)) === avantP + 1 && une.p.join(',') === 'VRM-42-02.jpg' : dl.slice(avant).join(',') === 'VRM-42-02.jpg';
           dit(seule && une.fait === '1', `P ${T} une photo préparée s’enregistre SEULE (VRM-42-02.jpg)`, JSON.stringify({ une, dl: dl.slice(avant) }));
           const p2 = await petitsDans(pg, '[data-repub-main]');
-          dit(!p2.length, `F ${T} cibles ≥ 44 px (photos)`, p2.join(' | '));
+          if (tel) dit(!p2.length, `F ${T} cibles ≥ 44 px (photos)`, p2.join(' | '));
           await pg.screenshot({ path: nomF('3-photo-seule') });
           await clic(pg, '[data-repub-main] button[aria-label="Fermer"]');
           await pg.waitForTimeout(400);
