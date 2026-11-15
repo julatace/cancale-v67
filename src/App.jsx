@@ -633,6 +633,8 @@ import { installerFiltreSupprimes, sansComptesSupprimes, lireSupprimes, CLE_SUPP
 import { etatAbonnement, rappelEssai, publierAbonnement, abonnementPublie, suivreAbonnement, installerGardeEcriture, CLE_PARRAIN, CODE_PARRAIN_RE, codeParrainDe, codeParrainDuChemin } from "./abonnement/etatAbonnement.js";
 // (13 nov., lot 54) Le parrainage clair et visible : « Offert par … » à l'inscription, la ligne du menu « Plus ».
 import { lireApercuParrain, lireParrainageOuvert, parrainageOuvertConnu, suivreParrainageOuvert, demanderParrainage } from "./parrainage/parrainage.js";
+// (15 nov.) Le lien d'un PARTENAIRE (`/p/LEO`) : gardé, présenté une fois (src/partenaires/lien.js).
+import { garderCodePartenaire, codePartenaireGarde, presenterCodePartenaire } from "./partenaires/lien.js";
 import { marquerApercu, effacerApercu, bloquerGestes } from "./abonnement/apercu.js";
 // (9 nov.) Solo / Pro : la règle des ventes par offre (api/_lib/plan-regle.js) et son état (src/abonnement/planVentes.js).
 import { venteHorsPlanUid, demarrerPlan, signaturePlan, suivrePlan, reglePlanCourante } from "./abonnement/planVentes.js";
@@ -1603,6 +1605,8 @@ installerGardeHorsLigne(SUPABASE_URL);
 // s'ouvre alors sur l'INSCRIPTION, avec « Offert par <nom choisi> ».
 let PARRAIN_DU_LIEN = '';
 try { const c = codeParrainDe(window.location.search) || codeParrainDuChemin(window.location.pathname); if (c) { localStorage.setItem(CLE_PARRAIN, c); PARRAIN_DU_LIEN = c; } } catch (_) {}   // (11 nov.) + le lien court `/r/CODE`
+let PARTENAIRE_DU_LIEN = '';
+try { PARTENAIRE_DU_LIEN = garderCodePartenaire(localStorage, window.location.search, window.location.pathname); } catch (_) {}   // (15 nov.) programme partenaire
 const codeParrainGarde = () => { try { const c = String(localStorage.getItem(CLE_PARRAIN) || ''); return CODE_PARRAIN_RE.test(c) ? c : ''; } catch (_) { return ''; } };
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -2258,7 +2262,8 @@ const authSignUp  = async (email, password) => {
   // (13 nov., lot 54) Le code de parrainage suit le COMPTE (`user_metadata.parrain`) : le lien de
   // confirmation ouvert sur un autre appareil ne le perd plus. Le serveur décide toujours tout.
   const parrain = codeParrainGarde();
-  const r = await authCall(avecRetour('signup'), { email: String(email).trim().toLowerCase(), password, data: { langue: langueNavigateur(), ...(parrain ? { parrain } : {}) } });
+  const partenaire = codePartenaireGarde(localStorage);   // (15 nov.) le code partenaire suit aussi le compte
+  const r = await authCall(avecRetour('signup'), { email: String(email).trim().toLowerCase(), password, data: { langue: langueNavigateur(), ...(parrain ? { parrain } : {}), ...(partenaire ? { partenaire } : {}) } });
   if (!r.ok) {
     if(r.captcha)return {ok:false,error:r.error};
     // On traduit les erreurs techniques de Supabase : « email rate limit
@@ -19564,7 +19569,7 @@ function AuthScreen() {
   // ouvre directement le bon formulaire (un clic de plus pour s'inscrire, c'est
   // des inscriptions en moins).
   const [mode, setMode] = React.useState(() => (RECOVERY_PENDING || (AUTH_REDIRECT && AUTH_REDIRECT.recovery)) ? 'newpw'
-    : ((/[?&]inscription(=|&|$)/.test(window.location.search || '') || PARRAIN_DU_LIEN) ? 'up'
+    : ((/[?&]inscription(=|&|$)/.test(window.location.search || '') || PARRAIN_DU_LIEN || PARTENAIRE_DU_LIEN) ? 'up'
     // 5.328 : « Mot de passe oublié ? » dans la carte de l'extension.
     : /[?&]mot-de-passe-oublie(=|&|$)/.test(window.location.search || '') ? 'reset' : 'in')); // in · up · reset · newpw
   const [email, setEmail] = React.useState('');
@@ -20309,6 +20314,14 @@ function BandeauAbonnement({ setTab }) {
         // (13 nov., lot 54) Un refus définitif est DIT une fois (« Tu ne peux pas être ton propre parrain. »…).
         else if (j && typeof j.message === 'string' && j.message) toast(j.message);
       }).catch(() => {});
+  }, []);
+  // (15 nov.) Le code d'un PARTENAIRE gardé depuis son lien (ou posé sur le compte à l'inscription) :
+  // présenté UNE fois, le serveur décide (src/partenaires/lien.js) ; un refus définitif est dit une fois.
+  React.useEffect(() => {
+    if (!(AUTH.session && AUTH.session.access_token)) return;
+    presenterCodePartenaire({ fetcher: (u, o) => fetch(u, o), enTete: enTeteSession(), stock: localStorage, uid: (AUTH.user && AUTH.user.id) || '',
+      duCompte: (AUTH.user && AUTH.user.user_metadata && AUTH.user.user_metadata.partenaire) || '',
+      dire: (sorte, j) => { if (sorte === 'ok') toast(tr('partenaires.rattache.ok', { code: j.code || '' })); else if (j && typeof j.message === 'string' && j.message) toast(j.message); } }).catch(() => {});
   }, []);
   const uid = (AUTH.user && AUTH.user.id) || '';
   const e = etatAbonnement(x === null ? undefined : x);
