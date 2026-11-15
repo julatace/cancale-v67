@@ -3,6 +3,7 @@ import ecran_journee from './en/journee.js';
 import ecran_confort from './en/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_studio from './en/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
 import ecran_capte from './en/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
+import ecran_parametres from './en/parametres.js';   // (15 nov.) Paramètres rangés en dix catégories
 import ecran_idees from './en/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './en/ventes.js';
 import ecran_commun from './en/commun.js';
@@ -457,10 +458,10 @@ export default {
   "reglages.donnees.droits": "Your other rights:",
   "reglages.donnees.exporter": "Export",
   "reglages.donnees.exporterOu.dessous": "“Full backup” below",
-  "reglages.donnees.exporterOu.reglages": "“Full backup” (Settings)",
+  "reglages.donnees.exporterOu.reglages": "“Full backup”, above",
   "reglages.donnees.lib": "Export my data",
   "reglages.donnees.supprimer": "Delete your account",
-  "reglages.donnees.supprimerOu": "“Delete my account”, at the very bottom",
+  "reglages.donnees.supprimerOu": "“Delete my account”, at the bottom of My account",
   "reglages.double.active": "On",
   "reglages.double.activeN": { one: "On · {n} device", other: "On · {n} devices" },
   "reglages.double.inactive": "Off",
@@ -555,8 +556,6 @@ export default {
   "reglages.sauvegarde.aRefaire": " · redo it",
   "reglages.sauvegarde.derniere": "Last backup: {quand}",
   "reglages.sauvegarde.jamais": "Never backed up — tap “Full backup”",
-  "reglages.securite.desc": "Check that only you can read and write your data.",
-  "reglages.securite.lib": "Data security",
   "reglages.signalements.lib": "Reports received",
   "reglages.simulation.lib": "Simulate an account creation",
   "reglages.simulation.desc": "A new seller’s journey, on made-up accounts.",
@@ -2254,4 +2253,5 @@ export default {
   ...ecran_confort,
   ...ecran_studio,
   ...ecran_capte,
+  ...ecran_parametres,
 };

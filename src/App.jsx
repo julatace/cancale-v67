@@ -905,6 +905,7 @@ import "./styles-refonte-ms.css";   // (14 nov., refonte) Messages, E-mails, Sto
 // styles-systeme et styles-tablette). Jetons --sb-*, quatre formes de bouton, la coque (docs/design/studio-bleu-clair.md).
 import "./design/studio-polices.css";
 import "./design/studio.css";
+import "./design/studio-parametres.css";   // (15 nov.) Paramètres en dix catégories — après studio.css et studio-reste.css
 import "./design/polices.js";   // le préchargement des deux polices, avec le morceau de l'app seulement
 import "./design/studio-paires.css";   // (14 nov., « Studio bleu clair ») Paires : Annonces, Stock, Inventaire, la fiche — EN DERNIER (docs/passation/2026-11-14-studio-paires.md)
 // (14 nov., Studio bleu clair) Ma journée en grille Bento : la tête, l'affiche, les tuiles et ce qu'elles déplient —
@@ -16867,6 +16868,9 @@ const ICON_PATHS = {
   lock:   <><rect x="4.5" y="10.5" width="15" height="10" rx="2.2"/><path d="M8 10.5V7.6a4 4 0 0 1 8 0v2.9"/><path d="M12 14.6v2"/></>,
   texte:  <><path d="M3.5 18.5 8 6.5l4.5 12"/><path d="M5.2 14.2h5.6"/><path d="M14.5 18.5l3-8 3 8"/><path d="M15.6 15.8h3.8"/></>,
   archive:<><rect x="3.5" y="4" width="17" height="4.5" rx="1.2"/><path d="M5 8.5v9.5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5"/><path d="M10 12.5h4"/></>,
+  // (15 nov., Paramètres) « Revoir » (une flèche qui revient) et « Conseils » (une ampoule) : une icône par ligne.
+  revoir: <><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.5 4.5v4h4"/></>,
+  ampoule: <><path d="M9.5 17.5h5"/><path d="M10.5 20.5h3"/><path d="M12 3.5a5.8 5.8 0 0 0-3.4 10.5c.6.5.9 1.1.9 1.8v.2h5v-.2c0-.7.3-1.3.9-1.8A5.8 5.8 0 0 0 12 3.5Z"/></>,
 };
 // Tuile d'icône façon réglages iOS : un carré arrondi teinté, une icône au
 // trait dedans. C'est ce détail qui sépare un écran de réglages d'une liste de
