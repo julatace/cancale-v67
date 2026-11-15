@@ -126,4 +126,13 @@
 
 /* ── 16. MA JOURNÉE (ordinateur) : « 3 ventes » touchait le bas du grand « 75 € » (l'affiche déborde de sa ligne). */
 .sj-journee[data-sj-ordi="1"] .vrm-jv2-faits { margin-top: 22px !important; }
+
+/* ── 17. FACTURES (téléphone) : « Facture » était un bloc-bouton SOUS chaque vente (la rangée passait à la ligne) ; il
+   tient dans la rangée, à droite du montant — 40 ventes, 40 lignes de moins à faire défiler. Même bouton, même geste. */
+@media (max-width: 600px) {
+  [data-fe-vente] { flex-wrap: nowrap !important; }
+  [data-fe-vente] > div:first-child { flex: 1 1 0 !important; min-width: 0 !important; }
+  [data-fe-vente]:has([data-spdp-envoyer], [data-spdp-relire]) { flex-wrap: wrap !important; }
+  [data-fe-vente] [data-fe-facture] { flex: 0 0 auto !important; min-height: 44px !important; padding: 0 12px !important; }
+}
 }
