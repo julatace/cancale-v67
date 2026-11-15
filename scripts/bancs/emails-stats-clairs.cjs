@@ -1,3 +1,4 @@
+require('./_reglages-compat.cjs');   // (15 nov.) Paramètres en catégories : la catégorie d'une rangée touchée avant elle
 // ═══════════════════════════════════════════════════════════════════════════
 // BANC : E-MAILS ET STATISTIQUES, CLAIRS POUR UN NON-TECHNICIEN (2 nov.)
 //        node scripts/bancs/emails-stats-clairs.cjs   (après la construction)

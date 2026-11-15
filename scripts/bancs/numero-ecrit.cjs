@@ -1,3 +1,4 @@
+require('./_reglages-compat.cjs');   // (15 nov.) Paramètres en catégories : la catégorie d'une rangée touchée avant elle
 // ════════════════════════════════════════════════════════════════════════════
 //  BANC « JE NUMÉROTE MOI-MÊME DANS MES ANNONCES » (7 nov.).
 //  Julien, 7 novembre : « la personne met son numéro d'étiquetage à la fin de sa

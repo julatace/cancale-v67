@@ -165,7 +165,7 @@ if (arg.includes('--prouve')) {
   dit(nav && /item\.site\s*\?\s*logoPlateforme\(item\.site\)/.test(nav[1]) && /if\(logo\) return <span className="vrm-nav-logo"/.test(nav[1]), 'une entrée de site (Leboncoin, eBay, Vestiaire) porte le logo du site (≠ « Prix à baisser », ≠ Annonces, ≠ Ventes)');
   // Paramètres : une icône par ligne, dans chaque onglet.
   const bloc = (debut, fin) => { const i = A.indexOf(debut), j = A.indexOf(fin, i + 1); return i >= 0 && j > i ? A.slice(i, j) : ''; };
-  for (const [nom, debut, fin] of [['Réglages', 'const GROUPES_REGLAGES = [', 'const GROUPES_COMPTE'], ['Mon compte', 'const GROUPES_COMPTE = ', 'const GROUPES_ABONNEMENT']]) {
+  for (const [nom, debut, fin] of [['Réglages', 'const GROUPES_REGLAGES = [', 'const GROUPES_COMPTE'], ['Mon compte', 'const GROUPES_COMPTE = ', '  const groupes = [...GROUPES_COMPTE']]) {
     // (Mon compte a deux formes : avec compte VRM, et sans — la seconde redit « Données et conditions ».)
     const b0 = bloc(debut, fin); const b = b0.split('\n  ] : [')[0];
     const ics = [...b.matchAll(/\bic:'(\w+)'/g)].map((m) => m[1]);

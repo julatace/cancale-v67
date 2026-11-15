@@ -38,7 +38,7 @@ const MUTATIONS = {
   'mouvement-force': ['src/composants/AideAnimation.jsx', "window.matchMedia('(prefers-reduced-motion: reduce)').matches", 'false'],
   'feuille-pas-montee': ['src/aideFiches.js', "aller: { lien: '?tab=settings', feuille: 'vrm:visite' }", "aller: { lien: '?tab=settings', feuille: 'vrm:tout-imprimer' }"],
 };
-const FICHIERS = ['src/aideFiches.js', 'src/aideAnimations.js', 'src/aideEtapes.js', 'src/aideEcrans.js', 'src/profilVendeur.js', 'src/navigationTache.js', 'src/argent.js', 'src/App.jsx', 'src/ecrans/Reglages.jsx', 'src/composants/AideEcran.jsx', 'src/composants/AideAnimation.jsx', 'src/composants/aide-ecran.css'];
+const FICHIERS = ['src/aideFiches.js', 'src/aideAnimations.js', 'src/aideEtapes.js', 'src/aideEcrans.js', 'src/profilVendeur.js', 'src/navigationTache.js', 'src/argent.js', 'src/App.jsx', 'src/ecrans/Reglages.jsx', 'src/parametres/categories.js', 'src/composants/AideEcran.jsx', 'src/composants/AideAnimation.jsx', 'src/composants/aide-ecran.css'];
 
 const arg = process.argv.slice(2);
 const mut = (arg.find((a) => a.startsWith('--mutation=')) || '').split('=')[1] || '';
@@ -141,8 +141,13 @@ const dit = (c, m) => { if (c) { verts++; console.log('  ✓ ' + m); } else { ro
   // Les feuilles de la liste sont écoutées par la coque (montée tout le temps), pas par un écran à la demande.
   const feuillesCoque = FEUILLES_AIDE.filter((e) => { const i = app.indexOf(`addEventListener('${e}'`); return i > 0 && !reg.includes(`addEventListener('${e}'`); });
   dit(feuillesCoque.length === FEUILLES_AIDE.length, 'les feuilles ouvertes par « M\'y emmener » sont écoutées par la coque');
-  dit(/const rg=p\.get\('reglage'\); if\(t==='settings'&&rg&&REGLAGES_AIDE\.includes\(rg\)\)\{ DEMANDE_REGLAGE_SOUS\.id=rg;/.test(app), 'la coque ouvre le panneau `reglage=` (liste fermée)');
-  dit(/if\(id==='abonnement'\)\{ setVueBrute\('abonnement'\)/.test(reg) && /\['appareils','double','equipe'(?:,'[a-z]+')*\]\.includes\(id\)\?'compte':'reglages'/.test(reg), 'Réglages sert l’abonnement et les panneaux de « Compte »');
+  // (15 nov., Paramètres en catégories) La liste reste FERMÉE : `REGLAGES_AIDE` + les liens nommés de
+  // src/parametres/categories.js (`LIENS_PROFONDS`) ; Réglages ouvre la catégorie du réglage puis son panneau
+  // (`allerAuReglage`), l'abonnement et les panneaux de « Compte » rangés dans la catégorie « compte ».
+  const cats = lire('src/parametres/categories.js');
+  dit(/const rg=p\.get\('reglage'\); if\(t==='settings'&&rg&&\(REGLAGES_AIDE\.includes\(rg\)\|\|LIENS_REGLAGES\.includes\(rg\)\)\)\{ DEMANDE_REGLAGE_SOUS\.id=rg;/.test(app) && /export const LIENS_PROFONDS = \[/.test(cats), 'la coque ouvre le panneau `reglage=` (liste fermée)');
+  const compteCat = (/\{ id: 'compte', ic: '[a-zA-Z0-9]+', groupes: \[([\s\S]*?)\n  \] \},/.exec(cats) || [])[1] || '';
+  dit(/const r=allerAuReglage\(id\);/.test(reg) && ['abonnement', 'appareils', 'double', 'equipe', 'fermer'].every((x) => compteCat.includes(`'${x}'`)), 'Réglages sert l’abonnement et les panneaux de « Compte »');
   const envois = []; const ok = emmener(FICHES_AIDE.find((f) => f.aller.feuille), { envoyer: (n, d) => envois.push([n, d]), plusTard: (fn) => fn() });
   dit(ok && envois.length === 2 && envois[0][0] === 'vrm:aller' && envois[0][1].startsWith('?tab=') && FEUILLES_AIDE.includes(envois[1][0]), 'emmener : le chemin des liens, puis la feuille');
   dit(emmener({ aller: { lien: 'https://exemple.fr' } }, { envoyer: () => envois.push(1) }) === false, 'emmener refuse un lien qui n’est pas `?tab=`');

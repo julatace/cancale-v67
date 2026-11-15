@@ -1,3 +1,4 @@
+require('./_reglages-compat.cjs');   // (15 nov.) Paramètres en catégories : la catégorie d'une rangée touchée avant elle
 // ── BANC : LA BEAUTÉ (8 nov. 2026) ────────────────────────────────────────────
 //        npm run build && node scripts/bancs/beaute.cjs
 //        BEAUTE_SEUL=J,C,T,S,A,P  (sections)   SHOTS=dossier  BANC_PORT=4471

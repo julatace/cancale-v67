@@ -4,9 +4,13 @@ import ecran_confort from './de/confort.js';   // (14 nov., lots 117–130) conf
 import ecran_studio from './de/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
 import ecran_correspondances from './de/correspondances.js';   // (15 nov.) Publier partout : catégories qui correspondent
 import ecran_capte from './de/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
+<<<<<<< HEAD
 import ecran_renvoyer from './de/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_retrait_ailleurs from './de/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
 import ecran_finition from './de/finition.js';   // (15 nov.) la finition écran par écran
+=======
+import ecran_parametres from './de/parametres.js';   // (15 nov.) Paramètres rangés en dix catégories
+>>>>>>> origin/claude/parametres
 import ecran_idees from './de/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './de/ventes.js';
 import ecran_commun from './de/commun.js';
@@ -465,10 +469,10 @@ export default {
   "reglages.donnees.droits": "Deine weiteren Rechte:",
   "reglages.donnees.exporter": "Exportieren",
   "reglages.donnees.exporterOu.dessous": "„Komplettes Backup“ unten",
-  "reglages.donnees.exporterOu.reglages": "„Komplettes Backup“ (Einstellungen)",
+  "reglages.donnees.exporterOu.reglages": "„Komplettes Backup“, weiter oben",
   "reglages.donnees.lib": "Meine Daten exportieren",
   "reglages.donnees.supprimer": "Dein Konto löschen",
-  "reglages.donnees.supprimerOu": "„Mein Konto löschen“, ganz unten",
+  "reglages.donnees.supprimerOu": "„Mein Konto löschen“, unten in Mein Konto",
   "reglages.double.active": "Aktiv",
   "reglages.double.activeN": { one: "Aktiv · {n} Gerät", other: "Aktiv · {n} Geräte" },
   "reglages.double.inactive": "Aus",
@@ -563,8 +567,6 @@ export default {
   "reglages.sauvegarde.aRefaire": " · erneuern",
   "reglages.sauvegarde.derniere": "Letztes Backup: {quand}",
   "reglages.sauvegarde.jamais": "Nie gesichert — tippe „Komplettes Backup“",
-  "reglages.securite.desc": "Prüfen, dass nur du deine Daten lesen und schreiben kannst.",
-  "reglages.securite.lib": "Datensicherheit",
   "reglages.signalements.lib": "Erhaltene Meldungen",
   "reglages.simulation.lib": "Kontoerstellung simulieren",
   "reglages.simulation.desc": "Der Weg eines neuen Verkäufers, mit erfundenen Konten.",
@@ -2262,8 +2264,12 @@ export default {
   ...ecran_confort,
   ...ecran_studio,
   ...ecran_capte,
+<<<<<<< HEAD
   ...ecran_retrait_ailleurs,
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_finition,
+=======
+  ...ecran_parametres,
+>>>>>>> origin/claude/parametres
 };

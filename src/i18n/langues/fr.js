@@ -9,9 +9,13 @@ import ecran_confort from './fr/confort.js';   // (14 nov., lots 117–130) conf
 import ecran_studio from './fr/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
 import ecran_correspondances from './fr/correspondances.js';   // (15 nov.) Publier partout : catégories qui correspondent
 import ecran_capte from './fr/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
+<<<<<<< HEAD
 import ecran_renvoyer from './fr/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_retrait_ailleurs from './fr/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
 import ecran_finition from './fr/finition.js';   // (15 nov.) la finition écran par écran
+=======
+import ecran_parametres from './fr/parametres.js';   // (15 nov.) Paramètres rangés en dix catégories
+>>>>>>> origin/claude/parametres
 import ecran_idees from './fr/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './fr/ventes.js';
 import ecran_commun from './fr/commun.js';
@@ -470,10 +474,10 @@ export default {
   "reglages.donnees.droits": "Tes autres droits :",
   "reglages.donnees.exporter": "Exporter",
   "reglages.donnees.exporterOu.dessous": "« Sauvegarde complète » ci-dessous",
-  "reglages.donnees.exporterOu.reglages": "« Sauvegarde complète » (Réglages)",
+  "reglages.donnees.exporterOu.reglages": "« Sauvegarde complète », plus haut",
   "reglages.donnees.lib": "Exporter mes données",
   "reglages.donnees.supprimer": "Supprimer ton compte",
-  "reglages.donnees.supprimerOu": "« Supprimer mon compte », tout en bas",
+  "reglages.donnees.supprimerOu": "« Supprimer mon compte », en bas de Mon compte",
   "reglages.double.active": "Activée",
   "reglages.double.activeN": { one: "Activée · {n} appareil", other: "Activée · {n} appareils" },
   "reglages.double.inactive": "Désactivée",
@@ -568,8 +572,6 @@ export default {
   "reglages.sauvegarde.aRefaire": " · à refaire",
   "reglages.sauvegarde.derniere": "Dernière sauvegarde : {quand}",
   "reglages.sauvegarde.jamais": "Jamais sauvegardé — touche « Sauvegarde complète »",
-  "reglages.securite.desc": "Vérifier que toi seul peux lire et écrire tes données.",
-  "reglages.securite.lib": "Sécurité des données",
   "reglages.signalements.lib": "Signalements reçus",
   "reglages.simulation.lib": "Simuler une création de compte",
   "reglages.simulation.desc": "Le parcours d’un nouveau vendeur, sur des comptes fictifs.",
@@ -2267,8 +2269,12 @@ export default {
   ...ecran_confort,
   ...ecran_studio,
   ...ecran_capte,
+<<<<<<< HEAD
   ...ecran_retrait_ailleurs,
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_finition,
+=======
+  ...ecran_parametres,
+>>>>>>> origin/claude/parametres
 };
