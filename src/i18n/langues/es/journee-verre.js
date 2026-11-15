@@ -61,4 +61,9 @@ export default {
   "annonces.v.aBaisser": "{n} d · a bajar",
   "annonces.v.taille": "T{t}",
   "annonces.v.jours": "{n} d",
+  "nav.groupe.ranger": "Guardar",
+  "nav.groupe.compter": "Contar",
+  "nav.settings": "Ajustes",
+  "sj.v.ensuite": "Después, en orden",
+  "sj.v.cetteSemaine": "esta semana",
 };

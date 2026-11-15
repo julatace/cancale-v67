@@ -17441,6 +17441,8 @@ const ENTREES_PAIRES=[
 ];
 // Messages : dans le menu du haut (téléphone) et dans la colonne (ordinateur), groupe « Gérer ».
 const ONGLET_MESSAGES=entreeNav({id:'messages', icon:'chat', label:'Messages'});
+// (15 nov., refonte-journee) Paramètres au pied du rail de l'ordinateur (la maquette validée).
+const ONGLET_PARAMETRES=entreeNav({id:'settings', icon:'gear', label:'Paramètres'});
 // Les tâches de la colonne de l'ordinateur : celles de la barre, sans l'alias « Paires » (ses trois écrans
 // ont leur groupe, juste dessous).
 const NAV_TACHES=[BOTTOM_TABS[0],BOTTOM_TABS[2],ONGLET_ARGENT];
@@ -19095,18 +19097,35 @@ function SideBar({ tab, setTab, entreprise, sites, badges }) {
       {(offre || (nomCoque.masque === false && nomCompte && mail)) ? <span className="vrm-nav-compte-sous">{offre ? <span className="vrm-nav-offre" data-nav-offre={planLu}>{offre}</span> : null}{nomCoque.masque === false && nomCompte && mail ? <span className="vrm-nav-compte-mail vrm-sensible" data-stream-type="compte" title={mail}>{mail}</span> : null}</span> : null}
     </span>
   </button> : null;
-  return <nav ref={railRef} className="vrm-sidebar vrm-atelier-rail" data-nav-v2="" aria-label={tr('coque.navigationPrincipale')} style={{width:NAV_LARGEUR,background:C.sidebar||C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
+  return <nav ref={railRef} className="vrm-sidebar vrm-atelier-rail vrm-rail-verre" data-nav-v2="" data-rail-verre="" aria-label={tr('coque.navigationPrincipale')} style={{width:NAV_LARGEUR,background:C.sidebar||C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
     <span ref={indRef} className="vrm-nav-indicateur" data-nav-indicateur="" aria-hidden="true"/>
     <div className="vrm-sidebar-brand"><span className="vrm-nav-tuile" aria-hidden="true"><img src="/logo-vrm-96.png" alt="" width="32" height="32" decoding="async"/></span><span className="vrm-sidebar-mot" role="img" aria-label="VRM">VRM</span></div>
     <div className="vrm-rail-scroll" ref={zoneRef}>
-      <div className="vrm-rail-platforms" data-nav-taches="">{NAV_TACHES.map(bouton)}</div>
-      {groupes.filter(g => g.nom !== 'Moi').map(groupe)}
+      {/* (15 nov., refonte-journee — le rail de la maquette ordinateur validée) Ma journée, puis VENDRE (Ventes, Annonces,
+          Messages, E-mails), RANGER (Stock, Achats), COMPTER (Argent) : les MÊMES entrées qu'hier (rien de retiré : une
+          entrée que ce classement ne nomme pas suit dans « Compter »), les mêmes data-nav-entree, les mêmes pastilles. */}
+      {(() => {
+        const entrees = [...NAV_TACHES, ...groupes.filter(g => g.nom !== 'Moi').flatMap(g => g.items)];
+        const pris = new Set();
+        const prendre = (ids) => ids.map(id => entrees.find(t => t.id === id && !pris.has(cleEntree(t)))).filter(Boolean).map(t => { pris.add(cleEntree(t)); return t; });
+        const tete = prendre(['journee']);
+        const R = [groupeNav({ cle: 'vendre', nom: 'vendre', items: prendre(['ventes', 'annonces', 'messages', 'emails']) }), groupeNav({ cle: 'ranger', nom: 'ranger', items: prendre(['garage', 'achats']) })];
+        const compter = prendre(['compta']);
+        const reste = entrees.filter(t => !pris.has(cleEntree(t)));
+        R.push(groupeNav({ cle: 'compter', nom: 'compter', items: [...compter, ...reste] }));
+        return <>
+          <div className="vrm-rail-platforms" data-nav-taches="">{tete.map(bouton)}</div>
+          {R.filter(g => g.items.length).map(groupe)}
+        </>;
+      })()}
     </div>
     {/* (1er nov., finition) « Moi » (Communauté, Paramètres) reste posé au pied
         de la colonne : une fenêtre basse fait défiler le reste, jamais
         Paramètres coupé par le bas. Même ordre, mêmes entrées. (9 nov., DA 5)
         Le pied est une carte : le compte, puis Communauté et Paramètres. */}
-    <div className="vrm-rail-pied">{carteCompte}{groupes.filter(g => g.nom === 'Moi').map(groupe)}</div>
+    {/* Le pied : Paramètres (la maquette validée le remet en entrée ; le menu du profil le garde aussi), le compte,
+        puis Communauté. */}
+    <div className="vrm-rail-pied"><div className="vrm-rail-management vrm-rail-reglages" data-nav-groupe="reglages">{bouton(ONGLET_PARAMETRES)}</div>{carteCompte}{groupes.filter(g => g.nom === 'Moi').map(groupe)}</div>
   </nav>;
 }
 

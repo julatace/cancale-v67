@@ -61,4 +61,9 @@ export default {
   "annonces.v.aBaisser": "{n} g · da ribassare",
   "annonces.v.taille": "T{t}",
   "annonces.v.jours": "{n} g",
+  "nav.groupe.ranger": "Riporre",
+  "nav.groupe.compter": "Contare",
+  "nav.settings": "Impostazioni",
+  "sj.v.ensuite": "Poi, in ordine",
+  "sj.v.cetteSemaine": "questa settimana",
 };
