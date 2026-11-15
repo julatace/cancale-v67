@@ -80,7 +80,7 @@ function DessinIphone() {
       <rect x="112" y="120" width="96" height="44" rx="12" className="pn-d-carte" />
       <text x="160" y="139" textAnchor="middle" className="pn-d-carte-t">{tr('pn.dessin.ouvrirUrl')}</text>
       <text x="160" y="154" textAnchor="middle" className="pn-d-nom">{DOMAINE_VINTED}</text>
-      <path d="M185 82 C 200 100, 196 112, 186 120" className="pn-d-fleche" />
+      <path d="M188 104 C 196 108, 194 114, 186 120" className="pn-d-fleche" />
     </svg>
   );
 }
