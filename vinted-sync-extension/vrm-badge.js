@@ -427,6 +427,7 @@
   .ap-liste li.coche-l .vig { width: 44px; height: 44px; }
   .ap-liste .quand { color: var(--doux); white-space: nowrap; }
   .sg { white-space: nowrap; }
+  .mois .mois-l .seg { display: inline; margin: 0; }   /* le résumé du mois garde ses « · » en ligne (la grille `.seg` est celle des touches) */
   span.vig { background: var(--creux); box-shadow: inset 0 0 0 .5px rgb(var(--o) / .08); }
   .ap-tout { margin: 0 2px 4px; }
   .ap-tout .ap-lbl { margin: 0; }
