@@ -125,19 +125,24 @@ const SONDE = () => {
   const o = window.__ouv = { images: [], pret: null, demarrageParti: null, erreurs: [], nav: performance.now() };
   addEventListener('error', (e) => { try { o.erreurs.push(String((e && (e.message || (e.error && e.error.message))) || 'erreur').slice(0, 200)); } catch (_) {} }, true);
   addEventListener('unhandledrejection', (e) => { try { o.erreurs.push(String((e && e.reason && (e.reason.message || e.reason)) || 'rejet').slice(0, 200)); } catch (_) {} });
-  const fondEn = (x, y) => {
-    let el = document.elementFromPoint(x, y);
-    while (el) {
-      const cs = getComputedStyle(el);
-      const img = cs.backgroundImage && cs.backgroundImage !== 'none' ? cs.backgroundImage : '';
-      const c = cs.backgroundColor;
-      const opaque = c && !/rgba\(.*,\s*0\)$/.test(c) && c !== 'transparent';
-      const op = Number(cs.opacity);
-      if ((img && /gradient/.test(img)) || opaque) return { tag: el.id || el.className && String(el.className).slice(0, 40) || el.tagName, c, img: img ? img.slice(0, 60) : '', op };
-      el = el.parentElement;
+  // Ce qui est SOUS l'écran de démarrage en (x, y) : le premier élément (hors de lui) qui peint un fond
+  // opaque ou un dégradé, sinon le fond du document (`body`, puis `html`). C'est ce qui transparaît pendant
+  // son fondu : un blanc pur ici = un éclair blanc à la sortie.
+  const peint = (el) => {
+    const cs = getComputedStyle(el);
+    const img = cs.backgroundImage && cs.backgroundImage !== 'none' && /gradient|url\(/.test(cs.backgroundImage) ? cs.backgroundImage : '';
+    const c = cs.backgroundColor;
+    const opaque = c && !/rgba\([^)]*,\s*0\)$/.test(c) && c !== 'transparent';
+    return (img || opaque) ? { tag: (el.id ? '#' + el.id : String(el.className || el.tagName).split(' ')[0]).slice(0, 40), c, img: img ? img.slice(0, 50) : '' } : null;
+  };
+  const sousDemarrage = (x, y) => {
+    const boot = document.getElementById('vrm-demarrage');
+    for (const el of document.elementsFromPoint(x, y)) {
+      if (boot && (el === boot || boot.contains(el))) continue;
+      if (el === document.body || el === document.documentElement) break;
+      const f = peint(el); if (f) return f;
     }
-    const b = getComputedStyle(document.body || document.documentElement);
-    return { tag: 'body', c: b.backgroundColor, img: b.backgroundImage.slice(0, 60), op: 1 };
+    return peint(document.body) || peint(document.documentElement) || { tag: 'canevas', c: 'rgb(255, 255, 255)', img: '' };
   };
   const tick = () => {
     const t = Math.round(performance.now());
@@ -146,9 +151,9 @@ const SONDE = () => {
         const d = document.getElementById('vrm-demarrage');
         const parti = !d || d.hasAttribute('data-sortie');
         if (parti && o.demarrageParti == null) o.demarrageParti = t;
-        const f = fondEn(Math.round(innerWidth / 2), 6);
         const fd = d ? getComputedStyle(d) : null;
-        o.images.push({ t, d: d ? (parti ? 'sortie' : 'la') : 'non', dop: fd ? Number(fd.opacity) : null, f });
+        o.images.push({ t, d: d ? (parti ? 'sortie' : 'la') : 'non', dop: fd ? Number(fd.opacity) : null,
+          haut: sousDemarrage(Math.round(innerWidth / 2), 6), centre: sousDemarrage(Math.round(innerWidth / 2), Math.round(innerHeight / 2)) });
         if (o.images.length > 900) o.images.splice(0, 300);
       }
       const pret = document.querySelector('[data-attente-ecran="journee"][data-attente="pret"], [data-attente-ecran="journee"][data-attente="plafond"]');
@@ -279,17 +284,17 @@ const blanc = (c) => { const x = rgb(c); return !!x && x[0] > 235 && x[1] > 235 
       await pg.goto(URL0, { waitUntil: 'commit' });
       const film = await filmer(pg);
       await pg.waitForSelector('#vrm-demarrage', { timeout: 20000 }).catch(() => {});
-      await attendre(400); await shot(pg, n + '-chargement-' + (sombre ? 'sombre' : 'clair'));
+      await attendre(300);   // (pas de capture ici : avec le film en cours, elle prend des secondes — scénario 6)
       const boot = await pg.evaluate(() => {
-        const d = document.getElementById('vrm-demarrage'); if (!d) return null;
+        const d = document.getElementById('vrm-demarrage'); if (!d) return { absent: document.readyState + ' ' + location.href + ' ' + (document.body ? document.body.innerHTML.length : -1) + ' ' + performance.now() };
         const cs = getComputedStyle(d); const m = document.querySelector('meta[name="theme-color"]');
         const logo = d.querySelector('img'); const r = logo ? logo.getBoundingClientRect() : null;
         return { img: cs.backgroundImage, couleur: cs.backgroundColor, theme: m ? m.getAttribute('content') : '', racine: document.documentElement.hasAttribute('data-vrm-boot'),
           logo: r ? [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2), Math.round(r.width)] : null, rail: !!d.querySelector('.vrm-boot-rail'),
           p: Number(d.style.getPropertyValue('--vrm-boot-p')) || null };
-      }).catch(() => null);
+      }).catch((e) => { if (DEBUG) console.log("   évaluation : " + String(e).slice(0, 200)); return null; });
       const attendu = sombre ? ['rgb(43, 82, 127)', 'rgb(21, 52, 92)'] : ['rgb(156, 200, 242)', 'rgb(44, 113, 190)'];
-      dit(!!boot && attendu.every((c) => boot.img.includes(c)) && (boot.img.match(/gradient/g) || []).length === 4, n + ' l’écran de chargement porte le dégradé « Verre dépoli »' + (sombre ? ' bleu-nuit' : ''), boot ? boot.img.slice(0, 120) : 'absent');
+      dit(!!boot && !boot.absent && attendu.every((c) => boot.img.includes(c)) && (boot.img.match(/gradient/g) || []).length === 4, n + ' l’écran de chargement porte le dégradé « Verre dépoli »' + (sombre ? ' bleu-nuit' : ''), boot ? (boot.absent || boot.img.slice(0, 120)) : 'absent');
       dit(!!boot && boot.theme === (sombre ? '#1E406A' : '#5E96D1'), n + ' la barre d’état (theme-color) prend le haut du dégradé pendant le démarrage', boot && boot.theme);
       dit(!!boot && boot.racine, n + ' le fond du document est le même bleu pendant le démarrage (data-vrm-boot)');
       dit(!!boot && boot.logo && Math.abs(boot.logo[0] - 195) <= 2 && boot.logo[2] >= 64, n + ' le logo VRM au centre', boot && JSON.stringify(boot.logo));
@@ -297,14 +302,30 @@ const blanc = (c) => { const x = rgb(c); return !!x && x[0] > 235 && x[1] > 235 
       await attendre(1200);
       await film.arreter();
       dit(t != null, n + ' Ma journée s’affiche', t == null ? (await etatPage(pg)).texte.slice(0, 200) : t + ' ms');
-      const fin = await pg.evaluate(() => ({ fin: window.__vrmDemarrage && window.__vrmDemarrage.fin, origine: performance.timeOrigin, racine: document.documentElement.hasAttribute('data-vrm-boot'), demarrage: !!document.getElementById('vrm-demarrage') })).catch(() => ({}));
+      const fin = await pg.evaluate(() => ({ fin: window.__vrmDemarrage && window.__vrmDemarrage.fin, origine: performance.timeOrigin, racine: document.documentElement.hasAttribute('data-vrm-boot'), demarrage: !!document.getElementById('vrm-demarrage'),
+        premiere: ((performance.getEntriesByName('first-paint')[0] || {}).startTime) })).catch(() => ({}));
       dit(!fin.racine && !fin.demarrage, n + ' après l’ouverture : plus d’écran de démarrage ni de fond de démarrage', JSON.stringify(fin));
       // Le film : jamais une image d'un blanc pur ; les premières images (le démarrage) bleues.
-      const imgs = film.images;
+      // Les images d'AVANT la première peinture de la page sont celles de l'onglet vierge (about:blank) : sur
+      // le téléphone, c'est l'image de lancement qui est là. On juge à partir de la première peinture de VRM.
+      const depuis = fin.premiere != null ? fin.origine + fin.premiere - 20 : 0;
+      const imgs = film.images.filter((x) => x.t >= depuis);
+      if (DEBUG) console.log('   images avant la 1re peinture de VRM (onglet vierge, écartées) : ' + (film.images.length - imgs.length));
+      if (DEBUG) console.log('   images : ' + film.images.map((x) => Math.round(x.t - fin.origine) + ':' + x.haut.join('.')).join(' ') + ' · fin du démarrage ' + Math.round(fin.fin));
       const blanches = imgs.filter((x) => purBlanc(x.haut) || purBlanc(x.centre));
       const premieres = imgs.slice(0, Math.min(5, imgs.length));
       dit(imgs.length >= 5 && blanches.length === 0, n + ' aucune image blanche de l’ouverture à Ma journée (' + imgs.length + ' images peintes)', blanches.slice(0, 3).map((x) => 'haut ' + x.haut + ' centre ' + x.centre).join(' | '));
       dit(premieres.length > 0 && premieres.every((x) => bleu(x.haut)), n + ' dès la première image peinte, le bleu (pas un blanc puis le bleu)', premieres.map((x) => x.haut.join(',')).join(' | '));
+      // Les COUCHES, image par image (rAF, dans la page) : tant que l'écran de démarrage n'est pas entièrement
+      // opaque (son fondu) ou une fois parti, ce qui est dessous ne doit jamais être un blanc pur.
+      const couches = await pg.evaluate(() => (window.__ouv && window.__ouv.images) || []).catch(() => []);
+      const blancPur = (f) => !!f && !f.img && /rgba?\((\d+), (\d+), (\d+)/.test(f.c) && f.c.match(/\d+/g).slice(0, 3).every((v) => Number(v) >= 250);
+      const visibles = couches.filter((x) => x.d !== 'la' || (x.dop != null && x.dop < 0.98));
+      const eclairs = visibles.filter((x) => (x.dop == null || x.dop < 0.98) && (blancPur(x.haut) || blancPur(x.centre)));
+      const fondus = couches.filter((x) => x.d === 'sortie');
+      dit(visibles.length > 0 && eclairs.length === 0, n + ' pendant le fondu et après, jamais un blanc pur sous l’écran de démarrage (' + fondus.length + ' images de fondu, ' + visibles.length + ' jugées)',
+        eclairs.slice(0, 3).map((x) => x.t + 'ms op ' + x.dop + ' haut ' + x.haut.tag + ' ' + x.haut.c + ' centre ' + x.centre.tag + ' ' + x.centre.c).join(' | '));
+      if (DEBUG) console.log('   sous le fondu : ' + [...new Set(fondus.map((x) => x.haut.tag + ' ' + (x.haut.img ? 'dégradé' : x.haut.c) + ' / ' + x.centre.tag + ' ' + (x.centre.img ? 'dégradé' : x.centre.c)))].join(' ; '));
       // Une image de la transition (la plus proche du départ du fondu), gardée pour la regarder.
       if (fin.fin != null) {
         const tFin = fin.origine + fin.fin + 170;
@@ -312,6 +333,7 @@ const blanc = (c) => { const x = rgb(c); return !!x && x[0] > 235 && x[1] > 235 
         for (const x of g) if (!best || Math.abs(x.t - tFin) < Math.abs(best.t - tFin)) best = x;
         if (best) try { fs.writeFileSync(path.join(SHOTS, n + '-transition-' + (sombre ? 'sombre' : 'clair') + '.png'), best.buf); } catch (_) {}
       }
+      if (DEBUG) console.log('   chargements ' + vu.navs + ' · ' + vu.film.join(' | '));
       if (DEBUG) console.log('   film : ' + imgs.map((x) => x.haut.join('.')).filter((x, i, l) => x !== l[i - 1]).slice(0, 40).join(' > '));
       juger(n, vu, await etatPage(pg));
       await shot(pg, n + '-journee-' + (sombre ? 'sombre' : 'clair'));
@@ -379,6 +401,29 @@ const blanc = (c) => { const x = rgb(c); return !!x && x[0] > 235 && x[1] > 235 
     await ctx.close();
   });
 
+  // ── 8. La transition, ralentie dix fois (CDP Animation.setPlaybackRate) : une capture AU MILIEU du fondu ──
+  for (const sombre of [false, true]) {
+    if (veut(8)) await essaie('8 transition ' + (sombre ? 'sombre' : 'claire'), async () => {
+      site.dist = DIST_A;
+      const ctx = await contexte({ sombre });
+      const { pg } = await nouvellePage(ctx);
+      const cdp = await ctx.newCDPSession(pg);
+      await cdp.send('Animation.enable'); await cdp.send('Animation.setPlaybackRate', { playbackRate: 0.03 });
+      // Le retrait de l'écran (un minuteur, src/demarrage.js) ne suit pas l'horloge des animations : retardé
+      // ici, DANS LE BANC SEULEMENT, du même facteur — le fondu ralenti va au bout sous nos yeux.
+      await pg.addInitScript(() => { const r = Element.prototype.remove; Element.prototype.remove = function () { if (this && this.id === 'vrm-demarrage') { const el = this; setTimeout(() => r.call(el), 14000); return; } return r.call(this); }; });
+      await pg.goto(URL0, { waitUntil: 'commit' });
+      await pg.waitForSelector('#vrm-demarrage[data-sortie]', { timeout: 90000, state: 'attached' }).catch(() => {});
+      const opacite = () => pg.evaluate(() => { const d = document.getElementById('vrm-demarrage'); return d ? Number(getComputedStyle(d).opacity) : null; }).catch(() => null);
+      let op = await opacite();
+      for (let i = 0; i < 200 && op != null && op > 0.6; i++) { await attendre(50); op = await opacite(); }
+      await shot(pg, '8-transition-' + (sombre ? 'sombre' : 'claire'));
+      op = op == null ? null : op;
+      dit(op != null && op > 0.05 && op < 0.95, '8 capture au milieu du fondu (' + (sombre ? 'sombre' : 'clair') + ')', 'opacité ' + op);
+      await ctx.close();
+    });
+  }
+
   // ── 4. Un morceau à la demande qui rate pour de vrai (même version en ligne) ─────────────────────────────
   if (veut(4)) await essaie('4 morceau qui rate (réseau)', async () => {
     site.dist = DIST_A;
@@ -416,7 +461,8 @@ const blanc = (c) => { const x = rgb(c); return !!x && x[0] > 235 && x[1] > 235 
     const { pg, vu } = await nouvellePage(ctx);
     site.refuse = null; site.lent = 0; site.bloque = /\/assets\/App-[\w-]+\.js$/;   // le morceau de l'app n'arrive pas
     await pg.goto(URL0, { waitUntil: 'commit' });
-    await attendre(5000);
+    await attendre(1500); await shot(pg, '6-chargement-clair');
+    await attendre(3500);
     const tot = await pg.evaluate(() => { const l = document.querySelector('#vrm-demarrage .vrm-boot-lent'); return l ? getComputedStyle(l).visibility : 'absent'; }).catch(() => '?');
     await attendre(4200);
     const l = await pg.evaluate(() => {
@@ -430,6 +476,8 @@ const blanc = (c) => { const x = rgb(c); return !!x && x[0] > 235 && x[1] > 235 
     dit(!!l && l.gestes === 1 && l.h >= 44 && l.bas <= 844, '6 UN geste « Recharger », 44 px au moins, dans l’écran', l && (l.gestes + ' geste(s), ' + l.h + ' px'));
     dit(!!l && !/chunk|module|javascript|erreur|error|réseau 4|http/i.test(l.texte), '6 pas un texte technique', l && l.texte);
     await shot(pg, '6-lent-clair');
+    // La même attente en sombre (bleu-nuit), pour la regarder.
+    { const c2 = await contexte({ sombre: true }); const p2 = await c2.newPage(); await p2.goto(URL0, { waitUntil: 'commit' }); await attendre(1500); await shot(p2, '6-chargement-sombre'); await attendre(7500); await shot(p2, '6-lent-sombre'); await c2.close(); }
     site.bloque = null;
     await pg.click('[data-vrm-boot-recharger]').catch(() => {});
     await pg.waitForEvent('load', { timeout: 20000 }).catch(() => {});
