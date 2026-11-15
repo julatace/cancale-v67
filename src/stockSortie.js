@@ -17,6 +17,12 @@
 //    un carton, il sert encore au bordereau, au bénéfice, à un retour).
 // ⚠️ « Remettre » (sur son clic) pose `garder[cle]` : une paire remise n'est
 //    plus jamais sortie toute seule.
+// ⚠️ (15 nov., étagères) Dans une colonne EN PILE, les cartons du dessus descendent d'un
+//    cran par case libérée (`tasserPiles`, src/stockEtageres.js) — l'emplacement change,
+//    jamais le N° — et chaque descente est rendue (`descentes`) pour être DITE.
+
+import { tasserPiles } from './stockEtageres.js';
+const seulement = (ms, ids) => { const set = new Set(ids.map(String)); return ms.filter((m) => m && set.has(String(m.id))); };
 
 const cleDefaut = (n) => {
   const s = String(n == null ? '' : n).toUpperCase().replace(/\s+/g, '').replace(/^N[°O]?(?=\d)/, '');
@@ -35,9 +41,9 @@ export function placeCase(i, meuble) {
 //   meubles   [{ id, name, cols, rows }]
 //   candidats [{ cle, num, tx, titre, statut, plateforme }] — décidés par la règle de sortie
 //   garder    { [cle]: ts }              — remis à la main : jamais retirés tout seuls
-// Rend { slots, sortis } ; `slots` est le MÊME objet si rien ne bouge.
+// Rend { slots, sortis, descentes } ; `slots` est le MÊME objet si rien ne bouge.
 export function libererCasesPartis({ slots, meubles, candidats, garder = {}, cle = cleDefaut, maintenant = Date.now() } = {}) {
-  if (!slots || typeof slots !== 'object') return { slots, sortis: [] };
+  if (!slots || typeof slots !== 'object') return { slots, sortis: [], descentes: [] };
   const ms = Array.isArray(meubles) ? meubles : [];
   let out = slots; const sortis = [];
   for (const c of (Array.isArray(candidats) ? candidats : [])) {
@@ -51,7 +57,13 @@ export function libererCasesPartis({ slots, meubles, candidats, garder = {}, cle
     sortis.push({ ...c, cle: k, source: 'meubles', meubleId: s.m, i: s.i, itemName: m ? String(m.name || 'Meuble') : 'Meuble supprimé',
       nom: p ? `rangée ${p.rangee}, colonne ${p.colonne}` : '', at: maintenant });
   }
-  return { slots: out, sortis };
+  if (!sortis.length) return { slots: out, sortis, descentes: [] };
+  // La gravité des piles, APRÈS les sorties (une sortie prouvée, et rien d'autre, vide une case).
+  const t = tasserPiles(out, seulement(ms, sortis.map((x) => x.meubleId)));
+  const descentes = t.descentes;
+  // Chaque sortie dit qui est descendu dans SON meuble (le journal « Cases libérées toutes seules »).
+  for (const x of sortis) { const d = descentes.filter((y) => y.m === String(x.meubleId)).map((y) => y.cle); if (d.length) x.descendus = [...new Set(d)]; }
+  return { slots: t.slots, sortis, descentes };
 }
 
 // Remettre (sur SON clic) un article sorti tout seul : dans SA case si elle
