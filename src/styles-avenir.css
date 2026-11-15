@@ -93,3 +93,5 @@
 .vrm-av-resume-total small { font: 500 12.5px/1 var(--sb-police-texte); color: var(--sb-encre-2); }
 .vrm-av-resume .vrm-av-chev { grid-column: 3; grid-row: 1; font-size: 18px; }
 .vrm-av-resume .vrm-av-barre { grid-column: 1 / -1; margin-top: 10px; height: 5px; }
+.vrm-av-total .sb-chiffre-affiche { font-size: 44px; line-height: 1; }
+@media (min-width: 1024px) { .vrm-av-total .sb-chiffre-affiche { font-size: 52px; } }

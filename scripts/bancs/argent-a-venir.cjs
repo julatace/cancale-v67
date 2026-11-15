@@ -73,7 +73,9 @@ const jeu = (exclu) => {
   return { lignes: L, comptes: NV.JEU_COMPTES, ecritures: 0 };
 };
 const aller = async (pg, q, attente = 3000) => {
-  await pg.goto(`http://localhost:${NV.PORT}/?${q.includes('=') ? q : 'tab=' + q}`, { waitUntil: 'domcontentloaded' });
+  const url = `http://localhost:${NV.PORT}/?${q.includes('=') ? q : 'tab=' + q}`;
+  // Une navigation de l'app en cours (elle réécrit l'adresse) peut annuler celle du banc : une seconde fois.
+  try { await pg.goto(url, { waitUntil: 'domcontentloaded' }); } catch (_) { await pg.waitForTimeout(800); await pg.goto(url, { waitUntil: 'domcontentloaded' }); }
   await pg.waitForSelector('.vrm-main', { timeout: 20000 }).catch(() => {});
   await pg.waitForTimeout(attente);
 };
