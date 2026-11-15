@@ -332,6 +332,10 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
   --sb-encre: var(--sv-encre) !important; --sb-encre-2: var(--sv-encre-2) !important; color: var(--sv-encre) !important;
 }
 
+/* « Traduire » sous la bulle de l'autre (conversation) : posé SUR LE FOND, hors de la bulle — l'encre claire
+   (en gris sombre --vrm-muted : 1,1:1 sur le bleu, banc studio-reste S4 conversation). */
+:root:root:root body .vrm-chat-panel .vrm-bulle-pied [data-traduire] { color: var(--sv-clair-2) !important; text-decoration-color: currentColor !important; }
+
 /* ══ 8. LA COQUE : la barre du bas (verre clair), la tête, la navigation de l'ordinateur ══ */
 :root:root:root body .vrm-app-shell .vrm-tabbar.vrm-tabbar {
   background: var(--sv-verre-barre) !important; -webkit-backdrop-filter: var(--sv-flou) !important; backdrop-filter: var(--sv-flou) !important;
