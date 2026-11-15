@@ -21,7 +21,7 @@
 //   F. la famille partagée (bloc <annonce-lbc-regle>, App.jsx = background.js) : une
 //      basket d'enfant (« Vêtements pour filles > Chaussures ») est une chaussure ; une
 //      chaussure de randonnée n'est pas une botte ;
-//   G. le câblage : synchronisé, extension 5.379 (`lbccriteres`), envoi de la fiche.
+//   G. le câblage : synchronisé, extension 5.381 (`lbccriteres`), envoi de la fiche.
 //
 //   node scripts/audit-correspondances.cjs                 l'audit
 //   node scripts/audit-correspondances.cjs --mutation=NOM  une règle réaffaiblie
@@ -262,7 +262,7 @@ const VUES = {
     console.log('── G. le câblage');
     const app = src.app || '';
     dit(/'vrm_correspondances',/.test(app), 'G1 SES réponses sont synchronisées (SYNC_KEYS)');
-    dit(/lbccriteres: '5\.379\.0'/.test(app) && /function criteresFicheLbc\(/.test(src.bg || ''), 'G2 capacité lbccriteres (5.379.0) : l’extension porte criteresFicheLbc');
+    dit(/lbccriteres: '5\.379\.0'/.test(app) && /function criteresFicheLbc\(/.test(src.bg || ''), 'G2 capacité lbccriteres (5.381.0) : l’extension porte criteresFicheLbc');
     dit(/const crit = lbcCriteres && e\.lbc \?/.test(app) && /annonce: \{ \.\.\.v\.annonce, \.\.\.crit \}/.test(app), 'G3 la catégorie et les critères ne partent qu’à une extension qui sait les poser');
     dit(/categorie: cat \}/.test(app) && !/appelEbay\(\{ action: 'pubinfo', title: t \}\)/.test(src.ebay || ''), 'G4 eBay : le brouillon reçoit SA catégorie ; plus aucune suggestion prise d’office');
     dit(/details\[id\]\.codes\.catalog_id/.test(app), 'G5 la catégorie Vinted est aussi lue sous `codes.catalog_id` (là où l’extension la range)');

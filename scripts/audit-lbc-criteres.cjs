@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// AUDIT : LA CATÉGORIE ET SES CRITÈRES PARTENT DE LA FICHE DE VRM (5.379, `lbccriteres`)
+// AUDIT : LA CATÉGORIE ET SES CRITÈRES PARTENT DE LA FICHE DE VRM (5.381, `lbccriteres`)
 //         node scripts/audit-lbc-criteres.cjs          (BANC_PORT, défaut 8417)
 //         node scripts/audit-lbc-criteres.cjs --prouve  chaque mutation doit rougir
 // ═══════════════════════════════════════════════════════════════════════════

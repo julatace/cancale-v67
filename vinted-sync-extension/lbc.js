@@ -1040,7 +1040,7 @@
   // rappelle fillNow à chaque mutation — sans ça on ré-ouvrirait le menu en
   // boucle). Réinitialisé par « Re-remplir » (fillNowForce).
   let _composFaits = new Set(); let _composEnCours = false; let _essaisMarque = {};
-  // (15 nov., 5.379) UN CRITÈRE SÛR REMPLACE LA PRÉDICTION DE LEBONCOIN. Leboncoin
+  // (15 nov., 5.381) UN CRITÈRE SÛR REMPLACE LA PRÉDICTION DE LEBONCOIN. Leboncoin
   //   pré-remplit Univers et Type d'après la photo et le titre (sa prédiction) : une
   //   basket femme pouvait partir en « Homme ». Quand la fiche de VRM porte le critère
   //   (`ad.criteres`, tiré de la catégorie Vinted ou de SA réponse), on choisit l'option
@@ -1304,7 +1304,7 @@
     //    confirmation) recliquait — une seconde publication (rouge sur l'avant).
     const prixKO = prixRefus(pending);
     if (prixKO) return { ok: false, raison: prixKO };
-    // (15 nov., 5.379) un critère sûr de la fiche que la page n'a pas pris (Univers, Type) :
+    // (15 nov., 5.381) un critère sûr de la fiche que la page n'a pas pris (Univers, Type) :
     //   on ne publie pas une annonce que Leboncoin aurait classée autrement — il le choisit.
     const pasPoses = criteresPasPoses(pending);
     if (pasPoses.length) return { ok: false, raison: pasPoses.join(' et ') + ' : pas trouvé sur Leboncoin — rien n\'est publié, choisis-le et publie toi-même, sans booster' };

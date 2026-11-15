@@ -1,6 +1,9 @@
-# 15 nov. — Publier partout : des catégories qui correspondent d'un site à l'autre (extension 5.379.0)
+# 15 nov. — Publier partout : des catégories qui correspondent d'un site à l'autre (extension 5.381.0)
 
 Branche `claude/publier-partout-categories` (partie de `origin/main` 70fbef70, extension 5.378.0). Aucune PR.
+⚠️ Version : 5.379.0 (`claude/lbc-orion`) et 5.380.0 (`claude/carte-extension`) sont prises par d'autres lots
+(coordinateur) ⇒ ce lot porte **5.381.0** ; si l'ordre de fusion change, remonter au-dessus de la plus haute et
+régénérer les zips une fois.
 
 Julien : « quand je poste une paire sur Vinted, je veux pouvoir la poster sans souci sur Leboncoin, eBay et
 Vestiaire Collective, pour que les catégories correspondent parfaitement entre elles, parce que des fois ce n'est
@@ -76,7 +79,7 @@ eBay : « Voir les catégories eBay » ⇒ SES catégories (nom + chemin), son t
 - **Numéros (§5)** : inchangés — rien ne part sans N° ; « Réf. VRM-{n°} » (Leboncoin, Vestiaire), SKU `VRM-{n°}`
   (eBay) ; aucun N° neuf. Garde-fous de l'extension intacts (compte de l'onglet, 50/h, une requête à la fois).
 
-## 4. L'extension 5.379.0 (capacité `lbccriteres`) — ce qui a changé, pour la fusion
+## 4. L'extension 5.381.0 (capacité `lbccriteres`) — ce qui a changé, pour la fusion
 
 - `background.js` : `criteresFicheLbc` + `LBC_CATEGORIES_FICHE` (nouveau, juste avant `progresLbcSur`) ;
   `appliquerAnnonceLbc` l'appelle (3 lignes) ; bloc partagé `<annonce-lbc-regle>` (le MÊME dans App.jsx) :

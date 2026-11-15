@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.379.0';
+const CODE_VERSION = '5.381.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -19297,7 +19297,7 @@ function appliquerAnnonceLbc(ad, saisie) {
     prixEdite: Number(v.annonce.price) !== Number(String(ad.price).replace(',', '.')),
   }) };
 }
-// (15 nov., 5.379) LA CATÉGORIE ET SES CRITÈRES, DEPUIS LA FICHE DE VRM — capacité
+// (15 nov., 5.381) LA CATÉGORIE ET SES CRITÈRES, DEPUIS LA FICHE DE VRM — capacité
 // `lbccriteres`. VRM les tire de la catégorie Vinted de l'annonce (table vérifiée,
 // src/correspondances.js) ou de SA réponse ; sans eux, Leboncoin DEVINAIT l'univers et
 // le type d'après la photo et le titre (sa prédiction), et la catégorie venait du titre.
