@@ -29,7 +29,8 @@ import {lireReceptionEmail,lireJournalEmail,lireTexteEmail,lireEmailBoite} from 
 // restent à lui.
 // ⚠️ « Pas su » n'est jamais « rien » ni « déjà rattaché » : toute lecture
 // ratée (ligne, registre, liste) répond 503.
-import { traiterEmail, lireRegistreEmails } from './email-inbound.js';
+import { traiterEmail, lireRegistreEmails, prevoirRetour } from './email-inbound.js';
+import { reclasserRetours } from './_lib/reclasser-retours.js';   // (15 nov., lot retours)
 import { contexteVendeur, withOwnerAll, conflictTarget } from './_lib/owner.js';
 import { PROPRIETAIRE_NEUTRE, peutReclamer, pourquoiPersonne, repliInstallation, normAdresse, estAdresseCollectrice } from './_lib/proprietaire-email.js';
 import { PREFIXE_PREUVE, idPreuve, cleLiens, lireLien, verifierJeton, etatAdresse, adresseRetenue, prouveeParCompte, relaisApple, adresseVerifiable, DUREE_LIEN_MS, DELAI_RENVOI_MS, MAX_ENVOIS_ADRESSE_JOUR, MAX_ADRESSES_JOUR, MAX_DEMANDES_VENDEUR_JOUR, idCompteurVendeur, reserverDemande } from './_lib/preuve-adresse.js';
@@ -643,6 +644,7 @@ export default async function handler(req, res) {
     return;
   }
   if (req.method === 'GET' && mode === 'liste') return lister(req, res);
+  if (req.method === 'POST' && mode === 'reclasser') return reclasser(req, res);
   if (req.method !== 'POST') { res.status(405).json({ error: 'POST only' }); return; }
 
   const owner = await vendeurDuJeton(jetonDe(req));
@@ -764,4 +766,41 @@ async function piecesGardees(ligne, trouve) {
     }
     return out;
   } catch (_) { return null; }
+}
+
+// ── (15 nov., lot retours) RECLASSER SES E-MAILS DE RETOUR GARDÉS « INCONNU » ──
+// POST ?mode=reclasser, SA session. Ses lignes `email_inconnu_*` seulement (filtre `owner`
+// = lui, base cloisonnée exigée), rejouées par la vraie route chez LUI (le vendeur que
+// l'adresse de réception avait déjà désigné à l'arrivée), à leur date d'origine, sans
+// notification. Rien n'est supprimé ; pas su ⇒ 503 (api/_lib/reclasser-retours.js).
+async function reclasser(req, res) {
+  const owner = await vendeurDuJeton(jetonDe(req));
+  if (owner === undefined) { connexionInjoignable(res); return; }
+  if (!owner) { res.status(401).json({ ok: false, error: 'connexion requise' }); return; }
+  if (await sondeCloisonnee() !== true) { indispo(res); return; }
+  const lire = async (q) => {
+    try { const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?${q}`, { headers: HEADERS }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; }
+  };
+  const lireLigne = async (id) => {
+    const j = await lire(`id=eq.${enc(id)}&owner=eq.${enc(owner)}&select=data`);
+    if (j === null) return undefined;
+    return j.length ? j[0].data || null : null;
+  };
+  const ecrire = async (id, data) => {
+    try {
+      const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?on_conflict=owner,id`, {
+        method: 'POST', headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify([{ owner, id, data, updated_at: new Date().toISOString() }]) });
+      return !!(r && r.ok);
+    } catch (_) { return false; }
+  };
+  const rejouer = async (corps, recuLe) => {
+    const faux = { method: 'POST', query: {}, headers: {}, body: corps, __ownerForce: owner, __recuLe: recuLe || null };
+    let resultat = null, code = 200;
+    const capture = { setHeader() {}, status(c) { code = Number(c) || 200; return this; }, json(o) { resultat = o; return this; } };
+    await contexteVendeur.run({ owner, silence: true }, () => traiterEmail(faux, capture));
+    return { code, corps: resultat };
+  };
+  const r = await reclasserRetours({ owner, lire, lireLigne, ecrire, prevoir: prevoirRetour, rejouer });
+  res.status(r.passu ? 503 : 200).json({ ok: !!r.ok, faits: r.faits || [], restes: (r.restes || []).map((x) => ({ famille: x.famille || '', raison: x.raison })), ...(r.raison ? { raison: r.raison } : {}) });
 }

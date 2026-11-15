@@ -21,6 +21,9 @@
 // Module PUR (aucune lecture, aucune écriture) : exécuté par
 // scripts/audit-retours-litiges.cjs, et sa route par le même audit.
 import { lireDateLimite } from './limite-envoi.js';
+// (15 nov., lot retours) « Retourne ta commande d'ici le … » : le SUJET et la date (jour + mois,
+// l'année de la réception) sont lus par LA règle de l'app (src/litiges.js) — une seule règle.
+import { SUJET_RETOUR_ACHAT, limiteDuJour, conversationDuCorps } from '../../src/litiges.js';
 
 const str = (v) => String(v == null ? '' : v);
 const TETE = String.raw`^\s*(?:(?:TR|Fwd?|Re)\s*:\s*)*`;
@@ -61,6 +64,9 @@ export function lireBordereauRetour({ subject, text, attachments } = {}) {
   const transaction = deLaPiece || duCorps;
   if (!transaction) return { ok: false, raison: 'aucun n° de transaction' };
   if (!pdf) return { ok: false, raison: 'aucun PDF de bordereau joint (ou plusieurs)', transaction };
+  // (15 nov.) Qui renvoie : LU dans le corps (« retourner la commande au vendeur ») — jamais supposé.
+  const sens = sensDuBordereau(text);
+  if (!sens) return { ok: false, raison: 'le corps ne dit pas que tu renvoies (sens pas prouvé)', transaction };
   // Le n° de suivi : écrit après « Numéro de suivi », chiffres ou lettres+chiffres.
   const sm = /Num[ée]ro de suivi\s*:?\s*([A-Z0-9]{8,30})(?![A-Z0-9])/i.exec(corps) || /N[°ºo]\s*de suivi\s*:?\s*([A-Z0-9]{8,30})(?![A-Z0-9])/i.exec(corps);
   const suivi = sm && /\d/.test(sm[1]) ? sm[1].toUpperCase() : '';
@@ -73,11 +79,45 @@ export function lireBordereauRetour({ subject, text, attachments } = {}) {
   let article = ((/(?:^|\n)\s*Article\s*:\s*([^\n]{2,160})/i.exec(corps) || [])[1] || '').trim();
   if (!article) { const m = /Bordereau de retour\s*[-–—]\s*(.+?)\s*[-–—]\s*à utiliser avant/i.exec(sujet); if (m) article = m[1].trim(); }
   return {
-    ok: true, transaction, suivi,
+    ok: true, transaction, suivi, sens,
     dateLimite: lim ? texteDate.replace(/\s+/g, ' ').trim() : '', dateLimiteJour: lim ? lim.jour : '', dateLimiteIso: lim ? lim.iso : '',
     article: article.slice(0, 160), pdf,
   };
 }
+
+// ── QUI RENVOIE À QUI (15 nov., lot retours) ─────────────────────────────────
+// Le bordereau de retour et l'avis « Retourne ta commande » sont écrits à CELUI QUI
+// DOIT DÉPOSER LE COLIS : l'acheteur de la transaction. Reçus à SON adresse, ils disent
+// donc qu'IL renvoie un ACHAT (sens « achat »). La preuve est LUE dans le corps, phrase
+// par phrase (mesuré : « retourner la commande au·à la vendeur·se », « Retourne la commande
+// d'ici le … Sinon, tu devras la garder et ton paiement sera transféré au vendeur ») ;
+// un corps qui ne le dit pas ne prouve rien ⇒ gardé « à vérifier », jamais rangé.
+// Le côté VENTE (un acheteur qui te renvoie une paire) ne passe PAS par ces e-mails :
+// la transaction de la vente le dit (440 « Retour initié », src/retoursStock.js).
+const plat = (s) => str(s).replace(/[   ]/g, ' ').replace(/\*/g, '').replace(/\s+/g, ' ');
+const SENS_ACHAT_BORDEREAU = /retourner la commande au(?:[·.\-]?\s*à la)? vendeur|renvoyer (?:la commande|l['’]article) au(?:[·.\-]?\s*à la)? vendeur|ton bordereau de retour est joint/i;
+const SENS_ACHAT_DEMANDE = /retourne la commande d['’]ici|ton paiement sera transf[ée]r[ée] au(?:[·.\-]?\s*à la)? vendeur|tu devras la garder/i;
+export const sensDuBordereau = (texte) => (SENS_ACHAT_BORDEREAU.test(plat(texte)) ? 'achat' : '');
+
+// ── 3. « Retourne ta commande d'ici le 16 nov. : <article> » (l'avis à l'ACHETEUR) ──
+// Aucune identité dans l'e-mail (mesuré, 2 sur 2 : ni n° de transaction ni conversation —
+// les liens mènent à l'accueil, aux réseaux, aux préférences) : l'article n'est qu'un
+// LIBELLÉ, la date limite est celle du SUJET (le jour, sans heure : Vinted ne l'écrit pas).
+// Rend { ok: true, sens, article, limiteJour, limiteIso, conv } ou { ok: false, raison }.
+export const estDemandeRetourAchat = (sujet) => SUJET_RETOUR_ACHAT.test(espaces(sujet).trim());
+export function lireDemandeRetourAchat({ subject, text, html, recuLe } = {}) {
+  const sujet = espaces(subject).trim();
+  const m = SUJET_RETOUR_ACHAT.exec(sujet);
+  if (!m) return { ok: false, raison: 'pas une demande de retour' };
+  if (!SENS_ACHAT_DEMANDE.test(plat(text) + ' ' + plat(String(html || '').replace(/<[^>]+>/g, ' ')))) return { ok: false, raison: 'le corps ne dit pas que tu renvoies (sens pas prouvé)' };
+  const l = limiteDuJour(m[1], m[2], recuLe);
+  if (!l) return { ok: false, raison: 'date limite illisible' };
+  return { ok: true, sens: 'achat', article: m[3].trim().slice(0, 160), limiteJour: l.jour, limiteIso: l.iso, conv: conversationDuCorps(str(text) + ' ' + str(html)) };
+}
+
+// La ligne d'un avis : `email_retourdemande_{empreinte du Message-ID}` (api/email-inbound.js,
+// `idDemandeRetour` — l'empreinte vit côté serveur, ce module reste lisible par l'app).
+export const PREFIXE_DEMANDE_RETOUR = 'email_retourdemande_';
 
 // ── 2. « La commande "…" a été remboursée ! » (un de SES achats) ────────────
 // Rend { ok: true, transaction, montant (nombre, €), estime ('AAAA-MM-JJ' | ''),
