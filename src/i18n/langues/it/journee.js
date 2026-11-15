@@ -207,6 +207,6 @@ export default {
   "veille.versement.datees": { one: "{n} già datata ✓", other: "{n} già datate ✓" },
   "veille.versement.pourquoi1": "Vinted dà questa data solo aprendo ogni vendita: l’estensione le legge quando vinted.fr è aperto su questo account. Nel frattempo non sono in nessun mese; nessuna viene indovinata.",
   "veille.versement.pourquoiN": "Vinted dà questa data solo aprendo ogni vendita: l’estensione le legge quando vinted.fr è aperto su ciascuno di questi account. Nel frattempo non sono in nessun mese; nessuna viene indovinata.",
-  "veille.versement.jours": { one: "Circa {n} giorno con Vinted aperto.", other: "Circa {n} giorni con Vinted aperto." },
+  "veille.versement.heures": { one: "Circa {n} h con vinted.fr aperto.", other: "Circa {n} h con vinted.fr aperto." },
   "veille.versement.geste": "Vedi il dettaglio",
 };

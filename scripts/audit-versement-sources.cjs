@@ -122,7 +122,8 @@ function regle(nom, f) {
     const avant = fApp([T(11, 450, J1)], null, null, null);
     const fus = C.fusionnerVersements(avant, m);
     dit(A.sourcesDeVersement(fus).get('13') === 'conversation' && fus.__vrmParReleve instanceof Set && fus.__vrmParReleve.has('12'), 'la fusion « une date connue ne redevient jamais pas lue » GARDE d’où vient chaque date', JSON.stringify([...A.sourcesDeVersement(fus)]));
-    dit(A.joursPourDater(1741) === 7 && A.joursPourDater(0) === 0 && A.joursPourDater(10) === 1, '« environ X jours » : 1 741 ventes ⇒ 7 jours (288 par jour, Vinted ouvert)', String(A.joursPourDater(1741)));
+    // (15 nov.) En HEURES de Vinted ouvert (12 lectures/h) : « 7 jours » supposait l'onglet ouvert 24 h sur 24.
+    dit(A.heuresPourDater(1741) === 146 && A.heuresPourDater(0) === 0 && A.heuresPourDater(10) === 1 && typeof A.joursPourDater !== 'function', '« environ X h avec vinted.fr ouvert » : 1 741 ventes ⇒ 146 h (12 par heure) — plus de « jours » de 24 h', String(A.heuresPourDater && A.heuresPourDater(1741)));
   });
 
   // ── 3. L'extension ──
@@ -207,16 +208,16 @@ function regle(nom, f) {
   await essaie('phrase', async () => {
     const F = (await import(pathToFileURL(path.join(RACINE, 'src', 'i18n', 'langues', 'fr', 'journee.js')).href)).default;
     const vj = sans(lire('src/VeilleJournee.jsx'));
-    dit(['veille.versement.titre', 'veille.versement.datees', 'veille.versement.pourquoi1', 'veille.versement.jours', 'veille.versement.geste'].every((k) => F[k] && vj.includes(`'${k}`)), '4. Ma journée dit la phrase par tr() : datées, pourquoi, environ X jours, le geste');
+    dit(['veille.versement.titre', 'veille.versement.datees', 'veille.versement.pourquoi1', 'veille.versement.heures', 'veille.versement.geste'].every((k) => F[k] && vj.includes(`'${k}`)), '4. Ma journée dit la phrase par tr() : datées, pourquoi, environ X h de Vinted ouvert, le geste');
     const tout = Object.values(F).map((x) => (typeof x === 'object' ? Object.values(x).join(' ') : x)).join(' ');
     dit(!/encaiss/i.test(tout), '4. jamais « encaissé » (§5)');
-    dit(['en', 'es', 'it', 'de'].every((l) => { const t = lire(`src/i18n/langues/${l}/journee.js`) + lire(`src/i18n/langues/${l}/compta.js`); return ['veille.versement.titre', 'veille.versement.pourquoiN', 'compta.dontConversation', 'compta.environJoursVinted'].every((k) => t.includes(`"${k}"`)); }), '4. les textes neufs existent dans les 5 langues');
+    dit(['en', 'es', 'it', 'de'].every((l) => { const t = lire(`src/i18n/langues/${l}/journee.js`) + lire(`src/i18n/langues/${l}/compta.js`); return ['veille.versement.titre', 'veille.versement.pourquoiN', 'compta.dontConversation', 'compta.environHeuresVinted', 'compta.releveAVerifier', 'compta.releveDesaccord'].every((k) => t.includes(`"${k}"`)); }), '4. les textes neufs existent dans les 5 langues');
   });
 
   // ── 5. Le câblage ──
   console.log('── 5. Le câblage');
   const fv = (/const fetchVersementsVinted = async \(\) => \{([\s\S]*?)\n\};/.exec(appSans) || [])[1] || '';
-  dit(/datesDeVersement\(rows, releve, convL, emailsL\)/.test(fv) && /VERSEMENT_CONV_SELECT/.test(fv) && /VERSEMENT_EMAIL_SELECT/.test(fv), 'l’app date par LA règle, sur les quatre sources');
+  dit(/porterVerifReleve\(datesDeVersement\(rows, releve, convL, emailsL\), releve\)/.test(fv) && /releve = versementsDuReleveVerifies\(releveL, rows\)/.test(fv) && /VERSEMENT_CONV_SELECT/.test(fv) && /VERSEMENT_EMAIL_SELECT/.test(fv), 'l’app date par LA règle, sur les quatre sources');
   dit(/harvest_%25_versement_%25&select=tx:data->>tx,at:data->>at,src:data->>source/.test(app) && /email_final_%25&data->>transaction=not\.is\.null&select=tx:data->>transaction,at:data->>receivedAt/.test(app), 'lectures légères, projetées (jamais select=data, §4.4)');
   dit(/ventesDatees?|venteDatees\(lignes, versementsParReleve\(versements\), sourcesDeVersement\(versements\)\)/.test(appSans), 'Ventes publie les datées par source');
   const srv = sans(lire('api/ship-reminders.js'));
@@ -228,7 +229,7 @@ function regle(nom, f) {
   { const v = (re, t) => ((re.exec(t) || [])[1] || ''); const num = (x) => x.split('.').map(Number); const sup = (a, b) => { const A = num(a), B = num(b); for (let i = 0; i < 3; i++) if ((A[i] || 0) !== (B[i] || 0)) return (A[i] || 0) > (B[i] || 0); return true; };
     const cv = v(/CODE_VERSION = '([\d.]+)'/, bg), mv = v(/"version": "([\d.]+)"/, lire('vinted-sync-extension/manifest.json')), ea = v(/EXT_ATTENDUE = '([\d.]+)'/, app);
     dit(!!cv && cv === mv && mv === ea && sup(cv, '5.376.0') && /versementconv: '5\.376\.0'/.test(app), `extension ${cv} (≥ 5.376.0), \`EXT_CAPACITES.versementconv\` = 5.376.0`); }
-  dit(/joursPourDater\(c\.n\)/.test(sans(lire('src/ecrans/Compta.jsx'))) && /data-adater-conversation/.test(lire('src/ecrans/Compta.jsx')), 'Déclarer : « dont N par la conversation » et « environ X jours »');
+  dit(/heuresPourDater\(c\.n\)/.test(sans(lire('src/ecrans/Compta.jsx'))) && /data-adater-conversation/.test(lire('src/ecrans/Compta.jsx')) && /data-adater-raison="releve-non-verifie"/.test(lire('src/ecrans/Compta.jsx')), 'Déclarer : « dont N par la conversation », « environ X h avec vinted.fr ouvert » et « dates du relevé pas encore vérifiées »');
 
   console.log(ko ? `\n❌ dates de versement, quatre sources : ${ok} vert(s), ${ko} rouge(s)` : `\n✅ dates de versement, quatre sources : ${ok} vert(s), 0 rouge(s)`);
   process.exit(ko ? 1 : 0);

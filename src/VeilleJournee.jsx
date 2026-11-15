@@ -16,7 +16,7 @@ import { BoutonBase } from './composants/Bouton.jsx';
 import { CLE_VEILLE, alertesAMontrer, texteAlerte } from './veilleChiffres.js';
 import { etatControle } from './controleNuit.js';
 import { tr } from './i18n/index.js';
-import { joursPourDater } from './versementRaisons.js';
+import { heuresPourDater } from './versementRaisons.js';   // (15 nov.) en heures de Vinted ouvert
 import { lireLigneVeille, lireControleNuit, lireControleInstallation, marquerAlerteVue } from './veilleLigne.js';
 import './styles-veille.css';
 
@@ -65,12 +65,12 @@ function texteVersement(l) {
   const d = l.detail || {};
   if (d.cause !== 'vinted-detail') return null;
   const reste = Number.isInteger(d.total) ? d.total : l.n;
-  const j = joursPourDater(reste);
+  const h = heuresPourDater(reste);
   return {
     titre: tr('veille.versement.titre', { n: l.n }),
     datees: Number.isInteger(d.datees) && d.datees > 0 ? tr('veille.versement.datees', { n: d.datees }) : '',
     pourquoi: tr(d.comptes > 1 ? 'veille.versement.pourquoiN' : 'veille.versement.pourquoi1'),
-    jours: j ? tr('veille.versement.jours', { n: j }) : '',
+    heures: h ? tr('veille.versement.heures', { n: h }) : '',
     geste: tr('veille.versement.geste'),
   };
 }
@@ -98,7 +98,7 @@ export function VeilleJournee() {
               <span className="vrm-veille-n">{l.n}</span>
               {v ? (
                 <span className="vrm-veille-txt" data-versement-texte="">{v.titre}{v.datees ? <> · <b data-versement-datees={l.detail.datees}>{v.datees}</b></> : null}
-                  <small className="vrm-veille-explique" data-versement-pourquoi="">{v.pourquoi}{v.jours ? <> <span data-versement-jours="">{v.jours}</span></> : null}</small></span>
+                  <small className="vrm-veille-explique" data-versement-pourquoi="">{v.pourquoi}{v.heures ? <> <span data-versement-heures="">{v.heures}</span></> : null}</small></span>
               ) : (
                 <span className="vrm-veille-txt">{l.phrase.replace(/^\d+\s/, '')}{l.cle === 'numeros-double' && l.ids.length ? <small> · N°{l.ids.slice(0, 4).join(', N°')}</small> : null}</span>
               )}

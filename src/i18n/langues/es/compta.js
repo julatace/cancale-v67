@@ -713,5 +713,7 @@ export default {
   "compta.recapPrepare": "Preparando el resumen…",
   "compta.dontConversation": " · {nbAd} por la conversación de la venta",
   "compta.dontEmail": " · {nbAd} por el e-mail de Vinted",
-  "compta.environJoursVinted": { one: "Unos {n} día con vinted.fr abierto en esta cuenta.", other: "Unos {n} días con vinted.fr abierto en esta cuenta." },
+  "compta.environHeuresVinted": { one: "Unas {n} h con vinted.fr abierto en esta cuenta.", other: "Unas {n} h con vinted.fr abierto en esta cuenta." },
+  "compta.releveAVerifier": { one: "{n} venta en el extracto del monedero: fechas del extracto aún no verificadas ({accords} de {min} coincidencias con el detalle de las ventas). Mientras tanto no se fecha nada con él.", other: "{n} ventas en el extracto del monedero: fechas del extracto aún no verificadas ({accords} de {min} coincidencias con el detalle de las ventas). Mientras tanto no se fecha nada con él." },
+  "compta.releveDesaccord": { one: "{n} venta en el extracto del monedero: su fecha no cae el mismo día que el detalle de la venta ({desaccords} desacuerdo). El extracto de esta cuenta no fecha nada.", other: "{n} ventas en el extracto del monedero: sus fechas no caen el mismo día que el detalle de las ventas ({desaccords} desacuerdo(s)). El extracto de esta cuenta no fecha nada." },
 };

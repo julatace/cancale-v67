@@ -713,5 +713,7 @@ export default {
   "compta.recapPrepare": "Je prépare le récap…",
   "compta.dontConversation": " · {nbAd} par la conversation de la vente",
   "compta.dontEmail": " · {nbAd} par l’e-mail de Vinted",
-  "compta.environJoursVinted": { one: "Environ {n} jour avec vinted.fr ouvert sur ce compte.", other: "Environ {n} jours avec vinted.fr ouvert sur ce compte." },
+  "compta.environHeuresVinted": { one: "Environ {n} h avec vinted.fr ouvert sur ce compte.", other: "Environ {n} h avec vinted.fr ouvert sur ce compte." },
+  "compta.releveAVerifier": { one: "{n} vente dans le relevé du porte-monnaie : dates du relevé pas encore vérifiées ({accords} sur {min} accords avec le détail des ventes). Rien n’en est daté d’ici là.", other: "{n} ventes dans le relevé du porte-monnaie : dates du relevé pas encore vérifiées ({accords} sur {min} accords avec le détail des ventes). Rien n’en est daté d’ici là." },
+  "compta.releveDesaccord": { one: "{n} vente dans le relevé du porte-monnaie : sa date ne tombe pas le même jour que le détail de la vente ({desaccords} désaccord). Le relevé de ce compte ne date rien.", other: "{n} ventes dans le relevé du porte-monnaie : leur date ne tombe pas le même jour que le détail des ventes ({desaccords} désaccord(s)). Le relevé de ce compte ne date rien." },
 };

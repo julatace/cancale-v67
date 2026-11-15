@@ -713,5 +713,7 @@ export default {
   "compta.recapPrepare": "Preparo il riepilogo…",
   "compta.dontConversation": " · {nbAd} tramite la conversazione della vendita",
   "compta.dontEmail": " · {nbAd} tramite l’e-mail di Vinted",
-  "compta.environJoursVinted": { one: "Circa {n} giorno con vinted.fr aperto su questo account.", other: "Circa {n} giorni con vinted.fr aperto su questo account." },
+  "compta.environHeuresVinted": { one: "Circa {n} h con vinted.fr aperto su questo account.", other: "Circa {n} h con vinted.fr aperto su questo account." },
+  "compta.releveAVerifier": { one: "{n} vendita nell’estratto del portafoglio: date dell’estratto non ancora verificate ({accords} su {min} corrispondenze con il dettaglio delle vendite). Fino ad allora non viene datato nulla.", other: "{n} vendite nell’estratto del portafoglio: date dell’estratto non ancora verificate ({accords} su {min} corrispondenze con il dettaglio delle vendite). Fino ad allora non viene datato nulla." },
+  "compta.releveDesaccord": { one: "{n} vendita nell’estratto del portafoglio: la sua data non cade nello stesso giorno del dettaglio della vendita ({desaccords} disaccordo). L’estratto di questo account non data nulla.", other: "{n} vendite nell’estratto del portafoglio: le loro date non cadono nello stesso giorno del dettaglio delle vendite ({desaccords} disaccordi). L’estratto di questo account non data nulla." },
 };

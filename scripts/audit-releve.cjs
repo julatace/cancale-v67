@@ -31,8 +31,8 @@ const REEL = {
   invoice_lines_has_more: false,
 };
 
-function banc({ releves = {}, hist = null, profil = '3166370055', reponses = null } = {}) {
-  const ecrites = [], demandes = [];
+function banc({ releves = {}, hist = null, profil = '3166370055', reponses = null, mensuel = null } = {}) {
+  const ecrites = [], demandes = [], mensuels = [];
   const store = {};
   const ctx = {
     console: { log() {}, warn() {}, error() {} },
@@ -62,6 +62,8 @@ function banc({ releves = {}, hist = null, profil = '3166370055', reponses = nul
         if (reponses) return J(reponses(cle));
         return J({ ...REEL, starting_date: cle ? cle + '-01' : '2026-08-01' });
       }
+      const mo = /vinted\.fr\/api\/v2\/wallet\/invoices\/(\d{4})\/(\d{2})\?banc=1$/.exec(u);
+      if (mo) { const cle = `${mo[1]}-${mo[2]}`; mensuels.push(cle); return J(mensuel ? mensuel(cle) : { ...REEL, history: [], starting_date: cle + '-01' }); }
       if (/vinted\.fr\//.test(u)) return J({});
       // ── SUPABASE ──
       if (opts && opts.method === 'POST' && /app_data/.test(u)) {
@@ -86,7 +88,7 @@ function banc({ releves = {}, hist = null, profil = '3166370055', reponses = nul
   ctx.getStoredAccounts = async () => [{ vinted_user_id: '111', domain: 'www.vinted.fr', access_token: 'x' }];
   ctx.compteConnecte = async () => '111';
   ctx.activeAccountId = async () => '111';
-  return { ctx, ecrites, demandes, store };
+  return { ctx, ecrites, demandes, mensuels, store };
 }
 
 let ok = 0, ko = 0;
@@ -140,38 +142,47 @@ const relevesEcrits = (e) => e.filter(r => /_releve_/.test(r.id));
     } else { ko += 4; console.log('  ❌ (4 contrôles) storeReleve absente'); }
   }
 
-  console.log('\n=== 3. LES MOIS PASSÉS : lecture bornée, et on sait s\'arrêter ===');
+  console.log('\n=== 3. LES MOIS PASSÉS : une recette APPRISE (5.378), jamais une adresse devinée ===');
   {
     if (typeof banc().ctx.capterReleves !== 'function') {
       T('capterReleves existe', false, 'aucun moyen de remonter au-delà du mois courant');
-      ko += 4; console.log('  ❌ (4 contrôles) capterReleves absente');
     } else {
-      const b = banc();
+      // (5.378) Sans recette apprise : AUCUNE requête (l'ancienne adresse `payouts?year=&month=`
+      // était devinée — 404 sur tous ses comptes, mesuré le 15 nov.).
+      const b0 = banc();
+      await b0.ctx.capterReleves('111');
+      T('sans recette apprise, aucune requête Vinted', b0.demandes.length === 0 && b0.mensuels.length === 0, JSON.stringify(b0.demandes.concat(b0.mensuels)));
+      // La recette s'apprend d'une réponse captée en passant (SON geste sur vinted.fr) : un relevé
+      // de juillet dont l'adresse porte 2026 et 07. (Adresse INVENTÉE pour le banc.)
+      const b = banc({ releves: { '2026-06': 1 } });   // le mois capté en passant est en base
+      await b.ctx.storeReleve('111', { ...REEL, starting_date: '2026-06-01', history: [{ year: 2026, month: 7 }, { year: 2026, month: 6 }] }, 'www.vinted.fr', '/api/v2/wallet/invoices/2026/06?banc=1');
+      T('une réponse de mois passé captée apprend la recette', !!(b.store.vrmReleveRecette && b.store.vrmReleveRecette['111'] && /\{Y\}.*\{MM\}/.test(b.store.vrmReleveRecette['111'].modele)), JSON.stringify(b.store.vrmReleveRecette));
       await b.ctx.capterReleves('111');
-      T('le mois manquant est demandé', b.demandes.length === 1 && b.demandes[0].mois === '2026-07', JSON.stringify(b.demandes));
-      T('la lecture utilise l\'ID DE PROFIL, pas l\'identifiant de compte', b.demandes[0] && b.demandes[0].pid === '3166370055', b.demandes[0] && b.demandes[0].pid);
+      T('le mois listé par Vinted (juillet) est demandé par la recette apprise', b.mensuels.length === 1 && b.mensuels[0] === '2026-07', JSON.stringify(b.mensuels));
       T('le relevé du mois passé est rangé', relevesEcrits(b.ecrites).some(r => r.id === 'harvest_111_releve_2026-07'), relevesEcrits(b.ecrites).map(r => r.id).join(','));
-
       // déjà en base → aucune requête
       const b2 = banc({ releves: { '2026-07': 1 } });
+      b2.store.vrmReleveRecette = { '111': { modele: '/api/v2/wallet/invoices/{Y}/{MM}?banc=1', pad: true, uid: '111', at: 1 } };
       await b2.ctx.capterReleves('111');
-      T('un mois déjà capté n\'est pas redemandé', b2.demandes.length === 0, JSON.stringify(b2.demandes));
-
+      T('un mois déjà capté n\'est pas redemandé', b2.mensuels.length === 0, JSON.stringify(b2.mensuels));
       // plafond par visite
       const gros = []; for (let m = 1; m <= 6; m++) gros.push({ year: 2026, month: m, title: 'M' + m });
       const b3 = banc({ hist: gros });
+      b3.store.vrmReleveRecette = b2.store.vrmReleveRecette;
       await b3.ctx.capterReleves('111');
       const cap = Number((/RELEVE_MAX_PAR_VISITE\s*=\s*(\d+)/.exec(src) || [])[1] || 0);
-      T(`le plafond par visite est respecté (${cap})`, cap > 0 && b3.demandes.length === cap, `${b3.demandes.length} requêtes pour un plafond de ${cap}`);
-
-      // ⚠️ le paramètre est ignoré → on s'arrête DÉFINITIVEMENT
-      const b4 = banc({ hist: gros, reponses: () => ({ ...REEL, starting_date: '2026-08-01' }) });
+      T(`le plafond par visite est respecté (${cap})`, cap > 0 && b3.mensuels.length === cap, `${b3.mensuels.length} requêtes pour un plafond de ${cap}`);
+      T('du plus récent au plus ancien', b3.mensuels.join(',') === '2026-06,2026-05', b3.mensuels.join(','));
+      // ⚠️ le mois rendu n'est pas celui demandé → recette OUBLIÉE, plus aucune requête
+      const b4 = banc({ hist: gros, mensuel: () => ({ ...REEL, starting_date: '2026-08-01' }) });
+      b4.store.vrmReleveRecette = b2.store.vrmReleveRecette;
       await b4.ctx.capterReleves('111');
-      T('un paramètre ignoré arrête la boucle tout de suite', b4.demandes.length === 1, `${b4.demandes.length} requêtes`);
-      T('et le compte est marqué muet (plus jamais réessayé)', !!(b4.store.vrmReleveMuet && b4.store.vrmReleveMuet['111']), JSON.stringify(b4.store.vrmReleveMuet));
-      const avant = b4.demandes.length;
+      T('un mois rendu ≠ demandé arrête la boucle tout de suite', b4.mensuels.length === 1, `${b4.mensuels.length} requêtes`);
+      T('et la recette est oubliée', !(b4.store.vrmReleveRecette && b4.store.vrmReleveRecette['111']), JSON.stringify(b4.store.vrmReleveRecette));
+      const avant = b4.mensuels.length;
       await b4.ctx.capterReleves('111');
-      T('une seconde visite ne redemande rien', b4.demandes.length === avant, `${b4.demandes.length} requêtes`);
+      T('une seconde visite ne redemande rien', b4.mensuels.length === avant, `${b4.mensuels.length} requêtes`);
+      T('l\'adresse devinée `payouts?year=&month=` n\'est plus jamais appelée', ![b0, b, b2, b3, b4].some(x => x.demandes.some(d => d.mois)), JSON.stringify(b3.demandes));
     }
   }
 

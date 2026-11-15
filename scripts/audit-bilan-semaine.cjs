@@ -179,8 +179,8 @@ if (process.argv.includes('--recopie')) {
   const sansC = (x) => x.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/[^\n]*/g, '$1');
   const fv = sansC((/const fetchVersementsVinted = async \(\) => \{([\s\S]*?)\n\};/.exec(app || '') || [])[1] || '');
   const vl = sansC((/export function versementsDeLignes\([^)]*\) \{([\s\S]*?)\n\}/.exec(bilSrc) || [])[1] || '');
-  dit(/return datesDeVersement\(rows, releve, convL, emailsL\)/.test(fv), 'fetchVersementsVinted (app) rend LA règle `datesDeVersement`', fv.slice(0, 80));
-  dit(/return datesDeVersement\(rows, releve, conversations, emails\)/.test(vl) && /versementsDuReleve\(releveRows\)/.test(vl), 'versementsDeLignes (serveur) rend la MÊME règle, recopiée, sur les mêmes sources (relevé compris)', vl.slice(0, 80));
+  dit(/return porterVerifReleve\(datesDeVersement\(rows, releve, convL, emailsL\), releve\)/.test(fv), 'fetchVersementsVinted (app) rend LA règle `datesDeVersement`', fv.slice(0, 80));
+  dit(/return porterVerifReleve\(datesDeVersement\(rows, releve, conversations, emails\), releve\)/.test(vl) && /versementsDuReleveVerifies\(releveRows, rows\)/.test(vl), 'versementsDeLignes (serveur) rend la MÊME règle, recopiée, sur les mêmes sources (relevé compris)', vl.slice(0, 80));
   const shipSrc = lire('api/ship-reminders.js') || '';
   const selApp = (n) => ((new RegExp(`const ${n} = '([^']+)'`).exec(app || '') || [])[1] || '');
   dit(!!selApp('VERSEMENT_CONV_SELECT') && shipSrc.includes(`'app_data?${selApp('VERSEMENT_CONV_SELECT')}'`) && !!selApp('VERSEMENT_EMAIL_SELECT') && shipSrc.includes(`'app_data?${selApp('VERSEMENT_EMAIL_SELECT')}'`),
