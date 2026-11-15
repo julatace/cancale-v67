@@ -22,17 +22,19 @@ Relie tes comptes Vinted, Leboncoin, eBay et Vestiaire à VRM : annonces, ventes
 <!-- description -->
 VRM est l'outil de gestion des revendeurs de seconde main (https://vrm.center). Cette extension relie l'app VRM à tes propres comptes Vinted, Leboncoin, eBay et Vestiaire Collective, depuis ton navigateur : tu n'as plus rien à recopier.
 
+Pour qui : les vendeurs de seconde main qui tiennent un ou plusieurs comptes sur ces sites et veulent leurs ventes, leurs colis et leurs chiffres au même endroit.
+
 Ce qu'elle fait pour toi
 • Elle range dans ton espace VRM ce que ces sites affichent déjà sur ta propre activité quand tu les ouvres : annonces, ventes, achats, messages, offres, soldes, bordereaux.
 • Elle récupère les bordereaux d'expédition de tes ventes, prêts à imprimer avec le numéro de rangement de la paire.
 • Elle relève les codes de retrait de tes colis et leur statut chez le transporteur.
-• Sur ton clic dans VRM : remplir une annonce sur Leboncoin, eBay ou Vestiaire Collective, republier une annonce Vinted, baisser un prix, poser le mode vacances, répondre à un message, accepter, refuser ou faire une offre, générer un bordereau.
+• Sur ton clic dans VRM : remplir une annonce sur Leboncoin, eBay ou Vestiaire Collective, republier une annonce Vinted, baisser ou remettre un prix, poser le mode vacances, créer un brouillon d’annonce Vinted, répondre à un message, accepter, refuser ou faire une offre, générer un bordereau.
 • Seulement si tu les allumes dans VRM (éteintes par défaut) : accepter les offres Vinted au-dessus du prix minimum que tu as fixé (et refuser avec TON message celles sous ton seuil), et envoyer ton message aux personnes qui mettent ton annonce en favori.
 
 Ses garde-fous
 • Elle n'agit qu'au nom du compte connecté dans l'onglet, jamais d'un autre.
-• Au plus 50 actions par heure et 200 par jour et par compte, une requête à la fois ; elle s’arrête net quand le site demande une pause ou une vérification.
-• Elle ne lit jamais ton mot de passe ni ton historique de navigation.
+• Au plus 50 actions par heure et 200 par jour et par compte (réglage par défaut), une requête à la fois ; elle s’arrête net quand le site demande une pause ou une vérification.
+• Elle ne lit jamais le mot de passe de tes comptes de revente ni ton historique de navigation.
 • Ce qu'elle lit part uniquement dans TON compte VRM. Rien n'est vendu, rien ne sert à la publicité.
 
 Il faut un compte VRM (vrm.center). Détail de ce que l'extension lit et envoie : https://vrm.center/legal/extension.html
@@ -49,9 +51,11 @@ s'affiche que dans le tableau de bord : prendre celle qui parle d'outils de trav
 - Icône 128 × 128 : `vinted-sync-extension/icon-128.png` (dans le paquet). ⚠️ Google conseille 96 × 96 de
   dessin + 16 px de marge transparente ; l'icône actuelle remplit tout le carré. Ce n'est pas un motif de
   refus, mais la redessiner change le paquet : à faire avec une version de l'extension, pas ici.
-- Captures 1280 × 800 (1 au moins, 5 au plus) : `capture-1-journee.png`, `capture-2-cat_bord.png`,
-  `capture-3-ventes.png`, `capture-4-annonces.png`, `capture-5-extension.png`. Données INVENTÉES (mode
-  exemple de l'app, bandeau « Exemple — rien n'est à toi » visible).
+- Captures 1280 × 800 (1 au moins, 5 au plus) : `capture-1-journee.png`, `capture-2-ventes.png`,
+  `capture-3-achats.png`, `capture-4-annonces.png`, `capture-5-extension.png` (refaites le 15 nov.,
+  palette Studio bleu clair). Données INVENTÉES (mode exemple de l'app, bandeau « Exemple — données
+  inventées » visible ; la carte du logo sur une page de dressing inventée, sans marque de site).
+  Pas à pas complet pour Julien : `docs/chrome-web-store/README.md`.
 - Petite tuile 440 × 280 : `tuile-440x280.png`. Grande tuile 1400 × 560 (facultative) : `tuile-1400x560.png`.
 
 **Site** : https://vrm.center · **Assistance** : l'adresse de contact de `src/contact.js` (à remplir d'abord).

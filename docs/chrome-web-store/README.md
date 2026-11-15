@@ -1,116 +1,91 @@
-> ⚠️ **REMPLACÉ le 8 novembre 2026 par `docs/boutiques/`** (fiches Chrome, Edge, Firefox prêtes à coller,
-> paquets `scripts/paquets-boutiques.cjs`, audit `scripts/audit-paquets-boutiques.cjs`, politique
-> `https://vrm.center/legal/extension.html`, visuels du mode exemple). Le texte ci-dessous est gardé pour
-> l'historique : il est **faux** sur plusieurs points (il dit que l'extension « n'accepte jamais une offre »
-> — l'acceptation automatique existe, éteinte par défaut ; il oublie Vestiaire Collective et les
-> transporteurs dans les autorisations). Ne pas le coller.
+# Chrome Web Store — le dossier d'envoi (15 novembre 2026, extension 5.385.0)
 
-# Publier l'extension VRM sur le Chrome Web Store
+> Ce dossier remplace l'ancien README du 8 octobre (faux sur plusieurs points) et ses images
+> (ancienne palette), retirés. **Les textes français audités** (fiche, autorisations, hôtes, données)
+> restent dans `docs/boutiques/chrome-web-store.md` — `scripts/audit-paquets-boutiques.cjs` vérifie
+> qu'aucune autorisation ni aucun site du manifeste n'y manque. Ici : le pas à pas pour Julien, la
+> version anglaise (`fiche-en.md`), ce qui a été vérifié et les risques de refus.
 
-> Edge, Opera, Brave et Firefox (ordinateur et Android) : voir
-> `docs/boutiques-extension.md` — le même paquet sert Edge et Opera, et les
-> textes ci-dessous servent les quatre boutiques.
-
-Tout ce qu'il faut coller dans le tableau de bord développeur de Google
-(https://chrome.google.com/webstore/devconsole), champ par champ.
-Le paquet à envoyer se fabrique par :
+## Fabriquer ce qu'on envoie
 
 ```
-node scripts/zip-extension.cjs --store VRM-chrome-web-store.zip
+node scripts/zip-extension.cjs --store <dossier>/VRM-chromium.zip     # le paquet (manifest.json à la racine, sans README, sans rien d'Orion/Safari)
+npm run build && node scripts/boutiques-visuels.cjs                 # captures FR dans docs/boutiques/visuels/
+node scripts/boutiques-visuels.cjs --langue en --sortie <dossier>   # les mêmes en anglais (en-*)
+node scripts/audit-paquets-boutiques.cjs                            # tout vert avant d'envoyer
 ```
 
-(`manifest.json` est à la racine du zip, comme la boutique l'exige ; le zip
-habituel `public/VRM-extension.zip` est refait en même temps.)
+⚠️ `zip-extension.cjs` refait AUSSI `public/VRM-extension.zip` et les paquets Orion (même contenu,
+octets différents à cause des dates) : `git checkout -- public/` ensuite, rien à commiter.
+`node scripts/paquets-boutiques.cjs` donne le même contenu (`dist/boutiques/VRM-<version>-chrome.zip`,
+dates fixes).
 
-## Ce que Julien doit faire (personne d'autre ne peut)
+## Ce qui a été vérifié le 15 novembre (paquet 5.385.0)
 
-1. Créer le compte développeur Google (5 $ une fois), au nom de l'éditeur.
-2. **Remplir l'adresse de contact** dans `public/legal/editeur.js` (champ
-   `email`) et `src/contact.js` : Google exige une adresse joignable et la
-   politique de confidentialité doit la porter. Sans elle, refus quasi certain.
-3. Envoyer le zip, coller les textes ci-dessous, ajouter les images de
-   `docs/chrome-web-store/` (icône 128, captures 1280×800, vignette 440×280).
-4. **Visibilité conseillée : « Non répertoriée »** (seules les personnes qui ont
-   le lien peuvent l'installer). On passe en « Publique » plus tard.
-5. Une fois publiée : retirer la copie installée à la main dans
-   `chrome://extensions` (sinon deux extensions VRM tournent, l'app le dit et
-   coupe les commandes).
+- Contenu du zip Store = `vinted-sync-extension/` sans `README.md`, identique fichier pour fichier au
+  zip servi (`public/VRM-extension.zip`) ; aucun `compat-firefox.js`, `compat-orion.js`, `orion-main.js`.
+- Chargé dans Chromium (Playwright, `--load-extension` sur le dossier dézippé) : service worker
+  `background.js` démarré, Chrome lit `version 5.385.0`, `manifest_version 3`, les 7 autorisations ;
+  `chrome://extensions` : état ENABLED, **0 erreur de manifeste, 0 avertissement d'installation** ;
+  `popup.html` s'ouvre sans erreur JavaScript.
+- Manifeste : MV3, icônes 16/32/48/128 aux bonnes tailles, ni `key` ni `update_url`, nom 24 car.,
+  description 124 car. (≤ 132), aucune autorisation `<all_urls>`, CSP des pages de l'extension
+  `script-src 'self'`.
+- Code distant : aucun `eval`, `new Function`, `setTimeout("…")`, `importScripts`, `import()` dynamique
+  ni script chargé depuis Internet. Les `<script>` posés dans les pages (`content.js`, `lbc-inject.js`,
+  `vc-inject.js`, `popup.js`) ont pour `src` un fichier du paquet (`chrome.runtime.getURL`) ; les
+  `chrome.scripting.executeScript` passent des fonctions du paquet (`func`) ou `files: ['bridge.js']`.
+  Les commandes venues de vrm.center sont des données, jamais du code. Code lisible (ligne la plus
+  longue : 767 caractères), pas d'obscurcissement.
+- Politique : `public/legal/extension.html` mise à jour le 15 nov. (mot de passe VRM saisi dans
+  l'extension, serveurs vrm.center comme destinataire, gestes ajoutés depuis le 8 nov., plafond du
+  jour, arrêt au contrôle anti-robot). Elle affiche l'e-mail de `public/legal/editeur.js`.
+- Images : 5 captures 1280 × 800 et tuile 440 × 280 en PNG 24 bits (sans alpha), données inventées
+  (mode exemple ; carte du logo sur une page de dressing inventée, sans marque de site).
 
-⚠️ **Chaque mise à jour repasse par la vérification de Google** (souvent
-quelques heures, parfois quelques jours). Pendant ce temps l'app peut dire
-« extension à mettre à jour » alors que la nouvelle version attend la
-validation : c'est normal.
+Pas vérifiable depuis ce conteneur : developer.chrome.com et vrm.center sont hors réseau (les exigences
+ci-dessous viennent de la lecture du 8 nov., `docs/boutiques/README.md` §1, et de ce qui était connu).
 
-## Fiche de la boutique
+## Le pas à pas (Julien)
 
-**Nom** : VRM — outil du revendeur
+1. **Avant** : un compte Google avec la **validation en deux étapes** ; 5 $ ; ton identité
+   d'éditeur. VRM est vendu par abonnement ⇒ Google te demandera le statut **professionnel (trader,
+   DSA)** : nom/raison sociale, adresse, téléphone, e-mail, vérifiés et **affichés sur la fiche**.
+   `public/legal/editeur.js` n'a que l'e-mail : remplir le reste (nom, forme, adresse, SIRET, RCS,
+   TVA, téléphone, directeur, médiateur) — sinon les mentions légales disent « à compléter ».
+2. https://chrome.google.com/webstore/devconsole → contrat, 5 $ → onglet **Compte** : éditeur `VRM`,
+   e-mail de contact `vrm.vinted35+contact@gmail.com` **vérifié** (sans lui, « Envoyer » reste grisé),
+   statut professionnel rempli.
+3. **+ Nouvel élément** → `VRM-chromium.zip`.
+4. **Fiche** : description, catégorie (Productivité → Outils), langue (Français), icône 128,
+   5 captures, petite tuile — textes dans `docs/boutiques/chrome-web-store.md`.
+5. **Confidentialité** : objectif unique, une phrase par autorisation, la case des hôtes, code distant
+   « Non », données (identification, finances, authentification, communications, activité, contenu
+   du site ; pas santé, position, historique), 3 certifications, URL
+   `https://vrm.center/legal/extension.html`.
+6. **Instructions de test** : un compte VRM vide réservé aux relecteurs (conseillé — sans lui,
+   « impossible à tester » est un refus courant) + le texte anglais du mode d'emploi.
+7. **Distribution** : gratuit ; **Non répertoriée** pour commencer (installable par le lien, absente des
+   recherches, même examen ; passage en Publique plus tard, ré-examiné) ; toutes les régions.
+8. **Envoyer pour examen**. Souvent 1 à 3 jours ; jusqu'à 2–3 semaines pour une première soumission
+   avec `cookies` et plusieurs sites.
+9. Accepté : me donner l'adresse `https://chromewebstore.google.com/detail/…/<id>` ⇒
+   `LIENS_BOUTIQUES.chrome` (`src/navigateursServis.js`) ; retirer la copie « non empaquetée » de chaque
+   Chrome (deux VRM dans un Chrome ⇒ l'app coupe les commandes) et se reconnecter une fois (autre
+   identifiant d'extension : l'app le découvre par le pont, rien à changer). Chaque nouvelle version :
+   « Importer un nouveau package » + « Envoyer pour examen ».
 
-**Résumé (132 caractères max, repris du manifeste)** :
-Relie tes comptes Vinted, Leboncoin et eBay à VRM : annonces, ventes, colis et bordereaux, depuis ton navigateur.
+## Risques de refus, et la réponse prête
 
-**Catégorie** : Productivité (outils) · **Langue** : français
+| risque | où on en est | si Google refuse |
+|---|---|---|
+| `https://*.amazonaws.com/*` jugé trop large | phrase précise (bucket S3 de Vinted nommé) | 5.393.0 : `https://svc-shipping-labels.s3.eu-central-1.amazonaws.com/*` (seule adresse vue, `background.js` vers la ligne 22 544 ; restreindre ne redemande aucune autorisation aux utilisateurs) |
+| `cookies` + jetons de session envoyés au serveur | déclaré (« Informations d'authentification »), expliqué case `cookies` et politique §3-4 | répondre avec l'objectif unique ; rien à cacher |
+| connexion obligatoire, impossible à tester | onglet « Instructions de test » | fournir le compte relecteur |
+| actions sur des sites tiers (messages, offres) | tout sur son clic ; automatismes éteints par défaut ; plafonds | citer `garde`, 50/h, 200/j, une requête à la fois |
+| fiche anglaise impossible | le paquet n'a pas `_locales` | 5.393.0 : `_locales/fr` + `_locales/en`, `default_locale: "fr"`, nom et description en `__MSG_…__` (textes : `fiche-en.md`) |
+| icône sans marge | remplit le carré (conseil Google : 96 + 16 px de marge) | 5.393.0 : icône redessinée |
+| logos tiers visibles dans les captures (le « V » de Vinted, Mondial Relay dans l'écran Achats) | c'est l'interface de VRM, mode exemple | refaire les captures sans l'écran Achats |
 
-**Description** :
-
-> VRM est l'outil de gestion des revendeurs de seconde main (vrm.center).
-> Cette extension relie VRM à tes propres comptes Vinted, Leboncoin et eBay,
-> depuis TON navigateur :
->
-> • tes annonces, ventes, achats, messages et soldes arrivent dans VRM tout seuls ;
-> • les bordereaux d'expédition de tes ventes sont récupérés et prêts à imprimer,
->   avec le numéro de rangement de la paire ;
-> • les codes de retrait de tes colis sont lus dans tes conversations ;
-> • tu publies une annonce sur Leboncoin ou eBay depuis VRM, sans recopier.
->
-> Tout se pilote dans l'app VRM. L'extension n'agit que pour le compte connecté
-> dans l'onglet, au plus 50 actions par heure, une requête à la fois, et
-> n'accepte jamais une offre ni ne supprime une annonce toute seule.
->
-> Un compte VRM est nécessaire. VRM est un outil indépendant, ni affilié ni
-> approuvé par Vinted, Leboncoin ou eBay.
-
-## Onglet « Pratiques de confidentialité »
-
-**Objectif unique** :
-Synchroniser l'activité de vente de l'utilisateur sur ses propres comptes de
-revente (Vinted, Leboncoin, eBay, Vestiaire Collective) avec son espace VRM, et
-exécuter dans ces comptes les actions qu'il demande depuis l'app VRM.
-
-**Justification des autorisations** :
-
-| autorisation | pourquoi |
-|---|---|
-| `cookies` | Savoir quel compte Vinted est connecté dans l'onglet : l'extension n'agit jamais au nom d'un autre compte que celui-là. Lecture seule. |
-| `storage` | Garder l'état de l'extension (session VRM, compteurs d'actions par heure, file des commandes) entre deux réveils du service worker. |
-| `alarms` | Relève périodique (toutes les 30 s à quelques minutes) des commandes envoyées depuis l'app et renouvellement de la session VRM. |
-| `scripting` | Lire, dans l'onglet de la plateforme déjà ouvert par l'utilisateur, les données de ses annonces et ventes (et remplir le formulaire de dépôt Leboncoin quand il publie depuis VRM). |
-| `tabs` | Retrouver l'onglet de la plateforme déjà ouvert, ouvrir la page de dépôt Leboncoin ou la conversation d'une vente quand l'utilisateur le demande. |
-| `downloads` | Repérer le PDF du bordereau d'expédition que l'utilisateur télécharge depuis Vinted, pour le ranger dans VRM avec la vente. Observation seule : l'extension ne déclenche aucun téléchargement. |
-| `contextMenus` | Ajouter au clic droit sur l'icône de l'extension deux entrées, « Connexion à VRM » et « État de l'extension », qui ouvrent la page de connexion de l'extension dans un onglet. Aucun autre menu, aucune lecture de page. |
-| hôtes `*.vinted.*`, `*.leboncoin.fr`, `*.ebay.*` | Les plateformes de revente de l'utilisateur. |
-| hôte `*.vinted.net` | Les photos de ses annonces (CDN de Vinted), pour les joindre à une annonce Leboncoin/eBay. |
-| hôte `*.amazonaws.com` | Les bordereaux PDF de Vinted sont servis par un stockage Amazon S3 (`svc-shipping-labels…amazonaws.com`). |
-| hôte `lgonxzrzjcqthjtbdpzo.supabase.co` | La base de données de VRM, où l'espace de l'utilisateur est rangé. |
-| hôtes `vrm.center`, `cancale-v67-ten.vercel.app` | L'app VRM, qui pilote l'extension. |
-
-**Code distant** : Non. Tout le code est dans le paquet (`inject.js` est un
-fichier du paquet injecté via `chrome.runtime.getURL`).
-
-**Données recueillies** (cases à cocher) :
-- Informations permettant d'identifier l'utilisateur (e-mail du compte VRM, pseudos des comptes de revente)
-- Communications personnelles (messages des conversations de vente)
-- Informations financières et de paiement (soldes et montants des ventes ; jamais de numéro de carte)
-- Informations d'authentification (session des comptes de revente, pour agir à sa demande)
-- Localisation : non · Historique web : non · Activité de l'utilisateur : non · Contenu du site web : oui (ses annonces)
-
-**Certifications** (les trois cases) : pas de vente à des tiers ; pas
-d'utilisation sans rapport avec l'objectif unique ; pas d'utilisation pour la
-solvabilité ou un prêt.
-
-**Politique de confidentialité** : https://vrm.center/legal/confidentialite.html
-
-## Images
-
-- Icône 128×128 : `vinted-sync-extension/icon-128.png`
-- Captures 1280×800 : `docs/chrome-web-store/capture-*.png` (données inventées, aucune donnée réelle)
-- Vignette promotionnelle 440×280 : `docs/chrome-web-store/vignette-440x280.png`
+Aucune de ces corrections n'est faite : elles changent le paquet, donc une nouvelle version (une version
+publiée ne change jamais de contenu, CLAUDE.md §6).
