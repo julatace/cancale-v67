@@ -13,6 +13,7 @@ import { texteDuree } from './etatArticle.js';
 import { escalierPrix, eurosPrix } from './historiquePrix.js';
 import { motsInsecables } from './motsInsecables.jsx';
 import { tr } from './i18n/index.js';
+import MarquePlateforme from './plateformes/Marque.jsx';   // (15 nov., verre 2) la ligne par site
 import { poserSlot } from './ficheLigne.js';
 import LigneDeTemps, { OngletsFiche, useVueFiche } from './paireHistoire/LigneDeTemps.jsx';   // (14 nov., idée 154) « Dans l'ordre »
 
@@ -272,8 +273,30 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
       </div>
     </section>
   ) : null;
+  // (15 nov., maquette « Verre dépoli » validée) UNE LIGNE PAR SITE : les annonces que la règle du parcours a lues PAR
+  // IDENTITÉ (`parcoursPaire`, l'étape « annonces »), chacune son site, son état, son prix — le même texte que
+  // l'étape, rangé (rien d'autre n'est lu ; le prix est celui que la ligne écrit). L'étape ne le redit pas dessous.
+  const etapeAnn = p && !double ? p.etapes.find((e) => e.cle === 'annonces' && Array.isArray(e.lignes) && e.lignes.length) : null;
+  const SITE_MARQUE = { Vinted: 'vinted', eBay: 'ebay', Leboncoin: 'leboncoin', Vestiaire: 'vestiaire' };
+  const sites = etapeAnn ? (
+    <section className="vg-fp-sites" data-fiche-sites={etapeAnn.lignes.length} aria-label={etapeAnn.titre}>
+      {etapeAnn.lignes.map((l, i) => {
+        const morceaux = String(l.texte || '').split(' · ');
+        const prixL = morceaux.find((m) => /€/.test(m)) || '';
+        const reste = morceaux.slice(1).filter((m) => m !== prixL);
+        return (
+          <div key={i} className="vg-fp-site" data-fiche-site={l.site} data-fiche-site-etat={l.etat || undefined}>
+            <span className="vg-fp-site-logo" aria-hidden="true">{SITE_MARQUE[l.site] ? <MarquePlateforme site={SITE_MARQUE[l.site]} taille={l.site === 'eBay' ? 11 : 18}/> : I('tag', 17)}</span>
+            <span className="vg-fp-site-txt"><b>{morceaux[0] || l.site}</b>{reste.length ? <small>{reste.join(' · ')}</small> : null}</span>
+            {prixL ? <b className="vg-fp-site-prix">{prixL}</b> : null}
+          </div>
+        );
+      })}
+    </section>
+  ) : null;
   const histoire = p ? (
     <>
+      {sites}
       {/* (10 nov., lot BD) La note privée de la paire (l'écran la fournit : NotePaireCoque). */}
       {note ? <div className="vrm-fp-note-privee" data-fiche-note="">{note}</div> : null}
       {double ? <p className="vrm-fp-double" role="alert" data-fiche-double="1" data-fiche-choisit="0">Deux {motsVendeur().noms} présent{motsVendeur().e}s portent le N°{p.num} : vérifie là où {motsVendeur().elle}s sont rangé{motsVendeur().e}s avant d’emballer ou d’imprimer.</p> : null}
@@ -315,7 +338,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
             <span className="vrm-fp-pastille" aria-hidden="true">{I(ICONE[e.cle] || 'info', 17)}</span>
             <span className="vrm-fp-txt">
               <span className="vrm-fp-ligne1"><b>{e.titre}</b>{e.date ? <time className="vrm-fp-date" dateTime={e.date}>{quand(e.date)}</time> : null}</span>
-              {e.lignes ? e.lignes.map((l, j) => <span key={j} className="vrm-fp-detail" data-fiche-ligne={l.site} data-fiche-tx={l.tx || undefined}>{l.texte}{l.date && e.cle === 'vente' && e.lignes.length > 1 ? ` · ${quand(l.date)}` : ''}</span>) : null}
+              {e.lignes && !(e.cle === 'annonces' && sites) ? e.lignes.map((l, j) => <span key={j} className="vrm-fp-detail" data-fiche-ligne={l.site} data-fiche-tx={l.tx || undefined}>{l.texte}{l.date && e.cle === 'vente' && e.lignes.length > 1 ? ` · ${quand(l.date)}` : ''}</span>) : null}
               {e.cle === 'prix' && Array.isArray(e.serie) && e.serie.length > 1 ? <EscalierPrix points={e.serie}/> : null}
               {e.evenements && e.evenements.length ? <ul className="vrm-fp-evs">{e.evenements.map((ev, j) => <Evenement key={j} ev={ev}/>)}</ul> : null}
               {e.detail ? <span className="vrm-fp-detail">{e.etat === 'passu' ? <>— <span data-fiche-raison="">{e.detail}</span></> : e.detail}</span> : null}

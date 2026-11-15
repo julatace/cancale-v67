@@ -283,4 +283,87 @@
 :root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp .vrm-offre-repere { margin: 0; font: 700 12.5px/1.3 var(--sb-police-texte, Inter, sans-serif); }
 :root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp .vrm-offre-repere[data-offre-niveau="sous-minimum"] { color: var(--sv-ambre) !important; }
 
+/* La conversation sur le bleu (maquette « ms2 ») : la tête posée sur le fond (le pseudo en blanc), la paire en verre
+   (photo, plaque N°, titre ; le prix et le compte dessous), les bulles (l'autre en porcelaine, toi en bleu clair),
+   le jour en pastille fumée, l'offre en verre bordé d'ambre, les réponses rapides en touches blanches, le champ blanc. */
+:root:root:root:root:root:root body .vrm-chat-panel {
+  background: radial-gradient(120% 60% at 15% 0%, var(--sv-reflet) 0%, transparent 55%), linear-gradient(170deg, var(--sv-haut) 0%, var(--sv-milieu) 45%, var(--sv-bas) 100%) !important;
+}
+:root:root:root:root:root:root body .vrm-chat-panel > .vrm-chat-head { background: transparent !important; border-bottom: 0 !important; box-shadow: none !important; }
+:root:root:root:root:root:root body .vrm-chat-panel > .vrm-chat-head :is(.vrm-chat-head-n, .vrm-chat-head-n *) { color: var(--sv-clair) !important; font-weight: 750 !important; letter-spacing: -.02em; }
+:root:root:root:root:root:root body .vrm-chat-panel > .vrm-chat-head :is(.vrm-chat-head-s, .vrm-chat-head-s *) { color: var(--sv-clair-2) !important; }
+:root:root:root:root:root:root body .vrm-chat-panel > .vrm-chat-head :is(.vrm-chat-back, .vrm-chat-sync, .vrm-chat-retirer) {
+  background: rgb(10 38 76 / .24) !important; border: 1px solid rgb(255 255 255 / .32) !important; color: #FFFFFF !important; box-shadow: none !important; }
+:root:root:root:root:root:root body .vrm-chat-panel > .vrm-chat-head .vrm-chat-back { width: 44px; height: 44px; border-radius: 50% !important; display: grid !important; place-items: center; flex: none; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-paire {
+  margin: 4px 16px 0 !important; padding: 10px 14px 10px 10px !important; border: 0 !important; border-radius: 22px !important;
+  background-color: transparent !important; background-image: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; box-shadow: var(--sv-ombre) !important;
+  display: grid !important; grid-template-columns: 44px auto minmax(0, 1fr); grid-template-areas: "ph num nom" "ph ligne ligne"; column-gap: 8px; row-gap: 4px; align-items: center; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-paire-ph { grid-area: ph; width: 44px !important; height: 44px !important; border-radius: 11px !important; overflow: hidden; margin-right: 3px; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-paire-t { display: contents !important; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-paire-numero { grid-area: num; justify-self: start; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-paire-n { grid-area: nom; min-width: 0; font: 650 14px/1.25 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-paire-l { grid-area: ligne; min-width: 0; font: 600 12px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-paire-prix { font-weight: 750; color: var(--sv-encre) !important; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-history { background: transparent !important; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-jour { align-self: center; font: 650 12px/1.2 var(--sb-police-texte, Inter, sans-serif) !important; color: #FFFFFF !important; padding: 3px 10px !important; border-radius: 10px !important; background: rgb(8 28 56 / .42) !important; border: 0 !important; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-bulle { border-radius: 18px !important; padding: 9px 13px 7px !important; font: 500 14.5px/1.35 var(--sb-police-texte, Inter, sans-serif) !important; box-shadow: none !important; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-bulle[data-bulle="acheteur"] { background: rgb(247 250 253 / .92) !important; color: #0C1D30 !important; border-bottom-left-radius: 6px !important; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-bulle[data-bulle="moi"] { background: #D3E6FB !important; color: #0C1D30 !important; border-bottom-right-radius: 6px !important; }
+:root:root:root:root:root:root[data-theme="dark"] body .vrm-chat-panel .vrm-bulle[data-bulle="acheteur"] { background: rgb(28 46 72 / .96) !important; color: #EAF2FB !important; }
+:root:root:root:root:root:root[data-theme="dark"] body .vrm-chat-panel .vrm-bulle[data-bulle="moi"] { background: #1E4A80 !important; color: #F2F7FD !important; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-bulle .vrm-bulle-h { color: #3F5468 !important; font: 600 11px/1 var(--sb-police-texte, Inter, sans-serif) !important; opacity: 1 !important; }
+:root:root:root:root:root:root[data-theme="dark"] body .vrm-chat-panel .vrm-bulle .vrm-bulle-h { color: #B9CADD !important; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-bulle-pied, :root:root:root:root:root:root body .vrm-chat-panel .vrm-bulle-pied * { color: var(--sv-clair-2) !important; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-offre { border-radius: 22px !important; padding: 14px !important; color: var(--sv-encre) !important;
+  background-color: transparent !important; background-image: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; box-shadow: var(--sv-ombre) !important; border: 1.5px solid rgb(178 106 0 / .5) !important; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-offre.vrm-chat-offre-info { border-color: var(--sv-bord) !important; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-foot { background: rgb(247 250 253 / .86) !important; -webkit-backdrop-filter: blur(26px); backdrop-filter: blur(26px); border-top: 1px solid rgb(255 255 255 / .9) !important; }
+:root:root:root:root:root:root[data-theme="dark"] body .vrm-chat-panel .vrm-chat-foot { background: rgb(16 30 50 / .86) !important; border-top-color: rgb(255 255 255 / .14) !important; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-rapide { background: #FFFFFF !important; color: #0C1D30 !important; border: 1px solid rgb(12 29 48 / .12) !important; border-radius: 22px !important; font: 600 13px/1 var(--sb-police-texte, Inter, sans-serif) !important; min-height: 44px; padding: 0 12px !important; box-shadow: none !important; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-compose > textarea { background: #FFFFFF !important; border: 1px solid rgb(12 29 48 / .14) !important; border-radius: 22px !important; color: #0C1D30 !important; }
+:root:root:root:root:root:root body .vrm-chat-panel .vrm-chat-send { border-radius: 50% !important; }
+
+/* ══ 5. LA FICHE D'UNE PAIRE (maquette « fp ») : sur le bleu, la paire en verre (photo 96, plaque, titre), les chiffres
+   en verres côte à côte, l'histoire dans un verre, les gestes en touches. */
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-cadre {
+  background: radial-gradient(120% 60% at 15% 0%, var(--sv-reflet) 0%, transparent 55%), linear-gradient(170deg, var(--sv-haut) 0%, var(--sv-milieu) 45%, var(--sv-bas) 100%) !important;
+  color: var(--sv-clair) !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-poignee { background: rgb(255 255 255 / .45) !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-tete :is(.vrm-fp-retour, .vrm-fp-fermer) {
+  background: rgb(10 38 76 / .24) !important; border: 1px solid rgb(255 255 255 / .32) !important; color: #FFFFFF !important; box-shadow: none !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-tete .vrm-fp-retour { border-radius: 22px !important; min-height: 44px; padding: 0 14px 0 8px !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-tete .vrm-fp-fermer { width: 44px; height: 44px; border-radius: 50% !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) :is(.vrm-fp-heros, .vrm-fp-tuile, .vrm-fp-etat, .vrm-fp-histo-num, .vrm-fp-parcours, .vrm-fp-actions-carte, .vrm-fp-sans-paire, .vrm-fp-note-privee, .vg-fp-sites) {
+  background-color: transparent !important; background-image: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; box-shadow: var(--sv-ombre) !important; border: 0 !important; border-radius: 22px !important; color: var(--sv-encre) !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-heros { display: flex !important; align-items: center; gap: 14px; padding: 10px 14px 10px 10px !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-heros-photo { width: 96px !important; height: 96px !important; flex: none; border-radius: 18px !important; overflow: hidden; box-shadow: 0 6px 14px -8px rgb(8 26 50 / .55) !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-heros-photo :is(img, svg) { width: 100% !important; height: 100% !important; object-fit: cover; border-radius: 18px; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-quoi { display: flex !important; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-quoi .vrm-fp-titre { font: 750 17px/1.25 var(--sb-police-texte, Inter, sans-serif) !important; letter-spacing: -.02em; color: var(--sv-encre) !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-quoi :is(.vrm-fp-sous, .vrm-fp-heros-ctx) { font: 550 12.5px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-heros-prix { font: 750 15px/1.2 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre) !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-tuiles { display: grid !important; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 10px !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-tuile { padding: 12px 14px !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-tuile > span { font: 600 12.5px/1.25 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-tuile > b { font: 750 22px/1.15 var(--sb-police-affiche, Inter, sans-serif) !important; letter-spacing: -.03em !important; color: var(--sv-encre) !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-tuile > small { font: 550 12px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) :is(.vrm-fp-etat-titre, .vrm-fp-raccourcis, .vrm-fp-note) { color: var(--sv-clair) !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) :is(.vrm-fp-etat, .vrm-fp-histo-num, .vrm-fp-actions-carte) .vrm-fp-etat-titre { color: var(--sv-encre-2) !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-parcours { padding: 10px 14px 6px !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-outils { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px !important; }
+:root:root:root:root:root:root:root body .vrm-fp:not(.sb-plan) .vrm-fp-outils > button { height: 48px !important; min-height: 48px !important; border-radius: 14px !important; padding: 0 8px !important; font: 600 13.5px/1.15 var(--sb-police-texte, Inter, sans-serif) !important;
+  background: rgb(247 250 253 / .86) !important; background-image: none !important; border: 1px solid rgb(255 255 255 / .8) !important; color: #0C1D30 !important; box-shadow: none !important; }
+:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-fp:not(.sb-plan) .vrm-fp-outils > button { background: rgb(255 255 255 / .08) !important; border-color: rgb(255 255 255 / .14) !important; color: #EAF2FB !important; }
+/* La ligne par site (une par annonce : le site, son compte et son état ; le prix à droite) */
+:root:root:root:root:root:root:root body .vrm-fp .vg-fp-sites { margin: 10px 0 0; padding: 2px 14px !important; }
+:root:root:root:root:root:root:root body .vrm-fp .vg-fp-site { display: flex; align-items: center; gap: 12px; min-height: 52px; }
+:root:root:root:root:root:root:root body .vrm-fp .vg-fp-site + .vg-fp-site { border-top: 1px solid rgb(12 29 48 / .10); }
+:root:root:root:root:root:root:root[data-theme="dark"] body .vrm-fp .vg-fp-site + .vg-fp-site { border-top-color: rgb(255 255 255 / .10); }
+:root:root:root:root:root:root:root body .vrm-fp .vg-fp-site-logo { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; flex: none; background: rgb(12 29 48 / .06); color: var(--sv-encre) !important; }
+:root:root:root:root:root:root:root body .vrm-fp .vg-fp-site-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+:root:root:root:root:root:root:root body .vrm-fp .vg-fp-site-txt b { font: 700 14px/1.25 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-encre) !important; }
+:root:root:root:root:root:root:root body .vrm-fp .vg-fp-site-txt small { font: 550 12.5px/1.3 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-encre-2) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:root:root:root:root:root:root:root body .vrm-fp .vg-fp-site-prix { flex: none; font: 750 15px/1.2 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-encre) !important; }
+
 } /* fin de @layer vrm-verre */
