@@ -114,3 +114,8 @@ L'app :
   retour, oublier le bordereau de retour, ignorer la liste, « n'importe quelle lecture finalisée »,
   supprimer la ligne entière, `select=data`, lecture ratée qui écrit, lignes de tous les vendeurs, PDF pas
   lu pour son transporteur, ceinture des 7 jours, bouton gardé dans l'app).
+- Banc `scripts/bancs/bordereau-supprime-versement.cjs` (390 px tactile, 1512 px, captures regardées) :
+  Colis → « bordereaux déjà traités » : la ligne au PDF retiré dit la phrase, sans bouton ; l'autre garde
+  « Réimprimer ». `bordereau-vestiaire-ouverture` vert.
+- Verts : fonctions-api, identite, urssaf, coherence, tdz, variables, traduction, quoi-de-neuf,
+  familles-serveur, bilan-semaine ; `npm run build`.
