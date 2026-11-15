@@ -288,7 +288,8 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
   // c) toute annonce EN LIGNE reçoit un numéro — comptes masqués compris
   // ⚠️ On ancre sur le commentaire + la ligne : `const items = (listings.items…)`
   // existe ailleurs dans le fichier, donc le tester seul donnait un faux vert.
-  /TOUTE ANNONCE EN LIGNE DOIT AVOIR UN NUMÉRO[\s\S]{0,900}?const items = \(listings\.items \|\| \[\]\);/.test(SRC)
+  // (15 nov.) + les masquées encore sur l'étagère (`annoncesANumeroter`) : toujours `listings.items`, jamais `annBase`.
+  /TOUTE ANNONCE EN LIGNE DOIT AVOIR UN NUMÉRO[\s\S]{0,1400}?const items = (?:\(listings\.items \|\| \[\]\)|annoncesANumeroter\(listings\.items, masqueesSurEtagere\));/.test(SRC)
     ? ok('la numérotation couvre TOUTES les annonces en ligne (comptes masqués compris)')
     : nok('la numérotation couvre TOUTES les annonces en ligne',
           'elle part encore d\'`annBase`, qui écarte les comptes masqués');
@@ -478,7 +479,8 @@ const nok = (nom, d) => { ko++; console.log(`❌ ${nom}${d ? ' — ' + d : ''}`)
   const mi = /let num = (numeroReprenable\()?numVentesParIdentite/.exec(SRC);
   const i = mi ? mi.index : -1;
   const neuf = i >= 0 ? SRC.indexOf('if (!num) num = prochainLibre(', i) : -1;
-  i >= 0 && neuf > i && neuf - i < 2000
+  // (15 nov.) la borne suit le bloc (la republication dans l'app Vinted s'insère avant le N° neuf) : l'ORDRE est la règle.
+  i >= 0 && neuf > i && neuf - i < 4000
     ? ok('la numérotation réutilise ce numéro AVANT d\'en créer un neuf')
     : nok('la numérotation réutilise ce numéro avant d\'en créer un neuf',
           'la réutilisation par vente ne passe pas avant l\'attribution');
