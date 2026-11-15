@@ -28,4 +28,13 @@ export default {
   "memePhoto.outil": "Gleiches Foto · zu verknüpfen",
   "memePhoto.outilDesc": "Eine Anzeige woanders mit dem Foto eines Vinted-Paars",
   "memePhoto.surSites": "Gleiches Foto auf {sites} · zu verknüpfen",
+  "memePhoto.sur": "Gleiches Foto · sicher",
+  "memePhoto.aVerifier": "Zu prüfen",
+  "memePhoto.pourquoi.pasMesure": "Nur eine Messung: sieh dir beide Fotos an",
+  "memePhoto.pourquoi.proche": "Sehr ähnlich, nicht sicher: sieh dir beide Fotos an",
+  "memePhoto.pourquoi.doute": "Ähnlich, nicht sicher: sieh dir beide Fotos an",
+  "memePhoto.pourquoi.ebay": "eBay: nur eine Messung möglich, sieh dir beide Fotos an",
+  "memePhoto.detailEtats": "{surs} sicher · {verifier} zu prüfen",
+  "memePhoto.extensionSure": "Erweiterung {v} bestätigt „sicher“: aktualisiere sie. Bis dahin ist alles „zu prüfen“.",
+  "memePhoto.aideSure": "„Sicher“: zwei verschiedene Messungen sagen, dass es dasselbe Foto ist. „Zu prüfen“: sieh dir beide Fotos an. Nichts wird ohne deinen Tipp verknüpft.",
 };

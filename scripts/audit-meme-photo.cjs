@@ -44,6 +44,18 @@ const iSrc = process.argv.indexOf('--src');
 const RACINE = iSrc > 0 ? path.resolve(process.argv[iSrc + 1]) : path.join(__dirname, '..');
 const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').slice(11);
 const BG = path.join(RACINE, 'vinted-sync-extension', 'background.js');
+// (15 nov., lot meme-photo-sure) La deuxième mesure : le bloc <photo-fine-regle> de src/photoFine.js,
+// recopié tel quel dans background.js (`--recopie`), comparé ici (F0).
+const BLOC_FIN = /\/\/ <photo-fine-regle>[^\n]*\n([\s\S]*?)\/\/ <\/photo-fine-regle>/;
+const sansExport = (t) => t.replace(/^export /gm, '');
+if (process.argv.includes('--recopie')) {
+  const m = BLOC_FIN.exec(fs.readFileSync(path.join(RACINE, 'src', 'photoFine.js'), 'utf8')); if (!m) { console.log('❌ bloc <photo-fine-regle> introuvable dans src/photoFine.js'); process.exit(1); }
+  const bg = fs.readFileSync(BG, 'utf8');
+  if (!BLOC_FIN.test(bg)) { console.log('❌ marques <photo-fine-regle> introuvables dans background.js'); process.exit(1); }
+  fs.writeFileSync(BG, bg.replace(BLOC_FIN, () => '// <photo-fine-regle> — COPIE de src/photoFine.js (scripts/audit-meme-photo.cjs --recopie). Ne pas modifier ici.\n' + sansExport(m[1]) + '// </photo-fine-regle>'));
+  console.log('✅ bloc <photo-fine-regle> recopié dans background.js');
+  process.exit(0);
+}
 
 const MUTATIONS = {
   seuil: ['src/memePhoto.js', 'if (d == null || d > seuil) continue;', 'if (d == null || d > seuil * 3) continue;'],

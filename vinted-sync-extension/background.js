@@ -8388,8 +8388,12 @@ function tickEmpreintes() {
     // 5.384 : Vinted d'abord ; sans image Vinted à ce tour, une photo Leboncoin / Vestiaire.
     // ⚠️ Le verrou du tour se lève dans TOUS les cas (un `finally` pour les deux) : sinon une image
     //    Vinted laissait le tour verrouillé 3 min (vu par audit-photos-comptes, E2).
+    // 5.388 : d'abord un couple à vérifier finement (peu nombreux, c'est ce qu'il voit « à vérifier »),
+    // puis Vinted, puis Leboncoin / Vestiaire — une seule chose par tour.
     try {
       let n = 0;
+      try { n = await verifFineUnTour(); } catch (_) { n = 0; }
+      if (n) return n;
       try { n = await empreintesUnTour(); } catch (_) { n = 0; }
       if (n) return n;
       try { return await empreintesSitesUnTour(); } catch (_) { return 0; }
@@ -8571,6 +8575,343 @@ async function empreintesSitesUnTour() {
   try { await chrome.storage.local.set({ [EMPREINTES_SITES_FILE]: file }); } catch (_) { return 0; }
   noterDiag('empreintes_sites_calculee');
   await rangerEmpreintesSites(false);
+  return 1;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 5.388 (15 nov.) — « MÊME PHOTO · SÛR » : LA DEUXIÈME MESURE (lot meme-photo-sure)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « Est-ce que tu peux faire la reconnaissance d'image et que ça soit parfaitement
+// fiable ? ». MESURÉ (banc meme-photo-fiabilite) : l'empreinte seule (64 bits, 64 × 64) confond
+// des exemplaires du MÊME modèle photographiés au même endroit. Une deuxième mesure, d'une autre
+// nature, est donc prise sur les DEUX images elles-mêmes : la corrélation fine après recalage
+// (<photo-fine-regle>, copie de src/photoFine.js) — SANS IA (§2.9), dans le service worker.
+// Seulement pour les couples CANDIDATS (`couplesAVerifier` : une photo Leboncoin / Vestiaire à
+// une empreinte ≤ 12 d'une photo Vinted) ; rangé dans `photo_meme_verif` : { couples: { [clé]:
+// { s: score | null, v, at } } } — un NOMBRE, jamais l'image, jamais un pixel.
+// Bornes (§3), celles des empreintes, rien de plus :
+//   · les DEUX images dans le même tour : la photo Vinted (onglet vinted.fr ouvert, compte
+//     connecté, pause / frein respectés, budget de LECTURE classe « photos », file Vinted
+//     `requeteVinted`) ET la photo de l'autre site (onglet de CE compte ouvert, anti-robot,
+//     pauses, budget de LECTURE du compte sur le site — les 8 des 20 des empreintes) ;
+//   · `VERIF_FINE_MAX_HEURE` couples par heure, `EMPREINTES_ECART_MS` entre deux, un tour à la
+//     fois (le verrou de `tickEmpreintes`) ; un couple raté n'est repris qu'après 24 h ;
+//   · sans cookie (`credentials: 'omit'`), au plus `EMPREINTES_SITES_MAX_OCTETS` par image ;
+//   · lire-fusionner-réécrire : une lecture ratée de la ligne n'écrit RIEN (le score reste en file).
+//   · eBay : aucune vérification (i.ebayimg.com n'est pas un hôte de l'extension) — l'app dit
+//     « à vérifier », jamais « sûr ».
+// <photo-fine-regle> — COPIE de src/photoFine.js (scripts/audit-meme-photo.cjs --recopie). Ne pas modifier ici.
+// La version de la mesure : un score d'une autre version n'est pas relu (recalculé).
+const VERSION_FINE = 1;
+// L'image est lue à `LECTURE_FINE` px au plus (proportions gardées), puis le contenu (bandes
+// unies retirées) est ramené à `COTE_FINE` × `COTE_FINE` niveaux de gris centrés-réduits.
+const LECTURE_FINE = 512;
+const COTE_FINE = 128;
+const GROSSIER = 32;
+// Un contenu plus petit que `COTE_FINE_MIN` px (vignette) ne se vérifie pas finement : « pas su ».
+const COTE_FINE_MIN = 96;
+// Les seuils — MESURÉS (banc meme-photo-fiabilite, 15 nov.), pas devinés :
+//   score ≥ SEUIL_FINE_SUR  ⇒ la même photo (les deux mesures concordent nettement) ;
+//   score < SEUIL_FINE_NON  ⇒ pas la même photo (le candidat est écarté) ;
+//   entre les deux          ⇒ « à vérifier » (montré, jamais compté sûr).
+const SEUIL_FINE_SUR = 0.97;
+const SEUIL_FINE_NON = 0.80;
+// La première mesure doit, elle aussi, être NETTE pour « sûr » (≤ `SEUIL_EMPREINTE_SUR` ;
+// au-dessus et jusqu'au seuil de proposition : « à vérifier »).
+const SEUIL_EMPREINTE_SUR = 10;
+
+function grisFin(rgba, w, h) {
+  const g = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) g[i] = 0.299 * rgba[i * 4] + 0.587 * rgba[i * 4 + 1] + 0.114 * rgba[i * 4 + 2];
+  return g;
+}
+// Les bandes UNIES du bord (ajoutées par un site pour mettre la photo au carré, ou un fond
+// uni) : une ligne / colonne dont l'écart est ≤ 8 niveaux et de la même teinte que la
+// première. Au plus 40 % de chaque côté.
+function boiteContenu(g, w, h) {
+  const T = 8;
+  const ligne = (y, x0, x1) => { let mn = 1e9, mx = -1e9, s = 0; for (let x = x0; x < x1; x++) { const v = g[y * w + x]; if (v < mn) mn = v; if (v > mx) mx = v; s += v; } return [mx - mn, s / Math.max(1, x1 - x0)]; };
+  const col = (x, y0, y1) => { let mn = 1e9, mx = -1e9, s = 0; for (let y = y0; y < y1; y++) { const v = g[y * w + x]; if (v < mn) mn = v; if (v > mx) mx = v; s += v; } return [mx - mn, s / Math.max(1, y1 - y0)]; };
+  let t = 0, b = h, l = 0, r = w;
+  let p = ligne(0, 0, w); if (p[0] <= T) { const m = p[1]; while (t < h * 0.4) { p = ligne(t, 0, w); if (p[0] > T || Math.abs(p[1] - m) > T) break; t++; } }
+  p = ligne(h - 1, 0, w); if (p[0] <= T) { const m = p[1]; while (b > h * 0.6) { p = ligne(b - 1, 0, w); if (p[0] > T || Math.abs(p[1] - m) > T) break; b--; } }
+  p = col(0, t, b); if (p[0] <= T) { const m = p[1]; while (l < w * 0.4) { p = col(l, t, b); if (p[0] > T || Math.abs(p[1] - m) > T) break; l++; } }
+  p = col(w - 1, t, b); if (p[0] <= T) { const m = p[1]; while (r > w * 0.6) { p = col(r - 1, t, b); if (p[0] > T || Math.abs(p[1] - m) > T) break; r--; } }
+  return [l, t, r, b];
+}
+// La zone [x0, x1) × [y0, y1) ramenée à N × N par moyenne de surface, centrée-réduite.
+function grilleFine(g, w, h, x0, y0, x1, y1, N) {
+  const out = new Float32Array(N * N), lw = x1 - x0, lh = y1 - y0;
+  for (let j = 0; j < N; j++) {
+    const ya = y0 + (j * lh) / N, yb = y0 + ((j + 1) * lh) / N;
+    for (let i = 0; i < N; i++) {
+      const xa = x0 + (i * lw) / N, xb = x0 + ((i + 1) * lw) / N;
+      let s = 0, a = 0;
+      for (let y = Math.floor(ya); y < Math.min(h, Math.ceil(yb)); y++) {
+        const fy = Math.min(y + 1, yb) - Math.max(y, ya); if (fy <= 0) continue;
+        for (let x = Math.floor(xa); x < Math.min(w, Math.ceil(xb)); x++) {
+          const fx = Math.min(x + 1, xb) - Math.max(x, xa); if (fx <= 0) continue;
+          s += fx * fy * g[y * w + x]; a += fx * fy;
+        }
+      }
+      out[j * N + i] = a > 0 ? s / a : 0;
+    }
+  }
+  let m = 0; for (let i = 0; i < out.length; i++) m += out[i]; m /= out.length;
+  let v = 0; for (let i = 0; i < out.length; i++) v += (out[i] - m) * (out[i] - m); v = Math.sqrt(v / out.length);
+  if (!(v > 1.5)) return null;                         // contenu uni : rien à comparer
+  for (let i = 0; i < out.length; i++) out[i] = (out[i] - m) / v;
+  return out;
+}
+// La taille à laquelle dessiner l'image avant `preparerFine` (proportions gardées).
+function tailleLectureFine(w, h) {
+  const k = Math.min(1, LECTURE_FINE / Math.max(1, w, h));
+  return { w: Math.max(1, Math.round(w * k)), h: Math.max(1, Math.round(h * k)) };
+}
+// `rgba` : les octets de l'image dessinée à `tailleLectureFine`. Rend { g, f, cote } ou null
+// (image uniforme, ou contenu trop petit pour une vérification fine : « pas su »).
+function preparerFine(rgba, w, h) {
+  w = Math.floor(Number(w)); h = Math.floor(Number(h));
+  if (!rgba || !(w > 0) || !(h > 0) || rgba.length < w * h * 4) return null;
+  const g = grisFin(rgba, w, h);
+  const [l, t, r, b] = boiteContenu(g, w, h);
+  const cote = Math.min(r - l, b - t);
+  if (cote < COTE_FINE_MIN) return null;
+  const f = grilleFine(g, w, h, l, t, r, b, COTE_FINE), c = grilleFine(g, w, h, l, t, r, b, GROSSIER);
+  return f && c ? { f, g: c, cote } : null;
+}
+// Corrélation de A (N × N) et de B lu en (c + (x − c)·sx + dx, c + (y − c)·sy + dy),
+// bilinéaire, sur la zone commune (au moins 60 % de l'image ; sinon −1).
+function correlation(A, B, N, sx, sy, dx, dy) {
+  const c = (N - 1) / 2;
+  let n = 0, sa = 0, sb = 0, saa = 0, sbb = 0, sab = 0;
+  for (let y = 0; y < N; y++) {
+    const fy = c + (y - c) * sy + dy; if (fy < 0 || fy > N - 1) continue;
+    const y0 = Math.floor(fy), y1 = y0 + 1 < N ? y0 + 1 : y0, ay = fy - y0;
+    for (let x = 0; x < N; x++) {
+      const fx = c + (x - c) * sx + dx; if (fx < 0 || fx > N - 1) continue;
+      const x0 = Math.floor(fx), x1 = x0 + 1 < N ? x0 + 1 : x0, ax = fx - x0;
+      const b = (1 - ay) * ((1 - ax) * B[y0 * N + x0] + ax * B[y0 * N + x1]) + ay * ((1 - ax) * B[y1 * N + x0] + ax * B[y1 * N + x1]);
+      const a = A[y * N + x];
+      n++; sa += a; sb += b; saa += a * a; sbb += b * b; sab += a * b;
+    }
+  }
+  if (n < N * N * 0.6) return -1;
+  const cov = sab - (sa * sb) / n, va = saa - (sa * sa) / n, vb = sbb - (sb * sb) / n;
+  return va > 0 && vb > 0 ? cov / Math.sqrt(va * vb) : 0;
+}
+// Le score (−1…1) de deux photos préparées : la meilleure corrélation fine après recalage.
+// Recalage cherché sur 32 × 32 (échelle 0,96…1,04 par axe, décalage ± 2), puis affiné sur la
+// grille fine autour du meilleur (± 1 % d'échelle, ± ½ pas). null si l'une n'est pas préparée.
+const ECHELLES = [0.96, 0.98, 1, 1.02, 1.04];
+function comparerFine(pa, pb) {
+  if (!pa || !pb || !pa.f || !pb.f || pa.f.length !== COTE_FINE * COTE_FINE || pb.f.length !== COTE_FINE * COTE_FINE) return null;
+  let best = { r: -2, sx: 1, sy: 1, dx: 0, dy: 0 };
+  for (const sx of ECHELLES) for (const sy of ECHELLES) for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+    const r = correlation(pa.g, pb.g, GROSSIER, sx, sy, dx, dy);
+    if (r > best.r) best = { r, sx, sy, dx, dy };
+  }
+  const k = COTE_FINE / GROSSIER;
+  let fin = -2;
+  for (const ex of [-0.01, 0, 0.01]) for (const ey of [-0.01, 0, 0.01]) for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+    const r = correlation(pa.f, pb.f, COTE_FINE, best.sx + ex, best.sy + ey, best.dx * k + (i * k) / 2, best.dy * k + (j * k) / 2);
+    if (r > fin) fin = r;
+  }
+  return Math.round(fin * 10000) / 10000;
+}
+// Le verdict d'un score : 'sur' · 'non' · 'doute' ; null (pas mesuré) ⇒ null.
+function verdictFin(score) {
+  if (typeof score !== 'number' || !Number.isFinite(score)) return null;
+  if (score >= SEUIL_FINE_SUR) return 'sur';
+  if (score < SEUIL_FINE_NON) return 'non';
+  return 'doute';
+}
+// La clé d'un couple vérifié : la photo de l'autre site × la photo Vinted (clés de photo,
+// sans signature). `site` : 'lbc' · 'vc' · 'ebay'.
+const cleCoupleFin = (site, idSite, kSite, uid, idVinted, kVinted) => `${site}|${idSite}|${kSite}#${uid}|${idVinted}|${kVinted}`;
+// Les couples à vérifier finement : chaque photo d'un autre site × chaque photo Vinted à une
+// distance d'empreinte ≤ `seuil` (le seuil de proposition). Une photo d'ailleurs proche de plus
+// de `parPhoto` annonces Vinted est un logo / un fond : ignorée. Les plus proches d'abord, `max` au plus.
+// `vinted` : { [uid]: { [idAnnonce]: { [clePhoto]: hex } } } ; `sites` : { lbc|vc|ebay: { [id]: { [clé]: hex } } }.
+function couplesAVerifier({ vinted = {}, sites = {}, seuil = 12, parPhoto = 8, max = 60 } = {}) {
+  const pv = [];
+  for (const [uid, parId] of Object.entries(vinted || {})) for (const [id, ph] of Object.entries(parId || {})) for (const [k, h] of Object.entries(ph || {})) pv.push({ uid, id, k, h });
+  const out = [];
+  for (const [site, parId] of Object.entries(sites || {})) for (const [sid, ph] of Object.entries(parId || {})) for (const [sk, sh] of Object.entries(ph || {})) {
+    const proches = [];
+    for (const v of pv) { const d = distanceEmpreintes(sh, v.h); if (d != null && d <= seuil) proches.push({ v, d }); }
+    if (!proches.length || new Set(proches.map((x) => `${x.v.uid}|${x.v.id}`)).size > parPhoto) continue;
+    for (const { v, d } of proches) out.push({ cle: cleCoupleFin(site, sid, sk, v.uid, v.id, v.k), site, sid, sk, uid: v.uid, vid: v.id, vk: v.k, d });
+  }
+  out.sort((a, b) => a.d - b.d || (a.cle < b.cle ? -1 : 1));
+  return out.slice(0, max);
+}
+// </photo-fine-regle>
+const VERIF_FINE_MAX_HEURE = 6;
+const VERIF_FINE_PLAN = 'vrmVerifFinePlan';          // { at, couples: [{ cle, site, sid, sk, uid, vid, vk, d, vu, su, compte }] }
+const VERIF_FINE_MEMO = 'vrmVerifFineMemo';          // { [clé]: ms du dernier essai }
+const VERIF_FINE_FILE = 'vrmVerifFineFile';          // [{ cle, s, at }] — mesurés, pas encore rangés
+const VERIF_FINE_DERNIERE = 'vrmVerifFineDerniere';
+const VERIF_FINE_HEURE = 'vrmVerifFineHeure';        // [ms] des couples de l'heure
+const LIGNE_VERIF_FINE = 'photo_meme_verif';
+// La liste des couples à vérifier, avec l'adresse des deux photos (SES annonces seulement :
+// dressings de ses comptes liés, `lbc_listings` / `vc_listings` de ses comptes). `null` = pas su.
+async function planVerifFine() {
+  let st = {};
+  try { st = await chrome.storage.local.get(VERIF_FINE_PLAN); } catch (_) { return null; }
+  const p = st[VERIF_FINE_PLAN];
+  const age = Date.now() - Number(p && p.at || 0);
+  if (p && Array.isArray(p.couples) && age >= 0 && age < (p.couples.length ? EMPREINTES_PLAN_MS : EMPREINTES_PLAN_VIDE_MS)) return p;
+  const comptes = (await getStoredAccounts()).map((a) => String(a && a.vinted_user_id || '')).filter((u) => /^\d{1,15}$/.test(u));
+  if (!comptes.length) return null;
+  const empV = await sbGet('app_data?id=like.photo_emprunte_*&select=id,a:data->payload->annonces');
+  const empS = await sbGet('app_data?id=in.(photo_empreinte_lbc,photo_empreinte_vc)&select=id,a:data->payload->annonces');
+  const faits = await sbGet(`app_data?id=eq.${LIGNE_VERIF_FINE}&select=c:data->payload->couples`);
+  if (empV === null || empS === null || faits === null) return null;
+  const vinted = {}, sites = {};
+  for (const r of empV || []) { const m = /^photo_emprunte_(\d+)$/.exec(String(r && r.id || '')); if (m && comptes.includes(m[1]) && r.a && typeof r.a === 'object') vinted[m[1]] = r.a; }
+  for (const r of empS || []) { const s = r && r.id === 'photo_empreinte_lbc' ? 'lbc' : r && r.id === 'photo_empreinte_vc' ? 'vc' : ''; if (s && r.a && typeof r.a === 'object') sites[s] = r.a; }
+  const deja = (faits && faits[0] && faits[0].c && typeof faits[0].c === 'object') ? faits[0].c : {};
+  const candidats = couplesAVerifier({ vinted, sites }).filter((c) => { const x = deja[c.cle]; return !(x && Number(x.v) === VERSION_FINE); });
+  if (!candidats.length) { const vide = { at: Date.now(), couples: [] }; try { await chrome.storage.local.set({ [VERIF_FINE_PLAN]: vide }); } catch (_) {} return vide; }
+  // Les adresses : la clé d'une photo est son adresse sans signature — on retrouve l'adresse
+  // complète là où l'extension l'a lue pour l'empreinte (dressing, fiche ; annonces des sites).
+  const dressings = await sbGet('app_data?id=like.harvest_*_listings&select=id,items:data->payload->items');
+  const lbc = await sbGetLbc('app_data?id=eq.lbc_listings&select=i:data->items');
+  const vc = await sbGet('app_data?id=eq.vc_listings&select=i:data->items');
+  if (dressings === null || lbc === null || vc === null) return null;
+  let details = {};
+  const dr = await sbGet('app_data?id=eq.vinted_item_details&select=data');
+  if (dr !== null) details = (dr[0] && dr[0].data) || {};
+  const urlV = new Map(), urlS = new Map();
+  for (const r of dressings || []) {
+    const m = /^harvest_(\d+)_listings$/.exec(String(r && r.id || '')); if (!m || !comptes.includes(m[1])) continue;
+    for (const it of Array.isArray(r.items) ? r.items : []) {
+      if (!it || !it.id) continue;
+      const id = String(it.id), ph = it.photo && typeof it.photo === 'object' ? it.photo : null;
+      if (ph && ph.url && urlImageVinted(ph.url)) urlV.set(`${m[1]}|${id}|${clePhotoEmpreinte(ph.url)}`, ph.url);
+      const d = details[id];
+      for (const u of (d && Array.isArray(d.photos) ? d.photos : []).slice(0, EMPREINTES_PAR_ANNONCE)) { const url = typeof u === 'string' ? u : (u && u.url); if (urlImageVinted(url)) urlV.set(`${m[1]}|${id}|${clePhotoEmpreinte(url)}`, url); }
+    }
+  }
+  const itemsLbc = (lbc && lbc[0] && lbc[0].i && typeof lbc[0].i === 'object') ? lbc[0].i : {};
+  for (const [cle, ad] of Object.entries(itemsLbc)) {
+    if (!ad || typeof ad !== 'object') continue;
+    const id = String(ad.id != null ? ad.id : cle), compte = String(ad.account || ad.lbcUser || '').replace(/^lbc-account:/, '');
+    if (!compteImpOk(compte)) continue;
+    for (const u of Array.isArray(ad.images) ? ad.images : []) if (urlImageSite('lbc', u)) urlS.set(`lbc|${id}|${clePhotoEmpreinte(u)}`, { url: u, compte });
+  }
+  const itemsVc = (vc && vc[0] && vc[0].i && typeof vc[0].i === 'object') ? vc[0].i : {};
+  for (const [id, it] of Object.entries(itemsVc)) { const compte = String(it && it.compte || ''); if (it && compteImpOk(compte) && urlImageSite('vc', it.photo)) urlS.set(`vc|${id}|${clePhotoEmpreinte(it.photo)}`, { url: it.photo, compte }); }
+  const couples = [];
+  for (const c of candidats) {
+    const vu = urlV.get(`${c.uid}|${c.vid}|${c.vk}`), s = urlS.get(`${c.site}|${c.sid}|${c.sk}`);
+    if (vu && s) couples.push(Object.assign({}, c, { vu, su: s.url, compte: s.compte }));
+  }
+  const plan = { at: Date.now(), couples };
+  try { await chrome.storage.local.set({ [VERIF_FINE_PLAN]: plan }); } catch (_) {}
+  return plan;
+}
+// Une image ⇒ sa préparation fine (ou null), dessinée à `tailleLectureFine` (proportions gardées).
+async function fineDeBlob(blob) {
+  try {
+    if (typeof createImageBitmap !== 'function' || typeof OffscreenCanvas !== 'function') return null;
+    const bmp = await createImageBitmap(blob);
+    const t = tailleLectureFine(bmp.width, bmp.height);
+    const c = new OffscreenCanvas(t.w, t.h);
+    const x = c.getContext('2d');
+    x.imageSmoothingQuality = 'high';
+    x.drawImage(bmp, 0, 0, t.w, t.h);
+    try { bmp.close && bmp.close(); } catch (_) {}
+    return preparerFine(x.getImageData(0, 0, t.w, t.h).data, t.w, t.h);
+  } catch (_) { return null; }
+}
+async function imageFine(url, max) {
+  try {
+    const res = await fetch(url, { credentials: 'omit', cache: 'no-store' });
+    const type = String((res.headers && res.headers.get && res.headers.get('content-type')) || '');
+    const taille = Number((res.headers && res.headers.get && res.headers.get('content-length')) || 0);
+    if (!res.ok || !/^image\//i.test(type) || taille > max) return { ok: false, status: 0, http: Number(res.status) || 0 };
+    const blob = await res.blob();
+    if (!blob || blob.size > max) return { ok: false, status: 0, http: 413 };
+    return { ok: true, status: 0, http: res.status, blob };
+  } catch (_) { return { ok: false, status: 0, http: 0 }; }
+}
+// La file des scores part dans `photo_meme_verif`, fusionnée sur la ligne RELUE ; une lecture
+// ratée n'écrit rien (la file reste). Un couple dont une des deux annonces n'a plus d'empreinte sort.
+async function rangerVerifFine() {
+  let file = [];
+  try { file = (await chrome.storage.local.get(VERIF_FINE_FILE))[VERIF_FINE_FILE] || []; } catch (_) { return false; }
+  if (!file.length) return true;
+  const r = await sbGet(`app_data?id=eq.${LIGNE_VERIF_FINE}&select=c:data->payload->couples`);
+  if (r === null) { noterDiag('verif_fine_lecture_ratee'); return false; }
+  const couples = Object.assign({}, (r[0] && r[0].c && typeof r[0].c === 'object') ? r[0].c : {});
+  for (const e of file) couples[e.cle] = { s: typeof e.s === 'number' ? e.s : null, v: VERSION_FINE, at: new Date(Number(e.at) || Date.now()).toISOString() };
+  const cles = Object.keys(couples);
+  if (cles.length > 400) for (const k of cles.sort((a, b) => String(couples[a].at).localeCompare(String(couples[b].at))).slice(0, cles.length - 400)) delete couples[k];
+  const ok = await supabaseUpsert('app_data', [{ id: LIGNE_VERIF_FINE, data: { type: 'photo_meme_verif', capturedAt: new Date().toISOString(), nItems: Object.keys(couples).length, payload: { version: VERSION_FINE, sur: SEUIL_FINE_SUR, non: SEUIL_FINE_NON, couples } } }], 'id');
+  if (ok === false) { noterDiag('verif_fine_ecriture_ratee'); return false; }
+  noterDiag('verif_fine_ecrite');
+  try { await chrome.storage.local.set({ [VERIF_FINE_FILE]: [] }); } catch (_) {}
+  return true;
+}
+// UN tour : un couple au plus (deux images). Rend 1 (un couple mesuré), 0 (rien à faire / refus).
+async function verifFineUnTour() {
+  const st = await chrome.storage.local.get([VERIF_FINE_DERNIERE, VERIF_FINE_MEMO, VERIF_FINE_HEURE, VERIF_FINE_FILE, EMPREINTES_FREIN, EMPREINTES_SITES_FREIN, ACTIVITE_VINTED]);
+  const t = Date.now();
+  if ((st[VERIF_FINE_FILE] || []).length) await rangerVerifFine();
+  const depuis = t - Number(st[VERIF_FINE_DERNIERE] || 0);
+  if (depuis >= 0 && depuis < EMPREINTES_ECART_MS) return 0;
+  const heure = (st[VERIF_FINE_HEURE] || []).filter((x) => t - Number(x) >= 0 && t - Number(x) < 3600e3);
+  if (heure.length >= VERIF_FINE_MAX_HEURE) { noterDiag('verif_fine_plafond'); return 0; }
+  const tabs = await chrome.tabs.query({ url: ['https://*.vinted.fr/*', 'https://*.vinted.com/*', 'https://*.vinted.it/*', 'https://*.vinted.de/*'] });
+  if (!tabs || !tabs.length) return 0;                // la photo Vinted se lit onglet vinted.fr ouvert, comme l'empreinte
+  const uid = await activeUidForDomain('www.vinted.fr');
+  if (!uid) return 0;
+  if (await pauseVinted()) return 0;
+  const fv = Number(st[EMPREINTES_FREIN] || 0);
+  if (fv && t - fv >= 0 && t - fv < EMPREINTES_RETRY_MS) return 0;
+  const depuisNav = t - Number(st[ACTIVITE_VINTED] || 0);
+  if (depuisNav >= 0 && depuisNav < PHOTOS_CALME_MS) return 0;
+  const plan = await planVerifFine();
+  if (!plan || !plan.couples.length) return 0;
+  const memo = st[VERIF_FINE_MEMO] || {}, freins = st[EMPREINTES_SITES_FREIN] || {};
+  const enFile = new Set((st[VERIF_FINE_FILE] || []).map((e) => e.cle));
+  let cible = null;
+  for (const c of plan.couples) {
+    if (enFile.has(c.cle) || (memo[c.cle] && t - Number(memo[c.cle]) < EMPREINTES_RETRY_MS)) continue;
+    const f = Number(freins[c.site] || 0); if (f && t - f >= 0 && t - f < EMPREINTES_RETRY_MS) continue;
+    if ((await ongletImpSite(SITE_IMPORT[c.site], c.compte)) == null) continue;   // l'onglet de CE compte sur son site
+    cible = c; break;
+  }
+  if (!cible) return 0;
+  const pf = SITE_IMPORT[cible.site];
+  { const rb = await secuRobotDit(pf, cible.compte); if (rb) { noterDiag('verif_fine_robot'); return 0; } }
+  if (cible.site === 'vc' && await pauseVc()) return 0;
+  if (cible.site === 'lbc' && ((await pauseLbcMsg()) || (await pauseLbcPrix()))) return 0;
+  const acc = (await getStoredAccounts()).find((a) => String(a.vinted_user_id) === String(uid));
+  if (!acc) return 0;
+  const refus = await gardeLecture(uid, acc, 'photos');
+  if (refus) { noterDiag('verif_fine_' + refus.code); return 0; }
+  const lu = await compterLecture(cleImpSite(pf, cible.compte), EMPREINTES_SITES_MAX_HEURE);
+  if (!lu.ok) { noterDiag('verif_fine_budget'); return 0; }
+  memo[cible.cle] = Date.now();
+  heure.push(Date.now());
+  try { await chrome.storage.local.set({ [VERIF_FINE_MEMO]: memo, [VERIF_FINE_DERNIERE]: Date.now(), [VERIF_FINE_HEURE]: heure }); } catch (_) {}
+  const rv = await requeteVinted('image', () => imageFine(cible.vu, EMPREINTES_MAX_OCTETS));
+  const rs = await imageFine(cible.su, EMPREINTES_SITES_MAX_OCTETS);
+  try { await chrome.storage.local.set({ [VERIF_FINE_DERNIERE]: Date.now() }); } catch (_) {}
+  if (!rv || !rv.ok || !rv.blob) { noterDiag(`verif_fine_vinted_refusee_${rv ? (rv.http || 0) : 0}`); if (rv && Number(rv.http) === 429) { try { await chrome.storage.local.set({ [EMPREINTES_FREIN]: Date.now() }); } catch (_) {} } return 0; }
+  if (!rs.ok || !rs.blob) { noterDiag(`verif_fine_site_refusee_${cible.site}_${rs.http || 0}`); if ([403, 429].includes(Number(rs.http))) { try { await chrome.storage.local.set({ [EMPREINTES_SITES_FREIN]: Object.assign({}, freins, { [cible.site]: Date.now() }) }); } catch (_) {} } return 0; }
+  const pa = await fineDeBlob(rs.blob), pb = await fineDeBlob(rv.blob);
+  // Une image trop petite / illisible : « pas su » rangé (s: null), jamais un score inventé.
+  const s = pa && pb ? comparerFine(pa, pb) : null;
+  let file = [];
+  try { file = (await chrome.storage.local.get(VERIF_FINE_FILE))[VERIF_FINE_FILE] || []; } catch (_) { return 0; }
+  file.push({ cle: cible.cle, s, at: Date.now() });
+  try { await chrome.storage.local.set({ [VERIF_FINE_FILE]: file }); } catch (_) { return 0; }
+  noterDiag(s == null ? 'verif_fine_pas_su' : 'verif_fine_mesuree');
+  await rangerVerifFine();
   return 1;
 }
 
