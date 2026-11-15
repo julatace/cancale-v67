@@ -38271,8 +38271,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const ailleurs = Object.keys(numeros).some((k) => k !== moi && cleNum((numeros[k] || {}).numero) === cle)
       || Object.values(saleOv || {}).some((o) => o && cleNum(o.numero) === cle);
     await poserNumero(it, String(y), f.numero, { carton: true, ...(ailleurs ? {} : { memePaire: true }) });
-    setTimeout(() => marquerCartonVerifie(moi, cle), 700);
-    { const apres = (load('vinted_annonce_numeros', {}) || {})[moi]; if (apres && cleNum(apres.numero) === cle) accompagner('numero.carton', { vars: { numero: String(y) } }).fini(); }
+    setTimeout(() => { marquerCartonVerifie(moi, cle); const apres = (load('vinted_annonce_numeros', {}) || {})[moi]; if (apres && cleNum(apres.numero) === cle) accompagner('numero.carton', { vars: { numero: String(y) } }).fini(); }, 700);
   };
 
   // ⚠️ « pas au garage » SUR CHAQUE LIGNE NE DIT RIEN TANT QUE LE GARAGE EST

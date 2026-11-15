@@ -421,6 +421,104 @@ action('vacances', async (nav) => {
 });
 
 // ── LES LISTES VIDES ET LES PREMIÈRES FOIS ──────────────────────────────────
+// ── (15 nov., lot numeros-masquees) LES MOMENTS DES NUMÉROS ─────────────────────────────────────
+// N° donné par VRM (`numero.donne`), demandé (« je numérote moi-même », `numero.demande`), choisi pour le
+// carton (`numero.carton`), « N°x republiée ? » (`numero.republie` / `numero.autre`), reconnu par la photo
+// fabriquée par VRM (`numero.reconnu`). Des gestes LOCAUX (aucune requête) : seul le moment « après » existe
+// (la pilule) ; l'avant est la ligne de Ma journée ou d'Annonces que le geste touche.
+const { empreinte: empreinteInventee, voisine: voisineInventee } = require(path.join(__dirname, '..', '_numerotation-vm.cjs'));
+const ilYaN = (h) => new Date(Date.now() - h * 3600e3).toISOString();
+// La base de `fabriquer`, ses fiches au champ de l'app (`numero`), + ce que la scène ajoute.
+function baseNumeros({ moi = false, nouvelles = [], fiches = {}, main = {}, lignes = [] } = {}) {
+  const b = base();
+  const m = b.main[0].data;
+  const nf = {};
+  for (const [id, f] of Object.entries(m.vinted_annonce_numeros || {})) nf[id] = { numero: String(f.numero || f.num), numberedAt: f.numberedAt, auto: false, manuelAt: f.numberedAt, accountId: UID_V };
+  m.vinted_annonce_numeros = { ...nf, ...fiches };
+  m.vinted_used_numeros = Object.values(m.vinted_annonce_numeros).map((f) => Number(f.numero)).filter(Number.isFinite);
+  m.vrm_numero_ecrit = moi ? { actif: true, ou: ['description', 'titre'], depuis: ilYaN(48), choisi: ilYaN(48) } : { actif: false, depuis: ilYaN(48), choisi: ilYaN(48) };
+  Object.assign(m, main);
+  const L = b.rows.find((r) => r.id === `harvest_${UID_V}_listings`);
+  for (const it of nouvelles) L.data.payload.items.push(it);
+  L.data.payload.pagination = { total_entries: L.data.payload.items.length };
+  L.data.nItems = L.data.payload.items.length;
+  b.rows.push(...lignes);
+  return b;
+}
+const annNeuve = (id, titre, x = {}) => ({ id, title: titre, brand_title: 'Adidas', size_title: '42', status: 'Très bon état', price: { amount: '59.0', currency_code: 'EUR' }, is_closed: false, is_hidden: false, is_draft: false, favourite_count: 0, view_count: 2,
+  created_at_ts: Math.floor((Date.now() - 3 * 3600e3) / 1000), photo: { url: `https://images1.vinted.net/t/${id}/f800/n.jpeg?s=n`, high_resolution: { timestamp: Math.floor((Date.now() - 3 * 3600e3) / 1000) } }, ...x });
+
+action('numero.donne', async (nav) => {
+  const b = baseNumeros({ nouvelles: [annNeuve(7999990001, 'Adidas Samba noire taille 40')] });
+  const o = await ouvrir(nav, { url: '/', b });
+  try {
+    noter('numero.donne', 'apres', await moment(o.pg, 'apres', 'numero.donne', { ms: 20000 }));
+    await shot(o.pg, 'numero-donne-apres');
+  } finally { await o.ctx.close(); }
+});
+
+action('numero.demande', async (nav) => {
+  const b = baseNumeros({ moi: true, nouvelles: [annNeuve(7999990002, 'Bottes Dior cuir noir taille 39')] });
+  const o = await ouvrir(nav, { url: '/', b });
+  try {
+    await toucher(o.pg, '[data-job="numeros-a-donner"]', { ms: 20000 });
+    await o.pg.waitForSelector('[data-ask-champ="numero-demande"]', { timeout: 10000 });
+    await o.pg.fill('[data-ask-champ="numero-demande"]', '777');
+    await o.pg.locator('div:has(> form [data-ask-champ="numero-demande"])').last().locator('button', { hasText: /^Enregistrer$/ }).first().click();
+    // La question du prix d'achat au numérotage (règle du 6 nov.) : « Plus tard ».
+    await o.pg.waitForSelector('[data-ask-champ="prix-numerotage"]', { timeout: 5000 }).then(() => o.pg.locator('div:has(> form [data-ask-champ="prix-numerotage"])').last().locator('button', { hasText: /^Plus tard$/ }).first().click()).catch(() => {});
+    noter('numero.demande', 'apres', await moment(o.pg, 'apres', 'numero.demande', { ms: 12000 }));
+    await shot(o.pg, 'numero-demande-apres');
+  } finally { await o.ctx.close(); }
+});
+
+action('numero.carton', async (nav) => {
+  const id = 7999990003;
+  const b = baseNumeros({ nouvelles: [annNeuve(id, 'Adidas Spezial bleu marine taille 42,5')], fiches: { [id]: { numero: '880', auto: true, numberedAt: ilYaN(40), accountId: UID_V } },
+    lignes: [{ id: 'panel_num_reserves', data: { attente: {}, items: { [id]: { numero: '881', at: ilYaN(41) } } } }] });
+  const o = await ouvrir(nav, { url: '/?tab=annonces', b });
+  try {
+    await toucher(o.pg, `[data-verif-prendre-reserve="881"]`, { ms: 20000 });
+    noter('numero.carton', 'apres', await moment(o.pg, 'apres', 'numero.carton', { ms: 10000 }));
+    await shot(o.pg, 'numero-carton-apres');
+  } finally { await o.ctx.close(); }
+});
+
+// « N°x republiée ? » : N°890 (annonce 7999990010) a disparu il y a 2 jours ; la nouvelle (7999990011) a la même photo.
+const sceneRepubliee = () => {
+  const hA = empreinteInventee(890);
+  return baseNumeros({ nouvelles: [annNeuve(7999990011, 'Adidas Spezial bleu marine taille 42,5')],
+    fiches: { 7999990010: { numero: '890', auto: true, numberedAt: ilYaN(300), accountId: UID_V, title: 'Adidas Spezial bleu marine taille 42,5' } },
+    main: { vrm_vus_en_ligne: { 7999990010: ilYaN(48) }, vrm_empreintes_fiches: { 7999990010: { n: '890', h: [hA], uid: UID_V, at: ilYaN(48) } } },
+    lignes: [{ id: `photo_emprunte_${UID_V}`, data: { payload: { version: 1, annonces: { 7999990011: { p1: voisineInventee(hA, 6, 8, 3) } } } } }] });
+};
+action('numero.republie', async (nav) => {
+  for (const [geste, bouton] of [['numero.republie', '[data-rt-oui="890"]'], ['numero.autre', '[data-rt-non]']]) {
+    const o = await ouvrir(nav, { url: '/', b: sceneRepubliee() });
+    try {
+      await toucher(o.pg, '[data-job="numeros-republiee"]', { ms: 25000 });
+      await o.pg.waitForSelector('[data-rt-feuille]', { timeout: 10000 });
+      await shot(o.pg, geste.replace('.', '-') + '-avant');
+      await toucher(o.pg, bouton);
+      noter(geste, 'apres', await moment(o.pg, 'apres', geste, { ms: 10000 }));
+      await shot(o.pg, geste.replace('.', '-') + '-apres');
+    } finally { await o.ctx.close(); }
+  }
+});
+
+action('numero.reconnu', async (nav) => {
+  const hVrm = empreinteInventee(891);
+  const b = baseNumeros({ nouvelles: [annNeuve(7999990021, 'Adidas Spezial bleu marine taille 42,5')],
+    fiches: { 7999990020: { numero: '891', auto: true, numberedAt: ilYaN(300), accountId: UID_V } },
+    main: { vrm_photos_vrm: { [hVrm]: { n: '891', src: '7999990020', uid: UID_V, at: ilYaN(30) } } },
+    lignes: [{ id: `photo_emprunte_${UID_V}`, data: { payload: { version: 1, annonces: { 7999990021: { p1: voisineInventee(hVrm, 3, 4, 9) } } } } }] });
+  const o = await ouvrir(nav, { url: '/', b });
+  try {
+    noter('numero.reconnu', 'apres', await moment(o.pg, 'apres', 'numero.reconnu', { ms: 20000 }));
+    await shot(o.pg, 'numero-reconnu-apres');
+  } finally { await o.ctx.close(); }
+});
+
 async function vides(nav) {
   console.log('\n── listes vides (base neuve) ──');
   for (const [nom, url] of [['ventes', '/?tab=ventes'], ['achats', '/?tab=achats'], ['annonces', '/?tab=vinted_annonces'], ['colis', '/?tab=cat_bord']]) {
