@@ -18,6 +18,7 @@ import { ordreStable, finALaFrontiere } from './ordre-stable.js';
 import { sbCle } from './cle.js';
 import { regrouper, estBruit, cleType } from './veille-plantages.js';
 import { PROPRIETAIRE_NEUTRE } from './proprietaire-email.js';
+import { versionApp } from './signalement.js';   // (15 nov.) la version de l'app, sa forme seule
 
 export const JOURS_COMPTES = 7;
 export const TYPES_MAX = 50;
@@ -37,7 +38,7 @@ export function plantagesParComptes(lignes, depuis, proprio = '') {
     if (!l || estBruit(l) || String(l.owner || '') === PROPRIETAIRE_NEUTRE || !((Date.parse(l.at || '') || 0) >= depuis)) continue;
     const k = cleType(l.message);
     fois.set(k, (fois.get(k) || 0) + Math.max(1, Number(l.n) || 1));
-    const v = /^[\w.+-]{1,40}$/.test(String(l.version || '')) ? String(l.version) : '';
+    const v = versionApp(l.version);
     if (v) { const m = versions.get(k) || new Map(); m.set(v, (m.get(v) || 0) + 1); versions.set(k, m); }
     if (l.origine === 'demarrage') bloque.set(k, (bloque.get(k) || 0) + 1);
   }
