@@ -421,6 +421,8 @@ function pixels(nom, w = 64, h = w) {
     const vn = (v) => String(v || '').split('.').map(Number).reduce((t, x) => t * 1000 + (x || 0), 0);
     dit(cap && cap[1] === '5.384.0' && /memephoto:'empreintesSitesUnTour'/.test(coh) && /async function empreintesSitesUnTour\(/.test(bg), 'C1 · `EXT_CAPACITES.memephoto` = 5.384.0, connue de audit-coherence, la fonction existe', cap && cap[1]);
     dit(man.version === cv && vn(cv) >= vn('5.384.0'), 'C1 · manifeste et CODE_VERSION égaux, au moins 5.384.0', `${man.version} / ${cv}`);
+    const capS = /EXT_CAPACITES = \{[^}]*\bmemephotosure: '([\d.]+)'/.exec(app);
+    dit(capS && capS[1] === '5.388.0' && /memephotosure:'verifFineUnTour'/.test(coh) && /async function verifFineUnTour\(/.test(bg) && vn(cv) >= vn('5.388.0'), 'C2 · `EXT_CAPACITES.memephotosure` = 5.388.0 (la deuxième mesure), connue de audit-coherence, `verifFineUnTour` existe, extension ≥ 5.388.0', `${capS && capS[1]} / ${cv}`);
   } catch (e) { dit(false, 'exécution', e && e.stack ? e.stack.split('\n').slice(0, 3).join(' | ') : String(e)); }
   console.log(ko ? `\n❌ ${ko} rouge(s)` : '\n✅ même photo : tout vert');
   process.exit(ko ? 1 : 0);
