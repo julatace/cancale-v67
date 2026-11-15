@@ -176,7 +176,7 @@ function extraire(src, nom) {
     const vc = DV.annoncesVcEnLigne(lst, {}).parNum;
     const hits = DV.doubleVenteApprise('30', null, null, vc);
     const n = DV.notificationDoubleVente(hits, 'Air Max');
-    dit(hits.length === 1 && hits[0].plateforme === 'vestiaire' && n && /Vestiaire/.test(n.title) && /site=vestiaire/.test(n.url), 'la vente Vinted de la N°30 pousse « encore en vente sur Vestiaire », vers l’écran Vestiaire', n ? n.title + ' · ' + n.url : 'aucune');
+    dit(hits.length === 1 && hits[0].plateforme === 'vestiaire' && n && /Vestiaire/.test(n.title) && /cible=ailleurs&num=30/.test(n.url), 'la vente Vinted de la N°30 pousse « à retirer de Vestiaire », vers « À retirer ailleurs » (15 nov.)', n ? n.title + ' · ' + n.url : 'aucune');
     const vieux = DV.annoncesVcEnLigne({ ...lst, capturedAt: iso(now - 2 * J) }, {}).parNum;
     dit(DV.doubleVenteApprise('30', null, null, vieux).length === 0, 'lecture Vestiaire périmée (> 24 h) ⇒ le serveur ne dit RIEN (une notification se reçoit sans contexte)');
   });

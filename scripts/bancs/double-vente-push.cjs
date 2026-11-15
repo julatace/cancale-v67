@@ -195,8 +195,8 @@ const vente = (to, article, prix = '60,00') => ({ from: "\"L'équipe Vinted\" <n
     dit(/N°230/.test(p.title || '') && /eBay/.test(`${p.title} ${p.body}`), 'elle nomme le N° et la plateforme (8 nov. : « encore en ligne sur … » en tête du corps)', JSON.stringify(p.title));
     // (3 nov., Julien : aucun texte explicatif) le titre dit le fait et le geste
     // (« vendu sur Vinted · encore en ligne sur eBay »), le corps nomme l'article.
-    dit(/Nike Air Max 90/.test(p.body || '') && /vendu sur Vinted$/.test(p.title || '') && /^Encore en ligne sur eBay · /.test(p.body || ''), 'elle nomme l’article, le site de la vente et celui où il reste en ligne', JSON.stringify(p.title + ' / ' + p.body));
-    dit(p.url === '/?tab=annonces&site=ebay&cible=doublon&num=230&plat=ebay', 'elle ouvre Annonces · eBay, sur la ligne N°230 à retirer (31 oct.)', p.url);
+    dit(/Nike Air Max 90/.test(p.body || '') && /vendue sur Vinted$/.test(p.title || '') && /^À retirer d'eBay · /.test(p.body || ''), 'elle nomme l’article, le site de la vente et celui où il reste en ligne', JSON.stringify(p.title + ' / ' + p.body));
+    dit(p.url === '/?tab=journee&cible=ailleurs&num=230', 'elle ouvre « À retirer ailleurs » (Ma journée), sur la N°230 (15 nov.)', p.url);
     dit(dv('B').length === 0, 'le téléphone du vendeur B ne reçoit rien');
   });
 
@@ -217,7 +217,7 @@ const vente = (to, article, prix = '60,00') => ({ from: "\"L'équipe Vinted\" <n
     const n = dv('A');
     dit(n.length === 1, 'lue en entier il y a 2 h et montrée : UNE notification « double vente »', `${n.length}`);
     dit(/N°231/.test((n[0] || {}).title || '') && /Leboncoin/.test(`${(n[0] || {}).title} ${(n[0] || {}).body}`), 'elle nomme N°231 et Leboncoin', JSON.stringify((n[0] || {}).title));
-    dit((n[0] || {}).url === '/?tab=annonces&site=leboncoin&cible=doublon&num=231&plat=leboncoin', 'elle ouvre Annonces · Leboncoin, sur « à retirer » (31 oct.)', (n[0] || {}).url);
+    dit((n[0] || {}).url === '/?tab=journee&cible=ailleurs&num=231', 'elle ouvre « À retirer ailleurs » (Ma journée), sur la N°231 (15 nov.)', (n[0] || {}).url);
   });
   console.log('\n── 2 bis. Leboncoin pas prouvé en ligne (< 24 h, lecture complète) ⇒ rien');
   const lbcSans = async (nom, listing) => {

@@ -879,7 +879,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           <div className="vrm-s2d-filtres" data-stock-filtres="">
             {platsPresents.length > 1 && <Filtres className="vrm-rangee vrm-filtres" label={tr('stock.filtrerPlateforme')} data-stock-filtre-plat={filtrePlat || 'toutes'} valeur={filtrePlat}
               onChange={(v) => setFiltrePlat(v)} options={['', ...platsPresents].map((x) => ({ v: x, l: x ? (NOM_PLAT_FILTRE[x] || x) : tr('journee.toutes'), attrs: { 'data-plat': x || 'toutes' } }))}/>}
-            {comptesPresents.length > 1 && <MenuCompte data-stock-filtre-compte={filtreCompte || 'tous'} valeur={filtreCompte} onChange={(v) => setFiltreCompte(v || '')}
+            {comptesPresents.length > 1 && <MenuCompte court data-stock-filtre-compte={filtreCompte || 'tous'} valeur={filtreCompte} onChange={(v) => setFiltreCompte(v || '')}
               comptes={comptesPresents.map((u) => ({ id: u, nom: comptesNoms.get(u) || u }))}/>}
           </div>
         )}

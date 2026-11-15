@@ -26,7 +26,7 @@
 //  Fonctions PURES : `scripts/bancs/double-vente-push.cjs` exécute la route.
 // ════════════════════════════════════════════════════════════════════════════
 import { cleNum, numeroExterne } from './numerotation.js';
-import { DESTINATIONS, lienNotif } from './lien-notif.js';
+import { DESTINATIONS } from './lien-notif.js';
 // (1er nov., audit A1) Vestiaire : ses annonces PROUVÉES en ligne, par identité
 // (annonce créée par VRM ou référence VRM-n° — jamais le titre), la règle de
 // l'app (api/_lib/vestiaire-regle.js, un propriétaire, importée).
@@ -284,12 +284,12 @@ export function notificationDoubleVente(hits, titre, o = {}) {
   const article = String(titre || '').trim().slice(0, 80);
   const ids = enLigne.flatMap((h) => h.annonces.map((a) => h.plateforme + ':' + (a.itemId || a.id))).sort();
   const p0 = plats[0] || 'ebay', h0 = enLigne.find((h) => h.plateforme === p0) || { numero: nums[0] };
-  const url = p0 === 'ebay' || p0 === 'leboncoin' ? DESTINATIONS.doublon({ plat: p0, num: h0.numero })
-    // Vinted : la carte « à retirer de Vinted » de Ma journée (VRM n'y retire rien, §3) ;
-    // Vestiaire : Annonces · Vestiaire.
-    : p0 === 'vinted' ? DESTINATIONS.journee() : lienNotif('annonces', { site: 'vestiaire' });
+  // (15 nov., retrait-ailleurs) UN endroit : Ma journée, « À retirer ailleurs », la paire par SON N° —
+  // chaque site y porte son geste (Leboncoin et eBay retirés sur son clic, Vinted et Vestiaire : l'annonce
+  // + « C'est retiré »). La phrase dit la vente et le geste : « N°124 vendue sur Vinted · à retirer de Leboncoin ».
+  const url = DESTINATIONS.retirerAilleurs({ num: h0.numero || nums[0] });
   return {
-    title: `⚠️ ${n} vendu sur ${NOM[venduSur]}${plats.length ? ` · encore en ligne sur ${ou}` : ''}${retEbay ? " · retiré d'eBay" : ''}`,
+    title: `⚠️ ${n} vendue sur ${NOM[venduSur]}${plats.length ? ` · à retirer ${/^[aeiouy]/i.test(ou) ? "d'" : 'de '}${ou}` : ''}${retEbay ? " · retirée d'eBay" : ''}`,
     body: article,
     tag: `dv-${venduSur}-${nums.join('+')}-${ids.join(',')}`.slice(0, 200),
     url,

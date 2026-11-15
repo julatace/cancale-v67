@@ -303,6 +303,19 @@ export const suivi = {
   _poser: (s) => { courant = s; annoncer(); },
 };
 
+// (15 nov., republier à la main) UN GESTE QU'IL A FAIT LUI-MÊME, relu par VRM (« C'est republié »,
+// « vue en ligne ») : une ligne dans « Ce que VRM a fait », comme un travail fini d'une annonce.
+// Le même article ne s'y écrit qu'une fois (l'id du travail vient de la sorte et de l'article).
+export function noterGesteFait({ sorte, titre, article, texte = '' } = {}, now = Date.now()) {
+  if (!article || article.id == null || !sorte) return false;
+  let s = creer({ sorte, titre, articles: [article], id: `m-${sorte}-${article.id}` }, now);
+  s = finArticle(s, article.id, { etat: 'ok', raison: texte }, now);
+  s = terminer(s, 'fini', now);
+  if (lireTravaux().some((x) => x && x.id === s.id)) return false;
+  garderFini(s);
+  return true;
+}
+
 // Le statut d'une fin de boucle : la demande d'abord (pause / arrêt), puis ce que l'écran
 // impose (`pause`), sinon : il reste des annonces pas commencées ⇒ « arrêté », sinon « terminé ».
 export function statutDeFin(s, force) {
