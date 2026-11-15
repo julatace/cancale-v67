@@ -26,6 +26,9 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (15 nov., refonte-journee) docs/passation/2026-11-15-refonte-journee.md — la maquette validée par Julien.
+  { id: 'paire-a-sortir', date: '2026-11-15', titre: 'Une vente tombe : VRM montre où est le carton', phrase: 'Le meuble, la case allumée, puis « Je l’ai sortie ».', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'journee-verre', date: '2026-11-15', titre: 'Ma journée refaite comme la maquette', phrase: 'Le mois en un verre, les colis avec leurs N°, codes et messages.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « J'aime la 9 ») docs/passation/2026-11-15-verre-depoli.md — le thème « Verre dépoli ».
   { id: 'verre-depoli', date: '2026-11-15', titre: 'Nouveau thème : verre dépoli sur bleu profond', phrase: 'Le chiffre du jour en blanc, tout se lit sur le verre.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « c'est moche et il y a des bugs ») docs/passation/2026-11-15-annonces-achats.md

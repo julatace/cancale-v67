@@ -785,7 +785,7 @@ import { etatArticle } from "./etatArticle.js";
 // ⟦→ ecrans/Stock.jsx #1⟧
 import './styles-stock-2d.css'; // (8 nov.) style de ./StockExplication.jsx, gardé à sa place (son écran est chargé à la demande)
 import { libererCasesPartis, remettreCase, resteAuStock, etatCase } from "./stockSortie.js";
-import { opsSortieCases } from "./stockEtageres.js";   // (15 nov., étagères) la case vidée + la descente des piles, en un geste
+import { opsSortieCases, sortirDeCases } from "./stockEtageres.js";   // (15 nov., étagères) la case vidée + la descente des piles, en un geste
 import { phraseDescentes, descentesDesOps } from "./etageresTextes.js";
 import { annoncesActuelles, annoncesVcStock, classerRangees } from "./stockAnnonces.js";
 import { PasEnLigneDetail, texteCartePasEnLigne } from "./PasEnLigne.jsx";   // (11 nov., lot pas-en-ligne)
@@ -930,7 +930,10 @@ import "./design/studio-paires.css";   // (14 nov., « Studio bleu clair ») Pai
 import "./design/studio-achats-relier.css";   // (15 nov.) Annonces → « Sans achat relié » : la carte compacte (classes `vrm-aar-*`, docs/passation/2026-11-15-annonces-achats.md)
 // (14 nov., Studio bleu clair) Ma journée en grille Bento : la tête, l'affiche, les tuiles et ce qu'elles déplient —
 // portée par `.sj-journee` seulement, EN DERNIER (docs/passation/2026-11-14-studio-journee.md).
-import { BentoJournee, placerTuiles, RangeeJ, LienJ, MontantAffiche } from "./JourneeStudio.jsx";
+import { BentoJournee, placerTuiles, RangeeJ, LienJ, MontantAffiche, Plaque as PlaqueJ } from "./JourneeStudio.jsx";
+import PaireASortir from "./PaireASortir.jsx";   // (15 nov., refonte-journee) « La paire à sortir en premier »
+import { ordreDeSortie, colonneDe } from "./paireASortir.js";
+import MarqueSite from "./plateformes/Marque.jsx";
 import "./design/studio-journee.css";
 import "./design/studio-finition.css";   // (15 nov.) La passe de finition écran par écran — `@layer vrm-finition`, la PREMIÈRE couche (index.html) : docs/passation/2026-11-15-finition-ecrans.md
 import "./design/studio-verre.css";   // (15 nov., Julien : « J'aime la 9 ») VERRE DÉPOLI — le fond bleu profond, le verre, l'encre claire sur le fond — `@layer vrm-verre`, la PREMIÈRE couche (index.html) : docs/passation/2026-11-15-verre-depoli.md
@@ -31590,6 +31593,8 @@ function FriseJournee({ liveStats, photosEntre = null, onVentes = null, onSemain
             <p className="vrm-jv2-faits">
               <span data-journal-case="ventes" data-valeur={J.ventes.valeur == null ? '' : String(J.ventes.valeur)} data-partiel={J.ventes.partiel ? '1' : undefined}>{faitVentes}</span>
               {' '}
+              {/* (15 nov., refonte-journee) « vendu aujourd'hui · 1 vente » : le chiffre dit de QUAND il parle (la maquette). */}
+              {!semaine && vSel != null && vSel > 0 ? <span className="vrm-jv2-quoi" data-jv2-quoi="">{(sel === 0 ? tr('journee.venduAuj') : sel === 1 ? tr('journee.venduHier') : tr('journee.venduLe', { quand: dateJourFr(jSel.d) })) + ' · '}</span> : null}
               <span data-jv2-verse={verse.valeur == null ? '' : String(Math.round(verse.valeur * 100))} data-partiel={verse.partiel ? '1' : undefined} title={verse.partiel && verse.manque && verse.manque.length ? tr('journee.moinsSans', { x: String(verse.manque.join(', ')) }) : tr('journee.argentVerseSites')}>{faitVerse}</span>
               {' '}
               <span data-journal-case="colis" data-valeur={J.colis.valeur == null ? '' : String(J.colis.valeur)} data-partiel={J.colis.partiel ? '1' : undefined} title={J.colis.partiel && J.colis.manque && J.colis.manque.length ? tr('journee.moinsSans', { x: String(J.colis.manque.join(', ')) }) : tr('journee.colisAsNotes')}>{faitColis}</span>
@@ -46633,13 +46638,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [, setTicStock] = useState(0);
   React.useEffect(() => {
     if (only !== 'journee') return undefined;
-    const CLES = ['vrm_stock_vendus', 'vrm_slots', 'vrm_meubles'];
+    const CLES = ['vrm_stock_vendus', 'vrm_slots', 'vrm_meubles', 'vinted_pairs_lost'];
     const f = (e) => { const k = e && e.detail && e.detail.k; if (!k || CLES.includes(k)) setTicStock((t) => t + 1); };
     window.addEventListener('vrm:save', f); window.addEventListener('vrm:stock-slots', f);
     return () => { window.removeEventListener('vrm:save', f); window.removeEventListener('vrm:stock-slots', f); };
   }, [only]);
   const [sortiesVues, setSortiesVues] = useState(() => { try { const v = JSON.parse(localStorage.getItem('vrm_journee_sorties_vues') || '{}'); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch (_) { return {}; } });
   // (6 nov., onglets C) LES COMPTES DONT LES E-MAILS N'ARRIVENT PAS, sur Ma journée : UNE carte (la
+  // (15 nov., refonte-journee) « La paire à sortir en premier » : ce qui est DIT juste après « Je l'ai sortie »
+  // (la case libérée, la pile qui descend) jusqu'à « Compris » — un état de l'écran, jamais une donnée.
+  const [apresSortie, setApresSortie] = useState(null);
   // règle des comptes muets, src/relierCompte.js), dite une fois par jour — touchée, elle s'efface
   // jusqu'au lendemain (préférence de cet appareil ; E-mails et Comptes liés la redisent).
   const { liste: aRelierListe } = useComptesARelier(accounts, only === 'journee' || only === 'bordereaux');
@@ -48335,7 +48343,75 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               ) };
         })();
         return (
-          <div className="vrm-day-layout vrm-fu-ecran vrm-fu-journee sj-journee" data-espace="journee" data-sj-ordi={ordiJournee ? '1' : '0'}>
+          <div className="vrm-day-layout vrm-fu-ecran vrm-fu-journee sj-journee" data-espace="journee" data-sj-ordi={ordiJournee ? '1' : '0'} data-sortir-present={sortirJ && (sortirJ.aSortir.length || apresSortie) ? '1' : undefined}>
+        // (15 nov., refonte-journee) LES COLIS DU JOUR, une liste pour « À envoyer » ET « La paire à sortir » : la même
+        // source qu'avant (`toShip`, eBay, Leboncoin, Vestiaire), le N° par IDENTITÉ (le bordereau de SA transaction, la
+        // fiche de SON annonce), la date limite, le site et le compte quand ils sont connus — jamais un titre comme identité.
+        const echeanceJ = (t) => {
+          if (!t || t.daysLeft == null) return { txt: '', ambre: false, date: false };
+          const H = t.heure ? heureCourteJ(t.heure) : '';
+          if (t.depasse && !t.retard) return { txt: tr('sj.ech.aVerifier'), ambre: true, date: false };
+          if (t.depasse) return { txt: tr('sj.ech.retard'), ambre: true, date: false };
+          if (t.daysLeft === 0) return { txt: H ? tr('sj.ech.aujH', { h: H }) : tr('sj.ech.auj'), ambre: true, date: false };
+          if (t.daysLeft === 1) return { txt: H ? tr('sj.ech.demainH', { h: H }) : tr('sj.ech.demain'), ambre: true, date: false };
+          const d = t.at ? new Date(t.at) : null;
+          return d ? { txt: d.toLocaleDateString(localeCourante(), { day: 'numeric', month: 'short' }), ambre: false, date: true } : { txt: tr('sj.ech.jours', { n: t.daysLeft }), ambre: false, date: false };
+        };
+        const colisJournee = (() => {
+          try {
+            const tailleDe = (titre) => { const m = /\b(?:taille|T\.?)\s*(\d{2}(?:[.,]5)?)\s*$/i.exec(String(titre || '')); return m ? m[1] : ''; };
+            const l = toShip.map((t) => { const o = t.o || {}; const tx = String(o.transaction_id || ''); const b = tx ? bordsParTxn[tx] : null; const en = effEntry(o);
+              return { cle: 'v:' + tx, num: (b ? numForBord(b) : '') || (en && en.numero) || '', titre: o.title || '', photo: orderPhoto(o), tr: transporteurVente(b, tx).nom || '', e: echeanceJ(t), j: t.daysLeft,
+                site: 'vinted', compte: o._acc ? accNameOf(o._acc) : '', prix: (() => { const v = o.price && typeof o.price === 'object' ? o.price.amount : o.price; const n = Number(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) && n > 0 && !(o.price && o.price.currency_code && o.price.currency_code !== 'EUR') ? montant(n) : ''; })(), taille: tailleDe(o.title), idAnnonce: (() => { try { return identiteAnnonce(o) || ''; } catch (_) { return ''; } })() }; })
+              .concat(((colisEb && colisEb.aPoster) || []).map((x) => ({ cle: 'e:' + x.compte + ':' + x.orderId, num: x.ordre ? (numLigneEbay(x.ordre, (x.ordre.lineItems || [])[0]) || '') : '', titre: x.titre || '', photo: x.ordre ? photoCommande(x.ordre) : null, tr: 'eBay', e: Number.isFinite(x.jours) ? echeanceJ({ daysLeft: x.jours }) : { txt: '', ambre: false }, j: Number.isFinite(x.jours) ? x.jours : null, site: 'ebay', compte: x.compte || '', prix: '', taille: '', idAnnonce: '' })))
+              .concat((colisAutres.leboncoin || []).map((x) => ({ cle: 'l:' + x.txId, num: '', titre: x.titre || '', photo: null, tr: 'Leboncoin', e: { txt: '', ambre: false }, j: null, site: 'leboncoin', compte: '', prix: '', taille: '', idAnnonce: '' })))
+              .concat((colisAutres.vestiaire || []).map((x) => ({ cle: 'vc:' + x.id, num: x.num || '', titre: tr('journee.venteVestiaire'), photo: x.photo || null, tr: 'Vestiaire', e: Number.isFinite(x.jours) ? echeanceJ({ daysLeft: x.jours }) : { txt: '', ambre: false }, j: Number.isFinite(x.jours) ? x.jours : null, site: 'vestiaire', compte: '', prix: '', taille: '', idAnnonce: '' })));
+            return l.sort((a, b) => (a.j == null ? 9999 : a.j) - (b.j == null ? 9999 : b.j));
+          } catch (_) { return []; }
+        })();
+        // (15 nov.) « LA PAIRE À SORTIR EN PREMIER » : seulement pour qui range dans le Stock (au moins un meuble) — sans
+        // meuble, chaque vente dirait « VRM ne sait pas où » : du bruit. L'ordre et la case : src/paireASortir.js.
+        const sortirJ = (() => {
+          if (baseKO || premierJour) return null;
+          try {
+            const meubles = load('vrm_meubles', []) || [];
+            if (!Array.isArray(meubles) || !meubles.length) return null;
+            const slots = lireObjet('vrm_slots');
+            const dbl = load('vrm_num_doublons', null);
+            const doublons = new Set(((dbl && Array.isArray(dbl.nums)) ? dbl.nums : []).map((x) => cleNum(x)).filter(Boolean));
+            const ventes = colisJournee.map((c) => ({ ...c, jours: Number.isFinite(c.j) ? c.j : null,
+              echeance: c.e && c.e.txt ? (c.e.date ? tr('sortir.limiteLe', { d: c.e.txt }) : tr('sortir.limiteQuand', { q: c.e.txt })) : '', echeanceCourte: c.e ? c.e.txt : '' }));
+            const r = ordreDeSortie(ventes, { slots, meubles, perdues: lireObjet('vinted_pairs_lost'), doublons, cle: cleNum });
+            return { ...r, slots, meubles };
+          } catch (_) { return null; }
+        })();
+        // « Je l'ai sortie » : LE GESTE DU STOCK (« Vendues à sortir » → « Je l'ai sortie ») — la déclaration
+        // `vinted_pairs_lost` de CE N° (`cleDeclarationPartie`, par identité) et la case libérée, la pile tassée
+        // (`sortieCaseStock` → `opsSortieCases`) ; un geste annulable, accompagné (`stock.sortir`).
+        const sortirPaireJ = (v) => {
+          const mots = motsVendeur();
+          if (!v || !v.num) { toast(tr('sortir.rienANoter')); return; }
+          const fiches = load('vinted_annonce_numeros', {}) || {};
+          const perdues = lireObjet('vinted_pairs_lost');
+          const k = cleNum(v.num);
+          const slotsAv = lireObjet('vrm_slots');
+          const cleD = cleDeclarationPartie(v.num, v.idAnnonce || '', fiches);
+          const ops = [{ k: 'vinted_pairs_lost', type: 'cle', id: cleD, apres: { ...(perdues[cleD] || {}), id: String(v.idAnnonce || ''), at: new Date().toISOString(), title: v.titre || '', from: 'stock' }, avant: perdues[cleD] }];
+          if (k && slotsAv[k]) ops.push(...sortieCaseStock(k));
+          const desc = descentesDesOps(ops);
+          let dit = { num: String(v.num), lieu: v.lieu || null, descendus: [] };
+          if (v.lieu && desc.length) {
+            const m0 = load('vrm_meubles', []) || [];
+            const r = sortirDeCases({ slots: slotsAv, meubles: Array.isArray(m0) ? m0 : [], cles: [k] });
+            dit = { ...dit, colAvant: colonneDe(v.lieu, slotsAv), colApres: colonneDe(v.lieu, r.slots), cible: v.lieu.rangee - 1, descendus: [...new Set(desc.map((d) => d.cle))], phrase: phraseDescentes(desc) };
+          }
+          gesteVrm(texteAvecDescentes(tr('sortir.fait', { num: String(v.num), e: mots.e }), ops), ops, {}, (sens) => {
+            if (ops.some((o) => o.k === 'vrm_slots')) { try { window.dispatchEvent(new Event('vrm:stock-slots')); } catch (_) {} }
+            setApresSortie(sens === 'avant' ? null : dit);
+            setTicStock((t) => t + 1);
+          }, 'stock.sortir');
+        };
+        const imprimerJ = () => { _pendingBordPrint = true; if (onNav) onNav('cat_bord'); };
             <ScreenHead icon="soleilLevant" title={tr('reglages.ma-journee.lib')}/>
 
             {/* (14 nov., Studio bleu clair — décision de Julien) LA TÊTE : le bonjour et la date, le grand titre, la
@@ -48374,6 +48450,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   onVoir={() => { if (onNav) onNav('achats'); }}/>
                 {/* SON ordre (« Modifier ma journée ») entre la phrase et l'affiche ; « Les chiffres du mois » sont une
                     tuile de la grille, « la prochaine chose » la première carte de « À faire » (`data-prochain`). */}
+                {/* (15 nov., refonte-journee — maquette validée) « LA PAIRE À SORTIR EN PREMIER » : quand une vente tombe, OÙ est
+                    l'article (son meuble, sa case allumée), puis « Je l'ai sortie » — avant le chiffre du jour. */}
+                {sortirJ ? <PaireASortir liste={sortirJ.aSortir} nSorties={sortirJ.sorties.length} slots={sortirJ.slots} Photo={PhotoVinted} Icon={Icon} mots={motsVendeur()}
+                  apres={apresSortie} onSortir={sortirPaireJ} onImprimer={imprimerJ} onRanger={(v) => { if (v && v.num && onStore) onStore(String(v.num)); else if (onNav) onNav('garage'); }}
+                  onCompris={() => setApresSortie(null)}
+                  toutesImprimer={{ n: Math.max(1, sortirJ.sorties.length), nums: sortirJ.sorties.map((x) => x.num).filter(Boolean), imprimer: imprimerJ }}/> : null}
                 {ordreJourneeHeure('tete', persoJ).filter((id) => id === 'phrase' || id === 'frise').map((id) => id === 'phrase'
                   ? (vuT('phrase') ? <div key={id} className="sj-phrase">{blocsTete.phrase}</div> : null)
                   : (vuT('frise') ? <div key={id} className="sj-affiche" data-sj-affiche="">{blocsTete.frise}</div> : <div key={id} hidden data-jp-cachee="frise">{blocsTete.frise}</div>))}
@@ -48425,22 +48507,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const n = nDe(xE), em = !xE.pasSu && xE.t && xE.t.emballer ? xE.t.emballer : null;
                 const imprimer = () => { _pendingBordPrint = true; if (onNav) onNav(xE.tab); };
                 const plein = em && em.n > 0 ? (
-                  <button type="button" className="sb-btn-plein" data-sj-imprimer={String(em.n)} data-fu-principal="" title={em.phrase}
+                  <button type="button" className={sortirLa ? 'sb-touche sj-imprimer-touche' : 'sb-btn-plein'} data-sj-imprimer={String(em.n)} data-fu-principal="" title={em.phrase}
+                // (15 nov., refonte-journee) « Imprimer les 3 bordereaux » en barre (la maquette) ; quand « La paire à sortir »
+                // est là, SON « Je l'ai sortie » est le plein de l'écran : l'impression devient une touche (un plein par écran).
+                const sortirLa = !!(sortirJ && (sortirJ.aSortir.length || apresSortie));
                     aria-label={tr('sj.imprimerN', { n: em.n })} onClick={imprimer}>
-                    <Icon name="printer" size={24}/><span>{tr('sj.imprimer')}</span>
+                    <Icon name="printer" size={24}/><span>{tr('sj.imprimerLesN', { n: em.n })}</span>
                   </button>) : null;
-                const colis = (() => {
-                  try {
-                    const l = toShip.map((t) => { const o = t.o || {}; const tx = String(o.transaction_id || ''); const b = tx ? bordsParTxn[tx] : null; const en = effEntry(o);
-                      return { cle: 'v:' + tx, num: (b ? numForBord(b) : '') || (en && en.numero) || '', titre: o.title || '', photo: orderPhoto(o), tr: transporteurVente(b, tx).nom || '', e: echeance(t), j: t.daysLeft }; })
-                      .concat(((colisEb && colisEb.aPoster) || []).map((x) => ({ cle: 'e:' + x.compte + ':' + x.orderId, num: x.ordre ? (numLigneEbay(x.ordre, (x.ordre.lineItems || [])[0]) || '') : '', titre: x.titre || '', photo: x.ordre ? photoCommande(x.ordre) : null, tr: 'eBay', e: Number.isFinite(x.jours) ? echeance({ daysLeft: x.jours }) : { txt: '', ambre: false }, j: Number.isFinite(x.jours) ? x.jours : null })))
-                      .concat((colisAutres.leboncoin || []).map((x) => ({ cle: 'l:' + x.txId, num: '', titre: x.titre || '', photo: null, tr: 'Leboncoin', e: { txt: '', ambre: false }, j: null })))
-                      .concat((colisAutres.vestiaire || []).map((x) => ({ cle: 'vc:' + x.id, num: x.num || '', titre: tr('journee.venteVestiaire'), photo: x.photo || null, tr: 'Vestiaire', e: Number.isFinite(x.jours) ? echeance({ daysLeft: x.jours }) : { txt: '', ambre: false }, j: Number.isFinite(x.jours) ? x.jours : null })));
-                    return l.sort((a, b) => (a.j == null ? 9999 : a.j) - (b.j == null ? 9999 : b.j));
-                  } catch (_) { return []; }
-                })();
+                const colis = colisJournee;
                 const montres = colis.slice(0, 6);
-                out.envoyer = { id: 'envoyer', lib: tr('sj.l.aEnvoyer'), aria: tr('sj.aria.aEnvoyer', { n: xE.pasSu ? '—' : n }),
+                const premier = colis.find((c) => c.e && c.e.txt) || null;
+                const plaquesE = colis.filter((c) => c.num).slice(0, 3);
+                out.envoyer = { id: 'envoyer', lib: xE.pasSu ? tr('sj.l.aEnvoyer') : tr('sj.v.aEnvoyerN', { n }), aria: tr('sj.aria.aEnvoyer', { n: xE.pasSu ? '—' : n }),
+                  lien: { txt: tr('sj.v.ventes'), faire: () => { if (onNav) onNav(xE.tab); }, attrs: { 'data-sj-lien': 'ventes' } },
                   // `data-sj-titre` / `data-sj-geste` : le geste du jour tel que l'instantané d'ouverture le range (src/journeeInstantanee.js).
                   attrs: { ...attrsCase(xE), 'data-sj-titre': `${n} colis ${Lbas.aEnvoyer}`, 'data-sj-geste': em && em.n > 0 ? VERBES.imprimer : VERBES.voir }, vide: !xE.pasSu && n === 0,
                   tasse: { n: xE.pasSu ? '—' : String(n), l: tr('sj.t.aEnvoyer') },
@@ -48449,6 +48528,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     {n > 0 ? <PileVignettes className="sj-pile" srcs={photosCase.envoyer} n={n} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="truck" size={20}/>}/> : null}
                     <span className="sj-sous">
                       {xE.pasSu ? pasSuTexte(xE) : <span className="sj-sous-l">{n === 0 ? tr('sj.rienAEnvoyer') : em ? tr(em.exact === false ? 'sj.pretsAuMoins' : 'sj.prets', { n: em.n }) : tr('sj.colis', { n })}</span>}
+                    {/* (15 nov., refonte-journee) Les plaques N° des premiers colis (par identité) et la date du plus pressé. */}
+                    {n > 0 && plaquesE.length ? <span className="sj-v-plaques" data-sj-plaques={String(plaquesE.length)}>{plaquesE.map((c) => <PlaqueJ key={c.cle} num={c.num}/>)}</span> : null}
+                    {n > 0 && premier ? <span className="sj-v-premier" data-sj-premier="">{premier.e.date ? <>{tr('sj.v.premierAvant', { d: '' }).replace(/\s*$/, ' ')}<b className="sj-v-am">{premier.e.txt}</b></> : <>{tr('sj.v.premierQuand', { q: '' }).replace(/\s*$/, ' ')}<b className="sj-v-am">{premier.e.txt}</b></>}</span> : null}
                       {forceDit(xE) || sous(xE)}
                     </span>
                   </>),
@@ -48477,9 +48559,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               if (xM && visT('messages').montree) {
                 const n = nDe(xM), ailleurs = sommeN(jobsM);
                 const nonLues = (convs.items || []).filter((c) => !acctOffOf(c) && conversationNonLue(c) && !conversationRetiree(convRetirees, String((c._acc && c._acc.vinted_user_id) || ''), c));
-                out.simples.push({ id: 'messages', lib: tr('sj.l.messages'), aria: tr('sj.aria.messages', { n: xM.pasSu ? '—' : n }), attrs: attrsCase(xM), vide: !xM.pasSu && n === 0 && !ailleurs,
+                const estOffre = (c) => /\boffre\b|\d\s?€/i.test(String(c.description || ''));
+                out.simples.push({ id: 'messages', lib: xM.pasSu ? tr('sj.l.messages') : tr('sj.v.messagesN', { n }), aria: tr('sj.aria.messages', { n: xM.pasSu ? '—' : n }), attrs: attrsCase(xM), vide: !xM.pasSu && n === 0 && !ailleurs,
                   tasse: { n: xM.pasSu ? '—' : String(n), l: tr('sj.t.messages') },
-                  face: (<><b className="sj-n">{xM.pasSu ? '—' : n}</b>{ailleurs ? <span className="sj-sous"><span className="sj-sous-l">{tr('sj.ailleurs', { n: ailleurs })}</span></span> : null}</>),
+                  face: (<><b className="sj-n">{xM.pasSu ? '—' : n}</b>
+                    {/* (15 nov., refonte-journee) Les deux dernières conversations non lues : le pseudo, puis sa phrase (une offre à l'ambre). */}
+                    {nonLues.length ? <span className="sj-v-convs" data-sj-convs={String(Math.min(2, nonLues.length))}>{nonLues.slice(0, 2).map((c, k) => (
+                      <span key={String(c.id || k)} className="sj-v-conv"><b>{(c.opposite_user && c.opposite_user.login) || tr('sj.conversation')}</b>
+                        <span className={estOffre(c) ? 'sj-v-am' : ''}>{String(c.description || '').slice(0, 60)}</span></span>))}</span>
+                      : (!xM.pasSu && n === 0 ? <span className="sj-v-convs is-vide"><span className="sj-v-conv"><span>{tr('sj.v.aucunNonLu')}</span></span></span> : null)}
+                    {ailleurs ? <span className="sj-sous"><span className="sj-sous-l">{tr('sj.ailleurs', { n: ailleurs })}</span></span> : null}</>),
                   deplie: (<>
                     {nonLues.length ? <div className="sj-liste" role="list">{nonLues.slice(0, 6).map((c, k) => (
                       <RangeeJ key={String(c.id || k)} photo={(photosCase.messages || [])[k] || null} Photo={PhotoVinted} icone={<Icon name="chat" size={18}/>}
@@ -48553,7 +48642,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   face: xR.pasSu ? <><b className="sj-n">—</b><span className="sj-sous">{pasSuTexte(xR)}</span></>
                     : n === 0 ? <><b className="sj-n">0</b><span className="sj-sous"><span className="sj-sous-l">{tr('sj.rienARetirer')}</span></span></>
                     : comptes.length ? <span className="sj-codes" data-sj-codes={String(comptes.length)}>{comptes.slice(0, 2).map((c, k) => (
-                        <span key={k} className="sj-code">{plaque(c)}<span className="sj-code-ou">{nomTr(c) || c.lieu || ''}</span></span>))}</span>
+                        <span key={k} className="sj-code">{plaque(c)}<span className="sj-code-ou">{String(c.lieu || '').split(/[\n,]/)[0].trim() || nomTr(c) || ''}</span></span>))}</span>
                     : <><b className="sj-n">{n}</b><span className="sj-sous">{sous(xR) || <span className="sj-sous-l">{tr('sj.codesPasLus')}</span>}</span></>,
                   deplie: (<>
                     {/* (15 nov., finition) « + N à vérifier » est déjà dans le titre de la carte (`soR`) : pas une seconde fois dessous. */}
