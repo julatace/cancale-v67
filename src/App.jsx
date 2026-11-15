@@ -49177,7 +49177,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             transaction, « Imprimer le bordereau » tamponné « RETOUR · N°… », limite, suivi, remboursement. */}
         {/* Sur « Tous » (la liste des achats montrée), un achat « à renvoyer » SANS bordereau a déjà sa carte et son lien
             dans la liste : il n'est pas redit ici (§7, un geste une fois) — ses bordereaux et avis, eux, le sont. */}
-        {!modeRetraits && <RetoursAchatBloc r={(aFilter==='all' && !modeListeAchats && retoursAchatRes && retoursAchatRes.etat==='lu') ? { ...retoursAchatRes, cartes: retoursAchatRes.cartes.filter((c) => c.source !== 'achat') } : retoursAchatRes}
+        {!modeRetraits && <RetoursAchatBloc r={retoursAchatRes} sansAchatsSeuls={aFilter==='all' && !modeListeAchats}
           onImprimer={imprimerRetourAchat} onDepose={basculerRetourDepose} Photo={PhotoVinted}/>}
         {/* ⚠️ SUR « À RETIRER », CES TROIS COMMANDES N'AGISSENT SUR RIEN.
             Cet onglet n'affiche AUCUNE liste de commandes (`aFilter==='attente'`

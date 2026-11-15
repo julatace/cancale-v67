@@ -132,7 +132,9 @@ export function CarteRenvoyer({ c, onImprimer, onDepose = null, Photo = null, no
 }
 
 // Achats → « À renvoyer » (au-dessus des listes). `r` : retoursAchat() ; rien à dire ⇒ rien.
-export function RetoursAchatBloc({ r, onImprimer, onDepose = null, Photo = null, now }) {
+// `sansAchatsSeuls` : sur « Tous », l'achat « à renvoyer » SANS bordereau a déjà sa carte et son lien dans la liste.
+export function RetoursAchatBloc({ r: rBrut, onImprimer, onDepose = null, Photo = null, now, sansAchatsSeuls = false }) {
+  const r = sansAchatsSeuls && rBrut && rBrut.etat === 'lu' ? { ...rBrut, cartes: rBrut.cartes.filter((c) => c.source !== 'achat') } : rBrut;
   if (!r || r.etat === 'encours') return null;
   if (r.etat === 'passu') return <p className="vrm-ret-note" data-retours-achat="passu">{tr('retours.passu')}</p>;
   if (!r.cartes.length && !r.anciennes.length) return r.manques.length ? <p className="vrm-ret-note" data-retours-manques={r.manques.join('|')}>{tr('retours.manques', { liste: r.manques.join(', ') })}</p> : null;
