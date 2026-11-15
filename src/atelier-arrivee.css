@@ -99,6 +99,6 @@
   .vrm-arr-pied-second > * { flex: 1 1 0; min-width: 0; }
 
   @media (max-width: 360px) { .vrm-arr-champs { grid-template-columns: minmax(0, 1fr); } .vrm-arr-photos { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-  @media (prefers-reduced-motion: no-preference) { .vrm-arr-corps { animation: vrm-arr-entre .24s cubic-bezier(.32,.72,0,1); } }
-  @keyframes vrm-arr-entre { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  /* Aucune animation d’entrée sur le corps d’une étape : mesuré au banc (1512, sombre), le contenu restait à
+     l’opacité 0 (animation figée sous la feuille). Le contenu est là, tout de suite. */
 /* La nuit : la feuille est un verre sombre ; l'encre et la surface suivent les jetons --vrm-*. */

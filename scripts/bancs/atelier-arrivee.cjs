@@ -95,9 +95,12 @@ function mesureEtape(tactile) {
   const cles = (texte.match(/\b(?:arr|acc|lt|ranger|atelier|reglages)\.[a-zA-Z.-]+\b/g) || []).slice(0, 5);
   const violet = [...feuille.querySelectorAll('*')].filter(vis).some((e) => { const c = getComputedStyle(e).color; const m = /rgba?\((\d+), (\d+), (\d+)/.exec(c); if (!m) return false; const [r, g, b] = [+m[1], +m[2], +m[3]]; return b > 150 && r > 110 && g < 90; });
   const prog = f.querySelector('[data-aa-prog]');
+  // Le corps de l'étape se VOIT (une opacité figée à 0 passait tous les autres contrôles : capture 1512 sombre).
+  const corps = f.querySelector('[data-aa-corps]');
+  const opaciteCorps = corps ? (() => { let o = 1; for (let e = corps; e && e !== feuille.parentElement; e = e.parentElement) o *= Number(getComputedStyle(e).opacity); return Math.round(o * 100) / 100; })() : 1;
   return { courante: prog ? prog.getAttribute('data-aa-courante') : '', etapes: [...f.querySelectorAll('[data-aa-etape]')].map((x) => x.getAttribute('data-aa-etape') + ':' + x.getAttribute('data-aa-etat')),
     reprise: (f.querySelector('[data-aa-reprise]') || {}).getAttribute ? f.querySelector('[data-aa-reprise]').getAttribute('data-aa-reprise') : '',
-    pleins, cibles, debord, cles, violet, page: document.documentElement.scrollWidth - window.innerWidth };
+    pleins, cibles, debord, cles, violet, opaciteCorps, page: document.documentElement.scrollWidth - window.innerWidth };
 }
 
 async function passe(b, vp, sombre) {
@@ -133,6 +136,7 @@ async function passe(b, vp, sombre) {
     if (!m) { dit(false, `${T} ${etape} : l’atelier est ouvert`); return null; }
     dit(!attendue || m.courante === attendue, `${T} ${etape} : l’étape courante est « ${attendue} »`, m.courante);
     dit(m.pleins.length <= 1, `${T} ${etape} : un seul bouton plein`, m.pleins);
+    dit(m.opaciteCorps >= 0.99, `${T} ${etape} : le corps de l’étape se voit (opacité ${m.opaciteCorps})`, m.opaciteCorps);
     if (tactile) dit(!m.cibles.length, `${T} ${etape} : cibles ≥ 44 px`, m.cibles);
     dit(!m.debord.length && m.page <= 1, `${T} ${etape} : rien ne déborde (feuille, page)`, { debord: m.debord, page: m.page });
     dit(!m.cles.length && !m.violet, `${T} ${etape} : aucune clé brute, pas de violet`, { cles: m.cles, violet: m.violet });
