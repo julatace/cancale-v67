@@ -39100,7 +39100,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (!r.ok) return;
         const j = await r.json().catch(() => null);
         try { localStorage.setItem('vrm_reclasse_retours_at', String(Date.now())); } catch (_) {}
-        if (vivant && j && Array.isArray(j.faits) && j.faits.length) {
+        // (15 nov., lot retour-parfait) + un transporteur lu sur l'étiquette d'un bordereau de retour d'avant : relu.
+        if (vivant && j && ((Array.isArray(j.faits) && j.faits.length) || (Array.isArray(j.transporteurs) && j.transporteurs.length))) {
           RETOURS_ACHAT_CACHE.v = undefined; RETOURS_ACHAT_CACHE.at = 0; EMAILS_LITIGES_CACHE.v = undefined; EMAILS_LITIGES_CACHE.at = 0;
           setRetoursVersion((n) => n + 1);
         }
