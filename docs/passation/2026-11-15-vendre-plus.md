@@ -74,7 +74,7 @@ par leur meilleur résultat, `ordre`), et la **vitesse** (`normaliser` saute NFD
 - Banc `scripts/bancs/baisses-conseillees.cjs` (390 tactile et 1512, clair et sombre) : 78 verts.
 - Non régressés : audit-conseil-mesure, audit-dormantes, audit-baisse-prix, audit-recherche-unique,
   -exacte, -numero, audit-traduction, audit-quoi-de-neuf, audit-studio, audit-icones,
-  audit-favoris-sans-vente, audit-robustesse-metier. Bancs : `vendre-plus` (2 rouges « Agir… Leboncoin · eBay · Vestiaire ») et `baisse-prix` G2 (le hasard de « Varier » laissé coché) sont rouges AUSSI sur le build de départ — pas ce lot.
+  audit-favoris-sans-vente, audit-robustesse-metier. Bancs : `vendre-plus` a 2 rouges (« Agir… Leboncoin · eBay · Vestiaire ») AUSSI sur le build de départ (mesuré) ; `baisse-prix` G2 dépend du hasard de « Varier » (le banc ne le décoche pas sur ce chemin, sans cible) — 1 rouge sur 59 ici, rien de ce lot sur ce chemin.
   `audit-recherche-universelle` : ses deux contrôles de temps à l'horloge murale rougissent sur
   cette machine chargée AVANT comme APRÈS ce lot (mesuré sur les deux arbres).
 
