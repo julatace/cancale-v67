@@ -118,6 +118,8 @@ const MESURE = (pg, tel) => pg.evaluate((tel) => {
   const at = sec ? [...sec.querySelectorAll('[data-at-journee] > .vrm-day-task-list > [data-job="a-trancher"]')].filter(vis) : [];
   out.nCartes = cartes.length + at.filter((e) => !(lst && lst.contains(e))).length + pro.filter((e) => !(lst && lst.contains(e))).length + va.filter((e) => !(lst && lst.contains(e)) && !e.hasAttribute('data-prochain')).length;
   out.ailleurs = va.map((e) => ({ dansListe: !!(lst && lst.contains(e)) || e.hasAttribute('data-prochain'), n: e.getAttribute('data-n') || '', texte: txt(e).slice(0, 80) }));
+  // (15 nov., retrait-ailleurs) « À retirer ailleurs » : le bloc EN TÊTE (avec les alertes d'argent), une paire par N°.
+  out.rx = [...document.querySelectorAll('[data-retirer-ailleurs-liste]')].filter(vis).map((b) => ({ enTete: !!b.closest('.sj-alertes'), nums: [...b.querySelectorAll('[data-ra-numero]')].map((a) => a.getAttribute('data-ra-numero')), texte: txt(b).slice(0, 400) }));
   // E5 — les verbes et les icônes des cartes.
   out.cartes = cartes.map((c) => {
     const act = c.querySelector('.vrm-day-task-action-mot, .vrm-day-task-action, .vrm-day-task-geste');
@@ -238,8 +240,10 @@ async function tournee(nav, { W, theme, scenario }) {
   // E2
   const horsListe = m.ailleurs.filter((a) => !a.dansListe);
   dit(!horsListe.length, 'E2', `${T} « Vendus ailleurs » n'est jamais hors de la liste « À faire »`, JSON.stringify(horsListe));
-  if (scenario === 'plein') dit(m.ailleurs.length === 1 && m.ailleurs[0].dansListe, 'E2', `${T} quelque chose à vérifier : « Vendus ailleurs » est UNE carte de la liste`, JSON.stringify(m.ailleurs));
-  else dit(m.ailleurs.length === 0, 'E2', `${T} rien à vérifier : pas de carte « Vendus ailleurs »`, JSON.stringify(m.ailleurs));
+  // (15 nov., retrait-ailleurs) Quelque chose à retirer : « À retirer ailleurs » EN TÊTE de Ma journée (un endroit, le
+  // geste sur place) ; la carte « Vendus ailleurs » ne se redit plus dans la liste (elle ne reste que pour un « pas su »).
+  if (scenario === 'plein') dit(m.ailleurs.length === 0 && m.rx.length === 1 && m.rx[0].enTete && m.rx[0].nums.join() === '5', 'E2', `${T} quelque chose à retirer : « À retirer ailleurs » EN TÊTE (la N°5), pas redit dans la liste`, JSON.stringify({ a: m.ailleurs, rx: m.rx }));
+  else dit(m.ailleurs.length === 0 && m.rx.length === 0, 'E2', `${T} rien à vérifier : ni carte « Vendus ailleurs » ni bloc « À retirer ailleurs »`, JSON.stringify({ a: m.ailleurs, rx: m.rx }));
   // E3
   // (9 nov., Ma journée v2) La semaine se touche dans la frise de la tête ; plus de carte à part.
   dit(!!(m.semBouton && m.semBouton.dansTete && m.semBouton.h >= 44) && m.semCarteAPart === 0, 'E3', `${T} « Semaine du … » se touche dans la tête (44 px), aucune carte Semaine à part`, JSON.stringify({ bouton: m.semBouton, aPart: m.semCarteAPart }));
@@ -307,15 +311,10 @@ async function tournee(nav, { W, theme, scenario }) {
   const ec = ECARTES.filter((re) => re.test(m.texteEcran)).map(String);
   dit(!ec.length, 'E0', `${T} aucun mot écarté (src/libelles.js)`, ec.join(' ¦ '));
 
-  // E2 (suite) — « Voir » ouvre la feuille « Vendus ailleurs » (SheetShell) : l'annonce, ses gestes.
-  if (scenario === 'plein' && m.ailleurs.length === 1) {
-    await pg.locator('.vrm-fu-afaire [data-vendus-ailleurs]').first().click().catch(() => {});
-    await pg.waitForTimeout(900);
-    const f = await pg.evaluate(() => { const d = document.querySelector('[data-feuille-ailleurs]'); return d ? { n: d.querySelectorAll('article').length, croix: !!d.querySelector('[data-feuille-croix]'), texte: (d.innerText || '').replace(/\s+/g, ' ').slice(0, 900), vide: !!d.querySelector('article [data-photo-vide]') } : null; });
+  // E2 (suite) — le bloc dit la paire (N°5) et le site où elle est encore en ligne, avec son geste.
+  if (scenario === 'plein' && m.rx.length === 1) {
     if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `e1-ailleurs-${W}-${theme}.png`) });
-    dit(!!f && f.n === 1 && f.croix && /N°5/.test(f.texte) && f.vide && /Leboncoin · encore/.test(f.texte), 'E2', `${T} « Voir » ouvre la feuille « Vendus ailleurs » (N°5, encore en ligne)`, JSON.stringify(f));
-    await pg.locator('[data-feuille-ailleurs] [data-feuille-croix]').click().catch(() => {});
-    await pg.waitForTimeout(500);
+    dit(/N°\s*5/.test(m.rx[0].texte) && /Leboncoin/.test(m.rx[0].texte), 'E2', `${T} « À retirer ailleurs » : la N°5, encore en ligne sur Leboncoin`, JSON.stringify(m.rx));
   }
   // E9 (suite) — « Voir » mène au Stock sur CE N°, puis la carte ne revient pas.
   if (scenario === 'plein' && m.stock.length === 1 && W === LARGEURS[0] && theme === THEMES[0]) {

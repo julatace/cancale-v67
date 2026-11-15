@@ -130,7 +130,13 @@ et ouvre `/?tab=journee&cible=ailleurs&num=124` : Ma journée, la paire éclair�
 - Banc `scripts/bancs/a-retirer-ailleurs.cjs` (harnais `nouveau-vendeur`, extension et route eBay
   simulées) : 5 scénarios × 390 tactile / 1512 × clair / sombre ; mesure par `data-*`, compte les
   touchers, contraste des liens. L'ancien banc `retirer-ailleurs.cjs` lance désormais celui-ci.
-  Sur le build d'avant (`BANC_DIST=<dist d'origin/main>`) : rouge (aucun bloc).
+  **Vert sur le build de la branche : 260 contrôles, 0 rouge** (plein 76, série 56, onglet 44,
+  sans extension 40, vente douteuse 44 ; un scénario par processus — la machine du banc était à
+  une charge de 37, un Chromium plantait sous la charge). Touchers comptés : 5 (plein, 3 sites),
+  2 (série), 2 (onglet, reprise comprise). **Rouge sur le build d'`ea152a4b`** (code d'avant, arbre
+  tiré par `git archive`) : « À retirer ailleurs » absent, la coque redit « à retirer de … ».
+  Captures regardées (390 / 1512, clair / sombre : journée, confirmation, après, série pendant,
+  onglet, reprise, sans extension, vente douteuse).
 - Audits verts : traduction, tdz, variables, studio (fichier ajouté aux migrés), identite,
   coherence, extension-zip, fonctions-api, csp, quoi-de-neuf, double-vente-ailleurs, cibles-notif,
   icones, preuve-vente, notifs-belles, notifs-centre, vestiaire-partout. `textes-courts` : 1 rouge
