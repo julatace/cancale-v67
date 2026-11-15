@@ -39,7 +39,8 @@ const dit = (bon, quoi, detail) => { if (bon) { ok++; console.log(`  ✅ ${quoi}
 const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { ko++; console.log(`  ❌ ${quoi} — a levé : ${String(e && e.message).slice(0, 220)}`); return null; } };
 
 const MIN = 60000;
-const LIENS = [{ cle: 'ventes', libelle: 'Mes ventes', url: 'https://www.vinted.fr/my_orders/sold' }, { cle: 'messages', libelle: 'Messages', url: 'https://www.vinted.fr/inbox' }, { cle: 'dressing', libelle: 'Mon dressing', url: 'https://www.vinted.fr/member/111' }];
+// 5.379 : plus de « Mes ventes » /my_orders/sold (404 chez Vinted, capture de Julien) — banc carte-extension.
+const LIENS = [{ cle: 'messages', libelle: 'Messages', url: 'https://www.vinted.fr/inbox' }, { cle: 'dressing', libelle: 'Mon dressing', url: 'https://www.vinted.fr/member/111' }];
 const APERCU = { etat: 'pret', total: 3, nonProuves: 1, ecartes: 2, ventesAilleurs: 'ok', selection: ['n1', 'n2', 'n5'],
   liste: [
     { id: 'n1', itemId: '101', pseudo: 'camille_b', titre: 'Nike Air Max 90 blanches 42', prix: 50, offre: 45, texte: 'Bonjour camille_b, Nike Air Max 90 blanches 42 est à 45 € pour toi !' },
@@ -109,7 +110,7 @@ const lire = (pg) => pg.evaluate(() => {
     lancer: q('[data-fav-lancer]') ? q('[data-fav-lancer]').innerText.trim() : null, aide: !!q('[data-fav-aide-texte]'),
     attente: q('[data-fav-attente-texte]') ? q('[data-fav-attente-texte]').innerText.trim() : '', dans: q('[data-fav-dans]') ? q('[data-fav-dans]').innerText.trim() : '',
     envoyes: q('[data-fav]') ? q('[data-fav]').getAttribute('data-fav-envoyes') : null, fin: q('[data-fav-fin]') ? q('[data-fav-fin]').getAttribute('data-fav-fin') : null,
-    pleins: boutons.filter((b) => b.classList.contains('b') && !b.classList.contains('sec') && getComputedStyle(b).backgroundColor !== 'rgba(0, 0, 0, 0)').length,
+    pleins: boutons.filter((b) => b.classList.contains('b') && !b.classList.contains('sec') && (getComputedStyle(b).backgroundColor !== 'rgba(0, 0, 0, 0)' || getComputedStyle(b).backgroundImage !== 'none')).length,   // 5.379 : le plein est un rond d’encre (dégradé)
     petits: boutons.filter((b) => b.offsetHeight < 44 && !b.closest('.outils')).map((b) => (b.className || b.tagName) + ':' + b.offsetHeight),   // taille de mise en page (l’animation d’entrée la réduit de 2 % un instant)
     vrmLiens: Array.from(r.querySelectorAll('a[href]')).filter((a) => /vrm\.center/.test(a.href) && !/VRM-extension|VRM-Orion|mot-de-passe/.test(a.href)).length,
     envoyes2: window.__envoyes.filter((x) => x.action !== 'etat'), accent,
@@ -140,12 +141,12 @@ const clic = async (pg, sel) => { await pg.evaluate((s) => { const b = document.
         await cap(t.pg, `carte-${largeur}-${scheme}`);
         dit(a.carteVisible && dedans(a.carte, largeur, hauteur), `${T} : la carte s’ouvre (et reste ouverte au clic du logo), dans l’écran`, JSON.stringify(a.carte));
         dit(!a.ouvrirVrm && a.raccourcis === 0, `${T} : plus de « Ouvrir VRM » ni de « Colis · Messages · Offres »`, JSON.stringify({ o: a.ouvrirVrm, r: a.raccourcis }));
-        dit(a.liens.map((l) => l.cle).join(',') === 'ventes,messages,dressing' && a.liens.every((l) => new URL(l.href).origin === 'https://www.vinted.fr' && l.target === '_top'), `${T} : Mes ventes · Messages · Mon dressing, sur vinted.fr, dans cet onglet`, JSON.stringify(a.liens));
+        dit(a.liens.map((l) => l.cle).join(',') === 'messages,dressing' && a.liens.every((l) => new URL(l.href).origin === 'https://www.vinted.fr' && l.target === '_top'), `${T} : Messages · Mon dressing, sur vinted.fr, dans cet onglet`, JSON.stringify(a.liens));
         dit(a.vrmLiens === 0, `${T} : aucun lien vers vrm.center`, String(a.vrmLiens));
-        dit(a.fav === 'pret' && a.favN === '3' && /3 favoris à qui écrire/.test(a.favTexte), `${T} : « 3 favoris à qui écrire · Voir »`, a.favTexte);
+        dit(a.fav === 'pret' && a.favN === '3' && /3 favoris à qui écrire/.test(a.favTexte) && a.lignes === 3, `${T} : « 3 favoris à qui écrire », la liste tout de suite (5.379 : plus d’étape « Voir »)`, a.favTexte);
         dit(!a.envoyes2.some((m) => m.action === 'ouvrirVRM'), `${T} : ouvrir la carte (logo touché / cliqué) n’ouvre PAS VRM`, JSON.stringify(a.envoyes2));
         dit(a.petits.length === 0, `${T} : cibles ≥ 44 px`, JSON.stringify(a.petits));
-        dit(a.pleins === 0, `${T} : aucun bouton plein sur la carte au repos (l’accent est rare)`, String(a.pleins));
+        dit(a.pleins === 1 && a.lancer === 'Envoyer le message (3)', `${T} : un seul bouton plein : « Envoyer le message (3) » (l’accent est rare)`, String(a.pleins));
         // L'aperçu.
         await clic(t.pg, '[data-fav-voir]');
         const b = await lire(t.pg);
@@ -185,18 +186,20 @@ const clic = async (pg, sel) => { await pg.evaluate((s) => { const b = document.
       await t.ctx.close();
     });
     await essaie('bloque', async () => {
-      const t = await ouvrir(nav, base({ apercu: { at: Date.now(), etat: 'bloque', raison: 'reglages' }, file: null }), { mobile: true, largeur: 390, hauteur: 844 });
+      const lus = [{ id: 'n1', pseudo: 'camille_b', titre: 'Nike Air Max 90 blanches 42', date: new Date(Date.now() - 5 * MIN).toISOString(), photo: '', etat: 'a_envoyer' }, { id: 'n2', pseudo: 'lea.vintage', titre: 'Adidas Samba OG 41', date: new Date(Date.now() - 50 * MIN).toISOString(), photo: '', etat: 'envoye' }];
+      const t = await ouvrir(nav, base({ apercu: { at: Date.now(), etat: 'bloque', raison: 'reglages' }, file: null }), { mobile: true, largeur: 390, hauteur: 844, apercu: { etat: 'bloque', raison: 'reglages', lus, totalLus: 2, file: null } });
       await montrer(t.pg, true);
       const a = await lire(t.pg);
-      dit(a.fav === 'bloque' && /Écris ton message une seule fois/.test(a.favTexte), 'aucun message enregistré : le geste est dit, en une phrase', a.favTexte);
+      await cap(t.pg, 'bloque-390-light');
+      dit(a.fav === 'bloque' && a.lignes === 2 && /Écris d’abord ton message dans VRM/.test(a.favTexte), 'aucun message enregistré : la liste lue ET le geste (« Écris d’abord ton message dans VRM › »)', a.favTexte);
       await t.ctx.close();
     });
     await essaie('clic lien', async () => {
       const t = await ouvrir(nav, base(), { largeur: 1512, hauteur: 900 });
       await montrer(t.pg, false);
-      await t.pg.evaluate(() => document.getElementById('vrm-badge').shadowRoot.querySelector('[data-lien-site="ventes"]').click());
-      await t.pg.waitForURL('**/my_orders/sold', { timeout: 4000 }).catch(() => {});
-      dit(t.pg.url() === 'https://www.vinted.fr/my_orders/sold', '« Mes ventes » mène aux ventes du compte, sur Vinted, dans cet onglet', t.pg.url());
+      await t.pg.evaluate(() => document.getElementById('vrm-badge').shadowRoot.querySelector('[data-lien-site="messages"]').click());
+      await t.pg.waitForURL('**/inbox', { timeout: 4000 }).catch(() => {});
+      dit(t.pg.url() === 'https://www.vinted.fr/inbox', '« Messages » mène aux messages du compte, sur Vinted, dans cet onglet', t.pg.url());
       await t.ctx.close();
     });
   } finally { await nav.close(); }

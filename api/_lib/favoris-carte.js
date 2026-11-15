@@ -49,6 +49,21 @@ export function resumeFileCarte(vue, maintenant = Date.now()) {
     raison: vue.raison || '', raisons };
 }
 
+// 5.379 : les favoris LUS, pour les montrer (jamais pour envoyer) : les plus récents d'abord
+// (l'ordre de favorisDepuisNotifications), avec ce qui est su de chacun — qui, quel article,
+// quand, la photo, et où il en est (`etat` : le code d'etatFavori, la règle de l'écran
+// Favoris). Aucune identité déduite d'un titre : le titre est celui de l'annonce PAR son id.
+export const FAVORIS_CARTE_LUS = 30;
+const PHOTO_VINTED = /^https:\/\/images\d*\.vinted\.net\//;
+function lusPourCarte(lignes, { statut, parNotif, items }) {
+  return lignes.slice(0, FAVORIS_CARTE_LUS).map((l) => {
+    const itemId = itemIdFavori(l), it = itemId ? items.get(String(itemId)) : null;
+    const e = etatFavori({ job: statut(l), journal: parNotif.get(String(l.id)) || [], vendue: false });
+    const photoIt = it && it.photo && typeof it.photo.url === 'string' && PHOTO_VINTED.test(it.photo.url) ? it.photo.url : '';
+    return { id: String(l.id), pseudo: pseudoFavori(l), titre: titreItem(it) || titreNotification(l.body), date: typeof l.date === 'string' ? l.date : null, photo: l.photo || photoIt || '', etat: e.code };
+  });
+}
+
 // prefs     : les réglages ENREGISTRÉS du compte, validés (validerReglagesFavoris), ou null ;
 // capture   : notifications complètes (capture + archive) du compte ;
 // vue       : vueFile du propriétaire (jobs, auto.journal) ;
@@ -58,10 +73,11 @@ export function resumeFileCarte(vue, maintenant = Date.now()) {
 export function apercuCarte({ prefs, capture, vue, dressing, garde = () => null, prouve = () => false, maintenant = Date.now() } = {}) {
   const file = resumeFileCarte(vue, maintenant);
   if (vue && vue.active) return { etat: 'encours', file };
-  if (!prefs) return { etat: 'bloque', raison: 'reglages', file };
-  if (!capture || !capture.payload || !Array.isArray(capture.payload.notifications)) return { etat: 'bloque', raison: 'favoris_absents', file };
-  const ed = etatDressingAuto(dressing, maintenant);
-  if (ed) return { etat: 'bloque', raison: ed, file };
+  // 5.379 (Julien, 15 nov. : « je veux voir les favoris du plus récent au plus vieux ») :
+  // la LISTE lue se rend même quand l'envoi n'est pas possible (pas de message écrit pour
+  // ce compte, dressing pas relu) — avant, « bloque » ne rendait qu'une phrase et la carte
+  // n'avait rien à montrer (§4.1 : une liste vide n'est jamais une réponse). Lecture seule.
+  if (!capture || !capture.payload || !Array.isArray(capture.payload.notifications)) return { etat: 'bloque', raison: 'favoris_absents', sansMessage: !prefs, file };
   const lignes = favorisDepuisNotifications(capture.payload, capture.domain).lignes;
   const statut = indexerContactsFavoris(vue && vue.jobs || []);
   const parNotif = new Map();
@@ -70,7 +86,11 @@ export function apercuCarte({ prefs, capture, vue, dressing, garde = () => null,
     const k = String(x.notificationId); if (!parNotif.has(k)) parNotif.set(k, []); parNotif.get(k).push(x);
   }
   for (const l of parNotif.values()) l.sort((a, b) => (Number(b.at) || 0) - (Number(a.at) || 0));
-  const items = new Map((dressing.items || []).filter((x) => x && x.id != null).map((x) => [String(x.id), x]));
+  const items = new Map((dressing && Array.isArray(dressing.items) ? dressing.items : []).filter((x) => x && x.id != null).map((x) => [String(x.id), x]));
+  const lus = lusPourCarte(lignes, { statut, parNotif, items });
+  if (!prefs) return { etat: 'bloque', raison: 'reglages', lus, totalLus: lignes.length, file };
+  const ed = etatDressingAuto(dressing, maintenant);
+  if (ed) return { etat: 'bloque', raison: ed, lus, totalLus: lignes.length, file };
   const offre = prefs.offreMode ? { mode: prefs.offreMode, valeur: prefs.offreMode === 'pct' ? prefs.pourcentage : prefs.offreValeur, arrondi: prefs.arrondi === true } : null;
   let ecartes = 0, nonProuves = 0;
   const prets = [];
@@ -98,7 +118,7 @@ export function apercuCarte({ prefs, capture, vue, dressing, garde = () => null,
       ...(offre ? { offre: Number(prixOffre) } : {}),
       texte: personnaliserMessageFavori(prefs.message, pseudo, () => 0, { article: titre, prix: prixOffre != null ? Number(prixOffre) : prix }).slice(0, 2000) };
   });
-  if (!liste.length) return { etat: 'rien', total: 0, nonProuves, ecartes, file };
+  if (!liste.length) return { etat: 'rien', total: 0, nonProuves, ecartes, lus, totalLus: lignes.length, file };
   return { etat: 'pret', total: prets.length, liste, selection: liste.map((x) => x.id), nonProuves, ecartes,
     message: { versions, offre: offre ? { mode: offre.mode, valeur: offre.valeur, arrondi: offre.arrondi } : null,
       intervalleMinutes: prefs.intervalleMinutes, intervalleMaxMinutes: prefs.intervalleMaxMinutes || null },

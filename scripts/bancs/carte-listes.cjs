@@ -49,7 +49,7 @@ const LISTES = (tous) => ({ ok: true, plateforme: 'vinted', compte: { id: '111',
   autres: tous ? [{ id: '222', nom: 'julien_kicks', lectureSeule: true, annonces: { n: 120, liste: ANN.slice(0, 4).map((x) => ({ titre: x.titre, prix: x.prix })) }, ventes: { n: 340, liste: VEN.slice(0, 4).map((x) => ({ titre: x.titre, prix: x.prix, etat: x.etat })) } }] : null });
 const ETAT = { ok: true, plateforme: 'vinted', capte: true, version: '5.377.0', code: '5.377.0', vrm: { ok: true, connecte: true, email: 'sophie@exemple.fr', cloisonne: true },
   site: { id: '111', nom: 'shop_sophie', choix: 'oui', jauge: { h: 12, maxH: 50, j: 40, maxJ: 200, complet: true }, favoris: { apercu: { at: T0 - MIN, etat: 'pret', total: 30 }, file: null } },
-  flux: { okAt: T0 - 3 * MIN }, liens: [{ cle: 'ventes', libelle: 'Mes ventes', url: 'https://www.vinted.fr/my_orders/sold' }, { cle: 'messages', libelle: 'Messages', url: 'https://www.vinted.fr/inbox' }], capteCoupe: false };
+  flux: { okAt: T0 - 3 * MIN }, liens: [{ cle: 'messages', libelle: 'Messages', url: 'https://www.vinted.fr/inbox' }], capteCoupe: false };
 
 async function ouvrir(nav, { scheme = 'light', largeur = 1512, hauteur = 900, mobile = false } = {}) {
   const ctx = await nav.newContext(Object.assign({ colorScheme: scheme, viewport: { width: largeur, height: hauteur } }, mobile ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}));

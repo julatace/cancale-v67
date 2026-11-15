@@ -69,7 +69,8 @@ const zero = (lot) => !!(lot && lot.n && Object.values(lot.n).some((v) => !(Numb
     r = await f.lot();
     dit(r && r.lot && r.lot.n && r.lot.n.ventes === 2 && Object.keys(r.lot.n).length === 1, '2 ventes nouvelles + 1 connue ⇒ « 2 ventes » (par n° de transaction)', JSON.stringify(r && r.lot));
     dit(r && r.lot && r.lot.compte === '111' && r.lot.nom === 'compte_banc', 'au nom du compte de l’onglet (shop : compte_banc)', JSON.stringify(r && r.lot));
-    dit(r && r.lot && r.lot.voir === 'https://www.vinted.fr/my_orders/sold', '« Voir » ouvre « Mes ventes » sur vinted.fr (jamais VRM)', r && r.lot && r.lot.voir);
+    // 5.379 : « Mes ventes » (/my_orders/sold) est une adresse que Vinted ne sert pas (404, capture de Julien) : pas de « Voir » plutôt qu'un faux lien.
+    dit(r && r.lot && r.lot.voir === '', '« Voir » : aucune adresse attestée pour les ventes Vinted ⇒ pas de lien (jamais VRM, jamais une page 404)', r && r.lot && r.lot.voir);
     const ev = f.capteEvts();
     dit(ev.length === 1 && ev[0].lot && ev[0].lot.n.ventes === 2, 'l’app ouverte reçoit le même lot une fois (`capte`)', JSON.stringify(ev));
     // F. vu une fois ⇒ ne revient pas.

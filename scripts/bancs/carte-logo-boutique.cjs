@@ -122,7 +122,8 @@ const inter = (a, b) => Math.max(0, Math.min(a.r, b.r) - Math.max(a.x, b.x)) * M
 const dedans = (c, W, H) => !!c && c.x >= 0 && c.y >= 0 && c.r <= W + 0.5 && c.b <= H + 0.5;
 const ouvrirCarte = async (pg, mobile) => { const l = await lire(pg); if (mobile) await pg.touchscreen.tap(l.btn.x + l.btn.w / 2, l.btn.y + l.btn.h / 2); else await pg.mouse.move(l.btn.x + l.btn.w / 2, l.btn.y + l.btn.h / 2); await pg.waitForTimeout(350); return lire(pg); };
 const lum = (rgb) => { const m = /(\d+),\s*(\d+),\s*(\d+)/.exec(rgb || ''); return m ? (0.2126 * m[1] + 0.7152 * m[2] + 0.0722 * m[3]) / 255 : null; };
-const estAmbre = (rgb) => { const m = /(\d+),\s*(\d+),\s*(\d+)/.exec(rgb || ''); return !!m && Number(m[1]) > 150 && Number(m[3]) < 60; };
+// 5.379 : l'ambre du studio (#764300 sur clair, #F2B65E sur nuit) — rouge > vert > bleu, et loin du bleu.
+const estAmbre = (rgb) => { const m = /(\d+),\s*(\d+),\s*(\d+)/.exec(rgb || ''); return !!m && Number(m[1]) > Number(m[2]) && Number(m[2]) > Number(m[3]) && Number(m[1]) - Number(m[3]) > 100; };
 
 (async () => {
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
