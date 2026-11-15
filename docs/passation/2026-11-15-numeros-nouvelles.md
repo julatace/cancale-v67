@@ -53,13 +53,15 @@ Règle : `src/numerosNouvelles.js` (JS pur). Texte : `src/i18n/langues/*/numeros
      « 3 nouvelles paires numérotées · N°216, 217, 218 », notification si l'app est en
      arrière-plan (`alerteLocale`, jamais en double d'une notification du serveur), et la
      carte de l'extension (ci-dessous) ;
-   - **Ma journée, en tête** : « 3 nouvelles paires numérotées · N°… » (« nouveaux articles »
-     pour un profil non Sneakers) ⇒ la feuille **« Nouveaux N° à écrire sur tes cartons »**
+   - **Ma journée, en tête** : « 3 nouveaux articles numérotés · N°… » (Ma journée dit
+     « articles » pour tous depuis le 3 nov., `enArticles` : la forme « article » est écrite en
+     entier, jamais « nouvelles articles numérotées ») ⇒ la feuille **« Nouveaux N° à écrire sur
+     tes cartons »** (« paires » pour un profil Sneakers, « articles » sinon)
      (photo, N° gravé, titre, « C'est écrit » par ligne, « Tout est écrit ») ; « C'est écrit »
      pose `nouveau.ecrit` + `cartonVerifie` (geste annulable), jamais le N°.
 2. **Mode « Je numérote moi-même »** — VRM n'attribue RIEN. Une annonce en ligne (lecture
    complète) sans N° ni N° écrit lisible (`demandesNumero`) ⇒ Ma journée en tête :
-   « 3 paires sans numéro · Donne-leur un N° » ⇒ une feuille par article (photo, titre,
+   « 3 articles sans numéro · Donne-leur un N° » ⇒ une feuille par article (photo, titre,
    « 1 sur 3 », champ pré-rempli avec la proposition `prochainLibre` calculée sur une COPIE,
    rien de réservé ; le rappel « Écris-le aussi à la fin de sa description » si son mode lit
    la description). La validation passe par `poserNumero` (le chemin de la carte : format,
@@ -79,6 +81,10 @@ Règle : `src/numerosNouvelles.js` (JS pur). Texte : `src/i18n/langues/*/numeros
    à une annonce republiée depuis le téléphone, reconnue par sa photo).
 5. Annonces : le bloc « mises en ligne numérotées par VRM » ne remontre pas une ligne déjà
    « écrite » dans Ma journée.
+6. Ma journée : la ligne de la cloche « N annonces sans numéro » (comptée à SON passage,
+   souvent avant la numérotation — mesuré au banc : « 2 annonces sans numéro » sous « 2 nouveaux
+   articles numérotés ») ne s'ajoute plus quand la ligne des nouvelles annonces est là, ni en
+   mode « moi » (la demande la remplace) : le même sujet, une fois (§7).
 
 ## Ce qui n'est PAS fait (et pourquoi)
 

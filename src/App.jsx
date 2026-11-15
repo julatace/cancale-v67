@@ -46573,6 +46573,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         //    passent ici, après les tuiles (§4.11 : rien ne disparaît en silence).
         if (Array.isArray(alertes)) for (const a of alertes) {
           if (!a || !(a.dv || a.jr)) continue;
+          // (15 nov.) « N annonces sans numéro » de la cloche (compté à SON passage, souvent avant la
+          // numérotation) : la ligne des nouvelles annonces le dit déjà, à jour — jamais deux fois (§7).
+          if (a.job === 'sans-numero' && (modeNum === 'moi' || nouveauxAEcrire.length > 0)) continue;
           if (a.dv) jobs.push({id:'double-vente', n:a.n, icon:a.ic||'alert', color:a.dv==='num'?C.doublon:C.warn, urgent:true, title:a.text, tab:a.tab, prio:-1, avant:a.avant, lbcSuppr:Array.isArray(a.lbcSuppr)&&a.lbcSuppr.length?a.lbcSuppr:null, photos:a.photos});
           else jobs.push({id:a.job||('a-faire-'+a.ic), n:a.n, icon:a.ic||'info', color:a.urssaf&&a.urssaf.proche?C.warn:C.text, title:a.text, sub:a.sub, tab:a.tab, prio:3, urssaf:a.urssaf,
             // (1er nov., « très répétitif ») Le rappel URSSAF en court : « Déclarer
@@ -46688,11 +46691,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // « 3 nouvelles paires numérotées · N°216, 217, 218 » ⇒ la feuille « à écrire sur tes cartons ».
         // « Je numérote moi-même » : « 3 articles sans numéro · Donne-leur un N° » ⇒ une feuille par article.
         if (modeNum === 'vrm' && nouveauxAEcrire.length) {
-          const court = `${tr(`nn.notif.${vendMots()}`, { n: nouveauxAEcrire.length })} · ${listeNumeros(nouveauxAEcrire.map((l) => l.numero))}`;
+          // Ma journée dit « articles » pour tout le monde (Julien, 3 nov. : pas de « paires » ici, `enArticles`) :
+          // la forme « article » écrite en entier, jamais un mot remplacé dans la phrase. La feuille, la
+          // notification et la carte de l'extension gardent le mot du profil.
+          const court = `${tr('nn.notif.autre', { n: nouveauxAEcrire.length })} · ${listeNumeros(nouveauxAEcrire.map((l) => l.numero))}`;
           jobs.push({ id: 'numeros-nouveaux', n: nouveauxAEcrire.length, icon: 'pencil', color: C.text, court, detail: tr('nn.job.detail'), title: court, photos: nouveauxAEcrire.map((l) => l.photo), tab: null, prio: 0.3, action: tr('nn.job.action'), avant: ouvrirAEcrire });
         }
         if (modeNum === 'moi' && numerosADemander.length) {
-          const court = tr(`nn.demande.court.${vendMots()}`, { n: numerosADemander.length });
+          const court = tr('nn.demande.court.autre', { n: numerosADemander.length });   // « articles » sur Ma journée (voir plus haut)
           jobs.push({ id: 'numeros-a-donner', n: numerosADemander.length, icon: 'pencil', color: C.warn, court, detail: tr('nn.demande.detail'), title: court, photos: numerosADemander.map((it) => it.photo || null), tab: null, prio: 0.3, action: tr('nn.demande.action'), avant: () => { demanderNumerosManquants(); } });
         }
         // (6 nov., vague 2 · point 4) Les annonces numérotées sans achat relié : le nombre, une fois ;

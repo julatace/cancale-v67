@@ -4,14 +4,14 @@
 //  suivante du dressing :
 //  A. « VRM numérote » (profil Sneakers, puis profil « autre » : une paire ET un sac,
 //     numérotés pareil) — lecture COMPLÈTE ⇒ N°8 et N°9 posés tout seuls, marqués
-//     « à écrire » ; Ma journée en tête : « 2 nouvelles paires numérotées · N°8, 9 »
-//     (« 2 nouveaux articles numérotés » pour le profil « autre », jamais « paire ») ;
-//     la feuille « Nouveaux N° à écrire sur tes cartons » (photo, N°, titre) ;
+//     « à écrire » ; Ma journée en tête : « 2 nouveaux articles numérotés · N°8, 9 »
+//     (Ma journée dit « articles » pour tous, Julien 3 nov.) ; la feuille « Nouveaux N° à
+//     écrire sur tes cartons » (photo, N°, titre ; « paires » pour Sneakers, « articles » sinon) ;
 //     « C'est écrit » ⇒ la ligne sort, la marque part au nuage, le N° ne change pas.
 //  P. La même lecture PARTIELLE (Vinted annonce 5 articles, 3 lus) ⇒ AUCUN N° neuf,
 //     aucune ligne dans Ma journée.
 //  B. « Je numérote moi-même » — le N° écrit (« N° 55 » dans le titre) est pris tel
-//     quel ; l'autre article : « 1 paire sans numéro · Donne-leur un N° » ⇒ la
+//     quel ; l'autre article : « 1 article sans numéro · Donne-leur un N° » ⇒ la
 //     feuille « Quel N° pour cette paire ? (1 sur 1) », photo, champ pré-rempli
 //     avec 56 (le suivant), le rappel « Écris-le aussi à la fin de sa description » ;
 //     « 60 » + Enregistrer ⇒ N°60 posé à la main ; la ligne disparaît.
@@ -130,10 +130,11 @@ async function scenarioA(b, largeur, sombre, vend) {
     dit((f['9310'] || {}).numero === '8' && (f['9311'] || {}).numero === '9', `${tag} : lecture complète ⇒ la paire N°8, le sac N°9 (le plus haut + 1, dans l'ordre de mise en ligne, sans catégorie)`, JSON.stringify({ a: f['9310'], b: f['9311'] }).slice(0, 200));
     dit(!!((f['9310'] || {}).nouveau && (f['9311'] || {}).nouveau) && (f['9301'] || {}).numero === '7' && !(f['9301'] || {}).nouveau, `${tag} : les deux sont « à écrire », la N°7 n'est pas touchée`);
     const j = await job(pg, 'numeros-nouveaux');
-    const attendu = vend === 'sneakers' ? /2 nouvelles paires numérotées · N°8, 9/ : /2 nouveaux articles numérotés · N°8, 9/;
-    dit(j && j.n === '2' && attendu.test(j.txt), `${tag} : Ma journée : « ${vend === 'sneakers' ? '2 nouvelles paires numérotées' : '2 nouveaux articles numérotés'} · N°8, 9 »`, JSON.stringify(j));
-    dit(!!j && (vend === 'sneakers' || !/paire/i.test(j.txt)), `${tag} : le mot du profil (jamais « paire » pour un profil non Sneakers)`, j && j.txt);
+    // Ma journée dit « articles » pour tous (Julien, 3 nov.) — la forme écrite en entier, accordée.
+    dit(j && j.n === '2' && /^2 nouveaux articles numérotés · N°8, 9/.test(j.txt), `${tag} : Ma journée : « 2 nouveaux articles numérotés · N°8, 9 » (accordé, jamais « nouvelles articles »)`, JSON.stringify(j));
+    dit(!!j && !/paire|nouvelles articles|numérotées/i.test(j.txt), `${tag} : aucun mot remplacé dans la phrase`, j && j.txt);
     dit(!!j && j.avant <= 1, `${tag} : la ligne est en tête d'« À faire »`, j && String(j.avant));
+    dit(!(await job(pg, 'sans-numero')), `${tag} : pas de seconde ligne « annonces sans numéro » (le même sujet, une fois)`);
     await pg.locator('[data-job="numeros-nouveaux"]').first().scrollIntoViewIfNeeded().catch(() => {});
     await capture(pg, `A-${cap}-journee`);
     await toucher(pg, '[data-job="numeros-nouveaux"] button, button[data-job="numeros-nouveaux"]', mobile);
@@ -146,6 +147,7 @@ async function scenarioA(b, largeur, sombre, vend) {
       dit(vend === 'sneakers' ? /paires/.test(sous) : (/articles/.test(sous) && !/paire/i.test(sous)), `${tag} : la feuille parle de ${vend === 'sneakers' ? 'paires' : 'articles'}`);
       const p = await petits(pg, '[data-nn-feuille] button');
       dit(!mobile || p.length === 0, `${tag} : boutons de la feuille à 44 px`, p.join(' | '));
+      await pg.waitForTimeout(700);   // la feuille a fini de monter
       await capture(pg, `A-${cap}-feuille`);
       await toucher(pg, '[data-nn-ecrit="9310"]', mobile);
       await pg.waitForTimeout(900);
@@ -188,8 +190,9 @@ async function scenarioB(b, largeur, sombre) {
     dit((f['9320'] || {}).numero === '55' && !(f['9320'] || {}).nouveau, `${tag} : le N° écrit (« N° 55 ») est pris tel quel`, JSON.stringify(f['9320']).slice(0, 160));
     dit(!(f['9321'] || {}).numero, `${tag} : rien d'écrit ⇒ VRM n'attribue RIEN`, JSON.stringify(f['9321']));
     const j = await job(pg, 'numeros-a-donner');
-    dit(j && j.n === '1' && /1 paire sans numéro/.test(j.txt) && /Donne-leur un N°/.test(j.txt), `${tag} : Ma journée : « 1 paire sans numéro · Donne-leur un N° »`, JSON.stringify(j));
+    dit(j && j.n === '1' && /1 article sans numéro/.test(j.txt) && /Donne-leur un N°/.test(j.txt), `${tag} : Ma journée : « 1 article sans numéro · Donne-leur un N° »`, JSON.stringify(j));
     dit(!(await job(pg, 'numeros-nouveaux')), `${tag} : aucune ligne « numérotées par VRM »`);
+    dit(!(await job(pg, 'sans-numero')), `${tag} : pas de seconde ligne « annonces sans numéro » (le même nombre, une fois)`);
     await pg.locator('[data-job="numeros-a-donner"]').first().scrollIntoViewIfNeeded().catch(() => {});
     await capture(pg, `B-${cap}-journee`);
     await toucher(pg, '[data-job="numeros-a-donner"] button, button[data-job="numeros-a-donner"]', mobile);
@@ -201,6 +204,7 @@ async function scenarioB(b, largeur, sombre) {
       dit(e.photo && /Quel N° pour cette paire \? \(1 sur 1\)/.test(e.txt) && /Bottes Dior/.test(e.txt), `${tag} : photo, titre de l'article, « 1 sur 1 »`, e.txt.slice(0, 200));
       dit(/Écris-le aussi à la fin de sa description/.test(e.txt), `${tag} : le rappel « écris-le aussi à la fin de sa description »`);
       dit(e.im === 'numeric', `${tag} : clavier chiffres`, String(e.im));
+      await pg.waitForTimeout(700);   // la feuille a fini de monter
       await capture(pg, `B-${cap}-feuille`);
       await pg.fill('[data-ask-champ="numero-demande"]', '60');
       const bt = pg.locator('div:has(> form [data-ask-champ="numero-demande"])').last().locator('button', { hasText: /^Enregistrer$/ }).first();
