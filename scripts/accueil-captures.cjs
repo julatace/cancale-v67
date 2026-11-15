@@ -36,9 +36,14 @@ const ECRANS = [
   // (14 nov.) « À retirer » vit dans Achats (Colis a été réparti entre Ventes et Achats) : le code est sur la ligne.
   // Depuis la refonte d'Achats, « À retirer » est replié : on l'ouvre par le chemin de l'app (`vrm:retirer-ouvrir`) et on amène sa section en haut.
   { nom: 'retirer', tab: 'achats', w: 390, h: 844, evenement: 'vrm:retirer-ouvrir', vers: '[data-retirer-repli]' },
-  { nom: 'numeros', tab: process.env.TAB_NUMEROS || 'annonces', w: 390, h: 844, defile: 620 },
-  { nom: 'compta', tab: 'compta', w: 390, h: 844, gestes: [/^\s*Ventes\s*$/, /^\s*Argent\s*$/, /^\s*Argent\s*$/, /^\s*Déclarer\s*$/, /^\s*Micro-entrepreneur/, /^\s*Par mois\s*$/] },
+  // (15 nov.) Sans défilement : la liste des annonces dès son haut (au défilement, la barre de recherche en verre passait sur les rangées).
+  { nom: 'numeros', tab: process.env.TAB_NUMEROS || 'annonces', w: 390, h: 844 },
+  // (15 nov., lot site-public) Argent → Résumé, après Ventes : vendu du mois, reçu et bénéfice dits « — » AVEC leur
+  // raison (ventes à dater, prix d'achat manquants), « à déclarer ». (« Déclarer » disait « Pas encore calculé » en exemple.)
+  { nom: 'compta', tab: 'ventes', w: 390, h: 844, attente: 6000, gestes: [/^\s*Argent\s*$/] },
   { nom: 'messages', tab: 'messages', w: 390, h: 844 },
+  // (15 nov., lot site-public) « Imprimer en un toucher » : Ventes, « À expédier » en tête avec le plein « Imprimer N ».
+  { nom: 'expedier', tab: 'ventes', w: 390, h: 844 },
   { nom: 'bureau', tab: 'journee', w: 1440, h: 900 },
 ];
 const CATALOGUE_VARIE = [
@@ -71,7 +76,10 @@ async function capturer(nav, e, theme) {
   // d'entrée). CATALOGUE=baskets rend le jeu d'avant (pour comparer). Tout est inventé.
   await ctx.addInitScript(({ sombre, catalogue }) => {
     try { sessionStorage.setItem('vrm_mode_exemple', '1'); if (catalogue) window.__vrmExempleCatalogue = catalogue; localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); } catch (_) {}
-  }, { sombre, catalogue: process.env.CATALOGUE === 'baskets' ? null : CATALOGUE_VARIE });
+  // (15 nov., lot site-public) Par défaut le jeu d'exemple AVEC SES PHOTOS (public/exemple/, CC0 et domaine
+  // public, src/exemplePhotos.js) — celui que montre « Découvrir avec des exemples ». CATALOGUE=varie rend le
+  // catalogue mélangé d'avant (sans photo : une photo n'est jamais prêtée à un autre article).
+  }, { sombre, catalogue: process.env.CATALOGUE === 'varie' ? CATALOGUE_VARIE : null });
   const pg = await ctx.newPage();
   const erreurs = [];
   pg.on('pageerror', (x) => erreurs.push(String(x.message || x).slice(0, 200)));
@@ -81,7 +89,7 @@ async function capturer(nav, e, theme) {
   // (14 nov.) Le cadre hachuré et les marques « exemple » des codes et adresses (src/guide-demarrage.css) sont
   // retirés DE LA CAPTURE, comme le bandeau : la page écrit déjà « Données d'exemple » sous chaque image.
   await pg.evaluate(() => document.documentElement.removeAttribute('data-vrm-exemple'));
-  await pg.waitForTimeout(3500);
+  await pg.waitForTimeout(3500 + (e.attente || 0));
   // Les gestes RÉELS qui amènent l'écran montré (un bouton, par son texte).
   for (const g of e.gestes || []) {
     const b = pg.locator('button, [role="tab"], [role="button"], a').filter({ hasText: g }).first();
