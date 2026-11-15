@@ -1,0 +1,116 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   FINITION ÉCRAN PAR ÉCRAN (15 nov.) — Julien : « tout doit être parfait », « je veux que ça soit pro »,
+   « enlève les écritures ». Récit : docs/passation/2026-11-15-finition-ecrans.md ; banc :
+   scripts/bancs/finition-ecrans.cjs (chevauchements, débordements, coupes « … », cibles 44 px).
+
+   OÙ IL VIT DANS LA CASCADE : `@layer vrm-finition`, nommée la PREMIÈRE dans index.html — pour une déclaration
+   `!important`, la couche nommée la première gagne. Chaque règle est donc `!important` (une règle sans lui
+   perdrait contre toutes les couches d'après) et vise un écran précis par sa racine (`data-espace`,
+   `data-ecran`, sa classe) : rien ne change hors de ce qu'elle nomme.
+   CE QUI NE CHANGE PAS : aucun texte de règle, aucun chiffre, aucun data-*, aucun geste.
+   ════════════════════════════════════════════════════════════════════════════ */
+@layer vrm-finition {
+
+/* ── 0. LE « ? » D'UN ÉCRAN : à côté de son titre, jamais collé (il mordait sur « Achats », « Stock », « E-mails »). */
+.vrm-phrase-ecran-aide > .vrm-aide-bouton { margin-left: 6px !important; }
+
+/* ── 1. MA JOURNÉE : le « ? » restait seul sur sa ligne, sous la carte des colis pressés (la phrase est lue au
+   lecteur d'écran seulement). La tête devient une rangée qui passe à la ligne : bonjour, puis « Ma journée ? »,
+   puis le reste en pleine largeur. L'ordre de lecture (DOM) ne change pas. */
+.sj-journee .sj-tete { display: grid !important; grid-template-columns: auto minmax(0, 1fr) !important; align-items: center !important; justify-items: stretch !important; }
+.sj-journee .sj-tete > * { grid-column: 1 / -1 !important; min-width: 0 !important; }
+.sj-journee .sj-tete > .sj-bonjour { grid-row: 1 !important; }
+.sj-journee .sj-tete > .sj-titre { grid-row: 2 !important; grid-column: 1 !important; }
+.sj-journee .sj-tete > .sj-phrase { grid-row: 2 !important; grid-column: 2 !important; justify-self: start !important; margin: 0 0 0 2px !important; }
+
+/* ── 2. LES PLATEAUX (Annonces · Stock · Achats, sites, vues, sous-rubriques) : la touche dessinée reste de 38–40 px
+   dans son puits de 44–48 px, mais la CIBLE au doigt couvre toute la hauteur du puits (un toucher sur le bord du
+   puits tombait à côté). Un pseudo-élément transparent, rien de dessiné. */
+@media (pointer: coarse) {
+  body .vrm-paires-selecteur .vrm-seg-btn::before,
+  body [data-espace="paires"] .vrm-tache-filtres > .vrm-filtre-site > button::before,
+  body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button:not(.vrm-ann-afaire)::before,
+  body [data-espace="paires"] .vrm-pf-collant .vrm-ui-filtre::before,
+  body [data-espace="paires"] .vrm-tache-sous .vrm-seg-btn::before {
+    content: "" !important; position: absolute !important; inset: -3px 0 !important; display: block !important; background: none !important; box-shadow: none !important; border: 0 !important; pointer-events: auto !important;
+  }
+  body .vrm-paires-selecteur .vrm-seg-btn::before { inset: -4px 0 !important; }
+  /* (la touche rognait son propre pseudo-élément : `overflow:hidden` posé pour rien, la touche a la largeur de son mot) */
+  body [data-espace="paires"] .vrm-tache-filtres > .vrm-filtre-site > button,
+  body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button:not(.vrm-ann-afaire),
+  body [data-espace="paires"] .vrm-pf-collant .vrm-ui-filtre { overflow: visible !important; }
+}
+
+/* ── 3. STOCK (téléphone) : la bande coupait ses libellés (« 1 024 p… », « 0 ra… », « 1 000 à… ») ; le nombre en
+   haut, le libellé dessous, entier. Les puces d'état passent à la ligne au lieu de passer sous le menu du compte. */
+@media (max-width: 600px) {
+  body .vrm-main[data-ecran="garage"] .vrm-ms-bande { gap: 18px !important; }
+  body .vrm-main[data-ecran="garage"] .vrm-ms-bande .vrm-ui-bande-item { display: flex !important; flex-direction: column !important; align-items: flex-start !important; gap: 4px !important; min-width: 0 !important; }
+  body .vrm-main[data-ecran="garage"] .vrm-ms-bande .vrm-ui-bande-n { white-space: nowrap !important; }
+  body .vrm-main[data-ecran="garage"] .vrm-ms-bande .vrm-ui-bande-l { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }
+  body .vrm-main[data-ecran="garage"] .vrm-s2d-resume > .vrm-pop-ligne { flex: 0 1 auto !important; max-width: 100% !important; width: auto !important; }
+  body .vrm-main[data-ecran="garage"] .vrm-s2d-resume .vrm-pop-chips { flex-wrap: wrap !important; row-gap: 8px !important; }
+  body .vrm-main[data-ecran="garage"] .vrm-s2d-resume > .vrm-s2d-filtres { flex: 0 1 auto !important; margin-left: auto !important; }
+}
+
+/* ── 4. LA LOUPE : micro, photo et « Fermer » se mordaient (marges négatives) et « Fermer » touchait le bord. */
+.vrm-hdr-recherche :is(.vrm-micro, .vrm-hdr-recherche-fermer) { margin-left: 0 !important; }
+.vrm-hdr-recherche { gap: 4px !important; padding-right: max(12px, env(safe-area-inset-right)) !important; }
+.vrm-hdr-recherche .vrm-hdr-recherche-fermer { padding: 0 4px 0 6px !important; }
+
+/* ── 5. LE DISQUE « + » : les quatre lames (100 px de large, 82 px d'écart) se chevauchaient ; 80 px chacune.
+   Le voile un peu plus couvrant : les mots de l'éventail ne se lisent plus PAR-DESSUS les chiffres de l'écran. */
+.sb-lame { width: 80px !important; margin-left: -40px !important; }
+.sb-lame-mot { max-width: 80px !important; }
+.sb-voile { background: radial-gradient(70% 55% at 50% 92%, rgb(255 255 255 / .55), transparent 70%), color-mix(in oklab, var(--sb-aplat) 92%, transparent) !important; }
+:root[data-theme="dark"] .sb-voile { background: radial-gradient(70% 55% at 50% 92%, rgb(110 160 230 / .16), transparent 70%), color-mix(in oklab, var(--sb-aplat) 92%, transparent) !important; }
+
+/* ── 6. E-MAILS : la rangée des rubriques sortait de 4 px à droite ; la puce « code » couvrait l'heure. */
+.vrm-boite-filtres > .vrm-boite-rubriques { margin-left: 0 !important; margin-right: 0 !important; }
+.vrm-boite-item:has(> .vrm-boite-puce-code) :is(.vrm-boite-ligne-haut, .vrm-boite-essentiel) { padding-right: 128px !important; box-sizing: border-box !important; }
+
+/* ── 7. PARAMÈTRES (téléphone) : la sous-ligne de chaque réglage, coupée au milieu d'un mot (« Chaque compte, sa
+   dernière relecture et l'e… »), ne disait plus rien ; elle reste lue au lecteur d'écran et trouvée par la
+   recherche des réglages, l'écran ne montre que le nom. Une sous-ligne d'ALERTE (un état) reste visible. */
+@media (max-width: 600px) {
+  .vrm-set-ligne small.vrm-set-desc[data-reglage-phrase=""] { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; clip-path: inset(50%) !important; white-space: nowrap !important; border: 0 !important; }
+}
+
+/* ── 8. LA FEUILLE « CHOISIR CE QUI PART » : « Générer N bordereaux » à 44 px au doigt. */
+@media (pointer: coarse) { [data-lot] [data-tout-generer] { min-height: 44px !important; } }
+
+
+/* ── 9. LA FICHE (vente ou paire) : le titre se centrait seul au milieu de sa colonne (un `align-self:center` d'une
+   grille d'avant, lu par la colonne flex du studio) ; à gauche, sous le N°. Ouverte depuis une vente à envoyer :
+   « Bordereau » redisait « Imprimer le bordereau » (le même geste, deux fois) et « Emballer » était un SECOND bouton
+   plein ; il devient un lien, comme « Changer le prix ». Les quatre gestes du colis en deux colonnes (la fiche
+   tient sur un écran). */
+.vrm-fp .vrm-fp-heros .vrm-fp-titre { align-self: stretch !important; text-align: left !important; }
+.vrm-fp-depuis-ligne .vrm-colis-actions { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
+.vrm-fp-depuis-ligne .vrm-colis-actions > * { margin: 0 !important; width: auto !important; min-width: 0 !important; max-width: none !important; }
+.vrm-fp-depuis-ligne .vrm-colis-actions > :is(.vrm-rangee-bord, :only-child) { grid-column: 1 / -1 !important; }
+.vrm-fp .vrm-fp-actions-carte:has([data-imprime="1"]) [data-fiche-bordereau] { display: none !important; }
+.vrm-fp .vrm-fp-actions-carte:has([data-imprime="1"]) .vrm-fp-b-plein {
+  background: transparent !important; color: var(--sb-diode, #0060CC) !important; box-shadow: none !important; border: 0 !important;
+  justify-content: flex-start !important; padding: 0 4px !important; min-height: 44px !important; font-weight: 600 !important; width: auto !important;
+}
+
+/* ── 10. VENTES : le mot du plein (« Imprimer 6 ») se coupait en « Imprime… » à l'ordinateur ; sur deux lignes au besoin. */
+.sb-btn-plein .sb-btn-plein-mot { max-width: 70px !important; white-space: normal !important; overflow: visible !important; text-overflow: clip !important; text-align: center !important; line-height: 1.1 !important; overflow-wrap: normal !important; hyphens: none !important; }
+/* « Envoyés » : la phrase qui explique l'ordre de la liste se lit au lecteur d'écran ; à l'écran, la liste parle. */
+.vrm-colis-envoyes > [data-envoyes-phrase] { position: absolute !important; width: 1px !important; height: 1px !important; margin: -1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; clip-path: inset(50%) !important; white-space: nowrap !important; }
+
+/* ── 11. LA LOUPE : les sous-lignes des ACTIONS (« Colis → « Tout imprimer » : tu choisis, puis t… ») et les deux
+   phrase d'aide du bas (ce qu'on peut taper) ne disaient rien de plus que le champ et le micro : lues au
+   lecteur d'écran, dans l'infobulle de la ligne, plus à l'écran. Les sous-lignes des RÉSULTATS restent (une info) ;
+   « À la voix… » reste, avec son « Pourquoi ? » (ce que fait le navigateur du son : une promesse, pas une aide). */
+:is([data-recherche-groupe="action"] [data-recherche-info], [data-recherche-aide]) { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; clip-path: inset(50%) !important; white-space: nowrap !important; border: 0 !important; }
+
+
+/* ── 12. ANNONCES · « N numéros à vérifier » : le « ⓘ Pourquoi vérifier » (cible de 44 px) mordait sur le titre du repli
+   juste au-dessus — deux cibles au même endroit. Sa ligne prend la hauteur de sa cible. */
+[data-numeros-a-verifier] > summary + div { display: flex !important; align-items: center !important; flex-wrap: wrap !important; column-gap: 4px !important; min-height: 44px !important; margin: 0 !important; }
+
+/* ── 13. MA JOURNÉE · « Ma semaine › » : l'espace avant le chevron tombait (rangée flex). */
+.vrm-jv2-ma-semaine { column-gap: .3em !important; }
+}
