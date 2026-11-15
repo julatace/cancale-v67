@@ -212,7 +212,8 @@ function systeme() {
   const st = fond.ctx.setTimeout;
   // Seules les ATTENTES voulues (l'écart entre deux offres, l'espacement de la sécurité) avancent l'heure —
   // pas les minuteurs de garde (`avecDelai` 25 s) qui ne font qu'attendre une réponse.
-  fond.ctx.setTimeout = (f, ms) => { if (Number(ms) > 0 && /attendreVc|secuGeste|tenirAttenteAimeVc/.test(String(new Error().stack))) decal += Number(ms); return st(f, ms); };
+  const tenu = { ms: 0 };
+  fond.ctx.setTimeout = (f, ms) => { const pile = String(new Error().stack); if (Number(ms) > 0 && /attendreVc|secuGeste|tenirAttenteAimeVc/.test(pile)) decal += Number(ms); if (Number(ms) > 0 && /tenirAttenteAimeVc/.test(pile)) tenu.ms += Number(ms); return st(f, ms); };
   // Les écarts TIRÉS entre deux offres (`vcaimes:ecart`, la même trace que les attentes des favoris Vinted).
   fond.ctx.__vrmPausesVues = [];
   const delais = { get vus() { return fond.ctx.__vrmPausesVues.filter((x) => x[0] === 'vcaimes:ecart').map((x) => x[1]); } };
@@ -222,7 +223,7 @@ function systeme() {
     return ch.ordre(m);
   };
   const cmd = (msg) => fond.envoyer(Object.assign({ from: 'vmr-bridge', action: 'cmd' }, msg), { origin: 'https://vrm.center', url: 'https://vrm.center/' });
-  return { ch, fond, ordres, cmd, delais };
+  return { ch, fond, ordres, cmd, delais, tenu };
 }
 const pret = async (S, { personnes = [P1, P2, P3], prix = 24900, ouvert = true } = {}) => {
   await S.ch.appel('GET', `${API}/users/me${Q}`, { data: { id: MOI, type: 'user' } }); await attendre(30);
@@ -280,6 +281,7 @@ async function a2a6() {
   dit(jr.filter((e) => e && e.s === 'favori').length === 3, 'A5 · chaque offre faite va au journal « Ce que VRM a fait » (vc:{compte}, sorte « favori »)', JSON.stringify(jr));
   const heures = S.heures || [];
   dit(heures.length === 3 && heures.every((h, i) => i === 0 || h - heures[i - 1] >= ecarts[i - 1]), 'A5 · l’offre suivante part APRÈS l’écart tiré (jamais avant)', JSON.stringify({ heures: heures.map((h) => h - heures[0]), ecarts }));
+  dit(S.tenu.ms >= 0.8 * (ecarts[0] + ecarts[1]), 'A5 · l’écart est TENU par l’attente revérifiée (onglet, compte, Tout arrêter) — pas laissé à un autre délai', JSON.stringify({ tenu: S.tenu.ms, ecarts }));
   dit(((S.fond.store.vrmActions || {})['vc:' + MOI] || []).length === 3, 'A5 · trois actions comptées sous le compte Vestiaire', JSON.stringify(S.fond.store.vrmActions));
   const n5 = posts(S).length;
   const r52 = await S.cmd({ cmd: 'vcOffreAimes', produit: ART, avantCents: 24900, prixCents: 22000 });
