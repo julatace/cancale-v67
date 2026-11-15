@@ -139,7 +139,7 @@ Extension **5.392.0** (zips régénérés). Aucune donnée réelle dans le dép�
   favoris Vinted ne le suivent pas non plus.
 - `audit-favoris-sites.cjs` étendu (horloge virtuelle) : écarts tirés et tenus, 300 tirages sans répétition, journal,
   ouverture, 15/h, Tout arrêter (avant et pendant), un compte à la fois (et Vinted ne retient pas Vestiaire), autre
-  compte pendant la série, reprise par un worker neuf, trop tard. **Mutations 24/24** (délai fixe, même valeur deux
+  compte pendant la série, reprise par un worker neuf, trop tard. **Mutations 25/25** (24 par `--prouve`, « sans écart » revérifiée seule après correction) (délai fixe, même valeur deux
   fois, plafond des favoris ignoré, porte ignorée, ouverture ignorée, autre compte, reprise absente, journal…).
 
 ### `photovrm` (5.392.0) — la photo fabriquée par l'atelier « Republier par VRM »
