@@ -103,12 +103,21 @@
 /* La tête et la phrase de descente ne fixent pas la largeur du meuble (largeur 0, puis 100 % de lui). */
 .vrm-etag .vrm-s2d-tete { width: 0; min-width: 100%; box-sizing: border-box; flex-wrap: wrap; row-gap: 4px; align-items: center; }
 .vrm-etag > .vrm-etag-descente { width: 0; min-width: 100%; box-sizing: border-box; }
-.vrm-etag-titre-m { display: flex; flex-direction: column; min-width: 0; flex: 1 1 96px; }
+.vrm-etag-titre-m { display: flex; flex-direction: column; min-width: 0; flex: 1 1 150px; }
 .vrm-etag-nom-l { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .vrm-etag-actions { display: flex; gap: 4px; margin-left: auto; flex: none; }
 /* Une pile : des cartons (plus larges que hauts), la base en bas. */
 .vrm-etag[data-forme-pile] .vrm-s2d-case { aspect-ratio: 4 / 3; }
 .vrm-etag[data-forme-pile] .vrm-s2d-case .vrm-s2d-num { left: 3px; bottom: 3px; max-width: calc(100% - 6px); padding: 0 4px; font-size: 11px !important; }
+/* Au téléphone, une pile se lit de côté : les cartons à gauche, son nom, ses gestes et la phrase de descente à
+   droite (plus de grand vide à côté d'une colonne étroite). */
+@media (max-width: 767px) {
+  .vrm-s2d-meuble.vrm-etag[data-forme-pile]:not([data-replie]) { display: grid; grid-template-columns: auto minmax(150px, 1fr); grid-template-rows: auto auto 1fr; column-gap: 14px; min-width: min(100%, 320px); align-items: start; }
+  .vrm-etag[data-forme-pile]:not([data-replie]) > .vrm-s2d-defile { grid-column: 1; grid-row: 1 / 4; margin: 0; padding: 0 0 4px; }
+  .vrm-etag[data-forme-pile]:not([data-replie]) > .vrm-s2d-tete { grid-column: 2; grid-row: 1; }
+  .vrm-etag[data-forme-pile]:not([data-replie]) > .vrm-etag-descente { grid-column: 2; grid-row: 2; }
+  .vrm-etag-place:has(> .vrm-etag[data-forme-pile]) { flex: 1 1 300px !important; }
+}
 /* La phrase de descente dans un meuble étroit : serrée, « Compris » à droite. */
 .vrm-etag[data-forme-pile] > .vrm-etag-descente { font-size: 13px; padding: 4px 4px 4px 10px; gap: 0 6px; }
 .vrm-etag[data-forme-pile] > .vrm-etag-descente > span { flex-basis: 100%; }
