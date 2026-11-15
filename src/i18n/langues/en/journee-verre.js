@@ -66,4 +66,12 @@ export default {
   "nav.settings": "Settings",
   "sj.v.ensuite": "Next, in order",
   "sj.v.cetteSemaine": "this week",
+  "annonces.th.article": "Item",
+  "annonces.th.taille": "Size",
+  "annonces.th.sites": "Sites",
+  "annonces.th.comptes": "Accounts",
+  "annonces.th.prix": "Price",
+  "annonces.th.enLigne": "Online",
+  "annonces.th.place": "Place",
+  "annonces.v.vendu": "sold",
 };

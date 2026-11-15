@@ -269,6 +269,7 @@
 }
 @media (min-width: 744px) and (max-width: 1399px) {
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] :is(.vrm-jv2-grand, .vrm-jv2-grand.vrm-fu-grand) { font-size: 52px !important; }
+  :root:root:root:root:root:root:root body .sj-journee .vrm-so[data-sortir-ordi] :is(.vrm-so-site, .vrm-so-rang) { display: none !important; }
   :root:root:root:root:root:root:root body .sj-journee .vrm-so[data-sortir-ordi] .vrm-so-carte:not(.vrm-so-d):not(.vrm-so-fin) { grid-template-columns: 110px minmax(0, 1fr) !important; }
   :root:root:root:root:root:root:root body .sj-journee .vrm-so[data-sortir-ordi] .vrm-so-ph { width: 110px !important; height: 110px !important; }
 }

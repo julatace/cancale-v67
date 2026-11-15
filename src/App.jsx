@@ -29794,6 +29794,14 @@ function placeDansMeubles(i, m) {
   return { rangee: Math.floor(i / cols) + 1, colonne: (i % cols) + 1 };
 }
 // ⟦→ ecrans/Stock.jsx #4⟧
+// (15 nov., refonte-journee) La place de chaque annonce dans le tableau d'Annonces : les meubles et les cases lus UNE fois
+// par passage (1 000 rangées : jamais 1 000 lectures du stockage) — relus après 1 s.
+const _placesAnn = { at: 0, slots: {}, meubles: [] };
+function placesAnnonces() {
+  const t = Date.now();
+  if (t - _placesAnn.at > 1000) { const s0 = load('vrm_slots', {}), m0 = load('vrm_meubles', []); _placesAnn.slots = s0 && typeof s0 === 'object' ? s0 : {}; _placesAnn.meubles = Array.isArray(m0) ? m0 : []; _placesAnn.at = t; }
+  return _placesAnn;
+}
 function ouDansMeubles(num, meublesArg, slotsArg) {
   const k = cleNum(num); if (!k) return null;
   const slots = slotsArg || load('vrm_slots', {}) || {};
@@ -51656,6 +51664,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             vignette · titre et méta · prix), la grille de vignettes d'hier restant au choix (« Grille », retenu sur cet
             appareil). Toucher une rangée la fait monter au premier plan, à sa place (src/paires/PaireAvant.jsx). */}
         <div className="vrm-ann-grid vrm-fiches vrm-ann-vignettes sb-liste" data-sb-liste="" data-sb-vue={vuePaires} onClick={clicAvant} data-ann-grille="vignettes" data-ann-grille-comptes={annGroupes.length} style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 180px), 1fr))',gap:16}}>
+          {/* (15 nov., la maquette ORDINATEUR « Annonces en tableau ») L'en-tête des colonnes (ordinateur, vue Liste). */}
+          {vuePaires === 'liste' ? <div className="vrm-ann-th" data-ann-th="" aria-hidden="true"><span>{tr('annonces.th.article')}</span><span>{tr('annonces.th.taille')}</span><span>{tr('annonces.th.sites')}</span><span>{tr('annonces.th.comptes')}</span><span className="is-r">{tr('annonces.th.prix')}</span><span className="is-r">{tr('annonces.th.enLigne')}</span><span>{tr('annonces.th.place')}</span></div> : null}
           {annGroupesVus.map(g=>{ const acc0 = g.items[0] && g.items[0]._acc; const nomG = acc0 ? accNameOf(acc0) : ''; return [
           <div key={'compte-'+g.uid} className="vrm-ann-compte-tete" data-ann-compte={g.uid} data-ann-compte-n={g.tous} role="heading" aria-level={3}>
             <span className="vrm-ann-compte-avatar" aria-hidden="true">{initialeCompte(nomG)}</span>
@@ -51837,6 +51847,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <span className={'vrm-ann-fin' + (conseil ? ' is-ambre' : '')} data-ann-fin={conseil ? 'baisser' : ''} aria-hidden="true">
                           {conseil && age != null ? tr('annonces.v.aBaisser', { n: age }) : [tl ? tr('annonces.v.taille', { t: tl }) : '', age != null ? tr('annonces.v.jours', { n: age }) : ''].filter(Boolean).join(' · ')}
                         </span>
+                        {/* (15 nov., la maquette ORDINATEUR) Les colonnes du tableau : taille · sites · compte · en ligne depuis · place
+                            dans le Stock (par identité du N°, `ouDansMeubles`). Montrées à l'ordinateur seulement (CSS). */}
+                        {(() => { const pl = placesAnnonces(); const ou = num && pl.meubles.length ? ouDansMeubles(num, pl.meubles, pl.slots) : null; return <>
+                          <span className="vrm-ann-c" data-ann-c="taille" aria-hidden="true">{tl ? tr('annonces.v.taille', { t: tl }) : '—'}</span>
+                          <span className="vrm-ann-c vrm-ann-c-sites" data-ann-c="sites" aria-hidden="true">{sitesL.map((x) => <MarqueSite key={x} site={x} taille={12.5}/>)}</span>
+                          <span className="vrm-ann-c" data-ann-c="compte" aria-hidden="true">{it._acc ? accNameOf(it._acc) : '—'}</span>
+                          <span className={'vrm-ann-c vrm-ann-c-r' + (conseil ? ' is-ambre' : '')} data-ann-c="age" aria-hidden="true">{soldBord ? tr('annonces.v.vendu') : age != null ? tr('annonces.v.jours', { n: age }) : '—'}</span>
+                          <span className="vrm-ann-c" data-ann-c="place" aria-hidden="true">{ou && ou.meuble ? String(ou.meuble.name || '') : '—'}</span>
+                        </>; })()}
                       </>;
                     })() : null}
                     {soldBord && <div title={tr('annonces.bordereauEnvoiEte')} style={{fontSize:12,fontWeight:600,color:C.warn}}>{tr('annonces.vendueBordereauRecu')}</div>}
