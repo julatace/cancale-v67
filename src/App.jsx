@@ -7356,7 +7356,7 @@ const fetchRetoursAchat = () => {
   return c.vol;
 };
 const lireRetoursAchat = async (c) => {
-  const champs = ['transaction', 'suivi', 'dateLimite', 'dateLimiteIso', 'article', 'uid', 'account', 'receivedAt'].map((k) => `${k}:meta->>${k}`).join(',');
+  const champs = ['transaction', 'suivi', 'dateLimite', 'dateLimiteIso', 'article', 'uid', 'account', 'receivedAt', 'transporteurPdf'].map((k) => `${k}:meta->>${k}`).join(',');
   const [b, r] = await Promise.all([
     lireTout(`id=like.email_bordretour_*&select=id,${champs},pdf:meta->>_pdf`, { strict: true }).catch(() => null),
     lireTout('id=like.email_rembachat_*&select=id,tx:meta->>transaction,montant:meta->>montant,estime:meta->>estime,at:meta->>receivedAt', { strict: true }).catch(() => null),
@@ -38608,6 +38608,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     return { demandes, gardes };
   }, [emailsLitiges]);
+  // (15 nov., lot retours-suivi) LES E-MAILS DU TRANSPORTEUR DES N° DE RETOUR (`email_track_*`, par le n° EXACT de
+  // chaque bordereau de retour — rangé ou encore gardé) : projetés, toutes les pages, STRICT (une page ratée ⇒
+  // `null`, « pas su » : la carte n'avance pas et ne recule pas). Relus avec les retours et à `vrm:transp-maj`.
+  const suivisRetours = useMemo(() => {
+    const l = [...(Array.isArray(retoursAchatLus && retoursAchatLus.bords) ? retoursAchatLus.bords : []), ...retoursEmails.gardes];
+    return [...new Set(l.map((b) => String((b && b.suivi) || '').toUpperCase().replace(/[\s\u00a0-]+/g, '')).filter((x) => /^[A-Z0-9]{6,30}$/.test(x)))].sort();
+  }, [retoursAchatLus, retoursEmails]);
+  const [retoursTrack, setRetoursTrack] = useState(undefined);
+  const [retoursTrackTic, setRetoursTrackTic] = useState(0);
+  useEffect(() => { const f = () => setRetoursTrackTic((n) => n + 1); try { window.addEventListener('vrm:transp-maj', f); } catch (_) {} return () => { try { window.removeEventListener('vrm:transp-maj', f); } catch (_) {} }; }, []);
+  useEffect(() => {
+    if (!suivisRetours.length) { setRetoursTrack([]); return undefined; }
+    let vivant = true;
+    lireTout(`id=like.email_track_*&meta->>suivi=in.(${suivisRetours.map((x) => encodeURIComponent(x)).join(',')})&select=suivi:meta->>suivi,status:meta->>status,emailAt:meta->>emailAt,at:meta->>receivedAt,retire:meta->>retireLe,carrier:meta->>carrier`, { strict: true })
+      .then((r) => { if (vivant) setRetoursTrack(Array.isArray(r) ? r : null); }, () => { if (vivant) setRetoursTrack(null); });
+    return () => { vivant = false; };
+  }, [suivisRetours.join(','), retoursTrackTic]);
   // (15 nov., lot retours) « Déposé » : SON clic (une carte « À renvoyer » ⇒ { cle: date }), synchronisé.
   const [retoursDeposes, setRetoursDeposes] = useStateCle('vrm_retours_deposes', () => load('vrm_retours_deposes', {}));
   const basculerRetourDepose = (cle) => {
@@ -41562,6 +41579,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const bords = Array.isArray(retoursAchatLus.bords) ? [...retoursAchatLus.bords, ...retoursEmails.gardes].map((b) => ({ ...b, suivi: normaliserSuivi(b.suivi || '') })) : retoursAchatLus.bords;
     const ventesTx = Array.isArray(sales.items) ? new Set(sales.items.map((o) => String(o.transaction_id))) : null;
     const res = retoursAchat({ bords, demandes: retoursEmails.demandes === undefined ? [] : retoursEmails.demandes, achats: achatsLus, remb: retoursAchatLus.remb, transp: transp === undefined ? undefined : transpMap,
+      track: retoursTrack === undefined ? [] : retoursTrack, departs: vcLoc0.departs instanceof Map ? vcLoc0.departs : null,
       deposes: retoursDeposes, ventesTx, numeroDe: (tx) => (buyNumByTxn[tx] != null ? String(buyNumByTxn[tx]) : ''), montantDe: montantCommandeLu });
     for (const c of [...res.cartes, ...res.anciennes]) {
       try { c.photo = c.achat ? orderPhoto(c.achat) || '' : ''; } catch (_) { c.photo = ''; }
@@ -41571,7 +41589,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     }
     return res;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [retoursAchatLus, retoursEmails, retoursDeposes, sales.items, buys.items, buys.error, buysBase, transp, transpMap, buyNumByTxn, accounts]);
+  }, [retoursAchatLus, retoursEmails, retoursDeposes, retoursTrack, vcLoc0.departsCle, sales.items, buys.items, buys.error, buysBase, transp, transpMap, buyNumByTxn, accounts]);
   // Imprimer le bordereau de retour : SON PDF (par son n°), tamponné « RETOUR · N°… » (src/tamponRetour.js),
   // ouvert dans la visionneuse (téléchargé sur iPhone). Rend 'ok' · 'passu' (dit sous le bouton).
   const imprimerRetourAchat = async (c) => {
@@ -46473,7 +46491,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const noms = rv.slice(0, 2).map((l) => [l.num ? `N°${l.num}` : '', l.titre || ''].filter(Boolean).join(' ')).filter(Boolean);
             jobs.push({ id: 'retours-vente', n: rv.length, icon: 'restore', color: C.text, photos: rv.map((l) => (l.vente ? orderPhoto(l.vente) : null)).filter(Boolean),
               court: tr('renv.vente.titre', { n: rv.length }), detail: noms.join(' · '), title: tr('renv.vente.titre', { n: rv.length }), tab: 'cat_bord', prio: 0.7,
-              attrs: { 'data-retours-vente': String(rv.length) } }); } }
+              attrs: { 'data-retours-vente': String(rv.length) } }); }
+          // (15 nov., lot retours-suivi) REVENU CHEZ TOI ? Vinted dit le colis de retour livré (ou remboursé), le N° est
+          //    connu par identité, pas encore noté « reçu » : la paire est PROPOSÉE à la remise en stock sous SON N°
+          //    (la règle existante `retourAReceptionner` ; Colis porte « Déjà reçu » ⇒ remise en stock, son clic).
+          const rr = retoursSuivis && retoursSuivis.etat === 'lu' ? retoursSuivis.lignes.filter((l) => retourAReceptionner(l) && l.etape !== 'en-route') : [];
+          if (rr.length) {
+            const nums = rr.slice(0, 3).map((l) => `N°${l.num}`).join(' · ');
+            jobs.push({ id: 'retours-vente-revenus', n: rr.length, icon: 'restore', color: C.warn, photos: rr.map((l) => (l.vente ? orderPhoto(l.vente) : null)).filter(Boolean),
+              court: tr('renv.vente.revenu', { n: rr.length }), detail: tr('renv.vente.revenuDetail', { nums }), title: tr('renv.vente.revenu', { n: rr.length }), tab: 'cat_bord', prio: 0.65,
+              attrs: { 'data-retours-vente-revenus': String(rr.length) } }); } }
         // (3 nov.) LITIGES, RETOURS, RÉCLAMATIONS EN COURS (src/litiges.js) : une carte
         // par IDENTITÉ (transaction, conversation, retour eBay), la date limite seulement
         // si elle est LUE, sinon « délai non lu » ; le geste = un lien vers le site. Le
