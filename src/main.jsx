@@ -1,6 +1,7 @@
 // (6 nov.) LE MODE EXEMPLE s'installe EN PREMIER, avant tout module de l'app : s'il
 // est demandé par cet onglet, le stockage et la base deviennent des copies en
 // mémoire (src/modeExemple.js) — rien de l'exemple n'est écrit nulle part.
+import { garderCodePartenaire } from './partenaires/lien.js';
 import { exempleActif } from './modeExemple.js';
 // (8 nov.) Les 30 dernières requêtes de la page (famille, code, durée — jamais une
 // adresse ni un contenu), pour « Signaler un problème » (src/lecturesRecentes.js).
@@ -162,10 +163,15 @@ const veutLApp = () => {
   // (13 nov., lot 54) Un lien de parrainage (`?parrain=CODE`, `/r/CODE`) ouvre l'INSCRIPTION (avec
   // « Offert par … ») : la page d'accueil, puis « Créer mon compte », perdait le code (l'adresse changée
   // en `/?inscription` avant que l'app ne le range).
-  return /[?&](connexion|inscription|tab|code|error|error_description|type|lier-extension|confirmer-adresse|parrain|partenaire)(=|&|$)/.test(q) || /(access_token|error|type)=/.test(h)
-    || /^\/r\/[A-Za-z0-9]{8}\/?$/.test(window.location.pathname || '')
-    || /^\/p\/[A-Za-z0-9]{3,16}\/?$/.test(window.location.pathname || '');   // (15 nov.) le lien d'un partenaire ouvre l'inscription
+  return /[?&](connexion|inscription|tab|code|error|error_description|type|lier-extension|confirmer-adresse|parrain)(=|&|$)/.test(q) || /(access_token|error|type)=/.test(h)
+    || /^\/r\/[A-Za-z0-9]{8}\/?$/.test(window.location.pathname || '');
+  // (15 nov., décision : la vitrine d'abord) Le lien d'un PARTENAIRE (`/p/CODE` → `?partenaire=CODE`) montre la page
+  // d'accueil : l'abonné de l'influenceur voit ce qu'est VRM ; « Essayer gratuitement » garde la suite de l'adresse
+  // jusqu'à l'inscription (`src/accueil/lienEntree.js`), le code est rattaché à l'inscription.
 };
+// (15 nov.) Le code d'un partenaire est GARDÉ sur l'appareil dès l'arrivée (même règle que l'app : src/partenaires/lien.js),
+// pour survivre à un détour par la vitrine ou par « Découvrir avec des exemples » avant l'inscription.
+try { garderCodePartenaire(localStorage, window.location.search, window.location.pathname); } catch (_) {}
 const versApp = () => aUneSession() || veutLApp();
 const filmDemande = /[?&]film(=|&|$)/.test(window.location.search || '');
 // (14 nov., lot argent-prix — 115) Le lien de son COMPTABLE (`/c/<jeton>` → `?comptable=`) : une page en lecture
