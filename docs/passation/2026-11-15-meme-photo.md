@@ -20,8 +20,22 @@ reste identique) : la même empreinte sert Vinted, Leboncoin, eBay et Vestiaire.
 
 Seuil **re-mesuré** avec le passage par un autre site (`scripts/bancs/photos-comptes-seuil.cjs`,
 8 paires × 6 prises de vue inventées, 15 transformations dont **WebP 80, WebP 60, réduite 50 % + JPEG 60
-+ WebP 60, vignette au quart**) : voir « Preuves » pour les chiffres du jour. Une distance comptée
-sur la meilleure des 3 × 3 combinaisons de recadrage.
++ WebP 60, vignette au quart**), plus « 50 paires IDENTIQUES » : 100 prises de vue DIFFÉRENTES du même
+modèle dessiné.
+
+| mesure (15 nov., Chromium du banc) | distance |
+|---|---|
+| même photo, toutes transformations (720) | **≤ 11** (recadrage 6 % / 5 % d'un côté : 11 ; JPEG 30 : 7) |
+| même photo passée par un autre site (WebP 80 · WebP 60 · moitié+JPEG 60+WebP 60 · vignette) | **8 · 6 · 9 · 8** |
+| deux photos différentes de la même paire (120) | ≥ 23 |
+| deux paires différentes (1 008) | ≥ 19 |
+| 100 prises de vue du même modèle, 4 950 couples | **≥ 15** (15 : 2 couples, 16 : 1, 17 : 4) |
+
+⚠️ **Le seuil de l'alerte entre comptes (`SEUIL_PHOTO = 16`) ne convient PAS pour proposer une
+liaison** : à 16, trois des « 50 paires identiques » recevaient une proposition fausse (15, 15, 16).
+D'où **`SEUIL_MEME_PHOTO = 12`** dans `src/memePhoto.js` : la photo réutilisée (≤ 11) passe, une autre
+photo de la même paire (≥ 15) jamais. L'alerte entre comptes garde 16 (prévenir de trop y est le bon
+côté). Une distance = meilleur dHash + meilleur pHash / 2 sur les 3 × 3 combinaisons de recadrage.
 
 ## Ce qui est livré
 
@@ -66,7 +80,24 @@ sur la meilleure des 3 × 3 combinaisons de recadrage.
 
 ## Preuves
 
-Voir le rapport de fin de session (chiffres, verts/rouges, captures).
+- `scripts/audit-meme-photo.cjs` — 38 verts (règle exécutée : 50 paires identiques ⇒ 0 proposition,
+  la seule photo reprise ⇒ N°217 ; deux paires ⇒ ambigu ; logo sur 8 annonces / fond sur 3 paires ⇒
+  ignoré ; reliée ⇒ rien ; lecture ratée ⇒ `lu:false` ; refus ; N° double ; sans N° ; Relier = les liens
+  existants ; Leboncoin limité à ses comptes ; extension dans `_fond-vm` : une image, sans cookie,
+  compte de l'onglet, budget 8/20, écart 45 s, Vinted d'abord, verrou levé, lecture ratée ⇒ rien
+  écrit, 429 ⇒ frein du site). `--mutation=toutes` : **13/13 rouges** (seuil, ambigu, generique,
+  relie, refus, douteux, passu, budget, onglet, cookie, lecture, verrou, ecart).
+- `scripts/bancs/photos-comptes-seuil.cjs` : S1–S7 verts ; `--mutation=seuil` (alerte 30, proposition
+  16) ⇒ S2, S3, S6, S7 rouges.
+- `scripts/bancs/meme-photo.cjs` (390 tactile, 1512, clair et sombre) : 95 verts. Ma journée (carte
+  ambre, 3), la feuille (2 propositions, 1 ambiguë, photos chargées côte à côte, gestes ≥ 44 px),
+  Relier ⇒ `vrm_lbc_liens[5001] = 124`, « Ce n'est pas la même » ⇒ noté, Annonces → Leboncoin (ligne
+  compacte ⇒ feuille du site), lecture ratée ⇒ « pas lues ». Captures regardées.
+- Défaut trouvé par `audit-photos-comptes` (rouge après le premier jet) : le `finally` qui lève le
+  verrou du tour ne couvrait plus que la branche « autres sites » ⇒ après une image Vinted, 3 min sans
+  empreinte. Corrigé, contrôle E4 + mutation `verrou` ajoutés.
+- Gardés verts : build, audits identite, coherence, extension-zip, traduction, tdz, variables, studio,
+  csp, budget-lectures, photos-comptes, quoi-de-neuf.
 
 ## Ce qui reste à vérifier sur ses vraies annonces
 
