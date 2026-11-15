@@ -40,7 +40,7 @@ export default {
   "fd.baisser.aucuneOffre": {"one": "No offer in {n} day", "other": "No offer in {n} days"},
   "fd.baisser.offres": {"one": "{n} offer in {j} days", "other": "{n} offers in {j} days"},
   "fd.baisser.depuis": {"one": "Online for {n} day", "other": "Online for {n} days"},
-  "fd.baisser.favoris": {"zero": "No favourites.", "one": "{n} favourite.", "other": "{n} favourites."},
+  "fd.baisser.favoris": {"one": "{n} favourite.", "other": "{n} favourites."},
   "fd.baisser.plein": "Lower the price",
   "fd.saisir.titre": "Purchase price not entered",
   "fd.saisir.plein": "Enter the purchase price",

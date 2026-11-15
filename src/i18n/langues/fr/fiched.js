@@ -40,7 +40,7 @@ export default {
   "fd.baisser.aucuneOffre": {"one": "Aucune offre en {n} jour", "other": "Aucune offre en {n} jours"},
   "fd.baisser.offres": {"one": "{n} offre en {j} jours", "other": "{n} offres en {j} jours"},
   "fd.baisser.depuis": {"one": "En ligne depuis {n} jour", "other": "En ligne depuis {n} jours"},
-  "fd.baisser.favoris": {"zero": "Aucun favori.", "one": "{n} favori.", "other": "{n} favoris."},
+  "fd.baisser.favoris": {"one": "{n} favori.", "other": "{n} favoris."},
   "fd.baisser.plein": "Baisser le prix",
   "fd.saisir.titre": "Prix d’achat pas saisi",
   "fd.saisir.plein": "Saisir le prix d’achat",

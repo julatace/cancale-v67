@@ -40,7 +40,7 @@ export default {
   "fd.baisser.aucuneOffre": {"one": "Ninguna oferta en {n} día", "other": "Ninguna oferta en {n} días"},
   "fd.baisser.offres": {"one": "{n} oferta en {j} días", "other": "{n} ofertas en {j} días"},
   "fd.baisser.depuis": {"one": "En línea desde hace {n} día", "other": "En línea desde hace {n} días"},
-  "fd.baisser.favoris": {"zero": "Ningún favorito.", "one": "{n} favorito.", "other": "{n} favoritos."},
+  "fd.baisser.favoris": {"one": "{n} favorito.", "other": "{n} favoritos."},
   "fd.baisser.plein": "Bajar el precio",
   "fd.saisir.titre": "Precio de compra sin escribir",
   "fd.saisir.plein": "Escribir el precio de compra",
