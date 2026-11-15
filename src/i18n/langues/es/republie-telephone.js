@@ -20,4 +20,7 @@ export default {
   "acc.numero.autre.apres": "Anotado: otro artículo · recibe un N° nuevo",
   "acc.numero.carton.apres": "N°{numero} anotado para esta caja",
   "rt.consequence": "Sí: su caja conserva el N°{numero}, nada que escribir. No: recibe un N° nuevo.",
+  "acc.numero.donne.apres": "{mot} · {numeros} · escríbelos en sus cajas",
+  "acc.numero.demande.apres": {"one": "{n} número guardado · escríbelo también en su caja", "other": "{n} números guardados · escríbelos también en sus cajas"},
+  "acc.numero.reconnu.apres": "{mot} · republicado en la app de Vinted, la caja no cambia",
 };

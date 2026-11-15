@@ -15389,7 +15389,8 @@ function direNouveauxNumeros(liste) {
     const vend = motsVendeur().nom === 'paire' ? 'sneakers' : 'autre';
     const titre = tr(`nn.notif.${vend}`, { n: l.length });
     const nums = listeNumeros(l.map((x) => x.numero));
-    toast(`${titre} · ${nums}`, 'ok');
+    // (15 nov., accompagnement) Le moment « après » du geste (la pilule `numero.donne`), plus un bandeau à part.
+    accompagner('numero.donne', { vars: { mot: titre, numeros: nums } }).fini();
     alerteLocale(titre, `${nums} · ${tr('nn.notif.geste')}`, '?tab=journee').catch(() => {});
     if (extSait('numerotes') !== 'ok') return;
     const ext = String((__vmrEtat && __vmrEtat.ok && __vmrEtat.ext) || '');
@@ -15407,7 +15408,7 @@ function direNumerosReconnus(liste) {
     const l = (Array.isArray(liste) ? liste : []).filter((x) => x && String(x.numero || '').trim());
     if (!l.length) return;
     const titre = l.length === 1 ? tr('rt.reconnu.un', { numero: String(l[0].numero) }) : tr('rt.reconnu.plusieurs', { n: l.length, numeros: listeNumeros(l.map((x) => x.numero)) });
-    toast(`${titre} · ${tr('rt.reconnu.geste')}`, 'ok');
+    accompagner('numero.reconnu', { vars: { mot: titre } }).fini();   // (accompagnement) la pilule `numero.reconnu`
     alerteLocale(titre, tr('rt.reconnu.geste'), '?tab=journee').catch(() => {});
   } catch (_) {}
 }
@@ -38225,7 +38226,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       await donnerNumeroNeuf(it, `Le N°${f.numero} est aussi sur ${autres.map(nomPorteur).join(' et ')}. Deux articles au même numéro, c'est le mauvais qui part.`);
       return;
     }
-    marquerCartonVerifie(String(it.id), cleNum(f.numero)); toast(`N°${f.numero} confirmé pour « ${it.title} »`);
+    marquerCartonVerifie(String(it.id), cleNum(f.numero)); accompagner('numero.carton', { vars: { numero: String(f.numero) } }).fini();
   };
   const corrigerCarton = async (it, valeur) => {
     const brut = String(valeur || '').trim();
@@ -38271,6 +38272,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       || Object.values(saleOv || {}).some((o) => o && cleNum(o.numero) === cle);
     await poserNumero(it, String(y), f.numero, { carton: true, ...(ailleurs ? {} : { memePaire: true }) });
     setTimeout(() => marquerCartonVerifie(moi, cle), 700);
+    { const apres = (load('vinted_annonce_numeros', {}) || {})[moi]; if (apres && cleNum(apres.numero) === cle) accompagner('numero.carton', { vars: { numero: String(y) } }).fini(); }
   };
 
   // ⚠️ « pas au garage » SUR CHAQUE LIGNE NE DIT RIEN TANT QUE LE GARAGE EST
@@ -41197,7 +41199,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       for (;;) {
         const desc = [`« ${String(it.title || '—')} »`, tr('nn.demande.proposition', { numero: prop }), rappel ? tr('nn.demande.rappel', { numero: prop }) : ''].filter(Boolean).join('\n');
         const rep = await askText({ title: tr(`nn.demande.titre.${vendMots()}`, { i: i + 1, n: liste.length }), desc, value: prop, numeric: clavierNum() === 'numeric', data: 'numero-demande', ok: tr('nn.demande.ok'), cancel: tr('nn.demande.plusTard'), photo: it.photo || null });
-        if (rep == null || typeof rep !== 'string' || !rep.trim()) { if (faits) toast(tr('nn.demande.fini', { n: faits }), 'ok'); return; }
+        if (rep == null || typeof rep !== 'string' || !rep.trim()) { if (faits) accompagner('numero.demande', { vars: { n: faits } }).fini(); return; }
         const k = cleNum(rep);
         if (deja.some((d) => cleNum(d) === k)) { toast(tr('nn.demande.dejaDonne', { numero: k })); prop = propositionNumero({ pris, prisCles: prisK, pref: prefNum, prochainLibre, deja }); continue; }
         await poserNumero(it, rep, '');
@@ -41208,7 +41210,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         break;
       }
     }
-    if (faits) toast(tr('nn.demande.fini', { n: faits }), 'ok');
+    if (faits) accompagner('numero.demande', { vars: { n: faits } }).fini();
   };
   const apercuEcrit = useMemo(() => {
     if (!Array.isArray(listings.items)) return null;

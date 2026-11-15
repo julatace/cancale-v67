@@ -374,6 +374,10 @@ export const GESTES_ACC = {
   'numero.autre':     { ecran: 'journee',   ensuite: null },
   // « N° à vérifier sur ton carton » : SON choix (le N° de la fiche ou celui que l'extension avait réservé).
   'numero.carton':    { ecran: 'annonces',  ensuite: null },
+  // Les N° donnés par VRM (à écrire sur les cartons), demandés (« je numérote moi-même »), reconnus par la photo VRM.
+  'numero.donne':     { ecran: 'journee',   ensuite: null },
+  'numero.demande':   { ecran: 'journee',   ensuite: null },
+  'numero.reconnu':   { ecran: 'journee',   ensuite: null },
 };
 export const IDS_GESTES_ACC = Object.keys(GESTES_ACC);
 export const gesteAcc = (id) => GESTES_ACC[id] || null;

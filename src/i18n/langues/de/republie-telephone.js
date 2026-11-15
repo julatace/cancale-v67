@@ -20,4 +20,7 @@ export default {
   "acc.numero.autre.apres": "Notiert: ein anderer Artikel · er bekommt eine neue Nummer",
   "acc.numero.carton.apres": "Nr. {numero} für diesen Karton notiert",
   "rt.consequence": "Ja: sein Karton behält Nr. {numero}, nichts zu schreiben. Nein: er bekommt eine neue Nummer.",
+  "acc.numero.donne.apres": "{mot} · {numeros} · auf ihre Kartons schreiben",
+  "acc.numero.demande.apres": {"one": "{n} Nummer gespeichert · schreib sie auch auf den Karton", "other": "{n} Nummern gespeichert · schreib sie auch auf die Kartons"},
+  "acc.numero.reconnu.apres": "{mot} · in der Vinted-App neu eingestellt, der Karton bleibt gleich",
 };
