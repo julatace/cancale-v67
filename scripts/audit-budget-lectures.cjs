@@ -44,6 +44,9 @@ const dit = (bon, quoi, det) => { if (bon) { ok++; console.log(`✅ ${quoi}`); }
 const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { ko++; console.log(`❌ ${quoi} — a levé : ${e && e.message}`); return null; } };
 
 const UID = '111', PID = 9001;
+// (5.378) Les mois du relevé se lisent par la recette APPRISE de sa navigation (plus d'adresse devinée) :
+// le banc la pose, comme si Julien avait ouvert une fois Porte-monnaie → Historique → un mois passé.
+const REC = () => ({ vrmReleveRecette: { [UID]: { modele: '/api/v2/wallet/invoices/{Y}/{MM}', pad: true, uid: UID, at: 1 } } });
 const FINALISEE = "Commande finalisée - l'acheteur a validé la commande";
 const RELAIS = "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais";
 const html = (id) => '<!doctype html><script id="__NEXT_DATA__" type="application/json">' + JSON.stringify({ props: { pageProps: { item: {
@@ -72,7 +75,7 @@ function vinted(r) {
   let m;
   if ((m = /\/api\/v2\/transactions\/(\d+)$/.exec(c))) return { status: 200, body: { transaction: { id: Number(m[1]), status: 450, status_updated_at: '2026-10-01T10:00:00Z' } } };
   if (/\/api\/v2\/conversations\/\d+$/.test(c)) return { status: 200, body: { conversation: { id: 1, messages: [] } } };
-  if ((m = /\/payouts\?year=(\d+)&month=(\d+)/.exec(c))) { const mm = String(m[2]).padStart(2, '0'); return { status: 200, body: { starting_date: `${m[1]}-${mm}-01`, invoice_lines_has_more: false, invoice_lines: [{ id: 1, amount: { amount: '10.0' }, date: `${m[1]}-${mm}-05`, entity_type: 'payout' }] } }; }
+  if ((m = /\/wallet\/invoices\/(\d{4})\/(\d{2})$/.exec(c))) { const mm = String(m[2]).padStart(2, '0'); return { status: 200, body: { starting_date: `${m[1]}-${mm}-01`, invoice_lines_has_more: false, invoice_lines: [{ id: 1, amount: { amount: '10.0' }, date: `${m[1]}-${mm}-05`, entity_type: 'payout' }] } }; }
   if ((m = /^\/items\/(\d+)$/.exec(c))) return { status: 200, body: html(m[1]) };
   return { status: 404, body: {} };
 }
@@ -87,15 +90,15 @@ const prioritaires = async (ctx) => { await ctx.capterPreuvesVente(UID); await c
   console.log('── 1. budget d’ACTIONS plein (20 bordereaux/réponses dans l’heure)');
   await essaie('budget actions plein', async () => {
     const t = maintenant();
-    const f = faireFond({ src: SRC, lignes: lignes(), vinted, store: { vrmActions: { [UID]: Array.from({ length: 20 }, () => t) } } });
+    const f = faireFond({ src: SRC, lignes: lignes(), vinted, store: { ...REC(), vrmActions: { [UID]: Array.from({ length: 20 }, () => t) } } });
     await prioritaires(f.ctx);
     dit(compte(f.j, /\/conversations\/\d+$/) > 0, 'les codes de retrait se lisent quand même', `${compte(f.j, /\/conversations\/\d+$/)} conversation(s) lue(s)`);
     dit(compte(f.j, /\/transactions\/\d+$/) > 0, 'les dates de versement se lisent quand même', `${compte(f.j, /\/transactions\/\d+$/)} transaction(s) lue(s)`);
-    dit(compte(f.j, /\/payouts\?year=/) > 0, 'les relevés se lisent quand même', `${compte(f.j, /\/payouts\?year=/)} relevé(s) lu(s)`);
+    dit(compte(f.j, /\/wallet\/invoices\/\d{4}\//) > 0, 'les relevés se lisent quand même', `${compte(f.j, /\/wallet\/invoices\/\d{4}\//)} relevé(s) lu(s)`);
     dit(compte(f.j, /\/transactions\/51\d\d$/) === 3, 'et les preuves de vente aussi (5.167 : 3 ventes en cours sans preuve)', `${compte(f.j, /\/transactions\/51\d\d$/)} preuve(s) lue(s)`);
   });
   await essaie('budget actions intact', async () => {
-    const f = faireFond({ src: SRC, lignes: lignes(), vinted, store: {} });
+    const f = faireFond({ src: SRC, lignes: lignes(), vinted, store: { ...REC() } });
     await prioritaires(f.ctx);
     const lu = f.j.vinted.length;
     dit(actions(f.store) === 0, 'ces lectures ne consomment AUCUNE action (bordereau, réponse gardent leurs 20)', `actions=${actions(f.store)} pour ${lu} lecture(s)`);
@@ -104,7 +107,7 @@ const prioritaires = async (ctx) => { await ctx.capterPreuvesVente(UID); await c
 
   console.log('── 2. les photos s’arrêtent avant la réserve de l’argent et des colis');
   await essaie('réserve', async () => {
-    const f = faireFond({ src: SRC, lignes: lignes(), vinted, store: {} });
+    const f = faireFond({ src: SRC, lignes: lignes(), vinted, store: { ...REC() } });
     await f.ctx.relireAnnoncesAutresComptes(UID);      // un seul compte : rien à relire (noté)
     await tours(f.ctx, 30);                          // le fond qui tourne chaque minute, une demi-heure
     const ph = compte(f.j, /^\/items\/\d+$/);
@@ -118,7 +121,7 @@ const prioritaires = async (ctx) => { await ctx.capterPreuvesVente(UID); await c
 
   console.log('── 3. la réserve se LIBÈRE quand il n’y a plus rien à lire');
   await essaie('libération', async () => {
-    const f = faireFond({ src: SRC, lignes: lignes({ relais: 0, mois: 0, datees: true, enCours: 0 }), vinted, store: {} });
+    const f = faireFond({ src: SRC, lignes: lignes({ relais: 0, mois: 0, datees: true, enCours: 0 }), vinted, store: { ...REC() } });
     await prioritaires(f.ctx);                          // rien à lire : chacun note « reste 0 »
     await f.ctx.relireAnnoncesAutresComptes(UID);
     dit(f.j.vinted.length === 0, 'rien à lire : aucune requête', `${f.j.vinted.length}`);
@@ -130,7 +133,7 @@ const prioritaires = async (ctx) => { await ctx.capterPreuvesVente(UID); await c
   console.log('── 4. « pas su » garde la réserve');
   await essaie('pas su', async () => {
     // Codes et relevés : rien à lire (noté). Versements : la lecture des ventes échoue.
-    const f = faireFond({ src: SRC, lignes: lignes({ relais: 0, mois: 0 }), vinted, store: {},
+    const f = faireFond({ src: SRC, lignes: lignes({ relais: 0, mois: 0 }), vinted, store: { ...REC() },
       lectureKO: (u) => /orders_sold/.test(u) });
     await prioritaires(f.ctx);
     await f.ctx.relireAnnoncesAutresComptes(UID);
@@ -142,7 +145,7 @@ const prioritaires = async (ctx) => { await ctx.capterPreuvesVente(UID); await c
   console.log('── 5. un clic n’est pas bridé, et le total tient');
   await essaie('clic', async () => {
     const t = maintenant();
-    const f = faireFond({ src: SRC, lignes: lignes(), vinted, store: { vrmLectures: { [UID]: Array.from({ length: 10 }, () => t) } } });
+    const f = faireFond({ src: SRC, lignes: lignes(), vinted, store: { ...REC(), vrmLectures: { [UID]: Array.from({ length: 10 }, () => t) } } });
     const eu = await f.ctx.completerPhotos(UID, '801');
     dit(eu === true && compte(f.j, /^\/items\/801$/) === 1, 'publier une paire va chercher SES photos même quand les photos de fond sont à la réserve', `rendu=${eu}`);
     await f.ctx.capterPhotosAnnonces(UID);
@@ -154,7 +157,7 @@ const prioritaires = async (ctx) => { await ctx.capterPreuvesVente(UID); await c
     // Plusieurs comptes liés, relecture jamais notée (« pas su ») : sa réserve (3) s'ajoute à celle de
     // l'argent et des colis — 13 depuis la fusion avec la preuve de vente (5 versements + 2 relevés
     // + 3 codes + 3 preuves).
-    const f = faireFond({ src: SRC, lignes: lignes(), vinted, store: {} });
+    const f = faireFond({ src: SRC, lignes: lignes(), vinted, store: { ...REC() } });
     await tours(f.ctx, 10);
     const ph = compte(f.j, /^\/items\/\d+$/);
     dit(ph === 4, 'les photos s’arrêtent avant la réserve de l’argent ET celle de la relecture : 4 pages (20 − 13 − 3)', `${ph} page(s) lue(s)`);
@@ -167,7 +170,7 @@ const prioritaires = async (ctx) => { await ctx.capterPreuvesVente(UID); await c
 
   console.log('── 7. le suivi des achats lit sous la réserve de l’argent et des colis (revue du 24 oct.)');
   await essaie('suivi', async () => {
-    const f = faireFond({ src: SRC, lignes: lignes(), vinted, store: {} });
+    const f = faireFond({ src: SRC, lignes: lignes(), vinted, store: { ...REC() } });
     const rP = await f.ctx.reserveLectures(UID, 'photos');
     dit(rP === 16, 'la réserve que les photos laissent : 16 (13 pour l’argent et les colis + 3 pour la relecture) — le suivi n’y est pas', `réserve=${rP}`);
     const acc = { vinted_user_id: UID, domain: 'www.vinted.fr' };

@@ -90,7 +90,11 @@ export function sourcesDeVersement(map) {
   return s instanceof Map ? s : new Map();
 }
 // (14 nov.) Le rythme de la relecture de fond, onglet vinted.fr ouvert sur le compte :
-// 12 lectures/h (20 moins la réserve des codes, preuves et relevés) ⇒ 288 par jour
-// (la même estimation que la carte de l'extension, `VERSEMENT_PAR_JOUR_ESTIME`).
-export const VERSEMENTS_PAR_JOUR = 12 * 24;
-export const joursPourDater = (n) => (Number.isFinite(Number(n)) && Number(n) > 0 ? Math.max(1, Math.ceil(Number(n) / VERSEMENTS_PAR_JOUR)) : 0);
+// 12 lectures/h (20 moins la réserve des codes, preuves et relevés).
+// ⚠️ (15 nov.) L'ESTIMATION EST EN HEURES DE VINTED OUVERT, plus en jours : « environ 7 jours »
+//    (1 741 ÷ 288) supposait vinted.fr ouvert 24 h sur 24 sur CE compte — mesuré le 15 nov.,
+//    son grand compte n'avait pas été ouvert depuis deux jours. Le vrai délai dépend du temps
+//    où l'onglet est ouvert : on dit ce temps-là (la même règle que la carte de l'extension,
+//    `VERSEMENT_PAR_HEURE_ESTIME`), jamais une date de fin.
+export const VERSEMENTS_PAR_HEURE = 12;
+export const heuresPourDater = (n) => (Number.isFinite(Number(n)) && Number(n) > 0 ? Math.max(1, Math.ceil(Number(n) / VERSEMENTS_PAR_HEURE)) : 0);

@@ -587,15 +587,17 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
   // 5.341 : les dates de versement encore à lire sur CE compte.
   await essaie('dates de versement', async () => {
     for (const [scheme, mobile] of [['light', { largeur: 390 }], ['dark', { largeur: 390 }], ['dark', null], ['light', null]]) {
-      const e = ETATS.connecte; e.site.choix = 'oui'; e.site.dates = { reste: 1751, jours: 7 };
+      const e = ETATS.connecte; e.site.choix = 'oui'; e.site.dates = { reste: 1751, heures: 146, releveSansRecette: 3 };   // 5.378 : en heures de Vinted ouvert
       const { ctx, pg } = await rendre(nav, e, { scheme, mobile });
       if (mobile) { await pg.tap('#vrm-badge'); await pg.waitForTimeout(400); } else await survoler(pg);
       const d = await pg.evaluate(() => { const x = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-dates-versement]'); return x ? { n: x.getAttribute('data-dates-versement'), t: x.innerText } : null; });
-      dit(!!d && d.n === '1751' && /1\s?751 restantes · environ 7 jours/.test(d.t), `${scheme} ${mobile ? 390 : 1512} : « 1 751 restantes · environ 7 jours »`, JSON.stringify(d));
+      dit(!!d && d.n === '1751' && /1\s?751 restantes · environ 146 h avec Vinted ouvert sur ce compte/.test(d.t) && !/jour/.test(d.t), `${scheme} ${mobile ? 390 : 1512} : « 1 751 restantes · environ 146 h avec Vinted ouvert sur ce compte »`, JSON.stringify(d));
+      const r = await pg.evaluate(() => { const x = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-releve-sans-recette]'); return x ? x.innerText : null; });
+      dit(!!r && /3 mois à lire/.test(r) && /Porte-monnaie → Historique/.test(r), `${scheme} ${mobile ? 390 : 1512} : « Relevé : 3 mois à lire · ouvre Porte-monnaie → Historique »`, String(r));
       await pg.screenshot({ path: path.join(SORTIE, `badge-dates-${mobile ? 390 : 1512}-${scheme}.png`) });
       await ctx.close();
     }
-    for (const dates of [null, { reste: 0, jours: 0 }]) {
+    for (const dates of [null, { reste: 0, heures: 0 }]) {
       const e = ETATS.connecte; e.site.choix = 'oui'; e.site.dates = dates;
       const { ctx, pg } = await rendre(nav, e);
       await survoler(pg);

@@ -54,7 +54,7 @@ const ETATS = {
   get deco() { return base({ vrm: { ok: true, connecte: false, cloisonne: true } }); },
   get refuse() { return base({ flux: { okAt: Date.now() - 60 * MIN, koAt: Date.now() - 2 * MIN, koStatut: '503' } }); },
   get lbc() { return base({ plateforme: 'leboncoin', site: { id: '9', nom: 'Sophie B.', type: 'particulier' }, lbc: { compte: { ok: true, texte: 'Sophie B.' }, annonces: { ok: true, texte: '37 lues en entier {quand}', at: Date.now() - 4 * MIN }, ventes: { ok: null, texte: 'pas encore lues' }, geste: '' } }); },
-  get progres() { return base({ site: { id: '111', nom: 'shop_x', choix: 'oui', dates: { reste: 1751, jours: 7 } } }); },
+  get progres() { return base({ site: { id: '111', nom: 'shop_x', choix: 'oui', dates: { reste: 1751, heures: 146 } } }); },
 };
 
 // La page du site, le faux `chrome` (stockage local VRAI : get/set/onChanged).
