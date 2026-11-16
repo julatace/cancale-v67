@@ -59,5 +59,9 @@ export default {
   "nc.mb.prix": "Inseriscili in Annunci.",
   "nc.mb.comptes": "Apri Vinted collegato a questi account.",
   "nc.mb.frais": "Apri Vendite: VRM rilegge le commissioni.",
-  "nc.mb.montant": "Apri Vendite: VRM ricalcola."
+  "nc.mb.montant": "Apri Vendite: VRM ricalcola.",
+  "nc.ecart": {
+    "one": "di cui {x} di differenza non contata ({n} vendita Vinted Pro contata al prezzo dell’articolo)",
+    "other": "di cui {x} di differenza non contata ({n} vendite Vinted Pro contate al prezzo dell’articolo)"
+  }
 };

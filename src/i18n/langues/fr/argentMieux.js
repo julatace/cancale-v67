@@ -59,5 +59,9 @@ export default {
   "nc.mb.prix": "Saisis-les dans Annonces.",
   "nc.mb.comptes": "Ouvre Vinted connecté sur ces comptes.",
   "nc.mb.frais": "Ouvre Ventes : VRM relit les frais.",
-  "nc.mb.montant": "Ouvre Ventes : VRM recalcule."
+  "nc.mb.montant": "Ouvre Ventes : VRM recalcule.",
+  "nc.ecart": {
+    "one": "dont {x} d’écart non compté ({n} vente Vinted Pro comptée au prix de l’article)",
+    "other": "dont {x} d’écart non compté ({n} ventes Vinted Pro comptées au prix de l’article)"
+  }
 };

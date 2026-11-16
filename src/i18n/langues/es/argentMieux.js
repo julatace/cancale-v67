@@ -59,5 +59,9 @@ export default {
   "nc.mb.prix": "Introdúcelos en Anuncios.",
   "nc.mb.comptes": "Abre Vinted con sesión iniciada en estas cuentas.",
   "nc.mb.frais": "Abre Ventas: VRM vuelve a leer las comisiones.",
-  "nc.mb.montant": "Abre Ventas: VRM recalcula."
+  "nc.mb.montant": "Abre Ventas: VRM recalcula.",
+  "nc.ecart": {
+    "one": "de los cuales {x} de diferencia no contada ({n} venta Vinted Pro contada al precio del artículo)",
+    "other": "de los cuales {x} de diferencia no contada ({n} ventas Vinted Pro contadas al precio del artículo)"
+  }
 };

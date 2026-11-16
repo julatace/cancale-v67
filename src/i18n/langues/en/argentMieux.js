@@ -59,5 +59,9 @@ export default {
   "nc.mb.prix": "Enter them in Listings.",
   "nc.mb.comptes": "Open Vinted logged in on these accounts.",
   "nc.mb.frais": "Open Sales: VRM reads the fees again.",
-  "nc.mb.montant": "Open Sales: VRM recalculates."
+  "nc.mb.montant": "Open Sales: VRM recalculates.",
+  "nc.ecart": {
+    "one": "of which {x} price gap not counted ({n} Vinted Pro sale counted at the item price)",
+    "other": "of which {x} price gap not counted ({n} Vinted Pro sales counted at the item price)"
+  }
 };

@@ -84,6 +84,11 @@ export default function MoisBoucle({ portes = {} }) {
         {tete}
         {K.montant && K.montant.ca != null ? <span className="vrm-mb-montant" data-mb-a-declarer={String(Math.round(K.montant.ca * 100))}>{somme(K.montant.ca)}<small>à déclarer</small></span> : null}
       </div>
+      {/* (16 nov. au soir, décision de Julien) Ventes Pro à deux prix COMPTÉES au prix de l'article : l'écart du mois
+          (la ligne publiée `vinted_urssaf_mois`), écrit à côté du montant, jamais ajouté. */}
+      {(() => { const m = ligneU && Array.isArray(ligneU.mois) ? ligneU.mois.find((x) => x && x.ym === K.ym) : null;
+        return m && Number(m.nEcart) > 0 && Number.isSafeInteger(m.ecartC)
+          ? <p className="vrm-mb-ecart" data-mb-ecart-pro={m.ecartC} data-mb-ecart-n={m.nEcart}>{tr('nc.ecart', { n: Number(m.nEcart), x: somme(m.ecartC / 100) })}</p> : null; })()}
       {K.etat === 'declare' ? null : (
         <ul className="vrm-mb-liste">
           {K.lignes.map((l) => {
