@@ -509,7 +509,8 @@ import { montant, fmt as fmtMontant, fmtE as fmtEMontant, fmtE0 as fmtE0Montant,
 import { SheetShell as SheetShellBase } from "./composants/SheetShell.jsx";
 import { poserFermeAuRetour } from "./ui/retour.jsx";   // (14 nov., correctif « À faire ») les feuilles de src/ui reçoivent le vrai FermeAuRetour
 import { BoutonBase, SegmenteBase } from "./composants/Bouton.jsx";
-import { ID_PAIRES, ECRANS_PAIRES, estPaires, dernierePaire, noterPaire, groupeBarre, badgePaires } from "./navPaires.js";   // (14 nov., n° 61) l'onglet « Paires »
+import { ID_PAIRES, ECRANS_PAIRES, estPaires, dernierePaire, noterPaire, groupeBarre, badgePaires } from "./navPaires.js";
+import { entreeHistorique } from "./navHistorique.js";   // (16 nov., barre-achats) passer d'un onglet de la barre à un autre n'empile rien   // (14 nov., n° 61) l'onglet « Paires »
 // (14 nov., Studio bleu clair) L'espace d'un écran, le disque et son éventail, l'ondulation au changement d'espace.
 import { espaceDe } from "./design/espace.js";
 import { DisqueEventail } from "./design/DisqueEventail.jsx";
@@ -17814,9 +17815,15 @@ const groupeNav=(o)=>{ Object.defineProperty(o,'titre',{get(){ return tr('nav.gr
 // « Plus » quitte la barre : tout ce qu'il portait est dans le menu du haut. Aucun écran perdu (§4.11).
 const ONGLET_PAIRES=entreeNav({id:ID_PAIRES, icon:'box', label:'Annonces'});   // (15 nov., Julien : « ne mets pas paires, tu mets annonces ») le TEXTE seul change (tr('nav.paires')) ; l'identifiant reste « paires »
 const ONGLET_ARGENT=entreeNav({id:'compta', icon:'euro', label:'Argent'});
+// (16 nov., lot barre-achats — Julien : « si on peut, ajoute les Achats dans la barre en bas ») Achats quitte
+// « Paires » (Annonces · Stock) et prend sa place dans la barre, juste après Annonces : l'onglet allumé est
+// TOUJOURS celui de l'écran (avant, sur Achats, c'était « Annonces » qui s'allumait). Le disque « + » suit
+// les trois premiers onglets (`POS_DISQUE`).
+const ONGLET_ACHATS=entreeNav({id:'achats',   icon:'cart', label:'Achats'});
 const BOTTOM_TABS=[
   entreeNav({id:'journee',  icon:'soleilLevant', label:'Ma journée', court:'Aujourd’hui'}),
   ONGLET_PAIRES,
+  ONGLET_ACHATS,
   entreeNav({id:'ventes',   icon:'bag',  label:'Ventes'}),
   // (10 nov.) UNE entrée « Argent » (Résumé · Statistiques · Déclarer · Factures, src/argent.js) ; (14 nov.) dans la barre.
   ONGLET_ARGENT,
@@ -17827,15 +17834,19 @@ const ENTREES_PAIRES=[
   entreeNav({id:'garage',   icon:'home', label:'Stock'}),
   // (11 nov., lot DJ3) Plus d'onglet Colis : « À expédier » est en tête de Ventes, « À retirer » en tête
   // d'Achats (src/colisPlace.js : les anciens chemins y mènent).
-  entreeNav({id:'achats',   icon:'cart', label:'Achats'}),
+  // (16 nov., barre-achats) La MÊME entrée que la barre : le menu et la colonne la gardent dans ce groupe ;
+  // le sélecteur de « Paires » ne la montre plus (src/navPaires.js : Annonces · Stock).
+  ONGLET_ACHATS,
 ];
+// La place du disque « + » dans la barre : après Aujourd'hui · Annonces · Achats.
+const POS_DISQUE=3;
 // Messages : dans le menu du haut (téléphone) et dans la colonne (ordinateur), groupe « Gérer ».
 const ONGLET_MESSAGES=entreeNav({id:'messages', icon:'chat', label:'Messages'});
 // (15 nov., refonte-journee) Paramètres au pied du rail de l'ordinateur (la maquette validée).
 const ONGLET_PARAMETRES=entreeNav({id:'settings', icon:'gear', label:'Paramètres'});
 // Les tâches de la colonne de l'ordinateur : celles de la barre, sans l'alias « Paires » (ses trois écrans
 // ont leur groupe, juste dessous).
-const NAV_TACHES=[BOTTOM_TABS[0],BOTTOM_TABS[2],ONGLET_ARGENT];
+const NAV_TACHES=['journee','ventes','compta'].map(id=>BOTTOM_TABS.find(t=>t.id===id));
 // (31 oct., soir — Julien, mot pour mot : « je veux qu'il y ait Achats à côté
 // de À retirer », « que dans les deux onglets il n'y ait pas la même chose »,
 // « enlever Plateforme en bas des onglets glissants… répartis avec les onglets
@@ -19854,13 +19865,15 @@ function SelecteurPaires({ tab, setTab, badges, sites }) {
   const g = groupesVisibles(sites, () => true).find((x) => x.cle === 'paires');
   const vus = new Set(g ? g.items.map((t) => t.id) : ECRANS_PAIRES);
   vus.add(tab);
-  const options = ENTREES_PAIRES.filter((t) => vus.has(t.id)).map((t) => {
+  const options = ENTREES_PAIRES.filter((t) => estPaires(t.id) && vus.has(t.id)).map((t) => {
     const v = badges && badges[t.id];
     // (14 nov., intégration) Le nombre du segment porte le même repère que la pastille de la barre d'hier
     // (`data-badge-nav` + `data-badge-n`) : « À retirer · N » se lit au même endroit qu'avant (bancs, cibles).
     const nb = typeof v === 'number' && v > 0;
     return { v: t.id, l: t.label, n: nb ? (v > 99 ? '99+' : v) : undefined, data: { 'data-nav-entree': t.id, 'data-paires-segment': t.id, ...(nb ? { 'data-badge-nav': t.id, 'data-badge-n': String(v) } : {}) } };
   });
+  // (16 nov., barre-achats) Achats a son onglet : un sélecteur à un seul segment (Stock caché) ne dit rien.
+  if (options.length < 2) return null;
   return <div className="vrm-paires-selecteur" data-paires-selecteur="">
     <Segmente label={tr('nav.paires')} options={options} value={tab} plein onChange={(id) => { if (id === tab) { remonterEnHaut(); return; } noterNavigationSimple(id); setTab(id); }}/>
   </div>;
@@ -19967,7 +19980,7 @@ function BottomBar({tab,setTab,sites,badges,gestes=null}) {
         <React.Fragment key={t.id}>
         {/* (14 nov., Studio bleu clair) Le DISQUE « + » au centre de la barre : l'éventail des gestes globaux
             (Chercher · Scanner · Publier · Imprimer N), chacun branché sur un geste qui existait déjà. */}
-        {i===2&&gestes ? <DisqueEventail gestes={gestes} nImprimer={nImprimer} Retour={FermeAuRetour} ecran={tab}/> : null}
+        {i===POS_DISQUE&&gestes ? <DisqueEventail gestes={gestes} nImprimer={nImprimer} Retour={FermeAuRetour} ecran={tab}/> : null}
         <button type="button" className="vrm-tab" data-nav-entree={t.id} onClick={(e)=>{ setPlusOuvert(false);
           const ic=e.currentTarget.querySelector('.vrm-tab-ic')||e.currentTarget;
           // (14 nov., n° 61) « Paires » ouvre le dernier de ses trois écrans ; retouché sur l'un d'eux, il remonte en haut.
@@ -61292,9 +61305,14 @@ function AppCoeur() {
       // On attend que ce retour soit fait avant d'empiler l'écran suivant.
       if(window.__vrmRetourFeuille){ h.minuteur=setTimeout(pousser,30); return; }
       try{
+        // (16 nov., lot barre-achats — Julien : « je ne veux pas qu'on puisse glisser entre les onglets »)
+        // D'un onglet de la barre à un autre, l'entrée est REMPLACÉE (src/navHistorique.js) : le retour du
+        // système (bord gauche sur iPhone) n'a plus d'onglet voisin à montrer. Feuilles et écrans du menu empilent.
         const st=window.history.state||{};
-        if(st.vrmTab===h.tab && st.vrmSub===h.sub) return;
-        window.history.pushState({ vrmTab:h.tab, vrmSub:h.sub }, '');
+        const geste=entreeHistorique(st, { tab:h.tab, sub:h.sub }, (t)=>groupeBarre(t,BAR_GROUPE), BOTTOM_TABS.map(x=>x.id));
+        if(geste==='rien') return;
+        if(geste==='remplacer') window.history.replaceState({ vrmTab:h.tab, vrmSub:h.sub }, '');
+        else window.history.pushState({ vrmTab:h.tab, vrmSub:h.sub }, '');
       }catch(_){}
     };
     h.minuteur=setTimeout(pousser,0);
@@ -65260,6 +65278,15 @@ function AppCoeur() {
         // le défilement à inertie est natif : elle ne servait plus qu'à piéger.
         // Banc `feuilles-coque.cjs`, qui applique la règle de WebKit.
         overscrollBehaviorY:'contain',
+        // (16 nov., barre-achats — « je ne veux pas qu'on puisse glisser entre les onglets ») Aucun rebond de
+        // côté : un glisser horizontal sur le contenu ne déplace jamais l'écran (les rangées qui défilent de
+        // côté gardent leur propre défilement, `overscroll-behavior-x: contain`).
+        overscrollBehaviorX:'none',
+        // Et le navigateur ne fait jamais de son glisser horizontal une « page précédente » (Chrome au doigt : la
+        // page d'avant apparaissait, comme l'onglet d'avant sur la capture de Julien). `pan-y` : le doigt défile
+        // en hauteur et zoome ; une rangée qui défile de côté (filtres, photos, frises) garde son glisser, car un
+        // glisser appartient au premier conteneur qui défile sous le doigt (banc barre-achats A6–A8).
+        touchAction:'pan-y pinch-zoom',
         width: ordi ? undefined : '100%',
         maxWidth: ordi ? 'none' : 1200,
         margin: ordi ? '0' : '0 auto',

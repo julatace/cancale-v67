@@ -7,7 +7,8 @@
 import { groupeBarre, ID_PAIRES } from '../navPaires.js';
 
 export const ESPACES = Object.freeze(['journee', 'paires', 'ventes', 'argent', 'autres']);
-const PAR_ONGLET = Object.freeze({ journee: 'journee', [ID_PAIRES]: 'paires', ventes: 'ventes', compta: 'argent' });
+// (16 nov., barre-achats) Achats a son onglet dans la barre ; son aplat reste celui des paires (aucune teinte de plus).
+const PAR_ONGLET = Object.freeze({ journee: 'journee', [ID_PAIRES]: 'paires', achats: 'paires', ventes: 'ventes', compta: 'argent' });
 
 // `barGroupe` : la table de la coque (BAR_GROUPE, src/App.jsx) — sans elle, les écrans
 // « annexes » (Ma semaine, Litiges…) tombent dans « autres », jamais dans un faux espace.
