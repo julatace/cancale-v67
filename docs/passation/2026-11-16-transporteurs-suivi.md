@@ -9,7 +9,7 @@ Extension **pas touchée** (décision « on ne fait pas avec l'extension » pour
 
 ## ÉTAT À LA REPRISE
 
-- Code fait, vert en local (voir §5). PR : voir la fin de ce fichier.
+- Code fait, vert en local (voir §5). **PR julatace/cancale-v67#1182, PAS fusionnée** : règle de Julien du 16 nov. « zéro rouge pour fusionner, y compris les rouges déjà sur main des jobs touchés ». CI du 1er commit : 70 audits rouges dont **69 aussi rouges sur la CI de #1181** (main d'avant, domaines sans rapport : accueil, aide, annonces, Vestiaire, textes courts…) et **1 neuf, `audit-retours-suivi` D1, corrigé** (commit af1fc76). Les jobs Audits 1-3, Bancs et parcours-critiques restent donc rouges par l'existant : à fusionner quand ces rouges d'avant seront réglés (ou sur décision de Julien).
 - **Ce qui reste, et pourquoi (point 9 du brief : rien d'inventé)** :
   1. **La forme RÉELLE d'une étiquette Mondial Relay de vente n'a pas été mesurée ici** (le PDF porte l'adresse de
      l'acheteur ; aucune lecture de PDF réel n'a été faite). La règle lit seulement « 5 chiffres + nom de ville »
