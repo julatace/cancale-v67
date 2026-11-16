@@ -2349,7 +2349,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (14 nov., Julien : « il y a 2 “ce que VRM a fait” ») Le JOURNAL quitte « Connexion » : il vit ici, à côté
       // de la confidentialité, avec un libellé qui ne se confond plus avec elle (« Journal : … » / « Confidentialité : … »).
       AUTH.user && { id:'journal-vrm', type:'panneau', ic:'journal', lib:tr('reglages.journal-vrm.lib'), el:<JournalVrm/> },
-      AUTH.user && { id:'mesure-demarrage', type:'switch', ic:'chart', lib:tr('satisf.mesure.lib'), desc:tr('satisf.mesure.desc'), on:!mesureCoupee, onClick:basculerMesure, data:{ 'data-reglage-mesure-demarrage': mesureCoupee ? 'off' : 'on' } },
+      AUTH.user && { id:'mesure-demarrage', type:'switch', ic:'chrono', lib:tr('satisf.mesure.lib'), desc:tr('satisf.mesure.desc'), on:!mesureCoupee, onClick:basculerMesure, data:{ 'data-reglage-mesure-demarrage': mesureCoupee ? 'off' : 'on' } },
       // (8 nov., confiance) Ce que VRM lit, garde et fait — chaque phrase tenue par le code (src/tesDonnees.js).
       { id:'tes-donnees', type:'panneau', ic:'confidentiel', lib:tr('reglages.tes-donnees.lib'), desc:tr('reglages.tes-donnees.desc'), data:{ 'data-reglage-tes-donnees':'' },
         el:<TesDonnees cloisonne={!!CLOISONNE} onExporter={exporterMesDonnees} onJournal={AUTH.user ? ()=>ouvrirSous('journal-vrm') : undefined} onFermer={AUTH.user ? ()=>ouvrirSous('fermer') : undefined}/> },
