@@ -14,6 +14,7 @@
 //       n'énumère plus de 3 fois « vente(s) Vinted » (le mur d'avant) ; le détail par vente est REPLIÉ ;
 //    B  « Copier » est un vrai bouton visible (fond ou bord ≥ 3:1 sur ce qui l'entoure, 44 px au doigt) ;
 //    L  aucun libellé coupé en « … » dans Déclarer ;
+//    E  (16 nov. au soir) les ventes Pro à écart ≤ 2 € sont COMPTÉES : l’écart est écrit (Résumé, carte du mois, Mois bouclé) ;
 //    M  les mesures (hauteur de Déclarer, mots, contraste min) sont écrites, pour le récit (avant/après).
 //  `LARGEURS=390` `THEMES=clair` `SEGMENTS=declarer` ; `SHOTS=<dossier>` ; `BANC_DIST=<dist>` (l'arbre d'avant : ROUGE).
 // ════════════════════════════════════════════════════════════════════════════
@@ -43,6 +44,9 @@ async function capture(pg, seg, fichier) {
 }
 fs.mkdirSync(SHOTS, { recursive: true });
 const N_DEUX_PRIX = 60;
+// (16 nov. au soir) Les ventes Pro à deux prix COMPTÉES (écart ≤ 2 €) : prix de l'article et écart en centimes.
+const ECARTS_COMPTES = Array.from({ length: 20 }, (_, i) => ({ i, tx: 73000000000 + i, art: (35 + i) * 100, ecartC: 47 + (i * 37) % 99, ceMois: i >= 10 }));
+const ecartSomme = (f) => ECARTS_COMPTES.filter(f).reduce((t, v) => t + v.ecartC, 0);
 
 // ── La base inventée ──
 const J = 86400000;
@@ -63,12 +67,19 @@ function base() {
     id: tx, item_id: tx + 1000000, status: 450, status_title: 'Commande finalisée', status_updated_at: dVers, user_side: 'seller',
     offer: { price: { amount: prixArticle, currency_code: 'EUR' } }, service_fee: { amount: frais, currency_code: 'EUR' },
     total_amount_without_tax: { amount: (Number(prixArticle) + Number(frais)).toFixed(2), currency_code: 'EUR' } } } } });
-  // Compte PRO : 60 ventes versées le mois dernier, la liste dit le prix + un écart de 0,47 € à 1,25 € (forme mesurée chez lui).
+  // Compte PRO : 60 ventes versées le mois dernier, la liste dit le prix + un écart de 2,10 € à 2,88 € — AU-DELÀ de 2 €,
+  // elles restent à part (16 nov. au soir, décision de Julien : seul un écart ≤ 2 € est compté au prix de l'article).
   const ventesPro = [];
   for (let i = 0; i < N_DEUX_PRIX; i++) {
-    const tx = 71000000000 + i, art = 30 + (i % 25) * 2, ecart = (47 + (i * 13) % 79) / 100;
+    const tx = 71000000000 + i, art = 30 + (i % 25) * 2, ecart = (210 + (i * 13) % 79) / 100;
     ventesPro.push(vente(PRO, tx, `Nike Dunk inventée ${i}`, (art + ecart).toFixed(2), jourAvant(1 + (i % 25), 9)));
     rows.push(txn(PRO, tx, art.toFixed(2), jourAvant(2 + (i % 25)), (art * 0.05 + 0.7).toFixed(2)));
+  }
+  // (16 nov. au soir, décision de Julien) + 20 ventes Pro à écart ≤ 2 € (0,47 € à 1,45 €, la forme mesurée chez lui) :
+  // COMPTÉES au prix de l'article, l'écart écrit à côté. 10 versées le mois dernier (Mois bouclé), 10 ce mois-ci (carte du mois).
+  for (const v of ECARTS_COMPTES) {
+    ventesPro.push(vente(PRO, v.tx, `Jordan inventée ${v.i}`, ((v.art + v.ecartC) / 100).toFixed(2), v.ceMois ? jourCe(1 + (v.i % 8)) : jourAvant(1 + v.i, 9)));
+    rows.push(txn(PRO, v.tx, (v.art / 100).toFixed(2), v.ceMois ? jourCe(1 + (v.i % 8)) : jourAvant(2 + v.i), '2.20'));
   }
   // Compte particulier : 30 versées le mois dernier, 8 ce mois-ci, 12 finalisées sans date de versement.
   const ventesPart = [];
@@ -110,6 +121,9 @@ function mesurerArgent(seg) {
     const k = (t.match(/\d+\s+ventes?\s+Vinted/g) || []).length;
     if (k > 3) out.murs.push(`${k}× « ${t.trim().slice(0, 60)} »`);
   }
+  // E — l'écart des ventes Pro comptées au prix de l'article (16 nov. au soir), écrit à côté.
+  out.ecarts = [...part.querySelectorAll('[data-ca-ecart-pro],[data-urssaf-ecart-pro],[data-mb-ecart-pro]')].filter(vis).map((e) => ({ ou: e.hasAttribute('data-ca-ecart-pro') ? 'resume' : e.hasAttribute('data-urssaf-ecart-pro') ? 'mois' : 'boucle',
+    c: Number(e.getAttribute('data-ca-ecart-pro') || e.getAttribute('data-urssaf-ecart-pro') || e.getAttribute('data-mb-ecart-pro')), n: Number(e.getAttribute('data-ca-ecart-n') || e.getAttribute('data-urssaf-ecart-n') || e.getAttribute('data-mb-ecart-n')), t: (e.textContent || '').trim().slice(0, 120) }));
   out.detailsOuverts = [...part.querySelectorAll('[data-nc-detail]')].filter((d) => d.open && vis(d)).length;
   out.detailsLignes = [...part.querySelectorAll('[data-nc-detail] [data-nc-vente]')].length;
   // B — le bouton « Copier »
@@ -176,6 +190,10 @@ const montants = {};
             const somme = (() => { let c = 0; for (let i = 0; i < N_DEUX_PRIX; i++) c += (30 + (i % 25) * 2) * 100; return c; })();
             dit(dp.length >= 1 && dp.every((g) => g.n === N_DEUX_PRIX && Number(g.c) === somme), `G ${ici} : « deux prix » = UNE ligne par endroit, ${N_DEUX_PRIX} ventes, au moins ${somme / 100} €`, JSON.stringify(m.groupes).slice(0, 220));
             dit(m.detailsOuverts === 0, `G ${ici} : le détail par vente est replié`, `${m.detailsOuverts} ouvert(s)`);
+            // E (16 nov. au soir, décision de Julien) : l'écart des ventes Pro comptées au prix de l'article est ÉCRIT.
+            const tout = ecartSomme(() => true), ceMois = ecartSomme((v) => v.ceMois), avant = ecartSomme((v) => !v.ceMois);
+            const voulu = seg === 'resume' ? [['resume', tout, 20]] : [['mois', ceMois, 10], ['boucle', avant, 10]];
+            dit(voulu.every(([ou, c, n]) => m.ecarts.some((e) => e.ou === ou && e.c === c && e.n === n && e.t.length > 0)), `E ${ici} : « dont … d'écart non compté » écrit (${voulu.map(([ou, c, n]) => `${ou} ${c} c / ${n}`).join(' · ')})`, JSON.stringify(m.ecarts));
           }
           if (seg === 'declarer') {
             dit(m.copier.length > 0 && m.copier.every((b) => b.h >= 44 && b.forme >= 3), `B ${ici} : « Copier » est un vrai bouton (forme ≥ 3:1, 44 px)`, JSON.stringify(m.copier));
