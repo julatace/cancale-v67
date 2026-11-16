@@ -91,7 +91,21 @@ async function rendre(b, tel) {
   return { ctx, pg, errs };
 }
 const ou = (pg, n) => pg.evaluate((n) => { const el = document.querySelector(`[data-case-num="${n}"]`); if (!el) return null; const m = /rangée (\d+), colonne (\d+)/.exec(el.getAttribute('aria-label') || ''); return m ? `${el.closest('[data-meuble]').getAttribute('data-meuble')}:${m[1]}.${m[2]}` : null; }, n);
-const retirer = async (pg, n) => { await pg.click(`[data-case-num="${n}"]`); await pg.click('button:has-text("Retirer de la case")'); await pg.waitForTimeout(300); };
+// (16 nov., bancs-rouges-a) Toucher une case ouvre LA fiche (14 nov., « fiche partout ») ; fiche D (15 nov.) : ses gestes
+// autres que le principal vivent sous « ⋯ » (`data-fd-plus-ouvrir`), dont « Retirer de la case » du Stock. Le banc
+// fait ce geste-là, puis exige que la fiche se REFERME (la paire n'est plus dans cette case ; restée ouverte, elle
+// couvrait la case suivante au téléphone).
+let fichesRestees = 0;
+const retirer = async (pg, n) => {
+  await pg.click(`[data-case-num="${n}"]`);
+  const plus = pg.locator('[data-fiche-paire] [data-fd-plus-ouvrir]').first();
+  await plus.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+  if (await plus.count()) await plus.click();
+  await pg.click('[data-fiche-retirer]');
+  const fermee = await pg.waitForSelector('[data-fiche-paire]', { state: 'detached', timeout: 8000 }).then(() => true).catch(() => false);
+  if (!fermee) fichesRestees++;
+  await pg.waitForTimeout(300);
+};
 
 (async () => {
   let b;
@@ -120,6 +134,9 @@ const retirer = async (pg, n) => { await pg.click(`[data-case-num="${n}"]`); awa
         // L'éditeur : poser une planche sous la rangée 3, enregistrer.
         await r.pg.click('[data-meuble="mG"] button[aria-label="Modifier le meuble"]');
         const avant = await r.pg.getAttribute('[data-planche-choix="3"]', 'aria-pressed');
+        // (16 nov.) Au doigt, chaque touche de l'éditeur fait 44 px (§7) — « Une à chaque rangée » et « Aucune » faisaient 30 px.
+        if (tel) { const h = await r.pg.evaluate(() => [...document.querySelectorAll('[data-editeur-planches] button, [data-planches-toutes], [data-planches-toutes] + button')].filter((x) => x.offsetParent).map((x) => { const q = x.getBoundingClientRect(); return Math.min(Math.round(q.height), Math.round(q.width)); }));
+          dit(h.length > 2 && h.every((x) => x >= 44), `${t} : chaque touche de l'éditeur de planches fait 44 px au doigt`, JSON.stringify(h)); }
         await r.pg.click('[data-planche-choix="3"]');
         await r.pg.click('[data-meuble-enregistrer]');
         await r.pg.waitForTimeout(1200);  // save() écrit l'appareil après 500 ms
@@ -153,6 +170,7 @@ const retirer = async (pg, n) => { await pg.click(`[data-case-num="${n}"]`); awa
         dit(sauveP2 === '[1,"2:2"]', `${t} : ⟷ pose la planche sur toute la largeur`, sauveP2);
         const x = await r.pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
         dit(x.sw <= x.cw + 1, `${t} : aucun débordement`, `${x.sw} > ${x.cw}`);
+        dit(fichesRestees === 0, `${t} : « Retirer de la case » referme la fiche à chaque fois`, `${fichesRestees} restée(s) ouverte(s)`); fichesRestees = 0;
         dit(r.errs.length === 0, `${t} : aucune erreur d'app`, r.errs.join(' | ').slice(0, 200));
         await r.ctx.close();
       });

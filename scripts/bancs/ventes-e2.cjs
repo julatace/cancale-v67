@@ -199,7 +199,8 @@ const capture = async (pg, nom) => {
   const H = await pg.evaluate(() => { let h = document.documentElement.scrollHeight; for (const e of document.querySelectorAll('.vrm-main, .vrm-main *')) if (e.scrollHeight > e.clientHeight + 50 && /auto|scroll/.test(getComputedStyle(e).overflowY)) h = Math.max(h, e.scrollHeight + 200); return h; });
   const avant = pg.viewportSize();
   await pg.setViewportSize({ width: W, height: Math.min(7000, Math.max(H, avant.height)) }); await pg.waitForTimeout(500);
-  await pg.screenshot({ path: path.join(SHOTS, nom + '.png') });
+  // (16 nov.) Une capture de 7 000 px dépasse 30 s sous charge (« gros », 1 000 ventes) : 2 min, c'est une capture, pas un contrôle.
+  await pg.screenshot({ path: path.join(SHOTS, nom + '.png'), timeout: 120000 });
   await pg.setViewportSize(avant);
 };
 
