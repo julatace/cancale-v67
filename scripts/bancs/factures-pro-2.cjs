@@ -254,7 +254,8 @@ const confirmer = async (pg, nom) => { const b = pg.getByRole('button', { name: 
         dit(!ecritures.some((e) => /envoiAuto/.test(e.corps)), '7. rien n’est écrit avant SA confirmation');
         await confirmer(pg, 'Activer');
         await pg.waitForFunction(() => document.querySelector('[data-fp-auto="on"]'), null, { timeout: 4000 });
-        await pg.waitForTimeout(1200);
+        // (16 nov.) L'écriture est une relecture PUIS un PATCH gardé par data.rev : on attend la REQUÊTE, pas un délai fixe (§6.5).
+        for (let t = 0; t < 80 && !ecritures.some((e) => /vrm_pro_facture/.test(e.url + e.corps) && /envoiAuto/.test(e.corps)); t++) await pg.waitForTimeout(100);
         const w = ecritures.find((e) => /vrm_pro_facture/.test(e.url + e.corps) && /envoiAuto/.test(e.corps));
         const d = w ? (((c) => (Array.isArray(c) ? c[0] : c))(JSON.parse(w.corps)) || {}).data || {} : {};   // (16 nov.) PATCH gardé par data.rev : { data }
         dit(d.envoiAuto === true && Math.abs(Date.parse(d.envoiAutoDepuis) - maintenant.getTime()) < 120000 && d.siret === SIRET, '7. allumé : `envoiAuto` + sa date écrits, la fiche relue et fusionnée (rien d’écrasé)', JSON.stringify({ a: d.envoiAuto, depuis: d.envoiAutoDepuis }));
