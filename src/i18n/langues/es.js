@@ -1,4 +1,5 @@
 // ESPAÑOL — traducción de fr.js (la fuente). Mismas claves, mismas {variables}.
+import ecran_ventesVerre from './es/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
 import ecran_journee from './es/journee.js';
 import ecran_confort from './es/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_studio from './es/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
@@ -6,6 +7,7 @@ import ecran_correspondances from './es/correspondances.js';   // (15 nov.) Publ
 import ecran_capte from './es/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_vcventes from './es/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
 import ecran_renvoyer from './es/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
+import ecran_liaison from './es/liaison.js';   // (15 nov.) La liaison achat ⇄ article
 import ecran_retrait_ailleurs from './es/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
 import ecran_finition from './es/finition.js';   // (15 nov.) la finition écran par écran
 import ecran_numeros_nouvelles from './es/numeros-nouvelles.js';   // (15 nov.) Les nouvelles annonces sans N°
@@ -45,6 +47,7 @@ import ecran_memePhoto from './es/memePhoto.js';   // (15 nov., lot meme-photo)
 import ecran_etageres from './es/etageres.js';   // (15 nov.) le Stock en étagères
 import ecran_journee_verre from './es/journee-verre.js';   // (15 nov.) Ma journée verre, la paire à sortir
 export default {
+  ...ecran_ventesVerre,
   ...ecran_studio_paires,
   ...ecran_republier_guide,
   ...ecran_etageres,
@@ -2274,6 +2277,7 @@ export default {
   ...ecran_memePhoto,
   ...ecran_correspondances,
   ...ecran_renvoyer,
+  ...ecran_liaison,
   ...ecran_finition,
   ...ecran_numeros_nouvelles,
 };

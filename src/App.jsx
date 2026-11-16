@@ -171,7 +171,7 @@ import { etatAncienne } from "./republierGuide.js";   // (15 nov.) « Republier 
 // ⟦→ ecrans/Republier.jsx #1⟧
 // (6 nov., vague 2) Remettre en vente une vente annulée avant l'envoi ; relier l'achat des annonces numérotées.
 import { annuleesChezToi, paireARemettre, fichesAnciennesAnnulees, ligneJournee as ligneAnnuleesJournee, etatRemise, VERDICT_MOTEUR as VERDICT_REMISE } from "./annuleesChezToi.js";
-import { fileSansAchat, aRelierJournee, meilleureSuggestion, texteSuggestion } from "./achatsARelier.js";
+import { fileSansAchat, aRelierJournee, meilleureSuggestion, texteSuggestion, cibleAnnonce } from "./achatsARelier.js";
 import { lignesManquantes as lignesPrixMiniManquants, carteJournee as carteJourneePrixMini } from "./prixMiniManquants.js";
 import { CLE_A_TRANCHER, publierSource as publierSourceTrancher, lirePublications as lirePubsTrancher, lignesATrancher, comptesARelireDe, badgeATrancher, phraseJournee as phraseATrancher, appliquerTranches, photosJournee as photosATrancher, typesJournee as typesATrancher, BINAIRES as BINAIRES_TRANCHER } from "./aTrancher.js";
 import { CLE_SANTE, publierSante } from "./santeDonnees.js";   // (11 nov., lot sante-donnees)
@@ -211,6 +211,8 @@ import { poserLienVc, defaireLienVc, numerosABarrer, marquerBarre, lienDe, produ
 import FeuilleLienVc from "./LienVestiaire.jsx";
 // ⟦→ ecrans/Vestiaire.jsx #1⟧
 import { suggestionsAchat, tousAchatsLibres, tousAchatsLibresDetail, filtresAchats, etiquetteLot, liensParAchat, lotDe, prixIndicatifLot, ecritureLot, suggestionsSaisieSerie } from "./suggestionsAchat.js";
+// (15 nov.) La liaison achat ⇄ article : l'affectation pondérée et globale (src/liaisonAchat.js).
+import { affecterPropositions, aValider, morceauxPourquoi, couleursTexte, lectureAchat, cleArticleAnnonce, cleArticleVente, cleRefusLiaison, propositionsArticle } from "./liaisonAchat.js";
 // (6 nov., vitesse 2) AchatsOutils : à la demande ; ses feuilles de style restent ICI, à la même place (même ordre).
 import './styles-annonces-outils.css';
 import './styles-baisse-prix.css';
@@ -625,6 +627,9 @@ import { litigesEnCours, litigeDeVente, requeteEmailsLitiges, texteLimite as tex
 import { ordreDesGroupes, ordonnerLot } from "./lotTransporteurs.js";
 import { trouverParScan, candidatsRetrait } from "./scanColis.js";
 import { ligneLotAutre, cochesParDefaut, selectionImprimable, texteSansBordereau, resumeLot } from "./lotSelection.js";
+// (15 nov., maquettes validées) Ventes « Verre dépoli » : les règles (src/ventesVerre.js) et l'habit (src/ventes/VentesVerre.jsx).
+import { cochesEffectives, basculerCoche, memeQueDefaut, emplacementDe as emplacementVente, etapesRoute, etapesFicheVente } from "./ventesVerre.js";
+import { SegmentVentes, HeroVentes, CaseCoche, Emplacement, PleinLarge, EtapesRoute, EtapesVente, DuoMontants, RangeeEntree, IconeV, texteEmplacement, FicheVenteBloc } from "./ventes/VentesVerre.jsx";
 import { etatVinted, NIVEAU_ETAT_MAX } from "./carteAnnonce.js";
 import ChoixPeriode from "./ChoixPeriode.jsx";
 import { libellePlage, phrasePlage } from "./periodeCalendrier.js";
@@ -937,6 +942,7 @@ import MarqueSite from "./plateformes/Marque.jsx";
 import "./design/studio-journee.css";
 import "./design/studio-finition.css";   // (15 nov.) La passe de finition écran par écran — `@layer vrm-finition`, la PREMIÈRE couche (index.html) : docs/passation/2026-11-15-finition-ecrans.md
 import "./design/studio-verre.css";   // (15 nov., Julien : « J'aime la 9 ») VERRE DÉPOLI — le fond bleu profond, le verre, l'encre claire sur le fond — `@layer vrm-verre`, la PREMIÈRE couche (index.html) : docs/passation/2026-11-15-verre-depoli.md
+import "./design/ventes-verre.css";   // (15 nov.) Ventes et Achats « Verre dépoli » (maquettes validées) : APRÈS la couche verre
 import "./design/verre-journee.css";   // (15 nov., refonte-journee) Ma journée comme la maquette validée, « La paire à sortir en premier » — docs/passation/2026-11-15-refonte-journee.md
 import "./design/verre-annonces.css";   // (15 nov., refonte-journee) Annonces comme la maquette validée : la rangée de 72 px, la recherche et les vues
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
@@ -3160,6 +3166,8 @@ const SYNC_KEYS = [
   // avant l'envoi ({ [tx]: at }), et les annonces « Plus tard » de « Sans achat relié »
   // ({ [itemId]: at }) : le même état sur tous ses appareils. Aucun prix, aucun N°.
   'vrm_annulees_reglees', 'vrm_achat_plus_tard',
+  // (15 nov., liaison) « Ce n'est pas lui » : { '<article>><tx achat>': at } — ce couple n'est plus proposé.
+  'vrm_liaison_refus',
   // (10 nov., lot BD) La NOTE PRIVÉE d'une paire ({ 'n:<N°>' | 'a:<id annonce>': { t, at } },
   // src/notePaire.js) — à lui seul, jamais envoyée à une plateforme. (lot BH) Les achats
   // hors plateforme masqués comme DOUBLE d'un autre (« Garder celle-ci », src/achatsDoubles.js).
@@ -16813,87 +16821,188 @@ function PrixMiniFeuille({ choisies, onPoser, onClose }) {
     </SheetShell>
   );
 }
-// ══ « SANS ACHAT RELIÉ » : UNE SUGGESTION PAR ANNONCE (6 nov., vague 2 · point 4) ══
-// La file (src/achatsARelier.js) : chaque annonce numérotée en ligne sans achat relié, avec
-// LA meilleure suggestion de `suggestionsAchat` (marque et taille obligatoires, achat
-// antérieur à la mise en ligne, lots). « Relier » écrit au prix du reçu (`propositionDe`),
-// « Saisir » le prix qu'il tape, « Plus tard » la range en fin de file. SON tap, toujours.
-function AchatsARelier({ file, achats, liens, propositionDe, onRelier, onSaisir, onPlusTard, onChoisir, compteDe, onSerie = null }) {
-  const lignes = useMemo(() => (Array.isArray(file) ? file.map((x) => {
-    const sugg = Array.isArray(achats) ? meilleureSuggestion({ item: x.item, achats, liens, marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel }) : null;
-    const p = sugg ? propositionDe(sugg.achat) : null;
-    return { ...x, sugg, texte: texteSuggestion(sugg, p) };
-  }) : null), [file, achats, liens, propositionDe]);
-  // (15 nov., Julien : « c'est moche et il y a des bugs ») La carte dont les gestes rares (« ⋯ ») sont montrés.
-  const [plusOuvert, setPlusOuvert] = useState(null);
-  if (lignes == null) return <div className="vrm-ar-vide" data-ar-etat="lecture">{PAS_SU.enCours}</div>;
-  if (!lignes.length) return <div className="vrm-ar-vide" data-ar-etat="vide">{tr('annonces.chaqueAnnonceNumerotee')}</div>;
-  const nSugg = lignes.filter((l) => l.sugg).length;
-  const jour = (d) => { const t = Date.parse(d || ''); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: new Date(t).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' }) : ''; };
-  // (15 nov., studio) Les classes sont `vrm-aar-*` : les `vrm-ar-*` d'avant étaient AUSSI celles de l'accueil des
-  // nouveaux (accueil-reste.css : `.vrm-ar-liste li` en rangée centrée, `.vrm-ar-titre` en 20 px gras) et de « Ton
-  // adresse VRM » — la carte héritait de leurs règles : contenu centré plus large que la carte (N° et photo coupés
-  // au bord gauche, titres sous le bord droit), titres énormes. Rien de métier ne change : mêmes `data-*`, mêmes
-  // gestes ; une suggestion reste une SUGGESTION, c'est SON toucher sur « Relier » qui relie (§5).
-  // Styles : src/design/studio-achats-relier.css.
+// ══ « SANS ACHAT RELIÉ » : L'ARTICLE ET SON ACHAT PROPOSÉ, CÔTE À CÔTE (15 nov., liaison) ══
+// Julien (15 nov.) : « Je veux que tu améliores la liaison entre les achats et les articles en vente ou
+// vendus, avec les titres, dates de retrait, couleur de l'article, etc. »
+// La file (src/achatsARelier.js) : chaque annonce numérotée en ligne sans achat relié, puis (onglet
+// « Vendus ») chaque vente récente sans achat relié. La PROPOSITION vient de l'affectation globale
+// (src/liaisonAchat.js, `affecterPropositions` : marque, mots du modèle pesés par rareté, taille, couleur,
+// jours entre le retrait et la mise en ligne, prix ; « très probable » seulement si rien d'autre ne lui
+// ressemble, dans les deux sens). Chaque carte montre l'article ET l'achat (deux photos, titre, taille,
+// couleur, date de retrait ou de commande, prix payé), le niveau et POURQUOI. « Relier » écrit au prix du
+// reçu (`propositionDe`), « Ce n'est pas lui » range le couple (synchronisé), « Valider les N très
+// probables » MONTRE la liste et c'est SON toucher qui relie. SON tap, toujours (§5).
+// Styles : src/design/studio-achats-relier.css.
+const COULEURS_LIAISON = ['noir', 'blanc', 'gris', 'bleu', 'vert', 'rouge', 'rose', 'jaune', 'orange', 'violet', 'beige', 'marron'];
+const motCouleur = (c) => (COULEURS_LIAISON.includes(c) ? tr(`liaison.couleur.${c}`) : '');
+function phrasePourquoi(p) {
+  return morceauxPourquoi(p).filter((m) => m.cle !== 'tailleInconnue').map((m) => {
+    if (m.cle === 'couleur') return motCouleur(m.vars.couleur);
+    if (m.cle.startsWith('jours.')) return tr(`liaison.p.${m.cle}`, { n: Number(m.vars.n) });
+    return tr(`liaison.p.${m.cle}`, m.vars);
+  }).filter(Boolean).join(' · ');
+}
+// Achats → sous un achat sans article relié : l'article proposé (photo, N°, titre, niveau), « Relier », « Ce n'est pas lui ».
+function PropositionAchat({ p, art, onRelier, onRefus }) {
+  const it = art.genre === 'vente' ? art.o : art.item;
+  const photo = art.genre === 'vente' ? orderPhoto(it) : it && it.photo;
+  const num = art.fiche && art.fiche.numero;
   return (
-    <section className="vrm-aar" data-ar={lignes.length} data-ar-sugg={achats === undefined ? '' : String(nSugg)} aria-label={tr('annonces.annoncesSansAchat')}>
+    <div className="vrm-buy-propose" data-achat-propose={p.key} data-niveau={p.niveau}>
+      {photo ? <PhotoVinted src={photo} alt="" className="vrm-buy-propose-photo" loading="lazy" decoding="async"/> : <PhotoVide taille={32} className="vrm-buy-propose-photo"/>}
+      <span className="vrm-buy-propose-centre">
+        <span className="vrm-buy-propose-mot">{art.genre === 'vente' ? tr('liaison.venteProposee') : tr('liaison.annonceProposee')} · <b data-niveau={p.niveau}>{p.niveau === 'tres-probable' ? tr('liaison.niveau.tresProbable') : tr('liaison.niveau.possible')}</b></span>
+        <span className="vrm-buy-propose-titre">{num ? <Numero n={num} taille="petit"/> : null} {(it && it.title) || ''}</span>
+      </span>
+      <button type="button" className="sb-lien" data-achat-propose-relier={p.key} onClick={onRelier}><Icon name="link" size={16}/><span>{VERBES.relier}</span></button>
+      <button type="button" className="sb-rond vrm-buy-propose-non" data-achat-propose-pas-lui={p.key} aria-label={tr('liaison.pasLui')} title={tr('liaison.pasLui')} onClick={onRefus}><Icon name="close" size={16}/></button>
+    </div>
+  );
+}
+function AchatsARelier({ file, vendus = null, liaison, achats, propositionDe, onRelier, onRelierSerie = null, onRelierVente = null, onSaisir, onPlusTard, onChoisir, onChoisirVente = null, onRefus = null, compteDe, onSerie = null }) {
+  // Deux files : les annonces en vente, puis les ventes récentes (bénéfice réel).
+  const [onglet, setOnglet] = useState('vente');
+  const [plusOuvert, setPlusOuvert] = useState(null);
+  const [valider, setValider] = useState(null);   // null · { coches: Set(key) }
+  const [enCours, setEnCours] = useState(false);
+  const jour = (d) => { const t = typeof d === 'number' ? d : Date.parse(d || ''); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: new Date(t).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' }) : ''; };
+  const lignesVente = useMemo(() => (Array.isArray(file) ? file.map((x) => ({ ...x, key: cleArticleAnnonce(x.id), genre: 'annonce', cible: cibleAnnonce(x.item) })) : null), [file]);
+  const lignesVendus = useMemo(() => (Array.isArray(vendus) ? vendus.map((x) => ({ ...x, genre: 'vente' })) : null), [vendus]);
+  const propsDe = (k) => (liaison && liaison.parArticle && liaison.parArticle[k]) || [];
+  const toutes = [...(lignesVente || []), ...(lignesVendus || [])];
+  const parCle = new Map(toutes.map((l) => [l.key, l]));
+  const tp = liaison ? aValider(liaison.parArticle).filter((v) => parCle.has(v.key)) : [];
+  const lignes = onglet === 'vendus' ? lignesVendus : lignesVente;
+  if (lignesVente == null) return <div className="vrm-ar-vide" data-ar-etat="lecture">{PAS_SU.enCours}</div>;
+  if (!lignesVente.length && !(lignesVendus && lignesVendus.length)) return <div className="vrm-ar-vide" data-ar-etat="vide">{tr('annonces.chaqueAnnonceNumerotee')}</div>;
+  const lecture = achats === undefined || liaison === undefined;
+  const nSugg = (lignes || []).filter((l) => propsDe(l.key).length).length;
+  const relierUne = (l, a, opts = {}) => (l.genre === 'vente' ? onRelierVente && onRelierVente(l, a, opts) : (opts.silencieux && onRelierSerie ? onRelierSerie(l.item, a) : onRelier(l.item, a)));
+  // « Valider les N très probables » : la liste est MONTRÉE, chaque ligne cochée par défaut ; SON toucher relie.
+  const validerCoches = async () => {
+    if (!valider) return;
+    const liste = tp.filter((v) => valider.coches.has(v.key));
+    setEnCours(true);
+    let n = 0;
+    for (const v of liste) { const l = parCle.get(v.key); if (!l) continue; try { const r = await relierUne(l, v.achat, { silencieux: true }); if (r === true) n++; } catch (_) {} }
+    setEnCours(false); setValider(null);
+    if (n) toast(tr('liaison.feuille.fait', { n }));
+  };
+  // (15 nov.) Classes `vrm-aar-*` (seulement cet écran) ; mêmes `data-ar-*` qu'avant pour les bancs.
+  return (
+    <section className="vrm-aar" data-ar={lignesVente.length} data-ar-vendus={lignesVendus ? lignesVendus.length : ''} data-ar-sugg={lecture ? '' : String(nSugg)} data-ar-tp={lecture ? '' : String(tp.length)} aria-label={tr('annonces.annoncesSansAchat')}>
       <div className="vrm-aar-tete">
-        <p className="vrm-aar-compte">{achats === undefined ? tr('annonces.annonces2', { n: String(lignes.length), toLowerCase: String(PAS_SU.enCours.toLowerCase()) }) : tr('annonces.annoncesAvecSuggestion', { n: String(lignes.length), nSugg: String(nSugg) })}
-          {/* La règle d'une suggestion : derrière le « ⓘ » (une phrase fixe ne prend pas une ligne de la file). */}
-          {achats !== undefined ? <Pourquoi label={tr('annonces.suggestionQuoi')}>{tr('annonces.suggestionRegle')}</Pourquoi> : null}</p>
+        <p className="vrm-aar-compte">{lecture ? tr('annonces.annonces2', { n: String((lignes || []).length), toLowerCase: String(PAS_SU.enCours.toLowerCase()) }) : tr('liaison.tete', { n: (lignes || []).length, nSugg })}
+          {!lecture ? <Pourquoi label={tr('annonces.suggestionQuoi')}>{tr('liaison.regle')}</Pourquoi> : null}</p>
         {onSerie ? <button type="button" className="sb-lien vrm-aar-serie" data-ar-serie="" onClick={onSerie}><Icon name="pencil" size={16}/><span>{tr('annonces.saisieSeriePrix')}</span></button> : null}
       </div>
+      <div className="vrm-aar-barre">
+        <div className="vrm-aar-onglets" role="tablist" aria-label={tr('liaison.quoi')}>
+          <button type="button" role="tab" aria-selected={onglet === 'vente'} data-ar-onglet="vente" onClick={() => setOnglet('vente')}>{tr('liaison.enVente')}<span className="vrm-aar-n">{lignesVente.length}</span></button>
+          <button type="button" role="tab" aria-selected={onglet === 'vendus'} data-ar-onglet="vendus" onClick={() => setOnglet('vendus')}>{tr('liaison.vendus')}<span className="vrm-aar-n">{lignesVendus ? lignesVendus.length : '—'}</span></button>
+        </div>
+        {tp.length ? <button type="button" className="sb-btn-plein sb-btn-plein--barre vrm-aar-valider" data-ar-valider={tp.length} onClick={() => setValider({ coches: new Set(tp.map((v) => v.key)) })}><Icon name="check" size={16}/><span>{tr('liaison.validerN', { n: tp.length })}</span></button> : null}
+      </div>
+      {lignes == null ? <div className="vrm-ar-vide" data-ar-etat="lecture">{PAS_SU.enCours}</div>
+        : !lignes.length ? <div className="vrm-ar-vide" data-ar-etat="vide">{onglet === 'vendus' ? tr('liaison.vendusVide') : tr('annonces.chaqueAnnonceNumerotee')}</div> : (
       <ul className="vrm-aar-liste">
-        {lignes.map((l) => {
-          const it = l.item, t = l.texte, num = l.fiche && l.fiche.numero;
-          const prix = (() => { const v = it.price && typeof it.price === 'object' ? it.price.amount : it.price; const n = Number(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null; })();
-          const relierTxt = t && t.proposition ? `${VERBES.relier} · ${montant(t.proposition.centimes / 100)}` : VERBES.relier;
-          const photoAchat = l.sugg ? orderPhoto(l.sugg.achat) : null;
-          // Les gestes rares derrière « ⋯ » : « Saisir le prix » (quand une suggestion tient la place) et « Plus tard ».
-          const rares = !!l.sugg || !l.plusTard;
-          const ouvert = plusOuvert === l.id;
-          const idPlus = `vrm-aar-plus-${l.id}`;
+        {lignes.map((l0) => {
+          const ps = propsDe(l0.key); const p = ps[0] || null;
+          const l = { ...l0, sugg: p };
+          const it = l.genre === 'vente' ? l.o : l.item;
+          const num = l.fiche && l.fiche.numero;
+          const prix = (() => { const v = it && it.price && typeof it.price === 'object' ? it.price.amount : it && it.price; const n = Number(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null; })();
+          const photoArt = l.genre === 'vente' ? (l.photo || orderPhoto(it)) : it.photo;
+          const a = p ? p.achat : null;
+          const prop = a ? propositionDe(a) : null;
+          const t = p ? texteSuggestion({ achat: a, rang: p.rang }, prop) : null;
+          const relierTxt = t && t.proposition ? tr('liaison.relierPrix', { prix: montant(t.proposition.centimes / 100) }) : VERBES.relier;
+          const photoAchat = a ? orderPhoto(a) : null;
+          const lu = a ? lectureAchat(a, extractBrand, extractColors) : null;
+          const tailleArt = l.cible && l.cible.taille ? String(l.cible.taille).replace('.', ',') : '';
+          const couleursArt = l.cible ? couleursTexte([l.cible.couleur || '', l.cible.titre || ''].join(' '), extractColors).map(motCouleur).filter(Boolean) : [];
+          const ouvert = plusOuvert === l.key;
+          const idPlus = `vrm-aar-plus-${String(l.key).replace(/[^a-z0-9]/gi, '')}`;
+          const sousArt = [tailleArt ? tr('liaison.taille', { taille: tailleArt }) : '', couleursArt.slice(0, 2).join(' / '), prix != null ? montant(prix) : '',
+            l.genre === 'vente' ? (l.o && l.o.date ? tr('liaison.venduLe', { date: jour(l.o.date) }) : '') : (l.ts ? tr('liaison.enLigneLe', { date: jour(l.ts) }) : ''),
+            l.reporteLe ? `reportée le ${jour(l.reporteLe)}${l.plusTard && l.revientLe ? ` · revient le ${jour(l.revientLe)}` : ''}` : ''].filter(Boolean).join(' · ');
+          const recu = p && p.recu ? tr(p.recu.source === 'clic' ? 'liaison.recu.retrait' : 'liaison.recu.livraison', { date: jour(p.recu.ms) }) : (a && a.date ? tr('liaison.commandeLe', { date: jour(a.date) }) : '');
+          const payeTxt = t ? (t.lot ? 'lot : le prix de cet article te sera demandé' : t.proposition ? tr('liaison.paye', { prix: montant(t.proposition.centimes / 100) }) : (t.prixLu != null ? tr('liaison.paye', { prix: montant(t.prixLu) }) : '')) : '';
+          const sousAchat = lu ? [lu.taille ? tr('liaison.taille', { taille: lu.taille.replace('.', ',') }) : '', lu.couleurs.map(motCouleur).filter(Boolean).slice(0, 2).join(' / '), recu, payeTxt, compteDe(a)].filter(Boolean).join(' · ') : '';
           return (
-            <li key={l.id} className="vrm-aar-carte" data-ar-ligne={l.id} data-ar-plus-tard={l.plusTard ? '1' : undefined} data-ar-reportee={l.reporteLe ? String(l.reporteLe).slice(0, 10) : undefined} data-ar-sugg-tx={l.sugg ? String(l.sugg.achat.transaction_id) : ''} data-ar-plus-ouvert={ouvert ? '1' : undefined}>
-              <div className="vrm-aar-annonce">
-                {it.photo ? <PhotoVinted src={it.photo} alt="" className="vrm-aar-photo" loading="lazy"/> : <PhotoVide taille={52} className="vrm-aar-photo"/>}
-                <span className="vrm-aar-centre">
-                  <span className="vrm-aar-titre" data-ar-titre="">{num ? <Numero n={num} taille="petit"/> : null}<span>{it.title || tr('annonces.sansTitre')}</span></span>
-                  {/* (6 nov., finitions) La date de SON « Plus tard » est dite ; au bout de 7 jours l'annonce revient. */}
-                  <span className="vrm-aar-sous" data-ar-sous="">{[prix != null ? montant(prix) : '', l.reporteLe ? `reportée le ${jour(l.reporteLe)}${l.plusTard && l.revientLe ? ` · revient le ${jour(l.revientLe)}` : ''}` : ''].filter(Boolean).join(' · ')}
-                    {/* Pas de suggestion : DIT sur la ligne du prix (« pas su » pendant la lecture des achats), jamais un bloc vide. */}
-                    {!l.sugg ? <span className="vrm-aar-sans" data-ar-sans-sugg="">{prix != null || l.reporteLe ? ' · ' : ''}{achats === undefined ? PAS_SU.enCours : tr('annonces.aucuneSuggestion')}</span> : null}</span>
-                </span>
-              </div>
-              {l.sugg ? (
-                <div className="vrm-aar-sugg" data-ar-rang={l.sugg.rang}>
-                  {/* La photo de l'achat quand on la connaît ; sinon rien (jamais une vignette vide). */}
-                  {photoAchat ? <PhotoVinted src={photoAchat} alt="" className="vrm-aar-photo-achat" loading="lazy"/> : null}
-                  <span className="vrm-aar-centre">
-                    <span className="vrm-aar-sugg-titre"><span className="vrm-aar-mot">{tr('annonces.suggestion')}</span>{t.titre || tr('annonces.achatSansTitre')}</span>
-                    <span className="vrm-aar-sous">{[jour(t.date), compteDe(l.sugg.achat), t.lot ? 'lot : le prix de cet article te sera demandé' : t.proposition ? (t.proposition.source === 'recu' ? 'prix du reçu' : 'article seul') : (t.prixLu != null ? `payé ${montant(t.prixLu)}` : '')].filter(Boolean).join(' · ')}</span>
-                  </span>
+            <li key={l.key} className={p ? 'vrm-aar-carte' : 'vrm-aar-carte vrm-aar-carte-seule'} data-ar-ligne={l.genre === 'vente' ? l.key : l.id} data-ar-genre={l.genre} data-ar-plus-tard={l.plusTard ? '1' : undefined} data-ar-reportee={l.reporteLe ? String(l.reporteLe).slice(0, 10) : undefined}
+              data-ar-sugg-tx={a ? String(a.transaction_id) : ''} data-ar-niveau={p ? p.niveau : ''} data-ar-plus-ouvert={ouvert ? '1' : undefined}>
+              <div className="vrm-aar-duo">
+                <div className="vrm-aar-cote" data-ar-cote="article">
+                  {photoArt ? <PhotoVinted src={photoArt} alt="" className="vrm-aar-photo" loading="lazy" decoding="async"/> : <PhotoVide taille={64} className="vrm-aar-photo"/>}
+                  <span className="vrm-aar-titre" data-ar-titre="">{num ? <Numero n={num} taille="petit"/> : null}<span>{(it && it.title) || tr('annonces.sansTitre')}</span></span>
+                  <span className="vrm-aar-sous" data-ar-sous="">{sousArt}</span>
                 </div>
+                <span className="vrm-aar-trait" aria-hidden="true"><Icon name="link" size={14}/></span>
+                {p ? (
+                  <div className="vrm-aar-cote vrm-aar-sugg" data-ar-cote="achat" data-ar-rang={p.rang}>
+                    {photoAchat ? <PhotoVinted src={photoAchat} alt="" className="vrm-aar-photo" loading="lazy" decoding="async"/> : <span className="vrm-aar-photo vrm-aar-photo-ico" aria-hidden="true"><Icon name="bag" size={22}/></span>}
+                    <span className="vrm-aar-titre vrm-aar-sugg-titre">{(t && t.titre) || tr('annonces.achatSansTitre')}</span>
+                    <span className="vrm-aar-sous" data-ar-achat-sous="">{sousAchat}</span>
+                  </div>
+                ) : (
+                  <div className="vrm-aar-cote vrm-aar-cote-vide" data-ar-cote="vide">
+                    <span className="vrm-aar-photo vrm-aar-photo-ico" aria-hidden="true"><Icon name="bag" size={22}/></span>
+                    <span className="vrm-aar-sans" data-ar-sans-sugg="">{lecture ? PAS_SU.enCours : tr('annonces.aucuneSuggestion')}</span>
+                  </div>
+                )}
+              </div>
+              {p ? (
+                <p className="vrm-aar-pourquoi" data-ar-pourquoi="">
+                  <span className="vrm-aar-niveau" data-niveau={p.niveau}>{p.niveau === 'tres-probable' ? tr('liaison.niveau.tresProbable') : tr('liaison.niveau.possible')}</span>
+                  <span>{p.ambigu ? tr('liaison.ambigu') : phrasePourquoi(p)}</span>
+                </p>
               ) : null}
               <div className="vrm-aar-gestes">
-                {l.sugg ? <button type="button" className="sb-touche vrm-aar-principal" data-ar-relier={String(l.sugg.achat.transaction_id)} onClick={() => onRelier(it, l.sugg.achat)}><Icon name="link" size={16}/><span>{relierTxt}</span></button>
-                  : <button type="button" className="sb-touche vrm-aar-principal" data-ar-saisir="" onClick={() => onSaisir(it)}><Icon name="pencil" size={16}/><span>{tr('annonces.saisirPrix')}</span></button>}
-                {/* (11 nov., lot DJ5) La suggestion n'est qu'une proposition : un AUTRE achat se choisit ici, à côté. */}
-                {l.sugg ? <button type="button" className="sb-lien vrm-aar-lien" data-ar-autre={String(l.sugg.achat.transaction_id)} onClick={() => onChoisir(it, l.sugg.achat)}><span>{tr('annonces.autreAchat')}</span></button>
-                  : <button type="button" className="sb-lien vrm-aar-lien" data-ar-choisir="" disabled={achats === undefined} onClick={() => onChoisir(it)}><span>{tr('annonces.choisirAchat')}</span></button>}
-                {rares ? <button type="button" className="sb-rond vrm-aar-plus" data-ar-plus="" aria-expanded={ouvert} aria-controls={idPlus} aria-label={tr('annonces.autresGestes')} title={tr('annonces.autresGestes')} onClick={() => setPlusOuvert((v) => (v === l.id ? null : l.id))}><Icon name="more" size={18}/></button> : null}
+                {p ? <button type="button" className="sb-touche vrm-aar-principal" data-ar-relier={String(a.transaction_id)} onClick={() => relierUne(l, a)}><Icon name="link" size={16}/><span>{relierTxt}</span></button>
+                  : <button type="button" className="sb-touche vrm-aar-principal" data-ar-saisir="" onClick={() => (l.genre === 'vente' ? (onChoisirVente && onChoisirVente(l)) : onSaisir(it))}><Icon name={l.genre === 'vente' ? 'link' : 'pencil'} size={16}/><span>{l.genre === 'vente' ? tr('annonces.choisirAchat') : tr('annonces.saisirPrix')}</span></button>}
+                {p && onRefus ? <button type="button" className="sb-lien vrm-aar-lien" data-ar-pas-lui={String(a.transaction_id)} onClick={() => onRefus(l.key, String(a.transaction_id))}><span>{tr('liaison.pasLui')}</span></button>
+                  : !p && l.genre !== 'vente' ? <button type="button" className="sb-lien vrm-aar-lien" data-ar-choisir="" disabled={achats === undefined} onClick={() => onChoisir(it)}><span>{tr('annonces.choisirAchat')}</span></button> : null}
+                <button type="button" className="sb-rond vrm-aar-plus" data-ar-plus="" aria-expanded={ouvert} aria-controls={idPlus} aria-label={tr('annonces.autresGestes')} title={tr('annonces.autresGestes')} onClick={() => setPlusOuvert((v) => (v === l.key ? null : l.key))}><Icon name="more" size={18}/></button>
               </div>
-              {rares ? (
-                <div className="vrm-aar-rares" id={idPlus} hidden={!ouvert}>
-                  {l.sugg ? <button type="button" className="sb-lien" data-ar-saisir="" onClick={() => onSaisir(it)}><Icon name="pencil" size={16}/><span>{tr('annonces.saisirPrix')}</span></button> : null}
-                  {!l.plusTard ? <button type="button" className="sb-lien" data-ar-plus-tard-geste="" onClick={() => { setPlusOuvert(null); onPlusTard(l.id); }}><span>{tr('annonces.plusTard')}</span></button> : null}
-                </div>
-              ) : null}
+              <div className="vrm-aar-rares" id={idPlus} hidden={!ouvert}>
+                {/* (11 nov., lot DJ5) La proposition n'est qu'une proposition : un AUTRE achat se choisit ici. */}
+                {p ? <button type="button" className="sb-lien" data-ar-autre={String(a.transaction_id)} onClick={() => { setPlusOuvert(null); if (l.genre === 'vente') { if (onChoisirVente) onChoisirVente(l, a); } else onChoisir(it, l.sugg.achat); }}><span>{tr('annonces.autreAchat')}</span></button> : null}
+                {l.genre !== 'vente' && p ? <button type="button" className="sb-lien" data-ar-saisir="" onClick={() => { setPlusOuvert(null); onSaisir(it); }}><Icon name="pencil" size={16}/><span>{tr('annonces.saisirPrix')}</span></button> : null}
+                {l.genre !== 'vente' && !l.plusTard ? <button type="button" className="sb-lien" data-ar-plus-tard-geste="" onClick={() => { setPlusOuvert(null); onPlusTard(l.id); }}><span>{tr('annonces.plusTard')}</span></button> : null}
+                {ps.length > 1 ? <span className="vrm-aar-autres" data-ar-autres={ps.length - 1}>{tr('liaison.autresPossibles', { n: ps.length - 1 })}</span> : null}
+              </div>
             </li>
           );
         })}
-      </ul>
+      </ul>)}
+      {valider ? (
+        <SheetShell onClose={() => (enCours ? null : setValider(null))} titre={tr('liaison.validerN', { n: tp.length })} data-ar-feuille-valider={tp.length}>
+          <p className="vrm-aar-feuille-aide">{tr('liaison.feuille.aide')}</p>
+          <ul className="vrm-aar-feuille">
+            {tp.map((v) => {
+              const l = parCle.get(v.key); const it = l.genre === 'vente' ? l.o : l.item; const coche = valider.coches.has(v.key);
+              const prop = propositionDe(v.achat);
+              return (
+                <li key={v.key} data-ar-valider-ligne={v.key} data-ar-valider-tx={String(v.achat.transaction_id)}>
+                  <label className="vrm-aar-feuille-ligne">
+                    <input type="checkbox" checked={coche} onChange={() => setValider((s) => { const c = new Set(s.coches); if (c.has(v.key)) c.delete(v.key); else c.add(v.key); return { coches: c }; })}/>
+                    {(l.genre === 'vente' ? (l.photo || orderPhoto(it)) : it.photo) ? <PhotoVinted src={l.genre === 'vente' ? (l.photo || orderPhoto(it)) : it.photo} alt="" className="vrm-aar-mini" loading="lazy" decoding="async"/> : <PhotoVide taille={40} className="vrm-aar-mini"/>}
+                    {orderPhoto(v.achat) ? <PhotoVinted src={orderPhoto(v.achat)} alt="" className="vrm-aar-mini" loading="lazy" decoding="async"/> : <span className="vrm-aar-mini vrm-aar-photo-ico" aria-hidden="true"><Icon name="bag" size={18}/></span>}
+                    <span className="vrm-aar-centre">
+                      <span className="vrm-aar-sugg-titre">{l.fiche && l.fiche.numero ? <Numero n={l.fiche.numero} taille="petit"/> : null} {(it && it.title) || ''}</span>
+                      <span className="vrm-aar-sous">{v.achat.title || ''}{prop ? ` · ${montant(prop.centimes / 100)}` : ''}</span>
+                    </span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="vrm-aar-feuille-pied">
+            <button type="button" className="sb-btn-plein sb-btn-plein--barre" data-ar-valider-ok={valider.coches.size} disabled={!valider.coches.size || enCours} onClick={validerCoches}><Icon name="link" size={16}/><span>{tr('liaison.feuille.relier', { n: valider.coches.size })}</span></button>
+          </div>
+        </SheetShell>
+      ) : null}
     </section>
   );
 }
@@ -37047,6 +37156,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const poserAnnuleeReglee = (tx) => gesteVrm('Noté : VRM ne la propose plus', [{ k: 'vrm_annulees_reglees', type: 'cle', id: String(tx), apres: new Date().toISOString(), avant: (annuleesReglees || {})[String(tx)] }], { vrm_annulees_reglees: setAnnuleesReglees });
   // (6 nov., vague 2 · point 4) « Plus tard » dans « Sans achat relié » : { [itemId]: at }.
   const [achatPlusTard, setAchatPlusTard] = useStateCle('vrm_achat_plus_tard', () => { const v = load('vrm_achat_plus_tard', {}); return v && typeof v === 'object' ? v : {}; });
+  // (15 nov., liaison) « Ce n'est pas lui » (SON clic) : { [`${article}>${tx}`]: at }, synchronisé (src/liaisonAchat.js).
+  const [liaisonRefus, setLiaisonRefus] = useStateCle('vrm_liaison_refus', () => { const v = load('vrm_liaison_refus', {}); return v && typeof v === 'object' ? v : {}; });
+  const refuserLiaison = (article, tx) => gesteVrm(tr('liaison.pasLuiFait'), [{ k: 'vrm_liaison_refus', type: 'cle', id: cleRefusLiaison(article, tx), apres: new Date().toISOString(), avant: (liaisonRefus || {})[cleRefusLiaison(article, tx)] }], { vrm_liaison_refus: setLiaisonRefus });
   const poserAchatPlusTard = (id) => gesteVrm('Mise de côté — elle revient dans 7 jours', [{ k: 'vrm_achat_plus_tard', type: 'cle', id: String(id), apres: new Date().toISOString(), avant: (achatPlusTard || {})[String(id)] }], { vrm_achat_plus_tard: setAchatPlusTard });
   // (6 nov., finitions) Sur un appareil NEUF, ces deux clés arrivent du nuage APRÈS le montage : sans cette
   // relecture, « Plus tard » et « Déjà remise en vente » posés ailleurs restaient vides ici (mesuré au banc
@@ -37055,6 +37167,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const lu = (k) => { const w = load(k, {}); return w && typeof w === 'object' ? w : {}; };
     setAnnuleesReglees((v) => (v && Object.keys(v).length) ? v : lu('vrm_annulees_reglees'));
     setAchatPlusTard((v) => (v && Object.keys(v).length) ? v : lu('vrm_achat_plus_tard'));
+    setLiaisonRefus((v) => (v && Object.keys(v).length) ? v : lu('vrm_liaison_refus'));
   }), []);
   // (revue du 5 nov.) Un lien posé à la main n'entre pas tant que l'ancienne est
   // ENCORE chez lui sur Vinted sous une autre forme (masquée, à confirmer,
@@ -39996,7 +40109,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => { if (accounts.length) loadOrders('sold', setSales); /* eslint-disable-next-line */ }, [cleComptes]);
   useEffect(() => { buysCharges.current = Array.isArray(buys.items); }, [buys.items]);
   // (31 oct.) Colis lit aussi les achats : sa colonne « À retirer » est la liste de `pickupUnion`.
-  useEffect(() => { if ((curSub==='achats'||curSub==='journee'||curSub==='bordereaux') && accounts.length && (buys.items===null || (buys.comptes && buys.comptes!==cleComptes) || !(Date.now() - (_commandesLuesA.purchased || 0) < _CACHE_TTL))) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [sub, cleComptes]);   // (13 nov.) copie partagée : relue (discrètement) si sa lecture a plus de 3 min, comme un écran neuf
+  useEffect(() => { if ((curSub==='achats'||curSub==='journee'||curSub==='bordereaux'||curSub==='ventes') && accounts.length && (buys.items===null || (buys.comptes && buys.comptes!==cleComptes) || !(Date.now() - (_commandesLuesA.purchased || 0) < _CACHE_TTL))) loadOrders('purchased', setBuys); /* eslint-disable-next-line */ }, [sub, cleComptes]);   // (13 nov.) copie partagée : relue (discrètement) si sa lecture a plus de 3 min, comme un écran neuf
 
   // AUTO-LOCK : dès qu'une vente finalisée correspond à UNE SEULE annonce
   // numérotée (titre non ambigu), on verrouille le lien vente↔paire par n° de
@@ -43197,7 +43310,70 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const w = await ecritureRelierAchat(a); if (!w) return;
     updatePair(it, w);
     accompagner('achat.relier', { vars: { prix: w.buyPrice ? `${String(w.buyPrice).replace('.', ',')}\u00a0€` : '—' } }).fini();
+    return true;
   };
+  // (15 nov., liaison) La même écriture, sans l'accompagnement à chaque paire : « Valider les N très probables ».
+  const relierAchatAnnonceSerie = async (it, a) => {
+    const w = await ecritureRelierAchat(a); if (!w) return false;
+    updatePair(it, w);
+    return true;
+  };
+  // ── (15 nov., liaison) LES VENDUS SANS ACHAT RELIÉ, ET L'AFFECTATION (src/liaisonAchat.js) ──
+  // Julien : « améliore la liaison entre les achats et les articles en vente ou vendus ». Les ventes des
+  // 12 derniers mois, ni annulées ni masquées, sans prix d'achat ni achat relié (la ligne de la vente,
+  // `effEntry`) : le bénéfice réel attend leur achat. La cible : le titre de la vente, la taille et la
+  // date de mise en ligne de SA fiche (par identité, `identiteAnnonce`), sinon la date de vente.
+  const fileVendus = useMemo(() => {
+    if (!Array.isArray(sales.items)) return null;
+    const borne = Date.now() - 365 * 86400e3, out = [];
+    for (const o of sales.items) {
+      if (!o || o.transaction_id == null || isHidden(o) || classifyOrderStatus(o.status) === 'cancelled') continue;
+      const t = Date.parse(o.date || ''); if (!Number.isFinite(t) || t < borne) continue;
+      const e = effEntry(o) || {};
+      if ((e.buyFromId != null && String(e.buyFromId) !== '') || (e.buyGros && e.buyGros.id) || (e.buyPrice != null && String(e.buyPrice).trim() !== '')) continue;
+      const idf = identiteAnnonce(o); const fiche = idf ? numeros[String(idf)] || null : null;
+      const key = cleArticleVente(o.transaction_id);
+      const enLigneLe = fiche && fiche.numberedAt && Date.parse(fiche.numberedAt) <= t ? fiche.numberedAt : null;
+      out.push({ key, id: key, o, idf: idf ? String(idf) : null, fiche: fiche || (e.numero ? e : null), ts: t,
+        cible: { key, titre: o.title || '', marque: '', taille: (fiche && fiche.size) || '', couleur: '', dateRef: enLigneLe || o.date, dateRefSource: enLigneLe ? 'en-ligne' : 'vente', prix: o.price } });
+    }
+    return out.sort((x, y) => y.ts - x.ts);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sales.items, numeros, saleOv]);
+  // L'affectation n'est calculée que sur les écrans qui la montrent, après le rendu (2 500 articles × 2 600
+  // achats : environ une seconde) ; undefined pendant le calcul, null si elle a échoué (« pas su »).
+  const vueLiaison = (curSub === 'annonces' && annSort === 'sansachat') || curSub === 'achats';
+  // Achats : « l'article proposé » a besoin des annonces (relues de la base, comme le délai d'achat).
+  useEffect(() => { if (curSub === 'achats' && accounts.length && listings.items === null && !listings.loading) loadListings(); /* eslint-disable-next-line */ }, [curSub, accounts.length]);
+  // Les articles par clé (Achats : « article proposé » sous un achat).
+  const articlesLiaison = useMemo(() => { const m = new Map(); for (const x of (fileAchat || [])) m.set(cleArticleAnnonce(x.id), { ...x, genre: 'annonce' }); for (const x of (fileVendus || [])) m.set(x.key, { ...x, genre: 'vente' }); return m; }, [fileAchat, fileVendus]);
+  const achatsLiaison = Array.isArray(fillBuyAchats.items) ? fillBuyAchats.items : (Array.isArray(buys.items) ? buys.items : undefined);
+  const [liaison, setLiaison] = useState(undefined);
+  useEffect(() => {
+    if (!vueLiaison) return undefined;
+    if (!fileAchat || achatsLiaison === undefined) { setLiaison(undefined); return undefined; }
+    const id = setTimeout(() => {
+      try {
+        const cibles = fileAchat.map((x) => { const c = cibleAnnonce(x.item); return { ...c, key: cleArticleAnnonce(x.id), prix: x.item.price, dateRef: c.dateRef || (x.fiche && x.fiche.numberedAt) || null }; })
+          .concat((fileVendus || []).map((x) => x.cible));
+        setLiaison(affecterPropositions({ cibles, achats: achatsLiaison, liens: liensAchats, refus: liaisonRefus, marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel,
+          receptionDe: (a) => dateReception(a, { infosTx: infosReception, recuClic: pickupDone }) }));
+      } catch (_) { setLiaison(null); }
+    }, 30);
+    return () => clearTimeout(id);
+  }, [vueLiaison, fileAchat, fileVendus, achatsLiaison, liensAchats, liaisonRefus, infosReception, pickupDone]);
+  // « Relier » une VENTE : l'écriture de « Relier un achat » ; sur la fiche de SON annonce (par identité),
+  // sinon sur la ligne de la vente — le même chemin que le sélecteur ouvert depuis Ventes.
+  const relierAchatVente = async (l, a, opts = {}) => {
+    const w = await ecritureRelierAchat(a); if (!w) return;
+    const o = l.o;
+    if (l.idf) updatePair({ id: l.idf, title: o.title, photo: orderPhoto(o), price: o.price && o.price.amount, _acc: o._acc }, w);
+    else setSaleOverride(String(o.transaction_id), w);
+    if (!opts.silencieux) accompagner('achat.relier', { vars: { prix: w.buyPrice ? `${String(w.buyPrice).replace('.', ',')}\u00a0€` : '—' } }).fini();
+    return true;
+  };
+  const choisirAchatVente = (l, propose) => { const o = l.o; const photo = orderPhoto(o); const sell = o.price && o.price.amount; const _autre = propose ? String(propose.transaction_id || '1') : undefined;
+    openPicker(l.idf ? { id: l.idf, title: o.title, photo, price: sell, _acc: o._acc, _dateRef: o.date, _autre } : { id: '_v' + o.transaction_id, _saleTx: String(o.transaction_id), title: o.title, photo, price: sell, _acc: o._acc, _dateRef: o.date, _autre }); };
   // « Saisir » : le prix qu'il tape (jamais deviné), sans achat relié — l'écriture de la case de la carte.
   const saisirPrixAnnonce = async (it) => {
     const e = numeros[it.id] || {};
@@ -45048,6 +45224,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [filtreEnvoyes, setFiltreEnvoyes] = useState('tous');
   // (lot AJ) La pastille de transporteur de « À envoyer » (un filtre, jamais un ordre).
   const [filtreEnvoyer, setFiltreEnvoyer] = useState('tous');
+  // (15 nov., Ventes « Verre dépoli ») Les colis COCHÉS pour l'impression en lot : null = rien touché (la règle du lot,
+  // « tous cochés » — `cochesParDefaut`), sinon SON jeu de clés (src/ventesVerre.js `cochesEffectives`).
+  const [cochesVentes, setCochesVentes] = useState(null);
+  // Le lot lu par la TÊTE d'« À expédier » (même rendu) : la liste et son pied le relisent sans le recalculer.
+  const vvLotRef = React.useRef({ Ltous: [], resLot: { total: 0, partent: 0, autres: 0 }, nLot: 0, sigDefaut: '', lignesImpr: [] });
   // (10 nov., lot L) Le stock d'emballages (src/emballages.js) : le choix d'emballage d'un colis dans « Préparer ».
   const [emballagesR, setEmballagesR] = useStateCle(CLE_EMBALLAGES, () => load(CLE_EMBALLAGES, null));
   // « Déposé » : LE geste existant (`marquerColisFait` pour Vinted, « Colis fait » Vestiaire),
@@ -45798,7 +45979,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (ech.ecart === 1) return { code: 'demain', texte: H ? tr('sv.ech.demainH', { h: H }) : tr('sv.ech.demain') };
     const d = new Date(String(l.jour).slice(0, 10) + 'T12:00:00');
     let j = ''; try { j = d.toLocaleDateString(localeCourante(), { day: 'numeric', month: 'short' }); } catch (_) { j = String(l.jour).slice(5); }
-    return { code: 'date', texte: j };
+    return { code: 'date', texte: j, ecart: ech.ecart };
   };
   const texteEnvoiColis = (t) => String(t || '').replace(/(^|\s)à poster(?=\s|$)/g, '$1à envoyer').replace(/(^|\s)pour poster(?=\s|$)/g, '$1pour l’envoyer').replace(/(\d) h\b/g, '$1 h');
   // (5 nov.) Le compte d'un colis ne se dit que s'il y en a plusieurs (un seul compte : la même étiquette
@@ -45829,7 +46010,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           out.push({ cle: 'v:' + (e.txn || e.key), site: 'vinted', type: 'coche', e, o, b, np, rang: np ? -1 : 0.5,
             photo: o ? orderPhoto(o) : bordPhoto(b), titre: (o && o.title) || (b && (b.modele || b.article)) || 'Vente',
             num: (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : ''), tr: transporteurVente(b, e.txn || tx),
-            lues: { imprime: !!((e.txn && bordsPrinted[e.txn]) || (b && isBordPrinted(b))), depose: true, enroute: !!(pv && pv.bougeLu), livre: !!(pv && pv.livreeLue) } });
+            lues: { imprime: !!((e.txn && bordsPrinted[e.txn]) || (b && isBordPrinted(b))), depose: true, enroute: !!(pv && pv.bougeLu), livre: !!(pv && pv.livreeLue), valide: !!(pv && pv.finalisee) } });
         }
         for (const o of sales.items) {
           // (13 nov., moteur-compta) La fenêtre des 45 jours d'abord (même règle, autre ordre) : à 20 000 ventes,
@@ -45843,7 +46024,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const pv = preuvesFriseDe(o);
           out.push({ cle: 'v:' + o.transaction_id, site: 'vinted', type: 'parti', o, b, st, j, rang: ordre[st.label],
             photo: orderPhoto(o), titre: o.title || 'Vente', num: (b ? numForBord(b) : '') || (effEntry(o)?.numero || ''), tr: transporteurVente(b, o.transaction_id),
-            lues: { imprime: !!(b && isBordPrinted(b)), depose: true, enroute: !!(pv && pv.bougeLu), livre: !!(pv && pv.livreeLue) } });
+            lues: { imprime: !!(b && isBordPrinted(b)), depose: true, enroute: !!(pv && pv.bougeLu), livre: !!(pv && pv.livreeLue), valide: !!(pv && pv.finalisee) } });
         }
         // (8 nov.) Encore « à expédier » chez Vinted (pas relu), mais le n° du bordereau de CETTE
         // transaction est pris en charge chez le transporteur (`partisTransp`) : sorti de « À envoyer »,
@@ -49275,7 +49456,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const cv = cascadeVente(o.price?.amount, e, { annulee: st === 'cancelled', autreDevise });
               const fraisConnus = !autreDevise && cv.frais != null && cv.frais > 0 ? cv.frais / 100 : null;
               const benefTexte = lb.benefice == null ? '—' : eurosRecap(lb.benefice);
-              const benefAide = st === 'cancelled' ? '' : lb.etat === 'partiel' ? 'frais pas confirmés' : lb.etat === 'illisible' ? 'un montant saisi est illisible' : lb.etat === 'prix' ? (autreDevise ? 'vente dans une autre devise' : 'prix de vente pas lu') : '';
+              const benefAide = st === 'cancelled' ? '' : lb.etat === 'partiel' ? 'frais pas confirmés' : lb.etat === 'illisible' ? 'un montant saisi est illisible' : lb.etat === 'prix' ? (autreDevise ? 'vente dans une autre devise' : 'prix de vente pas lu') : (lb.benefice == null && coutManque ? tr('vv.recap.aSaisir') : '');
               // (10 nov., lot BE) « Versé sur ton porte-monnaie » est l'étape « Versée » de la frise (sa date, une fois).
               const acheteur = o.user_login || (o.buyer && o.buyer.login) || (o.opposite_user && o.opposite_user.login) || '';
               const aRelie = !hidden && st !== 'cancelled' && e && e.buyFromId ? achatRelie(e) : null;
@@ -49355,6 +49536,44 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <section className="vrm-recap-gestes" aria-label={tr('ventes.actions')}>
                   {bordGeste ? <div className="vrm-recap-principal vrm-rangee-bord" data-rangee-bord=""><PastilleTransporteur t={trRecap} C={C} data-recap-transporteur=""/><BoutonBordereau grand uid={o._acc && o._acc.vinted_user_id} tx={String(o.transaction_id)} conv={o.conversation_id} login={accNameOf(o._acc)}
                     aGenerer pdf={!!(labelsCaptes[txL] || bordParTx[txL])} onImprimer={()=>imprimerBordereauVente(o)} onFait={(u)=>rechargerLabels(u)}/></div> : null}
+                  {/* (15 nov., Julien : « le bouton pour relier l'achat bien visible sur la vente ») Une vente SANS achat relié :
+                      l'achat PROPOSÉ par la règle de liaison (src/liaisonAchat.js, la même qu'Annonces → « Sans achat relié »), montré
+                      tout de suite — photo, titre, retrait, prix payé, pourquoi — et « Relier · 52 € » (SON toucher, la règle de prix
+                      du reçu `propositionSuggestion`) ; « Autre achat » et « Saisir le prix » en secondaires. Rien n'est relié seul (§5). */}
+                  {coutManque && !aRelie && !hidden ? (() => {
+                    const k = cleArticleVente(o.transaction_id);
+                    let p = null;
+                    try {
+                      const l0 = liaison && liaison.parArticle ? liaison.parArticle[k] : null;
+                      if (l0 && l0.length) p = l0[0];
+                      else if (Array.isArray(achatsLiaison)) { const vx = (fileVendus || []).find((x) => x.key === k);
+                        const cible = vx ? vx.cible : { key: k, titre: o.title || '', marque: '', taille: '', couleur: '', dateRef: o.date, dateRefSource: 'vente', prix: o.price };
+                        p = (propositionsArticle({ cible, achats: achatsLiaison, liens: liensAchats, refus: liaisonRefus, marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel,
+                          receptionDe: (a) => dateReception(a, { infosTx: infosReception, recuClic: pickupDone }) }) || [])[0] || null; }
+                    } catch (_) { p = null; }
+                    const l = { o, idf: identiteAnnonce(o) ? String(identiteAnnonce(o)) : null };
+                    const jourP = (t) => { const d = typeof t === 'number' ? t : Date.parse(t || ''); return Number.isFinite(d) ? new Date(d).toLocaleDateString(localeCourante(), { day: 'numeric', month: 'short' }) : ''; };
+                    const a = p ? p.achat : null; const prop = a ? propositionSuggestion(a) : null;
+                    const prixTxt = prop && prop.centimes != null ? montant(prop.centimes / 100) : '';
+                    const recu = p && p.recu ? tr(p.recu.source === 'clic' ? 'liaison.recu.retrait' : 'liaison.recu.livraison', { date: jourP(p.recu.ms) }) : (a && a.date ? tr('liaison.commandeLe', { date: jourP(a.date) }) : '');
+                    if (!a) return null;   // sans proposition : « Saisir le prix d'achat · ou relier un achat » de la ligne « Prix d'achat » suffit
+                    return (
+                      <div className="vv-propose" data-vv-achat-propose={a ? String(a.transaction_id || '') : ''} data-niveau={p ? p.niveau : ''}>
+                        {a ? <div className="vv-propose-achat">
+                          {orderPhoto(a) ? <PhotoVinted src={orderPhoto(a)} alt="" className="vv-propose-photo" loading="lazy" decoding="async"/> : <PhotoVide taille={48} className="vv-propose-photo"/>}
+                          <span className="vv-propose-mid">
+                            <span className="vv-propose-mot">{tr('vv.propose.titre')} · <b>{p.niveau === 'tres-probable' ? tr('liaison.niveau.tresProbable') : tr('liaison.niveau.possible')}</b></span>
+                            <b className="vv-propose-titre">{a.title || ''}</b>
+                            <span className="vv-propose-sous">{[recu, prixTxt ? tr('liaison.paye', { prix: prixTxt }) : ''].filter(Boolean).join(' · ')}</span>
+                            {phrasePourquoi(p) ? <span className="vv-propose-pourquoi">{phrasePourquoi(p)}</span> : null}
+                          </span>
+                        </div> : null}
+                        <div className="vv-propose-gestes">
+                          {a ? <button type="button" className="sb-touche vv-touche vv-propose-relier" data-vv-relier={String(a.transaction_id || '')} onClick={() => relierAchatVente(l, a)}><Icon name="link" size={16}/><span>{prixTxt ? tr('liaison.relierPrix', { prix: prixTxt }) : VERBES.relier}</span></button> : null}
+                          <button type="button" className="sb-lien vv-propose-saisir" data-vv-autre-achat="" onClick={() => choisirAchatVente(l, a)}>{tr('vv.propose.autre')}</button>
+                        </div>
+                      </div>);
+                  })() : null}
                   <div className="vrm-recap-grille">
                     {o.conversation_id && onNav ? <Bouton variante="secondaire" icone="chat" data-recap-conversation="" onClick={()=>{ fermer(); poserCible({ type: 'conv', conv: String(o.conversation_id), compte: String((o._acc && o._acc.vinted_user_id) || '') }, redirigerOnglet('cat_msg', null, ONGLETS_DEPLACES).tab); onNav('cat_msg'); }}>{tr('ventes.conversation')}</Bouton> : null}
                     {num ? <Bouton variante="secondaire" icone="doc" data-recap-fiche={num} aria-label={`Fiche ${motsVendeur().de} N°${num}`} onClick={()=>{fermer();window.dispatchEvent(new CustomEvent('vrm:fiche-paire',{detail:String(num)}));}}>Fiche {motsVendeur().de}</Bouton> : null}
@@ -51165,6 +51384,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 );
               })()}
             </div>
+            {/* (15 nov., liaison) Dans l'autre sens : un achat sans article relié ⇒ L'ARTICLE PROPOSÉ (src/liaisonAchat.js,
+                la même affectation qu'Annonces → « Sans achat relié ») ; SON toucher relie, « Ce n'est pas lui » le range. */}
+            {!cancelled && (numA == null || numA === '') && liaison && liaison.parAchat && liaison.parAchat[String(o.transaction_id)] ? (() => {
+              const lp = liaison.parAchat[String(o.transaction_id)][0]; const art = articlesLiaison.get(lp.key);
+              return art ? <PropositionAchat p={lp} art={art} onRelier={() => (art.genre === 'vente' ? relierAchatVente(art, o) : relierAchatAnnonce(art.item, o))} onRefus={() => refuserLiaison(lp.key, String(o.transaction_id))}/> : null;
+            })() : null}
             </React.Fragment>
           );})}
         </div>
@@ -51710,6 +51935,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             onDetailBrouillons={()=>setBrouillonsOpen(true)}/>
         ) : annSort==='sansachat' ? (
           <AchatsARelier file={fileAchat} achats={fillBuyAchats.loading && !fillBuyAchats.items ? undefined : (fillBuyAchats.items || (accounts.length ? undefined : []))} liens={liensAchats}
+            vendus={fileVendus} liaison={liaison} onRelierVente={relierAchatVente} onRelierSerie={relierAchatAnnonceSerie} onChoisirVente={choisirAchatVente} onRefus={refuserLiaison}
             propositionDe={propositionSuggestion} onRelier={relierAchatAnnonce} onSaisir={saisirPrixAnnonce} onPlusTard={poserAchatPlusTard} onSerie={()=>setFillBuyOpen(true)}
             onChoisir={(it, propose)=>openPicker({ ...it, _autre: propose ? String(propose.transaction_id || '1') : undefined, _dateRef: (()=>{ const t=Number(it.createdTs); return Number.isFinite(t)&&t>0 ? new Date(t<1e12?t*1000:t).toISOString() : null; })() })} compteDe={(a)=>a&&a._acc?accNameOf(a._acc):''}/>
         ) : annSort==='acompleter' ? (
@@ -52857,6 +53083,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const lotD = colisDans !== 'achats' ? selectionImprimable(Ltous, cochesParDefaut(Ltous)) : [];
           const sigDefaut = lotD.length ? sigImpr(lotD, formatLot, tamponsPerso) : '';
           lotDefautRef.current = { lignes: lotD, sig: sigDefaut };
+          vvLotRef.current = { Ltous, resLot, nLot, sigDefaut, lignesImpr };
           // (1er nov., capture de Julien : « Vestiaire » absent de Colis alors
           // qu'il y a un compte) Même règle que les filtres d'Annonces, Ventes,
           // Messages et que la rangée de Colis · Leboncoin : un site où il a un
@@ -53197,6 +53424,27 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const surEnvoyer = onglet === 'envoyer';
                   return <TuilesFiltres tuiles={tuiles} valeur={surEnvoyer ? eff : null} onChoix={(v) => { setFiltreEnvoyer(v); if (!surEnvoyer && onOngletColis) onOngletColis('envoyer'); }} label={tr('sv.filtre.label')} attrs={{ 'data-envoyer-filtres': '', 'data-envoyer-filtre': surEnvoyer ? eff : '' }}/>;
                 })();
+                // (15 nov., Ventes « Verre dépoli » — maquette validée) LE SEGMENT en verre fumé (À expédier · En route · Toutes,
+                // les mêmes onglets `onOngletColis` + « Toutes » qui replie les colis) puis, sur « À expédier », LE GRAND CHIFFRE
+                // posé sur le fond (le même nombre publié, « — » pas su). Le plein et le papier descendent SOUS la liste (pied de
+                // la liste) ; les tuiles-filtres (Avant demain, transporteurs) vivent derrière « … » (et restent dites quand un
+                // filtre est posé) ; Scanner et « … » restent deux ronds, à droite du chiffre.
+                if (!achatsSec) {
+                  const toutesSeules = ongletColis === 'toutes';
+                  const filtreActif = filtreEnvoyer && filtreEnvoyer !== 'tous';
+                  const nPrets0 = (Ltous || []).filter((l) => l && l.pdf !== false && l.cochable !== false).length;
+                  return (
+                    <div className="sb-tete-hote vv-tete" id={ID_SECTION_COLIS.ventes} data-colis-section="ventes" data-colis-barre="" data-sb-studio={colisDans} data-sb-tuiles={tuilesTete ? '1' : '0'} data-vv-toutes={toutesSeules ? '1' : '0'}>
+                      <div className="vrm-colis-onglets vv-onglets" data-colis-onglet={toutesSeules ? 'toutes' : onglet} data-colis-total={vue.total}>
+                        <SegmentVentes valeur={toutesSeules ? 'toutes' : onglet} nEnv={nEnv} envAmbre={urgentEnv} nRoute={nEnvoyes} onChoix={(v) => onOngletColis && onOngletColis(v)}/>
+                      </div>
+                      {!toutesSeules && onglet === 'envoyer' ? <HeroVentes n={nTete} auMoins={envPartiel && nTete != null ? tr('sv.auMoins') : ''}
+                        libelle={tr('sv.lib.envoyer', { n: nTete || 0 })} enLecture={tr('sv.lib.lecture')}
+                        sous={nPrets0 > 0 ? tr('vv.hero.sous') : (nTete ? tr('vv.hero.sousAttente') : null)}
+                        presses={pressesTete} libellePresses={tr('sv.presses.envoyer', { n: pressesTete })} ronds={ronds}/> : null}
+                      {!toutesSeules && onglet === 'envoyer' && tuilesTete ? <div className="vv-filtres" data-vv-filtres="" data-actif={filtreActif ? '1' : '0'}>{tuilesTete}</div> : null}
+                    </div>);
+                }
                 return (
                   <div className="sb-tete-hote" data-colis-barre="" data-sb-studio={colisDans} data-sb-tuiles={tuilesTete ? '1' : '0'}>
                     <TeteStudio section={colisDans} id={ID_SECTION_COLIS[achatsSec ? 'achats' : 'ventes']}
@@ -53214,7 +53462,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               right={barreColis}/>; })()}
             {/* (14 nov., impression-simple) À côté d'« Imprimer » : le papier retenu (un toucher discret pour le changer,
                 jamais une étape) et « Choisir » — ce qui n'est pas dans le lot y est DIT, avec sa raison. */}
-            {colisDans !== 'achats' && resLot.total > 0 ? <div className="vrm-impr-ligne" data-impr-ligne="">
+            {!colisDans && resLot.total > 0 ? <div className="vrm-impr-ligne" data-impr-ligne="">
               <button type="button" className="vrm-impr-lien" data-impr-format={formatLot} aria-label={tr('impr.formatAria', { format: tr(`impr.format.${formatLot}`) })} disabled={!!imprBusy} onClick={() => setChoixPapier({ puis: null })}>{tr(`impr.format.${formatLot}`)}<span aria-hidden="true"> ▾</span></button>
               <button type="button" className="vrm-impr-lien" data-lot-ouvrir="1" data-impr-autres={resLot.autres} disabled={!!imprBusy || batchBusy} onClick={ouvrirLot}>{resLot.autres > 0 ? tr('impr.choisirAutres', { n: resLot.autres }) : tr('impr.choisir')}</button>
             </div> : null}
@@ -53303,7 +53551,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   À envoyer · Envoyés · À retirer — les nombres d'envoi et de retrait sont CEUX de Ma journée,
                   de la cloche et du widget (`vrm_colis_aposter` / `vrm_colis_retirer`). */}
               {/* (11 nov., lot DJ3) Ventes : À envoyer · Envoyés ; Achats : la liste « À retirer » seule (pas d'onglet). */}
-              {colisDans === 'achats' ? null : <Segmente plein label={colisDans ? 'Colis à envoyer ou envoyés' : 'Colis à envoyer, envoyés ou à retirer'} value={onglet} onChange={(v) => onOngletColis && onOngletColis(v)}
+              {colisDans ? null /* (15 nov.) Ventes : le segment en verre de la tête (SegmentVentes) */ : <Segmente plein label={colisDans ? 'Colis à envoyer ou envoyés' : 'Colis à envoyer, envoyés ou à retirer'} value={onglet} onChange={(v) => onOngletColis && onOngletColis(v)}
                 options={[
                   { v: 'envoyer', l: 'À envoyer', n: colisDans ? null /* (14 nov., Studio) le grand chiffre de la tête le dit déjà (§7) */ : nEnv != null ? `${nEnv}${envPartiel ? '+' : ''}` : null, data: { 'data-colis-onglet-choix': 'envoyer', 'data-colis-onglet-n': nEnv != null ? String(nEnv) : '', 'data-urgent': urgentEnv ? '1' : '0', title: envPartiel ? `Au moins ${nEnv} : un site n'a pas pu être lu` : undefined } },
                   { v: 'envoyes', l: 'Envoyés', n: nEnvoyes != null ? String(nEnvoyes) : null, data: { 'data-colis-onglet-choix': 'envoyes', 'data-colis-onglet-n': nEnvoyes != null ? String(nEnvoyes) : '' } },
@@ -54062,13 +54310,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted}}>Déposé</button>}/>;
                 };
                 // (7 nov., vitesse) Les 24 plus pressées d'abord, TOUTES les autres juste après (sans clic : aucun colis caché).
-                return <><div className="vrm-colis-grille" data-cible="colonne:prets colonne:attente" data-colis-lignes="1" style={{display:'flex',flexDirection:'column',gap:6}}>{(colisTous ? exT : exT.slice(0, 24)).map((e,ix)=>{
+                // (15 nov., Ventes « Verre dépoli ») LA CASE de chaque colis : la ligne du lot de CE colis (même clé que
+                // « Tout imprimer » : n° de transaction, sinon la clé du site), cochée d'office par la règle du lot, décochée
+                // sur SON toucher. Sans ligne de lot (pas de bordereau, eBay) : la case est grisée, jamais cochée.
+                const enVentes = colisDans === 'ventes';
+                const { Ltous, resLot, nLot, sigDefaut, lignesImpr } = vvLotRef.current;
+                const lotPar = new Map((Ltous || []).map((l) => [String(l.cle), l]));
+                const cochesVues = enVentes ? cochesEffectives(Ltous, cochesVentes) : null;
+                const caseDe = (cle, titreC) => { if (!enVentes) return null; const l = lotPar.get(String(cle)); const ok = !!(l && l.cochable !== false && l.pdf !== false);
+                  return <CaseCoche coche={ok && cochesVues.has(l.cle)} desactive={!ok} label={ok ? tr('vv.coche.label', { titre: String(titreC || '') }) : tr('vv.coche.sansBordereau', { titre: String(titreC || '') })}
+                    onBascule={() => setCochesVentes((c) => basculerCoche(Ltous, c, l.cle))} attrs={{ 'data-vv-coche': String(cle), 'data-vv-coche-on': ok && cochesVues.has(l.cle) ? '1' : '0' }}/>; };
+                const empl = (num) => { try { return emplacementVente(num ? ouDansMeubles(num) : null); } catch (_) { return null; } };
+                return <><div className={'vrm-colis-grille' + (enVentes ? ' vv-liste' : '')} data-cible="colonne:prets colonne:attente" data-colis-lignes="1" style={{display:'flex',flexDirection:'column',gap:6}}>{enVentes ? <div className="vv-tab-tete" aria-hidden="true"><span/><span/><span>{tr('vv.col.paire')}</span><span>{tr('vv.col.limite')}</span><span>{tr('vv.col.ou')}</span><span>{tr('vv.col.transport')}</span><span>{tr('vv.col.montant')}</span></div> : null}{(colisTous ? exT : exT.slice(0, 24)).map((e,ix)=>{
                 const ouvreSansDate = ix === iSansDateEnv ? <LigneSansDate n={nSansDateEnv}/> : null;
                 const quandE = quandColisAEnvoyer(e);
                 if (e.__autre) return (
                   <React.Fragment key={e.key}>
                     {ouvreSansDate}
-                    <div data-envoyer-rang={ix} data-ordre-t={quandE != null ? String(quandE) : ''} data-envoyer-site={e.__autre} style={{display:'contents'}}>{carteAutre(e)}</div>
+                    {enVentes
+                      ? <div data-envoyer-rang={ix} data-ordre-t={quandE != null ? String(quandE) : ''} data-envoyer-site={e.__autre} className="vv-rang-autre">{caseDe(e.key, e.x ? e.x.titre : (e.v ? e.v.titre : ''))}{carteAutre(e)}</div>
+                      : <div data-envoyer-rang={ix} data-ordre-t={quandE != null ? String(quandE) : ''} data-envoyer-site={e.__autre} style={{display:'contents'}}>{carteAutre(e)}</div>}
                   </React.Fragment>);
                 const o=e.o, b=e.b;
                 // IDENTITÉ : la photo et le titre viennent de la VENTE quand on
@@ -54079,6 +54340,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const num = (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero||'') : '');
                 const posted = o ? isShipDone(o) : isBordShippedManual(b);
                 const cell = num ? garageCellOf(garageGrid, num) : null;
+                // (15 nov.) La PLACE dans le Stock (étagères), lue par le N° (`ouDansMeubles`, identité `cleNum`) : « Étagère A · r1 c3 ».
+                const ouE = enVentes && num ? empl(num) : null;
                 const dl = e.dl;
                 const urgCol = dl==null ? C.muted : dl<=1 ? C.warn : C.muted; // (26 oct.) un retard est ambre (§7)
                 // (22 oct.) L'HEURE limite sur la ligne : « à poster avant demain
@@ -54122,29 +54385,32 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   <React.Fragment key={e.key}>
                   {ouvreSansDate}
                   <div data-envoyer-rang={ix} data-ordre-t={quandE != null ? String(quandE) : ''} data-bord-card data-cible={attrCible(['colis',e.txn])} data-groupe-carte={grp} data-transporteur={cleStatTransporteur(trV)} data-tx-colis={e.txn||''} data-colis-ident={'v:'+(e.txn||e.key)} data-colis-num={num||''} data-colis-vente-email={e.venteEmail?'1':undefined} data-colis-imprime-sans-num={sansNumC?'1':undefined} data-limite={e.lim&&e.lim.limite||''} data-limite-heure={e.lim&&e.lim.heure||''} data-jours={dl==null?'':String(dl)} data-attente-j={att == null ? '' : String(att)} {...propsGlisserFait({ actif: !posted && !!o && o.transaction_id != null, onFait: () => gesteColisFait(o, b, true) })} {...flColis} className="vrm-colis-carte" style={{padding:'14px',border:`1px solid ${e.lim && e.lim.retard ? C.warn+'66' : C.border}`,background:C.card,borderRadius:12,opacity:posted?0.55:1}}>
-                    <div style={{display:'flex',gap:12,alignItems:'flex-start'}}>
+                    <div className="vv-rang-l" style={{display:'flex',gap:12,alignItems:'flex-start'}}>
+                      {caseDe(e.txn || e.key, titre)}
                       <div className="vrm-colis-photo" style={{width:64,height:80,borderRadius:12,background:C.card2||C.bg,border:`1px solid ${C.border}`,boxSizing:'border-box',flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                         {ph?<PhotoVinted src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
                         {/* (7 nov.) Le logo du transporteur LU (`trV`, la règle de la puce), dans le coin de la photo. */}
                         <BadgeTransporteur t={trV}/>
                       </div>
-                      <div style={{flex:'1 1 150px',minWidth:0}}>
-                        <div style={{display:'flex',alignItems:'flex-start',gap:10}}>
-                          {/* (5 nov., chantier D) Le N° en pastille (`Numero`, la forme de toute l'app ; rouge
-                              seulement quand deux articles le portent) DANS le titre, une fois — il était écrit
-                              deux fois (« N°31 · … » puis une pastille « N°31 » dessous). */}
-                          <span className="vrm-colis-titre" title={titre} style={{flex:1,minWidth:0,fontSize:15,fontWeight:600,lineHeight:1.35,color:C.text,letterSpacing:'-.01em',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',overflowWrap:'anywhere'}}>{num ? <><Numero n={num} taille="petit" etat={conflitsNum.some(x => String(x.numero) === String(num)) ? 'doublon' : undefined} className="vrm-colis-titre-num"/>{' '}</> : null}{motsInsecables(titre)}</span>
-                          {o && o.price && <span className="vrm-display vrm-colis-prix" style={{flexShrink:0,fontSize:17,fontWeight:700,color:C.text,whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums',letterSpacing:'-.02em'}}>{montant(o.price, { etrangere: 'ecarter' })}</span>}
-                          {/* (14 nov., Studio bleu clair) L'ÉCHÉANCE à droite de la rangée, en court (« demain 12 h », « 18 nov. »),
-                              de la MÊME limite (`e.lim`, lue ou estimée) ; ambre seulement « avant demain » (`avantDemainColis`).
-                              Une date estimée dépassée dit « à vérifier », jamais « en retard » (§5). */}
-                          {(() => { const ec = echeanceCourteColis(e.lim); return ec ? <span className={'sb-echeance' + (avantDemainColis(e) ? ' is-ambre' : '')} data-sb-echeance={ec.code}>{ec.texte}</span> : null; })()}
+                      <div className="vv-mid" style={{flex:'1 1 150px',minWidth:0}}>
+                        {/* (15 nov., Ventes « Verre dépoli ») LA PREMIÈRE LIGNE de la maquette : la plaque N° (gravée ; rouge
+                            seulement en doublon), le site, le compte qui a vendu (toujours : sites et comptes partout). */}
+                        <div className="vv-l1">
+                          {num ? <Numero n={num} taille="petit" etat={conflitsNum.some(x => String(x.numero) === String(num)) ? 'doublon' : undefined} className="vrm-colis-titre-num"/>
+                            : <span className="vrm-colis-num" title="Le numéro arrive dès que l'article est relié à une annonce numérotée. Tu peux le poser à la main." style={{fontSize:12,fontWeight:600,color:C.warn,background:'transparent',border:`1px dashed ${C.warn}88`,borderRadius:999,padding:'2px 9px',flexShrink:0,whiteSpace:'nowrap'}}>N° en attente</span>}
+                          <MarquePlateforme p="vinted" taille={13}/>
+                          {acc ? <span className="vv-cpt" data-vv-compte={String(acc.vinted_user_id || '')}>{accNameOf(acc)}</span> : (b && b.account ? <span className="vv-cpt">{b.account}</span> : null)}
                         </div>
-                        {(!num || (plusieursComptesColis && (acc || (b && b.account)))) ? <div style={{fontSize:12,color:C.muted,marginTop:6,display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                          {!num ? <span className="vrm-colis-num" title="Le numéro arrive dès que l'article est relié à une annonce numérotée. Tu peux le poser à la main." style={{fontSize:12,fontWeight:600,color:C.warn,background:'transparent',border:`1px dashed ${C.warn}88`,borderRadius:999,padding:'2px 9px',flexShrink:0,whiteSpace:'nowrap'}}>N° en attente</span> : null}
-                          {!plusieursComptesColis ? null : acc ? <AcctTag acc={acc} name={accNameOf(acc)}/> : (b && b.account ? <span style={{display:'inline-flex',alignItems:'center',gap:4,background:`${C.muted}22`,color:C.muted,fontSize:11,fontWeight:600,padding:'2px 7px',borderRadius:12,whiteSpace:'nowrap'}}>{b.account}</span> : null)}
-                        </div> : null}
-                        <div style={{fontSize:12,color:C.muted,marginTop:6,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
+                        <div className="vv-titre" style={{display:'flex',alignItems:'flex-start',gap:10}}>
+                          <span className="vrm-colis-titre" title={titre} style={{flex:1,minWidth:0,fontSize:15,fontWeight:600,lineHeight:1.35,color:C.text,letterSpacing:'-.01em',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden',overflowWrap:'anywhere'}}>{motsInsecables(titre)}</span>
+                        </div>
+                        <div className="vv-l3" style={{fontSize:12,color:C.muted,marginTop:6,display:'flex',alignItems:'center',gap:4,flexWrap:'wrap'}}>
+                          {/* La taille LUE sur la vente (`size_title`), jamais tirée du titre ; puis l'ÉCHÉANCE de la même limite
+                              (`e.lim`, lue ou estimée), ambre seulement « avant demain » (`avantDemainColis`) ; une estimée dépassée
+                              dit « à vérifier », jamais « en retard » (§5) ; « dans N j » pour une date plus loin. */}
+                          {(() => { const t = o && (typeof o.size_title === 'string' ? o.size_title : (typeof o.size === 'string' ? o.size : '')); return t ? <span className="vv-taille">{tr('vv.taille', { t })}{' · '}</span> : null; })()}
+                          {(() => { const ec = echeanceCourteColis(e.lim); if (!ec) return null; const am = avantDemainColis(e);
+                            return <><span className={'sb-echeance' + (am ? ' is-ambre' : '')} data-sb-echeance={ec.code}>{ec.code === 'date' ? tr('vv.ech.avantLe', { date: ec.texte }) : ec.texte}</span>{ec.code === 'date' && Number.isFinite(ec.ecart) && ec.ecart > 1 ? <span className="vv-dans">{' · '}{tr('vv.ech.dans', { n: ec.ecart })}</span> : null}</>; })()}
                           {/* (2 nov.) La date de vente et la date limite dans UN texte : en
                               deux éléments d'une rangée qui passe à la ligne, la seconde
                               ligne commençait par « · » (390 px). Le point reste collé.
@@ -54160,7 +54426,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             {urgTxt && <span data-colis-limite-texte="" title={urgTxt !== limiteCourte(urgTxt) ? texteEnvoiColis(urgTxt) : undefined} style={{overflowWrap:'anywhere',color:urgCol,fontWeight:dl!=null&&dl<=1?600:500}}>{texteEnvoiColis(limiteCourte(urgTxt))}</span>}
                             {att != null ? <span data-colis-attente={att}>{urgTxt ? <span className="vrm-colis-sep">{'\u00a0· '}</span> : ''}{texteAttenteVente(att)}</span> : null}
                           </span> : null}
-                          {cell
+                          {ouE ? null : cell
                             ? <button type="button" onClick={()=>onLocate&&onLocate(num)} style={{flexShrink:0,border:'none',background:'transparent',color:C.accentTexte||C.text,fontWeight:600,cursor:'pointer',padding:0,fontSize:12,fontFamily:'inherit'}}>· {garageCellLabel(cell)}</button>
                             /* ⚠️ Même règle que sur les Ventes (§11) : « pas rangée »
                                sur CHAQUE carte ne dit rien tant que le garage est
@@ -54170,6 +54436,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {inv && <span title="Compte pro : la facture reçue par e-mail sera imprimée avec le bordereau" style={{flexShrink:0,display:'inline-flex',alignItems:'center',gap:3,color:C.text,fontSize:12,fontWeight:600,whiteSpace:'nowrap'}}>· Facture {inv.number||''}</span>}
                           {posted && <span style={{flexShrink:0,color:C.text,fontWeight:600}}>· déposé</span>}
                         </div>
+                        {/* (15 nov.) Où est le carton : « Étagère A · r1 c3 » (maquette), lu du Stock par le N°. Pas rangée ⇒ rien. */}
+                        <Emplacement e={ouE}/>
                         {/* Le numéro de l'email vient d'un rapprochement par titre,
                             celui de la transaction est une identité : quand les deux
                             se contredisent on dit lequel on garde (§5.17). */}
@@ -54204,6 +54472,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           </div>
                         ) : null; })()}
                       </div>
+                      {/* (15 nov., Ventes « Verre dépoli ») À DROITE : le montant (à l'encre, §7) et le transporteur LU (`trV`). Pas lu ⇒ rien. */}
+                      <div className="vv-end">
+                        {o && o.price ? <span className="vrm-display vrm-colis-prix" style={{flexShrink:0,fontSize:17,fontWeight:700,color:C.text,whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums',letterSpacing:'-.02em'}}>{montant(o.price, { etrangere: 'ecarter' })}</span> : null}
+                        {trV && trV.nom ? <span className="vv-tr" data-vv-tr={trV.cle || ''}>{trV.nom}</span> : null}
+                      </div>
+                      {/* À L'ORDINATEUR (≥ 1100 px) : les colonnes de la maquette — date limite · où dans le stock · transport · montant —
+                          des MÊMES valeurs (rendues ici, montrées seulement sur grand écran ; au téléphone, la rangée les dit au-dessus). */}
+                      {enVentes ? (() => { const ec = echeanceCourteColis(e.lim); const am = avantDemainColis(e); const dv = o && o.date ? new Date(o.date) : null;
+                        let vendueLe = ''; try { vendueLe = dv && Number.isFinite(dv.getTime()) ? dv.toLocaleDateString(localeCourante(), { day: 'numeric', month: 'short' }) : ''; } catch (_) { vendueLe = ''; }
+                        return (
+                          <div className="vv-cols" aria-hidden="true">
+                            <div className="vv-col" data-vv-col="limite">{ec ? <b className={am ? 'vv-am' : ''}>{ec.texte}</b> : <b>—</b>}{ec && ec.code === 'date' && Number.isFinite(ec.ecart) ? <span>{tr('vv.ech.dans', { n: ec.ecart })}</span> : null}</div>
+                            <div className="vv-col" data-vv-col="ou">{ouE ? <><b>{ouE.nom || tr('vv.ou.meuble')}</b><span>{texteEmplacement(ouE, true)}</span></> : <b>—</b>}</div>
+                            <div className="vv-col" data-vv-col="transport">{trV && trV.nom ? <b>{trV.nom}</b> : <b>—</b>}<span>{pdf ? tr('vv.pret') : tr('vv.hero.sousAttente')}</span></div>
+                            <div className="vv-col vv-col-r" data-vv-col="montant">{o && o.price ? <b>{montant(o.price, { etrangere: 'ecarter' })}</b> : <b>—</b>}{vendueLe ? <span>{tr('vv.ech.vendue', { date: vendueLe })}</span> : null}</div>
+                          </div>); })() : null}
                       {/* (14 nov., Studio bleu clair) « Masquer » n'est plus un × de 32 px dans la rangée (aucun bouton dans une
                           rangée) : il est rangé avec les gestes du colis, dans la fiche ouverte (plus bas, `data-geste="masquer"`). */}
                       {/* (2 nov., 22 h) « … » : « Colis fait », « Marquer imprimé », « Suivre » (maquette : rien sous la frise). */}
@@ -54311,10 +54595,48 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           « Imprimer » le montre de toute façon. */}
                     </div>
                     </DansFiche>
+                    {/* (15 nov., Ventes « Verre dépoli » — maquette « la fiche d'une vente ») Dans la fiche ouverte depuis CETTE
+                        rangée : qui a vendu et à qui (tels que lus), Vendu · Pour toi (Vinted ne retire rien au vendeur), les étapes
+                        de la frise de la vente jusqu'au versement (prouvées seulement), la place lue du Stock et « Je l'ai sortie »
+                        (la sortie d'un article parti, `sortirPartisDuStock` : la case se libère, le N° reste). */}
+                    {enVentes && o ? <DansFiche cle={flColis['data-fiche-ligne']} place="contexte" seulementFiche>
+                      {(() => { const pv = pvC; const et = pv && Array.isArray(pv.etapes) ? etapesFicheVente(pv.etapes) : null; const ec = echeanceCourteColis(e.lim);
+                        const dv = o.date ? new Date(o.date) : null; let quand = ''; try { quand = dv && Number.isFinite(dv.getTime()) ? dv.toLocaleDateString(localeCourante(), { day: 'numeric', month: 'short' }) + ' · ' + dv.toLocaleTimeString(localeCourante(), { hour: 'numeric', minute: '2-digit' }) : ''; } catch (_) { quand = ''; }
+                        const prix = o.price ? montant(o.price, { etrangere: 'ecarter' }) : '';
+                        const pseudo = o.user_login || (o.buyer && o.buyer.login) || (o.opposite_user && o.opposite_user.login) || '';
+                        const sortie = !!(num && !ouE);
+                        return <FicheVenteBloc site={<MarquePlateforme p="vinted" taille={12}/>} compte={acc ? accNameOf(acc) : ''} acheteur={pseudo} vendu={prix} pourToi={prix} frais={prix ? tr('vv.fiche.sansFrais') : null}
+                          etapes={et} details={{ vendue: quand, bordereau: [trV && trV.nom, b && b.suivi].filter(Boolean).join(' · '), adeposer: ec ? (ec.code === 'date' ? tr('vv.ech.avantLe', { date: ec.texte }) : ec.texte) : '', versement: tr('vv.fiche.versementVinted') }}
+                          emplacement={ouE} sortie={sortie} onSortir={num && ouE ? () => sortirPartisDuStock([{ cle: cleNum(num), num: String(num), titre }]) : null}/>; })()}
+                    </DansFiche> : null}
                   </div>
                   </React.Fragment>
                 );
-              })}</div></>; })()}
+              })}
+              {/* (15 nov., Ventes « Verre dépoli ») LA RANGÉE « FORMAT » au pied du verre (le papier retenu ; son toucher ouvre
+                  le choix du papier, jamais une étape) — la même fonction et les mêmes data-* que la ligne d'avant. */}
+              {enVentes && resLot.total > 0 ? <button type="button" className="vrm-impr-lien vv-format" data-impr-format={formatLot} aria-label={tr('impr.formatAria', { format: tr(`impr.format.${formatLot}`) })} disabled={!!imprBusy} onClick={() => setChoixPapier({ puis: null })}>
+                <span className="vv-format-l"><IconeV nom="printer" taille={18} trait={1.9}/>{tr('vv.format')}</span>
+                <b className="vv-format-v">{tr(`impr.format.${formatLot}`)}<IconeV nom="chevron" taille={14} trait={2.2}/></b>
+              </button> : null}
+              </div>
+              {/* LE PLEIN de l'écran, sous la liste (maquette) : « Imprimer les N bordereaux » = les colis COCHÉS. Le même geste
+                  qu'avant (`imprimerLot`) : rien touché ⇒ le lot d'office (le PDF préparé d'avance part dans CE toucher) ;
+                  une case décochée ⇒ SA sélection. Les data-* d'avant (`data-imprimer-prets`, `data-impr-lot`…) suivent le compte. */}
+              {enVentes && resLot.total > 0 ? (() => {
+                const choix = cochesEffectives(Ltous, cochesVentes); const defaut = memeQueDefaut(Ltous, cochesVentes == null ? null : choix);
+                const nC = resumeLot(Ltous, choix).partent;
+                return (<div className="vv-pied" data-vv-pied="">
+                  <PleinLarge icone="printer" enCours={!!batchBusy || !!imprBusy} disabled={batchBusy || !!imprBusy || nC === 0}
+                    onClick={() => { if (nC <= 0) return; if (defaut) { if (nLot > 0) imprimerLot(); else ouvrirLot(); } else imprimerLot(choix); }}
+                    libelle={batchBusy || imprBusy ? tr('sv.imprimer.enCours') : nC > 0 ? tr('vv.imprimer.n', { n: nC }) : tr('vv.imprimer.aucun')}
+                    titre={nC > 0 ? tr('vv.imprimer.titre', { n: nC }) : tr('vv.imprimer.aucun')}
+                    attrs={{ 'data-colis-barre-btn': 'imprimer', 'data-imprimer-prets': nC, 'data-impr-lot': nC, 'data-vv-coches': nC, 'data-impr-pret': defaut && nLot > 0 && sigDefaut && pretPour(sigDefaut) ? '1' : '0', 'aria-pressed': imprBusy ? 'true' : undefined }}/>
+                  <ChiffreConseil cle="colis.imprimer" valeur={baseKO ? null : { nLot, presse: !!gesteEnvoi({ aImprimer: bordereauxAImprimer(lignesImpr).map((l) => ({ jours: l.e && Number.isFinite(l.e.dl) ? l.e.dl : null })) }, { urgentSeul: true }) }}/>
+                  <button type="button" className="vrm-impr-lien vv-choisir" data-lot-ouvrir="1" data-impr-autres={resLot.autres} disabled={!!imprBusy || batchBusy} onClick={ouvrirLot}>{resLot.autres > 0 ? tr('impr.choisirAutres', { n: resLot.autres }) : tr('vv.choisir')}</button>
+                </div>);
+              })() : null}
+              </>; })()}
               {/* (14 nov., Studio) la liste se ferme avec ses rangées (plus haut) */}
               {/* (2 nov., colis clair) Sous la liste : ce n'est pas un geste du moment. */}
               {/* (17 oct.) Julien : « un bouton dans l'onglet Colis qui met en couleur
@@ -54417,7 +54739,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               return { t: np ? `Vinted ne l’a pas vu partir${depuis ? ` · coché il y a ${depuis}` : ''}${np.limiteDepassee ? ' · date limite dépassée' : ''}` : 'Coché « Colis fait »', ambre: !!np }; }
             // (5 nov., chantier D) Les mots de l'app (src/libelles.js) : « En route » (plus « En transit »), « Livré »
             // pour un colis ; l'étiquette brute de Vinted reste dans `data-parti` (les règles la lisent).
-            if (x.type === 'parti') { const retour = /Retour/.test(x.st.label); const mot = { 'En transit': 'En route', 'Livrée': 'Livré', 'Au relais': 'Au relais de l’acheteur' }[x.st.label] || x.st.label; return { t: `${mot}${x.j != null ? ` · ${x.j === 0 ? 'vendue aujourd’hui' : `vendue il y a ${x.j} j`}` : ''}${plusieursComptes && x.o._acc ? ` · ${accNameOf(x.o._acc)}` : ''}`, ambre: retour, aide: x.st.aide }; }
+            if (x.type === 'parti') { const retour = /Retour/.test(x.st.label); const mot = { 'En transit': 'En route', 'Livrée': 'Livré', 'Au relais': 'Au relais de l’acheteur' }[x.st.label] || x.st.label; return { t: `${mot}${x.j != null ? ` · ${x.j === 0 ? 'vendue aujourd’hui' : `vendue il y a ${x.j} j`}` : ''}${plusieursComptes && x.o._acc && colisDans !== 'ventes' ? ` · ${accNameOf(x.o._acc)}` : ''}`, ambre: retour, aide: x.st.aide }; }
             if (x.type === 'vc') return { t: x.depart ? `Vestiaire · ${x.depart.phrase}` : 'Vestiaire · coché « Colis fait »', ambre: false };
             if (x.type === 'vcenvoyee') return { t: `Vestiaire · envoyée${x.j != null ? ` · ${x.j === 0 ? 'vendue aujourd’hui' : `vendue il y a ${x.j} j`}` : ''}`, ambre: false };
             // (8 nov.) Parti d'après le transporteur (le site ne l'a pas encore dit) : la raison, de la même ligne que la preuve.
@@ -54470,12 +54792,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                             {x.photo && !imgMortes.has(x.photo) ? <PhotoVinted src={x.photo} alt="" loading="lazy" decoding="async" onError={()=>noterImgMorte(x.photo)} style={{width:'100%',height:'100%',objectFit:'cover'}}/> : <Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
                             <BadgeTransporteur t={x.tr}/>
                           </div>
-                          <div style={{flex:'1 1 150px',minWidth:0}}>
-                            <div><span className="vrm-colis-titre" title={x.titre} style={{display:'block',fontSize:15,fontWeight:600,lineHeight:1.3,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{x.num ? <><Numero n={x.num} taille="petit"/>{' '}</> : null}{x.titre}</span></div>
+                          <div className="vv-mid" style={{flex:'1 1 150px',minWidth:0}}>
+                            {/* (15 nov., Ventes « Verre dépoli » — maquette « En route ») La plaque, le site, le compte ; puis le titre. */}
+                            {colisDans === 'ventes' ? <div className="vv-l1">{x.num ? <Numero n={x.num} taille="petit"/> : null}{x.site ? <MarquePlateforme p={x.site} taille={13}/> : null}{x.o && x.o._acc ? <span className="vv-cpt">{accNameOf(x.o._acc)}</span> : null}</div> : null}
+                            <div><span className="vrm-colis-titre" title={x.titre} style={{display:'block',fontSize:15,fontWeight:600,lineHeight:1.3,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{x.num && colisDans !== 'ventes' ? <><Numero n={x.num} taille="petit"/>{' '}</> : null}{x.titre}{colisDans === 'ventes' && x.o && typeof x.o.size_title === 'string' && x.o.size_title ? ` · ${tr('vv.taille', { t: x.o.size_title })}` : ''}</span></div>
                             <span data-colis-envoye-etat="" title={so.aide || undefined} style={{display:'block',marginTop:4,fontSize:13,fontWeight:so.ambre ? 600 : 500,color:so.ambre ? C.warn : C.muted,lineHeight:1.35}}>{so.t}</span>
                           </div>
+                          {/* Ce qui te revient (Vinted ne retire rien au vendeur : le prix lu) ; autre site ⇒ rien dit ici. */}
+                          {colisDans === 'ventes' && x.site === 'vinted' && x.o && x.o.price ? <div className="vv-end"><span className="vrm-colis-prix">{montant(x.o.price, { etrangere: 'ecarter' })}</span><span className="vv-tr">{tr('vv.route.pourToi')}</span></div> : null}
                         </div>
                         <Frise etapes={frise} cle={x.cle} className="vrm-colis-frise" label="Où en est le colis"/>
+                        {/* (15 nov.) Les QUATRE étapes de la maquette : Déposé · En transit · Livré · Validé, cochées sur preuve (`lues`). */}
+                        {colisDans === 'ventes' ? <EtapesRoute etapes={etapesRoute(x.lues || {})} cle={x.cle}/> : null}
                         {/* (5 nov., chantier D) « Suivre » sur un colis parti dont le n° est lu (le bordereau) : le geste qu'on y vient chercher. */}
                         {/* (11 nov., lot suivi-commandes) Le n° copiable, « Suivre ↗ », le DERNIER statut lu (source,
                             heure) et l'incohérence prouvée (ambre, un geste) — sur chaque colis encore en cours. Un
@@ -62781,7 +63109,7 @@ function AppCoeur() {
       </section>);
     const commun={accounts:vintedAccounts,liveStats:liveStatsVus,accountsReady:accountsLoaded,baseKO,onNav:setTab,garageGrid,onLocate:(n)=>{setGarageLocate(String(n));setTab('garage');},onStore:(n)=>{setGaragePlace(String(n));setTab('garage');},onFreeNum:freeGarageNum};
     if(t==='ventes') return (
-      <section className="vrm-colis-section" data-colis-hote="ventes" data-colis-site={site} aria-label="À expédier">
+      <section className="vrm-colis-section" data-colis-hote="ventes" data-colis-site={site} data-vv-toutes={ongletColis==='toutes' ? '1' : undefined} aria-label="À expédier">
         <AFaireHote><GardeEcran nom="ventes:colis"><Comptabilite key="colis_ventes" {...commun} only="bordereaux" colisDans="ventes"
           siteColisDemande={site==='toutes'?null:site} sitesPresents={sitesPresents}
           ongletColis={ongletColis} onOngletColis={choisirOngletColis} onOngletVu={setOngletColisMontre}/></GardeEcran></AFaireHote>
@@ -62831,9 +63159,11 @@ function AppCoeur() {
         </div>
         {/* (11 nov., lot DJ3) En tête : les colis à expédier (Ventes, section principale du site) ou à retirer (Achats). */}
         {/* (14 nov., refonte des listes) LA carte héros de Ventes EN HAUT (« une chose principale par écran ») : elle
-            était posée sous les 30 colis à expédier, à 5 500 px du haut. Mêmes chiffres, même carte, seulement montée. */}
-        {site==='toutes' && t==='ventes' && !baseKO && <div className="vrm-heros-hote" data-heros-hote="ventes" style={{padding:'12px 16px 0'}}><CarteStatsApp page="ventes-toutes" aide bande className="vrm-fu-ecran" ici="cat_ventes" onNav={setTab} sel={{ site: 'toutes', compte: null, periode: null }}/></div>}
+            était posée sous les 30 colis à expédier, à 5 500 px du haut. Mêmes chiffres, même carte, seulement montée.
+            (15 nov., Ventes « Verre dépoli », maquette validée) Le segment À expédier · En route · Toutes et le grand chiffre
+            ouvrent l'écran ; la bande du mois passe JUSTE SOUS les colis (en tête de « Toutes », qui replie les colis). */}
         {(t==='achats' || (t==='ventes' && (!sous || sec==='ventes'))) ? rendreColisSection(t,site) : null}
+        {site==='toutes' && t==='ventes' && !baseKO && <div className="vrm-heros-hote" data-heros-hote="ventes" style={{padding:'12px 16px 0'}}><CarteStatsApp page="ventes-toutes" aide bande className="vrm-fu-ecran" ici="cat_ventes" onNav={setTab} sel={{ site: 'toutes', compte: null, periode: null }}/></div>}
         {/* (10 nov., lot BB) L'entrée de « Litiges en cours » : sur Ventes, quel que soit le site. */}
         {t==='ventes' && !baseKO && <div className="vrm-entree-litiges-hote" style={{padding:'12px 16px 0'}}><EntreeLitiges ligne={aTrancherEtat && Array.isArray(aTrancherEtat.lignes) ? aTrancherEtat.lignes.find((l)=>l.cle==='litiges-en-cours') : null} onOuvrir={()=>setTab('litiges')}/></div>}
         {site==='toutes' && t==='ventes' && !baseKO && <div className="vrm-a-venir-hote" style={{padding:'12px 16px 0'}}><ArgentAVenirCarte A={liveStatsVus && liveStatsVus.aVenir} reserve/></div>}
