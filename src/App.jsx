@@ -933,8 +933,8 @@ import "./styles-refonte-ms.css";   // (14 nov., refonte) Messages, E-mails, Sto
 // (14 nov., décision de Julien) STUDIO BLEU CLAIR — les deux polices, puis LE studio : EN DERNIER (après styles-vitrine,
 // styles-systeme et styles-tablette). Jetons --sb-*, quatre formes de bouton, la coque (docs/design/studio-bleu-clair.md).
 import "./design/studio-polices.css";
-import "./design/fiche-d.css";   // (15 nov., Julien choisit la direction D « fiche produit ») la fiche d'un article en UN écran — `@layer vrm-verre` (la couche décide, pas l'ordre : importée AVANT studio.css, qui reste la dernière), classes `fd-*` : docs/passation/2026-11-15-fiche-d.md
 import "./design/studio.css";
+import "./design/fiche-d.css";   // (15 nov., Julien choisit la direction D « fiche produit ») la fiche d'un article en UN écran — `@layer vrm-verre` (la couche décide, pas l'ordre ; 16 nov. : juste APRÈS studio.css, toujours avant studio-verre.css dans la couche, audit-studio S3), classes `fd-*` : docs/passation/2026-11-15-fiche-d.md
 import "./design/studio-parametres.css";   // (15 nov.) Paramètres en dix catégories — après studio.css et studio-reste.css
 import "./design/polices.js";   // le préchargement des deux polices, avec le morceau de l'app seulement
 import "./design/studio-paires.css";   // (14 nov., « Studio bleu clair ») Paires : Annonces, Stock, Inventaire, la fiche — EN DERNIER (docs/passation/2026-11-14-studio-paires.md)

@@ -16,18 +16,18 @@
 :root {
   --fd-feuille: rgb(247 250 253 / .97); --fd-carte: #FFFFFF; --fd-creux: rgb(12 29 48 / .07); --fd-seg-on: #FFFFFF;
   --fd-plein: #0C1D30; --fd-plein-t: #FFFFFF; --fd-filet: rgb(12 29 48 / .10); --fd-pastille: rgb(12 29 48 / .06);
-  --fd-bord-am: rgb(178 106 0 / .45); --fd-ombre-carte: 0 10px 24px -14px rgb(8 26 50 / .5); --fd-doublon: #B8261A;
+  --fd-bord-am: rgb(178 106 0 / .45); --fd-ombre-carte: 0 10px 24px -14px rgb(8 26 50 / .5);
 }
 :root[data-theme="dark"] {
   --fd-feuille: rgb(14 27 46 / .97); --fd-carte: #16273C; --fd-creux: rgb(255 255 255 / .08); --fd-seg-on: rgb(255 255 255 / .16);
   --fd-plein: #EEF4FB; --fd-plein-t: #0C1D30; --fd-filet: rgb(255 255 255 / .10); --fd-pastille: rgb(255 255 255 / .08);
-  --fd-bord-am: rgb(242 182 94 / .45); --fd-ombre-carte: 0 10px 24px -14px rgb(0 0 0 / .8); --fd-doublon: #FF6B5E;
+  --fd-bord-am: rgb(242 182 94 / .45); --fd-ombre-carte: 0 10px 24px -14px rgb(0 0 0 / .8);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]):not([data-theme="dark"]) {
     --fd-feuille: rgb(14 27 46 / .97); --fd-carte: #16273C; --fd-creux: rgb(255 255 255 / .08); --fd-seg-on: rgb(255 255 255 / .16);
     --fd-plein: #EEF4FB; --fd-plein-t: #0C1D30; --fd-filet: rgb(255 255 255 / .10); --fd-pastille: rgb(255 255 255 / .08);
-    --fd-bord-am: rgb(242 182 94 / .45); --fd-ombre-carte: 0 10px 24px -14px rgb(0 0 0 / .8); --fd-doublon: #FF6B5E;
+    --fd-bord-am: rgb(242 182 94 / .45); --fd-ombre-carte: 0 10px 24px -14px rgb(0 0 0 / .8);
   }
 }
 
@@ -62,7 +62,7 @@
   background: linear-gradient(#FFFFFF, #EDF2F7) !important; border: 1px solid rgb(12 29 48 / .18); box-shadow: 0 2px 6px rgb(8 26 50 / .35);
   color: #0C1D30 !important; font: 700 20px/1 var(--sb-police-texte, Inter, sans-serif) !important; letter-spacing: -.01em; font-variant-numeric: tabular-nums;
 }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plaque.is-double { color: var(--fd-doublon) !important; border-color: var(--fd-doublon); }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-plaque.is-double { color: var(--vrm-doublon) !important; border-color: var(--vrm-doublon); }
 
 /* ══ 3. LA FEUILLE : nom, état, carte d'action, segment, vue ══ */
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-s {
@@ -74,7 +74,7 @@
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-nom { margin: 0 !important; font: 700 26px/1.15 var(--sb-police-texte, Inter, sans-serif) !important; letter-spacing: -.03em !important; color: var(--sv-encre) !important; overflow-wrap: anywhere; }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-etat { display: block; margin-top: 4px; font: 600 16px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-etat.is-am { color: var(--sv-ambre) !important; }
-:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-etat.is-rouge, :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-double { color: var(--fd-doublon) !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-etat.is-rouge, :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-double { color: var(--vrm-doublon) !important; }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-double { margin: 12px 0 0; font: 600 15px/1.35 var(--sb-police-texte, Inter, sans-serif) !important; }
 
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-act {
