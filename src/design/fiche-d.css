@@ -129,6 +129,10 @@
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-arg.is-grand .fd-arg-c.is-gros > b { font-size: 36px !important; }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-arg.is-grand .fd-arg-c:not(.is-gros) > b { font-size: 22px !important; margin-top: 10px; }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-arg-n { font: 600 15px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
+/* (16 nov., relier-fiable) « Reçu » et « Délier » à côté de « Achetée » : deux liens de 44 px, côte à côte, qui passent à la ligne au besoin. */
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-arg-gestes { display: flex; flex-wrap: wrap; align-items: center; column-gap: 14px; margin-top: 4px; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-arg-gestes .fd-arg-g { align-self: auto; margin-top: 0; text-align: left; font-size: 15px !important; }
+:root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-arg-gestes .fd-arg-n { font-size: 13px !important; }
 
 /* Sites : une rangée par site (logo dans une pastille, « Site · compte », ce qui s'y passe). */
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-site { display: flex; align-items: center; gap: 12px; min-height: 56px; }

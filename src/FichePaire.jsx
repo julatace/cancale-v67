@@ -240,7 +240,21 @@ function CarteAction({ a, I, Photo, relier, onBordereau, onPrix, onSaisir, num }
 // (16 nov., bancs-rouges-a) §5 « le chiffre faux est la porte pour le corriger » : une paire EN VENTE sans prix d'achat
 // a pour action « Baisser le prix » — la fiche D n'offrait alors plus aucun moyen de saisir ce prix. Le « ? » d'« Achetée »
 // devient la porte de la saisie (`onSaisir`), seulement quand la grande action n'est pas déjà « Saisir ».
-function VueArgent({ cases, etat, onSaisir = null }) {
+// (16 nov., relier-fiable — Julien : « ici j'ai mal relié un achat, je veux pouvoir l'enlever, et tu peux mettre le
+// justificatif d'achat à côté ») À côté de « Achetée », l'achat RELIÉ (par son n° de transaction) : « Reçu » (le reçu de
+// CET achat — e-mail Vinted, sinon l'attestation tirée de l'achat lu) ou « Pas de reçu » (jamais un lien mort), et
+// « Délier » (confirmé, annulable). `lien` : { tx, recu: undefined (lecture) | true | false, onRecu, onDelier }.
+function GestesAchatRelie({ lien }) {
+  if (!lien || !lien.tx) return null;
+  return (
+    <span className="fd-arg-gestes" data-fd-achat-relie={lien.tx}>
+      {lien.recu === true ? <button type="button" className="fd-lien fd-arg-g" data-fd-recu={lien.tx} onClick={lien.onRecu}>{tr('fd.argent.recu')}</button>
+        : lien.recu === false ? <small className="fd-arg-n" data-fd-pas-recu="">{tr('fd.argent.pasRecu')}</small> : null}
+      <button type="button" className="fd-lien fd-arg-g" data-fd-delier={lien.tx} onClick={lien.onDelier}>{tr('fd.argent.delier')}</button>
+    </span>
+  );
+}
+function VueArgent({ cases, etat, onSaisir = null, lien = null }) {
   if (!cases.length) return null;
   const grand = cases.some((c) => c.gros);
   return (
@@ -261,6 +275,7 @@ function VueArgent({ cases, etat, onSaisir = null }) {
             <span>{tr(c.lib)}</span>
             <b className={'num' + (c.cents == null && c.ambre ? ' is-am' : '')} title={c.cents == null && c.raison ? c.raison : undefined}>{c.signe ? signeFd(c.cents) : eurFd(c.cents)}</b>
             {c.cents == null && c.raison ? <small className="vg-sr" data-fiche-raison-benef="">{c.raison}</small> : c.partiel ? <small className="fd-arg-n">{tr('fd.argent.auPlus')}</small> : null}
+            {c.cle === 'achat' && c.cents != null ? <GestesAchatRelie lien={lien}/> : null}
           </div>
         );
       })}
@@ -302,7 +317,7 @@ function VueHistoire({ lignes }) {
   );
 }
 
-export default function FichePaire({ owner = '', p, etat = null, histoNum = null, lecture = false, num, onFermer, onRetour, onBordereau, onEmballer, onPrix, onPrixAchat = null, onDupliquer, onPublierAilleurs, onSource, neuve = null, onCopier, Photo, Icon, Retour, note = null, plus = null, sites = null, relier = null, ligne = null, ligneRes = null, onChoisirNum = null, extraTemps = null, outilsIdees = null }) {
+export default function FichePaire({ owner = '', p, etat = null, histoNum = null, lecture = false, num, onFermer, onRetour, onBordereau, onEmballer, onPrix, onPrixAchat = null, onDupliquer, onPublierAilleurs, onSource, neuve = null, onCopier, Photo, Icon, Retour, note = null, plus = null, sites = null, relier = null, achatRelie = null, ligne = null, ligneRes = null, onChoisirNum = null, extraTemps = null, outilsIdees = null }) {
   React.useEffect(() => {
     const k = (e) => { if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); onFermer(); } };
     window.addEventListener('keydown', k, true);
@@ -484,7 +499,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
               {['argent', 'sites', 'histoire'].map((v) => <button key={v} type="button" role="tab" className="fd-seg-b" aria-selected={vueOuverte === v} data-fd-seg={v} onClick={() => setVue(v)}>{tr('fd.seg.' + v)}</button>)}
             </div>
             <div className="fd-v" role="tabpanel" data-fd-vue-ouverte={vueOuverte}>
-              {vueOuverte === 'argent' ? (double ? <p className="fd-vide">{tr('fd.argent.double')}</p> : <VueArgent cases={cases} etat={etat} onSaisir={saisir && !(action && action.sorte === 'saisir') ? saisir : null}/>)
+              {vueOuverte === 'argent' ? (double ? <p className="fd-vide">{tr('fd.argent.double')}</p> : <VueArgent cases={cases} etat={etat} lien={achatRelie} onSaisir={saisir && !(action && action.sorte === 'saisir') ? saisir : null}/>)
                 : vueOuverte === 'sites' ? <VueSites sites={lignesSites} I={I}/>
                 : <VueHistoire lignes={hist}/>}
             </div>
