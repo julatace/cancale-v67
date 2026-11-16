@@ -19,6 +19,9 @@
 //   E2 VENDU — la carte du mois compte la vente e-mail (72 € de plus que le
 //      même jeu sans ses e-mails) ; la liste relue (le n° dans `orders_sold`)
 //      donne le MÊME vendu et une seule ligne, sans la marque e-mail.
+//   E4 (16 nov.) LA VENTE D'UN COMPTE PARTICULIER — e-mail SANS n° (la forme réelle :
+//      `transaction` vide), arrivé après la lecture : SA ligne dans Ventes, « vue par
+//      e-mail », « bordereau à venir », aucun geste d'envoi ; VENDU +64 €.
 //   E3 L'INDICATEUR — « Tes comptes · dernière relecture » : le compte 111 dit
 //      ses ventes en retard (date, geste, ambre) ; le compte 222 non.
 //  Réglages : `BANC_PORT` (9700–9749, 9712 par défaut), `LARGEURS=390,1512`,
@@ -61,9 +64,12 @@ const jeu = (variante) => {
   v1.data.payload.my_orders.push(venteV(TX_LUE, 'Asics Gel-Kayano 14 argent taille 41', 2, '64'));
   if (variante === 'relue') v1.data.payload.my_orders.push(venteV(TX_FRAICHE, 'Nike Air Force 1 blanche taille 43', 0.05, '72.00'));
   l.find((x) => x.id === 'harvest_111_listings').data.capturedAt = iso(0.0007);
+  // (16 nov., lot vente-email-absente) Le cas vu par Julien : la vente d'un compte PARTICULIER,
+  // e-mail SANS n° de transaction (mesuré : jamais de n° hors Pro), arrivée après la lecture d'hier.
+  if (variante === 'particulier') { l.push(mail('m9060', { transaction: '', designation: 'New balance 9060 vert et blanc taille 38', prix: '64.00', receivedAt: iso(0.04) })); return l; }
   if (variante !== 'sans') l.push(
     mail('a1', { transaction: TX_FRAICHE, designation: 'Nike Air Force 1 blanche taille 43', pro: true }),   // E1 : la vente du matin
-    mail('a2', { transaction: '', designation: 'Puma Suede rouge taille 40' }),                                // sans n° (compte particulier)
+    mail('a2', { transaction: '', designation: 'Puma Suede rouge taille 40', receivedAt: iso(2) }),           // sans n°, avant la lecture (16 nov. : une vente sans n° APRÈS la lecture entre — E4)
     mail('a3', { transaction: TX_LUE, designation: 'Asics Gel-Kayano 14 argent taille 41' }),                  // déjà dans la liste
     mail('a4', { transaction: TX_VIEILLE, designation: 'Vans Old Skool noire taille 42', receivedAt: iso(2) }),   // avant la lecture
     mail('a5', { transaction: TX_AUTRE, designation: 'New Balance 990 grise taille 44', uid: '333', account: 'pas_lie' }),   // compte non lié
@@ -187,6 +193,27 @@ async function ventes(nav, { W, theme }) {
   dit(Number.isFinite(vR) && vR === vF, 'E2', `${T} relue sur Vinted : le MÊME vendu (elle n'est comptée qu'une fois)`, JSON.stringify({ fraiche: venduFraiche, relue: rr.vendu }));
   dit(!rl.journal.erreurs.length, 'E0', `${T} aucune erreur JS (relue)`, rl.journal.erreurs.join(' ¦ '));
   await ferme(rl);
+
+  // E4 · (16 nov.) la vente d'un compte PARTICULIER, e-mail sans n° : elle est DANS Ventes.
+  const pa = await ouvrirVentes(nav, { W, theme, variante: 'particulier' });
+  await pa.pg.waitForSelector('[data-vente-email]', { timeout: 15000 }).catch(() => {});
+  const rp = await pa.pg.evaluate(new Function(`${vis}
+    const l = [...document.querySelectorAll('.vrm-sale-row[data-tx="email:email_sale_m9060"]')];
+    const note = l[0] && l[0].querySelector('[data-vente-email]');
+    const av = note && note.querySelector('[data-vente-email-bord-a-venir]');
+    const vendu = document.querySelector('[data-fu-vendu-mois]');
+    return { n: l.length, note: note ? note.getAttribute('data-vente-email') : null, noteVis: vis(note), aVenir: vis(av),
+      coupe: note ? note.scrollWidth > note.clientWidth + 1 : null,
+      envoi: l[0] ? l[0].querySelectorAll('[data-depose-vente], [data-fu-imprimer], [data-rangee-bord]').length : null,
+      vendu: vendu ? vendu.getAttribute('data-fu-vendu-mois') : null, debord: document.documentElement.scrollWidth > window.innerWidth + 1 };`));
+  if (rp.n) { await pa.pg.locator('.vrm-sale-row[data-tx="email:email_sale_m9060"]').first().scrollIntoViewIfNeeded().catch(() => {}); await attendre(300); }
+  await capture(pa.pg, `vef-particulier-${W}-${theme}`);
+  dit(rp.n === 1 && rp.note === 'email:email_sale_m9060' && rp.noteVis, 'E4', `${T} la vente e-mail SANS n° (compte particulier) a SA ligne dans Ventes, marquée « vue par e-mail »`, JSON.stringify(rp));
+  dit(rp.aVenir, 'E4', `${T} la ligne dit « bordereau à venir : l’extension ne l’a pas encore capté »`, JSON.stringify(rp));
+  dit(rp.envoi === 0 && rp.coupe === false && !rp.debord, 'E4', `${T} aucun geste d’envoi, rien de coupé, rien ne déborde`, JSON.stringify(rp));
+  dit(Number.isFinite(Number(rp.vendu)) && Number(rp.vendu) - vS === 6400, 'E4', `${T} VENDU du mois la compte (+64 € par rapport au même jeu sans elle)`, JSON.stringify({ particulier: rp.vendu, sans: rs.vendu }));
+  dit(!pa.journal.erreurs.length, 'E0', `${T} aucune erreur JS (particulier)`, pa.journal.erreurs.join(' ¦ '));
+  await ferme(pa);
 }
 
 (async () => {
