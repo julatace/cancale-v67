@@ -44288,8 +44288,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const ops = opsRelierGlisse({ cible, w, fiches: load('vinted_annonce_numeros', {}) || {}, ventes: load('vinted_sale_overrides', {}) || {}, prixParNum: load('vinted_buyprice_by_num', {}) || {} });
     if (!ops.length) return false;
     const qui = cible.num ? `N°${cible.num}` : String(cible.titre || '').slice(0, 40);
-    gesteVrm(tr('glisser.fait', { qui }), ops, { vinted_annonce_numeros: setNumeros, vinted_sale_overrides: setSaleOv },
-      () => { setTimeout(() => emettreClesRelues(['vinted_buyprice_by_num']), 700); }, 'achat.relier');
+    gesteVrm(tr('glisser.fait', { qui }), ops, { vinted_annonce_numeros: setNumeros, vinted_sale_overrides: setSaleOv, vinted_buyprice_by_num: setBuyByNum }, null, 'achat.relier');
     return true;
   };
   const relierAchatCle = async (key, a) => {
