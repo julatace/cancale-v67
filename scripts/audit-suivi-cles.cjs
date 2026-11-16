@@ -37,8 +37,9 @@ const MUTATIONS = {
   'ups-limite-ignoree': ['api/_lib/transporteurs.js', 'limite: lim, limiteSure: !!lim, limiteAt: null', 'limite: null, limiteSure: false, limiteAt: null'],
   'ups-echo-ignore': ['api/_lib/transporteurs.js', "  if (!pk) return rendu('forme', { forme: 'trackingNumber:autre' });\n", ''],
   'ups-jeton-jamais-garde': ['api/_lib/transporteurs-lecture.js', '  if (!neuf && g.jeton && g.jusqua - 60000 > maintenant) return g.jeton;\n', ''],
-  'cle-de-l-installation': ['api/_lib/transporteurs-lecture.js', 'return s && _clesParContexte.has(s) ? T.lecturesCleDe(clesCourantes()) : null; });', "return { colissimo: !!process.env.LAPOSTE_OKAPI_KEY || !!(clesCourantes() || {}).colissimo, ups: !!(process.env.UPS_CLIENT_ID && process.env.UPS_CLIENT_SECRET) || !!(clesCourantes() || {}).ups }; });"],
-  'cle-d-un-autre-vendeur': ['api/_lib/transporteurs-lecture.js', "const clesCourantes = () => { const s = contexteVendeur.getStore(); return s ? (_clesParContexte.get(s) || null) : null; };", "let _der = null; const clesCourantes = () => { const s = contexteVendeur.getStore(); const v = s ? (_clesParContexte.get(s) || null) : null; if (v && (v.colissimo || v.ups)) _der = v; return v && (v.colissimo || v.ups) ? v : _der; };"],
+  'cle-de-l-installation': ['api/_lib/transporteurs-lecture.js', 'T.fournirLecturesServeur(() => (entreeCles() ? T.lecturesCleDe(clesCourantes()) : null));', "T.fournirLecturesServeur(() => ({ colissimo: !!process.env.LAPOSTE_OKAPI_KEY || !!(clesCourantes() || {}).colissimo, ups: !!(process.env.UPS_CLIENT_ID && process.env.UPS_CLIENT_SECRET) || !!(clesCourantes() || {}).ups }));"],
+  'cle-d-un-autre-vendeur': ['api/_lib/transporteurs-lecture.js', "const clesCourantes = () => { const e = entreeCles(); return e ? e.cles : null; };", "let _der = null; const clesCourantes = () => { const e = entreeCles(); const v = e ? e.cles : null; if (v && (v.colissimo || v.ups)) _der = v; return v && (v.colissimo || v.ups) ? v : _der; };"],
+  'contexte-dont-le-vendeur-change': ['api/_lib/transporteurs-lecture.js', "return e && e.owner === proprietaireCourant() ? e : null; };", "return e || null; };"],
   'cle-env-en-repli': ['api/_lib/transporteurs-lecture.js', "const k = c && c.colissimo ? c.colissimo.cle : '';", "const k = (c && c.colissimo ? c.colissimo.cle : '') || process.env.LAPOSTE_OKAPI_KEY || '';"],
   'route-renvoie-la-cle': ['api/_lib/cles-transporteurs.js', "  return { etat: s ? 'posee' : 'illisible', fin: l.fin || null,", "  return { etat: s ? 'posee' : 'illisible', cle: s, chiffre: l.chiffre, fin: l.fin || null,"],
   'ups-refusee-rangee': ['api/_lib/cles-transporteurs.js', "    if (j && j.refus) return repondre(res, 400,", "    if (false) return repondre(res, 400,"],
@@ -408,6 +409,22 @@ const UPS_JETON = (j) => JSON.stringify({ token_type: 'Bearer', issued_at: Strin
     dit(!coffre.includes(CLE_LP) && CF.dechiffrerCoffre(CT.usageCle('colissimo'), B, (base.get(`${A}|suivi_cle_colissimo`) || {}).chiffre) === null, 'H2 le coffre ne garde que le chiffré ; recopié chez B, il ne se déchiffre pas');
     const vA = (base.get(`${A}|suivi_cle_colissimo`) || {}).verif;
     dit(vA === 'ok', 'H3 la première lecture réussie note sa clé « acceptée »', J({ vA }));
+  });
+
+  await essaie('un contexte dont le vendeur change ne garde pas les clés', async () => {
+    remise();
+    poserCle(A, 'colissimo', { cle: CLE_LP });
+    base.set(`${B}|email_track_colissimo_6A12345678905`, ligneLp('6A12345678905'));
+    transporteur = (u) => (u.hostname === 'api.laposte.fr' ? okLp() : null);
+    // Le même contexte (comme email-inbound, qui pose `owner` en cours de route) : A d'abord, puis B.
+    const r = await O.contexteVendeur.run({ owner: A }, async () => {
+      await L.passageTransporteurs({ max: 12, budgetMs: 20000 });
+      const n0 = appels.filter((x) => x.host === 'api.laposte.fr').length;
+      O.contexteVendeur.getStore().owner = B;
+      const rb = await L.passageTransporteurs({ max: 12, budgetMs: 20000 });
+      return { n0, nB: appels.filter((x) => x.host === 'api.laposte.fr').length - n0, lecture: rb.lecture };
+    });
+    dit(r.n0 === 1 && r.nB === 0 && r.lecture && r.lecture.colissimo === false, 'H4 le vendeur du contexte change (A ⇒ B) : les clés de A ne servent pas à B', J(r));
   });
 
   await essaie('passage avec les identifiants UPS', async () => {

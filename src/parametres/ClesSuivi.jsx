@@ -74,7 +74,7 @@ export default function ClesSuivi({ enTete = () => ({}), toast = () => {}, envoy
         const pret = t.champs.every((x) => String(val[`${t.id}.${x.k}`] || '').trim().length >= 8);
         return (
           <section key={t.id} className="vrm-sc-bloc" data-cle-transporteur={t.id} data-cle-etat={c ? c.etat : (s === undefined ? 'lecture' : 'pas-su')} data-cle-verif={(c && c.verif) || ''}>
-            <div className="vrm-sc-etat">{t.nom}</div>
+            <h3 data-cle-nom="" style={{ margin: '6px 0 0', fontSize: 17, fontWeight: 600, lineHeight: 1.3 }}>{t.nom}</h3>
             {s ? <div className={'vrm-sc-essai' + (e.ton ? ' is-ambre' : '')} data-cle-phrase="" role="status">
               {tr(e.cle, { nom: t.nom })}{posee && c.fin ? <> · <span data-cle-fin="">…{c.fin}</span>{dateCourte(c.at) ? ` · ${dateCourte(c.at)}` : ''}</> : null}
             </div> : null}

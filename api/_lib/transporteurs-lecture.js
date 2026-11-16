@@ -303,18 +303,22 @@ const ENTETES = {
 // `UPS_CLIENT_*` ne sont plus lues. Sans SA clé : `T.lectureServeurActive` est faux, aucun n° n'est
 // choisi, rien ne part.
 const _clesParContexte = new WeakMap();
-const clesCourantes = () => { const s = contexteVendeur.getStore(); return s ? (_clesParContexte.get(s) || null) : null; };
+// L'entrée garde le vendeur pour qui elle a été lue : un contexte dont le vendeur change (email-inbound pose `owner`
+// en cours de route) ne relit JAMAIS les clés d'un autre.
+const entreeCles = () => { const s = contexteVendeur.getStore(); const e = s ? _clesParContexte.get(s) : null; return e && e.owner === proprietaireCourant() ? e : null; };
+const clesCourantes = () => { const e = entreeCles(); return e ? e.cles : null; };
 // Hors d'un passage (aucune clé lue pour ce contexte) : `null` — « pas su », jamais « lu ».
-T.fournirLecturesServeur(() => { const s = contexteVendeur.getStore(); return s && _clesParContexte.has(s) ? T.lecturesCleDe(clesCourantes()) : null; });
+T.fournirLecturesServeur(() => (entreeCles() ? T.lecturesCleDe(clesCourantes()) : null));
 // Les clés du vendeur du passage : lues UNE fois (`undefined` : lecture ratée ⇒ aucune, « pas su »).
 async function poserClesDuPassage() {
   const s = contexteVendeur.getStore();
   if (!s) return null;
-  if (_clesParContexte.has(s)) return _clesParContexte.get(s);
+  const deja = entreeCles();
+  if (deja) return deja.cles;
   const owner = proprietaireCourant();
   const c = owner ? await lireClesTransporteurs(owner) : undefined;
   const v = c && typeof c === 'object' ? c : null;
-  _clesParContexte.set(s, v);
+  _clesParContexte.set(s, { owner, cles: v });
   return v;
 }
 // Ce que la lecture a appris de SA clé (« acceptée » / « refusée »), noté une fois sur sa ligne.

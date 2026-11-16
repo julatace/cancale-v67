@@ -53,7 +53,7 @@ const vide = { etat: 'aucune', fin: null, at: null, verif: null, verifAt: null }
         });
         await pg.goto(`http://localhost:${NV.PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' }); await attendre(1500);
         let ouvert = true;
-        await pg.click('[data-sous-ouvrir="cles-suivi"]', { timeout: 10000 }).catch((e) => { ouvert = false; dit(false, `K1 ${tag} : la rangée « Suivi Colissimo et UPS » se touche (Ventes et colis)`, String(e.message).split('\n')[0]); });
+        await pg.click('[data-sous-ouvrir="cles-suivi"]', { timeout: 15000 }).catch(async (e) => { ouvert = false; await capture(pg, `cles-suivi-${tag}-${issue}-rangee-absente`); dit(false, `K1 ${tag} : la rangée « Suivi Colissimo et UPS » se touche (Ventes et colis)`, String(e.message).split('\n')[0]); });
         if (!ouvert) { await ctx.close(); continue; }
         const cat = await pg.evaluate(() => { const c = document.querySelector('[data-categorie-contient~="cles-suivi"]'); return c ? c.getAttribute('data-categorie') || c.getAttribute('data-categorie-contient') : null; });
         await pg.waitForSelector('[data-cles-suivi]:not([data-cles-suivi="lecture"])', { timeout: 8000 }).catch(() => {});
