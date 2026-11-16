@@ -6,14 +6,22 @@
 // coupés net, sans indice qu'il y avait une suite.
 const SEL = '.vrm-rangee, .vrm-defile, .vrm-carrousel';
 
-function juger(el) {
+// (16 nov., stabilite-iphone) LIRE, PUIS ÉCRIRE. Avant, chaque rangée était lue PUIS marquée, l'une après
+// l'autre : chaque marque (`data-defile`) invalidait la mise en page et la lecture de la rangée suivante la
+// refaisait EN ENTIER — N rangées, N mises en page de tout l'écran. Profil de l'ouverture de Ventes (base de
+// 1 000 paires, Chromium) : 1,5 s de temps propre dans cette fonction. Maintenant : toutes les mesures d'abord
+// (une seule mise en page), toutes les marques ensuite.
+const mesurer = (el) => {
+  try { const sw = el.scrollWidth, cw = el.clientWidth; return sw > cw + 2 && sw - cw - el.scrollLeft > 2; } catch (_) { return null; }
+};
+const marquer = (el, suite) => {
+  if (suite == null) return;
   try {
-    const reste = el.scrollWidth - el.clientWidth - el.scrollLeft;
-    const suite = el.scrollWidth > el.clientWidth + 2 && reste > 2;
     if (suite) { if (el.getAttribute('data-defile') !== 'suite') el.setAttribute('data-defile', 'suite'); }
     else if (el.hasAttribute('data-defile')) el.removeAttribute('data-defile');
   } catch (_) {}
-}
+};
+function juger(el) { marquer(el, mesurer(el)); }
 
 // (7 nov., vitesse) Regroupé : au plus une mesure toutes les 300 ms (avant : à
 // CHAQUE changement de la page, une relecture de mise en page de toutes les
@@ -26,7 +34,11 @@ function toutJuger() {
     prevu = false;
     // (8 nov.) Jamais dans un écran gardé caché (src/ecransGardes.jsx) : le mesurer
     // forcerait toute sa mise en page, que `content-visibility: hidden` saute.
-    try { document.querySelectorAll(SEL).forEach((el) => { if (!el.closest('[data-ecran-cache]')) juger(el); }); } catch (_) {}
+    try {
+      const els = [...document.querySelectorAll(SEL)].filter((el) => !el.closest('[data-ecran-cache]'));
+      const suites = els.map(mesurer);
+      els.forEach((el, i) => marquer(el, suites[i]));
+    } catch (_) {}
   }), 300);
 }
 
