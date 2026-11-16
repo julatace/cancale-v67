@@ -100,6 +100,24 @@ let ko = 0, n = 0;
 const dit = (c, msg, det) => { n++; if (c) console.log('✅ ' + msg); else { ko++; console.log('❌ ' + msg + (det !== undefined ? ' — ' + JSON.stringify(det).slice(0, 500) : '')); } };
 const essaie = async (nom, f) => { try { await f(); } catch (e) { ko++; n++; console.log('❌ ' + nom + ' a levé : ' + String(e && e.message || e).slice(0, 300)); } };
 
+// (16 nov., intégration) Les imports RELATIFS des fichiers copiés (api/_lib → ../../src/alertesSeuils.js, et ce qu'ils
+// importent eux-mêmes) suivis jusqu'au bout : un fichier manquant est copié tel quel depuis la racine (jamais un fichier
+// déjà posé, qui peut porter une mutation). Sans eux l'import levait « Cannot find module … alertesSeuils.js ».
+function copierDependances(dossier, racine) {
+  const vus = new Set(); const file = [];
+  const marche = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) marche(p); else if (/\.m?js$/.test(e.name)) file.push(p); } };
+  marche(dossier);
+  while (file.length) {
+    const p = file.pop(); if (vus.has(p)) continue; vus.add(p);
+    const s = fs.readFileSync(p, 'utf8');
+    for (const m of s.matchAll(/(?:from|import)\s*\(?\s*['"](\.{1,2}\/[^'"]+\.m?js)['"]/g)) {
+      const cible = path.resolve(path.dirname(p), m[1]); const rel = path.relative(dossier, cible);
+      if (rel.startsWith('..') || fs.existsSync(cible)) { if (fs.existsSync(cible)) file.push(cible); continue; }
+      const src = path.join(racine, rel); if (!fs.existsSync(src)) continue;
+      fs.mkdirSync(path.dirname(cible), { recursive: true }); fs.copyFileSync(src, cible); file.push(cible);
+    }
+  }
+}
 (async () => {
   // Les règles, copiées dans un dossier (la mutation y est posée).
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'etag-'));
@@ -117,6 +135,7 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { ko++; n++; con
     texte[m[0]] = texte[m[0]].replace(m[1], m[2]);
   }
   for (const f of FICHIERS) if (texte[f] != null && f.endsWith('.js')) fs.writeFileSync(path.join(dir, f), texte[f]);
+  copierDependances(dir, R);
   const imp = async (f) => { if (texte[f] == null) return { __absent: true }; try { return await import(pathToFileURL(path.join(dir, f)).href); } catch (e) { return { __erreur: String(e && e.message || e) }; } };
   const E = await imp('src/stockEtageres.js'), S = await imp('src/stockSortie.js'), Y = await imp('src/cycleArticle.js'), G = await imp('src/gesteAnnulable.js');
   const A = await imp('src/stockAnnonces.js');
@@ -381,5 +400,7 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { ko++; n++; con
   });
 
   console.log(`\n${n - ko}/${n} contrôles verts${ko ? ` — ${ko} rouge(s)` : ''}.`);
+  // (16 nov., intégration) la copie temporaire est retirée (plus de cent dossiers « etag-* » restaient dans /tmp, disque serré)
+  try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
   process.exit(ko ? 1 : 0);
 })();
