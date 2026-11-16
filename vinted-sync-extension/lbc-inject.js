@@ -59,7 +59,7 @@
   }
   if (window.__vrmLbcInjected) return; window.__vrmLbcInjected = true;
   const TAG = 'CANCALE_LBC';
-  const CAPTEUR_VERSION='5.393.0';
+  const CAPTEUR_VERSION='5.396.0';
   // ⚠️⚠️ 5.362 (revue, moyennes 60 et 63) — UN CANAL PRIVÉ AVEC lbc-relay.js POUR
   //    LES ORDRES. Les ordres du fond (pause, suppression, réponse — leur jeton, le
   //    texte du message) et leurs résultats passaient par `window.postMessage(…,'*')` :
@@ -302,8 +302,11 @@
   const ecrireMemo = (m) => { try { localStorage.setItem('vrm_lbc_detail_vus', JSON.stringify(m)); } catch (_) {} };
   let detailEnCours = false;
   const detailsTentes=new Map(),accusesTransactions=new Map();
-  window.addEventListener('message',event=>{
-    const d=event.data;if(event.source!==window||d?.__tag!=='CANCALE_LBC_ACCUSE'||!Number.isSafeInteger(d.sequence))return;
+  // ⚠️ 5.396 (revue, basse 119) : l'accusé « détail intégré » ne vient plus que du CANAL PRIVÉ
+  //    (avant : `window`, qu'un script de la page pouvait forger — le mémo était posé et le
+  //    détail de transaction jamais relu).
+  surOrdre(d=>{
+    if(d?.__tag!=='CANCALE_LBC_ACCUSE'||!Number.isSafeInteger(d.sequence))return;
     const a=accusesTransactions.get(d.sequence);if(!a)return;clearTimeout(a.timer);accusesTransactions.delete(d.sequence);
     if(d.ok===true){const memo=memoDetail();memo[a.id]={t:Date.now(),st:a.st,preuve:'detail-integre-v1'};ecrireMemo(memo);}
   });

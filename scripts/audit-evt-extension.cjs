@@ -109,7 +109,27 @@ function faireCtx({ lignes = {}, ecriture = () => 201, cloisonne = false, sessio
         const st = ecriture(ids, j.posts.length);
         if (st === 'jette') throw new Error('réseau coupé');
         if (st < 400) for (const r of rows) lignes[r.id] = JSON.parse(JSON.stringify(r.data));
-        return rep(st, '');
+        // 5.396 : `return=representation` (création par comparer-et-échanger) — comme PostgREST.
+        const prefer = String((opts.headers && (opts.headers.Prefer || opts.headers.prefer)) || '');
+        return rep(st, st < 400 && /return=representation/.test(prefer) ? JSON.stringify(rows.map((r) => ({ id: r.id }))) : '');
+      }
+      // 5.396 (revue, moyenne 71) : PATCH conditionnel (`id=eq.X&data->>rev=eq.N`), comme PostgREST —
+      // la ligne de diagnostic s'écrit maintenant par comparer-et-échanger.
+      if ((opts.method || 'GET') === 'PATCH') {
+        const u = decodeURIComponent(u0);
+        const eqp = /[?&]id=eq\.([^&]+)/.exec(u), rv = /data->>rev=(eq\.(\d+)|is\.null)/.exec(u);
+        let corps = {}; try { corps = JSON.parse(opts.body || '{}'); } catch (_) {}
+        const ids = eqp ? [eqp[1]] : [];
+        j.posts.push({ ids, auth: (opts.headers && (opts.headers.Authorization || opts.headers.authorization)) || '', body: opts.body, patch: true });
+        const st = ecriture(ids, j.posts.length);
+        if (st === 'jette') throw new Error('réseau coupé');
+        if (st >= 400) return rep(st, '');
+        const cur = eqp ? lignes[eqp[1]] : undefined;
+        const revCur = cur && Number.isSafeInteger(cur.rev) ? cur.rev : null;
+        const passe = cur !== undefined && rv && (rv[1] === 'is.null' ? revCur == null : String(revCur) === rv[2]);
+        if (!passe) return rep(200, '[]');
+        lignes[eqp[1]] = JSON.parse(JSON.stringify(corps.data));
+        return rep(200, JSON.stringify([{ id: eqp[1] }]));
       }
       const u = decodeURIComponent(metaVersData(u0));
       if (/app_data\?select=owner&limit=1/.test(u)) return cloisonne ? rep(200, '[]') : rep(400, '{"message":"column app_data.owner does not exist"}');

@@ -12,8 +12,12 @@
 // MAIN world et l'extension).
 (function () {
   'use strict';
-  if (window.__cancaleVintedInjected) return;
-  window.__cancaleVintedInjected = true;
+  // 5.396 (revue, basse 103) : la marque « capteur déjà posé » n'est plus une variable
+  //    globale nommée et énumérable de la page (`window.__cancaleVintedInjected`) : une clé
+  //    symbole, non énumérable (ni `Object.keys(window)`, ni `for…in`).
+  const MARQUE_CAPTEUR = (typeof Symbol === 'function' && typeof Symbol.for === 'function') ? Symbol.for('vrm.capteur.vinted') : '__vrmCapteurVinted';
+  if (window[MARQUE_CAPTEUR]) return;
+  try { Object.defineProperty(window, MARQUE_CAPTEUR, { value: true, enumerable: false, configurable: false, writable: false }); } catch (_) { try { window[MARQUE_CAPTEUR] = true; } catch (_) {} }
 
   const TAG = 'CANCALE_VINTED';
   // ⚠️⚠️ 5.356 (revue de robustesse, critique 4) — UN CANAL PRIVÉ AVEC content.js.
@@ -33,8 +37,11 @@
     canal = mc.port1;
     window.postMessage({ __tag: 'CANCALE_VINTED_CANAL' }, location.origin, [mc.port2]);
   } catch (_) { canal = null; }
-  const versContent = (m, origineCible) => {
-    try { if (canal) canal.postMessage(m); else window.postMessage(m, origineCible || '*'); } catch (_) {}
+  // 5.396 (revue, basse 105) : sans canal, RIEN ne part — avant, on retombait sur
+  //    `window.postMessage(…, '*')`, que content.js n'écoute plus mais que tout script de
+  //    la page entendait (jeton CSRF, corps capturés).
+  const versContent = (m) => {
+    try { if (canal) canal.postMessage(m); } catch (_) {}
   };
   const ecoutesCanal = [];
   const surCanal = (fn) => { ecoutesCanal.push(fn); };
@@ -571,7 +578,15 @@ function clocheFavorisNative(activer=false,origine){
   // ensuite exactement la meme action en 1 clic, sans jamais deviner. On exclut
   // le bruit (tracking/metrics) et on ne garde que les vraies actions API.
   const WRITE_METHODS = /^(POST|PUT|PATCH|DELETE)$/i;
-  const WRITE_NOISE = /(track|metric|event|impression|visit|telemetr|analytic|log|pageview|consent)/i;
+  // 5.396 (revue, basse 107) : le bruit se reconnaît à un SEGMENT entier de l'adresse (hôte et
+  //    chemin découpés sur « . / - _ »), jamais à un bout de mot — avant, `log` et `event`
+  //    écartaient « catalog », « dialog », « events_feed »… et leurs recettes n'étaient jamais apprises.
+  const WRITE_NOISE = /^(track|tracks|tracking|tracker|metric|metrics|event|events|impression|impressions|visit|visits|telemetry|analytic|analytics|log|logs|logging|pageview|pageviews|consent|consents)$/i;
+  const bruitEcriture = (url) => {
+    let h = '', p = '';
+    try { const u = new URL(url, location.origin); h = u.hostname; p = u.pathname; } catch (_) { p = String(url || '').split('?')[0]; }
+    return (h + '/' + p).split(/[./_-]+/).some((seg) => seg && WRITE_NOISE.test(seg));
+  };
   const contexteCreation = (method,url) => {
     try {const u=new URL(url,location.origin);if(String(method).toUpperCase()!=='POST'||u.pathname!=='/api/v2/conversations'||!/^(?:(?:www|api)\.)?vinted\.(fr|com|it|de)$/.test(u.hostname))return null;
       const lien=dernierFavoriClique&&Date.now()-dernierFavoriClique.at<=5000?dernierFavoriClique.url:lienContexteFavori(location.href);dernierFavoriClique=null;return lien;
@@ -588,7 +603,7 @@ function clocheFavorisNative(activer=false,origine){
     try {
       if (!WRITE_METHODS.test(method || '')) return;
       if (!/\/api\//.test(url || '')) return;
-      if (WRITE_NOISE.test(url)) return;
+      if (bruitEcriture(url)) return;
       let b = body;
       if (b && typeof b !== 'string') {
         if (typeof URLSearchParams !== 'undefined' && b instanceof URLSearchParams) b = b.toString();

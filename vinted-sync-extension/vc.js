@@ -58,11 +58,29 @@
     return Object.assign({ achats, offset: Number(d.offset) || 0, total: typeof d.total === 'number' ? d.total : null, lus: Number(d.lus) || 0, page: String(d.page || '').slice(0, 160), forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 120).map((c) => String(c).slice(0, 120)) }, suite(d));
   };
   const importsEnAttente = new Map();
+  // ⚠️⚠️ 5.396 (revue, moyennes 60-62) — LE CANAL PRIVÉ. vc-inject.js (monde MAIN,
+  //   document_start, avant tout script de la page) nous remet le second port d'un
+  //   `MessageChannel`, UNE fois : seul le premier est cru. Les ordres du fond partent par lui,
+  //   et seules ses lettres comptent pour les résultats, les recettes « apprises »,
+  //   l'annonce publiée (`vcpublie`) et les personnes qui ont aimé. Une lettre de ces sortes
+  //   arrivée par `window` (n'importe quel script de la page) est jetée.
+  const SORTES_PRIVEES = new Set(['vcpublie', 'vcaimes', 'vcimportmodele', 'vcimportresultat', 'vcenvoiappris', 'vcenvoiresultat', 'vcoffreappris', 'vcoffreresultat', 'vcprixappris', 'vcprixresultat']);
+  let canalOrdres = null;
+  const versCapteur = (m) => { if (!canalOrdres) return false; try { canalOrdres.postMessage(m); return true; } catch (_) { return false; } };
   window.addEventListener('message', (event) => {
     try {
-      if (event.source !== window) return;
+      if (canalOrdres || event.source !== window || event.origin !== location.origin) return;
       const d = event.data;
+      if (!d || d.__tag !== 'CANCALE_VC_CANAL' || !event.ports || !event.ports[0]) return;
+      canalOrdres = event.ports[0];
+      canalOrdres.onmessage = (e) => { try { traiter(e && e.data, true); } catch (_) {} };
+    } catch (_) {}
+  });
+  window.addEventListener('message', (event) => { try { if (event.source === window) traiter(event.data, false); } catch (_) {} });
+  function traiter(d, prive) {
+    try {
       if (!d || d.__tag !== 'CANCALE_VC') return;
+      if (SORTES_PRIVEES.has(d.kind) && prive !== true) return;   // forgé par la page : jeté
       if (!vivant()) return;                    // extension rechargée : on se tait
       // 5.236 : tes annonces et leur boost, et l'identifiant d'une annonce créée.
       if (d.kind === 'vcannonces') {
@@ -242,7 +260,7 @@
         },
       }, () => { void chrome.runtime.lastError; });
     } catch (_) {}
-  });
+  }
   // ── RÉPONDRE, SUR SON CLIC (31 octobre, 5.295) ─────────────────────────────
   // L'ordre ne vient QUE du fond de l'extension (jamais de la page), et ne vaut
   // que pour le cadre principal. Il passe au capteur (monde MAIN, vc-inject.js),
@@ -258,7 +276,7 @@
       const t = setTimeout(() => { if (envoisEnAttente.delete(jeton)) sendResponse({ ok: false, code: 'muet' }); }, 20000);
       envoisEnAttente.set(jeton, (r) => { clearTimeout(t); sendResponse(r); });
       // 5.299 : le compte au nom duquel le fond veut parler — la page refuse si ce n'est pas le sien.
-      window.postMessage(Object.assign({ __tag: 'CANCALE_VC_ORDRE', kind: 'repondre', jeton, conv, texte, recette: msg.recette }, /^[\w-]{1,40}$/.test(String(msg.compte || '')) ? { compte: String(msg.compte) } : {}), '*');
+      if (!versCapteur(Object.assign({ __tag: 'CANCALE_VC_ORDRE', kind: 'repondre', jeton, conv, texte, recette: msg.recette }, /^[\w-]{1,40}$/.test(String(msg.compte || '')) ? { compte: String(msg.compte) } : {}))) { clearTimeout(t); envoisEnAttente.delete(jeton); sendResponse({ ok: false, code: 'canal' }); }
       return true;
     });
   } catch (_) {}
@@ -271,7 +289,7 @@
       const jeton = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2, 12));
       const t = setTimeout(() => { if (importsEnAttente.delete(jeton)) sendResponse({ ok: false, code: 'muet' }); }, 25000);
       importsEnAttente.set(jeton, (r) => { clearTimeout(t); sendResponse(r); });
-      window.postMessage({ __tag: 'CANCALE_VC_ORDRE', kind: 'importpage', jeton, quoi: msg.quoi, url: msg.url.slice(0, 600), compte: String(msg.compte) }, location.origin);
+      if (!versCapteur({ __tag: 'CANCALE_VC_ORDRE', kind: 'importpage', jeton, quoi: msg.quoi, url: msg.url.slice(0, 600), compte: String(msg.compte) })) { clearTimeout(t); importsEnAttente.delete(jeton); sendResponse({ ok: false, code: 'canal' }); }
       return true;
     });
   } catch (_) {}
@@ -285,7 +303,7 @@
       const jeton = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2, 12));
       const t = setTimeout(() => { if (envoisEnAttente.delete(jeton)) sendResponse({ ok: false, code: 'muet' }); }, 25000);
       envoisEnAttente.set(jeton, (r) => { clearTimeout(t); sendResponse(r); });
-      window.postMessage(Object.assign({ __tag: 'CANCALE_VC_ORDRE', kind: 'prix', jeton, produit, avantCents: avant, apresCents: apres, recette: msg.recette }, /^[\w-]{1,40}$/.test(String(msg.compte || '')) ? { compte: String(msg.compte) } : {}), '*');
+      if (!versCapteur(Object.assign({ __tag: 'CANCALE_VC_ORDRE', kind: 'prix', jeton, produit, avantCents: avant, apresCents: apres, recette: msg.recette }, /^[\w-]{1,40}$/.test(String(msg.compte || '')) ? { compte: String(msg.compte) } : {}))) { clearTimeout(t); envoisEnAttente.delete(jeton); sendResponse({ ok: false, code: 'canal' }); }
       return true;
     });
   } catch (_) {}
@@ -300,8 +318,8 @@
       const jeton = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2, 12));
       const t = setTimeout(() => { if (envoisEnAttente.delete(jeton)) sendResponse({ ok: false, code: 'muet' }); }, 20000);
       envoisEnAttente.set(jeton, (r) => { clearTimeout(t); sendResponse(r); });
-      window.postMessage(Object.assign({ __tag: 'CANCALE_VC_ORDRE', kind: 'offre', jeton, nego, geste, prixCents: Number(msg.prixCents) || 0, recette: msg.recette },
-        favori ? { produit: String(msg.produit), acheteur: String(msg.acheteur) } : {}, /^[\w-]{1,40}$/.test(String(msg.compte || '')) ? { compte: String(msg.compte) } : {}), '*');
+      if (!versCapteur(Object.assign({ __tag: 'CANCALE_VC_ORDRE', kind: 'offre', jeton, nego, geste, prixCents: Number(msg.prixCents) || 0, recette: msg.recette },
+        favori ? { produit: String(msg.produit), acheteur: String(msg.acheteur) } : {}, /^[\w-]{1,40}$/.test(String(msg.compte || '')) ? { compte: String(msg.compte) } : {}))) { clearTimeout(t); envoisEnAttente.delete(jeton); sendResponse({ ok: false, code: 'canal' }); }
       return true;
     });
   } catch (_) {}

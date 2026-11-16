@@ -48,8 +48,19 @@ const COMPAT = 'compat-firefox.js';
 //  · `compat-firefox.js` en tête de chaque script qui parle à `chrome.*`
 //    (jamais dans ceux du monde de la page : ils n'ont pas `chrome`).
 const ID_FIREFOX = 'vrm@vrm.center';
+// 5.396 (revue, moyenne 68) : `frame-ancestors` (qui peut encadrer popup.html) est posé pour
+// Chrome / Edge / Opera, où il est mesuré (Chromium, 16 nov.). Firefox et Safari ne le
+// garantissent pas dans la politique d'une extension : retiré de leur paquet, la règle de
+// `popup.js` (`cadreAutorise`) les tient seule, comme avant.
+function sansFrameAncestors(f) {
+  const c = f.content_security_policy;
+  if (c && typeof c === 'object' && typeof c.extension_pages === 'string') {
+    c.extension_pages = c.extension_pages.split(';').map((x) => x.trim()).filter((x) => x && !/^frame-ancestors\b/i.test(x)).join('; ');
+  }
+  return f;
+}
 function manifesteFirefox(m) {
-  const f = JSON.parse(JSON.stringify(m));
+  const f = sansFrameAncestors(JSON.parse(JSON.stringify(m)));
   const fond = f.background && f.background.service_worker;
   f.background = { scripts: [COMPAT, fond || 'background.js'] };
   delete f.externally_connectable;
@@ -89,7 +100,7 @@ function manifesteFirefox(m) {
 //    lbc-inject.js et vc-inject.js se posent eux-mêmes dans la page ;
 //  · `externally_connectable` GARDÉ : Safari le prend en charge (matches seuls).
 function manifesteSafari(m) {
-  const f = JSON.parse(JSON.stringify(m));
+  const f = sansFrameAncestors(JSON.parse(JSON.stringify(m)));
   const fond = f.background && f.background.service_worker;
   f.background = { scripts: [COMPAT, fond || 'background.js'], persistent: false };
   f.permissions = (f.permissions || []).filter((p) => p !== 'downloads');
@@ -163,7 +174,7 @@ function preparerArchive(dossier) {
 // (8 nov.) Les fonctions de manifeste servent aussi `paquets-boutiques.cjs`
 // (paquets des boutiques, sans toucher public/) : on les exporte, et le zip
 // ne se fabrique que lorsque CE script est lancé.
-module.exports = { manifesteFirefox, manifesteSafari, compatDansPopup, preparerArchive, COMPAT, ID_FIREFOX, sourcesEnLigne };
+module.exports = { sansFrameAncestors, manifesteFirefox, manifesteSafari, compatDansPopup, preparerArchive, COMPAT, ID_FIREFOX, sourcesEnLigne };
 if (require.main === module) {
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vrm-zip-'));
 try {

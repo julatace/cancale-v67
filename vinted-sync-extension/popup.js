@@ -517,6 +517,9 @@ function chargerAuth(rester) {
 function lancerCadre() {
   try { document.body.replaceChildren(); document.body.classList.remove('decide'); } catch (_) {}
   globalThis.__vrmCadre = true;
+  // 5.396 (revue, basse 123) : l'origine EXACTE de la page qui nous encadre (déjà jugée par
+  // `cadreAutorise`) — la carte ne parle plus qu'à elle (avant : `postMessage(…, '*')`).
+  globalThis.__vrmCadreOrigine = origineDuParent();
   const s = document.createElement('script');
   s.src = 'vrm-badge.js';
   (document.head || document.documentElement).appendChild(s);
@@ -539,6 +542,16 @@ function cadreAutorise() {
     let o = ''; try { o = new URL(document.referrer).origin; } catch (_) { o = ''; }
     return HOTES_CADRE.test(o);
   } catch (_) { return false; }
+}
+function origineDuParent() {
+  try {
+    if (window.parent === window) return '';
+    const anc = location.ancestorOrigins;
+    let o = '';
+    if (anc && typeof anc.length === 'number') o = anc.length ? String(anc[0]) : '';
+    else { try { o = new URL(document.referrer).origin; } catch (_) { o = ''; } }
+    return HOTES_CADRE.test(o) ? o : '';
+  } catch (_) { return ''; }
 }
 if ((REPARER || CARTE) && !cadreAutorise()) { try { document.body.setAttribute('data-cadre', 'refuse'); document.body.replaceChildren(); } catch (_) {} }
 else if (REPARER) reparerSiPerime().then((r) => { try { document.body.setAttribute('data-reparation', r); } catch (_) {} });

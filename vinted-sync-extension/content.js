@@ -206,18 +206,20 @@
     if(!versPage({__tag:'CANCALE_VINTED_FAVORI_REQ',id:m.id,action:m.action,cible:m.cible})){clearTimeout(timer);attentesFavoris.delete(m.id);sendResponse(null);}
     return true;
   }
+  // 5.396 (revue, moyenne 67) : le stockage qu'une page peut lire (miroir du fond, sinon `local`).
+  const zonePage = (cb) => { let fini = false; const L = () => { try { return chrome.storage.local; } catch (_) { return null; } }; const prendre = (z) => { if (fini) return; fini = true; try { cb(z); } catch (_) {} }; try { if (typeof globalThis.__vrmZonePage === 'function') { globalThis.__vrmZonePage(prendre); return; } const S = chrome.storage.session; if (!S || typeof S.get !== 'function') { prendre(L()); return; } setTimeout(() => prendre(L()), 1500); const r = S.get('vrmMiroir', (o) => { let ok = false; try { ok = !chrome.runtime.lastError && !!(o && o.vrmMiroir); } catch (_) {} prendre(ok ? S : L()); }); if (r && typeof r.catch === 'function') r.catch(() => prendre(L())); } catch (_) { prendre(L()); } };
   // La boîte aux lettres (navigateur sans `tabs.sendMessage`) : une demande
   // posée par le fond dans `chrome.storage.local`, prise par UN onglet Vinted.
   try {
     chrome.storage.onChanged.addListener((ch, zone) => {
       try {
-        if (zone !== 'local' || !ch || !ch.vrmPageReq) return;
+        if ((zone !== 'local' && zone !== 'session') || !ch || !ch.vrmPageReq) return;   // 5.396 : miroir des pages dans `session`
         const req = ch.vrmPageReq.newValue;
         if (!req || req.vrm !== 'fetchPage' || Date.now() - Number(req.at || 0) > 20000) return;
         // 5.361 : seul l'onglet VISÉ répond (numéro connu et égal) — jamais « un
         // onglet Vinted visible quelconque » (autre domaine, autre compte, doublon).
         if (monOnglet == null || req.tab !== monOnglet) return;
-        demanderPage(req).then((o) => { if (o) chrome.storage.local.set({ vrmPageRep: o }); });
+        demanderPage(req).then((o) => { if (o) zonePage((z) => { try { if (z) { const r = z.set({ vrmPageRep: o }); if (r && typeof r.catch === 'function') r.catch(() => {}); } } catch (_) {} }); });
       } catch (_) {}
     });
   } catch (_) {}

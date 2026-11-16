@@ -64,7 +64,9 @@ const fuite = (o) => { const s = JSON.stringify(o == null ? null : o); return PE
         return r.fulfill({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': 'https://fr.vestiairecollective.com', 'access-control-allow-credentials': 'true', 'access-control-allow-headers': '*' }, body: JSON.stringify(body) });
       });
       await p.goto('https://fr.vestiairecollective.com/messages/');
-      await p.addScriptTag({ content: 'window.__msgs=[];window.addEventListener("message",(e)=>{if(e.data&&e.data.__tag==="CANCALE_VC")window.__msgs.push(e.data)});' });
+      // 5.396 : le banc tient le bout « relais » du canal privé que vc-inject.js remet (comme vc.js) ;
+      // les résultats et les recettes n'arrivent QUE par ce port, les ordres partent par lui.
+      await p.addScriptTag({ content: 'window.__msgs=[];window.__surPort=[];window.addEventListener("message",(e)=>{if(e.data&&e.data.__tag==="CANCALE_VC_CANAL"&&e.ports&&e.ports[0]&&!window.__port){window.__port=e.ports[0];window.__port.onmessage=(ev)=>{if(ev.data&&ev.data.__tag==="CANCALE_VC"){window.__msgs.push(ev.data);for(const f of window.__surPort)f(ev.data);}};return;}if(e.data&&e.data.__tag==="CANCALE_VC")window.__msgs.push(e.data)});' });
       await p.addScriptTag({ content: inj });
       return { c, p, recues, msgs: (k) => p.evaluate((kk) => window.__msgs.filter((m) => m.kind === kk), k) };
     };
@@ -115,8 +117,8 @@ const fuite = (o) => { const s = JSON.stringify(o == null ? null : o); return PE
     const avant = A.recues.length;
     const res = await A.p.evaluate(async (recette) => {
       const j = 'jeton-ordre-0001';
-      const p = new Promise((ok) => { window.addEventListener('message', (e) => { if (e.data && e.data.__tag === 'CANCALE_VC' && e.data.kind === 'vcenvoiresultat' && e.data.jeton === j) ok(e.data); }); setTimeout(() => ok(null), 4000); });
-      window.postMessage({ __tag: 'CANCALE_VC_ORDRE', kind: 'repondre', jeton: j, conv: 'C7777', texte: 'Oui, envoi demain matin', recette }, '*');
+      const p = new Promise((ok) => { window.__surPort.push((d) => { if (d && d.kind === 'vcenvoiresultat' && d.jeton === j) ok(d); }); setTimeout(() => ok(null), 4000); });
+      window.__port.postMessage({ __tag: 'CANCALE_VC_ORDRE', kind: 'repondre', jeton: j, conv: 'C7777', texte: 'Oui, envoi demain matin', recette });
       return p;
     }, r);
     const envoi = A.recues.slice(avant).filter((x) => x.methode === 'POST');
@@ -125,19 +127,29 @@ const fuite = (o) => { const s = JSON.stringify(o == null ? null : o); return PE
     dit(envoi.length === 1 && envoi[0].entetes['x-vc-auth'] === 'jeton-tres-secret', 'avec l’en-tête que la PAGE vient d’envoyer (gardé en mémoire dans la page, jamais transmis)', JSON.stringify(envoi[0] && envoi[0].entetes));
     const res2 = await A.p.evaluate(async (recette) => {
       const j = 'jeton-ordre-0002';
-      const p = new Promise((ok) => { window.addEventListener('message', (e) => { if (e.data && e.data.__tag === 'CANCALE_VC' && e.data.kind === 'vcenvoiresultat' && e.data.jeton === j) ok(e.data); }); setTimeout(() => ok(null), 3000); });
-      window.postMessage({ __tag: 'CANCALE_VC_ORDRE', kind: 'repondre', jeton: j, conv: 'C7777', texte: 'x', recette: Object.assign({}, recette, { hote: 'evil.exemple.test' }) }, '*');
+      const p = new Promise((ok) => { window.__surPort.push((d) => { if (d && d.kind === 'vcenvoiresultat' && d.jeton === j) ok(d); }); setTimeout(() => ok(null), 3000); });
+      window.__port.postMessage({ __tag: 'CANCALE_VC_ORDRE', kind: 'repondre', jeton: j, conv: 'C7777', texte: 'x', recette: Object.assign({}, recette, { hote: 'evil.exemple.test' }) });
       return p;
     }, r);
     dit(!!res2 && res2.statut === 0 && res2.erreur === 'recette', 'une recette vers un AUTRE hôte que Vestiaire est refusée (rien ne part)', JSON.stringify(res2));
+    // 5.396 (revue, moyenne 60) : un ordre posté sur `window` par un script de la page — même
+    // bonne recette, même jeton bien formé — ne fait RIEN partir et ne rend aucun résultat.
+    const nForge = A.recues.length;
+    const forge = await A.p.evaluate(async (recette) => {
+      const j = 'jeton-forge-0009';
+      const p = new Promise((ok) => { const vu = (d) => { if (d && d.kind === 'vcenvoiresultat' && d.jeton === j) ok(d); }; window.__surPort.push(vu); window.addEventListener('message', (e) => vu(e.data)); setTimeout(() => ok(null), 1500); });
+      window.postMessage({ __tag: 'CANCALE_VC_ORDRE', kind: 'repondre', jeton: j, conv: 'C7777', texte: 'forgé par la page', recette }, location.origin);
+      return p;
+    }, r);
+    dit(forge === null && A.recues.slice(nForge).filter((x) => x.methode === 'POST').length === 0, 'un ordre « répondre » posté sur `window` par un script de la page : RIEN ne part, aucun résultat (seul le canal privé commande)', JSON.stringify({ forge, n: A.recues.length - nForge }));
     await A.c.close();
     // ── Une page qui n'a encore parlé à personne : pas d'en-têtes ⇒ rien ne part
     const B = await ouvrir();
     const n0 = B.recues.length;
     const res3 = await B.p.evaluate(async (recette) => {
       const j = 'jeton-ordre-0003';
-      const p = new Promise((ok) => { window.addEventListener('message', (e) => { if (e.data && e.data.__tag === 'CANCALE_VC' && e.data.kind === 'vcenvoiresultat' && e.data.jeton === j) ok(e.data); }); setTimeout(() => ok(null), 3000); });
-      window.postMessage({ __tag: 'CANCALE_VC_ORDRE', kind: 'repondre', jeton: j, conv: 'C7777', texte: 'Bonjour', recette }, '*');
+      const p = new Promise((ok) => { window.__surPort.push((d) => { if (d && d.kind === 'vcenvoiresultat' && d.jeton === j) ok(d); }); setTimeout(() => ok(null), 3000); });
+      window.__port.postMessage({ __tag: 'CANCALE_VC_ORDRE', kind: 'repondre', jeton: j, conv: 'C7777', texte: 'Bonjour', recette });
       return p;
     }, r);
     dit(!!res3 && res3.statut === 0 && res3.erreur === 'entetes' && B.recues.length === n0, 'sans les en-têtes de la page (rien chargé depuis l’ouverture) : RIEN ne part, et c’est dit', JSON.stringify({ res3, n: B.recues.length - n0 }));

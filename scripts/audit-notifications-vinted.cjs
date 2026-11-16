@@ -14,7 +14,7 @@ const ctx={URL,Headers,Request,Response,Promise,Uint8Array,ArrayBuffer,Date,cons
  location:{origin:'https://www.vinted.fr',href:'https://www.vinted.fr/member/general'},
  document:{hidden:false,addEventListener(){},querySelectorAll(){return[];}},
  setTimeout(f,ms){minuteries.push({f,ms});return minuteries.length;},clearTimeout(){},setInterval(){},clearInterval(){},
- addEventListener(){},postMessage(m){posts.push(m);},
+ addEventListener(){},postMessage(m){if(!(m&&m.__tag==='CANCALE_VINTED_CANAL'))posts.push(m);},MessageChannel:require('./_canal-faux.cjs').canalVersBanc((m)=>posts.push(m)),
  fetch:async()=>{appels++;return new Response(fixture.body,{status:fixture.status,headers:{'Content-Type':'application/json'}});}
 };ctx.window=ctx;vm.createContext(ctx);vm.runInContext(source,ctx);
 let verts=0,rouges=0;const check=(c,t)=>{console.log((c?'✅ ':'❌ ')+t);c?verts++:rouges++;};

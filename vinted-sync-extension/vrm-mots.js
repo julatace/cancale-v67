@@ -5,6 +5,25 @@
 // `chrome.storage.local.vrm_vend_ext` ({ vend, owner, at }) : « sneakers » ⇒ « paire »
 // (Julien, les textes d'avant mot pour mot) ; sinon « article ». Rien de rangé ⇒ les
 // textes d'avant. Aucune lecture réseau ici, aucune écriture.
+// 5.396 (revue, moyenne 67) — LE STOCKAGE QU'UNE PAGE PEUT LIRE. Sur Chrome / Edge, le fond
+// réserve `chrome.storage.local` à l'extension (jetons) et tient pour les pages un MIROIR sans
+// secret dans `chrome.storage.session` (marque `vrmMiroir`). `__vrmZonePage(cb)` rend le miroir
+// s'il est posé, sinon `local` comme avant (Firefox, Orion, Safari) ; partagé par les scripts
+// de contenu chargés après celui-ci (vrm-badge.js, vinted-capture.js…).
+if (typeof globalThis.__vrmZonePage !== 'function') {
+  globalThis.__vrmZonePage = (cb) => {
+    let fini = false;
+    const local = () => { try { return chrome.storage.local; } catch (_) { return null; } };
+    const prendre = (z) => { if (fini) return; fini = true; try { cb(z); } catch (_) {} };
+    try {
+      const S = chrome.storage.session;
+      if (!S || typeof S.get !== 'function') { prendre(local()); return; }
+      setTimeout(() => prendre(local()), 1500);
+      const r = S.get('vrmMiroir', (o) => { let ok = false; try { ok = !chrome.runtime.lastError && !!(o && o.vrmMiroir); } catch (_) {} prendre(ok ? S : local()); });
+      if (r && typeof r.catch === 'function') r.catch(() => prendre(local()));
+    } catch (_) { prendre(local()); }
+  };
+}
 (() => {
   if (globalThis.VRM_MOTS) return;
   const MOTS_ARTICLE = (() => {
@@ -24,8 +43,8 @@ const MOTS = {
   let vend = 'sneakers';
   const lire = (v) => { vend = v && typeof v === 'object' && v.vend === 'autre' ? 'autre' : 'sneakers'; };
   try {
-    chrome.storage.local.get('vrm_vend_ext').then((o) => lire(o && o.vrm_vend_ext)).catch(() => {});
-    chrome.storage.onChanged.addListener((ch, zone) => { if (zone === 'local' && ch.vrm_vend_ext) lire(ch.vrm_vend_ext.newValue); });
+    globalThis.__vrmZonePage((z) => { try { if (z) z.get('vrm_vend_ext', (o) => { try { void chrome.runtime.lastError; } catch (_) {} lire(o && o.vrm_vend_ext); }); } catch (_) {} });
+    chrome.storage.onChanged.addListener((ch, zone) => { if ((zone === 'local' || zone === 'session') && ch.vrm_vend_ext) lire(ch.vrm_vend_ext.newValue); });
   } catch (_) {}
   globalThis.VRM_MOTS = { mots: () => MOTS_ARTICLE[vend], vend: () => vend, MOTS_ARTICLE };
 })();

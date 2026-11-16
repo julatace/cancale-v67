@@ -43,6 +43,10 @@
   // site ne peut pas écrire dans le monde de l'extension) : le formulaire seul,
   // sans logo ni état (la carte du site les montre).
   const CADRE = (() => { try { return globalThis.__vrmCadre === true && window.top !== window; } catch (_) { return false; } })();
+  // 5.396 (revue, moyenne 67) : le stockage qu'une PAGE peut lire — le miroir sans secret du
+  // fond (`chrome.storage.session`) s'il est posé, sinon `local` (vrm-mots.js, `__vrmZonePage`).
+  // Dans la fenêtre de l'extension (cadre, listes) : `local`, comme avant.
+  const zonePage = (cb) => { try { if (typeof globalThis.__vrmZonePage === 'function') { globalThis.__vrmZonePage((z) => { if (z) cb(z); }); return; } cb(chrome.storage.local); } catch (_) {} };
   const MDP_PERMIS = CADRE;
   // 5.377 : la fenêtre de l'extension (popup.html?mode=onglet) charge CE fichier en mode
   // « listes » : Favoris · Annonces · Ventes du compte connecté, sans logo ni carte flottante.
@@ -528,7 +532,11 @@
   // état, ni verre (le verre est celui de la carte du site, derrière). Il dit à
   // la carte du site qu'il s'affiche (« prête ») et sa hauteur — rien d'autre
   // ne sort d'ici (ni e-mail, ni code, ni mot de passe, ni état).
-  const direAuSite = (d) => { if (!CADRE) return; try { window.parent.postMessage(Object.assign({ __vrmCarte: '' }, d), '*'); } catch (_) {} };
+  // 5.396 (revue, basse 123) : à l'origine EXACTE de la page qui nous encadre (posée par
+  // popup.js après `cadreAutorise`), jamais '*' — l'adresse Google / Discord (`aller`) ne part
+  // plus vers une page qui aurait navigué entre-temps. Origine inconnue ⇒ rien ne part.
+  const ORIGINE_PARENT = (() => { try { const o = String(globalThis.__vrmCadreOrigine || ''); return /^https:\/\/[a-z0-9.-]+$/i.test(o) ? o : ''; } catch (_) { return ''; } })();
+  const direAuSite = (d) => { if (!CADRE || !ORIGINE_PARENT) return; try { window.parent.postMessage(Object.assign({ __vrmCarte: '' }, d), ORIGINE_PARENT); } catch (_) {} };
   if (LISTES) {
     const st = document.createElement('style');
     st.textContent = `.btn, .question, .connexion, .capte { display: none !important; }
@@ -994,7 +1002,7 @@
   //     site), une vente est une ligne ; les liens du site restent ceux de la carte.
   // Tout vient du service worker (`carteListes`, lecture seule) ; pas su ⇒ « — », dit.
   let ongletListe = 'favoris', porteeTous = false, listes = null, listesAt = 0, listesEnVol = false, listesErreur = '';
-  try { chrome.storage.local.get(['vrmCarteOnglet', 'vrmCartePortee'], (g) => { try { void chrome.runtime.lastError; } catch (_) {} g = g || {}; if (['favoris', 'annonces', 'ventes'].includes(g.vrmCarteOnglet)) ongletListe = g.vrmCarteOnglet; if (g.vrmCartePortee === 'tous') porteeTous = true; }); } catch (_) {}
+  try { zonePage((z) => z.get(['vrmCarteOnglet', 'vrmCartePortee'], (g) => { try { void chrome.runtime.lastError; } catch (_) {} g = g || {}; if (['favoris', 'annonces', 'ventes'].includes(g.vrmCarteOnglet)) ongletListe = g.vrmCarteOnglet; if (g.vrmCartePortee === 'tous') porteeTous = true; })); } catch (_) {}
   const eurosL = (n) => { const x = Number(n); if (!(x > 0)) return '—'; const c = Math.round(x * 100); return (c % 100 ? (c / 100).toFixed(2).replace('.', ',') : String(c / 100)) + ' €'; };
   const ETAT_VENTE = { a_expedier: 'à expédier', en_route: 'en route', finalisee: 'finalisée', annulee: 'annulée — pas une vente', pas_su: 'état pas encore lu' };
   function chargerListes(force) {
@@ -2120,10 +2128,10 @@
     if (W - rr - t / 2 < W / 2) hote.setAttribute('data-gauche', ''); else hote.removeAttribute('data-gauche');
     return { r: rr, b: bb };
   }
-  const ranger = (o) => { try { chrome.storage.local.set(o); } catch (_) {} };
+  const ranger = (o) => { try { zonePage((z) => { try { const r = z.set(o); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch (_) {} }); } catch (_) {} };
   function enregistrerPlace(p) {
     posPerso = p;
-    try { chrome.storage.local.get('vrmBadgePos', (g) => { let m = {}; try { m = Object.assign({}, (g && g.vrmBadgePos) || {}); } catch (_) {} if (p) m[CLE_SITE] = p; else delete m[CLE_SITE]; ranger({ vrmBadgePos: m }); }); } catch (_) {}
+    try { zonePage((z) => z.get('vrmBadgePos', (g) => { let m = {}; try { m = Object.assign({}, (g && g.vrmBadgePos) || {}); } catch (_) {} if (p) m[CLE_SITE] = p; else delete m[CLE_SITE]; ranger({ vrmBadgePos: m }); })); } catch (_) {}
   }
   function remettreEnPlace() { placer(16, 16); enregistrerPlace(null); }
   function poserMini(oui) {
@@ -2142,7 +2150,7 @@
     if (t) hote.setAttribute('data-theme', t); else hote.removeAttribute('data-theme');
   }
   try {
-    chrome.storage.local.get(['vrmApparence', 'vrmBadgePos', 'vrmBadgeMini'], (g) => {
+    zonePage((z) => z.get(['vrmApparence', 'vrmBadgePos', 'vrmBadgeMini'], (g) => {
       try { if (chrome.runtime.lastError) return; } catch (_) { return; }
       g = g || {};
       if (['clair', 'sombre', 'auto', 'soir'].includes(g.vrmApparence)) { modeApparence = g.vrmApparence; appliquerTeinte(); }
@@ -2151,7 +2159,7 @@
       if (p && Number.isFinite(Number(p.r)) && Number.isFinite(Number(p.b))) posPerso = placer(Number(p.r), Number(p.b));
       else placer(16, 16);
       if (etat) rendre();
-    });
+    }));
   } catch (_) {}
   // 5.371 : une mesure par image au plus (redimensionnement, défilement, page qui change).
   let replacerDemande = false;
@@ -2264,7 +2272,7 @@
   // interroger qui que ce soit en boucle.
   try {
     chrome.storage.onChanged.addListener((ch, zone) => {
-      if (zone !== 'local') return;
+      if (zone !== 'local' && zone !== 'session') return;   // 5.396 : le miroir des pages vit dans `session`
       // 5.329 : Google / Discord dans la petite fenêtre — un refus est dit dans la carte.
       const o = ch.vrmOAuthEtat && ch.vrmOAuthEtat.newValue;
       if (o && o.etat === 'erreur' && formulaireEl) { direEtat(''); direErreur(o.message || 'La connexion n’a pas abouti.'); }
@@ -2413,7 +2421,7 @@
     capteEl.addEventListener('click', () => cacherCapte('toucher'));
     capteEl.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') capteSurvol = true; });
     capteEl.addEventListener('pointerleave', () => { capteSurvol = false; });
-    try { chrome.storage.onChanged.addListener((ch, zone) => { if (zone === 'local' && (ch.vrmCapteLots || ch.vrmCapteReglage)) setTimeout(demanderCapte, 250); }); } catch (_) {}
+    try { chrome.storage.onChanged.addListener((ch, zone) => { if ((zone === 'local' || zone === 'session') && (ch.vrmCapteLots || ch.vrmCapteReglage)) setTimeout(demanderCapte, 250); }); } catch (_) {}
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') setTimeout(demanderCapte, 600); });
     setTimeout(demanderCapte, 1200);
   }

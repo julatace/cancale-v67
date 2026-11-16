@@ -152,7 +152,8 @@ const lire = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch (_) { ret
     const faire = (id) => {
       const relaye = [], postes = [], ecouteurs = [];
       const win = { postMessage: (m) => postes.push(m), addEventListener: (t, f) => { if (t === 'message') ecouteurs.push(f); }, removeEventListener() {} };
-      const ctx = { window: win, document: { addEventListener() {}, removeEventListener() {}, createElement: () => ({ style: {}, setAttribute() {}, remove() {} }), body: { appendChild() {} } },
+      const ctx = { window: win, location: { origin: 'https://vrm.center', href: 'https://vrm.center/' },   // 5.396 : le pont poste à l'origine exacte de la page
+        document: { addEventListener() {}, removeEventListener() {}, createElement: () => ({ style: {}, setAttribute() {}, remove() {} }), body: { appendChild() {} } },
         setTimeout: () => 0, clearTimeout() {}, Object, String, JSON,
         chrome: { runtime: { id, lastError: null, getManifest: () => ({ version: '5.188.0' }), getURL: (p) => p, sendMessage: (m, cb) => { relaye.push(m); if (cb) cb({ ok: true, besoin: true, nonce: 'n' }); }, onMessage: { addListener() {} } } } };
       ctx.globalThis = ctx; vm.createContext(ctx); vm.runInContext(SRC, ctx);
