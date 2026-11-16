@@ -43,7 +43,8 @@ const PHOTO = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http:
 const V = [
   { tx: 9103, titre: 'Nike Cortez', uid: '111', num: '103', prix: '60.0', age: 2, suivi: 'XW103456789TS', limite: '17/11/2026 à 12:00', taille: '38', ach: 'paul_r' },
   { tx: 9110, titre: 'Nike Cortez', uid: '222', num: '110', prix: '65.0', age: 1, suivi: '41103456', limite: '18/11/2026 à 12:00', taille: '41', ach: 'lea.b' },
-  { tx: 9119, titre: 'Nike Terminator Low', uid: '111', num: '119', prix: '110.0', age: 0.2, suivi: '42119456', limite: '19/11/2026 à 12:00', taille: '36', ach: 'nina.k' },
+  // (16 nov., relier-fiable) la vente écrit sa couleur : l'achat n'est proposé que « très probable » (taille ET couleur).
+  { tx: 9119, titre: 'Nike Terminator Low rose', uid: '111', num: '119', prix: '110.0', age: 0.2, suivi: '42119456', limite: '19/11/2026 à 12:00', taille: '36', ach: 'nina.k' },
 ];
 const PARTIS = [
   { tx: 9146, titre: 'Adidas Samba OG', uid: '111', num: '146', prix: '80.0', age: 4, status: 'Colis en transit', tus: 'waiting' },

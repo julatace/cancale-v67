@@ -61,10 +61,13 @@ vm.runInNewContext([bout('const KNOWN_BRANDS=[', '];'), bout('function extractBr
   const MODELES = ['Salomon XT-6 noir', 'Nike Air Max 1 blanc', 'Adidas Samba beige', 'New Balance 550 vert', 'Asics Gel-1130 gris', 'Adidas Spezial bleu'];
   const achats = [];
   for (let i = 0; i < 300; i++) achats.push({ transaction_id: 5000 + i, title: `${MODELES[i % MODELES.length]} taille ${36 + (i % 10)}`, date: new Date(T0 + i * J / 3).toISOString(), price: { amount: String(30 + (i % 20)) }, status: 'Transaction finalisée' });
+  // (16 nov., train : relier-fiable) une proposition n'est faite que si elle est EXCLUSIVE : la paire cherchée a
+  // UN achat qui lui correspond (taille 47, absente de la série 36–45) — sinon la liste est vide et L2 ne mesure rien.
+  achats.push({ transaction_id: 9999, title: 'Salomon XT-6 noir taille 47', date: new Date(T0 + 150 * J).toISOString(), price: { amount: '40' }, status: 'Transaction finalisée' });
   let appels = 0;
   const marqueDe = (t) => { appels++; return ctx.extractBrand(t); };
   const regles = { marqueDe, couleursDe: ctx.extractColors, modeleDe: ctx.extractModel };
-  const cible = { key: 'v:1', titre: 'Salomon XT-6 noir taille 42', marque: 'Salomon', taille: '42', dateRef: new Date(T0 + 200 * J).toISOString(), dateRefSource: 'vente', prix: { amount: '80' } };
+  const cible = { key: 'v:1', titre: 'Salomon XT-6 noir taille 47', marque: 'Salomon', taille: '47', dateRef: new Date(T0 + 200 * J).toISOString(), dateRefSource: 'vente', prix: { amount: '80' } };
   const resume = (l) => JSON.stringify((l || []).map((p) => [String(p.achat.transaction_id), Math.round(p.score * 1000), p.niveau]));
   appels = 0; const r1 = L.propositionsArticle({ cible, achats, ...regles }); const a1 = appels;
   appels = 0; const r2 = L.propositionsArticle({ cible, achats, ...regles }); const a2 = appels;
