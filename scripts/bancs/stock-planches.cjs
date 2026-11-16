@@ -140,7 +140,7 @@ const retirer = async (pg, n) => { await direVendue(pg, n); await pg.waitForSele
         const pl2 = await r.pg.evaluate(() => [...document.querySelectorAll('[data-meuble="mG"] [data-planche]')].map((x) => x.getAttribute('data-planche')).join(','));
         const sauve = await r.pg.evaluate(() => { try { return JSON.stringify((JSON.parse(localStorage.getItem('vrm_meubles')) || []).find((m) => m.id === 'mG')); } catch (_) { return ''; } });
         dit(avant === 'false' && pl2 === '2,3' && /"planches":\[2,3\]/.test(sauve) && /"gravite":true/.test(sauve), `${t} : l'éditeur pose la planche, elle est dessinée et enregistrée`, `${avant} ${pl2} ${sauve}`);
-        dit(await ou(r.pg, '2') === 'mG:4.1' && await ou(r.pg, '4') === 'mG:2.1', `${t} : les articles restent à leur place après l'enregistrement`, `${await ou(r.pg, '2')} ${await ou(r.pg, '4')}`);
+        dit(await ou(r.pg, '2') === 'mG:4.1' && await ou(r.pg, '4') === 'mG:2.1', `${t} : les articles restent à leur place après l'enregistrement`, `${await ou(r.pg, '2')} ${await ou(r.pg, '4')} (N°3 : ${await ou(r.pg, '3')}, N°1 : ${await ou(r.pg, '1')}, N°5 : ${await ou(r.pg, '5')})`);
         if (process.env.SHOT) { await r.pg.evaluate(() => document.querySelector('[data-meuble="mG"]').scrollIntoView()); await r.pg.screenshot({ path: process.env.SHOT + (tel ? '-390' : '-1512') + '.png' }); }
         // Planche PARTIELLE (colonne par colonne).
         const pc = await r.pg.evaluate(() => ({ cases: [...document.querySelectorAll('[data-meuble="mP"] [data-planche-case]')].map((x) => x.getAttribute('data-planche-case')).join(','), pleines: document.querySelectorAll('[data-meuble="mP"] [data-planche]').length }));
