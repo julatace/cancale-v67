@@ -10775,31 +10775,24 @@ const aGenererBordereau = (s) => {
   return /paiement.*valid/i.test(t);
 };
 
-// (16 nov., vitesse-volume) Mémoire par chaîne, comme `classifyOrderStatus` : pure, même entrée, même sortie.
 const needsBordereau = (status) => {
-  const memo = typeof status === 'string' ? (needsBordereau.memo || (needsBordereau.memo = new Map())) : null;
-  if (memo && memo.has(status)) return memo.get(status);
-  const r = ((status) => {
-    const s = (status || '').toLowerCase();
-    if (!s) return true;
-    if (/annul|refus|rembours|cancel|retour|suspend/.test(s)) return false;
-    // « Le paiement a échoué » : aucune paire ne part (mesuré : statut 220 en base).
-    if (/paiement\s+a\s+[ée]chou|[ée]chec\s+du\s+paiement/.test(s)) return false;
-    if (/finalis|termin|complet|cl[oô]tur/.test(s)) return false;            // vente finie
-    // ⚠️ « BORDEREAU ENVOYÉ AU VENDEUR » N'EST PAS UN COLIS PARTI. Le test
-    // « déjà expédié » ci-dessous attrape le mot « envoyé » — donc au moment
-    // EXACT où Vinted te donne l'étiquette, l'app répondait « plus besoin de
-    // bordereau ». Deux conséquences mesurées : le numéro de cette paire
-    // retombait dans le pool alors que le carton est encore sur l'étagère
-    // (deux paires dans la même boîte, §19), et le même statut valait
-    // « à expédier » ailleurs dans l'app. La vente qui attend TON envoi passe
-    // donc en premier.
-    if (isAwaitingShipStatus(s)) return true;
-    if (/exp[eé]di|envoy|transit|achemin|en route|livr|remis|r[ée]ception/.test(s)) return false; // déjà parti/arrivé
-    return true;                                                              // à expédier
-  })(status);
-  if (memo) { if (memo.size > 5000) memo.clear(); memo.set(status, r); }
-  return r;
+  const s = (status || '').toLowerCase();
+  if (!s) return true;
+  if (/annul|refus|rembours|cancel|retour|suspend/.test(s)) return false;
+  // « Le paiement a échoué » : aucune paire ne part (mesuré : statut 220 en base).
+  if (/paiement\s+a\s+[ée]chou|[ée]chec\s+du\s+paiement/.test(s)) return false;
+  if (/finalis|termin|complet|cl[oô]tur/.test(s)) return false;            // vente finie
+  // ⚠️ « BORDEREAU ENVOYÉ AU VENDEUR » N'EST PAS UN COLIS PARTI. Le test
+  // « déjà expédié » ci-dessous attrape le mot « envoyé » — donc au moment
+  // EXACT où Vinted te donne l'étiquette, l'app répondait « plus besoin de
+  // bordereau ». Deux conséquences mesurées : le numéro de cette paire
+  // retombait dans le pool alors que le carton est encore sur l'étagère
+  // (deux paires dans la même boîte, §19), et le même statut valait
+  // « à expédier » ailleurs dans l'app. La vente qui attend TON envoi passe
+  // donc en premier.
+  if (isAwaitingShipStatus(s)) return true;
+  if (/exp[eé]di|envoy|transit|achemin|en route|livr|remis|r[ée]ception/.test(s)) return false; // déjà parti/arrivé
+  return true;                                                              // à expédier
 };
 
 // ── « CETTE VENTE ATTEND-ELLE MON ENVOI ? » — UNE SEULE RÈGLE (4 octobre) ──
@@ -37194,19 +37187,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // compte range la compta, ça ne fait pas disparaître un carton de
     // l'étagère (même règle que `toShip` — avant, Colis écartait le compte et
     // Ma journée le gardait : deux nombres pour la même obligation, §11).
-    // (16 nov., vitesse-volume) Les mêmes filtres en un seul passage, `aExpedier` (gardée par vente) d'abord :
-    // un filtre pur de plus ou de moins devant ne change ni la liste ni son ordre.
-    const items = [];
-    for (const o of (sales.items || [])) {
-      if (!aExpedier(o) || hiddenSales.has(String(o.transaction_id))) continue;
-      const b = o.transaction_id != null ? parTxn[String(o.transaction_id)] || null : null;
-      const e = { key: 'v' + o.transaction_id, o, b, txn: String(o.transaction_id || '') };
-      if (e.b && isBordDone(e.b)) continue;                // colis déjà parti : il sort tout seul
+    const items = (sales.items || [])
+      .filter(o => !hiddenSales.has(String(o.transaction_id)))
+      .filter(o => aExpedier(o))
+      .map(o => {
+        const b = o.transaction_id != null ? parTxn[String(o.transaction_id)] || null : null;
+        return { key: 'v' + o.transaction_id, o, b, txn: String(o.transaction_id || '') };
+      })
+      .filter(e => !(e.b && isBordDone(e.b)))             // colis déjà parti : il sort tout seul
       // (11 nov., lot DJ3) …même sans bordereau e-mail : la preuve de SA transaction (e-mail de dépôt du n° de
       // son étiquette, prise en charge, panneau, expédié à la main). « Colis fait » garde sa carte « posté ».
-      if (partiParPreuve(partisVinted.get(e.txn))) continue;
-      items.push(e);
-    }
+      .filter(e => !partiParPreuve(partisVinted.get(e.txn)));
     // (8 nov.) LA VENTE VUE PAR E-MAIL ET SON BORDEREAU (src/bordereauVenteEmail.js) : le même n°
     //    de transaction (l'identité) ⇒ un colis à envoyer, prêt à imprimer, sans attendre que
     //    l'extension relise Vinted. La liste Vinted, dès qu'elle porte le n°, la remplace.

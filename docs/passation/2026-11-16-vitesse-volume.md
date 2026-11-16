@@ -39,7 +39,7 @@ vert (« pas su »).
 
 ## 2. Mesures (CI GitHub, machine non partagée — la machine des sessions était à une charge de 40 à 60)
 
-| | main d'avant (5a9abe571 + banc seul) | cette branche (c52b747cc) |
+| | main d'avant (5a9abe571 + banc seul) | cette branche (c52b747cc ; relance f6a54aa11 : 19,2 s / 22,7 s, autre machine) |
 |---|---|---|
 | Ma journée, `donnees_ms` (3 passes) | 23 596 · 23 479 · 24 528 ⇒ **23,6 s** | 18 831 · 17 439 · 17 441 ⇒ **17,4 s** |
 | Ventes, `donnees_ms` | 22 724 · 24 300 · 25 904 ⇒ **24,3 s** | 18 278 · 18 513 · 18 767 ⇒ **18,5 s** |
@@ -48,7 +48,7 @@ vert (« pas su »).
 | verdict du banc (2 000 + 750 ms) | ❌ rouge (les deux écrans) | ❌ rouge (les deux écrans) |
 
 Avec le réseau 4G simulé (mesure d'avant), même CI : complet Ma journée 28,0 s (main) → 25,5 s ; Ventes 23,5 → 21,9 s.
-Les derniers commits (dates, tri, `needsBordereau`, `tsVenteADater`) sont postérieurs à la colonne de droite : la
+Les derniers commits (dates, tri, `tsVenteADater`) sont postérieurs à la colonne de droite : la
 relance CI est dans la PR.
 
 ## 3. Ce qui a changé (aucune règle métier, aucun chiffre)
@@ -58,9 +58,9 @@ l'ouverture et chaque rendu refait des parcours des 20 000 ventes. Corrigé là 
 
 - `aExpedier` et `venteSortieDuStock` : gardées par vente (identité de l'objet — une commande lue n'est jamais modifiée
   en place, vérifié) tant que `TXN_ETATS` ne change pas (`TXN_ETATS.ver`, monté par `noterEtatsTxn`, seul écrivain).
-- `needsBordereau` : mémoire par chaîne (pure), comme `classifyOrderStatus`.
 - `tsCommande`, `msDateCommande` (nouvelle, `new Date(o.date).getTime()`), `tsVenteADater` (src/aDaterAnnee.js) :
-  gardées par objet. Mêmes formules, NaN compris.
+  gardées par objet. Mêmes formules, NaN compris. La copie serveur `api/_lib/ventes-regle.js` refabriquée
+  (`audit-bilan-semaine --recopie`).
 - Tri des commandes par date (`triCommandesRecentes`) : le MÊME comparateur, chaque date lue une fois par tri au lieu
   de deux fois par comparaison (~600 000 dates construites par tri à 20 000 ventes). Tri stable, NaN ⇒ égalité : même
   ordre.
@@ -69,8 +69,9 @@ l'ouverture et chaque rendu refait des parcours des 20 000 ventes. Corrigé là 
 - `cartesColis`, `colisAEnvoyerBase`, `listeEnvoyes` : **une réponse par rendu** (`unParRendu`, src/lotRendus.js) —
   demandées jusqu'à 5 fois par rendu. Seulement PENDANT un rendu (détecté par le distributeur de crochets de React) :
   un geste ou un effet recalcule toujours.
-- `listeEnvoyes` : la preuve de départ (`partisVinted`, une lecture de table) jugée avant `aExpedier` ; `expeditions`
-  en un passage (mêmes filtres purs, même ordre).
+- `listeEnvoyes` : la preuve de départ (`partisVinted`, une lecture de table) jugée avant `aExpedier`.
+- Retirés après la CI (audits qui lisent la règle telle qu'écrite : `audit-coherence`, `audit-a-envoyer-preuves`) : la
+  mémoire de `needsBordereau` et `expeditions` en un passage — gain faible, la règle reste écrite comme avant.
 
 Essayé et RETIRÉ : rendre par lots les mises à jour d'état du moteur (`useStateLot`, file + compteur de lectures en
 vol). Mesuré : 24 rendus avant comme après sur Ventes — les rendus ne viennent pas de là (magasin partagé, coque,
