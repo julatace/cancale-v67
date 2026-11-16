@@ -8,7 +8,7 @@
 .vrm-cv-table tbody th { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-cv-table td { font-weight: 400; }
 .vrm-cv-table td:last-child, .vrm-cv-table th:last-child { padding-right: 0; }
-.vrm-cv-vrm { display: block; margin-top: 2px; font-size: 12px; line-height: 1.3; color: var(--vrm-muted, #6e6e73); }
+.vrm-cv-vrm { display: block; margin-top: 2px; font-size: 12px; line-height: 1.3; color: var(--vrm-muted); }
 .vrm-cv-notes { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
 .vrm-cv-notes .vrm-sv-note { margin: 0; }
 /* Téléphone : un compte = une ligne de quatre chiffres sous son nom (libellé au-dessus du chiffre). */
