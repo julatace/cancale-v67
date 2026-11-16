@@ -258,12 +258,14 @@ const ECRANS = [
   { nom: 'colis', url: '/?tab=cat_bord', pret: '[data-colis-barre]', zone: '[data-colis-prochain]', apres: async (pg, mobile, tag) => {
     const n = await pg.evaluate(() => {
       const vis = (e) => e.getClientRects().length > 0;
-      const lot = [...document.querySelectorAll('[data-lot-ouvrir]')].filter(vis).length;
+      // (16 nov.) « Imprimer en un toucher » (14 nov., docs/passation/2026-11-14-impression-simple.md) : le plein qui
+      // imprime le lot est `data-colis-barre-btn="imprimer"` ; `data-lot-ouvrir` est devenu « Choisir » (sans impression).
+      const lot = [...document.querySelectorAll('[data-colis-barre-btn="imprimer"]')].filter(vis).length;
       const agir = [...document.querySelectorAll('[data-colis-prochain-agir]')].filter(vis).map((e) => e.innerText.trim());
       const prochain = (document.querySelector('[data-colis-prochain]') || {}).getAttribute ? document.querySelector('[data-colis-prochain]').getAttribute('data-colis-prochain') : '';
       return { lot, agir, prochain };
     });
-    dit(n.lot === 1 && !n.agir.some((t) => /imprimer/i.test(t)), `${tag} : P4 — un seul bouton qui imprime le lot (« Tout imprimer »)`, JSON.stringify(n));
+    dit(n.lot === 1 && !n.agir.some((t) => /imprimer/i.test(t)), `${tag} : P4 — un seul bouton qui imprime le lot (« Imprimer (N) »)`, JSON.stringify(n));
   } },
   { nom: 'journee', url: '/?tab=journee', pret: '.vrm-main[data-ecran="journee"]' },
   // (10 nov., suite — branche claude/textes-courts-suite) Les écrans passés à la même règle
