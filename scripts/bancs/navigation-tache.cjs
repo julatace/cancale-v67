@@ -207,7 +207,8 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
           // (16 nov., lot derniers-rouges) PORTÉ sur la décision du 14 nov. (choix n° 61 de Julien, `BOTTOM_TABS` de src/App.jsx) :
           // QUATRE onglets — Aujourd'hui · Annonces (l'onglet « paires » : Annonces, Stock, Achats) · Ventes · Argent —, plus de
           // « Plus » : le reste vit dans le menu du haut (l'avatar). Le banc jugeait encore la barre du 11 nov. (lot DJ3).
-          const barre = await pg.evaluate(() => [...document.querySelectorAll('.vrm-mobile-nav > button')].filter((x) => x.getBoundingClientRect().width > 0).map((x) => ({ lib: (x.querySelector('.vrm-nav-label') || x).innerText.trim(), h: Math.round(x.getBoundingClientRect().height), entree: x.getAttribute('data-nav-entree') || (x.classList.contains('vrm-nav-more') ? 'plus' : '') })));
+          // Les ONGLETS (`data-nav-entree`) ; le disque « + » du centre (14 nov., Studio : l'éventail des gestes) n'en est pas un.
+          const barre = await pg.evaluate(() => [...document.querySelectorAll('.vrm-mobile-nav > button')].filter((x) => x.getBoundingClientRect().width > 0 && (x.hasAttribute('data-nav-entree') || x.classList.contains('vrm-nav-more'))).map((x) => ({ lib: (x.querySelector('.vrm-nav-label') || x).innerText.trim(), h: Math.round(x.getBoundingClientRect().height), entree: x.getAttribute('data-nav-entree') || 'plus' })));
           // (11 nov., intégration — lot Traduction) Les libellés passent par tr() : la langue suit le réglage du vendeur
           // (sinon celle du navigateur). On juge l'ENTRÉE (data-nav-entree) et, pour le libellé, le texte du dictionnaire
           // de la langue ACTIVE (src/i18n/langues/<lang>.js) — jamais une chaîne française en dur.
@@ -309,10 +310,14 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
         await capture(pg, `ventes-toutes-${tel ? 'tel' : 'ordi'}`);
         const l = await pg.evaluate((titre) => {
           const rows = [...document.querySelectorAll('[data-toutes-vente]')];
-          const memes = rows.filter((r) => (r.innerText || '').includes(titre));
-          return { n: rows.length, parSite: rows.reduce((m, r) => { const s = r.getAttribute('data-toutes-vente'); m[s] = (m[s] || 0) + 1; return m; }, {}), memes: memes.map((r) => r.getAttribute('data-toutes-vente') + ':' + r.getAttribute('data-toutes-id')), ids: rows.map((r) => r.getAttribute('data-toutes-vente') + ':' + r.getAttribute('data-toutes-id')), num: rows.filter((r) => r.querySelector('[data-toutes-num]')).map((r) => r.getAttribute('data-toutes-vente') + ':' + r.querySelector('[data-toutes-num]').getAttribute('data-toutes-num')) };
+          // (16 nov.) Le titre se lit dans le TEXTE de la ligne (textContent : le titre visible et son nom lu, quel que
+          // soit le rendu — innerText ignore un nom caché aux yeux), espaces normalisés.
+          const net = (t) => String(t || '').replace(/\s+/g, ' ');
+          const memes = rows.filter((r) => net(r.textContent).includes(titre));
+          const textes = rows.map((r) => net(r.textContent).slice(0, 90));
+          return { textes, n: rows.length, parSite: rows.reduce((m, r) => { const s = r.getAttribute('data-toutes-vente'); m[s] = (m[s] || 0) + 1; return m; }, {}), memes: memes.map((r) => r.getAttribute('data-toutes-vente') + ':' + r.getAttribute('data-toutes-id')), ids: rows.map((r) => r.getAttribute('data-toutes-vente') + ':' + r.getAttribute('data-toutes-id')), num: rows.filter((r) => r.querySelector('[data-toutes-num]')).map((r) => r.getAttribute('data-toutes-vente') + ':' + r.querySelector('[data-toutes-num]').getAttribute('data-toutes-num')) };
         }, MEME_TITRE);
-        dit(l.memes.length === 2 && l.memes.includes('vinted:7001') && l.memes.includes('leboncoin:lbc-tx-1'), 'D. deux paires au même titre sur deux sites = DEUX lignes, chacune sous son site', JSON.stringify(l.memes));
+        dit(l.memes.length === 2 && l.memes.includes('vinted:7001') && l.memes.includes('leboncoin:lbc-tx-1'), 'D. deux paires au même titre sur deux sites = DEUX lignes, chacune sous son site', JSON.stringify({ memes: l.memes, textes: l.textes }));
         dit(l.parSite.vinted === 3 && l.parSite.leboncoin === 2 && l.parSite.ebay === 1 && l.parSite.vestiaire === 1, 'D. chaque vente lue est une ligne (3 Vinted, 2 Leboncoin — l’achat n’en est pas une —, 1 eBay, 1 Vestiaire)', JSON.stringify(l.parSite));
         dit(new Set(l.ids).size === l.ids.length, 'D. aucune ligne en double', l.ids.join(' '));
         dit(l.num.includes('ebay:12') && l.num.includes('vestiaire:80') && !l.num.some((x) => x.startsWith('vinted:')), 'D. le N° seulement par identité (SKU eBay, référence Vestiaire) — un blanc pour Vinted plutôt qu’un faux', JSON.stringify(l.num));
