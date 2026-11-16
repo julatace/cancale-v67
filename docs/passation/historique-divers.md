@@ -1914,3 +1914,5 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **16 nov. · Personnalisation simple** : « Modifier ma journée » = une liste en 3 groupes, une phrase, le nom seul, poignée + ↑ ↓ + interrupteur, enregistré tout de suite, « Revenir au réglage de départ » (281 → 106 mots) ; un ordre égal au départ est oublié ; « La paire à sortir » SUPPRIMÉE de Ma journée et de l'éditeur (décision de Julien au train : la case allumée du Stock fait le travail, réglage ancien qui la nomme ignoré). `docs/passation/2026-11-16-personnalisation-simple.md`. Geste : aucun.
 
 <!-- déplacé tel quel de CLAUDE.md §9 le 16 nov. (train) -->
+
+- **15 nov. · « Verre dépoli » partout + Stock en étagères** : Julien a choisi la proposition 9 sur 30 ; couche `studio-verre.css` (contrastes mesurés, banc `verre`) ; Stock en meubles/cases/piles avec sites + compte par identité sur chaque case (`src/stockAnnonces.js`). Maquettes validées de tous les écrans (sauf l'étagère, v3 en cours) ; refonte des dispositions écran par écran en cours. `2026-11-15-verre-depoli.md`, `2026-11-15-stock-etageres.md`. Geste : aucun.
