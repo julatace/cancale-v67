@@ -46,14 +46,31 @@ coque-tablette (page publique des tarifs hors coque), stockage-sur (clés d'inde
 élément nommé n'est plus compté ; plafonds RESSERRÉS 278 → 182, 4/4 mutations), copies d'audit complétées
 (`scripts/_copie-imports.cjs` : api/_lib importe src/ ; lbc-en-ligne, retraits-suivi, comptes-exclus, stock-etageres, litiges).
 
+## Chiffres
+- Avant : **69 audits rouges** sur main (CI de #1181/#1182 : 25 + 27 + 17).
+- Après (CI de la PR #1196, commit 04697053a) : **3 rouges**, tous déjà rouges sur main : `audit-infos-vinted`,
+  `audit-vocabulaire-article`, `audit-vendeur-generaliste`. Part 2/3 entièrement verte.
+- Aussi réglés en route : `audit-config-facture` (textes « carton » ⇒ « là où l’article est rangé », décision des
+  9-11 nov.), `audit-chemin-json-guillemets` (vrai défaut serveur : le catalogue privé relisait un N° par une clé nue,
+  400 ⇒ « Rien n’a été créé »), les 5 audits d'extension réglés sans toucher l'extension (bancs servis comme le code
+  d'aujourd'hui : `annoncerCapte`, compte connecté, budget de lecture, lien « Mes ventes » retiré, case cochée de la carte).
+- `audit-safari` a rougi en route sur ce lot (un lookbehind ajouté dans notif-belle) : corrigé, vert.
+
 ## ÉTAT À LA REPRISE
-- PR ouverte depuis `claude/audits-vert-main` (voir la PR pour le chiffre exact des rouges restants après sa CI).
-- **Restent rouges, non traités ici** (raison) :
-  - Textes « paire / carton / chaussure » hors Sneakers : `audit-vocabulaire-article`, `audit-vendeur-generaliste`,
-    `audit-config-facture` — une centaine de textes neufs des 14–15 nov. (i18n) à relire un à un ; la liste exacte est
-    dans la sortie de chaque audit.
-  - Extension (exige une version au-dessus de 5.397, réservée par d'autres lots) : `audit-infos-vinted` (vrm-regles-achat.js
-    à recopier : `node scripts/regles-achat-extension.cjs --recopie`), `audit-confiance-publique` (vrm-badge.js),
-    `audit-chemin-json-guillemets` (background.js + 3 fichiers app/serveur), `audit-extension-capture`, `audit-recap-bordereau`,
-    `audit-bordereau-pdf` (`annoncerCapte`).
-- Une passe complète locale (672 audits) n'a pas pu finir : machine partagée, 2 à la fois ⇒ ~3 h. La CI de la PR fait foi.
+- PR #1196 depuis `claude/audits-vert-main`.
+- **Restent rouges (déjà rouges sur main)** :
+  - `audit-vocabulaire-article` S1 et `audit-vendeur-generaliste` S1/S3 : textes « paire / semelle / pointure » et
+    exemples de baskets hors Sneakers, arrivés avec les lots « Plus » des 14-15 nov. (la fiche « Infos » propose la
+    SEMELLE à tout vendeur : un vrai défaut, à garder pour Sneakers — `src/InfosPaire.jsx`, `src/AideReponse.jsx`,
+    `src/i18n/langues/*/plus.js`), table des catégories `src/correspondances.js` (libellés des sites, à permettre avec
+    sa raison), placeholders « air max 90 » / « dunk 42 ». Liste exacte : sortie de chaque audit.
+  - `audit-infos-vinted` : `vinted-sync-extension/vrm-regles-achat.js` à refabriquer
+    (`node scripts/regles-achat-extension.cjs --recopie`) ⇒ contenu d'extension changé ⇒ version au-dessus de 5.397
+    (5.394-5.397 réservées par d'autres lots), CODE_VERSION, manifeste, EXT_ATTENDUE, zips.
+- **Bancs principaux** (verifier.yml) : rouges sur main AVANT ce lot (part 1 : nouveau-vendeur ; part 3 :
+  colis-retirer-propre, annonces-actions, iphone-reprise, argent-mois, chiffres-coherents, retraits-suivi,
+  accessibilite-clavier ; part 2 coupée au délai). Hors des lots bancs-rouges-a/b et parcours-vert, à reprendre :
+  annonces-actions (cibles < 44 px dans le carré des actions à 1512), argent-mois (détail par compte), chiffres-coherents,
+  statut-colis, navigation-tache, budget-vitesse, morceau-perime.
+- Passe locale complète impossible (machine partagée, ~3 h à 2 audits) ; les 69 rouges d'avant relancés seuls : 64 verts
+  (puis config-facture aussi), `audit-doublons-historique` rouge SOUS CHARGE seulement (mesure de temps n/n²), vert seul.
