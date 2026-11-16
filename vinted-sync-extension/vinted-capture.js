@@ -265,14 +265,16 @@
   };
   const champPrix = () => document.querySelector('input[name="price"], #price, input[data-testid*="price"]');
   let verifCle = '', verifVol = false, verifAlertes = [], coupeesLocales = null;
+  // 5.396 (revue, moyenne 67) : le stockage qu'une page peut lire (miroir du fond, sinon `local`).
+  const zonePage = () => new Promise((ok) => { try { if (typeof globalThis.__vrmZonePage === 'function') globalThis.__vrmZonePage(ok); else ok(chrome.storage.local); } catch (_) { ok(null); } });
   async function lireCoupeesLocales() {
     if (coupeesLocales) return coupeesLocales;
-    try { const v = (await chrome.storage.local.get(COUPEES_LOCAL))[COUPEES_LOCAL]; coupeesLocales = new Set(Array.isArray(v) ? v : []); } catch (_) { coupeesLocales = new Set(); }
+    try { const z = await zonePage(); const v = (await z.get(COUPEES_LOCAL))[COUPEES_LOCAL]; coupeesLocales = new Set(Array.isArray(v) ? v : []); } catch (_) { coupeesLocales = new Set(); }
     return coupeesLocales;
   }
   async function couperLocale(code) {
     const c = await lireCoupeesLocales(); c.add(code);
-    try { await chrome.storage.local.set({ [COUPEES_LOCAL]: [...c] }); } catch (_) {}
+    try { const z = await zonePage(); await z.set({ [COUPEES_LOCAL]: [...c] }); } catch (_) {}
     verifAlertes = verifAlertes.filter((a) => a.code !== code); dessinerVerif();
   }
   function dessinerVerif() {

@@ -285,6 +285,6 @@
     "128": "icon-128.png"
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'"
+    "extension_pages": "script-src 'self'; object-src 'self'; frame-ancestors 'self' https://vrm.center https://*.vinted.fr https://*.vinted.com https://*.vinted.it https://*.vinted.de https://*.leboncoin.fr https://*.ebay.fr https://*.ebay.com https://*.vestiairecollective.com"
   }
 }

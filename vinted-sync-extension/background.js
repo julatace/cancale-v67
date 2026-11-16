@@ -319,6 +319,86 @@ try {
 } catch (_) {}
 // Au réveil du service worker : l'icône suit la session enregistrée.
 loadSession().then((s) => majIcone(!!s && !s.mort)).catch(() => {});
+// ⚠️⚠️ 5.396 (revue de robustesse, moyenne 67) — LES JETONS HORS DE PORTÉE DES PAGES.
+//    `chrome.storage.local` était lisible par TOUS les scripts de contenu (vinted.fr,
+//    leboncoin.fr, ebay, vestiaire, vrm.center) : la session VRM (`vrmSession` : jetons
+//    d'accès et de renouvellement), et chaque écriture y était DIFFUSÉE aux processus des
+//    pages par `storage.onChanged`. Un processus de page compromis (faille du moteur) les
+//    lisait. Sur Chrome / Edge (`setAccessLevel`, mesuré dans Chromium le 16 nov. : le
+//    réglage refuse `local` aux scripts de contenu, « Access to storage is not allowed from
+//    this context ») : `local` est réservé à l'extension (fond, fenêtre) ; les pages ne
+//    voient plus qu'un MIROIR dans `chrome.storage.session`, tenu par le fond :
+//      · VALEURS sans secret qu'une page lit ou écrit (apparence, position du logo, onglet
+//        de la carte, vérifications coupées, métier, boîte aux lettres du relais) — une
+//        valeur écrite par la page est recopiée dans `local` (elle survit au redémarrage) ;
+//      · SIGNAUX : pour ce que la page ne fait qu'ÉCOUTER (dont la session), un simple
+//        `{ at }` — jamais la valeur (« la carte suit » sans jeton) ;
+//      · `vrmOAuthEtat` réduit à `{ etat, message, at }` (ni e-mail, ni fournisseur).
+//    Les scripts de contenu prennent le miroir quand il est posé (`vrmMiroir`), sinon
+//    `local` comme avant (Firefox, Orion, Safari : pas de `setAccessLevel` ⇒ rien ne change).
+//    Le miroir est posé AVANT le verrou : jamais une page sans aucun stockage lisible.
+const MIROIR_VALEURS = ['vrmApparence', 'vrmCarteOnglet', 'vrmCartePortee', 'vrmBadgePos', 'vrmBadgeMini', 'vrmVerifCoupees', 'vrm_vend_ext', 'vrmPageReq', 'vrmPageRep'];
+const MIROIR_ECRIT_PAR_PAGE = ['vrmApparence', 'vrmCarteOnglet', 'vrmCartePortee', 'vrmBadgePos', 'vrmBadgeMini', 'vrmVerifCoupees', 'vrmPageRep'];
+const MIROIR_SIGNAUX = ['vrmSession', 'vrmFavorisCarte', 'vrmFavorisApercu', 'vrmPauseVinted', 'vrmFreinRepub', 'vrmFlux', 'vrmVcCapte', 'vrmBascule', 'vrmLbcCompte', 'vrmChoixComptes', 'vrmLoginsVus', 'vrmLogins', 'vrmCapteLots', 'vrmCapteReglage'];
+const MIROIR_REDUITS = { vrmOAuthEtat: (v) => (v && typeof v === 'object' ? { etat: String(v.etat || '').slice(0, 20), message: String(v.message || '').slice(0, 300), at: Number(v.at) || 0 } : null) };
+let STOCKAGE_MIROIR = false, STOCKAGE_VERROUILLE = false;
+const _miroirVu = new Map();   // clé → empreinte de la dernière valeur recopiée (pas d'écho sans fin)
+const empreinteMiroir = (v) => { try { return JSON.stringify(v === undefined ? null : v); } catch (_) { return String(Math.random()); } };
+function miroirDe(k, v) {
+  if (MIROIR_SIGNAUX.includes(k)) return { at: Date.now(), present: v !== undefined && v !== null };
+  if (MIROIR_REDUITS[k]) return MIROIR_REDUITS[k](v);
+  return v;
+}
+async function verrouillerStockage() {
+  const L = chrome.storage && chrome.storage.local, S = chrome.storage && chrome.storage.session;
+  if (!L || !S || typeof L.setAccessLevel !== 'function' || typeof S.setAccessLevel !== 'function') return false;
+  try { await S.setAccessLevel({ accessLevel: 'TRUSTED_AND_UNTRUSTED_CONTEXTS' }); } catch (_) { return false; }
+  try {
+    const cles = [...MIROIR_VALEURS, ...Object.keys(MIROIR_REDUITS), ...MIROIR_SIGNAUX];
+    const tout = (await L.get(cles)) || {};
+    const o = {};
+    for (const k of cles) if (tout[k] !== undefined) { o[k] = miroirDe(k, tout[k]); if (!MIROIR_SIGNAUX.includes(k)) _miroirVu.set(k, empreinteMiroir(o[k])); }
+    o.vrmMiroir = { at: Date.now(), ver: CODE_VERSION };
+    await S.set(o);
+  } catch (_) { return false; }                     // pas de miroir ⇒ pas de verrou (les pages garderaient `local`)
+  STOCKAGE_MIROIR = true;
+  try { await L.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' }); STOCKAGE_VERROUILLE = true; } catch (_) { STOCKAGE_VERROUILLE = false; }
+  return STOCKAGE_VERROUILLE;
+}
+try {
+  chrome.storage.onChanged.addListener((ch, zone) => {
+    if (!STOCKAGE_MIROIR || !ch) return;
+    try {
+      if (zone === 'local') {
+        const o = {}, rm = [];
+        for (const k of Object.keys(ch)) {
+          if (!(MIROIR_VALEURS.includes(k) || MIROIR_SIGNAUX.includes(k) || MIROIR_REDUITS[k])) continue;
+          const v = ch[k].newValue;
+          if (v === undefined && !MIROIR_SIGNAUX.includes(k)) { _miroirVu.delete(k); rm.push(k); continue; }
+          const m = miroirDe(k, v);
+          if (!MIROIR_SIGNAUX.includes(k)) { const e = empreinteMiroir(m); if (_miroirVu.get(k) === e) continue; _miroirVu.set(k, e); }
+          o[k] = m;
+        }
+        if (Object.keys(o).length) chrome.storage.session.set(o).catch(() => {});
+        if (rm.length) chrome.storage.session.remove(rm).catch(() => {});
+      } else if (zone === 'session') {
+        const o = {}, rm = [];
+        for (const k of Object.keys(ch)) {
+          if (!MIROIR_ECRIT_PAR_PAGE.includes(k)) continue;   // une page n'écrit QUE ces clés-là dans `local`
+          const v = ch[k].newValue;
+          const e = empreinteMiroir(v);
+          if (_miroirVu.get(k) === e) continue;
+          _miroirVu.set(k, e);
+          if (v === undefined) rm.push(k); else o[k] = v;
+        }
+        if (Object.keys(o).length) chrome.storage.local.set(o).catch(() => {});
+        if (rm.length) chrome.storage.local.remove(rm).catch(() => {});
+      }
+    } catch (_) {}
+  });
+} catch (_) {}
+verrouillerStockage().catch(() => {});
+
 
 // Une promesse qui ne répond pas ne doit jamais bloquer un appelant : au bout de
 // `ms`, on rend `repli` (« pas su »). La promesse d'origine continue sa vie.
@@ -4191,7 +4271,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           if (msg.action === 'getPending') {
             const g = await chrome.storage.local.get('vrmPendingEbay');
             const p = g && g.vrmPendingEbay;
-            sendResponse({ ok: true, ad: (p && p.at && (Date.now() - p.at) < 30 * 60 * 1000) ? p.ad : null }); return;
+            const ad = (p && p.at && (Date.now() - p.at) < 30 * 60 * 1000) ? p.ad : null;
+            // 5.396 (revue, moyenne 65) : la paire ne se remplit QUE dans l'onglet ouvert pour
+            // elle (`ebay:{id}`.tabId) — deux onglets eBay ne la remplissent plus deux fois.
+            sendResponse({ ok: true, ad: ad && (await ongletDuDepot('ebay:' + String(ad.id), sender)) ? ad : null }); return;
           }
           // ⚠️ JE N'AI JAMAIS VU LE FORMULAIRE eBAY. Plutôt que de deviner ses
           //    champs, l'extension me les RAPPORTE depuis son navigateur : c'est
@@ -4745,11 +4828,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             //    ouverte (un dépôt abandonné, puis relancé ailleurs) la reprenait
             //    au premier retour sur l'onglet — et publiait une seconde fois.
             //    Sans onglet connu (dépôt lancé autrement) : comme avant.
+            //    5.396 (revue, basse 101) : et SEULEMENT là — sans onglet retenu pour ce dépôt
+            //    (dépôt fermé, abandonné, jamais ouvert par VRM), aucun onglet ne la reçoit.
             let ad = frais ? p.ad : null;
-            if (ad && sender && sender.tab && sender.tab.id != null) {
-              const job = (await lireCmds())['lbc:' + String(ad.id)];
-              if (job && job.tabId != null && job.tabId !== sender.tab.id) ad = null;
-            }
+            if (ad && !(await ongletDuDepot('lbc:' + String(ad.id), sender))) ad = null;
             sendResponse({ ok: true, ad }); return;
           }
           sendResponse({ ok: false, error: 'action inconnue' });
@@ -20025,6 +20107,16 @@ async function ongletOuvert(tabId) {
   try { const t = await chrome.tabs.get(Number(tabId)); return t && t.id != null ? t : null; } catch (_) { return null; }
 }
 // Un onglet de dépôt fermé ⇒ le dépôt est abandonné, l'app le sait aussitôt.
+// 5.396 (revue, moyenne 65 et basse 101) : la page qui demande la paire en dépôt est-elle
+// l'onglet que VRM a ouvert POUR elle (`vrmCmds[jobId].tabId`) ? Pas de commande, pas
+// d'onglet retenu, onglet inconnu ou lecture ratée ⇒ non (« pas su » ne vaut pas « oui »).
+async function ongletDuDepot(jobId, sender) {
+  const tab = sender && sender.tab && sender.tab.id;
+  if (tab == null) return false;
+  let job = null;
+  try { job = (await lireCmds())[jobId] || null; } catch (_) { return false; }
+  return !!(job && job.tabId != null && job.tabId === tab);
+}
 async function depotOngletFerme(tabId) {
   const cmds = await lireCmds();
   for (const jid of Object.keys(cmds)) {

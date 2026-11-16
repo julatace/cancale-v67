@@ -60,7 +60,8 @@
     try { document.removeEventListener('DOMContentLoaded', announce); } catch (_) {}
     try { if (globalThis.__vrmPontVivant === moi) delete globalThis.__vrmPontVivant; } catch (_) {}
   };
-  const poster = (m) => { try { window.postMessage(m, '*'); } catch (_) {} };
+  // 5.396 (revue, basse 120) : à l'origine exacte de vrm.center, plus jamais '*'.
+  const poster = (m) => { try { window.postMessage(m, location.origin); } catch (_) {} };
   // 5.165 : l'IDENTIFIANT de l'extension voyage avec la version. Deux extensions
   //    VRM installées dans le même Chrome exécutaient CHAQUE commande de l'app
   //    deux fois (mesuré le 9 octobre) ; l'app compte les ponts qui répondent à
@@ -280,11 +281,13 @@
     } catch (_) { mode = null; }
     if (!mode) return;                      // pas su ⇒ rien n'est écrit (l'extension suit le système)
     try {
-      chrome.storage.local.get('vrmApparence', (g) => {
+      // 5.396 (revue, moyenne 67) : le stockage qu'une page peut lire (miroir du fond, sinon `local`).
+      const zonePage = (cb) => { let fini = false; const L = () => { try { return chrome.storage.local; } catch (_) { return null; } }; const prendre = (z) => { if (fini) return; fini = true; try { cb(z); } catch (_) {} }; try { if (typeof globalThis.__vrmZonePage === 'function') { globalThis.__vrmZonePage(prendre); return; } const S = chrome.storage.session; if (!S || typeof S.get !== 'function') { prendre(L()); return; } setTimeout(() => prendre(L()), 1500); const r = S.get('vrmMiroir', (o) => { let ok = false; try { ok = !chrome.runtime.lastError && !!(o && o.vrmMiroir); } catch (_) {} prendre(ok ? S : L()); }); if (r && typeof r.catch === 'function') r.catch(() => prendre(L())); } catch (_) { prendre(L()); } };
+      zonePage((z) => { if (!z) return; z.get('vrmApparence', (g) => {
         try { if (chrome.runtime.lastError) return; } catch (_) { return; }
         if (g && g.vrmApparence === mode) return;
-        try { chrome.storage.local.set({ vrmApparence: mode }); } catch (_) {}
-      });
+        try { const r = z.set({ vrmApparence: mode }); if (r && typeof r.catch === 'function') r.catch(() => {}); } catch (_) {}
+      }); });
     } catch (_) {}
   }
   recopierApparence();
