@@ -870,8 +870,8 @@ import { histoireArticle, offresDeConversation, colisDesVentes } from "./histoir
 import { etatArticle } from "./etatArticle.js";
 // ⟦→ ecrans/Stock.jsx #1⟧
 import './styles-stock-2d.css'; // (8 nov.) style de ./StockExplication.jsx, gardé à sa place (son écran est chargé à la demande)
-import { libererCasesPartis, remettreCase, resteAuStock, etatCase } from "./stockSortie.js";
-import { opsSortieCases, sortirDeCases } from "./stockEtageres.js";   // (15 nov., étagères) la case vidée + la descente des piles, en un geste
+import { libererCasesPartis, remettreCase, resteAuStock, etatCase, partieDuStock } from "./stockSortie.js";
+import { opsSortieCases } from "./stockEtageres.js";   // (15 nov., étagères) la case vidée + la descente des piles, en un geste
 import { phraseDescentes, descentesDesOps } from "./etageresTextes.js";
 import { annoncesActuelles, annoncesVcStock, classerRangees } from "./stockAnnonces.js";
 import { PasEnLigneDetail, texteCartePasEnLigne } from "./PasEnLigne.jsx";   // (11 nov., lot pas-en-ligne)
@@ -1023,8 +1023,7 @@ import "./design/studio-achats-relier.css";   // (15 nov.) Annonces → « Sans 
 // (14 nov., Studio bleu clair) Ma journée en grille Bento : la tête, l'affiche, les tuiles et ce qu'elles déplient —
 // portée par `.sj-journee` seulement, EN DERNIER (docs/passation/2026-11-14-studio-journee.md).
 import { BentoJournee, placerTuiles, RangeeJ, LienJ, MontantAffiche, Plaque as PlaqueJ } from "./JourneeStudio.jsx";
-import PaireASortir from "./PaireASortir.jsx";   // (15 nov., refonte-journee) « La paire à sortir en premier »
-import { ordreDeSortie, colonneDe, emplacementDe } from "./paireASortir.js";
+import { ordreDeSortie, emplacementDe } from "./paireASortir.js";
 import MarqueSite from "./plateformes/Marque.jsx";
 import "./design/studio-journee.css";
 import "./design/studio-finition.css";   // (15 nov.) La passe de finition écran par écran — `@layer vrm-finition`, la PREMIÈRE couche (index.html) : docs/passation/2026-11-15-finition-ecrans.md
@@ -45454,11 +45453,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!Array.isArray(listings.items) || listings.loading || listings.incomplet || listings.error) return;
     const parCle = new Map();
     for (const o of sales.items) {
-      if (!venteSortieDuStock(o)) continue;
+      // (16 nov., lot retirer-case-compact) UNE règle (`partieDuStock`, src/stockSortie.js) : le statut Vinted parti, OU la
+      // preuve du transporteur pour le n° EXACT de son bordereau (`partisVinted` : e-mail de dépôt, prise en charge) ;
+      // jamais une vente annulée/qui revient, jamais « Colis fait » seul, jamais une absence.
+      if (!o || o.transaction_id == null || !String(o.status || '')) continue;
+      const annulee = classifyOrderStatus(String(o.status)) === 'cancelled' || venteQuiRevient(o);
+      const statutParti = venteSortieDuStock(o), raisonDepart = partisVinted.get(String(o.transaction_id)) || null;
+      if (!partieDuStock({ statutParti, annulee, raison: raisonDepart })) continue;
       const num = effEntry(o)?.numero; const cle = cleNum(num || ''); if (!cle) continue;
       // Encore porté par une annonce présente ou une autre vente à envoyer : on ne touche à rien.
       if ((porteursNum[cle] || []).some(p => p.type !== 'garage')) continue;
-      parCle.set(cle, { cle, num: String(num), tx: String(o.transaction_id), titre: o.title || '', statut: o.status || '', plateforme: 'Vinted' });
+      parCle.set(cle, { cle, num: String(num), tx: String(o.transaction_id), titre: o.title || '', statut: statutParti ? (o.status || '') : (raisonDepart.type === 'email' ? 'colis déposé (e-mail du transporteur)' : 'pris en charge par le transporteur'), plateforme: 'Vinted' });
     }
     // (27 oct., « pareil pour Leboncoin et eBay ») Même règle, par IDENTITÉ :
     // Leboncoin = lien posé à la main ou référence VRM (`numeroLbcIdentite`),
@@ -45501,7 +45506,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for (const { v, num, cle } of vcSorties) ajouter(cle, { cle, num: String(num), tx: 'vc:' + String(v.id || ''), titre: '', statut: v.etat || 'colis parti', plateforme: 'Vestiaire' });
     if (parCle.size) sortirPartisDuStock([...parCle.values()]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, listings.items, porteursNum, baseKO, lbcLu, lbcVentes, ebayCmd, lbcItemsBenef, ventesVc]);
+  }, [sales.items, listings.items, porteursNum, baseKO, lbcLu, lbcVentes, ebayCmd, lbcItemsBenef, ventesVc, partisVinted]);
   // ── (1er nov.) « DÉPOSÉ » DEPUIS VENTES : glissé (téléphone) ou bouton ─────
   // Rien n'est écrit pendant DELAI_ANNULER_DEPOSE (« Annuler » ⇒ rien) ; puis LE
   // geste de Colis (`marquerPoste`). Écran quitté entre-temps : la même écriture
@@ -47900,7 +47905,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [only]);
   // (15 nov., refonte-journee) « La paire à sortir en premier » : ce qui est DIT juste après « Je l'ai sortie »
   // (la case libérée, la pile qui descend) jusqu'à « Compris » — un état de l'écran, jamais une donnée.
-  const [apresSortie, setApresSortie] = useState(null);
   const [feuilleTvb, setFeuilleTvb] = useState(() => trancherChoix === true);   // (15 nov.) la feuille « Tout va bien ? » de Ma journée
   // (16 nov., bancs-rouges-a) « À trancher » vit dans cette feuille depuis le 15 nov. : le lien `?tab=trancher` (SMS,
   // notifications) ouvrait la carte… dans une feuille fermée — il ne montrait rien. Il ouvre maintenant la feuille aussi.
@@ -49698,34 +49702,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return { ...r, slots, meubles };
           } catch (_) { return null; }
         })();
-        // « Je l'ai sortie » : LE GESTE DU STOCK (« Vendues à sortir » → « Je l'ai sortie ») — la déclaration
-        // `vinted_pairs_lost` de CE N° (`cleDeclarationPartie`, par identité) et la case libérée, la pile tassée
-        // (`sortieCaseStock` → `opsSortieCases`) ; un geste annulable, accompagné (`stock.sortir`).
-        const sortirPaireJ = (v) => {
-          const mots = motsVendeur();
-          if (!v || !v.num) { toast(tr('sortir.rienANoter')); return; }
-          const fiches = load('vinted_annonce_numeros', {}) || {};
-          const perdues = lireObjet('vinted_pairs_lost');
-          const k = cleNum(v.num);
-          const slotsAv = lireObjet('vrm_slots');
-          const cleD = cleDeclarationPartie(v.num, v.idAnnonce || '', fiches);
-          const ops = [{ k: 'vinted_pairs_lost', type: 'cle', id: cleD, apres: { ...(perdues[cleD] || {}), id: String(v.idAnnonce || ''), at: new Date().toISOString(), title: v.titre || '', from: 'stock' }, avant: perdues[cleD] }];
-          if (k && slotsAv[k]) ops.push(...sortieCaseStock(k));
-          const desc = descentesDesOps(ops);
-          let dit = { num: String(v.num), lieu: v.lieu || null, descendus: [] };
-          if (v.lieu && desc.length) {
-            const m0 = load('vrm_meubles', []) || [];
-            const r = sortirDeCases({ slots: slotsAv, meubles: Array.isArray(m0) ? m0 : [], cles: [k] });
-            dit = { ...dit, colAvant: colonneDe(v.lieu, slotsAv), colApres: colonneDe(v.lieu, r.slots), cible: v.lieu.rangee - 1, descendus: [...new Set(desc.map((d) => d.cle))], phrase: phraseDescentes(desc) };
-          }
-          gesteVrm(texteAvecDescentes(tr(mots.e ? 'sortir.faitF' : 'sortir.fait', { num: String(v.num) }), ops), ops, {}, (sens) => {
-            if (ops.some((o) => o.k === 'vrm_slots')) { try { window.dispatchEvent(new Event('vrm:stock-slots')); } catch (_) {} }
-            setApresSortie(sens === 'avant' ? null : dit);
-            setDernierMeubleSorti(sens === 'avant' ? null : (v.lieu ? v.lieu.meubleId : null));
-            setTicStock((t) => t + 1);
-          }, 'stock.sortir');
-        };
-        const imprimerJ = () => { _pendingBordPrint = true; if (onNav) onNav('cat_bord'); };
         // (15 nov., refonte-journee — Julien : « tu peux mettre litige achat, vente ensemble ici ») LE BLOC « RETOURS ET
         // LITIGES » : une ligne par article, les MÊMES listes qu'Achats (retours d'achat, sans ceux « sans nouvelles » ni
         // ceux qu'il a dits réglés), que Colis (retours de vente, `retoursSuivis`) et que les litiges (`litigesSuivis`).
@@ -49762,10 +49738,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         })();
         const retoursLitigesElt = retoursLitigesJ.length ? <RetoursLitigesJournee lignes={retoursLitigesJ} Photo={PhotoVinted}
           attrs={{ 'data-a-renvoyer-journee': String(retoursClasses.actifs.filter((c) => c.etape === 'a-deposer').length) }}/> : null;
-        const sortirElt = sortirJ ? <PaireASortir liste={sortirJ.aSortir} nSorties={sortirJ.sorties.length} slots={sortirJ.slots} Photo={PhotoVinted} Icon={Icon} mots={motsVendeur()}
-          apres={apresSortie} onSortir={sortirPaireJ} onImprimer={imprimerJ} onRanger={(v) => { if (v && v.num && onStore) onStore(String(v.num)); else if (onNav) onNav('garage'); }}
-          onCompris={() => setApresSortie(null)} ordi={ordiJournee}
-          toutesImprimer={{ n: Math.max(1, sortirJ.sorties.length), nums: sortirJ.sorties.map((x) => x.num).filter(Boolean), imprimer: imprimerJ }}/> : null;
+        // (16 nov., lot retirer-case-compact — Julien : « enlever la paire de sa case ça prend trop de place », puis « dans
+        // l'onglet Stock, la case doit être en surbrillance si l'article n'est pas rangé/retiré — pas de pop-up ») La grande
+        // carte « La paire à sortir en premier » n'est plus posée ici : le seul signe est la case ALLUMÉE du Stock, dont le
+        // toucher fait la sortie (annulable). `sortirJ` reste : la place de chaque colis dans les rangées de l'ordinateur.
         // (15 nov., refonte-journee — la maquette ORDINATEUR) Le chiffre du jour et sa semaine, construits une fois : dans la
         // tête au téléphone, en tête de la 1re colonne à l'ordinateur (les mêmes données, la même règle de « Vendu »).
         const friseJ = !premierJour ? (
@@ -49776,7 +49752,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               .map((o) => ({ o, t: tsCommande(o) })).filter((x) => x.t >= de && x.t < a)
               .map((x) => x.o).filter(Boolean), quandCommandeVinted).map((o) => orderPhoto(o)).filter(Boolean)}/>) : null;
         return (
-          <div className="vrm-day-layout vrm-fu-ecran vrm-fu-journee sj-journee" data-espace="journee" data-sj-ordi={ordiJournee ? '1' : '0'} data-sortir-present={sortirJ && (sortirJ.aSortir.length || apresSortie) ? '1' : undefined}>
+          <div className="vrm-day-layout vrm-fu-ecran vrm-fu-journee sj-journee" data-espace="journee" data-sj-ordi={ordiJournee ? '1' : '0'}>
             <ScreenHead icon="soleilLevant" title={tr('reglages.ma-journee.lib')}/>
 
             {/* (14 nov., Studio bleu clair — décision de Julien) LA TÊTE : le bonjour et la date, le grand titre, la
@@ -49804,9 +49780,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     10 h », « Imprimer le bordereau », « Déposé »). Plus aucune ligne « Retour » ailleurs dans la journée. */}
                 <ARenvoyerJournee r={null} onImprimer={imprimerRetourAchat} onPreparer={preparerRetourPdf} onDepose={basculerRetourDepose} Photo={PhotoVinted}
                   onVoir={() => { if (onNav) onNav('achats'); }}/>
-                {/* (15 nov., refonte-journee — maquette validée) « LA PAIRE À SORTIR EN PREMIER » : quand une vente tombe, OÙ est
-                    l'article (son meuble, sa case allumée), puis « Je l'ai sortie » — avant le chiffre du jour. */}
-                {ordiJournee ? null : sortirElt}
                 {/* SON ordre (« Modifier ma journée ») entre la phrase et l'affiche ; « Les chiffres du mois » sont une
                     tuile de la grille, « la prochaine chose » la première carte de « À faire » (`data-prochain`). */}
                 {ordreJourneeHeure('tete', persoJ).filter((id) => id === 'phrase' || (id === 'frise' && !(ordiJournee && !baseKO && !premierJour))).map((id) => id === 'phrase'
@@ -49863,11 +49836,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               if (xE && visT('envoyer').montree) {
                 const n = nDe(xE), em = !xE.pasSu && xE.t && xE.t.emballer ? xE.t.emballer : null;
                 const imprimer = () => { _pendingBordPrint = true; if (onNav) onNav(xE.tab); };
-                // (15 nov., refonte-journee) « Imprimer les 3 bordereaux » en barre (la maquette) ; quand « La paire à sortir »
-                // est là, SON « Je l'ai sortie » est le plein de l'écran : l'impression devient une touche (un plein par écran).
-                const sortirLa = !!(sortirJ && (sortirJ.aSortir.length || apresSortie));
+                // (15 nov., refonte-journee) « Imprimer les 3 bordereaux » en barre (la maquette) ; (16 nov.) toujours le plein de
+                // l'écran : « La paire à sortir » n'est plus dans Ma journée (la case allumée du Stock).
                 const plein = em && em.n > 0 ? (
-                  <button type="button" className={sortirLa ? 'sb-touche sj-imprimer-touche' : 'sb-btn-plein'} data-sj-imprimer={String(em.n)} data-fu-principal="" title={em.phrase}
+                  <button type="button" className="sb-btn-plein" data-sj-imprimer={String(em.n)} data-fu-principal="" title={em.phrase}
                     onClick={imprimer}>{/* (16 nov.) son nom = son texte visible (WCAG 2.5.3, banc accessibilite) */}
                     <Icon name="printer" size={24}/><span>{(em.n > 1 ? tr('sj.imprimerLesN', { n: em.n }) : tr('sj.imprimerLe'))}</span>
                   </button>) : null;
@@ -50051,7 +50023,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               return (<>
                 <BentoJournee tuiles={tuilesPlacees} ordi={ordiJournee} FermeAuRetour={FermeAuRetour}
                   colonnes={ordiJournee ? [
-                    { cle: 'c1', avant: <>{visibiliteCarte('frise', { reglage: persoJ, mode: PROFIL_VENDEUR.mode }).montree ? <div className="sj-affiche" data-sj-affiche="">{friseJ}</div> : <div hidden data-jp-cachee="frise">{friseJ}</div>}{sortirElt}</>, ids: ['mois'] },
+                    { cle: 'c1', avant: <>{visibiliteCarte('frise', { reglage: persoJ, mode: PROFIL_VENDEUR.mode }).montree ? <div className="sj-affiche" data-sj-affiche="">{friseJ}</div> : <div hidden data-jp-cachee="frise">{friseJ}</div>}</>, ids: ['mois'] },
                     { cle: 'c2', ids: ['envoyer', 'prix', 'offres', 'prix-achat'], apres: retoursLitigesElt },
                     { cle: 'c3', ids: ['retirer', 'messages'], apres: AF.section },
                   ] : null}/>
