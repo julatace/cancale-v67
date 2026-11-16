@@ -53,6 +53,25 @@
 //   l'écran en fait la phrase (« même marque · même taille 42 · noire · mise en ligne 2 j après
 //   le retrait »).
 //
+// (16 nov., lot relier-fiable) Julien, sur une capture d'Achats : la MÊME vente « N°116 Adidas Spezial »
+// (violette) proposée « Possible » sous TROIS achats (bleu marine, marron, bordeaux) — « je veux que la
+// liaison pour relier l'achat soit beaucoup plus fiable, sinon ça ne sert à rien de faire des propositions ».
+// Ce qui a changé (récit : docs/passation/2026-11-16-relier-fiable.md) :
+//   · EN LIGNE, seule la « très probable » se montre : `parArticle[key]` et `parAchat[tx]` portent AU PLUS
+//     UNE proposition, affectée globalement (meilleur couple d'abord, dominance mutuelle : égalité ⇒ rien) ;
+//     un achat n'est proposé qu'à UN article, un article ne reçoit qu'UN achat. Les autres candidats (qui
+//     passent tous les filtres durs) vont dans `pistes[key]`, montrées SEULEMENT repliées dans la feuille
+//     « Choisir un autre achat » ;
+//   · « très probable » exige la taille ET la couleur connues des deux côtés et d'accord, et les mots du
+//     modèle (plus jamais « la taille OU la couleur ») ; si les deux photos ont une couleur lue, elles
+//     doivent s'accorder aussi ;
+//   · la COULEUR d'un côté se lit dans l'ordre : le champ couleur de l'annonce, sinon les mots de couleur du
+//     titre (sept langues), sinon la couleur DOMINANTE de la photo, calculée sur l'appareil
+//     (src/couleurPhoto.js, sans IA, `couleurPhotoDe`) ; couleurs connues des deux côtés et sans accord ⇒
+//     écarté (« violet » / « bleu marine » ; deux couleurs vives se comparent entre elles, le blanc d'une
+//     semelle n'accorde pas un violet et un bleu) ;
+//   · la pointure se normalise (« 42⅔ » = « 42,66 » = « 42 2/3 », « 42,0 » = « 42 ») ;
+//   · un « Ce n'est pas lui » range le couple (synchronisé) : il ne revient jamais, ni en ligne ni en piste.
 // Module PUR : l'app (Annonces → « Sans achat relié », Achats, « Relier un achat ») et l'audit
 // exécutent CES fonctions. La marque, les couleurs et le modèle viennent des règles de l'app
 // (`extractBrand`, `extractColors`, `extractModel`), passées en paramètre (§11).
@@ -112,6 +131,37 @@ export function couleursTexte(texte, couleursDe, parMot = false) {
   for (const w of normMots(t).split(' ')) { const c = MOT_COULEUR.get(w); if (c) out.add(c); }
   return [...out];
 }
+// ── (16 nov.) L'ACCORD DE DEUX COULEURS ─────────────────────────────────────
+// x, y : des familles (« violet », « blanc »…). Rend la couleur d'accord, '' (désaccord) ou null (pas su).
+// Deux côtés qui ont chacun une couleur VIVE se comparent sur leurs couleurs vives seulement (le blanc d'une
+// semelle ne fait pas s'accorder un violet et un bleu marine) ; sinon sur tout. Une couleur lue sur une PHOTO
+// tolère les seules voisines que la lecture de pixels confond (bordeaux lu rouge ou marron, marron/beige,
+// rouge/rose) — jamais bleu/violet.
+const NEUTRES = new Set(['noir', 'blanc', 'gris']);
+const PROCHES_PHOTO = new Set(['rouge|marron', 'marron|rouge', 'marron|beige', 'beige|marron', 'rouge|rose', 'rose|rouge']);
+export function couleursAccord(x, y, { photo = false } = {}) {
+  const X = [...new Set((x || []).filter(Boolean))], Y = [...new Set((y || []).filter(Boolean))];
+  if (!X.length || !Y.length) return null;
+  const vx = X.filter((c) => !NEUTRES.has(c)), vy = Y.filter((c) => !NEUTRES.has(c));
+  const a = vx.length && vy.length ? vx : X, b = vx.length && vy.length ? vy : Y;
+  for (const c of a) if (b.includes(c)) return c;
+  if (photo) for (const c of a) for (const d of b) if (PROCHES_PHOTO.has(c + '|' + d)) return c;
+  return '';
+}
+// Les familles d'une lecture de photo ([{ c, part }] de src/couleurPhoto.js, ou ['bleu', …]) ; null = pas lue.
+const famillesPhoto = (v) => (Array.isArray(v) ? v.map((x) => (x && typeof x === 'object' ? x.c : x)).filter((c) => typeof c === 'string' && c) : null);
+// La couleur d'UN côté, dans l'ordre : le champ de l'annonce, les mots du titre, la photo.
+// Rend { c: [familles], source: 'champ' | 'titre' | 'photo' | '' , photo: [familles] | null }.
+export function couleurCote({ champ = '', titre = '', photo = null }, couleursDe) {
+  const ph = famillesPhoto(photo);
+  const ch = champ ? couleursTexte(champ, couleursDe, true) : [];
+  if (ch.length) return { c: ch, source: 'champ', photo: ph };
+  const t = couleursTexte(titre, couleursDe, true);
+  if (t.length) return { c: t, source: 'titre', photo: ph };
+  if (ph && ph.length) return { c: ph, source: 'photo', photo: ph };
+  return { c: [], source: '', photo: ph };
+}
+const photoUrl = (p) => (typeof p === 'string' ? p : p && typeof p === 'object' ? String(p.url || p.full_size_url || '') : '');
 // Des mots vides en plus de `MOTS_VIDES` (vus dans ses titres d'achat).
 const VIDES_EN_PLUS = new Set(['sans', 'sur', 'vends', 'vend', 'vendu', 'porte', 'portees', 'porté', 'peu', 'jamais', 'quasi', 'etat', 'state', 'condition',
   'used', 'worn', 'gebraucht', 'getragen', 'usato', 'usado', 'gedragen', 'cm', 'eu', 'size', 'gr', 'grosse']);
@@ -201,22 +251,30 @@ function baseAchat(a, marqueDe, couleursDe, couleursCle, modeleDe) {
   if (peutGarder) PREP_ACHAT.set(a, { marqueDe, couleursCle, modeleDe, titre: a.title, prixBrut: a.price, dateBrute: a.date, statut: a.status, txBrut: a.transaction_id, base });
   return base;
 }
-function preparerAchat(a, { marqueDe, couleursDe, couleursCle = couleursDe, receptionDe, modeleDe }) {
+function preparerAchat(a, { marqueDe, couleursDe, couleursCle = couleursDe, receptionDe, modeleDe, couleurPhotoDe }) {
   const base = baseAchat(a, marqueDe, couleursDe, couleursCle, modeleDe);
   const rec = typeof receptionDe === 'function' ? receptionDe(a) : null;
   const recMs = rec == null ? NaN : dateMs(typeof rec === 'object' ? rec.ms : rec);
-  return { ...base, a, recMs, recSource: rec && typeof rec === 'object' && rec.source ? rec.source : (Number.isFinite(recMs) ? 'livraison' : ''),
+  // (16 nov., relier-fiable) La couleur de la PHOTO (calculée sur l'appareil, elle arrive après) et (lot achats-retour)
+  // « hors relier » (la carte publiée des retours / litiges change sans que l'achat change) : relues à CHAQUE appel,
+  // jamais gardées avec le reste.
+  const url = photoUrl(a && (a.photo || a.photo_url));
+  const coul = couleurCote({ titre: base.t, photo: url && typeof couleurPhotoDe === 'function' ? couleurPhotoDe(url) : null }, couleursDe);
+  return { ...base, a, couleurs: coul.c, couleurSource: coul.source, couleursPhoto: coul.photo, annule: achatAnnule(a),
+    recMs, recSource: rec && typeof rec === 'object' && rec.source ? rec.source : (Number.isFinite(recMs) ? 'livraison' : ''),
     versions: null, motsArr: null, dispo: true };
 }
 
 // ── Préparer un article (annonce en vente, ou vente) ─────────────────────────
 // cible : { key, titre, marque?, taille?, couleur? (texte du champ), dateRef (mise en ligne, sinon
 //          vente), dateRefSource? ('en-ligne' | 'vente'), prix?, curTx?, empreinte? }
-function preparerCible(c, { marqueDe, couleursDe, modeleDe }) {
+function preparerCible(c, { marqueDe, couleursDe, modeleDe, couleurPhotoDe }) {
   const titre = String(c.titre || '');
+  const url = photoUrl(c.photo);
+  const coul = couleurCote({ champ: c.couleur || '', titre, photo: url && typeof couleurPhotoDe === 'function' ? couleurPhotoDe(url) : null }, couleursDe);
   const marque = marqueAnnonce({ marque: c.marque, titre }, marqueDe);
   const taille = c.taille ? tailleNorm(c.taille) : tailleDuTitre(titre);
-  return { c, key: String(c.key == null ? '' : c.key), titre, marque, mq: new Set(marque.split(' ').filter(Boolean)), mqArr: marque.split(' ').filter(Boolean), taille, couleurs: couleursTexte([c.couleur || '', titre].join(' '), couleursDe, true),
+  return { c, key: String(c.key == null ? '' : c.key), titre, marque, mq: new Set(marque.split(' ').filter(Boolean)), mqArr: marque.split(' ').filter(Boolean), taille, couleurs: coul.c, couleurSource: coul.source, couleursPhoto: coul.photo,
     ref: dateMs(c.dateRef), refSource: c.dateRefSource === 'vente' ? 'vente' : 'en-ligne', prix: prixNum(c.prix), mots: marque ? motsCles(titre, marque, couleursDe) : new Set(),
     modele: typeof modeleDe === 'function' ? modeleDe(titre) : null, motsArr: null };
 }
@@ -259,8 +317,11 @@ function evaluer(P, A, ctx) {
   const tailleOk = !!ta.taille && ta.taille === P.taille;
   if (ta.taille && !tailleOk && !ta.us) return null;
   // La couleur : connue des deux côtés et sans couleur commune ⇒ écarté.
-  let couleur = '';
-  if (P.couleurs.length && A.couleurs.length) { for (const c of A.couleurs) if (P.couleurs.includes(c)) { couleur = c; break; } if (!couleur) return null; }
+  // (16 nov.) Le champ, sinon le titre, sinon la photo — et, quand les DEUX photos sont lues, leur accord (pour « très probable »).
+  const accord = couleursAccord(P.couleurs, A.couleurs, { photo: P.couleurSource === 'photo' || A.couleurSource === 'photo' });
+  if (accord === '') return null;
+  const couleur = accord || '';
+  const accordPhotos = P.couleursPhoto && P.couleursPhoto.length && A.couleursPhoto && A.couleursPhoto.length ? couleursAccord(P.couleursPhoto, A.couleursPhoto, { photo: true }) : null;
   // La chronologie : retrait / livraison lus, sinon la commande.
   const recu = Number.isFinite(A.recMs) && (!Number.isFinite(P.ref) || A.recMs <= P.ref);
   const depuis = recu ? A.recMs : A.date;
@@ -285,8 +346,10 @@ function evaluer(P, A, ctx) {
   let photoOk = false;
   if (typeof distancePhoto === 'function') { const d = distancePhoto(P.c, A.a); if (d != null && d <= ctx.seuilPhoto) { photoOk = true; score += POIDS.photo; } }
   if (score < SEUIL_POSSIBLE) return null;
-  const fort = !A.lot && score >= SEUIL_TRES_PROBABLE && (photoOk || (!generique && couv >= COUVERTURE_TRES_PROBABLE && (tailleOk || (!!couleur && couv >= 0.75))));
-  return { A, score: Math.round(score * 100) / 100, couv, tailleOk, tailleUs: tailleOk && ta.us, couleur, generique, fort, photoOk, jours,
+  // (16 nov.) « Très probable » : la taille ET la couleur connues des deux côtés et d'accord, les mots du modèle,
+  // les photos d'accord quand les deux sont lues ; jamais un lot, jamais un titre d'achat sans modèle.
+  const fort = !A.lot && !generique && score >= SEUIL_TRES_PROBABLE && couv >= COUVERTURE_TRES_PROBABLE && tailleOk && !!couleur && accordPhotos !== '';
+  return { A, score: Math.round(score * 100) / 100, couv, tailleOk, tailleUs: tailleOk && ta.us, couleur, couleurPhoto: P.couleurSource === 'photo' || A.couleurSource === 'photo', generique, fort, photoOk, jours,
     depuis: recu ? (A.recSource === 'clic' ? 'retrait' : 'livraison') : 'commande', communs: COMMUNS.slice() };
 }
 // POURQUOI, dans l'ordre de lecture : marque · mots · taille · couleur · jours · photo.
@@ -294,27 +357,35 @@ function expliquer(P, e) {
   const out = [{ cle: 'marque', v: P.marque }];
   if (e.generique) out.push({ cle: 'generique' }); else out.push({ cle: 'mots', v: e.communs.join(' ') });
   if (e.tailleOk) out.push({ cle: e.tailleUs ? 'tailleUs' : 'taille', v: P.taille }); else out.push({ cle: 'tailleInconnue' });
-  if (e.couleur) out.push({ cle: 'couleur', v: e.couleur });
+  if (e.couleur) out.push({ cle: e.couleurPhoto ? 'couleurPhoto' : 'couleur', v: e.couleur });
   if (e.jours != null) out.push({ cle: 'jours', v: e.jours, depuis: e.depuis, ref: P.refSource });
   if (e.photoOk) out.push({ cle: 'photo' });
   return out;
 }
 
 // ── L'AFFECTATION GLOBALE ──────────────────────────────────────────────────
-// cibles : [cible] (voir `preparerCible`) · achats : la liste captée · liens : `liensParAchat`
-// refus : Set|objet de clés `${key}>${tx}` (« Ce n'est pas lui ») · receptionDe(a) → { ms, source } | ms | null
-// Rend { parArticle: { [key]: [proposition] }, parAchat: { [tx]: [{ key, score, niveau }] }, tresProbables: [{ key, tx }] }
-// proposition : { achat, score, niveau: 'tres-probable' | 'possible', ambigu, rang, pourquoi, jours, depuis }
+// cibles : [cible] (voir `preparerCible` ; `photo` : l'adresse de sa photo) · achats : la liste captée ·
+// liens : `liensParAchat` · refus : Set|objet de clés `${key}>${tx}` (« Ce n'est pas lui ») ·
+// receptionDe(a) → { ms, source } | ms | null · couleurPhotoDe(url) → [{ c, part }] | null (la couleur
+// dominante LUE sur l'appareil, src/indexCouleurs.js ; null = pas lue).
+// Rend {
+//   parArticle: { [key]: [proposition] }  — AU PLUS UNE, et seulement « très probable » (ce qui se montre EN LIGNE) ;
+//   parAchat:   { [tx]: [{ key, score, niveau }] } — AU PLUS UNE, la même (Achats : sous l'achat) ;
+//   pistes:     { [key]: [proposition] }  — les autres candidats qui passent TOUS les filtres durs, `niveau: 'piste'`,
+//               montrés seulement repliés dans la feuille « Choisir un autre achat » ;
+//   tresProbables: [{ key, tx }],
+//   stats: { couples, articles, ambigus } }
+// proposition : { achat, score, niveau: 'tres-probable' | 'piste', ambigu, rang, pourquoi, jours, recu }
 export function affecterPropositions({ cibles, achats, liens = null, refus = null, marqueDe, couleursDe, modeleDe = null, receptionDe = null,
-  distancePhoto = null, seuilPhoto = 12, max = 3 } = {}) {
-  const vide = { parArticle: {}, parAchat: {}, tresProbables: [] };
+  distancePhoto = null, seuilPhoto = 12, couleurPhotoDe = null, max = 3 } = {}) {
+  const vide = { parArticle: {}, parAchat: {}, pistes: {}, tresProbables: [], stats: { couples: 0, articles: 0, ambigus: 0 } };
   if (!Array.isArray(cibles) || !Array.isArray(achats) || typeof marqueDe !== 'function' || typeof couleursDe !== 'function') return vide;
   const refusSet = refus instanceof Set ? refus : new Set(Object.keys(refus || {}));
   // Les couleurs d'un mot, lues une fois (la règle de l'app compile ses motifs à chaque appel).
   const memo = new Map();
   const couleursM = (x) => { const k = String(x || ''); let v = memo.get(k); if (!v) { v = couleursDe(k) || []; memo.set(k, v); } return v; };
   const lz = liens || new Map();
-  const As = achats.filter((a) => a && txDe(a)).map((a) => preparerAchat(a, { marqueDe, couleursDe: couleursM, couleursCle: couleursDe, receptionDe, modeleDe }));
+  const As = achats.filter((a) => a && txDe(a)).map((a) => preparerAchat(a, { marqueDe, couleursDe: couleursM, couleursCle: couleursDe, receptionDe, modeleDe, couleurPhotoDe }));
   for (const A of As) { A.motsArr = A.motsArr0; A.versions = A.versions0; A.dispo = achatDisponible(A.a, lz, ''); }
   // Le poids d'un mot : 1. (MESURÉ sur ses 11 liaisons : la rareté parmi ses achats, `poidsMots`, donnait
   // top-1 73 % / top-3 73 % ; le poids plat 82 % / 91 %. `poidsMots` reste pour une mesure future.)
@@ -333,9 +404,10 @@ export function affecterPropositions({ cibles, achats, liens = null, refus = nul
   const Pde = new Map();    // key → article préparé
   const parTx = new Map();  // tx → [{ key, e }]
   const Ps = [];
+  let couples = 0;
   for (const c of cibles) {
     if (!c) continue;
-    const P = preparerCible(c, { marqueDe, couleursDe: couleursM, modeleDe });
+    const P = preparerCible(c, { marqueDe, couleursDe: couleursM, modeleDe, couleurPhotoDe });
     if (!P.key || !P.marque || !P.taille || !P.mots.size) { cand.set(P.key, []); continue; }
     P.motsArr = [...P.mots]; P.versions = [...versionsDe(P.mots)];
     P.totPoids = 0; for (const w of P.motsArr) P.totPoids += poids(w);
@@ -347,59 +419,100 @@ export function affecterPropositions({ cibles, achats, liens = null, refus = nul
     for (const w of P.motsArr) for (const A of (index.get(w) || [])) { if (A.vu === tampon) continue; A.vu = tampon; const e = evaluer(P, A, ctx); if (e) l.push(e); }
     for (const A of sansMots) { const e = evaluer(P, A, ctx); if (e) l.push(e); }
     l.sort((x, y) => (y.score - x.score) || (y.A.date - x.A.date));
-    cand.set(P.key, l);
+    cand.set(P.key, l); couples += l.length;
     for (const e of l) { if (!parTx.has(e.A.tx)) parTx.set(e.A.tx, []); parTx.get(e.A.tx).push({ key: P.key, e }); }
   }
-  // Dominance mutuelle, par tours : un couple est « très probable » quand l'achat devance nettement le
-  // 2e achat de l'article ET l'article devance nettement le 2e article de l'achat, parmi ce qui reste.
-  // Ce qui est confirmé sort du jeu (un achat sert une fois), puis on recommence. Jamais glouton :
-  // deux candidats proches restent proches, aucun n'est choisi.
+  // ── L'EXCLUSIVITÉ (16 nov.) : meilleur couple d'abord, dominance MUTUELLE, égalité ⇒ rien ──
+  // Les couples « forts » (taille + couleur + modèle) sont pris du meilleur score au moins bon. Un couple n'est
+  // retenu que si, parmi ce qui n'est pas déjà retenu ailleurs, l'achat devance de ECART_TRES_PROBABLE tout
+  // autre achat de CET article ET cet article devance de ECART_TRES_PROBABLE tout autre article de CET achat
+  // — les concurrents comptent TOUS (même faibles, même eux-mêmes sans proposition) : un article qui
+  // ressemble autant à deux achats n'en reçoit aucun ; un achat qui ressemble autant à deux articles n'est
+  // proposé à aucun. Jamais un tirage, jamais « le premier de la liste ».
   const pris = new Map();   // key → tx
   const prisTx = new Map(); // tx → key
-  for (let tour = 0; tour < 6; tour++) {
-    const nouveaux = [];
-    for (const P of Ps) {
-      if (pris.has(P.key)) continue;
-      const l = cand.get(P.key).filter((e) => !prisTx.has(e.A.tx));
-      const b = l[0]; if (!b || !b.fort) continue;
-      const s2 = l[1] ? l[1].score : -Infinity;
-      if (b.score - s2 < ECART_TRES_PROBABLE) continue;
-      const autres = (parTx.get(b.A.tx) || []).filter((x) => x.key !== P.key && !pris.has(x.key)).map((x) => x.e.score);
-      const s2a = autres.length ? Math.max(...autres) : -Infinity;
-      if (b.score - s2a < ECART_TRES_PROBABLE) continue;
-      nouveaux.push([P.key, b.A.tx]);
-    }
-    if (!nouveaux.length) break;
-    for (const [k, tx] of nouveaux) { if (prisTx.has(tx) || pris.has(k)) continue; pris.set(k, tx); prisTx.set(tx, k); }
+  const forts = [];
+  for (const [key, l] of cand) for (const e of l) if (e.fort) forts.push({ key, e });
+  forts.sort((x, y) => (y.e.score - x.e.score) || (x.key < y.key ? -1 : x.key > y.key ? 1 : 0) || (x.e.A.tx < y.e.A.tx ? -1 : 1));
+  for (const { key, e } of forts) {
+    if (pris.has(key) || prisTx.has(e.A.tx)) continue;
+    let rival = -Infinity;
+    for (const x of cand.get(key)) if (x !== e && !(prisTx.has(x.A.tx) && prisTx.get(x.A.tx) !== key)) { rival = Math.max(rival, x.score); break; }
+    if (e.score - rival < ECART_TRES_PROBABLE) continue;
+    let rivalA = -Infinity;
+    for (const x of parTx.get(e.A.tx) || []) if (x.key !== key && !pris.has(x.key)) rivalA = Math.max(rivalA, x.e.score);
+    if (e.score - rivalA < ECART_TRES_PROBABLE) continue;
+    pris.set(key, e.A.tx); prisTx.set(e.A.tx, key);
   }
-  const parArticle = {}, parAchat = {}, tresProbables = [];
+  const versProposition = (key, e, niveau, ambigu) => ({
+    achat: e.A.a, score: e.score, niveau, ambigu,
+    rang: e.tailleOk && e.couleur ? 1 : 2, pourquoi: expliquer(Pde.get(key), e), jours: e.jours,
+    recu: Number.isFinite(e.A.recMs) ? { ms: e.A.recMs, source: e.A.recSource } : null,
+  });
+  const parArticle = {}, parAchat = {}, pistes = {}, tresProbables = [];
+  let ambigus = 0;
   for (const [key, l0] of cand) {
     const sien = pris.get(key);
-    // Un achat « très probable » pour UN autre article n'est plus proposé ici.
+    // Un achat retenu pour UN autre article n'est plus proposé ici, même en piste (un lot excepté).
     const l = l0.filter((e) => !(prisTx.has(e.A.tx) && prisTx.get(e.A.tx) !== key && !e.A.lot));
-    if (!l.length) { parArticle[key] = []; continue; }
-    const ambigu = !sien && l.length > 1 && l[0].score - l[1].score < ECART_TRES_PROBABLE;
-    parArticle[key] = l.slice(0, max).map((e, i) => ({
-      achat: e.A.a, score: e.score, niveau: i === 0 && sien === e.A.tx ? 'tres-probable' : 'possible', ambigu: i === 0 ? ambigu : false,
-      rang: e.tailleOk && e.couleur ? 1 : 2, pourquoi: expliquer(Pde.get(key), e), jours: e.jours,
-      recu: Number.isFinite(e.A.recMs) ? { ms: e.A.recMs, source: e.A.recSource } : null,
-    }));
-    if (sien) tresProbables.push({ key, tx: sien });
+    const e0 = sien ? l.find((e) => e.A.tx === sien) : null;
+    parArticle[key] = e0 ? [versProposition(key, e0, 'tres-probable', false)] : [];
+    const reste = l.filter((e) => e !== e0);
+    const ambigu = !e0 && reste.length > 1 && reste[0].score - reste[1].score < ECART_TRES_PROBABLE;
+    if (ambigu) ambigus++;
+    if (reste.length) pistes[key] = reste.slice(0, max).map((e, i) => versProposition(key, e, 'piste', i === 0 ? ambigu : false));
+    if (e0) { tresProbables.push({ key, tx: sien }); parAchat[sien] = [{ key, score: e0.score, niveau: 'tres-probable' }]; }
   }
-  for (const [tx, l] of parTx) {
-    const k = prisTx.get(tx);
-    const libres = l.filter((x) => !pris.has(x.key) || x.key === k).sort((x, y) => y.e.score - x.e.score);
-    if (!libres.length) continue;
-    parAchat[tx] = libres.slice(0, max).map((x) => ({ key: x.key, score: x.e.score, niveau: x.key === k ? 'tres-probable' : 'possible' }));
-  }
-  return { parArticle, parAchat, tresProbables };
+  return { parArticle, parAchat, pistes, tresProbables, stats: { couples, articles: Ps.length, ambigus } };
 }
 
-// Un article seul (« Relier un achat », la meilleure suggestion d'une annonce) : la MÊME règle.
+// ── L'affectation PUBLIÉE (une seule vérité pour tous les écrans) ──────────
+// L'app publie ici la dernière affectation globale calculée (Annonces → « Sans achat relié », Achats) ; un
+// écran qui juge UN article seul (le numérotage, le récap d'une vente, la feuille « Relier un achat ») la lit :
+// un achat déjà retenu pour un AUTRE article ne lui est jamais proposé, et un article de l'affectation reçoit
+// exactement ce qu'elle dit. Rien n'est écrit en base.
+let _publiee = null;
+export function publierAffectation(r, cles = null) { _publiee = r && r.parArticle ? { ...r, cles: new Set(cles || Object.keys(r.parArticle)) } : null; }
+export const lireAffectation = () => _publiee;
+
+// Un article seul : la MÊME règle. Rend [] ou [la « très probable »] (ce qui se montre en ligne).
 export function propositionsArticle({ cible, ...o } = {}) {
   if (!cible) return [];
   const key = cible.key == null ? '_' : String(cible.key);
-  return affecterPropositions({ ...o, cibles: [{ ...cible, key }] }).parArticle[key] || [];
+  const pub = _publiee;
+  if (pub && pub.cles.has(key)) return pub.parArticle[key] || [];
+  const r = affecterPropositions({ ...o, cibles: [{ ...cible, key }] });
+  const l = r.parArticle[key] || [];
+  return pub ? l.filter((p) => !(pub.parAchat[txDe(p.achat)] && pub.parAchat[txDe(p.achat)][0].key !== key)) : l;
+}
+// Les PISTES d'un article (la feuille « Choisir un autre achat », repliées) : tout ce qui passe les filtres
+// durs, sans la « très probable » ; jamais un achat retenu pour un autre article.
+export function pistesArticle({ cible, ...o } = {}) {
+  if (!cible) return [];
+  const key = cible.key == null ? '_' : String(cible.key);
+  const pub = _publiee;
+  if (pub && pub.cles.has(key)) return (pub.pistes && pub.pistes[key]) || [];
+  const r = affecterPropositions({ ...o, cibles: [{ ...cible, key }] });
+  const l = r.pistes[key] || [];
+  return pub ? l.filter((p) => !(pub.parAchat[txDe(p.achat)] && pub.parAchat[txDe(p.achat)][0].key !== key)) : l;
+}
+
+// ── La SAISIE EN SÉRIE (« Prix d'achat à compléter ») : la MÊME affectation ──
+// lignes : [{ key (id de la fiche), titre, marque, taille, dateRef, photo? }] — chaque ligne devient l'article
+// `a:<key>` (les « Ce n'est pas lui » de Annonces s'y appliquent). Rend { [key]: [{ achat, sur, niveau }] } :
+// la « très probable » (`sur: true`, « C'est ça ») d'abord, puis les pistes (`sur: false`, repliées par l'écran).
+export function seriePropositions({ lignes, ...o } = {}) {
+  const out = {};
+  if (!Array.isArray(lignes)) return out;
+  const cle = (k) => cleArticleAnnonce(k);
+  const r = affecterPropositions({ ...o, cibles: lignes.filter((l) => l && l.key != null).map((l) => ({ key: cle(l.key), titre: l.titre || '', marque: l.marque || '', taille: l.taille || '', couleur: l.couleur || '', dateRef: l.dateRef || null, photo: l.photo || '' })) });
+  for (const l of lignes) {
+    if (!l || l.key == null) continue;
+    const k = cle(l.key);
+    const v = [...(r.parArticle[k] || []).map((p) => ({ ...p, sur: true })), ...((r.pistes[k] || []).slice(0, 2)).map((p) => ({ ...p, sur: false }))];
+    if (v.length) out[String(l.key)] = v;
+  }
+  return out;
 }
 
 // ── « Ce n'est pas lui » : la clé du couple refusé ──────────────────────────
@@ -429,6 +542,7 @@ export function morceauxPourquoi(p) {
     else if (x.cle === 'mots') out.push({ cle: 'mots', vars: { mots: motsLisibles(x.v) } });
     else if (x.cle === 'taille' || x.cle === 'tailleUs') out.push({ cle: x.cle, vars: { taille: String(x.v).replace('.', ',') } });
     else if (x.cle === 'couleur') out.push({ cle: 'couleur', vars: { couleur: x.v } });
+    else if (x.cle === 'couleurPhoto') out.push({ cle: 'couleurPhoto', vars: { couleur: x.v } });
     else if (x.cle === 'jours') out.push({ cle: `jours.${x.ref}.${x.depuis}`, vars: { n: String(x.v) } });
     else if (x.cle === 'photo') out.push({ cle: 'photo', vars: {} });
     else if (x.cle === 'tailleInconnue') out.push({ cle: 'tailleInconnue', vars: {} });

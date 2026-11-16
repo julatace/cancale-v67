@@ -2,6 +2,7 @@
 // Écrit par scripts/i18n-migrer.cjs (la source : fr/ventes.js ; méthode : docs/passation/2026-11-11-traduction.md).
 export default {
   "ventes.ventesCompteRelues": "· vendite di questo account rilette",
+  "ventes.venteEmailBordAVenir": "Etichetta in arrivo: l’estensione non l’ha ancora rilevata.",
   "ventes.photoIndisponible": "Foto non disponibile",
   "ventes.montantEurosEx": "Un importo in euro (es.: 25 o 25,50).",
   "ventes.coutAchat": "Costo d’acquisto?",
@@ -238,4 +239,12 @@ export default {
   "ventes.ventesAchetePeu2": "Su {total} vendite — compra un po’ prima.",
   "ventes.ventesAnnulees2": { one: "{n} vendita annullata", other: "{n} vendite annullate" },
   "ventes.moinsVentesSans": { one: "Almeno: {n} vendita senza prezzo letto, non contata.", other: "Almeno: {n} vendite senza prezzo letto, non contate." },
+  "ventes.regarder": {"one": "{n} cosa da guardare", "other": "{n} cose da guardare"},
+  "ventes.regarderVide": "Da guardare",
+  "ventes.basculeCourt": "Apri {login} su vinted.fr",
+  "ventes.basculeCourtOrdi": "Apri {login} su vinted.fr, sul computer",
+  "ventes.connecteCourt": "Accedi con {login} su vinted.fr",
+  "ventes.pourquoiBord": "Perché questa etichetta aspetta?",
+  "ventes.puceAchat": "Prezzo d’acquisto?",
+  "ventes.puceRelier": "Collega un acquisto",
 };
