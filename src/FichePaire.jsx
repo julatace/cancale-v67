@@ -367,6 +367,9 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
   const toutVoir = p ? (
     <details className="fd-tout" data-fiche-plus="">
       <summary className="fd-tout-s">{tr('verre2.fiche.toutVoir')}</summary>
+      {/* (15 nov., lot argent-plus ; rangé dans la fiche D le 16 nov.) Ce que le site et les frais saisis retirent
+          (src/beneficeArticle.js) — derrière « Tout voir » : la fiche D tient en un écran, chaque montant une fois (§7). */}
+      {!double && r && r.detail && !cases.some((c) => c.cle === 'si-vendue') ? <BeneficeArticleDetail b={r.detail} seulement={r.detail.plateforme === 'eBay' ? ['vente', 'site', 'saisis'] : ['site', 'saisis']}/> : null}
       {depuis ? <section className="vrm-fp-contexte" data-fiche-contexte={ctx} aria-label={tr(CLE_CTX[ctx] || 'fiche.ctx.vente')} ref={slotCtx}/> : null}
       {etat && !double ? <EtatArticle etat={etat}/> : null}
       <OngletsFiche vue={vueFiche} onVue={setVueFiche}/>
@@ -468,10 +471,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
               {['argent', 'sites', 'histoire'].map((v) => <button key={v} type="button" role="tab" className="fd-seg-b" aria-selected={vueOuverte === v} data-fd-seg={v} onClick={() => setVue(v)}>{tr('fd.seg.' + v)}</button>)}
             </div>
             <div className="fd-v" role="tabpanel" data-fd-vue-ouverte={vueOuverte}>
-              {vueOuverte === 'argent' ? (double ? <p className="fd-vide">{tr('fd.argent.double')}</p> : <><VueArgent cases={cases} etat={etat}/>
-                  {/* (15 nov., lot argent-plus ; intégré à la fiche D le 16 nov.) Ce que le site et les frais saisis retirent
-                      (src/beneficeArticle.js) — sur un article VENDU, seulement ce que les cases ne disent pas déjà (§7). */}
-                  {r && r.detail && !cases.some((c) => c.cle === 'si-vendue') ? <BeneficeArticleDetail b={r.detail} seulement={r.detail.plateforme === 'eBay' ? ['vente', 'site', 'saisis'] : ['site', 'saisis']}/> : null}</>)
+              {vueOuverte === 'argent' ? (double ? <p className="fd-vide">{tr('fd.argent.double')}</p> : <VueArgent cases={cases} etat={etat}/>)
                 : vueOuverte === 'sites' ? <VueSites sites={lignesSites} I={I}/>
                 : <VueHistoire lignes={hist}/>}
             </div>

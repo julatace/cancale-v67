@@ -146,6 +146,10 @@ const sansDebord = (pg) => pg.evaluate(() => { const d = document.scrollingEleme
         // ── S4. TOUTES MES DONNÉES ──
         await aller(pg, 'tab=settings', 3000);
         // La ligne « securite » vit dans une liste repliée sur ce gabarit : on la touche par son identité.
+        // (16 nov., intégration vague B) Paramètres en dix catégories (maquette validée) : la catégorie « Sécurité des données »
+        // (`data-categorie-ouvrir="donnees"`) s'ouvre d'abord, puis sa ligne « securite ».
+        await pg.evaluate(() => { const c = document.querySelector('[data-categorie-ouvrir="donnees"]'); if (c && !document.querySelector('[data-sous-ouvrir="securite"]')) c.click(); });
+        await pg.waitForTimeout(900);
         await pg.evaluate(() => { const e = document.querySelector('[data-sous-ouvrir="securite"]'); if (e) e.click(); });
         await pg.waitForTimeout(1500);
         const g = pg.locator('[data-sauvegarde-lancer]:visible').first();

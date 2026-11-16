@@ -168,7 +168,12 @@ async function scenario(b, vp) {
     dit(!lu.ecrit, `${T} X. « Transporteur inconnu » n'est écrit nulle part à l'écran`);
     dit(!lu.deborde, `${T} X. rien ne déborde en largeur`);
     // La tuile Chronopost filtre la liste sur SA vente (par identité, le n° de transaction).
-    await pg.click('[data-envoyer-filtre-choix="Chronopost"]').catch(() => {});
+    // (16 nov., intégration vague B) Ventes « Verre dépoli » : les tuiles-filtres vivent derrière « … » de la tête
+    // (`data-colis-barre-btn="outils"`, maquette validée) — on l'ouvre d'abord, comme lui.
+    if (!(await pg.locator('[data-envoyer-filtre-choix="Chronopost"]').first().isVisible().catch(() => false))) {
+      await pg.locator('[data-colis-barre-btn="outils"]').first().click().catch(() => {}); await pg.waitForTimeout(500);
+    }
+    await pg.click('[data-envoyer-filtre-choix="Chronopost"]', { timeout: 8000 }).catch(() => {});
     await pg.waitForTimeout(600);
     const filtre = await pg.evaluate(() => [...document.querySelectorAll('[data-bord-card][data-tx-colis]')].filter((c) => c.offsetParent).map((c) => c.getAttribute('data-tx-colis')));
     dit(filtre.join(',') === '9403', `${T} T. la tuile Chronopost ne garde que la vente 9403`, filtre.join(','));

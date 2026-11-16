@@ -123,6 +123,15 @@ async function passe(nav, { W, sombre }) {
     dit(!!c2 && !!c3 && c2 !== c3 && !prises.has(c2) && !prises.has(c3), `${T} P4 deux articles à ranger ⇒ deux cases DIFFÉRENTES, libres (jamais la même à deux)`, { c2, c3 });
     dit(c2 === 'mA:2' && c3 === 'mA:3', `${T} P4 dans l’ordre des N° : N°2 la première libre (mA:2), N°3 la suivante (mA:3)`, { c2, c3 });
     if (ici) {
+      // (16 nov., intégration vague B) Fiche D : les gestes de la case vivent derrière « ⋯ » → « Tout voir » (c39b2131) :
+      // on les ouvre d'abord quand « Ranger ici » n'est pas visible — le même chemin que lui.
+      if (!(await o.pg.locator('[data-fiche-ranger-ici]').first().isVisible().catch(() => false))) {
+        await o.pg.evaluate(() => { const b = document.querySelector('.vrm-fp [data-fd-plus-ouvrir]'); if (b) b.click(); });
+        await o.pg.waitForTimeout(300);
+        await o.pg.evaluate(() => { const d = document.querySelector('.vrm-fp [data-fiche-plus]'); if (d) d.open = true; });
+        await o.pg.waitForTimeout(500);
+        await o.pg.locator('[data-fiche-ranger-ici]').first().scrollIntoViewIfNeeded().catch(() => {});
+      }
       await o.pg.locator('[data-fiche-ranger-ici]').first().click().catch(() => {});
       const pose = await attendre(async () => { const l = await lireLocal(o.pg); return l.slots['3'] ? l.slots['3'] : null; }, 6000);
       dit(!!pose && pose.m + ':' + pose.i === c3, `${T} P4 « Ranger ici » pose N°3 dans SA case proposée`, pose);

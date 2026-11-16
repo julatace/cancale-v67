@@ -97,6 +97,14 @@ const ROUGE = `(c) => { const m = String(c).match(/\\d+(\\.\\d+)?/g); if (!m) re
         try {
           await P.pret(o.pg);
           await o.pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: '1205' })));
+          // (16 nov., intégration vague B) Fiche D : « Où vendre ? » est rangé avec les infos de la paire, derrière « ⋯ » →
+          // « Tout voir » (la fiche tient en un écran) : on l'ouvre, le même chemin que lui.
+          await o.pg.waitForSelector('.vrm-fp [data-fd-plus-ouvrir]', { timeout: 20000 }).catch(() => {});
+          await o.pg.evaluate(() => { const b = document.querySelector('.vrm-fp [data-fd-plus-ouvrir]'); if (b) b.click(); });
+          await o.pg.waitForTimeout(300);
+          await o.pg.evaluate(() => { const d = document.querySelector('.vrm-fp [data-fiche-plus]'); if (d) d.open = true; });
+          await o.pg.waitForTimeout(500);
+          await o.pg.locator('[data-ou-vendre]').first().scrollIntoViewIfNeeded().catch(() => {});
           await o.pg.waitForSelector('[data-ou-vendre]', { timeout: 20000 });
           await o.pg.waitForFunction(() => { const v = document.querySelector('[data-ou-vendre-site="vinted"]'); return v && v.getAttribute('data-ou-vendre-etat') !== 'inconnu'; }, null, { timeout: 12000 }).catch(() => {});
           await o.pg.waitForTimeout(500);

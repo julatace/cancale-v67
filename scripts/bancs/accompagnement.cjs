@@ -488,6 +488,13 @@ action('numero.carton', async (nav) => {
     lignes: [{ id: 'panel_num_reserves', data: { attente: {}, items: { [id]: { numero: '881', at: ilYaN(41) } } } }] });
   const o = await ouvrir(nav, { url: '/?tab=annonces', b });
   try {
+    // (16 nov., intégration vague B) Depuis refonte-journee (« la liste d'abord »), les N° à vérifier vivent dans « À faire »
+    // (la feuille, au téléphone) : on l'ouvre d'abord quand la ligne est rangée derrière — le même chemin que lui.
+    await o.pg.waitForSelector('[data-verif-prendre-reserve="881"]', { state: 'attached', timeout: 20000 }).catch(() => {});
+    if (!(await o.pg.locator('[data-verif-prendre-reserve="881"]').first().isVisible().catch(() => false))) {
+      await o.pg.locator('[data-ui-afaire]').first().click().catch(() => {});
+      await o.pg.waitForSelector('[data-ui-afaire-feuille]', { timeout: 8000 }).catch(() => {});
+    }
     await toucher(o.pg, `[data-verif-prendre-reserve="881"]`, { ms: 20000 });
     // La question du prix d'achat au numérotage (le geste du champ N°) : « Plus tard ».
     await o.pg.waitForSelector('[data-ask-champ="prix-numerotage"]', { timeout: 6000 }).then(() => o.pg.locator('div:has(> form [data-ask-champ="prix-numerotage"])').last().locator('button', { hasText: /^Plus tard$/ }).first().click()).catch(() => {});

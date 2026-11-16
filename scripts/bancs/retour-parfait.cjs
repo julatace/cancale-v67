@@ -211,23 +211,19 @@ const dernierPdf = async (pg, viaPartage) => {
       const ROWS = ROWS0.map((r) => ({ ...r, data: { ...r.data } }));
       const P = await preparer(b, vp, ROWS, { sombre });
       let { pg } = P;
+      // (16 nov., intégration vague B) Julien, 15 nov. (c8e526af, refonte-journee) : « Ma journée ne montre que ce qui
+      // demande un geste » — les retours y passent par le bloc « Retours et litiges » (une ligne par article, la MÊME liste
+      // classée qu'Achats) ; la carte « À renvoyer » complète (bande, gestes, suivi) vit dans Achats, jugée là plus bas.
       await essaie('Ma journée', async () => {
         await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
-        await pg.waitForSelector('[data-a-renvoyer-journee] [data-retour-cle]', { timeout: 40000 }).catch(() => {});
+        await pg.waitForSelector(`[data-retours-litiges] [data-rl-cle="a:r:${TXA}"]`, { timeout: 40000 }).catch(() => {});
         await pg.waitForTimeout(2500);
-        const cles = await pg.evaluate(() => [...document.querySelectorAll('[data-a-renvoyer-journee] [data-retour-cle]')].map((x) => x.getAttribute('data-retour-cle')));
-        dit(cles.join() === 'r:' + TXA, `${nom} : « À renvoyer » en tête de Ma journée : l’Autry SEUL (Nike est déjà déposé)`, JSON.stringify(cles));
-        const a = await carte(pg, '[data-a-renvoyer-journee]', TXA);
-        const reBande = new RegExp(`^À déposer avant ${motsJour(DANS8.j).replace(/\./g, '\\.')} 10 h$`);
-        dit(a && reBande.test(a.bande || '') && /^dans 8 jours · sinon tu gardes l’article et le vendeur est payé$/.test(a.sous || ''), `${nom} : la bande « ${a && a.bande} · ${a && a.sous} » (date en clair, heure de Paris)`, JSON.stringify(a && [a.bande, a.sous]));
-        dit(a && a.contraste >= 4.5, `${nom} : la bande se lit (contraste ${a && a.contraste}:1 ≥ 4,5)`, JSON.stringify(a && a.contraste));
-        dit(a && a.ctrCarte.length >= 4 && a.ctrCarte.every(([, v]) => v >= 4.5), `${nom} : la carte se lit en tête de Ma journée (titre, compte, n°, liens ≥ 4,5:1 : ${a && a.ctrCarte.map(([k, v]) => v).join(' · ')})`, JSON.stringify(a && a.ctrCarte));
-        dit(a && a.titre === AUTRY && a.photo && /banc_cancale/.test(a.meta), `${nom} : photo + titre (par SON n° de transaction) + compte`, JSON.stringify(a && [a.titre, a.meta, a.photo]));
-        dit(a && a.imprimer >= (vp.width < 600 ? 44 : 40) && a.depose >= (vp.width < 600 ? 44 : 40) && a.logo === 'chronopost' && a.copier && a.copier.txt.includes(SA) && a.copier.h >= 44 && a.suivre === `https://www.chronopost.fr/tracking-no-cms/suivi-page?listeNumerosLT=${SA}`,
-          `${nom} : Imprimer, Déposé, logo Chronopost, n° copiable, « Suivre ↗ » vers la page publique de Chronopost`, JSON.stringify(a && { i: a.imprimer, d: a.depose, logo: a.logo, c: a.copier, s: a.suivre }));
-        await pg.locator('[data-a-renvoyer-journee]').first().scrollIntoViewIfNeeded().catch(() => {});
-        await pg.locator('[data-a-renvoyer-journee]').first().screenshot({ path: path.join(SHOTS, `retour-parfait-journee-${suff}.png`) }).catch(() => {});
-        dit((await rougeIci(pg, '[data-a-renvoyer-journee]')) === false, `${nom} : aucun rouge (Ma journée)`);
+        const rl = await pg.evaluate(() => [...document.querySelectorAll('[data-retours-litiges] [data-rl-cle]')].map((x) => ({ cle: x.getAttribute('data-rl-cle'), imprimer: !!x.querySelector('[data-rl-imprimer]') })));
+        const imp = rl.filter((x) => x.imprimer).map((x) => x.cle);
+        dit(imp.join() === 'a:r:' + TXA && rl.some((x) => x.cle === 'a:r:' + TXN), `${nom} : Ma journée · Retours et litiges : l’Autry SEUL à déposer (Imprimer), Nike en route (déjà déposé)`, JSON.stringify(rl));
+        await pg.locator('[data-retours-litiges]').first().scrollIntoViewIfNeeded().catch(() => {});
+        await pg.locator('[data-retours-litiges]').first().screenshot({ path: path.join(SHOTS, `retour-parfait-journee-${suff}.png`) }).catch(() => {});
+        dit((await rougeIci(pg, '[data-retours-litiges]')) === false, `${nom} : aucun rouge (Ma journée)`);
       });
       await essaie('Achats', async () => {
         await pg.goto(`http://localhost:${PORT}/?tab=achats`, { waitUntil: 'domcontentloaded' });
@@ -235,6 +231,13 @@ const dernierPdf = async (pg, viaPartage) => {
         await pg.waitForTimeout(1500);
         const n = await carte(pg, '[data-retours-achat]', TXN), a = await carte(pg, '[data-retours-achat]', TXA);
         const etats = (c) => c ? c.etapes.map((e) => e.cle + ':' + e.etat).join(' ') : '';
+        const reBande = new RegExp(`^À déposer avant ${motsJour(DANS8.j).replace(/\./g, '\\.')} 10 h$`);
+        dit(a && reBande.test(a.bande || '') && /^dans 8 jours · sinon tu gardes l’article et le vendeur est payé$/.test(a.sous || ''), `${nom} : la bande « ${a && a.bande} · ${a && a.sous} » (date en clair, heure de Paris)`, JSON.stringify(a && [a.bande, a.sous]));
+        dit(a && a.contraste >= 4.5, `${nom} : la bande se lit (contraste ${a && a.contraste}:1 ≥ 4,5)`, JSON.stringify(a && a.contraste));
+        dit(a && a.ctrCarte.length >= 4 && a.ctrCarte.every(([, v]) => v >= 4.5), `${nom} : la carte « À renvoyer » se lit (Achats) (titre, compte, n°, liens ≥ 4,5:1 : ${a && a.ctrCarte.map(([k, v]) => v).join(' · ')})`, JSON.stringify(a && a.ctrCarte));
+        dit(a && a.titre === AUTRY && a.photo && /banc_cancale/.test(a.meta), `${nom} : photo + titre (par SON n° de transaction) + compte`, JSON.stringify(a && [a.titre, a.meta, a.photo]));
+        dit(a && a.imprimer >= (vp.width < 600 ? 44 : 40) && a.depose >= (vp.width < 600 ? 44 : 40) && a.logo === 'chronopost' && a.copier && a.copier.txt.includes(SA) && a.copier.h >= 44 && a.suivre === `https://www.chronopost.fr/tracking-no-cms/suivi-page?listeNumerosLT=${SA}`,
+          `${nom} : Imprimer, Déposé, logo Chronopost, n° copiable, « Suivre ↗ » vers la page publique de Chronopost`, JSON.stringify(a && { i: a.imprimer, d: a.depose, logo: a.logo, c: a.copier, s: a.suivre }));
         dit(n && n.etape === 'en-route' && etats(n) === 'bordereau:fait deposer:fait route:ici livre:avenir rembourse:avenir' && /^\d{1,2} \S+$/.test(n.etapes[1].det) && n.etapes[1].lib === 'Déposé' && n.etapes[2].lib === 'En route vers le vendeur',
           `${nom} : Nike — « Déposé · ${n && n.etapes[1] && n.etapes[1].det} » ✓, « En route vers le vendeur » ici, puis livré, remboursé`, JSON.stringify(n && n.etapes));
         dit(n && /lu dans l’e-mail Mondial Relay/.test(n.source) && n.bande === null && !n.imprimer && !n.depose && n.logo === 'mondialrelay' && /^https:\/\/www\.mondialrelay\.fr\/suivi-de-colis\/\?numeroExpedition=81230048/.test(n.suivre || ''),
@@ -286,8 +289,8 @@ const dernierPdf = async (pg, viaPartage) => {
           `${nom} : l’e-mail Chronopost fait avancer l’Autry SEUL — « Déposé · ${a && a.etapes[1] && a.etapes[1].det} » ✓, en route ici, bande et Imprimer partis`, JSON.stringify(a && { e: a.etape, et: a.etapes, s: a.source, b: a.bande }));
         await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
         await pg.waitForTimeout(4500);
-        const n = await pg.evaluate(() => document.querySelectorAll('[data-a-renvoyer-journee] [data-retour-cle]').length);
-        dit(n === 0, `${nom} : plus rien « à renvoyer » en tête de Ma journée (les deux sont déposés)`, String(n));
+        const n = await pg.evaluate(() => document.querySelectorAll('[data-retours-litiges] [data-rl-imprimer]').length);
+        dit(n === 0, `${nom} : plus rien « à déposer » dans Ma journée (les deux sont déposés)`, String(n));
         // Livré (lu chez Chronopost) puis remboursé (l'e-mail « … a été remboursée »).
         ROWS.push({ id: `depart_chronopost_${SA}`, data: { v: 1, sens: 'sortant', suivi: SA, carrier: 'chronopost', priseAt: ilYaH(2), etat: 'livre', etatAt: ilYaH(1), lu: ilYaH(0.5) } });
         ROWS.push({ id: `email_rembachat_${TXA}`, data: { type: 'remboursement-achat', transaction: TXA, montant: 34.32, article: AUTRY, receivedAt: ilYaH(0.3) } });

@@ -135,6 +135,13 @@ async function scenarioV(b, largeur, sombre) {
   const main = BASE_MAIN({ fiches: { 9360: { numero: '7', auto: true, numberedAt: ilYa(49), accountId: '111', photo: PH_A } } });
   const { pg, ctx, errs } = await ouvrir(b, { url: '/?tab=annonces', largeur, sombre, main, items, lignes });
   try {
+    // (16 nov., intégration vague B) Depuis refonte-journee (« la liste d'abord »), les N° à vérifier vivent dans « À faire »
+    // (la feuille, au téléphone) : on l'ouvre quand la ligne y est rangée — le même chemin que lui.
+    await pg.waitForSelector('[data-verif-reserve="3"]', { state: 'attached', timeout: 20000 }).catch(() => {});
+    if (!(await pg.locator('[data-verif-reserve="3"]').first().isVisible().catch(() => false))) {
+      await pg.locator('[data-ui-afaire]').first().click().catch(() => {});
+      await pg.waitForSelector('[data-ui-afaire-feuille]', { timeout: 8000 }).catch(() => {});
+    }
     const vu = await pg.waitForSelector('[data-verif-reserve="3"]', { timeout: 20000 }).then(() => true).catch(() => false);
     dit(vu, `${tag} : Annonces montre la ligne « N° à vérifier » de cette paire`);
     if (vu) {

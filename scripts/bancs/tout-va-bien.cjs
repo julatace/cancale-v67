@@ -119,7 +119,13 @@ async function scenario(b, scen, largeur, sombre) {
     dit(!/shop_test/.test(t), `${nom} : le compte relu il y a 1 h n’est pas en alerte`);
     await pg.waitForTimeout(1500);
     await pg.screenshot({ path: path.join(CAPT, `tout-va-bien-alerte-${nom}.png`) });
-    if (await alerte.count()) await alerte.locator('[data-alerte-voir]').click();
+    // (16 nov., intégration vague B) Julien, 14 nov. (AJOUT 3, 56e1ec66) : la ligne de fraîcheur quitte la tête de page — la
+    // cloche porte son point ambre, SA feuille porte la ligne entière. On ouvre donc la cloche, puis « Voir ».
+    if (await alerte.count() && !(await alerte.locator('[data-alerte-voir]').first().isVisible().catch(() => false))) {
+      await pg.locator('[data-centre-notifs-cloche]').first().click().catch(() => {});
+      await pg.waitForTimeout(800);
+    }
+    if (await alerte.count()) await pg.locator('[data-alerte-capture] [data-alerte-voir]:visible').first().click();
   } else {
     await pg.waitForTimeout(2500);
     dit(!(await alerte.count()), `${nom} : aucune ligne ambre`);

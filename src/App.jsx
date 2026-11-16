@@ -49848,6 +49848,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* (11 nov., lot import-depart) L'historique Vinted qui arrive : une barre fine par compte, seulement pendant l'import (src/ImportDepart.jsx). */}
             {/* (15 nov., refonte-journee) L'import du passé : dans la feuille « Tout va bien ? » et Paramètres → Historique ; le
                 contrôle de cette nuit (src/VeilleJournee.jsx) : Paramètres → « Tout va bien ? ». Plus sur Ma journée. */}
+            {/* (16 nov., intégration de claude/fiabilite-auto) Ce qui RESTE dans src/VeilleJournee.jsx demande un geste : un chiffre qui a
+                chuté d'un coup sans raison (« Vérifie tes annonces Vinted » · « C'est vérifié »). Rien d'autre ⇒ il ne rend rien. */}
+            {!loading && !baseKO && !premierJour ? <VeilleJournee/> : null}
             {/* (14 nov., lot argent-prix — 114) Un solde fini : VRM PROPOSE « Remettre les prix », c'est SON clic qui lance (src/soldes.js). */}
             {!loading && !baseKO ? (()=>{ const a = soldesARemettre(load(CLE_SOLDES, null)); return a.length ? <GardeEcran nom="journee:soldes"><Suspense fallback={null}><SoldesJourneeL aRemettre={a} onOuvrir={()=>{ try { window.dispatchEvent(new CustomEvent('vrm:remise-soldes')); } catch (_) {} }}/></Suspense></GardeEcran> : null; })() : null}
 

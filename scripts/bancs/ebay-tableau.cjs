@@ -182,7 +182,7 @@ const mesures = (pg) => pg.evaluate(() => {
 
 (async () => {
   if (!fs.existsSync(path.join(DIST, 'index.html'))) { console.log('KO  dist/ absent : npm run build'); process.exit(1); }
-  const b = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || undefined, args: ['--use-angle=swiftshader', '--no-sandbox'] });
+  const b = await chromium.launch({ executablePath: process.env.PW_CHROMIUM || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] });
   try {
     // ── 390 tactile, clair
     remettre();
