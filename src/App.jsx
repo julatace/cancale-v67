@@ -42601,7 +42601,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         } else {
           const a = autresParIdRapport.get(id);
           if (a) { achatC = a.achat != null ? c(a.achat) : null; num = a.num || ''; }
-          if (id.startsWith('ebay:')) { const r = so.venteAutre('ebay', ebayParId.get(id.slice(5))); prixC = r && r.ok ? r.centimes : null; }
+          if (id.startsWith('ebay:')) { const r = so.venteAutre('ebay', ebayParId.get(id.slice(5))); prixC = r && r.ok && !(Array.isArray(r.lignes) && r.lignes.length > 1) ? r.centimes : null; }   // (16 nov.) une commande à plusieurs articles : la marge d'UNE paire n'est pas su
           else if (id.startsWith('vestiaire:')) { const r = so.venteAutre('vestiaire', vcParId.get(id.slice(10))); prixC = r && r.ok ? r.centimes : null; }
           else if (!l.sansPrix) prixC = c(l.eur);           // Leboncoin, ventes importées : le prix de la vente
         }
