@@ -14,8 +14,8 @@ Voir la section « Preuves » (chiffres) et « Ce qui reste » en bas. Geste de 
 - Ce que l'extension range pour **Leboncoin**, **Vestiaire** et la **boîte Vinted** arrive à l'écran
   resté ouvert sans recharger — y compris sur l'iPhone ou quand la lecture vient d'un autre ordinateur.
   Un **e-mail** rangé fait paraître « Actualiser » dans la boîte e-mail (rien n'est relu sans son geste).
-- La page d'accueil publique est plus légère : le fichier d'entrée passe de 37,7 Ko à 29,9 Ko
-  compressés (les données du mode exemple et l'aide d'installation n'y sont plus).
+- La page d'accueil publique est plus légère : le fichier d'entrée passe de 37,7 Ko à 25,8 Ko
+  compressés (sous le budget de 26 Ko du banc `accueil`).
 
 ## 2. Point par point (mission du 16 nov.)
 
@@ -60,11 +60,18 @@ avec un greffon de build qui liste les modules du morceau d'entrée) :
   avec l'app ; un morceau absent ne montre rien ;
 - `navigateurIci` / `estOrionIci` sortis de `navigateurExtension.js` vers `src/navigateurIci.js`
   (ré-exportés à l'identique).
-Résultat : **37,7 Ko → 29,9 Ko** compressés. Le budget du banc (26 Ko) n'est **pas** atteint : reste
-surtout `Accueil.jsx` (≈ 4,7 Ko), `fr-accueil.js` (≈ 5,1 Ko), `main.jsx` (≈ 4,1 Ko), `modeExemple.js`
-(≈ 3,5 Ko : il doit s'installer avant tout module — le rendre paresseux demande de différer toute
-l'initialisation de main.jsx, sans `await` de premier niveau, cible es2020), `plantages.js` (≈ 3 Ko :
-il écoute dès le démarrage). Pistes notées en bas.
+- **le journal des plantages** (`src/plantages.js`) derrière un tampon minuscule (`src/plantagesTampon.js`) :
+  le tampon écoute dès le démarrage (erreurs, rejets, violations CSP, morceaux périmés, AVEC le contexte de
+  l'instant), le vrai journal arrive à l'inactivité (≤ 4 s) ou au premier plantage et reprend tout, dans
+  l'ordre, une fois (`scripts/tests/plantages-tampon.test.mjs`, 3/3) ;
+- **les offres** (`OFFRES`, `prixCompteSupTexte`, `PRIX_COMPTE_SUP_CENTIMES`) dans `api/_lib/plan-offres.js`,
+  ré-exportées par `plan-regle.js` (une seule source) : un module partagé avec l'app tombait ENTIER dans le
+  fichier d'entrée (règle de Rollup) — la règle des plans complète y était ; les mutations de
+  `audit-comptes-sup` / `audit-plans-solo-pro` copient le petit module à côté (toujours rouges) ;
+- même raison : les deux préférences lues par l'accueil (`src/accueil-media.js`, hors du moteur de mouvement
+  du film) et la présentation du code partenaire (`src/partenaires/presenter.js`, l'app seule).
+Résultat : **37,7 Ko → 25,8 Ko** compressés (26 410 octets ; budget 26 Ko) — banc `accueil` : le contrôle
+de poids est vert.
 
 ### (15) La sonde de 60 s des ventes — TRANCHÉ : elle reste
 Elle double la veille seulement quand tout va bien. Elle seule couvre encore (lu dans le code) :
@@ -105,13 +112,30 @@ pixel.
 
 ## 3. Preuves
 
-(à compléter par les mesures de fin de lot)
+- Sonde de piles (`initScript` + cartes de source, script jetable) : Ma journée et Messages, neuf et 2ᵉ
+  ouverture : `ebay_comptes` ×1, `ebay_orders*` ×1, `email_reception_*` ×0 (avant : ×3, ×2, ×2 permis au budget).
+- `budget-vitesse` (journee, messages), machine locale à charge 45 : plus aucune des adresses retirées ;
+  Messages 24 → 14 lectures en double. Restent rouges, nés d'autres lots sur `origin/main` (identiques sur le
+  build d'avant) : le JS (+342 Ko) et des doubles `vrm_controle_nuit`/`vrm_controle_installation` ×3,
+  `lbc_ventes&select=data`, `photo_emprunte_*`, `in.(vc_ventes,vc_listings)` — voir la CI de la PR.
+- `temps-reel` (390 tactile clair, 1512 sombre) : **38 verts, 0 rouge** (vente 14 s / 13 s, après l'écriture
+  2 lectures lourdes du SEUL compte touché, 548 Ko ; F : boîte du seul compte, Leboncoin et Vestiaire rejoués
+  une fois, e-mail signalé, aucune écriture). Avant le retrait de `lbc_a_retirer` : la pastille 390 manquait
+  (boucle) — le banc l'a vu.
+- `messages-sites` : plus aucune écriture (avant : 5 rouges « aucune écriture » + 1 `diag_photos`) ; reste 1
+  rouge d'avant (eBay 1512, la ligne e1 pas cliquable).
+- `accueil` : poids 25,8 Ko ≤ 26 Ko (vert ; avant 37,7 Ko rouge).
+- Tests : `temps-reel.test.mjs` 11/11, `plantages-tampon.test.mjs` 3/3. Audits verts : mode-exemple,
+  exemple-photos, vendeurs-differents (porté : `navigateurIci.js`), comptes-sup et plans-solo-pro (`--prouve`
+  compris), traduction, lancement, ouverture, variables, tdz, coherence, identite, lectures*, quoi-de-neuf.
+  Rouges identiques sur `origin/main` : chrome-en-dur, signalement, vendeur-generaliste, morceau-perime,
+  bilan-semaine, suites-serveur.
 
 ## 4. Ce qui reste
 
-- Banc `accueil` : fichier d'entrée 29,9 Ko > 26 Ko. Pistes : différer l'initialisation de main.jsx
-  pour charger `modeExemple.js` seulement quand l'exemple est demandé ; un tampon d'erreurs minuscule
-  au démarrage et `plantages.js` chargé ensuite ; la moitié basse de la page d'accueil (FAQ, moments,
-  temps gagné) et ses clés en morceau à part.
+- Banc `accueil` : le poids est vert (25,8 Ko) mais la marge est mince (0,2 Ko). Piste suivante : différer
+  l'initialisation de main.jsx pour charger `modeExemple.js` seulement quand l'exemple est demandé (≈ 3 Ko).
+  Autres rouges du banc, sans rapport avec ce lot (machine du banc chargée, charge 45) : LCP 3,1 s, le
+  bouton d'inscription doublé dans la barre à 1512, le film « fonction pure du temps ».
 - `messages-sites` : deux rouges d'avant, sans rapport avec les écritures (eBay 1512 : la ligne
   `[data-ebay-message="e1"]` jamais cliquable ; Leboncoin 1512 : « le compte, SON nombre de non-lus »).
