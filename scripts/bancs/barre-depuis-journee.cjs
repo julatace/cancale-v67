@@ -50,6 +50,7 @@ function fabriquer(reprise) {
       { id: `harvest_${UID}_listings`, data: { capturedAt: frais(60e3), nItems: items.length, payload: { items, pagination: { total_entries: items.length } } } },
       { id: `harvest_${UID}_profile`, data: { capturedAt: frais(60e3), payload: { user: { id: Number(UID), login: 'vendeur_barre' } } } },
       { id: `harvest_${UID}_orders_sold`, data: { capturedAt: frais(60e3), nItems: 3, payload: { my_orders: [vente(1), vente(2), vente(3)] } } },
+      { id: `harvest_${UID}_orders_purchased`, data: { capturedAt: frais(60e3), nItems: 1, payload: { my_orders: [{ transaction_id: 9400, title: 'Asics achetée', price: { amount: '40', currency_code: 'EUR' }, status: 'Commande finalisée', date: frais(5 * 86400e3) }] } } },
     ],
   });
 }

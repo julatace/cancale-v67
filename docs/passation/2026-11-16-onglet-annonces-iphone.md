@@ -28,8 +28,8 @@ par `?tab=annonces` en attendant.
 - Ajouté à la liste WebKit de la CI. Aucun changement de l'app (rien à corriger).
 
 ## Preuves
-- origin/main : banc vert (voir le rapport de la PR).
-- Mutation : l'onglet Annonces mène à Ma journée (`allerA('journee')` au lieu de `dernierePaire()`) ⇒ banc rouge.
+- origin/main (Chromium, 390 tactile) : **39/39**.
+- Mutation (build à part) : l'onglet Annonces mène à Ma journée (`allerA('journee')` au lieu de `dernierePaire()`) ⇒ **4 rouges** (J2 « paires ⇒ annonces » et « seul allumé », appareil neuf et reprise).
 - Captures regardées (Annonces, Achats, Ventes, Argent, Ma journée à 390).
 
 ## ÉTAT À LA REPRISE
