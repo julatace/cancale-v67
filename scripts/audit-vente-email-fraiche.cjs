@@ -42,7 +42,7 @@ if (process.argv.includes('--prouve')) {
     'compte écarté admis': [['src/venteEmailFraiche.js', "if (typeof ecarte === 'function' && ecarte(p.uid)) continue;", '']],
     'deux lignes pour un n°': [['src/venteEmailFraiche.js', "const ajout = fraiches.filter((o) => o && !connues.has(String(o.transaction_id)));", 'const ajout = fraiches.filter(Boolean);']],
     'la liste de Ventes sans les ventes e-mail': [['src/App.jsx', 'let arr = (ventesListe || [])', 'let arr = (sales.items || [])']],
-    'le CA déclaré reçoit les ventes e-mail': [['src/App.jsx', 'const decl = ventesDeclarables({ vinted: ventes, lbc, ebay, vestiaire, masquee', 'const decl = ventesDeclarables({ vinted: ventesVendu || ventes, lbc, ebay, vestiaire, masquee']],
+    'le CA déclaré reçoit les ventes e-mail': [['src/ecrans/Compta.jsx', 'const decl = ventesDeclarables({ vinted: ventes, lbc, ebay, vestiaire, masquee', 'const decl = ventesDeclarables({ vinted: ventesVendu || ventes, lbc, ebay, vestiaire, masquee']],
     'ventes en retard jamais dites': [['src/fraicheurComptes.js', 'return v != null && a != null && a - v > RETARD_VENTES_MS;', 'return false;']],
   });
   return;
