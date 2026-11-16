@@ -72,8 +72,39 @@ dans sa DERNIÈRE version, puis régénère les zips). Aucune version montée ic
   des `Bouton` de 40 px au bureau, ajoutés au carré après le banc (11 nov.) ; 44 px à toute largeur
   dans le carré (styles-annonces-coherence.css), comme les tuiles.
 
-(suite : voir ÉTAT À LA REPRISE)
+- **navigation-tache** (13 rouges sur la CI) : banc PÉRIMÉ — il jugeait la barre du 11 nov. (DJ3 : Journée ·
+  Annonces · Ventes · Achats · Plus) ; la barre a changé le 14 nov. (choix n° 61 : quatre onglets, le reste dans
+  le menu de l'avatar) puis le 16 (barre-achats : Achats revient). Porté sur la RÈGLE : la barre rendue doit être
+  `BOTTOM_TABS` tel que src/App.jsx le déclare (ordre, libellé `nav.<id>` dans la langue, 44 px, aucun « Plus » ;
+  le disque « + » du centre n'est pas un onglet) ; le menu de l'avatar porte Messages, Stock, E-mails, Communauté et
+  Paramètres ; le rail de l'ordinateur (15 nov., refonte-journee) : Ma journée, Vendre · Ranger · Compter, Paramètres
+  et la carte du compte au pied ; les sous-sections eBay sont lues dans `SOUS_SECTIONS` (src/navigationTache.js :
+  Tableau d'abord depuis le 15 nov.). Local (dist d'avant le merge de barre-achats) : 13 → 3 rouges (la barre, D).
+  D « deux paires au même titre » : le titre se lit désormais dans le `textContent` de la ligne (à confirmer CI).
+- **statut-colis** (33 rouges locaux) : banc PÉRIMÉ sur deux règles du 14 nov. — (1) f86e3b0b2 : un colis arrivé
+  SANS code n'est plus « à retirer » mais « À vérifier » (raison `sans_code`, jamais compté) ⇒ C5, C15, la carte
+  Tabavap à 3, total 9 ; (2) « Fiche partout » (proposition 62) : toucher un colis ouvre LA fiche, son détail y est
+  rendu (`DansFiche`) ⇒ `detail()` lit `[data-fiche-paire] [data-rp-detail]` puis ferme la fiche.
+- **chiffres-coherents** (4 rouges) : banc PÉRIMÉ — Ma journée est la grille Studio (14 nov.) : « 2 à imprimer »
+  est le geste de la tuile À envoyer (`data-sj-imprimer`) ; son exactitude est maintenant écrite
+  (`data-sj-imprimer-exact`, la même règle `emballer.exact` qu'avant) ; « Préparer la tournée de dépôt » est rangé
+  dans « À faire · N » (refonte des listes, 14 nov.) : le banc ouvre « À faire » avant de toucher la tournée.
+- **budget-vitesse** : trois lectures en double retirées dans l'app — les bordereaux e-mail (`email_bord_*`,
+  « NOUVELLE lecture en double » sur Annonces, Ventes, Achats) en une lecture en vol partagée ; `vrm_controle_nuit` /
+  `vrm_controle_installation` (3 lectures pour un budget de 2 à l'ouverture de Ma journée : VeilleJournee et
+  Fiabilite) partagées pour l'affichage ; `vinted_listing_dates` par `fetchMemo`. Le JS « appareil neuf » mesuré
+  par la CI : 2 310 Ko pour un budget de 1 966 (+17 %, `App-*.js` seul ≈ 1,85 Mo compressé) — pas relevé ici.
 
 ## ÉTAT À LA REPRISE
 
-(à compléter en fin de lot)
+- PR #1215 (`claude/derniers-rouges`) ; PR #1210 (`claude/regles-achat-recopie`, recopie de vrm-regles-achat.js) à
+  fusionner AVEC la dernière montée de version du train (ligne dans le fichier des versions réservées).
+- Audits du lot verts en local après le merge de main (8d8196d38) : vocabulaire-article, vendeur-generaliste,
+  notifs-redaction, traduction, quoi-de-neuf, transporteur-connu, veille, lectures*, tdz, variables.
+- Bancs : machine partagée saturée (charge 18-20, ~12 commandes lourdes en file) ⇒ un banc local attend 30 à 60 min
+  son créneau et un navigateur a été tué en cours de route (annonces-actions, « Target page closed ») ; la preuve
+  des bancs portés se lit sur la CI de la PR.
+- Reste (voir le rapport) : budget-vitesse JS (+17 %, à mesurer avant tout relevé : un relevé masquerait une
+  régression), doublons restants d'Achats (panel_num_reserves 5/4, brouillons 3/2, coffre 3/2), et les bancs
+  rouges traités par d'autres lots (nouveau-vendeur, colis-retirer-propre, ventes-e2, journee-coherence,
+  accessibilite…).
