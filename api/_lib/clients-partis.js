@@ -36,7 +36,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const MOIS_GARDE = 12;
 export const MOIS_AVIS = 11;
 export const MAX_AVIS = 20;
-export const MAX_SUPPRESSIONS = 5;
+export const MAX_SUPPRESSIONS = 1;   // (16 nov., H30 de la revue) un compte effacé par passage, au plus
+export const ECART_CONSTAT_H = 20;  // (16 nov., H30) deux constats à 20 h d'écart au moins (deux matins)
 export const ID_AVIS = 'vrm_depart_avis';
 export const STATUTS_FINIS = ['canceled', 'incomplete_expired', 'paused'];
 export const LIEN_COMPTE = `${SITE}/?tab=settings&vue=compte`;
@@ -173,6 +174,11 @@ export async function passageClientsPartis({ maintenant = Date.now(), env = proc
     if (lu.data.customer !== a.client_stripe) { ign('pas son client'); continue; }
     const fin = finDeStripe(lu.data, maintenant);
     if (fin == null) { ign('pas fini chez Stripe'); continue; }
+    // (16 nov., H20) TOUS ses abonnements chez Stripe, pas seulement celui de la ligne : réabonné
+    // sous un NOUVEL abonnement (webhook perdu), il est vivant — ni avis ni effacement. Pas su ⇒ rien.
+    const tous = await stripe('GET', 'subscriptions', { customer: a.client_stripe, status: 'all', limit: 100 });
+    if (!tous || !tous.ok || !tous.data || !Array.isArray(tous.data.data)) { ign('stripe pas su'); continue; }
+    if (tous.data.data.some((s) => s && s.id !== a.abonnement_stripe && finDeStripe(s, maintenant) == null)) { ign('autre abonnement vivant'); continue; }
     const lignes = await lire(url, service, `app_data?owner=eq.${owner}&id=eq.${ID_AVIS}&select=data&limit=1`);
     if (!lignes) { ign('avis pas su'); continue; }
     const etape = etapeDepart({ fin, maintenant, avis: lignes[0] && lignes[0].data });
@@ -203,12 +209,26 @@ export async function passageClientsPartis({ maintenant = Date.now(), env = proc
 
     // etape === 'supprimer'
     if (supprimes + incomplets >= maxSuppressions) { ign('plafond des suppressions'); continue; }
+    // (16 nov., H30) DOUBLE CONSTAT : l'effacement exige le même verdict sur DEUX passages espacés
+    // d'au moins `ECART_CONSTAT_H` (deux matins). Le 1er passage ne fait que le noter dans la ligne
+    // d'avis (relue telle quelle) ; écriture pas confirmée ⇒ rien. Un passage qui n'aboutit pas à un
+    // effacement complet ARRÊTE les suivants (plus aucun effacement dans ce passage).
+    {
+      const dAvis = (lignes[0] && lignes[0].data) || {};
+      const pour = new Date(fin).toISOString();
+      const c = dAvis.constat && dAvis.constat.pour === pour ? Date.parse(dAvis.constat.at || '') : NaN;
+      if (!Number.isFinite(c)) {
+        if (!(await ecrireAvis(url, service, owner, { ...dAvis, constat: { pour, at: new Date(maintenant).toISOString() } }))) { ign('constat non ecrit'); continue; }
+        ign('premier constat : effacement au prochain passage'); continue;
+      }
+      if (maintenant - c < ECART_CONSTAT_H * 3600e3) { ign('second constat trop tot'); continue; }
+    }
     const inv = await inventaire({ url, service, owner, proprio });
     if (!inv) { ign('inventaire pas su'); continue; }
     const adr = cfg.pret ? await adresse(owner) : null;          // lue AVANT : après, le compte n'existe plus
     const r = await effacerCompte({ url, service, owner, proprio, inv, maintenant });
     await noterJournal({ url, service, owner, ok: r.ok, nombres: { ...inv, donneesEffacees: r.etapes.donnees, depart: 1 }, maintenant });
-    if (!r.ok) { incomplets++; continue; }
+    if (!r.ok) { incomplets++; maxSuppressions = 0; continue; }   // (16 nov., H30) un échec arrête les suivants
     supprimes++;
     // (12 nov., M102) L'issue de l'e-mail « compte supprimé » est COMPTÉE dans la réponse du cron
     // (envoyé · refusé · incertain · sans adresse) : un envoi raté ne passe plus en silence.

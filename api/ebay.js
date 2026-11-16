@@ -170,14 +170,14 @@ function classeEchec(r) {
 //   `avertissements` : les messages de sévérité Warning (eBay a accepté, mais
 //                      il a quelque chose à dire) ;
 //   `erreurs`        : la liste complète `{code, severite, message, params}`.
-async function tradingCall(token, callName, inner) {
+async function tradingCall(token, callName, inner, delaiMs = DELAI_TRADING_MS) {
   const body = '<?xml version="1.0" encoding="utf-8"?>'
     + `<${callName}Request xmlns="urn:ebay:apis:eBLBaseComponents">${inner}</${callName}Request>`;
   try {
     const r = await fetchAvecDelai(`${EBAY_API}/ws/api.dll`, {
       method: 'POST',
       headers: { 'X-EBAY-API-CALL-NAME': callName, 'X-EBAY-API-SITEID': marcheCourant().siteId, 'X-EBAY-API-COMPATIBILITY-LEVEL': '1149', 'X-EBAY-API-IAF-TOKEN': token, 'Content-Type': 'text/xml' },
-      body, signal: AbortSignal.timeout(DELAI_TRADING_MS),
+      body, signal: AbortSignal.timeout(delaiMs),
     });
     const xml = await r.text();
     const ack = (/<Ack>([\s\S]*?)<\/Ack>/.exec(xml) || [])[1] || '';
@@ -295,12 +295,12 @@ async function listeVendeur(token, opts) {
 
 // Détail COMPLET d'une annonce (description, catégorie, état, photos,
 // caractéristiques). Pour capter « tout ».
-async function tradingGetItem(token, itemId) {
+async function tradingGetItem(token, itemId, delaiMs) {
   // (11 octobre, revue) L'heure de la lecture est celle où la question PART
   // chez eBay, jamais celle où la réponse arrive : une réponse lente ne doit pas
   // se croire plus fraîche qu'une pose faite pendant qu'elle voyageait.
   const t0 = Date.now();
-  const res = await tradingCall(token, 'GetItem', `<ItemID>${itemId}</ItemID><DetailLevel>ReturnAll</DetailLevel><IncludeItemSpecifics>true</IncludeItemSpecifics>`);
+  const res = await tradingCall(token, 'GetItem', `<ItemID>${itemId}</ItemID><DetailLevel>ReturnAll</DetailLevel><IncludeItemSpecifics>true</IncludeItemSpecifics>`, delaiMs);
   if (!res.ok) return { _err: res.err || res.ack || res.error || ('status ' + res.status) };
   const xml = res.xml;
   const g = (t) => { const x = new RegExp('<' + t + '[^>]*>([\\s\\S]*?)</' + t + '>').exec(xml); return x ? x[1].trim() : ''; };
@@ -1685,6 +1685,7 @@ async function handlePubInfo(b, ctx) {
   } };
 }
 
+const SYNC_PARALLELE = 4, SYNC_DELAI_GETITEM_MS = 8000, SYNC_BUDGET_DETAIL_MS = 25000;   // (16 nov., H24)
 async function handleSync(ctx) {
   const at = await jetonDe(ctx);
   if (!at.ok) return { status: at.status || 502, body: { ok: false, reason: at.reason, error: at.error, detail: at.detail || '' } };
@@ -1711,9 +1712,24 @@ async function handleSync(ctx) {
   // (zéro appel de plus) et rangée dans `ebay_offres` — jamais dans
   // `ebay_listings` (§11 : une ligne, un propriétaire).
   const lecturesRegle = {};
-  for (const it of lst.slice(0, 20)) {
-    if (!it.itemId) continue;
-    const d = await tradingGetItem(token, it.itemId);
+  // (16 nov., H24 de la revue serveur) Les 20 GetItem ne sont plus EN SÉRIE (jusqu'à 20 × 25 s :
+  // la synchro était coupée avant de ranger commandes et règles) : SYNC_PARALLELE à la fois, 8 s
+  // chacun, et un BUDGET global ; une annonce pas commencée à temps est dite « budget », jamais tue.
+  const aLire = lst.slice(0, 20).filter((it) => it.itemId);
+  const debutDetail = Date.now();
+  const lus = new Map();
+  let prochain = 0;
+  const ouvrier = async () => {
+    while (prochain < aLire.length) {
+      const it = aLire[prochain++];
+      if (Date.now() - debutDetail > SYNC_BUDGET_DETAIL_MS) { lus.set(it, { _budget: true }); continue; }
+      lus.set(it, await tradingGetItem(token, it.itemId, SYNC_DELAI_GETITEM_MS));
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(SYNC_PARALLELE, aLire.length) }, ouvrier));
+  for (const it of aLire) {
+    const d = lus.get(it);
+    if (d && d._budget) { lecturesRegle[it.itemId] = { lu: false, raison: 'budget', lueA: Date.now(), par: 'sync' }; continue; }
     if (d && !d._err) {
       const { _regle, ...detail } = d;
       it.detail = detail; if (!it.photo && detail.photos && detail.photos[0]) it.photo = detail.photos[0];

@@ -30,7 +30,8 @@
 //    chaque réponse.
 
 import './_lib/sans-bruit.js';
-import { vendeurExige, lireCommeVendeur, modifierCommeVendeur, insererCommeVendeur } from './_lib/session.js';
+import { vendeurExige, lireCommeVendeur, modifierCommeVendeur, insererCommeVendeur, entetesVendeur, URL_SUPABASE_SESSION } from './_lib/session.js';
+import { renouvelerSousBail, bailRenouv } from './_lib/renouvellement-vinted.js';   // (16 nov., H21)
 import { prendrePlaceServeur } from './_lib/frein-relais-serveur.js';
 import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
@@ -216,26 +217,24 @@ export default async function handler(req, res) {
 
     // Token expire -> on tente un refresh puis on rejoue une seule fois.
     if (vintedRes.status === 401 && refreshToken) {
-      const nt = await refreshTokens({
-        siteHost: siteHostFor(targetHost), token, refreshToken, anonId, csrfToken,
+      // (16 nov., H21) UN renouvellement à la fois par compte (bail), la base RELUE juste avant
+      // (une paire déjà changée par un autre relais est reprise sans rappeler Vinted), écriture
+      // CONDITIONNELLE au refresh_token consommé, 3 essais ; ratée, elle est DITE (`persiste:false`).
+      // ⚠️ Vinted vient de CONSOMMER l'ancien refresh_token : c'est ICI que les nouveaux doivent
+      //    être rangés, avec SA session (RLS : seulement sa ligne), filtré sur lui. La page ne
+      //    reçoit jamais les jetons (12 nov.).
+      const ligneJetons = `vinted_accounts?vinted_user_id=eq.${encodeURIComponent(uid)}${filtre}`;
+      const r = await renouvelerSousBail({
+        ancien: { access_token: token, refresh_token: refreshToken },
+        lireJetons: async () => { const l = await lireCommeVendeur(req, `${ligneJetons}&select=access_token,refresh_token&limit=1`); return l && l[0] ? l[0] : null; },
+        rafraichir: (paire) => refreshTokens({ siteHost: siteHostFor(targetHost), token: paire.access_token, refreshToken: paire.refresh_token, anonId, csrfToken }),
+        ecrire: (neuve, consomme) => modifierCommeVendeur(req, `${ligneJetons}&refresh_token=eq.${encodeURIComponent(consomme)}&select=vinted_user_id`,
+          { access_token: neuve.access_token, refresh_token: neuve.refresh_token, updated_at: new Date().toISOString() }),
+        bail: bailRenouv({ url: URL_SUPABASE_SESSION, entetes: entetesVendeur(req), owner: u.id, uid }),
       });
-      if (nt) {
-        refreshed = nt;
-        // ⚠️ Vinted vient de CONSOMMER l'ancien refresh_token : c'est ICI que les
-        //    nouveaux doivent être rangés. Depuis que ce relais relit les jetons
-        //    en base à chaque appel (et ignore ceux du navigateur), une écriture
-        //    laissée au navigateur — qui pouvait échouer en silence — cassait le
-        //    compte pour tous les appels suivants (revue du 5 octobre). On écrit
-        //    avec SA session (RLS : seulement sa ligne), filtré sur lui.
-        // (12 nov.) La page ne reçoit plus les jetons : c'est ICI que l'écriture doit
-        // réussir — 3 essais ; ratée, elle est DITE (`persiste: false`), jamais supposée.
-        let n = null;
-        for (let essai = 0; essai < 3 && !(n != null && n > 0); essai++) {
-          n = await modifierCommeVendeur(req,
-            `vinted_accounts?vinted_user_id=eq.${encodeURIComponent(uid)}${filtre}&select=vinted_user_id`,
-            { access_token: nt.access_token, refresh_token: nt.refresh_token, updated_at: new Date().toISOString() });
-        }
-        refreshed = { persiste: n != null && n > 0 };
+      if (r.jetons) {
+        const nt = r.jetons;
+        refreshed = { persiste: !!r.persiste };
         vintedRes = await doCall(nt.access_token, nt.refresh_token);
       }
     }

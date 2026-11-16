@@ -20,7 +20,7 @@ import { routeSms } from './_lib/sms-mondialrelay.js';
 import { avecSuiviDuSujet, suiviDeLigne, finDeLigne, finsDesLignes, sortiParSuivis, arriveesDeLigne, relireLigneMeta, SELECT_SUIVI_META, SELECT_TRANSP_META, ligneTranspDeMeta, leverGarde, nomTransporteurSuivi, txAchatsEnRetour } from './_lib/suivi-colis.js';
 import { preuveDeTransp, contredit } from './_lib/etat-colis.js';
 import { ordreStable, finALaFrontiere } from './_lib/ordre-stable.js';
-import { prendreDebit, refuserTropVite } from './_lib/debit-vendeur.js';   // (11 nov.) un vendeur ne mange pas l'égress des autres
+import { prendreDebit, prendreDebitPublic, refuserTropVite } from './_lib/debit-vendeur.js';   // (11 nov.) un vendeur ne mange pas l'égress des autres
 import { vendeurParIndex, ecrireIndexJeton } from './_lib/jeton-index.js';
 import { repondreSansCleService } from './_lib/cle-service.js';
 // (9 nov., suites serveur) L'offre Solo / Pro : la règle (api/_lib/plan-regle.js, la même que l'app)
@@ -787,6 +787,9 @@ export default async function handler(req, res) {
   // (6 nov.) LES SMS DE MONDIAL RELAY envoyés par SON automatisation Raccourcis :
   // une autre clé (`vrm_sms_token`, qui ÉCRIT), une autre règle — jamais la clé du
   // widget (lecture seule, et servie sans clé à un vendeur unique en transition).
+  // (16 nov.) Lien public à jeton (widget, SMS) : un débit par adresse et par jeton AVANT toute
+  // lecture — une clé inventée ne fait plus travailler la base en boucle.
+  { const d = prendreDebitPublic(String((req.query && req.query.mode) || '') === 'sms' ? 'sms' : 'widget', req, String((req.query && (req.query.k || req.query.key)) || (req.headers && req.headers['x-vrm-key']) || '')); if (!d.ok) return refuserTropVite(res, d); }
   if (String((req.query && req.query.mode) || '') === 'sms') return routeSms(req, res, { url: SUPABASE_URL, key: SUPABASE_KEY });
   try {
     // ⚠️ MULTI-VENDEURS : on résout SON owner par la clé AVANT toute lecture, et

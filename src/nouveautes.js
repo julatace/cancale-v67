@@ -26,6 +26,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (16 nov., lot serveur-robuste) docs/passation/2026-11-16-serveur-robuste.md — la page « nouveau mot de passe ».
+  { id: 'mot-de-passe-lien-sur', date: '2026-11-16', titre: 'Mot de passe : un lien piégé n’ouvre rien', phrase: 'Un lien pas demandé ici demande d’abord l’adresse du compte.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (16 nov., captures iPhone de Julien) docs/passation/2026-11-16-ventes-clair.md
   { id: 'ventes-clair', date: '2026-11-16', titre: 'Ventes plus clair : la liste tout de suite', phrase: 'Les infos sont rangées dans « À regarder » ; une vente, trois lignes.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (16 nov., Julien : « La personnalisation doit être plus simple. ») docs/passation/2026-11-16-personnalisation-simple.md

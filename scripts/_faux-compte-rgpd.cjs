@@ -188,6 +188,12 @@ async function faux(url, opts = {}) {
     const chemin = u.slice('https://api.stripe.com/v1/'.length).split('?')[0];
     etat.stripe.push({ m, chemin, corps: String(opts.body || '') });
     if (etat.pannes.has('stripe')) return rep({ error: { message: 'panne' } }, 500);
+    // (16 nov., H20) la LISTE d'un client, à la vraie forme de Stripe : GET subscriptions?customer=…&status=all
+    if (m === 'GET' && chemin === 'subscriptions') {
+      const q = new URL(u).searchParams;
+      const client = q.get('customer') || '';
+      return rep({ object: 'list', has_more: false, data: Object.values(base.subs).filter((x) => x && x.customer === client) });
+    }
     const s = base.subs[chemin.split('/')[1]];
     if (!s) return rep({ error: { message: 'inconnu' } }, 404);
     if (m === 'POST' && /cancel_at_period_end=true/.test(String(opts.body))) s.cancel_at_period_end = true;
