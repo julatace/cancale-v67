@@ -52,6 +52,9 @@ async function ouvrirEcran(nav, W, sombre, url, b) {
   const o = await P.ouvrir(nav, { W, sombre, b: b || baseRestes(), url, api: D2.api });
   await P.pret(o.pg);
   if (!(await o.pg.evaluate((u) => location.search === u.replace(/^\//, ''), url))) { await o.pg.goto(`http://localhost:${P.PORT}${url}`, { waitUntil: 'domcontentloaded' }); await P.pret(o.pg); }
+  // Le site demandé : l'app relit `?site=` puis le retire de l'adresse ; s'il n'est pas choisi, on touche son sélecteur.
+  const site = (String(url).match(/site=([a-z]+)/) || [])[1];
+  if (site) { const b = o.pg.locator(`button[data-site="${site}"][aria-pressed="false"] >> visible=true`).first(); if (await b.count()) { await b.click().catch(() => {}); await o.pg.waitForTimeout(1200); } }
   return o;
 }
 const attendre = async (pg, f, arg, ms = 4000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await pg.evaluate(f, arg).catch(() => false)) return true; await pg.waitForTimeout(120); } return false; };
@@ -152,7 +155,10 @@ async function partieFond(nav, sombre) {
     try {
       // Sous la charge, l'écran peut tarder : 15 s, puis une seconde ouverture (jamais un délai fixe).
       if (!(await attendre(o.pg, (s) => !!document.querySelector(s), sels[0], 15000))) { await o.pg.goto(`http://localhost:${P.PORT}${ECRANS[nom].url}`, { waitUntil: 'domcontentloaded' }).catch(() => {}); await P.pret(o.pg); await attendre(o.pg, (s) => !!document.querySelector(s), sels[0], 15000); }
-      const r = await o.pg.evaluate(mesurerFond, sels);
+      let r = await o.pg.evaluate(mesurerFond, sels);
+      for (let k = 0; k < 20 && !r.length; k++) { await o.pg.waitForTimeout(500); r = await o.pg.evaluate(mesurerFond, sels); }
+      await o.pg.screenshot({ path: path.join(SHOTS, `fond-${nom}-${W}-${sombre ? 'sombre' : 'clair'}.png`) });
+      if (!r.length) console.log('    (F) url', await o.pg.evaluate(() => location.search + ' ' + (document.querySelector('.vrm-main') || {}).getAttribute?.('data-ecran')));
       const vus = new Set(r.map((x) => x.s));
       for (const s of sels) if (!vus.has(s)) console.log(`    (F ${nom} ${W} ${t} : ${s} absent de cette base)`);
       const bas = r.filter((x) => x.ratio < 4.5);
@@ -202,6 +208,7 @@ async function partieGlisse(nav, sombre) {
     const bouge = await attendre(pg, (a) => [...document.querySelectorAll('[data-meuble]')].map((x) => x.getAttribute('data-meuble')).join(',') !== a, avant, 3000);
     const apres = await ordre();
     if (process.env.DEBUG) console.log('    ev', JSON.stringify(await pg.evaluate(() => window.__ev)), JSON.stringify(h));
+    await attendre(pg, () => { try { const l = JSON.parse(localStorage.getItem('vrm_meubles') || '[]'); return l.slice().sort((a, b) => a.ordre - b.ordre).map((m) => m.id).join(',') === 'mB,mA,mC'; } catch (_) { return false; } }, null, 4000);
     const stocke = await pg.evaluate(() => { try { const l = JSON.parse(localStorage.getItem('vrm_meubles') || '[]'); return l.slice().sort((a, b) => a.ordre - b.ordre).map((m) => m.id).join(','); } catch (_) { return ''; } });
     await pg.screenshot({ path: path.join(SHOTS, `glisse-390-${t}.png`) });
     dit(bouge && apres === 'mB,mA,mC', `G ${t} : glissé sous « Bureau », « Garage » y est posé`, { avant, apres });
