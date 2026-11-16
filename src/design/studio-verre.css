@@ -506,6 +506,10 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
   :root:root:root:root body .vrm-neuf-hote { top: calc(env(safe-area-inset-top, 0px) + 14px) !important; bottom: auto !important; left: 16px !important; right: auto !important; height: 0 !important; justify-content: flex-start !important; z-index: 60 !important; }
   :root:root:root:root body:has(.vrm-neuf) .vrm-app-header .vrm-hdr-titre { visibility: hidden !important; }
 }
+/* L'éventail du disque ouvert met la page en recul (studio.css : `transform: scale(.94)` sur .vrm-main) : .vrm-main devient
+   le bloc conteneur de la pastille (position fixe, rendue dedans), qui glissait sur « Bonjour · … » sous le voile (verre V9,
+   disque 390). Le temps du geste, elle se tait ; elle revient à la fermeture si elle a encore à dire. */
+html[data-sb-eventail] body .vrm-neuf-hote { visibility: hidden !important; }
 :root:root:root:root body .vrm-neuf { background: var(--sv-verre-barre) !important; color: var(--sv-encre-2) !important; -webkit-backdrop-filter: var(--sv-flou) !important; backdrop-filter: var(--sv-flou) !important; }
 :root:root:root:root body .vrm-neuf .vrm-neuf-point { background: var(--sv-encre-2) !important; }
 /* La recherche collée du Stock (claude/stock-etageres : `[data-stock-recherche]`, fond et champ en ligne) : 100 % opaque. */
