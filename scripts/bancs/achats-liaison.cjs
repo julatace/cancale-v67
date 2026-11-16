@@ -257,7 +257,7 @@ async function passe(b, nom, ctxOpts, sombre) {
   await pg.waitForTimeout(800);
   const relies = TRES_PROBABLES.filter((tx) => ecritLien(tx));
   dit(relies.length === TRES_PROBABLES.length - 1 && !ecritLien(decoche), `${nom} · clic · « Relier ces ${TRES_PROBABLES.length - 1} paires » relie exactement les couples cochés`, JSON.stringify(relies));
-  dit(!ecritLien('93000005') && !ecritLien('93000006') && !ecritLien('93000007'), `${nom} · clic · aucune paire identique reliée sans son toucher`);
+  dit(!ecritLien('93000005') && !ecritLien('93000007'), `${nom} · clic · aucune paire identique reliée sans son toucher (93000006 : reliée par SON clic sur la puce, plus haut)`);
   await capture(pg, nom, 'apres-valider');
   // Achats : l'article proposé sous un achat sans article relié.
   await pg.goto(`http://localhost:${PORT}/?tab=achats`, { waitUntil: 'domcontentloaded' });

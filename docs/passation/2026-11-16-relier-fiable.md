@@ -116,7 +116,13 @@ gardées) : le nombre de « très probables » monte à mesure, jamais leur excl
   taille et couleur) ; `relier-achat-suggestions` **28 / 0**. `achats-relier` (B0 « Reçu d'achat », clic
   intercepté par la fiche) et `serie` (case « Coût d'achat » introuvable sur Ventes) sont **rouges aussi
   sur `origin/main` 5a9abe571** (build de main rejoué) : sans rapport avec ce lot.
-- `audit-relier-fiable --prouve` : **11/11 mutations attrapées**.
+- `audit-relier-fiable --prouve` : **11/11 mutations attrapées** (puis 4 de plus pour Délier / Reçu, rouges une à une).
+- Bancs après les ajouts : `fiche-delier-recu` **vert** (390, 1512 ; captures : « Reçu · Délier » sous « Achetée 52 € »,
+  la feuille du reçu au-dessus de la fiche, « Pas de reçu » sur un achat illisible) ; `achats-liaison` 90 contrôles
+  (puce « Relier un achat » ×9 = le compte, 44 px, feuille, « Achetée 40 € ») ; `annonces-achats` **56 / 0**.
+  `fiche-paire` est rouge (15) sur des contrôles de l'ancienne fiche (« grand N° », étapes) que ce lot ne touche pas.
+- Passe complète `node scripts/lancer-audits.cjs` (673) : 69 rouges, **tous déjà rouges dans la CI de la dernière PR
+  fusionnée (#1181)**, sauf `recherche-universelle` (mesure de durée : rouge en parallèle, vert seul).
 
 
 ## Deux ajouts de Julien pendant le lot (16 nov.)
