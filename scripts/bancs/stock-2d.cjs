@@ -176,7 +176,9 @@ const caseIci = (pg, ici) => pg.evaluate((ici) => { const el = document.querySel
         await pg.fill('[data-stock-recherche] input', '2');
         await pg.waitForTimeout(300);
         await pg.click('[data-stock-res="2"]');
-        await pg.waitForTimeout(400);
+        // (16 nov.) La place du Stock arrive dans la fiche en transition (`startTransition`) : on attend qu'elle soit LÀ (10 s au plus).
+        await pg.waitForSelector('[data-fiche-ancienne-place]', { state: 'attached', timeout: 10000 }).catch(() => {});
+        await pg.waitForTimeout(200);
         const anc = await pg.evaluate(() => { const el = document.querySelector('[data-fiche-ancienne-place]'); return el ? el.innerText.replace(/\s+/g, ' ') : null; });
         dit(!!anc && /Garage/.test(anc) && /Pile du fond/.test(anc), `${t} : VIII — la fiche dit l'ancienne place dans la pièce 3D`, anc);
         dit(r.ecrits.room === 0, `${t} : VIII — la pièce 3D n'est jamais réécrite`, String(r.ecrits.room));
@@ -193,6 +195,10 @@ const caseIci = (pg, ici) => pg.evaluate((ici) => { const el = document.querySel
         const ve = await pg.$('[data-fiche-paire="1"] [data-fiche-etat-article]');
         dit(!!ve, `${t} : VII — la fiche ouverte par la case porte « L'état de cet article »`);
         if (ve) {
+          // (16 nov.) Fiche D (15 nov.) : le prix d'achat (`data-etat-ligne="prix-achat"`) vit dans la vue « Argent » — une
+          // paire en vente s'ouvre sur « Sites ». On l'ouvre comme lui.
+          const seg = pg.locator('[data-fiche-paire="1"] [data-fd-seg="argent"][aria-selected="false"]').first();
+          if (await seg.count()) await seg.click().catch(() => {});
           await pg.waitForFunction(() => { const el = document.querySelector('[data-etat-ligne="reception-en-ligne"] b'); return el && el.textContent !== '…'; }, null, { timeout: 15000 }).catch(() => {});
           await pg.waitForTimeout(500);
           const et = await pg.evaluate(() => { const o = {}; document.querySelectorAll('[data-etat-ligne]').forEach((el) => { o[el.getAttribute('data-etat-ligne')] = { val: el.getAttribute('data-etat-val'), borne: el.getAttribute('data-etat-borne') || '', src: el.getAttribute('data-etat-source') || '', txt: el.innerText.replace(/\s+/g, ' ') }; }); return o; });
@@ -204,8 +210,9 @@ const caseIci = (pg, ici) => pg.evaluate((ici) => { const el = document.querySel
           const honnete = (l) => (l.val !== '' && l.val != null) || (/—/.test(l.txt) && l.txt.replace(/.*—/, '').trim().length > 3);
           dit(honnete(av) && honnete(lv), `${t} : VII — achat → vente et mise en ligne → vente : un nombre, ou « — » avec sa raison`, `${av.txt} | ${lv.txt}`);
           if (lv.val !== '' && lv.val != null) dit(/au-moins/.test(lv.borne) && /au moins/.test(lv.txt), `${t} : VII — mise en ligne → vente est « au moins » (origine sans date)`, lv.borne);
-          const deux = await pg.evaluate(() => { const t = [...document.querySelectorAll('[data-fiche-paire] .vrm-fp-tuiles, [data-fiche-etat-article]')].map((x) => x.innerText).join(' '); return (t.match(/40\s€/g) || []).length; });
-          dit(deux === 1, `${t} : VII — le prix d'achat n'est écrit qu'une fois entre les tuiles et « L'état » (§7)`, String(deux));
+          const deux = await pg.evaluate(() => { const t = [...document.querySelectorAll('[data-fiche-paire] [data-fd-vue-argent], [data-fiche-paire] [data-fd-etat], [data-fiche-etat-article]')].map((x) => x.innerText).join(' '); return (t.match(/40\s€/g) || []).length; });
+          // (16 nov.) fiche « D » (15 nov.) : plus de tuiles — la vue Argent et la ligne d'état les remplacent.
+          dit(deux === 1, `${t} : VII — le prix d'achat n'est écrit qu'une fois entre la vue Argent et « L'état » (§7)`, String(deux));
           await shot(pg, (tel ? '390' : '1512') + (sombre ? '-sombre' : '-clair') + '-etat');
         }
         // IX

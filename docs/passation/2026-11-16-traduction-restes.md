@@ -17,6 +17,14 @@ native requise** avant d'ouvrir VRM hors de France.
   traduites en en/es/it/de (D2/F2 verts). `vrm-regles-achat.js` recopié des règles de l'app
   (`regles-achat-extension.cjs --recopie`) : `audit-infos-vinted` I10 était rouge sur main (copie
   périmée) — pris dans la 5.394.0, jamais servie. Fini, à intégrer (PR #1191).
+- Second merge de main (62 commits) : 3 nouveautés de plus traduites (stock-case-allumee,
+  fiche-porte-achat, achats-qr ; `audit-traduction` D2/F2 les avait rougies). Preuves : passe de
+  107 audits (dont les 99 qui exécutent le vrai background.js) : 105 verts, 2 rouges = ceux de main
+  (vendeur-generaliste, vocabulaire-article, lot derniers-rouges) ; build vert ; banc
+  `traduction-restes` : R2/R3 verts, R1 a 4 écarts **qui sont aussi entre deux relevés du MÊME build
+  de main** (bandeau « Vérification de tes données… » / « 2 choses à revoir » et sections
+  d'Achats chargées à la demande : dépend du moment) ⇒ R1 dépend de l'heure du relevé, pas du lot.
+  Vu en anglais : « rangé » (Stock) reste en français — texte de main, à reprendre.
 
 ## (20) Les chemins d'aide — `scripts/audit-chemins-aide.cjs`
 Mesuré sur main (b8f26f36d) : **4 rouges réels** que personne ne voyait :
