@@ -687,6 +687,16 @@ html[data-sb-eventail] body .vrm-neuf-hote { visibility: hidden !important; }
    mêmes bords, même ombre) reste ; le flou part. Il reste là où le contenu passe DESSOUS : la barre du bas, la tête au
    défilement, la pastille « Mis à jour », les filtres collés d'Achats, les ronds de la tête. */
 :root:root:root body .vrm-app-shell .vrm-main :is(.vrm-colis-grille, .vrm-toutes-liste, .vv-seg, .vv-liste) { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+/* Les RANGÉES des listes de Ventes, au téléphone : une rangée hors de l'écran n'est ni mise en page ni peinte
+   (`content-visibility: auto`, Safari 18+), sa hauteur est retenue après son premier affichage (`auto`). Ventes
+   rend ~90 rangées (≈ 6 900 nœuds) : chaque vague de données et chaque toucher recalculait TOUT l'écran.
+   Mesuré (base inventée, Chromium, même page) : recalcul complet de l'écran 934 ms → 248 ms ; même rendu à
+   l'écran (écart moyen 0,04 à 0,17 / 255 en haut de liste). Hauteurs de départ : les médianes mesurées. */
+@media (max-width: 743px) {
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row { content-visibility: auto; contain-intrinsic-size: auto 116px; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-colis-grille .vrm-colis-carte { content-visibility: auto; contain-intrinsic-size: auto 109px; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-toutes-ligne { content-visibility: auto; contain-intrinsic-size: auto 72px; }
+}
 
 /* ══ 13. eBAY : CE QUI EST FAIT POUR UNE CARTE CLAIRE A SA CARTE (16 nov., stabilite-iphone) ══════════════
    Capture de Julien (iPhone) : Ventes · eBay → « À traiter » — « Retours et annulations », « Tâches à traiter »,

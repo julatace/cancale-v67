@@ -27,6 +27,29 @@ pour la plupart (Ma journée 16 nov. : 5 ≤ 50 ms, 2 ≤ 100 ms). Achats : un t
 | « au moins 1 062 € » puis « au moins » une 2e fois | Argent · Reçu | la note de la case (`raisonCourte` ⇒ « au moins ») répétait le minimum déjà dit par le montant | `src/argent.js` : le minimum se dit une fois, sur le montant (`partiel`), la note retombe sur « au versement » | `audit-argent` vert |
 | « URSSAF · à déclarer pour octob… » coupé à 390 px | Argent | le titre en `nowrap` + points de suspension à côté de l'échéance | le titre passe à la ligne, l'échéance garde sa colonne | capture 390 |
 
+## L'arrivée des données (Julien : « lent quand les données s'affichent, c'est pas fluide »)
+Profil CPU de l'ouverture de Ventes · Vinted (main 5a9abe571, base inventée de 1 000 paires, Chromium, 20 s) —
+temps PROPRE des fonctions de l'app : `ajusterChiffre` (le grand chiffre qui tient dans sa place) **2,9 s**,
+`rangeesDefilantes` (le fondu des rangées qui défilent) **1,5 s**, la préparation des achats de
+`propositionsArticle` (la proposition d'achat sur CHAQUE vente sans achat relié, ajoutée le 15 nov.) **1,3 s sur
+1,5 s**. Les deux premières ne coûtent pas par elles-mêmes : elles FORCENT la mise en page de tout l'écran
+(≈ 6 900 nœuds sur Ventes, dont ~90 rangées) — et l'écrivaient entre deux lectures.
+
+| cause | correction | preuve |
+|---|---|---|
+| `propositionsArticle` re-préparait tous les achats à chaque appel (une fois par vente sans achat, à chaque rendu) | préparation gardée par achat (même objet, mêmes champs, mêmes règles ; la réception relue à chaque appel) | `audit-arrivee-sans-gel` L1–L3 : 2e appel 301 → 1 lecture de marque, résultat identique ; rouge sur main |
+| rangées : lire une rangée, l'écrire, lire la suivante… (une mise en page complète par rangée) | toutes les mesures, puis toutes les marques | R1 (ordre exécuté) ; rouge sur main |
+| grand chiffre : retirait ses styles puis relisait style calculé et largeur à CHAQUE valeur | rien n'est écrit quand il tient et n'a jamais été ajusté | C1 (0 écriture, 0 style relu) ; C2 trop long toujours ajusté ; rouge sur main |
+| ~90 rangées toutes mises en page et peintes à chaque vague de données | `content-visibility: auto` sur les rangées de Ventes au téléphone (hauteur retenue) | recalcul complet de l'écran **934 → 248 ms** (même page, injecté) ; même rendu en haut de liste (écart 0,04–0,17 / 255) |
+| « À venir » arrivait en poussant la liste de ~124 px (Ventes · Vinted, Ma journée) | sa place gardée pendant la lecture (`reserve`, comme sur Ventes · Tous) | capture « avec / sans » de Ventes · Toutes (la carte apparue entre deux prises) |
+
+`audit-arrivee-sans-gel.cjs --prouve` : 3/3 mutations rouges. Outils : `_mesure-arrivee.cjs` (vagues de rendu,
+longues tâches, CLS à l'ouverture), profil CPU (récit de la commande dans « Comment refaire »).
+
+## Comment refaire
+- Profil : `scripts/bancs/_mesure-arrivee.cjs <dist>` ; captures : `_comparer-captures.cjs flou <dist>` (avec
+  `STYLE_SANS='…'` pour juger une autre règle sur la même page) ; toucher : `_mesure-toucher.cjs <dist>`.
+
 ## Le banc `scripts/bancs/stabilite-iphone.cjs`
 Appareil « iPhone 15 » (viewport, agent iOS, tactile), clair et sombre, base inventée (1 000 paires, 1 000
 conversations, 1 000 e-mails + un compte eBay présent sans données). Chaque écran (Ma journée, Annonces et ses

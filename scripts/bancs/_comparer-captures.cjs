@@ -93,7 +93,7 @@ async function flou(dist) {
       { const y = pos === 'defile' ? 700 : 0; await o.pg.evaluate((y) => { const se = [...document.querySelectorAll('*')].filter((x) => /auto|scroll/.test(getComputedStyle(x).overflowY) && x.scrollHeight > x.clientHeight + 40).sort((p, q) => q.clientHeight - p.clientHeight)[0] || document.scrollingElement; se.scrollTop = y; }, y); await o.pg.waitForTimeout(pos === 'haut' ? 6000 : 800); }
       const flous = await o.pg.evaluate(() => [...document.querySelectorAll('.vrm-main :is(.vrm-colis-grille, .vrm-toutes-liste, .vv-seg, .vv-liste)')].filter((e) => { const c = getComputedStyle(e); return (c.backdropFilter || c.webkitBackdropFilter || 'none') !== 'none'; }).length);
       const avec = await o.pg.screenshot({ timeout: 180000 });
-      const st = await o.pg.addStyleTag({ content: '.vrm-main :is(.vrm-colis-grille, .vrm-toutes-liste, .vv-seg, .vv-liste){-webkit-backdrop-filter:none!important;backdrop-filter:none!important}' });
+      const st = await o.pg.addStyleTag({ content: process.env.STYLE_SANS || '.vrm-main :is(.vrm-colis-grille, .vrm-toutes-liste, .vv-seg, .vv-liste){-webkit-backdrop-filter:none!important;backdrop-filter:none!important}' });   // `STYLE_SANS` : une autre règle à juger de la même façon
       await o.pg.waitForTimeout(500);
       const sans = await o.pg.screenshot({ timeout: 180000 });
       await st.evaluate((n) => n.remove());
