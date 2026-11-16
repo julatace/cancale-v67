@@ -79,5 +79,8 @@ export default {
   "glisser.fait": "Achat relié à {qui}",
   "liaison.relieBenef": "Achat relié · Bénéfice {benef}",
   "liaison.relieAffiche": "Achat relié · Bénéfice {benef} au prix affiché",
+  "liaison.relieTitre": "Achat relié",
+  "liaison.relieSous": "Bénéfice {benef}",
+  "liaison.relieSousAffiche": "Bénéfice {benef} au prix affiché",
   "liaison.recu": "Reçu",
 };

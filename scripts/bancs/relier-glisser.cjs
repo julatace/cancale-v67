@@ -56,6 +56,16 @@ const recouvre = (pg) => pg.evaluate(() => {
   const sous = lignes.filter((l) => { const b = l.getBoundingClientRect(); const ul = l.closest('.vrm-rg-liste').getBoundingClientRect(); const vis = b.bottom > ul.top && b.top < ul.bottom; return vis && b.left < a.right && b.right > a.left && Math.min(b.bottom, ul.bottom) > a.top && Math.max(b.top, ul.top) < a.bottom; });
   return { pilule: true, n: sous.length, quoi: sous.map((l) => l.getAttribute('data-glisser-cible') || l.getAttribute('data-glisser-achat')).slice(0, 3) };
 });
+// (16 nov., reprise) Ce que la pilule MONTRE : titre + ligne du dessous, et si l'un des deux est coupé (« … » ou
+// lignes cachées : scrollWidth/scrollHeight au-delà de la boîte). innerText rend le texte même coupé : il ne suffit pas.
+const piluleLue = async (pg) => { await pg.waitForSelector('[data-pilule-etat="enregistre"]', { timeout: 4000 }).catch(() => {}); await pg.waitForTimeout(250); return lirePilule(pg); };
+const lirePilule = (pg) => pg.evaluate(() => {
+  const p = document.querySelector('[data-pilule]'); if (!p) return { pilule: false };
+  const nb = (x) => (x ? x.textContent : '').replace(/\u00a0|\u202f/g, ' ').trim();
+  const t = p.querySelector('.vrm-pil-titre'), s = p.querySelector('.vrm-pil-sous');
+  const coupe = [t, s].filter(Boolean).some((e) => e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1);
+  return { pilule: true, etat: p.getAttribute('data-pilule-etat'), titre: nb(t), sous: nb(s), coupe };
+});
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2' };
 const srv = http.createServer((q, r) => { let f = q.url.split('?')[0]; if (f === '/' || !path.extname(f)) f = '/index.html'; const p = path.join(DIST, f); if (!fs.existsSync(p)) { r.writeHead(404); return r.end(); } r.writeHead(200, { 'content-type': MIME[path.extname(p)] || 'application/octet-stream' }); r.end(fs.readFileSync(p)); });
 srv.on('error', (e) => { console.log('KO  le port ' + PORT + ' est pris (' + e.code + ')'); process.exit(1); });
@@ -167,8 +177,9 @@ async function tactile(b) {
   await pg.screenshot({ path: path.join(SHOTS, `relier-glisser-${nom}-question.png`) });
   if (await pg.locator('[data-glisser-oui]').count()) await pg.locator('[data-glisser-oui]').tap(); await pause(900);
   dit(await lien(pg, 'pa1') === T1, `${nom} · « Oui » : la fiche N°2 porte le lien vers ${T1}`, String(await lien(pg, 'pa1')));
-  const pt = (await pg.locator('[data-pilule] .vrm-pil-titre').innerText().catch(() => '')).replace(/\u00a0|\u202f/g, ' ');
-  dit(pt === 'Achat relié · Bénéfice au plus +31 € au prix affiché', `${nom} · la pilule dit le résultat : 71 € − 40 € (frais pas confirmés ⇒ « au plus », la règle)`, JSON.stringify(pt));
+  const pt = await piluleLue(pg);
+  dit(pt.titre === 'Achat relié' && pt.sous === 'Bénéfice au plus +31 € au prix affiché', `${nom} · la pilule dit le résultat : 71 € − 40 € (frais pas confirmés ⇒ « au plus », la règle)`, JSON.stringify(pt));
+  dit(pt.pilule && !pt.coupe, `${nom} · …et le bénéfice se lit EN ENTIER (rien de coupé par « … »)`, JSON.stringify(pt));
   dit(await pg.locator(`[data-pilule-autre="${T1}"]`).count() === 1, `${nom} · …et offre « Reçu » (CET achat)`);
   const rc = await recouvre(pg);
   dit(rc.pilule && rc.n === 0, `${nom} · la pilule ne recouvre aucune ligne (rectangles)`, JSON.stringify(rc));
@@ -223,8 +234,9 @@ async function souris(b) {
   if (await pg.locator('[data-glisser-oui]').count()) await pg.locator('[data-glisser-oui]').click(); await pg.waitForTimeout(900);
   const ov = await pg.evaluate(() => { try { const v = JSON.parse(localStorage.getItem('vinted_sale_overrides') || '{}'); return v['7200001'] ? v['7200001'].buyFromId : ''; } catch (_) { return null; } });
   dit(ov === T1, `${nom} · « Oui » : la vente (son n° de transaction) porte le lien`, String(ov));
-  const ptv = (await pg.locator('[data-pilule] .vrm-pil-titre').innerText().catch(() => '')).replace(/\u00a0|\u202f/g, ' ');
-  dit(ptv === 'Achat relié · Bénéfice au plus +50 €', `${nom} · la pilule : vente 90 € − achat 40 € ⇒ « au plus +50 € » (la règle de la ligne)`, JSON.stringify(ptv));
+  const ptv = await piluleLue(pg);
+  dit(ptv.titre === 'Achat relié' && ptv.sous === 'Bénéfice au plus +50 €', `${nom} · la pilule : vente 90 € − achat 40 € ⇒ « au plus +50 € » (la règle de la ligne)`, JSON.stringify(ptv));
+  dit(ptv.pilule && !ptv.coupe, `${nom} · …et le bénéfice se lit EN ENTIER (rien de coupé par « … »)`, JSON.stringify(ptv));
   const rcv = await recouvre(pg);
   dit(rcv.pilule && rcv.n === 0, `${nom} · la pilule ne recouvre aucune ligne (rectangles)`, JSON.stringify(rcv));
   await pg.screenshot({ path: path.join(SHOTS, `relier-glisser-${nom}-pilule.png`) });

@@ -145,5 +145,8 @@ export function vibrerSiPossible(nav = (typeof navigator !== 'undefined' ? navig
 export function texteApresLiaison({ genre = 'vente', prix = null, entree = null } = {}, t, ligne, texte) {
   const r = typeof ligne === 'function' ? ligne(prix, entree || {}) : null;
   const b = r && r.benefice != null ? texte(r) : '—';
-  return { texte: t(genre === 'annonce' ? 'liaison.relieAffiche' : 'liaison.relieBenef', { benef: b }), benefice: r && r.benefice != null ? r.benefice : null, etat: r ? r.etat : 'prix' };
+  // (16 nov., reprise) La pilule montre le bénéfice EN ENTIER : « Achat relié » en titre, le bénéfice dessous (deux lignes
+  // au plus, jamais coupé par « … ») ; `texte` (la phrase entière) reste ce que VoiceOver annonce.
+  return { texte: t(genre === 'annonce' ? 'liaison.relieAffiche' : 'liaison.relieBenef', { benef: b }),
+    titre: t('liaison.relieTitre', {}), sous: t(genre === 'annonce' ? 'liaison.relieSousAffiche' : 'liaison.relieSous', { benef: b }), benefice: r && r.benefice != null ? r.benefice : null, etat: r ? r.etat : 'prix' };
 }

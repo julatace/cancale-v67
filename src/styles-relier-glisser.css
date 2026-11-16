@@ -54,5 +54,6 @@
 }
 /* (16 nov., ajout de Julien) Le bas de l'écran est une BANDE réservée : la question, puis la pilule « Achat relié ·
    Bénéfice … · Reçu · Annuler » s'y posent — jamais sur une ligne des listes. */
-.vrm-rg-corps { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+/* (reprise) 116 px : la pilule du résultat, bénéfice en entier (jusqu'à trois lignes dans une autre langue). */
+.vrm-rg-corps { padding-bottom: calc(116px + env(safe-area-inset-bottom, 0px)); }
 body:has(.vrm-rg) .vrm-pil-zone { top: auto !important; bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important; }

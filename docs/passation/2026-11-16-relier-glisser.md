@@ -94,6 +94,26 @@ recouvrait la liste. « Quand je relie un achat, je veux avoir le bénéfice ave
 - Le point « empreintes de photos » pour relier les achats a été ANNULÉ par Julien (ses photos diffèrent de celles du
   vendeur) : rien n'a été fait.
 
+## Reprise du 16 nov. (soir) : le bénéfice était COUPÉ
+
+Les captures du banc montraient la pilule « Achat relié · Bén… » au téléphone et « Achat relié · Bénéfice au plu… »
+à l'ordinateur : le chiffre que Julien a demandé n'était pas lisible (le banc lisait `innerText`, qui rend le texte
+même coupé, et passait vert).
+
+- La pilule du résultat a deux lignes : **« Achat relié »** en titre, **le bénéfice** dessous (« Bénéfice au plus +31 € au
+  prix affiché »), en gras, qui passe à la ligne autant qu'il faut — jamais « … » ; la coche s'efface (le titre le dit).
+  `texteApresLiaison` rend `titre` / `sous` (clés `liaison.relieTitre`, `relieSous`, `relieSousAffiche`, 5 langues) ;
+  un geste (`gesteAnnulable` `lancer`) porte `titre` / `sous` jusqu'à `PiluleAnnuler` (classe `is-resultat`) ;
+  `texte` (la phrase entière) reste ce que VoiceOver annonce. Les autres pilules ne changent pas.
+- La bande réservée du mode glisser passe de 84 à 116 px (la pilule plus haute ne recouvre aucune ligne).
+- Preuves : banc `relier-glisser` lit ce que la pilule MONTRE (état « enregistré », `scrollWidth`/`scrollHeight`) :
+  **4 rouges** sur le build d'avant, **48/0** après ; build muté (ligne du bénéfice remise sur une ligne avec « … ») :
+  **1 rouge** (390). `audit-relier-glisser` **52 verts**, `--prouve` **21/21** (dont `app-une-ligne`, `pilule-coupe`,
+  `geste-sans-sous`). Captures regardées (390 : trois lignes lisibles au-dessus des listes ; 1512 sombre).
+- Audits touchés verts : geste-annulable, achats-a-relier, annuler-commandes, fusion-fiches, lien-vc, reseau-instable,
+  saisie-rapide, stock-etageres, stock-juste, traduction, quoi-de-neuf, achats-hors-relier, relier-fiable,
+  liaison-achat, suggestions-achat.
+
 ## ÉTAT À LA REPRISE
 
 - Branche `claude/relier-glisser` poussée ; PR vers `main` après celle de `claude/achats-retour`.

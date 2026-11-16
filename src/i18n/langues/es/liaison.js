@@ -79,5 +79,8 @@ export default {
   "glisser.fait": "Compra vinculada a {qui}",
   "liaison.relieBenef": "Compra vinculada · Beneficio {benef}",
   "liaison.relieAffiche": "Compra vinculada · Beneficio {benef} al precio anunciado",
+  "liaison.relieTitre": "Compra vinculada",
+  "liaison.relieSous": "Beneficio {benef}",
+  "liaison.relieSousAffiche": "Beneficio {benef} al precio anunciado",
   "liaison.recu": "Recibo",
 };

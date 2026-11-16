@@ -36,7 +36,10 @@ const MUTS = {
   'vibre-partout': ['src/relierGlisser.js', "  try { if (nav && typeof nav.vibrate === 'function') return nav.vibrate(ms) !== false; } catch (_) {}\n  return false;", '  return true;'],
   'app-cibles-reliees': ['src/App.jsx', '    for (const x of (fileAchat || [])) { const f = x.fiche || numeros[x.id] || {};', "    for (const x of (listings.items || []).map((it) => ({ id: it.id, item: it, ts: it.createdTs }))) { const f = numeros[x.id] || {};"],
   'app-sans-annuler': ['src/App.jsx', "    gesteVrm(res.texte, ops,", "    vueDesOps(ops, { vinted_annonce_numeros: setNumeros, vinted_sale_overrides: setSaleOv })('apres'); (() => {})(res.texte, ops,"],
-  'app-sans-recu': ['src/App.jsx', "cle: String(a.transaction_id || ''), faire: () => ouvrirRecuRelie(a, num) });", "cle: '', faire: () => {} });"],
+  'app-sans-recu': ['src/App.jsx', "cle: String(a.transaction_id || ''), faire: () => ouvrirRecuRelie(a, num) },", "cle: '', faire: () => {} },"],
+  'app-une-ligne': ['src/App.jsx', "faire: () => ouvrirRecuRelie(a, num) }, { titre: res.titre, sous: res.sous });", "faire: () => ouvrirRecuRelie(a, num) });"],
+  'pilule-coupe': ['src/pilule-annuler.css', ".vrm-pil.is-resultat .vrm-pil-sous { white-space: normal; text-overflow: clip;", ".vrm-pil.is-resultat .vrm-pil-sous { white-space: nowrap; text-overflow: ellipsis;"],
+  'geste-sans-sous': ['src/gesteAnnulable.js', "titre: g.titre || '', sous: g.sous || '',", ""],
   'app-feuille-bulle': ['src/App.jsx', "    const ok = confirmerLiaison(a, cible._saleTx ?", "    const ok = false && confirmerLiaison(a, cible._saleTx ?"],
   'benefice-sans-frais': ['src/relierGlisser.js', "  const r = typeof ligne === 'function' ? ligne(prix, entree || {}) : null;", "  const r = typeof ligne === 'function' ? ligne(prix, { buyPrice: (entree || {}).buyPrice, fraisComplets: true }) : null;"],
   'ligne-sans-benef': ['src/App.jsx', "benefSu: lb.benefice!=null && st!=='cancelled' ? texteBenefice(lb) : '',", "benefSu: '',"],
@@ -158,7 +161,7 @@ const sans = (s) => s.replace(/\/\/[^\n]*/g, '');
   const app = sans(APP);
   // ── R · le résultat d'une liaison : le bénéfice et le reçu (ajout de Julien) ──
   let BL = null; try { BL = await import(pathToFileURL(path.join(SRC, 'beneficeLigne.js')).href); } catch (_) {}
-  const tA = (k, v) => ({ 'liaison.relieBenef': 'Achat relié · Bénéfice {benef}', 'liaison.relieAffiche': 'Achat relié · Bénéfice {benef} au prix affiché' }[k] || k).replace('{benef}', v.benef);
+  const tA = (k, v) => ({ 'liaison.relieBenef': 'Achat relié · Bénéfice {benef}', 'liaison.relieAffiche': 'Achat relié · Bénéfice {benef} au prix affiché', 'liaison.relieTitre': 'Achat relié', 'liaison.relieSous': 'Bénéfice {benef}', 'liaison.relieSousAffiche': 'Bénéfice {benef} au prix affiché' }[k] || k).replace('{benef}', v && v.benef);
   const ap = (o) => (G.texteApresLiaison ? G.texteApresLiaison(o, tA, BL.beneficeLigneVente, BL.texteBenefice) : { texte: '' });
   const nb = (x) => String(x).replace(/\u00a0/g, ' ');
   dit(BL && nb(ap({ genre: 'vente', prix: '60.00', entree: { buyPrice: '37.43', fraisComplets: true } }).texte) === 'Achat relié · Bénéfice +22,57 €', 'R1 vente 60 € − achat 37,43 €, frais confirmés ⇒ « Achat relié · Bénéfice +22,57 € » (la règle de la ligne)', BL ? nb(ap({ genre: 'vente', prix: '60.00', entree: { buyPrice: '37.43', fraisComplets: true } }).texte) : 'beneficeLigne absent');
@@ -176,6 +179,20 @@ const sans = (s) => s.replace(/\/\/[^\n]*/g, '');
   dit(/const confirmerLiaison = [\s\S]{0,3000}?\{ libelle: [^,]+, cle: String\(a\.transaction_id \|\| ''\), faire: \(\) => ouvrirRecuRelie\(a, num\) \}/.test(app), 'R7 « Reçu » ouvre le reçu de CET achat (son n° de transaction)');
   dit(['const relierAchat = async', 'const relierAchatAnnonce = async', 'const relierAchatVente = async', 'const relierGlisse = async'].every((f) => new RegExp(f.replace(/[()]/g, '\\$&') + '[\\s\\S]{0,900}?(?:const ok = |if \\(!|\\|\\| !|return )confirmerLiaison\\(').test(app)) && !/accompagner\('achat\.relier'/.test(app), 'R8 feuille, propositions, ventes et glisser : la même confirmation (plus de bulle sur la liste)');
 
+  // (16 nov., reprise) La pilule montre le bénéfice EN ENTIER : « Achat relié » en titre, le bénéfice sur la ligne du dessous,
+  // qui passe à la ligne au lieu d'être coupé (une seule ligne coupait « Bénéfice au plus… » au téléphone ET à l'ordinateur).
+  {
+    const r = BL ? ap({ genre: 'annonce', prix: 70, entree: { buyPrice: '40' } }) : {};
+    dit(r.titre === 'Achat relié' && /^Bénéfice .+ au prix affiché$/.test(nb(r.sous || '')), 'R10 le résultat en deux morceaux : « Achat relié » + « Bénéfice … au prix affiché »', JSON.stringify(r));
+    const g = GA.creerGestes({ minuterie: () => 0, arreter: () => {} });
+    g.lancer({ texte: 'x · y', titre: 'x', sous: 'y', cles: [], vue: () => {}, ecrire: async () => ({ ok: true }) });
+    const v = ((g.etat ? g.etat() : g.instantane ? g.instantane() : {}) || {}).visible || {};
+    dit(v.titre === 'x' && v.sous === 'y', 'R11 le geste porte titre et ligne du dessous jusqu’à la pilule', JSON.stringify(v));
+    dit(/enregistre: \(v\) => \(\{ titre: v\.titre \|\| v\.texte, sous: v\.sous/.test(pil) && /faire: \(\) => ouvrirRecuRelie\(a, num\) \}, \{ titre: res\.titre, sous: res\.sous \}\)/.test(app), 'R12 la pilule affiche titre + bénéfice, et la liaison les lui passe');
+    const css = (() => { try { return fs.readFileSync(path.join(SRC, 'pilule-annuler.css'), 'utf8'); } catch (_) { return ''; } })();
+    const regle = (css.match(/\.vrm-pil\.is-resultat \.vrm-pil-sous \{([^}]*)\}/) || [])[1] || '';
+    dit(/white-space: normal/.test(regle) && !/line-clamp|nowrap|ellipsis/.test(regle), 'R13 la ligne du bénéfice passe à la ligne, jamais coupée (ni « … », ni nombre de lignes borné)', regle);
+  }
   dit(/benefSu: lb\.benefice!=null && st!=='cancelled' \? texteBenefice\(lb\) : ''/.test(app), 'R9 la LIGNE de la vente reliée montre son bénéfice, discret à côté du prix (la règle de la ligne)');
 
   // ── S · le branchement ──

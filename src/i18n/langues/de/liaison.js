@@ -79,5 +79,8 @@ export default {
   "glisser.fait": "Kauf mit {qui} verknüpft",
   "liaison.relieBenef": "Kauf verknüpft · Gewinn {benef}",
   "liaison.relieAffiche": "Kauf verknüpft · Gewinn {benef} zum Angebotspreis",
+  "liaison.relieTitre": "Kauf verknüpft",
+  "liaison.relieSous": "Gewinn {benef}",
+  "liaison.relieSousAffiche": "Gewinn {benef} zum Angebotspreis",
   "liaison.recu": "Beleg",
 };

@@ -79,5 +79,8 @@ export default {
   "glisser.fait": "Purchase linked to {qui}",
   "liaison.relieBenef": "Purchase linked · Profit {benef}",
   "liaison.relieAffiche": "Purchase linked · Profit {benef} at the listed price",
+  "liaison.relieTitre": "Purchase linked",
+  "liaison.relieSous": "Profit {benef}",
+  "liaison.relieSousAffiche": "Profit {benef} at the listed price",
   "liaison.recu": "Receipt",
 };
