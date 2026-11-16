@@ -170,7 +170,7 @@ jobs:
           BANCS_PORT_BASE: '10030'
           BANCS_TIMEOUT_S: '1800'
           LARGEURS: '390'
-        run: node scripts/lancer-bancs.cjs connexion-claire journee-coherence ventes-e2 colis-retirer-propre retraits-suivi tout-imprimer iphone-reprise nouveau-vendeur
+        run: node scripts/lancer-bancs.cjs connexion-claire journee-coherence ventes-e2 colis-retirer-propre retraits-suivi tout-imprimer iphone-reprise nouveau-vendeur barre-depuis-journee
 
   e2e-extension:
     # (11 nov.) L'APP ET LA VRAIE EXTENSION ENSEMBLE : un vrai Chromium (nouveau

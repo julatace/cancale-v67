@@ -1914,3 +1914,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **16 nov. · Personnalisation simple** : « Modifier ma journée » = une liste en 3 groupes, une phrase, le nom seul, poignée + ↑ ↓ + interrupteur, enregistré tout de suite, « Revenir au réglage de départ » (281 → 106 mots) ; un ordre égal au départ est oublié ; « La paire à sortir » SUPPRIMÉE de Ma journée et de l'éditeur (décision de Julien au train : la case allumée du Stock fait le travail, réglage ancien qui la nomme ignoré). `docs/passation/2026-11-16-personnalisation-simple.md`. Geste : aucun.
 
 <!-- déplacé tel quel de CLAUDE.md §9 le 16 nov. (train) -->
+
+<!-- déplacé tel quel de CLAUDE.md §9 le 16 nov. (lot onglet-annonces-iphone) -->
+- **16 nov. · Écrans refaits sur les maquettes validées (vague A)** : Ma journée (seulement les gestes, « Tout va bien ? · N points », retours et litiges ensemble, paire à sortir en premier), Annonces 72 px, Ventes/Achats (colis cochés d'office, place du Stock par N°, code au comptoir), fiche D (un geste : « Relier · N € » sur son toucher), Argent, Messages (plein « Proposer N € »), Paramètres, rail ordinateur Vendre/Ranger/Compter ; « À envoyer » partout (`src/libelles.js`). `2026-11-15-refonte-journee.md`, `-refonte-ventes.md`, `-fiche-d.md`. Geste : aucun.
