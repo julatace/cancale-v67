@@ -712,7 +712,7 @@ async function lirePdfLigne(id) {
 }
 let _lirePdfBanc = null;
 // Les bancs servent le PDF et son texte (jamais la production : rien ne l'appelle ici).
-export function _pdfPourBanc(o) { _lirePdfBanc = o && typeof o.lire === 'function' ? o : null; }
+export function _pdfPourBanc(o) { _lirePdfBanc = o && (typeof o.lire === 'function' || typeof o.texte === 'function') ? o : null; }
 export async function passageDeparts(b, { max = MAX_DEPARTS_APP, fin = Date.now() + BUDGET_APP_MS, signal = null, maintenant = Date.now() } = {}) {
   const lus = [];
   const bd = await lireBaseDeparts();
@@ -728,7 +728,7 @@ export async function passageDeparts(b, { max = MAX_DEPARTS_APP, fin = Date.now(
     let cp = '';
     if (it.carrier === 'mondialrelay') {
       if (!(vu && vu.cp) && !(vu && vu.cpsLu)) {
-        const e = await lireCpsEtiquette(it.cle, _lirePdfBanc ? { lirePdf: _lirePdfBanc.lire, texte: _lirePdfBanc.texte } : {});
+        const e = await lireCpsEtiquette(it.cle, _lirePdfBanc ? { lirePdf: _lirePdfBanc.lire || lirePdfLigne, texte: _lirePdfBanc.texte || null } : {});
         if (!e.lu) continue;
         let apresPdf = null;
         const w = await modifierCas(id, (d) => {

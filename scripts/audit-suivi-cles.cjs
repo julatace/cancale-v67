@@ -40,6 +40,8 @@ const MUTATIONS = {
   'cle-de-l-installation': ['api/_lib/transporteurs-lecture.js', 'return s && _clesParContexte.has(s) ? T.lecturesCleDe(clesCourantes()) : null; });', "return { colissimo: !!process.env.LAPOSTE_OKAPI_KEY || !!(clesCourantes() || {}).colissimo, ups: !!(process.env.UPS_CLIENT_ID && process.env.UPS_CLIENT_SECRET) || !!(clesCourantes() || {}).ups }; });"],
   'cle-d-un-autre-vendeur': ['api/_lib/transporteurs-lecture.js', "const clesCourantes = () => { const s = contexteVendeur.getStore(); return s ? (_clesParContexte.get(s) || null) : null; };", "let _der = null; const clesCourantes = () => { const s = contexteVendeur.getStore(); const v = s ? (_clesParContexte.get(s) || null) : null; if (v && (v.colissimo || v.ups)) _der = v; return v && (v.colissimo || v.ups) ? v : _der; };"],
   'cle-env-en-repli': ['api/_lib/transporteurs-lecture.js', "const k = c && c.colissimo ? c.colissimo.cle : '';", "const k = (c && c.colissimo ? c.colissimo.cle : '') || process.env.LAPOSTE_OKAPI_KEY || '';"],
+  'route-renvoie-la-cle': ['api/_lib/cles-transporteurs.js', "  return { etat: s ? 'posee' : 'illisible', fin: l.fin || null,", "  return { etat: s ? 'posee' : 'illisible', cle: s, chiffre: l.chiffre, fin: l.fin || null,"],
+  'ups-refusee-rangee': ['api/_lib/cles-transporteurs.js', "    if (j && j.refus) return repondre(res, 400,", "    if (false) return repondre(res, 400,"],
   'pause-de-tous-les-vendeurs': ['api/_lib/transporteurs-lecture.js', "const clePause = (carrier) => (T.CARRIERS_CLE.includes(carrier) ? `${carrier}@${proprietaireCourant() || '?'}` : carrier);", 'const clePause = (carrier) => carrier;'],
   'ups-401-sans-nouveau-jeton': ['api/_lib/transporteurs-lecture.js', "      if (carrier === 'ups' && r.status === 401) {", '      if (false) {'],
   'cle-absente-appelee': ['api/_lib/transporteurs-lecture.js', "      if (cle === null) return { echec: 'cle' };\n", ''],
@@ -159,7 +161,7 @@ global.fetch = async (url, opts = {}) => {
     return /return=representation/.test(prefer) ? rep(faits, 201) : new Response('', { status: 201 });
   }
   if (m === 'PATCH') { const corps = JSON.parse(opts.body || '{}'); const t = filtrer(u); for (const l of t) base.set(`${l.owner}|${l.id}`, corps.data); return rep(t.map((l) => ({ id: l.id }))); }
-  if (m === 'DELETE') { for (const l of filtrer(u)) base.delete(`${l.owner}|${l.id}`); return new Response('', { status: 204 }); }
+  if (m === 'DELETE') { for (const l of filtrer(u)) base.delete(`${l.owner}|${l.id}`); return new Response(null, { status: 204 }); }
   const sel = u.searchParams.get('select') || '';
   if (sel === 'owner' && u.searchParams.get('limit') === '1') return rep([]);
   return rep(filtrer(u).map((l) => projeter(l, sel)));
@@ -461,6 +463,40 @@ const UPS_JETON = (j) => JSON.stringify({ token_type: 'Bearer', issued_at: Strin
     T.noterLecturesServeur(null);
     for (const k of CLES) delete process.env[k];
     dit(appels.filter((x) => x.host === 'api.laposte.fr' || x.host === 'onlinetools.ups.com').length === 0, 'G1 sans clé du vendeur (variables Vercel posées), aucune requête ne part à La Poste ni à UPS', J(appels.map((x) => ({ h: x.host, k: !!x.okapi }))));
+  });
+
+  // ══ 5. LA ROUTE (/api/compte?mode=cles-suivi) — poser, lire, retirer ═════════
+  await essaie('la route des clés', async () => {
+    remise();
+    const res = () => { const o = { code: 0, corps: null }; o.status = (c) => { o.code = c; return o; }; o.json = (j) => { o.corps = j; return o; }; return o; };
+    const appel = async (method, corps, { cloisonnee = true, acces = true, owner = A } = {}) => { const r = res(); await CT.routeClesTransporteurs({ method }, r, { vendeur: { id: owner }, corps, acces, cloisonnee }); return r; };
+    const g0 = await appel('GET');
+    dit(g0.code === 200 && g0.corps.colissimo.etat === 'aucune' && g0.corps.ups.etat === 'aucune', 'R1 aucune clé : l’état le dit (« aucune »)', J(g0.corps));
+    const p1 = await appel('POST', { action: 'poser', transporteur: 'colissimo', cle: CLE_LP });
+    const ligne = base.get(`${A}|suivi_cle_colissimo`) || {};
+    dit(p1.code === 200 && p1.corps.colissimo.etat === 'posee' && p1.corps.colissimo.fin === CLE_LP.slice(-4) && !JSON.stringify(p1.corps).includes(CLE_LP) && !JSON.stringify(ligne).includes(CLE_LP) && ligne.chiffre, 'R2 poser : rangée CHIFFRÉE ; la réponse ne dit que la fin (jamais la clé, jamais le chiffré)', J(p1.corps));
+    dit(!('chiffre' in (p1.corps.colissimo || {})) && !('rev' in (p1.corps.colissimo || {})), 'R2b ni chiffré ni `rev` renvoyés au navigateur');
+    let jetonsDemandes = 0;
+    transporteur = (u, { methode }) => (u.hostname === 'onlinetools.ups.com' && methode === 'POST' ? (jetonsDemandes++, { status: 401, ctype: 'application/json', body: '{"response":{"errors":[{"code":"10401","message":"ClientId is Invalid"}]}}' }) : null);
+    const p2 = await appel('POST', { action: 'poser', transporteur: 'ups', id: UPS_ID, secret: UPS_SECRET });
+    dit(p2.code === 400 && p2.corps.erreur === 'refusee' && !base.get(`${A}|suivi_cle_ups`) && jetonsDemandes === 1, 'R3 UPS refuse les identifiants (401 au jeton) ⇒ RIEN rangé, dit', J({ code: p2.code, e: p2.corps && p2.corps.erreur }));
+    transporteur = (u, { methode }) => (u.hostname === 'onlinetools.ups.com' && methode === 'POST' ? { status: 200, ctype: 'application/json', body: UPS_JETON('jeton-pose') } : null);
+    const p3 = await appel('POST', { action: 'poser', transporteur: 'ups', id: UPS_ID, secret: UPS_SECRET });
+    dit(p3.code === 200 && p3.corps.ups.etat === 'posee' && p3.corps.ups.verif === 'ok' && !JSON.stringify(base.get(`${A}|suivi_cle_ups`)).includes(UPS_SECRET), 'R4 UPS rend un jeton ⇒ rangés chiffrés, « acceptée »', J(p3.corps && p3.corps.ups));
+    const gB = await appel('GET', null, { owner: B });
+    dit(gB.code === 200 && gB.corps.colissimo.etat === 'aucune' && gB.corps.ups.etat === 'aucune', 'R5 un autre vendeur ne voit AUCUNE clé (chaque ligne est à son vendeur)', J(gB.corps));
+    const r1 = await appel('POST', { action: 'retirer', transporteur: 'colissimo' });
+    const r2 = await appel('POST', { action: 'retirer', transporteur: 'colissimo', confirme: true }, { acces: false });
+    dit(r1.code === 400 && r2.code === 200 && r2.corps.colissimo.etat === 'aucune' && !base.get(`${A}|suivi_cle_colissimo`), 'R6 retirer : confirmation exigée ; possible même abonnement coupé ; la ligne effacée', J({ a: r1.code, b: r2.code }));
+    const x1 = await appel('POST', { action: 'poser', transporteur: 'colissimo', cle: CLE_LP }, { acces: false });
+    const x2 = await appel('POST', { action: 'poser', transporteur: 'colissimo', cle: CLE_LP }, { cloisonnee: false });
+    const x3 = await appel('POST', { action: 'poser', transporteur: 'colissimo', cle: 'a b' });
+    dit(x1.code === 402 && x2.code === 503 && x3.code === 400 && !base.get(`${A}|suivi_cle_colissimo`), 'R7 abonnement coupé (402), base pas cloisonnée (503), clé mal formée (400) ⇒ rien rangé', J([x1.code, x2.code, x3.code]));
+    const coffre = process.env.VRM_COFFRE_CLE, service = process.env.SUPABASE_SERVICE_KEY;
+    delete process.env.VRM_COFFRE_CLE; process.env.SUPABASE_SERVICE_KEY = '';
+    const x4 = await appel('POST', { action: 'poser', transporteur: 'colissimo', cle: CLE_LP });
+    process.env.VRM_COFFRE_CLE = coffre; process.env.SUPABASE_SERVICE_KEY = service;
+    dit(x4.code === 503 && !base.get(`${A}|suivi_cle_colissimo`), 'R8 sans clé de coffre ⇒ RIEN rangé (jamais en clair)', J(x4.code));
   });
 
   console.log(ko ? `\n❌ audit-suivi-cles : ${ko} rouge(s)` : '\n✅ audit-suivi-cles : Colissimo / La Poste et UPS s’allument avec la clé DU VENDEUR (jamais celle de l’installation ni d’un autre), sans clé rien ne part, jamais par l’extension');
