@@ -216,7 +216,7 @@ function arbreAvant() {
   return d;
 }
 (async () => {
-  if (process.argv.includes('--avant')) { const { ko, out } = await verifier(arbreAvant()); out.forEach((l) => console.log(l)); console.log(`\nArbre de départ : ${ko} rouge(s) (attendu : plusieurs)`); process.exit(ko ? 0 : 1); }
+  if (process.argv.includes('--avant')) { const d = arbreAvant(); const { ko, out } = await verifier(d); if (!process.env.AVANT) try { fs.rmSync(d, { recursive: true, force: true }); } catch (_) {} out.forEach((l) => console.log(l)); console.log(`\nArbre de départ : ${ko} rouge(s) (attendu : plusieurs)`); process.exit(ko ? 0 : 1); }
   if (!process.argv.includes('--prouve')) {
     const { ko, out } = await verifier(RACINE);
     out.forEach((l) => console.log(l));
@@ -227,6 +227,7 @@ function arbreAvant() {
   for (const m of Object.keys(MUTATIONS)) {
     let d; try { d = copie(m); } catch (e) { console.log(`KO  ${m} : ${e.message}`); vertes++; continue; }
     const { ko, out } = await verifier(d);
+    try { fs.rmSync(d, { recursive: true, force: true }); } catch (_) {}   // le disque est partagé
     console.log(`${ko ? 'OK ' : 'KO '} mutation « ${m} » : ${ko} rouge(s)${ko ? ' — ' + out.filter((l) => l.startsWith('KO')).map((l) => l.slice(4, 70)).slice(0, 2).join(' | ') : ''}`);
     if (!ko) vertes++;
   }
