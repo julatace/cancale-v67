@@ -823,6 +823,7 @@ export default {
   "favoris.sousTitreCompte": "Compte {compte} · écris à ceux qui aiment tes annonces.",
   "favoris.actualiser": "Actualiser",
   "favoris.outils": "Plus d’outils",
+  "versions.uneSeule": "Une version : si elle vient de partir, seule la salutation change (Bonjour, Salut, Hello).",   // (16 nov.) une seule version : la salutation varie
   "favoris.duree.secondes": { one: "{n} s", other: "{n} s" },
   "favoris.duree.minutes": { one: "{n} min", other: "{n} min" },
   "favoris.duree.heures": { one: "{n} h", other: "{n} h" },

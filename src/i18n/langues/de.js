@@ -818,6 +818,7 @@ export default {
   "favoris.sousTitreCompte": "Konto {compte} · schreib denen, die deine Anzeigen mögen.",
   "favoris.actualiser": "Aktualisieren",
   "favoris.outils": "Weitere Werkzeuge",
+  "versions.uneSeule": "Eine Version: Wurde sie gerade gesendet, ändert sich nur die Begrüßung (Bonjour, Salut, Hello).",   // (16 nov.) une seule version : la salutation varie
   "favoris.duree.secondes": { one: "{n} s", other: "{n} s" },
   "favoris.duree.minutes": { one: "{n} Min.", other: "{n} Min." },
   "favoris.duree.heures": { one: "{n} Std.", other: "{n} Std." },

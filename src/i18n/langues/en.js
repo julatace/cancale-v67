@@ -818,6 +818,7 @@ export default {
   "favoris.sousTitreCompte": "Account {compte} · write to people who like your listings.",
   "favoris.actualiser": "Refresh",
   "favoris.outils": "More tools",
+  "versions.uneSeule": "One version: if it was just sent, only the greeting changes (Bonjour, Salut, Hello).",   // (16 nov.) une seule version : la salutation varie
   "favoris.duree.secondes": { one: "{n} s", other: "{n} s" },
   "favoris.duree.minutes": { one: "{n} min", other: "{n} min" },
   "favoris.duree.heures": { one: "{n} h", other: "{n} h" },
