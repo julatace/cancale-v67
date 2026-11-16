@@ -62,4 +62,18 @@ export default {
   "acc.colis.retrouver.apres": "Colis retrouvé",
   "acc.colis.retrouver.pasReconnu": "Ce code ne porte aucun n° de suivi connu. Tape le n° imprimé sous le code-barres.",
   "acc.colis.retrouver.pasTrouve": "Aucune vente, aucun achat ni retour ne porte ce n°.",
+  // (16 nov., lot scan-achat) ce qu'il y a dans le colis d'un achat, « Colis inconnu · Relier ».
+  "scan.a.dedans": "Dans ce colis",
+  "scan.a.lot": {"one": "{n} article", "other": "{n} articles"},
+  "scan.a.marque": "Marque",
+  "scan.a.paye": "Payé",
+  "scan.a.date": "Acheté le",
+  "scan.a.vendeur": "Vendeur",
+  "scan.a.compte": "Ton compte",
+  "scan.a.ranger": "Ranger",
+  "scan.a.signaler": "Signaler un problème",
+  "scan.a.pasCa": "Ce n’est pas ça",
+  "scan.a.pasCaIndice": "Vise un autre code du colis, ou tape le n°.",
+  "scan.a.inconnu": "Colis inconnu : n° {n}, aucun achat avec ce n°",
+  "scan.a.relier": "Relier à un achat",
 };

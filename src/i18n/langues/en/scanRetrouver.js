@@ -62,4 +62,18 @@ export default {
   "acc.colis.retrouver.apres": "Parcel found",
   "acc.colis.retrouver.pasReconnu": "This code carries no known tracking number. Type the number printed under the barcode.",
   "acc.colis.retrouver.pasTrouve": "No sale, purchase or return has this number.",
+  // (16 nov., lot scan-achat) ce qu'il y a dans le colis d'un achat, « Colis inconnu · Relier ».
+  "scan.a.dedans": "In this parcel",
+  "scan.a.lot": {"one": "{n} item", "other": "{n} items"},
+  "scan.a.marque": "Brand",
+  "scan.a.paye": "Paid",
+  "scan.a.date": "Bought on",
+  "scan.a.vendeur": "Seller",
+  "scan.a.compte": "Your account",
+  "scan.a.ranger": "Store it",
+  "scan.a.signaler": "Report a problem",
+  "scan.a.pasCa": "That’s not it",
+  "scan.a.pasCaIndice": "Aim at another code on the parcel, or type the number.",
+  "scan.a.inconnu": "Unknown parcel: no. {n}, no purchase has this number",
+  "scan.a.relier": "Link to a purchase",
 };

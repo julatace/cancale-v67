@@ -62,4 +62,18 @@ export default {
   "acc.colis.retrouver.apres": "Paquete encontrado",
   "acc.colis.retrouver.pasReconnu": "Este código no lleva ningún número de seguimiento conocido. Escribe el número impreso bajo el código de barras.",
   "acc.colis.retrouver.pasTrouve": "Ninguna venta, compra ni devolución lleva este número.",
+  // (16 nov., lot scan-achat) ce qu'il y a dans le colis d'un achat, « Colis inconnu · Relier ».
+  "scan.a.dedans": "En este paquete",
+  "scan.a.lot": {"one": "{n} artículo", "other": "{n} artículos"},
+  "scan.a.marque": "Marca",
+  "scan.a.paye": "Pagado",
+  "scan.a.date": "Comprado el",
+  "scan.a.vendeur": "Vendedor",
+  "scan.a.compte": "Tu cuenta",
+  "scan.a.ranger": "Guardar",
+  "scan.a.signaler": "Señalar un problema",
+  "scan.a.pasCa": "No es esto",
+  "scan.a.pasCaIndice": "Apunta a otro código del paquete o escribe el n.º.",
+  "scan.a.inconnu": "Paquete desconocido: n.º {n}, ninguna compra con este n.º",
+  "scan.a.relier": "Vincular a una compra",
 };

@@ -38,5 +38,19 @@ export function lireSourcesColis() {
 }
 
 // L'ouverture : le disque « + » ⇒ Scanner, et les boutons de Ventes et d'Achats.
+// (16 nov., lot scan-achat) `code` : un code DÉJÀ lu (la douchette) — le scanner s'ouvre sur son résultat.
 export const EV_RETROUVER = 'vrm:retrouver';
-export function ouvrirRetrouver(depuis = '') { try { window.dispatchEvent(new CustomEvent(EV_RETROUVER, { detail: { depuis } })); } catch (_) {} }
+export function ouvrirRetrouver(depuis = '', code = '') { try { window.dispatchEvent(new CustomEvent(EV_RETROUVER, { detail: { depuis, code: String(code || '') } })); } catch (_) {} }
+// Un code lu par la douchette PENDANT que le scanner est ouvert : il le résout comme un code tapé.
+export const EV_RETROUVER_CODE = 'vrm:retrouver-code';
+export const scannerRetrouverOuvert = () => { try { return document.documentElement.hasAttribute('data-scan-retrouver'); } catch (_) { return false; } };
+// (16 nov., lot scan-achat) « Colis inconnu · Relier à un achat » : le choix de l'achat (la feuille de Achats → À
+// retirer, src/relierColis.js) s'ouvre sur CE n°. SON clic choisit l'achat ; le n° devient l'identité de cet achat.
+// Le premier écran qui sait relier prend la demande (`prendre`) : une seule feuille, jamais deux.
+export const EV_RELIER_COLIS = 'vrm:relier-colis';
+export function demanderRelierColis({ suivi, transporteur = '', nom = '' } = {}) {
+  const d = { suivi: String(suivi || ''), transporteur: String(transporteur || ''), nom: String(nom || ''), pris: false };
+  if (!d.suivi) return false;
+  try { window.dispatchEvent(new CustomEvent(EV_RELIER_COLIS, { detail: d })); } catch (_) {}
+  return d.pris;
+}
