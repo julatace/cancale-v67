@@ -97,6 +97,9 @@ import { AFaireSite } from '../plateformes/AFaireSite.jsx';   // (14 nov.) « Ou
 import { preparerApercusModes } from '../apercusBordereaux.js';
 import { CLE_IMPRESSION, FORMATS_THERMIQUES, TAMPONS, ENCRES, CONTRASTES, MARGE_MAX_MM, AUTRE_MIN_MM, AUTRE_MAX_MM, reglageImpression, papierThermique, fmtMm } from '../impression/thermique.js';   // (11 nov., lot thermique)
 import { fabriquerBordereau } from '../impression/bordereauExemple.js';
+import TamponsBordereaux from '../parametres/TamponsBordereaux.jsx';   // (16 nov., lot tampons-parametres)
+import { reglageTamponsChoisi, ecrireReglageTampons } from '../App.jsx';
+import { avecChoix as avecChoixTampons, modeDuContenu, contenuDuMode } from '../impression/tampons.js';
 import { actionsReglages } from '../reglagesActions.js';
 // ⟦← App.jsx #3⟧
 import ConnexionsCompte from '../auth/ConnexionsCompte.jsx';
@@ -363,10 +366,17 @@ const champMm = { width: 76, minHeight: 44, border: `1px solid ${C.border}`, bor
 const ImpressionBordereaux = ({ mode, reg, changer }) => {
   useLangue();
   const th = mode === 'thermique' || mode === 'planche4';   // (14 nov., 98) 4 par page : les étiquettes isolées comme en thermique
+  // (16 nov., lot tampons-parametres) Ce que le tampon écrit vient de `vrm_tampons` (LE réglage des tampons) : la liste
+  // courte ci-dessous l'écrit ; les cases fines (titre sans N°, sans mention…) sont dans « Tampons des bordereaux ».
+  const [tps, setTps] = React.useState(() => reglageTamponsChoisi());
+  React.useEffect(() => { const f = () => setTps(reglageTamponsChoisi()); window.addEventListener('vrm:tampons', f); const d = onCloudReady(f); return () => { window.removeEventListener('vrm:tampons', f); if (typeof d === 'function') d(); }; }, []);
+  const contenuVu = th ? tps.th : tps.a4;
+  const tampon = modeDuContenu(contenuVu) || 'perso';
+  const choisirTamponCourt = (v) => { const c = contenuDuMode(v); if (!c) return; const n = avecChoixTampons(tps, 'tous', { contenu: v === 'rien' ? c : { ...c, mention: contenuVu.mention } }, { support: th ? 'th' : 'a4' }); ecrireReglageTampons(n); setTps(reglageTamponsChoisi()); };
   const papier = papierThermique(reg);
   const fmt = FORMATS_THERMIQUES.find((f) => f.id === reg.format) || FORMATS_THERMIQUES[0];
   const [ap, setAp] = React.useState(null);   // null · {etat:'charge'} · {etat:'ko'} · {etat:'lu', octets, pages, r1}
-  const cle = JSON.stringify([mode, reg]);
+  const cle = JSON.stringify([mode, reg, tps]);
   React.useEffect(() => { setAp(null); }, [cle]);
   const voir = async () => {
     if (ap && ap.etat === 'charge') return;
@@ -379,7 +389,6 @@ const ImpressionBordereaux = ({ mode, reg, changer }) => {
       setAp({ etat: 'lu', octets: await out.save(), pages: out.getPageCount(), r1, b: bilanThermique(r1.details) });
     } catch (_) { setAp({ etat: 'ko' }); }
   };
-  const tampon = th ? reg.tamponTh : reg.tamponA4;
   const mm = (nom, val, min, max, vide) => (
     <input key={`${nom}-${val}`} type="text" inputMode="decimal" aria-label={tr(`impression.${nom}`)} data-impression-champ={nom} defaultValue={val == null ? '' : fmtMm(val)} placeholder={vide}
       style={champMm} onBlur={(e) => { const v = e.target.value.trim(); changer({ [nom]: v === '' ? null : v }); }}
@@ -422,9 +431,10 @@ const ImpressionBordereaux = ({ mode, reg, changer }) => {
         {/* Une liste, pas des pastilles : quatre choix ne tiennent pas sur 390 px (« Rie… » coupé). */}
         <div style={{ ...ligne, marginTop: 0 }}>
           <label htmlFor="vrm-impression-tampon" style={lib}>{tr('impression.tampon')}</label>
-          <select id="vrm-impression-tampon" data-impression-tampon-choix={tampon} value={tampon} onChange={(e) => changer(th ? { tamponTh: e.target.value } : { tamponA4: e.target.value })}
+          <select id="vrm-impression-tampon" data-impression-tampon-choix={tampon} value={tampon} onChange={(e) => choisirTamponCourt(e.target.value)}
             style={{ minHeight: 44, flex: '1 1 180px', maxWidth: 320, border: `1px solid ${C.border}`, borderRadius: 12, padding: '0 10px', fontSize: 15, background: C.bg, color: C.text, fontFamily: 'inherit' }}>
             {TAMPONS.map((v) => <option key={v} value={v}>{tr(`impression.tampon.${v}`)}</option>)}
+            {tampon === 'perso' && <option value="perso" disabled>{tr('tampons.perso')}</option>}
           </select>
         </div>
         {th && <div data-impression-pourquoi-titre="" style={aide}>{tr('impression.tampon.pourquoi')}</div>}
@@ -546,6 +556,7 @@ const ImprimanteSetting = ({ nu = false }) => {
           : <>A4, <b style={{color:C.text}}>une feuille par bordereau</b>, ton N° dans un blanc du PDF. <Pourquoi label="Recto-verso ?">Le document n’est pas réduit. Si ton imprimante sort du recto-verso, décoche-le dans sa fenêtre d’impression : le PDF le demande, le pilote peut passer outre.</Pourquoi></>}
       </div>
       <ImpressionBordereaux mode={mode} reg={reg} changer={changerReg}/>
+      <TamponsBordereaux/>
       <div style={{marginTop:14,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
         <div style={{fontSize:13,fontWeight:600,color:C.text}}>Tes types de bordereaux</div>
         {ap&&ap.etat!=='charge'&&<button type="button" onClick={charger} style={{marginTop:8,minHeight:44,border:`1px solid ${C.border}`,borderRadius:12,background:'transparent',color:C.text,padding:'8px 12px',font:'inherit',cursor:'pointer'}}>Actualiser les aperçus</button>}

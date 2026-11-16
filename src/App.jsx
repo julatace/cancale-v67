@@ -595,10 +595,12 @@ import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLie
 import { lignesFraicheur, quandRelu } from './fraicheurComptes.js';
 import { FRAICHEUR_ACHATS_J, fraicheurPubliee, suivreFraicheur } from './fraicheur.js';   // (9 nov., lot AG) le seuil des achats vit avec la ligne de fraîcheur unique
 import { ventesEmailFraiches, avecVentesEmail, requeteVentesEmail, gesteVenteEmail, STATUT_VENTE_EMAIL, groupesVentesEmailEnTete, statutVentesEmail } from './venteEmailFraiche.js';
-import { TAMPONS as TAMPONS_IMPR } from './impression/thermique.js';   // (14 nov.) le tampon par bordereau
+import { TAMPONS as TAMPONS_IMPR } from './impression/thermique.js';
+import { CLE_TAMPONS, TAILLES_TAMPON, avecChoix, reglageTampons, aEcrire, resoudreTampon, placesDeForme, avecPlace, familleDe, texteDuCartouche, contenuDuMode, repousserHorsInterdits, CIBLES as CIBLES_TAMPON } from './impression/tampons.js';   // (16 nov., lot tampons-parametres) LE réglage des tampons   // (14 nov.) le tampon par bordereau
 import { pagesDe, formatRetenu, signatureLot, voieOuverture, absentsDuLot } from './impression/lotSimple.js';   // (14 nov.) « Imprimer » en un toucher
-import { ChoixPapier, FeuilleImpression } from './ImpressionSimple.jsx';   // (14 nov., impression-simple) les deux feuilles
-import { CLE_IMPRESSION, reglageImpression, papierThermique, placementEtiquette, contenuTampon, carteEncre, boiteEncre, decouperFeuille, fusionnerProches, moduleDuCode, moduleImprimeMm, codeAssezGros, seuillerNoir, tramerNoir, zonesAdresse, CONTRASTES, MODULE_MIN_MM, BANDE_CONTINU_MM } from './impression/thermique.js';
+import { ChoixPapier, FeuilleImpression } from './ImpressionSimple.jsx';
+import ApercuAvantImpression from './impression/ApercuAvantImpression.jsx';   // (16 nov., lot tampons-parametres) l'aperçu avant impression   // (14 nov., impression-simple) les deux feuilles
+import { CLE_IMPRESSION, reglageImpression, papierThermique, placementEtiquette, carteEncre, boiteEncre, decouperFeuille, fusionnerProches, moduleDuCode, moduleImprimeMm, codeAssezGros, seuillerNoir, tramerNoir, zonesAdresse, CONTRASTES, MODULE_MIN_MM, BANDE_CONTINU_MM } from './impression/thermique.js';
 import { decisionNumeroVenteEmail, numeroEcritDansArticle, colisVentesEmail, MENTION_SANS_NUM, CLE_IMPRIMES_SANS_NUM, phraseImprimeSansNumero } from './bordereauVenteEmail.js';
 // (15 nov., Julien : « on range une ANNONCE, pas un achat ») La feuille « Ranger cet achat » n'est plus montée : la règle
 // des cases d'un gros lot, le rattrapage du pool et le N° de l'atelier d'arrivée (sans case : la case vient APRÈS, sur l'article).
@@ -3171,7 +3173,7 @@ const SYNC_KEYS = [
   // (15 nov., lot argent-plus) Les alertes de seuils déjà dites (« Compris », src/alertesSeuils.js) : une fois chacune, sur tous ses appareils.
   'vrm_seuils_vus',
   // (3 nov.) La place du tampon choisie à la main, par FORME de bordereau (« Toujours ici »).
-  'vrm_tampon_positions','vinted_bords_printed',
+  'vrm_tampon_positions','vrm_tampons','vinted_bords_printed',
   // (8 nov.) Les bordereaux imprimés SANS N° (src/bordereauVenteEmail.js) : la carte le redit.
   'vrm_bords_sans_num',
   // (5 nov.) Le PROGRAMME du mode stream (ce qu'il cache quand il filme) : le même sur
@@ -13789,12 +13791,18 @@ const trouverZoneBlanche = (pixels, width, height, boxW, boxH, marge, opts = {})
   for (let y = 0; y < ch; y++) { let row = 0; for (let x = 0; x < cw; x++) { row += encre[y * cw + x] >= 2 ? 1 : 0; sums[(y + 1) * stride + x + 1] = sums[y * stride + x + 1] + row; } }
   const w = Math.ceil((boxW + 2 * mx) / k), h = Math.ceil((boxH + 2 * my) / k);
   const bas = !!opts.depuisBas;
+  // (16 nov., lot tampons-parametres) `opts.vers` { x, y } (pixels) : parmi les fenêtres libres, celle dont le
+  // centre est le PLUS PROCHE de ce point (une place rapide : coin, haut, bas) — jamais une fenêtre qui touche l'encre.
+  const vers = opts.vers; let best = null;
   for (let j = 0; j + h <= ch; j++) for (let i = 0; i + w <= cw; i++) {
     const y = bas ? ch - h - j : j, x = bas ? cw - w - i : i;
     const n = sums[(y + h) * stride + x + w] - sums[y * stride + x + w] - sums[(y + h) * stride + x] + sums[y * stride + x];
-    if (n === 0) return { x: x * k + mx, y: y * k + my };
+    if (n !== 0) continue;
+    if (!vers) return { x: x * k + mx, y: y * k + my };
+    const d = ((x + w / 2) * k - vers.x) ** 2 + ((y + h / 2) * k - vers.y) ** 2;
+    if (!best || d < best.d) best = { x: x * k + mx, y: y * k + my, d };
   }
-  return null;
+  return best ? { x: best.x, y: best.y } : null;
 };
 // Rend la page 1 de `pdf` (pdf-lib) avec pdf.js : { pixels, w, h, s } dans le
 // sens AFFICHÉ, `s` pixels par point. Lève si pdf.js manque (hors ligne…).
@@ -13815,15 +13823,21 @@ const rendrePremierePage = async (pdf, echelle = TAMPON.echelle) => {
 // ① Où poser le cartouche sur la page affichée (recherche automatique) ?
 // `rendu` : la page déjà rendue (l'aperçu la réutilise). Rend { x, y, c, v }
 // (points, page affichée ; `v` = l'indice de la variante) ou null.
-const chercherPlaceTampon = async (pdf, bold, reg, numero, titre, rendu = null, bloques = []) => {
+// (16 nov., lot tampons-parametres) `o.k` : la taille du texte choisie (S 0,8 · M 1 · L 1,25, `vrm_tampons`) ;
+// `o.place` : une place rapide (`hg`, `hd`, `bg`, `bd`, `haut`, `bas`) — la zone blanche la plus proche de ce
+// coin ; 'auto' (ou rien) : la première zone blanche, comme toujours. Les zones `bloques` restent interdites.
+const varianteTampon = (v, k) => (k && k !== 1 ? { tn: v.tn * k, tt: v.tt * k, l: v.l * k } : v);
+const chercherPlaceTampon = async (pdf, bold, reg, numero, titre, rendu = null, bloques = [], o = {}) => {
   rendu = rendu || await rendrePremierePage(pdf); const s = rendu.s;
   const marge = { mx: Math.round(TAMPON.mx * s), my: Math.round(TAMPON.my * s) };
   // (11 nov., lot thermique) Les codes et les adresses de l'étiquette posée, comptés comme de l'encre.
   const bl = (bloques || []).map((z) => ({ x: z.x * s, y: z.y * s, w: z.w * s, h: z.h * s }));
+  const cible = CIBLES_TAMPON[o.place];
   for (let v = 0; v < CARTOUCHES.length; v++) {
-    const c = cartoucheTampon(bold, reg, numero, titre, CARTOUCHES[v]); if (!c) continue;
+    const c = cartoucheTampon(bold, reg, numero, titre, varianteTampon(CARTOUCHES[v], o.k)); if (!c) continue;
     const bw = Math.ceil(c.w * s), bh = Math.ceil(c.h * s);
-    const p = trouverZoneBlanche(rendu.pixels, rendu.w, rendu.h, bw, bh, marge, { bloques: bl });
+    const vers = cible ? { x: cible[0] * rendu.w, y: cible[1] * rendu.h } : null;
+    const p = trouverZoneBlanche(rendu.pixels, rendu.w, rendu.h, bw, bh, marge, { bloques: bl, vers });
     if (p) return { x: p.x / s, y: p.y / s, c, v };
   }
   return null;
@@ -13855,45 +13869,114 @@ const placeMentionVrm = (rendu, bw, bh, interdits) => {
   const p = trouverZoneBlanche(rendu.pixels, rendu.w, rendu.h, Math.ceil(bw * s), Math.ceil(bh * s), marge, { depuisBas: true, bloques });
   return p ? { x: p.x / s, y: p.y / s } : null;
 };
-// Pose la mention sur la page 1 si une place sûre existe. `rendu` : la page
-// AVANT le tampon ; `tampon` : la boîte du cartouche (points, page affichée).
-// Rend true si posée. Ne lève jamais (le bordereau s'imprime toujours).
-// (11 nov., lot thermique) `th` : la page EST le papier thermique ({ boite, bloques, marge } en
-// points, page affichée) — la mention ne va que dans le blanc AUTOUR de l'étiquette posée, en
-// NOIR fin (une tête thermique trame le gris en pointillés), jamais sur un code ni le N°.
-const poserMentionVrm = (PL, pdf, reg, rendu, tampon, th = null) => {
+// ── (16 nov., lot tampons-parametres) LA MENTION À SA PLACE : AU-DESSUS DU QR CODE ─────────────
+// Julien, mot pour mot : « le Créé par vrm.center, c'est mal placé » ; « mets-le en dessous de l'adresse de
+// livraison, au milieu sur le bordereau » ; « là où est le QR code » ; puis, DÉCISION FINALE : « ou au-dessus du
+// QR code, comme ça même si on met du scotch on le voit ». Donc, par défaut :
+//   ① juste AU-DESSUS du QR code, centrée sur SON axe, hors de sa zone de silence (sinon il ne se scanne plus) —
+//      le scotch couvre d'abord le bas et les bords de l'étiquette, le dessus du QR reste lisible ;
+//   ② seulement si cet espace est pris (texte, trait, cadre, code, adresse) : juste EN DESSOUS du QR ;
+//   ③ sans QR (ou sans place autour) : centrée sur le bordereau, dans la première bande blanche SOUS l'adresse du
+//      destinataire ; adresse introuvable : la première bande blanche sous la moitié haute ;
+//   ④ aucune place sûre : RIEN (jamais forcée sur un code, l'adresse, un cadre ou du texte).
+// Petite (6,5 pt en A4, 5,5 pt en thermique, × S/M/L), gris foncé en A4, noir en thermique (une tête thermique
+// tramerait le gris). Le réglage `vrm_tampons` peut la déplacer (coins, bas, place à la main) ou l'ôter.
+const MM_M = 72 / 25.4;   // (MM_PT est déclaré plus bas : une constante lue à l'initialisation ne peut pas s'en servir)
+const MENTION2 = { gris: 0.42, tailleTh: 5.5, marge: 1.2 * MM_M, gardeQrMin: 3 * MM_M, glisse: 8 * MM_M, pas: 0.5 * MM_M };
+// Une boîte (points) de `rendu` touche-t-elle l'encre ? (luminance < 200, comme la recherche du tampon)
+const encreDans = (rendu, b) => {
+  const { pixels: d, w, h, s } = rendu; let n = 0;
+  const x0 = Math.max(0, Math.floor(b.x * s)), y0 = Math.max(0, Math.floor(b.y * s)), x1 = Math.min(w, Math.ceil((b.x + b.w) * s)), y1 = Math.min(h, Math.ceil((b.y + b.h) * s));
+  if (x1 <= x0 || y1 <= y0) return 1e9;
+  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) { const i = (y * w + x) * 4; if (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2] < 200) n++; }
+  return n;
+};
+// Un QR (ou un DataMatrix) : un code à peu près carré. Sa boîte est AFFINÉE sur ses vrais pixels noirs : la carte
+// des codes est faite de cases de 6 pt, un bord du QR peut en dépasser.
+const estCarreCode = (q) => q.w / q.h >= 0.7 && q.w / q.h <= 1.43 && Math.min(q.w, q.h) >= 8 * MM_M;
+const affinerCode = (rendu, q, autour = 8) => {
+  const { pixels: d, w, h, s } = rendu;
+  const x0 = Math.max(0, Math.floor((q.x - autour) * s)), y0 = Math.max(0, Math.floor((q.y - autour) * s)), x1 = Math.min(w, Math.ceil((q.x + q.w + autour) * s)), y1 = Math.min(h, Math.ceil((q.y + q.h + autour) * s));
+  const qx0 = q.x * s, qy0 = q.y * s, qx1 = (q.x + q.w) * s, qy1 = (q.y + q.h) * s;
+  let X0 = qx0, Y0 = qy0, X1 = qx1, Y1 = qy1;
+  // Une ligne/colonne noire collée au code en fait partie (on s'arrête au premier blanc de 2 pt).
+  const noirLigne = (y, a, b2) => { for (let x = a; x < b2; x++) { const i = (y * w + x) * 4; if (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2] < 128) return true; } return false; };
+  const noirCol = (x, a, b2) => { for (let y = a; y < b2; y++) { const i = (y * w + x) * 4; if (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2] < 128) return true; } return false; };
+  const vide = Math.max(2, Math.round(2 * s));
+  let k = 0; for (let y = Math.floor(qy0) - 1; y >= y0 && k < vide; y--) { if (noirLigne(y, Math.floor(X0), Math.ceil(X1))) { Y0 = y; k = 0; } else k++; }
+  k = 0; for (let y = Math.ceil(qy1); y < y1 && k < vide; y++) { if (noirLigne(y, Math.floor(X0), Math.ceil(X1))) { Y1 = y + 1; k = 0; } else k++; }
+  k = 0; for (let x = Math.floor(qx0) - 1; x >= x0 && k < vide; x--) { if (noirCol(x, Math.floor(Y0), Math.ceil(Y1))) { X0 = x; k = 0; } else k++; }
+  k = 0; for (let x = Math.ceil(qx1); x < x1 && k < vide; x++) { if (noirCol(x, Math.floor(Y0), Math.ceil(Y1))) { X1 = x + 1; k = 0; } else k++; }
+  return { x: X0 / s, y: Y0 / s, w: (X1 - X0) / s, h: (Y1 - Y0) / s };
+};
+// La zone de silence d'un QR : 4 modules (la norme), 3 mm au moins.
+const gardeQr = (rendu, q) => {
+  let mod = null; try { const s = rendu.s; const m = moduleDuCode(rendu.pixels, rendu.w, rendu.h, { x: q.x * s, y: q.y * s, w: q.w * s, h: q.h * s }); mod = m != null ? m / s : null; } catch (_) { mod = null; }
+  return Math.max(MENTION2.gardeQrMin, mod != null ? 4.5 * mod : q.w * 0.16);
+};
+// LES ZONES INTERDITES d'une page rendue (points, page affichée) : chaque code-barres + 5 mm, chaque QR + sa zone
+// de silence, chaque adresse donnée. `codes` affinés rendus à part (l'éditeur les hachure, le banc les juge).
+const zonesInterditesTampon = (rendu, adresses = []) => {
+  const codes = zonesCodesTampon(rendu).map((q) => (estCarreCode(q) ? { ...affinerCode(rendu, q), qr: true } : { ...q, qr: false }));
+  const interdits = codes.map((q) => ({ ...elargir(q, q.qr ? gardeQr(rendu, q) : MENTION.codes), quoi: q.qr ? 'qr' : 'code' }));
+  for (const a of adresses || []) interdits.push({ ...a, quoi: 'adresse' });
+  return { codes, interdits };
+};
+// Pur (la page déjà rendue) : où poser une boîte bw × bh de mention, par la règle par défaut ①②③.
+// `o` : { codes, interdits, cadre, adresses, bord }. Rend { x, y, via, qr } (points) ou null.
+const placerMentionDefaut = (rendu, bw, bh, o = {}) => {
+  const s = rendu.s, W = rendu.w / s, H = rendu.h / s, B = o.bord != null ? o.bord : MENTION.bord, M = MENTION2.marge;
+  const interdits = o.interdits || [];
+  const libre = (x, y) => x >= B && y >= B && x + bw <= W - B && y + bh <= H - B
+    && !interdits.some((z) => x < z.x + z.w && x + bw > z.x && y < z.y + z.h && y + bh > z.y)
+    && encreDans(rendu, { x: x - M, y: y - M, w: bw + 2 * M, h: bh + 2 * M }) <= 2;
+  const qrs = (o.codes || []).filter((q) => q.qr).sort((a, b) => (b.w * b.h - a.w * a.h) || (a.y - b.y) || (a.x - b.x));
+  const q = qrs[0];
+  if (q) {
+    const garde = gardeQr(rendu, q), x = q.x + q.w / 2 - bw / 2;
+    // La boîte ne doit pas toucher la zone de silence de SON QR : on part de son bord, pas de la zone interdite.
+    for (let d = 0; d <= MENTION2.glisse; d += MENTION2.pas) { const y = q.y - garde - bh - d; if (libre(x, y)) return { x, y, via: 'qr-dessus', qr: q }; }
+    for (let d = 0; d <= MENTION2.glisse; d += MENTION2.pas) { const y = q.y + q.h + garde + d; if (libre(x, y)) return { x, y, via: 'qr-dessous', qr: q }; }
+  }
+  const C = o.cadre || { x: 0, y: 0, w: W, h: H }, x = C.x + C.w / 2 - bw / 2;
+  const ad = (o.adresses || []).filter((z) => z.x < C.x + C.w && z.x + z.w > C.x && z.y < C.y + C.h && z.y + z.h > C.y);
+  const y0 = ad.length ? Math.max(...ad.map((z) => z.y + z.h)) + M : C.y + C.h / 2;
+  for (let y = y0; y + bh <= C.y + C.h; y += MENTION2.pas) if (libre(x, y)) return { x, y, via: ad.length ? 'adresse' : 'milieu', qr: null };
+  return null;
+};
+// Pose la mention sur la page 1 (après ou avant le cartouche, voir `tamponnerBordereau`). `rendu` : la page AVANT
+// tout tampon ; `o` : { th (thermique), k (S/M/L), place ('qr' · 'bas' · coins), libre ({ vx, vy } posée à la main),
+// codes, interdits, cadre, adresses, evite (la boîte du cartouche, s'il est déjà posé) }. Rend la boîte posée
+// { x, y, w, h, via, repousse } ou null. Ne lève jamais (le bordereau s'imprime toujours).
+const poserMentionVrm = (PL, pdf, reg, rendu, o = {}) => {
   try {
-    if (!rendu) return false;
-    if (th) {
-      const page = pdf.getPages()[0], interdits = [elargir(th.boite, 2 * MM_PT), ...(th.bloques || [])];
-      if (tampon) interdits.push(elargir(tampon, 6 * MM_PT));
-      for (const q of zonesCodesTampon(rendu)) interdits.push(elargir(q, MENTION.codes));
-      const txt = texteEcrivable(reg, MENTION.texte), T = 5.5; if (!txt) return false;
-      const c = { w: Math.ceil(reg.widthOfTextAtSize(txt, T) + 2), h: Math.ceil(T * 1.1 + 2), pad: 1, lignes: [{ texte: txt, font: reg, taille: T, y: 1 + T * 0.8, gris: 0 }] };
-      const s = rendu.s, W = rendu.w / s, H = rendu.h / s, B = Math.max(1.5 * MM_PT, th.marge || 0);
+    if (!rendu) return null;
+    const page = pdf.getPages()[0], s = rendu.s, W = rendu.w / s, H = rendu.h / s;
+    const T = (o.th ? MENTION2.tailleTh : MENTION.taille) * (o.k || 1), gris = o.th ? 0 : MENTION2.gris;
+    const txt = texteEcrivable(reg, MENTION.texte); if (!txt) return null;
+    const c = { w: Math.ceil(reg.widthOfTextAtSize(txt, T) + 2), h: Math.ceil(T * 1.1 + 2), pad: 1, lignes: [{ texte: txt, font: reg, taille: T, y: 1 + T * 0.8, gris }] };
+    const B = o.th ? Math.max(1.5 * MM_M, o.marge || 0) : MENTION.bord;
+    const interdits = [...(o.interdits || [])]; if (o.evite) interdits.push(elargir(o.evite, 3 * MM_M));
+    if (o.libre && Number.isFinite(o.libre.vx) && Number.isFinite(o.libre.vy)) {
+      // Posée à la main : à sa place, fond blanc dessous — repoussée hors des codes, des QR et de l'adresse.
+      const p = repousserHorsInterdits({ x: o.libre.vx * W, y: o.libre.vy * H, w: c.w, h: c.h }, interdits, W, H);
+      if (!p) return null;
+      ecrireCartouche(PL, page, c, p.x, p.y, 1, true);
+      return { x: p.x, y: p.y, w: c.w, h: c.h, via: 'libre', repousse: p.repousse };
+    }
+    let p = null;
+    if (!o.place || o.place === 'qr') p = placerMentionDefaut(rendu, c.w, c.h, { codes: o.codes, interdits, cadre: o.cadre, adresses: o.adresses, bord: B });
+    else {
+      const cible = CIBLES_TAMPON[o.place];
       const zones = [...interdits, { x: 0, y: 0, w: W, h: B }, { x: 0, y: H - B, w: W, h: B }, { x: 0, y: 0, w: B, h: H }, { x: W - B, y: 0, w: B, h: H }];
       const bloques = zones.map((z) => ({ x: z.x * s, y: z.y * s, w: z.w * s, h: z.h * s }));
-      const p = trouverZoneBlanche(rendu.pixels, rendu.w, rendu.h, Math.ceil(c.w * s), Math.ceil(c.h * s), { mx: Math.round(1 * MM_PT * s), my: Math.round(1 * MM_PT * s) }, { depuisBas: true, bloques });
-      if (!p) return false;
-      ecrireCartouche(PL, page, c, p.x / s, p.y / s);
-      return true;
+      const q = trouverZoneBlanche(rendu.pixels, rendu.w, rendu.h, Math.ceil(c.w * s), Math.ceil(c.h * s), { mx: Math.round(MENTION2.marge * s), my: Math.round(MENTION2.marge * s) }, { bloques, vers: cible ? { x: cible[0] * rendu.w, y: cible[1] * rendu.h } : null });
+      if (q) p = { x: q.x / s, y: q.y / s, via: o.place };
     }
-    if (typeof zoneEtiquette !== 'function') return false;
-    const page = pdf.getPages()[0], b = page.getCropBox(), r = rotationPage(page);
-    const z = zoneEtiquette(PL, page); if (!z || !z.ok) return false;
-    const interdits = [];
-    for (const e of (z.etiquettes && z.etiquettes.length ? z.etiquettes : [z])) {
-      const a = versAffiche(b, r, e.x, e.y), c = versAffiche(b, r, e.x + e.w, e.y + e.h);
-      interdits.push(elargir({ x: Math.min(a.x, c.x), y: Math.min(a.y, c.y), w: Math.abs(c.x - a.x), h: Math.abs(c.y - a.y) }, MENTION.etiquette));
-    }
-    if (tampon) interdits.push(elargir(tampon, MENTION.ecart));
-    for (const q of zonesCodesTampon(rendu)) interdits.push(elargir(q, MENTION.codes));
-    const txt = texteEcrivable(reg, MENTION.texte), T = MENTION.taille; if (!txt) return false;
-    const c = { w: Math.ceil(reg.widthOfTextAtSize(txt, T) + 2), h: Math.ceil(T * 1.1 + 2), pad: 1, lignes: [{ texte: txt, font: reg, taille: T, y: 1 + T * 0.8, gris: MENTION.gris }] };
-    const p = placeMentionVrm(rendu, c.w, c.h, interdits); if (!p) return false;
+    if (!p) return null;
     ecrireCartouche(PL, page, c, p.x, p.y);
-    return true;
-  } catch (_) { return false; }
+    return { x: p.x, y: p.y, w: c.w, h: c.h, via: p.via, repousse: false };
+  } catch (_) { return null; }
 };
 // ── LE TAMPON LIBRE (3 nov., 18 h 59) ────────────────────────────────────────
 // Julien : « on doit pouvoir être LIBRE de le mettre où on veut, MÊME SUR DU
@@ -13930,19 +14013,24 @@ const formeTampon = (type, page, isole = false) => {
   const format = pres(595.28, 841.89, 8) ? 'A4' : pres(283.46, 425.2, 10) ? '10x15' : pres(419.53, 595.28, 8) ? 'A5' : `${Math.round(a / MM_PT)}x${Math.round(b / MM_PT)}mm`;
   const sens = w > h ? 'paysage' : 'portrait';
   const t = String(type || 'autre');
-  const nomT = { mondialrelay: 'Mondial Relay', international: 'Mondial Relay international', chronopost: 'Chronopost', colissimo: 'Colissimo', vintedgo: 'Vinted Go', relaiscolis: 'Relais Colis', ups: 'UPS', dpd: 'DPD' }[t] || 'Bordereau';
+  const nomT = { mondialrelay: 'Mondial Relay', international: 'Mondial Relay international', chronopost: 'Chronopost', colissimo: 'Colissimo', vintedgo: 'Vinted Go', relaiscolis: 'Relais Colis', ups: 'UPS', dpd: 'DPD', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire Collective', retour: 'Retour' }[t] || 'Bordereau';
   return {
     cle: `${t}·${format}·${sens}${r ? '·r' + r : ''}${isole ? '·th' : ''}`,
     nom: `${nomT} ${format.replace('x', '×')}${isole ? ' thermique' : ''}${sens === 'paysage' ? ' paysage' : ''}${r ? ' tourné' : ''}`,
   };
 };
 // La préférence SYNCHRONISÉE (SYNC_KEYS) : { [forme]: { vx, vy, vw, v, at } }.
-const TAMPON_POSITIONS = 'vrm_tampon_positions';
-const positionsTampon = () => { try { const m = typeof load === 'function' ? load(TAMPON_POSITIONS, {}) : {}; return m && typeof m === 'object' ? m : {}; } catch (_) { return {}; } };
+// (16 nov., lot tampons-parametres) LE réglage des tampons : `vrm_tampons` (src/impression/tampons.js, SYNC_KEYS),
+// lu à CHAQUE impression (Tout imprimer, une vente, Leboncoin, Vestiaire, l'équipe, les retours) et écrit par
+// Paramètres → Imprimante → « Tampons des bordereaux ». Tant qu'il n'a jamais été écrit, ses choix d'avant
+// (`vrm_impression.tamponA4/Th`, `vrm_tampon_positions`) sont repris TELS QUELS (migration à la lecture).
+const TAMPON_POSITIONS = 'vrm_tampon_positions';   // l'ancienne clé : lue par la migration seulement
+const reglageTamponsChoisi = () => { try { return reglageTampons(load(CLE_TAMPONS, null), { impression: load(CLE_IMPRESSION, null), positions: load(TAMPON_POSITIONS, null) }); } catch (_) { return reglageTampons(null); } };
+const ecrireReglageTampons = (r) => { const x = aEcrire(r); if (typeof save === 'function') save(CLE_TAMPONS, x); try { window.dispatchEvent(new CustomEvent('vrm:tampons', { detail: x })); } catch (_) {} return x; };
 // La position mémorisée d'une forme (ou null : le choix automatique). C'est
 // aussi ce que « Tout imprimer » appelle pour chaque bordereau du lot.
-const positionTampon = (forme) => { const p = positionsTampon()[forme && forme.cle != null ? forme.cle : forme]; return choixTamponValide(p) ? { vx: p.vx, vy: p.vy, vw: p.vw, v: p.v | 0 } : null; };
-const memoriserPositionTampon = (cle, choix) => { if (typeof save !== 'function') return; const m = { ...positionsTampon() }; if (choix && choixTamponValide(choix)) m[cle] = { vx: +choix.vx.toFixed(5), vy: +choix.vy.toFixed(5), vw: +choix.vw.toFixed(5), v: choix.v | 0, at: new Date().toISOString() }; else delete m[cle]; save(TAMPON_POSITIONS, m); };
+const positionTampon = (forme) => { const p = placesDeForme(reglageTamponsChoisi(), forme && forme.cle != null ? forme.cle : forme).n; return choixTamponValide(p) ? { vx: p.vx, vy: p.vy, vw: p.vw, v: p.v | 0 } : null; };
+const memoriserPositionTampon = (cle, choix) => { ecrireReglageTampons(avecPlace(reglageTamponsChoisi(), cle, 'n', choix && choixTamponValide(choix) ? choix : null)); };
 // Les codes-barres et QR de la page RENDUE (pour une puce, jamais un refus) :
 // cases de 6 pt où l'encre couvre 28 à 80 % avec des alternances serrées
 // (barres ou modules : ≥ 0,25 par point, lignes et colonnes ensemble), regroupées ; un groupe de moins de 24×12 pt est écarté
@@ -14046,42 +14134,70 @@ const ajouterFichePreparation = async (PL, pdf, bold, reg, { numero = '', titre 
 // affichée), jamais sous le tampon ; `fiche` : en thermique, { actif, W, H, … } — sans place sûre,
 // la fiche de préparation (actif) ou RIEN de tamponné (mode 'aucun', dit), jamais la fiche
 // 10×15 d'une A4 ; `th` : la mention en noir fin autour de l'étiquette (`poserMentionVrm`).
-const tamponnerBordereau = async (PL, pdf, { numero, titre, thermique = false, choix = null, bloques = [], fiche = null, th = null } = {}) => {
+// (16 nov., lot tampons-parametres) `tampon` : ce que `vrm_tampons` dit pour CE bordereau (`resoudreTampon`) —
+// { k (taille S/M/L du cartouche), place ('auto' ou une place rapide), mention (bool), kMention, placeMention
+// ('qr' par défaut : au-dessus du QR), libreMention ({ vx, vy } posée à la main), adresses / cadre (page A4) }.
+// GARDE-FOU INVIOLABLE : ni le cartouche ni la mention ne recouvrent un code-barres, un QR (zone de silence
+// comprise) ou une adresse repérée — une place posée à la main qui chevauche est REPOUSSÉE à la place libre la
+// plus proche (`repousse: true`, l'écran le dit). Rend aussi `mentionBoite`, `interdits`, `codes` (l'éditeur
+// de Paramètres les dessine, le banc les juge).
+const tamponnerBordereau = async (PL, pdf, { numero, titre, thermique = false, choix = null, bloques = [], fiche = null, th = null, tampon = null } = {}) => {
   const n = String(numero == null ? '' : numero).trim(), t = String(titre == null ? '' : titre).trim();
-  if (!n && !t) return { mode: 'rien', raison: '' };
+  const T = tampon || {}, veutMention = T.mention !== false;
+  if (!n && !t && !veutMention) return { mode: 'rien', raison: '' };
   const bold = await pdf.embedFont(PL.StandardFonts.HelveticaBold), reg = await pdf.embedFont(PL.StandardFonts.Helvetica);
-  if (choixTamponValide(choix)) {
-    const page = pdf.getPages()[0], pl = placeLibreTampon(page, bold, reg, n, t, choix);
+  const page = pdf.getPages()[0], { w: W0, h: H0 } = tailleAffichee(page);
+  let rendu = null, renduErr = null; try { rendu = await rendrePremierePage(pdf); } catch (e) { renduErr = e; }
+  const adresses = [...((th && th.adresses) || []), ...(T.adresses || [])];
+  const zi = rendu ? zonesInterditesTampon(rendu, adresses) : { codes: [], interdits: adresses.map((a) => ({ ...a, quoi: 'adresse' })) };
+  const interdits = [...zi.interdits, ...(bloques || []).map((z) => ({ ...z, quoi: z.quoi || 'bloque' }))];
+  const cadre = (th && th.boite) || T.cadre || null;
+  // (La mention garde la zone de silence MESURÉE de chaque QR, pas les 5 mm forfaitaires du cartouche.)
+  const interditsM = [...zi.interdits, ...(bloques || []).filter((z) => z.quoi !== 'code')];
+  const mentionO = { th: !!th, marge: th && th.marge, k: T.kMention, place: T.placeMention, libre: T.libreMention, codes: zi.codes, interdits: interditsM, cadre, adresses };
+  const fin = (r, mb) => ({ ...r, mention: !!mb, mentionBoite: mb || null, interdits, codes: zi.codes });
+  // ① Le cartouche posé À LA MAIN : à sa place (fond blanc dessous, même sur du texte — son choix), repoussé hors
+  // des codes, des QR et de l'adresse ; la mention vient ensuite, à côté de lui.
+  if ((n || t) && choixTamponValide(choix)) {
+    const pl = placeLibreTampon(page, bold, reg, n, t, choix);
     if (pl) {
-      let rendu = null; try { rendu = await rendrePremierePage(pdf); } catch (_) {}
-      const place = { x: pl.x, y: pl.y, w: pl.c.w * pl.k, h: pl.c.h * pl.k };
-      ecrireCartouche(PL, page, pl.c, pl.x, pl.y, pl.k, true);
-      return { mode: 'libre', raison: '', place, mention: poserMentionVrm(PL, pdf, reg, rendu, place, th) };
+      const w = pl.c.w * pl.k, h = pl.c.h * pl.k, p = repousserHorsInterdits({ x: pl.x, y: pl.y, w, h }, interdits, W0, H0);
+      if (p) {
+        const place = { x: p.x, y: p.y, w, h };
+        ecrireCartouche(PL, page, pl.c, p.x, p.y, pl.k, true);
+        const mb = veutMention ? poserMentionVrm(PL, pdf, reg, rendu, { ...mentionO, evite: place }) : null;
+        return fin({ mode: 'libre', raison: '', place, repousse: p.repousse }, mb);
+      }
     }
   }
+  // ② La mention d'abord (sa place est la décision de Julien : au-dessus du QR), puis le cartouche dans une zone
+  // blanche hors d'elle, hors des codes et de l'adresse.
+  const mb = veutMention ? poserMentionVrm(PL, pdf, reg, rendu, mentionO) : null;
+  if (!n && !t) return fin({ mode: 'rien', raison: '' }, mb);
   let raison = '';
   try {
-    const rendu = await rendrePremierePage(pdf);
-    const place = await chercherPlaceTampon(pdf, bold, reg, n, t, rendu, bloques);
-    if (place) { const boite = { x: place.x, y: place.y, w: place.c.w, h: place.c.h }; ecrireCartouche(PL, pdf.getPages()[0], place.c, place.x, place.y); return { mode: 'blanc', raison: '', place: boite, mention: poserMentionVrm(PL, pdf, reg, rendu, boite, th) }; }
+    if (!rendu) throw renduErr || Error('rendu');
+    const bl = [...interdits, ...(mb ? [elargir(mb, 4 * MM_M)] : [])];
+    const place = await chercherPlaceTampon(pdf, bold, reg, n, t, rendu, bl, { k: T.k, place: T.place });
+    if (place) { const boite = { x: place.x, y: place.y, w: place.c.w, h: place.c.h }; ecrireCartouche(PL, page, place.c, place.x, place.y); return fin({ mode: 'blanc', raison: '', place: boite }, mb); }
     raison = (bloques || []).length ? 'aucune place sûre (hors codes et adresses)' : 'aucun espace libre sur la page';
   } catch (e) {
     raison = 'aperçu du PDF indisponible (' + String((e && e.message) || e).slice(0, 60) + ')';
   }
-  const { w, h } = tailleAffichee(pdf.getPages()[0]);
+  const { w, h } = { w: W0, h: H0 };
   const BANDE_PERMISE = false;
   const tientA4 = (a, b) => (a <= A4_PT.w + 1 && b <= A4_PT.h + 1) || (a <= A4_PT.h + 1 && b <= A4_PT.w + 1);
   // (3 nov.) BANDE COUPÉE : le 28 oct. Julien a « explicitement refusé une bande ajoutée » (passation 2026-10-28). Sans zone libre, c'est la fiche colis qui suit l'étiquette. Rallumer seulement sur sa demande.
   if (BANDE_PERMISE && !thermique && tientA4(w, h + TAMPON.bande)) {
-    try { if (await pageAvecBande(PL, pdf, bold, reg, n, t)) return { mode: 'bande', raison }; } catch (_) {}
+    try { if (await pageAvecBande(PL, pdf, bold, reg, n, t)) return fin({ mode: 'bande', raison }, mb); } catch (_) {}
   }
   if (thermique && fiche) {
-    if (!fiche.actif) return { mode: 'aucun', raison };
+    if (!fiche.actif) return fin({ mode: 'aucun', raison }, mb);
     await ajouterFichePreparation(PL, pdf, bold, reg, { numero: n, titre: fiche.titre != null ? fiche.titre : t, taille: fiche.taille, photo: fiche.photo, emplacement: fiche.emplacement, W: fiche.W, H: fiche.H });
-    return { mode: 'fiche', raison };
+    return fin({ mode: 'fiche', raison }, mb);
   }
   ajouterFicheColis(PL, pdf, bold, reg, n, t);
-  return { mode: 'fiche', raison };
+  return fin({ mode: 'fiche', raison }, mb);
 };
 // ── IMPRIMANTE NORMALE OU THERMIQUE ─────────────────────────────────────────
 // Demande de Julien, 15 septembre : « il y a des personnes qui font simplement
@@ -14571,9 +14687,12 @@ const poserEtiquettesThermiques = async (PL, out, page, z, numero, bold, titre =
     if (!a) { etiquettes.push({ x: r.x, y: r.y, w: r.w, h: r.h, sens: r.sens, codes: null }); continue; }
     for (const e of a.etiquettes) etiquettes.push({ ...e, sens: a.coupe ? avecSens({ ok: true, ...e }, textes).sens : r.sens });
   }
-  let k = 0;
+  let k = 0; const poses = [];
+  // (16 nov., lot tampons-parametres) Ce que le tampon écrit : les cases de `vrm_tampons` (N° seul par défaut en
+  // thermique), ou le tampon choisi pour CE bordereau dans la feuille d'après (`imp.tampon`).
+  const ts = (imp && imp.ts) || resoudreTampon(reglageTamponsChoisi(), { famille: (imp && imp.famille) || 'autre', thermique: true });
   for (const e of etiquettes) {
-    const contenu = contenuTampon(reg.tamponTh, { numero: n, titre, taille: imp && imp.taille });
+    const contenu = texteDuCartouche(ts.contenu, { numero: n, titre, taille: imp && imp.taille });
     const bande = papier.continu && (contenu.numero || contenu.titre) ? BANDE_CONTINU_MM * MM_PT : 0;
     let { d, pl } = await composerEtiquette(PL, page, e, e.sens, papier, bande);
     let rendu = null, noir = false;
@@ -14586,66 +14705,51 @@ const poserEtiquettesThermiques = async (PL, out, page, z, numero, bold, titre =
     const dansE = (o) => { const cx = (o.x + o.X) / 2, cy = (o.y + o.Y) / 2; return cx > e.x && cx < e.x + e.w && cy > e.y && cy < e.y + e.h; };
     const clip = (q) => { const x = Math.max(e.x, q.x), y = Math.max(e.y, q.y), X = Math.min(e.x + e.w, q.x + q.w), Y = Math.min(e.y + e.h, q.y + q.h); return X > x && Y > y ? { x, y, w: X - x, h: Y - y } : null; };
     const adresses = zonesAdresse(textes.filter(dansE)).map(clip).filter(Boolean).map((q) => versPapier(e, pl, q));
-    const bloques = [...codes.map((c) => elargir(c.boite, MENTION.codes)), ...adresses];
+    const bloques = [...codes.map((c) => ({ ...elargir(c.boite, MENTION.codes), quoi: 'code' })), ...adresses.map((a) => ({ ...a, quoi: 'adresse' }))];
     const boiteAff = { x: pl.boite.x, y: pl.H - pl.boite.y - pl.boite.h, w: pl.boite.w, h: pl.boite.h };
-    const choix = choisir ? await choisir(d, { isole: true, k }) : null;
+    const td = tamponDePage({ ...(imp || {}), ts }, d.getPages()[0], true);
+    const choix = choisir ? await choisir(d, { isole: true, k }) : td.libreN;
     const fiche = { actif: reg.fiche, W: pl.W, H: papier.continu ? Math.max(pl.W * 1.45, 60 * MM_PT) : pl.H, titre, taille: imp && imp.taille, photo: imp && imp.photo, emplacement: imp && imp.emplacement };
-    const t = await tamponnerBordereau(PL, d, { numero: contenu.numero, titre: contenu.titre, thermique: true, choix, bloques, fiche, th: { boite: boiteAff, bloques, marge: papier.marge * MM_PT } });
+    const t = await tamponnerBordereau(PL, d, { numero: contenu.numero, titre: contenu.titre, thermique: true, choix, bloques, fiche, th: { boite: boiteAff, bloques, adresses, marge: papier.marge * MM_PT }, tampon: td.tampon });
     modes.push(t.mode);
     const mms = codes.map((c) => c.mm).filter((x) => x != null);
     details.push({ mode: t.mode, raison: t.raison || '', echelle: pl.s, tourne: pl.tourne, noir, W: pl.W, H: pl.H, codes: codes.length, retrouves,
       moduleMm: mms.length ? Math.min(...mms) : null, fins: codes.filter((c) => !codeAssezGros(c.mm)).length, mention: !!t.mention, place: t.place || null, boite: boiteAff, bloques });
+    poses.push({ page: out.getPageCount(), cle: td.cle, W: pl.W, H: pl.H, mode: t.mode, place: t.place || null, mentionBoite: t.mentionBoite, interdits: t.interdits, codes: t.codes, repousse: !!t.repousse, libre: !!choix });
     (await out.copyPages(d, d.getPageIndices())).forEach((p) => out.addPage(p));
     k++;
   }
-  return { k, modes, details };
+  return { k, modes, details, poses };
 };
-// LE réglage d'imprimante, lu au moment d'imprimer (§11 : un seul réglage
-// `vrm_imprimante`, que Colis et Réglages écrivent tous les deux).
-const imprimanteChoisie = () => imprMode(load('vrm_imprimante', 'normale'));
-// UN bordereau posé dans `out`, la même règle pour les trois chemins
-// d'impression (une vente, un lot, Leboncoin) :
-//   thermique + étiquette reconnue ⇒ une page du papier choisi par étiquette (et
-//   les pages suivantes du PDF, une déclaration en douane par exemple, telles
-//   quelles) ; (11 nov.) une A4 à 2 ou 4 étiquettes que `zoneEtiquette` ne sait
-//   pas lire est découpée d'après l'encre et les codes (`analyserZone`) ;
-//   sinon ⇒ page originale, tamponnée par `tamponnerBordereau` (zone libre,
-//   sinon fiche colis — jamais un refus).
-// Rend `{ isole, etiquettes, raison, tampons, details }` — l'écran dit ce qui a vraiment été fait.
-// `choisir(doc, { isole, k })` (facultatif) : rend la place choisie à la main
-// pour la page 1 de `doc` (aperçu ou position mémorisée de sa forme), sinon null.
-// `impression` (facultatif) : { reg, taille, photo, emplacement } — sans `reg`, le réglage
-// synchronisé (`vrm_impression`) ; c'est lui qui dit ce que le tampon écrit (A4 et thermique).
-const poserBordereau = async (PL, out, src, { numero, title, pos, thermique, choisir = null, impression = null }) => {
-  const { StandardFonts } = PL;
-  const reg = (impression && impression.reg) || reglageImpressionChoisi(), imp = { ...(impression || {}), reg };
-  const first = src.getPages()[0];
-  let z = thermique ? zoneEtiquette(PL, first) : { ok: false };
-  // Pas su, ou une zone qui ne fait qu'un QUART de la feuille (le cadre d'UNE des étiquettes
-  // d'une A4 à 2 ou 4) : la feuille entière est découpée d'après l'encre et les codes.
-  if (thermique && (!z.ok || (z.via !== 'page' && z.part != null && z.part < 0.4 && !(z.etiquettes && z.etiquettes.length > 1)))) {
-    try {
-      const { width: W, height: H } = first.getSize();
-      const a = await analyserZone(PL, first, { x: 0, y: 0, w: W, h: H }, { decouper: true });
-      if (a && a.coupe) { const tx = textesDePage(PL, first); z = { ok: true, x: 0, y: 0, w: W, h: H, via: 'encre', etiquettes: a.etiquettes.map((e) => ({ ...e, sens: avecSens({ ok: true, ...e }, tx).sens })) }; }
-    } catch (_) {}
-  }
-  if (thermique && z.ok) {
-    if (!out.__vrmGras) out.__vrmGras = await out.embedFont(StandardFonts.HelveticaBold);
-    const { k: n, modes, details } = await poserEtiquettesThermiques(PL, out, first, z, numero, out.__vrmGras, title, choisir, imp);
-    const reste = src.getPageIndices().slice(1);
-    if (reste.length) (await out.copyPages(src, reste)).forEach((p) => out.addPage(p));
-    return { isole: true, etiquettes: n, raison: '', tampons: modes, details };
-  }
-  // Page entière (A4 normale, ou thermique sans étiquette repérée) : le même
-  // tampon ; ce qu'il écrit est SON choix (`tamponA4`, ou `tamponTh` en thermique).
-  const contenu = contenuTampon(thermique ? reg.tamponTh : reg.tamponA4, { numero, titre: title, taille: imp.taille });
-  const choix = pos || (choisir ? await choisir(src, { isole: false, k: 0 }) : null);
-  const t = await tamponnerBordereau(PL, src, { numero: contenu.numero, titre: contenu.titre, thermique, choix });
-  (await out.copyPages(src, src.getPageIndices())).forEach((p) => out.addPage(p));
-  return { isole: false, etiquettes: 0, raison: thermique ? (z.raison || 'mise en page inconnue') : '', tampons: [t.mode], details: [] };
+// (16 nov., lot tampons-parametres) Ce que `vrm_tampons` dit pour UNE page tamponnée : la clé de SA forme (type ·
+// format · sens [· tourné] [· thermique]), le cartouche posé à la main pour elle (ou null : la place auto), et le
+// tampon à passer à `tamponnerBordereau` (taille, place rapide, mention et sa place). `imp.ts` : `resoudreTampon`.
+const tamponDePage = (imp, page, isole) => {
+  // (16 nov.) `imp.places` : les places posées dans l'aperçu AVANT impression pour CE bordereau (elles priment).
+  const ts = imp.ts, cle = formeTampon(ts.famille, page, isole).cle, pf = placesDeForme(imp.tampons || reglageTamponsChoisi(), cle);
+  const pi = imp.places || {}, pl = { n: pi.n !== undefined ? pi.n : pf.n, m: pi.m !== undefined ? pi.m : pf.m };
+  return { cle, libreN: choixTamponValide(pl.n) ? pl.n : null,
+    tampon: { k: ts.k, place: ts.place, mention: !!(ts.contenu && ts.contenu.mention), kMention: ts.kMention, placeMention: ts.placeMention, libreMention: pl.m || null } };
 };
-// ⟦→ ecrans/Reglages.jsx #25⟧
+// Le tampon d'une page tamponnée HORS de `poserBordereau` (retour d'achat, l'aide de l'équipe) : la même règle.
+const tamponPourPage = (PL, pdf, { famille = '', thermique = false } = {}) => {
+  let f = famille; if (!f) { let ty = 'autre'; try { ty = typeBordereau(PL, pdf).type; } catch (_) {} f = familleDe({ type: ty }); }
+  const imp = { tampons: reglageTamponsChoisi() }; imp.ts = resoudreTampon(imp.tampons, { famille: f, thermique });
+  const page = pdf.getPages()[0], td = tamponDePage(imp, page, false), geo = geoPageA4(PL, page);
+  return { famille: f, contenu: imp.ts.contenu, choix: td.libreN, tampon: { ...td.tampon, adresses: geo.adresses, cadre: geo.cadre } };
+};
+// L'étiquette et les adresses d'une page A4, sur la page AFFICHÉE (rotation comprise) : la mention se centre sur
+// l'étiquette, sous l'adresse ; le cartouche et la mention n'y vont jamais.
+const geoPageA4 = (PL, page) => {
+  const b = page.getCropBox(), r = rotationPage(page);
+  const aff = (q) => { const a = versAffiche(b, r, q.x, q.y), c = versAffiche(b, r, q.x + q.w, q.y + q.h); return { x: Math.min(a.x, c.x), y: Math.min(a.y, c.y), w: Math.abs(c.x - a.x), h: Math.abs(c.y - a.y) }; };
+  let adresses = [], cadre = null;
+  try { adresses = zonesAdresse(textesDePage(PL, page)).map(aff); } catch (_) { adresses = []; }
+  try { const z = zoneEtiquette(PL, page); if (z && z.ok && z.via !== 'page') cadre = aff(z); } catch (_) { cadre = null; }
+  return { adresses, cadre };
+};
+// Le TYPE d'un bordereau (le transporteur lu sur la page), pour l'aperçu de Réglages ET (16 nov.) pour le
+// réglage des tampons : une exception « seulement Mondial Relay » se pose sur ce type.
 const typeBordereau = (PL, doc) => {
   try {
     const page = doc.getPages()[0], ctx = doc.context, out = [];
@@ -14674,6 +14778,61 @@ const typeBordereau = (PL, doc) => {
     return { type: t || 'autre', cle: `${t || 'autre'}·${sens}`, sens, W, H };
   } catch (_) { return { type: 'autre', cle: 'autre·?', sens: '?', W: 0, H: 0 }; }
 };
+// LE réglage d'imprimante, lu au moment d'imprimer (§11 : un seul réglage
+// `vrm_imprimante`, que Colis et Réglages écrivent tous les deux).
+const imprimanteChoisie = () => imprMode(load('vrm_imprimante', 'normale'));
+// UN bordereau posé dans `out`, la même règle pour les trois chemins
+// d'impression (une vente, un lot, Leboncoin) :
+//   thermique + étiquette reconnue ⇒ une page du papier choisi par étiquette (et
+//   les pages suivantes du PDF, une déclaration en douane par exemple, telles
+//   quelles) ; (11 nov.) une A4 à 2 ou 4 étiquettes que `zoneEtiquette` ne sait
+//   pas lire est découpée d'après l'encre et les codes (`analyserZone`) ;
+//   sinon ⇒ page originale, tamponnée par `tamponnerBordereau` (zone libre,
+//   sinon fiche colis — jamais un refus).
+// Rend `{ isole, etiquettes, raison, tampons, details }` — l'écran dit ce qui a vraiment été fait.
+// `choisir(doc, { isole, k })` (facultatif) : rend la place choisie à la main
+// pour la page 1 de `doc` (aperçu ou position mémorisée de sa forme), sinon null.
+// `impression` (facultatif) : { reg, taille, photo, emplacement } — sans `reg`, le réglage
+// synchronisé (`vrm_impression`) ; c'est lui qui dit ce que le tampon écrit (A4 et thermique).
+const poserBordereau = async (PL, out, src, { numero, title, pos, thermique, choisir = null, impression = null }) => {
+  const { StandardFonts } = PL;
+  const reg = (impression && impression.reg) || reglageImpressionChoisi(), imp = { ...(impression || {}), reg };
+  const first = src.getPages()[0];
+  // (16 nov., lot tampons-parametres) LE réglage des tampons, pour CE bordereau : son type (retour · Leboncoin ·
+  // Vestiaire · le transporteur lu sur la page), le réglage « pour tous » ou l'exception de son type.
+  imp.tampons = (impression && impression.tampons) || reglageTamponsChoisi();
+  if (!imp.famille) { let ty = 'autre'; try { ty = typeBordereau(PL, src).type; } catch (_) {} imp.famille = familleDe({ retour: !!imp.retour, site: imp.site, type: ty }); }
+  imp.ts = resoudreTampon(imp.tampons, { famille: imp.famille, thermique: !!thermique });
+  { const c = imp.tampon ? contenuDuMode(imp.tampon) : null; if (c) imp.ts = { ...imp.ts, contenu: c }; }
+  let z = thermique ? zoneEtiquette(PL, first) : { ok: false };
+  // Pas su, ou une zone qui ne fait qu'un QUART de la feuille (le cadre d'UNE des étiquettes
+  // d'une A4 à 2 ou 4) : la feuille entière est découpée d'après l'encre et les codes.
+  if (thermique && (!z.ok || (z.via !== 'page' && z.part != null && z.part < 0.4 && !(z.etiquettes && z.etiquettes.length > 1)))) {
+    try {
+      const { width: W, height: H } = first.getSize();
+      const a = await analyserZone(PL, first, { x: 0, y: 0, w: W, h: H }, { decouper: true });
+      if (a && a.coupe) { const tx = textesDePage(PL, first); z = { ok: true, x: 0, y: 0, w: W, h: H, via: 'encre', etiquettes: a.etiquettes.map((e) => ({ ...e, sens: avecSens({ ok: true, ...e }, tx).sens })) }; }
+    } catch (_) {}
+  }
+  if (thermique && z.ok) {
+    if (!out.__vrmGras) out.__vrmGras = await out.embedFont(StandardFonts.HelveticaBold);
+    const { k: n, modes, details, poses } = await poserEtiquettesThermiques(PL, out, first, z, numero, out.__vrmGras, title, choisir, imp);
+    const reste = src.getPageIndices().slice(1);
+    if (reste.length) (await out.copyPages(src, reste)).forEach((p) => out.addPage(p));
+    return { isole: true, etiquettes: n, raison: '', tampons: modes, details, poses, famille: imp.famille };
+  }
+  // Page entière (A4 normale, ou thermique sans étiquette repérée) : le même
+  // tampon ; ce qu'il écrit est SON choix (`tamponA4`, ou `tamponTh` en thermique).
+  const contenu = texteDuCartouche(imp.ts.contenu, { numero, titre: title, taille: imp.taille });
+  const td = tamponDePage(imp, first, false), geo = geoPageA4(PL, first);
+  const choix = pos || (choisir ? await choisir(src, { isole: false, k: 0 }) : td.libreN);
+  const t = await tamponnerBordereau(PL, src, { numero: contenu.numero, titre: contenu.titre, thermique, choix, tampon: { ...td.tampon, adresses: geo.adresses, cadre: geo.cadre } });
+  const { w: Wa, h: Ha } = tailleAffichee(src.getPages()[0]);
+  const pose = { page: out.getPageCount(), cle: td.cle, W: Wa, H: Ha, mode: t.mode, place: t.place || null, mentionBoite: t.mentionBoite || null, interdits: t.interdits || [], codes: t.codes || [], repousse: !!t.repousse, libre: !!choix };
+  (await out.copyPages(src, src.getPageIndices())).forEach((p) => out.addPage(p));
+  return { isole: false, etiquettes: 0, raison: thermique ? (z.raison || 'mise en page inconnue') : '', tampons: [t.mode], details: [], poses: [pose], famille: imp.famille };
+};
+// ⟦→ ecrans/Reglages.jsx #25⟧
 // ⟦→ ecrans/Reglages.jsx #26⟧
 
 // ── OÙ POSER LE TAMPON DE CETTE IMPRESSION (3 nov., soir) ───────────────────
@@ -14689,13 +14848,16 @@ const demanderPlacementTampon = (o) => new Promise((resolve) => { if (!_placeurT
 // bordereaux suivants de la même forme (le premier de chaque forme est celui qu'on montre).
 // (11 nov., lot thermique) `thermique` : l'aperçu de placement montre ce que le tampon ÉCRIRA
 // (`contenuTampon` du réglage : N° seul par défaut en thermique, rien ⇒ aucun aperçu).
-const choisirTampon = ({ PL, src, numero, titre, apercu = true, deja = {}, thermique = false }) => {
+// (16 nov., lot tampons-parametres) `site` / `retour` : le type du réglage des tampons (Leboncoin, Vestiaire, un
+// retour) ; ce que le tampon écrit et la place gardée viennent de `vrm_tampons` (`reglageTamponsChoisi`).
+const choisirTampon = ({ PL, src, numero, titre, apercu = true, deja = {}, thermique = false, site = '', retour = false }) => {
   let type = 'autre'; try { type = typeBordereau(PL, src).type; } catch (_) {}
+  const famille = familleDe({ retour, site, type });
   return async (doc, info = {}) => {
-    const forme = formeTampon(type, doc.getPages()[0], !!info.isole);
+    const forme = formeTampon(famille, doc.getPages()[0], !!info.isole);
     if (forme.cle in deja) return deja[forme.cle];
     let choix = positionTampon(forme.cle);
-    const rg = reglageImpressionChoisi(), ct = contenuTampon(thermique ? rg.tamponTh : rg.tamponA4, { numero, titre });
+    const ts = resoudreTampon(reglageTamponsChoisi(), { famille, thermique }), ct = texteDuCartouche(ts.contenu, { numero, titre });
     const n = String(ct.numero == null ? '' : ct.numero).trim(), t = String(ct.titre == null ? '' : ct.titre).trim();
     if ((n || t) && (apercu === 'force' || (apercu && !choix)) && _placeurTampon) {
       libererOngletPdf();
@@ -14980,8 +15142,8 @@ const annotateAndDownloadBordereauBrut = async (numero, title, pdfArrayBuffer, p
   const thermique = imprMode(opts.imprimante || imprimanteChoisie()) === 'thermique';
   const src = await PDFDocument.load(pdfArrayBuffer);
   const pdf = await PDFDocument.create();
-  const choisir = choisirTampon({ PL, src, numero, titre: title, apercu: opts.apercu === undefined ? true : opts.apercu, thermique });
-  const r0 = await poserBordereau(PL, pdf, src, { numero, title, pos, thermique, choisir, impression: extrasImpression(numero, title, opts.extra || {}) });
+  const choisir = choisirTampon({ PL, src, numero, titre: title, apercu: opts.apercu === undefined ? true : opts.apercu, thermique, site: opts.site || '' });
+  const r0 = await poserBordereau(PL, pdf, src, { numero, title, pos, thermique, choisir, impression: { ...extrasImpression(numero, title, opts.extra || {}), site: opts.site || '' } });
   const hasNum = numero != null && String(numero).trim() !== '';
   posePrefsImpression(PL, pdf);
   const bytes = await pdf.save();
@@ -15040,8 +15202,10 @@ const composerBordereaux = async (items, resolvePos, opts = {}) => {
       // (14 nov., Julien : « modifier un par un chaque bordereau avec le tamponnage ») le tampon choisi pour CE
       // bordereau dans l'aperçu (`it.tampon` : N° seul, N° + titre, + taille, rien) remplace le réglage, pour lui seul.
       const impIt = extrasImpression(it.numero, it.title, { photo: it.photo || (it.ligne && it.ligne.photo) || null });
-      if (it.tampon && TAMPONS_IMPR.includes(it.tampon)) { const rg0 = reglageImpressionChoisi(); impIt.reg = { ...rg0, tamponA4: it.tampon, tamponTh: it.tampon }; }
-      const r1 = await poserBordereau(PL, out, src, { numero: it.numero, title: it.title, pos, thermique, impression: impIt, choisir: it.tampon === 'rien' ? null : choisirTampon({ PL, src, numero: it.numero, titre: it.title, apercu: opts.apercu === undefined ? false : opts.apercu, deja: dejaLot, thermique }) });
+      if (it.tampon && TAMPONS_IMPR.includes(it.tampon)) impIt.tampon = it.tampon;
+      impIt.site = it.site || '';
+      if (it.places) impIt.places = it.places;   // (16 nov.) les places posées dans l'aperçu avant impression
+      const r1 = await poserBordereau(PL, out, src, { numero: it.numero, title: it.title, pos, thermique, impression: impIt, choisir: it.tampon === 'rien' ? null : choisirTampon({ PL, src, numero: it.numero, titre: it.title, apercu: opts.apercu === undefined ? false : opts.apercu, deja: dejaLot, thermique, site: it.site || '' }) });
       for (const t of r1.tampons || []) { if (t === 'fiche') fiches++; else if (t === 'bande') bandes++; }
       details.push(...(r1.details || []));
       if (r1.isole) { isoles++; nEtiquettes += r1.etiquettes; }
@@ -15051,7 +15215,7 @@ const composerBordereaux = async (items, resolvePos, opts = {}) => {
       if (it.invBytes) {
         try { const isrc = await PDFDocument.load(it.invBytes); (await out.copyPages(isrc, isrc.getPageIndices())).forEach(p => out.addPage(p)); nInv++; } catch (_) {}
       }
-      plages.push({ index, cle: it.cle != null ? String(it.cle) : String(index), debut, n: out.getPageCount() - debut });
+      plages.push({ index, cle: it.cle != null ? String(it.cle) : String(index), debut, n: out.getPageCount() - debut, poses: r1.poses || [], famille: r1.famille || '' });
     } catch (e) {
       if (estTamponAnnule(e)) throw e;
       // Un bordereau qui casse en route ne laisse aucune page à moitié posée dans le lot.
@@ -27181,7 +27345,7 @@ async function imprimerBordereauVc({ bordId, num, titre, venteId, original = fal
       const r={url,filename:'bordereau-vestiaire-original.pdf',ouvert:ouvrirPdfOnglet(url,'bordereau-vestiaire-original.pdf','Bordereau Vestiaire · original sans tampon')};
       return{etat:'ok',r};
     }
-    const r=await annotateAndDownloadBordereau(num||'',titre||'',bytes,null,{avantOuverture:verifier});
+    const r=await annotateAndDownloadBordereau(num||'',titre||'',bytes,null,{avantOuverture:verifier,site:'vestiaire'});
     verifier();if(venteId)marquerVc('vrm_vc_imprimes',venteId,true);
     return{etat:'ok',r};
   }catch(e){libererOngletPdf();if(estTamponAnnule(e))return{etat:'annule'};return{etat:'refus',texte:String(e?.message||e)};}
@@ -43034,7 +43198,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (!lu || !lu.octets) return null;
       const PL = await import('pdf-lib');
       const pdf = await PL.PDFDocument.load(lu.octets);
-      const t = await tamponnerBordereau(PL, pdf, { numero: c.num || '', titre: `RETOUR · ${String(c.titre || '').replace(/\s+/g, ' ').trim()}`.slice(0, 90) });
+      // (16 nov., lot tampons-parametres) Le RETOUR reste toujours marqué « RETOUR » ; sa taille, sa place et la mention
+      // suivent `vrm_tampons` (type « retour »), comme toute impression.
+      const tp = tamponPourPage(PL, pdf, { famille: 'retour' });
+      const t = await tamponnerBordereau(PL, pdf, { numero: c.num || '', titre: `RETOUR · ${String(c.titre || '').replace(/\s+/g, ' ').trim()}`.slice(0, 90), choix: tp.choix, tampon: tp.tampon });
       posePrefsImpression(PL, pdf);
       const bytes = await pdf.save();
       const filename = `retour-${c.num ? 'N' + c.num + '-' : ''}${c.tx || 'vinted'}.pdf`;
@@ -46414,6 +46581,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // La garde du §5 reste : un N° « à vérifier » ou porté par deux fiches DEMANDE d'abord (`numerosDemandent`,
   // la même règle que `confirmerNumerosAVerifier`) — le PDF s'ouvre alors après sa réponse. Rien n'est caché :
   // un bordereau qui manque au PDF est NOMMÉ dans la feuille d'après, avec sa raison.
+  const [apercuImpr, setApercuImpr] = useState(null);   // (16 nov.) l'aperçu avant impression : { choisies, format, tampons, places, tous, sig }
+  const apercuRef = React.useRef(null); apercuRef.current = apercuImpr;
   const [imprEtat, setImprEtat] = useState(null);       // la feuille d'après : { res, sig, voie, etape, manque, corrige, absents, tamponCorrige }
   const [choixPapier, setChoixPapier] = useState(null); // { puis: null | [cles] } — la question du papier
   const imprAccRef = React.useRef(null);   // la pilule « pendant » de l'impression en cours (accompagner)
@@ -46456,13 +46625,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   // Composer UN lot : lire les octets, tamponner (jamais la feuille « Place du tampon » toute seule : la place
   // gardée, sinon la place automatique), mettre à la suite. Rien n'est ouvert ici.
-  const composerLot = async (lignes, format, tampons, { apercu = false, pas = null } = {}) => {
+  // (16 nov., lot tampons-parametres) `places` : { [cle]: { n, m } } posées dans l'aperçu avant impression.
+  const composerLot = async (lignes, format, tampons, { apercu = false, pas = null, places = null } = {}) => {
     const items = [], raisons = {};
     for (const [i, l] of lignes.entries()) {
       const o = await lireOctetsLigne(l);
       if (pas) pas(i + 1);
       if (!o.buf) { raisons[l.cle] = o.raison; continue; }
-      items.push({ numero: l.num || '', title: l.titre || '', pdfBuf: o.buf, invBytes: o.invBytes, cle: l.cle, site: l.site, ligne: l, tampon: TAMPONS_IMPR.includes((tampons || {})[l.cle]) ? tampons[l.cle] : null });
+      items.push({ numero: l.num || '', title: l.titre || '', pdfBuf: o.buf, invBytes: o.invBytes, cle: l.cle, site: l.site, ligne: l, tampon: TAMPONS_IMPR.includes((tampons || {})[l.cle]) ? tampons[l.cle] : null, places: places && places[l.cle] ? places[l.cle] : null });
     }
     if (!items.length) return { vide: true, raisons, lignes };
     const r = await composerBordereaux(items, (w, h) => posForFormat(w, h, false), { imprimante: format, apercu });
@@ -46473,7 +46643,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   // La signature compte AUSSI ce qui change le PDF hors des lignes : les places de tampon gardées (« Toujours ici ») et le
   // réglage d'impression (papier thermique, contenu du tampon) — un PDF préparé avant un de ces changements n'est plus le bon.
-  const empreinteReglagesImpr = () => { let h = 5381; const t = (() => { try { return JSON.stringify([positionsTampon(), reglageImpressionChoisi()]); } catch (_) { return ''; } })(); for (let i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0; return h.toString(36); };
+  const empreinteReglagesImpr = () => { let h = 5381; const t = (() => { try { return JSON.stringify([aEcrire(reglageTamponsChoisi()), reglageImpressionChoisi()]); } catch (_) { return ''; } })(); for (let i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0; return h.toString(36); };
   const sigImpr = (lignes, format, tampons) => `${AUTH.user?.id || ''}#${empreinteReglagesImpr()}#` + signatureLot({ lignes, sig: sigLigneLot, format, tampons });
   const preparer = (sig, fabrique) => {
     const m = prepsRef.current;
@@ -46548,6 +46718,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (isCloudReady() && !imprTouchee.current && formatRetenu(load('vrm_imprimante', null)) == null) { setChoixPapier({ puis: cles ? [...cles] : [] }); return; }
     lancerImpression(cles, formatLot);
   };
+  // (16 nov., lot tampons-parametres — Julien : « je sélectionne ce que je veux imprimer, et après ça m'ouvre une
+  // vignette […] le N° / le tamponnage je peux le régler là où je veux ; et quand je touche Imprimer, les réglages sont
+  // appliqués aux bordereaux ») LA SÉLECTION OUVRE L'APERÇU AVANT IMPRESSION : chaque bordereau choisi en vignette,
+  // tamponné par le vrai code ; il y déplace le N° ou la mention ; RIEN ne part avant « Imprimer » (`imprimerApercu`).
+  // Le PDF de l'aperçu est celui qui s'ouvre : sa signature compte les places posées (`sigAvecPlaces`).
+  const sigAvecPlaces = (sig, places) => (places && Object.keys(places).length ? `${sig}#places:${JSON.stringify(places)}` : sig);
   const lancerImpression = (cles, format, tampons = tamponsPerso) => {
     const L = lignesLotTous();
     const voulues = cles ? (cles instanceof Set ? cles : new Set(cles)) : null;
@@ -46555,14 +46731,48 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!choisies.length) { toast(tr('impr.rien')); return; }
     if (voulues) { const dispo = new Set(choisies.map((l) => l.cle)); const partis = [...voulues].filter((c) => !dispo.has(c)); if (partis.length) { toast(tr('impr.disparus', { n: partis.length })); return; } }
     const sig = sigImpr(choisies, format, tampons);
+    preparer(sig, () => composerLot(choisies, format, tampons));
+    setApercuImpr({ choisies, format, tampons, places: {}, tous: true, sig });
+  };
+  // « Imprimer » DE L'APERÇU : le PDF fait avec EXACTEMENT ces placements (prêt ⇒ ouvert dans le geste, §5 tenu).
+  const imprimerApercu = () => {
+    const a = apercuRef.current; if (!a || imprBusy) return;
+    const { choisies, format, tampons, places } = a;
+    const sig = sigAvecPlaces(sigImpr(choisies, format, tampons), places);
     const numeros = choisies.map((l) => l.num);
     const pret = pretPour(sig);
+    setApercuImpr(null);
     // Le chemin du geste : prêt, aucune question due (§5), version des N° relue il y a moins d'une minute.
     if (pret && !numerosDemandent(numeros) && (!numeros.some(Boolean) || versionFraiche())) {
       montrerApres(pret, ouvrirPdfLot(pret, { titre: tr('impr.titrePdf') }), sig);
       return;
     }
-    attendrePuisOuvrir(sig, choisies, numeros, () => composerLot(choisies, format, tampons, { pas: (f) => setImprBusy({ fait: f, total: choisies.length }) }));
+    attendrePuisOuvrir(sig, choisies, numeros, () => composerLot(choisies, format, tampons, { places, pas: (f) => setImprBusy({ fait: f, total: choisies.length }) }));
+  };
+  // Un tampon posé sur une vignette : pour CE bordereau (cette fois) et, « tous de ce type » coché, gardé pour la forme.
+  const poserApercu = (cle, quoi, b, pose, facteur = 1) => {
+    const a = apercuRef.current; if (!a) return;
+    const v = (pose.place && pose.place.v) || 0;
+    const place = quoi === 'n' ? { vx: b.x / pose.W, vy: b.y / pose.H, vw: Math.min(1, b.w / pose.W), v } : { vx: b.x / pose.W, vy: b.y / pose.H, vw: Math.min(1, b.w / pose.W) };
+    let tampons = a.tampons;
+    if (a.tous) {
+      let r = reglageTamponsChoisi();
+      if (quoi === 'm' && facteur !== 1) { const rs = resoudreTampon(r, { famille: (a.familles || {})[cle] || 'autre', thermique: imprMode(a.format) !== 'normale' }); const k = TAILLES_TAMPON[rs.texteMention] * facteur; r = avecChoix(r, 'tous', { texteMention: Object.keys(TAILLES_TAMPON).reduce((x, c) => (Math.abs(TAILLES_TAMPON[c] - k) < Math.abs(TAILLES_TAMPON[x] - k) ? c : x), 'M') }); }
+      ecrireReglageTampons(avecPlace(r, pose.cle, quoi, place));
+    }
+    const places = { ...a.places, [cle]: { ...(a.places[cle] || {}), [quoi]: place } };
+    const sig = sigAvecPlaces(sigImpr(a.choisies, a.format, tampons), places);
+    preparer(sig, () => composerLot(a.choisies, a.format, tampons, { places }));
+    setApercuImpr({ ...a, places, sig });
+  };
+  // « Revenir à la place d'origine » : la place de VRM pour ce tampon (et, « tous » coché, pour sa forme).
+  const origineApercu = (cle, quoi, pose) => {
+    const a = apercuRef.current; if (!a) return;
+    if (a.tous) ecrireReglageTampons(avecPlace(reglageTamponsChoisi(), pose.cle, quoi, null));
+    const places = { ...a.places, [cle]: { ...(a.places[cle] || {}), [quoi]: null } };
+    const sig = sigAvecPlaces(sigImpr(a.choisies, a.format, a.tampons), places);
+    preparer(sig, () => composerLot(a.choisies, a.format, a.tampons, { places }));
+    setApercuImpr({ ...a, places, sig });
   };
   // Le chemin d'attente (pas prêt, ou une question due) : la question d'abord, puis le PDF — la visionneuse sur
   // ordinateur (l'impression part seule), « Ouvrir le PDF » sur téléphone (SON toucher ouvre).
@@ -54471,6 +54681,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <button type="button" className="vrm-impr-lien" data-lot-ouvrir="1" data-impr-autres={resLot.autres} disabled={!!imprBusy || batchBusy} onClick={ouvrirLot}>{resLot.autres > 0 ? tr('impr.choisirAutres', { n: resLot.autres }) : tr('impr.choisir')}</button>
             </div> : null}
             {choixPapier ? <ChoixPapier Feuille={SheetShell} valeur={formatRetenu(load('vrm_imprimante', null)) ? formatLot : null} puisImprimer={!!choixPapier.puis} onChoisir={choisirPapier} onFermer={() => setChoixPapier(null)}/> : null}
+            {apercuImpr ? <ApercuAvantImpression Feuille={SheetShell} Bouton={Bouton} etat={apercuImpr} entree={prepsRef.current.get(apercuImpr.sig) || null} dessiner={dessinerPdf} occupe={!!imprBusy}
+              onPoser={poserApercu} onOrigine={origineApercu} onTous={(v) => setApercuImpr((x) => (x ? { ...x, tous: v } : x))} onImprimer={imprimerApercu} onFermer={() => setApercuImpr(null)}/> : null}
             {imprEtat ? <FeuilleImpression Feuille={SheetShell} Bouton={Bouton} etat={imprEtat} dessiner={dessinerPdf} occupe={!!imprBusy}
               pretManque={!!(imprEtat.manque && imprEtat.manque.size && pretPour(sigManque(imprEtat, imprEtat.manque)))}
               pretUn={!!(imprEtat.corrige && imprEtat.tamponCorrige && pretPour(sigUn(imprEtat, imprEtat.corrige, imprEtat.tamponCorrige)))}
@@ -59895,7 +60107,9 @@ async function imprimerBordereauEquipe(vendeur, row, numero, titre) {
   try {
     const PL = await import('pdf-lib');
     const pdf = await PL.PDFDocument.load(lu.octets);
-    await tamponnerBordereau(PL, pdf, { numero: numero || '', titre: titre || '' });
+    // (16 nov.) Le réglage des tampons (`vrm_tampons`) vaut aussi pour l'aide : contenu, taille, places.
+    const tp = tamponPourPage(PL, pdf, {}), ct = texteDuCartouche(tp.contenu, { numero: numero || '', titre: titre || '' });
+    await tamponnerBordereau(PL, pdf, { numero: ct.numero, titre: ct.titre, choix: tp.choix, tampon: tp.tampon });
     posePrefsImpression(PL, pdf);
     const url = URL.createObjectURL(new Blob([await pdf.save()], { type: 'application/pdf' }));
     return { ok: true, url, ouvert: ouvrirPdfOnglet(url) };
@@ -65555,4 +65769,5 @@ export { InfoPop, PuceProposition };
 export { fetchTranspLignes, relireTransporteursSiVieux };
 export { oublierReglageMontage };   // (11 nov., intégration) la lecture gardée au montage, oubliée par une écriture directe
 export { fetchTxnItemIds };   // (11 nov., robustesse) la synchro de l'inventaire relie par identité
+export { reglageTamponsChoisi, ecrireReglageTampons, Z_CONFIRMATION };   // (16 nov., lot tampons-parametres)
 export { sortieCaseStock, texteAvecDescentes, pushNotif, NotePaireCoque, ACTIONS_REPUB, ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, Badge, BlocBarrerVc, BlocComptesMuets, Bouton, BoutonBordereau, BoutonImprimerVc, BrandMark, Btn, BulleConv, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CarteStatsApp, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, CompteVente, CoutAchatVente, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DEMANDE_VC_PAIRE, DEPS_FACTURE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, ENTREPRISE_VIDE, EQUIPE_NON_INSTALLE_TXT, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, EbayCommande, FermeAuRetour, FicheConvVolet, FiltresVentes, FraicheurAnnonces, GuideReglage, IMPR_MODES, INV_STATUS, Icon, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneConv, LignePanne, LigneRelais, LigneVente, LigneVenteCompacte, ListeComptes, LiveStatsCarte, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, MULTI_USER, MicDictee, NAV, NOM_PLAT_STOCK, NOM_RECU_ACHAT, NUM_OK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PeriodePicker, PhraseEcran, PhotoVc, PhotoVente, PhotoVinted, PiedSansEnvoi, Pourquoi, QrColis, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, REGLES_CARTE, RapidesConv, RecapFrise, RepartitionsVentes, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SERIE_DECLARATION, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, Skeleton, StatBox, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, TamponPose, TeteFil, URL_ITEM_EBAY, VENTES_MASQUEES_AUCUNE, ZOOM_KEY, __vmrEtat, __vmrJobs, __vmrNotifier, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _fichesEbayMemo, _persistAcctCache, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aExpedier, aLaDemande, aPayerUrssaf, aRetirerDeLbcEbay, aRetirerDeLbcVinted, achatsMasques, actionEquipe, ageCourtVc, allerComptesEbay, annonceDeclareePartie, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, applyZoom, archiveNumeros, askChoix, askConfirm, askText, authSetPassword, authSignOut, avecDatesLbc, avecNumerosVc, avecRetour, b64ToBytes, beneficeDesJours, beneficeDuMoisPub, bilanLignes, bordereauFormatKey, brouillonsParametres, buildFacturXBytes, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, chargerPhotoBoite, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, classifyOrderStatus, clavierNum, cleDeclarationPartie, cleNum, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, codePerime, commandeEbayEngagee, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesLbcProuves, comptesLbcSession, comptesStockEcartes, connexionExtensionVrm, contexteSignalement, EcrireSupportFeuille, corpsCompteEbay, couvertureBenefice, dansVueEbay, dateCourteVc, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, debutPeriode, decalerPeriode, defaireVc, delaiDemandeEmail, deleteVintedAccount, demanderDeclaration, demanderQuestionRepub, demanderVue, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, dessinerPdf, doublesVenteEbay, doublesVenteLbc, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireJournalRepub, ecrireLigneAccompagnement, emettreClesRelues, enTeteSession, entForInvoice, estIOS, estOctetsPdf, estRelaisApple, estTamponAnnule, etapeVente, etatEnClair, etatRegleOffre, eurEbay, extEnRetard, extSait, extractBrand, extractColors, extractModel, extractSize, familleArticle, fetchEmailAchats, fetchHarvest, fetchHarvestOrders, fetchProInvoices, fetchVersementsVinted, fetchVintedAccounts, fetchVintedListings, fetchVintedOrders, ficheUniqueDuNumero, fichesPourEbay, filtreInventaire, fmt, fmtDate, gesteVrm, harvestTs, ilYaBr, ilYaCourt, imprMode, imprimanteChoisie, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, libelleRegime, libelleRelais, libelleSourceAchat, libererOngletPdf, lienEbay, lienItemEbay, lignesRecu, limiteVcTexte, lireAbonnement, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDatesLbc, lireDeclarations, lireDressings, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEquipe, lireExtrasRepartition, lireFichesPage, lireLbcEnVente, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireMisDeCote, lireModelesRanges, lireMontantSaisi, lireObjet, lirePdfLigne, lirePreuvesVenteVinted, lireReglage, lireReglageMontage, lireReglesEbay, lireReleveVentes, lireTout, lireVentesVestiaire, load, loadRoomPlan, logoFacture, makeChallenge, makeVerifier, mapMailError, marcheEbayDeRef, marquerEbay, masqueesPresentes, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisDeclare, moisPeriodeUrssaf, montantCommande, montantRecuEbay, montantPeriodeUrssaf, mpChoisi, netApresUrssafDe, nextUrssafDeadline, nomAppareil, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, numDeSkuEbay, numEbayLu, numLigneEbay, numeroLbcIdentite, numeroReprenable, numerosDejaVendus, numerosLbcSortis, numerosVcEffectifs, numerosVendusEbay, numerosVendusVc, onCloudReady, onSyncChange, onVmrExt, orderPhoto, ouDansMeubles, ouEstNumero, ouVenduesTexte, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirRecherchePhoto, ouvrirStripe, payeDe, pctFr, photoKey, phraseNonComptees, phrasePersonne, placeDansMeubles, poserBordereau, poserCible, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLisible, providerEnabled, questionRepubOk, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, readZoom, rechercheParNumero, recuAvecADater, recusAchatDe, refLbcPresente, regimeFiscal, regleEngage, reglesEngagees, relaisVivant, relierBoiteDe, repondreSansDepenses, reponsesRapidesPartagees, resultatReviseEbay, retraitsEbayAutoPermis, save, saveTout, sbAuth, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, texteCentimesRecu, textePerime, texteReglesQuiRestent, toast, tod, triNum, tsCommande, txRecuAchat, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, urlPhotoVc, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useEstProprietaire, useEtatEmailsComptes, useExcluAutre, useExtVivante, useLigneSynchro, useLigneUrssaf, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useRegimeFiscal, useReglesStream, useSansSouris, useSecondesRestantes, useSourcesCarte, useStateCle, useStream, useVcLocal, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, useVoixExt, useVueSession, useProfilVendeur, useMotsArticle, exemplesActuels, useExemplesVendeur, vendActuel, PROFIL_VENDEUR, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcCarte, vcSetter, ventesDeclarables, ventesFaites, ventilationRecuAchat, verifierAvantPublication, vintedDeChrome, vmrAuthEtat, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, withOwner, writeSession, xmlEsc, ymCompta, ymCourant, ymDeTs, zoneEtiquette, AideEcran, masquerPourEnvoi, oauthStart, dejaEnLigneEbay, dejaEnLigneLbc, optsNumeroVerif, DEMANDE_RETOUR_EBAY, seDeconnecter, ecrireCopieLocale, ventesAilleursDe, verifierMessageAvantEnvoi };

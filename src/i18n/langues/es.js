@@ -44,7 +44,8 @@ import ecran_plus from './es/plus.js';
 import ecran_plateformes from './es/plateformes.js';
 import ecran_colisplus from './es/colisplus.js';   // (14 nov., lot colis-plus)
 import ecran_studioventes from './es/studioventes.js';   // (14 nov., Studio bleu clair) Ventes et Achats
-import ecran_impression from './es/impression.js';   // (14 nov., impression-simple)
+import ecran_impression from './es/impression.js';
+import ecran_tampons from './es/tampons.js';   // (16 nov., lot tampons-parametres)   // (14 nov., impression-simple)
 import ecran_accueilReste from './es/accueilReste.js';
 import ecran_fraiscarte from './es/fraiscarte.js';   // (14 nov., frais-carte)
 import ecran_atelier from './es/atelier.js';
@@ -92,6 +93,7 @@ export default {
   ...ecran_colisplus,
   ...ecran_studioventes,
   ...ecran_impression,
+  ...ecran_tampons,
   ...ecran_stats,
   ...ecran_emails,
   ...ecran_messages,
