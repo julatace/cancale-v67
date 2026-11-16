@@ -118,10 +118,11 @@ async function defiler(pg, sel) { await pg.evaluate((s) => { const el = document
             if (await o.pg.waitForFunction(() => [...document.querySelectorAll('.vv-liste .vrm-colis-titre')].some((x) => x.clientWidth > 0), null, { timeout: 30000 }).then(() => true, () => false)) break;
             await o.pg.reload({ waitUntil: 'domcontentloaded' }); await P.pret(o.pg);
           }
+          await o.pg.evaluate(() => { const l = document.querySelector('.vv-liste [data-fiche-ligne], [data-fiche-ligne]'); if (l) l.scrollIntoView({ block: 'start' }); });
           await o.pg.waitForTimeout(1500);
           const e = await o.pg.evaluate((visTxt) => {
             const vis = eval(visTxt);
-            const ts = [...document.querySelectorAll('.vv-liste .vrm-colis-titre')].filter((x) => x.clientWidth > 0 && x.getClientRects().length > 0).slice(0, 12);
+            const ts = [...document.querySelectorAll('.vv-liste .vrm-colis-titre')].filter((x) => x.getBoundingClientRect().width > 0).slice(0, 12);
             const coupes = ts.filter((x) => x.scrollWidth > x.clientWidth + 1 || x.scrollHeight > x.clientHeight + 2).map((x) => x.textContent.trim());
             const lignes = ts.map((x) => Math.round(x.getBoundingClientRect().height / parseFloat(getComputedStyle(x).lineHeight)));
             return { n: ts.length, coupes, lignes };
@@ -130,6 +131,7 @@ async function defiler(pg, sel) { await pg.evaluate((s) => { const el = document
           dit(e.n > 0 && e.coupes.length === 0, `E ${t} — aucun titre coupé (${e.n} titres, ≤ 2 lignes)`, e);
           dit(e.lignes.every((k) => k <= 2), `E2 ${t} — un titre tient sur deux lignes au plus`, e.lignes);
           await capture(o.pg, `expedier-${suf}`);
+          await o.pg.waitForSelector('[data-fiche-ligne]', { timeout: 30000 }).catch(() => {});
           const l = (await o.pg.$$('[data-fiche-ligne]'))[0];
           if (!l) { dit(false, `F ${t} — une ligne de colis à ouvrir`); continue; }
           await l.click(); await o.pg.waitForTimeout(2500);
