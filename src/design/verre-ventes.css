@@ -30,16 +30,22 @@
 :root:root:root:root:root:root:root body .vrm-ventes-regarder-corps > * { margin: 0 !important; }
 @media (prefers-reduced-motion: reduce) { :root:root:root:root:root:root:root body .vrm-ventes-regarder-chev { transition: none !important; } }
 
+/* La bande du mois de Ventes · Vinted : « À envoyer » et « En route » sont déjà le segment juste au-dessus
+   (« À envoyer 30 · En route 18 ») — le même compteur jamais deux fois (§7), et jamais deux « En route » qui
+   ne comptent pas la même chose (ventes / colis). Restent le vendu du mois et « À payer ». */
+:root:root:root:root:root:root:root body .vrm-fu-ventes :is([data-fu-case="aposter"], [data-fu-case="enroute"]) { display: none !important; }
+
 /* La puce courte sous « Générer le bordereau » (« Ouvre tomj606 sur vinted.fr ») et son « Pourquoi ? ». */
 :root:root:root:root:root:root:root body .vrm-bord-puce { display: inline-flex !important; align-items: center !important; gap: 4px !important; flex-wrap: wrap !important; }
+
+/* ── 3. « Sélectionner », posé sur le fond (téléphone et ordinateur) ── */
+:root:root:root:root:root:root:root body .vrm-serie-entree [data-serie-ouvrir] { color: var(--sv-clair-lien) !important; min-height: 44px !important; }
 
 @media (max-width: 767px) {
   /* ── 2. Les filtres : jamais coupés ── */
   :root:root:root:root:root:root:root body .vrm-sales-workbar .vrm-filtres-et-outils { flex-wrap: wrap !important; align-items: flex-start !important; }
   :root:root:root:root:root:root:root body .vrm-sales-workbar .vrm-filtres { flex-wrap: wrap !important; overflow: visible !important; row-gap: 6px !important; }
 
-  /* ── 3. « Sélectionner », posé sur le fond ── */
-  :root:root:root:root:root:root:root body .vrm-serie-entree [data-serie-ouvrir] { color: var(--sv-clair-lien) !important; min-height: 44px !important; }
 
   /* ── 4. La ligne de vente en trois lignes ── */
   :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle {

@@ -8,7 +8,8 @@ require('./_porte-banc.cjs');
 //  Base inventée à la vraie forme (`_base-volume.cjs` : 3 comptes, 2 000 ventes), Ventes · Vinted · « Toutes ».
 //  On juge la RÈGLE (data-*, nombres, géométrie), pas un libellé :
 //  H  la 1re vente de la liste est VISIBLE sans défiler à 390 (son haut < 844 − la barre du bas) ;
-//  D  aucun nombre redit : la ligne des étapes d'« À venir » (`data-a-venir-etapes`) se tait sur Ventes · Vinted ;
+//  D  aucun nombre redit : la ligne des étapes d'« À venir » (`data-a-venir-etapes`) se tait sur Ventes · Vinted, et la
+//     bande du mois ne redit pas « À envoyer » / « En route » (le segment les porte) ;
 //  R  « N choses à regarder » (`data-ventes-regarder` = N ≥ 1) : fermé, ses cartes (prix d'achat, après frais…)
 //     ne se voient pas ; un toucher l'ouvre et elles se voient ;
 //  L  une ligne de vente tient en trois lignes (≤ 96 px au téléphone), rien n'y dépasse à droite ;
@@ -65,7 +66,7 @@ function mesurer() {
   const regarder = document.querySelector('[data-ventes-regarder]');
   const cartesRepli = regarder ? [...regarder.querySelectorAll('.vrm-ventes-regarder-corps > *')] : [];
   const filtres = [...document.querySelectorAll('.vrm-sales-workbar .vrm-filtres > button')].filter(vis);
-  const coupes = filtres.filter((b) => { const r = b.getBoundingClientRect(); for (let x = b.parentElement; x && x !== document.body; x = x.parentElement) { const cs = getComputedStyle(x); if (cs.overflowX !== 'visible' || cs.overflow !== 'visible') { const q = x.getBoundingClientRect(); if (r.left < q.left - 1 || r.right > q.right + 1) return true; } } return r.right > window.innerWidth + 1 || r.left < -1; }).map((b) => b.textContent.trim());
+  const coupes = filtres.filter((b) => { const r = b.getBoundingClientRect(); for (let x = b.parentElement; x && x !== document.body; x = x.parentElement) { const cs = getComputedStyle(x); if (cs.overflowX !== 'visible' || cs.overflow !== 'visible') { const q = x.getBoundingClientRect(); if (q.width < 2) continue; if (r.left < q.left - 1 || r.right > q.right + 1) return true; } } return r.right > window.innerWidth + 1 || r.left < -1; }).map((b) => b.textContent.trim());
   const hauteurs = lignes.slice(0, 12).map((l) => Math.round(l.getBoundingClientRect().height));
   const debord = lignes.slice(0, 12).filter((l) => { const r = l.getBoundingClientRect(); return [...l.querySelectorAll('*')].some((x) => { const q = x.getBoundingClientRect(); return q.width > 1 && vis(x) && q.right > r.right + 1; }); }).length;
   const bandes = [...document.querySelectorAll('.vrm-fu-ventes [data-fu-case-chiffre], .vrm-fu-ventes .vrm-fu-grand')].filter(vis).map((x) => ({ t: x.textContent.trim().slice(0, 12), c: contraste(x) }));
@@ -75,6 +76,7 @@ function mesurer() {
     iw: window.innerWidth, ih: window.innerHeight, barre: barre ? barre.getBoundingClientRect().top : window.innerHeight,
     premiere: l1 ? Math.round(l1.getBoundingClientRect().top) : null, n: lignes.length,
     etapes: [...document.querySelectorAll('[data-a-venir-etapes]')].filter(vis).length,
+    redits: [...document.querySelectorAll('.vrm-fu-ventes :is([data-fu-case="aposter"], [data-fu-case="enroute"])')].filter(vis).length,
     regarder: regarder ? { n: regarder.getAttribute('data-ventes-regarder'), ouvert: regarder.open, cachee: !!regarder.hidden, visibles: cartesRepli.filter(vis).length, total: cartesRepli.length } : null,
     hauteurs, debord, coupes, nFiltres: filtres.length,
     bandes, sel: sel && vis(sel) ? contraste(sel) : null, tete: tete && vis(tete) ? contraste(tete.querySelector('span:nth-child(2)') || tete) : null,
@@ -103,6 +105,7 @@ function mesurer() {
         dit(m.n > 0, `${t} : la liste des ventes est rendue`, m.n);
         if (W < 600) dit(m.premiere != null && m.premiere + 40 < m.barre, `H ${t} : la 1re vente est visible sans défiler (haut ${m.premiere} px, barre ${Math.round(m.barre)})`, m.premiere);
         dit(m.etapes === 0, `D ${t} : « À venir » ne redit pas les compteurs (étapes tues)`, m.etapes);
+        dit(m.redits === 0, `D ${t} : la bande ne redit pas « À envoyer » / « En route » du segment`, m.redits);
         dit(!!m.regarder && Number(m.regarder.n) >= 1 && !m.regarder.ouvert && m.regarder.visibles === 0, `R ${t} : « N choses à regarder », fermé, ses cartes cachées`, m.regarder);
         if (W < 600) dit(m.hauteurs.length > 3 && Math.max(...m.hauteurs) <= 96, `L ${t} : chaque ligne de vente tient en trois lignes (≤ 96 px)`, m.hauteurs);
         dit(m.debord === 0, `L ${t} : rien ne dépasse d'une ligne de vente`, m.debord);
