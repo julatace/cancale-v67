@@ -20,7 +20,7 @@ export default {
   "acc.numero.autre.apres": "Noté : un autre article · il reçoit un N° neuf",
   "acc.numero.carton.apres": "N°{numero} noté pour ce carton",
   "rt.consequence": "Oui : son carton garde N°{numero}, rien à écrire. Non : elle reçoit un N° neuf.",
-  "acc.numero.donne.apres": {"one": "{mot} · {numeros} · à écrire sur son carton", "other": "{mot} · {numeros} · à écrire sur leurs cartons"},
-  "acc.numero.demande.apres": {"one": "{n} N° enregistré · écris-le aussi sur son carton", "other": "{n} N° enregistrés · écris-les aussi sur leurs cartons"},
+  "acc.numero.donne.apres": {"one": "{mot} · {numeros} · à écrire sur son rangement", "other": "{mot} · {numeros} · à écrire sur leurs rangements"},
+  "acc.numero.demande.apres": {"one": "{n} N° enregistré · écris-le aussi sur son rangement", "other": "{n} N° enregistrés · écris-les aussi sur leurs rangements"},
   "acc.numero.reconnu.apres": "{mot} · republiée dans l’app Vinted, le carton ne change pas",
 };

@@ -88,7 +88,10 @@ const lireJ = (k) => { try { return JSON.parse(store.get(k) || 'null'); } catch 
   const main = fs.readFileSync(MAIN, 'utf8');
   const i = main.indexOf("window.addEventListener('vite:preloadError'");
   const bloc = i >= 0 ? main.slice(i, main.indexOf('});', i)) : '';
-  dit(/compterMorceauPerime\(ev && ev\.payload\);[\s\S]*?window\.location\.reload\(\);/.test(bloc), 'main.jsx compte le morceau PUIS recharge (le rechargement le rattrape)', bloc.slice(0, 300));
+  // (16 nov.) Décision du 15 nov. (chantier « ouverture », src/chargementSur.js) : plus de `location.reload()` aveugle (il
+  // retombait sur la coquille gardée) ; après le compte, la version du serveur est RELUE (`verifierMorceauPerime`), qui
+  // recharge proprement une fois par version — ou rien.
+  dit(/compterMorceauPerime\(ev && ev\.payload\);[\s\S]*?(?:window\.location\.reload\(\);|verifierMorceauPerime\('preload'\);)/.test(bloc), 'main.jsx compte le morceau PUIS recharge (ou relit la version du serveur, qui recharge proprement)', bloc.slice(0, 300));
   // (14 nov., fiabilité prod) LE VRAI `preload` DE VITE, EXÉCUTÉ avec le VRAI gestionnaire de main.jsx.
   // Mesuré dans la base (`plantage_*`, `plantages_terrain_*`) : 64 écrans tombés du 10 au 12 nov. sur
   // « undefined is not an object (evaluating 'e.FactureVente') », « …reading 'default' » — l'import
@@ -109,7 +112,8 @@ const lireJ = (k) => { try { return JSON.parse(store.get(k) || 'null'); } catch 
     const doc = { getElementsByTagName: () => [], querySelector: () => null, head: { appendChild: (l) => { if (/\.css$/.test(l.href)) setTimeout(() => (l._err || []).forEach((f) => f()), 1); } }, createElement: () => ({ relList: { supports: () => true }, setAttribute() {}, addEventListener(t, f) { if (t === 'error') (this._err = this._err || []).push(f); } }) };
     const blocMain = main.slice(i, main.indexOf('});', i) + 3);
     // eslint-disable-next-line no-new-func
-    new Function('window', 'sessionStorage', 'compterMorceauPerime', blocMain)(fen, { getItem: (k) => (sess.has(k) ? sess.get(k) : null), setItem: (k, v) => sess.set(k, String(v)) }, () => { comptes++; });
+    let verifies = 0;
+    new Function('window', 'sessionStorage', 'compterMorceauPerime', 'verifierMorceauPerime', blocMain)(fen, { getItem: (k) => (sess.has(k) ? sess.get(k) : null), setItem: (k, v) => sess.set(k, String(v)) }, () => { comptes++; }, () => { if (comptes >= 1) verifies++; return Promise.resolve(false); });
     // eslint-disable-next-line no-new-func
     const preload = new Function('window', 'document', 'Event', 'seen', 'assetsURL', 'scriptRel', '__VITE_IS_MODERN__', src + '\nreturn preload;')(fen, doc, Ev, {}, (d) => d, 'modulepreload', true);
     const absent = () => Promise.reject(new TypeError('Failed to fetch dynamically imported module: https://vrm.center/assets/FacturePro-ancien.js'));
@@ -118,14 +122,15 @@ const lireJ = (k) => { try { return JSON.parse(store.get(k) || 'null'); } catch 
     catch (e) { issue = 'rejeté : ' + String((e && e.message) || e); }
     dit(/^rejeté/.test(issue), 'un morceau introuvable : l’import est REJETÉ, jamais résolu à `undefined` (React.lazy lirait `undefined.default`)', issue);
     dit(/^rejeté/.test(issue) && P.estMorceauPerime(issue.replace(/^rejeté : /, '')), 'sa raison est celle d’un morceau périmé (comptée à part, jamais notée comme plantage)', issue);
-    dit(recharges === 1 && comptes >= 1, 'la page se recharge quand même, une fois, après avoir compté le morceau', `recharges=${recharges} comptes=${comptes}`);
+    dit((recharges === 1 || (recharges === 0 && verifies === 1)) && comptes >= 1, 'la page se recharge quand même (ou relit la version du serveur), une fois, après avoir compté le morceau', `recharges=${recharges} verifies=${verifies} comptes=${comptes}`);
     // Le même chemin que FactureVente (App.jsx) : `.then((m) => ({ default: m.FactureVente }))`.
     let lazyErr = '';
     sess.clear();
     try { await preload(absent, [], '').then((m) => ({ default: m.FactureVente })); } catch (e) { lazyErr = String((e && e.message) || e); }
     dit(lazyErr && P.estMorceauPerime(lazyErr) && !/FactureVente|reading 'default'/.test(lazyErr), 'un écran nommé (`m.FactureVente`) reçoit l’erreur du morceau, pas « undefined is not an object »', lazyErr);
   })();
-  dit(/if \(Date\.now\(\) - dernier < 60000\) return;/.test(bloc), 'une fois par minute au plus (jamais une boucle de rechargements)');
+  const CS = (() => { try { return fs.readFileSync(path.join(R, 'src', 'chargementSur.js'), 'utf8'); } catch (_) { return ''; } })();
+  dit(/if \(Date\.now\(\) - dernier < 60000\) return;/.test(bloc) || (/verifierMorceauPerime\('preload'\)/.test(bloc) && !/location\.reload\(/.test(bloc.replace(/\/\/[^\n]*/g, '')) && /if \(!force && !rechargementPermis\(lireNote\(\), cible\)\) return false;/.test(CS)), 'une fois par minute au plus (ou une fois par version, src/chargementSur.js) : jamais une boucle de rechargements');
   dit(!/fetch\(|rest\/v1/.test(fs.readFileSync(PL, 'utf8').slice(fs.readFileSync(PL, 'utf8').indexOf('export function compterMorceauPerime'), fs.readFileSync(PL, 'utf8').indexOf('// ⚠️ Revue adverse du 4 octobre'))), 'le compte reste sur l’appareil (aucune écriture vers la base)');
   console.log(ko ? `\n❌ ${ko} contrôle(s) rouge(s)` : '\n✅ un morceau d’un ancien déploiement est compté à part, jamais noté comme plantage');
   process.exit(ko ? 1 : 0);

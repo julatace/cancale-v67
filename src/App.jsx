@@ -983,8 +983,8 @@ import { ComparerFeuille } from './ui/ComparerFeuille.jsx';
 import { useGlisserSelection } from './ui/useGlisserSelection.js';
 import { retirerPublie as retirerPubliePhrase } from '../api/_lib/retrait-colis.js';
 import { NOM_TRANSPORTEUR as NOM_TRANSPORTEUR_PHRASE, filtreApplicable as filtreApplicablePhrase } from './recherchePhrase.js';
-import "./styles-tablette.css";   // (11 nov., iPad) la coque ordinateur AU DOIGT : 44 px, rien au survol, rail libellé — sous `data-tablette` seulement, EN DERNIER
 import "./styles-refonte-ms.css";   // (14 nov., refonte) Messages, E-mails, Stock : la liste d'abord, des rangées denses, le fil comme Messages d'iPhone — portée par leurs classes seulement
+import "./styles-tablette.css";   // (11 nov., iPad) la coque ordinateur AU DOIGT : 44 px, rien au survol, rail libellé — sous `data-tablette` seulement, EN DERNIER
 // (14 nov., décision de Julien) STUDIO BLEU CLAIR — les deux polices, puis LE studio : EN DERNIER (après styles-vitrine,
 // styles-systeme et styles-tablette). Jetons --sb-*, quatre formes de bouton, la coque (docs/design/studio-bleu-clair.md).
 import "./design/studio-polices.css";
@@ -17322,6 +17322,8 @@ const ICON_PATHS = {
   // la <svg> : une chaîne y devient du TEXTE, donc l'icône est INVISIBLE. C'est
   // le cas de `pin` et `nav` juste en dessous depuis leur ajout — les deux
   // repères des points relais ne se dessinaient pas.
+  // (16 nov.) Le zoom de l'app (Paramètres → Apparence) : une loupe « + », distincte de la grille des plateformes.
+  agrandir: <><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/><path d="M10.5 7.5v6"/><path d="M7.5 10.5h6"/></>,
   menu: <><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></>,
   // (13 nov., lot 54) Le parrainage : un paquet noué, au trait.
   cadeau: <><rect x="3.5" y="8" width="17" height="4" rx="1"/><path d="M5 12v7.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V12"/><path d="M12 8v12.5"/><path d="M12 8c-1.6-3.2-5.5-3.6-5.5-1.2C6.5 8 9 8 12 8Z"/><path d="M12 8c1.6-3.2 5.5-3.6 5.5-1.2C17.5 8 15 8 12 8Z"/></>,
@@ -23489,7 +23491,7 @@ function CarteParcoursNouveau({ pos }) {
         <span style={{fontSize:13,fontWeight:600,fontVariantNumeric:'tabular-nums',opacity:.75}}>{tr('pn.rang', { n: i + 1, total: ETAPES_NOUVEAU.length })}</span>
       </div>
       <div aria-hidden="true" style={{display:'grid',gridTemplateColumns:`repeat(${ETAPES_NOUVEAU.length},1fr)`,gap:5,margin:'12px 0 10px'}}>
-        {ETAPES_NOUVEAU.map((e, k) => <span key={e} style={{height:5,borderRadius:3,background:'currentColor',opacity:k < i ? .8 : k === i ? 1 : .18}}/>)}
+        {ETAPES_NOUVEAU.map((e, k) => <span key={e} style={{height:5,borderRadius:999,background:'currentColor',opacity:k < i ? .8 : k === i ? 1 : .18}}/>)}
       </div>
       <p className="vrm-cp-note" style={{margin:'0 0 10px'}}>{tr('pn.court.' + pos.etape)}</p>
       <Bouton variante="primaire" data-pn-reprendre="" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:parcours-nouveau', { detail: pos.etape })); } catch (_) {} }}>{tr('pn.continuer')}</Bouton>

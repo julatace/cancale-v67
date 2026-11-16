@@ -81,7 +81,11 @@ async function audit(src, bavard) {
   // (5 nov.) Depuis le 4 nov. (0b293942, « Masquées ») la vue est une branche d'une
   // chaîne de ternaires (`) : annSort==='sleeping' ? (`), la grille dans le DERNIER
   // « sinon ». Même règle : dans cette vue, la liste, et la grille seulement ailleurs.
-  dit(/\{annSort==='sleeping' \? \(\s*<QuiDorment /.test(code)
+  // (16 nov.) Depuis le 15 nov. (vendre plus), la branche est un fragment `(<> … </>)` : l'entrée « baisses conseillées »
+  // puis la liste <QuiDorment> ; la grille reste dans le « sinon » seulement (jugé sur la branche entière).
+  const brancheDort = (() => { const i = code.indexOf(") : annSort==='sleeping' ? (<>"); if (i < 0) return null; const j = code.indexOf('</>) : (<>', i); return j < 0 ? null : { dedans: code.slice(i, j), apres: code.slice(j, j + 400) }; })();
+  dit((brancheDort && /<QuiDorment /.test(brancheDort.dedans) && !/vrm-ann-grid/.test(brancheDort.dedans) && /^<\/>\) : \(<>\s*<div className="vrm-ledger-heading/.test(brancheDort.apres))
+    || /\{annSort==='sleeping' \? \(\s*<QuiDorment /.test(code)
     || /\) : annSort==='sleeping' \? \(\s*<QuiDorment [^\n]*\n(?:(?!\) : )[^\n]*\n)*?\s*\) : \(<>\s*<div className="vrm-ledger-heading[^\n]*\n(?:\s*\{\}\s*\n)*\s*<div className="vrm-ann-grid/.test(code), 'la liste remplace la grille dans cette vue');   // (11 nov.) un commentaire JSX (vidé en `{}`) peut précéder la grille (lot AM)
   // (13 nov., lot 14-15) Les gestes de la feuille vivent dans `allerDormante` (partagés avec le geste
   // proposé sur la ligne) : on juge la feuille ET cette fonction, la règle, pas son emplacement.

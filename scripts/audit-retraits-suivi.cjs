@@ -30,6 +30,7 @@ function copie(mutation) {
     const f = path.join(dir, mutation.fichier);
     fs.writeFileSync(f, remplace(fs.readFileSync(f, 'utf8'), mutation));
   }
+  require('./_copie-imports.cjs').completerImports(RACINE, dir);   // (16 nov.) ce qu'importe api/_lib depuis src/
   return { dir };
 }
 function remplace(s, m) { if (!s.includes(m.de)) throw new Error(`mutation « ${m.nom} » : motif absent`); return s.split(m.de).join(m.vers); }
