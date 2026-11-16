@@ -30,7 +30,8 @@ html body .vrm-msg-sans-date { margin: 8px 10px 0; font-size: 13px; }
 /* ── Ordinateur : pas de grand vide ─────────────────────────────────── */
 @media (min-width: 1024px) {
   /* Aucune conversation ouverte : deux colonnes, la liste prend plus de place, la fiche n'est pas là. */
-  :root body .vrm-message-workspace:not(#_):has(> .vrm-chat-column > .vrm-chat-empty) { grid-template-columns: minmax(400px, 1.15fr) minmax(0, 1fr) !important; }
+  /* (16 nov., parcours-vert) le fil garde 400 px au moins (banc bureau-chargement, 1024 px : 391 px avant). */
+  :root body .vrm-message-workspace:not(#_):has(> .vrm-chat-column > .vrm-chat-empty) { grid-template-columns: minmax(400px, 1.15fr) minmax(400px, 1fr) !important; }
   html body .vrm-message-workspace .vrm-chat-empty { display: flex !important; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--vrm-muted); font-size: 15px; background: var(--vrm-bg) !important; }
   html body .vrm-message-workspace .vrm-chat-empty svg { opacity: .45; }
   html body .vrm-message-workspace .vrm-chat-empty small { font-size: 13px; opacity: .8; }

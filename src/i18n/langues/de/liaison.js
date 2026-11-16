@@ -1,7 +1,7 @@
 // de · Kauf ⇄ Artikel verknüpfen (15. Nov.) — siehe src/i18n/langues/fr/liaison.js.
 export default {
   "liaison.tete": { one: "{n} Artikel · {nSugg} mit vorgeschlagenem Kauf", other: "{n} Artikel · {nSugg} mit vorgeschlagenem Kauf" },
-  "liaison.regle": "VRM schlägt den ähnlichsten Kauf vor: gleiche Marke, ein gemeinsames Modellwort, Größe und Farbe, wenn sie angegeben sind, gekauft vor dem Einstellen (je näher an der Abholung, desto besser). „Sehr wahrscheinlich“: kein anderer Kauf und kein anderer Artikel ist so ähnlich. Nichts wird ohne deinen Tipp verknüpft.",
+  "liaison.regle": "VRM schlägt einen Kauf nur vor, wenn er „sehr wahrscheinlich“ ist: gleiche Marke, ein gemeinsames Modellwort, gleiche Größe und gleiche Farbe (angegeben, sonst auf dem Foto erkannt), gekauft vor dem Einstellen — und kein anderer Kauf und kein anderer Artikel ist so ähnlich. Ein Kauf wird nur einem Artikel vorgeschlagen. Weitere Spuren findest du unter „Anderen Kauf wählen“. Nichts wird ohne deinen Tipp verknüpft.",
   "liaison.quoi": "Artikel ohne verknüpften Kauf",
   "liaison.enVente": "Im Verkauf",
   "liaison.vendus": "Verkauft",
@@ -33,6 +33,11 @@ export default {
   "liaison.p.tailleInconnue": "Größe beim Kauf nicht angegeben",
   "liaison.p.generique": "Kauftitel ohne Modell",
   "liaison.p.photo": "gleiches Foto",
+  "liaison.p.couleurPhoto": "{couleur} (auf dem Foto erkannt)",
+  "liaison.pistes": { one: "Weitere Spuren · {n}", other: "Weitere Spuren · {n}" },
+  "liaison.pistesAide": "Gleiche Marke, Modell, Größe und Farbe passen – aber nicht sicher genug für einen Vorschlag. Prüfe vor dem Verknüpfen.",
+  "liaison.ann.relier": "Kauf verknüpfen",
+  "liaison.ann.achetee": "Gekauft {prix}",
   "liaison.p.jours.en-ligne.retrait": { one: "{n} Tag nach der Abholung eingestellt", other: "{n} Tage nach der Abholung eingestellt" },
   "liaison.p.jours.en-ligne.livraison": { one: "{n} Tag nach der Lieferung eingestellt", other: "{n} Tage nach der Lieferung eingestellt" },
   "liaison.p.jours.en-ligne.commande": { one: "{n} Tag nach der Bestellung eingestellt", other: "{n} Tage nach der Bestellung eingestellt" },
