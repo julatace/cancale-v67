@@ -42,8 +42,8 @@ Un achat est **hors relier** quand une PREUVE le désigne par **son n° de trans
 
 ## Preuves
 
-- `scripts/audit-achats-hors-relier.cjs` : **21 verts** ; sur l'arbre d'avant (`origin/claude/relier-fiable`)
-  **4 verts · 18 rouges** ; `--prouve` **9/9 mutations** attrapées (clos ignoré, bordereau ignoré, partiel
+- `scripts/audit-achats-hors-relier.cjs` : **22 verts** (dont B6 : la carte publiée après un premier calcul s’applique aux mêmes objets d’achat — main garde désormais la préparation des achats en cache, « hors relier » est relu à chaque appel) ; sur l'arbre d'avant (`origin/claude/relier-fiable`)
+  **4 verts · 18 rouges** ; `--prouve` **10/10 mutations** attrapées (cache de la liaison, clos ignoré, bordereau ignoré, partiel
   écarté, litige ignoré, statut litige ignoré, carte pas lue, app sans publier, « pas en ligne » sur
   `buysBase`, atelier sans la carte).
 - Banc `scripts/bancs/relier-sans-retour.cjs` (390 tactile + 1512 sombre, lignes servies en projection

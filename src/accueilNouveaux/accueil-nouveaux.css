@@ -70,7 +70,8 @@
   padding: 8px 20px max(20px, env(safe-area-inset-bottom)); box-sizing: border-box; animation: vrm-an-feuille .36s var(--an-ressort) both; background-image: var(--an-lumiere); background-repeat: no-repeat; background-size: 100% 260px; }
 :root[data-theme="dark"] .vrm-an-feuille { background-color: #1C1C1E; }
 @keyframes vrm-an-feuille { from { transform: translateY(40px); opacity: .4; } to { transform: none; opacity: 1; } }
-@media (min-width: 744px) and (hover: hover) { .vrm-an-voile { align-items: center; } .vrm-an-feuille { border-radius: 22px; } }
+/* (16 nov.) La coque ordinateur (src/coque.js MQ_ORDINATEUR, recopiée mot pour mot) : jamais « ≥ 744 px » seul, qui allumait ces règles sur un iPhone couché. */
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) { .vrm-an-voile { align-items: center; } .vrm-an-feuille { border-radius: 22px; } }
 .vrm-an-cadre:focus, .vrm-an-feuille:focus { outline: none; }
 .vrm-an-poignee { display: block; width: 36px; height: 5px; border-radius: 999px; background: var(--an-filet); margin: 0 auto 4px; }
 .vrm-an-etape { font-size: 13px; font-weight: 600; color: var(--an-gris); }

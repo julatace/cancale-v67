@@ -30,6 +30,7 @@ const MUTS = {
   'litige-ignore': ['src/achatsHorsRelier.js', "    if (litigeTx.has(tx)) { out.set(tx, 'litige'); continue; }\n", ''],
   'statut-litige-ignore': ['src/achatsHorsRelier.js', "  if (/suspend/i.test(st) || RE_LITIGE_STATUT.test(st)) return 'litige';", "  if (/suspend/i.test(st)) return 'litige';"],
   'carte-pas-lue': ['src/suggestionsAchat.js', 'export const achatAnnule = (achat) => achatHorsRelier(achat);', "export const achatAnnule = (achat) => /annul|cancel|refus|rembours|retour|suspend|[ée]chou|failed/i.test(String((achat && achat.status) || ''));"],
+  'liaison-cache': ['src/liaisonAchat.js', "  return { ...base, a, couleurs: coul.c, couleurSource: coul.source, couleursPhoto: coul.photo, annule: achatAnnule(a),", "  return { ...base, a, couleurs: coul.c, couleurSource: coul.source, couleursPhoto: coul.photo,"],
   'app-sans-publier': ['src/App.jsx', '    publierHorsRelier(m);\n', ''],
   'app-pas-en-ligne': ['src/App.jsx', 'achats: Array.isArray(buys.items) && !buys.error ? buysAJuger : null', 'achats: Array.isArray(buys.items) && !buys.error ? buysBase : null'],
   'app-atelier': ['src/App.jsx', 'annule: (o) => achatAnnule(o) || achatHorsRelier(o, achatsHorsRelierRes)', 'annule: achatAnnule'],
@@ -136,6 +137,16 @@ const paye = (o) => Number(o && o.price && o.price.amount);
   dit(!pasSu.has('9001') && !pasSu.has('9003') && pasSu.has('9007'), 'P1 bordereaux, remboursements et litiges pas lus ⇒ seul le statut écarte', JSON.stringify([...pasSu]));
   // Jamais par le titre : un achat du même titre qu'un achat en retour reste libre.
   dit(libres.includes('9008') && libres.length === 3, 'P2 jamais par le titre : 8 achats au même titre, exactement 3 libres (9002, 9004, 9008)', libres.join(','));
+  // La carte arrive APRÈS une première affectation, sur les MÊMES objets d'achat (un cache par achat ne doit pas la manquer).
+  {
+    const A2 = [achat(9101, 'Nike Dunk Low noir 42'), achat(9102, 'Nike Dunk Low noir 42')];
+    H.publierHorsRelier(null);
+    const vus = () => { const r = L.affecterPropositions({ cibles: [cible], achats: A2, liens: new Map(), ...regles }); return [...(r.parArticle['v:777'] || []), ...((r.pistes || {})['v:777'] || [])].map((p) => String(p.achat.transaction_id)); };
+    const avant = vus();
+    H.publierHorsRelier(H.achatsHorsRelier({ achats: A2, txRetour: new Set(['9101']), montantDe: paye }));
+    const apres = vus();
+    dit(avant.includes('9101') && !apres.includes('9101') && apres.includes('9102'), 'B6 la carte publiée APRÈS un premier calcul s’applique aux mêmes achats (rien de gardé en cache)', `${avant} → ${apres}`);
+  }
   H.publierHorsRelier(null);
   const sansCarte = ids(S.tousAchatsLibresDetail({ achats: A, liens: new Map(), ...regles }).liste);
   dit(sansCarte.includes('9001') && !sansCarte.includes('9007'), 'P3 carte retirée ⇒ les preuves ne s’appliquent plus, le statut oui', sansCarte.join(','));
