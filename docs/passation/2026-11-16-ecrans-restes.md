@@ -5,7 +5,12 @@ inventées. Sept points de la liste du 16 nov. : 27, 28, 32, 36, 37, 51, 57.
 
 ## ÉTAT À LA REPRISE
 
-- Tout ce qui suit est poussé sur la branche ; la PR et la fusion sont dites dans la ligne de CLAUDE.md §9.
+- Tout ce qui suit est poussé sur la branche ; PR #1184 ouverte, **PAS fusionnée** : règle de Julien du 16 nov. « zéro rouge
+  pour fusionner ». La CI de la PR a les MÊMES jobs rouges que la dernière PR fusionnée dans main (#1181 : regles,
+  comptes-et-reception, 5 jobs ecrans, Audits 1–3, Bancs 1 et 3) — comparés ligne à ligne, aucun rouge nouveau après le
+  correctif `audit-saisie-rapide` B4. Ils viennent d'autres lots (ex. audit-photos-vinted : `partageFichiersPossible` déclaré
+  dans App.jsx ET Republier.jsx, `joursAvant` aussi ; bancs nouveau-vendeur, argent-mois, offres-objectif…).
+  À la reprise : une fois main au vert, `git merge origin/main`, repousser, fusionner.
 - Reste ouvert (dit plus bas, « Ce qui n'est pas fait ») : les N° d'un lot dans la notification serveur du bordereau.
 - Geste de Julien : aucun.
 
