@@ -789,7 +789,7 @@ export default async function handler(req, res) {
   // widget (lecture seule, et servie sans clé à un vendeur unique en transition).
   // (16 nov.) Lien public à jeton (widget, SMS) : un débit par adresse et par jeton AVANT toute
   // lecture — une clé inventée ne fait plus travailler la base en boucle.
-  { const d = prendreDebitPublic(String((req.query && req.query.mode) || '') === 'sms' ? 'sms' : 'widget', req, String((req.query && req.query.k) || '')); if (!d.ok) return refuserTropVite(res, d); }
+  { const d = prendreDebitPublic(String((req.query && req.query.mode) || '') === 'sms' ? 'sms' : 'widget', req, String((req.query && (req.query.k || req.query.key)) || (req.headers && req.headers['x-vrm-key']) || '')); if (!d.ok) return refuserTropVite(res, d); }
   if (String((req.query && req.query.mode) || '') === 'sms') return routeSms(req, res, { url: SUPABASE_URL, key: SUPABASE_KEY });
   try {
     // ⚠️ MULTI-VENDEURS : on résout SON owner par la clé AVANT toute lecture, et
