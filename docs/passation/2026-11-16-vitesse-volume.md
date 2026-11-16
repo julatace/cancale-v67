@@ -6,8 +6,9 @@ qui rougit si Ma journée ou Ventes dépasse 2 s après les données, prouvé ro
 
 ## ÉTAT À LA REPRISE
 
-- **Objectif < 2 s : PAS ATTEINT.** Gain mesuré en CI : **−26 % Ma journée, −24 % Ventes** (calcul, réseau mis à
-  part). Il reste ~17–18 s de calcul à 20 000 ventes sur la machine de CI (processeur ×4).
+- **Objectif < 2 s : PAS ATTEINT.** Gain mesuré sur LA MÊME machine de CI, main et branche en alternance :
+  **Ma journée −10 % (27,6 → 24,9 s), Ventes −2 % (30,6 → 29,9 s)** (calcul, réseau mis à part, processeur ×4).
+  ⚠️ Un premier chiffre (−25 %) venait de deux machines de CI différentes : faux, corrigé ici.
 - **Le garde-fou existe** (`scripts/bancs/volume-budget.cjs`, `scripts/budget-volume.json`, CI : « Bancs principaux
   part 3 ») et il est **rouge sur main ET sur cette branche** — c'est la vérité : 2 s ne sont pas tenues.
 - **PR ouverte, NON fusionnée** : la règle de Julien du 16 nov. est « zéro rouge pour fusionner » ; ce banc est rouge
@@ -37,19 +38,26 @@ le temps que l'app passe à demander, recevoir, calculer et rendre ses données.
 20 000 ventes inventées (`_base-volume`). Médiane de 3 ouvertures. Une ouverture pas complète n'est jamais un feu
 vert (« pas su »).
 
-## 2. Mesures (CI GitHub, machine non partagée — la machine des sessions était à une charge de 40 à 60)
+## 2. Mesures
 
-| | main d'avant (5a9abe571 + banc seul) | cette branche (c52b747cc ; relance f6a54aa11 : 19,2 s / 22,7 s, autre machine) |
+**La seule comparaison qui vaut : la même machine, en alternance** (`comparer-ci.cjs` sur la branche de mesure,
+run 43874396291 : construit origin/main puis mesure main / branche / main / branche…). D'une machine de CI à l'autre,
+le même build varie de 17 à 25 s : deux runs différents ne se comparent pas.
+
+| `donnees_ms`, réseau libre, ×4, 20 000 ventes | main (5a9abe571) | branche |
 |---|---|---|
-| Ma journée, `donnees_ms` (3 passes) | 23 596 · 23 479 · 24 528 ⇒ **23,6 s** | 18 831 · 17 439 · 17 441 ⇒ **17,4 s** |
-| Ventes, `donnees_ms` | 22 724 · 24 300 · 25 904 ⇒ **24,3 s** | 18 278 · 18 513 · 18 767 ⇒ **18,5 s** |
-| tâches longues Ma journée | 22,3 – 24,1 s | 15,8 – 17,4 s |
-| tâches longues Ventes | 22,6 – 25,8 s | 18,2 – 18,5 s |
-| verdict du banc (2 000 + 750 ms) | ❌ rouge (les deux écrans) | ❌ rouge (les deux écrans) |
+| Ma journée (3 passes alternées) | 28 930 · 27 561 · 27 513 ⇒ **27,6 s** | 25 194 · 24 746 · 24 915 ⇒ **24,9 s** (−10 %) |
+| Ventes | 30 649 · 30 301 · 30 794 ⇒ **30,6 s** | 30 039 · 29 920 · 29 920 ⇒ **29,9 s** (−2 %) |
+| tâches longues Ma journée | 28,6 – 29,4 s | 24,1 – 24,4 s |
+| verdict du banc `volume-budget` (2 000 + 750 ms) | ❌ rouge (runs 43839058650, 43857864562 : 23,6 s / 24,6 s) | ❌ rouge |
 
-Avec le réseau 4G simulé (mesure d'avant), même CI : complet Ma journée 28,0 s (main) → 25,5 s ; Ventes 23,5 → 21,9 s.
-Les derniers commits (dates, tri, `tsVenteADater`) sont postérieurs à la colonne de droite : la
-relance CI est dans la PR.
+Chiffres (`chiffres-volume`, 20 000 ventes) : en CI (même run, deux passes par build) **montants et comptes identiques
+sur les 7 écrans, les 12 publications identiques** (empreintes sha256) ; Argent/Déclarer 143 contre 144 attributs
+`data-*` dans ce run, mais rejoué ici sur main c04cb599 et la branche fusionnée : Argent 126 = 126 seul, 144 = 144
+dans la suite complète (bruit). **Ma journée, premier écran ouvert à froid, n'est pas déterministe dans ce banc, pour
+les DEUX builds** (mesuré : main 4 € puis 6 € relevés, branche 4 € puis 11 €, selon ce qui est arrivé au « calme ») :
+ses différences ne disent rien ; un banc de chiffres déterministe pour Ma journée reste à faire (attendre « complet »
+au lieu de 4 s sans lecture).
 
 ## 3. Ce qui a changé (aucune règle métier, aucun chiffre)
 
@@ -90,8 +98,8 @@ jours de travail sur un composant de 23 000 lignes, avec le banc `chiffres-volum
 ## 5. Preuves
 
 - `volume-budget` : **rouge sur main d'avant** (CI, run 43839058650 : 23,6 s / 24,3 s) — et rouge sur la branche.
-- Chiffres identiques : `chiffres-volume` + `compare-chiffres-volume` (voir la PR : relevés en CI sur les deux arbres,
-  la machine des sessions ne finissait pas les écrans à cette charge).
+- Chiffres : voir §2 (identiques sur 6 écrans + 12 publications ; Ma journée non déterministe dans le banc, pour les
+  deux builds).
 - Audits qui extraient ces règles : `audit-statuts`, `audit-dac7-comptes`, `audit-onglets-d`,
   `audit-transporteur-connu` verts (ils ont fait rendre les mémoires autonomes : `fn.memo` comme
   `classifyOrderStatus`).
