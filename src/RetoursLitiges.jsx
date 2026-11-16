@@ -263,12 +263,13 @@ export function ARenvoyerJournee({ r, onImprimer, onPreparer = null, onDepose = 
 // (lu sur l'achat relié par le n°, sinon rien) et « À déposer … » (la date LUE, sinon rien). Une case : cochée ⇒
 // le bordereau part dans le MÊME PDF que les ventes, tamponné RETOUR. Jamais compté dans « à envoyer ».
 // `lignes` : `lignesRetoursLot` · `coches` : Set des clés cochées · `onBascule(cle)` · `Case` : la case de l'écran hôte.
-export function RetoursLot({ lignes, coches, onBascule, Case = null, attrs = {}, now = Date.now() }) {
+// `section` : « retours » dans « Choisir » (la feuille), « retours-ecran » sous la liste d'À envoyer — jamais deux fois le même repère.
+export function RetoursLot({ lignes, coches, onBascule, Case = null, attrs = {}, now = Date.now(), section = 'retours-ecran' }) {
   const L = Array.isArray(lignes) ? lignes : [];
   if (!L.length) return null;
   const n = L.filter((l) => coches && coches.has(l.cle)).length;
   return (
-    <section className="vrm-ret-lot" data-lot-section="retours" data-retours-lot={L.length} data-retours-coches={n} aria-label={tr('impr.retour.section')} {...attrs}>
+    <section className="vrm-ret-lot" data-lot-section={section} data-retours-lot={L.length} data-retours-coches={n} aria-label={tr('impr.retour.section')} {...attrs}>
       <h3><b className="vrm-ret-mot" data-retour-mot="">{tr('impr.retour.mot')}</b> {tr('impr.retour.sousTitre')} <em className="vrm-ret-lot-n">{L.length}</em></h3>
       {L.map((l) => {
         const c = l.carte || l, coche = !!(coches && coches.has(l.cle)), q = quandLimite(c, now);
@@ -299,7 +300,7 @@ export function RetoursLot({ lignes, coches, onBascule, Case = null, attrs = {},
 // `r` : le résultat des retours (gardé pour l'appel d'avant) ; `lignes`/`coches`/`onBascule` : le lot.
 export function RetoursAImprimer({ r, lignes = null, coches = null, onBascule = null, Case = null }) {
   if (!r || r.etat !== 'lu' || !Array.isArray(lignes)) return null;
-  return <RetoursLot lignes={lignes} coches={coches} onBascule={onBascule} Case={Case}/>;
+  return <RetoursLot lignes={lignes} coches={coches} onBascule={onBascule} Case={Case} section="retours"/>;
 }
 
 const MOT_PREUVE = { transaction: 'pap.prouve.transaction', email: 'pap.prouve.email', 'commande+email': 'pap.prouve.deux', ebay: 'pap.prouve.ebay' };
