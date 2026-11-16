@@ -58,7 +58,9 @@ if (process.argv.includes('--prouve')) {
   for (const l of (r.stdout || '').split('\n').filter((x) => x.startsWith('❌')).slice(0, 40)) console.log('     ' + l.slice(0, 170));
   fs.rmSync(t, { recursive: true, force: true });
   if (!(r.status && rouges)) process.exit(1);
-  require('./_mutations-audit.cjs').prouver(__filename, ICI, MUTATIONS, ['public', 'vercel.json']);
+  // `MUTATIONS_FILTRE=<regex>` : rejouer seulement certaines mutations.
+  const filtre = process.env.MUTATIONS_FILTRE ? new RegExp(process.env.MUTATIONS_FILTRE) : null;
+  require('./_mutations-audit.cjs').prouver(__filename, ICI, filtre ? Object.fromEntries(Object.entries(MUTATIONS).filter(([k]) => filtre.test(k))) : MUTATIONS, ['public', 'vercel.json']);
   return;
 }
 
