@@ -137,7 +137,7 @@ function mesurer() {
         dit(m.tete != null && m.tete >= 4.5, `C ${t} : la tête du repli lisible`, m.tete);
         // P (suite) : toucher la vente (son titre, hors d'un bouton) ouvre sa fiche.
         {
-          const l = pg.locator('.vrm-ventes-liste .vrm-sale-row[data-fu-forme] .vrm-fu-vente-nom').first();
+          const l = pg.locator('.vrm-ventes-liste .vrm-sale-row[data-fu-forme] :is(.vrm-fu-vente-nom, .vrm-ledger-sale-nom) >> visible=true').first();
           if (W < 600) await l.tap().catch(() => {}); else await l.click().catch(() => {});
           let fiche = false; for (let k = 0; k < 20 && !fiche; k++) { await pg.waitForTimeout(250); fiche = await pg.evaluate(() => [...document.querySelectorAll('.vrm-fp')].some((x) => x.getClientRects().length)); }
           await pg.screenshot({ path: path.join(SHOTS, `ventes-${W}-${th}-fiche.png`) });

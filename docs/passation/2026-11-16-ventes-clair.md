@@ -54,7 +54,7 @@ Aussi : texte de la règle d'offre eBay raccourci (« Offre ≥ ce montant : eBa
 | « Sélectionner » | 1,65:1 | ≥ 4,5:1 |
 | filtres coupés / sur une ligne | « Annulées » coupé | entiers, une ligne |
 
-- Banc : **54 ✅ · 0 ❌** (390 tactile et 1512, clair et sombre). Sur l'arbre de départ : **8 ❌** (H, D, R, L, F, C×3).
+- Banc : **66 ✅ · 0 ❌** (dernier passage, build final) (390 tactile et 1512, clair et sombre). Sur l'arbre de départ : **8 ❌** (H, D, R, L, F, C×3).
   Le contrôle « Imprimer ne couvre pas ⋯ » a rougi sur la version intermédiaire (8 lignes chevauchées) avant le correctif ;
   « filtres sur une ligne » rougit sur la version sans les capsules serrées (54 px d'écart).
 - `ventes-verre` 70 verts. Audits : traduction, tdz, variables, studio (S3 : la feuille s'appelle `verre-ventes.css`,
