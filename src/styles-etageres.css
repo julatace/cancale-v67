@@ -282,3 +282,6 @@
 :root[data-theme="dark"] { --etag-lien: #8CC4FF; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --etag-lien: #8CC4FF; } }
 :root:root:root body .vrm-etag-barre .vrm-etag-aide { color: var(--etag-lien) !important; font-weight: 600; }
+/* La case TROUVÉE (recherche, « Voir au stock ») : un anneau bleu net et sa plaque au bleu — elle se voit d'un coup d'œil. */
+:root:root body .vrm-etag .vrm-s2d-case.is-vise:not(.is-vide) { box-shadow: 0 0 0 3px var(--etag-plaque-vendue), 0 0 0 7px color-mix(in srgb, var(--etag-plaque-vendue) 28%, transparent) !important; z-index: 3; }
+.vrm-etag .vrm-s2d-case.is-vise:not(.is-vendue) .vrm-s2d-num.vrm-etag-plaque { background: var(--etag-plaque-vendue) !important; color: var(--etag-plaque-vendue-encre) !important; }

@@ -124,11 +124,11 @@ async function contrastePixels(pg, el) {
     const couleur = getComputedStyle(e).color; const r = e.getBoundingClientRect();   // lue AVANT d'effacer le texte (le style calculé est vivant)
     const garde = e.getAttribute('style') || '';
     e.setAttribute('data-banc-style', garde);
-    e.style.setProperty('color', 'transparent', 'important'); e.style.setProperty('text-shadow', 'none', 'important'); e.style.setProperty('-webkit-text-fill-color', 'transparent', 'important');
+    e.style.setProperty('transition', 'none', 'important'); e.style.setProperty('color', 'transparent', 'important'); e.style.setProperty('text-shadow', 'none', 'important'); e.style.setProperty('-webkit-text-fill-color', 'transparent', 'important');
     return { couleur, x: r.left, y: r.top, w: r.width, h: r.height };
   });
   if (!info || info.w < 2 || info.h < 2) { await el.evaluate((e) => { e.setAttribute('style', e.getAttribute('data-banc-style') || ''); e.removeAttribute('data-banc-style'); }); return null; }
-  await pg.waitForTimeout(30);
+  await pg.waitForTimeout(60);
   let buf = null;
   try { buf = await pg.screenshot({ clip: { x: Math.max(0, info.x), y: Math.max(0, info.y), width: Math.max(2, info.w), height: Math.max(2, info.h) }, animations: 'disabled' }); } catch (_) {}
   await el.evaluate((e) => { const g = e.getAttribute('data-banc-style'); if (g) e.setAttribute('style', g); else e.removeAttribute('style'); e.removeAttribute('data-banc-style'); });
