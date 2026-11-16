@@ -195,6 +195,7 @@ const MESURE = () => {
             dit(MT.pleins.length <= 1, `${k} Ventes (Tous) : B au plus UN bouton bleu plein sur l'écran`, JSON.stringify(MT.pleins));
             if (!tel) dit(MT.larges.length === 0, `${k} Ventes (Tous) : W aucun bouton plus large que la moitié de la liste (${MT.lw} px)`, JSON.stringify(MT.larges));
             await pg.click('[data-filtre-site] button[data-site="vinted"]').catch(() => {});
+            if (process.env.VAV_MUTATION === 'logo-au-bout') await pg.addStyleTag({ content: '.vrm-fu-vente-l2 > [data-fu-transp-ligne]{order:99!important}' });
             if (process.env.VAV_MUTATION === 'sans-logo') await pg.addStyleTag({ content: '.vrm-sale-row[data-tx="9611"] [data-fu-transp-ligne]{display:none!important}' });
             await pg.waitForFunction(() => document.querySelectorAll('[data-fu-imprimer]').length >= 3 && [...document.querySelectorAll('.vrm-sale-row[data-tx]')].filter((e) => e.getBoundingClientRect().height > 0 && getComputedStyle(e).visibility !== 'hidden').length >= 6, null, { timeout: 40000 }).catch(() => {});
             await pg.waitForTimeout(1500);
@@ -230,12 +231,17 @@ const MESURE = () => {
               // Le logo VISIBLE (un par ligne) : au téléphone dans « N° · Vinted · logo · compte », juste après « Vinted » ;
               // à l'ordinateur en tête de « compte · date » (colonne Article). Même endroit sur toutes les lignes d'une taille.
               const parTx = rows.map((r) => { const tous = [...r.querySelectorAll('[data-fu-transp-ligne]')]; const lgs = tous.filter((x) => vis(x)); const lg = lgs[0] || tous[0] || null;
-                const l2 = tel ? r.querySelector('.vrm-fu-vente-l2') : r.querySelector('.vrm-ledger-sale-sous'); const site = tel ? (l2 && l2.querySelector('.vrm-fu-site')) : null;
+                // (16 nov., ventes-clair) Sur Ventes · Vinted, « Vinted » est tu (il ne liste que Vinted) : le repère est alors la
+                // plaque N° ; le logo est le PREMIER élément visible après lui (aucun autre entre les deux).
+                const l2 = tel ? r.querySelector('.vrm-fu-vente-l2') : r.querySelector('.vrm-ledger-sale-sous'); const siteVu = tel ? (l2 && l2.querySelector('.vrm-fu-site')) : null;
+                const site = siteVu && vis(siteVu) ? siteVu : (tel && l2 ? l2.querySelector('[data-fu-num], .vrm-num') : null);
                 const lr = lgs.length === 1 ? lgs[0].getBoundingClientRect() : null; const sr = site ? site.getBoundingClientRect() : (l2 ? { right: l2.getBoundingClientRect().left + 1, top: lr ? lr.top : 0, bottom: lr ? lr.bottom : 0 } : null);
                 const fr = r.querySelector('[data-frise-ligne], [data-fu-frise]'); const fb = fr && vis(fr) ? fr.getBoundingClientRect().bottom : null;
                 const enfants = [...r.querySelectorAll('[data-rangee-bord], [data-gestes-ligne], [data-vente-notes], .vrm-fu-apres, .vrm-remise-ligne')].filter(vis);
                 const bas = fb == null ? null : Math.max(fb, ...enfants.map((e) => e.getBoundingClientRect().bottom));
-                return { tx: r.getAttribute('data-tx'), cle: lg ? lg.getAttribute('data-fu-transp-ligne') : '', vu: !!lr, dansL2: !!(lgs[0] && l2 && l2.contains(lgs[0])), apresSite: !!(lr && sr && (tel ? lr.left >= sr.right - 1 && Math.abs((lr.top + lr.bottom) / 2 - (sr.top + sr.bottom) / 2) < 6 : Math.abs(lr.left - l2.getBoundingClientRect().left) < 2)),
+                return { tx: r.getAttribute('data-tx'), cle: lg ? lg.getAttribute('data-fu-transp-ligne') : '', vu: !!lr, dansL2: !!(lgs[0] && l2 && l2.contains(lgs[0])), apresSite: !!(lr && sr && (tel ? lr.left >= sr.right - 1 && Math.abs((lr.top + lr.bottom) / 2 - (sr.top + sr.bottom) / 2) < 6
+                    && ![...l2.children].some((c) => c !== site && !c.contains(lgs[0]) && vis(c) && c.getBoundingClientRect().left >= sr.right - 1 && c.getBoundingClientRect().right <= lr.left + 1 && c.getBoundingClientRect().width > 2)
+                    : Math.abs(lr.left - l2.getBoundingClientRect().left) < 2)),
                   dansRangee: !!r.querySelector('[data-rangee-bord] .vrm-puce-transp, [data-rangee-bord] [data-fu-transporteur]'), vide: bas == null ? null : Math.round(r.getBoundingClientRect().bottom - bas), rien: !enfants.length }; });
               const partie = (() => { const r = document.querySelector('.vrm-sale-row[data-tx="9604"]'); if (!r) return null; const f = r.querySelector('[data-fu-frise]');
                 const seg = (c) => { const e = f && f.querySelector(`[data-fu-etape="${c}"]`); return e ? { fait: e.getAttribute('data-fait'), cours: e.hasAttribute('data-cours') } : null; };
