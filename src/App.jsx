@@ -17442,6 +17442,8 @@ const ICON_PATHS = {
   invite: <><circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19.5a5.5 5.5 0 0 1 11 0"/><path d="M18.5 8v6M15.5 11h6"/></>,
   // (15 nov.) « Nouveaux comptes » (le propriétaire) : un téléphone et la personne qui arrive.
   nouveauCompte: <><rect x="6.5" y="2.5" width="11" height="19" rx="2.6"/><circle cx="12" cy="10" r="2.4"/><path d="M8.6 16.4a3.6 3.6 0 0 1 6.8 0"/></>,
+  // (16 nov., lot transporteurs-suivi) « Suivi Colissimo et UPS » (Paramètres) : un colis et une loupe.
+  suiviColis: <><path d="M3 7 9.5 3.5 16 7v6.5L9.5 17 3 13.5V7Z"/><path d="M3 7l6.5 3.5L16 7M9.5 10.5V17"/><circle cx="17" cy="17" r="3"/><path d="m19.2 19.2 2.3 2.3"/></>,
   ampoule: <><path d="M9.5 17.5h5"/><path d="M10.5 20.5h3"/><path d="M12 3.5a5.8 5.8 0 0 0-3.4 10.5c.6.5.9 1.1.9 1.8v.2h5v-.2c0-.7.3-1.3.9-1.8A5.8 5.8 0 0 0 12 3.5Z"/></>,
 };
 // Tuile d'icône façon réglages iOS : un carré arrondi teinté, une icône au

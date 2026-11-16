@@ -304,6 +304,9 @@ export function departsAInterroger({ sortants = [], departs = new Map(), entrant
     if (v != null && maintenant - v > FENETRE_DEPART_J * 86400000) continue;
     const t = departs instanceof Map ? departs.get(k) : null;
     if (t && t.carrier && t.carrier !== carrier) continue;
+    // (16 nov.) Mondial Relay sans code postal prouvé ni étiquette à lire (une vente Vestiaire, un bordereau sans
+    // n° de transaction) : rien à essayer, jamais deviné ⇒ pas choisi (aucune place prise, aucune ligne écrite).
+    if (carrier === 'mondialrelay' && !(t && t.cp) && !idPdfDuSortant(s.cle)) continue;
     const quand = prochainEssaiDepart(t);
     if (!(quand <= maintenant)) continue;
     items.push({ carrier, suivi: k, cle: String(s.cle == null ? '' : s.cle), quand, v: v == null ? Infinity : v, pris: !!(t && msDe(t.priseAt) != null) ? 1 : 0 });

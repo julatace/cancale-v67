@@ -2132,7 +2132,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         el:<SmsColisSetting jeton={jetonSms} onJeton={(v)=>{ save('vrm_sms_token', v); setJetonSms(v); }} toast={toast}/> },
       // (16 nov., lot transporteurs-suivi) SES clés gratuites La Poste / UPS : le suivi Colissimo et UPS lu par le serveur
       // avec SA clé seulement (§2.9), rangée chiffrée (api/_lib/cles-transporteurs.js). Session exigée.
-      AUTH.user && { id:'cles-suivi', type:'panneau', nu:true, ic:'truck', lib:tr('reglages.cles-suivi.lib'), desc:tr('reglages.cles-suivi.desc'), data:{ 'data-reglage-cles-suivi':'' },
+      AUTH.user && { id:'cles-suivi', type:'panneau', nu:true, ic:'suiviColis', lib:tr('reglages.cles-suivi.lib'), desc:tr('reglages.cles-suivi.desc'), data:{ 'data-reglage-cles-suivi':'' },
         el:<ClesSuivi enTete={enTeteSession} toast={toast}/> },
       proprioInst && { id:'import', type:'panneau', nu:true, ic:'calendar', lib:tr('reglages.import.lib'), desc:tr('reglages.import.desc'), el:<EmailStartSetting key={AUTH.user?.id||'sans-session'} nu/> },
     ]},

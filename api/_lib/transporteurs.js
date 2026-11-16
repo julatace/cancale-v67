@@ -711,7 +711,7 @@ export function lireReponseMondialRelayMvc(statut, ctype, corps, { suivi = '', c
 }
 // ══ (13 nov., lot 89) COLISSIMO / LA POSTE — API officielle « Suivi v2 » ═══════
 // `GET https://api.laposte.fr/suivi/v2/idships/{n}?lang=fr_FR`, en-têtes `Accept: application/json`
-// et `X-Okapi-Key` (la clé de l'installation, `LAPOSTE_OKAPI_KEY`). FORME (documentation Okapi
+// et `X-Okapi-Key` (16 nov. : la clé DU VENDEUR, api/_lib/cles-transporteurs.js). FORME (documentation Okapi
 // « Suivi v2 », recoupée par deux clients publics qui la lisent — e-amzallag/laposte-suivi-api,
 // rigwild/suivi-poste) :
 //   { lang, scope, returnCode: 200, shipment: { idShip, holder, product, isFinal, entryDate,
@@ -796,7 +796,7 @@ export function lireReponseLaPoste(statut, ctype, corps, { suivi = '' } = {}) {
 // `GET https://onlinetools.ups.com/api/track/v1/details/{n}?locale=fr_FR` avec `Authorization:
 // Bearer <jeton>`, `transId` (unique par requête) et `transactionSrc` (le nom de l'appelant). Le
 // jeton : `POST https://onlinetools.ups.com/security/v1/oauth/token`, `grant_type=client_credentials`,
-// Basic(UPS_CLIENT_ID:UPS_CLIENT_SECRET) — mis en cache jusqu'à son `expires_in`.
+// Basic(Client ID:Client Secret DU VENDEUR, 16 nov.) — mis en cache jusqu'à son `expires_in`, par vendeur.
 // FORME (spécification OpenAPI publiée par UPS, Tracking.yaml) :
 //   { trackResponse: { shipment: [{ inquiryNumber, warnings: [{ code, message }], package: [{
 //       trackingNumber, currentStatus, deliveryDate: [{ type: SDD|RDD|DEL, date: AAAAMMJJ }],
