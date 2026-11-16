@@ -285,6 +285,22 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
   .vrm-statistiques-premium > :is(.vrm-lien-action, .vrm-fc, .vrm-cv, .vrm-ac-section),
   .vrm-set-retour, .vrm-set-sous-h, .vrm-boite-vide-lecture) [style*="background"] *) { color: var(--sv-clair-2) !important; }
 
+/* (16 nov., intégration, capture de Julien) Paramètres → « Tout va bien ? » : les titres de groupe iOS (« Vinted »,
+   « Leboncoin », « Où tourne l'extension ») et leur pied sont posés DIRECTEMENT sur le fond — en gris d'encre (--d-gris),
+   1,1:1 sur le bleu au clair. L'encre claire seconde, comme les titres de groupe des autres sous-pages (la carte,
+   `.vrm-ios-carte`, garde son encre sombre). Banc tout-va-bien : contraste mesuré sur le fond rendu, ≥ 4,5:1. */
+:root:root:root body .vrm-app-shell[data-espace] [data-tout-va-bien] .vrm-ios-groupe > :is(.vrm-ios-groupe-titre, .vrm-ios-groupe-pied) {
+  --d-gris: var(--sv-clair-2) !important; --w-gris: var(--sv-clair-2) !important; color: var(--sv-clair-2) !important;
+}
+/* (16 nov., intégration, capture de Julien) Stock au téléphone : le bandeau d'une pile (« N°2 et N°3 sont descendus d'un
+   cran » · « Compris ») est posé sur le fond — encre sombre et lien d'accent, 2,0:1 et 1,0:1 au clair. L'encre claire et le
+   lien clair. À l'ordinateur le meuble est dans le volet de verre du centre (.vrm-st4-centre) : l'encre sombre y reste.
+   Banc stock-etageres, V6 (contraste mesuré sur le fond rendu). */
+:root:root:root body .vrm-app-shell[data-espace] .vrm-etag-descente:not(.vrm-st4-centre *) {
+  --vrm-ink: var(--sv-clair) !important; --sb-lien: var(--sv-clair-lien) !important; color: var(--sv-clair) !important;
+}
+:root:root:root body .vrm-app-shell[data-espace] .vrm-etag-descente:not(.vrm-st4-centre *) .sb-lien { color: var(--sv-clair-lien) !important; text-decoration: underline; text-underline-offset: 3px; }
+
 /* ══ 7. LES SURFACES REMETTENT L'ENCRE SOMBRE (une touche, une carte dans une tête claire reste lisible) ══ */
 :root:root:root body .vrm-app-shell[data-espace] :is(
   .sj-tete, .sj-affiche, .vrm-screen-head, .vrm-tete-row, .sb-tete, .sb-surtitre, .sb-ecran-titre, .vrm-fu-date-tete, .vrm-tache-tete,

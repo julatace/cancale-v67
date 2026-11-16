@@ -201,6 +201,28 @@ async function scenario(b, scen, largeur, sombre) {
   await pg.evaluate(() => { const e = document.querySelector('[data-tout-va-bien]'); if (e) e.scrollIntoView({ block: 'start' }); });
   await pg.waitForTimeout(300);
   await pg.screenshot({ path: path.join(CAPT, `tout-va-bien-${nom}.png`) }).catch(() => {});
+  // (16 nov., intégration, capture de Julien) Les titres de groupe (« Vinted », « Leboncoin », « Où tourne l'extension »)
+  // sont posés sur le fond bleu : presque illisibles en gris. Contraste ≥ 4,5:1 mesuré sur le fond RENDU (la zone du
+  // titre capturée, son texte masqué, la couleur moyenne décodée), jamais sur une couleur supposée.
+  const titres = await pg.evaluate(() => [...document.querySelectorAll('[data-tout-va-bien] .vrm-ios-groupe-titre')].filter((e) => e.getClientRects().length).map((e, i) => { e.setAttribute('data-sonde-titre', String(i)); return i; }));
+  const contrastes = [];
+  for (const i of titres) {
+    const m = await pg.evaluate((i) => { const e = document.querySelector(`[data-sonde-titre="${i}"]`); e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); const c = getComputedStyle(e).color; e.style.setProperty('color', 'transparent', 'important'); e.style.setProperty('text-shadow', 'none', 'important'); return { x: r.left, y: r.top, w: r.width, h: r.height, c, t: e.textContent.trim() }; }, i);
+    await pg.waitForTimeout(150);
+    const clip = { x: Math.max(0, m.x), y: Math.max(0, m.y), width: Math.max(2, Math.min(m.w, largeur - Math.max(0, m.x))), height: Math.max(2, m.h) };
+    const png = await pg.screenshot({ clip }).catch(() => null);
+    await pg.evaluate((i) => { const e = document.querySelector(`[data-sonde-titre="${i}"]`); e.style.removeProperty('color'); e.style.removeProperty('text-shadow'); e.removeAttribute('data-sonde-titre'); }, i);
+    if (!png) { contrastes.push({ t: m.t, ratio: null }); continue; }
+    const p2 = await b.newPage();
+    const fond = await p2.evaluate(async (b64) => { const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode(); const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d'); x.drawImage(img, 0, 0); const d = x.getImageData(0, 0, c.width, c.height).data; let r = 0, g = 0, bl = 0, n = 0; for (let k = 0; k < d.length; k += 4) { r += d[k]; g += d[k + 1]; bl += d[k + 2]; n++; } return [r / n, g / n, bl / n]; }, png.toString('base64'));
+    await p2.close();
+    const v = (String(m.c).match(/[\d.]+/g) || []).map(Number); const a = v.length > 3 ? v[3] : 1;
+    const texte = [0, 1, 2].map((k) => v[k] * a + fond[k] * (1 - a));
+    const L = (rgb) => { const f = (x) => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }; return 0.2126 * f(rgb[0]) + 0.7152 * f(rgb[1]) + 0.0722 * f(rgb[2]); };
+    const l1 = L(texte), l2 = L(fond);
+    contrastes.push({ t: m.t, ratio: Math.round(((Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)) * 100) / 100 });
+  }
+  dit(contrastes.length >= 2 && contrastes.every((x) => x.ratio != null && x.ratio >= 4.5), `${nom} : les titres de groupe lisibles sur le fond rendu (contraste ≥ 4,5:1)`, JSON.stringify(contrastes));
   dit(!errs.length, `${nom} : aucune erreur d’app`, errs.join(' | ').slice(0, 200));
   await ctx.close();
 }

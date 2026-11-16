@@ -209,6 +209,9 @@
      la feuille « ⋯ » (right 12 px, 460 px) débordait alors de 12 px à GAUCHE du panneau, coupée — plus de marge à
      gauche. Le fond de la fiche D est opaque (--fd-feuille) : le flou n'y montrait rien. Banc stock-etageres, K8. */
   :root:root:root:root:root:root:root:root body .vrm-fp.fd.fd-ordi.sb-plan { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+  /* … et la montée d'une fiche ouverte depuis sa ligne (`vrm-fp-monte`, remplissage `both`) laissait translateY(0) — une
+     transformation, donc le même cadre. Remplie seulement AVANT (elle part d'en bas), plus rien après : transform none. */
+  :root:root:root:root:root:root:root:root body .vrm-fp.fd.fd-ordi.is-depuis-ligne { animation-fill-mode: backwards !important; }
   /* Souris : les cibles restent confortables, et le survol se voit. */
   :root:root:root:root:root:root:root:root body .vrm-fp.fd.fd-ordi :is(.fd-seg-b, .fd-tuile, .fd-plein):hover { filter: brightness(.97); }
 }

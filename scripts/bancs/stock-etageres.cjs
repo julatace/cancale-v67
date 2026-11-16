@@ -103,6 +103,24 @@ const srv = http.createServer((q, r) => {
 srv.on('error', (e) => { console.log('KO  le port ' + PORT + ' est pris (' + e.code + ')'); process.exit(1); });
 srv.listen(PORT);
 
+// (16 nov., intégration) Le contraste d'un texte sur le fond RENDU : sa zone capturée, le texte masqué, la couleur moyenne
+// décodée dans le navigateur — jamais une couleur supposée (le fond est un dégradé, parfois un verre).
+async function contraste(pg, sel) {
+  const m = await pg.evaluate((sel) => { const e = document.querySelector(sel); if (!e) return null; e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); const c = getComputedStyle(e).color; e.setAttribute('data-sonde-contraste', ''); e.style.setProperty('color', 'transparent', 'important'); e.style.setProperty('text-shadow', 'none', 'important'); return { x: r.left, y: r.top, w: r.width, h: r.height, c, vw: innerWidth, t: (e.textContent || '').trim().slice(0, 30) }; }, sel);
+  if (!m) return null;
+  await pg.waitForTimeout(200);
+  const png = await pg.screenshot({ clip: { x: Math.max(0, m.x), y: Math.max(0, m.y), width: Math.max(2, Math.min(m.w, m.vw - Math.max(0, m.x))), height: Math.max(2, m.h) } }).catch(() => null);
+  await pg.evaluate(() => { const e = document.querySelector('[data-sonde-contraste]'); if (e) { e.style.removeProperty('color'); e.style.removeProperty('text-shadow'); e.removeAttribute('data-sonde-contraste'); } });
+  if (!png) return { t: m.t, ratio: null };
+  const p2 = await pg.context().browser().newPage();
+  const fond = await p2.evaluate(async (b64) => { const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode(); const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d'); x.drawImage(img, 0, 0); const d = x.getImageData(0, 0, c.width, c.height).data; let r = 0, g = 0, bl = 0, n = 0; for (let k = 0; k < d.length; k += 4) { r += d[k]; g += d[k + 1]; bl += d[k + 2]; n++; } return [r / n, g / n, bl / n]; }, png.toString('base64'));
+  await p2.close();
+  const v = (String(m.c).match(/[\d.]+/g) || []).map(Number); const a = v.length > 3 ? v[3] : 1;
+  const L = (rgb) => { const f = (x) => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }; return 0.2126 * f(rgb[0]) + 0.7152 * f(rgb[1]) + 0.0722 * f(rgb[2]); };
+  const l1 = L([0, 1, 2].map((k) => v[k] * a + fond[k] * (1 - a))), l2 = L(fond);
+  return { t: m.t, ratio: Math.round(((Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)) * 100) / 100 };
+}
+
 async function rendre(b, tel, sombre, larg = 1512) {
   const ctx = await b.newContext({ viewport: tel ? { width: 390, height: 844 } : { width: larg, height: 950 }, ...(tel ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}), colorScheme: sombre ? 'dark' : 'light' });
   const pg = await ctx.newPage();
@@ -324,7 +342,7 @@ async function personnaliser(pg, t, v, tel, r) {
           await ouvrirPlus(pg);
           // ── K8 (16 nov., intégration, capture de Julien) : à 1512 la feuille « ⋯ » de la fiche ouverte depuis une case
           //    débordait de 12 px à gauche du panneau (coupée) : plus de marge. Elle tient DANS la fiche, ses tuiles à ≥ 12 px du bord.
-          const K8 = await pg.evaluate(() => { const fp = document.querySelector('.vrm-fp.fd'), f = document.querySelector('.vrm-fp .fd-plus:not([hidden]) .fd-plus-f'), t = document.querySelector('.vrm-fp .fd-plus:not([hidden]) .fd-tuile'); if (!fp || !f || !t) return null; const a = fp.getBoundingClientRect(), b = f.getBoundingClientRect(), c = t.getBoundingClientRect(); return { fiche: [Math.round(a.left), Math.round(a.right)], feuille: [Math.round(b.left), Math.round(b.right)], marge: Math.round(c.left - Math.max(a.left, b.left)) }; });
+          const K8 = await pg.evaluate(() => { const fp = document.querySelector('.vrm-fp.fd'), f = document.querySelector('.vrm-fp .fd-plus:not([hidden]) .fd-plus-f'), t = document.querySelector('.vrm-fp .fd-plus:not([hidden]) .fd-tuile'); if (!fp || !f || !t) return null; const a = fp.getBoundingClientRect(), b = f.getBoundingClientRect(), c = t.getBoundingClientRect(); const cadres = []; for (let e = f.parentElement.parentElement; e && e !== document.documentElement; e = e.parentElement) { const k = getComputedStyle(e); const q = [k.transform !== 'none' && ('transform:' + k.transform + ' anim:' + k.animationName + ' ' + k.animationPlayState), k.filter !== 'none' && 'filter', (k.backdropFilter || k.webkitBackdropFilter || 'none') !== 'none' && 'backdrop', k.contain !== 'none' && 'contain:' + k.contain, k.willChange !== 'auto' && 'will-change:' + k.willChange, k.perspective !== 'none' && 'perspective', (k.containerType || 'normal') !== 'normal' && 'container'].filter(Boolean); if (q.length) cadres.push((e.className || e.tagName).toString().slice(0, 40) + ' ' + q.join('+')); } return { fiche: [Math.round(a.left), Math.round(a.right)], feuille: [Math.round(b.left), Math.round(b.right)], marge: Math.round(c.left - Math.max(a.left, b.left)), cadres }; });
           dit(!!K8 && K8.feuille[0] >= K8.fiche[0] - 1 && K8.feuille[1] <= K8.fiche[1] + 1 && K8.marge >= 12, `${t} · K8 : la feuille « ⋯ » tient dans la fiche, ses tuiles à ≥ 12 px du bord gauche`, K8);
           // les rangées du STOCK (src/stockAnnonces.js, par identité) ; la vue « Sites » de la fiche D a sa propre règle (Prix partout)
           const fs2 = await pg.evaluate(() => { const l = [...document.querySelectorAll('[data-stock-fiche] .vrm-etag-fiche-site[data-fiche-site]')]; return l.map((x) => x.getAttribute('data-fiche-site') + ':' + (x.getAttribute('data-compte') || '') + ':' + x.textContent.replace(/\s+/g, ' ').trim()); });
@@ -423,6 +441,10 @@ async function personnaliser(pg, t, v, tel, r) {
         const fois = await pg.evaluate(() => [...document.querySelectorAll('body *')].filter((e) => e.children.length === 0 && /descendus? d/.test(e.textContent || '') && !e.closest('[data-descente]')).length);
         const reste = await pg.evaluate(() => !!document.querySelector('[data-descente]'));
         dit(fois === 0 && reste, `${t} · V5 : la descente est dite UNE fois (le bandeau du meuble, qui reste jusqu'à « Compris »), aucun message par-dessus`, { fois, reste });
+        // ── V6 (16 nov., intégration, capture de Julien) : le nom de la pile, son bandeau et « Compris » lisibles là où ils sont
+        //    posés (sur le bleu au téléphone, sur le verre du volet à l'ordinateur) : ≥ 4,5:1 sur le fond RENDU.
+        const lis = [await contraste(pg, `[data-meuble="${P}"] .vrm-s2d-nom`), await contraste(pg, `[data-meuble="${P}"] [data-descente] > span`), await contraste(pg, `[data-meuble="${P}"] [data-descente] .sb-lien`)];
+        dit(lis.every((x) => x && x.ratio != null && x.ratio >= 4.5), `${t} · V6 : « Pile test », la descente et « Compris » lisibles sur leur fond (≥ 4,5:1)`, lis);
         const cote = await pg.evaluate(() => { const ss = [...document.querySelectorAll('[data-meuble]')]; const e = ss.find((x) => x.querySelector('.vrm-s2d-nom') && x.querySelector('.vrm-s2d-nom').textContent === 'Étagère test'); const p = ss.find((x) => x.querySelector('.vrm-s2d-nom') && x.querySelector('.vrm-s2d-nom').textContent === 'Pile test'); if (!e || !p) return null; const a = e.getBoundingClientRect(), b = p.getBoundingClientRect(); const g = p.querySelector('.vrm-s2d-etagere').getBoundingClientRect(), tt = p.querySelector('.vrm-s2d-tete').getBoundingClientRect(); return { memeLigne: Math.abs(a.bottom - b.bottom) < 3 && b.left > a.right - 1, ew: Math.round(a.width), pw: Math.round(g.width), teteADroite: tt.left >= g.right - 1 }; });
         if (tel) dit(!!cote && cote.pw <= 200 && cote.teteADroite, `${t} · V4 : la pile garde la largeur de ses cartons, son nom et ses gestes à côté (pas de grand vide)`, cote);
         const fichesApres = await pg.evaluate(() => { try { const f = JSON.parse(localStorage.getItem('vinted_annonce_numeros')); return Object.values(f).filter((x) => x && x.numero).length; } catch (_) { return -1; } });
