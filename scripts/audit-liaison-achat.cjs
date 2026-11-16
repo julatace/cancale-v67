@@ -31,14 +31,15 @@ const { execFileSync } = require('child_process');
 const R = path.join(__dirname, '..');
 const MUTS = {
   'marque-ignoree': ['src/liaisonAchat.js', "if (!ok) return null; }", '}'],
-  'unicite-article': ['src/liaisonAchat.js', 'if (b.score - s2 < ECART_TRES_PROBABLE) continue;', ''],
-  'unicite-achat': ['src/liaisonAchat.js', 'if (b.score - s2a < ECART_TRES_PROBABLE) continue;', ''],
+  // (16 nov., relier-fiable) L'affectation exclusive : meilleur couple d'abord, dominance mutuelle.
+  'unicite-article': ['src/liaisonAchat.js', '    if (e.score - rival < ECART_TRES_PROBABLE) continue;\n', ''],
+  'unicite-achat': ['src/liaisonAchat.js', '    if (e.score - rivalA < ECART_TRES_PROBABLE) continue;\n', ''],
   'version-ignoree': ['src/liaisonAchat.js', 'if (va && va !== v) return null;', ''],
   'taille-ignoree': ['src/liaisonAchat.js', 'if (ta.taille && !tailleOk && !ta.us) return null;', ''],
-  'couleur-ignoree': ['src/liaisonAchat.js', 'if (!couleur) return null; }', '}'],
+  'couleur-ignoree': ['src/liaisonAchat.js', "  if (accord === '') return null;\n", ''],
   'posterieur': ['src/liaisonAchat.js', 'if (!Number.isFinite(A.date) || (Number.isFinite(P.ref) && !(A.date < P.ref))) return null;', ''],
   'refus-ignore': ['src/liaisonAchat.js', "if (refus.size && refus.has(P.key + '>' + A.tx)) return null;", ''],
-  'lot-tres-probable': ['src/liaisonAchat.js', 'const fort = !A.lot && score', 'const fort = score'],
+  'lot-tres-probable': ['src/liaisonAchat.js', 'const fort = !A.lot && !generique && score', 'const fort = !generique && score'],
   'un-seul-sens': ['src/liaisonAchat.js', 'couv = ((tot > 0 ? com / tot : 0) + (totA > 0 ? com / totA : 0)) / 2;', 'couv = tot > 0 ? com / tot : 0;'],
   'sans-chrono': ['src/liaisonAchat.js', 'if (jours != null) score += POIDS.chrono * Math.exp(-jours / POIDS.chronoJours);', ''],
   // (deux gardes : l'index ne pèse que les achats qui partagent un mot, et `evaluer` exige un mot commun)
@@ -149,7 +150,10 @@ function jeu() {
   const pc = (x, n) => Math.round((100 * x) / n);
   const avant = S0 ? mesurer((c) => S0.suggestionsAchat({ cible: { titre: c.titre, marque: c.marque, taille: c.taille, dateRef: c.dateRef }, achats, liens: new Map(), ...regles, max: 3 }).map((s) => String(s.achat.transaction_id)).indexOf(verite[c.key])) : { t1: 0, t3: 0, n: cibles.length };
   const res = L.affecterPropositions({ cibles, achats, liens: new Map(), ...regles });
-  const apres = mesurer((c) => (res.parArticle[c.key] || []).map((p) => String(p.achat.transaction_id)).indexOf(verite[c.key]));
+  // (16 nov., relier-fiable) L'ordre que voit Julien : la « très probable » en ligne (au plus une), puis les PISTES
+  // (repliées dans la feuille « Choisir un autre achat »).
+  const rangs = (r, k) => [...(r.parArticle[k] || []), ...((r.pistes || {})[k] || [])];
+  const apres = mesurer((c) => rangs(res, c.key).map((p) => String(p.achat.transaction_id)).indexOf(verite[c.key]));
   console.log(`   ancienne règle : top-1 ${apres.n ? pc(avant.t1, avant.n) : 0} % (${avant.t1}/${avant.n}) · top-3 ${pc(avant.t3, avant.n)} %`);
   console.log(`   nouvelle règle : top-1 ${pc(apres.t1, apres.n)} % (${apres.t1}/${apres.n}) · top-3 ${pc(apres.t3, apres.n)} % · très probables ${res.tresProbables.length}`);
   dit(apres.t1 >= Math.ceil(0.75 * apres.n), 'P1 top-1 ≥ 75 % (le bon achat proposé en premier)', `${apres.t1}/${apres.n}`);
@@ -158,42 +162,44 @@ function jeu() {
   const fausses = res.tresProbables.filter((x) => verite[x.key] !== x.tx);
   dit(res.tresProbables.length >= 6 && !fausses.length, 'P4 des « très probables » (6 au moins), aucune fausse', JSON.stringify({ n: res.tresProbables.length, fausses }));
   const durs = cibles.slice(-2).map((c) => (res.parArticle[c.key] || [])[0]);
-  dit(durs.every((p) => !p || p.niveau === 'possible'), 'P5 les cas durs (titre d’achat sans modèle, plusieurs achats aussi proches) restent « possible »');
+  dit(durs.every((p) => !p || p.niveau !== 'tres-probable'), 'P5 les cas durs (titre d’achat sans modèle, plusieurs achats aussi proches) restent « possible »');
 
   console.log('\n── I. « Même avec 50 articles identiques, tu ne dois pas pouvoir te tromper »');
   const memes = Array.from({ length: 50 }, (_, i) => ({ key: 'a:' + i, titre: 'Nike Air Max 90 noir taille 42', taille: '42', dateRef: new Date(T0 + 30 * J).toISOString() }));
   const achatsMemes = Array.from({ length: 50 }, (_, i) => ({ transaction_id: 9000 + i, title: 'Nike Air Max 90 noir 42', date: new Date(T0 + (i % 10) * J).toISOString(), price: { amount: '40' }, status: 'Transaction finalisée' }));
   const r50 = L.affecterPropositions({ cibles: memes, achats: achatsMemes, ...regles });
-  dit(r50.tresProbables.length === 0 && memes.every((c) => (r50.parArticle[c.key] || []).length > 0 && r50.parArticle[c.key][0].niveau === 'possible'), 'I1 50 paires identiques × 50 achats identiques : une proposition chacune, AUCUNE « très probable »', String(r50.tresProbables.length));
-  dit(memes.every((c) => r50.parArticle[c.key][0].ambigu === true), 'I1b chacune est dite AMBIGUË (« à toi de choisir »)');
-  const autry = L.propositionsArticle({ cible: { titre: 'Autry reelwind low rose taille 36', marque: 'adidas', taille: '36', dateRef: new Date(T0 + 30 * J).toISOString() }, achats: [{ transaction_id: 1, title: '#Adidas Spezial, dunkelblau, Gr. 36', date: new Date(T0).toISOString(), price: { amount: '20' } }], ...regles });
-  const puma = L.propositionsArticle({ cible: { titre: 'Puma suede noir taille 42', taille: '42', dateRef: new Date(T0 + 30 * J).toISOString() }, achats: [{ transaction_id: 2, title: 'Nike suede noir 42', date: new Date(T0).toISOString(), price: { amount: '20' } }, { transaction_id: 3, title: 'Adidas Suede schwarz 42', date: new Date(T0).toISOString(), price: { amount: '20' } }], ...regles });
+  // (16 nov., relier-fiable) Plus rien EN LIGNE : seulement des pistes, repliées, dites ambiguës.
+  dit(r50.tresProbables.length === 0 && memes.every((c) => !(r50.parArticle[c.key] || []).length && (r50.pistes[c.key] || []).length > 0 && r50.pistes[c.key][0].niveau === 'piste'), 'I1 50 paires identiques × 50 achats identiques : AUCUNE proposition en ligne, aucune « très probable » (des pistes repliées)', String(r50.tresProbables.length));
+  dit(memes.every((c) => r50.pistes[c.key][0].ambigu === true), 'I1b chaque piste est dite AMBIGUË (« à toi de choisir »)');
+  const tout = (o) => [...L.propositionsArticle(o), ...L.pistesArticle(o)];
+  const autry = tout({ cible: { titre: 'Autry reelwind low rose taille 36', marque: 'adidas', taille: '36', dateRef: new Date(T0 + 30 * J).toISOString() }, achats: [{ transaction_id: 1, title: '#Adidas Spezial, dunkelblau, Gr. 36', date: new Date(T0).toISOString(), price: { amount: '20' } }], ...regles });
+  const puma = tout({ cible: { titre: 'Puma suede noir taille 42', taille: '42', dateRef: new Date(T0 + 30 * J).toISOString() }, achats: [{ transaction_id: 2, title: 'Nike suede noir 42', date: new Date(T0).toISOString(), price: { amount: '20' } }, { transaction_id: 3, title: 'Adidas Suede schwarz 42', date: new Date(T0).toISOString(), price: { amount: '20' } }], ...regles });
   dit(!autry.length && !puma.length, 'I2 une marque différente n’est jamais proposée (« Autry » marquée « adidas », « Puma » / « Nike »)', JSON.stringify([autry.length, puma.length]));
   const deux = L.affecterPropositions({ cibles: [{ key: 'a:1', titre: 'Asics gel kayano 14 argent taille 42', taille: '42', dateRef: new Date(T0 + 10 * J).toISOString() }, { key: 'a:2', titre: 'Asics gel kayano 14 argent taille 42', taille: '42', dateRef: new Date(T0 + 12 * J).toISOString() }],
     achats: [{ transaction_id: 77, title: 'Asics Gel-Kayano 14 silver 42', date: new Date(T0).toISOString(), price: { amount: '50' } }], ...regles });
-  dit(!deux.tresProbables.length && (deux.parAchat['77'] || []).length === 2, 'I3 un achat proche de DEUX articles n’est « très probable » pour aucun (il choisit)', JSON.stringify(deux.tresProbables));
+  dit(!deux.tresProbables.length && !deux.parAchat['77'] && (deux.pistes['a:1'] || []).length === 1 && (deux.pistes['a:2'] || []).length === 1, 'I3 un achat proche de DEUX articles n’est proposé à aucun (deux pistes : il choisit)', JSON.stringify(deux.tresProbables));
   dit(new Set(res.tresProbables.map((x) => x.tx)).size === res.tresProbables.length, 'I3b un achat n’est jamais « très probable » pour deux articles (jeu P)');
-  const v = L.propositionsArticle({ cible: { titre: 'asics novablast 4 taille 44,5', taille: '44,5', dateRef: new Date(T0 + 10 * J).toISOString() }, achats: [{ transaction_id: 5, title: 'ASICS NovaBlast 3 44,5', date: new Date(T0).toISOString(), price: { amount: '40' } }], ...regles });
+  const v = tout({ cible: { titre: 'asics novablast 4 taille 44,5', taille: '44,5', dateRef: new Date(T0 + 10 * J).toISOString() }, achats: [{ transaction_id: 5, title: 'ASICS NovaBlast 3 44,5', date: new Date(T0).toISOString(), price: { amount: '40' } }], ...regles });
   dit(!v.length, 'I4 deux versions différentes du modèle (« novablast 4 » / « NovaBlast 3 ») : écarté');
-  const post = L.propositionsArticle({ cible: { titre: 'Adidas samba noir taille 40', taille: '40', dateRef: new Date(T0).toISOString() }, achats: [{ transaction_id: 6, title: 'Adidas samba noir 40', date: new Date(T0 + J).toISOString(), price: { amount: '40' } }], ...regles });
+  const post = tout({ cible: { titre: 'Adidas samba noir taille 40', taille: '40', dateRef: new Date(T0).toISOString() }, achats: [{ transaction_id: 6, title: 'Adidas samba noir 40', date: new Date(T0 + J).toISOString(), price: { amount: '40' } }], ...regles });
   dit(!post.length, 'I5 un achat commandé APRÈS la mise en ligne n’est jamais proposé');
-  const c1 = cibles[4]; const avantRefus = (res.parArticle[c1.key] || [])[0];
+  const c1 = cibles[4]; const avantRefus = rangs(res, c1.key)[0];
   const r2 = L.affecterPropositions({ cibles, achats, refus: { [L.cleRefusLiaison(c1.key, verite[c1.key])]: '2026-11-15' }, ...regles });
-  dit(avantRefus && String(avantRefus.achat.transaction_id) === verite[c1.key] && !(r2.parArticle[c1.key] || []).some((p) => String(p.achat.transaction_id) === verite[c1.key]), 'I6 « Ce n’est pas lui » : ce couple n’est plus proposé');
+  dit(avantRefus && String(avantRefus.achat.transaction_id) === verite[c1.key] && !rangs(r2, c1.key).some((p) => String(p.achat.transaction_id) === verite[c1.key]), 'I6 « Ce n’est pas lui » : ce couple n’est plus proposé');
   const lot = L.affecterPropositions({ cibles: [{ key: 'a:9', titre: 'Saucony jazz 81 rouge taille 41', taille: '41', dateRef: new Date(T0 + 8 * J).toISOString() }], achats: [{ transaction_id: 8, title: 'Lot de 2 paires Saucony jazz 81 rouge 41', date: new Date(T0).toISOString(), price: { amount: '60' } }], ...regles });
-  dit((lot.parArticle['a:9'] || []).length === 1 && lot.parArticle['a:9'][0].niveau === 'possible' && !L.aValider(lot.parArticle).length, 'I7 un LOT peut être proposé, jamais « très probable » ni dans « Valider » (le prix de l’article est à saisir)');
-  const p0 = (res.parArticle[cibles[0].key] || [])[0];
+  dit(!(lot.parArticle['a:9'] || []).length && (lot.pistes['a:9'] || []).length === 1 && lot.pistes['a:9'][0].niveau === 'piste' && !L.aValider(lot.parArticle).length, 'I7 un LOT peut être proposé, jamais « très probable » ni dans « Valider » (le prix de l’article est à saisir)');
+  const p0 = rangs(res, cibles[0].key)[0];
   const m = p0 ? L.morceauxPourquoi(p0).map((x) => x.cle) : [];
   dit(m[0] === 'marque' && m.includes('mots') && m.includes('taille') && m.includes('couleur') && m.some((k) => /^jours\.en-ligne\.commande$/.test(k)), 'I8 POURQUOI : marque · mots · taille · couleur · jours depuis la commande', JSON.stringify(m));
-  const recu = L.propositionsArticle({ cible: { titre: 'Nike air max plus bleu taille 47', taille: '47', dateRef: new Date(T0 + 20 * J).toISOString() }, achats: [{ transaction_id: 11, title: 'Nike air max plus blue 47', date: new Date(T0).toISOString(), price: { amount: '70' } }], receptionDe: () => ({ ms: T0 + 18 * J, source: 'clic' }), ...regles });
+  const recu = tout({ cible: { titre: 'Nike air max plus bleu taille 47', taille: '47', dateRef: new Date(T0 + 20 * J).toISOString() }, achats: [{ transaction_id: 11, title: 'Nike air max plus blue 47', date: new Date(T0).toISOString(), price: { amount: '70' } }], receptionDe: () => ({ ms: T0 + 18 * J, source: 'clic' }), ...regles });
   dit(recu.length && recu[0].jours === 2 && L.morceauxPourquoi(recu[0]).some((x) => x.cle === 'jours.en-ligne.retrait' && x.vars.n === '2'), 'I9 la date de RETRAIT lue fait la chronologie (« mise en ligne 2 j après le retrait »)', JSON.stringify(recu[0] && recu[0].pourquoi));
   dit(L.tailleAchat('Nike Zoom Vomero 5 grau US 8', 'nike').taille === '41' && L.tailleAchat('Adidas samba us 9', 'adidas').taille === '42 2/3' && L.tailleAchat('Puma suede US 9', 'puma').taille === '', 'I10 une taille US se convertit par la table de SA marque (sinon : pas su)');
   dit(L.couleursTexte('Salomon xt-6 vert kaki', couleursDe).includes('vert') && L.couleursTexte('Nike dunkelblau', couleursDe).includes('bleu') && L.couleursTexte('Nike Shox schwarz', couleursDe).includes('noir'), 'I11 couleurs du titre en plusieurs langues (kaki, dunkelblau, schwarz)');
 
   const ref = new Date(T0 + 30 * J).toISOString();
-  const un = (titre, taille, titresAchats, joursAvant = 10) => L.propositionsArticle({ cible: { titre, taille, dateRef: ref }, achats: titresAchats.map((t, i) => ({ transaction_id: 700 + i, title: t, date: new Date(T0 + (30 - (Array.isArray(joursAvant) ? joursAvant[i] : joursAvant)) * J).toISOString(), price: { amount: '30' } })), ...regles });
+  const un = (titre, taille, titresAchats, joursAvant = 10) => tout({ cible: { titre, taille, dateRef: ref }, achats: titresAchats.map((t, i) => ({ transaction_id: 700 + i, title: t, date: new Date(T0 + (30 - (Array.isArray(joursAvant) ? joursAvant[i] : joursAvant)) * J).toISOString(), price: { amount: '30' } })), ...regles });
   const deuxAchats = un('Nike Dunk Low panda noir taille 42', '42', ['Nike dunk low panda 42', 'Nike Dunk Low panda noir 42']);
-  dit(deuxAchats.length === 2 && deuxAchats[0].niveau === 'possible' && deuxAchats[0].ambigu, 'I12 un article, deux achats aussi proches ⇒ ni l’un ni l’autre « très probable » (à lui de choisir)', JSON.stringify(deuxAchats.map((p) => [p.score, p.niveau])));
+  dit(deuxAchats.length === 2 && deuxAchats[0].niveau === 'piste' && deuxAchats[0].ambigu, 'I12 un article, deux achats aussi proches ⇒ ni l’un ni l’autre « très probable » (à lui de choisir)', JSON.stringify(deuxAchats.map((p) => [p.score, p.niveau])));
   dit(!un('Adidas samba noir taille 40', '40', ['Adidas samba noir 43']).length, 'I13 tailles écrites des deux côtés et différentes ⇒ écarté');
   dit(!un('Nike dunk low vert taille 42', '42', ['Nike dunk low rouge 42']).length, 'I14 couleurs écrites des deux côtés et sans couleur commune ⇒ écarté');
   dit(!un('Nike zoom fly 5 noir et rose taille 40', '40', ['Nike speakers maat 40']).length, 'I15 aucun mot du modèle en commun ⇒ écarté (« Nike speakers maat 40 »)');
