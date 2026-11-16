@@ -21,10 +21,10 @@ fond teinté sans bord sur chaque champ.
 
 | vue | hauteur | mots | contraste minimum |
 |---|---|---|---|
-| 390 clair | 1 081 px | 96 | 5,07:1 |
-| 390 sombre | 1 081 px | 96 | 6,8:1 |
-| 1512 clair | 738 px | 96 | 5,07:1 |
-| 1512 sombre | 738 px | 96 | 6,8:1 |
+| 390 clair | 1 062 px | 96 | 5,07:1 |
+| 390 sombre | 1 062 px | 96 | 6,8:1 |
+| 1512 clair | 735 px | 96 | 5,07:1 |
+| 1512 sombre | 735 px | 96 | 6,8:1 |
 
 Trois **cartes** de verre (`src/ebay/achats-ebay.css`, encre `--sv-encre`/`--sv-encre-2`) :
 
@@ -65,7 +65,7 @@ règle au détail. Textes neufs par `tr()`, 5 langues (`src/i18n/langues/*/ebaya
   plus) ; une ligne par recherche ; « Me prévenir » ⇒ `veille.alerte` ; détail au toucher ;
   édition 44 px ; Exporter/Historique dans le menu seulement ; une nouvelle annonce visible,
   « Retirer », phrase courte. **Vert** sur la branche ; **rouge** sur le build de `main`
-  (§6.1, 60+ KO) ; mutations (CSS du build) : voir plus bas.
+  (§6.1, 60+ KO). Mutations sur le CSS du build : texte d’exemple pâli (#A0AAB4) ⇒ 2,36:1 rouge ; l’override du champ retiré ⇒ fond teinté, 3,93:1 et « champ sur fond clair » rouges.
 - `scripts/bancs/alertes-ebay.cjs` porté sur la règle (état de chaque alerte sur la ligne de sa
   recherche, interrupteur + prix de revente au détail) : vert.
 - `scripts/bancs/ebay-achats-recherche.cjs` : **déjà rouge sur `main` (36 KO : le bouton
