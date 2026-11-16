@@ -35,7 +35,11 @@ const MUTS = {
   'sans-identite': ['src/relierGlisser.js', "  if (!cible || !w || w.buyFromId == null || String(w.buyFromId) === '') return [];", "  if (!cible || !w) return [];"],
   'vibre-partout': ['src/relierGlisser.js', "  try { if (nav && typeof nav.vibrate === 'function') return nav.vibrate(ms) !== false; } catch (_) {}\n  return false;", '  return true;'],
   'app-cibles-reliees': ['src/App.jsx', '    for (const x of (fileAchat || [])) { const f = x.fiche || numeros[x.id] || {};', "    for (const x of (listings.items || []).map((it) => ({ id: it.id, item: it, ts: it.createdTs }))) { const f = numeros[x.id] || {};"],
-  'app-sans-annuler': ['src/App.jsx', "    gesteVrm(tr('glisser.fait', { qui }), ops,", "    vueDesOps(ops, { vinted_annonce_numeros: setNumeros, vinted_sale_overrides: setSaleOv })('apres'); (() => {})(tr('glisser.fait', { qui }), ops,"],
+  'app-sans-annuler': ['src/App.jsx', "    gesteVrm(res.texte, ops,", "    vueDesOps(ops, { vinted_annonce_numeros: setNumeros, vinted_sale_overrides: setSaleOv })('apres'); (() => {})(res.texte, ops,"],
+  'app-sans-recu': ['src/App.jsx', "cle: String(a.transaction_id || ''), faire: () => ouvrirRecuRelie(a, num) });", "cle: '', faire: () => {} });"],
+  'app-feuille-bulle': ['src/App.jsx', "    const ok = confirmerLiaison(a, cible._saleTx ?", "    const ok = false && confirmerLiaison(a, cible._saleTx ?"],
+  'benefice-sans-frais': ['src/relierGlisser.js', "  const r = typeof ligne === 'function' ? ligne(prix, entree || {}) : null;", "  const r = typeof ligne === 'function' ? ligne(prix, { buyPrice: (entree || {}).buyPrice, fraisComplets: true }) : null;"],
+  'pilule-sans-action': ['src/PiluleAnnuler.jsx', "{v && v.action ? <button", "{false && v.action ? <button"],
   'ecran-defile-pendant': ['src/RelierGlisser.jsx', "if (appui.current && appui.current.phase === 'leve' && e.cancelable) e.preventDefault();", 'void e;'],
   'ecran-bloque-toujours': ['src/RelierGlisser.jsx', "if (appui.current && appui.current.phase === 'leve' && e.cancelable) e.preventDefault();", 'if (e.cancelable) e.preventDefault();'],
 };
@@ -150,11 +154,31 @@ const sans = (s) => s.replace(/\/\/[^\n]*/g, '');
   const textes = Object.entries(FR).filter(([k]) => /^glisser\./.test(k)).map(([, v]) => String(v)).join(' ');
   dit(textes.length > 50 && !/vibr/i.test(textes), 'V3 aucun texte de l’écran ne promet une vibration');
 
-  // ── S · le branchement ──
   const app = sans(APP);
+  // ── R · le résultat d'une liaison : le bénéfice et le reçu (ajout de Julien) ──
+  let BL = null; try { BL = await import(pathToFileURL(path.join(SRC, 'beneficeLigne.js')).href); } catch (_) {}
+  const tA = (k, v) => ({ 'liaison.relieBenef': 'Achat relié · Bénéfice {benef}', 'liaison.relieAffiche': 'Achat relié · Bénéfice {benef} au prix affiché' }[k] || k).replace('{benef}', v.benef);
+  const ap = (o) => (G.texteApresLiaison ? G.texteApresLiaison(o, tA, BL.beneficeLigneVente, BL.texteBenefice) : { texte: '' });
+  const nb = (x) => String(x).replace(/\u00a0/g, ' ');
+  dit(BL && nb(ap({ genre: 'vente', prix: '60.00', entree: { buyPrice: '37.43', fraisComplets: true } }).texte) === 'Achat relié · Bénéfice +22,57 €', 'R1 vente 60 € − achat 37,43 €, frais confirmés ⇒ « Achat relié · Bénéfice +22,57 € » (la règle de la ligne)', BL ? nb(ap({ genre: 'vente', prix: '60.00', entree: { buyPrice: '37.43', fraisComplets: true } }).texte) : 'beneficeLigne absent');
+  dit(BL && nb(ap({ genre: 'vente', prix: '60.00', entree: { buyPrice: '37.43', commission: '3.00' } }).texte) === 'Achat relié · Bénéfice au plus +19,57 €', 'R2 frais pas confirmés ⇒ « au plus » (la règle), les frais connus déduits');
+  dit(BL && nb(ap({ genre: 'vente', prix: null, entree: { buyPrice: '37.43' } }).texte) === 'Achat relié · Bénéfice —', 'R3 prix pas lu ⇒ « — » (jamais un 0)');
+  dit(BL && /au prix affiché$/.test(nb(ap({ genre: 'annonce', prix: 70, entree: { buyPrice: '40' } }).texte)), 'R4 une annonce pas vendue : le bénéfice au prix affiché');
+  const pil = (() => { try { return fs.readFileSync(path.join(SRC, 'PiluleAnnuler.jsx'), 'utf8'); } catch (_) { return ''; } })();
+  dit(/\{v && v\.action \? <button[^>]*data-pilule-autre=/.test(pil), 'R5 la pilule offre le second geste (« Reçu »), à côté d’« Annuler »');
+  {
+    const g = GA.creerGestes({ minuterie: () => 0, arreter: () => {} }); let vu = null; g.abonner ? g.abonner((x) => { vu = x; }) : null;
+    let fait = 0; const id = g.lancer({ texte: 'x', cles: [], vue: () => {}, ecrire: async () => ({ ok: true }), action: { libelle: 'Reçu', cle: '42', faire: () => { fait++; } } });
+    const v = (g.instantane ? g.instantane() : vu || {}).visible || (vu && vu.visible) || null;
+    dit(id && v && v.action && v.action.libelle === 'Reçu' && v.action.cle === '42', 'R6 le geste porte son action « Reçu » (n° de l’achat)', JSON.stringify(v && v.action));
+  }
+  dit(/const confirmerLiaison = [\s\S]{0,3000}?\{ libelle: [^,]+, cle: String\(a\.transaction_id \|\| ''\), faire: \(\) => ouvrirRecuRelie\(a, num\) \}/.test(app), 'R7 « Reçu » ouvre le reçu de CET achat (son n° de transaction)');
+  dit(['const relierAchat = async', 'const relierAchatAnnonce = async', 'const relierAchatVente = async', 'const relierGlisse = async'].every((f) => new RegExp(f.replace(/[()]/g, '\\$&') + '[\\s\\S]{0,900}?(?:const ok = |if \\(!|\\|\\| !|return )confirmerLiaison\\(').test(app)) && !/accompagner\('achat\.relier'/.test(app), 'R8 feuille, propositions, ventes et glisser : la même confirmation (plus de bulle sur la liste)');
+
+  // ── S · le branchement ──
   let ecran = ''; try { ecran = sans(fs.readFileSync(path.join(SRC, 'RelierGlisser.jsx'), 'utf8')); } catch (_) {}
   dit(/const ciblesGlisser = useMemo\(\(\) => \{[\s\S]{0,700}?for \(const x of \(fileAchat \|\| \[\]\)\)[\s\S]{0,900}?for \(const x of \(fileVendus \|\| \[\]\)\)/.test(app), 'S1 les cibles : les annonces et les ventes SANS achat relié (fileAchat, fileVendus)');
-  dit(/const relierGlisse = async[\s\S]{0,200}?ecritureRelierAchat\(a\)[\s\S]{0,400}?opsRelierGlisse\([\s\S]{0,400}?gesteVrm\(tr\('glisser\.fait'/.test(app), 'S2 l’écriture de « Relier » (un lot demande son prix), par identité, en geste annulable 5 s');
+  dit(/const relierGlisse = async[\s\S]{0,200}?ecritureRelierAchat\(a\)[\s\S]{0,700}?confirmerLiaison\(/.test(app) && /const confirmerLiaison = [\s\S]{0,1500}?opsRelierGlisse\([\s\S]{0,1800}?gesteVrm\(res\.texte, ops,/.test(app), 'S2 l’écriture de « Relier » (un lot demande son prix), par identité, en geste annulable 5 s');
   dit(['feuille', 'annonces', 'achats'].every((k) => app.includes(`data-glisser-ouvrir="${k}"`)), 'S3 trois entrées : la feuille « Relier », Annonces → Sans achat relié, Achats');
   dit(/addEventListener\('touchmove', bloque, \{ passive: false \}\)/.test(ecran) && /appui\.current\.phase === 'leve' && e\.cancelable\) e\.preventDefault\(\)/.test(ecran), 'S4 le doigt ne défile plus SEULEMENT une fois l’achat levé');
   dit(/data-glisser-ici=/.test(ecran) && /aria-pressed=\{choisi === x\.tx\}/.test(ecran), 'S5 l’alternative clavier / lecteur d’écran : choisir l’achat, puis « Relier ici »');

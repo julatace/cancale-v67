@@ -52,3 +52,7 @@
   .vrm-rg-corps { flex-direction: row; gap: 20px; padding: 0 24px 16px; max-width: 1200px; width: 100%; margin: 0 auto; box-sizing: border-box; }
   .vrm-rg-tete { padding: 16px 24px 8px; max-width: 1200px; width: 100%; margin: 0 auto; box-sizing: border-box; }
 }
+/* (16 nov., ajout de Julien) Le bas de l'écran est une BANDE réservée : la question, puis la pilule « Achat relié ·
+   Bénéfice … · Reçu · Annuler » s'y posent — jamais sur une ligne des listes. */
+.vrm-rg-corps { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+body:has(.vrm-rg) .vrm-pil-zone { top: auto !important; bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important; }

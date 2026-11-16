@@ -833,7 +833,7 @@ import { achatParIdentite, propositionPrixAchat, propositionsUniques, listeConfi
 // ⟦→ ecrans/Compta.jsx #7⟧
 import { livreDesRecettes, registreDesAchats, csvRegistre, pdfRegistre, nomFichierRegistre, achatAnnule } from "./registres.js";
 import { achatsHorsRelier, publierHorsRelier, achatHorsRelier } from "./achatsHorsRelier.js";
-import { opsRelierGlisse } from "./relierGlisser.js";
+import { opsRelierGlisse, texteApresLiaison } from "./relierGlisser.js";
 import { achatsPourAtelier, CLE_ACHATS_ATELIER, resumeAtelier, ligneAtelierJournee } from "./operations/atelier.js";
 // ⟦→ ecrans/Compta.jsx #8⟧
 import { produitsANumeroter, attribuerNumerosVc, carteNumerosVc } from "./numerosVestiaire.js";
@@ -5175,8 +5175,8 @@ const _ecrivainVrm = creerEcrivainLocal({
 // `ops` : les sous-valeurs posées (src/gesteAnnulable.js) ; `setters` : { [clé]: setState }
 // de l'écran (optionnel : un écran qui relit la clé à sa sauvegarde suit seul).
 // `acc` (14 nov., lot accompagnement) : le nom du geste, porté par la pilule (data-acc-apres / -echec).
-const gesteVrm = (texte, ops, setters = {}, apres = null, acc = '') => _gestes.lancer({
-  texte, cles: clesDe(ops), acc,
+const gesteVrm = (texte, ops, setters = {}, apres = null, acc = '', action = null) => _gestes.lancer({
+  texte, cles: clesDe(ops), acc, action,
   vue: (sens) => { vueDesOps(ops, setters)(sens); if (typeof apres === 'function') { try { apres(sens); } catch (_) {} } },
   ecrire: (sens) => ecrireOps({ ops, sens, lire: _ecrivainVrm.lire, ecrire: _ecrivainVrm.ecrire }),
 });
@@ -44157,6 +44157,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (11 nov., lot DJ5) « Déplacer ici » : un achat déjà relié ailleurs est DÉLIÉ de ses autres
   // détenteurs (src/relierAutreAchat.js) après SA confirmation, puis relié ici — un achat simple ne
   // compte qu'une fois dans les coûts. Un LOT pas complet n'est jamais « pris ».
+  // ── (16 nov., ajout de Julien : « quand je relie un achat, je veux avoir le bénéfice avec la facture d'achat à portée
+  // de main ») TOUTE liaison (feuille, propositions, glisser) : UN geste annulable 5 s (`gesteVrm`) dont la pilule —
+  // en bas, au-dessus de la barre, jamais sur la liste — dit le RÉSULTAT (« Achat relié · Bénéfice +22,57 € », la règle de
+  // la ligne de vente : `beneficeLigneVente`) et offre « Reçu » (le reçu de CET achat, par son n° : `ouvrirRecuRelie`).
+  // `cible` : { genre: 'annonce'|'vente', id, tx, idf, item?, o?, num } ; `w` : l'écriture de « Relier ».
+  const confirmerLiaison = (a, cible, w, autres = []) => {
+    if (!a || !cible || !w) return false;
+    const fiches = load('vinted_annonce_numeros', {}) || {}, ventes = load('vinted_sale_overrides', {}) || {};
+    const it = cible.item || null;
+    const ficheNeuve = cible.genre === 'annonce' && it && !fiches[String(cible.id)] ? { title: it.title || '', photo: it.photo || null, photoK: photoKey(it.photo) || null, price: it.price ?? null, size: it.size ?? null, accountId: it._acc?.vinted_user_id } : null;
+    const ops = opsRelierGlisse({ cible, w, fiches, ventes, prixParNum: load('vinted_buyprice_by_num', {}) || {}, ficheNeuve, autres });
+    if (!ops.length) return false;
+    // Le bénéfice : l'entrée telle qu'elle sera APRÈS la liaison (frais posés compris), la règle de la ligne.
+    let prix = null, entree = null;
+    if (cible.genre === 'vente' && cible.o) { const o = cible.o; prix = o.price && o.price.currency_code && o.price.currency_code !== 'EUR' ? null : (o.price && o.price.amount); entree = { ...(effEntry(o) || {}), ...w }; }
+    else { const f = fiches[String(cible.id)] || ficheNeuve || {}; const pv = it && it.price != null ? it.price : f.price; prix = pv && typeof pv === 'object' ? pv.amount : pv; entree = { ...f, ...w }; }
+    const res = texteApresLiaison({ genre: cible.genre, prix, entree }, tr, beneficeLigneVente, texteBenefice);
+    const num = cible.num || String(((cible.genre === 'annonce' ? fiches[String(cible.id)] : (cible.idf ? fiches[String(cible.idf)] : null)) || {}).numero || '');
+    gesteVrm(res.texte, ops, { vinted_annonce_numeros: setNumeros, vinted_sale_overrides: setSaleOv, vinted_buyprice_by_num: setBuyByNum }, null, 'achat.relier',
+      { libelle: tr('liaison.recu'), cle: String(a.transaction_id || ''), faire: () => ouvrirRecuRelie(a, num) });
+    return true;
+  };
   const iciPicker = (cible) => (cible ? (cible._saleTx ? { ou: 'vente', cle: String(cible._saleTx) } : { ou: 'fiche', cle: String(cible.id) }) : null);
   const relierAchat = async (a, opts = {}) => {
     const cible = pickerFor; if (!cible || !a) return;
@@ -44168,11 +44190,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       }
     }
     const w = await ecritureRelierAchat(a); if (!w) return;
-    for (const x of autres) { if (x.ou === 'vente') setSaleOverride(x.cle, x.patch); else setNumeros((prev) => { const u = { ...prev, [x.cle]: { ...(prev[x.cle] || {}), ...x.patch } }; save('vinted_annonce_numeros', u); return u; }); }
-    if (cible._saleTx) setSaleOverride(cible._saleTx, w); else updatePair(cible, w);
+    // (16 nov.) Un geste annulable qui dit le bénéfice et offre le reçu (`confirmerLiaison`) ; « Déplacer ici » dans le même geste.
+    const o = cible._saleTx ? (sales.items || []).find((x) => String(x.transaction_id) === String(cible._saleTx)) || null : null;
+    const ok = confirmerLiaison(a, cible._saleTx ? { genre: 'vente', tx: String(cible._saleTx), o } : { genre: 'annonce', id: String(cible.id), item: cible }, w, autres);
+    if (!ok) { for (const x of autres) { if (x.ou === 'vente') setSaleOverride(x.cle, x.patch); else setNumeros((prev) => { const u = { ...prev, [x.cle]: { ...(prev[x.cle] || {}), ...x.patch } }; save('vinted_annonce_numeros', u); return u; }); }
+      if (cible._saleTx) setSaleOverride(cible._saleTx, w); else updatePair(cible, w); }
     setPickerFor(null);
-    // (14 nov., lot accompagnement) APRÈS : « Achat relié · 45 € » et la suite (le bénéfice se complète).
-    accompagner('achat.relier', { vars: { prix: w.buyPrice ? `${String(w.buyPrice).replace('.', ',')}\u00a0€` : '—' } }).fini();
   };
   // « Délier » (la feuille, quand CET article a déjà son achat) : le lien part, le prix posé par lui aussi.
   const entreePicker = (cible) => (cible ? (cible._saleTx ? saleOv[String(cible._saleTx)] : numeros[cible.id]) : null);
@@ -44185,8 +44208,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (6 nov., vague 2 · point 4) « Relier » depuis la file « Sans achat relié » : SON tap, sur CETTE annonce.
   const relierAchatAnnonce = async (it, a) => {
     const w = await ecritureRelierAchat(a); if (!w) return;
-    updatePair(it, w);
-    accompagner('achat.relier', { vars: { prix: w.buyPrice ? `${String(w.buyPrice).replace('.', ',')}\u00a0€` : '—' } }).fini();
+    if (!confirmerLiaison(a, { genre: 'annonce', id: String(it.id), item: it }, w)) updatePair(it, w);
     return true;
   };
   // (15 nov., liaison) La même écriture, sans l'accompagnement à chaque paire : « Valider les N très probables ».
@@ -44266,9 +44288,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const relierAchatVente = async (l, a, opts = {}) => {
     const w = await ecritureRelierAchat(a); if (!w) return;
     const o = l.o;
-    if (l.idf) updatePair({ id: l.idf, title: o.title, photo: orderPhoto(o), price: o.price && o.price.amount, _acc: o._acc }, w);
-    else setSaleOverride(String(o.transaction_id), w);
-    if (!opts.silencieux) accompagner('achat.relier', { vars: { prix: w.buyPrice ? `${String(w.buyPrice).replace('.', ',')}\u00a0€` : '—' } }).fini();
+    if (opts.silencieux || !confirmerLiaison(a, { genre: 'vente', tx: String(o.transaction_id), idf: l.idf || null, o }, w)) {
+      if (l.idf) updatePair({ id: l.idf, title: o.title, photo: orderPhoto(o), price: o.price && o.price.amount, _acc: o._acc }, w);
+      else setSaleOverride(String(o.transaction_id), w);
+    }
     return true;
   };
   const choisirAchatVente = (l, propose) => { const o = l.o; const photo = orderPhoto(o); const sell = o.price && o.price.amount; const _autre = propose ? String(propose.transaction_id || '1') : undefined;
@@ -44307,11 +44330,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const relierGlisse = async (a, cible) => {
     if (!a || !cible) return false;
     const w = await ecritureRelierAchat(a); if (!w) return false;
-    const ops = opsRelierGlisse({ cible, w, fiches: load('vinted_annonce_numeros', {}) || {}, ventes: load('vinted_sale_overrides', {}) || {}, prixParNum: load('vinted_buyprice_by_num', {}) || {} });
-    if (!ops.length) return false;
-    const qui = cible.num ? `N°${cible.num}` : String(cible.titre || '').slice(0, 40);
-    gesteVrm(tr('glisser.fait', { qui }), ops, { vinted_annonce_numeros: setNumeros, vinted_sale_overrides: setSaleOv, vinted_buyprice_by_num: setBuyByNum }, null, 'achat.relier');
-    return true;
+    // (16 nov.) Le même geste que toute liaison : le bénéfice et « Reçu » dans la pilule, annulable 5 s.
+    const o = cible.genre === 'vente' ? (sales.items || []).find((x) => String(x.transaction_id) === String(cible.tx)) || null : null;
+    const it = cible.genre === 'annonce' ? (listings.items || []).find((x) => x && String(x.id) === String(cible.id)) || null : null;
+    return confirmerLiaison(a, { ...cible, o, item: it }, w);
   };
   const relierAchatCle = async (key, a) => {
     const w = await ecritureRelierAchat(a); if (!w) return;
@@ -50725,7 +50747,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // pas de carte encadrée séparée — style démo, comme Achats).
               <LigneVenteCompacte montantCentimes={sell!=null?Math.round(sell*100):undefined} numerosArticle={lot && lot.lu ? lot.nums : (num?[num]:[])} plateforme="vinted" photo={photo} photoNoeud={<><CaseSerie serie={serieVentes} cle={txL} etiquette={o.title} surPhoto/>{photo?<PhotoVenteSources {...photoSourcesProps} data-photo-vente="ligne" style={{width:28,height:36,borderRadius:12,objectFit:'cover',flexShrink:0}}/>:<PhotoVente src={photo} size={46} portrait/>}</>} titre={(()=>{ const t=String((e&&e.size)||o.size||'').trim(); const nom=t&&!tailleDansTitre(o.title,t)?`${o.title} · taille ${t}`:o.title; return nom; })()} numTitre={num||''}
                 {...avecSerie(gp, serieVentes.ligne(txL))} glisse={tiroirG} benef={benefLigne} recap={recapVente} data-depose-attente={deposeIci?'1':undefined}
-                fl={{ tx: txL, item: String(identiteAnnonce(o) || '') }} data-fu-ligne="" fusion={{ lot: lot ? { n: lot.n, nums: lot.nums || [], nonRelies: lot.nonRelies || 0 } : null, transp: fuTransp, prix: montant(sell, { devise: o.price?.currency_code || 'EUR' }), nom: String(o.title||'').replace(/[\s,·-]*(?:taille|t\.?)\s*[\d.,/ ]+(?:\s*(?:eu|fr|us|uk))?\s*$/i,'').trim() || o.title, num, site: 'vinted', siteNom: 'Vinted', taille: lot ? '' : String((e&&e.size)||o.size||'').trim() || ((String(o.title||'').match(/taille\s*([\d.,/]+)/i)||[])[1]||'') }} friseEtat={fuEtapes ? <Frise inline etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label={tr('ventes.vente3')}/> : null} frise={<>{(o._fromEmail ? o._txMail : o.transaction_id != null) ? <FactureVenteLigne deps={DEPS_FACTURE} groupe={groupeFacture} vente={{ tx: String(o._fromEmail ? o._txMail : o.transaction_id), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', venteLe: o.date || '', commandes: commandesParTx.get(String(o._fromEmail ? o._txMail : o.transaction_id)) || [] }}/> : null}</>}
+                fl={{ tx: txL, item: String(identiteAnnonce(o) || '') }} data-fu-ligne="" fusion={{ lot: lot ? { n: lot.n, nums: lot.nums || [], nonRelies: lot.nonRelies || 0 } : null, transp: fuTransp, prix: montant(sell, { devise: o.price?.currency_code || 'EUR' }), /* (16 nov., relier-glisser) le bénéfice, discret, à côté du prix (la règle de la ligne) */ benefSu: lb.benefice!=null && st!=='cancelled' ? texteBenefice(lb) : '', nom: String(o.title||'').replace(/[\s,·-]*(?:taille|t\.?)\s*[\d.,/ ]+(?:\s*(?:eu|fr|us|uk))?\s*$/i,'').trim() || o.title, num, site: 'vinted', siteNom: 'Vinted', taille: lot ? '' : String((e&&e.size)||o.size||'').trim() || ((String(o.title||'').match(/taille\s*([\d.,/]+)/i)||[])[1]||'') }} friseEtat={fuEtapes ? <Frise inline etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label={tr('ventes.vente3')}/> : null} frise={<>{(o._fromEmail ? o._txMail : o.transaction_id != null) ? <FactureVenteLigne deps={DEPS_FACTURE} groupe={groupeFacture} vente={{ tx: String(o._fromEmail ? o._txMail : o.transaction_id), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', venteLe: o.date || '', commandes: commandesParTx.get(String(o._fromEmail ? o._txMail : o.transaction_id)) || [] }}/> : null}</>}
                 data-vente-email-tete={o._venteEmail && emailEnTete ? String(o._acc.vinted_user_id) : undefined}
                 bas={o._venteEmail && emailEnTete && !toShipEmailTx.has(txL) ? null : o._venteEmail ? <>
                   {emailEnTete ? null : <NoteVenteEmail o={o}/>}

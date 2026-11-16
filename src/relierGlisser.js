@@ -96,9 +96,20 @@ export function phraseConfirmation({ cible, prix = null, lot = false } = {}, t, 
 // ({ buyPrice, buyFromId, buyFrom }) ; fiches / ventes / prixParNum : les valeurs COURANTES.
 // L'annonce (ou l'annonce vendue) porte le lien sur SA fiche ; une vente sans fiche, sur la vente.
 // Rend [] si rien ne peut être écrit (cible sans identité).
-export function opsRelierGlisse({ cible, w, fiches = {}, ventes = {}, prixParNum = {} } = {}) {
+// (16 nov., ajout de Julien : « le bénéfice avec la facture d'achat à portée de main ») La MÊME écriture sert toutes les
+// liaisons (liste, propositions, glisser) : `ficheNeuve` — l'annonce sans fiche (pas encore numérotée) reçoit sa fiche
+// (champs de l'annonce + le lien), retirée par « Annuler » ; `autres` — « Déplacer ici » : les détenteurs d'avant
+// (`ecrituresDeplacer`) déliés dans le MÊME geste, rendus par « Annuler ».
+export function opsRelierGlisse({ cible, w, fiches = {}, ventes = {}, prixParNum = {}, ficheNeuve = null, autres = [] } = {}) {
   if (!cible || !w || w.buyFromId == null || String(w.buyFromId) === '') return [];
   const ops = [];
+  for (const x of (Array.isArray(autres) ? autres : [])) {
+    if (!x || !x.patch || x.cle == null) continue;
+    const k = String(x.cle);
+    if (x.ou === 'fiche') { const f0 = fiches[k]; if (!f0 || typeof f0 !== 'object') continue; const av = {}; for (const c of Object.keys(x.patch)) av[c] = f0[c]; ops.push({ k: 'vinted_annonce_numeros', type: 'champs', id: k, apres: x.patch, avant: av }); }
+    else if (x.ou === 'vente') { const v0 = ventes[k]; const ap = { ...(v0 && typeof v0 === 'object' ? v0 : {}), ...x.patch }; for (const c of Object.keys(ap)) if (ap[c] == null || String(ap[c]).trim() === '') delete ap[c];
+      ops.push({ k: 'vinted_sale_overrides', type: 'cle', id: k, apres: Object.keys(ap).length ? ap : undefined, avant: v0 && typeof v0 === 'object' ? v0 : undefined }); }
+  }
   const idFiche = cible.genre === 'annonce' ? cible.id : cible.idf;
   const f = idFiche != null && String(idFiche) !== '' ? fiches[String(idFiche)] : null;
   const champs = { buyPrice: w.buyPrice, buyFromId: w.buyFromId, buyFrom: w.buyFrom };
@@ -108,17 +119,31 @@ export function opsRelierGlisse({ cible, w, fiches = {}, ventes = {}, prixParNum
     if (n && w.buyPrice != null && String(w.buyPrice).trim() !== '') ops.push({ k: 'vinted_buyprice_by_num', type: 'cle', id: n, apres: String(w.buyPrice), avant: prixParNum[n] });
     return ops;
   }
+  if (cible.genre === 'annonce' && idFiche != null && String(idFiche) !== '' && ficheNeuve && typeof ficheNeuve === 'object') {
+    ops.push({ k: 'vinted_annonce_numeros', type: 'cle', id: String(idFiche), apres: { ...ficheNeuve, ...champs }, avant: undefined });
+    return ops;
+  }
   if (cible.genre === 'vente' && cible.tx != null && String(cible.tx) !== '') {
     const tx = String(cible.tx), cur = ventes[tx];
     const apres = { ...(cur && typeof cur === 'object' ? cur : {}), ...champs };
     for (const k of Object.keys(apres)) if (apres[k] == null || String(apres[k]).trim() === '') delete apres[k];
     ops.push({ k: 'vinted_sale_overrides', type: 'cle', id: tx, apres, avant: cur && typeof cur === 'object' ? cur : undefined });
   }
-  return ops;
+  return ops.some((o) => o.apres && o.apres.buyFromId != null) ? ops : [];
 }
 
 // La vibration : seulement là où elle existe. Rend true si elle a été demandée.
 export function vibrerSiPossible(nav = (typeof navigator !== 'undefined' ? navigator : null), ms = 12) {
   try { if (nav && typeof nav.vibrate === 'function') return nav.vibrate(ms) !== false; } catch (_) {}
   return false;
+}
+
+// ── Le résultat d'une liaison, dit tout de suite (16 nov., ajout de Julien) ──
+// « Achat relié · Bénéfice +22,57 € » : la règle de la ligne de vente (`beneficeLigneVente` → `beneficePaire`,
+// src/beneficeLigne.js) sur l'entrée APRÈS la liaison ; une annonce pas vendue : au prix affiché. Frais pas
+// confirmés ⇒ « au plus » (la règle) ; prix ou achat pas lus ⇒ « — ». `t` : traduction ; `ligne`, `texte` : la règle.
+export function texteApresLiaison({ genre = 'vente', prix = null, entree = null } = {}, t, ligne, texte) {
+  const r = typeof ligne === 'function' ? ligne(prix, entree || {}) : null;
+  const b = r && r.benefice != null ? texte(r) : '—';
+  return { texte: t(genre === 'annonce' ? 'liaison.relieAffiche' : 'liaison.relieBenef', { benef: b }), benefice: r && r.benefice != null ? r.benefice : null, etat: r ? r.etat : 'prix' };
 }

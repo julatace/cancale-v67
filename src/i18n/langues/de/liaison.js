@@ -77,4 +77,7 @@ export default {
   "glisser.oui": "Ja",
   "glisser.annuler": "Abbrechen",
   "glisser.fait": "Kauf mit {qui} verknüpft",
+  "liaison.relieBenef": "Kauf verknüpft · Gewinn {benef}",
+  "liaison.relieAffiche": "Kauf verknüpft · Gewinn {benef} zum Angebotspreis",
+  "liaison.recu": "Beleg",
 };

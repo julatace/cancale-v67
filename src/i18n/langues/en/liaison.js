@@ -77,4 +77,7 @@ export default {
   "glisser.oui": "Yes",
   "glisser.annuler": "Cancel",
   "glisser.fait": "Purchase linked to {qui}",
+  "liaison.relieBenef": "Purchase linked · Profit {benef}",
+  "liaison.relieAffiche": "Purchase linked · Profit {benef} at the listed price",
+  "liaison.recu": "Receipt",
 };

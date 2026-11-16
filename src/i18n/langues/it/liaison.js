@@ -77,4 +77,7 @@ export default {
   "glisser.oui": "Sì",
   "glisser.annuler": "Annulla",
   "glisser.fait": "Acquisto collegato a {qui}",
+  "liaison.relieBenef": "Acquisto collegato · Utile {benef}",
+  "liaison.relieAffiche": "Acquisto collegato · Utile {benef} al prezzo indicato",
+  "liaison.recu": "Ricevuta",
 };

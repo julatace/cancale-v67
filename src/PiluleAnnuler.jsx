@@ -77,6 +77,7 @@ export function PiluleAnnuler({ gestes, enHaut = false }) {
             <span className="vrm-pil-titre">{t.titre}</span>
             {t.sous ? <span className="vrm-pil-sous">{t.sous}</span> : null}
           </span>
+          {v && v.action ? <button type="button" className="vrm-pil-action" data-pilule-autre={v.action.cle || ''} onClick={() => { try { v.action.faire(); } catch (_) {} }}>{v.action.libelle}</button> : null}
           {v && v.peutAnnuler ? <button type="button" className="vrm-pil-action" data-pilule-annuler={v.id} aria-label={`Annuler : ${v.texte}`} onClick={() => gestes.annuler(v.id)}>Annuler</button> : null}
           {v && v.peutReessayer ? <button type="button" className="vrm-pil-action" data-pilule-reessayer={v.id} aria-label={`Réessayer : ${v.texte}`} onClick={() => gestes.reessayer(v.id)}>Réessayer</button> : null}
         </div>

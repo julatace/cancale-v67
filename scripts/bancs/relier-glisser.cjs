@@ -25,7 +25,7 @@ const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || (21000 + Math.floor(Math.random() * 18000));
 const SHOTS = process.env.SHOTS || path.join(require('os').tmpdir(), 'banc-relier-glisser');
 fs.mkdirSync(SHOTS, { recursive: true });
-const J = 86400e3, U = sc.UID[0];
+const J = 86400e3, U = sc.UID[0], T1_TX = '7100001';
 const MODELES = ['Adidas Spezial noir 42', 'Nike Air Force 1 blanc 43', 'Asics Gel Kayano 14 argent 44', 'New Balance 550 blanc vert 41', 'Salomon XT-6 noir 42', 'Puma Suede bleu 40',
   'Nike Dunk Low panda 39', 'Adidas Samba OG 38', 'Vans Old Skool noir 41', 'Converse Chuck 70 beige 42', 'Reebok Club C 43', 'Onitsuka Tiger Mexico 66 jaune 40', 'Asics Gel 1130 blanc 42', 'Nike Air Max 90 gris 44'];
 const annonces = MODELES.map((t, i) => ({ ...sc.annonce({ id: 'pa' + i, titre: t, prix: 70 + i, taille: 42, marque: t.split(' ')[0] }), created_at_ts: Math.floor((sc.NOW - (20 + i) * J) / 1000) }));
@@ -35,7 +35,27 @@ const ACHATS = ['Nike Air Force 1 blanche 43', 'Converse basse', 'Paire running'
   'Baskets daim', 'Chaussures sport', 'Mocassins', 'Bottines'].map((t, i) => achat(i, i === 3 ? 'Baskets sans marque' : t, 40 + i));
 const vente = sc.ordre({ tx: '7200001', titre: 'Salomon Speedcross gris 43', prix: 90, statut: sc.STATUT_FINAL, dateMs: sc.NOW - 5 * J });
 const main = (sombre) => sc.ligneMain({ vinted_dark: sombre, vinted_annonce_numeros: fiches });
-const rows = [{ ...sc.ligneListings(U, annonces), data: { capturedAt: new Date(sc.NOW - 60e3).toISOString(), payload: { items: annonces, pagination: null } } }, sc.lignePurch(U, ACHATS), sc.ligneSold(U, [vente])];
+const RECU = { id: 'email_achat_r1', data: { subject: 'Ton reçu pour « Nike Air Force 1 blanche 43 »', article: 'Nike Air Force 1 blanche 43', prix: '40,00', transaction: T1_TX, receivedAt: new Date(sc.NOW - 39 * J).toISOString(), texte: 'Reçu de commande\nNike Air Force 1 blanche 43\nN° de transaction : ' + T1_TX + '\nMontant payé : 40,00 €' } };
+const rows = [RECU, { ...sc.ligneListings(U, annonces), data: { capturedAt: new Date(sc.NOW - 60e3).toISOString(), payload: { items: annonces, pagination: null } } }, sc.lignePurch(U, ACHATS), sc.ligneSold(U, [vente])];
+const projette = (row, sel) => {
+  const out = {};
+  for (const part of sel.split(',')) {
+    const m = /^(?:([^:]+):)?(.+)$/.exec(part.trim()); if (!m) continue;
+    const src = m[2], alias = m[1] || src.split(/->>|->/).pop();
+    if (src === 'id') { out[alias] = row.id; continue; }
+    if (src === 'data') { out[alias] = row.data; continue; }
+    let x = row.data; for (const seg of src.replace(/^data(->>|->)/, '').split(/->>|->/)) x = x == null ? null : x[seg];
+    out[alias] = x == null ? null : (/->>/.test(src) && typeof x !== 'object' ? String(x) : x);
+  }
+  return out;
+};
+// Le rectangle de la pilule ne doit couvrir aucune ligne visible des deux listes.
+const recouvre = (pg) => pg.evaluate(() => {
+  const p = document.querySelector('[data-pilule]'); if (!p) return { pilule: false };
+  const a = p.getBoundingClientRect(); const lignes = [...document.querySelectorAll('[data-glisser-cible], [data-glisser-achat]')];
+  const sous = lignes.filter((l) => { const b = l.getBoundingClientRect(); const ul = l.closest('.vrm-rg-liste').getBoundingClientRect(); const vis = b.bottom > ul.top && b.top < ul.bottom; return vis && b.left < a.right && b.right > a.left && Math.min(b.bottom, ul.bottom) > a.top && Math.max(b.top, ul.top) < a.bottom; });
+  return { pilule: true, n: sous.length, quoi: sous.map((l) => l.getAttribute('data-glisser-cible') || l.getAttribute('data-glisser-achat')).slice(0, 3) };
+});
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2' };
 const srv = http.createServer((q, r) => { let f = q.url.split('?')[0]; if (f === '/' || !path.extname(f)) f = '/index.html'; const p = path.join(DIST, f); if (!fs.existsSync(p)) { r.writeHead(404); return r.end(); } r.writeHead(200, { 'content-type': MIME[path.extname(p)] || 'application/octet-stream' }); r.end(fs.readFileSync(p)); });
 srv.on('error', (e) => { console.log('KO  le port ' + PORT + ' est pris (' + e.code + ')'); process.exit(1); });
@@ -56,8 +76,10 @@ async function ouvrir(b, nom, ctxOpts, sombre) {
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(sc.comptes ? sc.comptes() : []);
     if (/id=eq\.main/.test(u)) return j(main(sombre));
-    const eq = /id=eq\.([^&]*)/.exec(u); if (eq) return j(rows.filter((r) => r.id === eq[1]));
-    const m = /id=like\.([^&]*)/.exec(u); if (m) { const re = new RegExp('^' + m[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id))); }
+    const sel = (/[?&]select=([^&]*)/.exec(u) || [])[1] || '';
+    const forme = (r) => (/^email_/.test(r.id) && sel && sel !== 'data' ? projette(r, sel) : r);
+    const eq = /id=eq\.([^&]*)/.exec(u); if (eq) return j(rows.filter((r) => r.id === eq[1]).map(forme));
+    const m = /id=like\.([^&]*)/.exec(u); if (m) { const re = new RegExp('^' + m[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(rows.filter((r) => re.test(r.id)).map(forme)); }
     return j([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true,"devices":1}' }));
@@ -145,6 +167,11 @@ async function tactile(b) {
   await pg.screenshot({ path: path.join(SHOTS, `relier-glisser-${nom}-question.png`) });
   if (await pg.locator('[data-glisser-oui]').count()) await pg.locator('[data-glisser-oui]').tap(); await pause(900);
   dit(await lien(pg, 'pa1') === T1, `${nom} · « Oui » : la fiche N°2 porte le lien vers ${T1}`, String(await lien(pg, 'pa1')));
+  const pt = (await pg.locator('[data-pilule] .vrm-pil-titre').innerText().catch(() => '')).replace(/\u00a0|\u202f/g, ' ');
+  dit(pt === 'Achat relié · Bénéfice au plus +31 € au prix affiché', `${nom} · la pilule dit le résultat : 71 € − 40 € (frais pas confirmés ⇒ « au plus », la règle)`, JSON.stringify(pt));
+  dit(await pg.locator(`[data-pilule-autre="${T1}"]`).count() === 1, `${nom} · …et offre « Reçu » (CET achat)`);
+  const rc = await recouvre(pg);
+  dit(rc.pilule && rc.n === 0, `${nom} · la pilule ne recouvre aucune ligne (rectangles)`, JSON.stringify(rc));
   dit(JSON.stringify(await liensTous(pg)) === JSON.stringify([`pa1:${T1}`]), `${nom} · …et aucune autre fiche`, JSON.stringify(await liensTous(pg)));
   dit(!(await pg.locator('[data-glisser-cible="a:pa1"]').count()) && !(await pg.locator(`[data-glisser-achat="${T1}"]`).count()), `${nom} · l'annonce et l'achat sortent des listes`);
   await pg.screenshot({ path: path.join(SHOTS, `relier-glisser-${nom}-relie.png`) });
@@ -193,6 +220,11 @@ async function souris(b) {
   if (await pg.locator('[data-glisser-oui]').count()) await pg.locator('[data-glisser-oui]').click(); await pg.waitForTimeout(900);
   const ov = await pg.evaluate(() => { try { const v = JSON.parse(localStorage.getItem('vinted_sale_overrides') || '{}'); return v['7200001'] ? v['7200001'].buyFromId : ''; } catch (_) { return null; } });
   dit(ov === T1, `${nom} · « Oui » : la vente (son n° de transaction) porte le lien`, String(ov));
+  const ptv = (await pg.locator('[data-pilule] .vrm-pil-titre').innerText().catch(() => '')).replace(/\u00a0|\u202f/g, ' ');
+  dit(ptv === 'Achat relié · Bénéfice au plus +50 €', `${nom} · la pilule : vente 90 € − achat 40 € ⇒ « au plus +50 € » (la règle de la ligne)`, JSON.stringify(ptv));
+  const rcv = await recouvre(pg);
+  dit(rcv.pilule && rcv.n === 0, `${nom} · la pilule ne recouvre aucune ligne (rectangles)`, JSON.stringify(rcv));
+  await pg.screenshot({ path: path.join(SHOTS, `relier-glisser-${nom}-pilule.png`) });
   const an = pg.locator('[data-pilule-annuler]').first(); await an.waitFor({ timeout: 3000 }).catch(() => {});
   if (await an.count()) { await an.click(); await pg.waitForTimeout(900); }
   const ov2 = await pg.evaluate(() => { try { const v = JSON.parse(localStorage.getItem('vinted_sale_overrides') || '{}'); return v['7200001'] ? (v['7200001'].buyFromId || '') : ''; } catch (_) { return null; } });
@@ -208,6 +240,26 @@ async function souris(b) {
   await pg.screenshot({ path: path.join(SHOTS, `relier-glisser-${nom}-clavier.png`) });
   if (await pg.locator('[data-glisser-non]').count()) await pg.locator('[data-glisser-non]').click(); await pg.waitForTimeout(200);
   dit(!(await pg.locator('[data-glisser-question]').count()) && JSON.stringify(await liensTous(pg)) === '[]', `${nom} · « Annuler » de la question : rien écrit`);
+  // « Reçu » depuis la pilule : le reçu de CET achat (son n° de transaction)
+  await pg.locator(`[data-glisser-achat="${T1}"]`).click(); await pg.waitForTimeout(150);
+  const iciV = pg.locator('[data-glisser-ici="v:7200001"]'); await iciV.scrollIntoViewIfNeeded().catch(() => {});
+  if (await iciV.count()) await iciV.click(); await pg.waitForTimeout(250);
+  if (await pg.locator('[data-glisser-oui]').count()) await pg.locator('[data-glisser-oui]').click(); await pg.waitForTimeout(400);
+  const br = pg.locator(`[data-pilule-autre="${T1}"]`);
+  if (await br.count()) await br.click();
+  await pg.waitForSelector('[data-recu-feuille]', { timeout: 10000 }).catch(() => {});
+  const fr = await pg.evaluate(() => { const x = document.querySelector('[data-recu-feuille]'); return x ? x.innerText : null; });
+  dit(fr != null && fr.includes(T1_TX), `${nom} · « Reçu » ouvre le reçu de CET achat (n° ${T1_TX})`, fr == null ? 'aucune feuille' : JSON.stringify(fr.slice(0, 120)));
+  await pg.screenshot({ path: path.join(SHOTS, `relier-glisser-${nom}-recu.png`) });
+  await pg.keyboard.press('Escape'); await pg.evaluate(() => { const b = document.querySelector('[data-recu-retour]'); if (b) b.click(); }); await pg.waitForTimeout(300);
+  // La LIGNE de la vente reliée : son bénéfice (la règle), dans Ventes
+  if (await pg.locator('[data-glisser-fermer]').count()) await pg.locator('[data-glisser-fermer]').click().catch(() => {});
+  await pg.evaluate(() => { history.pushState({}, '', '/?tab=ventes&site=vinted'); window.dispatchEvent(new PopStateEvent('popstate')); });
+  await pg.waitForTimeout(1500);
+  if (!(await pg.locator('[data-benef-ligne]').count())) { await pg.goto(pg.url().replace(/\?.*$/, '') + '?tab=ventes&site=vinted', { waitUntil: 'domcontentloaded' }); await pg.waitForTimeout(4000); }
+  const bl = await pg.evaluate(() => { const r = [...document.querySelectorAll('[data-fiche-ligne]')].find((x) => /Salomon Speedcross/.test(x.innerText)); if (!r) return null; const b = r.querySelector('[data-benef-ligne]'); const su = r.querySelector('[data-fu-benef-su]'); return { b: b ? b.getAttribute('data-benef-ligne') : null, su: su ? su.innerText : null }; });
+  dit(bl && bl.b === '5000', `${nom} · Ventes : la ligne de la vente reliée porte son bénéfice (50 €, la règle)`, JSON.stringify(bl));
+  await pg.screenshot({ path: path.join(SHOTS, `relier-glisser-${nom}-ventes.png`) });
   dit(!errs.length, `${nom} · aucune erreur de page`, errs.slice(0, 2).join(' | '));
   await o.ctx.close();
 }
