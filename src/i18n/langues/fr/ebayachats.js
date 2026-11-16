@@ -63,7 +63,7 @@ export default {
   "ebayAchats.connexionCoupee": "La connexion a coupé : je relis tes recherches.",
   "ebayAchats.vide": "Aucune recherche. Cherche un modèle, puis « Enregistrer cette recherche ».",
   "ebayAchats.plafond": "Tes recherches eBay du jour sont faites : tout s’arrête jusqu’à minuit.",
-  "ebayAchats.plafondFil": "Relectures du jour faites ({n}) : reprise à minuit.",
+  "ebayAchats.plafondFil": "Fil arrêté : {n} relectures du jour faites, reprise à minuit.",
   "ebayAchats.plafondFilPourquoi": "Tes recherches ont fait leurs {n} relectures du jour : elles s’arrêtent jusqu’à minuit (heure de Paris). Les recherches restantes sont gardées pour chercher à la main.",
   "ebayAchats.pourquoi": "Pourquoi ?",
   "ebayAchats.prochainEssai": "Nouvel essai vers {h}.",

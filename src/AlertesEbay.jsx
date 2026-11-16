@@ -90,9 +90,11 @@ export default function AlertesEbay({ headers, revente = () => undefined, contex
       <div className="eba-annonces" data-alertes-liste="">
         {nouvelles.map((x) => <LigneAlerte key={x.itemId} x={x} veille={parId.get(x.veille) || null} revente={revente} contexte={contexte} onRetirer={retirer} occupe={occupe} />)}
       </div>
-      <p className="eba-gris" style={{ fontSize: 12 }}>{tr('alertesEbay.margeExplique')}{' '}
-        <button type="button" className="eba-lien" disabled={occupe} onClick={() => retirer(nouvelles.map((x) => x.itemId))} data-alertes-tout-retirer="" style={{ fontSize: 13 }}>{tr('alertesEbay.toutRetirer')}</button></p>
-      {pourquoi}
+      <p className="eba-gris" style={{ fontSize: 12 }}>{tr('alertesEbay.margeExplique')}</p>
+      <div className="eba-actions" style={{ marginLeft: -6 }}>
+        <button type="button" className="eba-lien" disabled={occupe} onClick={() => retirer(nouvelles.map((x) => x.itemId))} data-alertes-tout-retirer="">{tr('alertesEbay.toutRetirer')}</button>
+        {pourquoi}
+      </div>
     </>}
   </section>;
 }
