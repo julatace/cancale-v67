@@ -651,7 +651,7 @@ export const MAX_DEPARTS_APP = 3;
 export const MAX_DEPARTS_CRON = 6;
 async function lireBaseDeparts() {
   // (15 nov., lot retours-suivi) + les bordereaux de RETOUR de ses achats (le colis qu'il renvoie).
-  const [rows, vc, bords, retours, relus] = await Promise.all([
+  const [rows, vc, bordsLus, retours, relus] = await Promise.all([
     lireTout(`app_data?id=like.depart_*&select=${D.SELECT_DEPART_META}`),
     lireTout('app_data?id=eq.vc_ventes&select=ventes:data->ventes'),
     // (16 nov.) + le transporteur NOMMÉ par l'e-mail ou l'étiquette (Mondial Relay ne se reconnaît pas à son n°).
@@ -659,10 +659,11 @@ async function lireBaseDeparts() {
     lireTout('app_data?id=like.email_bordretour_*&select=suivi:meta->>suivi,transaction:meta->>transaction,receivedAt:meta->>receivedAt,transporteurPdf:meta->>transporteurPdf'),
     lireTout(REQ_RELUS),
   ]);
-  if (![rows, vc, bords, retours, relus].every(Array.isArray)) return null;
+  if (![rows, vc, bordsLus, retours, relus].every(Array.isArray)) return null;
+  const bords = avecRelus(bordsLus, relus);
   const departs = D.departsParSuivi(rows) || new Map();
   const vcVentes = vc[0] && vc[0].ventes && typeof vc[0].ventes === 'object' ? vc[0].ventes : {};
-  return { departs, sortants: D.sortantsDuVendeur({ vcVentes, bords: avecRelus(bords, relus), retours }) };
+  return { departs, sortants: D.sortantsDuVendeur({ vcVentes, bords, retours }) };
 }
 // Les n° ENTRANTS connus de ce passage (ses achats) : jamais lus comme départ.
 export function entrantsDe(b) {
