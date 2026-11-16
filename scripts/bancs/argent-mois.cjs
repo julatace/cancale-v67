@@ -187,8 +187,11 @@ const capture = async (pg, nom, sel) => { if (!SHOTS) return; fs.mkdirSync(SHOTS
       await pg.waitForSelector('[data-journal-semaine]', { timeout: 8000 }).catch(() => {});
       const J = await attrs(pg, '[data-journal-semaine]');
       dit(J && J['journal-semaine'] === ymL(lundiPasse), `B : le journal de la semaine du ${ymL(lundiPasse)} est en tête de Ma journée`, JSON.stringify(J));
-      const ordre = await pg.evaluate(() => { const j = document.querySelector('[data-journal-semaine]'); const t = document.querySelector('.vrm-fu-tete'); return !!(j && t && t.contains(j)) && j.getBoundingClientRect().top + window.scrollY < 900; });
-      dit(ordre, 'B : dans la tête sombre, en haut');
+      // (16 nov., parcours-vert) Ma journée à l'ordinateur (15 nov., 8e7b78080, maquette ordinateur validée) : la frise
+      // (« le chiffre du jour ») ouvre la PREMIÈRE colonne (`data-sj-col="c1"`) au lieu de la tête ; au téléphone elle
+      // reste dans la tête. La règle jugée : la semaine est dans la frise du jour, EN TÊTE de l'écran (< 900 px).
+      const ordre = await pg.evaluate((ordi) => { const j = document.querySelector('[data-journal-semaine]'); const hote = ordi ? document.querySelector('[data-sj-col="c1"] > [data-sj-affiche]') : document.querySelector('.vrm-fu-tete'); return { dedans: !!(j && hote && hote.contains(j)), top: j ? Math.round(j.getBoundingClientRect().top + window.scrollY) : null }; }, T.vp.width > 1000);
+      dit(ordre.dedans && ordre.top < 900, T.vp.width > 1000 ? 'B : en tête de la première colonne (frise du jour), en haut' : 'B : dans la tête sombre, en haut', JSON.stringify(ordre));
       const cases = await pg.evaluate(() => { const p = document.querySelector('[data-journal-semaine]'); if (!p) return {}; const o = Object.fromEntries([...p.querySelectorAll('[data-journal-case]')].map((e) => [e.getAttribute('data-journal-case'), e.getAttribute('data-valeur')])); const v = p.querySelector('[data-jv2-vendu]'); o.vendu = v ? v.getAttribute('data-jv2-vendu') : null; o.texte = p.innerText.replace(/\s+/g, ' '); return o; });
       const dansSem = (d) => d >= lundiPasse && d < lundiCourant;
       const vSem = VENTES.filter((v) => v[3] && dansSem(v[4]));
