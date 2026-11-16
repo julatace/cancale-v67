@@ -155,7 +155,13 @@ const MESURE_BRUTE = (pg, { tel, sombre }) => pg.evaluate(({ tel, sombre }) => {
   const sansPhotoVide = sansPhoto.filter((e) => !e.querySelector('[data-photo-vide]')).length;
   const pastillesMain = [...document.querySelectorAll('.vrm-ventes-liste .vrm-fu-num, .vrm-ventes-toutes [data-toutes-num]:not(:has([data-num]))')].filter(vis).length;
   const nums = [...document.querySelectorAll('.vrm-ventes-liste [data-num], .vrm-ventes-toutes [data-num]')].filter(vis);
-  const numsBlancs = sombre ? nums.filter((e) => { const x = rgba(getComputedStyle(e).backgroundColor); return x && x.a > 0.5 && hsl(x).l > 0.8; }).length : 0;
+  // (16 nov., bancs-rouges-a) « Verre dépoli » (15 nov., maquette 9 choisie par Julien, studio-verre.css §10) : la plaque N°
+  // est une plaquette BLANCHE en relief, l'encre sombre — partout, la nuit aussi. La règle d'avant (« jamais blanc en
+  // sombre ») visait une pastille blanche au texte clair, illisible ; ce qui est jugé maintenant : le N° se LIT, encre
+  // contre fond (contraste ≥ 4,5, WCAG AA). `numsBlancs` garde son nom : les N° illisibles.
+  const lum = (x) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(x.r) + 0.7152 * f(x.g) + 0.0722 * f(x.b); };
+  const contraste = (a, b) => { const l1 = lum(a), l2 = lum(b); return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05); };
+  const numsBlancs = sombre ? nums.filter((e) => { const s = getComputedStyle(e); const f = rgba(s.backgroundColor), c = rgba(s.color); return f && c && f.a > 0.5 && contraste(f, c) < 4.5; }).length : 0;
   // V8 — les couleurs.
   const ACCENT = sombre ? 'rgb(10, 132, 255)' : 'rgb(0, 113, 227)';
   const bleus = [], rouges = [], ambres = [];
@@ -199,7 +205,8 @@ const capture = async (pg, nom) => {
   const H = await pg.evaluate(() => { let h = document.documentElement.scrollHeight; for (const e of document.querySelectorAll('.vrm-main, .vrm-main *')) if (e.scrollHeight > e.clientHeight + 50 && /auto|scroll/.test(getComputedStyle(e).overflowY)) h = Math.max(h, e.scrollHeight + 200); return h; });
   const avant = pg.viewportSize();
   await pg.setViewportSize({ width: W, height: Math.min(7000, Math.max(H, avant.height)) }); await pg.waitForTimeout(500);
-  await pg.screenshot({ path: path.join(SHOTS, nom + '.png') });
+  // (16 nov.) Une capture de 7 000 px dépasse 30 s sous charge (« gros », 1 000 ventes) : 2 min, c'est une capture, pas un contrôle.
+  await pg.screenshot({ path: path.join(SHOTS, nom + '.png'), timeout: 120000 });
   await pg.setViewportSize(avant);
 };
 
@@ -252,7 +259,7 @@ async function tournee(nav, { W, theme, scenario }) {
       dit(v.aVenir && v.aVenir.lignes === 0 && v.aVenir.occ === 1, 'V1', `${T} Vinted : « À venir » d’un seul compte — le total une fois, aucune ligne`, JSON.stringify(v.aVenir));
       dit(!v.mots.length, 'V5', `${T} Vinted : aucun mot écarté (filtres, lignes)`, v.mots.join(' ¦ '));
       dit(!v.zeros.length, 'V6', `${T} Vinted : aucun « ,00 € »`, v.zeros.join(' ¦ '));
-      dit(v.nums >= 3 && !v.pastillesMain && !v.numsBlancs, 'V7', `${T} Vinted : chaque N° est \`Numero\` (${v.nums}), jamais blanc en sombre`, JSON.stringify({ main: v.pastillesMain, blancs: v.numsBlancs }));
+      dit(v.nums >= 3 && !v.pastillesMain && !v.numsBlancs, 'V7', `${T} Vinted : chaque N° est \`Numero\` (${v.nums}), lisible en sombre (encre/fond ≥ 4,5)`, JSON.stringify({ main: v.pastillesMain, blancs: v.numsBlancs }));
       dit(!v.bleus.length && !v.rouges.length && !v.ambres.length, 'V8', `${T} Vinted : ni texte bleu d’aplat, ni rouge, ni ambre sans geste`, JSON.stringify({ bleus: v.bleus.slice(0, 4), rouges: v.rouges.slice(0, 4), ambres: v.ambres.slice(0, 4) }));
       dit(!v.pied.vendusAilleurs && !v.pied.bilan, 'V4', `${T} Vinted : ni « Vendus ailleurs » ni le bilan des données en pied`, JSON.stringify(v.pied));
       if (tel) dit(!v.petits.length, 'V9', `${T} Vinted : commandes de 44 px au doigt`, v.petits.slice(0, 8).join(' ¦ '));

@@ -33,7 +33,7 @@ require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lec
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
-const DIST = path.join(__dirname, '..', '..', 'dist');
+const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');   // (16 nov.) BANC_DIST : un autre build (preuve §6.1)
 const PORT = Number(process.env.BANC_PORT) || 4771;
 
 const now = Date.now();
@@ -49,20 +49,33 @@ const publique = (uid, capH, items) => ({ id: `harvest_${uid}_enligne`, data: { 
 // compte_111 : dressing du « 8 octobre » (72 h) — 7001 (la paire) et 7011 ; relu en
 //   public il y a 1 h : 7001 n'y est plus (supprimée), 7011 y est.
 // compte_222 : dressing de 72 h — 7002 (la même paire) ; relu en public : vide.
-// compte_333 : dressing de 3 h — 7031 ; relu en public il y a 10 min : 7031 et
-//   7003, la paire REPUBLIÉE (jamais vue par son dressing).
+// compte_333 : dressing de 3 h — 7031 et 7003, la paire REPUBLIÉE (captée connectée
+//   après sa republication) ; relu en public il y a 10 min : 7031, 7003, et 7004
+//   — vue SEULEMENT en public, jamais dans son dressing.
+// ⚠️ (16 nov., bancs-rouges-a) Règle du 2 nov. (Julien, `<enligne-regle>` : « tant que
+//   l'extension n'a pas capté depuis le compte où l'annonce est, elle ne peut pas ajouter
+//   une annonce dans VRM ») : une lecture PUBLIQUE confirme ou retire, elle n'AJOUTE
+//   jamais. Avant elle, ce banc exigeait l'inverse (7003 connue par la seule lecture
+//   publique entrait dans la grille). La republiée est donc captée par son compte, et
+//   7004 (public seul) doit rester HORS de la grille, de la file Leboncoin et du compte.
 // compte_444 : dressing de 72 h, jamais relu — 7041, 7042 : « à confirmer ».
+// (16 nov., bancs-rouges-a) Depuis le 8 nov. un site ne se montre que s'il est CHOISI ou relié (« Où vends-tu ? ») :
+// sans ce choix, `?tab=leboncoin` revient à Annonces · Vinted (les sections 4 et 12 lisaient alors les cartes Vinted).
+const LBC_LU = { id: 'lbc_listings', data: { items: {}, lectures: {} } };
 const BASE = () => [
-  { id: 'main', data: { vinted_annonce_numeros: {
+  { id: 'main', data: { vrm_plateformes_affichees: { sites: ['vinted', 'leboncoin'], at: new Date(now).toISOString() }, vinted_annonce_numeros: {
     '7001': { numero: '11', mp: { lbc: true } }, '7002': { numero: '12', mp: { lbc: true } }, '7003': { numero: '13', mp: { lbc: true } },
     '7011': { numero: '21', mp: { lbc: true } }, '7031': { numero: '31', mp: { lbc: true } }, '7041': { numero: '41', mp: { lbc: true } }, '7042': { numero: '42', mp: { lbc: true } } } } },
+  // (16 nov.) Leboncoin RELIÉ (une ligne rangée par l'extension, aucune annonce) : sinon l'écran dit « pas encore lues »
+  // (`OngletManque`, 8 nov.) et la file n'est pas rendue.
+  LBC_LU,
   dressing('111', 72, [ann(7001, PAIRE), ann(7011, 'Zeta Garde Alpha 42')]),
   dressing('222', 72, [ann(7002, PAIRE)]),
-  dressing('333', 3, [ann(7031, 'Zeta Garde Gamma 41')]),
+  dressing('333', 3, [ann(7031, 'Zeta Garde Gamma 41'), ann(7003, PAIRE, { price: { amount: '49.0', currency_code: 'EUR' } })]),
   dressing('444', 72, [ann(7041, 'Zeta Figee Delta 40'), ann(7042, 'Zeta Figee Epsilon 39')]),
   publique('111', 1, [ann(7011, 'Zeta Garde Alpha 42')]),
   publique('222', 1, []),
-  publique('333', 10 / 60, [ann(7031, 'Zeta Garde Gamma 41'), ann(7003, PAIRE, { price: { amount: '49.0', currency_code: 'EUR' } })]),
+  publique('333', 10 / 60, [ann(7031, 'Zeta Garde Gamma 41'), ann(7003, PAIRE, { price: { amount: '49.0', currency_code: 'EUR' } }), ann(7004, 'Zeta Seule Publique 44')]),
 ];
 const FRAIS = () => [
   BASE()[0],
@@ -147,6 +160,9 @@ async function rendre(b, { lignes, tel = false, onglet = 'cat_annonces', enligne
     if (eq) return j(lignes.filter((r) => r.id === eq[1]).map(forme));
     const lk = /id=like\.([^&]*)/.exec(u);
     if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(lignes.filter((r) => re.test(r.id)).map(forme)); }
+    // (16 nov.) `id=in.(…)` : la lecture des sites reliés (lbc_listings, vc_session…) — servie comme la vraie base.
+    const inn = /id=in\.\(([^)]*)\)/.exec(u);
+    if (inn) { const ids = inn[1].split(','); return j(lignes.filter((r) => ids.includes(r.id)).map(forme)); }
     return j([]);
   });
   // Le relais Vinted en panne : l'app ne doit vivre que de NOTRE base.
@@ -177,7 +193,16 @@ const ouvrirPop = async (pg, sel) => {
   const ok = await pg.waitForSelector('[data-popup-corps]', { timeout: 4000 }).then(() => true).catch(() => false);
   // (10 nov.) Le détail est replié sous « Pourquoi ? » : le banc le déplie comme lui le ferait.
   if (ok) await pg.locator('[data-popup-pourquoi] > summary').first().click().catch(() => {});
+  // (16 nov.) Sous charge le toucher sur « Pourquoi ? » peut tomber pendant l'entrée de la feuille : on vérifie qu'il est OUVERT.
+  if (ok) await pg.waitForFunction(() => { const d = document.querySelector('[data-popup-corps] [data-popup-pourquoi]'); if (d && !d.open) d.querySelector('summary').click(); return !d || d.open; }, null, { timeout: 4000 }).catch(() => {});
   return ok;
+};
+// (16 nov., bancs-rouges-a) Statistiques (2 nov., « beaucoup d'incompréhension ») : la ligne de fraîcheur du tableau de
+// bord vit dans le volet « Argent depuis le début » (`RepliStats id="argent"`), replié par défaut et monté seulement
+// ouvert. Le banc l'ouvre comme lui (un toucher sur son titre) ; la tuile « En ligne » du haut reste lue sans rien ouvrir.
+const ouvrirVoletArgent = async (pg) => {
+  const v = pg.locator('[data-stats-repli="argent"][data-ouvert="0"] > summary').first();
+  if (await v.count()) { await v.click().catch(() => {}); await pg.waitForSelector('[data-dash-fraicheur]', { timeout: 8000 }).catch(() => {}); }
 };
 const fermerPop = async (pg) => { if (!(await pg.locator('[data-popup-corps]').count())) return; await pg.keyboard.press('Escape'); await pg.waitForSelector('[data-popup-corps]', { state: 'detached', timeout: 4000 }).catch(() => {}); };
 const dansPop = async (pg, sel, f, arg) => { const o = await ouvrirPop(pg, sel); const r = await pg.evaluate(f, arg); if (o) await fermerPop(pg); return r; };
@@ -205,7 +230,9 @@ const lireAnnonces0 = (pg) => pg.evaluate((PAIRE) => {
     sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth,
   };
 }, PAIRE);
-const lireAnnonces = async (pg) => { const o = await ouvrirPop(pg, '[data-ann-fraicheur], [data-dash-fraicheur]'); const r = await lireAnnonces0(pg); if (o) await fermerPop(pg); return r; };
+// (16 nov., bancs-rouges-a) `:is(…)` : « A, B [data-popup-ouvrir] » visait A LUI-MÊME (la virgule lie plus faiblement
+// que le descendant) — le clic tombait sur la ligne, pas sur son bouton, et la pop-up ne s'ouvrait pas.
+const lireAnnonces = async (pg) => { const o = await ouvrirPop(pg, ':is([data-ann-fraicheur], [data-dash-fraicheur])'); const r = await lireAnnonces0(pg); if (o) await fermerPop(pg); return r; };
 
 (async () => {
   let b;
@@ -222,7 +249,8 @@ const lireAnnonces = async (pg) => { const o = await ouvrirPop(pg, '[data-ann-fr
         const r = await rendre(b, { lignes: BASE(), tel });
         const a = await lireAnnonces(r.pg);
         dit(a.paire.length === 1, `${t} : la paire supprimée deux fois et republiée apparaît UNE fois`, JSON.stringify(a.paire));
-        dit(a.paire[0] === '7003', `${t} : et c'est la REPUBLIÉE (7003, connue par la lecture publique de ce matin)`, JSON.stringify(a.paire));
+        dit(a.paire[0] === '7003', `${t} : et c'est la REPUBLIÉE (7003, captée par son compte, confirmée par la lecture publique de ce matin)`, JSON.stringify(a.paire));
+        dit(!a.cartes.includes('7004') && !a.cartesAC.includes('7004'), `${t} : une annonce vue SEULEMENT en lecture publique n'entre pas (règle du 2 nov. : elle attend la capture de son compte)`, JSON.stringify({ c: a.cartes, ac: a.cartesAC }));
         dit(!a.cartes.includes('7001') && !a.cartes.includes('7002'), `${t} : les deux anciennes (absentes de la lecture la plus récente) ne sont plus là`, JSON.stringify(a.cartes));
         dit(a.cartes.includes('7011') && a.cartes.includes('7031'), `${t} : les autres paires en ligne restent`, JSON.stringify(a.cartes));
         dit(!a.cartes.includes('7041') && !a.cartes.includes('7042'), `${t} : le compte figé depuis 3 jours n'est PAS parmi les annonces sûres de la grille`, JSON.stringify(a.cartes));
@@ -250,6 +278,7 @@ const lireAnnonces = async (pg) => { const o = await ouvrirPop(pg, '[data-ann-fr
     if (veut('3')) await essaie('3', async () => {
       const r = await rendre(b, { lignes: BASE(), onglet: 'dashboard' });
       await r.pg.waitForTimeout(1500);
+      await ouvrirVoletArgent(r.pg);
       const d = await dansPop(r.pg, '[data-dash-fraicheur]', () => {
         const s = document.querySelector('[data-dash-stat="online"]');
         const f = [...document.querySelectorAll('[data-dash-fraicheur]')];
@@ -264,11 +293,14 @@ const lireAnnonces = async (pg) => { const o = await ouvrirPop(pg, '[data-ann-fr
     console.log('── 4. File Leboncoin de l’app');
     if (veut('4')) await essaie('4', async () => {
       const r = await rendre(b, { lignes: BASE(), onglet: 'leboncoin' });
+      // (16 nov.) La file se calcule après plusieurs lectures : on attend qu'elle soit RENDUE (une ligne ou un état dit).
+      await r.pg.waitForFunction(() => /Zeta Fear Trois/.test(document.body.innerText) || document.querySelector('[data-lbc-vide], [data-lbc-a-confirmer]'), null, { timeout: 20000 }).catch(() => {});
       await r.pg.waitForTimeout(1500);
       const txt = await r.pg.evaluate(() => document.body.innerText);
       const vus = (txt.match(/Zeta [A-Za-z]+ [A-Za-z]+/g) || []).join(' · ');
       dit(/Zeta Fear Trois/.test(txt), 'la republiée est proposée à la publication', vus);
       dit(!/Zeta Figee/.test(txt), 'les annonces « à confirmer » ne sont pas proposées', vus);
+      dit(!/Zeta Seule Publique/.test(txt), 'une annonce vue seulement en lecture publique n’est pas proposée', vus);
       dit(r.errs.length === 0, 'aucune erreur d’app', r.errs.join(' | ').slice(0, 160));
       await r.ctx.close();
     });
@@ -283,13 +315,13 @@ const lireAnnonces = async (pg) => { const o = await ouvrirPop(pg, '[data-ann-fr
         await r.pg.waitForTimeout(300);
         const a2 = await lireAnnonces(r.pg);
         const vues = new Set([...a2.cartes, ...a2.liste]);
-        const manquent = ['7001', '7002', '7011', '7031', '7041', '7042'].filter((id) => !vues.has(id));
+        const manquent = ['7001', '7002', '7003', '7011', '7031', '7041', '7042'].filter((id) => !vues.has(id));
         dit(!manquent.length, `${t} : rien ne disparaît en silence — chaque annonce connue est soit en ligne, soit « à confirmer »`, `manquent : ${manquent.join(',')}`);
         // Revue de la 5.167 : sans les lectures publiques, un dressing ne décide QUE
         // s'il a moins de 30 min (aucune lecture plus récente ne peut exister). Le
         // dressing de 3 h de compte_333 a justement été dépassé par une lecture
         // publique (la republiée 7003) : le croire ferait cacher la republiée.
-        dit(!a.cartes.includes('7001') && !a.cartes.includes('7002') && !a.cartes.includes('7031'), `${t} : aucune lecture de plus de 30 min ne décide seule — tout est « à confirmer », rien n'est ressuscité`, JSON.stringify(a.cartes));
+        dit(!a.cartes.includes('7001') && !a.cartes.includes('7002') && !a.cartes.includes('7003') && !a.cartes.includes('7031'), `${t} : aucune lecture de plus de 30 min ne décide seule — tout est « à confirmer », rien n'est ressuscité`, JSON.stringify(a.cartes));
         dit(a.supprimees === '0', `${t} : et rien n'est dit « plus en ligne » sur une lecture qui n'a pas eu lieu`, JSON.stringify(a.supprimees));
         const pk = await dansPop(r.pg, '[data-ann-fraicheur]', () => { const f = document.querySelector('[data-ann-fraicheur]'); const s = document.querySelector('[data-popup-corps] [data-pub-ko-dit]'); return { attr: f && f.getAttribute('data-pub-ko'), n: document.querySelectorAll('[data-pub-ko-dit]').length, t: s ? s.innerText : '' }; });
         dit(pk.attr === '1' && pk.n === 1 && /n.ont pas pu être lues/.test(pk.t), `${t} : et la panne est DITE, une fois`, JSON.stringify(pk));
@@ -336,8 +368,14 @@ const lireAnnonces = async (pg) => { const o = await ouvrirPop(pg, '[data-ann-fr
         ventesVides('111'), ventesVides('222'), ventesVides('333'), ventesVides('444'), dressing('333', 0.05, []), dressing('444', 0.05, []),
         dressing('111', 2, [ann(8001, 'Beta Alpha 40')]), dressing('222', 30, [ann(8002, 'Beta Beta 41')])];
       const posts = [];
-      const r = await rendre(b, { lignes, posts });
+      // (16 nov., bancs-rouges-a) Studio (14 nov., src/paires/PaireAvant.jsx) : fermée, la rangée ENTIÈRE est le geste et la
+      // plaque N° ne se touche pas (`pointer-events: none`) ; au téléphone, la rangée touchée monte au premier plan et
+      // ses contrôles (N°, photo) reprennent leur geste. Le banc fait ce geste-là, au téléphone : la RÈGLE jugée
+      // (taper le N° d'une paire « à confirmer ») ne change pas.
+      const r = await rendre(b, { lignes, posts, tel: true });
       await r.pg.waitForTimeout(1500);
+      await r.pg.click('[data-carte-annonce="8001"]', { timeout: 8000 });
+      await r.pg.waitForSelector('[data-carte-annonce="8001"][data-sb-avant]', { timeout: 8000 }).catch(() => {});
       await r.pg.click('[data-carte-annonce="8001"] [data-edition="numero"]', { timeout: 8000 });
       await r.pg.keyboard.press('Control+A'); await r.pg.keyboard.type('7'); await r.pg.keyboard.press('Enter');
       await r.pg.waitForTimeout(1200);
@@ -388,6 +426,7 @@ const lireAnnonces = async (pg) => { const o = await ouvrirPop(pg, '[data-ann-fr
       const lu = {};
       for (const onglet of ['dashboard', 'cat_annonces']) {
         const r = await rendre(b, { lignes: BASE(), onglet });
+        if (onglet === 'dashboard') await ouvrirVoletArgent(r.pg);
         await cliquerPop(r.pg, onglet === 'dashboard' ? '[data-dash-fraicheur]' : '[data-ann-fraicheur]', '[data-a-confirmer-ouvrir]');
         await ouvrirPop(r.pg, onglet === 'dashboard' ? '[data-dash-fraicheur]' : '[data-ann-fraicheur]');
         await r.pg.waitForTimeout(400);
@@ -417,7 +456,9 @@ const lireAnnonces = async (pg) => { const o = await ouvrirPop(pg, '[data-ann-fr
       // la lecture PUBLIQUE n'est pas une capture de SA session
       // (`ligneDeSaSession`) — la ligne doit dire le même âge (3 j) avec ou
       // sans elle, jamais « il y a moins d'une heure ».
-      const age = (t) => (/capté il y a ([^A-Z]*?)(?= Gérer|$)/.exec(t) || [])[1] || null;
+      // (16 nov., bancs-rouges-a) La ligne d'un compte dit maintenant « À relire il y a 3 j » (plus « capté il y a … ») :
+      // la RÈGLE jugée est la même — l'âge lu, identique avec ou sans la lecture publique.
+      const age = (t) => (/il y a (\d+\s*(?:j|h|min|s|mois)\b)/.exec(t) || [])[1] || null;
       dit(/3 j/.test(age(etat.avec) || '') && age(etat.avec) === age(etat.sans) && !/À jour|moins d.une heure/.test(etat.avec), 'compte figé depuis 3 jours, relu en public il y a 10 min : toujours « capté il y a 3 j », jamais rajeuni', JSON.stringify(etat));
       // Un compte « refusé par Vinted » (liste propre à l'appareil), sans aucune
       // capture de SA session depuis 10 jours, le reste — même relu en public.
@@ -434,7 +475,7 @@ const lireAnnonces = async (pg) => { const o = await ouvrirPop(pg, '[data-ann-fr
 
     console.log('── 12. L’écran Leboncoin dit la cause « à confirmer »');
     if (veut('12')) await essaie('12 leboncoin', async () => {
-      const tous = [BASE()[0], dressing('111', 30, [ann(7011, 'Zeta Garde Alpha 42')]), dressing('333', 30, [ann(7031, 'Zeta Garde Gamma 41')]), dressing('444', 30, [ann(7041, 'Zeta Figee Delta 40'), ann(7042, 'Zeta Figee Epsilon 39')])];
+      const tous = [BASE()[0], LBC_LU, dressing('111', 30, [ann(7011, 'Zeta Garde Alpha 42')]), dressing('333', 30, [ann(7031, 'Zeta Garde Gamma 41')]), dressing('444', 30, [ann(7041, 'Zeta Figee Delta 40'), ann(7042, 'Zeta Figee Epsilon 39')])];
       const r = await rendre(b, { lignes: tous, onglet: 'leboncoin' });
       await r.pg.waitForTimeout(1500);
       const d = await r.pg.evaluate(() => ({ t: document.body.innerText, ac: (document.querySelector('[data-lbc-a-confirmer]') || {}).getAttribute ? document.querySelector('[data-lbc-a-confirmer]').getAttribute('data-lbc-a-confirmer') : null, vide: (document.querySelector('[data-lbc-vide]') || { getAttribute: () => null }).getAttribute('data-lbc-vide') }));

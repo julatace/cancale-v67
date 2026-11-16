@@ -92,6 +92,8 @@ if (mut) {
   fs.writeFileSync(p, s.replace(M[1], M[2]));
   console.log('── mutation : ' + mut);
 }
+// (16 nov.) Les règles de l'app qu'importe api/_lib (argent-notif → src/alertesSeuils.js) : copiées si elles manquent.
+require('./_copie-imports.cjs').completerImports(RACINE, tmp);
 
 const APPSRC = fs.readFileSync(APP, 'utf8');
 const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
