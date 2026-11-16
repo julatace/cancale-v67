@@ -242,6 +242,7 @@ const COUPLES = {
   'src/parcoursArrivee.js|www.leboncoin.fr': ['lien', LIEN + ' — « Ouvrir Leboncoin » du parcours d’arrivée'],
   'src/parcoursArrivee.js|www.vestiairecollective.com': ['lien', LIEN + ' — « Ouvrir Vestiaire » du parcours d’arrivée'],
   'src/retoursAchat.js|www.vinted.fr': ['lien', LIEN + ' — la transaction ou la conversation du retour'],
+  'src/deuxComptes.js|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir sur Vinted » une des deux annonces (deux comptes, même paire)'],
   // (24 oct.) Le SERVEUR lit le statut public des colis (api/_lib/transporteurs-lecture.js).
   'api/_lib/transporteurs-lecture.js|ws.chronopost.fr': ['politique', 'transp'],
   'api/_lib/transporteurs-lecture.js|carrier.vintedgo.com': ['politique', 'transp'],
