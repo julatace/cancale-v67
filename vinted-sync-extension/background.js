@@ -8361,50 +8361,6 @@ async function rangerEmpreintes(force = false) {
   try { await chrome.storage.local.set({ [EMPREINTES_FILE]: restent }); } catch (_) {}
   return !restent.length;
 }
-// (16 nov., 5.395) LE REGISTRE DES PHOTOS QUE VRM A PRODUITES dans l'atelier
-// « Republier » (2026-11-15-numeros-masquees.md, src/republieTelephone.js) : les photos
-// y sont RÉGLÉES ici (`photoReglee`), l'app ne peut pas lire ces pixels (CORS). Chaque
-// photo acceptée par Vinted laisse son EMPREINTE (jamais l'image) avec le N° de la paire,
-// l'annonce d'origine et le compte, dans `photo_vrm_{uid}` (payload.photos :
-// { [empreinte]: { n, src, uid, at } }). L'app l'ajoute à son registre `vrm_photos_vrm` :
-// la même photo republiée PLUS TARD à la main dans l'app Vinted garde ce N°.
-// Lire-fusionner-réécrire : une lecture ratée n'écrit RIEN (la file reste). 60 jours.
-const PHOTOS_VRM_FILE = 'vrmPhotosVrmFile';           // [{ uid, h, n, src, at }] — pas encore rangées
-const PHOTOS_VRM_JOURS = 60;
-const PHOTOS_VRM_MAX = 600;                            // empreintes au plus par compte (ligne bornée)
-async function enfilerPhotosVrm(entrees) {
-  const ok = (Array.isArray(entrees) ? entrees : []).filter((e) => e && /^\d+$/.test(String(e.uid || '')) && empreinteValide(e.h) && /^[A-Z]{0,3}\d{1,6}$/.test(cleNum(e.n)));
-  if (!ok.length) return 0;
-  try {
-    const f = (await chrome.storage.local.get(PHOTOS_VRM_FILE))[PHOTOS_VRM_FILE] || [];
-    await chrome.storage.local.set({ [PHOTOS_VRM_FILE]: f.concat(ok).slice(-PHOTOS_VRM_MAX) });
-  } catch (_) { return 0; }
-  return ok.length;
-}
-async function rangerPhotosVrm() {
-  let file = [];
-  try { file = (await chrome.storage.local.get(PHOTOS_VRM_FILE))[PHOTOS_VRM_FILE] || []; } catch (_) { return false; }
-  if (!file.length) return true;
-  const restent = [];
-  const parUid = {};
-  for (const e of file) (parUid[e.uid] = parUid[e.uid] || []).push(e);
-  const limite = Date.now() - PHOTOS_VRM_JOURS * 86400e3;
-  for (const [uid, liste] of Object.entries(parUid)) {
-    const r = await sbGet(`app_data?id=eq.photo_vrm_${uid}&select=p:data->payload->photos`);
-    if (r === null) { restent.push(...liste); noterDiag('photos_vrm_lecture_ratee'); continue; }
-    const photos = {};
-    const avant = (r[0] && r[0].p && typeof r[0].p === 'object') ? r[0].p : {};
-    for (const [h, e] of Object.entries(avant)) if (e && Date.parse(e.at || '') >= limite) photos[h] = e;
-    for (const e of liste) photos[e.h] = { n: String(e.n), src: String(e.src || ''), uid: String(uid), at: e.at || new Date().toISOString() };
-    const cles = Object.keys(photos).sort((a, b) => Date.parse(photos[b].at) - Date.parse(photos[a].at));
-    for (const h of cles.slice(PHOTOS_VRM_MAX)) delete photos[h];
-    const n = Object.keys(photos).length;
-    const ok = await supabaseUpsert('app_data', [{ id: `photo_vrm_${uid}`, data: { type: 'photos_vrm', uid: String(uid), capturedAt: new Date().toISOString(), nItems: n, payload: { version: 1, photos } } }], 'id');
-    if (ok === false) { restent.push(...liste); noterDiag('photos_vrm_ecriture_ratee'); } else noterDiag('photos_vrm_ecrites');
-  }
-  try { await chrome.storage.local.set({ [PHOTOS_VRM_FILE]: restent }); } catch (_) {}
-  return !restent.length;
-}
 // (16 nov., 5.395) « MÊME PHOTO » SUR eBAY : la page VRM ne peut pas lire les pixels d'une
 // photo `i.ebayimg.com` (CORS) — elle demande ici l'EMPREINTE (jamais l'image). Le droit
 // d'hôte `https://i.ebayimg.com/*` (manifeste) ne sert qu'à ça. Bornes : seulement
@@ -8459,7 +8415,7 @@ async function empreintesUnTour() {
   try { file = (await chrome.storage.local.get(EMPREINTES_FILE))[EMPREINTES_FILE] || []; } catch (_) { return 0; }
   const enFile = new Set(file.map((e) => `${e.uid}|${e.id}|${e.k}`));
   const cible = plan.photos.find((p) => !enFile.has(`${p.uid}|${p.id}|${p.k}`) && !(memo[`${p.uid}|${p.id}|${p.k}`] && t - Number(memo[`${p.uid}|${p.id}|${p.k}`]) < EMPREINTES_RETRY_MS));
-  if (!cible) { await rangerEmpreintes(true); try { await rangerPhotosVrm(); } catch (_) {} return 0; }
+  if (!cible) { await rangerEmpreintes(true); return 0; }
   const acc = (await getStoredAccounts()).find((a) => String(a.vinted_user_id) === String(uid));
   if (!acc) return 0;
   const refus = await gardeLecture(uid, acc, 'photos');   // la classe la plus basse
@@ -14763,7 +14719,7 @@ async function refaireBrouillon(msg) {
     { const fr = await lireFreinRepub(uid); if (fr) { if (recuR.at) await rendreActions(uid, recuR.at, 1); noterDiag('frein_repub_tenu_file'); return { accepte: false, code: 'frein-refus', jusqua: fr.jusqua, raison: phraseFreinRepub(fr) }; } }
     suiviRepub(id);
     const temp = uuidRecreer();
-    const tp = await televerserPhotosRecreer(acc, urls, [], reglagesPhotoSurs(vb.reglages), temp, (k, n) => etapeRepub(id, 'photos', { fait: k, total: n }), msg.num ? { n: String(msg.num), src: id } : null);
+    const tp = await televerserPhotosRecreer(acc, urls, [], reglagesPhotoSurs(vb.reglages), temp, (k, n) => etapeRepub(id, 'photos', { fait: k, total: n }));
     if (tp.sansPage) return { accepte: false, code: 'onglet-vinted', raison: tp.erreur };
     if (!tp.ids) return { accepte: true, etape: 'echec', refaire: true, raison: `${tp.erreur} — aucun brouillon n'a été créé, tout reste enregistré dans VRM` };
     const assigned = tp.ids.map((pid) => ({ id: pid, orientation: 0 }));
@@ -14883,11 +14839,8 @@ function photosRefusees(rc) {
 // Les photos d'un brouillon fait par VRM, renvoyées depuis le coffre de
 // l'ancienne annonce (une par photo, avec ses réglages enregistrés).
 // Rend { ids } · { erreur } · {} (rien à renvoyer : pas de coffre).
-// (16 nov., 5.395) `marque` = { n: N° de la paire, src: annonce d'origine } : l'empreinte de
-// chaque photo RÉGLÉE entre au registre `photo_vrm_{uid}` une fois TOUTES acceptées par Vinted.
-async function televerserPhotosRecreer(acc, urls, second, reglages, temp, suivi, marque = null) {
+async function televerserPhotosRecreer(acc, urls, second, reglages, temp, suivi) {
   const ids = [];
-  const empreintes = [];
   for (let i = 0; i < urls.length; i++) {
     if (i > 0) await pauseRepub('photo', acc && acc.vinted_user_id);
     if (typeof suivi === 'function') { try { suivi(i, urls.length); } catch (_) {} }
@@ -14897,7 +14850,6 @@ async function televerserPhotosRecreer(acc, urls, second, reglages, temp, suivi,
     for (const u of essais) { try { const r = await fetch(u, { signal: AbortSignal.timeout(30000) }); if (!r.ok) throw new Error('http ' + r.status); blob = await r.blob(); break; } catch (e) { err = e; blob = null; } }
     if (!blob) return { erreur: `la photo ${i + 1} n'a pas pu être lue (${String(err && err.message || err || 'photo absente').slice(0, 40)})` };
     try { blob = await photoReglee(blob, reglages); } catch (e) { return { erreur: String(e && e.message || e).slice(0, 80) }; }
-    if (marque && marque.n) { try { const h = await empreinteDeBlob(blob); if (h) empreintes.push(h); } catch (_) {} }
     const rp = await vintedPagePhoto(acc, blob, `photo-${i + 1}.jpg`, temp);
     if (rp && rp.sansPage) return { erreur: raisonSansPage(rp), sansPage: rp.sansPage };
     const pid = rp && rp.ok ? idPhotoReponse(rp.json) : null;
@@ -14910,10 +14862,6 @@ async function televerserPhotosRecreer(acc, urls, second, reglages, temp, suivi,
       return { erreur: `Vinted n'a pas accepté la photo ${i + 1} (${(rp && rp.status) || 0})` };
     }
     ids.push(pid);
-  }
-  if (marque && marque.n && empreintes.length) {
-    const uid = String(acc && acc.vinted_user_id || ''), at = new Date().toISOString();
-    try { if (await enfilerPhotosVrm(empreintes.map((h) => ({ uid, h, n: String(marque.n), src: String(marque.src || ''), at })))) await rangerPhotosVrm(); } catch (_) {}
   }
   return { ids };
 }
@@ -15164,7 +15112,7 @@ async function recreerVinted(msg) {
     // 2. Les photos, une par une, depuis la page.
     await pauseRepub('lecture', uid);
     const temp = uuidRecreer();
-    const tp = await televerserPhotosRecreer(acc, urls, second, reglages, temp, (i, n) => etapeRepub(id, 'photos', { fait: i, total: n }), msg.num ? { n: String(msg.num), src: id } : null);
+    const tp = await televerserPhotosRecreer(acc, urls, second, reglages, temp, (i, n) => etapeRepub(id, 'photos', { fait: i, total: n }));
     if (tp.sansPage) return { accepte: false, code: 'onglet-vinted', raison: tp.erreur };
     if (!tp.ids) return { accepte: true, etape: 'echec', raison: `${tp.erreur} — rien n'a été créé ni supprimé, ton annonce est intacte` };
     const ids = tp.ids;

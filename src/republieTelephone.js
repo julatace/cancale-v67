@@ -82,11 +82,7 @@ export function ajouterAuRegistre(reg, entrees, maintenant = Date.now()) {
   for (const [h, e] of Object.entries(avant)) { if (empreinteValide(h) && e && Date.parse(e.at || '') >= limite) out[h] = e; else change = true; }
   for (const x of Array.isArray(entrees) ? entrees : []) {
     if (!x || !empreinteValide(x.h) || !str(x.n)) continue;
-    // (16 nov.) Une entrée datée (l'empreinte rangée par l'extension, `photo_vrm_{uid}`) garde SA date :
-    // le registre la purge 60 jours après la photo, pas après sa recopie.
-    const tx = Date.parse(str(x.at));
-    if (tx && tx < limite) continue;
-    const e = { n: str(x.n), src: str(x.src), uid: str(x.uid), at: new Date(tx && tx <= maintenant ? tx : maintenant).toISOString() };
+    const e = { n: str(x.n), src: str(x.src), uid: str(x.uid), at: new Date(maintenant).toISOString() };
     const p = out[x.h];
     if (p && p.n === e.n && p.src === e.src && p.uid === e.uid) continue;
     out[x.h] = e; change = true;
