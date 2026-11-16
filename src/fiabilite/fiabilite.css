@@ -35,7 +35,7 @@
 .vrm-fia-pastille { flex: 0 0 8px; width: 8px; height: 8px; margin-top: 7px; border-radius: 999px; background: var(--sv-encre-2, var(--d-gris)); opacity: .5; }
 .vrm-fia-pastille[data-ton="ok"] { opacity: .4; }
 .vrm-fia-pastille[data-ton="geste"] { background: var(--sb-ambre, var(--sv-ambre, #764300)); opacity: 1; }
-.vrm-fia-pastille[data-ton="rouge"] { background: var(--d-rouge, #C62828); opacity: 1; }
+.vrm-fia-pastille[data-ton="rouge"] { background: var(--d-rouge); opacity: 1; }
 .vrm-fia-pastille[data-ton="neutre"] { opacity: .35; }
 .vrm-fia-ouvrir > .vrm-fia-pastille { margin-top: 0; }
 

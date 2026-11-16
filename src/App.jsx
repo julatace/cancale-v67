@@ -858,6 +858,7 @@ import { useAvisBas, AvisBasDetail, titreAvisBas, detailAvisBas } from "./AvisNe
 import { LIGNE_AVIS_BAS, LIGNE_AVIS_BAS_VUS } from "./avisNegatif.js";
 // (11 nov., lot photos-comptes) La même PHOTO sur deux de ses comptes Vinted (empreintes de l'extension 5.358).
 import { annoncesPourPhotos, calculerPhotosComptes, publierPhotosComptes, cibleRepublier } from "./photosComptes.js";
+import { empreinteImageLocale } from "./photosComptes.js";   // (16 nov.) rétabli : la fusion de retour-parfait l’avait perdu (empreintes eBay)
 import { PhotosEntreComptesDetail, textePhotosComptes } from "./PhotosEntreComptes.jsx";
 // (15 nov., lot meme-photo) « La même photo » : une annonce d'ailleurs sans lien, à la photo d'une paire Vinted.
 import { propositionsMemePhoto, cleRefusMemePhoto } from "./memePhoto.js";
