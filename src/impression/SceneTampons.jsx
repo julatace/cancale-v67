@@ -127,8 +127,8 @@ export default function SceneTampons({ octets, pose, page, largeur, dessiner, on
       data-page={p ? (page != null ? page : p.page) : ''} style={{ width: largeur }}
       onPointerDown={bas} onPointerMove={bouge} onPointerUp={haut} onPointerCancel={haut}>
       <canvas ref={cv} className="vrm-tampon-page" aria-hidden="true" data-stream-image="bordereau"/>
-      {p && dessins > 0 && zonesDe(actif || 'n').map((z, i) => (
-        <i key={i} data-tampon-interdit={z.quoi || 'code'} className={'vrm-tampons-interdit' + (actif ? ' vrm-tampons-interdit-vu' : '')}
+      {p && dessins > 0 && zonesDe(actif || 'n').map((z) => (
+        <i key={`${z.quoi || 'code'}:${Math.round(z.x)}:${Math.round(z.y)}:${Math.round(z.w)}:${Math.round(z.h)}`} data-tampon-interdit={z.quoi || 'code'} className={'vrm-tampons-interdit' + (actif ? ' vrm-tampons-interdit-vu' : '')}
           style={{ left: Math.max(0, z.x) * ppt, top: Math.max(0, z.y) * ppt, width: Math.max(0, Math.min(p.W, z.x + z.w) - Math.max(0, z.x)) * ppt, height: Math.max(0, Math.min(p.H, z.y + z.h) - Math.max(0, z.y)) * ppt }}/>
       ))}
       {p && dessins > 0 && boite('n')}
