@@ -595,6 +595,17 @@ body .vrm-app-shell > :is(.vrm-main, .vrm-app-header) { transition: transform 36
   :root:root:root body .vrm-app-shell .vrm-tabbar > .sb-disque:is(:active, [aria-expanded="true"]) { background: var(--sb-creux) !important; box-shadow: var(--sb-enfonce) !important; transform: translateY(1px) !important; }
   /* Les pastilles de nombre : l'encre (un geste en attente), cerclées du verre. */
   :root:root:root body .vrm-app-shell .vrm-tabbar .vrm-nav-badge-barre.vrm-nav-badge-n { background: var(--sb-encre) !important; color: var(--sb-porcelaine) !important; box-shadow: 0 0 0 2px var(--sb-haut) !important; top: -3px !important; left: calc(100% - 12px) !important; }
+  /* (16 nov., lot barre-achats — Julien : « ajoute les Achats dans la barre en bas ») CINQ onglets et le disque.
+     « Aujourd'hui », le plus long, prend un peu plus de place ; le libellé suit la largeur (10,5 px à 390, 9 px au
+     plus étroit) ; disque et bords resserrés : chaque cible reste ≥ 44 px jusqu'à 320 px (banc barre-achats). */
+  :root:root:root body .vrm-app-shell .vrm-tabbar.vrm-tabbar { padding: 0 4px !important; }
+  :root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab[data-nav-entree="journee"] { flex-grow: 1.25 !important; }
+  :root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-nav-label { font-size: clamp(9px, 2.72vw, 10.5px) !important; letter-spacing: -.01em !important; white-space: nowrap !important; }
+  :root:root:root body .vrm-app-shell .vrm-tabbar > .sb-disque { margin: -16px 2px 0 !important; }
+  @media (max-width: 360px) {
+    :root:root:root body .vrm-app-shell .vrm-tabbar.vrm-tabbar { margin-left: 8px !important; margin-right: 8px !important; }
+    :root:root:root body .vrm-app-shell .vrm-tabbar > .sb-disque { flex-basis: 56px !important; width: 56px !important; height: 56px !important; min-height: 56px !important; }
+  }
 }
 
 /* ── 7.9 L'ORDINATEUR : la navigation en verre à gauche, l'actif enfoncé avec sa diode ── */

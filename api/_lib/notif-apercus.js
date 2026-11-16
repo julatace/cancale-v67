@@ -69,8 +69,10 @@ export const texteBordereau = ({ modele = '', numero = '', tamponne = false, dat
 // Une offre reçue (e-mail « Nouvelle offre »). ⚠️ `qui` (le pseudo de l'acheteur) n'est
 // PLUS dit (15 nov.) : accepté pour les anciens appelants, jamais rangé ni envoyé.
 // `juge` : le copilote ({ etat: 'unique' | 'ambigu', prix }), reconnu AU TITRE (« à vérifier »).
-export const texteOffre = ({ montant = '', qui: _qui = '', article = '', compte: _compte = '', juge = null } = {}) =>
-  fabrique('offre', { montant, article, juge: juge && typeof juge === 'object' ? { etat: juge.etat || '', prix: juge.prix != null ? juge.prix : null } : null });
+// (16 nov.) `site` : 'vestiaire' seulement pour une offre Vestiaire (elle expire) ; une offre
+// Vinted n'expire jamais (Julien, 11 nov.) ⇒ aucune échéance dite par défaut.
+export const texteOffre = ({ montant = '', qui: _qui = '', article = '', compte: _compte = '', juge = null, site = '' } = {}) =>
+  fabrique('offre', { montant, article, juge: juge && typeof juge === 'object' ? { etat: juge.etat || '', prix: juge.prix != null ? juge.prix : null } : null, ...(site === 'vestiaire' ? { site } : {}) });
 // Un message reçu (e-mail « Nouveau message »). Le pseudo de l'acheteur n'est plus dit (15 nov.).
 export const texteMessage = ({ paire = '', qui: _qui = '', compte = '', extrait = '' } = {}) => fabrique('message', { paire, compte, extrait });
 // Une annulation demandée (e-mail « … souhaiterait annuler l'achat … »). Sans pseudo (15 nov.).

@@ -14,7 +14,8 @@
 //   (a) c'est un e-mail de VENTE (`type: 'vente'`, la branche « Ton article
 //       s'est vendu » du serveur — jamais un statut) qui porte un n° de
 //       transaction NUMÉRIQUE (lu par le serveur dans la pièce jointe
-//       « Formulaire-retour-commande-{tx} » ou « Numéro de transaction ») ;
+//       « Formulaire-retour-commande-{tx} » ou « Numéro de transaction ») —
+//       ou (16 nov.) AUCUN n° : identifié alors par SA ligne (voir plus bas) ;
 //   (b) son compte — l'uid que le serveur a rangé d'après l'adresse de
 //       RÉCEPTION (§5), jamais l'expéditeur ni le texte — est un compte lié et
 //       pas écarté (masqué, hors des totaux : son choix) ;
@@ -33,6 +34,21 @@
 //   d'un `email_bord_*` n'est PAS une identité — mesuré le 6 nov. : les 135
 //   bordereaux numérotés l'ont reçu par TITRE (`findNumeroByTitle`), aucun n'a
 //   été lu dans l'e-mail.
+
+// ⚠️ (16 nov., lot vente-email-absente) LA VENTE D'UN COMPTE PARTICULIER. Julien,
+// cloche : « Vendu 64 € · 9060 vert/blanc T38 » … et rien dans Ventes. Mesuré (lecture
+// seule, 16 nov.) : les e-mails de vente des comptes PARTICULIERS ne portent JAMAIS de
+// n° de transaction (`transaction` vide : il n'est lu que dans la pièce jointe d'une
+// vente Pro) — 0 sur 13 depuis le 1er nov. La condition (a) « un n° numérique » les
+// écartait donc TOUS : seule une vente Pro entrait. Désormais (a) admet aussi l'e-mail
+// SANS n°, identifié par SA ligne (`email_sale_{empreinte}`, une ligne = une vente,
+// jamais un titre) ; (b) et (c) inchangées. Sans n°, la ligne e-mail ne peut pas être
+// REMPLACÉE par la ligne Vinted : elle disparaît dès que la liste du compte est relue
+// (c : la lecture fait foi) — jamais deux lignes après une relecture. Et si la liste,
+// lue AVANT l'e-mail, porte déjà une vente de ce compte datée de moins de
+// `FENETRE_AMBIGUE_MS` avant l'e-mail (l'e-mail en retard sur une lecture), on ne
+// sait pas si c'est la même : rien n'est ajouté (« pas su », jamais deviné au titre).
+// Une ligne sans n° n'a ni bordereau, ni facture, ni colis (tous se relient par n°).
 
 import { gesteRelireVentes } from './fraicheurComptes.js';
 
@@ -54,24 +70,40 @@ export const RE_PHOTO_EMAIL = /^https:\/\/images\d*\.vinted\.net\/tc?\/[^\s"'<>]
 // nom de l'acheteur, inutiles ici). `meta` est remplie par la base (004).
 export function requeteVentesEmail(maintenant = Date.now()) {
   const depuis = new Date(maintenant - JOURS_VENTES_EMAIL * 86400000).toISOString();
-  return 'id=like.email_sale_*&meta->>type=eq.vente&meta->>transaction=not.is.null'
+  // (16 nov.) Plus de filtre sur `transaction` : l'e-mail d'un compte particulier n'en porte pas.
+  return 'id=like.email_sale_*&meta->>type=eq.vente'
     + `&meta->>receivedAt=gte.${encodeURIComponent(depuis)}`
     + '&select=id,type:meta->>type,tx:meta->>transaction,uid:meta->>uid,at:meta->>receivedAt,titre:meta->>designation,prix:meta->>prix,photo:meta->>photo';
 }
 
-// (a) : la preuve qu'une ligne est une VENTE d'un compte, avec SON n°.
-//     Rend { tx, uid, t } ou null. La base filtre déjà ; on revérifie ici (une
-//     base qui ignorerait un filtre ne doit rien faire entrer).
+// L'identifiant d'une ligne d'e-mail de vente (`email_sale_{empreinte}`) : l'identité
+// d'une vente SANS n° (une ligne = un e-mail de vente, rangée par le serveur).
+export const RE_ID_VENTE_EMAIL = /^email_sale_[A-Za-z0-9_-]{4,120}$/;
+// Le préfixe de la clé d'une vente sans n° : jamais un nombre (aucune règle « par n° »
+// — bordereau, facture, colis, N° posé — ne la prend pour une transaction).
+export const PREFIXE_SANS_TX = 'email:';
+// La fenêtre où une vente déjà lue pourrait être celle de l'e-mail (e-mail en retard).
+export const FENETRE_AMBIGUE_MS = 30 * 60000;
+
+// (a) : la preuve qu'une ligne est une VENTE d'un compte, avec SON n° — ou, sans n°,
+//     avec SA ligne. Rend { tx, cle, uid, t } (`tx` vide sans n°) ou null. La base
+//     filtre déjà ; on revérifie ici (une base qui ignorerait un filtre ne doit rien
+//     faire entrer).
 export function preuveVenteEmail(m) {
   if (!m || typeof m !== 'object') return null;
   if (String(m.type || '') !== 'vente') return null;
-  const tx = String(m.tx == null ? '' : m.tx).trim();
-  if (!RE_TX_VENTE_EMAIL.test(tx)) return null;
+  const brut = String(m.tx == null ? '' : m.tx).trim();
+  // Un n° présent mais pas numérique : la ligne n'est pas sûre ⇒ rien.
+  if (brut && !RE_TX_VENTE_EMAIL.test(brut)) return null;
+  const tx = brut;
+  const id = String(m.id == null ? '' : m.id).trim();
+  if (!tx && !RE_ID_VENTE_EMAIL.test(id)) return null;
+  const cle = tx || (PREFIXE_SANS_TX + id);
   const uid = String(m.uid == null ? '' : m.uid).trim();
   if (!/^\d+$/.test(uid)) return null;
   const t = Date.parse(String(m.at || ''));
   if (!Number.isFinite(t)) return null;
-  return { tx, uid, t };
+  return { tx, cle, uid, t };
 }
 
 const montantEmail = (p) => {
@@ -103,18 +135,29 @@ export function ventesEmailFraiches({ mails, comptes, ecarte, ventes, ko, lectur
   // L'identité est la transaction : présente dans la liste d'UN compte, elle
   // est connue (jamais une seconde ligne, même rangée sous un autre compte).
   const connues = new Set();
-  for (const o of ventes) if (o && o.transaction_id != null && !o._venteEmail) connues.add(String(o.transaction_id));
+  // (16 nov.) La vente lue la plus récente de chaque compte (date de vente) : la fenêtre
+  // ambiguë d'un e-mail SANS n° (voir l'en-tête).
+  const derniereLue = new Map();
+  for (const o of ventes) {
+    if (!o || o._venteEmail) continue;
+    if (o.transaction_id != null) connues.add(String(o.transaction_id));
+    const u = String((o._acc && o._acc.vinted_user_id) || '').trim();
+    const d = Date.parse(String(o.date || ''));
+    if (u && Number.isFinite(d) && !(derniereLue.get(u) >= d)) derniereLue.set(u, d);
+  }
   const parTx = new Map();
   for (const m of mails) {
     const p = preuveVenteEmail(m); if (!p) continue;                    // (a)
     const acc = parUid.get(p.uid); if (!acc) continue;                  // (b) compte lié
     if (typeof ecarte === 'function' && ecarte(p.uid)) continue;        // (b) pas écarté
     if (pasSu.has(p.uid)) continue;                                     // liste pas lue : pas su
-    if (connues.has(p.tx)) continue;                                    // (c) déjà dans la liste
+    if (p.tx && connues.has(p.tx)) continue;                            // (c) déjà dans la liste
     const lu = lectures ? Number(lectures[p.uid]) : NaN;
     if (!Number.isFinite(lu)) continue;                                 // aucune lecture datée : pas su
     if (!(p.t > lu)) continue;                                          // (c) la lecture fait foi
-    const deja = parTx.get(p.tx);
+    // Sans n° : une vente lue de ce compte juste avant l'e-mail pourrait être la même ⇒ pas su.
+    if (!p.tx && derniereLue.get(p.uid) >= p.t - FENETRE_AMBIGUE_MS) continue;
+    const deja = parTx.get(p.cle);
     // Deux e-mails du même n° (une copie transférée) : une ligne, la plus ancienne date.
     if (deja && deja._t <= p.t) continue;
     const titre = String(m.titre || '').trim();
@@ -122,8 +165,8 @@ export function ventesEmailFraiches({ mails, comptes, ecarte, ventes, ko, lectur
     // serveur) : affichée tant que la liste Vinted n'a pas la vente. Même
     // contrôle qu'au serveur : une image d'annonce de Vinted, rien d'autre.
     const photo = RE_PHOTO_EMAIL.test(String(m.photo || '')) ? String(m.photo) : null;
-    parTx.set(p.tx, {
-      transaction_id: p.tx,
+    parTx.set(p.cle, {
+      transaction_id: p.cle,
       title: titre || 'Vente Vinted',
       price: { amount: montantEmail(m.prix), currency_code: 'EUR' },
       date: new Date(p.t).toISOString(),
@@ -131,7 +174,8 @@ export function ventesEmailFraiches({ mails, comptes, ecarte, ventes, ko, lectur
       ...(photo ? { photo } : {}),
       _venteEmail: true,
       _fromEmail: true,
-      _txMail: p.tx,
+      _txMail: p.tx,                                                    // vide sans n° : aucune facture, aucun bordereau
+      ...(p.tx ? {} : { _sansTx: true }),
       _acc: acc,
       _lectureVentes: lu,
       _t: p.t,
