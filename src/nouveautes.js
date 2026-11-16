@@ -37,10 +37,52 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'paire-a-sortir', date: '2026-11-15', titre: 'Une vente tombe : VRM montre le carton', phrase: 'Le meuble, la case allumée, puis « Je l’ai sortie ».', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'journee-verre', date: '2026-11-15', titre: 'Ma journée refaite comme la maquette', phrase: 'Le mois en un verre, les colis avec N°, codes, messages.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'annonces-verre', date: '2026-11-15', titre: 'Annonces : la liste d’abord, chaque rangée claire', phrase: 'Photo, N°, sites et compte, prix ; celles à baisser en ambre.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (15 nov., Julien : « Le transporteur inconnu n'est pas possible ») docs/passation/2026-11-15-transporteur-connu.md
+  { id: 'transporteur-connu', date: '2026-11-15', titre: 'À envoyer : chaque colis a son transporteur', phrase: 'Lu sur l’étiquette ; sinon VRM dit quel compte ouvrir.', tab: 'cat_bord', pour: 'tous', mode: 'tous' },
+  // (15 nov., Julien : « Enlève ça, on range une ANNONCE, pas un achat ») docs/passation/2026-11-15-pas-ranger-achat.md
+  { id: 'pas-ranger-achat', date: '2026-11-15', titre: 'Plus de rangement proposé sur un achat', phrase: 'Tu ranges l’article au Stock : une case à lui, jamais la même.', tab: 'garage', pour: 'tous', mode: 'tous' },
+  // (15 nov., Julien : « vas-y fais tout ») docs/passation/2026-11-15-atelier-arrivee.md — quatre lots.
+  { id: 'atelier-arrivee', date: '2026-11-15', titre: 'Achat retiré : de la boîte à en ligne', phrase: 'N°, case, photos, prix payé, fiche, publication : une étape après l’autre.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'historique-complet', date: '2026-11-15', titre: 'Toute l’histoire d’un article, datée', phrase: 'Achat, baisses, offres, masquages, vente, retour : sur sa fiche.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'note-conversation', date: '2026-11-15', titre: 'Ta note, à côté de la conversation', phrase: 'Écrite ou dictée, elle suit l’article jusqu’au message de l’acheteur.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  { id: 'taille-texte', date: '2026-11-15', titre: 'Taille du texte réglable', phrase: 'Quatre tailles dans Paramètres, toute l’app suit.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (15 nov., lot fiabilite-auto) docs/passation/2026-11-15-fiabilite-auto.md — VRM se vérifie chaque nuit.
+  { id: 'fiabilite-auto', date: '2026-11-15', titre: 'VRM se vérifie seul chaque nuit', phrase: 'Un écart ? Il est dans Tout va bien, avec le geste.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (15 nov., vendre plus) docs/passation/2026-11-15-vendre-plus.md — baisse conseillée, relance des favoris, loupe.
+  { id: 'baisses-conseillees', date: '2026-11-15', titre: 'Baisses conseillées pour les annonces qui dorment', phrase: 'Baisser ou garder, la raison, ton plancher ; tu appliques.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'relance-favoris', date: '2026-11-15', titre: 'Relancer les favoris au bon moment', phrase: 'Des gens l’aiment, rien depuis 7 jours : une offre, ton clic.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  { id: 'loupe-stock-retours', date: '2026-11-15', titre: 'La loupe trouve le stock et les retours', phrase: 'Un lieu de rangement, un suivi de retour : tout se trouve.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (15 nov., lot argent-plus) docs/passation/2026-11-15-argent-plus.md — bilan de fin de mois, seuils, bénéfice, sauvegarde.
+  { id: 'bilan-fin-mois', date: '2026-11-15', titre: 'Ton bilan du mois, le 1er', phrase: 'Vendu, reçu, URSSAF, qui dorment : en notification, PDF et tableur.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  { id: 'alertes-seuils', date: '2026-11-15', titre: 'Prévenu à 80 % de tes seuils', phrase: 'Plafond micro, TVA, DAC7 : une alerte, une phrase sourcée.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  { id: 'benefice-article', date: '2026-11-15', titre: 'Le vrai bénéfice de chaque article', phrase: 'Frais du site et frais notés déduits, le manque nommé.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  { id: 'sauvegarde-toutes-donnees', date: '2026-11-15', titre: 'Télécharger toutes tes données en un zip', phrase: 'Tableaux, données par catégorie et bordereaux, faits dans ton navigateur.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (15 nov., Julien : « Je veux que ce soit parfait et irréprochable ») docs/passation/2026-11-15-retour-parfait.md
+  { id: 'retour-parfait', date: '2026-11-15', titre: 'Retours : chaque étape jusqu’au remboursement', phrase: 'Imprime depuis l’iPhone ; VRM te rappelle la veille de la date.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (15 nov., Julien : « vas-y fais tout ») docs/passation/2026-11-15-securite-ventes.md — trois lignes, trois écrans.
+  { id: 'alerte-arnaque-langues', date: '2026-11-15', titre: 'Alerte arnaque dans tes messages, cinq langues', phrase: 'Une phrase dit le risque et quoi faire, rien n’est envoyé.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  { id: 'ou-vendre-fiche', date: '2026-11-15', titre: 'Où vendre ? Ce que tu touches par site', phrase: 'Sur la fiche, frais déduits, le meilleur mis en avant.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'objectif-anneau', date: '2026-11-15', titre: 'Ton objectif du mois en anneau', phrase: 'Ma journée dit ce qui reste et le rythme par jour.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (15 nov., Julien : « Améliore le parcours », « un onglet admin », « Signaler un problème qui t'arrive vraiment ») docs/passation/2026-11-15-parcours-nouveau.md
+  { id: 'parcours-nouveau', date: '2026-11-15', titre: 'Signaler un problème : la réponse arrive ici', phrase: 'Reçu, puis la réponse dans Paramètres → Mes signalements.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (15 nov., Julien : « pratique et compréhensible ») docs/passation/2026-11-15-parametres.md
+  { id: 'parametres-categories', date: '2026-11-15', titre: 'Paramètres rangés en dix catégories', phrase: 'Cherche « papier » ou « URSSAF » : le bon réglage s’ouvre.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (15 nov., eBay complet 3) docs/passation/2026-11-15-ebay-complet.md — les gestes (2e tour).
+  { id: 'ebay-gestes', date: '2026-11-15', titre: 'eBay : compléter une annonce en un toucher', phrase: 'Pourquoi elle ne se voit pas, et le geste qui corrige.', tab: 'plat_ebay', pour: 'tous', mode: 'tous' },
+  // (15 nov., eBay complet 2) docs/passation/2026-11-15-ebay-complet.md — Tableau, Argent, Trafic, Santé.
+  { id: 'ebay-tableau', date: '2026-11-15', titre: 'eBay : tableau, versements, trafic et santé', phrase: 'Frais réels, annonces qui ne se voient pas, litiges : tout ici.', tab: 'plat_ebay', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « J'aime la 9 ») docs/passation/2026-11-15-verre-depoli.md — le thème « Verre dépoli ».
   { id: 'verre-depoli', date: '2026-11-15', titre: 'Nouveau thème : verre dépoli sur bleu profond', phrase: 'Le chiffre du jour en blanc, tout se lit sur le verre.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (15 nov., Julien : « imagine que la personne publie sur l'app Vinted… ») docs/passation/2026-11-15-numeros-masquees.md
+  { id: 'republiee-telephone', date: '2026-11-15', titre: 'Republiée dans l’app Vinted ? Ton N° suit', phrase: 'Même photo : VRM te demande avant de donner un N°.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (15 nov., Julien) docs/passation/2026-11-15-numeros-nouvelles.md — les annonces publiées hors de VRM.
+  { id: 'numeros-nouvelles-annonces', date: '2026-11-15', titre: 'Tes nouvelles annonces reçoivent leur N°', phrase: 'VRM numérote et te le dit, ou te demande le N°.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « améliore la liaison entre les achats et les articles ») docs/passation/2026-11-15-achats-liaison.md
   { id: 'achats-liaison', date: '2026-11-15', titre: 'Achat et article côte à côte, vendus compris', phrase: 'Pourquoi, taille, couleur, retrait ; valide les très probables d’un toucher.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (15 nov., Julien : « l'app bug quand je l'ouvre, améliore l'onglet de chargement ») docs/passation/2026-11-15-ouverture.md
+  { id: 'ouverture-verre', date: '2026-11-15', titre: 'Ouverture en verre, sans écran d’erreur', phrase: 'Après une mise à jour, la nouvelle version s’ouvre directement.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (15 nov., Julien : « tu supprimes les bordereaux lorsque la vente est finalisée et que on a reçu l'argent ») docs/passation/2026-11-15-purge-bordereaux.md
+  { id: 'bordereaux-apres-versement', date: '2026-11-15', titre: 'Bordereaux allégés après le versement', phrase: 'Vente finalisée, argent reçu, aucun retour : le PDF part, l’historique reste.', tab: 'colis', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « c'est moche et il y a des bugs ») docs/passation/2026-11-15-annonces-achats.md
   { id: 'annonces-achats-cartes', date: '2026-11-15', titre: 'Prix d’achat : cartes nettes, recherche lisible', phrase: 'Une suggestion, Relier en un toucher ; la recherche ne se mélange plus.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « tout doit être beaucoup mieux, accompagné, même la publication tout court ») docs/passation/2026-11-15-republier-main.md
@@ -51,14 +93,12 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'retrait-ailleurs', date: '2026-11-15', titre: 'Vendue ? Retire-la ailleurs en un toucher', phrase: 'En tête de Ma journée : un bouton par site, VRM suit tout.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov.) docs/passation/2026-11-15-argent-attente.md — l'écran « Argent à venir ».
   { id: 'argent-a-venir-etapes', date: '2026-11-15', titre: 'L’argent à venir, étape par étape', phrase: 'Touche « À venir » : par étape, par site, par compte.', tab: 'cat_ventes', pour: 'tous', mode: 'tous' },
-  // (15 nov., Julien) docs/passation/2026-11-15-numeros-nouvelles.md — les annonces publiées hors de VRM.
-  { id: 'numeros-nouvelles-annonces', date: '2026-11-15', titre: 'Tes nouvelles annonces reçoivent leur N°', phrase: 'VRM numérote et te le dit, ou te demande le N°.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (15 nov., Julien : « le nombre de cases que l'on veut, des couleurs, la règle des piles ») docs/passation/2026-11-15-stock-etageres.md
+  { id: 'stock-etageres', date: '2026-11-15', titre: 'Ton stock en étagères colorées et piles', phrase: 'Autant de cases que tu veux ; une pile se tasse toute seule.', tab: 'garage', pour: 'tous', mode: 'tous' },
   // (15 nov., extension 5.383) Ventes Vestiaire : l'état le plus frais gagne, l'état en mots, le prix de vente.
   { id: 'vestiaire-ventes-justes', date: '2026-11-15', titre: 'Ventes Vestiaire : le vrai état, le vrai prix', phrase: 'Expédiée, en livraison, payée : plus de code ni de faux retard.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (15 nov., extension 5.384, Julien : « vraiment exactement la même photo ») docs/passation/2026-11-15-meme-photo.md
   { id: 'meme-photo', date: '2026-11-15', titre: 'Même photo qu’une paire Vinted : relier', phrase: 'Leboncoin, eBay, Vestiaire : la même photo est reconnue, tu relies.', tab: 'journee', pour: 'tous', mode: 'tous' },
-  // (15 nov., Julien : « le nombre de cases que l'on veut, des couleurs, la règle des piles ») docs/passation/2026-11-15-stock-etageres.md
-  { id: 'stock-etageres', date: '2026-11-15', titre: 'Ton stock en étagères colorées et piles', phrase: 'Autant de cases que tu veux ; une pile se tasse toute seule.', tab: 'garage', pour: 'tous', mode: 'tous' },
   // (15 nov., lot retours) docs/passation/2026-11-15-retours.md — « À renvoyer » : une carte par retour d'achat.
   { id: 'retours-a-renvoyer', date: '2026-11-15', titre: 'Retours : bordereau, date et heure, une carte', phrase: 'En tête de Ma journée : imprime, dépose, suis le remboursement.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « fais de plus belles notifications ») docs/passation/2026-11-15-notifications-belles.md
@@ -69,8 +109,6 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'carte-extension-studio', date: '2026-11-15', titre: 'La carte VRM sur Vinted, refaite', phrase: 'Favoris en liste, ventes sans tiret, liens qui marchent, bleu clair.', tab: 'messages', pour: 'tous', mode: 'tous' },
   // (15 nov., extension 5.379, Julien sur Orion iPhone : « Leboncoin marche pas ») docs/passation/2026-11-15-lbc-orion.md
   { id: 'lbc-orion-de-cote', date: '2026-11-15', titre: 'Leboncoin vide sur iPhone : VRM s’écarte', phrase: 'Page vide ? VRM se met de côté et le dit.', tab: 'settings', pour: 'tous', mode: 'tous' },
-  // (15 nov., Julien : « pratique et compréhensible ») docs/passation/2026-11-15-parametres.md
-  { id: 'parametres-categories', date: '2026-11-15', titre: 'Paramètres rangés en dix catégories', phrase: 'Cherche « papier » ou « URSSAF » : le bon réglage s’ouvre.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (15 nov., extension 5.378) Dates de versement : relevé vérifié avant de dater, délai en heures de Vinted ouvert.
   { id: 'versements-releve-verifie', date: '2026-11-15', titre: 'Dates de versement : relevé vérifié, délai honnête', phrase: 'Le relevé ne date rien avant cinq accords ; délai en heures.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « horriblement moche », « ne mets pas paires, tu mets annonces ») docs/passation/2026-11-15-annonces-propre.md

@@ -13,13 +13,19 @@ import ecran_capte from './fr/capte.js';   // (14 nov., extension 5.377) « L'ex
 import ecran_avenir from './fr/avenir.js';
 import ecran_verre2 from './fr/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
 import ecran_fiched from './fr/fiched.js';   // (15 nov.) la fiche d'un article, direction D
+import ecran_vcventes from './fr/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
+import ecran_transporteur_connu from './fr/transporteurConnu.js';   // (15 nov.) « À expédier » : transporteur connu
+import ecran_vendre from './fr/vendre.js';   // (15 nov., vendre plus) baisses conseillées, relance des favoris, loupe
+import ecran_ebaytableau from './fr/ebaytableau.js';   // (15 nov., eBay complet 2) Tableau, Argent, Trafic, Santé
 import ecran_renvoyer from './fr/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_liaison from './fr/liaison.js';   // (15 nov.) La liaison achat ⇄ article
 import ecran_retrait_ailleurs from './fr/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
 import ecran_finition from './fr/finition.js';   // (15 nov.) la finition écran par écran
 import ecran_parametres from './fr/parametres.js';   // (15 nov.) Paramètres rangés en dix catégories
-import ecran_vcventes from './fr/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
 import ecran_numeros_nouvelles from './fr/numeros-nouvelles.js';   // (15 nov.) Les nouvelles annonces sans N°
+import ecran_republie_telephone from './fr/republie-telephone.js';   // (15 nov.) Republiée dans l'app Vinted   // (15 nov.) Les nouvelles annonces sans N°
+import ecran_securite_ventes from './fr/securite-ventes.js';   // (15 nov.) Sécurité des ventes : arnaque, où vendre, anneau
+import ecran_parcours_nouveau from './fr/parcoursNouveau.js';   // (15 nov.) le parcours d'un nouveau, « Nouveaux comptes », le suivi d'un signalement   // (15 nov.) Paramètres rangés en dix catégories
 import ecran_idees from './fr/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './fr/ventes.js';
 import ecran_commun from './fr/commun.js';
@@ -49,18 +55,22 @@ import ecran_atelier from './fr/atelier.js';
 import ecran_accompagnement from './fr/accompagnement.js';   // (14 nov.) les quatre moments d'un geste
 import ecran_partenaires from './fr/partenaires.js';   // (15 nov.) programme partenaire
 import ecran_argentprix from './fr/argentprix.js';   // (14 nov., argent-prix)
+import ecran_argentPlus from './fr/argentPlus.js';   // (15 nov., lot argent-plus)
 import ecran_rechliste from './fr/rechliste.js';
 import ecran_studio_paires from './fr/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
 import ecran_republier_guide from './fr/republierGuide.js';   // (15 nov.) republier / publier à la main, guidés
 import ecran_memePhoto from './fr/memePhoto.js';   // (15 nov., lot meme-photo)
+import ecran_fiabilite from './fr/fiabilite.js';   // (15 nov., lot fiabilite-auto)
 import ecran_etageres from './fr/etageres.js';   // (15 nov.) le Stock en étagères
 import ecran_journee_verre from './fr/journee-verre.js';   // (15 nov.) Ma journée verre, la paire à sortir
+import ecran_arrivee from './fr/arrivee.js';   // (15 nov.) atelier d'arrivée, historique, taille du texte
 export default {
   ...ecran_ventesVerre,
   ...ecran_studio_paires,
   ...ecran_republier_guide,
   ...ecran_etageres,
   ...ecran_journee_verre,
+  ...ecran_arrivee,
   ...ecran_accueilReste,
   ...ecran_refonte_ms,
   ...ecran_studio_journee,
@@ -75,6 +85,7 @@ export default {
   ...ecran_accompagnement,
   ...ecran_plus,
   ...ecran_argentprix,
+  ...ecran_argentPlus,
   ...ecran_partenaires,
   ...ecran_plateformes,
   ...ecran_idees,
@@ -1012,12 +1023,14 @@ export default {
   "vcParcours.etape.verdict": "Validé",
   "vcParcours.etape.refuse": "Refusé",
   "vcParcours.etape.paye": "Payé",
+  "vcParcours.etape.livraison": "Livraison à l’acheteur",
   "vcParcours.court.envoye": "Envoyé",
   "vcParcours.court.arrive": "Arrivé",
   "vcParcours.court.authentification": "Contrôle",
   "vcParcours.court.verdict": "Validé",
   "vcParcours.court.refuse": "Refusé",
   "vcParcours.court.paye": "Payé",
+  "vcParcours.court.livraison": "Livraison",
   "vcParcours.etat.faitLe": "le {jour}",
   "vcParcours.etat.fait": "fait",
   "vcParcours.etat.refuseMot": "Vestiaire écrit « {mot} »",
@@ -2282,13 +2295,20 @@ export default {
   ...ecran_retrait_ailleurs,
   ...ecran_vcventes,
   ...ecran_memePhoto,
+  ...ecran_fiabilite,
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_liaison,
+  ...ecran_transporteur_connu,
+  ...ecran_vendre,
+  ...ecran_ebaytableau,
   ...ecran_finition,
   ...ecran_parametres,
   ...ecran_avenir,
   ...ecran_verre2,
   ...ecran_fiched,
   ...ecran_numeros_nouvelles,
+  ...ecran_republie_telephone,
+  ...ecran_securite_ventes,
+  ...ecran_parcours_nouveau,
 };

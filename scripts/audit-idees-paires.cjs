@@ -279,7 +279,7 @@ if (PROUVE) prouver();
     const AC = fs.readFileSync(path.join(RACINE, 'src', 'AnnoncesACompleter.jsx'), 'utf8');
     dit(/vueFiche === 'temps' \? <LigneDeTemps h=\{p\} extra=\{extraTemps \|\| \{\}\}\/> : <ol className="vrm-fp-parcours">/.test(FP) && /<OngletsFiche vue=\{vueFiche\} onVue=\{setVueFiche\}\/>/.test(FP),
       'B1 · la fiche : « Par étape » · « Dans l’ordre » (la ligne de temps à la place du parcours)');
-    dit(/extraTemps=\{\{ reception: ex \? ex\.reception : undefined, crees: numData \? \(numData\.crees === undefined \? null : numData\.crees\) : undefined, lireStudio: lireStudioDates \}\}/.test(APP)
+    dit(/extraTemps=\{\{ reception: ex \? ex\.reception : undefined, crees: numData \? \(numData\.crees === undefined \? null : numData\.crees\) : undefined, lireStudio: lireStudioDates(?: \}\}|,)/.test(APP)   /* (15 nov.) l’historique complet ajoute ses sources après */
       && /const lireStudioDates = \(num\) => lireBaseRelue\(`\$\{SUPABASE_URL\}\/rest\/v1\/app_data\?id=eq\.\$\{encodeURIComponent\('studio_photos_' \+ cleNum\(num\)\)\}&select=\$\{selectStudio\(\)\}`\);/.test(APP),
       'B2 · réception, dates Vinted, photos du studio : passées par identité ; studio lu en PROJECTION scalaire (jamais select=data)');
     dit(/<OutilsFicheIdees numero=\{p\.num\} source=\{champsADupliquer\(rn, ex\)\}/.test(APP) && /const r = await dupliquerNumero\(rn, ex, champs\);/.test(APP), 'B4 · la fiche : « Dans une autre taille » passe par dupliquerNumero (N° neuf)');

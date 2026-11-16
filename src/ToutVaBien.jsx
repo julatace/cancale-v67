@@ -30,6 +30,11 @@ import { LigneSante } from './SanteDonnees.jsx';
 import { useAlertesForme, LignesForme } from './AlerteFormeVinted.jsx';   // (11 nov., ext. 5.357) Vinted a changé une page
 import { BoutonRapportExtension, RapportsExtensionProprio } from './RapportExtension.jsx';   // (12 nov., ext. 5.371)
 import './styles-tout-va-bien.css';
+// (15 nov., lot fiabilite-auto) L'extension de CE navigateur, le contrôle de cette nuit, la santé de
+// chaque compte (une feuille), le rapport de plantages du propriétaire (src/fiabilite/Fiabilite.jsx).
+import { FiabiliteToutVaBien, RapportPlantages } from './fiabilite/Fiabilite.jsx';
+import { LIENS_BOUTIQUES } from './navigateursServis.js';
+import { tr } from './i18n/index.js';
 
 // La dernière version qui a écrit, n'importe où (les extensions d'avant la 5.327
 // ne publient pas leur appareil) : `panel_diag_capture`. Trois états.
@@ -133,7 +138,7 @@ function LigneAppareil({ a, maintenant, ouvert, onOuvrir }) {
       <Pastille ton={ev === 'ancienne' ? 'geste' : ev === 'pas-su' ? 'passu' : 'ok'}/>
       <div className="vrm-tvb-texte">
         <span className="vrm-tvb-titre">{a.nom}</span>
-        <span className="vrm-tvb-detail"><span className="vrm-tvb-ligne">Extension {v || '?'} · {vu}</span>
+        <span className="vrm-tvb-detail"><span className="vrm-tvb-ligne" data-tvb-version-phrase={ev === 'ancienne' ? '' : undefined}>{ev === 'ancienne' ? `${tr('fiab.ext.appareil', { nav: a.nom, v: v || '?', attendue: versionCourte(EXT_ATTENDUE) })} · ${vu}` : `Extension ${v || '?'} · ${vu}`}</span>
           {refus ? <span className="vrm-tvb-ligne" data-tvb-refus="">Dernier envoi {nomPlateforme(refus.p)} refusé {quandRelu(refus.r.at)}</span> : null}
           {secours ? <span className="vrm-tvb-ligne" data-tvb-secours={secours.etat}>{secours.etat === 'trop_lourd' ? 'vrm.center muet et liste trop lourde pour la voie directe : rien envoyé' : 'vrm.center muet : ventes envoyées par la voie directe'}</span> : null}
         </span>
@@ -141,6 +146,8 @@ function LigneAppareil({ a, maintenant, ouvert, onOuvrir }) {
           <div className="vrm-tvb-maj" data-tvb-maj={a.paquet}>
             <ol>{m.gestes.map((g, i) => <li key={i}>{g}</li>)}</ol>
             {m.lien ? <a className="vrm-b vrm-b-primaire vrm-tvb-lien" href={m.lien} download data-tvb-lien={m.lien}>Télécharger {m.nomLien}</a> : null}
+            {/* (15 nov.) La fiche du Chrome Web Store, SEULEMENT si elle est publiée (`LIENS_BOUTIQUES`). */}
+            {a.paquet !== 'orion' && a.paquet !== 'firefox' && LIENS_BOUTIQUES.chrome ? <a className="vrm-b vrm-b-secondaire vrm-tvb-lien" href={LIENS_BOUTIQUES.chrome} target="_blank" rel="noreferrer" data-tvb-boutique="chrome">{tr('fiab.ext.boutique', { boutique: 'Chrome Web Store' })}</a> : null}
           </div>
         ) : null}
       </div>
@@ -191,6 +198,7 @@ export function ToutVaBien({ onComptes }) {
         <button type="button" className="vrm-lien-action vrm-tvb-revoir" data-tvb-relire="" onClick={relire}>Revérifier</button>
       </div>
       <LignesForme alertes={formes} lieu="tvb"/>
+      <FiabiliteToutVaBien etat={etat}/>
       {parSite.map(([p, l]) => (
         <GroupeIos key={p} titre={nomPlateforme(p)} data-tvb-site={p}>
           {l.map((x) => <LigneCompte key={x.id} l={x} panne={panneDe.get(`${x.plateforme}:${x.id}`)}/>)}
@@ -222,6 +230,7 @@ export function ToutVaBien({ onComptes }) {
       {/* (12 nov., ext. 5.371) « Envoyer un rapport » : l'état technique de l'extension, sans tes données. */}
       <BoutonRapportExtension/>
       {proprio ? <AlertesProduction entetes={enTeteSession}/> : null}
+      {proprio ? <RapportPlantages entetes={enTeteSession}/> : null}
       {proprio ? <RapportsExtensionProprio/> : null}
       {onComptes ? <div className="vrm-tvb-pied"><button type="button" className="vrm-lien-action" onClick={onComptes}>Gérer mes comptes liés</button></div> : null}
     </div>

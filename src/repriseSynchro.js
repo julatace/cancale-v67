@@ -172,7 +172,7 @@ const NOMS_VUE = {
   'ebay-ventes-recherche': 'Recherche eBay', 'leboncoin-messages-zone': 'Vue Leboncoin',
 };
 const NOMS_VALEUR = {
-  aexpedier: 'À expédier', transit: 'En transit', finalisees: 'Finalisées', annulees: 'Annulées', encours: 'En cours', all: 'Tout',
+  aexpedier: 'À envoyer', transit: 'En transit', finalisees: 'Finalisées', annulees: 'Annulées', encours: 'En cours', all: 'Tout',
   attente: 'En attente', route: 'En route', recus: 'Reçus', recent: 'Plus récentes', oldest: 'Plus anciennes', price_desc: 'Prix décroissant',
   price_asc: 'Prix croissant', favs: 'Favoris', views: 'Vues', nonum: 'Sans numéro', boost: 'Boostées', sleeping: 'À relancer',
   republier: 'Republier', selection: 'Sélection', brouillons: 'Brouillons', masquees: 'Masquées', sansachat: 'Sans achat', acompleter: 'À compléter',

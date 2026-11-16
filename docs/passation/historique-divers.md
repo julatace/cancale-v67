@@ -1944,3 +1944,8 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 <!-- déplacé tel quel de CLAUDE.md §9 le 15 nov. 2026 -->
 - **15 nov. · Version « Studio bleu clair » en ligne** : les chantiers studio + impression en un toucher + idées 154/157/158/160 + correctif « À faire », intégrés ; passe complète (26 audits, 22 bancs) ; corrigé à la fusion : étiquette « Choisir » en double sur le plein, moments pendant/après/échec de l'impression rebranchés (`accompagner`), « Bénéfice : — ». `docs/passation/2026-11-15-version-studio.md`. Geste : fermer/rouvrir l'app, essayer « Imprimer » sur l'iPhone.
+
+
+## Ligne déplacée de CLAUDE.md §9 (16 nov.)
+
+- **15 nov. · Publier partout : catégories exactes (5.381.0)** : table `src/correspondances.js` par `catalog_id` Vinted (lu sous `codes.catalog_id`, l'app cherchait `catalogId`) ⇒ Leboncoin 18 sûres/5 à demander, Vestiaire 7/14, eBay demandé à eBay ; réponses retenues par catégorie (`vrm_correspondances`). `2026-11-15-publier-partout-categories.md`. Geste : installer 5.381.0, répondre une fois aux questions.

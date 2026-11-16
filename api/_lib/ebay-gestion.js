@@ -162,7 +162,14 @@ export function creerGestionEbay({accessToken,ebayJson,tradingCall,apiOrigin,fet
     if((!argent(b.expectedPrice) || !argent(offer.price) || Math.round(Number(String(b.expectedPrice).replace(',','.'))*100)!==Math.round(Number(offer.price)*100)) || b.currency!==offer.currency || !/^[A-Z]{3}$/.test(offer.currency || '') || !Number.isInteger(offer.quantity) || offer.quantity<1)return echec('L’offre a changé ou ses montants ne sont pas lisibles. Actualise-la.',409);
     let inner=`<ItemID>${offer.itemId}</ItemID><BestOfferID>${offer.id}</BestOfferID><Action>${b.decision}</Action>`;
     if(b.decision==='Counter')inner+=`<CounterOfferPrice currencyID="${offer.currency}">${Number(String(b.price).replace(',','.')).toFixed(2)}</CounterOfferPrice><CounterOfferQuantity>${offer.quantity}</CounterOfferQuantity>`;
-    return ecrire('RespondToBestOffer',inner,a.token);
+    const w=await ecrire('RespondToBestOffer',inner,a.token);
+    if(!w.body || !w.body.ok)return w;
+    // (15 nov., eBay complet 3) RELU APRÈS : l'offre ne doit plus être « en attente ». Encore en
+    // attente ⇒ « pas relu » (jamais « fait ») ; illisible ⇒ « fait » dit par eBay, relecture pas sue.
+    const apres=await lire('GetBestOffers',`<BestOfferID>${b.offerId}</BestOfferID><BestOfferStatus>All</BestOfferStatus>`,a.token);
+    const o2=apres.root?offresEbay(apres.root).find(o=>o.id===String(b.offerId)):null;
+    if(o2 && ['Pending','Active'].includes(o2.status))return echec('eBay a répondu, mais l’offre relue est encore en attente — regarde-la sur eBay.',409,'pas-relu');
+    return succes({...w.body,relu:o2?o2.status:null});
   }
   async function modifierAnnonce(b,owner){
     if(b.confirme!==true)return echec('Confirme la modification de l’annonce.',400,'confirmation');

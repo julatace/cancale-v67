@@ -122,7 +122,40 @@ export function erreursRecentes() {
 // son lot (src/mesuresCollecte.js). Le compte se fait AVANT le « une fois par
 // heure » du journal : une erreur qui revient dix fois dit dix.
 let compterAlerte = null;
-export function brancherAlertes(f) { compterAlerte = typeof f === 'function' ? f : null; }
+// (15 nov., lot fiabilite-auto) Une erreur qui BLOQUE L'OUVERTURE (le dernier filet de
+// main.jsx, ou un morceau périmé qui revient après le rechargement) arrive souvent AVANT que
+// la collecte (src/mesuresCollecte.js, chargée avec l'app) ne soit branchée : elle attend
+// ici, sur l'appareil (au plus 10, déjà nettoyée), et part avec le premier lot.
+const ATTENTE_ALERTES = 'vrm_alertes_attente';
+const ATTENTE_MAX = 10;
+const passerAlerte = (ev) => {
+  if (compterAlerte) { try { compterAlerte(ev); } catch (_) {} return; }
+  const l = lire(ATTENTE_ALERTES, []);
+  ecrire(ATTENTE_ALERTES, [...(Array.isArray(l) ? l : []), ev].slice(-ATTENTE_MAX));
+};
+export function brancherAlertes(f) {
+  compterAlerte = typeof f === 'function' ? f : null;
+  if (!compterAlerte) return;
+  const l = lire(ATTENTE_ALERTES, []);
+  if (!Array.isArray(l) || !l.length) return;
+  ecrire(ATTENTE_ALERTES, []);
+  for (const ev of l) if (ev && typeof ev === 'object') { try { compterAlerte(ev); } catch (_) {} }
+}
+// Le navigateur en deux mots (« iOS Safari », « Mac Chrome ») : la même forme que le journal.
+export function navigateurCourt(u) {
+  const ua = String(u == null ? '' : u);
+  return (/iPhone|iPad/.test(ua) ? 'iOS ' : /Android/.test(ua) ? 'Android ' : /Mac/.test(ua) ? 'Mac ' : /Windows/.test(ua) ? 'Windows ' : '')
+    + (/Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'autre');
+}
+const navigateurIci = () => { try { return navigateurCourt(navigator.userAgent || ''); } catch (_) { return ''; } };
+// Un morceau périmé BLOQUE quand le rechargement ne l'a pas réglé : il revient moins d'une
+// minute après lui (main.jsx pose `vrm_recharge_morceau`), ou c'est le dernier filet qui l'a vu.
+export const RECHARGE_MS = 60000;
+export function morceauBloquant(contexte, maintenant = Date.now()) {
+  if (contexte && contexte.origine === 'demarrage') return true;
+  let t = 0; try { t = Number(sessionStorage.getItem('vrm_recharge_morceau')) || 0; } catch (_) { t = 0; }
+  return t > 0 && maintenant - t < RECHARGE_MS;
+}
 
 // Rend l'entrée notée, ou null si elle est écartée (bruit, déjà notée, plafond).
 export function noterPlantage(err, contexte = {}) {
@@ -132,9 +165,16 @@ export function noterPlantage(err, contexte = {}) {
     const premiereExt = pileBrute.split('\n').find((l) => /(https?|chrome-extension|moz-extension|safari-web-extension|safari-extension):\/\//.test(l)) || '';
     const dExtension = /chrome-extension:\/\/|moz-extension:\/\/|safari-(web-)?extension:\/\//.test(premiereExt);
     if (message && !dExtension) noterErreurRecente(message, contexte, estMorceauPerime(message) || BRUIT.test(message));
-    if (message && estMorceauPerime(message)) { compterMorceauPerime(err); return null; }
+    if (message && estMorceauPerime(message)) {
+      compterMorceauPerime(err);
+      // (15 nov., lot fiabilite-auto) Rattrapé par le rechargement : compté à part, rien de plus.
+      // Revenu APRÈS le rechargement (ou vu par le dernier filet) : l'app ne s'ouvre pas — le
+      // propriétaire le sait (anonyme), sans attendre.
+      if (!dExtension && morceauBloquant(contexte)) passerAlerte({ message, ecran: contexte.ecran, origine: 'ouverture', version: contexte.version, appareil: navigateurIci() });
+      return null;
+    }
     if (!message || BRUIT.test(message)) return null;
-    if (!dExtension && compterAlerte) { try { compterAlerte({ message, ecran: contexte.ecran, origine: contexte.origine, version: contexte.version }); } catch (_) {} }
+    if (!dExtension) passerAlerte({ message, ecran: contexte.ecran, origine: contexte.origine, version: contexte.version, appareil: navigateurIci() });
     // Le bruit se juge sur la frame qui a LEVÉ, pas sur toute la pile : une
     // extension tierce qui enveloppe setTimeout apparaît PLUS BAS dans la pile
     // d'une vraie erreur de l'app, et l'écartait.
@@ -168,7 +208,7 @@ export function noterPlantage(err, contexte = {}) {
       ecran: String(contexte.ecran || '').slice(0, 40),
       origine: String(contexte.origine || 'page').slice(0, 20),
       version: String(contexte.version || '').slice(0, 40),
-      navigateur: (() => { try { const u = navigator.userAgent || ''; return (/iPhone|iPad/.test(u) ? 'iOS ' : /Android/.test(u) ? 'Android ' : /Mac/.test(u) ? 'Mac ' : /Windows/.test(u) ? 'Windows ' : '') + (/Edg\//.test(u) ? 'Edge' : /Chrome\//.test(u) ? 'Chrome' : /Firefox\//.test(u) ? 'Firefox' : /Safari\//.test(u) ? 'Safari' : 'autre'); } catch (_) { return ''; } })(),
+      navigateur: navigateurIci(),
       at: new Date(maintenant).toISOString(),
       nAppareil,
     };

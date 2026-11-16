@@ -2396,3 +2396,8 @@ build d'origin/main (8d01ecc9).
 ## Ligne déplacée de CLAUDE.md §9 (11 nov., taille)
 
 - **11 nov. · Clôturer l'année** : Argent → Déclarer (déc.–mai), 8 étapes CONSTATÉES (règles existantes) + portes ; « J'ai fini » = son clic (`vrm_cloture_annee`) ; Ma journée déc./janv. une fois. Sites officiels injoignables ici : cases/seuils non revérifiés. `2026-11-11-cloture-annee.md`.
+
+
+## Ligne déplacée de CLAUDE.md §9 (16 nov.)
+
+- **15 nov. · Dates de versement : relevé vérifié, délai honnête (extension 5.378.0)** : mesuré, aucune adresse de relevé d'un mois passé jamais vue (l'ancienne `payouts?year=&month=` était devinée, 404) ; le relevé ne date plus qu'après 5 accords avec « Commande finalisée » (0 désaccord), sinon dit ; délai « ~146 h avec vinted.fr ouvert » au lieu de « 7 jours ». `docs/passation/2026-11-15-versements-releve.md`. Geste : installer 5.378.0, laisser vinted.fr ouvert sur le grand compte, ouvrir une fois Porte-monnaie → Historique → un mois passé.

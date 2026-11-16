@@ -173,7 +173,9 @@ const CORPS_RB = (tx, montant = '45,90') => ['Bonjour banc_acheteur,', '', 'Le p
 
   await essaie('W l’écran est branché', async () => {
     const app = require('./_source-app.cjs').sourceApp ? require('./_source-app.cjs').sourceApp(R) : fs.readFileSync(path.join(R, 'src/App.jsx'), 'utf8');
-    dit(/<RetoursAchatBloc r=\{retoursAchatRes\}/.test(app) && /<RetoursAImprimer r=\{retoursAchatRes\}/.test(app), 'W1 Achats → « Retours » et « Tout imprimer » → « Retours » sont rendus');
+    // (16 nov., intégration vague B) Depuis refonte-journee (15 nov.), Achats rend la liste CLASSÉE (`retoursAchatVus` :
+    // les actifs, sans les « sans nouvelles » ni ceux qu'il a dits réglés), tirée de `retoursAchatRes`.
+    dit(/<RetoursAchatBloc r=\{retoursAchatVus\}/.test(app) && /const retoursAchatVus = useMemo\(\(\) => \(retoursAchatRes/.test(app) && /<RetoursAImprimer r=\{retoursAchatRes\}/.test(app), 'W1 Achats → « Retours » et « Tout imprimer » → « Retours » sont rendus');
     dit(/onPasAPas=\{\(c\) => setPapCle\(c\.cle\)\}/.test(app) && /<PasAPasRetour c=\{c\}/.test(app), 'W2 « Pas à pas » est rendu sur l’écran Litiges');
     dit(/id=like\.email_bordretour_\*&select=id,/.test(app) && !/email_bordretour_\*&select=data/.test(app), 'W3 les bordereaux de retour se lisent en PROJECTION (jamais `select=data` : le PDF est lourd)');
   });

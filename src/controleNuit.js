@@ -40,7 +40,7 @@ const objet = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : null
 
 // L'ordre = la gravité. `ou` : 'vendeur' (sa ligne) ou 'installation' (le propriétaire).
 export const CONTROLES = [
-  { cle: 'numeros-double', ou: 'vendeur', ton: 'rouge', get nom() { return `Deux ${motsVendeur().noms} sous un N°`; },
+  { cle: 'numeros-double', ou: 'vendeur', ton: 'rouge', notifie: true, get nom() { return `Deux ${motsVendeur().noms} sous un N°`; },
     phrase: (n) => `${n} N° ${pl(n, 'porté', 'portés')} par deux ${motsVendeur().noms} en ligne`,
     geste: { libelle: 'Corriger', aller: '/?tab=cat_bord' } },
   { cle: 'versement-30j', ou: 'vendeur', nom: 'Ventes sans versement',
@@ -49,6 +49,22 @@ export const CONTROLES = [
   { cle: 'comptes-48h', ou: 'vendeur', nom: 'Comptes pas relus',
     phrase: (n) => `${n} ${pl(n, 'compte pas relu', 'comptes pas relus')} depuis 48 h`,
     geste: { libelle: 'Mes comptes', aller: '/?tab=vintedaccounts' } },
+  // (15 nov., lot fiabilite-auto) Quatre contrôles de plus. Les mots affichés passent par
+  // `tr('fiab.ctl.<cle>…')` (src/fiabilite/ControleNuitLignes.jsx) ; ces phrases-ci servent au
+  // serveur et à la réponse du cron (le français fait foi). `notifie` : un écart RÉEL qui
+  // demande un geste ⇒ la notification du matin (api/_lib/controle-nuit.js `notifierControle`).
+  { cle: 'vente-sans-numero', ou: 'vendeur', nom: 'Ventes sans N°', notifie: true,
+    phrase: (n) => `${n} ${pl(n, 'vente récente', 'ventes récentes')} sans N° de rangement`,
+    geste: { libelle: 'Voir', aller: '/?tab=ventes' } },
+  { cle: 'pool-retreci', ou: 'vendeur', nom: 'Liste des N° rétrécie', notifie: true,
+    phrase: (n) => `${n} N° ${pl(n, 'manque', 'manquent')} dans ta liste de numéros`,
+    geste: { libelle: 'Voir', aller: '/?tab=settings&section=securite' } },
+  { cle: 'enligne-24h', ou: 'vendeur', nom: 'Annonces à confirmer', notifie: true,
+    phrase: (n) => `${n} ${pl(n, 'compte', 'comptes')} : annonces pas relues depuis 24 h`,
+    geste: { libelle: 'Mes comptes', aller: '/?tab=vintedaccounts' } },
+  { cle: 'totaux-mois', ou: 'vendeur', nom: 'Totaux du mois',
+    phrase: (n) => `${n} ${pl(n, 'total du mois ne correspond', 'totaux du mois ne correspondent')} pas à tes ventes`,
+    geste: { libelle: 'Ouvrir Argent', aller: '/?tab=compta' } },
   { cle: 'emails-quarantaine', ou: 'installation', nom: 'E-mails sans vendeur',
     phrase: (n) => `${n} ${pl(n, 'e-mail', 'e-mails')} en quarantaine, sans vendeur`,
     geste: { libelle: 'Voir', aller: '/?tab=emails' } },
@@ -57,6 +73,115 @@ export const CONTROLES = [
     geste: { libelle: 'Voir', aller: '/?tab=settings&section=pilotage' } },
 ];
 export const CLES_CONTROLES = CONTROLES.map((c) => c.cle);
+// (15 nov., Julien) « N ventes à dater » ne s'affiche NULLE PART : l'extension les date sans
+// rien lui demander. Le contrôle reste COMPTÉ (la réponse du cron), jamais montré ni notifié.
+export const CONTROLES_MUETS = new Set(['versement-30j']);
+export const CONTROLES_NOTIFIES = new Set(CONTROLES.filter((c) => c.notifie).map((c) => c.cle));
+
+// ── (15 nov., lot fiabilite-auto) LES NOUVELLES RÈGLES ─────────────────────────────
+const cleN = (v) => { let s = String(v == null ? '' : v).trim().toUpperCase().replace(/[\s\-_.]/g, ''); if (/^\d+$/.test(s)) s = String(parseInt(s, 10)); return s; };
+const NUM_FORME = /^([A-Z]{1,3})?\d{1,6}$/;
+// Un N° porté par une fiche (« 12 », « B230 », un lot « 12+13 ») ⇒ ses parties.
+export const partiesNumero = (v) => String(v == null ? '' : v).split('+').map(cleN).filter((k) => NUM_FORME.test(k));
+export const VENTE_RECENTE_J = 7;
+// Une vente Vinted RÉCENTE sans N° de rangement — par IDENTITÉ seulement (§5) :
+// transaction → annonce (`txItem`, le détail de transaction lu) → fiche ; ou la
+// transaction elle-même (`overrides[tx].numero`, `liens[tx]` → fiche). Une vente dont
+// l'annonce n'est PAS connue n'est pas comptée (« pas su » ne vaut pas « sans N° »).
+// `ventes` : [{ tx, ts, annulee }] ; rend les n° de transaction, du plus récent au plus ancien.
+export function ventesSansNumero({ ventes, txItem, fiches, overrides, liens, maintenant = Date.now(), jours = VENTE_RECENTE_J }) {
+  if (!Array.isArray(ventes) || !(txItem instanceof Map) || !objet(fiches)) return null;
+  const F = fiches, O = objet(overrides) || {}, L = objet(liens) || {};
+  const aNum = (k) => !!(k && F[String(k)] && partiesNumero(F[String(k)].numero).length);
+  const out = [];
+  const vus = new Set();
+  for (const v of ventes) {
+    if (!v || v.annulee || v.tx == null) continue;
+    const tx = String(v.tx);
+    if (vus.has(tx)) continue; vus.add(tx);
+    const t = Number(v.ts);
+    if (!Number.isFinite(t) || maintenant - t > jours * 864e5 || t > maintenant + 864e5) continue;
+    if (O[tx] && partiesNumero(O[tx].numero).length) continue;
+    if (L[tx] && aNum(L[tx])) continue;
+    const item = txItem.get(tx);
+    if (!item) continue;                       // annonce pas connue : pas su, pas compté
+    if (aNum(item)) continue;
+    out.push({ tx, ts: t });
+  }
+  return out.sort((a, b) => b.ts - a.ts).map((x) => x.tx);
+}
+// La liste des N° utilisés (`vinted_used_numeros`, append-only, §5) qui a RÉTRÉCI : un N°
+// porté par une fiche ou une vente qui n'y est plus, ou moins de N° que la nuit d'avant
+// (`avant` = le nombre rangé par le contrôle précédent). Rien n'est réparé : c'est dit.
+// Rend { ids, n } (ids : les N° manquants, puis « moins-K » si le nombre a baissé) ou null.
+export function poolRetreci({ pool, fiches, overrides, avant = null }) {
+  if (!Array.isArray(pool) || !objet(fiches)) return null;
+  const P = new Set();
+  for (const x of pool) for (const k of partiesNumero(x)) P.add(k);
+  const manquent = new Set();
+  const voir = (num) => { for (const k of partiesNumero(num)) if (!P.has(k)) manquent.add(k); };
+  for (const f of Object.values(fiches)) if (f && typeof f === 'object') voir(f.numero);
+  for (const o of Object.values(objet(overrides) || {})) if (o && typeof o === 'object') voir(o.numero);
+  const ids = [...manquent].sort((a, b) => (parseInt(a.replace(/\D/g, ''), 10) || 0) - (parseInt(b.replace(/\D/g, ''), 10) || 0) || a.localeCompare(b));
+  if (Number.isInteger(avant) && avant > P.size) ids.push(`moins-${avant - P.size}`);
+  return { ids, n: P.size };
+}
+// Les comptes Vinted GARDÉS dans les totaux dont la lecture « en ligne » a plus de 24 h
+// (la règle `<enligne-regle>` : des annonces « à confirmer »). `parCompte` : Map uid → le
+// résultat de `enLigneDuCompte` ; `gardes` : Set des uid gardés (null = pas su).
+export function enLigneVieux(parCompte, gardes) {
+  if (!(parCompte instanceof Map) || !(gardes instanceof Set)) return null;
+  const out = [];
+  for (const [uid, r] of parCompte) if (gardes.has(String(uid)) && r && Array.isArray(r.aConfirmer) && r.aConfirmer.length) out.push(String(uid));
+  return out.sort();
+}
+// LES TOTAUX DU MOIS publiés par l'app, comparés à LEUR source refaite au serveur (la règle
+// miroir de l'app, api/_lib/bilan-semaine.js `calculerBilan` : VENDU au jour de la vente,
+// REÇU au jour du versement) — et entre eux.
+//   · `widget_stats` (ventesMois, caMois) = VENDU du mois ;
+//   · `vinted_urssaf_mois.recu[ym]` = REÇU du mois ;
+//   · `vrm_benefice_jours` : les ventes FINALISÉES du mois (un sous-ensemble du vendu) ⇒
+//     jamais plus que le vendu du widget publié APRÈS lui.
+// On ne compare QUE ce qui peut l'être : une publication plus ancienne que la dernière
+// lecture des ventes (`sourceAt`), ou une source partielle, n'est pas un écart (« pas su »,
+// dit). `src` : { vendu:{etat,n,eur}, recu:{etat,eur} } ; publications : { at (ms), … }.
+// Rend { ecarts: ['widget-n', …], compares } ou { passu: raison }.
+export const TOLERANCE_EUR = 1;
+export function ecartsTotaux({ src, sourceAt, widget, urssaf, benefice, ym }) {
+  const ecarts = [];
+  let compares = 0;
+  const frais = (at) => Number.isFinite(at) && Number.isFinite(sourceAt) && at >= sourceAt;
+  const w = objet(widget), u = objet(urssaf), b = objet(benefice);
+  const vendu = src && objet(src.vendu), recu = src && objet(src.recu);
+  if (w && frais(w.at) && vendu && vendu.etat === 'su') {
+    if (Number.isInteger(w.n)) { compares++; if (w.n !== vendu.n) ecarts.push('widget-n'); }
+    if (Number.isFinite(w.eur)) { compares++; if (Math.abs(w.eur - vendu.eur) > TOLERANCE_EUR) ecarts.push('widget-ca'); }
+  }
+  if (u && frais(u.at) && recu && recu.etat === 'su' && Number.isFinite(u.eur)) { compares++; if (Math.abs(u.eur - recu.eur) > TOLERANCE_EUR) ecarts.push('recu-ca'); }
+  if (b && w && Number.isInteger(b.n) && Number.isInteger(w.n) && Number.isFinite(b.at) && Number.isFinite(w.at) && w.at >= b.at) { compares++; if (b.n > w.n) ecarts.push('benefice-n'); }
+  if (!compares) return { passu: `publiés avant la dernière lecture de tes ventes (${ym})` };
+  return { ecarts, compares };
+}
+// La signature d'un résultat pour la notification : les contrôles NOTIFIÉS en écart, et
+// leurs identifiants. La même signature qu'hier ⇒ rien de neuf, rien n'est envoyé.
+export function aNotifierControle(data, memo, maintenant = Date.now()) {
+  const c = objet(data) && objet(data.controles);
+  if (!c) return null;
+  const at = Date.parse(String(data.at || ''));
+  if (!Number.isFinite(at) || maintenant - at > FRAIS_MS) return null;
+  const lignes = [];
+  for (const C of CONTROLES) {
+    if (!CONTROLES_NOTIFIES.has(C.cle)) continue;
+    const x = objet(c[C.cle]);
+    if (x && Number.isInteger(x.n) && x.n > 0) lignes.push({ cle: C.cle, n: x.n, ids: Array.isArray(x.ids) ? x.ids.map(String) : [] });
+  }
+  if (!lignes.length) return null;
+  const sig = lignes.map((l) => `${l.cle}:${[...l.ids].sort().join(',')}`).join('|');
+  const m = objet(memo);
+  if (m && m.sig === sig) return null;
+  return { lignes, sig };
+}
+export const memoControleApres = (n, maintenant = Date.now()) => ({ v: 1, sig: n.sig, at: new Date(maintenant).toISOString() });
 
 // ── LES RÈGLES ──────────────────────────────────────────────────────────────────
 // `parNumero` : Map N° → [{ id }] (les annonces Vinted EN LIGNE par N°,
@@ -138,7 +263,7 @@ export function incoherencesStripe(rows, { stripe = null, maintenant = Date.now(
 // ── LE RÉSULTAT RANGÉ ───────────────────────────────────────────────────────────
 // `valeurs` : { cle: liste d'identifiants | nombre | null } ; `raisons` : { cle: texte }.
 // `details` (14 nov.) : { cle: { datees, comptes, total, cause } } — liste blanche, nombres et clé.
-export function resultatControle(valeurs, raisons = {}, maintenant = Date.now(), details = {}) {
+export function resultatControle(valeurs, raisons = {}, maintenant = Date.now(), details = {}, extra = {}) {
   const controles = {};
   for (const [cle, v] of Object.entries(valeurs || {})) {
     if (!CLES_CONTROLES.includes(cle)) continue;
@@ -153,7 +278,9 @@ export function resultatControle(valeurs, raisons = {}, maintenant = Date.now(),
     }
     else controles[cle] = { n: null, raison: String(raisons[cle] || 'pas lu').slice(0, 80) };
   }
-  return { v: 1, at: new Date(maintenant).toISOString(), controles };
+  // (15 nov., lot fiabilite-auto) `pool` : le nombre de N° de la liste, relu la nuit suivante.
+  const x = objet(extra) || {};
+  return { v: 1, at: new Date(maintenant).toISOString(), controles, ...(Number.isInteger(x.pool) && x.pool >= 0 ? { pool: x.pool } : {}) };
 }
 
 // ── CE QUE MA JOURNÉE MONTRE ────────────────────────────────────────────────────

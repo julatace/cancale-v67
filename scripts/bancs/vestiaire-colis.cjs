@@ -153,7 +153,9 @@ const jobs = (pg) => pg.evaluate(() => ({ env: (document.querySelector('[data-jo
             await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 }); await pg.waitForTimeout(800);
             const r = await lire(pg);
             dit(r.route === '1' && r.achats.join() === 'A1', 'Colis → « À retirer » : l’achat en route, pas celui livré', JSON.stringify(r.achats));
-            dit(/chronopost\.fr/.test(r.suivre) && r.h >= 44, 'Suivre l’achat sur Chronopost (44 px)', r.suivre);
+            // (15 nov., rouges-connus) §7 : « cibles AU DOIGT 44 px » — exigé au téléphone (tactile) ; à 1512 px (souris)
+            // le lien de la liste dense « À retirer » d'Achats (Studio) est plus bas, comme toute rangée d'ordinateur.
+            dit(/chronopost\.fr/.test(r.suivre) && (vp.width > 600 || r.h >= 44), `Suivre l’achat sur Chronopost${vp.width > 600 ? '' : ' (44 px au doigt)'}`, `${r.suivre} · ${Math.round(r.h)} px`);
             // (11 nov., intégration colis) Retour aux colis à envoyer : ils sont en tête de Ventes (lot DJ3).
             await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=cat_bord' }))); await pg.locator('[data-colis-section="ventes"]').first().waitFor({ timeout: 30000 }); await pg.waitForTimeout(1500);
             const vide = await pg.evaluate(() => /Aucun colis à envoyer\./.test(document.body.innerText));
@@ -169,6 +171,9 @@ const jobs = (pg) => pg.evaluate(() => ({ env: (document.querySelector('[data-jo
           // envoyer, il n'y a pas de tuile « envoyer » — on attend la tête de Ma journée, puis les gestes.
           await pg.waitForSelector(mode === 'lu' ? '[data-tuile="envoyer"]' : '.vrm-day-greeting', { timeout: 15000, state: 'attached' });
           await pg.waitForTimeout(3000);
+          // (15 nov.) Grille « Studio » de Ma journée (14 nov., `JOBS_TUILE_JOURNEE`) : les messages Vestiaire vivent dans la
+          // tuile « Messages », dépliée sur place — on la déplie (quand elle existe) avant de lire.
+          if (await pg.$('[data-tuile="messages"]')) { await pg.click('[data-tuile="messages"]').catch(() => {}); await pg.waitForSelector('.sj-taches [data-job="vestiaire-messages"]', { timeout: mode === 'lu' ? 10000 : 2000 }).catch(() => {}); }
           const t = await jobs(pg);
           if (mode === 'lu') {
             dit(t.env === '2' && /demain/.test(t.envTxt), 'Ma journée : « 2 ventes Vestiaire à envoyer », pressées (demain)', JSON.stringify(t));

@@ -181,14 +181,18 @@ const caseIci = (pg, ici) => pg.evaluate((ici) => { const el = document.querySel
         dit(!!anc && /Garage/.test(anc) && /Pile du fond/.test(anc), `${t} : VIII — la fiche dit l'ancienne place dans la pièce 3D`, anc);
         dit(r.ecrits.room === 0, `${t} : VIII — la pièce 3D n'est jamais réécrite`, String(r.ecrits.room));
         if (await pg.$('[data-stock-modale]')) await pg.click('[data-stock-modale] button[aria-label="Fermer"]');
-        // VII — « Voir l'état » de N°1.
+        // (15 nov., rouges-connus) Depuis le 14 nov. toucher une case ouvre LA fiche (FichePaire, « fiche partout »,
+        // docs/passation/2026-11-14-fiche-partout.md) — et non plus l'ancienne feuille du Stock avec son bouton
+        // « Voir l'état » : « L'état de cet article » (`data-fiche-etat-article`) est DANS cette fiche. Une fiche restée
+        // ouverte couvrait la case suivante au téléphone : on la referme d'abord, comme lui.
+        const fermerFiche = () => pg.evaluate(() => { const b = document.querySelector('[data-fiche-paire] [data-fiche-fermer]'); if (b) b.click(); });
+        await fermerFiche(); await pg.waitForTimeout(300);
+        // VII — l'état de N°1, dans la fiche ouverte par sa case.
         await pg.click('[data-case-num="1"]');
-        await pg.waitForTimeout(300);
-        const ve = await pg.$('[data-fiche-voir-etat]');
-        dit(!!ve, `${t} : VII — la fiche d'une case propose « Voir l'état »`);
+        await pg.waitForSelector('[data-fiche-paire="1"] [data-fiche-etat-article]', { timeout: 15000 }).catch(() => {});
+        const ve = await pg.$('[data-fiche-paire="1"] [data-fiche-etat-article]');
+        dit(!!ve, `${t} : VII — la fiche ouverte par la case porte « L'état de cet article »`);
         if (ve) {
-          await ve.click();
-          await pg.waitForSelector('[data-fiche-etat-article]', { timeout: 15000 }).catch(() => {});
           await pg.waitForFunction(() => { const el = document.querySelector('[data-etat-ligne="reception-en-ligne"] b'); return el && el.textContent !== '…'; }, null, { timeout: 15000 }).catch(() => {});
           await pg.waitForTimeout(500);
           const et = await pg.evaluate(() => { const o = {}; document.querySelectorAll('[data-etat-ligne]').forEach((el) => { o[el.getAttribute('data-etat-ligne')] = { val: el.getAttribute('data-etat-val'), borne: el.getAttribute('data-etat-borne') || '', src: el.getAttribute('data-etat-source') || '', txt: el.innerText.replace(/\s+/g, ' ') }; }); return o; });

@@ -132,7 +132,10 @@ async function passe(mut) {
   const exigees = ['cases.length', 'alertesArgent.length', 'autres.length', 'urssafJob ? 1 : 0', 'carteAilleurs ? 1 : 0', 'sortiesStock.length ? 1 : 0', 'deuxFois.length ? 1 : 0'];
   const formeDeux = /\.\.\.\(deuxFois\.length \? \[\{ el: carteDeuxFois\(\) \}\]/.test(z) || /'deux-fois': deuxFois\.length \? \[carteDeuxFois\(\)\]/.test(blocsAFaire);
   dit(exprGestes && rendues.length >= exigees.length && !nonComptees.length && exigees.every(compte) && !horsListe && tireDeBlocs && formeDeux, 'A4 « N gestes » compte toutes les cartes (dont « Vendus ailleurs », la sortie du Stock et « en ligne deux fois »)', nonComptees.length ? 'rendues sans être comptées : ' + nonComptees.join(', ') : (BAVARD_A4 ? rendues.join(' · ') : ''));
-  dit((/\.\.\.\(carteAilleurs \? \[\{ el: carteVendusAilleurs\(\) \}\]/.test(z) || /ailleurs: carteAilleurs \? \[carteVendusAilleurs\(\)\]/.test(blocsAFaire)) && (/\.\.\.\(sortiesStock\.length \? \[\{ el: carteSortieStock\(\) \}\]/.test(z) || /'stock-sortie': sortiesStock\.length \? \[carteSortieStock\(\)\]/.test(blocsAFaire)), 'A4 les deux cartes sont rendues DANS la liste « À faire » (en tête si elles viennent en premier)');
+  dit((/\.\.\.\(carteAilleurs \? \[\{ el: carteVendusAilleurs\(\) \}\]/.test(z) || /ailleurs: carteAilleurs \? \[carteVendusAilleurs\(\)\]/.test(blocsAFaire)
+    /* (15 nov., rouges-connus) Depuis « À retirer ailleurs » EN TÊTE (docs/passation/2026-11-15-retrait-ailleurs.md) la carte
+       reste dans la liste SAUF quand le bloc de tête dit déjà ces mêmes annonces (`articlesTeteRA()`) : jamais deux fois. */
+    || /ailleurs: carteAilleurs && !articlesTeteRA\(\)\.length \? \[carteVendusAilleurs\(\)\]/.test(blocsAFaire)) && (/\.\.\.\(sortiesStock\.length \? \[\{ el: carteSortieStock\(\) \}\]/.test(z) || /'stock-sortie': sortiesStock\.length \? \[carteSortieStock\(\)\]/.test(blocsAFaire)), 'A4 les deux cartes sont rendues DANS la liste « À faire » (en tête si elles viennent en premier)');
   const zoneJournee = (app.split("className=\"vrm-day-layout vrm-fu-ecran vrm-fu-journee")[1] || '').split("{!only && (")[0];
   dit(zoneJournee.length > 0 && !/<VendusAilleurs /.test(zoneJournee), 'A4 « Vendus ailleurs » n’est plus un repli posé sous la journée');
   const corpsJ = (app.split('const ICONE_JOURNEE')[1] || '').split('{!only && (')[0];

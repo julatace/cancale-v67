@@ -22,6 +22,7 @@ import { SheetShell as SheetShellBase } from './SheetShell.jsx';
 import { BoutonBase, SegmenteBase } from './Bouton.jsx';
 import { normaliserSignalement, lignesApercu, posterSignalement, phraseRefus, TEXTE_MAX } from '../../api/_lib/signalement.js';
 import { contactEmail } from '../contact.js';
+import { tr, date as dateI18n } from '../i18n/index.js';   // (15 nov.) « Reçu · on te répond ici », la réponse
 
 const S = {
   muet: { color: 'var(--vrm-muted)', fontSize: 13, lineHeight: 1.45 },
@@ -116,7 +117,8 @@ export function SignalerProblemeFeuille({ onClose, contexte, entetes, masque, Fe
       {etat.phase === 'envoye' ? (
         <div data-signalement-etat="envoye" role="status">
           <p style={{ fontSize: 17, fontWeight: 600, margin: '4px 0 6px', color: 'var(--vrm-ink)' }}>Envoyé. Merci.</p>
-          <p style={{ ...S.muet, margin: '0 0 16px' }}>Signalement reçu, avec l’écran, la version et les plantages.{repondreA ? ' Réponse par e-mail.' : ''}</p>
+          <p style={{ ...S.muet, margin: '0 0 6px' }}>Signalement reçu, avec l’écran, la version et les plantages.{repondreA ? ' Réponse par e-mail.' : ''}</p>
+          <p data-signalement-recu="" style={{ fontSize: 15, fontWeight: 600, margin: '0 0 16px', color: 'var(--vrm-ink)' }}>{tr('sg.suivi.recu')} — {tr('sg.suivi.titre')}</p>
           <Bouton variante="primaire" plein onClick={onClose}>Fermer</Bouton>
         </div>
       ) : (
@@ -248,6 +250,7 @@ export function SignalementsRecus({ entetes, Bouton = BoutonBase, fetcher = (typ
               {detail[s.id] === 'ko' ? <p role="alert" style={{ ...S.muet, color: 'var(--vrm-warn)' }}>Le détail n’a pas pu être lu. Réessaie.</p> : null}
               <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {!detail[s.id] || detail[s.id] === 'ko' ? <Bouton variante="discret" taille="petit" onClick={() => ouvrirDetail(s)} data-signalement-ouvrir={s.id}>Voir le détail</Bouton> : null}
+                <RepondreSignalement s={s} entetes={entetes} fetcher={fetcher} Bouton={Bouton} onRepondu={(rep, le) => setListe((l) => (Array.isArray(l) ? l.map((x) => (x.id === s.id ? { ...x, reponse: rep, reponduLe: le } : x)) : l))}/>
                 {s.repondre ? <a className="vrm-lien-action" href={'mailto:' + s.repondre + '?subject=' + encodeURIComponent('Ton signalement VRM')} data-signalement-repondre={s.id} style={{ display: 'inline-block', padding: '12px 0' }}>Répondre par e-mail</a> : null}
                 <Bouton variante={s.traite ? 'discret' : 'secondaire'} taille="petit" occupe={occupe === s.id} onClick={() => marquer(s, !s.traite)} data-signalement-traiter={s.id}>
                   {s.traite ? 'Rouvrir' : 'Traité'}
@@ -258,6 +261,73 @@ export function SignalementsRecus({ entetes, Bouton = BoutonBase, fetcher = (typ
         </ul>
       )}
     </div>
+  );
+}
+
+// ── (15 nov.) RÉPONDRE DANS SON APP, ET CE QU'IL VOIT ────────────────────────────
+// Le propriétaire écrit sa réponse sous le signalement : elle est rangée sur la ligne
+// du signalement (le serveur), et UNE notification part vers les appareils de celui qui
+// l'a envoyé. Lui voit, dans Paramètres → Aide → Mes signalements : « Reçu · on te
+// répond ici », puis la réponse (lue par le serveur, filtrée sur SA session).
+function RepondreSignalement({ s, entetes, fetcher, Bouton = BoutonBase, onRepondu }) {
+  const [ouvert, setOuvert] = React.useState(false);
+  const [texte, setTexte] = React.useState('');
+  const [etat, setEtat] = React.useState('');
+  if (s.reponse) return <p data-signalement-reponse={s.id} style={{ ...S.muet, margin: '8px 0 0', color: 'var(--vrm-ink)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}><b>{tr('sg.suivi.repondu')} · </b>{s.reponse}{s.reponduLe ? <span style={S.muet}> — {tr('sg.repondu.le', { date: dateI18n(s.reponduLe, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) })}</span> : null}</p>;
+  if (!s.de) return null;
+  const envoyer = async () => {
+    setEtat('envoi');
+    try {
+      const r = await fetcher('/api/compte?mode=signalement', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(entetes ? entetes() : {}) }, body: JSON.stringify({ action: 'repondre', id: s.id, texte }) });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j && j.ok === true) { setEtat('ok'); onRepondu && onRepondu(texte.trim(), j.reponduLe || new Date().toISOString()); return; }
+    } catch (_) {}
+    setEtat('ko');
+  };
+  if (!ouvert) return <Bouton variante="secondaire" taille="petit" onClick={() => setOuvert(true)} data-signalement-repondre-app={s.id}>{tr('sg.repondre')}</Bouton>;
+  return (
+    <div style={{ width: '100%', display: 'grid', gap: 8, marginTop: 4 }} data-signalement-reponse-champ={s.id}>
+      <textarea value={texte} onChange={(e) => setTexte(e.target.value)} rows={3} maxLength={2000} aria-label={tr('sg.repondre.place')} placeholder={tr('sg.repondre.place')}
+        style={{ width: '100%', boxSizing: 'border-box', fontSize: 16, lineHeight: 1.4, padding: '10px 12px', borderRadius: 12, border: '1px solid var(--vrm-line)', background: 'var(--vrm-surface)', color: 'var(--vrm-ink)', fontFamily: 'inherit' }}/>
+      {etat === 'ko' ? <p role="alert" style={{ ...S.muet, margin: 0, color: 'var(--vrm-warn)' }}>{tr('sg.repondre.pasEnvoye')}</p> : null}
+      <Bouton variante="primaire" taille="petit" occupe={etat === 'envoi'} disabled={texte.trim().length < 2} onClick={envoyer} data-signalement-envoyer-reponse={s.id}>{tr('sg.repondre.envoyer')}</Bouton>
+    </div>
+  );
+}
+
+// Paramètres → Aide → « Mes signalements » (toute session) : ce qu'il a envoyé, la réponse.
+export function MesSignalements({ entetes, fetcher = (typeof fetch === 'function' ? fetch : null) }) {
+  const [liste, setListe] = React.useState(undefined);
+  const lire = React.useCallback(async () => {
+    setListe(undefined);
+    try {
+      const r = await fetcher('/api/compte?mode=signalement&quoi=suivi', { headers: entetes ? entetes() : {}, cache: 'no-store' });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j && j.ok === true && Array.isArray(j.signalements)) { setListe(j.signalements); return; }
+    } catch (_) {}
+    setListe(null);
+  }, []);   // eslint-disable-line react-hooks/exhaustive-deps
+  React.useEffect(() => { lire(); }, [lire]);
+  if (liste === undefined) return <p style={S.muet} data-mes-signalements="lecture">…</p>;
+  if (liste === null) return <p style={S.muet} data-mes-signalements="pas-su">{tr('sg.suivi.pasSu')} <button type="button" className="vrm-lien-action" onClick={lire} style={{ minHeight: 44 }}>↻</button></p>;
+  if (!liste.length) return <p style={S.muet} data-mes-signalements="0">{tr('sg.suivi.aucun')}</p>;
+  const quand = (iso) => (iso ? dateI18n(iso, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '');
+  return (
+    <ul data-mes-signalements={liste.length} style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 10 }}>
+      {liste.map((x) => (
+        <li key={x.id} data-mon-signalement={x.id} data-repondu={x.reponse ? '1' : '0'} style={{ ...S.carte, padding: '12px 14px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
+            <b style={{ fontSize: 13, color: 'var(--vrm-muted)', fontWeight: 600 }}>{quand(x.at)}</b>
+            <span data-signalement-statut={x.reponse ? 'repondu' : 'recu'} style={{ fontSize: 13, fontWeight: 600, color: x.reponse ? 'var(--vrm-ink)' : 'var(--vrm-muted)' }}>{x.reponse ? tr('sg.suivi.repondu') : tr('sg.suivi.recu')}</span>
+          </div>
+          <p style={{ margin: '6px 0 0', fontSize: 15, lineHeight: 1.45, color: 'var(--vrm-ink)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{x.texte}</p>
+          {x.reponse ? <div data-signalement-reponse-lue="" style={{ marginTop: 10, padding: '10px 12px', borderRadius: 12, background: 'var(--vrm-fill, rgba(118,118,128,.12))' }}>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--vrm-muted)' }}>{tr('sg.suivi.repondu')} · {quand(x.reponduLe)}</p>
+            <p style={{ margin: '4px 0 0', fontSize: 15, lineHeight: 1.45, color: 'var(--vrm-ink)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{x.reponse}</p>
+          </div> : null}
+        </li>
+      ))}
+    </ul>
   );
 }
 

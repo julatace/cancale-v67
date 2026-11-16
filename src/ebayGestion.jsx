@@ -1,4 +1,5 @@
 import {formaterMontantEbay as montant} from './montantsEbay.js';
+import { tr as trEbt } from './i18n/index.js';   // (15 nov., 2e tour) les libellés des gestes nouveaux du journal
 import { motsVendeur } from './profilVendeur.js';
 import {appelerEbay} from './ebayRequetes.js';
 import { AlerteArnaque } from './AlerteArnaque.jsx';
@@ -227,7 +228,7 @@ export function EbayAgent({compte='principal',headers,theme:C,onSection}){
  const S=styleUI(C),[data,setData]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[search,setSearch]=useState(''),[allHistory,setAllHistory]=useState(false),[sectionFilter,setSectionFilter]=useState('all');
  async function charger(){setBusy(true);setError('');try{setData(await appelerEbay('agent',{compte},headers));}catch(e){setError(e.message);}finally{setBusy(false);}}
  useEffect(()=>{charger();},[]);
- const labels={agentpublie:'Publiée par l’agent',expedier:'Expédition',messageacheteur:'Message acheteur',repondre:'Réponse',repondreoffre:'Offre',modifierannonce:'Annonce modifiée',terminerannonce:'Fin d’annonce'};
+ const labels={agentpublie:'Publiée par l’agent',expedier:'Expédition',messageacheteur:'Message acheteur',repondre:'Réponse',repondreoffre:'Offre',modifierannonce:'Annonce modifiée',terminerannonce:'Fin d’annonce',get corrigeraspects(){return trEbt('ebt.journal.corrigeraspects');},get lierproduit(){return trEbt('ebt.journal.lierproduit');},get ajouterphotos(){return trEbt('ebt.journal.ajouterphotos');}};
  const matchingTasks=(data?.tasks || []).filter(t=>`${t.title || ''} ${t.ref} ${t.label}`.toLowerCase().includes(search.toLowerCase()));
  const tasks=matchingTasks.filter(t=>sectionFilter==='all' || t.section===sectionFilter);
  const history=data?.journal || [],incertains=history.filter(j=>['incertain','en_cours'].includes(j.etat)),autres=history.filter(j=>!['incertain','en_cours'].includes(j.etat));

@@ -19,7 +19,7 @@
 //       un point par jour ; une lecture ratée de l'historique n'écrit RIEN ;
 //       l'app (`evolutionHistorique`) : moins de deux jours ⇒ null (« pas su »).
 //  `--prouve` : chaque mutation doit faire rougir au moins un contrôle ; et le
-//  background.js / vc-inject.js / règles d'origin/main (git archive) sont rouges.
+//  background.js / vc-inject.js / règles d'AVANT le lot (f3ef0e5b^, git archive) sont rouges.
 // ════════════════════════════════════════════════════════════════════════════
 const fs = require('fs'), path = require('path'), os = require('os'), cp = require('child_process'), vm = require('vm');
 const { faireFond } = require('./_fond-vm.cjs');
@@ -67,11 +67,19 @@ async function importerDans(racine, rel, src) {
 }
 
 // vc-inject.js : `scalairesVente` et ce qu'elle lit, extraits du vrai fichier.
+// (15 nov., rouges-connus) Depuis la 5.374 (13 nov., docs/passation/2026-11-13-vestiaire-vente-orion.md :
+// la date de vente Vestiaire ne vient plus que d'une clé NOMMÉE, lue chiffre par chiffre pour WebKit),
+// la fonction est `scalairesVente(e, source)` et lit `dateLue` / `dateVenteDe` : l'ancienne extraction
+// (`scalairesVente(e)` seule) ne trouvait plus rien et P1 restait rouge sur une règle intacte. La règle
+// jugée (P1, P2) ne change pas ; ses mutations (« prix non lu », « nombre nu accepté ») la font rougir.
 function scalairesDe(srcVc) {
   const prendre = (re) => { const m = re.exec(srcVc); return m ? m[0] : ''; };
   const morceaux = [
     prendre(/  const CLE_ETAT = [^\n]*\n/), prendre(/  const CLE_DATE = [^\n]*\n/), prendre(/  const CLE_MONTANT = [^\n]*\n/), prendre(/  const PAS_ACHETEUR = [^\n]*\n/),
-    prendre(/  const eurosEcrits = [^\n]*\n/), prendre(/  function scalairesVente\(e\) \{[\s\S]*?\n  \}\n/),
+    prendre(/  const eurosEcrits = [^\n]*\n/),
+    prendre(/  const MOIS_EN = [^\n]*\n/), prendre(/  const deux = [^\n]*\n/), prendre(/  const jourValide = [^\n]*\n/), prendre(/  function dateLue\(v\) \{[\s\S]*?\n  \}\n/),
+    prendre(/  const CLES_DATE_VENTES = [^\n]*\n/), prendre(/  const CLES_JOUR_A_EXPEDIER = [^\n]*\n/), prendre(/  function dateVenteDe\(e, source\) \{[\s\S]*?\n  \}\n/),
+    prendre(/  function scalairesVente\(e, source\) \{[\s\S]*?\n  \}\n/),
   ];
   if (morceaux.some((x) => !x)) return null;
   return vm.runInNewContext(`${morceaux.join('')}; scalairesVente`, { Date, isFinite, Number, String, Object });
@@ -205,7 +213,9 @@ const MUTATIONS = [
   ['historique avec texte', F.bg, "    return { at: new Date(t).toISOString(), total, n, c };\n  };", "    return { ...p, at: new Date(t).toISOString(), total, n, c };\n  };"],
   ['historique : lecture ratée écrit', F.bg, "if (hr === null) { noterDiag('avis_historique_lecture_ratee'); return false; }", ''],
   ['historique : deux points le même jour', F.bg, "for (let i = l.length - 1; i >= 0; i--) if (l[i].at.slice(0, 10) === j) l.splice(i, 1); ", ''],
-  ['app : un seul jour suffit', F.notes, "if (new Date(a.t).toISOString().slice(0, 10) === new Date(b.t).toISOString().slice(0, 10)) return null;", ''],
+  // (15 nov.) le « même jour » se lit À PARIS depuis le 11 nov. (famille « dates à l'heure de Paris », src/dateParis.js) :
+  // la mutation vise la règle d'aujourd'hui (l'ancienne forme UTC n'existe plus, la mutation était « introuvable »).
+  ['app : un seul jour suffit', F.notes, "if (jourParis(a.t) === jourParis(b.t)) return null;", ''],
   ['app : total absent compté 0', F.notes, 'const nouveaux = a.total != null && b.total != null && b.total >= a.total ? b.total - a.total : null;', 'const nouveaux = (b.total || 0) - (a.total || 0);'],
 ];
 
@@ -237,15 +247,18 @@ function copieArbre(racine, rel, src) {
     console.log(`${rougis.length ? '✅' : '❌'} « ${nom} » ⇒ rouge : ${rougis.join(', ') || 'AUCUN'}`);
   }
   console.log(`${tenues}/${MUTATIONS.length} mutations rougissent`);
-  // origin/main (git archive) : le code d'AVANT.
+  // Le code d'AVANT ce lot : le parent de f3ef0e5b (« Extension 5.340.0 », 11 nov.). (15 nov., rouges-connus)
+  // C'était `origin/main` tant que le lot n'y était pas : depuis qu'il y est, `origin/main` EST le code jugé
+  // et « rouge sur origin/main » ne pouvait plus être vrai. `AUDIT_5340_AVANT` : un autre arbre d'avant.
+  const AVANT = process.env.AUDIT_5340_AVANT || 'f3ef0e5b^';
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'a5340-main-'));
   try {
-    cp.execSync(`git -C "${RACINE}" archive origin/main vinted-sync-extension src api scripts package.json | tar -x -C "${d}"`, { stdio: 'ignore' });
+    cp.execSync(`git -C "${RACINE}" archive ${AVANT} vinted-sync-extension src api scripts package.json | tar -x -C "${d}"`, { stdio: 'ignore' });
     const r = await controles(d);
     const n = r.filter((x) => !x.ok).length;
-    console.log(`\n── origin/main : ${n} contrôle(s) rouge(s) sur ${r.length} ${n ? '✅' : '❌ (le contrôle ne peut pas échouer)'}`);
+    console.log(`\n── avant le lot (${AVANT}) : ${n} contrôle(s) rouge(s) sur ${r.length} ${n ? '✅' : '❌ (le contrôle ne peut pas échouer)'}`);
     if (!n) rouge++;
-  } catch (e) { console.log('❌ origin/main illisible', e.message); rouge++; }
+  } catch (e) { console.log('❌ arbre d\'avant illisible', e.message); rouge++; }
   fs.rmSync(d, { recursive: true, force: true });
   process.exit(rouge ? 1 : 0);
 })();

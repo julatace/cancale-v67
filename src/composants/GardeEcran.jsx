@@ -30,6 +30,10 @@ import { tr } from '../i18n/index.js';
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { noterPlantage } from '../plantages.js';
+// (15 nov., ouverture) Un MORCEAU introuvable (ancienne version, pas de réseau) n'est pas un écran qui a un
+// souci : « Mettre à jour VRM », un bouton (src/composants/MettreAJourVRM.jsx, src/chargementSur.js).
+import { estErreurMorceau } from '../chargementSur.js';
+import MettreAJourVRM from './MettreAJourVRM.jsx';
 
 const versionBuild = () => (typeof __BUILD__ !== 'undefined' ? String(__BUILD__) : '');
 
@@ -60,6 +64,12 @@ export class GardeEcran extends React.Component {
     const { nom, feuille, onFermer, children } = this.props;
     if (!this.state.err) return plantageDeBancDemande(nom) ? <PlanteurDeBanc nom={nom}/> : (children === undefined ? null : children);
     const msg = String((this.state.err && this.state.err.message) || this.state.err).slice(0, 400);
+    if (estErreurMorceau(this.state.err)) {
+      const maj = <MettreAJourVRM/>;
+      if (!feuille) return <div className="vrm-garde-ecran-hote" data-garde-morceau={String(nom || '')}>{maj}</div>;
+      try { if (typeof document !== 'undefined' && document.body) return createPortal(<div className="vrm-garde-feuille" data-garde-morceau={String(nom || '')}>{maj}</div>, document.querySelector('.vrm-app-shell') || document.body); } catch (_) {}
+      return maj;
+    }
     const carte = (
       <div role="alert" className="vrm-etat-panne vrm-garde-ecran" data-garde-ecran={String(nom || '')}>
         <div className="vrm-etat-panne-texte">

@@ -212,7 +212,10 @@ const mesurer = (pg, mobile, racineSel) => pg.evaluate(([mobile, racineSel]) => 
           if (await sous.count()) { await sous.first().click(); await pg.waitForTimeout(800); }
           await pg.locator('[data-famille-notif]').first().waitFor({ state: 'attached', timeout: 6000 }).catch(() => {});
           const types = await pg.locator('[data-famille-notif]').evaluateAll((l) => l.map((e) => e.getAttribute('data-famille-notif')));
-          dit(types.length === 8 && ['ventes', 'offres', 'messages', 'poster', 'arrives', 'doublevente', 'rappels', 'comptes'].every((t) => types.includes(t)), `${T} · F1 huit types (dont « Nouveau compte relié ») réglables`, types.join(','));
+          // (16 nov., intégration vague B) La règle, pas un nombre figé : les familles réglables sont celles du serveur
+          // (api/_lib/notif-textes.js `FAMILLES` : 11 depuis moderation, avis et alertesebay), « Nouveau compte relié » comprise.
+          const attendus = (await import(require('url').pathToFileURL(require('path').join(__dirname, '..', '..', 'api', '_lib', 'notif-textes.js')).href)).FAMILLES.map((f) => f.id);
+          dit(types.length === attendus.length && attendus.every((t) => types.includes(t)) && types.includes('comptes'), `${T} · F1 chaque famille du serveur (${attendus.length}, dont « Nouveau compte relié ») réglable`, types.join(',') + ' / ' + attendus.join(','));
           // (11 nov., décision C8) L'heure du résumé du soir : défaut inchangé, réglable de 18 h à 22 h.
           // (14 nov., passe design 3) Le choix est le segmenté du système (plus un `<select>` natif) : ses segments portent
           // `data-np-soir-opt` (« Auto » = le défaut, puis 18 à 22 h) ; on touche le segment, la règle jugée est la même.

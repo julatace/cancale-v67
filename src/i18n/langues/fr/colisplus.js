@@ -73,4 +73,6 @@ export default {
   "cp.temps.pasMesure": "Pas encore mesuré : fais tes colis ici, VRM chronomètre entre deux « Colis fait ».",
   "cp.temps.comment": "Comment c’est mesuré",
   "cp.temps.pourquoi": "Sur cet appareil : l’écart entre deux « Colis fait » ici. Plus de 15 min, c’est une pause ; moins de 15 s, un colis déjà prêt : pas comptés. Le gain : le bénéfice des colis au prix d’achat connu, divisé par leur temps ; photos et achats n’y sont pas.",
+  // (15 nov.) Le PDF retiré par le serveur : vente finalisée et argent reçu (api/_lib/purge-bordereaux.js).
+  "colis.bordSupprimeVersement": "Bordereau supprimé après le versement",
 };

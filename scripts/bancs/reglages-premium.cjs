@@ -137,6 +137,8 @@ async function interrupteurs(pg, T) {
     const nom = (await s.getAttribute('aria-label')) || `n°${i}`;
     await s.scrollIntoViewIfNeeded();
     const libre = await s.evaluate((el) => { const r = el.getBoundingClientRect(); const x = r.left + r.width / 2, y = r.top + r.height / 2; const h = document.elementFromPoint(x, y); return !!h && (h === el || el.contains(h)); });
+    // (15 nov., rouges-connus) Ce qui recouvre, NOMMÉ (le rapport dit quoi corriger) : classe et position.
+    const dessus = libre ? '' : await s.evaluate((el) => { const r = el.getBoundingClientRect(); const h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return h ? `${h.tagName.toLowerCase()}.${String(h.className || '').split(' ').slice(0, 2).join('.')} à y=${Math.round(r.top)}/${innerHeight}` : 'rien'; });
     if (await s.isDisabled()) { dit(libre, `${T} interrupteur « ${nom} » (désactivé : réglage pas lu) rien ne le recouvre`); continue; }
     const avant = await s.getAttribute('aria-checked');
     await s.click({ timeout: 4000 });
@@ -145,7 +147,7 @@ async function interrupteurs(pg, T) {
     const s2 = pg.locator('.vrm-set [role="switch"]').nth(i);
     let apres = await s2.getAttribute('aria-checked');
     for (let k = 0; k < 30 && apres === avant; k++) { await pg.waitForTimeout(100); apres = await s2.getAttribute('aria-checked'); }
-    dit(libre && avant !== apres, `${T} interrupteur « ${nom} » : cliquable, et le clic change son état`, `${avant} → ${apres}${libre ? '' : ' · RECOUVERT'}`);
+    dit(libre && avant !== apres, `${T} interrupteur « ${nom} » : cliquable, et le clic change son état`, `${avant} → ${apres}${libre ? '' : ' · RECOUVERT par ' + dessus}`);
     await s2.click({ timeout: 4000 }).catch(() => {});
     await pg.waitForTimeout(350);
   }

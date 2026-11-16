@@ -14,11 +14,20 @@
 //   A. Annonces · Vestiaire : les 2 annonces écrites par l'extension, en fiches ;
 //      Ventes · Vestiaire : la vente à expédier ; Messages · Vestiaire : la
 //      conversation et les 3 non-lus ;
-//   B. AUCUNE ligne Vestiaire en base : le filtre « Vestiaire » est là dans
-//      Annonces, Ventes, Messages et Achats, chaque écran dit « pas encore lu »
-//      (jamais un écran blanc, jamais l'absence du filtre) ;
-//   C. l'extension connectée à un AUTRE compte VRM : chaque écran Vestiaire le dit
-//      en tête (c'est pourquoi rien n'arriverait ici) ;
+//   B. AUCUNE ligne Vestiaire en base. (15 nov., rouges-connus) Depuis le 8 nov.
+//      (docs/passation/2026-11-08-navigation-plateformes.md, demande de Julien) un
+//      site n'est montré que s'il est CHOISI (« Où vends-tu ? », Paramètres → Mes
+//      plateformes, `vrm_plateformes_affichees`) ou RELIÉ par preuve ; défaut : Vinted ;
+//      « un filtre mémorisé vers un site masqué revient à une vue affichée » ; la
+//      colonne ne porte plus d'entrée par plateforme (tâches uniques). Donc :
+//      B1 Vestiaire CHOISI, rien capté : le filtre « Vestiaire » est là dans Annonces,
+//         Ventes, Messages et Achats (choisi, et proposé quand Vinted est choisi),
+//         chaque écran dit « pas encore lu » avec le geste — jamais un écran blanc ;
+//      B2 Vestiaire ni choisi ni relié : aucun filtre « Vestiaire », `site=vestiaire`
+//         revient à une vue montrée (pas d'écran Vestiaire, pas d'écran blanc) ;
+//      à 1512 px, la colonne n'a aucune entrée `plat_*` (tâches uniques) ;
+//   C. l'extension connectée à un AUTRE compte VRM, Vestiaire choisi : chaque écran
+//      Vestiaire le dit en tête (c'est pourquoi rien n'arriverait ici) ;
 //   D. aucune erreur, aucun débordement. Données INVENTÉES (dépôt public).
 //   E. (1er nov., audit A4/A2) la vente Vestiaire à expédier COMPTE ailleurs que
 //      sur son écran : Ma journée « À envoyer » (`data-vestiaire`), la cloche
@@ -116,8 +125,9 @@ const PONT = (o) => {
   });
   post({ __vmr: 'ready', version: o.version, id: 'ext-banc' });
 };
-async function ouvrir(b, vp, lignes, vrm) {
-  const rows = [{ id: 'main', data: { vinted_annonce_numeros: {} } }, ...Object.entries(lignes).map(([id, data]) => ({ id, data }))];
+async function ouvrir(b, vp, lignes, vrm, { plateformes = null } = {}) {
+  // `plateformes` : ses sites CHOISIS (Paramètres → Mes plateformes, ligne `main`), comme le vendeur les a rangés.
+  const rows = [{ id: 'main', data: { vinted_annonce_numeros: {}, ...(plateformes ? { vrm_plateformes_affichees: { sites: plateformes, at: new Date().toISOString() } } : {}) } }, ...Object.entries(lignes).map(([id, data]) => ({ id, data }))];
   const ctx = await b.newContext({ viewport: vp, ...(vp.width < 600 ? { isMobile: true, hasTouch: true } : {}) });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
@@ -189,8 +199,8 @@ const lireEcran = (pg, attr) => pg.evaluate((a) => {
       await o.ctx.close();
     }
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
-      console.log(`── ${vp.width} px · B. aucune ligne Vestiaire en base`);
-      const o = await ouvrir(b, vp, {}, MOI);
+      console.log(`── ${vp.width} px · B1. aucune ligne Vestiaire en base, Vestiaire CHOISI dans ses plateformes`);
+      const o = await ouvrir(b, vp, {}, MOI, { plateformes: ['vinted', 'vestiaire'] });
       for (const [t, attr] of ECRANS) {
         await aller(o.pg, t, `[${attr}]:not([${attr}="charge"])`);
         const e = await lireEcran(o.pg, attr);
@@ -208,8 +218,23 @@ const lireEcran = (pg, attr) => pg.evaluate((a) => {
         dit(f.v, `${t} (Vinted choisi) : le filtre « Vestiaire » est proposé, même sans rien de capté`, JSON.stringify(f));
       }
       if (vp.width > 1000) {
-        const rail = await o.pg.evaluate(() => !!document.querySelector('[data-nav-entree="plat_vestiaire"]'));
-        dit(rail, 'la colonne porte l’entrée « Vestiaire » (Plateformes), même sans rien de capté', String(rail));
+        // (8 nov.) La colonne est faite de TÂCHES uniques : plus aucune entrée par plateforme (`plat_*`) ;
+        // Vestiaire se joint par le filtre ci-dessus. Il fallait au moins une entrée de la colonne rendue.
+        const rail = await o.pg.evaluate(() => ({ entrees: document.querySelectorAll('[data-nav-entree]').length, plat: [...document.querySelectorAll('[data-nav-entree^="plat_"]')].map((x) => x.getAttribute('data-nav-entree')) }));
+        dit(rail.entrees > 0 && rail.plat.length === 0, 'la colonne est rendue, par tâches : aucune entrée par plateforme (`plat_*`)', JSON.stringify(rail));
+      }
+      dit(o.errs.length === 0, 'aucune erreur d’app', o.errs.join(' | ').slice(0, 160));
+      await o.ctx.close();
+    }
+    for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
+      console.log(`── ${vp.width} px · B2. aucune ligne Vestiaire en base, Vestiaire ni choisi ni relié`);
+      const o = await ouvrir(b, vp, {}, MOI);
+      for (const [t, attr] of ECRANS) {
+        await o.pg.goto(o.pg.url().split('?')[0] + `?tab=${t}&site=vestiaire`, { waitUntil: 'domcontentloaded' }).catch(() => {});
+        await o.pg.waitForFunction(() => (document.querySelector('#root') || {}).innerText && document.querySelector('#root').innerText.trim().length > 40, null, { timeout: 15000 }).catch(() => {});
+        await o.pg.waitForTimeout(1500);
+        const e = await o.pg.evaluate((a) => ({ vc: !!document.querySelector('[data-site="vestiaire"]'), ecran: !!document.querySelector('[' + a + ']'), txt: ((document.querySelector('#root') || {}).innerText || '').trim().length }), attr);
+        dit(!e.vc && !e.ecran && e.txt > 40, `${t} : ni filtre ni écran « Vestiaire » (pas choisi, pas relié) — revenu à une vue montrée, jamais un écran blanc`, JSON.stringify(e));
       }
       dit(o.errs.length === 0, 'aucune erreur d’app', o.errs.join(' | ').slice(0, 160));
       await o.ctx.close();
@@ -223,13 +248,18 @@ const lireEcran = (pg, attr) => pg.evaluate((a) => {
       const j = await o.pg.evaluate(() => {
         const t = document.querySelector('[data-tuile="envoyer"]');
         let pub = null; try { pub = JSON.parse(localStorage.getItem('vrm_colis_aposter') || 'null'); } catch (_) {}
-        const h = document.querySelector('[data-vendu-mois]');
+        // (15 nov., rouges-connus) Depuis la grille « Studio » de Ma journée (14 nov., 48b76de2) le vendu du
+        // mois est la place « vendu · mois » de la carte du mois (`CarteStatsApp`, `data-carte-*`) — l'ancien
+        // grand chiffre (`data-vendu-mois`) n'est plus posé. Même règle : la vente au montant pas sûr n'est
+        // jamais comptée — « — » (rien de sûr) ou « au moins » qui NOMME Vestiaire (title de la place).
+        const h = document.querySelector('[data-carte-page="journee"][data-carte-chiffre="vendu"][data-carte-p="mois"]');
         return { n: t ? t.getAttribute('data-n') : null, vc: t ? t.getAttribute('data-vestiaire') : null, pub,
-          vendu: h ? h.getAttribute('data-vendu-mois') : null, nc: h ? h.getAttribute('data-vendu-non-comptees') : null, partiel: h ? h.getAttribute('data-vendu-partiel') : null };
+          vendu: h ? h.getAttribute('data-carte-valeur') : null, partiel: h ? h.getAttribute('data-carte-partiel') : null,
+          titre: h ? (h.getAttribute('title') || (h.closest('[title]') || { getAttribute: () => '' }).getAttribute('title') || '') : null };
       });
       dit(j.vc === '1' && Number(j.n) >= 1, 'Ma journée « À envoyer » compte la vente Vestiaire à expédier', JSON.stringify({ n: j.n, vc: j.vc }));
       dit(j.pub && j.pub.vestiaire === 1 && j.pub.total === Number(j.n), 'la cloche (`vrm_colis_aposter`) publie le MÊME nombre, Vestiaire compris', JSON.stringify(j.pub));
-      dit(j.nc === '1' && (j.vendu === '' || j.partiel === '1'), '« Vendu en … » : la vente Vestiaire au montant pas sûr n’est pas comptée, elle est NOMMÉE (« au moins »)', JSON.stringify({ vendu: j.vendu, nc: j.nc, partiel: j.partiel }));
+      dit(j.vendu != null && (j.vendu === '' || (j.partiel === '1' && /Vestiaire/.test(j.titre))), '« Vendu · mois » : la vente Vestiaire au montant pas sûr n’est pas comptée (« — », ou « au moins » qui la NOMME)', JSON.stringify({ vendu: j.vendu, partiel: j.partiel, titre: j.titre }));
       await o.pg.screenshot({ path: path.join(CAPTURES, 'vc-bout-journee-1512.png'), fullPage: true }).catch(() => {});
       await o.pg.goto(o.pg.url().split('?')[0] + '?tab=cat_bord', { waitUntil: 'domcontentloaded' }).catch(() => {});
       await o.pg.waitForSelector('[data-colis-ident^="vc:"]', { timeout: 20000 }) /* (2 nov.) Colis → « À envoyer » : la ligne Vestiaire porte son identité */.catch(() => {});
@@ -239,8 +269,8 @@ const lireEcran = (pg, attr) => pg.evaluate((a) => {
       await o.ctx.close();
     }
     {
-      console.log('── 390 px · C. extension connectée à un AUTRE compte VRM');
-      const o = await ouvrir(b, { width: 390, height: 844 }, {}, { ok: true, connecte: true, expiree: false, email: 'quelquun@ailleurs.test', user_id: '99999999-8888-7777-6666-555555555555', cloisonne: true });
+      console.log('── 390 px · C. extension connectée à un AUTRE compte VRM (Vestiaire choisi)');
+      const o = await ouvrir(b, { width: 390, height: 844 }, {}, { ok: true, connecte: true, expiree: false, email: 'quelquun@ailleurs.test', user_id: '99999999-8888-7777-6666-555555555555', cloisonne: true }, { plateformes: ['vinted', 'vestiaire'] });
       for (const [t, attr] of ECRANS.slice(0, 3)) {
         await aller(o.pg, t, '[data-vc-ext]');
         const e = await lireEcran(o.pg, attr);

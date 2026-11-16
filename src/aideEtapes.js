@@ -36,7 +36,7 @@ export const ETAPES_ECRANS = {
     "Donne le N° de la paire : son prix devient son coût."
   ],
   "emails": [
-    "Réglages → Mes e-mails : prends ton adresse VRM.",
+    "Paramètres → Mes plateformes : prends ton adresse VRM.",
     "Dans ta messagerie, fais suivre les e-mails de tes plateformes.",
     "Ils arrivent ici rangés : codes, bordereaux, ventes."
   ],
@@ -57,9 +57,9 @@ export const ETAPES_ECRANS = {
     "Un N° en rouge : deux paires dessous, vérifie les deux."
   ],
   "settings": [
-    "Installe l’extension, puis ouvre Vinted dans ce navigateur.",
-    "Relie ta boîte e-mail dans « Mes e-mails ».",
-    "Choisis tes comptes et tes sites."
+    "Tape un mot en haut : le bon réglage s’ouvre.",
+    "Mes plateformes : tes comptes, ton adresse VRM.",
+    "Aide : vérifier l’installation, signaler un problème."
   ],
   "communaute": [
     "Rejoins la carte si tu veux : position arrondie seulement.",

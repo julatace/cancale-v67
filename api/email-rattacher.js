@@ -30,7 +30,7 @@ import {lireReceptionEmail,lireJournalEmail,lireTexteEmail,lireEmailBoite} from 
 // ⚠️ « Pas su » n'est jamais « rien » ni « déjà rattaché » : toute lecture
 // ratée (ligne, registre, liste) répond 503.
 import { traiterEmail, lireRegistreEmails, prevoirRetour } from './email-inbound.js';
-import { reclasserRetours } from './_lib/reclasser-retours.js';   // (15 nov., lot retours)
+import { reclasserRetours, transporteursRetours } from './_lib/reclasser-retours.js';   // (15 nov., lots retours, retour-parfait)
 import { contexteVendeur, withOwnerAll, conflictTarget } from './_lib/owner.js';
 import { PROPRIETAIRE_NEUTRE, peutReclamer, pourquoiPersonne, repliInstallation, normAdresse, estAdresseCollectrice } from './_lib/proprietaire-email.js';
 import { PREFIXE_PREUVE, idPreuve, cleLiens, lireLien, verifierJeton, etatAdresse, adresseRetenue, prouveeParCompte, relaisApple, adresseVerifiable, DUREE_LIEN_MS, DELAI_RENVOI_MS, MAX_ENVOIS_ADRESSE_JOUR, MAX_ADRESSES_JOUR, MAX_DEMANDES_VENDEUR_JOUR, idCompteurVendeur, reserverDemande } from './_lib/preuve-adresse.js';
@@ -802,5 +802,22 @@ async function reclasser(req, res) {
     return { code, corps: resultat };
   };
   const r = await reclasserRetours({ owner, lire, lireLigne, ecrire, prevoir: prevoirRetour, rejouer });
-  res.status(r.passu ? 503 : 200).json({ ok: !!r.ok, faits: r.faits || [], restes: (r.restes || []).map((x) => ({ famille: x.famille || '', raison: x.raison })), ...(r.raison ? { raison: r.raison } : {}) });
+  // (15 nov., lot retour-parfait) Puis le transporteur LU sur l'étiquette des bordereaux de retour
+  // rangés avant la lecture du PDF à la réception (api/_lib/reclasser-retours.js) : écriture
+  // CONDITIONNELLE (`meta->>pdfLu` toujours absent en base), une ligne à la fois, rien d'autre ne change.
+  const ecrireSi = async (id, data) => {
+    try {
+      const r2 = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${enc(id)}&owner=eq.${enc(owner)}&meta->>pdfLu=is.null&select=id`, {
+        method: 'PATCH', headers: { ...HEADERS, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify({ data, updated_at: new Date().toISOString() }) });
+      if (!r2 || !r2.ok) return null;
+      const j = await r2.json().catch(() => null);
+      return Array.isArray(j) ? j.length === 1 : null;
+    } catch (_) { return null; }
+  };
+  let t = { ok: true, passu: false, faits: [] };
+  try { t = await transporteursRetours({ owner, lire, lireLigne, ecrireSi }); } catch (_) { t = { ok: false, passu: true, faits: [] }; }
+  const passu = !!(r.passu || t.passu);
+  res.status(passu ? 503 : 200).json({ ok: !!r.ok && !!t.ok, faits: r.faits || [], restes: (r.restes || []).map((x) => ({ famille: x.famille || '', raison: x.raison })),
+    transporteurs: (t.faits || []).map((x) => ({ transporteur: x.transporteur, lu: x.lu })), ...(r.raison ? { raison: r.raison } : {}) });
 }

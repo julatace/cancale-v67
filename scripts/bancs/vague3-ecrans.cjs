@@ -9,8 +9,8 @@
 //      Annonces (Vinted), Ventes (Vinted), Colis et Statistiques, la fraîcheur des
 //      lectures est dite par UNE voix (une seule source), jamais deux ;
 //   S  « RANGER » VISE SA CASE — 5 meubles (la case visée hors de l'écran) :
-//      « Voir au stock » (N° rangé), « Ranger au stock » (N° pas rangé : la première
-//      case libre proposée) et la cloche « Où ranger à l'arrivée » ouvrent le Stock
+//      « Voir au stock » (N° rangé) et « Ranger au stock » (N° pas rangé : SA case
+//      proposée ; 15 nov. : la cloche ne propose plus de case à un achat) ouvrent le Stock
 //      la case SÉLECTIONNÉE (`data-case-vise`), défilée (dans l'écran) et ÉCLAIRÉE
 //      (`data-cible-eclaire`, le crochet unique de src/cibleNotif.js) ;
 //   X  LE COMPTE EXCLU NULLE PART — un troisième compte masqué (`vinted_accounts_hidden`)
@@ -280,33 +280,20 @@ async function tourneeS(nav, { W, theme }) {
     dit(!o.journal.erreurs.length, 'S0', `${T} aucune erreur JS`, o.journal.erreurs.join(' ¦ '));
     await o.ctx.close();
   }
-  // 3. La cloche « Où ranger à l'arrivée » : l'achat 73001 vient d'arriver.
+  // 3. (15 nov., Julien : « on range une ANNONCE, pas un achat ») L'achat 73001 vient d'arriver : la cloche
+  //    ne propose PLUS de case (avant : « Première case libre · Ranger », la même à tous).
   {
     const o = await ouvrir(nav, { W, theme, lignes: stock({ arrive: true }), tab: 'journee',
       init: { fn: () => { try { localStorage.setItem('vrm_ranger_vus', JSON.stringify({ '73000': 'autre', '73001': 'autre', '73002': 'autre' })); } catch (_) {} }, arg: null } });
-    // La cloche relit 4 s après le nuage : on recharge pour que `vrm_ranger_vus` soit lu au montage.
     await o.pg.reload({ waitUntil: 'domcontentloaded' });
     await o.pg.waitForSelector('[data-centre-notifs-cloche]', { timeout: 20000 }).catch(() => {});
     await o.pg.waitForTimeout(6500);
     await o.pg.locator('[data-centre-notifs-cloche]').first().click().catch(() => {});
-    await o.pg.waitForSelector('[data-centre-ranger-ouvrir]', { timeout: 8000 }).catch(() => {});
-    const prop = await o.pg.evaluate(() => { const l = document.querySelector('[data-centre-ranger-case]'); return l ? l.getAttribute('data-centre-ranger-case') : null; });
-    dit(prop === 'mE:0', 'S', `${T} (contrôle du banc) la cloche propose la première case libre mE:0`, prop);
-    const b = o.pg.locator('[data-centre-ranger-ouvrir]').first();
-    if (await b.count()) {
-      await b.click().catch(() => {});
-      await o.pg.waitForSelector('[data-case-ici]', { timeout: 15000 }).catch(() => {});
-      const d = await attendreCase(o.pg, 'mE:0');
-      await capture(o.pg, `v3-S-cloche-${W}-${theme}`, false);
-      dit(!!(d && d.la && d.vise), 'S', `${T} cloche « Ranger » : la case mE:0 est SÉLECTIONNÉE`, JSON.stringify(d));
-      dit(!!(d && d.dedans), 'S', `${T} cloche « Ranger » : la case mE:0 est défilée dans l'écran`, JSON.stringify(d));
-      dit(!!(d && d.eclaire), 'S', `${T} cloche « Ranger » : la case mE:0 est ÉCLAIRÉE`, JSON.stringify(d));
-      // Toucher la case sélectionnée (vide) ouvre « choisir l'article » de CETTE case.
-      await o.pg.locator('[data-case-ici="mE:0"]').first().click().catch(() => {});
-      await o.pg.waitForTimeout(700);
-      const modale = await o.pg.evaluate(() => !!document.querySelector('[data-stock-modale]'));
-      dit(modale, 'S', `${T} cloche : toucher la case sélectionnée ouvre « choisir l'article » de cette case`);
-    } else dit(false, 'S', `${T} cloche : le bouton « Ranger » est là`);
+    await o.pg.waitForSelector('[data-centre-notifs]', { timeout: 8000 }).catch(() => {});
+    await o.pg.waitForTimeout(1200);
+    const n = await o.pg.evaluate(() => document.querySelectorAll('[data-centre-ranger-tx], [data-centre-ranger-ouvrir]').length);
+    dit(n === 0, 'S', `${T} la cloche ne propose aucune case à l'achat arrivé (on range un article, pas un achat)`, String(n));
+    await capture(o.pg, `v3-S-cloche-${W}-${theme}`, false);
     if (!tel) dit(!o.journal.erreurs.length, 'S0', `${T} cloche : aucune erreur JS`, o.journal.erreurs.join(' ¦ '));
     await o.ctx.close();
   }

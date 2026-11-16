@@ -17,7 +17,12 @@ import { lienEntree } from './accueil/lienEntree.js';
 import { tr, preparerLangue } from './i18n/index.js';
 import { useLangue } from './i18n/react.js';
 import { DemarrageVRM } from './Chargement.jsx';
-import { suivreDemarrage } from './demarrage.js';
+import { suivreDemarrage, etapeDemarrage } from './demarrage.js';
+// (15 nov., chantier « ouverture ») Un morceau de l'app qui ne se charge pas : relancé une fois, puis
+// rechargement PROPRE vers la nouvelle version, sinon « Mettre à jour VRM » — jamais un écran tombé ni
+// `undefined … default` (src/chargementSur.js).
+import { lazySur, verifierMorceauPerime, rechargerVersNouvelle, estErreurMorceau } from './chargementSur.js';
+import MettreAJourVRM from './composants/MettreAJourVRM.jsx';
 import { ecouterPlantages, ecouterViolationsCsp, noterPlantage, compterMorceauPerime } from './plantages.js';
 // Le journal des plantages écoute dès le démarrage : une erreur AVANT que l'app
 // soit montée est justement celle qu'aucun écran ne montre (src/plantages.js).
@@ -54,24 +59,17 @@ if (typeof window !== 'undefined' && /(^|[#&])discord(-erreur)?=/.test(String(wi
 }
 if (typeof window !== 'undefined') {
   window.addEventListener('vite:preloadError', (ev) => {
-    let dernier = 0;
-    try { dernier = Number(sessionStorage.getItem('vrm_recharge_morceau')) || 0; } catch (_) {}
-    if (Date.now() - dernier < 60000) return;
-    try { sessionStorage.setItem('vrm_recharge_morceau', String(Date.now())); } catch (_) { return; }
-    // (6 nov., filet 3) Compté À PART (src/plantages.js), jamais noté comme plantage :
-    // c'est rattrapé par le rechargement. Dans la minute, l'erreur repart telle quelle
-    // (vraie panne de réseau) et `noterPlantage` la compte à part elle aussi.
+    // (6 nov., filet 3) Compté À PART (src/plantages.js), jamais noté comme plantage.
     compterMorceauPerime(ev && ev.payload);
-    // ⚠️ (14 nov., fiabilité prod) JAMAIS `ev.preventDefault()` ici. Vite (son
-    // `preload`) rend alors `undefined` À LA PLACE DU MODULE (`baseModule().catch(
-    // handlePreloadError)`) : `React.lazy` lit `undefined.default`, et
-    // `import(…).then((m) => ({ default: m.FactureVente }))` lève « undefined is not
-    // an object (evaluating 'e.FactureVente') » — un VRAI plantage noté, alerte
-    // « Un écran est tombé » au propriétaire (mesuré dans la base : 64 écrans tombés
-    // du 10 au 12 nov., dont 60 d'un coup sur Ventes, iOS Safari). Sans lui, l'import
-    // est REJETÉ avec sa vraie raison (« Failed to fetch dynamically imported
-    // module… », compté à part par src/plantages.js) et la page se recharge quand même.
-    window.location.reload();
+    // ⚠️ (14 nov., fiabilité prod) JAMAIS `ev.preventDefault()` ici. Vite (son `preload`) rendrait alors
+    // `undefined` À LA PLACE DU MODULE : `React.lazy` lisait `undefined.default` (64 écrans tombés du 10 au
+    // 12 nov., iOS Safari). Sans lui, l'import est REJETÉ avec sa vraie raison.
+    // (15 nov., chantier « ouverture ») Plus un `location.reload()` aveugle (une fois par minute) : il
+    // retombait sur la coquille GARDÉE par le service worker — la même ancienne version, la même erreur.
+    // Le serveur est relu : une autre version en ligne ⇒ rechargement propre (coquille oubliée, une fois par
+    // version et par onglet) ; même version ou pas de réseau ⇒ rien (l'écran relance son morceau, puis
+    // « Mettre à jour VRM »). src/chargementSur.js.
+    verifierMorceauPerime('preload');
   });
 }
 // L'app n'est téléchargée que par ceux qui y entrent : un visiteur qui lit la
@@ -89,13 +87,13 @@ if (typeof window !== 'undefined') {
   });
   window.addEventListener('appinstalled', () => { window.__vrmInviteInstallation = null; });
 }
-const App = React.lazy(() => import('./App.jsx'));
+const App = lazySur(() => import('./App.jsx'));
 // Le film de la page d'accueil (`?film`, export MP4) est un morceau à part : un
 // visiteur de la page ne le télécharge jamais, et `?film` ne charge pas l'app.
-const Film = React.lazy(() => import('./AccueilFilm.jsx'));
+const Film = lazySur(() => import('./AccueilFilm.jsx'));
 // (14 nov., n° 144) vrm.center/tarifs : la page publique des tarifs, un morceau à part
 // (ni l'app ni l'accueil ne le téléchargent), ses textes avec lui (src/tarifs/Tarifs.jsx).
-const Tarifs = React.lazy(() => import('./tarifs/Tarifs.jsx'));
+const Tarifs = lazySur(() => import('./tarifs/Tarifs.jsx'));
 const pageTarifs = () => /^\/tarifs\/?$/.test(window.location.pathname || '');
 // Les polices : celle du SYSTÈME (SF Pro sur iPhone et Mac, styles-vitrine.css), aucune
 // police téléchargée. (5 nov., chantier A) Inter et Space Grotesk, hébergées ici depuis
@@ -117,6 +115,8 @@ class DernierFilet extends React.Component {
   componentDidCatch(err, info) { try { console.error('[VRM] application en erreur', err, info && info.componentStack); } catch (_) {} noterPlantage(err, { origine: 'demarrage', version: typeof __BUILD__ !== 'undefined' ? String(__BUILD__) : '' }); }
   render() {
     if (!this.state.err) return this.props.children;
+    // (15 nov.) Un morceau introuvable : « Mettre à jour VRM », un bouton — pas « l'application n'a pas pu démarrer ».
+    if (estErreurMorceau(this.state.err)) return <MettreAJourVRM pleinEcran/>;
     const msg = String((this.state.err && this.state.err.message) || this.state.err);
     const btn = { border: '1px solid #E5E5EA', background: 'transparent', borderRadius: 12, padding: '10px 15px',
       fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' };
@@ -177,10 +177,10 @@ const filmDemande = /[?&]film(=|&|$)/.test(window.location.search || '');
 // (14 nov., lot argent-prix — 115) Le lien de son COMPTABLE (`/c/<jeton>` → `?comptable=`) : une page en lecture
 // seule, SANS l'app ni session (src/VueComptable.jsx) — même quand une session existe sur ce navigateur.
 const comptableDemande = /[?&]comptable=/.test(window.location.search || '');
-const VueComptable = React.lazy(() => import('./VueComptable.jsx'));
+const VueComptable = lazySur(() => import('./VueComptable.jsx'));
 // (15 nov.) LA PAGE D'UN PARTENAIRE (`/pa/<jeton>` → `?espace-partenaire=`) : lecture seule, sans l'app ni session (src/VuePartenaire.jsx).
 const partenaireDemande = /[?&]espace-partenaire=/.test(window.location.search || '');
-const VuePartenaire = React.lazy(() => import('./VuePartenaire.jsx'));
+const VuePartenaire = lazySur(() => import('./VuePartenaire.jsx'));
 // (14 nov., ouverture instantanée) LES DERNIERS CHIFFRES DE MA JOURNÉE, PEINTS AVANT L'APP.
 // src/ouvertureInstantanee.js décide (rien que ce que la porte hors ligne laisserait voir, pour CE
 // compte, sur CET appareil) ; src/OuvertureInstantanee.jsx peint l'instantané dans l'écran de
@@ -209,7 +209,9 @@ const apercuPeint = apercuPossible
 // même le premier rendu, pour ne pas ajouter un aller-retour à son ouverture
 // (après l'instantané quand il y en a un : le fichier est déjà préchargé par
 // public/demarrage-app.js, seule son exécution attend la peinture).
-if (!filmDemande && !comptableDemande && !partenaireDemande && versApp()) { if (apercuPossible) apercuPeint.then(() => { try { import('./App.jsx'); } catch (_) {} }); else { try { import('./App.jsx'); } catch (_) {} } }
+// (15 nov.) Le morceau arrivé est un JALON de la progression de l'écran de démarrage (src/demarrage.js).
+const telechargerApp = () => { try { import('./App.jsx').then(() => etapeDemarrage('telechargee'), () => {}); } catch (_) {} };
+if (!filmDemande && !comptableDemande && !partenaireDemande && versApp()) { if (apercuPossible) apercuPeint.then(telechargerApp); else telechargerApp(); }
 
 const FondApp = DemarrageVRM;
 function Racine() {
@@ -245,7 +247,18 @@ const monter = () => ReactDOM.createRoot(document.getElementById('root')).render
 );
 // Français (la source) : aucune attente. Une autre langue : son morceau d'abord, 2 s au plus.
 // (14 nov.) Et l'instantané d'abord peint, s'il y en a un (1,5 s au plus, src/OuvertureInstantanee.jsx).
-Promise.all([preparerLangue().catch(() => {}), apercuPeint]).then(monter, monter);
+// (15 nov.) Les phrases de l'écran de démarrage (écrites en français dans index.html, avant tout script)
+// dans la langue choisie, dès qu'elle est prête.
+const traduireDemarrage = () => {
+  try {
+    const cles = { ouverture: 'demarrage.ouverture', lent: 'demarrage.lent', recharger: 'demarrage.recharger' };
+    for (const el of document.querySelectorAll('#vrm-demarrage [data-vrm-boot-texte]')) {
+      const c = cles[el.getAttribute('data-vrm-boot-texte')];
+      if (c) el.textContent = tr(c);
+    }
+  } catch (_) {}
+};
+Promise.all([preparerLangue().catch(() => {}), apercuPeint]).then(() => { traduireDemarrage(); monter(); }, monter);
 // (6 nov.) L'écran de démarrage d'index.html part quand la page montre autre chose
 // qu'une attente (src/demarrage.js) — l'écran d'ouverture prêt, l'accueil, la connexion.
 suivreDemarrage();
@@ -364,15 +377,29 @@ if ('serviceWorker' in navigator) {
       cacheeDepuisMs: cacheeA == null ? null : Date.now() - cacheeA,
     });
     cacheeA = null;
-    if (d === 'recharger') { reloading = true; window.location.reload(); return; }
-    if (d === 'proposer' && window.__vrmMajDispo !== fp) {
-      window.__vrmMajDispo = fp;
-      try { window.dispatchEvent(new Event('vrm:maj-dispo')); } catch (_) {}
+    // (15 nov., chantier « ouverture ») Le rechargement OUBLIE la coquille gardée par le service worker : sans
+    // ça, un rechargement que le navigateur ne marque pas « sans cache » retombait sur l'ancienne version, qui
+    // revoyait la nouvelle, et rechargeait encore (mesuré au banc ouverture : A ▸ A ▸ B). Une fois par version
+    // et par onglet ; refusé (déjà fait) ⇒ la pilule « Mettre à jour » à la place, jamais une boucle.
+    if (d === 'recharger') {
+      reloading = true;
+      if (await rechargerVersNouvelle({ cible: fp, raison: 'version' })) return;
+      reloading = false;
+    }
+    if (d === 'recharger' || d === 'proposer') {
+      if (window.__vrmMajDispo !== fp) {
+        window.__vrmMajDispo = fp;
+        try { window.dispatchEvent(new Event('vrm:maj-dispo')); } catch (_) {}
+      }
     }
   };
+
   window.addEventListener('vrm:verifier-version', () => check());
+  // (15 nov., chantier « ouverture ») La version est relue TOUT DE SUITE, plus à l'événement `load` : une
+  // app rouverte sur une version gardée par le service worker se recharge pendant que l'écran de démarrage
+  // la couvre encore (une seule attente à l'écran), plus après avoir montré Ma journée de l'ancienne.
+  setTimeout(check, 0);
   window.addEventListener('load', () => {
-    check();
     document.addEventListener('visibilitychange', () => { if (document.hidden) { cacheeA = Date.now(); return; } check(); });
     // pageshow (persisted) = page « gelée » restaurée (iOS installé) → on revérifie.
     window.addEventListener('pageshow', (e) => { if (e.persisted) check(); });

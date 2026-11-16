@@ -26,6 +26,8 @@
 // Pur : aucune lecture, aucune écriture, aucun module Node — l'app l'importe.
 // ────────────────────────────────────────────────────────────────────────────
 
+import { redigerBilanMois, redigerSeuil } from './argent-notif.js';   // (15 nov., lot argent-plus)
+
 export const TITRE_MAX = 40;
 export const CORPS_MAX = 90;
 export const LANGUES_NOTIF = ['fr', 'en', 'es', 'it', 'de'];
@@ -52,7 +54,10 @@ export function couperMot(s, n) {
 export function couperPhrases(s, n) {
   const x = espaces(s);
   if (x.length <= n) return x;
-  const phrases = x.split(/(?<=[.!?])\s+/);
+  // (15 nov., rouges-connus) SANS « lookbehind » `(?<=…)` : ce fichier est aussi dans le paquet de l'app,
+  // et Safari < 16.4 refuse de LIRE un paquet qui en contient un (audit-safari). Même découpe : après
+  // . ! ? suivi d'espaces, les espaces retirés.
+  const phrases = x.replace(/([.!?])\s+/g, '$1\u0000').split('\u0000');
   let out = '';
   for (const p of phrases) { const t = out ? `${out} ${p}` : p; if (t.length > n - 2) break; out = t; }
   return out && out.length >= n * 0.4 ? `${out} …` : couperMot(x, n);
@@ -74,15 +79,17 @@ const RE_IDS = [
 ];
 const RE_IDS_STRICTS = [
   /\bn[°ºo]\s*\d{6,}\b/gi,
-  /(?<![\w,.])\d{9,}(?![\w,.])/g,
+  // Un nombre nu de 9 chiffres ou plus, sans lettre, virgule ni point collés. Le caractère d'avant est
+  // PRIS dans `$1` et rendu tel quel (Safari < 16.4 ne lit pas `(?<!…)`, voir `couperPhrases`).
+  [/(^|[^\w,.])\d{9,}(?![\w,.])/g, '$1 '],
 ];
 export function sansIdentifiant(s, { strict = false } = {}) {
   let x = str(s);
-  for (const re of strict ? [...RE_IDS, ...RE_IDS_STRICTS] : RE_IDS) x = x.replace(re, ' ');
+  for (const e of strict ? [...RE_IDS, ...RE_IDS_STRICTS] : RE_IDS) { const [re, par] = Array.isArray(e) ? e : [e, ' ']; x = x.replace(re, par); }
   return x.replace(/\(\s*\)/g, ' ').replace(/(?:\s*·\s*){2,}/g, ' · ').replace(/\s+,/g, ',')
     .replace(BLANCS, ' ').replace(/^[\s·:—–-]+/, '').replace(/[\s·:—–-]+$/, '').trim();
 }
-export const aUnIdentifiant = (s, { strict = true } = {}) => (strict ? [...RE_IDS, ...RE_IDS_STRICTS] : RE_IDS).some((re) => { re.lastIndex = 0; const ok = re.test(str(s)); re.lastIndex = 0; return ok; });
+export const aUnIdentifiant = (s, { strict = true } = {}) => (strict ? [...RE_IDS, ...RE_IDS_STRICTS] : RE_IDS).some((e) => { const re = Array.isArray(e) ? e[0] : e; re.lastIndex = 0; const ok = re.test(str(s)); re.lastIndex = 0; return ok; });
 
 // ── LES MONTANTS ────────────────────────────────────────────────────────────
 // « 62 € », « 61,20 € » (« €62 » en anglais). Illisible ⇒ '' (jamais « 0 € »).
@@ -236,6 +243,11 @@ const TXT = {
     retourLivreCorps: "Le remboursement suit sous 2 jours, sauf problème signalé.",
     rembourse: (e) => (e ? `Remboursé · ${e}` : "Remboursé"),
     rembourseCorps: "Le remboursement d’un de tes achats est arrivé.",
+    // (15 nov., lot retour-parfait) Le rappel de la date limite d'un retour : la veille au soir, le matin du jour.
+    retourVeille: (av) => (av ? `Retour à déposer ${av}` : 'Retour à déposer demain'),
+    retourVeilleCorps: 'Imprime le bordereau, emballe, dépose le colis.',
+    retourJour: 'Dernier jour pour ton retour',
+    retourJourCorps: (h) => (h ? `À déposer avant ${h}` : 'À déposer aujourd’hui'),
     offre: (e) => (e ? `Offre de ${e}` : 'Nouvelle offre'),
     offreCorps: 'Accepte, refuse ou contre-propose',
     expire24: 'expire dans 24 h',
@@ -252,6 +264,11 @@ const TXT = {
     annulation: 'Annulation demandée',
     annulationCorps: (r) => `L’acheteur veut annuler${r ? ` (« ${r} »)` : ''} · accepte ou refuse sur Vinted`,
     laPlusRecente: 'la plus récente',
+    // (15 nov., lot fiabilite-auto) Le contrôle de nuit : un écart réel, avec son geste.
+    ctlTitre: (n) => (n > 1 ? `Tout va bien ? · ${n} points à voir` : 'Tout va bien ? · 1 point à voir'),
+    ctlVoir: 'Touche pour voir.',
+    ctl: { 'numeros-double': (n) => `${n} N° ${n > 1 ? 'portés' : 'porté'} par deux articles`, 'vente-sans-numero': (n) => `${n} vente${n > 1 ? 's' : ''} récente${n > 1 ? 's' : ''} sans N°`,
+      'pool-retreci': (n) => `${n} N° ${n > 1 ? 'manquent' : 'manque'} dans ta liste`, 'enligne-24h': (n) => `${n} compte${n > 1 ? 's' : ''} pas relu${n > 1 ? 's' : ''} depuis 24 h` },
     groupe: { bordereau: (k) => `${k} bordereaux prêts à imprimer`, vente: (k) => `${k} ventes`, argent: (k) => `${k} versements reçus`, arrivee: (k) => `${k} colis t'attendent`, offre: (k) => `${k} offres à trancher`, rappel: (k) => `${k} rappels`, message: (k) => `${k} nouveaux messages` },
     resume: { bordereau: (k) => `${k} colis à poster`, arrivee: (k) => `${k} colis à retirer`, vente: (k) => `${k} vente${k > 1 ? 's' : ''}`, argent: (k) => `${k} versement${k > 1 ? 's' : ''}`, offre: (k) => `${k} offre${k > 1 ? 's' : ''}`, message: (k) => `${k} message${k > 1 ? 's' : ''}`, autre: (k) => `${k} autre${k > 1 ? 's' : ''}`, notifs: (k) => `${k} notifications` },
   },
@@ -275,6 +292,10 @@ const TXT = {
     retourLivreCorps: "The refund follows within 2 days unless a problem is reported.",
     rembourse: (e) => (e ? `Refunded · ${e}` : "Refunded"),
     rembourseCorps: "A refund for one of your purchases has arrived.",
+    retourVeille: (av) => (av ? `Return to drop off ${av}` : 'Return to drop off tomorrow'),
+    retourVeilleCorps: 'Print the label, pack it, drop the parcel off.',
+    retourJour: 'Last day for your return',
+    retourJourCorps: (h) => (h ? `Drop it off before ${h}` : 'Drop it off today'),
     offre: (e) => (e ? `Offer of ${e}` : 'New offer'),
     offreCorps: 'Accept, decline or counter',
     expire24: 'expires in 24 h',
@@ -291,6 +312,10 @@ const TXT = {
     annulation: 'Cancellation requested',
     annulationCorps: (r) => `The buyer wants to cancel${r ? ` (“${r}”)` : ''} · accept or decline on Vinted`,
     laPlusRecente: 'latest',
+    ctlTitre: (n) => (n > 1 ? `All good? · ${n} things to check` : 'All good? · 1 thing to check'),
+    ctlVoir: 'Tap to see.',
+    ctl: { 'numeros-double': (n) => `${n} N° used by two items`, 'vente-sans-numero': (n) => `${n} recent sale${n > 1 ? 's' : ''} without a N°`,
+      'pool-retreci': (n) => `${n} N° missing from your list`, 'enligne-24h': (n) => `${n} account${n > 1 ? 's' : ''} not read for 24 h` },
     groupe: { bordereau: (k) => `${k} labels ready to print`, vente: (k) => `${k} sales`, argent: (k) => `${k} payments received`, arrivee: (k) => `${k} parcels waiting for you`, offre: (k) => `${k} offers to answer`, rappel: (k) => `${k} reminders`, message: (k) => `${k} new messages` },
     resume: { bordereau: (k) => `${k} to ship`, arrivee: (k) => `${k} to pick up`, vente: (k) => `${k} sale${k > 1 ? 's' : ''}`, argent: (k) => `${k} payment${k > 1 ? 's' : ''}`, offre: (k) => `${k} offer${k > 1 ? 's' : ''}`, message: (k) => `${k} message${k > 1 ? 's' : ''}`, autre: (k) => `${k} other${k > 1 ? 's' : ''}`, notifs: (k) => `${k} notifications` },
   },
@@ -314,6 +339,10 @@ const TXT = {
     retourLivreCorps: "El reembolso llega en 2 días salvo problema señalado.",
     rembourse: (e) => (e ? `Reembolsado · ${e}` : "Reembolsado"),
     rembourseCorps: "Ha llegado el reembolso de una de tus compras.",
+    retourVeille: (av) => (av ? `Devolución ${av}` : 'Devolución mañana'),
+    retourVeilleCorps: 'Imprime la etiqueta, embala y entrega el paquete.',
+    retourJour: 'Último día para tu devolución',
+    retourJourCorps: (h) => (h ? `Entrégala antes de las ${h}` : 'Entrégala hoy'),
     offre: (e) => (e ? `Oferta de ${e}` : 'Nueva oferta'),
     offreCorps: 'Acepta, rechaza o contraoferta',
     expire24: 'caduca en 24 h',
@@ -330,6 +359,10 @@ const TXT = {
     annulation: 'Cancelación solicitada',
     annulationCorps: (r) => `El comprador quiere cancelar${r ? ` («${r}»)` : ''} · acepta o rechaza en Vinted`,
     laPlusRecente: 'la más reciente',
+    ctlTitre: (n) => (n > 1 ? `¿Todo bien? · ${n} puntos que ver` : '¿Todo bien? · 1 punto que ver'),
+    ctlVoir: 'Toca para ver.',
+    ctl: { 'numeros-double': (n) => `${n} N° en dos artículos`, 'vente-sans-numero': (n) => `${n} venta${n > 1 ? 's' : ''} reciente${n > 1 ? 's' : ''} sin N°`,
+      'pool-retreci': (n) => `Faltan ${n} N° en tu lista`, 'enligne-24h': (n) => `${n} cuenta${n > 1 ? 's' : ''} sin leer desde hace 24 h` },
     groupe: { bordereau: (k) => `${k} etiquetas listas`, vente: (k) => `${k} ventas`, argent: (k) => `${k} pagos recibidos`, arrivee: (k) => `${k} paquetes te esperan`, offre: (k) => `${k} ofertas por responder`, rappel: (k) => `${k} recordatorios`, message: (k) => `${k} mensajes nuevos` },
     resume: { bordereau: (k) => `${k} por enviar`, arrivee: (k) => `${k} por recoger`, vente: (k) => `${k} venta${k > 1 ? 's' : ''}`, argent: (k) => `${k} pago${k > 1 ? 's' : ''}`, offre: (k) => `${k} oferta${k > 1 ? 's' : ''}`, message: (k) => `${k} mensaje${k > 1 ? 's' : ''}`, autre: (k) => `${k} más`, notifs: (k) => `${k} notificaciones` },
   },
@@ -353,6 +386,10 @@ const TXT = {
     retourLivreCorps: "Il rimborso arriva entro 2 giorni salvo problemi segnalati.",
     rembourse: (e) => (e ? `Rimborsato · ${e}` : "Rimborsato"),
     rembourseCorps: "È arrivato il rimborso di un tuo acquisto.",
+    retourVeille: (av) => (av ? `Reso da consegnare ${av}` : 'Reso da consegnare domani'),
+    retourVeilleCorps: 'Stampa l’etichetta, imballa e consegna il pacco.',
+    retourJour: 'Ultimo giorno per il tuo reso',
+    retourJourCorps: (h) => (h ? `Consegnalo entro le ${h}` : 'Consegnalo oggi'),
     offre: (e) => (e ? `Offerta di ${e}` : 'Nuova offerta'),
     offreCorps: 'Accetta, rifiuta o fai una controfferta',
     expire24: 'scade tra 24 h',
@@ -369,6 +406,10 @@ const TXT = {
     annulation: 'Annullamento richiesto',
     annulationCorps: (r) => `L’acquirente vuole annullare${r ? ` («${r}»)` : ''} · accetta o rifiuta su Vinted`,
     laPlusRecente: 'la più recente',
+    ctlTitre: (n) => (n > 1 ? `Tutto bene? · ${n} punti da vedere` : 'Tutto bene? · 1 punto da vedere'),
+    ctlVoir: 'Tocca per vedere.',
+    ctl: { 'numeros-double': (n) => `${n} N° su due articoli`, 'vente-sans-numero': (n) => `${n} vendit${n > 1 ? 'e' : 'a'} recent${n > 1 ? 'i' : 'e'} senza N°`,
+      'pool-retreci': (n) => `${n} N° mancanti nella tua lista`, 'enligne-24h': (n) => `${n} account non lett${n > 1 ? 'i' : 'o'} da 24 h` },
     groupe: { bordereau: (k) => `${k} etichette da stampare`, vente: (k) => `${k} vendite`, argent: (k) => `${k} pagamenti ricevuti`, arrivee: (k) => `${k} pacchi ti aspettano`, offre: (k) => `${k} offerte da valutare`, rappel: (k) => `${k} promemoria`, message: (k) => `${k} nuovi messaggi` },
     resume: { bordereau: (k) => `${k} da spedire`, arrivee: (k) => `${k} da ritirare`, vente: (k) => `${k} vendit${k > 1 ? 'e' : 'a'}`, argent: (k) => `${k} pagament${k > 1 ? 'i' : 'o'}`, offre: (k) => `${k} offert${k > 1 ? 'e' : 'a'}`, message: (k) => `${k} messagg${k > 1 ? 'i' : 'io'}`, autre: (k) => `${k} altr${k > 1 ? 'i' : 'o'}`, notifs: (k) => `${k} notifiche` },
   },
@@ -392,6 +433,10 @@ const TXT = {
     retourLivreCorps: "Die Erstattung folgt in 2 Tagen, außer bei einem Problem.",
     rembourse: (e) => (e ? `Erstattet · ${e}` : "Erstattet"),
     rembourseCorps: "Die Erstattung eines deiner Käufe ist da.",
+    retourVeille: (av) => (av ? `Rücksendung abgeben ${av}` : 'Rücksendung morgen abgeben'),
+    retourVeilleCorps: 'Etikett drucken, einpacken, Paket abgeben.',
+    retourJour: 'Letzter Tag für deine Rücksendung',
+    retourJourCorps: (h) => (h ? `Abgeben bis ${h}` : 'Heute abgeben'),
     offre: (e) => (e ? `Angebot über ${e}` : 'Neues Angebot'),
     offreCorps: 'Annehmen, ablehnen oder Gegenangebot',
     expire24: 'läuft in 24 h ab',
@@ -408,6 +453,10 @@ const TXT = {
     annulation: 'Stornierung angefragt',
     annulationCorps: (r) => `Der Käufer möchte stornieren${r ? ` („${r}“)` : ''} · annehmen oder ablehnen auf Vinted`,
     laPlusRecente: 'das neueste',
+    ctlTitre: (n) => (n > 1 ? `Alles gut? · ${n} Punkte prüfen` : 'Alles gut? · 1 Punkt prüfen'),
+    ctlVoir: 'Tippe zum Ansehen.',
+    ctl: { 'numeros-double': (n) => `${n} N° auf zwei Artikeln`, 'vente-sans-numero': (n) => `${n} neue${n > 1 ? '' : 'r'} Verkauf${n > 1 ? 'e' : ''} ohne N°`,
+      'pool-retreci': (n) => `${n} N° fehlen in deiner Liste`, 'enligne-24h': (n) => `${n} Konto${n > 1 ? 'en' : ''} seit 24 h nicht gelesen` },
     groupe: { bordereau: (k) => `${k} Etiketten druckbereit`, vente: (k) => `${k} Verkäufe`, argent: (k) => `${k} Zahlungen erhalten`, arrivee: (k) => `${k} Pakete warten auf dich`, offre: (k) => `${k} offene Angebote`, rappel: (k) => `${k} Erinnerungen`, message: (k) => `${k} neue Nachrichten` },
     resume: { bordereau: (k) => `${k} zu versenden`, arrivee: (k) => `${k} abzuholen`, vente: (k) => `${k} Verkä${k > 1 ? 'ufe' : 'uf'}`, argent: (k) => `${k} Zahlung${k > 1 ? 'en' : ''}`, offre: (k) => `${k} Angebot${k > 1 ? 'e' : ''}`, message: (k) => `${k} Nachricht${k > 1 ? 'en' : ''}`, autre: (k) => `${k} weitere`, notifs: (k) => `${k} Benachrichtigungen` },
   },
@@ -428,6 +477,10 @@ const num = (n) => { const s = str(n).trim(); return /^[A-Za-z]?\d{1,6}$/.test(s
 
 // ── LES SORTES ──────────────────────────────────────────────────────────────
 const SORTES = {
+  // (15 nov., lot argent-plus) Le bilan de fin de mois et un seuil de l'année (api/_lib/argent-notif.js) :
+  // les données viennent des règles (src/bilanFinMois.js, src/alertesSeuils.js), les mots d'ici.
+  bilanMois: (d, T, ctx) => redigerBilanMois(d, { langue: ctx.langue, max: CORPS_MAX }),
+  seuil: (d, T, ctx) => redigerSeuil(d, { langue: ctx.langue }),
   // Un compte relié pour la première fois. `comptes` : [{ plateforme, nom }] — le
   // nom est SON pseudo (le compte du vendeur, jamais un acheteur) ; sans nom, la
   // plateforme (« Ton compte Vestiaire est relié »), jamais l'identifiant.
@@ -483,6 +536,19 @@ const SORTES = {
     const { title, reste } = titreAvecObjet(T.retourLivre, a, d.article);
     return { title, body: joindre(reste, T.retourLivreCorps), ligne: a };
   },
+  // (15 nov., lot retour-parfait) Le rappel d'un retour pas encore déposé : `quand` 'veille' (le soir,
+  // « Retour à déposer avant demain 10 h ») ou 'jour' (le matin du dernier jour, « Dernier jour pour ton
+  // retour » / « À déposer avant 10 h »). L'heure est celle LUE (Paris) ; sans heure lue, aucune n'est dite.
+  retourRappel: (d, T, ctx) => {
+    const a = nomCourt(d.article);
+    const lm = Date.parse(str(d.limite));
+    if (d.quand === 'jour') {
+      const p = d.heure !== false && Number.isFinite(lm) ? partsParis(lm) : null;
+      return { title: T.retourJour, body: joindre(T.retourJourCorps(p ? heureTexte(p.h, p.mi, ctx.langue) : ''), a), ligne: a };
+    }
+    const av = avantClair(d.heure === false && d.jour ? d.jour : d.limite, ctx);
+    return { title: couperMot(T.retourVeille(av), TITRE_MAX), body: joindre(a, T.retourVeilleCorps), ligne: a };
+  },
   rembourse: (d, T, ctx) => {
     const e = montantClair(d.montant, ctx.langue), a = nomCourt(d.article);
     const { title, reste } = titreAvecObjet(T.rembourse(e), a, d.article);
@@ -525,6 +591,14 @@ const SORTES = {
     const { title, reste } = titreAvecObjet(T.annulation, a, d.article);
     return { title, body: joindre(reste, T.annulationCorps(d.raison ? couperMot(d.raison, 30) : '')), ligne: a };
   },
+};
+// (15 nov., lot fiabilite-auto) Le contrôle de nuit : `lignes` = [{ cle, n }] — des clés et des
+// nombres seulement (jamais un N°, un n° de transaction, un pseudo). Le plus grave d'abord.
+SORTES.controleNuit = (d, T) => {
+  const l = (Array.isArray(d.lignes) ? d.lignes : []).filter((x) => x && T.ctl[x.cle] && Number.isInteger(x.n) && x.n > 0);
+  if (!l.length) return null;
+  const phrases = l.slice(0, 2).map((x) => T.ctl[x.cle](x.n));
+  return { title: T.ctlTitre(l.length), body: `${phrases.join(' · ')}. ${T.ctlVoir}`, ligne: phrases[0] };
 };
 export const SORTES_NOTIF = Object.keys(SORTES);
 

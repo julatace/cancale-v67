@@ -23,10 +23,10 @@
 //   H4 NAVIGATION — une icône par entrée (colonne et « Plus ») ; le même colis ne
 //                   porte jamais deux badges (Ventes ET Colis) ;
 //   H5 CLOCHE     — la feuille est `SheetShell` (poignée, croix) ;
-//   H6 OÙ RANGER  — un achat vu « en route » puis « arrivé » : la cloche le compte, sa
-//                   ligne propose la PREMIÈRE CASE LIBRE (règles du Stock) et « Ranger »
-//                   ouvre le Stock ; rien n'est envoyé au téléphone ; meubles pas lus
-//                   ⇒ rien n'est proposé ; première lecture ⇒ rien non plus.
+//   H6 PAS D'ACHAT À RANGER (15 nov., Julien : « on range une ANNONCE, pas un achat ») — un
+//                   achat vu « en route » puis « arrivé » : la cloche ne propose RIEN (ni
+//                   ligne, ni pastille) ; rien n'est envoyé au téléphone ; meubles pas lus,
+//                   première lecture ⇒ rien non plus.
 //  Réglages : `BANC_PORT` (9300–9349, 9310 par défaut), `LARGEURS=390,1512`,
 //  `THEMES=clair,sombre`, `SHOTS=<dossier>` (captures à REGARDER), `BANC_DIST` (un
 //  autre dist/, pour juger la base). Un banc ne meurt pas : il rapporte.
@@ -132,17 +132,23 @@ async function enTete(nav, { W, theme }) {
     const badges = {}; for (const x of document.querySelectorAll('[data-badge-nav]')) if (x.getClientRects().length) badges[x.getAttribute('data-badge-nav')] = x.getAttribute('data-badge-n');
     return { n: entrees.length, doublons, badges };
   }, W < 600);
-  if (W >= 600) dit(nv.n >= 10 && !nv.doublons.length, 'H4', `${T} colonne : une icône par entrée (${nv.n} entrées)`, nv.doublons.join(' ¦ '));
+  // (15 nov., rouges-connus) La colonne de l'ordinateur compte NEUF entrées depuis le 14 nov. (App.jsx : `NAV_TACHES`
+  // Ma journée · Ventes · Argent, puis Annonces · Stock · Achats, Messages, E-mails, Communauté — « Plus » et Colis
+  // retirés, choix n° 61) : le plancher suit la colonne d'aujourd'hui, la règle (aucune icône en double) reste.
+  if (W >= 600) dit(nv.n >= 9 && !nv.doublons.length, 'H4', `${T} colonne : une icône par entrée (${nv.n} entrées)`, nv.doublons.join(' ¦ '));
   dit(!(nv.badges.ventes && nv.badges.cat_bord), 'H4', `${T} le même colis ne porte pas deux badges (Ventes ET Colis)`, JSON.stringify(nv.badges));
   if (W < 600) {
-    await pg.locator('.vrm-tab', { hasText: 'Plus' }).first().click().catch(() => {}); await attendre(800);
+    // (15 nov., rouges-connus) La barre du bas « Studio » (14 nov., docs/design/studio-bleu-clair.md : 4 espaces + le disque
+    // « + », `1fr 1fr 72px 1fr 1fr`) n'a plus d'onglet « Plus » : sans lui, la règle se juge sur les entrées de la barre.
+    const aPlus = await pg.locator('.vrm-tab', { hasText: 'Plus' }).count().catch(() => 0);
+    if (aPlus) { await pg.locator('.vrm-tab', { hasText: 'Plus' }).first().click().catch(() => {}); await attendre(800); }
     const pl = await pg.evaluate(() => {
       const tuiles = [...document.querySelectorAll('[data-nav-entree]')].filter((b) => b.getClientRects().length);
       const vu = {}; const d = [];
       for (const b of tuiles) { const sv = b.querySelector('svg, [data-nav-logo]'); const k = sv ? (sv.getAttribute('data-nav-logo') || sv.innerHTML.replace(/\s+/g, '')) : ''; const n = b.innerText.trim(); if (!k) continue; if (vu[k] && vu[k] !== n) d.push(vu[k] + ' = ' + n); else vu[k] = n; }
       return { n: tuiles.length, d };
     });
-    dit(pl.n >= 6 && !pl.d.length, 'H4', `${T} « Plus » : une icône par écran (${pl.n} tuiles)`, pl.d.join(' ¦ '));
+    dit(pl.n >= (aPlus ? 6 : 4) && !pl.d.length, 'H4', `${T} ${aPlus ? '« Plus »' : 'barre du bas (sans « Plus »)'} : une icône par écran (${pl.n} entrées)`, pl.d.join(' ¦ '));
     await capture(pg, `ch-plus-${W}-${theme}`);
     await pg.keyboard.press('Escape'); await attendre(300);
   }
@@ -190,7 +196,9 @@ async function parametres(nav, { W, theme }) {
       texte: set ? set.innerText : '',
       avatars: [...document.querySelectorAll('[data-profil-compte] .vrm-set-avatar, [data-photo-profil] span')].filter((e) => vis(e) && /^[A-Z?]$|^$/.test(e.innerText.trim()) && e.getBoundingClientRect().width >= 40).length,
       photoHors: [...document.querySelectorAll('[data-photo-profil]')].filter((e) => vis(e) && !e.closest('[data-profil-compte]')).length,
-      discord: [...document.querySelectorAll('[data-connexion-compte="discord"], [data-connexion-indispo="discord"]')].filter(vis).length + [...document.querySelectorAll('[data-discord-compte]')].filter(vis).length,
+      // (15 nov., rouges-connus) Une RANGÉE par endroit : « Bientôt » (`data-connexion-indispo`) vit DANS la rangée Discord de
+      // `ConnexionsCompte` (11 nov., DJ6) — elle était comptée une seconde fois.
+      discord: [...document.querySelectorAll('[data-connexion-compte="discord"], [data-connexion-indispo="discord"]')].filter((e) => vis(e) && !(e.matches('[data-connexion-indispo]') && e.closest('[data-connexion-compte="discord"]'))).length + [...document.querySelectorAll('[data-discord-compte]')].filter(vis).length,
     };
   });
   const m = await mesure();
@@ -209,7 +217,9 @@ async function parametres(nav, { W, theme }) {
   if (W >= 1024) {
     dit(m.gauche != null && m.gauche <= 24, 'H3', `${T} la colonne commence où commencent les autres écrans (titre à ${m.gauche} px du bord du contenu)`, String(m.gauche));
   }
-  const ECARTES = /\b(r[ée]gime fiscal|comptes connect[ée]s|e-?mails)\b/i;
+  // (15 nov., rouges-connus) « E-mails » est le MOT RETENU (src/libelles.js `NOTIONS.emails` : titre « E-mails », écarté
+  // « emails ») : l'ancienne expression `e-?mails` rejetait aussi le bon mot, montré depuis les dix catégories de Paramètres.
+  const ECARTES = /\b(r[ée]gime fiscal|comptes connect[ée]s|emails)\b/i;
   dit(!ECARTES.test(m.texte), 'H3', `${T} Réglages : aucun mot écarté (« régime fiscal », « comptes connectés », « emails »)`, (m.texte.match(ECARTES) || [''])[0]);
   await capture(pg, `ch-reglages-${W}-${theme}`);
   if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `ch-reglages-${W}-${theme}-page.png`), fullPage: true }).catch(() => {});
@@ -237,9 +247,8 @@ async function cloche(nav, { W, theme, scenario }) {
   else await pg.evaluate(() => { try { localStorage.removeItem('vrm_ranger_vus'); localStorage.removeItem('vrm_ranger_proposes'); } catch (_) {} });
   await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
   await attendre(4000);
-  // La cloche lit les achats 4 s après le chargement du nuage : on attend la pastille (au plus 15 s).
-  if (scenario === 'arrive') await pg.waitForFunction(() => !!document.querySelector('[data-centre-notifs-cloche] .vrm-cn-pastille'), null, { timeout: 15000 }).catch(() => {});
-  else await attendre(6000);
+  // L'ancienne cloche lisait les achats 4 s après le chargement du nuage : on laisse le temps qu'elle aurait eu.
+  await attendre(6000);
   const pastille = await pg.evaluate(() => { const p = document.querySelector('[data-centre-notifs-cloche] .vrm-cn-pastille'); return p ? p.innerText.trim() : ''; });
   await pg.locator('[data-centre-notifs-cloche]').first().click().catch(() => {});
   await pg.waitForSelector('[data-centre-notifs]', { timeout: 6000 }).catch(() => {});
@@ -253,12 +262,9 @@ async function cloche(nav, { W, theme, scenario }) {
   });
   if (scenario === 'arrive') {
     dit(f && f.shell && f.poignee && f.croix, 'H5', `${T} la cloche est la feuille de l'app (SheetShell : poignée, croix)`, JSON.stringify(f && { shell: f.shell, poignee: f.poignee, croix: f.croix }));
-    dit(f && f.lignes.length === 1 && f.lignes[0].tx === '73001' && f.lignes[0].cas === 'mA:1', 'H6', `${T} l'achat 73001 « arrivé » propose la première case libre (Étagère A, case 2)`, JSON.stringify(f && f.lignes));
-    dit(pastille === '1', 'H6', `${T} la cloche le compte (pastille « 1 »)`, JSON.stringify(pastille));
+    dit(f && f.lignes.length === 0, 'H6', `${T} l'achat 73001 « arrivé » ne propose AUCUNE case (on range un article, pas un achat)`, JSON.stringify(f && f.lignes));
+    dit(pastille === '' || pastille === '0', 'H6', `${T} la cloche ne le compte pas (aucune pastille locale)`, JSON.stringify(pastille));
     await capture(pg, `ch-cloche-ranger-${W}-${theme}`);
-    await pg.locator('[data-centre-ranger-ouvrir="73001"]').first().click().catch(() => {}); await attendre(1500);
-    const ecran = await pg.evaluate(() => (document.querySelector('.vrm-main') || {}).getAttribute ? document.querySelector('.vrm-main').getAttribute('data-ecran') : null);
-    dit(ecran === 'garage', 'H6', `${T} « Ranger » ouvre le Stock`, String(ecran));
     dit(!envois.length, 'H6', `${T} rien n'est envoyé au téléphone (aucune écriture de notification)`, envois.join(' ¦ '));
   } else {
     dit(f && f.lignes.length === 0 && (pastille === '' || pastille === '0'), 'H6', `${T} ${scenario === 'premiere' ? 'première lecture sur cet appareil' : 'meubles pas lus'} ⇒ rien n'est proposé`, JSON.stringify({ lignes: f && f.lignes, pastille }));

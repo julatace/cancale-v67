@@ -14,9 +14,6 @@
 import React from 'react';
 import { BoutonBase } from './composants/Bouton.jsx';
 import { CLE_VEILLE, alertesAMontrer, texteAlerte } from './veilleChiffres.js';
-import { etatControle } from './controleNuit.js';
-import { tr } from './i18n/index.js';
-import { heuresPourDater } from './versementRaisons.js';   // (15 nov.) en heures de Vinted ouvert
 import { lireLigneVeille, lireControleNuit, lireControleInstallation, marquerAlerteVue } from './veilleLigne.js';
 import './styles-veille.css';
 
@@ -56,59 +53,20 @@ function CarteAlerte({ a, onVue }) {
   );
 }
 
-// (14 nov., lot dates-versement) « 1741 ventes sans date de versement depuis 30 jours » ne
-// disait ni ce qui est déjà daté, ni pourquoi le reste attend, ni quoi faire (§2.7). Quand la
-// cause est UNE (`vinted-detail` : Vinted ne donne la date qu'en ouvrant chaque vente, et
-// l'extension les lit), la ligne le dit, avec le délai estimé (src/versementRaisons.js) — ton
-// neutre : rien n'est en faute. Une autre cause, ou une ligne d'avant ce lot : la phrase d'avant.
-function texteVersement(l) {
-  const d = l.detail || {};
-  if (d.cause !== 'vinted-detail') return null;
-  const reste = Number.isInteger(d.total) ? d.total : l.n;
-  const h = heuresPourDater(reste);
-  return {
-    titre: tr('veille.versement.titre', { n: l.n }),
-    datees: Number.isInteger(d.datees) && d.datees > 0 ? tr('veille.versement.datees', { n: d.datees }) : '',
-    pourquoi: tr(d.comptes > 1 ? 'veille.versement.pourquoiN' : 'veille.versement.pourquoi1'),
-    heures: h ? tr('veille.versement.heures', { n: h }) : '',
-    geste: tr('veille.versement.geste'),
-  };
-}
-
+// (15 nov., lot fiabilite-auto — Julien : « Ma journée encombrée de cases au hasard ») Le contrôle de
+// cette nuit ne s'affiche PLUS en carte ici : il vit dans Paramètres → « Tout va bien ? »
+// (src/fiabilite/Fiabilite.jsx, `ControleNuitLignes`) ; Ma journée n'en garde qu'UNE ligne discrète
+// « Tout va bien ? · N points » (`usePointsToutVaBien`, posée par le chantier refonte-journee). Et
+// « N ventes à dater » n'est plus dit nulle part (l'extension les date sans rien lui demander).
+// Reste ici : un chiffre qui a chuté d'un coup sans raison.
 export function VeilleJournee() {
-  const { chiffres, vendeur, installation, relire } = useVeille();
+  const { chiffres, relire } = useVeille();
   const maintenant = Date.now();
   const alertes = chiffres ? alertesAMontrer(chiffres, maintenant) : [];
-  const ctl = etatControle(vendeur, installation === undefined ? null : installation, maintenant);
-  const montrerCtl = ctl.etat === 'ok' || ctl.etat === 'probleme' || ctl.etat === 'passu';
-  if (!alertes.length && !montrerCtl) return null;
+  if (!alertes.length) return null;
   return (
-    <section className="vrm-veille" aria-label="Veille" data-veille={alertes.length} data-controle={ctl.etat}>
+    <section className="vrm-veille" aria-label="Veille" data-veille={alertes.length}>
       {alertes.map((a) => <CarteAlerte key={a.k} a={a} onVue={relire}/>)}
-      {ctl.etat === 'ok' ? (
-        <p className="vrm-veille-ok" data-controle-ok="">Tout est en ordre ✓ <span>· contrôle de cette nuit</span></p>
-      ) : null}
-      {ctl.etat === 'probleme' || ctl.etat === 'passu' ? (
-        <div className="vrm-veille-controle" data-controle-n={ctl.lignes.length}>
-          <p className="vrm-veille-sous">Contrôle de cette nuit</p>
-          {ctl.lignes.map((l) => {
-            const v = l.cle === 'versement-30j' ? texteVersement(l) : null;
-            return (
-            <div key={l.cle} className="vrm-veille-ligne" data-controle-ligne={l.cle} data-ton={l.ton} data-versement-cause={v ? 'vinted-detail' : undefined}>
-              <span className="vrm-veille-n">{l.n}</span>
-              {v ? (
-                <span className="vrm-veille-txt" data-versement-texte="">{v.titre}{v.datees ? <> · <b data-versement-datees={l.detail.datees}>{v.datees}</b></> : null}
-                  <small className="vrm-veille-explique" data-versement-pourquoi="">{v.pourquoi}{v.heures ? <> <span data-versement-heures="">{v.heures}</span></> : null}</small></span>
-              ) : (
-                <span className="vrm-veille-txt">{l.phrase.replace(/^\d+\s/, '')}{l.cle === 'numeros-double' && l.ids.length ? <small> · N°{l.ids.slice(0, 4).join(', N°')}</small> : null}</span>
-              )}
-              <BoutonBase variante="secondaire" data-controle-geste={l.cle} onClick={() => aller(l.geste.aller)}>{v ? v.geste : l.geste.libelle}</BoutonBase>
-            </div>
-            );
-          })}
-          {ctl.passu.length ? <p className="vrm-veille-passu" data-controle-passu={ctl.passu.length}>Pas vérifié : {ctl.passu.map((p) => `${p.nom.charAt(0).toLowerCase()}${p.nom.slice(1)} (${p.raison})`).join(' · ')}.</p> : null}
-        </div>
-      ) : null}
     </section>
   );
 }

@@ -12,7 +12,7 @@ import Frise from './design/Frise.jsx';
 import { parcoursVenteVc, friseParcoursVc } from './parcoursVestiaire.js';
 import { tr, date as dateI18n } from './i18n/index.js';
 
-const ETAPES = ['envoye', 'arrive', 'authentification', 'verdict', 'paye'];
+const ETAPES = ['envoye', 'arrive', 'authentification', 'livraison', 'verdict', 'paye'];   // (15 nov.) + « livraison » : l'envoi direct à l'acheteur
 const libelles = () => Object.fromEntries([...ETAPES.map((k) => [k, tr('vcParcours.etape.' + k)]), ['verdict.refuse', tr('vcParcours.etape.refuse')]]);
 const courts = () => Object.fromEntries([...ETAPES.map((k) => [k, tr('vcParcours.court.' + k)]), ['verdict.refuse', tr('vcParcours.court.refuse')]]);
 const moisLisible = (ym) => { const [a, m] = String(ym || '').split('-').map(Number); if (!a || !m) return ''; try { return dateI18n(new Date(a, m - 1, 15), { month: 'long', year: 'numeric' }); } catch (_) { return ym; } };

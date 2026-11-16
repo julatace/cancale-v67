@@ -218,7 +218,9 @@ const CORPS_AV = (avecSens = true) => [' E-mail Vinted ', '<https://links.vinted
     const app = sansCommentaires(require('./_source-app.cjs').sourceApp ? require('./_source-app.cjs').sourceApp(R) : fs.readFileSync(path.join(R, 'src/App.jsx'), 'utf8'));
     dit(/!\(l\.sens === 'achat' && l\.genre === 'retour'\)\)\.slice\(0, 8\)/.test(app), 'W1 Ma journée : plus AUCUNE ligne « Retour » d’achat dans les litiges (une seule place)');
     dit(!/id:'a-renvoyer'/.test(app), 'W1 Ma journée : plus de ligne « Renvoyer N articles (litige) » à part');
-    dit(/<ARenvoyerJournee r=\{retoursAchatRes\}/.test(app) && /<RetoursAchatBloc r=\{retoursAchatRes\}/.test(app), 'W2 « À renvoyer » : la même liste en tête de Ma journée et dans Achats');
+    // (16 nov., intégration vague B) Julien : « Ma journée ne montre que ce qui demande un geste » (c8e526af, refonte-journee) :
+    // les retours d'achat y passent par « Retours et litiges », tirés de la MÊME liste classée qu'Achats (`retoursClasses.actifs`).
+    dit(/<RetoursAchatBloc r=\{retoursAchatVus\}/.test(app) && /const retoursLitigesJ = [\s\S]{0,900}for \(const c of retoursClasses\.actifs\)/.test(app), 'W2 « À renvoyer » : la même liste dans Ma journée (Retours et litiges) et dans Achats');
     dit(/mode=reclasser/.test(app), 'W3 le reclassement est demandé au serveur à l’ouverture');
   });
 

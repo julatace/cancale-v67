@@ -135,7 +135,10 @@ const MESURE_BRUTE = (pg, { tel, sombre }) => pg.evaluate(({ tel, sombre }) => {
     const attendu = !!(r.querySelector('[data-toutes-etat]'));
     if (!attendu) continue;
     const m = meta && vis(meta) ? meta.getBoundingClientRect() : null, e = et && vis(et) ? et.getBoundingClientRect() : null;
-    etats.push({ id: r.getAttribute('data-toutes-id'), vu: !!e, dessous: !!(m && e && e.top >= m.bottom - 1), entier: !!(et && et.scrollWidth <= et.clientWidth + 1 && !/ellipsis/.test(getComputedStyle(et).textOverflow)), dansMeta: !!(meta && et && meta.innerText.includes(et.innerText.trim())), texte: et ? et.innerText.trim() : '' });
+    etats.push({ id: r.getAttribute('data-toutes-id'), vu: !!e, dessous: !!(m && e && e.top >= m.bottom - 1), entier: !!(et && et.scrollWidth <= et.clientWidth + 1 && !/ellipsis/.test(getComputedStyle(et).textOverflow)), dansMeta: !!(meta && et && (et.textContent || '').trim() && (meta.textContent || '').includes((et.textContent || '').trim())), texte: et ? (et.innerText || et.textContent || '').trim() : '' });
+    // (15 nov., rouges-connus) Les rangées de « Tous » sont en `content-visibility: auto` depuis la refonte des listes du
+    // 14 nov. (1 000 ventes, src/styles-listes.css) : une rangée hors de l'écran rend un innerText VIDE — le texte se lit
+    // par textContent (l'état n'était pas vide : c'est la lecture qui l'était).
   }
   // V3 — « jamais lu » ouvert, et « N sur N résultats ».
   const jamaisOuverts = [...document.querySelectorAll('[data-toutes-etat-site][data-etat="jamais"]')].filter((e) => vis(e) && !e.closest('[data-toutes-vide]')).map((e) => e.innerText.trim().slice(0, 60));

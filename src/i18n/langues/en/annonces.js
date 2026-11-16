@@ -343,6 +343,8 @@ export default {
   "annonces.autre": "Other number",
   "annonces.numeroEcritEtiquette": "Number written on the label of {title}",
   "annonces.corriger": "Correct",
+  "annonces.reserveDesaccord": "Record: No. {fiche} · reserved No. {reserve}",
+  "annonces.reserveCarton": "The box says No. {reserve}",
   // ── App.jsx
   "annonces.autres": { one: "… and {n} other.", other: "… and {n} others." },
   "annonces.reprendreCommencees": { one: "Resume the {n} not started", other: "Resume the {n} not started" },

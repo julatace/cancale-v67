@@ -208,7 +208,9 @@ function regle(nom, f) {
   await essaie('phrase', async () => {
     const F = (await import(pathToFileURL(path.join(RACINE, 'src', 'i18n', 'langues', 'fr', 'journee.js')).href)).default;
     const vj = sans(lire('src/VeilleJournee.jsx'));
-    dit(['veille.versement.titre', 'veille.versement.datees', 'veille.versement.pourquoi1', 'veille.versement.heures', 'veille.versement.geste'].every((k) => F[k] && vj.includes(`'${k}`)), '4. Ma journée dit la phrase par tr() : datées, pourquoi, environ X h de Vinted ouvert, le geste');
+    // (15 nov., lot fiabilite-auto — décision de Julien) « N ventes à dater » n'est plus dit NULLE PART :
+    // l'extension les date sans rien lui demander. Ma journée ne porte plus la ligne (ni le contrôle de nuit).
+    dit(['veille.versement.titre', 'veille.versement.datees', 'veille.versement.pourquoi1', 'veille.versement.heures', 'veille.versement.geste'].every((k) => F[k] && !vj.includes(`'${k}`)) && !/versement-30j/.test(vj), '4. Ma journée ne dit plus « ventes à dater » (décision de Julien, 15 nov.)');
     const tout = Object.values(F).map((x) => (typeof x === 'object' ? Object.values(x).join(' ') : x)).join(' ');
     dit(!/encaiss/i.test(tout), '4. jamais « encaissé » (§5)');
     dit(['en', 'es', 'it', 'de'].every((l) => { const t = lire(`src/i18n/langues/${l}/journee.js`) + lire(`src/i18n/langues/${l}/compta.js`); return ['veille.versement.titre', 'veille.versement.pourquoiN', 'compta.dontConversation', 'compta.environHeuresVinted', 'compta.releveAVerifier', 'compta.releveDesaccord'].every((k) => t.includes(`"${k}"`)); }), '4. les textes neufs existent dans les 5 langues');

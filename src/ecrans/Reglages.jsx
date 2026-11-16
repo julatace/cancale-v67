@@ -33,7 +33,10 @@ import { L, PAS_SU } from '../libelles.js';
 import { useReglageConseils } from '../Conseils.jsx';
 import { PHRASES_ECRAN } from '../phrasesEcran.js';
 import { APPARENCES, LIBELLES_APPARENCE, PHRASES_APPARENCE } from '../apparence.js';
-import { SignalerProblemeFeuille as SignalerProblemeFeuilleBase, SignalementsRecus } from '../composants/SignalerProbleme.jsx';
+import { TAILLES_TEXTE, lireTailleTexte, ecrireTailleTexte, facteurTaille } from '../tailleTexte.js';   // (15 nov.) Taille du texte
+import { echelleTexte } from '../grandTexte.js';
+import { SignalerProblemeFeuille as SignalerProblemeFeuilleBase, SignalementsRecus, MesSignalements } from '../composants/SignalerProbleme.jsx';
+import NouveauxComptes from '../parcoursNouveau/NouveauxComptes.jsx';   // (15 nov.) l'onglet « Nouveaux comptes » du propriétaire
 import { DemandesAideRecues } from '../composants/EcrireSupport.jsx';   // (13 nov., lot 55) « Demandes d'aide » (propriétaire)
 import { CLE_COMPTES_EXCLUS, estExclu, basculerExclu } from '../../api/_lib/comptes-exclus.js';
 import { PLATEFORMES_COMPTES, etatCompteLie, ageLecture, nomCompteLie, LIBELLE_ETAT } from '../comptesLies.js';
@@ -125,7 +128,9 @@ import {conflitAdresseCompte} from '../receptionEmail.js';
 import EspaceEmails from '../EspaceEmails.jsx';
 // ⟦← App.jsx #9⟧
 import { feuillesExport, fichiersExport, zipStocke, nomExport } from "../exportDonnees.js";
-import { toutesMesDonnees } from "../exportRgpd.js";   // (12 nov.) RGPD : toutes ses données
+import { toutesMesDonnees } from "../exportRgpd.js";
+import { SauvegardeDonnees } from '../SauvegardeDonnees.jsx';
+import { lecteurPdfBordereau } from '../sauvegardeDonnees.js';   // (15 nov., lot argent-plus) « Télécharger toutes mes données »   // (12 nov.) RGPD : toutes ses données
 // ⟦← App.jsx #11⟧
 import { MesuresTerrain } from "../composants/MesuresTerrain.jsx";
 import { PlantagesTerrain } from "../composants/PlantagesTerrain.jsx";
@@ -2191,13 +2196,17 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (8 nov., « beauté ») L'apparence : Clair · Sombre · Automatique (le système) · Le soir (19 h–7 h).
       // L'interrupteur ci-dessus reste le choix explicite (il quitte Automatique / Le soir).
       onApparence && { id:'apparence', type:'panneau', nu:true, ic:'contraste', lib:tr('reglages.apparence.lib'), desc:tr('reglages.apparence.desc'), val: LIBELLES_APPARENCE[apparence] || '', data:{ 'data-reglage-apparence': apparence || '' }, el:<ApparenceSetting valeur={apparence} onChoisir={onApparence}/> },
+      // (15 nov.) LA TAILLE DU TEXTE (src/tailleTexte.js) : quatre tailles, toute l'app grandit avec (le mécanisme du
+      // texte en grand de l'appareil, src/grandTexte.js) — rien ne déborde. Propre à CET appareil.
+      { id:'taille-texte', type:'panneau', nu:true, ic:'texte', lib:tr('reglages.tailleTexte.lib'), desc:tr('reglages.tailleTexte.desc'), val: tr('reglages.tailleTexte.' + lireTailleTexte()), data:{ 'data-reglage-taille-texte': lireTailleTexte() }, el:<TailleTexteSetting/> },
       // (5 nov.) Le mode stream PROGRAMMÉ : son sous-écran (catégories, mots, aperçu).
       // (5 nov., chantier H) L'interrupteur DANS la liste (le même état que « Stream » en
       // haut : un réglage), et son programme dans un sous-écran à son nom — le titre
       // « Mode stream » n'est plus écrit deux fois dans le sous-écran.
       { id:'stream-on', type:'switch', ic:'stream', lib:tr('reglages.stream-on.lib'), desc:tr('reglages.stream-on.desc'), on:!!streamOn, onClick:()=>poserStream(!streamOn), data:{ 'data-reglage-stream-on': streamOn ? 'on' : 'off' } },
       { id:'stream', type:'panneau', nu:true, ic:'filter', lib:tr('reglages.stream.lib'), desc:tr('reglages.stream.desc'), data:{ 'data-reglage-stream': streamOn ? 'on' : 'off' }, el:<ReglagesStream/> },
-      { id:'zoom', type:'panneau', nu:true, ic:'texte', lib:tr('reglages.zoom.lib'), desc:tr('reglages.zoom.desc'), val:valZoom, el:<ZoomSetting nu/> },
+      // (15 nov.) Au téléphone, « Taille du texte » (ci-dessus) remplace ce réglage : il ne reste que s'il porte une valeur à défaire.
+      (!etroit || readZoom() !== '1') && { id:'zoom', type:'panneau', nu:true, ic:'grid', lib:tr('reglages.zoom.lib'), desc:tr('reglages.zoom.desc'), val:valZoom, el:<ZoomSetting nu/> },
       urlWidget && { id:'widget', type:'panneau', nu:true, ic:'device', lib:tr('reglages.widget.lib'), desc:tr('reglages.widget.desc'), el:widget },
       // (10 nov., lot AH) Deux raccourcis iPhone par liens profonds (src/raccourcisSiri.js) : une PWA ne déclare pas d'intention Siri.
       { id:'raccourcis-siri', type:'panneau', nu:true, ic:'mic', lib:tr('reglages.raccourcis-siri.lib'), desc:tr('reglages.raccourcis-siri.desc'), data:{ 'data-reglage-raccourcis':'' }, el:<RaccourcisSiri toast={toast}/> },
@@ -2257,6 +2266,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (13 nov., lot 55) La question au support : le texte et cinq faits techniques, rien d'autre (src/demandeAide.js).
       { id:'support', type:'action', ic:'chat', lib:tr('reglages.support.lib'), desc:tr('reglages.support.desc'), onClick:()=>setSupport(true), data:{ 'data-reglage-support':'' } },
       { id:'signaler', type:'action', ic:'info', lib:tr('reglages.signaler.lib'), desc:tr('reglages.signaler.desc'), onClick:()=>setSignaler(true), data:{ 'data-reglage-signaler':'' } },
+      // (15 nov.) Ce qu'IL a signalé, « Reçu · on te répond ici », et la réponse de Julien (api/_lib/signalement.js `suiviSignalements`).
+      AUTH.user && { id:'mes-signalements', type:'panneau', nu:true, ic:'pencil', lib:tr('sg.suivi.lib'), desc:tr('sg.suivi.desc'), data:{ 'data-reglage-mes-signalements':'' }, el:<MesSignalements entetes={enTeteSession}/> },
       // La liste des signalements reçus : au PROPRIÉTAIRE de l'installation seul
       // (le serveur refuse tout autre compte).
       // (9 nov.) Le tableau de bord du PROPRIÉTAIRE (src/composants/TableauProprietaire.jsx) : lui seul
@@ -2268,6 +2279,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (13 nov., lot 55) Les demandes « Écrire au support » de tous les vendeurs : au PROPRIÉTAIRE seul (403 sinon).
       proprioInst && { id:'demandes-aide', type:'panneau', nu:true, ic:'more', lib:tr('reglages.demandesAide.lib'), desc:tr('reglages.demandesAide.desc'), data:{ 'data-reglage-demandes-aide':'' }, el:<DemandesAideRecues entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne}/> },
       // (11 nov., agent2-cloisonnement) Le parcours d'un nouveau vendeur joué sur des comptes FICTIFS (src/simulationCompte.js) : propriétaire seul.
+      // (15 nov.) « Ce que voit un nouveau » : l'aperçu en bac à sable et où s'arrêtent les vrais inscrits (403 à tout autre compte).
+      proprioInst && { id:'nouveaux-comptes', type:'panneau', nu:true, ic:'nouveauCompte', lib:tr('nc.lib'), desc:tr('nc.desc'), data:{ 'data-reglage-nouveaux-comptes':'' }, el:<NouveauxComptes entetes={enTeteSession}/> },
       proprioInst && { id:'simulation-compte', type:'panneau', nu:true, ic:'home', lib:tr('reglages.simulation.lib'), desc:tr('reglages.simulation.desc'), data:{ 'data-reglage-simulation-compte':'' }, el:<SimulationCompte/> },
       {id:'depannage',type:'panneau',nu:true,ic:'help',lib:tr('reglages.depannage.lib'),desc:tr('reglages.depannage.desc'),el:<div className="vrm-settings-help">
       <details data-aide-statut=""><summary>{tr('reglages.depannage.statut.q')}</summary><p>{tr('reglages.depannage.statut.r')}</p><Bouton variante="secondaire" onClick={()=>{ try { window.open('/statut', '_blank', 'noopener'); } catch (_) {} }}>{tr('reglages.depannage.statut.bouton')}</Bouton></details>
@@ -3785,7 +3798,7 @@ function Parrainage() {
     try { await navigator.clipboard.writeText(lien); toast('Lien copié'); } catch (_) { toast('Copie impossible ici — sélectionne le lien'); }
   };
   const partager = async () => {
-    try { await navigator.share({ title: 'VRM — 1 mois offert', text: TEXTE_PARTAGE, url: lien }); } catch (e) { if (!(e && e.name === 'AbortError')) copier(); }
+    try { if (!peutPartager) { copier(); return; } await navigator.share({ title: 'VRM — 1 mois offert', text: TEXTE_PARTAGE, url: lien }); } catch (e) { if (!(e && e.name === 'AbortError')) copier(); }
   };
   return (
     <div ref={racine} data-parrainage="ouvert" data-inscrits={s.inscrits} data-payes={s.payes} data-mois-gagnes={gagnes == null ? '' : gagnes} data-parrainage-test={p.modeTest ? '1' : undefined} style={{ scrollMarginTop: 72 }}>
@@ -4735,6 +4748,25 @@ function LangueSetting() {
     </div>
   );
 }
+// (15 nov.) Paramètres → TAILLE DU TEXTE : quatre lignes (la coche iOS), chacune écrite À SA taille, et un aperçu.
+// Le choix s'applique tout de suite (`applyZoom`) et reste sur CET appareil (`vrm_taille_texte`).
+function TailleTexteSetting() {
+  const [t, setT] = React.useState(lireTailleTexte);
+  const appareil = (() => { try { return echelleTexte(); } catch (_) { return 1; } })();
+  const choisir = (v) => { setT(ecrireTailleTexte(v)); applyZoom(readZoom()); };
+  return (
+    <div className="vrm-apparence vrm-taille-texte" role="radiogroup" aria-label={tr('reglages.tailleTexte.lib')} data-taille-texte-choix={t}>
+      {TAILLES_TEXTE.map(({ id }) => (
+        <button key={id} type="button" role="radio" aria-checked={t === id} className={'vrm-apparence-ligne' + (t === id ? ' is-choisi' : '')} data-taille-texte={id} onClick={() => choisir(id)}>
+          <span className="vrm-taille-texte-aa" aria-hidden="true" style={{ fontSize: Math.round(15 * facteurTaille(id)) }}>Aa</span>
+          <span className="vrm-apparence-txt"><b>{tr('reglages.tailleTexte.' + id)}</b></span>
+          <svg className="vrm-apparence-coche" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3.2L13 4.8"/></svg>
+        </button>
+      ))}
+      {appareil > 1 ? <p className="vrm-taille-texte-note" data-taille-texte-appareil={appareil}>{tr('reglages.tailleTexte.appareil')}</p> : null}
+    </div>
+  );
+}
 function ZoomSetting({ nu = false }) {
   const [z, setZ] = React.useState(readZoom);
   const [telephone, setTelephone] = React.useState(() => window.matchMedia('(max-width: 767px)').matches);
@@ -5249,6 +5281,9 @@ function SecuriteSetting() {
         d={!ext ? "Normal sur téléphone. Sur l'ordinateur, ouvre l'app dans le navigateur de l'extension."
           : ext.connecte ? "Elle écrira sous ce compte."
           : `Icône de l'extension ${NAV.dansNu} → Compte VRM → ton e-mail et ton mot de passe.`}/>
+      {/* (15 nov., lot argent-plus) « Télécharger toutes mes données » : un zip fait ICI, depuis SES lignes (src/SauvegardeDonnees.jsx). */}
+      <SauvegardeDonnees Bouton={Bouton} lireTout={lireTout} lirePdf={lecteurPdfBordereau({ fetcher: (u, o) => fetch(u, o), url: SUPABASE_URL, auth: () => sbAuth(), owner: (AUTH.user && AUTH.user.id) || '' })} owner={(AUTH.user && AUTH.user.id) || ''} sources={sourcesExportDonnees}
+        telecharger={telechargerFichier} nomCompte={(uid) => { try { return (load('vinted_account_labels', {}) || {})[uid] || uid; } catch (_) { return uid; } }}/>
       {/* (6 nov., v36) Les temps réels des vendeurs, anonymes et agrégés (src/composants/MesuresTerrain.jsx) :
           au propriétaire de l'installation seulement (la route refuse les autres). */}
       {proprio ? <MesuresTerrain entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne} nomEcran={nomEcranVeille}/> : null}

@@ -67,7 +67,7 @@ export function PlantagesTerrain({ entetes, fetcher = (typeof fetch === 'functio
   }, []);   // eslint-disable-line react-hooks/exhaustive-deps
   React.useEffect(() => { lire(); }, [lire]);
   const tete = <h3 style={{ fontSize: 17, fontWeight: 600, margin: '24px 0 4px', color: 'var(--vrm-ink)' }}>Plantages chez les vendeurs</h3>;
-  const pied = <p style={{ ...S.muet, margin: '4px 0 10px' }}>Un écran tombé ou une erreur répétée trois fois, sans rien du vendeur. Une notification groupée par heure au plus.</p>;
+  const pied = <p style={{ ...S.muet, margin: '4px 0 10px' }}>Un écran tombé ou une erreur répétée trois fois, sans rien du vendeur. Une notification seulement quand un même plantage touche 3 personnes ou bloque l’ouverture (une par heure au plus).</p>;
   if (jours === undefined) return <div data-plantages-terrain="lecture">{tete}<p style={S.muet}>Lecture…</p></div>;
   if (jours === null) return <div data-plantages-terrain="pas-su">{tete}{PanneEl ? <PanneEl quoi="Les alertes de plantage" raison={raison} onReessayer={lire}/> : <p style={S.muet}>Pas su pour l’instant. {raison} <button type="button" className="vrm-lien-action" onClick={lire}>Réessayer</button></p>}</div>;
   const avec = jours.filter((j) => j.types && j.types.length);

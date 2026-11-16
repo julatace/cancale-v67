@@ -39,10 +39,15 @@ const imp = async (f) => { try { return await import('file://' + path.join(R, f)
   {
     const i = APPc.indexOf('const treasury = useMemo(');
     const bloc = i >= 0 ? APPc.slice(i, APPc.indexOf('}, [', i)) : '';
-    dit(bloc && !/'pending'/.test(bloc) && !/\battente\s*\+=/.test(bloc), 'le calcul de la Trésorerie ne somme plus les statuts « en cours »', bloc ? bloc.slice(0, 160) : 'introuvable');
+    // (15 nov., rouges-connus) La feuille « Trésorerie » est RETIRÉE (plus aucun bouton ne l'ouvrait depuis le 13 nov., et
+    // elle mêlait le solde LU des porte-monnaie et une somme refaite). La règle reste jugée : si un calcul de Trésorerie
+    // revient, il ne somme pas les statuts « en cours » ; et nulle part l'app ne refait « en attente » par statut.
+    const retiree = i < 0 && !/showTreasury|openTreasury/.test(APPc);
+    const sommeStatuts = /'pending'[\s\S]{0,200}\battente\s*\+=|\battente\s*\+=[\s\S]{0,200}'pending'/.test(APPc);
+    dit((retiree || (bloc && !/'pending'/.test(bloc) && !/\battente\s*\+=/.test(bloc))) && !sommeStatuts, 'le calcul de la Trésorerie ne somme plus les statuts « en cours » (feuille retirée le 15 nov., aucune somme par statut ailleurs)', bloc ? bloc.slice(0, 160) : (retiree ? 'feuille retirée' : 'introuvable'));
     const j = APPc.indexOf('En attente (porte-monnaie Vinted)');
     const carte = j >= 0 ? APPc.slice(Math.max(0, j - 900), j) : '';
-    dit(/aVenirPour\(\s*liveStats\s*&&\s*liveStats\.aVenir/.test(carte) && /aV\.valeur/.test(carte), 'la carte « En attente » lit `aVenirPour(liveStats.aVenir)` (src/argentAVenir.js)', carte.slice(-200));
+    dit((j < 0 && retiree) || (/aVenirPour\(\s*liveStats\s*&&\s*liveStats\.aVenir/.test(carte) && /aV\.valeur/.test(carte)), 'la carte « En attente » lit `aVenirPour(liveStats.aVenir)` (src/argentAVenir.js) — ou elle est partie avec la feuille', carte.slice(-200));
   }
 
   console.log('\n── B · Bénéfice Leboncoin / Vestiaire = beneficePaire (frais saisis compris)');

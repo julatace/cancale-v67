@@ -37,6 +37,8 @@ const MIGRES = [
   ['src/Accueil.jsx', ['*']],
   ['src/JourneeStudio.jsx', ['*']],   // (14 nov., Studio) la grille Bento de Ma journée
   ['src/ARetirerAilleurs.jsx', ['*']],   // (15 nov., retrait-ailleurs) « À retirer ailleurs »
+  ['src/parcoursNouveau/ParcoursNouveau.jsx', ['*']],   // (15 nov., parcours nouveau) les huit étapes
+  ['src/parcoursNouveau/NouveauxComptes.jsx', ['*']],   // (15 nov., parcours nouveau) l'onglet du propriétaire
   ['src/ui/Accompagne.jsx', ['*']],   // (14 nov., lot accompagnement) la brique commune des quatre moments
   ['src/ImpressionSimple.jsx', ['*']],   // (14 nov., impression-simple) « Imprimer » en un toucher : les deux feuilles
   ['src/partenaires/Partenaires.jsx', ['*']], ['src/VuePartenaire.jsx', ['*']],   // (15 nov.) le programme partenaire
@@ -70,6 +72,7 @@ const MIGRES = [
   ['src/ideesArgent/Feuilles.jsx', ['*']],   // (14 nov., 160) la vente en main propre
   ['src/TvaMargeCarte.jsx', ['*']],
   ['src/RangerAchat.jsx', ['*']],   // (11 nov., lot rangement-guide)
+  ['src/AtelierArrivee.jsx', ['*']],   // (15 nov.) l'atelier « achat arrivé → en ligne »
   ['src/FavorisEtapes.jsx', ['*']],   // (11 nov., lot favoris-clair)
   ['src/FavorisSansVente.jsx', ['*']],   // (13 nov., lot 31) très aimées, pas vendues
   // (11 nov., lot prix-mini) Offres auto refait, et « Prix mini manquants ».

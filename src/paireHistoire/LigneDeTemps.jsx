@@ -13,11 +13,15 @@ import { ligneDeTemps, studioDe } from './ligneDeTemps.js';
 import './idees.css';
 
 const quand = (iso) => dateLoc(iso, { day: 'numeric', month: 'short', year: 'numeric' });
-const PREUVE_CLE = { clic: 'lt.src.clic', livraison: 'lt.src.livraison', studio: 'lt.src.studio' };
+const PREUVE_CLE = { clic: 'lt.src.clic', livraison: 'lt.src.livraison', studio: 'lt.src.studio', moderation: 'lt.src.moderation', clicRetour: 'lt.src.clicRetour' };
 
 function libelle(e) {
   if (e.quoi === 'photographiee') return tr('lt.photos', { n: e.n || 1 });
-  return tr('lt.quoi.' + e.quoi, { site: e.site || '' });
+  // (15 nov.) Une offre dit son état lu (acceptée, refusée…) ; une republication, qu'elle garde le N°.
+  const base = tr('lt.quoi.' + e.quoi, { site: e.site || '' });
+  if (e.statut) return `${base} · ${tr('lt.offre.' + e.statut)}`;
+  if (e.memeNumero) return `${base} · ${tr('lt.memeNumero')}`;
+  return base;
 }
 function montant(e) {
   if (e.montant == null) return '';
@@ -26,13 +30,15 @@ function montant(e) {
 }
 function preuve(e) {
   if (e.source === 'vinted') return [tr('lt.src.vinted'), e.preuve].filter(Boolean).join(' · ');
-  return PREUVE_CLE[e.preuve] ? tr(PREUVE_CLE[e.preuve]) : (e.preuve || '');
+  const p = PREUVE_CLE[e.preuve] ? tr(PREUVE_CLE[e.preuve]) : (e.preuve || '');
+  // (15 nov.) Le vendeur de l'achat, tel que l'achat relié l'a gardé (jamais deviné).
+  return e.vendeur ? [tr('lt.chez', { vendeur: e.vendeur }), p].filter(Boolean).join(' · ') : p;
 }
 
 // La clé d'un événement : son identité (sorte, date, annonce ou transaction), le rang seulement pour départager.
 const cleEv = (e, i) => `${e.quoi}|${e.at || ''}|${e.id || ''}|${e.preuve || ''}|${i}`;
 const Ev = ({ e, dernier, double }) => (
-  <li className={'vrm-lt-ev' + (dernier ? ' is-dernier' : '')} data-lt-quoi={e.quoi} data-lt-date={e.at || ''} data-lt-site={e.site || undefined} data-lt-id={e.id || undefined}>
+  <li className={'vrm-lt-ev' + (dernier ? ' is-dernier' : '')} data-lt-quoi={e.quoi} data-lt-date={e.at || ''} data-lt-site={e.site || undefined} data-lt-id={e.id || undefined} data-lt-statut={e.statut || undefined}>
     <span className="vrm-lt-point" aria-hidden="true"/>
     <span className="vrm-lt-corps">
       {e.at ? <time className="vrm-lt-date" dateTime={e.at}>{quand(e.at)}</time> : null}
@@ -52,10 +58,11 @@ export default function LigneDeTemps({ h, extra = {} }) {
     Promise.resolve(extra.lireStudio(cle)).then((rows) => { if (vivant) setStudio(studioDe(rows)); }).catch(() => { if (vivant) setStudio(null); });
     return () => { vivant = false; };
   }, [cle, extra.lireStudio]);
-  const lt = React.useMemo(() => ligneDeTemps(h, { reception: extra.reception, crees: extra.crees, studio }), [h, extra.reception, extra.crees, studio]);
+  const lt = React.useMemo(() => ligneDeTemps(h, { reception: extra.reception, crees: extra.crees, studio, ids: extra.ids, txs: extra.txs, moderation: extra.moderation, retours: extra.retours }),
+    [h, extra.reception, extra.crees, studio, extra.ids, extra.txs, extra.moderation, extra.retours]);
   if (!lt) return null;
   const double = !!(h && h.double);
-  const PAS_SU = { recue: 'lt.pasSu.recue', studio: 'lt.pasSu.studio', crees: 'lt.pasSu.crees' };
+  const PAS_SU = { recue: 'lt.pasSu.recue', studio: 'lt.pasSu.studio', crees: 'lt.pasSu.crees', moderation: 'lt.pasSu.moderation' };
   const pasSu = lt.pasSu.map((r) => (PAS_SU[r] ? tr(PAS_SU[r]) : r));
   return (
     <section className="vrm-idees vrm-lt" aria-label={tr('lt.titre')} data-ligne-temps={cle} data-lt-n={lt.evenements.length} data-lt-sans-date={lt.sansDate.length} data-lt-studio={studio === undefined ? 'encours' : studio === null ? 'passu' : String(studio.dates.length)}>
@@ -75,7 +82,9 @@ export default function LigneDeTemps({ h, extra = {} }) {
 // L'onglet de la fiche : « Par étape » (le parcours d'avant) · « Dans l'ordre » (la ligne de temps).
 // Le choix est un confort de CET appareil (rien de synchronisé, rien d'écrit dans la base).
 const CLE_VUE = 'vrm_fiche_vue_temps';
-const lireVue = () => { try { return localStorage.getItem(CLE_VUE) === 'temps' ? 'temps' : 'etapes'; } catch (_) { return 'etapes'; } };
+// (15 nov.) L'historique complet, demandé par Julien sur la fiche : « Dans l'ordre » (la frise datée) est la vue
+// par défaut ; « Par étape » reste un choix de CET appareil.
+const lireVue = () => { try { return localStorage.getItem(CLE_VUE) === 'etapes' ? 'etapes' : 'temps'; } catch (_) { return 'temps'; } };
 export function useVueFiche() {
   const [vue, setVue] = React.useState(lireVue);
   const poser = React.useCallback((v) => { setVue(v); try { localStorage.setItem(CLE_VUE, v); } catch (_) {} }, []);

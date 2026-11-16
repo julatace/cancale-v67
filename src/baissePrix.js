@@ -71,18 +71,22 @@ export function lignesBaisse({ annonces, baisse, compteOnglet, plancherDe, facte
     const prix = cts(a.prix) > 0 ? cts(a.prix) / 100 : null;
     const f = facteurs && Number.isFinite(Number(facteurs[String(a.id)])) ? Number(facteurs[String(a.id)]) : 1;
     const baisseL = baisse && baisse.ok && f !== 1 ? { ...baisse, valeur: Math.round(baisse.valeur * f * 100) / 100 } : baisse;
-    let nouveau = prix == null ? null : prixBaisse(prix, baisseL);
+    // (15 nov., vendre plus) `cible` : le prix CONSEILLÉ de cette annonce (src/baisseConseillee.js, euros
+    // entiers, sous le prix, jamais sous le plancher) — il remplace la baisse tapée et n'est jamais « varié ».
+    const cibleC = cts(a.cible);
+    const avecCible = prix != null && cibleC > 0 && cibleC % 100 === 0 && cibleC < Math.round(prix * 100);
+    let nouveau = prix == null ? null : avecCible ? cibleC / 100 : prixBaisse(prix, baisseL);
     if (!bloque && prix == null) bloque = 'Prix pas lu';
     else if (!bloque && baisse && baisse.ok && nouveau == null) bloque = 'Baisse plus grande que le prix';
     const p = plancherDe ? plancherDe(a) : null;
     const plancher = p && (p.etat === 'ok' || p.etat === 'partiel') && p.plancher != null ? { centimes: p.plancher, partiel: p.etat === 'partiel' } : null;
-    if (plancher && nouveau != null && f !== 1 && nouveau * 100 < plancher.centimes) {
+    if (plancher && nouveau != null && f !== 1 && !avecCible && nouveau * 100 < plancher.centimes) {
       const base = prixBaisse(prix, baisse);
       if (base != null && base * 100 >= plancher.centimes) nouveau = Math.max(nouveau, Math.ceil(plancher.centimes / 100));
     }
     const sousPlancher = !!(plancher && nouveau != null && nouveau * 100 < plancher.centimes);
     const achatPasSaisi = !!(p && p.etat === 'achat');
-    return { ...a, uid, prix, nouveau, plancher, sousPlancher, achatPasSaisi, bloque, coche: !bloque && nouveau != null && !sousPlancher && a.propose !== false, baisseVue: baisseL && baisseL.ok ? baisseL.valeur : null };
+    return { ...a, uid, prix, nouveau, plancher, sousPlancher, achatPasSaisi, bloque, coche: !bloque && nouveau != null && !sousPlancher && a.propose !== false, baisseVue: avecCible ? null : baisseL && baisseL.ok ? baisseL.valeur : null, avecCible };
   });
 }
 

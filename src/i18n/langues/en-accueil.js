@@ -12,6 +12,14 @@ export default {
   "erreur.demarrage.titre": "The app couldn’t start",
   "erreur.recharger": "Reload",
   "erreur.repartirPropre": "Start fresh",
+  // ── maj (15 nov., ouverture) : un morceau introuvable, l'écran de démarrage
+  "maj.titre": "Update VRM",
+  "maj.texte": "A new version of VRM is online. This part of the app comes from it: tap “Update” to load it. Your data stays as it is.",
+  "maj.texteHorsLigne": "This part of the app isn’t on this phone yet. Reconnect to the Internet, then tap “Update”.",
+  "maj.bouton": "Update",
+  "demarrage.ouverture": "Opening VRM…",
+  "demarrage.lent": "This is taking longer than usual. The connection may be slow.",
+  "demarrage.recharger": "Reload",
   // ── auth
   "auth.bouton.creer": "Create my account",
   "auth.titre.in": "Sign in",

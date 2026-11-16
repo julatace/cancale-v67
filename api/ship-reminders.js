@@ -31,7 +31,11 @@ import { lireJournal, lireLu } from './_lib/journal-notifs.js';
 import { DESTINATIONS, lienNotif } from './_lib/lien-notif.js';
 import { passageFacturesAuto } from './_lib/factures-auto.js';
 // (revue du 5 nov.) Les textes des rappels soir et « offres au mini » : un propriétaire, celui de l'aperçu.
-import { texteSoir, texteOffresMini } from './_lib/notif-apercus.js';
+import { texteSoir, texteOffresMini, texteRetourRappel, texteRetourDepose, texteRetourLivre } from './_lib/notif-apercus.js';
+import { passeNotifsRetours } from './_lib/retour-notifs.js';   // (15 nov., lot retour-parfait)
+import { ID_RETOURS_DEPOSES_CHAMP } from './_lib/retour-suivi.js';
+import { modifierCas } from './_lib/suivi-vinted.js';
+import { nomTransporteur } from './_lib/transporteurs.js';
 import { semainePassee, semaineCourante, calculerBilan, bilanAEnvoyer, texteBilan, versementsDeLignes } from './_lib/bilan-semaine.js';
 import { notificationUrssaf, rappelVeilleUrssaf, MAIN_URSSAF } from './_lib/rappel-urssaf.js';
 // « À expédier » : la règle du widget (elle-même jugée identique à celle de
@@ -57,7 +61,7 @@ import { ventesPartiesParPreuve, lirePreuvesDepart } from './_lib/depart-vente.j
 import { colisVentesEmailServeur, reqVentesEmail, txsDeCommandes } from './_lib/colis-ventes-email.js';
 import { relireCommandesVendeur } from './_lib/ebay-relecture.js';
 import { avecSuiviDuSujet, relireLigneMeta } from './_lib/suivi-colis.js';
-import { rappelsRetraitDuJour, texteRappelRetrait, SELECT_SUIVI_META, txDuColis, liensDesLignes, finDesTransactions, SELECT_TRANSP_META, ligneTranspDeMeta } from './_lib/suivi-colis.js';
+import { rappelsRetraitDuJour, texteRappelRetrait, SELECT_SUIVI_META, txDuColis, liensDesLignes, finDesTransactions, txAchatsEnRetour, SELECT_TRANSP_META, ligneTranspDeMeta } from './_lib/suivi-colis.js';
 import { commandeDuColisRegle, achatsDesLignes, indexDesLiens, txParCodeDe, titreDuColis } from './_lib/commande-colis.js';   // (13 nov.) le nom de la paire
 // (24 oct.) Le statut des colis lu chez leur transporteur (C1, C5).
 import { passageTransporteurs, MAX_CRON, BUDGET_CRON_MS, MAX_DEPARTS_CRON } from './_lib/transporteurs-lecture.js';
@@ -68,6 +72,8 @@ import { passageClientsPartis } from './_lib/clients-partis.js';
 import { passageSuppressionsPrevues } from './_lib/suppression-differee.js';   // (13 nov., lot 51) « Supprimer mon compte » : 30 jours de grâce
 // (8 nov.) Le bilan du mois par e-mail, pour qui l'a ACTIVÉ (api/_lib/bilan-mois.js).
 import { bilanMoisVendeur, partBilan, ID_CHOIX as ID_CHOIX_BILAN_MOIS, ID_ENVOIS as ID_ENVOIS_BILAN_MOIS } from './_lib/bilan-mois.js';
+// (15 nov., lot argent-plus) Le bilan de fin de mois en NOTIFICATION, et les seuils de l'année (80 % puis 100 %).
+import { passeBilanMoisPush, passeSeuilsPush, ID_BILAN_PUSH, ID_SEUILS, MAIN_ARGENT } from './_lib/argent-passes.js';
 import { envoyerSmtp } from './_lib/smtp.js';
 import { lireMentions } from './_lib/mentions-legales.js';
 // (5 nov.) « Compte Vinted pas relu » : la règle (api/_lib/comptes-a-relire.js).
@@ -94,6 +100,8 @@ import { vidangerAlertesPlantages } from './_lib/alertes-plantages.js';
 import { noterPilotageDuJour } from './_lib/pilotage.js';
 // (6 nov.) La purge à 30 jours du HTML d'origine des e-mails (api/_lib/email-html.js).
 import { purgerHtml } from './_lib/email-html.js';
+// (15 nov.) Le PDF d'un bordereau part quand la vente est finalisée ET l'argent reçu (api/_lib/purge-bordereaux.js).
+import { passePurgeBordereaux, rpcPostgrest } from './_lib/purge-bordereaux.js';
 // (6 nov., v36) Les temps réels des vendeurs (agrégats journaliers, api/_lib/mesures-terrain.js).
 import { histosDesJours, purgerMesuresAnciennes } from './_lib/mesures-terrain.js';
 import { proprietaireInstallation } from './_lib/signalement.js';
@@ -108,7 +116,7 @@ import { groupeProduction, SIGNAUX as SIGNAUX_PROD, ECHECS_COLIS, refusEnSerie, 
 import { pushConfigure } from './_lib/push.js';
 import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 // (11 nov., lot agent2-veille) Le contrôle de nuit (lecture seule) et la veille des chiffres.
-import { controleVendeur, controleInstallation } from './_lib/controle-nuit.js';
+import { controleVendeur, controleInstallation, notifierControle } from './_lib/controle-nuit.js';
 import { notifierAlertesChiffres } from './_lib/veille-chiffres.js';
 import { CAT_VEILLE } from '../src/veilleChiffres.js';
 import { stripeApi, stripePret } from './_lib/stripe.js';
@@ -540,20 +548,24 @@ async function retraitsDuJour(maintenant = Date.now(), jourCible = 0) {
   const txsPar = new Map();
   for (const x of candidats) { const t = txDuColis({ suivi: x.suivi, code: x.code }, relais, liens); txsPar.set(x.suivi, t); }
   const tousTx = [...new Set([...txsPar.values()].flatMap((t) => (t ? [...t] : [])))].filter((t) => /^\d{3,20}$/.test(t));
-  let achats = [], etats = new Map();
+  let achats = [], etats = new Map(), retours = null;
   // (13 nov.) La conversation d'une commande est aussi une identité (la jonction de l'écran) :
   // les commandes sont lues pour elle aussi, pour le nom de la paire.
   if (tousTx.length || candidats.some((x) => x.conv)) {
-    const [a, e] = await Promise.all([
+    // (15 nov.) + les BORDEREAUX DE RETOUR de ces achats (`email_bordretour_{tx}`, scalaires `meta->>` seulement) :
+    // un achat en retour n'est jamais « à retirer » (api/_lib/suivi-colis.js `txAchatsEnRetour`, la règle de l'app).
+    const [a, e, br, dm] = await Promise.all([
       fetchPaginated(scoped('app_data?id=like.harvest_%25_orders_purchased&select=id,orders:data->payload->my_orders,txns:data->resume->txns')),
       fetchPaginated(scoped(`app_data?id=like.harvest_%25_txn_%25&meta->>id=in.(${tousTx.join(',')})&select=tx:meta->>id,s:meta->>status,ss:meta->>ship_status_title`)),
+      fetchPaginated(scoped('app_data?id=like.email_bordretour_%25&select=transaction:meta->>transaction,sens:meta->>sens')),
+      fetchPaginated(scoped('app_data?id=like.email_retourdemande_%25&select=conv:meta->>conv,sens:meta->>sens')),
     ]);
-    if (!Array.isArray(a) || !Array.isArray(e)) return 'lecture ratée — rien envoyé';
-    achats = a;
+    if (!Array.isArray(a) || !Array.isArray(e) || !Array.isArray(br) || !Array.isArray(dm)) return 'lecture ratée — rien envoyé';
+    achats = a; retours = txAchatsEnRetour(br, { demandes: dm, achats: a.flatMap((row) => (Array.isArray(row && row.orders) ? row.orders : [])) });
     for (const r of e) if (r && r.tx && r.s != null && Number.isFinite(Number(r.s))) etats.set(String(r.tx), { s: Number(r.s), ss: String(r.ss || '') });
   }
   const liste = rappelsRetraitDuJour({ ...entree, liens, jourCible,
-    finParCommande: ({ suivi, code }) => finDesTransactions(txDuColis({ suivi, code }, relais, liens), achats, etats) });
+    finParCommande: ({ suivi, code }) => finDesTransactions(txDuColis({ suivi, code }, relais, liens), achats, etats, retours) });
   // (13 nov., Julien : « avec le n° de suivi on va voir quelle paire est à l'intérieur ») LE NOM DE
   // LA PAIRE : la commande reliée par IDENTITÉ — la jonction de l'écran (api/_lib/commande-colis.js :
   // conversation, n° de suivi, code de retrait), jamais le titre, le lieu ou la date (§5). Les
@@ -824,7 +836,7 @@ async function lireTransporteursDuVendeur({ max = MAX_CRON, maxDeparts = MAX_DEP
 // (12 nov., M79) Elle voyage dans le contexte du vendeur (`contexteVendeur`,
 // `compteurBilan`), plus dans une variable de module : deux passages simultanés
 // sur la même instance ne se volent plus le plafond. Sans compteur : rien.
-async function bilanDuMoisVendeur(maintenant = Date.now()) {
+async function bilanDuMoisVendeur(maintenant = Date.now(), lireDonnees = lireDonneesBilan) {
   const owner = proprietaireCourant();
   if (!owner) return null;
   const store = contexteVendeur.getStore && contexteVendeur.getStore();
@@ -835,7 +847,7 @@ async function bilanDuMoisVendeur(maintenant = Date.now()) {
     owner, maintenant, compteur, config: cfg, service: process.env.SUPABASE_SERVICE_KEY || '',
     lireChoix: () => getRow(ID_CHOIX_BILAN_MOIS), lireEnvois: () => getRow(ID_ENVOIS_BILAN_MOIS),
     ecrireEnvois: (data) => ecrireDedup(ID_ENVOIS_BILAN_MOIS, data),
-    lireDonnees: lireDonneesBilan,
+    lireDonnees,
     lirePub: async () => { const m = await getRowProjete('main', ['vrm_benefice_jours']); return m === undefined ? undefined : (m && m.vrm_benefice_jours) || null; },
     adresse: () => adresseDuCompte(owner),
     envoyer: (m) => envoyerSmtp({ hote: process.env.RELANCES_SMTP_HOTE, port: cfg.port, utilisateur: process.env.RELANCES_SMTP_UTILISATEUR, motDePasse: process.env.RELANCES_SMTP_MOT_DE_PASSE,
@@ -849,11 +861,66 @@ function etiquettesCron({ max, budgetMs }) {
     lirePdf: async (id) => { const r = await fetchPaginated(scoped(reqPdf(id))); if (!Array.isArray(r)) return null; return (r[0] && typeof r[0].pdf === 'string' && r[0].pdf !== 'None') ? r[0].pdf : ''; },
   });
 }
+// (15 nov., lot retour-parfait) LES RETOURS D'ACHAT (api/_lib/retour-notifs.js) : le rappel de la date
+// limite d'un retour PAS ENCORE DÉPOSÉ (le soir : la limite est demain ; le matin : c'est aujourd'hui), et
+// « Retour déposé » / « Retour livré au vendeur » quand le fait vient de la lecture chez le transporteur
+// (`depart_*`). Une fois chacune (`push_dedup`, la clé de la voie e-mail) ; une lecture ratée n'envoie rien.
+async function notifsRetoursAchat(moment = 'matin', maintenant = instantNotif()) {
+  return passeNotifsRetours({
+    moment, maintenant,
+    lire: (q) => fetchPaginated(scoped(q)),
+    lireDeparts: async () => { const rows = await fetchPaginated(scoped(`app_data?id=like.depart_%25&select=${SELECT_DEPART_META}`)); return Array.isArray(rows) ? (departsParSuivi(rows) || new Map()) : null; },
+    lireDeposes: async () => { const m = await getRowProjete('main', [ID_RETOURS_DEPOSES_CHAMP]); if (m === undefined) return undefined; const d = m && m[ID_RETOURS_DEPOSES_CHAMP]; return d && typeof d === 'object' ? d : null; },
+    reserver: async (cle) => {
+      const r = await modifierCas('push_dedup', (d) => { const ks = (d && Array.isArray(d.keys)) ? d.keys.filter((x) => typeof x === 'string') : []; if (ks.includes(cle)) return undefined; return { ...(d || {}), keys: [cle, ...ks].slice(0, 300) }; });
+      return r === true ? true : r === false ? false : null;
+    },
+    envoyer: (n) => sendPushToAll(n),
+    texte: (n) => (n.sorte === 'retourRappel' ? texteRetourRappel(n) : n.sorte === 'retourDepose' ? texteRetourDepose({ article: n.article, transporteur: n.transporteur ? nomTransporteur(n.transporteur) : '' }) : texteRetourLivre({ article: n.article })),
+    active: () => pushCategorieActive('colis'),
+    lien: (n) => DESTINATIONS.retour({ tx: n.tx }),
+  });
+}
+// (15 nov.) La purge des PDF de bordereaux pour le vendeur du tour : lectures `scoped` et
+// paginées (`fetchPaginated`, §4.5), l'écriture par la fonction de la base (migration 044).
+async function purgeBordereauxDuVendeur(maintenant = Date.now()) {
+  const owner = proprietaireCourant();
+  if (!owner) return { fait: false, raison: 'base non cloisonnée — rien écrit' };
+  return passePurgeBordereaux({
+    lireTout: (p) => fetchPaginated(scoped(p)), getRow, ecrire: ecrireDedup, owner, maintenant,
+    rpc: rpcPostgrest({ url: SUPABASE_URL, entetes: HEADERS, fetcher: fetchAvecDelai }),
+  });
+}
+// Des nombres seulement dans la réponse du cron (jamais un identifiant de ligne).
+const resumePurge = (r) => (!r ? null : { fait: !!r.fait, candidats: r.candidats || 0, supprimes: r.supprimes || 0, octets: r.octets || 0, ...(r.gardes ? { gardes: r.gardes } : {}), ...(r.migration ? { migration: r.migration } : {}), ...(r.fait ? {} : { raison: r.raison || 'pas-su' }) });
 async function traiterVendeur() {
   const [relu, transp] = await Promise.all([relireEbayDuVendeur(), lireTransporteursDuVendeur()]);
   // Un échec du bilan du mois n'empêche aucun rappel (et inversement).
   let bilanMois = null;
-  try { bilanMois = await bilanDuMoisVendeur(); } catch (e) { bilanMois = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
+  // (15 nov., lot argent-plus) Les lectures du bilan, UNE fois pour l'e-mail ET la notification.
+  let memoBilan = null;
+  const lireDonneesUneFois = () => (memoBilan || (memoBilan = lireDonneesBilan()));
+  try { bilanMois = await bilanDuMoisVendeur(Date.now(), lireDonneesUneFois); } catch (e) { bilanMois = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
+  // (15 nov., lot argent-plus) Le bilan de fin de mois en notification (le 1er, rattrapage au 7)
+  // et les seuils de l'année (chaque matin) — api/_lib/argent-passes.js. Un échec n'empêche rien.
+  let bilanMoisPush = null, seuils = null;
+  const lireMainArgent = () => getRowProjete('main', MAIN_ARGENT);
+  try {
+    bilanMoisPush = await passeBilanMoisPush({
+      actif: () => pushCategorieActive('bilan'), lireDedup: () => getRow(ID_BILAN_PUSH),
+      reserver: (deja, nouveau) => reserverDedup(ID_BILAN_PUSH, deja, nouveau),
+      lireDonnees: lireDonneesUneFois,
+      lirePub: async () => { const m = await getRowProjete('main', ['vrm_benefice_jours']); return m === undefined ? undefined : (m && m.vrm_benefice_jours) || null; },
+      lireMain: lireMainArgent, pousser: sendPushToAll,
+    });
+  } catch (e) { bilanMoisPush = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
+  try {
+    seuils = await passeSeuilsPush({
+      actif: () => pushCategorieActive('seuil'), lireDedup: () => getRow(ID_SEUILS),
+      reserver: (deja, nouveau) => reserverDedup(ID_SEUILS, deja, nouveau),
+      lireMain: lireMainArgent, pousser: sendPushToAll,
+    });
+  } catch (e) { seuils = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
   // (9 nov.) Le transporteur des ANCIENS bordereaux, relu dans le texte gardé de
   // LEUR e-mail (api/_lib/transporteur-anciens.js) : N par passage, idempotent ;
   // une lecture ratée n'écrit rien, et un échec n'empêche aucun rappel.
@@ -870,18 +937,35 @@ async function traiterVendeur() {
   let transporteursPdf = null;
   try { transporteursPdf = await etiquettesCron({ max: MAX_PDF_MATIN, budgetMs: BUDGET_PDF_MATIN_MS }); }
   catch (e) { transporteursPdf = { fait: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
+  // (15 nov., décision de Julien) Le PDF des bordereaux d'une vente FINALISÉE dont l'argent est
+  // REÇU (api/_lib/purge-bordereaux.js) — APRÈS la lecture des étiquettes (un PDF pas encore lu
+  // pour son transporteur n'est jamais retiré). Lots bornés ; une lecture ratée n'écrit rien ;
+  // un échec n'empêche aucun rappel. La réponse ne porte que des nombres.
+  let purgeBordereaux = null;
+  try { purgeBordereaux = resumePurge(await purgeBordereauxDuVendeur()); }
+  catch (e) { purgeBordereaux = { fait: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
   // (11 nov., lot agent2-veille) Le contrôle de nuit, en LECTURE SEULE (api/_lib/controle-nuit.js) :
   // une seule écriture, SA ligne `vrm_controle_nuit` ; un échec n'empêche aucun rappel.
   let controle = null;
-  try { controle = await controleVendeur({ lireTout: (p) => fetchPaginated(scoped(p)), ecrire: ecrireDedup }); }
+  // (15 nov., lot fiabilite-auto) + ventes récentes sans N°, liste des N° rétrécie, annonces lues il y a
+  // plus de 24 h, totaux du mois publiés comparés à leur source (la lecture et la règle du bilan).
+  try { controle = await controleVendeur({ lireTout: (p) => fetchPaginated(scoped(p)), ecrire: ecrireDedup, lireBilan: lireDonneesBilan, calculer: calculerBilan }); }
   catch (e) { controle = { ecrit: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
+  // UNE notification du matin, seulement pour un écart RÉEL et NOUVEAU qui demande un geste.
+  let controleDit = null;
+  try { controleDit = await notifierControle({ data: controle && controle.data, getRow, ecrire: ecrireDedup, pousser: sendPushToAll, active: () => pushCategorieActive(CAT_VEILLE) }); }
+  catch (e) { controleDit = { envoye: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
+  if (controle) { delete controle.data; controle.dit = { envoye: !!controleDit.envoye, raison: controleDit.raison || null }; }
   // Un chiffre qui a chuté sans raison et n'a pas encore sonné (le filet de `/api/push` action `veille`).
   let veilleChiffres = null;
   try { veilleChiffres = await notifierAlertesChiffres({ getRow, ecrire: ecrireDedup, pousser: sendPushToAll, active: () => pushCategorieActive(CAT_VEILLE) }); }
   catch (e) { veilleChiffres = { envoye: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
+  // (15 nov., lot retour-parfait) Les retours d'achat : « Dernier jour pour ton retour » (la limite est aujourd'hui), déposé/livré lus chez le transporteur.
+  let retoursAchat = null;
+  try { retoursAchat = await notifsRetoursAchat('matin'); } catch (e) { retoursAchat = { fait: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
   const out = await traiterVendeurApresRelecture();
   const rappels = await rappelsPersoSur();
-  return { ...out, rappels, ...(bilanMois ? { bilanMois } : {}), ebayRelu: resumeRelecture(relu), transporteurs: transp, transporteursAnciens, transporteursPdf, controle, veilleChiffres: { envoye: veilleChiffres.envoye, n: veilleChiffres.n || 0, raison: veilleChiffres.raison || null } };
+  return { ...out, rappels, retoursAchat, ...(bilanMois ? { bilanMois } : {}), ...(bilanMoisPush ? { bilanMoisPush } : {}), seuils, ebayRelu: resumeRelecture(relu), transporteurs: transp, transporteursAnciens, transporteursPdf, purgeBordereaux, controle, veilleChiffres: { envoye: veilleChiffres.envoye, n: veilleChiffres.n || 0, raison: veilleChiffres.raison || null } };
 }
 async function traiterVendeurApresRelecture() {
     const today = parisDate(0);
@@ -1460,12 +1544,15 @@ async function traiterVendeurSoir() {
   const [relu, transp] = await Promise.all([relireEbayDuVendeur(), lireTransporteursDuVendeur()]);
   const out = await rappelDuSoir();
   const rappels = await rappelsPersoSur();
+  // (15 nov., lot retour-parfait) « Retour à déposer avant demain 10 h » (la limite LUE est demain), déposé/livré lus chez le transporteur.
+  let retoursAchat = null;
+  try { retoursAchat = await notifsRetoursAchat('soir'); } catch (e) { retoursAchat = { fait: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
   // Le bilan de la semaine part le DIMANCHE SOIR (26 oct.) — même dédoublonnage
   // que le lundi matin (un seul bilan par semaine). Un échec du bilan n'empêche
   // jamais le rappel d'expédition du soir.
   let bilan = null;
   try { bilan = await bilanDeLaSemaine(Date.now(), true); } catch (e) { bilan = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
-  return { ...out, rappels, bilan, ebayRelu: resumeRelecture(relu), transporteurs: transp };
+  return { ...out, rappels, bilan, retoursAchat, ebayRelu: resumeRelecture(relu), transporteurs: transp };
 }
 
 // ── LA VEILLE DES PLANTAGES (6 nov., filet 4) ─────────────────────────────────
@@ -1847,4 +1934,4 @@ async function passageDuCron(req, res, moment, bailEtat) {
 
 // (8 nov., « à envoyer » prouvé) Pour le banc seulement (scripts/audit-a-envoyer-preuves.cjs) : la
 // composition « à expédier » du soir, du bilan et du matin, exécutée sur une fausse base.
-export const _banc = { txsAExpedier, lireDonneesColis, lireDonneesBilan, bilanDuMoisVendeur };   // (12 nov.) + le bilan du mois (M79, audit-revue-fin)
+export const _banc = { txsAExpedier, lireDonneesColis, lireDonneesBilan, bilanDuMoisVendeur, purgeBordereauxDuVendeur };   // (12 nov.) + le bilan du mois (M79, audit-revue-fin)

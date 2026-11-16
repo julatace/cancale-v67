@@ -368,9 +368,24 @@ export const GESTES_ACC = {
   'lien.partage':     { ecran: 'settings',  ensuite: null },
   'connexion.qr':     { ecran: 'settings',  ensuite: { lien: '?tab=journee' } },
   'fiches.fusion':    { ecran: 'garage',    ensuite: { lien: '?tab=garage' } },
+  // (15 nov.) L'atelier « achat arrivé → en ligne » : chaque étape qui écrit (src/AtelierArrivee.jsx) — la
+  // suite est l'étape d'après, dans la même feuille : aucun lien.
+  'arrivee.ranger':   { ecran: 'achats',    ensuite: null },
+  'arrivee.case':     { ecran: 'achats',    ensuite: null },
+  'arrivee.prix':     { ecran: 'achats',    ensuite: null },
+  'arrivee.fiche':    { ecran: 'achats',    ensuite: null },
   'export.donnees':   { ecran: 'settings',  ensuite: null },
   'export.comptable': { ecran: 'compta',    ensuite: null },
   'compte.supprimer': { ecran: 'settings',  ensuite: null },
+  // (15 nov., lot numeros-masquees) « N°42 republiée ? » : SA réponse (oui : le N° reste ; non : un N° neuf).
+  'numero.republie':  { ecran: 'journee',   ensuite: null },
+  'numero.autre':     { ecran: 'journee',   ensuite: null },
+  // « N° à vérifier sur ton carton » : SON choix (le N° de la fiche ou celui que l'extension avait réservé).
+  'numero.carton':    { ecran: 'annonces',  ensuite: null },
+  // Les N° donnés par VRM (à écrire sur les cartons), demandés (« je numérote moi-même »), reconnus par la photo VRM.
+  'numero.donne':     { ecran: 'journee',   ensuite: null },
+  'numero.demande':   { ecran: 'journee',   ensuite: null },
+  'numero.reconnu':   { ecran: 'journee',   ensuite: null },
 };
 export const IDS_GESTES_ACC = Object.keys(GESTES_ACC);
 export const gesteAcc = (id) => GESTES_ACC[id] || null;
@@ -409,10 +424,12 @@ const texteDe = (x) => {
 // d'exception, du JSON, « undefined », un chemin d'API, de l'anglais de navigateur.
 // (14 nov., intégration) Un code HTTP (« 403 ») est technique ; un numéro de version (« 5.336.0 ») ne l'est pas :
 // « Mets l'extension à jour (5.336) » gardait sinon sa raison vide (banc baisse-prix F1).
+// (15 nov., rouges-connus) « pas précédé d'un chiffre, d'un point ou d'une virgule » s'écrit `(?:^|[^\d.,])`,
+// jamais `(?<!…)` : Safari < 16.4 refuse de lire un paquet qui contient un lookbehind (audit-safari).
 export function phraseTechnique(t) {
   const s = String(t || '').trim();
   if (!s) return true;
-  return /\b(?:TypeError|ReferenceError|SyntaxError|AbortError|Error|undefined|null|NaN|stack|fetch|JSON|HTTP|status|ECONN\w*|ERR_\w*)\b|(?<![\d.,])\b[1-5]\d\d\b(?![.,]?\d)|[{}<>]|\/api\/|\/rest\/|Failed to|NetworkError|Load failed|timed? ?out/i.test(s);
+  return /\b(?:TypeError|ReferenceError|SyntaxError|AbortError|Error|undefined|null|NaN|stack|fetch|JSON|HTTP|status|ECONN\w*|ERR_\w*)\b|(?:^|[^\d.,])\b[1-5]\d\d\b(?![.,]?\d)|[{}<>]|\/api\/|\/rest\/|Failed to|NetworkError|Load failed|timed? ?out/i.test(s);
 }
 export function raisonEchec(x, { enLigne = (typeof navigator !== 'undefined' ? navigator.onLine !== false : true) } = {}) {
   if (x && typeof x === 'object' && x.horsLigne) return 'horsligne';

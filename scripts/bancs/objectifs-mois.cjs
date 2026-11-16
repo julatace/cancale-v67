@@ -137,11 +137,13 @@ const lireBarre = (pg, page) => pg.evaluate((page) => {
   const c = document.querySelector(`[data-carte-stats="${page}"]`); if (!c) return 'carte-absente';
   const o = c.querySelector('[data-objectif]'); if (!o) return null;
   const boite = (e) => { let x = e; while (x && x.getBoundingClientRect().width === 0) x = x.parentElement; return x; };
-  const r = o.getBoundingClientRect(), p = o.querySelector('.vrm-fu-objectif-piste').getBoundingClientRect(), cr = boite(c).getBoundingClientRect();
+  // (15 nov., lot securite-ventes) Ma journée : l'ANNEAU (proposition 14) à la place de la barre — mêmes data-objectif-*.
+  const anneau = o.hasAttribute('data-objectif-anneau');
+  const r = o.getBoundingClientRect(), p = (o.querySelector('.vrm-fu-objectif-piste') || o.querySelector('.vrm-anneau-obj-rond')).getBoundingClientRect(), cr = boite(c).getBoundingClientRect();
   const g = (k) => o.getAttribute('data-objectif' + k);
   const b = c.querySelector('[data-objectif-bilan]');
   return { type: g(''), cible: g('-cible'), valeur: g('-valeur'), pct: g('-pct'), partiel: g('-partiel'), reste: g('-reste'), jours: g('-jours'), rythme: g('-rythme'), ecart: g('-ecart'), h: Math.round(p.height), dedans: r.left >= cr.left - 0.5 && r.right <= cr.right + 0.5, rr: [Math.round(r.left), Math.round(r.right), Math.round(cr.left), Math.round(cr.right), boite(c).className],
-    bas: (o.querySelector('.vrm-fu-objectif-bas') || {}).scrollWidth - (o.querySelector('.vrm-fu-objectif-bas') || {}).clientWidth,
+    anneau, bas: (o.querySelector('.vrm-fu-objectif-bas, .vrm-anneau-obj-ligne') || {}).scrollWidth - (o.querySelector('.vrm-fu-objectif-bas, .vrm-anneau-obj-ligne') || {}).clientWidth,
     bilan: b ? { ym: b.getAttribute('data-objectif-bilan'), atteint: b.getAttribute('data-objectif-bilan-atteint'), ecart: b.getAttribute('data-objectif-bilan-ecart') } : null, txt: o.innerText.replace(/\n/g, ' · ') };
 }, page);
 const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -161,10 +163,10 @@ const range = (pg) => pg.evaluate(() => { try { return JSON.parse(localStorage.g
         await aller(pg, 'tab=journee', '[data-carte-stats="journee"] [data-objectif]');
         const o = await lireBarre(pg, 'journee');
         dit(o && o.type === 'ca' && o.cible === '200000' && o.valeur === '70000' && o.pct === '35' && !o.partiel, '2 000 € visés : 700 € vendus ce mois (tous sites) ⇒ 35 %', JSON.stringify(o));
-        dit(o && o.h <= 6 && o.dedans && o.bas <= 0, 'une barre FINE, dans la carte, rien de coupé', JSON.stringify(o && { h: o.h, d: o.dedans, bas: o.bas, rr: o.rr }));
+        dit(o && o.anneau && o.dedans && o.bas <= 0, 'Ma journée : l’ANNEAU (15 nov.), dans la carte, rien de coupé', JSON.stringify(o && { h: o.h, d: o.dedans, bas: o.bas, rr: o.rr }));
         dit(o && o.reste === '130000' && o.jours === '28', 'encore 1 300 € en 28 jours', JSON.stringify(o && { r: o.reste, j: o.jours }));
         dit(o && o.rythme === 'avance' && o.ecart === '52500', 'en avance de 525 € sur le rythme (175 € attendus le 3 à 15 h)', JSON.stringify(o && { ry: o.rythme, e: o.ecart }));
-        dit(o && /2\s000\s€ vendus ce mois/.test(o.txt) && /En avance de 525\s€/.test(o.txt), 'la phrase dit l’objectif et le rythme', o && o.txt);
+        dit(o && /Objectif 2\s000\s€ vendus/.test(o.txt) && /encore 1\s300\s€ · ≈ 47\s€ par jour jusqu’au 30 nov\./.test(o.txt), 'l’anneau dit l’objectif, ce qui reste et le rythme par jour (le rythme d’avance reste en data-*)', o && o.txt);
         if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `journee-objectif-${nom}.png`) });
       });
 

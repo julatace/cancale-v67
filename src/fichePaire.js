@@ -14,6 +14,10 @@
 import { beneficePaire, centimes, champsCharges } from './beneficePaire.js';
 import { origineDuPrix } from './fournisseurs.js';
 import { beneficeSiVendue, RAISON_SI_VENDUE } from './dormantes.js';
+// (15 nov., lot argent-plus) Le bénéfice réel de l'article vendu, frais du site inclus : la règle
+// qui ASSEMBLE celles du site (versé) et `beneficePaire` (achat, frais saisis) — src/beneficeArticle.js.
+import { beneficeArticle } from './beneficeArticle.js';
+const RAISON_ARTICLE = { achat: 'prix d’achat pas saisi', prix: 'prix de vente illisible', illisible: 'frais illisibles', plateforme: '' };
 
 const str = (v) => String(v == null ? '' : v).trim();
 
@@ -152,14 +156,15 @@ export function parcoursPaire(rn, d = {}, o = {}) {
 
   // 6. ARGENT — Vinted : le versement (transaction finalisée), les frais
   // renseignés, le bénéfice de l'écran Ventes. eBay : l'argent reçu (frais déduits).
-  let venteC = null, benefice = null, benefPartiel = false, raisonBenef = '';
+  let venteC = null, benefice = null, benefPartiel = false, raisonBenef = '', detailBenef = null;
   if (venteV && !annulee(venteV)) {
     const devise = venteV.price && venteV.price.currency_code;
     const bil = beneficePaire(venteV.price && venteV.price.amount, entree || {});
     venteC = bil.vente;
+    detailBenef = beneficeArticle({ plateforme: 'Vinted', vente: venteV.price && venteV.price.amount, entree: entree || {}, autreDevise: !!(devise && devise !== 'EUR') });
     if (devise && devise !== 'EUR') raisonBenef = `vente en ${devise} : écartée, jamais convertie`;
-    else if (bil.benefice != null) { benefice = Math.round(bil.benefice * 100); benefPartiel = !bil.complet; }
-    else raisonBenef = bil.achat == null ? 'prix d’achat pas saisi' : bil.vente == null ? 'prix de vente illisible' : 'frais illisibles';
+    else if (detailBenef.benefice != null) { benefice = detailBenef.benefice; benefPartiel = detailBenef.etat === 'partiel'; }
+    else raisonBenef = RAISON_ARTICLE[detailBenef.etat] || 'frais illisibles';
     const ver = d.versements == null ? undefined : d.versements[String(venteV._tx)] || null;
     const frais = bil.cents ? `frais renseignés ${(bil.cents / 100).toFixed(2).replace('.', ',')}\u00a0€${bil.complet ? '' : ' (pas tous confirmés)'}` : (bil.complet ? 'aucun frais' : 'frais pas renseignés');
     if (ver === undefined) etapes.push({ cle: 'argent', etat: 'passu', titre: 'Argent', detail: `dates de versement pas lues · ${frais}` });
@@ -167,9 +172,15 @@ export function parcoursPaire(rn, d = {}, o = {}) {
     else etapes.push({ cle: 'argent', etat: 'absent', titre: 'Argent', detail: `versement pas encore reçu · ${frais}` });
   } else if (venteE) {
     const r = o.montantRecuEbay ? o.montantRecuEbay(venteE) : { eur: null, raison: 'montant reçu inconnu' };
+    // (15 nov., lot argent-plus) Le dû au vendeur (port exclu, §2.8) et les frais eBay LUS ; ce qui reste
+    // passe par la MÊME règle que Vinted (achat ET frais saisis — avant, seul l'achat était déduit ici,
+    // alors que le bénéfice de Ventes et de la compta retirait aussi les frais saisis).
+    const du = venteE.paymentSummary && venteE.paymentSummary.totalDueSeller;
+    detailBenef = beneficeArticle({ plateforme: 'eBay', vente: du && du.currency === 'EUR' ? du.value : null, recu: r.eur, raisonRecu: r.raison, entree: entree || {} });
     if (r.eur != null) {
       venteC = Math.round(r.eur * 100);
-      if (achatC != null) benefice = venteC - achatC; else raisonBenef = 'prix d’achat pas saisi';
+      if (detailBenef.benefice != null) { benefice = detailBenef.benefice; benefPartiel = detailBenef.etat === 'partiel'; }
+      else raisonBenef = RAISON_ARTICLE[detailBenef.etat] || 'frais illisibles';
       etapes.push({ cle: 'argent', etat: 'fait', titre: 'Argent reçu sur eBay', detail: 'frais eBay déduits' });
     } else { raisonBenef = r.raison; etapes.push({ cle: 'argent', etat: 'passu', titre: 'Argent', detail: r.raison }); }
   } else if (venteL) {
@@ -177,8 +188,9 @@ export function parcoursPaire(rn, d = {}, o = {}) {
     // (11 nov., famille « une règle par notion ») LA règle du bénéfice (`beneficePaire`) : prix − achat −
     //    frais SAISIS sur la fiche, « au plus » tant qu'ils ne sont pas tous confirmés — comme Vinted.
     const bilL = venteC != null ? beneficePaire(venteC / 100, entree || {}) : null;
-    if (bilL && bilL.benefice != null) { benefice = Math.round(bilL.benefice * 100); benefPartiel = !bilL.complet; }
-    else raisonBenef = achatC == null ? 'prix d’achat pas saisi' : venteC == null ? 'prix de vente illisible' : 'frais illisibles';
+    detailBenef = beneficeArticle({ plateforme: 'Leboncoin', vente: venteC != null ? venteC / 100 : null, entree: entree || {} });
+    if (detailBenef.benefice != null) { benefice = detailBenef.benefice; benefPartiel = detailBenef.etat === 'partiel'; }
+    else raisonBenef = RAISON_ARTICLE[detailBenef.etat] || (achatC == null ? 'prix d’achat pas saisi' : venteC == null ? 'prix de vente illisible' : 'frais illisibles');
     const fraisL = bilL && bilL.cents ? `frais renseignés ${(bilL.cents / 100).toFixed(2).replace('.', ',')}\u00a0€${bilL.complet ? '' : ' (pas tous confirmés)'}` : (bilL && bilL.complet ? 'aucun frais' : 'frais pas renseignés');
     etapes.push({ cle: 'argent', etat: o.lbcFinalisee && o.lbcFinalisee(venteL) ? 'fait' : 'absent', titre: 'Argent', detail: `Leboncoin : daté à la vente · ${fraisL}` });
   } else if (ventesInconnues) { raisonBenef = 'ventes pas lues'; etapes.push({ cle: 'argent', etat: 'passu', titre: 'Argent', detail: 'tes ventes pas toutes lues' }); }
@@ -204,7 +216,7 @@ export function parcoursPaire(rn, d = {}, o = {}) {
   return {
     num: rn.cle, titre, taille: (fiche && fiche.taille) || null, photo: (annonce && annonce.photo) || (fiche && fiche.photo) || null,
     double: !!rn.double, ancienNumero: !!rn.ancienNumero, etat: rn.etat, manques: rn.manques || [],
-    resume: { achat: achatC, vente: venteC, benefice, benefPartiel, raisonBenef, siVendue, venteLib: !venteV && venteE && venteC != null ? 'Reçu' : 'Vente' },
+    resume: { achat: achatC, vente: venteC, benefice, benefPartiel, raisonBenef, siVendue, detail: detailBenef, venteLib: !venteV && venteE && venteC != null ? 'Reçu' : 'Vente' },
     // (13 nov.) La fiche qui porte le prix d'achat (l'annonce vendue, sinon celle de ce N°) :
     // « Saisir le prix d'achat » écrit sur ELLE (identité, §5) — null : aucune fiche.
     idFiche: idFiche != null ? String(idFiche) : null,

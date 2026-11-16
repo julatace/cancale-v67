@@ -66,6 +66,66 @@ export function lectureCompleteDe(it, listings) {
   return !!(listings.complets && listings.complets[uid] === true);
 }
 
+// ── LES ANNONCES MASQUÉES PAR VINTED (15 nov., audit de fiabilité #3 et #4) ──
+// Mesuré chez Julien : 4 annonces masquées (`is_hidden`, ni fermées ni brouillons)
+// SANS fiche, chacune liée par l'extension à un N° réservé (209, 210, 211, 214) ;
+// chez un autre vendeur, 5 masquées sans fiche. Cause : la numérotation ne
+// parcourait que `listings.items` (les annonces EN LIGNE). Une masquée est
+// toujours chez lui (`annoncesPresentes`, §5) : elle reçoit son N° comme une
+// annonce en ligne — d'abord ses IDENTITÉS (N° réservé lié à SON identifiant,
+// vente de la même annonce, même photo, annonce republiée), sinon un N° neuf
+// selon le mode, jamais par titre.
+// Une masquée vient du DRESSING (seule lecture qui la voit) : un N° NEUF ne lui
+// est donné que si CE dressing est COMPLET (`_vrmMasqueeComplete`, tous les
+// articles que Vinted annonce) et de moins de 24 h (`_vrmVueMasqueeLe`) — la
+// même fraîcheur que « en ligne » (<enligne-regle>). Une masquée vue dans un
+// dressing ancien est peut-être supprimée ou vendue depuis : aucun N° brûlé
+// pour elle (elle le reçoit à la prochaine lecture fraîche).
+export const MASQUEE_FRAIS_MS = 24 * 3600e3;
+const AVANCE_HORLOGE_MS = 5 * 60e3;   // une horloge un peu en avance ne rend pas une lecture « future » invalide
+export function lectureMasqueeComplete(it, listings, maintenant = Date.now()) {
+  if (!it || it._vrmMasquee !== true || it._vrmMasqueeComplete !== true) return false;
+  const uid = uidDe(it);
+  if (!uid) return false;
+  if (listings && Array.isArray(listings.ko) && listings.ko.map(String).includes(uid)) return false;
+  const t = Number(it._vrmVueMasqueeLe), now = Number(maintenant);
+  if (!Number.isFinite(t) || t <= 0 || !Number.isFinite(now)) return false;
+  const age = now - t;
+  return age <= MASQUEE_FRAIS_MS && age >= -AVANCE_HORLOGE_MS;
+}
+// La lecture qui montre CETTE annonce est-elle complète (en ligne : celle du
+// compte ; masquée : son dressing, frais) ?
+export const lectureCompleteAnnonce = (it, listings, maintenant = Date.now()) => (it && it._vrmMasquee === true ? lectureMasqueeComplete(it, listings, maintenant) : lectureCompleteDe(it, listings));
+// Les annonces que la numérotation parcourt : en ligne, PUIS les masquées encore
+// sur l'étagère (`masqueesSurEtagere` : moins celles déclarées parties). Une
+// même annonce une fois (une démasquée depuis est déjà « en ligne »).
+export function annoncesANumeroter(enLigne, masquees) {
+  const out = [], vus = new Set();
+  for (const l of [enLigne, masquees]) for (const it of Array.isArray(l) ? l : []) {
+    if (!it || it.id == null) continue;
+    const k = String(it.id); if (vus.has(k)) continue; vus.add(k); out.push(it);
+  }
+  return out;
+}
+// #4 — UNE RÉSERVATION LIÉE DONT LA FICHE PORTE UN AUTRE N° (1 cas chez Julien).
+// Rien ne change tout seul (un N° est écrit sur un carton) : la ligne « N° à
+// vérifier sur ton carton » le montre, SON choix décide. Pas ici :
+//   · une fiche déjà vérifiée (`cartonVerifie`, posé par SON choix) ;
+//   · une fiche que la règle des doublons a fait passer du N° réservé à ce N°
+//     (`reattribue.de` = la réservation, `reattribue.vers` = la fiche) — déjà dite
+//     dans « nouveaux numéros à écrire sur tes cartons », jamais deux fois (§7).
+// Rend { fiche, reserve } ou null. `cle` : l'identité d'un N° (`cleNum`).
+export function reserveEnDesaccord(id, fiche, parItem, cle = (n) => String(n == null ? '' : n).trim().toUpperCase()) {
+  if (id == null || !fiche || typeof fiche !== 'object' || !parItem || typeof parItem !== 'object') return null;
+  const r = parItem[String(id)];
+  const cf = cle(fiche.numero), cr = cle(r);
+  if (!cf || !cr || cf === cr) return null;
+  if (fiche.cartonVerifie) return null;
+  const ra = fiche.reattribue;
+  if (ra && typeof ra === 'object' && cle(ra.de) === cr && cle(ra.vers) === cf) return null;
+  return { fiche: String(fiche.numero), reserve: String(r) };
+}
+
 // Un N° NEUF peut-il être donné (le dernier recours, après toutes les identités) ?
 export function numeroNeufPermis({ mode, complet, horsLigne = false, retenue = false } = {}) {
   return mode === 'vrm' && complet === true && horsLigne !== true && retenue !== true;
@@ -103,12 +163,12 @@ export function listeNumeros(nums, max = 5) {
   return `N°${vus}${l.length > max ? ` +${l.length - max}` : ''}`;
 }
 
-// MODE « MOI » : les articles à DEMANDER. En ligne (la liste ne porte que les
-// annonces en ligne : jamais « à confirmer »), lecture complète de leur compte,
+// MODE « MOI » : les articles à DEMANDER. En ligne ou masqués (jamais « à
+// confirmer »), lecture complète de leur compte (masquée : son dressing frais),
 // numérotables (après la remise à zéro), sans N° sur leur fiche, et SANS N° écrit
 // lisible (`lecture.etat !== 'lu'` — un N° écrit est pris par la numérotation ;
 // deux N° écrits, un ancien N° ⇒ « à vérifier », déjà dit ailleurs : pas ici).
-export function demandesNumero({ items, fiches, listings, mode, numerotable = () => true, lectureEcrite = () => null } = {}) {
+export function demandesNumero({ items, fiches, listings, mode, numerotable = () => true, lectureEcrite = () => null, maintenant = Date.now() } = {}) {
   if (mode !== 'moi') return [];
   const out = [], vus = new Set();
   for (const it of Array.isArray(items) ? items : []) {
@@ -116,7 +176,7 @@ export function demandesNumero({ items, fiches, listings, mode, numerotable = ()
     const id = String(it.id); if (vus.has(id)) continue; vus.add(id);
     const f = fiches && fiches[id];
     if (f && String(f.numero == null ? '' : f.numero).trim()) continue;
-    if (!lectureCompleteDe(it, listings)) continue;
+    if (!lectureCompleteAnnonce(it, listings, maintenant)) continue;
     if (!numerotable(it)) continue;
     const l = lectureEcrite(it);
     if (l && l.etat && l.etat !== 'rien') continue;

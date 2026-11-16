@@ -14,6 +14,7 @@ import { escalierPrix, eurosPrix } from './historiquePrix.js';
 import { motsInsecables } from './motsInsecables.jsx';
 import { tr } from './i18n/index.js';
 import MarquePlateforme from './plateformes/Marque.jsx';   // (15 nov., verre 2) la ligne par site
+import { BeneficeArticleDetail } from './BeneficeArticle.jsx';   // (15 nov., lot argent-plus) le bénéfice réel, frais du site inclus
 import { poserSlot } from './ficheLigne.js';
 import LigneDeTemps, { OngletsFiche, useVueFiche } from './paireHistoire/LigneDeTemps.jsx';   // (14 nov., idée 154) « Dans l'ordre »
 // (15 nov., direction D « fiche produit ») la règle de rangement (pure) et sa matière.
@@ -331,7 +332,9 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
   const saisir = p && onPrixAchat && p.idFiche && !p.ancienNumero && r && r.achat == null ? () => onPrixAchat(p) : null;
   const double = !!(p && p.double);
   const photo = (p && p.photo) || (depuis && depuis.photo) || '';
-  const titre = p ? ((neuve && neuve.titre) || p.titre || (p.etat === 'rien' ? 'N° jamais servi' : 'Sans titre')) : ((depuis && depuis.titre) || tr('fiche.sansTitre'));
+  // (15 nov., rouges-connus) Comme la photo : la paire lue sans titre prend celui de la LIGNE touchée (la même
+  // annonce, désignée par identité) — la fiche d'un colis Vestiaire disait « Sans titre » sous « Cabas toile beige ».
+  const titre = p ? ((neuve && neuve.titre) || p.titre || (p.etat === 'rien' ? 'N° jamais servi' : (depuis && depuis.titre) || 'Sans titre')) : ((depuis && depuis.titre) || tr('fiche.sansTitre'));
   const taille = p ? ((neuve && neuve.taille) || p.taille || '') : '';
   const ctxHeros = ctx ? tr(CLE_CTX[ctx] || 'fiche.ctx.vente') : '';
   const codeHeros = ctx === 'retrait' && depuis && depuis.sous ? depuis.sous : '';
@@ -364,6 +367,9 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
   const toutVoir = p ? (
     <details className="fd-tout" data-fiche-plus="">
       <summary className="fd-tout-s">{tr('verre2.fiche.toutVoir')}</summary>
+      {/* (15 nov., lot argent-plus ; rangé dans la fiche D le 16 nov.) Ce que le site et les frais saisis retirent
+          (src/beneficeArticle.js) — derrière « Tout voir » : la fiche D tient en un écran, chaque montant une fois (§7). */}
+      {!double && r && r.detail && !cases.some((c) => c.cle === 'si-vendue') ? <BeneficeArticleDetail b={r.detail} seulement={r.detail.plateforme === 'eBay' ? ['vente', 'site', 'saisis'] : ['site', 'saisis']}/> : null}
       {depuis ? <section className="vrm-fp-contexte" data-fiche-contexte={ctx} aria-label={tr(CLE_CTX[ctx] || 'fiche.ctx.vente')} ref={slotCtx}/> : null}
       {etat && !double ? <EtatArticle etat={etat}/> : null}
       <OngletsFiche vue={vueFiche} onVue={setVueFiche}/>

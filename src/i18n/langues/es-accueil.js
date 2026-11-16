@@ -12,6 +12,14 @@ export default {
   "erreur.demarrage.titre": "La aplicación no pudo iniciarse",
   "erreur.recharger": "Recargar",
   "erreur.repartirPropre": "Empezar de cero",
+  // ── maj (15 nov., ouverture) : un morceau introuvable, l'écran de démarrage
+  "maj.titre": "Actualizar VRM",
+  "maj.texte": "Hay una nueva versión de VRM en línea. Esta parte de la app viene de ella: toca «Actualizar» para cargarla. Tus datos no cambian.",
+  "maj.texteHorsLigne": "Esta parte de la app aún no está en este teléfono. Vuelve a conectarte a Internet y toca «Actualizar».",
+  "maj.bouton": "Actualizar",
+  "demarrage.ouverture": "Abriendo VRM…",
+  "demarrage.lent": "Está tardando más de lo normal. Puede que la conexión sea lenta.",
+  "demarrage.recharger": "Recargar",
   // ── auth
   "auth.bouton.creer": "Crear mi cuenta",
   "auth.titre.in": "Iniciar sesión",

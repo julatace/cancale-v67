@@ -28,7 +28,8 @@
 
 // Les sortes d'événement, dans l'ordre du cycle (pour départager deux dates égales).
 export const QUOI = ['achetee', 'recue', 'numerotee', 'renumerotee', 'photographiee', 'publiee', 'vueEnLigne', 'republiee', 'baisse', 'hausse', 'prix',
-  'vendue', 'bordereau', 'partie', 'relais', 'livree', 'retourColis', 'versement', 'annulee'];
+  'offreRecue', 'offreFaite', 'offre', 'masquee', 'visible', 'disparue',
+  'vendue', 'bordereau', 'partie', 'relais', 'livree', 'retourColis', 'versement', 'annulee', 'retourRecu', 'remiseStock'];
 
 const str = (v) => String(v == null ? '' : v).trim();
 const ms = (v) => {
@@ -39,7 +40,17 @@ const ms = (v) => {
 const isoDe = (v) => { const t = ms(v); return t == null ? null : new Date(t).toISOString(); };
 const SITE_DE = { 'en-ligne': 'Vinted', republie: 'Vinted', ebay: 'eBay', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire Collective', vinted: 'Vinted' };
 
-// h : la sortie de `histoireArticle` · x : { reception, crees, studio }
+// (15 nov., l'historique complet demandé par Julien) Trois sources de plus, chacune par IDENTITÉ :
+//   · les OFFRES : celles que `histoireArticle` a gardées par l'identifiant de CETTE annonce
+//     (la transaction de la conversation → `item_id`), avec leur sens et leur état lu
+//     (`etatOffreVinted` : acceptée · refusée · en attente · terminée) ;
+//   · `moderation` : les événements « masquée / de nouveau visible / disparue » que
+//     l'extension a constatés en comparant deux lectures COMPLÈTES du dressing
+//     (`moderation_vinted_{uid}`, src/moderationVinted.js), par l'identifiant d'annonce
+//     (`ids`, les annonces de CE N°) — null ⇒ « pas lu », nommé ;
+//   · `retours` : SES clics « Reçu chez toi » / « Remis en stock » (Ventes → Retours,
+//     `vinted_retours_recus` / `_remis`), par le n° de transaction d'une vente de CE N° (`txs`).
+// h : la sortie de `histoireArticle` · x : { reception, crees, studio, ids, txs, moderation, retours }
 //   reception : { ms, source: 'livraison'|'clic' } | null (pas trouvée) | undefined (pas lue)
 //   crees     : { [idAnnonce]: ms } | null (pas lues) | undefined
 //   studio    : { dates: [iso] } | null (pas lu) | undefined (pas demandé)
@@ -57,7 +68,7 @@ export function ligneDeTemps(h, x = {}) {
   const passu = (cle) => { const e = etape(cle); if (e && e.etat === 'passu' && e.detail) pasSu.push(e.detail); };
 
   // ACHETÉE — l'achat relié (son n° de transaction) ou le prix saisi : la preuve de histoire.
-  for (const e of evDe('achat')) pose({ quoi: 'achetee', at: e.at, montant: (etape('achat') || {}).etat === 'fait' ? montantAchat(h) : null, preuve: e.preuve });
+  for (const e of evDe('achat')) pose({ quoi: 'achetee', at: e.at, montant: (etape('achat') || {}).etat === 'fait' ? montantAchat(h) : null, preuve: e.preuve, ...(e.vendeur ? { vendeur: str(e.vendeur) } : {}) });
   passu('achat');
   // REÇUE — seulement d'un achat RELIÉ (la date appartient à SA transaction).
   const rel = (etape('achat') || {}).evenements || [];
@@ -75,7 +86,8 @@ export function ligneDeTemps(h, x = {}) {
   // PUBLIÉE / REPUBLIÉE — par plateforme, par l'identifiant de l'annonce.
   for (const e of evDe('annonces')) {
     const id = (/annonce (\d+)/.exec(str(e.preuve)) || [])[1] || '';
-    if (e.cle === 'republie') { pose({ quoi: 'republiee', at: e.at, site: 'Vinted', preuve: e.preuve, id }); continue; }
+    // Une republication garde le N° de la paire (src/repriseNumero.js) : elle est sous CE N° par construction.
+    if (e.cle === 'republie') { pose({ quoi: 'republiee', at: e.at, site: 'Vinted', preuve: e.preuve, id, ...(e.recreeDe ? { memeNumero: true } : {}) }); continue; }
     if (e.cle === 'en-ligne') {
       const c = id && x.crees ? ms(x.crees[id]) : null;
       if (c != null) pose({ quoi: 'publiee', at: c, site: 'Vinted', preuve: e.preuve, id, source: 'vinted' });
@@ -92,6 +104,20 @@ export function ligneDeTemps(h, x = {}) {
     pose({ quoi: a == null || b == null || a === b ? 'prix' : b < a ? 'baisse' : 'hausse', at: e.at, site: str(e.site) === 'vinted' ? 'Vinted' : str(e.site), montant: b, avant: a, preuve: e.preuve });
   }
   passu('prix');
+  // OFFRES — reçues ou faites, par l'annonce de CETTE paire ; montant et état lus, jamais devinés.
+  for (const e of evDe('offres')) {
+    if (e.cle !== 'offre' || !Number.isFinite(Number(e.prix))) continue;
+    pose({ quoi: e.sens === 'faite' ? 'offreFaite' : e.sens === 'recue' ? 'offreRecue' : 'offre', at: e.at, site: 'Vinted', montant: Number(e.prix), preuve: e.preuve, id: str(e.item), statut: ['acceptee', 'refusee', 'attente', 'terminee'].includes(e.statut) ? e.statut : '' });
+  }
+  passu('offres');
+  // MASQUÉE / DE NOUVEAU VISIBLE / DISPARUE — constaté par l'extension sur deux lectures complètes, par l'annonce.
+  const idsM = new Set((Array.isArray(x.ids) ? x.ids : []).map(str).filter(Boolean));
+  if (x.moderation === null && idsM.size) pasSu.push('moderation');
+  else if (Array.isArray(x.moderation)) for (const m of x.moderation) {
+    if (!m || !idsM.has(str(m.a))) continue;
+    if (m.s === 'masquee') { pose({ quoi: 'masquee', at: m.t, site: 'Vinted', preuve: 'moderation', id: str(m.a) }); if (m.f) pose({ quoi: 'visible', at: m.f, site: 'Vinted', preuve: 'moderation', id: str(m.a) }); }
+    else if (m.s === 'disparue') pose({ quoi: 'disparue', at: m.t, site: 'Vinted', preuve: 'moderation', id: str(m.a) });
+  }
   // VENDUE — la vente de histoire (Vinted par sa transaction, eBay, Leboncoin).
   for (const e of evDe('vente')) pose({ quoi: 'vendue', at: e.at, site: SITE_DE[e.cle] || 'Vinted', montant: montantDuTexte(e.texte), preuve: e.preuve, id: e.tx ? String(e.tx) : '' });
   passu('vente');
@@ -113,6 +139,12 @@ export function ligneDeTemps(h, x = {}) {
   passu('argent');
   // ANNULÉE / RETOUR — une vente que son état fait revenir.
   for (const e of evDe('retour')) pose({ quoi: 'annulee', at: e.at, preuve: e.preuve });
+  // RETOUR REÇU / REMIS EN STOCK — SES clics, par le n° de transaction d'une vente de CE N°.
+  const R = x.retours && typeof x.retours === 'object' ? x.retours : null;
+  if (R) for (const tx of (Array.isArray(x.txs) ? x.txs : []).map(str).filter(Boolean)) {
+    const rc = R.recus && R.recus[tx]; if (rc) pose({ quoi: 'retourRecu', at: typeof rc === 'string' ? rc : null, preuve: 'clicRetour', id: tx });
+    const rm = R.remis && R.remis[tx]; if (rm) pose({ quoi: 'remiseStock', at: rm && typeof rm === 'object' ? rm.at : null, preuve: 'clicRetour', id: tx });
+  }
 
   const rang = (q) => { const i = QUOI.indexOf(q); return i < 0 ? 99 : i; };
   const dates = evs.filter((e) => e.at).sort((a, b) => (Date.parse(a.at) - Date.parse(b.at)) || (rang(a.quoi) - rang(b.quoi)));

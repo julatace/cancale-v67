@@ -29,6 +29,7 @@
 // ⚠️ Les contrats `data-*` (prérequis, navigateurs, ordinateur nécessaire, accès
 //    offert, contact, confiance) sont lus par les audits et les bancs : ne pas les retirer.
 import React from 'react';
+import { lazySur } from './chargementSur.js';   // (15 nov.) un morceau qui rate : relancé, puis rechargement propre ou « Mettre à jour VRM »
 import { tr, listeDansLaLangue, monnaie } from './i18n/index.js';
 import { useLangue } from './i18n/react.js';
 import ChoixLangue from './i18n/ChoixLangue.jsx';
@@ -41,7 +42,7 @@ import { useMoinsDeMouvement, useSansSouris } from './accueil-mouvement.js';
 import { lienEntree } from './accueil/lienEntree.js';
 // (11 nov., lot temps-gagne) Le calculateur « le temps que VRM te fait gagner » : un morceau à
 // part, demandé à l'approche de sa section (le fichier d'entrée a un budget de poids).
-const TempsGagne = React.lazy(() => import('./accueil/TempsGagne.jsx'));
+const TempsGagne = lazySur(() => import('./accueil/TempsGagne.jsx'));
 // (5 nov.) Les navigateurs où l'extension SERVIE s'installe : une source, la même
 // que l'app — jamais « Chrome obligatoire ». Module léger.
 import { navigateursServis, NAVS_ORDINATEUR_TEXTE as NAVS_ORDI } from './navigateursServis.js';

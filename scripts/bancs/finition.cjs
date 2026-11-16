@@ -290,7 +290,7 @@ function mesurer(opts) {
     }
     // Deux textes l'un sur l'autre : boîtes de texte d'éléments différents qui se croisent nettement.
     // Un texte dans une barre fixe ou collante (barre du bas, en-tête) : le contenu passe dessous, c'est voulu.
-    const flottant = (e) => { for (let x = e; x && x.nodeType === 1; x = x.parentElement) { const p = getComputedStyle(x).position; if (p === 'fixed' || p === 'sticky') return true; } return false; };
+    const flottant = (e) => { for (let x = e; x && x.nodeType === 1; x = x.parentElement) { if (x.classList && x.classList.contains('vrm-tabbar')) return true; /* (15 nov.) la barre du bas, nommée : posée à l'échelle 1 (`--vrm-dezoom`), sa position se lit mal sous un zoom */ const p = getComputedStyle(x).position; if (p === 'fixed' || p === 'sticky') return true; } return false; };
     // Un texte caché par le défilement d'un parent (« overflow » auto/hidden) n'est pas vu : sa boîte ne compte pas.
     const clipVisible = (e, r) => { for (let x = e.parentElement; x && x !== document.documentElement; x = x.parentElement) { const st = getComputedStyle(x); if (st.overflow === 'visible' && st.overflowX === 'visible' && st.overflowY === 'visible') continue; const c = x.getBoundingClientRect(); if (r.bottom <= c.top + 1 || r.top >= c.bottom - 1 || r.right <= c.left + 1 || r.left >= c.right - 1) return false; } return true; };
     const bx = boites.filter(({ e }) => !flottant(e)).flatMap(({ e, rr, t }) => rr.map((r) => ({ e, r, t }))).filter((b) => b.r.width > 3 && b.r.height > 6 && b.r.top >= 0 && b.r.bottom <= H && clipVisible(b.e, b.r));
@@ -343,7 +343,11 @@ const court = (a, n = 6) => JSON.stringify(a.slice(0, n)).slice(0, 900);
   for (const vue of VUES) for (const ecran of ECRANS) {
     const [l, mode] = vue.split('-');
     const sombre = mode === 'sombre';
-    const grand = /^grand(\d+)$/.exec(mode || '');
+    // (15 nov.) `taille112` · `taille124` · `taille136` : la TAILLE DU TEXTE choisie dans VRM (Paramètres,
+    // src/tailleTexte.js, `vrm_taille_texte`) — jugée comme le grand texte de l'appareil (G1–G3).
+    const taille = /^taille(\d+)$/.exec(mode || '');
+    const grand = /^grand(\d+)$/.exec(mode || '') || taille;
+    const TAILLE_ID = { 112: 'grand', 124: 'plusGrand', 136: 'tresGrand' };
     const tel = l === '390';
     const m = monde();
     const ctx = await b.newContext({ viewport: VP[l], colorScheme: sombre ? 'dark' : 'light', reducedMotion: 'reduce', locale: 'fr-FR', timezoneId: 'Europe/Paris', serviceWorkers: 'block', ...(tel ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}) });
@@ -357,12 +361,15 @@ const court = (a, n = 6) => JSON.stringify(a.slice(0, n)).slice(0, 900);
         localStorage.setItem('vrm_bienvenue_vue', JSON.stringify({ at: 'banc' })); localStorage.setItem('vrm_visite_vue', JSON.stringify({ at: 'banc' }));
         localStorage.setItem('vrm_acces_direct', '1');
       } catch (_) {}
+      if (gr && gr.vrm) { try { localStorage.setItem('vrm_taille_texte', gr.vrm); } catch (_) {} return; }
       // Le réglage « texte plus grand » du navigateur : la taille de police racine.
       if (gr) {
         const poser = () => { const st = document.createElement('style'); st.textContent = `html{font-size:${gr}% !important}`; document.documentElement.appendChild(st); };
         if (document.documentElement) poser(); else { const ob = new MutationObserver(() => { if (document.documentElement) { ob.disconnect(); poser(); } }); ob.observe(document, { childList: true }); }
       }
-    }, [session, sombre, grand ? Number(grand[1]) : 0]);
+    }, [session, sombre, taille ? { vrm: TAILLE_ID[taille[1]] || 'tresGrand' } : grand ? Number(grand[1]) : 0]);
+    // Outil de mise au point (15 nov.) : CSS_ESSAI=fichier.css injecte une feuille d'essai (jamais dans un rapport final).
+    if (process.env.CSS_ESSAI) { const css = fs.readFileSync(process.env.CSS_ESSAI, 'utf8'); await ctx.addInitScript((t) => { document.addEventListener('DOMContentLoaded', () => { const s = document.createElement('style'); s.textContent = t; document.head.appendChild(s); }); }, css); }
     const pg = await ctx.newPage();
     const errs = [];
     pg.on('pageerror', (e) => errs.push('page: ' + e.message.slice(0, 160)));
@@ -370,7 +377,7 @@ const court = (a, n = 6) => JSON.stringify(a.slice(0, n)).slice(0, 900);
     await pg.waitForSelector('.vrm-main', { timeout: 45000 }).catch(() => {});
     await pg.waitForTimeout(3500);
     await pg.evaluate(() => document.fonts && document.fonts.ready).catch(() => {});
-    if (process.env.MONTRER) console.log('   ⓘ', JSON.stringify(await pg.evaluate((q) => [...document.querySelectorAll(q)].slice(0, 3).map((e) => { const c = getComputedStyle(e); const r = e.getBoundingClientRect(); return ({ html: e.outerHTML.slice(0, 300), w: c.width, ml: c.marginLeft, mr: c.marginRight, pos: c.position, l: c.left, inset: c.inset, r: [r.left, r.right], zoom: c.zoom, parentW: e.parentElement && getComputedStyle(e.parentElement).width }); }), process.env.MONTRER)));
+    if (process.env.MONTRER) console.log('   ⓘ', JSON.stringify(await pg.evaluate((q) => [...document.querySelectorAll(q)].slice(0, 3).map((e) => { const c = getComputedStyle(e); const r = e.getBoundingClientRect(); return ({ html: e.outerHTML.slice(0, 300), w: c.width, ml: c.marginLeft, mr: c.marginRight, pos: c.position, l: c.left, inset: c.inset, r: [r.left, r.right], zoom: c.zoom, ow: c.overflowWrap, wb: c.wordBreak, ws: c.whiteSpace, disp: c.display, gtc: c.gridTemplateColumns, fw: c.flexWrap, kids: [...e.children].map((k) => k.className + ':' + Math.round(k.getBoundingClientRect().width)).join(' | '), clamp: c.webkitLineClamp, h: c.height, mh: c.maxHeight, gt: document.documentElement.getAttribute('data-grand-texte'), styles: document.querySelectorAll('style').length, parentW: e.parentElement && getComputedStyle(e.parentElement).width }); }), process.env.MONTRER)));
     const garde = await pg.evaluate(() => /pas pu s.afficher|Quelque chose s.est mal passé|Recharger l.app/i.test(document.body.innerText));
     const nom = `${ecran} · ${vue}`;
     const mes = await pg.evaluate(mesurer, { tactile: tel, sombre: true, coupes: !!grand || tel });

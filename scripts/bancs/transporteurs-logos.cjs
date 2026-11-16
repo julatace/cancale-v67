@@ -175,7 +175,10 @@ const sain = async (pg, ecran) => {
             // la puce d'abord, et l'en-tête du groupe au même transporteur.
             const act = c.querySelector('.vrm-colis-actions'); const rg = act && act.querySelector('.vrm-rangee-bord');
             const p = rg && rg.querySelector(':scope > .vrm-transporteur');
-            const bouton = rg && [...rg.children].find((x) => x !== p);
+            // (16 nov., intégration vague B) Depuis les finitions du 12 nov., « … » (`.vrm-fu-plus`) est le PREMIER enfant de la
+            // rangée (à gauche de tout, il ne se touchait plus posé à part) : le bouton bordereau est le premier enfant APRÈS
+            // ce « … » et qui n'est pas la puce. La règle reste : la puce, puis le bouton, dans la même rangée.
+            const bouton = rg && [...rg.children].find((x) => x !== p && !x.matches('.vrm-fu-plus'));
             let h = c.previousElementSibling; while (h && !h.hasAttribute('data-groupe-transp')) h = h.previousElementSibling;
             const nomP = p ? (p.getAttribute('data-transporteur-nom') || ((p.querySelector('[data-transporteur-nom]') || p).textContent || '')).trim() : '';
             const nomG = h ? h.getAttribute('data-groupe-transp') : '';
@@ -240,23 +243,33 @@ const sain = async (pg, ecran) => {
         await pg.screenshot({ path: path.join(SHOTS, `transporteurs-retirer-${vp.width}.png`), fullPage: false });
       });
       await essaie(T + ' Récapitulatif d’une vente', async () => {
-        await pg.goto(`http://localhost:${PORT}/?tab=cat_ventes`, { waitUntil: 'domcontentloaded' });
-        const t = pg.locator('.vrm-sale-row[data-tx="8002"] .vrm-ledger-sale-toggle').first();
-        await t.waitFor({ timeout: 30000 }); await pg.waitForTimeout(1200);
-        await t.scrollIntoViewIfNeeded(); await t.click();
-        const id = await t.getAttribute('aria-controls');
-        await pg.locator(`[id="${id}"]`).waitFor({ state: 'visible', timeout: 8000 }); await pg.waitForTimeout(500);
-        const r = await pg.evaluate((id) => { const d = document.getElementById(id); const p = d && d.querySelector('.vrm-recap-principal > .vrm-transporteur');
+        // (16 nov., intégration vague B) Depuis le 14 nov. (proposition 62) puis la fiche D (15 nov.), toucher une vente ouvre
+        // LA fiche de la paire ; le récapitulatif de la ligne y est rendu dans la place « contexte », derrière « ⋯ » → « Tout
+        // voir ». La règle jugée est la même : le transporteur à côté du bouton bordereau, dans le récapitulatif.
+        await pg.goto(`http://localhost:${PORT}/?tab=ventes&site=vinted`, { waitUntil: 'domcontentloaded' });
+        const ouvrirVente = async (tx) => {
+          const t = pg.locator(`[data-fl-tx="${tx}"] .vrm-ledger-sale-toggle`).first();
+          await t.waitFor({ timeout: 30000 }); await pg.waitForTimeout(800);
+          await t.scrollIntoViewIfNeeded(); await t.click();
+          await pg.waitForSelector('.vrm-fp', { timeout: 10000 }).catch(() => {});
+          await pg.evaluate(() => { const b = document.querySelector('.vrm-fp [data-fd-plus-ouvrir]'); if (b) b.click(); });
+          await pg.waitForTimeout(300);
+          await pg.evaluate(() => { const d = document.querySelector('.vrm-fp [data-fiche-plus]'); if (d) d.open = true; });
+          await pg.waitForTimeout(600);
+          return await t.getAttribute('aria-controls');
+        };
+        const id = await ouvrirVente('8002');
+        await pg.waitForSelector('.vrm-fp [data-recap-transporteur]', { state: 'attached', timeout: 10000 }).catch(() => {}); await pg.waitForTimeout(500);
+        const r = await pg.evaluate((id) => { const d = document.querySelector('.vrm-fp') || document.getElementById(id); const p = d && d.querySelector('.vrm-recap-principal > .vrm-transporteur');
           return { cle: p ? p.getAttribute('data-transporteur') : null, txt: p ? (p.getAttribute('data-transporteur-nom') || p.innerText) : '', marque: p ? (p.querySelector('[data-marque]') || { getAttribute: () => '' }).getAttribute('data-marque') : '', bouton: !!(p && p.parentElement.querySelector('button')) }; }, id);
         dit(r.cle === 'mondialrelay' && /Mondial Relay/.test(r.txt) && r.marque === 'mondialrelay' && r.bouton, `${T} R1 récapitulatif : « Mondial Relay » à côté du bouton bordereau`, JSON.stringify(r));
-        await pg.locator(`[id="${id}"]`).screenshot({ path: path.join(SHOTS, `transporteurs-recap-${vp.width}.png`) }).catch(() => {});
-        const t5 = pg.locator('.vrm-sale-row[data-tx="8005"] .vrm-ledger-sale-toggle').first();
-        const croix = pg.locator('.vrm-ledger-drawer-host:not([hidden]) .vrm-recap-fermer');
-        if (await croix.count()) { await croix.first().click(); await pg.waitForTimeout(400); }
-        await t5.scrollIntoViewIfNeeded(); if (await t5.getAttribute('aria-expanded') !== 'true') await t5.click();
-        const id5 = await t5.getAttribute('aria-controls');
-        await pg.locator(`[id="${id5}"]`).waitFor({ state: 'visible', timeout: 8000 }); await pg.waitForTimeout(500);
-        const r5 = await pg.evaluate((id) => { const d = document.getElementById(id); const p = d && d.querySelector('[data-recap-transporteur]');
+        await pg.locator('.vrm-fp').first().screenshot({ path: path.join(SHOTS, `transporteurs-recap-${vp.width}.png`) }).catch(() => {});
+        await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(500);
+        await pg.evaluate(() => { const b = document.querySelector('.vrm-fp [data-fiche-fermer], .vrm-fp .vrm-fp-fermer, .vrm-fp [aria-label="Fermer"]'); if (b) b.click(); });
+        await pg.waitForTimeout(500);
+        const id5 = await ouvrirVente('8005');
+        await pg.waitForSelector('.vrm-fp [data-recap-transporteur]', { state: 'attached', timeout: 10000 }).catch(() => {}); await pg.waitForTimeout(500);
+        const r5 = await pg.evaluate((id) => { const d = document.querySelector('.vrm-fp') || document.getElementById(id); const p = d && d.querySelector('[data-recap-transporteur]');
           return { cle: p ? p.getAttribute('data-transporteur') : null, src: p ? p.getAttribute('data-transporteur-source') : null, n: d ? d.querySelectorAll('[data-recap-transporteur]').length : 0 }; }, id5);
         dit(r5.cle === 'chronopost' && r5.src === 'email' && r5.n === 1, `${T} R2 vente déposée : « Chronopost » (e-mail du même n°), dit une fois`, JSON.stringify(r5));
       });
