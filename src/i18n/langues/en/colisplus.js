@@ -66,4 +66,6 @@ export default {
   "cp.temps.pasMesure": "Not measured yet: pack your parcels here, VRM times the gap between two “Parcel done”.",
   "cp.temps.comment": "How it’s measured",
   "cp.temps.pourquoi": "On this device: the gap between two “Parcel done” here. Over 15 min is a break; under 15 s, a parcel packed earlier: not counted. Earnings: profit of parcels with a known purchase price, divided by their time; photos and buying aren’t included.",
+  // (15 nov.) Le PDF retiré par le serveur : vente finalisée et argent reçu (api/_lib/purge-bordereaux.js).
+  "colis.bordSupprimeVersement": "Label deleted after the payout",
 };
