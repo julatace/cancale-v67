@@ -50,6 +50,19 @@ longues tâches, CLS à l'ouverture), profil CPU (récit de la commande dans « 
 - Profil : `scripts/bancs/_mesure-arrivee.cjs <dist>` ; captures : `_comparer-captures.cjs flou <dist>` (avec
   `STYLE_SANS='…'` pour juger une autre règle sur la même page) ; toucher : `_mesure-toucher.cjs <dist>`.
 
+## Pendant le chargement (capture de Julien : « pendant le chargement c'est moche »)
+Le banc sert une base LENTE (`charge_*` : chaque lecture attend `LENT_MS`, défaut 6 s) et juge Ma journée, Ventes,
+Achats, Argent, Stock AU MILIEU du chargement (captures regardées). Deux contrôles neufs : **S11** jamais deux textes
+l'un sur l'autre (rectangles de texte, texte réservé au lecteur d'écran écarté) et **S12** aucun squelette en plaque
+blanche opaque sur le fond.
+
+| défaut (main) | écran | correction | preuve |
+|---|---|---|---|
+| squelettes `.vrm-skeleton-element` en blanc PLEIN (255,255,255) sur le bleu | Ventes, Achats | la matière des cartes : verre translucide, même ombre, rayon 22, barres à l'encre du verre très légère ; aucun reflet animé avec « moins d'animations » (déjà) | S12 rouge sur main (Ventes 3, Achats 2), vert après |
+| « Je lis tes annonces Vinted, Leboncoin… » gris sombre sur le bleu (1,05:1 lu sur la capture) | Stock | le gris clair du verre posé sur le fond | S3 + S10 rouges sur main |
+| en-tête « Pour mieux acheter » (1,5:1) | Achats | idem (hors feuilles et cartes) | S3 rouge sur main |
+| la rangée de chiffres qui s'effondre (« Bén… Ven… Reç… », deux montants l'un sur l'autre) | Ma journée | chaque case garde SA colonne (`overflow: hidden`, `min-width: 0`), le libellé passe à la ligne au lieu d'être coupé ; le chiffre se réduit déjà pour tenir | ⚠️ **pas reproduit** sur la base inventée (ni pendant le chargement, ni montants longs forcés `cases_serrees`) : la garde est posée, le contrôle S11 la surveille ; à revoir sur SA capture si elle revient |
+
 ## Le banc `scripts/bancs/stabilite-iphone.cjs`
 Appareil « iPhone 15 » (viewport, agent iOS, tactile), clair et sombre, base inventée (1 000 paires, 1 000
 conversations, 1 000 e-mails + un compte eBay présent sans données). Chaque écran (Ma journée, Annonces et ses

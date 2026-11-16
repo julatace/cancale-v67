@@ -64,6 +64,15 @@ const ECRANS = {
   fiche: ['/?tab=journee', 'fiche'],
   plus: ['/?tab=journee', 'plus'],
   menu: ['/?tab=journee', 'menu'],
+  // PENDANT LE CHARGEMENT (16 nov., capture de Julien : « pendant le chargement c'est moche ») : la base répond
+  // lentement (`LENT_MS`, défaut 6 000 ms par lecture), la capture et les mesures sont prises au MILIEU.
+  charge_journee: ['/?tab=journee', 'chargement'],
+  charge_ventes: ['/?tab=ventes&site=vinted', 'chargement'],
+  charge_achats: ['/?tab=achats', 'chargement'],
+  charge_argent: ['/?tab=compta', 'chargement'],
+  charge_stock: ['/?tab=garage', 'chargement'],
+  // La rangée de chiffres de Ma journée au PIRE (la capture de Julien) : montants longs, libellés longs, rangée étroite.
+  cases_serrees: ['/?tab=journee', 'cases-serrees'],
 };
 const VOULUS = liste('ECRANS', Object.keys(ECRANS).join(','));
 const THEMES = liste('THEMES', 'clair,sombre');
@@ -73,6 +82,7 @@ const ONGLETS_MAX = Number(process.env.ONGLETS_MAX || 8);
 const SHOTS = process.env.SHOTS || path.join(require('os').tmpdir(), 'banc-stabilite-iphone');
 fs.mkdirSync(SHOTS, { recursive: true });
 const IPHONE = PW.devices['iPhone 15'];
+const LENT = { ms: 0 };
 // La base : celle du volume, + un compte eBay présent (ses lignes de commandes et d'annonces existent, vides) — sans
 // elles, Ventes · eBay ne montre que « Aucun compte eBay relié » et ses sections (À traiter, Offres…) ne sont jamais
 // rendues. Les routes eBay du banc répondent `{}` : chaque section dit son « pas pu lire » (la capture de Julien).
@@ -179,6 +189,48 @@ function sousLaBarre() {
     }
     ok(out);
   }, 500));
+}
+
+// S11 : jamais deux textes l'un sur l'autre (« 2 87⁠1062 € » : deux montants peints au même endroit) ; S12 : un
+// squelette de chargement n'est jamais une plaque BLANCHE opaque posée sur le fond bleu (le verre, translucide).
+function superpositions() {
+  const out = { textes: [], blancs: [] };
+  const vis = (el) => { const c = getComputedStyle(el); return c.visibility !== 'hidden' && c.display !== 'none' && parseFloat(c.opacity) > 0.05; };
+  const boites = [];
+  for (const el of document.querySelectorAll('.vrm-main *')) {
+    if (el.closest('svg, [aria-hidden="true"], .vrm-sr-seul, .vg-sr, details:not([open]) > :not(summary)')) continue;
+    let tn = null; for (const n of el.childNodes) if (n.nodeType === 3 && /[\p{L}\p{N}€]/u.test(n.nodeValue)) { tn = n; break; }
+    if (!tn || !vis(el)) continue;
+    // un parent transparent (opacité cumulée faible) : pas vu
+    let op = 1, cache = false;
+    for (let a = el; a && a !== document.body; a = a.parentElement) { const c = getComputedStyle(a); op *= parseFloat(c.opacity || '1'); const ra = a.getBoundingClientRect();
+      if (c.clip === 'rect(0px, 0px, 0px, 0px)' || /inset\(50%\)/.test(c.clipPath) || (c.position === 'absolute' && ra.width <= 1 && ra.height <= 1)) { cache = true; break; } }
+    if (op < 0.2 || cache) continue;   // texte réservé au lecteur d'écran (caché exprès), ou transparent : pas vu
+    const g = document.createRange(); g.selectNodeContents(tn);
+    for (const r of g.getClientRects()) if (r.width > 3 && r.height > 3 && r.bottom > 0 && r.top < innerHeight) boites.push({ el, r, t: tn.nodeValue.trim().slice(0, 18) });
+    if (boites.length > 900) break;
+  }
+  for (let i = 0; i < boites.length; i++) for (let j = i + 1; j < boites.length; j++) {
+    const a = boites[i], b = boites[j];
+    if (a.el === b.el || a.el.contains(b.el) || b.el.contains(a.el)) continue;
+    const w = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left), h = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top);
+    if (w <= 2 || h <= 2) continue;
+    const petit = Math.min(a.r.width * a.r.height, b.r.width * b.r.height);
+    if (w * h < 0.3 * petit) continue;
+    // l'un des deux recouvert par un panneau opaque (feuille, barre) : il n'est pas vu, pas une superposition
+    const cx = Math.max(a.r.left, b.r.left) + w / 2, cy = Math.max(a.r.top, b.r.top) + h / 2;
+    const hit = document.elementFromPoint(cx, cy); if (!hit || !(a.el.contains(hit) || b.el.contains(hit) || hit.contains(a.el) || hit.contains(b.el))) continue;
+    out.textes.push(`« ${a.t} » × « ${b.t} » (${Math.round(w)}×${Math.round(h)} px)`);
+    if (out.textes.length > 8) return out;
+  }
+  for (const el of document.querySelectorAll('.vrm-main [class*="skeleton"], .vrm-main [class*="squelette"], .vrm-main [data-a-venir-attente]')) {
+    if (!vis(el)) continue;
+    const r = el.getBoundingClientRect(); if (r.width < 40 || r.height < 20) continue;   // tout l'écran, pas seulement la partie vue
+    const m = getComputedStyle(el).backgroundColor.match(/rgba?\(([\d.]+)[ ,]+([\d.]+)[ ,]+([\d.]+)(?:[ ,/]+([\d.]+))?/);
+    if (!m) continue; const a = m[4] == null ? 1 : +m[4];
+    if (a >= 0.95 && +m[1] > 235 && +m[2] > 235 && +m[3] > 235) out.blancs.push(`${el.className && String(el.className).split(' ')[0]} ${Math.round(r.width)}×${Math.round(r.height)} (${getComputedStyle(el).backgroundColor})`);
+  }
+  return out;
 }
 
 // S7 : chaque cible amenée au centre se touche.
@@ -316,6 +368,12 @@ async function geste(o, g) {
     const b = pg.locator('[data-sb-disque]').first();
     if (await b.count()) await b.tap().catch(() => {});
     await pg.waitForTimeout(1200);
+  } else if (g === 'cases-serrees') {
+    await pg.evaluate(() => {
+      const L = ['2 879 €', '1 062 €', '3 140 €', '987 €'];
+      document.querySelectorAll('.vrm-main .vrm-fu-cases').forEach((r) => { r.style.width = '300px'; r.querySelectorAll(':scope > .vrm-fu-case > b').forEach((b, i) => { b.textContent = 'au moins ' + L[i % L.length]; }); });
+    });
+    await pg.waitForTimeout(600);
   } else if (g === 'menu') {
     const b = pg.locator('[data-menu-ecrans], button[aria-label*="Tous les écrans"], button[aria-label*="Menu"]').first();
     if (await b.count()) await b.tap().catch(() => {});
@@ -332,7 +390,7 @@ const ongletsVus = (pg) => pg.evaluate((max) => {
   return out.slice(0, max);
 }, ONGLETS_MAX);
 
-async function juger(o, suf, { perf }) {
+async function juger(o, suf, { perf, chargement = false }) {
   const pg = o.pg;
   // S9 (1) — une fenêtre CALME de 2,5 s avant toute mesure du banc (les mesures elles-mêmes bloquent la page) : l'app
   // seule, écran prêt. Longues tâches du fil principal (Chromium) ; sous WebKit, le pire trou entre deux images.
@@ -363,6 +421,9 @@ async function juger(o, suf, { perf }) {
   dit(m.deborde.page <= 1 && m.deborde.main <= 1 && m.deborde.hors === 0, `S4 ${suf} : rien ne déborde à l'horizontale`, `page +${m.deborde.page} · main +${m.deborde.main} · ${m.deborde.hors} hors écran${m.deborde.hors ? ' : ' + m.deborde.horsNoms.join(' | ') : ''}`);
   dit(s.chevauche.length === 0, `S5 ${suf} : aucune barre fixe sur une autre`, s.chevauche.slice(0, DETAIL).join(' | ') + (s.chevauche.length ? ` (fixes : ${s.fixes.join(' ; ')})` : ''));
   dit(!s.bloque, `S8 ${suf} : le défilement n'est pas bloqué`, s.bloque || '');
+  const sp = await pg.evaluate(superpositions);
+  dit(sp.textes.length === 0, `S11 ${suf} : jamais deux textes l'un sur l'autre${chargement ? ' (pendant le chargement)' : ''}`, sp.textes.slice(0, DETAIL).join(' | '));
+  dit(sp.blancs.length === 0, `S12 ${suf} : aucun squelette en plaque blanche opaque sur le fond`, sp.blancs.slice(0, DETAIL).join(' | '));
   const couv = await ciblesCouvertes(pg);
   dit(couv.length === 0, `S7 ${suf} : chaque cible amenée au centre se touche`, couv.slice(0, DETAIL).join(' | '));
   const sb = await pg.evaluate(sousLaBarre);
@@ -383,7 +444,17 @@ if (require.main === module) (async () => {
   const nav = await lancer(PW, { executablePath: process.env.BANC_CHROMIUM || '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
   // L'appareil « iPhone 15 » : viewport, agent iOS, tactile (le reste de `ouvrir` est celui des bancs de design).
   const nc = nav.newContext.bind(nav);
-  nav.newContext = (o = {}) => nc(Object.assign({}, o, o.isMobile ? { viewport: IPHONE.viewport, screen: IPHONE.screen, userAgent: IPHONE.userAgent, deviceScaleFactor: 2, isMobile: NAVIGATEUR !== 'firefox', hasTouch: true } : {}));
+  nav.newContext = async (o = {}) => {
+    const ctx = await nc(Object.assign({}, o, o.isMobile ? { viewport: IPHONE.viewport, screen: IPHONE.screen, userAgent: IPHONE.userAgent, deviceScaleFactor: 2, isMobile: NAVIGATEUR !== 'firefox', hasTouch: true } : {}));
+    // Une base LENTE quand l'écran est jugé pendant son chargement : chaque lecture de la base attend `LENT_MS`.
+    const np = ctx.newPage.bind(ctx);
+    ctx.newPage = async (...x) => {
+      const pg = await np(...x); const r0 = pg.route.bind(pg);
+      pg.route = (url, h, ...y) => r0(url, async (route, req) => { if (LENT.ms && /\/rest\/v1\//.test(route.request().url())) await new Promise((ok) => setTimeout(ok, LENT.ms)); return h(route, req); }, ...y);
+      return pg;
+    };
+    return ctx;
+  };
   console.log(`Moteur : ${NAVIGATEUR} · iPhone 15 ${IPHONE.viewport.width}×${IPHONE.viewport.height} · ${VOULUS.length} écrans × ${THEMES.join('/')}`);
   try {
     for (const th of THEMES) for (const e of VOULUS) {
@@ -393,16 +464,18 @@ if (require.main === module) (async () => {
       let o;
       try {
         const t0 = Date.now();
+        LENT.ms = g === 'chargement' ? (Number(process.env.LENT_MS) || 6000) : 0;
         o = await P.ouvrir(nav, { W: 390, sombre: th === 'sombre', b: base(), url, api: B.apiVolume });
         o.consoles = [];
         o.pg.on('console', (msg) => { if (msg.type() !== 'error') return; const t = msg.text(); if (/Failed to load resource|net::ERR|due to access control checks|Fetch API cannot load|ERR_ABORTED|status of 4\d\d|status of 5\d\d/i.test(t)) return; o.consoles.push(t.slice(0, 200)); });
         await o.pg.addInitScript(TEMOIN); await o.pg.evaluate(TEMOIN).catch(() => {});
         await o.pg.addInitScript(DEFILEUR); await o.pg.evaluate(DEFILEUR).catch(() => {});
-        await P.pret(o.pg);
-        if (g) await geste(o, g);
+        if (g === 'chargement') { await o.pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {}); await o.pg.waitForTimeout(Math.round((Number(process.env.LENT_MS) || 6000) / 2)); }
+        else await P.pret(o.pg);
+        if (g && g !== 'chargement') await geste(o, g);
         await o.pg.waitForTimeout(500);
         console.log(`   ${suf} prêt en ${Date.now() - t0} ms`);
-        await juger(o, suf, { perf: !g && th === THEMES[0] });
+        await juger(o, suf, { perf: !g && th === THEMES[0], chargement: g === 'chargement' });
         if (!g) {
           const onglets = await ongletsVus(o.pg);
           for (const lib of onglets) {
