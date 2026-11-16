@@ -96,7 +96,7 @@ async function ouvrir(b, vp, sombre, etat) {
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.clock.install({ time: DEPART });
-  await pg.addInitScript((s) => { try { localStorage.setItem('vrm_acces_direct', '1'); if (s) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, !!sombre);
+  await pg.addInitScript((s) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_je_vends', JSON.stringify({ choix: 'sneakers', at: '2026-10-01T10:00:00.000Z' })); if (s) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, !!sombre);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
@@ -132,10 +132,18 @@ async function ouvrir(b, vp, sombre, etat) {
   });
   return { ctx, pg, errs };
 }
+// (16 nov., lot ebay-achats-refonte) L'onglet s'ouvre par son adresse (le bouton « Achats » de la
+// coque a changé de forme : le banc restait sur l'écran d'avant, 36 rouges sur main).
 const ouvrirAchats = async (pg) => {
-  await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay`, { waitUntil: 'domcontentloaded' });
-  await pg.getByRole('button', { name: 'Achats', exact: true }).first().click({ timeout: 15000 });
-  await pg.waitForSelector('[data-ebay-recherche]', { timeout: 15000 });
+  await pg.goto(`http://localhost:${PORT}/?tab=plat_ebay&section=achats`, { waitUntil: 'domcontentloaded' });
+  await pg.waitForSelector('[data-ebay-recherche]', { timeout: 30000 });
+};
+// (16 nov.) « Mes recherches » : une ligne par recherche, son détail (ses annonces) au toucher.
+const ouvrirLigne = async (pg, id) => {
+  const sel = id ? '[data-ebay-fil-recherche="' + id + '"]' : '[data-ebay-fil-recherche]';
+  await pg.waitForFunction((s) => { const e = document.querySelector(s); return e && /^(lu|criteres|pas-su|plafond)$/.test(e.getAttribute('data-etat')); }, sel, { timeout: 15000 });
+  if (!(await pg.$(sel + ' [data-ebay-detail]'))) await pg.click(sel + ' [data-ebay-ligne]');
+  await pg.waitForSelector(sel + ' [data-ebay-detail]', { timeout: 5000 });
 };
 const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 const tic = (pg, ms) => pg.clock.runFor(ms);
@@ -149,6 +157,7 @@ const tic = (pg, ms) => pg.clock.runFor(ms);
       let { ctx, pg, errs } = await ouvrir(b, vp, sombre);
       await essaie('le fil, première lecture', async () => {
         await ouvrirAchats(pg);
+        await ouvrirLigne(pg);
         await pg.waitForSelector('[data-ebay-fil-recherche] [data-ebay-liste]', { timeout: 15000 });
         const n = await pg.$eval('[data-ebay-fil]', (e) => e.getAttribute('data-ebay-fil'));
         dit(n === '1', 'le fil lit la recherche enregistrée', n);
@@ -159,6 +168,7 @@ const tic = (pg, ms) => pg.clock.runFor(ms);
         const txt = await pg.$eval('[data-ebay-fil-recherche]', (e) => e.innerText);
         dit(/port non indiqué/.test(txt), 'un port inconnu est dit « port non indiqué », jamais gratuit');
         dit(!/Achat test Converse/.test(await pg.innerText('body')) && !autres.some((x) => x.action === 'achats'), 'les achats gagnés ne sont pas lus tant que le repli est fermé');
+        await pg.click('[data-ebay-details] > summary');   // (16 nov.) « Les données » repliées sous « Détails »
         const don = await pg.$eval('[data-ebay-donnees]', (e) => e.innerText);
         dit(/1 recherche sur 200/.test(don) && /Ko reçus d’eBay/.test(don) && /5 000/.test(don), 'les données : recherches du jour sur le plafond, Ko reçus et envoyés, plafond d’eBay', don.replace(/\s+/g, ' ').slice(0, 220));
         // (30 oct., revue) Le total du jour en Ko sur cet appareil (sa question sur les données).
@@ -166,9 +176,9 @@ const tic = (pg, ms) => pg.clock.runFor(ms);
         // §7 : deux annonces du même modèle ⇒ le repère est dit UNE fois au-dessus de la liste.
         const nr = await pg.$$eval('[data-ebay-fil-recherche] [data-ebay-repere]', (l) => l.length);
         dit(nr === 1, 'le repère du modèle est dit une fois au-dessus de la liste (pas sur chaque ligne)', nr + ' fois');
-        // La pastille « Dans le fil » de l'espace plus bas est lisible (texte et fond contrastés, sombre compris).
-        const ct = await pg.$eval('.ops-statut', (e) => { const rgb = (c) => (c.match(/\d+(\.\d+)?/g) || []).slice(0, 3).map(Number); const L = (c) => { const [r, g, b] = rgb(c).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; }; const cs = getComputedStyle(e); const a = L(cs.color), b = L(cs.backgroundColor); return { t: e.textContent, ratio: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05), c: cs.color, f: cs.backgroundColor }; });
-        dit(ct.t === 'Dans le fil' && ct.ratio >= 3, 'la pastille « Dans le fil » est lisible', JSON.stringify(ct));
+        // (16 nov.) La recherche relue porte « dans le fil » (son interrupteur « Me prévenir ») ; plus de pastille.
+        const dans = await pg.$$eval('[data-ebay-fil-recherche][data-ops-fil="dans"] [role="switch"]', (l) => l.length);
+        dit(dans === 1, 'la recherche relue est « dans le fil » (son interrupteur « Me prévenir »)', String(dans));
       });
       await essaie('relecture bornée', async () => {
         const avant = appels.length;
@@ -246,6 +256,7 @@ const tic = (pg, ms) => pg.clock.runFor(ms);
         await ctx.close(); visite = 2; appels = [];
         ({ ctx, pg, errs } = await ouvrir(b, vp, sombre, etat));
         await ouvrirAchats(pg);
+        await ouvrirLigne(pg, VEILLE.id);
         await pg.waitForSelector('[data-ebay-fil-recherche="' + VEILLE.id + '"] [data-ebay-liste]', { timeout: 15000 });
         const nv = await pg.$$eval('[data-ebay-fil-recherche="' + VEILLE.id + '"] [data-nouveau="oui"]', (l) => l.map((e) => e.getAttribute('data-ebay-resultat')));
         dit(nv.length === 1 && nv[0] === 'v1|5009|0', 'visite suivante : seule l’annonce jamais vue est « nouvelle » (par itemId)', JSON.stringify(nv));
@@ -339,9 +350,9 @@ const tic = (pg, ms) => pg.clock.runFor(ms);
         ({ ctx, pg, errs } = await ouvrir(b, vp, sombre));
         await ouvrirAchats(pg);
         await pg.waitForSelector('[data-ebay-hors-fil]', { timeout: 15000 });
-        await pg.waitForSelector('.ops-statut', { timeout: 15000 });
         const t = await pg.innerText('[data-ebay-achats-onglet]');
-        const dans = (t.match(/Dans le fil/g) || []).length, hors = await pg.$$eval('[data-ops-fil="hors"]', (l) => l.map((e) => e.closest('article') && e.closest('article').querySelector('h3') && e.closest('article').querySelector('h3').textContent));
+        // (16 nov.) Une ligne par recherche : « dans le fil » = son interrupteur, « Hors du fil » = une étiquette.
+        const dans = await pg.$$eval('[data-ops-fil="dans"]', (l) => l.length), hors = await pg.$$eval('[data-ops-fil="hors"]', (l) => l.map((e) => (e.querySelector('.eba-nom') || {}).textContent));
         dit(dans === 10 && hors.length === 1 && hors[0] === 'Recherche 1', '« Dans le fil » pour les 10 relues, « Hors du fil » pour la plus ancienne', `dans ${dans} · hors ${JSON.stringify(hors)}`);
         dit(/1 autre recherche active n’est pas relue/.test(t) && !/ne est/.test(t), 'la phrase dit « n’est pas relue »');
         dit(appels.length <= 10, 'le fil ne relit que 10 recherches', appels.length + ' appel(s)');
@@ -352,6 +363,8 @@ const tic = (pg, ms) => pg.clock.runFor(ms);
         ({ ctx, pg, errs } = await ouvrir(b, vp, sombre));
         await ouvrirAchats(pg);
         await pg.waitForSelector('[data-ebay-fil-recherche][data-etat="criteres"]', { timeout: 15000 });
+        await pg.click('[data-ebay-fil-recherche][data-etat="criteres"] [data-ebay-ligne]');
+        await pg.waitForSelector('[data-ebay-fil-recherche][data-etat="criteres"] [data-ebay-detail]', { timeout: 5000 });
         const t = await pg.$eval('[data-ebay-fil-recherche][data-etat="criteres"]', (e) => e.innerText);
         dit(/Critères refusés/.test(t) && /Modifie/.test(t), 'critères refusés : dit, avec le geste', t.replace(/\s+/g, ' ').slice(0, 160));
         const avant = appels.length;
@@ -381,6 +394,7 @@ const tic = (pg, ms) => pg.clock.runFor(ms);
         dit(nb === 1 && !/Organisation/.test(t) && (t.match(/rien n’est perdu/g) || []).length === 1, 'espace illisible : une phrase, un « Réessayer »', `Réessayer ×${nb} · ${t.replace(/\s+/g, ' ').slice(0, 200)}`);
         opsKo = false;
         await pg.click('[data-ebay-achats-onglet] button:text-is("Réessayer")');
+        await ouvrirLigne(pg);
         await pg.waitForSelector('[data-ebay-fil-recherche]', { timeout: 15000 });
         dit(true, 'espace illisible : « Réessayer » relit le fil');
       });
