@@ -368,11 +368,12 @@ const FEUILLES = [
   // docs/passation/2026-11-06-onglets-d.md, « Prochain geste ») — son bouton : la même feuille.
   { nom: 'Prix d’achat à compléter (Annonces)', url: '?tab=cat_annonces', ouvrir: (pg) => pg.locator('[data-ann-achats-completer], [data-ann-prochain-geste="prix"] [data-ann-prochain-geste-bouton]').first().click(), sel: null },
   // (6 nov.) Deux commandes par vente, « le reste dans … » (c6b2e1ea, critique du 3 nov.) :
-  // « Relier un achat » est derrière le « … » de la ligne (`data-vente-plus`) quand il n'est pas à vue.
+  // (16 nov., ventes-clair) Plus de « … » sur la ligne : « Relier un achat » vient avec la saisie, ouverte par la puce
+  // « Prix d'achat ? » (`data-cout-vente-saisir`) de la ligne.
   { nom: 'Relier un achat (Ventes)', url: '?tab=ventes&site=vinted', ouvrir: async (pg) => {
-    const r = pg.locator('[data-cout-vente-relier]').first();
-    if (!(await r.isVisible())) await pg.locator('[data-fu-forme]').filter({ has: pg.locator('[data-cout-vente-relier]') }).first().locator('[data-vente-plus]').click();
-    await r.click();
+    const r = pg.locator('[data-cout-vente="ligne"] [data-cout-vente-relier]').first();
+    if (!(await r.isVisible().catch(() => false))) await pg.locator('[data-cout-vente="ligne"] [data-cout-vente-saisir]').first().click();
+    await pg.locator('[data-cout-vente="ligne"] [data-cout-vente-relier]').first().click();
   }, sel: null },
   { nom: 'Nouvelle facture (Factures)', url: '?tab=compta&section=factures', ouvrir: (pg) => pg.getByRole('button', { name: /Nouvelle facture/ }).first().click(), sel: null },
 ];

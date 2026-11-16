@@ -15,7 +15,7 @@ require('./_porte-banc.cjs');
 //  L  une ligne de vente tient en trois lignes (≤ 96 px au téléphone), rien n'y dépasse à droite ;
 //  F  les filtres de la liste sont entiers (aucun coupé par son conteneur) et tiennent avec « Outils » sur UNE ligne ;
 //  P  plus aucun « ⋯ » sur une ligne de vente ; toucher la vente ouvre sa fiche ; la puce « Prix d'achat ? » (44 px)
-//     seulement quand il manque (N°1–3 ont un prix saisi : aucune puce) ; « Imprimer » et « Déposé » côte à côte ;
+//     seulement quand il manque (une vente sur trois a son prix saisi : aucune puce) ; « Imprimer » et « Déposé » côte à côte ;
 //  C  contraste ≥ 4,5:1 : les chiffres de la bande du mois, « Sélectionner », la tête du repli.
 //  `LARGEURS=390,1512` `THEMES=clair,sombre` ; `BANC_DIST=` le build jugé ; `SHOTS=` les captures.
 //  Un banc ne meurt pas, il rapporte.
@@ -30,13 +30,15 @@ const THEMES = liste('THEMES', 'clair,sombre');
 const SHOTS = process.env.SHOTS || path.join(require('os').tmpdir(), 'banc-ventes-clair');
 fs.mkdirSync(SHOTS, { recursive: true });
 
+const SAISIES = new Set();
 function base() {
   const b = fabriquer({ comptes: 3, ventes: 2000 });
   const m = b.main[0].data; const at = '2026-11-01T10:00:00.000Z';
   Object.assign(m, { vrm_bienvenue_vue: { at }, vrm_visite_vue: { at }, vrm_je_vends: { choix: 'sneakers', at }, vrm_configuration: { etat: 'fait', at, statut: null, version: 1 },
     vrm_plateformes_affichees: { sites: ['vinted'], at }, vrm_parcours: { etat: 'fini', at }, vrm_bilan_minute: { vu: at, fin: 'vu' } });
-  // Trois fiches au prix d'achat SAISI (N°1, 2, 3) : leur ligne ne porte AUCUNE puce « Prix d'achat ? ».
-  for (const f of Object.values(m.vinted_annonce_numeros || {})) if (f && ['1', '2', '3'].includes(String(f.numero ?? f.num))) f.buyPrice = '20';
+  // Une vente sur trois au prix d'achat SAISI (sur la vente, `vinted_sale_overrides`) : sa ligne ne porte AUCUNE puce.
+  m.vinted_sale_overrides = Object.assign({}, m.vinted_sale_overrides || {});
+  for (const r of b.rows) if (/_orders_sold$/.test(r.id)) (r.data.payload.my_orders || []).forEach((o, i) => { if (i % 3 === 0) { m.vinted_sale_overrides[String(o.transaction_id)] = { buyPrice: '20' }; SAISIES.add(String(o.transaction_id)); } });
   const vus = {}; for (const a of b.accounts) vus[a.vinted_user_id] = Date.now() - 120000;
   b.rows.push({ id: 'ext_appareil_0123456789abcdef', data: { appareil: { paquet: 'chromium', nav: 'chrome', systeme: 'mac' }, ver: '5.375.0', code: '5.375.0', atMs: Date.now() - 60000, flux: {}, vus: { vinted: vus } } });
   return b;
@@ -88,7 +90,7 @@ function mesurer() {
     redits: [...document.querySelectorAll('.vrm-fu-ventes :is([data-fu-case="aposter"], [data-fu-case="enroute"])')].filter(vis).length,
     regarder: regarder ? { n: regarder.getAttribute('data-ventes-regarder'), ouvert: regarder.open, cachee: !!regarder.hidden, visibles: cartesRepli.filter(vis).length, total: cartesRepli.length } : null,
     points: lignes.filter((l) => [...l.querySelectorAll('.vrm-fu-plus-vente, [data-vente-plus], .vrm-ledger-sale-plus')].some(vis)).length,
-    puces: lignes.slice(0, 20).map((l) => { const num = (l.querySelector('[data-fu-num]') || {}).textContent || ''; const pu = [...l.querySelectorAll('[data-cout-vente="ligne"] [data-cout-vente-saisir], [data-cout-vente="ligne"] [data-prix-propose]')].filter(vis); const r = pu[0] ? pu[0].getBoundingClientRect() : null; return { num: num.replace(/\D/g, ''), manque: l.querySelector('[data-achat-etat="manque"]') != null, puce: pu.length, h: r ? Math.round(r.height) : null }; }),
+    puces: lignes.slice(0, 20).map((l) => { const num = l.getAttribute('data-fl-tx') || ''; const pu = [...l.querySelectorAll('[data-cout-vente="ligne"] [data-cout-vente-saisir], [data-cout-vente="ligne"] [data-prix-propose]')].filter(vis); const r = pu[0] ? pu[0].getBoundingClientRect() : null; return { num: num.replace(/\D/g, ''), manque: l.querySelector('[data-achat-etat="manque"]') != null, puce: pu.length, h: r ? Math.round(r.height) : null }; }),
     aEnvoyer, hauteurs, debord, coupes, nFiltres: filtres.length,
     uneLigne: (() => { const o = document.querySelector('.vrm-sales-workbar .vrm-outils-ventes'); const tops = [...filtres, o].filter(Boolean).filter(vis).map((x) => { const r = x.getBoundingClientRect(); return Math.round(r.top + r.height / 2); }); return tops.length ? Math.max(...tops) - Math.min(...tops) : null; })(),
     bandes, sel: sel && vis(sel) ? contraste(sel) : null, tete: tete && vis(tete) ? contraste(tete.querySelector('span:nth-child(2)') || tete) : null,
@@ -124,7 +126,7 @@ function mesurer() {
         if (W < 600) dit(m.hauteurs.length > 3 && Math.max(...m.hauteurs.slice(0, 9)) <= 96, `L ${t} : chaque ligne de vente tient en trois lignes (≤ 96 px)`, m.hauteurs);
         if (W < 600) dit(m.aEnvoyer.length > 0 && m.aEnvoyer.every((x) => !x.chevauche && !x.coupe && x.cible >= 44), `L ${t} : une vente à envoyer : « Imprimer » et « Déposé » (44 px) côte à côte, « À envoyer » entier`, m.aEnvoyer);
         dit(m.points === 0, `P ${t} : plus aucun « ⋯ » sur une ligne de vente`, m.points);
-        const pAvec = m.puces.filter((x) => ['1', '2', '3'].includes(x.num)), pSans = m.puces.filter((x) => x.manque);
+        const pAvec = m.puces.filter((x) => SAISIES.has(x.num)), pSans = m.puces.filter((x) => x.manque && !SAISIES.has(x.num));
         dit(pAvec.length > 0 && pAvec.every((x) => x.puce === 0) && pSans.length > 0 && pSans.every((x) => x.puce === 1 && x.h >= 44), `P ${t} : la puce « Prix d'achat ? » (44 px) seulement quand il manque`, m.puces.slice(0, 6));
         dit(m.debord === 0, `L ${t} : rien ne dépasse d'une ligne de vente`, m.debord);
         dit(m.nFiltres >= 3 && m.coupes.length === 0, `F ${t} : les filtres sont entiers`, m.coupes);

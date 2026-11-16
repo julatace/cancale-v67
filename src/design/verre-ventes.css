@@ -97,9 +97,9 @@
     position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; white-space: nowrap !important;
   }
   /* « Imprimer » à côté du « ⋯ » (2e et 3e lignes) : le texte de ces deux lignes leur laisse la place ; la frise s'efface
-     (une vente à envoyer est à sa 1re étape : « ● À envoyer · Vendue · 11 nov. » le dit). */
+     (des traits plus courts : « ● À envoyer · Vendue · 11 nov. » garde sa place). */
   :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme]:has(> .vrm-rangee-bord > .vrm-fu-imprimer-ligne:only-child) :is(.vrm-fu-vente-l2, .vrm-ledger-sale-frise) { padding-right: 92px !important; }
-  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme]:has(> .vrm-rangee-bord > .vrm-fu-imprimer-ligne:only-child) .vrm-ledger-sale-frise .vrm-fu-seg { display: none !important; }
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme]:has(> .vrm-rangee-bord > .vrm-fu-imprimer-ligne:only-child) .vrm-ledger-sale-frise .vrm-fu-seg { flex-basis: 8px !important; width: 8px !important; }
 }
 
 /* ── 5. PLUS DE « ⋯ » SUR UNE LIGNE DE VENTE (Julien, 16 nov.) : toucher la vente ouvre sa fiche (tous les gestes) ;
