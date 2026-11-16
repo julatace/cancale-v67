@@ -197,6 +197,21 @@ async function passe(b, nom, ctxOpts, sombre) {
   dit(!lv.debord.length && !lv.cote.length, `${nom} · vendus · même carte, rien ne déborde`, lv.debord.concat(lv.cote).slice(0, 3).join(' ; '));
   await pg.locator('[data-ar-onglet="vente"]').first().click({ timeout: 5000 }).catch(() => {});
   await pg.waitForTimeout(600);
+  // (16 nov., relier-fiable) Une paire sans proposition (trois identiques) : « Choisir un achat » ouvre la feuille ; les
+  // candidats y sont REPLIÉS sous « Autres pistes · N », jamais ouverts d'office ; son toucher les déplie.
+  await pg.locator('[data-ar-ligne="81005"] [data-ar-choisir]').first().evaluate((e) => e.click()).catch(() => {});
+  await pg.locator('[data-relier-feuille]').first().waitFor({ timeout: 8000 }).catch(() => {});
+  await pg.locator('[data-pistes-achat]').first().waitFor({ timeout: 8000 }).catch(() => {});
+  const pz = await pg.evaluate(() => { const z = document.querySelector('[data-pistes-achat]'); return { n: z ? Number(z.getAttribute('data-pistes-achat')) : 0, ouv: z ? z.getAttribute('data-pistes-ouvertes') : '', vues: document.querySelectorAll('[data-piste-achat]').length, sugg: document.querySelectorAll('[data-relier-feuille] [data-suggestion-achat]').length }; });
+  await capture(pg, nom, 'feuille-pistes');
+  dit(pz.n >= 1 && pz.ouv === '0' && pz.vues === 0 && pz.sugg === 0, `${nom} · feuille · aucune suggestion en tête, « Autres pistes · ${pz.n} » REPLIÉES`, JSON.stringify(pz));
+  await pg.locator('[data-pistes-bouton]').first().evaluate((e) => e.click()).catch(() => {});
+  await pg.waitForTimeout(400);
+  const pz2 = await pg.evaluate(() => [...document.querySelectorAll('[data-piste-achat]')].map((e) => e.getAttribute('data-piste-achat')).sort());
+  await capture(pg, nom, 'feuille-pistes-ouvertes');
+  dit(pz2.length >= 1 && pz2.every((t) => /^9300000[567]$/.test(t)) && !ecrits.some((x) => /buyFromId/.test(x)), `${nom} · feuille · dépliées sur SON toucher : les achats identiques, rien d'écrit`, JSON.stringify(pz2));
+  await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(500);
+  if (await pg.locator('[data-relier-feuille]').count()) { await pg.mouse.click(8, 8).catch(() => {}); await pg.waitForTimeout(500); }
   // « Valider les N très probables » : la liste, puis SON toucher.
   dit(l.valider === TRES_PROBABLES.length, `${nom} · clic · « Valider les ${TRES_PROBABLES.length} très probables » visible`, String(l.valider));
   await pg.locator('[data-ar-valider]').first().evaluate((e) => e.click()).catch(() => {});
