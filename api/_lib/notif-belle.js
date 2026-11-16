@@ -123,8 +123,8 @@ export const etiquetteGroupe = (genre) => `vrm-${genre.id}`;
 
 // Le texte regroupé : `k` notifications NON LUES de ce genre (celle-ci comprise).
 // k ≤ 1 ⇒ inchangé. (15 nov.) Le corps dit LA PLUS RÉCENTE en une ligne courte :
-// sa `ligne` quand la règle de rédaction l'a faite (« 9060 vert/blanc T38, expire
-// dans 24 h »), sinon son titre puis son corps. Dans la langue du vendeur.
+// sa `ligne` quand la règle de rédaction l’a faite (« 9060 vert/blanc T38 » — une
+// offre Vinted n’expire pas), sinon son titre puis son corps. Dans la langue du vendeur.
 export function texteGroupe(n, genre, k, langue = 'fr') {
   if (!genre || !(k > 1)) return n;
   const derniere = n.ligne ? n.ligne : (genre.sansTitre && n.body ? [n.body] : [n.title, n.body]).filter(Boolean).join(' · ');

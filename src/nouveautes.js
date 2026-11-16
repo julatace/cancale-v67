@@ -26,6 +26,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (16 nov., lot vente-email-absente) docs/passation/2026-11-16-vente-email-absente.md
+  { id: 'vente-email-particulier', date: '2026-11-16', titre: 'Une vente vue par e-mail est dans Ventes', phrase: 'Même sur un compte particulier, avant que l’extension la lise.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (16 nov., lot argent-mieux) docs/passation/2026-11-16-argent-mieux.md
   { id: 'argent-lisible', date: '2026-11-16', titre: 'Argent : tout se lit, clair ou sombre', phrase: 'Les ventes pas comptées tiennent en une ligne par raison.', tab: 'argent', pour: 'tous', mode: 'tous' },
   // (16 nov., lot barre-achats — Julien : « ajoute les Achats dans la barre » ; « je ne veux pas qu'on puisse glisser
