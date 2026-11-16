@@ -17,7 +17,7 @@ require('./_porte-banc.cjs');
 //    H5 « Tout est à jour » ne prend aucune place en tête de page ;
 //    F  toutes les fonctions de la barre d'hier restent joignables : loupe, cloche, menu du
 //       compte (Paramètres), panneau « Actions Vinted », œil des montants ;
-//    N  la barre du bas : exactement 4 onglets (journee · paires · ventes · compta) ; CHAQUE
+//    N  la barre du bas : exactement 5 onglets (journee · paires · achats · ventes · compta, 16 nov.) ; CHAQUE
 //       écran d'hier joignable en ≤ 2 touchers depuis Ma journée ; pastilles conservées
 //       (segment Achats = son nombre ; onglet Paires = la somme, muet sur un écran de Paires) ;
 //    D  pas de débordement horizontal ;
@@ -186,7 +186,8 @@ async function regles(nav) {
     const o = await ouvrir(nav, { W: 390, sombre: false, b: base(), url: '/?tab=journee' }); await pret(o.pg);
     const pg = o.pg;
     const onglets = await pg.evaluate(() => [...document.querySelectorAll('.vrm-tabbar > button')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => b.getAttribute('data-nav-entree') || (b.classList.contains('vrm-nav-more') ? 'plus' : '?')));
-    dit(onglets.join(',') === 'journee,paires,ventes,compta', 'N la barre du bas : quatre onglets — Aujourd\'hui · Paires · Ventes · Argent', onglets.join(','));
+    // (16 nov., barre-achats — Julien : « ajoute les Achats dans la barre en bas »)
+    dit(onglets.join(',') === 'journee,paires,achats,ventes,compta', 'N la barre du bas : cinq onglets — Aujourd\'hui · Annonces · Achats · Ventes · Argent', onglets.join(','));
     await attendre(pg, () => pg.evaluate(() => !!document.querySelector('.vrm-tabbar [data-badge-nav="paires"]')), 12000);
     const pastilles = await pg.evaluate(() => { const b = document.querySelector('.vrm-tabbar [data-badge-nav="paires"]'); return b ? b.getAttribute('data-badge-n') : null; });
     dit(pastilles != null && Number(pastilles) > 0, 'N l\'onglet Paires porte la somme de ses écrans (ailleurs que sur Paires)', String(pastilles));
