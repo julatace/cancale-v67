@@ -5,8 +5,15 @@ Aucune fonction `api/` ajoutée (toujours 12). La migration 043 (partenaires, PA
 
 ## ÉTAT À LA REPRISE
 
-- Tout est écrit, poussé, vert en local (voir « Preuves »). La PR est ouverte par REST puis fusionnée
-  si la CI n'a aucun rouge nouveau (voir le rapport final de la session pour son numéro et son état).
+- Tout est écrit, poussé, vert en local (voir « Preuves »). **PR #1185 ouverte, PAS fusionnée** : règle de
+  Julien du 16 nov. « zéro rouge pour fusionner, même les rouges déjà sur main ». La CI de la PR a 69 audits
+  rouges ; 67 sont rouges À L'IDENTIQUE sur `origin/main` (rejoués un par un sur l'arbre de main :
+  accueil-reste, config-facture, infos-vinted, vocabulaire-article, annonces-coherence, revue-fin…, et le job
+  `regles` : `scripts/tests/lot-preparation-reprise.cjs`, « React is not defined ») ; le seul rouge NOUVEAU
+  (`audit-ebay-lien-identite` : `modifierCle` absent de son bac à sable) et `textes-courts` (Ebay.jsx) sont
+  corrigés. Bancs rouges de la CI (nouveau-vendeur, colis-retirer-propre, annonces-actions, iphone-reprise,
+  argent-mois, chiffres-coherents, retraits-suivi, accessibilite-clavier) : aucun ne touche ce lot. À la
+  reprise : quand main est revenu au vert, `git merge origin/main`, repousser, attendre la CI, fusionner.
 - Rien n'attend Julien pour ce lot, SAUF la migration 043 (programme partenaire), déjà listée comme
   son geste : elle est retouchée ici (colonnes du remboursement partiel) et toujours pas appliquée —
   mesuré le 16 nov. (`list_tables` sur la vraie base, lecture seule : aucune table `partenaire_*`).
