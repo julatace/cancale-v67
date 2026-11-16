@@ -129,6 +129,8 @@ const mesure = (pg) => pg.evaluate(() => {
     section: sec && vis(sec) ? sec.getAttribute('data-colis-section') : null,
     nSections: n('[data-colis-section]'), avant,
     titre: sec ? (sec.querySelector('h2') || {}).textContent || '' : '',
+    teteSection: sec ? sec.innerText || '' : '',
+    depotDom: document.querySelectorAll('[data-depot-ouvrir]:not([data-depot-ouvrir="hors-ligne"])').length,
     choixEnvoyer: n('[data-colis-onglet-choix="envoyer"]'), choixEnvoyes: n('[data-colis-onglet-choix="envoyes"]'), choixRetirer: n('[data-colis-onglet-choix="retirer"]'),
     cartesEnvoi: n('[data-bord-card]'), colonneRetirer: n('[data-cc-colonne="retirer"]'), outils: document.querySelectorAll('[data-colis-retraits="outils"]').length,
     imprimer: n('[data-colis-barre-btn="imprimer"]'), scanner: n('[data-colis-scanner]'), barres: n('[data-colis-barre]'), depot: n('[data-depot-ouvrir]'), relais: n('[data-relais-ouvrir]'),
@@ -146,6 +148,9 @@ const mesure = (pg) => pg.evaluate(() => {
     pretsImprimer: (document.querySelector('[data-colis-barre-btn="imprimer"]') || { getAttribute: () => null }).getAttribute('data-imprimer-prets'),
   };
 });
+// (16 nov.) Après la visionneuse du PDF (iframe du lecteur PDF de Chromium), un `page.waitForTimeout` sous horloge
+// installée fait planter l'onglet (« Page crashed », 4 vues sur 4, mesuré ; une attente côté Node, non) : on attend côté Node.
+const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 const attendre = async (pg, q) => { await pg.waitForSelector(q, { timeout: 30000 }); await pg.waitForTimeout(1800); };
 
 (async () => {
@@ -163,21 +168,34 @@ const attendre = async (pg, q) => { await pg.waitForSelector(q, { timeout: 30000
           dit(m.pubEnv && m.pubEnv.total === 2, 'P `vrm_colis_aposter` publié depuis Ma journée (2)', JSON.stringify(m.pubEnv && m.pubEnv.total));
           dit(m.pubRet && m.pubRet.total === 2, 'P `vrm_colis_retirer` publié depuis Ma journée (2)', JSON.stringify(m.pubRet && m.pubRet.total));
           dit(m.navColis === 0, 'N plus d’entrée « Colis » dans la navigation', String(m.navColis));
-          dit(m.navAchats >= 1, 'N « Achats » est dans la navigation', String(m.navAchats));
+          // (14 nov., choix n° 61 de Julien) Au téléphone, « Achats » est dans « Annonces » (l'onglet `paires` de la
+          // barre : Annonces · Stock · Achats, src/navPaires.js) : on touche l'onglet, l'entrée doit y être.
+          let navAchats = m.navAchats;
+          if (!navAchats && vp.width < 600) {
+            await pg.locator('[data-nav-entree="paires"]').filter({ visible: true }).first().tap().catch(() => {});
+            await pg.waitForSelector('[data-nav-entree="achats"]', { state: 'visible', timeout: 15000 }).catch(() => {});
+            navAchats = await pg.evaluate(() => [...document.querySelectorAll('[data-nav-entree="achats"]')].filter((e) => e.getBoundingClientRect().width > 0).length);
+          }
+          dit(navAchats >= 1, 'N « Achats » est dans la navigation (au téléphone : dans l’onglet Annonces)', String(navAchats));
         });
         dit(errs.length === 0, 'U aucune erreur (Ma journée)', errs.slice(0, 2).join(' | '));
         await ctx.close(); }
       // V : l'ancien lien de Colis ⇒ Ventes, « À expédier » en tête.
       { const { ctx, pg, errs } = await ouvrir(b, vp, sombre, '?tab=cat_bord');
         await essaie('V ' + nom, async () => {
-          await attendre(pg, '[data-colis-section="ventes"] ~ *, [data-bord-card]');
+          // (16 nov.) Une LISTE de sélecteurs fait attendre le PREMIER élément trouvé, ici un frère de la section
+          // caché (hauteur 0) : la carte de colis seule est attendue.
+          await attendre(pg, '[data-bord-card]');
           const m = await mesure(pg);
           dit(m.tache === 'ventes' && m.section === 'ventes', 'V `?tab=cat_bord` ouvre Ventes, section « À expédier »', `${m.tache} · ${m.section}`);
-          dit(/À envoyer/.test(m.titre), 'V l’intertitre dit « À envoyer » (le mot de src/libelles.js, 16 nov.)', m.titre);
+          // (16 nov.) La tête de la section n'a plus d'intertitre <h2> (maquette de Ventes du 15 nov. : le segment
+          // « À envoyer · En route · Toutes » puis le grand chiffre) : le mot est jugé sur la tête entière.
+          dit(/À envoyer/.test(m.teteSection) && !/exp[ée]dier/i.test(m.teteSection), 'V la tête de la section dit « À envoyer » (le mot de src/libelles.js, 16 nov.), jamais « à expédier »', m.teteSection.replace(/\s+/g, ' ').slice(0, 120));
           dit(m.avant === true, 'V la section est EN TÊTE (avant la liste des ventes)', String(m.avant));
           dit(m.choixEnvoyer === 1 && m.choixEnvoyes === 1 && m.choixRetirer === 0, 'V À envoyer · Envoyés, jamais « À retirer » dans Ventes', `${m.choixEnvoyer}/${m.choixEnvoyes}/${m.choixRetirer}`);
           dit(m.cartesEnvoi === 2, 'V les 2 colis à envoyer, chacun une fois', String(m.cartesEnvoi));
-          dit(m.imprimer === 1 && m.depot === 1 && m.barres === 1, 'V « Tout imprimer » et « Je dépose », une fois', `${m.imprimer}/${m.depot}/${m.barres}`);
+          // « Je dépose » vit derrière « … » depuis la refonte de Ventes (15 nov.) : présent UNE fois dans la page.
+          dit(m.imprimer === 1 && m.depotDom === 1 && m.barres === 1, 'V « Imprimer » (visible) et « Je dépose » (derrière « … »), une fois', `${m.imprimer}/${m.depotDom}/${m.barres}`);
           dit(m.colonneRetirer === 0 && m.outils === 0 && m.codes.length === 0, 'V aucun colis à retirer dans Ventes', `${m.colonneRetirer}/${m.outils}/${m.codes.length}`);
           dit(m.versColis === 0 && !m.h1Colis, 'V plus de « À envoyer : Colis › » ni de titre « Colis »', `${m.versColis}/${m.h1Colis}`);
           dit(m.deposee === 0 && m.pretsImprimer === '2', 'B la vente DÉPOSÉE (e-mail de dépôt du n° de SON étiquette) n’est ni une carte, ni dans « Tout imprimer (2) »', `${m.deposee} · ${m.pretsImprimer}`);
@@ -193,55 +211,69 @@ const attendre = async (pg, q) => { await pg.waitForSelector(q, { timeout: 30000
         });
         dit(errs.length === 0, 'U aucune erreur (Ventes)', errs.slice(0, 2).join(' | '));
         await ctx.close(); }
-      // I : « TOUT IMPRIMER » EN TROIS TEMPS — choisir (la déposée absente), aperçu A4, imprimer UN PDF, « C'est imprimé ? »
-      //     ⇒ prêts à déposer (la date d'impression rangée), « Je dépose » ouvre le mode dépôt.
+      // I : « IMPRIMER » EN UN TOUCHER (14 nov., docs/passation/2026-11-14-impression-simple.md — l'ancien « Tout imprimer »
+      //     en trois temps, aperçu A4 et « C'est imprimé ? » n'existe plus). Le plein « Imprimer les 2 bordereaux » ⇒ la
+      //     question du papier (la première fois seulement) ⇒ UN PDF ouvert (ici la visionneuse : ni iPhone ni Android)
+      //     ⇒ noté imprimé quand il est OUVERT ⇒ « Tout est sorti ? » avec les 2 vignettes, la déposée ni dedans ni
+      //     dite absente ; « Choisir, réimprimer » liste les 2 (la déposée absente), décochés car déjà imprimés,
+      //     le titre long en entier ; « Je dépose » (derrière « … » depuis le 15 nov.) ouvre le mode dépôt.
       { const { ctx, pg, errs } = await ouvrir(b, vp, sombre, '?tab=cat_bord');
         await essaie('I ' + nom, async () => {
           await attendre(pg, '[data-colis-barre-btn="imprimer"]:not([disabled])');
-          const libelle = await pg.locator('[data-colis-barre-btn="imprimer"]').first().innerText();
-          dit(/Tout imprimer \(2\)/.test(libelle), 'I un seul bouton « Tout imprimer (2) » en tête de « À expédier »', libelle);
-          await pg.locator('[data-colis-barre-btn="imprimer"]').first().click();
-          await pg.waitForSelector('[data-lot-etape="choix"]', { timeout: 15000 });
-          await pg.waitForTimeout(500);
-          const f = await pg.evaluate(() => { const r = document.querySelector('[data-lot-etape]'); const q = (x) => [...r.querySelectorAll(x)];
-            return { lignes: q('[data-lot-ligne]').map((e) => e.getAttribute('data-lot-ligne')), coches: q('[data-lot-ligne][data-coche="1"]').length, partent: q('[data-lot-section="partent"] [data-lot-ligne]').length,
-              pages: q('[data-lot-apercu]').length, tampons: q('.vrm-tip-a4-tampon').map((e) => e.innerText.replace(/\s+/g, ' ')), bouton: (r.querySelector('[data-lot-imprimer]') || {}).innerText || '', cibles: q('input.vrm-tip-case').map((e) => { const l = e.closest('label').getBoundingClientRect(); return Math.round(l.height); }),
-              deb: r.scrollWidth - r.clientWidth }; });
-          dit(f.lignes.length === 2 && !f.lignes.includes('7203') && f.coches === 2 && f.partent === 2, 'I 1 · ce qui part : les 2 colis, cochés ; la déposée absente', JSON.stringify(f.lignes));
-          dit(f.pages === 2 && f.tampons.some((t) => /Yellow Stone/.test(t)), 'I 2 · l’aperçu : une page A4 par colis, avec son tampon (titre)', JSON.stringify(f.tampons));
-          dit(f.cibles.every((h) => h >= 44), 'I chaque ligne se touche sur 44 px au moins', JSON.stringify(f.cibles));
-          dit(/Imprimer \(2\)/.test(f.bouton) && f.deb <= 0, 'I « Imprimer (2) », rien ne déborde dans la feuille', f.bouton + ' · ' + f.deb);
-          const m = await mesure(pg);
-          dit(m.titres.filter((x) => /Yellow Stone/.test(x.t)).every((x) => !x.coupe), 'I le titre long se lit en entier dans la feuille', JSON.stringify(m.titres.filter((x) => /Yellow Stone/.test(x.t))));
-          if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `tout-imprimer-1-${nom}.png`) });
-          await pg.click('[data-lot-imprimer]');
-          for (let i = 0; i < 120; i++) {
-            const etat = await pg.evaluate(() => { if (document.querySelector('[data-lot-question]')) return 'q';
-              const clic = (l) => { const bs = [...document.querySelectorAll('button')].filter((x) => x.innerText.trim() === l && x.offsetParent); if (bs.length) { bs[bs.length - 1].click(); return true; } return false; };
-              if (clic("J'ai vérifié, imprimer")) return 'clic';
-              const t = document.querySelector('[data-placeur-tampon]:not([data-placeur-tampon="charge"]) [data-tampon-imprimer], [data-impr-apercu="pret"] [data-impr-apercu-imprimer]:not([disabled])'); if (t) { t.click(); return 'clic'; }
-              return 'attente'; });
-            if (etat === 'q') break; await pg.waitForTimeout(250);
-          }
-          const apres = await pg.evaluate(() => ({ pdfs: (window.__pdfs || []).length, q: !!document.querySelector('[data-lot-question]'), demande: /Préparer quand même/.test(document.body.innerText), lien: !!document.querySelector('[data-lot-ouvrir-pdf][href^="blob:"]'), double: /Ouvrir les bordereaux|bordereaux prêts/.test(document.body.innerText), imprimes: Object.keys(JSON.parse(localStorage.getItem('vinted_bords_printed') || '{}')) }));
-          dit(apres.pdfs === 1 && apres.q && !apres.demande, 'I UN seul PDF, puis « C’est imprimé ? » (aucune question « contrôlé »)', JSON.stringify(apres));
-          dit(apres.lien && !apres.double, 'I 3 · « C’est imprimé ? » porte le lien du PDF ; pas de seconde fenêtre « bordereaux prêts »', JSON.stringify({ lien: apres.lien, double: apres.double }));
-          dit(apres.imprimes.length === 0, 'I rien n’est marqué imprimé avant « Oui »', JSON.stringify(apres.imprimes));
-          if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `tout-imprimer-3-${nom}.png`) });
-          // (ordinateur) La visionneuse du PDF s'ouvre par-dessus : on l'imprime là, puis on la ferme ; la question attend dessous.
-          if (await pg.$('[data-visionneuse-fermer]')) await pg.click('[data-visionneuse-fermer]');
-          await pg.click('[data-lot-imprime-oui]');
-          await pg.waitForSelector('[data-lot-depot]', { timeout: 8000 });
-          await pg.waitForTimeout(400);
-          // Le geste annulable s'écrit par sa file (src/gesteAnnulable.js) : on attend l'écriture, sans délai fixe.
+          const bt = await pg.evaluate(() => { const e = [...document.querySelectorAll('[data-colis-barre-btn="imprimer"]')].filter((x) => x.getBoundingClientRect().width > 0); return { n: e.length, lot: e[0] && e[0].getAttribute('data-impr-lot'), txt: e[0] ? e[0].innerText.trim() : '' }; });
+          dit(bt.n === 1 && bt.lot === '2' && /(^|\D)2(\D|$)/.test(bt.txt), 'I un seul plein « Imprimer (2) » en tête de « À envoyer » (data-impr-lot)', JSON.stringify(bt));
+          await pg.locator('[data-colis-barre-btn="imprimer"]').filter({ visible: true }).first().click();
+          await pg.waitForSelector('[data-impr-papier-feuille="premiere"]', { timeout: 15000 });
+          const avantPapier = await pg.evaluate(() => (window.__pdfs || []).length);
+          dit(avantPapier === 0, 'I la PREMIÈRE fois : la question du papier, aucun PDF avant', String(avantPapier));
+          if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `imprimer-1-papier-${nom}.png`) });
+          await pg.click('[data-impr-papier-choix="normale"]');
+          // (16 nov., lot tampons-parametres — Julien : « ça m'ouvre une vignette […] et quand je touche Imprimer, les
+          // réglages sont appliqués ») L'APERÇU AVANT IMPRESSION : rien ne part avant son « Imprimer ».
+          await pg.waitForSelector('[data-impr-apercu="pret"] [data-impr-apercu-imprimer]:not([disabled])', { timeout: 60000 });
+          dit(await pg.evaluate(() => (window.__pdfs || []).length) === 0, 'I l’aperçu avant impression d’abord, aucun PDF avant son « Imprimer »');
+          if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `imprimer-1b-apercu-${nom}.png`) });
+          await pg.click('[data-impr-apercu-imprimer]');
+          await pg.waitForSelector('[data-visionneuse-pdf="pret"]', { timeout: 30000 });
+          // Noté imprimé quand le PDF est OUVERT (impression-simple) : on attend l'écriture (file du geste), sans délai fixe.
           await pg.waitForFunction(() => Object.keys(JSON.parse(localStorage.getItem('vinted_bords_printed') || '{}')).length >= 2, null, { timeout: 10000 }).catch(() => {});
-          const ok3 = await pg.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('vinted_bords_printed') || '{}')).sort());
-          dit(ok3.join(',') === '7201,7202', 'I « Oui, imprimé » ⇒ les 2 colis prêts à déposer (et seulement eux)', ok3.join(','));
-          if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `tout-imprimer-4-${nom}.png`) });
-          await pg.click('[data-lot-je-depose]');
-          await pg.waitForTimeout(800);
+          const ouvert = await pg.evaluate(() => ({ pdfs: (window.__pdfs || []).length, imprimes: Object.keys(JSON.parse(localStorage.getItem('vinted_bords_printed') || '{}')).sort().join(',') }));
+          dit(ouvert.pdfs === 1, 'I UN seul PDF, ouvert dans la visionneuse', String(ouvert.pdfs));
+          dit(ouvert.imprimes === '7201,7202', 'I les 2 colis du PDF notés imprimés (et seulement eux, jamais la déposée)', ouvert.imprimes);
+          if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `imprimer-2-pdf-${nom}.png`) });
+          await pg.click('[data-visionneuse-fermer]');
+          await pg.waitForSelector('[data-impr-feuille="question"]', { timeout: 10000 });
+          const apres = await pg.evaluate(() => { const f = document.querySelector('[data-impr-feuille]'); return { n: f.getAttribute('data-impr-n'), vign: f.querySelectorAll('[data-impr-vignette]').length, absents: [...f.querySelectorAll('[data-impr-absent]')].map((e) => e.getAttribute('data-impr-absent')), deb: f.scrollWidth - f.clientWidth }; });
+          dit(apres.n === '2' && apres.vign === 2 && !apres.absents.some((a) => /7203/.test(a)), 'I « Tout est sorti ? » : les 2 vignettes ; la déposée ni dedans ni dite absente', JSON.stringify(apres));
+          if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `imprimer-3-apres-${nom}.png`) });
+          await pg.click('[data-impr-oui]');
+          await pg.waitForFunction(() => !document.querySelector('[data-impr-feuille]'), null, { timeout: 8000 });
+          // « Choisir, réimprimer » : la feuille qui choisit CE qui part.
+          await pg.locator('[data-lot-ouvrir]').filter({ visible: true }).first().click();
+          await pg.waitForSelector('[data-lot-etape="choix"]', { timeout: 15000 });
+          await dormir(500);
+          const f = await pg.evaluate(() => { const r = document.querySelector('[data-lot-etape]'); const q = (x) => [...r.querySelectorAll(x)];
+            return { lignes: q('[data-lot-ligne]').map((e) => e.getAttribute('data-lot-ligne')), coches: q('[data-lot-ligne][data-coche="1"]').length,
+              imprimes: (r.querySelector('[data-lot-pourquoi-imprimes]') || { getAttribute: () => null }).getAttribute('data-lot-pourquoi-imprimes'),
+              cibles: q('input.vrm-tip-case').map((e) => { const l = e.closest('label').getBoundingClientRect(); return Math.round(l.height); }), deb: r.scrollWidth - r.clientWidth }; });
+          dit(f.lignes.length === 2 && !f.lignes.some((l) => /7203/.test(l)), 'I « Choisir » : les 2 colis, la déposée absente', JSON.stringify(f.lignes));
+          dit(f.coches === 0 && f.imprimes === '2', 'I déjà imprimés ⇒ décochés d’office (« 2 déjà imprimés — coche pour réimprimer »)', `${f.coches} · ${f.imprimes}`);
+          dit(f.cibles.length === 2 && f.cibles.every((h) => h >= 44) && f.deb <= 0, 'I chaque ligne se touche sur 44 px au moins, rien ne déborde dans la feuille', JSON.stringify(f));
+          const m = await mesure(pg);
+          const longsF = m.titres.filter((x) => /Yellow Stone/.test(x.t));
+          dit(longsF.length >= 1 && longsF.every((x) => !x.coupe), 'I le titre long se lit en entier dans la feuille', JSON.stringify(longsF));
+          if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `imprimer-4-choisir-${nom}.png`) });
+          await pg.locator('.vrm-lot [data-feuille-croix]').first().click().catch(async () => { await pg.keyboard.press('Escape'); });
+          await pg.waitForFunction(() => !document.querySelector('[data-lot-etape]'), null, { timeout: 8000 });
+          // « Je dépose » : derrière « … » (refonte de Ventes, 15 nov. : rien entre le chiffre et la liste), puis, au
+          // téléphone, dans la feuille « À faire · N » (src/ui/AFaire.jsx, 14 nov.).
+          if (!(await pg.locator('[data-depot-ouvrir]').filter({ visible: true }).count())) await pg.locator('[data-colis-outils-bascule]').filter({ visible: true }).first().click();
+          await dormir(400);
+          if (!(await pg.locator('[data-depot-ouvrir]').filter({ visible: true }).count())) { await pg.locator('[data-ui-afaire]').filter({ visible: true }).first().click(); await pg.waitForSelector('[data-ui-afaire-feuille] [data-depot-ouvrir]', { timeout: 8000 }); await dormir(400); }
+          await pg.locator('[data-depot-ouvrir]').filter({ visible: true }).first().click();
+          await dormir(800);
           const dep = await pg.evaluate(() => !!document.querySelector('.vrm-depot[data-depot]'));
-          dit(dep, 'I « Je dépose » ouvre le mode dépôt, d’un geste', String(dep));
+          dit(dep, 'I « Je dépose » ouvre le mode dépôt', String(dep));
         });
         dit(errs.length === 0, 'U aucune erreur (Tout imprimer)', errs.slice(0, 2).join(' | '));
         await ctx.close(); }

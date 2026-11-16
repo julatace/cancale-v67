@@ -186,7 +186,7 @@ const LISTES = [
   { cle: 'annonces-vestiaire', tab: 'tab=annonces&site=vestiaire', ligne: '[data-vc-annonce="71000009"]', toucher: '[data-vc-annonce="71000009"] strong', num: '212', ctx: 'annonce',
     inventaire: [] },
   { cle: 'stock', tab: 'tab=garage', ligne: '[data-case-num="203"]', toucher: '[data-case-num="203"]', num: '203', ctx: 'stock',
-    inventaire: ['[data-fiche-ranger]', '[data-fiche-retirer]'] },
+    inventaire: ['[data-fiche-ranger]'] },   // (16 nov., lot retirer-case-compact) « Retirer de la case » n'est plus dans la fiche
   { cle: 'achats', tab: 'tab=achats&site=vinted', ligne: '[data-achat-tx="33000000001"]', toucher: '[data-achat-tx="33000000001"] .vrm-buy-title', num: '206', ctx: 'achat',
     inventaire: ['[data-rappel-bouton]', '[data-achat-masquer="33000000001"]', '[data-achat-joindre-facture="33000000001"]'] },
   // Le colis à retirer n'a AUCUNE identité de paire sur sa ligne : la fiche de la LIGNE, jamais une paire devinée.
