@@ -26,6 +26,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const vm = require('vm');
+const { pathToFileURL } = require('url');
 const { spawnSync } = require('child_process');
 const iSur = process.argv.indexOf('--sur');
 const R = process.env.AUDIT_RACINE || (iSur > 0 ? path.resolve(process.argv[iSur + 1]) : path.join(__dirname, '..'));
@@ -48,6 +49,8 @@ const MUTATIONS = {
   'corps-170': ['api/_lib/notif-redaction.js', 'export const CORPS_MAX = 90;', 'export const CORPS_MAX = 170;'],
   'langue-ignoree': ['api/_lib/push.js', "  const red = redaction ? rediger(redaction, { langue, maintenant: t, relatif: !plusTard }) : null;", "  const red = redaction ? rediger(redaction, { langue: 'fr', maintenant: t, relatif: !plusTard }) : null;"],
   'retour-vers-achats': ['api/email-inbound.js', 'url: DESTINATIONS.retour({ tx: lu.transaction })', 'url: DESTINATIONS.achat({ tx: lu.transaction })'],
+  // (16 nov.) L'échéance remise sur toute offre (la régression vue par Julien le 16 nov.).
+  'offre-vinted-expire': ['api/_lib/notif-redaction.js', "const ech = str(d.site).toLowerCase() === 'vestiaire' ? T.expire24 : '';", "const ech = T.expire24;"],
   'groupe-dernier': ['api/_lib/notif-belle.js', "  const derniere = n.ligne ? n.ligne : (genre.sansTitre", "  const derniere = (genre.sansTitre"],
 };
 if (process.argv.includes('--mutations')) {
@@ -244,7 +247,14 @@ function serviceWorker() {
     dit(/^Offre de 50\s€ · 9060 vert\/blanc T38$/.test(p1.title || ''), '4 une offre : « Offre de 50 € · 9060 vert/blanc T38 »', p1.title);
     regle(p, '4 huit offres', { url: L.DESTINATIONS.offres(), tag: 'vrm-offre' });
     dit(p.title === '8 offres à trancher', '4 le titre : « 8 offres à trancher »', p.title);
-    dit(/^La plus récente : 9060 vert\/blanc T38, expire dans 24 h$/.test(p.body || ''), '4 le corps : « La plus récente : 9060 vert/blanc T38, expire dans 24 h »', p.body);
+    // (16 nov., lot vente-email-absente) Une offre VINTED n'expire pas (Julien, 11 nov.) : jamais
+    // « expire » dans son texte, seule ni regroupée ; une offre Vestiaire, elle, le dit.
+    dit(/^La plus récente : 9060 vert\/blanc T38$/.test(p.body || ''), '4 le corps : « La plus récente : 9060 vert/blanc T38 » (une offre Vinted n’expire pas)', p.body);
+    dit(!/expir/i.test(String(p1.title) + ' ' + String(p1.body)) && !/expir/i.test(String(p.title) + ' ' + String(p.body)), '4 offre Vinted : jamais « expire » (seule ni regroupée)', `${p1.body} | ${p.body}`);
+    const RD = await import(pathToFileURL(path.join(R, 'api', '_lib', 'notif-redaction.js')).href);
+    const vc = RD.rediger({ sorte: 'offre', montant: '40', article: 'Salomon XT-6 blanc taille 40', site: 'vestiaire' }, { langue: 'fr' });
+    const vi = RD.rediger({ sorte: 'offre', montant: '40', article: 'Salomon XT-6 blanc taille 40' }, { langue: 'fr' });
+    dit(/expire dans 24 h/.test(String(vc && vc.body)) && !/expir/i.test(String(vi && vi.body) + String(vi && vi.ligne)), '4 la règle : « expire dans 24 h » pour Vestiaire seulement', `${vc && vc.body} | ${vi && vi.body}`);
     await auTelephone(p, '4 huit offres', L.DESTINATIONS.offres());
   });
 
