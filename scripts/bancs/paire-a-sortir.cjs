@@ -15,7 +15,10 @@ require('./_porte-banc.cjs');
 //     R4 « sortie » se prouve par SA déclaration (`N°` nu, ou `N°@id` de CETTE annonce seulement) ;
 //     R5 après une sortie, à date égale on reste dans le meuble où l'on est (il est devant).
 //  A  L'APP RENDUE (base inventée, 390 tactile, 1512 et 1280 — les maquettes ordinateur —, clair et sombre) :
-//     A1 la section est là, AVANT le chiffre du jour, dans le premier écran du téléphone ;
+//     A1 la section est là ; (16 nov., Julien) au téléphone PAS tout en haut : sous le chiffre du jour, la tuile
+//        « À envoyer » et la liste « À faire », et compacte (moins de 60 % de l'écran) ;
+//     B  (16 nov.) cachée par lui (« Modifier ma journée », réglage du nuage) ⇒ rien ; un réglage enregistré
+//        AVANT elle (l'ancien ordre de départ) ne la remonte pas ;
 //     A2 la première carte = la vente la plus pressée, SA case (meuble, rangée, case ; la case allumée du plan) ;
 //     A3 l'ordre de la suite (date, puis le même meuble), chaque rangée avec SA case ; la vente au même titre
 //        que la première a la sienne, jamais celle de l'autre ; la vente jamais rangée dit « place pas connue » ;
@@ -87,9 +90,10 @@ const MUTATIONS = [
 // ── A. LA BASE INVENTÉE ────────────────────────────────────────────────────────
 const J = 86400000;
 const enJours = (j) => new Date(Date.now() + j * J).toISOString();
-function base({ seulementInconnue = false } = {}) {
+function base({ seulementInconnue = false, perso } = {}) {
   const b = P.base();
   const m = b.main[0].data;
+  if (perso !== undefined) m.vrm_journee_perso = perso;   // (16 nov.) « Modifier ma journée », venu du nuage
   const uid0 = b.accounts[0].vinted_user_id;
   // Les ventes « à expédier » du premier compte qui ont leur e-mail de bordereau : le banc en garde quatre.
   const sold = b.rows.find((r) => r.id === `harvest_${uid0}_orders_sold`).data.payload.my_orders;
@@ -129,12 +133,16 @@ const mesurer = (pg) => pg.evaluate(() => {
   let ls = {}; try { ls = { slots: JSON.parse(localStorage.getItem('vrm_slots') || 'null'), perdues: JSON.parse(localStorage.getItem('vinted_pairs_lost') || 'null') }; } catch (_) {}
   return {
     la: !!s, top: s ? Math.round(s.getBoundingClientRect().top) : null, topAffiche: aff ? Math.round(aff.getBoundingClientRect().top) : null, h: innerHeight,
+    // (16 nov.) Les repères au-dessus desquels elle ne doit plus être (téléphone) : la tuile « À envoyer », la liste « À faire ».
+    topEnvoyer: (() => { const e = [...document.querySelectorAll('.sj-journee [data-tuile="envoyer"]')].find(vis); return e ? Math.round(e.getBoundingClientRect().top) : null; })(),
+    topAFaire: (() => { const e = [...document.querySelectorAll('.sj-journee [data-fu-gestes]')].find(vis); return e ? Math.round(e.getBoundingClientRect().top) : null; })(),
+    hCarte: prem ? Math.round(prem.getBoundingClientRect().height) : null,
     n: s ? s.getAttribute('data-sortir-n') : null, sorties: s ? s.getAttribute('data-sortir-sorties') : null,
     premier: prem ? { num: prem.getAttribute('data-sortir-num'), lieu: prem.getAttribute('data-sortir-lieu'), raison: prem.getAttribute('data-sortir-raison'),
       meuble: (prem.querySelector('[data-sortir-meuble]') || {}).textContent || '', place: (prem.querySelector('[data-sortir-place]') || {}).textContent || '',
       plan: (prem.querySelector('[data-so-plan]') || { getAttribute: () => null }).getAttribute('data-so-plan'), cible: !!prem.querySelector('[data-so-case="cible"]'),
       ranger: prem.querySelector('[data-sortir-ranger]') ? prem.querySelector('[data-sortir-ranger]').getAttribute('data-sortir-ranger') : null,
-      inconnu: !!prem.querySelector('[data-sortir-inconnu]'), geste: !!prem.querySelector('[data-sortir-geste="sortie"]') } : null,
+      inconnu: !!prem.querySelector('[data-sortir-inconnu]'), geste: !!prem.querySelector('[data-sortir-geste="sortie"]'), compact: prem.hasAttribute('data-sortir-compact') } : null,
     suite, pleins, petits, deborde, sw: document.documentElement.scrollWidth, iw: innerWidth,
     apres: (() => { const a = document.querySelector('[data-sortir-apres]'); return a ? { num: a.getAttribute('data-sortir-apres'), desc: a.getAttribute('data-sortir-descendus'), phrase: !!a.querySelector('[data-sortir-phrase]'), vis: vis(a) } : null; })(),
     pilule: !!document.querySelector('[data-acc-apres="stock.sortir"]'),
@@ -153,7 +161,12 @@ async function scenario(nav, { W, th, sortir }) {
   await o.pg.screenshot({ path: path.join(SHOTS, `sortir-${W}-${th}.png`) }).catch(() => {});
   dit(m.la, `${T} A1 « La paire à sortir » est sur Ma journée`, JSON.stringify(m).slice(0, 200));
   if (!m.la) { await o.ctx.close(); return; }
-  if (W < 600) dit(m.top != null && m.top < m.h * 0.6 && (m.topAffiche == null || m.top < m.topAffiche), `${T} A1 avant le chiffre du jour, dans le premier écran (haut ${m.top} px, chiffre ${m.topAffiche} px)`, JSON.stringify([m.top, m.topAffiche]));
+  // (16 nov., lot personnalisation-simple — Julien : « je ne veux pas qu'elle soit tout en haut ») La règle a CHANGÉ : au
+  // téléphone, la section n'est plus la première de Ma journée — sous le chiffre du jour, sous la grille (« À envoyer ») et
+  // sous la liste « À faire » (la carte `sortir` de la zone « En bas »). Jugé sur les positions RENDUES (data-*).
+  if (W < 600) dit(m.top != null && m.topAffiche != null && m.top > m.topAffiche && m.topEnvoyer != null && m.top > m.topEnvoyer && (m.topAFaire == null || m.top > m.topAFaire),
+    `${T} A1 PAS tout en haut : sous le chiffre du jour (${m.topAffiche} px), sous « À envoyer » (${m.topEnvoyer} px) et « À faire » (${m.topAFaire} px) — elle à ${m.top} px`, JSON.stringify([m.top, m.topAffiche, m.topEnvoyer, m.topAFaire]));
+  if (W < 600) dit(!!(m.premier && m.premier.compact) && m.hCarte != null && m.hCarte < m.h * 0.6, `${T} A1 compacte au téléphone (vignette, « Je l'ai sortie » gardé) : la carte fait ${m.hCarte} px sur ${m.h}`, JSON.stringify([m.hCarte, m.h, m.premier && m.premier.compact]));
   const p = m.premier || {};
   dit(p.num === '501' && p.lieu === 'B:3' && /Pile B/.test(p.meuble) && p.plan === '4:1' && p.cible, `${T} A2 la plus pressée d'abord (N°501) : SA case — Pile B, la boîte du bas, la case allumée`, JSON.stringify(p));
   const nums = m.suite.map((x) => x.num).filter((x) => ['502', '503', '504'].includes(x));
@@ -208,6 +221,26 @@ async function inconnue(nav, { W, th }) {
   await o.ctx.close();
 }
 
+// (16 nov., lot personnalisation-simple) B — SES choix : cachée ⇒ rien ; l'ancien ordre de départ (enregistré avant que la
+// carte existe : la tête, « À faire », puis « En bas » sans elle) ⇒ elle reste sous la grille, jamais tout en haut.
+async function choixDeLui(nav, { W, th }) {
+  const T = `[${W} ${th} · ses choix]`;
+  const vieux = ['phrase', 'prochain', 'frise', 'ailleurs', 'deux-fois', 'envoyer', 'retirer', 'messages', 'prix', 'notifs', 'guide'];
+  for (const [nom, perso, attendu] of [['cachée', { v: 1, ordre: [], choix: { sortir: false } }, 'absente'], ['ancien ordre de départ', { v: 1, ordre: vieux, choix: {} }, 'basse']]) {
+    const o = await P.ouvrir(nav, { W, sombre: th === 'sombre', b: base({ perso }), url: '/?tab=journee', dsf: W < 600 ? 2 : 1 });
+    await P.pret(o.pg);
+    await o.pg.waitForSelector('.sj-journee [data-tuile="envoyer"]', { timeout: 30000 }).catch(() => {});
+    if (attendu === 'basse') await o.pg.waitForSelector('[data-sortir] [data-sortir-premier]', { timeout: 20000 }).catch(() => {});
+    await o.pg.waitForTimeout(1500);
+    const m = await mesurer(o.pg);
+    await o.pg.screenshot({ path: path.join(SHOTS, `sortir-${W}-${th}-${attendu}.png`) }).catch(() => {});
+    if (attendu === 'absente') dit(!m.la && m.topEnvoyer != null, `${T} B ${nom} par lui : « La paire à sortir » ne s'affiche pas (Ma journée, elle, est là)`, JSON.stringify([m.la, m.topEnvoyer]));
+    else dit(m.la && m.top > m.topEnvoyer, `${T} B ${nom} : toujours sous « À envoyer » (${m.top} > ${m.topEnvoyer} px)`, JSON.stringify([m.la, m.top, m.topEnvoyer]));
+    dit(o.erreurs.length === 0, `${T} B aucune erreur JS (${nom})`, o.erreurs.join(' | '));
+    await o.ctx.close();
+  }
+}
+
 (async () => {
   // R : la règle, puis chaque mutation.
   const M = await charger(SRC);
@@ -227,6 +260,7 @@ async function inconnue(nav, { W, th }) {
       try { await scenario(nav, { W, th, sortir }); } catch (e) { dit(false, `[${W} ${th}] le scénario a pu s'exécuter`, String(e && e.stack || e).slice(0, 300)); }
     }
     try { await inconnue(nav, { W: LARGEURS[0], th: THEMES[0] }); } catch (e) { dit(false, 'le scénario « sans emplacement » a pu s\'exécuter', String(e && e.stack || e).slice(0, 300)); }
+    if (LARGEURS[0] < 600) { try { await choixDeLui(nav, { W: LARGEURS[0], th: THEMES[0] }); } catch (e) { dit(false, 'le scénario « ses choix » a pu s\'exécuter', String(e && e.stack || e).slice(0, 300)); } }
   } finally { await nav.close(); P.srv.close(); }
   console.log(ko ? `\n${ko} KO` : '\nTOUT VERT');
   process.exit(ko ? 1 : 0);

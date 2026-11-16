@@ -63,6 +63,10 @@ export const CARTES_JOURNEE = [
   // (11 nov.) « Supprimés de Vinted » n'est plus une carte : ces articles vivent dans « À trancher » (lot DJ4).
   { id: 'autres', zone: 'afaire', nom: 'Les autres rappels', desc: 'Litiges, achats à relier, inventaire…' },
   { id: 'urssaf', zone: 'afaire', nom: 'Déclaration URSSAF', desc: 'L’échéance qui approche.' },
+  // (16 nov., lot personnalisation-simple — Julien : la carte « 3 ventes · à sortir dans cet ordre » ne doit PAS être tout
+  // en haut) « La paire à sortir » devient une carte, EN TÊTE DE « EN BAS » : sous la grille (À envoyer, À retirer, le mois)
+  // et sous « À faire », au-dessus des notifications et du guide. Il peut la cacher et la ranger dans « En bas ».
+  { id: 'sortir', zone: 'bas', nom: 'Ventes à sortir du stock', desc: 'Où est le carton de chaque vente.' },
   { id: 'notifs', zone: 'bas', nom: 'Notifications coupées', desc: 'Quand ce téléphone ne te prévient plus.' },
   { id: 'guide', zone: 'bas', nom: 'Démarrer avec VRM', desc: 'Les étapes qui restent.' },
 ];
@@ -72,10 +76,25 @@ export const carteJournee = (id) => PAR_ID.get(id) || null;
 // Le réglage d'origine : rien de touché.
 export const REGLAGE_ORIGINE = Object.freeze({ v: 1, ordre: [], choix: {} });
 
+// (16 nov., lot personnalisation-simple) UN ORDRE ÉGAL AU DÉPART N'EST PAS UN ORDRE À LUI : quand, zone par zone, les
+// cartes rangées sont dans l'ordre du catalogue (il a déplacé puis remis, ou l'ordre enregistré recopie l'ancien
+// départ), l'ordre est oublié — le départ d'AUJOURD'HUI s'applique (une carte déplacée par un lot, comme « La paire à
+// sortir » le 16 nov., prend sa nouvelle place ; l'ordre selon l'heure du jour revient). Ses choix (visible / cachée)
+// ne sont jamais touchés.
+export function ordreEgalDepart(ordre) {
+  const l = Array.isArray(ordre) ? ordre.filter((id) => PAR_ID.has(id) && !PAR_ID.get(id).fixe) : [];
+  return ZONES_JOURNEE.every((z) => {
+    const siens = l.filter((id) => PAR_ID.get(id).zone === z.id);
+    const depart = CARTES_JOURNEE.filter((c) => c.zone === z.id && siens.includes(c.id)).map((c) => c.id);
+    return siens.join('|') === depart.join('|');
+  });
+}
+
 // Lecture tolérante (une ligne abîmée ⇒ le réglage d'origine, jamais une erreur).
 export function lireJourneePerso(brut) {
   const b = brut && typeof brut === 'object' && !Array.isArray(brut) ? brut : {};
-  const ordre = Array.isArray(b.ordre) ? [...new Set(b.ordre.filter((x) => typeof x === 'string' && x))] : [];
+  const lu = Array.isArray(b.ordre) ? [...new Set(b.ordre.filter((x) => typeof x === 'string' && x))] : [];
+  const ordre = ordreEgalDepart(lu) ? [] : lu;
   const choix = {};
   if (b.choix && typeof b.choix === 'object') for (const [k, v] of Object.entries(b.choix)) if (typeof v === 'boolean') choix[k] = v;
   return { v: 1, ordre, choix, ...(typeof b.at === 'string' ? { at: b.at } : {}) };
@@ -159,3 +178,7 @@ export function deplacerCarte(reglage, id, vers) {
 }
 
 export const revenirOrigine = () => estampille({ ...REGLAGE_ORIGINE, choix: {} });
+
+// (16 nov., lot personnalisation-simple) Les boutons ↑ ↓ de l'éditeur : une place vers le haut / le bas dans sa zone.
+export const monterCarte = (reglage, id) => { const c = PAR_ID.get(id); if (!c || c.fixe) return lireJourneePerso(reglage); return deplacerCarte(reglage, id, ordreMobile(c.zone, reglage).indexOf(id) - 1); };
+export const descendreCarte = (reglage, id) => { const c = PAR_ID.get(id); if (!c || c.fixe) return lireJourneePerso(reglage); return deplacerCarte(reglage, id, ordreMobile(c.zone, reglage).indexOf(id) + 1); };

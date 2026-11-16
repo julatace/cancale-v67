@@ -49661,7 +49661,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         })();
         const retoursLitigesElt = retoursLitigesJ.length ? <RetoursLitigesJournee lignes={retoursLitigesJ} Photo={PhotoVinted}
           attrs={{ 'data-a-renvoyer-journee': String(retoursClasses.actifs.filter((c) => c.etape === 'a-deposer').length) }}/> : null;
-        const sortirElt = sortirJ ? <PaireASortir liste={sortirJ.aSortir} nSorties={sortirJ.sorties.length} slots={sortirJ.slots} Photo={PhotoVinted} Icon={Icon} mots={motsVendeur()}
+        // (16 nov., lot personnalisation-simple — Julien : « je ne veux pas qu'elle soit tout en haut ») Une CARTE de « Modifier
+        // ma journée » (`sortir`, zone « En bas », en tête) : au téléphone sous la grille et « À faire » ; cachée par lui ⇒ rien.
+        const sortirVu = visibiliteCarte('sortir', { reglage: persoJ, mode: PROFIL_VENDEUR.mode }).montree;
+        const sortirElt = sortirJ && sortirVu ? <PaireASortir liste={sortirJ.aSortir} nSorties={sortirJ.sorties.length} slots={sortirJ.slots} Photo={PhotoVinted} Icon={Icon} mots={motsVendeur()}
           apres={apresSortie} onSortir={sortirPaireJ} onImprimer={imprimerJ} onRanger={(v) => { if (v && v.num && onStore) onStore(String(v.num)); else if (onNav) onNav('garage'); }}
           onCompris={() => setApresSortie(null)} ordi={ordiJournee}
           toutesImprimer={{ n: Math.max(1, sortirJ.sorties.length), nums: sortirJ.sorties.map((x) => x.num).filter(Boolean), imprimer: imprimerJ }}/> : null;
@@ -49703,9 +49706,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     10 h », « Imprimer le bordereau », « Déposé »). Plus aucune ligne « Retour » ailleurs dans la journée. */}
                 <ARenvoyerJournee r={null} onImprimer={imprimerRetourAchat} onPreparer={preparerRetourPdf} onDepose={basculerRetourDepose} Photo={PhotoVinted}
                   onVoir={() => { if (onNav) onNav('achats'); }}/>
-                {/* (15 nov., refonte-journee — maquette validée) « LA PAIRE À SORTIR EN PREMIER » : quand une vente tombe, OÙ est
-                    l'article (son meuble, sa case allumée), puis « Je l'ai sortie » — avant le chiffre du jour. */}
-                {ordiJournee ? null : sortirElt}
+                {/* (16 nov., lot personnalisation-simple) « La paire à sortir » n'est PLUS ici, tout en haut (Julien) : c'est la
+                    carte `sortir` de la zone « En bas » (sous la grille et « À faire »), dans SON ordre. */}
                 {/* SON ordre (« Modifier ma journée ») entre la phrase et l'affiche ; « Les chiffres du mois » sont une
                     tuile de la grille, « la prochaine chose » la première carte de « À faire » (`data-prochain`). */}
                 {ordreJourneeHeure('tete', persoJ).filter((id) => id === 'phrase' || (id === 'frise' && !(ordiJournee && !baseKO && !premierJour))).map((id) => id === 'phrase'
@@ -49764,7 +49766,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const imprimer = () => { _pendingBordPrint = true; if (onNav) onNav(xE.tab); };
                 // (15 nov., refonte-journee) « Imprimer les 3 bordereaux » en barre (la maquette) ; quand « La paire à sortir »
                 // est là, SON « Je l'ai sortie » est le plein de l'écran : l'impression devient une touche (un plein par écran).
-                const sortirLa = !!(sortirJ && (sortirJ.aSortir.length || apresSortie));
+                const sortirLa = !!(sortirElt && (sortirJ.aSortir.length || apresSortie));
                 const plein = em && em.n > 0 ? (
                   <button type="button" className={sortirLa ? 'sb-touche sj-imprimer-touche' : 'sb-btn-plein'} data-sj-imprimer={String(em.n)} data-fu-principal="" title={em.phrase}
                     aria-label={tr('sj.imprimerN', { n: em.n })} onClick={imprimer}>
@@ -50034,6 +50036,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 (`premierJour`) garde son guide plein écran : c'est tout l'écran, il ne se cache pas. */}
             {!baseKO && !premierJour ? ordreJournee('bas', persoJ).map((id) => {
               if (!visibiliteCarte(id, { reglage: persoJ, mode: PROFIL_VENDEUR.mode }).montree) return null;
+              if (id === 'sortir') return ordiJournee ? null : <React.Fragment key={id}>{sortirElt}</React.Fragment>;
               if (id === 'notifs') return <NotifsMuettes key={id} onNav={onNav}/>;
               if (id === 'guide') return !loading && accountsReady && Array.isArray(accounts) ? <GuideDemarrageApp key={id} onNav={onNav} comptes={accounts}/> : null;
               return null;
@@ -50046,7 +50049,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>
             ); })() : null}
             {feuillePerso ? (
-              <SheetShell titre={tr('journee.modifierMaJournee')} sousTitre={tr('journee.montreCacheRange')} onClose={() => setFeuillePerso(false)} maxWidth={560} data-feuille-journee-perso="">
+              <SheetShell titre={tr('journee.modifierMaJournee')} onClose={() => setFeuillePerso(false)} maxWidth={560} data-feuille-journee-perso="">
                 <JourneePersoSetting/>
               </SheetShell>
             ) : null}

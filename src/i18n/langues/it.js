@@ -1,4 +1,5 @@
 // ITALIANO — traduzione di fr.js (la fonte). Stesse chiavi, stesse {variabili}.
+import ecran_perso from './it/perso.js';   // (16 nov.) « Modifier ma journée » simple
 import ecran_ventesVerre from './it/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
 import ecran_journee from './it/journee.js';
 import ecran_confort from './it/confort.js';   // (14 nov., lots 117–130) confort et sécurité
@@ -63,6 +64,7 @@ import ecran_etageres from './it/etageres.js';   // (15 nov.) le Stock en étag�
 import ecran_journee_verre from './it/journee-verre.js';   // (15 nov.) Ma journée verre, la paire à sortir
 import ecran_arrivee from './it/arrivee.js';   // (15 nov.) atelier d'arrivée, historique, taille du texte
 export default {
+  ...ecran_perso,
   ...ecran_ventesVerre,
   ...ecran_studio_paires,
   ...ecran_republier_guide,

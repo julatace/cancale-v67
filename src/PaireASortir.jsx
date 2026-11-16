@@ -66,10 +66,45 @@ const Site = ({ v }) => (v.site || v.compte ? (
   <span className="vrm-so-site" data-so-site={v.site || ''}>{v.site ? <MarquePlateforme site={v.site} taille={13}/> : null}{v.compte ? <span>{v.compte}</span> : null}</span>
 ) : null);
 
-function Carte({ v, total, rang, slots, Photo, Icon, mots, onSortir, onImprimer, onRanger }) {
+function Carte({ v, total, rang, slots, Photo, Icon, mots, onSortir, onImprimer, onRanger, compact = false }) {
   const lieu = v.lieu;
   const meta = [v.taille ? 'T' + v.taille : '', v.prix || '', v.acheteur ? tr('sortir.acheteur', { qui: v.acheteur }) : ''].filter(Boolean).join(' · ');
   const raison = { sansNumero: 'sortir.inconnu.sansNumero', pasRange: 'sortir.inconnu.pasRange', meubleAbsent: 'sortir.inconnu.meubleAbsent', horsMeuble: 'sortir.inconnu.horsMeuble', doublon: 'sortir.inconnu.doublon' }[v.raison] || 'sortir.inconnu.pasRange';
+  // (16 nov., lot personnalisation-simple — Julien : la grande photo et le bloc pointillé prenaient tout l'écran à 390 px)
+  // AU TÉLÉPHONE, la carte est COMPACTE : une vignette à gauche, le N°, le site, le rang et la date à côté ; le lieu (ou
+  // « VRM ne sait pas où… », en plus petit) ; « Je l'ai sortie » reste le plein de la carte. Les mêmes `data-*`.
+  if (compact) return (
+    <div className={'vrm-so-carte is-compact' + (total > 1 ? ' is-plusieurs' : '')} data-sortir-premier={v.cle} data-sortir-compact="" data-sortir-num={v.num || ''} data-sortir-lieu={lieu ? `${lieu.meubleId}:${lieu.i}` : ''} data-sortir-raison={lieu ? undefined : (v.raison || 'pasRange')}>
+      <div className="vrm-so-c-tete">
+        <div className="vrm-so-ph">{v.photo && Photo ? <Photo src={v.photo} alt="" loading="lazy" decoding="async" width={72} height={72}/> : <span className="vrm-so-ph-vide" aria-hidden="true">{Icon ? <Icon name="box" size={24}/> : null}</span>}</div>
+        <div className="vrm-so-m">
+          <span className="vrm-so-c-l1"><Plq num={v.num}/>{v.site || v.compte ? <span className="vrm-so-c-site" data-so-site={v.site || ''}>{v.site ? <MarquePlateforme site={v.site} taille={12}/> : null}{v.compte ? <span>{v.compte}</span> : null}</span> : null}{total > 1 ? <span className="vrm-so-c-rang">{tr('sortir.rangSur', { k: rang, n: total })}</span> : null}</span>
+          <b>{v.titre || tr('sortir.sansTitre')}</b>
+          {v.echeance ? <span className={'vrm-so-lim' + (v.echeanceAmbre === false ? '' : ' is-ambre')} data-sortir-limite="">{Icon ? <Icon name="clock" size={13}/> : null}{v.echeance}</span> : meta ? <span>{meta}</span> : null}
+        </div>
+      </div>
+      {lieu ? (
+        <div className="vrm-so-ou" data-sortir-ou="">
+          <MiniPlan lieu={lieu} slots={slots} photo={v.photo} Photo={Photo}/>
+          <div className="vrm-so-ou-t">
+            <b data-sortir-meuble="">{nomMeuble(lieu)}</b>
+            <em data-sortir-place="">{lieuEnMots(lieu)}</em>
+            {aideEnMots(lieu) ? <small>{aideEnMots(lieu)}</small> : null}
+          </div>
+        </div>
+      ) : (
+        <div className="vrm-so-inc" data-sortir-inconnu={v.raison || 'pasRange'}>
+          <div><b>{tr('sortir.inconnu.titre', { ce: mots.ce })}</b><span>{tr(raison, { num: v.num || '', nom: mots.nom })}</span></div>
+        </div>
+      )}
+      <button type="button" className="sb-btn-plein vrm-so-plein" data-sortir-geste="sortie" data-sortir-cle={v.cle} onClick={() => onSortir(v)}>
+        {Icon ? <Icon name="check" size={20}/> : null}<span>{tr(mots.e ? 'sortir.jeLaiSortieF' : 'sortir.jeLaiSortie')}</span>
+      </button>
+      {lieu
+        ? (onImprimer ? <button type="button" className="sb-touche vrm-so-touche" data-sortir-imprimer="" onClick={onImprimer}>{Icon ? <Icon name="printer" size={18}/> : null}<span>{tr('sortir.puisImprimer')}</span></button> : null)
+        : <button type="button" className="sb-touche vrm-so-touche" data-sortir-ranger={v.num || ''} onClick={() => onRanger(v)}>{Icon ? <Icon name="box" size={18}/> : null}<span>{tr('sortir.rangerDabord')}</span></button>}
+    </div>
+  );
   return (
     <div className={'vrm-so-carte' + (total > 1 ? ' is-plusieurs' : '')} data-sortir-premier={v.cle} data-sortir-num={v.num || ''} data-sortir-lieu={lieu ? `${lieu.meubleId}:${lieu.i}` : ''} data-sortir-raison={lieu ? undefined : (v.raison || 'pasRange')}>
       <div className="vrm-so-ph">
@@ -152,7 +187,7 @@ export default function PaireASortir({ liste, nSorties = 0, slots, Photo, Icon, 
       )}
       {!apres && !uneSeule ? <p className="vrm-so-regle" data-sortir-regle="">{tr('sortir.regle')}</p> : null}
       {premier ? (
-        <Carte v={premier} total={total} rang={nSorties + 1} slots={slots} Photo={Photo} Icon={Icon} mots={mots} onSortir={onSortir} onImprimer={onImprimer} onRanger={onRanger}/>
+        <Carte v={premier} total={total} rang={nSorties + 1} slots={slots} Photo={Photo} Icon={Icon} mots={mots} onSortir={onSortir} onImprimer={onImprimer} onRanger={onRanger} compact={!ordi}/>
       ) : null}
       {suite.length && !apres ? (
         <div className="vrm-so-suite" data-sortir-suite={String(l.length - 1)}>
