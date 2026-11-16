@@ -15,6 +15,19 @@ Tout est poussé sur `claude/serveur-robuste`. Gardien : `scripts/audit-serveur-
 (36 contrôles qui EXÉCUTENT les routes ; `--prouve` : rouge sur origin/main + mutations).
 Reste ouvert : voir « Pas fait » en bas. Geste de Julien : **aucun**.
 
+### Reprise du 16 nov. au soir
+
+- Vrai `git merge origin/main` (conflits CLAUDE.md §9 et `src/nouveautes.js` : les deux côtés gardés).
+- **M50 mesuré (lecture seule, 16 nov. 18 h 40 UTC)** : l'unicité GLOBALE de la 023
+  (`vinted_accounts_vinted_user_id_global_idx`) est **déjà posée dans la vraie base**, 0 compte Vinted
+  chez deux vendeurs ; la RPC 042 (`vrm_vinted_relier`) n'y est pas (geste de Julien, déjà listé). La
+  contrainte demandée existe donc : un second vendeur qui relie le même compte reçoit 23505 ⇒
+  `deja_relie` (route), `unicite` (extension). **Aucune migration neuve n'est à écrire.**
+- Mutations rejouées à la main sur les points « déjà sur main » : H14 (bail tenu ignoré ⇒
+  `audit-cron-lots` rouge), H18 (PATCH sans `conditionStatut` ⇒ `audit-serveur-migrations` J2 rouge),
+  M50 (409/23505 lu comme échec ⇒ `audit-serveur-migrations` rouge).
+- `audit-serveur-robuste --prouve` après le merge : 28 rouges sur origin/main, **17/17 mutations**.
+
 ## Ce qui était déjà fait sur `main` (vérifié présent, pas refait)
 
 | point | où |
