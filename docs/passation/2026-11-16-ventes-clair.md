@@ -33,6 +33,15 @@ deux fois, une phrase répétée se dit une fois, 44 px).
 Aussi : texte de la règle d'offre eBay raccourci (« Offre ≥ ce montant : eBay l'accepte, la paire est vendue… ») — rouge
 `audit-textes-courts` venu de main (règle du 16 nov. : zéro rouge).
 
+8. **Plus de « ⋯ » sur une ligne de vente** (Julien, 2e capture : « les points doivent être remplacés ») : toucher la
+   vente ouvre SA fiche avec tous ses gestes (« Déposé » y est ajouté : `data-recap-depose`, le même `demanderDepose`) ;
+   la puce « Prix d'achat ? » (44 px, ambre : un geste à faire) est TOUJOURS sur la ligne quand le prix manque, et rien
+   quand il est saisi ; elle ouvre la saisie sur place, « Relier un achat » vient avec elle ; « Imprimer » et « Déposé »
+   sont deux ronds de 44 px sur la ligne. Banc tous-boutons porté (la puce au lieu du « … »).
+9. **Source des audits réparée** (venue de main) : `partageFichiersPossible`, `joursAvant`, `lireNumeroEcrit` déclarés à
+   la fois dans App.jsx et dans un écran découpé ⇒ `_source-app.cjs` ne lisait plus App.jsx (≈ 40 audits KO). Renommés
+   dans Republier.jsx / Reglages.jsx.
+
 ## Mesures (banc `scripts/bancs/ventes-clair.cjs`, 2 000 ventes inventées, 3 comptes)
 
 | | avant (main 5a9abe57) | après |
@@ -53,9 +62,11 @@ Aussi : texte de la règle d'offre eBay raccourci (« Offre ≥ ce montant : eBa
 
 ## Pas fait (dit)
 - 1512 « fiche à droite en permanence » (maquette) : la fiche s'ouvre toujours en plan au clic.
+- Achats : son « ⋯ » (un menu, déjà recopié dans la fiche) n'est pas retiré dans CETTE PR (6 bancs le touchent) : lot design-restes.
+- Une vente à envoyer SANS prix d'achat garde la puce sur une 4e ligne (≈ 120 px) : la 2e ligne porte « Imprimer » et « Déposé ».
 - La puce « Ouvre Y sur l'ordinateur » n'est pas encore dite UNE fois en en-tête quand plusieurs lignes la portent.
 - Annulations / prix d'achat : repliés ici, pas déplacés vers Santé des comptes / Argent (aucune règle touchée).
 - Le banc ne sert pas d'« Argent à venir » rempli au premier rendu : la règle « étapes tues » est jugée quand la carte est là.
 
 ## ÉTAT À LA REPRISE
-Branche poussée ; PR « Ventes plus clair » (voir CLAUDE.md §9). Geste de Julien : aucun.
+Branche poussée ; PR #1202 « Ventes plus clair ». Main est rouge sur de nombreux jobs (Audits ×3, Bancs, écrans) AVANT ce lot : règle « zéro rouge » ⇒ pas de fusion tant qu'un rouge reste. Geste de Julien : aucun.
