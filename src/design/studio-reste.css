@@ -241,6 +241,10 @@
   padding: 0 8px !important; flex: 1 1 auto !important; min-width: 0 !important; white-space: nowrap !important;
 }
 @media (pointer: coarse) { :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-seg .vrm-seg-btn { min-height: 44px !important; } }
+/* (16 nov., parcours-vert) « Questions · Tout » (eBay) et la navigation « 1 · 2 » entre les questions d'une annonce :
+   44 × 44 px au doigt ET à la souris (styles-parcours-clairs.css, banc offres-objectif) — le segmenté ci-dessus (40 px,
+   largeur libre) les réduisait à 22 × 40 px. */
+:root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-seg .vrm-seg-btn:is([data-q-aller], [data-ebay-vue]) { min-width: 44px !important; min-height: 44px !important; }
 :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-seg .vrm-seg-btn:is([aria-current="page"], [aria-pressed="true"], [aria-selected="true"]) {
   background: var(--sb-porcelaine) linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2)) !important; color: var(--sb-encre) !important; box-shadow: var(--sb-ombre-plan) !important;
 }

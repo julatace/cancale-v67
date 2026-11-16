@@ -645,6 +645,10 @@ html[data-sb-eventail] body .vrm-neuf-hote { visibility: hidden !important; }
     background: var(--rv-pastille) !important; color: var(--rv-pastille-t) !important; font: 700 11.5px/22px Inter, system-ui, sans-serif !important; text-align: center !important; box-shadow: none !important;
   }
   :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-pied { margin-top: auto !important; border-top: 1px solid var(--rv-filet) !important; padding-top: 8px !important; background: transparent !important; box-shadow: none !important; }
+  /* (16 nov., parcours-vert) Fenêtre basse (1280 × 620, banc navigation-plateformes) : le pied (Paramètres, le compte)
+     passait sous le bas de l'écran. Le rail défile, son pied reste collé en bas, toujours joignable. */
+  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] { overflow-y: auto !important; overscroll-behavior: contain; scrollbar-width: none; }
+  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] > .vrm-rail-pied { position: sticky !important; bottom: -12px !important; z-index: 1; padding-bottom: 12px !important; background: var(--rv-fond) !important; }
   :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-compte { background: transparent !important; box-shadow: none !important; color: var(--rv-encre) !important; }
   :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-compte-nom { font: 700 13.5px/1.25 Inter, system-ui, sans-serif !important; color: var(--rv-encre) !important; }
   :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-compte-sous { font: 550 12px/1.25 Inter, system-ui, sans-serif !important; color: var(--rv-gris) !important; }
