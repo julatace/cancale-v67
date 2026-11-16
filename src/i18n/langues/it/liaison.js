@@ -36,6 +36,8 @@ export default {
   "liaison.p.couleurPhoto": "{couleur} (letto sulla foto)",
   "liaison.pistes": { one: "Altre piste · {n}", other: "Altre piste · {n}" },
   "liaison.pistesAide": "Stessa marca, modello, taglia e colore compatibili, ma non abbastanza sicure da essere proposte. Controlla prima di collegare.",
+  "liaison.ann.relier": "Collega un acquisto",
+  "liaison.ann.achetee": "Acquistata {prix}",
   "liaison.p.jours.en-ligne.retrait": { one: "pubblicato {n} giorno dopo il ritiro", other: "pubblicato {n} giorni dopo il ritiro" },
   "liaison.p.jours.en-ligne.livraison": { one: "pubblicato {n} giorno dopo la consegna", other: "pubblicato {n} giorni dopo la consegna" },
   "liaison.p.jours.en-ligne.commande": { one: "pubblicato {n} giorno dopo l’ordine", other: "pubblicato {n} giorni dopo l’ordine" },

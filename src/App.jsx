@@ -171,7 +171,7 @@ import { etatAncienne } from "./republierGuide.js";   // (15 nov.) « Republier 
 // ⟦→ ecrans/Republier.jsx #1⟧
 // (6 nov., vague 2) Remettre en vente une vente annulée avant l'envoi ; relier l'achat des annonces numérotées.
 import { annuleesChezToi, paireARemettre, fichesAnciennesAnnulees, ligneJournee as ligneAnnuleesJournee, etatRemise, VERDICT_MOTEUR as VERDICT_REMISE } from "./annuleesChezToi.js";
-import { fileSansAchat, aRelierJournee, meilleureSuggestion, texteSuggestion, cibleAnnonce } from "./achatsARelier.js";
+import { fileSansAchat, sansAchatRelie, aRelierJournee, meilleureSuggestion, texteSuggestion, cibleAnnonce } from "./achatsARelier.js";
 import { lignesManquantes as lignesPrixMiniManquants, carteJournee as carteJourneePrixMini } from "./prixMiniManquants.js";
 import { CLE_A_TRANCHER, publierSource as publierSourceTrancher, lirePublications as lirePubsTrancher, lignesATrancher, comptesARelireDe, badgeATrancher, phraseJournee as phraseATrancher, appliquerTranches, photosJournee as photosATrancher, typesJournee as typesATrancher, BINAIRES as BINAIRES_TRANCHER } from "./aTrancher.js";
 import { CLE_SANTE, publierSante } from "./santeDonnees.js";   // (11 nov., lot sante-donnees)
@@ -53106,6 +53106,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div className="vrm-ann-price-line" style={{display:'flex',alignItems:'center',gap:10}}>
                       <span data-prix style={{fontSize:20,fontWeight:700,color:C.text,fontVariantNumeric:'tabular-nums',letterSpacing:'-.02em'}}>{prixAffiche(prix(it.price,it.currency)||'—')}</span>
                     </div>
+                    {/* (16 nov., relier-fiable — Julien, capture d'Annonces : « il n'y a rien pour relier un achat ») Sur CHAQUE
+                        annonce sans achat relié : « Relier un achat » (une puce, 44 px) ouvre la feuille « Choisir un achat » (les
+                        propositions fiables d'abord, puis ses achats libres) ; SON clic relie, par l'identifiant de l'annonce
+                        (`updatePair`) — le lien suit la vente et la republication (identité, src/repriseNumero.js). Reliée :
+                        « Achetée 24,63 € », discret ; « Délier » et « Reçu » sont dans sa fiche. */}
+                    {/* La MÊME règle que le compte de « Sans achat relié » (`sansAchatRelie`, src/achatsARelier.js) : chaque puce est comptée. */}
+                    {(e.buyFromId != null && String(e.buyFromId) !== '')
+                      ? <span className="vrm-ann-lien vrm-ann-achetee" data-ann-achetee={String(e.buyFromId)}>{tr('liaison.ann.achetee', { prix: achatConnu ? prixCourt(achat) : '—' })}</span>
+                      : sansAchatRelie(e, () => (achatConnu ? achat : null)) ? <button type="button" className="vrm-ann-lien vrm-ann-relier" data-ann-relier={String(it.id)} onClick={(ev) => { ev.stopPropagation(); openPicker(item); }}><Icon name="link" size={14}/><span>{tr('liaison.ann.relier')}</span></button> : null}
                     {/* (14 nov., « Studio bleu clair ») L'état, le prix d'achat et les chiffres de l'annonce (accepter dès, refuser
                         sous, boost, marge) : la rangée ne les montre plus ; ouverte en fiche, ils montent EN TÊTE de la fiche
                         (`DansFiche`, place « contexte ») — les mêmes éléments, les mêmes écritures, les mêmes data-*. */}

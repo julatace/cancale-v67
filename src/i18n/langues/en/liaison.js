@@ -36,6 +36,8 @@ export default {
   "liaison.p.couleurPhoto": "{couleur} (read from the photo)",
   "liaison.pistes": { one: "Other leads · {n}", other: "Other leads · {n}" },
   "liaison.pistesAide": "Same brand, model, size and colour compatible — but not sure enough to be suggested. Check before linking.",
+  "liaison.ann.relier": "Link a purchase",
+  "liaison.ann.achetee": "Bought {prix}",
   "liaison.p.jours.en-ligne.retrait": { one: "listed {n} day after pickup", other: "listed {n} days after pickup" },
   "liaison.p.jours.en-ligne.livraison": { one: "listed {n} day after delivery", other: "listed {n} days after delivery" },
   "liaison.p.jours.en-ligne.commande": { one: "listed {n} day after the order", other: "listed {n} days after the order" },
