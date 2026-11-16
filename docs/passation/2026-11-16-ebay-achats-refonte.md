@@ -73,6 +73,23 @@ règle au détail. Textes neufs par `tr()`, 5 langues (`src/i18n/langues/*/ebaya
   sur la règle (détail ouvert avant de lire une liste, « Détails » ouvert avant « Les données »,
   « dans le fil » = l'interrupteur).
 
+## Reprise du 16 nov. (soir) — passe d'audits finie
+
+- `git merge origin/main` (vrai) : conflits §9 et `nouveautes.js` résolus (les deux lignes gardées) ;
+  CLAUDE.md repassé sous 59 000 o (deux lignes du 15 nov. déplacées telles quelles dans
+  `historique-divers.md`).
+- Les 4 zips d'extension avaient été régénérés par une passe d'audits et commités dans deux merges :
+  remis à l'identique de `main` (le lot ne touche pas l'extension).
+- CI du commit `acab52bc0` comparée à celle de `main` (`e48dd99c1`) : **mêmes rouges, aucun de plus**.
+  Audits : vendeur-generaliste, vocabulaire-article, infos-vinted, notifs-redaction (aucun ne cite
+  un fichier du lot). Bancs : nouveau-vendeur ; colis-retirer-propre, annonces-actions,
+  iphone-reprise, chiffres-coherents, retraits-suivi, accessibilite-clavier ; part 2 annulée des deux
+  côtés. `comptes-et-reception` : messagerie instable (KO puis OK au rejeu), sans lien avec eBay.
+- En local sur le build de la branche : `ebay-achats-refonte` (Tout est OK, mesures identiques),
+  `alertes-ebay`, `ebay-achats-recherche`, `barre-achats` et `garde-ecrans` verts ; audits qui touchent eBay/traduction/nouveautés
+  verts (alertes-ebay, traduction, quoi-de-neuf, icones, textes-courts, notifications…).
+- Captures 390 et 1512, clair et sombre, regardées : trois cartes lisibles, aucun titre doublé.
+
 ## ÉTAT À LA REPRISE
 
 - Branche `claude/ebay-achats-refonte`. Captures avant/après regardées (390 et 1512, clair et
