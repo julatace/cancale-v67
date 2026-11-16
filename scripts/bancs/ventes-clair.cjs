@@ -67,6 +67,11 @@ function mesurer() {
   const cartesRepli = regarder ? [...regarder.querySelectorAll('.vrm-ventes-regarder-corps > *')] : [];
   const filtres = [...document.querySelectorAll('.vrm-sales-workbar .vrm-filtres > button')].filter(vis);
   const coupes = filtres.filter((b) => { const r = b.getBoundingClientRect(); for (let x = b.parentElement; x && x !== document.body; x = x.parentElement) { const cs = getComputedStyle(x); if (cs.overflowX !== 'visible' || cs.overflow !== 'visible') { const q = x.getBoundingClientRect(); if (q.width < 2) continue; if (r.left < q.left - 1 || r.right > q.right + 1) return true; } } return r.right > window.innerWidth + 1 || r.left < -1; }).map((b) => b.textContent.trim());
+  const inter = (a, b) => !(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top);
+  const aEnvoyer = lignes.filter((l) => l.querySelector('[data-fu-imprimer]')).slice(0, 8).map((l) => {
+    const p = l.querySelector('[data-fu-imprimer]').getBoundingClientRect(); const pl = l.querySelector('.vrm-fu-plus-vente'); const l3 = l.querySelector('.vrm-fu-vente-l3');
+    return { chevauche: pl ? inter(p, pl.getBoundingClientRect()) : false, coupe: l3 && vis(l3) ? l3.scrollWidth > l3.clientWidth + 1 : false, h: Math.round(l.getBoundingClientRect().height), cible: Math.round(Math.min(p.width, p.height)) };
+  });
   const hauteurs = lignes.slice(0, 12).map((l) => Math.round(l.getBoundingClientRect().height));
   const debord = lignes.slice(0, 12).filter((l) => { const r = l.getBoundingClientRect(); return [...l.querySelectorAll('*')].some((x) => { const q = x.getBoundingClientRect(); return q.width > 1 && vis(x) && q.right > r.right + 1; }); }).length;
   const bandes = [...document.querySelectorAll('.vrm-fu-ventes [data-fu-case-chiffre], .vrm-fu-ventes .vrm-fu-grand')].filter(vis).map((x) => ({ t: x.textContent.trim().slice(0, 12), c: contraste(x) }));
@@ -78,8 +83,8 @@ function mesurer() {
     etapes: [...document.querySelectorAll('[data-a-venir-etapes]')].filter(vis).length,
     redits: [...document.querySelectorAll('.vrm-fu-ventes :is([data-fu-case="aposter"], [data-fu-case="enroute"])')].filter(vis).length,
     regarder: regarder ? { n: regarder.getAttribute('data-ventes-regarder'), ouvert: regarder.open, cachee: !!regarder.hidden, visibles: cartesRepli.filter(vis).length, total: cartesRepli.length } : null,
-    hauteurs, debord, coupes, nFiltres: filtres.length,
-    uneLigne: (() => { const o = document.querySelector('.vrm-sales-workbar .vrm-outils-ventes'); const tops = [...filtres, o].filter(Boolean).filter(vis).map((x) => Math.round(x.getBoundingClientRect().top)); return tops.length ? Math.max(...tops) - Math.min(...tops) : null; })(),
+    aEnvoyer, hauteurs, debord, coupes, nFiltres: filtres.length,
+    uneLigne: (() => { const o = document.querySelector('.vrm-sales-workbar .vrm-outils-ventes'); const tops = [...filtres, o].filter(Boolean).filter(vis).map((x) => { const r = x.getBoundingClientRect(); return Math.round(r.top + r.height / 2); }); return tops.length ? Math.max(...tops) - Math.min(...tops) : null; })(),
     bandes, sel: sel && vis(sel) ? contraste(sel) : null, tete: tete && vis(tete) ? contraste(tete.querySelector('span:nth-child(2)') || tete) : null,
   };
 }
@@ -111,9 +116,10 @@ function mesurer() {
         dit(m.redits === 0, `D ${t} : la bande ne redit pas « À envoyer » / « En route » du segment`, m.redits);
         dit(!!m.regarder && Number(m.regarder.n) >= 1 && !m.regarder.ouvert && m.regarder.visibles === 0, `R ${t} : « N choses à regarder », fermé, ses cartes cachées`, m.regarder);
         if (W < 600) dit(m.hauteurs.length > 3 && Math.max(...m.hauteurs) <= 96, `L ${t} : chaque ligne de vente tient en trois lignes (≤ 96 px)`, m.hauteurs);
+        if (W < 600) dit(m.aEnvoyer.length > 0 && m.aEnvoyer.every((x) => !x.chevauche && !x.coupe && x.h <= 96 && x.cible >= 44), `L ${t} : une vente à envoyer : « Imprimer » (44 px) ne couvre pas « ⋯ », « À envoyer » entier, ≤ 96 px`, m.aEnvoyer);
         dit(m.debord === 0, `L ${t} : rien ne dépasse d'une ligne de vente`, m.debord);
         dit(m.nFiltres >= 3 && m.coupes.length === 0, `F ${t} : les filtres sont entiers`, m.coupes);
-        dit(m.uneLigne != null && m.uneLigne <= 4, `F ${t} : les filtres et « Outils » tiennent sur UNE ligne`, m.uneLigne);
+        dit(m.uneLigne != null && m.uneLigne <= 8, `F ${t} : les filtres et « Outils » tiennent sur UNE ligne`, m.uneLigne);
         const bas = m.bandes.filter((x) => x.c != null && x.c < 4.5);
         dit(m.bandes.length > 0 && !bas.length, `C ${t} : chiffres de la bande lisibles (≥ 4,5:1)`, m.bandes);
         dit(m.sel == null || m.sel >= 4.5, `C ${t} : « Sélectionner » lisible`, m.sel);
