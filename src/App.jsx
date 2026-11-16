@@ -830,6 +830,7 @@ import { achatsPourAtelier, CLE_ACHATS_ATELIER, resumeAtelier, ligneAtelierJourn
 // ⟦→ ecrans/Compta.jsx #8⟧
 import { produitsANumeroter, attribuerNumerosVc, carteNumerosVc } from "./numerosVestiaire.js";
 import { CLE_STOCK_IMPORTE, CLE_VENTES_IMPORTEES, CLE_IMPORTS, annulerImport, refVente } from "./importStock.js";
+import { importeesPourRecherche, importeeDuNumero } from "./stockImporteVue.js";   // (16 nov., lot ecrans-restes) le stock importé, montré
 import { ImportStockReglage } from "./composants/ImportStock.jsx";
 import { sitesDuNumero, appliquerPrix, noterJournalPrix, envoisPrix, prixParSite } from "./prixPartout.js";
 import { champsSource, dupliquerFiche, fichesAPublier, texteAColler } from "./dupliquerFiche.js";
@@ -18231,8 +18232,11 @@ function rechercheParNumero(q, numData, comptes) {
     // n'est pas lue.
     plan: ((load('vrm_meubles', []) || []).length ? (lu(nd.plan) || {}) : lu(nd.plan)),
     archive: archiveNumeros(),
+    // (16 nov., lot ecrans-restes) Le stock importé d'un autre outil (synchronisé) : lu dès que le nuage l'est.
+    importes: (() => { const imp = load(CLE_STOCK_IMPORTE, null); return Array.isArray(imp) ? imp : (cloud ? [] : null); })(),
   }, {
     cleNum, conflits: (p) => conflitsDeNumeros(p, GROUPES_DEUX_FOIS),
+    importeeDuNumero: (liste, k) => importeeDuNumero(liste, k, { cleNum }),
     ouStock: ouStockNumero,
     numEbayLigne: numLigneEbay,
     numEbayAnnonce: (a) => numEbayLu(a && a.sku, a && a.itemId, null, a && a.depuis),
@@ -43301,16 +43305,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         enRetard: toShip.filter(t => t.retard).length + (eb ? eb.filter(x => x.jours != null && x.jours < 0).length : 0) + (vc ? vc.filter(x => x.jours != null && x.jours < 0).length : 0),
         vinted: toShip.length, ebay: eb ? eb.length : null, leboncoin: lb ? lb.length : null, vestiaire: vc ? vc.length : null,
         nePasPoster: colisEb ? colisEb.nePasPoster.length : null, at: Date.now() };
+      // (16 nov., lot ecrans-restes) + LA LISTE des colis Vinted à expédier et leur date limite (la règle de Colis,
+      // `limiteExpedition` : l'e-mail du bordereau, sinon estimée) — la loupe la lit (« colis à expédier demain »).
+      // Sur CET appareil seulement (clé non synchronisée) ; le N° d'un lot est celui de son tampon (`lotDeVente`).
+      // Ni acheteur, ni adresse, ni n° de suivi : le titre court, le N°, le jour.
+      try {
+        v.liste = toShip.slice(0, 100).map((t) => { const o = t.o || {}; const l = lotDeVente(o); const e = effEntry(o) || {};
+          return { nom: String(o.title || '').slice(0, 60), num: String((l && l.lu ? l.tampon : e.numero) || ''), jour: t.jour || '', heure: t.heure || '', estimee: t.limite === 'estimee', retard: !!t.retard }; });
+      } catch (_) { v.liste = null; }
+      v.sigListe = Array.isArray(v.liste) ? v.liste.map((x) => `${x.num}|${x.jour}|${x.heure}|${x.nom}`).join(';') : '';
       const avant = load('vrm_colis_aposter', null);
       // (6 nov., onglets A) Et une fois l'heure même sans changement : le badge et la carte ne croient
       // qu'une publication de moins de 12 h (`publicationColisFraiche`) — un nombre stable restait
       // daté de la veille alors que l'écran qui le compte était ouvert.
-      if (!avant || avant.total !== v.total || avant.enRetard !== v.enRetard || avant.ebay !== v.ebay || avant.leboncoin !== v.leboncoin || avant.vestiaire !== v.vestiaire || avant.nePasPoster !== v.nePasPoster || !(Date.now() - (Number(avant.at) || 0) < 3600000)) {
+      if (!avant || avant.total !== v.total || avant.enRetard !== v.enRetard || avant.ebay !== v.ebay || avant.leboncoin !== v.leboncoin || avant.vestiaire !== v.vestiaire || avant.nePasPoster !== v.nePasPoster || avant.sigListe !== v.sigListe || !(Date.now() - (Number(avant.at) || 0) < 3600000)) {
         save('vrm_colis_aposter', v);
         try { window.dispatchEvent(new CustomEvent('vrm:colis')); } catch (_) {}
       }
     } catch (_) {}
-  }, [toShip, sales.items, emailBords, colisEb, colisAutres]);
+  }, [toShip, sales.items, emailBords, colisEb, colisAutres, lotsTx]);
   // ── MA JOURNÉE HORS LIGNE : LA PHOTO, APRÈS UNE LECTURE COMPLÈTE (21 oct.) ──
   // Ce que Ma journée montre — colis à expédier, colis à retirer avec leurs
   // codes et QR — rangé SUR L'APPAREIL, au nom de CE vendeur
@@ -45494,15 +45507,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // existe (lu par l'extension, `lbcpdf`). eBay n'a pas de PDF chez VRM (l'étiquette se prend dans
   // eBay, §2.8) : jamais dans le lot. L'ordre est celui des GROUPES de l'écran (`colisAEnvoyerRanges`,
   // `ordonnerLot`) : tous les colis d'un transporteur, puis le suivant.
-  const sigLigneLot = (l) => l.site === 'vinted' ? signatureColis(l.e) : empreinteColis({ owner: AUTH.user?.id || '', compte: l.site, transaction: l.cle, numero: l.num || '' });
+  // (16 nov., lot ecrans-restes) Les N° qu'une ligne du lot tamponne : ceux de SES articles pour une vente en lot
+  // (chacun passe la garde du §5, `confirmerNumerosAVerifier`), sinon le sien.
+  const numerosDeLigne = (l) => (Array.isArray(l && l.nums) ? l.nums.filter(Boolean) : [l && l.num]);
+  // (16 nov.) Une vente en lot signe AUSSI son tampon (un article relié change le PDF à préparer).
+  const sigLigneLot = (l) => l.site === 'vinted' ? signatureColis(l.e) + (Array.isArray(l.nums) ? '#lot:' + (l.num || '') : '') : empreinteColis({ owner: AUTH.user?.id || '', compte: l.site, transaction: l.cle, numero: l.num || '' });
   const lignesLotTous = () => {
     let ranges = []; try { ranges = colisAEnvoyerRanges(); } catch (_) { ranges = []; }
     const ordre = ordreDesGroupes(ranges, trNomColis);
     const rangDe = new Map(ranges.map((x, i) => [x.__autre ? x.key : String(x.txn || x.key), i]));
     const L = [];
     if (voitSite('vinted')) for (const l of lignesLot()) { const o = l.e.o, b = l.e.b;
+      // (16 nov., lot ecrans-restes) Une vente EN LOT : le tampon liste les N° de SES articles (« 124 · 131 · 140 »,
+      // `lotDeVente`, la règle d'`imprimerBordereauVente`) et la garde du §5 vérifie CHACUN (`nums`) — avant, « Tout
+      // imprimer » tamponnait le N° d'un seul article (récit 2026-11-11-ventes-lot.md, « ce qui reste »).
+      const lotV = o ? lotDeVente(o) : null; const enLotV = !!(lotV && lotV.lu);
       L.push({ ...l, site: 'vinted', pdf: true, cochable: true, trNom: trNomColis(l.e), rang: rangDe.get(String(l.cle)),
-        num: (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : ''), titre: (o && o.title) || (b && (b.modele || b.article)) || 'Bordereau',
+        ...(enLotV ? { nums: lotV.nums.slice() } : {}),
+        num: enLotV ? lotV.tampon : ((b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : '')), titre: (o && o.title) || (b && (b.modele || b.article)) || 'Bordereau',
         photo: o ? orderPhoto(o) : bordPhoto(b), sous: `Vinted · ${o && o._acc ? accNameOf(o._acc) : 'compte inconnu'}` }); }
     // (4 nov., Julien : « je n'ai pas la possibilité de sélectionner la vente de Vestiaire Co et de
     // Leboncoin ») Chaque colis des autres sites a SA ligne (`ligneLotAutre`, src/lotSelection.js) :
@@ -46242,7 +46264,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!choisies.length) { toast(tr('impr.rien')); return; }
     if (voulues) { const dispo = new Set(choisies.map((l) => l.cle)); const partis = [...voulues].filter((c) => !dispo.has(c)); if (partis.length) { toast(tr('impr.disparus', { n: partis.length })); return; } }
     const sig = sigImpr(choisies, format, tampons);
-    const numeros = choisies.map((l) => l.num);
+    const numeros = choisies.flatMap(numerosDeLigne);
     const pret = pretPour(sig);
     // Le chemin du geste : prêt, aucune question due (§5), version des N° relue il y a moins d'une minute.
     if (pret && !numerosDemandent(numeros) && (!numeros.some(Boolean) || versionFraiche())) {
@@ -46326,15 +46348,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const reimprimerUn = (cle) => {
     const s = imprEtatRef.current; const l = s && ligneDe(s, cle); if (!l) return;
     const t = s.tamponCorrige, sg = sigUn(s, cle, t), pret = pretPour(sg);
-    if (pret && !numerosDemandent([l.num]) && (!l.num || versionFraiche())) { montrerApres(pret, ouvrirPdfLot(pret, { titre: tr('impr.titrePdf') }), sg); return; }
+    if (pret && !numerosDemandent(numerosDeLigne(l)) && (!l.num || versionFraiche())) { montrerApres(pret, ouvrirPdfLot(pret, { titre: tr('impr.titrePdf') }), sg); return; }
     const format = s.res.mode || formatLot;
-    attendrePuisOuvrir(sg, [l], [l.num], () => composerLot([l], format, { [cle]: t }));
+    attendrePuisOuvrir(sg, [l], numerosDeLigne(l), () => composerLot([l], format, { [cle]: t }));
   };
   // « Déplacer le tampon » : la feuille « Place du tampon » pour CE bordereau seulement (sur sa demande).
   const deplacerTamponUn = (cle) => {
     const s = imprEtatRef.current; const l = s && ligneDe(s, cle); if (!l) return;
     const format = s.res.mode || formatLot, t = s.tamponCorrige || (tamponsPerso[cle] || '');
-    attendrePuisOuvrir(`${sigImpr([l], format, { [cle]: t })}#place:${Date.now()}`, [l], [l.num], () => composerLot([l], format, t ? { [cle]: t } : {}, { apercu: 'force' }));
+    attendrePuisOuvrir(`${sigImpr([l], format, { [cle]: t })}#place:${Date.now()}`, [l], numerosDeLigne(l), () => composerLot([l], format, t ? { [cle]: t } : {}, { apercu: 'force' }));
   };
   const corrigerUn = (cle) => setImprEtat((x) => x ? { ...x, corrige: x.corrige === cle ? null : cle, tamponCorrige: x.corrige === cle ? '' : (tamponsPerso[cle] || '') } : x);
   const fermerApres = (dire = true) => {
@@ -61287,7 +61309,8 @@ function AppCoeur() {
         // (1er nov.) La date de versement (transaction finalisée, 450) — la règle
         // de `fetchVersementsVinted`, lue dans la MÊME réponse (aucune requête de plus).
         const ver={}; for(const r of rows){ if(r&&r.tx&&String(r.s)==='450'&&r.su&&!isNaN(Date.parse(r.su))) ver[String(r.tx)]=r.su; } versementsLus=ver; return m; }catch(_){ return null; } })(),
-      lireTout('id=like.email_bord_*&select=id,tx:meta->>transaction,pdf:meta->>_pdf',{strict:true}).catch(()=>null),
+      // (16 nov.) + la date limite lue dans l'e-mail (scalaire de `meta`, §4.4 : jamais le PDF) — la fiche la dit.
+      lireTout('id=like.email_bord_*&select=id,tx:meta->>transaction,pdf:meta->>_pdf,dateLimite:meta->>dateLimite',{strict:true}).catch(()=>null),
       lireTout('id=like.harvest_*_label_*&select=id,tx:meta->>tx,pdf:meta->>_pdf',{strict:true}).catch(()=>null),
       sb('app_data?id=eq.lbc_ventes&select=ventes:data->ventes'),
       lireComptesEbay().catch(()=>null),
@@ -61309,7 +61332,7 @@ function AppCoeur() {
         for(const it of masqueesPresentes(masqueesDuCompte(res.fermees, supp===null?null:(supp.get(k[1])||{}), dateLectureDressing(r)), fichesM, perduesM)) masquees.add(String(it.id)); }
     }catch(_){ enLigne=null; aConfirmer=null; masquees=null; crees=null; } }
     let ventes=null; if(soldRows){ ventes=[]; const vus=new Set(); for(const r of soldRows){ const p={ my_orders: Array.isArray(r&&r.mo)?r.mo:[] }; const uid=(/^harvest_(\d+)_orders_sold$/.exec(String((r&&r.id)||''))||[])[1]||null; for(const o of (p.my_orders||[])){ const t=String(o.transaction_id||''); if(t&&!vus.has(t)){ vus.add(t); ventes.push(uid?{...o,_uid:uid}:o); } } } }
-    const bordereaux=(bE&&bL)?[...bE,...bL].filter(b=>b&&b.tx).map(b=>({tx:String(b.tx),pdf:!!b.pdf&&String(b.pdf)!=='false'})):null;
+    const bordereaux=(bE&&bL)?[...bE,...bL].filter(b=>b&&b.tx).map(b=>({tx:String(b.tx),pdf:!!b.pdf&&String(b.pdf)!=='false',dateLimite:b.dateLimite||''})):null;
     let lbcVentes=null, lbcItems=null;
     if(lbcRows){ const v=(lbcRows[0]&&lbcRows[0].ventes)||{}; lbcVentes=Object.entries(v).map(([id,x])=>({...(x||{}),_id:id})).filter(x=>x.isSeller===true);
       const liens=load('vrm_lbc_liens',{})||{}; if(lbcVentes.some(x=>x.itemId!=null&&!liens[String(x.itemId)])) lbcItems=await lbcAnnoncesSession(); }
@@ -64005,7 +64028,9 @@ function AppCoeur() {
           { numEbay: (c, li) => numLigneEbay(c, li) || '', numLbc: (v) => numeroLbcIdentite(v, (numData && numData.lbcItems) || null, load('vrm_lbc_liens', {}) || {}) }));
         // (15 nov., vendre plus) LE STOCK : chaque N° rangé (le plan, par `cleNum`) et son lieu ; le garage aussi.
         let brutPlan = null; try { brutPlan = localStorage.getItem('vrm_room_plan'); } catch (_) {}
-        const stockGs = memoSur('gs-stock', [brutPlan, garageGrid], () => stockPourRecherche(brutPlan, garageGrid));
+        // (16 nov., lot ecrans-restes) + les paires IMPORTÉES d'un autre outil (`vrm_stock_importe`), par leur N°.
+        let brutImp = null; try { brutImp = localStorage.getItem(CLE_STOCK_IMPORTE); } catch (_) {}
+        const stockGs = memoSur('gs-stock', [brutPlan, garageGrid, brutImp], () => [...stockPourRecherche(brutPlan, garageGrid), ...importeesPourRecherche(lireStockImporte(), { cleNum })]);
         const idx = indexRechercheMemo({ ventes: soldCache, achats: buyCache, pseudos: gsData ? gsData.pseudos : null, bordereaux: gsData ? gsData.bordereaux : null, colis: gsData ? gsData.colis : null, fiches, annonces: gsData ? gsData.annonces : null, factures, numerosTx, autres, messages: gsData ? gsData.messages : null,
           stock: stockGs, retours: gsData ? (gsData.retours === undefined ? null : gsData.retours) : null });
         const kNumQ = lireNumeroCherche(qBrut, { cleNum }, [prefixeNumeros(), archiveNumeros()]);
@@ -64094,8 +64119,8 @@ function AppCoeur() {
             info = [etat, nomCompteGs(e.compte), e.date ? jourCourt(e.date) : ''].filter(Boolean).join(' · ');
           } else if (type === 'stock') {
             vignette = <>{numBadge(e.numero)}{thumb(null, <Icon name="box" size={18} style={{color:C.muted}}/>)}</>;
-            titre = tr('vp.loupe.stockSeul'); etat = tr('vp.loupe.stockSeul');
-            info = (e.lieuxAff || []).slice(0, 2).join(' · ');
+            titre = e.importe && e.titre ? e.titre : tr('vp.loupe.stockSeul'); etat = e.importe ? tr('er.loupe.importee') : tr('vp.loupe.stockSeul');
+            info = [e.importe ? etat : '', ...(e.lieuxAff || []).slice(0, 2)].filter(Boolean).join(' · ');
           } else if (type === 'retour') {
             vignette = <>{e.numero ? numBadge(e.numero) : null}{thumb(e.photo, <Icon name="box" size={18} style={{color:C.muted}}/>)}</>;
             titre = e.titre || tr('vp.loupe.retourInfo'); etat = tr('vp.loupe.retourInfo');
@@ -64206,8 +64231,21 @@ function AppCoeur() {
           const lusColis = pubR ? retirerPubliePhrase(pubR, Date.now()) : null;
           const colisP = veut('colis') && lusColis ? passe(lusColis.liste.map((c, i) => ({ ...c, _i: i })), { quoi: 'colis', etats: ['a-retirer'], acces: {
             titre: (c) => c.nom || '', transporteur: (c) => c.transporteur || null, etat: () => 'a-retirer', jour: (c) => c.limite || null } }) : [];
+          // (16 nov., lot ecrans-restes) Les colis À EXPÉDIER et leur date limite : la liste publiée par Ventes « À expédier »
+          // (`vrm_colis_aposter.liste`, la règle de Colis `limiteExpedition`), crue si elle a moins de 12 h — sinon « pas su ».
+          const pubE = load('vrm_colis_aposter', null);
+          const lusEnv = pubE && Array.isArray(pubE.liste) && publicationColisFraiche(pubE) ? pubE.liste : null;
+          const colisE = veut('colis') && lusEnv ? passe(lusEnv.map((c, i) => ({ ...c, _i: i })), { quoi: 'colis', etats: ['a-expedier'], acces: {
+            titre: (c) => c.nom || '', numero: (c) => c.num || '', etat: () => 'a-expedier', jour: (c) => c.jour || null } }) : [];
           const MAXP = 8;
-          nPhrase = paires.length + ventesP.length + achatsP.length + colisP.length;
+          nPhrase = paires.length + ventesP.length + achatsP.length + colisP.length + colisE.length;
+          const lignesEnvoyer = colisE.slice(0, MAXP).map((c) => (
+            <button key={'phrase-env-' + c._i} type="button" className="vrm-recherche-ligne" data-recherche-resultat="phrase-colis-envoyer" data-phrase-limite={c.jour || ''} data-phrase-num={c.num || undefined}
+              onClick={() => ouvrir({ e: { type: 'colis', c: { sens: 'aenvoyer' } }, par: 'phrase' }, 'colis')} style={styleLigne}>
+              {thumb(null, <Icon name="box" size={18} style={{color:C.muted}}/>)}
+              {ligneTexte((c.num ? `N°${c.num} · ` : '') + (c.nom || tr('er.phrase.colisSansTitre')), c.jour ? tr(c.estimee ? 'er.phrase.limiteEstimee' : 'er.phrase.limite', { d: jourCourt(c.jour + 'T12:00:00') }) : '')}
+              <span style={{fontSize:17,color:C.muted}}>›</span>
+            </button>));
           const lignesColis = colisP.slice(0, MAXP).map((c) => (
             <button key={'phrase-colis-' + c._i} type="button" className="vrm-recherche-ligne" data-recherche-resultat="phrase-colis" data-phrase-colis={c.transporteur || ''} data-phrase-limite={c.limite || ''}
               onClick={() => ouvrir({ e: { type: 'colis', c: { sens: 'entrant' } }, par: 'phrase' }, 'colis')} style={styleLigne}>
@@ -64225,6 +64263,8 @@ function AppCoeur() {
               {sous(tr('listes.phrase.quoi.achat'), achatsP, 'achat')}
               {veut('colis') && (phraseGs.filtres.some((f) => f.k === 'transporteur' || (f.k === 'etat' && f.v === 'a-retirer')) || quoiF) && !lusColis ? <div data-phrase-colis-pas-su="" style={{fontSize:12,color:C.muted,padding:'4px 2px'}}>{tr('listes.phrase.colisPasSu')}</div> : null}
               {colisP.length ? <div data-recherche-phrase-type="colis" data-recherche-n={colisP.length}>{entete(tr('listes.phrase.loupeColis'), colisP.length, 'phrase-colis')}{lignesColis}</div> : null}
+              {veut('colis') && phraseGs.filtres.some((f) => f.k === 'etat' && f.v === 'a-expedier') && !lusEnv ? <div data-phrase-envoyer-pas-su="" style={{fontSize:12,color:C.muted,padding:'4px 2px'}}>{tr('er.phrase.envoyerPasSu')}</div> : null}
+              {colisE.length ? <div data-recherche-phrase-type="colis-envoyer" data-recherche-n={colisE.length}>{entete(tr('er.phrase.aEnvoyer'), colisE.length, 'phrase-colis-envoyer')}{lignesEnvoyer}</div> : null}
             </div>);
         }
         return (
@@ -64373,6 +64413,10 @@ function AppCoeur() {
       etapeVente: (o) => etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }),
       venteAnnulee: (o) => classifyOrderStatus(o && o.status) === 'cancelled' || (o && o.transaction_id != null && txnAnnuleeAvantEnvoi(o.transaction_id)),
       montantRecuEbay, commandeEbayEngagee, lbcAnnulee, lbcFinalisee,
+      // (16 nov., lot ecrans-restes) La date limite d'envoi d'une vente à poster : LA règle de Colis
+      // (`limiteExpedition` : l'e-mail du bordereau, sinon vente + 7 j estimée) et SA phrase (`texteLimiteEnvoi`).
+      limiteEnvoi: (v, b) => { const l = limiteExpedition(v, b && b.dateLimite ? { dateLimite: b.dateLimite } : null); if (!l || !l.jour) return null;
+        const t = texteLimiteEnvoi(l); return t ? { texte: t, estimee: l.limite === 'estimee', retard: !!l.retard, ambre: !!l.retard || (Number.isFinite(l.daysLeft) && l.daysLeft <= 1), jour: l.jour } : null; },
     });
     // (5 nov.) « Voir l'état » : ce qui se calcule (`etatArticle`), depuis
     // l'histoire ci-dessus et deux lectures en plus (dates Vinted, réception).
