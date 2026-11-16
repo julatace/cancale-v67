@@ -235,7 +235,8 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
   .vrm-argent-partie > :is(.vrm-compta-q, .vrm-ac-section, details.vrm-compta-repli), .vrm-stats-vitrine > :is(.vrm-sv-sous-titre, details.vrm-stats-repli),
   .vrm-statistiques-premium > :is(.vrm-lien-action, .vrm-fc, .vrm-cv, .vrm-ac-section),
   .vrm-set-retour, .vrm-set-sous-h, .vrm-boite-vide-lecture,
-  .vrm-sel-tete, .vrm-sel-astuce, .vrm-sel-compte, .vrm-ann-stock-tools > summary, [data-places-wrap] > summary
+  .vrm-sel-tete, .vrm-sel-astuce, .vrm-sel-compte, .vrm-ann-stock-tools > summary, [data-places-wrap] > summary,
+  .vrm-settings-status
 ) {
   --sb-encre: var(--sv-clair) !important; --d-encre: var(--sv-clair) !important; --vrm-ink: var(--sv-clair) !important; --vrm-text: var(--sv-clair) !important;
   --p-encre: var(--sv-clair) !important; --w-encre: var(--sv-clair) !important; --fu-encre: var(--sv-clair) !important; --bx-encre: var(--sv-clair) !important;
@@ -673,6 +674,7 @@ html[data-sb-eventail] body .vrm-neuf-hote { visibility: hidden !important; }
    annonces, puis choisis À la main ou Par VRM »), l'astuce « Glisse… », la tête d'un compte (« compte_banc · 4 annonces ·
    Tout cocher ») sont posées SUR le fond : ajoutées au §6 (1,2 à 1,8:1 mesurés par axe). « Stock et ajustements » et
    « Publier aussi ailleurs » : leur rangée n'a plus de fond (verre) et leurs couleurs sont écrites en ligne (#0C1D30
-   sur le bleu, 1,2:1) — l'encre claire est posée ici. */
+   sur le bleu, 1,2:1) — l'encre claire est posée ici. « Enregistrement… » d'un réglage (sous-écran de Paramètres,
+   `.vrm-settings-status`) : posé sur le fond, ajouté au §6. */
 :root:root:root body .vrm-app-shell[data-espace] :is(.vrm-ann-stock-tools > summary, [data-places-wrap] > summary) :is(span, b) { color: var(--sv-clair) !important; }
 :root:root:root body .vrm-app-shell[data-espace] .vrm-sel-compte .vrm-b-discret { color: var(--sv-clair-lien) !important; }

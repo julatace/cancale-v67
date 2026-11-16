@@ -2408,7 +2408,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
 
         <div className="vrm-fe-trois" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', borderBottom: `1px solid ${C.border}` }}>
           {[
-            ['Ce que VRM prépare', 'Une facture électronique par vente, et le récapitulatif du mois de tes ventes aux particuliers.'],
+            ['Ce que VRM prépare', 'Une facture électronique par vente, et le récap du mois de tes ventes aux particuliers.'],
             ["Où l'envoyer", "Super PDP : connecte TON compte ci-dessous. Ailleurs : dépose-les toi-même."],
             ['À partir de quand', 'Septembre 2027 pour les micro-entreprises — à vérifier sur impots.gouv.fr.'],
           ].map(([t, d], i) => (
@@ -3685,7 +3685,9 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
     ? tr('compta.su', { libelle: String(q.libelle), x: String(q.note ? q.note + ', ' : ''), question: String(q.question) })
     : `${q.libelle} : ${q.valeur == null ? q.texte : (q.partiel ? 'au moins ' : '') + somme(q.valeur)}${q.note ? ', ' + q.note : ''} — ${q.question}`);
   const attrs = (q) => ({ 'data-argent-q': q.id, 'data-argent-valeur': q.valeur == null ? '' : String(Math.round(q.valeur * 100)), 'data-argent-partiel': q.partiel ? '1' : undefined,
-    'data-argent-raison': q.raison || undefined, 'data-argent-echeance': q.echeance ? String(q.echeance) : undefined, 'aria-label': nom(q), onClick: () => aller(q) });
+    'data-argent-raison': q.raison || undefined, 'data-argent-echeance': q.echeance ? String(q.echeance) : undefined, title: nom(q), onClick: () => aller(q) });
+  // (16 nov.) Le nom d'une case = son texte visible (WCAG 2.5.3 : un aria-label différent cachait le chiffre lu) ;
+  // la phrase complète (« au moins », la question) reste en `title`.
   const chiffre = (q, affiche = false) => (
     <b className="vrm-argent-w-n" data-argent-pas-su={q.valeur == null && !q.texte ? '' : undefined}>
       {q.valeur != null ? <>{q.partiel ? <small>{tr('journee.moins')} </small> : null}{affiche ? sommeAffiche(somme(q.valeur)) : somme(q.valeur)}</> : (q.texte || '—')}
