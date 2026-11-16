@@ -185,7 +185,8 @@ async function regles(nav) {
   {
     const o = await ouvrir(nav, { W: 390, sombre: false, b: base(), url: '/?tab=journee' }); await pret(o.pg);
     const pg = o.pg;
-    const onglets = await pg.evaluate(() => [...document.querySelectorAll('.vrm-tabbar > button')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => b.getAttribute('data-nav-entree') || (b.classList.contains('vrm-nav-more') ? 'plus' : '?')));
+    // (16 nov., barre-achats) Les ONGLETS (`.vrm-tab`) : le disque « + » du centre (14 nov.) est un bouton de la barre, pas un onglet.
+    const onglets = await pg.evaluate(() => [...document.querySelectorAll('.vrm-tabbar > .vrm-tab, .vrm-tabbar > .vrm-nav-more')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => b.getAttribute('data-nav-entree') || (b.classList.contains('vrm-nav-more') ? 'plus' : '?')));
     // (16 nov., barre-achats — Julien : « ajoute les Achats dans la barre en bas »)
     dit(onglets.join(',') === 'journee,paires,achats,ventes,compta', 'N la barre du bas : cinq onglets — Aujourd\'hui · Annonces · Achats · Ventes · Argent', onglets.join(','));
     await attendre(pg, () => pg.evaluate(() => !!document.querySelector('.vrm-tabbar [data-badge-nav="paires"]')), 12000);
