@@ -40,7 +40,7 @@ export default {
   "rx.v.deux": "À vérifier : deux annonces sous ce N° sur ce site, VRM ne choisit pas.",
   "rx.v.vieille": "À vérifier : lue le {date}, elle est peut-être déjà retirée.",
   "rx.v.pasConfirme": "À vérifier : état pas confirmé, elle est peut-être déjà retirée.",
-  "rx.ambigus": {"one": "{n} N° porté par deux paires : aucun retrait proposé (vérifie le N° sur le carton).", "other": "{n} N° portés par deux paires : aucun retrait proposé (vérifie le N° sur le carton)."},
+  "rx.ambigus": {"one": "{n} N° porté par deux paires : aucun retrait proposé (vérifie le N° écrit sur son rangement).", "other": "{n} N° portés par deux paires : aucun retrait proposé (vérifie le N° écrit sur son rangement)."},
   "rx.manques": "Pas tout relu : {liste}. Ce qui n’est pas lu n’est ni affirmé ni retiré.",
   "rx.marque": "N°{n} noté retiré de {site}.",
   "rx.marqueKo": "Pas noté : la base n’a pas répondu. Réessaie.",
