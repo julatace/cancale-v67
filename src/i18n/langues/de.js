@@ -12,6 +12,7 @@ import ecran_vcventes from './de/vcventes.js';   // (15 nov.) ventes Vestiaire :
 import ecran_transporteur_connu from './de/transporteurConnu.js';   // (15 nov.) « À expédier » : transporteur connu
 import ecran_vendre from './de/vendre.js';   // (15 nov., vendre plus) baisses conseillées, relance des favoris, loupe
 import ecran_ebaytableau from './de/ebaytableau.js';   // (15 nov., eBay complet 2) Tableau, Argent, Trafic, Santé
+import ecran_scan_retrouver from './de/scanRetrouver.js';   // (15 nov.) Scanner pour retrouver un colis
 import ecran_renvoyer from './de/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_liaison from './de/liaison.js';   // (15 nov.) La liaison achat ⇄ article
 import ecran_retrait_ailleurs from './de/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
@@ -56,6 +57,8 @@ import ecran_studio_paires from './de/studio-paires.js';   // (14 nov., Studio b
 import ecran_republier_guide from './de/republierGuide.js';   // (15 nov.) republier / publier à la main, guidés
 import ecran_memePhoto from './de/memePhoto.js';   // (15 nov., lot meme-photo)
 import ecran_fiabilite from './de/fiabilite.js';   // (15 nov., lot fiabilite-auto)
+import ecran_deuxComptes from './de/deuxComptes.js';   // (15 nov., lot deux-comptes)
+import ecran_favorisSites from './de/favorisSites.js';   // (15 nov., lot favoris-sites)
 import ecran_etageres from './de/etageres.js';   // (15 nov.) le Stock en étagères
 import ecran_journee_verre from './de/journee-verre.js';   // (15 nov.) Ma journée verre, la paire à sortir
 import ecran_arrivee from './de/arrivee.js';   // (15 nov.) atelier d'arrivée, historique, taille du texte
@@ -1872,7 +1875,7 @@ export default {
   "registres.nRecettes": {"one": "{n} Einnahme", "other": "{n} Einnahmen"},
   "registres.nAchats": {"one": "{n} Einkauf", "other": "{n} Einkäufe"},
   "registres.aucune": "Keine Zeile im Zeitraum.",
-  "registres.horsRecettes": {"one": "In keinem Monat · zu datieren ({n})", "other": "In keinem Monat · zu datieren ({n})"},
+  "registres.horsRecettes": {"one": "In keinem Monat · ohne Auszahlungsdatum ({n})", "other": "In keinem Monat · ohne Auszahlungsdatum ({n})"},
   "registres.horsAchats": {"one": "Ohne Datum ({n})", "other": "Ohne Datum ({n})"},
   "registres.loi": "Was das Gesetz sagt",
   "registres.aVerifier": "zu prüfen",
@@ -2294,12 +2297,15 @@ export default {
   ...ecran_vcventes,
   ...ecran_memePhoto,
   ...ecran_fiabilite,
+  ...ecran_deuxComptes,
+  ...ecran_favorisSites,
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_liaison,
   ...ecran_transporteur_connu,
   ...ecran_vendre,
   ...ecran_ebaytableau,
+  ...ecran_scan_retrouver,
   ...ecran_finition,
   ...ecran_parametres,
   ...ecran_avenir,

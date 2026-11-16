@@ -12,6 +12,7 @@ import ecran_vcventes from './en/vcventes.js';   // (15 nov.) ventes Vestiaire :
 import ecran_transporteur_connu from './en/transporteurConnu.js';   // (15 nov.) « À expédier » : transporteur connu
 import ecran_vendre from './en/vendre.js';   // (15 nov., vendre plus) baisses conseillées, relance des favoris, loupe
 import ecran_ebaytableau from './en/ebaytableau.js';   // (15 nov., eBay complet 2) Tableau, Argent, Trafic, Santé
+import ecran_scan_retrouver from './en/scanRetrouver.js';   // (15 nov.) Scanner pour retrouver un colis
 import ecran_renvoyer from './en/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_liaison from './en/liaison.js';   // (15 nov.) La liaison achat ⇄ article
 import ecran_retrait_ailleurs from './en/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
@@ -56,6 +57,8 @@ import ecran_studio_paires from './en/studio-paires.js';   // (14 nov., Studio b
 import ecran_republier_guide from './en/republierGuide.js';   // (15 nov.) republier / publier à la main, guidés
 import ecran_memePhoto from './en/memePhoto.js';   // (15 nov., lot meme-photo)
 import ecran_fiabilite from './en/fiabilite.js';   // (15 nov., lot fiabilite-auto)
+import ecran_deuxComptes from './en/deuxComptes.js';   // (15 nov., lot deux-comptes)
+import ecran_favorisSites from './en/favorisSites.js';   // (15 nov., lot favoris-sites)
 import ecran_etageres from './en/etageres.js';   // (15 nov.) le Stock en étagères
 import ecran_journee_verre from './en/journee-verre.js';   // (15 nov.) Ma journée verre, la paire à sortir
 import ecran_arrivee from './en/arrivee.js';   // (15 nov.) atelier d'arrivée, historique, taille du texte
@@ -1872,7 +1875,7 @@ export default {
   "registres.nRecettes": {"one": "{n} sale", "other": "{n} sales"},
   "registres.nAchats": {"one": "{n} purchase", "other": "{n} purchases"},
   "registres.aucune": "No line in this period.",
-  "registres.horsRecettes": {"one": "In no month · to date ({n})", "other": "In no month · to date ({n})"},
+  "registres.horsRecettes": {"one": "In no month · no payout date ({n})", "other": "In no month · no payout date ({n})"},
   "registres.horsAchats": {"one": "No date ({n})", "other": "No date ({n})"},
   "registres.loi": "What the law says",
   "registres.aVerifier": "to check",
@@ -2294,12 +2297,15 @@ export default {
   ...ecran_vcventes,
   ...ecran_memePhoto,
   ...ecran_fiabilite,
+  ...ecran_deuxComptes,
+  ...ecran_favorisSites,
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_liaison,
   ...ecran_transporteur_connu,
   ...ecran_vendre,
   ...ecran_ebaytableau,
+  ...ecran_scan_retrouver,
   ...ecran_finition,
   ...ecran_parametres,
   ...ecran_avenir,

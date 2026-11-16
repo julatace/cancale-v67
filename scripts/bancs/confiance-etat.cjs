@@ -82,7 +82,12 @@ async function confiance(nav, theme, tel) {
   dit(!ecarts.length, `${T} — chaque nombre rendu est celui du code (${Object.keys(DU_CODE).length})`, ecarts);
   dit(/\b50 actions par heure et par compte\b/.test(l.texte.replace(/\s+/g, ' ')) || DU_CODE['actions-heure'] !== '50', `${T} — « ${DU_CODE['actions-heure']} actions par heure et par compte » se lit tel quel`);
   dit(!l.seuls.length, `${T} — chaque nombre reste dans sa phrase (en ligne, jamais seul sur sa ligne)`, l.seuls);
-  dit(l.theme === (theme === 'sombre' ? 'dark' : 'light') && (theme === 'sombre' ? l.fond === 'rgb(0, 0, 0)' : l.fond === 'rgb(242, 242, 247)'), `${T} — le thème suit le système (${theme})`, l.fond);
+  // (15 nov., « Verre dépoli ») Le contrôle figeait un fond d'avant (#000 / #F2F2F7 — déjà faux au studio) :
+  // il juge la RÈGLE — `data-theme` suit le système, le fond est le bleu profond de CETTE teinte
+  // (bleu nuit plus sombre la nuit). Verre et contraste : scripts/bancs/verre-extension-site.cjs.
+  const rgb = (/rgb\((\d+), (\d+), (\d+)\)/.exec(l.fond || '') || []).slice(1).map(Number);
+  const bleu = rgb.length === 3 && rgb[2] - rgb[0] >= 50;
+  dit(l.theme === (theme === 'sombre' ? 'dark' : 'light') && bleu && (theme === 'sombre' ? rgb[2] < 100 : rgb[2] >= 100), `${T} — le thème suit le système (${theme}) : fond bleu profond de la teinte`, l.fond);
   dit(l.liens.some((a) => a.h === '/etat') && l.liens.some((a) => a.h === '/legal/confidentialite.html'), `${T} — liée à /etat et à la politique de confidentialité`);
   if (tel) dit(l.liens.every((a) => a.haut >= 44), `${T} — chaque lien fait au moins 44 px de haut`, l.liens.filter((a) => a.haut < 44));
   const accent = await pg.evaluate(() => [...document.querySelectorAll('li b, h2, h1')].map((e) => getComputedStyle(e).color).filter((c, i, t) => t.indexOf(c) === i));
