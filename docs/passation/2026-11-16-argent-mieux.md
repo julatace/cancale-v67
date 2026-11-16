@@ -144,17 +144,26 @@ finalisées) : l'écart apparaît après la finalisation.
 - Ma journée, Statistiques, le widget : ils lisent les mêmes lignes ; les 66 ventes sortent d'elles-mêmes de « pas
   comptées ».
 
-### Ce qui n'est PAS fait (dit)
-- Le serveur ne pose PAS `_prixPro` (depuis le 11 nov., la règle Pro vit au chargement dans l'app) : le bilan de la
-  semaine / du mois (`api/ship-reminders.js`) compte ces ventes au prix de la LISTE — comme avant (il les comptait déjà
-  au prix de la liste quand l'app les mettait à part). Écart ≈ quelques euros par mois. Le corriger demande de lire
-  profil + transactions Pro côté serveur et une copie de `typeCompteVinted` : un lot à part.
-- L'envoi AUTOMATIQUE des factures Pro par le serveur (`api/_lib/factures-auto.js`) compare aussi au prix de la liste :
-  pour une vente déjà finalisée à deux prix, il refuse (comme avant) ; l'envoi depuis l'app, lui, passe.
-- Une vente déjà DÉCLARÉE (registre « J'ai déclaré ce mois ») restait comptée dans son mois au prix de la LISTE ;
-  elle y compte maintenant au prix de l'article (même règle partout). Le montant qu'il a noté lors de sa déclaration
-  n'est pas réécrit.
+### Le serveur suit la MÊME règle (demandé par le coordinateur : §5, une règle par notion)
+- `api/_lib/prix-pro.js` : importe la règle (`appliquerPrixPro`, `lectureProDeLignes` — la mise en forme des
+  lectures, désormais partagée avec l'app, `lecturePrixPro` s'en sert) de `src/vintedPro.js`, et `typeCompteVinted`
+  du miroir `api/_lib/ventes-regle.js`, recopiée d'App.jsx au jeton près par `audit-bilan-semaine --recopie`
+  (étendu aux déclarations `function`). Aucune copie à la main.
+- Bilan de la semaine ET du mois (`api/ship-reminders.js` `lireDonneesBilan`, aussi lu par le contrôle de nuit) :
+  la règle Pro est posée sur les ventes de chaque compte, comme l'app au chargement (profil, transactions,
+  relevé : les mêmes projections scalaires).
+- Factures Pro (`api/_lib/facture-pro.js` `lirePreuveEtCommandes`, lue par l'émission à son clic ET par l'envoi
+  automatique `factures-auto`) : la vente prend le prix de la règle ⇒ preuve « même montant » avec l'e-mail
+  (prix de l'article) ⇒ facture au prix de l'article. Écart > 2 € : refusée comme avant.
+- Preuve : `scripts/audit-deux-prix-serveur.cjs` EXÉCUTE `lireDonneesBilan` + `calculerBilan` et la route
+  `routeFacturePro` (« emettre ») sur une fausse base : 11 verts ; sur l'arbre d'avant 5 rouges (vendu 204,93 € au
+  lieu de 203 €, facture refusée « le prix diffère ») ; `--prouve` 4/4 (bilan sans la règle, preuve sans la règle,
+  profil pris pour Pro, prix haut).
 
+### Ce qui reste (dit)
+- Une vente déjà DÉCLARÉE (registre « J'ai déclaré ce mois ») restait comptée dans son mois au prix de la LISTE ;
+  elle y compte maintenant au prix de l'article (même règle partout). **Le montant que Julien a noté lors de sa
+  déclaration n'est pas réécrit** (choix gardé : c'est SON registre).
 
 ### Les preuves (deux-prix-compter)
 - `scripts/audit-deux-prix-compter.cjs` (base inventée, vraies règles : `src/vintedPro.js` puis le miroir serveur) :
