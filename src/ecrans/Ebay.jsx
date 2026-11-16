@@ -2607,7 +2607,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
         <div data-regle-panneau={it.itemId} data-acc-pendant={envoiRegle ? 'offre.ebay' : undefined} {...(regleSignal === 'prix-change' ? { 'data-regle-prix-change': '1' } : {})} {...(regleSignal === 'existante' ? { 'data-regle-existante': '1' } : {})}
           style={{ margin: '0 0 12px', background: E.card2, borderRadius: 12, padding: '11px 12px' }}>
           <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 8 }}>
-            <span data-acc-avant="offre.ebay">{prixVuN ? <>Prix de l'annonce : <b style={{ color: E.text }}>{eurEbay(prixVuN)}</b>. </> : null}Offre ≥ ce montant : eBay l'accepte seul, l'article est vendu. En dessous, elle t'arrive. {tr('acc.offre.ebay.pas')}</span>
+            <span data-acc-avant="offre.ebay">{prixVuN ? <>Prix de l'annonce : <b style={{ color: E.text }}>{eurEbay(prixVuN)}</b>. </> : null}Offre ≥ ce montant : eBay l'accepte, la paire est vendue. En dessous, elle t'arrive. {tr('acc.offre.ebay.pas')}</span>
             {et.etat === 'pas-su' && et.raison === 'offres-inconnues' && et.lu
               ? <span data-regle-panneau-offres-inconnues={it.itemId}>{` Règle actuelle : eBay montre un seuil${et.lu.accepte != null ? ` dès ${eurEbay(et.lu.accepte)}` : ''}${et.lu.refuse != null ? ` (refus sous ${eurEbay(et.lu.refuse)})` : ''}, offres peut-être éteintes : enregistrer les active.`}</span>
               : (et.etat === 'pas-su' ? ' Règle actuelle pas lue : rien remplacé sans te redemander.' : '')}

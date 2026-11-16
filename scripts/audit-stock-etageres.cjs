@@ -61,6 +61,7 @@ const MUTATIONS = {
   'pseudo-uid': ['src/ecrans/Stock.jsx', "pseudo: String(acc.login || acc.username || ''),", "pseudo: String(acc.login || acc.username || uid),"],
   'ebay-vieux-en-ligne': ['src/stockAnnonces.js', "const etat = p.frais === false && p.etat === 'enligne' ? 'aconfirmer' : p.etat;", "const etat = p.etat;"],
   'annuler-partiel': ['src/stockEtageres.js', "  for (const d of r.descentes) ops.push(", "  for (const d of []) ops.push("],
+  'placer-echange': ['src/stockEtageres.js', "  const tri = l.slice(); const [x] = tri.splice(k, 1); tri.splice(j, 0, x);", "  const tri = l.slice(); const x = tri[k]; tri[k] = tri[j]; tri[j] = x;"],
   'ordre-ignore': ['src/stockEtageres.js', "    .sort((a, b) => (a[1] - b[1]) || (a[2] - b[2])).map((x) => x[0]);", "    .map((x) => x[0]);"],
   'deplacer-recopie': ['src/stockEtageres.js', "place.has(String(m.id)) ? { ...m, ordre: place.get(String(m.id)) } : m));", "place.has(String(m.id)) ? { id: m.id, name: m.name, cols: m.cols, rows: m.rows, ordre: place.get(String(m.id)) } : m));"],
   'couleurs-par-index': ['src/stockEtageres.js', "export const cleCase = (i, m) => { const { cols } = dims(m); return `${Math.floor(i / cols) + 1}:${(i % cols) + 1}`; };", "export const cleCase = (i, m) => `${Math.floor(i / 4) + 1}:${(i % 4) + 1}`;"],
@@ -102,6 +103,9 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { ko++; n++; con
     if (!texte[m[0]] || !texte[m[0]].includes(m[1])) { console.log('❌ ancre de mutation introuvable : ' + mut); process.exit(1); }
     texte[m[0]] = texte[m[0]].replace(m[1], m[2]);
   }
+  // (16 nov.) api/_lib (copié tel quel) importe des règles de src/ (argent-notif.js → alertesSeuils.js → …) : les modules
+  // purs de src/ (premier niveau) sont copiés tels quels, sous les fichiers jugés (qui gardent leur texte, mutations comprises).
+  for (const f of fs.readdirSync(path.join(R, 'src'))) if (f.endsWith('.js') && !FICHIERS.includes('src/' + f)) fs.copyFileSync(path.join(R, 'src', f), path.join(dir, 'src', f));
   for (const f of FICHIERS) if (texte[f] != null && f.endsWith('.js')) fs.writeFileSync(path.join(dir, f), texte[f]);
   const imp = async (f) => { if (texte[f] == null) return { __absent: true }; try { return await import(pathToFileURL(path.join(dir, f)).href); } catch (e) { return { __erreur: String(e && e.message || e) }; } };
   const E = await imp('src/stockEtageres.js'), S = await imp('src/stockSortie.js'), Y = await imp('src/cycleArticle.js'), G = await imp('src/gesteAnnulable.js');
@@ -290,6 +294,13 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { ko++; n++; con
     dit(u && E.ordonner(u).map((m) => m.id).join(',') === 'mB,mA', 'M2 · « monter » le Bureau le met en premier');
     dit(u && u[1].gravite === false && Array.isArray(u[1].planches) && u[1].cols === 7 && u[1].rows === 10 && u[1].name === 'Bureau', 'M2 · un déplacement garde TOUS les champs d’origine', u && u[1]);
     dit(E.deplacerMeuble(anciens, 'mA', -1) === null, 'M2 · le premier ne monte pas plus haut (rien n’est écrit)');
+    // (16 nov., design-restes) Glisser au doigt : poser un meuble au rang voulu, les autres gardent leur ordre relatif.
+    const trois = [...anciens, { id: 'mC', name: 'Cave', cols: 2, rows: 2, ordre: 2 }];
+    const g = typeof E.placerMeuble === 'function' ? E.placerMeuble(trois, 'mA', 2) : null;
+    dit(g && E.ordonner(g).map((m) => m.id).join(',') === 'mB,mC,mA', 'M2 · glisser le Garage tout en bas : Bureau, Cave, Garage', g && E.ordonner(g).map((m) => m.id));
+    const g2 = typeof E.placerMeuble === 'function' ? E.placerMeuble(trois, 'mC', 0) : null;
+    dit(g2 && E.ordonner(g2).map((m) => m.id).join(',') === 'mC,mA,mB' && g2[1].gravite === false && g2[1].cols === 7, 'M2 · glisser la Cave en haut garde l’ordre des autres et TOUS leurs champs', g2 && E.ordonner(g2).map((m) => m.id));
+    dit(typeof E.placerMeuble === 'function' && E.placerMeuble(trois, 'mB', 1) === null, 'M2 · posé à sa place : rien n’est écrit');
   });
   await essaie('M3', async () => {
     let ok = true, l = null;
