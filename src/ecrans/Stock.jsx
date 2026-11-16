@@ -77,6 +77,22 @@ const extractPairNumber = (text) => {
 // Une règle (§11) : `planchesCases` lit, `planchesRangees` range, et tout le
 // reste (dessin, éditeur, gravité) passe par elles.
 function planchesDe(m) { return planchesRangees(planchesCases(m && m.planches, m && m.cols, m && m.rows), m && m.cols, m && m.rows); }
+// (16 nov., lot stock-mieux) Un meuble plus large que l'écran (8 colonnes à 390 px : 44 px au doigt × 8 ne tiennent
+// pas) défile de côté DANS sa carte. Ce défilement se voit : `data-deborde` dit de quel côté il reste des cases
+// (« droite », « gauche », les deux) ⇒ un fondu sur ce bord, et les numéros de rangée restent collés à gauche.
+// Ref de rappel au niveau du module (stable) : elle suit le défilement et la taille, une seule fois par élément.
+function suivreDebord(el) {
+  if (!el || el.__vrmDebord) return;
+  const maj = () => {
+    const reste = el.scrollWidth - el.clientWidth - el.scrollLeft;
+    const cotes = [el.scrollLeft > 2 ? 'gauche' : '', reste > 2 ? 'droite' : ''].filter(Boolean).join(' ');
+    if (cotes) el.setAttribute('data-deborde', cotes); else el.removeAttribute('data-deborde');
+  };
+  el.__vrmDebord = maj;
+  el.addEventListener('scroll', maj, { passive: true });
+  try { const ro = new ResizeObserver(maj); ro.observe(el); if (el.firstElementChild) ro.observe(el.firstElementChild); } catch (_) { window.addEventListener('resize', maj); }
+  maj();
+}
 // (15 nov., étagères) `tasserMeuble` (28 oct.) ne comptait que les paires MONTRÉES : une paire d'un compte écarté, ou
 // toutes pendant le chargement, laissaient « vide » une case qui porte un carton, et celles du dessus descendaient à
 // travers lui. La gravité est maintenant `tasserApres` (src/stockEtageres.js) : une case est occupée dès que `vrm_slots`
@@ -544,7 +560,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   React.useEffect(() => {
     if (!flash) return;
     const id = requestAnimationFrame(() => requestAnimationFrame(() => {
-      try { const el = document.querySelector(`[data-case-num="${CSS.escape(flash)}"]`); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {}
+      try { const el = document.querySelector(`[data-case-num="${CSS.escape(flash)}"]`); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' }); } catch (_) {}
     }));
     return () => cancelAnimationFrame(id);
   }, [flash]);
@@ -827,7 +843,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         </div>
         {desc && !replie ? <div className="vrm-etag-descente" data-descente={desc.cles.join(',')} role="status" aria-live="polite"><span>{desc.texte}</span><button className="sb-lien" type="button" onClick={() => setDescente(null)}>{tr('etag.compris')}</button></div> : null}
         {!replie && (
-        <div className="vrm-s2d-defile">
+        <div className="vrm-s2d-defile" ref={suivreDebord}>
         <div className="vrm-s2d-etagere" data-meuble-grille="" data-zoom={zoom} data-glisse={glisse ? '1' : undefined} style={{ gridTemplateColumns: `16px repeat(${m.cols},minmax(44px,${cMax}px))`, gap, maxWidth: `max(min(100%, ${m.cols * (cMax + gap) + 34}px), ${m.cols * (44 + gap) + 34}px)` }}>
           {/* Règle : colonnes numérotées au-dessus, rangées à gauche (comme sur le meuble). Une colonne en pile le dit. */}
           <span />
@@ -1412,7 +1428,10 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         const rang = (k) => { const f = ficheParCle[k]; const ou = f && ouEst(f); if (!ou) return [9999, 0]; return [meublesVus.findIndex((x) => x.id === ou.meuble.id), ou.i]; };
         const tri = [...cibles].sort((a, b) => { const x = rang(a), y = rang(b); return x[0] - y[0] || x[1] - y[1]; });
         return (
-        <div data-stock-cibles={cibles.length} style={{ marginTop: 6, background: C.card, border: `1px solid ${C.accent}`, borderRadius: 12, padding: '8px 6px 8px 12px', fontSize: 15, color: C.text, maxHeight: '40vh', overflowY: 'auto' }}>
+        // (16 nov., lot stock-mieux) Plaque opaque (jetons `--etag-plaque`, jour et nuit) : sur la barre collée bleue,
+        // le fond `C.card` (7 % d'encre) laissait « À aller chercher » sombre sur bleu, et « Fermer » (marge −12 px du
+        // bouton discret) sortait du panneau qui défile ⇒ coupé. Couleurs et marge : `.vrm-etag-cibles`.
+        <div data-stock-cibles={cibles.length} className="vrm-etag-cibles" style={{ marginTop: 6, border: `1px solid ${C.accent}`, borderRadius: 12, padding: '6px 6px 8px 12px', fontSize: 15, maxHeight: '40vh', overflowY: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
             <b>{tr('stock.allerChercher')}{cibles.length > 1 ? ` · ${cibles.length}` : ''}</b>
             <span style={{ flex: 1 }} />

@@ -14,9 +14,16 @@
 //   H  la tête du meuble : nom et « 12 / 32 » lisibles (≥ 4,5:1 aux pixels), chaque bouton visible porte un MOT
 //      (sauf la poignée de glisser) ; « Comment ça marche ? » ≥ 4,5:1 ;
 //   R  chercher « 118 » (dans le Bureau, hors de l'écran) : sa case est en surbrillance ET défilée dans l'écran ;
+//   R  aussi « 1024 », au fond à droite du Bureau (8e colonne) : sa case vient dans l'écran, hors du fondu du bord ;
+//   K  le panneau « À aller chercher » : titre ≥ 4,5:1 aux pixels, « Fermer » entier DANS le panneau (il était coupé),
+//      coins ≤ 24 px (la règle du champ de recherche en faisait une pilule qui rognait « Fermer ») ;
+//   D  à 390, le Bureau (8 colonnes, plus large que l'écran) dit qu'il continue à droite (`data-deborde`, fondu) ;
+//      défilé au bout : plus de fondu et le N° de rangée reste visible à gauche ; le cadre (montants) entoure TOUTES
+//      les colonnes (avant : les colonnes 7-8 sortaient du meuble dessiné) ; le Garage (qui tient) ne dit rien ;
 //   G  44 px au doigt (cases, boutons de la tête), aucune page plus large que l'écran, aucune erreur ;
 //   M  rapporté : hauteur de la section « Mes meubles », « + » dessinés, contraste mini, taille du N°.
-// MUTATION=num (N° réduit et coupé) ou MUTATION=plus (« + » dans chaque case vide) : CSS injectée ⇒ le banc DOIT rougir.
+// MUTATION=num (N° réduit et coupé), plus (« + » dans chaque case vide), debord (rangées plus collées), fermer (marge
+// −12 px rendue au bouton) : CSS injectée ⇒ le banc DOIT rougir.
 // BANC_DIST=<dist> (l'arbre d'avant doit être ROUGE), BANC_PORT, CAPTURES=dossier, VARIANTES=390c,390s,1512c,1512s.
 const path = require('path');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
@@ -84,6 +91,8 @@ srv.on('error', (e) => { console.log('KO  le port ' + PORT + ' est pris (' + e.c
 
 const CSS_MUTATION = {
   num: '.vrm-s2d-case * { font-size: 9px !important; } .vrm-s2d-case > span { max-width: 14px !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }',
+  debord: '.vrm-s2d-regle[data-regle-rang] { position: static !important; }',
+  fermer: '.vrm-etag-cibles .vrm-b-discret { margin: -12px 0 !important; }',
   plus: '.vrm-s2d-case.is-vide::after { content: "+" !important; display: block !important; position: absolute; inset: 0; display: grid !important; place-items: center; font-size: 22px; opacity: .6; color: #445; }',
 };
 
@@ -267,7 +276,38 @@ async function contrastePixels(pg, el) {
         const vise = await pg.evaluate(() => { const c = document.querySelector('[data-case-num="118"]'); if (!c) return null; const q = c.getBoundingClientRect(); const dans = q.top >= 0 && q.bottom <= innerHeight && q.left >= 0 && q.right <= innerWidth; return { allume: c.classList.contains('vrm-case-flash') || c.hasAttribute('data-case-vise'), dans }; });
         dit(!!vise && vise.allume && vise.dans, `${t} · R : chercher « 118 » allume SA case et la fait venir dans l'écran`, vise);
         if (CAPT) await pg.screenshot({ path: path.join(CAPT, `sm-${v}-3-recherche.png`) });
+        // ── K : le panneau « À aller chercher » — « Fermer » DEDANS (pas coupé), titre lisible aux pixels ──
+        const pan = await pg.evaluate(() => { const p = document.querySelector('[data-stock-cibles]'); if (!p) return null; const f = p.querySelector('button'); const a = p.getBoundingClientRect(), q = f.getBoundingClientRect(); return { rayon: parseFloat(getComputedStyle(p).borderTopRightRadius), dedans: q.top >= a.top - 0.5 && q.bottom <= a.bottom + 0.5 && q.right <= a.right + 0.5 && q.left >= a.left - 0.5, mot: f.innerText.trim(), haut: Math.round(q.height) }; });
+        const titre = await pg.$('[data-stock-cibles] b');
+        const ctTitre = titre ? await contrastePixels(pg, titre) : null;
+        dit(!!pan && pan.dedans && pan.rayon <= 24 && pan.haut >= (tel ? 44 : 40) && ctTitre != null && ctTitre >= 4.5, `${t} · K : « À aller chercher » lisible (${ctTitre}:1) et « Fermer » entier dans son panneau`, pan);
+        // ── R2 : « 1024 » est au fond à DROITE du Bureau (8e colonne) : sa case vient dans l'écran, hors du fondu ──
+        await pg.evaluate(() => window.scrollTo(0, 0)); await pg.waitForTimeout(200);
+        await inp.fill('1024');
+        await pg.waitForSelector('[data-stock-res="1024"]', { timeout: 8000 }).catch(() => {});
+        if (await pg.$('[data-stock-res="1024"]')) await pg.click('[data-stock-res="1024"]'); else await inp.press('Enter');
+        await pg.waitForTimeout(1500);
+        const v2 = await pg.evaluate(() => { const c = document.querySelector('[data-case-num="1024"]'); if (!c) return null; const d = c.closest('.vrm-s2d-defile'); const q = c.getBoundingClientRect(), z = d.getBoundingClientRect(); const fondu = /droite/.test(d.getAttribute('data-deborde') || '') ? 36 : 0; return { allume: c.hasAttribute('data-case-vise'), dans: q.top >= 0 && q.bottom <= innerHeight && q.left >= z.left - 0.5 && q.right <= z.right - fondu + 0.5, q: [Math.round(q.left), Math.round(q.right)], z: [Math.round(z.left), Math.round(z.right)], fondu }; });
+        dit(!!v2 && v2.allume && v2.dans, `${t} · R : chercher « 1024 » (8e colonne) la fait venir dans l'écran, hors du fondu`, v2);
+        if (CAPT) await pg.screenshot({ path: path.join(CAPT, `sm-${v}-5-recherche-1024.png`) });
       } else dit(false, `${t} · R : la recherche du Stock est là`);
+      // ── D : un meuble plus large que l'écran — le défilement de côté se voit et la rangée reste dite ──
+      // (la recherche refermée d'abord : pendant une recherche, un meuble sans la paire se replie)
+      if (await pg.$('[data-stock-cibles] button')) { await pg.click('[data-stock-cibles] button'); await pg.waitForTimeout(500); }
+      const deb = await pg.evaluate(async () => {
+        const d = document.querySelector('[data-meuble="mB"] .vrm-s2d-defile'), dA = document.querySelector('[data-meuble="mA"] .vrm-s2d-defile');
+        if (!d) return null;
+        d.scrollTo({ left: 0, behavior: 'instant' }); await new Promise((r) => setTimeout(r, 300));
+        const avant = { deborde: d.scrollWidth > d.clientWidth + 2, attr: d.getAttribute('data-deborde') || '' };
+        d.scrollTo({ left: d.scrollWidth, behavior: 'instant' }); await new Promise((r) => setTimeout(r, 300));
+        const z = d.getBoundingClientRect(); const lab = d.querySelector('[data-regle-rang="5"]'); const l = lab.getBoundingClientRect();
+        const apres = { attr: d.getAttribute('data-deborde') || '', rangVue: l.left >= z.left - 0.5 && l.right <= z.right && getComputedStyle(lab).opacity !== '0' };
+        d.scrollTo({ left: 0, behavior: 'instant' });
+        const cadre = [...document.querySelectorAll('[data-meuble] .vrm-s2d-etagere')].every((e) => e.scrollWidth <= e.clientWidth + 1);
+        return { avant, apres, cadre, garage: dA ? (dA.getAttribute('data-deborde') || '') : null };
+      });
+      if (tel) dit(!!deb && deb.avant.deborde && /droite/.test(deb.avant.attr) && !/droite/.test(deb.apres.attr) && deb.apres.rangVue && deb.cadre && deb.garage === '', `${t} · D : le Bureau (8 colonnes) dit qu'il continue à droite ; défilé au bout, plus de fondu et le N° de rangée reste à gauche ; le cadre du meuble entoure toutes ses colonnes ; le Garage (qui tient) ne dit rien`, deb);
+      else dit(!!deb && !deb.avant.deborde && deb.avant.attr === '' && deb.cadre && deb.garage === '', `${t} · D : à 1512, les deux meubles tiennent, aucun fondu`, deb);
       dit(r.errs.length === 0, `${t} · G : aucune erreur d'app`, r.errs.join(' | '));
       await r.ctx.close();
     }

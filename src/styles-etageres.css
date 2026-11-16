@@ -285,3 +285,12 @@
 /* La case TROUVÉE (recherche, « Voir au stock ») : un anneau bleu net et sa plaque au bleu — elle se voit d'un coup d'œil. */
 :root:root body .vrm-etag .vrm-s2d-case.is-vise:not(.is-vide) { box-shadow: 0 0 0 3px var(--etag-plaque-vendue), 0 0 0 7px color-mix(in srgb, var(--etag-plaque-vendue) 28%, transparent) !important; z-index: 3; }
 .vrm-etag .vrm-s2d-case.is-vise:not(.is-vendue) .vrm-s2d-num.vrm-etag-plaque { background: var(--etag-plaque-vendue) !important; color: var(--etag-plaque-vendue-encre) !important; }
+/* (16 nov., lot stock-mieux, reprise) Un meuble plus large que l'écran (8 colonnes à 390 px) défile de côté dans sa
+   carte : le bord droit s'efface en fondu tant qu'il reste des cases à droite (`data-deborde`, posé par `suivreDebord`), et les numéros
+   de rangée restent collés à gauche pendant le défilement (à gauche, ce sont eux qui disent le bord). Centré quand il est plus étroit que sa carte. */
+.vrm-etag-carte > .vrm-s2d-defile > .vrm-s2d-etagere { margin-inline: auto; min-width: min-content; }   /* le cadre (montants, socle) entoure TOUTES les colonnes, même quand il défile */
+.vrm-s2d-defile[data-deborde~="droite"] { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); }
+.vrm-s2d-defile[data-deborde] .vrm-s2d-regle[data-regle-rang] { position: sticky; left: 0; z-index: 2; background: inherit; border-radius: 6px; }
+/* Le panneau « À aller chercher » : une plaque opaque (lisible sur la barre bleue), « Fermer » dedans. */
+:root:root:root:root body .vrm-app-shell .vrm-main [data-stock-recherche] > .vrm-etag-cibles, :root:root body .vrm-etag-cibles { background: var(--etag-plaque) !important; border-radius: 16px !important; color: var(--etag-plaque-encre); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.vrm-app-shell .vrm-main .vrm-etag-cibles .vrm-b.vrm-b-discret, .vrm-etag-cibles .vrm-b-discret { margin-block: 0; min-height: 44px; }
