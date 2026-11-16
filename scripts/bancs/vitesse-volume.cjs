@@ -18,9 +18,9 @@ for (let p = 0; p < PASSES; p++) {
     const port = 9500 + Math.floor(Math.random() * 400);
     let out = '';
     try { out = execFileSync(process.execPath, [path.join(__dirname, '_mesure-demarrage.cjs'), d, String(port)], { env: { ...process.env, VENTES: process.env.VENTES || '20000', TABS }, encoding: 'utf8', timeout: 900000, stdio: ['ignore', 'pipe', 'ignore'] }); } catch (e) { out = String(e.stdout || ''); }
-    for (const l of out.split('\n')) if (l.startsWith('{')) { const x = JSON.parse(l); const r = (res[i][x.tab] = res[i][x.tab] || { pret: [], longues: [], plus: [] }); r.pret.push(x.pret_ms); r.longues.push(x.longues_ms); r.plus.push(x.plusLongue); }
+    for (const l of out.split('\n')) if (l.startsWith('{')) { const x = JSON.parse(l); const r = (res[i][x.tab] = res[i][x.tab] || { pret: [], longues: [], plus: [] }); r.pret.push(x.pret_ms); r.longues.push(x.longues_ms); r.plus.push(x.plusLongue); (r.apres = r.apres || []).push(x.apresDonnees_ms); (r.complet = r.complet || []).push(x.complet_ms); }
     console.log(`passe ${p + 1} · ${path.basename(d)} : ${Object.entries(res[i]).map(([t, r]) => `${t} ${r.pret[r.pret.length - 1]}`).join(' ')}`);
   });
 }
-const bilan = res.map((r, i) => ({ dist: dists[i], ecrans: Object.fromEntries(Object.entries(r).map(([t, v]) => [t, { pret: med(v.pret), longues: med(v.longues), plusLongue: med(v.plus), passes: v.pret }])) }));
+const bilan = res.map((r, i) => ({ dist: dists[i], ecrans: Object.fromEntries(Object.entries(r).map(([t, v]) => [t, { pret: med(v.pret), longues: med(v.longues), plusLongue: med(v.plus), apresDonnees: med(v.apres || []), complet: med((v.complet || []).filter(x => x != null)), passes: v.pret, passesApres: v.apres }])) }));
 console.log(JSON.stringify(bilan, null, 1));

@@ -260,12 +260,16 @@ import { annoncesACompleter } from "./annoncesACompleter.js";
 import { BoutonCentreNotifs, FeuilleCentreNotifs } from "./CentreNotifs.jsx";
 import { nombreNonLues, marquerLues, fusionnerLus } from "./journalNotifs.js";
 import { masqueesParCompte } from "./annoncesMasquees.js";
-import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, stockQuiDort, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation, PERIODES, bornesPeriode, dansBornes, venduPeriode, barresPeriode, ventesPar, plusRapides } from "./statsVentes.js";
+import { rythmeVendu, minuitLocal, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, stockQuiDort, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation, PERIODES, bornesPeriode, dansBornes, venduPeriode, barresPeriode, ventesPar, plusRapides } from "./statsVentes.js";
 import "./stats-vitrine.css";
 import {appelerFavorisDirect} from './favorisTransport.js';
 import { ventesPourHistorique } from './favorisParcours.js';   // (11 nov., lot favoris-clair)
 import { useNouveauxFavoris, preparerEnvoiFavoris } from './favorisJournee.js';
 import React, { useState, useMemo, useEffect, useRef, Suspense } from "react";
+import { unParRendu } from './lotRendus.js';   // (16 nov., vitesse-volume)
+import { recentesOuSansDate, filtreParVersion, parTransaction } from './indexVentes.js';   // (16 nov., vitesse-moteur)
+import { gardeSiMeme } from './memeValeur.js';   // (16 nov., vitesse-moteur)
+import { parVersion } from './calculParVersion.js';   // (16 nov., vitesse-moteur)
 // (15 nov., chantier « ouverture ») JAMAIS `React.lazy` nu : un morceau qui rate (une mise en ligne entre-temps)
 // rendait « Cet écran a un souci » ou `undefined … default`. `lazySur` le relance, puis recharge proprement vers la
 // nouvelle version, sinon « Mettre à jour VRM » (src/chargementSur.js ; banc ouverture, audit-ouverture).
@@ -4705,7 +4709,9 @@ function useSystemeSombre(ecouter) {
 function useStateCle(k, init) {
   const [v, setV] = React.useState(init);
   const initRef = React.useRef(init); initRef.current = init;
-  React.useEffect(() => onCleRelue(k, () => { try { setV(initRef.current()); } catch (_) {} }), [k]);
+  // (16 nov., vitesse-moteur) Relue À L'IDENTIQUE (nuage relu, même contenu) ⇒ la valeur d'avant est gardée
+  // (src/memeValeur.js) : aucun rendu, aucun calcul refait pour la même réponse. Contenu différent ⇒ la neuve.
+  React.useEffect(() => onCleRelue(k, () => { try { const n = initRef.current(); setV((avant) => gardeSiMeme(avant, n)); } catch (_) {} }), [k]);
   return [v, setV];
 }
 const emettreClesRelues = (cles) => {
@@ -9179,7 +9185,9 @@ let TXN_ETATS_LU;
 const RETOURS_EBAY_CACHE = { v: undefined, at: 0 };
 // (3 nov.) Les e-mails de litige (src/litiges.js) : une lecture par 10 min, partagée par les écrans.
 const EMAILS_LITIGES_CACHE = { v: undefined, at: 0 };
-const noterEtatsTxn = (rows) => { for (const r of (rows || [])) if (r && r.tx && r.s != null && isFinite(Number(r.s))) TXN_ETATS.set(String(r.tx), { s: Number(r.s), ss: String(r.ss || ''), su: r.su || null, cap: r.cap || null }); };
+// (16 nov., vitesse-volume) `TXN_ETATS.ver` : la version de TXN_ETATS — tout ce qui garde une réponse lue
+// dans TXN_ETATS (`aExpedier`) repart de zéro dès qu'une transaction est notée.
+const noterEtatsTxn = (rows) => { for (const r of (rows || [])) if (r && r.tx && r.s != null && isFinite(Number(r.s))) { TXN_ETATS.set(String(r.tx), { s: Number(r.s), ss: String(r.ss || ''), su: r.su || null, cap: r.cap || null }); TXN_ETATS.ver = (TXN_ETATS.ver || 0) + 1; } };
 const lireEtatsTxn = async () => { try { const rows = await lireTxnMeta(); if (rows === null) return false; noterEtatsTxn(rows); return true; } catch (_) { return false; } };
 const etatTxn = (tx) => (tx == null ? null : TXN_ETATS.get(String(tx)) || null);
 const txnBloqueEnvoi = (tx) => { const e = etatTxn(tx); return !!(e && (e.s === 220 || e.s >= 430)); };
@@ -9719,7 +9727,24 @@ const venteRecente = (o) => {
 // moisson sans aucun tri : plusieurs comptes mis bout à bout s'entremêlaient et
 // l'ordre n'avait plus de sens. Une date illisible part en bas plutôt que de
 // remonter en tête.
-const tsCommande = (o) => Date.parse((o && o.date) || '') || 0;
+// (16 nov., vitesse-volume) Les deux lectures de la date d'une commande, gardées par commande (identité de
+// l'objet : une commande lue n'est jamais modifiée en place). À 20 000 ventes, la même date était relue des
+// dizaines de fois par rendu. Mêmes formules qu'avant, mêmes réponses (NaN compris).
+// (16 nov., vitesse-volume) Le tri « la plus récente en haut » des commandes : LE MÊME comparateur
+// (`new Date(b.date || 0) - new Date(a.date || 0)`, NaN ⇒ égalité, tri stable), la date de chaque commande lue
+// UNE fois par tri au lieu de deux fois par comparaison (20 000 ventes : ~600 000 dates construites).
+const triCommandesRecentes = () => { const k = new Map(); const t = (o) => { let v = k.get(o); if (v === undefined) { v = +new Date(o.date || 0); k.set(o, v); } return v; }; return (a, b) => t(b) - t(a); };
+const tsCommande = (o) => {
+  if (!o || typeof o !== 'object') return Date.parse((o && o.date) || '') || 0;
+  const m = tsCommande.memo || (tsCommande.memo = new WeakMap());
+  let v = m.get(o); if (v === undefined) { v = Date.parse(o.date || '') || 0; m.set(o, v); } return v;
+};
+// `new Date(o.date).getTime()` (NaN si illisible) — pour les fenêtres « il y a N jours ».
+const msDateCommande = (o) => {
+  if (!o || typeof o !== 'object') return new Date(o && o.date).getTime();
+  const m = msDateCommande.memo || (msDateCommande.memo = new WeakMap());
+  let v = m.get(o); if (v === undefined) { v = new Date(o.date).getTime(); m.set(o, v); } return v;
+};
 // ⚠️ LE MONTANT D'UNE COMMANDE VINTED EST UN OBJET `{amount, currency_code}`,
 // pas un nombre. Une lecture naïve (`Number(o.price)`) rend NaN et une somme
 // tombe à 0 — c'est déjà arrivé deux fois (§5.27 : « aucune vente en cours »
@@ -10840,17 +10865,27 @@ const venteQuiRevient = (o) => /non\s+r[ée]clam|retour\s+initi|retour\s+en\s+co
 // de sa base (« Bordereau envoyé au vendeur », « Le paiement a été validé ») ne
 // sont pas touchés. MÊME RÈGLE dans le widget et l'extension (§11).
 const COLIS_DEJA_BOUGE = /d[ée]pos[ée]|exp[ée]di[ée]|achemin|transit|livr[ée]e?\b|non\s+r[ée]clam|r[ée]ceptionn/i;
+// (16 nov., vitesse-volume) Gardée par vente (identité de l'objet — une commande lue n'est jamais modifiée
+// en place) tant que TXN_ETATS ne change pas (`TXN_ETATS.ver`) : la règle ne lit rien d'autre. Mesuré à
+// 20 000 ventes : appelée des dizaines de milliers de fois par rendu (Colis, Ma journée, Ventes).
 const aExpedier = (o) => {
-  if (!o) return false;
-  const s = String(o.status || '');
-  if (PAS_UN_ENVOI.test(s)) return false;
-  // Le détail de la transaction, plus frais que la liste (litige, retour,
-  // suspension, annulation, finalisée) : jamais un colis à poster.
-  if (o.transaction_id != null && txnBloqueEnvoi(o.transaction_id)) return false;
-  const t = tusDe(o);
-  if (t === 'needs_action') return !COLIS_DEJA_BOUGE.test(s);
-  if (t === 'waiting' || t === 'completed' || t === 'failed') return false;
-  return needsBordereau(s);
+  const memo = o && typeof o === 'object' ? (aExpedier.memo || (aExpedier.memo = new WeakMap())) : null;
+  const ver = TXN_ETATS.ver || 0;
+  if (memo) { const m = memo.get(o); if (m && m[0] === ver) return m[1]; }
+  const r = ((o) => {
+    if (!o) return false;
+    const s = String(o.status || '');
+    if (PAS_UN_ENVOI.test(s)) return false;
+    // Le détail de la transaction, plus frais que la liste (litige, retour,
+    // suspension, annulation, finalisée) : jamais un colis à poster.
+    if (o.transaction_id != null && txnBloqueEnvoi(o.transaction_id)) return false;
+    const t = tusDe(o);
+    if (t === 'needs_action') return !COLIS_DEJA_BOUGE.test(s);
+    if (t === 'waiting' || t === 'completed' || t === 'failed') return false;
+    return needsBordereau(s);
+  })(o);
+  if (memo) memo.set(o, [ver, r]);
+  return r;
 };
 // ── L'ÉTIQUETTE D'UNE VENTE / D'UN ACHAT, UNE RÈGLE (§11) ─────────────────
 // Sortie des composants le 16 octobre : la recherche globale (dans la coque)
@@ -28292,12 +28327,20 @@ const libererNumeroDuPlan = (plan, itemId, num) => {
 // une autre vente à envoyer n'est pas touché. Une « boîte seule » (un meuble à
 // elle seule) n'est pas retirée : elle reste dans « vendues mais au garage ».
 const COLIS_PARTI_VINTED = /achemin|en\s+transit|livr|remis|d[eé]pos|exp[eé]di[eé]|finalis|termin/i;
+// (16 nov., vitesse-volume) Gardée par vente tant que TXN_ETATS ne change pas (elle lit `aExpedier`), comme lui.
 const venteSortieDuStock = (o) => {
-  if (!o || o.transaction_id == null) return false;
-  const st = String(o.status || ''); if (!st) return false;
-  if (classifyOrderStatus(st) === 'cancelled' || venteQuiRevient(o)) return false;
-  if (aExpedier(o) || needsBordereau(st)) return false;
-  return COLIS_PARTI_VINTED.test(st);
+  const memo = o && typeof o === 'object' ? (venteSortieDuStock.memo || (venteSortieDuStock.memo = new WeakMap())) : null;
+  const ver = TXN_ETATS.ver || 0;
+  if (memo) { const m = memo.get(o); if (m && m[0] === ver) return m[1]; }
+  const r = ((o) => {
+    if (!o || o.transaction_id == null) return false;
+    const st = String(o.status || ''); if (!st) return false;
+    if (classifyOrderStatus(st) === 'cancelled' || venteQuiRevient(o)) return false;
+    if (aExpedier(o) || needsBordereau(st)) return false;
+    return COLIS_PARTI_VINTED.test(st);
+  })(o);
+  if (memo) memo.set(o, [ver, r]);
+  return r;
 };
 const retirerPileDuPlan = (plan, itemId, idx) => {
   let fait = false;
@@ -34022,6 +34065,8 @@ function usePasEnLigne({ actif = false, accounts = [], achats = null, hors = [],
   return { r, seuil, setSeuil, relire: () => { setLecture(undefined); setTic((x) => x + 1); } };
 }
 
+// (16 nov., vitesse-volume) La première commande de chaque n° de transaction, par liste lue (identité) — `numFromTxn`.
+const _indexPremiereParTx = new WeakMap();
 function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false, aTrancher = null, onAllerTrancher = null, onTrancherAT = null, filTous = false, colisDans = null }) {
   // (11 nov., saisie rapide) Les ventes prouvées sans prix d'achat (publiées par la coque) : Ma journée.
   const prixAFaire = React.useSyncExternalStore(abonnerDemandesPrix, lireDemandesPrix);
@@ -35080,7 +35125,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   // Géocodage des points relais (nom → coordonnées) pour la carte à épingle.
   // Nominatim (OpenStreetMap), gratuit, 1 requête/seconde, cache local.
-  const [geo, setGeo] = useState(() => load('vrm_geo_cache_v2', {}));
+  // (16 nov., vitesse-moteur) Le cache de géocodage n'est plus un ÉTAT : seul le planificateur de tournée le lit
+  // (feuille ouverte, il le relit alors), et chaque point géocodé (ou raté) redessinait tout le moteur — mesuré à
+  // 20 000 ventes, 8 changements et 5 rendus de Ma journée sur 38 rien que pour lui. Il vit dans `vrm_geo_cache_v2` seul.
   const [openPoint, setOpenPoint] = useState(null); // lieu déplié (liste des colis)
   // Points relais HABITUELS, pré-enregistrés : la carte s'affiche en permanence,
   // les badges apparaissent à l'arrivée des colis. Synchronisé.
@@ -35193,7 +35240,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const cpLu = (String(c.adresse || '') + ' ' + String(c.display || '')).match(/\b\d{5}\b/);
       if (!cpLu) continue;
       const hit = (c.adresse && await geocode(c.adresse, cpLu[0])) || await geocode(c.display, cpLu[0]);
-      setGeo(prev => { const u = { ...prev, [nom]: hit || { failedAt: Date.now() } }; save('vrm_geo_cache_v2', u); return u; });
+      { const u = { ...(load('vrm_geo_cache_v2', {}) || {}), [nom]: hit || { failedAt: Date.now() } }; save('vrm_geo_cache_v2', u); }
       if (hit) ensureSavedPoint(nom, c.adresse, hit.lat, hit.lon);
       await new Promise(r2 => setTimeout(r2, 400));
     }
@@ -35402,7 +35449,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const memoVisibles = useRef(null);
   if (!memoVisibles.current || memoVisibles.current.cle.some((x, i) => x !== cleVisibles[i])) memoVisibles.current = { cle: cleVisibles, m: new WeakMap() };
   const visiblesM = memoVisibles.current.m;
-  const isHidden = (o) => { if (!o || typeof o !== 'object') return isHiddenCalcul(o); if (visiblesM.has(o)) return visiblesM.get(o); const v = isHiddenCalcul(o); visiblesM.set(o, v); return v; };
+  const isHidden = (o) => { if (!o || typeof o !== 'object') return isHiddenCalcul(o); const deja = visiblesM.get(o); if (deja !== undefined) return deja; const v = isHiddenCalcul(o); visiblesM.set(o, v); return v; };
   const toggleHidden = () => {};   // (29 oct.) une vente ne se masque plus
   const [annSearch, setAnnSearch] = useVueSession('annonces-recherche', ''); // recherche annonces (titre/marque/N°)
   // (3 nov.) « Articles qui dorment » : le seuil (30/60/90 j) est un confort de CET
@@ -37207,9 +37254,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // compte range la compta, ça ne fait pas disparaître un carton de
     // l'étagère (même règle que `toShip` — avant, Colis écartait le compte et
     // Ma journée le gardait : deux nombres pour la même obligation, §11).
-    const items = (sales.items || [])
+    // (16 nov., vitesse-moteur) Les ventes à expédier, gardées PAR LISTE tant que `TXN_ETATS` ne change pas
+    // (src/indexVentes.js — `aExpedier` ne lit que la vente et TXN_ETATS) : les deux mêmes filtres purs,
+    // dans l'autre ordre (même résultat, même ordre), sans reparcourir les 20 000 ventes à chaque rendu.
+    const items = filtreParVersion(sales.items || [], 'aExpedier', aExpedier, TXN_ETATS.ver || 0)
       .filter(o => !hiddenSales.has(String(o.transaction_id)))
-      .filter(o => aExpedier(o))
       .map(o => {
         const b = o.transaction_id != null ? parTxn[String(o.transaction_id)] || null : null;
         return { key: 'v' + o.transaction_id, o, b, txn: String(o.transaction_id || '') };
@@ -37452,7 +37501,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!o || typeof o !== 'object') return fn(o);
     let e = memosVersion.current[nom];
     if (!e || !e.lue) { const k = cle(); if (!e || e.k.length !== k.length || e.k.some((x, i) => x !== k[i])) e = memosVersion.current[nom] = { k, m: new WeakMap() }; e.lue = true; queueMicrotask(() => { e.lue = false; }); }
-    if (e.m.has(o)) return e.m.get(o);
+    // (16 nov., vitesse-moteur) Une lecture au lieu de deux (appelée des centaines de milliers de fois par ouverture).
+    const deja = e.m.get(o); if (deja !== undefined || e.m.has(o)) return deja;
     const r = fn(o); e.m.set(o, r); return r;
   };
   const reglesNumeros = () => `${coupureNumerotation()}|${archiveNumeros()}|${numeroEcritActif()}|${JSON.stringify(ouNumeroEcrit())}`;
@@ -40755,7 +40805,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const garde = prec.items.filter(o => !okUids.has(String(o && o._acc && o._acc.vinted_user_id)));
         const seen = new Set(garde.map(o => String(o.transaction_id))); const neufs = [];
         for (const { acc, res } of lus) for (const o of res.items) { const id = String(o.transaction_id); if (seen.has(id)) continue; seen.add(id); neufs.push({ ...o, _acc: acc }); }
-        const items = [...neufs, ...garde].sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
+        const items = [...neufs, ...garde].sort(triCommandesRecentes());
         const failedUids = (Array.isArray(prec.failedUids) ? prec.failedUids : []).map(String).filter(u => !okUids.has(u));
         const failed = accounts.filter(a => failedUids.includes(String(a.vinted_user_id))).map(accNameOf);
         const caps = {};
@@ -40815,7 +40865,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // orders_purchased) — c'est LA vérité. Un onglet peut être momentanément
     // vide si l'extension n'a pas encore moissonné : « Synchroniser » force, et
     // il suffit de repasser sur vinted.fr avec l'extension.
-    out.sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
+    out.sort(triCommandesRecentes());
     // Erreur seulement si RIEN n'a pu être chargé et qu'au moins un appel a échoué.
     const error = out.length===0 && anyErr && !anyOk;
     if (!_magasinCommandes.estCourant(cleM, n)) return;     // une lecture plus récente est partie après celle-ci (tous moteurs)
@@ -40839,7 +40889,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (!(prev && Array.isArray(prev.items))) return { loading:false, items: out, error, failed, failedUids, comptes: demandes };
         const dejaLa = new Set(out.map(o => String(o.transaction_id)));
         const garde = prev.items.filter(o => ko.has(String(o && o._acc && o._acc.vinted_user_id)) && !dejaLa.has(String(o.transaction_id)));
-        const items = garde.length ? [...out, ...garde].sort((a,b) => new Date(b.date||0) - new Date(a.date||0)) : out;
+        const items = garde.length ? [...out, ...garde].sort(triCommandesRecentes()) : out;
         return { ...prev, loading:false, items, error: items.length===0 && !anyOk, failed, failedUids, comptes: demandes };
       });
       return;
@@ -41294,7 +41344,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // NEUF : sans ça elle grave d'abord et découvre l'identité ensuite, et comme
   // un numéro n'est jamais repris (§5.40) l'erreur est définitive.
   const [txnPret, setTxnPret] = useState(false);
-  useEffect(() => { let mort = false; fetchTxnItemIds().then(m => { if (mort) return; if (m && Object.keys(m).length) setTxnItem(m); setTxnPret(true); }).catch(() => { if (!mort) setTxnPret(true); }); return () => { mort = true; }; }, [sales.items]);
+  // (16 nov., vitesse-moteur) Relu à chaque arrivée de ventes : le même contenu garde la même valeur (src/memeValeur.js) —
+  // sinon l'identité de chaque vente (`identiteAnnonce`) et tout ce qui la lit repartaient de zéro pour la même réponse.
+  useEffect(() => { let mort = false; fetchTxnItemIds().then(m => { if (mort) return; if (m && Object.keys(m).length) setTxnItem((avant) => gardeSiMeme(avant, m)); setTxnPret(true); }).catch(() => { if (!mort) setTxnPret(true); }); return () => { mort = true; }; }, [sales.items]);
   // Sources déjà capturées : lire les petites photos projetées, jamais les transactions entières.
   useEffect(()=>{
     if(!['ventes','journee','bordereaux'].includes(curSub) || !sales.items?.length)return;
@@ -44040,7 +44092,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const identite = achatParIdentite({ lie, photo, venteTx, venteDate, achats, cleDePhoto: cleMemo, pris });
       return propositionPrixAchat({ prixConnu, annulee, identite, ventilationDe: ventilationDeTx, estLot: estLotPropose });
     };
-    const ventes = [...(sales.items || [])].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    const ventes = [...(sales.items || [])].sort(triCommandesRecentes());
     for (const o of ventes) {
       if (!o || o.transaction_id == null || o._fromEmail) continue;
       const e = effEntry(o);
@@ -45780,8 +45832,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // (7 nov., vitesse) Index par transaction, refait seulement quand la liste change
     // (avant : un balayage de toutes les ventes PAR bordereau, à chaque rendu).
     const items = sales.items || [];
-    if (numFromTxn._items !== items) { const m = new Map(); for (const o of items) { const k = String(o.transaction_id); if (!m.has(k)) m.set(k, o); } numFromTxn._items = items; numFromTxn._m = m; }
-    const so = numFromTxn._m.get(String(b.transaction));
+    // (16 nov., vitesse-volume) `numFromTxn` est redéclarée à chaque rendu : l'index rangé SUR elle repartait
+    // de zéro à chaque rendu (20 000 ventes balayées). Il est gardé par liste, au niveau du module.
+    let m = _indexPremiereParTx.get(items);
+    if (!m) { m = new Map(); for (const o of items) { const k = String(o.transaction_id); if (!m.has(k)) m.set(k, o); } _indexPremiereParTx.set(items, m); }
+    const so = m.get(String(b.transaction));
     if (!so) return '';
     const e = effEntry(so);
     return e && e.numero ? String(e.numero) : '';
@@ -45902,7 +45957,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // s'affiche que sous « Tous les sites » ou sous SON site. Seul le rouge « deux
   // paires sous un N° » reste partout (le seul risque irréversible, §5).
   const voitSite = (s) => siteColis === 'toutes' || siteColis === s;
-  const cartesColis = () => {
+  // (16 nov., vitesse-volume) UNE réponse par rendu (`unParRendu`) : demandée jusqu'à trois fois par rendu.
+  const cartesColis = unParRendu(() => {
     const L = [];
     const nomAvecTaille = (titre, o) => { const t = String(titre || '').trim(); const e = o ? effEntry(o) : null; const tl = e && e.taille ? String(e.taille) : ''; return tl && !tailleDansTitre(t, tl) ? `${t} · ${tl}` : t; };
     const lectureFinie = labelsPrets && emailBords !== null;
@@ -46072,9 +46128,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const TXT = { 'Retournée': 'Retour à vérifier', 'Retour en cours': 'Retour en cours', 'Au relais': 'Au relais de l’acheteur', 'En transit': 'En transit', 'Livrée': 'Livré' };
       // (13 nov., moteur-compta) La fenêtre des 45 jours est jugée AVANT `aExpedier` et `venteStage` (la même règle,
       // dans un autre ordre : trois filtres purs) — à 20 000 ventes, l'étape n'est plus calculée pour les vieilles.
-      sales.items
+      // (16 nov., vitesse-moteur) Seulement les ventes qui PEUVENT passer la fenêtre des 45 jours (src/indexVentes.js,
+      // dans l'ordre de la liste) : les filtres ci-dessous, inchangés, tranchent.
+      recentesOuSansDate(sales.items, 45, msDateCommande)
         .filter(o => o && !hiddenSales.has(String(o.transaction_id)))
-        .map(o => ({ o, j: o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null }))
+        .map(o => ({ o, j: o.date ? Math.floor((Date.now() - msDateCommande(o)) / 86400000) : null }))
         .filter(x => (x.j == null || x.j <= 45) && !aExpedier(x.o))
         .map(x => ({ o: x.o, st: venteStage(x.o), j: x.j }))
         .filter(x => ordre[x.st.label] != null)
@@ -46082,7 +46140,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         .forEach(({ o, st }) => L.push({ cle: 'p:' + o.transaction_id, groupe: 'parti', site: 'vinted', nom: nomAvecTaille(o.title || 'Vente', o), photo: orderPhoto(o), num: effEntry(o)?.numero || '', etat: TXT[st.label] || st.label, ambre: ordre[st.label] === 0, ouvrir: false }));
     }
     return L;
-  };
+  });
   // ── (1er nov.) LE MODE EMBALLAGE ────────────────────────────────────────
   // Les colis de la colonne « Prêts à imprimer », DANS SON ORDRE (jamais triés
   // par emplacement — refus du 11 oct.), un par un. Chaque colis porte : son N°
@@ -46960,7 +47018,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // coche, déposé = « Colis fait » ou un statut qui a bougé, en route / livré = les preuves lues).
   // ── (3 nov.) LES COLIS « À ENVOYER », TOUS SITES — une construction pour l'écran ET pour
   // « Tout imprimer » (l'ordre des groupes de transporteurs est le même, `src/lotTransporteurs.js`).
-  const colisAEnvoyerBase = () => {
+  // (16 nov., vitesse-volume) UNE réponse par rendu (`unParRendu`) : demandée jusqu'à cinq fois par rendu.
+  const colisAEnvoyerBase = unParRendu(() => {
     const vintedLu = voitSite('vinted') && !sales.loading && !sales.error;
     const exTout = vintedLu ? expeditions().filter(e => !e.o || matchOrd(e.o)) : [];
     const lbcParTx = new Map(((lbcVentes && lbcVentes.ventes) || []).map((o) => [String(o && o.txId != null ? o.txId : ''), o]));
@@ -46970,7 +47029,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       ...((siteColis === 'toutes' && colisAutres.leboncoin) || []).map((x) => { const o = lbcParTx.get(String(x.txId)) || {}; const tr = transporteurDuColis({ declare: o.deliveryMethod || o.deliveryLabel || '' }); return { __autre: 'lbc', key: 'l:' + x.txId, x, o, tr, trNom: nomEnvoye(tr), dl: null }; }),
     ];
     return { vintedLu, exTout, autresColis };
-  };
+  });
   const trNomColis = (x) => { if (x.__autre) return x.trNom; return nomEnvoye(trDeLigne(x)); };
   // (15 nov.) Pourquoi une ligne n'a pas de transporteur, et le geste (jamais « inconnu ») : src/colisEnvoyes.js `pourquoiSansTransporteur`.
   const pasLuDeLigne = (x) => { const tx = txDeLigne(x); const et = pdfEtiquettesParTx() || {}, vus = pdfVusParTx() || {}; const acc = x && x.o && x.o._acc;
@@ -47029,7 +47088,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Les colis à envoyer rangés comme l'écran : le plus récent en haut (lot AJ).
   const colisAEnvoyerRanges = () => { const { exTout, autresColis } = colisAEnvoyerBase(); return rangerColisEnvoi([...exTout.filter(x => !estPosteColis(x)), ...autresColis], trNomColis); };
   const LIMITE_ENVOYES_J = 45;
-  const listeEnvoyes = () => {
+  // (16 nov., vitesse-volume) UNE réponse par rendu (`unParRendu`, src/lotRendus.js) : Ma journée, Ventes et les
+  // vérifications la demandent jusqu'à trois fois par rendu, pour les mêmes valeurs.
+  const listeEnvoyes = unParRendu(() => {
     const out = [];
     try {
       if (voitSite('vinted') && Array.isArray(sales.items)) {
@@ -47045,11 +47106,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             num: (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : ''), tr: transporteurVente(b, e.txn || tx),
             lues: { imprime: !!((e.txn && bordsPrinted[e.txn]) || (b && isBordPrinted(b))), depose: true, enroute: !!(pv && pv.bougeLu), livre: !!(pv && pv.livreeLue), valide: !!(pv && pv.finalisee) } });
         }
-        for (const o of sales.items) {
+        // (16 nov., vitesse-moteur) Seulement les ventes qui PEUVENT passer la fenêtre (src/indexVentes.js : un
+        // sur-ensemble, dans l'ordre de la liste) — la règle ci-dessous, inchangée, tranche.
+        for (const o of recentesOuSansDate(sales.items, LIMITE_ENVOYES_J, msDateCommande)) {
           // (13 nov., moteur-compta) La fenêtre des 45 jours d'abord (même règle, autre ordre) : à 20 000 ventes,
           // `aExpedier` et `venteStage` ne tournent plus sur les vieilles.
           if (!o || hiddenSales.has(String(o.transaction_id))) continue;
-          const j = o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null;
+          const j = o.date ? Math.floor((Date.now() - msDateCommande(o)) / 86400000) : null;
           if (j != null && j > LIMITE_ENVOYES_J) continue;
           if (aExpedier(o)) continue;
           const st = venteStage(o); if (ordre[st.label] == null) continue;
@@ -47062,16 +47125,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // (8 nov.) Encore « à expédier » chez Vinted (pas relu), mais le n° du bordereau de CETTE
         // transaction est pris en charge chez le transporteur (`partisTransp`) : sorti de « À envoyer »,
         // il est ICI, avec la raison — jamais caché. Un colis déjà coché reste dans sa ligne « coche ».
-        for (const o of sales.items) {
+        // (16 nov., vitesse-moteur) Seulement les ventes dont la transaction a une preuve de départ (l'index
+        // n° ⇒ positions de src/indexVentes.js), dans l'ordre de la liste : la règle ci-dessous, inchangée, tranche.
+        const posPartis = []; { const ix = parTransaction(sales.items); for (const tx of partisVinted.keys()) { const l = ix.get(String(tx)); if (l) posPartis.push(...l); } }
+        posPartis.sort((a, b) => a - b);
+        for (const o of posPartis.filter((p, k) => k === 0 || posPartis[k - 1] !== p).map((p) => sales.items[p])) {
           const tx = o && o.transaction_id != null ? String(o.transaction_id) : '';
+          // (16 nov., vitesse-volume) La preuve de départ d'abord (une lecture de table) : les mêmes conditions,
+          // toutes sans effet, dans un autre ordre — `aExpedier` ne tourne plus sur les 20 000 ventes.
+          const rv = tx ? partisVinted.get(tx) : null;
+          const dp = rv && (rv.type === 'email' || rv.type === 'transporteur') ? rv : null; if (!dp) continue;
           if (!tx || hiddenSales.has(tx) || !aExpedier(o) || isShipDone(o)) continue;
           // (8 nov., « à envoyer » prouvé) + l'e-mail du transporteur pour le n° de SON bordereau
           // (api/_lib/depart-vente.js) : la même règle que la sortie de « À envoyer ».
-          const rv = partisVinted.get(tx);
-          const dp = rv && (rv.type === 'email' || rv.type === 'transporteur') ? rv : null; if (!dp) continue;
           const b = bordsParTxn[tx] || null;
           if (b && isBordShippedManual(b)) continue;
-          const j = o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null;
+          const j = o.date ? Math.floor((Date.now() - msDateCommande(o)) / 86400000) : null;
           out.push({ cle: 'v:' + tx, site: 'vinted', type: 'transp', o, b, j, depart: dp, rang: 1.5,
             photo: orderPhoto(o), titre: o.title || 'Vente', num: (b ? numForBord(b) : '') || (effEntry(o)?.numero || ''), tr: transporteurVente(b, tx),
             lues: { imprime: !!(b && isBordPrinted(b)), depose: true, enroute: true } });
@@ -47120,7 +47189,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const vente = x.site === 'vinted' ? (x.o && x.o.date) : x.site === 'vestiaire' ? (x.v && x.v.date) : (x.lo && x.lo.dateVente);
       return { ...x, quand: quandEnvoye({ depart, coche, vente }) };
     });
-  };
+  });
   // ── (11 nov., lot suivi-commandes) LE SUIVI D'UNE COMMANDE EN COURS ────────────────────────
   // Julien : « intègre les numéros de suivi sur les commandes en cours […] pour voir la
   // cohérence ». Le n° vient d'une IDENTITÉ prouvée (le bordereau de SA transaction, `b.suivi` ;
@@ -48598,8 +48667,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const anIci = String(new Date().getFullYear());
         // (6 nov.) + ses ventes à dater VENDUES cette année : versées cette année (src/aDaterAnnee.js,
         // la règle de Compta) ; seules les autres laissent « au moins ».
-        const adSurAn = declarables && Array.isArray(declarables.aDater) ? declarables.aDater.filter((l) => l && String(anneeSureDeVente(tsVenteADater(l), Date.now())) === anIci) : [];
-        const caAnnee = declarables ? declarables.lignes.reduce((x, l) => (l && String(l.ym || '').startsWith(anIci)) ? x + l.eur : x, 0) + adSurAn.reduce((x, l) => x + l.eur, 0) : null;
+        // (16 nov., vitesse-moteur) Calculés UNE fois par version de `declarables` et par année (src/calculParVersion.js) :
+        // les mêmes formules, dans le même ordre. Une vente à dater datée APRÈS maintenant entrera dans l'année quand
+        // l'heure la rattrapera : la réponse gardée ne vaut que jusque-là (`jusqua`).
+        const { adSurAn, caAnnee } = parVersion('journee.caAnnee', [declarables, anIci], () => {
+          const adSurAn = declarables && Array.isArray(declarables.aDater) ? declarables.aDater.filter((l) => l && String(anneeSureDeVente(tsVenteADater(l), Date.now())) === anIci) : [];
+          const caAnnee = declarables ? declarables.lignes.reduce((x, l) => (l && String(l.ym || '').startsWith(anIci)) ? x + l.eur : x, 0) + adSurAn.reduce((x, l) => x + l.eur, 0) : null;
+          return { adSurAn, caAnnee };
+        }, { jusqua: () => { const now = Date.now(); let m = Infinity; for (const l of (declarables && Array.isArray(declarables.aDater) ? declarables.aDater : [])) { const t = l ? Number(tsVenteADater(l)) : NaN; if (t > now && t < m) m = t; } return m; } });
         const adVinted = declarables ? declarables.aDater.filter(l => l.plateforme === 'Vinted').length : 0;
         // (30 oct.) Des ventes finalisées sans date de versement ne sont dans aucun mois :
         // « Reçu » et le CA de l'année sont alors des MINIMUMS — la couverture se dit à côté (§5).
@@ -49173,7 +49248,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // montants déjà écrits ailleurs sur l'écran (vendu du jour) ne sont pas
         // redits : la case dit l'ÉCART à la moyenne, pas le montant (§7).
         W.tendances = vuHero ? (()=>{
-          const R = rythmeVendu(vendus.lignes);
+          // (16 nov., vitesse-moteur) Une fois par version des lignes et par JOUR : `rythmeVendu` ne lit l'heure que par
+          // son minuit (src/statsVentes.js, `minuitLocal`) — même jour ⇒ même réponse (src/calculParVersion.js).
+          const R = parVersion('journee.rythme', [vendus.lignes, minuitLocal(Date.now())], () => rythmeVendu(vendus.lignes));
           if (!R) return null;
           const eJ = R.moyenne ? ecartPct(R.jour.eur, R.moyenne.eur) : null;
           const e7 = ecartPct(R.j7.eur, R.j7av.eur);
@@ -57139,6 +57216,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {tourneeOpen && (()=>{
         const avail=(tracking||[]).filter(isPickupActive);
         const groups={};
+        // (16 nov., vitesse-moteur) Le cache de géocodage n'est plus un état du moteur : lu ici, feuille ouverte.
+        const geo=load('vrm_geo_cache_v2', {}) || {};
         avail.forEach(t=>{ const c=cleanLieu(t.lieu); const key=c.nom || carrierName(t.carrier); if(!groups[key]) groups[key]={colis:[],carrier:t.carrier,adresse:c.adresse||'',geo:geo[c.nom]||null}; groups[key].colis.push(t); if(!groups[key].carrier) groups[key].carrier=t.carrier; });
         const points=Object.entries(groups).map(([nom,g])=>({nom,...g})).sort((a,b)=>b.colis.length-a.colis.length || a.nom.localeCompare(b.nom));
         const mapsUrl=(p)=> p.geo&&p.geo.lat ? `https://www.google.com/maps/search/?api=1&query=${p.geo.lat},${p.geo.lon}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.nom+(p.adresse?' '+p.adresse:''))}`;
