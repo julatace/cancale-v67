@@ -36,3 +36,6 @@
 .vrm-mph-choix .vrm-mph-raison { padding-left: 0; }
 .vrm-mph-diode { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--sb-diode, #0060CC); box-shadow: 0 0 0 3px color-mix(in oklab, var(--sb-diode, #0060CC) 18%, transparent); }
 .vrm-mph-choix .vrm-mph-sur, .vrm-mph-choix .vrm-mph-averifier { font-size: 12px; margin: 0; }
+/* (16 nov., lot photo-identite-sites) Reconnues par la photo : rien à faire, ton neutre. */
+.vrm-mph-titre-reconnues { margin: 20px 0 8px; font-size: 13px; font-weight: 600; letter-spacing: .01em; color: var(--sb-encre-2, inherit); }
+.vrm-mph-ligne.is-reconnue .vrm-mph-ligne-texte { flex: 1; min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

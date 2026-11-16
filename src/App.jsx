@@ -867,6 +867,8 @@ import { empreinteImageLocale } from "./photosComptes.js";   // (16 nov.) rétab
 import { PhotosEntreComptesDetail, textePhotosComptes } from "./PhotosEntreComptes.jsx";
 // (15 nov., lot meme-photo) « La même photo » : une annonce d'ailleurs sans lien, à la photo d'une paire Vinted.
 import { propositionsMemePhoto, cleRefusMemePhoto } from "./memePhoto.js";
+import { identitesParPhoto, avecIdentites, fusionnerIdentites, liensLbcAvecPhoto, liensVcAvecPhoto, poserIdentitesPhoto, lireIdentitesPhoto, EVT_IDENTITES_PHOTO } from "./photoIdentite.js";
+import { identitesParCode } from "./photoOrigine.js";
 import { VERSION_FINE } from "./photoFine.js";
 import { publierMemePhoto, lireMemePhoto, ouvrirMemePhoto } from "./memePhotoEtat.js";
 import { MemePhotoHote, LigneMemePhoto, LigneMemePhotoNumero, texteMemePhoto, useMemePhoto } from "./MemePhoto.jsx";
@@ -4517,7 +4519,7 @@ function FichesNeuves({ annonces = null }) {
   const draftsFiches = new Set(Object.values(toutes0).filter((f) => f && f.vinted && f.vinted.draftId).map((f) => String(f.vinted.draftId)));
   const portes = new Set();
   for (const [id, f] of Object.entries(load('vinted_annonce_numeros', {}) || {})) if (f && f.numero && !draftsFiches.has(String(id))) portes.add(cleNum(f.numero));
-  for (const n of Object.values(load('vrm_lbc_liens', {}) || {})) if (n) portes.add(cleNum(n));
+  for (const n of Object.values(liensLbcLus())) if (n) portes.add(cleNum(n));
   for (const n of Object.values(carteNumerosVc(vcCarte('vrm_vc_numeros')))) if (n) portes.add(cleNum(n));
   const liste = fichesAPublier(toutes0, portes, cleNum).filter((f) => etatFicheVinted(f, annonces) !== 'en-ligne');
   if (!liste.length && !ouvert && !mainF) return null;
@@ -5402,7 +5404,7 @@ onCloudReady(() => { setTimeout(async () => { try { const rows = await listerPoi
 // Les N° portés hors des fiches et des ventes : un N° rendu ne doit être porté par AUCUNE autre paire.
 const numerosPortesAilleurs = () => {
   const out = [];
-  try { for (const n of Object.values(load('vrm_lbc_liens', {}) || {})) if (n) out.push(n); } catch (_) {}
+  try { for (const n of Object.values(liensLbcLus())) if (n) out.push(n); } catch (_) {}
   try { for (const x of Object.values(load('vrm_vc_numeros', {}) || {})) { const n = x && typeof x === 'object' ? x.numero : x; if (n) out.push(n); } } catch (_) {}
   return out;
 };
@@ -5627,7 +5629,7 @@ async function numerosServisImport() {
   const add = (v, raison) => { const c = cleNum(v); if (c && !pris.has(c)) pris.set(c, raison); };
   Object.values(load('vinted_annonce_numeros', {}) || {}).forEach((e) => add(e && e.numero, 'est déjà sur une annonce'));
   Object.values(load('vinted_sale_overrides', {}) || {}).forEach((e) => add(e && e.numero, 'est déjà sur une vente'));
-  Object.values(load('vrm_lbc_liens', {}) || {}).forEach((v) => add(v, 'est déjà relié sur Leboncoin'));
+  Object.values(liensLbcLus()).forEach((v) => add(v, 'est déjà relié sur Leboncoin'));
   try { Object.values(carteNumerosVc(vcCarte('vrm_vc_numeros'))).forEach((v) => add(v, 'est déjà sur Vestiaire')); } catch (_) {}
   numerosReserves(jr[0] ? jr[0].data : null).cles.forEach((v) => add(v, 'est réservé pour une annonce en cours'));
   lireStockImporte().forEach((x) => add(x && x.numero, 'est déjà importé'));
@@ -13308,7 +13310,15 @@ const vcSetter = (k) => (f) => { _vcMem[k] = f(vcCarte(k)); signalerVc(); };
 // le N° donné par VRM, remplacé par celui de l'annonce Vinted quand il les a
 // reliées (`vrm_vc_liens`, src/lienVestiaire.js). Le N° donné reste dans
 // `vrm_vc_numeros` (servi, jamais redonné) : défaire la liaison le rend.
-const numerosVcEffectifs = () => carteNumerosVc(numerosVcAvecLiens(vcCarte('vrm_vc_numeros'), vcCarte('vrm_vc_liens')));
+// (16 nov., lot photo-identite-sites) Les identités par la PHOTO (src/photoIdentite.js), celles du compte
+// connecté seulement ; `null` (pas encore calculées, ou lecture ratée) ⇒ aucune.
+const identPhotoDuCompte = () => { const i = lireIdentitesPhoto(); return i && i.owner && i.owner === AUTH.user?.id ? i : null; };
+// LES LIENS LUS : ses liens (posés, défaits) d'abord, puis « même photo · sûr ». Pour LIRE une identité
+// seulement — une écriture part toujours de `load('vrm_lbc_liens')` (jamais la photo recopiée en base).
+const liensLbcLus = () => liensLbcAvecPhoto(load('vrm_lbc_liens', {}) || {}, identPhotoDuCompte());
+const liensVcLus = () => liensVcAvecPhoto(vcCarte('vrm_vc_liens'), identPhotoDuCompte());
+const avecPhotoLbc = (m) => liensLbcAvecPhoto(m, identPhotoDuCompte());
+const numerosVcEffectifs = () => carteNumerosVc(numerosVcAvecLiens(vcCarte('vrm_vc_numeros'), liensVcLus()));
 if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
   // La valeur gardée (fusionnée, ou venue d'un autre appareil) remplace la copie en mémoire.
   window.addEventListener('vrm:save', (e) => { const k = e && e.detail && e.detail.k; if (k && k in _vcMem) { delete _vcMem[k]; signalerVc(); } });
@@ -13381,7 +13391,7 @@ async function numeroterVestiaire() {
       const auto = vcCarte('vrm_vc_numeros');
       // (3 nov.) Une annonce reliée à la main (`vrm_vc_liens`) porte DÉJÀ le N° de
       // son annonce Vinted : jamais un N° neuf pour elle.
-      const liensMainVc = carteNumerosVc(numerosVcAvecLiens({}, vcCarte('vrm_vc_liens')));
+      const liensMainVc = carteNumerosVc(numerosVcAvecLiens({}, liensVcLus()));
       const ids = produitsANumeroter({ items: L.capturedAt ? items : null, ventes, liens: { ...liensMainVc, ...(L.liens || {}) }, auto, cleNum,
         etatRetiree: (it) => etatAnnonceVcBrut(it, false, L.capturedAt) === 'retiree', venteAnnulee: vcVenteAnnulee });
       if (!ids.length) return 0;
@@ -13391,7 +13401,7 @@ async function numeroterVestiaire() {
       (load('vinted_used_numeros', []) || []).forEach(add);
       Object.values(load('vinted_annonce_numeros', {}) || {}).forEach((e) => add(e && e.numero));
       Object.values(load('vinted_sale_overrides', {}) || {}).forEach((e) => add(e && e.numero));
-      Object.values(load('vrm_lbc_liens', {}) || {}).forEach(add);
+      Object.values(liensLbcLus()).forEach(add);
       Object.values(L.liens || {}).forEach(add);
       Object.values(carteNumerosVc(auto)).forEach(add);
       numerosReserves(jr[0] ? jr[0].data : null).cles.forEach(add);
@@ -18349,7 +18359,7 @@ function rechercheParNumero(q, numData, comptes) {
   const cloud = isCloudReady();
   const fichesLues = cloud || Object.keys(numeros).length ? numeros : null;
   const shipDone = load('vinted_ship_done', {}) || {};
-  const liensLbc = load('vrm_lbc_liens', {}) || {};
+  const liensLbc = liensLbcLus();
   const series = [prefixeNumeros(), archiveNumeros()];
   const lu = (v) => (v === undefined ? null : v);
   const rn = toutSurLeNumero(q, {
@@ -18502,7 +18512,7 @@ export function enregistrerSoldeVrm({ fin, site, faites }) {
 export const soldeOkVrm = () => extSait('remiseprix') === 'ok';
 const sitesPrixDe = (k, rn, extra) => sitesDuNumero(k, { rn, fiches: load('vinted_annonce_numeros', {}) || {}, lbcItems: extra ? extra.lbcItems : null, vcItems: extra ? extra.vcItems : null }, {
   cleNum, capVinted: extSait('republiermodif'),
-  numLbc: (ad, id) => numeroLbcIdentite({ itemId: id }, { [id]: ad }, load('vrm_lbc_liens', {}) || {}),
+  numLbc: (ad, id) => numeroLbcIdentite({ itemId: id }, { [id]: ad }, liensLbcLus()),
   numVc: (id, it) => numeroVcIdentite(id, it, extra ? extra.vcLiens : null),
 });
 // Les envois, appelés UNIQUEMENT par « Appliquer » (src/PrixPartout.jsx).
@@ -18568,7 +18578,7 @@ async function numerosServisLus() {
   (load('vinted_used_numeros', []) || []).forEach(add);
   Object.values(load('vinted_annonce_numeros', {}) || {}).forEach((e) => add(e && e.numero));
   Object.values(load('vinted_sale_overrides', {}) || {}).forEach((e) => add(e && e.numero));
-  Object.values(load('vrm_lbc_liens', {}) || {}).forEach(add);
+  Object.values(liensLbcLus()).forEach(add);
   Object.values(load('vrm_fiches_neuves', {}) || {}).forEach((e) => add(e && e.numero));
   (load('vinted_offvinted_buys', []) || []).forEach((b) => add(b && b.numero));
   Object.keys(load('vrm_slots', {}) || {}).forEach(add);   // un N° noté dans une case est sur un carton
@@ -18585,7 +18595,7 @@ function apercuNumerosLot(n) {
   (load('vinted_used_numeros', []) || []).forEach(add);
   Object.values(load('vinted_annonce_numeros', {}) || {}).forEach((e) => add(e && e.numero));
   Object.values(load('vrm_fiches_neuves', {}) || {}).forEach((e) => add(e && e.numero));
-  Object.values(load('vrm_lbc_liens', {}) || {}).forEach(add);
+  Object.values(liensLbcLus()).forEach(add);
   (load('vinted_offvinted_buys', []) || []).forEach((b) => add(b && b.numero));
   Object.keys(load('vrm_slots', {}) || {}).forEach(add);   // (intégration g1) la même liste que `numerosServisLus`
   ajouterNumerosHorsEcran(pris, prisK);
@@ -25255,7 +25265,7 @@ function VentesLeboncoin({ lbcVentes = {ventes:[],inconnues:0}, sansTotaux = fal
   // SAISI de cette paire (`vinted_buyprice_by_num`, via `prixAchatDe` — la MÊME
   // source que Vinted/eBay, §11). Prix d'achat inconnu ⇒ pas de bénéfice (jamais
   // 0 : un total partiel présenté comme complet est pire qu'un absent).
-  const liens = React.useMemo(() => load('vrm_lbc_liens', {}) || {}, [lbcVentes]);
+  const liens = React.useMemo(() => liensLbcLus(), [lbcVentes]);
   const buyByNum = React.useMemo(() => load('vinted_buyprice_by_num', {}) || {}, [lbcVentes]);
   const numerosFiches = React.useMemo(() => load('vinted_annonce_numeros', {}) || {}, [lbcVentes]);
   // La carte des annonces LBC donne la réf VRM ; en l'attendant, `null` ⇒ le
@@ -26502,10 +26512,14 @@ async function relierVc({ productId, item, numVinted, titre }) {
 }
 async function defaireVc(productId) {
   const e = lienDe(vcCarte('vrm_vc_liens'), productId);
-  if (!e) return false;
-  const ok = await askConfirm({ title: 'Défaire la liaison ?', desc: e.de ? `L’annonce Vestiaire reprend le N°${e.de}.` : '', ok: 'Défaire', cancel: 'Annuler' });
+  // (16 nov.) Reconnue par la PHOTO (aucun lien posé) : défaire = « ce n'est pas la même » (sinon la photo la referait).
+  const ph = !e ? ((identPhotoDuCompte() || {}).Vestiaire || {})[String(productId)] : null;
+  if (!e && !ph) return false;
+  const ok = await askConfirm({ title: 'Défaire la liaison ?', desc: e && e.de ? `L’annonce Vestiaire reprend le N°${e.de}.` : '', ok: 'Défaire', cancel: 'Annuler' });
   if (!ok) return false;
-  vcPoser('vrm_vc_liens', defaireLienVc(vcCarte('vrm_vc_liens'), productId));
+  if (e) vcPoser('vrm_vc_liens', defaireLienVc(vcCarte('vrm_vc_liens'), productId));
+  // La même photo ne la relie plus à ce N° (son « défaire » est une décision, comme « délier » sur Leboncoin).
+  refuserMemePhoto({ annonce: { plateforme: 'Vestiaire', id: String(productId) }, numero: (e && e.numero) || (ph && ph.numero) || '' });
   return true;
 }
 // ══ « LA MÊME PHOTO » : UNE ANNONCE D'AILLEURS, SANS LIEN, À LA PHOTO D'UNE PAIRE VINTED (15 nov.) ══
@@ -26520,6 +26534,23 @@ async function defaireVc(productId) {
 // garde sa règle (`numeroExterne`) : le N° posé est celui de la fiche Vinted, tel quel.
 const LIGNES_EMPREINTES_SITES = { photo_empreinte_lbc: 'Leboncoin', photo_empreinte_vc: 'Vestiaire', photo_empreinte_ebay: 'eBay' };
 const CLE_REFUS_MEME_PHOTO = 'vrm_meme_photo_non';
+// (16 nov., lot photo-identite-sites, extension 5.401) LE CODE D'ORIGINE (SHA-256 du fichier qu'il téléverse) :
+// `photo_origine_vinted` (annonce ⇒ codes) et `photo_origine_lbc` (nom d'image ⇒ code). Projections seules ;
+// ligne absente ⇒ {} (rien vu) ; lecture ratée ⇒ null (aucune identité par le code). src/photoOrigine.js.
+const lireOriginesPhotos = async () => {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(photo_origine_vinted,photo_origine_lbc)${filtreProprio()}&select=id,a:data->payload->annonces,i:data->payload->images`, { headers: sbAuth() });
+    if (!r.ok) return null;
+    const j = await r.json();
+    if (!Array.isArray(j)) return null;
+    const out = { vinted: {}, lbc: {} };
+    for (const l of j) {
+      if (l && l.id === 'photo_origine_vinted' && l.a && typeof l.a === 'object') out.vinted = l.a;
+      if (l && l.id === 'photo_origine_lbc' && l.i && typeof l.i === 'object') out.lbc = l.i;
+    }
+    return out;
+  } catch (_) { return null; }
+};
 const lireEmpreintesSites = async () => {
   try {
     const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=in.(${Object.keys(LIGNES_EMPREINTES_SITES).join(',')})${filtreProprio()}&select=id,a:data->payload->annonces`, { headers: sbAuth() });
@@ -26566,7 +26597,8 @@ async function annoncesAutresMemePhoto() {
         if (!siens.has(idCompteLbcApp(ad.account || ad.lbcUser || '')) && !(liens[id] != null && String(liens[id]).trim())) continue;
         const n = numeroLbcIdentite({ itemId: ad.id }, ls.items, liens);
         autres.push({ plateforme: 'Leboncoin', id, compte: idCompteLbcApp(ad.account || ad.lbcUser || ''), compteNom: ad.accountName || '', titre: ad.subject || ad.title || '',
-          photo: (Array.isArray(ad.images) && typeof ad.images[0] === 'string' && ad.images[0]) || null, lien: lienAnnonceLeboncoin(ad) || null, relie: !!n || !!sans['ad:' + id], numero: n || '' });
+          photo: (Array.isArray(ad.images) && typeof ad.images[0] === 'string' && ad.images[0]) || null, photos: Array.isArray(ad.images) ? ad.images.filter((u) => typeof u === 'string').slice(0, 20) : [],
+          lien: lienAnnonceLeboncoin(ad) || null, relie: !!n || !!sans['ad:' + id], numero: n || '' });
       }
     }
   } catch (_) { illisibles.push('Leboncoin'); }
@@ -26656,32 +26688,46 @@ function empreintesEbayPage(autres, deja) {
 // Tout calculer une fois (relu au plus toutes les 2 min, ou sur demande), publié dans
 // src/memePhotoEtat.js : la feuille, Ma journée et les écrans des sites LISENT.
 let _memePhotoEnCours = null, _memePhotoAt = 0, _memePhotoAttente = false;
-async function chargerMemePhoto(force = false) {
+async function chargerMemePhoto(force = false, { sansEbay = false } = {}) {
   // Les fiches et les liens viennent du nuage : avant lui, on attend (une fois), jamais un calcul sur du vide.
-  if (!isCloudReady()) { if (!_memePhotoAttente) { _memePhotoAttente = true; onCloudReady(() => { _memePhotoAttente = false; chargerMemePhoto(force); }); } return null; }
+  if (!isCloudReady()) { if (!_memePhotoAttente) { _memePhotoAttente = true; onCloudReady(() => { _memePhotoAttente = false; chargerMemePhoto(force, { sansEbay }); }); } return null; }
   if (!AUTH.user?.id) return null;
   if (_memePhotoEnCours) return _memePhotoEnCours;
   if (!force && Date.now() - _memePhotoAt < 120000 && lireMemePhoto()) return lireMemePhoto();
   _memePhotoEnCours = (async () => {
     const owner = AUTH.user?.id;
-    const [empV, empS, ext, verifs] = await Promise.all([lireEmpreintesPhotos(), lireEmpreintesSites(), annoncesAutresMemePhoto(), lireVerifsFines()]);
+    const [empV, empS, ext, verifs, origines] = await Promise.all([lireEmpreintesPhotos(), lireEmpreintesSites(), annoncesAutresMemePhoto(), lireVerifsFines(), lireOriginesPhotos()]);
     if (AUTH.user?.id !== owner) return null;
     const vinted = empV ? annoncesVintedMemePhoto(empV) : [];
     const empreintes = empV && empS ? { vinted: Object.fromEntries(Object.entries(empV).map(([cc, v]) => [cc.replace(/^vinted:/, ''), v])), ...empS } : null;
     let douteux = new Set(); try { douteux = lireNumerosAmbigus(); } catch (_) {}
     const res = propositionsMemePhoto({ vinted, autres: ext.autres, empreintes, refus: load(CLE_REFUS_MEME_PHOTO, {}) || {}, numerosDouteux: douteux, cle: cleNum, verifs });
-    const etat = { ...res, illisibles: ext.illisibles, vinted, at: Date.now() };
+    // (16 nov., lot photo-identite-sites) « Même photo · sûr » (les deux mesures), une seule paire :
+    // une IDENTITÉ (§5), calculée ici, jamais écrite ; ses liens et ses « délier » gagnent toujours.
+    // (16 nov.) Julien : « non pas à quoi elle ressemble, mais son CODE » : l'identité AUTOMATIQUE vient du code
+    // d'origine (exact) ; la ressemblance reste une proposition (IDENTITE_PAR_RESSEMBLANCE éteinte, src/photoIdentite.js).
+    const fichesN = {}, infosV = {};
+    for (const [id, f] of Object.entries(load('vinted_annonce_numeros', {}) || {})) if (f && f.numero != null && String(f.numero).trim()) {
+      fichesN[id] = String(f.numero);
+      infosV[id] = { titre: f.title || '', photo: (typeof f.photo === 'string' ? f.photo : (f.photo && f.photo.url)) || null, lien: /^\d+$/.test(String(id)) ? `https://www.vinted.fr/items/${id}` : null };
+    }
+    const identCode = identitesParCode({ vinted: origines ? origines.vinted : null, lbcImages: origines ? origines.lbc : null, fiches: fichesN, vintedInfos: infosV, autres: ext.autres,
+      liensLbc: load('vrm_lbc_liens', {}) || {}, refus: load(CLE_REFUS_MEME_PHOTO, {}) || {}, numerosDouteux: douteux, cleRefus: (pf, id, n) => cleRefusMemePhoto(pf, id, n, cleNum), cle: cleNum });
+    const identRess = identitesParPhoto(res, { liensLbc: load('vrm_lbc_liens', {}) || {}, liensVc: vcCarte('vrm_vc_liens'), numerosVc: carteNumerosVc(vcCarte('vrm_vc_numeros')), cle: cleNum });
+    const ident = fusionnerIdentites(identCode, identRess);
+    poserIdentitesPhoto(ident.lu ? { ...ident, owner } : null);
+    const etat = { ...avecIdentites(res, ident), illisibles: ext.illisibles, vinted, at: Date.now(), origineLue: !!origines, nAnnoncesAvecCode: identCode.nAnnoncesAvecCode };
     _memePhotoAt = Date.now();
     publierMemePhoto(etat);
     // eBay : les photos sans empreinte se calculent ICI, puis tout est relu une fois.
-    if (empS) empreintesEbayPage(ext.autres, empS.eBay).then((n) => { if (n > 0) chargerMemePhoto(true); });
+    if (empS && !sansEbay) empreintesEbayPage(ext.autres, empS.eBay).then((n) => { if (n > 0) chargerMemePhoto(true); });
     return etat;
   })().catch(() => null).finally(() => { _memePhotoEnCours = null; });
   return _memePhotoEnCours;
 }
 if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
   // Un lien posé, défait, ou un « pas la même » (ici ou sur un autre appareil) : tout est relu.
-  window.addEventListener('vrm:save', (e) => { const k = e && e.detail && e.detail.k; if (['vrm_lbc_liens', 'vrm_ebay_liens', 'vrm_vc_liens', CLE_REFUS_MEME_PHOTO, 'vrm_lbc_pas_de_paire'].includes(k) && lireMemePhoto()) setTimeout(() => chargerMemePhoto(true), 50); });
+  window.addEventListener('vrm:save', (e) => { const k = e && e.detail && e.detail.k; if (e && e.detail && e.detail.photo) return; if (['vrm_lbc_liens', 'vrm_ebay_liens', 'vrm_vc_liens', CLE_REFUS_MEME_PHOTO, 'vrm_lbc_pas_de_paire'].includes(k) && lireMemePhoto()) setTimeout(() => chargerMemePhoto(true), 50); });
 }
 // RELIER, sur SON toucher (proposition ou choix dans un cas ambigu). Le N° est celui de la
 // fiche Vinted ; `vintedId` l'annonce Vinted de cette fiche. Rend true si le lien est posé.
@@ -34154,7 +34200,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const lbcAussi = React.useMemo(() => {
     const posted = lbcPostesEncoreEnVente(lbcPosted, numeros, lbcSortisAnn);
     if (!lbcVentesAnn || !posted.size || !annoncesLbcVendues(lbcVentesAnn).size) return posted;
-    const liens = { ...(load('vrm_lbc_liens', {}) || {}) };
+    const liens = { ...(liensLbcLus()) };
     const { doublons } = doublesVenteLbc({ ventes: lbcVentesAnn, items: lbcItemsAnn || {}, liens, numeros, enLigne: posted });
     const ici = new Set(doublons.flatMap((d) => d.surVinted || []));
     if (!ici.size) return posted;
@@ -34228,7 +34274,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const ra = await fetchMemo(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=data`, { headers: sbAuth() });
         if (ra.ok) { const ar = await ra.json(); if (Array.isArray(ar)) { const accs = (ar[0] && ar[0].data && ar[0].data.accounts) || {}; preuve = { lectures: ls.lectures || {}, comptes: new Set([...comptesLbcProuves(ventes, ls.items), ...comptesLbcSession(accs)]), depuis: postedDepuis }; } }
       } catch (_) {}
-      setLbcSortisAnn(numerosLbcSortis(ls.items, { ...(load('vrm_lbc_liens', {}) || {}) }, annoncesLbcVendues(ventes), preuve).prouves);
+      setLbcSortisAnn(numerosLbcSortis(ls.items, { ...(liensLbcLus()) }, annoncesLbcVendues(ventes), preuve).prouves);
     } catch (_) { /* pas su ⇒ Set vide ⇒ aucune pastille, jamais un faux « publiée » */ }
   })(); }, []);
   // Ses VENTES Leboncoin — demande de Julien (21 sept.) : « je veux une partie
@@ -42670,7 +42716,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Leboncoin (banc `vitesse.cjs`, Ma journée). Seules les annonces lues sont un état.
   const lbcBesoinAnnonces = useMemo(() => {
     if (lbcLu !== true) return false;
-    const liens = load('vrm_lbc_liens', {}) || {};
+    const liens = liensLbcLus();
     return (lbcVentes.ventes || []).some(v => v && v.isSeller === true && v.itemId != null && !lbcAnnulee(v) && lbcFinalisee(v) && !(liens[String(v.itemId)] != null && String(liens[String(v.itemId)]).trim()));
   }, [lbcLu, lbcVentes]);
   const [lbcItemsLus, setLbcItemsLus] = useState(undefined);
@@ -42690,7 +42736,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const autresBenefice = useMemo(() => {
     if (lbcLu !== true || !Array.isArray(ebayCmd) || !lbcItemsBenef) return null;
     try {
-      const liens = load('vrm_lbc_liens', {}) || {};
+      const liens = liensLbcLus();
       // (11 nov.) les frais saisis sur la fiche, comme Vinted ; Vestiaire verse DÉJÀ sans sa commission (pas comptée deux fois).
       const fraisFicheAutres = (f, pl) => (pl === 'Vestiaire' ? coutsVente(Object.assign({}, f, { commission: '' })).total : chargesVente(f));
       return ventesAutresBenefice({ lbc: lbcVentes.ventes || [], ebay: ebayCmd, vestiaire: ventesVc || [], numeros,
@@ -45405,7 +45451,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // rien ; un N° encore à poster ailleurs (Vinted, Leboncoin, eBay) non plus.
     const aPoster = new Set();
     const lbcOk = lbcLu === true && lbcItemsBenef && typeof lbcItemsBenef === 'object';
-    const liensLbc = load('vrm_lbc_liens', {}) || {};
+    const liensLbc = liensLbcLus();
     const numLbcDe = (v) => { try { return numeroLbcIdentite(v, lbcItemsBenef || {}, liensLbc); } catch (_) { return null; } };
     const lbcSorties = [], ebaySorties = [];
     if (lbcOk) for (const v of (lbcVentes.ventes || [])) {
@@ -47557,7 +47603,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (!rows.some((r) => r.id === "lbc_ventes"))
         manques.push("ventes Leboncoin jamais reçues");
     } else manques.push("Leboncoin non relu");
-    const liens = load("vrm_lbc_liens", {}) || {},
+    const liens = liensLbcLus(),
       comptesProuves = new Set(
         [
           ...comptesLbcProuves(ventesL, items),
@@ -58338,7 +58384,7 @@ async function lireLbcEnVente() {
     if (!vr.ok) return null;
     const vrows = await vr.json(); if (!Array.isArray(vrows)) return null;
     const vendues = annoncesLbcVendues((vrows[0] && vrows[0].data && vrows[0].data.ventes) || {});
-    const liens = { ...(load('vrm_lbc_liens', {}) || {}) };
+    const liens = { ...(liensLbcLus()) };
     const liste = [];
     for (const ad of Object.values(items || {})) {
       if (!annonceLbcEnVente(ad, vendues)) continue;
@@ -58416,7 +58462,7 @@ async function lireLbcPreuve() {
   try {
     const ls = await lbcListingsSession();
     if (!ls || !ls.items) return null;
-    const liens = { ...(load('vrm_lbc_liens', {}) || {}) };
+    const liens = { ...(liensLbcLus()) };
     const comptes = new Set();
     let sansIdentite = 0;
     for (const ad of Object.values(ls.items || {})) {
@@ -60607,7 +60653,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
       }
     }
     if (voit('leboncoin') && lbcLu === true) {
-      const liens = load('vrm_lbc_liens', {}) || {};
+      const liens = liensLbcLus();
       const dates = lireDatesLbc();
       for (const v of ((lbcVentes && lbcVentes.ventes) || [])) {
         if (!v || v.isSeller !== true || lbcAnnulee(v)) continue;
@@ -60956,6 +61002,16 @@ function AppCoeur() {
   // (5 nov.) Groupes d'accompagnement : si le vendeur partage ses chiffres dans un
   // groupe, ses agrégats repartent quand ils changent (src/communaute/accompagnement.js).
   React.useEffect(()=>ecouterPartage(enTeteSession),[]);
+  // (16 nov., lot photo-identite-sites) LA PHOTO IDENTIQUE EST UNE IDENTITÉ (src/photoIdentite.js) : calculée
+  // une fois après l'ouverture (lecture seule : projections des empreintes, rien écrit — le calcul eBay dans
+  // la page n'est PAS lancé d'ici), puis relue sur un lien posé / défait. Quand elle CHANGE, les lecteurs des
+  // liens Leboncoin / Vestiaire (N°, à retirer ailleurs, ventes croisées) relisent (`emettreClesRelues`).
+  React.useEffect(()=>{
+    const t=setTimeout(()=>{ chargerMemePhoto(false,{ sansEbay:true }); },4000);
+    const f=()=>{ for(const k of ['vrm_lbc_liens','vrm_vc_liens']){ const s=_clesRelues.get(k); if(s) [...s].forEach(fn=>{ try{ fn(); }catch(_){} }); try{ window.dispatchEvent(new CustomEvent('vrm:save',{ detail:{ k, photo:true } })); }catch(_){} } };
+    window.addEventListener(EVT_IDENTITES_PHOTO,f);
+    return ()=>{ clearTimeout(t); window.removeEventListener(EVT_IDENTITES_PHOTO,f); };
+  },[]);
   // ── LE JOURNAL DES PLANTAGES PART DANS SA BASE (src/plantages.js) ──────────
   // AppCoeur ne monte qu'avec une session : c'est ici seulement qu'on peut
   // écrire AU NOM du vendeur (RLS). Une écriture non confirmée reste en file et
@@ -61765,7 +61821,7 @@ function AppCoeur() {
     const bordereaux=(bE&&bL)?[...bE,...bL].filter(b=>b&&b.tx).map(b=>({tx:String(b.tx),pdf:!!b.pdf&&String(b.pdf)!=='false'})):null;
     let lbcVentes=null, lbcItems=null;
     if(lbcRows){ const v=(lbcRows[0]&&lbcRows[0].ventes)||{}; lbcVentes=Object.entries(v).map(([id,x])=>({...(x||{}),_id:id})).filter(x=>x.isSeller===true);
-      const liens=load('vrm_lbc_liens',{})||{}; if(lbcVentes.some(x=>x.itemId!=null&&!liens[String(x.itemId)])) lbcItems=await lbcAnnoncesSession(); }
+      const liens=liensLbcLus(); if(lbcVentes.some(x=>x.itemId!=null&&!liens[String(x.itemId)])) lbcItems=await lbcAnnoncesSession(); }
     let ebayCommandes=null, ebayAnnonces=null;
     if(Array.isArray(cE)){ const tous=async(base,sel,champ)=>{ const r=await lireEbayTous(base,sel,champ,cE); return (!r||r.illisibles.length)?null:r.items; };
       [ebayCommandes, ebayAnnonces]=await Promise.all([tous('ebay_orders',SEL_EBAY_COMMANDES,'orders'), tous('ebay_listings',SEL_EBAY_ANNONCES,'items')]); }
@@ -63506,7 +63562,7 @@ function AppCoeur() {
           const rows=await r.json();
           const ventesL=(rows&&rows[0]&&rows[0].data&&rows[0].data.ventes)||{};
           if(Array.isArray(rows)) ventesLbcLu=ventesL;
-          const liensL=load('vrm_lbc_liens',{})||{};
+          const liensL=liensLbcLus();
           const calc=(items)=>doublesVenteLbc({ventes:ventesL, items, liens:liensL, numeros:nums, enLigne:lbcOnlineIds, vendusVinted:soldIdsN});
           let dv=calc(null);
           if(dv.aRelier.length){ const items=await lbcAnnoncesSession(); lbcItemsLu=items||null; if(items) dv=calc(items); }
@@ -63543,7 +63599,7 @@ function AppCoeur() {
         const items=ls?ls.items:null;
         if(lbcItemsLu===undefined) lbcItemsLu=items||null;
         lbcLecturesLu=ls?ls.lectures:null;
-        const liensR=load('vrm_lbc_liens',{})||{};
+        const liensR=liensLbcLus();
         let sortis=null;
         if(items){
           // La preuve, comme l'écran Leboncoin : ses comptes (session vue ou
@@ -63614,7 +63670,7 @@ function AppCoeur() {
         // (6 octobre) Le verdict « déjà vendue, toutes plateformes » — la MÊME
         // règle que l'écran eBay (`numerosDejaVendus`, §11) : une programmée
         // vendue sur Leboncoin ou sur eBay est « à annuler » aussi.
-        const liensV=load('vrm_lbc_liens',{})||{};
+        const liensV=liensLbcLus();
         // (1er nov., audit A1) + Vestiaire (par identité ; pas su ⇒ aucune alerte inventée).
         const ventesVcN=ventesVcDe(avecNumerosVc(await lireVentesVestiaire()));
         const verdict=(items)=>numerosDejaVendus({numeros:nums, enLigne:enLigneE, vendusVinted:vendusE, commandes:ords, ventesLbc:ventesLbcLu, itemsLbc:items, liensLbc:liensV, ventesVc:ventesVcN});
@@ -63653,7 +63709,7 @@ function AppCoeur() {
           const soldEbayN=numerosVendusEbay(ords);
           if(soldEbayN && soldEbayN.size){
             const vintedRemN=new Set((lbcARetirer||[]).map(r=>cleNum(r.numero)).filter(Boolean));
-            const liensE=load('vrm_lbc_liens',{})||{};
+            const liensE=liensLbcLus();
             const reE=aRetirerDeLbcEbay({soldEbay:soldEbayN, posted:postedIds, numeros:nums, itemsLbc:lbcItemsLu||null, liens:liensE, vendusLbc:ventesLbcLu?annoncesLbcVendues(ventesLbcLu):null, sortis:sortisN, deja:vintedRemN, lectures:lbcLecturesLu});
             lbcRemoveEbayCount=reE?reE.length:0; lbcSupprEbay=(reE||[]).filter(r=>r&&r.ident&&r.lbcId);
           }
@@ -63661,7 +63717,7 @@ function AppCoeur() {
           const soldVcN=numerosVendusVc(ventesVcN);
           if(soldVcN && soldVcN.size){
             const dejaN=new Set([...(lbcARetirer||[]).map(r=>cleNum(r.numero)).filter(Boolean)]);
-            const reV=aRetirerDeLbcEbay({soldEbay:soldVcN, posted:postedIds, numeros:nums, itemsLbc:lbcItemsLu||null, liens:load('vrm_lbc_liens',{})||{}, vendusLbc:ventesLbcLu?annoncesLbcVendues(ventesLbcLu):null, sortis:sortisN, deja:dejaN, lectures:lbcLecturesLu});
+            const reV=aRetirerDeLbcEbay({soldEbay:soldVcN, posted:postedIds, numeros:nums, itemsLbc:lbcItemsLu||null, liens:liensLbcLus(), vendusLbc:ventesLbcLu?annoncesLbcVendues(ventesLbcLu):null, sortis:sortisN, deja:dejaN, lectures:lbcLecturesLu});
             lbcRemoveVcCount=reV?reV.length:0; lbcSupprVc=(reV||[]).filter(r=>r&&r.ident&&r.lbcId);
           }
         }
@@ -63732,7 +63788,7 @@ function AppCoeur() {
           ]);
           let itemsC=lbcItemsLu;
           const vd=(it)=>numerosDejaVendus({ numeros:nums, enLigne:new Set([...lectures.values()].flatMap(l=>[...l.enLigne])), vendusVinted:pv&&pv.vendus?pv.vendus:null,
-            commandes:ordsC, ventesLbc:ventesLbcLu, itemsLbc:it, liensLbc:load('vrm_lbc_liens',{})||{}, ventesVc:vcC });
+            commandes:ordsC, ventesLbc:ventesLbcLu, itemsLbc:it, liensLbc:liensLbcLus(), ventesVc:vcC });
           let verdictC=vd(itemsC===undefined?undefined:itemsC);
           if(verdictC.lbcSansPaire>0 && itemsC===undefined){ itemsC=await lbcAnnoncesSession().catch(()=>null); verdictC=vd(itemsC||null); }
           const ventes=(!pv||!pv.vendus||verdictC.pasSu.length||verdictC.enCours)?null:{ ids:pv.vendus, nums:new Set(verdictC.vendus.keys()), revenues:pv.revenuesItems||new Set() };
@@ -64480,7 +64536,7 @@ function AppCoeur() {
         // Vestiaire : le N° de la vente lue) — jamais par le titre.
         const autres = memoSur('gs-autres', [numData && numData.ebayCommandes, numData && numData.lbcVentes, numData && numData.lbcItems, gsData && gsData.vcVentes], () => ventesAutresPourRecherche(
           { ebay: numData && numData.ebayCommandes, lbc: numData && numData.lbcVentes, vc: gsData && gsData.vcVentes },
-          { numEbay: (c, li) => numLigneEbay(c, li) || '', numLbc: (v) => numeroLbcIdentite(v, (numData && numData.lbcItems) || null, load('vrm_lbc_liens', {}) || {}) }));
+          { numEbay: (c, li) => numLigneEbay(c, li) || '', numLbc: (v) => numeroLbcIdentite(v, (numData && numData.lbcItems) || null, liensLbcLus()) }));
         // (15 nov., vendre plus) LE STOCK : chaque N° rangé (le plan, par `cleNum`) et son lieu ; le garage aussi.
         let brutPlan = null; try { brutPlan = localStorage.getItem('vrm_room_plan'); } catch (_) {}
         const stockGs = memoSur('gs-stock', [brutPlan, garageGrid], () => stockPourRecherche(brutPlan, garageGrid));
@@ -65604,4 +65660,4 @@ export { InfoPop, PuceProposition };
 export { fetchTranspLignes, relireTransporteursSiVieux };
 export { oublierReglageMontage };   // (11 nov., intégration) la lecture gardée au montage, oubliée par une écriture directe
 export { fetchTxnItemIds };   // (11 nov., robustesse) la synchro de l'inventaire relie par identité
-export { sortieCaseStock, texteAvecDescentes, pushNotif, NotePaireCoque, ACTIONS_REPUB, ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, Badge, BlocBarrerVc, BlocComptesMuets, Bouton, BoutonBordereau, BoutonImprimerVc, BrandMark, Btn, BulleConv, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CarteStatsApp, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, CompteVente, CoutAchatVente, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DEMANDE_VC_PAIRE, DEPS_FACTURE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, ENTREPRISE_VIDE, EQUIPE_NON_INSTALLE_TXT, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, EbayCommande, FermeAuRetour, FicheConvVolet, FiltresVentes, FraicheurAnnonces, GuideReglage, IMPR_MODES, INV_STATUS, Icon, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneConv, LignePanne, LigneRelais, LigneVente, LigneVenteCompacte, ListeComptes, LiveStatsCarte, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, MULTI_USER, MicDictee, NAV, NOM_PLAT_STOCK, NOM_RECU_ACHAT, NUM_OK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PeriodePicker, PhraseEcran, PhotoVc, PhotoVente, PhotoVinted, PiedSansEnvoi, Pourquoi, QrColis, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, REGLES_CARTE, RapidesConv, RecapFrise, RepartitionsVentes, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SERIE_DECLARATION, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, Skeleton, StatBox, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, TamponPose, TeteFil, URL_ITEM_EBAY, VENTES_MASQUEES_AUCUNE, ZOOM_KEY, __vmrEtat, __vmrJobs, __vmrNotifier, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _fichesEbayMemo, _persistAcctCache, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aExpedier, aLaDemande, aPayerUrssaf, aRetirerDeLbcEbay, aRetirerDeLbcVinted, achatsMasques, actionEquipe, ageCourtVc, allerComptesEbay, annonceDeclareePartie, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, applyZoom, archiveNumeros, askChoix, askConfirm, askText, authSetPassword, authSignOut, avecDatesLbc, avecNumerosVc, avecRetour, b64ToBytes, beneficeDesJours, beneficeDuMoisPub, bilanLignes, bordereauFormatKey, brouillonsParametres, buildFacturXBytes, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, chargerPhotoBoite, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, classifyOrderStatus, clavierNum, cleDeclarationPartie, cleNum, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, codePerime, commandeEbayEngagee, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesLbcProuves, comptesLbcSession, comptesStockEcartes, connexionExtensionVrm, contexteSignalement, EcrireSupportFeuille, corpsCompteEbay, couvertureBenefice, dansVueEbay, dateCourteVc, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, debutPeriode, decalerPeriode, defaireVc, delaiDemandeEmail, deleteVintedAccount, demanderDeclaration, demanderQuestionRepub, demanderVue, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, dessinerPdf, doublesVenteEbay, doublesVenteLbc, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireJournalRepub, ecrireLigneAccompagnement, emettreClesRelues, enTeteSession, entForInvoice, estIOS, estOctetsPdf, estRelaisApple, estTamponAnnule, etapeVente, etatEnClair, etatRegleOffre, eurEbay, extEnRetard, extSait, extractBrand, extractColors, extractModel, extractSize, familleArticle, fetchEmailAchats, fetchHarvest, fetchHarvestOrders, fetchProInvoices, fetchVersementsVinted, fetchVintedAccounts, fetchVintedListings, fetchVintedOrders, ficheUniqueDuNumero, fichesPourEbay, filtreInventaire, fmt, fmtDate, gesteVrm, harvestTs, ilYaBr, ilYaCourt, imprMode, imprimanteChoisie, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, libelleRegime, libelleRelais, libelleSourceAchat, libererOngletPdf, lienEbay, lienItemEbay, lignesRecu, limiteVcTexte, lireAbonnement, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDatesLbc, lireDeclarations, lireDressings, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEquipe, lireExtrasRepartition, lireFichesPage, lireLbcEnVente, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireMisDeCote, lireModelesRanges, lireMontantSaisi, lireObjet, lirePdfLigne, lirePreuvesVenteVinted, lireReglage, lireReglageMontage, lireReglesEbay, lireReleveVentes, lireTout, lireVentesVestiaire, load, loadRoomPlan, logoFacture, makeChallenge, makeVerifier, mapMailError, marcheEbayDeRef, marquerEbay, masqueesPresentes, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisDeclare, moisPeriodeUrssaf, montantCommande, montantRecuEbay, montantPeriodeUrssaf, mpChoisi, netApresUrssafDe, nextUrssafDeadline, nomAppareil, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, numDeSkuEbay, numEbayLu, numLigneEbay, numeroLbcIdentite, numeroReprenable, numerosDejaVendus, numerosLbcSortis, numerosVcEffectifs, numerosVendusEbay, numerosVendusVc, onCloudReady, onSyncChange, onVmrExt, orderPhoto, ouDansMeubles, ouEstNumero, ouVenduesTexte, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirRecherchePhoto, ouvrirStripe, payeDe, pctFr, photoKey, phraseNonComptees, phrasePersonne, placeDansMeubles, poserBordereau, poserCible, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLisible, providerEnabled, questionRepubOk, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, readZoom, rechercheParNumero, recuAvecADater, recusAchatDe, refLbcPresente, regimeFiscal, regleEngage, reglesEngagees, relaisVivant, relierBoiteDe, repondreSansDepenses, reponsesRapidesPartagees, resultatReviseEbay, retraitsEbayAutoPermis, save, saveTout, sbAuth, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, texteCentimesRecu, textePerime, texteReglesQuiRestent, toast, tod, triNum, tsCommande, txRecuAchat, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, urlPhotoVc, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useEstProprietaire, useEtatEmailsComptes, useExcluAutre, useExtVivante, useLigneSynchro, useLigneUrssaf, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useRegimeFiscal, useReglesStream, useSansSouris, useSecondesRestantes, useSourcesCarte, useStateCle, useStream, useVcLocal, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, useVoixExt, useVueSession, useProfilVendeur, useMotsArticle, exemplesActuels, useExemplesVendeur, vendActuel, PROFIL_VENDEUR, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcCarte, vcSetter, ventesDeclarables, ventesFaites, ventilationRecuAchat, verifierAvantPublication, vintedDeChrome, vmrAuthEtat, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, withOwner, writeSession, xmlEsc, ymCompta, ymCourant, ymDeTs, zoneEtiquette, AideEcran, masquerPourEnvoi, oauthStart, dejaEnLigneEbay, dejaEnLigneLbc, optsNumeroVerif, DEMANDE_RETOUR_EBAY, seDeconnecter, ecrireCopieLocale, ventesAilleursDe, verifierMessageAvantEnvoi };
+export { liensLbcLus, liensVcLus, avecPhotoLbc, sortieCaseStock, texteAvecDescentes, pushNotif, NotePaireCoque, ACTIONS_REPUB, ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, Badge, BlocBarrerVc, BlocComptesMuets, Bouton, BoutonBordereau, BoutonImprimerVc, BrandMark, Btn, BulleConv, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CarteStatsApp, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, CompteVente, CoutAchatVente, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DEMANDE_VC_PAIRE, DEPS_FACTURE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, ENTREPRISE_VIDE, EQUIPE_NON_INSTALLE_TXT, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, EbayCommande, FermeAuRetour, FicheConvVolet, FiltresVentes, FraicheurAnnonces, GuideReglage, IMPR_MODES, INV_STATUS, Icon, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneConv, LignePanne, LigneRelais, LigneVente, LigneVenteCompacte, ListeComptes, LiveStatsCarte, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, MULTI_USER, MicDictee, NAV, NOM_PLAT_STOCK, NOM_RECU_ACHAT, NUM_OK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PeriodePicker, PhraseEcran, PhotoVc, PhotoVente, PhotoVinted, PiedSansEnvoi, Pourquoi, QrColis, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, REGLES_CARTE, RapidesConv, RecapFrise, RepartitionsVentes, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SERIE_DECLARATION, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, Skeleton, StatBox, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, TamponPose, TeteFil, URL_ITEM_EBAY, VENTES_MASQUEES_AUCUNE, ZOOM_KEY, __vmrEtat, __vmrJobs, __vmrNotifier, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _fichesEbayMemo, _persistAcctCache, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aExpedier, aLaDemande, aPayerUrssaf, aRetirerDeLbcEbay, aRetirerDeLbcVinted, achatsMasques, actionEquipe, ageCourtVc, allerComptesEbay, annonceDeclareePartie, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, applyZoom, archiveNumeros, askChoix, askConfirm, askText, authSetPassword, authSignOut, avecDatesLbc, avecNumerosVc, avecRetour, b64ToBytes, beneficeDesJours, beneficeDuMoisPub, bilanLignes, bordereauFormatKey, brouillonsParametres, buildFacturXBytes, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, chargerPhotoBoite, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, classifyOrderStatus, clavierNum, cleDeclarationPartie, cleNum, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, codePerime, commandeEbayEngagee, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesLbcProuves, comptesLbcSession, comptesStockEcartes, connexionExtensionVrm, contexteSignalement, EcrireSupportFeuille, corpsCompteEbay, couvertureBenefice, dansVueEbay, dateCourteVc, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, debutPeriode, decalerPeriode, defaireVc, delaiDemandeEmail, deleteVintedAccount, demanderDeclaration, demanderQuestionRepub, demanderVue, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, dessinerPdf, doublesVenteEbay, doublesVenteLbc, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireJournalRepub, ecrireLigneAccompagnement, emettreClesRelues, enTeteSession, entForInvoice, estIOS, estOctetsPdf, estRelaisApple, estTamponAnnule, etapeVente, etatEnClair, etatRegleOffre, eurEbay, extEnRetard, extSait, extractBrand, extractColors, extractModel, extractSize, familleArticle, fetchEmailAchats, fetchHarvest, fetchHarvestOrders, fetchProInvoices, fetchVersementsVinted, fetchVintedAccounts, fetchVintedListings, fetchVintedOrders, ficheUniqueDuNumero, fichesPourEbay, filtreInventaire, fmt, fmtDate, gesteVrm, harvestTs, ilYaBr, ilYaCourt, imprMode, imprimanteChoisie, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, libelleRegime, libelleRelais, libelleSourceAchat, libererOngletPdf, lienEbay, lienItemEbay, lignesRecu, limiteVcTexte, lireAbonnement, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDatesLbc, lireDeclarations, lireDressings, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEquipe, lireExtrasRepartition, lireFichesPage, lireLbcEnVente, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireMisDeCote, lireModelesRanges, lireMontantSaisi, lireObjet, lirePdfLigne, lirePreuvesVenteVinted, lireReglage, lireReglageMontage, lireReglesEbay, lireReleveVentes, lireTout, lireVentesVestiaire, load, loadRoomPlan, logoFacture, makeChallenge, makeVerifier, mapMailError, marcheEbayDeRef, marquerEbay, masqueesPresentes, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisDeclare, moisPeriodeUrssaf, montantCommande, montantRecuEbay, montantPeriodeUrssaf, mpChoisi, netApresUrssafDe, nextUrssafDeadline, nomAppareil, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, numDeSkuEbay, numEbayLu, numLigneEbay, numeroLbcIdentite, numeroReprenable, numerosDejaVendus, numerosLbcSortis, numerosVcEffectifs, numerosVendusEbay, numerosVendusVc, onCloudReady, onSyncChange, onVmrExt, orderPhoto, ouDansMeubles, ouEstNumero, ouVenduesTexte, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirRecherchePhoto, ouvrirStripe, payeDe, pctFr, photoKey, phraseNonComptees, phrasePersonne, placeDansMeubles, poserBordereau, poserCible, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLisible, providerEnabled, questionRepubOk, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, readZoom, rechercheParNumero, recuAvecADater, recusAchatDe, refLbcPresente, regimeFiscal, regleEngage, reglesEngagees, relaisVivant, relierBoiteDe, repondreSansDepenses, reponsesRapidesPartagees, resultatReviseEbay, retraitsEbayAutoPermis, save, saveTout, sbAuth, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, texteCentimesRecu, textePerime, texteReglesQuiRestent, toast, tod, triNum, tsCommande, txRecuAchat, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, urlPhotoVc, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useEstProprietaire, useEtatEmailsComptes, useExcluAutre, useExtVivante, useLigneSynchro, useLigneUrssaf, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useRegimeFiscal, useReglesStream, useSansSouris, useSecondesRestantes, useSourcesCarte, useStateCle, useStream, useVcLocal, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, useVoixExt, useVueSession, useProfilVendeur, useMotsArticle, exemplesActuels, useExemplesVendeur, vendActuel, PROFIL_VENDEUR, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcCarte, vcSetter, ventesDeclarables, ventesFaites, ventilationRecuAchat, verifierAvantPublication, vintedDeChrome, vmrAuthEtat, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, withOwner, writeSession, xmlEsc, ymCompta, ymCourant, ymDeTs, zoneEtiquette, AideEcran, masquerPourEnvoi, oauthStart, dejaEnLigneEbay, dejaEnLigneLbc, optsNumeroVerif, DEMANDE_RETOUR_EBAY, seDeconnecter, ecrireCopieLocale, ventesAilleursDe, verifierMessageAvantEnvoi };

@@ -37,5 +37,12 @@ export default {
   "memePhoto.nSurs": {"one": "{n} sicher", "other": "{n} sicher"},
   "memePhoto.nAVerifier": {"one": "{n} zu prüfen", "other": "{n} zu prüfen"},
   "memePhoto.extensionSure": "Erweiterung {v} bestätigt „sicher“: aktualisiere sie. Bis dahin ist alles „zu prüfen“.",
+  "memePhoto.reconnue": "Gleiches Foto · erkannt: Nr. {numero}",
+  "memePhoto.reconnues": {"one": "{n} Anzeige am Foto erkannt", "other": "{n} Anzeigen am Foto erkannt"},
+  "memePhoto.aussiSur": "Auch auf {sites} · gleiches Foto",
+  "memePhoto.memeSurNumeros": "Gleiches Foto bei {numeros} und {dernier}: welches?",
   "memePhoto.aideSure": "„Sicher“: zwei verschiedene Messungen sagen, dass es dasselbe Foto ist. „Zu prüfen“: sieh dir beide Fotos an. Nichts wird ohne deinen Tipp verknüpft.",
+  "memePhoto.aussiSurOrigine": "Auch auf {sites} · am Originalfoto erkannt",
+  "memePhoto.reconnueOrigine": "Identisches Originalfoto · Nr. {numero}",
+  "memePhoto.limiteOrigine": "Originalfoto: dieselbe Datei, aus deinem Chrome mit der Erweiterung hochgeladen. Aus einer Handy-App veröffentlicht, sieht VRM sie nicht.",
 };
