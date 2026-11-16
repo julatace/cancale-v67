@@ -269,7 +269,13 @@ async function editeur(b, vue) {
   const o = await ouvrir(b, { tactile, LIGNES, url: '/?tab=settings&reglage=imprimante' });
   const { pg } = o;
   try {
-    const g = await attendre(pg, () => document.querySelectorAll('[data-tampons-vignette][data-etat="ok"]').length >= 11, null, 120000);
+    // Les vignettes se dessinent quand elles arrivent à l'écran : on fait défiler la galerie, une par une.
+    await pg.waitForSelector('[data-tampons-galerie]', { timeout: 60000 }).catch(() => {});
+    for (const id of ['mondialrelay', 'relaiscolis', 'chronopost', 'colissimo', 'vintedgo', 'ups', 'dpd', 'international', 'leboncoin', 'vestiaire', 'retour']) {
+      await pg.locator(`[data-tampons-vignette="${id}"]`).scrollIntoViewIfNeeded().catch(() => {});
+      await attendre(pg, (i) => { const e = document.querySelector(`[data-tampons-vignette="${i}"]`); return e && e.getAttribute('data-etat') !== 'charge'; }, id, 60000);
+    }
+    const g = await attendre(pg, () => document.querySelectorAll('[data-tampons-vignette][data-etat="ok"]').length >= 11, null, 20000);
     const ids = await pg.evaluate(() => [...document.querySelectorAll('[data-tampons-vignette]')].map((e) => e.getAttribute('data-tampons-vignette') + ':' + e.getAttribute('data-etat')));
     dit(g, `${nom} : E1 la galerie : chaque type dessiné par le vrai code`, ids.join(' '));
     await pg.locator('[data-tampons-galerie]').scrollIntoViewIfNeeded();

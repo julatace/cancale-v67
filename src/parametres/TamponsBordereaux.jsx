@@ -60,12 +60,22 @@ const boiteTexte = (b) => (b ? `${b.x.toFixed(1)},${b.y.toFixed(1)},${b.w.toFixe
 // Une vignette : le bordereau rendu (pdf.js), les tampons cerclés par-dessus.
 function Vignette({ fam, support, tampons, ouvrir, nomSupport }) {
   useLangue();
-  const cv = React.useRef(null);
+  const cv = React.useRef(null), boite = React.useRef(null);
   const [st, setSt] = React.useState({ etat: 'charge' });
+  // Dessinée seulement quand elle est À L'ÉCRAN (ou presque) : ouvrir Paramètres ne lance pas onze rendus de PDF.
+  const [vue, setVue] = React.useState(false);
+  React.useEffect(() => {
+    const el = boite.current; if (!el) return undefined;
+    if (typeof IntersectionObserver === 'undefined') { setVue(true); return undefined; }
+    const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { setVue(true); io.disconnect(); } }, { rootMargin: '200px' });
+    io.observe(el); return () => io.disconnect();
+  }, []);
   const cle = JSON.stringify([fam.id, support, tampons]);
   React.useEffect(() => {
+    if (!vue) return undefined;
     let vivant = true; setSt({ etat: 'charge' });
     enFile(async () => {
+      await new Promise((r) => setTimeout(r, 30));   // l'écran respire entre deux rendus
       if (!vivant) return;
       const ex = await rendreExemple(fam, support, tampons);
       if (!vivant || !ex.pose) { if (vivant) setSt({ etat: 'ko' }); return; }
@@ -73,13 +83,13 @@ function Vignette({ fam, support, tampons, ouvrir, nomSupport }) {
       if (vivant) setSt({ etat: 'ok', ...ex, ppt: (cv.current ? parseFloat(cv.current.style.width) : 150) / ex.pose.W });
     }).catch(() => { if (vivant) setSt({ etat: 'ko' }); });
     return () => { vivant = false; };
-  }, [cle]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [cle, vue]);   // eslint-disable-line react-hooks/exhaustive-deps
   const p = st.pose, k = st.ppt || 0;
   const pl = p ? placesDeForme(tampons, p.cle) : { n: null, m: null };
   const statut = !p ? '' : (pl.n || pl.m) ? tr('tampons.statut.main') : (tampons.types && tampons.types[fam.id]) ? tr('tampons.statut.type') : tr('tampons.statut.auto');
   const nom = tr(`tampons.famille.${fam.id}`);
   return (
-    <button type="button" className="vrm-tampons-vignette" data-tampons-vignette={fam.id} data-etat={st.etat} data-cle={p ? p.cle : ''}
+    <button type="button" ref={boite} className="vrm-tampons-vignette" data-tampons-vignette={fam.id} data-etat={st.etat} data-cle={p ? p.cle : ''}
       data-n={p ? boiteTexte(p.place) : ''} data-m={p ? boiteTexte(p.mentionBoite) : ''}
       aria-label={tr('tampons.vignette.aria', { nom, support: nomSupport })} onClick={() => ouvrir(fam)} disabled={st.etat === 'charge' && false}>
       <span className="vrm-tampons-vignette-page" style={{ background: '#fff' }}>

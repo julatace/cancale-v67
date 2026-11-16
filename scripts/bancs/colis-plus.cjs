@@ -268,6 +268,7 @@ async function lotClassiqueBrut(b, nom, vue, LIGNES) {
     await pg.locator(`[data-lot-ligne="${ap[0].cle}"] input`).first().check().catch(() => {});
     const n2 = await pg.evaluate(() => window.__pdfs.length);
     await cliquer(pg, 'button[data-lot-imprimer]');
+    await passerApercu(pg);
     await attendrePdfVisionneuse(pg, n2, 60000); await fermerVisionneuse(pg);
     await pg.waitForSelector('[data-impr-feuille="question"]', { timeout: 10000 }).catch(() => {});
     const tt = await unSeul(ap[0].cle, 'num');
@@ -279,6 +280,7 @@ async function lotClassiqueBrut(b, nom, vue, LIGNES) {
     await pg.evaluate(() => { for (const i of document.querySelectorAll('[data-lot-ligne] input')) if (!i.checked && !i.disabled) i.click(); });
     const n3 = await pg.evaluate(() => window.__pdfs.length);
     await cliquer(pg, 'button[data-lot-imprimer]');
+    await passerApercu(pg);
     await attendrePdfVisionneuse(pg, n3, 240000); await fermerVisionneuse(pg);
     await pg.waitForSelector('[data-impr-manque]', { timeout: 10000 }).catch(() => {});
     await cliquer(pg, '[data-impr-manque]');
