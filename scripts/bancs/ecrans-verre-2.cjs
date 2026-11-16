@@ -253,6 +253,16 @@ function mesurer(vue) {
       // chaque info UNE fois : un montant écrit deux fois sur ce qui est vu
       montants: (() => { const t = [...racine.querySelectorAll('.fd-s')].map((x) => { const c = x.cloneNode(true); c.querySelectorAll('.fd-plein, .fd-plus').forEach((b) => b.remove()); return c.textContent; }).join(' \n '); const l = t.match(/[+−-]?\d[\d  ]*(,\d+)?\s?€/g) || []; const c = {}; l.forEach((x) => { const k = x.replace(/[^\d,]/g, ''); c[k] = (c[k] || 0) + 1; }); return c; })(),
       doublons: (() => { const vus = {}; for (const e of racine.querySelectorAll('.fd-s button, .fd-s summary, .fd-s h1, .fd-s h2, .fd-s h3')) { if (!vis(e)) continue; const k = (e.innerText || '').trim(); if (k.length < 4) continue; vus[k] = (vus[k] || 0) + 1; } return Object.entries(vus).filter(([, n]) => n > 1).map(([k, n]) => `${k} ×${n}`); })(),
+      // (16 nov., intégration vague A) Un message passager dit PENDANT la fiche (« 24 nouvelles paires numérotées ») se posait
+      // sur ‹ et ⋯ (la coque met les messages EN HAUT quand une feuille est ouverte). Sonde : une bulle de la vraie
+      // forme posée dans la VRAIE zone `.vrm-toasts` (montée même vide), sa place mesurée contre les deux ronds, puis retirée.
+      toast: (() => { const z = document.querySelector('.vrm-toasts'); if (!z) return null; const b = document.createElement('div'); b.className = 'vrm-toast'; b.setAttribute('data-sonde-toast', '');
+        b.style.cssText = 'display:flex;align-items:center;gap:10px;padding:12px 16px;max-width:520px;width:100%;box-sizing:border-box;border:1px solid transparent';
+        b.innerHTML = '<span class="vrm-toast-icon">i</span><span>24 nouvelles paires numérotées</span>'; z.prepend(b);
+        // la sonde en PREMIÈRE place, et chaque bulle déjà là (un vrai message de la coque) jugée aussi
+        const bulles = [...z.children].filter(vis).map(R), ronds = [...racine.querySelectorAll('.fd-top .fd-rond')].filter(vis).map(R); b.remove();
+        const coupe = (a, c) => a.x < c.r && c.x < a.r && a.y < c.b && c.y < a.b;
+        return { place: z.getAttribute('data-toasts-place'), bulles, ronds: ronds.length, couvre: ronds.filter((r) => bulles.some((t) => coupe(t, r))).length }; })(),
     };
   }
   return out;
@@ -334,6 +344,7 @@ function juger(m, suf, tel) {
     dit(F.chiffres.every((c) => c.fs >= 22) && (!F.chiffres.length || Math.max(...F.chiffres.map((c) => c.fs)) >= 28), `F3 ${suf} : les chiffres 28–36 px`, JSON.stringify(F.chiffres));
     if (v !== 'fiche-plus') dit(F.plus && F.plusFerme && F.toutVoir && F.tuiles.length >= 4, `F6 ${suf} : « ⋯ » fermé, ses tuiles (${F.tuiles.join(', ')}) et « Tout voir »`);
     else dit(!F.plusFerme && !!F.feuille && F.feuille.r <= m.W + 1 && F.tuilesVues.length >= 8 && F.tuilesVues.every((h) => h >= 44) && F.toutVoir, `F6 ${suf} : « ⋯ » ouvert : ${F.tuilesVues.length} tuiles (≥ 44 px) et « Tout voir », dans l'écran`, JSON.stringify({ feuille: F.feuille, t: F.tuilesVues }));
+    dit(!!F.toast && F.toast.ronds === 2 && F.toast.couvre === 0, `F8 ${suf} : un message passager ne couvre ni ‹ ni ⋯ (fiche plein écran)`, JSON.stringify(F.toast));
     if (v === 'fiche-histoire') dit(F.vue === 'histoire' && F.histoire.length >= 3 && F.histoire.length <= 5 && F.histoire[0] === 'achat:am' && F.histoire.includes('vente') && F.histoire.includes('colis:am'), `F7 ${suf} : l'histoire en 3 à 5 lignes, l'achat à relier et l'envoi en ambre`, F.histoire.join(','));
     dit(!F.jargon.length, `F5 ${suf} : aucun identifiant ni mot technique à l'écran`, F.jargon.slice(0, 5).join(' | '));
     dit(!F.doublons.length, `F5 ${suf} : chaque geste, chaque titre UNE fois`, F.doublons.slice(0, 5).join(' | '));
