@@ -141,7 +141,10 @@ const res = (pg) => pg.evaluate(() => ({
         dit(ve === '128,7', `${t} : les vendues à sortir listées avec leur place, dans l'ordre du chemin`, ve);
         await inp.fill('nike 42');
         await r.pg.click('[data-stock-res="12"]');
-        await r.pg.waitForTimeout(1200);
+        // (16 nov., bancs-rouges-a) Le défilement est DOUX : sous charge il dépassait 1,2 s (case encore à y = 1 233 / 950).
+        // On attend l'ÉTAT (la case dans l'écran, 8 s au plus, §6.5) ; une app qui ne l'amène jamais reste rouge.
+        await r.pg.waitForFunction(() => { const el = document.querySelector('[data-case-num="12"]'); if (!el) return false; const q = el.getBoundingClientRect(); return q.top >= 0 && q.bottom <= innerHeight; }, null, { timeout: 8000 }).catch(() => {});
+        await r.pg.waitForTimeout(300);
         const flash = await r.pg.evaluate(() => { const el = document.querySelector('[data-case-num="12"]'); if (!el) return null; const rc = el.getBoundingClientRect(); const c = document.querySelector('[data-stock-cibles]'); return { cls: el.className, r: [Math.round(rc.top), Math.round(rc.bottom), innerHeight], vu: rc.top >= 0 && rc.bottom <= innerHeight, liste: !!document.querySelector('[data-stock-resultats]'), cible: c ? c.innerText : '' }; });
         dit(flash && /vrm-case-flash/.test(flash.cls) && flash.vu, `${t} : toucher le résultat montre SA case, à l'écran, qui clignote`, JSON.stringify(flash));
         dit(flash && !flash.liste && /N°12/.test(flash.cible) && /rangée 2, colonne 3/.test(flash.cible), `${t} : la liste se referme, la place reste écrite`, JSON.stringify(flash));

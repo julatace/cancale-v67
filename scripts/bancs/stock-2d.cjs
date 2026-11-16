@@ -176,7 +176,9 @@ const caseIci = (pg, ici) => pg.evaluate((ici) => { const el = document.querySel
         await pg.fill('[data-stock-recherche] input', '2');
         await pg.waitForTimeout(300);
         await pg.click('[data-stock-res="2"]');
-        await pg.waitForTimeout(400);
+        // (16 nov.) La place du Stock arrive dans la fiche en transition (`startTransition`) : on attend qu'elle soit LÀ (10 s au plus).
+        await pg.waitForSelector('[data-fiche-ancienne-place]', { state: 'attached', timeout: 10000 }).catch(() => {});
+        await pg.waitForTimeout(200);
         const anc = await pg.evaluate(() => { const el = document.querySelector('[data-fiche-ancienne-place]'); return el ? el.innerText.replace(/\s+/g, ' ') : null; });
         dit(!!anc && /Garage/.test(anc) && /Pile du fond/.test(anc), `${t} : VIII — la fiche dit l'ancienne place dans la pièce 3D`, anc);
         dit(r.ecrits.room === 0, `${t} : VIII — la pièce 3D n'est jamais réécrite`, String(r.ecrits.room));
