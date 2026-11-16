@@ -46681,12 +46681,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // un bordereau qui manque au PDF est NOMMÉ dans la feuille d'après, avec sa raison.
   const [apercuImpr, setApercuImpr] = useState(null);   // (16 nov.) l'aperçu avant impression : { choisies, format, tampons, places, tous, sig }
   const apercuRef = React.useRef(null); apercuRef.current = apercuImpr;
-  // (16 nov.) Aucun PDF lisible dans la sélection : l'aperçu se ferme et le DIT (comme avant : « rien à imprimer »).
-  React.useEffect(() => {
-    const a = apercuImpr; if (!a) return;
-    const e = prepsRef.current.get(a.sig);
-    if (e && e.etat === 'vide') { setApercuImpr(null); const toutPasLu = e.res && e.res.raisons && Object.values(e.res.raisons).every((r) => r === 'pasLu'); if (toutPasLu) prepsRef.current.delete(a.sig); toast(tr('impr.vide')); }
-  });
   const [imprEtat, setImprEtat] = useState(null);       // la feuille d'après : { res, sig, voie, etape, manque, corrige, absents, tamponCorrige }
   const [choixPapier, setChoixPapier] = useState(null); // { puis: null | [cles] } — la question du papier
   const imprAccRef = React.useRef(null);   // la pilule « pendant » de l'impression en cours (accompagner)
@@ -46835,8 +46829,28 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!choisies.length) { toast(tr('impr.rien')); return; }
     if (voulues) { const dispo = new Set(choisies.map((l) => l.cle)); const partis = [...voulues].filter((c) => !dispo.has(c)); if (partis.length) { toast(tr('impr.disparus', { n: partis.length })); return; } }
     const sig = sigImpr(choisies, format, tampons);
-    preparer(sig, () => composerLot(choisies, format, tampons));
-    setApercuImpr({ choisies, format, tampons, places: {}, tous: true, sig });
+    // La lecture des PDF se voit (« Préparation… 1/3 », `imprBusy`) ; une panne est DITE avec « Réessayer » (la même
+    // sélection, l'aperçu rouvert) ; rien choisi n'est lisible : dit ; le compte change pendant la lecture : rien.
+    const proprio = AUTH.user?.id || null, total = choisies.length;
+    const acc = accompagner('colis.imprimer', { total, arretable: false }).pendant(0);
+    imprAccRef.current = acc;
+    setImprBusy({ fait: 0, total });
+    const e = preparer(sig, () => composerLot(choisies, format, tampons, { pas: (f) => setImprBusy({ fait: f, total }) }));
+    setApercuImpr({ choisies, format, tampons, places: {}, tous: true, sig, proprio });
+    const reessayer = () => lancerImpression(cles, format, tampons);
+    Promise.resolve(e.promesse).then(() => {
+      const ouvert = apercuRef.current && apercuRef.current.sig === sig;
+      if ((AUTH.user?.id || null) !== proprio) { setApercuImpr(null); acc.echec({ message: tr('impr.change') }); return; }
+      if (e.etat === 'echec') { setApercuImpr(null); acc.echec(e.err || new Error('PDF'), { reessayer }); return; }
+      if (e.etat === 'vide') {
+        setApercuImpr(null);
+        const toutPasLu = e.res && e.res.raisons && Object.values(e.res.raisons).every((r) => r === 'pasLu');
+        if (toutPasLu && prepsRef.current.get(sig) === e) prepsRef.current.delete(sig);
+        acc.echec(toutPasLu ? { acc: 'serveur' } : { message: tr('impr.vide') }, { reessayer: toutPasLu ? reessayer : null });
+        return;
+      }
+      if (ouvert || !apercuRef.current) acc.oublier();
+    }).finally(() => { setImprBusy(null); if (imprAccRef.current === acc) imprAccRef.current = null; });
   };
   // « Imprimer » DE L'APERÇU : le PDF fait avec EXACTEMENT ces placements (prêt ⇒ ouvert dans le geste, §5 tenu).
   const imprimerApercu = () => {
@@ -46846,6 +46860,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const numeros = choisies.map((l) => l.num);
     const pret = pretPour(sig);
     setApercuImpr(null);
+    // Le compte VRM ou un bordereau a changé depuis l'aperçu : rien ne s'ouvre (comme le chemin d'attente).
+    const maintenant = new Map(lignesLotTous().map((l) => [l.cle, sigLigneLot(l)]));
+    if ((a.proprio !== undefined && (AUTH.user?.id || null) !== a.proprio) || choisies.some((l) => maintenant.get(l.cle) !== sigLigneLot(l))) { toast(tr('impr.change')); return; }
     // Le chemin du geste : prêt, aucune question due (§5), version des N° relue il y a moins d'une minute.
     if (pret && !numerosDemandent(numeros) && (!numeros.some(Boolean) || versionFraiche())) {
       montrerApres(pret, ouvrirPdfLot(pret, { titre: tr('impr.titrePdf') }), sig);
