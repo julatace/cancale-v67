@@ -102,4 +102,12 @@ contre cette branche, les mêmes données :
 
 ## ÉTAT À LA REPRISE
 
-ETAT
+- Code, audits et bancs du lot poussés sur `claude/personnalisation-simple` ; PR ouverte vers `main`.
+- Règle de Julien du 16 nov. : **zéro rouge pour fusionner**. `main` porte déjà des rouges hors de ce lot (CI de la PR
+  #1181 : audits 1-3, bancs 1 et 3, parcours-critiques `regles`, `ecrans …`, `comptes-et-reception`). Tant qu'ils ne
+  sont pas réglés, la PR n'est PAS fusionnée (voir le rapport final du lot pour l'état exact de la CI).
+- Le banc `journee-perso` (11 nov.) n'a pas pu tourner jusqu'au bout ici (machine à charge ~100, pages Chromium
+  tuées) : à relancer au calme — `npm run build && node scripts/bancs/journee-perso.cjs`. Ses contrôles (K clavier,
+  G glisser, O synchro, U urgent, P Paramètres) restent valables sur l'éditeur simple (mêmes `data-*`).
+- À décider par Julien (rien fait) : garder seulement « Apparence » (et retirer l'interrupteur « Mode sombre » qui redit
+  la même chose) ; ranger le groupe Affichage (17 lignes).
