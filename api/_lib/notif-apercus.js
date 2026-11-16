@@ -58,7 +58,8 @@ const fabrique = (sorte, donnees) => {
 // Une vente Vinted (e-mail « Ton article s'est vendu »). `compte` : SON pseudo.
 // (6 nov.) `verification` : la vente « avec Vérification de l'article » (l'e-mail
 // ne donne pas de prix — il n'est jamais deviné) ; le colis part au centre de Vinted.
-export const texteVendu = ({ article = '', prix = '', compte = '', verification = false } = {}) => fabrique('vendu', { article, prix, compte, verification: !!verification });
+// (16 nov.) `ailleurs` : une vente Leboncoin, eBay ou Vestiaire (l'étiquette se prend sur le site, pas par e-mail).
+export const texteVendu = ({ article = '', prix = '', compte = '', verification = false, ailleurs = false } = {}) => fabrique('vendu', { article, prix, compte, verification: !!verification, ...(ailleurs ? { ailleurs: true } : {}) });
 // L'argent d'une vente arrive (e-mail « Transaction finalisée »).
 export const texteArgentRecu = ({ montant = '', article = '', compte = '' } = {}) => fabrique('argent', { montant, article, compte });
 // Vendu sur Vestiaire (e-mail de vente Vestiaire). `montant` en euros (nombre) ; `limite` AAAA-MM-JJ.

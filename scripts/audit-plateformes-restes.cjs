@@ -35,6 +35,11 @@ const MUTS = {
   'vc-cat-toujours-finir': ["const portee = !!ctx.vcCategorie && !corr.demandes.length", "const portee = false && !corr.demandes.length", 'src/publierPartout.js'],
   'vc-cat-finir-ignore': ['const finir = [...new Set([...arr(e.finir), ...arr(r.finir)])];', 'const finir = arr(e.finir);', 'src/publierPartout.js'],
   'vc-fin-tout-ou-rien': ["return { ca: cents / 100, etat: f.pasSur ? 'au-moins' : 'lu', auMoins: f.pasSur > 0, pasSur: f.pasSur, n: f.sures.length };", "if (f.pasSur) return { ca: null, etat: 'pas-sur', pasSur: f.pasSur, n: 0 };\n  return { ca: cents / 100, etat: 'lu', auMoins: false, pasSur: 0, n: f.sures.length };", 'src/caAutresParJour.js'],
+  'notif-premiere-lecture': ["if (neufs.has(ck)) { vus[k] = maintenant; premieres++; continue; }", 'if (false) { continue; }', 'api/_lib/ventes-sites-notif.js'],
+  'notif-annulee': ['if (!v.engagee) continue;', '', 'api/_lib/ventes-sites-notif.js'],
+  'notif-vieille': ['if (v.t == null || maintenant - v.t > FRAICHEUR_MS || v.t - maintenant > FRAICHEUR_MS) continue;', '', 'api/_lib/ventes-sites-notif.js'],
+  'notif-deux-fois': ['      if (vus[k]) continue;\n', '', 'api/_lib/ventes-sites-notif.js'],
+  'notif-memo-apres': ["if (!(await ecrireDedup(MEMO_VENTES_SITES, r.memoApres))) return { etat: 'memo-non-ecrit', n: r.nouvelles.length };", 'ecrireDedup(MEMO_VENTES_SITES, r.memoApres);', 'api/ship-reminders.js'],
   'vc-fin-deux-regles': ["const r = resumeFinaliseVestiaire(ventesVc, { etapeMotVc, vcVenteAnnulee, montantRecuVc, dateVenteVc });", "const r = { etat: 'lu', ca: 0 };", 'src/ecrans/Stats.jsx'],
 };
 if (process.argv.includes('--prouve')) {
@@ -56,6 +61,7 @@ if (MUT) {
   fs.mkdirSync(path.join(d, 'vinted-sync-extension'), { recursive: true });
   fs.copyFileSync(path.join(R, 'vinted-sync-extension', 'background.js'), path.join(d, 'vinted-sync-extension', 'background.js'));
   fs.cpSync(path.join(R, 'api', '_lib'), path.join(d, 'api', '_lib'), { recursive: true });
+  fs.copyFileSync(path.join(R, 'api', 'ship-reminders.js'), path.join(d, 'api', 'ship-reminders.js'));
   const f = path.join(d, MUTS[MUT][2]); const s = fs.readFileSync(f, 'utf8');
   if (!s.includes(MUTS[MUT][0])) { console.log('motif introuvable : ' + MUT); process.exit(2); }
   fs.writeFileSync(f, s.replace(MUTS[MUT][0], MUTS[MUT][1]));
@@ -203,6 +209,41 @@ const url = (f) => pathToFileURL(path.join(BASE, f)).href;
   const corpsVc = (stats.split('const caVestiaireFinalise = (ventesVc) => {')[1] || '').split('\n};')[0];
   dit(/const r = resumeFinaliseVestiaire\(ventesVc, \{ etapeMotVc, vcVenteAnnulee, montantRecuVc, dateVenteVc \}\);/.test(corpsVc) && !/let ca = 0, n = 0, pasSur = 0;/.test(stats) && !/for \(const v of ventesVc\)/.test(stats), 'V5 « Finalisé par plateforme » consomme la règle (aucune boucle à lui)');
   dit(/data-stats-total-au-moins=/.test(stats) && /tr\('stats\.totalAuMoins'\)/.test(stats), 'V6 le total dit « au moins » quand une plateforme l’est');
+
+  // ── N · « VENDU ! » LEBONCOIN, eBAY, VESTIAIRE (décision de Julien, 16 nov.) ─
+  console.log('\n── N. (39) « Vendu ! » Leboncoin, eBay, Vestiaire, d’après ce que VRM lit');
+  let NV = null, VRG = null, EEC = null;
+  try { NV = await import(url('api/_lib/ventes-sites-notif.js')); VRG = await import(url('api/_lib/ventes-regle.js')); EEC = await import(url('api/_lib/ebay-etat-commande.js')); } catch (e) { dit(false, 'N api/_lib/ventes-sites-notif.js existe et se charge', e.message); }
+  if (NV && VR && VRG && EEC) {
+    const RN = { lbcAnnulee: VRG.lbcAnnulee, etatCommandeEbay: EEC.etatCommandeEbay, vcVenteAnnulee: VR.vcVenteAnnulee, dateVenteVc: VR.dateVenteVc };
+    const T0 = Date.parse('2026-11-16T10:00:00Z'), H = 3600e3;
+    const lbcV = (id, o = {}) => ({ txId: id, isSeller: true, account: 'lbc-account:A', title: 'Nike Air Max 90 blanche', price: 4500, dateVente: new Date(T0 - 2 * H).toISOString(), stepStatus: 'paid', ...o });
+    const ebV = (id, o = {}) => ({ orderId: id, _compte: 'principal', orderPaymentStatus: 'PAID', orderFulfillmentStatus: 'NOT_STARTED', creationDate: new Date(T0 - H).toISOString(), lineItems: [{ title: 'Nike Air Max 90 blanche', lineItemCost: { value: '60.00', currency: 'EUR' } }], ...o });
+    const histo = []; for (let i = 0; i < 50; i++) histo.push(lbcV(String(2849300000 + i), { dateVente: new Date(T0 - 40 * 24 * H).toISOString() }));
+    const p1 = NV.ventesDesSites({ lbc: histo, ebay: [ebV('11-00000-00001')], vestiaire: [] }, RN);
+    const r1 = NV.ventesANotifier(null, p1, T0);
+    dit(r1.nouvelles.length === 0 && r1.premieres === 51, 'N1 première lecture des comptes (50 ventes Leboncoin, 1 eBay) ⇒ AUCUNE notification, tout rangé « vu »', r1.nouvelles.length);
+    const p2 = NV.ventesDesSites({ lbc: [...histo, lbcV('2849309999')], ebay: [ebV('11-00000-00001'), ebV('11-00000-00002')], vestiaire: [] }, RN);
+    const r2 = NV.ventesANotifier(r1.memoApres, p2, T0 + 15 * 60e3);
+    dit(r2.nouvelles.length === 2 && r2.nouvelles.some((v) => v.site === 'leboncoin' && v.id === '2849309999') && r2.nouvelles.some((v) => v.site === 'ebay' && v.id === '11-00000-00002'), 'N2 une vente NOUVELLE (même titre que 50 autres) ⇒ UNE notification, désignée par SON n°', r2.nouvelles.map((v) => v.tag));
+    const r3 = NV.ventesANotifier(r2.memoApres, p2, T0 + 30 * 60e3);
+    dit(r3.nouvelles.length === 0, 'N3 le passage suivant ne la renvoie pas (jamais deux fois)');
+    const r4 = NV.ventesANotifier(r2.memoApres, NV.ventesDesSites({ lbc: null, ebay: null, vestiaire: null }, RN), T0 + 45 * 60e3);
+    dit(r4.nouvelles.length === 0 && JSON.stringify(r4.memoApres.vus) === JSON.stringify(r2.memoApres.vus), 'N4 plateformes pas lues ⇒ rien ne change (ni oubli, ni notification)');
+    const p5 = NV.ventesDesSites({ lbc: [...histo, lbcV('2849309999'), lbcV('2849308888', { stepStatus: 'cancelled' }), lbcV('2849307777', { dateVente: new Date(T0 - 10 * 24 * H).toISOString() }), lbcV('2849306666', { dateVente: '' })], ebay: [ebV('11-00000-00002'), ebV('11-00000-00003', { cancelStatus: { cancelState: 'CANCELED' } }), ebV('11-00000-00004', { orderPaymentStatus: 'PENDING' })], vestiaire: null }, RN);
+    const r5 = NV.ventesANotifier(r2.memoApres, p5, T0 + 60 * 60e3);
+    dit(r5.nouvelles.length === 0, 'N5 annulée, non payée, vieille de 10 jours ou sans date ⇒ aucune notification', r5.nouvelles.map((v) => v.tag));
+    const nouveauCompte = NV.ventesDesSites({ lbc: [...histo, lbcV('2849305555', { account: 'lbc-account:B' })], ebay: null, vestiaire: null }, RN);
+    dit(NV.ventesANotifier(r2.memoApres, nouveauCompte, T0 + 70 * 60e3).nouvelles.length === 0, 'N6 un compte lu pour la première fois (même avec une vente du jour) ⇒ silencieux');
+    const vc = NV.ventesDesSites({ lbc: null, ebay: null, vestiaire: [{ id: 'k1', productId: '72987282', titre: 'Sac banc', num: '124', etat: 'Versée', date: new Date(T0 - H).toISOString() }] }, RN);
+    dit(vc.vestiaire[0] && vc.vestiaire[0].tag === 'vc-vente-72987282', 'N7 Vestiaire : le tag est celui de l’e-mail de vente (`vc-vente-{productId}`) — l’un ou l’autre, jamais les deux');
+    const d = NV.donneesVendu({ site: 'vestiaire', num: '124', titre: 'Sac banc', eur: 84 });
+    dit(d.article === 'N°124 · Sac banc' && d.compte === 'sur Vestiaire' && NV.donneesVendu({ site: 'ebay', num: '', titre: 'X', eur: null }).article === 'X', 'N8 « N°124 · titre » seulement si le N° vient de l’identité ; « sur Vestiaire / eBay / Leboncoin »');
+  }
+  const sr = sansCommentaires(lire('api/ship-reminders.js'));
+  dit(/if \(!\(await ecrireDedup\(MEMO_VENTES_SITES, r\.memoApres\)\)\) return \{ etat: 'memo-non-ecrit'/.test(sr) && /if \(memo === undefined\) return \{ etat: 'memo-illisible' \};/.test(sr), 'N9 le mémo est écrit AVANT l’envoi ; mémo illisible ⇒ rien');
+  dit(/if \(ks\.includes\(v\.tag\)\) return undefined;/.test(sr) && /if \(res !== true\) continue;/.test(sr) && /pushCategorieActive\('vente'\)/.test(sr), 'N10 le tag est réservé dans `push_dedup` (déjà sonnée par l’e-mail ⇒ rien) ; famille « Ventes »');
+  dit(/ventesSites = await passageVentesSites\(Date\.now\(\)\);/.test(sr), 'N11 branché sur le passage de 15 min (`?moment=groupe`)');
 
   console.log(`\n${ok} verts, ${ko} rouges`);
   process.exit(ko ? 1 : 0);
