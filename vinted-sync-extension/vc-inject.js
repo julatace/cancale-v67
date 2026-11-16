@@ -1226,6 +1226,40 @@
       post({ kind: 'vcmessages', conversations: [...par.values()], offset: 0, total: null, lus: par.size, forme: [], page: '/chat/', moi: moiId });
     } catch (_) {}
   }
+  // ── 5.392 (15 nov., lot favoris-sites) LES PERSONNES QUI ONT AIMÉ TES ARTICLES ──
+  // MESURÉ (lecture seule, 15 nov.) : le fil des notifications « updates » de Vestiaire
+  // porte une carte par « j'aime » — `eventType: 'custom_community'`, texte « … vient
+  // d'aimer votre pièce, envoyez-lui un message ! », lien `productLink.meta` =
+  // `{ type: 'chat', data: { id: '{acheteur}-{article}' } }` (58 cartes chez lui). C'est
+  // Vestiaire qui nomme la personne et invite à lui écrire : le geste natif existe.
+  // Ce qui sort de la page : l'ARTICLE, l'IDENTIFIANT numérique de la personne (pour lui
+  // faire, sur TON clic, l'offre que Vestiaire propose) et la date — jamais son pseudo,
+  // son nom, son avatar ni le texte de la carte. Le fond le garde dans CE navigateur
+  // (`chrome.storage.local`), jamais en base : la base ne reçoit que des NOMBRES.
+  const CARTE_AIME = /like_item/i;
+  const TEXTE_AIME = /\b(aim|like|gefällt|piace|gusta)/i;
+  function noteAimes(url, texte) {
+    try {
+      let u; try { u = new URL(url, location.origin); } catch (_) { return; }
+      if (!DE_VC(url) || !/\/notification-feed(\/v\d+)?\/?$/i.test(u.pathname)) return;
+      let obj; try { obj = JSON.parse(texte); } catch (_) { return; }
+      if (!obj || !Array.isArray(obj.data)) return;
+      const aimes = [];
+      for (const e of obj.data.slice(0, 200)) {
+        if (!e || e.eventType !== 'custom_community') continue;
+        const lien = e.productLink && e.productLink.meta;
+        if (!lien || lien.type !== 'chat' || !lien.data) continue;
+        const canal = String(lien.data.id == null ? '' : lien.data.id);
+        const m = /^(\d{3,15})-(\d{3,15})$/.exec(canal);
+        if (!m) continue;
+        const dl = String((e.productLink && e.productLink.deeplink) || '');
+        if (!CARTE_AIME.test(dl) && !TEXTE_AIME.test(String(e.textBody || ''))) continue;   // une autre carte « communauté » : rien
+        if (moiId && m[1] === moiId) continue;                                             // jamais soi-même
+        aimes.push({ produit: m[2], acheteur: m[1], at: dateMsg({ date: e.date }) || '' });
+      }
+      if (aimes.length) post({ kind: 'vcaimes', aimes: aimes.slice(0, 200), page: pageIci(), moi: moiId });
+    } catch (_) {}
+  }
   // L'ouverture d'une conversation (`POST apiv2…/chat/channel/`, mesurée) : son
   // identifiant et son article — jamais l'acheteur ni le vendeur.
   function noteCanal(url, methode, texte) {
@@ -1476,8 +1510,11 @@
     if (!f || !f.dernier || f.dernier.par !== 'vendeur') return null;
     const evs = f.evenements;
     const avantAcheteur = evs.slice(0, -1).some((e) => e.action === 'offer' && e.par === 'acheteur');
-    const geste = f.dernier.action === 'accept' ? 'accepter' : f.dernier.action === 'decline' ? 'refuser' : (f.dernier.action === 'offer' && avantAcheteur) ? 'contre' : '';
-    if (!geste) return null;   // une offre que TU proposes d'abord (à un favori) n'est pas une réponse
+    // 5.392 : une offre que TU proposes d'abord (aucune offre de la personne avant) est le geste
+    // « favori » — celui que Vestiaire propose depuis « … vient d'aimer votre pièce ».
+    const geste = f.dernier.action === 'accept' ? 'accepter' : f.dernier.action === 'decline' ? 'refuser' : (f.dernier.action === 'offer' && avantAcheteur) ? 'contre'
+      : (f.dernier.action === 'offer' && !avantAcheteur && f.evenements.every((e) => e.par === 'vendeur')) ? 'favori' : '';
+    if (!geste) return null;
     const base = { geste, methode: String(methode).toUpperCase(), hote: u.hostname, chemin: normChemin(sansId(u.pathname)) };
     const non = (raison) => ({ ...base, rejouable: false, raison });
     const ids = { '{nego}': f.id, '{produit}': f.produit, '{acheteur}': f._acheteur };
@@ -1522,9 +1559,16 @@
         return non('valeur-inconnue');
       }
     }
-    if (geste === 'contre' && !avecPrix) return non('prix-introuvable');
-    if (!modele.includes('{nego}') && !modele.includes('{produit}') && !fixes.some((x) => x[1] === '{nego}' || x[1] === '{produit}')) return non('offre-introuvable');
-    if (!negosVues.has(f.id)) return non('offre-non-vue');
+    if ((geste === 'contre' || geste === 'favori') && !avecPrix) return non('prix-introuvable');
+    if (geste === 'favori') {
+      // Une offre NEUVE : l'article ET la personne doivent être des trous de la recette (jamais une valeur figée).
+      if (!modele.includes('{produit}') && !fixes.some((x) => x[1] === '{produit}')) return non('article-introuvable');
+      if (!f._acheteur || (!modele.includes('{acheteur}') && !fixes.some((x) => x[1] === '{acheteur}'))) return non('personne-introuvable');
+      if (modele.includes('{nego}') || fixes.some((x) => x[1] === '{nego}')) return non('offre-existante');
+    } else {
+      if (!modele.includes('{nego}') && !modele.includes('{produit}') && !fixes.some((x) => x[1] === '{nego}' || x[1] === '{produit}')) return non('offre-introuvable');
+      if (!negosVues.has(f.id)) return non('offre-non-vue');
+    }
     const noms = Object.keys(nomsEntetes(entetes)).filter((k) => !ENTETES_INTERDITS.test(k)).slice(0, 20);
     return { ...base, rejouable: true, raison: '', modele, recherche: u.search || '', fixes, sansCorps, entetes: noms };
   }
@@ -1547,6 +1591,7 @@
     if (!/^[a-z0-9-]{8,64}$/i.test(jeton)) return;
     const fin = (o) => post(Object.assign({ kind: 'vcoffreresultat', jeton }, o));
     if (window.top !== window || !/(^|\.)vestiairecollective\.com$/i.test(location.hostname)) return fin({ statut: 0, erreur: 'pas-vestiaire' });
+    if (geste === 'favori') return offrirAUnePersonne(d, r, fin);
     if (!ID_NEGO.test(nego) || !/^(accepter|refuser|contre)$/.test(geste)) return fin({ statut: 0, erreur: 'invalide' });
     const prixDemande = Number(d.prixCents);
     if (geste === 'contre' && !(Number.isInteger(prixDemande) && prixDemande > 0 && prixDemande < 10000000)) return fin({ statut: 0, erreur: 'invalide' });
@@ -1614,6 +1659,68 @@
       fin({ statut, confirme, erreur, defi, ra });
     } finally { offreEnCours = false; }
   }); } catch (_) {}
+
+  // ── 5.392 : UNE offre à UNE personne qui a aimé l'article (l'ordre vient du fond, sur SON clic) ──
+  // Au nom du compte ouvert dans CETTE page ; la recette « favori » APPRISE de son propre geste ;
+  // l'article et la personne en chiffres ; « fait » seulement si Vestiaire RENVOIE une négociation
+  // de CET article dont le dernier geste est TON offre, à CE prix.
+  async function offrirAUnePersonne(d, r, fin) {
+    const produit = String(d.produit || ''), acheteur = String(d.acheteur || '');
+    const prix = Number(d.prixCents);
+    if (!/^\d{3,15}$/.test(produit) || !/^\d{3,15}$/.test(acheteur) || !(Number.isInteger(prix) && prix >= 100 && prix < 10000000)) return fin({ statut: 0, erreur: 'invalide' });
+    if (!r || r.rejouable !== true || r.geste !== 'favori' || !/^(POST|PUT|PATCH)$/.test(String(r.methode)) || !/(^|\.)vestiairecollective\.com$/i.test(String(r.hote || ''))
+      || typeof r.modele !== 'string' || !/^\/[\w\-/{}.]*$/.test(r.modele) || !Array.isArray(r.fixes)) return fin({ statut: 0, erreur: 'recette' });
+    if (offreEnCours) return fin({ statut: 0, erreur: 'en-cours' });
+    if (d.compte !== undefined && (!moiId || String(d.compte) !== moiId)) return fin({ statut: 0, erreur: moiId ? 'autre-compte' : 'compte-pas-su' });
+    if (moiId && acheteur === moiId) return fin({ statut: 0, erreur: 'invalide' });
+    const vals = { '{produit}': produit, '{acheteur}': acheteur };
+    const besoin = (k) => r.modele.includes(k) || r.fixes.some((x) => x && x[1] === k);
+    if (besoin('{nego}') || !besoin('{produit}') || !besoin('{acheteur}') || !(besoin('{prixCents}') || besoin('{prix}'))) return fin({ statut: 0, erreur: 'recette' });
+    const h = {};
+    for (const n of (Array.isArray(r.entetes) ? r.entetes : [])) {
+      const k = String(n).toLowerCase();
+      if (ENTETES_INTERDITS.test(k)) continue;
+      if (!entetesApi || entetesApi[k] == null) return fin({ statut: 0, erreur: 'entetes' });
+      h[k] = entetesApi[k];
+    }
+    h.accept = h.accept || 'application/json';
+    let corps = null;
+    if (!r.sansCorps) {
+      corps = {};
+      try {
+        for (const [ch, v, t] of r.fixes) {
+          let x = v;
+          if (v === '{prixCents}') x = prix;
+          else if (v === '{prix}') x = t === 'number' ? prix / 100 : (prix % 100 ? (prix / 100).toFixed(2) : String(prix / 100));
+          else if (typeof v === 'string' && vals[v] !== undefined) x = t === 'number' ? Number(vals[v]) : vals[v];
+          poser(corps, ch.map(String), x);
+        }
+      } catch (_) { return fin({ statut: 0, erreur: 'recette' }); }
+      h['content-type'] = 'application/json';
+    }
+    let chemin = r.modele;
+    for (const k of Object.keys(vals)) chemin = chemin.split(k).join(encodeURIComponent(vals[k]));
+    const adresse = 'https://' + r.hote + chemin + (/^\?[\w=&.%:-]*$/.test(String(r.recherche || '')) ? r.recherche : '');
+    offreEnCours = true;
+    try {
+      let statut = 0, rep = '', erreur = '', defi = false, ra = '';
+      try {
+        const res = await origFetch.call(window, adresse, Object.assign({ method: r.methode, credentials: 'include', headers: h }, corps ? { body: JSON.stringify(corps) } : {}));
+        statut = Number(res.status) || 0;
+        try { rep = String(await res.text()).slice(0, 400000); } catch (_) {}
+        defi = defiDe(res, rep); ra = raDe(res);
+      } catch (e) { erreur = String((e && e.message) || e).slice(0, 80) || 'reseau'; }
+      let confirme = null;
+      if (statut >= 200 && statut < 300) {
+        try {
+          const j = JSON.parse(rep); const f = j && j.data && !Array.isArray(j.data) ? ficheNego(j.data) : null;
+          confirme = !!(f && f.produit === produit && f._acheteur === acheteur && f.dernier && f.dernier.par === 'vendeur' && f.dernier.action === 'offer' && f.dernier.cents === prix);
+          if (f) { retenirNego(f); post({ kind: 'vcoffres', offres: [ficheSortie(f)], liste: false, page: pageIci(), moi: moiId }); }
+        } catch (_) { confirme = false; }
+      }
+      fin({ statut, confirme, erreur, defi, ra });
+    } finally { offreEnCours = false; }
+  }
 
   // ── 5.364 (11 nov., Julien : « baisser le prix en série sur Vestiaire, sur mon
   //    clic ») — LE PRIX D'UNE ANNONCE. La requête qui change un prix n'a JAMAIS été
@@ -1839,7 +1946,7 @@
             // 5.299 : une réponse d'ERREUR (401, 404, 500…) n'est ni une liste, ni un compte, ni un schéma.
             // 5.364 : TON changement de prix à la main (réponse JSON ou non) ⇒ la recette du prix.
             if (DE_VC(url) && res.status >= 200 && res.status < 300 && /^(POST|PUT|PATCH)$/i.test(String(meth)) && !/json/i.test(String(ct || ''))) notePrixManuel(url, meth, res.status, corpsEnvoye, ent, '');
-            if (DE_VC(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { if (/^(POST|PUT|PATCH)$/i.test(String(meth))) { notePrixManuel(url, meth, res.status, corpsEnvoye, ent, t); noteReponseOffre(url, meth, res.status, corpsEnvoye, ent, t); } else noteOffres(url, meth, t); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); notePageData(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteCanal(url, meth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
+            if (DE_VC(url) && res.status >= 200 && res.status < 300 && /json/i.test(String(ct || ''))) res.clone().text().then((t) => { if (/^(POST|PUT|PATCH)$/i.test(String(meth))) { notePrixManuel(url, meth, res.status, corpsEnvoye, ent, t); noteReponseOffre(url, meth, res.status, corpsEnvoye, ent, t); } else noteOffres(url, meth, t); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); notePageData(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteAimes(url, t); noteCanal(url, meth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, meth, res.status, t); }).catch(() => {});
           } catch (_) {}
         }).catch(() => {});
       } catch (_) {}
@@ -1865,7 +1972,7 @@
             if ((DE_VC(url) || DE_STREAM(url)) && /^(POST|PUT)$/i.test(String(this.__vcMeth || ''))) noteEnvoi(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH);
             if (t && DE_STREAM(url) && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) noteStream(url, this.__vcMeth, this.status, t);
             if (DE_VC(url) && this.status >= 200 && this.status < 300 && /^(POST|PUT|PATCH)$/i.test(String(this.__vcMeth || ''))) notePrixManuel(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH, t && /json/i.test(String(ct || '')) ? t : '');
-            if (t && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) { if (DE_VC(url) && /^(POST|PUT|PATCH)$/i.test(String(this.__vcMeth || ''))) noteReponseOffre(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH, t); else if (DE_VC(url)) noteOffres(url, this.__vcMeth, t); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); notePageData(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteCanal(url, this.__vcMeth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
+            if (t && this.status >= 200 && this.status < 300 && /json/i.test(String(ct || ''))) { if (DE_VC(url) && /^(POST|PUT|PATCH)$/i.test(String(this.__vcMeth || ''))) noteReponseOffre(url, this.__vcMeth, this.status, this.__vcCorps, this.__vcH, t); else if (DE_VC(url)) noteOffres(url, this.__vcMeth, t); noteSchema(url, t); noteCatalogue(url, t); noteMoi(url, t); noteAnnonces(url, t); noteVentes(url, t); notePageData(url, t); noteTimeline(url, t); noteCompteur(url, t); noteMessages(url, t); noteFluxMessages(url, t); noteAimes(url, t); noteCanal(url, this.__vcMeth, t); noteFil(url, t); noteAchats(url, t); notePublication(url, this.__vcMeth, this.status, t); }
           } catch (_) {}
         });
       } catch (_) {}

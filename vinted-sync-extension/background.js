@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.390.0';
+const CODE_VERSION = '5.392.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -4410,6 +4410,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return true;
     }
     // 5.319 : tes OFFRES Vestiaire et la recette d'une réponse faite par toi sur la page.
+    // 5.392 : les personnes qui ont aimé TES articles (gardées dans CE navigateur ; la base n'en reçoit que des nombres).
+    if (msg && msg.from === 'cancale-vc' && msg.action === 'vcAimes') {
+      (async () => {
+        try {
+          let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
+          if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
+          const ok = await rangerVcAimes(msg, await compteVcCapture(sender && sender.tab && sender.tab.id, msg.moi));
+          sendResponse({ ok: ok === true });
+        } catch (e) { sendResponse({ ok: false, error: String(e) }); }
+      })();
+      return true;
+    }
     if (msg && msg.from === 'cancale-vc' && (msg.action === 'vcOffres' || msg.action === 'vcOffreAppris' || msg.action === 'vcPrixAppris')) {
       (async () => {
         try {
@@ -11552,7 +11564,7 @@ function surAlarme(a) {
   else if (a.name === 'vrm-photos') lance('photos', () => tickPhotos());
   else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); }   // 5.376 : les favoris lancés depuis la carte
   else if (a.name === 'vrm-lbc') lance('lbc', () => relireLbcEnFond());
-  else if (a.name === 'vrm-offres') { lance('offres', () => offresTick()); lance('baisses', () => baissesTick()); lance('favoriattente', () => reprendreMessagesFavoris()); }   // 5.372 : un message au favori qui attendait après l'offre   // 5.370 : les baisses programmées
+  else if (a.name === 'vrm-offres') { lance('offres', () => offresTick()); lance('baisses', () => baissesTick()); lance('favoriattente', () => reprendreMessagesFavoris()); lance('vcaimes', () => reprendreOffresAimesVc()); lance('photosvrm', () => rangerPhotosVrm()); }   // 5.372 : un message au favori qui attendait après l'offre   // 5.370 : les baisses programmées
   // 5.290 : le statut des colis chez le transporteur (voir `transpTick`).
   else if (a.name === 'vrm-transp') lance('transp', () => transpTick('alarme'));
   // 5.341 : les dates de versement, onglet Vinted ouvert (voir `tickVersements`).
@@ -15103,7 +15115,7 @@ async function refaireBrouillon(msg) {
     { const fr = await lireFreinRepub(uid); if (fr) { if (recuR.at) await rendreActions(uid, recuR.at, 1); noterDiag('frein_repub_tenu_file'); return { accepte: false, code: 'frein-refus', jusqua: fr.jusqua, raison: phraseFreinRepub(fr) }; } }
     suiviRepub(id);
     const temp = uuidRecreer();
-    const tp = await televerserPhotosRecreer(acc, urls, [], reglagesPhotoSurs(vb.reglages), temp, (k, n) => etapeRepub(id, 'photos', { fait: k, total: n }));
+    const tp = await televerserPhotosRecreer(acc, urls, [], reglagesPhotoSurs(vb.reglages), temp, (k, n) => etapeRepub(id, 'photos', { fait: k, total: n }), { uid, src: id, n: msg && msg.num ? String(msg.num) : '' });
     if (tp.sansPage) return { accepte: false, code: 'onglet-vinted', raison: tp.erreur };
     if (!tp.ids) return { accepte: true, etape: 'echec', refaire: true, raison: `${tp.erreur} — aucun brouillon n'a été créé, tout reste enregistré dans VRM` };
     const assigned = tp.ids.map((pid) => ({ id: pid, orientation: 0 }));
@@ -15223,8 +15235,9 @@ function photosRefusees(rc) {
 // Les photos d'un brouillon fait par VRM, renvoyées depuis le coffre de
 // l'ancienne annonce (une par photo, avec ses réglages enregistrés).
 // Rend { ids } · { erreur } · {} (rien à renvoyer : pas de coffre).
-async function televerserPhotosRecreer(acc, urls, second, reglages, temp, suivi) {
+async function televerserPhotosRecreer(acc, urls, second, reglages, temp, suivi, origine = null) {
   const ids = [];
+  const produites = [];   // 5.392 : l'empreinte de chaque photo PRODUITE (réglée) par VRM — rangée après la boucle
   for (let i = 0; i < urls.length; i++) {
     if (i > 0) await pauseRepub('photo', acc && acc.vinted_user_id);
     if (typeof suivi === 'function') { try { suivi(i, urls.length); } catch (_) {} }
@@ -15234,6 +15247,8 @@ async function televerserPhotosRecreer(acc, urls, second, reglages, temp, suivi)
     for (const u of essais) { try { const r = await fetch(u, { signal: AbortSignal.timeout(30000) }); if (!r.ok) throw new Error('http ' + r.status); blob = await r.blob(); break; } catch (e) { err = e; blob = null; } }
     if (!blob) return { erreur: `la photo ${i + 1} n'a pas pu être lue (${String(err && err.message || err || 'photo absente').slice(0, 40)})` };
     try { blob = await photoReglee(blob, reglages); } catch (e) { return { erreur: String(e && e.message || e).slice(0, 80) }; }
+    // 5.392 (`photovrm`) : la MÊME empreinte que `tickEmpreintes` (`empreinteDeBlob`), sur le fichier PRODUIT.
+    if (origine) { try { const h = await empreinteDeBlob(blob); if (h) produites.push(h); } catch (_) {} }
     const rp = await vintedPagePhoto(acc, blob, `photo-${i + 1}.jpg`, temp);
     if (rp && rp.sansPage) return { erreur: raisonSansPage(rp), sansPage: rp.sansPage };
     const pid = rp && rp.ok ? idPhotoReponse(rp.json) : null;
@@ -15247,7 +15262,52 @@ async function televerserPhotosRecreer(acc, urls, second, reglages, temp, suivi)
     }
     ids.push(pid);
   }
+  // La file est posée tout de suite (stockage de l'extension) ; l'écriture en base suit sans retenir l'atelier.
+  if (origine && produites.length && await noterPhotosVrm(origine, produites)) rangerPhotosVrm().catch(() => {});
   return { ids };
+}
+// ══ 5.392 (15 nov., `photovrm`) — LA PHOTO FABRIQUÉE PAR L'ATELIER « REPUBLIER PAR VRM » ═══════════
+// Pour qu'une photo de l'atelier, republiée PLUS TARD à la main dans l'app Vinted, soit reconnue
+// (src/republieTelephone.js, registre `vrm_photos_vrm`, seuil SÛR `SEUIL_PHOTO_VRM`) : l'empreinte de
+// chaque photo RÉGLÉE (`photoReglee`) est rangée dans `photo_vrm_{uid}` (compte de l'onglet) :
+// `payload.photos = { [empreinte]: { h, n (N° de la fiche), src (l'annonce d'origine), uid, at } }`.
+// Jamais l'image. La file vit dans `chrome.storage.local` (§4.9) ; la ligne est lue-fusionnée-réécrite
+// (une lecture ratée n'écrit RIEN, la file reste), bornée (60 jours, 1 500 empreintes). Rien d'autre ne
+// change dans l'atelier : le rangement suit l'envoi des photos, il n'en retient aucune.
+const PHOTOS_VRM_FILE = 'vrmPhotosVrmFile';
+const PHOTOS_VRM_JOURS = 60, PHOTOS_VRM_MAX = 1500;
+async function noterPhotosVrm(origine, hexes) {
+  const uid = String((origine && origine.uid) || ''), src = String((origine && origine.src) || ''), n = String((origine && origine.n) || '').trim();
+  if (!/^\d{1,20}$/.test(uid) || !/^\d{1,20}$/.test(src)) return false;
+  const at = new Date().toISOString();
+  try {
+    const f = (await chrome.storage.local.get(PHOTOS_VRM_FILE))[PHOTOS_VRM_FILE] || [];
+    for (const h of hexes) if (empreinteValide(h)) f.push({ h, n, src, uid, at });
+    await chrome.storage.local.set({ [PHOTOS_VRM_FILE]: f.slice(-400) });
+  } catch (_) { return false; }
+  return true;
+}
+async function rangerPhotosVrm() {
+  let file = [];
+  try { file = (await chrome.storage.local.get(PHOTOS_VRM_FILE))[PHOTOS_VRM_FILE] || []; } catch (_) { return false; }
+  if (!file.length) return true;
+  const restent = [];
+  const parUid = {};
+  for (const e of file) if (e && /^\d{1,20}$/.test(String(e.uid || ''))) (parUid[e.uid] = parUid[e.uid] || []).push(e);
+  const limite = Date.now() - PHOTOS_VRM_JOURS * 864e5;
+  for (const [uid, liste] of Object.entries(parUid)) {
+    const r = await sbGet(`app_data?id=eq.photo_vrm_${uid}&select=p:data->payload->photos`);
+    if (r === null) { restent.push(...liste); noterDiag('photos_vrm_lecture_ratee'); continue; }
+    const photos = Object.assign({}, (r[0] && r[0].p && typeof r[0].p === 'object' && !Array.isArray(r[0].p)) ? r[0].p : {});
+    for (const e of liste) photos[e.h] = { h: e.h, n: String(e.n || ''), src: String(e.src || ''), uid: String(uid), at: e.at };
+    let garde = Object.entries(photos).filter(([h, e]) => empreinteValide(h) && e && Date.parse(e.at || '') >= limite);
+    garde.sort((a, b) => String(b[1].at).localeCompare(String(a[1].at)));
+    garde = garde.slice(0, PHOTOS_VRM_MAX);
+    const ok = await supabaseUpsert('app_data', [{ id: `photo_vrm_${uid}`, data: { type: 'photo_vrm', uid: String(uid), capturedAt: new Date().toISOString(), nItems: garde.length, payload: { version: 1, photos: Object.fromEntries(garde) } } }], 'id');
+    if (ok === false) { restent.push(...liste); noterDiag('photos_vrm_ecriture_ratee'); } else noterDiag('photos_vrm_ecrites');
+  }
+  try { await chrome.storage.local.set({ [PHOTOS_VRM_FILE]: restent }); } catch (_) {}
+  return !restent.length;
 }
 // (28 oct.) La fiche d'UNE annonce dans `vinted_item_details`. ⚠️ Mesuré dans
 // les journaux de la base : `select=f:data->10312441750` répond 400 — un nombre
@@ -15496,7 +15556,7 @@ async function recreerVinted(msg) {
     // 2. Les photos, une par une, depuis la page.
     await pauseRepub('lecture', uid);
     const temp = uuidRecreer();
-    const tp = await televerserPhotosRecreer(acc, urls, second, reglages, temp, (i, n) => etapeRepub(id, 'photos', { fait: i, total: n }));
+    const tp = await televerserPhotosRecreer(acc, urls, second, reglages, temp, (i, n) => etapeRepub(id, 'photos', { fait: i, total: n }), { uid, src: id, n: msg && msg.num ? String(msg.num) : '' });
     if (tp.sansPage) return { accepte: false, code: 'onglet-vinted', raison: tp.erreur };
     if (!tp.ids) return { accepte: true, etape: 'echec', raison: `${tp.erreur} — rien n'a été créé ni supprimé, ton annonce est intacte` };
     const ids = tp.ids;
@@ -17062,6 +17122,14 @@ const DISCRETION_CACHE_MS = 60000;
 const SORTES_LIMITEES = ['favori', 'offre'];
 const PAR_HEURE_SORTE_DEFAUT = 15;
 const tirerEntre = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+// (15 nov., 5.392) La porte sert aussi un compte VESTIAIRE (`vc:{id}`, la clé de ses actions) : les
+// mêmes règles que les favoris Vinted (Tout arrêter, vérification, 15/h par sorte, ouverture du site,
+// un compte à la fois, série décalée), chacune SITE PAR SITE — un geste Vestiaire ne retient pas un
+// compte Vinted, et l'inverse. Les autres Chrome ne sont lus que pour Vinted (leur ligne n'existe que là).
+const cleDiscretionOk = (u) => /^\d{1,20}$/.test(String(u || '')) || /^vc:\d{1,20}$/.test(String(u || ''));
+const siteDiscretion = (u) => (/^vc:/.test(String(u || '')) ? 'vc' : 'vinted');
+const cleVerrouCompte = (u) => (siteDiscretion(u) === 'vc' ? 'vrmVerrouCompteVc' : 'vrmVerrouCompte');
+const cleSerie = (u, sorte) => (siteDiscretion(u) === 'vc' ? 'vc:' + sorte : sorte);
 // Le jour de Paris (« 2026-11-12 ») et l'heure de Paris (0-23), quel que soit le fuseau.
 function jourParis(t) {
   try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(t)); }
@@ -17322,7 +17390,7 @@ function phraseRefusDiscretion(c) {
 //    d'absence, une attente de 2 à 6 min est tirée.
 function noterOuvertureVinted(uid) {
   const u = String(uid || '');
-  if (!/^\d{1,20}$/.test(u)) return Promise.resolve(null);
+  if (!cleDiscretionOk(u)) return Promise.resolve(null);   // (5.392) aussi `vc:{id}` : vestiairecollective.com ouvert
   return surDiscretion(async () => {
     const t = Date.now();
     const m = await lireLocal('vrmOuverture');
@@ -17357,10 +17425,10 @@ async function phaseRythme(uid, t) {
 // Un bordereau (une obligation d'envoi) n'attend que la vérification.
 async function porteDiscretion(uid, sorte, opts = {}) {
   const u = String(uid || '');
-  if (!/^\d{1,20}$/.test(u)) return null;                 // Vestiaire / Leboncoin : pas cette porte
+  if (!cleDiscretionOk(u)) return null;                   // Leboncoin : pas cette porte (Vestiaire : `vc:{id}`, 5.392)
   const t = Date.now();
-  // Les autres Chrome du compte : lus seulement pour une sorte limitée (favoris, offres).
-  const autres = opts.autres || (SORTES_LIMITEES.includes(sorte) ? await actionsAutresNavigateurs(u) : null);
+  // Les autres Chrome du compte : lus seulement pour une sorte limitée (favoris, offres) — Vinted seulement.
+  const autres = opts.autres || (SORTES_LIMITEES.includes(sorte) && siteDiscretion(u) === 'vinted' ? await actionsAutresNavigateurs(u) : null);
   const ta = await toutArreteDepuis(autres);
   if (ta) return { ok: false, code: 'tout-arrete', depuis: ta, attendreMs: 0, error: phraseArret('tout') };
   const cap = await captchaEnCours(u, autres);
@@ -17375,11 +17443,11 @@ async function porteDiscretion(uid, sorte, opts = {}) {
     if (tous.length >= lim) { const ms = tous[tous.length - lim] + 3600000 - t; return att(ms, 'sorte', `${lim} ${sorte === 'favori' ? 'messages aux favoris' : 'réponses aux offres'} cette heure : VRM reprend dans ${minutes(ms)} min.`); }
   }
   const ouv = (await lireLocal('vrmOuverture'))[u];
-  if (ouv && Number(ouv.depuis) + Number(ouv.attente || 0) > t) { const ms = Number(ouv.depuis) + Number(ouv.attente) - t; return att(ms, 'ouverture', `Vinted vient d’être ouvert : VRM attend ${minutes(ms)} min avant d’agir seul.`); }
-  const v = await lireLocal('vrmVerrouCompte');
+  if (ouv && Number(ouv.depuis) + Number(ouv.attente || 0) > t) { const ms = Number(ouv.depuis) + Number(ouv.attente) - t; return att(ms, 'ouverture', `${siteDiscretion(u) === 'vc' ? 'Vestiaire' : 'Vinted'} vient d’être ouvert : VRM attend ${minutes(ms)} min avant d’agir seul.`); }
+  const v = await lireLocal(cleVerrouCompte(u));
   if (v.uid && String(v.uid) !== u && Number(v.jusqua) > t) { const ms = Number(v.jusqua) - t; return att(ms, 'autre-compte', `Un autre compte vient d’agir dans ce navigateur : VRM attend ${minutes(ms)} min.`); }
   if (SORTES_SERIE.includes(sorte)) {
-    const s = (await lireLocal('vrmSeries'))[sorte];
+    const s = (await lireLocal('vrmSeries'))[cleSerie(u, sorte)];
     if (s && String(s.uid) !== u && Number(s.dernier) + Number(s.ecart) > t) { const ms = Number(s.dernier) + Number(s.ecart) - t; return att(ms, 'serie', `La même série vient de passer sur un autre compte : VRM attend ${minutes(ms)} min.`); }
   }
   if (opts.rythme) {
@@ -17391,10 +17459,10 @@ async function porteDiscretion(uid, sorte, opts = {}) {
 // Un geste automatique est PARTI (sa place est prise) : le verrou du navigateur et la série.
 function noterGesteAuto(uid, sorte) {
   const u = String(uid || '');
-  if (!/^\d{1,20}$/.test(u) || sorte === 'bordereau') return Promise.resolve();
+  if (!cleDiscretionOk(u) || sorte === 'bordereau') return Promise.resolve();
   return surDiscretion(async () => {
     const t = Date.now();
-    const maj = { vrmVerrouCompte: { uid: u, jusqua: t + VERROU_COMPTE_MS, at: t } };
+    const maj = { [cleVerrouCompte(u)]: { uid: u, jusqua: t + VERROU_COMPTE_MS, at: t } };
     if (SORTES_LIMITEES.includes(sorte)) {
       const so = await lireLocal('vrmSortes');
       const e = so[u] && typeof so[u] === 'object' ? so[u] : {};
@@ -17403,8 +17471,8 @@ function noterGesteAuto(uid, sorte) {
     }
     if (SORTES_SERIE.includes(sorte)) {
       const s = await lireLocal('vrmSeries');
-      const c = s[sorte];
-      s[sorte] = { uid: u, dernier: t, ecart: c && String(c.uid) === u && Number(c.ecart) > 0 ? Number(c.ecart) : tirerEntre(SERIE_ECART_MIN_MS, SERIE_ECART_MAX_MS), at: t };
+      const cs = cleSerie(u, sorte), c = s[cs];
+      s[cs] = { uid: u, dernier: t, ecart: c && String(c.uid) === u && Number(c.ecart) > 0 ? Number(c.ecart) : tirerEntre(SERIE_ECART_MIN_MS, SERIE_ECART_MAX_MS), at: t };
       maj.vrmSeries = s;
     }
     try { await chrome.storage.local.set(maj); } catch (_) {}
@@ -18199,14 +18267,20 @@ const FAVORI_ATTENTE = 'vrmFavoriAttente';
 const FAVORI_ATTENTE_TRANCHE_MS = 2000;
 const FAVORI_ATTENTE_TROP_TARD_MS = 10 * 60000;
 const _favorisAttenteIci = new Set();   // les attentes tenues par CE worker (un worker neuf n'en a aucune)
-async function tirerAttenteOffreMessage() {
-  const [a, b] = OFFRE_MESSAGE_S;
+// (15 nov., 5.392) Le tirage « au hasard, jamais deux fois de suite la même valeur » (à la seconde,
+// la dernière gardée sous `cle` dans `chrome.storage.local`, §4.9) — partagé par l'attente offre →
+// message des favoris Vinted et l'écart entre deux offres aux personnes qui aiment, sur Vestiaire.
+async function tirerSansRepeter(cle, a, b) {
   let der = NaN;
-  try { der = Number(((await chrome.storage.local.get('vrmOffreMessageDernier')).vrmOffreMessageDernier || {}).s); } catch (_) {}
+  try { der = Number(((await chrome.storage.local.get(cle))[cle] || {}).s); } catch (_) {}
   let s = a + Math.floor(Math.random() * (b - a + 1));
   if (s === der) s = a + ((s - a + 1 + Math.floor(Math.random() * (b - a))) % (b - a + 1));
-  try { await chrome.storage.local.set({ vrmOffreMessageDernier: { s, at: Date.now() } }); } catch (_) {}
+  try { await chrome.storage.local.set({ [cle]: { s, at: Date.now() } }); } catch (_) {}
   return s;
+}
+async function tirerAttenteOffreMessage() {
+  const [a, b] = OFFRE_MESSAGE_S;
+  return tirerSansRepeter('vrmOffreMessageDernier', a, b);
 }
 async function lireAttentesFavori() {
   try { const v = (await chrome.storage.local.get(FAVORI_ATTENTE))[FAVORI_ATTENTE]; return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch (_) { return null; }
@@ -19751,7 +19825,7 @@ async function etatPourApp() {
   //    présence comme `pause` et `vivant`).
   // 29 oct. : `lbcSupprime` — elle sait aussi SUPPRIMER une annonce Leboncoin
   //    sur commande confirmée (même règle : le bouton n'apparaît qu'à elle).
-  return Object.assign({ ok: true, version, code: CODE_VERSION, ext, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus, lbcPause: true, lbcSupprime: true, vcRepondre: true, lbcRepondre: true, vcOffre: true, lbcPrix: true, vcPrix: true },
+  return Object.assign({ ok: true, version, code: CODE_VERSION, ext, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus, lbcPause: true, lbcSupprime: true, vcRepondre: true, lbcRepondre: true, vcOffre: true, vcOffreAimes: true, lbcPrix: true, vcPrix: true },
     vintedPasSu ? { vintedPasSu: true } : {},
     pause && pause !== PAUSE_PAS_SUE ? { pause: { jusqua: Number(pause.jusqua) || 0 } } : {},
     nav ? { nav } : {},
@@ -20162,6 +20236,8 @@ async function executerCommande(msg) {
   if (msg && msg.cmd === 'vcRepondre') return await repondreVestiaire(msg);
   // 4 nov. (5.319) : répondre à UNE offre Vestiaire, sur son clic (voir `repondreOffreVestiaire`).
   if (msg && msg.cmd === 'vcOffre') return await repondreOffreVestiaire(msg);
+  // 15 nov. (5.392) : UNE offre aux personnes qui ont aimé un article Vestiaire, sur son clic (`offrirAuxAimesVc`).
+  if (msg && msg.cmd === 'vcOffreAimes') return await offrirAuxAimesVc(msg);
   // 11 nov. (5.364) : baisser UN prix Vestiaire, sur son clic (voir `baisserPrixVestiaire`).
   if (msg && msg.cmd === 'vcPrix') return await baisserPrixVestiaire(msg);
   // 3 nov. (5.318) : répondre dans UNE conversation Leboncoin, sur son clic (voir `repondreLeboncoin`).
@@ -24970,6 +25046,8 @@ function noterSessionVc(id, tabId, forme, source) {
 async function noterSessionVcMaintenant(id, tabId, forme, source) {
   if (!/^[\w-]{1,40}$/.test(String(id || ''))) return false;
   const now = Date.now();
+  // 5.392 : vestiairecollective.com ouvert sur ce compte (la même règle que vinted.fr, point 4 de la discrétion).
+  if (/^\d{1,20}$/.test(String(id))) { try { await noterOuvertureVinted('vc:' + String(id)); } catch (_) {} }
   try {
     const m = (await chrome.storage.local.get(VC_ONGLETS))[VC_ONGLETS] || {};
     if (tabId != null) m[String(tabId)] = { compte: String(id), at: now };
@@ -25189,6 +25267,9 @@ async function repondreVestiaire(msg) {
 const VC_RECETTE_OFFRES = 'vrmVcRecetteOffres';
 const VC_OFFRES_MAX = 300;
 const GESTES_OFFRE = ['accepter', 'refuser', 'contre'];
+// 5.392 : la recette « favori » (TA première offre à une personne qui a aimé l'article) s'apprend à côté ;
+// elle ne répond à AUCUNE offre reçue (jamais acceptée par `repondreOffreVestiaire`).
+const GESTES_RECETTE_VC = [...GESTES_OFFRE, 'favori'];
 const cleOffreVc = (id) => 'n' + String(id);
 let _vcOffresChaine = Promise.resolve();
 function rangerVcOffres(m, compte) {
@@ -25246,7 +25327,7 @@ async function rangerVcOffresMaintenant(m, compte) {
 }
 // La recette d'UN geste reçue d'une page : refaite champ par champ.
 function nettoyerRecetteOffreVc(r) {
-  if (!r || typeof r !== 'object' || !GESTES_OFFRE.includes(String(r.geste))) return null;
+  if (!r || typeof r !== 'object' || !GESTES_RECETTE_VC.includes(String(r.geste))) return null;
   const base = { geste: String(r.geste), methode: /^(POST|PUT|PATCH)$/.test(String(r.methode)) ? String(r.methode) : '', hote: /^([a-z0-9-]+\.)*vestiairecollective\.com$/i.test(String(r.hote || '')) ? String(r.hote) : '', chemin: String(r.chemin || '').slice(0, 160) };
   if (!base.methode || !base.hote) return null;
   if (r.rejouable !== true) return { ...base, rejouable: false, raison: String(r.raison || 'inconnue').slice(0, 40) };
@@ -25265,6 +25346,12 @@ function nettoyerRecetteOffreVc(r) {
   const vise = (k) => modele.includes(k) || fixes.some((x) => x[1] === k);
   if (!vise('{nego}') && !vise('{produit}')) return { ...base, rejouable: false, raison: 'offre-introuvable' };
   if (base.geste === 'contre' && !vise('{prixCents}') && !vise('{prix}')) return { ...base, rejouable: false, raison: 'prix-introuvable' };
+  if (base.geste === 'favori') {
+    if (!vise('{prixCents}') && !vise('{prix}')) return { ...base, rejouable: false, raison: 'prix-introuvable' };
+    if (!vise('{produit}')) return { ...base, rejouable: false, raison: 'article-introuvable' };
+    if (!vise('{acheteur}')) return { ...base, rejouable: false, raison: 'personne-introuvable' };
+    if (vise('{nego}')) return { ...base, rejouable: false, raison: 'offre-existante' };
+  }
   const entetes = (Array.isArray(r.entetes) ? r.entetes : []).map((x) => String(x).toLowerCase()).filter((x) => /^[a-z0-9-]{1,60}$/.test(x) && !/^(cookie|content-length|host|connection|origin|referer|user-agent|accept-encoding|content-type)$/.test(x)).slice(0, 20);
   const recherche = /^\?[\w=&.%:-]{0,200}$/.test(String(r.recherche || '')) && !/\d{3,}/.test(String(r.recherche || '')) ? String(r.recherche) : '';
   return { ...base, rejouable: true, raison: '', modele, recherche, fixes, sansCorps: r.sansCorps === true && !fixes.length, entetes };
@@ -25281,7 +25368,7 @@ async function noterRecetteOffreVc(brute) {
   tout[r.geste] = { recette: garde, at: r.rejouable ? at : ((avant && avant.at) || at), dernierEssai: { at, rejouable: r.rejouable, raison: r.raison || '' } };
   try { await chrome.storage.local.set({ [VC_RECETTE_OFFRES]: tout }); } catch (_) { return false; }
   const pourApp = {};
-  for (const g of GESTES_OFFRE) { const e = tout[g]; if (e && e.recette) pourApp[g] = { appris: e.recette.rejouable === true, raison: e.recette.rejouable ? '' : String(e.recette.raison || ''), at: e.at || '', dernierEssai: e.dernierEssai || null }; }
+  for (const g of GESTES_RECETTE_VC) { const e = tout[g]; if (e && e.recette) pourApp[g] = { appris: e.recette.rejouable === true, raison: e.recette.rejouable ? '' : String(e.recette.raison || ''), at: e.at || '', dernierEssai: e.dernierEssai || null }; }
   const ok = await supabaseUpsert('app_data', [{ id: 'vc_offres_recette', data: Object.assign(pourApp, { ver: CODE_VERSION, at }) }], 'id');
   if (ok === true) notifierApp({ type: 'maj', quoi: 'vestiaire' });
   return ok === true;
@@ -25350,6 +25437,250 @@ async function repondreOffreVestiaire(msg) {
     }
     return { accepte: true, etape: 'refuse', statut, raison: `Vestiaire a répondu ${statut} — ta réponse n'est pas partie` };
   } finally { VC_REPONSE_EN_VOL = false; }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// VESTIAIRE : UNE OFFRE AUX PERSONNES QUI ONT AIMÉ, SUR SON CLIC (15 nov., 5.392)
+// ══════════════════════════════════════════════════════════════════════════
+// Julien : « est-ce que tu as lancé les messages aux favoris sur Vestiaire ? ». MESURÉ
+// (lecture seule, 15 nov.) : Vestiaire NOMME chaque personne qui aime un article — une
+// carte du fil des notifications par « j'aime » (`custom_community`, « … vient d'aimer
+// votre pièce, envoyez-lui un message ! », conversation `{personne}-{article}`) — et le
+// vendeur peut lui faire la PREMIÈRE offre (`POST apiv2…/products/{id}/negotiations`,
+// vu le 2 nov. : une offre du vendeur à 237 € sur un article à 249 €). Le geste natif
+// existe ; VRM le refait, sur SON clic, seulement après l'avoir APPRIS de son propre geste.
+//  · `vrmVcAimes` (LOCAL, jamais en base) : { [article]: { [personne]: date } } — les
+//    identifiants numériques que la page a vus ; borné ; `vc_aimes` (base) n'en reçoit
+//    que des NOMBRES par article (personnes vues, déjà prévenues, la dernière date).
+//  · `vrmVcAimesFaits` (LOCAL) : { 'article|personne': { at, cents, etat } } — UNE offre par
+//    personne et par article, jamais deux (posé AVANT l'envoi : un worker tué au milieu ne
+//    renvoie pas, la ligne reste « incertaine »).
+//  · `offrirAuxAimesVc` : la recette « favori » apprise (sinon rien, dit), l'article LU dans
+//    `vc_listings` (son compte, son prix = celui de l'aperçu), l'offre sous le prix et 1 € au
+//    moins, l'onglet vestiairecollective.com sur CE compte ; puis, une personne à la fois :
+//    pause 429/403, sécurité des comptes (5.366, « série »), 45/h (réserve 5) ; 8–20 s au
+//    hasard entre deux offres ; 10 personnes par toucher au plus. « Faite » seulement si
+//    Vestiaire renvoie TON offre à ce prix. Un refus arrête tout (rien n'est relancé seul).
+const VC_AIMES = 'vrmVcAimes';
+const VC_AIMES_FAITS = 'vrmVcAimesFaits';
+const VC_AIMES_MAX_ARTICLES = 400, VC_AIMES_MAX_PAR_ARTICLE = 200;
+const VC_AIMES_PAR_TOUCHER = 10;
+const VC_AIMES_ECART_S = [8, 20];   // l'écart entre deux offres, en secondes (le même que l'offre → message des favoris Vinted)
+let _vcAimesChaine = Promise.resolve();
+function rangerVcAimes(m, compte) {
+  const run = _vcAimesChaine.then(() => rangerVcAimesMaintenant(m, compte)).catch(() => false);
+  _vcAimesChaine = run.then(() => {}, () => {});
+  return run;
+}
+function resumeAimesVc(aimes, faits) {
+  const produits = {};
+  for (const [p, parPersonne] of Object.entries(aimes || {})) {
+    const ps = Object.keys(parPersonne || {});
+    if (!ps.length) continue;
+    const dates = ps.map((k) => String(parPersonne[k] || '')).filter(Boolean).sort();
+    const prevenues = ps.filter((k) => faits && faits[p + '|' + k]).length;
+    produits['n' + p] = { produit: p, n: ps.length, prevenues, aPrevenir: ps.length - prevenues, dernier: dates[dates.length - 1] || '' };
+  }
+  return produits;
+}
+async function publierAimesVc(aimes, faits, compte, extra = {}) {
+  const now = new Date().toISOString();
+  const data = Object.assign({ v: 1, produits: resumeAimesVc(aimes, faits), compte: compte || '', capturedAt: now, ver: CODE_VERSION }, extra);
+  const ok = await supabaseUpsert('app_data', [{ id: 'vc_aimes', data }], 'id');
+  if (ok === true) notifierApp({ type: 'maj', quoi: 'vestiaire' });
+  return ok === true;
+}
+async function rangerVcAimesMaintenant(m, compte) {
+  const neufs = (Array.isArray(m && m.aimes) ? m.aimes : []).slice(0, 200).filter((x) => x && /^\d{3,15}$/.test(String(x.produit || '')) && /^\d{3,15}$/.test(String(x.acheteur || '')));
+  if (!neufs.length) return false;
+  let tout, faits;
+  try { const o = await chrome.storage.local.get([VC_AIMES, VC_AIMES_FAITS]); tout = o[VC_AIMES] || {}; faits = o[VC_AIMES_FAITS] || {}; } catch (_) { return false; }
+  let change = false;
+  for (const x of neufs) {
+    const p = String(x.produit), k = String(x.acheteur);
+    if (compte && k === String(compte)) continue;                       // jamais soi-même
+    const par = tout[p] = tout[p] || {};
+    const at = /^\d{4}-\d{2}-\d{2}T/.test(String(x.at || '')) ? String(x.at).slice(0, 30) : '';
+    if (!(k in par) || (at && String(par[k] || '') < at)) { par[k] = at || par[k] || ''; change = true; }
+    const cles = Object.keys(par);
+    if (cles.length > VC_AIMES_MAX_PAR_ARTICLE) { for (const c of cles.sort((a, b) => String(par[a]).localeCompare(String(par[b]))).slice(0, cles.length - VC_AIMES_MAX_PAR_ARTICLE)) delete par[c]; }
+  }
+  const articles = Object.keys(tout);
+  if (articles.length > VC_AIMES_MAX_ARTICLES) {
+    const recent = (p) => Object.values(tout[p] || {}).map(String).sort().pop() || '';
+    for (const p of articles.sort((a, b) => recent(a).localeCompare(recent(b))).slice(0, articles.length - VC_AIMES_MAX_ARTICLES)) delete tout[p];
+  }
+  if (!change) return true;
+  try { await chrome.storage.local.set({ [VC_AIMES]: tout }); } catch (_) { return false; }
+  return await publierAimesVc(tout, faits, compte);
+}
+// (15 nov., coordinateur : « les mêmes techniques que pour Vinted, aléatoirement ») — la série suit
+// EXACTEMENT les favoris Vinted, en RÉUTILISANT leurs fonctions :
+//  · l'écart entre deux offres : 8 à 20 s au hasard, jamais deux fois de suite la même valeur
+//    (`tirerSansRepeter`, le tirage de `attendreOffreMessage`) ;
+//  · avant CHAQUE offre, la porte des favoris (`porteDiscretion(…, 'favori')` sur `vc:{id}`) : « Tout
+//    arrêter », vérification jusqu'à « Reprendre », 15/h (réglable, `vinted_discretion.parHeure.favori`),
+//    2 à 6 min après l'ouverture du site, un compte à la fois, série décalée sur un autre compte ; puis la
+//    sécurité des comptes (`secuGeste('vestiaire', …, 'favori', 'serie')` : plafond du jour, par type,
+//    repos, prudence, arrêt anti-robot) ; puis les 45/h (`compterAction`, réserve 5) ; `noterGesteAuto` ;
+//  · le rythme actif/calme n'est PAS appliqué : Julien l'a REFUSÉ pour les favoris (« étalement des
+//    messages aux favoris sur la journée », CLAUDE.md §3) — les favoris Vinted ne le suivent pas non plus ;
+//  · AUCUN message n'accompagne l'offre (MESURÉ : l'offre de Vestiaire n'a pas de texte ; un texte libre
+//    dans le corps rend la recette « pas rejouable ») ⇒ ni temps d'écriture ni variantes ici ;
+//  · l'attente se tient par tranches (`FAVORI_ATTENTE_TRANCHE_MS`) en revérifiant tout : « Tout arrêter »,
+//    arrêt anti-robot, pause 429/403, onglet fermé ou passé sur un autre compte ⇒ RIEN ne part, c'est dit ;
+//  · §4.9 : la file vit dans `chrome.storage.local` (`vrmVcAimesFile`) ; un worker neuf la REPREND au réveil
+//    `vrm-offres` (1 min, `reprendreOffresAimesVc`), trop tard (10 min après l'heure prévue) ⇒ rien ne part, dit ;
+//  · chaque offre FAITE va au journal « Ce que VRM a fait » (`noterJournal(vc:{id}, 'favori')`).
+const VC_AIMES_FILE = 'vrmVcAimesFile';
+const VC_AIMES_ECART_DERNIER = 'vrmVcAimesEcartDernier';
+let _vcAimesIci = false;          // la série tenue par CE worker (un worker neuf n'en tient aucune)
+const attendreVc = (ms) => new Promise((r) => setTimeout(r, ms));
+async function lireFileAimesVc() { try { const v = (await chrome.storage.local.get(VC_AIMES_FILE))[VC_AIMES_FILE]; return v && typeof v === 'object' && !Array.isArray(v) ? v : null; } catch (_) { return undefined; } }
+async function poserFileAimesVc(f) { try { if (f) await chrome.storage.local.set({ [VC_AIMES_FILE]: f }); else await chrome.storage.local.remove(VC_AIMES_FILE); return true; } catch (_) { return false; } }
+// Un « non » avant une offre Vestiaire : la raison dite, sinon ''.
+async function arretAvantOffreAimeVc(compte) {
+  try { if ((await toutArreteDepuis(null)) > 0) return phraseArret('tout'); } catch (_) {}
+  try { const sa = await secuLire(); if (sa && secuArretEffectif(sa.evts).arrete) return phraseArret('tout'); } catch (_) {}
+  const rb = await secuRobotDit('vestiaire', compte); if (rb) return rb.error;
+  const pz = await pauseVc(); if (pz) return `Vestiaire a demandé de ralentir (${pz.statut || 'refus'}) — rien n'est parti`;
+  const ot = await ongletVestiaire(compte);
+  if (!ot.ok) return ot.raison;
+  return '';
+}
+// Tenir l'attente jusqu'à `jusqua`, par tranches, en revérifiant tout avant chacune.
+async function tenirAttenteAimeVc(compte, jusqua) {
+  for (;;) {
+    const non = await arretAvantOffreAimeVc(compte);
+    if (non) return { ok: false, raison: non };
+    const r = Number(jusqua) - Date.now();
+    if (!(r > 0)) return { ok: true };
+    await attendreVc(Math.min(FAVORI_ATTENTE_TRANCHE_MS, r));
+  }
+}
+async function offrirAuxAimesVc(msg) {
+  const produit = String((msg && msg.produit) || '');
+  const avant = Number(msg && msg.avantCents), prix = Number(msg && msg.prixCents);
+  if (!/^\d{3,15}$/.test(produit) || !Number.isInteger(avant) || !Number.isInteger(prix) || !(prix >= 100) || !(prix < avant) || avant > 1e8) return { accepte: false, code: 'invalide', raison: 'article ou montant invalide (l’offre doit être sous ton prix, 1 € au moins)' };
+  if (VC_REPONSE_EN_VOL || _vcAimesIci) return { accepte: false, code: 'en-cours', raison: 'une autre action Vestiaire part en ce moment — une à la fois' };
+  const enFile = await lireFileAimesVc();
+  if (enFile && Array.isArray(enFile.reste) && enFile.reste.length) return { accepte: false, code: 'en-cours', raison: 'une série d’offres Vestiaire est déjà en cours — une à la fois' };
+  VC_REPONSE_EN_VOL = true;
+  let lance = false;
+  try {
+    const pause = await pauseVc();
+    if (pause) return { accepte: false, code: 'vc-pause', raison: `Vestiaire a demandé de ralentir (${pause.statut || 'refus'}) — rien n'est parti, réessaie après ${new Date(pause.jusqua).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` };
+    let tout, aimes, faits;
+    try { const o = await chrome.storage.local.get([VC_RECETTE_OFFRES, VC_AIMES, VC_AIMES_FAITS]); tout = o[VC_RECETTE_OFFRES] || {}; aimes = o[VC_AIMES] || {}; faits = o[VC_AIMES_FAITS] || {}; } catch (_) { return { accepte: false, code: 'lecture', raison: "le stockage de l'extension n'a pas répondu — rien n'est parti" }; }
+    const recette = tout.favori && tout.favori.recette;
+    if (!recette) return { accepte: false, code: 'pas-appris', raison: "l'extension n'a encore jamais vu ce geste — sur vestiairecollective.com, dans ce Chrome, ouvre une notification « … vient d'aimer votre pièce » et fais UNE offre toi-même : VRM apprendra, puis pourra le faire d'ici" };
+    if (recette.rejouable !== true) return { accepte: false, code: 'pas-rejouable', raison: `la façon dont Vestiaire envoie cette offre n'est pas encore sûre à refaire (${recette.raison || 'forme inconnue'}) — fais-la sur Vestiaire, rien n'est parti` };
+    const rows = await sbGet('app_data?id=eq.vc_listings&select=items:data->items');
+    if (rows === null) return { accepte: false, code: 'lecture', raison: "la base VRM n'a pas répondu — rien n'est parti" };
+    const items = rows && rows[0] && rows[0].items && typeof rows[0].items === 'object' ? rows[0].items : {};
+    const it = items[produit];
+    if (!it || typeof it !== 'object') return { accepte: false, code: 'inconnue', raison: "l'extension n'a pas encore lu cet article — ouvre « Mes articles » sur Vestiaire, rien n'est parti" };
+    const lu = centsPrixVc(it.prix);
+    if (lu == null) return { accepte: false, code: 'prix-pas-lu', raison: "le prix de cet article n'a pas été lu — ouvre « Mes articles » sur Vestiaire, rien n'est parti" };
+    if (lu !== avant) return { accepte: false, code: 'prix-change', prixVu: lu / 100, raison: `le prix lu n'est plus celui de l'aperçu (${(lu / 100).toFixed(2).replace('.', ',')} €) — rien n'est parti` };
+    const compte = String(it.compte || '');
+    if (!compte) return { accepte: false, code: 'session', raison: "je ne sais pas à quel compte Vestiaire appartient cet article — recharge « Mes articles » sur Vestiaire (connecté sur ton compte), puis réessaie" };
+    const personnes = Object.keys(aimes[produit] || {}).filter((k) => k !== compte && !faits[produit + '|' + k]);
+    if (!personnes.length) return { accepte: false, code: 'personne', raison: Object.keys(aimes[produit] || {}).length ? "toutes les personnes vues ont déjà reçu une offre pour cet article — rien n'est reparti" : "ce Chrome n'a vu personne qui aime cet article — ouvre tes notifications sur Vestiaire dans ce Chrome, puis réessaie" };
+    const ot = await ongletVestiaire(compte);
+    if (!ot.ok) return { accepte: false, code: ot.code, raison: ot.raison };
+    { const rbVc = await secuRobotDit('vestiaire', ot.compte); if (rbVc) return { accepte: false, code: rbVc.code, raison: rbVc.error }; }
+    // La porte des favoris AVANT de lancer (sans prendre de place) : un refus est dit tout de suite.
+    { const p = await porteDiscretion('vc:' + ot.compte, 'favori'); if (p) return { accepte: false, code: p.code, raison: p.error, attendreMs: p.attendreMs || 0 }; }
+    const lot = personnes.slice(0, VC_AIMES_PAR_TOUCHER);
+    const suivi = { produit, at: new Date().toISOString(), cents: prix, n: lot.length, faites: 0, incertaines: 0, fin: '', raison: '' };
+    if (!(await poserFileAimesVc({ produit, compte: ot.compte, cents: prix, reste: lot, prochain: Date.now(), suivi, v: CODE_VERSION }))) return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
+    await publierAimesVc(aimes, faits, ot.compte, { envoi: suivi });
+    lance = true;
+    VC_REPONSE_EN_VOL = false;
+    // La série continue après la réponse (l'app relit `vc_aimes`), une offre à la fois.
+    deroulerAimesVc().catch(() => {});
+    return { accepte: true, etape: 'encours', n: lot.length, reste: personnes.length - lot.length };
+  } finally { if (!lance) VC_REPONSE_EN_VOL = false; }
+}
+// Dérouler la file (le premier toucher, ou un worker neuf qui la reprend).
+async function deroulerAimesVc() {
+  if (_vcAimesIci) return 0;
+  _vcAimesIci = true;
+  VC_REPONSE_EN_VOL = true;
+  let f = null, n = 0;
+  const finir = async (fin, raison) => {
+    if (!f) return;
+    f.suivi.fin = fin; if (raison) f.suivi.raison = String(raison).slice(0, 300);
+    let aimes = {}, faits = {};
+    try { const o = await chrome.storage.local.get([VC_AIMES, VC_AIMES_FAITS]); aimes = o[VC_AIMES] || {}; faits = o[VC_AIMES_FAITS] || {}; } catch (_) {}
+    await poserFileAimesVc(null);
+    await publierAimesVc(aimes, faits, f.compte, { envoi: Object.assign({}, f.suivi) });
+  };
+  try {
+    for (;;) {
+      f = await lireFileAimesVc();
+      if (!f || !Array.isArray(f.reste) || !f.suivi || !/^\d{3,15}$/.test(String(f.produit || '')) || !/^\d{1,20}$/.test(String(f.compte || ''))) { if (f) await poserFileAimesVc(null); f = null; break; }
+      if (!f.reste.length) { await finir('fini', ''); break; }
+      if (Date.now() > Number(f.prochain) + FAVORI_ATTENTE_TROP_TARD_MS) { await finir('arret', "l'extension s'était arrêtée trop longtemps — la suite n'est pas partie"); break; }
+      const compte = String(f.compte), produit = String(f.produit), prix = Number(f.cents), k = String(f.reste[0]);
+      // L'écart tiré au hasard, tenu en revérifiant tout (onglet, compte, Tout arrêter, pause, anti-robot).
+      const att = await tenirAttenteAimeVc(compte, f.prochain);
+      if (!att.ok) { await finir('arret', att.raison); break; }
+      let tout = {};
+      try { tout = (await chrome.storage.local.get(VC_RECETTE_OFFRES))[VC_RECETTE_OFFRES] || {}; } catch (_) { await finir('arret', RAISON_STOCKAGE); break; }
+      const recette = tout.favori && tout.favori.recette;
+      if (!recette || recette.rejouable !== true) { await finir('arret', "la recette de l'offre n'est plus là — rien n'est parti"); break; }
+      const ot = await ongletVestiaire(compte);
+      if (!ot.ok) { await finir('arret', ot.raison); break; }
+      // Les MÊMES portes que les favoris Vinted : discrétion (15/h, ouverture, un compte à la fois, série,
+      // vérification, Tout arrêter), sécurité du compte (jour, type, prudence, repos), puis les 45/h.
+      const p = await porteDiscretion('vc:' + ot.compte, 'favori');
+      if (p) { await finir('arret', p.error); break; }
+      const sg = await secuGeste('vestiaire', ot.compte, 'favori', 'serie');
+      if (sg) { await finir('arret', sg.error || 'sécurité du compte'); break; }
+      const cpt = await compterAction('vc:' + ot.compte, ACTIONS_MAX_HEURE - RESERVE_GESTES);
+      if (!cpt.ok) { await finir('arret', cpt.code === 'stockage' ? RAISON_STOCKAGE : `déjà ${ACTIONS_MAX_HEURE - RESERVE_GESTES} actions sur ce compte Vestiaire cette heure-ci`); break; }
+      await noterGesteAuto('vc:' + ot.compte, 'favori');
+      const depuis = Number(cpt.at) || (Date.now() - 5);
+      // « Une fois » : posé AVANT l'envoi (un worker tué au milieu ne renverra pas) ; la file avance aussi avant.
+      const noter = async (etat) => { try { const o = await chrome.storage.local.get(VC_AIMES_FAITS); const fa = o[VC_AIMES_FAITS] || {}; if (etat) fa[produit + '|' + k] = { at: new Date().toISOString(), cents: prix, etat }; else delete fa[produit + '|' + k]; await chrome.storage.local.set({ [VC_AIMES_FAITS]: fa }); return true; } catch (_) { return false; } };
+      if (!(await noter('envoi'))) { await rendreActions('vc:' + ot.compte, depuis, 1); await finir('arret', RAISON_STOCKAGE); break; }
+      f.reste = f.reste.slice(1);
+      const s = await tirerSansRepeter(VC_AIMES_ECART_DERNIER, VC_AIMES_ECART_S[0], VC_AIMES_ECART_S[1]);
+      try { if (Array.isArray(globalThis.__vrmPausesVues)) globalThis.__vrmPausesVues.push(['vcaimes:ecart', s * 1000]); } catch (_) {}
+      f.prochain = Date.now() + s * 1000;
+      await poserFileAimesVc(f);
+      let rep = null;
+      try { rep = await avecDelai(chrome.tabs.sendMessage(ot.tabId, { from: 'vrm-fond', action: 'vcOffre', geste: 'favori', produit, acheteur: k, prixCents: prix, recette, compte: ot.compte }, { frameId: 0 }), 25000, null); } catch (_) { rep = null; }
+      const statut = (rep && Number(rep.statut)) || 0;
+      if (!rep || rep.ok !== true) { noterDiag('vc_aime_muet'); await noter('incertaine'); f.suivi.incertaines++; await finir('arret', "l'onglet Vestiaire n'a pas répondu — regarde sur Vestiaire avant de recommencer"); break; }
+      if (!statut) {
+        const e = String(rep.erreur || '');
+        if (e && e !== 'reseau') { await rendreActions('vc:' + ot.compte, depuis, 1); await noter(null); await finir('arret', e === 'entetes' ? 'recharge une page Vestiaire, puis réessaie (rien n’est parti)' : e === 'autre-compte' || e === 'compte-pas-su' ? "l'onglet Vestiaire n'est plus sur ce compte — rien n'est parti" : `rien n'est parti (${e})`); break; }
+        await noter('incertaine'); f.suivi.incertaines++; await finir('arret', 'le réseau a coupé pendant un envoi — regarde sur Vestiaire avant de recommencer'); break;
+      }
+      noterDiag('vc_aime_' + statut);
+      if (await secuObserver('vestiaire', ot.compte, { status: statut, defi: rep.defi === true, retryAfter: rep.ra || null }) === 'robot') { await poserPauseVc(statut || 403, rep.ra); await noter('refusee'); await finir('arret', secuTexte(SECU_REFUS, 'robot', secuMots('vestiaire'))); break; }
+      if (statut === 429 || statut === 403) { await poserPauseVc(statut, rep.ra); await noter('refusee'); await finir('arret', `Vestiaire a refusé (${statut}) — pause de 30 min`); break; }
+      if (statut >= 200 && statut < 300 && rep.confirme === true) { await noter('faite'); f.suivi.faites++; n++; await noterJournal('vc:' + ot.compte, 'favori', {}); }
+      else if (statut >= 200 && statut < 300) { await noter('incertaine'); f.suivi.incertaines++; }
+      else { await noter('refusee'); await finir('arret', `Vestiaire a répondu ${statut}`); break; }
+      await poserFileAimesVc(f);
+      let aimes = {}, faits = {};
+      try { const o = await chrome.storage.local.get([VC_AIMES, VC_AIMES_FAITS]); aimes = o[VC_AIMES] || {}; faits = o[VC_AIMES_FAITS] || {}; } catch (_) {}
+      await publierAimesVc(aimes, faits, ot.compte, { envoi: Object.assign({}, f.suivi) });
+    }
+  } catch (_) { try { await finir('arret', 'interrompu'); } catch (_e) {} }
+  finally { _vcAimesIci = false; VC_REPONSE_EN_VOL = false; }
+  return n;
+}
+// Le réveil `vrm-offres` (1 min) : une file que personne ne tient plus (worker endormi puis réveillé).
+async function reprendreOffresAimesVc() {
+  if (_vcAimesIci || VC_REPONSE_EN_VOL) return 0;
+  const f = await lireFileAimesVc();
+  if (!f || !Array.isArray(f.reste)) return 0;
+  return deroulerAimesVc();
 }
 
 // ══════════════════════════════════════════════════════════════════════════

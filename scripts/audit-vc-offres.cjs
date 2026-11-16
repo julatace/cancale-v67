@@ -208,10 +208,11 @@ async function o1a3() {
   const rv = await p4.appel('PUT', `${API}/negotiations/${N1}${Q}`, { data: acc }, 200, JSON.stringify({ action: 'accept' }));
   const recV = de(rv, 'vcoffreappris')[0];
   dit(!!recV && recV.recette.rejouable === false && recV.recette.raison === 'offre-non-vue', 'O3 · une offre que la page n’avait jamais montrée ⇒ « pas rejouable » (offre-non-vue)', JSON.stringify(recV));
-  // Une offre que TU fais à un favori (pas une réponse) : aucune recette.
+  // Une offre que TU fais à un favori (pas une réponse) : jamais une recette de RÉPONSE. (15 nov., 5.392) Elle
+  // est apprise À PART, sous le geste « favori » (scripts/audit-favoris-sites.cjs), que `vcOffre` refuse.
   const p5 = chrome2();
   const rf = await p5.appel('POST', `${API}/products/${ART2}/negotiations${Q}`, { data: NB }, 200, JSON.stringify({ buyerId: Number(ACH), price: { cents: 23700 } }));
-  dit(!de(rf, 'vcoffreappris').length && de(rf, 'vcoffres').length === 1, 'O3 · ton offre spontanée à un favori n’est pas une réponse : aucune recette (l’offre est rangée)', JSON.stringify(rf.map((x) => x.kind)));
+  dit(de(rf, 'vcoffreappris').every((x) => x.recette.geste === 'favori') && de(rf, 'vcoffres').length === 1, 'O3 · ton offre spontanée à un favori n’est pas une réponse : aucune recette accepter/refuser/contre (seulement « favori », à part ; l’offre est rangée)', JSON.stringify(rf.map((x) => [x.kind, x.recette && x.recette.geste])));
   capt.recA = recA && recA.recette; capt.recC = recC && recC.recette; capt.recR = recR && recR.recette;
 }
 

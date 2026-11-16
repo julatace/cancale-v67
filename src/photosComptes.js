@@ -43,7 +43,7 @@ export function annoncesPourPhotos(vinted, { verdict = () => 'ok', numeroDe = ()
 export function calculerPhotosComptes({ annonces, comptesLus, noms, empreintes }) {
   const lu = empreintes !== null && empreintes !== undefined;
   const res = photosEnDouble({ annonces, empreintes: lu ? empreintes : {}, comptesLus });
-  return { ...res, lu, annonces, empreintes: lu ? empreintes : {}, noms, index: indexEmpreintes(lu ? empreintes : {}) };
+  return { ...res, lu, annonces, empreintes: lu ? empreintes : {}, noms, comptesLus: comptesLus || {}, index: indexEmpreintes(lu ? empreintes : {}) };
 }
 
 // La carte de Ma journée et le titre de la feuille (une source, §7).

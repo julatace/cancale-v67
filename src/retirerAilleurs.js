@@ -109,8 +109,11 @@ export function planRetirerAilleurs(v, o = {}) {
     if (a._venteDouteuse) art.douteuse = art.douteuse !== false; else art.douteuse = false;
     art.sites.push({ cle: cleSite(a), douteuse: !!a._venteDouteuse, plateforme: a.plateforme, id: String(a.id), compte: a.compte, compteNom: a.compteNom && a.compteNom !== 'principal' ? a.compteNom : '', lien: a.lien || null, onglet: a.onglet || null, voie, moyen, raison, code, pourquoiCode: a._pourquoiCode || '', lu: Number.isFinite(t) ? t : null, titre: a.titre || '' });
   }
-  const liste = [...articles.values()].map((art) => ({ ...art, sites: art.sites.sort((x, y) => ORDRE.indexOf(x.plateforme) - ORDRE.indexOf(y.plateforme)) }))
-    .sort((a, b) => String(a.numero).localeCompare(String(b.numero), 'fr', { numeric: true }));
+  // (15 nov., lot deux-comptes) Vendue sur un compte Vinted, encore en ligne sur un AUTRE compte Vinted
+  // (la même paire par identité, `memes`) : en TÊTE — sur Vinted, un deuxième acheteur paie en un toucher.
+  const deuxComptes = (art) => art.venduSur.includes('Vinted') && art.sites.some((s) => s.plateforme === 'Vinted');
+  const liste = [...articles.values()].map((art) => ({ ...art, deuxComptes: deuxComptes(art), sites: art.sites.sort((x, y) => ORDRE.indexOf(x.plateforme) - ORDRE.indexOf(y.plateforme)) }))
+    .sort((a, b) => (a.deuxComptes === b.deuxComptes ? 0 : a.deuxComptes ? -1 : 1) || String(a.numero).localeCompare(String(b.numero), 'fr', { numeric: true }));
   const tous = liste.flatMap((a) => a.sites);
   return {
     articles: liste,

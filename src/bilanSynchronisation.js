@@ -88,11 +88,29 @@ export const cleNumSync = (v) => cleNum(v);
 export const numerosSync = (v) => [
   ...new Set(String(v == null ? "" : v).split("+").map(cleNumSync).filter(Boolean)),
 ];
+// (15 nov., lot deux-comptes) `memes` : [[idA, idB], …] — deux annonces VINTED qui sont la MÊME
+// paire par une IDENTITÉ (même photo exacte de fiche, `recreeDe`, fusion faite sur SON clic :
+// `memesPairesFiches`, src/deuxComptes.js). Elles comptent pour UNE paire (le N° porté par les
+// deux n'est pas ambigu), et la vente de l'une sur un compte Vinted fait « à retirer » l'autre,
+// encore en ligne sur un AUTRE compte Vinted. Sans `memes`, rien ne change : deux annonces du
+// même site sous un N° restent ambiguës, et une vente Vinted ne vise que les autres sites.
 export function articlesVendusAilleurs({
   numeros = {},
   ventes = [],
   annonces = [],
+  memes = [],
 }) {
+  const racineMeme = new Map();
+  for (const m of Array.isArray(memes) ? memes : []) {
+    if (!Array.isArray(m) || m.length !== 2) continue;
+    const [x, y] = m.map(String);
+    if (!x || !y || x === y) continue;
+    const rx = racineMeme.get(x) || x, ry = racineMeme.get(y) || y;
+    const r = rx < ry ? rx : ry;
+    for (const [k, v] of [...racineMeme]) if (v === rx || v === ry) racineMeme.set(k, r);
+    racineMeme.set(x, r); racineMeme.set(y, r);
+  }
+  const memePaire = (a, b) => String(a) !== String(b) && racineMeme.has(String(a)) && racineMeme.get(String(a)) === racineMeme.get(String(b));
   const parNum = new Map();
   for (const [id, e] of Object.entries(numeros))
     if (e?.numero != null && String(e.numero).trim())
@@ -117,7 +135,7 @@ export function articlesVendusAilleurs({
         vus.add(p);
         p = String(numeros[p].recreeDe);
       }
-      roots.add(p);
+      roots.add(racineMeme.get(p) || p);
     }
     return roots.size === 1 ? n : null;
   };
@@ -143,8 +161,9 @@ export function articlesVendusAilleurs({
     const ventesLiees = ventes.filter(
       (v) =>
         v.engagee === true &&
-        v.plateforme !== a.plateforme &&
-        croise(groupe(v.numero), n),
+        ((v.plateforme !== a.plateforme && croise(groupe(v.numero), n)) ||
+          // Deux comptes Vinted, une paire : la vente de l'une, l'autre encore en ligne.
+          (v.plateforme === "Vinted" && a.plateforme === "Vinted" && memePaire(v.id, a.id))),
     );
     if (!ventesLiees.length) continue;
     const cle = [a.plateforme, a.compte, a.id].join(":");
@@ -156,6 +175,9 @@ export function articlesVendusAilleurs({
           x.active === true &&
           x.plateforme === v.plateforme &&
           String(x.id) !== String(v.id) &&
+          // L'annonce elle-même (encore en ligne sur l'autre compte) n'est pas une remise en vente.
+          String(x.id) !== String(a.id) &&
+          !memePaire(x.id, v.id) &&
           croise(groupe(x.numero), groupe(v.numero)),
       ),
     );

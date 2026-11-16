@@ -56,6 +56,8 @@ import ecran_studio_paires from './en/studio-paires.js';   // (14 nov., Studio b
 import ecran_republier_guide from './en/republierGuide.js';   // (15 nov.) republier / publier à la main, guidés
 import ecran_memePhoto from './en/memePhoto.js';   // (15 nov., lot meme-photo)
 import ecran_fiabilite from './en/fiabilite.js';   // (15 nov., lot fiabilite-auto)
+import ecran_deuxComptes from './en/deuxComptes.js';   // (15 nov., lot deux-comptes)
+import ecran_favorisSites from './en/favorisSites.js';   // (15 nov., lot favoris-sites)
 import ecran_etageres from './en/etageres.js';   // (15 nov.) le Stock en étagères
 import ecran_journee_verre from './en/journee-verre.js';   // (15 nov.) Ma journée verre, la paire à sortir
 import ecran_arrivee from './en/arrivee.js';   // (15 nov.) atelier d'arrivée, historique, taille du texte
@@ -2291,6 +2293,8 @@ export default {
   ...ecran_vcventes,
   ...ecran_memePhoto,
   ...ecran_fiabilite,
+  ...ecran_deuxComptes,
+  ...ecran_favorisSites,
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_liaison,
