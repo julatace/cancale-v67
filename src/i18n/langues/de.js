@@ -2151,6 +2151,7 @@ export default {
   "creerVinted.photo.retirer": "Foto {n} entfernen",
   "creerVinted.photo.lecture": "Wird gelesen…",
   "creerVinted.photo.ajouter": "Fotos hinzufügen",
+  "creerVinted.photo.studio": {one: "1 Foto aus deinem Studio übernommen: entferne es oder füge weitere hinzu.", other: "{n} Fotos aus deinem Studio übernommen: entferne sie oder füge weitere hinzu."},
   "creerVinted.fait": "Entwurf auf Vinted bereit ✓",
   "creerVinted.ouvrir": "Auf Vinted öffnen",
   "creerVinted.aFinir": "Auf Vinted zu wählen: {liste}",

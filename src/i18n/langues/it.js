@@ -2151,6 +2151,7 @@ export default {
   "creerVinted.photo.retirer": "Rimuovi la foto {n}",
   "creerVinted.photo.lecture": "Lettura…",
   "creerVinted.photo.ajouter": "Aggiungi foto",
+  "creerVinted.photo.studio": {one: "1 foto del tuo studio ripresa: toglila o aggiungine altre.", other: "{n} foto del tuo studio riprese: toglile o aggiungine altre."},
   "creerVinted.fait": "Bozza pronta su Vinted ✓",
   "creerVinted.ouvrir": "Apri su Vinted",
   "creerVinted.aFinir": "Da scegliere su Vinted: {liste}",

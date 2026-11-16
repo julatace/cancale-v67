@@ -166,6 +166,8 @@ export default {
   "rg.publier.sous": "Tu publies toi-même, rien ne part d’ici",
   "rg.publier.refus": "Texte pas prêt : {raison}.",
   "rg.publier.num": "Le N°{num} est celui de la fiche : le même sur la boîte.",
+  "rg.publier.reserve": "Le N°{num} de la fiche s’affiche à côté de « Publier » sur Vinted : l’annonce le prendra.",
+  "rg.publier.pris": "Le N°{num} est déjà sur une annonce Vinted : rien n’est réservé, regarde Annonces.",
   // (15 nov., « je veux TOUTES les photos », « les barres beaucoup mieux »)
   "rg.photos.choix": "{n} sur {m} photos choisies · touche une photo pour la retirer ou la remettre",
   "rg.photos.aucuneChoisie": "Aucune photo choisie : touche une photo pour la remettre.",

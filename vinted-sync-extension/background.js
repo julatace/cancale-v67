@@ -1210,6 +1210,7 @@ try {
         if (msg.type === 'reglageCapte') { sendResponse(await poserCapteCoupe(msg.coupe === true)); return; }   // 5.377
         if (msg.type === 'numerotes') { sendResponse(await annoncerNumerotes(msg)); return; }   // 5.382
         if (msg.type === 'empreinteImage') { sendResponse(await empreintesImagesPourApp(msg)); return; }   // 5.395
+        if (msg.type === 'ficheAPublier') { sendResponse(await annoncerFicheAPublier(msg)); return; }   // 5.395
         if(msg.type==='favorisEtat'){const e=await etatPourApp();sendResponse(e);if(Date.now()-dernierPontFavoris>60000){dernierPontFavoris=Date.now();reinjecterPont().catch(()=>{});}return;}
         if(msg.type==='favorisExec'&&msg.endpoint==='/vrm/favoris'){sendResponse(await executerPourApp({...msg,method:'POST'},sender));return;}
         if(msg.type==='favorisOuvrir'){sendResponse(await executerPourApp({...msg,method:'POST',endpoint:'/vrm/favoris/ouvrir'},sender));return;}
@@ -5286,6 +5287,44 @@ async function modifierLigneCas(id, modifier, essais = 6) {
   return null;
 }
 const corpsResa = (r) => ({ attente: r.attente, items: r.items, capturedAt: new Date().toISOString(), ver: EXT_VERSION });
+// (16 nov., 5.395) « PUBLIER CETTE FICHE » (2026-11-11-rangement-guide.md) : SUR SON CLIC, dans
+// l'app (« Ouvrir Vinted » d'une fiche « À publier »), la page de dépôt qui s'ouvre ensuite dans CE
+// navigateur affiche et réserve LE N° DE LA FICHE (celui de sa boîte), pas le suivant ; la publication
+// relie ce N° à l'annonce créée par l'identifiant que Vinted rend (`items[itemId].fiche`) — une identité,
+// jamais un titre. Une fois, 30 min au plus, la PREMIÈRE page de dépôt qui s'ouvre. Un N° déjà porté par
+// une annonce ⇒ refusé (rien d'annoncé). Aucune requête vers Vinted.
+const FICHE_A_PUBLIER = 'vrmFicheAPublier';           // { fiche, numero, at }
+const FICHE_A_PUBLIER_MS = 30 * 60000;
+function numeroPorteAilleurs(main, resa, numero) {
+  const c = cleNum(numero);
+  if (!c) return true;
+  if (Object.values((main && main.vinted_annonce_numeros) || {}).some((e) => e && cleNum(e.numero) === c)) return true;
+  if (Object.values((resa && resa.items) || {}).some((v) => v && cleNum(v.numero) === c)) return true;
+  return false;
+}
+async function annoncerFicheAPublier(msg) {
+  const fiche = String((msg && msg.fiche) || ''), numero = String((msg && msg.numero) || '').trim();
+  if (!/^[\w-]{1,80}$/.test(fiche) || !/^[A-Z]{0,3}\d{1,6}$/.test(cleNum(numero))) return { ok: false, code: 'invalide' };
+  return unResaALaFois(async () => {
+    const main = await lireMain(['vinted_annonce_numeros', 'vrm_numero_ecrit']);
+    if (main === null) return { ok: false, code: 'lecture' };
+    if (numeroEcritAllume(main)) return { ok: false, code: 'ecrit' };
+    const resa = await lireResa();
+    if (resa === null) return { ok: false, code: 'lecture' };
+    if (numeroPorteAilleurs(main, resa, numero)) { noterDiag('fiche_publier_numero_pris'); return { ok: false, code: 'pris' }; }
+    try { await chrome.storage.local.set({ [FICHE_A_PUBLIER]: { fiche, numero, at: Date.now() } }); } catch (_) { return { ok: false, code: 'stockage' }; }
+    noterDiag('fiche_publier_annoncee');
+    return { ok: true, numero };
+  });
+}
+async function prendreFicheAPublier() {
+  let f = null;
+  try { f = (await chrome.storage.local.get(FICHE_A_PUBLIER))[FICHE_A_PUBLIER] || null; } catch (_) { return null; }
+  if (!f) return null;
+  try { await chrome.storage.local.remove(FICHE_A_PUBLIER); } catch (_) {}
+  const age = Date.now() - Number(f.at || 0);
+  return age >= 0 && age < FICHE_A_PUBLIER_MS && f.fiche && f.numero ? f : null;
+}
 async function reserverNumeroPourOnglet(tabId, domain) {
   return unResaALaFois(async () => {
     if (tabId == null) return { ok: false, raison: 'onglet' };
@@ -5309,15 +5348,20 @@ async function reserverNumeroPourOnglet(tabId, domain) {
     if (numeroEcritAllume(main)) { noterDiag('resa_numero_ecrit'); return { ok: false, raison: 'ecrit' }; }
     // 5.356 : le N° est calculé SUR la ligne lue, et écrit seulement si personne
     // n'a réservé entre-temps (comparer-et-échanger) — sinon relu et recalculé.
-    let numero = null;
+    let numero = null, ficheLiee = '';
+    // 5.395 : la fiche annoncée par SON clic dans l'app (une fois, 30 min) donne SON N° à cette page.
+    const ficheP = await prendreFicheAPublier();
     const ecrit = await modifierLigneCas(RESA_LIGNE, (d) => {
       const r = resaPropre(d);
-      numero = prochainNumeroDe(main, r);
-      r.attente[numero] = { at: new Date().toISOString(), uid: String(uid) };
+      ficheLiee = '';
+      if (ficheP && !numeroPorteAilleurs(main, r, ficheP.numero)) { numero = String(ficheP.numero); ficheLiee = String(ficheP.fiche); }
+      else numero = prochainNumeroDe(main, r);
+      r.attente[numero] = { at: new Date().toISOString(), uid: String(uid), ...(ficheLiee ? { fiche: ficheLiee } : {}) };
       return corpsResa(r);
     });
     if (ecrit !== true || !numero) { noterDiag(ecrit === null ? 'resa_ecriture_ratee' : 'resa_rien'); return { ok: false, raison: 'ecriture' }; }
-    loc[tabId] = { numero, at: Date.now(), uid: String(uid) };
+    if (ficheP) noterDiag(ficheLiee ? 'fiche_publier_reservee' : 'fiche_publier_numero_pris');
+    loc[tabId] = { numero, at: Date.now(), uid: String(uid), ...(ficheLiee ? { fiche: ficheLiee } : {}) };
     try { await chrome.storage.local.set({ [RESA_LOCAL]: loc }); } catch (_) {}
     noterDiag('resa_posee');
     notifierApp({ type: 'maj', quoi: 'numeros' });
@@ -5381,7 +5425,7 @@ async function lierPublicationsEnAttente() {
   const ecrit = await modifierLigneCas(RESA_LIGNE, (d) => {
     const r = resaPropre(d);
     for (const [, v] of aLier) {
-      if (!r.items[v.item]) r.items[v.item] = { numero: v.numero, at: new Date().toISOString(), uid: v.uid };
+      if (!r.items[v.item]) r.items[v.item] = { numero: v.numero, at: new Date().toISOString(), uid: v.uid, ...(v.fiche ? { fiche: String(v.fiche) } : {}) };
       delete r.attente[v.numero];
     }
     return corpsResa(r);
