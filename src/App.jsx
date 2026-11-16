@@ -14804,6 +14804,8 @@ const poserBordereau = async (PL, out, src, { numero, title, pos, thermique, cho
   if (!imp.famille) { let ty = 'autre'; try { ty = typeBordereau(PL, src).type; } catch (_) {} imp.famille = familleDe({ retour: !!imp.retour, site: imp.site, type: ty }); }
   imp.ts = resoudreTampon(imp.tampons, { famille: imp.famille, thermique: !!thermique });
   { const c = imp.tampon ? contenuDuMode(imp.tampon) : null; if (c) imp.ts = { ...imp.ts, contenu: c }; }
+  // Un RETOUR reste TOUJOURS marqué « RETOUR » (son N° et son titre écrits, quel que soit le réglage des ventes).
+  if (imp.retour) imp.ts = { ...imp.ts, contenu: { ...imp.ts.contenu, num: true, titre: true } };
   let z = thermique ? zoneEtiquette(PL, first) : { ok: false };
   // Pas su, ou une zone qui ne fait qu'un QUART de la feuille (le cadre d'UNE des étiquettes
   // d'une A4 à 2 ou 4) : la feuille entière est découpée d'après l'encre et les codes.

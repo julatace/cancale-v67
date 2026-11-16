@@ -65,7 +65,8 @@ if (MUT === 'deforme') imp = muter(imp, 'xScale: pl.s, yScale: pl.s, rotate: PL.
 if (MUT === 'rogne') regles = muter(regles, 'return { tourne, lw, lh, s: Math.min(dispoW / lw, dispoH / lh, agrandi) };', 'return { tourne, lw, lh, s: Math.min(dispoW / lw, agrandi) };');
 if (MUT === 'gris') regles = muter(regles, "const v = lum(pixels, i) < seuil ? 0 : 255;", "const v = lum(pixels, i);");
 if (MUT === 'titre') regles = muter(regles, "if (m === 'num') return { numero: n, titre: '' };", "if (m === 'num') return { numero: n, titre: t };");
-if (MUT === 'sansBloques') imp = muter(imp, 'const bloques = [...codes.map((c) => elargir(c.boite, MENTION.codes)), ...adresses];', 'const bloques = [];');
+// (16 nov.) Les codes sont gardés deux fois (l'étiquette posée ET la page rendue, `zonesInterditesTampon`) : la mutation ôte les deux.
+if (MUT === 'sansBloques') { imp = muter(imp, "const bloques = [...codes.map((c) => ({ ...elargir(c.boite, MENTION.codes), quoi: 'code' })), ...adresses.map((a) => ({ ...a, quoi: 'adresse' }))];", 'const bloques = [];'); tampon = muter(tampon, "  const zi = rendu ? zonesInterditesTampon(rendu, adresses) : {", "  const zi = false ? zonesInterditesTampon(rendu, adresses) : {"); }
 if (MUT === 'sansRecadrage') imp = muter(imp, 'const b = boiteEncre(carte, z, Math.round(3 * MM_PT * S)) || z;', 'const b = z;');
 const SCRIPT = `const chargerPdfjs=async()=>window.pdfjsLib;
 let __store={}; const load=(k,d)=>(k in __store?JSON.parse(JSON.stringify(__store[k])):d); const save=(k,v)=>{__store[k]=JSON.parse(JSON.stringify(v));}; const libererOngletPdf=()=>{};
