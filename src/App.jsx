@@ -367,6 +367,29 @@ function HoteFicheLigne({ rendre, deps, onActive }) {
   const l = React.useSyncExternalStore(abonnerFicheLigne, ligneOuverte, ligneOuverte);
   const [choisi, setChoisi] = React.useState(null);
   React.useEffect(() => { setChoisi(null); }, [l && l.cle]);
+  // (16 nov., accessibilite-feuilles F1) La fiche FERMÉE rend le focus à la rangée touchée (WCAG 2.4.3) : un toucher
+  // sur une rangée (une <div>) ne laissait rien de focalisé, et le focus retombait sur <body> (le clavier et
+  // VoiceOver repartaient du haut de l'écran). Sans défiler (`preventScroll`) ; un focus déjà rendu ailleurs est gardé.
+  const origineFiche = React.useRef(null);
+  const etaitOuverte = React.useRef(false);
+  React.useEffect(() => {
+    if (l) { etaitOuverte.current = true; return undefined; }
+    if (!etaitOuverte.current) return undefined;
+    etaitOuverte.current = false;
+    const o = origineFiche.current; origineFiche.current = null;
+    if (!o) return undefined;
+    const t = setTimeout(() => {
+      try {
+        const a = document.activeElement;
+        if (a && a !== document.body && a !== document.documentElement && a.isConnected) return;
+        const row = o.row && o.row.isConnected ? o.row : (o.cle ? document.querySelector(`[data-fiche-ligne="${CSS.escape(o.cle)}"]`) : null);
+        if (!row) return;
+        if (!row.hasAttribute('tabindex') && !row.matches('a[href],button,input,select,textarea')) row.setAttribute('tabindex', '-1');
+        row.focus({ preventScroll: true });
+      } catch (_) {}
+    }, 60);
+    return () => clearTimeout(t);
+  }, [l]);
   // Le toucher : délégué une fois pour toute l'app (les rangées ne portent que leurs `data-fl-*`).
   React.useEffect(() => {
     const clic = (e) => {
@@ -374,7 +397,7 @@ function HoteFicheLigne({ rendre, deps, onActive }) {
       const t = e.target; if (!t || typeof t.closest !== 'function') return;
       const row = t.closest('[data-fiche-ligne]'); if (!row || !toucheLeCorps(t, row)) return;
       try { const sel = window.getSelection && String(window.getSelection() || ''); if (sel && sel.length > 2) return; } catch (_) {}
-      const x = lireLigne(row); if (x) ouvrirLigne(x);
+      const x = lireLigne(row); if (x) { origineFiche.current = { row, cle: row.getAttribute('data-fiche-ligne') }; ouvrirLigne(x); }
     };
     // Le morceau de la fiche se charge au premier appui (pas au premier toucher complet).
     const prechauffe = (e) => { const t = e.target; if (t && t.closest && t.closest('[data-fiche-ligne]')) { import('./FichePaire.jsx').catch(() => {}); document.removeEventListener('pointerdown', prechauffe, true); } };
@@ -848,8 +871,8 @@ import { histoireArticle, offresDeConversation, colisDesVentes } from "./histoir
 import { etatArticle } from "./etatArticle.js";
 // ⟦→ ecrans/Stock.jsx #1⟧
 import './styles-stock-2d.css'; // (8 nov.) style de ./StockExplication.jsx, gardé à sa place (son écran est chargé à la demande)
-import { libererCasesPartis, remettreCase, resteAuStock, etatCase } from "./stockSortie.js";
-import { opsSortieCases, sortirDeCases } from "./stockEtageres.js";   // (15 nov., étagères) la case vidée + la descente des piles, en un geste
+import { libererCasesPartis, remettreCase, resteAuStock, etatCase, partieDuStock } from "./stockSortie.js";
+import { opsSortieCases } from "./stockEtageres.js";   // (15 nov., étagères) la case vidée + la descente des piles, en un geste
 import { phraseDescentes, descentesDesOps } from "./etageresTextes.js";
 import { annoncesActuelles, annoncesVcStock, classerRangees } from "./stockAnnonces.js";
 import { PasEnLigneDetail, texteCartePasEnLigne } from "./PasEnLigne.jsx";   // (11 nov., lot pas-en-ligne)
@@ -1001,8 +1024,7 @@ import "./design/studio-achats-relier.css";   // (15 nov.) Annonces → « Sans 
 // (14 nov., Studio bleu clair) Ma journée en grille Bento : la tête, l'affiche, les tuiles et ce qu'elles déplient —
 // portée par `.sj-journee` seulement, EN DERNIER (docs/passation/2026-11-14-studio-journee.md).
 import { BentoJournee, placerTuiles, RangeeJ, LienJ, MontantAffiche, Plaque as PlaqueJ } from "./JourneeStudio.jsx";
-import PaireASortir from "./PaireASortir.jsx";   // (15 nov., refonte-journee) « La paire à sortir en premier »
-import { ordreDeSortie, colonneDe, emplacementDe } from "./paireASortir.js";
+import { ordreDeSortie, emplacementDe } from "./paireASortir.js";
 import MarqueSite from "./plateformes/Marque.jsx";
 import "./design/studio-journee.css";
 import "./design/studio-finition.css";   // (15 nov.) La passe de finition écran par écran — `@layer vrm-finition`, la PREMIÈRE couche (index.html) : docs/passation/2026-11-15-finition-ecrans.md
@@ -24019,7 +24041,7 @@ export function ArgentAVenirCarte({ A, plateforme = null, reserve = false }) {
   return (
     <section className="vrm-a-venir" data-a-venir={T.valeur == null ? '' : String(Math.round(T.valeur * 100))} data-a-venir-n={String(T.n)} data-a-venir-site={plateforme || 'toutes'} data-a-venir-partiel={T.partiel ? '1' : undefined} data-a-venir-groupes={String(groupes.length)}
       style={{ marginBottom: 12 }}>
-      <button type="button" className="vrm-av-resume" data-a-venir-ouvrir="" onClick={ouvrirArgentAVenir} aria-label={`${tr('avenir.ouvrir')} — ${T.partiel && T.valeur != null ? tr('journee.moins') + ' ' : ''}${T.valeur == null ? '—' : montant(T.valeur)}`}>
+      <button type="button" className="vrm-av-resume" data-a-venir-ouvrir="" onClick={ouvrirArgentAVenir} title={`${tr('avenir.ouvrir')} — ${T.partiel && T.valeur != null ? tr('journee.moins') + ' ' : ''}${T.valeur == null ? '—' : montant(T.valeur)}`}>
         <span className="vrm-av-resume-txt">
           <span className="vrm-av-resume-titre">{tr('journee.venir')}</span>
           {resume
@@ -30627,8 +30649,9 @@ function ChoixPlanches({ cols, rows, planches, setPlanches, plateau = false, fix
       </div>
       </div>
       {rows > 1 && <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 10 }}>
-        <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" data-planches-toutes="" onClick={() => setPlanches(Array.from({ length: rows - 1 }, (_, i) => i + 1))}>Une à chaque rangée</button>
-        <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setPlanches([])}>Aucune</button>
+        {/* (16 nov., bancs-rouges-a) 44 px au doigt (§7) : ces deux boutons « petits » faisaient 30 px. */}
+        <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" data-planches-toutes="" onClick={() => setPlanches(Array.from({ length: rows - 1 }, (_, i) => i + 1))} style={{ minHeight: 44 }}>Une à chaque rangée</button>
+        <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" data-planches-aucune="" onClick={() => setPlanches([])} style={{ minHeight: 44 }}>Aucune</button>
       </div>}
   </>);
 }
@@ -45444,11 +45467,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!Array.isArray(listings.items) || listings.loading || listings.incomplet || listings.error) return;
     const parCle = new Map();
     for (const o of sales.items) {
-      if (!venteSortieDuStock(o)) continue;
+      // (16 nov., lot retirer-case-compact) UNE règle (`partieDuStock`, src/stockSortie.js) : le statut Vinted parti, OU la
+      // preuve du transporteur pour le n° EXACT de son bordereau (`partisVinted` : e-mail de dépôt, prise en charge) ;
+      // jamais une vente annulée/qui revient, jamais « Colis fait » seul, jamais une absence.
+      if (!o || o.transaction_id == null || !String(o.status || '')) continue;
+      const annulee = classifyOrderStatus(String(o.status)) === 'cancelled' || venteQuiRevient(o);
+      const statutParti = venteSortieDuStock(o), raisonDepart = partisVinted.get(String(o.transaction_id)) || null;
+      if (!partieDuStock({ statutParti, annulee, raison: raisonDepart })) continue;
       const num = effEntry(o)?.numero; const cle = cleNum(num || ''); if (!cle) continue;
       // Encore porté par une annonce présente ou une autre vente à envoyer : on ne touche à rien.
       if ((porteursNum[cle] || []).some(p => p.type !== 'garage')) continue;
-      parCle.set(cle, { cle, num: String(num), tx: String(o.transaction_id), titre: o.title || '', statut: o.status || '', plateforme: 'Vinted' });
+      parCle.set(cle, { cle, num: String(num), tx: String(o.transaction_id), titre: o.title || '', statut: statutParti ? (o.status || '') : (raisonDepart.type === 'email' ? 'colis déposé (e-mail du transporteur)' : 'pris en charge par le transporteur'), plateforme: 'Vinted' });
     }
     // (27 oct., « pareil pour Leboncoin et eBay ») Même règle, par IDENTITÉ :
     // Leboncoin = lien posé à la main ou référence VRM (`numeroLbcIdentite`),
@@ -45491,7 +45520,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for (const { v, num, cle } of vcSorties) ajouter(cle, { cle, num: String(num), tx: 'vc:' + String(v.id || ''), titre: '', statut: v.etat || 'colis parti', plateforme: 'Vestiaire' });
     if (parCle.size) sortirPartisDuStock([...parCle.values()]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, listings.items, porteursNum, baseKO, lbcLu, lbcVentes, ebayCmd, lbcItemsBenef, ventesVc]);
+  }, [sales.items, listings.items, porteursNum, baseKO, lbcLu, lbcVentes, ebayCmd, lbcItemsBenef, ventesVc, partisVinted]);
   // ── (1er nov.) « DÉPOSÉ » DEPUIS VENTES : glissé (téléphone) ou bouton ─────
   // Rien n'est écrit pendant DELAI_ANNULER_DEPOSE (« Annuler » ⇒ rien) ; puis LE
   // geste de Colis (`marquerPoste`). Écran quitté entre-temps : la même écriture
@@ -47890,8 +47919,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [only]);
   // (15 nov., refonte-journee) « La paire à sortir en premier » : ce qui est DIT juste après « Je l'ai sortie »
   // (la case libérée, la pile qui descend) jusqu'à « Compris » — un état de l'écran, jamais une donnée.
-  const [apresSortie, setApresSortie] = useState(null);
-  const [feuilleTvb, setFeuilleTvb] = useState(false);   // (15 nov.) la feuille « Tout va bien ? » de Ma journée
+  const [feuilleTvb, setFeuilleTvb] = useState(() => trancherChoix === true);   // (15 nov.) la feuille « Tout va bien ? » de Ma journée
+  // (16 nov., bancs-rouges-a) « À trancher » vit dans cette feuille depuis le 15 nov. : le lien `?tab=trancher` (SMS,
+  // notifications) ouvrait la carte… dans une feuille fermée — il ne montrait rien. Il ouvre maintenant la feuille aussi.
+  useEffect(() => { const f = () => setFeuilleTvb(true); window.addEventListener('vrm:trancher-ouvrir', f); return () => window.removeEventListener('vrm:trancher-ouvrir', f); }, []);
   // (16 nov., fiabilite-auto) Les écarts du contrôle de cette nuit (N° en double, vente sans N°, totaux…) comptent dans la
   // ligne « Tout va bien ? · N points » et se lisent dans sa feuille. L'extension en retard est dite par la ligne de fraîcheur.
   const pointsFiab = usePointsToutVaBien();
@@ -49685,34 +49716,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return { ...r, slots, meubles };
           } catch (_) { return null; }
         })();
-        // « Je l'ai sortie » : LE GESTE DU STOCK (« Vendues à sortir » → « Je l'ai sortie ») — la déclaration
-        // `vinted_pairs_lost` de CE N° (`cleDeclarationPartie`, par identité) et la case libérée, la pile tassée
-        // (`sortieCaseStock` → `opsSortieCases`) ; un geste annulable, accompagné (`stock.sortir`).
-        const sortirPaireJ = (v) => {
-          const mots = motsVendeur();
-          if (!v || !v.num) { toast(tr('sortir.rienANoter')); return; }
-          const fiches = load('vinted_annonce_numeros', {}) || {};
-          const perdues = lireObjet('vinted_pairs_lost');
-          const k = cleNum(v.num);
-          const slotsAv = lireObjet('vrm_slots');
-          const cleD = cleDeclarationPartie(v.num, v.idAnnonce || '', fiches);
-          const ops = [{ k: 'vinted_pairs_lost', type: 'cle', id: cleD, apres: { ...(perdues[cleD] || {}), id: String(v.idAnnonce || ''), at: new Date().toISOString(), title: v.titre || '', from: 'stock' }, avant: perdues[cleD] }];
-          if (k && slotsAv[k]) ops.push(...sortieCaseStock(k));
-          const desc = descentesDesOps(ops);
-          let dit = { num: String(v.num), lieu: v.lieu || null, descendus: [] };
-          if (v.lieu && desc.length) {
-            const m0 = load('vrm_meubles', []) || [];
-            const r = sortirDeCases({ slots: slotsAv, meubles: Array.isArray(m0) ? m0 : [], cles: [k] });
-            dit = { ...dit, colAvant: colonneDe(v.lieu, slotsAv), colApres: colonneDe(v.lieu, r.slots), cible: v.lieu.rangee - 1, descendus: [...new Set(desc.map((d) => d.cle))], phrase: phraseDescentes(desc) };
-          }
-          gesteVrm(texteAvecDescentes(tr(mots.e ? 'sortir.faitF' : 'sortir.fait', { num: String(v.num) }), ops), ops, {}, (sens) => {
-            if (ops.some((o) => o.k === 'vrm_slots')) { try { window.dispatchEvent(new Event('vrm:stock-slots')); } catch (_) {} }
-            setApresSortie(sens === 'avant' ? null : dit);
-            setDernierMeubleSorti(sens === 'avant' ? null : (v.lieu ? v.lieu.meubleId : null));
-            setTicStock((t) => t + 1);
-          }, 'stock.sortir');
-        };
-        const imprimerJ = () => { _pendingBordPrint = true; if (onNav) onNav('cat_bord'); };
         // (15 nov., refonte-journee — Julien : « tu peux mettre litige achat, vente ensemble ici ») LE BLOC « RETOURS ET
         // LITIGES » : une ligne par article, les MÊMES listes qu'Achats (retours d'achat, sans ceux « sans nouvelles » ni
         // ceux qu'il a dits réglés), que Colis (retours de vente, `retoursSuivis`) et que les litiges (`litigesSuivis`).
@@ -49749,10 +49752,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         })();
         const retoursLitigesElt = retoursLitigesJ.length ? <RetoursLitigesJournee lignes={retoursLitigesJ} Photo={PhotoVinted}
           attrs={{ 'data-a-renvoyer-journee': String(retoursClasses.actifs.filter((c) => c.etape === 'a-deposer').length) }}/> : null;
-        const sortirElt = sortirJ ? <PaireASortir liste={sortirJ.aSortir} nSorties={sortirJ.sorties.length} slots={sortirJ.slots} Photo={PhotoVinted} Icon={Icon} mots={motsVendeur()}
-          apres={apresSortie} onSortir={sortirPaireJ} onImprimer={imprimerJ} onRanger={(v) => { if (v && v.num && onStore) onStore(String(v.num)); else if (onNav) onNav('garage'); }}
-          onCompris={() => setApresSortie(null)} ordi={ordiJournee}
-          toutesImprimer={{ n: Math.max(1, sortirJ.sorties.length), nums: sortirJ.sorties.map((x) => x.num).filter(Boolean), imprimer: imprimerJ }}/> : null;
+        // (16 nov., lot retirer-case-compact — Julien : « enlever la paire de sa case ça prend trop de place », puis « dans
+        // l'onglet Stock, la case doit être en surbrillance si l'article n'est pas rangé/retiré — pas de pop-up ») La grande
+        // carte « La paire à sortir en premier » n'est plus posée ici : le seul signe est la case ALLUMÉE du Stock, dont le
+        // toucher fait la sortie (annulable). `sortirJ` reste : la place de chaque colis dans les rangées de l'ordinateur.
         // (15 nov., refonte-journee — la maquette ORDINATEUR) Le chiffre du jour et sa semaine, construits une fois : dans la
         // tête au téléphone, en tête de la 1re colonne à l'ordinateur (les mêmes données, la même règle de « Vendu »).
         const friseJ = !premierJour ? (
@@ -49763,7 +49766,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               .map((o) => ({ o, t: tsCommande(o) })).filter((x) => x.t >= de && x.t < a)
               .map((x) => x.o).filter(Boolean), quandCommandeVinted).map((o) => orderPhoto(o)).filter(Boolean)}/>) : null;
         return (
-          <div className="vrm-day-layout vrm-fu-ecran vrm-fu-journee sj-journee" data-espace="journee" data-sj-ordi={ordiJournee ? '1' : '0'} data-sortir-present={sortirJ && (sortirJ.aSortir.length || apresSortie) ? '1' : undefined}>
+          <div className="vrm-day-layout vrm-fu-ecran vrm-fu-journee sj-journee" data-espace="journee" data-sj-ordi={ordiJournee ? '1' : '0'}>
             <ScreenHead icon="soleilLevant" title={tr('reglages.ma-journee.lib')}/>
 
             {/* (14 nov., Studio bleu clair — décision de Julien) LA TÊTE : le bonjour et la date, le grand titre, la
@@ -49791,9 +49794,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     10 h », « Imprimer le bordereau », « Déposé »). Plus aucune ligne « Retour » ailleurs dans la journée. */}
                 <ARenvoyerJournee r={null} onImprimer={imprimerRetourAchat} onPreparer={preparerRetourPdf} onDepose={basculerRetourDepose} Photo={PhotoVinted}
                   onVoir={() => { if (onNav) onNav('achats'); }}/>
-                {/* (15 nov., refonte-journee — maquette validée) « LA PAIRE À SORTIR EN PREMIER » : quand une vente tombe, OÙ est
-                    l'article (son meuble, sa case allumée), puis « Je l'ai sortie » — avant le chiffre du jour. */}
-                {ordiJournee ? null : sortirElt}
                 {/* SON ordre (« Modifier ma journée ») entre la phrase et l'affiche ; « Les chiffres du mois » sont une
                     tuile de la grille, « la prochaine chose » la première carte de « À faire » (`data-prochain`). */}
                 {ordreJourneeHeure('tete', persoJ).filter((id) => id === 'phrase' || (id === 'frise' && !(ordiJournee && !baseKO && !premierJour))).map((id) => id === 'phrase'
@@ -49850,12 +49850,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               if (xE && visT('envoyer').montree) {
                 const n = nDe(xE), em = !xE.pasSu && xE.t && xE.t.emballer ? xE.t.emballer : null;
                 const imprimer = () => { _pendingBordPrint = true; if (onNav) onNav(xE.tab); };
-                // (15 nov., refonte-journee) « Imprimer les 3 bordereaux » en barre (la maquette) ; quand « La paire à sortir »
-                // est là, SON « Je l'ai sortie » est le plein de l'écran : l'impression devient une touche (un plein par écran).
-                const sortirLa = !!(sortirJ && (sortirJ.aSortir.length || apresSortie));
+                // (15 nov., refonte-journee) « Imprimer les 3 bordereaux » en barre (la maquette) ; (16 nov.) toujours le plein de
+                // l'écran : « La paire à sortir » n'est plus dans Ma journée (la case allumée du Stock).
                 const plein = em && em.n > 0 ? (
-                  <button type="button" className={sortirLa ? 'sb-touche sj-imprimer-touche' : 'sb-btn-plein'} data-sj-imprimer={String(em.n)} data-fu-principal="" title={em.phrase}
-                    aria-label={tr('sj.imprimerN', { n: em.n })} onClick={imprimer}>
+                  <button type="button" className="sb-btn-plein" data-sj-imprimer={String(em.n)} data-fu-principal="" title={em.phrase}
+                    onClick={imprimer}>{/* (16 nov.) son nom = son texte visible (WCAG 2.5.3, banc accessibilite) */}
                     <Icon name="printer" size={24}/><span>{(em.n > 1 ? tr('sj.imprimerLesN', { n: em.n }) : tr('sj.imprimerLe'))}</span>
                   </button>) : null;
                 const colis = colisJournee;
@@ -50038,7 +50037,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               return (<>
                 <BentoJournee tuiles={tuilesPlacees} ordi={ordiJournee} FermeAuRetour={FermeAuRetour}
                   colonnes={ordiJournee ? [
-                    { cle: 'c1', avant: <>{visibiliteCarte('frise', { reglage: persoJ, mode: PROFIL_VENDEUR.mode }).montree ? <div className="sj-affiche" data-sj-affiche="">{friseJ}</div> : <div hidden data-jp-cachee="frise">{friseJ}</div>}{sortirElt}</>, ids: ['mois'] },
+                    { cle: 'c1', avant: <>{visibiliteCarte('frise', { reglage: persoJ, mode: PROFIL_VENDEUR.mode }).montree ? <div className="sj-affiche" data-sj-affiche="">{friseJ}</div> : <div hidden data-jp-cachee="frise">{friseJ}</div>}</>, ids: ['mois'] },
                     { cle: 'c2', ids: ['envoyer', 'prix', 'offres', 'prix-achat'], apres: retoursLitigesElt },
                     { cle: 'c3', ids: ['retirer', 'messages'], apres: AF.section },
                   ] : null}/>
@@ -51095,8 +51094,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // (11 nov., famille « pas su ≠ 0 ») prix illisible ou compte pas relu : « au moins », la couverture dite.
           const depS = lu ? sommeConnue(mois, montantCommandeLu) : null;
           const comptesKO = lu ? (Array.isArray(buys.failedUids) ? buys.failedUids : []).map(String).filter((u) => !acctOff(u)).length : 0;
-          const depense = depS ? depS.total : null;
           const depPartiel = !!(depS && (depS.partiel || comptesKO > 0));
+          // (16 nov., bancs-rouges-b) « Au moins 0 € » ne se dit JAMAIS (§5) : une somme partielle nulle est « pas su » (—),
+          // et des comptes pas relus SANS aucun achat lu ne valent pas « 0 en route / 0 arrivés » (rien lu ≠ rien).
+          const depense = depS ? (depPartiel && !depS.total ? null : depS.total) : null;
+          const rienLu = lu && comptesKO > 0 && !buysBase.length;
           const n = { route: 0, recu: 0 }; if (lu) buysBase.forEach((o) => { const ph = phaseReception(o); if (n[ph] != null) n[ph]++; });
           // (14 nov., refonte Achats — AJOUT 3 de Julien : pas de carte sombre hors de Ma journée) LA même carte réglable,
           // dessinée en BANDE de chiffres compacte (styles-achats-photos.css §5) : mêmes chiffres, « Modifier », « ? ».
@@ -51104,8 +51106,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             attrs={{ 'data-achats-hero': '' }}
             locaux={{
               depense: { nom: 'Dépensé du mois', court: tr('achats.depense'), type: 'eur', aide: tr('achats.achatsMoisHors'), valeur: depense, partiel: depPartiel, manque: depPartiel ? [...(depS.partiel ? [`${depS.manque} prix pas lu${depS.manque > 1 ? 's' : ''}`] : []), ...(comptesKO ? [`${comptesKO} compte${comptesKO > 1 ? 's' : ''} pas relu${comptesKO > 1 ? 's' : ''}`] : [])] : [], couverture: depS && depS.partiel ? `${depS.connus} sur ${depS.n}` : '', ...enLecture, quand: (() => { const m = m0.toLocaleDateString('fr-FR', { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1); })(), attrs: { 'data-n': lu ? String(mois.length) : '' } },
-              enroute: { nom: 'En route', court: tr('achats.route'), type: 'n', aide: tr('achats.achatsPayesExpedies'), valeur: lu ? n.route : null, ...enLecture, attrs: { 'data-n': lu ? String(n.route) : '' } },
-              recus: { nom: 'Arrivés', court: tr('achats.arrives'), type: 'n', aide: tr('achats.achatsLivresFinalises'), valeur: lu ? n.recu : null, ...enLecture, attrs: { 'data-n': lu ? String(n.recu) : '' } },
+              enroute: { nom: 'En route', court: tr('achats.route'), type: 'n', aide: tr('achats.achatsPayesExpedies'), valeur: lu && !rienLu ? n.route : null, ...enLecture, attrs: { 'data-n': lu && !rienLu ? String(n.route) : '' } },
+              recus: { nom: 'Arrivés', court: tr('achats.arrives'), type: 'n', aide: tr('achats.achatsLivresFinalises'), valeur: lu && !rienLu ? n.recu : null, ...enLecture, attrs: { 'data-n': lu && !rienLu ? String(n.recu) : '' } },
             }}/>;
         })()}
         {/* (5 nov.) Pourquoi des codes manquent (l'extension les lit dans les conversations, sur le
@@ -53736,11 +53738,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 sans ouvrir. `data-places` reste sur le contenu : le banc le
                 trouve par cet attribut (invariant : aucune case eBay). */}
             <details data-places-wrap style={{marginBottom:12}}>
-              <summary aria-label={tr('annonces.publierAussiAilleurs')} style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'11px 14px',boxShadow:C.shadow||'none',fontFamily:'inherit'}}>
+              <summary style={{listStyle:'none',cursor:'pointer',display:'flex',alignItems:'center',gap:8,border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'11px 14px',boxShadow:C.shadow||'none',fontFamily:'inherit'}}>
                 <span style={{display:'inline-flex',color:C.muted}}><Icon name="tag" size={15}/></span>
                 <span style={{fontSize:13,fontWeight:600,color:C.text}}><span className="vrm-label-full">{tr('annonces.publierAussiAilleurs')}</span><span className="vrm-label-short" aria-hidden="true">{tr('annonces.publier2')}</span></span>
                 <span style={{flex:1,textAlign:'right',fontSize:12,color:C.muted,fontVariantNumeric:'tabular-nums',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{lignes.map(l=>`${l.pl.nom} ${l.n}/${annStats.n}`).join(' · ')}</span>
-                <span className="vrm-chevron" style={{fontSize:15,color:C.muted}}>›</span>
+                <span className="vrm-chevron" aria-hidden="true" style={{fontSize:15,color:C.muted}}>›</span>
               </summary>
               <div data-places="" style={{marginTop:8,background:C.card,border:`1px solid ${C.border}`,borderRadius:12,padding:'8px 12px 10px',boxShadow:C.shadow||'none'}}>
               <div style={{display:'flex',flexWrap:'wrap',columnGap:22}}>
@@ -55726,7 +55728,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               })}
               {/* (15 nov., Ventes « Verre dépoli ») LA RANGÉE « FORMAT » au pied du verre (le papier retenu ; son toucher ouvre
                   le choix du papier, jamais une étape) — la même fonction et les mêmes data-* que la ligne d'avant. */}
-              {enVentes && resLot.total > 0 ? <button type="button" className="vrm-impr-lien vv-format" data-impr-format={formatLot} aria-label={tr('impr.formatAria', { format: tr(`impr.format.${formatLot}`) })} disabled={!!imprBusy} onClick={() => setChoixPapier({ puis: null })}>
+              {enVentes && resLot.total > 0 ? <button type="button" className="vrm-impr-lien vv-format" data-impr-format={formatLot} disabled={!!imprBusy} onClick={() => setChoixPapier({ puis: null })}>
                 <span className="vv-format-l"><IconeV nom="printer" taille={18} trait={1.9}/>{tr('vv.format')}</span>
                 <b className="vv-format-v">{tr(`impr.format.${formatLot}`)}<IconeV nom="chevron" taille={14} trait={2.2}/></b>
               </button> : null}
