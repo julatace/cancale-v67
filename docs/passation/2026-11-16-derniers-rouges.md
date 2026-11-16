@@ -95,12 +95,42 @@ dans sa DERNIÈRE version, puis régénère les zips). Aucune version montée ic
   Fiabilite) partagées pour l'affichage ; `vinted_listing_dates` par `fetchMemo`. Le JS « appareil neuf » mesuré
   par la CI : 2 310 Ko pour un budget de 1 966 (+17 %, `App-*.js` seul ≈ 1,85 Mo compressé) — pas relevé ici.
 
+## 5. Reprise du 16 nov. (soir)
+
+CI de la PR sur a1a33f6c1 : statut-colis 81/0 et navigation-tache 162/0 VERTS (bancs portés confirmés) ; part 2 finie en
+27 min (part 1 26, part 3 31 : le rééquilibrage suffit, aucune part coupée). Restaient :
+
+- **budget-vitesse, JS + 18 % — vrai défaut trouvé** : pdf-lib (+ pako, polices, upng ≈ 1,1 Mo brut) dans le morceau
+  `App` depuis le 9 nov. — App.jsx importe `api/_lib/transporteur-anciens.js` ⇒ `transporteur-pdf.js` ⇒ `texte-pdf.js`
+  ⇒ pdf-lib, en tête de fichier : chaque appareil neuf le téléchargeait au démarrage. `transporteur-pdf.js` charge
+  désormais `texte-pdf.js` à la lecture d'un PDF (`import()`), le serveur aussi (audits transporteur-pdf,
+  transporteurs-parfaits, logos-bordereaux, retour-parfait, fonctions-api verts). Mesuré (plugin d'analyse du build) :
+  App-*.js 1 858 → 1 674 Ko compressés ; banc : 2 317 → 2 140 Ko. Le reste est le code des lots du 13 au 16 nov.
+  (CSS de la refonte verre/Studio, dictionnaires) : budget JS relevé à **2 250** (+5 %, pas +10 % : le build d'avant, 2 317,
+  y reste rouge) ; 2ᵉ ouverture 20 → 26 (coquille 23 Ko). Lectures, octets, doublons NON relevés.
+- **annonces-actions F à 1512** : le correctif d'avant (`min-height: 44px` hors couche) perdait contre
+  `--d-h-ctrl` (36 px à la souris, styles-systeme.css §2.3 dans `@layer vrm-premium` + `!important` : en `!important`, la
+  couche gagne). Le carré pose `--d-h-ctrl: 44px` : vert (banc entier, 1512 et 390, clair et sombre).
+- **chiffres-coherents D** : banc PÉRIMÉ — la tournée est derrière « … » des Ventes en verre (ventes-verre.css §9) ; le
+  banc ouvre « … » (`data-colis-outils-bascule`) comme lui. 26/26.
+- **nouveau-vendeur** (18 rouges) : vrais défauts — touches de site d'Annonces/Achats 38 px (puits 50, touches 44 au
+  doigt), « 30 j / 90 j » 40 px de large (44), « 2 prix à saisir » 24 px avec un `::after` (le lien fait 44 px, marges
+  négatives : place inchangée), « · aucun compte relié » en tête de ligne (note posée en bloc ; en ligne désormais),
+  Paramètres à l'ordinateur : le bureau plafonné à 880 px (`.vrm-set > *`, styles-reglages.css) contre la maquette
+  « toute la largeur » ⇒ « Supprimer mon compte » sur deux lignes. Banc précisé : un élément `pointer-events: none`
+  (la plaque N° d'une rangée de liste — « la rangée est le geste ») n'est pas une cible ; un bouton touchable petit
+  reste rouge. Sonde utilisée : CDP `CSS.getMatchedStylesForNode` (quelle règle donne la hauteur).
+
 ## ÉTAT À LA REPRISE
 
 - PR #1215 (`claude/derniers-rouges`) ; PR #1210 (`claude/regles-achat-recopie`, recopie de vrm-regles-achat.js) à
   fusionner AVEC la dernière montée de version du train (ligne dans le fichier des versions réservées).
 - Audits du lot verts en local après le merge de main (8d8196d38) : vocabulaire-article, vendeur-generaliste,
   notifs-redaction, traduction, quoi-de-neuf, transporteur-connu, veille, lectures*, tdz, variables.
+- (soir) Reste : budget-vitesse — doublons d'Achats (`panel_num_reserves` 5/4 sur la CI, quatre lecteurs : App.jsx
+  5624, 13385, 18580, 37800 — le dernier en `fetch` nu, hors lecture partagée) et Annonces 2ᵉ ouverture octets +11 % (CI) :
+  pas traités. Les autres bancs rouges de la CI (colis-retirer-propre, iphone-reprise, retraits-suivi, ventes-e2,
+  journee-coherence, morceau-perime, accessibilite*) sont à d'autres lots.
 - Bancs : machine partagée saturée (charge 18-20, ~12 commandes lourdes en file) ⇒ un banc local attend 30 à 60 min
   son créneau et un navigateur a été tué en cours de route (annonces-actions, « Target page closed ») ; la preuve
   des bancs portés se lit sur la CI de la PR.
