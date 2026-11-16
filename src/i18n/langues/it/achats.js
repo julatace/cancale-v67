@@ -358,6 +358,7 @@ export default {
   "achats.selectionner": "Seleziona",
   // (16 nov., lot achats-qr) « Afficher le QR », le n° copiable, « Achat pas encore relié · Relier ».
   "achats.qr.afficher": "Mostra il QR",
+  "achats.qr.court": "QR",
   "achats.qr.afficherAria": "Mostra il QR di ritiro in grande",
   "achats.suivi.copierAria": "N. di tracking {su}: tocca per copiarlo",
   "achats.suivi.copie": "copiato",

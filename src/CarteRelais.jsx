@@ -548,7 +548,7 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
         {/* (16 nov., lot achats-qr) LE QR, LE GESTE ÉVIDENT AU COMPTOIR : un vrai bouton « Afficher le QR » (icône + texte,
             44 px) à côté de « J'ai retiré » — seulement quand un QR existe pour CE colis (`qrDe`, par identité). Le code
             en très grand (sans QR) garde son rond, avec une icône « agrandir » qui ne ressemble plus à un scanner. */}
-        {ouvrirQr ? <button type="button" className="vrm-rpf-code vrm-rpf-qr" data-rp-qr-ligne="" data-rp-afficher-qr={x.cle} aria-label={trVA('achats.qr.afficherAria')} onClick={(ev) => { ev.stopPropagation(); ouvrirQr(); }}><IcoCode/><span className="vrm-rpf-qr-t">{trVA('achats.qr.afficher')}</span></button>
+        {ouvrirQr ? <button type="button" className="vrm-rpf-code vrm-rpf-qr" data-rp-qr-ligne="" data-rp-afficher-qr={x.cle} aria-label={trVA('achats.qr.afficherAria')} onClick={(ev) => { ev.stopPropagation(); ouvrirQr(); }}><IcoCode/><span className="vrm-rpf-qr-t"><span className="vrm-rpf-qr-long">{trVA('achats.qr.afficher')}</span><span className="vrm-rpf-qr-court" aria-hidden="true">{trVA('achats.qr.court')}</span></span></button>
           : x.code && !desaccord ? <button type="button" className="va-rond-code" data-va-code-grand={x.code} aria-label={trVA('va.code.grand')} title={trVA('va.code.grand')} onClick={(ev) => { ev.stopPropagation(); setComptoir(true); }}><IcoAgrandir/></button> : null}
         {retirer ? <button type="button" className="vrm-rpf-retire" data-colis-retire="" aria-label="J’ai retiré ce colis" onClick={(ev) => { ev.stopPropagation(); retirer(x); }}>J’ai retiré</button> : null}
       </div>

@@ -127,11 +127,12 @@ const ouvrir = async (b, vp, sombre) => {
     return j([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
-  await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
+  await pg.goto(`http://localhost:${PORT}/?tab=retraits`, { waitUntil: 'domcontentloaded' });
   return { ctx, pg, errs, ecrits };
 };
 const shot = async (pg, k, nom) => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { recursive: true }); await pg.screenshot({ path: path.join(SHOTS, `achats-qr-${k}-${nom}.png`) }); };
-const LIGNE = (code) => `[...document.querySelectorAll('.vrm-rpf-ligne[data-cc-carte]')].find((l) => l.querySelector('[data-code-retrait="${code}"]'))`;
+// La ligne VISIBLE d'Achats → À retirer (un autre écran monté et caché ne compte pas).
+const LIGNE = (code) => `[...document.querySelectorAll('.vrm-tache[data-tache="achats"] .vrm-rpf-ligne[data-cc-carte]')].find((l) => l.getClientRects().length > 0 && l.querySelector('[data-code-retrait="${code}"]'))`;
 
 (async () => {
   const b = await lancer(PW, { executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] }).catch((e) => { if (estWebkit) throw e; return chromium.launch(); });
@@ -145,22 +146,21 @@ const LIGNE = (code) => `[...document.querySelectorAll('.vrm-rpf-ligne[data-cc-c
       const { ctx, pg, errs, ecrits } = await ouvrir(b, vp, sombre);
       const tel = vp.width < 600;
       await essaie(nom, async () => {
-        await pg.locator('[data-colis-section]').first().waitFor({ timeout: 45000 }).catch(() => {});
-        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' })));
         const deux = () => pg.waitForFunction(new Function(`return !!(${LIGNE(A.code)}) && !!(${LIGNE(M.code)});`), null, { timeout: 45000 });
         await deux(); await pg.waitForTimeout(1000); await deux();
         await pg.evaluate(new Function(`const l = ${LIGNE(A.code)}; if (l) { l.scrollIntoView({ block: 'center' }); }`));
-        await pg.waitForTimeout(300);
+        await pg.waitForFunction(() => !document.querySelector('.vrm-tache[data-tache="achats"] .vrm-squelette, .vrm-tache[data-tache="achats"] [data-squelette]'), null, { timeout: 15000 }).catch(() => {});
+        await pg.waitForTimeout(600);
         await shot(pg, 'liste', nom);
         // Q1
         const q1 = await pg.evaluate(new Function(`const la = ${LIGNE(A.code)}, lm = ${LIGNE(M.code)};
           const bA = la && la.querySelector('[data-rp-afficher-qr]'); const r = bA ? bA.getBoundingClientRect() : null;
           const vis = (e) => { if (!e) return false; const q = e.getBoundingClientRect(); const s = getComputedStyle(e); return q.width > 0 && q.height > 0 && s.visibility !== 'hidden' && s.display !== 'none'; };
-          return { aBouton: !!bA && vis(bA), texte: bA ? bA.innerText.trim() : '', w: r ? Math.round(r.width) : 0, h: r ? Math.round(r.height) : 0, icone: !!(bA && bA.querySelector('svg')),
+          return { aBouton: !!bA && vis(bA), texte: bA ? bA.innerText.trim() : '', aria: bA ? bA.getAttribute('aria-label') : '', w: r ? Math.round(r.width) : 0, h: r ? Math.round(r.height) : 0, icone: !!(bA && bA.querySelector('svg')),
             mBouton: !!(lm && lm.querySelector('[data-rp-afficher-qr]')), mini: document.querySelectorAll('.vrm-rpf-qr-mini').length,
             rondA: !!(la && la.querySelector('[data-va-code-grand]')), rondM: !!(lm && lm.querySelector('[data-va-code-grand]')),
             dansRangee: !!(bA && bA.parentElement && bA.parentElement.classList.contains('vrm-rpf-rang') && bA.parentElement.querySelector('[data-colis-retire]')) };`));
-        dit(q1.aBouton && /Afficher le QR/.test(q1.texte) && q1.icone && q1.h >= 44 && q1.w >= 44 && q1.dansRangee, `${nom} : Q1 « Afficher le QR » visible sur le colis AVEC QR (icône + texte, ${q1.w}×${q1.h}), dans la rangée de « J'ai retiré »`, JSON.stringify(q1));
+        dit(q1.aBouton && (tel ? /QR/ : /Afficher le QR/).test(q1.texte) && /Afficher le QR/.test(q1.aria) && q1.icone && q1.h >= 44 && q1.w >= 44 && q1.dansRangee, `${nom} : Q1 « Afficher le QR » visible sur le colis AVEC QR (icône + texte, ${q1.w}×${q1.h}), dans la rangée de « J'ai retiré »`, JSON.stringify(q1));
         dit(!q1.mBouton && q1.mini === 0, `${nom} : Q1 aucun bouton QR sur le colis SANS QR ; plus d'icône grise`, JSON.stringify({ m: q1.mBouton, mini: q1.mini }));
         dit(!q1.rondA && q1.rondM, `${nom} : Q1 le rond « en grand » ne concurrence plus le QR (absent sur A, gardé pour le code seul de M)`, JSON.stringify({ rondA: q1.rondA, rondM: q1.rondM }));
         // Q3 (ligne) puis Q2 (bouton) — la feuille
@@ -174,6 +174,12 @@ const LIGNE = (code) => `[...document.querySelectorAll('.vrm-rpf-ligne[data-cc-c
         dit(!!f && f.code === A.code && f.img === '1', `${nom} : Q2 le bouton ouvre la feuille du QR de CE colis (QR montré)`, JSON.stringify(f));
         const nL = Number((/encore (\d+) j/.exec(joursLigne) || [])[1]); const nF = Number((/encore (\d+) j/.exec((f && f.txt) || '') || [])[1]);
         dit(nL === 3 && nF === 3 && f && f.lim === '3', `${nom} : Q3 la ligne et la feuille disent le MÊME nombre de jours (ligne « ${joursLigne} », feuille « ${f && f.txt} »)`, JSON.stringify({ nL, nF, lim: f && f.lim }));
+        // Q2 ter : toucher le QR l'agrandit (au comptoir), sans permission demandée
+        await pg.evaluate(() => { const im = document.querySelector('[data-qr-plein] img.vrm-eg-qr'); if (im) im.click(); });
+        await pg.waitForTimeout(400);
+        const agr = await pg.evaluate(() => { const im = document.querySelector('[data-qr-plein] img.vrm-eg-qr'); return im ? { a: im.getAttribute('data-qr-plein-agrandi'), w: Math.round(im.getBoundingClientRect().width) } : null; });
+        dit(!!agr && agr.a === '1', `${nom} : Q2 toucher le QR l'agrandit (${agr && agr.w} px)`, JSON.stringify(agr));
+        await pg.evaluate(() => { try { if (document.fullscreenElement) document.exitFullscreen(); } catch (_) {} });
         await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(500);
         if (await pg.locator('[data-qr-plein]').count()) { const x = pg.locator('[data-qr-plein] button[aria-label*="Fermer"], [data-qr-plein] .vrm-fs-croix').first(); if (await x.count()) await x.click().catch(() => {}); await pg.waitForTimeout(400); }
         // Q2 bis : toucher le CODE ouvre aussi le QR

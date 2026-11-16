@@ -57824,7 +57824,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div className="vrm-eg-corps">
             {qrView.photo ? <PhotoVinted src={qrView.photo} alt="" loading="lazy" className="vrm-eg-photo"/> : null}
             {/* Vrai QR uniquement. Si l'image hébergée ne charge pas, on bascule sur le code — jamais un QR fabriqué. */}
-            {qrView.img ? <img className="vrm-eg-qr" src={qrView.img} alt="QR de retrait"
+            {/* (16 nov., lot achats-qr) Au comptoir : toucher le QR l'agrandit (plein écran quand le navigateur le permet,
+                sinon la largeur de l'écran) — aucune permission demandée ; l'écran reste allumé (`GardeEcranAllume`). */}
+            {qrView.img ? <img className={'vrm-eg-qr' + (qrView.plein ? ' is-plein' : '')} src={qrView.img} alt="QR de retrait" data-qr-plein-agrandi={qrView.plein ? '1' : '0'}
+              onClick={(ev) => { const el = ev.currentTarget; try { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); else if (!qrView.plein && el.requestFullscreen) el.requestFullscreen().catch(() => {}); } catch (_) {} setQrView(v => v ? { ...v, plein: !v.plein } : v); }}
               onError={qrView.hosted ? (() => setQrView(v => v ? { ...v, img: null, real: false, hosted: false } : v)) : undefined}/> : null}
             {/* Consigne Pickup : DEUX codes — Identifiant + Code d'ouverture. */}
             {qrView.code2 ? <div className="vrm-eg-code is-second"><span className="vrm-eg-code-l">Identifiant</span><span className="vrm-eg-code-v vrm-sensible" data-stream-type="code">{qrView.code2}</span></div> : null}
