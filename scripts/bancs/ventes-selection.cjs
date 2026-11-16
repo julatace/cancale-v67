@@ -113,7 +113,8 @@ const finVisible = async (pg) => {
 
 async function passe(nav, { W, theme }) {
   const sombre = theme === 'sombre', tel = W < 600, T = `[${W}px ${theme}]`, nomS = (x) => `vsel-${W}-${theme}-${x}`;
-  const o = await NV.ouvrir(nav, { W, sombre, base: { lignes: jeu(), comptes: NV.JEU_COMPTES, ecritures: 0 }, tab: 'ventes' });
+  const base = { lignes: jeu(), comptes: NV.JEU_COMPTES, ecritures: 0 };
+  const o = await NV.ouvrir(nav, { W, sombre, base, tab: 'ventes' });
   const pg = o.pg;
   await pg.waitForTimeout(1500);
   await pg.locator('[data-selecteur-logos] button[data-site="vinted"]').first().click().catch(() => {});
@@ -149,7 +150,19 @@ async function passe(nav, { W, theme }) {
   dit(await pg.evaluate(() => !document.documentElement.hasAttribute('data-serie-ouverte')), 'R', `${T} sélection fermée : la barre du bas revient`);
 
   // ── E : « À envoyer » (3 lignes au milieu de 2 000) ───────────────────────
-  await pg.evaluate((at) => { localStorage.setItem('vrm_reprise_ecrans', JSON.stringify({ vues: { 'ventes-filtre': { valeur: 'aexpedier', at } } })); }, Date.now() - 1000);
+  // Le clic « Finalisées » est écrit dans la reprise synchronisée (nuage compris) APRÈS un délai
+  // (DELAI_ECRITURE, 1,5 s) et daté de son geste : on revient à « Toutes » (le défaut, effacé de
+  // la reprise), on attend que ce soit écrit, puis on pose « À envoyer » daté
+  // MAINTENANT (la plus récente gagne). Avant : posée à +0,6 s, datée « il y a 1 s », elle
+  // perdait contre ce clic selon la vitesse de la machine (rouge au hasard, clair OU sombre).
+  await pg.locator('.vrm-sales-workbar .vrm-filtres button', { hasText: 'Toutes' }).first().click({ timeout: 5000 }).catch(() => {});
+  await pg.waitForTimeout(2500);
+  // La reprise est SYNCHRONISÉE : le nuage (la base du banc, où l'app l'a écrite) est relu à
+  // l'ouverture — on la pose donc aux deux endroits, comme un autre appareil l'aurait laissée.
+  const atE = await pg.evaluate(() => Date.now());
+  const repE = { 'ventes-filtre': { valeur: 'aexpedier', at: atE } };
+  for (const r of base.lignes) if (r && r.data && r.data.vrm_reprise_ecrans && typeof r.data.vrm_reprise_ecrans === 'object') r.data.vrm_reprise_ecrans = { ...r.data.vrm_reprise_ecrans, vues: { ...(r.data.vrm_reprise_ecrans.vues || {}), ...repE } };
+  await pg.evaluate((v) => { let c = {}; try { c = JSON.parse(localStorage.getItem('vrm_reprise_ecrans') || '{}') || {}; } catch (_) {} c.vues = { ...(c.vues || {}), ...v }; localStorage.setItem('vrm_reprise_ecrans', JSON.stringify(c)); }, repE);
   await pg.reload({ waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(1500);
   await pg.locator('[data-selecteur-logos] button[data-site="vinted"]').first().click().catch(() => {});
