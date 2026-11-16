@@ -255,9 +255,15 @@ async function scenario(b, vp, sombre) {
     await pg.waitForFunction(() => [...document.querySelectorAll('[data-fu-ligne]')].some((x) => /Terminator/.test(x.innerText || '')), null, { timeout: 25000 }).catch(() => {});
     await pg.waitForTimeout(600);
     await pg.evaluate(() => { const l = [...document.querySelectorAll('[data-fu-ligne]')].find((x) => /Terminator/.test(x.innerText || '')); if (l) { l.scrollIntoView({ block: 'center' }); (l.querySelector('.vrm-ledger-sale-toggle') || l).click(); } });
-    await pg.waitForSelector('[data-recap-vente] [data-recap-phrase]', { timeout: 10000 }).catch(() => {});
+    await pg.waitForSelector('[data-recap-vente] [data-recap-phrase]', { state: 'attached', timeout: 10000 }).catch(() => {});
     await pg.waitForTimeout(700);
     await shot(pg, `ventes-verre-${nom}-recap`);
+    // (16 nov., intégration de la fiche D) la fiche de la vente s'ouvre en direction D : sa carte d'action propose l'achat ;
+    // le récapitulatif de la ligne (la place « contexte ») vit derrière « ⋯ » → « Tout voir », jugé là, sur la même règle.
+    await pg.evaluate(() => { const b = document.querySelector('.vrm-fp [data-fd-plus-ouvrir]'); if (b) b.click(); });
+    await pg.waitForTimeout(300);
+    await pg.evaluate(() => { const d = document.querySelector('.vrm-fp [data-fiche-plus]'); if (d) d.open = true; });
+    await pg.waitForTimeout(500);
     if (SHOTS) { await pg.evaluate(() => { const x = document.querySelector('[data-recap-vente] .vrm-recap-argent'); if (x) x.scrollIntoView({ block: 'start' }); }); await pg.waitForTimeout(300); await shot(pg, `ventes-verre-${nom}-recap-argent`); await pg.evaluate(() => { const x = document.querySelector('[data-vv-achat-propose]'); if (x) x.scrollIntoView({ block: 'center' }); }); await pg.waitForTimeout(300); await shot(pg, `ventes-verre-${nom}-recap-relier`); }
     const rv = await pg.evaluate(() => { const z = [...document.querySelectorAll('[data-recap-vente]')].find((x) => x.getBoundingClientRect().height > 0); if (!z) return null;
       const p = [...z.querySelectorAll('.vrm-b-primaire, [data-variante="primaire"], .sb-btn-plein, [data-bouton-bord="pdf"]')].filter((x) => x.getBoundingClientRect().width > 0);
