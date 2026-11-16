@@ -42,9 +42,11 @@ import ecran_rechliste from './es/rechliste.js';
 import ecran_studio_paires from './es/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
 import ecran_republier_guide from './es/republierGuide.js';   // (15 nov.) republier / publier à la main, guidés
 import ecran_memePhoto from './es/memePhoto.js';   // (15 nov., lot meme-photo)
+import ecran_etageres from './es/etageres.js';   // (15 nov.) le Stock en étagères
 export default {
   ...ecran_studio_paires,
   ...ecran_republier_guide,
+  ...ecran_etageres,
   ...ecran_accueilReste,
   ...ecran_refonte_ms,
   ...ecran_studio_journee,

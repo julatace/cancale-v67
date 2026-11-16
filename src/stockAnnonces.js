@@ -37,6 +37,13 @@ const cleDefaut = (n) => {
   return /^\d+$/.test(s) ? String(parseInt(s, 10)) : s;
 };
 const RANG_ETAT = { enligne: 0, masquee: 1, aconfirmer: 2 };
+// (15 nov., Julien : « avec les numéros, mets les plateformes sur lesquelles la paire est et le compte ») Ce que
+// chaque annonce RÉUNIE porte : son site, le PSEUDO de son compte (lu chez le site : login Vinted, nom du compte
+// Leboncoin dans `lbc_accounts`, pseudo eBay ; jamais un identifiant — inconnu ⇒ ''), son prix et sa date de mise
+// en ligne s'ils sont lus. Un nombre ou rien (jamais 0 deviné).
+const pseudoLu = (x) => { const t = String(x == null ? '' : x).trim(); return t && !/^(#|n°\s)/i.test(t) && !/^\d{5,}$/.test(t) ? t.slice(0, 40) : ''; };
+const prixLu = (p) => { const v = Array.isArray(p) ? p[0] : (p && typeof p === 'object' ? (p.amount != null ? p.amount : p.value) : p); const n = Number(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null; };
+const dateLue = (d) => { if (d == null || d === '') return null; const n = Number(d); const t = Number.isFinite(n) && n > 0 ? (n < 1e12 ? n * 1000 : n) : Date.parse(String(d)); return Number.isFinite(t) && t > 0 ? t : null; };
 
 // Les annonces Vestiaire telles que le Stock les compte (module PUR).
 //   lst    : `vc_listings` projeté { items, liens, capturedAt, complet } ; null = la
@@ -93,6 +100,22 @@ export function annoncesVcStock({ lst, ventes = null, auto = null, maintenant = 
 //        vcSansNumero, vcNonJugees, vcVieille, su, auMoins }.
 //   article : { cle, numero, ids, titre, photo, plateformes, comptes, etat, aussi }
 //   etat : 'enligne' (au moins une annonce en ligne) · 'masquee' · 'aconfirmer'
+// Les sites d'un article (une ligne par site ET par compte) : l'état de CETTE annonce (« en ligne » seulement si
+// son site l'a dite en ligne dans une lecture fraîche — un eBay lu il y a plus de 24 h est « à confirmer » ici,
+// pour l'affichage), le pseudo (vide si inconnu), le prix et la date lus. Ordre : Vinted, Leboncoin, eBay, Vestiaire.
+const ORDRE_SITES = ['vinted', 'leboncoin', 'ebay', 'vestiaire'];
+export function sitesDe(groupe) {
+  const par = new Map();
+  for (const p of arr(groupe)) {
+    if (!p || !p.plat) continue;
+    const etat = p.frais === false && p.etat === 'enligne' ? 'aconfirmer' : p.etat;
+    const k = p.plat + '|' + (p.compte || p.pseudo || '');
+    const d = par.get(k);
+    if (!d || RANG_ETAT[etat] < RANG_ETAT[d.etat]) par.set(k, { plat: p.plat, pseudo: p.pseudo || (d && d.pseudo) || '', etat, prix: p.prix != null ? p.prix : (d ? d.prix : null), depuis: p.depuis != null ? p.depuis : (d ? d.depuis : null) });
+    else if (!d.pseudo && p.pseudo) d.pseudo = p.pseudo;
+  }
+  return [...par.values()].sort((a, b) => (ORDRE_SITES.indexOf(a.plat) - ORDRE_SITES.indexOf(b.plat)) || (RANG_ETAT[a.etat] - RANG_ETAT[b.etat]));
+}
 export function annoncesActuelles({ vinted, numeros, ebay, lbc, vestiaire, vendus, cle = cleDefaut, clePhoto = null } = {}) {
   const parts = [];          // { id, cle, numero, titre, photo, plat, compte, etat }
   const manque = [], aConfirmerComptes = [];
@@ -110,7 +133,7 @@ export function annoncesActuelles({ vinted, numeros, ebay, lbc, vestiaire, vendu
       const id = String(it.id), f = fiches[id] || {};
       const numero = f.numero != null ? String(f.numero).trim() : '';
       parts.push({ id: 'v:' + id, cle: numero ? cle(numero) : '', numero, titre: String(it.title || f.title || ''), photo: it.photo || f.photo || null,
-        plat: 'vinted', compte: String(c.uid || ''), etat });
+        plat: 'vinted', compte: String(c.uid || ''), etat, pseudo: pseudoLu(c.pseudo), prix: prixLu(it.price), depuis: dateLue(it.createdTs != null ? it.createdTs : it.created_at_ts) });
     };
     arr(c.enLigne).forEach((it) => pousse(it, 'enligne'));
     arr(c.aConfirmer).forEach((it) => pousse(it, 'aconfirmer'));
@@ -126,7 +149,8 @@ export function annoncesActuelles({ vinted, numeros, ebay, lbc, vestiaire, vendu
       if (vendus && vendus.has(k)) continue;
       const etat = a && a.etat === 'aconfirmer' ? 'aconfirmer' : 'enligne';
       if (etat === 'aconfirmer') { nAc++; if (!Number.isFinite(a.lu)) jamais = true; else if (luAc == null || a.lu < luAc) luAc = a.lu; }
-      parts.push({ id: plat + ':' + k, cle: k, numero, titre: String((a && a.title) || ''), photo: (a && a.photo) || null, plat, compte: '', etat });
+      parts.push({ id: plat + ':' + k, cle: k, numero, titre: String((a && a.title) || ''), photo: (a && a.photo) || null, plat, compte: '', etat,
+        pseudo: pseudoLu(a && a.pseudo), prix: prixLu(a && a.prix), depuis: dateLue(a && a.depuis), frais: a && a.frais === false ? false : undefined });
     }
     if (nAc) aConfirmerComptes.push({ uid: '', plateforme: plat, nom: plat === 'leboncoin' ? 'Leboncoin' : plat, n: nAc, lu: jamais ? null : luAc });
   };
@@ -151,7 +175,8 @@ export function annoncesActuelles({ vinted, numeros, ebay, lbc, vestiaire, vendu
       if (!k) { sansNumero.vestiaire += 1; vcSansNumero.push({ id: String((a && a.id) || ''), titre: String((a && a.titre) || '') }); continue; }
       if (vendus && vendus.has(k)) continue;
       if (a.etat === 'aconfirmer') nAc++;
-      parts.push({ id: 'vc:' + String(a.id), cle: k, numero, titre: String(a.titre || ''), photo: a.photo || null, plat: 'vestiaire', compte: '', etat: a.etat === 'aconfirmer' ? 'aconfirmer' : 'enligne' });
+      parts.push({ id: 'vc:' + String(a.id), cle: k, numero, titre: String(a.titre || ''), photo: a.photo || null, plat: 'vestiaire', compte: '', etat: a.etat === 'aconfirmer' ? 'aconfirmer' : 'enligne',
+        pseudo: pseudoLu(a.pseudo), prix: prixLu(a.prix), depuis: dateLue(a.depuis) });
     }
     for (const a of arr(vestiaire.sansNumero)) { sansNumero.vestiaire += 1; vcSansNumero.push({ id: String((a && a.id) || ''), titre: String((a && a.titre) || '') }); }
     for (const a of arr(vestiaire.nonJugees)) vcNonJugees.push({ id: String((a && a.id) || ''), titre: String((a && a.titre) || ''), cle: a && a.numero ? cle(a.numero) : '' });
@@ -187,6 +212,7 @@ export function annoncesActuelles({ vinted, numeros, ebay, lbc, vestiaire, vendu
       plateformes: [...new Set(g.map((p) => p.plat))],
       comptes: [...new Set(g.map((p) => p.compte).filter(Boolean))],
       etat, aussi: nums.filter((n) => cle(n) !== t.cle),
+      sites: sitesDe(g),
     });
     if (!t.cle) sansNumero.vinted += 1;
   }
