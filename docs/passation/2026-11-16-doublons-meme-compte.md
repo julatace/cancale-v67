@@ -50,9 +50,14 @@ Branche `claude/doublons-meme-compte` (depuis `origin/main`). Mission :
   « ÉTAT À LA REPRISE ».
 
 ## ÉTAT À LA REPRISE
-- Code, audit, récit poussés ; PR ouverte (voir le rapport). Build et banc de rendu en attente du sémaphore
-  (machine saturée le 16 nov. au soir) : à lancer `npx vite build --outDir dist-dc` puis
-  `BANC_DIST=dist-dc BANC_PORT=… CAPTURES=… node scripts/bancs/en-ligne-deux-fois.cjs` et regarder les captures
-  `deux-fois-G-*`.
+- Code, audit, banc, récit poussés ; PR ouverte (voir le rapport).
+- Banc `en-ligne-deux-fois` sur ce build : **78 verts, 0 rouge** (390 tactile et 1512). Sur le build d'origin/main
+  avec le banc neuf : **16 rouges** (A : titre/ligne/infobulle/geste ; G : carte, « peut-être », marques ; H : carte
+  pendant Republier) — les contrôles neufs mordent. Captures regardées (G : feuille « photo presque identique, à
+  vérifier », Annonces : marque « En double » sur les deux lignes). Un premier passage avait vu F rouge à 390 une
+  fois (lent, machine saturée) ; vert au passage suivant et sur main.
+- À AMÉLIORER (petit) : pour un indice « à vérifier », l'alerte d'Annonces et l'intro de la feuille gardent les
+  textes d'« en ligne deux fois » (« N°12 en ligne deux fois », « Le même article est en vente deux fois ») ;
+  seule la preuve dit « à vérifier ». Les nuancer via `etat === 'verifier'` dans `EnLigneDeuxFois.jsx`.
 - Le mot « paire » de la phrase suit les autres textes de la carte (motsVendeur n'existe qu'en français).
 - Rien à faire pour Julien.
