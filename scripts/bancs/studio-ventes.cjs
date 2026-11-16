@@ -281,8 +281,14 @@ async function scenario(b, vp, sombre) {
     // ── O : LA RANGÉE S'OUVRE au premier plan avec SES gestes : imprimer CE bordereau, marquer déposé, imprimé, suivre, masquer.
     await pg.evaluate(() => { const c = document.querySelector('[data-bord-card][data-tx-colis="9304"]'); if (c) c.scrollIntoView({ block: 'center' }); });
     await pg.locator('[data-bord-card][data-tx-colis="9304"] .vrm-colis-titre').click().catch(() => {});
-    await pg.waitForSelector('.vrm-fp-depuis-ligne [data-imprime="1"]', { timeout: 8000 }).catch(() => {});
+    await pg.waitForSelector('.vrm-fp-depuis-ligne [data-imprime="1"]', { state: 'attached', timeout: 8000 }).catch(() => {});
     await pg.waitForTimeout(500);
+    // (16 nov., intégration de la fiche D) les gestes de la ligne vivent derrière « ⋯ » (feuille de tuiles, « Tout voir ») :
+    // un toucher les montre — comme le banc studio-paires. La règle jugée ne change pas : ils sont JOIGNABLES depuis la rangée ouverte.
+    await pg.evaluate(() => { const b = document.querySelector('.vrm-fp [data-fd-plus-ouvrir]'); if (b) b.click(); });
+    await pg.waitForTimeout(300);
+    await pg.evaluate(() => { const d = document.querySelector('.vrm-fp [data-fiche-plus]'); if (d) d.open = true; });
+    await pg.waitForTimeout(400);
     const fiche = await pg.evaluate(() => { /* (15 nov.) la fiche porte DEUX places depuis la ligne : « contexte » (la fiche de la vente) et « actions » */ const zs = [...document.querySelectorAll('.vrm-fp-depuis-ligne')]; if (!zs.length) return null; const vis = (s) => zs.flatMap((z) => [...z.querySelectorAll(s)]).some((x) => x.offsetParent && x.getBoundingClientRect().width > 0);
       return { imprimer: vis('[data-imprime="1"]'), depose: vis('[data-geste="fait"]'), imprime: vis('[data-geste="imprime"]'), suivre: vis('[data-geste="suivre"]'), masquer: vis('[data-geste="masquer"]'), plus: vis('[data-colis-plus]') }; });
     dit(!!fiche && fiche.imprimer && fiche.depose && fiche.imprime && fiche.suivre && fiche.masquer, `${nom} : O la rangée ouverte porte ses gestes (imprimer ce bordereau, déposé, imprimé, suivre, masquer)`, JSON.stringify(fiche));
