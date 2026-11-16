@@ -90,8 +90,8 @@ Audits retouchés sur la RÈGLE : `audit-copie-annonces` (M2 : `save(CLE_CARTE_M
   `actionFiche`, `limiteExpedition` et `calculerBilan` du serveur (vente importée comptée, déjà lue jamais deux fois).
 - Banc `scripts/bancs/ecrans-restes.cjs` (données inventées, `locale: 'fr-FR'`) : A stock importé (390 tactile + 1512),
   B date limite (fiche, publication, loupe — 390 + 1512), C 900/768/1000/820 doigt/1512, E MFA (1512 puis un autre
-  appareil à 390) : **30 / 30 verts** ; sur le build d'origin/main (`BANC_DIST`) : **A 10 rouges, B 7 rouges, C 7 rouges,
-  E 2 rouges** (seul E1, la carte qui se montre, est vert des deux côtés : c'est la précondition).
+  appareil à 390) : **30 / 30 verts** ; sur le build d'origin/main (`BANC_DIST`) : **A 10 rouges, B 8 rouges, C 7 rouges,
+  E 2 rouges** (27 sur 30) (seul E1, la carte qui se montre, est vert des deux côtés : c'est la précondition).
 - Captures regardées (390, 900, 1512) : Stock (section importées), fiche N°160 « à poster avant le 19 nov. à 10 h »,
   loupe « colis à expédier », Messages 820 doigt (plus de vide sous le panneau), Paramètres 1512 (ligne entière),
   barre du haut à 900 px.
