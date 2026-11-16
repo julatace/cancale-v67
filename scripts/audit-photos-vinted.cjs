@@ -229,9 +229,18 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
     const fichiers = fs.readdirSync(path.join(R, 'src')).filter((f) => /\.jsx?$/.test(f));
     const trouves = [], inconnus = [];
     let nPhotoVinted = 0;
+    // (16 nov., lot impression-retours) App.jsx et ses écrans découpés (src/ecrans/*.jsx) se lisent CHACUN comme le
+    // module qu'il est : collés en un seul texte, deux constantes de module homonymes (`partageFichiersPossible`,
+    // `joursAvant`…) faisaient lever l'analyseur et rendaient l'audit rouge sans qu'aucune photo ne soit en cause.
+    const { fichiersApp } = require('./_source-app.cjs');
+    const unites = [];
     for (const f of fichiers) {
-      let src = fs.readFileSync(path.join(R, 'src', f), 'utf8');
-      if (f === 'App.jsx' && MUTER_APP[MUTATION]) src = MUTER_APP[MUTATION](src);
+      if (f !== 'App.jsx') { unites.push([f, fs.readFileSync(path.join(R, 'src', f), 'utf8')]); continue; }
+      for (const p of fichiersApp(R)) unites.push([path.relative(path.join(R, 'src'), p), fs.readFileSync(p).toString('utf8')]);   // en octets : jamais la lecture collée
+    }
+    for (const [f, src0] of unites) {
+      let src = src0;
+      if ((f === 'App.jsx' || f.startsWith('ecrans')) && MUTER_APP[MUTATION]) src = MUTER_APP[MUTATION](src);
       let ast;
       try { ast = parser.parse(src, { sourceType: 'module', plugins: ['jsx'] }); }
       catch (e) { nok(`src/${f} se lit`, e.message); continue; }
