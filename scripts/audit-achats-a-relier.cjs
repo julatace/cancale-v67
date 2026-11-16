@@ -117,7 +117,9 @@ const { extractBrand: marqueDe, extractColors: couleursDe, extractModel: modeleD
   const pool = Array.from({ length: 50 }, (_, i) => ach(1000 + i, 'Adidas Spezial noire 42.5', 10 + i));
   const liens = new Map();
   const props = cinquante.map((x) => A.meilleureSuggestion({ item: x, achats: pool, liens, marqueDe, couleursDe, modeleDe }));
-  dit(props.every(Boolean) && liens.size === 0, 'G5 50 annonces identiques, 50 achats identiques : une proposition chacune, AUCUN lien posé (SON tap relie)');
+  // (16 nov., relier-fiable) Julien : une proposition n'a de sens que si elle est fiable — 50 achats identiques,
+  // c'est l'égalité : AUCUNE proposition en ligne (on ne devine pas), et toujours aucun lien posé.
+  dit(props.every((x) => x === null) && liens.size === 0, 'G5 50 annonces identiques, 50 achats identiques : AUCUNE proposition (égalité ⇒ on ne devine pas), AUCUN lien posé');
   dit(A.cibleAnnonce({ createdTs: 0 }).dateRef === null && A.cibleAnnonce(annonces[0]).dateRef === new Date(annonces[0].createdTs * 1000).toISOString(), 'G6 la date de mise en ligne est la borne (inconnue ⇒ pas de borne inventée)');
 
   console.log('\n── T. Ce que la ligne montre');

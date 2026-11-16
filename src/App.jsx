@@ -171,7 +171,7 @@ import { etatAncienne } from "./republierGuide.js";   // (15 nov.) « Republier 
 // ⟦→ ecrans/Republier.jsx #1⟧
 // (6 nov., vague 2) Remettre en vente une vente annulée avant l'envoi ; relier l'achat des annonces numérotées.
 import { annuleesChezToi, paireARemettre, fichesAnciennesAnnulees, ligneJournee as ligneAnnuleesJournee, etatRemise, VERDICT_MOTEUR as VERDICT_REMISE } from "./annuleesChezToi.js";
-import { fileSansAchat, aRelierJournee, meilleureSuggestion, texteSuggestion, cibleAnnonce } from "./achatsARelier.js";
+import { fileSansAchat, sansAchatRelie, aRelierJournee, meilleureSuggestion, texteSuggestion, cibleAnnonce } from "./achatsARelier.js";
 import { lignesManquantes as lignesPrixMiniManquants, carteJournee as carteJourneePrixMini } from "./prixMiniManquants.js";
 import { CLE_A_TRANCHER, publierSource as publierSourceTrancher, lirePublications as lirePubsTrancher, lignesATrancher, comptesARelireDe, badgeATrancher, phraseJournee as phraseATrancher, appliquerTranches, photosJournee as photosATrancher, typesJournee as typesATrancher, BINAIRES as BINAIRES_TRANCHER } from "./aTrancher.js";
 import { CLE_SANTE, publierSante } from "./santeDonnees.js";   // (11 nov., lot sante-donnees)
@@ -214,7 +214,7 @@ import FeuilleLienVc from "./LienVestiaire.jsx";
 // ⟦→ ecrans/Vestiaire.jsx #1⟧
 import { suggestionsAchat, tousAchatsLibres, tousAchatsLibresDetail, filtresAchats, etiquetteLot, liensParAchat, lotDe, prixIndicatifLot, ecritureLot, suggestionsSaisieSerie } from "./suggestionsAchat.js";
 // (15 nov.) La liaison achat ⇄ article : l'affectation pondérée et globale (src/liaisonAchat.js).
-import { affecterPropositions, propositionsArticle, aValider, morceauxPourquoi, couleursTexte, lectureAchat, cleArticleAnnonce, cleArticleVente, cleRefusLiaison } from "./liaisonAchat.js";
+import { affecterPropositions, propositionsArticle, pistesArticle, publierAffectation, seriePropositions, aValider, morceauxPourquoi, couleursTexte, lectureAchat, cleArticleAnnonce, cleArticleVente, cleRefusLiaison } from "./liaisonAchat.js";
 import { cibleVente, venteDeLaPaire } from "./ficheProduit.js";   // (15 nov.) la fiche d'un article, direction D : la cible de l'achat proposé
 // (6 nov., vitesse 2) AchatsOutils : à la demande ; ses feuilles de style restent ICI, à la même place (même ordre).
 import './styles-annonces-outils.css';
@@ -509,7 +509,8 @@ import { montant, fmt as fmtMontant, fmtE as fmtEMontant, fmtE0 as fmtE0Montant,
 import { SheetShell as SheetShellBase } from "./composants/SheetShell.jsx";
 import { poserFermeAuRetour } from "./ui/retour.jsx";   // (14 nov., correctif « À faire ») les feuilles de src/ui reçoivent le vrai FermeAuRetour
 import { BoutonBase, SegmenteBase } from "./composants/Bouton.jsx";
-import { ID_PAIRES, ECRANS_PAIRES, estPaires, dernierePaire, noterPaire, groupeBarre, badgePaires } from "./navPaires.js";   // (14 nov., n° 61) l'onglet « Paires »
+import { ID_PAIRES, ECRANS_PAIRES, estPaires, dernierePaire, noterPaire, groupeBarre, badgePaires } from "./navPaires.js";
+import { entreeHistorique } from "./navHistorique.js";   // (16 nov., barre-achats) passer d'un onglet de la barre à un autre n'empile rien   // (14 nov., n° 61) l'onglet « Paires »
 // (14 nov., Studio bleu clair) L'espace d'un écran, le disque et son éventail, l'ondulation au changement d'espace.
 import { espaceDe } from "./design/espace.js";
 import { DisqueEventail } from "./design/DisqueEventail.jsx";
@@ -8070,7 +8071,7 @@ function useVentesEmailFraiches(ventes, ko, comptes, ecarte, cleEcarte) {
 // La ligne d'une vente vue par e-mail : ce qu'elle est, depuis quand la liste
 // n'a pas été relue, et LE geste (où la relire — le navigateur nommé par
 // `motsNavigateur`, ou l'ordinateur de l'extension quand elle n'est pas ici).
-function NoteVenteEmail({ o }) {
+function NoteVenteEmail({ o, bordLa = false }) {
   const lu = Number(o && o._lectureVentes);
   // La date dite comme dans l'indicateur des comptes (`quandRelu`, une règle) : « hier 15 h 11 ».
   const quand = Number.isFinite(lu) ? quandRelu(lu) : '';
@@ -8081,6 +8082,8 @@ function NoteVenteEmail({ o }) {
       <span style={{ color: C.text, fontWeight: 600 }}>{STATUT_VENTE_EMAIL}</span>
       {quand ? <> {tr('ventes.ventesCompteRelues')} {quand}</> : null}
       <br/><span data-vente-email-geste="" style={{ color: C.warn }}>{gesteVenteEmail(dans).replace(/^./, (c) => c.toUpperCase())}.</span>
+      {/* (16 nov.) Pas encore de bordereau (aucun avec CE n°, ou vente sans n°) : il le dit. */}
+      {bordLa ? null : <><br/><span data-vente-email-bord-a-venir="">{tr('ventes.venteEmailBordAVenir')}</span></>}
     </div>
   );
 }
@@ -8088,7 +8091,7 @@ function NoteVenteEmail({ o }) {
 // affichées d'un compte sont « vues par e-mail » (`groupesVentesEmailEnTete`), ce qui est dit
 // sur `NoteVenteEmail` — l'état, la date de lecture du compte, le geste — se dit ici, en tête
 // de la liste ; la ligne ne garde que ce qui lui est propre (son état court, son bordereau).
-function NoteVentesEmailTete({ g, nom }) {
+function NoteVentesEmailTete({ g, nom, sansBord = 0 }) {
   const lu = Number(g && g.lu);
   const quand = Number.isFinite(lu) ? quandRelu(lu) : '';
   const dans = vmrExtPresent() ? NAV.dans : 'sur l’ordinateur où est l’extension VRM';
@@ -8099,6 +8102,7 @@ function NoteVentesEmailTete({ g, nom }) {
       {nom ? <> · <span className="vrm-sensible" data-stream-type="compte">{nom}</span></> : null}
       {quand ? <> {tr('ventes.ventesCompteRelues')} {quand}</> : null}
       <br/><span data-ventes-email-tete-geste="" style={{ color: C.warn }}>{gesteVenteEmail(dans).replace(/^./, (c) => c.toUpperCase())}.</span>
+      {sansBord > 0 ? <><br/><span data-ventes-email-tete-bord-a-venir={String(sansBord)}>{tr('ventes.venteEmailBordAVenir')}</span></> : null}
     </div>
   );
 }
@@ -17138,6 +17142,7 @@ const motCouleur = (c) => (COULEURS_LIAISON.includes(c) ? tr(`liaison.couleur.${
 function phrasePourquoi(p) {
   return morceauxPourquoi(p).filter((m) => m.cle !== 'tailleInconnue').map((m) => {
     if (m.cle === 'couleur') return motCouleur(m.vars.couleur);
+    if (m.cle === 'couleurPhoto') return motCouleur(m.vars.couleur) ? tr('liaison.p.couleurPhoto', { couleur: motCouleur(m.vars.couleur) }) : '';
     if (m.cle.startsWith('jours.')) return tr(`liaison.p.${m.cle}`, { n: Number(m.vars.n) });
     return tr(`liaison.p.${m.cle}`, m.vars);
   }).filter(Boolean).join(' · ');
@@ -17270,7 +17275,8 @@ function AchatsARelier({ file, vendus = null, liaison, achats, propositionDe, on
                 {p ? <button type="button" className="sb-lien" data-ar-autre={String(a.transaction_id)} onClick={() => { setPlusOuvert(null); if (l.genre === 'vente') { if (onChoisirVente) onChoisirVente(l, a); } else onChoisir(it, l.sugg.achat); }}><span>{tr('annonces.autreAchat')}</span></button> : null}
                 {l.genre !== 'vente' && p ? <button type="button" className="sb-lien" data-ar-saisir="" onClick={() => { setPlusOuvert(null); onSaisir(it); }}><Icon name="pencil" size={16}/><span>{tr('annonces.saisirPrix')}</span></button> : null}
                 {l.genre !== 'vente' && !l.plusTard ? <button type="button" className="sb-lien" data-ar-plus-tard-geste="" onClick={() => { setPlusOuvert(null); onPlusTard(l.id); }}><span>{tr('annonces.plusTard')}</span></button> : null}
-                {ps.length > 1 ? <span className="vrm-aar-autres" data-ar-autres={ps.length - 1}>{tr('liaison.autresPossibles', { n: ps.length - 1 })}</span> : null}
+                {/* (16 nov., relier-fiable) Les autres candidats ne se montrent plus ici : seulement repliés (« Autres pistes »)
+                    dans la feuille « Choisir un autre achat ». */}
               </div>
             </li>
           );
@@ -17838,9 +17844,15 @@ const groupeNav=(o)=>{ Object.defineProperty(o,'titre',{get(){ return tr('nav.gr
 // « Plus » quitte la barre : tout ce qu'il portait est dans le menu du haut. Aucun écran perdu (§4.11).
 const ONGLET_PAIRES=entreeNav({id:ID_PAIRES, icon:'box', label:'Annonces'});   // (15 nov., Julien : « ne mets pas paires, tu mets annonces ») le TEXTE seul change (tr('nav.paires')) ; l'identifiant reste « paires »
 const ONGLET_ARGENT=entreeNav({id:'compta', icon:'euro', label:'Argent'});
+// (16 nov., lot barre-achats — Julien : « si on peut, ajoute les Achats dans la barre en bas ») Achats quitte
+// « Paires » (Annonces · Stock) et prend sa place dans la barre, juste après Annonces : l'onglet allumé est
+// TOUJOURS celui de l'écran (avant, sur Achats, c'était « Annonces » qui s'allumait). Le disque « + » suit
+// les trois premiers onglets (`POS_DISQUE`).
+const ONGLET_ACHATS=entreeNav({id:'achats',   icon:'cart', label:'Achats'});
 const BOTTOM_TABS=[
   entreeNav({id:'journee',  icon:'soleilLevant', label:'Ma journée', court:'Aujourd’hui'}),
   ONGLET_PAIRES,
+  ONGLET_ACHATS,
   entreeNav({id:'ventes',   icon:'bag',  label:'Ventes'}),
   // (10 nov.) UNE entrée « Argent » (Résumé · Statistiques · Déclarer · Factures, src/argent.js) ; (14 nov.) dans la barre.
   ONGLET_ARGENT,
@@ -17851,15 +17863,19 @@ const ENTREES_PAIRES=[
   entreeNav({id:'garage',   icon:'home', label:'Stock'}),
   // (11 nov., lot DJ3) Plus d'onglet Colis : « À expédier » est en tête de Ventes, « À retirer » en tête
   // d'Achats (src/colisPlace.js : les anciens chemins y mènent).
-  entreeNav({id:'achats',   icon:'cart', label:'Achats'}),
+  // (16 nov., barre-achats) La MÊME entrée que la barre : le menu et la colonne la gardent dans ce groupe ;
+  // le sélecteur de « Paires » ne la montre plus (src/navPaires.js : Annonces · Stock).
+  ONGLET_ACHATS,
 ];
+// La place du disque « + » dans la barre : après Aujourd'hui · Annonces · Achats.
+const POS_DISQUE=3;
 // Messages : dans le menu du haut (téléphone) et dans la colonne (ordinateur), groupe « Gérer ».
 const ONGLET_MESSAGES=entreeNav({id:'messages', icon:'chat', label:'Messages'});
 // (15 nov., refonte-journee) Paramètres au pied du rail de l'ordinateur (la maquette validée).
 const ONGLET_PARAMETRES=entreeNav({id:'settings', icon:'gear', label:'Paramètres'});
 // Les tâches de la colonne de l'ordinateur : celles de la barre, sans l'alias « Paires » (ses trois écrans
 // ont leur groupe, juste dessous).
-const NAV_TACHES=[BOTTOM_TABS[0],BOTTOM_TABS[2],ONGLET_ARGENT];
+const NAV_TACHES=['journee','ventes','compta'].map(id=>BOTTOM_TABS.find(t=>t.id===id));
 // (31 oct., soir — Julien, mot pour mot : « je veux qu'il y ait Achats à côté
 // de À retirer », « que dans les deux onglets il n'y ait pas la même chose »,
 // « enlever Plateforme en bas des onglets glissants… répartis avec les onglets
@@ -19878,13 +19894,15 @@ function SelecteurPaires({ tab, setTab, badges, sites }) {
   const g = groupesVisibles(sites, () => true).find((x) => x.cle === 'paires');
   const vus = new Set(g ? g.items.map((t) => t.id) : ECRANS_PAIRES);
   vus.add(tab);
-  const options = ENTREES_PAIRES.filter((t) => vus.has(t.id)).map((t) => {
+  const options = ENTREES_PAIRES.filter((t) => estPaires(t.id) && vus.has(t.id)).map((t) => {
     const v = badges && badges[t.id];
     // (14 nov., intégration) Le nombre du segment porte le même repère que la pastille de la barre d'hier
     // (`data-badge-nav` + `data-badge-n`) : « À retirer · N » se lit au même endroit qu'avant (bancs, cibles).
     const nb = typeof v === 'number' && v > 0;
     return { v: t.id, l: t.label, n: nb ? (v > 99 ? '99+' : v) : undefined, data: { 'data-nav-entree': t.id, 'data-paires-segment': t.id, ...(nb ? { 'data-badge-nav': t.id, 'data-badge-n': String(v) } : {}) } };
   });
+  // (16 nov., barre-achats) Achats a son onglet : un sélecteur à un seul segment (Stock caché) ne dit rien.
+  if (options.length < 2) return null;
   return <div className="vrm-paires-selecteur" data-paires-selecteur="">
     <Segmente label={tr('nav.paires')} options={options} value={tab} plein onChange={(id) => { if (id === tab) { remonterEnHaut(); return; } noterNavigationSimple(id); setTab(id); }}/>
   </div>;
@@ -19991,7 +20009,7 @@ function BottomBar({tab,setTab,sites,badges,gestes=null}) {
         <React.Fragment key={t.id}>
         {/* (14 nov., Studio bleu clair) Le DISQUE « + » au centre de la barre : l'éventail des gestes globaux
             (Chercher · Scanner · Publier · Imprimer N), chacun branché sur un geste qui existait déjà. */}
-        {i===2&&gestes ? <DisqueEventail gestes={gestes} nImprimer={nImprimer} Retour={FermeAuRetour} ecran={tab}/> : null}
+        {i===POS_DISQUE&&gestes ? <DisqueEventail gestes={gestes} nImprimer={nImprimer} Retour={FermeAuRetour} ecran={tab}/> : null}
         <button type="button" className="vrm-tab" data-nav-entree={t.id} onClick={(e)=>{ setPlusOuvert(false);
           const ic=e.currentTarget.querySelector('.vrm-tab-ic')||e.currentTarget;
           // (14 nov., n° 61) « Paires » ouvre le dernier de ses trois écrans ; retouché sur l'un d'eux, il remonte en haut.
@@ -43926,14 +43944,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // Avant : le barème `scoreAchatPrep`, où le titre seul suffisait et où un achat
     // postérieur à l'annonce pouvait être proposé. Rien n'est relié tout seul : SON tap.
     // `sur` (« C'est ça ») = les trois critères (marque, taille, couleur) ; les autres se replient.
-    const s = suggestionsSaisieSerie({ lignes: fillBuyRows.map((r) => ({ key: r.key, titre: r.titre, marque: r.marque, taille: r.taille, dateRef: r.dateRef })),
-      achats, liens: liensParAchat(numeros, saleOv), marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel, max: 3 });
+    // (16 nov., relier-fiable) La MÊME affectation que Annonces → « Sans achat relié » et Achats (`seriePropositions`,
+    // src/liaisonAchat.js) : « C'est ça » = la seule « très probable » (exclusive : un achat pour une paire), les
+    // pistes repliées ; « Ce n'est pas lui » (`vrm_liaison_refus`) respecté.
+    const s = seriePropositions({ lignes: fillBuyRows.map((r) => ({ key: r.key, titre: r.titre, marque: r.marque, taille: r.taille, dateRef: r.dateRef, photo: (r.e && r.e.photo) || '' })),
+      achats, liens: liensParAchat(numeros, saleOv), refus: liaisonRefus, marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel, max: 3 });
     const out = {};
     for (const k of Object.keys(s)) out[k] = s[k].map((x) => ({ o: x.achat, sur: x.sur }));
     return out;
     // ⚠️ `liensAchats` est déclaré plus bas (piège TDZ, §4.6) : la table des liens est relue ici.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fillBuyOpen, fillBuyAchats.items, fillBuyRows, numeros, saleOv]);
+  }, [fillBuyOpen, fillBuyAchats.items, fillBuyRows, numeros, saleOv, liaisonRefus]);
 
   // ── (3 nov.) LE PRIX D'ACHAT PROPOSÉ, PAR IDENTITÉ (src/prixAchatPropose.js) ──
   // Une vente ou une fiche sans prix d'achat, reliée PAR IDENTITÉ à un achat
@@ -44136,7 +44157,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const v = pickerFor._saleTx ? (sales.items || []).find((o) => String(o.transaction_id) === String(pickerFor._saleTx)) : null;
     return { titre: pickerFor.title || '', marque: pickerFor.brand_title || pickerFor.brand || '', taille: pickerFor.size_title || pickerFor.size || '',
       couleur: pickerFor.color1 || pickerFor.couleur || '', dateRef: pickerFor._dateRef || (v && v.date) || pickerFor.created_at_ts || null,
-      curTx: (numeros[pickerFor.id] && numeros[pickerFor.id].buyFromId) || '' };
+      curTx: (numeros[pickerFor.id] && numeros[pickerFor.id].buyFromId) || '',
+      // (16 nov., relier-fiable) La clé de l'article dans l'affectation publiée (src/liaisonAchat.js) et sa photo.
+      key: pickerFor._saleTx ? cleArticleVente(pickerFor._saleTx) : (pickerFor.id != null && !String(pickerFor.id).startsWith('_') ? cleArticleAnnonce(pickerFor.id) : '_'),
+      photo: (typeof pickerFor.photo === 'string' ? pickerFor.photo : '') || '' };
   }, [pickerFor, sales.items, numeros]);
   const liensAchats = useMemo(() => liensParAchat(numeros, saleOv), [numeros, saleOv]);
   const prixPayeAchat = (a) => {
@@ -44227,7 +44251,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const key = cleArticleVente(o.transaction_id);
       const enLigneLe = fiche && fiche.numberedAt && Date.parse(fiche.numberedAt) <= t ? fiche.numberedAt : null;
       out.push({ key, id: key, o, idf: idf ? String(idf) : null, fiche: fiche || (e.numero ? e : null), ts: t,
-        cible: { key, titre: o.title || '', marque: '', taille: (fiche && fiche.size) || '', couleur: '', dateRef: enLigneLe || o.date, dateRefSource: enLigneLe ? 'en-ligne' : 'vente', prix: o.price } });
+        cible: { key, titre: o.title || '', marque: '', taille: (fiche && fiche.size) || '', couleur: '', dateRef: enLigneLe || o.date, dateRefSource: enLigneLe ? 'en-ligne' : 'vente', prix: o.price, photo: (fiche && fiche.photo) || orderPhoto(o) || '' } });
     }
     return out.sort((x, y) => y.ts - x.ts);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -44241,19 +44265,41 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const articlesLiaison = useMemo(() => { const m = new Map(); for (const x of (fileAchat || [])) m.set(cleArticleAnnonce(x.id), { ...x, genre: 'annonce' }); for (const x of (fileVendus || [])) m.set(x.key, { ...x, genre: 'vente' }); return m; }, [fileAchat, fileVendus]);
   const achatsLiaison = Array.isArray(fillBuyAchats.items) ? fillBuyAchats.items : (Array.isArray(buys.items) ? buys.items : undefined);
   const [liaison, setLiaison] = useState(undefined);
+  // (16 nov., relier-fiable) La couleur DOMINANTE des photos (src/couleurPhoto.js, calculée sur l'appareil, sans IA,
+  // gardée par adresse de photo dans src/indexCouleurs.js) : la couleur d'un côté qui n'en écrit aucune. Map url → [{ c, part }].
+  const [couleursLiaison, setCouleursLiaison] = useState(null);
+  const photosLiaisonTentees = useRef(new Set());
   useEffect(() => {
     if (!vueLiaison) return undefined;
     if (!fileAchat || achatsLiaison === undefined) { setLiaison(undefined); return undefined; }
     const id = setTimeout(() => {
       try {
-        const cibles = fileAchat.map((x) => { const c = cibleAnnonce(x.item); return { ...c, key: cleArticleAnnonce(x.id), prix: x.item.price, dateRef: c.dateRef || (x.fiche && x.fiche.numberedAt) || null }; })
+        const cibles = fileAchat.map((x) => { const c = cibleAnnonce(x.item); return { ...c, key: cleArticleAnnonce(x.id), prix: x.item.price, photo: x.item.photo || '', dateRef: c.dateRef || (x.fiche && x.fiche.numberedAt) || null }; })
           .concat((fileVendus || []).map((x) => x.cible));
-        setLiaison(affecterPropositions({ cibles, achats: achatsLiaison, liens: liensAchats, refus: liaisonRefus, marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel,
-          receptionDe: (a) => dateReception(a, { infosTx: infosReception, recuClic: pickupDone }) }));
-      } catch (_) { setLiaison(null); }
+        const r = affecterPropositions({ cibles, achats: achatsLiaison, liens: liensAchats, refus: liaisonRefus, marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel,
+          receptionDe: (a) => dateReception(a, { infosTx: infosReception, recuClic: pickupDone }), couleurPhotoDe: (u) => (couleursLiaison && couleursLiaison.get(u)) || null });
+        r.photosCibles = new Map(cibles.map((c) => [c.key, c.photo || '']));
+        publierAffectation(r, cibles.map((c) => c.key));
+        setLiaison(r);
+      } catch (_) { publierAffectation(null); setLiaison(null); }
     }, 30);
     return () => clearTimeout(id);
-  }, [vueLiaison, fileAchat, fileVendus, achatsLiaison, liensAchats, liaisonRefus, infosReception, pickupDone]);
+  }, [vueLiaison, fileAchat, fileVendus, achatsLiaison, liensAchats, liaisonRefus, infosReception, pickupDone, couleursLiaison]);
+  // Les photos à lire : celles des articles qui ont des candidats et de leurs achats candidats (au plus 240 par passe,
+  // chacune UNE fois par ouverture ; les couleurs déjà gardées sur l'appareil reviennent sans rien relire). Une photo
+  // illisible reste « pas su » : elle n'accorde rien et n'écarte rien.
+  useEffect(() => {
+    if (!vueLiaison || !liaison || !liaison.pistes) return undefined;
+    const urls = [];
+    const ajoute = (u) => { const x = typeof u === 'string' ? u : (u && u.url) || ''; if (x && !photosLiaisonTentees.current.has(x) && !urls.includes(x)) urls.push(x); };
+    for (const [k, l] of Object.entries(liaison.pistes)) { if (urls.length >= 240) break; ajoute(liaison.photosCibles && liaison.photosCibles.get(k)); for (const p of l) ajoute(orderPhoto(p.achat)); }
+    if (!urls.length) return undefined;
+    for (const u of urls) photosLiaisonTentees.current.add(u);
+    import('./indexCouleurs.js').then((m) => m.mettreAJourCouleurs(urls.map((u) => ({ cle: u, src: u })), { lireOctets: (u) => chargerPhotoBoite(u), parallele: 2 }))
+      .then((res) => { if (!res || !(res.couleurs instanceof Map) || !res.couleurs.size) return; setCouleursLiaison((m0) => { const m = new Map(m0 || []); let neuf = false; for (const [u, c] of res.couleurs) if (!m.has(u)) { m.set(u, c); neuf = true; } return neuf ? m : m0; }); })
+      .catch(() => {});
+    return undefined;
+  }, [vueLiaison, liaison]);
   // « Relier » une VENTE : l'écriture de « Relier un achat » ; sur la fiche de SON annonce (par identité),
   // sinon sur la ligne de la vente — le même chemin que le sélecteur ouvert depuis Ventes.
   const relierAchatVente = async (l, a, opts = {}) => {
@@ -50427,7 +50473,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           onPro={() => { voirAbonnement(null); onNav && onNav('settings'); }}/>}
         {/* (8 nov., « restes ventes ») UNE PHRASE PAR GROUPE (§7) : ce que plusieurs lignes diraient
             à l'identique — la note « vue par e-mail » d'un compte, un refus de facture commun. */}
-        {[...ventesEmailTete.values()].map((g) => <NoteVentesEmailTete key={g.uid} g={g} nom={g.acc ? accNameOf(g.acc) : ''}/>)}
+        {[...ventesEmailTete.values()].map((g) => <NoteVentesEmailTete key={g.uid} g={g} nom={g.acc ? accNameOf(g.acc) : ''} sansBord={g.txs.filter((t) => !toShipEmailTx.has(t)).length}/>)}
         <FactureRaisonsTete deps={DEPS_FACTURE} ventes={groupeFacture}/>
         {ventesAffichees.length>1 && <div className="vrm-serie-entree" style={{display:'flex',justifyContent:'flex-end'}}><OuvrirSerie serie={serieVentes}/></div>}
         <BarreSerie serie={serieVentes} actions={actionsSerieVentes()} rendreIcone={iconeApp}/>
@@ -50706,7 +50752,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 fl={{ tx: txL, item: String(identiteAnnonce(o) || '') }} data-fu-ligne="" fusion={{ lot: lot ? { n: lot.n, nums: lot.nums || [], nonRelies: lot.nonRelies || 0 } : null, transp: fuTransp, prix: montant(sell, { devise: o.price?.currency_code || 'EUR' }), nom: String(o.title||'').replace(/[\s,·-]*(?:taille|t\.?)\s*[\d.,/ ]+(?:\s*(?:eu|fr|us|uk))?\s*$/i,'').trim() || o.title, num, site: 'vinted', siteNom: 'Vinted', taille: lot ? '' : String((e&&e.size)||o.size||'').trim() || ((String(o.title||'').match(/taille\s*([\d.,/]+)/i)||[])[1]||'') }} friseEtat={fuEtapes ? <Frise inline etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label={tr('ventes.vente3')}/> : null} frise={<>{(o._fromEmail ? o._txMail : o.transaction_id != null) ? <FactureVenteLigne deps={DEPS_FACTURE} groupe={groupeFacture} vente={{ tx: String(o._fromEmail ? o._txMail : o.transaction_id), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', venteLe: o.date || '', commandes: commandesParTx.get(String(o._fromEmail ? o._txMail : o.transaction_id)) || [] }}/> : null}</>}
                 data-vente-email-tete={o._venteEmail && emailEnTete ? String(o._acc.vinted_user_id) : undefined}
                 bas={o._venteEmail && emailEnTete && !toShipEmailTx.has(txL) ? null : o._venteEmail ? <>
-                  {emailEnTete ? null : <NoteVenteEmail o={o}/>}
+                  {emailEnTete ? null : <NoteVenteEmail o={o} bordLa={toShipEmailTx.has(txL)}/>}
                   {/* (8 nov.) Le bordereau reçu par e-mail porte le MÊME n° de transaction : il s'imprime
                       tout de suite, avec le N° seulement s'il est sûr (src/bordereauVenteEmail.js). */}
                   {toShipEmailTx.has(txL) ? <div className="vrm-rangee-bord" data-rangee-bord="" data-sans-glisse="" data-vente-email-bord={txL}>
@@ -53158,6 +53204,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <div className="vrm-ann-price-line" style={{display:'flex',alignItems:'center',gap:10}}>
                       <span data-prix style={{fontSize:20,fontWeight:700,color:C.text,fontVariantNumeric:'tabular-nums',letterSpacing:'-.02em'}}>{prixAffiche(prix(it.price,it.currency)||'—')}</span>
                     </div>
+                    {/* (16 nov., relier-fiable — Julien, capture d'Annonces : « il n'y a rien pour relier un achat ») Sur CHAQUE
+                        annonce sans achat relié : « Relier un achat » (une puce, 44 px) ouvre la feuille « Choisir un achat » (les
+                        propositions fiables d'abord, puis ses achats libres) ; SON clic relie, par l'identifiant de l'annonce
+                        (`updatePair`) — le lien suit la vente et la republication (identité, src/repriseNumero.js). Reliée :
+                        « Achetée 24,63 € », discret ; « Délier » et « Reçu » sont dans sa fiche. */}
+                    {/* La MÊME règle que le compte de « Sans achat relié » (`sansAchatRelie`, src/achatsARelier.js) : chaque puce est comptée. */}
+                    {(e.buyFromId != null && String(e.buyFromId) !== '')
+                      ? <span className="vrm-ann-lien vrm-ann-achetee" data-ann-achetee={String(e.buyFromId)}>{tr('liaison.ann.achetee', { prix: achatConnu ? prixCourt(achat) : '—' })}</span>
+                      : sansAchatRelie(e, () => (achatConnu ? achat : null)) ? <button type="button" className="vrm-ann-lien vrm-ann-relier" data-ann-relier={String(it.id)} onClick={(ev) => { ev.stopPropagation(); openPicker(item); }}><Icon name="link" size={14}/><span>{tr('liaison.ann.relier')}</span></button> : null}
                     {/* (14 nov., « Studio bleu clair ») L'état, le prix d'achat et les chiffres de l'annonce (accepter dès, refuser
                         sous, boost, marge) : la rangée ne les montre plus ; ouverte en fiche, ils montent EN TÊTE de la fiche
                         (`DansFiche`, place « contexte ») — les mêmes éléments, les mêmes écritures, les mêmes data-*. */}
@@ -61232,9 +61287,14 @@ function AppCoeur() {
       // On attend que ce retour soit fait avant d'empiler l'écran suivant.
       if(window.__vrmRetourFeuille){ h.minuteur=setTimeout(pousser,30); return; }
       try{
+        // (16 nov., lot barre-achats — Julien : « je ne veux pas qu'on puisse glisser entre les onglets »)
+        // D'un onglet de la barre à un autre, l'entrée est REMPLACÉE (src/navHistorique.js) : le retour du
+        // système (bord gauche sur iPhone) n'a plus d'onglet voisin à montrer. Feuilles et écrans du menu empilent.
         const st=window.history.state||{};
-        if(st.vrmTab===h.tab && st.vrmSub===h.sub) return;
-        window.history.pushState({ vrmTab:h.tab, vrmSub:h.sub }, '');
+        const geste=entreeHistorique(st, { tab:h.tab, sub:h.sub }, (t)=>groupeBarre(t,BAR_GROUPE), BOTTOM_TABS.map(x=>x.id));
+        if(geste==='rien') return;
+        if(geste==='remplacer') window.history.replaceState({ vrmTab:h.tab, vrmSub:h.sub }, '');
+        else window.history.pushState({ vrmTab:h.tab, vrmSub:h.sub }, '');
       }catch(_){}
     };
     h.minuteur=setTimeout(pousser,0);
@@ -64874,6 +64934,37 @@ function AppCoeur() {
     else { const ov=(load('vinted_sale_overrides',{})||{})[st.tx]||{}; ops.push({ k:'vinted_sale_overrides', type:'champs', id:st.tx, apres:w, avant:{ buyPrice:ov.buyPrice, buyFromId:ov.buyFromId, buyFrom:ov.buyFrom } }); }
     gesteVrm(tr('fd.relier.fait',{ n:num, prix:pr.texte||'' }), ops, {}, ()=>{ setTimeout(()=>{ emettreClesRelues(['vinted_annonce_numeros','vinted_buyprice_by_num','vinted_sale_overrides']); setFicheTick(t=>t+1); setPrixTick(t=>t+1); },700); }, 'achat.relier');
   };
+  // ── (16 nov., relier-fiable) L'ACHAT RELIÉ D'UNE PAIRE : « Délier » et « Reçu », à côté de « Achetée » ──
+  // Julien (fiche N°215) : « ici j'ai mal relié un achat, je veux pouvoir l'enlever, et tu peux mettre le justificatif
+  // d'achat à côté ». Le lien est lu PAR IDENTITÉ : la fiche de la paire (`buyFromId`), sinon la ligne de SA vente.
+  const lienAchatDe=(numF)=>{
+    let rn=null, p=null; try{ ({ rn, p }=histoirePaire(numF, false)); }catch(_){ return null; }
+    if(!p||p.double||p.ancienNumero) return null;
+    const fiches=load('vinted_annonce_numeros',{})||{}, ov=load('vinted_sale_overrides',{})||{};
+    const v=venteDeLaPaire(rn, venteAnnuleeFiche);
+    const relie=(e)=>!!(e&&e.buyFromId!=null&&String(e.buyFromId)!=='');
+    const keys=[]; if(p.idFiche) keys.push(cleArticleAnnonce(p.idFiche)); if(v&&v._tx!=null) keys.push(cleArticleVente(v._tx));
+    if(p.idFiche&&relie(fiches[p.idFiche])) return { ou:'fiche', id:String(p.idFiche), e:fiches[p.idFiche], tx:String(fiches[p.idFiche].buyFromId), num:String(p.num||''), keys };
+    if(v&&relie(ov[String(v._tx)])) return { ou:'vente', id:String(v._tx), e:ov[String(v._tx)], tx:String(ov[String(v._tx)].buyFromId), num:String(p.num||''), keys };
+    return null;
+  };
+  // « Délier » : confirmé en une phrase, annulable (`gesteVrm`) ; le lien part (le prix posé PAR le lien aussi, `patchDelier` —
+  // un prix tapé par lui reste), et le couple est rangé dans « Ce n'est pas lui » : la même proposition ne revient pas.
+  const delierAchatFiche=async(l)=>{
+    if(!l) return;
+    const titre=String((l.e.buyFrom&&l.e.buyFrom.title)||'').slice(0,60);
+    const ok=await askConfirm({ title:tr('fd.delier.titre'), desc:tr('fd.delier.phrase',{ titre, n:l.num }), ok:tr('fd.delier.ok'), cancel:VERBES.annuler });
+    if(ok!==true) return;
+    const patch=patchDelier(l.e); if(!patch) return;
+    const ops=[{ k:l.ou==='fiche'?'vinted_annonce_numeros':'vinted_sale_overrides', type:'champs', id:l.id, apres:patch, avant:{ buyPrice:l.e.buyPrice, buyFromId:l.e.buyFromId, buyFrom:l.e.buyFrom } }];
+    if(l.ou==='fiche'&&patch.buyPrice===''&&String(l.e.numero||'').trim()){
+      const buy=load('vinted_buyprice_by_num',{})||{}, k=String(l.e.numero).trim(), lu=Number(String(buy[k]==null?'':buy[k]).replace(',','.')), pose=Number(String((l.e.buyFrom&&l.e.buyFrom.price)!=null?l.e.buyFrom.price:l.e.buyPrice||'').replace(',','.'));
+      if(buy[k]!=null&&Number.isFinite(lu)&&Number.isFinite(pose)&&Math.abs(lu-pose)<0.005) ops.push({ k:'vinted_buyprice_by_num', type:'cle', id:k, apres:undefined, avant:buy[k] });
+    }
+    const refus=load('vrm_liaison_refus',{})||{};
+    for(const key of l.keys){ const id=cleRefusLiaison(key,l.tx); if(!refus[id]) ops.push({ k:'vrm_liaison_refus', type:'cle', id, apres:new Date().toISOString(), avant:undefined }); }
+    gesteVrm(tr('fd.delier.fait',{ n:l.num }), ops, {}, ()=>{ setTimeout(()=>{ emettreClesRelues(['vinted_annonce_numeros','vinted_buyprice_by_num','vinted_sale_overrides','vrm_liaison_refus']); setFicheTick(t=>t+1); setPrixTick(t=>t+1); },700); });
+  };
   const histoirePaire=(numF, avecExtra=true)=>{
     // (1er nov.) LA FICHE COMPLÈTE D'UNE PAIRE : la même lecture que « Tout
     // sur le N° » (`rechercheParNumero`), racontée en parcours (`parcoursPaire`).
@@ -64901,6 +64992,27 @@ function AppCoeur() {
       reception: ex ? ex.reception : undefined, receptionRaison: ex ? ex.receptionRaison : '' }) : null;
     return { rn, numeros, nomCompte, ex, p, etat, neuve };
   };
+  // (16 nov., relier-fiable) ⚠️ APRÈS `histoirePaire` (piège TDZ, §4.6) : `lienAchatDe` la lit pendant le rendu.
+  // « Reçu » : le reçu de CET achat, relié par SON n° de transaction seulement (§5) — l'e-mail Vinted rangé, sinon
+  // l'attestation tirée de l'achat lu (la règle de « Reçu » d'un achat relié, Ventes) ; ni l'un ni l'autre ⇒ « Pas de reçu ».
+  const [recuFicheDispo,setRecuFicheDispo]=useState(null);   // { tx, rc, achat } | { tx, aucun:true } ; null = pas encore lu
+  const [recuFicheVue,setRecuFicheVue]=useState(null);
+  const lienFicheOuvert=numOutil&&numData?lienAchatDe(numOutil):null;
+  const txLienFiche=lienFicheOuvert?lienFicheOuvert.tx:'';
+  useEffect(()=>{ if(!txLienFiche){ setRecuFicheDispo(null); return undefined; } let vivant=true; setRecuFicheDispo(null);
+    (async()=>{
+      const l=lienAchatDe(numOutil); if(!l) return;
+      let achat=null; try{ const achats=await lireAchatsFiche(); achat=Array.isArray(achats)?achats.find((a)=>a&&String(a.transaction_id)===l.tx)||null:null; }catch(_){ achat=null; }
+      const s=l.e.buyFrom;
+      if(!achat&&s&&(s.title||s.price!=null)) achat={ transaction_id:l.tx, title:s.title||'', date:s.date||'', status:s.status||'', seller:s.seller, photo:s.photo?{ url:s.photo }:null, price:s.price!=null?{ amount:s.price, currency_code:s.devise||'EUR' }:null };
+      let rc=null;
+      if(achat){ try{ const recus=recusAchatDe(await fetchEmailAchats()); const delies=load('vrm_recus_delies',{})||{};
+        rc=Array.isArray(recus)?recuDeLAchat(achat, indexRecusParTransaction(recus.filter((r)=>!(r&&r.id&&delies[r.id])), (r)=>ventilationRecuAchat(r&&r.texte).trouve)):null; }catch(_){ rc=null; } }
+      if(vivant) setRecuFicheDispo(rc||achat?{ tx:l.tx, rc, achat }:{ tx:l.tx, aucun:true });
+    })();
+    return ()=>{ vivant=false; }; /* eslint-disable-next-line */ },[txLienFiche,ficheTick]);
+  const ouvrirRecuFiche=()=>{ const d=recuFicheDispo; if(!d||d.aucun) return; if(d.rc){ setRecuFicheVue(d.rc); return; }
+    generateAchatJustificatif(d.achat, { account:d.achat._accName||'', regime:load('vinted_regime','micro'), numero:lienFicheOuvert?lienFicheOuvert.num:'', ouvrir:true }); };
   // (14 nov., 160) LA VENTE EN MAIN PROPRE depuis un N° tapé : le verdict de « Vendu ailleurs » de la fiche
   // (`verdictVenteMain`, src/ideesArgent/venteMain.js), sur la MÊME histoire. `numData` pas lu ⇒ « lecture ».
   const verdictVenteMainCoque=(q, choisie=null)=>{
@@ -64954,7 +65066,9 @@ function AppCoeur() {
               // « Choisir un autre achat » : la vente, dans Ventes (où « Relier un achat » ouvre la liste des achats).
               if (c === 'autre') { fermer(); setGsOpen(false); poserCible({ type: 'vente', tx: String(pf.tx), depuisFiche: true }, redirigerOnglet('ventes', null, ONGLETS_DEPLACES).tab); setTab('ventes'); }
             } } : null;
-          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={numF} lecture={!numData} plus={plusFiche} sites={sitesFiche} relier={relierFiche} onFermer={fermer} onRetour={depuis ? fermer : ()=>{ fermer(); setGsQ(String((p && p.num) || numF)); setGsOpen(true); }}
+          const lienF = p ? lienAchatDe(numF) : null;
+          const achatRelieFiche = lienF ? { tx: lienF.tx, recu: recuFicheDispo && recuFicheDispo.tx === lienF.tx ? !recuFicheDispo.aucun : undefined, onRecu: ouvrirRecuFiche, onDelier: () => delierAchatFiche(lienF) } : null;
+          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={numF} lecture={!numData} plus={plusFiche} sites={sitesFiche} relier={relierFiche} achatRelie={achatRelieFiche} onFermer={fermer} onRetour={depuis ? fermer : ()=>{ fermer(); setGsQ(String((p && p.num) || numF)); setGsOpen(true); }}
             onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}
             onEmballer={()=>{ fermer(); setGsOpen(false); DEMANDE_EMBALLAGE.at = Date.now(); setTab('cat_bord'); try { window.dispatchEvent(new Event('vrm:emballer')); } catch (_) {} }}
             onPrix={(n)=>setPrixNum(String(n))} onPublierAilleurs={(n)=>setPubAil({ num: String(n), site: null })} neuve={neuve}
@@ -65146,6 +65260,15 @@ function AppCoeur() {
         // le défilement à inertie est natif : elle ne servait plus qu'à piéger.
         // Banc `feuilles-coque.cjs`, qui applique la règle de WebKit.
         overscrollBehaviorY:'contain',
+        // (16 nov., barre-achats — « je ne veux pas qu'on puisse glisser entre les onglets ») Aucun rebond de
+        // côté : un glisser horizontal sur le contenu ne déplace jamais l'écran (les rangées qui défilent de
+        // côté gardent leur propre défilement, `overscroll-behavior-x: contain`).
+        overscrollBehaviorX:'none',
+        // Et le navigateur ne fait jamais de son glisser horizontal une « page précédente » (Chrome au doigt : la
+        // page d'avant apparaissait, comme l'onglet d'avant sur la capture de Julien). `pan-y` : le doigt défile
+        // en hauteur et zoome ; une rangée qui défile de côté (filtres, photos, frises) garde son glisser, car un
+        // glisser appartient au premier conteneur qui défile sous le doigt (banc barre-achats A6–A8).
+        touchAction:'pan-y pinch-zoom',
         width: ordi ? undefined : '100%',
         maxWidth: ordi ? 'none' : 1200,
         margin: ordi ? '0' : '0 auto',
@@ -65176,6 +65299,8 @@ function AppCoeur() {
             ouvrirAnnonces={()=>{ setRpOuvert(false); setTab('cat_annonces'); }} onClose={()=>setRpOuvert(false)}/>
         </React.Suspense>}
         {calcOuverte && <GardeEcran nom="calculette" feuille onFermer={()=>setCalcOuverte(false)}><CalculetteAchat Feuille={SheetShell} onClose={()=>setCalcOuverte(false)} contexte={ctxCalculette} emballages={load(CLE_EMBALLAGES, null)}/></GardeEcran>}
+        {/* (16 nov., relier-fiable) « Reçu » de l'achat relié, ouvert depuis la fiche : au-dessus d'elle. */}
+        {recuFicheVue && <FeuilleRecuAchat recu={recuFicheVue} z={Z_CONFIRMATION + 10} fermer={()=>setRecuFicheVue(null)}/>}
         {ficheNum && <GardeEcran nom="fiche" feuille resetKey={ficheNum} onFermer={()=>setFicheNum(null)}><Differe rendre={()=>rendreFichePaire(ficheNum, null, ()=>setFicheNum(null))}/></GardeEcran>}
         {/* (14 nov., proposition 62) Toucher une ligne de liste ouvre LA fiche de la paire (même composant). */}
         {/* (14 nov., propositions 102-107) Studio sur une paire, séance photo, recherche par couleur. */}
