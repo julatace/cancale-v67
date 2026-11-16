@@ -205,9 +205,9 @@ function CertificatPaire({ cle, num, base, Icon, confirmer, dire }) {
 
 // ── 107 · MÊME PAIRE QU'UNE AUTRE FICHE ? ────────────────────────────────────
 const valeurChamp = (c, v) => (v == null || v === '' ? '—' : c === 'buyPrice' || c === 'fees' ? `${String(v).replace('.', ',')} €` : String(v));
-export function FeuilleFusion({ idFiche, fiches, registre, vendus, caseDe, cleNum, proposer, Photo, Feuille, Bouton, Segmente, onFusionner, onClose }) {
+export function FeuilleFusion({ idFiche, autreInitial = null, fiches, registre, vendus, caseDe, cleNum, proposer, Photo, Feuille, Bouton, Segmente, onFusionner, onClose }) {
   const [q, setQ] = React.useState('');
-  const [autre, setAutre] = React.useState(null);
+  const [autre, setAutre] = React.useState(autreInitial != null && String(autreInitial) !== String(idFiche) ? String(autreInitial) : null);   // (15 nov., deux-comptes) « C’est la même paire » arrive avec l’autre annonce choisie
   const [carton, setCarton] = React.useState(null);
   const moi = (fiches || {})[idFiche] || {};
   const candidats = React.useMemo(() => {

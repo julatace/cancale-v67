@@ -26,3 +26,13 @@
 .vrm-mph-ligne-texte { font-weight: 600; color: var(--sb-encre, inherit); }
 .vrm-mph-ligne-sous { flex: 1; min-width: 0; color: var(--sb-encre-2, inherit); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-mph-chevron { color: var(--sb-encre-2, inherit); font-size: 18px; }
+/* (15 nov., lot meme-photo-sure) L'état d'une proposition : « sûr » = la diode (l'accent, rare, petit) ;
+   « à vérifier » = le point ambre et la raison. Jamais de rouge. */
+.vrm-mph-sur, .vrm-mph-averifier { margin: 0 0 6px; display: flex; align-items: center; gap: 6px; font-size: 13px; line-height: 1.35; }
+.vrm-mph-sur { font-weight: 600; color: var(--sb-encre, inherit); }
+.vrm-mph-averifier { color: var(--sb-ambre, #764300); flex-wrap: wrap; }
+.vrm-mph-averifier b { font-weight: 600; }
+.vrm-mph-raison { flex-basis: 100%; padding-left: 12px; font-size: 12px; line-height: 1.35; }
+.vrm-mph-choix .vrm-mph-raison { padding-left: 0; }
+.vrm-mph-diode { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--sb-diode, #0060CC); box-shadow: 0 0 0 3px color-mix(in oklab, var(--sb-diode, #0060CC) 18%, transparent); }
+.vrm-mph-choix .vrm-mph-sur, .vrm-mph-choix .vrm-mph-averifier { font-size: 12px; margin: 0; }
