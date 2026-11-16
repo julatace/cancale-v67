@@ -65,6 +65,8 @@
     gap: 6px !important; min-width: 0 !important; overflow: hidden !important; white-space: nowrap !important; padding-right: 44px !important;
   }
   :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] .vrm-fu-vente-l2 > * { flex: none !important; }
+  /* Ventes · Vinted ne liste que Vinted : « Vinted » sur chaque ligne ne dit rien (une phrase répétée), le compte y gagne sa place. */
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme][data-plateforme-vente="vinted"] .vrm-fu-vente-l2 > .vrm-fu-site[data-site="vinted"] { display: none !important; }
   :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] .vrm-fu-vente-l2 > .vrm-fu-vente-compte { flex: 0 1 auto !important; min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; }
   :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] .vrm-fu-vente-l2 > .vrm-fu-vente-compte * { overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
   :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] .vrm-fu-vente-l3 { grid-column: 2 !important; grid-row: 3 !important; margin: 0 !important; min-width: 0 !important; }
