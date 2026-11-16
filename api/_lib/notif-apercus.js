@@ -102,6 +102,9 @@ export const texteOffresMini = (n) => ({
 //   offres   : { n } — offres Vestiaire REÇUES qui expirent avant demain soir
 //              (Vinted : aucune, ses offres n'expirent pas — Julien, 5 nov.) ;
 //   manque   : les sources de colis pas relues ⇒ « au moins », nommées.
+//   colis.nums : (16 nov., lot alerte-soir-colis) { demain: ['215', …], retard: [...] } — les N°
+//              trouvés PAR IDENTITÉ (api/_lib/soir-colis.js) : « 2 à déposer… : N°215, N°193 ».
+//              Trois au plus (« +1 ») ; corps trop long ⇒ redit sans les N° (≤ 90).
 const pl = (n, un, plusieurs) => (n > 1 ? plusieurs : un);
 const lieuCourt = (l) => String(l || '').split(',')[0].trim().slice(0, 30);
 export function texteSoir({ colis = null, retraits = null, offres = null, manque = null } = {}) {
@@ -118,17 +121,23 @@ export function texteSoir({ colis = null, retraits = null, offres = null, manque
       : nRetraits ? `Demain : ${nRetraits} colis à retirer`
         : `Demain : ${nOffres} ${pl(nOffres, 'offre Vestiaire expire', 'offres Vestiaire expirent')}`;
   const H = c.heure ? heureCourte(c.heure) : '';
+  const corps = (avecNums) => {
+  const nums = avecNums && c.nums ? c.nums : {};
+  const liste = (l) => { const v = Array.isArray(l) ? l.filter(Boolean) : []; return v.length ? ' : ' + v.slice(0, 3).map((x) => 'N°' + x).join(', ') + (v.length > 3 ? ` +${v.length - 3}` : '') : ''; };
   const phrases = [];
   // (15 nov.) Corps ≤ 90 (api/_lib/notif-redaction.js) : le titre dit déjà « Demain ».
   // (15 nov.) Corps ≤ 90 (api/_lib/notif-redaction.js) : des morceaux courts joints par « · »
   // (le titre dit déjà « Demain »), le retard, la date estimée et le point toujours dits.
-  if (nDemain) phrases.push(nDemain === 1 ? (H ? `1 avant ${H}` : '1 colis à déposer') : (H ? `${nDemain} à déposer, le premier avant ${H}` : `${nDemain} colis à déposer`));
-  if (nRetard) phrases.push(`${nRetard} déjà en retard`);
+  if (nDemain) phrases.push((nDemain === 1 ? (H ? `1 avant ${H}` : '1 colis à déposer') : (H ? `${nDemain} à déposer, le premier avant ${H}` : `${nDemain} colis à déposer`)) + liste(nums.demain));
+  if (nRetard) phrases.push(`${nRetard} déjà en retard` + liste(nums.retard));
   if (nVerif) phrases.push(`${nVerif} ${pl(nVerif, 'date estimée passée', 'dates estimées passées')} : vérifie sur Vinted`);
   if (nRetraits) phrases.push(nRetraits === 1 && lieuCourt(retraits.lieu) ? `dernier jour pour retirer à ${lieuCourt(retraits.lieu)}` : `dernier jour pour ${nRetraits} retraits`);
   if (nOffres) phrases.push(`${nOffres} ${pl(nOffres, 'offre Vestiaire expire', 'offres Vestiaire expirent')} demain soir`);
   if (manques.length && nColis) phrases.push(`${manques.join(' et ')} pas ${pl(manques.length, 'relu', 'relus')} : peut-être plus`);
-  const corpsSoir = phrases.join(' · ');
+  return phrases.join(' · ');
+  };
+  let corpsSoir = corps(true);
+  if (corpsSoir.length > 90) corpsSoir = corps(false);
   return { title, body: corpsSoir.charAt(0).toUpperCase() + corpsSoir.slice(1) };
 }
 
@@ -189,7 +198,7 @@ export const APERCUS_NOTIF = {
   rappels: {
     quoi: 'Le soir, ce qu’il y a à faire demain (colis, retraits, offres), la déclaration URSSAF à faire, le bilan de la semaine, un compte Vinted pas relu depuis plus de 24 h.',
     get exemples() { return [
-      { ...texteSoir({ colis: { demain: 2, heure: '12:00', retard: 0, aVerifier: 0 }, retraits: { n: 1, lieu: 'Tabac des Halles, 8 Rue des Lilas, 44000 Nantes' }, offres: { n: 0 } }), mene: 'Colis · À envoyer (le premier geste de demain)' },
+      { ...texteSoir({ colis: { demain: 2, heure: '12:00', retard: 0, aVerifier: 0, nums: { demain: ['215', '193'] } }, retraits: { n: 1, lieu: 'Tabac des Halles, 8 Rue des Lilas, 44000 Nantes' }, offres: { n: 0 } }), mene: 'Colis · À envoyer (le premier geste de demain)' },
       ...(URSSAF && URSSAF.envoyer ? [{ ...deux(URSSAF), mene: 'Comptabilité · ta déclaration' }] : []),
       { ...deux(BILAN()), mene: 'Ma journée' },
       { ...texteComptesARelire([{ nom: EX.compte, age: 'il y a 2 j' }]), mene: 'Paramètres · Comptes liés' },

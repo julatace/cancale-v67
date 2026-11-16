@@ -29,6 +29,8 @@ export const NOUVEAUTES = Object.freeze([
   // (16 nov., lot retirer-case-compact) docs/passation/2026-11-16-retirer-case-compact.md
   { id: 'stock-case-allumee', date: '2026-11-16', titre: 'Stock : la case vendue reste allumée', phrase: 'Touche-la quand l’article est sorti ; « Annuler » la remet.', tab: 'garage', pour: 'tous', mode: 'tous' },
   // (16 nov., bancs-rouges-a) docs/passation/2026-11-16-bancs-rouges-a.md
+  // (16 nov., lot alerte-soir-colis) docs/passation/2026-11-16-alerte-soir-colis.md
+  { id: 'soir-une-fois', date: '2026-11-16', titre: 'Le rappel du soir nomme tes N°', phrase: 'Un colis déjà rappelé ne revient pas, sauf limite le lendemain.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (16 nov., Julien : « la liaison pour relier l'achat beaucoup plus fiable ») docs/passation/2026-11-16-relier-fiable.md
   { id: 'fiche-delier-recu', date: '2026-11-16', titre: 'Fiche : délier un achat, ouvrir son reçu', phrase: 'À côté de « Achetée » : « Reçu » et « Délier », confirmé.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'relier-fiable', date: '2026-11-16', titre: 'Relier un achat : seulement les propositions sûres', phrase: 'Même taille, même couleur, un seul achat ; le reste dans « Autres pistes ».', tab: 'achats', pour: 'tous', mode: 'tous' },
