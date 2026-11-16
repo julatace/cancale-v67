@@ -132,7 +132,8 @@ const remplacer = (src, a, b) => { if (!src.includes(a)) { console.error('ancre 
     dit(['1', '2', '3'].every((k) => carte.includes(`data-urssaf-etape="${k}"`)), 'B1 · « Déclarer » en trois étapes : ce qui est sûr · ce qui manque · déclarer');
     dit(/<SourceChiffre id="ca">/.test(carte) && /<SourceChiffre id="cotis">/.test(carte), 'B2 · chaque chiffre de la déclaration a son « ? »');
     dit(/ligne\.mois\.filter\(\(m\) => m && \(P\.mois \|\| \[\]\)\.includes\(m\.ym\)\)/.test(carte), 'B2 · la phrase du « ? » vient de la MÊME ligne publiée que le chiffre');
-    dit(/periodeADater\(ligne && ligne\.aDater\)/.test(carte) && /data-urssaf-adater-periode/.test(carte), 'B3 · les ventes à dater disent QUAND elles ont été vendues');
+    // (15 nov., extension 5.390) Plus de « elles ont été vendues de … à … » : une ligne discrète, aucun geste.
+    dit(/<LigneDatesVersement /.test(carte) && !/data-urssaf-adater-periode|data-urssaf-dater/.test(carte), 'B3 · les ventes sans date : la ligne discrète, plus de période ni de geste (5.390)');
     dit(/data-urssaf-rien-manque/.test(carte), 'B3 · rien ne manque : la carte le DIT (l’étape 2 n’est jamais muette)');
     dit(!/encaiss/i.test(carte), 'B4 · jamais « encaissé »');
     dit(/data-urssaf-copier="ca"/.test(carte) && /data-urssaf-cest-declare=/.test(carte) && /data-urssaf-manque=/.test(carte), 'B4 · « Copier », « J’ai déclaré » et le manque nommé restent (bancs du chantier F)');

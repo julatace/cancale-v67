@@ -12,9 +12,9 @@
 // `printf "%v"` : une langue absente (vieux compte, invitation) rend "<nil>"
 // au lieu d'une erreur de comparaison.
 //
-// Style : Apple sobre — fond #F2F2F7, carte blanche, encre #1D1D1F, UN bouton
-// bleu #0071E3 de 44 px, police système. Tables et styles en ligne (clients
-// mail) ; le bloc <style> ne sert qu'au mode sombre des clients qui le lisent.
+// Style : « Verre dépoli » (15 nov.) — api/_lib/mail-verre.js, commun à tous les
+// e-mails. Tables et styles en ligne (clients mail) ; le bloc <style> ne sert
+// qu'au mode sombre et au téléphone des clients qui le lisent.
 const fs = require('fs');
 const path = require('path');
 
@@ -152,67 +152,39 @@ const MODELES = [
   },
 ];
 
-const POLICE = "-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',Helvetica,Arial,sans-serif";
+// (15 nov., « Verre dépoli », Julien : « J'aime la 9 » ; « intègre les e-mails ») LA FORME vient
+// d'api/_lib/mail-verre.js — la MÊME que les e-mails que VRM envoie (api/_lib/mail-gabarit.js) :
+// fond bleu profond (couleur unie #174C88 + dégradé en image de fond), logo hébergé + « VRM » et
+// le TITRE en blanc sur le bleu, carte blanche arrondie, code EN GRAND, UN plein d'encre, pied en
+// clair. Un document entier par langue (`{{ if $en }}…{{ else }}…{{ end }}`) : le `lang` suit.
+const { VERRE, teteVerre, boutonVerre, codeVerre, enveloppeVerre } = require('../api/_lib/mail-verre.js');
 const SECOURS = { fr: 'Le bouton ne marche pas ? Copie ce lien dans ton navigateur :', en: 'Button not working? Copy this link into your browser:' };
 
 const bloc = (m, l) => {
-  const t = m[l];
-  // Le code : chiffres espacés par l'interlettrage (une copie rend « 123456 »,
-  // sans espace), sélectionnable d'un geste.
-  const code = m.code
-    ? `<tr><td style="padding:4px 0 20px"><div class="c-doux" style="font-family:${POLICE};font-size:13px;line-height:18px;color:#6E6E73;padding:0 0 6px">${t.legende}</div><div class="c-code" style="font-family:'SF Mono',ui-monospace,Menlo,Consolas,monospace;font-size:34px;line-height:44px;font-weight:700;letter-spacing:10px;color:#1D1D1F;background:#F2F2F7;border-radius:12px;padding:12px 16px;text-align:center;-webkit-user-select:all;user-select:all">${m.code}</div></td></tr>`
-    : '';
-  const ou = m.code && m.lien ? `<tr><td class="c-texte" style="padding:0 0 12px;font-family:${POLICE};font-size:15px;line-height:22px;color:#424245">${t.ou}</td></tr>` : '';
-  const action = code + ou + (!m.lien ? ''
-    : `<tr><td style="padding:4px 0 20px"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td bgcolor="#0071E3" style="background:#0071E3;border-radius:12px"><a class="c-btn" href="${m.lien}" style="display:inline-block;padding:12px 24px;font-family:${POLICE};font-size:17px;line-height:20px;font-weight:600;color:#FFFFFF;text-decoration:none;border-radius:12px">${t.bouton}</a></td></tr></table></td></tr>`);
-  const note = t.note ? `<tr><td class="c-doux" style="padding:0 0 16px;font-family:${POLICE};font-size:14px;line-height:20px;color:#6E6E73">${t.note}</td></tr>` : '';
-  const secours = !m.lien ? '' : `<tr><td class="c-trait" style="padding:16px 0 0;border-top:1px solid #E5E5EA;font-family:${POLICE};font-size:13px;line-height:19px;color:#6E6E73"><span class="c-doux">${SECOURS[l]}</span><br><a class="c-lien" href="${m.lien}" style="color:#0066CC;text-decoration:underline;word-break:break-all">${m.lien}</a></td></tr>`;
-  return [
-    `<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent">${t.apercu}</div>`,
-    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="c-fond" style="background:#F2F2F7"><tr><td align="center" style="padding:32px 16px">`,
-    `<table role="presentation" width="520" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:520px">`,
-    `<tr><td style="padding:0 4px 18px"><table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td style="vertical-align:middle"><img src="https://vrm.center/vrm-logo-v5-192.png" width="36" height="36" alt="" style="display:block;border:0;border-radius:10px"></td><td class="c-encre" style="vertical-align:middle;padding-left:10px;font-family:${POLICE};font-size:20px;font-weight:700;letter-spacing:-0.5px;color:#1D1D1F">VRM</td></tr></table></td></tr>`,
-    `<tr><td class="c-carte" style="background:#FFFFFF;border-radius:14px;padding:32px 28px">`,
+  const t = m[l], P = VERRE.police;
+  const ligne = (html, pad = '0 0 20px') => `<tr><td style="padding:${pad}">${html}</td></tr>`;
+  const corps = [
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">`,
-    `<tr><td class="c-encre" style="padding:0 0 12px;font-family:${POLICE};font-size:24px;line-height:30px;font-weight:700;letter-spacing:-0.4px;color:#1D1D1F">${t.titre}</td></tr>`,
-    `<tr><td class="c-texte" style="padding:0 0 24px;font-family:${POLICE};font-size:16px;line-height:24px;color:#424245">${t.texte}</td></tr>`,
-    action, note, secours,
-    `</table></td></tr>`,
-    `<tr><td class="c-doux" style="padding:20px 8px 0;font-family:${POLICE};font-size:12px;line-height:18px;color:#86868B">${t.pied}<br><br>VRM · <a href="https://vrm.center" style="color:#86868B;text-decoration:underline">vrm.center</a></td></tr>`,
-    `</table></td></tr></table>`,
-  ].join('\n');
+    ligne(`<p class="vv-encre" style="margin:0;font-family:${P};font-size:16px;line-height:25px;color:${VERRE.encre}">${t.texte}</p>`, '0 0 22px'),
+    m.code ? ligne(codeVerre({ codeHtml: m.code, legendeHtml: t.legende }), '0 0 22px') : '',
+    m.code && m.lien ? ligne(`<p class="vv-gris" style="margin:0;font-family:${P};font-size:15px;line-height:22px;color:${VERRE.gris}">${t.ou}</p>`, '0 0 6px') : '',
+    m.lien ? ligne(boutonVerre({ urlHtml: m.lien, motHtml: t.bouton }), '0') : '',
+    t.note ? ligne(`<p class="vv-gris" style="margin:0;font-family:${P};font-size:14px;line-height:21px;color:${VERRE.gris}">${t.note}</p>`, '0 0 16px') : '',
+    m.lien ? ligne(`<p class="vv-gris vv-filet" style="margin:0;padding:16px 0 0;border-top:1px solid ${VERRE.filet};font-family:${P};font-size:13px;line-height:19px;color:${VERRE.gris}">${SECOURS[l]}<br><a class="vv-lien" href="${m.lien}" style="color:${VERRE.lien};text-decoration:underline;word-break:break-all">${m.lien}</a></p>`, '0') : '',
+    `</table>`,
+  ].join('');
+  const pied = `<p style="margin:0 0 10px;font-family:${P};font-size:13px;line-height:20px;color:${VERRE.surBleu2}">${t.pied}</p>`
+    + `<p style="margin:0;font-family:${P};font-size:13px;line-height:20px;color:${VERRE.surBleu2}">VRM · <a href="https://vrm.center" style="color:${VERRE.surBleu};text-decoration:underline">vrm.center</a></p>`;
+  return enveloppeVerre({ lang: l, titreDoc: 'VRM', apercuHtml: t.apercu, teteHtml: teteVerre({ titreHtml: t.titre }), corpsHtml: corps, piedHtml: pied });
 };
-
-const STYLE = `<style>
-:root{color-scheme:light dark;supported-color-schemes:light dark}
-body{margin:0;padding:0;-webkit-text-size-adjust:100%}
-@media (prefers-color-scheme:dark){
- .c-fond,body{background:#000000!important}
- .c-carte{background:#1C1C1E!important}
- .c-encre{color:#F5F5F7!important}
- .c-texte{color:#D1D1D6!important}
- .c-doux{color:#98989D!important}
- .c-trait{border-top-color:#3A3A3C!important}
- .c-code{background:#2C2C2E!important;color:#F5F5F7!important}
- .c-lien{color:#409CFF!important}
-}
-</style>`;
 
 const html = (m) => [
   EN,
-  `<!doctype html>`,
-  `<html lang="{{ if $en }}en{{ else }}fr{{ end }}">`,
-  `<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark"><title>VRM</title>`,
-  STYLE,
-  `</head>`,
-  `<body class="c-fond" style="margin:0;padding:0;background:#F2F2F7">`,
   `{{ if $en }}`,
   bloc(m, 'en'),
   `{{ else }}`,
   bloc(m, 'fr'),
   `{{ end }}`,
-  `</body>`,
-  `</html>`,
   '',
 ].join('\n');
 

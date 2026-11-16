@@ -73,8 +73,8 @@ export const SOURCES = [
     pourquoi: 'leurs ventes et bordereaux n’ont pas de compte', geste: { libelle: 'Relier', tab: 'emails', clic: '[data-boite-vue="relier"]', cible: '[data-adresses-sans-compte]' } },
   { cle: 'comptes-a-relire', ecran: 'Ventes', quoi: (n) => `${n} ${pl(n, 'compte', 'comptes')} à relire`,
     pourquoi: 'leurs ventes datent de plus d’un jour', geste: { libelle: 'Mes comptes', tab: 'vintedaccounts' } },
-  { cle: 'ventes-a-dater', ecran: 'Ventes', quoi: (n) => `${n} ${pl(n, 'vente', 'ventes')} à dater`,
-    pourquoi: 'sans date de versement : dans aucun mois déclaré', geste: { libelle: 'Dater', tab: 'compta', clic: '[data-urssaf-dater]' } },
+  // (15 nov., extension 5.390) Julien : « Enlève les 1741 ventes à dater […] le but est que l'extension récupère ces infos, pas que ça soit à nous de le faire. »
+  // « Ventes à dater » n'est plus une chose à trancher : rien ne lui est demandé.
 ];
 // Le nom d'une source quand son nombre n'est pas su (sans nombre dans la phrase).
 export const NOMS = {
@@ -92,7 +92,6 @@ export const NOMS = {
   'achats-sans-prix': 'Annonces sans prix d’achat',
   'adresses-sans-compte': 'Adresses e-mail sans compte',
   'comptes-a-relire': 'Comptes à relire',
-  'ventes-a-dater': 'Ventes à dater',
 };
 export const CLES_SOURCES = SOURCES.map((s) => s.cle);
 
@@ -176,10 +175,6 @@ export function lignesATrancher({ pubs = {}, colisRetirer = null, urssafMois = n
       const p = colisRetirer && typeof colisRetirer === 'object' && Number.isFinite(Number(colisRetirer.aVerifier))
         ? { n: Number(colisRetirer.aVerifier) + (Number(colisRetirer.enVerification) || 0), at: colisRetirer.at } : null;
       e = etatPub(p, FRAIS_MS, maintenant, src.ecran);
-    } else if (src.cle === 'ventes-a-dater') {
-      const ad = urssafMois && urssafMois.aDater;
-      const p = ad && Number.isFinite(Number(ad.n)) ? { n: Number(ad.n), at: urssafMois.at } : null;
-      e = etatPub(p, FRAIS_URSSAF_MS, maintenant, src.ecran);
     } else if (src.cle === 'comptes-a-relire') {
       e = Array.isArray(comptes) ? { n: comptes.length, raison: '', noms: comptes.map((c) => c.login).filter(Boolean) }
         : comptes === null ? { n: null, raison: 'la fraîcheur des lectures n’a pas pu être lue' } : { n: undefined, raison: 'lecture…' };
@@ -215,7 +210,7 @@ export const TYPES = [
   { type: 'ventes', titre: 'Ventes', cles: ['litiges-en-cours'] },
   { type: 'paires', titre: 'Annonces', cles: ['supprimes-vinted', 'remise-en-ligne', 'achats-sans-prix'] },
   { type: 'comptes', titre: 'Comptes', cles: ['adresses-sans-compte', 'comptes-a-relire'] },
-  { type: 'compta', titre: 'Compta', cles: ['achats-doubles', 'ventes-a-dater'] },
+  { type: 'compta', titre: 'Compta', cles: ['achats-doubles'] },
 ];
 // La question : `n` (carte d'une source, le nombre est dans la vignette) ou `x` (une chose).
 export const QUESTIONS = {
@@ -233,7 +228,6 @@ export const QUESTIONS = {
   'achats-sans-prix': { n: () => 'Annonces sans prix d’achat', x: () => 'Prix d’achat pas saisi' },
   'adresses-sans-compte': { n: (n) => (n > 1 ? 'Adresses e-mail sans compte relié' : 'Adresse e-mail sans compte relié') },
   'comptes-a-relire': { n: (n) => (n > 1 ? 'Comptes à relire sur Vinted' : 'Compte à relire sur Vinted') },
-  'ventes-a-dater': { n: (n) => (n > 1 ? 'Ventes sans date de versement' : 'Vente sans date de versement') },
 };
 // Les gestes BINAIRES faits ici même : internes à VRM, réversibles (« Annuler » 5 s),
 // sur UNE chose désignée par son identité. « Non » n'écrit rien : il ouvre l'écran

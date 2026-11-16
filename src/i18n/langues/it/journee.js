@@ -89,7 +89,7 @@ export default {
   "journee.republierPreparerAilleurs": "Ripubblicare, preparare altrove o cambiare il prezzo tu: scegli tu, niente parte da solo",
   "journee.inventaireCours": "Inventario in corso",
   "journee.vusReprendsT": { one: "{n} N° visto — riprendi da dove eri rimasto", other: "{n} N° visti — riprendi da dove eri rimasto" },
-  "journee.listeGuideeVentes": "Un elenco guidato: vendite da datare, inventario, fatturato, URSSAF, imposte, esportazione",
+  "journee.listeGuideeVentes": "Un elenco guidato: date di versamento, inventario, fatturato, URSSAF, imposte, esportazione",
   "journee.venteVestiaire": "Vendita Vestiaire",
   "journee.supprimerLeboncoin": "Elimina da Leboncoin",
   "journee.supprimer": "Elimina",

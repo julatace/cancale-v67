@@ -304,7 +304,8 @@ async function reglesApp() {
     dit(nApp >= 5 && nCompta >= 3, `les écrans de chiffres passent les ventes importées (${nApp} + ${nCompta})`);
     const srv = lire('api/_lib/ventes-regle.js');
     dit(/importees/.test(srv), 'la copie serveur des règles (refabriquée) les connaît');
-    dit(/'importee'/.test(lire('src/versementRaisons.js')) && /data-adater-raison="importee"/.test(compta), '« à dater » dit la raison des ventes importées, avec le geste');
+    // (15 nov., extension 5.390) Plus de geste de datation à l'écran : la raison reste publiée (mesure), la ligne discrète la compte.
+    dit(/importee: \{\}/.test(lire('src/versementRaisons.js')) && !/data-adater-raison/.test(compta), 'les ventes importées sans versement : raison publiée, aucun geste à l’écran (5.390)');
   });
 
   console.log(`\n${ko ? '❌' : '✅'} ${ok} vert(s), ${ko} rouge(s)`);
