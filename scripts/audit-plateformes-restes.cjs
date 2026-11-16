@@ -201,7 +201,7 @@ const url = (f) => pathToFileURL(path.join(BASE, f)).href;
   } else dit(false, 'V src/caAutresParJour.js porte finalisesVestiaire');
   const stats = sansCommentaires(lire('src/ecrans/Stats.jsx'));
   const corpsVc = (stats.split('const caVestiaireFinalise = (ventesVc) => {')[1] || '').split('\n};')[0];
-  dit(/const r = resumeFinaliseVestiaire\(ventesVc, \{ etapeMotVc, vcVenteAnnulee, montantRecuVc, dateVenteVc \}\);/.test(corpsVc) && !/for \(const v of ventesVc\)/.test(corpsVc), 'V5 « Finalisé par plateforme » consomme la règle (aucune boucle à lui)');
+  dit(/const r = resumeFinaliseVestiaire\(ventesVc, \{ etapeMotVc, vcVenteAnnulee, montantRecuVc, dateVenteVc \}\);/.test(corpsVc) && !/let ca = 0, n = 0, pasSur = 0;/.test(stats) && !/for \(const v of ventesVc\)/.test(stats), 'V5 « Finalisé par plateforme » consomme la règle (aucune boucle à lui)');
   dit(/data-stats-total-au-moins=/.test(stats) && /tr\('stats\.totalAuMoins'\)/.test(stats), 'V6 le total dit « au moins » quand une plateforme l’est');
 
   console.log(`\n${ok} verts, ${ko} rouges`);

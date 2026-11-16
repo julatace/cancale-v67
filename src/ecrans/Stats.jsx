@@ -268,18 +268,6 @@ const caVestiaireFinalise = (ventesVc) => {
   if (r.etat === 'au-moins') return { ca: r.ca, auMoins: true, note: tr('stats.vcFin.auMoins', { n: r.pasSur }) };
   return { ca: r.ca, note: tr('stats.vcFin.lu') };
 };
-  if (!Array.isArray(ventesVc)) return { ca: null, note: 'ventes Vestiaire pas lues' };
-  let ca = 0, n = 0, pasSur = 0;
-  for (const v of ventesVc) {
-    if (!v || vcVenteAnnulee(v)) continue;
-    const et = etapeMotVc(v); if (et !== 'versee' && et !== 'terminee') continue;
-    const r = montantRecuVc(v);
-    if (r.eur == null) { pasSur++; continue; }
-    ca += r.eur; n++;
-  }
-  if (pasSur) return { ca: null, note: `${pasSur} vente${pasSur > 1 ? 's' : ''} finalisée${pasSur > 1 ? 's' : ''} au montant pas sûr` };
-  return n ? { ca: Math.round(ca * 100) / 100, note: 'ventes finalisées (montant versé)' } : { ca: null, note: 'pas encore de vente finalisée' };
-};
 // (11 nov., parité) `excluAutre` : le prédicat des comptes écartés (Paramètres → Comptes liés,
 // et l'offre Solo) — le MÊME que `ventesFaites`/`ventesDeclarables`. Avant, cette carte
 // comptait encore les ventes d'un compte Leboncoin, eBay ou Vestiaire écarté de tous
