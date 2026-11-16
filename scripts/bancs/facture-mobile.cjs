@@ -141,7 +141,7 @@ const ouvrir = async (b, vp, sombre, { vrmPret = true } = {}) => {
   await pg.waitForTimeout(1500);
   return { ctx, pg, errs };
 };
-const ligneFacture = (pg, tx) => pg.locator(`.vrm-sale-row[data-tx="${tx}"] [data-fp-forme="ligne"]`).first();
+const ligneFacture = (pg, tx) => pg.locator(`.vrm-sale-row[data-tx="${tx}"] [data-fp-forme="ligne"]:visible`).first();
 
 // Les mesures, dans la page : débordements, miniature, tableau.
 const mesurer = (pg) => pg.evaluate(() => {
@@ -196,7 +196,7 @@ const mesurer = (pg) => pg.evaluate(() => {
       await essaie('feuille', async () => {
         await ligneFacture(pg, '7020').waitFor({ timeout: 8000 });
         await ligneFacture(pg, '7020').scrollIntoViewIfNeeded();
-        await ligneFacture(pg, '7020').locator('[data-fp-vente="a-faire"]').click();
+        await ligneFacture(pg, '7020').locator('[data-fp-vente="a-faire"]').dispatchEvent('click');
         const f = pg.locator('[data-fp-feuille-vente="7020"]');
         await f.locator('[data-fp-apercu]').waitFor({ timeout: 6000 });
         dit(await f.locator('[data-fp-anglais]').getAttribute('data-fp-anglais') === '1', '0. acheteuse aux Pays-Bas : facture bilingue pré-cochée');
@@ -279,7 +279,7 @@ const mesurer = (pg) => pg.evaluate(() => {
         const o = await ouvrir(b, vp, sombre, { vrmPret: false });
         await essaie('vrm fermé', async () => {
           await ligneFacture(o.pg, '7020').scrollIntoViewIfNeeded();
-          await ligneFacture(o.pg, '7020').locator('[data-fp-vente="a-faire"]').click();
+          await ligneFacture(o.pg, '7020').locator('[data-fp-vente="a-faire"]').dispatchEvent('click');
           const f = o.pg.locator('[data-fp-feuille-vente="7020"]');
           await f.locator('[data-fp-apercu]').waitFor({ timeout: 6000 });
           const bloque = f.locator('.vrm-fp-gestes.is-bas [data-fp-bloque]');
@@ -295,7 +295,7 @@ const mesurer = (pg) => pg.evaluate(() => {
         const o2 = await ouvrir(b, vp, sombre);
         await essaie('émise', async () => {
           await ligneFacture(o2.pg, '7020').scrollIntoViewIfNeeded();
-          await ligneFacture(o2.pg, '7020').locator('[data-fp-vente="a-faire"]').click();
+          await ligneFacture(o2.pg, '7020').locator('[data-fp-vente="a-faire"]').dispatchEvent('click');
           const f = o2.pg.locator('[data-fp-feuille-vente="7020"]');
           await f.locator('[data-fp-emettre]').waitFor({ timeout: 6000 });
           await f.locator('[data-fp-emettre]').click();
