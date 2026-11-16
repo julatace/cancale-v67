@@ -1954,3 +1954,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne déplacée de CLAUDE.md §9 (16 nov.)
 
 - **15 nov. · Vitrine publique refaite + notifications claires** : accueil (« Tes ventes Vinted, Leboncoin, eBay et Vestiaire au même endroit. », un plein « Essayer gratuitement », vraie capture du mode exemple, tarifs, FAQ des vrais garde-fous, aucun faux), OG refait ; lien partenaire `/p/CODE` ⇒ la vitrine d'abord, code gardé dès l'arrivée (`src/main.jsx`) ; notifications : `api/_lib/notif-redaction.js` (titre ≤ 40, corps ≤ 90, dates de Paris en clair, ni pseudo ni identifiant, 5 langues), « from VRM » = iOS. `2026-11-15-site-public.md`, `2026-11-15-notifications-belles.md`. Geste : aucun.
+
+### Déplacé de CLAUDE.md §9 le 16 nov. (taille)
+- **15 nov. · Extension 5.380.0 : carte du logo + Leboncoin sûr (5.379 jamais publiée seule)** : « Mes ventes » (`/my_orders/sold`, jamais attestée) retiré, liens sur liste blanche `CHEMINS_ATTESTES` ; favoris listés même sans message ; plaque N° seulement si connue ; studio ; LBC : lecture bornée (`lisible`), enveloppes `commeNatif`, disjoncteur `vrm_lbc_de_cote`, cadres étrangers ignorés ; Vinted : plus de double envoi sur exception. `2026-11-15-carte-extension.md`, `2026-11-15-lbc-orion.md`. Geste : installer 5.380.0 ; donner l'URL de sa page « Mes ventes » Vinted.

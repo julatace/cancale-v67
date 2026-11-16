@@ -14797,12 +14797,12 @@ const ouvrirPdfOnglet = (url, nom, titre) => {
 // l'impression seule. Rend la voie prise ; 'bouton' ⇒ la feuille propose « Ouvrir le PDF » (SON toucher).
 // Le fichier est refait si les octets ont changé (un PDF « Il en manque » hérite des champs du lot : jamais son fichier).
 const fichierPdf = (pret) => { try { if (!pret.file || pret.fileDe !== pret.bytes) { pret.file = new File([pret.bytes], pret.filename || 'bordereaux.pdf', { type: 'application/pdf' }); pret.fileDe = pret.bytes; } return pret.file; } catch (_) { return null; } };
-const partageFichiersPossible = (f) => { try { return !!(f && navigator.canShare && navigator.share && navigator.canShare({ files: [f] })); } catch (_) { return false; } };
+const partagePdfPossible = (f) => { try { return !!(f && navigator.canShare && navigator.share && navigator.canShare({ files: [f] })); } catch (_) { return false; } };
 const ouvrirPdfLot = (pret, { geste = true, titre = '' } = {}) => {
   if (!pret || !pret.url) return 'bouton';
   const ios = estIOS(), android = estAndroid();
   const f = ios || android ? fichierPdf(pret) : null;
-  const voie = voieOuverture({ ios, android, partageFichiers: partageFichiersPossible(f), pret: true, geste });
+  const voie = voieOuverture({ ios, android, partageFichiers: partagePdfPossible(f), pret: true, geste });
   try {
     if (voie === 'partage' && typeof navigator.share === 'function') { const p = navigator.share({ files: [f], title: titre || pret.filename }); if (p && p.catch) p.catch(() => {}); return 'partage'; }
     if (voie === 'onglet') { const w = window.open(pret.url, '_blank'); return w ? 'onglet' : 'bouton'; }

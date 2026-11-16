@@ -30,6 +30,10 @@ function banc(reponse, { session = ancienne() } = {}) {
     ecritures = 0;
   const c = vm.createContext({
     AUTH: { session },
+    // (16 nov., parcours-vert) Depuis le 14 nov. (src/jetonFrais.js) le bloc branche aussi la garde « jamais un jeton
+    // expiré » sur CE renouvellement : le banc la reçoit et vérifie qu'elle passe par authRefresh (un seul en vol).
+    SUPABASE_URL: "https://base.example.test",
+    installerJetonFrais: (o) => { c.__jeton = o; },
     authCall: async () => {
       appels++;
       return typeof reponse === "function" ? reponse() : reponse;
@@ -48,6 +52,7 @@ function banc(reponse, { session = ancienne() } = {}) {
     },
   });
   vm.runInContext(refresh, c);
+  if (!c.__jeton || typeof c.__jeton.rafraichir !== "function" || c.__jeton.session() !== c.AUTH.session) throw new Error("la garde du jeton frais n'est pas branchée sur la session et authRefresh");
   return {
     renouveler: (o) => c.renouveler(o),
     changer: (j) => {
