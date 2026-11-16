@@ -55,7 +55,6 @@ const C = (a, b) => { const x = L(a), y = L(b); return (Math.max(x, y) + 0.05) /
     'essai j6': RE.texteRelance('j6', { fin, lien }).html,
     'bilan du mois': BM.texteBilanMois({ libelle: 'octobre 2026', vendu: { etat: 'su', n: 3, eur: 120 }, recu: { etat: 'su', eur: 100 }, benefice: { etat: 'su', brut: 40, n: 3, nCout: 3, manque: [] }, meilleure: null }, { lien: 'https://vrm.center/api/compte?mode=bilan-mois&d=demonstration' }).html,
     'preuve d’adresse': PA.emailConfirmation('demo@exemple.test', 'https://vrm.center/?confirmer-adresse=demonstration').html,
-    'facture Pro': FR.emailFacture({}, { type: 'facture', numero: 'FA-2026-0001', vendeur: { nom: 'Boutique Démo' }, acheteur: { nom: 'Client Démo' }, lignes: [{ designation: 'Article de démonstration' }] }, { via: 'vrm' }).html,
     'essai de la boîte des factures': FP.mailBoiteEssai().html,
     'e-mail d’essai': ME.mailEssai().html,
     'suppression prévue': SD.mailDemande({ effaceLe: new Date(Date.now() + 30 * 86400e3).toISOString(), contact: 'contact@exemple.test' }).html,
@@ -101,8 +100,29 @@ const C = (a, b) => { const x = L(a), y = L(b); return (Math.max(x, y) + 0.05) /
     return f;
   }
   const marques = new Set(['facture Pro']);
-  const tout = (M, S) => {
+  // (16 nov., lot factures-mieux — Julien, capture : « lourd et peu professionnel ») La facture d'un
+  // VENDEUR à SON client n'est pas un e-mail de VRM : elle a sa forme SOBRE (api/_lib/mail-facture.js) —
+  // fond blanc, le nom de la boutique sous un filet, AUCUN cadre bleu, aucune image, sombre toléré.
+  const FM = await imp('api/_lib/mail-facture.js');
+  const factures = {
+    'facture Pro': FR.emailFacture({}, { type: 'facture', numero: 'FA-2026-0001', vendeur: { nom: 'Boutique Démo' }, acheteur: { nom: 'Client Démo' }, lignes: [{ designation: 'Article de démonstration' }] }, { via: 'vrm' }).html,
+  };
+  function reglesFacture(nom, html) {
+    const f = []; const exige = (ok, quoi) => { if (!ok) f.push(`${nom} : ${quoi}`); };
+    const B = FM.FACTURE_MAIL;
+    exige(!/data-vv=/.test(html) && !html.includes(V.bleu) && !/linear-gradient/.test(html), 'S1 le cadre bleu des e-mails de VRM est revenu sur la facture du vendeur');
+    exige(new RegExp(`data-fm="fond"[^>]*bgcolor="${B.fond}"`).test(html) && ['tete', 'corps'].every((x) => html.includes(`data-fm="${x}"`)), 'S1 fond blanc, en-tête boutique ou corps absent');
+    exige(![...html.matchAll(/<img\b/g)].length && !/>VRM</.test(html), 'S2 une image ou le mot VRM dans la facture du vendeur');
+    const sansStyle = [...html.replace(/<!--\[if mso\]>[\s\S]*?<!\[endif\]-->/g, '').matchAll(/<(td|p|a|h1)\b(?![^>]*\bstyle=)[^>]*>/g)];
+    exige(!sansStyle.length && !/<link\b|@import|<script\b/i.test(html), 'S3 style en ligne absent, ou feuille/script externe');
+    exige(/max-width:600px/.test(html) && /<!--\[if mso\]><table role="presentation" width="600"/.test(html), 'S3 largeur 600 (et table fantôme d’Outlook) absente');
+    exige(/@media \(prefers-color-scheme:dark\)/.test(html) && /\[data-ogsc\] \.fm-encre/.test(html), 'S4 sombre (prefers-color-scheme + data-ogsc) absent');
+    exige(Buffer.byteLength(html) < 100 * 1024 && /<html lang="(fr|en)"/.test(html), 'S5 poids ou lang');
+    return f;
+  }
+  const tout = (M, S, FX = factures) => {
     const f = [];
+    for (const [nom, html] of Object.entries(FX)) f.push(...reglesFacture(nom, html));
     for (const [nom, html] of Object.entries(M)) f.push(...regles(nom, html, { marque: marques.has(nom) }));
     for (const m of MODELES) {
       const b = blocs(S[m.id]);
@@ -124,10 +144,10 @@ const C = (a, b) => { const x = L(a), y = L(b); return (Math.max(x, y) + 0.05) /
   const fautes = tout(mails, supa).concat(fautesC);
   for (const f of fautes) console.error('✗ ' + f);
   rouge += fautes.length;
-  if (!fautes.length) console.log(`✓ ${Object.keys(mails).length} e-mails de VRM et ${MODELES.length} modèles Supabase (fr + en) : la forme commune « Verre dépoli », un plein d’encre, styles en ligne, 600 px, logo hébergé, < 100 Ko, sombre, variables Supabase, contrastes AA (${paires.map(([n, a, b]) => `${n} ${C(a, b).toFixed(1)}`).join(' · ')})`);
+  if (!fautes.length) console.log(`✓ la facture d’un vendeur dans sa forme sobre (fond blanc, aucun cadre bleu) · ${Object.keys(mails).length} e-mails de VRM et ${MODELES.length} modèles Supabase (fr + en) : la forme commune « Verre dépoli », un plein d’encre, styles en ligne, 600 px, logo hébergé, < 100 Ko, sombre, variables Supabase, contrastes AA (${paires.map(([n, a, b]) => `${n} ${C(a, b).toFixed(1)}`).join(' · ')})`);
 
   if (process.argv.includes('--prouve')) {
-    const muter = (fn) => { const M = Object.fromEntries(Object.entries(mails).map(([k, v]) => [k, fn(v, k)])); const S = Object.fromEntries(Object.entries(supa).map(([k, v]) => [k, fn(v, k)])); return tout(M, S).length; };
+    const muter = (fn) => { const M = Object.fromEntries(Object.entries(mails).map(([k, v]) => [k, fn(v, k)])); const S = Object.fromEntries(Object.entries(supa).map(([k, v]) => [k, fn(v, k)])); const FX = Object.fromEntries(Object.entries(factures).map(([k, v]) => [k, fn(v, k)])); return tout(M, S, FX).length; };
     const mutations = [
       ['F1 feuille commune changée', (h, k) => (k === 'bilan du mois' ? h.split('.vv-carte{').join('.vv-x{') : h)],
       ['F1 titre sur la carte (encre)', (h, k) => (k === 'magic_link' ? h.split(`color:${V.surBleu};word-break`).join(`color:${V.encre};word-break`) : h)],
@@ -135,7 +155,9 @@ const C = (a, b) => { const x = L(a), y = L(b); return (Math.max(x, y) + 0.05) /
       ['F3 feuille externe', (h, k) => (k === 'invite' ? h.replace('</head>', '<link rel="stylesheet" href="https://exemple.test/a.css"></head>') : h)],
       ['F3 style en ligne retiré', (h, k) => (k === 'e-mail d’essai' ? h.replace(/<p class="vv-encre" style="[^"]*"/, '<p class="vv-encre"') : h)],
       ['F4 logo en base64', (h, k) => (k === 'preuve d’adresse' ? h.split(`src="${V.logo}"`).join('src="data:image/png;base64,AAAA"') : h)],
-      ['F4 logo VRM sur la facture d’un vendeur', (h, k) => (k === 'facture Pro' ? h.replace('<tr><td data-vv="tete"', `<tr><td><img src="${V.logo}" width="32" height="32" alt="" style="display:block"></td></tr><tr><td data-vv="tete"`) : h)],
+      ['S2 logo VRM sur la facture d’un vendeur', (h, k) => (k === 'facture Pro' ? h.replace('<tr><td class="fm-filet fm-encre" data-fm="tete"', `<tr><td style="padding:0"><img src="${V.logo}" width="32" height="32" alt="" style="display:block"></td></tr><tr><td class="fm-filet fm-encre" data-fm="tete"`) : h)],
+      ['S1 cadre bleu revenu sur la facture', (h, k) => (k === 'facture Pro' ? h.replace('data-fm="fond"', `data-fm="fond" data-vv="fond" style="background-color:${V.bleu}"`) : h)],
+      ['S4 sombre retiré de la facture', (h, k) => (k === 'facture Pro' ? h.split('[data-ogsc] ').join('[data-x] ') : h)],
       ['F5 trop lourd', (h, k) => (k === 'recovery' ? h.replace('</body>', `<p style="margin:0">${'x'.repeat(110 * 1024)}</p></body>`) : h)],
       ['F6 sombre retiré', (h, k) => (k === 'suppression faite' ? h.split('[data-ogsc] ').join('[data-x] ') : h)],
       ['F7 code retiré', (h, k) => (k === 'reauthentication' ? h.split('{{ .Token }}').join('') : h)],

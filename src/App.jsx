@@ -15240,11 +15240,13 @@ const generateRemboursementAttestation = async (o, opts = {}) => {
   line('Compte acheteur', opts.account || '—');
   y -= 4;
   const notes = [
-    'Attestation d\'un achat annule ou retourne, rembourse par Vinted.',
-    'Recapitulatif etabli par VRM d\'apres les donnees de la commande Vinted. Ce n\'est pas une facture emise par Vinted.',
-    'Etabli le ' + new Date().toLocaleDateString('fr-FR') + '.',
+    // (16 nov., lot factures-mieux) Les accents écrits (Helvetica de pdf-lib sait le WinAnsi).
+    'Attestation d\'un achat annulé ou retourné, remboursé par Vinted.',
+    'Récapitulatif établi par VRM d\'après les données de la commande Vinted. Ce n\'est pas une facture émise par Vinted.',
+    'Établi le ' + new Date().toLocaleDateString('fr-FR') + '.',
   ];
-  notes.forEach(n => { page.drawText(n.slice(0, 74), { x: 32, y, size: 8, font: reg, color: G }); y -= 13; });
+  // Coupé en lignes (jamais tronqué : la phrase « pas une facture émise par Vinted » doit rester entière).
+  notes.forEach(n => { let l = ''; for (const m of n.split(' ')) { const e = l ? l + ' ' + m : m; if (reg.widthOfTextAtSize(e, 8) > 356 && l) { page.drawText(l, { x: 32, y, size: 8, font: reg, color: G }); y -= 11; l = m; } else l = e; } if (l) { page.drawText(l, { x: 32, y, size: 8, font: reg, color: G }); y -= 13; } });
   _telechargerPdf(await pdf.save(), `attestation-remboursement-${o.transaction_id || 'achat'}.pdf`);
 };
 

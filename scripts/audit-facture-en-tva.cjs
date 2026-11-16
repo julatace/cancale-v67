@@ -87,12 +87,14 @@ async function textePdf(octets) {
 
   // L'e-mail
   const m = regle.emailFacture(CFG, en, { via: 'vrm' });
-  dit(/^Facture \/ Invoice FA-2026-0007/.test(m.sujet) && /Please find attached invoice FA-2026-0007/.test(m.texte) && /Vous trouverez ci-joint la facture FA-2026-0007/.test(m.texte) && !/on behalf of|pour le compte de/.test(m.texte + m.html),
-    'F14 l’e-mail : objet bilingue, message par défaut anglais puis français, aucun pied VRM (11 nov.)', m.sujet);
+  // (16 nov., lot factures-mieux — Julien, capture : l'anglais PUIS le français empilés) L'e-mail
+  // parle UNE langue : l'anglais pour une facture en anglais, sinon le français.
+  dit(/^Your invoice FA-2026-0007/.test(m.sujet) && /Please find attached invoice FA-2026-0007/.test(m.texte) && !/Vous trouverez|Bonjour|Pièce jointe|N° de facture/.test(m.texte + m.html + m.sujet) && m.langue === 'en' && /<html lang="en"/.test(m.html) && !/on behalf of|pour le compte de/.test(m.texte + m.html),
+    'F14 l’e-mail d’une facture en anglais : objet, message et récapitulatif en anglais SEULEMENT (une langue), aucun pied VRM', m.sujet);
   const mPerso = regle.emailFacture({ ...CFG, message: 'Ciao {acheteur}, grazie !' }, en, { via: 'boite' });
-  dit(mPerso.texte === 'Ciao Giulia Banco, grazie !', 'F15 un message écrit par le vendeur reste le sien (jamais traduit)', mPerso.texte);
+  dit(mPerso.message === 'Ciao Giulia Banco, grazie !' && mPerso.texte.startsWith('Ciao Giulia Banco, grazie !'), 'F15 un message écrit par le vendeur reste le sien (jamais traduit)', mPerso.message);
   const mFr = regle.emailFacture(CFG, fr, { via: 'vrm' });
-  dit(!/Invoice|Please|on behalf/.test(mFr.texte + mFr.sujet + mFr.html), 'F16 sans l’option, l’e-mail est exactement français', mFr.sujet);
+  dit(!/Invoice|Please|Attachment|Amount due|on behalf/.test(mFr.texte + mFr.sujet + mFr.html) && /^Votre facture FA-2026-0007/.test(mFr.sujet) && /<html lang="fr"/.test(mFr.html), 'F16 sans l’option, l’e-mail est exactement français', mFr.sujet);
   // L'indice « hors France »
   const adr = regle.adresseVintedLisible;
   const h = EN.acheteurHorsFrance;
@@ -143,7 +145,8 @@ async function textePdf(octets) {
   const fp = lire('src/FacturePro.jsx');
   dit(/langue: anglais \? 'en' : 'fr'[^}]*\}\);/.test(fp.slice(fp.indexOf("action: 'emettre'") - 10, fp.indexOf("action: 'emettre'") + 200)) && /data-fp-anglais=/.test(fp), 'B4 la case « Facture en anglais » part à la route d’émission', '');
   const api = lire('api/_lib/facture-pro.js');
-  dit(/contenuFacture\(cfg, vente, \{ numero, emiseLe, langue: corps\.langue === 'en' \? 'en' : 'fr' \}\)/.test(api), 'B5 le serveur ne lit que « en » (tout le reste = français)', '');
+  // (16 nov.) Pas choisie ⇒ la règle de la case pré-cochée (`langueFactureParDefaut`) : série et envoi auto = la feuille.
+  dit(/const langue = corps\.langue === 'en' \|\| corps\.langue === 'fr' \? corps\.langue : langueFactureParDefaut\(vente\.acheteur\.adresse\);/.test(api) && /contenuFacture\(cfg, vente, \{ numero, emiseLe, langue \}\)/.test(api), 'B5 le serveur lit « en » / « fr » ; sinon la règle de la feuille (adresse prouvée)', '');
 
   console.log(`\n${ok} ✅ · ${ko} ❌`);
   process.exit(ko ? 1 : 0);

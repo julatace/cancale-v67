@@ -15,7 +15,7 @@
 // ⚠️ Le pied ne dit jamais « reconstruit depuis l'e-mail » : « Récapitulatif établi
 //    par VRM d'après la commande Vinted — ce n'est pas une facture émise par Vinted. »
 // ⚠️ Les accents : Helvetica de pdf-lib écrit le WinAnsi (é, è, ç, à, ô, —, •, €) ;
-//    l'ancien reçu écrivait « Recu », « deductible » parce que le TEXTE était tapé
+//    l'ancien reçu écrivait ces mots SANS leurs accents parce que le TEXTE était tapé
 //    sans accents. Ce qui n'est pas WinAnsi (espace fine d'Intl, emoji) est remplacé.
 // Module PUR (aucun DOM, aucune base) : l'app et les audits l'exécutent tels quels.
 

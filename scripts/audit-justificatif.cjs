@@ -41,8 +41,11 @@ dit(/siret/i.test(F), 'il peut porter le SIRET');
 dit(/companyAddress/.test(F), 'il peut porter l\'adresse');
 
 // ⚠️ LA PHRASE QUI EMPÊCHE DE LE PRENDRE POUR UNE FACTURE VINTED.
-dit(/pas une facture emise par Vinted|pas une facture émise par Vinted/i.test(F),
-  'il dit qu\'il n\'est PAS la facture de Vinted');
+// (16 nov., lot factures-mieux) La mise en page et le pied vivent dans src/recuAchat.js.
+const RA = fs.readFileSync(path.join(RACINE, 'src/recuAchat.js'), 'utf8');
+dit(/import\('\.\/recuAchat\.js'\)/.test(F) && /PIED_RECU_GENERE = "Récapitulatif établi par VRM d'après la commande Vinted — ce n'est pas une facture émise par Vinted\."/.test(RA) && /champs\.pied \|\| PIED_RECU_GENERE/.test(RA),
+  'il dit qu\'il n\'est PAS la facture de Vinted (pied du reçu, src/recuAchat.js)');
+dit(!/Recu d\\'achat|deductible|Recapitulatif|'Etabli/.test(F + RA), 'les accents sont écrits (« Reçu », « déductible », « Récapitulatif », « Établi »)');
 
 dit(/Etabli le|Établi le/.test(F), 'il porte sa date d\'établissement');
 
@@ -51,8 +54,9 @@ dit(/opts\.numero/.test(F), 'il porte le N° de la paire quand on le connaît');
 dit(/regime\s*===\s*'marge'|regime==='marge'/.test(F),
   'il adapte sa mention au régime (micro / marge)');
 
-// La photo passe par l'extension : le CDN Vinted n'a aucun en-tête CORS.
-dit(/vmrPhoto/.test(F), 'la photo passe par l\'extension (le CDN Vinted refuse CORS)');
+// (16 nov.) Plus de photo : le modèle choisi par Julien (« je veux que ça soit comme ça ») n'en a pas.
+// Ce qui ne doit pas revenir : une photo chargée en direct du CDN Vinted (aucun en-tête CORS).
+dit(!/fetch\([^)]*vinted/i.test(F), 'aucune photo chargée en direct du CDN Vinted');
 
 // ⚠️ Une hauteur de bloc FIGÉE laissait un trou de 94 px quand il n'y a ni
 // photo ni marque reconnue — visible comme un défaut d'impression.
