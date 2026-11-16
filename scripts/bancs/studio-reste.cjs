@@ -48,8 +48,11 @@ const ECRANS = {
   factures: { url: '/?tab=invoices', racine: RAC },
   stats: { url: '/?tab=dashboard', racine: RAC },
   messages: { url: '/?tab=messages', racine: RAC },
-  conversation: { url: '/?tab=messages', racine: '.vrm-chat-panel', avant: async (pg) => { await pg.locator('.vrm-inbox-row').first().click(); await pg.waitForTimeout(1600); } },
-  settings: { url: '/?tab=settings', racine: RAC },
+  // (16 nov., Messages « Verre dépoli ») une conversation est une rangée `[data-fil]`, plus `.vrm-inbox-row`.
+  conversation: { url: '/?tab=messages', racine: '.vrm-chat-panel', avant: async (pg) => { await pg.locator('.vrm-inbox-row, [data-fil]').first().click(); await pg.waitForTimeout(1600); } },
+  // (16 nov., Paramètres en tuiles, maquette validée le 15 nov.) le premier écran montre les catégories ; leurs rangées
+  // vivent DANS chaque catégorie : l'inventaire (S6) est l'union du premier écran et de chaque catégorie ouverte.
+  settings: { url: '/?tab=settings', racine: RAC, categories: true },
   securite: { url: '/?tab=settings', racine: RAC, avant: async (pg) => {
     // « Sécurité des données » (son vocabulaire technique est gardé, §5) : Réglages, sinon Mon compte.
     for (const vue of [null, 'compte']) {
@@ -68,6 +71,15 @@ const ECRANS = {
 // Les gestes d'avant qu'on a RETIRÉS EXPRÈS, chacun avec la place où il vit maintenant (Règles des boutons, note t25) :
 const RANGES = [
   /^texte:\+ Nouvelle facture$/,   // le doublon de l'état vide de Factures : le geste est le plein en tête (data-fac-principal)
+  // (16 nov.) Paramètres en catégories (maquette validée le 15 nov., docs/passation/2026-11-15-ecrans-verre-2.md) : ces rangées
+  // nommées par leur TEXTE portent maintenant leur identité (`data-reglage-id`), le même geste dans sa catégorie :
+  /^texte:Mon compte$/,   // la carte « Mon compte » en tête (data-categorie-ouvrir=compte, data-vue=compte)
+  /^texte:Réglages$/,   // l'ancien segment Réglages · Mon compte : le premier écran EST les catégories (data-categorie-ouvrir)
+  /^texte:Abonnement$/,   // data-reglage-abonnement (data-reglage-id=abonnement), catégorie Mon compte
+  /^texte:Compléter les prix d'achat/,   // data-reglage-id=prixachat, catégorie Argent
+  /^texte:Comptes liés/,   // data-reglage-id=liens, catégorie Mes plateformes
+  /^texte:Restaurer une sauvegarde/,   // data-reglage-id=restaurer, catégorie Sécurité des données
+  /^repli:texte:Réglages avancésSécurité et sauvegarde/,   // le repli est devenu la catégorie « Sécurité des données » (data-categorie-ouvrir=donnees)
 ];
 // Les gestes qui n'apparaissent qu'APRÈS une lecture asynchrone (la même place, le même geste — présents ou non
 // selon que la lecture a répondu avant la mesure, sur une machine chargée) :
@@ -171,7 +183,8 @@ function mesurer({ racine, tactile }) {
     let forme = null;
     const ligne = el.matches('.sb-rangee, .sb-tuile, .vrm-set-ligne, .vrm-inbox-row, .vrm-argent-w, summary, [data-fil], [role="tab"]:not(.vrm-seg-btn), .vrm-fiche-menu > button, tr, li > a') || (r.width >= parentW * 0.9 && r.width >= 240 && r.height >= 44);
     // une tuile (Bento, record, carte qu'on touche entière) : porcelaine, grand rayon, haute
-    const tuile = el.matches('.sb-tuile') || (rad >= 18 && r.height >= 80 && r.width >= 120);
+    // (16 nov.) les tuiles des catégories de Paramètres, trois par rangée au téléphone : 113 px de large
+    const tuile = el.matches('.sb-tuile') || (rad >= 18 && r.height >= 80 && r.width >= 100);
     // un lien DANS une phrase (pied de page, « ouvre Ventes ») : WCAG 2.5.8 l'exempte du gabarit de 44
     const enLigne = cs.display === 'inline' && el.tagName === 'A';
     if (el.matches('.sb-btn-plein') || (plein && r.height >= 40)) forme = 'plein';
@@ -220,7 +233,7 @@ function mesurer({ racine, tactile }) {
   const VOLATILE = /^data-(vrm-tone|fil|vrm-vignette|photo|vu|temps|neuf|attente|reprise|argent-valeur|argent-raison|argent-echeance|eur|compta|benef|prevision|ca-|carte-valeur|valeur|n$|fraicheur|conv-paire|fils?-|defile|seg-deborde|point|tx|id|at|depense|abo|ticket|msg-n)/;
   const inv = new Set();
   for (const el of tous) {
-    if (el.closest('.vrm-inbox-row, .vrm-msg-list') && !el.matches('.vrm-msg-list > :first-child')) { if (el.matches('.vrm-inbox-row')) inv.add('rangée:conversation'); continue; }
+    if (el.closest('.vrm-inbox-row, [data-fil], .vrm-msg-list') && !el.matches('.vrm-msg-list > :first-child')) { if (el.matches('.vrm-inbox-row, [data-fil]')) inv.add('rangée:conversation'); continue; }
     const d = [...el.attributes].filter((a) => a.name.startsWith('data-') && !VOLATILE.test(a.name)).map((a) => a.name + (a.value && a.value.length < 30 && !/\d{4,}/.test(a.value) ? '=' + a.value : '')).sort();
     const lu = (el.getAttribute('aria-label') || '').trim();
     const txt = (el.textContent || '').replace(/\s+/g, ' ').trim().replace(/\d[\d\s,.]*/g, '#').slice(0, 40);
@@ -255,6 +268,17 @@ function mesurer({ racine, tactile }) {
           for (let i = 0; i < 3 && (!m.racine || m.boutons < 2); i++) { await o.pg.waitForTimeout(4000); m = await o.pg.evaluate(mesurer, { racine: E.racine, tactile: W < 600 }); }
           // L'inventaire d'un écran : l'union de ses quatre rendus (390/1512, clair/sombre).
           inventaire[e] = [...new Set([...(inventaire[e] || []), ...m.inventaire])].sort();
+          if (E.categories) {
+            const ids = await o.pg.evaluate(() => [...new Set([...document.querySelectorAll('[data-categorie-ouvrir]')].map((x) => x.getAttribute('data-categorie-ouvrir')))]);
+            for (const id of ids) {
+              await o.pg.locator(`[data-categorie-ouvrir="${id}"]`).first().click({ timeout: 8000 }).catch(() => {});
+              await o.pg.waitForTimeout(900);
+              const mc = await o.pg.evaluate(mesurer, { racine: E.racine, tactile: W < 600 });
+              inventaire[e] = [...new Set([...inventaire[e], ...mc.inventaire])].sort();
+              await o.pg.locator('[data-categorie-retour]').first().click({ timeout: 8000 }).catch(() => {});
+              await o.pg.waitForTimeout(500);
+            }
+          }
           if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await o.pg.screenshot({ path: path.join(SHOTS, `${e}-${W}-${t}.png`), timeout: 120000 }).catch(() => console.log(`·  ${T} : capture ratée (machine lente)`)); }
           if (INV_OUT) { console.log(`·  ${T} : ${m.inventaire.length} gestes relevés, ${m.boutons} boutons visibles`); continue; }
           dit(m.racine > 0, `S0 ${T} : l'écran est rendu`, E.racine);
@@ -274,9 +298,14 @@ function mesurer({ racine, tactile }) {
     if (!INV_REF[e] || !inventaire[e]) continue;
     // Un libellé se juge sur ses quatre premiers mots (la suite dit un état : « Charge… », « 3 sur 5 ») ;
     // un libellé « en cours » (qui finit par « … ») et les lectures asynchrones (VOLATILS) ne sont pas des gestes.
-    const norme = (k) => { const m = /^((?:repli:)?(?:texte|nom):)(.*)$/.exec(k); return m ? m[1] + m[2].split(/\s+/).slice(0, 4).join(' ').replace(/[#\s]+$/, '') : k; };
+    // (16 nov., Paramètres en catégories) une rangée porte en plus `data-reglage-id` (son identité) : cette marque ne compte pas.
+    // Un geste nommé par ses data-* est encore là quand un élément les porte TOUS (il peut en porter de nouveaux).
+    const marques = (k) => k.split(' ').filter((x) => x && !/^data-reglage-id(=|$)/.test(x));
+    const norme = (k) => { const m = /^((?:repli:)?(?:texte|nom):)(.*)$/.exec(k); return m ? m[1] + m[2].split(/\s+/).slice(0, 4).join(' ').replace(/[#\s]+$/, '') : marques(k).join(' '); };
     const ici = new Set(inventaire[e].map(norme));
-    const manque = INV_REF[e].filter((k) => !/…$/.test(k) && !ici.has(norme(k)) && !RANGES.some((x) => x.test(k)) && !VOLATILS.some((x) => x.test(k)));
+    const iciData = inventaire[e].filter((k) => /^data-/.test(k)).map((k) => new Set(marques(k)));
+    const present = (k) => ici.has(norme(k)) || (/^data-/.test(k) && iciData.some((t) => marques(k).every((x) => t.has(x))));
+    const manque = INV_REF[e].filter((k) => !/…$/.test(k) && !present(k) && !RANGES.some((x) => x.test(k)) && !VOLATILS.some((x) => x.test(k)));
     dit(!manque.length, `S6 ${e} : l'inventaire d'avant est entier (${INV_REF[e].length} gestes relevés, ${inventaire[e].length} après)`, manque.join(' ¦ '));
   }
   if (INV_OUT) { fs.writeFileSync(INV_OUT, JSON.stringify(inventaire, null, 1)); console.log('inventaire écrit :', INV_OUT); }

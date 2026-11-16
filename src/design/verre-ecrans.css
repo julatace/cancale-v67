@@ -446,6 +446,11 @@
     background-color: transparent !important; background-image: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; box-shadow: var(--sv-ombre) !important; }
   :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat > .vrm-set-groupe > .vrm-set-titre { margin: 0 0 6px !important; padding: 0 !important; font: 700 17px/1.25 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre) !important; text-transform: none !important; letter-spacing: -.01em !important; }
   :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat > .vrm-set-groupe > .vrm-set-pied, :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat > .vrm-set-groupe > .vrm-set-pied * { color: var(--sv-encre-2) !important; }
+  /* (16 nov., intégration) Un pied qui porte SA couleur en ligne (« Jamais sauvegardé — touche … », ambre : un geste à faire)
+     prenait l'encre claire « sur le fond » de la couche commune (studio-verre, `[style*="color"]`) — sur le verre, 1,39:1
+     (banc studio-reste S4). Sur le verre de l'ordinateur : l'ambre pour le geste à faire, l'encre seconde sinon. */
+  :root:root:root:root:root:root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat > .vrm-set-groupe > .vrm-set-pied [data-derniere-sauvegarde] { color: var(--sv-encre-2) !important; }
+  :root:root:root:root:root:root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat > .vrm-set-groupe > .vrm-set-pied [data-derniere-sauvegarde="ancienne"] { color: var(--sv-ambre) !important; }
   :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat > .vrm-set-groupe > .vrm-set-liste { background: transparent !important; background-image: none !important; box-shadow: none !important; border: 0 !important; padding: 0 !important; }
   :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat .vrm-set-ligne { padding-left: 0 !important; padding-right: 0 !important; min-height: 60px !important; }
   :root:root:root:root:root:root:root body .vrm-pm[data-reglages-disposition="ordinateur"] .vrm-pm-cat .vrm-set-ligne + .vrm-set-ligne { border-top: 1px solid rgb(12 29 48 / .10) !important; box-shadow: none !important; }
@@ -472,6 +477,11 @@
   :root:root:root:root:root:root body [data-fils-tous] .vrm-chat-column .vrm-chat-panel > .vrm-chat-head :is(.vrm-chat-head-s, .vrm-chat-head-s *) { color: var(--sv-encre-2) !important; }
   :root:root:root:root:root:root body [data-fils-tous] .vrm-chat-column .vrm-chat-jour { background: transparent !important; color: var(--sv-encre-2) !important; }
   :root:root:root:root:root:root body [data-fils-tous] .vrm-chat-column .vrm-chat-foot { background: transparent !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  /* (16 nov., intégration) Sur le verre de l'ordinateur, ce qui était écrit pour le bleu (blanc) se lit à l'encre : « Traduire »
+     sous une bulle (1,39:1) et les ronds de la tête (‹, Retirer, ⟳ : blanc sur verre, 2,4:1) — banc studio-reste S4. */
+  :root:root:root:root:root:root:root body [data-fils-tous] .vrm-chat-column .vrm-chat-panel .vrm-bulle-pied, :root:root:root:root:root:root:root body [data-fils-tous] .vrm-chat-column .vrm-chat-panel .vrm-bulle-pied * { color: var(--sv-lien) !important; }
+  :root:root:root:root:root:root:root body [data-fils-tous] .vrm-chat-column .vrm-chat-panel > .vrm-chat-head :is(.vrm-chat-back, .vrm-chat-sync, .vrm-chat-retirer) { background: rgb(12 29 48 / .07) !important; border-color: transparent !important; color: var(--sv-encre) !important; }
+  :root:root:root:root:root:root:root body [data-fils-tous] .vrm-chat-column .vrm-chat-panel > .vrm-chat-head :is(.vrm-chat-back, .vrm-chat-sync, .vrm-chat-retirer) * { color: inherit !important; }
 
   /* LA FICHE : un plan large (comme la page de la maquette) en trois colonnes — la paire ; ses sites, ses chiffres, l'état ;
      son histoire et les gestes. L'ordre du code ne change pas (grid, placement par rôle). */
