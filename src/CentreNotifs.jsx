@@ -13,8 +13,6 @@ import { TYPES_CENTRE, ETAT_CENTRE, entreesDuJournal, estLue, marquerLues, toutL
 import { ICONE_FAMILLE, GESTE_FAMILLE } from '../api/_lib/notif-belle.js';
 import { SheetShell } from './composants/SheetShell.jsx';
 import { EtatPanne } from './composants/EtatPanne.jsx';
-import { BoutonBase as Bouton } from './composants/Bouton.jsx';
-import { NOTIONS } from './libelles.js';
 
 const nomType = (f) => (TYPES_CENTRE.find((t) => t.id === f) || {}).titre || (f === 'test' ? 'Essai' : 'Autre');
 // (8 nov.) Une ligne de la cloche : l'icône de la famille, le fait, le texte, le
@@ -59,13 +57,13 @@ function GroupeNotifs({ g, lu, onOuvrir, Icon }) {
 
 // La cloche de l'en-tête : la pastille dit le nombre de non-lues (rien si 0 ou
 // pas su — « pas su » n'affiche jamais « 0 »).
-// `enPlus` : les notifications LOCALES (« Où ranger », src/ouRanger.js) — comptées
-// dans la pastille, jamais envoyées au téléphone.
+// (15 nov.) Plus de notifications LOCALES (« Où ranger » sur un achat arrivé, retiré : on range un article,
+// pas un achat) : la pastille ne compte que le journal.
 // (14 nov., refonte de la coque) `alerte` : la ligne de fraîcheur a quelque chose à revoir (un compte pas relu,
 // l'extension muette…) — elle ne s'écrit plus en tête de page (jamais au-dessus du titre) : un POINT ambre sur
 // la cloche, et la ligne entière (son détail, son geste) en tête de la feuille.
-export function BoutonCentreNotifs({ nonLues, onOuvrir, Icon, enPlus = 0, alerte = false, alerteNom = '' }) {
-  const n = (Number.isSafeInteger(nonLues) && nonLues > 0 ? nonLues : 0) + (Number.isSafeInteger(enPlus) && enPlus > 0 ? enPlus : 0);
+export function BoutonCentreNotifs({ nonLues, onOuvrir, Icon, alerte = false, alerteNom = '' }) {
+  const n = Number.isSafeInteger(nonLues) && nonLues > 0 ? nonLues : 0;
   const lib = (n ? `Notifications : ${n} non lue${n > 1 ? 's' : ''}` : 'Notifications') + (alerte && alerteNom ? ` · ${alerteNom}` : '');
   return (
     <button className="vrm-hbtn vrm-cn-cloche" type="button" data-centre-notifs-cloche="" data-non-lues={Number.isSafeInteger(nonLues) ? String(nonLues) : ''}
@@ -81,10 +79,9 @@ export function BoutonCentreNotifs({ nonLues, onOuvrir, Icon, enPlus = 0, alerte
 // La feuille. `charger()` rend `{ journal: data|null, lu: data|null }` ;
 // `ecrireLu(next)` rend true si la base l'a pris.
 // (5 nov., chantier H) La feuille est LA feuille de l'app (`SheetShell` : poignée,
-// titre, la même croix, portail, retour du navigateur). `aRanger` : les achats qui
-// viennent d'arriver et LA case proposée (src/ouRanger.js) — locales, jamais
-// envoyées au téléphone ; `undefined` = en cours, `null` = pas su (rien n'est dit).
-export function FeuilleCentreNotifs({ onFermer, charger, ecrireLu, onAller, onReglages, Fermer, Icon, z = 9500, aRanger = null, onRanger = null, onRangeFait = null, enTete = null }) {
+// titre, la même croix, portail, retour du navigateur). (15 nov.) Le bloc « À ranger » (un achat arrivé et
+// « Première case libre » — la même à tous) est RETIRÉ : on range un article au Stock, jamais un achat.
+export function FeuilleCentreNotifs({ onFermer, charger, ecrireLu, onAller, onReglages, Fermer, Icon, z = 9500, enTete = null }) {
   const [etat, setEtat] = React.useState({ entrees: undefined, lu: null });
   const [filtre, setFiltre] = React.useState('');
   const vivant = React.useRef(true);
@@ -109,8 +106,7 @@ export function FeuilleCentreNotifs({ onFermer, charger, ecrireLu, onAller, onRe
   };
   const toutMarquer = () => { if (entrees && entrees.length && lu !== null) poserLu(toutLu(entrees[0].seq, lu)); };
   const groupes = visibles ? parJour(visibles) : [];
-  const rangees = Array.isArray(aRanger) ? aRanger : [];
-  const etatListe = entrees === undefined ? 'lecture' : entrees === null ? 'passu' : (entrees.length || rangees.length) ? 'lu' : 'vide';
+  const etatListe = entrees === undefined ? 'lecture' : entrees === null ? 'passu' : entrees.length ? 'lu' : 'vide';
   return (
     <SheetShell onClose={onFermer} titre="Notifications" maxWidth={560} z={z} FermeAuRetour={Fermer}
       className="vrm-cn-feuille" aria-label="Notifications" data-centre-notifs="" data-centre-etat={etatListe} data-noswipe="1">
@@ -127,34 +123,11 @@ export function FeuilleCentreNotifs({ onFermer, charger, ecrireLu, onAller, onRe
         </div>
       ) : null}
       <div className="vrm-cn-liste">
-        {rangees.length && !filtre ? (
-          <div className="vrm-cn-jour" data-centre-ranger={rangees.length}>
-            <h3 className="vrm-cn-jour-titre">À ranger</h3>
-            <ul>
-              {rangees.map((r) => (
-                <li key={'r' + r.tx}>
-                  <div className="vrm-cn-ligne is-non-lue vrm-cn-ranger" data-centre-ranger-tx={r.tx} data-centre-ranger-case={r.case ? r.case.meubleId + ':' + r.case.i : ''}>
-                    <span className="vrm-cn-point" aria-hidden="true"/>
-                    <span className="vrm-cn-corps">
-                      <span className="vrm-cn-meta"><span>{NOTIONS.arrives.un}</span>{r.at ? <time dateTime={new Date(r.at).toISOString()}>{heureCourte(r.at)}</time> : null}</span>
-                      <span className="vrm-cn-ti">{r.titre || 'Un achat'}</span>
-                      <span className="vrm-cn-tx">Première case libre : <b>{r.ou}</b></span>
-                      <span className="vrm-cn-actions">
-                        <Bouton variante="primaire" taille="petit" data-centre-ranger-ouvrir={r.tx} onClick={() => { onFermer(); if (onRanger) onRanger(r); }}>Ranger</Bouton>
-                        <Bouton variante="discret" taille="petit" data-centre-ranger-fait={r.tx} onClick={() => { if (onRangeFait) onRangeFait(r); }}>Déjà rangé</Bouton>
-                      </span>
-                    </span>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
         {entrees === undefined ? <div className="vrm-cn-vide" aria-busy="true"><span className="vrm-cn-attente" aria-hidden="true"/><span>Lecture en cours…</span></div>
           : entrees === null ? (
             <EtatPanne quoi="Tes notifications" raison="La base n’a pas répondu." onReessayer={lire} data-centre-passu=""/>
           ) : !entrees.length ? (
-            rangees.length ? null : <div className="vrm-cn-vide" data-centre-vide=""><span className="vrm-cn-vide-ic" aria-hidden="true"><Icon name="bell2" size={22}/></span><b className="vrm-cn-vide-titre">Rien pour l’instant</b><span>Une vente, une offre ou un colis arrivé s’affichera ici.</span></div>
+            <div className="vrm-cn-vide" data-centre-vide=""><span className="vrm-cn-vide-ic" aria-hidden="true"><Icon name="bell2" size={22}/></span><b className="vrm-cn-vide-titre">Rien pour l’instant</b><span>Une vente, une offre ou un colis arrivé s’affichera ici.</span></div>
           ) : groupes.map((g) => (
             <div key={g.cle} className="vrm-cn-jour">
               <h3 className="vrm-cn-jour-titre">{g.titre}</h3>

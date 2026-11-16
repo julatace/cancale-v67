@@ -39,6 +39,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'annonces-verre', date: '2026-11-15', titre: 'Annonces : la liste d’abord, chaque rangée claire', phrase: 'Photo, N°, sites et compte, prix ; celles à baisser en ambre.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « Le transporteur inconnu n'est pas possible ») docs/passation/2026-11-15-transporteur-connu.md
   { id: 'transporteur-connu', date: '2026-11-15', titre: 'À expédier : chaque colis a son transporteur', phrase: 'Lu sur l’étiquette ; sinon VRM dit quel compte ouvrir.', tab: 'cat_bord', pour: 'tous', mode: 'tous' },
+  // (15 nov., Julien : « Enlève ça, on range une ANNONCE, pas un achat ») docs/passation/2026-11-15-pas-ranger-achat.md
+  { id: 'pas-ranger-achat', date: '2026-11-15', titre: 'Plus de rangement proposé sur un achat', phrase: 'Tu ranges l’article au Stock : une case à lui, jamais la même.', tab: 'garage', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « J'aime la 9 ») docs/passation/2026-11-15-verre-depoli.md — le thème « Verre dépoli ».
   { id: 'verre-depoli', date: '2026-11-15', titre: 'Nouveau thème : verre dépoli sur bleu profond', phrase: 'Le chiffre du jour en blanc, tout se lit sur le verre.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « améliore la liaison entre les achats et les articles ») docs/passation/2026-11-15-achats-liaison.md
