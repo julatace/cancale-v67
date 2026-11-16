@@ -118,6 +118,35 @@ gardées) : le nombre de « très probables » monte à mesure, jamais leur excl
   sur `origin/main` 5a9abe571** (build de main rejoué) : sans rapport avec ce lot.
 - `audit-relier-fiable --prouve` : **11/11 mutations attrapées**.
 
+
+## Deux ajouts de Julien pendant le lot (16 nov.)
+
+1. **Fiche d'une vente, onglet « Argent »** (capture N°215 : « ici j'ai mal relié un achat, je veux pouvoir
+   l'enlever, et tu peux mettre le justificatif d'achat à côté ») : à côté de « Achetée 24,63 € », **« Reçu »**
+   et **« Délier »** (`GestesAchatRelie`, src/FichePaire.jsx ; `lienAchatDe` / `delierAchatFiche` /
+   `ouvrirRecuFiche`, src/App.jsx dans `AppCoeur`).
+   - Le lien est lu par identité : la fiche de la paire (`buyFromId`), sinon la ligne de SA vente.
+   - « Délier » : une phrase de confirmation (`askConfirm`), puis un geste annulable (`gesteVrm`) : `patchDelier`
+     (le lien part, le prix posé PAR le lien aussi — un prix tapé par lui reste), `vinted_buyprice_by_num` retiré
+     seulement s'il vaut le prix du lien, et le couple rangé dans « Ce n'est pas lui » (`vrm_liaison_refus`, sous
+     la clé de l'annonce ET celle de la vente) : la même proposition ne revient pas. Le bénéfice redevient « ? »
+     avec sa raison (prix d'achat manquant), jamais 0 (la règle de la fiche).
+   - « Reçu » : l'achat relié est relu (`lireAchatsFiche`, sinon la copie `buyFrom`), son reçu e-mail se trouve par
+     SON n° de transaction (`recuDeLAchat`, §5) et s'ouvre dans la feuille du reçu (au-dessus de la fiche, `z`) ;
+     sans e-mail, l'attestation tirée de l'achat (`generateAchatJustificatif`, la règle de « Reçu » de Ventes) ; ni
+     achat lisible ni reçu ⇒ « Pas de reçu », jamais un lien mort. Pas fait : la photo du ticket d'un achat HORS
+     plateforme (lien `buyGros`) — ces liens n'ont pas de `buyFromId`, la fiche ne montre rien pour eux.
+   - Banc `fiche-delier-recu` (390 tactile, 1512) ; audit `relier-fiable` D1-D5 + 4 mutations.
+2. **Annonces** (capture de la liste : « il n'y a rien pour relier un achat ») : sur chaque annonce sans achat
+   relié — **la même règle que le compte de « Sans achat relié »** (`sansAchatRelie`) — une puce
+   **« Relier un achat »** (44 px au doigt ; téléphone : 3e ligne de la rangée ; ordinateur : sous le nom ;
+   vignettes : dans la carte) qui ouvre la feuille « Choisir un achat » (`openPicker` : la très probable, les
+   pistes repliées, puis la recherche) ; reliée, **« Achetée 40 € »** discret. SON clic relie par l'identifiant
+   de l'annonce (`updatePair`) : la vente de cette annonce lit sa fiche par identité (`identiteAnnonce`) et une
+   republication garde le N° et la fiche (src/repriseNumero.js) — pas de nouveau banc pour « la vente plus tard
+   hérite du lien » (règle existante, jugée par ses audits). Banc `achats-liaison` : puces = compte, ≥ 44 px,
+   la puce ouvre la feuille, relier ⇒ « Achetée 40 € » et le compte baisse d'un.
+
 ## ÉTAT À LA REPRISE
 
 - Code fini et poussé sur `claude/relier-fiable` ; mise en ligne par PR (voir l'état de la PR dans
