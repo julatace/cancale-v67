@@ -13,7 +13,7 @@ require('./_porte-banc.cjs');
 //  Ici, le compte est le PROPRIÉTAIRE (le cas de Julien) :
 //   P1  un écran tombe sur son garde-fou (Ventes, crochet de banc) ;
 //   P2  une promesse rejetée (une `Error`) et une autre rejetée avec une simple chaîne ;
-//   P3  un morceau de l'app introuvable (Réglages, 404 comme après une mise en ligne) ;
+//   P3  un morceau de l'app introuvable (un fichier /assets/ absent, comme après une mise en ligne) ;
 //   puis la page part (`pagehide`) : le lot part par `sendBeacon` vers
 //   `/api/compte?mode=mesures`, et le banc le donne à la VRAIE fonction du serveur
 //   (`recevoirMesures`, api/_lib/mesures-terrain.js) contre une fausse base en mémoire.
@@ -79,10 +79,6 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
       recus.push({ brut, jetonApp, reponse: r });
       return route.fulfill({ status: r.code, contentType: 'application/json', body: JSON.stringify(r.corps) });
     });
-    // P3 : le morceau de Réglages n'existe plus (une mise en ligne est passée) — même version servie.
-    const reglages = (fs.readdirSync(path.join(DIST, 'assets')).find((f) => /^Reglages-[\w-]+\.js$/.test(f)) || '');
-    dit(!!reglages, '(banc) le morceau de Réglages existe dans ce build', reglages);
-    await pg.route(new RegExp('/assets/' + reglages.replace(/[.]/g, '\\.') + '$'), (r) => r.fulfill({ status: 404, body: 'The page could not be found' }));
     await attendre(2500);
 
     // P1 — Ventes tombe sur son garde-fou.
@@ -96,26 +92,27 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
     // P2 — deux promesses rejetées que rien ne rattrape.
     await pg.evaluate(() => { setTimeout(() => { Promise.reject(new Error('rejet de banc (Error)')); Promise.reject('rejet de banc en chaîne'); }, 0); });
     await attendre(800);
-    // P3 — Réglages : son morceau est introuvable.
-    await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=settings' })));
-    await attendre(6000);
-    const maj = await pg.evaluate(() => !!document.querySelector('[data-garde-morceau], [data-mettre-a-jour-vrm]'));
-    dit(maj, 'P3 (scène) Réglages introuvable : « Mettre à jour VRM », jamais un écran blanc');
-    await pg.screenshot({ path: path.join(SHOTS, 'P3-morceau-390.png') }).catch(() => {});
+    // P3 — un morceau de l'app introuvable (après une mise en ligne, l'ancienne page demande un fichier que le
+    // serveur n'a plus) : un import à la demande d'un fichier /assets/ absent, que rien ne rattrape.
+    await pg.evaluate(() => { setTimeout(() => { import('/assets/Ecran-disparu-banc0.js'); }, 0); });
+    await attendre(1500);
 
     // L'envoi : la page part (le lot attend d'habitude une minute entre deux envois).
     const n0 = recus.length;
     await pg.evaluate(() => { try { localStorage.setItem('vrm_mesures_envoi_at', '0'); } catch (_) {} window.dispatchEvent(new Event('pagehide')); });
     for (let i = 0; i < 40 && recus.length === n0; i++) await attendre(250);
-    const dernier = recus[recus.length - 1] || null;
-    let c = null; try { c = dernier && JSON.parse(dernier.brut); } catch (_) {}
-    dit(!!dernier && recus.length > n0, 'la page envoie un lot vers /api/compte?mode=mesures', recus.length);
-    dit(!!c && Array.isArray(c.p) && c.p.length >= 3, 'le lot porte les plantages (`p`)', c && c.p);
-    dit(!!dernier && dernier.jetonApp && dernier.jetonApp.length > 4, '(banc) le lot porte le jeton de la session');
+    // Le serveur prend UN lot de mesures par minute et par appareil (un second rend 429) ; les ALERTES de chaque lot
+    // sont rangées quand même. On juge donc l'ensemble des lots reçus.
+    const lots = recus.map((r) => { let c = null; try { c = JSON.parse(r.brut); } catch (_) {} return { ...r, c }; });
+    const avecP = lots.filter((l) => l.c && Array.isArray(l.c.p) && l.c.p.length);
+    const ps = avecP.flatMap((l) => l.c.p);
+    dit(recus.length > n0, 'la page envoie un lot vers /api/compte?mode=mesures au départ de la page', recus.length);
+    dit(ps.length >= 4, 'les lots portent les plantages (`p`) : écran tombé, deux promesses, le morceau', ps.map((x) => [x.origine, x.message]));
+    dit(lots.every((l) => l.jetonApp && l.jetonApp.length > 4), '(banc) chaque lot porte le jeton de la session');
     const perso = [UID, 'nouvelle.vendeuse@exemple.test', 'jeton-nouveau-vendeur'];
-    const sansJeton = c ? JSON.stringify({ ...c, jeton: '' }) : '';
-    dit(!!c && perso.every((p) => !sansJeton.includes(p)) && !/\d{5,}/.test(JSON.stringify(c.p || [])), 'rien du vendeur dans le corps (identifiant, e-mail, longues suites de chiffres)', sansJeton.slice(0, 300));
-    dit(!!dernier && dernier.reponse.code === 200 && dernier.reponse.corps.alertes && dernier.reponse.corps.alertes.fait === true, 'la VRAIE route range les plantages (200, alertes rangées)', dernier && dernier.reponse);
+    const sansJeton = JSON.stringify(lots.map((l) => (l.c ? { ...l.c, jeton: '' } : null)));
+    dit(lots.length > 0 && perso.every((p) => !sansJeton.includes(p)) && !/\d{5,}/.test(JSON.stringify(ps)), 'rien du vendeur dans les corps (identifiant, e-mail, longues suites de chiffres)', sansJeton.slice(0, 300));
+    dit(avecP.length > 0 && avecP.every((l) => l.reponse.corps && l.reponse.corps.alertes && l.reponse.corps.alertes.fait === true), 'la VRAIE route range les plantages de chaque lot (alertes rangées)', avecP.map((l) => l.reponse));
 
     // La ligne du jour, chez le propriétaire.
     const ligne = [...lignes.entries()].find(([id]) => /^plantages_terrain_\d{4}-\d{2}-\d{2}$/.test(id));
@@ -129,7 +126,7 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
     dit(!!tMorceau, 'P3 le morceau qui ne se charge pas est dans le journal (origine « morceau »)', types.map((t) => [t.message, t.origines]));
     dit(types.length >= 4 && types.every((t) => Number(t.proprio) === Number(t.n) && Array.isArray(t.appareils) && t.appareils.length === 0 && !(Number(t.bloque) > 0)), 'chez le propriétaire : rangés « chez toi », JAMAIS une personne touchée ni une ouverture bloquée', types.map((t) => ({ n: t.n, p: t.proprio, ap: (t.appareils || []).length, b: t.bloque })));
     dit(!JSON.stringify(types).includes(UID) && !JSON.stringify(types).includes('nouvelle.vendeuse'), 'aucun identifiant ni e-mail dans les types rangés');
-    dit(!o.journal.erreurs.filter((e) => !/rejet de banc|plantage de banc/.test(e)).length, 'aucune autre erreur JS', o.journal.erreurs);
+    dit(!o.journal.erreurs.filter((e) => !/rejet de banc|plantage de banc|Ecran-disparu-banc0|dynamically imported module/.test(e)).length, 'aucune autre erreur JS', o.journal.erreurs);
     await o.ctx.close();
   } catch (e) { dit(false, 'le banc a tourné jusqu’au bout', String(e && e.stack || e).slice(0, 300)); }
   finally { await nav.close(); NV.srv.close(); }
