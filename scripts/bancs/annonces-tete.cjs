@@ -200,6 +200,12 @@ async function juger(nav, W, theme) {
       const id = await o.pg.evaluate(() => { const l = document.querySelector('[data-vc-annonce]'); return l ? l.getAttribute('data-vc-annonce') : ''; });
       await o.pg.locator(`[data-vc-annonce="${id}"] .vrm-ui-ligne-titre`).first().click({ timeout: 6000, force: true, noWaitAfter: true }).catch(() => {});
       await o.pg.waitForTimeout(1500);
+      // (16 nov., intégration de la fiche D) les gestes de la ligne vivent derrière « ⋯ » (feuille de tuiles, « Tout voir ») :
+      // un toucher les montre — comme les bancs studio-paires et studio-ventes. Toujours joignable depuis la rangée.
+      await o.pg.evaluate(() => { const b = document.querySelector('.vrm-fp [data-fd-plus-ouvrir]'); if (b) b.click(); });
+      await o.pg.waitForTimeout(300);
+      await o.pg.evaluate(() => { const d = document.querySelector('.vrm-fp [data-fiche-plus]'); if (d) d.open = true; });
+      await o.pg.waitForTimeout(400);
       const joint = await o.pg.evaluate((id) => { const e = [...document.querySelectorAll(`[data-vc-relier="${id}"]`)].find((x) => { const r = x.getBoundingClientRect(); return r.width > 1 && r.height > 1; }); return !!e; }, id);
       await o.pg.screenshot({ path: path.join(SHOTS, `annonces-vestiaire-${W}-${theme}-fiche.png`) }).catch(() => {});
       if (!joint) fautes.push('vestiaire : « Relier à Vinted » pas joignable (ni sur la rangée ni dans la fiche)');
