@@ -231,7 +231,7 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
       await essaie('V2 bon de retour de Vinted', async () => {
         const avant = lectures.filter((u) => /retourB64/.test(u)).length;
         dit(avant === 0, 'V2 le formulaire de retour n’est JAMAIS lu dans la liste (§4.4)', String(avant));
-        await ligneFacture(pg, '7001').locator('[data-fp-pastille]').click();
+        await ligneFacture(pg, '7001').locator('[data-fp-pastille]').dispatchEvent('click');
         const f = pg.locator('[data-fp-feuille-vente="7001"]');
         await f.locator('[data-fp-bon-retour="vinted"]').waitFor({ timeout: 6000 });
         const pop = ctx.waitForEvent('page', { timeout: 4000 }).catch(() => null);

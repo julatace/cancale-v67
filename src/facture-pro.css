@@ -234,3 +234,7 @@ li[data-fp-a-envoyer-etat="a-annuler"] .vrm-fp-rangee-txt > span { color: var(--
 /* Au téléphone, à droite de l'état (« Payée · Facture à envoyer ») ; jamais coupée en deux. */
 .vrm-fu-vente-l3 .vrm-fp-pastille-hote { margin-left: 8px; white-space: nowrap; }
 .vrm-ledger-sale-sous .vrm-fp-pastille-hote { margin-left: 8px; }
+/* La pastille ne grandit JAMAIS la ligne : aucune hauteur minimale de cible (la règle des 44 px
+   des boutons ne s'applique pas à elle) ; sa zone de toucher est agrandie SANS place prise. */
+:root:root body .vrm-fp-pastille { min-height: 0 !important; min-width: 0 !important; height: auto !important; position: relative; }
+.vrm-fp-pastille::after { content: ''; position: absolute; inset: -12px -6px; }
