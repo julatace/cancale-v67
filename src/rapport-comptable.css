@@ -1,0 +1,10 @@
+/* (16 nov., lot factures-mieux) Rapport comptable : des lignes de ventes et d'achats homogènes.
+   Titre sur deux lignes au plus (plus coupé à une), le détail dessous, le montant à droite au
+   format français (montant(), src/format.js), le reçu en bouton de 44 px qui dit ce qu'il fait. */
+.vrm-rapport-ligne { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border: 1px solid var(--vrm-line); border-radius: 12px; background: var(--vrm-surface, var(--vrm-card)); color: var(--vrm-ink); }
+.vrm-rapport-ligne-txt { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.vrm-rapport-ligne-titre { font-size: 14px; line-height: 1.35; color: var(--vrm-ink); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.vrm-rapport-ligne-titre b { font-weight: 600; }
+.vrm-rapport-ligne-sous { font-size: 12px; line-height: 1.4; color: var(--vrm-muted); overflow-wrap: anywhere; }
+.vrm-rapport-ligne-montant { flex-shrink: 0; font-size: 15px; font-weight: 600; color: var(--vrm-ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.vrm-b.vrm-rapport-recu { flex-shrink: 0; min-height: 44px; padding: 0 12px; gap: 6px; font-size: 13px; }

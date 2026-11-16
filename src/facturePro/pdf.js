@@ -88,25 +88,46 @@ export async function pdfFacture(contenu, { PDFLib } = {}) {
     page.drawText(p, { x: droite ? x - w : centre ? x - w / 2 : x, y, size: t, font, color: c(couleur) });
   };
 
-  let y = H - M;
-
-  // ── En-tête : logo à gauche, « FACTURE » et son numéro à droite ──────────
-  let hLogo = 0;
+  // ── (16 nov., lot factures-mieux) L'EN-TÊTE : un bandeau à la couleur du vendeur ──
+  // Même charte que le reçu d'achat (Julien, 16 nov. : « je veux que ça soit comme ça ») :
+  // un bandeau sobre (sa couleur, texte blanc) — à gauche le type de document en petites
+  // capitales et SON nom (ou son logo sur une pastille blanche), à droite le numéro et la
+  // date d'émission ; puis le montant EN GRAND ; puis vendeur | acheteur, la vente, le
+  // tableau, les totaux, le paiement, les mentions, le pied. Avant : rien en haut à gauche
+  // sans logo, et la date de vente, la nature et la référence sur une ligne grise coupée.
+  const BLANC = [1, 1, 1];
+  const hBande = 92;
+  page.drawRectangle({ x: 0, y: H - hBande, width: W, height: hBande, color: c(accent) });
+  let yb = H - 34;
+  ecrire(B(estAvoir ? 'AVOIR' : 'FACTURE').toUpperCase(), M, yb, { font: fb, t: 8.5, couleur: BLANC });
+  let logoPose = false;
   if (contenu.logo) {
     try {
       const b64 = contenu.logo.split(',')[1] || '';
       const octets = typeof Buffer !== 'undefined' ? Buffer.from(b64, 'base64') : Uint8Array.from(atob(b64), (x) => x.charCodeAt(0));
       const img = /^data:image\/png/.test(contenu.logo) ? await doc.embedPng(octets) : await doc.embedJpg(octets);
-      const k = Math.min(150 / img.width, 64 / img.height, 1);
-      const w = img.width * k; hLogo = img.height * k;
-      page.drawImage(img, { x: M, y: y - hLogo, width: w, height: hLogo });
-    } catch (_) { hLogo = 0; }
+      const k = Math.min(140 / img.width, 34 / img.height, 1);
+      const w = img.width * k, h = img.height * k;
+      page.drawRectangle({ x: M - 6, y: H - hBande + 10, width: w + 12, height: h + 12, color: c(BLANC) });
+      page.drawImage(img, { x: M, y: H - hBande + 16, width: w, height: h });
+      logoPose = true;
+    } catch (_) { logoPose = false; }
   }
-  ecrire(B(estAvoir ? 'AVOIR' : 'FACTURE'), W - M, y - 20, { font: fb, t: en ? 18 : 22, droite: true });
-  ecrire(`N° ${contenu.numero}`, W - M, y - 38, { font: fb, t: 11, couleur: accent, droite: true });
-  ecrire(`${B("Date d'émission")} : ${contenu.emiseJour}`, W - M, y - 53, { t: 9.5, couleur: GRIS, droite: true });
-  if (estAvoir && contenu.origine) ecrire(`${B('Annule la facture')} ${contenu.origine}`, W - M, y - 66, { t: 9.5, couleur: GRIS, droite: true });
-  y -= Math.max(hLogo, estAvoir ? 70 : 58) + 26;
+  const colG = (W - 2 * M) * 0.56;
+  if (!logoPose) couper(contenu.vendeur.nom, fb, 17, colG).slice(0, 2).forEach((l, i) => ecrire(l, M, yb - 24 - i * 19, { font: fb, t: 17, couleur: BLANC }));
+  ecrire(`N° ${contenu.numero}`, W - M, yb, { font: fb, t: 12, couleur: BLANC, droite: true });
+  ecrire(`${B("Date d'émission")} : ${contenu.emiseJour}`, W - M, yb - 18, { t: 9.5, couleur: BLANC, droite: true });
+  if (estAvoir && contenu.origine) ecrire(`${B('Annule la facture')} ${contenu.origine}`, W - M, yb - 32, { t: 9.5, couleur: BLANC, droite: true });
+  let y = H - hBande - 34;
+
+  // ── Le montant, en grand (la dernière ligne des totaux, ni recalculée ni arrondie) ──
+  const T0 = contenu.totaux;
+  const libGrand = contenu.regime === 'normal' ? (estAvoir ? 'Total TTC à rembourser' : 'Total TTC') : contenu.regime === 'franchise' ? (estAvoir ? 'Montant à rembourser' : 'Net à payer') : (estAvoir ? 'Montant à rembourser' : 'Total à payer');
+  ecrire(B(libGrand), M, y + 2, { font: fb, t: 11, couleur: GRIS });
+  ecrire(euros(T0.ttc), W - M - 6, y, { font: fb, t: 22, droite: true });
+  y -= 18;
+  page.drawLine({ start: { x: M, y }, end: { x: W - M, y }, thickness: 0.6, color: c(FILET) });
+  y -= 24;
 
   // ── Vendeur | Acheteur ───────────────────────────────────────────────────
   const col = (W - 2 * M - 24) / 2;
@@ -122,10 +143,16 @@ export async function pdfFacture(contenu, { PDFLib } = {}) {
   const y2 = bloc(B(estAvoir ? 'CLIENT' : 'FACTURÉ À'), a.nom, [...a.adresse, a.email], M + col + 24);
   y = Math.min(y1, y2) - 18;
 
-  // ── Les infos de la vente ────────────────────────────────────────────────
-  const infos = [`${B('Date de la vente')} : ${contenu.venteJour}`, `${B('Nature')} : ${en && EN[contenu.nature] ? `${contenu.nature} / ${EN[contenu.nature]}` : contenu.nature}`, contenu.reference ? `${B('Référence')} : ${contenu.reference}` : ''].filter(Boolean).join('   ·   ');
-  for (const l of couper(infos, f, 9, W - 2 * M)) { ecrire(l, M, y, { t: 9, couleur: GRIS }); y -= 12; }
-  y -= 10;
+  // ── La vente : une étiquette grise, puis la valeur — une ligne chacune ──────
+  const infos = [[B('Date de la vente'), contenu.venteJour], [B('Nature'), en && EN[contenu.nature] ? `${contenu.nature} / ${EN[contenu.nature]}` : contenu.nature], ...(contenu.reference ? [[B('Référence'), contenu.reference]] : [])];
+  const largEtiq = Math.max(...infos.map(([k]) => larg(propre(k), f, 9))) + 14;
+  for (const [k, val] of infos) {
+    ecrire(k, M, y, { t: 9, couleur: GRIS });
+    const ls = couper(val, f, 9, W - 2 * M - largEtiq);
+    ls.forEach((l, i) => ecrire(l, M + largEtiq, y - i * 12, { t: 9 }));
+    y -= 12 * ls.length + 2;
+  }
+  y -= 12;
 
   // ── Le tableau ───────────────────────────────────────────────────────────
   const marge = contenu.regime === 'marge';

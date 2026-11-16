@@ -40,6 +40,7 @@ import { envoyerSmtp, FOURNISSEURS, fournisseurDe, hoteValide, emailSur } from '
 import { gabaritMail } from './mail-gabarit.js';
 import { refusMarge, manquantsVendeur, manquantsVente, contenuFacture, numeroFacture, anneeParis, jourParis, nomFichier, MESSAGE_DEFAUT, emailFacture, adresseVintedLisible, emailValide } from '../../src/facturePro/regle.js';
 import { preuveAcheteur } from '../../src/facturePro/rattachement.js';
+import { langueFactureParDefaut } from '../../src/facturePro/anglais.js';
 import { pdfFacture } from '../../src/facturePro/pdf.js';
 import { configurationRelances } from './relances-essai.js';
 // (11 nov., lot ventes-lot) Une vente de plusieurs articles : la règle de l'app (src/venteLot.js),
@@ -356,7 +357,11 @@ export async function emettre(owner, corps, res) {
   }
   const emiseLe = Date.now();
   // (10 nov., lot T) « Facture en anglais » : choisie à l'émission, figée dans l'instantané.
-  const contenu = contenuFacture(cfg, vente, { numero, emiseLe, langue: corps.langue === 'en' ? 'en' : 'fr' });
+  // (16 nov., lot factures-mieux) Pas choisie (la série, l'envoi automatique) ⇒ la MÊME
+  // règle que la case pré-cochée de la feuille (`langueFactureParDefaut`, l'adresse
+  // PROUVÉE) : une vente produit la même facture par les trois chemins.
+  const langue = corps.langue === 'en' || corps.langue === 'fr' ? corps.langue : langueFactureParDefaut(vente.acheteur.adresse);
+  const contenu = contenuFacture(cfg, vente, { numero, emiseLe, langue });
   const data = {
     ...(ligne || {}), type: 'facture_pro', number: numero, status: 'emise', contenu,
     emiseLe: contenu.emiseLe, transaction: tx, account: String(corps.compte || (ligne && ligne.account) || '').slice(0, 80),
@@ -502,7 +507,7 @@ export async function envoyer(owner, corps, res, env = process.env, opts = {}) {
   }
   const pieces = [{ nom: nomFichier(c), octets: pdf }];
   if (c.type !== 'avoir' && ligne.retourB64) pieces.push({ nom: ligne.retourNom || 'Formulaire-retour.pdf', octets: Buffer.from(ligne.retourB64, 'base64') });
-  const mail = emailFacture(cfg || {}, c, { via });
+  const mail = emailFacture(cfg || {}, c, { via, pieces: pieces.map((x) => x.nom) });
   const v = await envoyerSmtp({ hote: transport.hote, port: transport.port, utilisateur: transport.utilisateur, motDePasse: transport.motDePasse,
     de: transport.de, nomDe: mail.nomExpediteur, a: c.acheteur.email, cc: transport.cc, replyTo: transport.replyTo, bcc: transport.bcc,
     sujet: mail.sujet, texte: mail.texte, html: mail.html, pieces });

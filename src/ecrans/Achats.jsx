@@ -168,7 +168,9 @@ const openReceipt = (a) => {
 // revient à la fermeture sur ce qui l'avait ouverte (« Voir › »). Même motif que
 // le panneau des écrans (`MenuEcrans`).
 function FeuilleRecuAchat({ recu, fermer }) {
-  const r = champsRecuAchat(recu);
+  // (16 nov., lot factures-mieux) Un reçu GÉNÉRÉ d'après la commande (`_genere`, src/recuAchat.js)
+  // prend exactement cette forme ; ses lignes inconnues ne s'écrivent pas, son pied le dit.
+  const r = recu && recu._genere ? recu._genere : champsRecuAchat(recu);
   const boite = useRef(null);
   // (29 oct.) LE PDF JOINT À L'EMAIL (s'il y en a un) se lit AU CLIC seulement
   // (§4.4 : la liste ne rapatrie jamais `pdfB64`). Trois états : lecture · pas
@@ -230,7 +232,7 @@ function FeuilleRecuAchat({ recu, fermer }) {
         <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
           <button type="button" data-recu-retour="" onClick={fermer} aria-label={tr('ebay.param.politique.retour')} style={{...cible,width:44,height:44,padding:0,fontSize:20,fontWeight:600,lineHeight:1}}>‹</button>
           <div style={{flex:1,minWidth:0,fontSize:17,fontWeight:700,color:C.text}}>{NOM_RECU_ACHAT}</div>
-          <button type="button" data-recu-pdf="" onClick={()=>openReceipt(recu)} title={tr('achats.imprimerPdf')} style={{...cible,gap:6,padding:'0 14px',fontSize:15,fontWeight:600}}><Icon name="printer" size={15}/>PDF</button>
+          <button type="button" data-recu-pdf="" onClick={()=>(recu && recu._genere ? recu._pdfGenere() : openReceipt(recu))} title={tr('achats.imprimerPdf')} style={{...cible,gap:6,padding:'0 14px',fontSize:15,fontWeight:600}}><Icon name="printer" size={15}/>PDF</button>
         </div>
         {aPdf && (
           <div data-recu-pj={pj ? pj.etat : 'repos'} style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:8,padding:'8px 12px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
@@ -248,15 +250,16 @@ function FeuilleRecuAchat({ recu, fermer }) {
             </div>
             {r.hasStructured ? (
               <div style={{padding:'14px 18px 16px'}}>
-                {r.paye != null && (
-                  <div data-recu-total={r.paye} style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:12,paddingBottom:12,borderBottom:`1px solid ${C.border}`,marginBottom:2}}>
+                {(r.paye != null || r.genere) && (
+                  <div data-recu-total={r.paye == null ? '' : r.paye} style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:12,paddingBottom:12,borderBottom:`1px solid ${C.border}`,marginBottom:2}}>
                     <span style={{fontSize:15,color:C.muted,fontWeight:600}}>{tr('achats.montantPaye')}</span>
-                    <span style={{fontSize:28,fontWeight:700,color:C.text,whiteSpace:'nowrap'}}>{texteCentimesRecu(r.paye)}</span>
+                    <span style={{fontSize:28,fontWeight:700,color:C.text,whiteSpace:'nowrap'}}>{r.paye == null ? '—' : texteCentimesRecu(r.paye)}</span>
                   </div>
                 )}
                 {r.lignes.map((l, i) => <Row key={i} montant label={l.libelle} val={l.centimes == null ? '—' : texteCentimesRecu(l.centimes)} attrs={{ 'data-recu-ligne': l.libelle, 'data-recu-centimes': l.centimes == null ? '' : String(l.centimes) }}/>)}
-                <div data-recu-somme={r.somme} hidden={!r.phrase} style={{fontSize:13,lineHeight:1.5,color:C.muted,padding:'10px 0 2px'}}>{r.phrase}</div>
+                <div data-recu-somme={r.somme} hidden={!r.phrase} style={{fontSize:13,lineHeight:1.5,color:C.muted,padding:'10px 0 2px'}}>{r.genere ? tr('achats.recuSansDetail') : r.phrase}</div>
                 <div style={{height:10}}/>
+                {r.numero ? <Row label={tr('achats.numeroRangement')} val={`N°${r.numero}`}/> : null}
                 <Row label={tr('achats.vendeur2')} val={r.vendeur}/>
                 <Row label={tr('achats.modePaiement')} val={r.mode}/>
                 <Row label={tr('achats.datePaiement')} val={r.datePaie}/>
@@ -267,7 +270,7 @@ function FeuilleRecuAchat({ recu, fermer }) {
               <div style={{padding:'16px 18px',whiteSpace:'pre-wrap',lineHeight:1.6,fontSize:15,color:C.text}}>{r.cleaned}</div>
             )}
           </div>
-          <div data-recu-fin="" style={{textAlign:'center',color:C.muted,fontSize:12,marginTop:12,lineHeight:1.5}}>{tr('achats.recuReconstruitDepuis')}</div>
+          <div data-recu-fin={r.genere ? 'genere' : 'email'} style={{textAlign:'center',color:C.muted,fontSize:12,marginTop:12,lineHeight:1.5}}>{r.genere ? tr('achats.recuGenerePied') : tr('achats.recuReconstruitDepuis')}</div>
         </div>
       </div>
     </div>, document.body);

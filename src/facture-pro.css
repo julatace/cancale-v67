@@ -212,3 +212,13 @@ li[data-fp-a-envoyer-etat="a-annuler"] .vrm-fp-rangee-txt > span { color: var(--
 .vrm-fa-question { display: grid; gap: 8px; }
 /* (12 nov.) « Connecter ma boîte » dans la phrase du bas : un lien, cible de 44 px. */
 [data-fp-bloque] .vrm-lien-action { background: none; border: 0; padding: 0 2px; margin: 0; font: inherit; font-weight: 600; cursor: pointer; min-height: 44px; vertical-align: baseline; }
+
+/* (16 nov., lot factures-mieux) La feuille d'une facture émise : l'état en une ligne, puis
+   à qui ; UNE rangée d'actions de largeur égale (Voir · Partager · Renvoyer). */
+.vrm-fp-etat.is-court b { font-size: 15px; line-height: 1.35; }
+.vrm-fp-etat.is-court .vrm-fp-etat-copie { font-weight: 400; color: var(--vrm-muted); }
+.vrm-fp-etat.is-court > span { font-size: 14px; }
+.vrm-fp-gestes.is-rangee { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; }
+.vrm-fp-gestes.is-rangee .vrm-b { min-height: 44px; width: 100%; min-width: 0; padding-left: 8px; padding-right: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-fp-ligne-etat[data-fp-ligne-etat] b { font-size: 13px; font-weight: 500; color: var(--vrm-muted); }
+.vrm-fp-ligne-etat[data-fp-ligne-etat="refusee"] b, .vrm-fp-ligne-etat[data-fp-ligne-etat="incertaine"] b { color: var(--vrm-warn, #b25000); }
