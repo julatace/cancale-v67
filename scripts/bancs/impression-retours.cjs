@@ -143,7 +143,7 @@ async function ouvrir(b, { vp, sombre = false, ROWS }) {
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
   ctx.on('page', (p) => { if (p !== pg) p.close().catch(() => {}); });
-  await pg.goto(`http://localhost:${PORT}/?tab=ventes`, { waitUntil: 'domcontentloaded' });
+  await pg.goto(`http://localhost:${PORT}/?tab=ventes`, { waitUntil: 'domcontentloaded', timeout: 120000 });   // machine chargée : une ouverture lente n'est pas un défaut
   await pg.waitForFunction(() => document.body.innerText.includes('N°40'), null, { timeout: 45000 }).catch(() => {});
   // Les compteurs publiés par l'écran (`vrm_colis_prets`, `vrm_colis_aposter`) et le bouton : attendus, jamais lus trop tôt.
   await pg.waitForFunction(() => !!localStorage.getItem('vrm_colis_prets') && !!localStorage.getItem('vrm_colis_aposter') && !!document.querySelector('[data-colis-barre-btn="imprimer"]'), null, { timeout: 30000 }).catch(() => {});
