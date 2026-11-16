@@ -1,6 +1,7 @@
 // (16 nov., lot traduction-restes) « Quoi de neuf » auf Deutsch — ein Eintrag pro Neuheit aus
 // src/nouveautes.js ([Titel, Satz]). Übersetzung aus erster Hand: relecture native requise.
 const T = {
+  'traduction-restes': ['Die Erweiterung und Neuheiten in deiner Sprache', 'Das Fenster, die Logo-Karte und die Neuheiten werden übersetzt.'],
   'ventes-verre': ['Verkäufe: Pakete abhaken, Platz im Lager', 'Jedes Paket sagt, wo sein Karton ist; druck die abgehakten.'],
   'achats-code-comptoir': ['Der Abholcode groß am Schalter', 'Eine Ziffer pro Feld, « Abgeholt » direkt darunter.'],
   'fiche-d': ['Die Karte eines Artikels passt auf einen Bildschirm', 'Das Foto, sein Zustand, das Einzige zu tun; der Rest hinter ⋯.'],

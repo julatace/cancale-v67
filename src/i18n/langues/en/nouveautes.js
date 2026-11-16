@@ -1,6 +1,7 @@
 // (16 nov., lot traduction-restes) « Quoi de neuf » en anglais — une entrée par nouveauté de
 // src/nouveautes.js ([titre, phrase]). Traduction de première main : relecture native requise.
 const T = {
+  'traduction-restes': ['The extension and What’s new in your language', 'The window, the logo card and the new features are translated.'],
   'ventes-verre': ['Sales: ticked parcels, place in stock', 'Each parcel says where its box is; print the ticked ones.'],
   'achats-code-comptoir': ['The pickup code, big, at the counter', 'One digit per box, « I picked it up » just below.'],
   'fiche-d': ['An item’s card fits on one screen', 'The photo, its state, the one thing to do; the rest behind ⋯.'],

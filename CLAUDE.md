@@ -442,6 +442,7 @@ sans la fonction.
 
 | capacité | fonction de l'extension | arrivée en | ce que l'app promet |
 |---|---|---|---|
+| `langues` | `traduirePage` (popup.js) | **5.394.0** (16 nov.) | la fenêtre, le diagnostic et la connexion + l'état de la carte du logo dans la langue du NAVIGATEUR (`_locales`, fr par défaut, `T()` avec le français en repli) ; le reste de la carte encore en français |
 | `memephoto` | `empreintesSitesUnTour` | **5.384.0** (15 nov.) | « Même photo · à relier » : empreinte des photos Leboncoin/Vestiaire (compte de l'onglet, 1 image/45 s, ≤ 8 des 20 lectures/h, empreinte seule) ; proposition seulement à distance ≤ 12 (`SEUIL_MEME_PHOTO`), deux paires possibles ⇒ il choisit ; relier = SON clic |
 | `numerotes` | `annoncerNumerotes` | **5.382.0** (15 nov.) | les N° neufs que VRM vient de donner aux annonces publiées hors de VRM (app Vinted) dits une fois : bandeau, notification, et « VRM a numéroté » dans la carte du logo (identités `id:N°`, compte de l'onglet) ; « je numérote moi-même » ⇒ l'app DEMANDE le N° de chaque nouvel article |
 | `lbccriteres` | `criteresFicheLbc` | **5.381.0** (15 nov.) | Publier partout : la catégorie, l'univers et le type Leboncoin posés depuis la table `src/correspondances.js` (par `catalog_id` Vinted, jamais le titre) ; pas posé ⇒ rien publié, dit |
@@ -486,6 +487,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **16 nov. · Traduction, les restes (ext. 5.394)** : extension en 5 langues (`_locales`, fenêtre + connexion/état de la carte), 30 textes « paire/article » (`trm`, `src/motsLangues.js`), Quoi de neuf (chaque nouveauté traduite, D2/F2), prochain geste, facture (écran), bordereau, Qui dorment, périodes ; chemins d'aide relus contre l'app (`audit-chemins-aide`, 4 chemins faux corrigés). `docs/passation/2026-11-16-traduction-restes.md`. Geste : installer 5.394.0.
 - **16 nov. · Nouveautés (vague B)** : transporteur lu sur l'étiquette (jamais « inconnu », `src/colisEnvoyes.js`) ; plus de rangement sur un achat — l'atelier d'arrivée donne le N° puis la case sur la fiche (`casesProposees`) ; contrôle de nuit + santé des comptes + extension en retard (`src/fiabilite/`) ; baisse conseillée, relance des favoris, loupe universelle ; bilan du mois, alertes de seuils, bénéfice réel, sauvegarde zip ; écran de chargement verre. Récits `2026-11-15-*.md`. Geste : aucun.
 - **16 nov. · Écrans refaits sur les maquettes validées (vague A)** : Ma journée (seulement les gestes, « Tout va bien ? · N points », retours et litiges ensemble, paire à sortir en premier), Annonces 72 px, Ventes/Achats (colis cochés d'office, place du Stock par N°, code au comptoir), fiche D (un geste : « Relier · N € » sur son toucher), Argent, Messages (plein « Proposer N € »), Paramètres, rail ordinateur Vendre/Ranger/Compter ; « À envoyer » partout (`src/libelles.js`). `2026-11-15-refonte-journee.md`, `-refonte-ventes.md`, `-fiche-d.md`. Geste : aucun.
 - **15 nov. · « Verre dépoli » partout + Stock en étagères** : Julien a choisi la proposition 9 sur 30 ; couche `studio-verre.css` (contrastes mesurés, banc `verre`) ; Stock en meubles/cases/piles avec sites + compte par identité sur chaque case (`src/stockAnnonces.js`). Maquettes validées de tous les écrans (sauf l'étagère, v3 en cours) ; refonte des dispositions écran par écran en cours. `2026-11-15-verre-depoli.md`, `2026-11-15-stock-etageres.md`. Geste : aucun.
@@ -505,7 +507,7 @@ vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
 - Facture Pro : compléter « Ma facture » (Argent → Factures : SIRET, forme, régime de TVA, son e-mail) ; poser `RELANCES_SMTP_*` + `RELANCES_EXPEDITEUR` (SPF/DKIM, Brevo 300/j) — VRM envoie par défaut.
-- Installer l’extension **5.385.0** (15 nov. : remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip` ; chez lui : Chrome en 5.329, iPhone en 5.368). La liste complète et à jour des gestes : `docs/passation/2026-11-09-passation-generale.md` §5.
+- Installer l’extension **5.394.0** (16 nov. : remplacer le dossier, puis ⟳ dans CHAQUE Chrome ; Orion : `VRM-Orion-dossier.zip` ; chez lui : Chrome en 5.329, iPhone en 5.368). La liste complète et à jour des gestes : `docs/passation/2026-11-09-passation-generale.md` §5.
 - Sur leboncoin.fr, ouvrir « Mes annonces » sur CHACUN de ses comptes Leboncoin.
 - Recoller `scripts/gmail-forwarder.gs` (avec sa clé) dans la boîte qui fait tourner le
   script, puis poser `EMAIL_INBOUND_SECRET` sur Vercel (l'ancien script lit encore la

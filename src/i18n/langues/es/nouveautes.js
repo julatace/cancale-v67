@@ -1,6 +1,7 @@
 // (16 nov., lot traduction-restes) « Quoi de neuf » en espagnol — una entrada por novedad de
 // src/nouveautes.js ([título, frase]). Traducción de primera mano: relecture native requise.
 const T = {
+  'traduction-restes': ['La extensión y Novedades en tu idioma', 'La ventana, la tarjeta del logo y las novedades se traducen.'],
   'ventes-verre': ['Ventas: paquetes marcados, lugar en el stock', 'Cada paquete dice dónde está su caja; imprime los marcados.'],
   'achats-code-comptoir': ['El código de recogida, grande, en el mostrador', 'Una cifra por casilla, « Lo he recogido » justo debajo.'],
   'fiche-d': ['La ficha de un artículo cabe en una pantalla', 'La foto, su estado, lo único que hacer; el resto tras ⋯.'],
