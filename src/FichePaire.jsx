@@ -341,6 +341,24 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
   const [tuile, setTuile] = React.useState(null);
   const numCle = p ? p.num : '';
   React.useEffect(() => { setVue(null); setPlusOuvert(false); setTuile(null); }, [numCle]);
+  // (16 nov., intégration) La feuille « ⋯ » ouverte au téléphone : un message passager (la coque les met EN HAUT pendant
+  // une feuille) couvrait « Plus ✕ » quand la feuille monte haut (« Tout voir » ouvert). Même règle que la fiche et la
+  // conversation : il se pose JUSTE SOUS la tête de la feuille. Sa place change avec la hauteur de la feuille (posée en
+  // bas) : on la mesure à l'ouverture, à la fin de la montée et à chaque changement de taille (`--fd-plus-tete-bas`,
+  // lue par fiche-d.css). Banc ecrans-verre-2, F9.
+  const feuillePlusRef = React.useRef(null);
+  React.useEffect(() => {
+    const f = feuillePlusRef.current;
+    if (!plusOuvert || !f || typeof document === 'undefined') return undefined;
+    const racine = document.documentElement;
+    const poser = () => { const t = f.querySelector('.fd-plus-tete'); if (!t) return; const b = t.getBoundingClientRect().bottom; if (Number.isFinite(b) && b > 0) racine.style.setProperty('--fd-plus-tete-bas', Math.round(b) + 'px'); };
+    poser();
+    const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(poser) : null;
+    if (ro) ro.observe(f);
+    f.addEventListener('animationend', poser); window.addEventListener('resize', poser);
+    const t1 = setTimeout(poser, 320);
+    return () => { if (ro) ro.disconnect(); f.removeEventListener('animationend', poser); window.removeEventListener('resize', poser); clearTimeout(t1); racine.style.removeProperty('--fd-plus-tete-bas'); };
+  }, [plusOuvert]);
   if (typeof document === 'undefined') return null;
   const I = (n, s = 18) => (Icon ? <Icon name={n} size={s}/> : null);
   const r = p && p.resume;
@@ -417,7 +435,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
   const feuillePlus = p ? (
     <div className="fd-plus" hidden={!plusOuvert} data-fd-plus={plusOuvert ? '1' : '0'} data-noglisse="1">
       <button type="button" className="fd-plus-voile" aria-label={tr('fd.plus.fermer')} tabIndex={-1} onClick={fermerPlus}/>
-      <div className="fd-plus-f" role="dialog" aria-modal="true" aria-label={tr('fd.plus.titre')}>
+      <div className="fd-plus-f" ref={feuillePlusRef} role="dialog" aria-modal="true" aria-label={tr('fd.plus.titre')}>
         <div className="fd-plus-tete"><b>{tr('fd.plus.titre')}</b><Rond className="is-clair" aria-label={tr('fd.plus.fermer')} data-fd-plus-fermer="" onClick={fermerPlus}>{I('close', 18)}</Rond></div>
         {depuis ? <section className="vrm-fp-actions-sec" data-fiche-actions={ctx} aria-label={tr('fiche.actions')}><div className="vrm-fp-actions-ligne" ref={slotAct} data-fiche-actions-ligne=""/></section> : null}
         {tuiles.length ? <div className="fd-tuiles" role="group" aria-label={tr('fd.plus.titre')}>

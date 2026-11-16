@@ -322,6 +322,10 @@ async function personnaliser(pg, t, v, tel, r) {
           dit(K6.some((x) => /^vestiaire:pas-su/.test(x)) && !K6.some((x) => /^vestiaire:en-ligne/.test(x)), `${t} · K7 : Vestiaire, jamais lu, est dit « pas su » sur la fiche (jamais tu, jamais « en ligne »)`, K6);
           if (CAPT) await pg.screenshot({ path: path.join(CAPT, `etag-${v}-0a-fiche-d-sites.png`) });
           await ouvrirPlus(pg);
+          // ── K8 (16 nov., intégration, capture de Julien) : à 1512 la feuille « ⋯ » de la fiche ouverte depuis une case
+          //    débordait de 12 px à gauche du panneau (coupée) : plus de marge. Elle tient DANS la fiche, ses tuiles à ≥ 12 px du bord.
+          const K8 = await pg.evaluate(() => { const fp = document.querySelector('.vrm-fp.fd'), f = document.querySelector('.vrm-fp .fd-plus:not([hidden]) .fd-plus-f'), t = document.querySelector('.vrm-fp .fd-plus:not([hidden]) .fd-tuile'); if (!fp || !f || !t) return null; const a = fp.getBoundingClientRect(), b = f.getBoundingClientRect(), c = t.getBoundingClientRect(); return { fiche: [Math.round(a.left), Math.round(a.right)], feuille: [Math.round(b.left), Math.round(b.right)], marge: Math.round(c.left - Math.max(a.left, b.left)) }; });
+          dit(!!K8 && K8.feuille[0] >= K8.fiche[0] - 1 && K8.feuille[1] <= K8.fiche[1] + 1 && K8.marge >= 12, `${t} · K8 : la feuille « ⋯ » tient dans la fiche, ses tuiles à ≥ 12 px du bord gauche`, K8);
           // les rangées du STOCK (src/stockAnnonces.js, par identité) ; la vue « Sites » de la fiche D a sa propre règle (Prix partout)
           const fs2 = await pg.evaluate(() => { const l = [...document.querySelectorAll('[data-stock-fiche] .vrm-etag-fiche-site[data-fiche-site]')]; return l.map((x) => x.getAttribute('data-fiche-site') + ':' + (x.getAttribute('data-compte') || '') + ':' + x.textContent.replace(/\s+/g, ' ').trim()); });
           dit(fs2.length === 2 && /^vinted:compte_invente:/.test(fs2[0]) && /^leboncoin:nord_lbc:.*95/.test(fs2[1]), `${t} · K5 : la fiche de N°20 dit une ligne par site (logo · compte · prix · depuis)`, fs2);

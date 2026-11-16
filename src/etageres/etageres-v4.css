@@ -50,7 +50,6 @@
 .vrm-m4[data-affichage="cartons"] .vrm-m4-pl > i.vrm-m4-pl-bord { margin: 0 -2.5px 0 0; background: linear-gradient(var(--a) 0 5px, var(--b) 5px, var(--c)); }
 .vrm-m4[data-affichage="cartons"] .vrm-m4-pl > i.is-pile { background: linear-gradient(var(--g), var(--h)); box-shadow: none; }
 .vrm-m4[data-affichage="cartons"] .vrm-m4-pl > i[data-planche-case] { box-shadow: inset 0 1px 0 #fff, inset 0 -2px 0 rgb(0 0 0 / .25), 0 3px 3px -1px rgb(3 12 28 / .45); }
-  background: linear-gradient(var(--a) 0 5px, var(--b) 5px, var(--c)); box-shadow: inset 0 1px 0 #fff, inset 0 -1px 0 rgb(0 0 0 / .18), 0 3px 3px -1px rgb(3 12 28 / .45); }
 .vrm-m4[data-affichage="cartons"] .vrm-s2d-socle { height: 12px; margin: 0 6px; border-radius: 0; background: linear-gradient(90deg, var(--c) 0 30px, transparent 30px calc(100% - 30px), var(--c) calc(100% - 30px)); }
 .vrm-m4 .vrm-m4-pile { position: absolute; top: -2px; right: 18px; z-index: 4; display: inline-flex; align-items: center; gap: 3px; height: 19px; padding: 0 8px; border-radius: 10px;
   background: rgb(8 28 56 / .72); color: #fff; font-size: 11px; font-weight: 700; pointer-events: none; }

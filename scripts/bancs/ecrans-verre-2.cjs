@@ -147,6 +147,19 @@ async function preparer(o, vue) {
     if (vue === 'fiche-vente-tout') {
       await toucher('[data-fd-plus-ouvrir]'); await pg.waitForTimeout(700);
       await toucher('.fd-plus .fd-tout > summary'); await pg.waitForTimeout(700);
+      // (16 nov., intégration) F9 : « Tout voir » déplié, la feuille monte haut — un message passager (sonde de la vraie
+      // forme, dans la vraie zone `.vrm-toasts`) ne couvre pas sa tête (« Plus », ✕). Mesuré AVANT de faire défiler.
+      await pg.evaluate(() => {
+        const vis = (e) => { if (!e) return false; const r = e.getBoundingClientRect(); const c = getComputedStyle(e); return r.width > 1 && r.height > 1 && c.visibility !== 'hidden' && c.display !== 'none' && !e.closest('[hidden]'); };
+        const R = (e) => { const r = e.getBoundingClientRect(); return { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), b: Math.round(r.bottom), r: Math.round(r.right) }; };
+        const z = document.querySelector('.vrm-toasts'); if (!z) { window.__sondeF9 = null; return; }
+        const b = document.createElement('div'); b.className = 'vrm-toast'; b.setAttribute('data-sonde-toast', '');
+        b.style.cssText = 'display:flex;align-items:center;gap:10px;padding:12px 16px;max-width:520px;width:100%;box-sizing:border-box;border:1px solid transparent';
+        b.innerHTML = '<span class="vrm-toast-icon">i</span><span>24 nouvelles paires numérotées · N°2323, 2324, 2325 · à écrire sur leurs cartons</span>'; z.prepend(b);
+        const bulles = [...z.children].filter(vis).map(R), tete = [...document.querySelectorAll('.vrm-fp .fd-plus:not([hidden]) .fd-plus-tete > *')].filter(vis).map(R); b.remove();
+        const coupe = (a, c) => a.x < c.r && c.x < a.r && a.y < c.b && c.y < a.b;
+        window.__sondeF9 = { place: z.getAttribute('data-toasts-place'), bulles, tete: tete.length, teteR: tete, couvreTete: tete.filter((r) => bulles.some((t) => coupe(t, r))).length };
+      });
       await pg.evaluate(() => { const r = document.querySelector('.fd-plus .fd-tout [data-rangee-bord]'); if (r) r.scrollIntoView({ block: 'center' }); });
       await pg.waitForTimeout(400);
     }
@@ -263,6 +276,9 @@ function mesurer(vue) {
       const a = R(puce), b = R(g);
       return { ecart: b.x - a.r, recouvre: a.x < b.r && b.x < a.r && a.y < b.b && b.y < a.b, plein: opaque(g) && !g.hasAttribute('data-fiche-principal'), h: b.h };
     });
+    out.toastPlus = window.__sondeF9 || null;
+    // (16 nov., intégration) le sur-titre de la fiche ouverte depuis sa ligne (« Colis à envoyer ») : la taille du texte courant
+    out.ctxFiche = (() => { const e = racine.querySelector('[data-fiche-heros-ctx]'); return e && vis(e) ? parseFloat(getComputedStyle(e).fontSize) : null; })();
     return out;
   }
   if (racineFiche) {
@@ -304,9 +320,11 @@ function mesurer(vue) {
         b.style.cssText = 'display:flex;align-items:center;gap:10px;padding:12px 16px;max-width:520px;width:100%;box-sizing:border-box;border:1px solid transparent';
         b.innerHTML = '<span class="vrm-toast-icon">i</span><span>24 nouvelles paires numérotées</span>'; z.prepend(b);
         // la sonde en PREMIÈRE place, et chaque bulle déjà là (un vrai message de la coque) jugée aussi
-        const bulles = [...z.children].filter(vis).map(R), ronds = [...racine.querySelectorAll('.fd-top .fd-rond')].filter(vis).map(R); b.remove();
+        const bulles = [...z.children].filter(vis).map(R), ronds = [...racine.querySelectorAll('.fd-top .fd-rond')].filter(vis).map(R);
+        // (16 nov., intégration) la feuille « ⋯ » ouverte : sa tête (« Plus », ✕) jugée aussi (F9)
+        const tete = [...racine.querySelectorAll('.fd-plus:not([hidden]) .fd-plus-tete > *')].filter(vis).map(R); b.remove();
         const coupe = (a, c) => a.x < c.r && c.x < a.r && a.y < c.b && c.y < a.b;
-        return { place: z.getAttribute('data-toasts-place'), bulles, ronds: ronds.length, couvre: ronds.filter((r) => bulles.some((t) => coupe(t, r))).length }; })(),
+        return { place: z.getAttribute('data-toasts-place'), bulles, ronds: ronds.length, couvre: ronds.filter((r) => bulles.some((t) => coupe(t, r))).length, tete: tete.length, couvreTete: tete.filter((r) => bulles.some((t) => coupe(t, r))).length }; })(),
     };
   }
   return out;
@@ -382,6 +400,10 @@ function juger(m, suf, tel) {
     const T = m.toutVoirBord;
     dit(T.length >= 1 && T.every((x) => x.ecart >= 8 && !x.recouvre), `FV1 ${suf} : « Tout voir » d'une vente — « Imprimer le bordereau » ne touche pas la marque du transporteur (≥ 8 px)`, JSON.stringify(T));
     dit(T.length >= 1 && T.every((x) => x.plein === false), `FV2 ${suf} : … et ce n'est pas un second plein (la fiche porte déjà le sien)`, JSON.stringify(T));
+    // (16 nov., intégration, capture de Julien) au téléphone, « ⋯ » puis « Tout voir » : la tête de la feuille (Plus, ✕) jamais
+    // sous un message passager (même règle que la fiche et la conversation : sous la tête). À l'ordinateur, en bas à droite.
+    dit(m.ctxFiche != null && m.ctxFiche >= 15, `F10 ${suf} : le sur-titre de la fiche ouverte depuis sa ligne au texte courant (≥ 15 px)`, String(m.ctxFiche));
+    if (m.W < 744) dit(!!m.toastPlus && m.toastPlus.tete >= 2 && m.toastPlus.couvreTete === 0, `F9 ${suf} : « Tout voir » déplié — un message passager ne couvre pas « Plus ✕ »`, JSON.stringify(m.toastPlus));
   }
   if (m.fd) {
     const F = m.fd, v = m.vue;
@@ -395,6 +417,9 @@ function juger(m, suf, tel) {
     if (v !== 'fiche-plus') dit(F.plus && F.plusFerme && F.toutVoir && F.tuiles.length >= 4, `F6 ${suf} : « ⋯ » fermé, ses tuiles (${F.tuiles.join(', ')}) et « Tout voir »`);
     else dit(!F.plusFerme && !!F.feuille && F.feuille.r <= m.W + 1 && F.tuilesVues.length >= 8 && F.tuilesVues.every((h) => h >= 44) && F.toutVoir, `F6 ${suf} : « ⋯ » ouvert : ${F.tuilesVues.length} tuiles (≥ 44 px) et « Tout voir », dans l'écran`, JSON.stringify({ feuille: F.feuille, t: F.tuilesVues }));
     dit(!!F.toast && F.toast.ronds === 2 && F.toast.couvre === 0, `F8 ${suf} : un message passager ne couvre ni ‹ ni ⋯ (fiche plein écran)`, JSON.stringify(F.toast));
+    // (16 nov., intégration, capture de Julien) « ⋯ » ouvert au téléphone, « Tout voir » déplié : la feuille monte haut et
+    // un message passager couvrait « Plus ✕ ». Même règle que la fiche et la conversation : sous la tête.
+    if (F.toast && F.toast.tete) dit(F.toast.tete >= 2 && F.toast.couvreTete === 0, `F9 ${suf} : un message passager ne couvre pas la tête de la feuille « ⋯ » (Plus, ✕)`, JSON.stringify(F.toast));
     if (v === 'fiche-histoire') dit(F.vue === 'histoire' && F.histoire.length >= 3 && F.histoire.length <= 5 && F.histoire[0] === 'achat:am' && F.histoire.includes('vente') && F.histoire.includes('colis:am'), `F7 ${suf} : l'histoire en 3 à 5 lignes, l'achat à relier et l'envoi en ambre`, F.histoire.join(','));
     dit(!F.jargon.length, `F5 ${suf} : aucun identifiant ni mot technique à l'écran`, F.jargon.slice(0, 5).join(' | '));
     dit(!F.doublons.length, `F5 ${suf} : chaque geste, chaque titre UNE fois`, F.doublons.slice(0, 5).join(' | '));
