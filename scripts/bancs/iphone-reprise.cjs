@@ -150,7 +150,13 @@ const ouvrirPage = async (ctx, query = '') => {
   // mesuré en CI : toute la partie R tombait). Installée une fois, puis seulement avancée.
   const t0 = maintenant.getTime() + (Date.now() - DEBUT);
   if (!ctx.__vrmHorloge) { await pg.clock.install({ time: t0 }); ctx.__vrmHorloge = true; }
-  else await pg.clock.setSystemTime(t0);
+  // (16 nov., bancs-rouges-b) Sous WebKit, une page NEUVE (about:blank) n'a pas encore l'horloge du contexte :
+  // `setSystemTime` y lève « __pwClock.controller » (mesuré en CI, toute la partie R tombait encore). On ouvre
+  // d'abord un petit document de la même origine (le script d'horloge s'y pose), puis on avance l'heure.
+  else await pg.clock.setSystemTime(t0).catch(async () => {
+    await pg.goto(`http://localhost:${PORT}/etat-version.json`, { waitUntil: 'domcontentloaded' });
+    await pg.clock.setSystemTime(t0);
+  });
   await pg.goto(`http://localhost:${PORT}/${query}`, { waitUntil: 'domcontentloaded' });
   await pg.waitForFunction(() => document.querySelector('.vrm-main') || /pas pu s'afficher/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
   await pg.waitForTimeout(2800);

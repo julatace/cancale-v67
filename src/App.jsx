@@ -364,6 +364,29 @@ function HoteFicheLigne({ rendre, deps, onActive }) {
   const l = React.useSyncExternalStore(abonnerFicheLigne, ligneOuverte, ligneOuverte);
   const [choisi, setChoisi] = React.useState(null);
   React.useEffect(() => { setChoisi(null); }, [l && l.cle]);
+  // (16 nov., accessibilite-feuilles F1) La fiche FERMÉE rend le focus à la rangée touchée (WCAG 2.4.3) : un toucher
+  // sur une rangée (une <div>) ne laissait rien de focalisé, et le focus retombait sur <body> (le clavier et
+  // VoiceOver repartaient du haut de l'écran). Sans défiler (`preventScroll`) ; un focus déjà rendu ailleurs est gardé.
+  const origineFiche = React.useRef(null);
+  const etaitOuverte = React.useRef(false);
+  React.useEffect(() => {
+    if (l) { etaitOuverte.current = true; return undefined; }
+    if (!etaitOuverte.current) return undefined;
+    etaitOuverte.current = false;
+    const o = origineFiche.current; origineFiche.current = null;
+    if (!o) return undefined;
+    const t = setTimeout(() => {
+      try {
+        const a = document.activeElement;
+        if (a && a !== document.body && a !== document.documentElement && a.isConnected) return;
+        const row = o.row && o.row.isConnected ? o.row : (o.cle ? document.querySelector(`[data-fiche-ligne="${CSS.escape(o.cle)}"]`) : null);
+        if (!row) return;
+        if (!row.hasAttribute('tabindex') && !row.matches('a[href],button,input,select,textarea')) row.setAttribute('tabindex', '-1');
+        row.focus({ preventScroll: true });
+      } catch (_) {}
+    }, 60);
+    return () => clearTimeout(t);
+  }, [l]);
   // Le toucher : délégué une fois pour toute l'app (les rangées ne portent que leurs `data-fl-*`).
   React.useEffect(() => {
     const clic = (e) => {
@@ -371,7 +394,7 @@ function HoteFicheLigne({ rendre, deps, onActive }) {
       const t = e.target; if (!t || typeof t.closest !== 'function') return;
       const row = t.closest('[data-fiche-ligne]'); if (!row || !toucheLeCorps(t, row)) return;
       try { const sel = window.getSelection && String(window.getSelection() || ''); if (sel && sel.length > 2) return; } catch (_) {}
-      const x = lireLigne(row); if (x) ouvrirLigne(x);
+      const x = lireLigne(row); if (x) { origineFiche.current = { row, cle: row.getAttribute('data-fiche-ligne') }; ouvrirLigne(x); }
     };
     // Le morceau de la fiche se charge au premier appui (pas au premier toucher complet).
     const prechauffe = (e) => { const t = e.target; if (t && t.closest && t.closest('[data-fiche-ligne]')) { import('./FichePaire.jsx').catch(() => {}); document.removeEventListener('pointerdown', prechauffe, true); } };

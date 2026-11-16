@@ -539,6 +539,70 @@ action('numero.reconnu', async (nav) => {
   } finally { await o.ctx.close(); }
 });
 
+// (16 nov., lot bancs-rouges-b, mission 54) Les gestes « — » du tableau du 14 nov., joués quand leur monde se
+// sert sans forme inconnue.
+// 8. CONNEXION PAR QR (l'iPhone a lu le QR de l'ordinateur : `?connexion-qr=…`) — avant (la question et sa
+//    prudence), après (« Connecté »), échec (ticket expiré : 410).
+const TICKET_QR = 'bancQrTicket_' + 'x'.repeat(24);
+action('connexion.qr', async (nav) => {
+  const route = (statutVoir) => (u, req) => {
+    if (!/mode=qr-connexion/.test(u)) return null;
+    let corps = {}; try { corps = JSON.parse(req.postData() || '{}'); } catch (_) {}
+    if (corps.action === 'voir') return statutVoir === 410 ? { status: 410, body: { erreur: 'expire' } } : { body: { appareil: 'Mac de banc', exp: new Date(Date.now() + 120000).toISOString() } };
+    return { body: { ok: true } };
+  };
+  const o = await ouvrir(nav, { url: `/?connexion-qr=${TICKET_QR}`, api: route(200) });
+  try {
+    const la = await o.pg.waitForSelector('[data-qr-oui]', { timeout: 15000 }).then(() => true).catch(() => false);
+    if (!la) { for (const s of ['avant', 'apres']) noter('connexion.qr', s, null, { raisonNonJoue: 'la question « Connecter … ? » ne s’est pas ouverte' }); }
+    else {
+      noter('connexion.qr', 'avant', await moment(o.pg, 'avant', 'connexion.qr'));
+      await shot(o.pg, 'qr-avant');
+      await toucher(o.pg, '[data-qr-oui]');
+      noter('connexion.qr', 'apres', await moment(o.pg, 'apres', 'connexion.qr'));
+      await shot(o.pg, 'qr-apres');
+    }
+  } finally { await o.ctx.close(); }
+  const o2 = await ouvrir(nav, { url: `/?connexion-qr=${TICKET_QR}`, api: route(410) });
+  try {
+    noter('connexion.qr', 'echec', await moment(o2.pg, 'echec', 'connexion.qr', { ms: 15000 }));
+    await shot(o2.pg, 'qr-echec');
+  } finally { await o2.ctx.close(); }
+});
+
+// 9. PUBLIER PARTOUT (la fiche d'une paire → « Partout ») — avant (ce qui va partir, sur combien de sites).
+//    Pendant / après / échec : chaque site répond par l'extension avec ses propres formes (Leboncoin, eBay,
+//    Vestiaire) — non joués ici, dits.
+action('publier.partout', async (nav) => {
+  const o = await ouvrir(nav, { url: '/?tab=vinted_annonces' });
+  try {
+    const num = await o.pg.evaluate(() => { try { const m = JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}'); const v = Object.values(m).find((x) => x && x.numero); return v ? String(v.numero) : null; } catch (_) { return null; } });
+    if (!num) { noter('publier.partout', 'avant', null, { raisonNonJoue: 'aucune annonce numérotée dans cette base' }); return; }
+    await o.pg.evaluate((n) => window.dispatchEvent(new CustomEvent('vrm:publier-partout', { detail: { nums: [n] } })), num);
+    noter('publier.partout', 'avant', await moment(o.pg, 'avant', 'publier.partout', { ms: 15000 }));
+    await shot(o.pg, 'partout-avant');
+    for (const s of ['pendant', 'apres', 'echec']) noter('publier.partout', s, null, { raisonNonJoue: 'chaque site répond par l’extension avec sa forme réelle (pas inventée ici)' });
+  } finally { await o.ctx.close(); }
+});
+
+// 10. REPUBLIER (Annonces → Republier) — avant (ce qui va se passer, combien d'annonces) une fois une paire cochée.
+action('republier', async (nav) => {
+  const o = await ouvrir(nav, { url: '/?tab=vinted_annonces' });
+  try {
+    await o.pg.waitForSelector('[data-vue-republier]', { timeout: 30000 }).catch(() => {});
+    await o.pg.locator('[data-vue-republier]').first().click().catch(() => {});
+    await o.pg.waitForTimeout(1200);
+    // Une paire cochée (la case de la vue de sélection), puis le moment AVANT de l'atelier.
+    const caseP = o.pg.locator('[data-selection-vue="republier"] input[type="checkbox"], [data-republier-paire] input[type="checkbox"]').first();
+    if (await caseP.count()) await caseP.check().catch(() => {});
+    const suivant = o.pg.locator('[data-republier-suivant], [data-selection-agir]').first();
+    if (await suivant.count()) await suivant.click().catch(() => {});
+    const r = await moment(o.pg, 'avant', 'republier', { ms: 12000 });
+    if (r) noter('republier', 'avant', r); else noter('republier', 'avant', null, { raisonNonJoue: 'l’atelier n’a pas proposé de paire à republier dans cette base' });
+    await shot(o.pg, 'republier-avant');
+  } finally { await o.ctx.close(); }
+});
+
 async function vides(nav) {
   console.log('\n── listes vides (base neuve) ──');
   for (const [nom, url] of [['ventes', '/?tab=ventes'], ['achats', '/?tab=achats'], ['annonces', '/?tab=vinted_annonces'], ['colis', '/?tab=cat_bord']]) {

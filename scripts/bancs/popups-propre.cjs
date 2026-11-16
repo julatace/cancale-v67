@@ -139,6 +139,8 @@ const paragraphes = (pg, seuil) => pg.evaluate((seuil) => {
     // 15-16 nov.) n'est pas un paragraphe : ses morceaux (titre, N°, prix, taille) sont posés côte à côte en grille.
     // Le texte réservé aux lecteurs d'écran (`.vrm-sr`, invisible) n'est pas lu non plus. Tout autre bloc reste jugé.
     if (el.matches('[data-fiche-ligne]')) continue;
+    // Une BANDE de chiffres (la carte réglable `CarteStatsApp` : « — Dépensé · 0 En route… ») n'est pas un paragraphe.
+    if (el.querySelector('[data-carte-chiffre]')) continue;
     const s = getComputedStyle(el);
     if (!bloc(s.display) || !vis(el)) continue;
     // une feuille de texte : aucun enfant BLOC qui porte du texte
@@ -235,7 +237,7 @@ const ECRANS = [
     // (16 nov.) La ligne de fraîcheur vit dans « À faire · N » (src/ui/AFaire.jsx, 14 nov.) : au téléphone, une feuille
     // qu'on ouvre d'abord.
     if (!(await pg.locator('[data-ann-fraicheur]').filter({ visible: true }).count()) && await pg.locator('[data-ui-afaire]').filter({ visible: true }).count()) {
-      await toucher(pg, '[data-ui-afaire]', mobile);
+      await toucher(pg, '[data-ui-afaire]', mobile).catch(() => pg.locator('[data-ui-afaire]').filter({ visible: true }).first().evaluate((e) => e.click()));
       await pg.locator('[data-ui-afaire-feuille] [data-ann-fraicheur]').first().waitFor({ timeout: 5000 }).catch(() => {});
     }
     await popup(pg, mobile, tag, { ligne: '[data-ann-fraicheur]', nom: 'fraicheur-annonces', quoi: 'fraîcheur des annonces',
