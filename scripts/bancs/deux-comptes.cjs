@@ -194,7 +194,9 @@ const lireFeuille = (pg) => pg.evaluate(() => {
         dit(r.carte, 'A · même photo exacte sur deux comptes : UNE carte « Deux comptes, une paire »', r.texte);
         if (r.carte) {
           dit(r.n === '1' && r.ids === '5000001+6000001', 'A · une paire, ses deux annonces', `${r.n} ${r.ids}`);
-          dit(r.titre === 'N°12 en vente sur deux comptes' && r.lt === 1, 'A · le titre « N°12 en vente sur deux comptes », sur UNE ligne', `${r.titre} / ${r.lt} lignes`);
+          // (16 nov., intégration vague C) À 1512, la carte est dans la colonne « À faire » de Ma journée (refonte-journee,
+          // ≈ 340 px) : le titre y passe sur deux lignes comme les autres rangées, jamais coupé. Au téléphone : une ligne.
+          dit(r.titre === 'N°12 en vente sur deux comptes' && (vp.width < 600 ? r.lt === 1 : r.lt <= 2), vp.width < 600 ? 'A · le titre « N°12 en vente sur deux comptes », sur UNE ligne' : 'A · le titre « N°12 en vente sur deux comptes », entier (deux lignes au plus dans la colonne « À faire »)', `${r.titre} / ${r.lt} lignes`);
           dit(/N°12 est en vente sur compte-alpha et compte-beta-long-nom/.test(r.complet || ''), 'A · la phrase entière (les deux comptes) dans l’infobulle', r.complet);
           const rgb = (s) => (/rgba?\(([^)]+)\)/.exec(s || '') || [])[1];
           dit(!!rgb(r.couleurNote) && rgb(r.couleurNote) !== rgb(r.couleurTitre) && !/184,\s*38,\s*26|255,\s*107,\s*94/.test(r.couleurNote), 'A · la ligne en AMBRE (jamais le rouge du doublon)', `${r.couleurNote} / ${r.couleurTitre}`);

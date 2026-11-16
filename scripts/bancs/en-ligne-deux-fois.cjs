@@ -162,7 +162,12 @@ const ouvrir = async (b, vp, sc) => {
           dit(r.titre === 'N°12 en ligne deux fois', 'le titre : « N°12 en ligne deux fois »', r.titre);
           dit(r.note === 'Même compte · supprimes-en une', 'la ligne : le même compte et le geste', r.note);
           dit(/N°12 et N°40/.test(r.complet || '') && /deux annonces sur compte-alpha/.test(r.complet || ''), 'l’infobulle nomme les deux N° et le compte', r.complet);
-          dit(r.lt === 1 && r.ln === 1 && !r.coupeT && !r.coupeN, 'titre et ligne tiennent chacun sur UNE ligne, sans être coupés', JSON.stringify({ lt: r.lt, ln: r.ln, coupeT: r.coupeT, coupeN: r.coupeN }));
+          // (16 nov., intégration vague C) À l'ordinateur, la carte vit dans la colonne « À faire » de Ma journée
+          // (refonte-journee, ≈ 340 px) où CHAQUE rangée garde sa ligne d'une ligne, coupée au besoin (« 4 annonces
+          // numérotées… Saisis le prix ou relie l'achat (une… ») : là, la ligne peut être coupée SI l'infobulle porte la
+          // phrase entière (contrôlé juste au-dessus) ; le titre, lui, n'est jamais coupé. Au téléphone : une ligne chacun.
+          if (nomVp === '390') dit(r.lt === 1 && r.ln === 1 && !r.coupeT && !r.coupeN, 'titre et ligne tiennent chacun sur UNE ligne, sans être coupés', JSON.stringify({ lt: r.lt, ln: r.ln, coupeT: r.coupeT, coupeN: r.coupeN }));
+          else dit(r.lt <= 2 && !r.coupeT && r.ln === 1 && (!r.coupeN || /N°12 et N°40/.test(r.complet || '')), 'colonne « À faire » : titre entier (2 lignes au plus), ligne d’une ligne — coupée seulement avec l’infobulle entière', JSON.stringify({ lt: r.lt, ln: r.ln, coupeT: r.coupeT, coupeN: r.coupeN }));
           const rgb = (s) => (/rgba?\(([^)]+)\)/.exec(s || '') || [])[1];
           dit(!!rgb(r.couleurNote) && rgb(r.couleurNote) !== rgb(r.couleurTitre) && !/255,\s*59,\s*48|255,\s*69,\s*58/.test(r.couleurNote), 'la ligne est en AMBRE (pas l’encre, jamais le rouge du doublon)', `${r.couleurNote} / titre ${r.couleurTitre} / --vrm-warn ${r.warn}`);
           dit(r.visible && !r.deborde, 'visible, aucun débordement horizontal');
