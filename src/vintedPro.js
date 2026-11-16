@@ -227,3 +227,22 @@ export function ecartNonCompte(lignes, garde = null) {
   }
   return { n, c };
 }
+
+// ── LES LECTURES D'UN COMPTE PRO, MISES EN FORME (16 nov. au soir, lot deux-prix-compter) ──────────────
+// UNE mise en forme pour l'app (`lecturePrixPro`, au chargement des ventes) ET le serveur (bilan de la
+// semaine / du mois, preuve d'une facture Pro) : §5, une seule règle par notion. Les lectures restent
+// chez chacun (même projection, `SELECT_PROFIL_PRO` / `SELECT_TXN_PRO`) ; `typeCompte` est la règle
+// `typeCompteVinted` (App.jsx = background.js, recopiée au jeton près dans api/_lib/ventes-regle.js).
+//   profil  : lignes lues (`harvest_{uid}_profile`, projection) · null/undefined = lecture ratée ;
+//   txns    : lignes lues (`harvest_{uid}_txn_*`, SELECT_TXN_PRO) · null/undefined = ratée ;
+//   releves : lignes lues (`harvest_{uid}_releve_*`, `id,l`) · null/undefined = ratée.
+// → { pro, txns, releve } pour `appliquerPrixPro`. Profil pas lu ⇒ pro null (rien ne change) ;
+//   compte pas Pro ⇒ les transactions ne servent pas (`pro` seul).
+export const SELECT_PROFIL_PRO = 'business:data->payload->user->business,business_account_id:data->payload->user->business_account_id,business_account:data->payload->user->business_account';
+export function lectureProDeLignes({ profil, txns, releves, typeCompte } = {}) {
+  const pro = Array.isArray(profil) && profil[0] && typeof typeCompte === 'function' ? typeCompte({ user: profil[0] }) : null;
+  if (pro !== true) return { pro };
+  const t = Array.isArray(txns) ? new Map(txns.filter((x) => x && x.tx).map((x) => [String(x.tx), x])) : null;
+  const r = Array.isArray(releves) ? relevesParTx(releves.flatMap((x) => (x && Array.isArray(x.l) ? x.l : []))) : null;
+  return { pro, txns: t, releve: r };
+}

@@ -40,6 +40,7 @@ import { envoyerSmtp, FOURNISSEURS, fournisseurDe, hoteValide, emailSur } from '
 import { gabaritMail } from './mail-gabarit.js';
 import { refusMarge, manquantsVendeur, manquantsVente, contenuFacture, numeroFacture, anneeParis, jourParis, nomFichier, MESSAGE_DEFAUT, emailFacture, adresseVintedLisible, emailValide } from '../../src/facturePro/regle.js';
 import { preuveAcheteur } from '../../src/facturePro/rattachement.js';
+import { ventesAvecPrixPro } from './prix-pro.js';   // (16 nov. au soir) la règle Pro de l'app (deux prix)
 import { pdfFacture } from '../../src/facturePro/pdf.js';
 import { configurationRelances } from './relances-essai.js';
 // (11 nov., lot ventes-lot) Une vente de plusieurs articles : la règle de l'app (src/venteLot.js),
@@ -162,7 +163,12 @@ export async function lirePreuveEtCommandes(owner, tx, brouillon) {
   const commandes = [];
   for (const v of ventes) {
     const uid = (String((v && v.id) || '').match(/^harvest_(\d+)_orders_sold$/) || [])[1] || '';
-    for (const c of Array.isArray(v && v.commandes) ? v.commandes : []) if (c && String(c.transaction_id) === String(tx)) commandes.push({ ...c, uid });
+    // (16 nov. au soir, lot deux-prix-compter) Sur un compte Vinted PRO, le prix de la vente est celui de la
+    // règle de l'app (src/vintedPro.js, via api/_lib/prix-pro.js) : liste > article de 2 € au plus ⇒ le prix
+    // de l'ARTICLE (celui de l'e-mail de vente) ; sinon inchangé, à part. La même preuve que dans l'app.
+    const siennes = (Array.isArray(v && v.commandes) ? v.commandes : []).filter((c) => c && String(c.transaction_id) === String(tx));
+    const posees = await ventesAvecPrixPro(uid, siennes, (q) => lireListe(q, owner), { tx });
+    for (const c of posees) commandes.push({ ...c, uid });
   }
   return { preuve: preuveAcheteur({ tx, mails, commandes, brouillon, adresseLisible: adresseVintedLisible }), commandes, mails };
 }

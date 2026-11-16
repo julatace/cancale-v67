@@ -81,6 +81,7 @@ import { lireMentions } from './_lib/mentions-legales.js';
 import { notifierComptesRelies } from './_lib/compte-relie.js';
 import { notifierModeration } from './_lib/moderation-notif.js';
 import { notifierAvisBas } from './_lib/avis-negatif.js';   // (11 nov.) le filet des avis négatifs
+import { ventesAvecPrixPro } from './_lib/prix-pro.js';   // (16 nov. au soir) la règle Pro de l'app (deux prix)
 import { demandesDuCron as demandesPrixAchat } from './_lib/prix-achat-demande.js';   // (11 nov., saisie rapide)
 // (9 nov.) Le transporteur des anciens bordereaux, relu dans le texte de leur e-mail.
 import { passeTransporteursAnciens, passeTransporteursPdf, reqPdf, avecRelus, REQ_RELUS, MAX_PDF_MATIN, BUDGET_PDF_MATIN_MS } from './_lib/transporteur-anciens.js';
@@ -320,6 +321,11 @@ async function lireDonneesBilan() {
       const um = String((l && l.id) || '').match(/^harvest_(.+?)_orders_sold$/);
       if (um) commandes[um[1]] = { orders: Array.isArray(l.orders) ? l.orders : [], txns: Array.isArray(l.txns) ? l.txns : null, cap: l.cap || null };
     }
+    // (16 nov. au soir, décision de Julien, lot deux-prix-compter) Sur un compte Vinted PRO, la règle des
+    // deux prix de l'app (`appliquerPrixPro`, src/vintedPro.js) est posée sur ses ventes AVANT le bilan :
+    // liste > article de 2 € au plus ⇒ prix de l'article ; sinon à part, dit. Une règle (§5).
+    const lireP = (q) => fetchPaginated(scoped(`app_data?${q}`));
+    await Promise.all(Object.entries(commandes).map(async ([u, c]) => { c.orders = await ventesAvecPrixPro(u, c.orders, lireP); }));
   }
   const mm = m === undefined ? null : objet(m);
   return {

@@ -428,4 +428,14 @@ export const datesDeVersement = (txn, releve, conversations, emails) => {
   return out;
 };
 
+export function typeCompteVinted(json) {
+  const u = json && typeof json === 'object' ? (json.user && typeof json.user === 'object' ? json.user : null) : null;
+  if (!u) return null;
+  const ba = u.business_account;
+  const baid = u.business_account_id;
+  if (u.business === true || (ba && typeof ba === 'object') || (baid != null && baid !== 0 && baid !== '')) return true;
+  if (u.business === false && (ba == null) && (baid == null || baid === 0 || baid === '')) return false;
+  return null;
+}
+
 export const compteEcarte = compteEcarteRegle;

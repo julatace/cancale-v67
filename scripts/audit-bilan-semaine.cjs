@@ -39,7 +39,9 @@ catch (e) { console.log('❌ analyseur Babel introuvable — ' + e.message); pro
 // règles Vestiaire que lisent `ventesFaites`/`ventesDeclarables` vivent dans
 // api/_lib/vestiaire-regle.js (un propriétaire, importé par l'app ET par le
 // miroir) : elles sont posées dans le contexte de l'app avant d'exécuter.
-const NOMS = ['classifyOrderStatus', 'tsCommande', 'montantCommande', 'montantCommandeLu', 'lbcAnnulee', 'lbcFinalisee', 'lbcExpediee', 'venteFinalisee', 'commandeEbayEngagee', 'montantRecuEbay', 'ymDeTs', 'indexDeclarations', 'moisDeclare', 'ventesDeclarables', 'ventesFaites', 'compteEcarteChoix', 'compteEcarteRegle', 'datesDeVersement'];
+const NOMS = ['classifyOrderStatus', 'tsCommande', 'montantCommande', 'montantCommandeLu', 'lbcAnnulee', 'lbcFinalisee', 'lbcExpediee', 'venteFinalisee', 'commandeEbayEngagee', 'montantRecuEbay', 'ymDeTs', 'indexDeclarations', 'moisDeclare', 'ventesDeclarables', 'ventesFaites', 'compteEcarteChoix', 'compteEcarteRegle', 'datesDeVersement', 'typeCompteVinted'];
+// (16 nov. au soir, lot deux-prix-compter) + `typeCompteVinted` (une déclaration `function`) : le serveur reconnaît
+// un compte Pro par la règle de l'app (= extension, audit-etat-compte) pour poser la règle des deux prix (src/vintedPro.js).
 // (9 nov., offres Solo/Pro) Dans l'app, `compteEcarte` = `compteEcarteRegle(uid, masques, panneau,
 // reglePlanCourante())` : le choix du vendeur OU une vente hors de son offre Solo (`venteHorsPlan`,
 // api/_lib/plan-regle.js, importé tel quel des deux côtés). (9 nov., suites serveur) Le serveur porte
@@ -56,6 +58,12 @@ function declarations(src, plugins) {
   const ast = parser.parse(src, { sourceType: 'module', plugins, errorRecovery: true, tokens: true });
   for (const n of ast.program.body) {
     const d0 = n.type === 'ExportNamedDeclaration' ? n.declaration : n;
+    if (d0 && d0.type === 'FunctionDeclaration' && d0.id && !out[d0.id.name]) {
+      const jetons = ast.tokens.filter((t) => t.start >= d0.start && t.end <= d0.end && t.type !== 'CommentLine' && t.type !== 'CommentBlock')
+        .map((t) => (t.type && t.type.label ? t.type.label : t.type) + ':' + (t.value === undefined ? '' : String(t.value)));
+      out[d0.id.name] = { texte: src.slice(d0.start, d0.end), jetons: jetons.join(' ') };
+      continue;
+    }
     if (!d0 || d0.type !== 'VariableDeclaration') continue;
     for (const d of d0.declarations) {
       const nom = d.id && d.id.name;

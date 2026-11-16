@@ -1049,7 +1049,7 @@ import { offresVestiaire, offresJourneeVc, euros as eurosOffre, resteAvant as re
 import frApp from "./i18n/langues/fr.js";
 ajouterSourceApp(frApp);
 import { detenteursAchat, texteDejaRelie, patchDelier, ecrituresDeplacer } from "./relierAutreAchat.js";
-import { appliquerPrixPro, relevesParTx as relevesProParTx, SELECT_TXN_PRO, ecartNonCompte } from "./vintedPro.js";   // (11 nov., lot vinted-pro)
+import { appliquerPrixPro, SELECT_TXN_PRO, SELECT_PROFIL_PRO, lectureProDeLignes, ecartNonCompte } from "./vintedPro.js";   // (11 nov., lot vinted-pro)
 import { AlerteArnaque, CompteurArnaque, PastilleArnaque } from "./AlerteArnaque.jsx";
 import { motifDeLApercu } from "./antiArnaque.js";
 // (11 nov., anti-arnaque) Un fil Vinted lu pour la règle : seuls les messages PROUVÉS de l'autre (`autre`) comptent.
@@ -10994,16 +10994,15 @@ const posteSansDepart = ({ o, cocheLe, captureAt, joursLimite, vuParTransporteur
 const lecturePrixPro = (uid) => cachedRow(`prixpro_${uid}`, async () => {
   const u = String(uid || '');
   if (!/^\d{1,20}$/.test(u)) return { pro: null };
-  const p = await lireTout(`id=eq.harvest_${u}_profile&select=business:data->payload->user->business,business_account_id:data->payload->user->business_account_id,business_account:data->payload->user->business_account`, { strict: true }).catch(() => null);
-  const pro = Array.isArray(p) && p[0] ? typeCompteVinted({ user: p[0] }) : null;
-  if (pro !== true) return { pro };
+  // (16 nov. au soir) La mise en forme est celle du serveur (`lectureProDeLignes`, src/vintedPro.js) : une règle.
+  const p = await lireTout(`id=eq.harvest_${u}_profile&select=${SELECT_PROFIL_PRO}`, { strict: true }).catch(() => null);
+  const l0 = lectureProDeLignes({ profil: p, typeCompte: typeCompteVinted });
+  if (l0.pro !== true) return l0;
   const [t, r] = await Promise.all([
     lireTout(`id=like.harvest_${u}_txn_*&select=${SELECT_TXN_PRO}`, { strict: true }).catch(() => null),
     lireTout(`id=like.harvest_${u}_releve_*&select=id,l:data->lignes`, { strict: true }).catch(() => null),
   ]);
-  const txns = Array.isArray(t) ? new Map(t.filter((x) => x && x.tx).map((x) => [String(x.tx), x])) : null;
-  const releve = Array.isArray(r) ? relevesProParTx(r.flatMap((x) => (x && Array.isArray(x.l) ? x.l : []))) : null;
-  return { pro, txns, releve };
+  return lectureProDeLignes({ profil: p, txns: t, releves: r, typeCompte: typeCompteVinted });
 });
 const appliquerPrixProCompte = async (uid, items) => {
   try { const l = await lecturePrixPro(uid); return appliquerPrixPro(items, l || {}); } catch (_) { return items; }
