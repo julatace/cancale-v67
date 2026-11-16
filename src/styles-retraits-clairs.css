@@ -68,7 +68,6 @@
   :root:root:root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] .vrm-rpf-ligne[data-rp-a-qr] .vrm-rpf-qr .vrm-rpf-qr-long { display: inline !important; }
   :root:root:root:root:root:root:root:root:root:root body .vrm-tache[data-tache="achats"] .vrm-rpf-ligne[data-rp-a-qr] .vrm-rpf-qr .vrm-rpf-qr-court { display: none !important; }
 }
-}
 /* Le n° de suivi : coupé à l'écran, copié en entier au toucher (le tiret du bas dit qu'il se touche). */
 :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-suivi-copie { cursor: copy; text-decoration: underline dotted; text-underline-offset: 3px; }
 :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-suivi-copie[data-rp-suivi-copie-etat="copie"] { text-decoration: none; color: var(--p-encre, currentColor); }
