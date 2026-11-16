@@ -242,7 +242,10 @@ const iso = (j) => new Date(NOW - j * J).toISOString();
     // (11 nov.) Ma journée v2 range ses cartes dans une liste (`[{ el: carteARelier() }]`) ; même règle : UNE carte.
     dit((/\{comptesARelierJour\.length \? (?:carteARelier\(\)|P\(carteARelier\(\)\)) : null\}/.test(APP) || /\.\.\.\(comptesARelierJour\.length \? \[\{ el: carteARelier\(\) \}\] : \[\]\)/.test(APP)
       // (11 nov., lot journee-perso) les cartes de Ma journée sont rangées par id dans SON ordre (`blocsAF`)
-      || /'a-relier': comptesARelierJour\.length \? \[carteARelier\(\)\] : \[\],/.test(APP)) && /\(comptesARelierJour\.length \? 1 : 0\)/.test(APP), 'R7 Ma journée : UNE carte, comptée dans « N gestes »');
+      || /'a-relier': comptesARelierJour\.length \? \[carteARelier\(\)\] : \[\],/.test(APP)
+      // (16 nov.) Décision du 15 nov. (refonte-journee, récit §5) : la carte sort de la liste vers la feuille « Tout va bien ? »
+      // (`tvbCartes`, la MÊME carte, le même geste) ; elle reste UNE et comptée.
+      || /const tvbCartes = \[[\s\S]{0,600}?\.\.\.\(comptesARelierJour\.length \? \[carteARelier\(\)\] : \[\]\),/.test(APP)) && /\(comptesARelierJour\.length \? 1 : 0\)/.test(APP), 'R7 Ma journée : UNE carte, comptée dans « N gestes »');
     // (11 nov.) Depuis le 10 nov. (6f60bc8b) Colis lit aussi la règle (la marque sur les cartes des comptes muets).
     dit(/useComptesARelier\(accounts, only === 'journee'(?: \|\| only === 'bordereaux')?\)/.test(APP), 'R7 Ma journée (et Colis) seulement lisent la règle');
   });

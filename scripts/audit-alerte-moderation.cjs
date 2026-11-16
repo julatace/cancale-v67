@@ -120,9 +120,10 @@ async function regle(R) {
   dit(n1.length === 2 && n2.length === 0, 'R14 déjà notifié ⇒ rien');
   dit(R.aNotifierModeration([{ ...evts[0], t: Date.now() - 4 * J }], {}).length === 0, 'R14b plus de 3 jours ⇒ aucune notification (pas de rattrapage tardif)');
   const tx = R.texteNotifModeration(n1, { nomCompte: () => 'shop_a' });
-  dit(!!tx && /shop_a/.test(tx.title) && /1 annonce masquée/.test(tx.title) && /1 annonce disparue/.test(tx.title), 'R15 UNE notification pour le lot', JSON.stringify(tx));
+  // (16 nov.) Titre ≤ 40 signes (notif-redaction) : ce qui est arrivé peut passer en tête du corps — jamais perdu, corps ≤ 90.
+  dit(!!tx && /shop_a/.test(tx.title) && tx.title.length <= 40 && tx.body.length <= 90 && /1 annonce masquée/i.test(tx.title + ' ' + tx.body) && /1 annonce disparue/i.test(tx.title + ' ' + tx.body), 'R15 UNE notification pour le lot', JSON.stringify(tx));
   const tb = R.texteNotifModeration([{ s: 'banni', compte: '111', t: 1, cle: 'a' }, { s: 'masquee', compte: '111', t: 1, cle: 'b', a: '1000001' }], { nomCompte: () => 'shop_a' });
-  dit(/compte fermé/.test(tb.title) && /Pause conseillée/.test(tb.body), 'R15b compte fermé : le plus grave d’abord, la pause conseillée');
+  dit((/compte fermé/.test(tb.title) || /^Compte fermé/.test(tb.body)) && /Pause conseillée/.test(tb.body) && tb.title.length <= 40 && tb.body.length <= 90, 'R15b compte fermé : le plus grave d’abord, la pause conseillée', JSON.stringify(tb));
 }
 
 // ── E. LE VRAI background.js ─────────────────────────────────────────────────

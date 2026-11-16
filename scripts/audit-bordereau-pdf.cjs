@@ -81,6 +81,8 @@ const essai = async (nom, reponses, attenduOk, attenduEssais) => {
         activeAccountId: async () => '42',
         ...(regleAx ? {} : { AWAITING_SHIP: (st) => /bordereau|paiement/i.test(String(st || '')) }),
         logActivity: (m) => { journal.push(String(m)); },
+        // (16 nov.) 5.377 : un bordereau rangé est ANNONCÉ à l'app (`annoncerCapte`, hors de ce bloc) — servi ici, sans réseau.
+        annoncerCapte: async () => null,
         // ⚠️ `_label_*` est un balayage de famille NON BORNÉ : le code le lit
         //    désormais en PAGINÉ (`sbGetTout`, §4.5). Le vm doit donc le fournir,
         //    sinon l'appel lève et le cas « un seul colis » tombe — artefact de

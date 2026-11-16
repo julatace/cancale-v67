@@ -21,7 +21,7 @@ import { suivreDemarrage, etapeDemarrage } from './demarrage.js';
 // (15 nov., chantier « ouverture ») Un morceau de l'app qui ne se charge pas : relancé une fois, puis
 // rechargement PROPRE vers la nouvelle version, sinon « Mettre à jour VRM » — jamais un écran tombé ni
 // `undefined … default` (src/chargementSur.js).
-import { lazySur, verifierMorceauPerime, rechargerVersNouvelle, estErreurMorceau } from './chargementSur.js';
+import { lazySur, verifierMorceauPerime, rechargerVersNouvelle, estErreurMorceau, relancerFeuilles } from './chargementSur.js';
 import MettreAJourVRM from './composants/MettreAJourVRM.jsx';
 import { ecouterPlantages, ecouterViolationsCsp, noterPlantage, compterMorceauPerime } from './plantages.js';
 // Le journal des plantages écoute dès le démarrage : une erreur AVANT que l'app
@@ -70,6 +70,9 @@ if (typeof window !== 'undefined') {
     // version et par onglet) ; même version ou pas de réseau ⇒ rien (l'écran relance son morceau, puis
     // « Mettre à jour VRM »). src/chargementSur.js.
     verifierMorceauPerime('preload');
+    // (16 nov., parcours-vert) Une feuille refusée reste « déjà vue » pour Vite : la reposer une fois, sinon l'app
+    // s'affiche sans aucune mise en forme (banc session-reveil D). Même version : aucun rechargement.
+    setTimeout(() => { relancerFeuilles(); }, 450);
   });
 }
 // L'app n'est téléchargée que par ceux qui y entrent : un visiteur qui lit la
