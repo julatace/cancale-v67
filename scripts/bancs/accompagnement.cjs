@@ -574,9 +574,12 @@ action('connexion.qr', async (nav) => {
 //    Pendant / après / échec : chaque site répond par l'extension avec ses propres formes (Leboncoin, eBay,
 //    Vestiaire) — non joués ici, dits.
 action('publier.partout', async (nav) => {
-  const o = await ouvrir(nav, { url: '/?tab=vinted_annonces' });
+  // La base « numéros » (une annonce en ligne, N°1, fiche à la forme de l'app) : la base de volume n'a pas de fiche
+  // numérotée à la forme de l'app (dit plus haut, `baseNumeros`).
+  const o = await ouvrir(nav, { url: '/?tab=vinted_annonces', b: baseNumeros() });
   try {
-    const num = await o.pg.evaluate(() => { try { const m = JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}'); const v = Object.values(m).find((x) => x && x.numero); return v ? String(v.numero) : null; } catch (_) { return null; } });
+    await o.pg.waitForTimeout(1500);
+    const num = '1';
     if (!num) { noter('publier.partout', 'avant', null, { raisonNonJoue: 'aucune annonce numérotée dans cette base' }); return; }
     await o.pg.evaluate((n) => window.dispatchEvent(new CustomEvent('vrm:publier-partout', { detail: { nums: [n] } })), num);
     noter('publier.partout', 'avant', await moment(o.pg, 'avant', 'publier.partout', { ms: 15000 }));

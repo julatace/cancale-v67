@@ -194,6 +194,11 @@ async function popup(pg, mobile, tag, { ligne, nom, attendu, quoi }) {
   await capture(pg, `${tag.replace(/\s+/g, '-')}-${nom}-popup`);
   await toucher(pg, '[data-feuille-croix]', mobile);
   dit(await corps.waitFor({ state: 'detached', timeout: 4000 }).then(() => true).catch(() => false), `${tag} : ${quoi} — la croix la ferme`);
+  // (16 nov.) La ligne peut vivre dans « À faire · N » (une feuille que la pop-up referme) : on la rouvre.
+  if (!(await pg.locator(ligne).filter({ visible: true }).count()) && await pg.locator('[data-ui-afaire]').filter({ visible: true }).count()) {
+    await pg.locator('[data-ui-afaire]').filter({ visible: true }).first().evaluate((e) => e.click());
+    await pg.locator(ligne).filter({ visible: true }).first().waitFor({ timeout: 5000 }).catch(() => {});
+  }
   await toucher(pg, `${ligne} [data-popup-ouvrir]`, mobile);
   await corps.waitFor({ timeout: 4000 }).catch(() => {});
   await pg.keyboard.press('Escape');

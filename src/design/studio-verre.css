@@ -235,7 +235,7 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
   .vrm-argent-partie > :is(.vrm-compta-q, .vrm-ac-section, details.vrm-compta-repli), .vrm-stats-vitrine > :is(.vrm-sv-sous-titre, details.vrm-stats-repli),
   .vrm-statistiques-premium > :is(.vrm-lien-action, .vrm-fc, .vrm-cv, .vrm-ac-section),
   .vrm-set-retour, .vrm-set-sous-h, .vrm-boite-vide-lecture,
-  .vrm-sel-tete, .vrm-sel-astuce, .vrm-sel-compte
+  .vrm-sel-tete, .vrm-sel-astuce, .vrm-sel-compte, .vrm-ann-stock-tools > summary, [data-places-wrap] > summary
 ) {
   --sb-encre: var(--sv-clair) !important; --d-encre: var(--sv-clair) !important; --vrm-ink: var(--sv-clair) !important; --vrm-text: var(--sv-clair) !important;
   --p-encre: var(--sv-clair) !important; --w-encre: var(--sv-clair) !important; --fu-encre: var(--sv-clair) !important; --bx-encre: var(--sv-clair) !important;

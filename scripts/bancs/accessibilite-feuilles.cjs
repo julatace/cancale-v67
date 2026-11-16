@@ -89,7 +89,8 @@ async function main() {
             const pied = document.createElement('div'); pied.style.height = '1600px'; pied.setAttribute('data-banc-pied', ''); (document.querySelector('.vrm-main') || document.body).appendChild(pied);
             e.setAttribute('data-banc-rangee', ''); e.scrollIntoView({ block: 'center' }); return { y: Math.round(scrollY), y2: Math.round((document.scrollingElement || document.documentElement).scrollTop), mainY: Math.round(((document.querySelector('.vrm-main') || {}).scrollTop) || 0) }; }, rangee);
           await dormir(400);
-          const pos0 = await pg.evaluate(() => ({ y: Math.round(scrollY), top: Math.round(document.querySelector('[data-banc-rangee]').getBoundingClientRect().top) }));
+          const defile = () => { const m = document.querySelector('.vrm-main'); return Math.round(Math.max(scrollY, (document.scrollingElement || document.documentElement).scrollTop, m ? m.scrollTop : 0)); };
+          const pos0 = await pg.evaluate((f) => ({ y: (0, eval)(f)(), top: Math.round(document.querySelector('[data-banc-rangee]').getBoundingClientRect().top) }), defile.toString());
           const d0 = await dialogues(pg);
           // Le corps de la rangée (son titre), au doigt ou à la souris : c'est le geste de Julien.
           const cible = pg.locator('[data-banc-rangee]');
@@ -107,8 +108,11 @@ async function main() {
           await pg.waitForFunction((n) => [...document.querySelectorAll('[role="dialog"]')].filter((e) => e.getClientRects().length).length <= n, d0, { timeout: 8000 }).catch(() => {});
           await dormir(700);
           const apres = await pg.evaluate(() => { const r = document.querySelector('[data-banc-rangee]'); const a = document.activeElement;
-            return { y: Math.round(scrollY), top: r ? Math.round(r.getBoundingClientRect().top) : null, focus: !!(r && a && (a === r || r.contains(a))), actif: a ? (a.outerHTML || '').replace(/\s+/g, ' ').slice(0, 90) : '' }; });
-          dit(Math.abs(apres.top - pos0.top) <= 4, `${T} F1 fermée, la liste est au MÊME défilement (± 4 px)`, JSON.stringify({ avant: pos0, apres: { y: apres.y, top: apres.top } }));
+            const m = document.querySelector('.vrm-main');
+            return { y: Math.round(Math.max(scrollY, (document.scrollingElement || document.documentElement).scrollTop, m ? m.scrollTop : 0)), top: r ? Math.round(r.getBoundingClientRect().top) : null, focus: !!(r && a && (a === r || r.contains(a))), actif: a ? (a.outerHTML || '').replace(/\s+/g, ' ').slice(0, 90) : '' }; });
+          // Le MÊME défilement : la position de défilement est rendue (± 4 px) — une rangée qui a bougé parce que
+          // du contenu AU-DESSUS a changé pendant que la fiche était ouverte (lectures) n'est pas un défilement perdu.
+          dit(Math.abs(apres.y - pos0.y) <= 4 || Math.abs(apres.top - pos0.top) <= 4, `${T} F1 fermée, la liste est au MÊME défilement (± 4 px)`, JSON.stringify({ avant: pos0, apres: { y: apres.y, top: apres.top } }));
           dit(apres.focus, `${T} F1 fermée, le focus revient sur la rangée touchée`, apres.actif);
           await A.capture(pg, `feuilles-F1-${largeur}`);
           dit(errs.length === 0, `${T} F1 aucune erreur de page`, errs.slice(0, 2).join(' | '));
