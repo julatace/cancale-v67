@@ -287,7 +287,9 @@ async function unSeul(b, vue) {
       const lignes = titres.map((t) => { const el = [...document.querySelectorAll('body *')].find((e) => e.children.length === 0 && (e.textContent || '').trim() === t && e.getBoundingClientRect().width > 0); return el ? r(el) : '—'; });
       return { bouton: t(bt), lignes: lignes.join(' | '), occupe: bt.hasAttribute('data-occupe'), texte: bt.innerText.trim() }; }, [sel, V.map((v) => v.titre)]);
     let avant = await rects();
-    for (let i = 0; i < 20; i++) { await pg.waitForTimeout(250); const a2 = await rects(); if (JSON.stringify(a2) === JSON.stringify(avant)) break; avant = a2; }
+    // Posée = 2 s sans rien qui change (les lectures de fond peuvent encore glisser une ligne au-dessus) : ce qui bouge
+    // APRÈS, c'est le geste.
+    for (let i = 0, egaux = 0; i < 60 && egaux < 8; i++) { await pg.waitForTimeout(250); const a2 = await rects(); egaux = JSON.stringify(a2) === JSON.stringify(avant) ? egaux + 1 : 0; avant = a2; }
     await shot(pg, `${vue}-rien-ne-bouge-avant`);
     await toucher(o, sel);
     await pg.waitForTimeout(80);
@@ -337,7 +339,7 @@ async function bordPret(b, vue) {
       await toucher(o, sel1);
       await pg.waitForTimeout(80);
       const r1 = await pg.locator(sel1).first().boundingBox().catch(() => null);
-      dit(r0 && r1 && ['x', 'y', 'width', 'height'].every((k) => Math.abs(r0[k] - r1[k]) < 1), `${nom} : B0 le bouton d'UN bordereau ne bouge pas et garde sa taille pendant la préparation`, JSON.stringify({ r0, r1 }));
+      dit(r0 && r1 && ['x', 'y', 'width', 'height'].every((k) => Math.abs(r0[k] - r1[k]) <= 1.5) /* ≤ 1,5 px : l'arrondi d'une feuille posée au ressort ; « la ligne bouge » mesurait 24 px */, `${nom} : B0 le bouton d'UN bordereau ne bouge pas et garde sa taille pendant la préparation`, JSON.stringify({ r0, r1 }));
     } else {
       const ok = await pg.evaluate(() => { const e = document.querySelector('[data-lg-imprimer]'); if (!e) return false; e.click(); return true; });
       dit(ok, `${nom} : B0 le geste « Imprimer » d'UNE vente existe (action de la ligne)`);
@@ -349,6 +351,8 @@ async function bordPret(b, vue) {
     const pret = await attendre(pg, () => { const f = document.querySelector('[data-bord-pret]'); return f && f.querySelector('[data-bord-pret-apercu="ok"]'); }, null, 60000);
     await pg.evaluate(() => { const f = document.querySelector('[data-visionneuse-fermer]'); if (f) f.click(); });
     await pg.waitForTimeout(500);
+    // La visionneuse fermée part en fondu : on attend (5 s au plus) que « Imprimer » soit au premier plan.
+    await attendre(pg, () => { const bi = document.querySelector('[data-bord-pret] [data-bord-imprimer]'); const rb = bi && bi.getBoundingClientRect(); return !!(rb && rb.width > 0 && bi.contains(document.elementFromPoint(rb.x + rb.width / 2, rb.y + rb.height / 2))); }, null, 5000);
     const feuille = await pg.evaluate(() => { const f = document.querySelector('[data-bord-pret]'); if (!f) return null;
       // AU-DESSUS de tout (la fiche de la vente est à 9000, sa feuille « ⋯ » à 9100) : le point au centre de
       // « Imprimer » est bien ce bouton.
