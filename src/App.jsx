@@ -1865,6 +1865,26 @@ const lireEmpreintesPhotos = async () => {
     return out;
   } catch (_) { return null; }
 };
+// (16 nov., extension 5.395) Les photos que l'ATELIER « Republier » a réglées dans l'extension : leur empreinte,
+// le N°, l'annonce d'origine (`photo_vrm_{uid}`, payload.photos). Projection, toutes les lignes ; lecture ratée ⇒ `null`.
+const lirePhotosVrmExtension = async () => {
+  try {
+    const out = [];
+    for (let debut = 0; debut < 20000; debut += 1000) {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=like.photo_vrm_*&select=id,p:data->payload->photos`, { headers: sbAuth({ Range: `${debut}-${debut + 999}` }) });
+      if (!r.ok) return null;
+      const j = await r.json();
+      if (!Array.isArray(j)) return null;
+      for (const l of j) {
+        const m = /^photo_vrm_(\d{1,15})$/.exec(String(l && l.id || ''));
+        if (!m || !l.p || typeof l.p !== 'object') continue;
+        for (const [h, e] of Object.entries(l.p)) if (e && typeof e === 'object') out.push({ h, n: e.n, src: e.src, uid: m[1], at: e.at });
+      }
+      if (j.length < 1000) break;
+    }
+    return out;
+  } catch (_) { return null; }
+};
 const sbAuth = (extra) => {
   // Le jeton du vendeur ne sert QUE si la base sait s'en servir. Avant la
   // migration on garde la clé publique : le rôle « connecté » n'a pas forcément
@@ -26554,12 +26574,26 @@ function empreintesEbayPage(autres, deja) {
   if (!aFaire.length) return Promise.resolve(0);
   _ebayEmpEnCours = (async () => {
     const calc = {};
+    const refusees = [];
     for (const a of aFaire) {
       if (!AUTH.user?.id) break;
       const h = await empreinteImageLocale(a.photo);
       _ebayEmpFaites++;
       if (h) calc[a.id] = { ...(calc[a.id] || {}), [clePhotoEmpreinte(a.photo)]: h };
+      else if (/^https:\/\/i\.ebayimg\.com\//i.test(a.photo)) refusees.push(a);
       await new Promise((ok) => setTimeout(ok, 1500));
+    }
+    // (16 nov., extension 5.395) Une photo `i.ebayimg.com` que la page ne peut pas lire (CORS) : l'extension
+    // de CE navigateur (droit d'hôte `i.ebayimg.com`) rend son EMPREINTE seule, 5 par demande. Pas d'extension
+    // à jour ⇒ la photo reste « pas vérifiée » (jamais devinée).
+    const extE = extSait('empreinteebay') === 'ok' ? String((__vmrEtat && __vmrEtat.ok && __vmrEtat.ext) || '') : '';
+    for (let i = 0; extE && i < refusees.length; i += 5) {
+      if (!AUTH.user?.id) break;
+      const lot = refusees.slice(i, i + 5);
+      const rep = await versExtension(extE, { type: 'empreinteImage', urls: lot.map((a) => a.photo) }, 120000).catch(() => null);
+      if (!rep || !rep.ok || !rep.h || typeof rep.h !== 'object') break;
+      for (const a of lot) { const h = rep.h[a.photo]; if (typeof h === 'string' && /^[0-9a-f]{96}$/.test(h)) calc[a.id] = { ...(calc[a.id] || {}), [clePhotoEmpreinte(a.photo)]: h }; }
+      if (rep.plein) break;
     }
     if (!Object.keys(calc).length) return 0;
     const owner = AUTH.user?.id;
@@ -41758,7 +41792,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   useEffect(() => {
     if (!cloudReady || cleAnnoncesEmpreintes == null) return undefined;
     let vivant = true;
-    lireEmpreintesPhotos().then((e) => { if (vivant) setEmpreintesVinted(e); }, () => { if (vivant) setEmpreintesVinted(null); });
+    // (16 nov.) Le registre de l'extension (photos réglées par l'atelier) entre au registre AVANT la numérotation
+    // (elle attend `empreintesVinted`). Lecture ratée ⇒ rien ajouté (le registre de l'appareil reste).
+    Promise.all([lireEmpreintesPhotos(), lirePhotosVrmExtension().catch(() => null)]).then(([e, ext]) => {
+      if (!vivant) return;
+      if (Array.isArray(ext) && ext.length) { try { const r = ajouterAuRegistre(load(CLE_PHOTOS_VRM, {}), ext); if (r) save(CLE_PHOTOS_VRM, r); } catch (_) {} }
+      setEmpreintesVinted(e);
+    }, () => { if (vivant) setEmpreintesVinted(null); });
     return () => { vivant = false; };
   }, [cloudReady, cleAnnoncesEmpreintes]);
   // Les propositions « N°42 republiée ? » (Ma journée) et le signal d'une réponse (relance la numérotation).
@@ -53500,7 +53540,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           part Vinted des fils est VIDE (rien à lire), pas « Lecture… » à l'infini. */}
       {curSub==='messages' && filTous && <NoAcc/>}
       {curSub==='messages' && filTous && <FilsTous
-        vinted={noAcc ? [] : convs.items==null ? (convs.error ? null : undefined) : (convs.items||[]).filter(c=>{ const u=String((c._acc&&c._acc.vinted_user_id)||''); return accountUids.has(u)&&!acctOffOf(c)&&!conversationRetiree(convRetirees,u,c); }).map(c=>{ const u=String(c._acc.vinted_user_id); const o=offresConv instanceof Map ? (offresConv.get(`${u}_${c.id}`) || null) : null; const oo=o&&offresConfirmees.current.has(cleOffreVinted(u,o))?null:offreOuverte(o,u,lectureOffres); return { c, paire: paireDeConv(u, c.id, null), compte: accName(c._acc), offre: oo }; })}
+        vinted={noAcc ? [] : convs.items==null ? (convs.error ? null : undefined) : (convs.items||[]).filter(c=>{ const u=String((c._acc&&c._acc.vinted_user_id)||''); return accountUids.has(u)&&!acctOffOf(c)&&!conversationRetiree(convRetirees,u,c); }).map(c=>{ const u=String(c._acc.vinted_user_id); const o=offresConv instanceof Map ? (offresConv.get(`${u}_${c.id}`) || null) : null; const oo=o&&offresConfirmees.current.has(cleOffreVinted(u,o))?null:offreOuverte(o,u,lectureOffres); const paire=paireDeConv(u, c.id, null); /* (16 nov., anti-arnaque) le dernier message du FIL capté, auteur PROUVÉ — la même règle que la liste Vinted (motifConv) */ const ex=extraitConversation(c, paire&&paire.r, paire&&paire.titre, normTitle); const dernier = ex.kind==='message' && ex.source==='fil' && !ex.vinted && (ex.de==='eux'||ex.de==='toi') ? { texte: ex.texte, deMoi: ex.de==='toi' } : null; return { c, paire, compte: accName(c._acc), offre: oo, dernier }; })}
         compteOnglet={compteConnecte}
         vintedOuvert={openConv ? String(openConv.acc?.vinted_user_id||'')+':'+String(openConv.convId) : ''}
         ouvrirVinted={(c)=>openConversation(c)} fermerVinted={()=>setOpenConv(null)} rendreVinted={()=>rendreConversation()}
