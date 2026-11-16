@@ -121,7 +121,7 @@ export function avecIdentites(res, ident) {
   for (const p of reconnues) { if (!reconnuesParNumero.has(p.numero)) reconnuesParNumero.set(p.numero, []); reconnuesParNumero.get(p.numero).push(p); }
   const nARelier = propositions.length + ambigus.filter((x) => x.raison !== 'sans-numero').length;
   const nSurs = propositions.filter((p) => p.etat === 'sur').length;
-  return { ...res, propositions, reconnues, parNumero, reconnuesParNumero, nARelier, nSurs, nAVerifier: nARelier - nSurs, nReconnues: reconnues.length };
+  return { ...res, propositions, ambigus, reconnues, parNumero, reconnuesParNumero, nARelier, nSurs, nAVerifier: nARelier - nSurs, nReconnues: reconnues.length };
 }
 
 // Les deux sources réunies : le CODE d'abord (exact), la ressemblance ensuite (si allumée) là où le code ne dit rien.
