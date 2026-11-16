@@ -61,7 +61,9 @@ export const lienVinted = (a) => (/^https:\/\/www\.vinted\.[a-z.]+\//.test(Strin
 // est à ≤ `seuil`, l'une pour l'autre leur SEULE annonce proche (toutes annonces et tous
 // comptes confondus, même compte compris). Une photo proche de 3 annonces ou plus est
 // générique (une boîte, un fond) ou une série de paires identiques : rien.
-export function apparieParEmpreinte(photos, { seuil = SEUIL_MEME_PHOTO } = {}) {
+// (16 nov., lot doublons-meme-compte) `memeCompte: true` : les appariements d’un MÊME compte (src/doublonsCompte.js),
+// les mêmes règles (seuil strict, unique et mutuel) — seul le dernier tri change.
+export function apparieParEmpreinte(photos, { seuil = SEUIL_MEME_PHOTO, memeCompte = false } = {}) {
   if (!photos || !photos.lu || !photos.empreintes) return [];
   const points = [];
   for (const a of arr(photos.annonces)) {
@@ -92,7 +94,7 @@ export function apparieParEmpreinte(photos, { seuil = SEUIL_MEME_PHOTO } = {}) {
     const [y, d] = [...m][0];
     const my = proches.get(y);
     if (!my || my.size !== 1 || !my.has(x)) continue;   // l'appariement doit être mutuel et unique
-    if (compteDe.get(x) === compteDe.get(y)) continue;  // même compte : pas « deux comptes »
+    if ((compteDe.get(x) === compteDe.get(y)) !== memeCompte) continue;  // même compte : pas « deux comptes » (ou SEULEMENT lui)
     const k = cleCouple([x, y]);
     if (vus.has(k)) continue;
     vus.add(k);

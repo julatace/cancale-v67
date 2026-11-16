@@ -61,4 +61,18 @@ export default {
   "vp.loupe.stockSeul": "Gelagert, ohne Anzeige",
   "vp.loupe.retourInfo": "Rücksendung zu verschicken",
   "vp.loupe.parRangement": "Lagerplatz",
+  // (16 nov., lot doublons-meme-compte) deux annonces d’un même compte, une paire
+  "doublons.titre": "{n} Anzeigen von {compte} sind dasselbe Paar",
+  "doublons.titreNum": "{n} Anzeigen von {compte} sind dasselbe Paar (Nr. {num})",
+  "doublons.titreVerifier": "{n} Anzeigen von {compte} sind vielleicht dasselbe Paar",
+  "doublons.titreVerifierNum": "{n} Anzeigen von {compte} sind vielleicht dasselbe Paar (Nr. {num})",
+  "doublons.titrePlusieurs": "{n} Paare doppelt auf einem Konto",
+  "doublons.detailSur": "Gleiches Konto · entferne die überzählige",
+  "doublons.detailVerifier": "Gleiches Konto · vielleicht · zu prüfen",
+  "doublons.voirLesDeux": "Beide ansehen",
+  "doublons.voir": "Ansehen",
+  "doublons.preuveEmpreinte": "fast identisches Foto, zu prüfen",
+  "doublons.carte": "{n} Anzeigen, 1 Paar",
+  "doublons.carteNum": "Nr. {num} · {n} Anzeigen, 1 Paar",
+  "doublons.geste": "Entferne die überzählige auf Vinted.",
 };

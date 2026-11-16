@@ -902,6 +902,7 @@ import { MemePhotoHote, LigneMemePhoto, LigneMemePhotoNumero, texteMemePhoto, us
 import { clePhotoEmpreinte, SEUIL_PHOTO } from "./photoEmpreinte.js";
 import { groupesParCompte, initialeCompte, remisesSurVignettes } from "./annoncesGrille.js";   // (10 nov., lot AM) Annonces en grille, par compte
 import { EnLigneDeuxFoisDetail, EnLigneDeuxFoisAlerte } from "./EnLigneDeuxFois.jsx";
+import { doublonsMemeCompte, republicationsEnCours, texteDoublonsCompte } from "./doublonsCompte.js";   // (16 nov.) deux annonces d’un même compte, une paire
 import { groupesDeuxComptes, memesPairesFiches, CLE_REFUS_DEUX_COMPTES, CLE_RETRAITS_DEUX_COMPTES, marquesUtiles, reglees as retraitsRegles, texteDeuxComptes } from "./deuxComptes.js";
 import { DeuxComptesDetail, DeuxComptesAlerte, texteEtDe } from "./DeuxComptes.jsx";
 import { CLE_JOURNAL_NUMEROS, evenementsNumeroFiches, ajouterAuJournal, historiqueNumero } from "./historiqueNumero.js";
@@ -34660,7 +34661,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // avec SES réglages figés ; 'modifier' = il la rouvre pour la changer (rien ne part).
   const [repubProg, setRepubProg] = useState(null);
   const [progsRepub] = useProgrammesRepub(only==='annonces');
-  const journalRepub = useJournalRepub(only==='annonces');
+  // (16 nov., lot doublons-meme-compte) Lu aussi par Ma journée : une republication EN COURS n'est pas un doublon.
+  const journalRepub = useJournalRepub(only==='annonces' || only==='journee');
   const ouvrirProgramme = (prog, mode) => { if (!prog) return; setRepubProg({ prog, mode }); setRepubReprise(prog.ids.slice()); setRepubDepart(true); setRepubCle(c=>c+1); setRepubAction(prog.action); };
   useEffect(() => {
     if (only!=='annonces') return undefined;
@@ -37632,6 +37634,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const deuxComptesTexte = deuxComptes && deuxComptes.groupes.length ? texteDeuxComptes(deuxComptes.groupes, tr, texteEtDe) : null;
   // UN endroit : un groupe dit ici sort des cartes voisines (« en ligne deux fois », « photos en double »).
   const idsDeuxComptes = useMemo(() => new Set((deuxComptes ? deuxComptes.groupes : []).flatMap((g) => g.annonces.map((a) => String(a.id)))), [deuxComptes]);
+  // (16 nov., lot doublons-meme-compte) DEUX ANNONCES D'UN MÊME COMPTE, UNE PAIRE (src/doublonsCompte.js) : les groupes
+  // « même compte » de `enLigneDeux` (photo exacte, `recreeDe`, fusion : sûrs) + la même photo à l'EMPREINTE, au seuil
+  // strict, unique et mutuelle (« peut-être ») — jamais le titre ; le même N° reste au bloc rouge (§5). Une
+  // republication EN COURS (l'opération de cet appareil, le journal de moins de 2 h) n'est pas un doublon.
+  const [opRepubDoublons, setOpRepubDoublons] = useState(() => lireJournalRepub());
+  useEffect(() => { const f = () => setOpRepubDoublons(lireJournalRepub()); window.addEventListener('vrm:journal-repub', f); return () => window.removeEventListener('vrm:journal-repub', f); }, []);
+  const doublonsCompte = useMemo(() => (enLigneDeux ? doublonsMemeCompte({ enLigneDeux, photos: photosComptes, infoDe: (id) => infoDeuxParId.get(String(id)) || null,
+    republication: republicationsEnCours({ journal: journalRepub || null, operation: opRepubDoublons, fiches: numeros }) }) : null),
+    [enLigneDeux, photosComptes, infoDeuxParId, journalRepub, opRepubDoublons, numeros]);
+  // Ce que Ma journée et Annonces DISENT (une source, §11) : les groupes d'un même compte ci-dessus, puis ceux
+  // sur deux comptes que « Deux comptes, une paire » ne dit pas déjà.
+  const deuxFoisADire = useMemo(() => [
+    ...(doublonsCompte ? doublonsCompte.groupes : []),
+    ...(enLigneDeux && enLigneDeux.vinted.length ? enLigneDeux.vinted : []).filter((g) => !g.memeCompte && !(g.comptes && g.comptes.length >= 2 && g.annonces.filter((a) => a.plat === 'vinted').every((a) => idsDeuxComptes.has(String(a.id))))),
+  ], [doublonsCompte, enLigneDeux, idsDeuxComptes]);
   // (29 oct.) La lecture des annonces telle que la règle de l'offre la juge
   // (`annonceOffreEnVente`) : la MÊME que l'écran Annonces (§11) — en ligne, à
   // confirmer, masquées, brouillons, l'heure de la lecture qui fait foi par compte
@@ -39460,7 +39477,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (11 nov., limites-client) La grille se rend par paquets : la suite arrive au défilement (SuitePaquets).
   const annPlus = React.useCallback(() => setAnnMax((m) => m + PAQUET_LISTE), []);   // eslint-disable-line react-hooks/exhaustive-deps
   // Les annonces que l'alerte « même paire en ligne deux fois » nomme (lot AF, mêmes groupes, §11) : une marque sur leur vignette.
-  const annEnDouble = useMemo(() => new Set(groupesDeuxFois.filter((g) => g.length > 1).flat()), [groupesDeuxFois]);
+  // (16 nov., lot doublons-meme-compte) La marque « En double » sur les lignes : les groupes DITS (`deuxFoisADire` : même compte
+  // — republication en cours écartée, indices compris — et sur deux comptes), plus ceux sur deux comptes de « Deux comptes ».
+  const annEnDouble = useMemo(() => new Set([
+    ...deuxFoisADire.flatMap((g) => (g.annonces || []).filter((a) => a.plat === 'vinted').map((a) => String(a.id))),
+    ...(enLigneDeux && Array.isArray(enLigneDeux.vinted) ? enLigneDeux.vinted : []).filter((g) => !g.memeCompte).flatMap((g) => (g.annonces || []).filter((a) => a.plat === 'vinted').map((a) => String(a.id))),
+  ]), [deuxFoisADire, enLigneDeux]);
   // La grille de vignettes est montrée pour « Toutes » et ses tris (pas pour les vues à cocher ni les files).
   const annGrilleMontree = !['selection','brouillons','republier','sansachat','masquees','sleeping'].includes(annSort);
   // ── SÉLECTIONNER, PUIS « ACTIONS POSSIBLES » (5 nov., `src/annoncesActions.js`) ──
@@ -49372,7 +49394,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // (15 nov., lot deux-comptes) Les groupes sur DEUX comptes vont dans « Deux comptes, une paire » (UN endroit) ;
               // « en ligne deux fois » garde ceux d'un même compte.
               const deuxComptesJ = deuxComptes && deuxComptes.groupes.length ? deuxComptes.groupes : [];
-              const deuxFois = (enLigneDeux && enLigneDeux.vinted.length ? enLigneDeux.vinted : []).filter((g) => !(g.comptes && g.comptes.length >= 2 && g.annonces.filter((a) => a.plat === 'vinted').every((a) => idsDeuxComptes.has(String(a.id)))));
+              // (16 nov., lot doublons-meme-compte) Les groupes d'un même compte viennent de `doublonsCompte` (republication en cours écartée).
+              const deuxFois = deuxFoisADire;
               // (11 nov., lot suivi-commandes) LES COMMANDES À VÉRIFIER : une incohérence PROUVÉE entre Vinted,
               // les e-mails et le transporteur (api/_lib/suivi-commandes.js). Ambre : c'est un geste.
               const aVerifier = commandesAVerifier();
@@ -49444,13 +49467,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 );
               };
               const carteDeuxFois = () => {
-                const t = texteEnLigneDeuxFois(deuxFois);
+                // (16 nov.) Tout sur un même compte : « 2 annonces de tomj606 sont la même paire (N°124) » · « Voir les deux ».
+                const t0 = texteEnLigneDeuxFois(deuxFois);
+                const t = (deuxFois.every((g) => g.memeCompte) && texteDoublonsCompte(deuxFois, { complet: deuxFois.every((g) => g.etat !== 'verifier') && t0 ? t0.complet : '' })) || t0;
                 return (
                   <button key="en-ligne-deux-fois" type="button" className="vrm-day-task vrm-fu-tache" data-en-ligne-deux-fois={deuxFois.map((g) => g.annonces.map((a) => a.id).join('+')).join(' ')} data-n={String(deuxFois.length)}
+                    data-doublons-compte={deuxFois.filter((g) => g.memeCompte).map((g) => `${g.etat || 'sur'}:${g.annonces.map((a) => a.id).join('+')}`).join(' ') || undefined}
                     title={t.complet} aria-label={t.complet} onClick={() => setFeuilleDeux(true)}>
                     <PileVignettes srcs={deuxFois.flatMap((g) => g.annonces.map((a) => a.photo))} n={deuxFois.length} Photo={PhotoVinted} mortes={imgMortes} onMorte={noterImgMorte} icone={<Icon name="alert" size={20}/>}/>
                     <span className="vrm-day-task-textes"><span className="vrm-day-task-title">{t.titre}</span><span className="vrm-day-task-note is-urgent" data-sous-ligne="deux-fois">{t.detail}</span></span>
-                    <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{VERBES.voir}</span></span>
+                    <span className="vrm-day-task-action"><span className="vrm-day-task-action-mot">{t.geste || VERBES.voir}</span></span>
                   </button>
                 );
               };
@@ -52958,7 +52984,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             sur vinted.fr (VRM ne supprime rien, §3). */}
         {/* (15 nov., lot deux-comptes) « Deux comptes, une paire » : une ligne dans « À faire », la feuille porte le geste. */}
         {deuxComptesTexte && <VersAFaire><DeuxComptesAlerte res={deuxComptes} texte={deuxComptesTexte} onOuvrir={()=>setFeuilleDeuxComptes(true)}/></VersAFaire>}
-        {(()=>{ const g = enLigneDeux ? enLigneDeux.vinted.filter((x)=>!(x.comptes && x.comptes.length >= 2 && x.annonces.filter((a)=>a.plat==='vinted').every((a)=>idsDeuxComptes.has(String(a.id))))) : [];
+        {(()=>{ const g = enLigneDeux ? deuxFoisADire : [];
           return g.length > 0 ? <VersAFaire><EnLigneDeuxFoisAlerte groupes={g} manque={enLigneDeux.manque} PhotoVinted={PhotoVinted} Feuille={SheetShell}/></VersAFaire> : null; })()}
         {listings.loading && !listings.items && <Skeleton variant="card" count={6}/>}
         {listings.error && <EtatPanne quoi="Tes annonces Vinted" data-ann-panne="" onReessayer={()=>loadListings(true)}/>}
