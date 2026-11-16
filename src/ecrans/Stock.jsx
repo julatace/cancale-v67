@@ -560,7 +560,16 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   React.useEffect(() => {
     if (!flash) return;
     const id = requestAnimationFrame(() => requestAnimationFrame(() => {
-      try { const el = document.querySelector(`[data-case-num="${CSS.escape(flash)}"]`); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' }); } catch (_) {}
+      try {
+        const el = document.querySelector(`[data-case-num="${CSS.escape(flash)}"]`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // (16 nov., stock-mieux) Un meuble qui défile de côté : la case est centrée DANS son meuble (jamais sous le
+          // fondu du bord). Seul le meuble défile de côté — `inline` de scrollIntoView poussait aussi la page.
+          const d = el.closest('.vrm-s2d-defile');
+          if (d && d.scrollWidth > d.clientWidth + 2) { const a = d.getBoundingClientRect(), q = el.getBoundingClientRect(); d.scrollTo({ left: d.scrollLeft + (q.left + q.width / 2) - (a.left + a.width / 2), behavior: 'smooth' }); }
+        }
+      } catch (_) {}
     }));
     return () => cancelAnimationFrame(id);
   }, [flash]);

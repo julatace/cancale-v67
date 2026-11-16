@@ -13,16 +13,36 @@ surbrillance) + `claude/design-restes` (PR #1205, meuble glissé au doigt), fusi
 4. ↑ ↓ et le crayon sans mot.
 5. En bas : « Plus · Aujourd'hui · 10 N° à vérifier · 0 sur 10 vérifiés » ; la liste dépliée sortait de la carte.
 
-## Les pistes évaluées
+## Les deux pistes, faites en captures puis comparées (reprise du 16 nov. au soir)
 
-- (a) vue par défaut = la LISTE groupée par meuble, le plan en mini-carte : la liste existe déjà dans le Stock
-  (« la liste », au-dessus de « Mes meubles », avec la recherche collée) ; la dupliquer par meuble aurait mis deux
-  listes à l'écran. Écartée.
-- (b) plan « étagère » net : chaque case pleine = la photo nette, le N° en grand sur une plaque opaque ; cases vides
-  à peine marquées. **Retenue** : devant les cartons, c'est le plan qui ressemble au meuble ; le N° est ce qui est
-  écrit sur le carton (§5).
-- (c) la recherche qui allume et fait défiler (elle existait : vérifiée par le banc, R) + un compte clair
-  « N rangées · N à sortir · N cases libres ». **Retenue**, posée dans la barre du plan.
+Julien (relayé) : comparer « liste d'abord + mini-plan » et « étagère réaliste », les deux en captures (390 et 1512).
+Les deux ont été rendues dans LA MÊME page de l'app, avec les MÊMES données inventées que le banc `stock-mieux`
+(Garage 4×8 à 12 paires dont N°3 et N°7 vendues, N°9 plus en ligne ; Bureau 8×10 à 30 paires dont N°1024) :
+
+- **A — la liste d'abord + un mini-plan** : maquette posée dans la vraie page par un script hors dépôt (la vraie tête du
+  meuble ; à la place du plan, un mini-plan en points de 12 px — plein, vendue en bleu, plus en ligne en ambre,
+  cherchée en anneau — puis la liste des paires rangées dans l'ordre de leur place : N° en 24 px, photo 48 px,
+  « Rangée 5 · col. 4 », pastille « à sortir »). Rien de A n'est dans l'app.
+- **B — l'étagère réaliste** : le plan de ce lot (le code).
+
+| mesuré (390 px, clair) | A — liste + mini-plan | B — étagère |
+|---|---|---|
+| hauteur du Garage (12 paires) | 1 015 px | 682 px |
+| hauteur du Bureau (30 paires) | **2 217 px** | **602 px** |
+| N° lisibles sur un écran de téléphone | 6 à 7 | 11 (Garage) à 28 (Bureau) |
+| « où est le carton ? » | lire « Rangée 5 · col. 4 », puis compter sur le meuble | la case est À SA PLACE, comme sur le meuble |
+| le mini-plan | points de 12 px : ni N°, ni touchables (< 44 px) | — (le plan EST la carte) |
+| à 1512 | deux longues colonnes de lignes | les deux meubles côte à côte, 42 N° d'un coup d'œil |
+
+**Choix : B, l'étagère réaliste.** C'est la plus lisible : 4 fois plus de N° par écran, et la case est à l'endroit du
+carton — devant le meuble, il n'y a rien à traduire. La liste existe déjà au-dessus de « Mes meubles » (la recherche,
+ses résultats, « À aller chercher ») : A la doublait meuble par meuble. Le seul point où A gagnait — un meuble plus
+large que le téléphone (8 colonnes de 44 px ne tiennent pas dans 390 px) — est corrigé dans B (reprise, plus bas).
+La recherche qui allume la case et la fait venir dans l'écran, et le compte « N rangées · N à sortir · N cases
+libres » dans la barre du plan, sont gardés.
+
+Captures (hors dépôt, données inventées) : `A-*.png` (piste A) et `sm-*.png` (piste B), et l'avant (main) dans
+`capt-main/`, sous `scratchpad/stock-mieux/` de la session.
 
 ## Ce qui a changé (aucune règle de rangement : N° jamais réattribué, `prochainLibre`, `cleNum` intouchés)
 
@@ -46,10 +66,50 @@ surbrillance) + `claude/design-restes` (PR #1205, meuble glissé au doigt), fusi
 - Textes : `etag.*` (5 langues), `confort.tournant.titre/fait` reformulés (5 langues), ligne « Quoi de neuf »
   `stock-plan-lisible`.
 
+### Reprise du 16 nov. au soir (après la pause)
+
+- **Un meuble plus large que l'écran** (le Bureau 8×10 à 390 px) : il défilait de côté sans le dire, et ses colonnes
+  7-8 sortaient du meuble dessiné (le cadre s'arrêtait à la largeur de la carte). Maintenant : le bord droit s'efface
+  en fondu tant qu'il reste des cases (`data-deborde`, `suivreDebord` dans `src/ecrans/Stock.jsx`), les numéros de
+  rangée restent collés à gauche, le cadre entoure toutes les colonnes (`min-width: min-content`), un meuble plus
+  étroit que sa carte est centré.
+- **La case trouvée** (recherche, « Voir au stock ») est centrée DANS son meuble qui défile (jamais sous le fondu) ;
+  la page, elle, ne défile qu'en hauteur (un `inline: 'center'` poussait la page de côté à 1512 : essayé, retiré).
+- **« À aller chercher »** : plaque opaque (`.vrm-etag-cibles`, jetons `--etag-plaque`) — avant, texte sombre sur la
+  barre bleue (2,33:1) et « Fermer » coupé (marge −12 px du bouton discret, coins en pilule hérités du champ).
+- **Le menu d'un meuble** passe au-dessus du meuble suivant (`:has(.vrm-etag-menu:not([hidden]))`) : « Descendre »
+  était recouvert par la règle des colonnes du meuble d'en dessous quand le meuble était replié (banc
+  `stock-etageres`, rouge depuis le début du lot).
+- Fusions : `origin/claude/retirer-case-compact` (#1197, en file, pas encore sur main) puis `origin/main` (vrais
+  merges) ; la case allumée et la sortie automatique de #1197 sont intactes (banc `stock-case-a-sortir` vert).
+
 ## Les preuves
 
-MESURES (à compléter par le banc) — voir « ÉTAT À LA REPRISE ».
+- Banc `scripts/bancs/stock-mieux.cjs` : **64 OK** aux quatre variantes (390 tactile / 1512 souris, clair / sombre).
+  Mesures : N° des cases en 18 px (16 px à 4 chiffres), contraste aux pixels ≥ 5,92:1 (clair) et 7,28:1 (sombre),
+  tête ≥ 5,49:1, « + » dessinés au repos : 0 et 0 (main : 20 et 50).
+- **Rouge sur main** (arbre `git archive origin/main`, banc copié dedans, 390 clair + 1512 sombre) : 14 échecs —
+  20/50 « + », N° 11-12 px, pseudo « vanessa… » coupé, tête 1,12:1 et 2,15:1, ↑ ↓ ✎ sans mot, « Comment ça marche ? »
+  1,01:1, « À aller chercher » 2,33:1 et « Fermer » coupé, Bureau sans fondu ni cadre entier.
+- **Rouge sur la branche avant la reprise** (94aa55fcb) pour les contrôles ajoutés : K (2,33:1, coins 999 px, « Fermer »
+  hors du panneau) et D. R « 1024 » passe aussi avant : c'est une garde (la case doit rester hors du fondu).
+- **Mutations** (CSS injectée, 390 clair) : `num` ⇒ N rouge (9 px) — elle ne prenait plus (les plaques portent leur
+  taille en `!important` sur 4 classes) : préfixée ; `plus` ⇒ P rouge (20/50) ; `debord` ⇒ D rouge ; `fermer` ⇒ K rouge.
+- Bancs portés : `stock-case-a-sortir` (S1 : la plaque écrit le N° SEUL, « 3 », retiré du texte comme « N°3 »),
+  `stock-retrouver` (« De près » à 390 : la carte coûte ~6 px par case, 64 → 69 ; « agrandit » suffit au téléphone,
+  +10 px gardé à 1512). Verts : stock-mieux, stock-etageres, stock-case-a-sortir, stock-retrouver, stock-planches
+  (rouge une fois sous charge — attente fixe de 1,2 s après l'enregistrement —, vert à la relance, avant comme après),
+  paire-a-sortir, stock-annonces, design-restes.
+- Audits verts : actions-serie, calculette-emballages, confort-securite, cout-vente, import-autre-outil,
+  inventaire(-annuel, -hors-ligne), note-achat-double, numeros-clenum, pas-ranger-achat, plancher-stock,
+  robustesse-metier, stock-etageres, stock-hors-ligne, stock-juste, stockage-sur, textes-courts, sortie-expedition,
+  traduction, quoi-de-neuf, icones, coherence. Rouge connu de main, rien de ce lot dedans : vendeur-generaliste.
+- Captures regardées : 390 et 1512, clair et sombre (plan, Bureau défilé, recherche « 118 » et « 1024 », barre du plan).
+- Aucune règle de numéro touchée : N° jamais réattribué, `cleNum`, `prochainLibre` intacts ; aucun nouveau texte
+  visible dans la reprise (le fondu et les rangées collées sont muets ; l'aide vocale dit déjà « N°… » et la place).
 
 ## ÉTAT À LA REPRISE
 
-(à compléter)
+Fini, à intégrer (PR de `claude/stock-mieux`). Contient #1197 (`claude/retirer-case-compact`) fusionnée : intégrer
+#1197 d'abord est le plus propre, mais cette PR la porte entière. Possible plus tard : dire « glisse → » en mots au-dessus
+d'un meuble qui défile (aujourd'hui le fondu et la colonne coupée le montrent).

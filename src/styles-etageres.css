@@ -294,3 +294,6 @@
 /* Le panneau « À aller chercher » : une plaque opaque (lisible sur la barre bleue), « Fermer » dedans. */
 :root:root:root:root body .vrm-app-shell .vrm-main [data-stock-recherche] > .vrm-etag-cibles, :root:root body .vrm-etag-cibles { background: var(--etag-plaque) !important; border-radius: 16px !important; color: var(--etag-plaque-encre); -webkit-backdrop-filter: none; backdrop-filter: none; }
 .vrm-app-shell .vrm-main .vrm-etag-cibles .vrm-b.vrm-b-discret, .vrm-etag-cibles .vrm-b-discret { margin-block: 0; min-height: 44px; }
+/* Le menu d'un meuble passe AU-DESSUS du meuble suivant (chaque carte de verre est son propre empilement : sans ça,
+   la règle des colonnes du meuble d'en dessous recouvrait « Descendre » quand le meuble est replié). */
+.vrm-s2d-meuble:has(.vrm-etag-menu:not([hidden])) { position: relative; z-index: 30; }

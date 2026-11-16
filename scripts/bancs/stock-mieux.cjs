@@ -90,7 +90,8 @@ const srv = http.createServer((q, r) => {
 srv.on('error', (e) => { console.log('KO  le port ' + PORT + ' est pris (' + e.code + ')'); process.exit(1); });
 
 const CSS_MUTATION = {
-  num: '.vrm-s2d-case * { font-size: 9px !important; } .vrm-s2d-case > span { max-width: 14px !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }',
+  // (reprise) préfixée : les plaques portent leur taille en `!important` sur 4 classes — sans préfixe, la mutation ne prenait plus.
+  num: ':root:root:root:root body .vrm-s2d-case.vrm-s2d-case * { font-size: 9px !important; } :root:root:root:root body .vrm-s2d-case.vrm-s2d-case > span { max-width: 14px !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }',
   debord: '.vrm-s2d-regle[data-regle-rang] { position: static !important; }',
   fermer: '.vrm-etag-cibles .vrm-b-discret { margin: -12px 0 !important; }',
   plus: '.vrm-s2d-case.is-vide::after { content: "+" !important; display: block !important; position: absolute; inset: 0; display: grid !important; place-items: center; font-size: 22px; opacity: .6; color: #445; }',
