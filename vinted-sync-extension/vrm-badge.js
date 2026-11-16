@@ -528,7 +528,11 @@
   // état, ni verre (le verre est celui de la carte du site, derrière). Il dit à
   // la carte du site qu'il s'affiche (« prête ») et sa hauteur — rien d'autre
   // ne sort d'ici (ni e-mail, ni code, ni mot de passe, ni état).
-  const direAuSite = (d) => { if (!CADRE) return; try { window.parent.postMessage(Object.assign({ __vrmCarte: '' }, d), '*'); } catch (_) {} };
+  // 5.396 (revue, basse 123) : à l'origine EXACTE de la page qui nous encadre (posée par
+  // popup.js après `cadreAutorise`), jamais '*' — l'adresse Google / Discord (`aller`) ne part
+  // plus vers une page qui aurait navigué entre-temps. Origine inconnue ⇒ rien ne part.
+  const ORIGINE_PARENT = (() => { try { const o = String(globalThis.__vrmCadreOrigine || ''); return /^https:\/\/[a-z0-9.-]+$/i.test(o) ? o : ''; } catch (_) { return ''; } })();
+  const direAuSite = (d) => { if (!CADRE || !ORIGINE_PARENT) return; try { window.parent.postMessage(Object.assign({ __vrmCarte: '' }, d), ORIGINE_PARENT); } catch (_) {} };
   if (LISTES) {
     const st = document.createElement('style');
     st.textContent = `.btn, .question, .connexion, .capte { display: none !important; }

@@ -33,8 +33,11 @@
     canal = mc.port1;
     window.postMessage({ __tag: 'CANCALE_VINTED_CANAL' }, location.origin, [mc.port2]);
   } catch (_) { canal = null; }
-  const versContent = (m, origineCible) => {
-    try { if (canal) canal.postMessage(m); else window.postMessage(m, origineCible || '*'); } catch (_) {}
+  // 5.396 (revue, basse 105) : sans canal, RIEN ne part — avant, on retombait sur
+  //    `window.postMessage(…, '*')`, que content.js n'écoute plus mais que tout script de
+  //    la page entendait (jeton CSRF, corps capturés).
+  const versContent = (m) => {
+    try { if (canal) canal.postMessage(m); } catch (_) {}
   };
   const ecoutesCanal = [];
   const surCanal = (fn) => { ecoutesCanal.push(fn); };

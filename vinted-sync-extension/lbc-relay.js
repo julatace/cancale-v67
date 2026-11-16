@@ -145,7 +145,7 @@
     const {m,taille}=file.shift();tailleFile-=taille;
     let fini=false;const suite=(ok,sansSession)=>{
       if(fini)return;fini=true;clearTimeout(timer);
-      if(m.action==='lbcVente'&&Number.isSafeInteger(m.sequence))try{window.postMessage({__tag:'CANCALE_LBC_ACCUSE',sequence:m.sequence,ok:ok===true},'*');}catch(_){}
+      if(m.action==='lbcVente'&&Number.isSafeInteger(m.sequence))versCapteur({__tag:'CANCALE_LBC_ACCUSE',sequence:m.sequence,ok:ok===true});   // 5.396 : canal privé seulement (basse 119)
       if(!ok&&sansSession===true&&REJOUABLES.includes(m.action)){
         garderPourSession(m,taille);
         if(m.action==='lbcSessionPrivee')signaler('session');

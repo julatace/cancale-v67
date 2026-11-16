@@ -38,7 +38,33 @@
   } catch (_) {}
   if (window.__vrmVcInjected) return; window.__vrmVcInjected = true;
   const TAG = 'CANCALE_VC';
-  const post = (payload) => { try { window.postMessage(Object.assign({ __tag: TAG }, payload), '*'); } catch (_) {} };
+  // ⚠️⚠️ 5.396 (revue de robustesse, moyennes 60-62) — UN CANAL PRIVÉ AVEC vc.js, comme
+  //    Leboncoin (5.362). Les ordres du fond (répondre, offre, prix, page d'historique : leur
+  //    jeton, le texte, la recette) et ce qui en revient (résultats, recettes « apprises »,
+  //    l'identifiant d'une annonce publiée, les personnes qui ont aimé) passaient par
+  //    `window.postMessage(…,'*')` : tout script de la page les lisait et pouvait poster un
+  //    faux résultat 200, une fausse recette, ou relier un `productId` arbitraire à la paire
+  //    en dépôt (identité §5). Dès le chargement (document_start, monde MAIN, AVANT tout script
+  //    de la page) : un `MessageChannel` ; son second port est remis UNE fois au relais, qui ne
+  //    croit que lui pour ces sortes-là. Sans canal : rien ne part (jamais un repli par `window`).
+  //    Les simples lectures restent sur `window`, adressées à l'origine exacte (plus jamais '*').
+  let canalOrdres = null;
+  const ecoutesOrdres = [];
+  try {
+    const mc = new MessageChannel();
+    canalOrdres = mc.port1;
+    canalOrdres.onmessage = (e) => { const d = e && e.data; if (!d || typeof d !== 'object') return; for (const f of ecoutesOrdres) { try { f({ source: window, data: d }); } catch (_) {} } };
+    window.postMessage({ __tag: 'CANCALE_VC_CANAL' }, location.origin, [mc.port2]);
+  } catch (_) { canalOrdres = null; }
+  const surOrdre = (fn) => { ecoutesOrdres.push(fn); };
+  const SORTES_PRIVEES = new Set(['vcpublie', 'vcaimes', 'vcimportmodele', 'vcimportresultat', 'vcenvoiappris', 'vcenvoiresultat', 'vcoffreappris', 'vcoffreresultat', 'vcprixappris', 'vcprixresultat']);
+  const post = (payload) => {
+    try {
+      const m = Object.assign({ __tag: TAG }, payload);
+      if (SORTES_PRIVEES.has(m.kind)) { if (canalOrdres) canalOrdres.postMessage(m); return; }
+      window.postMessage(m, location.origin);
+    } catch (_) {}
+  };
   const NOISE = /(datadome|captcha|track|metric|telemetr|analytic|consent|pixel|gtm|beacon|sentry|hotjar|optimizely|segment\.io)/i;
   const DE_VC = (url) => { try { return /(^|\.)vestiairecollective\.com$/i.test(new URL(url, location.origin).hostname); } catch (_) { return false; } };
   const hoteDe = (url) => { try { return new URL(url, location.origin).hostname; } catch (_) { return ''; } };
@@ -890,7 +916,7 @@
     } catch (_) {}
   }
   let importEnCours = false;
-  try { window.addEventListener('message', async (event) => {
+  try { surOrdre(async (event) => {
     const d = event && event.data;
     if (event.source !== window || !d || d.__tag !== 'CANCALE_VC_ORDRE' || d.kind !== 'importpage') return;
     const jeton = String(d.jeton || '');
@@ -1352,7 +1378,7 @@
   // ── L'ENVOI, SUR SON CLIC (l'ordre vient du fond de l'extension par vc.js) ──
   let envoiEnCours = false;
   const poser = (o, ch, v) => { let x = o; for (let i = 0; i < ch.length - 1; i++) { if (!x[ch[i]] || typeof x[ch[i]] !== 'object') x[ch[i]] = {}; x = x[ch[i]]; } x[ch[ch.length - 1]] = v; };
-  try { window.addEventListener('message', async (event) => {
+  try { surOrdre(async (event) => {
     const d = event && event.data;
     if (event.source !== window || !d || d.__tag !== 'CANCALE_VC_ORDRE' || d.kind !== 'repondre') return;
     const jeton = String(d.jeton || ''), conv = String(d.conv || ''), texte = typeof d.texte === 'string' ? d.texte : '';
@@ -1583,7 +1609,7 @@
   }
   // ── RÉPONDRE À UNE OFFRE, SUR SON CLIC (l'ordre vient du fond par vc.js) ──
   let offreEnCours = false;
-  try { window.addEventListener('message', async (event) => {
+  try { surOrdre(async (event) => {
     const d = event && event.data;
     if (event.source !== window || !d || d.__tag !== 'CANCALE_VC_ORDRE' || d.kind !== 'offre') return;
     const jeton = String(d.jeton || ''), nego = String(d.nego || ''), geste = String(d.geste || '');
@@ -1832,7 +1858,7 @@
   }
   // ── BAISSER UN PRIX, SUR SON CLIC (l'ordre vient du fond par vc.js) ──
   let prixVcEnCours = false;
-  try { window.addEventListener('message', async (event) => {
+  try { surOrdre(async (event) => {
     const d = event && event.data;
     if (event.source !== window || !d || d.__tag !== 'CANCALE_VC_ORDRE' || d.kind !== 'prix') return;
     const jeton = String(d.jeton || ''), produit = String(d.produit || '');
