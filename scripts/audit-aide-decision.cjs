@@ -47,7 +47,7 @@ const lire = (f) => { try { return fs.readFileSync(f, 'utf8'); } catch (_) { ret
 const MUTATIONS = {
   // A — le moteur
   ext_contre_allumee_par_defaut: { f: 'bg', m: (s) => s.replace("const contre = actif && m.vinted_offres_contre === true;", "const contre = actif && m.vinted_offres_contre !== false;") },
-  ext_contre_sans_moteur: { f: 'bg', m: (s) => s.replace("const contre = actif && m.vinted_offres_contre === true;", "const contre = m.vinted_offres_contre === true;") },
+  ext_contre_option_ignoree: { f: 'bg', m: (s) => s.replace("else if (reg.contre === true && isFinite(min) && min > 0 && o.prix < min) quoi = 'contre';", "else if (isFinite(min) && min > 0 && o.prix < min) quoi = 'contre';") },
   ext_contre_sans_garde: { f: 'bg', m: (s) => s.replace("if (quoi === 'accept' || quoi === 'contre') {", "if (quoi === 'accept') {") },
   ext_contre_sous_le_mini: { f: 'bg', m: (s) => s.replace("prixContre = contreOffreMini(o.prix, await prixAnnonceContre(uid, o.item), min);", "prixContre = Math.floor(min) - 1;") },
   ext_contre_prix_devine: { f: 'bg', m: (s) => s.replace("prixContre = contreOffreMini(o.prix, await prixAnnonceContre(uid, o.item), min);", "prixContre = contreOffreMini(o.prix, (await prixAnnonceContre(uid, o.item)) || 999, min);") },
@@ -136,6 +136,8 @@ async function partieA(S) {
     dit(r.premier === 0, 'A4 à la première vue de l’offre, RIEN ne part (délai tiré au hasard)', `premier=${r.premier}`);
     const memo = r.f.store.vrmOffresFaites || {};
     dit(!!memo[String(OID)], 'A5 l’offre est mémorisée (vrmOffresFaites) — jamais deux contre-offres');
+    const acts = ((r.f.store.vrmActions || {})[UID] || []).length;
+    dit(acts === 1, 'A5b la contre-offre prend SA place dans le plafond de 50 actions/heure du compte', `actions=${acts}`);
     const journal = (r.f.store.vrmJournal || {})[UID] || [];
     dit(journal.some((e) => e.s === 'contre_offre' && e.auto === true && e.p === 40 && e.de === 30), 'A6 noté au journal « Ce que VRM a fait » (contre_offre, auto, 40 € pour une offre de 30 €)', JSON.stringify(journal)); }
   { const r = await moteur({ trois: true });
@@ -166,6 +168,9 @@ async function partieA(S) {
     dit(r.contres.length === 1, 'A19 sans « Refuser sous » : toute offre sous le mini reçoit la contre-offre', `contres=${r.contres.length}`); }
   { const r = await moteur({ connecte: '999' });
     dit(r.contres.length === 0, 'A20 navigateur sur un AUTRE compte Vinted : rien ne part', `contres=${r.contres.length}`); }
+  { const plein = Array.from({ length: 45 }, (_, i) => Date.now() - 60000 - i * 1000);
+    const r = await moteur({ store: { vrmActions: { [UID]: plein } } });
+    dit(r.contres.length === 0, 'A21b plafond de l’heure atteint (45/50, réserve gardée pour ses clics) : rien ne part', `contres=${r.contres.length}`); }
   { const r = await moteur({ store: { vrmPauseVinted: { jusqua: Date.now() + 600000, niveau: 1, statut: 429 } } });
     dit(r.contres.length === 0, 'A21 pause Vinted (429/403) : rien ne part', `contres=${r.contres.length}`); }
   // La copie de la règle est IDENTIQUE à celle de la messagerie (src/messagesVolets.js).
@@ -231,7 +236,7 @@ async function partieC(S) {
   dit((V.ralentissements([...serie('a', 4, 40, 20 * H), ...serie('a', 5, 5, 60 * H)], { maintenant: now }) || []).length === 0, 'C2 moins de 5 colis datés d’un côté : rien n’est dit');
   dit((V.ralentissements([...serie('a', 5, 40, 20 * H), ...serie('a', 5, 5, 28 * H)], { maintenant: now }) || []).length === 0, 'C3 20 h → 28 h (×1,4) : pas « nettement », rien n’est dit');
   dit((V.ralentissements([...serie('a', 5, 40, 2 * H), ...serie('a', 5, 5, 10 * H)], { maintenant: now }) || []).length === 0, 'C4 2 h → 10 h (moins de 24 h de plus) : rien n’est dit');
-  const sansDate = [...serie('a', 5, 40, 20 * H), ...serie('a', 5, 5, 60 * H).map((l) => ({ ...l, depart: null }))];
+  const sansDate = [...serie('a', 3, 40, 20 * H), ...serie('a', 2, 45, 20 * H).map((l) => ({ ...l, depart: null })), ...serie('a', 5, 5, 60 * H)];
   dit((V.ralentissements(sansDate, { maintenant: now }) || []).length === 0, 'C5 des dépôts sans date prouvée ne comptent pas (jamais devinés)');
   dit(V.ralentissements(null) === null, 'C6 rien publié ⇒ null (pas su)');
 }
