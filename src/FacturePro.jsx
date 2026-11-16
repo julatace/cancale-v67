@@ -801,7 +801,7 @@ export function FactureRaisonsTete({ ventes, deps }) {
 // de retour · avoir). « Envoyer la facture » et « Bon de retour » ne sont plus sous la ligne : dans
 // cette feuille et dans la fiche de la vente. Une vente Pro dont l'acheteur n'est pas prouvé n'a pas
 // de pastille (la raison est dite en tête de la liste et dans la fiche).
-export function FactureVente({ vente, deps, ligne = false, groupe = null, pastille = false }) {
+export function FactureVente({ vente, deps, ligne = false, groupe = null, pastille = false, ou = 'tel' }) {
   const d = useFactures(deps);
   const [ouverte, setOuverte] = React.useState(false);
   // (11 nov., lot DJ1) Une vente d'un compte Pro dont l'e-mail de vente n'est pas (encore)
@@ -830,7 +830,7 @@ export function FactureVente({ vente, deps, ligne = false, groupe = null, pastil
     const stop = (ev) => { ev.stopPropagation(); };
     // Dans la ligne (un <button>) : la pastille est un <span> qui ouvre la feuille ; ses événements
     // (et ceux de la feuille, rendue par un portail) ne remontent pas jusqu'à la ligne.
-    return <span className="vrm-fp-pastille-hote" data-fp-tx={tx} data-fp-forme="ligne" onClick={stop} onPointerDown={stop} onKeyDown={stop}>
+    return <span className="vrm-fp-pastille-hote" data-ou={ou} data-fp-tx={tx} data-fp-forme="ligne" onClick={stop} onPointerDown={stop} onKeyDown={stop}>
       <span className="vrm-fp-pastille" role="button" tabIndex={0} data-fp-pastille={cle} data-fp-vente={emise ? (e ? e.etat : 'emise') : 'a-faire'} data-fp-ligne-etat={emise ? k : undefined} title={emise ? f.numero : undefined}
         onClick={() => setOuverte(true)} onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); setOuverte(true); } }}>
         <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
