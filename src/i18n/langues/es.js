@@ -13,6 +13,7 @@ import ecran_vcventes from './es/vcventes.js';   // (15 nov.) ventes Vestiaire :
 import ecran_transporteur_connu from './es/transporteurConnu.js';   // (15 nov.) « À expédier » : transporteur connu
 import ecran_vendre from './es/vendre.js';   // (15 nov., vendre plus) baisses conseillées, relance des favoris, loupe
 import ecran_ebaytableau from './es/ebaytableau.js';   // (15 nov., eBay complet 2) Tableau, Argent, Trafic, Santé
+import ecran_scan_retrouver from './es/scanRetrouver.js';   // (15 nov.) Scanner pour retrouver un colis
 import ecran_renvoyer from './es/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_liaison from './es/liaison.js';   // (15 nov.) La liaison achat ⇄ article
 import ecran_retrait_ailleurs from './es/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
@@ -57,6 +58,8 @@ import ecran_studio_paires from './es/studio-paires.js';   // (14 nov., Studio b
 import ecran_republier_guide from './es/republierGuide.js';   // (15 nov.) republier / publier à la main, guidés
 import ecran_memePhoto from './es/memePhoto.js';   // (15 nov., lot meme-photo)
 import ecran_fiabilite from './es/fiabilite.js';   // (15 nov., lot fiabilite-auto)
+import ecran_deuxComptes from './es/deuxComptes.js';   // (15 nov., lot deux-comptes)
+import ecran_favorisSites from './es/favorisSites.js';   // (15 nov., lot favoris-sites)
 import ecran_etageres from './es/etageres.js';   // (15 nov.) le Stock en étagères
 import ecran_journee_verre from './es/journee-verre.js';   // (15 nov.) Ma journée verre, la paire à sortir
 import ecran_arrivee from './es/arrivee.js';   // (15 nov.) atelier d'arrivée, historique, taille du texte
@@ -1871,7 +1874,7 @@ export default {
   "registres.nRecettes": {"one": "{n} ingreso", "other": "{n} ingresos"},
   "registres.nAchats": {"one": "{n} compra", "other": "{n} compras"},
   "registres.aucune": "Ninguna línea en el periodo.",
-  "registres.horsRecettes": {"one": "En ningún mes · por fechar ({n})", "other": "En ningún mes · por fechar ({n})"},
+  "registres.horsRecettes": {"one": "En ningún mes · sin fecha de pago ({n})", "other": "En ningún mes · sin fecha de pago ({n})"},
   "registres.horsAchats": {"one": "Sin fecha ({n})", "other": "Sin fecha ({n})"},
   "registres.loi": "Lo que dice la ley",
   "registres.aVerifier": "por verificar",
@@ -2292,12 +2295,15 @@ export default {
   ...ecran_vcventes,
   ...ecran_memePhoto,
   ...ecran_fiabilite,
+  ...ecran_deuxComptes,
+  ...ecran_favorisSites,
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_liaison,
   ...ecran_transporteur_connu,
   ...ecran_vendre,
   ...ecran_ebaytableau,
+  ...ecran_scan_retrouver,
   ...ecran_finition,
   ...ecran_parametres,
   ...ecran_avenir,

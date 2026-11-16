@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.385.0';
+const CODE_VERSION = '5.393.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -4410,6 +4410,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return true;
     }
     // 5.319 : tes OFFRES Vestiaire et la recette d'une réponse faite par toi sur la page.
+    // 5.392 : les personnes qui ont aimé TES articles (gardées dans CE navigateur ; la base n'en reçoit que des nombres).
+    if (msg && msg.from === 'cancale-vc' && msg.action === 'vcAimes') {
+      (async () => {
+        try {
+          let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
+          if (!/(^|\.)vestiairecollective\.com$/i.test(hote)) { sendResponse({ ok: false }); return; }
+          const ok = await rangerVcAimes(msg, await compteVcCapture(sender && sender.tab && sender.tab.id, msg.moi));
+          sendResponse({ ok: ok === true });
+        } catch (e) { sendResponse({ ok: false, error: String(e) }); }
+      })();
+      return true;
+    }
     if (msg && msg.from === 'cancale-vc' && (msg.action === 'vcOffres' || msg.action === 'vcOffreAppris' || msg.action === 'vcPrixAppris')) {
       (async () => {
         try {
@@ -8388,8 +8400,12 @@ function tickEmpreintes() {
     // 5.384 : Vinted d'abord ; sans image Vinted à ce tour, une photo Leboncoin / Vestiaire.
     // ⚠️ Le verrou du tour se lève dans TOUS les cas (un `finally` pour les deux) : sinon une image
     //    Vinted laissait le tour verrouillé 3 min (vu par audit-photos-comptes, E2).
+    // 5.388 : d'abord un couple à vérifier finement (peu nombreux, c'est ce qu'il voit « à vérifier »),
+    // puis Vinted, puis Leboncoin / Vestiaire — une seule chose par tour.
     try {
       let n = 0;
+      try { n = await verifFineUnTour(); } catch (_) { n = 0; }
+      if (n) return n;
       try { n = await empreintesUnTour(); } catch (_) { n = 0; }
       if (n) return n;
       try { return await empreintesSitesUnTour(); } catch (_) { return 0; }
@@ -8571,6 +8587,466 @@ async function empreintesSitesUnTour() {
   try { await chrome.storage.local.set({ [EMPREINTES_SITES_FILE]: file }); } catch (_) { return 0; }
   noterDiag('empreintes_sites_calculee');
   await rangerEmpreintesSites(false);
+  return 1;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 5.388 (15 nov.) — « MÊME PHOTO · SÛR » : LA DEUXIÈME MESURE (lot meme-photo-sure)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « Est-ce que tu peux faire la reconnaissance d'image et que ça soit parfaitement
+// fiable ? ». MESURÉ (banc meme-photo-fiabilite) : l'empreinte seule (64 bits, 64 × 64) confond
+// des exemplaires du MÊME modèle photographiés au même endroit. Une deuxième mesure, d'une autre
+// nature, est donc prise sur les DEUX images elles-mêmes : la corrélation fine après recalage
+// (<photo-fine-regle>, copie de src/photoFine.js) — SANS IA (§2.9), dans le service worker.
+// Seulement pour les couples CANDIDATS (`couplesAVerifier` : une photo Leboncoin / Vestiaire à
+// une empreinte ≤ 12 d'une photo Vinted) ; rangé dans `photo_meme_verif` : { couples: { [clé]:
+// { s: score | null, v, at } } } — un NOMBRE, jamais l'image, jamais un pixel.
+// Bornes (§3), celles des empreintes, rien de plus :
+//   · les DEUX images dans le même tour : la photo Vinted (onglet vinted.fr ouvert, compte
+//     connecté, pause / frein respectés, budget de LECTURE classe « photos », file Vinted
+//     `requeteVinted`) ET la photo de l'autre site (onglet de CE compte ouvert, anti-robot,
+//     pauses, budget de LECTURE du compte sur le site — les 8 des 20 des empreintes) ;
+//   · `VERIF_FINE_MAX_HEURE` couples par heure, `EMPREINTES_ECART_MS` entre deux, un tour à la
+//     fois (le verrou de `tickEmpreintes`) ; un couple raté n'est repris qu'après 24 h ;
+//   · sans cookie (`credentials: 'omit'`), au plus `EMPREINTES_SITES_MAX_OCTETS` par image ;
+//   · lire-fusionner-réécrire : une lecture ratée de la ligne n'écrit RIEN (le score reste en file).
+//   · eBay : aucune vérification (i.ebayimg.com n'est pas un hôte de l'extension) — l'app dit
+//     « à vérifier », jamais « sûr ».
+// <photo-fine-regle> — COPIE de src/photoFine.js (scripts/audit-meme-photo.cjs --recopie). Ne pas modifier ici.
+// La version de la mesure : un score d'une autre version n'est pas relu (recalculé).
+const VERSION_FINE = 1;
+// L'image est lue à `LECTURE_FINE` px au plus (proportions gardées), puis le contenu (bandes
+// unies retirées) est ramené à `COTE_FINE` × `COTE_FINE` niveaux de gris centrés-réduits.
+const LECTURE_FINE = 512;
+const COTE_FINE = 128;
+// L'écart par case se mesure sur une grille plus fine encore (256 × 256) : les plis, l'usure,
+// le grain d'un AUTRE exemplaire ne se voient qu'à cette échelle.
+const COTE_DETAIL = 256;
+const GROSSIER = 32;
+// Un contenu plus petit que `COTE_FINE_MIN` px (vignette) ne se vérifie pas finement : « pas su ».
+const COTE_FINE_MIN = 96;
+// La mesure fine rend DEUX nombres (`comparerFine` ⇒ { s, r }) :
+//   s = 1 − l'écart moyen des 10 % de cases les plus mal superposées (grille 256, flou égalisé) ;
+//   r = la corrélation de toute l'image une fois recalée (grille 128).
+// Les seuils — MESURÉS (banc meme-photo-fiabilite, 15 nov.), pas devinés :
+//   « sûr »  : s ≥ SEUIL_FINE_SUR ET r ≥ SEUIL_CORREL_SUR (les deux, nettement) ;
+//   « non »  : s < SEUIL_FINE_NON — pas la même photo, le candidat est écarté ;
+//   entre    : « à vérifier » (montré, jamais compté sûr).
+// MESURÉ : 2 × 50 exemplaires du même modèle photographiés au même endroit ⇒ s ≤ 0,79, r ≤ 0,9963 ;
+// la même photo recompressée (JPEG 50–90, WebP 60–80) ⇒ s ≥ 0,87, r ≥ 0,999.
+const SEUIL_FINE_SUR = 0.85;
+const SEUIL_CORREL_SUR = 0.998;
+const SEUIL_FINE_NON = 0.35;
+// La première mesure doit, elle aussi, être NETTE pour « sûr » (≤ `SEUIL_EMPREINTE_SUR` ;
+// au-dessus et jusqu'au seuil de proposition : « à vérifier »).
+const SEUIL_EMPREINTE_SUR = 10;
+
+function grisFin(rgba, w, h) {
+  const g = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) g[i] = 0.299 * rgba[i * 4] + 0.587 * rgba[i * 4 + 1] + 0.114 * rgba[i * 4 + 2];
+  return g;
+}
+// Les bandes UNIES du bord (ajoutées par un site pour mettre la photo au carré, ou un fond
+// uni) : une ligne / colonne dont l'écart est ≤ 8 niveaux et de la même teinte que la
+// première. Au plus 40 % de chaque côté.
+function boiteContenu(g, w, h) {
+  const T = 8;
+  const ligne = (y, x0, x1) => { let mn = 1e9, mx = -1e9, s = 0; for (let x = x0; x < x1; x++) { const v = g[y * w + x]; if (v < mn) mn = v; if (v > mx) mx = v; s += v; } return [mx - mn, s / Math.max(1, x1 - x0)]; };
+  const col = (x, y0, y1) => { let mn = 1e9, mx = -1e9, s = 0; for (let y = y0; y < y1; y++) { const v = g[y * w + x]; if (v < mn) mn = v; if (v > mx) mx = v; s += v; } return [mx - mn, s / Math.max(1, y1 - y0)]; };
+  let t = 0, b = h, l = 0, r = w;
+  let p = ligne(0, 0, w); if (p[0] <= T) { const m = p[1]; while (t < h * 0.4) { p = ligne(t, 0, w); if (p[0] > T || Math.abs(p[1] - m) > T) break; t++; } }
+  p = ligne(h - 1, 0, w); if (p[0] <= T) { const m = p[1]; while (b > h * 0.6) { p = ligne(b - 1, 0, w); if (p[0] > T || Math.abs(p[1] - m) > T) break; b--; } }
+  p = col(0, t, b); if (p[0] <= T) { const m = p[1]; while (l < w * 0.4) { p = col(l, t, b); if (p[0] > T || Math.abs(p[1] - m) > T) break; l++; } }
+  p = col(w - 1, t, b); if (p[0] <= T) { const m = p[1]; while (r > w * 0.6) { p = col(r - 1, t, b); if (p[0] > T || Math.abs(p[1] - m) > T) break; r--; } }
+  return [l, t, r, b];
+}
+// La zone [x0, x1) × [y0, y1) ramenée à N × N par moyenne de surface, centrée-réduite.
+function grilleFine(g, w, h, x0, y0, x1, y1, N) {
+  const out = new Float32Array(N * N), lw = x1 - x0, lh = y1 - y0;
+  for (let j = 0; j < N; j++) {
+    const ya = y0 + (j * lh) / N, yb = y0 + ((j + 1) * lh) / N;
+    for (let i = 0; i < N; i++) {
+      const xa = x0 + (i * lw) / N, xb = x0 + ((i + 1) * lw) / N;
+      let s = 0, a = 0;
+      for (let y = Math.floor(ya); y < Math.min(h, Math.ceil(yb)); y++) {
+        const fy = Math.min(y + 1, yb) - Math.max(y, ya); if (fy <= 0) continue;
+        for (let x = Math.floor(xa); x < Math.min(w, Math.ceil(xb)); x++) {
+          const fx = Math.min(x + 1, xb) - Math.max(x, xa); if (fx <= 0) continue;
+          s += fx * fy * g[y * w + x]; a += fx * fy;
+        }
+      }
+      out[j * N + i] = a > 0 ? s / a : 0;
+    }
+  }
+  let m = 0; for (let i = 0; i < out.length; i++) m += out[i]; m /= out.length;
+  let v = 0; for (let i = 0; i < out.length; i++) v += (out[i] - m) * (out[i] - m); v = Math.sqrt(v / out.length);
+  if (!(v > 1.5)) return null;                         // contenu uni : rien à comparer
+  for (let i = 0; i < out.length; i++) out[i] = (out[i] - m) / v;
+  return out;
+}
+// La taille à laquelle dessiner l'image avant `preparerFine` (proportions gardées).
+function tailleLectureFine(w, h) {
+  const k = Math.min(1, LECTURE_FINE / Math.max(1, w, h));
+  return { w: Math.max(1, Math.round(w * k)), h: Math.max(1, Math.round(h * k)) };
+}
+// `rgba` : les octets de l'image dessinée à `tailleLectureFine`. Rend { v: [variante…], cote } ou
+// null (image uniforme, ou contenu trop petit pour une vérification fine : « pas su »).
+// Une variante = { f, m, p } : la grille fine 128 × 128, 32 × 32 et 16 × 16 (le recalage grossier).
+// Deux variantes : l'image entière, et l'image SANS ses bandes unies (quand il y en a) — un site
+// qui ajoute des bandes, ou un fond blanc écrêté par l'éclaircissement, ne déplace pas le contenu
+// de la même façon : la comparaison prend la meilleure des combinaisons.
+function preparerFine(rgba, w, h) {
+  w = Math.floor(Number(w)); h = Math.floor(Number(h));
+  if (!rgba || !(w > 0) || !(h > 0) || rgba.length < w * h * 4) return null;
+  const g = grisFin(rgba, w, h);
+  const [l, t, r, b] = boiteContenu(g, w, h);
+  const cote = Math.min(r - l, b - t);
+  if (cote < COTE_FINE_MIN) return null;
+  const variante = (x0, y0, x1, y1) => { const f = grilleFine(g, w, h, x0, y0, x1, y1, COTE_FINE), m = grilleFine(g, w, h, x0, y0, x1, y1, GROSSIER), p = grilleFine(g, w, h, x0, y0, x1, y1, 16), d = grilleFine(g, w, h, x0, y0, x1, y1, COTE_DETAIL); return f && m && p && d ? { f, m, p, d } : null; };
+  const v = [variante(0, 0, w, h)];
+  if (l > 0 || t > 0 || r < w || b < h) v.push(variante(l, t, r, b));
+  const ok = v.filter(Boolean);
+  return ok.length ? { v: ok, cote } : null;
+}
+// B lu en (c + (x − c)·sx + dx, c + (y − c)·sy + dy), bilinéaire ; NaN hors de l'image.
+function lireDeforme(B, N, sx, sy, dx, dy) {
+  const c = (N - 1) / 2, out = new Float32Array(N * N);
+  for (let y = 0; y < N; y++) {
+    const fy = c + (y - c) * sy + dy;
+    for (let x = 0; x < N; x++) {
+      const fx = c + (x - c) * sx + dx;
+      if (fy < 0 || fy > N - 1 || fx < 0 || fx > N - 1) { out[y * N + x] = NaN; continue; }
+      const y0 = Math.floor(fy), y1 = y0 + 1 < N ? y0 + 1 : y0, ay = fy - y0, x0 = Math.floor(fx), x1 = x0 + 1 < N ? x0 + 1 : x0, ax = fx - x0;
+      out[y * N + x] = (1 - ay) * ((1 - ax) * B[y0 * N + x0] + ax * B[y0 * N + x1]) + ay * ((1 - ax) * B[y1 * N + x0] + ax * B[y1 * N + x1]);
+    }
+  }
+  return out;
+}
+// Corrélation de A et de B lu déformé, sur la zone commune (au moins 60 % de l'image ; sinon −1).
+function correlation(A, B, N, sx, sy, dx, dy) {
+  const c = (N - 1) / 2;
+  let n = 0, sa = 0, sb = 0, saa = 0, sbb = 0, sab = 0;
+  for (let y = 0; y < N; y++) {
+    const fy = c + (y - c) * sy + dy; if (fy < 0 || fy > N - 1) continue;
+    const y0 = Math.floor(fy), y1 = y0 + 1 < N ? y0 + 1 : y0, ay = fy - y0;
+    for (let x = 0; x < N; x++) {
+      const fx = c + (x - c) * sx + dx; if (fx < 0 || fx > N - 1) continue;
+      const x0 = Math.floor(fx), x1 = x0 + 1 < N ? x0 + 1 : x0, ax = fx - x0;
+      const b = (1 - ay) * ((1 - ax) * B[y0 * N + x0] + ax * B[y0 * N + x1]) + ay * ((1 - ax) * B[y1 * N + x0] + ax * B[y1 * N + x1]);
+      const a = A[y * N + x];
+      n++; sa += a; sb += b; saa += a * a; sbb += b * b; sab += a * b;
+    }
+  }
+  if (n < N * N * 0.6) return -1;
+  const cov = sab - (sa * sb) / n, va = saa - (sa * sa) / n, vb = sbb - (sb * sb) / n;
+  return va > 0 && vb > 0 ? cov / Math.sqrt(va * vb) : 0;
+}
+// L'ÉCART PAR CASE une fois recalées : la grille fine coupée en 8 × 8 cases ; dans chaque case,
+// l'écart quadratique moyen des deux images centrées-réduites (sur la zone commune). La même
+// photo se superpose PARTOUT (chaque case petite) ; une autre prise de vue, même identique de
+// loin (même fond, même lumière), laisse des cases où la paire, ses plis, son ombre ne tombent
+// pas au même endroit. Rend les écarts des cases, du plus grand au plus petit.
+const CASES = 8;
+function ecartsCases(A, B, N, sx, sy, dx, dy, CASES = 8) {
+  const Bd = lireDeforme(B, N, sx, sy, dx, dy);
+  let n = 0, sa = 0, sb = 0, saa = 0, sbb = 0;
+  for (let i = 0; i < N * N; i++) { const b = Bd[i]; if (b !== b) continue; const a = A[i]; n++; sa += a; sb += b; saa += a * a; sbb += b * b; }
+  if (n < N * N * 0.6) return null;
+  const ma = sa / n, mb = sb / n, ea = Math.sqrt(Math.max(1e-9, saa / n - ma * ma)), eb = Math.sqrt(Math.max(1e-9, sbb / n - mb * mb));
+  const t = N / CASES, out = [];
+  for (let cy = 0; cy < CASES; cy++) for (let cx = 0; cx < CASES; cx++) {
+    let s = 0, k = 0;
+    for (let y = cy * t; y < (cy + 1) * t; y++) for (let x = cx * t; x < (cx + 1) * t; x++) { const b = Bd[y * N + x]; if (b !== b) continue; const d = (A[y * N + x] - ma) / ea - (b - mb) / eb; s += d * d; k++; }
+    if (k >= t * t * 0.5) out.push(Math.sqrt(s / k));
+  }
+  return out.length >= CASES * CASES * 0.5 ? out.sort((x, y) => y - x) : null;
+}
+// Le recalage : sur 16 × 16, toutes les échelles 0,96…1,04 par axe et tous les décalages ± 2, pour
+// chaque combinaison de variantes ; puis affiné sur 32 × 32 (± 1 % d'échelle, ± 1 px) ; puis sur la
+// grille fine (décalage ± 1 px, puis échelle ± 0,5 %).
+const ECHELLES = [0.96, 0.98, 1, 1.02, 1.04];
+function mesureFine(pa, pb) {
+  const N = COTE_FINE, ok = (x) => x && Array.isArray(x.v) && x.v.length && x.v.every((q) => q && q.f && q.f.length === N * N && q.m && q.m.length === GROSSIER * GROSSIER && q.p && q.p.length === 256 && q.d && q.d.length === COTE_DETAIL * COTE_DETAIL);
+  if (!ok(pa) || !ok(pb)) return null;
+  let b = { r: -2, A: null, B: null, sx: 1, sy: 1, dx: 0, dy: 0 };
+  for (const A of pa.v) for (const B of pb.v) for (const sx of ECHELLES) for (const sy of ECHELLES) for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+    const r = correlation(A.p, B.p, 16, sx, sy, dx, dy);
+    if (r > b.r) b = { r, A, B, sx, sy, dx, dy };
+  }
+  const { A, B } = b;
+  let m = { r: -2, sx: b.sx, sy: b.sy, dx: b.dx * 2, dy: b.dy * 2 };
+  const m0 = { ...m };
+  for (const ex of [-0.01, 0, 0.01]) for (const ey of [-0.01, 0, 0.01]) for (const i of [-1, 0, 1]) for (const j of [-1, 0, 1]) {
+    const r = correlation(A.m, B.m, GROSSIER, m0.sx + ex, m0.sy + ey, m0.dx + i, m0.dy + j);
+    if (r > m.r) m = { r, sx: m0.sx + ex, sy: m0.sy + ey, dx: m0.dx + i, dy: m0.dy + j };
+  }
+  const k = N / GROSSIER;
+  let fin = { r: -2, sx: m.sx, sy: m.sy, dx: m.dx * k, dy: m.dy * k };
+  const f0 = { ...fin };
+  for (const i of [-1, 0, 1]) for (const j of [-1, 0, 1]) { const r = correlation(A.f, B.f, N, f0.sx, f0.sy, f0.dx + i, f0.dy + j); if (r > fin.r) fin = { r, sx: f0.sx, sy: f0.sy, dx: f0.dx + i, dy: f0.dy + j }; }
+  const f1 = { ...fin };
+  for (const ex of [-0.005, 0, 0.005]) for (const ey of [-0.005, 0, 0.005]) { const r = correlation(A.f, B.f, N, f1.sx + ex, f1.sy + ey, f1.dx, f1.dy); if (r > fin.r) fin = { r, sx: f1.sx + ex, sy: f1.sy + ey, dx: f1.dx, dy: f1.dy }; }
+  // Affinage sous le pixel (½ px puis ¼ px, ¼ % d'échelle) : une copie se superpose EXACTEMENT.
+  for (const [pd, pe] of [[0.5, 0.0025], [0.25, 0.00125]]) {
+    let f2 = { ...fin };
+    for (const i of [-pd, 0, pd]) for (const j of [-pd, 0, pd]) { const r = correlation(A.f, B.f, N, f2.sx, f2.sy, f2.dx + i, f2.dy + j); if (r > fin.r) fin = { r, sx: f2.sx, sy: f2.sy, dx: f2.dx + i, dy: f2.dy + j }; }
+    f2 = { ...fin };
+    for (const ex of [-pe, 0, pe]) for (const ey of [-pe, 0, pe]) { const r = correlation(A.f, B.f, N, f2.sx + ex, f2.sy + ey, f2.dx, f2.dy); if (r > fin.r) fin = { r, sx: f2.sx + ex, sy: f2.sy + ey, dx: f2.dx, dy: f2.dy }; }
+  }
+  // Sur la grille de DÉTAIL (256) : recalage affiné encore (¼ px), puis le flou ÉGALISÉ — une copie
+  // réduite ou recompressée est plus floue que l'original : on floute l'image la plus nette de
+  // 0 à 1,5 px et on garde l'écart le plus petit (une autre prise de vue ne s'efface pas en floutant).
+  const D = COTE_DETAIL, kd = D / N;
+  let g = { r: correlation(A.d, B.d, D, fin.sx, fin.sy, fin.dx * kd, fin.dy * kd), sx: fin.sx, sy: fin.sy, dx: fin.dx * kd, dy: fin.dy * kd };
+  for (const pd of [0.5, 0.25]) {
+    const g0 = { ...g };
+    for (const i of [-pd, 0, pd]) for (const j of [-pd, 0, pd]) { if (!i && !j) continue; const r = correlation(A.d, B.d, D, g0.sx, g0.sy, g0.dx + i, g0.dy + j); if (r > g.r) g = { r, sx: g0.sx, sy: g0.sy, dx: g0.dx + i, dy: g0.dy + j }; }
+  }
+  const Bd = lireDeforme(B.d, D, g.sx, g.sy, g.dx, g.dy);
+  let meilleur = null;
+  for (const [fa, fb] of [[0, 0], [0.8, 0], [1.5, 0], [0, 0.8], [0, 1.5]]) {
+    const e = ecartsGrilles(fa ? flou(A.d, D, fa) : A.d, fb ? flou(Bd, D, fb) : Bd, D);
+    if (e && (!meilleur || e.global < meilleur.global)) meilleur = e;
+  }
+  if (!meilleur) return null;
+  const moy = (l) => { const p = l.slice(0, Math.max(1, Math.round(l.length / 10))); return p.reduce((t, x) => t + x, 0) / p.length; };
+  return { r: fin.r, pire: moy(meilleur.c8), max: meilleur.c8[0], med: moy(meilleur.c16) };
+}
+// Flou gaussien séparable (σ en px de la grille), NaN (hors de l'image) préservé.
+function flou(Z, N, sigma) {
+  const r = Math.ceil(sigma * 2.5), w = []; let t = 0;
+  for (let i = -r; i <= r; i++) { const v = Math.exp(-(i * i) / (2 * sigma * sigma)); w.push(v); t += v; }
+  const tmp = new Float32Array(N * N), out = new Float32Array(N * N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const z0 = Z[y * N + x]; if (z0 !== z0) { tmp[y * N + x] = NaN; continue; } let s = 0, a = 0; for (let i = -r; i <= r; i++) { const xx = x + i; if (xx < 0 || xx >= N) continue; const z = Z[y * N + xx]; if (z !== z) continue; s += w[i + r] * z; a += w[i + r]; } tmp[y * N + x] = s / a; }
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const z0 = tmp[y * N + x]; if (z0 !== z0) { out[y * N + x] = NaN; continue; } let s = 0, a = 0; for (let i = -r; i <= r; i++) { const yy = y + i; if (yy < 0 || yy >= N) continue; const z = tmp[yy * N + x]; if (z !== z) continue; s += w[i + r] * z; a += w[i + r]; } out[y * N + x] = s / a; }
+  return out;
+}
+// Les écarts de deux grilles déjà superposées (NaN = hors de l'image) : global, cases 8 × 8 et 16 × 16.
+function ecartsGrilles(A, Bd, N) {
+  let n = 0, sa = 0, sb = 0, saa = 0, sbb = 0;
+  for (let i = 0; i < N * N; i++) { const b = Bd[i], a = A[i]; if (b !== b || a !== a) continue; n++; sa += a; sb += b; saa += a * a; sbb += b * b; }
+  if (n < N * N * 0.6) return null;
+  const ma = sa / n, mb = sb / n, ea = Math.sqrt(Math.max(1e-9, saa / n - ma * ma)), eb = Math.sqrt(Math.max(1e-9, sbb / n - mb * mb));
+  const cases = (C) => {
+    const t = N / C, out = [];
+    for (let cy = 0; cy < C; cy++) for (let cx = 0; cx < C; cx++) {
+      let s = 0, k = 0;
+      for (let y = cy * t; y < (cy + 1) * t; y++) for (let x = cx * t; x < (cx + 1) * t; x++) { const b = Bd[y * N + x], a = A[y * N + x]; if (b !== b || a !== a) continue; const d = (a - ma) / ea - (b - mb) / eb; s += d * d; k++; }
+      if (k >= t * t * 0.5) out.push(Math.sqrt(s / k));
+    }
+    return out.length >= C * C * 0.5 ? out.sort((x, y) => y - x) : null;
+  };
+  const c8 = cases(8), c16 = cases(16);
+  if (!c8 || !c16) return null;
+  let s = 0; for (const x of c16) s += x * x;
+  return { global: Math.sqrt(s / c16.length), c8, c16 };
+}
+// La mesure rangée : { s, r } (4 décimales). s = 1 − l'écart moyen des 10 % de cases les PLUS mal
+// superposées (la même photo : près de 1 partout ; une autre prise de vue : ses pires cases la
+// trahissent) ; r = la corrélation globale. null : pas mesurable (« pas su »).
+function comparerFine(pa, pb) {
+  const x = mesureFine(pa, pb);
+  const q = (v) => Math.round(v * 10000) / 10000;
+  return x ? { s: q(Math.max(0, 1 - x.pire)), r: q(x.r) } : null;
+}
+// Une mesure rangée valide : { s, r } numériques. Rend la mesure ou null.
+function mesureValide(m) {
+  return m && typeof m === 'object' && typeof m.s === 'number' && Number.isFinite(m.s) && typeof m.r === 'number' && Number.isFinite(m.r) ? { s: m.s, r: m.r } : null;
+}
+// Le verdict d'une mesure { s, r } : 'sur' · 'non' · 'doute' ; null (pas mesurée) ⇒ null.
+function verdictFin(mesure) {
+  const m = mesureValide(mesure);
+  if (!m) return null;
+  if (m.s < SEUIL_FINE_NON) return 'non';
+  if (m.s >= SEUIL_FINE_SUR && m.r >= SEUIL_CORREL_SUR) return 'sur';
+  return 'doute';
+}
+// La clé d'un couple vérifié : la photo de l'autre site × la photo Vinted (clés de photo,
+// sans signature). `site` : 'lbc' · 'vc' · 'ebay'.
+const cleCoupleFin = (site, idSite, kSite, uid, idVinted, kVinted) => `${site}|${idSite}|${kSite}#${uid}|${idVinted}|${kVinted}`;
+// Les couples à vérifier finement : chaque photo d'un autre site × chaque photo Vinted à une
+// distance d'empreinte ≤ `seuil` (le seuil de proposition). Une photo d'ailleurs proche de plus
+// de `parPhoto` annonces Vinted est un logo / un fond : ignorée. Les plus proches d'abord, `max` au plus.
+// `vinted` : { [uid]: { [idAnnonce]: { [clePhoto]: hex } } } ; `sites` : { lbc|vc|ebay: { [id]: { [clé]: hex } } }.
+function couplesAVerifier({ vinted = {}, sites = {}, seuil = 12, parPhoto = 8, max = 60 } = {}) {
+  const pv = [];
+  for (const [uid, parId] of Object.entries(vinted || {})) for (const [id, ph] of Object.entries(parId || {})) for (const [k, h] of Object.entries(ph || {})) pv.push({ uid, id, k, h });
+  const out = [];
+  for (const [site, parId] of Object.entries(sites || {})) for (const [sid, ph] of Object.entries(parId || {})) for (const [sk, sh] of Object.entries(ph || {})) {
+    const proches = [];
+    for (const v of pv) { const d = distanceEmpreintes(sh, v.h); if (d != null && d <= seuil) proches.push({ v, d }); }
+    if (!proches.length || new Set(proches.map((x) => `${x.v.uid}|${x.v.id}`)).size > parPhoto) continue;
+    for (const { v, d } of proches) out.push({ cle: cleCoupleFin(site, sid, sk, v.uid, v.id, v.k), site, sid, sk, uid: v.uid, vid: v.id, vk: v.k, d });
+  }
+  out.sort((a, b) => a.d - b.d || (a.cle < b.cle ? -1 : 1));
+  return out.slice(0, max);
+}
+// </photo-fine-regle>
+const VERIF_FINE_MAX_HEURE = 6;
+const VERIF_FINE_PLAN = 'vrmVerifFinePlan';          // { at, couples: [{ cle, site, sid, sk, uid, vid, vk, d, vu, su, compte }] }
+const VERIF_FINE_MEMO = 'vrmVerifFineMemo';          // { [clé]: ms du dernier essai }
+const VERIF_FINE_FILE = 'vrmVerifFineFile';          // [{ cle, s, at }] — mesurés, pas encore rangés
+const VERIF_FINE_DERNIERE = 'vrmVerifFineDerniere';
+const VERIF_FINE_HEURE = 'vrmVerifFineHeure';        // [ms] des couples de l'heure
+const LIGNE_VERIF_FINE = 'photo_meme_verif';
+// La liste des couples à vérifier, avec l'adresse des deux photos (SES annonces seulement :
+// dressings de ses comptes liés, `lbc_listings` / `vc_listings` de ses comptes). `null` = pas su.
+async function planVerifFine() {
+  let st = {};
+  try { st = await chrome.storage.local.get(VERIF_FINE_PLAN); } catch (_) { return null; }
+  const p = st[VERIF_FINE_PLAN];
+  const age = Date.now() - Number(p && p.at || 0);
+  if (p && Array.isArray(p.couples) && age >= 0 && age < (p.couples.length ? EMPREINTES_PLAN_MS : EMPREINTES_PLAN_VIDE_MS)) return p;
+  const comptes = (await getStoredAccounts()).map((a) => String(a && a.vinted_user_id || '')).filter((u) => /^\d{1,15}$/.test(u));
+  if (!comptes.length) return null;
+  const empV = await sbGet('app_data?id=like.photo_emprunte_*&select=id,a:data->payload->annonces');
+  const empS = await sbGet('app_data?id=in.(photo_empreinte_lbc,photo_empreinte_vc)&select=id,a:data->payload->annonces');
+  const faits = await sbGet(`app_data?id=eq.${LIGNE_VERIF_FINE}&select=c:data->payload->couples`);
+  if (empV === null || empS === null || faits === null) return null;
+  const vinted = {}, sites = {};
+  for (const r of empV || []) { const m = /^photo_emprunte_(\d+)$/.exec(String(r && r.id || '')); if (m && comptes.includes(m[1]) && r.a && typeof r.a === 'object') vinted[m[1]] = r.a; }
+  for (const r of empS || []) { const s = r && r.id === 'photo_empreinte_lbc' ? 'lbc' : r && r.id === 'photo_empreinte_vc' ? 'vc' : ''; if (s && r.a && typeof r.a === 'object') sites[s] = r.a; }
+  const deja = (faits && faits[0] && faits[0].c && typeof faits[0].c === 'object') ? faits[0].c : {};
+  const candidats = couplesAVerifier({ vinted, sites }).filter((c) => { const x = deja[c.cle]; return !(x && Number(x.v) === VERSION_FINE); });
+  if (!candidats.length) { const vide = { at: Date.now(), couples: [] }; try { await chrome.storage.local.set({ [VERIF_FINE_PLAN]: vide }); } catch (_) {} return vide; }
+  // Les adresses : la clé d'une photo est son adresse sans signature — on retrouve l'adresse
+  // complète là où l'extension l'a lue pour l'empreinte (dressing, fiche ; annonces des sites).
+  const dressings = await sbGet('app_data?id=like.harvest_*_listings&select=id,items:data->payload->items');
+  const lbc = await sbGetLbc('app_data?id=eq.lbc_listings&select=i:data->items');
+  const vc = await sbGet('app_data?id=eq.vc_listings&select=i:data->items');
+  if (dressings === null || lbc === null || vc === null) return null;
+  let details = {};
+  const dr = await sbGet('app_data?id=eq.vinted_item_details&select=data');
+  if (dr !== null) details = (dr[0] && dr[0].data) || {};
+  const urlV = new Map(), urlS = new Map();
+  for (const r of dressings || []) {
+    const m = /^harvest_(\d+)_listings$/.exec(String(r && r.id || '')); if (!m || !comptes.includes(m[1])) continue;
+    for (const it of Array.isArray(r.items) ? r.items : []) {
+      if (!it || !it.id) continue;
+      const id = String(it.id), ph = it.photo && typeof it.photo === 'object' ? it.photo : null;
+      if (ph && ph.url && urlImageVinted(ph.url)) urlV.set(`${m[1]}|${id}|${clePhotoEmpreinte(ph.url)}`, ph.url);
+      const d = details[id];
+      for (const u of (d && Array.isArray(d.photos) ? d.photos : []).slice(0, EMPREINTES_PAR_ANNONCE)) { const url = typeof u === 'string' ? u : (u && u.url); if (urlImageVinted(url)) urlV.set(`${m[1]}|${id}|${clePhotoEmpreinte(url)}`, url); }
+    }
+  }
+  const itemsLbc = (lbc && lbc[0] && lbc[0].i && typeof lbc[0].i === 'object') ? lbc[0].i : {};
+  for (const [cle, ad] of Object.entries(itemsLbc)) {
+    if (!ad || typeof ad !== 'object') continue;
+    const id = String(ad.id != null ? ad.id : cle), compte = String(ad.account || ad.lbcUser || '').replace(/^lbc-account:/, '');
+    if (!compteImpOk(compte)) continue;
+    for (const u of Array.isArray(ad.images) ? ad.images : []) if (urlImageSite('lbc', u)) urlS.set(`lbc|${id}|${clePhotoEmpreinte(u)}`, { url: u, compte });
+  }
+  const itemsVc = (vc && vc[0] && vc[0].i && typeof vc[0].i === 'object') ? vc[0].i : {};
+  for (const [id, it] of Object.entries(itemsVc)) { const compte = String(it && it.compte || ''); if (it && compteImpOk(compte) && urlImageSite('vc', it.photo)) urlS.set(`vc|${id}|${clePhotoEmpreinte(it.photo)}`, { url: it.photo, compte }); }
+  const couples = [];
+  for (const c of candidats) {
+    const vu = urlV.get(`${c.uid}|${c.vid}|${c.vk}`), s = urlS.get(`${c.site}|${c.sid}|${c.sk}`);
+    if (vu && s) couples.push(Object.assign({}, c, { vu, su: s.url, compte: s.compte }));
+  }
+  const plan = { at: Date.now(), couples };
+  try { await chrome.storage.local.set({ [VERIF_FINE_PLAN]: plan }); } catch (_) {}
+  return plan;
+}
+// Une image ⇒ sa préparation fine (ou null), dessinée à `tailleLectureFine` (proportions gardées).
+async function fineDeBlob(blob) {
+  try {
+    if (typeof createImageBitmap !== 'function' || typeof OffscreenCanvas !== 'function') return null;
+    const bmp = await createImageBitmap(blob);
+    const t = tailleLectureFine(bmp.width, bmp.height);
+    const c = new OffscreenCanvas(t.w, t.h);
+    const x = c.getContext('2d');
+    x.imageSmoothingQuality = 'high';
+    x.drawImage(bmp, 0, 0, t.w, t.h);
+    try { bmp.close && bmp.close(); } catch (_) {}
+    return preparerFine(x.getImageData(0, 0, t.w, t.h).data, t.w, t.h);
+  } catch (_) { return null; }
+}
+async function imageFine(url, max) {
+  try {
+    const res = await fetch(url, { credentials: 'omit', cache: 'no-store' });
+    const type = String((res.headers && res.headers.get && res.headers.get('content-type')) || '');
+    const taille = Number((res.headers && res.headers.get && res.headers.get('content-length')) || 0);
+    if (!res.ok || !/^image\//i.test(type) || taille > max) return { ok: false, status: 0, http: Number(res.status) || 0 };
+    const blob = await res.blob();
+    if (!blob || blob.size > max) return { ok: false, status: 0, http: 413 };
+    return { ok: true, status: 0, http: res.status, blob };
+  } catch (_) { return { ok: false, status: 0, http: 0 }; }
+}
+// La file des scores part dans `photo_meme_verif`, fusionnée sur la ligne RELUE ; une lecture
+// ratée n'écrit rien (la file reste). Un couple dont une des deux annonces n'a plus d'empreinte sort.
+async function rangerVerifFine() {
+  let file = [];
+  try { file = (await chrome.storage.local.get(VERIF_FINE_FILE))[VERIF_FINE_FILE] || []; } catch (_) { return false; }
+  if (!file.length) return true;
+  const r = await sbGet(`app_data?id=eq.${LIGNE_VERIF_FINE}&select=c:data->payload->couples`);
+  if (r === null) { noterDiag('verif_fine_lecture_ratee'); return false; }
+  const couples = Object.assign({}, (r[0] && r[0].c && typeof r[0].c === 'object') ? r[0].c : {});
+  for (const e of file) couples[e.cle] = { s: typeof e.s === 'number' ? e.s : null, r: typeof e.r === 'number' ? e.r : null, v: VERSION_FINE, at: new Date(Number(e.at) || Date.now()).toISOString() };
+  const cles = Object.keys(couples);
+  if (cles.length > 400) for (const k of cles.sort((a, b) => String(couples[a].at).localeCompare(String(couples[b].at))).slice(0, cles.length - 400)) delete couples[k];
+  const ok = await supabaseUpsert('app_data', [{ id: LIGNE_VERIF_FINE, data: { type: 'photo_meme_verif', capturedAt: new Date().toISOString(), nItems: Object.keys(couples).length, payload: { version: VERSION_FINE, sur: SEUIL_FINE_SUR, correl: SEUIL_CORREL_SUR, non: SEUIL_FINE_NON, couples } } }], 'id');
+  if (ok === false) { noterDiag('verif_fine_ecriture_ratee'); return false; }
+  noterDiag('verif_fine_ecrite');
+  try { await chrome.storage.local.set({ [VERIF_FINE_FILE]: [] }); } catch (_) {}
+  return true;
+}
+// UN tour : un couple au plus (deux images). Rend 1 (un couple mesuré), 0 (rien à faire / refus).
+async function verifFineUnTour() {
+  const st = await chrome.storage.local.get([VERIF_FINE_DERNIERE, VERIF_FINE_MEMO, VERIF_FINE_HEURE, VERIF_FINE_FILE, EMPREINTES_FREIN, EMPREINTES_SITES_FREIN, ACTIVITE_VINTED]);
+  const t = Date.now();
+  if ((st[VERIF_FINE_FILE] || []).length) await rangerVerifFine();
+  const depuis = t - Number(st[VERIF_FINE_DERNIERE] || 0);
+  if (depuis >= 0 && depuis < EMPREINTES_ECART_MS) return 0;
+  const heure = (st[VERIF_FINE_HEURE] || []).filter((x) => t - Number(x) >= 0 && t - Number(x) < 3600e3);
+  if (heure.length >= VERIF_FINE_MAX_HEURE) { noterDiag('verif_fine_plafond'); return 0; }
+  const tabs = await chrome.tabs.query({ url: ['https://*.vinted.fr/*', 'https://*.vinted.com/*', 'https://*.vinted.it/*', 'https://*.vinted.de/*'] });
+  if (!tabs || !tabs.length) return 0;                // la photo Vinted se lit onglet vinted.fr ouvert, comme l'empreinte
+  const uid = await activeUidForDomain('www.vinted.fr');
+  if (!uid) return 0;
+  if (await pauseVinted()) return 0;
+  const fv = Number(st[EMPREINTES_FREIN] || 0);
+  if (fv && t - fv >= 0 && t - fv < EMPREINTES_RETRY_MS) return 0;
+  const depuisNav = t - Number(st[ACTIVITE_VINTED] || 0);
+  if (depuisNav >= 0 && depuisNav < PHOTOS_CALME_MS) return 0;
+  const plan = await planVerifFine();
+  if (!plan || !plan.couples.length) return 0;
+  const memo = st[VERIF_FINE_MEMO] || {}, freins = st[EMPREINTES_SITES_FREIN] || {};
+  const enFile = new Set((st[VERIF_FINE_FILE] || []).map((e) => e.cle));
+  let cible = null;
+  for (const c of plan.couples) {
+    if (enFile.has(c.cle) || (memo[c.cle] && t - Number(memo[c.cle]) < EMPREINTES_RETRY_MS)) continue;
+    const f = Number(freins[c.site] || 0); if (f && t - f >= 0 && t - f < EMPREINTES_RETRY_MS) continue;
+    if ((await ongletImpSite(SITE_IMPORT[c.site], c.compte)) == null) continue;   // l'onglet de CE compte sur son site
+    cible = c; break;
+  }
+  if (!cible) return 0;
+  const pf = SITE_IMPORT[cible.site];
+  { const rb = await secuRobotDit(pf, cible.compte); if (rb) { noterDiag('verif_fine_robot'); return 0; } }
+  if (cible.site === 'vc' && await pauseVc()) return 0;
+  if (cible.site === 'lbc' && ((await pauseLbcMsg()) || (await pauseLbcPrix()))) return 0;
+  const acc = (await getStoredAccounts()).find((a) => String(a.vinted_user_id) === String(uid));
+  if (!acc) return 0;
+  const refus = await gardeLecture(uid, acc, 'photos');
+  if (refus) { noterDiag('verif_fine_' + refus.code); return 0; }
+  const lu = await compterLecture(cleImpSite(pf, cible.compte), EMPREINTES_SITES_MAX_HEURE);
+  if (!lu.ok) { noterDiag('verif_fine_budget'); return 0; }
+  memo[cible.cle] = Date.now();
+  heure.push(Date.now());
+  try { await chrome.storage.local.set({ [VERIF_FINE_MEMO]: memo, [VERIF_FINE_DERNIERE]: Date.now(), [VERIF_FINE_HEURE]: heure }); } catch (_) {}
+  const rv = await requeteVinted('image', () => imageFine(cible.vu, EMPREINTES_MAX_OCTETS));
+  const rs = await imageFine(cible.su, EMPREINTES_SITES_MAX_OCTETS);
+  try { await chrome.storage.local.set({ [VERIF_FINE_DERNIERE]: Date.now() }); } catch (_) {}
+  if (!rv || !rv.ok || !rv.blob) { noterDiag(`verif_fine_vinted_refusee_${rv ? (rv.http || 0) : 0}`); if (rv && Number(rv.http) === 429) { try { await chrome.storage.local.set({ [EMPREINTES_FREIN]: Date.now() }); } catch (_) {} } return 0; }
+  if (!rs.ok || !rs.blob) { noterDiag(`verif_fine_site_refusee_${cible.site}_${rs.http || 0}`); if ([403, 429].includes(Number(rs.http))) { try { await chrome.storage.local.set({ [EMPREINTES_SITES_FREIN]: Object.assign({}, freins, { [cible.site]: Date.now() }) }); } catch (_) {} } return 0; }
+  const pa = await fineDeBlob(rs.blob), pb = await fineDeBlob(rv.blob);
+  // Une image trop petite / illisible : « pas su » rangé (s: null), jamais une mesure inventée.
+  const mesure = pa && pb ? comparerFine(pa, pb) : null;
+  let file = [];
+  try { file = (await chrome.storage.local.get(VERIF_FINE_FILE))[VERIF_FINE_FILE] || []; } catch (_) { return 0; }
+  file.push({ cle: cible.cle, s: mesure ? mesure.s : null, r: mesure ? mesure.r : null, at: Date.now() });
+  try { await chrome.storage.local.set({ [VERIF_FINE_FILE]: file }); } catch (_) { return 0; }
+  noterDiag(mesure == null ? 'verif_fine_pas_su' : 'verif_fine_mesuree');
+  await rangerVerifFine();
   return 1;
 }
 
@@ -11088,7 +11564,7 @@ function surAlarme(a) {
   else if (a.name === 'vrm-photos') lance('photos', () => tickPhotos());
   else if (a.name === 'vrm-relais') { lance('relais', () => relaisTick('alarme')); lance('favoriscarte', () => tickFavorisCarte()); }   // 5.376 : les favoris lancés depuis la carte
   else if (a.name === 'vrm-lbc') lance('lbc', () => relireLbcEnFond());
-  else if (a.name === 'vrm-offres') { lance('offres', () => offresTick()); lance('baisses', () => baissesTick()); lance('favoriattente', () => reprendreMessagesFavoris()); }   // 5.372 : un message au favori qui attendait après l'offre   // 5.370 : les baisses programmées
+  else if (a.name === 'vrm-offres') { lance('offres', () => offresTick()); lance('baisses', () => baissesTick()); lance('favoriattente', () => reprendreMessagesFavoris()); lance('vcaimes', () => reprendreOffresAimesVc()); lance('photosvrm', () => rangerPhotosVrm()); }   // 5.372 : un message au favori qui attendait après l'offre   // 5.370 : les baisses programmées
   // 5.290 : le statut des colis chez le transporteur (voir `transpTick`).
   else if (a.name === 'vrm-transp') lance('transp', () => transpTick('alarme'));
   // 5.341 : les dates de versement, onglet Vinted ouvert (voir `tickVersements`).
@@ -14639,7 +15115,7 @@ async function refaireBrouillon(msg) {
     { const fr = await lireFreinRepub(uid); if (fr) { if (recuR.at) await rendreActions(uid, recuR.at, 1); noterDiag('frein_repub_tenu_file'); return { accepte: false, code: 'frein-refus', jusqua: fr.jusqua, raison: phraseFreinRepub(fr) }; } }
     suiviRepub(id);
     const temp = uuidRecreer();
-    const tp = await televerserPhotosRecreer(acc, urls, [], reglagesPhotoSurs(vb.reglages), temp, (k, n) => etapeRepub(id, 'photos', { fait: k, total: n }));
+    const tp = await televerserPhotosRecreer(acc, urls, [], reglagesPhotoSurs(vb.reglages), temp, (k, n) => etapeRepub(id, 'photos', { fait: k, total: n }), { uid, src: id, n: msg && msg.num ? String(msg.num) : '' });
     if (tp.sansPage) return { accepte: false, code: 'onglet-vinted', raison: tp.erreur };
     if (!tp.ids) return { accepte: true, etape: 'echec', refaire: true, raison: `${tp.erreur} — aucun brouillon n'a été créé, tout reste enregistré dans VRM` };
     const assigned = tp.ids.map((pid) => ({ id: pid, orientation: 0 }));
@@ -14759,8 +15235,9 @@ function photosRefusees(rc) {
 // Les photos d'un brouillon fait par VRM, renvoyées depuis le coffre de
 // l'ancienne annonce (une par photo, avec ses réglages enregistrés).
 // Rend { ids } · { erreur } · {} (rien à renvoyer : pas de coffre).
-async function televerserPhotosRecreer(acc, urls, second, reglages, temp, suivi) {
+async function televerserPhotosRecreer(acc, urls, second, reglages, temp, suivi, origine = null) {
   const ids = [];
+  const produites = [];   // 5.392 : l'empreinte de chaque photo PRODUITE (réglée) par VRM — rangée après la boucle
   for (let i = 0; i < urls.length; i++) {
     if (i > 0) await pauseRepub('photo', acc && acc.vinted_user_id);
     if (typeof suivi === 'function') { try { suivi(i, urls.length); } catch (_) {} }
@@ -14770,6 +15247,8 @@ async function televerserPhotosRecreer(acc, urls, second, reglages, temp, suivi)
     for (const u of essais) { try { const r = await fetch(u, { signal: AbortSignal.timeout(30000) }); if (!r.ok) throw new Error('http ' + r.status); blob = await r.blob(); break; } catch (e) { err = e; blob = null; } }
     if (!blob) return { erreur: `la photo ${i + 1} n'a pas pu être lue (${String(err && err.message || err || 'photo absente').slice(0, 40)})` };
     try { blob = await photoReglee(blob, reglages); } catch (e) { return { erreur: String(e && e.message || e).slice(0, 80) }; }
+    // 5.392 (`photovrm`) : la MÊME empreinte que `tickEmpreintes` (`empreinteDeBlob`), sur le fichier PRODUIT.
+    if (origine) { try { const h = await empreinteDeBlob(blob); if (h) produites.push(h); } catch (_) {} }
     const rp = await vintedPagePhoto(acc, blob, `photo-${i + 1}.jpg`, temp);
     if (rp && rp.sansPage) return { erreur: raisonSansPage(rp), sansPage: rp.sansPage };
     const pid = rp && rp.ok ? idPhotoReponse(rp.json) : null;
@@ -14783,7 +15262,52 @@ async function televerserPhotosRecreer(acc, urls, second, reglages, temp, suivi)
     }
     ids.push(pid);
   }
+  // La file est posée tout de suite (stockage de l'extension) ; l'écriture en base suit sans retenir l'atelier.
+  if (origine && produites.length && await noterPhotosVrm(origine, produites)) rangerPhotosVrm().catch(() => {});
   return { ids };
+}
+// ══ 5.392 (15 nov., `photovrm`) — LA PHOTO FABRIQUÉE PAR L'ATELIER « REPUBLIER PAR VRM » ═══════════
+// Pour qu'une photo de l'atelier, republiée PLUS TARD à la main dans l'app Vinted, soit reconnue
+// (src/republieTelephone.js, registre `vrm_photos_vrm`, seuil SÛR `SEUIL_PHOTO_VRM`) : l'empreinte de
+// chaque photo RÉGLÉE (`photoReglee`) est rangée dans `photo_vrm_{uid}` (compte de l'onglet) :
+// `payload.photos = { [empreinte]: { h, n (N° de la fiche), src (l'annonce d'origine), uid, at } }`.
+// Jamais l'image. La file vit dans `chrome.storage.local` (§4.9) ; la ligne est lue-fusionnée-réécrite
+// (une lecture ratée n'écrit RIEN, la file reste), bornée (60 jours, 1 500 empreintes). Rien d'autre ne
+// change dans l'atelier : le rangement suit l'envoi des photos, il n'en retient aucune.
+const PHOTOS_VRM_FILE = 'vrmPhotosVrmFile';
+const PHOTOS_VRM_JOURS = 60, PHOTOS_VRM_MAX = 1500;
+async function noterPhotosVrm(origine, hexes) {
+  const uid = String((origine && origine.uid) || ''), src = String((origine && origine.src) || ''), n = String((origine && origine.n) || '').trim();
+  if (!/^\d{1,20}$/.test(uid) || !/^\d{1,20}$/.test(src)) return false;
+  const at = new Date().toISOString();
+  try {
+    const f = (await chrome.storage.local.get(PHOTOS_VRM_FILE))[PHOTOS_VRM_FILE] || [];
+    for (const h of hexes) if (empreinteValide(h)) f.push({ h, n, src, uid, at });
+    await chrome.storage.local.set({ [PHOTOS_VRM_FILE]: f.slice(-400) });
+  } catch (_) { return false; }
+  return true;
+}
+async function rangerPhotosVrm() {
+  let file = [];
+  try { file = (await chrome.storage.local.get(PHOTOS_VRM_FILE))[PHOTOS_VRM_FILE] || []; } catch (_) { return false; }
+  if (!file.length) return true;
+  const restent = [];
+  const parUid = {};
+  for (const e of file) if (e && /^\d{1,20}$/.test(String(e.uid || ''))) (parUid[e.uid] = parUid[e.uid] || []).push(e);
+  const limite = Date.now() - PHOTOS_VRM_JOURS * 864e5;
+  for (const [uid, liste] of Object.entries(parUid)) {
+    const r = await sbGet(`app_data?id=eq.photo_vrm_${uid}&select=p:data->payload->photos`);
+    if (r === null) { restent.push(...liste); noterDiag('photos_vrm_lecture_ratee'); continue; }
+    const photos = Object.assign({}, (r[0] && r[0].p && typeof r[0].p === 'object' && !Array.isArray(r[0].p)) ? r[0].p : {});
+    for (const e of liste) photos[e.h] = { h: e.h, n: String(e.n || ''), src: String(e.src || ''), uid: String(uid), at: e.at };
+    let garde = Object.entries(photos).filter(([h, e]) => empreinteValide(h) && e && Date.parse(e.at || '') >= limite);
+    garde.sort((a, b) => String(b[1].at).localeCompare(String(a[1].at)));
+    garde = garde.slice(0, PHOTOS_VRM_MAX);
+    const ok = await supabaseUpsert('app_data', [{ id: `photo_vrm_${uid}`, data: { type: 'photo_vrm', uid: String(uid), capturedAt: new Date().toISOString(), nItems: garde.length, payload: { version: 1, photos: Object.fromEntries(garde) } } }], 'id');
+    if (ok === false) { restent.push(...liste); noterDiag('photos_vrm_ecriture_ratee'); } else noterDiag('photos_vrm_ecrites');
+  }
+  try { await chrome.storage.local.set({ [PHOTOS_VRM_FILE]: restent }); } catch (_) {}
+  return !restent.length;
 }
 // (28 oct.) La fiche d'UNE annonce dans `vinted_item_details`. ⚠️ Mesuré dans
 // les journaux de la base : `select=f:data->10312441750` répond 400 — un nombre
@@ -15032,7 +15556,7 @@ async function recreerVinted(msg) {
     // 2. Les photos, une par une, depuis la page.
     await pauseRepub('lecture', uid);
     const temp = uuidRecreer();
-    const tp = await televerserPhotosRecreer(acc, urls, second, reglages, temp, (i, n) => etapeRepub(id, 'photos', { fait: i, total: n }));
+    const tp = await televerserPhotosRecreer(acc, urls, second, reglages, temp, (i, n) => etapeRepub(id, 'photos', { fait: i, total: n }), { uid, src: id, n: msg && msg.num ? String(msg.num) : '' });
     if (tp.sansPage) return { accepte: false, code: 'onglet-vinted', raison: tp.erreur };
     if (!tp.ids) return { accepte: true, etape: 'echec', raison: `${tp.erreur} — rien n'a été créé ni supprimé, ton annonce est intacte` };
     const ids = tp.ids;
@@ -16598,6 +17122,14 @@ const DISCRETION_CACHE_MS = 60000;
 const SORTES_LIMITEES = ['favori', 'offre'];
 const PAR_HEURE_SORTE_DEFAUT = 15;
 const tirerEntre = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+// (15 nov., 5.392) La porte sert aussi un compte VESTIAIRE (`vc:{id}`, la clé de ses actions) : les
+// mêmes règles que les favoris Vinted (Tout arrêter, vérification, 15/h par sorte, ouverture du site,
+// un compte à la fois, série décalée), chacune SITE PAR SITE — un geste Vestiaire ne retient pas un
+// compte Vinted, et l'inverse. Les autres Chrome ne sont lus que pour Vinted (leur ligne n'existe que là).
+const cleDiscretionOk = (u) => /^\d{1,20}$/.test(String(u || '')) || /^vc:\d{1,20}$/.test(String(u || ''));
+const siteDiscretion = (u) => (/^vc:/.test(String(u || '')) ? 'vc' : 'vinted');
+const cleVerrouCompte = (u) => (siteDiscretion(u) === 'vc' ? 'vrmVerrouCompteVc' : 'vrmVerrouCompte');
+const cleSerie = (u, sorte) => (siteDiscretion(u) === 'vc' ? 'vc:' + sorte : sorte);
 // Le jour de Paris (« 2026-11-12 ») et l'heure de Paris (0-23), quel que soit le fuseau.
 function jourParis(t) {
   try { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(t)); }
@@ -16858,7 +17390,7 @@ function phraseRefusDiscretion(c) {
 //    d'absence, une attente de 2 à 6 min est tirée.
 function noterOuvertureVinted(uid) {
   const u = String(uid || '');
-  if (!/^\d{1,20}$/.test(u)) return Promise.resolve(null);
+  if (!cleDiscretionOk(u)) return Promise.resolve(null);   // (5.392) aussi `vc:{id}` : vestiairecollective.com ouvert
   return surDiscretion(async () => {
     const t = Date.now();
     const m = await lireLocal('vrmOuverture');
@@ -16893,10 +17425,10 @@ async function phaseRythme(uid, t) {
 // Un bordereau (une obligation d'envoi) n'attend que la vérification.
 async function porteDiscretion(uid, sorte, opts = {}) {
   const u = String(uid || '');
-  if (!/^\d{1,20}$/.test(u)) return null;                 // Vestiaire / Leboncoin : pas cette porte
+  if (!cleDiscretionOk(u)) return null;                   // Leboncoin : pas cette porte (Vestiaire : `vc:{id}`, 5.392)
   const t = Date.now();
-  // Les autres Chrome du compte : lus seulement pour une sorte limitée (favoris, offres).
-  const autres = opts.autres || (SORTES_LIMITEES.includes(sorte) ? await actionsAutresNavigateurs(u) : null);
+  // Les autres Chrome du compte : lus seulement pour une sorte limitée (favoris, offres) — Vinted seulement.
+  const autres = opts.autres || (SORTES_LIMITEES.includes(sorte) && siteDiscretion(u) === 'vinted' ? await actionsAutresNavigateurs(u) : null);
   const ta = await toutArreteDepuis(autres);
   if (ta) return { ok: false, code: 'tout-arrete', depuis: ta, attendreMs: 0, error: phraseArret('tout') };
   const cap = await captchaEnCours(u, autres);
@@ -16911,11 +17443,11 @@ async function porteDiscretion(uid, sorte, opts = {}) {
     if (tous.length >= lim) { const ms = tous[tous.length - lim] + 3600000 - t; return att(ms, 'sorte', `${lim} ${sorte === 'favori' ? 'messages aux favoris' : 'réponses aux offres'} cette heure : VRM reprend dans ${minutes(ms)} min.`); }
   }
   const ouv = (await lireLocal('vrmOuverture'))[u];
-  if (ouv && Number(ouv.depuis) + Number(ouv.attente || 0) > t) { const ms = Number(ouv.depuis) + Number(ouv.attente) - t; return att(ms, 'ouverture', `Vinted vient d’être ouvert : VRM attend ${minutes(ms)} min avant d’agir seul.`); }
-  const v = await lireLocal('vrmVerrouCompte');
+  if (ouv && Number(ouv.depuis) + Number(ouv.attente || 0) > t) { const ms = Number(ouv.depuis) + Number(ouv.attente) - t; return att(ms, 'ouverture', `${siteDiscretion(u) === 'vc' ? 'Vestiaire' : 'Vinted'} vient d’être ouvert : VRM attend ${minutes(ms)} min avant d’agir seul.`); }
+  const v = await lireLocal(cleVerrouCompte(u));
   if (v.uid && String(v.uid) !== u && Number(v.jusqua) > t) { const ms = Number(v.jusqua) - t; return att(ms, 'autre-compte', `Un autre compte vient d’agir dans ce navigateur : VRM attend ${minutes(ms)} min.`); }
   if (SORTES_SERIE.includes(sorte)) {
-    const s = (await lireLocal('vrmSeries'))[sorte];
+    const s = (await lireLocal('vrmSeries'))[cleSerie(u, sorte)];
     if (s && String(s.uid) !== u && Number(s.dernier) + Number(s.ecart) > t) { const ms = Number(s.dernier) + Number(s.ecart) - t; return att(ms, 'serie', `La même série vient de passer sur un autre compte : VRM attend ${minutes(ms)} min.`); }
   }
   if (opts.rythme) {
@@ -16927,10 +17459,10 @@ async function porteDiscretion(uid, sorte, opts = {}) {
 // Un geste automatique est PARTI (sa place est prise) : le verrou du navigateur et la série.
 function noterGesteAuto(uid, sorte) {
   const u = String(uid || '');
-  if (!/^\d{1,20}$/.test(u) || sorte === 'bordereau') return Promise.resolve();
+  if (!cleDiscretionOk(u) || sorte === 'bordereau') return Promise.resolve();
   return surDiscretion(async () => {
     const t = Date.now();
-    const maj = { vrmVerrouCompte: { uid: u, jusqua: t + VERROU_COMPTE_MS, at: t } };
+    const maj = { [cleVerrouCompte(u)]: { uid: u, jusqua: t + VERROU_COMPTE_MS, at: t } };
     if (SORTES_LIMITEES.includes(sorte)) {
       const so = await lireLocal('vrmSortes');
       const e = so[u] && typeof so[u] === 'object' ? so[u] : {};
@@ -16939,8 +17471,8 @@ function noterGesteAuto(uid, sorte) {
     }
     if (SORTES_SERIE.includes(sorte)) {
       const s = await lireLocal('vrmSeries');
-      const c = s[sorte];
-      s[sorte] = { uid: u, dernier: t, ecart: c && String(c.uid) === u && Number(c.ecart) > 0 ? Number(c.ecart) : tirerEntre(SERIE_ECART_MIN_MS, SERIE_ECART_MAX_MS), at: t };
+      const cs = cleSerie(u, sorte), c = s[cs];
+      s[cs] = { uid: u, dernier: t, ecart: c && String(c.uid) === u && Number(c.ecart) > 0 ? Number(c.ecart) : tirerEntre(SERIE_ECART_MIN_MS, SERIE_ECART_MAX_MS), at: t };
       maj.vrmSeries = s;
     }
     try { await chrome.storage.local.set(maj); } catch (_) {}
@@ -17735,14 +18267,20 @@ const FAVORI_ATTENTE = 'vrmFavoriAttente';
 const FAVORI_ATTENTE_TRANCHE_MS = 2000;
 const FAVORI_ATTENTE_TROP_TARD_MS = 10 * 60000;
 const _favorisAttenteIci = new Set();   // les attentes tenues par CE worker (un worker neuf n'en a aucune)
-async function tirerAttenteOffreMessage() {
-  const [a, b] = OFFRE_MESSAGE_S;
+// (15 nov., 5.392) Le tirage « au hasard, jamais deux fois de suite la même valeur » (à la seconde,
+// la dernière gardée sous `cle` dans `chrome.storage.local`, §4.9) — partagé par l'attente offre →
+// message des favoris Vinted et l'écart entre deux offres aux personnes qui aiment, sur Vestiaire.
+async function tirerSansRepeter(cle, a, b) {
   let der = NaN;
-  try { der = Number(((await chrome.storage.local.get('vrmOffreMessageDernier')).vrmOffreMessageDernier || {}).s); } catch (_) {}
+  try { der = Number(((await chrome.storage.local.get(cle))[cle] || {}).s); } catch (_) {}
   let s = a + Math.floor(Math.random() * (b - a + 1));
   if (s === der) s = a + ((s - a + 1 + Math.floor(Math.random() * (b - a))) % (b - a + 1));
-  try { await chrome.storage.local.set({ vrmOffreMessageDernier: { s, at: Date.now() } }); } catch (_) {}
+  try { await chrome.storage.local.set({ [cle]: { s, at: Date.now() } }); } catch (_) {}
   return s;
+}
+async function tirerAttenteOffreMessage() {
+  const [a, b] = OFFRE_MESSAGE_S;
+  return tirerSansRepeter('vrmOffreMessageDernier', a, b);
 }
 async function lireAttentesFavori() {
   try { const v = (await chrome.storage.local.get(FAVORI_ATTENTE))[FAVORI_ATTENTE]; return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch (_) { return null; }
@@ -19287,7 +19825,7 @@ async function etatPourApp() {
   //    présence comme `pause` et `vivant`).
   // 29 oct. : `lbcSupprime` — elle sait aussi SUPPRIMER une annonce Leboncoin
   //    sur commande confirmée (même règle : le bouton n'apparaît qu'à elle).
-  return Object.assign({ ok: true, version, code: CODE_VERSION, ext, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus, lbcPause: true, lbcSupprime: true, vcRepondre: true, lbcRepondre: true, vcOffre: true, lbcPrix: true, vcPrix: true },
+  return Object.assign({ ok: true, version, code: CODE_VERSION, ext, vrm, vinted: uid && !vintedPasSu ? { uid: String(uid), login: login || '' } : null, cmds: cmdsVus, lbcPause: true, lbcSupprime: true, vcRepondre: true, lbcRepondre: true, vcOffre: true, vcOffreAimes: true, lbcPrix: true, vcPrix: true },
     vintedPasSu ? { vintedPasSu: true } : {},
     pause && pause !== PAUSE_PAS_SUE ? { pause: { jusqua: Number(pause.jusqua) || 0 } } : {},
     nav ? { nav } : {},
@@ -19698,6 +20236,8 @@ async function executerCommande(msg) {
   if (msg && msg.cmd === 'vcRepondre') return await repondreVestiaire(msg);
   // 4 nov. (5.319) : répondre à UNE offre Vestiaire, sur son clic (voir `repondreOffreVestiaire`).
   if (msg && msg.cmd === 'vcOffre') return await repondreOffreVestiaire(msg);
+  // 15 nov. (5.392) : UNE offre aux personnes qui ont aimé un article Vestiaire, sur son clic (`offrirAuxAimesVc`).
+  if (msg && msg.cmd === 'vcOffreAimes') return await offrirAuxAimesVc(msg);
   // 11 nov. (5.364) : baisser UN prix Vestiaire, sur son clic (voir `baisserPrixVestiaire`).
   if (msg && msg.cmd === 'vcPrix') return await baisserPrixVestiaire(msg);
   // 3 nov. (5.318) : répondre dans UNE conversation Leboncoin, sur son clic (voir `repondreLeboncoin`).
@@ -21060,9 +21600,33 @@ async function capterSuivisAchats(uid) {
 //    déclare), puis LES PLUS ANCIENNES d'abord : l'URSSAF se déclare mois après mois,
 //    le plus ancien mois incomplet est celui à compléter en premier.
 // Sans date lisible : en dernier.
-const VERSEMENT_MAX_PAR_VISITE = 10;
+// ══ 5.390 (15 nov.) — TOUTE SEULE, ET AUSSI VITE QUE LE BUDGET LE PERMET ═══════
+// Julien : « Enlève les 1741 ventes à dater, cela n'a aucun sens. Le but est que
+// l'extension récupère ces infos, pas que ça soit à nous de le faire. »
+// MESURÉ (base de prod, lecture seule, 15 nov.) : son grand compte a 1 790 ventes
+// finalisées dans la liste, 58 ont leur détail 450, **1 732 n'ont JAMAIS eu leur détail
+// lu** (aucune n'est « figée à 230 » : les 21 détails à 230 de ce compte sont des ventes
+// que la liste ne dit pas finalisées) ; vendues de mai 2025 à juin 2026. Aucune source
+// en lot n'existe pour elles : relevé du porte-monnaie (`history` vide, aucun mois
+// listé), `my_orders[].date` (0 / 476 le jour de la finalisation, 30 % dans un autre
+// mois), la boîte (`description` = le titre de l'annonce), les notifications (le rappel
+// « laisser une évaluation » arrive 2 jours APRÈS la 450), la liste des commandes en
+// séquestre (adresse vue, forme jamais captée). ⇒ Le détail, vente par vente, reste la
+// seule date PROUVÉE ; ce qui la freinait : 10 par visite et 15 par heure, alors que
+// ses visites sur ce compte sont COURTES (10 lues le 15 nov. en deux minutes, puis rien).
+// Ce qui change, et SEULEMENT ça :
+//  · une visite (ou un passage de fond) lit jusqu'à 20 détails, et l'argent a TOUT le
+//    budget de lecture de l'heure (20, comme la classe 'argent' l'a toujours eu) —
+//    jamais au-dessus : `gardeLecture` compte chaque lecture, tous Chrome confondus ;
+//  · la réserve des codes de retrait, preuves et relevés reste ENTIÈRE (« pas su » ⇒
+//    réserve entière) : au-delà de la part ordinaire, rien ne prend leur place ;
+//  · L'ORDRE : la vente la plus RÉCENTE d'abord, partout (le mois en cours et le
+//    précédent se déclarent, puis l'historique en remontant) ;
+//  · une requête à la fois, pause 2–5 s, 429/403 ⇒ pause et arrêt, compte de l'onglet,
+//    « pas su » ⇒ pas daté : inchangés.
+const VERSEMENT_MAX_PAR_VISITE = 20;
 const VERSEMENT_PART_VISITE = 5;                  // la part ordinaire d'une visite (et la réserve des photos)
-const VERSEMENT_MAX_HEURE = 15;                   // DANS les 20 lectures/h, jamais en plus
+const VERSEMENT_MAX_HEURE = 20;                   // = le budget de lecture (20/h), jamais en plus
 const VERSEMENT_RETRY_MS = 24 * 60 * 60 * 1000;
 const VERSEMENT_PAUSE_MS = [2000, 5000];
 const VERSEMENT_LUS = 'vrmVersementLus';          // { [uid]: [ms, …] } — les lectures d'argent de l'heure (§4.9)
@@ -21088,18 +21652,16 @@ async function noterVersementLu(uid) {
     await chrome.storage.local.set({ [VERSEMENT_LUS]: cur });
   } catch (_) {}
 }
-// 5.376 : les 45 derniers jours (la plus récente d'abord), puis la plus ANCIENNE
-// d'abord ; sans date lisible, en dernier (ordre d'arrivée gardé).
-const VERSEMENT_RECENT_MS = 45 * 864e5;
-function ordreVersements(liste, maintenant = Date.now()) {
+// 5.390 (15 nov.) : la plus RÉCENTE d'abord, partout — le mois en cours et le précédent
+// (ceux qui se déclarent) passent les premiers, puis l'historique en remontant (5.376
+// lisait les plus ANCIENNES d'abord hors des 45 derniers jours). Sans date lisible : en
+// dernier (ordre d'arrivée gardé).
+function ordrePlusRecentes(liste) {
   const d = (o) => { const t = Date.parse((o && (o.date || o.created_at)) || ''); return Number.isFinite(t) ? t : null; };
-  const rang = (t) => (t == null ? 2 : maintenant - t <= VERSEMENT_RECENT_MS ? 0 : 1);
   return liste.map((o, i) => [o, i, d(o)]).sort((a, b) => {
-    const ra = rang(a[2]), rb = rang(b[2]);
-    if (ra !== rb) return ra - rb;
-    if (ra === 0) return (b[2] - a[2]) || (a[1] - b[1]);
-    if (ra === 1) return (a[2] - b[2]) || (a[1] - b[1]);
-    return a[1] - b[1];
+    if ((a[2] == null) !== (b[2] == null)) return a[2] == null ? 1 : -1;
+    if (a[2] == null) return a[1] - b[1];
+    return (b[2] - a[2]) || (a[1] - b[1]);
   }).map((x) => x[0]);
 }
 // 5.376 — LA DATE DU VERSEMENT DANS LA CONVERSATION D'UNE VENTE. Rend { tx, at, cid }
@@ -21156,7 +21718,7 @@ async function capterDatesVersementUn(uid, opts) {
     const rows = await sbGet(`app_data?id=eq.harvest_${uid}_orders_sold&select=v:data->payload->my_orders`);
     if (!Array.isArray(rows)) return 0;                                   // pas su
     const ventes = (rows[0] && Array.isArray(rows[0].v)) ? rows[0].v : [];
-    const finalisees = ordreVersements(ventes.filter(o => o && o.transaction_id != null
+    const finalisees = ordrePlusRecentes(ventes.filter(o => o && o.transaction_id != null
       && /finalis/i.test(String(o.status || '')) && !/annul|cancel|refus|rembours|retour|suspend/i.test(String(o.status || ''))));
     if (!finalisees.length) { await noterLecturesDues(uid, 'versement', 0, { nonDatees: 0 }); return 0; }
     const det = await sbGetTout(`app_data?id=like.harvest_${uid}_txn_*&select=id,s:meta->>status,su:meta->>status_updated_at`);
@@ -21308,7 +21870,10 @@ async function tickBordereaux() {
 //    grand compte n'avait pas été ouvert depuis deux jours. La même règle que l'app
 //    (`heuresPourDater`, src/versementRaisons.js). + les mois du relevé que Vinted liste
 //    sans recette apprise (`releveSansRecette`) : la carte dit le geste qui les débloque.
-const VERSEMENT_PAR_HEURE_ESTIME = 12;
+// ⚠️ 5.390 (15 nov.) — 18 PAR HEURE : l'argent a tout le budget (20) ; 2 de marge pour la
+//    réserve des codes, preuves et relevés quand ils ont à lire. La même règle que l'app
+//    (`VERSEMENTS_PAR_HEURE`, src/versementRaisons.js — audit-versements-auto les compare).
+const VERSEMENT_PAR_HEURE_ESTIME = 18;
 async function datesPourCarte(uid) {
   try {
     const d = (((await chrome.storage.local.get(LECTURES_DUES))[LECTURES_DUES] || {})[String(uid)] || {}).versement;
@@ -24481,6 +25046,8 @@ function noterSessionVc(id, tabId, forme, source) {
 async function noterSessionVcMaintenant(id, tabId, forme, source) {
   if (!/^[\w-]{1,40}$/.test(String(id || ''))) return false;
   const now = Date.now();
+  // 5.392 : vestiairecollective.com ouvert sur ce compte (la même règle que vinted.fr, point 4 de la discrétion).
+  if (/^\d{1,20}$/.test(String(id))) { try { await noterOuvertureVinted('vc:' + String(id)); } catch (_) {} }
   try {
     const m = (await chrome.storage.local.get(VC_ONGLETS))[VC_ONGLETS] || {};
     if (tabId != null) m[String(tabId)] = { compte: String(id), at: now };
@@ -24700,6 +25267,9 @@ async function repondreVestiaire(msg) {
 const VC_RECETTE_OFFRES = 'vrmVcRecetteOffres';
 const VC_OFFRES_MAX = 300;
 const GESTES_OFFRE = ['accepter', 'refuser', 'contre'];
+// 5.392 : la recette « favori » (TA première offre à une personne qui a aimé l'article) s'apprend à côté ;
+// elle ne répond à AUCUNE offre reçue (jamais acceptée par `repondreOffreVestiaire`).
+const GESTES_RECETTE_VC = [...GESTES_OFFRE, 'favori'];
 const cleOffreVc = (id) => 'n' + String(id);
 let _vcOffresChaine = Promise.resolve();
 function rangerVcOffres(m, compte) {
@@ -24757,7 +25327,7 @@ async function rangerVcOffresMaintenant(m, compte) {
 }
 // La recette d'UN geste reçue d'une page : refaite champ par champ.
 function nettoyerRecetteOffreVc(r) {
-  if (!r || typeof r !== 'object' || !GESTES_OFFRE.includes(String(r.geste))) return null;
+  if (!r || typeof r !== 'object' || !GESTES_RECETTE_VC.includes(String(r.geste))) return null;
   const base = { geste: String(r.geste), methode: /^(POST|PUT|PATCH)$/.test(String(r.methode)) ? String(r.methode) : '', hote: /^([a-z0-9-]+\.)*vestiairecollective\.com$/i.test(String(r.hote || '')) ? String(r.hote) : '', chemin: String(r.chemin || '').slice(0, 160) };
   if (!base.methode || !base.hote) return null;
   if (r.rejouable !== true) return { ...base, rejouable: false, raison: String(r.raison || 'inconnue').slice(0, 40) };
@@ -24776,6 +25346,12 @@ function nettoyerRecetteOffreVc(r) {
   const vise = (k) => modele.includes(k) || fixes.some((x) => x[1] === k);
   if (!vise('{nego}') && !vise('{produit}')) return { ...base, rejouable: false, raison: 'offre-introuvable' };
   if (base.geste === 'contre' && !vise('{prixCents}') && !vise('{prix}')) return { ...base, rejouable: false, raison: 'prix-introuvable' };
+  if (base.geste === 'favori') {
+    if (!vise('{prixCents}') && !vise('{prix}')) return { ...base, rejouable: false, raison: 'prix-introuvable' };
+    if (!vise('{produit}')) return { ...base, rejouable: false, raison: 'article-introuvable' };
+    if (!vise('{acheteur}')) return { ...base, rejouable: false, raison: 'personne-introuvable' };
+    if (vise('{nego}')) return { ...base, rejouable: false, raison: 'offre-existante' };
+  }
   const entetes = (Array.isArray(r.entetes) ? r.entetes : []).map((x) => String(x).toLowerCase()).filter((x) => /^[a-z0-9-]{1,60}$/.test(x) && !/^(cookie|content-length|host|connection|origin|referer|user-agent|accept-encoding|content-type)$/.test(x)).slice(0, 20);
   const recherche = /^\?[\w=&.%:-]{0,200}$/.test(String(r.recherche || '')) && !/\d{3,}/.test(String(r.recherche || '')) ? String(r.recherche) : '';
   return { ...base, rejouable: true, raison: '', modele, recherche, fixes, sansCorps: r.sansCorps === true && !fixes.length, entetes };
@@ -24792,7 +25368,7 @@ async function noterRecetteOffreVc(brute) {
   tout[r.geste] = { recette: garde, at: r.rejouable ? at : ((avant && avant.at) || at), dernierEssai: { at, rejouable: r.rejouable, raison: r.raison || '' } };
   try { await chrome.storage.local.set({ [VC_RECETTE_OFFRES]: tout }); } catch (_) { return false; }
   const pourApp = {};
-  for (const g of GESTES_OFFRE) { const e = tout[g]; if (e && e.recette) pourApp[g] = { appris: e.recette.rejouable === true, raison: e.recette.rejouable ? '' : String(e.recette.raison || ''), at: e.at || '', dernierEssai: e.dernierEssai || null }; }
+  for (const g of GESTES_RECETTE_VC) { const e = tout[g]; if (e && e.recette) pourApp[g] = { appris: e.recette.rejouable === true, raison: e.recette.rejouable ? '' : String(e.recette.raison || ''), at: e.at || '', dernierEssai: e.dernierEssai || null }; }
   const ok = await supabaseUpsert('app_data', [{ id: 'vc_offres_recette', data: Object.assign(pourApp, { ver: CODE_VERSION, at }) }], 'id');
   if (ok === true) notifierApp({ type: 'maj', quoi: 'vestiaire' });
   return ok === true;
@@ -24861,6 +25437,250 @@ async function repondreOffreVestiaire(msg) {
     }
     return { accepte: true, etape: 'refuse', statut, raison: `Vestiaire a répondu ${statut} — ta réponse n'est pas partie` };
   } finally { VC_REPONSE_EN_VOL = false; }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// VESTIAIRE : UNE OFFRE AUX PERSONNES QUI ONT AIMÉ, SUR SON CLIC (15 nov., 5.392)
+// ══════════════════════════════════════════════════════════════════════════
+// Julien : « est-ce que tu as lancé les messages aux favoris sur Vestiaire ? ». MESURÉ
+// (lecture seule, 15 nov.) : Vestiaire NOMME chaque personne qui aime un article — une
+// carte du fil des notifications par « j'aime » (`custom_community`, « … vient d'aimer
+// votre pièce, envoyez-lui un message ! », conversation `{personne}-{article}`) — et le
+// vendeur peut lui faire la PREMIÈRE offre (`POST apiv2…/products/{id}/negotiations`,
+// vu le 2 nov. : une offre du vendeur à 237 € sur un article à 249 €). Le geste natif
+// existe ; VRM le refait, sur SON clic, seulement après l'avoir APPRIS de son propre geste.
+//  · `vrmVcAimes` (LOCAL, jamais en base) : { [article]: { [personne]: date } } — les
+//    identifiants numériques que la page a vus ; borné ; `vc_aimes` (base) n'en reçoit
+//    que des NOMBRES par article (personnes vues, déjà prévenues, la dernière date).
+//  · `vrmVcAimesFaits` (LOCAL) : { 'article|personne': { at, cents, etat } } — UNE offre par
+//    personne et par article, jamais deux (posé AVANT l'envoi : un worker tué au milieu ne
+//    renvoie pas, la ligne reste « incertaine »).
+//  · `offrirAuxAimesVc` : la recette « favori » apprise (sinon rien, dit), l'article LU dans
+//    `vc_listings` (son compte, son prix = celui de l'aperçu), l'offre sous le prix et 1 € au
+//    moins, l'onglet vestiairecollective.com sur CE compte ; puis, une personne à la fois :
+//    pause 429/403, sécurité des comptes (5.366, « série »), 45/h (réserve 5) ; 8–20 s au
+//    hasard entre deux offres ; 10 personnes par toucher au plus. « Faite » seulement si
+//    Vestiaire renvoie TON offre à ce prix. Un refus arrête tout (rien n'est relancé seul).
+const VC_AIMES = 'vrmVcAimes';
+const VC_AIMES_FAITS = 'vrmVcAimesFaits';
+const VC_AIMES_MAX_ARTICLES = 400, VC_AIMES_MAX_PAR_ARTICLE = 200;
+const VC_AIMES_PAR_TOUCHER = 10;
+const VC_AIMES_ECART_S = [8, 20];   // l'écart entre deux offres, en secondes (le même que l'offre → message des favoris Vinted)
+let _vcAimesChaine = Promise.resolve();
+function rangerVcAimes(m, compte) {
+  const run = _vcAimesChaine.then(() => rangerVcAimesMaintenant(m, compte)).catch(() => false);
+  _vcAimesChaine = run.then(() => {}, () => {});
+  return run;
+}
+function resumeAimesVc(aimes, faits) {
+  const produits = {};
+  for (const [p, parPersonne] of Object.entries(aimes || {})) {
+    const ps = Object.keys(parPersonne || {});
+    if (!ps.length) continue;
+    const dates = ps.map((k) => String(parPersonne[k] || '')).filter(Boolean).sort();
+    const prevenues = ps.filter((k) => faits && faits[p + '|' + k]).length;
+    produits['n' + p] = { produit: p, n: ps.length, prevenues, aPrevenir: ps.length - prevenues, dernier: dates[dates.length - 1] || '' };
+  }
+  return produits;
+}
+async function publierAimesVc(aimes, faits, compte, extra = {}) {
+  const now = new Date().toISOString();
+  const data = Object.assign({ v: 1, produits: resumeAimesVc(aimes, faits), compte: compte || '', capturedAt: now, ver: CODE_VERSION }, extra);
+  const ok = await supabaseUpsert('app_data', [{ id: 'vc_aimes', data }], 'id');
+  if (ok === true) notifierApp({ type: 'maj', quoi: 'vestiaire' });
+  return ok === true;
+}
+async function rangerVcAimesMaintenant(m, compte) {
+  const neufs = (Array.isArray(m && m.aimes) ? m.aimes : []).slice(0, 200).filter((x) => x && /^\d{3,15}$/.test(String(x.produit || '')) && /^\d{3,15}$/.test(String(x.acheteur || '')));
+  if (!neufs.length) return false;
+  let tout, faits;
+  try { const o = await chrome.storage.local.get([VC_AIMES, VC_AIMES_FAITS]); tout = o[VC_AIMES] || {}; faits = o[VC_AIMES_FAITS] || {}; } catch (_) { return false; }
+  let change = false;
+  for (const x of neufs) {
+    const p = String(x.produit), k = String(x.acheteur);
+    if (compte && k === String(compte)) continue;                       // jamais soi-même
+    const par = tout[p] = tout[p] || {};
+    const at = /^\d{4}-\d{2}-\d{2}T/.test(String(x.at || '')) ? String(x.at).slice(0, 30) : '';
+    if (!(k in par) || (at && String(par[k] || '') < at)) { par[k] = at || par[k] || ''; change = true; }
+    const cles = Object.keys(par);
+    if (cles.length > VC_AIMES_MAX_PAR_ARTICLE) { for (const c of cles.sort((a, b) => String(par[a]).localeCompare(String(par[b]))).slice(0, cles.length - VC_AIMES_MAX_PAR_ARTICLE)) delete par[c]; }
+  }
+  const articles = Object.keys(tout);
+  if (articles.length > VC_AIMES_MAX_ARTICLES) {
+    const recent = (p) => Object.values(tout[p] || {}).map(String).sort().pop() || '';
+    for (const p of articles.sort((a, b) => recent(a).localeCompare(recent(b))).slice(0, articles.length - VC_AIMES_MAX_ARTICLES)) delete tout[p];
+  }
+  if (!change) return true;
+  try { await chrome.storage.local.set({ [VC_AIMES]: tout }); } catch (_) { return false; }
+  return await publierAimesVc(tout, faits, compte);
+}
+// (15 nov., coordinateur : « les mêmes techniques que pour Vinted, aléatoirement ») — la série suit
+// EXACTEMENT les favoris Vinted, en RÉUTILISANT leurs fonctions :
+//  · l'écart entre deux offres : 8 à 20 s au hasard, jamais deux fois de suite la même valeur
+//    (`tirerSansRepeter`, le tirage de `attendreOffreMessage`) ;
+//  · avant CHAQUE offre, la porte des favoris (`porteDiscretion(…, 'favori')` sur `vc:{id}`) : « Tout
+//    arrêter », vérification jusqu'à « Reprendre », 15/h (réglable, `vinted_discretion.parHeure.favori`),
+//    2 à 6 min après l'ouverture du site, un compte à la fois, série décalée sur un autre compte ; puis la
+//    sécurité des comptes (`secuGeste('vestiaire', …, 'favori', 'serie')` : plafond du jour, par type,
+//    repos, prudence, arrêt anti-robot) ; puis les 45/h (`compterAction`, réserve 5) ; `noterGesteAuto` ;
+//  · le rythme actif/calme n'est PAS appliqué : Julien l'a REFUSÉ pour les favoris (« étalement des
+//    messages aux favoris sur la journée », CLAUDE.md §3) — les favoris Vinted ne le suivent pas non plus ;
+//  · AUCUN message n'accompagne l'offre (MESURÉ : l'offre de Vestiaire n'a pas de texte ; un texte libre
+//    dans le corps rend la recette « pas rejouable ») ⇒ ni temps d'écriture ni variantes ici ;
+//  · l'attente se tient par tranches (`FAVORI_ATTENTE_TRANCHE_MS`) en revérifiant tout : « Tout arrêter »,
+//    arrêt anti-robot, pause 429/403, onglet fermé ou passé sur un autre compte ⇒ RIEN ne part, c'est dit ;
+//  · §4.9 : la file vit dans `chrome.storage.local` (`vrmVcAimesFile`) ; un worker neuf la REPREND au réveil
+//    `vrm-offres` (1 min, `reprendreOffresAimesVc`), trop tard (10 min après l'heure prévue) ⇒ rien ne part, dit ;
+//  · chaque offre FAITE va au journal « Ce que VRM a fait » (`noterJournal(vc:{id}, 'favori')`).
+const VC_AIMES_FILE = 'vrmVcAimesFile';
+const VC_AIMES_ECART_DERNIER = 'vrmVcAimesEcartDernier';
+let _vcAimesIci = false;          // la série tenue par CE worker (un worker neuf n'en tient aucune)
+const attendreVc = (ms) => new Promise((r) => setTimeout(r, ms));
+async function lireFileAimesVc() { try { const v = (await chrome.storage.local.get(VC_AIMES_FILE))[VC_AIMES_FILE]; return v && typeof v === 'object' && !Array.isArray(v) ? v : null; } catch (_) { return undefined; } }
+async function poserFileAimesVc(f) { try { if (f) await chrome.storage.local.set({ [VC_AIMES_FILE]: f }); else await chrome.storage.local.remove(VC_AIMES_FILE); return true; } catch (_) { return false; } }
+// Un « non » avant une offre Vestiaire : la raison dite, sinon ''.
+async function arretAvantOffreAimeVc(compte) {
+  try { if ((await toutArreteDepuis(null)) > 0) return phraseArret('tout'); } catch (_) {}
+  try { const sa = await secuLire(); if (sa && secuArretEffectif(sa.evts).arrete) return phraseArret('tout'); } catch (_) {}
+  const rb = await secuRobotDit('vestiaire', compte); if (rb) return rb.error;
+  const pz = await pauseVc(); if (pz) return `Vestiaire a demandé de ralentir (${pz.statut || 'refus'}) — rien n'est parti`;
+  const ot = await ongletVestiaire(compte);
+  if (!ot.ok) return ot.raison;
+  return '';
+}
+// Tenir l'attente jusqu'à `jusqua`, par tranches, en revérifiant tout avant chacune.
+async function tenirAttenteAimeVc(compte, jusqua) {
+  for (;;) {
+    const non = await arretAvantOffreAimeVc(compte);
+    if (non) return { ok: false, raison: non };
+    const r = Number(jusqua) - Date.now();
+    if (!(r > 0)) return { ok: true };
+    await attendreVc(Math.min(FAVORI_ATTENTE_TRANCHE_MS, r));
+  }
+}
+async function offrirAuxAimesVc(msg) {
+  const produit = String((msg && msg.produit) || '');
+  const avant = Number(msg && msg.avantCents), prix = Number(msg && msg.prixCents);
+  if (!/^\d{3,15}$/.test(produit) || !Number.isInteger(avant) || !Number.isInteger(prix) || !(prix >= 100) || !(prix < avant) || avant > 1e8) return { accepte: false, code: 'invalide', raison: 'article ou montant invalide (l’offre doit être sous ton prix, 1 € au moins)' };
+  if (VC_REPONSE_EN_VOL || _vcAimesIci) return { accepte: false, code: 'en-cours', raison: 'une autre action Vestiaire part en ce moment — une à la fois' };
+  const enFile = await lireFileAimesVc();
+  if (enFile && Array.isArray(enFile.reste) && enFile.reste.length) return { accepte: false, code: 'en-cours', raison: 'une série d’offres Vestiaire est déjà en cours — une à la fois' };
+  VC_REPONSE_EN_VOL = true;
+  let lance = false;
+  try {
+    const pause = await pauseVc();
+    if (pause) return { accepte: false, code: 'vc-pause', raison: `Vestiaire a demandé de ralentir (${pause.statut || 'refus'}) — rien n'est parti, réessaie après ${new Date(pause.jusqua).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` };
+    let tout, aimes, faits;
+    try { const o = await chrome.storage.local.get([VC_RECETTE_OFFRES, VC_AIMES, VC_AIMES_FAITS]); tout = o[VC_RECETTE_OFFRES] || {}; aimes = o[VC_AIMES] || {}; faits = o[VC_AIMES_FAITS] || {}; } catch (_) { return { accepte: false, code: 'lecture', raison: "le stockage de l'extension n'a pas répondu — rien n'est parti" }; }
+    const recette = tout.favori && tout.favori.recette;
+    if (!recette) return { accepte: false, code: 'pas-appris', raison: "l'extension n'a encore jamais vu ce geste — sur vestiairecollective.com, dans ce Chrome, ouvre une notification « … vient d'aimer votre pièce » et fais UNE offre toi-même : VRM apprendra, puis pourra le faire d'ici" };
+    if (recette.rejouable !== true) return { accepte: false, code: 'pas-rejouable', raison: `la façon dont Vestiaire envoie cette offre n'est pas encore sûre à refaire (${recette.raison || 'forme inconnue'}) — fais-la sur Vestiaire, rien n'est parti` };
+    const rows = await sbGet('app_data?id=eq.vc_listings&select=items:data->items');
+    if (rows === null) return { accepte: false, code: 'lecture', raison: "la base VRM n'a pas répondu — rien n'est parti" };
+    const items = rows && rows[0] && rows[0].items && typeof rows[0].items === 'object' ? rows[0].items : {};
+    const it = items[produit];
+    if (!it || typeof it !== 'object') return { accepte: false, code: 'inconnue', raison: "l'extension n'a pas encore lu cet article — ouvre « Mes articles » sur Vestiaire, rien n'est parti" };
+    const lu = centsPrixVc(it.prix);
+    if (lu == null) return { accepte: false, code: 'prix-pas-lu', raison: "le prix de cet article n'a pas été lu — ouvre « Mes articles » sur Vestiaire, rien n'est parti" };
+    if (lu !== avant) return { accepte: false, code: 'prix-change', prixVu: lu / 100, raison: `le prix lu n'est plus celui de l'aperçu (${(lu / 100).toFixed(2).replace('.', ',')} €) — rien n'est parti` };
+    const compte = String(it.compte || '');
+    if (!compte) return { accepte: false, code: 'session', raison: "je ne sais pas à quel compte Vestiaire appartient cet article — recharge « Mes articles » sur Vestiaire (connecté sur ton compte), puis réessaie" };
+    const personnes = Object.keys(aimes[produit] || {}).filter((k) => k !== compte && !faits[produit + '|' + k]);
+    if (!personnes.length) return { accepte: false, code: 'personne', raison: Object.keys(aimes[produit] || {}).length ? "toutes les personnes vues ont déjà reçu une offre pour cet article — rien n'est reparti" : "ce Chrome n'a vu personne qui aime cet article — ouvre tes notifications sur Vestiaire dans ce Chrome, puis réessaie" };
+    const ot = await ongletVestiaire(compte);
+    if (!ot.ok) return { accepte: false, code: ot.code, raison: ot.raison };
+    { const rbVc = await secuRobotDit('vestiaire', ot.compte); if (rbVc) return { accepte: false, code: rbVc.code, raison: rbVc.error }; }
+    // La porte des favoris AVANT de lancer (sans prendre de place) : un refus est dit tout de suite.
+    { const p = await porteDiscretion('vc:' + ot.compte, 'favori'); if (p) return { accepte: false, code: p.code, raison: p.error, attendreMs: p.attendreMs || 0 }; }
+    const lot = personnes.slice(0, VC_AIMES_PAR_TOUCHER);
+    const suivi = { produit, at: new Date().toISOString(), cents: prix, n: lot.length, faites: 0, incertaines: 0, fin: '', raison: '' };
+    if (!(await poserFileAimesVc({ produit, compte: ot.compte, cents: prix, reste: lot, prochain: Date.now(), suivi, v: CODE_VERSION }))) return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
+    await publierAimesVc(aimes, faits, ot.compte, { envoi: suivi });
+    lance = true;
+    VC_REPONSE_EN_VOL = false;
+    // La série continue après la réponse (l'app relit `vc_aimes`), une offre à la fois.
+    deroulerAimesVc().catch(() => {});
+    return { accepte: true, etape: 'encours', n: lot.length, reste: personnes.length - lot.length };
+  } finally { if (!lance) VC_REPONSE_EN_VOL = false; }
+}
+// Dérouler la file (le premier toucher, ou un worker neuf qui la reprend).
+async function deroulerAimesVc() {
+  if (_vcAimesIci) return 0;
+  _vcAimesIci = true;
+  VC_REPONSE_EN_VOL = true;
+  let f = null, n = 0;
+  const finir = async (fin, raison) => {
+    if (!f) return;
+    f.suivi.fin = fin; if (raison) f.suivi.raison = String(raison).slice(0, 300);
+    let aimes = {}, faits = {};
+    try { const o = await chrome.storage.local.get([VC_AIMES, VC_AIMES_FAITS]); aimes = o[VC_AIMES] || {}; faits = o[VC_AIMES_FAITS] || {}; } catch (_) {}
+    await poserFileAimesVc(null);
+    await publierAimesVc(aimes, faits, f.compte, { envoi: Object.assign({}, f.suivi) });
+  };
+  try {
+    for (;;) {
+      f = await lireFileAimesVc();
+      if (!f || !Array.isArray(f.reste) || !f.suivi || !/^\d{3,15}$/.test(String(f.produit || '')) || !/^\d{1,20}$/.test(String(f.compte || ''))) { if (f) await poserFileAimesVc(null); f = null; break; }
+      if (!f.reste.length) { await finir('fini', ''); break; }
+      if (Date.now() > Number(f.prochain) + FAVORI_ATTENTE_TROP_TARD_MS) { await finir('arret', "l'extension s'était arrêtée trop longtemps — la suite n'est pas partie"); break; }
+      const compte = String(f.compte), produit = String(f.produit), prix = Number(f.cents), k = String(f.reste[0]);
+      // L'écart tiré au hasard, tenu en revérifiant tout (onglet, compte, Tout arrêter, pause, anti-robot).
+      const att = await tenirAttenteAimeVc(compte, f.prochain);
+      if (!att.ok) { await finir('arret', att.raison); break; }
+      let tout = {};
+      try { tout = (await chrome.storage.local.get(VC_RECETTE_OFFRES))[VC_RECETTE_OFFRES] || {}; } catch (_) { await finir('arret', RAISON_STOCKAGE); break; }
+      const recette = tout.favori && tout.favori.recette;
+      if (!recette || recette.rejouable !== true) { await finir('arret', "la recette de l'offre n'est plus là — rien n'est parti"); break; }
+      const ot = await ongletVestiaire(compte);
+      if (!ot.ok) { await finir('arret', ot.raison); break; }
+      // Les MÊMES portes que les favoris Vinted : discrétion (15/h, ouverture, un compte à la fois, série,
+      // vérification, Tout arrêter), sécurité du compte (jour, type, prudence, repos), puis les 45/h.
+      const p = await porteDiscretion('vc:' + ot.compte, 'favori');
+      if (p) { await finir('arret', p.error); break; }
+      const sg = await secuGeste('vestiaire', ot.compte, 'favori', 'serie');
+      if (sg) { await finir('arret', sg.error || 'sécurité du compte'); break; }
+      const cpt = await compterAction('vc:' + ot.compte, ACTIONS_MAX_HEURE - RESERVE_GESTES);
+      if (!cpt.ok) { await finir('arret', cpt.code === 'stockage' ? RAISON_STOCKAGE : `déjà ${ACTIONS_MAX_HEURE - RESERVE_GESTES} actions sur ce compte Vestiaire cette heure-ci`); break; }
+      await noterGesteAuto('vc:' + ot.compte, 'favori');
+      const depuis = Number(cpt.at) || (Date.now() - 5);
+      // « Une fois » : posé AVANT l'envoi (un worker tué au milieu ne renverra pas) ; la file avance aussi avant.
+      const noter = async (etat) => { try { const o = await chrome.storage.local.get(VC_AIMES_FAITS); const fa = o[VC_AIMES_FAITS] || {}; if (etat) fa[produit + '|' + k] = { at: new Date().toISOString(), cents: prix, etat }; else delete fa[produit + '|' + k]; await chrome.storage.local.set({ [VC_AIMES_FAITS]: fa }); return true; } catch (_) { return false; } };
+      if (!(await noter('envoi'))) { await rendreActions('vc:' + ot.compte, depuis, 1); await finir('arret', RAISON_STOCKAGE); break; }
+      f.reste = f.reste.slice(1);
+      const s = await tirerSansRepeter(VC_AIMES_ECART_DERNIER, VC_AIMES_ECART_S[0], VC_AIMES_ECART_S[1]);
+      try { if (Array.isArray(globalThis.__vrmPausesVues)) globalThis.__vrmPausesVues.push(['vcaimes:ecart', s * 1000]); } catch (_) {}
+      f.prochain = Date.now() + s * 1000;
+      await poserFileAimesVc(f);
+      let rep = null;
+      try { rep = await avecDelai(chrome.tabs.sendMessage(ot.tabId, { from: 'vrm-fond', action: 'vcOffre', geste: 'favori', produit, acheteur: k, prixCents: prix, recette, compte: ot.compte }, { frameId: 0 }), 25000, null); } catch (_) { rep = null; }
+      const statut = (rep && Number(rep.statut)) || 0;
+      if (!rep || rep.ok !== true) { noterDiag('vc_aime_muet'); await noter('incertaine'); f.suivi.incertaines++; await finir('arret', "l'onglet Vestiaire n'a pas répondu — regarde sur Vestiaire avant de recommencer"); break; }
+      if (!statut) {
+        const e = String(rep.erreur || '');
+        if (e && e !== 'reseau') { await rendreActions('vc:' + ot.compte, depuis, 1); await noter(null); await finir('arret', e === 'entetes' ? 'recharge une page Vestiaire, puis réessaie (rien n’est parti)' : e === 'autre-compte' || e === 'compte-pas-su' ? "l'onglet Vestiaire n'est plus sur ce compte — rien n'est parti" : `rien n'est parti (${e})`); break; }
+        await noter('incertaine'); f.suivi.incertaines++; await finir('arret', 'le réseau a coupé pendant un envoi — regarde sur Vestiaire avant de recommencer'); break;
+      }
+      noterDiag('vc_aime_' + statut);
+      if (await secuObserver('vestiaire', ot.compte, { status: statut, defi: rep.defi === true, retryAfter: rep.ra || null }) === 'robot') { await poserPauseVc(statut || 403, rep.ra); await noter('refusee'); await finir('arret', secuTexte(SECU_REFUS, 'robot', secuMots('vestiaire'))); break; }
+      if (statut === 429 || statut === 403) { await poserPauseVc(statut, rep.ra); await noter('refusee'); await finir('arret', `Vestiaire a refusé (${statut}) — pause de 30 min`); break; }
+      if (statut >= 200 && statut < 300 && rep.confirme === true) { await noter('faite'); f.suivi.faites++; n++; await noterJournal('vc:' + ot.compte, 'favori', {}); }
+      else if (statut >= 200 && statut < 300) { await noter('incertaine'); f.suivi.incertaines++; }
+      else { await noter('refusee'); await finir('arret', `Vestiaire a répondu ${statut}`); break; }
+      await poserFileAimesVc(f);
+      let aimes = {}, faits = {};
+      try { const o = await chrome.storage.local.get([VC_AIMES, VC_AIMES_FAITS]); aimes = o[VC_AIMES] || {}; faits = o[VC_AIMES_FAITS] || {}; } catch (_) {}
+      await publierAimesVc(aimes, faits, ot.compte, { envoi: Object.assign({}, f.suivi) });
+    }
+  } catch (_) { try { await finir('arret', 'interrompu'); } catch (_e) {} }
+  finally { _vcAimesIci = false; VC_REPONSE_EN_VOL = false; }
+  return n;
+}
+// Le réveil `vrm-offres` (1 min) : une file que personne ne tient plus (worker endormi puis réveillé).
+async function reprendreOffresAimesVc() {
+  if (_vcAimesIci || VC_REPONSE_EN_VOL) return 0;
+  const f = await lireFileAimesVc();
+  if (!f || !Array.isArray(f.reste)) return 0;
+  return deroulerAimesVc();
 }
 
 // ══════════════════════════════════════════════════════════════════════════

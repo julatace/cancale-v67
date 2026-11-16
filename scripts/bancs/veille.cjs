@@ -142,6 +142,7 @@ const capture = async (pg, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, { rec
     const aDater = { n: 1741, plus30: { n: 1741, ca: 1 }, datees: { n: 356, releve: 0 }, raisons: [{ cle: 'vinted-detail', n: 1741, ca: 1, comptes: [{ uid: '111', nom: 'atelier_test', n: 1741 }] }] };
     return { id: C.CLE_CONTROLE, data: C.resultatControle({ 'numeros-double': [], 'versement-30j': C.versementsEnRetard(aDater), 'comptes-48h': [] }, {}, auj - 2 * 3600e3, { 'versement-30j': C.detailVersement(aDater) }) };
   };
+  const document_a_dater = (t) => /à dater|ventes sans versement|Voir le détail/.test(String(t || ''));
   let b;
   try {
     b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });

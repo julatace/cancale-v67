@@ -178,7 +178,7 @@ export function parcoursPaire(rn, d = {}, o = {}) {
     const frais = bil.cents ? `frais renseignés ${(bil.cents / 100).toFixed(2).replace('.', ',')}\u00a0€${bil.complet ? '' : ' (pas tous confirmés)'}` : (bil.complet ? 'aucun frais' : 'frais pas renseignés');
     if (ver === undefined) etapes.push({ cle: 'argent', etat: 'passu', titre: 'Argent', detail: `dates de versement pas lues · ${frais}` });
     else if (ver) etapes.push({ cle: 'argent', etat: 'fait', titre: 'Argent versé', date: ver, detail: frais });
-    else etapes.push({ cle: 'argent', etat: 'absent', titre: 'Argent', detail: `versement pas encore reçu · ${frais}` });
+    else etapes.push({ cle: 'argent', etat: 'absent', titre: 'Argent', detail: `date de versement en lecture par l’extension · ${frais}` });
   } else if (venteE) {
     const r = o.montantRecuEbay ? o.montantRecuEbay(venteE) : { eur: null, raison: 'montant reçu inconnu' };
     // (15 nov., lot argent-plus) Le dû au vendeur (port exclu, §2.8) et les frais eBay LUS ; ce qui reste
