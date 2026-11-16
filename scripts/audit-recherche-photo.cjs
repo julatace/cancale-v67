@@ -154,7 +154,8 @@ const MUTATIONS = {
       dit(!fautes.length, `D. ${f} : aucune requête, aucune écriture, aucune adresse tierce`, fautes.join(' '));
     }
     const app = fs.readFileSync(path.join(RACINE, 'src/App.jsx'), 'utf8');
-    dit(/React\.lazy\(\s*\(\)\s*=>\s*import\(\s*['"]\.\/RecherchePhoto\.jsx['"]\s*\)\s*\)/.test(app), 'D. la feuille est chargée à la demande (React.lazy)');
+    // (16 nov.) Depuis le 15 nov., tout morceau à part passe par `lazySur` (src/chargementSur.js).
+    dit(/(?:React\.lazy|lazySur)\(\s*\(\)\s*=>\s*import\(\s*['"]\.\/RecherchePhoto\.jsx['"]\s*\)\s*\)/.test(app), 'D. la feuille est chargée à la demande (lazySur)');
     dit(!/^\s*import[^;]*from\s*['"]\.\/(empreintePhoto|indexPhotos|RecherchePhoto)(\.jsx?)?['"]/m.test(app), 'D. App.jsx n’importe ni l’empreinte, ni l’index, ni la feuille au chargement');
     // Le chemin des octets est celui de l'app (extension d'abord, puis la route de VRM) — jamais un service tiers.
     dit(/lireOctets=\{\(u\)=>chargerPhotoBoite\(u\)\}/.test(app), 'D. les octets d’une photo Vinted passent par `chargerPhotoBoite` (extension, puis la route de VRM)');

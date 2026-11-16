@@ -18,7 +18,7 @@ import {stockageParcours,garderReprise} from './repriseEcran.js';
 import { CLE_REPRISE_ECRANS, DELAI_ECRITURE as DELAI_REPRISE, DUREE_RECHERCHE as DUREE_RECHERCHE_REPRISE, lireCarte as lireCarteReprise, poserCarte as poserCarteReprise, cumulerPatch as cumulerPatchReprise, vueReprise, compteReprise, siteReprise, repriseLocale, ecranAOuvrir, vueSynchronisee, estRecherche as estRechercheVue, ecransDeVue, retenusAffiches } from './repriseSynchro.js';
 import {RecapSelection,CompteurListe,HistoriqueModifications} from './OutilsParcours.jsx';
 import { useSelectionSerie, CaseSerie, BarreSerie, OuvrirSerie, avecSerie } from './composants/SelectionSerie.jsx';
-import { trierSerie, resumeSerie, csvDe } from './selectionSerie.js';
+import { trierSerie, resumeSerie, csvDe, clesSelectionnables, portee } from './selectionSerie.js';
 import {creerGardeLectures,garderConversationsNonLues} from './lecturesVinted.js';
 import {lienAnnonceLeboncoin,etatAnnonceLeboncoin} from './etatAnnonceLeboncoin.js';
 import BilanSynchronisation from './BilanSynchronisation.jsx';
@@ -985,8 +985,8 @@ import { ComparerFeuille } from './ui/ComparerFeuille.jsx';
 import { useGlisserSelection } from './ui/useGlisserSelection.js';
 import { retirerPublie as retirerPubliePhrase } from '../api/_lib/retrait-colis.js';
 import { NOM_TRANSPORTEUR as NOM_TRANSPORTEUR_PHRASE, filtreApplicable as filtreApplicablePhrase } from './recherchePhrase.js';
-import "./styles-tablette.css";   // (11 nov., iPad) la coque ordinateur AU DOIGT : 44 px, rien au survol, rail libellé — sous `data-tablette` seulement, EN DERNIER
 import "./styles-refonte-ms.css";   // (14 nov., refonte) Messages, E-mails, Stock : la liste d'abord, des rangées denses, le fil comme Messages d'iPhone — portée par leurs classes seulement
+import "./styles-tablette.css";   // (11 nov., iPad) la coque ordinateur AU DOIGT : 44 px, rien au survol, rail libellé — sous `data-tablette` seulement, EN DERNIER
 // (14 nov., décision de Julien) STUDIO BLEU CLAIR — les deux polices, puis LE studio : EN DERNIER (après styles-vitrine,
 // styles-systeme et styles-tablette). Jetons --sb-*, quatre formes de bouton, la coque (docs/design/studio-bleu-clair.md).
 import "./design/studio-polices.css";
@@ -17326,6 +17326,8 @@ const ICON_PATHS = {
   // la <svg> : une chaîne y devient du TEXTE, donc l'icône est INVISIBLE. C'est
   // le cas de `pin` et `nav` juste en dessous depuis leur ajout — les deux
   // repères des points relais ne se dessinaient pas.
+  // (16 nov.) Le zoom de l'app (Paramètres → Apparence) : une loupe « + », distincte de la grille des plateformes.
+  agrandir: <><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/><path d="M10.5 7.5v6"/><path d="M7.5 10.5h6"/></>,
   menu: <><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></>,
   // (13 nov., lot 54) Le parrainage : un paquet noué, au trait.
   cadeau: <><rect x="3.5" y="8" width="17" height="4" rx="1"/><path d="M5 12v7.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V12"/><path d="M12 8v12.5"/><path d="M12 8c-1.6-3.2-5.5-3.6-5.5-1.2C6.5 8 9 8 12 8Z"/><path d="M12 8c1.6-3.2 5.5-3.6 5.5-1.2C17.5 8 15 8 12 8Z"/></>,
@@ -23493,7 +23495,7 @@ function CarteParcoursNouveau({ pos }) {
         <span style={{fontSize:13,fontWeight:600,fontVariantNumeric:'tabular-nums',opacity:.75}}>{tr('pn.rang', { n: i + 1, total: ETAPES_NOUVEAU.length })}</span>
       </div>
       <div aria-hidden="true" style={{display:'grid',gridTemplateColumns:`repeat(${ETAPES_NOUVEAU.length},1fr)`,gap:5,margin:'12px 0 10px'}}>
-        {ETAPES_NOUVEAU.map((e, k) => <span key={e} style={{height:5,borderRadius:3,background:'currentColor',opacity:k < i ? .8 : k === i ? 1 : .18}}/>)}
+        {ETAPES_NOUVEAU.map((e, k) => <span key={e} style={{height:5,borderRadius:999,background:'currentColor',opacity:k < i ? .8 : k === i ? 1 : .18}}/>)}
       </div>
       <p className="vrm-cp-note" style={{margin:'0 0 10px'}}>{tr('pn.court.' + pos.etape)}</p>
       <Bouton variante="primaire" data-pn-reprendre="" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:parcours-nouveau', { detail: pos.etape })); } catch (_) {} }}>{tr('pn.continuer')}</Bouton>
@@ -38543,23 +38545,38 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return tx == null ? null : { tx: String(tx), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', venteLe: o.date || '', commandes: commandesParTx.get(String(tx)) || [] };
   }).filter(Boolean), [ventesAffichees, ventesMax, commandesParTx]);
   // (11 nov., lot actions-serie) Ventes : sélectionner plusieurs lignes, agir une fois (src/selectionSerie.js).
-  const ordreVentesSerie = useMemo(() => ventesAffichees.map(o => String(o.transaction_id)), [ventesAffichees]);
-  const serieVentes = useSelectionSerie(ordreVentesSerie, { nom: 'ventes' });
+  // ⚠️ (16 nov., lot ventes-selection — Julien, iPhone : « je ne comprends pas pourquoi ça me dit de
+  // sélectionner plus de 2000 articles ») LA SÉLECTION = LES LIGNES DESSINÉES, du compte mis en avant :
+  // `ventesAffichees` est TOUT l'historique filtré (2 185 ventes chez lui) dont 60 seulement sont
+  // dessinées ; « Tout sélectionner · 2185 » cochait des ventes qu'il ne voyait pas. Ce sont les lignes
+  // rendues (`ventesGroupees` ou les `ventesMax` premières), sans les lignes estompées d'un autre compte
+  // (`estFloute`) — `clesSelectionnables` (src/selectionSerie.js). Placé après `ventesGroupees` (TDZ, §4.6).
+  const ordreVentesSerie = useMemo(() => clesSelectionnables(
+    ventesGroupees ? ventesGroupees.entrees.filter(e => e && e.ligne !== undefined).map(e => e.ligne) : ventesAffichees.slice(0, ventesMax),
+    { cle: (o) => o.transaction_id, exclue: estFloute }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ventesGroupees, ventesAffichees, ventesMax, selEff]);
+  // Changer de filtre, de compte ou de période VIDE la sélection (rien ne reste coché hors de l'écran).
+  const serieVentes = useSelectionSerie(ordreVentesSerie, { nom: 'ventes', vue: JSON.stringify([vFilter, selEff || '', periode || null, !!showHidden]) });
   const actionsSerieVentes = () => {
     const parTx = new Map(ventesAffichees.map(o => [String(o.transaction_id), o]));
     const lignes = (cles) => cles.map(k => parTx.get(k)).filter(Boolean);
     const annulee = (o) => classifyOrderStatus(o.status) === 'cancelled';
+    // UNE règle par action, lue par le bouton (« 2 sur 3 », grisé à 0) ET par l'action (`trierSerie`).
+    let pretsMemo = null;
+    const prets = () => pretsMemo || (pretsMemo = new Set(lignesLotTous().filter(l => l.cochable !== false).map(l => String(l.cle))));
+    const peutImprimer = (o) => annulee(o) ? 'annulée' : estParti(o) ? 'déjà partie' : prets().has(String(o.transaction_id)) ? true : 'pas de bordereau prêt';
+    const peutDeposer = (o) => annulee(o) ? 'annulée' : estParti(o) ? 'déjà déposée' : !aExpedier(o) ? 'pas à envoyer' : true;
     return [
-      { k: 'imprimer', libelle: 'Imprimer', icone: 'printer', variante: 'primaire', faire: async (cles) => {
+      { k: 'imprimer', libelle: 'Imprimer', icone: 'printer', variante: 'primaire', portee: (cles) => portee(lignes(cles), peutImprimer), faire: async (cles) => {
         // Les bordereaux prêts du lot « Tout imprimer » (même clé : le n° de transaction).
-        const prets = new Set(lignesLotTous().filter(l => l.cochable !== false).map(l => String(l.cle)));
-        const { ok, pasFaits } = trierSerie(lignes(cles), (o) => annulee(o) ? 'annulée' : estParti(o) ? 'déjà partie' : prets.has(String(o.transaction_id)) ? true : 'pas de bordereau prêt');
+        const { ok, pasFaits } = trierSerie(lignes(cles), peutImprimer);
         if (ok.length) await batchBordereaux(new Set(ok.map(o => String(o.transaction_id))));
         return resumeSerie({ faits: ok, pasFaits }, { un: 'bordereau préparé', plusieurs: 'bordereaux préparés' });
       } },
-      { k: 'depose', libelle: 'Je dépose', icone: 'check', faire: (cles) => {
+      { k: 'depose', libelle: 'Je dépose', icone: 'check', portee: (cles) => portee(lignes(cles), peutDeposer), faire: (cles) => {
         // L'écriture de « Colis déposé » (`gesteColisFait`), en UN geste ⇒ UN « Annuler ».
-        const { ok, pasFaits } = trierSerie(lignes(cles), (o) => annulee(o) ? 'annulée' : estParti(o) ? 'déjà déposée' : !aExpedier(o) ? 'pas à envoyer' : true);
+        const { ok, pasFaits } = trierSerie(lignes(cles), peutDeposer);
         const ops = [];
         for (const o of ok) {
           const k = String(o.transaction_id), b = bordsParTxn[k], kb = b ? bordKey(b) : null;
@@ -41776,8 +41793,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   useEffect(() => { setAchatsMax(60); }, [aFilter, ordSearchDiff, periode]);
   // (11 nov., lot actions-serie) Sélectionner plusieurs achats, agir une fois (src/selectionSerie.js).
-  const ordreAchatsSerie = useMemo(() => achatsAffiches.map(x => String(x.o.transaction_id)), [achatsAffiches]);
-  const serieAchats = useSelectionSerie(ordreAchatsSerie, { nom: 'achats' });
+  // (16 nov., lot ventes-selection) Comme Ventes : les lignes DESSINÉES, sans les estompées d'un autre compte.
+  const ordreAchatsSerie = useMemo(() => clesSelectionnables(
+    achatsGroupees ? achatsGroupees.entrees.filter(e => e && e.ligne !== undefined).map(e => e.ligne) : achatsAffiches.slice(0, achatsMax),
+    { cle: (x) => x.o.transaction_id, exclue: (x) => estFloute(x.o) }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [achatsGroupees, achatsAffiches, achatsMax, selEff]);
+  const serieAchats = useSelectionSerie(ordreAchatsSerie, { nom: 'achats', vue: JSON.stringify([aFilter, selEff || '']) });
   // Les actions : la même écriture que le geste unitaire, ligne par ligne, et un résumé honnête.
   const actionsSerieAchats = () => {
     const parTx = new Map(achatsAffiches.map(x => [String(x.o.transaction_id), x]));
@@ -49999,7 +50021,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     { cle: 'c3', ids: ['retirer', 'messages'], apres: AF.section },
                   ] : null}/>
                 {/* (15 nov.) L'argent à venir, en résumé sous la grille : un toucher ouvre son écran (src/ArgentAVenirEcran.jsx). */}
-                {!baseKO && !premierJour ? <div className="vrm-a-venir-hote vrm-a-venir-journee" style={{ margin: "12px 0 0" }}><ArgentAVenirCarte A={liveStats && liveStats.aVenir}/></div> : null}
+                {!baseKO && !premierJour ? <div className="vrm-a-venir-hote vrm-a-venir-journee" style={{ margin: "12px 0 0" }}><ArgentAVenirCarte A={liveStats && liveStats.aVenir} reserve/></div> : null}
                 {!out.mois ? <div hidden data-jp-cachee="chiffres">{chiffresMois}</div> : null}
                 {ordiJournee ? null : retoursLitigesElt}
               </>);
@@ -50202,7 +50224,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* (5 nov., chantier E2) L'argent de Vinted, sous la carte du mois — le même ordre que
             « Tous » : la carte, puis « À venir ». Mêmes composants, mêmes règles qu'avant. */}
         {dansPlateforme && !baseKO && <div className="vrm-retirer-hote" style={{margin:'12px 0 0'}}><RetirerArgent liveStats={liveStats}/></div>}
-        {dansPlateforme && !baseKO && <div className="vrm-a-venir-hote" style={{margin:'12px 0 0'}}><ArgentAVenirCarte A={liveStats && liveStats.aVenir} plateforme="Vinted"/></div>}
+        {dansPlateforme && !baseKO && <div className="vrm-a-venir-hote" style={{margin:'12px 0 0'}}><ArgentAVenirCarte A={liveStats && liveStats.aVenir} plateforme="Vinted" reserve/></div>}
         {/* ⚠️ LES OUTILS DE TRAVAIL AVANT LES COMMENTAIRES. La période et la
             recherche étaient sous six bandeaux d'explication : il fallait
             défiler un écran et demi pour filtrer ses ventes. Ce qu'on manipule
@@ -64406,10 +64428,10 @@ function AppCoeur() {
           }}</EbayActionCompte>)}
           {sec==='ventes'&&<EbayVentes baseKO={baseKO} vue={ebayVueEff} comptesEbay={comptesEbay} cible={ebayCible?.section==='ventes'?ebayCible:null} onClearCible={()=>setEbayCible(null)}/>}
           {sec==='messages'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayMessagesVolets key={ref} comptesEbay={comptesEbay} owner={AUTH.user?.id || 'installation'} cible={ebayCible?.compte===ref && ebayCible.section==='messages'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
-          {sec==='agent'&&<div style={{padding:16}}><GuidesEbay ids={['vente','retour']}/><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayRetours key={'rt-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onSection={(section,t)=>{setEbayVue(ref);setEbayCible(cibleEbay(ref,{...t,section}));allerSec(section);}}/><EbayEvaluations key={'ev-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/></>}</EbayActionCompte></div>}
-          {sec==='promo'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayPromotion key={'pr-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/><EbayRemises key={'rm-'+ref} compte={ref}/></>}</EbayActionCompte></div>}
+          {sec==='agent'&&<div className="vrm-ebay-panneau" style={{padding:16}}><GuidesEbay ids={['vente','retour']}/><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayRetours key={'rt-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onSection={(section,t)=>{setEbayVue(ref);setEbayCible(cibleEbay(ref,{...t,section}));allerSec(section);}}/><EbayEvaluations key={'ev-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/></>}</EbayActionCompte></div>}
+          {sec==='promo'&&<div className="vrm-ebay-panneau" style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayPromotion key={'pr-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/><EbayRemises key={'rm-'+ref} compte={ref}/></>}</EbayActionCompte></div>}
           {sec==='achats'&&<EbayAchatsOnglet headers={enTeteSession} panelOff={panelOffCoque} vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue} contexte={ctxCalculette}/>}
-          {sec==='offres'&&<div style={{padding:16}}><GuidesEbay ids={['offre']}/><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayOffres key={ref} cible={ebayCible?.compte===ref && ebayCible.section==='offres'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onAnnonces={()=>allerSec('annonces')}/>}</EbayActionCompte></div>}
+          {sec==='offres'&&<div className="vrm-ebay-panneau" style={{padding:16}}><GuidesEbay ids={['offre']}/><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayOffres key={ref} cible={ebayCible?.compte===ref && ebayCible.section==='offres'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onAnnonces={()=>allerSec('annonces')}/>}</EbayActionCompte></div>}
           {sec==='annonces'&&!baseKO&&<LigneMemePhoto site="eBay" charger={chargerMemePhotoUI}/>}
           {sec==='annonces'&&<EbayAnnonces baseKO={baseKO} comptes={vintedAccounts} vue={ebayVueEff} comptesEbay={comptesEbay}/>}
         </section>); };

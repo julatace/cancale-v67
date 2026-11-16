@@ -312,8 +312,9 @@ async function verifier(racine, { muet = false, avant = null } = {}) {
   const pages = ['vinted-capture.js', 'vinted-infos.js', 'lbc.js', 'vc-depot.js', 'vrm-badge.js'];
   const malPlaces = man ? pages.filter((p) => !(man.content_scripts || []).some((c) => { const js = c.js || []; return js.includes(p) && js.indexOf('vrm-mots.js') > -1 && js.indexOf('vrm-mots.js') < js.indexOf(p); })) : pages;
   dit(!malPlaces.length, 'B7 manifeste : vrm-mots.js chargé AVANT chaque page qui l’utilise', malPlaces);
-  dit(/await rafraichirVendExt\(main\.vrm_je_vends, owner\);/.test(fond) && /'vrm_numero_ecrit', 'vrm_je_vends'\]/.test(fond) && /function fullSync\(\) \{ vendExtAJour\(\);/.test(fond), 'B8 fond : `vrm_je_vends` relu avec les infos de page et à chaque synchronisation (au plus toutes les 6 h)');
-  dit(/const GROUPES = GROUPES_LOUPE\.map\(\(\[t, l\]\) => \[t, t === 'paire' \? motsVendeur\(\)\.Noms : l\]\);/.test(app), 'B9 la recherche : le groupe « Paires » s’appelle « Articles » hors Sneakers');
+  dit(/await rafraichirVendExt\(main\.vrm_je_vends, owner\);/.test(fond) && /'vrm_numero_ecrit', 'vrm_je_vends'(?:, '\w+')*\]/.test(fond)   /* (16 nov.) la lecture de `main` a d'autres clés à la suite (liste de recherche, achetées) */ && /function fullSync\(\) \{ vendExtAJour\(\);/.test(fond), 'B8 fond : `vrm_je_vends` relu avec les infos de page et à chaque synchronisation (au plus toutes les 6 h)');
+  // (16 nov.) Depuis le 15 nov. les groupes suivent l'ordre de la requête et passent par `libGroupe` (stock, retours) : « paire » ⇒ le mot du vendeur.
+  dit(/const GROUPES = GROUPES_LOUPE\.map\(\(\[t, l\]\) => \[t, t === 'paire' \? motsVendeur\(\)\.Noms : l\]\);/.test(app) || (/const libGroupe = \(t, l\) => \(t === 'paire' \? motsVendeur\(\)\.Noms : /.test(app) && /\.map\(\(\[t, l\]\) => \[t, libGroupe\(t, l\)\]\);/.test(app)), 'B9 la recherche : le groupe « Paires » s’appelle « Articles » hors Sneakers');
   dit(/const rv = retraitsVestiaire\(\{.*, mots: motsVendeur\(\) \}\);/.test(app), 'B10 Ma journée (Vestiaire) passe le mot du vendeur à `retraitsVestiaire`');
   if (arbreAvant) try { fs.rmSync(arbreAvant, { recursive: true, force: true }); } catch (_) {}
   return ko;
