@@ -169,16 +169,21 @@ const VIDES = new Set(('le la les l de du des d un une et ou au aux en pour avec
 
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '[\\s-]+');
 const alt = (l) => [...l].sort((a, b) => b.length - a.length).map(esc).join('|');
-const B0 = "(?<=^|[\\s,;.!?(\\-])", B1 = "(?=$|[\\s,;.!?)\\-])";
+// (15 nov., rouges-connus) Le début d'un mot ne s'écrit plus `(?<=^|[…])` : Safari < 16.4 refuse de
+// LIRE un paquet qui contient un « lookbehind » (« L'application n'a pas pu démarrer », audit-safari).
+// Un MOTIF est une liste de branches, essayées DANS L'ORDRE à chaque position de la phrase (comme
+// l'alternance d'une regex, collante `y`) ; une branche `debut` n'est essayée qu'au début de la phrase
+// ou après un caractère de DEBUT — exactement ce que faisait l'ancien lookbehind devant elle.
+const DEBUT = /[\s,;.!?(\-]/, B1 = "(?=$|[\\s,;.!?)\\-])";
+const motif = (...branches) => branches.map(([debut, src]) => ({ debut, re: new RegExp(src, 'y') }));
+const mot = (src) => motif([true, src]);
 const NOMBRE = '(\\d{1,6}(?:[.,]\\d{1,2})?)';
-const _reMots = new Map();
-const reMot = (a) => { let r = _reMots.get(a); if (!r) { r = new RegExp(`${B0}${esc(a)}${B1}`, 'g'); _reMots.set(a, r); } return r; };
 const _vocabs = new Map();
 function vocabulaire(paires, nom) {
   if (nom && _vocabs.has(nom)) return _vocabs.get(nom);
   const parAlias = new Map(); const tous = [];
   for (const [cle, al, ...rest] of paires) for (const a of al) { if (!parAlias.has(a)) parAlias.set(a, [cle, rest]); tous.push(a); }
-  const v = { re: new RegExp(`${B0}(?:${alt(tous)})${B1}`, 'g'), parAlias };
+  const v = { re: mot(`(?:${alt(tous)})${B1}`), parAlias };
   if (nom) _vocabs.set(nom, v);
   return v;
 }
@@ -189,17 +194,19 @@ const RE = (() => {
   const unites = alt(Object.values(UNITES).flat());
   const motsNb = alt(Object.keys(NOMBRES_MOTS));
   return {
-    duree: new RegExp(`${B0}(?:(${alt(AVANT_DUREE_LT)})\\s+|(${alt(AVANT_DUREE_GE)})\\s+)?(\\d{1,4}|${motsNb})\\s*(${unites})${B1}`, 'g'),
-    prixEntre: new RegExp(`${B0}(?:entre|between|from|de|tra|fra|zwischen|von)\\s+${NOMBRE}\\s*${DEVISE}?\\s+(?:et|and|to|a|y|e|und|bis)\\s+${NOMBRE}\\s*${DEVISE}${B1}`, 'g'),
-    prixTiret: new RegExp(`${B0}${NOMBRE}\\s*${DEVISE}?\\s*(?:-|\\s(?:a|to|bis|al)\\s)\\s*${NOMBRE}\\s*${DEVISE}${B1}`, 'g'),
-    prixMax: new RegExp(`(?:${B0}(?:${alt(AVANT_PRIX_MAX.filter((x) => /^[a-z]/.test(x)))})\\s*|(?:${alt(AVANT_PRIX_MAX.filter((x) => !/^[a-z]/.test(x)))})\\s*)${NOMBRE}\\s*(?:${DEVISE})?${B1}`, 'g'),
-    prixMin: new RegExp(`(?:${B0}(?:${alt(AVANT_PRIX_MIN.filter((x) => /^[a-z]/.test(x)))})\\s*|(?:${alt(AVANT_PRIX_MIN.filter((x) => !/^[a-z]/.test(x)))})\\s*)${NOMBRE}\\s*(?:${DEVISE})?${B1}`, 'g'),
-    prixMot: new RegExp(`${B0}(?:prix|price|precio|prezzo|preis)\\s*:?\\s*${NOMBRE}\\s*(?:${DEVISE})?${B1}`, 'g'),
-    prixExact: new RegExp(`(?:${B0}${NOMBRE}\\s*${DEVISE}${B1}|€\\s*${NOMBRE}${B1})`, 'g'),
-    taille: new RegExp(`${B0}(?:${alt(AVANT_TAILLE)})\\s?\\.?\\s?(\\d{2}(?:[.,]5)?(?:\\s?[12]\\/3|\\s?1\\/2)?)${B1}`, 'g'),
-    numero: new RegExp(`${B0}(?:${alt(AVANT_NUMERO)})\\s?\\.?\\s?([a-z]?\\d{1,6})${B1}`, 'g'),
-    numeroLettre: new RegExp(`${B0}([a-z]\\d{1,6})${B1}`, 'g'),
-    nombre: new RegExp(`${B0}(\\d{1,6}(?:[.,]5)?)${B1}`, 'g'),
+    duree: mot(`(?:(${alt(AVANT_DUREE_LT)})\\s+|(${alt(AVANT_DUREE_GE)})\\s+)?(\\d{1,4}|${motsNb})\\s*(${unites})${B1}`),
+    prixEntre: mot(`(?:entre|between|from|de|tra|fra|zwischen|von)\\s+${NOMBRE}\\s*${DEVISE}?\\s+(?:et|and|to|a|y|e|und|bis)\\s+${NOMBRE}\\s*${DEVISE}${B1}`),
+    prixTiret: mot(`${NOMBRE}\\s*${DEVISE}?\\s*(?:-|\\s(?:a|to|bis|al)\\s)\\s*${NOMBRE}\\s*${DEVISE}${B1}`),
+    prixMax: motif([true, `(?:${alt(AVANT_PRIX_MAX.filter((x) => /^[a-z]/.test(x)))})\\s*${NOMBRE}\\s*(?:${DEVISE})?${B1}`],
+      [false, `(?:${alt(AVANT_PRIX_MAX.filter((x) => !/^[a-z]/.test(x)))})\\s*${NOMBRE}\\s*(?:${DEVISE})?${B1}`]),
+    prixMin: motif([true, `(?:${alt(AVANT_PRIX_MIN.filter((x) => /^[a-z]/.test(x)))})\\s*${NOMBRE}\\s*(?:${DEVISE})?${B1}`],
+      [false, `(?:${alt(AVANT_PRIX_MIN.filter((x) => !/^[a-z]/.test(x)))})\\s*${NOMBRE}\\s*(?:${DEVISE})?${B1}`]),
+    prixMot: mot(`(?:prix|price|precio|prezzo|preis)\\s*:?\\s*${NOMBRE}\\s*(?:${DEVISE})?${B1}`),
+    prixExact: motif([true, `${NOMBRE}\\s*${DEVISE}${B1}`], [false, `€\\s*${NOMBRE}${B1}`]),
+    taille: mot(`(?:${alt(AVANT_TAILLE)})\\s?\\.?\\s?(\\d{2}(?:[.,]5)?(?:\\s?[12]\\/3|\\s?1\\/2)?)${B1}`),
+    numero: mot(`(?:${alt(AVANT_NUMERO)})\\s?\\.?\\s?([a-z]?\\d{1,6})${B1}`),
+    numeroLettre: mot(`([a-z]\\d{1,6})${B1}`),
+    nombre: mot(`(\\d{1,6}(?:[.,]5)?)${B1}`),
   };
 })();
 
@@ -228,7 +235,17 @@ export function analyserPhrase(q, { maintenant = Date.now(), marques = [] } = {}
   const filtres = [];
   const prendre = (de, a) => { s = s.slice(0, de) + ' '.repeat(a - de) + s.slice(a); };
   const poser = (f, de, a) => { filtres.push({ ...f, de, a, src: brut.slice(de, a) }); prendre(de, a); };
-  const chaque = (re, fn) => { re.lastIndex = 0; const trouves = []; let m; while ((m = re.exec(s))) { trouves.push(m); if (m[0] === '') re.lastIndex++; } for (const x of trouves) fn(x, x.index, x.index + x[0].length); };
+  // Les correspondances d'un MOTIF (voir `motif`), de gauche à droite, sans chevauchement — ce que rendait
+  // `re.exec` en boucle sur une regex `g` (une correspondance vide avance d'un caractère).
+  const chaque = (branches, fn) => {
+    const trouves = [];
+    for (let i = 0; i <= s.length;) {
+      let m = null;
+      for (const b of branches) { if (b.debut && i > 0 && !DEBUT.test(s[i - 1])) continue; b.re.lastIndex = i; m = b.re.exec(s); if (m) break; }
+      if (m) { trouves.push(m); i += m[0].length || 1; } else i++;
+    }
+    for (const x of trouves) fn(x, x.index, x.index + x[0].length);
+  };
   // UNE expression par vocabulaire (les alias du plus long au plus court : à une même place, le plus long gagne).
   const listeMots = (paires, fn, nom = null) => {
     const v = vocabulaire(paires, nom);
@@ -261,10 +278,10 @@ export function analyserPhrase(q, { maintenant = Date.now(), marques = [] } = {}
   // 5. Les jours (« demain », « lundi », « avant demain »).
   const auj = jourParis(maintenant);
   const reAvant = `(?:(${alt(AVANT_JOUR)})\\s+)?`;
-  for (const [cle, d, al] of JOURS_REL) chaque(new RegExp(`${B0}${reAvant}(${alt(al)})${B1}`, 'g'), (m, de, a) => {
+  for (const [cle, d, al] of JOURS_REL) chaque(mot(`${reAvant}(${alt(al)})${B1}`), (m, de, a) => {
     const j = decalerJour(auj, d); poser({ k: 'jour', rel: cle, de_: m[1] ? null : j, jusqua: j, avant: !!m[1] }, de, a);
   });
-  SEMAINE.forEach((al, i) => chaque(new RegExp(`${B0}${reAvant}(${alt(al)})${B1}`, 'g'), (m, de, a) => {
+  SEMAINE.forEach((al, i) => chaque(mot(`${reAvant}(${alt(al)})${B1}`), (m, de, a) => {
     const ecart = (i - jourSemaine(auj) + 7) % 7; const j = decalerJour(auj, ecart);
     poser({ k: 'jour', rel: 'semaine', jourSemaine: i, de_: m[1] ? null : j, jusqua: j, avant: !!m[1] }, de, a);
   }));

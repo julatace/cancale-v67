@@ -10,6 +10,10 @@
 // et, une fois par écran (1512 clair) :
 //   · Ventes : le « ? » de la carte ouvre « D'où viennent ces chiffres », une ligne par
 //     chiffre de la carte, chacune avec sa phrase ; la vente Vestiaire porte son montant ;
+//     (15 nov., rouges-connus) depuis la refonte des listes du 14 nov. (0dddcbb7,
+//     docs/passation/2026-11-14-refonte-listes.md) « Tous » rend la carte en BANDE
+//     (« 1 471 € vendu · 26 ventes · 30 à envoyer · ⋯ », son « ? » retiré, celui du titre gardé) :
+//     le « ? » de la carte se juge sur la carte d'un site (Ventes · Vinted), où elle reste une carte ;
 //   · Achats : les onglets d'étape ne redisent pas les nombres de la carte ; l'achat
 //     suspendu n'est pas compté « en route » ;
 //   · Ma journée : « Colis envoyés » de la semaine passée n'est pas « 0 » quand des ventes
@@ -84,14 +88,17 @@ const VP = { '390': { width: 390, height: 844 }, '1512': { width: 1512, height: 
     dit(!etat.garde && !etat.mots.length, `${vue} ${ecran} : aucun garde-fou, aucun « undefined/NaN/null » affiché`, JSON.stringify(etat));
     if (CAPT) { fs.mkdirSync(CAPT, { recursive: true }); await pg.screenshot({ path: path.join(CAPT, `onglets-a-${ecran}-${vue}.png`), fullPage: !tel }); }
     if (vue === '1512-clair' && ecran === 'ventes') {
-      await pg.click('[data-carte-stats="ventes-toutes"] [data-carte-aide]').catch(() => {});
-      const f = await pg.waitForSelector('[data-carte-aide-feuille]', { timeout: 5000 }).then(() => true).catch(() => false);
-      const lignes = f ? await pg.$$eval('[data-carte-aide-feuille] [data-carte-aide-chiffre]', (els) => els.map((e) => ({ id: e.getAttribute('data-carte-aide-chiffre'), phrase: (e.querySelector('dd') || {}).textContent || '' }))) : [];
-      dit(f && lignes.length >= 3 && lignes.every((x) => x.phrase.length > 20), 'Ventes : « ? » ouvre « D’où viennent ces chiffres », une phrase par chiffre de la carte', JSON.stringify(lignes.map((x) => x.id)));
-      if (CAPT && f) await pg.screenshot({ path: path.join(CAPT, 'onglets-a-ventes-aide-1512-clair.png') });
-      await pg.keyboard.press('Escape').catch(() => {});
       const vc = await pg.evaluate(() => { const l = [...document.querySelectorAll('*')].find((e) => e.children.length < 40 && /Sac banc Vestiaire/.test(e.textContent || '') && /203,23/.test(e.textContent || '')); return !!l; });
       dit(vc, 'Ventes · Tous : la vente Vestiaire porte le montant que « vendu » compte (203,23 €)');
+      // La carte d'un site (Ventes · Vinted) : son « ? » ouvre « D'où viennent ces chiffres ».
+      await pg.goto(`http://localhost:${PORT}/?tab=ventes&site=vinted`, { waitUntil: 'domcontentloaded' });
+      await pg.waitForSelector('[data-carte-stats="ventes"] [data-carte-aide]', { state: 'visible', timeout: 60000 }).catch(() => {});
+      await pg.click('[data-carte-stats="ventes"] [data-carte-aide]', { timeout: 10000 }).catch(() => {});
+      const f = await pg.waitForSelector('[data-carte-aide-feuille]', { timeout: 5000 }).then(() => true).catch(() => false);
+      const lignes = f ? await pg.$$eval('[data-carte-aide-feuille] [data-carte-aide-chiffre]', (els) => els.map((e) => ({ id: e.getAttribute('data-carte-aide-chiffre'), phrase: (e.querySelector('dd') || {}).textContent || '' }))) : [];
+      dit(f && lignes.length >= 3 && lignes.every((x) => x.phrase.length > 20), 'Ventes · Vinted : le « ? » de la carte ouvre « D’où viennent ces chiffres », une phrase par chiffre de la carte', JSON.stringify(lignes.map((x) => x.id)));
+      if (CAPT && f) { await pg.waitForTimeout(800); await pg.screenshot({ path: path.join(CAPT, 'onglets-a-ventes-aide-1512-clair.png') }); }
+      await pg.keyboard.press('Escape').catch(() => {});
     }
     if (vue === '1512-clair' && ecran === 'achats') {
       const seg = await pg.evaluate(() => [...document.querySelectorAll('[data-achats-onglet]')].map((b) => ({ id: b.getAttribute('data-achats-onglet'), n: b.getAttribute('data-n'), vu: !!b.querySelector('.vrm-seg-n') })));

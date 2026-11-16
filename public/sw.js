@@ -154,10 +154,14 @@ const rechaufferPlusTard = (cache) => new Promise((r) => setTimeout(r, ATTENTE_R
 // Un écran à la demande (`src/ecrans/*`) jamais ouvert en ligne n'était pas en cache :
 // hors ligne il restait sur « La page n'a pas pu se charger ». Le build publie la liste de
 // SES morceaux (`/hors-ligne-assets.json`, vite.config.js) ; en ligne, une fois la
-// coquille rangée, on range ceux qui manquent, UN PAR UN (jamais une rafale), 160 au plus.
+// coquille rangée, on range ceux qui manquent, UN PAR UN (jamais une rafale), MAX_MORCEAUX_HL au plus.
 // Un échec arrête là (la prochaine ouverture reprend). La liste rangée dit aussi à la purge
 // ce qu'elle doit garder (sinon elle jetterait ces morceaux au déploiement suivant).
 const LISTE_HL = '/hors-ligne-assets.json';
+// (15 nov., rouges-connus) La borne était 160 : le paquet en compte 165 depuis le 15 nov. — les 5 derniers n'étaient
+// JAMAIS rangés et leurs écrans restaient « La page n'a pas pu se charger » hors ligne (banc stock-hors-reseau O :
+// 160/165 deux fois). Une borne garde son rôle (jamais une liste sans fin), au-dessus de ce que l'app livre.
+const MAX_MORCEAUX_HL = 400;
 let _rechauffe = null;
 function rechaufferMorceaux(cache) {
   if (_rechauffe) return _rechauffe;
@@ -165,7 +169,7 @@ function rechaufferMorceaux(cache) {
     const r = await fetch(LISTE_HL, { cache: 'no-store', credentials: 'same-origin' });
     if (!r || !r.ok || r.type !== 'basic') return;
     const j = await r.clone().json().catch(() => null);
-    const l = j && Array.isArray(j.fichiers) ? j.fichiers.filter((n) => typeof n === 'string' && /^\/assets\/[A-Za-z0-9._-]+\.(?:js|css)$/.test(n)).slice(0, 160) : null;
+    const l = j && Array.isArray(j.fichiers) ? j.fichiers.filter((n) => typeof n === 'string' && /^\/assets\/[A-Za-z0-9._-]+\.(?:js|css)$/.test(n)).slice(0, MAX_MORCEAUX_HL) : null;
     if (!l) return;
     await cache.put(LISTE_HL, r);
     for (const n of l) {

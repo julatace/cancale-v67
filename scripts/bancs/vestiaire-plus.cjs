@@ -158,10 +158,16 @@ const sain = async (pg, ecran) => {
       LIGNES = lignes(false);
       const { ctx, pg, errs } = await preparer(b, vp, sombre);
       await essaie('A. Ma journée', async () => {
+        // (15 nov., rouges-connus) Depuis la grille « Studio » de Ma journée (14 nov., 48b76de2 ; App.jsx
+        // `JOBS_TUILE_JOURNEE`) les offres Vestiaire vivent dans la tuile « Offres », dépliée sur place (`data-sj-offres`),
+        // et les messages Vestiaire dans la tuile « Messages » ; l'offre PRESSÉE (« bientôt ») remonte en tête de l'écran
+        // (et sort de la tuile). La liste jugée : tuile dépliée, toutes les lignes de l'écran dans leur ordre, une par offre.
         await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
-        await pg.waitForSelector('[data-vc-offre-journee]', { timeout: 25000 });
+        await pg.waitForSelector('[data-sj-offres]', { timeout: 25000 });
+        await pg.click('[data-sj-offres]');
+        await pg.waitForFunction(() => document.querySelectorAll('.sj-taches [data-vc-offre-journee]').length >= 1, null, { timeout: 15000 }).catch(() => {});
         await pg.waitForTimeout(500);
-        const l = await pg.evaluate(() => [...document.querySelectorAll('[data-vc-offre-journee]')].map((x) => ({ id: x.getAttribute('data-vc-offre-journee'), b: x.getAttribute('data-vc-offre-bientot'), t: (x.getAttribute('title') || '') + ' ' + x.innerText })));
+        const l = await pg.evaluate(() => [...document.querySelectorAll('[data-vc-offre-journee]')].filter((x) => x.getClientRects().length).map((x) => ({ id: x.getAttribute('data-vc-offre-journee'), b: x.getAttribute('data-vc-offre-bientot'), t: (x.getAttribute('title') || '') + ' ' + x.innerText })));
         dit(l.map((x) => x.id).join(',') === '170000002,170000001,170000003', 'A · une ligne par offre, celle qui expire le plus tôt d’abord (2 h, 30 h, sans échéance)', JSON.stringify(l.map((x) => x.id)));
         dit(l[0] && l[0].b === '1' && l[1] && l[1].b == null, 'A · « expire dans 2 h » marqué bientôt (ambre), l’autre non', JSON.stringify(l.map((x) => x.b)));
         dit(l[0] && /Répondre/.test(l[0].t) && /120\s?€/.test(l[0].t) && /expire dans/.test(l[0].t) && l[2] && /échéance non dite/.test(l[2].t), 'A · le prix, l’échéance (ou « échéance non dite ») et le geste « Répondre »', JSON.stringify(l.map((x) => x.t.replace(/\s+/g, ' '))));
@@ -173,8 +179,10 @@ const sain = async (pg, ecran) => {
         dit(m.offres === '3' && m.tache === 'messages', 'A · « Répondre » ouvre Messages · Vestiaire, sur les offres (pas Annonces)', JSON.stringify(m));
         await capture(pg, `journee-repondre-${nomVp}`);
         await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
-        await pg.waitForSelector('[data-job="vestiaire-messages"]', { timeout: 20000 });
-        await pg.click('[data-job="vestiaire-messages"]');
+        await pg.waitForSelector('[data-tuile="messages"]', { timeout: 20000 });
+        await pg.click('[data-tuile="messages"]');
+        await pg.waitForSelector('.sj-taches [data-job="vestiaire-messages"]', { state: 'visible', timeout: 20000 });
+        await pg.click('.sj-taches [data-job="vestiaire-messages"]');
         const t2 = await pg.waitForSelector('[data-tache-vestiaire="messages"]', { timeout: 15000 }).then(() => 'messages', () => pg.evaluate(() => (document.querySelector('[data-tache-vestiaire]') || { getAttribute: () => 'aucune' }).getAttribute('data-tache-vestiaire')));
         dit(t2 === 'messages', 'A · « 2 messages Vestiaire non lus » ouvre Messages · Vestiaire (avant : Annonces)', t2);
       });

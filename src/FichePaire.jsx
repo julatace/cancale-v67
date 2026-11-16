@@ -331,7 +331,9 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
   const saisir = p && onPrixAchat && p.idFiche && !p.ancienNumero && r && r.achat == null ? () => onPrixAchat(p) : null;
   const double = !!(p && p.double);
   const photo = (p && p.photo) || (depuis && depuis.photo) || '';
-  const titre = p ? ((neuve && neuve.titre) || p.titre || (p.etat === 'rien' ? 'N° jamais servi' : 'Sans titre')) : ((depuis && depuis.titre) || tr('fiche.sansTitre'));
+  // (15 nov., rouges-connus) Comme la photo : la paire lue sans titre prend celui de la LIGNE touchée (la même
+  // annonce, désignée par identité) — la fiche d'un colis Vestiaire disait « Sans titre » sous « Cabas toile beige ».
+  const titre = p ? ((neuve && neuve.titre) || p.titre || (p.etat === 'rien' ? 'N° jamais servi' : (depuis && depuis.titre) || 'Sans titre')) : ((depuis && depuis.titre) || tr('fiche.sansTitre'));
   const taille = p ? ((neuve && neuve.taille) || p.taille || '') : '';
   const ctxHeros = ctx ? tr(CLE_CTX[ctx] || 'fiche.ctx.vente') : '';
   const codeHeros = ctx === 'retrait' && depuis && depuis.sous ? depuis.sous : '';

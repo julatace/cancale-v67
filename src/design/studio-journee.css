@@ -168,7 +168,7 @@
   -webkit-tap-highlight-color: transparent !important; transition: background-color 160ms ease !important;
 }
 .sj-journee .sj-zone:active { background: rgb(var(--sb-o) / .04) !important; }
-.sj-journee .sj-lib { display: -webkit-box !important; -webkit-box-orient: vertical !important; -webkit-line-clamp: 2 !important; font: 600 13px/1.2 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; padding-right: 18px !important; overflow: hidden !important; overflow-wrap: anywhere !important; hyphens: auto !important; }
+.sj-journee .sj-lib { display: -webkit-box !important; -webkit-box-orient: vertical !important; -webkit-line-clamp: 2 !important; font: 600 13px/1.2 var(--sb-police-texte) !important; color: var(--sb-encre-2) !important; padding-right: 18px !important; overflow: hidden !important; overflow-wrap: break-word !important; hyphens: manual !important; }   /* (15 nov., rouges-connus) design-passe F : plus de coupure de mot au trait (« Mes-/sages ») ; un mot trop long seul passe encore à la ligne */
 .sj-journee .sb-tuile-plus { position: absolute !important; top: 14px !important; right: 14px !important; color: var(--sb-encre-2) !important; pointer-events: none !important; }
 .sj-journee .sj-face { position: absolute !important; inset: 34px 14px 14px 16px !important; display: flex !important; flex-direction: column !important; justify-content: flex-end !important; align-items: flex-start !important; min-width: 0 !important; }
 .sj-journee .sj-n { display: flex !important; align-items: center !important; gap: 8px !important; font: 500 38px/.8 var(--sb-police-affiche) !important; letter-spacing: -.03em !important; color: var(--sb-encre) !important; white-space: nowrap !important; }

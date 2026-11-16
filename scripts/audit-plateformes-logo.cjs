@@ -61,6 +61,10 @@ const MUTS = {
   'vc-id-tronque': ['src/plateformes.js', "return id === '-' ? '' : `n° ${id}`;", "return id === '-' ? '' : `n° ${id.slice(0, 8)}`;"],
   'vc-texte-brut': ['src/publierAilleurs.js', "const description = typeof r.descriptionLbc === 'function' ? str(r.descriptionLbc({ ref, texte: x.desc, marque: x.marque, taille: x.taille, etat: x.etat, couleur: x.couleur })) : str(x.desc);\n    return { ...base, titre, description, identite: ref ? { quoi: 'Référence'", "const description = str(x.desc);\n    return { ...base, titre, description, identite: ref ? { quoi: 'Référence'"],
   'ebay-titre-brut': ['src/publierAilleurs.js', "const titre = typeof r.titreEbay === 'function' ? str(r.titreEbay(x.title, x.taille)) : str(x.title);", "const titre = str(x.title);"],
+  // (15 nov.) D10 sur la règle d'aujourd'hui : l'entrée « + » de la barre doit ouvrir Publier ailleurs SUR SON site.
+  'lbc-entree-sans-site': ['src/ecrans/Leboncoin.jsx', "new CustomEvent('vrm:publier-ailleurs', { detail: { site: 'leboncoin' } })", "new CustomEvent('vrm:publier-ailleurs', { detail: {} })"],
+  'vc-entree-retiree': ['src/ecrans/Vestiaire.jsx', '<span className="vrm-pa-entree is-outil" data-pa-entree="vestiaire">', '<span className="vrm-pa-entree is-outil">'],
+  'ecoute-sans-site': ['src/App.jsx', "const st=['leboncoin','vestiaire','ebay'].includes(d.site)?d.site:null;", "const st=null;"],
   'parcours-envoie': ['src/App.jsx', "    if (sx === 'leboncoin') { DEMANDE_LBC_FICHE.id = id;", "    if (sx === 'leboncoin') { vmrCmd({ cmd: 'lbcPublier', id }); DEMANDE_LBC_FICHE.id = id;"],
 };
 if (process.argv.includes('--prouve')) {
@@ -198,7 +202,17 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   // (6 nov., Julien : « eBay, c'est vraiment pas ouf ») Sur eBay, « Publier une annonce
   // Vinted sur eBay » et « Vendre un article sur eBay » menaient au MÊME formulaire
   // (`DEMANDE_EBAY_PAIRE`) : UNE entrée, « Vendre sur eBay » (`data-ebay-vendre`).
-  dit(/<EntreePublierAilleurs site="leboncoin"\/>/.test(APP) && (/<EntreePublierAilleurs site="ebay"\/>/.test(APP) || /data-ebay-vendre=""[\s\S]{0,200}data-poster="ebay"/.test(APP)) && /<EntreePublierAilleurs site="vestiaire"\/>/.test(APP), 'D10 « Publier ailleurs » joignable depuis Annonces · Leboncoin, eBay (« Vendre sur eBay »), Vestiaire');
+  // (15 nov., rouges-connus) Depuis la refonte des sites du 14 nov. (a04a8355, « la liste d'abord »,
+  // docs/passation/2026-11-14-refonte-plateformes-reglages.md) l'entrée de Leboncoin et de Vestiaire est le
+  // « + » de la barre de la liste — « l'événement `vrm:publier-ailleurs` et `data-pa-entree` gardés » — et plus
+  // la carte `<EntreePublierAilleurs site=…/>`. La règle jugée reste la même : sur CHAQUE site, une entrée
+  // rendue qui ouvre « Publier ailleurs » SUR CE SITE (l'événement porte `site`), et l'écouteur de l'app
+  // accepte ce site. La carte d'avant compte toujours.
+  const entreeSite = (site) => new RegExp(`<EntreePublierAilleurs site="${site}"\\/>`).test(APP)
+    || new RegExp(`data-pa-entree="${site}"[^\\n]{0,400}new CustomEvent\\('vrm:publier-ailleurs', \\{ detail: \\{ site: '${site}' \\} \\}\\)`).test(APP);
+  const ecoute = /addEventListener\('vrm:publier-ailleurs',ouvrir\)/.test(APP) && /const st=\['leboncoin','vestiaire','ebay'\]\.includes\(d\.site\)\?d\.site:null; setPubAil\(\{num:n,site:st\}\)/.test(APP);
+  dit(ecoute && entreeSite('leboncoin') && (entreeSite('ebay') || /data-ebay-vendre=""[\s\S]{0,200}data-poster="ebay"/.test(APP)) && entreeSite('vestiaire'), 'D10 « Publier ailleurs » joignable depuis Annonces · Leboncoin, eBay (« Vendre sur eBay »), Vestiaire — et sur CE site',
+    JSON.stringify({ ecoute, leboncoin: entreeSite('leboncoin'), vestiaire: entreeSite('vestiaire') }));
   dit(/receptionDe=\{receptionAchatMs\}/.test(APP) && /const receptionAchatMs = React\.useCallback/.test(APP), 'D11 « Relier un achat » reçoit la date de réception lue (règle `dateReception`)');
 
   // (relecture du 5 nov.) « Relier un achat » s'ouvre depuis Ventes/Annonces : les dates de

@@ -8,12 +8,12 @@ import ecran_capte from './en/capte.js';   // (14 nov., extension 5.377) « L'ex
 import ecran_avenir from './en/avenir.js';
 import ecran_verre2 from './en/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
 import ecran_fiched from './en/fiched.js';   // (15 nov.) la fiche d'un article, direction D
+import ecran_vcventes from './en/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
 import ecran_renvoyer from './en/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_liaison from './en/liaison.js';   // (15 nov.) La liaison achat ⇄ article
 import ecran_retrait_ailleurs from './en/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
 import ecran_finition from './en/finition.js';   // (15 nov.) la finition écran par écran
 import ecran_parametres from './en/parametres.js';   // (15 nov.) Paramètres rangés en dix catégories
-import ecran_vcventes from './en/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
 import ecran_numeros_nouvelles from './en/numeros-nouvelles.js';   // (15 nov.) Les nouvelles annonces sans N°
 import ecran_idees from './en/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './en/ventes.js';
@@ -47,8 +47,8 @@ import ecran_argentprix from './en/argentprix.js';   // (14 nov., argent-prix)
 import ecran_rechliste from './en/rechliste.js';
 import ecran_studio_paires from './en/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
 import ecran_republier_guide from './en/republierGuide.js';   // (15 nov.) republier / publier à la main, guidés
-import ecran_memePhoto from './en/memePhoto.js';   // (15 nov., lot meme-photo)
 import ecran_etageres from './en/etageres.js';   // (15 nov.) le Stock en étagères
+import ecran_memePhoto from './en/memePhoto.js';   // (15 nov., lot meme-photo)
 import ecran_journee_verre from './en/journee-verre.js';   // (15 nov.) Ma journée verre, la paire à sortir
 export default {
   ...ecran_ventesVerre,
@@ -1007,12 +1007,14 @@ export default {
   "vcParcours.etape.verdict": "Approved",
   "vcParcours.etape.refuse": "Rejected",
   "vcParcours.etape.paye": "Paid",
+  "vcParcours.etape.livraison": "Delivery to the buyer",
   "vcParcours.court.envoye": "Sent",
   "vcParcours.court.arrive": "Arrived",
   "vcParcours.court.authentification": "Check",
   "vcParcours.court.verdict": "Approved",
   "vcParcours.court.refuse": "Rejected",
   "vcParcours.court.paye": "Paid",
+  "vcParcours.court.livraison": "Delivery",
   "vcParcours.etat.faitLe": "on {jour}",
   "vcParcours.etat.fait": "done",
   "vcParcours.etat.refuseMot": "Vestiaire says “{mot}”",

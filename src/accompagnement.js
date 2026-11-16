@@ -409,10 +409,12 @@ const texteDe = (x) => {
 // d'exception, du JSON, « undefined », un chemin d'API, de l'anglais de navigateur.
 // (14 nov., intégration) Un code HTTP (« 403 ») est technique ; un numéro de version (« 5.336.0 ») ne l'est pas :
 // « Mets l'extension à jour (5.336) » gardait sinon sa raison vide (banc baisse-prix F1).
+// (15 nov., rouges-connus) « pas précédé d'un chiffre, d'un point ou d'une virgule » s'écrit `(?:^|[^\d.,])`,
+// jamais `(?<!…)` : Safari < 16.4 refuse de lire un paquet qui contient un lookbehind (audit-safari).
 export function phraseTechnique(t) {
   const s = String(t || '').trim();
   if (!s) return true;
-  return /\b(?:TypeError|ReferenceError|SyntaxError|AbortError|Error|undefined|null|NaN|stack|fetch|JSON|HTTP|status|ECONN\w*|ERR_\w*)\b|(?<![\d.,])\b[1-5]\d\d\b(?![.,]?\d)|[{}<>]|\/api\/|\/rest\/|Failed to|NetworkError|Load failed|timed? ?out/i.test(s);
+  return /\b(?:TypeError|ReferenceError|SyntaxError|AbortError|Error|undefined|null|NaN|stack|fetch|JSON|HTTP|status|ECONN\w*|ERR_\w*)\b|(?:^|[^\d.,])\b[1-5]\d\d\b(?![.,]?\d)|[{}<>]|\/api\/|\/rest\/|Failed to|NetworkError|Load failed|timed? ?out/i.test(s);
 }
 export function raisonEchec(x, { enLigne = (typeof navigator !== 'undefined' ? navigator.onLine !== false : true) } = {}) {
   if (x && typeof x === 'object' && x.horsLigne) return 'horsligne';

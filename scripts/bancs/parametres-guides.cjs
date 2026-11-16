@@ -114,6 +114,13 @@ const projette = (row, sel) => {
       // (5 nov., chantiers G et H) Les adresses ne sont plus un sous-écran de Paramètres : la
       // ligne « E-mails » MÈNE à l'écran E-mails (« Relier ma boîte »), au lieu d'un panneau caché.
       await pg.locator('[data-sous-retour]').click().catch(() => {});
+      // (15 nov., rouges-connus) Paramètres rangés en dix catégories (docs/passation/2026-11-15-parametres.md) : au
+      // téléphone, la ligne « E-mails » vit dans SA catégorie (« Plateformes ») — on revient à la liste et on l'ouvre.
+      for (let k = 0; k < 4 && !(await pg.locator('[data-reglage-emails]').first().isVisible().catch(() => false)); k++) {
+        const cat = pg.locator('[data-categorie-contient*=" adresses "]').first();
+        if (await cat.isVisible().catch(() => false)) { await cat.click(); await pg.waitForTimeout(500); continue; }
+        await pg.locator('[data-categorie-retour], [data-sous-retour]').first().click({ timeout: 3000 }).catch(() => {}); await pg.waitForTimeout(400);
+      }
       await pg.locator('[data-reglage-emails]').first().click();
       await pg.waitForSelector('.vrm-main[data-ecran="emails"]',{timeout:15000}).catch(() => {});
       dit(await pg.evaluate(()=>(document.querySelector('.vrm-main')||{}).getAttribute?.('data-ecran'))==='emails', `${largeur} : un raccourci ouvre les adresses (l'écran E-mails) au lieu de défiler vers un panneau caché`);

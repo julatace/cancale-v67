@@ -51,6 +51,12 @@ export const MOT_REFUS_VC = /refus|reject|non.?conform|not.?conform|not.?authent
 export const MOT_ARRIVE_VC = /received.?by|arriv|reception|warehouse|entrep/i;
 
 export const ETAPES_PARCOURS_VC = ['envoye', 'arrive', 'authentification', 'verdict', 'paye'];
+// (15 nov., rouges-connus) L'ENVOI DIRECT à l'acheteur, MESURÉ (docs/passation/2026-11-15-vestiaire-ventes.md : la vente
+// Gucci, `sellerShipment: done`, `sellerDelivery: ongoing`, `statutVc: deliveryInProgress` ; sur Vestiaire « Article
+// expédié le 7 novembre · EN COURS · Livraison à l'acheteur ») : le colis ne passe PAS par Vestiaire. Le parcours suit
+// alors les étapes LUES : envoyé → livraison à l'acheteur → validé (le contrôle, après la livraison) → payé — jamais
+// « arrivé chez Vestiaire » ni « authentification », qui n'arriveront pas.
+export const ETAPES_PARCOURS_VC_DIRECT = ['envoye', 'livraison', 'verdict', 'paye'];
 
 // `v` : une vente de `vc_ventes.ventes` ; `colisFait` : la date de « Colis fait » (ou rien).
 // Rend null pour une vente qui n'est pas un objet ; sinon
@@ -72,12 +78,26 @@ export function parcoursVenteVc(v, colisFait = null) {
   // Le mot de Vestiaire ne prouve l'envoi que hors « à expédier » (`vcVentePartie`, la règle partagée).
   const envoyeLu = !!colisFait || fait('sellerShipment') || vcVentePartie(v);
   const plusLoin = paye || livre || valide || refus || controleEnCours || arriveMot;
+  // ENVOI DIRECT : la livraison à l'acheteur est LUE en cours ou faite (frise, ou le statut mesuré `deliveryInProgress`)
+  // alors que le contrôle n'est NI fait NI en cours (`upcoming`, absent) — l'ordre lu dit que l'acheteur reçoit d'abord.
+  const livraisonEnCours = enCoursMot(s('sellerDelivery')) || /^deliveryInProgress$/i.test(String(v.statutVc || '').trim());
+  const direct = (livre || livraisonEnCours) && !valide && !controleEnCours && !arriveMot && !refus;
   const etape = (cle, ok, enCours, preuve, etatInconnu, t = null) => {
     if (ok) return { cle, etat: 'fait', t, preuve };
     if (etatInconnu) return { cle, etat: 'passu', t: null, preuve: '', mot: etatInconnu };
     if (enCours) return { cle, etat: 'encours', t: null, preuve };
     return { cle, etat: e || brut || colisFait ? 'avenir' : 'passu', t: null, preuve: '' };
   };
+  if (direct) {
+    const etapesD = [
+      etape('envoye', true, false,
+        colisFait ? 'colis-fait' : fait('sellerShipment') ? 'vestiaire' : envoyeLu ? 'mot' : 'deduit', '', colisFait || null),
+      etape('livraison', livre || paye, livraisonEnCours, enCoursMot(s('sellerDelivery')) || livre ? 'vestiaire' : 'mot', inconnu('sellerDelivery') ? s('sellerDelivery') : ''),
+      etape('verdict', valide || paye, false, valide ? 'vestiaire' : 'deduit', inconnu('sellerConformity') ? s('sellerConformity') : ''),
+      etape('paye', paye, enCoursMot(s('sellerPayment')), fait('sellerPayment') ? 'vestiaire' : 'mot', inconnu('sellerPayment') ? s('sellerPayment') : '', v.verseLe || null),
+    ];
+    return { etapes: etapesD, argent: argentVenteVc(v), refusee: false, motVestiaire: brut, direct: true };
+  }
   const etapes = [
     etape('envoye', envoyeLu || plusLoin, enCoursMot(s('sellerShipment')),
       colisFait ? 'colis-fait' : fait('sellerShipment') ? 'vestiaire' : envoyeLu ? 'mot' : 'deduit', inconnu('sellerShipment') ? s('sellerShipment') : '', colisFait || null),
