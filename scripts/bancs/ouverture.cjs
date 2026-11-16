@@ -294,7 +294,9 @@ const blanc = (c) => { const x = rgb(c); return !!x && x[0] > 235 && x[1] > 235 
           logo: r ? [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2), Math.round(r.width)] : null, rail: !!d.querySelector('.vrm-boot-rail'),
           p: Number(d.style.getPropertyValue('--vrm-boot-p')) || null };
       }).catch((e) => { if (DEBUG) console.log("   évaluation : " + String(e).slice(0, 200)); return null; });
-      const attendu = sombre ? ['rgb(43, 82, 127)', 'rgb(21, 52, 92)'] : ['rgb(156, 200, 242)', 'rgb(44, 113, 190)'];
+      // (16 nov., intégration vague B) Les valeurs FINALES de src/design/studio-verre.css (`--sv-reflet`, `--sv-haut`), plus
+      // la proposition 9 : le reflet du haut et le haut du dégradé, clair puis bleu-nuit (audit-ouverture les relit dans le CSS).
+      const attendu = sombre ? ['rgba(90, 140, 210, 0.08)', 'rgb(19, 52, 96)'] : ['rgba(120, 175, 235, 0.1)', 'rgb(37, 99, 168)'];
       dit(!!boot && !boot.absent && attendu.every((c) => boot.img.includes(c)) && (boot.img.match(/gradient/g) || []).length === 4, n + ' l’écran de chargement porte le dégradé « Verre dépoli »' + (sombre ? ' bleu-nuit' : ''), boot ? (boot.absent || boot.img.slice(0, 120)) : 'absent');
       dit(!!boot && boot.theme === (sombre ? '#133460' : '#2563A8'), n + ' la barre d’état (theme-color) prend le haut du dégradé pendant le démarrage', boot && boot.theme);
       dit(!!boot && boot.racine, n + ' le fond du document est le même bleu pendant le démarrage (data-vrm-boot)');

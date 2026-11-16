@@ -122,11 +122,13 @@ async function scenario(b, scen, largeur, sombre) {
     // (16 nov., intégration vague B) Julien, 14 nov. (AJOUT 3, 56e1ec66) : la ligne de fraîcheur quitte la tête de page — la
     // cloche porte son point ambre, SA feuille porte la ligne entière. On ouvre donc la cloche, puis « Voir ».
     if (await alerte.count() && !(await alerte.locator('[data-alerte-voir]').first().isVisible().catch(() => false))) {
-      await pg.locator('[data-centre-notifs-cloche]').first().click().catch(() => {});
-      await pg.waitForTimeout(800);
+      await pg.locator('[data-centre-notifs-cloche]:visible').first().click({ timeout: 5000 }).catch(async () => { await pg.evaluate(() => { const b = document.querySelector('[data-centre-notifs-cloche]'); if (b) b.click(); }); });
+      await pg.waitForSelector('[data-centre-fraicheur] [data-alerte-capture]', { timeout: 12000 }).catch(() => {});
+      await pg.waitForTimeout(400);
     }
     // Plusieurs choses à revoir : la ligne se déplie, la rangée en panne s'ouvre, son geste (le même « Voir »).
     if (await alerte.count() && !(await pg.locator('[data-alerte-capture] [data-alerte-voir]:visible').count())) {
+      // (la ligne de la feuille de la cloche, pas la copie masquée de la coque)
       await pg.locator('[data-alerte-capture] [data-fraicheur-deplier]:visible').first().click().catch(() => {});
       await pg.waitForTimeout(400);
       await pg.locator('[data-fraicheur-rangee="panne"] .vrm-fraicheur-rangee-tete:visible').first().click().catch(() => {});
