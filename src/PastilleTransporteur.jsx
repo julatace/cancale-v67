@@ -49,10 +49,12 @@ const nomDe = (t) => (t && t.nom) || '';
 
 // (7 nov.) LE BADGE posé dans le coin de la vignette d'un colis (comme le badge d'une app).
 // Il lit le MÊME `t` que la puce ; inconnu ⇒ le pictogramme neutre (jamais une marque devinée).
-export function BadgeTransporteur({ t, className = '', ...rest }) {
+// (15 nov., « transporteur connu ») `pasLu` : ce que dit le badge quand rien n'est lu (« Transporteur pas encore lu »),
+// passé par l'appelant (traduit) ; sans lui, l'ancien libellé. `data-transporteur-nom` (les règles, les bancs) ne change pas.
+export function BadgeTransporteur({ t, className = '', pasLu = '', ...rest }) {
   const cle = (t && t.cle) || null;
   const nom = nomDe(t);
-  const libelle = cle || nom ? `Transporteur : ${nom || nomDuTransporteur(cle)}` : PAS_LU;
+  const libelle = cle || nom ? `Transporteur : ${nom || nomDuTransporteur(cle)}` : (pasLu || PAS_LU);
   return (
     <span className={`vrm-colis-logo-transp ${className}`.trim()} data-colis-logo-transp={cle || (nom ? 'autre' : 'inconnu')}
       data-transporteur-nom={nom || PAS_LU} role="img" aria-label={libelle} title={libelle} {...rest}>

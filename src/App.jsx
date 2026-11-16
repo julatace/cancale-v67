@@ -679,7 +679,7 @@ import { placeDesColis, ecranDeCible, ID_SECTION_COLIS } from "./colisPlace.js";
 import { delaiRetrait } from "./delaiRetrait.js";
 import PastilleTransporteur, { LogoTransporteur, LogoInconnu, BadgeTransporteur } from "./PastilleTransporteur.jsx";
 import { transporteurDuColis, cleStatTransporteur, cleTransporteur } from "./transporteursVisuels.js";
-import { transporteurDeVente, quandEnvoye, rangerEnvoyes, filtresTransporteurs, filtrerEnvoyes, nomEnvoye, INCONNU as TRANSP_INCONNU, raisonInconnu, compterRaisons, libelleTransp } from "./colisEnvoyes.js";
+import { transporteurDeVente, quandEnvoye, rangerEnvoyes, filtresTransporteurs, filtrerEnvoyes, nomEnvoye, INCONNU as TRANSP_INCONNU, raisonInconnu, compterRaisons, libelleTransp, transporteurDeLigne, transporteurParTx, txDeLigne, tuilesTransporteursConnus, pourquoiSansTransporteur, resumePasLus } from "./colisEnvoyes.js";
 import { ordreRecent, nbSansDate, debutSansDate, PHRASE_SANS_DATE, quandCommandeVinted, quandLeboncoin, quandEbay, quandVestiaire, quandColisAEnvoyer, quandARetirer, ordreRecentPoints } from "./ordreRecent.js";
 import { CarteTournee, TourneePleinEcran } from "./Tournee.jsx";
 // (1er nov.) Julien : « enlève Tournée » — la carte n'est plus sur Ma journée.
@@ -11567,6 +11567,25 @@ function EtatRelaisConv({ vinted }) {
 }
 // UNE phrase, au-dessus d'une liste de boutons qui passent par l'ordinateur
 // (§7 : elle n'est pas redite sous chaque bouton ; le bouton la porte en titre).
+// (15 nov., « transporteur connu » — Julien : « Le transporteur inconnu n'est pas possible ») LA LIGNE DISCRÈTE de « À expédier » :
+// les colis sans transporteur lu, comptés PAR RAISON (src/colisEnvoyes.js `resumePasLus`), avec le geste quand il y en a un
+// (« ouvre vinted.fr sur {compte} »). Jamais « Transporteur inconnu », jamais une tuile. Rien à dire ⇒ rien rendu.
+function LignePasLus({ resume }) {
+  const R = Array.isArray(resume) ? resume.filter((r) => r && r.n > 0) : [];
+  if (!R.length) return null;
+  const n = R.reduce((a, r) => a + r.n, 0);
+  const morceau = (r) => {
+    const raison = tr(`tc.raison.${r.cle}`, { n: r.n });
+    if (r.cle !== 'pas-encore-lu') return raison;
+    const geste = r.comptes.length ? tr('tc.geste.ouvrirVinted', { comptes: r.comptes.join(', ') }) : tr('tc.geste.ouvrirVintedSans');
+    return `${raison} — ${geste}`;
+  };
+  return (
+    <p className="vrm-colis-pas-lus" data-envoyer-pas-lus={n} role="note" style={{ margin: '0 0 8px', fontSize: 12, color: C.muted, lineHeight: 1.45, overflowWrap: 'anywhere' }}>
+      {R.map((r, i) => <React.Fragment key={r.cle}>{i ? ' · ' : ''}<span data-pas-lu-raison={r.cle} data-pas-lu-n={r.n} data-pas-lu-comptes={r.comptes.join(',')}>{morceau(r)}</span></React.Fragment>)}
+    </p>
+  );
+}
 function LigneRelais({ quoi }) {
   useExtVivante();
   const rl = etatRelais();
@@ -36246,7 +36265,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // la ligne de départ lue chez le transporteur pour son n°, le transporteur NOMMÉ dans l'e-mail
   // du bordereau, puis la règle commune (src/colisEnvoyes.js). Avant : la forme du n° seule.
   // (9 nov.) `tx` : la vente sans bordereau e-mail prend ce que SON étiquette captée nomme (relu au cron, par n°).
-  const transporteurVente = (b, tx) => { const k = String((b && b.transaction) || tx || ''); const et = pdfEtiquettesParTx(); return transporteurDeVente({ bord: b || null, pdf: (k && et && et[k]) || null, departs: vcLoc0.departs, transp: transpMap, suivisEmail: Array.isArray(tracking) ? tracking : null }); };
+  const transporteurVente = (b, tx) => transporteurParTx(b, tx, { pdfParTx: pdfEtiquettesParTx(), departs: vcLoc0.departs, transp: transpMap, suivisEmail: Array.isArray(tracking) ? tracking : null });
+  // (15 nov., « transporteur connu ») UNE LIGNE de « À expédier » (`colisAEnvoyerBase`) : une vente Vinted se lit TOUJOURS par
+  // SON n° de transaction — le bordereau e-mail seul laissait « inconnu » la vente dont l'étiquette captée était LUE (src/colisEnvoyes.js).
+  const trDeLigne = (x) => transporteurDeLigne(x, transporteurVente);
   // (9 nov., lot AD) L'IDENTITÉ PUBLIÉE d'un colis à retirer (`vrm_colis_retirer.colis[i][3]`) : le n°
   // de suivi (`e:`), sinon la transaction Vinted (`v:{compte}:{tx}`), sinon la clé de l'e-mail (`k:`).
   // Une seule écriture de cette règle : la publication ci-dessous ET le mode relais (même liste).
@@ -45388,7 +45410,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         : { etat: 'pas-lu', texte: 'Stock pas encore lu sur cet appareil' };
       // (2 nov.) Le transporteur LU (la règle de la carte, src/transporteursVisuels.js) :
       // `b.transporteur` n'existe sur aucun bordereau (mesuré : 214 lignes, aucun champ).
-      const transporteur = transporteurVente(b).nom || '';
+      const transporteur = transporteurVente(b, x.tx || (e && e.txn)).nom || '';
       const lim = e ? (texteLimiteEnvoi(e.lim) || '') : '';
       return { cle: x.cle, tx: x.tx, num: x.num || '', nom: x.nom, photo: x.photo || null, e,
         sous: [o && o._acc ? accNameOf(o._acc) : '', lim].filter(Boolean).join(' · '),
@@ -46009,7 +46031,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     ];
     return { vintedLu, exTout, autresColis };
   };
-  const trNomColis = (x) => { if (x.__autre) return x.trNom; return nomEnvoye(transporteurVente(x.b)); };
+  const trNomColis = (x) => { if (x.__autre) return x.trNom; return nomEnvoye(trDeLigne(x)); };
+  // (15 nov.) Pourquoi une ligne n'a pas de transporteur, et le geste (jamais « inconnu ») : src/colisEnvoyes.js `pourquoiSansTransporteur`.
+  const pasLuDeLigne = (x) => { const tx = txDeLigne(x); const et = pdfEtiquettesParTx() || {}, vus = pdfVusParTx() || {}; const acc = x && x.o && x.o._acc;
+    return pourquoiSansTransporteur({ site: x && x.__autre ? ({ vc: 'vestiaire', eb: 'ebay', lbc: 'leboncoin' }[x.__autre] || x.__autre) : 'vinted', bord: (x && x.b) || null, pdf: (tx && et[tx]) || null, vu: (tx && vus[tx]) || null, capte: (tx && labelsCaptes[tx]) || null, compte: acc ? (acc.login || accNameOf(acc)) : ((x && x.b && x.b.account) || '') }); };
   const estPosteColis = (x) => !!(x.o ? isShipDone(x.o) : isBordShippedManual(x.b));
   // (14 nov., Studio bleu clair) « AVANT DEMAIN » : la tuile-filtre et l'ambre du grand chiffre de « À expédier »,
   // UNE règle sur LA liste de l'écran (`colisAEnvoyerBase`, la même que « Tout imprimer ») : la limite (`dl`, jours
@@ -47690,7 +47715,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           if (baseKO || premierJour || loading) return null;
           try {
             const tEnv = T.find(x => x.id === 'envoyer'), tRet = T.find(x => x.id === 'retirer');
-            const lignesImpr = lignesLot().map(l => ({ cle: l.cle, imprime: l.imprime, transporteur: transporteurVente(l.e && l.e.b).cle || '' }));
+            const lignesImpr = lignesLot().map(l => ({ cle: l.cle, imprime: l.imprime, transporteur: (trDeLigne(l.e) || {}).cle || '' }));
             // La règle de la case « À envoyer » (plus haut) : sans les bordereaux captés
             // (lus par Colis seulement), le nombre publié par Colis s'il parle du même
             // lot, sinon « au moins » ce que les e-mails disent (§5).
@@ -47698,7 +47723,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const pretsExact = labelsPrets || toShip.length === 0 || !!(pubPrets && pubPrets.total === toShip.length);
             const nPrets = (!labelsPrets && pubPrets && pubPrets.total === toShip.length) ? Math.max(pubPrets.prets, lignesImpr.length) : lignesImpr.length;
             const aPoster = toShip.map(t => { const o = t.o || {}; const tx = String(o.transaction_id || ''); const b = tx ? bordsParTxn[tx] : null; const en = effEntry(o);
-                return { cle: 'v:' + tx, num: (b ? numForBord(b) : '') || (en && en.numero) || '', titre: o.title || '', transporteur: transporteurVente(b).cle || '', jours: Number.isFinite(t.daysLeft) ? t.daysLeft : null, site: 'vinted' }; })
+                return { cle: 'v:' + tx, num: (b ? numForBord(b) : '') || (en && en.numero) || '', titre: o.title || '', transporteur: transporteurVente(b, tx).cle || '', jours: Number.isFinite(t.daysLeft) ? t.daysLeft : null, site: 'vinted' }; })
               .concat(((colisEb && colisEb.aPoster) || []).map(x => ({ cle: 'e:' + x.compte + ':' + x.orderId, num: x.ordre ? (numLigneEbay(x.ordre, (x.ordre.lineItems || [])[0]) || '') : '', titre: x.titre || '', transporteur: '', jours: Number.isFinite(x.jours) ? x.jours : null, site: 'ebay' })))
               // (1er nov., audit A4) Leboncoin et Vestiaire : les colis de la case « À envoyer ».
               .concat((colisAutres.leboncoin || []).map(x => ({ cle: 'l:' + x.txId, num: '', titre: x.titre || '', transporteur: '', jours: null, site: 'leboncoin' })))
@@ -49520,7 +49545,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const preuvesFrise = preuvesFriseDe(o);
             const fuEtapes = preuvesFrise.etapes ? friseVenteFusion(preuvesFrise.etapes, { geste: peutDeposer, verification: preuvesFrise.verification }) : null;
             // Le transporteur : la règle de la pastille (`transporteurVente` → `transporteurDuColis`), la même que le tiroir.
-            const fuTransp = transporteurVente(preuvesFrise.bordE);
+            const fuTransp = transporteurVente(preuvesFrise.bordE, txL);
             const fuPdf = !!(labelsCaptes[txL] || bordParTx[txL]);
             const recapVente = ({ titreId, fermerRef, fermer }) => {
               const { s, tus, vs, horsParcours, bordE, bordC, posteMain, finalisee, versement, etapes } = preuvesFrise;
@@ -49562,7 +49587,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               const bordGeste = !hidden && st !== 'cancelled' && aExpedier(o) && !estParti(o) && o.transaction_id != null;
               // (2 nov.) Le transporteur LU de la vente (n° de SON bordereau) : à côté du bouton
               // bordereau tant qu'il y a un colis à envoyer, sinon une ligne des détails (dit une fois).
-              const trRecap = transporteurVente(bordE);
+              const trRecap = transporteurVente(bordE, o && o.transaction_id);
               return <>
                 <header className="vrm-recap-tete">
                   <div className="vrm-sale-photo vrm-recap-photo">{photo ? <PhotoArticleAgrandissable src={photo} titre={o.title}><PhotoVenteSources {...photoSourcesProps} data-photo-vente="detail" style={{width:'100%',height:'100%',objectFit:'cover'}}/></PhotoArticleAgrandissable> : <Icon name="image" size={22} style={{color:C.muted,opacity:.55}}/>}</div>
@@ -53493,14 +53518,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // (`avantDemainColis`), un transporteur par tuile (`filtresTransporteurs`) — la liste les applique (`filtrerEnvoyes`).
                 const tuilesTete = achatsSec ? null : (() => {
                   const tous = colisAEnvoyerListe(); if (tous.length < 2) return null;
-                  const trDe = (x) => (x.__autre ? x.tr : transporteurVente(x.b));
+                  const trDe = trDeLigne;
                   const nAD = tous.filter(avantDemainColis).length;
-                  const pastilles = filtresTransporteurs(tous, trDe);
-                  const eff = filtreEnvoyer === '__avantDemain' ? (nAD > 0 ? '__avantDemain' : 'tous') : filtrerEnvoyes(tous, filtreEnvoyer, trDe).filtre;
+                  // (15 nov., « transporteur connu ») Les tuiles ne regroupent QUE des transporteurs CONNUS (src/colisEnvoyes.js
+                  // `tuilesTransporteursConnus`) ; les colis sans transporteur lu sont dits en UNE ligne discrète sous la liste
+                  // (`LignePasLus`), avec leur raison et le geste — jamais une tuile « Transporteur inconnu ».
+                  const { tuiles: pastilles, reste: sansTr } = tuilesTransporteursConnus(tous, trDe);
+                  const fE = filtreEnvoyer === TRANSP_INCONNU ? 'tous' : filtreEnvoyer;
+                  const eff = fE === '__avantDemain' ? (nAD > 0 ? '__avantDemain' : 'tous') : filtrerEnvoyes(tous, fE, trDe).filtre;
                   const tuiles = [
                     { v: 'tous', l: tr('sv.filtre.tous'), n: tous.length, attrs: { 'data-envoyer-filtre-choix': 'tous', 'data-envoyer-filtre-n': tous.length } },
                     ...(nAD > 0 && nAD < tous.length ? [{ v: '__avantDemain', l: tr('sv.filtre.avantDemain'), n: nAD, unite: tr('sv.filtre.aPoster'), ambre: true, attrs: { 'data-envoyer-filtre-choix': 'avant-demain', 'data-envoyer-filtre-n': nAD } }] : []),
-                    ...(pastilles.length > 1 ? pastilles.map((p) => ({ v: p.nom, l: p.nom, n: p.n, unite: tr('sv.filtre.colis', { n: p.n }), attrs: { 'data-envoyer-filtre-choix': p.nom, 'data-envoyer-filtre-cle': p.cle || 'inconnu', 'data-envoyer-filtre-n': p.n } })) : []),
+                    ...((pastilles.length > 1 || (pastilles.length === 1 && sansTr.length > 0)) ? pastilles.map((p) => ({ v: p.nom, l: p.nom, n: p.n, unite: tr('sv.filtre.colis', { n: p.n }), attrs: { 'data-envoyer-filtre-choix': p.nom, 'data-envoyer-filtre-cle': p.cle || 'autre', 'data-envoyer-filtre-n': p.n } })) : []),
                   ];
                   // Sur « Envoyés », les tuiles restent à leur place (la tête ne bouge pas d'un onglet à l'autre) ; aucune n'est posée,
                   // et en toucher une ramène à « À envoyer », filtré.
@@ -54286,12 +54315,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           </div>
                           {!groupesT.length ? <div className="vrm-colis-vide-envoi" data-tournee-fini=""><span className="vrm-colis-vide-titre">Tout est déposé</span><span className="vrm-colis-vide-sous">Plus aucun colis à déposer pour l’instant.</span></div> : null}
                           {groupesT.map((g) => {
-                            const trG = g.colis[0].x.__autre ? g.colis[0].x.tr : transporteurVente(g.colis[0].x.b);
+                            const trG = trDeLigne(g.colis[0].x);
                             return (
                               <section key={g.nom} className="vrm-tournee-groupe" data-tournee-groupe={g.nom} data-n={g.colis.length}>
                                 <div className="vrm-fu-groupe-transp">
                                   <span className="vrm-fu-groupe-tuile" aria-hidden="true">{trG && trG.cle ? <LogoTransporteur cle={trG.cle} taille={22} repli={<Icon name="truck" size={15}/>}/> : <LogoInconnu taille={22}/>}</span>
-                                  <h3>{libelleTransp(g.nom)}</h3>
+                                  <h3>{g.nom === TRANSP_INCONNU ? tr('tc.groupe.pasLu') : g.nom}</h3>
                                   <span>{g.colis.length} colis</span>
                                 </div>
                                 <ul className="vrm-tournee-liste">
@@ -54338,22 +54367,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // (2 nov., 22 h, maquette FusionColis) LES COLIS RANGÉS PAR TRANSPORTEUR : un en-tête
                 // (la tuile du logo, son nom, « N colis »), les colis dessous dans l'ordre d'avant
                 // (le plus pressé d'abord) ; les transporteurs dans l'ordre de leur premier colis.
-                const trNomDe = (x) => { if (x.__autre) return x.trNom; return nomEnvoye(transporteurVente(x.b)); };  // (9 nov.) « Transporteur inconnu » (des mots simples), plus « Autres » fourre-tout
+                const trNomDe = trNomColis;  // (9 nov.) « Transporteur inconnu » (des mots simples), plus « Autres » fourre-tout
                 // (3 nov.) Tous les sites : le plus pressé d'abord (jours avant la limite ; sans limite à la fin,
                 // tri stable), puis les transporteurs dans l'ordre de leur premier colis.
                 // (3 nov.) La règle partagée avec « Tout imprimer » (src/lotTransporteurs.js).
                 const tous = [...ex, ...autresColis];
                 // (9 nov., soir, lot AJ) UNE liste, la vente la plus récente en haut (tous comptes, tous sites) ;
                 // le transporteur est une PASTILLE (filtre, comme « Envoyés »), plus un groupe qui impose l'ordre.
-                const trDeColis = (x) => (x.__autre ? x.tr : transporteurVente(x.b));
+                const trDeColis = trDeLigne;
                 // (14 nov., Studio bleu clair) LES TUILES-FILTRES : « Tous », « Avant demain » (la règle `avantDemainColis`,
                 // celle de l'ambre du grand chiffre) et un transporteur par tuile (`filtresTransporteurs`, inchangé). Une tuile
                 // posée est ENFONCÉE avec sa diode ; une tuile qui ne filtre plus rien revient à « tous » (aucun colis caché).
                 const nAvantDemain = tous.filter(avantDemainColis).length;
                 const { liste: tousF } = (filtreEnvoyer === '__avantDemain' && nAvantDemain > 0)
                   ? { liste: tous.filter(avantDemainColis), filtre: '__avantDemain' }
-                  : filtrerEnvoyes(tous, filtreEnvoyer, trDeColis);
+                  : filtrerEnvoyes(tous, filtreEnvoyer === TRANSP_INCONNU ? 'tous' : filtreEnvoyer, trDeColis);
                 const exT = rangerColisEnvoi(tousF, trNomDe);
+                // (15 nov., « transporteur connu ») Les colis de la liste SANS transporteur lu : une ligne discrète, par raison,
+                // avec le geste (« ouvre vinted.fr sur {compte} ») — src/colisEnvoyes.js `pourquoiSansTransporteur` / `resumePasLus`.
+                const lignePasLus = <LignePasLus resume={resumePasLus(tousF.filter((x) => nomEnvoye(trDeColis(x)) === TRANSP_INCONNU).map(pasLuDeLigne))}/>;
                 const iSansDateEnv = debutSansDate(exT, quandColisAEnvoyer), nSansDateEnv = nbSansDate(exT, quandColisAEnvoyer);
                 // (14 nov., Studio) Les tuiles-filtres sont rendues dans la TÊTE de « À expédier » (sous le grand chiffre) : mêmes
                 // valeurs (`filtreEnvoyer`), même règle de repli (`filtrerEnvoyes`), ici seulement la liste filtrée.
@@ -54404,7 +54436,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   return <CaseCoche coche={ok && cochesVues.has(l.cle)} desactive={!ok} label={ok ? tr('vv.coche.label', { titre: String(titreC || '') }) : tr('vv.coche.sansBordereau', { titre: String(titreC || '') })}
                     onBascule={() => setCochesVentes((c) => basculerCoche(Ltous, c, l.cle))} attrs={{ 'data-vv-coche': String(cle), 'data-vv-coche-on': ok && cochesVues.has(l.cle) ? '1' : '0' }}/>; };
                 const empl = (num) => { try { return emplacementVente(num ? ouDansMeubles(num) : null); } catch (_) { return null; } };
-                return <><div className={'vrm-colis-grille' + (enVentes ? ' vv-liste' : '')} data-cible="colonne:prets colonne:attente" data-colis-lignes="1" style={{display:'flex',flexDirection:'column',gap:6}}>{enVentes ? <div className="vv-tab-tete" aria-hidden="true"><span/><span/><span>{tr('vv.col.paire')}</span><span>{tr('vv.col.limite')}</span><span>{tr('vv.col.ou')}</span><span>{tr('vv.col.transport')}</span><span>{tr('vv.col.montant')}</span></div> : null}{(colisTous ? exT : exT.slice(0, 24)).map((e,ix)=>{
+                return <>{lignePasLus}<div className={'vrm-colis-grille' + (enVentes ? ' vv-liste' : '')} data-cible="colonne:prets colonne:attente" data-colis-lignes="1" style={{display:'flex',flexDirection:'column',gap:6}}>{enVentes ? <div className="vv-tab-tete" aria-hidden="true"><span/><span/><span>{tr('vv.col.paire')}</span><span>{tr('vv.col.limite')}</span><span>{tr('vv.col.ou')}</span><span>{tr('vv.col.transport')}</span><span>{tr('vv.col.montant')}</span></div> : null}{(colisTous ? exT : exT.slice(0, 24)).map((e,ix)=>{
                 const ouvreSansDate = ix === iSansDateEnv ? <LigneSansDate n={nSansDateEnv}/> : null;
                 const quandE = quandColisAEnvoyer(e);
                 if (e.__autre) return (
@@ -54473,7 +54505,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <div className="vrm-colis-photo" style={{width:64,height:80,borderRadius:12,background:C.card2||C.bg,border:`1px solid ${C.border}`,boxSizing:'border-box',flexShrink:0,overflow:'hidden',display:'flex',alignItems:'center',justifyContent:'center'}}>
                         {ph?<PhotoVinted src={ph} alt="" loading="lazy" decoding="async" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<Icon name="image" size={20} style={{color:C.muted,opacity:.55}}/>}
                         {/* (7 nov.) Le logo du transporteur LU (`trV`, la règle de la puce), dans le coin de la photo. */}
-                        <BadgeTransporteur t={trV}/>
+                        <BadgeTransporteur t={trV} pasLu={tr('tc.carte.pasEncoreLu')}/>
                       </div>
                       <div className="vv-mid" style={{flex:'1 1 150px',minWidth:0}}>
                         {/* (15 nov., Ventes « Verre dépoli ») LA PREMIÈRE LIGNE de la maquette : la plaque N° (gravée ; rouge

@@ -156,3 +156,83 @@ export function compterRaisons(raisons) {
   for (const r of raisons || []) if (r) n.set(r, (n.get(r) || 0) + 1);
   return Object.keys(RAISONS_INCONNU).filter((k) => n.get(k)).map((k) => ({ cle: k, n: n.get(k), texte: RAISONS_INCONNU[k][n.get(k) > 1 ? 1 : 0] }));
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+//  (15 nov., 23 h — Julien, capture iPhone Ventes → À expédier : « Le transporteur
+//  inconnu n'est pas possible ») LE TRANSPORTEUR D'UN COLIS À EXPÉDIER EST CONNU
+//  DÈS QU'UNE SOURCE EXISTE, ET « INCONNU » N'EST JAMAIS UNE TUILE.
+//
+//  Mesuré sur la vraie base (lecture seule) : les tuiles « Tous 3 · Colissimo 1 ·
+//  Transporteur inconnu 2 » lisaient le transporteur par le seul bordereau E-MAIL
+//  (`transporteurVente(x.b)`, sans le n° de transaction). Une vente dont le
+//  bordereau a été capté par l'extension (aucun e-mail : la boîte du compte n'est
+//  pas reliée) avait pourtant son étiquette LUE (transporteur et n° rangés dans
+//  `vrm_bord_transporteurs.pdf[tx]`) — et la carte, elle, le disait (elle passait
+//  le n°). Vinted ne range le transporteur NULLE PART avant l'étiquette : 0 sur
+//  1 432 détails de transaction (`shipment` = id + statut), 0 sur 934
+//  conversations, 0 dans `my_orders` ; l'étiquette est la source.
+//
+//  La règle (une, ici — l'écran, la tournée, les tuiles et `vrm_colis_aposter`) :
+//   · `transporteurDeLigne(x, deVente)` : une ligne de « À expédier » ; une vente
+//     Vinted se lit TOUJOURS par SON n° de transaction (bordereau e-mail, puis
+//     étiquette relue, puis transporteur, e-mails du même n°, forme du n° —
+//     `transporteurDeVente`), jamais par le bordereau e-mail seul ;
+//   · `pourquoiSansTransporteur(...)` : pourquoi une ligne n'a PAS de transporteur, et le
+//     geste. Aucune source encore (ni bordereau, ni étiquette captée, ni lecture)
+//     ⇒ 'pas-encore-lu' + le compte à ouvrir sur vinted.fr ; une étiquette captée
+//     pas encore relue ⇒ 'a-lire' ; une étiquette lue qui ne nomme personne ⇒ la
+//     raison de `raisonInconnu` ; un autre site ⇒ 'site' (il ne l'a pas dit) ;
+//   · `tuilesTransporteursConnus(liste, tr)` : les tuiles ne regroupent QUE des
+//     transporteurs connus ; le reste est rendu (une ligne discrète, par raison).
+// ════════════════════════════════════════════════════════════════════════════
+export const estConnu = (t) => nomEnvoye(t) !== INCONNU;
+
+// `x` : une ligne de `colisAEnvoyerBase` ({ __autre, tr } pour un autre site ;
+// { o, b, txn } pour une vente Vinted). `deVente(b, tx)` : `transporteurVente` de l'app.
+export function txDeLigne(x) {
+  if (!x || x.__autre) return '';
+  return String(x.txn || (x.o && x.o.transaction_id != null ? x.o.transaction_id : '') || (x.b && x.b.transaction) || '');
+}
+// La vente par SON n° (`transporteurVente` de l'app, ici pour qu'un audit l'EXÉCUTE) : le n° du bordereau e-mail,
+// sinon celui de la ligne ; `pdfParTx` : `vrm_bord_transporteurs.pdf` ({ tx: { t, s } }, l'étiquette relue).
+export function transporteurParTx(b, tx, { pdfParTx = null, departs = null, transp = null, suivisEmail = null } = {}) {
+  const k = String((b && b.transaction) || tx || '');
+  return transporteurDeVente({ bord: b || null, pdf: (k && pdfParTx && pdfParTx[k]) || null, departs, transp, suivisEmail });
+}
+export function transporteurDeLigne(x, deVente) {
+  if (!x) return null;
+  if (x.__autre) return x.tr || null;
+  return typeof deVente === 'function' ? (deVente(x.b || null, txDeLigne(x)) || null) : null;
+}
+
+export const RAISONS_PAS_LU = Object.freeze(['pas-encore-lu', 'a-lire', 'muette', 'plusieurs', 'illisible', 'sans-pdf', 'site']);
+// `site` : 'vinted' | 'vestiaire' | 'ebay' | 'leboncoin' ; `bord` : SON bordereau e-mail ;
+// `pdf`/`vu` : ce que la passe des étiquettes a rangé pour SON n° ; `capte` : l'étiquette captée
+// par l'extension (`harvest_{uid}_label_{tx}`) ; `compte` : le pseudo du compte de la vente.
+// Rend { cle, compte } — `cle` dans RAISONS_PAS_LU, jamais « inconnu ».
+export function pourquoiSansTransporteur({ site = 'vinted', bord = null, pdf = null, vu = null, capte = null, compte = '' } = {}) {
+  const c = String(compte || '').trim();
+  if (site && site !== 'vinted') return { cle: 'site', compte: c };
+  const r = raisonInconnu({ bord, pdf, vu });
+  if (r === 'sans-bordereau') return capte ? { cle: 'a-lire', compte: c } : { cle: 'pas-encore-lu', compte: c };
+  return { cle: r, compte: c };
+}
+
+// Les tuiles : seulement les transporteurs CONNUS ([{ nom, cle, n }], l'ordre de
+// `filtresTransporteurs`) ; `reste` : les lignes sans transporteur lu (rien de caché).
+export function tuilesTransporteursConnus(liste, tr = (x) => x && x.tr) {
+  const L = Array.isArray(liste) ? liste : [];
+  return { tuiles: filtresTransporteurs(L, tr).filter((p) => p.nom !== INCONNU), reste: L.filter((x) => !estConnu(tr(x))) };
+}
+
+// Le reste, compté par raison (l'ordre de RAISONS_PAS_LU) : [{ cle, n, comptes }] —
+// `comptes` : les pseudos à ouvrir sur vinted.fr ('pas-encore-lu'), sans doublon, triés.
+export function resumePasLus(raisons) {
+  const par = new Map();
+  for (const r of raisons || []) {
+    if (!r || !r.cle) continue;
+    const p = par.get(r.cle) || { cle: r.cle, n: 0, comptes: new Set() };
+    p.n++; if (r.compte) p.comptes.add(r.compte); par.set(r.cle, p);
+  }
+  return RAISONS_PAS_LU.filter((k) => par.has(k)).map((k) => { const p = par.get(k); return { cle: k, n: p.n, comptes: [...p.comptes].sort((a, b) => a.localeCompare(b, 'fr')) }; });
+}

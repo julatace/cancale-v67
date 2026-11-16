@@ -9,6 +9,7 @@ import ecran_avenir from './it/avenir.js';
 import ecran_verre2 from './it/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
 import ecran_fiched from './it/fiched.js';   // (15 nov.) la fiche d'un article, direction D
 import ecran_vcventes from './it/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
+import ecran_transporteur_connu from './it/transporteurConnu.js';   // (15 nov.) « À expédier » : transporteur connu
 import ecran_renvoyer from './it/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_liaison from './it/liaison.js';   // (15 nov.) La liaison achat ⇄ article
 import ecran_retrait_ailleurs from './it/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
@@ -2282,6 +2283,7 @@ export default {
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_liaison,
+  ...ecran_transporteur_connu,
   ...ecran_finition,
   ...ecran_parametres,
   ...ecran_avenir,
