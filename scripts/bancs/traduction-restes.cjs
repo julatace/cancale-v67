@@ -31,6 +31,9 @@ const capture = async (pg, nom) => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { r
 const net = (t) => String(t || '').replace(/\s+/g, ' ').replace(/\b\d{1,2}[:h]\d{2}\b/g, 'HH:MM').replace(/il y a \d+ (?:s|min|h|j)\b/g, 'il y a N').trim();
 
 async function ecran(nav, l, W, tab) {
+  try { return await ecranBrut(nav, l, W, tab); } catch (e) { return { texte: '', brutes: [], debord: false, lang: '', erreur: String(e.message || e).slice(0, 200) }; }
+}
+async function ecranBrut(nav, l, W, tab) {
   const base = { lignes: JSON.parse(JSON.stringify(NV.JEU_LIGNES)), comptes: NV.JEU_COMPTES, ecritures: 0 };
   base.lignes.find((x) => x.id === 'main').data.vrm_langue = l;
   const o = await NV.ouvrir(nav, { W, sombre: false, base, tab });
@@ -58,10 +61,12 @@ async function ecran(nav, l, W, tab) {
     for (const W of LARGEURS) {
       for (const tab of ECRANS) {
         const fr = await ecran(nav, 'fr', W, tab);
+        if (fr.erreur) dit(false, `[fr ${W}px] ${tab} : la page tient`, fr.erreur);
         releve[`${W}:${tab}`] = net(fr.texte);
         dit(fr.lang === 'fr' && fr.texte.length > 20, `[fr ${W}px] ${tab} : l'écran se rend en français (${fr.texte.length} caractères)`, fr.lang);
         if (process.env.SANS_EN !== '1') {
           const en = await ecran(nav, 'en', W, tab);
+          if (en.erreur) dit(false, `[en ${W}px] ${tab} : la page tient`, en.erreur);
           dit(en.lang === 'en' && !en.brutes.length, `[en ${W}px] ${tab} : aucune clé brute des lots traduits`, en.brutes.join(', '));
           dit(!en.debord, `[en ${W}px] ${tab} : rien ne déborde à droite`);
         }
