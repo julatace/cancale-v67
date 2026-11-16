@@ -291,6 +291,9 @@ async function ajout3(nav) {
     const o = await ouvrir(nav, { W: 390, sombre: false, b: base(), url: '/?tab=achats' }); await pret(o.pg);
     await o.pg.evaluate(() => { window.__vrmMajDispo = 'assets/index-banc.js'; window.dispatchEvent(new Event('vrm:maj-dispo')); });
     await o.pg.waitForTimeout(3200);
+    // (16 nov., barre-achats) Achats n'a plus le sélecteur de « Paires » en tête (son onglet est dans la barre) : le
+    // premier contenu de <main> est l'écran lui-même, chargé à la demande — on l'attend (8 s au plus), jamais un délai seul.
+    await o.pg.waitForFunction(() => { const main = document.querySelector('.vrm-main'); return !!main && [...main.children].some((c) => c.getBoundingClientRect().height > 2 && getComputedStyle(c).position !== 'fixed'); }, null, { timeout: 8000 }).catch(() => {});
     const m = await o.pg.evaluate(() => {
       const x = document.querySelector('[data-maj-dispo]'); if (!x) return null;
       const r = x.getBoundingClientRect(); const bar = document.querySelector('.vrm-tabbar'); const rb = bar ? bar.getBoundingClientRect() : null;
