@@ -255,11 +255,13 @@ function preparerAchat(a, { marqueDe, couleursDe, couleursCle = couleursDe, rece
   const base = baseAchat(a, marqueDe, couleursDe, couleursCle, modeleDe);
   const rec = typeof receptionDe === 'function' ? receptionDe(a) : null;
   const recMs = rec == null ? NaN : dateMs(typeof rec === 'object' ? rec.ms : rec);
-  // (16 nov., train) relier-fiable : la couleur vient du titre ET de la photo (`couleurCote`) ; la photo
-  // (`couleurPhotoDe`) peut être lue plus tard : relue à chaque appel, hors de la part gardée par achat.
+  // (16 nov., relier-fiable) La couleur de la PHOTO (calculée sur l'appareil, elle arrive après) et (lot achats-retour)
+  // « hors relier » (la carte publiée des retours / litiges change sans que l'achat change) : relues à CHAQUE appel,
+  // jamais gardées avec le reste.
   const url = photoUrl(a && (a.photo || a.photo_url));
   const coul = couleurCote({ titre: base.t, photo: url && typeof couleurPhotoDe === 'function' ? couleurPhotoDe(url) : null }, couleursDe);
-  return { ...base, a, couleurs: coul.c, couleurSource: coul.source, couleursPhoto: coul.photo, recMs, recSource: rec && typeof rec === 'object' && rec.source ? rec.source : (Number.isFinite(recMs) ? 'livraison' : ''),
+  return { ...base, a, couleurs: coul.c, couleurSource: coul.source, couleursPhoto: coul.photo, annule: achatAnnule(a),
+    recMs, recSource: rec && typeof rec === 'object' && rec.source ? rec.source : (Number.isFinite(recMs) ? 'livraison' : ''),
     versions: null, motsArr: null, dispo: true };
 }
 

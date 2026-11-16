@@ -856,6 +856,7 @@ import { NOM_BENEFICE, NOM_BENEFICE_BRUT, NOM_APRES_FRAIS, chiffreBenefice, chif
 import { achatParIdentite, propositionPrixAchat, propositionsUniques, listeConfirmation, ecritureProposition, texteProposition } from "./prixAchatPropose.js";
 // ⟦→ ecrans/Compta.jsx #7⟧
 import { livreDesRecettes, registreDesAchats, csvRegistre, pdfRegistre, nomFichierRegistre, achatAnnule } from "./registres.js";
+import { achatsHorsRelier, publierHorsRelier, achatHorsRelier } from "./achatsHorsRelier.js";
 import { achatsPourAtelier, CLE_ACHATS_ATELIER, resumeAtelier, ligneAtelierJournee } from "./operations/atelier.js";
 // ⟦→ ecrans/Compta.jsx #8⟧
 import { produitsANumeroter, attribuerNumerosVc, carteNumerosVc } from "./numerosVestiaire.js";
@@ -39937,6 +39938,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sales.items, sales.error, buys.items, buys.error, emailsLitiges, txnItem, numeros, saleOv, retoursEbayLus, accounts]);
+  // (16 nov., lot achats-retour) Julien : « j'ai demandé un retour, donc j'ai fait un litige : ne me la propose pas ».
+  // Les achats HORS RELIER (src/achatsHorsRelier.js) : retour (bordereau, avis par conversation), remboursement
+  // prouvé, litige ouvert, par SON n° ; un litige clos sans retour (commande finalisée) redevient proposable.
+  // PUBLIÉ ici (les règles de liaison le lisent : src/suggestionsAchat.js `achatAnnule`) ; l'achat reste dans
+  // Achats → Retours / Litiges. Pas su ⇒ le statut seul.
+  const achatsHorsRelierRes = useMemo(() => {
+    const m = achatsHorsRelier({ achats: buys.items || [], txRetour: txRetourAchat, remb: rembAchatsParTx instanceof Map ? rembAchatsParTx : null,
+      litiges: litigesSuivis && litigesSuivis.etat === 'lu' ? litigesSuivis.lignes : null, montantDe: montantCommandeLu });
+    publierHorsRelier(m);
+    return m;
+  }, [buys.items, txRetourAchat, rembAchatsParTx, litigesSuivis]);
   // (13 nov., point 29) Les articles en stock après un retour (remis à la main OU revenus tout seuls),
   // publiés avec les paires présentes. Trois états : états des transactions lus ⇒ la règle ; lecture
   // ratée (ou ventes illisibles) ⇒ la DERNIÈRE publication reste (une lecture ratée n'écrit rien) ;
@@ -42971,7 +42983,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const achatsDoubles = useMemo(() => achatsEnDouble({ vinted: buysBase, hors: offBuysTous, masquesHors: new Set(horsMasques) }), [buysBase, offBuysTous, horsMasques]);
   // (11 nov., lot pas-en-ligne) « Achetés mais pas encore en ligne » : jugé pour Ma journée et Achats
   // (src/pasEnLigne.js). Les achats Vinted ne sont jugés que LUS (pas su ⇒ aucun).
-  const pasEnLigne = usePasEnLigne({ actif: curSub === 'journee' || curSub === 'achats', accounts, achats: Array.isArray(buys.items) && !buys.error ? buysBase : null, hors: offBuysTous, horsMasques });
+  // (16 nov., lot achats-retour) Un achat en retour / litige / remboursé n'est pas « acheté, pas en ligne ».
+  const buysAJuger = useMemo(() => buysBase.filter((o) => !achatHorsRelier(o, achatsHorsRelierRes)), [buysBase, achatsHorsRelierRes]);
+  const pasEnLigne = usePasEnLigne({ actif: curSub === 'journee' || curSub === 'achats', accounts, achats: Array.isArray(buys.items) && !buys.error ? buysAJuger : null, hors: offBuysTous, horsMasques });
   const pasEnLigneJ = pasEnLigne.r && pasEnLigne.r.su ? pasEnLigne.r : null;
   const [feuillePasEnLigne, setFeuillePasEnLigne] = useState(false);
   const ouvrirPasEnLigne = (c) => {
@@ -43140,13 +43154,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!Array.isArray(buys.items) || buys.error) return;
     if ((Array.isArray(buys.failedUids) ? buys.failedUids : []).some(u => !acctOff(u))) return;
     try {
-      const l = achatsPourAtelier({ vinted: buysBase, hors: offBuys, numParTx: buyNumByTxn, annule: achatAnnule, photo: orderPhoto });
+      const l = achatsPourAtelier({ vinted: buysBase, hors: offBuys, numParTx: buyNumByTxn, annule: (o) => achatAnnule(o) || achatHorsRelier(o, achatsHorsRelierRes), photo: orderPhoto });
       const uid = AUTH.user?.id || '';
       const avant = load(CLE_ACHATS_ATELIER, null);
       if (!(avant && avant.uid === uid && JSON.stringify(avant.l) === JSON.stringify(l))) save(CLE_ACHATS_ATELIER, { v: 1, uid, l, at: Date.now() });
     } catch (_) {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [buys.items, buys.error, buys.failedUids, buysBase, offBuys, buyNumByTxn]);
+  }, [buys.items, buys.error, buys.failedUids, buysBase, offBuys, buyNumByTxn, achatsHorsRelierRes]);
 
   // ── Trésorerie : l'argent réel, pas le CA ─────────────────────────────
   // Vinted BLOQUE l'argent d'une vente jusqu'à ce que l'acheteur valide (ou que
@@ -43950,7 +43964,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return out;
     // ⚠️ `liensAchats` est déclaré plus bas (piège TDZ, §4.6) : la table des liens est relue ici.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fillBuyOpen, fillBuyAchats.items, fillBuyRows, numeros, saleOv, liaisonRefus]);
+  }, [fillBuyOpen, fillBuyAchats.items, fillBuyRows, numeros, saleOv, liaisonRefus, achatsHorsRelierRes]);
 
   // ── (3 nov.) LE PRIX D'ACHAT PROPOSÉ, PAR IDENTITÉ (src/prixAchatPropose.js) ──
   // Une vente ou une fiche sans prix d'achat, reliée PAR IDENTITÉ à un achat
@@ -44280,7 +44294,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       } catch (_) { publierAffectation(null); setLiaison(null); }
     }, 30);
     return () => clearTimeout(id);
-  }, [vueLiaison, fileAchat, fileVendus, achatsLiaison, liensAchats, liaisonRefus, infosReception, pickupDone, couleursLiaison]);
+  }, [vueLiaison, fileAchat, fileVendus, achatsLiaison, liensAchats, liaisonRefus, infosReception, pickupDone, couleursLiaison, achatsHorsRelierRes]);
   // Les photos à lire : celles des articles qui ont des candidats et de leurs achats candidats (au plus 240 par passe,
   // chacune UNE fois par ouverture ; les couleurs déjà gardées sur l'appareil reviennent sans rien relire). Une photo
   // illisible reste « pas su » : elle n'accorde rien et n'écarte rien.

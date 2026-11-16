@@ -41,6 +41,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'fiche-porte-achat', date: '2026-11-16', titre: 'Le « ? » d’« Achetée » ouvre la saisie', phrase: 'Et « Déplacer » est sous ⋯, sans « Tout voir ».', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (16 nov., lot achats-qr) docs/passation/2026-11-16-achats-qr.md
   { id: 'achats-qr', date: '2026-11-16', titre: 'À retirer : le QR en un toucher', phrase: 'Bouton QR visible, jours justes, achat relié par ton clic.', tab: 'retraits', pour: 'tous', mode: 'tous' },
+  // (16 nov., Julien : « j'ai demandé un retour […] ne me la propose pas ») docs/passation/2026-11-16-achats-retour.md
+  { id: 'relier-sans-retour', date: '2026-11-16', titre: 'Un achat renvoyé n’est plus proposé', phrase: 'Retour, litige ou remboursement : il reste dans Retours, pas dans « Relier ».', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (16 nov., lot barre-achats — Julien : « ajoute les Achats dans la barre » ; « je ne veux pas qu'on puisse glisser
   // entre les onglets ») docs/passation/2026-11-16-barre-achats.md
   { id: 'barre-achats', date: '2026-11-16', titre: 'Achats a son onglet dans la barre', phrase: 'Et glisser du doigt ne change plus d’onglet.', tab: 'achats', pour: 'tous', mode: 'tous' },
