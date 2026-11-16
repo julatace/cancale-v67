@@ -37,6 +37,8 @@ const MIGRES = [
   ['src/Accueil.jsx', ['*']],
   ['src/JourneeStudio.jsx', ['*']],   // (14 nov., Studio) la grille Bento de Ma journée
   ['src/ARetirerAilleurs.jsx', ['*']],   // (15 nov., retrait-ailleurs) « À retirer ailleurs »
+  ['src/parcoursNouveau/ParcoursNouveau.jsx', ['*']],   // (15 nov., parcours nouveau) les huit étapes
+  ['src/parcoursNouveau/NouveauxComptes.jsx', ['*']],   // (15 nov., parcours nouveau) l'onglet du propriétaire
   ['src/ui/Accompagne.jsx', ['*']],   // (14 nov., lot accompagnement) la brique commune des quatre moments
   ['src/ImpressionSimple.jsx', ['*']],   // (14 nov., impression-simple) « Imprimer » en un toucher : les deux feuilles
   ['src/partenaires/Partenaires.jsx', ['*']], ['src/VuePartenaire.jsx', ['*']],   // (15 nov.) le programme partenaire

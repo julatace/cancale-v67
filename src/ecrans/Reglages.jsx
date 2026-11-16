@@ -35,7 +35,8 @@ import { PHRASES_ECRAN } from '../phrasesEcran.js';
 import { APPARENCES, LIBELLES_APPARENCE, PHRASES_APPARENCE } from '../apparence.js';
 import { TAILLES_TEXTE, lireTailleTexte, ecrireTailleTexte, facteurTaille } from '../tailleTexte.js';   // (15 nov.) Taille du texte
 import { echelleTexte } from '../grandTexte.js';
-import { SignalerProblemeFeuille as SignalerProblemeFeuilleBase, SignalementsRecus } from '../composants/SignalerProbleme.jsx';
+import { SignalerProblemeFeuille as SignalerProblemeFeuilleBase, SignalementsRecus, MesSignalements } from '../composants/SignalerProbleme.jsx';
+import NouveauxComptes from '../parcoursNouveau/NouveauxComptes.jsx';   // (15 nov.) l'onglet « Nouveaux comptes » du propriétaire
 import { DemandesAideRecues } from '../composants/EcrireSupport.jsx';   // (13 nov., lot 55) « Demandes d'aide » (propriétaire)
 import { CLE_COMPTES_EXCLUS, estExclu, basculerExclu } from '../../api/_lib/comptes-exclus.js';
 import { PLATEFORMES_COMPTES, etatCompteLie, ageLecture, nomCompteLie, LIBELLE_ETAT } from '../comptesLies.js';
@@ -2265,6 +2266,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (13 nov., lot 55) La question au support : le texte et cinq faits techniques, rien d'autre (src/demandeAide.js).
       { id:'support', type:'action', ic:'chat', lib:tr('reglages.support.lib'), desc:tr('reglages.support.desc'), onClick:()=>setSupport(true), data:{ 'data-reglage-support':'' } },
       { id:'signaler', type:'action', ic:'info', lib:tr('reglages.signaler.lib'), desc:tr('reglages.signaler.desc'), onClick:()=>setSignaler(true), data:{ 'data-reglage-signaler':'' } },
+      // (15 nov.) Ce qu'IL a signalé, « Reçu · on te répond ici », et la réponse de Julien (api/_lib/signalement.js `suiviSignalements`).
+      AUTH.user && { id:'mes-signalements', type:'panneau', nu:true, ic:'pencil', lib:tr('sg.suivi.lib'), desc:tr('sg.suivi.desc'), data:{ 'data-reglage-mes-signalements':'' }, el:<MesSignalements entetes={enTeteSession}/> },
       // La liste des signalements reçus : au PROPRIÉTAIRE de l'installation seul
       // (le serveur refuse tout autre compte).
       // (9 nov.) Le tableau de bord du PROPRIÉTAIRE (src/composants/TableauProprietaire.jsx) : lui seul
@@ -2276,6 +2279,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (13 nov., lot 55) Les demandes « Écrire au support » de tous les vendeurs : au PROPRIÉTAIRE seul (403 sinon).
       proprioInst && { id:'demandes-aide', type:'panneau', nu:true, ic:'more', lib:tr('reglages.demandesAide.lib'), desc:tr('reglages.demandesAide.desc'), data:{ 'data-reglage-demandes-aide':'' }, el:<DemandesAideRecues entetes={enTeteSession} Bouton={Bouton} PanneEl={EtatPanne}/> },
       // (11 nov., agent2-cloisonnement) Le parcours d'un nouveau vendeur joué sur des comptes FICTIFS (src/simulationCompte.js) : propriétaire seul.
+      // (15 nov.) « Ce que voit un nouveau » : l'aperçu en bac à sable et où s'arrêtent les vrais inscrits (403 à tout autre compte).
+      proprioInst && { id:'nouveaux-comptes', type:'panneau', nu:true, ic:'nouveauCompte', lib:tr('nc.lib'), desc:tr('nc.desc'), data:{ 'data-reglage-nouveaux-comptes':'' }, el:<NouveauxComptes entetes={enTeteSession}/> },
       proprioInst && { id:'simulation-compte', type:'panneau', nu:true, ic:'home', lib:tr('reglages.simulation.lib'), desc:tr('reglages.simulation.desc'), data:{ 'data-reglage-simulation-compte':'' }, el:<SimulationCompte/> },
       {id:'depannage',type:'panneau',nu:true,ic:'help',lib:tr('reglages.depannage.lib'),desc:tr('reglages.depannage.desc'),el:<div className="vrm-settings-help">
       <details data-aide-statut=""><summary>{tr('reglages.depannage.statut.q')}</summary><p>{tr('reglages.depannage.statut.r')}</p><Bouton variante="secondaire" onClick={()=>{ try { window.open('/statut', '_blank', 'noopener'); } catch (_) {} }}>{tr('reglages.depannage.statut.bouton')}</Bouton></details>

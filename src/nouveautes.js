@@ -63,6 +63,10 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'alerte-arnaque-langues', date: '2026-11-15', titre: 'Alerte arnaque dans tes messages, cinq langues', phrase: 'Une phrase dit le risque et quoi faire, rien n’est envoyé.', tab: 'messages', pour: 'tous', mode: 'tous' },
   { id: 'ou-vendre-fiche', date: '2026-11-15', titre: 'Où vendre ? Ce que tu touches par site', phrase: 'Sur la fiche, frais déduits, le meilleur mis en avant.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'objectif-anneau', date: '2026-11-15', titre: 'Ton objectif du mois en anneau', phrase: 'Ma journée dit ce qui reste et le rythme par jour.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (15 nov., Julien : « Améliore le parcours », « un onglet admin », « Signaler un problème qui t'arrive vraiment ») docs/passation/2026-11-15-parcours-nouveau.md
+  { id: 'parcours-nouveau', date: '2026-11-15', titre: 'Signaler un problème : la réponse arrive ici', phrase: 'Reçu, puis la réponse dans Paramètres → Mes signalements.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (15 nov., Julien : « pratique et compréhensible ») docs/passation/2026-11-15-parametres.md
+  { id: 'parametres-categories', date: '2026-11-15', titre: 'Paramètres rangés en dix catégories', phrase: 'Cherche « papier » ou « URSSAF » : le bon réglage s’ouvre.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « J'aime la 9 ») docs/passation/2026-11-15-verre-depoli.md — le thème « Verre dépoli ».
   { id: 'verre-depoli', date: '2026-11-15', titre: 'Nouveau thème : verre dépoli sur bleu profond', phrase: 'Le chiffre du jour en blanc, tout se lit sur le verre.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « imagine que la personne publie sur l'app Vinted… ») docs/passation/2026-11-15-numeros-masquees.md
@@ -101,8 +105,6 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'carte-extension-studio', date: '2026-11-15', titre: 'La carte VRM sur Vinted, refaite', phrase: 'Favoris en liste, ventes sans tiret, liens qui marchent, bleu clair.', tab: 'messages', pour: 'tous', mode: 'tous' },
   // (15 nov., extension 5.379, Julien sur Orion iPhone : « Leboncoin marche pas ») docs/passation/2026-11-15-lbc-orion.md
   { id: 'lbc-orion-de-cote', date: '2026-11-15', titre: 'Leboncoin vide sur iPhone : VRM s’écarte', phrase: 'Page vide ? VRM se met de côté et le dit.', tab: 'settings', pour: 'tous', mode: 'tous' },
-  // (15 nov., Julien : « pratique et compréhensible ») docs/passation/2026-11-15-parametres.md
-  { id: 'parametres-categories', date: '2026-11-15', titre: 'Paramètres rangés en dix catégories', phrase: 'Cherche « papier » ou « URSSAF » : le bon réglage s’ouvre.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (15 nov., extension 5.378) Dates de versement : relevé vérifié avant de dater, délai en heures de Vinted ouvert.
   { id: 'versements-releve-verifie', date: '2026-11-15', titre: 'Dates de versement : relevé vérifié, délai honnête', phrase: 'Le relevé ne date rien avant cinq accords ; délai en heures.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « horriblement moche », « ne mets pas paires, tu mets annonces ») docs/passation/2026-11-15-annonces-propre.md

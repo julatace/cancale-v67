@@ -19,6 +19,7 @@ import ecran_parametres from './de/parametres.js';   // (15 nov.) Paramètres ra
 import ecran_numeros_nouvelles from './de/numeros-nouvelles.js';   // (15 nov.) Les nouvelles annonces sans N°
 import ecran_republie_telephone from './de/republie-telephone.js';   // (15 nov.) Republiée dans l'app Vinted   // (15 nov.) Les nouvelles annonces sans N°
 import ecran_securite_ventes from './de/securite-ventes.js';   // (15 nov.) Sécurité des ventes : arnaque, où vendre, anneau
+import ecran_parcours_nouveau from './de/parcoursNouveau.js';   // (15 nov.) le parcours d'un nouveau, « Nouveaux comptes », le suivi d'un signalement   // (15 nov.) Paramètres rangés en dix catégories
 import ecran_idees from './de/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './de/ventes.js';
 import ecran_commun from './de/commun.js';
@@ -2302,4 +2303,5 @@ export default {
   ...ecran_numeros_nouvelles,
   ...ecran_republie_telephone,
   ...ecran_securite_ventes,
+  ...ecran_parcours_nouveau,
 };

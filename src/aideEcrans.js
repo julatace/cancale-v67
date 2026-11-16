@@ -23,6 +23,15 @@ export const ARTICLES_AIDE = {
   abonnement: 'L’abonnement',
   'tout-va-bien': '« Tout va bien ? » : quand un chiffre manque',
   signaler: 'Signaler un problème',
+  // (15 nov., parcours nouveau) les écrans d'aujourd'hui
+  'premiers-pas': 'Tes premières minutes sur VRM',
+  parametres: 'Paramètres : où trouver quoi',
+  stock: 'Le Stock en étagères',
+  'retirer-ailleurs': 'Vendue ? La retirer des autres sites',
+  'meme-photo': 'Même photo qu’une paire Vinted : relier',
+  republier: 'Republier, pas à pas',
+  retours: 'Retours : « À renvoyer »',
+  'argent-a-venir': 'L’argent à venir',
 };
 
 export const AIDE_ECRANS = {

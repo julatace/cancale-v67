@@ -105,7 +105,8 @@ import { pageExport } from './_lib/export-rgpd.js';   // (12 nov.) RGPD : toutes
 import { compteOAuthAnnulable } from '../src/auth/compteNeuf.js';   // (11 nov., lot DJ6)
 import { envoyerSmtp } from './_lib/smtp.js';
 import { contactEmail } from '../src/contact.js';
-import { envoyerSignalement, listerSignalements, marquerTraite, proprietaireInstallation as proprioAlertes } from './_lib/signalement.js';
+import { envoyerSignalement, listerSignalements, marquerTraite, repondreSignalement, suiviSignalements, notifReponse, proprietaireInstallation as proprioAlertes } from './_lib/signalement.js';
+import { routeParcoursComptes } from './_lib/parcours-comptes.js';   // (15 nov.) Réglages → Nouveaux comptes : où les inscrits s'arrêtent (anonyme)
 // (13 nov., lot 55) « Écrire au support » : la question, cinq faits techniques, rangée chez LUI (api/_lib/demande-aide.js).
 import { envoyerDemandeAide, listerDemandesAide, marquerDemandeTraitee } from './_lib/demande-aide.js';
 import { recevoirRapportExt, listerRapportsExt } from './_lib/rapport-extension.js';   // (12 nov., ext. 5.371) « Envoyer un rapport »
@@ -2212,10 +2213,19 @@ async function mailEssaiRoute(req, res) {
 async function signalement(req, res) {
   const utilisateur = await vendeurExige(req, res);
   if (!utilisateur) return;
+  // (15 nov.) `?quoi=suivi` : SES signalements et la réponse (toute session, filtrés sur elle).
+  if (req.method === 'GET' && req.query && req.query.quoi === 'suivi') { res.setHeader('Cache-Control', 'no-store'); const r = await suiviSignalements({ utilisateur }); return repondre(res, r.code, r.corps); }
   if (req.method === 'GET') { const r = await listerSignalements({ utilisateur, unId: (req.query && req.query.id) || null }); return repondre(res, r.code, r.corps); }
   const corps = await lireCorpsJson(req);
   if (!corps || typeof corps !== 'object') return repondre(res, 400, { ok: false, raison: 'corps' });
   if (corps.action === 'traite') { const r = await marquerTraite({ utilisateur, corps }); return repondre(res, r.code, r.corps); }
+  // (15 nov.) La réponse du propriétaire : rangée sur le signalement, puis UNE notification à
+  // celui qui l'a envoyé (ses appareils, son contexte). La notification ne décide jamais du « envoyé ».
+  if (corps.action === 'repondre') {
+    const r = await repondreSignalement({ utilisateur, corps });
+    if (r.code === 200 && r.de) { try { const p = await contexteVendeur.run({ owner: r.de }, () => sendPushToAll(notifReponse({ reponse: r.reponse }))); r.corps.notifie = !!(p && p.sent > 0); } catch (_) { r.corps.notifie = false; } }
+    return repondre(res, r.code, r.corps);
+  }
   const r = await envoyerSignalement({ utilisateur, corps, pousser: (notif, proprio) => contexteVendeur.run({ owner: proprio }, () => sendPushToAll(notif)) });
   return repondre(res, r.code, r.corps);
 }
@@ -2389,7 +2399,8 @@ export default async function handler(req, res) {
     const utilisateur = await vendeurExige(req, res);
     if (!utilisateur) return;
     res.setHeader('Cache-Control', 'no-store');
-    const r = await routePilotage({ utilisateur });
+    // (15 nov.) `&quoi=parcours` : Réglages → Nouveaux comptes (api/_lib/parcours-comptes.js), même garde.
+    const r = req.query && req.query.quoi === 'parcours' ? await routeParcoursComptes({ utilisateur }) : await routePilotage({ utilisateur });
     return repondre(res, r.code, r.corps);
   }
   if (mode === 'mesures') return (m === 'GET' || m === 'POST') ? mesures(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
