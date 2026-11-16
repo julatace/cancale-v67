@@ -36,7 +36,7 @@ import ChoixLangue from './i18n/ChoixLangue.jsx';
 import { contactEmail, CONTACT_A_VENIR } from './contact.js';
 import { ACCES_OFFERT, EXTENSION_SUR_LE_STORE, VESTIAIRE_BRANCHE, PRIX_MOIS, PRIX_PRO_MOIS, PRO_OUVERT, ESSAI_JOURS } from './accueil-reglages.js';
 // (9 nov.) Deux offres : Solo (un compte vendeur par plateforme + comptes d'achat) et Pro (les ventes de tous les comptes).
-import { OFFRES, prixCompteSupTexte } from '../api/_lib/plan-regle.js';
+import { OFFRES, prixCompteSupTexte } from '../api/_lib/plan-offres.js';   // (16 nov.) le petit module des offres (plan-regle.js les ré-exporte)
 import { useMoinsDeMouvement, useSansSouris } from './accueil-mouvement.js';
 // (15 nov.) Les liens d'entrée portent la suite de l'adresse (code d'un partenaire, utm…) jusqu'au formulaire.
 import { lienEntree } from './accueil/lienEntree.js';
