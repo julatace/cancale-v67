@@ -17,8 +17,8 @@
 
 /* ── 1. Les blocs qui deviennent du verre (fond + forme) ─────────────────────── */
 :root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] :is(
-  .vrm-compta-carte, details.vrm-compta-repli, details.vrm-micro-repli, .vrm-ac-section > details.vrm-repli,
-  .vrm-ap-section > details, .vrm-mb, .vrm-urssaf-geste
+  .vrm-compta-carte, details.vrm-compta-repli, details.vrm-micro-repli, .vrm-ac-section > details,
+  .vrm-mb, .vrm-urssaf-geste
 ) {
   background-color: transparent !important; background-image: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important;
   box-shadow: var(--sv-ombre) !important; border: 0 !important; border-radius: 22px !important;
@@ -27,16 +27,16 @@
 :root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] .vrm-compta-carte::before { content: none !important; display: none !important; }
 :root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] .vrm-compta-carte { padding: 18px 18px 14px !important; }
 /* Un repli devenu carte : l'air dedans, son titre au doigt. */
-:root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] :is(details.vrm-compta-repli, details.vrm-micro-repli, .vrm-ac-section > details.vrm-repli, .vrm-ap-section > details) {
+:root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] :is(details.vrm-compta-repli, details.vrm-micro-repli, .vrm-ac-section > details) {
   padding: 2px 16px 6px !important; margin: 12px 0 0 !important;
 }
-:root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] :is(details.vrm-compta-repli, details.vrm-micro-repli, .vrm-ac-section > details.vrm-repli, .vrm-ap-section > details) > summary { min-height: 48px !important; }
+:root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] :is(details.vrm-compta-repli, details.vrm-micro-repli, .vrm-ac-section > details) > summary { min-height: 48px !important; }
 /* Deux replis qui se suivent : une liste-carte (le filet entre eux, pas deux îles). */
 :root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] details.vrm-compta-repli + details.vrm-compta-repli::before { display: none !important; }
 
 /* ── 2. L'encre du VERRE dans ces blocs (et dans ce qu'ils contiennent) ──────── */
 :root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] :is(
-  .vrm-compta-carte, details.vrm-compta-repli, details.vrm-micro-repli, .vrm-ac-section > details.vrm-repli, .vrm-ap-section > details,
+  .vrm-compta-carte, details.vrm-compta-repli, details.vrm-micro-repli, .vrm-ac-section > details,
   .vrm-mb, .vrm-urssaf-geste, .vrm-ac-tuile, .vrm-ac-carte, .vrm-nc
 ) {
   --sb-encre: var(--sv-encre) !important; --d-encre: var(--sv-encre) !important; --vrm-ink: var(--sv-encre) !important; --vrm-text: var(--sv-encre) !important;
@@ -53,11 +53,11 @@
   color: var(--sv-encre) !important;
 }
 /* Les couleurs posées EN LIGNE (C.text, C.muted, C.warn du thème JS) dans ces blocs : l'encre du verre, par nature. */
-:root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] :is(.vrm-compta-carte, details.vrm-compta-repli, details.vrm-micro-repli, .vrm-ac-section > details.vrm-repli, .vrm-mb, .vrm-urssaf-geste)
+:root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] :is(.vrm-compta-carte, details.vrm-compta-repli, details.vrm-micro-repli, .vrm-ac-section > details, .vrm-mb, .vrm-urssaf-geste)
   :is(b, strong, h3, h4, .vrm-display, .vrm-compta-hero, .vrm-compta-libelle, .vrm-compta-repli-titre, summary, [style*="color"]):not(:is(button, a, .vrm-b, .sb-btn-plein, [class*="ambre"], [data-nc-groupe] *, .vrm-nc-geste)) {
   color: var(--sv-encre) !important;
 }
-:root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] :is(.vrm-compta-carte, details.vrm-compta-repli, details.vrm-micro-repli, .vrm-ac-section > details.vrm-repli, .vrm-mb, .vrm-urssaf-geste)
+:root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] :is(.vrm-compta-carte, details.vrm-compta-repli, details.vrm-micro-repli, .vrm-ac-section > details, .vrm-mb, .vrm-urssaf-geste)
   :is(small, .vrm-compta-phrase, .vrm-compta-repli-resume, .vrm-mb-sous, .vrm-urssaf-lib small, .vrm-urssaf-etape small, .vrm-urssaf-geste-tete span, .vrm-ac-note, [style*="color: rgb(1"], [style*="color:var(--vrm-muted"]) {
   color: var(--sv-encre-2) !important;
 }
@@ -109,7 +109,7 @@
 @layer vrm-verre {
 /* ── 6. Un bouton INACTIF (« Chercher » tant que rien n'est tapé) reste lisible : sa propre matière, l'encre grise
    du verre (il était transparent sur le bleu : gris sur bleu, 1,39:1). */
-:root:root:root:root:root:root:root:root body .vrm-app-shell [data-argent-vue] .vrm-b:disabled {
+:root:root:root:root:root:root:root:root body .vrm-app-shell[data-espace="argent"] .vrm-main .vrm-b:disabled {
   background: var(--sv-verre-2) !important; background-image: none !important; color: var(--sv-encre-2) !important;
   border: 1px solid rgb(127 145 165 / .45) !important; opacity: 1 !important;
 }

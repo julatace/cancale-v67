@@ -26,6 +26,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (16 nov., lot argent-mieux) docs/passation/2026-11-16-argent-mieux.md
+  { id: 'argent-lisible', date: '2026-11-16', titre: 'Argent : tout se lit, clair ou sombre', phrase: 'Les ventes pas comptées tiennent en une ligne par raison.', tab: 'argent', pour: 'tous', mode: 'tous' },
   // (16 nov., lot ventes-selection) docs/passation/2026-11-16-ventes-selection.md
   { id: 'selection-visible', date: '2026-11-16', titre: 'Sélection : seulement les lignes affichées', phrase: '« Tout sélectionner » prend ce que tu vois, rien de caché.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (16 nov., stabilite-iphone — « l'app bug un peu » sur iPhone) docs/passation/2026-11-16-stabilite-iphone.md

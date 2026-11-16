@@ -162,7 +162,7 @@ const mesures = [];
           const v = await o.pg.evaluate(mesurerVerre);
           const ko = v.contraste;
           mesures.push({ ici, hauteur: m.hauteur, mots: m.mots, contrasteKo: ko.length, contrasteMin: ko.length ? Math.min(...ko.map((x) => x.k)) : null, groupes: m.groupes.length, murs: m.murs.length });
-          dit(ko.length === 0, `C ${ici} : contraste AA de chaque texte, replis fermés (${v.textes} textes)`, ko.slice(0, 6).map((x) => `${x.k}<${x.seuil} « ${x.t} » (${x.c} sur ${x.f})`).join(' | '));
+          dit(ko.length === 0, `C ${ici} : contraste AA de chaque texte, replis fermés (${v.textes} textes)`, ko.slice(0, 6).map((x) => `${x.k}<${x.seuil} « ${x.t} » ${x.el} (${x.c} sur ${x.f})`).join(' | '));
           if (seg === 'declarer' || seg === 'resume') {
             dit(m.murs.length === 0, `G ${ici} : aucun mur « N vente(s) Vinted · … » (plus de 3 dans un texte)`, m.murs.slice(0, 2).join(' | '));
             const dp = m.groupes.filter((g) => /deux-prix/.test(g.k));
@@ -179,7 +179,7 @@ const mesures = [];
           await o.pg.waitForTimeout(900);
           const v2 = await o.pg.evaluate(mesurerVerre);
           await capture(o.pg, seg, path.join(SHOTS, `${ici}-ouvert.png`));
-          dit(v2.contraste.length === 0, `C ${ici} : contraste AA, ${ouverts} repli(s) ouvert(s) (${v2.textes} textes)`, v2.contraste.slice(0, 6).map((x) => `${x.k}<${x.seuil} « ${x.t} » (${x.c} sur ${x.f})`).join(' | '));
+          dit(v2.contraste.length === 0, `C ${ici} : contraste AA, ${ouverts} repli(s) ouvert(s) (${v2.textes} textes)`, v2.contraste.slice(0, 6).map((x) => `${x.k}<${x.seuil} « ${x.t} » ${x.el} (${x.c} sur ${x.f})`).join(' | '));
           if (seg === 'declarer' || seg === 'resume') {
             const m2 = await o.pg.evaluate(mesurerArgent, seg);
             dit(m2.murs.length === 0 && (seg !== 'declarer' || m2.detailsLignes >= N_DEUX_PRIX), `G ${ici} : ouvert, le détail est une LISTE (une ligne par vente), jamais un paragraphe`, `${m2.detailsLignes} ligne(s) · ${m2.murs.length} mur(s)`);
