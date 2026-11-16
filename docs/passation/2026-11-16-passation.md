@@ -13,6 +13,7 @@ chantier est dans son récit `docs/passation/2026-11-15-*.md` (nom du chantier).
 | julatace/cancale-v67#1177 | extension **5.385.0** servie (N° des annonces publiées hors VRM, Vestiaire juste, même photo, lecture publique vide, retours suivis) |
 | julatace/cancale-v67#1178 | **« Verre dépoli »** partout (palette choisie par Julien) + Stock en étagères + dossier Chrome Web Store |
 | julatace/cancale-v67#1179 | **Écrans refaits sur les maquettes validées** : Ma journée, Annonces, Ventes, Achats, fiche D, Argent, Messages, Paramètres, rail ordinateur ; « À envoyer » partout |
+| (PR de la vague C) | **Extension 5.393.0** (verre de la carte/site/e-mails, même photo · sûr, versements, Vestiaire « aimés », scanner pour retrouver) + banc `sante-donnees` réparé : aucune donnée réécrite à l'ouverture d'Achats (le banc servait une `main` à 2 clés) |
 | julatace/cancale-v67#1180 | **Nouveautés** : transporteur lu sur l'étiquette, atelier d'arrivée (N° puis case sur la fiche), contrôle de nuit + santé des comptes, baisse conseillée, relance des favoris, loupe universelle, bilan du mois, alertes de seuils, bénéfice réel, sauvegarde zip, écran de chargement verre, retours, eBay, purge des bordereaux |
 
 Base de prod (avec l'accord de Julien, 15 nov.) : migrations `bordereau_retirer_pdf_044`,
@@ -25,13 +26,11 @@ du 2 oct. nettoyé (sauvegarde `sauvegarde.copie_compte_20261115`).
 
 | chantier | branche | état |
 |---|---|---|
-| **Extension 5.393.0** (vague C) | directement sur `claude/project-review-nsk5su` | fusionne `verre-extension-site` (5.386), `meme-photo-sure` (5.388), `versements-auto` (5.390), `deux-comptes` (5.392), `scanner-colis`. Aucune de 5.386–5.392 n'a été servie : tout part sous **5.393.0**, zips régénérés une seule fois à la fin. Conflits en cours sur `public/*.zip` (à régénérer, pas à résoudre à la main). |
 | **Finitions** | `claude/finitions-16nov` | « Week-end calme » qui se remet à « oui » (`push_prefs`, centre-notifs F11) ; segments 40 px → 44 ; banc tout-va-bien sans session ; message passager qui couvre ‹ et Retirer d'une conversation ; « Imprimer le bordereau » qui chevauche le logo dans « Tout voir » ; fiche D depuis le Stock : « Sites » ≠ sites du Stock (une seule source : `src/stockAnnonces.js`) ; `audit-politique-hotes`. |
 | **Stock v4** (fini, à intégrer) | `claude/stock-v4` | étagère personnalisable (Cartons / Rayonnage / Plan, teintes, étiquette à cocher, densités, « Personnaliser », « La pièce »), Stock ordinateur en 3 volets. Audit 75/75 + 23/23 mutations, banc 165. **À relancer à l'intégration** : `fiche-partout`, `stock-gestes`, `stock-finitions`, `stock-2d-revue`, `stock-hors-reseau`, `rangement`, `journee-coherence`, `vague3-ecrans` (à l'ordinateur, toucher une case ouvre le volet de droite, plus la fiche). `stock-2d` : 4 rouges déjà sur main (« Voir l'état »). Texte de la pile peu lisible sur le bleu (vu sur main) : à vérifier sur la v4. |
-| **Banc `sante-donnees` réparé** (à intégrer) | `claude/achats-ecriture-main` (6b740ebc) | TRANCHÉ : **aucune donnée de prod réécrite**. Le banc servait une `main` à 2 clés ; la première synchro de l'app (`cloudPush` au chargement) ajoutait les clés absentes (« absent → vide »), et sous charge elle tombait après la photo « avant ». `Achats.jsx` n'écrit rien. Prod (lecture) : `vinted_sales` présente sur les 8 `main`. Banc réécrit sur la règle (aucune clé existante ne change, aucune clé de données n'apparaît, fiches et pool intacts), mutations M1/M2 rouges. Reste à valider : `widget_stats`, `lbc_a_retirer`, `restore_N`, `vrm_reprise_ecrans`, `vrm_achats_jours`, `vrm_annonces_achetees` déclarées publications d'écran. Encore rouge : G numeros-double / colis-postes attendent l'entrée « Colis » du rail, qui n'existe plus. |
 
-**Ordre de mise en ligne conseillé** : finitions + banc sante-donnees → stock-v4 → extension 5.393 (en dernier,
-puis dire à Julien d'installer). Toujours : `npm run build` + `audit-traduction` après
+**Ordre de mise en ligne conseillé** : finitions → stock-v4.
+Rouges connus après la vague C : `verre` V4 (9 flous pour 8 à 390 selon le moment où « Quoi de neuf » apparaît, aussi sur main), `popup` (« ⟳ = chrome.runtime.reload », déjà rouge avant), `scan-colis` (chrono < 1 s à 1512 sous charge). Titre de la carte « deux comptes » sur deux lignes à 1512 (banc assoupli, écran inchangé). Toujours : `npm run build` + `audit-traduction` après
 chaque fusion (une union a déjà créé deux `export default` dans les dictionnaires),
 bancs UN PAR UN (machine chargée, disque ~1,5 Go libre), PR, merge avec le SHA complet,
 Vercel READY, `/api/sante`, `/extension-version.json` via `mcp__Vercel__web_fetch_vercel_url`.
@@ -80,7 +79,7 @@ Leboncoin et Vestiaire · empreinte des photos d'achat pour la liaison achats-ar
 
 ## 5. Gestes de Julien (lui seul peut)
 
-1. **Installer l'extension 5.393.0** dès qu'elle est servie (remplacer le dossier, ⟳ dans chaque Chrome ; Orion : `VRM-Orion-dossier.zip`). Retrouver le navigateur resté en **5.273**.
+1. **Installer l'extension 5.393.0** (servie depuis le 16 nov.) (remplacer le dossier, ⟳ dans chaque Chrome ; Orion : `VRM-Orion-dossier.zip`). Retrouver le navigateur resté en **5.273**.
 2. **Déposer l'Autry** (Chronopost XU…JF) **avant le lundi 23 nov. à 10 h**.
 3. Ouvrir vinted.fr sur le compte qui porte la vente **N°193** (transporteur pas encore lu).
 4. Laisser vinted.fr et leboncoin.fr ouverts sur le compte pour que la mesure « même photo · sûr » tourne.
