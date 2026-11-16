@@ -61,6 +61,9 @@ const rowsDe = ({ sombre, mauvais }) => [
   { id: 'harvest_222_profile', data: { uid: '222', capturedAt: ilYaH(3), payload: { user: { login: 'compte_b', feedback_reputation: 0.96, feedback_count: 48, positive_feedback_count: 47, neutral_feedback_count: 1, negative_feedback_count: 0 } } } },
   { id: 'harvest_111_feedbacks', data: { type: 'feedbacks', uid: '111', capturedAt: ilYaH(3), nItems: 20, payload: { user_feedbacks: AVIS, pagination: { total_entries: 120, total_pages: 6 }, historique: [{ at: ilYaH(24 * 34), total: 100, n: 20, c: [0, 0, 1, 1, 18] }, { at: ilYaH(3), total: 120, n: 20, c: [0, 0, 0, 0, 20] }] } } },
   { id: 'panel_comptes_etat', data: { comptes: { 111: { etat: 'actif', at: ilYaH(2) }, 222: { etat: 'actif', at: ilYaH(3) } } } },
+  // (16 nov., lot extension-restes) La mémoire du serveur des avis bas (`vrm_avis_bas`) : UN avis 2★ arrivé il y a 2 j sur
+  // compte_a ⇒ dit dans « Pourquoi ? », sous le seuil (2) : compte_a reste « En forme ».
+  { id: 'vrm_avis_bas', data: { comptes: { 111: { base: ilYaH(24 * 40), ids: ['a1'] } }, alertes: [{ uid: '111', id: 'a1', note: 2, at: ilYaH(48) }], rev: 1 } },
 ];
 
 let ko = 0;
@@ -181,6 +184,10 @@ const publier = async (pg) => {
           dit(an.al === '1' && /3 sur 6/.test(an.t) && /qui a annulé/.test(an.t), 'Pourquoi ? : annulations 3 sur 6, « Vinted ne dit pas qui a annulé »', an.t);
           dit(av.lu === '0' && /—/.test(av.t) && /ouvre ton profil Vinted/.test(av.t), 'Pourquoi ? : avis de compte_b pas lus ⇒ « — » + raison et geste', av.t);
           dit(no.lu === '1' && /4,8\/5/.test(no.t) && /À surveiller sous 4,5\/5/.test(no.t), 'Pourquoi ? : note 4,8/5 et son seuil écrit', no.t);
+          await pg.click('[data-sc-compte="111"] [data-sc-pourquoi]').catch(() => {});
+          await pg.waitForTimeout(300);
+          const avA = await pg.evaluate(() => { const x = document.querySelector('[data-sc-compte="111"] [data-sc-ind="avisBas"]'); return x ? { t: x.innerText, al: x.getAttribute('data-sc-alerte') } : null; });
+          dit(!!avA && avA.al !== '1' && /arrivé|arrived|llegó|arrivata|kam/.test(avA.t), 'Pourquoi ? : l’avis bas DATÉ par le serveur (vrm_avis_bas) est dit, sous le seuil', JSON.stringify(avA));
           const carte = await pg.$('[data-stats-carte="sante-comptes"]'); if (carte) await carte.screenshot({ path: path.join(SHOTS, `stats-${suf}.png`) });
           await sain(pg, `${nom} Statistiques`, '[data-stats-carte="sante-comptes"]');
         });

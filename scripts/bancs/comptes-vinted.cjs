@@ -66,6 +66,10 @@ function base(MAINTENANT, VENTES){
     messages:[offre(1,20,D(2026,11,2)),offre(2,20,D(2026,11,4)),offre(3,20,D(2026,11,6)),offre(4,30,D(2026,11,8)),offre(5,10,D(2026,11,10))] } } } });
   rows.push({ id:'harvest_222_conv_2', data:{ capturedAt:iso(D(2026,10,29)), payload:{ conversation:{ id:2, opposite_user:{ id:9001 }, transaction:{ current_user_side:'seller' },
     messages:[offre(6,20,D(2026,10,22)),offre(7,20,D(2026,10,24)),offre(8,30,D(2026,10,26))] } } } });
+  // (16 nov., lot extension-restes) Le journal des gestes ACCEPTÉS par Vinted (extension 5.337) : paris_kicks (222),
+  // conversations pas relues, a 2 offres acceptées et 1 refusée par VRM dans les 30 j ⇒ « 2 acceptées par VRM » sous le « — ».
+  const tJ=(j)=>new Date(MAINTENANT.getTime()-j*86400000).getTime();
+  rows.push({ id:'journal_vrm_222_navbanc', data:{ e:[{ t:tJ(2), s:'offre_acceptee', a:'1' }, { t:tJ(5), s:'offre_acceptee', a:'2' }, { t:tJ(6), s:'offre_refusee', a:'3' }, { t:tJ(3), s:'favori' }] } });
   rows.push({ id:'vinted_listing_dates', data:{} });
   rows.push({ id:'lbc_ventes', data:{ ventes:{} } });
   rows.push({ id:'ebay_orders', data:{ orders:[] } });
@@ -137,7 +141,7 @@ const publier=async(pg)=>{
 const captureEl=async(pg,sel,nom)=>{ if(!CAPT) return; fs.mkdirSync(CAPT,{recursive:true}); const el=pg.locator(sel).first(); await el.scrollIntoViewIfNeeded().catch(()=>{}); await pg.waitForTimeout(400); await el.screenshot({ path:path.join(CAPT,nom+'.png') }).catch(e=>console.log('   (capture '+nom+' : '+e.message.slice(0,80)+')')); };
 const CARTE='[data-sv-carte="comptes-vinted"]';
 const lireTableau=(pg)=>pg.evaluate((sel)=>{ const c=document.querySelector(sel); if(!c) return null;
-  const lignes=[...c.querySelectorAll('[data-cv-compte]')].map((r)=>({ uid:r.getAttribute('data-cv-compte'), n:r.getAttribute('data-cv-n'), prix:r.getAttribute('data-cv-prix'), delai:r.getAttribute('data-cv-delai'), dr:r.getAttribute('data-cv-delai-raison'), offres:r.getAttribute('data-cv-offres'), or:r.getAttribute('data-cv-offres-raison'), h:r.getBoundingClientRect().height }));
+  const lignes=[...c.querySelectorAll('[data-cv-compte]')].map((r)=>({ uid:r.getAttribute('data-cv-compte'), n:r.getAttribute('data-cv-n'), prix:r.getAttribute('data-cv-prix'), delai:r.getAttribute('data-cv-delai'), dr:r.getAttribute('data-cv-delai-raison'), offres:r.getAttribute('data-cv-offres'), or:r.getAttribute('data-cv-offres-raison'), vrm:(r.querySelector('[data-cv-offres-vrm]')||{getAttribute:()=>null}).getAttribute('data-cv-offres-vrm'), vrmP:!!r.querySelector('[data-cv-offres-vrm-partiel]'), h:r.getBoundingClientRect().height }));
   const couleurs=[...c.querySelectorAll('th,td')].map((e)=>getComputedStyle(e).color);
   const deb=c.scrollWidth>c.clientWidth+1 || document.documentElement.scrollWidth>window.innerWidth+1;
   const choix=[...c.querySelectorAll('[data-cv-choix]')].map((b)=>b.getBoundingClientRect().height);
@@ -168,6 +172,7 @@ const attendreLu=(pg)=>pg.waitForFunction((sel)=>{ const c=document.querySelecto
         dit(L('111').offres==='60', 'A4 atelier_sneak : 3 offres acceptées sur 5 ⇒ 60 %', L('111').offres+' '+(L('111').or||''));
         dit(L('222').n==='2' && L('222').prix==='' && L('222').delai==='' && L('222').dr==='sansdate', 'A5 paris_kicks : 2 ventes, prix « — » (moins de 3), jours « — » (pas de date)', JSON.stringify(L('222')));
         dit(L('222').offres==='' && L('222').or==='partiel' && r.notes.includes('offres'), 'A6 paris_kicks : offres « — », lues jusqu’au 29 oct. (dit)', L('222').or);
+        dit(L('222').vrm==='2' && !L('222').vrmP && r.notes.includes('offresvrm') && L('111').vrm===null, 'A6b paris_kicks : sous le « — », « 2 acceptées par VRM » (journal des gestes acceptés) et la note qui dit pourquoi ce n’est pas un taux ; atelier_sneak (taux lu) n’en a pas', JSON.stringify({ v:L('222').vrm, p:L('222').vrmP, n:r.notes }));
         // « Aucune couleur » : chaque texte du tableau est NEUTRE (gris ou encre, r ≈ g ≈ b), jamais teinté.
         const neutre=(c)=>{ const m=/rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(c); if(!m) return false; const v=[+m[1],+m[2],+m[3]]; return Math.max(...v)-Math.min(...v)<=10; };
         dit(r.couleurs.length>0 && r.couleurs.every(neutre), 'A7 aucune couleur dans le tableau (encre ou gris seulement)', r.couleurs.join(' | '));
@@ -178,6 +183,8 @@ const attendreLu=(pg)=>pg.waitForFunction((sel)=>{ const c=document.querySelecto
         await pg.click(`${CARTE} [data-cv-choix="annee"]`); await pg.waitForTimeout(500);
         const ra=await lireTableau(pg); const La=ra.lignes.find((l)=>l.uid==='111')||{};
         dit(ra.periode==='annee' && La.n==='6' && La.prix==='6500', 'A11 Année : la vente d’août entre (6 ventes · 65,00 €)', JSON.stringify(La));
+        const La2=ra.lignes.find((l)=>l.uid==='222')||{};
+        dit(La2.vrm==='2' && La2.vrmP, 'A11b Année : « au moins 2 acceptées par VRM » (le journal ne garde que 30 jours)', JSON.stringify(La2));
         await pg.click(`${CARTE} [data-cv-choix="j90"]`); await pg.waitForTimeout(500);
         const r9=await lireTableau(pg); const L9=r9.lignes.find((l)=>l.uid==='111')||{};
         dit(r9.periode==='j90' && L9.n==='5', 'A12 90 j : la vente d’août reste dehors', JSON.stringify(L9));
