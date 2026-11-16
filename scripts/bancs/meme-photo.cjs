@@ -95,6 +95,10 @@ const uL = (n) => `https://img.leboncoin.fr/api/v1/lbcpb1/images/05_${n.toLowerC
 const uE = (n) => `https://i.ebayimg.com/images/g/05_${n.toLowerCase()}_banc/s-l500.jpg`;
 const uC = (n) => `https://images.vestiairecollective.com/images/resized/w=256/produit/05_${n.toLowerCase()}_banc.jpg`;
 const cleDe = (u) => u.split('#')[0].split('?')[0];
+// (16 nov.) Le code d'origine (SHA-256 du fichier téléversé, extension 5.401) et le nom d'image rendu par Leboncoin.
+const CODE = (t) => require('crypto').createHash('sha256').update('fichier-' + t).digest('hex');
+const NOM_5004 = require('crypto').createHash('sha1').update('lbc-5004').digest('hex'), NOM_5005 = require('crypto').createHash('sha1').update('lbc-5005').digest('hex');
+const IMG_LBC = (n) => `https://img.leboncoin.fr/api/v1/lbcpb1/images/${n.slice(0, 2)}/${n.slice(2, 4)}/${n.slice(4, 6)}/${n}.jpg?rule=ad-large`;
 
 function scenario(F, o = {}) {
   const h = (n) => F[n].h;
@@ -105,6 +109,11 @@ function scenario(F, o = {}) {
     5001: { id: 5001, account: 'lbc-account:987', accountName: 'boutique-lbc', subject: 'Basket blanche 42', status: 'active', price: 80, images: [uL('P1cdn')], seenAt: iso(1), url: 'https://www.leboncoin.fr/ad/chaussures/5001' },
     5002: { id: 5002, account: 'lbc-account:987', accountName: 'boutique-lbc', subject: 'Nike Air Max 1 blanche 42', status: 'active', price: 80, images: [uL('P1v3')], seenAt: iso(1), url: 'https://www.leboncoin.fr/ad/chaussures/5002' },
     5003: { id: 5003, account: 'lbc-account:987', accountName: 'boutique-lbc', subject: 'Asics grise', status: 'active', price: 70, images: [uL('P6')], seenAt: iso(1), url: 'https://www.leboncoin.fr/ad/chaussures/5003' },
+    // (16 nov., lot photo-identite-sites) Le CODE D'ORIGINE : 5004 = le même FICHIER envoyé que la Samba N°125 (Vinted 9002)
+    // ⇒ identité exacte ; 5005 = le même fichier que 9003 ET 9004 (N°300, N°301) ⇒ ambigu, dit.
+    ...(o.origine ? {
+      5004: { id: 5004, account: 'lbc-account:987', accountName: 'boutique-lbc', subject: 'Samba noire 41', status: 'active', price: 75, images: [IMG_LBC(NOM_5004)], seenAt: iso(1), url: 'https://www.leboncoin.fr/ad/chaussures/5004' },
+      5005: { id: 5005, account: 'lbc-account:987', accountName: 'boutique-lbc', subject: 'NB 550 verte', status: 'active', price: 90, images: [IMG_LBC(NOM_5005)], seenAt: iso(1), url: 'https://www.leboncoin.fr/ad/chaussures/5005' } } : {}),
   };
   const LIGNES = [
     { id: 'harvest_111_listings', data: { capturedAt: iso(1), uid: '111', payload: { items, pagination: { total_entries: items.length } } } },
@@ -115,6 +124,9 @@ function scenario(F, o = {}) {
     // (15 nov., lot meme-photo-sure) La deuxième mesure, à la forme de l'extension 5.388 : Leboncoin 5001 × N°124
     // mesuré (le VRAI score des deux images) ⇒ « sûr » ; eBay 2001 jamais mesuré (pas d'hôte) ⇒ « à vérifier ».
     ...(o.fine != null ? [{ id: 'photo_meme_verif', data: { capturedAt: iso(1), payload: { version: 1, couples: { [`lbc|5001|${cleDe(uL('P1cdn'))}#111|9001|${cleDe(uV('P1'))}`]: { ...o.fine, v: 1, at: iso(1) } } } } }] : []),
+    ...(o.origine ? [
+      { id: 'photo_origine_vinted', data: { capturedAt: iso(1), payload: { version: 1, annonces: { 9002: { codes: [CODE('samba')], compte: '111', at: iso(2) }, 9003: { codes: [CODE('nb550')], compte: '111', at: iso(2) }, 9004: { codes: [CODE('nb550')], compte: '111', at: iso(2) } } } } },
+      { id: 'photo_origine_lbc', data: { capturedAt: iso(1), payload: { version: 1, images: { [NOM_5004]: { code: CODE('samba'), at: iso(1) }, [NOM_5005]: { code: CODE('nb550'), at: iso(1) } } } } }] : []),
     { id: 'lbc_listings', data: { items: { ...lbc,
       // L'annonce d'un AUTRE vendeur vue en naviguant (mesuré chez lui : 49 sur 60) — même photo que N°124 : jamais proposée.
       5009: { id: 5009, account: 'lbc-account:inconnu', accountName: 'quelqu-un', subject: 'Basket blanche', status: 'active', images: [uL('P1cdn')], seenAt: iso(1) } },
@@ -240,7 +252,7 @@ const ecrit = (ecritures, re) => ecritures.some((e) => re.test(e.corps));
     const fineP1 = await gen.evaluate(([a, c]) => window.__fine(a, c), [`data:${F.P1.type};base64,${F.P1.b64}`, `data:${F.P1cdn.type};base64,${F.P1cdn.b64}`]);
     console.log(`── deuxième mesure (src/photoFine.js) : P1 ~ P1 passée par un autre site ${JSON.stringify(fineP1)}`);
     await gen.close();
-    const A = scenario(F, { fine: fineP1 }), C = scenario(F, { empreintesKO: true });
+    const A = scenario(F, { fine: fineP1 }), C = scenario(F, { empreintesKO: true }), O = scenario(F, { fine: fineP1, origine: true });
 
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 945 }].filter((v) => !process.env.BANC_SEUL || String(v.width) === process.env.BANC_SEUL)) {
       const tel = vp.width < 600, nomVp = tel ? '390' : '1512';
@@ -322,6 +334,39 @@ const ecrit = (ecritures, re) => ecritures.some((e) => re.test(e.corps));
           await ctx.close();
         });
       }
+      // (16 nov., lot photo-identite-sites) LE CODE D'ORIGINE : identité exacte, sans geste ; ambiguïté dite.
+      await essaie(`O ${nomVp}`, async () => {
+        const { ctx, pg, errs, ecritures } = await ouvrir(b, vp, O, { images: F });
+        const avant = ecritures.length;
+        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:meme-photo-ouvrir', { detail: { site: 'Leboncoin' } })));
+        await pg.waitForSelector('[data-feuille-meme-photo] [data-meme-photo]', { timeout: 8000 }).catch(() => {});
+        await pg.waitForTimeout(800);
+        await pg.locator('[data-meme-photo-reconnue]').first().scrollIntoViewIfNeeded().catch(() => {}); await pg.waitForTimeout(300);
+        if (CAPT) await pg.screenshot({ path: path.join(CAPT, `mp-${nomVp}-origine-feuille.png`) });
+        const r = await pg.evaluate(() => {
+          const rec = [...document.querySelectorAll('[data-meme-photo-reconnue]')].map((e) => ({ id: e.getAttribute('data-meme-photo-reconnue'), n: e.getAttribute('data-numero'), par: (e.querySelector('[data-mph-par]') || {}).getAttribute && e.querySelector('[data-mph-par]').getAttribute('data-mph-par'), t: e.textContent }));
+          const amb = [...document.querySelectorAll('[data-meme-photo-ambigu]')].map((e) => ({ id: e.getAttribute('data-meme-photo-ambigu'), phrase: (e.querySelector('[data-mph-phrase-ambigu]') || {}).textContent || '' }));
+          const props = [...document.querySelectorAll('[data-meme-photo-prop]')].map((e) => e.getAttribute('data-meme-photo-prop'));
+          const lim = document.querySelector('[data-mph-limite-origine]');
+          return { rec, amb, props, limite: lim ? lim.textContent : '' };
+        });
+        dit(r.rec.length === 1 && r.rec[0].id === 'Leboncoin:5004' && r.rec[0].n === '125' && r.rec[0].par === 'code' && /Photo d’origine identique · N°125/.test(r.rec[0].t),
+          'O1 Leboncoin 5004 (le même fichier que N°125) ⇒ « Photo d’origine identique · N°125 », reconnue SANS geste', JSON.stringify(r.rec));
+        dit(r.amb.some((a) => a.id === 'Leboncoin:5005' && /Même photo sur N°300 et N°301 : laquelle \?/.test(a.phrase)), 'O2 Leboncoin 5005 (même fichier sur N°300 et N°301) ⇒ rien déduit, « Même photo sur N°300 et N°301 : laquelle ? »', JSON.stringify(r.amb));
+        dit(r.props.includes('Leboncoin:5001') && !r.props.includes('Leboncoin:5004'), 'O3 la ressemblance (5001, « sûr ») reste une PROPOSITION à relier ; 5004 n’est pas « à relier »', JSON.stringify(r.props));
+        dit(/applis? mobile/i.test(r.limite), 'O4 la limite est dite : « Publiée depuis une appli mobile, VRM ne la voit pas »', r.limite);
+        dit(!ecritures.slice(avant).some((e) => /vrm_lbc_liens|photo_origine/.test(e.corps)), 'O5 rien n’est écrit (l’identité est calculée, jamais recopiée)', '');
+        // La fiche de la paire N°125 : « Aussi sur Leboncoin · reconnue par la photo d’origine ».
+        await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: '125' })));
+        await pg.waitForSelector('[data-meme-photo-aussi="125"]', { timeout: 8000 }).catch(() => {});
+        await pg.waitForTimeout(500);
+        await pg.locator('[data-meme-photo-aussi="125"]').first().scrollIntoViewIfNeeded().catch(() => {}); await pg.waitForTimeout(300);
+        if (CAPT) await pg.screenshot({ path: path.join(CAPT, `mp-${nomVp}-origine-fiche.png`) });
+        const fi = await pg.evaluate(() => { const e = document.querySelector('[data-meme-photo-aussi="125"]'); return e ? { par: e.getAttribute('data-par'), t: e.textContent, h: Math.round(e.getBoundingClientRect().height), titre: e.getAttribute('title') || '' } : null; });
+        dit(fi && fi.par === 'code' && /Aussi sur Leboncoin · reconnue par la photo d’origine/.test(fi.t) && fi.h >= 44 && /appli mobile/.test(fi.titre), 'O6 la fiche N°125 : « Aussi sur Leboncoin · reconnue par la photo d’origine » (≥ 44 px), la limite en titre', JSON.stringify(fi));
+        dit(errs.length === 0, 'aucune erreur JS', errs.slice(0, 2).join(' | '));
+        await ctx.close();
+      });
       await essaie(`C ${nomVp}`, async () => {
         const { ctx, pg, errs } = await ouvrir(b, vp, C, { images: F });
         const r = await pg.evaluate(() => ({ carte: !!document.querySelector('[data-journee-meme-photo]'), rendu: !!document.querySelector('.vrm-fu-afaire, [data-tout-a-jour]') }));
