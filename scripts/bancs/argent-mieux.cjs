@@ -143,10 +143,11 @@ const mesures = [];
       const suf = `${W}-${th}`;
       let o;
       try {
-        // L'écran Ventes publie la ligne URSSAF (comme chez lui) ; puis Argent, dans la MÊME page (navigation de l'app).
+        // L'écran Ventes publie la ligne URSSAF (comme chez lui) — on attend la publication qui porte les ventes Pro lues
+        // (une première peut partir avant la lecture des transactions Pro : un banc chargé la prenait) ; puis Argent, dans la MÊME page (navigation de l'app).
         o = await P.ouvrir(nav, { W, sombre: th === 'sombre', b: base(), url: '/?tab=cat_ventes', dsf: DSF });
         await P.pret(o.pg);
-        await o.pg.waitForFunction(() => { try { const kk = Object.keys(localStorage).filter((k) => /urssaf_mois/.test(k)); const v = kk.length ? JSON.parse(localStorage.getItem(kk[0]) || 'null') : null; return !!(v && Array.isArray(v.mois) && v.mois.length); } catch (_) { return false; } }, null, { timeout: 30000 }).catch(() => {});
+        await o.pg.waitForFunction(() => { try { const kk = Object.keys(localStorage).filter((k) => /urssaf_mois/.test(k)); const v = kk.length ? JSON.parse(localStorage.getItem(kk[0]) || 'null') : null; return !!(v && Array.isArray(v.mois) && v.mois.length && v.nonComptees && Array.isArray(v.nonComptees.det)); } catch (_) { return false; } }, null, { timeout: 45000 }).catch(() => {});
         if (process.env.DEBUG) console.log('DEBUG', await o.pg.evaluate(() => { const kk = Object.keys(localStorage).filter((k) => /urssaf_mois/.test(k)); const v = kk.length ? JSON.parse(localStorage.getItem(kk[0]) || 'null') : null; return kk.join(',') + ' ' + JSON.stringify(v && { nc: v.nonComptees, mois: v.mois, aDater: v.aDater && v.aDater.n }).slice(0, 1500); }));
         await o.pg.evaluate(() => { history.pushState({}, '', '/?tab=argent'); window.dispatchEvent(new PopStateEvent('popstate')); });
         await o.pg.waitForSelector('[data-argent-nav]', { timeout: 8000 }).catch(async () => { await o.pg.goto(o.pg.url().replace(/\?.*$/, '') + '?tab=argent'); });
