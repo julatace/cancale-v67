@@ -58,4 +58,18 @@ export default {
   "etag.site.masquee": "oculto por Vinted",
   "etag.site.depuis": "desde el {date}",
   "etag.glisser": "Arrastra «{nom}» arriba o abajo",
+  // (16 nov., lot stock-mieux) le plan lisible
+  "etag.rangeesSur": "{n} / {total} guardados",
+  "etag.modifier": "Editar",
+  "etag.gerer": "Editar o mover «{nom}»",
+  "etag.monterCourt": "Subir",
+  "etag.descendreCourt": "Bajar",
+  "etag.somme.rangees": "guardados",
+  "etag.somme.rangee": "guardado",
+  "etag.somme.sortir": "por sacar",
+  "etag.somme.libres": "huecos libres",
+  "etag.somme.libre": "hueco libre",
+  "etag.zoom.loin": "De lejos",
+  "etag.zoom.normal": "Normal",
+  "etag.zoom.pres": "De cerca",
 };

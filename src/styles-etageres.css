@@ -159,3 +159,106 @@
 .vrm-etag-pied { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
 .vrm-etag-pied .sb-touche { min-height: 44px; padding: 0 18px; }
 .vrm-etag-pied .sb-lien { min-height: 44px; margin-left: auto; }
+
+/* ══ (16 nov., lot stock-mieux — Julien : « tu peux faire mieux ») LE PLAN LISIBLE AU TÉLÉPHONE ══════════════════
+   Mesuré avant (390 px) : un « + » dans chaque case vide (dizaines), « V j… / N… » sur les cases pleines (N° 12 px,
+   pseudo tronqué), la tête gris-bleu sur le fond bleu. Ici : chaque meuble est une CARTE de verre (l'encre sombre
+   s'y lit) ; une case pleine porte son N° EN GRAND sur une plaque opaque pleine largeur ; une case vide est un fond
+   à peine marqué, son « + » ne paraît qu'au survol, à la pose ou sur la case visée ; la barre du plan dit le compte.
+   Les plaques ont leurs propres jetons (jamais le verre translucide) : ≥ 4,5:1 sur toute photo, jour et nuit. */
+:root {
+  --etag-plaque: rgb(255 255 255 / .95); --etag-plaque-encre: #0C1D30;
+  --etag-plaque-vendue: #0060CC; --etag-plaque-vendue-encre: #FFFFFF;
+  --etag-plaque-hors: #8F4200; --etag-plaque-hors-encre: #FFFFFF;
+  --etag-vide: rgb(120 132 148 / .10); --etag-vide-bord: rgb(120 132 148 / .22);
+}
+:root[data-theme="dark"] {
+  --etag-plaque: rgb(10 20 34 / .92); --etag-plaque-encre: #F2F7FD;
+  --etag-plaque-vendue: #4DA3FF; --etag-plaque-vendue-encre: #04101F;
+  --etag-plaque-hors: #F2B65E; --etag-plaque-hors-encre: #1D1200;
+  --etag-vide: rgb(180 200 225 / .08); --etag-vide-bord: rgb(180 200 225 / .18);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --etag-plaque: rgb(10 20 34 / .92); --etag-plaque-encre: #F2F7FD;
+    --etag-plaque-vendue: #4DA3FF; --etag-plaque-vendue-encre: #04101F;
+    --etag-plaque-hors: #F2B65E; --etag-plaque-hors-encre: #1D1200;
+    --etag-vide: rgb(180 200 225 / .08); --etag-vide-bord: rgb(180 200 225 / .18);
+  }
+}
+
+/* Le meuble : une carte (le verre du studio, coins arrondis partout), la tête dedans. */
+.vrm-s2d-meuble.vrm-etag.vrm-etag-carte { border-radius: 22px; padding: 12px 12px 12px; box-sizing: border-box; scroll-margin-top: 88px; }
+.vrm-etag-carte > .vrm-s2d-defile { margin: 0 -12px; padding: 6px 12px 4px; }
+.vrm-etag-carte > .vrm-s2d-tete { margin: 0 0 6px; gap: 8px; position: relative; }
+.vrm-etag-carte .vrm-s2d-nom { font-size: 18px; }
+.vrm-etag-carte .vrm-s2d-compte { font-size: 13px; font-weight: 600; margin-top: 1px; }
+.vrm-etag-carte[data-replie] .vrm-s2d-tete { opacity: 1; }
+.vrm-etag-carte[data-replie] { opacity: .7; }
+.vrm-etag-carte .vrm-s2d-tete .vrm-s2d-pastille:not([data-vide]) { background: var(--etag-plaque-vendue); color: var(--etag-plaque-vendue-encre); font-size: 13px; padding: 3px 10px; }
+.vrm-etag-carte .vrm-s2d-tete .vrm-s2d-pastille[data-vide] { font-size: 13px; }
+.vrm-etag-modifier { min-height: 44px; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px; font-size: 15px; font-weight: 600; }
+.vrm-etag-menu-hote { position: relative; display: inline-flex; }
+.vrm-etag-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 40; min-width: 210px; display: flex; flex-direction: column; padding: 6px;
+  border-radius: 16px; background: var(--sv-porcelaine, var(--vrm-surface, #FFFFFF)); box-shadow: 0 10px 30px rgb(8 26 50 / .22), 0 0 0 .5px rgb(8 26 50 / .12);
+  transform-origin: top right; animation: vrm-etag-menu .16s cubic-bezier(.23, 1, .32, 1); }
+.vrm-etag-menu[hidden] { display: none; }
+.vrm-etag-menu > button { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; border: 0; border-radius: 10px; background: transparent;
+  color: var(--sb-encre, var(--vrm-ink, #0C1D30)); font: inherit; font-size: 15px; font-weight: 600; text-align: left; cursor: pointer; }
+.vrm-etag-menu > button:disabled { opacity: .4; cursor: default; }
+.vrm-etag-menu > button:not(:disabled):active { background: color-mix(in srgb, var(--vrm-muted, #8E8E93) 14%, transparent); }
+@media (hover: hover) and (pointer: fine) { .vrm-etag-menu > button:not(:disabled):hover { background: color-mix(in srgb, var(--vrm-muted, #8E8E93) 12%, transparent); } }
+@keyframes vrm-etag-menu { from { opacity: 0; transform: scale(.96) translateY(-4px); } to { opacity: 1; transform: none; } }
+
+/* La case vide : discrète, sans pointillé ni « + » ; le « + » paraît au survol (souris), à la pose d'une paire
+   (`is-cible`) et sur la case visée (`is-vise`). */
+.vrm-etag .vrm-s2d-case.is-vide { outline: 0; background: var(--etag-vide); box-shadow: inset 0 0 0 1px var(--etag-vide-bord); }
+.vrm-etag .vrm-s2d-case.is-vide[data-couleur] { background: color-mix(in srgb, var(--etag-fond) 70%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--etag-bord) 55%, transparent); }
+.vrm-etag .vrm-s2d-case.is-vide .vrm-s2d-plus { opacity: 0; transition: opacity .15s ease-out; }
+.vrm-etag .vrm-s2d-case.is-vide:is(.is-cible, .is-vise, .is-survol) .vrm-s2d-plus { opacity: .9; color: var(--s2d-accent); }
+.vrm-etag .vrm-s2d-case.is-vide.is-cible { outline: 0; background: color-mix(in srgb, var(--s2d-accent) 9%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--s2d-accent) 55%, transparent); }
+@media (hover: hover) and (pointer: fine) { .vrm-etag .vrm-s2d-case.is-vide:hover .vrm-s2d-plus { opacity: .9; } }
+
+/* La case pleine : la photo nette, la plaque du N° en bas, pleine largeur, opaque. */
+.vrm-etag .vrm-s2d-case .vrm-s2d-num.vrm-etag-plaque {
+  left: 0 !important; right: 0 !important; bottom: 0 !important; max-width: none !important; border-radius: 0 !important; box-shadow: none !important;
+  padding: 2px 2px 3px !important; text-align: center; overflow: hidden; text-overflow: clip; z-index: 2;
+  font-size: 18px !important; font-weight: 750; line-height: 1.12; letter-spacing: -.02em !important; font-variant-numeric: normal;
+  background: var(--etag-plaque) !important; color: var(--etag-plaque-encre) !important; }
+.vrm-etag .vrm-s2d-case .vrm-s2d-num.vrm-etag-plaque[data-long="4"] { font-size: 16px !important; letter-spacing: -.03em !important; }
+.vrm-etag .vrm-s2d-case .vrm-s2d-num.vrm-etag-plaque[data-long="5"] { font-size: 13px !important; letter-spacing: -.03em !important; }
+.vrm-etag .vrm-s2d-case .vrm-s2d-num.vrm-etag-plaque[data-vendue] { background: var(--etag-plaque-vendue) !important; color: var(--etag-plaque-vendue-encre) !important; }
+.vrm-etag .vrm-s2d-case .vrm-s2d-num.vrm-etag-plaque[data-hors-ligne] { background: var(--etag-plaque-hors) !important; color: var(--etag-plaque-hors-encre) !important; }
+.vrm-etag .vrm-s2d-case.is-double .vrm-s2d-num.vrm-etag-plaque { background: var(--sb-doublon, var(--vrm-doublon, #C8102E)) !important; color: #FFFFFF !important; }
+.vrm-s2d-etagere[data-zoom="pres"] .vrm-s2d-num.vrm-etag-plaque { font-size: 22px !important; padding: 4px 2px 5px !important; }
+/* La bande des sites : rien à dire ⇒ rien de dessiné ; une couleur de case ne passe plus sous la plaque. */
+.vrm-etag-sites:not([data-sites-vus]) { display: none; }
+.vrm-etag .vrm-s2d-case[data-couleur]:not(.is-vide)::after { top: 0; bottom: auto; height: 4px; }
+
+/* La barre du plan : le compte, les meubles en onglets, la taille, la légende, l'aide. */
+.vrm-etag-barre { border-radius: 22px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; margin: 0 0 14px; }
+.vrm-etag-somme { margin: 0; display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 15px; color: var(--vrm-ink, inherit); }
+.vrm-etag-somme b { font-size: 20px; font-weight: 750; letter-spacing: -.02em; margin-right: 2px; }
+.vrm-etag-somme-sortir b { color: var(--sb-lien, var(--vrm-accent-texte, #0060CC)); }
+.vrm-etag-onglets { display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; margin: 0 -14px; padding: 2px 14px 4px; scrollbar-width: none; }
+.vrm-etag-onglets::-webkit-scrollbar { display: none; }
+.vrm-etag-onglet { flex: none; display: inline-flex; align-items: baseline; gap: 8px; min-height: 44px; padding: 0 14px; border-radius: 999px; border: 0; cursor: pointer; font: inherit;
+  background: color-mix(in srgb, var(--vrm-muted, #8E8E93) 12%, transparent); color: var(--vrm-ink, #0C1D30); align-items: center; transition: background-color .15s ease, color .15s ease; }
+.vrm-etag-onglet-nom { font-size: 15px; font-weight: 650; }
+.vrm-etag-onglet-n { font-size: 13px; font-weight: 600; opacity: .8; }
+.vrm-etag-onglet[aria-current="true"] { background: var(--etag-plaque-vendue); color: var(--etag-plaque-vendue-encre); }
+.vrm-etag-onglet:active { transform: scale(.97); }
+.vrm-etag-barre-bas { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.vrm-etag-barre-bas .vrm-s2d-legende-l { flex: 1 1 220px; min-width: 0; color: var(--sb-encre-2, var(--vrm-muted, #4A5868)); }
+.vrm-etag-barre-bas .vrm-etag-aide { min-height: 44px; margin-left: auto; }
+.vrm-etag-barre .vrm-s2d-pastille { min-width: 18px; width: 18px; height: 18px; padding: 0; }
+.vrm-etag-barre .vrm-s2d-pastille.is-libre { outline: 0; background: var(--etag-vide); box-shadow: inset 0 0 0 1px var(--etag-vide-bord); }
+.vrm-etag-barre .vrm-s2d-pastille.is-rangee { background: var(--etag-plaque); box-shadow: inset 0 0 0 1px var(--etag-vide-bord), 0 1px 2px rgb(0 0 0 / .18); }
+.vrm-etag-barre .vrm-s2d-pastille.is-vendue { background: var(--etag-plaque-vendue); }
+.vrm-etag-barre .vrm-s2d-pastille.is-plusenligne { background: var(--etag-plaque-hors); }
+@media (min-width: 1024px) { .vrm-etag-piece .vrm-s2d-meuble.vrm-etag.vrm-etag-carte { box-shadow: none !important; background-image: none !important; background: color-mix(in srgb, var(--sb-porcelaine, #FFFFFF) 55%, transparent) !important; } }
+@media (prefers-reduced-motion: reduce) {
+  .vrm-etag-menu { animation: none; }
+  .vrm-etag .vrm-s2d-case.is-vide .vrm-s2d-plus, .vrm-etag-onglet { transition: none; }
+  .vrm-etag-onglet:active { transform: none; }
+}

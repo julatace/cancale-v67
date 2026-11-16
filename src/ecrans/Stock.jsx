@@ -313,6 +313,29 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   const [journal, setJournal] = useStateCle('vrm_stock_sortis', () => load('vrm_stock_sortis', {}) || {});
   const [explication, setExplication] = React.useState(false);
   const [glisse, setGlisse] = React.useState(null);        // cleNum glissé à la souris
+  // (16 nov., lot stock-mieux) Le meuble SOUS LES YEUX (le plus visible), marqué dans les onglets de la barre du plan.
+  const [meubleVu, setMeubleVu] = React.useState(null);
+  const reduitMouvement = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } };
+  const nMeublesVus = Array.isArray(meubles) ? meubles.length : 0;
+  React.useEffect(() => {
+    if (nMeublesVus < 2 || typeof IntersectionObserver === 'undefined') return undefined;
+    const parts = new Map();
+    const io = new IntersectionObserver((ents) => {
+      for (const x of ents) parts.set(x.target.getAttribute('data-meuble'), x.isIntersecting ? x.intersectionRect.height : 0);
+      let best = null, h = 0; for (const [k, v] of parts) if (v > h) { h = v; best = k; }
+      if (best) setMeubleVu((x) => (x === best ? x : best));
+    }, { threshold: [0, 0.25, 0.5, 0.75, 1] });
+    document.querySelectorAll('section[data-meuble]').forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, [nMeublesVus]);
+  const [menuMeuble, setMenuMeuble] = React.useState(null);   // (16 nov., lot stock-mieux) l'id du meuble dont le menu est ouvert
+  React.useEffect(() => {
+    if (!menuMeuble) return undefined;
+    const hors = (e) => { if (!(e.target && e.target.closest && e.target.closest('.vrm-etag-menu-hote'))) setMenuMeuble(null); };
+    const echap = (e) => { if (e.key === 'Escape') setMenuMeuble(null); };
+    document.addEventListener('pointerdown', hors, true); document.addEventListener('keydown', echap);
+    return () => { document.removeEventListener('pointerdown', hors, true); document.removeEventListener('keydown', echap); };
+  }, [menuMeuble]);
   const [survol, setSurvol] = React.useState(null);        // 'mid:i' sous la souris pendant un glisser
   const souris = React.useMemo(() => { try { return window.matchMedia('(hover: hover) and (pointer: fine)').matches; } catch (_) { return false; } }, []);
   const ecrireMeubles = (u) => { setMeubles(u); save('vrm_meubles', u); };
@@ -688,8 +711,13 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       {/* (11 nov., lot accessibilité) Dans une vignette MINI (44–48 px), « N°12 » était coupé (« N°1… ») :
           la pastille y est resserrée (styles-stock-2d.css) et porte le N° entier en `title` ; la ligne
           l'écrit aussi en clair, d'où `aria-hidden` (lu une fois). */}
-      <span className="vrm-s2d-num" data-vendue={sold ? '1' : undefined} data-hors-ligne={!sold && hors ? '1' : undefined}
-        {...(mini ? { title: `N°${f.numero}`, 'aria-hidden': 'true', 'data-mini': '' } : {})}>N°{f.numero}</span>
+      {/* (16 nov., lot stock-mieux — Julien : « tu peux faire mieux ») Dans une case du plan, le N° EST l'identité
+          physique (§5) : une plaque pleine largeur en bas, le numéro SEUL en grand (16–19 px selon sa longueur, jamais
+          coupé — « N° » est dit à l'aide vocale de la case), sur un fond opaque (≥ 4,5:1 sur toute photo). */}
+      {dansCase
+        ? <span className="vrm-s2d-num vrm-etag-plaque" data-case-n={String(f.numero)} data-long={String(f.numero).length > 4 ? '5' : String(f.numero).length > 3 ? '4' : undefined} data-vendue={sold ? '1' : undefined} data-hors-ligne={!sold && hors ? '1' : undefined} aria-hidden="true">{f.numero}</span>
+        : <span className="vrm-s2d-num" data-vendue={sold ? '1' : undefined} data-hors-ligne={!sold && hors ? '1' : undefined}
+        {...(mini ? { title: `N°${f.numero}`, 'aria-hidden': 'true', 'data-mini': '' } : {})}>N°{f.numero}</span>}
       {sold && !mini && !dansCase && <span className="vrm-s2d-vendue">{tr('ventes.vendue2')}</span>}
       {!sold && hors && !mini && <span className="vrm-s2d-horsligne">{tr('stock.plusLigne2')}</span>}
     </>
@@ -704,10 +732,16 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     if (!l.length) return null;
     const plats = []; for (const x of l) if (!plats.some((p) => p.plat === x.plat)) plats.push(x);
     const pseudos = [...new Set(l.filter((x) => x.pseudo).sort((a, b) => (a.etat === 'enligne' ? 0 : 1) - (b.etat === 'enligne' ? 0 : 1)).map((x) => x.pseudo))];
+    // (16 nov., lot stock-mieux) Sur la case, « V j… » (logo + pseudo coupé) ne se lisait pas : les logos seulement
+    // quand ils APPRENNENT quelque chose (un autre site que Vinted, ou une annonce pas « en ligne »), le pseudo
+    // seulement « De près » et s'il tient EN ENTIER (jamais tronqué) ; tout reste dit à l'aide vocale et sur la fiche.
+    const utiles = plats.some((x) => x.plat !== 'vinted' || x.etat !== 'enligne') || plats.length > 1;
+    const compteTxt = pseudos.length ? `${pseudos[0]}${pseudos.length > 1 ? ` +${pseudos.length - 1}` : ''}` : '';
+    const compteVu = zoom === 'pres' && compteTxt && compteTxt.length <= 14;
     return (
-      <span className="vrm-etag-sites" data-case-sites={plats.map((x) => x.plat + ':' + x.etat).join(',')} data-case-compte={pseudos[0] || undefined} aria-hidden="true">
-        {plats.map((x) => <MarquePlateforme key={x.plat} site={x.plat} taille={14} carre className="vrm-etag-site" style={x.etat === 'enligne' ? undefined : { opacity: .45 }} />)}
-        {pseudos.length ? <span className="vrm-etag-compte">{pseudos[0]}{pseudos.length > 1 ? ` +${pseudos.length - 1}` : ''}</span> : null}
+      <span className="vrm-etag-sites" data-case-sites={plats.map((x) => x.plat + ':' + x.etat).join(',')} data-case-compte={pseudos[0] || undefined} data-sites-vus={utiles || compteVu ? '' : undefined} aria-hidden="true">
+        {utiles ? plats.map((x) => <MarquePlateforme key={x.plat} site={x.plat} taille={14} carre className="vrm-etag-site" style={x.etat === 'enligne' ? undefined : { opacity: .45 }} />) : null}
+        {compteVu ? <span className="vrm-etag-compte">{compteTxt}</span> : null}
       </span>);
   };
   // La même chose, en clair, pour l'aide vocale de la case et la fiche : une ligne par site (logo · compte · prix · depuis).
@@ -739,6 +773,9 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     onDragLeave: () => setSurvol((x) => (x === mid + ':' + i ? null : x)),
     onDrop: (e) => { e.preventDefault(); let k = glisse; try { const d = e.dataTransfer.getData('text/plain'); if (/^vrm-num:/.test(d)) k = d.slice(8); } catch (_) {} setGlisse(null); setSurvol(null); if (k) poser(k, mid, i); },
   } : {});
+  // (16 nov., lot stock-mieux) Le menu d'un meuble (Modifier / Monter / Descendre), un seul ouvert ; il se ferme au
+  // toucher ailleurs ou sur Échap.
+  const ouvrirEditeurMeuble = (m) => { const coulM = COULEURS.includes(m.couleur) ? m.couleur : null; setModal({ type: 'meuble', id: m.id, name: m.name, cols: m.cols, rows: m.rows, planches: planchesDe(m), gravite: !!m.gravite, typeM: typeDe(m), couleur: coulM, couleurs: couleursDans(m.couleurs, m.cols, m.rows), piles: [...colonnesEnPile({ ...m, gravite: false, type: undefined })] }); };
   const cadreMeuble = (m, rang = 0) => {
     const T = total(m);
     let filled = 0, nIci = 0, nVenduesIci = 0;
@@ -757,25 +794,33 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     const piles = colonnesEnPile(m);
     const desc = descente && descente.m === String(m.id) ? descente : null;
     return (
-      <section key={m.id} data-meuble={m.id} data-meuble-type={typeM} data-forme-pile={formePile ? '' : undefined} data-couleur={coulM} data-meuble-ici={cherche ? nIci : undefined} className="vrm-s2d-meuble vrm-etag" data-replie={replie ? '1' : undefined}>
-        <div className="vrm-s2d-tete">
+      <section key={m.id} data-meuble={m.id} data-meuble-type={typeM} data-forme-pile={formePile ? '' : undefined} data-couleur={coulM} data-meuble-ici={cherche ? nIci : undefined} className="vrm-s2d-meuble vrm-etag sb-plan vrm-etag-carte" data-meuble-actif={meublesVus.length > 1 && meubleVu === String(m.id) ? '' : undefined} data-replie={replie ? '1' : undefined}>
+        <div className="vrm-s2d-tete" data-meuble-tete="">
           {/* (15 nov.) Le titre (nom, puis « 3/5 · 1×5 · empilé ») et les gestes : la tête ne fixe pas la largeur du
-              meuble (une pile reste étroite) — elle passe sur deux lignes quand le meuble est étroit. */}
+              meuble (une pile reste étroite) — elle passe sur deux lignes quand le meuble est étroit.
+              (16 nov., lot stock-mieux) « 12 / 32 rangées » en mots (plus « 0/32 · 4×8 ») ; les gestes portent un MOT :
+              « Modifier » (un seul meuble : l'éditeur ; plusieurs : un menu Modifier / Monter / Descendre) ; la poignée reste. */}
           <span className="vrm-etag-titre-m">
             <span className="vrm-etag-nom-l">{coulM ? <i className="vrm-etag-pastille" data-couleur={coulM} aria-hidden="true" /> : null}<span className="vrm-s2d-nom">{m.name}</span></span>
-            <span className="vrm-s2d-compte" data-meuble-plein={filled}>{filled}/{T} · {m.cols}×{m.rows}{piles.size ? (piles.size === m.cols ? tr('stock.empile') : tr('etag.colonnesPile', { n: piles.size })) : ''}</span>
+            <span className="vrm-s2d-compte" data-meuble-plein={filled} data-meuble-total={T}>{tr('etag.rangeesSur', { n: String(filled), total: String(T) })}{piles.size ? (piles.size === m.cols ? tr('stock.empile') : tr('etag.colonnesPile', { n: piles.size })) : ''}</span>
           </span>
           {nVenduesIci > 0 && !cherche && <span className="vrm-s2d-pastille" data-meuble-vendues={nVenduesIci}>{trj('stock.sortir', { nVenduesIci: nVenduesIci })}</span>}
           {cherche && <span className="vrm-s2d-pastille" data-vide={nIci ? undefined : '1'}>{nIci ? tr('stock.ici', { nIci: String(nIci) }) : tr('stock.rienIci')}</span>}
           <span className="vrm-etag-actions">
-          {meublesVus.length > 1 && <>
-            <button className="sb-rond vrm-etag-rond vrm-etag-poignee" type="button" data-meuble-glisser={m.id} onPointerDown={(e) => glisserMeuble(e, m.id)}
+          {meublesVus.length > 1 && <button className="sb-rond vrm-etag-rond vrm-etag-poignee" type="button" data-meuble-glisser={m.id} onPointerDown={(e) => glisserMeuble(e, m.id)}
               onKeyDown={(e) => { if (e.key === 'ArrowUp') { e.preventDefault(); deplacer(m.id, -1); } else if (e.key === 'ArrowDown') { e.preventDefault(); deplacer(m.id, 1); } }}
-              aria-label={tr('etag.glisser', { nom: String(m.name) })} title={tr('etag.glisser', { nom: String(m.name) })}><Icon name="menu" size={16}/></button>
-            <button className="sb-rond vrm-etag-rond" type="button" data-meuble-monter={m.id} disabled={rang === 0} onClick={() => deplacer(m.id, -1)} aria-label={tr('etag.monter', { nom: String(m.name) })}><Icon name="chevron" size={16} style={{ transform: 'rotate(-90deg)' }} /></button>
-            <button className="sb-rond vrm-etag-rond" type="button" data-meuble-descendre={m.id} disabled={rang === meublesVus.length - 1} onClick={() => deplacer(m.id, 1)} aria-label={tr('etag.descendre', { nom: String(m.name) })}><Icon name="chevron" size={16} style={{ transform: 'rotate(90deg)' }} /></button>
-          </>}
-          <button className="sb-rond vrm-etag-rond" type="button" data-meuble-modifier={m.id} onClick={() => setModal({ type: 'meuble', id: m.id, name: m.name, cols: m.cols, rows: m.rows, planches: planchesDe(m), gravite: !!m.gravite, typeM: typeDe(m), couleur: coulM || null, couleurs: couleursDans(m.couleurs, m.cols, m.rows), piles: [...colonnesEnPile({ ...m, gravite: false, type: undefined })] })} aria-label={tr('stock.modifierMeuble')}><Icon name="pencil" size={15} /></button>
+              aria-label={tr('etag.glisser', { nom: String(m.name) })} title={tr('etag.glisser', { nom: String(m.name) })}><Icon name="menu" size={16}/></button>}
+          {meublesVus.length > 1
+            ? <span className="vrm-etag-menu-hote">
+                <button className="sb-touche vrm-etag-modifier" type="button" data-meuble-menu={m.id} aria-haspopup="menu" aria-expanded={menuMeuble === m.id} aria-label={tr('etag.gerer', { nom: String(m.name) })}
+                  onClick={() => setMenuMeuble((x) => (x === m.id ? null : m.id))}><Icon name="pencil" size={15} /><span>{tr('etag.modifier')}</span></button>
+                <span className="vrm-etag-menu" role="menu" data-meuble-menu-liste={m.id} hidden={menuMeuble !== m.id}>
+                  <button role="menuitem" type="button" data-meuble-modifier={m.id} aria-label={tr('stock.modifierMeuble')} onClick={() => { setMenuMeuble(null); ouvrirEditeurMeuble(m); }}><Icon name="pencil" size={15} /><span>{tr('stock.modifierMeuble')}</span></button>
+                  <button role="menuitem" type="button" data-meuble-monter={m.id} disabled={rang === 0} aria-label={tr('etag.monter', { nom: String(m.name) })} onClick={() => { setMenuMeuble(null); deplacer(m.id, -1); }}><Icon name="chevron" size={15} style={{ transform: 'rotate(-90deg)' }} /><span>{tr('etag.monterCourt')}</span></button>
+                  <button role="menuitem" type="button" data-meuble-descendre={m.id} disabled={rang === meublesVus.length - 1} aria-label={tr('etag.descendre', { nom: String(m.name) })} onClick={() => { setMenuMeuble(null); deplacer(m.id, 1); }}><Icon name="chevron" size={15} style={{ transform: 'rotate(90deg)' }} /><span>{tr('etag.descendreCourt')}</span></button>
+                </span>
+              </span>
+            : <button className="sb-touche vrm-etag-modifier" type="button" data-meuble-modifier={m.id} aria-label={tr('stock.modifierMeuble')} onClick={() => ouvrirEditeurMeuble(m)}><Icon name="pencil" size={15} /><span>{tr('etag.modifier')}</span></button>}
           </span>
         </div>
         {desc && !replie ? <div className="vrm-etag-descente" data-descente={desc.cles.join(',')} role="status" aria-live="polite"><span>{desc.texte}</span><button className="sb-lien" type="button" onClick={() => setDescente(null)}>{tr('etag.compris')}</button></div> : null}
@@ -1465,18 +1510,38 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       </Card>
     )}
 
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'space-between' }}>
-      {/* (6 nov., onglets B) CE QUE VEULENT DIRE LES CASES, en une ligne (Julien : « être accompagné ») :
-          les MÊMES classes que les cases (libre, rangée, vendue = l'accent, plus en ligne = l'ambre, §7). */}
-      {meubles.length > 0 ? <div className="vrm-s2d-legende-l" data-stock-legende="" style={{ flex: '1 1 200px', minWidth: 0 }}>
-        <span data-legende="libre"><i className="vrm-s2d-pastille is-libre" aria-hidden="true">+</i>{tr('stock.libre')}</span>
-        <span data-legende="rangee"><i className="vrm-s2d-pastille is-rangee" aria-hidden="true">N°</i>{tr('stock.rangee3')}</span>
-        <span data-legende="vendue"><i className="vrm-s2d-pastille is-vendue" aria-hidden="true">N°</i>{tr('stock.vendueSortir')}</span>
-        <span data-legende="plusenligne"><i className="vrm-s2d-pastille is-plusenligne" aria-hidden="true">N°</i>{tr('stock.plusLigne3')}</span>
-      </div> : <div style={{ flex: '1 1 200px', minWidth: 0 }} />}
-      {/* (30 oct.) Sans meuble, « De loin / De près » ne montrait rien : le choix attend le premier meuble. */}
-      {meubles.length > 0 && <div data-meubles-zoom={zoom}><Segmente label={tr('stock.tailleCases')} value={zoom} onChange={setZoom} options={[{ v: 'loin', l: 'De loin', data: { 'data-zoom-choix': 'loin' } }, { v: 'normal', l: 'Normale', data: { 'data-zoom-choix': 'normal' } }, { v: 'pres', l: 'De près', data: { 'data-zoom-choix': 'pres' } }]} /></div>}
-    </div>
+    {/* (16 nov., lot stock-mieux — Julien : « tu peux faire mieux ») LA BARRE DU PLAN, une carte lisible (le fond bleu
+        ne porte plus de texte) : le compte « N rangées · N à sortir · N cases libres », les meubles en onglets (toucher =
+        y aller ; celui sous les yeux est marqué), la taille des cases, la légende, « Comment ça marche ? ». */}
+    {meubles.length > 0 && (() => {
+      let pleines = 0, tot = 0;
+      const parM = meublesVus.map((m) => { const T = total(m); let f = 0; for (let i = 0; i < T; i++) if (occupant(m.id, i) || noteeIci(m.id, i)) f++; pleines += f; tot += T; return { m, f, T }; });
+      const nSortir = vendSortir.filter((f) => ouEst(f)).length;
+      return (
+        <div className="sb-plan vrm-etag-barre" data-stock-barre-plan="" data-plan-rangees={pleines} data-plan-sortir={nSortir} data-plan-libres={tot - pleines}>
+          <p className="vrm-etag-somme" data-stock-somme="">
+            <span><b>{nombre(pleines)}</b> {tr(pleines > 1 ? 'etag.somme.rangees' : 'etag.somme.rangee')}</span>
+            {nSortir > 0 ? <span className="vrm-etag-somme-sortir"><b>{nombre(nSortir)}</b> {tr('etag.somme.sortir')}</span> : null}
+            <span><b>{nombre(tot - pleines)}</b> {tr(tot - pleines > 1 ? 'etag.somme.libres' : 'etag.somme.libre')}</span>
+          </p>
+          {parM.length > 1 && <nav className="vrm-etag-onglets" aria-label={tr('ms.stock.meubles')} data-meubles-onglets="">
+            {parM.map(({ m, f, T }) => <button key={m.id} type="button" className="vrm-etag-onglet" data-meuble-onglet={m.id} aria-current={meubleVu === String(m.id) ? 'true' : undefined}
+              onClick={() => { setMeubleVu(String(m.id)); try { const el = document.querySelector(`section[data-meuble="${CSS.escape(String(m.id))}"]`); if (el) el.scrollIntoView({ behavior: reduitMouvement() ? 'auto' : 'smooth', block: 'start' }); } catch (_) {} }}>
+              <span className="vrm-etag-onglet-nom">{m.name}</span><span className="vrm-etag-onglet-n">{f}/{T}</span></button>)}
+          </nav>}
+          <div className="vrm-etag-barre-bas">
+            <div data-meubles-zoom={zoom}><Segmente label={tr('stock.tailleCases')} value={zoom} onChange={setZoom} options={[{ v: 'loin', l: tr('etag.zoom.loin'), data: { 'data-zoom-choix': 'loin' } }, { v: 'normal', l: tr('etag.zoom.normal'), data: { 'data-zoom-choix': 'normal' } }, { v: 'pres', l: tr('etag.zoom.pres'), data: { 'data-zoom-choix': 'pres' } }]} /></div>
+            {/* (6 nov., onglets B) CE QUE VEULENT DIRE LES CASES, en une ligne : les MÊMES classes que les cases. */}
+            <div className="vrm-s2d-legende-l" data-stock-legende="">
+              <span data-legende="libre"><i className="vrm-s2d-pastille is-libre" aria-hidden="true" />{tr('stock.libre')}</span>
+              <span data-legende="rangee"><i className="vrm-s2d-pastille is-rangee" aria-hidden="true" />{tr('stock.rangee3')}</span>
+              <span data-legende="vendue"><i className="vrm-s2d-pastille is-vendue" aria-hidden="true" />{tr('stock.vendueSortir')}</span>
+              <span data-legende="plusenligne"><i className="vrm-s2d-pastille is-plusenligne" aria-hidden="true" />{tr('stock.plusLigne3')}</span>
+            </div>
+            {!explication && <button className="sb-lien vrm-etag-aide" type="button" data-stock-explication-ouvrir="" onClick={() => setExplication(true)}>{tr('stock.commentCaMarche')}</button>}
+          </div>
+        </div>);
+    })()}
 
     {/* De loin, les meubles se rangent côte à côte : toute la pièce d'un coup d'œil. (15 nov., étagères) LA PIÈCE : un
         plan où les meubles sont POSÉS au sol (alignés par le bas), côte à côte dès que la largeur le permet ; un meuble
@@ -1484,11 +1549,9 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     <div data-meubles-liste="" className="vrm-etag-piece" data-zoom={zoom}>
       {meublesVus.map((m, k) => <div key={m.id} className="vrm-etag-place" style={{ flex: zoom === 'pres' ? '1 1 100%' : '0 1 auto' }}>{cadreMeuble(m, k)}</div>)}
     </div>
-    {/* (30 oct.) Pièce vide : créer un meuble est LE geste de l'écran (primaire) ; ensuite il redevient une touche.
-        (15 nov.) UNE ligne : « + Ajouter un meuble » (l'action) et « Comment ça marche ? » (un lien discret). */}
+    {/* (30 oct.) Pièce vide : créer un meuble est LE geste de l'écran (primaire) ; ensuite il redevient une touche. */}
     <div className="vrm-etag-pied" data-meubles-pied="">
       <button className={meubles.length ? 'sb-touche' : 'vrm-b vrm-b-primaire'} type="button" data-creer-meuble="" onClick={() => setModal({ type: 'meuble' })}>{tr('stock.ajouterMeuble')}</button>
-      {meubles.length > 0 && !explication && <button className="sb-lien" type="button" data-stock-explication-ouvrir="" onClick={() => setExplication(true)}>{tr('stock.commentCaMarche')}</button>}
     </div>
     {meubles.length > 0 && explication && <StockExplication sneakers={motsStock.nom === 'paire'} onFermer={() => setExplication(false)} />}
 

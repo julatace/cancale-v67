@@ -100,6 +100,12 @@ const direVendue = (pg, n) => pg.evaluate((n) => { let v = null; try { v = JSON.
   localStorage.setItem('vrm_stock_vendus', JSON.stringify({ nums: [...nums], at: Date.now() })); window.dispatchEvent(new Event('vrm:stock-slots')); }, n);
 const retirer = async (pg, n) => { await direVendue(pg, n); await pg.waitForSelector(`[data-case-num="${n}"].is-vendue`, { timeout: 8000 }).catch(() => {}); await pg.click(`[data-case-num="${n}"]`); await pg.waitForTimeout(600); };
 
+// (16 nov., lot stock-mieux) Plusieurs meubles : « Modifier » ouvre le menu (Modifier le meuble / Monter / Descendre).
+async function modifierMeuble(pg, id) {
+  const menu = await pg.$(`[data-meuble="${id}"] [data-meuble-menu]`);
+  if (menu) { await menu.click(); await pg.waitForSelector(`[data-meuble="${id}"] [data-meuble-modifier]:visible`, { timeout: 4000 }).catch(() => {}); }
+  await pg.click(`[data-meuble="${id}"] [data-meuble-modifier]`);
+}
 (async () => {
   let b;
   const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' : le scénario a tourné jusqu’au bout', String(e && e.message).slice(0, 400)); } };
@@ -125,7 +131,7 @@ const retirer = async (pg, n) => { await direVendue(pg, n); await pg.waitForSele
         await retirer(r.pg, '6');
         dit(await ou(r.pg, '7') === 'mF:2.1', `${t} : meuble non empilé — N°7 ne bouge pas`, await ou(r.pg, '7'));
         // L'éditeur : poser une planche sous la rangée 3, enregistrer.
-        await r.pg.click('[data-meuble="mG"] button[aria-label="Modifier le meuble"]');
+        await modifierMeuble(r.pg, 'mG');
         const avant = await r.pg.getAttribute('[data-planche-choix="3"]', 'aria-pressed');
         await r.pg.click('[data-planche-choix="3"]');
         await r.pg.click('[data-meuble-enregistrer]');
@@ -142,7 +148,7 @@ const retirer = async (pg, n) => { await direVendue(pg, n); await pg.waitForSele
         dit(await ou(r.pg, '8') === 'mP:1.1', `${t} : colonne 1 — N°8 reste posée sur SA planche partielle`, await ou(r.pg, '8'));
         await retirer(r.pg, '11');
         dit(await ou(r.pg, '10') === 'mP:3.2', `${t} : colonne 2 (sans planche) — N°10 descend tout en bas`, await ou(r.pg, '10'));
-        await r.pg.click('[data-meuble="mP"] button[aria-label="Modifier le meuble"]');
+        await modifierMeuble(r.pg, 'mP');
         await r.pg.click('[data-planche-case-choix="2:2"]');
         if (process.env.DBG) { console.log(await r.pg.evaluate(() => { const b = document.querySelector('[data-planche-case-choix="2:2"]'); const q = b.getBoundingClientRect(); const e = document.elementFromPoint(q.x + q.width / 2, q.y + q.height / 2); return JSON.stringify({ q, press: b.getAttribute('aria-pressed'), top: e && e.outerHTML.slice(0, 120) }); })); }
         await r.pg.click('[data-meuble-enregistrer]');
@@ -152,7 +158,7 @@ const retirer = async (pg, n) => { await direVendue(pg, n); await pg.waitForSele
         dit(sauveP === '["1:1","2:2"]' && pc2 === '1:1,2:2', `${t} : l'éditeur pose une planche sous une seule colonne, dessinée et enregistrée`, `${sauveP} ${pc2}`);
         dit(await ou(r.pg, '10') === 'mP:3.2', `${t} : N°10, sous la nouvelle planche, reste en bas`, await ou(r.pg, '10'));
         // Le bouton ⟷ fait toute la largeur : rangée 1 devient pleine (rangée en nombre).
-        await r.pg.click('[data-meuble="mP"] button[aria-label="Modifier le meuble"]');
+        await modifierMeuble(r.pg, 'mP');
         await r.pg.click('[data-planche-choix="1"]');
         await r.pg.click('[data-meuble-enregistrer]');
         await r.pg.waitForTimeout(1200);
