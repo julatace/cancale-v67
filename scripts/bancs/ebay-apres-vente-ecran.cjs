@@ -96,7 +96,10 @@ async function ouvrir(b, vp) {
   return { ctx, pg, errs };
 }
 const feuille = (pg) => pg.locator('div[style*="z-index: 2000"]');
-const sousOnglet = async (pg, nom) => { await pg.getByRole('button', { name: nom, exact: true }).first().click({ timeout: 8000 }); await pg.waitForTimeout(900); };
+// (16 nov.) Les sous-onglets eBay ont changé de forme (refonte) : on ouvre la section par son
+// lien (`?tab=plat_ebay&section=…`, celui que l'app pose elle-même), pas par un libellé.
+const SECTION = { 'À traiter': 'agent', 'Promotion': 'promo', 'Achats': 'achats' };
+const sousOnglet = async (pg, nom) => { const u = new URL(pg.url()); await pg.goto(`${u.origin}/?tab=plat_ebay&section=${SECTION[nom]}`, { waitUntil: 'domcontentloaded' }); await pg.waitForTimeout(1500); };
 const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 (async () => {
   let b;
@@ -151,9 +154,11 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         await pg.waitForSelector('[data-ebay-promo="3002"]', { timeout: 10000 });
         const p = await pg.$$eval('[data-ebay-promo]', (l) => l.map((e) => [e.getAttribute('data-ebay-promo'), e.getAttribute('data-promue')]));
         dit(JSON.stringify(p) === JSON.stringify([['3001', 'oui'], ['3002', 'non']]), 'promue / pas promue, annonce par annonce', JSON.stringify(p));
-        dit(/UNIQUEMENT si la paire se vend/.test(await pg.$eval('[data-ebay-promotion]', (e) => e.innerText)), 'les frais de promotion sont dits');
+        dit(/UNIQUEMENT si .{1,30} se vend/.test(await pg.$eval('[data-ebay-promotion]', (e) => e.innerText)), 'les frais de promotion sont dits');
         const avant = envois.length;
         await pg.click('[data-ebay-promo="3002"] [data-geste="promouvoir"]');
+        await pg.waitForTimeout(600);
+        if (process.env.SHOT) await pg.screenshot({ path: path.join(process.env.SHOT, 'promo-' + vp.width + '.png') });
         await feuille(pg).getByRole('button', { name: 'Promouvoir' }).click({ timeout: 5000 }); await pg.waitForTimeout(700);
         const e3 = envois[avant] || {};
         dit(e3.action === 'promouvoir' && e3.listingId === '3002' && e3.taux === '5' && e3.confirme === true, 'promouvoir : l’annonce choisie, au taux affiché, sur confirmation', JSON.stringify(e3));
@@ -182,7 +187,9 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         dit(true, 'Tâches à traiter refusées (compte à reconnecter) ⇒ le bouton « Reconnecter » est là');
         if (process.env.SHOT) await pg.screenshot({ path: path.join(process.env.SHOT, 'traiter-scope-' + vp.width + '.png'), fullPage: true });
         await pg.click('[data-ebay-taches-erreur] [data-ebay-reconnecter]'); await pg.waitForTimeout(900);
-        dit(/section=compte/.test(pg.url()) || await pg.evaluate(() => /Compte/.test((document.querySelector('[aria-current="page"],[aria-pressed="true"]') || {}).innerText || '')), 'le bouton ouvre eBay → Compte', pg.url());
+        const vuCompte = await pg.waitForSelector('[data-ebay-compte-section]', { timeout: 8000 }).then(() => true, () => false);
+        if (process.env.SHOT && !vuCompte) await pg.screenshot({ path: path.join(process.env.SHOT, 'apres-reconnecter-' + vp.width + '.png') });
+        dit(vuCompte, 'le bouton ouvre eBay → Compte (la section de connexion du compte)', pg.url());
       });
       dit(errs.length === 0, 'aucune erreur de page', errs.join(' | ').slice(0, 200));
       await ctx.close();

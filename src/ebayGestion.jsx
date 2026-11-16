@@ -316,8 +316,8 @@ export function EbayRetours({compte='principal',headers,confirm,theme:C,onComman
   <div style={{display:'flex',alignItems:'center',gap:8,margin:'18px 0 10px'}}><h3 style={{margin:0,fontSize:15,color:C.text}}>Retours et annulations</h3><button type="button" onClick={charger} disabled={busy} style={{...S.button,marginLeft:'auto'}}>Actualiser</button></div>
   <Erreur message={message}/>
   {(ouverts===undefined || aDecider===undefined) && <p style={{fontSize:12,color:C.muted}}>Lecture des demandes…</p>}
-  {aDecider===null && <p style={{fontSize:12,color:C.muted}} data-pas-su="annulations">Annulations : {raisons.a || 'pas pu les lire.'}</p>}
-  {ouverts===null && <p style={{fontSize:12,color:C.muted}} data-pas-su="retours" data-raison={raisons.rr || undefined}>Retours : {raisons.r || 'pas pu les lire.'}</p>}
+  {aDecider===null && <p style={{fontSize:12,color:C.text}} data-pas-su="annulations">Annulations : {raisons.a || 'pas pu les lire.'}</p>}
+  {ouverts===null && <p style={{fontSize:12,color:C.text}} data-pas-su="retours" data-raison={raisons.rr || undefined}>Retours : {raisons.r || 'pas pu les lire.'}</p>}
   {onReconnecter && (GESTE_RECONNECTER.has(raisons.rr) || GESTE_RECONNECTER.has(raisons.ar)) && <button type="button" data-ebay-reconnecter="" onClick={onReconnecter} style={{...S.button,minHeight:44}}>{trEbt('ebt.reconnecter')}</button>}
   {Array.isArray(ouverts) && Array.isArray(aDecider) && !ouverts.length && !aDecider.length && <p style={{fontSize:12,color:C.muted}}>Aucune demande de retour ni d’annulation en cours.</p>}
   <div style={{display:'grid',gap:8}}>
