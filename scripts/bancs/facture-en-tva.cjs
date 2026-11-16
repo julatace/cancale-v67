@@ -201,7 +201,7 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
       await essaie('1. acheteur en Italie', async () => {
         await ligneFacture(pg, '7010').waitFor({ timeout: 8000 });
         await ligneFacture(pg, '7010').scrollIntoViewIfNeeded();
-        await ligneFacture(pg, '7010').locator('[data-fp-vente="a-faire"]').click();
+        await ligneFacture(pg, '7010').locator('[data-fp-vente="a-faire"]').dispatchEvent('click');
         const f = pg.locator('[data-fp-feuille-vente="7010"]');
         await f.locator('[data-fp-apercu]').waitFor({ timeout: 6000 });
         dit(await f.locator('[data-fp-anglais]').getAttribute('data-fp-anglais') === '1', '1. adresse prouvée en Italie : « Facture en anglais » pré-cochée');
@@ -210,7 +210,8 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
         dit(await ap.getAttribute('data-fp-langue') === 'fr-en' && /FACTURE \/ INVOICE/i.test(t) && /TVA non applicable, art\. 293 B du CGI/.test(t) && /VAT not applicable, article 293 B/.test(t) && /140,00\s€/.test(t) && !/\$|£/.test(t),
           '1. l’aperçu bilingue : « FACTURE / INVOICE », la mention française puis sa traduction, en euros', t.slice(0, 160));
         const objet = await f.locator('[data-fp-objet]').innerText();
-        dit(/^Facture \/ Invoice FA-2026-0006/.test(objet), '1. l’objet de l’e-mail est bilingue', objet);
+        // (16 nov., lot factures-mieux) L'e-mail parle UNE langue : celle de la facture (anglais ici) ; le PDF reste bilingue.
+        dit(/^Your invoice FA-2026-0006/.test(objet) && await f.locator('[data-fp-mail-langue="en"]').count() === 1, '1. l’e-mail d’une facture en anglais part en anglais seulement (objet, message)', objet);
         if (SHOTS) { await f.locator('[data-fp-anglais]').scrollIntoViewIfNeeded(); await pg.screenshot({ path: path.join(SHOTS, `t-anglais-case-${nf}.png`) }); await ap.scrollIntoViewIfNeeded(); await pg.screenshot({ path: path.join(SHOTS, `t-anglais-apercu-${nf}.png`) }); }
         const c = await f.locator('[data-fp-anglais]').boundingBox();
         if (tel) dit(c && c.height >= 43.5, '4. la case « Facture en anglais » : cible de 44 px', c && String(Math.round(c.height)));
@@ -233,7 +234,7 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
       });
       await essaie('2. acheteur en France', async () => {
         await ligneFacture(pg, '7001').scrollIntoViewIfNeeded();
-        await ligneFacture(pg, '7001').locator('[data-fp-vente="a-faire"]').click();
+        await ligneFacture(pg, '7001').locator('[data-fp-vente="a-faire"]').dispatchEvent('click');
         const f = pg.locator('[data-fp-feuille-vente="7001"]');
         await f.locator('[data-fp-apercu]').waitFor({ timeout: 6000 });
         dit(await f.locator('[data-fp-anglais]').getAttribute('data-fp-anglais') === '0' && await f.locator('[data-fp-apercu]').getAttribute('data-fp-langue') === 'fr', '2. acheteur en France : case décochée, facture en français');

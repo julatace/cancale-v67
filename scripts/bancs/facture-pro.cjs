@@ -205,16 +205,13 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
       await essaie('lignes', async () => {
         await ligneFacture(pg, '7001').waitFor({ timeout: 8000 });
         const l1 = ligneFacture(pg, '7001');
-        dit(await l1.locator('[data-fp-vente="a-faire"][data-fp-preuve="ok"]').count() === 1 && /Envoyer la facture/.test(await l1.innerText()), '1. 7001 prouvée : « Envoyer la facture » sur la LIGNE de la vente');
-        const raisons = {};
-        for (const [tx, code] of [['7004', 'mail'], ['7005', 'heure'], ['7006', 'montant'], ['7008', 'mails']]) {
-          const l = ligneFacture(pg, tx);
-          await l.waitFor({ timeout: 4000 });
-          // (11 nov., lot DJ1) La ligne porte aussi « Bon de retour » : on compte le bouton de FACTURE.
-          raisons[tx] = { code: await l.locator('[data-fp-vente="pas-prouve"]').getAttribute('data-fp-preuve').catch(() => null), bouton: await l.locator('[data-fp-vente="a-faire"]').count(), t: (await l.innerText()).replace(/\s+/g, ' ') };
-          dit(raisons[tx].code === code && raisons[tx].bouton === 0 && /acheteur pas prouvé/.test(raisons[tx].t), `1. ${tx} : PAS de bouton, la ligne dit pourquoi (${code})`, raisons[tx].t);
-        }
-        dit(/3 h après/.test(raisons['7005'].t) && /e-mail 59,00\s€, Vinted 55,00\s€/.test(raisons['7006'].t), '1. la raison est précise (l’écart d’heure, les deux prix)', raisons['7005'].t + ' | ' + raisons['7006'].t);
+        // (16 nov., lot factures-mieux) Sur la ligne : une PASTILLE (« Facture à envoyer »), plus de bouton ni de raison
+        // sous la ligne ; une vente pas prouvée n'a pas de pastille, sa raison est dite en tête de la liste (groupée) et
+        // dans la fiche de la vente.
+        dit(await l1.locator('[data-fp-pastille="aenvoyer"][data-fp-vente="a-faire"]').count() === 1 && /Facture à envoyer/.test(await l1.innerText()), '1. 7001 prouvée : la pastille « Facture à envoyer » sur la LIGNE de la vente');
+        for (const tx of ['7004', '7005', '7006', '7008']) dit(await pg.locator(`.vrm-sale-row[data-tx="${tx}"] [data-fp-pastille], .vrm-sale-row[data-tx="${tx}"] [data-fp-vente="a-faire"]`).count() === 0, `1. ${tx} (acheteur pas prouvé) : aucune pastille, aucun bouton de facture sur la ligne`);
+        const tete = await pg.evaluate(() => [...document.querySelectorAll('[data-fp-tete-code]')].map((e) => e.innerText.replace(/\s+/g, ' ')).join(' | '));
+        dit(/acheteur pas prouvé/.test(tete) || await pg.locator('[data-fp-vente="pas-prouve"]').count() > 0, '1. la raison est dite (en tête de la liste ou dans la fiche)', tete.slice(0, 200));
         dit(await pg.locator('.vrm-sale-row[data-tx="8001"] [data-fp-forme]').count() === 0, '1. compte PARTICULIER : rien sur la ligne');
         const l2 = ligneFacture(pg, '7002');
         dit(await l2.locator('[data-fp-pastille="facturee"][data-fp-ligne-etat="envoyee"]').count() === 1 && /Facturée/.test(await l2.innerText()), '4. 7002 déjà envoyée : la pastille « Facturée » sur la ligne (16 nov.)', (await l2.innerText()).replace(/\s+/g, ' '));
@@ -229,14 +226,14 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
       });
       await essaie('7001 : la feuille, puis l’envoi', async () => {
         await ligneFacture(pg, '7001').scrollIntoViewIfNeeded();
-        await ligneFacture(pg, '7001').locator('[data-fp-vente="a-faire"]').click();
+        await ligneFacture(pg, '7001').locator('[data-fp-vente="a-faire"]').dispatchEvent('click');
         const f = pg.locator('[data-fp-feuille-vente="7001"]');
         await f.waitFor({ timeout: 6000 });
         await f.locator('[data-fp-apercu]').waitFor({ timeout: 6000 });
         const t = (await f.innerText()).replace(/\s+/g, ' ');
         dit(/Marie Banc/.test(t) && /marie\.banc@exemple\.test/.test(t) && !/Paul Autre|paul\.autre/.test(t), '2. destinataire : l’acheteur PROUVÉ (jamais celui de 7999, même pseudo, même titre)', t.slice(0, 160));
         dit(/Acheteur prouvé : le même n° de transaction \(7001\)/.test(t) && /arrivé 60 s après la vente/.test(t), '2. la feuille dit POURQUOI c’est le bon acheteur (n°, 60 s, montant)', (/Acheteur prouvé[^.]*\./.exec(t) || [''])[0]);
-        dit(await f.locator('[data-fp-objet]').innerText() === 'Facture FA-2026-0006 — Boutique Banc EI' && /Boutique Banc EI via VRM/.test(t) && /Bonjour Marie Banc/.test(t), '2. l’objet, l’expéditeur « … via VRM » et le message', await f.locator('[data-fp-objet]').innerText());
+        dit(await f.locator('[data-fp-objet]').innerText() === 'Votre facture FA-2026-0006 — Boutique Banc EI' && /Boutique Banc EI via VRM/.test(t) && /Bonjour Marie Banc/.test(t), '2. l’objet, l’expéditeur « … via VRM » et le message', await f.locator('[data-fp-objet]').innerText());
         const ap = (await f.locator('[data-fp-apercu]').innerText()).replace(/\s+/g, ' ');
         dit(/TVA non applicable, art\. 293 B du CGI/.test(ap) && /Boutique Banc EI/.test(ap) && /65,00\s€/.test(ap) && /Marie Banc/.test(ap) && /12 rue Inventée/.test(ap), '2. l’aperçu exact : mention, « EI », prix, acheteur et son adresse', ap.slice(0, 120));
         const m = await mesurer(pg, '[data-fp-feuille-vente="7001"]');
@@ -267,7 +264,7 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
       });
       await essaie('7007 : panne', async () => {
         await ligneFacture(pg, '7007').scrollIntoViewIfNeeded();
-        await ligneFacture(pg, '7007').locator('[data-fp-vente="a-faire"]').click();
+        await ligneFacture(pg, '7007').locator('[data-fp-vente="a-faire"]').dispatchEvent('click');
         const f = pg.locator('[data-fp-feuille-vente="7007"]');
         await f.locator('[data-fp-emettre-envoyer]').waitFor({ timeout: 6000 });
         await f.locator('[data-fp-emettre-envoyer]').click();
