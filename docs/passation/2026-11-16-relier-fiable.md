@@ -32,7 +32,18 @@ achat et ses 1 558 ventes des 12 derniers mois (≈ ce que l'app calcule).
 | achats proposés à PLUSIEURS articles | 265 | **0** |
 | pistes (repliées dans la feuille) | — | 1 717 articles |
 
-La vérité terrain (ses liens posés) : voir « Vérité » plus bas.
+**Vérité terrain** — ses 12 fiches qu'IL a reliées à un achat, rejouées comme si elles ne l'étaient pas :
+
+| ses 12 liens | montré en ligne et juste | montré en ligne et FAUX | rien en ligne | le bon achat dans les pistes |
+|---|---|---|---|---|
+| avant | 8 | **4** | 0 | — |
+| après (titres seuls) | 0 | **0** | 12 | 9 |
+
+Avant, une proposition sur trois de sa vérité désignait le MAUVAIS achat. Après : aucune fausse ; ses titres
+d'achat n'écrivent presque jamais taille ET couleur, donc tant que les photos ne sont pas lues rien n'est
+« très probable » ; le bon achat est dans « Autres pistes » 9 fois sur 12. Les couleurs de photo (lues à
+l'ouverture, sur l'appareil) feront monter les « très probables » ; ce rejeu ne peut pas les mesurer (le
+conteneur n'a ni l'extension ni sa session).
 
 Les couleurs des photos s'ajoutent à l'ouverture d'Achats / « Sans achat relié » (lues sur l'appareil,
 gardées) : le nombre de « très probables » monte à mesure, jamais leur exclusivité ne bouge.
@@ -100,6 +111,18 @@ gardées) : le nombre de « très probables » monte à mesure, jamais leur excl
 - Banc `achats-liaison` porté (les trois paires identiques ne reçoivent plus rien ; « Ce n'est pas lui »
   sur la très probable qui reste ; sous Achats, un article sous UN seul achat).
 
+- Bancs : `achats-liaison` **78 verts, 0 rouge** (390 ×2, 1512 ×2, dont la feuille « Autres pistes »
+  repliée puis dépliée, captures regardées) ; `annonces-achats` **56 / 0** (fixture : deux achats écrivent
+  taille et couleur) ; `relier-achat-suggestions` **28 / 0**. `achats-relier` (B0 « Reçu d'achat », clic
+  intercepté par la fiche) et `serie` (case « Coût d'achat » introuvable sur Ventes) sont **rouges aussi
+  sur `origin/main` 5a9abe571** (build de main rejoué) : sans rapport avec ce lot.
+- `audit-relier-fiable --prouve` : **11/11 mutations attrapées**.
+
 ## ÉTAT À LA REPRISE
 
-Voir la fin de ce fichier (complétée au moment de la mise en ligne).
+- Code fini et poussé sur `claude/relier-fiable` ; mise en ligne par PR (voir l'état de la PR dans
+  l'historique Git / GitHub).
+- Pas mesurable ici : le nombre de « très probables » une fois les couleurs de PHOTO lues sur son appareil
+  (il faut ouvrir Achats ou « Sans achat relié » chez lui ; chaque photo est lue une fois, gardée).
+- Piste suivante possible (non faite) : le récap d'une vente n'a une proposition que si l'affectation a été
+  calculée (Achats ou « Sans achat relié » ouverts) ; sinon il juge la vente seule, avec la même règle.
