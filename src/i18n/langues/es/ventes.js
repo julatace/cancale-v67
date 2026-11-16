@@ -239,4 +239,12 @@ export default {
   "ventes.ventesAchetePeu2": "De {total} ventas — compra un poco antes.",
   "ventes.ventesAnnulees2": { one: "{n} venta cancelada", other: "{n} ventas canceladas" },
   "ventes.moinsVentesSans": { one: "Como mínimo: {n} venta sin precio leído, no contada.", other: "Como mínimo: {n} ventas sin precio leído, no contadas." },
+  "ventes.regarder": {"one": "{n} cosa que revisar", "other": "{n} cosas que revisar"},
+  "ventes.regarderVide": "Para revisar",
+  "ventes.basculeCourt": "Abre {login} en vinted.fr",
+  "ventes.basculeCourtOrdi": "Abre {login} en vinted.fr, en el ordenador",
+  "ventes.connecteCourt": "Conecta {login} en vinted.fr",
+  "ventes.pourquoiBord": "¿Por qué espera esta etiqueta?",
+  "ventes.puceAchat": "¿Precio de compra?",
+  "ventes.puceRelier": "Vincular una compra",
 };
