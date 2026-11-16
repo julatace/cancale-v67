@@ -208,7 +208,9 @@ export async function traiterCatalogue(deps) {
   if (montrerNumero) {
     const presents = ids.filter((id) => parId.has(id));
     if (presents.length) {
-      const sel = presents.map((id) => `n${id}:data->vinted_annonce_numeros->${id}->>numero`).join(',');
+      // (16 nov.) La clé entre guillemets : un n° d'annonce NU (`->10312441750`) est lu comme un INDEX par PostgREST
+      // (NULL sur un objet, 400 au-delà d'un int) — la création échouait « Rien n'a été créé » (audit-chemin-json-guillemets).
+      const sel = presents.filter((id) => /^\d+$/.test(String(id))).map((id) => `n${id}:data->vinted_annonce_numeros->"${id}"->>numero`).join(',');
       const m = await deps.lireVendeur(`app_data?id=eq.main&select=${sel}&limit=1`);
       if (!Array.isArray(m)) return { status: 503, type: 'json', body: { erreur: 'base', message: 'Rien n’a été créé. Réessaie dans un instant.' } };
       numeros = m[0] || {};

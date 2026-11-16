@@ -17,7 +17,8 @@
   --capte-ombre: inset 0 .5px 0 rgb(255 255 255 / .09), 0 0 0 .5px rgb(0 0 0 / .5), 0 24px 48px -20px rgb(0 0 0 / .9);
   background: linear-gradient(180deg, #16273C, #122135);
 }
-@media (min-width: 744px) { .vrm-capte { left: auto; right: 24px; bottom: 24px; width: 380px; margin: 0; } }
+/* (16 nov.) La coque ordinateur (src/coque.js MQ_ORDINATEUR, recopiée mot pour mot) : jamais « ≥ 744 px » seul, qui allumait ces règles sur un iPhone couché. */
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) { .vrm-capte { left: auto; right: 24px; bottom: 24px; width: 380px; margin: 0; } }
 .vrm-capte-corps { flex: 1; min-width: 0; }
 .vrm-capte-t { font-size: 12.5px; font-weight: 500; color: var(--capte-doux); overflow-wrap: anywhere; }
 .vrm-capte-t b { color: var(--capte-texte); font-weight: 600; }

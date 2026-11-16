@@ -16,6 +16,7 @@ import { useLangue } from '../i18n/react.js';
 import MarquePlateforme from '../plateformes/Marque.jsx';
 import { ETAPES_NOUVEAU, SITES_PARCOURS, progression, captureDe, LIENS_EXTENSION, estDerniere } from './regle.js';
 import './parcours-nouveau.css';
+import { motsNavigateur } from '../navigateurExtension.js';   // (16 nov.) la page des extensions de CE navigateur, jamais « chrome:// » en dur
 
 // Des noms propres (jamais traduits) dans les dessins.
 const DOMAINE_VINTED = 'vinted.fr', NOM_ORION = 'Orion';
@@ -153,7 +154,7 @@ function EtapeExtension({ etats, appareil, dansOrion }) {
   const x = etats.extension;
   const lignes = appareil === 'iphone' ? [tr('pn.extension.i1'), tr('pn.extension.i2'), tr('pn.extension.i3')]
     : appareil === 'android' ? [tr('pn.extension.a1'), tr('pn.extension.a2')]
-      : [tr('pn.extension.o1'), tr('pn.extension.o2'), tr('pn.extension.o3')];
+      : [tr('pn.extension.o1'), tr('pn.extension.o2', { page: motsNavigateur().pageExt || tr('pn.extension.page') }), tr('pn.extension.o3')];
   return (
     <div className="pn-verre">
       <Statut etat={x.etat} cle="extension">{phraseExtension(x, appareil, dansOrion)}</Statut>
