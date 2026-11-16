@@ -61,8 +61,8 @@ const srv = http.createServer((q, r) => {
   r.writeHead(200, { 'content-type': MIME[path.extname(p)] || 'application/octet-stream' }); r.end(fs.readFileSync(p));
 });
 
-async function ouvrir(nav, vp, { sombre = false, chemin = '/?tab=journee', journalKO = false, journal = JOURNAL, lu = LU } = {}) {
-  const mobile = vp.width < 600;
+async function ouvrir(nav, vp, { sombre = false, chemin = '/?tab=journee', journalKO = false, journal = JOURNAL, lu = LU, souris = false } = {}) {
+  const mobile = vp.width < 600 && !souris;
   const ctx = await nav.newContext({ viewport: vp, locale: 'fr-FR', timezoneId: 'Europe/Paris', ...(mobile ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}) });
   const pg = await ctx.newPage();
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(e.message));
@@ -331,6 +331,25 @@ const mesurer = (pg, mobile, racineSel) => pg.evaluate(([mobile, racineSel]) => 
           await ctx.close();
         });
       }
+      // F8b — (16 nov., finitions) À la LARGEUR d'un téléphone, 44 px même quand le navigateur ne se dit pas « au doigt »
+      // (`pointer: coarse` émulé ou non : mesuré instable d'un lancement à l'autre — les segments de l'heure du soir et
+      // « Voir les notifications envoyées » tombaient à 40 px). La règle de la coque : largeur de téléphone, doigt, ou
+      // pas de survol (styles-coque.css) — elle ne dépend plus de l'émulation du toucher.
+      if (vp.width < 600) await essaie(`${vp.width} px · F8b`, async () => {
+        const { ctx, pg } = await ouvrir(nav, vp, { chemin: '/?tab=settings', souris: true });
+        const sous = pg.locator('[data-sous-ouvrir="push"]');
+        if (await sous.count()) { await sous.first().click(); await pg.waitForTimeout(800); }
+        await pg.locator('[data-np-soir-choix]').first().waitFor({ state: 'attached', timeout: 8000 }).catch(() => {});
+        await pg.waitForTimeout(600);
+        const p = await pg.evaluate(() => {
+          const h = (e) => Math.round(e.getBoundingClientRect().height);
+          const segs = [...document.querySelectorAll('[data-np-soir-opt], [data-np-fenetre-choix]')].filter((e) => e.getClientRects().length).map(h);
+          const sec = [...document.querySelectorAll('.vrm-set .vrm-b-secondaire')].filter((e) => e.getClientRects().length && e.getBoundingClientRect().width > 1).map((e) => `${(e.innerText || '').trim().slice(0, 24)} ${h(e)}`);
+          return { coarse: matchMedia('(pointer: coarse)').matches, segs, sec, petits: segs.filter((x) => x < 43.5).length + sec.filter((x) => Number(x.split(' ').pop()) < 43.5).length };
+        });
+        dit(p.segs.length >= 10 && p.sec.length >= 1 && p.petits === 0, `${vp.width} px · F8b largeur de téléphone (toucher non émulé) : segments et boutons secondaires de Notifications à 44 px`, JSON.stringify(p));
+        await ctx.close();
+      });
       // D — le toucher d'une notification du téléphone ; E — pas su
       const T = `${vp.width} px`;
       await essaie(`${T} · notif`, async () => {
