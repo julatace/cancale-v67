@@ -23,8 +23,8 @@ Branche `claude/doublons-meme-compte` (depuis `origin/main`). Mission :
     (`vrm_operation_repub`, pas finie, touchée depuis < 2 h) qui porte l'une des deux ; le journal
     `vrm_repub_journal` (l'une remplace l'autre depuis < 2 h) ; le lien `recreeDe` quand la nouvelle est en ligne
     depuis < 2 h. Au-delà de 2 h, l'ancienne encore en ligne est dite (vraie double vente possible).
-  - `texteDoublonsCompte` : la carte courte « N°124 · 2 annonces de tomj606 » / « La même paire · retire celle en
-    trop » (« Peut-être la même paire · à vérifier » pour un indice), geste « Voir les deux » ; la phrase entière
+  - `texteDoublonsCompte` : la carte courte « N°124 · 2 annonces, 1 paire » / « Même compte · retire celle en
+    trop » (« Même compte · peut-être · à vérifier » pour un indice ; le nom du compte rendait le titre trop long à 390 px), geste « Voir les deux » ; la phrase entière
     « 2 annonces de tomj606 sont la même paire (N°124) » dans l'infobulle et pour le lecteur d'écran.
 - `src/deuxComptes.js` : `apparieParEmpreinte` prend `memeCompte` (le seul tri final change).
 - `App.jsx` (`Comptabilite`) : `doublonsCompte` puis `deuxFoisADire` (même compte + deux comptes non dits par

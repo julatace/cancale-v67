@@ -175,10 +175,10 @@ const ouvrir = async (b, vp, sc, tab = 'journee') => {
         dit(r.carte, 'même photo exacte deux fois sur UN compte : la carte « en ligne deux fois » est dans « À faire »', r.texte);
         if (r.carte) {
           dit(r.n === '1' && r.ids === '5000001+6000001', 'une paire, ses deux annonces (5000001 + 6000001)', `${r.n} ${r.ids}`);
-          // (16 nov., lot doublons-meme-compte) Le même compte : « N°12 · 2 annonces de compte-alpha » / « La même paire · retire
+          // (16 nov., lot doublons-meme-compte) Le même compte : « N°12 · 2 annonces, 1 paire » / « Même compte · retire
           // celle en trop » ; l'infobulle porte la phrase « 2 annonces de compte-alpha sont la même paire (N°12) » ET les deux N°.
-          dit(r.titre === 'N°12 · 2 annonces de compte-alpha', 'le titre : « N°12 · 2 annonces de compte-alpha »', r.titre);
-          dit(r.note === 'La même paire · retire celle en trop', 'la ligne : la même paire et le geste', r.note);
+          dit(r.titre === 'N°12 · 2 annonces, 1 paire', 'le titre : « N°12 · 2 annonces, 1 paire »', r.titre);
+          dit(r.note === 'Même compte · retire celle en trop', 'la ligne : le même compte et le geste', r.note);
           dit(/^2 annonces de compte-alpha sont la même paire \(N°12\)/.test(r.complet || '') && /N°12 et N°40/.test(r.complet || '') && /deux annonces sur compte-alpha/.test(r.complet || ''), 'l’infobulle : la phrase, les deux N° et le compte', r.complet);
           dit(r.geste === 'Voir les deux', 'le geste : « Voir les deux »', r.geste);
           // (16 nov., intégration vague C) À l'ordinateur, la carte vit dans la colonne « À faire » de Ma journée
@@ -268,7 +268,7 @@ const ouvrir = async (b, vp, sc, tab = 'journee') => {
         if (CAPT) await pg.screenshot({ path: path.join(CAPT, `deux-fois-G-${nomVp}.png`) });
         const r = await pg.evaluate(() => { const c = document.querySelector('[data-en-ligne-deux-fois]'); return c ? { d: c.getAttribute('data-doublons-compte'), titre: (c.querySelector('.vrm-day-task-title') || {}).textContent, note: (c.querySelector('.vrm-day-task-note') || {}).textContent, geste: (c.querySelector('.vrm-day-task-action-mot') || {}).textContent, complet: c.getAttribute('title') } : null; });
         dit(r && r.d === 'verifier:5000001+5000003', 'G même EMPREINTE sur deux annonces du même compte : la carte, « à vérifier », ces deux annonces', JSON.stringify(r));
-        dit(r && r.titre === 'N°12 · 2 annonces de compte-alpha' && r.note === 'Peut-être la même paire · à vérifier' && r.geste === 'Voir les deux' && /peut-être la même paire/.test(r.complet || ''), 'G … dit « peut-être », jamais « sûr » ; « Voir les deux »', JSON.stringify(r));
+        dit(r && r.titre === 'N°12 · 2 annonces, 1 paire' && r.note === 'Même compte · peut-être · à vérifier' && r.geste === 'Voir les deux' && /peut-être la même paire/.test(r.complet || ''), 'G … dit « peut-être », jamais « sûr » ; « Voir les deux »', JSON.stringify(r));
         if (r) {
           await pg.click('[data-en-ligne-deux-fois]').catch(() => {});
           await pg.waitForSelector('[data-feuille-deux-fois]', { timeout: 5000 }).catch(() => {});

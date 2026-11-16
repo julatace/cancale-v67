@@ -122,7 +122,7 @@ export function doublonsMemeCompte({ enLigneDeux = null, photos = null, infoDe =
 }
 
 // La carte de Ma journée (une source pour le titre, la ligne, l'infobulle — §7). null s'il n'y a rien.
-// La carte tient sur une ligne à 390 px : « N°124 · 2 annonces de tomj606 » / « La même paire · retire celle
+// La carte tient sur une ligne à 390 px (mesuré au banc) : « N°124 · 2 annonces, 1 paire » / « Même compte · retire celle
 // en trop » ; la PHRASE entière (infobulle, lecteur d'écran, feuille) : « 2 annonces de tomj606 sont la même
 // paire (N°124) » — un indice dit « peut-être ». `complet` : ce que l'app ajoute après la phrase (le texte
 // d'« en ligne deux fois », qui nomme tous les N° et le compte), sinon le geste.
