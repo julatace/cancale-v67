@@ -98,7 +98,7 @@ async function main() {
           await A.capture(pg, `feuilles-F1-avant-${largeur}`);
           // Toucher le TITRE de la rangée (en haut, au milieu : ni la photo, ni le prix, ni la plaque N° qui est un bouton).
           const bb = await cible.boundingBox();
-          if (tel) await pg.touchscreen.tap(bb.x + bb.width * 0.45, bb.y + bb.height * 0.3); else await pg.mouse.click(bb.x + bb.width * 0.45, bb.y + bb.height * 0.3);
+          if (tel) await cible.tap({ position: { x: Math.round(bb.width * 0.45), y: Math.round(bb.height * 0.3) } }); else await pg.mouse.click(bb.x + bb.width * 0.45, bb.y + bb.height * 0.3);
           const ouverte = await pg.waitForFunction((n) => [...document.querySelectorAll('[role="dialog"]')].filter((e) => e.getClientRects().length).length > n, d0, { timeout: 25000 }).then(() => true).catch(() => false);
           dit(ouverte, `${T} F1 toucher la rangée ouvre la fiche`, JSON.stringify(avant));
           if (!ouverte) return;
