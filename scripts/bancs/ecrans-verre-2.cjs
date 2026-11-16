@@ -84,7 +84,10 @@ function baseFiches() {
   const enl = b.rows.find((r) => r.id === `harvest_${uid}_enligne`);
   if (enl) { enl.data.ids.push(it); enl.data.items.push({ id: it, title: 'Adidas Samba OG taille 40' }); enl.data.n = enl.data.ids.length; }
   lst.data.nItems = lst.data.payload.items.length; lst.data.payload.pagination = { total_entries: lst.data.payload.items.length };
-  b.rows.push({ id: 'lbc_listings', data: { items: { 2900000001: { subject: 'Adidas Samba OG 40', price: 85, status: 'active', url: 'https://www.leboncoin.fr/ad/chaussures/2900000001' } }, lectures: {} } });
+  // (16 nov., finitions) la FORME mesurée (comme scripts/bancs/stock-etageres.cjs) : l'annonce porte son `id` et son compte,
+  // la lecture du compte est datée — la fiche lit désormais ses sites comme le Stock (src/stockAnnonces.js).
+  b.rows.push({ id: 'lbc_listings', data: { items: { 2900000001: { id: 2900000001, account: 'lbc1', subject: 'Adidas Samba OG 40', price: 85, status: 'active', url: 'https://www.leboncoin.fr/ad/chaussures/2900000001' } },
+    lectures: { lbc1: { at: new Date(Date.now() - 3600000).toISOString(), total: 1, n: 1 } } } });
   m.vrm_lbc_liens = { ...(m.vrm_lbc_liens || {}), 2900000001: '3102' };
   m.vinted_used_nums = [...new Set([...(m.vinted_used_nums || []), 3119, 3120, 3102])];
   return b;
@@ -410,7 +413,9 @@ function juger(m, suf, tel) {
     }
     if (v === 'fiche-2sites') {
       dit(F.actions[0] === 'baisser', `D3 ${suf} : en vente ⇒ « Baisser le prix »`, F.actions.join(','));
-      dit(F.vue === 'sites' && F.sites.length === 2 && F.sites.includes('vinted:en-ligne') && F.sites.includes('leboncoin:en-ligne'), `D3 ${suf} : ouverte sur Sites, une rangée par site`, F.sites.join(','));
+      // (16 nov., finitions) les sites du Stock ; une lecture absente (eBay, Vestiaire…) est une rangée « pas su » à part.
+      const vusD3 = F.sites.filter((x) => !/:pas-su$/.test(x));
+      dit(F.vue === 'sites' && vusD3.length === 2 && vusD3.includes('vinted:en-ligne') && vusD3.includes('leboncoin:en-ligne'), `D3 ${suf} : ouverte sur Sites, une rangée par site`, F.sites.join(','));
       dit(F.etat && /sur 2 sites/.test(F.etat.txt) && !F.etat.ambre, `D3 ${suf} : « En vente 85 € · sur 2 sites… »`, JSON.stringify(F.etat));
     }
   }
