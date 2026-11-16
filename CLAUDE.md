@@ -502,7 +502,7 @@ sans la fonction.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.393.0** (16 nov. : regroupe 5.386 verre de la carte, 5.388 même photo sûre, 5.390 versements, 5.392 deux comptes/aimés Vestiaire — jamais servies seules). **À lire en premier : `docs/passation/2026-11-16-passation.md`** (en ligne, en cours, reste à faire, gestes), puis `2026-11-10-passation-finale.md` et `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
+**Extension servie : 5.393.0** (16 nov. : regroupe 5.386 verre de la carte, 5.388 même photo sûre, 5.390 versements, 5.392 deux comptes/aimés Vestiaire — jamais servies seules). **À lire en premier : `docs/passation/2026-11-16-passation-generale.md`** (la plus complète : en ligne, prêt, en pause, en file, refusé, gestes), puis `2026-11-16-passation.md`, `2026-11-10-passation-finale.md` et `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
