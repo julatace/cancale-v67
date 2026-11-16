@@ -27,7 +27,7 @@ export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
   // (16 nov., bancs-rouges-a) docs/passation/2026-11-16-bancs-rouges-a.md
-  { id: 'fiche-porte-achat', date: '2026-11-16', titre: 'Le « ? » d’« Achetée » ouvre la saisie', phrase: 'Et « Retirer de la case » est sous ⋯, sans « Tout voir ».', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'fiche-porte-achat', date: '2026-11-16', titre: 'Le « ? » d’« Achetée » ouvre la saisie', phrase: 'Et « Déplacer » est sous ⋯, sans « Tout voir ».', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (16 nov., lot barre-achats — Julien : « ajoute les Achats dans la barre » ; « je ne veux pas qu'on puisse glisser
   // entre les onglets ») docs/passation/2026-11-16-barre-achats.md
   { id: 'barre-achats', date: '2026-11-16', titre: 'Achats a son onglet dans la barre', phrase: 'Et glisser du doigt ne change plus d’onglet.', tab: 'achats', pour: 'tous', mode: 'tous' },
