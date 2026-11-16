@@ -15,6 +15,20 @@ const R = path.join(__dirname, '..');
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (!c && d !== undefined ? ' — ' + String(d).slice(0, 240) : '')); };
 const png = (f) => { const b = fs.readFileSync(f); return { w: b.readUInt32BE(16), h: b.readUInt32BE(20), couleur: b[25] }; };
+// (15 nov., chantier « ouverture ») Les écrans de lancement sont en JPEG (un dégradé en PNG : 23 Mo les 24) :
+// leurs dimensions se lisent dans le segment SOF. PNG ou JPEG, ce sont les dimensions EXACTES qu'iOS exige.
+const dimensions = (f) => {
+  const b = fs.readFileSync(f);
+  if (b[0] === 0x89 && b[1] === 0x50) return png(f);
+  if (b[0] !== 0xFF || b[1] !== 0xD8) return null;
+  for (let i = 2; i + 9 < b.length;) {
+    if (b[i] !== 0xFF) return null;
+    const m = b[i + 1], l = b.readUInt16BE(i + 2);
+    if (m >= 0xC0 && m <= 0xCF && m !== 0xC4 && m !== 0xC8 && m !== 0xCC) return { w: b.readUInt16BE(i + 7), h: b.readUInt16BE(i + 5), jpeg: true };
+    i += 2 + l;
+  }
+  return null;
+};
 const pub = (u) => path.join(R, 'public', u.replace(/^\//, ''));
 
 (async () => {
@@ -44,7 +58,7 @@ const pub = (u) => path.join(R, 'public', u.replace(/^\//, ''));
   const IPHONES = [[440, 956, 3], [430, 932, 3], [402, 874, 3], [393, 852, 3], [428, 926, 3], [390, 844, 3], [414, 896, 3], [375, 812, 3], [414, 896, 2], [414, 736, 3], [375, 667, 2], [320, 568, 2]];
   for (const [w, h, r] of IPHONES) for (const sch of ['light', 'dark']) {
     const l = demarrages.find(([, med]) => med.includes(`(device-width: ${w}px)`) && med.includes(`(device-height: ${h}px)`) && med.includes(`ratio: ${r})`) && med.includes(`prefers-color-scheme: ${sch}`));
-    const d = l && fs.existsSync(pub(l[2])) ? png(pub(l[2])) : null;
+    const d = l && fs.existsSync(pub(l[2])) ? dimensions(pub(l[2])) : null;
     dit(d && d.w === w * r && d.h === h * r, `démarrage iPhone ${w}×${h}@${r} ${sch}`, l ? JSON.stringify(d) : 'absent');
   }
   dit(/html\{overscroll-behavior:none;\}/.test(html.replace(/\/\*[\s\S]*?\*\//g, '')), 'la racine refuse le rechargement au tirer');

@@ -10,6 +10,7 @@ import { problemesAnnonce } from '../verifAnnonce.js';
 import FiabiliteVentes from '../FiabiliteVentes.jsx';
 import { preuvesFriseEbay } from '../friseSites.js';
 import React from 'react';
+import { lazySur } from '../chargementSur.js';   // (15 nov.) un morceau qui rate : relancé, puis rechargement propre ou « Mettre à jour VRM »
 import { montant } from '../format.js';
 import { Numero } from '../composants/Numero.jsx';
 import { ChiffreConseil } from '../Conseils.jsx';
@@ -46,7 +47,7 @@ import { requeteDeLaVoix } from '../rechercheVocale.js';
 import { motsInsecables } from '../motsInsecables.jsx';
 import { AFaireSite } from '../plateformes/AFaireSite.jsx';   // (14 nov., refonte visible) « À faire · N › »
 import { BarreOutils, Filtres } from '../ui/index.js';   // (14 nov., passe 2) « Gel-1130 » ne se coupe pas au trait d'union
-const FactureEbayParesseuse = React.lazy(() => import('../FactureAutres.jsx').then((m) => ({ default: m.FactureAutreVente })));
+const FactureEbayParesseuse = lazySur(() => import('../FactureAutres.jsx').then((m) => ({ default: m.FactureAutreVente })));
 const FactureEbayVente = (props) => <React.Suspense fallback={null}><FactureEbayParesseuse {...props}/></React.Suspense>;
 
 // ⟦← App.jsx #7⟧

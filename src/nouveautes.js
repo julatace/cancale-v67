@@ -65,6 +65,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'verre-depoli', date: '2026-11-15', titre: 'Nouveau thème : verre dépoli sur bleu profond', phrase: 'Le chiffre du jour en blanc, tout se lit sur le verre.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « améliore la liaison entre les achats et les articles ») docs/passation/2026-11-15-achats-liaison.md
   { id: 'achats-liaison', date: '2026-11-15', titre: 'Achat et article côte à côte, vendus compris', phrase: 'Pourquoi, taille, couleur, retrait ; valide les très probables d’un toucher.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (15 nov., Julien : « l'app bug quand je l'ouvre, améliore l'onglet de chargement ») docs/passation/2026-11-15-ouverture.md
+  { id: 'ouverture-verre', date: '2026-11-15', titre: 'Ouverture en verre, sans écran d’erreur', phrase: 'Après une mise à jour, la nouvelle version s’ouvre directement.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « c'est moche et il y a des bugs ») docs/passation/2026-11-15-annonces-achats.md
   { id: 'annonces-achats-cartes', date: '2026-11-15', titre: 'Prix d’achat : cartes nettes, recherche lisible', phrase: 'Une suggestion, Relier en un toucher ; la recherche ne se mélange plus.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « tout doit être beaucoup mieux, accompagné, même la publication tout court ») docs/passation/2026-11-15-republier-main.md

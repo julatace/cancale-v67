@@ -10,6 +10,7 @@
 // Elle n'écrit rien par elle-même : l'écriture attend « Vendue » dans la feuille.
 // ═══════════════════════════════════════════════════════════════════════════
 import React from 'react';
+import { lazySur } from '../chargementSur.js';   // (15 nov.) un morceau qui rate : relancé, puis rechargement propre ou « Mettre à jour VRM »
 
 export const EVT_IDEES = 'vrm:idees';
 export const IDEES = Object.freeze(['vente-main']);
@@ -28,7 +29,7 @@ export function ideeDuLien(search) {
   } catch (_) { return null; }
 }
 
-const Feuilles = React.lazy(() => import('./Feuilles.jsx'));
+const Feuilles = lazySur(() => import('./Feuilles.jsx'));
 
 export default function IdeesArgentRacine({ pret = false, verdict = null, surOuverture = null }) {
   const [ouvert, setOuvert] = React.useState(null);

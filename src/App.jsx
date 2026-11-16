@@ -264,11 +264,15 @@ import "./stats-vitrine.css";
 import {appelerFavorisDirect} from './favorisTransport.js';
 import { ventesPourHistorique } from './favorisParcours.js';   // (11 nov., lot favoris-clair)
 import { useNouveauxFavoris, preparerEnvoiFavoris } from './favorisJournee.js';
-import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from "react";
-const Operations = lazy(() => import("./operations/Operations.jsx"));
-const Communaute = lazy(() => import("./communaute/Communaute.jsx"));
+import React, { useState, useMemo, useEffect, useRef, Suspense } from "react";
+// (15 nov., chantier « ouverture ») JAMAIS `React.lazy` nu : un morceau qui rate (une mise en ligne entre-temps)
+// rendait « Cet écran a un souci » ou `undefined … default`. `lazySur` le relance, puis recharge proprement vers la
+// nouvelle version, sinon « Mettre à jour VRM » (src/chargementSur.js ; banc ouverture, audit-ouverture).
+import { lazySur } from "./chargementSur.js";
+const Operations = lazySur(() => import("./operations/Operations.jsx"));
+const Communaute = lazySur(() => import("./communaute/Communaute.jsx"));
 // (5 nov.) L'écran « E-mails » : boîte de réception + « Relier ma boîte » (src/BoiteEmails.jsx).
-const BoiteEmails = lazy(() => import("./BoiteEmails.jsx"));
+const BoiteEmails = lazySur(() => import("./BoiteEmails.jsx"));
 // ── (6 nov., vitesse 2) LES ÉCRANS ET FEUILLES CHARGÉS À LA DEMANDE ─────────
 // Mesuré (`npx vite build`, analyse des morceaux) : le morceau `App` pesait
 // 3 832 Ko (1 194 Ko compressés), téléchargé et compilé EN ENTIER avant le
@@ -293,7 +297,7 @@ function MorceauAttente({ feuille = false }) {
     : <SqueletteChargement count={3}/>;
 }
 function aLaDemande(charger, feuille = false) {
-  const Paresseux = lazy(charger);
+  const Paresseux = lazySur(charger);
   return function MorceauALaDemande(props) {
     return <Suspense fallback={<MorceauAttente feuille={feuille}/>}><Paresseux {...props}/></Suspense>;
   };
@@ -310,8 +314,8 @@ const MeilleuresSources = aLaDemande(() => import('./MeilleuresSources.jsx'));
 const AideReponse = aLaDemande(() => import('./AideReponse.jsx'));
 const AchatsPlus = aLaDemande(() => import('./AchatsPlus.jsx'));
 const CataloguePrive = aLaDemande(() => import('./CataloguePrive.jsx'));
-const InfosPaireVueP = lazy(() => import('./InfosPaire.jsx').then((m) => ({ default: m.InfosPaireVue })));
-const InfosPaireFeuilleP = lazy(() => import('./InfosPaire.jsx').then((m) => ({ default: m.InfosPaireFeuille })));
+const InfosPaireVueP = lazySur(() => import('./InfosPaire.jsx').then((m) => ({ default: m.InfosPaireVue })));
+const InfosPaireFeuilleP = lazySur(() => import('./InfosPaire.jsx').then((m) => ({ default: m.InfosPaireFeuille })));
 // ⟦→ ecrans/Vestiaire.jsx #3⟧
 // ⟦→ ecrans/Compta.jsx #3⟧
 const RechercheEbay = aLaDemande(() => import('./ebayRecherche.jsx'));
@@ -325,29 +329,29 @@ const FactureVente = aLaDemande(() => import('./FacturePro.jsx').then((m) => ({ 
 // (8 nov.) La ligne ambre « compte pas relu » : son morceau à part (il importe App.jsx).
 // (9 nov., lot AG) La ligne ambre « compte qui n'arrive plus » est FONDUE dans la ligne de fraîcheur unique
 // (src/LigneFraicheur.jsx, règle src/fraicheur.js) : une voix en haut de l'app, plus deux.
-const LigneFraicheurParesseuse = lazy(() => import('./LigneFraicheur.jsx'));
+const LigneFraicheurParesseuse = lazySur(() => import('./LigneFraicheur.jsx'));
 // (11 nov., ext. 5.357) « Vinted a changé sa page des ventes : VRM ne la lit plus, on corrige » — une fois, sur Ma journée.
-const AlerteFormeVinted = lazy(() => import('./AlerteFormeVinted.jsx'));
-const AlertesVerificationJournee = lazy(() => import('./Discretion.jsx'));   // (12 nov., ext. 5.370) « Vinted demande une vérification »
+const AlerteFormeVinted = lazySur(() => import('./AlerteFormeVinted.jsx'));
+const AlertesVerificationJournee = lazySur(() => import('./Discretion.jsx'));   // (12 nov., ext. 5.370) « Vinted demande une vérification »
 // (8 nov.) « shop_x est relié à VRM » : la feuille d'accueil d'un compte relié pour la première fois (src/CompteRelie.jsx).
-const AccueilComptesReliesParesseux = lazy(() => import('./CompteRelie.jsx').then((m) => ({ default: m.AccueilComptesRelies })));
-const FactureVenteLigneParesseuse = lazy(() => import('./FacturePro.jsx').then((m) => ({ default: m.FactureVente })));
+const AccueilComptesReliesParesseux = lazySur(() => import('./CompteRelie.jsx').then((m) => ({ default: m.AccueilComptesRelies })));
+const FactureVenteLigneParesseuse = lazySur(() => import('./FacturePro.jsx').then((m) => ({ default: m.FactureVente })));
 const FactureVenteLigne = (props) => <Suspense fallback={null}><FactureVenteLigneParesseuse ligne {...props}/></Suspense>;
 // (10 nov., lot S) La facture Pro d'une vente Leboncoin / eBay / Vestiaire, dans le détail de la vente.
-const FactureAutreParesseuse = lazy(() => import('./FactureAutres.jsx').then((m) => ({ default: m.FactureAutreVente })));
+const FactureAutreParesseuse = lazySur(() => import('./FactureAutres.jsx').then((m) => ({ default: m.FactureAutreVente })));
 const FactureAutreVente = (props) => <Suspense fallback={null}><FactureAutreParesseuse {...props}/></Suspense>;
 // (11 nov., lot lbc-plus) La remise en main propre organisée d'une vente Leboncoin (date, heure, lieu, « Remis »).
-const RemiseMainPropreParesseuse = lazy(() => import('./RemiseMainPropre.jsx'));
+const RemiseMainPropreParesseuse = lazySur(() => import('./RemiseMainPropre.jsx'));
 const RemiseMainPropre = (props) => <Suspense fallback={null}><RemiseMainPropreParesseuse {...props}/></Suspense>;
 // (8 nov.) Le refus de facture commun à plusieurs lignes, dit une fois en tête de la liste (§7).
-const FactureRaisonsTeteParesseuse = lazy(() => import('./FacturePro.jsx').then((m) => ({ default: m.FactureRaisonsTete })));
+const FactureRaisonsTeteParesseuse = lazySur(() => import('./FacturePro.jsx').then((m) => ({ default: m.FactureRaisonsTete })));
 const FactureRaisonsTete = (props) => <Suspense fallback={null}><FactureRaisonsTeteParesseuse {...props}/></Suspense>;
 const ScannerColis = aLaDemande(() => import('./ScannerColis.jsx'), true);
 const ModeEmballage = aLaDemande(() => import('./ModeEmballage.jsx'), true);
 // (9 nov., lot AD) « Préparer mes colis » pas à pas : à la demande (sa feuille de style reste ICI).
 const PreparerColis = aLaDemande(() => import('./PreparerColis.jsx'), true);
 const FichePaire = aLaDemande(() => import('./FichePaire.jsx'), true);
-const OutilsFicheIdeesP = lazy(() => import('./autreTaille/OutilsFiche.jsx'));   // (14 nov., idée 157) « Dans une autre taille »
+const OutilsFicheIdeesP = lazySur(() => import('./autreTaille/OutilsFiche.jsx'));   // (14 nov., idée 157) « Dans une autre taille »
 const OutilsFicheIdees = (props) => <Suspense fallback={null}><OutilsFicheIdeesP {...props}/></Suspense>;
 // (14 nov., proposition 62 — « Une seule fiche partout ») L'HÔTE DE LA FICHE OUVERTE PAR UNE LIGNE.
 // Un toucher sur le corps d'une rangée qui porte `attrsFicheLigne` (src/ficheLigne.js) ouvre LA fiche de
@@ -411,10 +415,10 @@ function SuiviTravailCoque() {
 }
 // (11 nov., lot agent2-veille) Chiffres qui chutent, contrôle de nuit : chargé à la demande SANS squelette
 // (le plus souvent la carte ne rend rien — un squelette puis rien ferait sauter Ma journée).
-const VeilleJourneeParesseux = lazy(() => import('./VeilleJournee.jsx'));
+const VeilleJourneeParesseux = lazySur(() => import('./VeilleJournee.jsx'));
 const VeilleJournee = () => <GardeEcran nom="journee:veille"><Suspense fallback={null}><VeilleJourneeParesseux/></Suspense></GardeEcran>;
 const ImportDepart = aLaDemande(() => import('./ImportDepart.jsx'));   // (11 nov., lot import-depart) la barre « Ton historique Vinted » (ext. 5.344)   // (10 nov., lot G) « 12/50 cette heure »
-const AlerteModeration = lazy(() => import('./AlerteModeration.jsx'));   // (11 nov., ext. 5.350) « Vinted a masqué / fait disparaître / limite »
+const AlerteModeration = lazySur(() => import('./AlerteModeration.jsx'));   // (11 nov., ext. 5.350) « Vinted a masqué / fait disparaître / limite »
 const PublierAilleurs = aLaDemande(() => import('./PublierAilleurs.jsx'), true);
 // (11 nov.) « Publier partout » : la feuille à la demande (règle : src/publierPartout.js).
 const PublierPartout = aLaDemande(() => import('./PublierPartout.jsx'), true);
@@ -18641,7 +18645,7 @@ function useAchatsANumeroter(actif = true) {
 // passe par `gesteVrm` (annulable 5 s) ; rien n'est écrit sans SON geste.
 // ══════════════════════════════════════════════════════════════════════════════
 const AtelierArriveeLazy = aLaDemande(() => import('./AtelierArrivee.jsx'), true);
-const PlanRangerLazy = React.lazy(() => import('./RangerAchat.jsx').then((m) => ({ default: m.Plan })));
+const PlanRangerLazy = lazySur(() => import('./RangerAchat.jsx').then((m) => ({ default: m.Plan })));   // jamais React.lazy nu (chargementSur.js)
 const PlanRanger = (props) => <React.Suspense fallback={null}><PlanRangerLazy {...props}/></React.Suspense>;
 const lireEtatAtelier = () => ({ fiches: load(CLE_FICHES_RANGEES, {}) || {}, couts: load('vinted_buyprice_by_num', {}) || {}, marques: load(CLE_ATELIER, {}) || {}, meubles: load('vrm_meubles', []) || [], slots: load('vrm_slots', {}) || {} });
 const ecrireAtelier = (texte, ops, acc = '') => { gesteVrm(texte, ops, {}, () => { emettreClesRelues([...new Set(ops.map((o) => o.k))]); }, acc); };
@@ -21598,7 +21602,7 @@ function usePdfsHorsLigne(uid, lignes) {
 // contre la DERNIÈRE liste des paires que le Stock a lue (src/inventaireHorsLigne.js), avec
 // son heure. Les saisies restent sur l'appareil et partent au retour du réseau
 // (`useRejouerInventaire`). AUCUN numéro n'est changé : ni lecture ni écriture de la base ici.
-const InventaireStockParesseux = lazy(() => import('./InventaireStock.jsx').then((m) => ({ default: m.InventaireStock })));
+const InventaireStockParesseux = lazySur(() => import('./InventaireStock.jsx').then((m) => ({ default: m.InventaireStock })));
 const lireInventaireHl = async () => null;          // hors connexion : rien n'est lu, donc rien n'est écrit
 const ecrireInventaireHl = async () => 'ko';
 function BlocInventaireHorsLigne({ uid, ouvrirAuto = false }) {
@@ -26667,9 +26671,9 @@ function attendreFinJob(jobId, ms = ATTENTE_DEPOT_MS) {
 // ══════════════════════════════════════════════════════════════════════════════
 // (14 nov., lot argent-prix) LES DEUX FEUILLES DE LA COQUE — chargées à la demande (src/ArgentPrix.jsx)
 // ══════════════════════════════════════════════════════════════════════════════
-const EcartsPrixFeuilleL = lazy(() => import('./ArgentPrix.jsx').then((m) => ({ default: m.EcartsPrixFeuille })));
-const RemiseSoldesFeuilleL = lazy(() => import('./ArgentPrix.jsx').then((m) => ({ default: m.RemiseSoldesFeuille })));
-const SoldesJourneeL = lazy(() => import('./ArgentPrix.jsx').then((m) => ({ default: m.SoldesJournee })));
+const EcartsPrixFeuilleL = lazySur(() => import('./ArgentPrix.jsx').then((m) => ({ default: m.EcartsPrixFeuille })));
+const RemiseSoldesFeuilleL = lazySur(() => import('./ArgentPrix.jsx').then((m) => ({ default: m.RemiseSoldesFeuille })));
+const SoldesJourneeL = lazySur(() => import('./ArgentPrix.jsx').then((m) => ({ default: m.SoldesJournee })));
 // Les listes Leboncoin et Vestiaire (trois états : undefined en cours · null pas lu · objet).
 function useAnnoncesAutresSites() {
   const [autres, setAutres] = React.useState(undefined);
@@ -27751,12 +27755,12 @@ function CountUpEuro({ value, petitEuro = false }) {
 // src/Room3D.jsx et se charge À LA DEMANDE (Vitesse 5) : il sort du bundle
 // initial. `C`, `Icon`, `load`, `save` lui sont passés en props. Rendu
 // derrière <Suspense> à l'ouverture du Stock.
-const Room3D = React.lazy(() => import('./Room3D.jsx'));
+const Room3D = lazySur(() => import('./Room3D.jsx'));
 // Studio photo (fonction n°33) : chargé au clic, jamais à l'ouverture de l'app.
-const StudioPhoto = React.lazy(() => import('./StudioPhoto.jsx'));
+const StudioPhoto = lazySur(() => import('./StudioPhoto.jsx'));
 // (6 nov.) Chercher par photo : la feuille, l'empreinte et l'index se chargent
 // au clic sur l'appareil photo (loupe, Stock) — rien au premier chargement.
-const RecherchePhoto = React.lazy(() => import('./RecherchePhoto.jsx'));
+const RecherchePhoto = lazySur(() => import('./RecherchePhoto.jsx'));
 const ouvrirRecherchePhoto = () => { try { window.dispatchEvent(new Event('vrm:recherche-photo')); } catch (_) {} };
 // Les candidats de la recherche par photo (src/RecherchePhoto.jsx) : la 1re
 // photo de chaque annonce EN LIGNE (la règle `lireLignesEnLigne`, §11) et de
@@ -60988,7 +60992,10 @@ function AppCoeur() {
       document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
       for (const [nom,valeur] of Object.entries(variablesTheme(t,dark))) document.documentElement.style.setProperty(nom,valeur);
       const m = document.querySelector('meta[name="theme-color"]');
-      if (m) m.setAttribute('content', t.haut || t.bg);   // (14 nov., Studio) la barre d'état prend le HAUT de la lumière
+      // (15 nov., chantier « ouverture ») Tant que l'écran de démarrage couvre l'app (`data-vrm-boot`), la barre
+      // d'état garde le haut de SON dégradé (public/demarrage-theme.js) : elle prend celle de l'app à sa sortie.
+      const poser = () => { if (m) m.setAttribute('content', t.haut || t.bg); };   // (14 nov., Studio) la barre d'état prend le HAUT de la lumière
+      if (document.documentElement.hasAttribute('data-vrm-boot')) window.addEventListener('vrm:demarrage-fin', poser, { once: true }); else poser();
     } catch (_) { /* un navigateur sans <head> accessible ne doit rien casser */ }
   }, [dark]);
   // (17 oct., revue) Une « bascule Minéral » remettait ici le thème CLAIR une
