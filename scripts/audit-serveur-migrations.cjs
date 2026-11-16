@@ -199,6 +199,9 @@ function ligneDeBase() {
         appels.push({ m, u, corps: typeof o.body === 'string' ? o.body.length : 0 });
         if (/\/auth\/v1\/user/.test(u)) return rep({ id: A, email: 'a@exemple.test', email_confirmed_at: '2026-01-01' });
         if (/app_data\?select=owner&limit=1/.test(u)) return rep([{ owner: A }]);
+        // (16 nov., M73) le compte Vinted « 1 » est relié à A (la route le vérifie avant d'écrire).
+        if (/\/rest\/v1\/vinted_accounts\?vinted_user_id=eq\.1&/.test(u) && m === 'GET') return rep([{ vinted_user_id: '1' }]);
+        if (/\/rest\/v1\/app_data\?id=like\.harvest\\_1\\_\*/.test(u) && m === 'GET') return rep([]);
         const rpc = /\/rest\/v1\/rpc\/(vrm_commandes_(?:lire|ecrire))$/.exec(u);
         if (rpc && m === 'POST') {
           const a = JSON.parse(o.body), r = run(comme(A) + sqlRpc(rpc[1], a));

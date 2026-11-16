@@ -881,11 +881,10 @@ async function logEmail(entry) {
 
 // Retrouve le N° d'une paire par le titre de l'annonce (annonces numérotées
 // de l'app, synchronisées). Refuse de deviner si deux annonces ont le même titre.
-async function findNumeroByTitle(title, size) {
+async function findNumeroByTitle(title) {
   if (!title) return '';
   try {
     const norm = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
-    const normSz = s => String(s == null ? '' : s).toLowerCase().replace(',', '.').replace(/[^0-9.]/g, '').replace(/\.0+$/, '').trim();
     const t = norm(title);
     if (!t) return '';
     const res = await fetchAvecDelai(await duVendeur(`${SUPABASE_URL}/rest/v1/app_data?id=eq.main&select=data->vinted_annonce_numeros`), {
@@ -897,17 +896,11 @@ async function findNumeroByTitle(title, size) {
     // Une entrée par numéro, titre identique.
     const byNum = new Map();
     for (const e of Object.values(map)) { if (e && e.numero != null && norm(e.title) === t) byNum.set(String(e.numero), e); }
-    let cands = [...byNum.values()];
+    // (16 nov., H9 de la revue serveur) UN SEUL titre identique ⇒ ce N° ; plusieurs ⇒ RIEN.
+    // Le départage par TAILLE est retiré : « jamais par titre, marque, taille » (§2.4, §5) —
+    // deux paires au même titre et à la même pointure sont courantes, mieux vaut un blanc qu'un faux.
+    const cands = [...byNum.values()];
     if (cands.length === 1) return String(cands[0].numero);
-    // Plusieurs paires même titre → on départage par la TAILLE si le bordereau
-    // la donne (on garde tailles égales OU inconnues ; exacte prioritaire).
-    const tgt = normSz(size);
-    if (cands.length > 1 && tgt) {
-      const exactSz = cands.filter(e => normSz(e.size) === tgt);
-      if (exactSz.length === 1) return String(exactSz[0].numero);
-      const compat = cands.filter(e => { const es = normSz(e.size); return !es || es === tgt; });
-      if (compat.length === 1) return String(compat[0].numero);
-    }
     return '';
   } catch (_) { return ''; }
 }
@@ -943,7 +936,7 @@ export async function numeroDEmail(numeroLu, titre, viaTitre) {
   if (mk === null || (mk !== undefined && !arch)) out = { numero: lu, numeroTitre: '' };
   else out = numeroDuTitreApresCoupure(lu, titre, mk, lu ? await fichesVendeur() : {});
   if (!out.numero && viaTitre && mk !== undefined) {
-    const n = await findNumeroByTitle(viaTitre.title, viaTitre.size);
+    const n = await findNumeroByTitle(viaTitre.title);
     // `parTitre` : retrouvé par RESSEMBLANCE de titre, pas lu dans l'email. Bon
     // pour tamponner un bordereau, jamais pour affirmer une double vente (§5).
     if (n && !(arch && estArchive(n, arch))) { out.numero = n; out.parTitre = true; }
@@ -2988,11 +2981,14 @@ export async function traiterEmail(req, res) {
       let montant = (finText.match(/vir[ée]\s+sur\s+ton\s+compte(?:\s+vinted)?\s*:?\s*(\d+[,.]\d{2})\s*€/i) || [])[1] || '';
       if (!montant) montant = (finText.match(/(\d+[,.]\d{2})\s*€\s*(?:ont|a)?\s*(?:[ée]t[ée]\s+)?(?:vir[ée]s?|ajout[ée]s?|cr[ée]dit[ée]s?|re[çc]us?)/i) || [])[1] || '';
       if (!montant) montant = (finText.match(/(?:re[çc]u|ajout[ée]s?|cr[ée]dit[ée]s?|porte-monnaie|solde|gagn[ée])[^€\d]{0,40}(\d+[,.]\d{2})\s*€/i) || [])[1] || '';
-      if (!montant) { const all = [...finText.matchAll(/(\d+[,.]\d{2})\s*€/g)].map(x => parseFloat(x[1].replace(',', '.'))).filter(v => v > 0); if (all.length) montant = String(Math.max(...all).toFixed(2)).replace('.', ','); }
+      // (16 nov., H29) PLUS DE « PLUS GROS MONTANT » : il pouvait être le prix de vente ou un total,
+      // rangé comme le net viré. Aucune tournure reconnue ⇒ montant vide (« pas su ») et la ligne
+      // le dit (`montantPasLu`) : jamais un chiffre deviné présenté comme lu.
+      const montantPasLu = !montant;
       const jn = await numeroDEmail((article.match(/\bn[°º]?\s*(\d{2,6})\b/i) || [])[1] || '', article);
       const numero = jn.numero;
       await supabaseUpsert([{ id: `email_final_${key}`, data: {
-        type: 'finalisation', subject, article, montant, numero, ...(jn.numeroTitre ? { numeroTitre: jn.numeroTitre } : {}),
+        type: 'finalisation', subject, article, montant, ...(montantPasLu ? { montantPasLu: true } : {}), numero, ...(jn.numeroTitre ? { numeroTitre: jn.numeroTitre } : {}),
         ...(ident.transaction ? { transaction: ident.transaction } : {}), ...(mail.messageId ? { messageId: String(mail.messageId).slice(0, 300) } : {}),
         account: acc.login || '', uid: acc.uid || '', receivedAt: now,
       } }]);

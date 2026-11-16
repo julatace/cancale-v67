@@ -195,6 +195,18 @@ export const txAFournir = (envoi) => {
   return fen.map(([k]) => k).filter((k) => !fournies.has(k));
 };
 
+// (16 nov., M73) true : le compte est à lui · false : jamais vu chez lui · null : pas su.
+export async function compteDuVendeur(req, uid, proprio) {
+  const u = encodeURIComponent(String(uid));
+  const [relie, capte] = await Promise.all([
+    lireCommeVendeur(req, `vinted_accounts?vinted_user_id=eq.${u}${proprio}&select=vinted_user_id&limit=1`),
+    lireCommeVendeur(req, `app_data?id=like.harvest%5C_${u}%5C_*&id=not.like.*orders*${proprio}&select=id&limit=1`),
+  ]);
+  if ((relie && relie.length) || (capte && capte.length)) return true;
+  if (relie === null || capte === null) return null;
+  return false;
+}
+
 // POST /api/compte?mode=commandes — corps : l'envoi (voir `appliquerEnvoi`).
 // Réponses : 200 { ok, ecrit, complet, manquants, n } · 400 envoi illisible ·
 // 401 session · 503 base injoignable (RIEN écrit) · 409 deux écritures en même
@@ -210,6 +222,17 @@ export async function routeCommandes(req, res, { maintenant = () => Date.now() }
   const rowId = `harvest_${envoi.uid}_${envoi.type}`;
   const cloison = await baseCloisonnee();
   const proprio = cloison ? `&owner=eq.${encodeURIComponent(u.id)}` : '';
+  // (16 nov., M73 de la revue serveur) LE COMPTE VINTED DOIT ÊTRE DÉJÀ À LUI : relié
+  // (`vinted_accounts`) OU déjà capté chez lui (une autre ligne `harvest_{uid}_*` que ses
+  // commandes). Mesuré le 16 nov. en lecture seule : 12 des 47 lignes de commandes ont un uid
+  // absent de `vinted_accounts`, AUCUNE sans autre ligne captée — la règle ne refuse aucune vraie
+  // vente. Un uid jamais vu chez lui ⇒ 409 « compte-inconnu », rien écrit (l'extension réessaie
+  // à la visite suivante, une fois le compte capté). Pas su ⇒ 503, rien écrit.
+  {
+    const c = await compteDuVendeur(req, envoi.uid, proprio);
+    if (c === null) return res.status(503).json({ ok: false, erreur: 'base' });
+    if (c === false) return res.status(409).json({ ok: false, erreur: 'compte-inconnu' });
+  }
   const pOwner = cloison ? u.id : null;
   let squelette = true;                // faux dès que la base dit « fonction inconnue » (042 pas passée)
   for (let tour = 0; tour < 2; tour++) {

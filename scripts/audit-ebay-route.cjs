@@ -2027,6 +2027,19 @@ const RA = {};
     const w3 = ecrit(o3.journal, 'ebay_offres');
     dit(!!w3 && w3.data.items['110000000302'] && w3.data.items['110000000302'].lu === false, '[R-sync] GetItem raté pour une annonce ⇒ son entrée « pas lue »', w3 ? JSON.stringify(w3.data.items['110000000302']) : 'rien');
   });
+  // (16 nov., H24 de la revue serveur) Les GetItem de la synchro partent 4 à la fois (plus en série :
+  // 20 × 25 s dépassaient le temps de la route, commandes et règles n'étaient jamais rangées).
+  await essaie('[R-sync-parallele]', async () => {
+    avecR(); mode.getitemLent = true;
+    for (let i = 0; i < 9; i++) ebay['at-J'].actives.push(annonce(String(110000000500 + i), 'Paire ' + i, 'VRM-5' + i, '50.00', '2026-11-01T10:00:00.000Z'));
+    const o = await app(JWT_J, { action: 'sync' });
+    const nAct = ebay['at-J'].actives.length;
+    const nGet = auCompte(o.journal).filter((x) => x.appel === 'GetItem').length;
+    const L = ecrit(o.journal, 'ebay_listings');
+    dit(o.code === 200 && nGet === Math.min(20, nAct) && maxGetEnVol > 1 && maxGetEnVol <= 4,
+      '[R-sync-parallele] H24 : les GetItem de la synchro partent à plusieurs (4 au plus), un par annonce', `${nGet} GetItem pour ${nAct} · max en vol ${maxGetEnVol}`);
+    dit(!!L && L.data.items.filter((x) => x.detail).length === Math.min(20, nAct), '[R-sync-parallele] … et chaque annonce garde SON détail (aucun mélange)', L ? String(L.data.items.filter((x) => x.detail).length) : 'rien');
+  });
   await essaie('[R-prix-change]', async () => {
     const regleR2 = () => lignes.push({ owner: J, id: 'ebay_offres', data: { items: { '110000000302': { lu: true, offresActives: true, accepte: 70, refuse: 50, devise: 'EUR', prix: 90, lueA: Date.now() - H, par: 'sync' }, '110000000301': { lu: true, offresActives: false, accepte: null, refuse: null, devise: 'EUR', prix: 80, lueA: Date.now() - H, par: 'sync' } }, capturedAt: 5 } });
     avecR(); regleR2();

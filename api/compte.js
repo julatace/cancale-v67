@@ -118,6 +118,8 @@ import { etatPublic } from './_lib/etat-public.js';
 import { statutPourSante, relancerSondesSiVieilles, oublierStatutPublic } from './_lib/statut-sondes.js';
 import { sendPushToAll, pushConfigure } from './_lib/push.js';
 import { contexteVendeur } from './_lib/owner.js';
+import { prendreDebitPublic, refuserTropVite } from './_lib/debit-vendeur.js';   // (16 nov.) liens publics à jeton
+import { verrouCheckout, MESSAGES_VERROU } from './_lib/checkout-unique.js';   // (16 nov., H19)
 import { freinFork } from './_lib/frein-fork.js';   // (12 nov., M54)
 import { lireJetonBilan, lireChoixBilan, ecrireChoixBilan, lireEnvoisBilan, choixEffectif } from './_lib/bilan-mois.js';
 import { envoyerMailEssai } from './_lib/mail-essai.js';
@@ -883,6 +885,10 @@ async function checkout(req, res) {
     //    journaux ci-dessus et sur la carte « Mon compte » du propriétaire.
     return repondre(res, 503, { erreur: 'prix-cgv', message: "Le paiement n'est pas encore ouvert : rien n'a été prélevé. Réessaie plus tard." });
   }
+  // (16 nov., H19) Stripe RELU avant d'ouvrir : un abonnement vivant, ou un paiement qui vient
+  // d'aboutir ⇒ refus ; une autre session encore ouverte (autre onglet) ⇒ expirée. Pas su ⇒ rien.
+  { const v = await verrouCheckout({ stripe: stripeApi, owner: u.id, client: (ligne && ligne.client_stripe) || '', email: u.email ? normEmail(u.email) : '' });
+    if (!v.ok) { const m = MESSAGES_VERROU[v.raison] || MESSAGES_VERROU['pas-su']; return repondre(res, m.status, { erreur: m.erreur, message: m.message }); } }
   // Essai gratuit 7 jours — UNE seule fois par e-mail ET par compte Vinted.
   // `false` = éligible ; `true` = déjà utilisé ; `null` = pas su ⇒ pas d'essai.
   const idsVinted = await lireVintedIds(u.id);
@@ -1461,6 +1467,8 @@ async function appareils(req, res) {
 // par le jeton seul (`f`, réécrit depuis /agenda/<jeton>.ics), le réglage sur SA session.
 async function agenda(req, res) {
   const fichier = req.query && req.query.f != null ? String(req.query.f) : null;
+  // (16 nov.) Lien public à jeton : un débit par adresse et par jeton, AVANT toute lecture.
+  if (fichier != null) { const d = prendreDebitPublic('agenda', req, fichier); if (!d.ok) return refuserTropVite(res, d); }
   let user = null, corps = null;
   if (fichier == null) {
     user = await vendeurExige(req, res);
@@ -1483,6 +1491,7 @@ async function agenda(req, res) {
 //   GET  + session                  ⇒ ses liens ; POST + session { action: 'creer' | 'revoquer' }.
 async function catalogue(req, res) {
   const jeton = req.query && req.query.j != null ? String(req.query.j) : null;
+  if (jeton != null) { const d = prendreDebitPublic('catalogue', req, jeton); if (!d.ok) return refuserTropVite(res, d); }   // (16 nov.)
   let user = null, corps = null;
   if (jeton == null) {
     user = await vendeurExige(req, res);
@@ -1507,6 +1516,7 @@ async function catalogue(req, res) {
 // compta projetée) ; sinon la session du vendeur (créer, publier, couper). Règle : api/_lib/comptable-lien.js.
 async function comptable(req, res) {
   const jeton = req.query && req.query.j != null ? String(req.query.j) : null;
+  if (jeton != null) { const d = prendreDebitPublic('comptable', req, jeton); if (!d.ok) return refuserTropVite(res, d); }   // (16 nov.)
   let user = null, corps = null;
   if (jeton == null) {
     user = await vendeurExige(req, res);

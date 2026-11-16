@@ -16,11 +16,13 @@ const root=process.env.VRM_RECUPERATION_ROOT||path.join(__dirname,'../../public'
    const page=await nav.newPage({viewport:{width,height:900}});
    page.setDefaultTimeout(10000);
    if(width===390)await page.addInitScript(()=>Object.defineProperty(AbortSignal,'timeout',{value:undefined,configurable:true}));
+   // (16 nov.) l'e-mail a été demandé dans CE navigateur (la marque de l'app) : la page ouvre le formulaire.
+   await page.addInitScript(()=>{if(!sessionStorage.getItem('banc-marque')){sessionStorage.setItem('banc-marque','1');localStorage.setItem('vrm_lien_demande',String(Date.now()));}});
    let verification=503,enregistrement=503,appels=0,sorties=0;
    await page.route('**/*',r=>{
     const u=r.request().url();
     if(u.startsWith(origine+'/api/compte'))return r.fulfill({json:{ok:true,url:'https://projet.supabase.co',cle:'fictive'}});
-    if(u.startsWith('https://projet.supabase.co/auth/v1/verify'))return r.fulfill({status:verification,json:verification===200?{access_token:'faux.jeton.test'}:{message:'service indisponible'}});
+    if(u.startsWith('https://projet.supabase.co/auth/v1/verify'))return r.fulfill({status:verification,json:verification===200?{access_token:'faux.jeton.test',user:{id:'fictif',email:'fictif@exemple.test'}}:{message:'service indisponible'}});
     if(u.startsWith('https://projet.supabase.co/auth/v1/user')){appels++;return r.fulfill({status:enregistrement,json:enregistrement===200?{id:'fictif'}:{message:'service indisponible'}});}
     if(u.includes('/logout?scope=global')){sorties++;return r.fulfill({status:503,json:{}});}
     if(u.startsWith(origine+'/'))return r.continue();return r.abort();

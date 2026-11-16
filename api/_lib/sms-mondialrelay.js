@@ -251,6 +251,7 @@ export async function routeSms(req, res, { url, key, maintenant = Date.now } = {
   // jeton neuf) ⇒ l'ancienne recherche UNE fois — filtre exact sur le jeton
   // (format déjà vérifié : aucun caractère à échapper) ; aucun ⇒ 401 ; deux
   // vendeurs au même jeton ⇒ on ne choisit pas (409) — puis l'index est écrit.
+  // (16 nov., B141) le jeton est ENCODÉ dans le filtre : sûr même si `jetonSmsValide` s'élargit un jour.
   const idx = await vendeurParIndex({ url, headers: H, genre: 'sms', jeton: k });
   if (idx === undefined) { res.status(503).json({ ok: false, erreur: 'base-injoignable' }); return; }
   if (idx.etat === 'perime') { res.status(401).json({ ok: false, erreur: 'jeton invalide' }); return; }
@@ -258,7 +259,7 @@ export async function routeSms(req, res, { url, key, maintenant = Date.now } = {
   if (!owner) {
     let lignes = null;
     try {
-      const r = await fetchAvecDelai(`${url}/rest/v1/app_data?id=eq.main&data->>vrm_sms_token=eq.${k}&select=owner,t:data->>vrm_sms_token&limit=2`, { headers: H });
+      const r = await fetchAvecDelai(`${url}/rest/v1/app_data?id=eq.main&data->>vrm_sms_token=eq.${encodeURIComponent(k)}&select=owner,t:data->>vrm_sms_token&limit=2`, { headers: H });
       const j = r.ok ? await r.json() : null; lignes = Array.isArray(j) ? j : null;
     } catch (_) { lignes = null; }
     if (lignes === null) { res.status(503).json({ ok: false, erreur: 'base-injoignable' }); return; }
