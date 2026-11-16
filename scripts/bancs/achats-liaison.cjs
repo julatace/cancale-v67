@@ -8,8 +8,9 @@ require('./_porte-banc.cjs');
 //  avec les titres, dates de retrait, couleur de l'article, etc. » Ce banc mesure :
 //    cote      chaque carte avec un achat proposé montre l'ARTICLE et l'ACHAT côte à côte (deux photos,
 //              deux titres, la date de retrait ou de commande, le prix payé), le NIVEAU et POURQUOI ;
-//    niveau    les « très probables » attendus (achats uniques) le sont ; les 3 paires identiques ne le
-//              sont pas (« possible », ambiguës) ; une marque différente n'est jamais proposée ;
+//    niveau    les « très probables » attendus (achats uniques) le sont ; les 3 paires identiques ne
+//              reçoivent RIEN en ligne (16 nov., relier-fiable : seule la « très probable », exclusive, se
+//              montre) ; une marque différente n'est jamais proposée ;
 //    clic      rien n'est écrit avant SON toucher : « Valider les N très probables » OUVRE la liste (rien
 //              d'écrit), « Relier ces N » écrit EXACTEMENT ces N achats ; « Ce n'est pas lui » range le
 //              couple (`vrm_liaison_refus`) et la carte passe à la suite ;
@@ -52,8 +53,9 @@ const listing = ([id, titre, marque, taille, prix, , jours]) => ({ ...sc.annonce
   created_at_ts: Math.floor((sc.NOW - jours * J) / 1000), photo: { url: photoUrl('a' + id) } });
 const achat = (tx, titre, prix, jours, ph = true) => ({ ...sc.ordre({ tx, titre, prix, statut: sc.STATUT_FINAL, dateMs: sc.NOW - jours * J }), ...(ph ? { photo: { url: photoUrl('h' + tx) } } : {}) });
 const ACHATS = [
-  achat('93000001', 'Salomon xt-6 vert kaki', 41.78, 16),
-  achat('93000002', 'Nike Air Max 1 Lemonade (yellow and green)', 82.64, 20),
+  // (16 nov., relier-fiable) « très probable » exige la taille ET la couleur des deux côtés : ces achats les écrivent.
+  achat('93000001', 'Salomon xt-6 vert kaki 41,5', 41.78, 16),
+  achat('93000002', 'Nike Air Max 1 Lemonade (yellow and green) 43', 82.64, 20),
   achat('93000003', 'Adidas handball spezial navy size 37.5', 22.74, 30, false),
   achat('93000004', 'ASICS Novablast 4 schwarz (44.5)', 31.5, 25),
   achat('93000009', 'ASICS NovaBlast 3 44,5', 30, 40),          // autre VERSION : jamais proposé à « novablast 4 »
@@ -61,7 +63,7 @@ const ACHATS = [
   achat('93000006', 'Nike Air Force 1 weiß 42', 40, 30),
   achat('93000007', 'Nike Air Force 1 weiß 42', 40, 30),
   achat('93000008', '#Adidas Spezial, dunkelblau, Gr. 36', 21, 60),  // marque contredite : jamais proposé
-  achat('93000010', 'Nike Dunk Low panda 44', 55, 70),              // l'achat de la vente
+  achat('93000010', 'Nike Dunk Low panda noir 44', 55, 70),              // l'achat de la vente
   achat('93000011', 'New Balance 550 verte et blanche taille 41', 52, 40),
 ];
 const TRES_PROBABLES = ['93000001', '93000002', '93000003', '93000004', '93000010', '93000011'];   // 93000010 : celui de la VENTE
@@ -173,10 +175,10 @@ async function passe(b, nom, ctxOpts, sombre) {
   const l = await pg.evaluate(lire, { tactile });
   await capture(pg, nom, 'en-vente');
   const c = l.cartes;
-  dit(!l.cote.length && Object.values(c).filter((x) => x.tx).length >= 6, `${nom} · cote · article et achat côte à côte (photos, titres), niveau et pourquoi, « Relier » et « Ce n'est pas lui »`, l.cote.slice(0, 4).join(' ; ') || JSON.stringify(c));
+  dit(!l.cote.length && Object.values(c).filter((x) => x.tx).length >= 5, `${nom} · cote · article et achat côte à côte (photos, titres), niveau et pourquoi, « Relier » et « Ce n'est pas lui »`, l.cote.slice(0, 4).join(' ; ') || JSON.stringify(c));
   const tp = Object.entries(c).filter(([, x]) => x.niveau === 'tres-probable').map(([, x]) => x.tx).sort();
   dit(JSON.stringify(tp) === JSON.stringify(TRES_PROBABLES.filter((x) => x !== '93000010').sort()), `${nom} · niveau · les très probables (en vente) sont les achats uniques (${tp.length})`, JSON.stringify(tp));
-  dit(['81005', '81006', '81007'].every((k) => c[k] && c[k].tx && c[k].niveau === 'possible' && /choisir/.test(c[k].pourquoi)), `${nom} · niveau · trois paires identiques : « possible », « à toi de choisir »`, JSON.stringify(['81005', '81006', '81007'].map((k) => c[k])));
+  dit(['81005', '81006', '81007'].every((k) => c[k] && !c[k].tx) && Object.values(c).every((x) => !x.tx || x.niveau === 'tres-probable'), `${nom} · niveau · trois paires identiques : AUCUNE proposition en ligne ; tout ce qui est montré est « très probable »`, JSON.stringify(['81005', '81006', '81007'].map((k) => c[k])));
   dit(c['81008'] && !c['81008'].tx && !Object.values(c).some((x) => x.tx === '93000008' || x.tx === '93000009'), `${nom} · niveau · marque contredite et autre version jamais proposées`, JSON.stringify(c['81008']));
   dit(/même marque/.test(c['81001'].pourquoi) && /kaki|vert/.test(c['81001'].pourquoi + c['81001'].achat) && /mise en ligne 10 j après la commande/.test(c['81001'].pourquoi) && /payé 41,78/.test(c['81001'].achat) && /commandé le/.test(c['81001'].achat),
     `${nom} · cote · pourquoi (« même marque · vert · mise en ligne 10 j après la commande ») et l'achat (« commandé le … · payé 41,78 € »)`, JSON.stringify(c['81001']));
@@ -216,14 +218,6 @@ async function passe(b, nom, ctxOpts, sombre) {
   dit(relies.length === TRES_PROBABLES.length - 1 && !ecritLien(decoche), `${nom} · clic · « Relier ces ${TRES_PROBABLES.length - 1} paires » relie exactement les couples cochés`, JSON.stringify(relies));
   dit(!ecritLien('93000005') && !ecritLien('93000006') && !ecritLien('93000007'), `${nom} · clic · aucune paire identique reliée sans son toucher`);
   await capture(pg, nom, 'apres-valider');
-  // « Ce n'est pas lui » sur une paire identique : le couple est rangé, la carte passe à un autre achat.
-  const avant = await pg.evaluate(() => { const li = document.querySelector('[data-ar-ligne="81005"]'); return li ? li.getAttribute('data-ar-sugg-tx') : null; });
-  await pg.locator('[data-ar-ligne="81005"] [data-ar-pas-lui]').first().click({ timeout: 5000 }).catch(() => {});
-  // Le geste est annulable quelques secondes, puis rangé (`vrm_liaison_refus`, dans SYNC_KEYS : il part au nuage avec la ligne main).
-  const refusRange = () => pg.evaluate(() => { try { return localStorage.getItem('vrm_liaison_refus') || ''; } catch (_) { return ''; } });
-  let refus = ''; for (let i = 0; i < 30 && !/>93000005/.test(refus); i++) { await pg.waitForTimeout(500); refus = await refusRange(); }
-  const apres = await pg.evaluate(() => { const li = document.querySelector('[data-ar-ligne="81005"]'); return li ? li.getAttribute('data-ar-sugg-tx') : null; });
-  dit(avant && apres !== avant && refus.includes('a:81005>' + avant) && !ecritLien(avant), `${nom} · clic · « Ce n'est pas lui » : rangé (synchronisé), la carte passe à la suite`, JSON.stringify({ avant, apres }));
   // Achats : l'article proposé sous un achat sans article relié.
   await pg.goto(`http://localhost:${PORT}/?tab=achats`, { waitUntil: 'domcontentloaded' });
   await pg.locator('[data-achat-tx]').first().waitFor({ timeout: 25000 }).catch(() => {});
@@ -234,8 +228,26 @@ async function passe(b, nom, ctxOpts, sombre) {
   await pg.waitForTimeout(500);
   await capture(pg, nom, 'achats-propose');
   // (les liens posés plus haut restent dans l'appareil : l'achat décoché, 93000011, reste à relier ⇒ « N°209 » proposé ;
-  //  les trois Air Force identiques ⇒ « possible »)
-  dit(pa.some((x) => x.tx === decoche && x.k === 'a:81009' && x.n === 'tres-probable') && pa.filter((x) => /^9300000[567]$/.test(x.tx)).every((x) => x.n === 'possible'), `${nom} · achats · sous un achat sans article : l'article proposé (et son niveau)`, JSON.stringify(pa.slice(0, 6)));
+  //  les trois Air Force identiques ⇒ RIEN (16 nov., relier-fiable : égalité ⇒ aucune proposition) ; un article n'est
+  //  proposé que sous UN achat)
+  const parCle = {}; for (const x of pa) parCle[x.k] = (parCle[x.k] || 0) + 1;
+  dit(pa.some((x) => x.tx === decoche && x.k === 'a:81009' && x.n === 'tres-probable') && !pa.some((x) => /^9300000[567]$/.test(x.tx)) && pa.every((x) => x.n === 'tres-probable') && Object.values(parCle).every((n) => n === 1),
+    `${nom} · achats · sous un achat sans article : l'article proposé, « très probable », sous UN seul achat ; rien sous les trois identiques`, JSON.stringify(pa.slice(0, 6)));
+  // « Ce n'est pas lui » sur la proposition qui reste (N°209 ⇄ 93000011, décochée plus haut) : le couple est rangé,
+  // et il ne revient plus (16 nov. : ni en ligne, ni sous l'achat).
+  await pg.goto(`http://localhost:${PORT}/?tab=annonces&site=vinted`, { waitUntil: 'domcontentloaded' });
+  await pg.locator('[data-vue-sans-achat]').first().waitFor({ timeout: 30000 }).catch(() => {});
+  await pg.waitForTimeout(1200);
+  await pg.locator('[data-vue-sans-achat]').first().evaluate((e) => e.click()).catch(() => {});
+  await pg.locator('[data-ar-ligne="81009"][data-ar-sugg-tx]').first().waitFor({ timeout: 20000 }).catch(() => {});
+  for (let i = 0; i < 20; i++) { const t = await pg.evaluate(() => { const li = document.querySelector('[data-ar-ligne="81009"]'); return li ? li.getAttribute('data-ar-sugg-tx') : ''; }); if (t) break; await pg.waitForTimeout(500); }
+  const avant = await pg.evaluate(() => { const li = document.querySelector('[data-ar-ligne="81009"]'); return li ? li.getAttribute('data-ar-sugg-tx') : null; });
+  await pg.locator('[data-ar-ligne="81009"] [data-ar-pas-lui]').first().click({ timeout: 5000 }).catch(() => {});
+  // Le geste est annulable quelques secondes, puis rangé (`vrm_liaison_refus`, dans SYNC_KEYS : il part au nuage avec la ligne main).
+  const refusRange = () => pg.evaluate(() => { try { return localStorage.getItem('vrm_liaison_refus') || ''; } catch (_) { return ''; } });
+  let refus = ''; for (let i = 0; i < 30 && !/>93000011/.test(refus); i++) { await pg.waitForTimeout(500); refus = await refusRange(); }
+  const apres = await pg.evaluate(() => { const li = document.querySelector('[data-ar-ligne="81009"]'); return li ? li.getAttribute('data-ar-sugg-tx') : null; });
+  dit(avant === decoche && apres !== avant && refus.includes('a:81009>' + avant) && !ecritLien(avant), `${nom} · clic · « Ce n'est pas lui » : rangé (synchronisé), la proposition ne revient pas`, JSON.stringify({ avant, apres }));
   dit(!errs.length, `${nom} · aucune erreur de page`, errs.slice(0, 2).join(' | '));
   await ctx.close();
 }

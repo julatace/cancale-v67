@@ -84,7 +84,10 @@ const enLigne = (r) => Object.values(r.parArticle).reduce((n, l) => n + (l || []
   try { L = await import(require('url').pathToFileURL(path.join(SRC, 'liaisonAchat.js')).href); } catch (e) { dit(false, 'src/liaisonAchat.js se charge', e.message); }
   try { S = await import(require('url').pathToFileURL(path.join(SRC, 'suggestionsAchat.js')).href); } catch (_) {}
   if (!L) { console.log(`\n${ok} ✅ · ${ko} ❌`); process.exit(1); }
-  const aff = (o) => L.affecterPropositions({ ...regles, liens: new Map(), ...o });
+  const aff = (o) => { const r = L.affecterPropositions({ ...regles, liens: new Map(), ...o }); r.pistes = r.pistes || {}; return r; };
+  // (un banc ne meurt pas, il rapporte : une fonction absente sur l'arbre d'avant rend un rouge, pas une exception)
+  const manque = (f) => () => { throw new Error(f + ' absente'); };
+  for (const f of ['couleursAccord', 'publierAffectation', 'seriePropositions', 'pistesArticle']) if (typeof L[f] !== 'function') { dit(false, `src/liaisonAchat.js exporte \`${f}\``); L = { ...L, [f]: f === 'publierAffectation' ? () => {} : f === 'couleursAccord' ? () => undefined : f === 'seriePropositions' ? () => ({}) : manque(f) }; }
 
   // ── C · LA CAPTURE DE JULIEN : la vente violette, trois achats d'une autre couleur ───────────
   {
