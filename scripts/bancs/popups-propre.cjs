@@ -135,12 +135,19 @@ const paragraphes = (pg, seuil) => pg.evaluate((seuil) => {
   const longs = [];
   for (const el of main.querySelectorAll('*')) {
     if (el.closest('[data-feuille], [data-feuille-cadre], svg, script, style, select, table, [aria-hidden="true"], [hidden], details:not([open]) > :not(summary), .vrm-pop-corps')) continue;
+    // (16 nov.) Une RANGÉE qui se touche entière (`data-fiche-ligne`, Annonces en rangées de 72 px, refonte du
+    // 15-16 nov.) n'est pas un paragraphe : ses morceaux (titre, N°, prix, taille) sont posés côte à côte en grille.
+    // Le texte réservé aux lecteurs d'écran (`.vrm-sr`, invisible) n'est pas lu non plus. Tout autre bloc reste jugé.
+    if (el.matches('[data-fiche-ligne]')) continue;
+    // Une BANDE de chiffres (la carte réglable `CarteStatsApp` : « — Dépensé · 0 En route… ») n'est pas un paragraphe.
+    if (el.querySelector('[data-carte-chiffre]')) continue;
     const s = getComputedStyle(el);
     if (!bloc(s.display) || !vis(el)) continue;
     // une feuille de texte : aucun enfant BLOC qui porte du texte
     if ([...el.children].some((c) => bloc(getComputedStyle(c).display) && (c.innerText || '').trim())) continue;
+    const sr = [...el.querySelectorAll('.vrm-sr')].map((s) => (s.innerText || '')).join('');
     const t = (el.innerText || '').replace(/\s+/g, ' ').trim();
-    if (t.length <= seuil) continue;
+    if (t.length - sr.replace(/\s+/g, ' ').length <= seuil) continue;
     // une ligne coupée (« … ») n'est pas un paragraphe
     const lh = parseFloat(s.lineHeight) || parseFloat(s.fontSize) * 1.3;
     const lignes = Math.round(el.getBoundingClientRect().height / lh);
@@ -187,6 +194,11 @@ async function popup(pg, mobile, tag, { ligne, nom, attendu, quoi }) {
   await capture(pg, `${tag.replace(/\s+/g, '-')}-${nom}-popup`);
   await toucher(pg, '[data-feuille-croix]', mobile);
   dit(await corps.waitFor({ state: 'detached', timeout: 4000 }).then(() => true).catch(() => false), `${tag} : ${quoi} — la croix la ferme`);
+  // (16 nov.) La ligne peut vivre dans « À faire · N » (une feuille que la pop-up referme) : on la rouvre.
+  if (!(await pg.locator(ligne).filter({ visible: true }).count()) && await pg.locator('[data-ui-afaire]').filter({ visible: true }).count()) {
+    await pg.locator('[data-ui-afaire]').filter({ visible: true }).first().evaluate((e) => e.click());
+    await pg.locator(ligne).filter({ visible: true }).first().waitFor({ timeout: 5000 }).catch(() => {});
+  }
   await toucher(pg, `${ligne} [data-popup-ouvrir]`, mobile);
   await corps.waitFor({ timeout: 4000 }).catch(() => {});
   await pg.keyboard.press('Escape');
@@ -227,6 +239,12 @@ const fiches = (pg) => pg.evaluate(() => { try { return JSON.parse(localStorage.
 
 const ECRANS = [
   { nom: 'annonces-vinted', url: '/?tab=annonces&site=vinted', pret: '[data-ann-fraicheur]', zone: '[data-ann-fraicheur]', apres: async (pg, mobile, tag) => {
+    // (16 nov.) La ligne de fraîcheur vit dans « À faire · N » (src/ui/AFaire.jsx, 14 nov.) : au téléphone, une feuille
+    // qu'on ouvre d'abord.
+    if (!(await pg.locator('[data-ann-fraicheur]').filter({ visible: true }).count()) && await pg.locator('[data-ui-afaire]').filter({ visible: true }).count()) {
+      await toucher(pg, '[data-ui-afaire]', mobile).catch(() => pg.locator('[data-ui-afaire]').filter({ visible: true }).first().evaluate((e) => e.click()));
+      await pg.locator('[data-ui-afaire-feuille] [data-ann-fraicheur]').first().waitFor({ timeout: 5000 }).catch(() => {});
+    }
     await popup(pg, mobile, tag, { ligne: '[data-ann-fraicheur]', nom: 'fraicheur-annonces', quoi: 'fraîcheur des annonces',
       attendu: [/annonces lues/i, /ce que tu as supprimé ou mis en ligne depuis n'y est pas/] });
     // P3 — la proposition : une carte VISUELLE (deux photos, « Même paire ? », [Oui] [Non]), sans paragraphe.
@@ -237,7 +255,7 @@ const ECRANS = [
     const la = await carte.count() > 0;
     const m = la ? await carte.evaluate((e) => ({ photos: [...e.querySelectorAll('.vrm-remise-photo')].filter((p) => p.getBoundingClientRect().width > 0).length + (e.closest('[data-carte-annonce="9303"]') && e.closest('[data-carte-annonce="9303"]').querySelector('[data-fiche-photo]') ? 1 : 0), q: (e.querySelector('.vrm-remise-q b') || {}).innerText || '', oui: e.querySelectorAll('[data-remise-oui]').length, non: e.querySelectorAll('[data-remise-non]').length,
       txt: [...e.childNodes].map((c) => c.querySelector && c.querySelector('.vrm-pourquoi') ? (c.querySelector('b') || {}).innerText || '' : c.innerText || '').join(' ').replace(/\s+/g, ' ').trim() })) : null;
-    dit(!!m && m.photos === 2 && /Même paire/.test(m.q) && /N°7/.test(m.q) && m.oui === 1 && m.non === 1, `${tag} : P3 — la proposition est une carte : deux photos, « Même paire que N°7 ? », [Oui] [Non]`, JSON.stringify(m));
+    dit(!!m && m.photos === 2 && /Même (paire|article)/.test(m.q) && /N°7/.test(m.q) && m.oui === 1 && m.non === 1, `${tag} : P3 — la proposition est une carte : deux photos, « Même paire (ou article, selon le profil — 15 nov.) que N°7 ? », [Oui] [Non]`, JSON.stringify(m));
     dit(!!m && m.txt.length <= 60, `${tag} : P3 — aucun paragraphe sur la carte (${m && m.txt.length} caractères)`, m && m.txt);
     const avant = String(((await fiches(pg))['9303'] || {}).numero || '');
     dit(avant !== '7', `${tag} : P3 — avant SON clic, 9303 ne porte pas le N°7`, JSON.stringify((await fiches(pg))['9303'] || null));
@@ -258,12 +276,14 @@ const ECRANS = [
   { nom: 'colis', url: '/?tab=cat_bord', pret: '[data-colis-barre]', zone: '[data-colis-prochain]', apres: async (pg, mobile, tag) => {
     const n = await pg.evaluate(() => {
       const vis = (e) => e.getClientRects().length > 0;
-      const lot = [...document.querySelectorAll('[data-lot-ouvrir]')].filter(vis).length;
+      // (16 nov.) « Imprimer en un toucher » (14 nov., docs/passation/2026-11-14-impression-simple.md) : le plein qui
+      // imprime le lot est `data-colis-barre-btn="imprimer"` ; `data-lot-ouvrir` est devenu « Choisir » (sans impression).
+      const lot = [...document.querySelectorAll('[data-colis-barre-btn="imprimer"]')].filter(vis).length;
       const agir = [...document.querySelectorAll('[data-colis-prochain-agir]')].filter(vis).map((e) => e.innerText.trim());
       const prochain = (document.querySelector('[data-colis-prochain]') || {}).getAttribute ? document.querySelector('[data-colis-prochain]').getAttribute('data-colis-prochain') : '';
       return { lot, agir, prochain };
     });
-    dit(n.lot === 1 && !n.agir.some((t) => /imprimer/i.test(t)), `${tag} : P4 — un seul bouton qui imprime le lot (« Tout imprimer »)`, JSON.stringify(n));
+    dit(n.lot === 1 && !n.agir.some((t) => /imprimer/i.test(t)), `${tag} : P4 — un seul bouton qui imprime le lot (« Imprimer (N) »)`, JSON.stringify(n));
   } },
   { nom: 'journee', url: '/?tab=journee', pret: '.vrm-main[data-ecran="journee"]' },
   // (10 nov., suite — branche claude/textes-courts-suite) Les écrans passés à la même règle

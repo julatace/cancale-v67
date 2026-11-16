@@ -1745,7 +1745,10 @@ function StatsPlus({ b, V, partielVendu, lp, stock, barres, ligneUrssaf, lib, no
     : (<>
       <GraphiqueVenduRecu VR={VR} lib={lib} titre={tr('stats.venduRecu', { noteBarres: String(noteBarres) })}/>
       <div className="vrm-sv-note" data-sp-vr-note={VR.raison || ''}>
-        {tr('stats.venduDateVente')}{!VR.recuLu ? ` · ${RAISON_RECU[VR.raison] || 'reçu pas lu'}` : !VR.recuComplet ? tr('stats.recuToutLu') : ''}{aDater > 0 ? ` · ${plSP(aDater, 'vente')} sans date de versement (dans aucune barre)` : ''}
+        {/* (16 nov., bancs-rouges-b) Le manque reste DIT à l'écran (§5) ; la définition Vendu / Reçu, toujours la même,
+            passe sous « Pourquoi ? » (textes courts : plus de paragraphe de 130 caractères). */}
+        {[!VR.recuLu ? (RAISON_RECU[VR.raison] || 'reçu pas lu') : !VR.recuComplet ? tr('stats.recuToutLu').replace(/^\s*·\s*/, '') : '', aDater > 0 ? `${plSP(aDater, 'vente')} sans date de versement (dans aucune barre)` : ''].filter(Boolean).join(' · ')}
+        {' '}<Pourquoi>{tr('stats.venduDateVente')}</Pourquoi>
       </div>
     </>);
   // ── Les 10 meilleures ventes ──

@@ -283,7 +283,9 @@ async function main() {
     await essaie('P', async () => {
       const { ctx, pg, errs } = await preparer(b, { width: 390, height: 844 }, { theme: 'light' });
       await pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' });
-      const ligne = pg.locator('[data-reglage-journee-perso]').first();
+      // (16 nov.) Paramètres en catégories (15 nov.) : la rangée vit dans « Affichage » ; `data-sous-ouvrir` laisse
+      // `_reglages-compat.cjs` toucher d'abord la catégorie, comme le vendeur.
+      const ligne = pg.locator('[data-sous-ouvrir="ma-journee"]').first();
       await ligne.waitFor({ timeout: 20000 }); await ligne.click();
       await pg.waitForSelector('[data-jp-editeur]', { timeout: 10000 }); await pg.waitForTimeout(400);
       await shot(pg, 'jp-parametres-390-light');
