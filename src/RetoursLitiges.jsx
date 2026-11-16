@@ -20,6 +20,8 @@ import { BoutonBase } from './composants/Bouton.jsx';
 import './styles-retours.css';
 import { motsVendeur } from './profilVendeur.js';
 import { attrCible } from './cibleNotif.js';   // (15 nov.) la notification « À renvoyer » ouvre CETTE carte
+import { etapesRetour } from './ventesVerre.js';   // (15 nov., Achats « Verre dépoli ») les étapes d'un retour, prouvées
+import { EtapesVente } from './ventes/VentesVerre.jsx';
 // (intégration g1) retours-litiges × vocabulaire-article : les textes qui nomment l'article ont une variante
 // `.art` (« l’article ») hors Sneakers ; un vendeur Sneakers garde « la paire » mot pour mot.
 const AVEC_ART = new Set(['pap.verifier', 'pap.etape.recevoir', 'pap.etape.fait', 'pap.revenue', 'pap.revenueN', 'pap.contester']);
@@ -162,6 +164,11 @@ export function CarteRenvoyer({ c, onImprimer, onDepose = null, Photo = null, no
           {c.suiviPartage ? <span className="vrm-ret-ligne" data-retour-suivi-partage="">{tr('renv.suiviPartage')}</span> : c.faitsPasSu ? <span className="vrm-ret-ligne" data-retour-suivi-pas-su="">{tr('renv.suiviPasLu')}</span> : null}
           {c.etape !== 'rembourse' && c.etape !== 'a-deposer' ? <span className="vrm-ret-ligne" data-retour-phrase-remb="">{phraseRemb(c.rembourse)}</span> : null}
         </div>) : null}
+      {/* (15 nov., Achats « Verre dépoli » — maquette « À renvoyer ») Les étapes jusqu'au remboursement, PROUVÉES (src/ventesVerre.js
+          `etapesRetour`, de l'étape de src/retoursAchat.js) ; sur Achats seulement (Ma journée garde la carte compacte). */}
+      {!compact && etapesRetour(c) ? <div className="vv-fiche-st vv-ret-st" data-vv-retour-etapes={c.cle}><EtapesVente etapes={etapesRetour(c)}
+        libelles={{ accepte: tr('va.retour.accepte'), bordereau: tr('va.retour.bordereau'), adeposer: tr('va.retour.adeposer'), enroute: tr('va.retour.enroute'), rembourse: tr('va.retour.rembourse') }}
+        details={{ adeposer: montrerLimite ? phraseQuand(c, now) : '', rembourse: c.rembourse && c.rembourse.montant != null ? monnaie(c.rembourse.montant) : '' }}/></div> : null}
       <LigneSuiviRetour c={c}/>
       <SansPdf c={c}/>
       <div className="vrm-ret-gestes">
@@ -307,5 +314,60 @@ export function BoutonPasAPas({ c, onOuvrir }) {
     <button type="button" className="sb-touche vrm-pap-ouvrir" data-pap-ouvrir={c.cle} onClick={() => onOuvrir(c)}>
       {ICONE_RETOUR}<span>{tr('pap.ouvrir')}</span>
     </button>
+  );
+}
+
+// ── (15 nov., refonte-journee — Julien : « tu peux mettre litige achat, vente ensemble ici ») ──────────────────
+// Ma journée → UN bloc « Retours et litiges » : côté ACHAT (à renvoyer, en route vers le vendeur), côté VENTE (en route
+// vers toi, revenu chez toi), les litiges et transactions suspendues. Une ligne par article : photo, N° (connu par
+// identité), le sens (« tu renvoies » / « on te renvoie » / « litige »), l'étape et la date, UN geste. Les lignes sont
+// préparées par Ma journée (les MÊMES règles qu'Achats, Colis et les litiges : src/retoursAchat.js, src/retoursStock.js,
+// src/litiges.js) ; ce composant ne décide rien.
+export function RetoursLitigesJournee({ lignes, Photo = null, max = 5, onVoirTout = null, attrs = null }) {
+  const l = Array.isArray(lignes) ? lignes : [];
+  if (!l.length) return null;
+  const vus = l.slice(0, max);
+  return (
+    <section className="vrm-rl" data-retours-litiges={String(l.length)} aria-label={tr('rl.titre')} {...(attrs || {})}>
+      <h2 className="vrm-rl-h2">{tr('rl.titre')} <span>· {l.length}</span></h2>
+      <div className="vrm-rl-liste" role="list">
+        {vus.map((x) => (
+          <div key={x.cle} role="listitem" className="vrm-rl-ligne" data-rl-sens={x.sens} data-rl-cle={x.cle} data-rl-num={x.num || ''}>
+            <span className="vrm-rl-ph" aria-hidden="true">{x.photo && Photo ? <Photo src={x.photo} alt="" loading="lazy" decoding="async" width={44} height={44}/> : null}</span>
+            <span className="vrm-rl-mid">
+              <span className="vrm-rl-l1">{x.num ? <span className="sb-plaque vrm-rl-pq"><small>N°</small>{x.num}</span> : null}<b>{x.titre || tr('retours.article')}</b></span>
+              <span className={'vrm-rl-l2' + (x.ambre ? ' is-ambre' : '')}><span className="vrm-rl-sens">{tr('rl.sens.' + x.sens)}</span> · {x.etapeTexte}</span>
+            </span>
+            {x.geste ? <button type="button" className="sb-touche vrm-rl-geste" onClick={x.geste.faire} {...(x.geste.attrs || {})}>{x.geste.txt}</button> : null}
+          </div>
+        ))}
+      </div>
+      {l.length > vus.length && onVoirTout ? <button type="button" className="sb-lien vrm-rl-tout" data-rl-tout={String(l.length)} onClick={onVoirTout}>{tr('sortir.autres', { n: l.length - vus.length })} ›</button> : null}
+    </section>
+  );
+}
+
+// Achats → « À vérifier » : les retours sans nouvelles depuis plus de 7 jours après la date limite (`retourPerime`).
+// Une phrase claire, « Voir sur Vinted », et « C'est réglé » (SON clic) qui l'archive.
+export function RetoursAVerifier({ perimes, onRegle, Photo = null }) {
+  const l = Array.isArray(perimes) ? perimes : [];
+  if (!l.length) return null;
+  return (
+    <section className="vrm-ret vrm-ret-verif" data-retours-a-verifier={String(l.length)} aria-label={tr('rl.verif.titre')}>
+      <h2 className="vrm-ret-h2">{tr('rl.verif.titre')} <span>{l.length}</span></h2>
+      {l.map((c) => (
+        <div key={c.cle} className="vrm-ret-verif-ligne" data-retour-perime={c.cle}>
+          <span className="vrm-rl-ph" aria-hidden="true">{c.achat && c.achat.photo && Photo ? <Photo src={typeof c.achat.photo === 'string' ? c.achat.photo : (c.achat.photo.url || '')} alt="" loading="lazy" decoding="async" width={44} height={44}/> : null}</span>
+          <span className="vrm-rl-mid">
+            <span className="vrm-rl-l1">{c.num ? <span className="sb-plaque vrm-rl-pq"><small>N°</small>{c.num}</span> : null}<b>{c.titre || tr('retours.article')}</b></span>
+            <span className="vrm-rl-l2">{tr('rl.verif.phrase', { d: c.limiteTexte || '' })}</span>
+          </span>
+          <span className="vrm-ret-verif-gestes">
+            {c.vinted ? <a className="sb-lien" href={c.vinted} target="_blank" rel="noreferrer">{tr('rl.verif.vinted')}</a> : null}
+            <button type="button" className="sb-touche" data-retour-regle={c.cle} onClick={() => onRegle && onRegle(c.cle)}>{tr('rl.verif.regle')}</button>
+          </span>
+        </div>
+      ))}
+    </section>
   );
 }

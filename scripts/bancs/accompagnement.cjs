@@ -293,7 +293,11 @@ action('colis.depose', async (nav) => {
     if (!btn) { for (const s of ['avant', 'pendant', 'apres', 'echec']) noter('colis.depose', s, null, { raisonNonJoue: '« Je dépose » absent (aucun colis à déposer dans cette base)' }); return; }
     // (14 nov., intégration avec claude/refonte-listes) Au téléphone, « Préparer mes colis · Je dépose » vit dans
     // « • À faire · N » (src/ui/AFaire.jsx) : on ouvre d'abord sa feuille, comme lui.
+    // (16 nov., Ventes « Verre dépoli ») « À faire » vit maintenant derrière « … » de la tête (data-colis-barre-btn="outils") :
+    // on ouvre « … », puis « À faire » s'il le faut — le même chemin que lui (banc studio-ventes, I).
     await o.pg.locator('[data-depot-ouvrir]').first().waitFor({ state: 'visible', timeout: 4000 }).catch(async () => {
+      if (await o.pg.locator('[data-colis-barre-btn="outils"]').count() && !(await o.pg.evaluate(() => document.documentElement.hasAttribute('data-colis-outils')))) { await o.pg.locator('[data-colis-barre-btn="outils"]').first().click().catch(() => {}); await o.pg.waitForTimeout(400); }
+      if (await o.pg.locator('[data-depot-ouvrir]').first().isVisible().catch(() => false)) return;
       if (await o.pg.locator('[data-ui-afaire]').count()) { await toucher(o.pg, '[data-ui-afaire]'); await o.pg.waitForSelector('[data-ui-afaire-feuille] [data-depot-ouvrir]', { timeout: 8000 }).catch(() => {}); }
     });
     await toucher(o.pg, '[data-depot-ouvrir]');

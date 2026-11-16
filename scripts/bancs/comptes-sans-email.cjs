@@ -1,3 +1,4 @@
+require('./_reglages-compat.cjs');   // (15 nov.) Paramètres en catégories : la catégorie d'une rangée touchée avant elle
 // ═══════════════════════════════════════════════════════════════════════════
 // BANC : « QUELS COMPTES N'ENVOIENT AUCUN EMAIL À VRM, ET DEPUIS QUAND »
 //        (node scripts/bancs/comptes-sans-email.cjs — après `npm run build`)

@@ -168,8 +168,8 @@ async function parametres(nav, { W, theme }) {
     const carte = (e) => { const s = getComputedStyle(e); return plein(s.backgroundColor) && (s.boxShadow !== 'none' || ['Top', 'Right', 'Bottom', 'Left'].every((c) => parseFloat(s['border' + c + 'Width']) > 0)); };
     const set = document.querySelector('.vrm-set');
     const icones = {}; const doublons = [];
-    for (const l of [...document.querySelectorAll('.vrm-set-liste .vrm-set-ligne')].filter(vis)) {
-      const sv = l.querySelector('.vrm-set-ic svg'); if (!sv) continue; const k = sv.innerHTML.replace(/\s+/g, ''); const n = (l.querySelector('.vrm-set-lib b') || l).innerText.trim();
+    for (const l of [...document.querySelectorAll('.vrm-set-liste .vrm-set-ligne, [data-categories-reglages] .vg-pm-tuile')].filter(vis)) {   /* (15 nov., verre 2) au téléphone, les catégories sont des TUILES (maquette validée) : la même règle, sur leur icône */
+      /* (15 nov.) une CATÉGORIE (plaque d'encre) et un réglage (icône gravée) ne se confondent pas : comparés chacun avec les siens */ const sv = l.querySelector('.vrm-set-ic svg, .vrm-pm-cat-ic svg, .vg-pm-tuile-ic svg'); if (!sv) continue; const k = (sv.closest('.vrm-pm-cat-ic, .vg-pm-tuile-ic') ? 'cat:' : 'reg:') + sv.innerHTML.replace(/\s+/g, ''); const n = (l.querySelector('.vrm-set-lib b') || l).innerText.trim();
       if (icones[k] && icones[k] !== n) doublons.push(`${icones[k]} = ${n}`); else icones[k] = n;
     }
     // Carte dans une carte : une liste (déjà une carte) dans un groupe qui en est une aussi,
@@ -194,7 +194,15 @@ async function parametres(nav, { W, theme }) {
     };
   });
   const m = await mesure();
-  dit(!m.doublons.length && m.n >= 12, 'H3', `${T} Réglages : une icône par ligne (${m.n} distinctes)`, m.doublons.join(' ¦ '));
+  // (15 nov., Paramètres en dix catégories) Au téléphone, « Organisation » est sous « Stock et rangement », DANS la
+  // catégorie « Stock et numéros » (CLAUDE.md §3) : on la touche, comme lui, puis on revient.
+  if (!m.orgaLien && await pg.locator('[data-categorie-ouvrir="stock"]').first().isVisible().catch(() => false)) {
+    await pg.locator('[data-categorie-ouvrir="stock"]').first().click(); await attendre(700);
+    const s = await mesure(); m.orgaLien = s.orgaLien; m.orgaLigne = s.orgaLigne;
+    await pg.locator('[data-categorie-retour]').first().click().catch(() => {}); await attendre(500);
+  }
+  // (15 nov., verre 2) Au téléphone : neuf tuiles à icône + « Mon compte » en carte à AVATAR (maquette validée) ⇒ 9 icônes distinctes.
+  dit(!m.doublons.length && m.n >= (W < 600 ? 9 : 12), 'H3', `${T} Réglages : une icône par ligne (${m.n} distinctes)`, m.doublons.join(' ¦ '));
   dit(!m.orgaLigne && m.orgaLien, 'H3', `${T} « Organisation » n'est plus une ligne de la liste, mais reste joignable par son lien`, JSON.stringify({ ligne: m.orgaLigne, lien: m.orgaLien }));
   dit(!m.cdc.length, 'H3', `${T} Réglages : aucune carte dans une carte`, m.cdc.join(' ¦ '));
   dit(!m.statut || (m.statut.haut >= m.statut.titreHaut - 4 && m.statut.haut <= m.statut.titreBas), 'H3', `${T} « Enregistrement… » dans la ligne du titre, pas au-dessus`, JSON.stringify(m.statut));

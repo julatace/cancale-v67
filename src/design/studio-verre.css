@@ -602,4 +602,68 @@ html[data-sb-eventail] body .vrm-neuf-hote { visibility: hidden !important; }
 :root:root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] :is(.vrm-tab-ic, .vrm-nav-label) { color: var(--sv-encre) !important; }
 :root:root:root:root body .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] .vrm-nav-label { font-weight: 700 !important; }
 
+/* ══ 11. LE RAIL DE L'ORDINATEUR (15 nov., maquettes ordinateur validées par Julien — `scratchpad/maquettes-verre/o-ecrans.cjs`,
+   `.side`) : COMMUN à tous les écrans (posé par claude/refonte-journee, repris tel quel par les autres chantiers).
+   Un panneau de verre (232 px, rayon 24, bord blanc, l'ombre qui descend) ; « VRM » écrit ; Ma journée ; VENDRE (Ventes,
+   Annonces, Messages, E-mails) · RANGER (Stock, Achats) · COMPTER (Argent) ; au pied Paramètres, le compte, Communauté.
+   L'entrée ouverte : une porcelaine blanche, l'encre en 750. Les nombres : une pastille d'encre à droite.
+   Sous 1400 px de large : le rail se RÉDUIT (78 px, l'icône et le libellé dessous, les nombres en coin) — la maquette 1280.
+   Le composant : `SideBar` (src/App.jsx, `data-rail-verre`) ; les entrées, les data-nav-entree et les pastilles ne changent pas. */
+@media (min-width: 768px) {
+  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] {
+    --rv-fond: rgb(247 250 253 / .84); --rv-bord: rgb(255 255 255 / .85); --rv-encre: #0C1D30; --rv-libelle: #2E4257; --rv-gris: #3F5468; --rv-filet: rgb(12 29 48 / .10);
+    --rv-actif: #FFFFFF; --rv-actif-ombre: inset 0 1px 2px rgb(8 26 50 / .10), 0 4px 12px -6px rgb(8 26 50 / .4); --rv-pastille: #0C1D30; --rv-pastille-t: #FFFFFF;
+    top: 14px !important; left: 14px !important; bottom: 14px !important; width: 232px !important; padding: 16px 12px 12px !important; border-radius: 24px !important;
+    background: var(--rv-fond) !important; background-image: none !important; -webkit-backdrop-filter: blur(26px) saturate(140%) !important; backdrop-filter: blur(26px) saturate(140%) !important;
+    border: 1px solid var(--rv-bord) !important; box-shadow: 0 18px 40px -16px rgb(8 26 50 / .6) !important; color: var(--rv-encre) !important;
+  }
+  :root:root:root:root:root:root[data-theme="dark"] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] {
+    --rv-fond: rgb(16 30 50 / .72); --rv-bord: rgb(255 255 255 / .13); --rv-encre: #EAF2FB; --rv-libelle: #C9D6E4; --rv-gris: #9CB0C6; --rv-filet: rgb(255 255 255 / .10);
+    --rv-actif: rgb(255 255 255 / .14); --rv-actif-ombre: inset 0 1px 2px rgb(0 0 0 / .25); --rv-pastille: #EEF4FB; --rv-pastille-t: #0C1D30;
+  }
+  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] > .vrm-sidebar-brand { padding: 2px 8px 12px !important; gap: 0 !important; }
+  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-tuile { display: none !important; }
+  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-sidebar-mot { font: 800 20px/1 Inter, system-ui, sans-serif !important; letter-spacing: -.03em !important; color: var(--rv-encre) !important; }
+  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-section-label { font: 750 11.5px/1.2 Inter, system-ui, sans-serif !important; letter-spacing: .02em !important; color: var(--rv-gris) !important; padding: 14px 10px 6px !important; margin: 0 !important; text-transform: none !important; }
+  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] [data-nav-groupe].vrm-rail-management-group { margin-top: 0 !important; padding-top: 0 !important; border: 0 !important; }
+  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] :is(.vrm-rail-platforms, .vrm-rail-management) { gap: 2px !important; }
+  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-button {
+    min-height: 44px !important; height: 44px !important; padding: 0 10px !important; gap: 11px !important; border-radius: 13px !important;
+    color: var(--rv-libelle) !important; font: 600 14.5px/1.2 Inter, system-ui, sans-serif !important; background: transparent !important; box-shadow: none !important;
+  }
+  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-button > :first-child { color: inherit !important; flex: 0 0 20px !important; width: 20px !important; }
+  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-button > :first-child svg { width: 20px !important; height: 20px !important; color: inherit !important; }
+  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-button[aria-current="page"] { color: var(--rv-encre) !important; font-weight: 750 !important; }
+  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre]:not([data-indicateur]) .vrm-rail-button[aria-current="page"] { background: var(--rv-actif) !important; box-shadow: var(--rv-actif-ombre) !important; }
+  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-indicateur.vrm-nav-indicateur { background: var(--rv-actif) !important; box-shadow: var(--rv-actif-ombre) !important; border-radius: 13px !important; border: 0 !important; }
+  /* §7 « actif = enfoncé + diode » : la pastille blanche de la maquette garde un creux à peine marqué et la diode du studio (5 px, en haut à droite). */
+  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-indicateur.vrm-nav-indicateur::after { top: 7px !important; right: 7px !important; width: 5px !important; height: 5px !important; }
+  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-badge-rail.vrm-nav-badge-n {
+    margin-left: auto !important; min-width: 22px !important; height: 22px !important; padding: 0 7px !important; border-radius: 11px !important; position: static !important;
+    background: var(--rv-pastille) !important; color: var(--rv-pastille-t) !important; font: 700 11.5px/22px Inter, system-ui, sans-serif !important; text-align: center !important; box-shadow: none !important;
+  }
+  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-pied { margin-top: auto !important; border-top: 1px solid var(--rv-filet) !important; padding-top: 8px !important; background: transparent !important; box-shadow: none !important; }
+  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-compte { background: transparent !important; box-shadow: none !important; color: var(--rv-encre) !important; }
+  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-compte-nom { font: 700 13.5px/1.25 Inter, system-ui, sans-serif !important; color: var(--rv-encre) !important; }
+  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-compte-sous { font: 550 12px/1.25 Inter, system-ui, sans-serif !important; color: var(--rv-gris) !important; }
+}
+/* La maquette 1280 : le rail réduit (78 px), l'icône et son libellé dessous, le nombre en coin ; le contenu se rapproche. */
+@media (min-width: 768px) and (max-width: 1399px) {
+  :root:root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] { width: 78px !important; padding: 16px 8px 12px !important; align-items: center !important; }
+  :root:root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] > .vrm-sidebar-brand { justify-content: center !important; padding: 2px 0 10px !important; }
+  :root:root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-section-label { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; padding: 0 !important; }
+  :root:root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-scroll { width: 100% !important; display: flex !important; flex-direction: column !important; align-items: center !important; }
+  :root:root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] :is(.vrm-rail-platforms, .vrm-rail-management, .vrm-rail-management-group) { align-items: center !important; width: 100% !important; }
+  :root:root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-button {
+    width: 62px !important; height: 56px !important; min-height: 56px !important; padding: 0 2px !important; margin-top: 4px !important;
+    flex-direction: column !important; justify-content: center !important; align-items: center !important; gap: 3px !important; position: relative !important;
+  }
+  :root:root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-lib { font: 600 10px/1.1 Inter, system-ui, sans-serif !important; text-align: center !important; flex: none !important; white-space: nowrap !important; overflow-wrap: normal !important; }
+  :root:root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-badge-rail.vrm-nav-badge-n { position: absolute !important; top: 2px !important; right: 4px !important; margin: 0 !important; min-width: 18px !important; height: 18px !important; padding: 0 5px !important; font-size: 10px !important; line-height: 18px !important; }
+  :root:root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-pied { width: 100% !important; display: flex !important; flex-direction: column !important; align-items: center !important; }
+  :root:root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-compte { justify-content: center !important; padding: 8px 0 0 !important; width: auto !important; }
+  :root:root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-compte-txt { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; }
+  :root:root:root:root:root:root:root body .vrm-app-shell:has(nav.vrm-sidebar[data-rail-verre]) main.vrm-main { margin-left: 112px !important; }
+}
+
 } /* fin de @layer vrm-verre */

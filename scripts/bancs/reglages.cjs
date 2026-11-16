@@ -1,3 +1,4 @@
+require('./_reglages-compat.cjs');   // (15 nov.) Paramètres en catégories : la catégorie d'une rangée touchée avant elle
 require(require('path').join(__dirname, '..', '_horloge-notif.cjs'));   // heures calmes : midi (Paris) pour ce banc
 // ═══════════════════════════════════════════════════════════════════════════
 // BANC : UN RÉGLAGE QU'ON N'A PAS PU LIRE NE SE FAIT PAS ÉCRASER

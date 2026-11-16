@@ -70,3 +70,86 @@
 .vrm-aar-rares { display: flex; flex-wrap: wrap; align-items: center; gap: 0 20px; min-width: 0; padding: 0 2px; border-top: .5px solid rgb(var(--sb-o, 18 52 96) / .12); }
 .vrm-aar-rares[hidden] { display: none !important; }
 :root[data-theme="dark"] .vrm-aar-rares { border-top-color: rgb(255 255 255 / .10); }
+.vrm-aar-autres { font: 500 12px/44px var(--sb-police-texte, inherit); color: var(--sb-encre-2, #3F5468); }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   (15 nov., liaison achat ⇄ article) L'ARTICLE ET SON ACHAT, CÔTE À CÔTE.
+   Julien : « améliore la liaison entre les achats et les articles en vente ou vendus, avec les
+   titres, dates de retrait, couleur de l'article ». Maquette « Verre dépoli » : deux colonnes égales
+   (article | achat) reliées par un trait, chacune sa photo 64, son titre (2 lignes), sa ligne de
+   détails (taille · couleur · date de retrait · prix payé) ; dessous le NIVEAU (plaque) et POURQUOI
+   en une ligne ; puis la ligne de gestes. Onglets « En vente / Vendus » et « Valider les N très
+   probables » (le seul bouton plein de l'écran) au-dessus de la file. Rien de métier ici.
+   ════════════════════════════════════════════════════════════════════════════ */
+.vrm-aar-barre { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; min-width: 0; }
+.vrm-aar-onglets { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--sb-creux, #E4EEF7); box-shadow: var(--sb-enfonce, inset 0 1px 2px rgb(18 52 96 / .16)); min-width: 0; }
+.vrm-aar-onglets > button {
+  appearance: none; border: 0; background: transparent; color: var(--sb-encre-2, #3F5468); min-height: 36px; padding: 0 14px; border-radius: 999px;
+  font: 600 14px/1 var(--sb-police-texte, inherit); display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap;
+}
+.vrm-aar-onglets > button[aria-selected="true"] { background: var(--sb-porcelaine, #fff); color: var(--sb-encre, #0C1D30); box-shadow: 0 1px 2px rgb(18 52 96 / .14), 0 4px 10px -6px rgb(18 52 96 / .3); }
+.vrm-aar-n { font: 600 12px/1 var(--sb-police-texte, inherit); font-variant-numeric: tabular-nums; color: var(--sb-encre-2, #3F5468); }
+.vrm-aar .vrm-aar-valider { min-height: 44px; padding: 0 18px; gap: 8px; max-width: 100%; }
+.vrm-aar .vrm-aar-valider > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+/* La carte : verre dépoli clair (la porcelaine d'avant, un peu plus d'air). */
+.vrm-aar-liste { grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr)); }
+.vrm-aar-carte { gap: 10px; padding: 12px; border-radius: 22px; }
+.vrm-aar-duo { display: grid; grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr); align-items: start; gap: 0 4px; min-width: 0; }
+.vrm-aar-cote { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; padding: 8px 0; }
+.vrm-aar-cote > .vrm-aar-photo { width: 64px; height: 64px; border-radius: 16px; object-fit: cover; flex: none; display: block; margin-bottom: 2px; }
+.vrm-aar-photo-ico { display: grid; place-items: center; color: var(--sb-encre-2, #3F5468); background: var(--sb-creux, #E4EEF7); box-shadow: var(--sb-enfonce, inset 0 1px 2px rgb(18 52 96 / .14)); }
+.vrm-aar-cote .vrm-aar-titre { font-size: 14px; line-height: 18px; }
+.vrm-aar-cote .vrm-aar-sous { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; font-size: 12px; line-height: 16px; overflow-wrap: anywhere; }
+/* L'achat : la même colonne, posée dans un puits (on lit « proposé », pas « acquis »). */
+.vrm-aar-cote.vrm-aar-sugg, .vrm-aar-cote-vide {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 8px; margin: 0; border-radius: 16px;
+  background: var(--sbp-puits, rgb(255 255 255 / .46)); box-shadow: var(--sbp-puits-sh, inset 0 1px 2px rgb(18 52 96 / .13), inset 0 0 0 .5px rgb(18 52 96 / .08));
+}
+.vrm-aar-cote.vrm-aar-sugg > .vrm-aar-photo { width: 64px; height: 64px; }
+.vrm-aar-cote .vrm-aar-sugg-titre { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; font: 600 14px/18px var(--sb-police-texte, inherit); }
+.vrm-aar-cote-vide .vrm-aar-sans { font: 500 13px/17px var(--sb-police-texte, inherit); color: var(--sb-encre-2, #3F5468); }
+.vrm-aar-trait { display: grid; place-items: center; height: 64px; margin-top: 8px; color: var(--sb-encre-2, #3F5468); opacity: .75; }
+
+/* Le niveau et POURQUOI : une plaque + une ligne (deux au plus). */
+.vrm-aar-pourquoi { margin: 0; display: flex; align-items: baseline; gap: 8px; min-width: 0; font: 500 12.5px/17px var(--sb-police-texte, inherit); color: var(--sb-encre-2, #3F5468); }
+.vrm-aar-pourquoi > span:last-child { min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+.vrm-aar-niveau { flex: none; display: inline-flex; align-items: center; gap: 5px; font: 650 11px/20px var(--sb-police-texte, inherit); letter-spacing: .02em; text-transform: uppercase; color: var(--sb-encre-2, #3F5468); padding: 0 8px; border-radius: 999px; background: var(--sb-creux, #E4EEF7); }
+.vrm-aar-niveau::before { content: ''; width: 6px; height: 6px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px currentColor; }
+.vrm-aar-niveau[data-niveau="tres-probable"] { color: var(--sb-encre, #0C1D30); background: var(--sb-porcelaine, #fff); box-shadow: 0 0 0 .5px rgb(var(--sb-o, 18 52 96) / .18), 0 1px 2px rgb(18 52 96 / .12); }
+.vrm-aar-niveau[data-niveau="tres-probable"]::before { background: currentColor; box-shadow: none; }
+
+/* La feuille « Valider les N très probables » : la liste montrée, cochée, et SON toucher. */
+.vrm-aar-feuille-aide { margin: 0 0 10px; font: 500 13px/18px var(--sb-police-texte, inherit); color: var(--sb-encre-2, #3F5468); }
+/* La liste défile DANS la feuille ; « Relier ces N » reste toujours visible dessous (mesuré : à 1512 × 950, la
+   feuille de 6 couples sortait de l'écran et son bouton avec). */
+.vrm-aar-feuille { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; max-height: min(44vh, 360px); overflow: auto; overscroll-behavior: contain; }
+.vrm-aar-feuille-ligne { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 6px 4px; cursor: pointer; min-width: 0; }
+.vrm-aar-feuille-ligne > input { width: 22px; height: 22px; flex: none; accent-color: var(--sb-encre, #0C1D30); }
+.vrm-aar-mini { width: 40px; height: 40px; border-radius: 12px; object-fit: cover; flex: none; display: block; }
+.vrm-aar-feuille-ligne .vrm-aar-centre { min-width: 0; }
+.vrm-aar-feuille-ligne .vrm-aar-sugg-titre, .vrm-aar-feuille-ligne .vrm-aar-sous { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.vrm-aar-feuille-pied { display: flex; justify-content: flex-end; padding-top: 12px; position: sticky; bottom: 0; }
+.vrm-aar-feuille-pied .sb-btn-plein { min-height: 48px; gap: 8px; }
+
+/* Achats : l'article proposé sous un achat sans article relié — une rangée fine dans la liste. */
+.vrm-buy-propose { display: flex; align-items: center; gap: 10px; min-width: 0; margin: -2px 12px 8px 64px; padding: 6px 6px 6px 8px; border-radius: 14px;
+  background: var(--sbp-puits, rgb(255 255 255 / .46)); box-shadow: var(--sbp-puits-sh, inset 0 1px 2px rgb(18 52 96 / .13), inset 0 0 0 .5px rgb(18 52 96 / .08)); }
+.vrm-buy-propose-photo { width: 32px; height: 32px; border-radius: 9px; object-fit: cover; flex: none; display: block; }
+.vrm-buy-propose-centre { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; }
+.vrm-buy-propose-mot { font: 500 11.5px/15px var(--sb-police-texte, inherit); color: var(--sb-encre-2, #3F5468); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vrm-buy-propose-mot b { font-weight: 650; color: var(--sb-encre, #0C1D30); }
+.vrm-buy-propose-mot b[data-niveau="possible"] { font-weight: 500; color: inherit; }
+.vrm-buy-propose-titre { font: 600 13px/17px var(--sb-police-texte, inherit); color: var(--sb-encre, #0C1D30); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.vrm-buy-propose .sb-lien { flex: none; min-height: 44px; }
+.vrm-buy-propose .vrm-buy-propose-non { flex: none; background: transparent; box-shadow: none; color: var(--sb-encre-2, #3F5468); }
+@media (max-width: 520px) { .vrm-buy-propose { margin-left: 12px; } }
+
+/* Sans achat proposé : l'article en UNE rangée (vignette · titre · détails), « Aucune suggestion » en une ligne
+   dessous — jamais une colonne vide à côté. */
+.vrm-aar-carte-seule .vrm-aar-duo { grid-template-columns: minmax(0, 1fr); }
+.vrm-aar-carte-seule .vrm-aar-trait { display: none; }
+.vrm-aar-carte-seule [data-ar-cote="article"] { display: grid; grid-template-columns: 56px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 12px; row-gap: 2px; align-items: start; padding: 0; }
+.vrm-aar-carte-seule [data-ar-cote="article"] > .vrm-aar-photo { grid-row: 1 / span 2; width: 56px; height: 56px; border-radius: 14px; margin: 0; }
+.vrm-aar-carte-seule .vrm-aar-cote-vide { flex-direction: row; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 12px; margin-top: 8px; }
+.vrm-aar-carte-seule .vrm-aar-cote-vide > .vrm-aar-photo-ico { display: none; }

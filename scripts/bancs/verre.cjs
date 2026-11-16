@@ -205,6 +205,9 @@ function mesurer() {
   for (const b of document.querySelectorAll('.vrm-app-shell[data-espace] .vrm-main .vrm-aide-bouton')) {
     const sv = b.querySelector('svg'); if (!sv || !vis(b)) continue;
     const r = sv.getBoundingClientRect();
+    // (16 nov.) un « ? » VU seulement, comme le texte : sous une liste flottante (la loupe ouverte sur Ma journée), il
+    // n'est pas vu et le texte de la liste n'est pas « sa ligne ».
+    { const h = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2); if (!h || !(h === b || b.contains(h))) continue; }
     for (const x of textesVus) for (const t of rectsTexte(x)) {
       const vert = t.bottom > r.top + 2 && t.top < r.bottom - 2;
       const ecart = t.right <= r.left ? r.left - t.right : t.left >= r.right ? t.left - r.right : -1;

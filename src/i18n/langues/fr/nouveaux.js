@@ -16,7 +16,7 @@ export default {
   "nouveaux.bilan.auMoins.manque": "Pas encore lu : {noms}.",
   "nouveaux.bilan.auMoins.montant": { one: "{n} vente au montant pas lu, hors du total.", other: "{n} ventes au montant pas lu, hors du total." },
   "nouveaux.bilan.auMoins.attente": "Une plateforme est encore en lecture.",
-  "nouveaux.bilan.aExpedier": "à expédier",
+  "nouveaux.bilan.aExpedier": "à envoyer",
   "nouveaux.bilan.aRetirer": "à retirer",
   "nouveaux.bilan.enLigne": "en ligne",
   "nouveaux.bilan.matin.surtitre": "Et ensuite",

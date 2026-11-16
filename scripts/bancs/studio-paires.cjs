@@ -10,6 +10,8 @@ require('./_porte-banc.cjs');
 //
 //  A. FORME — base inventée (design-passe : 3 comptes, 36 annonces), 390 tactile ET 1512, clair ET sombre :
 //     premiere  la 1re rangée d'Annonces dans la moitié haute d'un iPhone (≤ 422 px sur 844) ;
+//     (15 nov., refonte-journee) rangée : la photo d'abord, la plaque N° sous le titre (maquette validée) ; « À faire » sur la
+//     ligne du TITRE (h1) — le sélecteur Annonces | Stock | Achats est maintenant dans la tête, sous le titre ;
 //     rangee    une rangée fait 60–72 px, porte sa plaque N° en 1re colonne, sa vignette, son prix ;
 //     pleins    au plus UN bouton plein (encre ou accent) dans le premier écran ;
 //     debord    rien ne déborde de l'écran (largeur) ;
@@ -89,7 +91,12 @@ function mesurer({ tel }) {
     const plaque = r.querySelector('.vrm-fiche-numero .vrm-num, .vrm-fiche-num-vide'), photo = r.querySelector('a.vrm-fiche-photo'), prix = r.querySelector('[data-prix]');
     const p = plaque && plaque.getBoundingClientRect(), ph = photo && photo.getBoundingClientRect();
     if (b.height < 59 || b.height > 73) out.rangee.push(`hauteur ${Math.round(b.height)} (${r.getAttribute('data-sb-avant-cle')})`);
-    if (!p || !ph || p.left > ph.left) out.rangee.push(`plaque pas en 1re colonne (${r.getAttribute('data-sb-avant-cle')})`);
+    // (15 nov., refonte-journee — la maquette « Annonces » validée par Julien) La rangée : la PHOTO d'abord, la plaque N°
+    // sous le titre (2e ligne), visible et dans la rangée ; à l'ordinateur (maquette « ordi/annonces » validée) le tableau :
+    // photo, puis la plaque N° dans la colonne juste après, AVANT le titre, sur la même ligne.
+    const ti = r.querySelector('[data-titre]'), tb = ti && ti.getBoundingClientRect();
+    if (innerWidth < 768) { if (!p || !ph || !tb || p.width < 4 || p.left < ph.right || p.top < tb.bottom - 2 || p.bottom > b.bottom + 1) out.rangee.push(`plaque pas sous le titre, à droite de la photo (${r.getAttribute('data-sb-avant-cle')})`); }
+    else if (!p || !ph || !tb || p.width < 4 || p.left < ph.right - 1 || p.right > tb.left + 1 || p.bottom < tb.top || p.top > tb.bottom) out.rangee.push(`plaque pas dans la colonne N° (entre la photo et le titre) (${r.getAttribute('data-sb-avant-cle')})`);
     if (!prix || prix.getBoundingClientRect().width < 4) out.rangee.push(`prix absent (${r.getAttribute('data-sb-avant-cle')})`);
     if (r.querySelectorAll('button:not(.vrm-fiche-plus-bouton):not([data-edition])').length) {
       const vis = [...r.querySelectorAll('button')].filter((x) => x.getBoundingClientRect().width > 2 && !x.closest('.vrm-fiche-numero') && !x.classList.contains('vrm-fiche-plus-bouton') && getComputedStyle(x).pointerEvents !== 'none');
@@ -161,7 +168,7 @@ async function forme(nav, W, theme) {
   if (m.rouge.length) fautes.push('rouge hors doublon : ' + m.rouge.slice(0, 3).join(' ; '));
   const tete = await joignables(o.pg, GESTES_TETE);
   // « À faire · N » : au téléphone sur la ligne du titre ; à l'ordinateur, les alertes posées sous les vues.
-  const afaire = await o.pg.evaluate((tel) => { const e = document.querySelector(tel ? '[data-espace="paires"] .vrm-ann-afaire[data-ui-afaire]' : '[data-espace="paires"] [data-ui-afaire-place="ordinateur"]'); if (!e) return 'absent'; if (!tel) return 'ok'; const t = document.querySelector('[data-espace="paires"] .vrm-tache-tete').getBoundingClientRect(), r = e.getBoundingClientRect(); return Math.abs((r.top + r.bottom) / 2 - (t.top + t.bottom) / 2) < 14 ? 'ok' : `hors de la ligne du titre (${Math.round(r.top)} / ${Math.round(t.top)})`; }, tel);
+  const afaire = await o.pg.evaluate((tel) => { const e = document.querySelector(tel ? '[data-espace="paires"] .vrm-ann-afaire[data-ui-afaire]' : '[data-espace="paires"] [data-ui-afaire-place="ordinateur"]'); if (!e) return 'absent'; if (!tel) return 'ok'; const t = (document.querySelector('[data-espace="paires"] .vrm-tache-tete h1') || document.querySelector('[data-espace="paires"] .vrm-tache-tete')).getBoundingClientRect(), r = e.getBoundingClientRect(); return Math.abs((r.top + r.bottom) / 2 - (t.top + t.bottom) / 2) < 14 ? 'ok' : `hors de la ligne du titre (${Math.round(r.top)} / ${Math.round(t.top)})`; }, tel);
   if (afaire !== 'ok' && !(afaire === 'absent' && !tel)) fautes.push('À faire : ' + afaire);
   if (tete.length) fautes.push('pas joignable en tête : ' + tete.join(', '));
   // Toucher une rangée (la 3e) : téléphone ⇒ elle monte ; ordinateur ⇒ la fiche en plan à droite.
@@ -187,9 +194,18 @@ async function forme(nav, W, theme) {
       if (av.length) fautes.push('pas joignable dans la carte : ' + av.join(', '));
       await o.pg.screenshot({ path: path.join(SHOTS, `paires-${W}-${theme}-avant.png`) }).catch(() => {});
       // ⋯ ⇒ la fiche, avec le reste ; puis son menu « ⋯ »
+      // (15 nov., refonte-journee) La notification passagère de la coque (« 36 nouvelles paires numérotées », ~2 s) se pose
+      // au-dessus de la barre du bas, là où tombe « ⋯ » de la carte montée : un clic forcé PENDANT la touchait elle
+      // (mesuré : elementFromPoint = .vrm-toast). On attend qu'elle parte — une condition, pas un délai.
+      await o.pg.waitForSelector('.vrm-toast', { state: 'detached', timeout: 15000 }).catch(() => {});
       await o.pg.locator('[data-sb-avant-plus]').click({ timeout: 5000, force: true, noWaitAfter: true }).catch(() => {});
       await o.pg.waitForSelector('.vrm-fp [data-fiche-menu-ouvrir]', { timeout: 8000 }).catch(() => {});
       await o.pg.waitForTimeout(600);
+      // (15 nov., fiche D) les gestes de la ligne vivent derrière « ⋯ » (feuille de tuiles, « Tout voir ») : un toucher les montre.
+      await o.pg.evaluate(() => { const b = document.querySelector('.vrm-fp [data-fd-plus-ouvrir]'); if (b) b.click(); });
+      await o.pg.waitForTimeout(300);
+      await o.pg.evaluate(() => { const d = document.querySelector('.vrm-fp [data-fiche-plus]'); if (d) d.open = true; });
+      await o.pg.waitForTimeout(300);
       const fi = await joignables(o.pg, GESTES_FICHE);
       if (fi.length) fautes.push('pas joignable dans la fiche : ' + fi.join(', '));
       await o.pg.screenshot({ path: path.join(SHOTS, `paires-${W}-${theme}-fiche.png`) }).catch(() => {});
@@ -214,7 +230,7 @@ async function forme(nav, W, theme) {
     else {
       await o.pg.waitForTimeout(700);
       const e = await o.pg.evaluate((cle) => {
-        const f = document.querySelector('.vrm-fp.sb-plan .vrm-fp-cadre').getBoundingClientRect();
+        const f = document.querySelector('.vrm-fp.sb-plan .vrm-fp-cadre, .vrm-fp.sb-plan .fd-cadre').getBoundingClientRect();
         const rows = [...document.querySelectorAll('[data-sb-liste] > [data-sb-avant-cle]')].filter((x) => { const r = x.getBoundingClientRect(); return r.height > 8 && r.top < innerHeight && r.bottom > 0; });
         const gauche = rows.filter((x) => x.getBoundingClientRect().right <= f.left + 2).length;
         return { droite: f.left > innerWidth / 2, gauche, choisie: !!document.querySelector(`[data-sb-avant-cle="${cle}"][data-sb-choisie]`) };
@@ -222,6 +238,11 @@ async function forme(nav, W, theme) {
       if (!e.droite) fautes.push('la fiche n’est pas à droite');
       if (e.gauche < 4) fautes.push(`la liste ne reste pas visible à gauche (${e.gauche} rangées)`);
       if (!e.choisie) fautes.push('la rangée touchée n’est pas désignée');
+      // (15 nov., fiche D) les gestes de la ligne vivent derrière « ⋯ » (feuille de tuiles, « Tout voir ») : un toucher les montre.
+      await o.pg.evaluate(() => { const b = document.querySelector('.vrm-fp [data-fd-plus-ouvrir]'); if (b) b.click(); });
+      await o.pg.waitForTimeout(300);
+      await o.pg.evaluate(() => { const d = document.querySelector('.vrm-fp [data-fiche-plus]'); if (d) d.open = true; });
+      await o.pg.waitForTimeout(300);
       const fi = await joignables(o.pg, GESTES_FICHE);
       if (fi.length) fautes.push('pas joignable dans la fiche : ' + fi.join(', '));
       await o.pg.screenshot({ path: path.join(SHOTS, `paires-${W}-${theme}-plan.png`) }).catch(() => {});

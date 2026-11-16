@@ -14,7 +14,7 @@ export default {
   "fiche.gesteRelier.achat": "To link it: set the pair's No. on its listing, or link this purchase from the sale.",
   "fiche.gesteRelier.annonce": "To link it: give this listing a No.",
   "fiche.ctx.vente": "Sale",
-  "fiche.ctx.colis": "Parcel to ship",
+  "fiche.ctx.colis": "Parcel to send",
   "fiche.ctx.achat": "Purchase",
   "fiche.ctx.annonce": "Listing",
   "fiche.ctx.stock": "Stock",

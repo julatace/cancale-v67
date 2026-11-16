@@ -1,13 +1,19 @@
 // DEUTSCH — Übersetzung von fr.js (der Quelle). Gleiche Schlüssel, gleiche {Variablen}.
+import ecran_ventesVerre from './de/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
 import ecran_journee from './de/journee.js';
 import ecran_confort from './de/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_studio from './de/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
 import ecran_correspondances from './de/correspondances.js';   // (15 nov.) Publier partout : catégories qui correspondent
 import ecran_capte from './de/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
-import ecran_vcventes from './de/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
+import ecran_avenir from './de/avenir.js';
+import ecran_verre2 from './de/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
+import ecran_fiched from './de/fiched.js';   // (15 nov.) la fiche d'un article, direction D
 import ecran_renvoyer from './de/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
+import ecran_liaison from './de/liaison.js';   // (15 nov.) La liaison achat ⇄ article
 import ecran_retrait_ailleurs from './de/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
 import ecran_finition from './de/finition.js';   // (15 nov.) la finition écran par écran
+import ecran_parametres from './de/parametres.js';   // (15 nov.) Paramètres rangés en dix catégories
+import ecran_vcventes from './de/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
 import ecran_numeros_nouvelles from './de/numeros-nouvelles.js';   // (15 nov.) Les nouvelles annonces sans N°
 import ecran_idees from './de/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './de/ventes.js';
@@ -43,10 +49,13 @@ import ecran_studio_paires from './de/studio-paires.js';   // (14 nov., Studio b
 import ecran_republier_guide from './de/republierGuide.js';   // (15 nov.) republier / publier à la main, guidés
 import ecran_memePhoto from './de/memePhoto.js';   // (15 nov., lot meme-photo)
 import ecran_etageres from './de/etageres.js';   // (15 nov.) le Stock en étagères
+import ecran_journee_verre from './de/journee-verre.js';   // (15 nov.) Ma journée verre, la paire à sortir
 export default {
+  ...ecran_ventesVerre,
   ...ecran_studio_paires,
   ...ecran_republier_guide,
   ...ecran_etageres,
+  ...ecran_journee_verre,
   ...ecran_accueilReste,
   ...ecran_refonte_ms,
   ...ecran_studio_journee,
@@ -470,10 +479,10 @@ export default {
   "reglages.donnees.droits": "Deine weiteren Rechte:",
   "reglages.donnees.exporter": "Exportieren",
   "reglages.donnees.exporterOu.dessous": "„Komplettes Backup“ unten",
-  "reglages.donnees.exporterOu.reglages": "„Komplettes Backup“ (Einstellungen)",
+  "reglages.donnees.exporterOu.reglages": "„Komplettes Backup“, weiter oben",
   "reglages.donnees.lib": "Meine Daten exportieren",
   "reglages.donnees.supprimer": "Dein Konto löschen",
-  "reglages.donnees.supprimerOu": "„Mein Konto löschen“, ganz unten",
+  "reglages.donnees.supprimerOu": "„Mein Konto löschen“, unten in Mein Konto",
   "reglages.double.active": "Aktiv",
   "reglages.double.activeN": { one: "Aktiv · {n} Gerät", other: "Aktiv · {n} Geräte" },
   "reglages.double.inactive": "Aus",
@@ -568,8 +577,6 @@ export default {
   "reglages.sauvegarde.aRefaire": " · erneuern",
   "reglages.sauvegarde.derniere": "Letztes Backup: {quand}",
   "reglages.sauvegarde.jamais": "Nie gesichert — tippe „Komplettes Backup“",
-  "reglages.securite.desc": "Prüfen, dass nur du deine Daten lesen und schreiben kannst.",
-  "reglages.securite.lib": "Datensicherheit",
   "reglages.signalements.lib": "Erhaltene Meldungen",
   "reglages.simulation.lib": "Kontoerstellung simulieren",
   "reglages.simulation.desc": "Der Weg eines neuen Verkäufers, mit erfundenen Konten.",
@@ -2272,6 +2279,11 @@ export default {
   ...ecran_memePhoto,
   ...ecran_correspondances,
   ...ecran_renvoyer,
+  ...ecran_liaison,
   ...ecran_finition,
+  ...ecran_parametres,
+  ...ecran_avenir,
+  ...ecran_verre2,
+  ...ecran_fiched,
   ...ecran_numeros_nouvelles,
 };

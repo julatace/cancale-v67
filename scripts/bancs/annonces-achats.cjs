@@ -17,7 +17,8 @@ require('./_porte-banc.cjs');
 //              Jugé sur « Sans achat relié », sur « Toutes » et sur Stock ;
 //    debord    `scrollWidth <= innerWidth` (document et `.vrm-main`), chaque carte DANS l'écran et chaque
 //              élément visible d'une carte DANS sa carte ; un titre tient sur 2 lignes au plus ;
-//    hauteur   une carte sans suggestion ≤ 136 px, avec suggestion ≤ 188 px (390 et 1512) — avant : 207 et 252 ;
+//    hauteur   une carte sans suggestion ≤ 200 px, avec suggestion ≤ 310 px (390 et 1512) — la carte côte à côte du 15 nov.
+//              (src/liaisonAchat.js) ; avant le 15 nov. : ≤ 136 et ≤ 188 (la carte d'une ligne) ;
 //    gestes    chaque carte porte ses gestes (mêmes `data-*`) : avec suggestion « Relier · X € »
 //              (`data-ar-relier`), « Autre achat », « Saisir », « Plus tard » ; sans, « Saisir le prix »,
 //              « Choisir un achat », « Plus tard » ; un geste replié derrière « ⋯ » (`data-ar-plus`)
@@ -67,7 +68,7 @@ const listing = ([id, titre, marque, taille, prix, , jours, ph]) => ({ ...sc.ann
 // Les achats : trois rapprochables (même marque, même taille, achetés AVANT la mise en ligne), dont un sans photo.
 const achat = (tx, titre, prix, jours, ph) => ({ ...sc.ordre({ tx, titre, prix, statut: sc.STATUT_FINAL, dateMs: sc.NOW - jours * J }), ...(ph ? { photo: { url: photoUrl('h' + tx) } } : {}) });
 const ACHATS = [
-  achat('92000001', 'Adidas Handball Spezial nere usate 42', 43.67, 60, true),
+  achat('92000001', 'Adidas Handball Spezial marroni usate 42', 43.67, 60, true),   // (15 nov., liaison) « nere » (noir) contredit « Brown » : la règle pondérée l'écarte
   achat('92000002', 'Nike Air Max 1 Monarch 44', 19.05, 70, true),
   // (15 nov.) Deux achats que la règle §5 ÉCARTE (captures de Julien) : aucun mot de modèle commun, marque contredite.
   achat('92000005', 'Basket Nike 44', 15, 75, true),
@@ -179,7 +180,9 @@ function file({ tactile }) {
     const t = li.querySelector('[data-ar-titre]') || li.querySelector('.vrm-ar-titre');
     if (t) { const cs = getComputedStyle(t); const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.25; if (t.getBoundingClientRect().height > 2 * lh + 2) out.debord.push(`carte ${id} : titre sur ${Math.round(t.getBoundingClientRect().height / lh)} lignes`); }
     const sugg = !!li.getAttribute('data-ar-sugg-tx'); if (sugg) out.info.sugg++;
-    const max = sugg ? 188 : 136;
+    // (15 nov., liaison) La carte montre désormais l'article ET l'achat côte à côte (photos 64, titres, retrait, prix
+    // payé, niveau, pourquoi) : plus haute par construction ; sans achat proposé, une rangée et une ligne.
+    const max = sugg ? 310 : 200;
     if (rl.height > max) out.hauteur.push(`carte ${id} ${sugg ? 'avec' : 'sans'} suggestion : ${Math.round(rl.height)} px (> ${max})`);
     // Les gestes : présents ; visibles, ou derrière « ⋯ » de la carte.
     const plus = li.querySelector('[data-ar-plus]');

@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // AUDIT : L'ARGENT À VENIR — CE QUE LES SITES DOIVENT ENCORE, UNE SEULE RÈGLE
-//         node scripts/audit-argent-a-venir.cjs [--mutation=tx450|versement|holds|vcverse|zero|site|libere]
+//         node scripts/audit-argent-a-venir.cjs [--mutation=tx450|versement|holds|vcverse|zero|site|libere|etape-double|bloquee-total|inconnu-zero|devise|estime|frise]
 // ═══════════════════════════════════════════════════════════════════════════
 // Julien (4 nov.) : « ce que Vinted, eBay, Vestiaire (et Leboncoin) me doivent
 // encore », par site et par compte, la date prévue SEULEMENT si elle est lue.
@@ -24,6 +24,12 @@
 //   6. le branchement (lu dans App.jsx et la carte des chiffres) : la coque
 //      calcule, Ma journée, Ventes, le résumé Vinted, la carte et le widget
 //      consomment — plus aucune somme des statuts de la liste.
+//   7. (15 nov.) LES ÉTAPES : chaque vente dans UNE étape ; total = somme des
+//      étapes = somme des sites ; bloquée / litige (440) À PART, hors total ;
+//      montant inconnu ⇒ nommé (`illisible`), jamais 0 ; autre devise ⇒ écartée,
+//      dite (`devise`), jamais convertie ; eBay sans frais lus ⇒ le dû au vendeur,
+//      marqué « frais eBay à déduire » (`estime`) ; compte écarté ⇒ hors total ;
+//      la frise (semaine · suivante · plus tard · sans date) = le total.
 // `--mutation=…` réaffaiblit la règle dans une copie : rouge exigé.
 require('./_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const fs = require('fs'), path = require('path'), vm = require('vm'), os = require('os');
@@ -40,7 +46,13 @@ const muter = (avant, apres) => {
   if (!MODULE.includes(avant)) { console.log('❌ mutation impossible : motif absent — ' + avant.slice(0, 90)); process.exit(2); }
   MODULE = MODULE.replace(avant, apres);
 };
-if (MUT === 'tx450') muter('if (e && (e.s === 450 || e.s === 220 || e.s >= 430)) continue;', 'if (e && (e.s === 220 || (e.s >= 430 && e.s !== 450))) continue;');
+if (MUT === 'tx450') muter('if (e && (e.s === 450 || e.s === 220 || e.s >= 500)) continue;', 'if (e && (e.s === 220 || e.s >= 500)) continue;');
+else if (MUT === 'etape-double') muter("const L = lignes.filter((l) => (l.etape || 'autre') === k);", "const L = lignes.filter((l) => true);");
+else if (MUT === 'bloquee-total') muter("if (e && e.s >= 430) { bloquees.push(", "if (e && e.s >= 430 && false) { bloquees.push(");
+else if (MUT === 'inconnu-zero') muter("if (eur == null) { nonComptees.push({ id, plateforme: 'Vinted', compte, titre, sorte: 'illisible', raison: 'prix pas lu' }); continue; }", "if (eur == null) { lignes.push({ id, plateforme: 'Vinted', compte, titre, eur: 0, prevu: null, ts: null, etape: 'autre' }); continue; }");
+else if (MUT === 'devise') muter("const deviseDe = (p) => (p && typeof p === 'object' && p.currency_code ? String(p.currency_code).toUpperCase() : 'EUR');", "const deviseDe = (p) => 'EUR';");
+else if (MUT === 'estime') muter("if (d != null) { eur = d; estime = 'fraisEbay'; }", "if (d != null) { eur = d; }");
+else if (MUT === 'frise') muter("if (l.prevu == null || !Number.isFinite(l.prevu)) B.sansDate.push(l);", "if (l.prevu == null || !Number.isFinite(l.prevu)) continue;");
 else if (MUT === 'versement') muter('if (versements && versements[String(tx)]) continue;', '');
 else if (MUT === 'holds') muter('if (!retenues.length) continue;', '');
 else if (MUT === 'libere') muter("const LIBERE = /^(RELEASED|RELEASE_CONFIRMED|NOT_HELD)$/i;", "const LIBERE = /^$/;");
@@ -144,7 +156,7 @@ const charger = async (texte, nom) => {
     const ids = A.lignes.map((l) => l.id).sort();
     const attendus = ['ebay:E2', 'ebay:E5', 'lbc:L1', 'vestiaire:V1', 'vinted:1', 'vinted:10', 'vinted:2'];
     dit(JSON.stringify(ids) === JSON.stringify(attendus), 'les ventes à venir sont exactement celles attendues', ids.join(' '));
-    dit(!ids.includes('vinted:3'), 'Vinted : la liste dit « colis déposé » mais la transaction est finalisée (450) ⇒ pas à venir');
+    dit(!ids.includes('vinted:3') && !((A.bloquees && A.bloquees.lignes) || []).some((l) => l.id === 'vinted:3'), 'Vinted : la liste dit « colis déposé » mais la transaction est finalisée (450) ⇒ pas à venir, ni « bloquée »');
     dit(!ids.includes('vinted:4'), 'Vinted : une date de versement lue ⇒ pas à venir');
     dit(!ids.includes('vinted:5'), 'Vinted : transaction en retour (440) ⇒ pas à venir');
     dit(!ids.includes('vinted:8'), 'Vinted : un compte écarté n’entre pas');
@@ -193,6 +205,70 @@ const charger = async (texte, nom) => {
     dit(ko2.manque.includes('vendeur_b') && M.aVenirPour(ko2, { plateforme: 'Vinted', login: 'vendeuse_a' }).partiel === false, 'un compte Vinted pas lu ⇒ nommé ; il ne rend pas partiel un AUTRE compte');
     dit(M.dateEcriteLue('3 juil. 2026') != null && M.dateEcriteLue('jui 2026') == null && M.dateEcriteLue('32 novembre 2026') == null && M.dateEcriteLue('bientôt') == null, 'date écrite : « 3 juil. 2026 » lue ; ambiguë ou impossible ⇒ rien');
 
+
+    console.log('── 7. Les étapes (15 nov.)');
+    // Le parcours Vestiaire (src/parcoursVestiaire.js), la vraie règle.
+    const PV = (await charger(lire('src/parcoursVestiaire.js').replace("from '../api/_lib/vestiaire-regle.js'", `from 'file://${path.join(R, 'api/_lib/vestiaire-regle.js')}'`), 'parcours')).mod;
+    // L'étape Vinted : la traduction de l'étiquette (`etapeVintedAVenir` dans App.jsx) est jugée au banc
+    // (scripts/bancs/argent-a-venir.cjs) ; ici une table sur le statut, pour juger la RÈGLE du module.
+    const etV = (o) => /Bordereau|paiement a été validé/i.test(o.status) ? 'envoyer' : /livrée/i.test(o.status) ? 'livree' : /expédiée|déposé/i.test(o.status) ? 'route' : 'autre';
+    const R7 = { ...RG, etapeVinted: etV, parcoursVc: (v) => PV.parcoursVenteVc(v) };
+    const vinted7 = [
+      vv(21, 'Bordereau envoyé au vendeur', 64, accA), vv(22, "Commande expédiée et en cours d'acheminement ! ", 72, accA),
+      vv(23, 'Commande livrée ! ', 95, accB), vv(24, 'Le paiement a été validé', 85, accB),
+      vv(25, "Commande expédiée et en cours d'acheminement ! ", 110, accA),        // transaction 440 : retour ⇒ à part
+      vv(26, "Commande expédiée et en cours d'acheminement ! ", 99, accA),         // transaction 430 : suspendue ⇒ à part
+      vv(27, 'Commande livrée ! ', null, accA),                                    // prix illisible
+      { ...vv(28, 'Commande livrée ! ', 40, accA), price: { amount: '40', currency_code: 'GBP' } },   // autre devise
+      vv(29, 'Commande livrée ! ', 77, accX),                                      // compte écarté
+    ];
+    const etats7 = { 25: { s: 440 }, 26: { s: 430 } };
+    const cmd7 = (id, extra) => ({ orderId: id, orderPaymentStatus: 'PAID', creationDate: '2026-11-10T10:00:00Z', _pseudo: 'ebay_moi', lineItems: [{ title: 'Paire eBay ' + id }], ...extra });
+    const ebay7 = [
+      cmd7('E21', { orderFulfillmentStatus: 'FULFILLED', paymentSummary: { totalDueSeller: eur(110), payments: [{ paymentHolds: [{ holdState: 'HELD', holdAmount: eur(95.7), expectedReleaseDate: '2026-11-18T08:00:00.000Z' }] }] }, totalMarketplaceFee: eur(14.3) }),
+      cmd7('E22', { orderFulfillmentStatus: 'NOT_STARTED', paymentSummary: { totalDueSeller: eur(80), payments: [{ paymentHolds: [{ holdState: 'HELD' }] }] }, totalMarketplaceFee: eur(10) }),       // retenue sans montant ⇒ dû − frais
+      cmd7('E23', { orderFulfillmentStatus: 'FULFILLED', paymentSummary: { totalDueSeller: eur(60), payments: [{ paymentHolds: [{ holdState: 'HELD' }] }] } }),                                        // frais pas lus ⇒ dû, « à déduire »
+      cmd7('E24', { orderFulfillmentStatus: 'FULFILLED', paymentSummary: { totalDueSeller: { value: '50', currency: 'GBP' }, payments: [{ paymentHolds: [{ holdState: 'HELD', holdAmount: { value: '45', currency: 'GBP' } }] }] } }),   // GBP
+    ];
+    const vest7 = [
+      { id: 'V21', etat: 'IN_PROGRESS', montant: { cle: 'sellerEarning', devise: 'EUR', valeur: 203.23 }, etapesVc: { sellerSale: 'done', sellerShipment: 'done', sellerDelivery: 'ongoing', sellerPayment: 'upcoming' }, paiementEstime: '19 novembre 2026', compte: 'vc_moi' },
+      { id: 'V22', etat: 'ACTION_NEEDED', aExpedier: true, montant: { cle: 'sellerEarning', devise: 'EUR', valeur: 150 }, etapesVc: { sellerSale: 'done', sellerShipment: 'pending' }, paiementEstime: '2 décembre 2026', compte: 'vc_moi' },
+      { id: 'V23', etat: 'IN_PROGRESS', montant: { cle: 'sellerEarning', devise: 'EUR', valeur: 88 }, etapesVc: { sellerDelivery: 'done', sellerPayment: 'ongoing' }, compte: 'vc_moi' },
+      { id: 'V24', etat: 'IN_PROGRESS', montant: { cle: 'sellerEarning', devise: 'EUR', valeur: 70 }, etapesVc: { sellerConformity: 'refused' }, statutVc: 'item rejected', compte: 'vc_moi' },   // refusée ⇒ à part
+      { id: 'V25', etat: 'IN_PROGRESS', montant: { cle: 'sellerEarning', devise: 'USD', valeur: 90 }, compte: 'vc_moi' },                                                                         // USD
+      { id: 'V26', etat: 'IN_PROGRESS', montant: { cle: 'sellerEarning', devise: 'EUR', valeur: 33 }, compte: 'autre_vc' },                                                                       // compte écarté
+    ];
+    const lbc7 = [{ txId: 'L21', isSeller: true, price: 4500, stepStatus: 'validation', parcelStatus: 'in_transit', accountName: 'Toto' }];
+    const exclu7 = (site, v) => site === 'vestiaire' && v.compte === 'autre_vc';
+    const A7 = M.argentAVenir({ vinted: vinted7, lbc: lbc7, ebay: ebay7, vestiaire: vest7, versements: {}, etatTx: (tx) => etats7[String(tx)] || null, cachee, excluAutre: exclu7, R: R7 });
+    const parE = Object.fromEntries((A7.parEtape || []).map((g) => [g.etape, g]));
+    const C = (x) => Math.round(x * 100);
+    const sommeE = (A7.parEtape || []).reduce((t, g) => t + C(g.eur), 0), sommeS = (A7.parSite || []).reduce((t, g) => t + C(g.eur), 0);
+    dit(A7.lignes.every((l) => (M.ETAPES_A_VENIR || []).includes(l.etape)) && (A7.parEtape || []).reduce((t, g) => t + g.n, 0) === A7.n, 'chaque vente est dans UNE étape (le nombre des étapes = le nombre de ventes)', JSON.stringify((A7.parEtape || []).map((g) => g.etape + ':' + g.n)));
+    dit(sommeE === C(A7.total) && sommeS === C(A7.total), `le total (${A7.total} €) = la somme des étapes = la somme des sites, au centime`, `${sommeE / 100} / ${sommeS / 100}`);
+    // À la main : envoyer 64 + 85 + 150 + 70 (E22 : 80 − 10) = 369 ; route 72 + 203,23 + 45 (Leboncoin) = 320,23 ;
+    // livree 95 ; versement 95,70 (E21) + 60 (E23, avant frais) + 88 (V23) = 243,70 ⇒ 1 027,93 €.
+    dit(parE.envoyer && C(parE.envoyer.eur) === 36900 && parE.envoyer.n === 4, 'à envoyer : 64 + 85 + 150 + 70 (eBay pas expédiée, dû − frais) = 369 €', JSON.stringify(parE.envoyer));
+    dit(parE.route && C(parE.route.eur) === 32023 && parE.route.n === 3, 'en route : 72 + 203,23 (Vestiaire envoyée) + 45 (Leboncoin en transit) = 320,23 €', JSON.stringify(parE.route));
+    dit(parE.livree && C(parE.livree.eur) === 9500 && parE.livree.n === 1, 'livrée : 95 € (le prix illisible, la devise et le compte écarté n’y sont pas)', JSON.stringify(parE.livree));
+    dit(parE.versement && C(parE.versement.eur) === 24370 && parE.versement.n === 3, 'versement en cours : 95,70 (retenue eBay) + 60 (avant frais) + 88 (Vestiaire paie) = 243,70 €', JSON.stringify(parE.versement));
+    dit(C(A7.total) === 102793 && A7.n === 11, 'le total à la main : 1 027,93 € pour 11 ventes', `${A7.total} / ${A7.n}`);
+    const bl = A7.bloquees || { n: 0, lignes: [] };
+    dit(bl.n === 3 && C(bl.eur) === 27900 && ['vinted:25', 'vinted:26', 'vestiaire:V24'].every((id) => bl.lignes.some((l) => l.id === id)) && !A7.lignes.some((l) => ['vinted:25', 'vinted:26', 'vestiaire:V24'].includes(l.id)), 'bloquées : retour (440), suspendue (430), refusée au contrôle — 279 € À PART, hors total', JSON.stringify(bl.lignes.map((l) => l.id + ':' + l.eur)));
+    const nc7 = Object.fromEntries((A7.nonComptees || []).map((x) => [x.id, x]));
+    dit(nc7['vinted:27'] && nc7['vinted:27'].sorte === 'illisible' && !A7.lignes.some((l) => l.id === 'vinted:27'), 'montant inconnu ⇒ nommé (« illisible »), jamais 0 € dans une étape', JSON.stringify(nc7['vinted:27']));
+    dit(nc7['vinted:28'] && nc7['vinted:28'].sorte === 'devise' && nc7['vinted:28'].devise === 'GBP', 'Vinted en GBP ⇒ écartée et dite (« devise GBP »), jamais convertie', JSON.stringify(nc7['vinted:28']));
+    dit(nc7['ebay:E24'] && nc7['ebay:E24'].sorte === 'devise' && nc7['vestiaire:V25'] && nc7['vestiaire:V25'].sorte === 'devise', 'eBay en GBP, Vestiaire en USD ⇒ écartées et dites', JSON.stringify([nc7['ebay:E24'], nc7['vestiaire:V25']]));
+    const e23 = A7.lignes.find((l) => l.id === 'ebay:E23'), e22 = A7.lignes.find((l) => l.id === 'ebay:E22');
+    dit(e23 && e23.eur === 60 && e23.estime === 'fraisEbay' && A7.estimes && A7.estimes.n === 1 && C(A7.estimes.eur) === 6000, 'eBay sans frais lus ⇒ le dû au vendeur (60 €), « frais eBay à déduire » dit — un montant connu, jamais « inconnu »', JSON.stringify({ e23, est: A7.estimes }));
+    dit(e22 && e22.eur === 70 && !e22.estime, 'eBay, retenue sans montant ⇒ l’argent reçu (`montantRecuEbay` : 80 − 10 = 70 €)', JSON.stringify(e22));
+    dit(!A7.lignes.some((l) => l.id === 'vinted:29' || l.id === 'vestiaire:V26') && !bl.lignes.some((l) => l.id === 'vinted:29'), 'un compte écarté (Vinted, Vestiaire) n’entre dans aucune étape ni dans le total');
+    const v21 = A7.lignes.find((l) => l.id === 'vestiaire:V21');
+    dit(v21 && v21.prevu != null && new Date(v21.prevu).getDate() === 19 && !A7.lignes.filter((l) => l.plateforme === 'Vinted').some((l) => l.prevu != null), 'la date : Vestiaire « 19 novembre 2026 » lue ; Vinted n’en a aucune (jamais estimée)');
+    const F = typeof M.friseAVenir === 'function' ? M.friseAVenir(A7, new Date(2026, 10, 15, 10, 0, 0).getTime()) : null;   // dimanche 15 nov.
+    const sF = F ? C(F.semaine.eur) + C(F.suivante.eur) + C(F.plusTard.eur) + C(F.sansDate.eur) : -1;
+    dit(!!F && sF === C(A7.total) && F.semaine.n + F.suivante.n + F.plusTard.n + F.sansDate.n === A7.n, 'la frise : cette semaine + la suivante + plus tard + sans date = le total, chaque vente une fois', JSON.stringify(F));
+    dit(F && F.semaine.n === 0 && F.suivante.n === 2 && F.plusTard.n === 1 && F.datees === 3, 'la frise (dimanche 15 nov.) : 18 et 19 nov. ⇒ la semaine suivante ; 2 déc. ⇒ plus tard', JSON.stringify(F));
     console.log('── La carte des chiffres lit la même règle');
     const carteTxt = CARTE.replace("from '../argentAVenir.js'", `from 'file://${tmpM}'`)
       // (11 nov.) la carte importe aussi src/formatsDate.js (un format créé une fois) : le vrai fichier
@@ -230,6 +306,11 @@ const charger = async (texte, nom) => {
   dit(/const attV = aVenirPour\(liveStats && liveStats\.aVenir, \{ plateforme: 'Vinted' \}\);/.test(A0), 'le résumé Vinted lit la part Vinted de la règle');
   dit(/const aV = aVenirPour\(liveStatsVus\.aVenir\);\s*if \(aV\.valeur != null && !aV\.partiel\) base0\.enAttente/.test(A0), 'le widget prend la règle, seulement complète');
   dit(/aVenirPour\(L\.aVenir \|\| null, \{ plateforme, login \}\)/.test(sansCommentaires(CARTE)) && !/L\.walletAttente/.test(sansCommentaires(CARTE)), 'la carte des chiffres lit la règle, plus le seul porte-monnaie');
+  // (15 nov.) L'étape Vinted vient de l'étiquette de la vente (`etapeVente`), celle de Vestiaire du parcours : jamais une seconde lecture.
+  dit(/etapeVinted: \(o\) => etapeVintedAVenir\(o\), parcoursVc: \(v\) => parcoursVenteVc\(v\)/.test(A0) && /const etapeVintedAVenir = \(o\) => \{\s*const e = etapeVente\(o\);/.test(A0), 'les étapes : Vinted par `etapeVente`, Vestiaire par `parcoursVenteVc` (les règles propriétaires)');
+  const ECRAN = sansCommentaires(lire('src/ArgentAVenirEcran.jsx'));
+  dit(!!ECRAN && !/\.reduce\(/.test(ECRAN.replace(/export function resumeEtapes[\s\S]*$/, '')) && /friseAVenir\(A, maintenant\)/.test(ECRAN), 'l’écran « Argent à venir » n’additionne rien lui-même (les sommes viennent de la règle)');
+  dit(/<ArgentAVenirHote\/>/.test(A0) && /window\.addEventListener\('vrm:argent-a-venir'/.test(A0), 'la coque monte l’écran et l’ouvre sur `vrm:argent-a-venir`');
 
   console.log(`\n${ko ? '❌' : '✅'} audit-argent-a-venir : ${ok} vert(s), ${ko} rouge(s)${MUT ? ' [mutation ' + MUT + ']' : ''}`);
   process.exit(ko ? 1 : 0);

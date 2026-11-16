@@ -142,9 +142,18 @@ async function fermerFiche(pg) {
     await pg.waitForTimeout(400);
   }
 }
+// (16 nov., fiche D) Les gestes et les places de la case (`DansFiche` : Déplacer, Retirer, les sites de la case) vivent
+// derrière « ⋯ » de la fiche (feuille de tuiles, « Tout voir ») : un toucher les montre, comme lui.
+async function ouvrirPlus(pg) {
+  await pg.evaluate(() => { const b = document.querySelector('.vrm-fp [data-fd-plus-ouvrir]'); if (b) b.click(); });
+  await pg.waitForTimeout(300);
+  await pg.evaluate(() => { const d = document.querySelector('.vrm-fp [data-fiche-plus]'); if (d) d.open = true; });
+  await pg.waitForTimeout(300);
+}
 async function retirerCase(pg, n) {
   if (!(await toucher(pg, `[data-case-num="${n}"]`))) return false;
-  await pg.waitForSelector('[data-fiche-retirer]', { timeout: 8000 }).catch(() => {});
+  await pg.waitForSelector('[data-fiche-retirer]', { state: 'attached', timeout: 8000 }).catch(() => {});
+  await ouvrirPlus(pg);
   await toucher(pg, '[data-fiche-retirer]');
   await pg.waitForTimeout(500); await fermerFiche(pg); await pg.waitForTimeout(300);
   return (await ou(pg, n)) === null;   // jugé sur la case (un clic qui se détache en partant n'est pas un échec)
@@ -186,8 +195,10 @@ async function retirerCase(pg, n) {
         if (CAPT) { await pg.evaluate(() => document.querySelector('[data-case-num="20"]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(300); await pg.screenshot({ path: path.join(CAPT, `etag-${v}-0-sites.png`) }); }
         if (complet) {
           await toucher(pg, '[data-case-num="20"]');
-          await pg.waitForSelector('[data-fiche-sites]', { timeout: 8000 }).catch(() => {});
-          const fs2 = await pg.evaluate(() => { const l = [...document.querySelectorAll('[data-fiche-site]')]; return l.map((x) => x.getAttribute('data-fiche-site') + ':' + (x.getAttribute('data-compte') || '') + ':' + x.textContent.replace(/\s+/g, ' ').trim()); });
+          await pg.waitForSelector('.vrm-etag-fiche-sites[data-fiche-sites]', { state: 'attached', timeout: 8000 }).catch(() => {});
+          await ouvrirPlus(pg);
+          // les rangées du STOCK (src/stockAnnonces.js, par identité) ; la vue « Sites » de la fiche D a sa propre règle (Prix partout)
+          const fs2 = await pg.evaluate(() => { const l = [...document.querySelectorAll('.vrm-etag-fiche-site[data-fiche-site]')]; return l.map((x) => x.getAttribute('data-fiche-site') + ':' + (x.getAttribute('data-compte') || '') + ':' + x.textContent.replace(/\s+/g, ' ').trim()); });
           dit(fs2.length === 2 && /^vinted:compte_invente:/.test(fs2[0]) && /^leboncoin:nord_lbc:.*95/.test(fs2[1]), `${t} · K5 : la fiche de N°20 dit une ligne par site (logo · compte · prix · depuis)`, fs2);
           if (CAPT) await pg.screenshot({ path: path.join(CAPT, `etag-${v}-0b-fiche-sites.png`) });
           await fermerFiche(pg); await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(400);

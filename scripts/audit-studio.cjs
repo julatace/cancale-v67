@@ -97,7 +97,9 @@ function juger(depot) {
   // (14 nov., version studio) Les feuilles d'ÉCRAN du studio (`./design/studio-<écran>.css`, ex. studio-paires.css)
   // se posent PAR-DESSUS la fondation : elles lisent ses jetons et peuvent la suivre. Rien d'autre ne passe après.
   const tous = [...app.matchAll(/^import\s+["']([^"']+\.css)["']/gm)].map((m) => m[1]);
-  let fin = tous.length; while (fin > 0 && /^\.\/design\/studio-(?!polices)[a-z-]+\.css$/.test(tous[fin - 1])) fin--;
+  // (16 nov., intégration vague A) Les feuilles d'écran du VERRE (`verre-*.css`, `ventes-verre.css`, `fiche-d.css`, toutes
+  // dans la couche `vrm-verre`) sont de la même famille : par-dessus la fondation, jamais avant ses polices.
+  let fin = tous.length; while (fin > 0 && /^\.\/design\/(?:studio-(?!polices)[a-z-]+|verre-[a-z-]+|ventes-verre|fiche-d)\.css$/.test(tous[fin - 1])) fin--;
   const imports = tous.slice(0, fin);
   dit(imports[imports.length - 1] === './design/studio.css', 'S3 studio.css est la DERNIÈRE feuille importée par App.jsx', imports.slice(-3).join(' · '));
   dit(imports.indexOf('./design/studio-polices.css') === imports.length - 2, 'S3 ses polices juste avant lui');

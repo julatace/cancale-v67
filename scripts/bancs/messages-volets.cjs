@@ -14,8 +14,13 @@
 //      et ne montre aucun N° ;
 //   (5 nov., chantier G) Le N° est la pastille commune `Numero` (deux morceaux en boîte flexible : « N°\n80 » en innerText) : on lit `N°\s*80`.
 //   3. la carte d'offre : « Offre de 100 € — ton mini : 105 € » (le mini posé à
-//      côté du N°), Refuser · Proposer 105 € · Accepter, dans cet ordre (3 nov. :
-//      la contre-offre en un tap, X = SON mini arrondi à l'euro supérieur) ;
+//      côté du N°) ; la contre-offre en un tap (3 nov. : X = SON mini arrondi à
+//      l'euro supérieur). (16 nov.) La maquette « Verre dépoli » validée par Julien
+//      le 15 nov. (« tout est parfait sauf étagères », docs/passation/2026-11-15-
+//      ecrans-verre-2.md : « le plein va à Proposer N € ; Accepter N € et Refuser en
+//      touches ») remplace l'ordre Refuser · Proposer · Accepter du 31 oct. : le
+//      plein « Proposer 105 € » en tête, pleine largeur, puis Accepter et Refuser
+//      côte à côte, en touches ; ta bulle en bleu clair (plus en encre pleine) ;
 //   4. aucun envoi sans clic : ouvrir, une réponse rapide (qui REMPLIT le champ),
 //      et Accepter (qui DEMANDE) — aucune requête autre qu'une lecture ne part ;
 //      annuler la confirmation n'envoie rien ; PUIS le tap « Proposer 105 € »
@@ -159,7 +164,7 @@ const boite = (pg, sel) => pg.evaluate((s) => { const e = document.querySelector
       const t = (fiche && fiche.txt) || '';
       dit(/N°\s*80/.test(t) && /120\s?€/.test(t) && /11 favoris/.test(t) && /120 vues/.test(t) && /Meuble C/.test(t) && /42/.test(t) && /boutique_test/.test(t), 'elle porte son prix, sa taille, le compte, le N°, sa place dans « Mes meubles » et favoris · vues', t.replace(/\n/g, ' | '));
       dit(!/N°81|130\s?€|3 favoris|Meuble D/.test(t), 'rien de l’autre annonce au même titre (N°81, 130 €, 3 favoris, Meuble D)');
-      const offre = await r.pg.evaluate(() => { const e = document.querySelector('.vrm-chat-offre-traiter'); if (!e) return null; const bs = [...e.querySelectorAll('.vrm-chat-offre-actions button')].map((x) => ({ g: x.getAttribute('data-offre-geste'), t: x.innerText.trim(), l: x.getBoundingClientRect().left, y: x.getBoundingClientRect().top }));
+      const offre = await r.pg.evaluate(() => { const e = document.querySelector('.vrm-chat-offre-traiter'); if (!e) return null; const bs = [...e.querySelectorAll('.vrm-chat-offre-actions button')].map((x) => ({ g: x.getAttribute('data-offre-geste'), t: x.innerText.trim(), l: x.getBoundingClientRect().left, y: x.getBoundingClientRect().top, w: x.getBoundingClientRect().width, bg: getComputedStyle(x).backgroundColor }));
         // (9 nov.) Depuis le 8 nov. (« Clarifier les offres », `ResumeOffre`) l'en-tête est un tableau :
         // Prix affiché · Offre reçue · Ton minimum, puis le repère (« 5 € sous ton minimum »).
         const dd = (k) => ((e.querySelector(`[data-offre-prix="${k}"] dd`) || {}).innerText || '').replace(/[\u00a0\u202f]/g, ' ');
@@ -167,7 +172,9 @@ const boite = (pg, sel) => pg.evaluate((s) => { const e = document.querySelector
         return { mini: e.getAttribute('data-offre-mini'), contre: e.getAttribute('data-offre-contre'), recue: dd('recue'), miniTxt: dd('mini'), niveau: rep ? rep.getAttribute('data-offre-niveau') : null, repere: rep ? rep.innerText : '', tete: (e.querySelector('[data-offre-comparer]') || {}).innerText || '', bs }; });
       dit(offre && /^100(,00)? €$/.test(offre.recue) && /^105(,00)? €$/.test(offre.miniTxt) && offre.mini === '105' && offre.niveau === 'sous-minimum' && /5(,00)?\s€ sous ton minimum/.test(offre.repere.replace(/[\u00a0\u202f]/g, ' ')), 'la carte d’offre : « Offre reçue 100 € · Ton minimum 105 € — 5 € sous ton minimum »', JSON.stringify(offre && { recue: offre.recue, mini: offre.miniTxt, niveau: offre.niveau, repere: offre.repere }));
       const ordre = offre ? offre.bs.map((x) => x.g).join(',') : '';
-      dit(ordre === 'refuser,proposer,accepter' && offre.bs.every((x) => Math.abs(x.y - offre.bs[0].y) < 2) && offre.bs[0].l < offre.bs[1].l && offre.bs[1].l < offre.bs[2].l && /Proposer 105\s€/.test(offre.bs[1].t) && offre.contre === '105', 'Refuser · Proposer 105 € · Accepter (X = son mini), côte à côte et dans cet ordre', JSON.stringify(offre && offre.bs));
+      // (16 nov., maquette validée le 15 nov.) le plein en tête, pleine largeur ; dessous Accepter · Refuser côte à côte, en touches.
+      const [bp, ba, br] = offre ? offre.bs : [];
+      dit(ordre === 'proposer,accepter,refuser' && bp.y < ba.y - 20 && Math.abs(ba.y - br.y) < 2 && ba.l < br.l && bp.w >= ba.w + br.w && bp.bg !== ba.bg && ba.bg === br.bg && /Proposer 105\s€/.test(bp.t) && /Accepter 100\s€/.test(ba.t) && offre.contre === '105', 'le plein « Proposer 105 € » (X = son mini) en tête, pleine largeur ; Accepter · Refuser dessous, en touches (maquette du 15 nov.)', JSON.stringify(offre && offre.bs));
       const pied = await r.pg.evaluate(() => ({ rapides: document.querySelectorAll('.vrm-chat-panel .vrm-chat-rapides button').length, ph: (document.querySelector('.vrm-chat-compose textarea') || {}).placeholder, mic: !!document.querySelector('.vrm-chat-compose [data-mic-dictee]'), dicteeOk: 'SpeechRecognition' in window || 'webkitSpeechRecognition' in window, send: (() => { const s = document.querySelector('.vrm-chat-send'); if (!s) return null; const b = s.getBoundingClientRect(); return { w: Math.round(b.width), h: Math.round(b.height), bg: getComputedStyle(s).backgroundColor, label: s.getAttribute('aria-label') }; })() }));
       dit(pied.rapides >= 3 && pied.ph === 'Écris ta réponse…' && (pied.mic || !pied.dicteeOk) && pied.send && Math.abs(pied.send.w - pied.send.h) <= 1 && pied.send.label === 'Envoyer', 'le pied : pastilles de réponses rapides, « Écris ta réponse… », micro de dictée, Envoyer rond', JSON.stringify(pied));
       // Aucun envoi sans clic.
@@ -215,14 +222,17 @@ const boite = (pg, sel) => pg.evaluate((s) => { const e = document.querySelector
       const carte = await r.pg.evaluate(() => { const c = document.querySelector('[data-fil-paire]'); return c ? { item: c.getAttribute('data-fil-paire'), txt: c.innerText } : null; });
       dit(carte && carte.item === '801' && /Salomon XT-6/.test(carte.txt) && /42/.test(carte.txt) && /120\s?€/.test(carte.txt) && /Vinted/.test(carte.txt) && /boutique_test/.test(carte.txt) && /Meuble C/.test(carte.txt) && /N°\s*80/.test(carte.txt) && !/N°81|Meuble D/.test(carte.txt), 'en tête du fil : la paire (titre · taille, prix · site · compte · rangement, N°80)', JSON.stringify(carte));
       const ordre = await r.pg.evaluate(() => [...document.querySelectorAll('.vrm-chat-offre-actions button')].map((x) => x.getAttribute('data-offre-geste')).join(','));
-      dit(ordre === 'refuser,proposer,accepter', 'la carte d’offre au téléphone : Refuser · Proposer 105 € · Accepter', ordre);
+      dit(ordre === 'proposer,accepter,refuser', 'la carte d’offre au téléphone : Proposer 105 € (le plein), puis Accepter · Refuser (maquette du 15 nov.)', ordre);
       const bt = await r.pg.evaluate(() => [...document.querySelectorAll('.vrm-chat-offre-actions button')].map((x) => { const b = x.getBoundingClientRect(); return { r: Math.round(b.right), h: Math.round(b.height), t: x.innerText, plein: x.scrollWidth <= x.clientWidth + 1 }; }));
       dit(bt.length === 3 && bt.every((x) => x.r <= 390 && x.h >= 36 && x.plein), 'les trois boutons tiennent dans 390 px, textes entiers', JSON.stringify(bt));
       const bulles = await r.pg.evaluate(() => [...document.querySelectorAll('.vrm-chat-panel .vrm-bulle')].map((x) => ({ moi: x.getAttribute('data-bulle'), bg: getComputedStyle(x).backgroundColor, h: !!x.querySelector('time') })));
       const moi = bulles.find((x) => x.moi === 'moi'), eux = bulles.find((x) => x.moi === 'acheteur');
-      // « Encre pleine » : le fond de SA bulle est la couleur du texte de l'app.
+      // (16 nov., maquette « Verre dépoli » validée le 15 nov. : « l'autre en porcelaine, toi en bleu clair ») SA bulle est
+      // bleu clair (claire, le bleu au-dessus du rouge), jamais l'encre ; celle de l'acheteur, une autre surface.
       const encre = await r.pg.evaluate(() => { const d = document.createElement('span'); d.style.color = 'var(--vrm-ink)'; document.body.appendChild(d); const c = getComputedStyle(d).color; d.remove(); return c; });
-      dit(moi && eux && moi.bg === encre && eux.bg !== encre && bulles.every((x) => x.h), 'les bulles : lui en encre pleine, l’acheteur en surface, chacune avec son heure', JSON.stringify({ bulles, encre }));
+      const rgb = (c) => (String(c).match(/[\d.]+/g) || []).map(Number);
+      const bleuClair = (c) => { const [r0, g0, b0] = rgb(c); return b0 >= 200 && b0 > r0 + 20 && (0.2126 * r0 + 0.7152 * g0 + 0.0722 * b0) > 170; };
+      dit(moi && eux && moi.bg !== encre && bleuClair(moi.bg) && eux.bg !== moi.bg && eux.bg !== encre && bulles.every((x) => x.h), 'les bulles : la sienne en bleu clair, l’acheteur en surface, chacune avec son heure', JSON.stringify({ bulles, encre }));
       await r.pg.screenshot({ path: path.join(os.tmpdir(), 'messages-volets-390-fil.png') });
       // (3 nov.) Le tap « Proposer 105 € » : UNE offre, de 105 €, sur SA transaction.
       dit(gestes(r).length === 0, 'rien n’est parti avant le tap');
