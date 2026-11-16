@@ -35409,7 +35409,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const memoVisibles = useRef(null);
   if (!memoVisibles.current || memoVisibles.current.cle.some((x, i) => x !== cleVisibles[i])) memoVisibles.current = { cle: cleVisibles, m: new WeakMap() };
   const visiblesM = memoVisibles.current.m;
-  const isHidden = (o) => { if (!o || typeof o !== 'object') return isHiddenCalcul(o); if (visiblesM.has(o)) return visiblesM.get(o); const v = isHiddenCalcul(o); visiblesM.set(o, v); return v; };
+  const isHidden = (o) => { if (!o || typeof o !== 'object') return isHiddenCalcul(o); const deja = visiblesM.get(o); if (deja !== undefined) return deja; const v = isHiddenCalcul(o); visiblesM.set(o, v); return v; };
   const toggleHidden = () => {};   // (29 oct.) une vente ne se masque plus
   const [annSearch, setAnnSearch] = useVueSession('annonces-recherche', ''); // recherche annonces (titre/marque/N°)
   // (3 nov.) « Articles qui dorment » : le seuil (30/60/90 j) est un confort de CET
@@ -37461,7 +37461,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!o || typeof o !== 'object') return fn(o);
     let e = memosVersion.current[nom];
     if (!e || !e.lue) { const k = cle(); if (!e || e.k.length !== k.length || e.k.some((x, i) => x !== k[i])) e = memosVersion.current[nom] = { k, m: new WeakMap() }; e.lue = true; queueMicrotask(() => { e.lue = false; }); }
-    if (e.m.has(o)) return e.m.get(o);
+    // (16 nov., vitesse-moteur) Une lecture au lieu de deux (appelée des centaines de milliers de fois par ouverture).
+    const deja = e.m.get(o); if (deja !== undefined || e.m.has(o)) return deja;
     const r = fn(o); e.m.set(o, r); return r;
   };
   const reglesNumeros = () => `${coupureNumerotation()}|${archiveNumeros()}|${numeroEcritActif()}|${JSON.stringify(ouNumeroEcrit())}`;
