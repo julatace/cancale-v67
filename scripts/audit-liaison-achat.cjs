@@ -36,7 +36,7 @@ const MUTS = {
   'unicite-achat': ['src/liaisonAchat.js', '    if (e.score - rivalA < ECART_TRES_PROBABLE) continue;\n', ''],
   'version-ignoree': ['src/liaisonAchat.js', 'if (va && va !== v) return null;', ''],
   'taille-ignoree': ['src/liaisonAchat.js', 'if (ta.taille && !tailleOk && !ta.us) return null;', ''],
-  'couleur-ignoree': ['src/liaisonAchat.js', 'if (!couleur) return null; }', '}'],
+  'couleur-ignoree': ['src/liaisonAchat.js', "  if (accord === '') return null;\n", ''],
   'posterieur': ['src/liaisonAchat.js', 'if (!Number.isFinite(A.date) || (Number.isFinite(P.ref) && !(A.date < P.ref))) return null;', ''],
   'refus-ignore': ['src/liaisonAchat.js', "if (refus.size && refus.has(P.key + '>' + A.tx)) return null;", ''],
   'lot-tres-probable': ['src/liaisonAchat.js', 'const fort = !A.lot && !generique && score', 'const fort = !generique && score'],
