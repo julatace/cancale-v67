@@ -149,7 +149,7 @@ function enFrancais(texte, racine) {
     let rempl, a0 = debut, a1 = fin;
     if (fn === 'trm') {
       const vs = vars || {};
-      const enJsx = texte[debut - 1] === '{' && texte[fin] === '}' && !/[\w-]=\{$/.test(texte.slice(Math.max(0, debut - 40), debut)) && jsxSur(v.replace(/\{\w+\}/g, ''));
+      const enJsx = texte[debut - 1] === '{' && texte[debut - 2] !== '$' && texte[fin] === '}' && !/[\w-]=\{$/.test(texte.slice(Math.max(0, debut - 40), debut)) && jsxSur(v.replace(/\{\w+\}/g, ''));
       if (enJsx) { a0 = debut - 1; a1 = fin + 1; rempl = v.replace(/\{(\w+)\}/g, (mm, n) => '{' + (n in vs ? vs[n] : 'motsVendeur().' + n) + '}'); }
       else rempl = '`' + v.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${').replace(/\{(\w+)\}/g, (mm, n) => '${' + (n in vs ? vs[n] : 'motsVendeur().' + n) + '}') + '`';
       out += texte.slice(i, a0) + rempl; i = a1; re.lastIndex = fin; continue;
