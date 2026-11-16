@@ -751,7 +751,12 @@ import { PaireAvantHote, clicAvant, ouvrirFicheDe } from './paires/PaireAvant.js
 import DansFiche from './DansFiche.jsx';
 import { cascadeVente, valeurStock, publierValeurStock } from "./coutVente.js";   // (10 nov., lots BA et BF)
 import { CLE_PRIX_LUS, noterPrixLus } from "./historiquePrix.js";
-import { conseilBaisse, derniereBaisseLue, baisseProportion, noterConseils, fusionConseils, CLE_CONSEIL_PRIX } from "./conseilPrix.js";   // (12 nov.) le conseil de baisse, mesuré   // (10 nov., lot L) les prix lus dans le dressing
+import { conseilBaisse, derniereBaisseLue, baisseProportion, noterConseils, fusionConseils, CLE_CONSEIL_PRIX } from "./conseilPrix.js";
+// (15 nov., vendre plus) La baisse intelligente (règle pure), sa feuille, la relance des favoris au bon moment.
+import { baisseConseillee, indexComparables, comparablesDe, ventesComparablesDuReleve, commeConseil, classerConseils } from "./baisseConseillee.js";
+import BaissesConseillees, { EntreeBaissesConseillees } from "./BaissesConseillees.jsx";
+import { cartesRelance, datesFavorisParAnnonce } from "./relanceFavoris.js";
+import RelanceFavorisCarte from "./RelanceFavorisCarte.jsx";   // (12 nov.) le conseil de baisse, mesuré   // (10 nov., lot L) les prix lus dans le dressing
 import CalculetteAchat from "./CalculetteAchat.jsx";   // (10 nov., lot L) la calculette d'achat (Achats, ⌘K)
 import { ChoixEmballageColis } from "./EmballagesCarte.jsx";   // (10 nov., lot L) l'emballage d'un colis (facultatif)
 import { CLE_EMBALLAGES, colisFaits as colisFaitsEmb } from "./emballages.js";
@@ -27776,6 +27781,26 @@ const premiereCaseLibre = (plan) => {
   }
   return null;
 };
+// (15 nov., vendre plus) TOUS les N° rangés et leur lieu, pour la loupe (src/rechercheUnique.js, `stock`) :
+// le plan (pièce · meuble · case, les MÊMES règles qu'`ouEstNumero`) et le garage. `brut` : le texte rangé de
+// `vrm_room_plan` (relu seulement s'il change) ; illisible ⇒ seulement le garage. Rien n'est écrit.
+const stockPourRecherche = (brut, grille) => {
+  const out = [];
+  let plan = null; try { plan = brut ? normalizePlan(JSON.parse(brut)) : null; } catch (_) { plan = null; }
+  for (const rm of ((plan && plan.rooms) || [])) for (const it of (rm.items || [])) {
+    const lieu = [rm.name, it.name].filter(Boolean).join(' · ');
+    try {
+      if (meubleACases(it)) {
+        const { nr, nc } = dimsMeuble(it); const { mode } = casesDe(it); const vue = graviteCases(it.slots, nr, nc, mode, it, rm.room && rm.room.wallH);
+        for (const k in vue) for (const v of (vue[k] || [])) if (v != null && String(v).trim()) out.push({ numero: String(v), lieu: [lieu, nomCase(nr, k, mode, it)].filter(Boolean).join(' · ') });
+      }
+    } catch (_) {}
+    if (Array.isArray(it.nums)) for (const v of it.nums) if (v != null && String(v).trim()) out.push({ numero: String(v), lieu });
+    if (it.num != null && String(it.num).trim()) out.push({ numero: String(it.num), lieu });
+  }
+  for (const [box, arr] of Object.entries(grille || {})) if (Array.isArray(arr)) for (const v of arr) if (v != null && String(v).trim()) out.push({ numero: String(v), lieu: String(box) });
+  return out;
+};
 // Où est posé ce numéro (comparé par IDENTITÉ de numéro, `cleNum`) ?
 const ouEstNumero = (plan, num) => {
   const t = cleNum(num); if (!t) return null;
@@ -39852,7 +39877,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // carte. L'action reste un lien vers l'annonce — aucune écriture côté Vinted.
   const [conseilMemo, setConseilMemo] = useStateCle(CLE_CONSEIL_PRIX, () => load(CLE_CONSEIL_PRIX, null));
   useEffect(() => onCloudReady(() => setConseilMemo((local) => fusionConseils(load(CLE_CONSEIL_PRIX, null), local))), []);
-  const conseilsPrix = useMemo(() => {
+  // (15 nov., vendre plus — validé par Julien) LA BAISSE INTELLIGENTE : la MÊME carte, mais chaque
+  // proposition passe par `baisseConseillee` (src/baisseConseillee.js) — SES ventes comparables (délai
+  // habituel du même modèle, de la même marque lue, de la même tranche de prix), les vues, favoris et
+  // offres LUS, et le plancher complet (`plancherVente` : achat + frais connus). Elle garde les bornes de
+  // `conseilBaisse` (≤ −10 %, 14 j, achat + 10 %) ; « garder » ⇒ aucune proposition dans la carte, la
+  // feuille « Baisses conseillées » dit pourquoi. Ses ventes passées : la lecture PARTAGÉE de Statistiques
+  // (`lireExtrasRepartition`, 10 min de cache), seulement sur Annonces ; pas lues ⇒ sans comparables.
+  const [extrasBc, setExtrasBc] = useState(undefined);
+  useEffect(() => { if (only !== 'annonces') return undefined; let mort = false;
+    lireExtrasRepartition().then((x) => { if (!mort) setExtrasBc(x || null); }).catch(() => { if (!mort) setExtrasBc(null); });
+    return () => { mort = true; }; }, [only]);
+  const indexBc = useMemo(() => (extrasBc && extrasBc.items && extrasBc.txn ? indexComparables(ventesComparablesDuReleve(lireReleveVentes(), extrasBc, dateMiseEnLigneMs)) : null), [extrasBc]);
+  const decisionsBaisse = useMemo(() => {
     const m = new Map();
     const journal = load(CLE_PRIX_LUS, null), histo = load('vinted_prix_historique', []) || [];
     const memoA = conseilMemo && conseilMemo.v === 1 && conseilMemo.a ? conseilMemo.a : {};
@@ -39860,11 +39897,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const id = String(it.id);
       const c = conseilBaisse({ prix: it.price, ageJours: listedAgeDays(it), achat: prixAchatDe(numeros[it.id], buyByNum),
         favoris: it.favourites ?? null, derniereBaisse: derniereBaisseLue(id, journal, histo), memo: memoA[id] || null });
-      if (c.sugg != null) m.set(id, c);
+      const d = baisseConseillee({ conseil: c, prix: it.price, ageJours: listedAgeDays(it), vues: Number.isFinite(it.views) ? it.views : null, favoris: Number.isFinite(it.favourites) ? it.favourites : null,
+        offres: null, plancher: plancherVente(numeros[id] || null), comparables: indexBc ? comparablesDe({ marque: it.brand, titre: it.title, prix: it.price }, indexBc) : null });
+      if (d.decision) m.set(id, d);
     }
     return m;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [annBase, numeros, buyByNum, conseilMemo, listingDates]);
+  }, [annBase, numeros, buyByNum, conseilMemo, listingDates, indexBc]);
+  const conseilsPrix = useMemo(() => {
+    const m = new Map();
+    for (const [id, d] of decisionsBaisse) { const c = commeConseil(d, tr); if (c) m.set(id, c); }
+    return m;
+  }, [decisionsBaisse]);
+  // (15 nov.) La feuille « Baisses conseillées » : chaque annonce en ligne ≥ 30 j avec SA décision (identité :
+  // compte + identifiant de l'annonce, jamais le titre), rangée par `classerConseils`.
+  const [bcOuvert, setBcOuvert] = useState(false);
+  const nBaissesConseillees = useMemo(() => { let n = 0; for (const d of decisionsBaisse.values()) if (d.decision === 'baisser') n++; return n; }, [decisionsBaisse]);
+  const lignesBc = useMemo(() => {
+    if (!bcOuvert) return undefined;
+    if (!Array.isArray(listings.items)) return null;
+    return classerConseils(annBase.filter((it) => decisionsBaisse.has(String(it.id))).map((it) => { const e = numeros[it.id] || {}; const uid = String((it._acc && it._acc.vinted_user_id) || '');
+      return { cle: uid + ':' + String(it.id), id: String(it.id), uid, it, numero: e.numero ? String(e.numero) : '', titre: it.title || '', photo: photoArticle(it) || '', age: listedAgeDays(it), d: decisionsBaisse.get(String(it.id)) }; }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bcOuvert, decisionsBaisse, annBase, listings.items, numeros]);
   // Une proposition NOUVELLE est notée (sa date ouvre les 14 jours) ; rien d'autre n'est écrit.
   useEffect(() => {
     if (![...conseilsPrix.values()].some((c) => c.nouveau)) return;
@@ -46418,6 +46473,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // réduites à leurs identités (n° d'annonce de la transaction, l'autre personne de la conversation).
   // (11 nov., lot favoris-clair) Ma journée : « N annonces ont de nouveaux favoris depuis hier » (le compte de Messages).
   const nouveauxFav = useNouveauxFavoris({ uid: favorisUid, owner: AUTH.user?.id || '', ownerActuel: () => AUTH.user?.id || '', base: SUPABASE_URL, headers: () => sbAuth(), actif: only === 'journee', vendus: articlesVendusFavoris });
+  // (15 nov., vendre plus — validé par Julien) « RELANCER AU BON MOMENT » : les annonces EN LIGNE (la base de
+  // la grille, `annBase`) qui ont au moins N favoris LUS (le seuil de « Très aimées, pas vendues ») et rien
+  // depuis 7 jours (mise en ligne, dernier favori daté par la cloche — la MÊME lecture que la carte du dessus —,
+  // offres reçues : pas lues ici, DIT sur la carte). Règle : src/relanceFavoris.js ; carte : RelanceFavorisCarte.
+  const relanceFav = useMemo(() => {
+    if (only !== 'journee' || !Array.isArray(listings.items) || listings.error) return null;
+    let seuilR = 3; try { seuilR = Number(localStorage.getItem('vrm_sans_vente_favoris_min')) || 3; } catch (_) {}
+    const vendusR = new Set([...(articlesVendusFavoris || [])].map((x) => 'vinted:' + String(x)));
+    return cartesRelance({ seuil: seuilR, vendus: vendusR, datesFavoris: nouveauxFav && nouveauxFav.lignes ? datesFavorisParAnnonce(nouveauxFav.lignes) : null,
+      annonces: annBase.map((it) => { const e = numeros[it.id] || {}; return { plateforme: 'vinted', id: String(it.id), uid: String((it._acc && it._acc.vinted_user_id) || ''), numero: e.numero ? String(e.numero) : '',
+        titre: it.title || '', photo: photoArticle(it) || '', favoris: Number.isInteger(it.favourites) ? it.favourites : null, age: listedAgeDays(it), derniereOffre: null, offresLues: false }; }) });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [only, listings.items, listings.error, annBase, numeros, nouveauxFav, articlesVendusFavoris, listingDates]);
   const ventesFavorisHisto = useMemo(() => ventesPourHistorique({ ventes: sales.items || [], txnItem, conversations: convs.items || [], uid: favorisUid, annulee: (v) => classifyOrderStatus(v.status) === 'cancelled' }), [sales.items, txnItem, convs.items, favorisUid]);
   const [zoneMessages,setZoneMessages]=React.useState('conversations');
   // (11 nov., lot DJ8) Favoris & offres : deux vues, « Favoris » et « Offres auto ».
@@ -48719,7 +48787,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 autres: autres.filter((j) => !HORS_JOURNEE_JOBS.has(j.id)).map((j, i) => tache(j, i)),
                 urssaf: urssafJob ? [tache(urssafJob, 99)] : [],
                 // (11 nov., lot favoris-clair) Nouveaux favoris : ouvre l'envoi PRÉPARÉ (ces annonces choisies), rien ne part seul.
-                favoris: nouveauxFav && nouveauxFav.annonces > 0 ? [tache({ id: 'favoris-nouveaux', n: nouveauxFav.annonces, icon: 'heart', color: C.text, court: tr('favoris.journee.titre', { n: nouveauxFav.annonces }), detail: null, title: tr('favoris.journee.titre', { n: nouveauxFav.annonces }), action: tr('favoris.journee.geste'), tab: 'cat_msg', avant: () => { preparerEnvoiFavoris(favorisUid); demanderVue('favoris'); } }, 98)] : [],
+                favoris: (nouveauxFav && nouveauxFav.annonces > 0 ? [tache({ id: 'favoris-nouveaux', n: nouveauxFav.annonces, icon: 'heart', color: C.text, court: tr('favoris.journee.titre', { n: nouveauxFav.annonces }), detail: null, title: tr('favoris.journee.titre', { n: nouveauxFav.annonces }), action: tr('favoris.journee.geste'), tab: 'cat_msg', avant: () => { preparerEnvoiFavoris(favorisUid); demanderVue('favoris'); } }, 98)] : []).concat(relanceFav && relanceFav.cartes.length ? [<RelanceFavorisCarte key="relance-favoris" res={relanceFav} cap={(c)=>extSait(c)} version={(c)=>EXT_CAPACITES[c] || ''} Photo={PhotoVinted}
+                  onGeste={(c, k)=>{ if (k !== 'favoris' || !c.uid) return; preparerEnvoiFavoris(c.uid, undefined, c.id); if (typeof setCompteSel === 'function') setCompteSel(c.uid); demanderVue('favoris'); onNav && onNav('cat_msg'); }}/>] : []),
               };
               const forcesAF = [], montresAF = [];
               for (const id of ordreJourneeHeure('afaire', persoJ)) {
@@ -52174,7 +52243,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <VueACompleter Photo={PhotoVinted} res={annACompleter} onBrouillon={(id)=>setAtelier(String(id))} onPrixAchat={(id)=>{ const it=(listings.items||[]).find(x=>x&&String(x.id)===String(id)); if (it) saisirPrixAnnonce(it); }}/>
         ) : annSort==='masquees' ? (
           <AnnoncesMasquees Photo={PhotoVinted} res={listings.masquees==null ? (listings.loading ? undefined : null) : masqueesParCompte(annMasquees, { numeroDe:(id)=>(numeros[id]||{}).numero||'', nomDe:(a)=>a?accNameOf(a):'' })}/>
-        ) : annSort==='sleeping' ? (
+        ) : annSort==='sleeping' ? (<>
+          {/* (15 nov., vendre plus) « N baisses conseillées » : la feuille (src/BaissesConseillees.jsx), rien n'est envoyé d'ici. */}
+          {modeDort !== 'favoris' ? <EntreeBaissesConseillees n={nBaissesConseillees} onOuvrir={()=>setBcOuvert(true)}/> : null}
           <QuiDorment seuil={seuilDort} onSeuil={setSeuilDort} Segmente={Segmente} fmt={fmt} onAgir={(a)=>setDortAgir(a)}
             onGeste={(a)=>{ if (!a.geste) return; if (a.geste.bloque) { toast(a.geste.bloque); return; } const go = allerDormante(a).aller[a.geste.k]; if (go) go(); }}
             onPrixAchat={(a)=>saisirPrixAnnonce(a.it)}
@@ -52182,7 +52253,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             mode={modeDort} onMode={setModeDort} seuilFavoris={seuilFav} onSeuilFavoris={setSeuilFav} nDort={vueRelancer.dort} nFavoris={vueRelancer.favoris}
             pasLus={modeDort==='favoris' && vueRelancer.favorisPasLus>0 ? `Favoris pas lus sur ${vueRelancer.favorisPasLus} annonce${vueRelancer.favorisPasLus>1?'s':''}.` : ''}
             liste={listings.items==null ? null : listeDormantes}/>
-        ) : (<>
+        </>) : (<>
         <div className="vrm-ledger-heading vrm-ann-ledger-heading" aria-hidden="true"><span>{tr('annonces.articleStock')}</span><span>{tr('partout.part.prix')}</span></div>
         {/* (10 nov., lot AM — demande 15 de Julien : « la disposition par compte de Vinted me plaît … la même pour
             Toutes, en gardant toutes les fonctions ») LA GRILLE DE VIGNETTES, RANGÉE PAR COMPTE, comme le dressing
@@ -56670,6 +56741,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           toast(n === lignes.length ? `${n} prix mini posé${n>1?'s':''}` : `${n} prix mini posé${n>1?'s':''} · ${lignes.length - n} annonce${lignes.length - n > 1 ? 's' : ''} plus en ligne : rien posé`);
         }}/>
       )}
+      {bcOuvert && (
+        // (15 nov., vendre plus) LES BAISSES CONSEILLÉES. « Appliquer » ouvre la baisse en série EXISTANTE avec le
+        // prix conseillé de chaque annonce (`cible`) : aperçu, son clic, confirmation, prix RELU. Un « garder » ouvre
+        // le geste d'abord (les écrans de « Agir », `allerDormante`) ; prix d'achat : la saisie de la fiche.
+        <BaissesConseillees lignes={lignesBc} ventesLues={indexBc ? true : extrasBc === undefined ? null : false} Photo={PhotoVinted} Retour={FermeAuRetour}
+          onFermer={()=>setBcOuvert(false)}
+          onAppliquer={(ls)=>{ const l2 = (ls||[]).filter((l)=>l && l.it && l.d && l.d.sugg > 0); if (!l2.length) return; setBcOuvert(false); setBaisseSelInit(null); setBaisseSel(l2.map((l)=>({ ...annonceBaisse(l.it), cible: l.d.sugg }))); }}
+          onGeste={(l, k)=>{ setBcOuvert(false);
+            if (k === 'achat') { saisirPrixAnnonce(l.it); return; }
+            if (k === 'offres') { demanderVue('offres'); onNav && onNav('cat_msg'); return; }
+            const go = allerDormante({ it: l.it, geste: null }).aller[k === 'favoris' ? 'favoris' : 'republier']; if (go) go(); }}/>
+      )}
       {baisseSel && (()=>{
         // (10 nov., lot C) « Baisser le prix » en série (src/BaissePrixSerie.jsx, règles src/baissePrix.js).
         // Promis seulement à une extension 5.336+ de CE navigateur, connectée à CE compte VRM
@@ -60774,7 +60857,11 @@ function AppCoeur() {
     const mr=messagesRetires();
     const messages=messagesPourRecherche(convRows,(u)=>!mr.has(String(u))&&(!okUid||okUid.has(String(u))));
     let vcVentes=null; try{ vcVentes=vcBrut?ventesVcDe(avecNumerosVc(vcBrut)):null; }catch(_){ vcVentes=null; }
-    setGsData({online,sold:so?sold:null,bought:po?bought:null,lbc,pseudos,bordereaux,colis,annonces,facturesPro,messages,vcVentes});
+    // (15 nov., vendre plus) LES RETOURS D'ACHAT (la lecture PARTAGÉE de l'écran Achats, projetée, cache 5 min) :
+    // trouvés par leur n° de transaction et le n° de suivi du bordereau de retour. Lecture ratée ⇒ `null` (dit).
+    const retR=await fetchRetoursAchat().catch(()=>null);
+    const retours=retR&&Array.isArray(retR.bords)?retR.bords.map(b=>({tx:b.tx||b.transaction||'',suivi:b.suivi||'',titre:b.article||'',limite:b.dateLimiteIso||b.dateLimite||'',at:b.at||''})):null;
+    setGsData({online,sold:so?sold:null,bought:po?bought:null,lbc,pseudos,bordereaux,colis,annonces,facturesPro,messages,vcVentes,retours});
   })(); /* eslint-disable-next-line */ },[gsOpen]);
   // (6 nov., v36) LES E-MAILS DE LA LOUPE : le moteur de l'écran E-mails (côté base, sur
   // TOUTES ses lignes, `filtreRecherche`) — pas de second moteur. Une requête par
@@ -63559,14 +63646,18 @@ function AppCoeur() {
         const autres = memoSur('gs-autres', [numData && numData.ebayCommandes, numData && numData.lbcVentes, numData && numData.lbcItems, gsData && gsData.vcVentes], () => ventesAutresPourRecherche(
           { ebay: numData && numData.ebayCommandes, lbc: numData && numData.lbcVentes, vc: gsData && gsData.vcVentes },
           { numEbay: (c, li) => numLigneEbay(c, li) || '', numLbc: (v) => numeroLbcIdentite(v, (numData && numData.lbcItems) || null, load('vrm_lbc_liens', {}) || {}) }));
-        const idx = indexRechercheMemo({ ventes: soldCache, achats: buyCache, pseudos: gsData ? gsData.pseudos : null, bordereaux: gsData ? gsData.bordereaux : null, colis: gsData ? gsData.colis : null, fiches, annonces: gsData ? gsData.annonces : null, factures, numerosTx, autres, messages: gsData ? gsData.messages : null });
+        // (15 nov., vendre plus) LE STOCK : chaque N° rangé (le plan, par `cleNum`) et son lieu ; le garage aussi.
+        let brutPlan = null; try { brutPlan = localStorage.getItem('vrm_room_plan'); } catch (_) {}
+        const stockGs = memoSur('gs-stock', [brutPlan, garageGrid], () => stockPourRecherche(brutPlan, garageGrid));
+        const idx = indexRechercheMemo({ ventes: soldCache, achats: buyCache, pseudos: gsData ? gsData.pseudos : null, bordereaux: gsData ? gsData.bordereaux : null, colis: gsData ? gsData.colis : null, fiches, annonces: gsData ? gsData.annonces : null, factures, numerosTx, autres, messages: gsData ? gsData.messages : null,
+          stock: stockGs, retours: gsData ? (gsData.retours === undefined ? null : gsData.retours) : null });
         const kNumQ = lireNumeroCherche(qBrut, { cleNum }, [prefixeNumeros(), archiveNumeros()]);
         // Une seule recherche pour tout : N° (partiel), pseudo, n° de suivi, code de retrait,
         // n° de transaction, n° de facture, montant, titre / marque / taille. Le titre ne sert
         // qu'à CHERCHER : chaque ligne ouvre SON objet par son identité (src/rechercheUnique.js).
         // (10 nov., lot AX) `exactesEnTete` : une correspondance EXACTE d'identité (N°, suivi, code,
         // transaction, commande, facture — jamais le titre) sort de son groupe et passe EN TÊTE.
-        const trouve = q ? chercherPartout(idx, qBrut, { numero: kNumQ, exactesEnTete: true, max: { paire: gsMax.paire || 12, vente: gsMax.vente || 8, achat: gsMax.achat || 8, colis: gsMax.colis || 8, retrait: gsMax.retrait || 8, message: gsMax.message || 6, annonce: gsMax.annonce || 8, facture: gsMax.facture || 6 } }) : null;
+        const trouve = q ? chercherPartout(idx, qBrut, { numero: kNumQ, exactesEnTete: true, max: { paire: gsMax.paire || 12, vente: gsMax.vente || 8, achat: gsMax.achat || 8, colis: gsMax.colis || 8, retrait: gsMax.retrait || 8, message: gsMax.message || 6, annonce: gsMax.annonce || 8, facture: gsMax.facture || 6, stock: gsMax.stock || 6, retour: gsMax.retour || 6 } }) : null;
         // (9 nov.) Ce que la requête a l'air d'être — DIT, jamais décidé : tout est cherché.
         const compris = q ? reconnaitreRequete(qBrut, { numero: kNumQ }) : null;
         // Un NUMÉRO tapé (« 128 », « B128 », « n128 ») : le bloc « Tout sur le N° » passe devant,
@@ -63601,6 +63692,8 @@ function AppCoeur() {
           if (qBrut.trim()) setGsRecents(noterRecent(qBrut.trim()));
           setGsOpen(false);
           if (d.fiche) { setFicheNum(String(d.fiche)); return; }
+          // (15 nov.) Un N° rangé sans fiche : le Stock, sur CE N° (comme « Tout sur le N° »).
+          if (d.stock) { setGarageLocate(String(d.stock)); DEMANDE_STOCK_CHERCHE.nums=[String(d.stock)]; DEMANDE_STOCK_CHERCHE.at=Date.now(); setTab('garage'); return; }
           if (d.facture) demanderOuverture('facture', d.facture);
           if (d.email) demanderOuverture('email', d.email);
           if (type === 'achat') demanderVue('achats');
@@ -63628,7 +63721,7 @@ function AppCoeur() {
             vignette = <>{numBadge(e.numero)}{thumb(e.photo)}</>;
             titre = e.titre || '(sans titre)';
             etat = e.enLigne === true ? 'En ligne' : e.enLigne === false ? 'Pas en ligne sur Vinted' : '';
-            info = [etat, onLbc ? 'Leboncoin' : '', box != null ? 'Au garage' : '', e.f && e.f.buyPrice ? `achat ${prixCourt(String(e.f.buyPrice).replace(',', '.'))}` : '', e.f && e.f.price ? prixCourt(String(e.f.price).replace(',', '.')) : ''].filter(Boolean).join(' · ');
+            info = [etat, onLbc ? 'Leboncoin' : '', e.lieuxAff && e.lieuxAff.length ? tr('vp.loupe.range', { lieu: e.lieuxAff[0] }) : box != null ? 'Au garage' : '', e.f && e.f.buyPrice ? `achat ${prixCourt(String(e.f.buyPrice).replace(',', '.'))}` : '', e.f && e.f.price ? prixCourt(String(e.f.price).replace(',', '.')) : ''].filter(Boolean).join(' · ');
           } else if (type === 'annonce') {
             vignette = <>{numBadge(null)}{thumb(e.photo)}</>;
             titre = e.titre || '(sans titre)'; etat = 'En ligne · sans N°';
@@ -63642,6 +63735,14 @@ function AppCoeur() {
             vignette = thumb(e.photo, <Icon name="chat" size={18} style={{color:C.muted}}/>);
             titre = e.titre || 'Conversation'; etat = 'Conversation Vinted';
             info = [etat, nomCompteGs(e.compte), e.date ? jourCourt(e.date) : ''].filter(Boolean).join(' · ');
+          } else if (type === 'stock') {
+            vignette = <>{numBadge(e.numero)}{thumb(null, <Icon name="box" size={18} style={{color:C.muted}}/>)}</>;
+            titre = tr('vp.loupe.stockSeul'); etat = tr('vp.loupe.stockSeul');
+            info = (e.lieuxAff || []).slice(0, 2).join(' · ');
+          } else if (type === 'retour') {
+            vignette = <>{e.numero ? numBadge(e.numero) : null}{thumb(e.photo, <Icon name="box" size={18} style={{color:C.muted}}/>)}</>;
+            titre = e.titre || tr('vp.loupe.retourInfo'); etat = tr('vp.loupe.retourInfo');
+            info = [etat, e.date ? jourCourt(e.date) : ''].filter(Boolean).join(' · ');
           } else if (type === 'facture') {
             vignette = thumb(null, <Icon name="doc" size={18} style={{color:C.muted}}/>);
             titre = e.titre || `Facture ${e.facture}`;
@@ -63659,7 +63760,7 @@ function AppCoeur() {
               style={styleLigne}>
               {/* (14 nov., passe 2) Trouvée PAR son N° : le N° est déjà écrit sur la rangée (la pastille de gauche, ou « N°… »
                   de la ligne d'info) — il ne s'écrit pas une seconde fois à droite (§7 : le même nombre, une fois). */}
-              {vignette}{ligneTexte(titre, info)}{r.par === 'numero' && e.numero ? null : pastille(r)}
+              {vignette}{ligneTexte(titre, info)}{(r.par === 'numero' && e.numero) || r.par === 'rangement' ? null : pastille(r)}
               <span style={{fontSize:17,color:C.muted}}>›</span>
             </button>); };
         // Un e-mail trouvé par le moteur de l'écran E-mails : sa nature, l'essentiel, sa date.
@@ -63675,7 +63776,9 @@ function AppCoeur() {
         const entete = (lib, n, cle) => <div className="vrm-recherche-groupe" data-recherche-entete={cle} style={{fontSize:11,fontWeight:700,color:C.muted,textTransform:'uppercase',letterSpacing:0.4,margin:'14px 2px 6px'}}>{lib}{n != null ? ` (${n})` : ''}</div>;
         const plus = (type, reste) => reste > 0 ? <button type="button" className="vrm-lien-action" data-recherche-plus={type} onClick={()=>setGsMax(m=>({...m,[type]:500}))} style={{minHeight:44,width:'100%',border:0,background:'transparent',color:C.accentTexte,fontFamily:'inherit',fontSize:13,fontWeight:600,cursor:'pointer',textAlign:'left',padding:'0 10px'}}>Voir les {reste} autres</button> : null;
         // (10 nov., lot AX) Paires · Ventes · Achats · Colis · Retraits · … (src/rechercheUnique.js).
-        const GROUPES = GROUPES_LOUPE.map(([t, l]) => [t, t === 'paire' ? motsVendeur().Noms : l]);
+        // (15 nov., vendre plus) + Stock et Retours ; les groupes suivent `ordre` (le plus probable d'abord).
+        const libGroupe = (t, l) => (t === 'paire' ? motsVendeur().Noms : t === 'stock' ? tr('vp.loupe.stock') : t === 'retour' ? tr('vp.loupe.retour') : l);
+        const GROUPES = (trouve && Array.isArray(trouve.ordre) ? trouve.ordre.map((t) => GROUPES_LOUPE.find(([k]) => k === t)).filter(Boolean) : GROUPES_LOUPE).map(([t, l]) => [t, libGroupe(t, l)]);
         // La TÊTE : la correspondance exacte d'identité, et PAR QUOI (« par son n° de suivi »).
         const parExacte = (l) => [...new Set(l.map(r => IDENTITES_EXACTES[r.par]).filter(Boolean))].join(', ');
         const blocExactes = exactes.length ? <div data-recherche-groupe="exacte" data-recherche-exacte="" data-recherche-n={exactes.length}>

@@ -39,7 +39,10 @@
 // trouvée par son N° exact est marquée `exact` (l'écran la laisse au bloc).
 
 const str = (v) => String(v == null ? '' : v);
-export const normaliser = (s) => str(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[ \s]+/g, ' ').trim();
+// (15 nov., vendre plus — vitesse) Un texte tout en ASCII n'a ni accent ni espace insécable : il saute la
+// décomposition NFD (la plus chère, mesurée : la moitié de la construction de l'index). Même résultat.
+const ASCII = /^[\x00-\x7f]*$/;
+export const normaliser = (s) => { const x = str(s); return (ASCII.test(x) ? x : x.normalize('NFD').replace(/[̀-ͯ]/g, '')).toLowerCase().replace(/[ \s]+/g, ' ').trim(); };
 // Une identité (suivi, code, transaction) : lettres et chiffres seulement, en majuscules.
 export const alnum = (s) => str(s).toUpperCase().replace(/[^A-Z0-9]/g, '');
 // La clé d'un N° (la même que `cleNum` de l'app) : « 007 » = « 7 », « b125 » = « B125 ».
@@ -69,8 +72,10 @@ const urlPhoto = (p) => { if (!p) return ''; if (typeof p === 'string') return p
 // (10 nov., lot AX) Les GROUPES de la loupe. Un colis du transporteur reste de type
 // `colis` (sa clé, sa destination) mais se range dans « Retraits » quand il VIENT
 // chez lui (tout ce qui n'est pas `sens: 'sortant'`) : `groupe` de l'entrée.
-export const TYPES = ['paire', 'vente', 'achat', 'colis', 'retrait', 'message', 'annonce', 'facture'];
-export const GROUPES_LOUPE = [['paire', 'Paires'], ['vente', 'Ventes'], ['achat', 'Achats'], ['colis', 'Colis'], ['retrait', 'Retraits'], ['message', 'Messages'], ['annonce', 'Annonces sans N°'], ['facture', 'Factures']];
+// (15 nov., vendre plus) + `stock` (un N° rangé sans fiche, et le lieu de rangement d'une paire)
+// et `retour` (un retour d'achat à renvoyer, par SON n° de transaction et SON n° de suivi).
+export const TYPES = ['paire', 'vente', 'achat', 'colis', 'retrait', 'message', 'annonce', 'facture', 'stock', 'retour'];
+export const GROUPES_LOUPE = [['paire', 'Paires'], ['vente', 'Ventes'], ['achat', 'Achats'], ['colis', 'Colis'], ['retrait', 'Retraits'], ['message', 'Messages'], ['annonce', 'Annonces sans N°'], ['facture', 'Factures'], ['stock', 'Stock'], ['retour', 'Retours']];
 export const groupeDe = (e) => (e && e.groupe) || (e && e.type) || '';
 
 // (10 nov., lot AX) LES IDENTITÉS : une correspondance EXACTE sur l'une d'elles passe
@@ -85,15 +90,19 @@ export const estIdentiteExacte = (r) => !!(r && r.exact === true && r.par !== 't
 // n'est pas « rien trouvé » — la loupe le DIT (« Achats pas encore lus »), jamais un
 // silence qui ferait croire que l'achat n'existe pas (§5 « rien lu ne vaut pas rien »).
 const SOURCES_LUES = [['ventes', 'Ventes', 'lues'], ['achats', 'Achats', 'lus'], ['colis', 'Colis et retraits', 'lus'], ['pseudos', 'Pseudos des acheteurs', 'lus'], ['bordereaux', 'N° de suivi des ventes', 'lus'], ['annonces', 'Annonces en ligne', 'lues'], ['messages', 'Messages', 'lus']];
+// (15 nov.) Le stock et les retours ne sont dits « pas lus » que s'ils ont été DEMANDÉS
+// (clé présente, `null`) : une source que l'écran ne donne pas n'est pas une lecture ratée.
+const SOURCES_DEMANDEES = [['stock', 'Stock', 'lu'], ['retours', 'Retours', 'lus']];
 export function sourcesNonLues(sources) {
   const S = sources || {};
-  return SOURCES_LUES.filter(([k]) => !Array.isArray(S[k])).map(([k]) => k);
+  return SOURCES_LUES.filter(([k]) => !Array.isArray(S[k])).map(([k]) => k)
+    .concat(SOURCES_DEMANDEES.filter(([k]) => Object.prototype.hasOwnProperty.call(S, k) && S[k] === null).map(([k]) => k));
 }
 // LA phrase (une seule) : « en cours » (la loupe lit encore) ou « pas lus » (la lecture n'a
 // pas répondu). Une source : « Achats pas encore lus. » ; plusieurs : « Pas encore lus :
 // achats, colis et retraits. » — '' si tout est lu.
 export function phraseNonLues(cles, { enCours = false } = {}) {
-  const l = SOURCES_LUES.filter(([k]) => (cles || []).includes(k));
+  const l = SOURCES_LUES.concat(SOURCES_DEMANDEES).filter(([k]) => (cles || []).includes(k));
   if (!l.length) return '';
   const raison = enCours ? '' : ' — la lecture n’a pas répondu';
   if (l.length === 1) { const [, lib, acc] = l[0]; return `${lib} ${enCours ? 'pas encore ' : 'pas '}${acc}${raison}.`; }
@@ -256,6 +265,34 @@ export function indexRecherche(sources) {
       numero: '', facture: str(x.number), nums: [x.number, ...(Array.isArray(x.refs) ? x.refs : [])].map(alnum).filter((v) => v.length >= 3), photo: '',
       pseudos: ach ? [normaliser(ach)] : [], pseudosAff: ach ? [ach] : [], suivis: [], codes: [], montants: montantsDe(x.montant), date: str(x.date) });
   }
+  // (15 nov., vendre plus) LE STOCK : [{ numero, lieu }] (le plan de rangement, par `cleNum`). Le lieu
+  // d'une paire qui a une fiche s'ajoute à CETTE paire (même N°, jamais une seconde ligne) ; un N° rangé
+  // sans fiche est une entrée `stock`. Deux lieux pour un N° : les deux sont dits (rien n'est choisi).
+  if (Array.isArray(S.stock)) {
+    const parNum = new Map();
+    for (const e of entrees) if (e.type === 'paire' && e.numK) { if (!parNum.has(e.numK)) parNum.set(e.numK, []); parNum.get(e.numK).push(e); }
+    const seuls = new Map();
+    for (const r of S.stock) {
+      const k = cleNumero(r && r.numero); const lieu = str(r && r.lieu).trim();
+      if (!k) continue;
+      const ps = parNum.get(k);
+      if (ps) { for (const e of ps) { e.lieux = e.lieux || []; e.lieuxAff = e.lieuxAff || []; if (lieu && !e.lieuxAff.includes(lieu)) { e.lieux.push(normaliser(lieu)); e.lieuxAff.push(lieu); } } continue; }
+      let e = seuls.get(k);
+      if (!e) { e = { type: 'stock', cle: 'stock:' + k, id: k, tx: '', o: null, titre: '', t: '', numero: str(r.numero).trim(), numK: k, lieux: [], lieuxAff: [], photo: '', pseudos: [], pseudosAff: [], suivis: [], codes: [], montants: [], date: '' }; seuls.set(k, e); entrees.push(e); }
+      if (lieu && !e.lieuxAff.includes(lieu)) { e.lieux.push(normaliser(lieu)); e.lieuxAff.push(lieu); }
+    }
+  }
+  // (15 nov., vendre plus) LES RETOURS D'ACHAT : une entrée par n° de transaction (l'achat renvoyé) ;
+  // trouvés par ce n°, par le n° de suivi DU BORDEREAU DE RETOUR, par les mots de l'article.
+  const vusRet = new Set();
+  for (const r of Array.isArray(S.retours) ? S.retours : []) {
+    const tx = alnum(r && r.tx); const s = alnum(r && r.suivi);
+    const cle = 'retour:' + (tx || s);
+    if (!(tx || s) || vusRet.has(cle)) continue; vusRet.add(cle);
+    const titre = str(r.titre);
+    entrees.push({ type: 'retour', cle, id: tx, tx, o: null, r, titre, t: normaliser(titre), numero: str(r.numero).trim(), numK: r.numero ? cleNumero(r.numero) : '',
+      photo: urlPhoto(r.photo), pseudos: [], pseudosAff: [], suivis: s.length >= 6 ? [s] : [], codes: [], montants: [], date: str(r.limite || r.at || '') });
+  }
   return { entrees, n: entrees.length, annoncesLues: !!annoncesLues, nonLues: sourcesNonLues(S) };
 }
 
@@ -263,7 +300,7 @@ export function indexRecherche(sources) {
 let _memo = { cles: null, index: null };
 export function indexMemo(sources) {
   const S = sources || {};
-  const cles = [S.ventes, S.achats, S.pseudos, S.bordereaux, S.colis, S.fiches, S.annonces, S.factures, S.numerosTx, S.autres, S.messages];
+  const cles = [S.ventes, S.achats, S.pseudos, S.bordereaux, S.colis, S.fiches, S.annonces, S.factures, S.numerosTx, S.autres, S.messages, S.stock, S.retours];
   if (_memo.cles && _memo.cles.length === cles.length && _memo.cles.every((x, i) => x === cles[i])) return _memo.index;
   const index = indexRecherche(S);
   _memo = { cles, index };
@@ -272,7 +309,13 @@ export function indexMemo(sources) {
 
 // Le rang d'une trouvaille : une identité exacte d'abord, puis une identité
 // partielle, le pseudo, enfin le titre.
-const RANG = { code: 0, numero: 0.5, suivi: 1, transaction: 1, commande: 1, facture: 1, montant: 2, pseudo: 3, titre: 4 };
+// (15 nov.) `rangement` : le lieu où la paire est rangée (« étagère B »), entre le pseudo et le titre.
+const RANG = { code: 0, numero: 0.5, suivi: 1, transaction: 1, commande: 1, facture: 1, montant: 2, pseudo: 3, rangement: 3.5, titre: 4 };
+// (15 nov., vendre plus) LE PLUS PROBABLE D'ABORD, dans le titre : des mots ENTIERS (« dunk low »
+// dans « nike dunk low panda ») passent devant un morceau de mot (« dunk » dans « dunkerque ») ;
+// à égalité, une paire EN LIGNE passe devant une paire qui ne l'est plus. Ce n'est qu'un ordre :
+// chaque ligne ouvre SON objet, rien n'est relié par ressemblance (§5).
+const motsEntiers = (t, mots) => { const x = ' ' + t + ' '; for (const m of mots) if (!x.includes(' ' + m + ' ')) return false; return true; };
 
 // Cherche `q` dans l'index. Rend { q, groupes: { paire: [...], vente: [...], … }, totaux, total }
 // chaque résultat = { e (l'entrée), par: 'code'|'numero'|'suivi'|'transaction'|'facture'|'montant'|'pseudo'|'titre', exact, valeur }.
@@ -286,7 +329,7 @@ export function chercherPartout(index, q, { max = MAX_PAR_GROUPE, numero = null,
   const totaux = {}; for (const t of TYPES) totaux[t] = 0;
   const qn = normaliser(q);
   const qa = alnum(q);
-  if (!index || !qn) return { q: qn, groupes, totaux, total: 0, exactes: [] };
+  if (!index || !qn) return { q: qn, groupes, totaux, total: 0, exactes: [], ordre: [] };
   const mots = qn.split(' ').filter(Boolean);
   const chiffres = /^\d+$/.test(qa);
   const cents = montantCherche(q);
@@ -307,8 +350,10 @@ export function chercherPartout(index, q, { max = MAX_PAR_GROUPE, numero = null,
       else { const n = e.nums.find((x) => x.includes(qa)); if (n) { par = 'facture'; exact = n === qa; valeur = e.facture; } }
     }
     if (!par && qn.length >= 3 && e.pseudos.length) { const i = e.pseudos.findIndex((p) => p.includes(qn)); if (i >= 0) { par = 'pseudo'; exact = e.pseudos[i] === qn; valeur = e.pseudosAff[i]; } }
-    if (!par && e.t && mots.every((m) => e.t.includes(m))) { par = 'titre'; }
-    if (par) trouve.push({ e, par, exact, valeur, rang: RANG[par] - (exact ? 0.5 : 0) });
+    if (!par && qn.length >= 2 && e.lieux && e.lieux.length) { const i = e.lieux.findIndex((l) => mots.every((m) => l.includes(m))); if (i >= 0) { par = 'rangement'; exact = e.lieux[i] === qn; valeur = e.lieuxAff[i]; } }
+    let bonus = 0;
+    if (!par && e.t && mots.every((m) => e.t.includes(m))) { par = 'titre'; bonus = (motsEntiers(e.t, mots) ? 0 : 0.2) + (e.enLigne === false ? 0.1 : 0); }
+    if (par) trouve.push({ e, par, exact, valeur, rang: RANG[par] - (exact ? 0.5 : 0) + bonus });
   }
   const numVal = (e) => { const m = /(\d+)$/.exec(e.numK || ''); return m ? Number(m[1]) : Infinity; };
   trouve.sort((a, b) => a.rang - b.rang || (a.e.date < b.e.date ? 1 : a.e.date > b.e.date ? -1 : 0) || numVal(a.e) - numVal(b.e));
@@ -318,7 +363,12 @@ export function chercherPartout(index, q, { max = MAX_PAR_GROUPE, numero = null,
     if (estIdentiteExacte(t)) { exactes.push(t); if (exactesEnTete) continue; }
     const k = groupeDe(t.e); totaux[k] = (totaux[k] || 0) + 1; const g = groupes[k]; if (g && g.length < maxDe(k)) g.push(t);
   }
-  return { q: qn, groupes, totaux, total: trouve.length, exactes };
+  // (15 nov., vendre plus) L'ORDRE DES GROUPES : celui dont le meilleur résultat est le plus probable
+  // d'abord (à égalité, l'ordre de GROUPES_LOUPE). L'écran le suit ; les groupes vides n'y sont pas.
+  const meilleur = {};
+  for (const t of trouve) { const k = groupeDe(t.e); if (meilleur[k] == null || t.rang < meilleur[k]) meilleur[k] = t.rang; }
+  const ordre = GROUPES_LOUPE.map(([k]) => k).filter((k) => groupes[k] && groupes[k].length).sort((a, b) => meilleur[a] - meilleur[b] || TYPES.indexOf(a) - TYPES.indexOf(b));
+  return { q: qn, groupes, totaux, total: trouve.length, exactes, ordre };
 }
 
 // (6 nov.) LES SUGGESTIONS du champ vide : tirées de l'index (des objets lus,
@@ -358,5 +408,8 @@ export function destinationResultat(r) {
   // Une facture saisie dans l'app : la liste cherchée sur SON n°. Une facture Pro : la liste
   // « Factures Pro émises », en tête de l'écran (la recherche de l'écran ne la voit pas).
   if (e.type === 'facture') return { tab: 'invoices', facture: e.x && e.x.pro ? '' : (e.facture || '') };
+  // (15 nov.) Un N° rangé sans fiche : le Stock, sur CE N° ; un retour : SON achat (par son n° de transaction).
+  if (e.type === 'stock') return { stock: e.numero };
+  if (e.type === 'retour') return { tab: 'achats', cible: e.tx ? { type: 'achat', tx: e.tx } : null };
   return null;
 }
