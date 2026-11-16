@@ -57,7 +57,9 @@
 :root:root:root body .vg-a-vendu .vrm-argent-w-n :is(.eur, small) { font: inherit !important; letter-spacing: inherit !important; color: inherit !important; vertical-align: baseline !important; position: static !important; }
 :root:root:root body .vg-a-vendu .vrm-argent-w-n small { font-size: 15px !important; font-weight: 600 !important; letter-spacing: 0 !important; margin-right: 4px; }
 :root:root:root body .vg-a-vendu-sous { display: block; margin-top: 6px; font: 600 13.5px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-clair) !important; }
-:root:root:root body .vg-a-vendu-sous .vrm-argent-w-note { color: var(--sv-clair-2) !important; font-weight: 500; }
+:root:root:root body .vg-a-vendu-sous .vrm-argent-w-note { color: var(--sv-clair-2) !important; font-weight: 500; display: inline !important; -webkit-line-clamp: none; }
+/* (16 nov., derniers-rouges) la note suit « vendu en novembre » sur SA ligne (styles-argent.css la posait en bloc à deux lignes :
+   « · aucun compte relié » commençait une ligne, banc nouveau-vendeur). */
 /* Reçu · Bénéfice : deux verres côte à côte (12/14, chiffre 22/750). */
 :root:root:root body .vg-a-duo { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 :root:root:root body .vg-a-case { -webkit-appearance: none; appearance: none; font-family: inherit; text-align: left; cursor: pointer; margin: 0; -webkit-tap-highlight-color: transparent; display: flex !important; flex-direction: column; align-items: flex-start; min-width: 0; padding: 12px 14px !important; }
