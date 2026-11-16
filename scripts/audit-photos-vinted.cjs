@@ -225,6 +225,14 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
       'Accueil :: "/logo-vrm-96.png"': 'logo de l’app (page d’accueil)',
       'Plateau :: "/logo-vrm-192.png"': 'logo de l’app (scène du film d’accueil, src/AccueilFilm.jsx)',
       'CarteJourEcran :: "/logo-vrm-96.png"': 'logo de l’app (carte « Ma journée » de l’accueil, src/accueil-carte.jsx)',
+      // (16 nov., lot impression-retours) Sources relevées une fois l'audit capable de lire chaque module (avant : il
+      // levait sur deux constantes homonymes et ne voyait plus rien). Chacune vérifiée dans son fichier :
+      'AuthScreen :: "/accueil/journee-clair.webp"': 'image fixe de l’app (écran de connexion, public/accueil/)',
+      'PhotoStockHl :: a': 'photo du Stock gardée hors ligne : adresse MÊME ORIGINE `/hl-photo?u=…` servie par le service worker (`adressePhotoHl`, src/stockHorsLigne.js), jamais l’adresse Vinted',
+      'EtapePhotos :: p.detoure || p.img': 'photos du studio prises sur l’appareil (data:/blob: de l’atelier d’arrivée, src/AtelierArrivee.jsx), jamais une photo Vinted',
+      'PhotosPaire :: p.detoure || p.img': 'photos du studio prises sur l’appareil (data:/blob:, src/AtelierPaire.jsx), jamais une photo Vinted',
+      'RangeeJ :: photo': 'repli seulement quand l’appelant ne donne pas `Photo` ; les trois appelants (App.jsx, Ma journée) passent `Photo={PhotoVinted}`',
+      'RechercheCouleur :: e.src': 'rendu seulement si `e.src` commence par `data:image/` (garde dans la même ligne) ; sinon `Photo(e.src)` (PhotoVinted)',
     };
     const fichiers = fs.readdirSync(path.join(R, 'src')).filter((f) => /\.jsx?$/.test(f));
     const trouves = [], inconnus = [];
