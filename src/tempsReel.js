@@ -56,10 +56,23 @@ const REGLES = [
   [/^actions_compte_(\d{1,20})_[A-Za-z0-9-]{1,64}$/, 'jauge'],
   [/^journal_vrm_(\d{1,20})_[A-Za-z0-9-]{1,64}$/, 'journal'],
   [/^transp_[a-z0-9]{1,30}_[A-Za-z0-9]{1,60}$/, 'transp'],
+  // (16 nov., vitesse-lectures) Les familles qui manquaient (2026-11-11-temps-reel.md §7), seulement
+  // celles dont l'écran a DÉJÀ un chemin de relecture sur signal :
+  //   · la boîte Vinted d'un compte (`harvest_{uid}_inbox`) ⇒ Messages relit CE compte ;
+  //   · Leboncoin et Vestiaire (les lignes que l'extension range et signale `maj · lbc / vestiaire`) ⇒
+  //     leurs écrans relisent par le même signal (src/passerelleVeille.js) ;
+  //   · un e-mail rangé (`email_reception_*`, écrit par le serveur) ⇒ la boîte e-mail montre
+  //     « Actualiser » (aucune lecture de la route sans son geste).
+  // Pas de `uid` pour ces trois-là (une ligne par vendeur, pas par compte).
+  [/^harvest_(\d{1,20})_inbox$/, 'messages'],
+  [/^lbc_(?:listings|ventes|accounts|messages|a_retirer)$/, 'lbc'],
+  [/^vc_(?:listings|ventes|session|offres|messages|achats)$/, 'vestiaire'],
+  [/^email_reception_[0-9a-f]{16,64}$/, 'emails'],
 ];
+const SANS_COMPTE = new Set(['transp', 'lbc', 'vestiaire', 'emails']);
 export function quoiDe(id) {
   const s = String(id == null ? '' : id);
-  for (const [re, quoi] of REGLES) { const m = re.exec(s); if (m) return { quoi, uid: quoi === 'transp' ? null : m[1] }; }
+  for (const [re, quoi] of REGLES) { const m = re.exec(s); if (m) return { quoi, uid: SANS_COMPTE.has(quoi) ? null : m[1] }; }
   return null;
 }
 

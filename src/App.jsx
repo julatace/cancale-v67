@@ -25498,24 +25498,38 @@ const lienItemEbay = (itemId, ref) => lienAnnonceMarche(marcheEbayDeRef(ref), it
 // Le registre, lu une fois par ouverture (et relu après une connexion ou une
 // déconnexion : `vrm:ebay-comptes`). TROIS états : `undefined` en cours ·
 // `null` pas su (la base n'a pas répondu) · la liste des comptes actifs.
-let _comptesEbay = null;
-function lireComptesEbay(force) {
-  if (force || !_comptesEbay) {
+// (16 nov., vitesse-lectures) La ligne BRUTE du registre (`[{comptes}]`, ou `null` pas su) est lue UNE
+// fois pour tous ses lecteurs : la liste des comptes actifs (ici) ET les comptes reliés des autres sites
+// (`useComptesAutresSites`). Mesuré au banc budget-vitesse : Messages et Ma journée la lisaient 3 fois
+// (les deux lecteurs, à plus de 2 s d'écart : hors du partage de `lecturesPartagees`). Même vie que
+// la liste : jusqu'à une connexion / déconnexion (`signalerComptesEbay`) ; une lecture RATÉE n'est
+// pas gardée (la suivante réessaie, « pas su » n'est jamais figé).
+let _registreEbay = null;
+function lireRegistreEbayBrut(force) {
+  if (force || !_registreEbay) {
     const p = (async () => {
       try {
         const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_comptes&select=comptes:data->comptes`, { headers: sbAuth() });
         if (!r.ok) return null;
         const rows = await r.json();
-        if (!Array.isArray(rows)) return null;
-        return comptesEbayActifs(rows[0] ? { comptes: rows[0].comptes } : null);
+        return Array.isArray(rows) ? rows : null;
       } catch (_) { return null; }
     })();
+    _registreEbay = p;
+    p.then((v) => { if (v === null && _registreEbay === p) _registreEbay = null; });
+  }
+  return _registreEbay;
+}
+let _comptesEbay = null;
+function lireComptesEbay(force) {
+  if (force || !_comptesEbay) {
+    const p = lireRegistreEbayBrut(force).then((rows) => (Array.isArray(rows) ? comptesEbayActifs(rows[0] ? { comptes: rows[0].comptes } : null) : null)).catch(() => null);
     _comptesEbay = p;
     p.then((v) => { if (v === null && _comptesEbay === p) _comptesEbay = null; });
   }
   return _comptesEbay;
 }
-const signalerComptesEbay = () => { _comptesEbay = null; try { window.dispatchEvent(new Event('vrm:ebay-comptes')); } catch (_) {} };
+const signalerComptesEbay = () => { _comptesEbay = null; _registreEbay = null; try { window.dispatchEvent(new Event('vrm:ebay-comptes')); } catch (_) {} };
 function useComptesEbay() {
   const [c, setC] = React.useState(undefined);
   React.useEffect(() => {
@@ -30669,23 +30683,52 @@ async function lireCapturesDetail() {
 }
 // `actif` (5 nov.) : le panneau de l'indicateur ne lit ces lignes qu'OUVERT —
 // il vit dans l'en-tête de chaque écran, il ne doit rien lire au démarrage.
+// (16 nov., vitesse-lectures) Les SEPT lectures de ce crochet partent UNE fois pour tous ses lecteurs
+// montés (la feuille « compte relié » de la coque, Solo, l'indicateur, Comptes liés, « Tout va bien ? ») :
+// mesuré au banc budget-vitesse, Messages et Ma journée relisaient `ebay_orders*` et le registre eBay une
+// 2e fois, plus de 2 s après (hors du partage de `lecturesPartagees`). La réponse sert `AUTRES_SITES_MS` ;
+// un signal qui dit que ces lignes ont changé (`vrm:ext` Leboncoin/Vestiaire, `vrm:ebay-comptes`) ou un
+// « relire » explicite l'oublie AVANT que les crochets relisent ; une lecture dont une ligne est RATÉE n'est
+// pas gardée (chacun réessaie, « pas su » n'est jamais figé).
+const AUTRES_SITES_MS = 30000;
+let _autresSites = null;   // { at, uid, p }
+const oublierAutresSites = () => { _autresSites = null; };
+let _autresSitesEcoute = false;
+function lireAutresSitesLignes(force) {
+  if (!_autresSitesEcoute && typeof window !== 'undefined') {
+    _autresSitesEcoute = true;
+    // Posé AVANT les écoutes des crochets (premier appel) : elles relisent ensuite une réponse neuve.
+    window.addEventListener('vrm:ext', (e) => { const d = e && e.detail; if (d && d.type === 'maj' && /lbc|vestiaire|vc|ebay/.test(String(d.quoi || ''))) oublierAutresSites(); });
+    window.addEventListener('vrm:ebay-comptes', oublierAutresSites);
+  }
+  const uid = (AUTH.user && AUTH.user.id) || '';
+  const m = _autresSites;
+  if (!force && m && m.uid === uid && Date.now() - m.at < AUTRES_SITES_MS) return m.p;
+  const B = `${SUPABASE_URL}/rest/v1/app_data?`;
+  const p = Promise.all([
+    lireBaseRelue(`${B}id=eq.lbc_accounts&select=a:data->accounts`),
+    lireBaseRelue(`${B}id=eq.lbc_listings&select=l:data->lectures`),
+    lireBaseRelue(`${B}id=eq.vc_session&select=id:data->>id,at:data->>at,comptes:data->comptes`),
+    lireBaseRelue(`${B}id=eq.vc_listings&select=cap:data->>capturedAt`),
+    lireBaseRelue(`${B}id=eq.vc_ventes&select=cap:data->>capturedAt,ventes:data->ventes`),
+    lireRegistreEbayBrut(force),
+    lireBaseRelue(`${B}id=like.ebay_orders*&select=id,cap:data->>capturedAt`),
+  ]);
+  const ent = { at: Date.now(), uid, p };
+  _autresSites = ent;
+  p.then((r) => { if (r.some((x) => !Array.isArray(x)) && _autresSites === ent) _autresSites = null; }, () => { if (_autresSites === ent) _autresSites = null; });
+  return p;
+}
 function useComptesAutresSites(actif = true) {
   const [lu, setLu] = React.useState({ leboncoin: undefined, vestiaire: undefined, ebay: undefined });
   const [tour, setTour] = React.useState(0);
+  const force = React.useRef(false);
   React.useEffect(() => {
     if (!actif) return undefined;
     let mort = false;
-    const B = `${SUPABASE_URL}/rest/v1/app_data?`;
+    const f = force.current; force.current = false;
     (async () => {
-      const [acc, lec, ses, vcl, vcv, reg, cap] = await Promise.all([
-        lireBaseRelue(`${B}id=eq.lbc_accounts&select=a:data->accounts`),
-        lireBaseRelue(`${B}id=eq.lbc_listings&select=l:data->lectures`),
-        lireBaseRelue(`${B}id=eq.vc_session&select=id:data->>id,at:data->>at,comptes:data->comptes`),
-        lireBaseRelue(`${B}id=eq.vc_listings&select=cap:data->>capturedAt`),
-        lireBaseRelue(`${B}id=eq.vc_ventes&select=cap:data->>capturedAt,ventes:data->ventes`),
-        lireBaseRelue(`${B}id=eq.ebay_comptes&select=comptes:data->comptes`),
-        lireBaseRelue(`${B}id=like.ebay_orders*&select=id,cap:data->>capturedAt`),
-      ]);
+      const [acc, lec, ses, vcl, vcv, reg, cap] = await lireAutresSitesLignes(f).catch(() => [null, null, null, null, null, null, null]);
       if (mort) return;
       const ouvLbc = Array.isArray(acc) && acc[0] ? compteLbcOuvert(acc[0].a || {}) : '';
       const leboncoin = (!Array.isArray(acc) || !Array.isArray(lec)) ? null : comptesLbcLies((acc[0] && acc[0].a) || {}, (lec[0] && lec[0].l) || {}, ouvLbc);
@@ -30711,7 +30754,8 @@ function useComptesAutresSites(actif = true) {
     window.addEventListener('vrm:ext', f); window.addEventListener('vrm:ebay-comptes', g);
     return () => { window.removeEventListener('vrm:ext', f); window.removeEventListener('vrm:ebay-comptes', g); };
   }, []);
-  return [lu, () => setTour((t) => t + 1)];
+  // « Relire » demandé par l'écran : une lecture NEUVE (jamais la réponse gardée).
+  return [lu, () => { force.current = true; oublierAutresSites(); setTour((t) => t + 1); }];
 }
 // ⟦→ ecrans/Reglages.jsx #32⟧
 // (6 nov., onglets B) EN TÊTE DE COLIS : les comptes qui n'envoient AUCUN e-mail à VRM (la MÊME règle,
@@ -41405,6 +41449,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       for (const u of bouges) _rowCache.delete(`o:${u}`);
       const deja = new Set();
       for (const q of d.quoi) {
+        // (16 nov., vitesse-lectures) La boîte Vinted d'un compte a changé : Messages (et Ma journée, qui
+        // compte les non-lus) relit CE compte — sa ligne vient d'être oubliée (`viderMemoLignes`), les
+        // autres boîtes restent servies par leur mémoire ; aucune requête Vinted (moisson seulement).
+        if (q.quoi === 'messages') {
+          if (q.uid) _rowCache.delete(`h:${q.uid}:inbox`);
+          try { delete _acctCache.convs; _persistAcctCache(); } catch (_) {}
+          if ((curSub === 'messages' || curSub === 'journee') && !deja.has('messages')) { deja.add('messages'); loadConvs(); }
+          continue;
+        }
         if (!['ventes', 'achats', 'annonces', 'suivi', 'transp'].includes(q.quoi)) continue;
         // Une relecture des ventes couvre tous les comptes touchés (leurs lignes viennent d'être oubliées).
         if ((q.quoi === 'ventes' || q.quoi === 'achats') && deja.has(q.quoi)) continue;
