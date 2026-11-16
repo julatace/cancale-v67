@@ -720,4 +720,11 @@ export default {
   "facturePro.serieVrmDesc": "Dein Postfach ist nicht verbunden: VRM sendet sie für dich, jede an IHREN nachgewiesenen Käufer, du in Kopie. Deine Einstellung „aus meinem Postfach“ bleibt.",
   "facturePro.envoyerAvecVrm": "Mit VRM senden",
   "facturePro.toutEnvoyerVrm": "Alle mit VRM senden ({n})",
+  // (15 nov., extension 5.390) La ligne discrète : l’extension récupère les dates de versement, aucun geste.
+  "versement.ligne": { one: "Auszahlungsdaten: die Erweiterung holt sie (≈ {n} übrig · etwa {h} Std. mit offenem vinted.fr).", other: "Auszahlungsdaten: die Erweiterung holt sie (≈ {n} übrig · etwa {h} Std. mit offenem vinted.fr)." },
+  "versement.ligneSans": { one: "Auszahlungsdaten: die Erweiterung holt sie (≈ {n} übrig).", other: "Auszahlungsdaten: die Erweiterung holt sie (≈ {n} übrig)." },
+  "versement.court": "Daten werden gelesen",
+  "versement.lbcReleve": "die Erweiterung liest ihr Verkaufsdatum nebenbei auf leboncoin.fr",
+  "versement.lbcSans": { one: "{n} Leboncoin-Verkauf ohne Verkaufsdatum: vorerst in keinem Zeitraum (die Erweiterung liest es auf leboncoin.fr).", other: "{n} Leboncoin-Verkäufe ohne Verkaufsdatum: vorerst in keinem Zeitraum (die Erweiterung liest sie auf leboncoin.fr)." },
+  "versement.dac7Si": "ohne Auszahlungsdatum mitzählen",
 };

@@ -720,4 +720,11 @@ export default {
   "facturePro.serieVrmDesc": "Your mailbox isn’t connected: VRM sends them for you, each to ITS proven buyer, with you in copy. Your “from my mailbox” setting doesn’t change.",
   "facturePro.envoyerAvecVrm": "Send with VRM",
   "facturePro.toutEnvoyerVrm": "Send all with VRM ({n})",
+  // (15 nov., extension 5.390) La ligne discrète : l’extension récupère les dates de versement, aucun geste.
+  "versement.ligne": { one: "Payout dates: the extension is fetching them (≈ {n} left · about {h} h with vinted.fr open).", other: "Payout dates: the extension is fetching them (≈ {n} left · about {h} h with vinted.fr open)." },
+  "versement.ligneSans": { one: "Payout dates: the extension is fetching them (≈ {n} left).", other: "Payout dates: the extension is fetching them (≈ {n} left)." },
+  "versement.court": "dates being read",
+  "versement.lbcReleve": "the extension picks up their sale date on leboncoin.fr as you browse",
+  "versement.lbcSans": { one: "{n} Leboncoin sale without a sale date: in no period for now (the extension picks it up on leboncoin.fr).", other: "{n} Leboncoin sales without a sale date: in no period for now (the extension picks them up on leboncoin.fr)." },
+  "versement.dac7Si": "without a payout date count",
 };

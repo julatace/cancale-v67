@@ -140,7 +140,9 @@ function juger(depot) {
 
   // S7 — le disque branché sur les gestes qui existent.
   dit(/chercher:\s*\(\)\s*=>\s*ouvrirRecherche\(\)/.test(app), 'S7 Chercher = la loupe (ouvrirRecherche)');
-  dit(/scanner:[^\n]*DEMANDE_SCAN\.at = Date\.now\(\)[^\n]*setTab\('ventes'\)[^\n]*vrm:scanner/.test(app) && /addEventListener\('vrm:scanner', prendre\)/.test(app) && /setScanOuvert\('envoi'\)/.test(app), 'S7 Scanner = le scanner de bordereau de Ventes (vrm:scanner)');
+  // (15 nov., Julien : « tu scannes le code-barres d'un colis… VRM ouvre directement la bonne vente ou le bon achat »)
+  // Le disque ouvre le scanner POUR RETROUVER (src/ScannerRetrouver.jsx) ; le scanner de dépôt reste le rond d'À expédier.
+  dit(/scanner:\s*\(\)\s*=>\s*ouvrirRetrouver\('disque'\)/.test(app) && /window\.addEventListener\(EV_RETROUVER, o\)/.test(app) && /<ScannerRetrouver Photo=\{PhotoVinted\}/.test(app) && /<HoteRetrouver /.test(app), 'S7 Scanner = le scanner pour retrouver (vrm:retrouver ⇒ HoteRetrouver)');
   dit(/publier:[^\n]*vrm:publier-ailleurs/.test(app) && /addEventListener\('vrm:publier-ailleurs'/.test(app), 'S7 Publier = « Publier ailleurs »');
   dit(/imprimer:\s*\(\)\s*=>\s*lancerActionRecherche\(\{ id: 'imprimer-jour' \}\)/.test(app), 'S7 Imprimer = « Imprimer les bordereaux du jour » (la feuille Tout imprimer)');
   dit(/v\.lot = r\.partent/.test(app) && /colisPrets\.lot\)\?colisPrets\.lot:undefined/.test(app), 'S7 Imprimer N lit `vrm_colis_prets.lot` (le nombre de « Tout imprimer (N) »), undefined sinon');
@@ -163,7 +165,7 @@ const MUTATIONS = [
   ['S6', 'un bouton hors des quatre formes', 'src/ui/Filtres.jsx', (t) => t.replace('className="vrm-ui-filtre sb-touche"', 'className="vrm-ui-filtre"')],
   ['S6', 'un bouton sans forme ajouté', 'src/ui/Feuille.jsx', (t) => t.replace('{children}', '{children}<button type="button" className="vrm-pilule">x</button>')],
   ['S7', 'Imprimer N deviné à 0', 'src/App.jsx', (t) => t.replace('colisPrets&&Number.isFinite(colisPrets.lot)?colisPrets.lot:undefined', 'colisPrets&&Number.isFinite(colisPrets.lot)?colisPrets.lot:0')],
-  ['S7', 'Scanner débranché', 'src/App.jsx', (t) => t.replace("window.addEventListener('vrm:scanner', prendre);", '')],
+  ['S7', 'Scanner débranché', 'src/App.jsx', (t) => t.replace("window.addEventListener(EV_RETROUVER, o);", '')],
 ];
 
 if (process.argv.includes('--prouve')) {
