@@ -222,3 +222,12 @@ li[data-fp-a-envoyer-etat="a-annuler"] .vrm-fp-rangee-txt > span { color: var(--
 .vrm-fp-gestes.is-rangee .vrm-b { min-height: 44px; width: 100%; min-width: 0; padding-left: 8px; padding-right: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vrm-fp-ligne-etat[data-fp-ligne-etat] b { font-size: 13px; font-weight: 500; color: var(--vrm-muted); }
 .vrm-fp-ligne-etat[data-fp-ligne-etat="refusee"] b, .vrm-fp-ligne-etat[data-fp-ligne-etat="incertaine"] b { color: var(--vrm-warn, #b25000); }
+
+/* (16 nov., lot factures-mieux) La facture en PASTILLE sur la ligne de la vente, dans la rangée
+   « N° · compte · taille » : aucune hauteur ajoutée. Neutre (« Facturée ») ; ambre seulement pour un
+   geste à faire (« Facture à envoyer », « à vérifier ») — CLAUDE.md §7. */
+.vrm-fp-pastille-hote { display: inline; margin-left: 6px; }
+.vrm-fp-pastille { display: inline-flex; align-items: center; gap: 4px; vertical-align: baseline; padding: 0 7px; border-radius: 999px; border: 1px solid var(--vrm-line); font-size: 11.5px; line-height: 17px; font-weight: 500; color: var(--vrm-muted); white-space: nowrap; cursor: pointer; }
+.vrm-fp-pastille svg { flex-shrink: 0; }
+.vrm-fp-pastille[data-fp-pastille="aenvoyer"], .vrm-fp-pastille[data-fp-pastille="averifier"] { color: var(--vrm-warn, #b25000); border-color: color-mix(in srgb, var(--vrm-warn, #b25000) 40%, transparent); }
+.vrm-fp-pastille:focus-visible { outline: 2px solid var(--vrm-accent, #0071e3); outline-offset: 2px; }

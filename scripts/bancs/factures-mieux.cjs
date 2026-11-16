@@ -101,7 +101,7 @@ const MESURE = () => {
         dit(!x.contrastes.length, `${ou} C : contraste ≥ 4,5:1`, x.contrastes.slice(0, 3));
         dit(!x.bleus.length, `${ou} B : aucun texte sur fond bleu`, x.bleus.slice(0, 3));
         dit(x.lang === langue && !(langue === 'fr' ? EN_MOTS : FR_MOTS).test(x.tout), `${ou} U : une seule langue (${langue})`, (x.tout.match(langue === 'fr' ? EN_MOTS : FR_MOTS) || [])[0]);
-        dit(/Atelier Démo des Baskets Anciennes EI/.test(x.tete) && !/\bVRM\b/.test(x.tout), `${ou} F : la boutique en tête, aucun mot VRM`, x.tete);
+        dit(/^Atelier Démo des Baskets Anciennes( EI)?$/.test(x.tete.trim()) && !/\bVRM\b/.test(x.tout), `${ou} F : la boutique en tête, aucun mot VRM`, x.tete);
         dit(x.corps.includes(montant) && x.corps.includes(fichier) && /(FA|AV)-2026-000\d/.test(x.corps), `${ou} F : montant, n° et pièce jointe au récapitulatif`);
         dit(!x.images && !dehors.length && !x.liens && x.h1 === 1, `${ou} F : aucune image, aucune requête, aucun bouton, une <h1>`, { images: x.images, dehors, liens: x.liens });
         await page.screenshot({ path: path.join(SHOTS, `${nom}-${largeur}-${theme}.png`), fullPage: true });

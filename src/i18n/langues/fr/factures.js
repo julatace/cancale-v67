@@ -45,4 +45,9 @@ export default {
   "rapport.recuCourt": "Reçu",
   "rapport.csv": "Tableur (CSV)",
   "rapport.pdf": "Document (PDF)",
+  "fm.pastille.facturee": "Facturée",
+  "fm.pastille.aenvoyer": "Facture à envoyer",
+  "fm.pastille.encours": "Facture en cours",
+  "fm.pastille.averifier": "Facture à vérifier",
+  "fm.pastille.annulee": "Facture annulée",
 };

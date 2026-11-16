@@ -45,4 +45,9 @@ export default {
   "rapport.recuCourt": "Beleg",
   "rapport.csv": "Tabelle (CSV)",
   "rapport.pdf": "Dokument (PDF)",
+  "fm.pastille.facturee": "Abgerechnet",
+  "fm.pastille.aenvoyer": "Rechnung zu senden",
+  "fm.pastille.encours": "Rechnung wird gesendet",
+  "fm.pastille.averifier": "Rechnung prüfen",
+  "fm.pastille.annulee": "Rechnung storniert",
 };

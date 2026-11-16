@@ -794,7 +794,14 @@ export function FactureRaisonsTete({ ventes, deps }) {
 // `vente` = { tx, uid, compte, titre, centimes, venteLe, commandes:[ventes Vinted portant ce n°] }.
 // `ligne` : la forme courte, sur la ligne de la liste (à côté de la vente).
 // `groupe` (ligne seulement) : les ventes affichées — un refus commun est dit en tête, pas ici.
-export function FactureVente({ vente, deps, ligne = false, groupe = null }) {
+// (16 nov., lot factures-mieux — Julien, capture de la liste Ventes : « pour facture envoyée, fais
+// mieux ») `pastille` : sur la LIGNE de la vente, une pastille compacte dans la rangée « N° · compte ·
+// taille » (aucune hauteur ajoutée) — « Facturée », « Facture à envoyer », « Facture à vérifier »,
+// « Facture annulée » ; la toucher ouvre la feuille de la facture (Voir · Partager · Renvoyer · Bon
+// de retour · avoir). « Envoyer la facture » et « Bon de retour » ne sont plus sous la ligne : dans
+// cette feuille et dans la fiche de la vente. Une vente Pro dont l'acheteur n'est pas prouvé n'a pas
+// de pastille (la raison est dite en tête de la liste et dans la fiche).
+export function FactureVente({ vente, deps, ligne = false, groupe = null, pastille = false }) {
   const d = useFactures(deps);
   const [ouverte, setOuverte] = React.useState(false);
   // (11 nov., lot DJ1) Une vente d'un compte Pro dont l'e-mail de vente n'est pas (encore)
@@ -815,6 +822,23 @@ export function FactureVente({ vente, deps, ligne = false, groupe = null }) {
   const e = f && f.envoi;
   let corps;
   let preuve = null;
+  if (pastille) {
+    if (!emise) preuve = preuveAcheteur({ tx, mails, commandes: vente.commandes || [], brouillon: f, adresseLisible: adresseVintedLisible });
+    if (!emise && !(preuve && preuve.prouve)) return null;
+    const k = emise ? etatLigne(e, av) : 'afaire';
+    const cle = { envoyee: 'facturee', emise: 'aenvoyer', refusee: 'aenvoyer', afaire: 'aenvoyer', encours: 'encours', incertaine: 'averifier', annulee: 'annulee' }[k] || 'aenvoyer';
+    const stop = (ev) => { ev.stopPropagation(); };
+    // Dans la ligne (un <button>) : la pastille est un <span> qui ouvre la feuille ; ses événements
+    // (et ceux de la feuille, rendue par un portail) ne remontent pas jusqu'à la ligne.
+    return <span className="vrm-fp-pastille-hote" data-fp-tx={tx} data-fp-forme="ligne" onClick={stop} onPointerDown={stop} onKeyDown={stop}>
+      <span className="vrm-fp-pastille" role="button" tabIndex={0} data-fp-pastille={cle} data-fp-vente={emise ? (e ? e.etat : 'emise') : 'a-faire'} data-fp-ligne-etat={emise ? k : undefined} title={emise ? f.numero : undefined}
+        onClick={() => setOuverte(true)} onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); setOuverte(true); } }}>
+        <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
+        {tr(`fm.pastille.${cle}`)}
+      </span>
+      {ouverte ? <FeuilleFactureVente vente={vente} preuve={preuve} facture={f} avoir={av} deps={deps} fermer={() => setOuverte(false)}/> : null}
+    </span>;
+  }
   if (emise) {
     corps = (
       <button type="button" className={ligne ? 'vrm-fp-ligne-etat' : 'vrm-fp-vente-ligne'} data-fp-vente={e ? e.etat : 'emise'} data-fp-ligne-etat={etatLigne(e, av)} data-sans-glisse="" onClick={() => setOuverte(true)} title={ligne ? f.numero : undefined}>
@@ -973,6 +997,7 @@ function FeuilleFactureVente({ vente, preuve, facture, avoir, deps, fermer }) {
             {!bloque && !(avoir && avoir.emiseLe) ? <button type="button" className={`vrm-b ${dejaParti ? 'vrm-b-secondaire' : 'vrm-b-primaire'}`} disabled={!!occupe} data-fp-envoyer="" onClick={() => envoyerFacture(dejaParti)}>{occupe === 'envoyer' ? tr('fm.envoi') : dejaParti ? tr('fm.renvoyer') : tr('fm.envoyer')}</button> : null}
             {bloque && bloque.vrm && !(avoir && avoir.emiseLe) ? <button type="button" className="vrm-b vrm-b-primaire" disabled={!!occupe} data-fp-envoyer-vrm="" onClick={() => envoyerFacture(dejaParti, 'vrm')}>{occupe === 'envoyer' ? tr('fm.envoi') : dejaParti ? tr('fm.renvoyerVrm') : tr('fm.envoyerVrm')}</button> : null}
           </div>
+          <BonRetour vente={vente} preuve={preuve} facture={facture} deps={deps} ligne={false}/>
           {bloque && !(avoir && avoir.emiseLe) && etat !== undefined ? <p className="vrm-fp-muet" data-fp-bloque="">{bloque.vrm ? 'Ta boîte n’est pas connectée.' : bloque.texte} {bloque.champ ? <button type="button" className="vrm-lien-action" onClick={() => setFiche(bloque.champ)}>{bloque.geste}</button> : null}</p> : null}
           {envois.length > 1 ? <details className="vrm-fp-plus" data-fp-journal={envois.length}>
             <summary>{tr('fm.historique', { n: envois.length })}</summary>
@@ -1003,6 +1028,7 @@ function FeuilleFactureVente({ vente, preuve, facture, avoir, deps, fermer }) {
             <div className="vrm-fp-mail"><small>De</small><span>{mail.nomExpediteur}{cfg.envoiPar === 'boite' ? '' : ` — réponses et copie à ${cfg.email || 'ton e-mail'}`}</span><small>Objet</small><b data-fp-objet="">{mail.sujet}</b><small>Message</small><pre className="vrm-sensible" data-stream-type="acheteur" data-fp-mail-langue={mail.langue}>{mail.message}</pre><small>Pièce jointe</small><span>{nomFichier(apercu)}</span></div>
           </section> : null}
           {apercu ? <section className="vrm-fp-section"><h3>Aperçu de la facture</h3><MiniatureFacture ouvrir={() => ouvrirPdf(apercuEnGrand(apercu), deps)}><ApercuFacture contenu={apercu} provisoire sensible numeroLibelle={etat && Number.isInteger(etat.prochain) && !numero ? `N° ${apercu.numero} (donné à l’émission)` : ''}/></MiniatureFacture></section> : null}
+          <BonRetour vente={vente} preuve={preuve} facture={facture} deps={deps} ligne={false}/>
           {!mv.length && mvt.length ? <p className="vrm-fp-muet" data-fp-manque-vente="">Il manque {mvt.map((m) => m.l).join(', ')}.</p> : null}
           <AccAvant geste="facture.pro"/>
           <div className="vrm-fp-gestes is-bas">

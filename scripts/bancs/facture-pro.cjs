@@ -217,7 +217,7 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
         dit(/3 h après/.test(raisons['7005'].t) && /e-mail 59,00\s€, Vinted 55,00\s€/.test(raisons['7006'].t), '1. la raison est précise (l’écart d’heure, les deux prix)', raisons['7005'].t + ' | ' + raisons['7006'].t);
         dit(await pg.locator('.vrm-sale-row[data-tx="8001"] [data-fp-forme]').count() === 0, '1. compte PARTICULIER : rien sur la ligne');
         const l2 = ligneFacture(pg, '7002');
-        dit(await l2.locator('[data-fp-ligne-etat="envoyee"]').count() === 1 && await l2.locator('[data-fp-vente="envoyee"]').count() === 1, '4. 7002 déjà envoyée : UNE mention « envoyée » sur la ligne (16 nov.)', (await l2.innerText()).replace(/\s+/g, ' '));
+        dit(await l2.locator('[data-fp-pastille="facturee"][data-fp-ligne-etat="envoyee"]').count() === 1 && /Facturée/.test(await l2.innerText()), '4. 7002 déjà envoyée : la pastille « Facturée » sur la ligne (16 nov.)', (await l2.innerText()).replace(/\s+/g, ' '));
         if (SHOTS) { await pg.locator('.vrm-sale-row[data-tx="7001"]').first().scrollIntoViewIfNeeded(); await pg.screenshot({ path: path.join(SHOTS, `fp-lignes-${nf}.png`) }); await pg.locator('.vrm-sale-row[data-tx="7005"]').first().scrollIntoViewIfNeeded(); await pg.screenshot({ path: path.join(SHOTS, `fp-pas-prouve-${nf}.png`) }); }
       });
       await essaie('fiche de la vente 7004', async () => {
@@ -263,7 +263,7 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
         await f.waitFor({ state: 'detached', timeout: 4000 });
         await pg.waitForTimeout(800);
         const l1 = (await ligneFacture(pg, '7001').innerText()).replace(/\s+/g, ' ');
-        dit(await ligneFacture(pg, '7001').locator('[data-fp-ligne-etat="envoyee"][title="FA-2026-0006"]').count() === 1 && /Facture envoyée le/.test(l1), '3. … et la LIGNE de la vente le dit aussi (une mention courte, le n° au survol)', l1);
+        dit(await ligneFacture(pg, '7001').locator('[data-fp-pastille="facturee"][title="FA-2026-0006"]').count() === 1 && /Facturée/.test(l1), '3. … et la LIGNE de la vente le dit aussi (pastille « Facturée », le n° au survol)', l1);
       });
       await essaie('7007 : panne', async () => {
         await ligneFacture(pg, '7007').scrollIntoViewIfNeeded();
@@ -280,7 +280,7 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
         await f.waitFor({ state: 'detached', timeout: 4000 });
         await pg.waitForTimeout(600);
         const l = (await ligneFacture(pg, '7007').innerText()).replace(/\s+/g, ' ');
-        dit(!/envoyée le/.test(l) && /pas encore envoyée/.test(l), '3. … et la ligne dit « émise, pas encore envoyée »', l);
+        dit(await ligneFacture(pg, '7007').locator('[data-fp-pastille="aenvoyer"]').count() === 1 && !/Facturée/.test(l), '3. … et la ligne dit « Facture à envoyer » (jamais « Facturée »)', l);
       });
       dit(!errs.length, '6. aucune erreur d’app', errs.join(' | ').slice(0, 300));
       await ctx.close();
