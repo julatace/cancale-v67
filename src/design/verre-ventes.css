@@ -132,4 +132,35 @@
   }
 }
 
+/* ── 5 bis. L'ORDINATEUR (≥ 1024 px) : la ligne reste UNE rangée (≤ 96 px) — « Déposé » prend la colonne de l'ancien
+   « ⋯ » (44 px, à droite), la puce « Prix d'achat ? » la colonne des actions (sous « Imprimer » quand il est là). */
+@media (min-width: 1024px) {
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > .vrm-fu-apres {
+    grid-column: 3 !important; grid-row: 1 !important; margin: 0 !important; padding: 0 !important; align-self: center !important; justify-self: end !important;
+  }
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > .vrm-fu-apres .vrm-depose-bouton {
+    width: 40px !important; min-width: 40px !important; height: 40px !important; min-height: 40px !important; padding: 0 !important; border-radius: 20px !important; font-size: 0 !important; gap: 0 !important; justify-content: center !important;
+  }
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > .vrm-ledger-gestes:not(:has(form)) {
+    grid-column: 2 !important; grid-row: 1 !important; margin: 0 !important; padding: 0 !important; align-self: center !important; justify-self: end !important;
+  }
+  /* « Imprimer » ET la puce côte à côte : la colonne des actions passe à 240 px sur TOUTES les lignes (les colonnes de la
+     ligne restent alignées d'une vente à l'autre) ; « Imprimer » à droite, la puce à gauche quand les deux sont là. */
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] { grid-template-columns: minmax(0, 1fr) 240px 44px !important; }
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste:has(.vrm-sale-row[data-fu-forme]) > .vrm-ventes-entete { padding-right: calc(14px + 240px + 44px + 24px) !important; }
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme]:has(> .vrm-rangee-bord) > .vrm-ledger-gestes:not(:has(form)) { justify-self: start !important; }
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > .vrm-rangee-bord { justify-self: end !important; }
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > .vrm-rangee-bord :is(button, a) { height: 36px !important; min-height: 36px !important; }
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] [data-cout-vente="ligne"] :is([data-cout-vente-saisir], [data-prix-propose]) { min-height: 36px !important; height: 36px !important; }
+}
+/* De 1024 à 1279 px, le titre n'a plus la place d'une colonne de 240 px (banc bureau-chargement) : la colonne des actions
+   garde 168 px, et la puce passe SOUS « Imprimer » quand les deux sont là (la ligne et « Déposé » enjambent les deux étages). */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] { grid-template-columns: minmax(0, 1fr) 168px 44px !important; }
+  :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste:has(.vrm-sale-row[data-fu-forme]) > .vrm-ventes-entete { padding-right: calc(14px + 168px + 44px + 24px) !important; }
+  :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme]:has(> .vrm-rangee-bord):has(> .vrm-ledger-gestes:not(:has(form))) { row-gap: 2px !important; }
+  :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme]:has(> .vrm-rangee-bord):has(> .vrm-ledger-gestes:not(:has(form))) > :is(button.vrm-ledger-sale-toggle, .vrm-fu-apres) { grid-row: 1 / 3 !important; }
+  :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme]:has(> .vrm-rangee-bord) > .vrm-ledger-gestes:not(:has(form)) { grid-row: 2 !important; justify-self: end !important; }
+}
+
 } /* fin de @layer vrm-verre */

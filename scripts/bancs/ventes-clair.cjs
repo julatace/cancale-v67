@@ -127,7 +127,7 @@ function mesurer() {
         if (W < 600) dit(m.aEnvoyer.length > 0 && m.aEnvoyer.every((x) => !x.chevauche && !x.coupe && x.cible >= 44), `L ${t} : une vente à envoyer : « Imprimer » et « Déposé » (44 px) côte à côte, « À envoyer » entier`, m.aEnvoyer);
         dit(m.points === 0, `P ${t} : plus aucun « ⋯ » sur une ligne de vente`, m.points);
         const pAvec = m.puces.filter((x) => SAISIES.has(x.num)), pSans = m.puces.filter((x) => x.manque && !SAISIES.has(x.num));
-        dit(pAvec.length > 0 && pAvec.every((x) => x.puce === 0) && pSans.length > 0 && pSans.every((x) => x.puce === 1 && x.h >= 44), `P ${t} : la puce « Prix d'achat ? » (44 px) seulement quand il manque`, m.puces.slice(0, 6));
+        dit(pAvec.length > 0 && pAvec.every((x) => x.puce === 0) && pSans.length > 0 && pSans.every((x) => x.puce === 1 && x.h >= (W < 600 ? 44 : 36)), `P ${t} : la puce « Prix d'achat ? » (44 px au doigt, 36 à la souris) seulement quand il manque`, m.puces.slice(0, 6));
         dit(m.debord === 0, `L ${t} : rien ne dépasse d'une ligne de vente`, m.debord);
         dit(m.nFiltres >= 3 && m.coupes.length === 0, `F ${t} : les filtres sont entiers`, m.coupes);
         dit(m.uneLigne != null && m.uneLigne <= 8, `F ${t} : les filtres et « Outils » tiennent sur UNE ligne`, m.uneLigne);
