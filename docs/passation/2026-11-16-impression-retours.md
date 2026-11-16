@@ -85,3 +85,21 @@ de retour (un ACHAT qu'il renvoie : e-mail « Bordereau de retour », ligne `ema
   (l'aperçu de placement ne s'ouvre jamais pour un retour) ; « déjà imprimé » d'un retour est gardé sur l'appareil
   (`vrm_retours_imprimes`, pas synchronisé) ; `src/tamponRetour.js` est mort depuis le 15 nov. (seul son audit
   l'exécute).
+
+### Mise à jour : PR julatace/cancale-v67#1194 NON fusionnée (règle « zéro rouge » de Julien, 16 nov.)
+
+- Rouges de main réparés au passage (ils touchent l'impression ou bloquaient le premier pas d'un job) :
+  `impression-carton`, `textes-courts` (Ebay.jsx), `selection-bordereaux` 5b (règle), `colis-plus` C9/C12,
+  `audit-photos-vinted` (lisait App.jsx + écrans collés : deux constantes homonymes ⇒ l'analyseur levait ; chaque
+  module lu à part ; Fils en `PhotoVinted` ; 6 sources sûres listées avec leur raison ; `Republier.jsx`
+  `partageFichiersPossible` → `partagePhotosPossible`), tests `inscription-parcours` et
+  `bilan-synchronisation-adaptateur` (dépendances du code extrait) ⇒ `audit-parcours-production` vert (228/0).
+- Rouges RESTANTS, tous déjà rouges sur main (mesurés sur `git archive origin/main` 5a9abe57) et hors de ce lot :
+  ~46 audits (accueil-reste, aide-videos, boite-emails, secrets, stock-etageres, recap-bordereau, label-latest,
+  ebay-colis, bancs — fixture `_inventaire-reglages.json` —, boutons, dates-paris, retraits-suivi…), le banc
+  `nouveau-vendeur` (cibles < 44 px, « · » en tête, boutons sur 2 lignes), `comptes-et-reception`
+  (`session-renouvellement.test.mjs` : `installerJetonFrais is not defined`, puis des tests d'interface),
+  `regles` et `ecrans (…)` de reprise-chantiers, banc `retours-litiges` « Paire revenue » 36 px à 1512.
+  Les branches `claude/zero-audit-rouge` et `claude/zero-banc-rouge` existent pour eux.
+- À la reprise : quand main sera au vert, `git merge origin/main` sur `claude/impression-retours`, repousser,
+  attendre la CI, fusionner (`gh api …/pulls/1194/merge -X PUT -f merge_method=merge`).
