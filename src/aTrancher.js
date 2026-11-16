@@ -189,6 +189,36 @@ export function lignesATrancher({ pubs = {}, colisRetirer = null, urssafMois = n
   return { lignes, total, partiel: manque.length > 0, manque, aTrancher: lignes.filter((l) => l.n > 0) };
 }
 
+// (16 nov., captures iPhone de Julien : « Au moins 1 762 choses à trancher » sur une pile « 999+ ») La ligne
+// de MA JOURNÉE ne compte que ce qu'aucune autre carte de Ma journée ne dit déjà : « 36 nouveaux N° à écrire »,
+// « 36 annonces sans prix d'achat », « Colis à vérifier »… ont leur propre carte, avec leur geste ; les redire
+// dans la somme écrivait deux fois le même nombre sur l'écran (§7) et gonflait un total que personne ne lit.
+// L'écran « À trancher » garde TOUT (c'est l'endroit unique) ; seule la ligne de Ma journée est réduite.
+// `JOB_SOURCE` : l'id d'une carte de Ma journée → la source qu'elle dit déjà.
+export const JOB_SOURCE = Object.freeze({
+  'numeros-en-double': 'numeros-double',
+  'poste-sans-depart': 'colis-postes',
+  'retrait-a-verifier': 'colis-retirer',
+  'retrait-en-verification': 'colis-retirer',
+  'litige': 'litiges-en-cours',
+  'numeros-nouveaux': 'numeros-a-ecrire',
+  'achat-a-relier': 'achats-sans-prix',
+  'supprime-vinted': 'supprimes-vinted',
+});
+// Rend l'état sans les sources nommées (Set ou tableau de clés) : total, manque, « au moins » recalculés.
+// Une source retirée qui n'était pas sue ne rend plus le total « au moins » (sa carte la dit elle-même).
+export function sansSourcesDites(etat, cles) {
+  if (!etat || !Array.isArray(etat.lignes)) return etat;
+  const dites = cles instanceof Set ? cles : new Set(Array.isArray(cles) ? cles : []);
+  if (!dites.size) return etat;
+  const lignes = etat.lignes.filter((l) => !dites.has(l.cle));
+  const total = lignes.filter((l) => Number.isInteger(l.n)).reduce((t, l) => t + l.n, 0);
+  const manque = lignes.filter((l) => !Number.isInteger(l.n));
+  return { ...etat, lignes, total, partiel: manque.length > 0, manque, aTrancher: lignes.filter((l) => l.n > 0) };
+}
+// Les sources déjà dites par les cartes de Ma journée (ids des cartes présentes).
+export const sourcesDitesPar = (jobs) => new Set((Array.isArray(jobs) ? jobs : []).map((j) => j && JOB_SOURCE[j.id]).filter(Boolean));
+
 // Le compteur de la navigation : la somme SUE, et rien si elle est nulle (jamais « 0 »).
 export const badgeATrancher = (r) => (r && r.total > 0 ? r.total : null);
 // La ligne de Ma journée : seulement s'il y a quelque chose à trancher.
