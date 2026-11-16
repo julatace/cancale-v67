@@ -115,6 +115,17 @@ export async function marquerAlerteVue(k, maintenant = Date.now()) {
   return r.etat === 'ok' || r.etat === 'rien';
 }
 
-export const lireControleNuit = () => lireLigneVeille(CLE_CONTROLE);
-export const lireControleInstallation = () => lireLigneVeille(CLE_CONTROLE_INSTALLATION);
+// (16 nov., lot derniers-rouges — budget-vitesse : ces deux lignes lues 3 fois à l'ouverture de Ma journée) Ma journée
+// (VeilleJournee) et « Tout va bien ? » (Fiabilite) les demandent ensemble : pour l'AFFICHAGE, une lecture en vol est
+// partagée (chacun reçoit sa copie) ; la suivante, après la réponse, relit. Les écritures (`modifierVeille`) relisent
+// toujours elles-mêmes.
+const enVol = new Map();
+const lirePartage = (id) => {
+  const k = id + '|' + (B.owner() || '');
+  let p = enVol.get(k);
+  if (!p) { p = lireLigneVeille(id).finally(() => { if (enVol.get(k) === p) enVol.delete(k); }); enVol.set(k, p); }
+  return p.then((d) => (d && typeof d === 'object' ? JSON.parse(JSON.stringify(d)) : d));
+};
+export const lireControleNuit = () => lirePartage(CLE_CONTROLE);
+export const lireControleInstallation = () => lirePartage(CLE_CONTROLE_INSTALLATION);
 export { alertesDe };
