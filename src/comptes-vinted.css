@@ -1,6 +1,7 @@
 /* (13 nov., lot 36-27) « Tes comptes Vinted » — src/ComptesVinted.jsx. Neutre (§7) : aucune couleur. */
 .vrm-stats-vitrine .vrm-cv-carte .vrm-sv-carte-tete { align-items: center; flex-wrap: wrap; }
 .vrm-cv-periode { flex: 0 0 auto; }
+html body .vrm-cv-periode button, html body .vrm-cv-periode [role="radio"] { min-width: 44px; min-height: 44px; }
 .vrm-cv-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-variant-numeric: tabular-nums; }
 .vrm-cv-table th, .vrm-cv-table td { padding: 9px 6px; border-top: 1px solid var(--vrm-line); text-align: right; font-size: 14px; color: var(--vrm-ink); vertical-align: top; overflow-wrap: anywhere; }
 .vrm-cv-table thead th { border-top: 0; font-size: 12px; font-weight: 600; color: var(--vrm-muted); line-height: 1.25; }

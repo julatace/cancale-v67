@@ -58,3 +58,12 @@ Tout est poussé sur `claude/extension-restes` (merge `origin/main` fait, 5.393 
 regardées : Statistiques → Santé des comptes 390 clair (« 0 sur les 10 derniers · dont 1 arrivé avant-hier »),
 « Tes comptes Vinted » 390 sombre (« — » puis « 2 acceptées par VRM »), « Tout va bien ? » 390 clair.
 Règle de Julien du 16 nov. : ZÉRO rouge pour fusionner. La PR suit (voir le rapport final du lot).
+
+### CI de la PR #1190 et règle « zéro rouge » (16 nov.)
+- Reds introduits par ce lot, trouvés par la CI et corrigés : `audit-comptes-vinted` E4 (repli `#6e6e73` en dur),
+  `audit-paquets-boutiques` F (l'hôte `i.ebayimg.com` justifié dans les trois fiches et la politique de l'extension),
+  banc `nouveau-vendeur` « 30 j / 90 j » de « Tes comptes Vinted » à 40 px (cibles portées à 44 px).
+- Les 68 autres audits rouges de la CI sont rouges À L'IDENTIQUE sur `origin/main` (vérifié un par un sur un arbre
+  `git archive origin/main`) ; bancs rouges (colis-retirer-propre, annonces-actions, iphone-reprise, argent-mois,
+  chiffres-coherents, retraits-suivi, accessibilite-clavier, nouveau-vendeur hors « Tes comptes Vinted ») et jobs
+  `parcours-critiques` rouges aussi sur main. **PR NON FUSIONNÉE** (règle de Julien du 16 nov. : zéro rouge).
