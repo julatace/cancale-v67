@@ -18,7 +18,7 @@ import {stockageParcours,garderReprise} from './repriseEcran.js';
 import { CLE_REPRISE_ECRANS, DELAI_ECRITURE as DELAI_REPRISE, DUREE_RECHERCHE as DUREE_RECHERCHE_REPRISE, lireCarte as lireCarteReprise, poserCarte as poserCarteReprise, cumulerPatch as cumulerPatchReprise, vueReprise, compteReprise, siteReprise, repriseLocale, ecranAOuvrir, vueSynchronisee, estRecherche as estRechercheVue, ecransDeVue, retenusAffiches } from './repriseSynchro.js';
 import {RecapSelection,CompteurListe,HistoriqueModifications} from './OutilsParcours.jsx';
 import { useSelectionSerie, CaseSerie, BarreSerie, OuvrirSerie, avecSerie } from './composants/SelectionSerie.jsx';
-import { trierSerie, resumeSerie, csvDe } from './selectionSerie.js';
+import { trierSerie, resumeSerie, csvDe, clesSelectionnables, portee } from './selectionSerie.js';
 import {creerGardeLectures,garderConversationsNonLues} from './lecturesVinted.js';
 import {lienAnnonceLeboncoin,etatAnnonceLeboncoin} from './etatAnnonceLeboncoin.js';
 import BilanSynchronisation from './BilanSynchronisation.jsx';
@@ -38542,23 +38542,38 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return tx == null ? null : { tx: String(tx), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', venteLe: o.date || '', commandes: commandesParTx.get(String(tx)) || [] };
   }).filter(Boolean), [ventesAffichees, ventesMax, commandesParTx]);
   // (11 nov., lot actions-serie) Ventes : sélectionner plusieurs lignes, agir une fois (src/selectionSerie.js).
-  const ordreVentesSerie = useMemo(() => ventesAffichees.map(o => String(o.transaction_id)), [ventesAffichees]);
-  const serieVentes = useSelectionSerie(ordreVentesSerie, { nom: 'ventes' });
+  // ⚠️ (16 nov., lot ventes-selection — Julien, iPhone : « je ne comprends pas pourquoi ça me dit de
+  // sélectionner plus de 2000 articles ») LA SÉLECTION = LES LIGNES DESSINÉES, du compte mis en avant :
+  // `ventesAffichees` est TOUT l'historique filtré (2 185 ventes chez lui) dont 60 seulement sont
+  // dessinées ; « Tout sélectionner · 2185 » cochait des ventes qu'il ne voyait pas. Ce sont les lignes
+  // rendues (`ventesGroupees` ou les `ventesMax` premières), sans les lignes estompées d'un autre compte
+  // (`estFloute`) — `clesSelectionnables` (src/selectionSerie.js). Placé après `ventesGroupees` (TDZ, §4.6).
+  const ordreVentesSerie = useMemo(() => clesSelectionnables(
+    ventesGroupees ? ventesGroupees.entrees.filter(e => e && e.ligne !== undefined).map(e => e.ligne) : ventesAffichees.slice(0, ventesMax),
+    { cle: (o) => o.transaction_id, exclue: estFloute }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ventesGroupees, ventesAffichees, ventesMax, selEff]);
+  // Changer de filtre, de compte ou de période VIDE la sélection (rien ne reste coché hors de l'écran).
+  const serieVentes = useSelectionSerie(ordreVentesSerie, { nom: 'ventes', vue: JSON.stringify([vFilter, selEff || '', periode || null, !!showHidden]) });
   const actionsSerieVentes = () => {
     const parTx = new Map(ventesAffichees.map(o => [String(o.transaction_id), o]));
     const lignes = (cles) => cles.map(k => parTx.get(k)).filter(Boolean);
     const annulee = (o) => classifyOrderStatus(o.status) === 'cancelled';
+    // UNE règle par action, lue par le bouton (« 2 sur 3 », grisé à 0) ET par l'action (`trierSerie`).
+    let pretsMemo = null;
+    const prets = () => pretsMemo || (pretsMemo = new Set(lignesLotTous().filter(l => l.cochable !== false).map(l => String(l.cle))));
+    const peutImprimer = (o) => annulee(o) ? 'annulée' : estParti(o) ? 'déjà partie' : prets().has(String(o.transaction_id)) ? true : 'pas de bordereau prêt';
+    const peutDeposer = (o) => annulee(o) ? 'annulée' : estParti(o) ? 'déjà déposée' : !aExpedier(o) ? 'pas à envoyer' : true;
     return [
-      { k: 'imprimer', libelle: 'Imprimer', icone: 'printer', variante: 'primaire', faire: async (cles) => {
+      { k: 'imprimer', libelle: 'Imprimer', icone: 'printer', variante: 'primaire', portee: (cles) => portee(lignes(cles), peutImprimer), faire: async (cles) => {
         // Les bordereaux prêts du lot « Tout imprimer » (même clé : le n° de transaction).
-        const prets = new Set(lignesLotTous().filter(l => l.cochable !== false).map(l => String(l.cle)));
-        const { ok, pasFaits } = trierSerie(lignes(cles), (o) => annulee(o) ? 'annulée' : estParti(o) ? 'déjà partie' : prets.has(String(o.transaction_id)) ? true : 'pas de bordereau prêt');
+        const { ok, pasFaits } = trierSerie(lignes(cles), peutImprimer);
         if (ok.length) await batchBordereaux(new Set(ok.map(o => String(o.transaction_id))));
         return resumeSerie({ faits: ok, pasFaits }, { un: 'bordereau préparé', plusieurs: 'bordereaux préparés' });
       } },
-      { k: 'depose', libelle: 'Je dépose', icone: 'check', faire: (cles) => {
+      { k: 'depose', libelle: 'Je dépose', icone: 'check', portee: (cles) => portee(lignes(cles), peutDeposer), faire: (cles) => {
         // L'écriture de « Colis déposé » (`gesteColisFait`), en UN geste ⇒ UN « Annuler ».
-        const { ok, pasFaits } = trierSerie(lignes(cles), (o) => annulee(o) ? 'annulée' : estParti(o) ? 'déjà déposée' : !aExpedier(o) ? 'pas à envoyer' : true);
+        const { ok, pasFaits } = trierSerie(lignes(cles), peutDeposer);
         const ops = [];
         for (const o of ok) {
           const k = String(o.transaction_id), b = bordsParTxn[k], kb = b ? bordKey(b) : null;
@@ -41764,8 +41779,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   useEffect(() => { setAchatsMax(60); }, [aFilter, ordSearchDiff, periode]);
   // (11 nov., lot actions-serie) Sélectionner plusieurs achats, agir une fois (src/selectionSerie.js).
-  const ordreAchatsSerie = useMemo(() => achatsAffiches.map(x => String(x.o.transaction_id)), [achatsAffiches]);
-  const serieAchats = useSelectionSerie(ordreAchatsSerie, { nom: 'achats' });
+  // (16 nov., lot ventes-selection) Comme Ventes : les lignes DESSINÉES, sans les estompées d'un autre compte.
+  const ordreAchatsSerie = useMemo(() => clesSelectionnables(
+    achatsGroupees ? achatsGroupees.entrees.filter(e => e && e.ligne !== undefined).map(e => e.ligne) : achatsAffiches.slice(0, achatsMax),
+    { cle: (x) => x.o.transaction_id, exclue: (x) => estFloute(x.o) }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [achatsGroupees, achatsAffiches, achatsMax, selEff]);
+  const serieAchats = useSelectionSerie(ordreAchatsSerie, { nom: 'achats', vue: JSON.stringify([aFilter, selEff || '']) });
   // Les actions : la même écriture que le geste unitaire, ligne par ligne, et un résumé honnête.
   const actionsSerieAchats = () => {
     const parTx = new Map(achatsAffiches.map(x => [String(x.o.transaction_id), x]));
