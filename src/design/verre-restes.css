@@ -11,7 +11,7 @@
 /* ── 1. LA CARTE QUI MONTE (Leboncoin, eBay, Vestiaire) ── */
 :root:root:root:root:root:root:root body .sb-rangee-site .sb-avant-place:empty { display: none !important; }
 @media (max-width: 767px) {
-  :root:root:root:root:root:root:root body [data-sb-liste][data-sb-recul] .sb-rangee-site[data-sb-avant-cle]:not([data-sb-avant]) { opacity: .4 !important; transition: opacity 160ms ease !important; }
+  :root:root:root:root:root:root:root body [data-sb-liste][data-sb-recul] .sb-rangee-site[data-sb-avant-cle]:not([data-sb-avant]) { opacity: .4 !important; }
   :root:root:root:root:root:root:root body .sb-rangee-site[data-sb-avant] {
     display: flex !important; flex-wrap: wrap !important; align-items: flex-start !important; column-gap: 12px !important; row-gap: 0 !important;
     height: auto !important; min-height: 0 !important; margin: 6px 6px 10px !important; padding: 14px !important; width: auto !important;

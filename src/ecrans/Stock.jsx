@@ -621,11 +621,12 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   // Le meuble suit le doigt ; aucun délai fixe ; le clavier garde ↑ / ↓ (et les deux touches restent).
   const glisserMeuble = (e, id) => {
     if (e.button > 0) return;
-    const poignee = e.currentTarget; const sec = poignee.closest('[data-meuble]'); const parent = sec && sec.parentElement;
-    if (!sec || !parent) return;
+    const poignee = e.currentTarget; const sec = poignee.closest('[data-meuble]');
+    if (!sec) return;
     e.preventDefault();
     try { poignee.setPointerCapture(e.pointerId); } catch (_) {}
-    const autres = [...parent.querySelectorAll(':scope > [data-meuble]')].filter((x) => x !== sec);
+    // Les autres meubles dans l'ordre de l'écran (chacun peut avoir son propre conteneur).
+    const autres = [...document.querySelectorAll('section[data-meuble]')].filter((x) => x !== sec && x.getClientRects().length);
     const milieux = autres.map((x) => { const r = x.getBoundingClientRect(); return r.top + r.height / 2; });
     const y0 = e.clientY; let vers = null;
     sec.setAttribute('data-meuble-glisse', '1');

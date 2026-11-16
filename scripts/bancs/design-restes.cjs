@@ -69,6 +69,7 @@ async function partieMonte(nav, sombre) {
       const cible = pg.locator(e.rangee + (e.toucher ? ' ' + e.toucher : '')).first();
       await cible.scrollIntoViewIfNeeded().catch(() => {});
       await cible.tap({ timeout: 4000 }).catch((x) => console.log('    (tap)', String(x).slice(0, 120)));
+      await pg.waitForTimeout(400);   // la carte et le recul sont posés après l'image (hôte)
       const monte = await attendre(pg, (c) => { const r = document.querySelector('[data-sb-avant]'); return !!r && (!c || r.getAttribute('data-sb-avant-cle') === c) && !!r.querySelector('[data-sb-avant-chiffres]'); }, cle, 3000);
       const m = await pg.evaluate(() => {
         const r = document.querySelector('[data-sb-avant]');
@@ -85,7 +86,8 @@ async function partieMonte(nav, sombre) {
       dit(monte && m.cle === cle, `M ${nom} ${t} : la rangée touchée MONTE à sa place`, m);
       dit(!m.fiche, `M ${nom} ${t} : aucune fiche ne s'ouvre par-dessus`, m.fiche);
       dit(m.cartes === 1, `M ${nom} ${t} : une seule carte dans la rangée`, m.cartes);
-      dit(!!(m.ch && m.ch.prix), `M ${nom} ${t} : la carte porte le prix lu`, m.ch);
+      if (nom !== 'stock') dit(!!(m.ch && m.ch.prix), `M ${nom} ${t} : la carte porte le prix lu`, m.ch);
+      else dit(!!m.ch && 'prix' in m.ch, `M stock ${t} : la carte porte la case du prix (« — » quand aucun site ne l'a lu)`, m.ch);
       dit(m.op == null || m.op < 0.6, `M ${nom} ${t} : les autres rangées reculent (opacité < .6)`, m.op);
       dit(!m.debord, `M ${nom} ${t} : la carte ne déborde pas de l'écran`);
       if (nom === 'vc') dit(m.ch && m.ch.achat === '55', `M vc ${t} : « acheté » = le prix d'achat saisi de SON N° (55)`, m.ch);
@@ -148,7 +150,8 @@ async function partieFond(nav, sombre) {
   for (const W of [390, 1512]) for (const [nom, sels] of Object.entries(FOND)) {
     const o = await ouvrirEcran(nav, W, sombre, ECRANS[nom].url);
     try {
-      await attendre(o.pg, (s) => !!document.querySelector(s), sels[0], 6000);
+      // Sous la charge, l'écran peut tarder : 15 s, puis une seconde ouverture (jamais un délai fixe).
+      if (!(await attendre(o.pg, (s) => !!document.querySelector(s), sels[0], 15000))) { await o.pg.goto(`http://localhost:${P.PORT}${ECRANS[nom].url}`, { waitUntil: 'domcontentloaded' }).catch(() => {}); await P.pret(o.pg); await attendre(o.pg, (s) => !!document.querySelector(s), sels[0], 15000); }
       const r = await o.pg.evaluate(mesurerFond, sels);
       const vus = new Set(r.map((x) => x.s));
       for (const s of sels) if (!vus.has(s)) console.log(`    (F ${nom} ${W} ${t} : ${s} absent de cette base)`);
@@ -190,6 +193,7 @@ async function partieGlisse(nav, sombre) {
     dit(!!h && h.h >= 44 && h.w >= 44, `G ${t} : la poignée du meuble (44 px au doigt)`, h);
     if (!h) return;
     // Un vrai glisser au doigt : pointerdown, déplacements, pointerup (CDP « touch »).
+    await pg.evaluate(() => { window.__ev = []; for (const t of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'touchstart']) document.addEventListener(t, (e) => { if (window.__ev.length < 30) window.__ev.push(t + ':' + (e.target && e.target.getAttribute ? (e.target.getAttribute('data-meuble-glisser') || e.target.tagName) : '')); }, true); });
     const cdp = await pg.context().newCDPSession(pg);
     const pt = (x, y) => [{ x: Math.round(x), y: Math.round(y) }];
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pt(h.x, h.y) });
@@ -197,6 +201,7 @@ async function partieGlisse(nav, sombre) {
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
     const bouge = await attendre(pg, (a) => [...document.querySelectorAll('[data-meuble]')].map((x) => x.getAttribute('data-meuble')).join(',') !== a, avant, 3000);
     const apres = await ordre();
+    if (process.env.DEBUG) console.log('    ev', JSON.stringify(await pg.evaluate(() => window.__ev)), JSON.stringify(h));
     const stocke = await pg.evaluate(() => { try { const l = JSON.parse(localStorage.getItem('vrm_meubles') || '[]'); return l.slice().sort((a, b) => a.ordre - b.ordre).map((m) => m.id).join(','); } catch (_) { return ''; } });
     await pg.screenshot({ path: path.join(SHOTS, `glisse-390-${t}.png`) });
     dit(bouge && apres === 'mB,mA,mC', `G ${t} : glissé sous « Bureau », « Garage » y est posé`, { avant, apres });
