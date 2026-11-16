@@ -156,12 +156,17 @@ const ecran = (pg) => pg.evaluate((CHAMP_ANNONCES) => {
 const toucher = async (pg, sel) => { const l = pg.locator(sel).first(); if (!(await l.count())) { console.log(`     (absent : ${sel})`); return false; } await l.tap({ timeout: 5000 }).catch(() => l.click({ timeout: 3000 }).catch(() => {})); await pg.waitForTimeout(700);
   await pg.waitForFunction(() => !document.querySelector('.vrm-tabbar[data-en-cours]'), null, { timeout: 4000 }).catch(() => {}); await pg.waitForTimeout(300); return true; };
 const cliquer = async (pg, sel) => { const l = pg.locator(sel).first(); if (!(await l.count())) { console.log(`     (absent : ${sel})`); return false; } await l.click({ timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(900); return true; };
-// Un VRAI glisser de doigt (Chromium : le geste de défilement synthétique du navigateur, celui
-// qui fait défiler une rangée ou la page, pas un événement fabriqué dans la page).
+// Un VRAI glisser de doigt : des touchers envoyés au NAVIGATEUR (CDP Input.dispatchTouchEvent), pas des
+// événements fabriqués dans la page — le navigateur défile lui-même une rangée ou la page, comme au doigt.
 const glisserDoigt = async (pg, x, y, dx, dy) => {
   const cdp = await pg.context().newCDPSession(pg);
-  await cdp.send('Input.synthesizeScrollGesture', { x, y, xDistance: dx, yDistance: dy, gestureSourceType: 'touch', speed: 1200, preventFling: true, repeatCount: 1 }).catch((e) => console.log('     (geste refusé : ' + e.message + ')'));
-  await cdp.detach().catch(() => {}); await pg.waitForTimeout(500);
+  const pt = (k) => [{ x: Math.round(x + dx * k), y: Math.round(y + dy * k), id: 1, radiusX: 4, radiusY: 4, force: 1 }];
+  try {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pt(0) });
+    for (let k = 1; k <= 12; k++) { await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: pt(k / 12) }); await new Promise((r) => setTimeout(r, 16)); }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  } catch (e) { console.log('     (toucher refusé : ' + e.message + ')'); }
+  await cdp.detach().catch(() => {}); await pg.waitForTimeout(600);
 };
 // Les touchers d'une page (ce que lirait un gestionnaire de balayage de la coque), du bord et du milieu.
 const balayerEvenements = (pg, x0, x1, y) => pg.evaluate(([x0, x1, y]) => {
@@ -235,8 +240,12 @@ const ECRANS = [
         dit(!!m && m.entrees.every((e) => e.touche), `A2 ${qui} : le toucher au centre tombe sur l'entrée`, JSON.stringify(m && m.entrees.filter((e) => !e.touche).map((e) => e.id)));
         dit(!!m && m.docW <= m.vw, `A2 ${qui} : rien ne déborde de côté`, JSON.stringify(m && [m.docW, m.vw]));
         // A3 · le compteur d'Achats (colis à retirer, publié par Achats), une fois.
+        // Le nombre est « À retirer » PUBLIÉ par Achats (`vrm_colis_retirer.total`, < 12 h) : l'app le recalcule à
+        // l'ouverture ; on juge la règle — publié > 0 ⇒ ce nombre sur l'onglet Achats, une fois ; 0 ⇒ aucun.
         const bAch = m ? m.badges.filter(([k]) => k === 'achats') : [];
-        dit(bAch.length === 1 && /^\d+$/.test(bAch[0][1]), `A3 ${qui} : Achats porte son compteur (À retirer), une fois`, JSON.stringify(m && m.badges));
+        const pub = await pg.evaluate(() => { try { const v = JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); return v && Number.isFinite(v.total) ? v.total : null; } catch (_) { return null; } });
+        const nJuste = pub > 0 ? (bAch.length === 1 && bAch[0][1] === String(pub)) : bAch.length === 0;
+        dit(!!m && m.entrees.some((e) => e.id === 'achats') && nJuste, `A3 ${qui} : l'onglet Achats porte le nombre « À retirer » publié (${pub}), une fois`, JSON.stringify({ pub, badges: m && m.badges }));
         const nombres = m ? m.badges.map(([, n]) => n).filter((n) => /^\d+$/.test(n)) : [];
         dit(new Set(m ? m.badges.map(([k]) => k) : []).size === (m ? m.badges.length : 0), `A3 ${qui} : une pastille par onglet au plus`, JSON.stringify(m && m.badges));
         // A4 · l'onglet allumé = l'écran, pour chaque écran (au toucher de la barre).
