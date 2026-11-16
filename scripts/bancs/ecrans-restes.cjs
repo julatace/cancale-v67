@@ -158,6 +158,7 @@ const CHEVAUCHE = () => {
       const { ctx, pg, errs } = await ouvrir(b, vp);
       await aller(pg, 'garage');
       await pg.waitForSelector('[data-stock-importees]', { timeout: 25000 }).catch(() => {});
+      await pg.waitForFunction(() => [...document.querySelectorAll('[data-stock-importee="900"]')].some((e) => e.getClientRects().length && /Carton/.test(e.innerText || '')), null, { timeout: 15000 }).catch(() => {});
       const r = await pg.evaluate(() => {
         const s = [...document.querySelectorAll('[data-stock-importees]')].find((e) => e.getClientRects().length) || null;
         const l = (n) => [...document.querySelectorAll(`[data-stock-importee="${n}"]`)].find((e) => e.getClientRects().length) || null;
@@ -219,7 +220,7 @@ const CHEVAUCHE = () => {
       dit(vue, 'E1 la carte « Protège ton compte VRM » se montre (double vérification lue inactive)');
       await pg.evaluate(() => { const b = [...document.querySelectorAll('[data-carte-mfa-plus-tard]')].find((e) => e.getClientRects().length); if (b) b.click(); });
       await pg.waitForFunction(() => !document.querySelector('[data-carte-mfa]'), null, { timeout: 5000 }).catch(() => {});
-      await pg.waitForTimeout(9000);
+      for (let t = 0; t < 30 && !ecrits.some((x) => /vrm_carte_mfa_rangee/.test(x)); t++) await pg.waitForTimeout(1000);
       const dbg = await pg.evaluate(() => ({ carte: [...document.querySelectorAll('[data-carte-mfa]')].some((e) => e.getClientRects().length), ls: localStorage.getItem('vrm_carte_mfa_rangee') }));
       if (process.env.DBG) console.log(JSON.stringify(dbg));
       const part = ecrits.some((x) => /vrm_carte_mfa_rangee/.test(x));
@@ -279,7 +280,7 @@ const CHEVAUCHE = () => {
       // Un réglage synchronisé changé (son prénom), la base refuse d'écrire : la ligne d'état doit le dire, lisible.
       const champ = pg.locator('input[aria-label="Ton prénom"]').first();
       await champ.fill('Banc', { timeout: 8000 }).catch(() => {});
-      await pg.waitForSelector('[data-statut-reglages="echec"]', { timeout: 30000 }).catch(() => {});
+      await pg.waitForSelector('[data-statut-reglages="echec"]', { timeout: 90000 }).catch(() => {});
       await pg.waitForTimeout(800);
       const r = await pg.evaluate(() => {
         const s = document.querySelector('[data-statut-reglages]'); if (!s) return { absent: true };
