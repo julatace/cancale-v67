@@ -26,6 +26,9 @@ Mission : `docs/passation/file-attente-16nov/4-reprendre.md` (validée par Julie
   `positionReprise` absente, câblage).
 - Banc `reprise-ecrans` (390 tactile + 1512, base inventée) : P6 13 h ⇒ Ma journée ; P7 11 h ⇒ Ventes + filtre ;
   P8 défiler 700 px, recharger ⇒ même écran, 700 px ; lien `?tab=achats` gagne ; P9 ordinateur 11 h ⇒ Annonces.
+  **35/35**, captures regardées. Note : dans ce banc, toucher « Annonces » dans la barre du bas depuis Ma journée
+  (iPhone, P6) ne menait pas à Annonces (vu sur la capture ; non expliqué, probablement hérité) : P6 y va par
+  `?tab=annonces` (la reprise des VUES reste jugée). À regarder par le lot des bancs rouges.
 
 ## ÉTAT À LA REPRISE
 Fini, PR ouverte (voir le rapport). Rien d'autre à faire. Geste de Julien : aucun.

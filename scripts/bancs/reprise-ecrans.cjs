@@ -63,7 +63,9 @@ const ecran = (pg) => pg.evaluate(() => (document.querySelector('main.vrm-main')
 const attendreEcran = (pg, t, ms = 12000) => H.attendre(async () => (await ecran(pg)) === t, ms);
 const capture = async (pg, nom) => { try { await pg.screenshot({ path: path.join(CAPT, nom + '.png') }); } catch (_) {} };
 const aller = async (pg, id) => {
-  const b = pg.locator(`[data-nav-entree="${id}"]`).first();
+  // (16 nov.) L'entrée VISIBLE (sur l'iPhone, la barre du bas ; une entrée cachée — barre latérale,
+  // carte hors écran — ne mène nulle part).
+  const b = pg.locator(`[data-nav-entree="${id}"]:visible`).first();
   if (await b.count()) { await b.click().catch(() => {}); return attendreEcran(pg, id, 8000); }
   return false;
 };
@@ -175,7 +177,10 @@ const bandeau = (pg) => pg.evaluate(() => (document.querySelector('[data-reprise
   await pD.pg.waitForTimeout(7000);
   dit((await ecran(pD.pg)) === 'journee', 'P6 : un dernier écran de 13 h ⇒ Ma journée', await ecran(pD.pg));
   await capture(pD.pg, 'P6-journee');
-  const surAnnonces = await aller(pD.pg, 'annonces');
+  // (16 nov.) Par le lien (la barre du bas de Ma journée ne mène pas toujours à Annonces dans ce banc, cf. récit) :
+  // un lien `?tab=` fait taire la reprise d'ÉCRAN, pas celle des vues — c'est la recherche qui est jugée ici.
+  await pD.pg.goto(srv.url + '/?tab=annonces', { waitUntil: 'domcontentloaded' });
+  const surAnnonces = await attendreEcran(pD.pg, 'annonces', 15000);
   await H.attendre(async () => (await rechercheAnnonces(pD.pg)) !== null, 15000);
   dit((await rechercheAnnonces(pD.pg)) === '', 'P6 : une recherche quittée il y a 11 min ne revient pas', JSON.stringify(await rechercheAnnonces(pD.pg)) + ' · écran ' + (await ecran(pD.pg)) + (surAnnonces ? '' : ' (barre : pas arrivé)'));
   await capture(pD.pg, 'P6-annonces');
