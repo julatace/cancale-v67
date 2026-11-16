@@ -35085,9 +35085,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   // Géocodage des points relais (nom → coordonnées) pour la carte à épingle.
   // Nominatim (OpenStreetMap), gratuit, 1 requête/seconde, cache local.
-  // (16 nov., vitesse-moteur) Le cache de géocodage n'est plus un ÉTAT : aucun rendu ne le lisait, et chaque point
-  // géocodé (ou raté) redessinait tout le moteur — mesuré à 20 000 ventes, 8 rendus de Ma journée sur 38 rien que
-  // pour lui. Il vit dans `vrm_geo_cache_v2` seul (lu et écrit par le géocodage ci-dessous).
+  // (16 nov., vitesse-moteur) Le cache de géocodage n'est plus un ÉTAT : seul le planificateur de tournée le lit
+  // (feuille ouverte, il le relit alors), et chaque point géocodé (ou raté) redessinait tout le moteur — mesuré à
+  // 20 000 ventes, 8 rendus de Ma journée sur 38 rien que pour lui. Il vit dans `vrm_geo_cache_v2` seul.
   const [openPoint, setOpenPoint] = useState(null); // lieu déplié (liste des colis)
   // Points relais HABITUELS, pré-enregistrés : la carte s'affiche en permanence,
   // les badges apparaissent à l'arrivée des colis. Synchronisé.
@@ -57169,6 +57169,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {tourneeOpen && (()=>{
         const avail=(tracking||[]).filter(isPickupActive);
         const groups={};
+        // (16 nov., vitesse-moteur) Le cache de géocodage n'est plus un état du moteur : lu ici, feuille ouverte.
+        const geo=load('vrm_geo_cache_v2', {}) || {};
         avail.forEach(t=>{ const c=cleanLieu(t.lieu); const key=c.nom || carrierName(t.carrier); if(!groups[key]) groups[key]={colis:[],carrier:t.carrier,adresse:c.adresse||'',geo:geo[c.nom]||null}; groups[key].colis.push(t); if(!groups[key].carrier) groups[key].carrier=t.carrier; });
         const points=Object.entries(groups).map(([nom,g])=>({nom,...g})).sort((a,b)=>b.colis.length-a.colis.length || a.nom.localeCompare(b.nom));
         const mapsUrl=(p)=> p.geo&&p.geo.lat ? `https://www.google.com/maps/search/?api=1&query=${p.geo.lat},${p.geo.lon}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.nom+(p.adresse?' '+p.adresse:''))}`;
