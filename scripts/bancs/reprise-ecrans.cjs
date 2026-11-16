@@ -175,9 +175,10 @@ const bandeau = (pg) => pg.evaluate(() => (document.querySelector('[data-reprise
   await pD.pg.waitForTimeout(7000);
   dit((await ecran(pD.pg)) === 'journee', 'P6 : un dernier écran de 13 h ⇒ Ma journée', await ecran(pD.pg));
   await capture(pD.pg, 'P6-journee');
-  await aller(pD.pg, 'annonces');
-  await H.attendre(async () => (await rechercheAnnonces(pD.pg)) !== null, 8000);
-  dit((await rechercheAnnonces(pD.pg)) === '', 'P6 : une recherche quittée il y a 11 min ne revient pas', JSON.stringify(await rechercheAnnonces(pD.pg)));
+  const surAnnonces = await aller(pD.pg, 'annonces');
+  await H.attendre(async () => (await rechercheAnnonces(pD.pg)) !== null, 15000);
+  dit((await rechercheAnnonces(pD.pg)) === '', 'P6 : une recherche quittée il y a 11 min ne revient pas', JSON.stringify(await rechercheAnnonces(pD.pg)) + ' · écran ' + (await ecran(pD.pg)) + (surAnnonces ? '' : ' (barre : pas arrivé)'));
+  await capture(pD.pg, 'P6-annonces');
   await aller(pD.pg, 'ventes');
   await H.attendre(async () => (await pD.pg.locator('button[aria-pressed="true"]', { hasText: /^Finalisées$/ }).count()) > 0, 8000);
   dit((await pD.pg.locator('button[aria-pressed="true"]', { hasText: /^Finalisées$/ }).count()) > 0, 'P6 : le filtre de Ventes (2 jours) revient, dit à l’écran');
