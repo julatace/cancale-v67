@@ -219,7 +219,7 @@ const attendre = async (pg, q) => { await pg.waitForSelector(q, { timeout: 30000
             const etat = await pg.evaluate(() => { if (document.querySelector('[data-lot-question]')) return 'q';
               const clic = (l) => { const bs = [...document.querySelectorAll('button')].filter((x) => x.innerText.trim() === l && x.offsetParent); if (bs.length) { bs[bs.length - 1].click(); return true; } return false; };
               if (clic("J'ai vérifié, imprimer")) return 'clic';
-              const t = document.querySelector('[data-placeur-tampon]:not([data-placeur-tampon="charge"]) [data-tampon-imprimer]'); if (t) { t.click(); return 'clic'; }
+              const t = document.querySelector('[data-placeur-tampon]:not([data-placeur-tampon="charge"]) [data-tampon-imprimer], [data-impr-apercu="pret"] [data-impr-apercu-imprimer]:not([disabled])'); if (t) { t.click(); return 'clic'; }
               return 'attente'; });
             if (etat === 'q') break; await pg.waitForTimeout(250);
           }

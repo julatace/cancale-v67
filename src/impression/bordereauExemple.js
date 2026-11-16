@@ -88,10 +88,13 @@ export function dessinerEtiquette(page, PL, qrcode, f, fb, ox, oy, w, h, o = {})
   // `blancQr` (points) : un blanc AU-DESSUS du QR, collé à lui — assez grand pour un tampon
   // seulement si l'on oublie la garde de 5 mm autour des codes (le banc s'en sert pour le prouver).
   if (o.plein && o.blancQr) page.drawRectangle({ x: ox + w * 0.56, y: oy + m + 26, width: w * 0.44 - m, height: 33 * mod + 4 + o.blancQr, color: blanc });
+  const yAdresse = y;
   const cote = dessinerQR(page, PL, qrcode, o.qr || `VRM-EXEMPLE-${suivi}`, ox + w - m - 29 * mod, oy + m + 30, mod);
   y = oy + m + 30 + cote - 8;
-  T('Expéditeur', ox + m, y, 7, fb, gris); y -= 10;
-  for (const l of EXPEDITEUR_INVENTE) { T(l, ox + m, y, 8); y -= 10; }
+  // (16 nov.) Une étiquette couchée (peu haute) : l'expéditeur passe À DROITE de l'adresse au lieu de la chevaucher.
+  const xE = y > yAdresse - 4 ? ox + m + Math.max(fb.widthOfTextAtSize(ADRESSE_INVENTEE[0], 11), f.widthOfTextAtSize(ADRESSE_INVENTEE[1], 11)) + 24 : ox + m;
+  T('Expéditeur', xE, y, 7, fb, gris); y -= 10;
+  for (const l of EXPEDITEUR_INVENTE) { T(l, xE, y, 8); y -= 10; }
   T('24R', ox + m, oy + m + 4, 26, fb);
   if (o.gris !== false) T('Poids 0,5 kg · Colis 1/1', ox + m + 70, oy + m + 8, 7, f, gris);
 }

@@ -251,8 +251,8 @@ const VARIANTES = [{ tn: 18, tt: 8 }, { tn: 15, tt: 7 }, { tn: 12, tt: 6.5 }];
       dit(pdf && pdf.pages === 1, 'une seule page : pas de fiche colis', pdf && `${pdf.pages} p.`);
       // 5. Mémorisé pour la forme : le clic suivant imprime directement au même endroit.
       // (4 nov.) `save` écrit un instant après le geste : on attend l'écriture (rouge intermittent sinon, aussi sur main).
-      await pg.waitForFunction((f) => { try { return !!(JSON.parse(localStorage.getItem('vrm_tampon_positions') || '{}') || {})[f]; } catch (_) { return false; } }, forme, { timeout: 8000 }).catch(() => {});
-      const memo = await pg.evaluate((f) => { try { return (JSON.parse(localStorage.getItem('vrm_tampon_positions') || '{}') || {})[f] || null; } catch (_) { return null; } }, forme);
+      await pg.waitForFunction((f) => { try { return !!(Object.fromEntries(Object.entries((JSON.parse(localStorage.getItem('vrm_tampons') || '{}') || {}).formes || {}).filter(([, v]) => v && v.n).map(([k, v]) => [k, v.n])) || {})[f]; } catch (_) { return false; } }, forme, { timeout: 8000 }).catch(() => {});
+      const memo = await pg.evaluate((f) => { try { return (Object.fromEntries(Object.entries((JSON.parse(localStorage.getItem('vrm_tampons') || '{}') || {}).formes || {}).filter(([, v]) => v && v.n).map(([k, v]) => [k, v.n])) || {})[f] || null; } catch (_) { return null; } }, forme);
       dit(memo && Math.abs(memo.vx * 595.28 - b.x) < 0.5 && Math.abs(memo.vy * 841.89 - b.y) < 0.5, '« Toujours ici » : la place est rangée pour la forme (`vrm_tampon_positions`)', JSON.stringify(memo));
       try { await pg.locator('[data-visionneuse-fermer]').click({ timeout: 3000 }); } catch (_) {}
       try { await pg.locator('[data-bord-fermer]:visible').first().click({ timeout: 3000 }); } catch (_) {}

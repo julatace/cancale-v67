@@ -92,7 +92,11 @@ window.__lire = async (b64, n, dpmm, png) => {
     await pg.render({ canvasContext: x, viewport: v }).promise;
     const d = x.getImageData(0, 0, c.width, c.height).data, W = c.width, H = c.height;
     const bw = new Uint8ClampedArray(d.length); for (let i = 0; i < d.length; i += 4) { const k = __lum(d, i) < 160 ? 0 : 255; bw[i] = bw[i + 1] = bw[i + 2] = k; bw[i + 3] = 255; }
-    const qr = jsQR(bw, W, H);
+    // Deux étiquettes (ou quatre) sur la feuille : jsQR n'en lit qu'un à la fois — on essaie la page, puis chaque moitié.
+    const morceau = (x0, y0, w0, h0) => { const o = new Uint8ClampedArray(w0 * h0 * 4); for (let y = 0; y < h0; y++) o.set(bw.subarray(((y0 + y) * W + x0) * 4, ((y0 + y) * W + x0 + w0) * 4), y * w0 * 4); const r = jsQR(o, w0, h0); if (r) for (const k of ['topLeftCorner', 'topRightCorner', 'bottomLeftCorner', 'bottomRightCorner']) { r.location[k].x += x0; r.location[k].y += y0; } return r; };
+    const Wd = Math.floor(W / 2), Hd = Math.floor(H / 2);
+    const essais = [jsQR(bw, W, H), morceau(0, 0, Wd, H), morceau(Wd, 0, W - Wd, H), morceau(0, 0, W, Hd), morceau(0, Hd, W, H - Hd)].filter(Boolean);
+    const qr = essais[0] || null;
     // ITF : lignes et colonnes, deux sens.
     const itf = new Map();
     const scan = (n2, len, at, boite) => { for (const sens of [1, -1]) { const runs = [], starts = []; let cur = 255, l = 0;
@@ -107,12 +111,15 @@ window.__lire = async (b64, n, dpmm, png) => {
     const k = 1 / s;
     const q = qr ? { data: qr.data, box: { x: Math.min(qr.location.topLeftCorner.x, qr.location.bottomLeftCorner.x) * k, y: Math.min(qr.location.topLeftCorner.y, qr.location.topRightCorner.y) * k, X: Math.max(qr.location.topRightCorner.x, qr.location.bottomRightCorner.x) * k, Y: Math.max(qr.location.bottomLeftCorner.y, qr.location.bottomRightCorner.y) * k } } : null;
     window.__px = window.__px || {}; const cle = Math.random().toString(36).slice(2); window.__px[cle] = { bw, W, H, s };
-    return { w: v1.width, h: v1.height, items, qr: q, itf: [...itf.values()].map((e) => ({ t: e.t, box: { x: e.b.x0 * k, y: e.b.y0 * k, X: e.b.x1 * k, Y: e.b.y1 * k } })), px: cle, png: png ? c.toDataURL('image/png') : null };
+    const boiteQr = (r) => ({ x: Math.min(r.location.topLeftCorner.x, r.location.bottomLeftCorner.x) * k, y: Math.min(r.location.topLeftCorner.y, r.location.topRightCorner.y) * k, X: Math.max(r.location.topRightCorner.x, r.location.bottomRightCorner.x) * k, Y: Math.max(r.location.bottomLeftCorner.y, r.location.bottomRightCorner.y) * k });
+    const qrs = []; for (const r of essais) if (!qrs.some((x) => x.data === r.data)) qrs.push({ data: r.data, box: boiteQr(r) });
+    return { w: v1.width, h: v1.height, items, qr: q, qrs, itf: [...itf.values()].map((e) => ({ t: e.t, box: { x: e.b.x0 * k, y: e.b.y0 * k, X: e.b.x1 * k, Y: e.b.y1 * k } })), px: cle, png: png ? c.toDataURL('image/png') : null };
   } finally { await doc.destroy(); }
 };
 // Combien de pixels N&B diffèrent entre deux rendus, dans une boîte (points).
-window.__diff = (a, b, box) => { const A = window.__px[a], B = window.__px[b]; if (!A || !B || A.W !== B.W || A.H !== B.H) return -1;
-  const s = A.s, x0 = Math.max(0, Math.floor(box.x * s)), y0 = Math.max(0, Math.floor(box.y * s)), x1 = Math.min(A.W, Math.ceil(box.X * s)), y1 = Math.min(A.H, Math.ceil(box.Y * s)); let n = 0;
+// (Rouleau continu : la page avec tampon est plus haute — la bande du N° sous l'étiquette ; on compare depuis le HAUT.)
+window.__diff = (a, b, box) => { const A = window.__px[a], B = window.__px[b]; if (!A || !B || A.W !== B.W) return -1;
+  const s = A.s, x0 = Math.max(0, Math.floor(box.x * s)), y0 = Math.max(0, Math.floor(box.y * s)), x1 = Math.min(A.W, Math.ceil(box.X * s)), y1 = Math.min(A.H, B.H, Math.ceil(box.Y * s)); let n = 0;
   for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) { const i = (y * A.W + x) * 4; if (A.bw[i] !== B.bw[i]) n++; } return n; };
 // La planche : toutes les vignettes d'un support sur une image (regardée, mise dans le récit).
 window.__planche = async (pngs, titre) => { const imgs = await Promise.all(pngs.map((p) => new Promise((ok) => { const im = new Image(); im.onload = () => ok({ im, nom: p.nom }); im.src = p.png; })));
@@ -154,18 +161,21 @@ async function typeSupport(pg, id, support, vignettes) {
   dit(qrOk, `${t} : A. le QR se décode après les tampons`, L.qr ? L.qr.data : 'aucun QR lu');
   dit(L.itf.length > 0 || (L0 && L0.itf.length === 0), `${t} : A. le code-barres se lit (s'il se lisait sans tampon)`, L.itf.map((i) => i.t).join(',') || '—');
   // B. aucun pixel changé sur le QR + 4 modules, ni sur le code-barres + 10 modules (comparé au même SANS tampon)
-  if (L0 && L0.qr) {
-    const mod = (L0.qr.box.X - L0.qr.box.x) / 29, zone = elargi(L0.qr.box, 4 * mod);
+  for (const qq of (L0 ? L0.qrs : [])) {
+    const mod = (qq.box.X - qq.box.x) / 29, zone = elargi(qq.box, 4 * mod);
     const d = await pg.evaluate(([p, q, b]) => __diff(p, q, b), [L.px, L0.px, zone]);
-    dit(d === 0, `${t} : B. QR + zone de silence intacts (pixels changés : ${d})`);
+    dit(d === 0, `${t} : B. QR ${qq.data.slice(-2)} + zone de silence intacts (pixels changés : ${d})`);
   }
+  if (L0 && L0.qrs.length > 1) dit(L0.qrs.every((qq) => L.qrs.some((x) => x.data === qq.data)), `${t} : A. chacun des ${L0.qrs.length} QR se décode après les tampons`);
   for (const c of (L0 ? L0.itf : [])) {
     const d = await pg.evaluate(([p, q, b]) => __diff(p, q, b), [L.px, L0.px, elargi(c.box, 4 * MM)]);
     dit(d === 0, `${t} : B. code-barres ${c.t} + zone de silence intacts (pixels changés : ${d})`);
   }
   // C. la mention : écrite, centrée sur l'axe du QR, juste au-dessus (sinon juste dessous), hors zone de silence
   const m = L.items.find((i) => /Créé par vrm\.center/.test(i.s));
-  const qrb = L0 && L0.qr ? L0.qr.box : (L.qr ? L.qr.box : null);
+  // Le QR de la mention : celui dont l'axe est le plus proche d'elle (une feuille à deux étiquettes en a deux).
+  const qrsRef = L0 && L0.qrs.length ? L0.qrs : (L.qrs || []);
+  const qrb = !qrsRef.length ? null : !m ? qrsRef[0].box : qrsRef.map((x) => x.box).sort((a, b) => Math.abs((a.x + a.X) / 2 - (m.x + m.l / 2)) - Math.abs((b.x + b.X) / 2 - (m.x + m.l / 2)))[0];
   if (!m) { stats.sans++; dit(false, `${t} : C. « Créé par vrm.center » écrite`, `via=${a.pose && a.pose.mentionBoite ? a.pose.mentionBoite.via : 'rien'}`); }
   else if (qrb) {
     const mb = texteBoite(m), cx = (mb.x + mb.X) / 2, qcx = (qrb.x + qrb.X) / 2, ecart = Math.abs(cx - qcx) / L.w;
@@ -176,11 +186,12 @@ async function typeSupport(pg, id, support, vignettes) {
     dit((dessus || dessous) && gap >= 2.5 * MM && gap <= 16 * MM, `${t} : C. mention juste ${dessus ? 'AU-DESSUS' : 'EN DESSOUS'} du QR, hors de sa zone de silence (${(gap / MM).toFixed(1)} mm)`, `via=${via}`);
     dit(m.t <= 7.5 && m.t >= 4.5, `${t} : C. mention petite (${m.t.toFixed(1)} pt)`);
   }
-  // D. le N°
+  // D. le N° — sur l'étiquette, ou sur la fiche (colis / préparation) qui la suit quand il n'y a aucune place sûre
   const num = L.items.find((i) => /^N° 124/.test(i.s));
-  dit(!!num, `${t} : D. le N° est écrit`);
+  const fiche = !num && a.pose && /fiche/.test(a.pose.mode) ? await pg.evaluate(([b, k]) => __lire(b, k, 4, false), [a.b64, a.pose.page + 1]).catch(() => null) : null;
+  dit(!!num || !!(fiche && fiche.items.some((i) => /N° 124/.test(i.s))), `${t} : D. le N° est écrit${!num && fiche ? ' (sur la fiche qui suit : aucune place sûre sur l’étiquette)' : ''}`, a.pose ? a.pose.mode : '');
   if (num && qrb) dit(!touche(texteBoite(num), elargi(qrb, 3 * MM)), `${t} : D. le N° hors du QR`);
-  if (id === 'retour') dit(L.items.some((i) => /RETOUR/.test(i.s)), `${t} : le retour est marqué « RETOUR »`);
+  if (id === 'retour') dit(L.items.some((i) => /RETOUR/.test(i.s)) || !!(fiche && fiche.items.some((i) => /RETOUR/.test(i.s))), `${t} : le retour est marqué « RETOUR »`);
 }
 
 (async () => {
@@ -223,7 +234,9 @@ async function typeSupport(pg, id, support, vignettes) {
     // place posée à la main pour la forme ⇒ le N° y est
     const cleMr = 'mondialrelay·A4·portrait';
     x = await un(pg, 'mondialrelay', 'a4', { tampons: R({ formes: { [cleMr]: { n: { vx: 0.1, vy: 0.1, vw: 0.25, v: 0 } } } }), sansTemoin: true });
-    { const i = x && x.L.items.find((k) => /^N° 124/.test(k.s)); dit(i && Math.abs(i.x - (0.1 * 595.28 + 3 * (0.25 * 595.28 / 190))) < 6 && Math.abs((i.y - i.t * 0.8) - 0.1 * 841.89) < 12, 'place à la main (forme Mondial Relay A4) : le N° posé à cet endroit', i ? `${i.x.toFixed(1)},${i.y.toFixed(1)}` : '—'); }
+    // Le N° écrit DANS la boîte posée à la main, et la boîte à la place voulue (±1 pt).
+    const dansBoite = (i, b) => i && b && i.x >= b.x - 1 && i.x <= b.x + b.w && i.y - i.t * 0.8 >= b.y - 2 && i.y <= b.y + b.h + 2;
+    { const i = x && x.L.items.find((k) => /^N° 124/.test(k.s)), b = x && x.a.pose && x.a.pose.place; dit(b && Math.abs(b.x - 0.1 * 595.28) < 1 && Math.abs(b.y - 0.1 * 841.89) < 1 && dansBoite(i, b), 'place à la main (forme Mondial Relay A4) : le N° posé à cet endroit', b ? `boîte ${b.x.toFixed(1)},${b.y.toFixed(1)} · N° ${i ? i.x.toFixed(1) + ',' + i.y.toFixed(1) : '—'}` : '—'); }
     // place à la main SUR le QR ⇒ repoussée, QR lisible
     const z0 = await un(pg, 'mondialrelay', 'a4', { sansTemoin: true });
     const q = z0.L.qr.box;
@@ -239,11 +252,11 @@ async function typeSupport(pg, id, support, vignettes) {
     // migration : vrm_tampons jamais écrit, vrm_impression.tamponA4 = « num » ⇒ N° seul
     x = await un(pg, 'chronopost', 'a4', { store: { vrm_impression: { tamponA4: 'num' } }, sansTemoin: true });
     dit(x && !titreDe(x.L) && x.L.items.some((i) => /^N° 124/.test(i.s)), 'migration : le choix d’avant (« N° seul » en A4) repris tel quel');
-    x = await un(pg, 'chronopost', 'a4', { store: { vrm_tampon_positions: { 'chronopost·A4·paysage': { vx: 0.6, vy: 0.05, vw: 0.2, v: 0 } } }, sansTemoin: true });
-    { const i = x && x.L.items.find((k) => /^N° 124/.test(k.s)); dit(i && Math.abs(i.x - 0.6 * 841.89) < 8, 'migration : la place gardée d’avant (vrm_tampon_positions) reprise', i ? i.x.toFixed(1) : '—'); }
+    x = await un(pg, 'chronopost', 'a4', { store: { vrm_tampon_positions: { 'chronopost·A4·paysage': { vx: 0.05, vy: 0.8, vw: 0.2, v: 0 } } }, sansTemoin: true });
+    { const i = x && x.L.items.find((k) => /^N° 124/.test(k.s)), b = x && x.a.pose && x.a.pose.place; dit(b && Math.abs(b.x - 0.05 * 841.89) < 1 && Math.abs(b.y - 0.8 * 595.28) < 1 && dansBoite(i, b), 'migration : la place gardée d’avant (vrm_tampon_positions) reprise', b ? `${b.x.toFixed(1)},${b.y.toFixed(1)}` : '—'); }
     // l'aperçu avant impression : une place pour CE bordereau prime
     x = await un(pg, 'mondialrelay', 'a4', { places: { n: { vx: 0.55, vy: 0.08, vw: 0.25, v: 0 } }, sansTemoin: true });
-    { const i = x && x.L.items.find((k) => /^N° 124/.test(k.s)); dit(i && Math.abs(i.x - (0.55 * 595.28 + 3 * (0.25 * 595.28 / 190))) < 6, 'aperçu avant impression : la place posée pour CE bordereau est imprimée', i ? i.x.toFixed(1) : '—'); }
+    { const i = x && x.L.items.find((k) => /^N° 124/.test(k.s)), b = x && x.a.pose && x.a.pose.place; dit(b && Math.abs(b.x - 0.55 * 595.28) < 1 && Math.abs(b.y - 0.08 * 841.89) < 1 && dansBoite(i, b), 'aperçu avant impression : la place posée pour CE bordereau est imprimée', b ? `${b.x.toFixed(1)},${b.y.toFixed(1)}` : '—'); }
     // le RETOUR reste « RETOUR » même quand le titre est décoché
     x = await un(pg, 'retour', 'a4', { tampons: R({ a4: { num: true, titre: false, taille: false, mention: true } }), sansTemoin: true });
     dit(x && x.L.items.some((i) => /RETOUR/.test(i.s)), 'retour : « RETOUR » écrit même titre décoché');

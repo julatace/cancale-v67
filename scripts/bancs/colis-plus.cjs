@@ -145,6 +145,8 @@ async function ouvrir(b, vue, LIGNES, { sombre = false, voix = true, imprimante 
 const lire = (pg, k) => pg.evaluate((cle) => { try { return JSON.parse(localStorage.getItem(cle) || 'null'); } catch (_) { return 'illisible'; } }, k);
 const shot = async (pg, nom) => { if (SHOTS) { try { await pg.screenshot({ path: path.join(SHOTS, `colis-plus-${nom}.png`), timeout: 60000 }); } catch (e) { console.log('  (capture ' + nom + ' manquée : ' + String(e.message).slice(0, 60) + ')'); } } };
 const cliquer = (pg, s) => pg.evaluate((q) => { const e = document.querySelector(q); if (!e) return false; e.click(); return true; }, s);
+// (16 nov., lot tampons-parametres) La sélection ouvre l'APERÇU AVANT IMPRESSION (vignettes, tampon réglable) : son « Imprimer ».
+const passerApercu = async (pg) => { const ok = await pg.waitForSelector('[data-impr-apercu="pret"] [data-impr-apercu-imprimer]:not([disabled])', { timeout: 120000 }).then(() => true).catch(() => false); if (ok) await pg.click('[data-impr-apercu-imprimer]'); return ok; };
 const position = (pg) => pg.evaluate(() => { const f = document.querySelector('[data-preparer]'); return f ? f.getAttribute('data-preparer-position') : null; });
 const cleColis = (pg) => pg.evaluate(() => { const e = document.querySelector('[data-preparer-cle]'); return e ? e.getAttribute('data-preparer-cle') : null; });
 const deborde = (pg, racine) => pg.evaluate((r) => { const s = document.querySelector(r); const w = window.innerWidth; const hors = s ? [...s.querySelectorAll('*')].filter((e) => { const b = e.getBoundingClientRect(); return b.width > 0 && (b.right > w + 1 || b.left < -1); }).map((e) => String(e.className).slice(0, 30)) : []; return { page: document.documentElement.scrollWidth - document.documentElement.clientWidth, hors: hors.slice(0, 4) }; }, racine);
@@ -180,6 +182,7 @@ async function lotBrut(b, nom, vue, LIGNES) {
     await pg.waitForFunction(() => { const e = document.querySelector('[data-impr-lot]'); return e && e.getAttribute('data-impr-pret') === '1'; }, null, { timeout: 240000 }).catch(() => {});
     const n0 = await pg.evaluate(() => window.__pdfs.length);
     await cliquer(pg, '[data-impr-lot]');
+    await passerApercu(pg);   // (16 nov.) l'aperçu avant impression, puis son « Imprimer »
     const b64 = await attendrePdfVisionneuse(pg, n0 - 1);
     const diag = b64 ? '' : await pg.evaluate(() => JSON.stringify({ dialogues: [...document.querySelectorAll('[role=dialog],[role=alertdialog]')].map((e) => (e.getAttribute('aria-label') || '') + ':' + (e.innerText || '').replace(/\s+/g, ' ').slice(0, 300)) }));
     dit(!!b64, `${nom} : A2 UN toucher ⇒ UN PDF ouvert`, diag + ' ' + consoleErrs.slice(-4).join(' | '));
@@ -224,6 +227,7 @@ async function lotClassiqueBrut(b, nom, vue, LIGNES) {
     await shot(pg, `${nom}-lot-classique`);
     const n0 = await pg.evaluate(() => window.__pdfs.length);
     await cliquer(pg, 'button[data-lot-imprimer]');
+    await passerApercu(pg);   // (16 nov.) l'aperçu avant impression, puis son « Imprimer »
     const b64 = await attendrePdfVisionneuse(pg, n0);
     dit(!!b64, `${nom} : F2 UN PDF est produit et ouvert`);
     if (!b64) return;

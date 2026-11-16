@@ -129,10 +129,12 @@ const projette = (row, sel) => {
       await pg.waitForTimeout(800);
       dit(!(await pg.getByRole('button',{name:'Préparer quand même les PDF',exact:true}).count()), 'aucune question « contrôlé » entre « Imprimer » et le PDF');
       // (4 nov.) Le type de ces bordereaux n'a pas de place gardée : la feuille du tampon s'ouvre UNE fois, « Imprimer ».
-      const feuille = await pg.waitForSelector('[data-placeur-tampon]:not([data-placeur-tampon="charge"])', { timeout: 20000 }).then(() => true).catch(() => false);
-      const nFeuilles = await pg.evaluate(() => document.querySelectorAll('[data-placeur-tampon]').length);
-      dit(feuille && nFeuilles === 1, 'la feuille du tampon s’ouvre pour ce type de bordereau, une fois', String(nFeuilles));
-      if (feuille) await pg.click('[data-tampon-imprimer]');
+      // (16 nov., lot tampons-parametres) La sélection ouvre l'APERÇU AVANT IMPRESSION (une feuille, chaque bordereau en
+      // vignette, le tampon réglable) ; son « Imprimer » lance le PDF.
+      const feuille = await pg.waitForSelector('[data-impr-apercu="pret"] [data-impr-apercu-imprimer]:not([disabled])', { timeout: 60000 }).then(() => true).catch(() => false);
+      const nFeuilles = await pg.evaluate(() => document.querySelectorAll('[data-impr-apercu]').length);
+      dit(feuille && nFeuilles === 1, 'l’aperçu avant impression s’ouvre, une fois', String(nFeuilles));
+      if (feuille) await pg.click('[data-impr-apercu-imprimer]');
       // Le message du lot : celui qui dit « N sur M ».
       const msg = await pg.waitForFunction(() => {
         const t = document.body.innerText; const m = /(\d+) sur (\d+) imprimé[^\n]*/.exec(t); return m ? m[0] : null;

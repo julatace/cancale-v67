@@ -13894,6 +13894,20 @@ const encreDans = (rendu, b) => {
 // Un QR (ou un DataMatrix) : un code à peu près carré. Sa boîte est AFFINÉE sur ses vrais pixels noirs : la carte
 // des codes est faite de cases de 6 pt, un bord du QR peut en dépasser.
 const estCarreCode = (q) => q.w / q.h >= 0.7 && q.w / q.h <= 1.43 && Math.min(q.w, q.h) >= 8 * MM_M;
+// Un QR alterne noir/blanc dans les DEUX sens ; un code-barres (même trapu, agrandi sur un papier thermique) seulement
+// de gauche à droite : ses colonnes sont pleines. Mesuré sur 5 lignes et 5 colonnes de la boîte.
+const alterneDeuxSens = (rendu, q) => {
+  const { pixels: d, w, h, s } = rendu;
+  const x0 = Math.max(0, Math.round(q.x * s)), y0 = Math.max(0, Math.round(q.y * s)), x1 = Math.min(w - 1, Math.round((q.x + q.w) * s)), y1 = Math.min(h - 1, Math.round((q.y + q.h) * s));
+  const noir = (x, y) => { const i = (y * w + x) * 4; return 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2] < 128; };
+  let th = 0, tv = 0;
+  for (let t = 1; t <= 5; t++) {
+    const y = y0 + Math.floor(((y1 - y0) * t) / 6), x = x0 + Math.floor(((x1 - x0) * t) / 6);
+    for (let i = x0 + 1; i <= x1; i++) if (noir(i, y) !== noir(i - 1, y)) th++;
+    for (let j = y0 + 1; j <= y1; j++) if (noir(x, j) !== noir(x, j - 1)) tv++;
+  }
+  return th >= 20 && tv >= 20 && tv >= th * 0.25;
+};
 const affinerCode = (rendu, q, autour = 8) => {
   const { pixels: d, w, h, s } = rendu;
   const x0 = Math.max(0, Math.floor((q.x - autour) * s)), y0 = Math.max(0, Math.floor((q.y - autour) * s)), x1 = Math.min(w, Math.ceil((q.x + q.w + autour) * s)), y1 = Math.min(h, Math.ceil((q.y + q.h + autour) * s));
@@ -13917,7 +13931,7 @@ const gardeQr = (rendu, q) => {
 // LES ZONES INTERDITES d'une page rendue (points, page affichée) : chaque code-barres + 5 mm, chaque QR + sa zone
 // de silence, chaque adresse donnée. `codes` affinés rendus à part (l'éditeur les hachure, le banc les juge).
 const zonesInterditesTampon = (rendu, adresses = []) => {
-  const codes = zonesCodesTampon(rendu).map((q) => (estCarreCode(q) ? { ...affinerCode(rendu, q), qr: true } : { ...q, qr: false }));
+  const codes = zonesCodesTampon(rendu).map((q) => (estCarreCode(q) && alterneDeuxSens(rendu, q) ? { ...affinerCode(rendu, q), qr: true } : { ...q, qr: false }));
   const interdits = codes.map((q) => ({ ...elargir(q, q.qr ? gardeQr(rendu, q) : MENTION.codes), quoi: q.qr ? 'qr' : 'code' }));
   for (const a of adresses || []) interdits.push({ ...a, quoi: 'adresse' });
   return { codes, interdits };
@@ -14746,6 +14760,8 @@ const geoPageA4 = (PL, page) => {
   let adresses = [], cadre = null;
   try { adresses = zonesAdresse(textesDePage(PL, page)).map(aff); } catch (_) { adresses = []; }
   try { const z = zoneEtiquette(PL, page); if (z && z.ok && z.via !== 'page') cadre = aff(z); } catch (_) { cadre = null; }
+  // Étiquette repérée : seules ses adresses comptent (« Fiche destinataire : à glisser… » de la notice n'est pas une adresse).
+  if (cadre) adresses = adresses.filter((a) => a.x < cadre.x + cadre.w && a.x + a.w > cadre.x && a.y < cadre.y + cadre.h && a.y + a.h > cadre.y);
   return { adresses, cadre };
 };
 // Le TYPE d'un bordereau (le transporteur lu sur la page), pour l'aperçu de Réglages ET (16 nov.) pour le
@@ -15144,8 +15160,19 @@ const annotateAndDownloadBordereauBrut = async (numero, title, pdfArrayBuffer, p
   const thermique = imprMode(opts.imprimante || imprimanteChoisie()) === 'thermique';
   const src = await PDFDocument.load(pdfArrayBuffer);
   const pdf = await PDFDocument.create();
-  const choisir = choisirTampon({ PL, src, numero, titre: title, apercu: opts.apercu === undefined ? true : opts.apercu, thermique, site: opts.site || '' });
-  const r0 = await poserBordereau(PL, pdf, src, { numero, title, pos, thermique, choisir, impression: { ...extrasImpression(numero, title, opts.extra || {}), site: opts.site || '' } });
+  // (16 nov., lot tampons-parametres — Julien : « je sélectionne […] ça m'ouvre une vignette […] le N° je peux le régler
+  // là où je veux ; quand je touche Imprimer, les réglages sont appliqués ») UN bordereau imprimé seul passe AUSSI par
+  // l'aperçu avant impression (sa vignette, le même éditeur) ; « Annuler » ⇒ rien. Sans l'aperçu monté (ou `apercu:
+  // false`) : la place gardée de sa forme, sinon la place de VRM.
+  const apercuVoulu = opts.apercu === undefined ? true : opts.apercu;
+  let places = null, choisir = null;
+  if (apercuVoulu && _apercuUn) {
+    libererOngletPdf();   // la visionneuse « préparation… » ouverte au clic : l'aperçu passe d'abord
+    const rep = await demanderApercuUn({ octets: pdfArrayBuffer, numero, title, imprimante: thermique ? 'thermique' : 'normale', site: opts.site || '', extra: opts.extra || {} });
+    if (rep === null) throw Object.assign(Error(TAMPON_ANNULE), { tamponAnnule: true });
+    places = rep && rep.places ? rep.places : null;
+  } else choisir = choisirTampon({ PL, src, numero, titre: title, apercu: apercuVoulu, thermique, site: opts.site || '' });
+  const r0 = await poserBordereau(PL, pdf, src, { numero, title, pos, thermique, choisir, impression: { ...extrasImpression(numero, title, opts.extra || {}), site: opts.site || '', ...(places ? { places } : {}) } });
   const hasNum = numero != null && String(numero).trim() !== '';
   posePrefsImpression(PL, pdf);
   const bytes = await pdf.save();
@@ -33671,6 +33698,51 @@ function TamponPose({ r }) {
 // « Toujours ici » (coché) mémorise la place pour la FORME du bordereau
 // (`vrm_tampon_positions`) ; « Revenir au choix de VRM » l'oublie. Aucune phrase
 // d'explication (sa demande). Ouverte par `demanderPlacementTampon`.
+// ── (16 nov., lot tampons-parametres) L'APERÇU AVANT IMPRESSION D'UN BORDEREAU SEUL ─────────────────
+// La même feuille que celle d'« Imprimer (N) » (`ApercuAvantImpression`), pour UN bordereau : sa vignette composée par le
+// vrai code (`composerBordereaux`), le N° et la mention qu'on déplace (refusés sur un code, un QR, l'adresse), « tous de
+// ce type » (la place gardée pour sa forme, `vrm_tampons`). « Imprimer » rend les places ; fermer rend null (rien).
+let _apercuUn = null;
+const demanderApercuUn = (o) => new Promise((resolve) => { if (!_apercuUn) return resolve(undefined); _apercuUn({ ...o, resolve }); });
+function ApercuUnCoque() {
+  const [q, setQ] = React.useState(null);
+  React.useEffect(() => { _apercuUn = (o) => setQ(o); return () => { _apercuUn = null; }; }, []);
+  if (!q) return null;
+  const fin = (r) => { const res = q.resolve; setQ(null); res(r); };
+  return <ApercuUnFeuille q={q} fin={fin}/>;
+}
+function ApercuUnFeuille({ q, fin }) {
+  const [etat, setEtat] = React.useState({ choisies: [{ cle: 'un' }], places: {}, tous: true });
+  const [entree, setEntree] = React.useState({ etat: 'encours', res: null });
+  const n0 = React.useRef(0);
+  const composer = React.useCallback(async (places) => {
+    const k = ++n0.current; setEntree((e) => ({ ...e, etat: 'encours' }));
+    try {
+      const it = { numero: q.numero || '', title: q.title || '', pdfBuf: q.octets, cle: 'un', site: q.site || '', places: places && places.un ? places.un : null };
+      const r = await composerBordereaux([it], null, { imprimante: q.imprimante, apercu: false });
+      if (k === n0.current) setEntree({ etat: 'pret', res: { ...r, items: [{ cle: 'un', numero: q.numero || '', title: q.title || '' }] } });
+    } catch (e) { if (k === n0.current) setEntree({ etat: 'echec', res: null, err: e }); }
+  }, [q]);
+  React.useEffect(() => { composer({}); }, [composer]);
+  const poser = (cle, quoi, b, pose, facteur = 1) => {
+    const v = (pose.place && pose.place.v) || 0;
+    const place = quoi === 'n' ? { vx: b.x / pose.W, vy: b.y / pose.H, vw: Math.min(1, b.w / pose.W), v } : { vx: b.x / pose.W, vy: b.y / pose.H, vw: Math.min(1, b.w / pose.W) };
+    if (etat.tous) {
+      let r = reglageTamponsChoisi();
+      if (quoi === 'm' && facteur !== 1) { const rs = resoudreTampon(r, { famille: 'autre', thermique: q.imprimante !== 'normale' }); const k = TAILLES_TAMPON[rs.texteMention] * facteur; r = avecChoix(r, 'tous', { texteMention: Object.keys(TAILLES_TAMPON).reduce((x, c) => (Math.abs(TAILLES_TAMPON[c] - k) < Math.abs(TAILLES_TAMPON[x] - k) ? c : x), 'M') }); }
+      ecrireReglageTampons(avecPlace(r, pose.cle, quoi, place));
+    }
+    const places = { ...etat.places, [cle]: { ...(etat.places[cle] || {}), [quoi]: place } };
+    setEtat((x) => ({ ...x, places })); composer(places);
+  };
+  const origine = (cle, quoi, pose) => {
+    if (etat.tous) ecrireReglageTampons(avecPlace(reglageTamponsChoisi(), pose.cle, quoi, null));
+    const places = { ...etat.places, [cle]: { ...(etat.places[cle] || {}), [quoi]: null } };
+    setEtat((x) => ({ ...x, places })); composer(places);
+  };
+  return <ApercuAvantImpression Feuille={SheetShell} Bouton={Bouton} etat={etat} entree={entree} dessiner={dessinerPdf} occupe={false}
+    onPoser={poser} onOrigine={origine} onTous={(v) => setEtat((x) => ({ ...x, tous: v }))} onImprimer={() => fin({ places: etat.places.un ? { ...etat.places.un } : null })} onFermer={() => fin(null)}/>;
+}
 function PlaceurTampon() {
   const [q, setQ] = React.useState(null);
   React.useEffect(() => { _placeurTampon = (o) => setQ(o); return () => { _placeurTampon = null; }; }, []);
@@ -46585,6 +46657,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // un bordereau qui manque au PDF est NOMMÉ dans la feuille d'après, avec sa raison.
   const [apercuImpr, setApercuImpr] = useState(null);   // (16 nov.) l'aperçu avant impression : { choisies, format, tampons, places, tous, sig }
   const apercuRef = React.useRef(null); apercuRef.current = apercuImpr;
+  // (16 nov.) Aucun PDF lisible dans la sélection : l'aperçu se ferme et le DIT (comme avant : « rien à imprimer »).
+  React.useEffect(() => {
+    const a = apercuImpr; if (!a) return;
+    const e = prepsRef.current.get(a.sig);
+    if (e && e.etat === 'vide') { setApercuImpr(null); const toutPasLu = e.res && e.res.raisons && Object.values(e.res.raisons).every((r) => r === 'pasLu'); if (toutPasLu) prepsRef.current.delete(a.sig); toast(tr('impr.vide')); }
+  });
   const [imprEtat, setImprEtat] = useState(null);       // la feuille d'après : { res, sig, voie, etape, manque, corrige, absents, tamponCorrige }
   const [choixPapier, setChoixPapier] = useState(null); // { puis: null | [cles] } — la question du papier
   const imprAccRef = React.useRef(null);   // la pilule « pendant » de l'impression en cours (accompagner)
@@ -60573,7 +60651,7 @@ export default function App() {
   // vendeur que la base vérifie). Sans invitation acceptée, rien ne change.
   return <>{(MULTI_USER && authState.user)
     ? <PorteConfidentialite key={authState.user.id} session={authState.session} theme={C} onDeconnexion={authSignOut} onRafraichir={()=>authRefresh()} onVerifier={uid=>{_confidentialiteUid=uid;}}><PorteEquipe key={authState.user.id} uid={authState.user.id}><PorteAbonnement uid={authState.user.id}>{coeur}</PorteAbonnement></PorteEquipe></PorteConfidentialite>
-    : coeur}<VisionneusePdf/><PlaceurTampon/>{authState.user && authState.user.id ? <ConfortCoque uid={authState.user.id} entetes={enTeteSession} onDeconnexion={authSignOut} ticketQr={QR_A_APPROUVER}/> : null}{authState.user && authState.user.id ? <CapteNotif feuilleOuverte={uneFeuilleOuverte} abonnerFeuilles={abonnerFeuilles}/> : null}</>;
+    : coeur}<VisionneusePdf/><PlaceurTampon/><ApercuUnCoque/>{authState.user && authState.user.id ? <ConfortCoque uid={authState.user.id} entetes={enTeteSession} onDeconnexion={authSignOut} ticketQr={QR_A_APPROUVER}/> : null}{authState.user && authState.user.id ? <CapteNotif feuilleOuverte={uneFeuilleOuverte} abonnerFeuilles={abonnerFeuilles}/> : null}</>;
 }
 
 // ── Le code Discord (revue de sécurité du 21 octobre) ─────────────────────────
