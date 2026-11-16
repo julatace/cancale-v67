@@ -75,6 +75,9 @@ const ECRANS = {
   charge_stock: ['/?tab=garage', 'chargement'],
   // La rangée de chiffres de Ma journée au PIRE (la capture de Julien) : montants longs, libellés longs, rangée étroite.
   cases_serrees: ['/?tab=journee', 'cases-serrees'],
+  // L'INSTANTANÉ de Ma journée (la capture de Julien à 15 h 34) : une 1re ouverture complète range les derniers chiffres
+  // rendus ; la 2e, base lente, les montre PENDANT le chargement (src/JourneeInstantanee.jsx) — c'est lui qu'il voit.
+  instantane_journee: ['/?tab=journee', 'instantane'],
 };
 const VOULUS = liste('ECRANS', Object.keys(ECRANS).join(','));
 const THEMES = liste('THEMES', 'clair,sombre');
@@ -225,7 +228,22 @@ function superpositions() {
     out.textes.push(`« ${a.t} » × « ${b.t} » (${Math.round(w)}×${Math.round(h)} px)`);
     if (out.textes.length > 8) return out;
   }
-  for (const el of document.querySelectorAll('.vrm-main [class*="skeleton"], .vrm-main [class*="squelette"], .vrm-main [data-a-venir-attente]')) {
+  // S13 — la rangée de chiffres : aucun libellé ni montant coupé (« Bén… », « 2 8… ») ni sorti de sa case
+  out.coupes = [];
+  for (const c of document.querySelectorAll('.vrm-main .vrm-fu-cases > .vrm-fu-case')) {
+    if (!vis(c)) continue; const rc = c.getBoundingClientRect(); if (rc.width < 4) continue;
+    for (const x of c.querySelectorAll('*')) {
+      if (x.closest('.vrm-sr-seul, [aria-hidden="true"]')) continue;
+      let t = ''; for (const n of x.childNodes) if (n.nodeType === 3) t += n.nodeValue; t = t.trim(); if (!t || !vis(x)) continue;
+      const cs = getComputedStyle(x), r = x.getBoundingClientRect();
+      const coupe = (cs.textOverflow === 'ellipsis' || /hidden|clip/.test(cs.overflowX)) && x.scrollWidth > x.clientWidth + 1;
+      // le TEXTE lui-même (sa boîte de Range) doit tenir dans la case : une case qui rogne (overflow) cache un libellé qui la dépasse
+      let rt = r; for (const n of x.childNodes) if (n.nodeType === 3 && n.nodeValue.trim()) { const g = document.createRange(); g.selectNodeContents(n); rt = g.getBoundingClientRect(); break; }
+      const sorti = rt.right > rc.right + 1 || rt.left < rc.left - 1;
+      if (coupe || sorti) out.coupes.push(`« ${t.slice(0, 16)} » ${coupe ? 'coupé' : 'sorti de sa case'} (${Math.round(x.scrollWidth)}/${Math.round(x.clientWidth)} px)`);
+    }
+  }
+  for (const el of document.querySelectorAll('.vrm-main [class*="skeleton"], .vrm-main [class*="squelette"], .vrm-main [data-a-venir-attente], .vrm-main .vrm-sq-carte')) {
     if (!vis(el)) continue;
     const r = el.getBoundingClientRect(); if (r.width < 40 || r.height < 20) continue;   // tout l'écran, pas seulement la partie vue
     const m = getComputedStyle(el).backgroundColor.match(/rgba?\(([\d.]+)[ ,]+([\d.]+)[ ,]+([\d.]+)(?:[ ,/]+([\d.]+))?/);
@@ -372,6 +390,12 @@ async function geste(o, g) {
     const b = pg.locator('[data-sb-disque]').first();
     if (await b.count()) await b.tap().catch(() => {});
     await pg.waitForTimeout(1200);
+  } else if (g === 'instantane') {
+    await pg.waitForTimeout(4000);   // l'instantané est rangé une fois l'écran vrai complet
+    LENT.ms = Number(process.env.LENT_MS) || 8000;
+    await pg.reload({ waitUntil: 'domcontentloaded' });
+    await pg.waitForSelector('.vrm-ji, [data-ouverture-instantanee]', { timeout: 15000 }).catch(() => {});
+    await pg.waitForTimeout(1500);
   } else if (g === 'cases-serrees') {
     await pg.evaluate(() => {
       const L = ['2 879 €', '1 062 €', '3 140 €', '987 €'];
@@ -428,6 +452,7 @@ async function juger(o, suf, { perf, chargement = false }) {
   const sp = await pg.evaluate(superpositions);
   dit(sp.textes.length === 0, `S11 ${suf} : jamais deux textes l'un sur l'autre${chargement ? ' (pendant le chargement)' : ''}`, sp.textes.slice(0, DETAIL).join(' | '));
   dit(sp.blancs.length === 0, `S12 ${suf} : aucun squelette en plaque blanche opaque sur le fond`, sp.blancs.slice(0, DETAIL).join(' | '));
+  dit(sp.coupes.length === 0, `S13 ${suf} : la rangée de chiffres entière (aucun libellé ni montant coupé ou sorti de sa case)`, sp.coupes.slice(0, DETAIL).join(' | '));
   const couv = await ciblesCouvertes(pg);
   dit(couv.length === 0, `S7 ${suf} : chaque cible amenée au centre se touche`, couv.slice(0, DETAIL).join(' | '));
   const sb = await pg.evaluate(sousLaBarre);
@@ -479,7 +504,7 @@ if (require.main === module) (async () => {
         if (g && g !== 'chargement') await geste(o, g);
         await o.pg.waitForTimeout(500);
         console.log(`   ${suf} prêt en ${Date.now() - t0} ms`);
-        await juger(o, suf, { perf: !g && th === THEMES[0], chargement: g === 'chargement' });
+        await juger(o, suf, { perf: !g && th === THEMES[0], chargement: g === 'chargement' || g === 'instantane' });
         if (!g) {
           const onglets = await ongletsVus(o.pg);
           for (const lib of onglets) {
