@@ -69,8 +69,11 @@ const VENTES = [['9001', MAINTENANT - 5 * 86400e3, '', '', null, 0], ['9002', MA
 const ADATER = 4, MIS_DE_COTE = 1, A_VERIFIER = 2;
 // Attendu À LA MAIN.
 const ATTENDU_S = { 'numeros-double': 1, 'numeros-a-ecrire': 2, 'colis-a-confirmer': 1, 'colis-postes': 1, 'emails-mis-de-cote': 1, 'emails-a-verifier': 2,
-  'achats-sans-prix': 3, 'ventes-sans-achat': 2, 'ventes-a-dater': 4, 'comptes-a-relire': 1, 'annonces-a-confirmer': 2, 'extension-en-retard': 0 };
-const N_A_CORRIGER = 11;
+  'achats-sans-prix': 3, 'ventes-sans-achat': 2, 'comptes-a-relire': 1, 'annonces-a-confirmer': 2, 'extension-en-retard': 0 };
+// (16 nov., bancs-rouges-a) « Ventes sans date de versement » n'est plus une ligne (15 nov., Julien : « Enlève les 1741
+// ventes à dater […] le but est que l'extension récupère ces infos », 6495a5abe) : 10 choses à corriger, plus 11. Les
+// 4 ventes à dater restent SEMÉES (vinted_urssaf_mois) : la santé ne doit pas en refaire une ligne.
+const N_A_CORRIGER = 10;
 
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '✅ ' : '❌ ') + m + (d != null && d !== '' ? ' — ' + d : '')); };
@@ -191,7 +194,7 @@ const actif = (pg) => pg.evaluate(() => { const e = document.querySelector('.vrm
     const rouge = parCle['numeros-double'], ambre = parCle['numeros-a-ecrire'];
     dit(rouge && ambre && rouge.couleur !== ambre.couleur, `S ${nom} : le rouge se voit (couleur différente de l'ambre)`, rouge && `${rouge.couleur} / ${ambre && ambre.couleur}`);
     const aCorr = r.lignes.filter((l) => l.etat === 'rouge' || l.etat === 'geste');
-    dit(aCorr.length === N_A_CORRIGER && r.aFaire === N_A_CORRIGER && /^11 choses à corriger$/.test(r.resume), `S ${nom} : ${N_A_CORRIGER} choses à corriger, dites en tête`, `${aCorr.length} · ${r.aFaire} · ${r.resume}`);
+    dit(aCorr.length === N_A_CORRIGER && r.aFaire === N_A_CORRIGER && new RegExp(`^${N_A_CORRIGER} choses à corriger$`).test(r.resume), `S ${nom} : ${N_A_CORRIGER} choses à corriger, dites en tête`, `${aCorr.length} · ${r.aFaire} · ${r.resume}`);
     dit(aCorr.every((l) => l.bouton && l.bouton.h >= 44 && l.bouton.w >= 44), `S ${nom} : chaque ligne à corriger a UN bouton ≥ 44 px`, aCorr.filter((l) => !(l.bouton && l.bouton.h >= 44)).map((l) => l.cle + ':' + JSON.stringify(l.bouton)).join(' '));
     dit(r.lignes.filter((l) => l.etat === 'ok').every((l) => !l.bouton), `S ${nom} : une ligne à jour n'a pas de bouton`);
     dit(r.aJour === '0' && r.resume !== 'Tout est à jour ✓', `S ${nom} : pas « Tout est à jour » quand il reste à corriger`);
@@ -264,7 +267,7 @@ const actif = (pg) => pg.evaluate(() => { const e = document.querySelector('.vrm
     // l'onglet de colis reste jugé.
     'numeros-double': { ecran: 'ventes', onglet: 'envoyer' }, 'colis-postes': { ecran: 'ventes', onglet: 'envoyes' },
     'achats-sans-prix': { ecran: 'annonces', saisie: true }, 'ventes-sans-achat': { ecran: 'annonces', saisie: true },
-    'colis-a-confirmer': { ecran: 'achats' }, 'ventes-a-dater': { ecran: 'compta' }, 'emails-mis-de-cote': { ecran: 'emails' },
+    'colis-a-confirmer': { ecran: 'achats' }, 'emails-mis-de-cote': { ecran: 'emails' },
     'comptes-a-relire': { reglage: 'toutvabien' }, 'annonces-a-confirmer': { ecran: 'annonces' },
   };
   if (!SEUL || SEUL === 'G') for (const cle of Object.keys(ATTENDU_G).filter((k) => !process.env.SD_CLE || k === process.env.SD_CLE)) await essaie('G ' + cle, async () => {

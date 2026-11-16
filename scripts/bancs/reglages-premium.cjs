@@ -138,7 +138,7 @@ async function interrupteurs(pg, T) {
     await s.scrollIntoViewIfNeeded();
     const libre = await s.evaluate((el) => { const r = el.getBoundingClientRect(); const x = r.left + r.width / 2, y = r.top + r.height / 2; const h = document.elementFromPoint(x, y); return !!h && (h === el || el.contains(h)); });
     // (15 nov., rouges-connus) Ce qui recouvre, NOMMÉ (le rapport dit quoi corriger) : classe et position.
-    const dessus = libre ? '' : await s.evaluate((el) => { const r = el.getBoundingClientRect(); const h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return h ? `${h.tagName.toLowerCase()}.${String(h.className || '').split(' ').slice(0, 2).join('.')} à y=${Math.round(r.top)}/${innerHeight}` : 'rien'; });
+    const dessus = libre ? '' : await s.evaluate((el) => { const r = el.getBoundingClientRect(); const h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return h ? `${h.tagName.toLowerCase()}.${String(h.className || '').split(' ').slice(0, 2).join('.')} « ${String(h.textContent || '').trim().slice(0, 40)} » dans ${[h.parentElement, h.parentElement && h.parentElement.parentElement].filter(Boolean).map((p) => p.tagName.toLowerCase() + '.' + String(p.className || '').split(' ')[0] + [...p.attributes].filter((a) => a.name.startsWith('data-')).map((a) => '[' + a.name + ']').join('')).join(' < ')} à y=${Math.round(r.top)}/${innerHeight}` : 'rien'; });
     if (await s.isDisabled()) { dit(libre, `${T} interrupteur « ${nom} » (désactivé : réglage pas lu) rien ne le recouvre`); continue; }
     const avant = await s.getAttribute('aria-checked');
     await s.click({ timeout: 4000 });
@@ -162,7 +162,8 @@ async function interrupteurs(pg, T) {
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
       const mobile = vp.width < 600;
       // (15 nov.) Téléphone : chaque catégorie (src/parametres/categories.js) ; ordinateur : la page entière, deux fois.
-      const VUES = mobile ? ['plateformes', 'ventes', 'stock', 'argent', 'notifications', 'apparence', 'securite-comptes', 'aide', 'donnees', 'compte'] : ['reglages', 'compte'];
+      const VUES = (mobile ? ['plateformes', 'ventes', 'stock', 'argent', 'notifications', 'apparence', 'securite-comptes', 'aide', 'donnees', 'compte'] : ['reglages', 'compte'])
+        .filter((v) => !process.env.RP_VUES || process.env.RP_VUES.split(',').includes(v));   // (16 nov.) RP_VUES=aide : une vue seulement
       for (const vue of VUES) {
         const T = `${vp.width} px · ${vue === 'compte' ? 'Mon compte' : vue === 'reglages' ? 'Réglages' : vue}`;
         console.log(`\n── ${T}`);
