@@ -79,7 +79,12 @@ async function verifier(racine, { muet = false, mutation = null } = {}) {
   const iRet = appC.indexOf('if (!num && retenueCartons) continue;');
   const iProch = appC.indexOf('if (!num) num = prochainLibre(taken, takenK, prefNum);');
   dit(iEff > 0 && iRet > iEff && iProch > iRet, 'N16 App.jsx : sous la retenue, la numérotation saute le N° NEUF (avant `prochainLibre`)');
-  dit(/if \(dec\.ecrit && \(ecritsEnDouble\.has\(cleNum\(n\)\) \|\| Object\.keys\(nextNum\)\.some\(\(k\) => k !== String\(it\.id\) && nextNum\[k\] && cleNum\(nextNum\[k\]\.numero\) === cleNum\(n\)\)\)\) continue;/.test(appC), 'N17 App.jsx : « je numérote moi-même » ne pose jamais un N° écrit en double, ni un N° d’une autre fiche');
+  // (16 nov., audits-vert-main) Depuis le 15 nov. (<republie-telephone>), le N° écrit d'une fiche du MÊME compte
+  // qui vient de DISPARAÎTRE (republiée dans l'app Vinted) est repris : la seule exception, toutes les autres fiches
+  // au même N° devant être disparues ; un N° écrit sur deux annonces présentes ne se pose toujours jamais.
+  dit(/const autresN = dec\.ecrit \? Object\.keys\(nextNum\)\.filter\(\(k\) => k !== String\(it\.id\) && nextNum\[k\] && cleNum\(nextNum\[k\]\.numero\) === cleNum\(n\)\) : \[\];/.test(appC)
+    && /const republieeEcrite = autresN\.length > 0 && autresN\.every\(\(k\) => disparuesIds\.has\(String\(k\)\)\);/.test(appC)
+    && /if \(dec\.ecrit && \(ecritsEnDouble\.has\(cleNum\(n\)\) \|\| \(autresN\.length && !republieeEcrite\)\)\) continue;/.test(appC), 'N17 App.jsx : « je numérote moi-même » ne pose jamais un N° écrit en double, ni un N° d’une autre fiche (sauf la sienne disparue : republiée)');
   dit(/poolVide: nextUsed\.size === 0 && taken\.size === 0 && !Object\.values\(nextNum\)\.some/.test(appC), 'N18 App.jsx : « sans aucun N° » = pool vide ET aucun N° pris ET aucune fiche numérotée');
   dit(!/localStorage\.(?:setItem|getItem)\(['"]vrm_numero_ecrit/.test(lire('src/accueilReste/AccueilReste.jsx')) && /OUTILS\.save\(CLE_NUMERO_ECRIT, reponseCartons\(/.test(lire('src/accueilReste/AccueilReste.jsx')), 'N19 la réponse passe par `save` (synchronisée), jamais par un drapeau du navigateur');
 
@@ -116,7 +121,7 @@ async function verifier(racine, { muet = false, mutation = null } = {}) {
   for (const e of V.ECRANS_VISITE) for (const s of V.ETAPES_ECRANS[e]) { for (const k of [V.cleTitre(e, s.cle), V.cleTexte(e, s.cle)]) if (!FR[k]) manque.push(k); if (nbMots(FR[V.cleTexte(e, s.cle)]) > 12) long.push(V.cleTexte(e, s.cle)); }
   dit(!manque.length, 'V9 chaque bulle a son titre et sa phrase (5 langues : audit-traduction)', manque);
   dit(!long.length, 'V10 une phrase de bulle : 12 mots au plus', long);
-  dit(/<VisiteEcranHote tab=\{tab\}/.test(appC) && /!bienvenue && !configOuverte && !parcoursOuvert && !visite \? <GardeEcran nom="visite-ecran"><VisiteEcranHote/.test(appC), 'V11 la coque monte la visite des écrans, jamais avec l’arrivée');
+  dit(/<VisiteEcranHote tab=\{tab\}/.test(appC) && /!bienvenue && (?:!pnOuvert && )?!configOuverte && !parcoursOuvert && !visite \? <GardeEcran nom="visite-ecran"><VisiteEcranHote/.test(appC), 'V11 la coque monte la visite des écrans, jamais avec l’arrivée');
   dit(/<RevoirVisite cle=\{cle\}/.test(lire('src/composants/AideEcran.jsx')), 'V12 rejouable depuis le « ? » de l’écran');
 
   // ── G : 139 ─────────────────────────────────────────────────────────────

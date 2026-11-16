@@ -278,7 +278,8 @@ function sansCommentaires(t) {
   // ── 5. LE BRANCHEMENT DANS L'APP (le code, sans ses commentaires) ────────
   essaie('app', () => {
     const a = sansCommentaires(src.app);
-    dit(/factures, numerosTx, autres, messages: gsData \? gsData\.messages : null \}\)/.test(a), 'la loupe indexe les ventes hors Vinted et les conversations');
+    // (16 nov.) D'autres sources ont suivi (15 nov.) : la loupe garde ventes hors Vinted et conversations, la liste peut continuer.
+    dit(/factures, numerosTx, autres, messages: gsData \? gsData\.messages : null(?: \}\)|,\s)/.test(a), 'la loupe indexe les ventes hors Vinted et les conversations');
     dit(/\(e\.metaKey \|\| e\.ctrlKey\) && !e\.altKey && !e\.shiftKey && \(e\.key === 'k' \|\| e\.key === 'K'\)/.test(a), '⌘K / Ctrl+K ouvrent la loupe');
     dit(/clavierChamp\(e\)/.test(a) && /onKeyDown=\{clavierPanneau\}/.test(a), 'le champ et le panneau ont leur clavier (↑ ↓ Entrée)');
     dit(/colisVente: ex \? ex\.colisVente : undefined/.test(a) && /onSource=\{/.test(a), 'la fiche reçoit le colis de la vente et ouvre l’écran source');
