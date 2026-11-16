@@ -27,6 +27,8 @@ export const PHRASE_MOTS_MAX = 12;
 import { phraseVendeur } from './profilVendeur.js';
 
 export const NOUVEAUTES = Object.freeze([
+  // (16 nov., lot derniers-rouges) docs/passation/2026-11-16-derniers-rouges.md
+  { id: 'mot-article', date: '2026-11-16', titre: 'Tes écrans disent « article » partout', phrase: 'Fiches, listes, nouveautés et aide, dans les cinq langues.', tab: 'journee', pour: 'autre', mode: 'tous' },
   // (16 nov., lot barre-achats — Julien : « ajoute les Achats dans la barre » ; « je ne veux pas qu'on puisse glisser
   // entre les onglets ») docs/passation/2026-11-16-barre-achats.md
   { id: 'barre-achats', date: '2026-11-16', titre: 'Achats a son onglet dans la barre', phrase: 'Et glisser du doigt ne change plus d’onglet.', tab: 'achats', pour: 'tous', mode: 'tous' },
