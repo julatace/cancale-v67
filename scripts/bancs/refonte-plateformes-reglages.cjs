@@ -43,7 +43,7 @@ if (process.env.DSF) {
 
 // ── L'inventaire des réglages d'AVANT (origin/main, 14 nov.) : chaque ligne `data-sous-ouvrir`
 //    et chaque attribut d'un réglage, par vue. Relevé par `INVENTAIRE=1` sur le build d'avant. ──
-const INVENTAIRE = require('./_inventaire-reglages.json');
+const INVENTAIRE = require('./_inventaire-reglages.cjs');   // (16 nov.) un module, jamais un .json dans scripts/bancs (audit-bancs)
 
 const LISTES = {
   'leboncoin-annonces': '[data-lbc-catalog-id]',
@@ -172,7 +172,7 @@ const enPlus = async (o, Ex, sous, racines, { W }) => {
   m.reglages = [];
   if (Ex.nom === 'reglages') {
     const vus = await reglagesJoignables(o);
-    if (process.env.INVENTAIRE) require('fs').writeFileSync(require('path').join(__dirname, '_inventaire-reglages.json'), JSON.stringify([...vus].sort(), null, 1) + '\n');
+    if (process.env.INVENTAIRE) require('fs').writeFileSync(require('path').join(__dirname, '_inventaire-reglages.cjs'), 'module.exports = ' + JSON.stringify([...vus].sort(), null, 1) + ';\n');
     for (const x of INVENTAIRE) if (!vus.has(x)) m.reglages.push({ manque: x });
   }
   return m;

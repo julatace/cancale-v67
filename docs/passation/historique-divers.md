@@ -1954,3 +1954,14 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne déplacée de CLAUDE.md §9 (16 nov.)
 
 - **15 nov. · Vitrine publique refaite + notifications claires** : accueil (« Tes ventes Vinted, Leboncoin, eBay et Vestiaire au même endroit. », un plein « Essayer gratuitement », vraie capture du mode exemple, tarifs, FAQ des vrais garde-fous, aucun faux), OG refait ; lien partenaire `/p/CODE` ⇒ la vitrine d'abord, code gardé dès l'arrivée (`src/main.jsx`) ; notifications : `api/_lib/notif-redaction.js` (titre ≤ 40, corps ≤ 90, dates de Paris en clair, ni pseudo ni identifiant, 5 langues), « from VRM » = iOS. `2026-11-15-site-public.md`, `2026-11-15-notifications-belles.md`. Geste : aucun.
+
+
+## Lignes déplacées de CLAUDE.md §9 (16 nov., train de mise en ligne)
+
+- **15 nov. · Programme partenaire (3 €/mois/client payant, à vie)** : `api/_lib/partenaires-regle.js`, lien `vrm.center/p/CODE`, page `/pa/<jeton>` (nombres seuls), Réglages → Abonnement → Partenaires (« Versé » sur son clic, rien ne part seul). Migration **043 PAS appliquée**. `2026-11-15-partenaires.md`. Geste : contrat écrit, migration 043, 5 événements webhook Stripe, créer le partenaire (copier sa page privée tout de suite).
+- **15 nov. · Extension 5.380.0 : carte du logo + Leboncoin sûr (5.379 jamais publiée seule)** : « Mes ventes » (`/my_orders/sold`, jamais attestée) retiré, liens sur liste blanche `CHEMINS_ATTESTES` ; favoris listés même sans message ; plaque N° seulement si connue ; studio ; LBC : lecture bornée (`lisible`), enveloppes `commeNatif`, disjoncteur `vrm_lbc_de_cote`, cadres étrangers ignorés ; Vinted : plus de double envoi sur exception. `2026-11-15-carte-extension.md`, `2026-11-15-lbc-orion.md`. Geste : installer 5.380.0 ; donner l'URL de sa page « Mes ventes » Vinted.
+
+
+## Lignes déplacées de CLAUDE.md §9 (16 nov., train de mise en ligne)
+
+- **15 nov. · Retours : reconnus, une seule carte « À renvoyer »** : bordereaux de retour et « Retourne ta commande d'ici le … » reconnus (sens lu dans le corps), e-mails gardés « inconnu » reclassés tout seuls (`api/_lib/reclasser-retours.js`, mode de `/api/email-rattacher`) ; `src/retoursAchat.js` : une liste « À renvoyer » (Achats + tête de Ma journée), photo, date limite en clair, « Imprimer le bordereau », « Déposé ». `2026-11-15-retours.md`. Geste : aucun.

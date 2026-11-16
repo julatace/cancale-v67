@@ -267,11 +267,18 @@ export function texteNotifModeration(evts, { nomCompte = () => '' } = {}) {
   if (n('masquee')) morceaux.push(`${n('masquee')} annonce${n('masquee') > 1 ? 's' : ''} masquée${n('masquee') > 1 ? 's' : ''}`);
   if (n('disparue')) morceaux.push(`${n('disparue')} annonce${n('disparue') > 1 ? 's' : ''} disparue${n('disparue') > 1 ? 's' : ''}`);
   const grave = n('banni') || n('restreint');
-  const title = `Vinted${sur} : ${morceaux.join(', ')}`;
-  const body = grave
-    ? 'Pause conseillée : VRM a arrêté ses actions auto sur ce compte. Vois tes messages Vinted.'   // (15 nov.) ≤ 90
-    : (n('masquee') ? 'Ouvre l’annonce sur Vinted : la raison est écrite dessus.' : 'Peut-être retirée par Vinted. Vérifie tes messages Vinted.');
-  return { title, body };
+  const plein = `Vinted${sur} : ${morceaux.join(', ')}`;
+  // (16 nov.) Le titre d'une notification est coupé à 40 signes (api/_lib/notif-redaction.js) : « Vinted sur shop_a : 1 annonce
+  // masquée, 1 annonce disparue » perdait TOUT ce qui était arrivé. Trop long ⇒ le compte en titre, ce qui est arrivé en tête du corps.
+  if (plein.length <= 40) {
+    const body = grave
+      ? 'Pause conseillée : VRM a arrêté ses actions auto sur ce compte. Vois tes messages Vinted.'   // (15 nov.) ≤ 90
+      : (n('masquee') ? 'Ouvre l’annonce sur Vinted : la raison est écrite dessus.' : 'Peut-être retirée par Vinted. Vérifie tes messages Vinted.');
+    return { title: plein, body };
+  }
+  const quoi = morceaux.join(', ');
+  const geste = grave ? 'Pause conseillée : actions auto arrêtées.' : (n('masquee') ? 'La raison est écrite sur l’annonce.' : 'Vérifie tes messages Vinted.');
+  return { title: `Vinted${sur}`, body: `${quoi.charAt(0).toUpperCase()}${quoi.slice(1)}. ${geste}` };
 }
 
 // « Ce que VRM a fait » : un événement constaté (jamais un geste de VRM).
