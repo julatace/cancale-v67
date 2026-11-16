@@ -89,8 +89,8 @@ async function flou(dist) {
     if (vue === 'toutes') await o.pg.evaluate(() => { const x = [...document.querySelectorAll('.vrm-main button')].find((y) => /^Toutes/.test(y.textContent.trim())); if (x) x.click(); });
     await o.pg.waitForTimeout(3000);
     await o.pg.addStyleTag({ content: '*{animation:none!important;transition:none!important;caret-color:transparent!important}' });
-    for (const pos of ['haut', 'defile']) {
-      if (pos === 'defile') { await o.pg.evaluate(() => { const se = [...document.querySelectorAll('*')].filter((x) => /auto|scroll/.test(getComputedStyle(x).overflowY) && x.scrollHeight > x.clientHeight + 40).sort((p, q) => q.clientHeight - p.clientHeight)[0] || document.scrollingElement; se.scrollTop = 700; }); await o.pg.waitForTimeout(800); }
+    for (const pos of ['defile', 'haut']) {   // défilé d'abord : l'écran a fini d'arriver (photos, pastilles) quand on revient en haut
+      { const y = pos === 'defile' ? 700 : 0; await o.pg.evaluate((y) => { const se = [...document.querySelectorAll('*')].filter((x) => /auto|scroll/.test(getComputedStyle(x).overflowY) && x.scrollHeight > x.clientHeight + 40).sort((p, q) => q.clientHeight - p.clientHeight)[0] || document.scrollingElement; se.scrollTop = y; }, y); await o.pg.waitForTimeout(pos === 'haut' ? 6000 : 800); }
       const flous = await o.pg.evaluate(() => [...document.querySelectorAll('.vrm-main :is(.vrm-colis-grille, .vrm-toutes-liste, .vv-seg, .vv-liste)')].filter((e) => { const c = getComputedStyle(e); return (c.backdropFilter || c.webkitBackdropFilter || 'none') !== 'none'; }).length);
       const avec = await o.pg.screenshot({ timeout: 180000 });
       const st = await o.pg.addStyleTag({ content: '.vrm-main :is(.vrm-colis-grille, .vrm-toutes-liste, .vv-seg, .vv-liste){-webkit-backdrop-filter:none!important;backdrop-filter:none!important}' });
