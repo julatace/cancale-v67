@@ -213,11 +213,17 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
           const rect = (el) => el && el.getBoundingClientRect();
           const pe = [...document.querySelectorAll('.vrm-sale-row[data-tx="7001"] [data-fp-pastille]')].find((e) => e.getClientRects().length);
           const p = rect(pe);
-          const l2 = rect(pe && pe.closest('.vrm-fu-vente-l2, .vrm-ledger-sale-sous'));   // la rangée du N° (téléphone) ou du compte (ordinateur)
-          const h = (tx) => { const e = document.querySelector(`.vrm-sale-row[data-tx="${tx}"]`); return e ? Math.round(e.getBoundingClientRect().height) : -1; };
-          return { p: p && { t: p.top, b: p.bottom }, l2: l2 && { t: l2.top, b: l2.bottom }, h7001: h('7001'), h8001: h('8001') };
+          const l2 = rect(pe && pe.closest('.vrm-fu-vente-l3, .vrm-ledger-sale-sous'));   // la rangée de l'état (téléphone) ou du compte (ordinateur)
+          // La hauteur de la ligne AVEC la pastille, puis SANS (la pastille retirée un instant).
+          const ligne = document.querySelector('.vrm-sale-row[data-tx="7001"]');
+          const avec = ligne ? ligne.getBoundingClientRect().height : -1;
+          const hotes = [...document.querySelectorAll('.vrm-sale-row[data-tx="7001"] .vrm-fp-pastille-hote')];
+          hotes.forEach((h) => { h.style.display = 'none'; });
+          const sans = ligne ? ligne.getBoundingClientRect().height : -1;
+          hotes.forEach((h) => { h.style.display = ''; });
+          return { p: p && { t: p.top, b: p.bottom }, l2: l2 && { t: l2.top, b: l2.bottom }, h7001: Math.round(avec), h8001: Math.round(sans) };
         });
-        dit(r.p && r.l2 && r.p.t >= r.l2.t - 2 && r.p.b <= r.l2.b + 2 && r.h7001 <= r.h8001 + 1, 'V1 la pastille tient DANS la rangée du N° : aucune hauteur de ligne ajoutée', JSON.stringify(r));
+        dit(r.p && r.l2 && r.p.t >= r.l2.t - 2 && r.p.b <= r.l2.b + 2 && r.h7001 <= r.h8001 + 1, 'V1 la pastille tient DANS une rangée existante (état au téléphone, compte à l’ordinateur) : aucune hauteur de ligne ajoutée', JSON.stringify(r));
         if (SHOTS) { await l1.scrollIntoViewIfNeeded(); await pg.waitForTimeout(300); await pg.screenshot({ path: path.join(SHOTS, `fvp-lignes-${nf}.png`) }); }
         const m = await mesurer(pg, `.vrm-sale-row[data-tx="7001"]`);
         dit(m && m.deb <= 1 && !m.hors.length, 'V1 la ligne ne déborde pas', m && `${m.deb}px ${m.hors.join(' | ')}`);

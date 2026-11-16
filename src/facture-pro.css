@@ -231,3 +231,6 @@ li[data-fp-a-envoyer-etat="a-annuler"] .vrm-fp-rangee-txt > span { color: var(--
 .vrm-fp-pastille svg { flex-shrink: 0; }
 .vrm-fp-pastille[data-fp-pastille="aenvoyer"], .vrm-fp-pastille[data-fp-pastille="averifier"] { color: var(--vrm-warn, #b25000); border-color: color-mix(in srgb, var(--vrm-warn, #b25000) 40%, transparent); }
 .vrm-fp-pastille:focus-visible { outline: 2px solid var(--vrm-accent, #0071e3); outline-offset: 2px; }
+/* Au téléphone, à droite de l'état (« Payée · Facture à envoyer ») ; jamais coupée en deux. */
+.vrm-fu-vente-l3 .vrm-fp-pastille-hote { margin-left: 8px; white-space: nowrap; }
+.vrm-ledger-sale-sous .vrm-fp-pastille-hote { margin-left: 8px; }
