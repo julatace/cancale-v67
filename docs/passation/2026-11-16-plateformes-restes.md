@@ -7,8 +7,8 @@ sur une ligne lourde).
 
 ## ÉTAT À LA REPRISE
 
-Fait et poussé : 38, 40 (en partie), 41, 42, 43. **Rien d'inventé pour 39 et pour les e-mails de 40** : aucune
-forme d'e-mail de vente ou d'achat Leboncoin / eBay / Vestiaire n'existe dans la base (mesure ci-dessous).
+Fait et poussé : 38, 39 (« Vendu ! » d'après ce que VRM lit, pas d'e-mail), 40 (en partie), 41, 42, 43. **Aucun
+lecteur d'e-mail inventé** : aucune forme d'e-mail de vente ou d'achat Leboncoin / eBay / Vestiaire n'existe dans la base.
 La notification « achat arrivé » n'est PAS faite : elle contredit deux décisions de Julien (voir 40).
 Reste à faire : les gestes de mesure listés en bas ; la PR (voir le rapport de session pour son état).
 
@@ -39,14 +39,29 @@ Reste à faire : les gestes de mesure listés en bas ; la PR (voir le rapport de
   `?tab=ventes&site=leboncoin&cible=lbcvente&tx=…` — nouvelle cible `lbcvente` (src/cibleNotif.js), la carte
   `vrm-lbc-package` porte `data-lbc-vente` + `data-cible="lbcvente:{tx}"`.
 
-## 39 · Lecteur d'e-mail de vente Leboncoin / eBay — NON FAIT (aucune forme mesurée)
+## 39 · « Vendu ! » Leboncoin, eBay, Vestiaire (décision de Julien relayée le 16 nov.)
 
-Aucune forme n'a été vue (tableau ci-dessus) : pas de lecteur, pas de notification « vendu », pas de frise ni de
-cycle hors Vinted tirés d'un e-mail. Les e-mails reçus ne sont que ceux d'un collecteur qui ne transfère, semble-t-il,
-que les e-mails Vinted et quelques publicités.
-**Geste qui débloque** : au prochain article vendu sur Leboncoin et sur eBay, laisser arriver l'e-mail « vendu »
-dans la boîte relevée par VRM (vérifier que le filtre Gmail du collecteur ne l'écarte pas). Il sera gardé entier
-(`email_inconnu_*`) : sa forme pourra alors être apprise.
+**Pas d'e-mail** : aucune forme d'e-mail de vente de ces sites en base (tableau ci-dessus) ⇒ aucun lecteur d'e-mail.
+**Source = ce que VRM lit déjà** (`api/_lib/ventes-sites-notif.js`, pur) : `lbc_ventes` (ventes `isSeller`),
+`ebay_orders*` (comptes actifs, `lireCommandesEbay`), `vc_ventes` (`ventesVcDe`). Branché sur le passage de
+15 min (`?moment=groupe`, `passageVentesSites` dans api/ship-reminders.js) : seuls les vendeurs qui ont une de ces
+lignes sont visités.
+- Une fois par vente : identité = n° de transaction Leboncoin / n° de commande eBay / productId Vestiaire ; mémo
+  `vrm_ventes_sites_vues` (`comptes`, `vus`) écrit AVANT l'envoi (mémo illisible ⇒ rien ; écriture ratée ⇒ rien
+  envoyé) ; puis le tag réservé dans `push_dedup` (Vestiaire : `vc-vente-{productId}`, le tag de l'e-mail de vente
+  Vestiaire ⇒ l'un ou l'autre, jamais les deux).
+- Jamais l'historique : la 1re lecture d'un compte range tout « vu » sans sonner ; une vente de plus de 72 h ou
+  sans date lisible est rangée sans sonner ; annulée / remboursée / pas payée ⇒ rien (elle sonnera si elle devient
+  une vente fraîche).
+- Texte : famille « Ventes » (`texteVendu`, catégorie `vente`), « Vendu 45 € · N°124 · titre » / « sur Leboncoin ·
+  Prépare le colis : l'étiquette est sur le site » (`venduAilleurs`, 5 langues). Le N° n'est dit que s'il vient de
+  l'identité (Vestiaire) ; eBay et Leboncoin sans N° (un SKU d'avant la remise à zéro désigne l'ancienne paire).
+- **Ce qu'il faut savoir** : Leboncoin et Vestiaire ne sonnent qu'après la LECTURE par l'extension (une vente pas
+  encore relue n'est pas connue du serveur) ; eBay après la dernière lecture des commandes (l'app, ou le cron du
+  matin), pas en temps réel. Les comptes écartés / hors offre ne sont pas encore filtrés pour ce « Vendu ! ».
+- Frise et cycle hors Vinted : rien de neuf (aucune forme d'e-mail).
+- Preuves : `audit-plateformes-restes` section N (N1–N11) ; mutations première lecture, annulée, vieille,
+  deux fois, mémo après l'envoi : rouges.
 
 ## 40 · Achats Leboncoin / eBay / Vestiaire
 
@@ -94,7 +109,7 @@ une commande à plusieurs articles n'a pas de prix « d'une paire » (prix `null
 
 ## Preuves
 
-- `node scripts/audit-plateformes-restes.cjs` : **35 verts** ; `--prouve` : **13/13 mutations rouges** ; sur
+- `node scripts/audit-plateformes-restes.cjs` : **46 verts** ; `--prouve` : **18/18 mutations rouges** ; sur
   `origin/main` (fichiers extraits) : **15 rouges, 0 vert**.
 - `node scripts/audit-factures-autres.cjs` : **53 verts** ; sur `origin/main` : 5 rouges (S2 ×4, S10) ; mutation
   « les lignes ne passent pas dans `venteFacture` » ⇒ 2 rouges.
