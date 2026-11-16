@@ -10,7 +10,16 @@ sur une ligne lourde).
 Fait et poussé : 38, 39 (« Vendu ! » d'après ce que VRM lit, pas d'e-mail), 40 (en partie), 41, 42, 43. **Aucun
 lecteur d'e-mail inventé** : aucune forme d'e-mail de vente ou d'achat Leboncoin / eBay / Vestiaire n'existe dans la base.
 La notification « achat arrivé » n'est PAS faite : elle contredit deux décisions de Julien (voir 40).
-Reste à faire : les gestes de mesure listés en bas ; la PR (voir le rapport de session pour son état).
+**PR #1188 ouverte, NON fusionnée** (règle de Julien du 16 nov. : zéro rouge, y compris ceux déjà sur `main`).
+Les rouges de la CI de la PR sont tous déjà sur `main` (vérifiés un par un en local, et en remettant le fichier de
+`main` à la place du mien quand le lot y touchait) : audits `benefice` (identifiants déclarés deux fois entre
+App.jsx et src/ecrans — `partageFichiersPossible` dans Republier.jsx, `joursAvant`), `dates-paris` (soldes.js,
+recherchePhrase.js…), `numeros-clenum` (aRetirerAilleurs.js), `config-facture` (« le carton » dans des textes),
+`ebay-colis`, `extension-capture` K2, `lien-vc`, `conseils`, `journee-coherence`…, banc `nouveau-vendeur`
+(cibles 44 px, Paramètres), `regles` (`lot-preparation-reprise` : `React` absent de sa VM), `comptes-et-reception`,
+`achats-sourcing`. Aucun ne vient de ce lot. À reprendre : quand `main` est revenu au vert (lots « rouges »),
+vrai merge de `origin/main`, repousser, attendre la CI, fusionner.
+Reste aussi : les gestes de mesure listés en bas.
 
 ## Ce qui a été mesuré (lecture seule, 16 nov.)
 
