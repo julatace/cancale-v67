@@ -151,22 +151,29 @@ const capture = async (pg, nom, sel) => { if (!SHOTS) return; fs.mkdirSync(SHOTS
       const A = await attrs(pg, '[data-a-venir]');
       const att = Math.round((A_VENIR_VINTED + VC_MONTANT) * 100);
       dit(A && A['a-venir-site'] === 'toutes' && Number(A['a-venir']) === att && A['a-venir-n'] === '3', `A : Ventes · Tous — « À venir » = ${att / 100} € sur 3 ventes (Vinted + Vestiaire)`, JSON.stringify(A));
-      // (6 nov.) Le détail par compte est replié : le total seul, puis le détail au toucher.
-      const replieAvant = await pg.evaluate(() => ({ ferme: !!document.querySelector('[data-a-venir-replier="ferme"]'), lignes: document.querySelectorAll('[data-a-venir-ligne]').length }));
-      dit(replieAvant.ferme && replieAvant.lignes === 0, 'A : le détail par compte est replié (le total seul)', JSON.stringify(replieAvant));
-      await pg.click('[data-a-venir-replier="ferme"]').catch(() => {});
-      await pg.waitForSelector('[data-a-venir-ligne]', { timeout: 5000 }).catch(() => {});
-      const lignes = await pg.evaluate(() => [...document.querySelectorAll('[data-a-venir-ligne]')].map((e) => ({ s: e.getAttribute('data-a-venir-ligne'), c: e.getAttribute('data-a-venir-compte'), eur: e.getAttribute('data-a-venir-eur'), prevu: e.getAttribute('data-a-venir-prevu') })));
-      dit(lignes.length === 3 && lignes.some((l) => l.s === 'Vinted' && l.c === 'atelier_sneak' && l.eur === '7000') && lignes.some((l) => l.s === 'Vinted' && l.c === 'paris_kicks' && l.eur === '4550'), 'A : une ligne par site et par compte', JSON.stringify(lignes));
-      const vc = lignes.find((l) => l.s === 'Vestiaire');
+      // (16 nov., parcours-vert) Depuis le 15 nov. (« Argent à venir : étapes, écran, résumé compact », d4940f9b8) la
+      // carte n'est plus repliable : elle est le RÉSUMÉ (le total, les sites, les étapes) et le détail par site et
+      // par compte vit dans l'écran « Argent à venir » qu'elle ouvre au toucher. Les règles jugées restent : le
+      // total seul sur la carte (aucune ligne de compte), une ligne par site et par compte (montants exacts),
+      // Vestiaire avec SA date « paiement estimé », aucune date inventée pour Vinted, des cibles de 44 px.
+      const carte = await pg.evaluate(() => ({ comptes: document.querySelectorAll('section.vrm-a-venir [data-a-venir-compte]').length, groupes: (document.querySelector('section.vrm-a-venir[data-a-venir-site="toutes"]') || { getAttribute: () => null }).getAttribute('data-a-venir-groupes') }));
+      dit(carte.comptes === 0 && carte.groupes === '3', 'A : la carte est le résumé (le total seul, aucune ligne de compte ; 3 groupes site × compte)', JSON.stringify(carte));
+      await pg.click('section.vrm-a-venir[data-a-venir-site="toutes"] [data-a-venir-ouvrir]').catch(() => {});
+      await pg.waitForSelector('[data-argent-a-venir-ecran] [data-av-site]', { timeout: 6000 }).catch(() => {});
+      for (const site of ['Vinted', 'Vestiaire']) { await pg.click(`[data-argent-a-venir-ecran] [data-av-site="${site}"] > button`).catch(() => {}); await pg.waitForTimeout(250); }
+      const lignes = await pg.evaluate(() => [...document.querySelectorAll('[data-argent-a-venir-ecran] [data-av-compte]')].map((e) => ({ s: e.getAttribute('data-av-compte-site'), c: e.getAttribute('data-av-compte'), eur: e.getAttribute('data-eur') })));
+      dit(lignes.length === 3 && lignes.some((l) => l.s === 'Vinted' && l.c === 'atelier_sneak' && l.eur === '7000') && lignes.some((l) => l.s === 'Vinted' && l.c === 'paris_kicks' && l.eur === '4550') && lignes.some((l) => l.s === 'Vestiaire' && l.eur === String(Math.round(VC_MONTANT * 100))), 'A : une ligne par site et par compte (l’écran « Argent à venir »)', JSON.stringify(lignes));
+      const ventes = await pg.evaluate(() => [...document.querySelectorAll('[data-argent-a-venir-ecran] [data-av-vente]')].map((e) => ({ id: e.getAttribute('data-av-vente'), prevu: e.getAttribute('data-prevu') })));
+      const vc = ventes.find((l) => /^vestiaire:/.test(l.id || ''));
       dit(vc && vc.prevu === new Date(prevuVc.getFullYear(), prevuVc.getMonth(), prevuVc.getDate(), 12).toISOString().slice(0, 10), 'A : Vestiaire avec SA date « paiement estimé »', JSON.stringify(vc));
-      dit(lignes.filter((l) => l.s === 'Vinted').every((l) => !l.prevu), 'A : aucune date inventée pour Vinted');
+      dit(ventes.some((l) => /^vinted:/.test(l.id || '')) && ventes.filter((l) => /^vinted:/.test(l.id || '')).every((l) => !l.prevu), 'A : aucune date inventée pour Vinted', JSON.stringify(ventes));
       const txt = await pg.evaluate(() => document.body.innerText);
       dit(!/Argent en attente \(estimation\)|≈\s*\d/.test(txt), 'A : plus d’« estimation » ni de « ≈ » sur l’argent');
-      const petits = await cibles(pg, '[data-a-venir-ligne]');
+      const petits = await cibles(pg, '[data-argent-a-venir-ecran] [data-av-site] > button, [data-argent-a-venir-ecran] [data-av-compte] > button');
       dit(!petits.length, 'A : lignes de 44 px', JSON.stringify(petits));
       dit(T.vp.width > 500 || (await deborde(pg)) <= 1, 'A : aucun débordement à 390 px');
-      await capture(pg, `A-ventes-tous-${T.nom}`, '[data-a-venir]');
+      await capture(pg, `A-ventes-tous-${T.nom}`, '[data-argent-a-venir-ecran]');
+      await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(400);
     });
     await essaie(`B ${T.nom}`, async () => {
       // (11 nov.) Depuis Ma journée v2 (9 nov., 60febc6f, docs/passation/2026-11-09-journee-v2.md) la carte

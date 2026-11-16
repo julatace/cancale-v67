@@ -3115,7 +3115,7 @@ async function annulerSuppressionCompte() {
   } catch (_) { return { ok: false, message: "Pas de réponse (connexion coupée) : la suppression n'est pas annulée. Réessaie quand tu as du réseau." }; }
 }
 const dateLongue = (iso) => { const t = Date.parse(iso || ''); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', day: 'numeric', month: 'long', year: 'numeric' }) : ''; };
-const joursAvant = (iso) => { const t = Date.parse(iso || ''); return Number.isFinite(t) ? Math.max(0, Math.ceil((t - Date.now()) / 864e5)) : null; };
+const joursAvantEffacement = (iso) => { const t = Date.parse(iso || ''); return Number.isFinite(t) ? Math.max(0, Math.ceil((t - Date.now()) / 864e5)) : null; };
 // Le bandeau de la coque relit l'état quand il change ici.
 const signalerSuppression = () => { try { window.dispatchEvent(new Event('vrm:suppression-prevue')); } catch (_) {} };
 async function lireInventaireSuppression() {
@@ -3233,7 +3233,7 @@ function FermerCompte({ onExporter }) {
               {annonce && !annonce.ok && <div role="status" data-supprimer-annonce="echec" data-acc-echec="compte.supprimer" style={{ ...txt, color: C.warn, marginBottom: 8 }}>{annonce.message}</div>}
               <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>Suppression prévue le {dateLongue(info.prevue.effaceLe)}</div>
               <div style={{ ...txt, marginTop: 4 }}>
-                {joursAvant(info.prevue.effaceLe) ? `Dans ${joursAvant(info.prevue.effaceLe)} jour${joursAvant(info.prevue.effaceLe) > 1 ? 's' : ''}. ` : 'Elle a lieu au prochain passage du matin. '}
+                {joursAvantEffacement(info.prevue.effaceLe) ? `Dans ${joursAvantEffacement(info.prevue.effaceLe)} jour${joursAvantEffacement(info.prevue.effaceLe) > 1 ? 's' : ''}. ` : 'Elle a lieu au prochain passage du matin. '}
                 D’ici là, rien n’est effacé : ton compte et tes données restent là.
                 {['resilie', 'deja-resilie'].includes(info.prevue.abonnement) && <span data-supprimer-abonnement-prevue=""> Ton abonnement est résilié : aucun nouveau prélèvement.</span>}
               </div>
