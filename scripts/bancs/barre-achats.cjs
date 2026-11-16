@@ -227,7 +227,10 @@ const ECRANS = [
       await essaie(`A ${qui}`, async () => {
         const ctx = await appareil(b, mode, { ...local, vinted_dark: sombre });
         const { pg, errs } = await ouvrirPage(ctx, '?tab=journee');
-        const m = await mesureBarre(pg);
+        // L'écran finit de se poser (lectures, bulles d'arrivée) : la barre est mesurée quand le toucher y arrive,
+        // 4 essais au plus (jamais un délai seul) — le verdict porte sur la dernière mesure.
+        let m = null;
+        for (let k = 0; k < 4; k++) { m = await mesureBarre(pg); if (m && m.entrees.every((e) => e.touche)) break; await pg.waitForTimeout(1500); }
         await capture(pg, `barre-${mode}-${sombre ? 'sombre' : 'clair'}`);
         const ids = m ? m.entrees.map((e) => e.id) : [];
         dit(JSON.stringify(ids) === JSON.stringify(ATTENDU_BARRE), `A1 ${qui} : la barre = Aujourd'hui · Annonces · Achats · « + » · Ventes · Argent`, JSON.stringify(ids));
@@ -242,9 +245,14 @@ const ECRANS = [
         // A3 · le compteur d'Achats (colis à retirer, publié par Achats), une fois.
         // Le nombre est « À retirer » PUBLIÉ par Achats (`vrm_colis_retirer.total`, < 12 h) : l'app le recalcule à
         // l'ouverture ; on juge la règle — publié > 0 ⇒ ce nombre sur l'onglet Achats, une fois ; 0 ⇒ aucun.
-        const bAch = m ? m.badges.filter(([k]) => k === 'achats') : [];
-        const pub = await pg.evaluate(() => { try { const v = JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); return v && Number.isFinite(v.total) ? v.total : null; } catch (_) { return null; } });
-        const nJuste = pub > 0 ? (bAch.length === 1 && bAch[0][1] === String(pub)) : bAch.length === 0;
+        // La publication peut arriver après la première mesure : on relit (6 s au plus) jusqu'à ce que publié et rendu concordent.
+        let bAch = [], pub = null, nJuste = false;
+        for (let k = 0; k < 6 && !nJuste; k++) {
+          if (k) { await pg.waitForTimeout(1000); m = await mesureBarre(pg) || m; }
+          bAch = m ? m.badges.filter(([cle]) => cle === 'achats') : [];
+          pub = await pg.evaluate(() => { try { const v = JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); return v && Number.isFinite(v.total) && Date.now() - (Number(v.at) || 0) < 12 * 3600000 ? v.total : null; } catch (_) { return null; } });
+          nJuste = pub > 0 ? (bAch.length === 1 && bAch[0][1] === String(pub)) : bAch.length === 0;
+        }
         dit(!!m && m.entrees.some((e) => e.id === 'achats') && nJuste, `A3 ${qui} : l'onglet Achats porte le nombre « À retirer » publié (${pub}), une fois`, JSON.stringify({ pub, badges: m && m.badges }));
         const nombres = m ? m.badges.map(([, n]) => n).filter((n) => /^\d+$/.test(n)) : [];
         dit(new Set(m ? m.badges.map(([k]) => k) : []).size === (m ? m.badges.length : 0), `A3 ${qui} : une pastille par onglet au plus`, JSON.stringify(m && m.badges));

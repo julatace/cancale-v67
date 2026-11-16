@@ -65086,6 +65086,11 @@ function AppCoeur() {
         // côté : un glisser horizontal sur le contenu ne déplace jamais l'écran (les rangées qui défilent de
         // côté gardent leur propre défilement, `overscroll-behavior-x: contain`).
         overscrollBehaviorX:'none',
+        // Et le navigateur ne fait jamais de son glisser horizontal une « page précédente » (Chrome au doigt : la
+        // page d'avant apparaissait, comme l'onglet d'avant sur la capture de Julien). `pan-y` : le doigt défile
+        // en hauteur et zoome ; une rangée qui défile de côté (filtres, photos, frises) garde son glisser, car un
+        // glisser appartient au premier conteneur qui défile sous le doigt (banc barre-achats A6–A8).
+        touchAction:'pan-y pinch-zoom',
         width: ordi ? undefined : '100%',
         maxWidth: ordi ? 'none' : 1200,
         margin: ordi ? '0' : '0 auto',
