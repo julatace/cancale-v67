@@ -92,7 +92,7 @@ async function verifier(racine, { dire = true } = {}) {
   dit(!/action: 'emettre'[^}]*langue/.test(jsx.slice(jsx.indexOf('export async function envoyerFacturesSerie'))) && !/langue/.test(auto), 'M2 la série et l’envoi automatique ne forcent aucune langue (la règle du serveur s’applique)');
 
   // (16 nov.) La facture en PASTILLE dans la rangée N° · compte · taille, plus sous la ligne.
-  dit(/facture: \(o\._fromEmail \? o\._txMail : o\.transaction_id != null\) \? <FactureVenteLigne pastille /.test(lire('src/App.jsx')) && /\{fusion\.facture \|\| null\}<\/span>/.test(lire('src/App.jsx')) && !/frise=\{<>\{\(o\._fromEmail \? o\._txMail : o\.transaction_id != null\) \? <FactureVenteLigne/.test(lire('src/App.jsx')), 'M3 sur la ligne de vente : une pastille dans la rangée du N° (plus de gros boutons sous la ligne)');
+  dit(/facture: \(o\._fromEmail \? o\._txMail : o\.transaction_id != null\) \? <FactureVenteLigne pastille /.test(lire('src/App.jsx')) && /\{fusion && fusion\.facture \? fusion\.facture : null\}/.test(lire('src/App.jsx')) && /\{fusion && fusion\.factureBureau \? fusion\.factureBureau : null\}/.test(lire('src/App.jsx')) && !/frise=\{<>\{\(o\._fromEmail \? o\._txMail : o\.transaction_id != null\) \? <FactureVenteLigne/.test(lire('src/App.jsx')), 'M3 sur la ligne de vente : une pastille DANS la ligne (téléphone : à droite de l’état ; ordinateur : rangée du compte), plus de gros boutons dessous');
   dit(/fm\.pastille\.\$\{cle\}/.test(jsx) && /<BonRetour vente=\{vente\} preuve=\{preuve\} facture=\{facture\} deps=\{deps\} ligne=\{false\}\/>/.test(jsx), 'M3 la pastille ouvre la feuille de la facture, qui porte le bon de retour');
 
   // ── R · le reçu d'achat généré ──
@@ -130,7 +130,7 @@ const MUTATIONS = [
   ['accent perdu dans le reçu', 'src/recuAchat.js', `ecrire("REÇU D'ACHAT VINTED"`, `ecrire("RECU D'ACHAT VINTED"`],
   ['port inventé sur le reçu', 'src/recuAchat.js', '    lignes: [],', "    lignes: [{ libelle: 'Frais de port', centimes: 288 }],"],
   ['montant à point dans le rapport', 'src/rapportPdf.js', "  if (n == null || !Number.isFinite(Number(n))) return '—';\n  let t;", "  if (n == null || !Number.isFinite(Number(n))) return '—';\n  return Number(n).toFixed(2);\n  let t;"],
-  ['facture revenue sous la ligne', 'src/App.jsx', '{fusion.facture || null}</span>', '</span>'],
+  ['facture revenue sous la ligne', 'src/App.jsx', '      {fusion && fusion.facture ? fusion.facture : null}', ''],
   ['série en français forcé', 'api/_lib/facture-pro.js', ": langueFactureParDefaut(vente.acheteur.adresse);", ": 'fr';"],
 ];
 
