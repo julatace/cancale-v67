@@ -14,18 +14,9 @@ require('./_porte-banc.cjs');
 //        inconnu après ceux de sa date ;
 //     R4 « sortie » se prouve par SA déclaration (`N°` nu, ou `N°@id` de CETTE annonce seulement) ;
 //     R5 après une sortie, à date égale on reste dans le meuble où l'on est (il est devant).
-//  A  L'APP RENDUE (base inventée, 390 tactile, 1512 et 1280 — les maquettes ordinateur —, clair et sombre) :
-//     A1 la section est là, AVANT le chiffre du jour, dans le premier écran du téléphone ;
-//     A2 la première carte = la vente la plus pressée, SA case (meuble, rangée, case ; la case allumée du plan) ;
-//     A3 l'ordre de la suite (date, puis le même meuble), chaque rangée avec SA case ; la vente au même titre
-//        que la première a la sienne, jamais celle de l'autre ; la vente jamais rangée dit « place pas connue » ;
-//     A4 un seul bouton plein visible ; chaque bouton de la section ≥ 44 px au doigt ; rien ne déborde ;
-//     A5 « Je l'ai sortie » (390 clair, et 1512 sombre) : la case se libère, la pile descend (les N° ne
-//        changent pas), c'est DIT une fois (Avant / Maintenant, « Compris »), la déclaration est écrite, la
-//        pilule d'accompagnement du geste paraît ; la suivante (même meuble) monte en tête, avec sa NOUVELLE case ;
-//     A6 sans emplacement connu (une seule vente, jamais rangée) : dit franchement, « Ranger d'abord » ouvre
-//        le Stock pour CE N° ;
-//     A7 aucune erreur JS.
+//  A  L'APP RENDUE (base inventée, 390 tactile, 1512 et 1280, clair et sombre) — depuis le 16 nov. (lot
+//     retirer-case-compact) l'ABSENCE : A1 plus de carte « La paire à sortir » sur Ma journée (le Stock allume la case,
+//     banc stock-case-a-sortir.cjs) ; A2 aucune fenêtre à sa place ; A3 rien ne déborde ; A4 aucune erreur JS.
 //  Données INVENTÉES (design-passe : 3 comptes Vinted, pseudos et montants fabriqués). `LARGEURS=390`
 //  `THEMES=clair` ; `BANC_DIST=<dist>` (l'arbre de départ : il doit être ROUGE) ; `SHOTS=<dossier>`.
 //  Un banc ne meurt pas, il rapporte.
@@ -116,95 +107,32 @@ function base({ seulementInconnue = false } = {}) {
   return b;
 }
 
-// ── A. LA MESURE DANS LA PAGE ──────────────────────────────────────────────────
-const mesurer = (pg) => pg.evaluate(() => {
-  const vis = (e) => { if (!e || !e.getClientRects().length) return false; const r = e.getBoundingClientRect(); if (r.width < 1 || r.height < 1) return false; for (let p = e; p && p !== document.documentElement; p = p.parentElement) { const s = getComputedStyle(p); if (s.display === 'none' || s.visibility === 'hidden' || Number(s.opacity) < 0.05) return false; } return true; };
-  const s = document.querySelector('[data-sortir]');
-  const aff = document.querySelector('.sj-journee [data-sj-affiche]');
-  const prem = s && s.querySelector('[data-sortir-premier]');
-  const suite = s ? [...s.querySelectorAll('[data-sortir-rang]')].map((e) => ({ num: e.getAttribute('data-sortir-num'), lieu: e.getAttribute('data-sortir-lieu'), txt: e.textContent })) : [];
-  const pleins = [...document.querySelectorAll('.sb-btn-plein')].filter(vis).filter((e) => !e.closest('.vrm-fs')).length;
-  const petits = s ? [...s.querySelectorAll('button')].filter(vis).map((e) => ({ e, r: e.getBoundingClientRect() })).filter(({ r }) => r.width < 43.5 || r.height < 43.5).map(({ e, r }) => `${e.className} ${Math.round(r.width)}×${Math.round(r.height)}`) : [];
-  const deborde = s ? [...s.querySelectorAll('*')].filter(vis).filter((e) => { const r = e.getBoundingClientRect(); return r.right > innerWidth + 1 || r.left < -1; }).map((e) => e.className).slice(0, 4) : [];
-  let ls = {}; try { ls = { slots: JSON.parse(localStorage.getItem('vrm_slots') || 'null'), perdues: JSON.parse(localStorage.getItem('vinted_pairs_lost') || 'null') }; } catch (_) {}
-  return {
-    la: !!s, top: s ? Math.round(s.getBoundingClientRect().top) : null, topAffiche: aff ? Math.round(aff.getBoundingClientRect().top) : null, h: innerHeight,
-    n: s ? s.getAttribute('data-sortir-n') : null, sorties: s ? s.getAttribute('data-sortir-sorties') : null,
-    premier: prem ? { num: prem.getAttribute('data-sortir-num'), lieu: prem.getAttribute('data-sortir-lieu'), raison: prem.getAttribute('data-sortir-raison'),
-      meuble: (prem.querySelector('[data-sortir-meuble]') || {}).textContent || '', place: (prem.querySelector('[data-sortir-place]') || {}).textContent || '',
-      plan: (prem.querySelector('[data-so-plan]') || { getAttribute: () => null }).getAttribute('data-so-plan'), cible: !!prem.querySelector('[data-so-case="cible"]'),
-      ranger: prem.querySelector('[data-sortir-ranger]') ? prem.querySelector('[data-sortir-ranger]').getAttribute('data-sortir-ranger') : null,
-      inconnu: !!prem.querySelector('[data-sortir-inconnu]'), geste: !!prem.querySelector('[data-sortir-geste="sortie"]') } : null,
-    suite, pleins, petits, deborde, sw: document.documentElement.scrollWidth, iw: innerWidth,
-    apres: (() => { const a = document.querySelector('[data-sortir-apres]'); return a ? { num: a.getAttribute('data-sortir-apres'), desc: a.getAttribute('data-sortir-descendus'), phrase: !!a.querySelector('[data-sortir-phrase]'), vis: vis(a) } : null; })(),
-    pilule: !!document.querySelector('[data-acc-apres="stock.sortir"]'),
-    ls,
-  };
-});
-
-async function scenario(nav, { W, th, sortir }) {
+// (16 nov., lot retirer-case-compact — Julien : « enlever la paire de sa case ça prend trop de place », puis « dans
+// l'onglet Stock, la case doit être en surbrillance si l'article n'est pas rangé/retiré — PAS DE POP-UP ») La carte
+// « La paire à sortir en premier » n'est plus posée sur Ma journée (ni carte, ni fenêtre) : la case allumée du Stock
+// fait tout (banc stock-case-a-sortir.cjs). Ce scénario sert les MÊMES ventes qu'avant (quatre ventes rangées,
+// à expédier) et exige l'absence — l'arbre du 15 nov. le rend rouge (sa carte y est), et il mesure la place rendue.
+async function scenario(nav, { W, th }) {
   const sombre = th === 'sombre', T = `[${W} ${th}]`;
   const o = await P.ouvrir(nav, { W, sombre, b: base(), url: '/?tab=journee', dsf: W < 600 ? 2 : 1 });
-  if (W >= 600 && W !== 1512) await o.pg.setViewportSize({ width: W, height: W <= 1280 ? 800 : 900 });   // la maquette 1280 × 800
+  if (W >= 600 && W !== 1512) await o.pg.setViewportSize({ width: W, height: W <= 1280 ? 800 : 900 });
   await P.pret(o.pg);
-  await o.pg.waitForSelector('[data-sortir] [data-sortir-premier]', { timeout: 30000 }).catch(() => {});
-  await o.pg.waitForTimeout(1500);
-  const m = await mesurer(o.pg);
-  await o.pg.screenshot({ path: path.join(SHOTS, `sortir-${W}-${th}.png`) }).catch(() => {});
-  dit(m.la, `${T} A1 « La paire à sortir » est sur Ma journée`, JSON.stringify(m).slice(0, 200));
-  if (!m.la) { await o.ctx.close(); return; }
-  if (W < 600) dit(m.top != null && m.top < m.h * 0.6 && (m.topAffiche == null || m.top < m.topAffiche), `${T} A1 avant le chiffre du jour, dans le premier écran (haut ${m.top} px, chiffre ${m.topAffiche} px)`, JSON.stringify([m.top, m.topAffiche]));
-  const p = m.premier || {};
-  dit(p.num === '501' && p.lieu === 'B:3' && /Pile B/.test(p.meuble) && p.plan === '4:1' && p.cible, `${T} A2 la plus pressée d'abord (N°501) : SA case — Pile B, la boîte du bas, la case allumée`, JSON.stringify(p));
-  const nums = m.suite.map((x) => x.num).filter((x) => ['502', '503', '504'].includes(x));
-  dit(nums.join(',') === '504,502,503', `${T} A3 l'ordre : N°504 (même meuble), N°502 (l'autre meuble), N°503 (inconnue)`, JSON.stringify(m.suite.map((x) => [x.num, x.lieu])));
-  const s502 = m.suite.find((x) => x.num === '502'), s503 = m.suite.find((x) => x.num === '503'), s504 = m.suite.find((x) => x.num === '504');
-  dit(s502 && s502.lieu === 'A:6' && s504 && s504.lieu === 'B:2', `${T} A3 au même titre que N°501, N°502 a SA case (Étagère A, i 6) — jamais B:3 ni celle de N°777 (A:0)`, JSON.stringify([s502, s504]));
-  dit(s503 && s503.lieu === '', `${T} A3 N°503, jamais rangée : aucune case inventée (« place pas connue »)`, JSON.stringify(s503));
-  dit(m.pleins === 1, `${T} A4 un seul bouton plein visible (« Je l'ai sortie »)`, m.pleins);
-  if (W < 600) dit(m.petits.length === 0, `${T} A4 chaque bouton de la section ≥ 44 × 44 px`, m.petits.join(' · '));
-  dit(m.sw <= m.iw + 1 && m.deborde.length === 0, `${T} A4 rien ne déborde`, JSON.stringify([m.sw, m.iw, m.deborde]));
-  if (sortir) {
-    await o.pg.click('[data-sortir-premier] [data-sortir-geste="sortie"]');
-    await o.pg.waitForSelector('[data-sortir-apres]', { timeout: 8000 }).catch(() => {});
-    // Les cases s'écrivent par le geste du Stock (après la déclaration) : on attend l'ÉCRITURE elle-même, jamais un délai
-    // fixe (sous charge, 900 ms ne suffisaient pas) ; pas écrite en 12 s ⇒ le contrôle d'en dessous dit son rouge.
-    await o.pg.waitForFunction(() => { try { const s = JSON.parse(localStorage.getItem('vrm_slots') || 'null'); return !!s && !s['501']; } catch (_) { return false; } }, null, { timeout: 12000 }).catch(() => {});
-    await o.pg.waitForTimeout(900);
-    const a = await mesurer(o.pg);
-    await o.pg.screenshot({ path: path.join(SHOTS, `sortir-${W}-${th}-apres.png`) }).catch(() => {});
-    const desc = String((a.apres && a.apres.desc) || '').split(',').filter(Boolean).sort().join(',');
-    dit(a.apres && a.apres.num === '501' && a.apres.vis && desc === '504,590' && a.apres.phrase, `${T} A5 « Je l'ai sortie » : N°501 sortie, N°504 et N°590 descendus — dit (Avant / Maintenant)`, JSON.stringify(a.apres));
-    const sl = (a.ls && a.ls.slots) || {};
-    dit(!sl['501'] && sl['504'] && sl['504'].i === 3 && sl['590'] && sl['590'].i === 2 && sl['502'] && sl['502'].i === 6, `${T} A5 les cases écrites : 501 libérée, la pile tassée (504 → i 3, 590 → i 2), les autres intactes ; les N° ne changent pas`, JSON.stringify(sl));
-    dit(!!(a.ls && a.ls.perdues && Object.keys(a.ls.perdues).some((k) => /^501(@|$)/.test(k))), `${T} A5 la déclaration du Stock est écrite (vinted_pairs_lost, N°501)`, JSON.stringify(a.ls && a.ls.perdues));
-    dit(a.pilule, `${T} A5 la pilule d'accompagnement du geste paraît (data-acc-apres="stock.sortir")`);
-    dit(a.premier && a.premier.num === '504' && a.premier.lieu === 'B:3' && a.sorties === '1', `${T} A5 la suivante monte en tête : N°504, avec sa NOUVELLE case (B:3)`, JSON.stringify([a.premier, a.sorties]));
-    dit(a.pleins === 1, `${T} A5 après le geste : toujours un seul plein`, a.pleins);
-    await o.pg.click('[data-sortir-compris]').catch(() => {});
-    await o.pg.waitForTimeout(500);
-    const c = await mesurer(o.pg);
-    dit(!c.apres, `${T} A5 « Compris » : dit une fois, puis plus`, JSON.stringify(c.apres));
-  }
-  dit(o.erreurs.length === 0, `${T} A7 aucune erreur JS`, o.erreurs.join(' | '));
-  await o.ctx.close();
-}
-
-async function inconnue(nav, { W, th }) {
-  const T = `[${W} ${th} · sans emplacement]`;
-  const o = await P.ouvrir(nav, { W, sombre: th === 'sombre', b: base({ seulementInconnue: true }), url: '/?tab=journee', dsf: W < 600 ? 2 : 1 });
-  await P.pret(o.pg);
-  await o.pg.waitForSelector('[data-sortir] [data-sortir-premier]', { timeout: 30000 }).catch(() => {});
-  await o.pg.waitForTimeout(1200);
-  const m = await mesurer(o.pg);
-  await o.pg.screenshot({ path: path.join(SHOTS, `sortir-${W}-${th}-inconnue.png`) }).catch(() => {});
-  const p = m.premier || {};
-  dit(p.num === '503' && p.raison === 'pasRange' && p.inconnu && !p.lieu && p.ranger === '503' && p.geste, `${T} A6 dit franchement (aucune case), « Ranger d'abord » pour CE N°`, JSON.stringify(p));
-  await o.pg.click('[data-sortir-ranger]').catch(() => {});
+  await o.pg.waitForSelector('.sj-journee', { timeout: 30000 }).catch(() => {});
   await o.pg.waitForTimeout(2500);
-  const ec = await o.pg.evaluate(() => { const e = document.querySelector('.vrm-main[data-ecran]'); return e ? e.getAttribute('data-ecran') : (new URL(location.href)).searchParams.get('tab'); });
-  dit(ec === 'garage', `${T} A6 « Ranger d'abord » ouvre le Stock`, ec);
-  dit(o.erreurs.length === 0, `${T} A7 aucune erreur JS`, o.erreurs.join(' | '));
+  const m = await o.pg.evaluate(() => {
+    const vis = (e) => { if (!e || !e.getClientRects().length) return false; const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+    const s = document.querySelector('[data-sortir]');
+    return { journee: !!document.querySelector('.sj-journee'), la: !!s, h: s && vis(s) ? Math.round(s.getBoundingClientRect().height) : 0,
+      fenetres: [...document.querySelectorAll('[role="dialog"], .vrm-confirmation, [data-sortir-pop]')].filter(vis).length,
+      geste: !!document.querySelector('[data-sortir-geste], [data-sortir-compris]'), sw: document.documentElement.scrollWidth, iw: innerWidth };
+  });
+  await o.pg.screenshot({ path: path.join(SHOTS, `sortir-${W}-${th}.png`) }).catch(() => {});
+  console.log(`MESURE ${T} : hauteur de « La paire à sortir en premier » = ${m.h} px`);
+  dit(m.journee, `${T} A1 Ma journée est rendue`, JSON.stringify(m));
+  dit(!m.la && !m.geste && m.h === 0, `${T} A1 plus de carte « La paire à sortir » ni de « Je l'ai sortie » sur Ma journée`, `${m.h} px`);
+  dit(m.fenetres === 0, `${T} A2 aucune fenêtre ne s'ouvre à sa place`, String(m.fenetres));
+  dit(m.sw <= m.iw + 1, `${T} A3 rien ne déborde`, JSON.stringify([m.sw, m.iw]));
+  dit(o.erreurs.length === 0, `${T} A4 aucune erreur JS`, o.erreurs.join(' | '));
   await o.ctx.close();
 }
 
@@ -223,10 +151,8 @@ async function inconnue(nav, { W, th }) {
   const nav = await P.chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] });
   try {
     for (const W of LARGEURS) for (const th of THEMES) {
-      const sortir = (W < 600 && th === 'clair') || (W >= 600 && th === 'sombre') || (W === 1280 && th === 'clair');
-      try { await scenario(nav, { W, th, sortir }); } catch (e) { dit(false, `[${W} ${th}] le scénario a pu s'exécuter`, String(e && e.stack || e).slice(0, 300)); }
+      try { await scenario(nav, { W, th }); } catch (e) { dit(false, `[${W} ${th}] le scénario a pu s'exécuter`, String(e && e.stack || e).slice(0, 300)); }
     }
-    try { await inconnue(nav, { W: LARGEURS[0], th: THEMES[0] }); } catch (e) { dit(false, 'le scénario « sans emplacement » a pu s\'exécuter', String(e && e.stack || e).slice(0, 300)); }
   } finally { await nav.close(); P.srv.close(); }
   console.log(ko ? `\n${ko} KO` : '\nTOUT VERT');
   process.exit(ko ? 1 : 0);

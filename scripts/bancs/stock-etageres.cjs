@@ -150,13 +150,19 @@ async function ouvrirPlus(pg) {
   await pg.evaluate(() => { const d = document.querySelector('.vrm-fp [data-fiche-plus]'); if (d) d.open = true; });
   await pg.waitForTimeout(300);
 }
+// (16 nov., lot retirer-case-compact — Julien : « dans l'onglet Stock, la case doit être en surbrillance si l'article n'est
+// pas rangé/retiré ») « Retirer de la case » n'est plus dans la fiche : une paire sort de sa case quand elle est VENDUE, par
+// le toucher de sa case allumée. Le banc la dit vendue (la preuve publiée, `vrm_stock_vendus`), attend la surbrillance,
+// puis touche la case — le même geste de case (la pile tassée, le N° jamais touché).
+const direVendue = (pg, n) => pg.evaluate((n) => { let v = null; try { v = JSON.parse(localStorage.getItem('vrm_stock_vendus') || 'null'); } catch (_) {}
+  const nums = new Set(((v && Array.isArray(v.nums)) ? v.nums : []).map(String)); nums.add(String(n));
+  localStorage.setItem('vrm_stock_vendus', JSON.stringify({ nums: [...nums], at: Date.now() })); window.dispatchEvent(new Event('vrm:stock-slots')); }, n);
 async function retirerCase(pg, n) {
+  await direVendue(pg, n);
+  await pg.waitForSelector(`[data-case-num="${n}"].is-vendue`, { timeout: 8000 }).catch(() => {});
   if (!(await toucher(pg, `[data-case-num="${n}"]`))) return false;
-  await pg.waitForSelector('[data-fiche-retirer]', { state: 'attached', timeout: 8000 }).catch(() => {});
-  await ouvrirPlus(pg);
-  await toucher(pg, '[data-fiche-retirer]');
-  await pg.waitForTimeout(500); await fermerFiche(pg); await pg.waitForTimeout(300);
-  return (await ou(pg, n)) === null;   // jugé sur la case (un clic qui se détache en partant n'est pas un échec)
+  await pg.waitForTimeout(700);
+  return (await ou(pg, n)) === null;   // jugé sur la case
 }
 
 (async () => {
