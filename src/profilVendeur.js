@@ -210,6 +210,31 @@ export const PHRASES_ARTICLE = {
   'Donne le N° de la paire : son prix devient son coût.': 'Donne le N° de l’article : son prix devient son coût.',
   'Range chaque paire là où VRM l’indique.': 'Range chaque article là où VRM l’indique.',
   'Un N° en rouge : deux paires dessous, vérifie les deux.': 'Un N° en rouge : deux articles dessous, vérifie les deux.',
+  // (16 nov., lot derniers-rouges) les vidéos d’aide (src/aideVideos.js), les cartes de Ma journée (src/journeePerso.js)
+  // et les lignes de « Quoi de neuf » (src/nouveautes.js) — rendues par `phraseVendeur`.
+  'Retrouver une paire': 'Retrouver un article',
+  'La paire, son N°, l’offre et ce qu’elle te laisse': 'L’article, son N°, l’offre et ce qu’il te laisse',
+  'Une annonce d’ailleurs avec la photo d’une paire Vinted.': 'Une annonce d’ailleurs avec la photo d’un article Vinted.',
+  'Une paire en vente sur deux comptes': 'Un article en vente sur deux comptes',
+  'Même photo qu’une paire Vinted : relier': 'Même photo qu’un article Vinted : relier',
+  'Des notifications courtes, la paire nommée': 'Des notifications courtes, l’article nommé',
+  '« Paires » devient « Annonces » ; Relier à Vinted tient dans la ligne.': 'Le menu s’appelle « Annonces » ; Relier à Vinted tient dans la ligne.',
+  'Tes paires : touche-en une, elle monte': 'Tes articles : touches-en un, il monte',
+  'L’histoire d’une paire, dans l’ordre': 'L’histoire d’un article, dans l’ordre',
+  'Vraies photos de paires, bandeau et cadre « Exemple » partout.': 'Vraies photos d’articles, bandeau et cadre « Exemple » partout.',
+  'Ce que leurs paires ont rapporté, délais, soucis.': 'Ce que leurs articles ont rapporté, délais, soucis.',
+  'Paires réunit Annonces, Stock, Achats ; le reste sous ☰.': 'Articles réunit Annonces, Stock, Achats ; le reste sous ☰.',
+  'Les paires sans photo ou à reprendre, cochées une à une.': 'Les articles sans photo ou à reprendre, cochés un à un.',
+  'Chercher tes paires par couleur': 'Chercher tes articles par couleur',
+  'Dicter une note sur une paire': 'Dicter une note sur un article',
+  'Le certificat d’authenticité rangé avec la paire': 'Le certificat d’authenticité rangé avec l’article',
+  'Fusionner deux fiches de la même paire': 'Fusionner deux fiches du même article',
+  'Une seule fiche pour chaque paire': 'Une seule fiche pour chaque article',
+  'Ce que chaque site t’a coûté, et où partent tes paires.': 'Ce que chaque site t’a coûté, et où partent tes articles.',
+  'Ventes de l’année, colis, paires en ligne : rejouable dans Paramètres → Aide.': 'Ventes de l’année, colis, articles en ligne : rejouable dans Paramètres → Aide.',
+  'Frais de chaque site compris, et la même paire à deux prix.': 'Frais de chaque site compris, et le même article à deux prix.',
+  'Épingle tes paires en haut': 'Épingle tes articles en haut',
+  'Comparer deux paires côte à côte': 'Comparer deux articles côte à côte',
 };
 export const phraseVendeur = (t, vend = vendCourant()) => (vend === 'sneakers' || typeof t !== 'string' ? t : (PHRASES_ARTICLE[t] || t));
 // « 3 paires » / « 1 article », pour le vendeur connecté (ou `vend` donné).

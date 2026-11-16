@@ -7,6 +7,7 @@
 // visibilité, urgences) est src/journeePerso.js : ce fichier ne fait que la montrer.
 import React from 'react';
 import { BoutonBase } from './composants/Bouton.jsx';
+import { phraseVendeur } from './profilVendeur.js';   // (16 nov.) une carte qui dit « paire » se dit « article » hors Sneakers
 import { CARTES_JOURNEE, ZONES_JOURNEE, ordreJournee, ordreMobile, visibiliteCarte, basculerCarte, deplacerCarte, revenirOrigine, estOrigine, carteJournee } from './journeePerso.js';
 
 const Poignee = () => (
@@ -92,7 +93,7 @@ export function JourneePersoEditeur({ reglage, poser, mode, accent = '#0071E3', 
                     </button>)}
                     <span className="vrm-jp-textes">
                       <span className="vrm-jp-nom">{c.nom}</span>
-                      <span className="vrm-jp-desc">{c.desc}</span>
+                      <span className="vrm-jp-desc">{phraseVendeur(c.desc)}</span>
                     </span>
                     <button type="button" role="switch" aria-checked={v.choisie} aria-label={`${c.nom} : ${v.choisie ? 'affichée' : 'cachée'}`}
                       className="vrm-switch" style={{ '--vrm-sw': v.choisie ? accent : eteint }} data-jp-interrupteur={id}

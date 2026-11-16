@@ -14,6 +14,7 @@ import React, { useMemo } from 'react';
 import { tr, langueCourante } from './i18n/index.js';
 import { propositionsPour, questionEnAttente, langueDuMessage } from './questionsFrequentes.js';
 import { morceauxInfos, insererDansReponse, cmTexte } from './infosPaire.js';
+import { vendCourant } from './profilVendeur.js';
 import './styles-aide-reponse.css';
 
 const court = (t, n = 64) => (t.length > n ? t.slice(0, n - 1) + '…' : t);
@@ -27,7 +28,8 @@ export default function AideReponse({ messages = [], infos = null, tailleFiche =
   const propositions = useMemo(() => propositionsPour(question, { langueApp, infos, tailleFiche, partie }), [question, langueApp, infos, tailleFiche, partie]);
   const morceaux = useMemo(() => morceauxInfos(infos, langue), [infos, langue]);
   const cachees = !!(infos && infos.cachee);
-  const manques = propositions.filter((p) => !p.texte && ['taille', 'defauts', 'semelle'].includes(p.manque));
+  // (16 nov., lot derniers-rouges) « + semelle » ne se propose qu'à un vendeur de Sneakers (la fiche ne la demande qu'à lui).
+  const manques = propositions.filter((p) => !p.texte && ['taille', 'defauts', 'semelle'].includes(p.manque) && (p.manque !== 'semelle' || vendCourant() === 'sneakers'));
   const pretes = propositions.filter((p) => p.texte);
   if (!pretes.length && !morceaux.length && !manques.length && !onEditerInfos && !cachees) return null;
   const inserer = (t) => { if (!desactive && typeof onInserer === 'function') onInserer(insererDansReponse(valeur, t)); };

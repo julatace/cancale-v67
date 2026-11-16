@@ -51,6 +51,16 @@ const PERMIS = [
   // montrées seulement pour un article de cette catégorie, le texte est celui de Vestiaire.
   ...['fr', 'en', 'es', 'it', 'de'].map((l) => [`src/i18n/langues/${l}.js`, /^"vcPhotos\.vue\.(semelle|pointure)"/, 'photo exigée par Vestiaire pour la catégorie chaussures, montrée pour cette catégorie seulement', 'ligne']),
   ['src/aideFiches.js', /^'(la mauvaise chaussure)'$/, 'côté Sneakers de la table de mots (remplacé par « le mauvais article » hors Sneakers)'],
+  // (16 nov., lot derniers-rouges)
+  ...['fr', 'en', 'es', 'it', 'de'].map((l) => [`src/i18n/langues/${l}/arrivee.js`, /^"arr\.cat\.baskets"/, 'une des catégories proposées à l’arrivée d’un achat (Baskets, Vêtements…), choisie par lui', 'ligne']),
+  ['src/i18n/langues/fr/correspondances.js', /^"corr\.champ\.pointure(EU)?"/, 'nom du critère de la catégorie chaussures des sites (montré seulement pour un article de cette catégorie, CorrespondancesPartout.jsx)', 'ligne'],
+  ['src/publierPartout.js', /^'Pointure'$/, 'nom du critère, seulement quand la catégorie Leboncoin choisie est une catégorie chaussure (même ligne : `/chaussure/i.test(…sousNom)`)'],
+  ['src/questionsFrequentes.js', /^'semelle interieure'$/, 'mot de LECTURE d’une question d’acheteur (jamais affiché)'],
+  ['src/rechercheReglages.js', /^'vends sneakers vetements categorie'$/, 'mots de recherche du réglage « Je vends » (lecture de ce qu’il tape, jamais affichés)'],
+  ['src/recherchePhrase.js', /^'le la les l de du /, 'liste des mots vides de la recherche (jamais affichée)'],
+  ['src/infosPaire.js', /^'Longueur de semelle : \{v\} cm\.'$/, 'phrase mise dans sa réponse seulement quand la semelle est notée — le champ ne se propose qu’à un vendeur de Sneakers (InfosPaire.jsx)'],
+  ['src/autreTaille/autreTaille.js', /^'\(\?:taille\|pointure\|/, 'expression de lecture d’une taille écrite dans un titre (aucun texte affiché)'],
+  ['src/correspondances.js', /^'(Chaussures( enfants)?|Baskets( & Sneakers)?|Chaussures (à lacets|à scratch|de randonnées|aquatiques)|[A-Z][^'>]* > [^']+|(baskets|chaussures) [a-zéèêàç ]+)'$/, 'libellés EXACTS des catégories et critères servis par Leboncoin et Vestiaire (fdata, catalogue de dépôt) : la table de correspondance, proposée seulement pour un article de ces catégories'],
 ];
 const MOTS = /\b(chaussures?|baskets?|sneakers?|pointures?|semelles?|lacets?)\b/i;
 // Les exemples de baskets (S3) et les fichiers qui ne contiennent que des LISTES de lecture
@@ -67,10 +77,15 @@ const fichiersSrc = (racine) => { const out = []; const w = (d) => { for (const 
 // Une clé jamais appelée n'est pas gardée.
 const GARDE_SNEAKERS = /(?:===|!==) ?'sneakers'|'sneakers' ?(?:===|!==)|nom === 'paire'|\b(?:sn|snEx|sneakers) \?/;
 const gardesCles = (racine) => { const usages = new Map(); for (const f of fichiersSrc(racine)) { if (/[\\/]i18n[\\/]langues[\\/]/.test(f)) continue; sansCom(fs.readFileSync(f, 'utf8')).split('\n').forEach((l) => { for (const m of l.matchAll(/\btrj?\('([\w.-]+)'/g)) { const u = usages.get(m[1]) || []; u.push(GARDE_SNEAKERS.test(l)); usages.set(m[1], u); } }); } return (cle) => { const u = usages.get(cle); return !!(u && u.length && u.every(Boolean)); }; };
+// (16 nov.) Une phrase du dictionnaire qui a sa variante « article » (`X.art`, choisie par `t()` hors Sneakers —
+// audit-vocabulaire-article A1) est gardée quand la variante ne dit pas le mot jugé.
+const varianteSure = (FR, k, re) => !!(k && FR && FR[k + '.art'] != null && !re.test(JSON.stringify(FR[k + '.art'])));
 const cleDeLigneDico = (rel, l) => (/^src\/i18n\/langues\//.test(rel) ? ((l.match(/^\s*"([\w.-]+)":/) || [])[1] || null) : null);
 async function verifier(racine, { muet = false } = {}) {
   const cleGardee = gardesCles(racine);
   let ko = 0;
+  let FR = {};
+  try { FR = (await import(pathToFileURL(path.join(racine, 'src/i18n/langues/fr.js')).href + '?v=' + Math.random())).default || {}; } catch (_) { FR = {}; }
   const dit = (bon, quoi, det) => { if (!bon) ko++; if (!muet || !bon) console.log(`${bon ? 'OK  ' : 'KO  '}${quoi}${!bon && det !== undefined ? ' — ' + String(typeof det === 'string' ? det : JSON.stringify(det)).slice(0, 600) : ''}`); };
   const imp = (p) => import(pathToFileURL(path.join(racine, p)).href + '?v=' + Math.random());
   let PV, G, V, ET;
@@ -137,7 +152,7 @@ async function verifier(racine, { muet = false } = {}) {
         if (/^['"`][a-z-]+['"`]$/.test(s)) continue;                    // une clé (« sneakers », « chaussures »), pas un texte
         if (/^['"`][a-z][\w-]*(?:\.[\w-]+)+['"`]$/.test(s)) continue;     // (11 nov.) une clé de traduction (« accueil.faq.baskets.q »), pas un texte
         if (/(?:===|!==) ?'sneakers'|'sneakers' ?(?:===|!==)/.test(l)) continue;   // gardé par ce qu'il vend
-        { const k = cleDeLigneDico(rel, l); if (k && cleGardee(k)) continue; }
+        { const k = cleDeLigneDico(rel, l); if (k && (cleGardee(k) || varianteSure(FR, k, MOTS))) continue; }
         if (PERMIS.some(([fi, re, , parLigne]) => fi === rel && (parLigne ? re.test(l.trim()) : re.test(s)))) continue;
         hors.push(`${rel}:${i + 1} ${s.slice(0, 90)}`);
       }
@@ -157,7 +172,9 @@ async function verifier(racine, { muet = false } = {}) {
       for (const x of lits) {
         if (!MARQUES_BASKET.test(x) || !/\s/.test(x.trim().slice(1, -1))) continue;   // une phrase, pas un mot-clé
         if (/(?:===|!==) ?'sneakers'|'sneakers' ?(?:===|!==)|nom === 'paire'|\b(?:sn|snEx|sneakers) \?/.test(l)) continue;
-        { const k = cleDeLigneDico(rel, l); if (k && cleGardee(k)) continue; }
+        { const k = cleDeLigneDico(rel, l); if (k && (cleGardee(k) || varianteSure(FR, k, MARQUES_BASKET))) continue; }
+        // (16 nov.) une CLÉ de la table de conversion US → EU (lecture d'un titre), jamais affichée.
+        if (rel === 'src/liaisonAchat.js' && /^US_EU\.jordan = US_EU\.nike; US_EU\['air jordan'\] = US_EU\.nike;$/.test(l.trim())) continue;
         if (lits.length >= 4 && !/placeholder|titre=|title=|setErreur/.test(l)) continue;   // une liste de lecture (marques, modèles)
         if (rel === 'src/FacturePro.jsx' && /^'Nike Air Max 90 — taille 42 \(exemple\)'$/.test(x) && /deps\.vendActuel\(\) !== 'sneakers'/.test(l0(f))) continue;   // remplacé hors Sneakers
         marques.push(`${rel}:${i + 1} ${x.slice(0, 90)}`);
@@ -198,6 +215,10 @@ async function verifier(racine, { muet = false } = {}) {
     process.exit(ko ? 1 : 0);
   }
   const MUTATIONS = [
+    // (16 nov., lot derniers-rouges)
+    ['src/InfosPaire.jsx', 'la semelle demandée à tout vendeur', "{sn ? <label className=\"vrm-plus-champ\">{tr('plus.infos.semelle')}", "{<label className=\"vrm-plus-champ\">{tr('plus.infos.semelle')}"],
+    ['src/i18n/langues/fr/article.js', 'l’exemple « dunk 42 » remis hors Sneakers', '"ia.vm.numeroExemple.art": "124, B125 ou un mot du titre",', '"ia.vm.numeroExemple.art": "124, B125 ou « dunk 42 »",'],
+    ['src/AchatsPlus.jsx', 'l’exemple « air max 90 » montré à tous', "placeholder={vendCourant() === 'sneakers' ? 'air max 90' : undefined}", 'placeholder="air max 90"'],
     ['src/profilVendeur.js', 'Lunettes retirée des tuiles', "  { v: 'lunettes', titre: 'Lunettes' },", ''],
     ['src/configurationDepart.js', 'question reposée après « Plus tard »', '  return l.choix === \'auto\' && !l.categories && !l.vu;', '  return l.choix === \'auto\' && !l.categories;'],
     ['src/configurationDepart.js', 'question pour un compte qui a choisi', '  return l.choix === \'auto\' && !l.categories && !l.vu;', '  return !l.vu;'],

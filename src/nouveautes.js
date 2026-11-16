@@ -24,6 +24,7 @@ export const POUR = Object.freeze(['tous', 'sneakers', 'autre', 'pro']);
 export const MODES = Object.freeze(['tous', 'complet']);
 export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
+import { phraseVendeur } from './profilVendeur.js';
 
 export const NOUVEAUTES = Object.freeze([
   // (16 nov., lot ventes-selection) docs/passation/2026-11-16-ventes-selection.md
@@ -312,7 +313,13 @@ export function pourLui(n, { vend = null, categories = null, pro = null, mode = 
 export function nouveautesDuCompte(ctx = {}, liste = NOUVEAUTES) {
   const depuis = jourDe(ctx.inscritLe);
   if (!depuis) return [];
-  return liste.filter((n) => n && n.date > depuis && pourLui(n, ctx));
+  // (16 nov., lot derniers-rouges) Hors Sneakers, une ligne qui dit « paire » se dit « article »
+  // (PHRASES_ARTICLE, src/profilVendeur.js) ; « pas su » ⇒ le mot neutre.
+  const vend = ctx.vend === 'sneakers' ? 'sneakers' : 'autre';
+  return liste.filter((n) => n && n.date > depuis && pourLui(n, ctx)).map((n) => {
+    const titre = phraseVendeur(n.titre, vend), phrase = phraseVendeur(n.phrase, vend);
+    return titre === n.titre && phrase === n.phrase ? n : { ...n, titre, phrase };
+  });
 }
 
 // Celles à montrer sur la carte : pas encore vues.

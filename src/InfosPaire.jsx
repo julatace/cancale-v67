@@ -12,6 +12,7 @@ import React, { useState } from 'react';
 import { tr, langueCourante } from './i18n/index.js';
 import { Feuille } from './ui/Feuille.jsx';
 import { semelleCm, cmTexte } from './infosPaire.js';
+import { vendCourant } from './profilVendeur.js';
 import './styles-aide-reponse.css';
 
 export function InfosPaireVue({ infos = null, onEditer = null, numero = '' }) {
@@ -37,6 +38,8 @@ export function InfosPaireFeuille({ valeur = null, numero = '', onEnregistrer, o
   const [defauts, setDefauts] = useState((valeur && valeur.defauts) || '');
   const [semelle, setSemelle] = useState(valeur && valeur.semelle != null ? cmTexte(valeur.semelle, langueCourante()) : '');
   const semelleKo = String(semelle).trim() !== '' && semelleCm(semelle) == null;
+  // (16 nov., lot derniers-rouges) La semelle ne se demande qu'à un vendeur de Sneakers (ou si elle est déjà notée).
+  const sn = vendCourant() === 'sneakers' || !!(valeur && valeur.semelle != null);
   return (
     <Feuille titre={numero ? tr('plus.infos.titreNum', { n: numero }) : tr('plus.infos.titre')} onClose={onClose} data-infos-feuille="" className="vrm-ui-feuille vrm-plus-feuille">
       <p className="vrm-plus-desc">{tr('plus.infos.desc')}</p>
@@ -46,9 +49,9 @@ export function InfosPaireFeuille({ valeur = null, numero = '', onEnregistrer, o
       <label className="vrm-plus-champ">{tr('plus.infos.defauts')}
         <input data-infos-champ="defauts" value={defauts} maxLength={160} placeholder={tr('plus.infos.defautsEx')} onChange={(e) => setDefauts(e.target.value)}/>
       </label>
-      <label className="vrm-plus-champ">{tr('plus.infos.semelle')}
+      {sn ? <label className="vrm-plus-champ">{tr('plus.infos.semelle')}
         <input data-infos-champ="semelle" inputMode="decimal" value={semelle} maxLength={6} placeholder={tr('plus.infos.semelleEx')} onChange={(e) => setSemelle(e.target.value)}/>
-      </label>
+      </label> : null}
       {semelleKo ? <p className="vrm-plus-erreur" role="status">{tr('plus.infos.semelleKo')}</p> : null}
       <div className="vrm-plus-actions">
         <button type="button" className="vrm-plus-principal" data-infos-enregistrer="" disabled={semelleKo}
