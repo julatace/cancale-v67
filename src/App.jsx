@@ -9665,6 +9665,10 @@ const venteRecente = (o) => {
 // (16 nov., vitesse-volume) Les deux lectures de la date d'une commande, gardées par commande (identité de
 // l'objet : une commande lue n'est jamais modifiée en place). À 20 000 ventes, la même date était relue des
 // dizaines de fois par rendu. Mêmes formules qu'avant, mêmes réponses (NaN compris).
+// (16 nov., vitesse-volume) Le tri « la plus récente en haut » des commandes : LE MÊME comparateur
+// (`new Date(b.date || 0) - new Date(a.date || 0)`, NaN ⇒ égalité, tri stable), la date de chaque commande lue
+// UNE fois par tri au lieu de deux fois par comparaison (20 000 ventes : ~600 000 dates construites).
+const triCommandesRecentes = () => { const k = new Map(); const t = (o) => { let v = k.get(o); if (v === undefined) { v = +new Date(o.date || 0); k.set(o, v); } return v; }; return (a, b) => t(b) - t(a); };
 const tsCommande = (o) => {
   if (!o || typeof o !== 'object') return Date.parse((o && o.date) || '') || 0;
   const m = tsCommande.memo || (tsCommande.memo = new WeakMap());
@@ -40605,7 +40609,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const garde = prec.items.filter(o => !okUids.has(String(o && o._acc && o._acc.vinted_user_id)));
         const seen = new Set(garde.map(o => String(o.transaction_id))); const neufs = [];
         for (const { acc, res } of lus) for (const o of res.items) { const id = String(o.transaction_id); if (seen.has(id)) continue; seen.add(id); neufs.push({ ...o, _acc: acc }); }
-        const items = [...neufs, ...garde].sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
+        const items = [...neufs, ...garde].sort(triCommandesRecentes());
         const failedUids = (Array.isArray(prec.failedUids) ? prec.failedUids : []).map(String).filter(u => !okUids.has(u));
         const failed = accounts.filter(a => failedUids.includes(String(a.vinted_user_id))).map(accNameOf);
         const caps = {};
@@ -40665,7 +40669,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // orders_purchased) — c'est LA vérité. Un onglet peut être momentanément
     // vide si l'extension n'a pas encore moissonné : « Synchroniser » force, et
     // il suffit de repasser sur vinted.fr avec l'extension.
-    out.sort((a,b) => new Date(b.date||0) - new Date(a.date||0));
+    out.sort(triCommandesRecentes());
     // Erreur seulement si RIEN n'a pu être chargé et qu'au moins un appel a échoué.
     const error = out.length===0 && anyErr && !anyOk;
     if (!_magasinCommandes.estCourant(cleM, n)) return;     // une lecture plus récente est partie après celle-ci (tous moteurs)
@@ -40689,7 +40693,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (!(prev && Array.isArray(prev.items))) return { loading:false, items: out, error, failed, failedUids, comptes: demandes };
         const dejaLa = new Set(out.map(o => String(o.transaction_id)));
         const garde = prev.items.filter(o => ko.has(String(o && o._acc && o._acc.vinted_user_id)) && !dejaLa.has(String(o.transaction_id)));
-        const items = garde.length ? [...out, ...garde].sort((a,b) => new Date(b.date||0) - new Date(a.date||0)) : out;
+        const items = garde.length ? [...out, ...garde].sort(triCommandesRecentes()) : out;
         return { ...prev, loading:false, items, error: items.length===0 && !anyOk, failed, failedUids, comptes: demandes };
       });
       return;
@@ -43880,7 +43884,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const identite = achatParIdentite({ lie, photo, venteTx, venteDate, achats, cleDePhoto: cleMemo, pris });
       return propositionPrixAchat({ prixConnu, annulee, identite, ventilationDe: ventilationDeTx, estLot: estLotPropose });
     };
-    const ventes = [...(sales.items || [])].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    const ventes = [...(sales.items || [])].sort(triCommandesRecentes());
     for (const o of ventes) {
       if (!o || o.transaction_id == null || o._fromEmail) continue;
       const e = effEntry(o);
