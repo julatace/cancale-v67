@@ -54,8 +54,10 @@ const PUBLIE = /^(vinted_urssaf_mois|vrm_benefice_jours|vrm_colis_aposter|vrm_co
   const b = await chromium.launch({ executablePath: process.env.VRM_CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] }).catch(() => chromium.launch());
   const res = { ventes: Number(process.env.VENTES) || 0, ecrans: {}, publie: {}, erreurs: [] };
   try {
-    const ctx = await b.newContext({ serviceWorkers: 'block', viewport: { width: 1512, height: 982 } });
-    await ctx.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vrm_visite_bulles_vue', '1'); } catch (_) {} });
+    // (16 nov., vitesse-moteur) CAPTURES=<préfixe> : une capture par écran relevé ; LARGEUR=390 (tactile) ; SOMBRE=1.
+    const larg = Number(process.env.LARGEUR) || 1512, tel = larg < 600;
+    const ctx = await b.newContext({ serviceWorkers: 'block', viewport: { width: larg, height: tel ? 844 : 982 }, ...(tel ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}) });
+    await ctx.addInitScript((sombre) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vrm_visite_bulles_vue', '1'); if (sombre) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, !!process.env.SOMBRE);
     let derniere = Date.now();
     await ctx.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
     await ctx.route('**/rest/v1/**', async (route) => {
@@ -82,6 +84,7 @@ const PUBLIE = /^(vinted_urssaf_mois|vrm_benefice_jours|vrm_colis_aposter|vrm_co
         for (const e of main.querySelectorAll('*')) for (const a of e.attributes) if (a.name.startsWith('data-') && /^-?\d+(?:[.,]\d+)?$/.test(a.value)) attrs.push(a.name + '=' + a.value);
         return { montants, comptes, attrs };
       });
+      if (process.env.CAPTURES) await pg.screenshot({ path: `${process.env.CAPTURES}-${tab}.png` }).catch(() => {});
     }
     const ls = await pg.evaluate(() => Object.fromEntries(Object.keys(localStorage).map((k) => [k, localStorage.getItem(k)])));
     for (const [k, v] of Object.entries(ls)) { const kk = k.replace(/_[0-9a-f-]{36}$/, ''); if (!PUBLIE.test(kk)) continue; let x = v; try { x = JSON.parse(v); } catch (_) {} res.publie[kk] = nettoie(x); }
