@@ -259,7 +259,7 @@ import { annoncesACompleter } from "./annoncesACompleter.js";
 import { BoutonCentreNotifs, FeuilleCentreNotifs } from "./CentreNotifs.jsx";
 import { nombreNonLues, marquerLues, fusionnerLus } from "./journalNotifs.js";
 import { masqueesParCompte } from "./annoncesMasquees.js";
-import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, stockQuiDort, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation, PERIODES, bornesPeriode, dansBornes, venduPeriode, barresPeriode, ventesPar, plusRapides } from "./statsVentes.js";
+import { rythmeVendu, minuitLocal, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix, TRANCHES_PRIX, stockQuiDort, SEUILS_DORT, rotationStock, tauxVenteMois, tauxAnnulation, PERIODES, bornesPeriode, dansBornes, venduPeriode, barresPeriode, ventesPar, plusRapides } from "./statsVentes.js";
 import "./stats-vitrine.css";
 import {appelerFavorisDirect} from './favorisTransport.js';
 import { ventesPourHistorique } from './favorisParcours.js';   // (11 nov., lot favoris-clair)
@@ -268,6 +268,7 @@ import React, { useState, useMemo, useEffect, useRef, Suspense } from "react";
 import { unParRendu } from './lotRendus.js';   // (16 nov., vitesse-volume)
 import { recentesOuSansDate, filtreParVersion, parTransaction } from './indexVentes.js';   // (16 nov., vitesse-moteur)
 import { gardeSiMeme } from './memeValeur.js';   // (16 nov., vitesse-moteur)
+import { parVersion } from './calculParVersion.js';   // (16 nov., vitesse-moteur)
 // (15 nov., chantier « ouverture ») JAMAIS `React.lazy` nu : un morceau qui rate (une mise en ligne entre-temps)
 // rendait « Cet écran a un souci » ou `undefined … default`. `lazySur` le relance, puis recharge proprement vers la
 // nouvelle version, sinon « Mettre à jour VRM » (src/chargementSur.js ; banc ouverture, audit-ouverture).
@@ -48604,8 +48605,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const anIci = String(new Date().getFullYear());
         // (6 nov.) + ses ventes à dater VENDUES cette année : versées cette année (src/aDaterAnnee.js,
         // la règle de Compta) ; seules les autres laissent « au moins ».
-        const adSurAn = declarables && Array.isArray(declarables.aDater) ? declarables.aDater.filter((l) => l && String(anneeSureDeVente(tsVenteADater(l), Date.now())) === anIci) : [];
-        const caAnnee = declarables ? declarables.lignes.reduce((x, l) => (l && String(l.ym || '').startsWith(anIci)) ? x + l.eur : x, 0) + adSurAn.reduce((x, l) => x + l.eur, 0) : null;
+        // (16 nov., vitesse-moteur) Calculés UNE fois par version de `declarables` et par année (src/calculParVersion.js) :
+        // les mêmes formules, dans le même ordre. Une vente à dater datée APRÈS maintenant entrera dans l'année quand
+        // l'heure la rattrapera : la réponse gardée ne vaut que jusque-là (`jusqua`).
+        const { adSurAn, caAnnee } = parVersion('journee.caAnnee', [declarables, anIci], () => {
+          const adSurAn = declarables && Array.isArray(declarables.aDater) ? declarables.aDater.filter((l) => l && String(anneeSureDeVente(tsVenteADater(l), Date.now())) === anIci) : [];
+          const caAnnee = declarables ? declarables.lignes.reduce((x, l) => (l && String(l.ym || '').startsWith(anIci)) ? x + l.eur : x, 0) + adSurAn.reduce((x, l) => x + l.eur, 0) : null;
+          return { adSurAn, caAnnee };
+        }, { jusqua: () => { const now = Date.now(); let m = Infinity; for (const l of (declarables && Array.isArray(declarables.aDater) ? declarables.aDater : [])) { const t = l ? Number(tsVenteADater(l)) : NaN; if (t > now && t < m) m = t; } return m; } });
         const adVinted = declarables ? declarables.aDater.filter(l => l.plateforme === 'Vinted').length : 0;
         // (30 oct.) Des ventes finalisées sans date de versement ne sont dans aucun mois :
         // « Reçu » et le CA de l'année sont alors des MINIMUMS — la couverture se dit à côté (§5).
@@ -49179,7 +49186,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // montants déjà écrits ailleurs sur l'écran (vendu du jour) ne sont pas
         // redits : la case dit l'ÉCART à la moyenne, pas le montant (§7).
         W.tendances = vuHero ? (()=>{
-          const R = rythmeVendu(vendus.lignes);
+          // (16 nov., vitesse-moteur) Une fois par version des lignes et par JOUR : `rythmeVendu` ne lit l'heure que par
+          // son minuit (src/statsVentes.js, `minuitLocal`) — même jour ⇒ même réponse (src/calculParVersion.js).
+          const R = parVersion('journee.rythme', [vendus.lignes, minuitLocal(Date.now())], () => rythmeVendu(vendus.lignes));
           if (!R) return null;
           const eJ = R.moyenne ? ecartPct(R.jour.eur, R.moyenne.eur) : null;
           const e7 = ecartPct(R.j7.eur, R.j7av.eur);
