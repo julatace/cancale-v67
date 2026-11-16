@@ -57,8 +57,31 @@ de retour (un ACHAT qu'il renvoie : e-mail « Bordereau de retour », ligne `ema
 
 ## Résultat
 
-(rempli à la fin du lot, plus bas)
+- Banc `impression-retours` : **42 verts, 0 rouge** (1512 clair, 390 tactile clair et sombre). Un toucher ⇒ UN PDF
+  de 2 pages : la vente « N° 40 » (jamais « RETOUR »), le retour « RETOUR / N° 31 / … / Achat renvoyé · pas une
+  vente » dans son cadre. PDF rendu en image (pdf.js dans Chromium) et regardé, captures 390/1512 regardées
+  (section lisible sur le verre, jour et nuit ; « + 1 retour » sous le bouton ; feuille « 2 bordereaux dans le PDF ·
+  dont 1 retour », vignette RETOUR).
+- Compteurs : « à envoyer », `data-impr-lot`, `vrm_colis_prets`, `vrm_colis_aposter` IDENTIQUES à ceux du même
+  compte joué SANS le bordereau de retour (témoin dans le banc).
+- **Rouge sur le code d'avant** (`git archive origin/main` 5a9abe57, banc copié, dist reconstruit) : 10 rouges (pas
+  de section, pas de « + 1 retour », retour absent du PDF : 1 page).
+- **Mutation** « tampon de vente sur un retour » (`if (it.retour)` ⇒ `if (false)`, dist reconstruit) : R3 rouge
+  (« Mondial Relay N° 31 Nike Dunk… », sans RETOUR).
+- Audits : `impression-retours` 25 verts + 7/7 mutations ; `colis-plus` (C9/C12 portés sur la règle : la branche
+  retour acceptée, la règle des ventes inchangée) ; `impression-carton` — rouge sur main (distance de 900
+  caractères dépassée par des commentaires du 15 nov.) — jugé désormais sur la RÈGLE (la question avant
+  `preparer`), mutation « question après la fabrication » ⇒ rouge ; `textes-courts` — rouge sur main (Ebay.jsx,
+  94 caractères) — phrase raccourcie sans changer son sens ; traduction, retours-litiges, impression, coherence,
+  variables, violet, rouge-doublon, identite : verts.
+- `retours-litiges` (banc) : la section de l'écran avait le même repère que celle de « Choisir » (deux 9501) ⇒
+  l'écran porte `data-lot-section="retours-ecran"`, « Choisir » garde `retours`.
 
 ## ÉTAT À LA REPRISE
 
-Voir la fin de ce fichier.
+- Branche `claude/impression-retours` poussée ; PR ouverte vers main (voir le rapport). Rien n'est écrit en base,
+  aucune extension touchée.
+- Ce qui reste possible plus tard : le cartouche RETOUR n'est pas montré dans la feuille « Place du tampon »
+  (l'aperçu de placement ne s'ouvre jamais pour un retour) ; « déjà imprimé » d'un retour est gardé sur l'appareil
+  (`vrm_retours_imprimes`, pas synchronisé) ; `src/tamponRetour.js` est mort depuis le 15 nov. (seul son audit
+  l'exécute).
