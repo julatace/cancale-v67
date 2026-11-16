@@ -99,5 +99,27 @@ d'iOS n'est pas reproduit par Chromium logiciel : la preuve du gain viendra des 
 - Le « 999+ » du sélecteur de sites à 4,03:1 sur la pastille claire ; « Novembre · Vinted » de la carte d'action
   de Ventes · Vinted (blanc 66 %) à 3,23:1 — rapportés par S3, pas encore corrigés.
 
+## Sous WebKit, après la mise en ligne (workflow `iphone-webkit.yml`, run 43877293536, main 3106f62a1)
+Base inventée, iPhone 15, Ma journée · Ventes · Vinted · eBay À traiter · Achats · Argent · Stock (+ pendant le
+chargement) : **aucune longue tâche > 200 ms** ni au calme ni au défilement sur aucun écran ; défilement avec et
+sans le verre au même rythme (Ma journée 11/11 im/s, Ventes 12/13, Achats 9/11, Stock 9/9 — WebKit logiciel de
+la CI : seules les comparaisons comptent) : le flou ne coûte plus. Restaient : « ResizeObserver loop… » (le grand
+chiffre, corrigé : l'ajustement à l'image suivante) et « vendu » à 3,43:1 dans la carte d'action (corrigé). PR 2 :
+`claude/stabilite-iphone-2` (et « 999+ » du sélecteur, le banc messagerie qui jugeait une rangée pas encore peinte).
+
+## Ma journée pendant le chargement = L'INSTANTANÉ (capture de Julien à 15 h 34, après #1198)
+La version servie contenait bien #1198 (Vercel ✓ 3106f62a1 à 13 h 35 UTC, puis c04cb5996 à 14 h 16 UTC). Ce qu'il voit
+pendant le chargement est l'instantané (src/JourneeInstantanee.jsx : les derniers chiffres rendus, montrés le temps
+de tout relire) — un banc sans instantané rangé ne le voyait jamais. Scénario `instantane_journee` : 1re ouverture
+complète (l'instantané se range), puis rechargement, base lente, jugé au milieu. Sur main (2907b5a4f) : S11 deux textes
+superposés (« Bénéfice · mois » × « Vendu · mois », « 1 680 € »…), S12 `.vrm-sq-carte` blanc opaque (361 × 218),
+S13 libellés coupés à 38 px, « 30 colis à envoyer » blanc sur la carte claire, l'icône blanche sur sa case blanche,
+« 75 € » à 78 %. Causes : les cases étaient posées DANS la tête (ses règles de rangée flex et son encre claire) au lieu
+de la tuile du mois de l'écran vrai ; la « prochaine chose » aussi (encre claire sur carte claire). Corrections : les
+cases dans la même tuile que l'écran vrai (`sj-bento > sj-grille > sj-t-mois > sj-face`), colonnes au moins larges
+comme leur libellé (son ordre « Bénéfice » d'abord), « Mis à jour… » dans la tête, la carte de la prochaine chose à
+l'encre du verre, le chiffre plein, les squelettes en verre, l'ouverture à froid dans l'espace de la coque
+(`data-espace`). Après : 24 ✅ · 0 ❌ (clair et sombre), captures regardées.
+
 ## ÉTAT À LA REPRISE
-Branche `claude/stabilite-iphone`. À relire le lendemain : `mesures_jour_2026-11-17` (Ventes · téléphone · inp).
+PR #1198 fusionnée (3106f62a1, Vercel ✓). PR 2 `claude/stabilite-iphone-2`. Restent : le coût JS d'un changement d'onglet de Ventes (rendus React, à instrumenter), la rangée de chiffres de sa capture (pas reproduite), « Carnet des vendeurs » pendant le chargement d'Achats (2,29:1, à regarder). À relire le lendemain : `mesures_jour_2026-11-17` (Ventes · téléphone · inp).
