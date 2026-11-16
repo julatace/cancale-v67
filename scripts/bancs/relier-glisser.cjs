@@ -200,6 +200,7 @@ async function souris(b) {
   const a5 = await centre(pg, '[data-glisser-achat="7100005"]');
   await pg.mouse.move(a5.x, a5.y); await pg.mouse.wheel(0, 300); await pg.waitForTimeout(300);
   dit(!(await pg.locator('[data-glisser-flotte]').count()), `${nom} · molette sur la liste : aucun glisser`);
+  await pg.evaluate(() => { document.querySelector('[data-glisser-achats]').scrollTop = 0; }); await pg.waitForTimeout(200);
   // lâché dans le vide
   let a1 = await centre(pg, `[data-glisser-achat="${T1}"]`);
   await pg.mouse.move(a1.x, a1.y); await pg.mouse.down(); await pg.mouse.move(a1.x + 40, a1.y + 10, { steps: 4 });
@@ -241,7 +242,7 @@ async function souris(b) {
   if (await pg.locator('[data-glisser-non]').count()) await pg.locator('[data-glisser-non]').click(); await pg.waitForTimeout(200);
   dit(!(await pg.locator('[data-glisser-question]').count()) && JSON.stringify(await liensTous(pg)) === '[]', `${nom} · « Annuler » de la question : rien écrit`);
   // « Reçu » depuis la pilule : le reçu de CET achat (son n° de transaction)
-  await pg.locator(`[data-glisser-achat="${T1}"]`).click(); await pg.waitForTimeout(150);
+  if (!(await pg.locator(`[data-glisser-achat="${T1}"][aria-pressed="true"]`).count())) await pg.locator(`[data-glisser-achat="${T1}"]`).click(); await pg.waitForTimeout(150);
   const iciV = pg.locator('[data-glisser-ici="v:7200001"]'); await iciV.scrollIntoViewIfNeeded().catch(() => {});
   if (await iciV.count()) await iciV.click(); await pg.waitForTimeout(250);
   if (await pg.locator('[data-glisser-oui]').count()) await pg.locator('[data-glisser-oui]').click(); await pg.waitForTimeout(400);
@@ -254,9 +255,10 @@ async function souris(b) {
   await pg.keyboard.press('Escape'); await pg.evaluate(() => { const b = document.querySelector('[data-recu-retour]'); if (b) b.click(); }); await pg.waitForTimeout(300);
   // La LIGNE de la vente reliée : son bénéfice (la règle), dans Ventes
   if (await pg.locator('[data-glisser-fermer]').count()) await pg.locator('[data-glisser-fermer]').click().catch(() => {});
-  await pg.evaluate(() => { history.pushState({}, '', '/?tab=ventes&site=vinted'); window.dispatchEvent(new PopStateEvent('popstate')); });
-  await pg.waitForTimeout(1500);
-  if (!(await pg.locator('[data-benef-ligne]').count())) { await pg.goto(pg.url().replace(/\?.*$/, '') + '?tab=ventes&site=vinted', { waitUntil: 'domcontentloaded' }); await pg.waitForTimeout(4000); }
+  const nv = pg.locator('[data-nav-entree="ventes"]').first();
+  if (await nv.count()) await nv.click().catch(() => {});
+  for (let i = 0; i < 30 && !(await pg.locator('[data-benef-ligne]').count()); i++) await pg.waitForTimeout(300);
+  const toutes = pg.locator('button', { hasText: /^Toutes$/ }).first(); if (await toutes.count()) { await toutes.click().catch(() => {}); await pg.waitForTimeout(800); }
   const bl = await pg.evaluate(() => { const r = [...document.querySelectorAll('[data-fiche-ligne]')].find((x) => /Salomon Speedcross/.test(x.innerText)); if (!r) return null; const b = r.querySelector('[data-benef-ligne]'); const su = r.querySelector('[data-fu-benef-su]'); return { b: b ? b.getAttribute('data-benef-ligne') : null, su: su ? su.innerText : null }; });
   dit(bl && bl.b === '5000', `${nom} · Ventes : la ligne de la vente reliée porte son bénéfice (50 €, la règle)`, JSON.stringify(bl));
   await pg.screenshot({ path: path.join(SHOTS, `relier-glisser-${nom}-ventes.png`) });

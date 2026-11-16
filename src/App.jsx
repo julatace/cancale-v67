@@ -56364,7 +56364,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           </div>
         </div>
       )}
-      {receiptView && <FeuilleRecuAchat recu={receiptView} fermer={()=>setReceiptView(null)}/>}
+      {receiptView && <FeuilleRecuAchat recu={receiptView} z={1500} fermer={()=>setReceiptView(null)}/>}
       {reventeVue && <SheetShell onClose={()=>setReventeVue(null)}><div data-revente-feuille="" style={{padding:'0 2px 8px'}}><div className="vrm-display" style={{fontSize:20,fontWeight:700,color:C.text}}>Revendu combien ?</div><div style={{fontSize:13,color:C.muted,marginTop:2,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{reventeVue.titre}</div>
         {modeleSur('', reventeVue.titre) ? <ReventeModele ouvert C={C} cible={{ titre: reventeVue.titre }} lireReleve={lireReleveVentes} lireExtras={lireExtrasRepartition} dateEnLigne={dateMiseEnLigneMs}/> : <div data-revente-modele="inconnu" style={{fontSize:13,color:C.muted,marginTop:10}}>Modèle pas reconnu dans le titre : rien à comparer.</div>}</div></SheetShell>}
       {showSourcing && (
