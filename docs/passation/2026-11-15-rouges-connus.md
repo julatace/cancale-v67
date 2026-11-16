@@ -76,6 +76,16 @@ conclure.
   `vrm_achats_jours`, `vrm_annonces_achetees` (publications d'écran et état de l'app, hors `CLES_PUBLIEES`) ; **et**
   `colis-a-confirmer` réécrit `vinted_annonce_numeros`, `vinted_sales`, `vinted_accounts`… en ouvrant Achats — à
   MESURER avant de conclure (artefact du banc ou vraie réécriture de `main` ?). Non tranché.
+  **Tranché (16 nov., `claude/achats-ecriture-main`) : effet du banc, aucune donnée réécrite.** La ligne `main`
+  servie n'avait que 2 clés ; la PREMIÈRE synchronisation de l'appareil (au chargement, avant tout geste, `cloudPush`
+  via `_pushPending`/`onCloudReady`) y ajoute ce que l'appareil sait : `vinted_annonce_numeros` absent ⇒ `{}`,
+  `vinted_sales` ⇒ `[]`, `vinted_accounts` ⇒ la copie sans jetons, `vrm_je_vends`, `vrm_ecrans_vus`… (absent ⇒ vide,
+  rien perdu ni écrasé). Machine chargée ⇒ cet envoi arrivait après la photo « avant » ; reproduit à coup sûr en
+  retenant ce premier envoi jusqu'au clic (exactement ces clés). Achats n'écrit aucune de ces clés. La prod porte
+  déjà ces clés dans `main` (lecture `data ? …`, 6 lignes sur 8). Banc corrigé : `main` réaliste (fiches, pool,
+  comptes), photo AU REPOS, jugement par règle (clé existante inchangée, aucune clé de données apparue, fiches et
+  pool intacts) ; publications déclarées. G « n'écrit aucune donnée » : 9/9 verts ; rouge sous mutation (Achats
+  réécrit un prix de fiche ; Achats invente une vente).
 - `reglages-premium` (4) : « Mots expliqués » recouvert par un `span` sans classe à mi-écran (y = 325, sans doute un
   toast ou la pastille « Enregistrement… ») ; un « Page crashed » et deux clics de 4 s à 1512 (charge 45–80).
 - `ventes-e2` : un `page.screenshot` dépassé (30 s) sur le scénario « gros », charge 60+.

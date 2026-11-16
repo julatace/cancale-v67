@@ -168,6 +168,13 @@
         chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcOffres', offres, liste: d.liste === true, page: String(d.page || '').slice(0, 160), moi: moiDe(d), inconnu: inconnuDe(d) }, () => { void chrome.runtime.lastError; });
         return;
       }
+      // 5.392 : les personnes qui ont aimé TES articles (article + identifiant numérique + date ; rien d'autre).
+      if (d.kind === 'vcaimes') {
+        const aimes = (Array.isArray(d.aimes) ? d.aimes : []).slice(0, 200).map((x) => (x && /^\d{3,15}$/.test(String(x.produit || '')) && /^\d{3,15}$/.test(String(x.acheteur || ''))
+          ? { produit: String(x.produit), acheteur: String(x.acheteur), at: /^\d{4}-\d{2}-\d{2}T[\w:.+-]{0,24}$/.test(String(x.at || '')) ? String(x.at) : '' } : null)).filter(Boolean);
+        if (aimes.length) chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcAimes', aimes, moi: moiDe(d) }, () => { void chrome.runtime.lastError; });
+        return;
+      }
       if (d.kind === 'vcoffreappris') {
         const r = d.recette;
         if (!r || typeof r !== 'object') return;
@@ -288,11 +295,13 @@
       if (!msg || msg.from !== 'vrm-fond' || msg.action !== 'vcOffre') return;
       if (!sender || sender.id !== chrome.runtime.id || window.top !== window) return;
       const nego = String(msg.nego || ''), geste = String(msg.geste || '');
-      if (!/^\d{3,15}$/.test(nego) || !/^(accepter|refuser|contre)$/.test(geste)) { sendResponse({ ok: false, code: 'invalide' }); return; }
+      const favori = geste === 'favori' && /^\d{3,15}$/.test(String(msg.produit || '')) && /^\d{3,15}$/.test(String(msg.acheteur || ''));
+      if (!favori && (!/^\d{3,15}$/.test(nego) || !/^(accepter|refuser|contre)$/.test(geste))) { sendResponse({ ok: false, code: 'invalide' }); return; }
       const jeton = (self.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2, 12));
       const t = setTimeout(() => { if (envoisEnAttente.delete(jeton)) sendResponse({ ok: false, code: 'muet' }); }, 20000);
       envoisEnAttente.set(jeton, (r) => { clearTimeout(t); sendResponse(r); });
-      window.postMessage(Object.assign({ __tag: 'CANCALE_VC_ORDRE', kind: 'offre', jeton, nego, geste, prixCents: Number(msg.prixCents) || 0, recette: msg.recette }, /^[\w-]{1,40}$/.test(String(msg.compte || '')) ? { compte: String(msg.compte) } : {}), '*');
+      window.postMessage(Object.assign({ __tag: 'CANCALE_VC_ORDRE', kind: 'offre', jeton, nego, geste, prixCents: Number(msg.prixCents) || 0, recette: msg.recette },
+        favori ? { produit: String(msg.produit), acheteur: String(msg.acheteur) } : {}, /^[\w-]{1,40}$/.test(String(msg.compte || '')) ? { compte: String(msg.compte) } : {}), '*');
       return true;
     });
   } catch (_) {}

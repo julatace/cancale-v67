@@ -308,7 +308,11 @@ function FavorisLeboncoin() {
   return (
     <div data-favoris-lbc={ads.length ? String(connus.length) : 'aucune'}>
       <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.55, marginBottom: 10 }}>
-        <span data-favoris-lbc-qui="jamais">{tr('messages.leboncoinDonne')} <b>{tr('messages.nombre')}</b> {tr('messages.favorisJamais')} <b>{tr('messages.texte')}</b> {tr('messages.vrmEcritPersonne')}</span>{' '}
+        {/* (15 nov., lot favoris-sites) MESURÉ : aucune réponse Leboncoin vue ne dit QUI a mis une annonce en favori
+            (stats : des nombres ; `followme/…/follower-targeting` vise les ABONNÉS du vendeur, son envoi jamais vu).
+            Le levier qui reste est la baisse de prix (recette apprise, son clic) — VRM ne promet pas que Leboncoin les prévient. */}
+        <span data-favoris-lbc-qui="jamais">{tr('favorisSites.lbcQui')}</span>{' '}
+        <span data-favoris-lbc-levier="baisse">{tr('favorisSites.lbcLevier')}</span>{' '}
         {capStats === 'ok' ? <>{tr('messages.ouvre2')} <b>{tr('messages.statistiques')}</b> {tr('messages.annonceLeboncoinChiffre')}</>
           : capStats === 'retard' ? <>{tr('messages.releverChiffreFaut')} <b>{EXT_CAPACITES.lbcstats}</b> {tr('messages.metsJourDepuis')} <b>{tr('messages.statistiques')}</b> {tr('messages.annonceLeboncoin')}</>
           : <>{tr('messages.extensionInstalleeReleve2')} <b>{tr('messages.statistiques')}</b> {tr('messages.annonceLeboncoin2')}</>}

@@ -111,7 +111,9 @@ async function controles(SRC, dit) {
     dit(/releve = versementsDuReleveVerifies\(releveL, rows\)/.test(corps) && /porterVerifReleve\(datesDeVersement\(rows, releve, convL, emailsL\), releve\)/.test(corps), '9. l’app (`fetchVersementsVinted`) passe par la voie VÉRIFIÉE, avec les détails 450 qu’elle a lus');
     dit(/ad\.releve = rv/.test(app) && /relevesNonVerifies\(versements, nomDe\)/.test(app), '9. Ventes publie les relevés pas encore vérifiés (`aDater.releve`)');
     const compta = fs.readFileSync(path.join(RACINE, 'src', 'ecrans', 'Compta.jsx'), 'utf8');
-    dit(/data-adater-raison="releve-non-verifie"/.test(compta) && /compta\.releveAVerifier/.test(compta) && /compta\.releveDesaccord/.test(compta), '9. « Déclarer » le dit (par tr())');
+    // (15 nov., extension 5.390) « Déclarer » ne dit plus le détail du relevé (aucun geste, une ligne discrète) ;
+    // rien n'est daté par un relevé pas vérifié — la règle ci-dessus le prouve.
+    dit(!/data-adater-raison/.test(compta) && /<LigneDatesVersement /.test(compta), '9. « Déclarer » : une ligne discrète, plus la carte des raisons (5.390)');
   });
 }
 

@@ -151,7 +151,7 @@ export function ImportStockReglage({ outils, Bouton, Segmente }) {
             {champsDe(mode).map((c) => <li key={c} data-imps-attendue={c}>{noms[c]}{OBLIGATOIRES[mode].includes(c) ? '' : ' · facultatif'}</li>)}
           </ul>
           <p className="vrm-imps-note">{mode === 'ventes'
-            ? 'Le chiffre d’affaires déclaré reste daté au jour du versement : une vente sans date de versement est « à dater », dans aucun mois.'
+            ? 'Le chiffre d’affaires déclaré reste daté au jour du versement : une vente sans date de versement n’est dans aucun mois tant que la date n’est pas lue.'
             : 'Un N° qui existe déjà dans VRM n’est jamais écrasé ni renuméroté : il est montré en conflit.'} Rien n’est enregistré avant ton «&nbsp;Importer&nbsp;».</p>
         </>
       )}
