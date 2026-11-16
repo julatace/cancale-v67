@@ -11,7 +11,7 @@ require('./_porte-banc.cjs');
 //  T  Ma journée : la ligne « N choses à trancher » (`data-job="a-trancher"`, `data-n`) ne compte PAS ce qu'une autre
 //     carte de Ma journée dit déjà (N° à écrire, annonces sans prix d'achat, colis à vérifier… `JOB_SOURCE`) ;
 //  V  Ma journée : « Colis à vérifier » dit le GESTE (`data-job-geste`), les raisons comptées restent en infobulle ;
-//  E  Ventes · À expédier : aucun titre coupé en une ligne (deux lignes au plus, rien de caché à droite) ;
+//  E  Ventes · À expédier : aucun titre coupé (il se lit en entier, règle de bancs-rouges-b fusionnée le 16 nov.) ;
 //  O  fiche d'un colis, feuille « Plus » : aucun pictogramme de transporteur PAS LU seul à côté du bordereau ;
 //  B  fiche d'un colis, feuille « Plus » : UN seul geste du bordereau visible (pas de tuile « Bordereau » en plus) ;
 //  S  fiche, « Tout voir » → « L'état » : une même raison n'est pas écrite sous deux chiffres.
@@ -128,8 +128,7 @@ async function defiler(pg, sel) { await pg.evaluate((s) => { const el = document
             return { n: ts.length, coupes, lignes };
           }, vis);
           console.log('   à expédier :', JSON.stringify(e));
-          dit(e.n > 0 && e.coupes.length === 0, `E ${t} — aucun titre coupé (${e.n} titres, ≤ 2 lignes)`, e);
-          dit(e.lignes.every((k) => k <= 2), `E2 ${t} — un titre tient sur deux lignes au plus`, e.lignes);
+          dit(e.n > 0 && e.coupes.length === 0, `E ${t} — aucun titre coupé (${e.n} titres)`, e);
           await capture(o.pg, `expedier-${suf}`);
           await o.pg.waitForSelector('[data-fiche-ligne]', { timeout: 30000 }).catch(() => {});
           const l = (await o.pg.$$('[data-fiche-ligne]'))[0];

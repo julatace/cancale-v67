@@ -31,7 +31,8 @@ sur la production, Vercel prod = `main`) :
    d'« Imprimer le bordereau » se tait (comme sur la ligne de vente) ; la tuile « Bordereau » ne redit plus le geste
    de la ligne (contexte colis, `FichePaire.jsx`).
 4. **« L'état »** : « achat pas relié à cette paire » sous deux chiffres ⇒ dit une fois sous le titre.
-5. **À expédier** : titres sur deux lignes au plus (plus « New Balance spezial taill… »).
+5. **À expédier** : titres coupés (« New Balance spezial taill… ») — corrigé sur `main` par bancs-rouges-b pendant ce lot
+   (titre entier) ; ma version (deux lignes) a été abandonnée au merge, le banc juge « aucun titre coupé ».
 6. **« 9 autres · Choisir »** ⇒ « 9 colis n'y sont pas · Choisir » (sous « Imprimer les N bordereaux »). 5 langues.
 
 ## Preuves
