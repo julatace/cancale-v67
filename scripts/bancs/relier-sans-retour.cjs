@@ -76,6 +76,14 @@ async function passe(b, nom, ctxOpts, sombre) {
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true,"devices":1}' }));
   await pg.goto(`http://localhost:${PORT}/?tab=ventes&site=vinted`, { waitUntil: 'domcontentloaded' });
+  // (16 nov., train) Depuis « Ventes plus clair » (#1202), Ventes s'ouvre sur « À envoyer » : la vente livrée du
+  // banc est sous « Toutes » (le segment, comme le banc ventes-clair).
+  await pg.waitForSelector('[data-ventes-seg-choix="toutes"]', { timeout: 20000 }).catch(() => {});
+  await pg.evaluate(() => { const b = document.querySelector('[data-ventes-seg-choix="toutes"]'); if (b) b.click(); });
+  // … et sur la ligne, « Relier un achat » vient avec la saisie : la puce « Prix d'achat ? » l'ouvre (CoutAchatVente).
+  const puce = pg.locator('[data-cout-vente="ligne"] [data-cout-vente-saisir]').first();
+  await puce.waitFor({ timeout: 25000 }).catch(() => {});
+  if (await puce.count()) await puce.click().catch(() => {});
   const bouton = pg.locator('[data-cout-vente-relier]').first();
   await bouton.waitFor({ timeout: 25000 }).catch(() => {});
   dit(await bouton.count() > 0, `${nom} · « Relier un achat » visible sur la vente sans prix`);
