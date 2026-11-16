@@ -95,6 +95,9 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { ko++; n++; con
   // (15 nov., sites sur la case) La règle de Vestiaire importée par stockAnnonces.js : api/_lib copié tel quel.
   fs.mkdirSync(path.join(dir, 'api', '_lib'), { recursive: true });
   for (const f of fs.readdirSync(path.join(R, 'api', '_lib'))) if (f.endsWith('.js')) fs.copyFileSync(path.join(R, 'api', '_lib', f), path.join(dir, 'api', '_lib', f));
+  // (16 nov., lot retirer-case-compact) api/_lib importe aussi des règles de src/ (argent-notif.js → src/alertesSeuils.js) :
+  // les modules purs de src/ (premier niveau) sont copiés tels quels — ceux de FICHIERS sont réécrits plus bas (mutation).
+  for (const f of fs.readdirSync(path.join(R, 'src'))) if (/\.(js|mjs)$/.test(f)) fs.copyFileSync(path.join(R, 'src', f), path.join(dir, 'src', f));
   const texte = {};
   for (const f of FICHIERS) { const p = path.join(R, f); texte[f] = fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : null; }
   if (mut) {

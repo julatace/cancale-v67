@@ -1228,7 +1228,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       onFermer={() => { setInventaire(false); if (retourAnnuel.current) { retourAnnuel.current = false; setAnnuel(true); } }}
       onFiche={(n) => { try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(n) })); } catch (_) {} }}
       onVoirCase={(k) => { const f = ficheDe(k); setInventaire(false); montrer(f ? { ...f, numero: f.numero } : { numero: k }); }}
-      peutSortir={(k) => !!ficheDe(k)} onSortir={(k) => { const f = ficheDe(k); if (f) sortir({ ...f, id: f.id, numero: f.numero, title: f.title || '' }); }}/>;
+      peutSortir={(k) => !!ficheDe(k)} onSortir={(k) => { const f = ficheDe(k); if (f) sortirAnnulable({ ...f, id: f.id, numero: f.numero, title: f.title || "" }); }}/>;
   })() : null;
 
   // (5 nov.) Qui découvre : l'explication animée (données inventées), puis le
