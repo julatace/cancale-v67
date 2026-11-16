@@ -1172,7 +1172,9 @@ export function texteMatin({ overdue, aVerifier = 0, dueToday, dueTomorrow, ebay
   return {
     title: nePasPoster && !total ? 'Commande eBay : ne poste pas' : overdue ? 'Colis en retard à expédier' : 'Colis à expédier',   // (8 nov.) le retard DANS le titre, sans emoji
     // (15 nov.) « Ouvre l'app… » seulement s'il tient dans les 90 caractères (le toucher l'ouvre de toute façon).
-    body: ((b0, fin) => (b0 + fin).length <= 90 ? b0 + fin : b0)((corps + estime + stop).trim(), ebayDus || vestiaireDus || nePasPoster ? " Ouvre l'app pour les voir." : " Ouvre l'app pour les préparer."),
+    // (16 nov.) « ne poste pas » ne tombe JAMAIS sous la coupe des 90 : s'il ne tient pas avec le détail, le détail part
+    // (il est dans l'app) et la phrase d'annulation reste entière.
+    body: ((b0, fin) => (b0 + fin).length <= 90 ? b0 + fin : b0.length <= 90 || !stop ? b0 : ((total > 0 ? `${quoi}.` : '') + stop).trim())((corps + estime + stop).trim(), ebayDus || vestiaireDus || nePasPoster ? " Ouvre l'app pour les voir." : " Ouvre l'app pour les préparer."),
   };
 }
 

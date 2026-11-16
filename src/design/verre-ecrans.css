@@ -93,6 +93,9 @@
 :root:root:root body .vg-a-urssaf { position: relative; margin-top: 10px; padding: 12px 14px !important; }
 :root:root:root body .vg-a-urssaf .vg-a-case-corps { padding-right: 0 !important; }
 :root:root:root body .vg-a-urssaf-tete { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; width: 100%; }
+/* (16 nov., stabilite-iphone — capture de Julien) « URSSAF · à déclarer pour octob… » coupé à 390 px : le titre passe à la ligne
+   (jamais coupé au milieu d'un mot), l'échéance garde sa colonne à droite. */
+:root:root:root body .vg-a-urssaf-tete > .vg-ds { flex: 1 1 auto; min-width: 0; white-space: normal !important; overflow: visible !important; text-overflow: clip !important; overflow-wrap: normal; }
 :root:root:root body .vg-a-echeance { flex: none; margin-top: 2px; font: 700 13px/1.25 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-ambre) !important; text-align: right; max-width: 50%; }
 :root:root:root body .vg-a-urssaf-pied { margin-top: 6px; font-size: 12.5px !important; }
 :root:root:root body .vg-a-urssaf:has(.vg-a-declare) .vg-a-urssaf-pied { padding-right: 132px; }

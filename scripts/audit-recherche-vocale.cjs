@@ -77,7 +77,8 @@ async function audit(src, bavard) {
   dit(/const dicterRecherche = \(t\) => \{ (?:\{ const vm = ventesDuMois\(t\);[^\n]*\n\s*)?const r = requeteDeLaVoix\(t\);[\s\S]{0,700}?setGsQ\(r\.requete\)/.test(code),'la barre de recherche pose la requête lue par `requeteDeLaVoix`');
   dit(/const micLoupe = <MicDictee nu canal="loupe"[^>]*onText=\{dicterRecherche\}/.test(code) && (code.match(/\{micLoupe\}/g) || []).length === 2, 'le micro est dans la barre, sur ordinateur ET au téléphone');
   dit(/if \(!DICTEE_OK \|\| refus\) return null;/.test(code) && /typeof \(window\.SpeechRecognition \|\| window\.webkitSpeechRecognition\) === 'function'/.test(code), 'sans l’API, ou micro refusé : pas de bouton');
-  dit(/rec\.lang = 'fr-FR'/.test(MOTEUR), 'reconnaissance en fr-FR (le moteur commun)');
+  // (16 nov.) Depuis la traduction, la langue de l'app passe au moteur (« de-DE »…) ; le repli reste fr-FR.
+  dit(/rec\.lang = 'fr-FR'/.test(MOTEUR) || /rec\.lang = \/\^\[a-z\]\{2\}-\[A-Z\]\{2\}\$\/\.test\(String\(lang \|\| ''\)\) \? lang : 'fr-FR';/.test(MOTEUR), 'reconnaissance en fr-FR (le moteur commun ; la langue de l’app sinon)');
   dit(![code, MOTEUR].some((c) => /fetch\([^)]*(speech|whisper|transcri|audio)/i.test(c) || /MediaRecorder|getUserMedia/.test(c)), 'aucun son enregistré ni envoyé à un service (ni MediaRecorder, ni appel de transcription)');
   console.log(ko ? `\n❌ audit-recherche-vocale : ${ko} rouge(s)` : '\n✅ audit-recherche-vocale : tout vert');
   process.exit(ko ? 1 : 0);

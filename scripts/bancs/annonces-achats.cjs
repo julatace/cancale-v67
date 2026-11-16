@@ -49,7 +49,7 @@ const photoUrl = (k) => `https://images1.vinted.net/t/${k}_d/f800/${k}.jpeg`;
 const ANNONCES = [
   // [id, titre, marque, taille, prix, N°, jours en ligne, photo ?]
   ['71001', 'Adidas Handball Spezial chunky Brown taille 42 édition limitée très rare', 'Adidas', '42', 85, '132', 30, true],
-  ['71002', 'Nike Air Max 1 Monarch homme pointure 44 état neuf avec sa boîte', 'Nike', '44', 84, '136', 29, true],
+  ['71002', 'Nike Air Max 1 Monarch blanc homme pointure 44 état neuf avec sa boîte', 'Nike', '44', 84, '136', 29, true],
   ['71003', 'Adidas Samba blanc/argenté taille 39 femme', 'Adidas', '39', 53, '150', 28, true],
   ['71004', 'Chaussures de basketball Puma MB.01 LaMelo Ball Rick and Morty pointure 45', 'Puma', '45', 70, '151', 27, false],
   ['71005', '3 manuels première maths physique chimie', '', '', 50, 'B188', 26, true],
@@ -69,11 +69,12 @@ const listing = ([id, titre, marque, taille, prix, , jours, ph]) => ({ ...sc.ann
 const achat = (tx, titre, prix, jours, ph) => ({ ...sc.ordre({ tx, titre, prix, statut: sc.STATUT_FINAL, dateMs: sc.NOW - jours * J }), ...(ph ? { photo: { url: photoUrl('h' + tx) } } : {}) });
 const ACHATS = [
   achat('92000001', 'Adidas Handball Spezial marroni usate 42', 43.67, 60, true),   // (15 nov., liaison) « nere » (noir) contredit « Brown » : la règle pondérée l'écarte
-  achat('92000002', 'Nike Air Max 1 Monarch 44', 19.05, 70, true),
+  // (16 nov., relier-fiable) « très probable » (la seule montrée) exige la taille ET la couleur des deux côtés.
+  achat('92000002', 'Nike Air Max 1 Monarch blanche 44', 19.05, 70, true),
   // (15 nov.) Deux achats que la règle §5 ÉCARTE (captures de Julien) : aucun mot de modèle commun, marque contredite.
   achat('92000005', 'Basket Nike 44', 15, 75, true),
   achat('92000006', '#Adidas Spezial, dunkelblau, Gr. 36', 21, 80, true),
-  achat('92000003', 'New Balance 550 41', 52, 65, false),
+  achat('92000003', 'New Balance 550 vert 41', 52, 65, false),
   achat('92000004', 'Sac à dos en toile', 12, 50, true),
 ];
 const NUMEROS = Object.fromEntries(ANNONCES.map(([id, titre, , , prix, n]) => [id, { numero: n, title: titre, price: prix }]));

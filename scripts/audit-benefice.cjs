@@ -287,7 +287,7 @@ essaie('le code', () => {
   const pubI = src.indexOf("save('vrm_benefice_jours'");
   const pub = pubI >= 0 ? src.slice(Math.max(0, pubI - 1500), pubI) : '';
   dit(/ajouterVenteBenefice\(/.test(pub) && /achatDe\(e\)/.test(pub), 'la publication par jour utilise la même règle et la même lecture du prix d’achat');
-  dit(/'vrm_benefice_jours'/.test(src.slice(src.indexOf('const SYNC_KEYS'), src.indexOf('const SYNC_KEYS') + 20000)), 'la publication est synchronisée (elle arrive sur un autre appareil)');
+  dit(/'vrm_benefice_jours'/.test(src.slice(src.indexOf('const SYNC_KEYS'), src.indexOf('\n];', src.indexOf('const SYNC_KEYS')))), 'la publication est synchronisée (elle arrive sur un autre appareil)');
   dit(!/pas encore ton bénéfice net/.test(src), 'la phrase « ce n’est donc pas encore ton bénéfice net » a disparu');
   // (19 oct., suite) Leboncoin et eBay : la même règle, et aucune ressemblance.
   dit(/for \(const x of \(autresBenefice \|\| \[\]\)\)[^\n]*ajouterVenteBenefice\(acc, x\.eur, x\.achat, x\.frais, x\.plateforme\)/.test(t), 'l’écran Ventes ajoute Leboncoin et eBay par la même règle');

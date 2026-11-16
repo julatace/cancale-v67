@@ -459,6 +459,17 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
 :root:root:root:root body .vrm-app-shell > .vrm-app-header .vrm-header-actions :is(button.vrm-hbtn, .vrm-cn-cloche > button, button.vrm-cn-cloche) svg { color: inherit !important; }
 /* Le fondu sous la barre : vers le bas du dégradé. */
 :root:root:root body .vrm-app-shell .vrm-tabbar.vrm-tabbar::before { background: linear-gradient(to bottom, transparent, color-mix(in oklab, var(--sv-bas) 70%, transparent) 78%) !important; }
+/* (16 nov., stabilite-iphone — « l'app bug un peu » sur iPhone) LE VERRE DE LA BARRE PASSE DEVANT LE FONDU. La barre est
+   un contexte d'empilement (relative, z-index 60) : son fondu `::before` (z-index -1) se peint AU-DESSUS de son propre
+   fond. Avec le fond bleu profond, il recouvrait le verre clair : barre bleu-gris (≈ rgb 75 100 130 mesuré) et libellés
+   `--sv-onglet` à ≈ 1,6:1 — « Aujourd'hui », « Annonces », « Argent » presque invisibles. Le verre est peint par
+   `::after` (même couche, après le fondu dans l'ordre du document) ; le fond de la barre garde son verre (le flou de
+   `backdrop-filter` reste celui de la barre) : la barre redevient le verre clair de la maquette, au-dessus du fondu.
+   Banc : scripts/bancs/stabilite-iphone.cjs (S10, mesuré sur les PIXELS de la capture). */
+:root:root:root body .vrm-app-shell .vrm-tabbar.vrm-tabbar::after {
+  content: "" !important; display: block !important; position: absolute !important; inset: 0 !important; z-index: -1 !important;
+  border-radius: inherit !important; background: var(--sv-verre-barre) !important; pointer-events: none !important;
+}
 :root:root:root body .vrm-app-shell .vrm-tabbar .vrm-nav-badge-barre.vrm-nav-badge-n { color: #FFFFFF !important; box-shadow: 0 0 0 2px var(--sv-verre-barre) !important; }
 :root:root:root[data-theme="dark"] body .vrm-app-shell .vrm-tabbar .vrm-nav-badge-barre.vrm-nav-badge-n { color: #0C1D30 !important; }
 
@@ -643,6 +654,10 @@ html[data-sb-eventail] body .vrm-neuf-hote { visibility: hidden !important; }
     background: var(--rv-pastille) !important; color: var(--rv-pastille-t) !important; font: 700 11.5px/22px Inter, system-ui, sans-serif !important; text-align: center !important; box-shadow: none !important;
   }
   :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-pied { margin-top: auto !important; border-top: 1px solid var(--rv-filet) !important; padding-top: 8px !important; background: transparent !important; box-shadow: none !important; }
+  /* (16 nov., parcours-vert) Fenêtre basse (1280 × 620, banc navigation-plateformes) : le pied (Paramètres, le compte)
+     passait sous le bas de l'écran. Le rail défile, son pied reste collé en bas, toujours joignable. */
+  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] { overflow-y: auto !important; overscroll-behavior: contain; scrollbar-width: none; }
+  :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] > .vrm-rail-pied { position: sticky !important; bottom: -12px !important; z-index: 1; padding-bottom: 12px !important; background: var(--rv-fond) !important; }
   :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-compte { background: transparent !important; box-shadow: none !important; color: var(--rv-encre) !important; }
   :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-compte-nom { font: 700 13.5px/1.25 Inter, system-ui, sans-serif !important; color: var(--rv-encre) !important; }
   :root:root:root:root:root:root body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-compte-sous { font: 550 12px/1.25 Inter, system-ui, sans-serif !important; color: var(--rv-gris) !important; }
@@ -666,4 +681,89 @@ html[data-sb-eventail] body .vrm-neuf-hote { visibility: hidden !important; }
   :root:root:root:root:root:root:root body .vrm-app-shell:has(nav.vrm-sidebar[data-rail-verre]) main.vrm-main { margin-left: 112px !important; }
 }
 
+/* ══ 12 bis. LE FLOU SEULEMENT LÀ OÙ IL SE VOIT (16 nov., stabilite-iphone — « l'app bug énormément ») ══════════
+   Mesuré sur l'iPhone de Julien (mesures_jour_2026-11-16, Ventes · téléphone · réponse au toucher) : 7 touchers sur 9
+   entre 1,25 et 4 s, contre 650 ms au pire la veille. Ventes portait DEUX `backdrop-filter: blur(24px) saturate(175%)`
+   sur ses LISTES entières (À envoyer : 358 × 3 067 px mesurés ; Toutes les ventes : une rangée par vente) et un
+   `blur(18px)` sur le segment : sous WebKit, un flou se recalcule sur toute sa surface à chaque image et à chaque
+   rendu de la liste. Ces trois éléments ne flottent pas : ils sont posés sur le dégradé lisse du fond, où le flou ne
+   change rien à l'œil (même principe que les cartes, §« La vitesse » du récit Verre dépoli). Leur verre (même couleur,
+   mêmes bords, même ombre) reste ; le flou part. Il reste là où le contenu passe DESSOUS : la barre du bas, la tête au
+   défilement, la pastille « Mis à jour », les filtres collés d'Achats, les ronds de la tête. */
+:root:root:root body .vrm-app-shell .vrm-main :is(.vrm-colis-grille, .vrm-toutes-liste, .vv-seg, .vv-liste) { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+/* (16 nov., stabilite-iphone) « Novembre · Vinted », « Depuis le début · eBay » et « Modifier » de la carte d'action
+   (posée sur le fond) : blanc à 66 % (`--p-nuit-texte-2`, la carte de nuit d'avant le verre) sur le haut éclairé du
+   dégradé = 3,23:1 (banc stabilite-iphone S3). Le gris clair du verre posé sur le fond (`--sv-clair-2`, ≥ 4,5:1). */
+:root:root:root body .vrm-app-shell[data-espace] .vrm-fu-carte.a-action > :is(.vrm-fu-carte-haut, .vrm-fu-carte-tete) { --p-nuit-texte-2: var(--sv-clair-2) !important; --fu-sur-sombre-2: var(--sv-clair-2) !important; }   /* + « vendu » (`.vrm-fu-sous-nom`, blanc à 70 % : 3,43:1 sous WebKit) */
+
+/* (16 nov., stabilite-iphone — capture de Julien PENDANT le chargement de Ma journée : « c'est moche ») LA RANGÉE DE
+   CHIFFRES garde sa forme pendant que les données arrivent : chaque case reste dans SA colonne (rien ne déborde chez la
+   voisine : « 2 87⁠1062 € », deux montants peints au même endroit), le libellé passe à la ligne au lieu d'être coupé
+   (« Bén… Ven… Reç… ») ; le grand chiffre, lui, se réduit déjà pour tenir (`ajusterChiffre`). */
+@media (max-width: 743px) {
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-fu-cases > .vrm-fu-case { min-width: 0 !important; overflow: hidden !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-fu-cases > .vrm-fu-case > :is(b, [data-fu-case-chiffre]) { max-width: 100% !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-fu-cases > .vrm-fu-case > :is(span:not(.vrm-sr-seul), small) { white-space: normal !important; text-overflow: clip !important; overflow-wrap: normal !important; overflow: visible !important; min-width: 0 !important; }   /* le libellé (après le chiffre) passe à la ligne : jamais « Bénéfice · mo » rogné */
+}
+/* Posés SUR LE FOND pendant la lecture (banc stabilite-iphone, base lente) : « Je lis tes annonces Vinted, Leboncoin… »
+   du Stock (gris sombre sur le bleu : 1,05:1 lu sur la capture) et l'en-tête « Pour mieux acheter » d'Achats (1,5:1) —
+   le gris clair du verre posé sur le fond ; dans une feuille ou une carte, rien ne change. */
+:root:root:root body .vrm-app-shell[data-espace] .vrm-main :is(.vrm-ms-stock-resume .vrm-s2d-resume-l, .vrm-plus-entete):not(:is(.vrm-fs, [role="dialog"], .vrm-surface, .sb-plan, .vrm-reglages-groupe, .vrm-set-liste) *) { color: var(--sv-clair-2) !important; }
+:root:root:root body .vrm-app-shell[data-espace] .vrm-main .vrm-ms-stock-resume .vrm-s2d-resume-l b { color: var(--sv-clair) !important; }
+/* LES SQUELETTES DE CHARGEMENT ont la matière des cartes qu'ils annoncent : le verre (translucide, même ombre), plus
+   jamais une plaque blanche opaque sur le bleu (Ventes, Achats : `.vrm-skeleton-element` en blanc plein, banc S12).
+   Les barres grises : l'encre du verre, très légère. `prefers-reduced-motion` : aucun reflet animé (styles-mineral.css). */
+:root:root:root body .vrm-app-shell[data-espace] .vrm-skeleton-element { background: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; border-color: transparent !important; box-shadow: var(--sv-ombre) !important; border-radius: 22px !important; }
+:root:root:root body .vrm-app-shell[data-espace] .vrm-skeleton-element .vrm-skeleton-reflet { background: color-mix(in oklab, var(--sv-encre) 12%, transparent) !important; }
+
+/* Les RANGÉES des listes de Ventes, au téléphone : une rangée hors de l'écran n'est ni mise en page ni peinte
+   (`content-visibility: auto`, Safari 18+), sa hauteur est retenue après son premier affichage (`auto`). Ventes
+   rend ~90 rangées (≈ 6 900 nœuds) : chaque vague de données et chaque toucher recalculait TOUT l'écran.
+   Mesuré (base inventée, Chromium, même page) : recalcul complet de l'écran 934 ms → 248 ms ; même rendu à
+   l'écran (écart moyen 0,04 à 0,17 / 255 en haut de liste). Hauteurs de départ : les médianes mesurées. */
+@media (max-width: 743px) {
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row { content-visibility: auto; contain-intrinsic-size: auto 116px; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-colis-grille .vrm-colis-carte { content-visibility: auto; contain-intrinsic-size: auto 109px; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-toutes-ligne { content-visibility: auto; contain-intrinsic-size: auto 72px; }
+}
+
+/* ══ 13. eBAY : CE QUI EST FAIT POUR UNE CARTE CLAIRE A SA CARTE (16 nov., stabilite-iphone) ══════════════
+   Capture de Julien (iPhone) : Ventes · eBay → « À traiter » — « Retours et annulations », « Tâches à traiter »,
+   « Évaluations à laisser », « Vendue ? Comment faire ? », « Retours : … » posés DIRECTEMENT sur le bleu, à l'encre
+   sombre du thème eBay (`EBAY_SKIN`, des couleurs EN LIGNE) : 1,2 à 1,7:1 mesuré. Ces écrans (À traiter, Offres,
+   Promotion) et ces lignes (les guides « Comment faire ? » des commandes, « Aucun brouillon eBay ») sont dessinés pour une
+   surface claire : ils retrouvent LA carte de verre (même verre, même rayon, même ombre que les panneaux), leur encre
+   sombre y tient l'AA (banc stabilite-iphone S3 et S10, sur le fond réel). Le reste de l'écran (tête, onglets, tuiles)
+   est inchangé. */
+:root:root:root body .vrm-app-shell[data-espace] :is(.vrm-ebay-panneau, .vrm-ebay-sales > [data-ebay-guides], [data-ebay-brouillons]) {
+  background: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; border-radius: 22px !important;
+  box-shadow: var(--sv-ombre) !important; color: var(--sv-encre) !important;
+}
+:root:root:root body .vrm-app-shell[data-espace] .vrm-ebay-panneau { margin: 0 16px 16px !important; width: auto !important; max-width: calc(100% - 32px) !important; box-sizing: border-box !important; }
+/* le lien « Comment faire ? » sur ce verre : le lien du verre (5,5:1), pas le bleu du thème eBay (4,4:1) */
+:root:root:root body .vrm-app-shell[data-espace] :is(.vrm-ebay-panneau, .vrm-ebay-sales > [data-ebay-guides]) [data-ebay-guides] button, :root:root:root body .vrm-app-shell[data-espace] .vrm-ebay-sales > [data-ebay-guides] button { color: var(--sv-lien) !important; }
+:root:root:root body .vrm-app-shell[data-espace] .vrm-ebay-sales > [data-ebay-guides] { padding: 8px 14px !important; margin: 0 0 12px !important; }
+:root:root:root body .vrm-app-shell[data-espace] [data-ebay-brouillons] { padding: 14px 16px !important; }
+
+/* (16 nov., stabilite-iphone, passe de contraste) Le nombre d'annonces du sélecteur de sites (« 999+ ») : le gris du verre à
+   78 % d'opacité sur la pastille claire = 4,03:1 (banc S3, Annonces · Leboncoin) ; plein, il tient l'AA. */
+:root:root:root body .vrm-app-shell[data-espace] .vrm-sel-sites .vrm-ss-n { opacity: 1 !important; }
+/* (16 nov., stabilite-iphone — capture de Julien à 15 h 34, Ma journée PENDANT le chargement : c'est L'INSTANTANÉ,
+   src/JourneeInstantanee.jsx, les derniers chiffres montrés le temps de tout relire)
+   · la « prochaine chose » est posée dans la tête (encre claire du §6) : sur sa carte claire, « 30 colis à envoyer » et
+     « Vérification… » sortaient en blanc sur le verre (illisibles), l'icône blanche sur sa case blanche (« carré vide ») ;
+     la carte remet l'encre du verre ;
+   · le grand chiffre à 78 % d'opacité (« 62 € » délavé) : plein — « Mis à jour il y a… » dit déjà qu'il est ancien ;
+   · les squelettes (`.vrm-sq-carte`, « Ensuite · 6 gestes ») : la carte de verre, plus une plaque blanche opaque. */
+:root:root:root:root body .vrm-app-shell .vrm-ji .vrm-jv2-prochain .vrm-day-task,
+:root:root:root:root body .vrm-app-shell .vrm-ji .vrm-jv2-prochain .vrm-day-task :is(.vrm-day-task-title, svg, .vrm-pile-icone, .vrm-pile-icone *) { color: var(--sv-encre) !important; }
+:root:root:root:root body .vrm-app-shell .vrm-ji .vrm-jv2-prochain .vrm-day-task :is(.vrm-day-task-note, .vrm-ji-geste, .vrm-ji-geste *) { color: var(--sv-encre-2) !important; opacity: 1 !important; }
+:root:root:root:root body .vrm-app-shell .vrm-ji .vrm-ji-chiffres .vrm-fu-grand { opacity: 1 !important; }
+:root:root:root:root body .vrm-app-shell .vrm-ji :is(.vrm-fu-phrase-tete, .vrm-jv2-jour > span) { color: var(--sv-clair-2) !important; opacity: 1 !important; }   /* la phrase et les lettres des jours, délavées (55–70 % de blanc : 2,7 à 3,4:1) : comme l'écran vrai */
+:root:root:root body .vrm-app-shell .vrm-sq-carte:not(.is-sombre) { background: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; border-color: transparent !important; box-shadow: var(--sv-ombre) !important; border-radius: 22px !important; }
+:root:root:root body .vrm-app-shell .vrm-sq-carte:not(.is-sombre) .vrm-sq-barre { background: color-mix(in oklab, var(--sv-encre) 12%, transparent) !important; }
+/* La rangée de trois chiffres du mois : les colonnes .9 / 1 / 1,4 étaient taillées pour « Vendu · Reçu · Bénéfice » ;
+   dans SON ordre (« Bénéfice » d'abord, sa capture) le libellé insécable « Bénéfice · mois » (90 px) débordait de sa
+   colonne de 69 px et se faisait rogner. Chaque colonne fait au moins la largeur de son libellé, le reste se partage. */
+:root:root:root:root:root:root:root body .vrm-app-shell .sj-journee :is(.sj-t-mois, [data-ji-cases]) .vrm-fu-cases:has(> .vrm-fu-case:nth-child(3):last-child) { grid-template-columns: repeat(3, minmax(min-content, 1fr)) !important; }
 } /* fin de @layer vrm-verre */
