@@ -1,6 +1,13 @@
 {
   "_lire": "Les audits ROUGES CONNUS, hors du périmètre d'une fusion ordinaire. Ils restent LANCÉS par scripts/lancer-audits.cjs (rapportés « rouge connu ») mais ne bloquent pas la fusion. Chaque entrée dit pourquoi et depuis quand ; le jour où l'audit repasse au vert, le lanceur dit « exception à retirer ». Ne jamais ajouter une exception pour faire passer une PR : corriger l'audit ou le code.",
   "exceptions": [],
-  "_lire_bancs": "Les bancs ROUGES CONNUS (scripts/lancer-bancs.cjs) : seulement les lignes rouges qui répondent à `rouges` ; une ligne rouge nouvelle rend le banc rouge pour de bon.",
-  "bancs": []
+  "_lire_bancs": "Les bancs ROUGES CONNUS (scripts/lancer-bancs.cjs) : seulement les lignes rouges qui répondent à `rouges` ; une ligne rouge nouvelle rend le banc rouge pour de bon. `navigateur` (facultatif, « webkit ») : l’exception ne vaut que sous ce moteur ; sans lui, sous Chromium seulement. (16 nov., lot anti-bug) Ces listes rendent les bancs WebKit et e2e-extension BLOQUANTS pour toute ligne rouge NOUVELLE ; chaque entrée nomme le lot qui la répare.",
+  "bancs": [
+    {
+      "banc": "e2e-extension",
+      "raison": "rouge sur main : l’app ne dit pas le plafond plein / la pause après un 429 (scénario 4) — réparé par la PR #1203 (bancs-rouges-b)",
+      "depuis": "2026-11-16",
+      "rouges": "^4 : (l’app dit le plafond|un 429 de Vinted pose la pause)"
+    }
+  ]
 }

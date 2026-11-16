@@ -409,7 +409,7 @@ const blanc = (c) => { const x = rgb(c); return !!x && x[0] > 235 && x[1] > 235 
   // ── 9. (16 nov., lot anti-bug) Ouverte, VISIBLE, sur Ventes, pendant la mise en ligne ─────────────────────
   //  9a  au calme (aucun geste depuis 30 s, aucune feuille) : rechargée TOUTE SEULE sur la nouvelle version,
   //      toujours sur Ventes, une seule fois, aucune erreur ;
-  //  9b  « Plus » ouvert (une feuille) : JAMAIS rechargée dessous — la pilule « Mettre à jour » à la place ;
+  //  9b  la feuille du « + » ouverte : JAMAIS rechargée dessous — la pilule « Mettre à jour » à la place ;
   //  9c  un champ en cours de saisie : jamais rechargée, la pilule.
   for (const cas of ['9a', '9b', '9c']) {
     if (veut(9) || veut(cas)) await essaie(cas + ' nouvelle version, app ouverte', async () => {
@@ -419,10 +419,11 @@ const blanc = (c) => { const x = rgb(c); return !!x && x[0] > 235 && x[1] > 235 
       await pg.goto(URL0, { waitUntil: 'commit' });
       await attendrePret(pg);
       await aller(pg, 'ventes'); await attendre(2500);
-      if (cas === '9b') await pg.evaluate(() => { const b = [...document.querySelectorAll('.vrm-nav-more')].find((x) => x.getBoundingClientRect().width > 0); if (b) b.click(); });
+      // 9b : la feuille du « + » de la barre du bas (une feuille de l'app : FermeAuRetour, entrée d'historique).
+      if (cas === '9b') await pg.locator('.vrm-tabbar button[aria-label*="Ajouter"], .vrm-tabbar button[aria-haspopup]').first().click({ timeout: 8000 });
       if (cas === '9c') await pg.evaluate(() => { const i = document.createElement('input'); i.type = 'text'; i.setAttribute('data-banc-saisie', '1'); i.style.cssText = 'position:fixed;top:0;left:0;width:10px;height:10px;opacity:.01'; document.body.appendChild(i); i.focus(); });
       await attendre(500);
-      const avant = await pg.evaluate(() => ({ ecran: (document.querySelector('main.vrm-main') || {}).getAttribute ? document.querySelector('main.vrm-main').getAttribute('data-ecran') : null, feuille: !!document.querySelector('.vrm-sheet') })).catch(() => ({}));
+      const avant = await pg.evaluate(() => ({ ecran: (document.querySelector('main.vrm-main') || {}).getAttribute ? document.querySelector('main.vrm-main').getAttribute('data-ecran') : null, feuille: !!document.querySelector('.vrm-sheet') || !!(history.state && history.state.vrmFeuille) })).catch(() => ({}));
       site.dist = DIST_B;   // la mise en ligne
       // 35 s sans aucun geste, puis les vérifications que la page fait d'elle-même (minute, retour au premier plan).
       await attendre(35000);
@@ -431,14 +432,14 @@ const blanc = (c) => { const x = rgb(c); return !!x && x[0] > 235 && x[1] > 235 
       if (cas === '9a') await attendrePret(pg, 30000).catch(() => {});
       await attendre(2500);
       const v = await versionDe(pg);
-      const apres = await pg.evaluate(() => ({ ecran: document.querySelector('main.vrm-main') ? document.querySelector('main.vrm-main').getAttribute('data-ecran') : null, pilule: !!document.querySelector('[data-maj-dispo]'), feuille: !!document.querySelector('.vrm-sheet'), saisie: !!document.querySelector('[data-banc-saisie]') })).catch(() => ({}));
+      const apres = await pg.evaluate(() => ({ ecran: document.querySelector('main.vrm-main') ? document.querySelector('main.vrm-main').getAttribute('data-ecran') : null, pilule: !!document.querySelector('[data-maj-dispo]'), feuille: !!document.querySelector('.vrm-sheet') || !!(history.state && history.state.vrmFeuille), saisie: !!document.querySelector('[data-banc-saisie]') })).catch(() => ({}));
       if (DEBUG) console.log('   ' + cas + ' avant ' + JSON.stringify(avant) + ' après ' + JSON.stringify(apres) + ' chargements ' + vu.navs + ' ' + vu.versions.join(' > ') + '\n   film : ' + vu.film.join(' | '));
       if (cas === '9a') {
         dit(avant.ecran === 'ventes' && v === vB, '9a au calme, sans feuille : rechargée TOUTE SEULE sur la nouvelle version', 'version ' + v + ' (attendue ' + vB + ')');
         dit(apres.ecran === 'ventes', '9a l’écran courant est gardé (Ventes)', 'écran ' + apres.ecran);
         dit(vu.navs === 2, '9a une seule fois (pas de boucle)', vu.navs + ' chargement(s)');
       } else {
-        const quoi = cas === '9b' ? 'une feuille ouverte (« Plus »)' : 'un champ en cours de saisie';
+        const quoi = cas === '9b' ? 'une feuille ouverte (« + »)' : 'un champ en cours de saisie';
         dit(cas === '9b' ? avant.feuille === true : true, cas + ' la scène : ' + quoi, JSON.stringify(avant));
         dit(v === vA && vu.navs === 1, cas + ' ' + quoi + ' : JAMAIS rechargée dessous', 'version ' + v + ', ' + vu.navs + ' chargement(s)');
         dit(apres.pilule === true, cas + ' la pilule « Nouvelle version · Mettre à jour » à la place', JSON.stringify(apres));
