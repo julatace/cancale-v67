@@ -63,10 +63,9 @@ export const CARTES_JOURNEE = [
   // (11 nov.) « Supprimés de Vinted » n'est plus une carte : ces articles vivent dans « À trancher » (lot DJ4).
   { id: 'autres', zone: 'afaire', nom: 'Les autres rappels', desc: 'Litiges, achats à relier, inventaire…' },
   { id: 'urssaf', zone: 'afaire', nom: 'Déclaration URSSAF', desc: 'L’échéance qui approche.' },
-  // (16 nov., lot personnalisation-simple — Julien : la carte « 3 ventes · à sortir dans cet ordre » ne doit PAS être tout
-  // en haut) « La paire à sortir » devient une carte, EN TÊTE DE « EN BAS » : sous la grille (À envoyer, À retirer, le mois)
-  // et sous « À faire », au-dessus des notifications et du guide. Il peut la cacher et la ranger dans « En bas ».
-  { id: 'sortir', zone: 'bas', nom: 'Ventes à sortir du stock', desc: 'Où est le carton de chaque vente.' },
+  // (16 nov., train — décision de Julien, capture de Ma journée : « Tu ne l'as pas enlevée ») Plus de carte « La paire à
+  // sortir » (`sortir`) : la case ALLUMÉE du Stock fait le travail (lot retirer-case-compact). Un réglage ancien qui la
+  // nomme (ordre, choix) est ignoré sans erreur : un id hors catalogue n'est jamais lu (`PAR_ID`).
   { id: 'notifs', zone: 'bas', nom: 'Notifications coupées', desc: 'Quand ce téléphone ne te prévient plus.' },
   { id: 'guide', zone: 'bas', nom: 'Démarrer avec VRM', desc: 'Les étapes qui restent.' },
 ];

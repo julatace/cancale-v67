@@ -14,7 +14,7 @@
 //     glissée en tête ; puis ↑ : une place, une seule.
 //  D  « Revenir au réglage de départ » : tout revient (ordre et choix), le bouton se grise.
 //  A  PRÉFÉRENCES ANCIENNES (venues du NUAGE, forme du 11 nov.) : son ordre et ses choix relus tels quels ; un ordre
-//     qui recopie l'ancien départ vaut le départ d'aujourd'hui (« La paire à sortir » jamais en tête).
+//     qui recopie l'ancien départ vaut le départ d'aujourd'hui ; « La paire à sortir » n'est plus une carte (16 nov., Julien).
 //  T  Les textes de l'éditeur dans une autre langue (en) : aucun mot français restant dans les noms des cartes.
 // L'arbre d'avant (BANC_DIST=<dist de main>) doit être ROUGE (aucune flèche, une phrase par carte, deux phrases d'en-tête).
 require('./_porte-banc.cjs');
@@ -226,7 +226,7 @@ async function main() {
       });
       // ── A : préférences anciennes, venues du nuage ──
       await essaie('A ' + T, async () => {
-        const ancien = { v: 1, ordre: ['frise', 'phrase', 'prochain', 'messages', 'ailleurs', 'envoyer'], choix: { prix: true, retirer: false, guide: false }, at: '2026-11-12T08:00:00.000Z' };
+        const ancien = { v: 1, ordre: ['frise', 'phrase', 'prochain', 'messages', 'ailleurs', 'envoyer', 'sortir'], choix: { prix: true, retirer: false, guide: false, sortir: true }, at: '2026-11-12T08:00:00.000Z' };   // (16 nov., train) « sortir » : une carte retirée, encore nommée par un réglage ancien
         const { ctx, pg, errs } = await preparer(b, vp, { perso: ancien });
         await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
         await attendreJournee(pg);
@@ -236,7 +236,10 @@ async function main() {
         const af = ed.zones.afaire.filter((id) => !ed.fixes.includes(id));
         dit(ed.zones.tete.join() === 'frise,phrase,prochain,chiffres' && af[0] === 'messages' && af.indexOf('ailleurs') < af.indexOf('envoyer') && ed.montrees.prix === '1' && ed.montrees.retirer === '0' && ed.montrees.guide === '0' && ed.origine === '0',
           `A ${T} réglage du 12 nov. (nuage) : son ordre et ses choix relus tels quels`, JSON.stringify({ tete: ed.zones.tete, af: af.slice(0, 4), m: [ed.montrees.prix, ed.montrees.retirer, ed.montrees.guide] }));
-        dit(ed.zones.bas && ed.zones.bas[0] === 'sortir' && !ed.zones.tete.includes('sortir'), `A ${T} « La paire à sortir » (neuve) arrive en tête de « En bas », jamais « En haut »`, JSON.stringify(ed.zones.bas));
+        // (16 nov., train — décision de Julien : « Tu ne l'as pas enlevée ») « La paire à sortir » n'est plus une carte : absente
+        // de l'éditeur et de Ma journée, même quand un réglage ancien la nomme (ignorée sans erreur).
+        const sortirLa = await pg.evaluate(() => !!document.querySelector('[data-jp-ligne="sortir"], [data-sortir], [data-sortir-geste]'));
+        dit(!Object.values(ed.zones).some((z) => (z || []).includes('sortir')) && !sortirLa, `A ${T} « La paire à sortir » n'existe plus (éditeur et écran), même nommée par un réglage ancien`, JSON.stringify({ zones: ed.zones, sortirLa }));
         dit(!errs.length, `A ${T} aucune erreur d'app`, errs.join(' | ').slice(0, 200));
         await ctx.close();
         // L'ancien départ recopié (l'ordre complet d'avant le 16 nov., sans « sortir ») vaut le départ d'aujourd'hui.

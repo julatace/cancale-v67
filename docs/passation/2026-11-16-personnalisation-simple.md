@@ -112,3 +112,9 @@ contre cette branche, les mêmes données :
   le banc touche maintenant `[data-sous-ouvrir="ma-journee"]`, la catégorie s'ouvre par `_reglages-compat.cjs`).
 - À décider par Julien (rien fait) : garder seulement « Apparence » (et retirer l'interrupteur « Mode sombre » qui redit
   la même chose) ; ranger le groupe Affichage (17 lignes).
+
+## Fusion par le train (16 nov., soir)
+Décision de Julien (capture de Ma journée : « Tu ne l'as pas enlevée ») : la carte « La paire à sortir » est SUPPRIMÉE — on garde #1197
+(`PaireASortir.jsx` supprimé, la case allumée du Stock fait la sortie). À la fusion : `sortir` retiré de `CARTES_JOURNEE`
+(un réglage ancien qui la nomme est ignoré sans erreur, `PAR_ID`) et de la grille de Ma journée ; banc `personnalisation-simple` A
+porté sur « carte absente, même nommée par un réglage ancien » ; banc `paire-a-sortir` = celui de #1197 (carte absente).

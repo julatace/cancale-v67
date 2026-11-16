@@ -44,7 +44,7 @@ const feuillesApp = () => {
 
 function Apercu({ snap, cadre }) {
   return (
-    <div className={cadre.shell} style={cadre.vars} data-ouverture-instantanee="">
+    <div className={cadre.shell} style={cadre.vars} data-espace="journee" data-ouverture-instantanee="">   {/* (16 nov.) l'espace de la coque : les règles du verre (fond, cartes, encres) s'y appliquent comme dans l'app */}
       {/* La barre fixe du haut de la coque : sa place et sa couleur seulement (ses boutons arrivent avec l'app). */}
       {cadre.haut > 0 && cadre.barre ? <div aria-hidden="true" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: cadre.haut, background: cadre.barre }}/> : null}
       <main className={cadre.main} data-ecran="journee" style={{ top: cadre.haut }}>
