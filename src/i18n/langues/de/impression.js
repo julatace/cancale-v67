@@ -11,7 +11,7 @@ export default {
   "impr.format.planche4": "4 pro A4-Seite",
   "impr.formatAria": "Papier: {format}. Ändern",
   "impr.choisir": "Auswählen",
-  "impr.choisirAutres": { one: "{n} weiteres · Auswählen", other: "{n} weitere · Auswählen" },
+  "impr.choisirAutres": { one: "1 Paket nicht dabei · Auswählen", other: "{n} Pakete nicht dabei · Auswählen" },
   "impr.choisirTitre": "Auswählen, was rausgeht",
   "impr.papier.titre": "Dein Drucker",
   "impr.papier.phrase": "Für die nächsten Male gemerkt.",

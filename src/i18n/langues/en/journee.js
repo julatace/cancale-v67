@@ -83,6 +83,8 @@ export default {
   "journee.colisRetirerAujourd": "{hd} parcels to pick up today or tomorrow",
   "journee.colisVerifier": "{x} parcels to check",
   "journee.colisVerifier2": "Parcels to check",
+  "journee.colisVerifier.suivi": { one: "Check its tracking before going to the pick-up point", other: "Check their tracking before going to the pick-up point" },
+  "journee.colisVerifier.relier": { one: "Not linked yet: open the purchase on Vinted", other: "Not linked yet: open the purchases on Vinted" },
   "journee.supprimeVinted": "No. {numero} deleted from Vinted",
   "journee.annoncesNumeroteesSans": { one: "{n} numbered listing without a purchase price", other: "{n} numbered listings without a purchase price" },
   "journee.saisisPrixRelie": "Enter the price or link the purchase (one suggestion per listing, or bulk entry)",

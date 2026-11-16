@@ -173,7 +173,7 @@ import { etatAncienne } from "./republierGuide.js";   // (15 nov.) « Republier 
 import { annuleesChezToi, paireARemettre, fichesAnciennesAnnulees, ligneJournee as ligneAnnuleesJournee, etatRemise, VERDICT_MOTEUR as VERDICT_REMISE } from "./annuleesChezToi.js";
 import { fileSansAchat, sansAchatRelie, aRelierJournee, meilleureSuggestion, texteSuggestion, cibleAnnonce } from "./achatsARelier.js";
 import { lignesManquantes as lignesPrixMiniManquants, carteJournee as carteJourneePrixMini } from "./prixMiniManquants.js";
-import { CLE_A_TRANCHER, publierSource as publierSourceTrancher, lirePublications as lirePubsTrancher, lignesATrancher, comptesARelireDe, badgeATrancher, phraseJournee as phraseATrancher, appliquerTranches, photosJournee as photosATrancher, typesJournee as typesATrancher, BINAIRES as BINAIRES_TRANCHER } from "./aTrancher.js";
+import { CLE_A_TRANCHER, publierSource as publierSourceTrancher, lirePublications as lirePubsTrancher, lignesATrancher, comptesARelireDe, badgeATrancher, phraseJournee as phraseATrancher, appliquerTranches, photosJournee as photosATrancher, typesJournee as typesATrancher, BINAIRES as BINAIRES_TRANCHER, sansSourcesDites as sansSourcesDitesTrancher, sourcesDitesPar as sourcesDitesParTrancher } from "./aTrancher.js";
 import { CLE_SANTE, publierSante } from "./santeDonnees.js";   // (11 nov., lot sante-donnees)
 import ATrancher, { QuestionChezToi } from "./ATrancher.jsx";
 // (10 nov., lot BC) « Ma semaine » : l'écran du bilan de la semaine (src/maSemaine.js, aucune règle à lui).
@@ -48361,9 +48361,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // (6 nov., onglets A, §7) Les raisons SANS leur nombre, pour quand la case « À retirer » dit déjà
           // « + N à vérifier » (sur sa base : « + 34 à vérifier » puis « Colis à vérifier · 34 délais dépassés »).
           const raisonsSansN = [nD ? pl(nD, 'délai dépassé', 'délais dépassés') : '', nT ? pl(nT, 'incident', 'incidents') : '', nc ? `pas encore ${pl(nc, 'relié', 'reliés')}` : ''].filter(Boolean).join(' · ');
-          jobs.push({ id: nv ? 'retrait-a-verifier' : 'retrait-en-verification', n: nv || nc, nRelier: nc, icon:'box', color: nv ? C.warn : C.muted, detailSansN: raisonsSansN,
+          // (16 nov., captures de Julien : « Colis à vérifier · délais dépassés · pas encore relié » ne disait pas QUOI faire)
+          // La ligne dit le GESTE ; les raisons comptées restent dans l'infobulle (`plein`) et le titre long.
+          const gesteVerif = nv ? tr('journee.colisVerifier.suivi', { n: nv + nc }) : tr('journee.colisVerifier.relier', { n: nc });
+          jobs.push({ id: nv ? 'retrait-a-verifier' : 'retrait-en-verification', n: nv || nc, nRelier: nc, icon:'box', color: nv ? C.warn : C.muted, detailSansN: gesteVerif, attrs: { 'data-job-geste': nv ? 'suivi' : 'relier', 'data-job-raisons': raisonsSansN },
             photos: [...av.map(x => x && x.o ? orderPhoto(x.o) : null), ...(pickupUnion.aConfirmer || []).map(o => orderPhoto(o))],
-            title: tr('journee.colisVerifier', { x: String(nv + nc) }), court: tr('journee.colisVerifier2'), detail: raisons, plein: long,
+            title: tr('journee.colisVerifier', { x: String(nv + nc) }), court: tr('journee.colisVerifier2'), detail: gesteVerif, plein: `${raisons}. ${long}`,
             tab:'retraits', prio:0.6 });
         }
         // (1er nov., « très répétitif ») LE MÊME NOMBRE UNE FOIS (§7). Quand la case
@@ -48490,12 +48493,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               avant: () => { demanderVue('offresauto'); try { window.dispatchEvent(new CustomEvent('vrm:vue',{detail:'offresauto'})); } catch(_) {} } }); } }
         // (9 nov., lot AC) « À TRANCHER » : UNE ligne, seulement s'il y a quelque chose
         // (la somme SUE des sources, src/aTrancher.js — « au moins » s'il en manque une).
-        if (aTrancher && aTrancher.total > 0) {
-          const t = phraseATrancher(aTrancher);
+        // (16 nov., captures de Julien) Sans ce que les cartes CI-DESSUS disent déjà (src/aTrancher.js `JOB_SOURCE`) :
+        // le même nombre ne s'écrit pas deux fois sur Ma journée (§7). L'écran « À trancher » garde tout.
+        const aTrJ = aTrancher ? sansSourcesDitesTrancher(aTrancher, sourcesDitesParTrancher(jobs)) : null;
+        if (aTrJ && aTrJ.total > 0) {
+          const t = phraseATrancher(aTrJ);
           // (10 nov., cartes) Le même style que l'écran : les photos des premières choses (par
           // identité, publiées par leurs écrans) en pile, et les types — plus de phrase.
-          const ph = photosATrancher(aTrancher);
-          jobs.push({ id: 'a-trancher', n: aTrancher.total, icon: 'help', color: C.text, court: t, detail: typesATrancher(aTrancher), title: t, prio: 1.9, photos: ph.length ? ph : null, action: 'Trancher' });
+          const ph = photosATrancher(aTrJ);
+          jobs.push({ id: 'a-trancher', n: aTrJ.total, icon: 'help', color: C.text, court: t, detail: typesATrancher(aTrJ), title: t, prio: 1.9, photos: ph.length ? ph : null, action: 'Trancher' });
         }
         // (11 nov., saisie rapide) VENDUE SANS PRIX D'ACHAT (vente PROUVÉE de moins de 3 jours,
         // src/prixAchatVente.js) : ambre, un geste — « Saisir » ouvre la petite feuille du prix.
