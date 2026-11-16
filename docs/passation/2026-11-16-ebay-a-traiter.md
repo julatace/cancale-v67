@@ -60,7 +60,17 @@ Couverte par l'audit (E1, E2).
   ouvre eBay → Compte ; 390 et 1512 px.
 
 ## ÉTAT À LA REPRISE
-- Fait et poussé sur `claude/ebay-a-traiter` (PR : voir le rapport).
+- Fait et poussé sur `claude/ebay-a-traiter`, PR #1187 **pas fusionnée** : la règle du 16 nov.
+  (zéro rouge, y compris ceux qui sont déjà sur main) n'est pas tenue. Sur la PR, la CI montre
+  68 audits rouges dans « Audits 1-3 » : ce sont exactement les mêmes que sur la PR #1181 déjà
+  fusionnée (70 rouges là-bas, aucun rouge nouveau ici). Les mêmes jobs « Bancs principaux »,
+  `regles`, `ecrans (…)` et `comptes-et-reception` sont rouges des deux côtés. Fusionner dès que
+  main est revenu au vert (ou sur décision).
+- Banc `ebay-apres-vente-ecran` (absent des lots de la CI) : il était périmé sur main, car les
+  sous-onglets ont changé. Il ouvre maintenant les sections par `?tab=plat_ebay&section=…`. Tous
+  les contrôles du lot passent à 390 et 1512 px. À 1512 px, il reste 3 rouges instables : la
+  feuille de confirmation n'apparaît pas toujours (`askConfirm` sans écouteur monté ⇒ repli sur
+  `window.confirm`, que Playwright ferme). Ces rouges sont hors du lot et restent à regarder.
 - **Ce qui manque (mesure réelle)** : la vraie réponse de `return/search` sur le compte de Julien n'a
   jamais été vue. Si « illisible » revient, la réponse de la route porte maintenant `champs` (noms
   des champs reçus) : les relever dans l'onglet réseau (ou un `console.log` de banc) et ajouter la
