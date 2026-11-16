@@ -64,6 +64,11 @@ export function ajusterChiffre(el, plancher = 22) {
     const largeur = el.clientWidth;
     if (largeur === derniere) return;
     derniere = largeur;
+    // (16 nov., stabilite-iphone) LE CAS COURANT SANS RIEN ÉCRIRE : jamais ajusté et il tient déjà ⇒ on ne touche à
+    // aucun style. Avant, chaque appel retirait les styles puis relisait la taille calculée et la largeur : deux mises en
+    // page de TOUT l'écran forcées par chiffre, à chaque nouvelle valeur (profil de l'ouverture de Ventes, base de 1 000
+    // paires : 2,9 s de temps propre ici, la première cause des longues tâches à l'arrivée des données).
+    if (!el.style.fontSize && !el.style.whiteSpace && !el.hasAttribute('data-chiffre-replie') && !(el.scrollWidth > largeur + 0.5)) return;
     el.style.removeProperty('font-size');
     el.style.removeProperty('white-space');
     el.style.removeProperty('overflow-wrap');
