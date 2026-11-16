@@ -81,6 +81,8 @@ let SRC = path.join(R, 'src');
 const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').split('=')[1];
 if (MUT) {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'plat-'));
+  // (16 nov., bancs-rouges-a) La copie de src/ (≈ 25 Mo) restait dans /tmp à chaque mutation : 72 copies, 1,8 Go, disque plein.
+  process.on('exit', () => { try { fs.rmSync(d, { recursive: true, force: true }); } catch (_) {} });
   fs.cpSync(path.join(R, 'src'), path.join(d, 'src'), { recursive: true, filter: (s) => !/node_modules/.test(s) });
   const [fic, de, vers] = MUTS[MUT];
   const f = path.join(d, fic); const s = fs.readFileSync(f, 'utf8');

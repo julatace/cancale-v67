@@ -232,6 +232,13 @@ const lireEcran = (pg, attr) => pg.evaluate((a) => {
       for (const [t, attr] of ECRANS) {
         await o.pg.goto(o.pg.url().split('?')[0] + `?tab=${t}&site=vestiaire`, { waitUntil: 'domcontentloaded' }).catch(() => {});
         await o.pg.waitForFunction(() => (document.querySelector('#root') || {}).innerText && document.querySelector('#root').innerText.trim().length > 40, null, { timeout: 15000 }).catch(() => {});
+        // (16 nov., bancs-rouges-a) MESURÉ (sonde toutes les 300 ms, 390 px) : tant que ses plateformes ne sont pas lues
+        // (`useProfilVendeur`, « pas su » ⇒ aucune rangée), `site=vestiaire` ouvre la tâche sur Vestiaire ; dès qu'elles
+        // le sont, l'effet de `FiltreSites` revient à une vue montrée (achats : écran Vestiaire de 924 à 1 674 ms, puis
+        // Vinted). L'ancien délai fixe de 1,5 s tombait, sous charge, dans cette fenêtre (§6.5 : un état, pas un délai).
+        // On attend donc que la tâche ait QUITTÉ Vestiaire (15 s au plus), puis qu'elle n'y revienne pas (1,5 s) :
+        // une app qui ne revient jamais (l'effet retiré) reste rouge.
+        await o.pg.waitForFunction(() => { const s = document.querySelector('[data-tache-site]'); return !!s && s.getAttribute('data-tache-site') !== 'vestiaire'; }, null, { timeout: 15000 }).catch(() => {});
         await o.pg.waitForTimeout(1500);
         const e = await o.pg.evaluate((a) => ({ vc: !!document.querySelector('[data-site="vestiaire"]'), ecran: !!document.querySelector('[' + a + ']'), txt: ((document.querySelector('#root') || {}).innerText || '').trim().length }), attr);
         dit(!e.vc && !e.ecran && e.txt > 40, `${t} : ni filtre ni écran « Vestiaire » (pas choisi, pas relié) — revenu à une vue montrée, jamais un écran blanc`, JSON.stringify(e));

@@ -33,6 +33,15 @@ const ATTENDUE = (/const EXT_ATTENDUE = '([\d.]+)'/.exec(fs.readFileSync(path.jo
 // (vm), comme l'app la lit — plus en JSON brut (le banc plantait au chargement, sans rien juger).
 const PUBLIEES = require('vm').runInNewContext('(' + ((/export const CLES_PUBLIEES = (\[[^\]]*\])/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'fileEnvoi.js'), 'utf8')) || [, '[]'])[1]) + ')', {});
 
+// (16 nov., bancs-rouges-a) MESURÉ (chaque écriture de `main` journalisée clé par clé, valeur égale ou non) : une
+// écriture de `main` réécrit la ligne ENTIÈRE (vinted_sales, vinted_accounts… y repassent à valeur ÉGALE — c'était
+// le « colis-a-confirmer réécrit vinted_sales » du 15 nov.) ; ce qui CHANGE après un bouton n'est que publications et
+// état de l'app. Pas des données, écrites par l'app sans geste (la même liste qu'a-trancher, plus deux publications
+// en ligne à part, §5 « un écran publie ») : l'écran ouvert (`vrm_reprise_ecrans`, ignoré aussi par `compterEnAttente`),
+// le point de restauration automatique (`restore_*`), la veille des chiffres (`vrm_veille_chiffres`), le widget
+// (`widget_stats`, écrit quand ce qu'il afficherait change) et « à retirer de Leboncoin » (`lbc_a_retirer`, écrit
+// quand il change ou toutes les 6 h). Toute autre clé ou ligne écrite reste rouge.
+const NON_DONNEES = (k) => k === 'vrm_reprise_ecrans' || k === 'vrm_veille_chiffres' || /^restore_\d+$/.test(k) || k === 'widget_stats' || k === 'lbc_a_retirer';
 const UID = '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b';   // la session de banc (_porte-banc.cjs)
 const H = 3600e3, M = 60e3, MAINTENANT = Date.now();
 const iso = (ilYa) => new Date(MAINTENANT - ilYa).toISOString();
@@ -182,7 +191,7 @@ const actif = (pg) => pg.evaluate(() => { const e = document.querySelector('.vrm
     dit(aCorr.every((l) => l.bouton && l.bouton.h >= 44 && l.bouton.w >= 44), `S ${nom} : chaque ligne à corriger a UN bouton ≥ 44 px`, aCorr.filter((l) => !(l.bouton && l.bouton.h >= 44)).map((l) => l.cle + ':' + JSON.stringify(l.bouton)).join(' '));
     dit(r.lignes.filter((l) => l.etat === 'ok').every((l) => !l.bouton), `S ${nom} : une ligne à jour n'a pas de bouton`);
     dit(r.aJour === '0' && r.resume !== 'Tout est à jour ✓', `S ${nom} : pas « Tout est à jour » quand il reste à corriger`);
-    const ecr = ecritures.slice(e0);
+    const ecr = ecritures.slice(e0).filter((w) => w.ids.some((i) => !NON_DONNEES(i)));
     dit(!ecr.length, `S ${nom} : aucune écriture vers la base pendant 3 s écran ouvert`, JSON.stringify(ecr));
     const debord = await pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     dit(debord <= 0, `S ${nom} : aucun défilement horizontal`, debord);
@@ -213,7 +222,9 @@ const actif = (pg) => pg.evaluate(() => { const e = document.querySelector('.vrm
 
   // ── G ──
   const ATTENDU_G = {
-    'numeros-double': { ecran: 'cat_bord', onglet: 'envoyer' }, 'colis-postes': { ecran: 'cat_bord', onglet: 'envoyes' },
+    // (16 nov., bancs-rouges-a) Colis vit DANS Ventes depuis le 11 nov. (lot DJ3, revue-colis) : l'écran actif est Ventes,
+    // l'onglet de colis reste jugé.
+    'numeros-double': { ecran: 'ventes', onglet: 'envoyer' }, 'colis-postes': { ecran: 'ventes', onglet: 'envoyes' },
     'achats-sans-prix': { ecran: 'annonces', saisie: true }, 'ventes-sans-achat': { ecran: 'annonces', saisie: true },
     'colis-a-confirmer': { ecran: 'achats' }, 'ventes-a-dater': { ecran: 'compta' }, 'emails-mis-de-cote': { ecran: 'emails' },
     'comptes-a-relire': { reglage: 'toutvabien' }, 'annonces-a-confirmer': { ecran: 'annonces' },
@@ -239,8 +250,8 @@ const actif = (pg) => pg.evaluate(() => { const e = document.querySelector('.vrm
       if (A.saisie) dit(!!(await pg.$('[role="dialog"][aria-label="Prix d\'achat à compléter"]')), `G ${cle} : la saisie en série s'ouvre`);
     }
     await pg.waitForTimeout(1500);
-    const changees = Object.keys({ ...avantMain, ...MAIN }).filter((k) => k !== 'rev' && !PUBLIEES.includes(k) && JSON.stringify(avantMain[k]) !== JSON.stringify(MAIN[k]));
-    const autres = ecritures.slice(e0).filter((w) => !w.ids.includes('main') && !/id=eq\.main/.test(w.url)).map((w) => w.ids.join(','));
+    const changees = Object.keys({ ...avantMain, ...MAIN }).filter((k) => k !== 'rev' && !PUBLIEES.includes(k) && !NON_DONNEES(k) && JSON.stringify(avantMain[k]) !== JSON.stringify(MAIN[k]));
+    const autres = ecritures.slice(e0).filter((w) => !w.ids.includes('main') && !/id=eq\.main/.test(w.url)).map((w) => w.ids.filter((i) => !NON_DONNEES(i)).join(',')).filter(Boolean);
     dit(!changees.length && !autres.length, `G ${cle} : le bouton n'écrit aucune donnée (il ouvre)`, JSON.stringify({ changees, autres }));
     await shot(pg, 'G-' + cle);
     await ctx.close();
