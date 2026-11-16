@@ -21,6 +21,18 @@ extension-restes, 5.397 plateformes-restes).
   `VRM-Orion-dossier.zip`). Après la mise à jour, les onglets vinted.fr / Vestiaire / Leboncoin déjà
   ouverts affichent « Recharge cet onglet » : un clic sur « Recharger » (VRM ne recharge jamais à sa place).
 
+### Reprise du 16 nov. au soir
+
+- Deux vrais `git merge origin/main` (main toujours en 5.393.0 côté extension) ; les zips ont été
+  RÉGÉNÉRÉS depuis la source 5.396.0 (`node scripts/zip-extension.cjs --orion public/VRM-Orion.xpi`),
+  jamais pris d'un côté ; CLAUDE.md §9 ramené sous 59 000 octets (lignes les plus anciennes déplacées
+  telles quelles dans `historique-divers.md`).
+- Rejoué après merge : `audit-extension-robuste` 41/41 (un rouge isolé vu UNE fois sous forte charge,
+  puis 5 passes vertes de suite), `--prouve` **30/30 mutations**, sur origin/main **37 rouges** ;
+  banc Chromium `extension-stockage-cadre` 6/6 ; `audit-extension-zip`, `-navigateurs`, `coherence`,
+  `familles-extension` 29/29, `extension-moyennes` 30/30 et les 14 audits remis à la règle : verts.
+- Points 25/26 (hôtes photo, avant la plage 27–123) : déjà sur main (`urlPhotoPermise`).
+
 ## Les familles, dans l'ordre demandé (sécurité, puis perte de données, puis le reste)
 
 ### Sécurité
