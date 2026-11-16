@@ -1,7 +1,7 @@
 // es · Vincular compra ⇄ artículo (15 nov.) — ver src/i18n/langues/fr/liaison.js.
 export default {
   "liaison.tete": { one: "{n} artículo · {nSugg} con una compra propuesta", other: "{n} artículos · {nSugg} con una compra propuesta" },
-  "liaison.regle": "VRM propone la compra que más se parece: misma marca, una palabra del modelo en común, la talla y el color cuando están escritos, comprada antes de publicar (cuanto más cerca de la recogida, mejor). «Muy probable»: ninguna otra compra ni ningún otro artículo se le parece tanto. Nada se vincula sin tu toque.",
+  "liaison.regle": "VRM solo propone una compra si es «muy probable»: misma marca, una palabra del modelo en común, la misma talla y el mismo color (escritos, si no leídos en la foto), comprada antes de publicar — y ninguna otra compra ni otro artículo se le parece tanto. Una compra solo se propone a un artículo. Las demás pistas están en «Elegir otra compra». Nada se vincula sin tu toque.",
   "liaison.quoi": "Artículos sin compra vinculada",
   "liaison.enVente": "En venta",
   "liaison.vendus": "Vendidos",
@@ -33,6 +33,9 @@ export default {
   "liaison.p.tailleInconnue": "talla no escrita en la compra",
   "liaison.p.generique": "título de compra sin modelo",
   "liaison.p.photo": "misma foto",
+  "liaison.p.couleurPhoto": "{couleur} (leído en la foto)",
+  "liaison.pistes": { one: "Otras pistas · {n}", other: "Otras pistas · {n}" },
+  "liaison.pistesAide": "Misma marca, modelo, talla y color compatibles, pero no lo bastante seguras para proponerlas. Comprueba antes de vincular.",
   "liaison.p.jours.en-ligne.retrait": { one: "publicado {n} día después de la recogida", other: "publicado {n} días después de la recogida" },
   "liaison.p.jours.en-ligne.livraison": { one: "publicado {n} día después de la entrega", other: "publicado {n} días después de la entrega" },
   "liaison.p.jours.en-ligne.commande": { one: "publicado {n} día después del pedido", other: "publicado {n} días después del pedido" },

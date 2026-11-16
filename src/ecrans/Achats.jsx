@@ -3,7 +3,7 @@
 import { DEMANDE_OUVRIR_ACHAT } from '../pasEnLigne.js';   // (11 nov., lot pas-en-ligne)
 import { prixAchatSaisi } from '../prixAuNumerotage.js';
 import { tousAchatsLibres, tousAchatsLibresDetail, filtresAchats, etiquetteLot } from '../suggestionsAchat.js';
-import { propositionsArticle } from '../liaisonAchat.js';
+import { propositionsArticle, pistesArticle } from '../liaisonAchat.js';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { tr } from '../i18n/index.js';
 import { createPortal } from 'react-dom';
@@ -727,7 +727,13 @@ function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, recep
   const [taille, setTaille] = useState('');
   // (15 nov., liaison) La MÊME règle que Annonces → « Sans achat relié » : `propositionsArticle` (src/liaisonAchat.js) —
   // mots du modèle, taille et couleur quand elles sont écrites, jours entre le retrait (lu) et la mise en ligne.
-  const sugg = useMemo(() => (Array.isArray(achats) ? propositionsArticle({ cible, achats, liens, marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel, receptionDe }) : []), [cible, achats, liens, receptionDe]);
+  // (16 nov., relier-fiable) EN TÊTE, seulement la « très probable » (exclusive : aucun autre achat ni aucun autre article
+  // ne lui ressemble autant) ; les autres candidats — qui passent tous les filtres durs (marque, mot du modèle, taille,
+  // couleur, date) — sont REPLIÉS sous « Autres pistes · N », jamais ouverts d'office.
+  const regles = { marqueDe: extractBrand, couleursDe: extractColors, modeleDe: extractModel, receptionDe };
+  const sugg = useMemo(() => (Array.isArray(achats) ? propositionsArticle({ cible, achats, liens, ...regles }) : []), [cible, achats, liens, receptionDe]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const pistes = useMemo(() => (Array.isArray(achats) ? pistesArticle({ cible, achats, liens, ...regles }) : []), [cible, achats, liens, receptionDe]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const [pistesOuvertes, setPistesOuvertes] = useState(false);
   const voirTous = tous || !!autre || (Array.isArray(achats) && !sugg.length);
   // (relecture du 5 nov.) Les dates de réception se lisent à la demande (son tap sur
   // « Filtres ») : tant qu'elles arrivent, le filtre de date attend — il n'écarte rien
@@ -769,7 +775,16 @@ function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, recep
           {onDelier ? <Bouton variante="discret" data-relier-delier={String(actuel.transaction_id || '')} onClick={onDelier} style={{ flexShrink: 0, minHeight: 44 }}>{tr('achats.delier')}</Bouton> : null}
         </div>
       ) : null}
-      {!autre && sugg.length > 0 && <div data-suggestions-achat={sugg.length}>{sugg.map((x) => ligne(x.achat, { 'data-suggestion-achat': String(x.achat.transaction_id), 'data-rang': x.rang }))}</div>}
+      {!autre && sugg.length > 0 && <div data-suggestions-achat={sugg.length}>{sugg.map((x) => ligne(x.achat, { 'data-suggestion-achat': String(x.achat.transaction_id), 'data-rang': x.rang, 'data-niveau': x.niveau }))}</div>}
+      {pistes.length > 0 && (
+        <div data-pistes-achat={pistes.length} data-pistes-ouvertes={pistesOuvertes ? '1' : '0'} style={{ marginTop: 6 }}>
+          <Bouton variante="discret" data-pistes-bouton aria-expanded={pistesOuvertes} onClick={() => setPistesOuvertes((v) => !v)} style={{ alignSelf: 'flex-start', minHeight: 44 }}>{tr('liaison.pistes', { n: pistes.length })}</Bouton>
+          {pistesOuvertes ? <>
+            <div style={{ fontSize: 12, color: C.muted, padding: '2px 0 4px' }}>{tr('liaison.pistesAide')}</div>
+            {pistes.map((x) => ligne(x.achat, { 'data-piste-achat': String(x.achat.transaction_id), 'data-niveau': 'piste' }))}
+          </> : null}
+        </div>
+      )}
       {!voirTous && <Bouton variante="discret" data-voir-tous-achats onClick={() => setTous(true)} style={{ alignSelf: 'flex-start', minHeight: 44, marginTop: 6 }}>{tr('ventes.choisirAutreAchat')}</Bouton>}
       {voirTous && (
         <div data-tous-achats={liste.length} style={{ marginTop: sugg.length ? 10 : 0 }}>

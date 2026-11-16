@@ -1,7 +1,7 @@
 // fr · La liaison achat ⇄ article (15 nov.) — Annonces → « Sans achat relié », Achats (src/App.jsx, src/liaisonAchat.js).
 export default {
   "liaison.tete": { one: "{n} article · {nSugg} avec un achat proposé", other: "{n} articles · {nSugg} avec un achat proposé" },
-  "liaison.regle": "VRM propose l’achat qui ressemble le plus : même marque, un mot du modèle en commun, la taille et la couleur quand elles sont écrites, acheté avant la mise en ligne (plus c’est proche du retrait, mieux c’est). « Très probable » : aucun autre achat ni aucun autre article ne lui ressemble autant. Rien n’est relié sans ton toucher.",
+  "liaison.regle": "VRM ne propose un achat que s’il est « très probable » : même marque, un mot du modèle en commun, la même taille et la même couleur (écrites, sinon lues sur la photo), acheté avant la mise en ligne — et aucun autre achat ni aucun autre article ne lui ressemble autant. Un achat n’est proposé qu’à un seul article. Les autres pistes sont dans « Choisir un autre achat ». Rien n’est relié sans ton toucher.",
   "liaison.quoi": "Articles sans achat relié",
   "liaison.enVente": "En vente",
   "liaison.vendus": "Vendus",
@@ -33,6 +33,9 @@ export default {
   "liaison.p.tailleInconnue": "taille pas écrite sur l’achat",
   "liaison.p.generique": "titre d’achat sans modèle",
   "liaison.p.photo": "même photo",
+  "liaison.p.couleurPhoto": "{couleur} (lu sur la photo)",
+  "liaison.pistes": { one: "Autres pistes · {n}", other: "Autres pistes · {n}" },
+  "liaison.pistesAide": "Même marque, modèle, taille et couleur compatibles — mais pas assez sûres pour être proposées. Vérifie avant de relier.",
   "liaison.p.jours.en-ligne.retrait": { one: "mise en ligne {n} j après le retrait", other: "mise en ligne {n} j après le retrait" },
   "liaison.p.jours.en-ligne.livraison": { one: "mise en ligne {n} j après la livraison", other: "mise en ligne {n} j après la livraison" },
   "liaison.p.jours.en-ligne.commande": { one: "mise en ligne {n} j après la commande", other: "mise en ligne {n} j après la commande" },
