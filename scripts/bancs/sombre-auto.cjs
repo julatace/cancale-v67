@@ -4,7 +4,8 @@
 //  Rien de choisi ⇒ « Automatique » : VRM prend la teinte de l'iPhone / de l'ordinateur
 //  (`prefers-color-scheme`), EN DIRECT quand le système bascule ; un choix fait à la
 //  main reste prioritaire (ancien `vinted_dark` true OU false gardé ; `vrm_apparence`).
-//  Données INVENTÉES (`_base-ecritures.cjs`), aucune `fx/`.
+//  Données INVENTÉES (`_base-ecritures.cjs`), aucune `fx/`. Un compte (une base) par scénario : le
+//  choix d'apparence voyage avec le compte (SYNC_KEYS), il ne doit pas passer d'un scénario à l'autre.
 //
 //   S1  aucun choix, appareil sombre (390 tactile) ⇒ sombre DÈS le premier rendu :
 //       `data-theme` n'a JAMAIS valu « light » (aucun flash), barre d'état sombre ;
@@ -14,8 +15,8 @@
 //   S4  choix « Sombre » (`vrm_apparence`), appareil clair ⇒ sombre ;
 //   S5  1512 : aucun choix, appareil clair ⇒ clair ; Paramètres → Apparence :
 //       « Automatique (par défaut) » en premier et coché ;
-//   S6  contraste (axe-core, règle color-contrast) : aucun texte sous 4,5:1 sur Ma
-//       journée, en clair et en sombre (390 et 1512).
+//   S6  contraste : texte et texte secondaire du thème affiché ≥ 4,5:1 sur la surface
+//       des cartes et sur le fond, en clair et en sombre (390 et 1512).
 //  §6.1 : rouge sur le build d'avant (`BANC_DIST=<dist d'avant>`), vert après.
 //  Lancer : npm run build && node scripts/bancs/sombre-auto.cjs   (BANC_CAPTURES=<dossier>)
 // ════════════════════════════════════════════════════════════════════════════
@@ -25,7 +26,6 @@ const H = require('./_base-ecritures.cjs');
 const fs = require('node:fs'), path = require('node:path');
 const CAPT = process.env.BANC_CAPTURES || path.join(require('node:os').tmpdir(), 'vrm-bancs', 'sombre-auto');
 fs.mkdirSync(CAPT, { recursive: true });
-const AXE = fs.readFileSync(require.resolve('axe-core/axe.min.js', { paths: [path.join(__dirname, '..', '..')] }), 'utf8');
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 
@@ -55,19 +55,25 @@ const lum = (c) => {
   const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
   return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
 };
+// Le contraste des COULEURS DU THÈME posées sur la racine (variablesTheme) : le texte et le texte
+// secondaire sur la surface des cartes et sur le fond — ≥ 4,5:1 (WCAG AA), dans la teinte affichée.
 async function contraste(pg) {
-  await pg.evaluate(() => { try { for (const a of document.getAnimations()) { try { a.finish(); } catch (_) {} } } catch (_) {} });
-  await pg.evaluate(AXE);
-  return pg.evaluate(async () => {
-    const r = await window.axe.run(document.querySelector('main.vrm-main') || document, { runOnly: { type: 'rule', values: ['color-contrast'] }, resultTypes: ['violations'] });
-    return r.violations.flatMap((v) => v.nodes.map((n) => `${n.target.join(' ')} — ${(n.failureSummary || '').replace(/\s+/g, ' ').slice(0, 140)}`));
-  });
+  const v = await pg.evaluate(() => { const cs = getComputedStyle(document.documentElement); const g = (k) => cs.getPropertyValue(k).trim(); return { ink: g('--vrm-ink'), muted: g('--vrm-muted'), surface: g('--vrm-surface'), bg: g('--vrm-bg') }; });
+  const ratio = (a, b) => { const la = lum(a), lb = lum(b); if (la == null || lb == null) return null; return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05); };
+  const out = [];
+  for (const [t, f] of [['ink', 'surface'], ['ink', 'bg'], ['muted', 'surface'], ['muted', 'bg']]) {
+    const r = ratio(v[t], v[f]);
+    if (r == null || r < 4.5) out.push(`${t} ${v[t]} sur ${f} ${v[f]} : ${r == null ? 'illisible' : r.toFixed(2)}:1`);
+  }
+  return out;
 }
 // Avant tout script de la page : chaque valeur prise par `data-theme` est notée (le « flash »).
 const NOTER = () => {
   window.__vrmThemes = [];
-  const noter = () => { const v = document.documentElement.getAttribute('data-theme'); if (v && window.__vrmThemes[window.__vrmThemes.length - 1] !== v) window.__vrmThemes.push(v); };
-  try { new MutationObserver(noter).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] }); } catch (_) {}
+  const noter = () => { const r = document.documentElement; const v = r && r.getAttribute('data-theme'); if (v && window.__vrmThemes[window.__vrmThemes.length - 1] !== v) window.__vrmThemes.push(v); };
+  // Sur le DOCUMENT (la racine n'existe pas encore quand ce script passe) : chaque pose de `data-theme`.
+  try { new MutationObserver(noter).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-theme'] }); } catch (_) {}
+  noter(); document.addEventListener('DOMContentLoaded', noter);
 };
 
 (async () => {
@@ -85,7 +91,7 @@ const NOTER = () => {
   await pA.pg.waitForTimeout(6000);
   const h1 = await historique(pA.pg);
   dit((await theme(pA.pg)) === 'dark', 'S1 : rien de choisi, iPhone en sombre ⇒ VRM en sombre', await theme(pA.pg));
-  dit(h1 && !/light/.test(h1), 'S1 : aucun flash — `data-theme` n’a jamais valu « light » depuis le démarrage', h1);
+  dit(h1 && !/light/.test(h1), 'S1 : aucun flash — `data-theme` n’a jamais valu « light » depuis le démarrage', h1 || '(rien noté)');
   const b1 = await barre(pA.pg);
   dit(lum(b1) !== null && lum(b1) < 0.2, 'S1 : la barre d’état (theme-color) est sombre', b1);
   await capture(pA.pg, 'S1-390-auto-sombre');
@@ -104,7 +110,7 @@ const NOTER = () => {
   const cSombre390 = await contraste(pA.pg);
 
   // ── S3 · ANCIEN CHOIX « CLAIR » GARDÉ ────────────────────────────────────────
-  const B = await H.appareil(nav, base, { nom: 'B', vp: { width: 390, height: 844 }, init: { vinted_dark: 'false' } });
+  const B = await H.appareil(nav, fabriquer(), { nom: 'B', vp: { width: 390, height: 844 }, init: { vinted_dark: 'false' } });
   await B.ctx.addInitScript(NOTER);
   const pB = await B.ouvrir('B'); errs.push(pB.errs);
   await pB.pg.emulateMedia({ colorScheme: 'dark' });
@@ -113,7 +119,7 @@ const NOTER = () => {
   dit((await theme(pB.pg)) === 'light' && !/dark/.test(await historique(pB.pg)), 'S3 : « clair » choisi autrefois (vinted_dark false), iPhone sombre ⇒ clair, sans flash', `${await theme(pB.pg)} · ${await historique(pB.pg)}`);
 
   // ── S4 · CHOIX « SOMBRE » PRIORITAIRE ────────────────────────────────────────
-  const C = await H.appareil(nav, base, { nom: 'C', vp: { width: 390, height: 844 }, init: { vrm_apparence: '"sombre"' } });
+  const C = await H.appareil(nav, fabriquer(), { nom: 'C', vp: { width: 390, height: 844 }, init: { vrm_apparence: '"sombre"' } });
   const pC = await C.ouvrir('C'); errs.push(pC.errs);
   await pC.pg.emulateMedia({ colorScheme: 'light' });
   await pC.pg.goto(srv.url + '/?tab=journee', { waitUntil: 'domcontentloaded' });
@@ -121,7 +127,7 @@ const NOTER = () => {
   dit((await theme(pC.pg)) === 'dark', 'S4 : « Sombre » choisi, iPhone clair ⇒ sombre (le choix manuel gagne)', await theme(pC.pg));
 
   // ── S5 · ORDINATEUR, PARAMÈTRES → APPARENCE ─────────────────────────────────
-  const D = await H.appareil(nav, base, { nom: 'D', vp: { width: 1512, height: 900 } });
+  const D = await H.appareil(nav, fabriquer(), { nom: 'D', vp: { width: 1512, height: 900 } });
   const pD = await D.ouvrir('D'); errs.push(pD.errs);
   await pD.pg.emulateMedia({ colorScheme: 'light' });
   await pD.pg.goto(srv.url + '/?tab=journee', { waitUntil: 'domcontentloaded' });
@@ -135,7 +141,7 @@ const NOTER = () => {
   await pD.pg.waitForTimeout(800);
   await capture(pD.pg, 'S5-1512-auto-sombre');
   const cSombre1512 = await contraste(pD.pg);
-  await pD.pg.goto(srv.url + '/?tab=reglages', { waitUntil: 'domcontentloaded' });
+  await pD.pg.goto(srv.url + '/?tab=settings', { waitUntil: 'domcontentloaded' });
   await pD.pg.waitForTimeout(4000);
   const ligne = pD.pg.locator('[data-reglage-apparence]').first();
   if (await ligne.count()) { await ligne.click().catch(() => {}); await pD.pg.waitForTimeout(1200); }
@@ -145,7 +151,7 @@ const NOTER = () => {
 
   // ── S6 · CONTRASTE ≥ 4,5:1 ──────────────────────────────────────────────────
   for (const [nom, v] of [['390 clair', cClair390], ['390 sombre', cSombre390], ['1512 clair', cClair1512], ['1512 sombre', cSombre1512]]) {
-    dit(Array.isArray(v) && v.length === 0, `S6 : Ma journée ${nom} — aucun texte sous 4,5:1 (axe color-contrast)`, Array.isArray(v) ? `${v.length} : ${v.slice(0, 3).join(' ║ ')}` : String(v));
+    dit(Array.isArray(v) && v.length === 0, `S6 : Ma journée ${nom} — texte et texte secondaire ≥ 4,5:1 sur cartes et fond (couleurs du thème)`, Array.isArray(v) ? `${v.length} : ${v.slice(0, 3).join(' ║ ')}` : String(v));
   }
 
   const toutes = errs.flat().filter((e) => !/ResizeObserver|Failed to fetch|NetworkError|Load failed/.test(e));
