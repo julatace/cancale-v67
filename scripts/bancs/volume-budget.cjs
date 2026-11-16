@@ -38,8 +38,8 @@ for (let p = 0; p < PASSES; p++) {
     let out = '';
     try {
       out = execFileSync(process.execPath, [path.join(__dirname, '_mesure-demarrage.cjs'), DIST, String(basePort + p * 7 + ECRANS.indexOf(tab))], {
-        env: { ...process.env, VENTES: String(B.ventes || 20000), CPU: String(B.cpu || 4), COMPLET: '1', TABS: tab },
-        encoding: 'utf8', timeout: 600000, stdio: ['ignore', 'pipe', 'pipe'],
+        env: { ...process.env, VENTES: String(B.ventes || 20000), CPU: String(B.cpu || 4), COMPLET: '1', COMPLET_MAX_MS: String(B.complet_max_ms || 240000), TABS: tab },
+        encoding: 'utf8', timeout: 900000, stdio: ['ignore', 'pipe', 'pipe'],
       });
     } catch (e) { out = String(e.stdout || ''); }
     const l = out.split('\n').find((x) => x.startsWith('{'));
@@ -51,10 +51,12 @@ for (let p = 0; p < PASSES; p++) {
 for (const tab of ECRANS) {
   const b = B.ecrans[tab] || {}; const budget = Number(b.budget_ms || B.budget_ms); const marge = Number(b.marge_ms ?? B.marge_ms);
   const mes = res[tab].filter(Boolean);
-  const apres = med(mes.map((x) => x.apresDonnees_ms));
-  const prets = mes.filter((x) => x.etat === 'pret' || x.etat === 'plafond').length;
-  dit(prets === PASSES, `${tab} · l'écran s'ouvre (${prets}/${PASSES})`);
-  dit(apres != null && apres <= budget + marge, `${tab} · ${apres == null ? '—' : apres} ms après les données (médiane de ${mes.length} : ${mes.map((x) => x.apresDonnees_ms).join(' · ')}) — budget ${budget} ms + marge ${marge} ms`);
+  // Seule une ouverture COMPLÈTE (toutes ses données essentielles là) se juge : sans elle, « après les données »
+  // ne veut rien dire — « pas su » n'est jamais un feu vert.
+  const completes = mes.filter((x) => x.complet_ms != null && x.apresDonnees_ms != null);
+  const apres = completes.length === mes.length ? med(completes.map((x) => x.apresDonnees_ms)) : null;
+  dit(completes.length === PASSES, `${tab} · l'écran a toutes ses données (${completes.length}/${PASSES} ouvertures complètes)`);
+  dit(apres != null && apres <= budget + marge, `${tab} · ${apres == null ? '—' : apres} ms après les données (médiane de ${mes.length} : ${mes.map((x) => x.complet_ms == null ? 'pas complet' : x.apresDonnees_ms).join(' · ')}) — budget ${budget} ms + marge ${marge} ms`);
 }
 console.log(ko ? `\n❌ ${ko} contrôle(s) rouge(s)` : '\n✅ volume-budget : Ma journée et Ventes sous le budget à 20 000 ventes');
 process.exit(ko ? 1 : 0);

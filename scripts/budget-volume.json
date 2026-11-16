@@ -3,6 +3,7 @@
   "ventes": 20000,
   "cpu": 4,
   "passes": 3,
+  "complet_max_ms": 240000,
   "budget_ms": 2000,
   "marge_ms": 750,
   "ecrans": {
