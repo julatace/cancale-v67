@@ -500,7 +500,7 @@ sans la fonction.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.385.0** (15 nov. : 5.382 nouvelles annonces numérotées, 5.383 Vestiaire, 5.384 même photo, 5.385 lecture publique vide — jamais publiées seules). **À lire en premier : `docs/passation/2026-11-10-passation-finale.md`** (état exact, gestes de Julien, ce qui reste, base), puis `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
+**Extension servie : 5.385.0** (15 nov. : 5.382 nouvelles annonces numérotées, 5.383 Vestiaire, 5.384 même photo, 5.385 lecture publique vide — jamais publiées seules). **À lire en premier : `docs/passation/2026-11-16-passation.md`** (en ligne, en cours, reste à faire, gestes), puis `2026-11-10-passation-finale.md` et `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
