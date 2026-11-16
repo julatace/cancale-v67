@@ -123,7 +123,11 @@ const importer = (p) => import('file://' + path.join(R, p));
   // 8. Le branchement : une ligne dans la coque, la ligne ambre fondue dedans.
   const app = sansCommentaires(fs.readFileSync(path.join(R, 'src/App.jsx'), 'utf8'));
   const lf = sansCommentaires(fs.readFileSync(path.join(R, 'src/LigneFraicheur.jsx'), 'utf8'));
-  dit((app.match(/<LigneFraicheurParesseuse /g) || []).length === 1 && /\{!baseKO (?:&& !horsLigne )?&& <Suspense[^\n]*<LigneFraicheurParesseuse baseKO=\{baseKO\}/.test(app), 'la coque rend la ligne UNE fois, jamais pendant une panne de base');
+  // (16 nov.) Depuis le 14 nov. la cloche reprend la ligne en tête (`publier={false}` : elle ne publie rien, jamais pendant une
+  // panne) ; la coque, elle, la rend toujours UNE fois.
+  const lignesLF = app.match(/<LigneFraicheurParesseuse [^>]*>/g) || [];
+  const enCloche = lignesLF.filter((t) => /publier=\{false\}/.test(t));
+  dit(lignesLF.length - enCloche.length === 1 && enCloche.length <= 1 && (!enCloche.length || /enTete=\{\(fermer\)=>!baseKO && !horsLigne \? <Suspense fallback=\{null\}><LigneFraicheurParesseuse baseKO=\{baseKO\}[^>]*publier=\{false\}/.test(app)) && /\{!baseKO (?:&& !horsLigne )?&& <Suspense[^\n]*<LigneFraicheurParesseuse baseKO=\{baseKO\}/.test(app), 'la coque rend la ligne UNE fois, jamais pendant une panne de base');
   dit(!/AlerteCaptureParesseuse|<AlerteCapture/.test(app), 'la ligne ambre « compte qui n’arrive plus » n’est plus une seconde voix');
   dit(/data-alerte-capture=/.test(lf) && /data-alerte-voir=/.test(lf), 'la ligne garde `data-alerte-capture` / `data-alerte-voir` pour une panne');
   dit(/horsLigneActif\(\)/.test(lf) && /navigator\.onLine === false/.test(lf), 'hors ligne (mesuré ou mode froid) ⇒ la ligne se tait');

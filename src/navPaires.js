@@ -11,7 +11,9 @@
 //  Fonctions pures (aucun React) : la coque (src/App.jsx) et les bancs les lisent.
 // ════════════════════════════════════════════════════════════════════════════
 export const ID_PAIRES = 'paires';
-export const ECRANS_PAIRES = ['annonces', 'garage', 'achats'];
+// (16 nov., lot barre-achats — Julien : « ajoute les Achats dans la barre en bas ») Achats a quitté
+// « Paires » : il a son onglet dans la barre, allumé sur son écran. Paires = Annonces · Stock.
+export const ECRANS_PAIRES = ['annonces', 'garage'];
 const CLE_DERNIER = 'vrm_paires_dernier';
 
 export const estPaires = (tab) => ECRANS_PAIRES.includes(tab);

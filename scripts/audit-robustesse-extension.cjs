@@ -31,6 +31,7 @@
 const fs = require('fs'), vm = require('vm'), path = require('path'), os = require('os');
 const { MessageChannel } = require('worker_threads');
 const { faireFond } = require('./_fond-vm.cjs');
+const { filCapte } = require('./_fil-capte-vm.cjs');   // (5.398) le fil relu avant le geste
 
 const arg = (n) => { const i = process.argv.indexOf(n); return i > 0 ? path.resolve(process.argv[i + 1]) : null; };
 const EXT = arg('--ext') || path.join(__dirname, '..', 'vinted-sync-extension');
@@ -94,7 +95,7 @@ async function auditer(S) {
           // (12 nov., intégration) C juge le VERROU du moteur, pas l'heure : le repos de nuit de la sécurité des
           // comptes (5.366, allumé par défaut) est éteint ici, sinon C rougit entre 23 h et 7 h (heure de Paris).
           vrm_securite_comptes: { plateformes: { vinted: { repos: { actif: false } } } } } };
-      return fond({ lignes, store, connecte: UID, vinted: () => ({ status: 200, body: {} }) });
+      return fond({ lignes, store, connecte: UID, vinted: filCapte(lignes) });
     };
     const due = (f) => { const pv = f.store.vrmOffresPrevues || {}; for (const k in pv) if (pv[k]) pv[k].at = Date.now() - 1000; };
     const f = monter();

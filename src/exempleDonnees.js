@@ -28,7 +28,7 @@ export { UID_EXEMPLE, EMAIL_EXEMPLE };
 export const TRACES_EXEMPLE = ['vendeuse_a', 'vendeuse_b', 'acheteuse_lyon', EMAIL_EXEMPLE];
 // (14 nov.) Le point relais d'exemple : un nom et une rue INVENTÉS (aucun commerce
 // réel), une ville réelle seulement pour que le code postal se lise comme un vrai.
-export const LIEU_EXEMPLE = ['Relais Exemple', '12 rue Imaginaire', '35000 Rennes'];
+export const LIEU_EXEMPLE = ['Relais Exemple', '12 rue de l’Exemple', '35000 Rennes'];
 
 // (11 nov., page d'accueil publique) `catalogue` : une liste [titre, marque,
 // taille] MÉLANGÉE (vêtements, sacs, chaussures…) que scripts/accueil-captures.cjs

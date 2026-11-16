@@ -26,6 +26,7 @@
 // Module PUR. Exécuté par scripts/audit-argent-prix.cjs (section 114).
 // ═══════════════════════════════════════════════════════════════════════════
 
+import { jourDecale } from './dateParis.js';
 export const CLE_SOLDES = 'vrm_soldes';
 export const SITES_SOLDE = ['vinted', 'leboncoin', 'vestiaire'];
 export const SOLDE_MAX_J = 90;
@@ -33,7 +34,7 @@ const c = (v) => { const n = Number(String(v == null ? '' : v).replace(',', '.')
 const RE_JOUR = /^\d{4}-\d{2}-\d{2}$/;
 
 export const jourParis = (ms) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
-const plusJours = (jour, n) => { const [y, m, d] = jour.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10); };
+const plusJours = (jour, n) => jourDecale(jour, n);   // (16 nov.) src/dateParis.js
 export const clePaire = (p) => `${p.site}|${String(p.uid || '')}|${String(p.id || '')}`;
 
 // Le jour de fin tapé : demain au plus tôt, dans SOLDE_MAX_J jours au plus.

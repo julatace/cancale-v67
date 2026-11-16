@@ -34,11 +34,23 @@ const MUTATIONS = [
   ['regle', "let r; try { r = await faire(l, i); }", "let r; try { r = faire(l, i); }", 'les lignes partent en parallèle'],
   ['app', "return st.step === 3 ? true : 'pas au point relais';", "return true;", '« Retiré » marque un colis pas au relais'],
   ['app', "gesteVrm(L.length > 1 ? `${L.length} colis retirés` : 'Colis retiré', L.map(", "L.forEach((o) => markPickupDone(o)); void (", '« Retiré » en N gestes (N « Annuler »)'],
-  ['app', "const { ok, pasFaits } = trierSerie(lignes(cles), (o) => annulee(o) ? 'annulée' : estParti(o) ? 'déjà déposée' : !aExpedier(o) ? 'pas à envoyer' : true);", "const { ok, pasFaits } = trierSerie(lignes(cles), () => true);", '« Je dépose » sur une vente finalisée'],
+  ['app', "const peutDeposer = (o) => annulee(o) ? 'annulée' : estParti(o) ? 'déjà déposée' : !aExpedier(o) ? 'pas à envoyer' : true;", "const peutDeposer = () => true;", '« Je dépose » sur une vente finalisée'],
+  // (16 nov., lot ventes-selection) « Tout sélectionner · 2185 » : la sélection = les lignes DESSINÉES.
+  ['regle', "if (ex) continue;", "", 'une ligne estompée (autre compte) redevient sélectionnable'],
+  ['regle', "if (!k || k === 'undefined' || k === 'null' || vu.has(k)) continue;", "if (!k) continue;", 'une ligne en double compte deux fois'],
+  ['regle', "if (p === true) n++; }", "n++; }", '« 2 sur 3 » compte les lignes où l’action n’a pas de sens'],
+  ['app', "const ordreVentesSerie = useMemo(() => clesSelectionnables(", "const ordreVentesSerie = useMemo(() => ventesAffichees.map(o => String(o.transaction_id)), [ventesAffichees]); const _x = useMemo(() => clesSelectionnables(", 'Ventes : « Tout sélectionner » compte tout l’historique'],
+  ['app', "const ordreAchatsSerie = useMemo(() => clesSelectionnables(", "const ordreAchatsSerie = useMemo(() => achatsAffiches.map(x => String(x.o.transaction_id)), [achatsAffiches]); const _y = useMemo(() => clesSelectionnables(", 'Achats : « Tout sélectionner » compte tout l’historique'],
+  ['app', "useSelectionSerie(ordreVentesSerie, { nom: 'ventes', vue:", "useSelectionSerie(ordreVentesSerie, { nom: 'ventes', _vue:", 'Ventes : changer de filtre garde la sélection'],
+  ['geste', "if (vueAvant.current !== vue) { vueAvant.current = vue; vider(); }", "vueAvant.current = vue;", 'une autre vue ne vide plus la sélection'],
+  ['geste', "if (!visibles.has(k)) return;   //", "if (false) return;   //", 'une ligne pas sélectionnable se coche'],
+  ['geste', "try { document.addEventListener('scroll', surDefile, { capture: true, passive: true }); } catch (_) {}", "", 'un défilement après 450 ms ouvre la sélection'],
+  ['geste', "racine.setAttribute('data-serie-ouverte', serie.nom || '1');", "", 'la barre du bas ne cède plus sa place'],
+  ['geste', "disabled={!n || occupe || !!a.desactive || zero}", "disabled={!n || occupe || !!a.desactive}", 'une action sans aucune ligne utile reste active'],
   ['app', "if (ops.length) gesteVrm(ok.length > 1 ? `${ok.length} colis déposés` : 'Colis déposé', ops,", "if (ops.length) void (", '« Je dépose » n’écrit plus'],
   ['app', "if (ok.length) await batchBordereaux(new Set(ok.map(o => String(o.transaction_id))));", "", '« Imprimer » n’imprime pas'],
   ['app', "gesteVrm(L.length > 1 ? `${L.length} achats masqués` : 'Achat masqué', txs.map(", "void (txs.map(", '« Masquer » en série n’écrit pas'],
-  ['stock', "if (!(await askConfirm({ title: `Enlever ${ok.length} paire", "if (false && !(await askConfirm({ title: `Enlever ${ok.length} paire", '« Enlever du stock » sans confirmation'],
+  ['stock', "if (!(await askConfirm({ title: `Enlever ${ok.length} ", "if (false && !(await askConfirm({ title: `Enlever ${ok.length} ", '« Enlever du stock » sans confirmation'],   // (16 nov.) ancre recalée sur « motsVendeur() »
   ['stock', "const u = { ...slots }; for (const f of ok) delete u[cleDeFiche(f)];", "for (const f of ok) retirerCase(cleDeFiche(f)); const u = { ...slots };", 'N écritures des cases qui s’écrasent'],
   ['boite', "if (ok.length) poserLu(ok, valeur, ok.map((e) => ({ k: valeur ? 'lu' : 'nonlu', id: e.id, at: e.at })));", "", 'Lu / Non lu n’écrit pas'],
   ['facture', "if (!(await deps.askConfirm({ title: `Envoyer ${prets.length} facture", "if (false && !(await deps.askConfirm({ title: `Envoyer ${prets.length} facture", 'factures envoyées sans confirmation'],
@@ -79,6 +91,17 @@ async function verifier(textes) {
   ok(R.resumeSerie({ faits: [1], pasFaits: [{ raison: 'a' }, { raison: 'b' }] }) === '1 fait · 2 pas faits : 1 a, 1 b', 'R14 plusieurs raisons : chacune comptée');
   ok(R.resumeSerie({ faits: [1, 2], pasFaits: [] }) === '2 faits', 'R15 tout fait : pas de « 0 pas fait »');
   }
+  // (16 nov., lot ventes-selection) Les lignes SÉLECTIONNABLES = celles dessinées, sans les estompées.
+  if (typeof R.clesSelectionnables !== 'function' || typeof R.portee !== 'function') ok(false, 'R16 clesSelectionnables / portee existent');
+  else {
+    const dess = [{ tx: 1, u: 'a' }, { tx: 2, u: 'b' }, { tx: 3, u: 'a' }, { tx: 3, u: 'a' }, { tx: null, u: 'a' }, null];
+    const c = R.clesSelectionnables(dess, { cle: (o) => o.tx, exclue: (o) => o.u !== 'a' });
+    ok(c.join() === '1,3', 'R16 sélectionnables : dessinées, sans l’autre compte, sans double ni ligne sans clé', c.join());
+    const histo = Array.from({ length: 2003 }, (_, i) => ({ tx: i }));
+    ok(R.clesSelectionnables(histo.slice(0, 60), { cle: (o) => o.tx }).length === 60, 'R17 60 dessinées sur 2 003 ⇒ 60 (jamais l’historique)');
+    const p = R.portee([1, 2, 3], (x) => (x === 2 ? true : 'pas de bordereau'));
+    ok(p.n === 1 && p.m === 3, 'R18 « 1 sur 3 » : la règle de l’action, ligne par ligne', JSON.stringify(p));
+  }
   // ── 2. LES BRANCHEMENTS ──
   const app = sansCommentaires(textes.app), stock = sansCommentaires(textes.stock), boite = sansCommentaires(textes.boite), fac = sansCommentaires(textes.facture), ge = sansCommentaires(textes.geste);
   const tranche = (t, debut, n = 2600) => { const i = t.indexOf(debut); return i < 0 ? '' : t.slice(i, i + n); };
@@ -102,6 +125,12 @@ async function verifier(textes) {
   ok(monte(app, 'serieAchats') && monte(app, 'serieVentes') && monte(stock, 'serieStock') && /attrsSerie=\{serie\.ligne\(/.test(boite) && boite.includes('<BarreSerie serie={serie}'), 'B12 UN mécanisme monté sur Achats, Ventes, Stock, E-mails (barre + case + ligne)');
   ok(/if \(e\.key === 'Escape' && !e\.defaultPrevented && !feuilleOuverte\(\)\)/.test(ge) && /if \(e\.pointerType !== 'touch' \|\| actif\) return;/.test(ge) && /e\.shiftKey && ancre\.current != null/.test(ge), 'B13 Échap (après une feuille), appui long au doigt, Maj-clic à la souris');
   ok(/deps\.push\(serieVentes\.actif \?/.test(app), 'B14 une ligne de vente mémoïsée se redessine quand on la coche');
+  // (16 nov., lot ventes-selection)
+  ok(/const ordreVentesSerie = useMemo\(\(\) => clesSelectionnables\(\s*ventesGroupees \? ventesGroupees\.entrees[^;]*ventesAffichees\.slice\(0, ventesMax\),\s*\{ cle: \(o\) => o\.transaction_id, exclue: estFloute \}\)/.test(app), 'B15 Ventes : la sélection = les lignes DESSINÉES du compte mis en avant');
+  ok(/const ordreAchatsSerie = useMemo\(\(\) => clesSelectionnables\(\s*achatsGroupees \? achatsGroupees\.entrees[^;]*achatsAffiches\.slice\(0, achatsMax\),\s*\{ cle: \(x\) => x\.o\.transaction_id, exclue: \(x\) => estFloute\(x\.o\) \}\)/.test(app), 'B16 Achats : la même règle');
+  ok(/useSelectionSerie\(ordreVentesSerie, \{ nom: 'ventes', vue: JSON\.stringify\(\[vFilter, selEff/.test(app) && /useSelectionSerie\(ordreAchatsSerie, \{ nom: 'achats', vue: JSON\.stringify\(\[aFilter, selEff/.test(app), 'B17 changer de filtre ou de compte vide la sélection (Ventes, Achats)');
+  ok(/if \(vueAvant\.current !== vue\) \{ vueAvant\.current = vue; vider\(\); \}/.test(ge) && /if \(!visibles\.has\(k\)\) return;/.test(ge) && /addEventListener\('scroll', surDefile/.test(ge), 'B18 une autre vue vide ; une ligne pas sélectionnable ne se coche pas ; un défilement annule l’appui long');
+  ok(/racine\.setAttribute\('data-serie-ouverte'/.test(ge) && /disabled=\{!n \|\| occupe \|\| !!a\.desactive \|\| zero\}/.test(ge) && /portee: \(cles\) => portee\(lignes\(cles\), peutImprimer\)/.test(app), 'B19 la barre prend la place de la barre du bas ; « Imprimer · N sur M », grisé à 0');
   return res;
 }
 

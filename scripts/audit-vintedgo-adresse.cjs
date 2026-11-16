@@ -157,7 +157,9 @@ const ban = (feats) => ({ type: 'FeatureCollection', features: feats.map((f) => 
 
   await essaie('E. Colis branche la règle', async () => {
     const A = fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8').replace(/\/\/[^\n]*/g, '');
-    dit(/const lieuDeLigne = \(t(?:, a)?\) => \{[^}]*lieuCompleteParTransporteur\(lieuDe\(t && t\.lieu\), \(t && t\.transp\) \|\| \(tpmC && k \? tpmC\.get\(k\)/.test(A), 'les cartes « À retirer » complètent le lieu par la ligne `transp_` du MÊME n° (`suiviDeLigne`)', '');
+    // (16 nov.) Depuis le 15 nov., le lieu de base peut être le point de l'ACHAT relié quand l'e-mail dit « chez le transporteur »
+    // (`base`) ; la complétion reste celle de la ligne `transp_` du MÊME n° (`k = suiviDeLigne(t)`).
+    dit(/const lieuDeLigne = \(t(?:, a)?\) => \{ const k = suiviDeLigne\(t\);[^}]*lieuCompleteParTransporteur\(lieuDe\((?:t && t\.lieu|base)\), \(t && t\.transp\) \|\| \(tpmC && k \? tpmC\.get\(k\)/.test(A) || /const lieuDeLigne = \(t(?:, a)?\) => \{[^}]*lieuCompleteParTransporteur\(lieuDe\(t && t\.lieu\), \(t && t\.transp\) \|\| \(tpmC && k \? tpmC\.get\(k\)/.test(A), 'les cartes « À retirer » complètent le lieu par la ligne `transp_` du MÊME n° (`suiviDeLigne`)', '');
     dit(/for \(const t of \(pickupUnion\.emailList \|\| \[\]\)\) \{\s*const a = achatDuColis\(t, buysBase, indexSuivisAchats\); const lu = lieuDeLigne\(t(?:, a)?\);/.test(A), '… pour les e-mails « à retirer »', '');
     dit(/const lu = x\.kind === 'email' \? lieuDeLigne\(x\.t(?:, o)?\)/.test(A), '… et pour les « à vérifier »', '');
     const C = fs.readFileSync(path.join(R, 'src', 'CarteRelais.jsx'), 'utf8');

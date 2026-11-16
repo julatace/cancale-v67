@@ -85,7 +85,9 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').m
   dit(/const rangerColisEnvoi = \(tous\) => ordreRecent\(tous, quandColisAEnvoyer\)/.test(app), 'S5 « À envoyer », Préparer, la tournée : `rangerColisEnvoi` = la règle unique');
   dit(/const colisAEnvoyerRanges = \(\) => \{[^\n]*rangerColisEnvoi\(/.test(app) && /const colisPreparer = \(\) => \{\s*let ranges = \[\]; try \{ ranges = colisAEnvoyerRanges\(\)/.test(app), 'S6 « Préparer mes colis » suit l’ordre de la liste');
   const env = bloc('const exT = rangerColisEnvoi(tousF', 9000);
-  dit(!!env && !/data-groupe-transp/.test(env) && /filtresTransporteurs\(tous/.test(app), 'S7 « À envoyer » : aucun groupe par transporteur, une pastille (filtre)');
+  // (16 nov.) Depuis le 15 nov. (« transporteur connu »), les tuiles-filtres de « À envoyer » passent par
+  // `tuilesTransporteursConnus(tous, …)` (src/colisEnvoyes.js), qui appelle `filtresTransporteurs` : la même pastille.
+  dit(!!env && !/data-groupe-transp/.test(env) && (/filtresTransporteurs\(tous/.test(app) || (/tuilesTransporteursConnus\(tous, /.test(app) && /return \{ tuiles: filtresTransporteurs\(L, tr\)/.test(lire('src/colisEnvoyes.js')))), 'S7 « À envoyer » : aucun groupe par transporteur, une pastille (filtre)');
   dit(/ordonner: ordreRecentPoints/.test(app), 'S8 « À retirer » : les points rangés par arrivée lue');
   dit(/LigneSansDate/.test(app), 'S9 « sans date lue » est dit');
   dit(/ordreRecent\(/.test(lire('src/ecrans/Vestiaire.jsx')) && /ordreRecent\(/.test(lire('src/ecrans/Ebay.jsx')), 'S10 Vestiaire et eBay : la règle unique');
