@@ -231,14 +231,11 @@ li[data-fp-a-envoyer-etat="a-annuler"] .vrm-fp-rangee-txt > span { color: var(--
 .vrm-fp-pastille svg { flex-shrink: 0; }
 .vrm-fp-pastille[data-fp-pastille="aenvoyer"], .vrm-fp-pastille[data-fp-pastille="averifier"] { color: var(--vrm-warn, #b25000); border-color: color-mix(in srgb, var(--vrm-warn, #b25000) 40%, transparent); }
 .vrm-fp-pastille:focus-visible { outline: 2px solid var(--vrm-accent, #0071e3); outline-offset: 2px; }
-/* Au téléphone : posée à droite de la ligne de l'état, en position absolue (aucune hauteur) ;
-   à l'ordinateur : dans la rangée du compte, sous le titre. Une seule des deux est montrée. */
+/* Posée à droite de la ligne de l'état, sous la frise, en position absolue (aucune hauteur) —
+   au téléphone comme à l'ordinateur (colonne « État »). */
 :root:root body .vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-frise:has(> .vrm-fp-pastille-hote), :root:root body .vrm-app-shell .vrm-main .vrm-sale-row > .vrm-ledger-sale-toggle:has(> .vrm-fp-pastille-hote) { position: relative; }
 :root:root body .vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-frise > .vrm-fp-pastille-hote[data-ou="tel"] { position: absolute; right: 0; bottom: 0; margin: 0; white-space: nowrap; z-index: 1; }
 :root:root body .vrm-app-shell .vrm-main .vrm-sale-row > .vrm-ledger-sale-toggle > .vrm-fp-pastille-hote[data-ou="tel"] { position: absolute; right: 52px; bottom: 10px; margin: 0; white-space: nowrap; z-index: 1; }
-.vrm-ledger-sale-sous .vrm-fp-pastille-hote { margin-left: 8px; white-space: nowrap; }
-@media (max-width: 1023.98px) { .vrm-fp-pastille-hote[data-ou="bureau"] { display: none !important; } }
-@media (min-width: 1024px) { .vrm-fp-pastille-hote[data-ou="tel"] { display: none !important; } }
 /* La pastille ne grandit JAMAIS la ligne : aucune hauteur minimale de cible (la règle des 44 px
    des boutons ne s'applique pas à elle) ; sa zone de toucher est agrandie SANS place prise. */
 :root:root body .vrm-fp-pastille { min-height: 0 !important; min-width: 0 !important; height: auto !important; position: relative; }
