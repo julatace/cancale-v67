@@ -46,6 +46,24 @@ function fauxInbound(R) {
     }
     return true;
   };
+  // (15 nov., lot retour-parfait) Les filtres `meta->>x` / `data->>x` (eq., is.null, in.) servis comme
+  // la base — SUR DEMANDE (`filtresMeta(true)`) : les audits d'avant gardent la fausse base qu'ils
+  // connaissent. `meta` = les scalaires de premier niveau de `data` (≤ 600 car.) + `_pdf` (migration 004).
+  let avecFiltresMeta = false;
+  const metaDe = (d) => { const o = {}; if (d && typeof d === 'object') for (const [k, v] of Object.entries(d)) if (['string', 'number', 'boolean'].includes(typeof v) && JSON.stringify(v).length <= 600) o[k] = v; if (d && d.pdfB64) o._pdf = true; return o; };
+  const condMeta = (u, d) => {
+    if (!avecFiltresMeta) return true;
+    for (const [k, v] of u.searchParams.entries()) {
+      const m = /^(meta|data)->>(\w+)$/.exec(k);
+      if (!m || (m[1] === 'data' && m[2] === 'rev')) continue;
+      const val = m[1] === 'meta' ? metaDe(d)[m[2]] : (d || {})[m[2]];
+      const x = val == null ? null : String(val);
+      if (v === 'is.null') { if (x != null) return false; }
+      else if (v.startsWith('eq.')) { if (x !== v.slice(3)) return false; }
+      else if (v.startsWith('in.(')) { if (!v.slice(4, -1).split(',').map((y) => y.replace(/^"|"$/g, '')).includes(x)) return false; }
+    }
+    return true;
+  };
   const projette = (l, sel) => {
     if (!sel || sel === 'data' || sel === 'id,data' || sel === 'owner,data' || sel === '*') return { id: l.id, owner: l.owner, data: l.data };
     const o = {};
@@ -80,7 +98,7 @@ function fauxInbound(R) {
     if (m === 'PATCH') {
       const b = JSON.parse(opts.body || '{}');
       const fi = filtreId(u), fo = filtreOwner(u);
-      const cibles = lignes().filter((l) => fi(l.id) && fo(l.owner) && condRev(u, l.data));
+      const cibles = lignes().filter((l) => fi(l.id) && fo(l.owner) && condRev(u, l.data) && condMeta(u, l.data));
       if (cibles.some((l) => enPanne(l.id))) return rep({ message: 'indisponible' }, 503);
       for (const l of cibles) { base.set(`${l.owner}|${l.id}`, b.data !== undefined ? b.data : l.data); ecritures.push(l.id); }
       return rep(cibles.map((l) => ({ id: l.id })));
@@ -89,7 +107,7 @@ function fauxInbound(R) {
     const sel = u.searchParams.get('select') || '';
     if (sel === 'owner' && u.searchParams.get('limit') === '1') return rep([]);
     const fi = filtreId(u), fo = filtreOwner(u);
-    return rep(lignes().filter((l) => fi(l.id) && fo(l.owner)).map((l) => projette(l, sel)));
+    return rep(lignes().filter((l) => fi(l.id) && fo(l.owner) && condMeta(u, l.data)).map((l) => projette(l, sel)));
   };
   const faireRes = () => { const r = { code: null, corps: null }; r.status = (n) => { r.code = n; return r; }; r.json = (o) => { r.corps = o; return r; }; r.setHeader = () => {}; r.send = () => r; r.end = () => r; return r; };
   let route = null, n = 0;
@@ -105,6 +123,6 @@ function fauxInbound(R) {
   const vider = () => { base.clear(); ecritures.length = 0; base.set(`${A}|vrm_email_owners`, { adresses: { 'boite@banc.test': { owner: A } } }); };
   vider();
   const ids = (re) => lignes().filter((l) => re.test(l.id));
-  return { A, base, comptes, ecritures, recoit, vider, ids, charger, panne: (f) => { enPanne = f || (() => false); } };
+  return { A, base, comptes, ecritures, recoit, vider, ids, charger, fauxFetch, panne: (f) => { enPanne = f || (() => false); }, filtresMeta: (b) => { avecFiltresMeta = !!b; } };
 }
 module.exports = { fauxInbound, A };

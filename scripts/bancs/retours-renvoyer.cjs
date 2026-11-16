@@ -201,7 +201,7 @@ const cartes = (pg, racine) => pg.evaluate((rac) => [...document.querySelectorAl
           await pg.click('[data-retours-achat] [data-retour-depose="r:990009601"]');
           await pg.waitForTimeout(500);
           const d = await pg.evaluate(() => { const bt = document.querySelector('[data-retours-achat] [data-retour-depose="r:990009601"]'); const c = document.querySelector('[data-retours-achat] [data-retour-cle="r:990009601"]'); return { pressed: bt && bt.getAttribute('aria-pressed'), etape: c && c.getAttribute('data-retour-etape'), txt: c && (c.querySelector('[data-retour-phrase-etape]') || {}).innerText }; });
-          dit(d.pressed === 'true' && d.etape === 'depose' && /Déposé le/.test(d.txt || ''), `${nom} : « Déposé » (SON clic) s’enfonce, la carte dit « Déposé le … »`, JSON.stringify(d));
+          dit(d.pressed === 'true' && d.etape === 'depose' && /Déposé\s+\d{1,2} \S+ · noté par toi/.test(d.txt || ''), `${nom} : « Déposé » (SON clic) s’enfonce, l’étape dit « Déposé · <date> · noté par toi »`, JSON.stringify(d));
           await pg.click('[data-retours-achat] [data-retour-imprimer="990009602"]');
           await pg.waitForSelector('[data-visionneuse-pdf="pret"]', { timeout: 15000 }).catch(() => {});
           const ouvert = await pg.$('[data-visionneuse-pdf="pret"]');

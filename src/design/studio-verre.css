@@ -303,7 +303,7 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
   .vrm-day-task-list, .vrm-buy-list, .vrm-msg-list, .vrm-colis-carte, .vrm-a-venir, .vrm-colis-prochain, .vrm-ann-geste, details.vrm-quick-settings,
   .vrm-ann-card, .vrm-settings-todo, .vrm-sv-tuile, .vrm-sv-carte, .vrm-onglet-manque, .vrm-d7-carte, .vrm-fp-section, .vrm-boite-liste-col,
   .vrm-rpf-point, .vrm-sx, .vrm-pa-carte, .vrm-carte-mfa, .vrm-sp-rec, .vrm-compta-replis, .vrm-argent-w, .vrm-at-carte, .vrm-compta-groupe,
-  .vrm-ui-afaire-corps, .vrm-acc, .vrm-toast, .vrm-surface, .vrm-ac-carte, .vrm-fc-carte, .vrm-d7-rapport, .vrm-pm-case, .vrm-fc-pastille, .vrm-d7-btn, .vrm-cx-form, .vrm-cx-etiquettes > *, .vrm-cx-marque i, .vrm-statistiques-premium > .vrm-stats-repli
+  .vrm-ui-afaire-corps, .vrm-acc, .vrm-toast, .vrm-surface, .vrm-ac-carte, .vrm-fc-carte, .vrm-d7-rapport, .vrm-pm-case, .vrm-fc-pastille, .vrm-d7-btn, .vrm-cx-form, .vrm-cx-etiquettes > *, .vrm-cx-marque i, .vrm-statistiques-premium > .vrm-stats-repli, .vrm-ret-carte
 ) {
   --sb-encre: var(--sv-encre) !important; --d-encre: var(--sv-encre) !important; --vrm-ink: var(--sv-encre) !important; --vrm-text: var(--sv-encre) !important;
   --p-encre: var(--sv-encre) !important; --w-encre: var(--sv-encre) !important; --fu-encre: var(--sv-encre) !important; --bx-encre: var(--sv-encre) !important;

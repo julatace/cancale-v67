@@ -243,6 +243,11 @@ const TXT = {
     retourLivreCorps: "Le remboursement suit sous 2 jours, sauf problème signalé.",
     rembourse: (e) => (e ? `Remboursé · ${e}` : "Remboursé"),
     rembourseCorps: "Le remboursement d’un de tes achats est arrivé.",
+    // (15 nov., lot retour-parfait) Le rappel de la date limite d'un retour : la veille au soir, le matin du jour.
+    retourVeille: (av) => (av ? `Retour à déposer ${av}` : 'Retour à déposer demain'),
+    retourVeilleCorps: 'Imprime le bordereau, emballe, dépose le colis.',
+    retourJour: 'Dernier jour pour ton retour',
+    retourJourCorps: (h) => (h ? `À déposer avant ${h}` : 'À déposer aujourd’hui'),
     offre: (e) => (e ? `Offre de ${e}` : 'Nouvelle offre'),
     offreCorps: 'Accepte, refuse ou contre-propose',
     expire24: 'expire dans 24 h',
@@ -287,6 +292,10 @@ const TXT = {
     retourLivreCorps: "The refund follows within 2 days unless a problem is reported.",
     rembourse: (e) => (e ? `Refunded · ${e}` : "Refunded"),
     rembourseCorps: "A refund for one of your purchases has arrived.",
+    retourVeille: (av) => (av ? `Return to drop off ${av}` : 'Return to drop off tomorrow'),
+    retourVeilleCorps: 'Print the label, pack it, drop the parcel off.',
+    retourJour: 'Last day for your return',
+    retourJourCorps: (h) => (h ? `Drop it off before ${h}` : 'Drop it off today'),
     offre: (e) => (e ? `Offer of ${e}` : 'New offer'),
     offreCorps: 'Accept, decline or counter',
     expire24: 'expires in 24 h',
@@ -330,6 +339,10 @@ const TXT = {
     retourLivreCorps: "El reembolso llega en 2 días salvo problema señalado.",
     rembourse: (e) => (e ? `Reembolsado · ${e}` : "Reembolsado"),
     rembourseCorps: "Ha llegado el reembolso de una de tus compras.",
+    retourVeille: (av) => (av ? `Devolución ${av}` : 'Devolución mañana'),
+    retourVeilleCorps: 'Imprime la etiqueta, embala y entrega el paquete.',
+    retourJour: 'Último día para tu devolución',
+    retourJourCorps: (h) => (h ? `Entrégala antes de las ${h}` : 'Entrégala hoy'),
     offre: (e) => (e ? `Oferta de ${e}` : 'Nueva oferta'),
     offreCorps: 'Acepta, rechaza o contraoferta',
     expire24: 'caduca en 24 h',
@@ -373,6 +386,10 @@ const TXT = {
     retourLivreCorps: "Il rimborso arriva entro 2 giorni salvo problemi segnalati.",
     rembourse: (e) => (e ? `Rimborsato · ${e}` : "Rimborsato"),
     rembourseCorps: "È arrivato il rimborso di un tuo acquisto.",
+    retourVeille: (av) => (av ? `Reso da consegnare ${av}` : 'Reso da consegnare domani'),
+    retourVeilleCorps: 'Stampa l’etichetta, imballa e consegna il pacco.',
+    retourJour: 'Ultimo giorno per il tuo reso',
+    retourJourCorps: (h) => (h ? `Consegnalo entro le ${h}` : 'Consegnalo oggi'),
     offre: (e) => (e ? `Offerta di ${e}` : 'Nuova offerta'),
     offreCorps: 'Accetta, rifiuta o fai una controfferta',
     expire24: 'scade tra 24 h',
@@ -416,6 +433,10 @@ const TXT = {
     retourLivreCorps: "Die Erstattung folgt in 2 Tagen, außer bei einem Problem.",
     rembourse: (e) => (e ? `Erstattet · ${e}` : "Erstattet"),
     rembourseCorps: "Die Erstattung eines deiner Käufe ist da.",
+    retourVeille: (av) => (av ? `Rücksendung abgeben ${av}` : 'Rücksendung morgen abgeben'),
+    retourVeilleCorps: 'Etikett drucken, einpacken, Paket abgeben.',
+    retourJour: 'Letzter Tag für deine Rücksendung',
+    retourJourCorps: (h) => (h ? `Abgeben bis ${h}` : 'Heute abgeben'),
     offre: (e) => (e ? `Angebot über ${e}` : 'Neues Angebot'),
     offreCorps: 'Annehmen, ablehnen oder Gegenangebot',
     expire24: 'läuft in 24 h ab',
@@ -514,6 +535,19 @@ const SORTES = {
     const a = nomCourt(d.article);
     const { title, reste } = titreAvecObjet(T.retourLivre, a, d.article);
     return { title, body: joindre(reste, T.retourLivreCorps), ligne: a };
+  },
+  // (15 nov., lot retour-parfait) Le rappel d'un retour pas encore déposé : `quand` 'veille' (le soir,
+  // « Retour à déposer avant demain 10 h ») ou 'jour' (le matin du dernier jour, « Dernier jour pour ton
+  // retour » / « À déposer avant 10 h »). L'heure est celle LUE (Paris) ; sans heure lue, aucune n'est dite.
+  retourRappel: (d, T, ctx) => {
+    const a = nomCourt(d.article);
+    const lm = Date.parse(str(d.limite));
+    if (d.quand === 'jour') {
+      const p = d.heure !== false && Number.isFinite(lm) ? partsParis(lm) : null;
+      return { title: T.retourJour, body: joindre(T.retourJourCorps(p ? heureTexte(p.h, p.mi, ctx.langue) : ''), a), ligne: a };
+    }
+    const av = avantClair(d.heure === false && d.jour ? d.jour : d.limite, ctx);
+    return { title: couperMot(T.retourVeille(av), TITRE_MAX), body: joindre(a, T.retourVeilleCorps), ligne: a };
   },
   rembourse: (d, T, ctx) => {
     const e = montantClair(d.montant, ctx.langue), a = nomCourt(d.article);

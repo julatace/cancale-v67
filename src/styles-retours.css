@@ -64,6 +64,35 @@
 :root:root body .vrm-renv-suivi { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; }
 :root:root body .vrm-renv-logo { display: inline-flex; align-items: center; }
 :root:root body .vrm-renv-carte button.vrm-renv-copier { min-height: 44px !important; height: auto !important; padding: 0; background: none; color: var(--ret-encre) !important; font: 600 14px/1.2 var(--sb-police-texte, system-ui, sans-serif); font-variant-numeric: tabular-nums; letter-spacing: .01em; overflow-wrap: anywhere; text-align: left; }
+/* (15 nov., lot retour-parfait) La maquette « Verre dépoli » (achats-retour) : la bande ambre de la date limite,
+   les étapes jusqu'au remboursement (rond plein + coche = prouvé ; rond ambre = où il en est ; rond creux = à
+   venir ; gris = passé sans preuve), « Imprimer le bordereau » sur toute la largeur, « Déposé » avec sa coche.
+   Ambre = le geste à faire (§7) ; aucun rouge. */
+:root:root body .vrm-renv-bande { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 16px; background: var(--ret-bande-fond, #FFE7C4); color: var(--ret-bande-encre, #5E3900); border: 1px solid var(--ret-bande-bord, rgb(178 106 0 / .22)); min-width: 0; }
+:root:root body .vrm-renv-bande-ic { flex: 0 0 auto; display: inline-flex; color: currentColor; }
+:root:root body .vrm-renv-bande-ic svg { width: 20px; height: 20px; }
+:root:root body .vrm-renv-bande-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+:root:root body .vrm-renv-bande-txt > b { font: 700 15px/1.3 var(--sb-police-texte, var(--vrm-police, system-ui, sans-serif)); color: inherit; overflow-wrap: anywhere; }
+:root:root body .vrm-renv-bande .vrm-ret-limite, :root:root body .vrm-renv-bande .vrm-ret-limite.is-presse { font: inherit; color: inherit; }
+:root:root body .vrm-renv-bande-txt > span { font: 550 13px/1.35 var(--sb-police-texte, var(--vrm-police, system-ui, sans-serif)); color: inherit; overflow-wrap: anywhere; }
+:root[data-theme="dark"] { --ret-bande-fond: rgb(242 182 94 / .14); --ret-bande-encre: #F2B65E; --ret-bande-bord: rgb(242 182 94 / .30); }
+:root:root body .vrm-renv-etapes { list-style: none; margin: 0; padding: 4px 2px 2px; display: flex; flex-direction: column; }
+:root:root body .vrm-renv-et { display: grid; grid-template-columns: 22px minmax(0, auto) minmax(0, 1fr); align-items: center; gap: 10px; min-height: 30px; position: relative; }
+:root:root body .vrm-renv-et + .vrm-renv-et::before { content: ""; position: absolute; left: 10px; top: -9px; height: 12px; width: 2px; border-radius: 1px; background: var(--ret-trait, rgb(12 29 48 / .14)); }
+:root:root body .vrm-renv-et > i { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--ret-rond, #FFFFFF); box-shadow: inset 0 0 0 2px var(--ret-rond-bord, rgb(12 29 48 / .22)); color: var(--ret-rond-coche, #FFFFFF); font-style: normal; }
+:root:root body .vrm-renv-et.is-fait > i { background: var(--ret-encre); box-shadow: none; color: var(--ret-carte-plein, #FFFFFF); }
+:root:root body .vrm-renv-et.is-ici > i { background: var(--ret-bande-fond, #FFE2B8); box-shadow: inset 0 0 0 2px var(--ret-ambre); }
+:root:root body .vrm-renv-et.is-saute > i { background: transparent; box-shadow: inset 0 0 0 2px var(--ret-trait, rgb(12 29 48 / .14)); }
+:root:root body .vrm-renv-et > b { font: 650 14px/1.25 var(--sb-police-texte, var(--vrm-police, system-ui, sans-serif)); color: var(--ret-gris); overflow-wrap: anywhere; }
+:root:root body .vrm-renv-et.is-fait > b, :root:root body .vrm-renv-et.is-ici > b { color: var(--ret-encre); }
+:root:root body .vrm-renv-et > span { font: 600 13px/1.25 var(--sb-police-texte, var(--vrm-police, system-ui, sans-serif)); color: var(--ret-gris); text-align: right; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+:root:root body .vrm-renv-et.is-ici > span { color: var(--ret-ambre); font-weight: 700; }
+:root[data-theme="dark"] { --ret-trait: rgb(255 255 255 / .16); --ret-rond: rgb(255 255 255 / .06); --ret-rond-bord: rgb(255 255 255 / .28); --ret-carte-plein: #0C1D30; }
+:root:root body .vrm-renv-carte .vrm-ret-imprimer { flex: 1 1 100%; flex-direction: column; align-items: stretch; }
+:root:root body .vrm-renv-carte button.vrm-renv-imprimer { width: 100%; justify-content: center; min-height: 48px; font-weight: 700; }
+:root:root body .vrm-renv-carte button.vrm-renv-depose { gap: 6px; }
+:root:root body .vrm-renv-carte button.vrm-renv-depose > svg { width: 14px; height: 14px; }
+:root:root body .vrm-renv-carte button.vrm-renv-depose[aria-pressed="false"] > svg { opacity: .35; }
 /* « Tout imprimer » → Retours : une ligne par bordereau de retour. */
 :root:root body .vrm-ret-tip-ligne { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 16px; min-width: 0; border-top: 1px solid var(--ret-tuile); }
 :root:root body .vrm-ret-tip-ligne:first-of-type { border-top: 0; }

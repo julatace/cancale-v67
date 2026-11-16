@@ -82,6 +82,8 @@ export const texteRetourAchat = ({ article = '', limite = '' } = {}) => fabrique
 export const texteRetourDepose = ({ article = '', transporteur = '' } = {}) => fabrique('retourDepose', { article, transporteur });
 export const texteRetourLivre = ({ article = '' } = {}) => fabrique('retourLivre', { article });
 export const texteRembourse = ({ montant = null, article = '' } = {}) => fabrique('rembourse', { montant, article });
+// (15 nov., lot retour-parfait) Le rappel de la date limite d'un retour pas encore déposé (cron : soir = la veille, matin = le jour).
+export const texteRetourRappel = ({ article = '', limite = '', quand = 'veille', heure = true, jour = '' } = {}) => fabrique('retourRappel', { article, limite, quand, heure, jour });
 
 // Le rappel du cron « offres au-dessus de ton prix mini » (api/ship-reminders.js).
 export const texteOffresMini = (n) => ({
