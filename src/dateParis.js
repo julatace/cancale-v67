@@ -64,6 +64,16 @@ export const moisRecents = (n, maintenant = Date.now()) => {
   return out;
 };
 
+// (16 nov., lot compta-donnees) Arithmétique de JOUR sur le texte 'AAAA-MM-JJ' (aucun fuseau en
+// jeu : midi UTC, puis les composants UTC) — '' si illisible. Les écrans qui recopiaient
+// `Date.UTC(…).toISOString().slice(0, 10)` passent ici.
+export const decalerJour = (jour, n) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(jour || ''));
+  if (!m) return '';
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + Math.trunc(Number(n) || 0), 12));
+  return Number.isFinite(d.getTime()) ? `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}` : '';
+};
+
 // Clé 'AAAA-MM-JJ' d'une date de CALENDRIER construite par ses composants
 // (`new Date(an, mois, jour)` d'une grille, d'un sélecteur) : elle se lit dans le fuseau où elle
 // a été construite. À n'utiliser QUE pour une date de calendrier, jamais pour un instant capté

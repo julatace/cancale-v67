@@ -34,6 +34,7 @@ const COMBINANT = /[̀-ͯ]/g;
 
 // Une normalisation qui garde la LONGUEUR (un signe pour un signe) : les positions
 // trouvées dans le texte normalisé sont celles du texte tapé.
+import { jourParis as jourParisRegle, decalerJour as decalerJourRegle } from './dateParis.js';
 export function normaliserPhrase(s) {
   let out = '';
   for (const c of str(s)) {
@@ -211,19 +212,10 @@ const RE = (() => {
 })();
 
 // La date du jour à Paris (« 2026-11-14 ») et ses voisines — sans horloge cachée.
-export function jourParis(ms) {
-  // L'heure de Paris sans Intl (rapide, la même partout) : UTC+1, UTC+2 du dernier dimanche de mars
-  // (1 h UTC) au dernier dimanche d'octobre (1 h UTC) — la règle européenne.
-  const d = new Date(ms); const y = d.getUTCFullYear();
-  const dernierDimanche = (m) => { const x = new Date(Date.UTC(y, m + 1, 0, 1)); x.setUTCDate(x.getUTCDate() - x.getUTCDay()); return x.getTime(); };
-  const ete = ms >= dernierDimanche(2) && ms < dernierDimanche(9);
-  return new Date(ms + (ete ? 2 : 1) * 3600000).toISOString().slice(0, 10);
-}
-export function decalerJour(jour, n) {
-  const [y, m, d] = String(jour).split('-').map(Number);
-  const t = new Date(Date.UTC(y, m - 1, d + n));
-  return t.toISOString().slice(0, 10);
-}
+// (16 nov., lot compta-donnees) Le jour de Paris et l'arithmétique de jour de src/dateParis.js
+// (une seule règle : Intl Europe/Paris, secours européen sans Intl).
+export function jourParis(ms) { return jourParisRegle(ms); }
+export function decalerJour(jour, n) { return decalerJourRegle(jour, n); }
 const jourSemaine = (jour) => { const [y, m, d] = jour.split('-').map(Number); return (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7; };   // 0 = lundi
 
 // ══ ANALYSER : la phrase ⇒ des filtres (avec la place de leurs mots) ══

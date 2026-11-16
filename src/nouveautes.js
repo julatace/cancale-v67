@@ -12,7 +12,8 @@
 //   date    'AAAA-MM-JJ', le jour de la mise en ligne, du plus récent au plus ancien ;
 //   titre   8 mots au plus ;  phrase  12 mots au plus ;
 //   tab     un écran que `?tab=` sait ouvrir (ONGLETS_LIENS d'App.jsx) ;
-//   pour    'tous' · 'sneakers' · 'autre' (pas que des sneakers) · 'pro' (micro, société, marge) ;
+//   pour    'tous' · 'sneakers' · 'autre' (pas que des sneakers) · 'pro' (micro, société, marge) ·
+//           'proprietaire' (16 nov. : le propriétaire de l'installation SEUL — Julien ; pas su ⇒ caché) ;
 //   mode    'tous' · 'complet' (un écran que l'affichage Simple ne montre pas).
 //
 // L'état « vu » : `vrm_nouveautes_vues` = { vues: { [id]: iso } }, dans SYNC_KEYS
@@ -20,12 +21,15 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 export const CLE_NOUVEAUTES_VUES = 'vrm_nouveautes_vues';
-export const POUR = Object.freeze(['tous', 'sneakers', 'autre', 'pro']);
+export const POUR = Object.freeze(['tous', 'sneakers', 'autre', 'pro', 'proprietaire']);
 export const MODES = Object.freeze(['tous', 'complet']);
 export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (16 nov., lot compta-donnees) docs/passation/2026-11-16-compta-donnees.md
+  { id: 'partenaires-prorata', date: '2026-11-16', titre: 'Partenaires : remboursement partiel, commission au prorata', phrase: '1 € rendu sur 16,99 € : il reste 2,82 € dus.', tab: 'settings', pour: 'proprietaire', mode: 'tous' },
+  { id: 'serie-facture-vrm', date: '2026-11-16', titre: 'Factures en série : envoyer avec VRM', phrase: 'Ta boîte pas connectée ? VRM les envoie, toi en copie.', tab: 'compta', pour: 'pro', mode: 'tous' },
   // (15 nov., maquettes validées : « tout est parfait ») docs/passation/2026-11-15-refonte-ventes.md
   { id: 'ventes-verre', date: '2026-11-15', titre: 'Ventes : colis cochés, place dans le stock', phrase: 'Chaque colis dit où est le carton ; imprime les cochés.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'achats-code-comptoir', date: '2026-11-15', titre: 'Le code de retrait en grand au comptoir', phrase: 'Un chiffre par case, « Je l’ai retiré » juste dessous.', tab: 'achats', pour: 'tous', mode: 'tous' },
@@ -280,14 +284,16 @@ export const lireVues = (r) => {
 //   vend        'sneakers' | 'autre' | null
 //   categories  les tuiles de « Tu vends quoi ? » (null = pas répondu)
 //   pro         true | false | null (régime micro, société ou marge)
+//   proprietaire true | false | null (le propriétaire de l'installation ; pas su ⇒ caché)
 //   mode        'simple' | 'complet'
-export function pourLui(n, { vend = null, categories = null, pro = null, mode = 'complet' } = {}) {
+export function pourLui(n, { vend = null, categories = null, pro = null, proprietaire = null, mode = 'complet' } = {}) {
   if (!n) return false;
   if (n.mode === 'complet' && mode === 'simple') return false;
   const cats = Array.isArray(categories) ? categories : null;
   if (n.pour === 'sneakers') return vend === 'sneakers' || !!(cats && cats.includes('sneakers'));
   if (n.pour === 'autre') return vend === 'autre' && !(cats && cats.length === 1 && cats[0] === 'sneakers');
   if (n.pour === 'pro') return pro === true;
+  if (n.pour === 'proprietaire') return proprietaire === true;
   return n.pour === 'tous';
 }
 
