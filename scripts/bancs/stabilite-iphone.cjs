@@ -127,7 +127,8 @@ function stabilite() {
   const feuille = document.querySelector('.vrm-fs, [role="dialog"][aria-modal="true"], .vrm-garde-feuille');
   const sc = window.__vrmDefileur();
   if (!feuille && sc && sc.scrollHeight > sc.clientHeight + 40) {
-    const avant = sc.scrollTop; sc.scrollTop = avant + 120; const bouge = sc.scrollTop !== avant; sc.scrollTop = avant;
+    // vers le bas, et vers le haut (déjà tout en bas après une mesure, il ne peut que remonter)
+    const avant = sc.scrollTop; sc.scrollTop = avant + 120; let bouge = sc.scrollTop !== avant; if (!bouge) { sc.scrollTop = avant - 120; bouge = sc.scrollTop !== avant; } sc.scrollTop = avant;
     if (!bouge) out.bloque = `${nom(sc)} ne défile pas (haut ${sc.scrollHeight}, vu ${sc.clientHeight}, overflow-y ${getComputedStyle(sc).overflowY})`;
   }
   return out;
