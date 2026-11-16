@@ -133,6 +133,7 @@ async function contrastePixels(pg, el) {
   try { buf = await pg.screenshot({ clip: { x: Math.max(0, info.x), y: Math.max(0, info.y), width: Math.max(2, info.w), height: Math.max(2, info.h) }, animations: 'disabled' }); } catch (_) {}
   await el.evaluate((e) => { const g = e.getAttribute('data-banc-style'); if (g) e.setAttribute('style', g); else e.removeAttribute('style'); e.removeAttribute('data-banc-style'); });
   if (!buf) return null;
+  if (process.env.BANC_DEBUG) { console.log('    (contraste ' + JSON.stringify(info) + ')'); fs.writeFileSync(path.join(CAPT || '.', 'sm-debug-' + Math.round(info.y) + '.png'), buf); }
   return pg.evaluate(async ({ b64, couleur }) => {
     const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode();
     const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d'); x.drawImage(img, 0, 0);
@@ -241,7 +242,7 @@ async function contrastePixels(pg, el) {
       dit(boutons.length > 0 && sansMot.length === 0, `${t} · H : chaque bouton de la tête porte un mot (sauf la poignée)`, boutons);
       dit(boutons.every((x) => !x.petit), `${t} · G : boutons de la tête ≥ ${tel ? 44 : 40} px`, boutons.filter((x) => x.petit));
       const lien = await pg.$('[data-stock-explication-ouvrir]');
-      if (lien) { await lien.scrollIntoViewIfNeeded(); await pg.waitForTimeout(200); const ct = await contrastePixels(pg, lien); dit(ct != null && ct >= 4.5, `${t} · H : « Comment ça marche ? » lisible (${ct}:1)`); }
+      if (lien) { await lien.evaluate((e) => e.scrollIntoView({ block: 'center' })); await pg.waitForTimeout(400); const ct = await contrastePixels(pg, lien); dit(ct != null && ct >= 4.5, `${t} · H : « Comment ça marche ? » lisible (${ct}:1)`); }
       else dit(!!(await pg.$('[data-stock-aide]')), `${t} · H : « Comment ça marche ? » rangé sous l'aide « ? »`);
 
       // ── G : cibles et largeur ──
