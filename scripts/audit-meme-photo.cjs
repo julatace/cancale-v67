@@ -228,7 +228,7 @@ function pixels(nom, w = 64, h = w) {
     const rel = corps('async function relierParPhoto(', 3200);
     dit(/k: 'vrm_lbc_liens', type: 'cle', id, apres: n,/.test(rel) && /pairId: String\(vintedId\), numero: n/.test(rel) && /k: LIENS_EBAY, type: 'cle'/.test(rel) && /await relierVc\(\{ productId: id, item: String\(vintedId\), numVinted: n/.test(rel),
       'R7 · Relier pose l’identité EXISTANTE de chaque site (vrm_lbc_liens = N°, vrm_ebay_liens = { pairId, numero }, relierVc)', rel.slice(0, 200));
-    dit(/const lien = liens \? liens\[iid\] : null;\s*\n\s*if \(lien != null && String\(lien\)\.trim\(\)\) return cleNum\(lien\);/.test(corps('const numeroLbcIdentite = ', 600)) && /return x && x\.pairId \? x : null/.test(corps('const lienEbay = ', 300)) && /numerosVcAvecLiens\(vcCarte\('vrm_vc_numeros'\), vcCarte\('vrm_vc_liens'\)\)/.test(app),
+    dit(/const lien = liens \? liens\[iid\] : null;\s*\n\s*if \(lien != null && String\(lien\)\.trim\(\)\) return cleNum\(lien\);/.test(corps('const numeroLbcIdentite = ', 600)) && /return x && x\.pairId \? x : null/.test(corps('const lienEbay = ', 300)) && (/numerosVcAvecLiens\(vcCarte\('vrm_vc_numeros'\), vcCarte\('vrm_vc_liens'\)\)/.test(app) || (/numerosVcAvecLiens\(vcCarte\('vrm_vc_numeros'\), liensVcLus\(\)\)/.test(app) && /const liensVcLus = \(\) => liensVcAvecPhoto\(vcCarte\('vrm_vc_liens'\),/.test(app))),
       'R7 · ce sont les liens que lisent numeroLbcIdentite, lienEbay et numerosVcEffectifs (le retrait ailleurs)', '');
     const aut = corps('async function annoncesAutresMemePhoto(', 2400);
     dit(/comptesLbcSession\(/.test(aut) && /if \(!siens\.has\(idCompteLbcApp\(/.test(aut), 'R7 · Leboncoin : seulement SES annonces (compte connecté chez lui, ou lien posé) — `lbc_listings` garde aussi celles d’autres vendeurs', '');
@@ -362,9 +362,10 @@ function pixels(nom, w = 64, h = w) {
       // §5 : « sûr » propose, SON toucher relie — aucun chemin ne relie seul.
       const appSrc = app.replace(/^\s*\/\/.*$/gm, '');
       const appels = (appSrc.match(/relierParPhoto\s*\(/g) || []).length, refs = (appSrc.match(/\brelierParPhoto\b/g) || []).length;
+      // (16 nov., photo-identite-sites) le calcul LIT ses liens posés (identités par le code d'origine) : une lecture, jamais une écriture.
       const charge = corps('async function chargerMemePhoto(', 4000).split('\nif (typeof window')[0].replace(/^\s*\/\/.*$/gm, '');
       const regles = (fs.readFileSync(path.join(RACINE, 'src', 'photoFine.js'), 'utf8') + fs.readFileSync(path.join(RACINE, 'src', 'memePhoto.js'), 'utf8')).replace(/\/\/.*$/gm, '');
-      dit(appels === 1 && refs === 2 && /onRelier=\{relierParPhoto\}/.test(appSrc) && !/relier|gesteVrm|vrm_lbc_liens|LIENS_EBAY|relierVc/.test(charge) && !/fetch\(|save\(|localStorage|withOwner|gesteVrm/.test(regles),
+      dit(appels === 1 && refs === 2 && /onRelier=\{relierParPhoto\}/.test(appSrc) && !/relier|gesteVrm|vrm_lbc_liens|LIENS_EBAY|relierVc/.test(charge.replace(/load\('vrm_lbc_liens', \{\}\) \|\| \{\}/g, '')) && !/fetch\(|save\(|localStorage|withOwner|gesteVrm/.test(regles),
         'F6 · §5 : relier n’a lieu que sur SON toucher (`onRelier`), même « sûr » ; le calcul et les règles n’écrivent rien', JSON.stringify({ appels, refs, charge: /relier|gesteVrm/.test(charge) }));
     }
     {

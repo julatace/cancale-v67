@@ -26,6 +26,9 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (16 nov., lot photo-identite-sites — Julien : « VRM la reconnaît parce que la photo utilisée est exactement la même »)
+  // docs/passation/2026-11-16-photo-identite-sites.md
+  { id: 'photo-identite', date: '2026-11-16', titre: 'Même photo d’origine : même N°', phrase: 'Envoyée depuis ton Chrome sur Leboncoin : elle prend le N° Vinted.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (16 nov., lot retirer-case-compact) docs/passation/2026-11-16-retirer-case-compact.md
   { id: 'stock-case-allumee', date: '2026-11-16', titre: 'Stock : la case vendue reste allumée', phrase: 'Touche-la quand l’article est sorti ; « Annuler » la remet.', tab: 'garage', pour: 'tous', mode: 'tous' },
   // (16 nov., bancs-rouges-a) docs/passation/2026-11-16-bancs-rouges-a.md

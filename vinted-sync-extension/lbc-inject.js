@@ -59,7 +59,7 @@
   }
   if (window.__vrmLbcInjected) return; window.__vrmLbcInjected = true;
   const TAG = 'CANCALE_LBC';
-  const CAPTEUR_VERSION='5.393.0';
+  const CAPTEUR_VERSION='5.401.0';
   // ⚠️⚠️ 5.362 (revue, moyennes 60 et 63) — UN CANAL PRIVÉ AVEC lbc-relay.js POUR
   //    LES ORDRES. Les ordres du fond (pause, suppression, réponse — leur jeton, le
   //    texte du message) et leurs résultats passaient par `window.postMessage(…,'*')` :
@@ -1078,15 +1078,46 @@
       return !(Number(taille) > 8000000);
     } catch (_) { return false; }
   };
+  // ── LE CODE D'ORIGINE DE SES PHOTOS (16 nov., 5.401, lot photo-identite-sites) ──
+  // Quand LUI envoie une photo (`POST api/pintad/v1/public/upload/image`, le fichier choisi), le
+  // SHA-256 du fichier est calculé ICI (aucune requête de plus, l'image ne part nulle part) ; après
+  // le 2xx de Leboncoin, le NOM d'image rendu (`<40 hex>.jpg`, celui que portent ensuite les adresses
+  // des photos de l'annonce, toutes tailles) voyage avec son code. Jamais l'image.
+  const RE_UPLOAD_LBC = /\/api\/pintad\/v\d+\/public\/upload\/image(?:[?#]|$)/i;
+  const imageDuCorpsLbc = (b) => {
+    try {
+      if (typeof Blob !== 'undefined' && b instanceof Blob) return /^image\//i.test(b.type || '') ? b : null;
+      if (typeof FormData !== 'undefined' && b instanceof FormData) { let x = null; b.forEach((v) => { if (!x && typeof Blob !== 'undefined' && v instanceof Blob && /^image\//i.test(v.type || '')) x = v; }); return x; }
+    } catch (_) {}
+    return null;
+  };
+  const codeOrigineLbc = (b) => {
+    const img = imageDuCorpsLbc(b);
+    if (!img || img.size > 25 * 1024 * 1024 || !(window.crypto && crypto.subtle)) return null;
+    return img.arrayBuffer().then((a) => crypto.subtle.digest('SHA-256', a)).then((h) => Array.from(new Uint8Array(h), (o) => o.toString(16).padStart(2, '0')).join('')).catch(() => null);
+  };
+  const notePhotoOrigineLbc = (meth, url, status, lireTexte, codeP) => {
+    try {
+      if (!codeP || String(meth || '').toUpperCase() !== 'POST' || !RE_UPLOAD_LBC.test(String(url || ''))) return;
+      const st = Number(status); if (!(st >= 200 && st < 300)) return;
+      Promise.all([codeP, Promise.resolve().then(lireTexte)]).then(([code, t]) => {
+        let j = null; try { j = JSON.parse(t); } catch (_) {}
+        const m = /([0-9a-f]{40})\.(?:jpe?g|png|webp)/i.exec(String((j && (j.filename || j.url)) || ''));
+        if (m && /^[0-9a-f]{64}$/.test(String(code || ''))) post({ kind: 'lbcphotoorigine', fichier: m[1].toLowerCase(), code });
+        else post({ kind: 'lbcphotoorigine', fichier: null, cles: j && typeof j === 'object' ? Object.keys(j).slice(0, 12) : [] });
+      }).catch(() => {});
+    } catch (_) {}
+  };
   const origFetch = window.fetch;
   if (origFetch) {
     window.fetch = commeNatif(function (input, init) {
-      let url = '', meth = 'GET', corpsReq = null, corpsRetrait = null;
+      let url = '', meth = 'GET', corpsReq = null, corpsRetrait = null, codeEnvoi = null;
       try {
         url = (typeof input === 'string') ? input : (input instanceof URL ? input.href : (input && input.url) || '');
         meth = (init && init.method) || (typeof input === 'object' && input && input.method) || 'GET';
       } catch (_) {}
       try { if (MODIFIE.test(meth)) noteEnvoi(url, init && init.body, meth); } catch (_) {}
+      try { if (String(meth).toUpperCase() === 'POST' && RE_UPLOAD_LBC.test(url)) codeEnvoi = codeOrigineLbc(init && init.body); } catch (_) {}   // 16 nov. (5.401)
       // La liste d'un vendeur : son corps de requête dit si elle peut DÉCIDER (22 oct.).
       try { if (init && typeof init.body === 'string' && LISTE_VENDEUR(url)) corpsReq = init.body; } catch (_) {}
       try { noterEntetes(url, init && init.headers); } catch (_) {}
@@ -1106,6 +1137,7 @@
             if (/vinted|supabase/i.test(url)) return; // ne touche pas aux autres domaines
             const ct = res.headers && res.headers.get && res.headers.get('content-type');
             noteSeen(url, meth, res.status, ct);
+            if (codeEnvoi) notePhotoOrigineLbc(meth, url, res.status, () => res.clone().text(), codeEnvoi);   // 16 nov. (5.401)
             if (corpsRetrait) noterRetraitPage(url, meth, corpsRetrait, res.status);
             if (MODIFIE.test(meth) && /\/messaging\//i.test(url)) noteEnvoiMsgLbc(url, meth, res.status, init && typeof init.body === 'string' ? init.body : null, init && init.headers);
             else if (MODIFIE.test(meth)) noteEnvoiPrixLbc(url, meth, res.status, init && typeof init.body === 'string' ? init.body : null, init && init.headers);
@@ -1124,6 +1156,7 @@
     if (origSetH) OX.prototype.setRequestHeader = commeNatif(function (k, v) { try { (this.__lbcH = this.__lbcH || {})[String(k)] = String(v); } catch (_) {} return origSetH.apply(this, arguments); }, origSetH);
     OX.prototype.send = commeNatif(function (corps) {
       try { if (MODIFIE.test(this.__lbcMeth || '')) noteEnvoi(this.__lbcUrl || '', corps, this.__lbcMeth); } catch (_) {}
+      try { this.__lbcCode = (String(this.__lbcMeth || '').toUpperCase() === 'POST' && RE_UPLOAD_LBC.test(String(this.__lbcUrl || ''))) ? codeOrigineLbc(corps) : null; } catch (_) {}   // 16 nov. (5.401)
       try { this.__lbcCorpsMsg = (typeof corps === 'string' && /\/messaging\//i.test(this.__lbcUrl || '')) ? corps : null; } catch (_) {}
       try { this.__lbcCorpsPrix = (typeof corps === 'string' && corps.length < 4000 && MODIFIE.test(this.__lbcMeth || '')) ? corps : null; } catch (_) {}
       try { this.__lbcCorps = (typeof corps === 'string' && LISTE_VENDEUR(this.__lbcUrl || '')) ? corps : null; this.__lbcRetrait = (typeof corps === 'string' && RETRAIT_PAGE.test(this.__lbcUrl || '')) ? corps : null; noterEntetes(this.__lbcUrl || '', this.__lbcH); } catch (_) {}
@@ -1134,6 +1167,7 @@
             if (/vinted|supabase/i.test(url)) return;
             const ct = this.getResponseHeader && this.getResponseHeader('content-type');
             noteSeen(url, this.__lbcMeth, this.status, ct);
+            if (this.__lbcCode) notePhotoOrigineLbc(this.__lbcMeth, url, this.status, () => { try { return this.responseType === 'json' ? JSON.stringify(this.response) : (this.responseType === '' || this.responseType === 'text') ? this.responseText : ''; } catch (_) { return ''; } }, this.__lbcCode);   // 16 nov. (5.401)
             if (this.__lbcRetrait) noterRetraitPage(url, this.__lbcMeth, this.__lbcRetrait, this.status);
             if (MODIFIE.test(this.__lbcMeth || '') && /\/messaging\//i.test(url)) noteEnvoiMsgLbc(url, this.__lbcMeth, this.status, this.__lbcCorpsMsg, this.__lbcH);
             else if (MODIFIE.test(this.__lbcMeth || '')) noteEnvoiPrixLbc(url, this.__lbcMeth, this.status, this.__lbcCorpsPrix, this.__lbcH);

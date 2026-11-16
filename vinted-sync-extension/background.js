@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.393.0';
+const CODE_VERSION = '5.401.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -3773,7 +3773,7 @@ async function commandeParcours(msg,sender){return parcoursSerie(async()=>{
 });}
 
 // --- Messages venant de content.js ----------------------------------------
-const PAGE_SORTES_PREUVE = new Set(['label', 'receipt', 'suppression', 'vacances', 'writereq', 'fiche', 'publication', 'brouillon', 'brouillonPublie']);
+const PAGE_SORTES_PREUVE = new Set(['label', 'receipt', 'suppression', 'vacances', 'writereq', 'fiche', 'publication', 'brouillon', 'brouillonPublie', 'photoOrigine', 'annoncePhotos']);
 function canalPageDouteux(msg) {
   if (msg && msg.canal === 'douteux') return true;
   let orion = false; try { orion = !!globalThis.__vrmOrionCompat; } catch (_) {}
@@ -4453,6 +4453,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           // Les OCTETS des photos, pour les ATTACHER au formulaire au lieu de
           // les télécharger sur son disque. Le fond les lit parce que le CDN de
           // Vinted ne renvoie aucun en-tête CORS : la page seule ne peut pas.
+          // 16 nov. (5.401) : le code d'origine (SHA-256) d'une photo qu'il vient d'envoyer à Leboncoin (2xx).
+          if (msg.action === 'lbcPhotoOrigine') {
+            if (sender?.frameId > 0 || !/^https:\/\/(?:[a-z0-9-]+\.)*leboncoin\.fr\//i.test(sender?.tab?.url || '')) { sendResponse({ ok: false }); return; }
+            const ok = msg.fichier ? await noterPhotoOrigineLbc(msg) : (noterDiag('origine_lbc_forme_inconnue'), false);
+            sendResponse({ ok: ok === true }); return;
+          }
           if (msg.action === 'photoBytes' && Array.isArray(msg.urls)) { const ph = await photosEnOctets(msg.urls, msg.max); sendResponse({ ok: true, photos: ph }); return; }
           // Ce que la page Leboncoin porte vraiment. Aucune donnée d'annonce :
           // juste de quoi savoir si la capture a pu lire quelque chose. Sans ça,
@@ -4803,6 +4809,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   } else if (msg.kind === 'publication') {
     if (msg.itemId) noterPublication(sender && sender.tab ? sender.tab.id : null, msg.itemId, msg.status);
     else noterDiag('publication_forme_inconnue');
+  } else if (msg.kind === 'photoOrigine') {
+    // 16 nov. (5.401) : le code d'origine (SHA-256) d'une photo qu'il vient d'envoyer à Vinted (2xx).
+    if (msg.photoId && !(sender && sender.frameId > 0)) noterPhotoOrigineVinted(msg, domain).catch(() => {});
+    else noterDiag('origine_photo_forme_inconnue');
+  } else if (msg.kind === 'annoncePhotos') {
+    if (msg.itemId && !(sender && sender.frameId > 0)) noterAnnoncePhotosVinted(msg, domain).catch(() => {});
   } else if (msg.kind === 'brouillon') {
     // 28 oct. : un brouillon qu'il vient d'ENREGISTRER sur Vinted (2xx) — son
     // corps, pour le mettre en ligne depuis VRM (`noterBrouillonVinted`).
@@ -8588,6 +8600,93 @@ async function empreintesSitesUnTour() {
   noterDiag('empreintes_sites_calculee');
   await rangerEmpreintesSites(false);
   return 1;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 5.401 (16 nov.) — LE CODE D'ORIGINE DE SES PHOTOS (lot photo-identite-sites)
+// ══════════════════════════════════════════════════════════════════════════════
+// Julien : « non pas à quoi elle ressemble, mais son CODE » ; « vas-y, fais ça au moins ».
+// MESURÉ : Vinted et Leboncoin réencodent ce qu'il téléverse (tailles refaites, une « règle » par
+// taille) : le code des photos SERVIES ne se retrouve jamais d'un site à l'autre. Le code exact
+// (SHA-256) est donc celui du FICHIER D'ORIGINE, calculé dans la page au moment où LUI l'envoie
+// (inject.js / lbc-inject.js) — une LECTURE de son geste, aucune requête de plus vers un site.
+//   · Vinted : photo envoyée (identifiant rendu par Vinted ⇒ code), gardée ici 3 jours au plus,
+//     puis l'annonce qu'il enregistre (`assigned_photos`) ⇒ `photo_origine_vinted.annonces[itemId]`
+//     = { codes, compte, at } — seulement pour le compte CONNECTÉ dans l'onglet (porte `compteNonCapte`) ;
+//   · Leboncoin : le nom d'image rendu ⇒ `photo_origine_lbc.images[nom]` = { code, at }.
+// Lire-fusionner-réécrire : une lecture ratée n'écrit rien (la file reste) ; lignes bornées.
+// L'app (src/photoOrigine.js) : un code porté par UN seul N° ⇒ l'annonce Leboncoin porte ce N°.
+const ORIGINE_PHOTOS_VINTED = 'vrm_origine_photos_vinted';   // { [photoId]: { code, uid, at } }
+const ORIGINE_FILE = 'vrm_origine_file';                    // [{ ligne, cle, val }]
+const LIGNE_ORIGINE = { vinted: 'photo_origine_vinted', lbc: 'photo_origine_lbc' };
+const ORIGINE_ATTENTE_MS = 3 * 24 * 3600e3, ORIGINE_ATTENTE_MAX = 400, ORIGINE_LIGNE_MAX = 4000;
+const codeOrigineValide = (c) => typeof c === 'string' && /^[0-9a-f]{64}$/.test(c);
+let _origineChaine = Promise.resolve();
+const enChaineOrigine = (f) => { const r = _origineChaine.then(f, f); _origineChaine = r.then(() => {}, () => {}); return r; };
+async function noterPhotoOrigineVinted(msg, domain) {
+  const id = String((msg && msg.photoId) || ''), code = String((msg && msg.code) || '');
+  if (!/^\d{1,15}$/.test(id) || !codeOrigineValide(code) || !/(^|\.)vinted\.[a-z.]+$/i.test(String(domain || ''))) { noterDiag('origine_photo_refusee'); return false; }
+  let uid = null; try { uid = await activeUidForDomain(domain); } catch (_) { uid = null; }
+  if (!uid) { noterDiag('origine_photo_sans_compte'); return false; }
+  if (await compteNonCapte(uid)) { noterDiag('origine_photo_compte_non_capte'); return false; }
+  return enChaineOrigine(async () => {
+    let m = {}; try { m = (await chrome.storage.local.get(ORIGINE_PHOTOS_VINTED))[ORIGINE_PHOTOS_VINTED] || {}; } catch (_) { return false; }
+    const now = Date.now();
+    m[id] = { code, uid: String(uid), at: now };
+    const vivants = Object.entries(m).filter(([, e]) => e && now - Number(e.at || 0) < ORIGINE_ATTENTE_MS).sort((a, b) => Number(b[1].at) - Number(a[1].at)).slice(0, ORIGINE_ATTENTE_MAX);
+    try { await chrome.storage.local.set({ [ORIGINE_PHOTOS_VINTED]: Object.fromEntries(vivants) }); } catch (_) { return false; }
+    noterDiag('origine_photo_notee');
+    return true;
+  });
+}
+async function noterAnnoncePhotosVinted(msg, domain) {
+  const itemId = String((msg && msg.itemId) || '');
+  const ids = Array.isArray(msg && msg.photoIds) ? msg.photoIds.map(String).filter((x) => /^\d{1,15}$/.test(x)).slice(0, 30) : [];
+  if (!/^\d{4,15}$/.test(itemId) || !ids.length || !/(^|\.)vinted\.[a-z.]+$/i.test(String(domain || ''))) return false;
+  let uid = null; try { uid = await activeUidForDomain(domain); } catch (_) { uid = null; }
+  if (!uid || await compteNonCapte(uid)) return false;
+  // La photo envoyée juste avant (même onglet) peut être encore dans la chaîne : on l'attend.
+  await enChaineOrigine(async () => true);
+  let m = {}; try { m = (await chrome.storage.local.get(ORIGINE_PHOTOS_VINTED))[ORIGINE_PHOTOS_VINTED] || {}; } catch (_) { return false; }
+  // Seulement les photos envoyées par CE compte (jamais celles d'un autre compte du même Chrome).
+  const codes = [...new Set(ids.map((p) => m[p]).filter((e) => e && String(e.uid) === String(uid) && codeOrigineValide(e.code)).map((e) => e.code))];
+  if (!codes.length) return false;
+  return enfilerOrigine({ ligne: LIGNE_ORIGINE.vinted, cle: itemId, val: { codes, compte: String(uid), at: new Date().toISOString() } });
+}
+async function noterPhotoOrigineLbc(msg) {
+  const nom = String((msg && msg.fichier) || ''), code = String((msg && msg.code) || '');
+  if (!/^[0-9a-f]{40}$/.test(nom) || !codeOrigineValide(code)) { noterDiag('origine_lbc_refusee'); return false; }
+  return enfilerOrigine({ ligne: LIGNE_ORIGINE.lbc, cle: nom, val: { code, at: new Date().toISOString() } });
+}
+async function enfilerOrigine(e) {
+  return enChaineOrigine(async () => {
+    let f = []; try { f = (await chrome.storage.local.get(ORIGINE_FILE))[ORIGINE_FILE] || []; } catch (_) { return false; }
+    f.push(e);
+    try { await chrome.storage.local.set({ [ORIGINE_FILE]: f.slice(-2000) }); } catch (_) { return false; }
+    return rangerOrigineMaintenant();
+  });
+}
+// Lire-fusionner-réécrire chaque ligne ; une lecture ou une écriture ratée garde la file (rejouée au prochain geste).
+async function rangerOrigineMaintenant() {
+  let f = []; try { f = (await chrome.storage.local.get(ORIGINE_FILE))[ORIGINE_FILE] || []; } catch (_) { return false; }
+  if (!f.length) return true;
+  const restent = [];
+  for (const ligne of [...new Set(f.map((e) => e && e.ligne).filter(Boolean))]) {
+    const liste = f.filter((e) => e && e.ligne === ligne);
+    const champ = ligne === LIGNE_ORIGINE.lbc ? 'images' : 'annonces';
+    const r = await sbGet(`app_data?id=eq.${ligne}&select=a:data->payload->${champ}`);
+    if (r === null) { restent.push(...liste); noterDiag('origine_lecture_ratee'); continue; }
+    const carte = Object.assign({}, (r[0] && r[0].a && typeof r[0].a === 'object') ? r[0].a : {});
+    for (const e of liste) {
+      if (champ === 'annonces') { const avant = carte[e.cle] && Array.isArray(carte[e.cle].codes) ? carte[e.cle].codes : []; carte[e.cle] = Object.assign({}, e.val, { codes: [...new Set([...avant, ...e.val.codes])].slice(0, 30) }); }
+      else carte[e.cle] = e.val;
+    }
+    const gardes = Object.entries(carte).sort((a, b) => String((b[1] && b[1].at) || '').localeCompare(String((a[1] && a[1].at) || ''))).slice(0, ORIGINE_LIGNE_MAX);
+    const ok = await supabaseUpsert('app_data', [{ id: ligne, data: { type: 'photo_origine', capturedAt: new Date().toISOString(), nItems: gardes.length, payload: { version: 1, [champ]: Object.fromEntries(gardes) } } }], 'id');
+    if (ok === false) { restent.push(...liste); noterDiag('origine_ecriture_ratee'); } else noterDiag('origine_ecrite');
+  }
+  try { await chrome.storage.local.set({ [ORIGINE_FILE]: restent }); } catch (_) {}
+  return !restent.length;
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
