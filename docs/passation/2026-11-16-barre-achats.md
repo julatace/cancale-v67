@@ -63,5 +63,17 @@
   disque : 3 à gauche, 2 à droite) — accepté pour garder chaque cible ≥ 44 px.
 
 ## ÉTAT À LA REPRISE
-- Voir la PR du lot (fusionnée ou non, dit dans le rapport). Geste de Julien : aucun (l'app se met à jour).
-- À regarder sur SON iPhone : glisser depuis le bord sur Argent ne doit plus montrer Ma journée.
+- **PR #1201 ouverte, NON fusionnée** (règle du 16 nov. : zéro rouge pour fusionner). La CI de `main` est déjà
+  rouge sur tous les jobs que ce lot touche (Audits 1-3, Bancs 1-3, parcours-critiques) ; comparée ligne à ligne à
+  celle de la PR #1181 (dernier main) : **aucun rouge nouveau** — Audits 69 KO contre 70 (extension-zip réparé),
+  Bancs 1 identique (nouveau-vendeur 18 défauts), Bancs 3 : 5 lignes de main réparées (iphone-reprise « aucun
+  libellé coupé » ×4, colis-retirer-propre « pastille d'Achats ») et seule différence la garde réseau
+  d'accessibilite-clavier (12 requêtes au lieu de 8, même rouge) ; Bancs 2 coupé à 45 min (comme sur main) avant
+  d'atteindre `barre-achats` ; parcours-critiques : mêmes échecs, mêmes messages.
+- En local (machine saturée) : audits 70 KO, tous KO aussi sur origin/main ; `barre-achats` 85 ✅ ; `studio-coque`
+  0 ❌ ; `navigation-tache` exactement les 14 rouges d'avant ; `refonte-coque` : H2 (déjà rouge avant) ; la partie R
+  d'`iphone-reprise` (reprise) varie d'un passage à l'autre sous la charge (jamais la même ligne).
+- À faire pour fusionner : remettre `main` au vert (hors de ce lot) ou décision de Julien ; puis vrai merge de
+  origin/main, CI, fusion. Allonger le délai du job Bancs 2 (45 min) pour que `barre-achats` y tourne.
+- Geste de Julien : aucun. À regarder sur SON iPhone après la mise en ligne : glisser depuis le bord sur Argent ne
+  doit plus montrer Ma journée ; Achats est dans la barre.
