@@ -442,6 +442,7 @@ sans la fonction.
 
 | capacité | fonction de l'extension | arrivée en | ce que l'app promet |
 |---|---|---|---|
+| `fichepublier` `empreinteebay` | `annoncerFicheAPublier` · `empreintesImagesPourApp` | **5.395.0** (16 nov.) | « Ouvrir Vinted » d'une fiche (SON clic) ⇒ la 1re page de dépôt (30 min) montre et réserve LE N° DE LA FICHE, lié à l'annonce créée (`items[id].fiche`) ; l'empreinte d'une photo `i.ebayimg.com` (droit d'hôte, sans cookie, 5/demande, 60/h, empreinte seule) pour « même photo » eBay |
 | `memephotosure` `versementsauto` `photovrm` `vcaimes` | `verifFineUnTour` · `ordrePlusRecentes` · `noterPhotosVrm` · `offrirAuxAimesVc` | **5.393.0** (16 nov. ; 5.386–5.392 jamais servies) | « Même photo · sûr » : 2e mesure sur les deux images (empreinte ≤ 10 ET s ≥ 0,85 ET r ≥ 0,998), 6 couples/h dans le budget de lecture, eBay toujours « à vérifier » ; dates de versement lues du plus récent ; photos réglées par Republier reconnues ; Vestiaire : offres aux « aimés » comme Vinted (son clic, compte de l'onglet, 15/h) |
 | `memephoto` | `empreintesSitesUnTour` | **5.384.0** (15 nov.) | « Même photo · à relier » : empreinte des photos Leboncoin/Vestiaire (compte de l'onglet, 1 image/45 s, ≤ 8 des 20 lectures/h, empreinte seule) ; proposition seulement à distance ≤ 12 (`SEUIL_MEME_PHOTO`), deux paires possibles ⇒ il choisit ; relier = SON clic |
 | `numerotes` | `annoncerNumerotes` | **5.382.0** (15 nov.) | les N° neufs que VRM vient de donner aux annonces publiées hors de VRM (app Vinted) dits une fois : bandeau, notification, et « VRM a numéroté » dans la carte du logo (identités `id:N°`, compte de l'onglet) ; « je numérote moi-même » ⇒ l'app DEMANDE le N° de chaque nouvel article |
@@ -487,6 +488,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **16 nov. · Extension 5.395.0 (lot extension-restes)** : « Mondial Relay by InPost » = Mondial Relay ; N° de la fiche à côté de « Publier » ; empreintes eBay par l'extension ; Créer sur Vinted reprend le studio ; anti-arnaque compte « Tous » ; avis bas datés dans la santé des comptes ; « pas partie » prévenu par le serveur (passage de 15 min) ; offres « par VRM ». `docs/passation/2026-11-16-extension-restes.md`. Geste : installer 5.395.0.
 - **16 nov. · Extension 5.393.0 (vague C)** : verre de la carte du logo, du site et des e-mails ; « même photo · sûr » vérifiée sur les deux images ; dates de versement ; Vestiaire « aimés » comme Vinted ; scanner pour retrouver (disque « + ») ; banc `sante-donnees` réparé (aucune donnée réécrite à l'ouverture d'Achats). Geste : installer 5.393.0.
 - **16 nov. · Nouveautés (vague B)** : transporteur lu sur l'étiquette (jamais « inconnu », `src/colisEnvoyes.js`) ; plus de rangement sur un achat — l'atelier d'arrivée donne le N° puis la case sur la fiche (`casesProposees`) ; contrôle de nuit + santé des comptes + extension en retard (`src/fiabilite/`) ; baisse conseillée, relance des favoris, loupe universelle ; bilan du mois, alertes de seuils, bénéfice réel, sauvegarde zip ; écran de chargement verre. Récits `2026-11-15-*.md`. Geste : aucun.
 - **16 nov. · Écrans refaits sur les maquettes validées (vague A)** : Ma journée (seulement les gestes, « Tout va bien ? · N points », retours et litiges ensemble, paire à sortir en premier), Annonces 72 px, Ventes/Achats (colis cochés d'office, place du Stock par N°, code au comptoir), fiche D (un geste : « Relier · N € » sur son toucher), Argent, Messages (plein « Proposer N € »), Paramètres, rail ordinateur Vendre/Ranger/Compter ; « À envoyer » partout (`src/libelles.js`). `2026-11-15-refonte-journee.md`, `-refonte-ventes.md`, `-fiche-d.md`. Geste : aucun.
@@ -501,7 +503,7 @@ sans la fonction.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.393.0** (16 nov. : regroupe 5.386 verre de la carte, 5.388 même photo sûre, 5.390 versements, 5.392 deux comptes/aimés Vestiaire — jamais servies seules). **À lire en premier : `docs/passation/2026-11-16-passation.md`** (en ligne, en cours, reste à faire, gestes), puis `2026-11-10-passation-finale.md` et `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
+**Extension servie : 5.395.0** (16 nov. ; 5.394 réservée par un autre lot ; avant : 5.393.0, regroupe 5.386 verre de la carte, 5.388 même photo sûre, 5.390 versements, 5.392 deux comptes/aimés Vestiaire — jamais servies seules). **À lire en premier : `docs/passation/2026-11-16-passation.md`** (en ligne, en cours, reste à faire, gestes), puis `2026-11-10-passation-finale.md` et `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien

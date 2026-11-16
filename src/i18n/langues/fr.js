@@ -2159,7 +2159,7 @@ export default {
   "creerVinted.photo.retirer": "Retirer la photo {n}",
   "creerVinted.photo.lecture": "Lecture…",
   "creerVinted.photo.ajouter": "Ajouter des photos",
-  "creerVinted.photo.studio": {one: "1 photo de ton studio reprise : retire-la ou ajoutes-en.", other: "{n} photos de ton studio reprises : retire-les ou ajoutes-en."},
+  "creerVinted.photo.studio": {one: "{n} photo de ton studio reprise : retire-la ou ajoutes-en.", other: "{n} photos de ton studio reprises : retire-les ou ajoutes-en."},
   "creerVinted.fait": "Brouillon prêt sur Vinted ✓",
   "creerVinted.ouvrir": "Ouvrir sur Vinted",
   "creerVinted.aFinir": "À choisir sur Vinted : {liste}",
