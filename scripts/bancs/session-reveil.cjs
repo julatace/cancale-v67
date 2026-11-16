@@ -171,7 +171,10 @@ async function main() {
         console.log('     (texte rendu : ' + JSON.stringify(txt.slice(0, 160)) + ')');
         const tombe = /pas pu s'afficher|Unable to preload|Recharger/i.test(txt);
         dit(etatSrv.cssRefus === 1, 'D. le CSS d\'un ancien déploiement a bien été refusé une fois', `${etatSrv.cssRefus}`);
-        dit(navigations === 2, 'D. la page s\'est rechargée UNE fois (pas zéro, pas en boucle)', `${navigations} chargement(s)`);
+        // (16 nov., parcours-vert) Depuis le 15 nov. (chantier « ouverture », src/chargementSur.js) la page n'est
+        // rechargée QUE si le serveur sert une autre version ; ici la version est la même : le morceau est relancé
+        // sur place (sa feuille reposée). La règle : jamais une boucle (au plus un rechargement), l'app avec son style.
+        dit(navigations >= 1 && navigations <= 2, 'D. la page ne se recharge pas en boucle (au plus une fois)', `${navigations} chargement(s)`);
         const css = await pg.evaluate(() => [...document.styleSheets].some((f) => { try { return /\/assets\/App-.*\.css/.test(f.href || '') && f.cssRules.length > 0; } catch (_) { return false; } }));
         dit(!tombe && await pg.locator('.vrm-app-shell .vrm-main').isVisible() && css, 'D. l\'app s\'affiche AVEC sa feuille de style après le rechargement', `${txt.length} caractères, feuille de style ${css ? 'chargée' : 'ABSENTE (page sans mise en forme)'}`);
         etatSrv.cssPerime = false;

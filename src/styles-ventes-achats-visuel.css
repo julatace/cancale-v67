@@ -179,6 +179,13 @@ html body .vrm-fu-frise > .vrm-fu-seg { position: relative !important; }
   :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste:has(.vrm-sale-row[data-fu-forme]) > .vrm-ventes-entete > .is-droite { text-align: right !important; }
 }
 
+/* (16 nov., parcours-vert) De 1024 à 1279 px, la colonne « état + frise » (190 px) laissait 98 px au titre
+   (banc bureau-chargement : « le vrai titre reste visible en colonnes ») : elle passe à 140 px, en-tête compris. */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle { grid-template-columns: 56px minmax(0, 1fr) 140px 88px 96px !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-ventes-liste:has(.vrm-sale-row[data-fu-forme]) > .vrm-ventes-entete { grid-template-columns: 56px minmax(0, 1fr) 140px 88px 96px !important; }
+}
+
 /* Une rangée de note vide (aucune note sur la paire) ne laisse plus un trou de 8 px + un écart. */
 :root:root:root body .vrm-app-shell .vrm-main .vrm-sale-row[data-fu-forme] > .vrm-note-rangee:empty { display: none !important; }
 /* Téléphone : les colonnes de l'ordinateur (cachées, lues par VoiceOver) ne créent aucune rangée de grille. */
