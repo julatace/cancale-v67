@@ -82,7 +82,7 @@
     else if (d.kind === 'lbcprixappris' && d.recette && typeof d.recette === 'object') { try { transmettre({ from: 'cancale-lbc', action: 'lbcPrixAppris', recette: d.recette }); } catch (_) {} }
     else if (d.kind === 'lbcprixresultat' && typeof d.jeton === 'string') { const r = prixEnAttente.get(d.jeton); if (r) { prixEnAttente.delete(d.jeton); const pv = Number(d.prixVu); r({ ok: true, statut: Number(d.statut) || 0, cles: (Array.isArray(d.cles) ? d.cles : []).slice(0, 60).map((c) => String(c).slice(0, 120)), prixVu: d.prixVu != null && Number.isFinite(pv) && pv > 0 ? pv : null, erreur: String(d.erreur || '').slice(0, 80), defi: d.defi === true, ra: String(d.ra || '').slice(0, 40) }); } }
     // 5.370 : l'import de l'historique (modèle vu, résultat d'une page) — canal privé seulement.
-    else if(d.kind==='lbcimportmodele'&&typeof d.url==='string'){try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcImportModele',url:d.url.slice(0,600),moi:/^[a-z0-9_-]{1,64}$/i.test(String(d.moi||''))?String(d.moi):''});}catch(_){}}
+    else if(d.kind==='lbcimportmodele'&&typeof d.url==='string'){try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcImportModele',url:d.url.slice(0,600),moi:/^[a-z0-9_-]{1,64}$/i.test(String(d.moi||''))?String(d.moi):''},()=>{void chrome.runtime.lastError;});}catch(_){}}
     else if(d.kind==='lbcimportresultat'&&typeof d.jeton==='string'){const r=importsEnAttente.get(d.jeton);if(r){importsEnAttente.delete(d.jeton);r({ ok: true, statut: Number(d.statut) || 0, erreur: String(d.erreur || '').slice(0, 40), url: typeof d.url === 'string' ? d.url.slice(0, 600) : '', corps: typeof d.corps === 'string' ? d.corps.slice(0, 200000) : '', session: typeof d.session === 'string' ? d.session.slice(0, 80) : '', moi: /^[a-z0-9_-]{1,64}$/i.test(String(d.moi || '')) ? String(d.moi) : '' }); } }
   };
   window.addEventListener('message',event=>{
@@ -99,11 +99,11 @@
   const importsEnAttente=new Map();    // 5.365 : jeton → réponse au fond (une page de l'historique)
   const envoisEnAttente=new Map();     // 5.318 : jeton → réponse au fond (répondre dans un fil)
   const prixEnAttente=new Map();       // 5.363 : jeton → réponse au fond (changer un prix)
-  const diagnostic=(capteur,capteurVersion)=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur,relaisVersion:'5.393.0',capteurVersion});}catch(_){}};
+  const diagnostic=(capteur,capteurVersion)=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur,relaisVersion:'5.393.0',capteurVersion},()=>{void chrome.runtime.lastError;});}catch(_){}};
   diagnostic(false);
   // Enregistrer l'identité avant de traiter les annonces arrivées ensuite.
   const file=[];let enCours=false,tailleFile=0,identiteRefusee=false;
-  const signaler=erreurCapture=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur:true,erreurCapture});}catch(_){}};
+  const signaler=erreurCapture=>{try{chrome.runtime.sendMessage({from:'cancale-lbc',action:'lbcTransport',capteur:true,erreurCapture},()=>{void chrome.runtime.lastError;});}catch(_){}};
   // 5.335 (9 nov.) : ce que la page a lu PENDANT que l'extension n'était pas
   // connectée à VRM (le fond répond `sansSession`) n'est plus jeté : gardé ici
   // (en mémoire, ce document seulement, 48 messages / 4 Mo / 30 min au plus) et
@@ -171,12 +171,12 @@
     if(Number.isSafeInteger(d.__vrmSequence)){if(vus.has(d.__vrmSequence))return;vus.add(d.__vrmSequence);if(vus.size>256)vus.delete(vus.values().next().value);}
     if(d.kind==='lbcsessionprivee'&&d.preuve){try{transmettre({from:'cancale-lbc',action:'lbcSessionPrivee',url:d.url,preuve:d.preuve});}catch(_){}return;}
     if (d.kind === 'lbcraw' && d.body) { try { transmettre({ from: 'cancale-lbc', action: 'lbcRaw', url: d.url, body: d.body, session: typeof d.session === 'string' ? d.session.slice(0, 80) : '' }); } catch (_) {} }
-    else if (d.kind === 'lbccatalogue' && d.body) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcCatalogue', url: d.url, body: d.body, coupe: !!d.coupe }); } catch (_) {} }
-    else if (d.kind === 'lbcenvoi' && d.cles) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcEnvoi', url: d.url, methode: d.methode || '', cles: d.cles }); } catch (_) {} }
+    else if (d.kind === 'lbccatalogue' && d.body) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcCatalogue', url: d.url, body: d.body, coupe: !!d.coupe },()=>{void chrome.runtime.lastError;}); } catch (_) {} }
+    else if (d.kind === 'lbcenvoi' && d.cles) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcEnvoi', url: d.url, methode: d.methode || '', cles: d.cles },()=>{void chrome.runtime.lastError;}); } catch (_) {} }
     else if (d.kind === 'lbcvente' && d.body) { try { transmettre({ from: 'cancale-lbc', action: 'lbcVente', sequence:d.__vrmSequence,url: d.url, body: d.body, coupe: !!d.coupe,session:typeof d.session==='string'?d.session.slice(0,80):'' }); } catch (_) {} }
     else if(d.kind==='lbcblocage'){signaler(d.raison==='taille'?'taille':null);}
-    else if (d.kind === 'lbcpaths' && d.paths) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcPaths', paths: d.paths, url: location.href }); } catch (_) {} }
-    else if (d.kind === 'lbcschema' && d.cles) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcSchema', endpoint: d.endpoint, cles: d.cles }); } catch (_) {} }
+    else if (d.kind === 'lbcpaths' && d.paths) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcPaths', paths: d.paths, url: location.href },()=>{void chrome.runtime.lastError;}); } catch (_) {} }
+    else if (d.kind === 'lbcschema' && d.cles) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcSchema', endpoint: d.endpoint, cles: d.cles },()=>{void chrome.runtime.lastError;}); } catch (_) {} }
     // La messagerie : le NOMBRE de non-lus d'un compte, et la liste de ses comptes
     // liés (sans email). Jamais un texte de message (voir lbc-inject.js).
     else if (d.kind === 'lbcmsgcompteur' && d.userId) { try { transmettre({ from: 'cancale-lbc', action: 'lbcMsgCompteur', userId: String(d.userId).slice(0, 64), unread: Number(d.unread) }); } catch (_) {} }
@@ -199,7 +199,7 @@
       try { transmettre({ from: 'cancale-lbc', action: 'lbcFil', conv: String(d.conv), messages, lus: Number(d.lus) || 0, moi: /^[0-9a-z_-]{1,64}$/i.test(String(d.moi || '')) ? String(d.moi) : '', page: String(d.page || '').slice(0, 160), forme: (Array.isArray(d.forme) ? d.forme : []).slice(0, 80).map((c) => String(c).slice(0, 120)) }); } catch (_) {}
     }
     // 5.362 : la recette apprise et le résultat d'un envoi ne viennent QUE du canal privé (`traiterCanal`).
-    else if (d.kind === 'lbccomptes' && Array.isArray(d.comptes)) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcComptes', comptes: d.comptes.slice(0, 10).map((c) => ({ id: String(c.id || '').slice(0, 64), name: String(c.name || '').slice(0, 60), pro: !!c.pro })) }); } catch (_) {} }
+    else if (d.kind === 'lbccomptes' && Array.isArray(d.comptes)) { try { chrome.runtime.sendMessage({ from: 'cancale-lbc', action: 'lbcComptes', comptes: d.comptes.slice(0, 10).map((c) => ({ id: String(c.id || '').slice(0, 64), name: String(c.name || '').slice(0, 60), pro: !!c.pro })) },()=>{void chrome.runtime.lastError;}); } catch (_) {} }
   }, false);
   // ── METTRE EN PAUSE, SUR SON CLIC (22 octobre) ───────────────────────────
   // (29 oct.) et SUPPRIMER, sur son clic confirmé : même chemin, l'ordre dit lequel.

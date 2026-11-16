@@ -293,6 +293,9 @@ function ouvrirVRMDepuis(urlActive, opts) {
 }
 try {
   chrome.action.onClicked.addListener(async (tab) => {
+    // 5.396 (revue, basse 90) : sans menu (Orion) et sans session EN MÉMOIRE, la fenêtre de
+    //   connexion s'ouvre TOUT DE SUITE, dans le geste (`openPopup` le perd après un `await`).
+    if (sansMenuIcone() && !(VRM_SESSION && VRM_SESSION.access_token)) { try { const r = chrome.action.openPopup(); if (r && typeof r.catch === 'function') r.catch(() => {}); return; } catch (_) {} }
     // Le clic n'arrive ici que si le popup est vide, donc si une session
     // existe. Si elle a expiré entre-temps, on remet la fenêtre de connexion.
     const e = await authEtat().catch(() => ({ connecte: true }));
@@ -1393,7 +1396,20 @@ async function withOwner(row) {
 async function appDataConflict() { return 'owner,id'; }
 
 // Dernier csrf-token vu par domaine (fourni par inject.js).
+// 5.396 (revue, basse 79) : recopié dans `chrome.storage.session` (§4.9 : une variable de
+//   module meurt avec le worker — au réveil, `x-csrf-token: ''` jusqu'à la page suivante).
+//   Session : effacé à la fermeture du navigateur ; c'est un jeton que la page a déjà.
 const lastCsrfByDomain = {};
+const CSRF_STORE = 'vrmCsrf';
+try { const S = chrome.storage && chrome.storage.session; if (S) S.get(CSRF_STORE).then((o) => { const v = o && o[CSRF_STORE]; if (v && typeof v === 'object') for (const [d, t] of Object.entries(v)) if (!lastCsrfByDomain[d] && typeof t === 'string' && t.length <= 400) lastCsrfByDomain[d] = t; }).catch(() => {}); } catch (_) {}
+// Rend vrai si le jeton a CHANGÉ (basse 102 : seulement alors on relit le compte).
+function noterCsrf(domain, csrf) {
+  const d = String(domain || ''), t = String(csrf || '').slice(0, 400);
+  if (!d || !t || lastCsrfByDomain[d] === t) return false;
+  lastCsrfByDomain[d] = t;
+  try { const S = chrome.storage && chrome.storage.session; if (S) S.set({ [CSRF_STORE]: Object.assign({}, lastCsrfByDomain) }).catch(() => {}); } catch (_) {}
+  return true;
+}
 
 // --- Utilitaires -----------------------------------------------------------
 
@@ -4317,9 +4333,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             const prev = await sbGet('app_data?id=eq.panel_ebay_form&select=data');
             if (prev === null) { sendResponse({ ok: false, error: 'lecture' }); return; }   // « pas su » ≠ « rien »
             const cur = (prev && prev[0] && prev[0].data) || {};
-            const etapes = Object.assign({}, cur.etapes || {});
-            etapes[String(msg.etape || msg.url || Object.keys(etapes).length)] =
-              { url: msg.url, fields: msg.fields.slice(0, 150), selects: (msg.selects || []).slice(0, 30), fichiers: msg.fichiers || 0, at: new Date().toISOString() };
+            let etapes = Object.assign({}, cur.etapes || {});
+            // 5.396 (revue, basse 99) : la clé est NORMALISÉE (chemin sans requête ni chiffres,
+            //   120 signes) et la ligne BORNÉE à 24 étapes (les plus récentes), comme Vestiaire.
+            const cleEtape = String(msg.etape || (() => { try { return new URL(String(msg.url || '')).pathname; } catch (_) { return String(msg.url || ''); } })() || Object.keys(etapes).length).replace(/\d{3,}/g, '{n}').slice(0, 120);
+            etapes[cleEtape] =
+              { url: String(msg.url || '').split('?')[0].slice(0, 300), fields: msg.fields.slice(0, 150), selects: (msg.selects || []).slice(0, 30), fichiers: Number(msg.fichiers) || 0, at: new Date().toISOString() };
+            const cles = Object.keys(etapes);
+            if (cles.length > 24) etapes = Object.fromEntries(cles.map((k) => [k, etapes[k]]).sort((a, b) => String((b[1] && b[1].at) || '').localeCompare(String((a[1] && a[1].at) || ''))).slice(0, 24));
             await supabaseUpsert('app_data', [{ id: 'panel_ebay_form', data: { ...cur, url: msg.url, fields: msg.fields.slice(0, 150), etapes, at: new Date().toISOString() } }], 'id');
             sendResponse({ ok: true }); return;
           }
@@ -4890,9 +4911,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   //    marque tient le canal pour douteux.
   if (PAGE_SORTES_PREUVE.has(String(msg.kind || '')) && canalPageDouteux(msg)) { noterDiag('page_canal_douteux_' + String(msg.kind).slice(0, 20)); return; }
   if (msg.kind === 'csrf' && msg.csrf) {
-    lastCsrfByDomain[domain] = msg.csrf;
-    // On rattache le csrf au compte actif (mise a jour legere).
-    captureDomain(domain);
+    // On rattache le csrf au compte actif (mise a jour legere) — 5.396 (basse 102) :
+    // seulement quand le jeton CHANGE (avant : à chaque requête de la page qui le portait).
+    if (noterCsrf(domain, msg.csrf)) captureDomain(domain);
   } else if (msg.kind === 'harvest' && msg.body) {
     storeHarvest(domain,msg.type,msg.id,msg.body,msg.url,sender?.frameId>0?null:sender?.tab?.id,msg.method,msg.httpStatus).then(()=>sendResponse({recu:true}),()=>sendResponse({recu:false}));
     return true;
@@ -11618,8 +11639,28 @@ function afficherRappelLbc(version){
   }
   bloc.append(titre,texte,actions);(document.body||document.documentElement)?.appendChild(bloc);
 }
+// 5.396 (revue, moyenne 66) : Vinted et Vestiaire aussi. Après une mise à jour, leurs onglets
+//   ouverts gardent les scripts de l'ANCIENNE version, orphelins (captures muettes) — et le
+//   capteur de la page ne peut pas être reposé sans recharger (son canal privé est remis UNE
+//   fois, au chargement). La page n'est JAMAIS rechargée à sa place : le même encart lui dit
+//   de recharger, c'est son clic.
+function afficherRappelSite(version, site){
+  if(document.querySelector('[data-vrm-maj-site]'))return;
+  const bloc=document.createElement('aside');bloc.setAttribute('data-vrm-maj-site',String(site||''));bloc.setAttribute('data-vrm-maj-version',version);bloc.setAttribute('role','status');
+  Object.assign(bloc.style,{position:'fixed',left:'16px',bottom:'76px',zIndex:'2147483647',maxWidth:'calc(100vw - 32px)',width:'320px',boxSizing:'border-box',padding:'14px',background:'#203d47',color:'#fff',borderRadius:'12px',boxShadow:'0 6px 24px #0004',font:'13px/1.5 system-ui,sans-serif'});
+  const titre=document.createElement('b');titre.textContent='VRM · Mise à jour '+version;
+  const texte=document.createElement('p');texte.textContent='Recharge cet onglet '+site+' pour que VRM le lise à nouveau.';texte.style.margin='6px 0 10px';
+  const actions=document.createElement('div');Object.assign(actions.style,{display:'flex',gap:'8px'});
+  for(const [lib,agir]of [['Recharger '+site,()=>location.reload()],['Plus tard',()=>bloc.remove()]]){
+    const b=document.createElement('button');b.type='button';b.textContent=lib;Object.assign(b.style,{minHeight:'44px',padding:'7px 10px',border:'1px solid #ffffff66',borderRadius:'8px',background:'transparent',color:'#fff',font:'600 12px system-ui,sans-serif',cursor:'pointer'});b.onclick=agir;actions.appendChild(b);
+  }
+  bloc.append(titre,texte,actions);(document.body||document.documentElement)?.appendChild(bloc);
+}
 async function rappelerMiseAJourLbc(){
   try{const tabs=await chrome.tabs.query({url:['https://*.leboncoin.fr/*']});for(const t of tabs||[])try{await chrome.scripting.executeScript({target:{tabId:t.id},func:afficherRappelLbc,args:[CODE_VERSION]});}catch(_){}}catch(_){}
+  for(const [site,urls] of [['Vinted',['https://*.vinted.fr/*','https://*.vinted.com/*','https://*.vinted.it/*','https://*.vinted.de/*']],['Vestiaire',['https://*.vestiairecollective.com/*']]]){
+    try{const tabs=await chrome.tabs.query({url:urls});for(const t of tabs||[])try{await chrome.scripting.executeScript({target:{tabId:t.id,frameIds:[0]},func:afficherRappelSite,args:[CODE_VERSION,site]});}catch(_){}}catch(_){}
+  }
 }
 chrome.runtime.onInstalled.addListener((details) => { fullSync(); if (raisonReinjecte(details)){reinjecterPont();rappelerMiseAJourLbc();} });
 chrome.runtime.onStartup.addListener(() => { fullSync(); });
@@ -12847,7 +12888,8 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
       // 5.356 : le mémo RELU juste avant le geste (jamais l'instantané du début).
       const stFrais = (await chrome.storage.local.get('vrmOffresFaites')).vrmOffresFaites || {};
       if (stFrais[o.oid]) { st[o.oid] = stFrais[o.oid]; continue; }
-      for (const k in stFrais) if (!st[k]) st[k] = stFrais[k];
+      // 5.396 (basse 95) : la relecture ne ramène pas un mémo purgé (plus de 7 j ET offre partie).
+      for (const k in stFrais) if (!st[k] && !(stFrais[k] < limite && !encoreLa.has(String(k)))) st[k] = stFrais[k];
       // (5.366) Sécurité du compte : repos de nuit, « si tu es là », prudence, Tout arrêter,
       // plafonds, pas de rafale. Refus ⇒ l'offre reste prévue (rien n'est noté « faite »).
       if (await secuGeste('vinted', uid, 'offre', 'auto')) break;
@@ -23696,6 +23738,9 @@ async function sbGetMemo(query) {
   // à Vinted un bordereau qui existe déjà. `sbGetTout` rend `null` si une page
   // échoue, comme `sbGet` sur un échec.
   const p = /[?&]id=like\./.test(query) ? sbGetTout(query) : sbGet(query);
+  // 5.396 (revue, basse 82) : les entrées périmées partent à chaque insertion (la carte ne
+  //   grossit plus pendant toute la vie du worker), 200 au plus.
+  { const t = Date.now(); for (const [k, v] of _memoVisite) if (!v || t - v.at >= VISITE_MEMO_MS) _memoVisite.delete(k); while (_memoVisite.size >= 200) _memoVisite.delete(_memoVisite.keys().next().value); }
   _memoVisite.set(cle, { at: Date.now(), p });
   const resultat=await p;return (await loadSession())?.user_id===session.user_id?resultat:null;
 }
@@ -25382,6 +25427,7 @@ async function repondreVestiaire(msg) {
     const statut = (rep && Number(rep.statut)) || 0;
     if (!rep || rep.ok !== true) {
       if (rep && rep.code === 'invalide') { await rendreActions('vc:' + o.compte, depuis, 1); return { accepte: false, code: 'invalide', raison: 'message refusé par la page — rien n’est parti' }; }
+      if (rep && rep.code === 'canal') { await rendreActions('vc:' + o.compte, depuis, 1); return { accepte: false, code: 'canal', raison: "recharge la page Vestiaire, puis réessaie — rien n'est parti" }; }   // 5.396 : pas de canal privé avec le capteur — rien n'est parti
       noterDiag('vc_repondre_muet');
       return { accepte: true, etape: 'incertain', raison: "l'onglet Vestiaire n'a pas répondu — je ne sais pas si le message est parti : regarde la conversation sur Vestiaire avant de renvoyer" };
     }
@@ -25576,6 +25622,7 @@ async function repondreOffreVestiaire(msg) {
     const statut = (rep && Number(rep.statut)) || 0;
     if (!rep || rep.ok !== true) {
       if (rep && rep.code === 'invalide') { await rendreActions('vc:' + ot.compte, depuis, 1); return { accepte: false, code: 'invalide', raison: 'geste refusé par la page — rien n’est parti' }; }
+      if (rep && rep.code === 'canal') { await rendreActions('vc:' + ot.compte, depuis, 1); return { accepte: false, code: 'canal', raison: "recharge la page Vestiaire, puis réessaie — rien n'est parti" }; }   // 5.396
       noterDiag('vc_offre_muet');
       return { accepte: true, etape: 'incertain', raison: "l'onglet Vestiaire n'a pas répondu — je ne sais pas si ta réponse est partie : regarde l'offre sur Vestiaire avant de recommencer" };
     }
@@ -25817,6 +25864,7 @@ async function deroulerAimesVc() {
       let rep = null;
       try { rep = await avecDelai(chrome.tabs.sendMessage(ot.tabId, { from: 'vrm-fond', action: 'vcOffre', geste: 'favori', produit, acheteur: k, prixCents: prix, recette, compte: ot.compte }, { frameId: 0 }), 25000, null); } catch (_) { rep = null; }
       const statut = (rep && Number(rep.statut)) || 0;
+      if (rep && rep.code === 'canal') { await rendreActions('vc:' + ot.compte, depuis, 1); await noter(null); await finir('arret', "recharge la page Vestiaire, puis réessaie — rien n'est parti"); break; }   // 5.396 : rien n'est parti
       if (!rep || rep.ok !== true) { noterDiag('vc_aime_muet'); await noter('incertaine'); f.suivi.incertaines++; await finir('arret', "l'onglet Vestiaire n'a pas répondu — regarde sur Vestiaire avant de recommencer"); break; }
       if (!statut) {
         const e = String(rep.erreur || '');
@@ -25943,6 +25991,7 @@ async function baisserPrixVestiaire(msg) {
     const statut = (rep && Number(rep.statut)) || 0;
     if (!rep || rep.ok !== true) {
       if (rep && rep.code === 'invalide') { await rendreActions('vc:' + ot.compte, depuis, 1); return { accepte: false, code: 'invalide', raison: 'baisse refusée par la page — rien n’est parti' }; }
+      if (rep && rep.code === 'canal') { await rendreActions('vc:' + ot.compte, depuis, 1); return { accepte: false, code: 'canal', raison: "recharge la page Vestiaire, puis réessaie — rien n'est parti" }; }   // 5.396
       noterDiag('vc_prix_muet');
       return { accepte: true, etape: 'incertain', raison: "l'onglet Vestiaire n'a pas répondu — je ne sais pas si le prix a changé : regarde l'annonce sur Vestiaire avant de recommencer" };
     }

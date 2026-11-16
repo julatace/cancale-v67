@@ -73,7 +73,11 @@ function filtreOk(row, u) {
 // `lectureKO(u)` → vrai pour faire échouer une LECTURE de la base (522).
 function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }), lectureKO = () => false, ecritureKO = () => false, retardLecture = () => 0,
   connecte = '111', comptes = null, store = {}, cdn = null, onglets = [{ id: 7, url: 'https://www.vinted.fr/', status: 'complete' }], firefox = null, retirer = null,
-  transporteur = null, vrm = null, permis = undefined, permisAccorde = undefined, vraisComptes = false, globales = null } = {}) {
+  transporteur = null, vrm = null, permis = undefined, permisAccorde = undefined, vraisComptes = false, globales = null,
+  sessionStore = null, niveauKO = null } = {}) {
+  // 5.396 : `sessionStore` (objet) ⇒ un `chrome.storage.session` à état ET `setAccessLevel` sur
+  // `local` et `session` (Chrome / Edge) ; `niveauKO` ('local' | 'session') : ce réglage-là lève.
+  // Sans `sessionStore` : ni `session` ni `setAccessLevel` (comme avant : Firefox, Orion…).
   // 21 oct. : l'extension exige une session VRM pour toute lecture/écriture (main f9d3245) ; une session de banc par défaut, sauf si l'audit la règle lui-même.
   if (store.vrmSession === undefined && !store.__sansSession) store.vrmSession = { access_token: 'jeton.banc.defaut', refresh_token: 'r', user_id: 'owner-banc', email: 'banc@vrm.test', expires_at: Date.now() + 365*864e5 };
 
@@ -322,6 +326,18 @@ function faireFond({ src, lignes = {}, vinted = () => ({ status: 404, body: {} }
     } });
     ctx.browser = promesses;
     ctx.chrome = rappelsSeuls(promesses);
+  }
+  if (sessionStore) {
+    j.niveaux = {};
+    const sigSession = (changes) => { if (!Object.keys(changes).length) return; for (const f of ecoutesStockage.slice()) { try { f(changes, 'session'); } catch (_) {} } };
+    const niveau = (zone) => (o) => { if (niveauKO === zone) return Promise.reject(new Error('This StorageArea is not available for setting access level')); j.niveaux[zone] = o && o.accessLevel; return Promise.resolve(); };
+    ctx.chrome.storage.local.setAccessLevel = niveau('local');
+    ctx.chrome.storage.session = {
+      get(k, cb) { const cles = k == null ? Object.keys(sessionStore) : (Array.isArray(k) ? k : (typeof k === 'string' ? [k] : Object.keys(k || {}))); const out = {}; for (const c of cles) if (sessionStore[c] !== undefined) out[c] = copie(sessionStore[c]); if (typeof cb === 'function') { cb(out); return; } return Promise.resolve(out); },
+      set(o, cb) { if (niveauKO === 'ecriture-session') return Promise.reject(new Error('QUOTA_BYTES quota exceeded')); const ch = {}; for (const k of Object.keys(o || {})) ch[k] = { oldValue: copie(sessionStore[k]), newValue: copie(o[k]) }; Object.assign(sessionStore, copie(o)); setTimeout(() => sigSession(ch), 0); if (typeof cb === 'function') { cb(); return; } return Promise.resolve(); },
+      remove(k, cb) { const ch = {}; for (const c of [].concat(k)) { if (sessionStore[c] !== undefined) ch[c] = { oldValue: copie(sessionStore[c]) }; delete sessionStore[c]; } setTimeout(() => sigSession(ch), 0); if (typeof cb === 'function') { cb(); return; } return Promise.resolve(); },
+      setAccessLevel: niveau('session'),
+    };
   }
   vm.createContext(ctx);
   if (firefox && firefox.compat) vm.runInContext(firefox.compat, ctx, { filename: 'compat-firefox.js' });
