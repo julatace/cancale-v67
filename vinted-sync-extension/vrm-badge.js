@@ -452,6 +452,73 @@
   .detail > summary { min-height: 44px; }
   .capte { background: var(--fond-carte); border: 0; -webkit-backdrop-filter: none; backdrop-filter: none; }
   @media (max-width: 480px) { .carte, .question { max-height: calc(100vh - 80px); } .rangs, .ap-liste { max-height: min(340px, calc(100vh - 360px)); } }
+  /* ══ 5.386 — « VERRE DÉPOLI » (Julien, 15 nov. : « J'aime la 9 ») ═══════════════════
+     La carte est un petit panneau au dégradé BLEU PROFOND, OPAQUE (jamais la page du site
+     à travers : elle se pose sur n'importe quelle page, blanche ou noire) ; ses lignes
+     vivent sur des plaques de VERRE posées sur CE dégradé. Le titre se lit en blanc sur le
+     bleu ; tout le reste se lit sur le verre (encre la journée, clair la nuit). Contraste AA
+     mesuré sur les couleurs calculées, sur la partie la plus sombre du dégradé pour le verre
+     et la plus claire pour le blanc (banc verre-extension-site). Accent rare, ambre = geste,
+     jamais violet ni rouge. Sans flou possible (ou transparence réduite) : verre opaque. */
+  :host { --vb-fond-uni: #0C2848;
+    --vb-fond: radial-gradient(120% 60% at 12% 0%, rgb(90 150 220 / .14) 0%, rgb(90 150 220 / 0) 60%), linear-gradient(170deg, #133A68 0%, #0C2848 50%, #06142A 100%);
+    --vb-verre: rgb(8 18 33 / .72); --vb-verre-o: #0E2139; --vb-verre-bord: rgb(255 255 255 / .12);
+    --vb-verre-ombre: inset 0 .5px 0 rgb(255 255 255 / .10), 0 10px 24px -14px rgb(0 0 0 / .85);
+    --vb-sur: #FFFFFF; --vb-sur-2: #D6E4F3; --pale: #8FA3B9;
+    --plan: rgb(255 255 255 / .05); --plan-ombre: inset 0 0 0 .5px rgb(255 255 255 / .07);
+    --vb-plein-sur-bleu: #FFFFFF; --vb-plein-sur-bleu-t: #0C1D30; }
+  @media (prefers-color-scheme: light) {
+    :host(:not([data-theme="sombre"])) { --vb-fond-uni: #174C88;
+      --vb-fond: radial-gradient(120% 60% at 12% 0%, rgb(120 180 240 / .16) 0%, rgb(120 180 240 / 0) 55%), radial-gradient(70% 45% at 100% 38%, rgb(61 139 224 / .16) 0%, rgb(61 139 224 / 0) 70%), linear-gradient(170deg, #1E5DA4 0%, #174C88 45%, #0F2F57 100%);
+      --vb-verre: rgb(247 250 253 / .9); --vb-verre-o: #D7DEE6; --vb-verre-bord: rgb(255 255 255 / .75);
+      --vb-verre-ombre: inset 0 1px 0 rgb(255 255 255 / .9), 0 12px 26px -16px rgb(8 26 50 / .6);
+      --vb-sur: #FFFFFF; --vb-sur-2: #EEF4FB; --pale: #4F6276;
+      --plan: rgb(255 255 255 / .55); --plan-ombre: inset 0 0 0 .5px rgb(18 52 96 / .08); }
+  }
+  :host([data-theme="clair"]) { --vb-fond-uni: #174C88;
+      --vb-fond: radial-gradient(120% 60% at 12% 0%, rgb(120 180 240 / .16) 0%, rgb(120 180 240 / 0) 55%), radial-gradient(70% 45% at 100% 38%, rgb(61 139 224 / .16) 0%, rgb(61 139 224 / 0) 70%), linear-gradient(170deg, #1E5DA4 0%, #174C88 45%, #0F2F57 100%);
+      --vb-verre: rgb(247 250 253 / .9); --vb-verre-o: #D7DEE6; --vb-verre-bord: rgb(255 255 255 / .75);
+      --vb-verre-ombre: inset 0 1px 0 rgb(255 255 255 / .9), 0 12px 26px -16px rgb(8 26 50 / .6);
+      --vb-sur: #FFFFFF; --vb-sur-2: #EEF4FB; --pale: #4F6276;
+      --plan: rgb(255 255 255 / .55); --plan-ombre: inset 0 0 0 .5px rgb(18 52 96 / .08); }
+  /* Le panneau : le dégradé, opaque (une couleur unie dessous, au cas où). */
+  .carte, .question { background-color: var(--vb-fond-uni); background-image: var(--vb-fond); border: 1px solid rgb(255 255 255 / .14); padding: 14px 12px 12px; }
+  .carte .tete, .question .tete { padding: 0 4px; margin-bottom: 4px; min-height: 30px; }
+  .carte .tete b, .question .tete b { color: var(--vb-sur); font-size: 20px; letter-spacing: -.03em; }
+  .carte .tete .ver { color: var(--vb-sur-2); }
+  .fermer { color: var(--vb-sur-2); }
+  .fermer:hover { color: var(--vb-sur); background: rgb(255 255 255 / .12); }
+  /* Les plaques de verre : chaque ligne de la carte, posée sur le bleu. */
+  .contenu > :not(.tete):not(.fermer):not(.b):not(style), .carte > .connexion, .question > .err {
+    margin: 8px 0 0; padding: 10px 12px; border: 1px solid var(--vb-verre-bord); border-radius: 18px;
+    background: var(--vb-verre); -webkit-backdrop-filter: blur(26px) saturate(1.4); backdrop-filter: blur(26px) saturate(1.4); box-shadow: var(--vb-verre-ombre); color: var(--texte); }
+  .contenu > .ligne { border-top: 1px solid var(--vb-verre-bord); padding-top: 10px; }
+  .contenu > .liens { padding: 0; overflow: hidden; }
+  .contenu > .liens .lien-site.lien-vrm { background: transparent; box-shadow: none; margin: 0; }
+  .contenu > .detail { padding-top: 0; padding-bottom: 0; }
+  .contenu > .detail[open] { padding-bottom: 8px; }
+  .contenu > .mois { padding-top: 0; }
+  .contenu > .ligne.secu { margin-top: 8px; }
+  .gestes > .listes:first-child, .gestes > .fav:first-child { margin-top: 0; }
+  .carte > .connexion { margin-top: 8px; }
+  .carte > .connexion[hidden] { display: none; }
+  /* Sur le bleu : le plein est blanc (l'encre ne se verrait pas) ; la touche, du verre. */
+  .contenu > .b:not(.sec), .question > .b:not(.sec) { background: var(--vb-plein-sur-bleu); color: var(--vb-plein-sur-bleu-t); box-shadow: 0 1px 2px rgb(0 0 0 / .25), 0 12px 22px -12px rgb(0 0 0 / .7); }
+  .contenu > .b.sec, .question > .b.sec { background: var(--vb-verre); color: var(--texte); border: 1px solid var(--vb-verre-bord); box-shadow: var(--vb-verre-ombre); -webkit-backdrop-filter: blur(26px) saturate(1.4); backdrop-filter: blur(26px) saturate(1.4); }
+  /* La question « c'est bien un de tes comptes ? » : une phrase en blanc sur le bleu. */
+  .question .q, .question > .val { color: var(--vb-sur); padding: 0 4px; }
+  .question > .val.gris { color: var(--vb-sur-2); }
+  /* « VRM a capté » : une plaque de verre posée sur le même dégradé (jamais la page derrière). */
+  .capte { background-color: var(--vb-verre-o); background-image: linear-gradient(var(--vb-verre), var(--vb-verre)), var(--vb-fond); border: 1px solid var(--vb-verre-bord); }
+  /* Sans flou (ou transparence réduite) : le verre devient opaque, la lecture ne change pas. */
+  @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+    .contenu > :not(.tete):not(.fermer):not(.b):not(style), .carte > .connexion, .question > .err, .contenu > .b.sec, .question > .b.sec { background: var(--vb-verre-o); }
+    .capte { background-image: none; }
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    .contenu > :not(.tete):not(.fermer):not(.b):not(style), .carte > .connexion, .question > .err, .contenu > .b.sec, .question > .b.sec { background: var(--vb-verre-o); -webkit-backdrop-filter: none; backdrop-filter: none; }
+    .capte { background-image: none; }
+  }
 </style>
 <div class="carte" part="carte"><div class="contenu"></div><div class="connexion" hidden></div></div>
 <div class="question" role="dialog" aria-label="Confirmer le compte Vinted"></div>
@@ -483,7 +550,7 @@
     st.textContent = `.btn, .question, .contenu { display: none !important; }
   .carte, .carte.on { position: static; display: block; width: auto; max-height: none; overflow: visible; background: transparent; border: 0;
     box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; padding: 0; border-radius: 0; }
-  .connexion { margin: 0; border-top: 0; padding: 0 0 2px; }
+  .connexion, .carte > .connexion { margin: 0; border: 0; border-top: 0; padding: 0 0 2px; border-radius: 0; background: transparent; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
   .carte.on { animation: none; }`;
     ombre.appendChild(st);
     carte.classList.add('on');
@@ -1254,11 +1321,11 @@
     // repliée : c'est ce qui avance pendant qu'il laisse Vinted ouvert).
     const dt = e.capte && !ignore && e.plateforme === 'vinted' && e.site && e.site.dates;
     // 5.378 : l'estimation en HEURES de Vinted ouvert sur ce compte (plus des jours de 24 h) ;
-    // et, si Vinted liste des mois de relevé que VRM ne sait pas encore lire, le geste.
+    // ⚠️ 5.390 (15 nov., Julien : « pas que ça soit à nous de le faire ») : plus AUCUN geste
+    //    demandé ici — la ligne « ouvre une fois Porte-monnaie → Historique » est retirée ;
+    //    la recette du relevé s'apprend quand même s'il ouvre cette page de lui-même.
     const progression = (dt && Number(dt.reste) > 0
-      ? `<div class="progres val gris" data-dates-versement="${Number(dt.reste)}" data-dates-heures="${Number(dt.heures) || 0}">Dates de versement en cours de lecture · ${Number(dt.reste).toLocaleString('fr-FR')} restantes · environ ${Number(dt.heures) || 1} h avec Vinted ouvert sur ce compte</div>` : '')
-      + (dt && Number(dt.releveSansRecette) > 0
-        ? `<div class="progres val gris" data-releve-sans-recette="${Number(dt.releveSansRecette)}">Relevé du porte-monnaie : ${Number(dt.releveSansRecette)} mois à lire · ouvre une fois Porte-monnaie → Historique → un mois passé, VRM apprend la page</div>` : '');
+      ? `<div class="progres val gris" data-dates-versement="${Number(dt.reste)}" data-dates-heures="${Number(dt.heures) || 0}">Dates de versement : l'extension les récupère · ${Number(dt.reste).toLocaleString('fr-FR')} restantes · environ ${Number(dt.heures) || 1} h avec Vinted ouvert sur ce compte</div>` : '');
 
     // 5.243 : sur Vestiaire, ce qui est capté, famille par famille.
     if (e.plateforme === 'vestiaire' && e.vcCapte) {

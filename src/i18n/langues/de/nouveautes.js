@@ -1,6 +1,12 @@
 // (16 nov., lot traduction-restes) « Quoi de neuf » auf Deutsch — ein Eintrag pro Neuheit aus
 // src/nouveautes.js ([Titel, Satz]). Übersetzung aus erster Hand: relecture native requise.
 const T = {
+  'verre-extension-site': ['Erweiterung und Seite in Milchglas', 'Die Logo-Karte und vrm.center: Tiefblau, Glasplatten.'],
+  'meme-photo-sure': ['Gleiches Foto: « sicher » oder « zu prüfen »', 'Zwei verschiedene Messungen müssen für « sicher » übereinstimmen.'],
+  'versements-auto': ['Auszahlungsdaten: die Erweiterung kümmert sich', 'Nichts mehr selbst zu datieren: eine Zeile zeigt den Stand.'],
+  'scanner-retrouver': ['Paket scannen: VRM öffnet seinen Verkauf', 'Strichcode von Paket oder Etikett: der richtige Verkauf, der richtige Kauf.'],
+  'deux-comptes': ['Ein Paar auf zwei Konten im Verkauf', 'VRM zeigt beide nebeneinander: du entfernst eins auf Vinted.'],
+  'vestiaire-aimes': ['Vestiaire: ein Angebot an die, denen es gefällt', 'Nachrichten → Vestiaire: ein Angebot pro Person, auf deinen Tipp.'],
   'traduction-restes': ['Die Erweiterung und Neuheiten in deiner Sprache', 'Das Fenster, die Logo-Karte und die Neuheiten werden übersetzt.'],
   'ventes-verre': ['Verkäufe: Pakete abhaken, Platz im Lager', 'Jedes Paket sagt, wo sein Karton ist; druck die abgehakten.'],
   'achats-code-comptoir': ['Der Abholcode groß am Schalter', 'Eine Ziffer pro Feld, « Abgeholt » direkt darunter.'],

@@ -95,7 +95,8 @@ export function declarerDe(P, profil, dateCourte = (t) => String(t)) {
   if (P.etat === 'statut') return vide('choisis ton statut', 'statut');
   if (P.etat === 'horsMicro') return vide('pas d’URSSAF', 'horsMicro');
   const quand = P.dueDate ? `avant le ${dateCourte(P.dueDate)}` : '';
-  const aDater = P.aDater > 0 ? `${P.aDater} ${pluriel(P.aDater, 'vente', 'ventes')} à dater` : '';
+  // (15 nov., 5.390) Plus « N ventes à dater » : le montant dit « au moins » (P.partiel), rien d’autre.
+  const aDater = P.aDater > 0 && !(P.ca > 0) ? 'dates de versement en lecture' : '';
   if (P.etat !== 'lu' || P.ca == null) return { ...vide([quand, 'ouvre Ventes'].filter(Boolean).join(' · '), 'passu'), echeance: P.dueDate || null };
   // « Au moins 0 » ne se dit jamais (§5).
   if (P.partiel && !(P.ca > 0)) return { ...vide([quand, aDater || 'pas tout lu'].filter(Boolean).join(' · '), 'partiel'), echeance: P.dueDate || null };

@@ -4,29 +4,55 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    /* 5.328 — les jetons de l'app (`--d-*`, src/styles-design-2026.css, DESIGN.md) :
-       style Apple, police système, UN accent bleu rare (#0071E3 / #0A84FF), ambre =
-       un geste, jamais violet ; clair et sombre suivent le système ; rayons 12
-       (contrôles) ; cibles 44 px. CSS seulement, aucune logique. */
+    /* 5.386 — « VERRE DÉPOLI » (Julien, 15 nov. : « J'aime la 9 ») : la fenêtre est un fond
+       BLEU PROFOND dégradé ; le titre se lit en blanc sur le bleu, le reste sur une plaque de
+       VERRE (encre la journée, clair la nuit). Encre #0C1D30, accent rare (liens), ambre = un
+       geste, jamais violet ni rouge. Contraste AA mesuré (banc verre-extension-site) ; sans
+       flou ou transparence réduite : verre opaque. CSS seulement, aucune logique. */
     :root { color-scheme: light dark;
-      --fond: #F2F2F7; --carte: #FFFFFF; --bord: rgba(60,60,67,.18); --texte: #1D1D1F; --doux: #6E6E73;
-      --accent: #0071E3; --ambre: #B25000; --survol: rgba(118,118,128,.12); --remplir: rgba(118,118,128,.12); }
+      --fond-uni: #174C88;
+      --fond-bleu: radial-gradient(120% 60% at 12% 0%, rgb(120 180 240 / .16) 0%, rgb(120 180 240 / 0) 55%), radial-gradient(70% 45% at 100% 38%, rgb(61 139 224 / .16) 0%, rgb(61 139 224 / 0) 70%), linear-gradient(170deg, #1E5DA4 0%, #174C88 45%, #0F2F57 100%);
+      --verre: rgb(247 250 253 / .9); --verre-o: #D7DEE6; --verre-bord: rgb(255 255 255 / .75);
+      --verre-ombre: inset 0 1px 0 rgb(255 255 255 / .9), 0 12px 26px -16px rgb(8 26 50 / .6);
+      --sur: #FFFFFF; --sur-2: #EEF4FB;
+      --fond: #174C88; --carte: #FFFFFF; --bord: rgba(18,52,96,.16); --texte: #0C1D30; --doux: #3F5468;
+      --accent: #0055B8; --ambre: #764300; --survol: rgba(18,52,96,.06); --remplir: rgba(18,52,96,.07);
+      --plein: #0C1D30; --plein-t: #FFFFFF; }
     @media (prefers-color-scheme: dark) {
-      :root { --fond: #000000; --carte: #1C1C1E; --bord: rgba(84,84,88,.6); --texte: #F5F5F7; --doux: #98989D;
-        --accent: #0A84FF; --ambre: #FF9F0A; --survol: rgba(118,118,128,.24); --remplir: rgba(118,118,128,.24); }
+      :root { --fond-uni: #0C2848;
+      --fond-bleu: radial-gradient(120% 60% at 12% 0%, rgb(90 150 220 / .14) 0%, rgb(90 150 220 / 0) 60%), linear-gradient(170deg, #133A68 0%, #0C2848 50%, #06142A 100%);
+      --verre: rgb(8 18 33 / .72); --verre-o: #0E2139; --verre-bord: rgb(255 255 255 / .12);
+      --verre-ombre: inset 0 .5px 0 rgb(255 255 255 / .10), 0 10px 24px -14px rgb(0 0 0 / .85);
+      --sur: #FFFFFF; --sur-2: #D6E4F3;
+      --fond: #0C2848; --carte: rgb(255 255 255 / .06); --bord: rgba(255,255,255,.16); --texte: #EAF2FB; --doux: #A9BBCF;
+      --accent: #6CB4FF; --ambre: #F2B65E; --survol: rgba(255,255,255,.08); --remplir: rgba(255,255,255,.07);
+      --plein: #FFFFFF; --plein-t: #0C1D30; }
     }
     /* 5.351 : la teinte choisie dans VRM (data-theme, posé par le script de la fenêtre) passe avant le système. */
-    :root[data-theme="clair"] { color-scheme: light; --fond: #F2F2F7; --carte: #FFFFFF; --bord: rgba(60,60,67,.18); --texte: #1D1D1F; --doux: #6E6E73;
-      --accent: #0071E3; --ambre: #B25000; --survol: rgba(118,118,128,.12); --remplir: rgba(118,118,128,.12); }
-    :root[data-theme="sombre"] { color-scheme: dark; --fond: #000000; --carte: #1C1C1E; --bord: rgba(84,84,88,.6); --texte: #F5F5F7; --doux: #98989D;
-      --accent: #0A84FF; --ambre: #FF9F0A; --survol: rgba(118,118,128,.24); --remplir: rgba(118,118,128,.24); }
+    :root[data-theme="clair"] { color-scheme: light; --fond-uni: #174C88;
+      --fond-bleu: radial-gradient(120% 60% at 12% 0%, rgb(120 180 240 / .16) 0%, rgb(120 180 240 / 0) 55%), radial-gradient(70% 45% at 100% 38%, rgb(61 139 224 / .16) 0%, rgb(61 139 224 / 0) 70%), linear-gradient(170deg, #1E5DA4 0%, #174C88 45%, #0F2F57 100%);
+      --verre: rgb(247 250 253 / .9); --verre-o: #D7DEE6; --verre-bord: rgb(255 255 255 / .75);
+      --verre-ombre: inset 0 1px 0 rgb(255 255 255 / .9), 0 12px 26px -16px rgb(8 26 50 / .6);
+      --sur: #FFFFFF; --sur-2: #EEF4FB;
+      --fond: #174C88; --carte: #FFFFFF; --bord: rgba(18,52,96,.16); --texte: #0C1D30; --doux: #3F5468;
+      --accent: #0055B8; --ambre: #764300; --survol: rgba(18,52,96,.06); --remplir: rgba(18,52,96,.07);
+      --plein: #0C1D30; --plein-t: #FFFFFF; }
+    :root[data-theme="sombre"] { color-scheme: dark; --fond-uni: #0C2848;
+      --fond-bleu: radial-gradient(120% 60% at 12% 0%, rgb(90 150 220 / .14) 0%, rgb(90 150 220 / 0) 60%), linear-gradient(170deg, #133A68 0%, #0C2848 50%, #06142A 100%);
+      --verre: rgb(8 18 33 / .72); --verre-o: #0E2139; --verre-bord: rgb(255 255 255 / .12);
+      --verre-ombre: inset 0 .5px 0 rgb(255 255 255 / .10), 0 10px 24px -14px rgb(0 0 0 / .85);
+      --sur: #FFFFFF; --sur-2: #D6E4F3;
+      --fond: #0C2848; --carte: rgb(255 255 255 / .06); --bord: rgba(255,255,255,.16); --texte: #EAF2FB; --doux: #A9BBCF;
+      --accent: #6CB4FF; --ambre: #F2B65E; --survol: rgba(255,255,255,.08); --remplir: rgba(255,255,255,.07);
+      --plein: #FFFFFF; --plein-t: #0C1D30; }
     html.carte[data-theme] { color-scheme: normal; }
     * { box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; width: 320px; margin: 0; padding: 16px;
-      background: var(--fond); color: var(--texte); font-size: 15px; line-height: 1.45; letter-spacing: -.006em; -webkit-font-smoothing: antialiased; font-kerning: normal; }
+    html { background: var(--fond-uni); }
+    body { font-family: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; width: 320px; margin: 0; padding: 16px; min-height: 100vh;
+      background-color: var(--fond-uni); background-image: var(--fond-bleu); color: var(--texte); font-size: 15px; line-height: 1.45; letter-spacing: -.006em; -webkit-font-smoothing: antialiased; font-kerning: normal; }
     /* 5.328 : la carte du logo pose ce cadre DANS son verre : fond transparent,
        hauteur du contenu (le cadre la donne à la carte), une colonne. */
-    body.carte { width: auto; margin: 0; padding: 3px; background: transparent; }
+    body.carte { width: auto; margin: 0; padding: 3px; min-height: 0; background: transparent; }
     html.carte { color-scheme: normal; background: transparent; }
     body.carte .head, body.carte #auth > .who.deco { display: none; }
     .lab { display: block; margin-top: 12px; font-size: 13px; font-weight: 500; color: var(--doux); }
@@ -40,18 +66,26 @@
     .head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
     body.carte .head { padding-right: 44px; }
     .logo { width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0; display: block; box-shadow: 0 0 0 .5px var(--bord); }
-    h1 { font-size: 17px; margin: 0; font-weight: 600; letter-spacing: -.012em; }
+    h1 { font-size: 20px; margin: 0; font-weight: 700; letter-spacing: -.03em; color: var(--sur); }
+    .logo { box-shadow: 0 0 0 .5px rgb(255 255 255 / .3), 0 6px 14px -6px rgb(0 0 0 / .5); }
+    /* Les plaques de verre : la connexion, la mise à jour, le diagnostic. */
+    #auth, body > .maj, #parcours-favoris { padding: 12px 14px 14px; border: 1px solid var(--verre-bord) !important; border-radius: 18px !important;
+      background: var(--verre) !important; -webkit-backdrop-filter: blur(26px) saturate(1.4); backdrop-filter: blur(26px) saturate(1.4); box-shadow: var(--verre-ombre); color: var(--texte); }
+    #auth:empty { padding: 0; border: 0 !important; box-shadow: none; background: transparent !important; }
+    #parcours-favoris { margin-top: 12px !important; }
+    @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) { #auth, body > .maj, #parcours-favoris { background: var(--verre-o) !important; } }
+    @media (prefers-reduced-transparency: reduce) { #auth, body > .maj, #parcours-favoris { background: var(--verre-o) !important; -webkit-backdrop-filter: none; backdrop-filter: none; } }
     .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--doux); flex-shrink: 0; }
     .dot.warn { background: var(--ambre); }
     .nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
     button { display: block; width: 100%; margin-top: 12px; padding: 0 14px; min-height: 44px; border: 1px solid transparent; border-radius: 12px;
-      background: var(--accent); color: #fff; font-weight: 600; font-size: 15px; line-height: 1.2; cursor: pointer; font-family: inherit;
+      background: var(--plein); color: var(--plein-t); font-weight: 600; font-size: 15px; line-height: 1.2; cursor: pointer; font-family: inherit; border-radius: 999px;
       transition: filter .15s cubic-bezier(.23,1,.32,1), background .15s cubic-bezier(.23,1,.32,1), transform .15s cubic-bezier(.23,1,.32,1); }
     button:active:not(:disabled) { transform: scale(.98); }
     button:hover { filter: brightness(1.06); }
     button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     button:disabled { opacity: .6; cursor: default; }
-    button.sec { background: var(--remplir); color: var(--texte); border-color: transparent; margin-top: 8px; }
+    button.sec { background: var(--carte); color: var(--texte); border-color: var(--bord); margin-top: 8px; }
     button.sec:hover { background: var(--survol); filter: none; }
     /* 5.325 : « Continuer avec Google / Discord » — bouton neutre, logo à gauche
        (chartes de Google et de Discord), une ligne. */

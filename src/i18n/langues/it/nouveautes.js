@@ -1,6 +1,12 @@
 // (16 nov., lot traduction-restes) « Quoi de neuf » in italiano — una voce per novità di
 // src/nouveautes.js ([titolo, frase]). Traduzione di prima mano: relecture native requise.
 const T = {
+  'verre-extension-site': ['Estensione e sito in vetro smerigliato', 'La scheda del logo e vrm.center: blu profondo, lastre di vetro.'],
+  'meme-photo-sure': ['Stessa foto: « sicuro » o « da verificare »', 'Due misure diverse devono dire stessa foto per « sicuro ».'],
+  'versements-auto': ['Date di pagamento: ci pensa l’estensione', 'Niente più da datare tu: una riga dice a che punto è.'],
+  'scanner-retrouver': ['Scansiona un pacco: VRM apre la sua vendita', 'Codice a barre del pacco o dell’etichetta: la vendita, l’acquisto giusto.'],
+  'deux-comptes': ['Un paio in vendita su due account', 'VRM li mostra affiancati: ne togli uno su Vinted.'],
+  'vestiaire-aimes': ['Vestiaire: un’offerta a chi lo apprezza', 'Messaggi → Vestiaire: un’offerta a persona, con il tuo tocco.'],
   'traduction-restes': ['L’estensione e Novità nella tua lingua', 'La finestra, la scheda del logo e le novità si traducono.'],
   'ventes-verre': ['Vendite: pacchi spuntati, posto nello stock', 'Ogni pacco dice dov’è la sua scatola; stampa quelli spuntati.'],
   'achats-code-comptoir': ['Il codice di ritiro, grande, al banco', 'Una cifra per casella, « L’ho ritirato » subito sotto.'],

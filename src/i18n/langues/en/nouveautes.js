@@ -1,6 +1,12 @@
 // (16 nov., lot traduction-restes) « Quoi de neuf » en anglais — une entrée par nouveauté de
 // src/nouveautes.js ([titre, phrase]). Traduction de première main : relecture native requise.
 const T = {
+  'verre-extension-site': ['Extension and site in frosted glass', 'The logo card and vrm.center: deep blue, glass panels.'],
+  'meme-photo-sure': ['Same photo: « sure » or « to check »', 'Two different measures must say same photo for « sure ».'],
+  'versements-auto': ['Payout dates: the extension takes care of it', 'Nothing left to date yourself: one line says how far it is.'],
+  'scanner-retrouver': ['Scan a parcel: VRM opens its sale', 'Parcel or label barcode: the right sale, the right purchase.'],
+  'deux-comptes': ['A pair for sale on two accounts', 'VRM shows them side by side: you remove one on Vinted.'],
+  'vestiaire-aimes': ['Vestiaire: an offer to those who like it', 'Messages → Vestiaire: one offer per person, on your tap.'],
   'traduction-restes': ['The extension and What’s new in your language', 'The window, the logo card and the new features are translated.'],
   'ventes-verre': ['Sales: ticked parcels, place in stock', 'Each parcel says where its box is; print the ticked ones.'],
   'achats-code-comptoir': ['The pickup code, big, at the counter', 'One digit per box, « I picked it up » just below.'],

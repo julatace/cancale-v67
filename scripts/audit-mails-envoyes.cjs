@@ -77,7 +77,9 @@ function decoder(brut) {
 }
 
 // ── Les contrôles d'un e-mail ───────────────────────────────────────────────
-const corpsAvantPied = (html) => html.split('<hr')[0];
+// (15 nov., « Verre dépoli ») le pied est la cellule `data-vv="pied"` (en clair sur le bleu), plus un filet `<hr`.
+const PIED = 'data-vv="pied"';
+const corpsAvantPied = (html) => html.split(PIED)[0];
 // « 0,00 € » seul (pas la fin de « 300,00 € ») : un zéro écrit pour un chiffre pas su.
 const ZERO = /(?<![\d\u00a0\u202f ])0,00\s€/;
 const boutons = (html) => (corpsAvantPied(html).match(/<a\s/g) || []).length;
@@ -114,7 +116,10 @@ async function banc(R, { silencieux = false } = {}) {
     dit(/display:none;max-height:0/.test(m.html) && /max-width:600px/.test(m.html) && /<!--\[if mso\]><table role="presentation" width="600"/.test(m.html) && /<meta name="color-scheme" content="light dark">/.test(m.html) && /prefers-color-scheme:dark/.test(m.html), `${nom} : préentête caché, largeur 600 (Outlook compris, 11 nov.), mode sombre toléré`);
     // (11 nov., lot emails-envoyes) Plus aucune image : l'en-tête est un MOT — « VRM » en
     // petit pour ses propres e-mails, le nom de la boutique pour la facture (rien de VRM).
-    dit(!/<img\b/i.test(m.html) && (marque ? !/>VRM</.test(m.html) : />VRM<\/div>/.test(m.html)), `${nom} : ${marque ? 'le nom du vendeur en tête, rien de VRM' : 'le mot « VRM » en tête'}, aucune image`);
+    // (15 nov.) Le logo HÉBERGÉ sur vrm.center + le mot « VRM » (une image bloquée laisse le mot) ; jamais une image en base64 ;
+    // la facture d'un vendeur : son nom, rien de VRM (ni mot, ni logo).
+    const imgs = [...m.html.matchAll(/<img\b[^>]*src="([^"]*)"/gi)].map((x) => x[1]);
+    dit(marque ? (!imgs.length && !/>VRM</.test(m.html)) : (imgs.length === 1 && imgs[0] === 'https://vrm.center/vrm-logo-v5-192.png' && />VRM<\/td>/.test(m.html)), `${nom} : ${marque ? 'le nom du vendeur en tête, rien de VRM' : 'le logo hébergé et le mot « VRM » en tête'}, aucune image en base64`, JSON.stringify(imgs));
     if (facultatif !== undefined) dit(/Gérer mes e-mails/.test(m.html) === facultatif && /Gérer mes e-mails/.test(m.texte) === facultatif, `${nom} : « Gérer mes e-mails » ${facultatif ? 'au pied (e-mail facultatif)' : 'absent (e-mail non facultatif)'}`);
     dit(m.sujet.length > 0 && m.sujet.length <= 60, `${nom} : sujet court (${m.sujet.length} car.)`, m.sujet);
   };
@@ -129,7 +134,7 @@ async function banc(R, { silencieux = false } = {}) {
       await envoyer({ a: 'vendeur@exemple.test', sujet: t.sujet, texte: t.texte, html: t.html });
       const m = dernier();
       forme(`essai ${etape}`, m, { facultatif: true });
-      dit(/mode=relances/.test(m.html.split('<hr')[1] || '') && !/mode=relances/.test(corpsAvantPied(m.html)), `essai ${etape} : « ne plus recevoir » au pied seulement`);
+      dit(/mode=relances/.test(m.html.split(PIED)[1] || '') && !/mode=relances/.test(corpsAvantPied(m.html)), `essai ${etape} : « ne plus recevoir » au pied seulement`);
     }
     {
       const t = RE.texteRelance('j3', { fin, relie: { vinted: true, emails: null, notifications: true }, lien: 'https://vrm.center/x' });
@@ -229,9 +234,9 @@ async function banc(R, { silencieux = false } = {}) {
       dit(boutons(g.html) === 0, 'gabarit : un bouton sans URL sûre ne se dessine pas');
       const vide = G.gabaritMail({ titre: 't', paras: ['p'], bouton: { mot: 'Ouvrir', url: 'https://vrm.center' }, pied: { texte: 'x' } , editeur: { nom: null, adresse: null } });
       const plein = G.gabaritMail({ titre: 't', paras: ['p'], bouton: { mot: 'Ouvrir', url: 'https://vrm.center' }, pied: { texte: 'x' }, editeur: { nom: 'Éditeur inventé', forme: 'EI', adresse: '1 rue inventée' } });
-      dit(((vide.html.split('<hr')[1] || '').match(/<p class="vrm-doux"/g) || []).length === 2 && vide.texte.split('—\n')[1].split('\n').length === 1 && !/Éditeur inventé/.test(vide.html) && /Éditeur inventé · EI/.test(plein.html) && /1 rue inventée/.test(plein.texte), 'gabarit : l’identité de l’éditeur au pied seulement si elle est remplie (rien d’inventé)');
-      dit(/Le bouton ne marche pas \?/.test(plein.html.split('<hr')[1] || '') && /https:\/\/vrm\.center/.test(plein.texte), 'gabarit : le lien en clair de secours, au pied (et dans le texte brut)');
-      dit(/line-height:44px/.test(plein.html) && /#0071e3/i.test(plein.html) && !/#(7c3aed|8b5cf6|a855f7|6d28d9)/i.test(plein.html), 'gabarit : bouton bleu Apple de 44 px, aucun violet');
+      dit(((vide.html.split(PIED)[1] || '').match(/<p class="vv-pied"/g) || []).length === 2 && vide.texte.split('—\n')[1].split('\n').length === 1 && !/Éditeur inventé/.test(vide.html) && /Éditeur inventé · EI/.test(plein.html) && /1 rue inventée/.test(plein.texte), 'gabarit : l’identité de l’éditeur au pied seulement si elle est remplie (rien d’inventé)');
+      dit(/Le bouton ne marche pas \?/.test(plein.html.split(PIED)[1] || '') && /https:\/\/vrm\.center/.test(plein.texte), 'gabarit : le lien en clair de secours, au pied (et dans le texte brut)');
+      dit(/data-vv="plein"[^>]*bgcolor="#0C1D30"/.test(plein.html) && /line-height:48px/.test(plein.html) && !/#(7c3aed|8b5cf6|a855f7|6d28d9)/i.test(plein.html), 'gabarit : UN plein d’encre de 48 px (Verre dépoli), aucun violet');
     });
   } catch (e) {
     dit(false, 'le banc a levé', e && e.stack);
