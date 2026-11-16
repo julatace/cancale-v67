@@ -59,10 +59,16 @@ const publique = (uid, capH, items) => ({ id: `harvest_${uid}_enligne`, data: { 
 //   publique entrait dans la grille). La republiée est donc captée par son compte, et
 //   7004 (public seul) doit rester HORS de la grille, de la file Leboncoin et du compte.
 // compte_444 : dressing de 72 h, jamais relu — 7041, 7042 : « à confirmer ».
+// (16 nov., bancs-rouges-a) Depuis le 8 nov. un site ne se montre que s'il est CHOISI ou relié (« Où vends-tu ? ») :
+// sans ce choix, `?tab=leboncoin` revient à Annonces · Vinted (les sections 4 et 12 lisaient alors les cartes Vinted).
+const LBC_LU = { id: 'lbc_listings', data: { items: {}, lectures: {} } };
 const BASE = () => [
-  { id: 'main', data: { vinted_annonce_numeros: {
+  { id: 'main', data: { vrm_plateformes_affichees: { sites: ['vinted', 'leboncoin'], at: new Date(now).toISOString() }, vinted_annonce_numeros: {
     '7001': { numero: '11', mp: { lbc: true } }, '7002': { numero: '12', mp: { lbc: true } }, '7003': { numero: '13', mp: { lbc: true } },
     '7011': { numero: '21', mp: { lbc: true } }, '7031': { numero: '31', mp: { lbc: true } }, '7041': { numero: '41', mp: { lbc: true } }, '7042': { numero: '42', mp: { lbc: true } } } } },
+  // (16 nov.) Leboncoin RELIÉ (une ligne rangée par l'extension, aucune annonce) : sinon l'écran dit « pas encore lues »
+  // (`OngletManque`, 8 nov.) et la file n'est pas rendue.
+  LBC_LU,
   dressing('111', 72, [ann(7001, PAIRE), ann(7011, 'Zeta Garde Alpha 42')]),
   dressing('222', 72, [ann(7002, PAIRE)]),
   dressing('333', 3, [ann(7031, 'Zeta Garde Gamma 41'), ann(7003, PAIRE, { price: { amount: '49.0', currency_code: 'EUR' } })]),
@@ -154,6 +160,9 @@ async function rendre(b, { lignes, tel = false, onglet = 'cat_annonces', enligne
     if (eq) return j(lignes.filter((r) => r.id === eq[1]).map(forme));
     const lk = /id=like\.([^&]*)/.exec(u);
     if (lk) { const re = new RegExp('^' + lk[1].replace(/[.]/g, '\\.').replace(/[*%]/g, '.*') + '$'); return j(lignes.filter((r) => re.test(r.id)).map(forme)); }
+    // (16 nov.) `id=in.(…)` : la lecture des sites reliés (lbc_listings, vc_session…) — servie comme la vraie base.
+    const inn = /id=in\.\(([^)]*)\)/.exec(u);
+    if (inn) { const ids = inn[1].split(','); return j(lignes.filter((r) => ids.includes(r.id)).map(forme)); }
     return j([]);
   });
   // Le relais Vinted en panne : l'app ne doit vivre que de NOTRE base.
@@ -184,6 +193,8 @@ const ouvrirPop = async (pg, sel) => {
   const ok = await pg.waitForSelector('[data-popup-corps]', { timeout: 4000 }).then(() => true).catch(() => false);
   // (10 nov.) Le détail est replié sous « Pourquoi ? » : le banc le déplie comme lui le ferait.
   if (ok) await pg.locator('[data-popup-pourquoi] > summary').first().click().catch(() => {});
+  // (16 nov.) Sous charge le toucher sur « Pourquoi ? » peut tomber pendant l'entrée de la feuille : on vérifie qu'il est OUVERT.
+  if (ok) await pg.waitForFunction(() => { const d = document.querySelector('[data-popup-corps] [data-popup-pourquoi]'); if (d && !d.open) d.querySelector('summary').click(); return !d || d.open; }, null, { timeout: 4000 }).catch(() => {});
   return ok;
 };
 // (16 nov., bancs-rouges-a) Statistiques (2 nov., « beaucoup d'incompréhension ») : la ligne de fraîcheur du tableau de
@@ -282,6 +293,8 @@ const lireAnnonces = async (pg) => { const o = await ouvrirPop(pg, ':is([data-an
     console.log('── 4. File Leboncoin de l’app');
     if (veut('4')) await essaie('4', async () => {
       const r = await rendre(b, { lignes: BASE(), onglet: 'leboncoin' });
+      // (16 nov.) La file se calcule après plusieurs lectures : on attend qu'elle soit RENDUE (une ligne ou un état dit).
+      await r.pg.waitForFunction(() => /Zeta Fear Trois/.test(document.body.innerText) || document.querySelector('[data-lbc-vide], [data-lbc-a-confirmer]'), null, { timeout: 20000 }).catch(() => {});
       await r.pg.waitForTimeout(1500);
       const txt = await r.pg.evaluate(() => document.body.innerText);
       const vus = (txt.match(/Zeta [A-Za-z]+ [A-Za-z]+/g) || []).join(' · ');
@@ -355,8 +368,14 @@ const lireAnnonces = async (pg) => { const o = await ouvrirPop(pg, ':is([data-an
         ventesVides('111'), ventesVides('222'), ventesVides('333'), ventesVides('444'), dressing('333', 0.05, []), dressing('444', 0.05, []),
         dressing('111', 2, [ann(8001, 'Beta Alpha 40')]), dressing('222', 30, [ann(8002, 'Beta Beta 41')])];
       const posts = [];
-      const r = await rendre(b, { lignes, posts });
+      // (16 nov., bancs-rouges-a) Studio (14 nov., src/paires/PaireAvant.jsx) : fermée, la rangée ENTIÈRE est le geste et la
+      // plaque N° ne se touche pas (`pointer-events: none`) ; au téléphone, la rangée touchée monte au premier plan et
+      // ses contrôles (N°, photo) reprennent leur geste. Le banc fait ce geste-là, au téléphone : la RÈGLE jugée
+      // (taper le N° d'une paire « à confirmer ») ne change pas.
+      const r = await rendre(b, { lignes, posts, tel: true });
       await r.pg.waitForTimeout(1500);
+      await r.pg.click('[data-carte-annonce="8001"]', { timeout: 8000 });
+      await r.pg.waitForSelector('[data-carte-annonce="8001"][data-sb-avant]', { timeout: 8000 }).catch(() => {});
       await r.pg.click('[data-carte-annonce="8001"] [data-edition="numero"]', { timeout: 8000 });
       await r.pg.keyboard.press('Control+A'); await r.pg.keyboard.type('7'); await r.pg.keyboard.press('Enter');
       await r.pg.waitForTimeout(1200);
@@ -437,7 +456,9 @@ const lireAnnonces = async (pg) => { const o = await ouvrirPop(pg, ':is([data-an
       // la lecture PUBLIQUE n'est pas une capture de SA session
       // (`ligneDeSaSession`) — la ligne doit dire le même âge (3 j) avec ou
       // sans elle, jamais « il y a moins d'une heure ».
-      const age = (t) => (/capté il y a ([^A-Z]*?)(?= Gérer|$)/.exec(t) || [])[1] || null;
+      // (16 nov., bancs-rouges-a) La ligne d'un compte dit maintenant « À relire il y a 3 j » (plus « capté il y a … ») :
+      // la RÈGLE jugée est la même — l'âge lu, identique avec ou sans la lecture publique.
+      const age = (t) => (/il y a (\d+\s*(?:j|h|min|s|mois)\b)/.exec(t) || [])[1] || null;
       dit(/3 j/.test(age(etat.avec) || '') && age(etat.avec) === age(etat.sans) && !/À jour|moins d.une heure/.test(etat.avec), 'compte figé depuis 3 jours, relu en public il y a 10 min : toujours « capté il y a 3 j », jamais rajeuni', JSON.stringify(etat));
       // Un compte « refusé par Vinted » (liste propre à l'appareil), sans aucune
       // capture de SA session depuis 10 jours, le reste — même relu en public.
@@ -454,7 +475,7 @@ const lireAnnonces = async (pg) => { const o = await ouvrirPop(pg, ':is([data-an
 
     console.log('── 12. L’écran Leboncoin dit la cause « à confirmer »');
     if (veut('12')) await essaie('12 leboncoin', async () => {
-      const tous = [BASE()[0], dressing('111', 30, [ann(7011, 'Zeta Garde Alpha 42')]), dressing('333', 30, [ann(7031, 'Zeta Garde Gamma 41')]), dressing('444', 30, [ann(7041, 'Zeta Figee Delta 40'), ann(7042, 'Zeta Figee Epsilon 39')])];
+      const tous = [BASE()[0], LBC_LU, dressing('111', 30, [ann(7011, 'Zeta Garde Alpha 42')]), dressing('333', 30, [ann(7031, 'Zeta Garde Gamma 41')]), dressing('444', 30, [ann(7041, 'Zeta Figee Delta 40'), ann(7042, 'Zeta Figee Epsilon 39')])];
       const r = await rendre(b, { lignes: tous, onglet: 'leboncoin' });
       await r.pg.waitForTimeout(1500);
       const d = await r.pg.evaluate(() => ({ t: document.body.innerText, ac: (document.querySelector('[data-lbc-a-confirmer]') || {}).getAttribute ? document.querySelector('[data-lbc-a-confirmer]').getAttribute('data-lbc-a-confirmer') : null, vide: (document.querySelector('[data-lbc-vide]') || { getAttribute: () => null }).getAttribute('data-lbc-vide') }));
