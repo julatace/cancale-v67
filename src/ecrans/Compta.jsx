@@ -3627,7 +3627,7 @@ function AVenirVerre({ A }) {
   return (
     <section className="vrm-a-venir vg-a-venir vg-carte" data-a-venir={T.valeur == null ? '' : c(T.valeur)} data-a-venir-n={String(T.n)} data-a-venir-site="toutes" data-a-venir-partiel={T.partiel ? '1' : undefined}>
       <button type="button" className="vg-a-venir-btn" data-a-venir-ouvrir="" onClick={ouvrirArgentAVenir}
-        aria-label={`${tr('avenir.ouvrir')} — ${T.partiel && T.valeur != null ? tr('journee.moins') + ' ' : ''}${T.valeur == null ? '—' : montant(T.valeur)}`}>
+        title={`${tr('avenir.ouvrir')} — ${T.partiel && T.valeur != null ? tr('journee.moins') + ' ' : ''}${T.valeur == null ? '—' : montant(T.valeur)}`}>
         <span className="vg-a-venir-tete">
           <span className="vg-ds">{tr('journee.venir')}</span>
           <b className="vg-a-venir-total" data-a-venir-total="">{T.partiel && T.valeur != null ? <small>{tr('journee.moins')} </small> : null}{T.valeur == null ? '—' : montant(T.valeur)}</b>

@@ -36,7 +36,10 @@ jamais jugés en absolu.
 | `popups-propre` P1 Annonces | la rangée de 72 px (titre, N°, prix, taille côte à côte, plus le texte `.vrm-sr` pour lecteur d'écran) prise pour un paragraphe | contrôle périmé | une rangée `data-fiche-ligne` et une bande de chiffres (`data-carte-chiffre`) ne sont pas des paragraphes ; le texte `.vrm-sr` n'est pas compté | vert |
 | `popups-propre` P2/P3 Annonces | fraîcheur dans « À faire · N » (14 nov.) ; « Même article / paire » selon le profil (15 nov.) | contrôle périmé | ouvrir « À faire » ; les deux mots acceptés | à relancer (scénario coupé par la charge) |
 | `audit-textes-courts` T1 (rouge sur `main`) | eBay : « Offre ≥ ce montant : eBay l'accepte seul… En dessous, elle t'arrive. » (94) | **défaut app** (textes courts) | même sens (« l'article est vendu » gardé, §3) en 78 caractères | 49/49 |
-| `iphone-reprise` R (WebKit) | `clock.setSystemTime` sur une page NEUVE (about:blank) : l'horloge du contexte n'y est pas encore sous WebKit | contrôle (banc) | en cas d'échec, ouvrir un petit document de la même origine puis avancer l'heure | à vérifier en CI (WebKit absent du conteneur) |
+| `iphone-reprise` R (WebKit) | `clock.setSystemTime` sur une page NEUVE (about:blank) : l'horloge du contexte n'y est pas encore sous WebKit | contrôle (banc) | en cas d'échec, ouvrir un petit document de la même origine puis avancer l'heure | CI de la PR (WebKit) : R1–R5 verts sur 390 clair et sombre (rouges sur `main`) |
+| `popups-propre` Factures (1512) | « Une facture électronique par vente, et le récapitulatif… » (95 car.) | **défaut app** (textes courts) | « récap » (87) | vert |
+| `accessibilite` (axe, noms) | `aria-label` différent du texte visible (WCAG 2.5.3) : « Imprimer les N bordereaux » de Ma journée / À trancher, « Format · Classique · A4 » de Ventes, les cases d'Argent | **défaut app** | le nom = le texte visible ; la phrase complète des cases d'Argent reste en `title` | à relire sur la CI de la PR |
+| audits (passe complète) | 64 audits KO localement | aucun de ce lot | les MÊMES 64 sont KO sur l'arbre de `main` (5a9abe57) lancé à part | — |
 
 ## Bancs neufs
 
@@ -59,11 +62,13 @@ Défauts trouvés ET corrigés :
 - « Publier aussi ailleurs » : nom accessible complété des nombres visibles (« Leboncoin 3/4 »).
 
 ### `volume-lbc-vestiaire.cjs` (mission 56)
-1 000 annonces Leboncoin et 1 000 Vestiaire INVENTÉES, 390 et 1512 : V1 les 1 000 comptées (rendues ou total dit ;
+1 000 annonces Leboncoin et 1 000 Vestiaire INVENTÉES (44 verts sur le build fusionné), 390 et 1512 : V1 les 1 000 comptées (rendues ou total dit ;
 `data-vc-annonces-n`), V2 temps RELATIFS à une référence de 10 annonces mesurée juste avant (×3 ou +8 s : la machine est
 partagée) et nœuds du DOM ≤ 60 000, V3 la recherche trouve L'annonce unique, V4 aucune lecture `select=data` entière
-d'une liste de 1 000 et la projection `items` lue ≤ 4 fois, V5 rien ne déborde, aucune erreur. Mesures imprimées
-(« MESURE … ») : voir le résultat final plus bas.
+d'une liste de 1 000 et la projection `items` lue ≤ 4 fois, V5 rien ne déborde, aucune erreur. Mesures (charge 20–40) : première rangée 8–17 s pour 1 000 contre 8–12 s pour 10 ; recherche 0,3–0,8 s ;
+nœuds ≈ 12 000–13 400. **CONSTAT** (⚠️, rouge avec `VOL_STRICT=1`) : Vestiaire relit la projection `items` de
+`vc_listings` 5 à 6 fois à l'ouverture (dix lecteurs indépendants dans App.jsx) — à confier à un lecteur partagé.
+Le banc lui-même s'était trompé de champ à 1512 (la recherche générale de l'en-tête vient avant) : corrigé.
 
 ### `accompagnement.cjs` (mission 54)
 Ajoutés : **connexion par QR** (avant, après, échec 410 — le monde entier se sert sans forme inconnue),
@@ -79,8 +84,15 @@ fusion — leur monde demande des conversations / commandes à la forme réelle.
   « 2 prix à saisir ») — la plaque N° est « à trancher » par Julien (15 nov.). `ventes-e2` V7 (N° blancs en sombre) et G.
 - `iphone-reprise` B : juge encore le panneau « Plus » de la barre, retiré le 14 nov. (choix n° 61) — à porter sur le
   menu ☰ (`MenuEcrans`).
-- `accessibilite-feuilles` F1 au téléphone : le toucher de la rangée n'ouvrait pas la fiche dans le banc (à ordinateur :
-  vert) — cause pas trouvée sous la charge.
+- `accessibilite-feuilles` F1 au téléphone : le toucher de la rangée n'ouvre pas la fiche dans le banc (ordinateur :
+  vert) — cause pas trouvée sous la charge (le corps de la rangée est bien touché ; à rejouer machine calme).
+- `accessibilite` (dans la CI) : contrastes de textes à couleur ÉCRITE EN LIGNE posés sur le bleu (Messages
+  `data-fils-vide`, Achats `.vrm-ms-hors`, Leboncoin `.vrm-pf-note`, eBay `.vrm-note-ligne`, Vestiaire « À faire »,
+  Organisation `.ops-surtitre`, Annonces `h3[data-titre-section]` à 1512) : une encre écrite en ligne ne suit pas les
+  jetons du §6, il faut toucher chaque écran (pas fait : risque de texte blanc sur une carte blanche ailleurs) ; plaque
+  N° 40×22 (« à trancher » par Julien, 15 nov.).
+- PR #1203 : « App + vraie extension » VERT (rouge sur `main`) ; Audits, Bancs principaux, WebKit, parcours-critiques
+  rouges, dont les rouges de `main` — **non fusionnée** (règle zéro rouge).
 - Rouges d'autres chantiers sur les jobs touchés (journee-coherence E6/E8, colis-retirer-propre, retraits-suivi R5/R7/R8,
   tout-imprimer « N° lus ») : pas de ce lot.
 
