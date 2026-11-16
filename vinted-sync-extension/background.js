@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.393.0';
+const CODE_VERSION = '5.402.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -12508,9 +12508,13 @@ function seuilOffreLu(v) {
   return isFinite(n) && n > 0 ? n : null;
 }
 async function offreAutoReglages() {
-  const m = await lireMain(['vinted_offres_auto', 'vinted_annonce_numeros', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', 'vinted_offres_garde']);
+  const m = await lireMain(['vinted_offres_auto', 'vinted_offres_contre', 'vinted_annonce_numeros', 'vinted_offre_refus_msg', 'vinted_offre_refus_variantes', 'vinted_offres_garde']);
   if (m === null) return null;                         // « pas su » ⇒ on n'allume rien
   const actif = m.vinted_offres_auto === true;
+  // (5.402, 16 nov., lot aide-decision — validé par Julien) La CONTRE-OFFRE AUTOMATIQUE
+  // au prix mini : une option À PART, éteinte par défaut, qui ne vit que moteur allumé.
+  // Seul un vrai « oui » l'allume (absent, illisible ⇒ éteinte).
+  const contre = actif && m.vinted_offres_contre === true;
   const nums = m.vinted_annonce_numeros || {};
   const mins = {}, refuses = {};
   for (const k in nums) {
@@ -12524,7 +12528,64 @@ async function offreAutoReglages() {
   // jamais celle du refus précédent. Sans 1re version, rien n'est écrit (comme avant).
   const refusVersions = msgRefus ? versionsMessage(msgRefus, Array.isArray(m.vinted_offre_refus_variantes) ? m.vinted_offre_refus_variantes : []) : [];
   const garde = m.vinted_offres_garde && typeof m.vinted_offres_garde === 'object' ? m.vinted_offres_garde : null;
-  return { actif, mins, refuses, msgRefus, refusVersions, garde };
+  return { actif, contre, mins, refuses, msgRefus, refusVersions, garde };
+}
+// <contre-offre-mini-regle> COPIE de `contreOffreMini` (src/messagesVolets.js) — la
+// MÊME règle que « Proposer X € » de la messagerie (3 nov.) ; `audit-contre-offre-auto`
+// exige les deux corps identiques. X = son mini arrondi à l'euro supérieur, jamais sous
+// le mini, jamais au-dessus du prix de l'annonce, toujours au-dessus de l'offre ; sinon null.
+function contreOffreMini(offre, prixAffiche, mini) {
+  const o = Number(offre), p = Number(prixAffiche), m = Number(mini);
+  if (!Number.isFinite(o) || !(o > 0)) return null;
+  if (!Number.isFinite(m) || !(m > 0)) return null;
+  if (!Number.isFinite(p) || !(p > 0)) return null;
+  if (o >= m) return null;
+  if (p < m) return null;
+  const x = Math.min(Math.ceil(Math.round(m * 100) / 100 - 1e-9), p);
+  const c = Math.round(x * 100) / 100;
+  if (c < m || c > p || !(c > o)) return null;
+  return c;
+}
+// </contre-offre-mini-regle>
+// (5.402) Le prix AFFICHÉ de l'annonce, lu dans la lecture du dressing de CE compte
+// (par identifiant d'annonce, jamais par titre). Lecture de plus de 24 h, annonce
+// absente, autre devise, ligne illisible ⇒ null (« pas su » : aucune contre-offre).
+const CONTRE_DRESSING_MAX_MS = 24 * 3600 * 1000;
+async function prixAnnonceContre(uid, item) {
+  if (!/^\d{1,20}$/.test(String(uid || '')) || !/^\d{1,20}$/.test(String(item || ''))) return null;
+  let rows;
+  try { rows = await sbGet(`app_data?id=eq.harvest_${uid}_listings&select=items:data->payload->items,cap:data->>capturedAt`); } catch (_) { return null; }
+  if (!Array.isArray(rows) || !rows[0] || !Array.isArray(rows[0].items)) return null;
+  const cap = dateLectureDressing(rows[0]);
+  if (!Number.isFinite(cap) || Date.now() - cap > CONTRE_DRESSING_MAX_MS || cap > Date.now() + 120000) return null;
+  const it = rows[0].items.find((x) => x && String(x.id) === String(item));
+  if (!it || it.is_closed === true || it.is_hidden === true) return null;
+  const v = it.price;
+  const montant = v && typeof v === 'object' ? Number(v.amount) : Number(v);
+  const devise = v && typeof v === 'object' ? String(v.currency_code || 'EUR') : String(it.currency || 'EUR');
+  if (devise !== 'EUR' || !(Number.isFinite(montant) && montant > 0)) return null;
+  return montant;
+}
+// (5.402) La contre-offre AUTOMATIQUE : la recette que l'extension CONNAÎT déjà —
+// « faire une offre » de la messagerie et des favoris (POST /transactions/{tx}/offers
+// {offer:{currency, price}}, relevée sur ses vraies requêtes et celles de Vintex,
+// EXEC_PERMIS). Depuis l'ONGLET vinted.fr (aucun `Authorization`), sous `garde`
+// (compte de l'onglet, plafond 45/h, pause), comme `repondreOffre`.
+async function contreOffreAuto({ uid, tx, prix }) {
+  if (!uid || !/^\d{1,20}$/.test(String(tx || ''))) return { ok: false, error: 'offre incomplète' };
+  const p = Number(prix);
+  if (!(Number.isFinite(p) && p >= 1 && p < 100000)) return { ok: false, error: 'prix de la contre-offre invalide' };
+  const accts = await getStoredAccounts({ ouNull: true });
+  if (accts === null) return { ok: false, code: 'pas-su', error: 'tes comptes n’ont pas pu être relus — rien n’est parti, réessaie' };
+  const acc = accts.find((a) => String(a.vinted_user_id) === String(uid));
+  if (!acc) return { ok: false, error: 'compte introuvable' };
+  const stop = await garde(uid, acc, { sorte: 'offre', rythme: true }); if (stop) return stop;
+  const r = await vintedPage(acc, 'POST', `/api/v2/transactions/${tx}/offers`, { offer: { currency: 'EUR', price: p.toFixed(2) } }, { timeoutMs: 12000 });
+  if (r.sansPage) { noterDiag('offre_auto_sans_onglet'); return { ok: false, status: 0, code: 'onglet-vinted', sansPage: r.sansPage, error: 'ouvre vinted.fr dans ce Chrome : rien n\'est parti' }; }
+  const faite = !!(r.ok && (!r.json || r.json.code == null || Number(r.json.code) === 0));
+  noterDiag(faite ? 'offre_auto_contre' : `offre_auto_contre_refuse_${r.status}`);
+  if (!faite && !r.pause && refusRestreint(r)) await poserFreinRepub(uid, r);
+  return { ok: faite, status: r.status, code: r.code, error: faite ? '' : ((r.json && (r.json.message || r.json.error)) || `erreur ${r.status}`) };
 }
 // Les offres de CE compte qui attendent VRAIMENT une réponse, lues dans les
 // conversations DÉJÀ captées (aucun appel Vinted ajouté). Copie fidèle de
@@ -12696,11 +12757,15 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
       let quoi = null;
       if (isFinite(min) && min > 0 && o.prix >= min) quoi = 'accept';
       else if (isFinite(refuse) && refuse > 0 && o.prix < refuse) quoi = 'reject';
+      // (5.402) Entre « Refuser sous » et le mini (ou sous le mini sans seuil de refus),
+      // option allumée : une contre-offre AU MINI, une fois par offre.
+      else if (reg.contre === true && isFinite(min) && min > 0 && o.prix < min) quoi = 'contre';
       if (!quoi) continue;
       // (5.308) Jamais une acceptation sur une paire vendue ailleurs, ni sur une
       // garde absente, incomplète ou périmée : l'offre attend, rien n'est envoyé,
       // et c'est dit une fois par offre (journal + diag). Le refus reste permis.
-      if (quoi === 'accept') {
+      // (5.402) La contre-offre aussi : l'acheteur qui la prend ACHÈTE la paire.
+      if (quoi === 'accept' || quoi === 'contre') {
         const raison = offreGardeDit(reg.garde, o.item, Date.now());
         if (raison) {
           const dits = (await chrome.storage.local.get('vrmOffresGardeDit')).vrmOffresGardeDit || {};
@@ -12709,7 +12774,9 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
             for (const k in dits) if (dits[k] < Date.now() - 7 * 86400000) delete dits[k];
             await chrome.storage.local.set({ vrmOffresGardeDit: dits });
             noterDiag('offre_auto_garde_' + raison);
-            logActivity(raison === 'vendue-ailleurs'
+            logActivity(quoi === 'contre'
+              ? `⏸ Offre de ${o.prix.toFixed(2)} € : pas de contre-offre (${raison === 'vendue-ailleurs' ? 'vendue ailleurs' : 'ouvre VRM pour qu\'il vérifie les autres sites'})`
+              : raison === 'vendue-ailleurs'
               ? `⛔ Offre de ${o.prix.toFixed(2)} € NON acceptée : ${motsExt().ce} est vendu${motsExt().e} ailleurs (retire l'annonce Vinted)`
               : `⏸ Offre de ${o.prix.toFixed(2)} € pas acceptée : ouvre VRM pour qu'il vérifie qu'elle n'est vendue nulle part ailleurs`);
           }
@@ -12727,8 +12794,22 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
       for (const k in stFrais) if (!st[k]) st[k] = stFrais[k];
       // (5.366) Sécurité du compte : repos de nuit, « si tu es là », prudence, Tout arrêter,
       // plafonds, pas de rafale. Refus ⇒ l'offre reste prévue (rien n'est noté « faite »).
+      // (5.402) Le prix de la contre-offre : la règle de la messagerie sur le prix AFFICHÉ
+      // de l'annonce (lecture du dressing < 24 h). Pas su ⇒ rien ne part, et l'offre est
+      // notée examinée (une fois : pas une relecture par minute), c'est dit.
+      let prixContre = null;
+      if (quoi === 'contre') {
+        prixContre = contreOffreMini(o.prix, await prixAnnonceContre(uid, o.item), min);
+        if (prixContre == null) {
+          st[o.oid] = Date.now(); delete pv[o.oid]; pvChange = true;
+          await chrome.storage.local.set({ vrmOffresFaites: st, vrmOffresPrevues: pv });
+          noterDiag('offre_auto_contre_pas_su');
+          logActivity(`⏸ Offre de ${o.prix.toFixed(2)} € : pas de contre-offre automatique (prix de l'annonce pas relu depuis 24 h, ou ton mini au-dessus) — à toi de répondre`);
+          continue;
+        }
+      }
       if (await secuGeste('vinted', uid, 'offre', 'auto')) break;
-      const r = await repondreOffre({ uid, tx: o.tx, oid: o.oid, quoi, conv: o.conv, prix: o.prix, pseudo: o.pseudo, article: o.article, msg: quoi === 'reject' ? (reg.refusVersions && reg.refusVersions.length ? reg.refusVersions : reg.msgRefus) : null });
+      const r = quoi === 'contre' ? await contreOffreAuto({ uid, tx: o.tx, prix: prixContre }) : await repondreOffre({ uid, tx: o.tx, oid: o.oid, quoi, conv: o.conv, prix: o.prix, pseudo: o.pseudo, article: o.article, msg: quoi === 'reject' ? (reg.refusVersions && reg.refusVersions.length ? reg.refusVersions : reg.msgRefus) : null });
       // (5.342) Rien n'est parti (pas d'onglet vinted.fr) : l'offre reste prévue, pas « faite ».
       if (r && r.sansPage) {
         const dits = (await chrome.storage.local.get('vrmOffresOngletDit')).vrmOffresOngletDit || {};
@@ -12744,8 +12825,9 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
       await chrome.storage.local.set({ vrmOffresFaites: st, vrmOffresPrevues: pv });   // écrit AVANT de boucler : un worker tué ne retraite pas
       if (r && r.ok) {
         faites += 1;
-        await noterJournal(uid, quoi === 'accept' ? 'offre_acceptee' : 'offre_refusee', { a: o.item, x: o.tx, p: o.prix, auto: true, v: r.variante });
-        if (quoi === 'accept') logActivity(`✅ Offre de ${o.prix.toFixed(2)} € acceptée automatiquement (ton mini : ${min} €)`);
+        await noterJournal(uid, quoi === 'accept' ? 'offre_acceptee' : quoi === 'contre' ? 'contre_offre' : 'offre_refusee', { a: o.item, x: o.tx, p: quoi === 'contre' ? prixContre : o.prix, de: quoi === 'contre' ? o.prix : undefined, auto: true, v: r.variante });
+        if (quoi === 'contre') logActivity(`↗️ Offre de ${o.prix.toFixed(2)} € : contre-offre à ${prixContre.toFixed(2)} € envoyée automatiquement (ton mini : ${min} €)`);
+        else if (quoi === 'accept') logActivity(`✅ Offre de ${o.prix.toFixed(2)} € acceptée automatiquement (ton mini : ${min} €)`);
         else logActivity(`↩️ Offre de ${o.prix.toFixed(2)} € refusée automatiquement (ton seuil : ${refuse} €)${r.variante ? ` + ton message (version ${r.variante})` : (reg.msgRefus && r.messagePasParti ? " — ton message n'est pas parti" : '')}`);
         notifierApp({ type: 'maj', quoi: 'ventes', uid: String(uid) });
       } else { break; }                                 // garde-fou atteint ou refus de Vinted : on arrête le lot (pas de refus en série)
