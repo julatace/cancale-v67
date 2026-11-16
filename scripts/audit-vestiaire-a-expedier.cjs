@@ -132,7 +132,7 @@ const MAINTENANT = Date.parse('2026-11-15T14:11:00+01:00');
     dit(aExp({ ...base, etapesVc: { ...base.etapesVc, sellerShipment: 'ongoing' } }, LECTURES) === true, 'D2 « ongoing » ne prouve rien');
     dit(aExp({ ...base, etapesVc: null, statutVc: '' }, LECTURES) === true, 'D3 rien lu : « à expédier » reste (pas su ≠ envoyé)');
     const r = etat(base, { lectures: LECTURES });
-    dit(r.cle === 'aExpedierPassee' && texte(r).startsWith('À expédier · date limite passée ('), 'D4 date limite passée et rien ne prouve l’envoi : « À expédier · date limite passée (…) »', texte(r));
+    dit(r.cle === 'aExpedierPassee' && texte(r).startsWith('À envoyer · date limite passée ('), 'D4 date limite passée et rien ne prouve l’envoi : « À envoyer · date limite passée (…) » (16 nov. : « À envoyer » partout, src/libelles.js)', texte(r));
     dit(etat(base, { lectures: LECTURES, fait: '2026-11-08T10:00:00Z' }).cle === 'colisFait', 'D5 « Colis fait » posé par lui : « Colis fait »');
   });
   await essaie('E', () => {
