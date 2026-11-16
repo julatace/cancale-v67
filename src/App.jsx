@@ -1008,7 +1008,7 @@ import "./design/ventes-verre.css";   // (15 nov.) Ventes et Achats « Verre dé
 import "./design/verre-ecrans.css";   // (15 nov., maquettes validées : « tout est parfait sauf étagères ») Argent, à venir, Messages, Paramètres, la fiche — des classes `vg-*` neuves, `@layer vrm-verre` : docs/passation/2026-11-15-ecrans-verre-2.md
 import "./design/verre-journee.css";   // (15 nov., refonte-journee) Ma journée comme la maquette validée, « La paire à sortir en premier » — docs/passation/2026-11-15-refonte-journee.md
 import "./design/verre-annonces.css";   // (15 nov., refonte-journee) Annonces comme la maquette validée : la rangée de 72 px, la recherche et les vues
-import "./design/argent-mieux.css";   // (16 nov., lot argent-mieux) Argent lisible partout : cartes de verre, encre du verre, « Copier » plein, ventes non comptées groupées — `@layer vrm-verre` : docs/passation/2026-11-16-argent-mieux.md
+import "./design/verre-argent.css";   // (16 nov., lot argent-mieux) Argent lisible partout : cartes de verre, encre du verre, « Copier » plein, ventes non comptées groupées — `@layer vrm-verre` : docs/passation/2026-11-16-argent-mieux.md
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
