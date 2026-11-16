@@ -228,7 +228,9 @@ const PLUS_ATTENDUES = (() => {
 const mesureBarre = (pg) => pg.evaluate(() => {
   const nav = document.querySelector('.vrm-tabbar'); if (!nav) return null;
   const r = nav.getBoundingClientRect();
-  const entrees = [...nav.querySelectorAll(':scope > button')].map((x) => {
+  // (16 nov., barre-achats) Les ENTRÉES de la barre : ses onglets (`.vrm-tab`) — cinq depuis qu'Achats y est —, pas
+  // le disque « + » du centre (14 nov.), qui comptait jusqu'ici pour la 5ᵉ entrée.
+  const entrees = [...nav.querySelectorAll(':scope > .vrm-tab, :scope > .vrm-nav-more')].map((x) => {
     const q = x.getBoundingClientRect(); const lab = x.querySelector('.vrm-nav-label');
     const hit = document.elementFromPoint(q.left + q.width / 2, q.top + q.height / 2);
     return { id: x.getAttribute('data-nav-entree') || 'plus', h: Math.round(q.height), w: Math.round(q.width), coupe: lab ? lab.scrollWidth > lab.clientWidth + 1 : true, touche: !!hit && x.contains(hit) };
