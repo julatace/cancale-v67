@@ -94,7 +94,11 @@ function evalue(q, env) {
     const norm = (s) => s.replace(/\s+/g, ' ').replace(/\s*:\s*/g, ': ').replace(/\s*,\s*/g, ', ').trim();
     const ATTENDUES = new Set([norm(MQ_ORDINATEUR), norm(MQ_TELEPHONE)]);
     let copies = 0; const perimees = [];
+    // (16 nov.) Hors de la coque : la page publique des tarifs (src/main.jsx la monte SANS l'app, comme l'accueil) — ses
+    // « ≥ 744 px » sont la mise en page d'une page web, pas une décision téléphone / ordinateur.
+    const HORS_COQUE = new Set([path.join('src', 'tarifs', 'tarifs.css')]);
     for (const f of fichiers) {
+      if (HORS_COQUE.has(f)) continue;
       const src = lire(f) || '';
       for (const m of src.matchAll(/@media\s*([^{]+)\{/g)) {
         const q = norm(m[1]); const ligne = src.slice(0, m.index).split('\n').length;
@@ -118,7 +122,11 @@ function evalue(q, env) {
   dit(enLigne.length === 0, 'aucune copie en ligne de la règle de coque (matchMedia)', enLigne.join(' | '));
   dit(/className="vrm-app-shell" data-tablette=\{\(ordi && tablette\) \|\| undefined\}/.test(app), 'la racine porte `data-tablette` (seulement dans la coque ordinateur)');
   const imports = [...app.matchAll(/^import ["']\.\/([^"']+\.css)["'];/gm)].map((m) => m[1]);
-  dit(imports.length > 10 && imports[imports.length - 1] === 'styles-tablette.css', 'styles-tablette.css est importée après toutes les autres feuilles', `dernière : ${imports[imports.length - 1]}`);
+  // (16 nov., audits-vert-main) Décision du 14 nov. (Studio bleu clair, écrite dans App.jsx) : les feuilles du studio
+  // (`./design/…`) viennent EN DERNIER, après styles-tablette. styles-tablette reste après toutes les AUTRES feuilles.
+  const horsStudio = imports.filter((f) => !/^design\//.test(f));
+  const iTab = imports.indexOf('styles-tablette.css');
+  dit(imports.length > 10 && horsStudio[horsStudio.length - 1] === 'styles-tablette.css' && imports.slice(iTab + 1).every((f) => /^design\//.test(f)), 'styles-tablette.css est importée après toutes les autres feuilles (le studio `design/` ensuite, décision du 14 nov.)', `dernière hors studio : ${horsStudio[horsStudio.length - 1]}`);
   const po = lire('src/passageOnglet.js') || '';
   dit(/import \{ MQ_ORDINATEUR \} from '\.\/coque\.js'/.test(po) && /matchMedia\(MQ_ORDINATEUR\)/.test(po), 'passageOnglet.js lit la même règle');
 

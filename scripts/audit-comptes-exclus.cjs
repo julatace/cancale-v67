@@ -49,6 +49,7 @@ async function charger(mut) {
   fs.mkdirSync(path.join(dir, 'src'), { recursive: true }); fs.copyFileSync(path.join(R, 'src', 'profilVendeur.js'), path.join(dir, 'src', 'profilVendeur.js')); fs.copyFileSync(path.join(R, 'src', 'venteAilleurs.js'), path.join(dir, 'src', 'venteAilleurs.js'));   // (12 nov., saisie rapide) importé par bilan-semaine.js   // (lot vocabulaire-article) importé par bilan-semaine
   fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"module"}');
   fs.writeFileSync(path.join(dir, 'api', 'package.json'), '{"type":"module"}');
+  require('./_copie-imports.cjs').completerImports(R, dir);   // (16 nov.) ce qu'importe api/_lib depuis src/ (argent-notif → alertesSeuils)
   const imp = (f) => import('file://' + path.join(lib, f));
   let app = require("./_source-app.cjs").sourceApp();
   if (mut && mut.fichier === 'App.jsx') app = mut.fn(app);

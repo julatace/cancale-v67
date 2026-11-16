@@ -147,7 +147,10 @@ const sansCommentaires = (t) => t.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/
   dit(/data-remettre-vente=\{txL\}[^>]*onClick=\{\(\)=>remettreEnVente\(annChez\)\}/.test(APP), 'S3 la ligne de la vente annulée porte « Remettre en vente » (SON clic)');
   dit(/numeros: \{ \.\.\.fichesAnciennesAnnulees\(repubMain, nextNum, \{ reprenable: numeroReprenable \}\), \.\.\.nextNum \}, recrees: recreesEff/.test(APP), 'S4 la reprise du N° lit la fiche prêtée (N° posé sur la vente), la vraie fiche gagne');
   dit(/if \(lj\) jobs\.push\(\{ id: 'remettre-en-vente'/.test(APP) && /ligneAnnuleesJournee\(annulChez\)/.test(APP), 'S5 Ma journée « À faire » le dit une fois');
-  dit(/paire\.annulee[\s\S]{0,200}rien à supprimer/.test(APP), 'S6 « à la main » dit que l’ancienne est fermée : rien à supprimer');
+  // (16 nov.) Le texte est passé par tr() (lot traduction) : la clé posée sur `paire.annulee`, et le français qui dit « rien à supprimer ».
+  const FR_RG = (() => { try { return fs.readFileSync(path.join(SRC, 'i18n', 'langues', 'fr', 'republierGuide.js'), 'utf8'); } catch (_) { return ''; } })();
+  dit(/paire\.annulee[\s\S]{0,200}rien à supprimer/.test(APP)
+    || (/paire\.annulee \? <div[^>]*>\{tr\(paire\.retour \? 'rg\.creer\.annuleeRetour' : 'rg\.creer\.annulee'\)\}/.test(APP) && /"rg\.creer\.annulee": "[^"]*fermée[^"]*rien à supprimer/.test(FR_RG) && /"rg\.creer\.annuleeRetour": "[^"]*fermée[^"]*rien à supprimer/.test(FR_RG)), 'S6 « à la main » dit que l’ancienne est fermée : rien à supprimer');
   dit(!/useEffect\([^;]*remettreEnVente/.test(APP), 'S7 rien n’est remis en vente tout seul (aucun effet n’appelle « Remettre en vente »)');
 
   console.log(`\n${ok} contrôle(s) OK, ${ko} en échec`);
