@@ -407,11 +407,16 @@ function prochesDe(v, m) {
   v.proches.set(m, out);
   return out;
 }
-// Un pseudo (lettres ET chiffres, « tomj606 ») : la même tolérance, comptée sur sa longueur,
-// seulement s'il a 5 signes au moins (« tomj660 » ⇒ tomj606 ; « tom » ne trouve rien de proche).
+// Un pseudo (« tomj606 ») : la même tolérance, comptée sur sa longueur, seulement s'il a 5
+// signes au moins — et ses CHIFFRES jamais : « tmoj606 » ⇒ tomj606, mais « tomj660 » n'est
+// pas tomj606, ni « acheteur_1998 » acheteur_1999 (deux personnes ; un chiffre est une identité).
+const chiffresDe = (s) => s.replace(/[^0-9]/g, '');
 function pseudoProche(m, p) {
-  if (!m || !p || m === p || m.length < 5 || !/^[a-z0-9._-]+$/.test(m)) return false;
+  if (!m || !p || m === p || m.length < 5) return false;
   const k = m.length >= 8 ? 2 : 1;
+  if (Math.abs(m.length - p.length) > k) return false;   // le plus fréquent, d'abord (rapide)
+  if (!/^[a-z0-9._-]+$/.test(m)) return false;
+  if (chiffresDe(m) !== chiffresDe(p)) return false;
   return distanceFautes(m, p, k) <= k;
 }
 
@@ -438,6 +443,8 @@ export function chercherPartout(index, q, { max = MAX_PAR_GROUPE, numero = null,
   const tolere = cents == null && tolerance !== false && (!!pseudoTape || mots.some((m) => fautesPermises(m) !== 0));
   const voc = tolere ? vocabulaire(index) : null;
   const proches = tolere ? mots.map((m) => (fautesPermises(m) !== 0 ? prochesDe(voc, m) : null)) : null;
+  // Aucun mot lu n’est proche d’un mot tapé : rien à pardonner dans les titres (la boucle n’essaie même pas).
+  const tolereTitre = !!proches && proches.some((p) => p && p.size > 0);
   const trouve = [];
   let ie = -1;
   for (const e of index.entrees) {
@@ -464,7 +471,7 @@ export function chercherPartout(index, q, { max = MAX_PAR_GROUPE, numero = null,
     if (!tolere) continue;
     if (pseudoTape && e.pseudos.length) { const i = e.pseudos.findIndex((p) => pseudoProche(pseudoTape, p)); if (i >= 0) { trouve.push({ e, par: 'pseudo', exact: false, proche: true, valeur: e.pseudosAff[i], rang: RANG_PROCHE.pseudo }); continue; } }
     const lus = voc.motsDe[ie];
-    if (!e.t || !lus || !lus.length) continue;
+    if (!tolereTitre || !e.t || !lus || !lus.length) continue;
     let pardonne = '', ok = true;
     for (let i = 0; i < mots.length && ok; i++) {
       const m = mots[i];

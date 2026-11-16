@@ -15,7 +15,8 @@
 //   · une trouvaille « à une faute près » n'est JAMAIS exacte, passe APRÈS toute
 //     trouvaille exacte, ouvre SON objet (sa transaction), dit le mot compris (« ≈ … ») ;
 //   · 50 paires au même titre : « 124 » met LA N°124 en tête, seule ; « B124 », « 007 » ;
-//   · un pseudo à une faute près (« tomj660 » ⇒ tomj606), après le pseudo exact ;
+//   · un pseudo à une faute près (« tmoj606 » ⇒ tomj606), après le pseudo exact — jamais
+//     sur un CHIFFRE (« tomj660 » n’est pas tomj606) ;
 //   · rapide : 20 000 ventes, index construit une fois, < 50 ms par frappe (mesuré).
 //   node scripts/audit-recherche-tolerante.cjs [--mutation=NOM | --prouve]
 const fs = require('fs'), path = require('path'), os = require('os');
@@ -46,6 +47,8 @@ const MUTATIONS = {
   // Le vocabulaire refait à chaque frappe (plus de mémo) : trop lent.
   'vocab-memo': ['  let v = _vocab.get(index);\n  if (v) return v;', '  let v = null;'],
   // Le pseudo approché oublié.
+  // Un chiffre de pseudo pardonné (« acheteur_1998 » ⇒ acheteur_1999 : une autre personne).
+  'pseudo-chiffres': ['  if (chiffresDe(m) !== chiffresDe(p)) return false;\n', ''],
   'pseudo-proche': ["if (pseudoTape && e.pseudos.length) {", "if (false && pseudoTape && e.pseudos.length) {"],
 };
 
@@ -95,7 +98,7 @@ if (arg.includes('--prouve')) {
     { transaction_id: 22000000782, title: 'Mocassins Médicis cuir', date: '2026-11-06T10:00:00Z' },
   ];
   const achats = [{ transaction_id: 23000000001, title: 'Nike Air Max 1 rouge', date: '2026-11-05T10:00:00Z' }];
-  const pseudos = [{ tx: '22000000778', pseudo: 'tomj606' }, { tx: '22000000779', pseudo: 'tomj660x' }];
+  const pseudos = [{ tx: '22000000778', pseudo: 'tomj606' }, { tx: '22000000779', pseudo: 'tomj660x' }, { tx: '22000000780', pseudo: 'tmoj606' }];
   const bordereaux = [{ tx: '22000000777', suivi: 'XW300000777FR' }];
   const colis = [{ id: 'email_track_1', suivi: 'MR7000123', code: '500123', status: 'available', sens: 'entrant', art: 'Colis Asics', carrier: 'mondialrelay', at: '2026-11-12T08:00:00Z' }];
   const idx = R.indexRecherche({ ventes, achats, pseudos, bordereaux, colis, fiches, annonces: [] });
@@ -158,8 +161,9 @@ if (arg.includes('--prouve')) {
     const p = c('tomj606');
     dit(p.groupes.vente[0] && p.groupes.vente[0].e.cle === 'vente:22000000778' && p.groupes.vente[0].par === 'pseudo' && p.groupes.vente[0].exact, '« tomj606 » ⇒ SA vente (pseudo exact) en tête', p.groupes.vente.map((x) => [x.e.cle, x.par, x.exact]));
     const q = c('tomj660');
-    dit(q.groupes.vente[0] && q.groupes.vente[0].e.cle === 'vente:22000000779' && !q.groupes.vente[0].proche, '« tomj660 » : le pseudo qui le CONTIENT (tomj660x) d’abord', q.groupes.vente.map((x) => [x.e.cle, x.par, !!x.proche]));
-    dit(q.groupes.vente.some((x) => x.e.cle === 'vente:22000000778' && x.par === 'pseudo' && x.proche), '… puis tomj606 à une faute près', q.groupes.vente.map((x) => [x.e.cle, x.par, !!x.proche]));
+    dit(q.groupes.vente.map((x) => x.e.cle).join() === 'vente:22000000779' && !q.groupes.vente[0].proche, '« tomj660 » : le pseudo qui le CONTIENT (tomj660x), et PAS tomj606 (un chiffre de pseudo n’est jamais pardonné)', q.groupes.vente.map((x) => [x.e.cle, x.par, !!x.proche]));
+    const t = c('tmoj606');
+    dit(t.groupes.vente.map((x) => x.e.cle).join() === 'vente:22000000780,vente:22000000778' && t.groupes.vente[1].par === 'pseudo' && t.groupes.vente[1].proche && !t.groupes.vente[0].proche, '« tmoj606 » : le pseudo EXACT tmoj606 d’abord, puis tomj606 à une faute près (lettres inversées)', t.groupes.vente.map((x) => [x.e.cle, x.par, !!x.proche]));
     const d = R.destinationResultat(c('air mxa').groupes.vente[0]);
     dit(d && d.tab === 'ventes' && d.cible && d.cible.tx === '22000000777', 'une vente trouvée à une faute près ouvre SA transaction', d);
     dit(E.motPastille(c('air mxa').groupes.vente[0]) === '≈ max' && E.motPastille(c('kayano').groupes.vente[0]) === '', 'la pastille dit le mot compris (« ≈ max »), rien pour un titre exact');
@@ -173,6 +177,8 @@ if (arg.includes('--prouve')) {
     const F = {}; for (let i = 1; i <= 2000; i++) F['f' + i] = { numero: String(i), title: MOTS[i % MOTS.length] + ' ' + MOTS[(i * 3) % MOTS.length] + ' paire ' + i };
     const I = R.indexMemo({ ventes: V, pseudos: P, fiches: F });
     const frappes = []; for (const mot of ['air mxa 42', 'jordn chicgo', 'tomj660', 'salomn noire', 'B124', 'gazele']) for (let i = 1; i <= mot.length; i++) frappes.push(mot.slice(0, i));
+    // Une première passe (le moteur JavaScript chauffe ; le vocabulaire est déjà prêt avec l’index), puis la mesure.
+    for (const q of frappes) R.chercherPartout(I, q, { exactesEnTete: true });
     const t0 = performance.now();
     let pire = 0, qPire = "";
     for (const q of frappes) { const t = performance.now(); R.chercherPartout(I, q, { exactesEnTete: true }); const d = performance.now() - t; if (d > pire) { pire = d; qPire = q; } }
