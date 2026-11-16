@@ -340,7 +340,7 @@ async function verifier(racine, { muet = false, avant = null } = {}) {
     const phrases = [...Object.values(AV.VIDEOS_AIDE).flatMap((v) => [v.titre, v.geste]), ...JP.CARTES_JOURNEE.map((c) => c.desc), ...NV.NOUVEAUTES.flatMap((n) => [n.titre, n.phrase])].filter((t) => typeof t === 'string' && MOT.test(t));
     const manque = phrases.filter((t) => !PV.PHRASES_ARTICLE[t]);
     const av = lire(racine, 'src/composants/AideVideo.jsx'), jp = lire(racine, 'src/JourneePerso.jsx');
-    dit(phrases.length > 0 && !manque.length && /\{phraseVendeur\(v\.titre\)\}/.test(av) && /\{phraseVendeur\(x\.geste\)\}/.test(av) && /\{phraseVendeur\(c\.desc\)\}/.test(jp), `B11 vidéos d’aide, cartes de Ma journée, Quoi de neuf : chaque phrase qui dit « paire » (${phrases.length}) a sa version « article », et l’écran la prend`, manque);
+    dit(phrases.length > 0 && !manque.length && /phraseVendeur\(v\.titre\)/.test(av) && !/\{[vx]\.(?:titre|geste)\}/.test(av) && /\{phraseVendeur\(c\.desc\)\}/.test(jp) && !/\{c\.desc\}/.test(jp), `B11 vidéos d’aide, cartes de Ma journée, Quoi de neuf : chaque phrase qui dit « paire » (${phrases.length}) a sa version « article », et l’écran la prend`, manque);
     const ctx = { inscritLe: '2026-11-01', vend: 'autre', mode: 'complet' };
     const vus = NV.nouveautesDuCompte(ctx).filter((n) => MOT.test(n.titre + ' ' + n.phrase));
     const sn = NV.nouveautesDuCompte({ ...ctx, vend: 'sneakers' });
