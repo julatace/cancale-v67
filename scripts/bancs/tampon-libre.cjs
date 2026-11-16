@@ -22,6 +22,13 @@
 //   6. « Déplacer le tampon » n'existe que dans la modale du résultat (iPhone) —
 //      non jugé ici ; aucune erreur d'app, aucun débordement.
 // Captures : CAPTURES=dossier (aperçu au téléphone et à l'ordinateur).
+//
+// ⚠️ (16 nov., lot tampons-parametres) RÈGLES CHANGÉES PAR JULIEN : la sélection ouvre TOUJOURS l'aperçu avant
+// impression (plus seulement « forme jamais vue ») ; un tampon posé sur un code-barres, un QR ou l'adresse est REFUSÉ
+// (plus une puce) ; la place vit dans `vrm_tampons`. Le parcours de ce banc (glisser, même sur du texte, agrandir au
+// doigt et à la souris, imprimer À CETTE PLACE, mémorisé pour la forme, revenir à l'origine) est joué par
+// `scripts/bancs/tampons-apercu.cjs` (390 tactile par vrais points de contact CDP, 1512 souris) : ce fichier le lance.
+if (!process.env.TAMPON_LIBRE_ANCIEN) { require('./tampons-apercu.cjs'); return; }
 require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const path = require('path'), fs = require('fs'), http = require('http'), os = require('os');
 const RACINE = path.join(__dirname, '..', '..');

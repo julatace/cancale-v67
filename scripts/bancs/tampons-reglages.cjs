@@ -112,7 +112,7 @@ window.__lire = async (b64, n, dpmm, png) => {
     const q = qr ? { data: qr.data, box: { x: Math.min(qr.location.topLeftCorner.x, qr.location.bottomLeftCorner.x) * k, y: Math.min(qr.location.topLeftCorner.y, qr.location.topRightCorner.y) * k, X: Math.max(qr.location.topRightCorner.x, qr.location.bottomRightCorner.x) * k, Y: Math.max(qr.location.bottomLeftCorner.y, qr.location.bottomRightCorner.y) * k } } : null;
     window.__px = window.__px || {}; const cle = Math.random().toString(36).slice(2); window.__px[cle] = { bw, W, H, s };
     const boiteQr = (r) => ({ x: Math.min(r.location.topLeftCorner.x, r.location.bottomLeftCorner.x) * k, y: Math.min(r.location.topLeftCorner.y, r.location.topRightCorner.y) * k, X: Math.max(r.location.topRightCorner.x, r.location.bottomRightCorner.x) * k, Y: Math.max(r.location.bottomLeftCorner.y, r.location.bottomRightCorner.y) * k });
-    const qrs = []; for (const r of essais) if (!qrs.some((x) => x.data === r.data)) qrs.push({ data: r.data, box: boiteQr(r) });
+    const qrs = []; for (const r of essais) if (/^VRM-EXEMPLE-/.test(r.data) && !qrs.some((x) => x.data === r.data)) qrs.push({ data: r.data, box: boiteQr(r) });
     return { w: v1.width, h: v1.height, items, qr: q, qrs, itf: [...itf.values()].map((e) => ({ t: e.t, box: { x: e.b.x0 * k, y: e.b.y0 * k, X: e.b.x1 * k, Y: e.b.y1 * k } })), px: cle, png: png ? c.toDataURL('image/png') : null };
   } finally { await doc.destroy(); }
 };
@@ -120,7 +120,11 @@ window.__lire = async (b64, n, dpmm, png) => {
 // (Rouleau continu : la page avec tampon est plus haute — la bande du N° sous l'étiquette ; on compare depuis le HAUT.)
 window.__diff = (a, b, box) => { const A = window.__px[a], B = window.__px[b]; if (!A || !B || A.W !== B.W) return -1;
   const s = A.s, x0 = Math.max(0, Math.floor(box.x * s)), y0 = Math.max(0, Math.floor(box.y * s)), x1 = Math.min(A.W, Math.ceil(box.X * s)), y1 = Math.min(A.H, B.H, Math.ceil(box.Y * s)); let n = 0;
-  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) { const i = (y * A.W + x) * 4; if (A.bw[i] !== B.bw[i]) n++; } return n; };
+  // Pages de même taille : pixel à pixel. Rouleau continu (hauteurs différentes, trame décalée d'une fraction de point) :
+  // un pixel ne compte que s'il diffère aussi de ses voisins à 1 px dans le témoin (un tampon, lui, change des aplats).
+  const tol = A.H !== B.H ? 1 : 0;
+  const pareil = (x, y, v) => { for (let dy = -tol; dy <= tol; dy++) for (let dx = -tol; dx <= tol; dx++) { const yy = y + dy, xx = x + dx; if (yy < 0 || xx < 0 || yy >= B.H || xx >= B.W) continue; if (B.bw[(yy * B.W + xx) * 4] === v) return true; } return false; };
+  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) { const i = (y * A.W + x) * 4; if (A.bw[i] !== B.bw[(y * B.W + x) * 4] && !pareil(x, y, A.bw[i])) n++; } return n; };
 // La planche : toutes les vignettes d'un support sur une image (regardée, mise dans le récit).
 window.__planche = async (pngs, titre) => { const imgs = await Promise.all(pngs.map((p) => new Promise((ok) => { const im = new Image(); im.onload = () => ok({ im, nom: p.nom }); im.src = p.png; })));
   const L = 260, col = 4, h = Math.max(...imgs.map((x) => x.im.height * L / x.im.width)), rows = Math.ceil(imgs.length / col);
@@ -155,6 +159,7 @@ async function un(pg, id, support, o = {}) {
 async function typeSupport(pg, id, support, vignettes) {
   const x = await un(pg, id, support, { png: true }); if (!x) return;
   const { t, a, L, L0 } = x;
+  if (process.env.BANC_DIAG && a.pose) console.log('    (diag) ' + t + ' interdits ' + JSON.stringify((a.pose.interdits || []).map((z) => [z.quoi, Math.round(z.x), Math.round(z.y), Math.round(z.w), Math.round(z.h)])) + ' n ' + JSON.stringify(a.pose.place) + ' m ' + JSON.stringify(a.pose.mentionBoite));
   if (L.png) vignettes.push({ nom: `${id}`, png: L.png });
   // A. codes décodés après les tampons
   const qrOk = !!(L.qr && /^VRM-EXEMPLE-/.test(L.qr.data));

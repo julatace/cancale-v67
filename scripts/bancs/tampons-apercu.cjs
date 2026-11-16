@@ -176,6 +176,10 @@ const qrsDe = (pg, b64) => pg.evaluate(async (b) => {
   return out;
 }, b64);
 const numDe = (page) => page.items.find((i) => /^N° 3\d/.test(i.s));
+// L'aperçu redessiné après un geste : le PDF refait (« pret ») puis chaque vignette redessinée (`data-pret="1"`).
+const apercuStable = async (pg) => { await pg.waitForTimeout(300); await attendre(pg, () => { const e = document.querySelector('[data-impr-apercu]'); return e && e.getAttribute('data-impr-apercu') === 'pret' && document.querySelectorAll('[data-impr-apercu-item] [data-tampons-scene][data-pret="1"] [data-tampon-el="n"]').length === document.querySelectorAll('[data-impr-apercu-item]').length; }, null, 60000); };
+// Le centre d'une zone interdite (après avoir amené la vignette à l'écran : les coordonnées sont celles de l'écran).
+const centreZone = async (pg, item, quoi) => { await pg.locator(`[data-impr-apercu-item="${item}"] [data-tampons-scene]`).scrollIntoViewIfNeeded(); return pg.evaluate(([c, q]) => { const e = document.querySelector(`[data-impr-apercu-item="${c}"] [data-tampon-interdit="${q}"]`); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }, [item, quoi]); };
 
 async function apercu(b, vue) {
   const tactile = vue === '390', nom = `${vue}${tactile ? ' tactile' : ''}`;
@@ -198,14 +202,13 @@ async function apercu(b, vue) {
     const ppt = await pg.evaluate((c) => +document.querySelector(`[data-impr-apercu-item="${c}"] [data-tampons-scene]`).getAttribute('data-ppt'), items[1]);
     const dxp = Math.round(70 * ppt), dyp = Math.round(-60 * ppt);   // ≈ 70 pt à droite, 60 pt plus haut (la notice, blanche par endroits)
     await glisser(o, s2, dxp, dyp);
-    await attendre(pg, (s) => { const e = document.querySelector('[data-impr-apercu]'); return e && e.getAttribute('data-impr-apercu') === 'pret'; }, null, 30000);
-    await pg.waitForTimeout(800);
+    await apercuStable(pg);
     const apres2 = await boiteEl(pg, s2);
     const bouge = apres2 && avant[1] && Math.hypot(apres2.x - avant[1].x, apres2.y - avant[1].y) > 20;
     dit(bouge, `${nom} : P2 le N° de la 2ᵉ vignette glissé et redessiné par le vrai code`, JSON.stringify({ avant: avant[1], apres: apres2 }));
     await shot(pg, `${vue}-glisse`);
     // P3 sur le QR ⇒ refusé
-    const zq = await pg.evaluate((c) => { const e = document.querySelector(`[data-impr-apercu-item="${c}"] [data-tampon-interdit="qr"]`); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; }, items[0]);
+    const zq = await centreZone(pg, items[0], 'qr');
     const b0 = await pg.locator(`[data-impr-apercu-item="${items[0]}"] [data-tampon-el="n"]`).boundingBox();
     if (zq && b0) {
       await glisser(o, `[data-impr-apercu-item="${items[0]}"] [data-tampon-el="n"]`, zq.x - (b0.x + Math.min(b0.width / 2, 12)), zq.y - (b0.y + b0.height / 2));
@@ -246,8 +249,7 @@ async function apercu(b, vue) {
     const ppt = await pg.evaluate((c) => +document.querySelector(`[data-impr-apercu-item="${c}"] [data-tampons-scene]`).getAttribute('data-ppt'), items[0]);
     await glisser(o2, `[data-impr-apercu-item="${items[0]}"] [data-tampon-el="n"]`, Math.round(70 * ppt), Math.round(-60 * ppt));
     const garde = await attendre(pg, () => { try { const t = JSON.parse(localStorage.getItem('vrm_tampons') || 'null'); return t && Object.keys(t.formes || {}).length === 1; } catch (_) { return false; } }, null, 10000);
-    await attendre(pg, () => { const e = document.querySelector('[data-impr-apercu]'); return e && e.getAttribute('data-impr-apercu') === 'pret'; }, null, 30000);
-    await pg.waitForTimeout(800);
+    await apercuStable(pg);
     const bx = await boiteEl(pg, `[data-impr-apercu-item="${items[0]}"] [data-tampon-el="n"]`);
     await toucher(o2, '[data-impr-apercu-imprimer]');
     await attendre(pg, () => !!document.querySelector('[data-visionneuse-cadre]') || window.__ouvertures.length > 0, null, 40000);
@@ -280,6 +282,7 @@ async function editeur(b, vue) {
     const garde = await attendre(pg, (c) => { try { const t = JSON.parse(localStorage.getItem('vrm_tampons') || 'null'); return !!(t && t.formes && t.formes[c] && t.formes[c].n); } catch (_) { return false; } }, cle, 10000);
     dit(garde, `${nom} : E1 le N° glissé ⇒ la place est enregistrée pour la forme (${cle})`);
     await attendre(pg, () => document.querySelector('[data-tampons-editeur]').getAttribute('data-etat') === 'ok', null, 30000);
+    await pg.locator('[data-tampons-editeur] [data-tampon-el="m"]').scrollIntoViewIfNeeded();
     const zq = await pg.evaluate(() => { const e = document.querySelector('[data-tampons-editeur] [data-tampon-interdit="qr"]'); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
     const bm = await pg.locator('[data-tampons-editeur] [data-tampon-el="m"]').boundingBox();
     if (zq && bm) {

@@ -13930,8 +13930,31 @@ const gardeQr = (rendu, q) => {
 };
 // LES ZONES INTERDITES d'une page rendue (points, page affichée) : chaque code-barres + 5 mm, chaque QR + sa zone
 // de silence, chaque adresse donnée. `codes` affinés rendus à part (l'éditeur les hachure, le banc les juge).
+// (16 nov.) DU TEXTE N'EST PAS UN CODE. `zonesCodesTampon` prend aussi une ligne de titre gras (« Comment utiliser votre
+// étiquette ») ou un gros « 24R » : mesuré sur les bordereaux d'exemple, ces faux codes refusaient un tampon posé à la
+// main SUR DU TEXTE (que Julien permet). Un CODE-BARRES est fait de barres PLEINES : presque chaque colonne encrée l'est
+// sur toute sa hauteur (≥ 60 %, chiffres dessous compris) ; un QR / un code 2D alterne dans les deux sens sans ligne ni
+// colonne vide. Une ligne de texte n'a que quelques jambages pleins. Ce qui n'est ni l'un ni l'autre n'est pas protégé
+// comme un code (le tampon automatique, lui, évite toute encre).
+const estUnCode = (rendu, q) => {
+  const { pixels: d, w, h, s } = rendu;
+  const X0 = Math.max(0, Math.floor(q.x * s)), Y0 = Math.max(0, Math.floor(q.y * s)), X1 = Math.min(w, Math.ceil((q.x + q.w) * s)), Y1 = Math.min(h, Math.ceil((q.y + q.h) * s));
+  const noir = (x, y) => { const i = (y * w + x) * 4; return 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2] < 128; };
+  let a = 1e9, b = -1, c = 1e9, e = -1;
+  for (let y = Y0; y < Y1; y++) for (let x = X0; x < X1; x++) if (noir(x, y)) { if (y < a) a = y; if (y > b) b = y; if (x < c) c = x; if (x > e) e = x; }
+  if (b < 0 || b - a < 4 || e - c < 4) return true;
+  const H = b - a + 1;
+  let encrees = 0, pleines = 0, cv = 0;
+  for (let x = c; x <= e; x++) { let run = 0, best = 0, vu = false; for (let y = a; y <= b; y++) { if (noir(x, y)) { run++; vu = true; if (run > best) best = run; } else run = 0; } if (!vu) { cv++; continue; } encrees++; if (best >= 0.6 * H) pleines++; }
+  if (encrees && pleines / encrees >= 0.7) return true;                         // code-barres
+  // Le même code-barres sur une page TOURNÉE (Vestiaire, /Rotate 270) : ses barres sont des rangées pleines.
+  const L = e - c + 1; let encR = 0, pleinesR = 0, rv = 0;
+  for (let y = a; y <= b; y++) { let run = 0, best = 0, vu = false; for (let x = c; x <= e; x++) { if (noir(x, y)) { run++; vu = true; if (run > best) best = run; } else run = 0; } if (!vu) { rv++; continue; } encR++; if (best >= 0.6 * L) pleinesR++; }
+  if (encR && pleinesR / encR >= 0.7) return true;
+  return rv / H < 0.05 && cv / (e - c + 1) < 0.05 && alterneDeuxSens(rendu, { x: c / s, y: a / s, w: (e - c + 1) / s, h: H / s });   // QR, code 2D
+};
 const zonesInterditesTampon = (rendu, adresses = []) => {
-  const codes = zonesCodesTampon(rendu).map((q) => (estCarreCode(q) && alterneDeuxSens(rendu, q) ? { ...affinerCode(rendu, q), qr: true } : { ...q, qr: false }));
+  const codes = zonesCodesTampon(rendu).filter((q) => estUnCode(rendu, q)).map((q) => (estCarreCode(q) && alterneDeuxSens(rendu, q) ? { ...affinerCode(rendu, q), qr: true } : { ...q, qr: false }));
   const interdits = codes.map((q) => ({ ...elargir(q, q.qr ? gardeQr(rendu, q) : MENTION.codes), quoi: q.qr ? 'qr' : 'code' }));
   for (const a of adresses || []) interdits.push({ ...a, quoi: 'adresse' });
   return { codes, interdits };

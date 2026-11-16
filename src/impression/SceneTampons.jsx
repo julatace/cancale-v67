@@ -21,15 +21,19 @@ const MMP = 72 / 25.4;
 
 export default function SceneTampons({ octets, pose, page, largeur, dessiner, onPoser, onRefus, libres = {}, libelles = {}, occupe = false, compact = false }) {
   const cv = React.useRef(null), scene = React.useRef(null);
-  const [pret, setPret] = React.useState(false);
+  // `dessins` : combien de fois la page a été dessinée — les tampons restent visibles pendant qu'un geste la refait
+  // (pas d'éclair) ; `pret` (data-pret) ne dit « 1 » qu'une fois le dernier dessin fini.
+  const [dessins, setDessins] = React.useState(0);
+  const [enCours, setEnCours] = React.useState(true);
+  const pret = dessins > 0 && !enCours;
   const [boites, setBoites] = React.useState({ n: null, m: null });
   const [actif, setActif] = React.useState(null);
   const ref = React.useRef({}); ref.current = { boites, pose };
   const ppt = pose ? largeur / pose.W : 1;
   React.useEffect(() => {
-    let vivant = true; setPret(false);
+    let vivant = true; setEnCours(true);
     if (!octets || !pose) return undefined;
-    dessiner(cv.current, octets, { page: (page != null ? page : pose.page) + 1, largeur }).then(() => { if (vivant) setPret(true); }).catch(() => {});
+    dessiner(cv.current, octets, { page: (page != null ? page : pose.page) + 1, largeur }).then(() => { if (vivant) { setDessins((n) => n + 1); setEnCours(false); } }).catch(() => { if (vivant) setEnCours(false); });
     return () => { vivant = false; };
   }, [octets, pose, page, largeur]);   // eslint-disable-line react-hooks/exhaustive-deps
   React.useEffect(() => { setBoites({ n: pose && pose.place ? { ...pose.place } : null, m: pose && pose.mentionBoite ? { ...pose.mentionBoite } : null }); }, [pose]);
@@ -47,7 +51,7 @@ export default function SceneTampons({ octets, pose, page, largeur, dessiner, on
   const enPoints = (e) => { const r = scene.current.getBoundingClientRect(); return { x: (e.clientX - r.left) / ppt, y: (e.clientY - r.top) / ppt }; };
   const borner = (b) => (p ? { ...b, x: Math.max(0, Math.min(p.W - b.w, b.x)), y: Math.max(0, Math.min(p.H - b.h, b.y)) } : b);
   const bas = (e) => {
-    if (!p || !pret || occupe) return;
+    if (!p || !dessins || occupe) return;
     pointeurs.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointeurs.current.size >= 2 && geste.current) {
       const [u, v] = [...pointeurs.current.values()], b = ref.current.boites[geste.current.quoi];
@@ -121,12 +125,12 @@ export default function SceneTampons({ octets, pose, page, largeur, dessiner, on
       data-page={p ? (page != null ? page : p.page) : ''} style={{ width: largeur }}
       onPointerDown={bas} onPointerMove={bouge} onPointerUp={haut} onPointerCancel={haut}>
       <canvas ref={cv} className="vrm-tampon-page" aria-hidden="true" data-stream-image="bordereau"/>
-      {p && pret && (p.interdits || []).map((z, i) => (
+      {p && dessins > 0 && (p.interdits || []).map((z, i) => (
         <i key={i} data-tampon-interdit={z.quoi || 'code'} className={'vrm-tampons-interdit' + (actif ? ' vrm-tampons-interdit-vu' : '')}
           style={{ left: Math.max(0, z.x) * ppt, top: Math.max(0, z.y) * ppt, width: Math.max(0, Math.min(p.W, z.x + z.w) - Math.max(0, z.x)) * ppt, height: Math.max(0, Math.min(p.H, z.y + z.h) - Math.max(0, z.y)) * ppt }}/>
       ))}
-      {p && pret && boite('n')}
-      {p && pret && boite('m')}
+      {p && dessins > 0 && boite('n')}
+      {p && dessins > 0 && boite('m')}
     </div>
   );
 }
