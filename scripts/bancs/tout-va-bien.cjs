@@ -125,7 +125,14 @@ async function scenario(b, scen, largeur, sombre) {
       await pg.locator('[data-centre-notifs-cloche]').first().click().catch(() => {});
       await pg.waitForTimeout(800);
     }
-    if (await alerte.count()) await pg.locator('[data-alerte-capture] [data-alerte-voir]:visible').first().click();
+    // Plusieurs choses à revoir : la ligne se déplie, la rangée en panne s'ouvre, son geste (le même « Voir »).
+    if (await alerte.count() && !(await pg.locator('[data-alerte-capture] [data-alerte-voir]:visible').count())) {
+      await pg.locator('[data-alerte-capture] [data-fraicheur-deplier]:visible').first().click().catch(() => {});
+      await pg.waitForTimeout(400);
+      await pg.locator('[data-fraicheur-rangee="panne"] .vrm-fraicheur-rangee-tete:visible').first().click().catch(() => {});
+      await pg.waitForTimeout(400);
+    }
+    if (await alerte.count()) await pg.locator('[data-alerte-capture] [data-alerte-voir]:visible, [data-fraicheur-rangee="panne"] .vrm-fraicheur-rangee-bouton:visible').first().click({ timeout: 10000 });
   } else {
     await pg.waitForTimeout(2500);
     dit(!(await alerte.count()), `${nom} : aucune ligne ambre`);
