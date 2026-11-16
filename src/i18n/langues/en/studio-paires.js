@@ -15,4 +15,7 @@ export default {
   "studio.paires.grille": "Grid",
   "studio.paires.dansStock": "in Stock",
   "studio.paires.ranger": "to store",
+  "studio.paires.observateurs": "watchers",
+  "studio.paires.voirSur": "View on {site}",
+  "studio.paires.ouvrirFiche": "Open the item card",
 };

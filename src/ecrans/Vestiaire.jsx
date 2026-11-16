@@ -2,6 +2,7 @@
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import DansFiche from '../DansFiche.jsx';
 import { attrsFicheLigne } from '../ficheLigne.js';
+import { attrsAvantSite, clicAvantSite, PaireAvantSiteHote } from '../paires/PaireAvantSite.jsx';   // (16 nov.) la rangée touchée monte à sa place
 import { poserNombreAnnonces, compterVcEnLigne } from '../plateformes/nombresAnnonces.js';
 import { problemesAnnonce } from '../verifAnnonce.js';
 import { AlerteArnaque, CompteurArnaque, PastilleArnaque } from '../AlerteArnaque.jsx';
@@ -30,7 +31,7 @@ import { friseVenteFusion } from '../design/friseFusion.js';
 import { attrCible } from '../cibleNotif.js';
 import { nomCompteVente } from '../plateformes.js';
 import { champsFacultatifs, motsVendeur } from '../profilVendeur.js';
-import { SheetShell, InfoPop, AUTH, BlocBarrerVc, Bouton, BoutonImprimerVc, BulleConv, C, CadreFil, Card, ComposeConv, CoutAchatVente, DEMANDE_VC_PAIRE, EXT_CAPACITES, FicheConvVolet, Icon, LigneConv, LigneVenteCompacte, MULTI_USER, NAV, PhotoVc, PhotoVinted, PiedSansEnvoi, Pourquoi, RapidesConv, RecapFrise, SUPABASE_URL, TeteFil, __vmrJobs, __vmrNotifier, aLaDemande, ageCourtVc, askConfirm, cleNum, clePhotoLbc, dateCourteVc, defaireVc, emettreClesRelues, enTeteSession, extSait, familleArticle, ficheUniqueDuNumero, fmt, gesteVrm, limiteVcTexte, lireBaseRelue, load, nonLusVestiaire, normTitle, onCloudReady, prixAchatDe, raisonExtGlobale, rangementDuNum, reponsesRapidesPartagees, save, sbAuth, signalerVc, urlPhotoVc, useCompteVcOuvert, useEbayPaires, useExtVivante, useNumerotationVestiaire, useSansSouris, useStateCle, useVcLocal, vcCarte, vcSetter, verifierAvantPublication, vmrCmd, vendActuel, optsNumeroVerif, FermeAuRetour } from '../App.jsx';
+import { achatDuNumeroLu, SheetShell, InfoPop, AUTH, BlocBarrerVc, Bouton, BoutonImprimerVc, BulleConv, C, CadreFil, Card, ComposeConv, CoutAchatVente, DEMANDE_VC_PAIRE, EXT_CAPACITES, FicheConvVolet, Icon, LigneConv, LigneVenteCompacte, MULTI_USER, NAV, PhotoVc, PhotoVinted, PiedSansEnvoi, Pourquoi, RapidesConv, RecapFrise, SUPABASE_URL, TeteFil, __vmrJobs, __vmrNotifier, aLaDemande, ageCourtVc, askConfirm, cleNum, clePhotoLbc, dateCourteVc, defaireVc, emettreClesRelues, enTeteSession, extSait, familleArticle, ficheUniqueDuNumero, fmt, gesteVrm, limiteVcTexte, lireBaseRelue, load, nonLusVestiaire, normTitle, onCloudReady, prixAchatDe, raisonExtGlobale, rangementDuNum, reponsesRapidesPartagees, save, sbAuth, signalerVc, urlPhotoVc, useCompteVcOuvert, useEbayPaires, useExtVivante, useNumerotationVestiaire, useSansSouris, useStateCle, useVcLocal, vcCarte, vcSetter, verifierAvantPublication, vmrCmd, vendActuel, optsNumeroVerif, FermeAuRetour } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import { preuvesFriseVc, preuvesFriseEbay } from "../friseSites.js";
@@ -350,15 +351,17 @@ function AnnoncesVestiaire() {
         <section className="vrm-pf-liste vrm-vc-catalog" aria-label="Mes annonces Vestiaire" data-pf-liste="vestiaire" style={{ margin: 0 }}>
           {/* (11 nov.) Regroupées par compte quand un compte Vestiaire est ouvert (src/regroupeComptes.js, suit le flou). */}
           {!visibles.length ? <p className="vrm-pf-vide" data-vc-annonces-rien="">{tr('plateformes.rien')}</p> : null}
-          <ul className="vrm-pf-rangees"><ListeParCompte enLi unite="annonce" libelle="Compte ouvert sur Vestiaire" lignes={visibles} ouvert={vcOuvert} floute={(l) => vcFloute(vcOuvert, l.it.compte)} compteDe={(l) => String(l.it.compte == null ? '' : l.it.compte).trim()} nomDe={(id) => nomCompteVente('vestiaire', { compte: id }, {})} rendre={({ id, it, num, etat, label, brut }) => {
+          <ul className="vrm-pf-rangees sb-liste" data-sb-liste="" onClick={clicAvantSite}><ListeParCompte enLi unite="annonce" libelle="Compte ouvert sur Vestiaire" lignes={visibles} ouvert={vcOuvert} floute={(l) => vcFloute(vcOuvert, l.it.compte)} compteDe={(l) => String(l.it.compte == null ? '' : l.it.compte).trim()} nomDe={(id) => nomCompteVente('vestiaire', { compte: id }, {})} rendre={({ id, it, num, etat, label, brut }) => {
             const flou = vcFloute(vcOuvert, it.compte);
             const prix = it.prix && isFinite(Number(it.prix.valeur)) ? (it.prix.devise && it.prix.devise !== 'EUR' ? `${Number(it.prix.valeur).toFixed(2).replace('.', ',')} ${it.prix.devise}` : fmt(it.prix.valeur)) : '—';
             const extra = [it.boost === true ? 'boostée' : '', typeof it.favoris === 'number' ? `${it.favoris} favori${it.favoris > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ');
             // (14 nov., proposition 62) Toucher l'annonce ouvre LA fiche de la paire (le N° lié à CE produit Vestiaire) ;
             // « Relier / Délier Vinted » y est rendu dans « Actions » (`DansFiche`).
             const flVc = attrsFicheLigne({ contexte: 'annonce', site: 'vestiaire', cle: 'v' + id, nums: num ? [String(num)] : [], photo: it.photo || '', titre: it.titre || '', prix: prix !== '—' ? prix : '' });
+            // (16 nov.) Au téléphone, la rangée touchée MONTE à sa place : prix et favoris lus par Vestiaire, prix d'achat de SON N°.
+            const avVc = attrsAvantSite({ site: 'vestiaire', id, prix: prix !== '—' ? prix : '', favoris: typeof it.favoris === 'number' ? it.favoris : null, num });
             return (
-              <li key={id} {...flVc} className="vrm-ui-ligne vrm-pf-rangee" data-vc-annonce={id} data-vc-annonce-num={num || ''} data-vc-annonce-etat={etat} data-flou={flou ? '1' : '0'} style={flou ? STYLE_FLOU : undefined}>
+              <li key={id} {...flVc} {...avVc} className="vrm-ui-ligne vrm-pf-rangee sb-rangee-site" data-vc-annonce={id} data-vc-annonce-num={num || ''} data-vc-annonce-etat={etat} data-flou={flou ? '1' : '0'} style={flou ? STYLE_FLOU : undefined}>
                 {/* (14 nov., refonte visible) Une RANGÉE (photo 52, le N° et le nom, une ligne d'état, le prix),
                     plus une carte photo de 300 px : on voit 8 annonces par écran d'iPhone. */}
                 <span className="vrm-ui-ligne-photo vrm-pf-photo-vc" aria-hidden="true"><PhotoVc src={it.photo}/></span>
@@ -380,9 +383,11 @@ function AnnoncesVestiaire() {
                   </span>
                 </div>
                 <b className="vrm-ui-ligne-valeur" data-vc-annonce-prix={it.prix ? String(it.prix.valeur) : ''} title={it.prix && it.prix.cle ? 'Prix lu sur Vestiaire' : undefined}>{prix}</b>
+                <span className="sb-avant-place" data-sb-avant-place=""/>
               </li>
             );
           }}/></ul>
+          <PaireAvantSiteHote site="vestiaire" achatDe={achatDuNumeroLu}/>
         </section>
         {/* (2 nov., soir) Chaque annonce reçoit un N° (comme Vinted et Leboncoin) : celui de
             la paire publiée depuis VRM ou de sa référence VRM-n°, sinon un N° neuf — par

@@ -3,6 +3,7 @@
 import { ordreRecent, quandEbay } from '../ordreRecent.js';
 import DansFiche, { useLigneIci } from '../DansFiche.jsx';
 import { attrsFicheLigne, ouvrirLigne } from '../ficheLigne.js';
+import { attrsAvantSite, basculerAvant, PaireAvantSiteHote } from '../paires/PaireAvantSite.jsx';   // (16 nov.) la rangée touchée monte à sa place
 import { suivi } from '../suiviTravail.js';   // (11 nov., lot suivi-travail) VRM figé, détail et barre pendant la publication
 import { modifierLigneCas } from '../ligneCas.js';
 import BilanSynchronisation from '../BilanSynchronisation.jsx';
@@ -21,7 +22,7 @@ import Frise from '../design/Frise.jsx';
 import { friseVenteFusion } from '../design/friseFusion.js';
 import { attrCible } from '../cibleNotif.js';
 import { champsFacultatifs, motsVendeur, motArticle } from '../profilVendeur.js';
-import { AUTH, Bouton, BoutonBordereau, C, ChipsModeles, CompteVente, CoutAchatVente, DEMANDE_EBAY_PAIRE, EBAY_SKIN, EXT_ATTENDUE, EbayCommande, FiltresVentes, Icon, KpiVentes, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneVente, MOIS_COURTS, NUM_OK, PhotoVente, PhotoVinted, Pourquoi, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SUPABASE_URL, ScreenHead, SheetShell, Skeleton, URL_ITEM_EBAY, _fichesEbayMemo, aExpedier, allerComptesEbay, appelEbay, askConfirm, caEbayPayees, centsR, cheminCatalogueVinted, clavierNum, cleNum, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, connexionExtensionVrm, corpsCompteEbay, dansVueEbay, descriptionDeFaits, descriptionEbayPropre, doublesVenteEbay, ebayTitre, enTeteSession, etatEnClair, etatRegleOffre, eurEbay, extSait, extractBrand, extractSize, familleArticle, fichesPourEbay, fmt, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lienEbay, lienItemEbay, lireEbayParCompte, lireEbayTous, lireFichesPage, lireObjet, lirePreuvesVenteVinted, lireReglesEbay, load, marcheEbayDeRef, marquerEbay, nomCompteEbay, numDeSkuEbay, numEbayLu, numLigneEbay, numerosDejaVendus, onCloudReady, onVmrExt, ouVenduesTexte, prixAchatDe, prixCompatibleRegle, raisonExtGlobale, regleEngage, reglesEngagees, resultatReviseEbay, retraitsEbayAutoPermis, save, sbAuth, seuilTropBas, signalerComptesEbay, siteCompteEbayTexte, skuEbayDe, texteReglesQuiRestent, toast, triNum, typeCompteEbayTexte, useEbayPaires, useEstProprietaire, useSansSouris, useStateCle, useVentesVestiaire, useVueSession, verifierAvantPublication, vmrCmd, vmrExtPresent, withOwner, vendActuel, exemplesActuels, dejaEnLigneEbay, optsNumeroVerif } from '../App.jsx';
+import { achatDuNumeroLu, AUTH, Bouton, BoutonBordereau, C, ChipsModeles, CompteVente, CoutAchatVente, DEMANDE_EBAY_PAIRE, EBAY_SKIN, EXT_ATTENDUE, EbayCommande, FiltresVentes, Icon, KpiVentes, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneVente, MOIS_COURTS, NUM_OK, PhotoVente, PhotoVinted, Pourquoi, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SUPABASE_URL, ScreenHead, SheetShell, Skeleton, URL_ITEM_EBAY, _fichesEbayMemo, aExpedier, allerComptesEbay, appelEbay, askConfirm, caEbayPayees, centsR, cheminCatalogueVinted, clavierNum, cleNum, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, connexionExtensionVrm, corpsCompteEbay, dansVueEbay, descriptionDeFaits, descriptionEbayPropre, doublesVenteEbay, ebayTitre, enTeteSession, etatEnClair, etatRegleOffre, eurEbay, extSait, extractBrand, extractSize, familleArticle, fichesPourEbay, fmt, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lienEbay, lienItemEbay, lireEbayParCompte, lireEbayTous, lireFichesPage, lireObjet, lirePreuvesVenteVinted, lireReglesEbay, load, marcheEbayDeRef, marquerEbay, nomCompteEbay, numDeSkuEbay, numEbayLu, numLigneEbay, numerosDejaVendus, onCloudReady, onVmrExt, ouVenduesTexte, prixAchatDe, prixCompatibleRegle, raisonExtGlobale, regleEngage, reglesEngagees, resultatReviseEbay, retraitsEbayAutoPermis, save, sbAuth, seuilTropBas, signalerComptesEbay, siteCompteEbayTexte, skuEbayDe, texteReglesQuiRestent, toast, triNum, typeCompteEbayTexte, useEbayPaires, useEstProprietaire, useSansSouris, useStateCle, useVentesVestiaire, useVueSession, verifierAvantPublication, vmrCmd, vmrExtPresent, withOwner, vendActuel, exemplesActuels, dejaEnLigneEbay, optsNumeroVerif } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import { PHOTOS_AJOUT_MAX, PHOTOS_EBAY_MAX, estPhotoAjoutee, placesPhotos, deplacerPhoto, avecPhotosAjoutees, photoEnJpegBase64 } from '../photosEbayAjout.js';
@@ -2512,8 +2513,11 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
   const nb = Array.isArray(d.photos) ? d.photos.length : null;
   const desc = String(d.description || '').replace(/&lt;br&gt;|<br\s*\/?>/gi, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
   const chip = { fontSize: 11, color: E.text, background: E.card2, border: `1px solid ${E.border}`, borderRadius: 999, padding: '3px 9px', whiteSpace: 'nowrap' };
+  // (16 nov.) Au téléphone, toucher la carte la fait MONTER à sa place (la même carte qu'Annonces · Vinted) : prix, jours
+  // en ligne, observateurs lus par eBay, prix d'achat de SON N° (lu dans son SKU) ; « ⋯ » ouvre la fiche, comme avant.
+  const avEb = attrsAvantSite({ site: 'ebay', id: (it._compte || '') + ':' + (it.itemId || ''), prix: euro(prixCarte), jours: supprimee ? null : j, observateurs: obs != null ? obs : null, num: numero, lien: url || '' });
   return (
-    <div className="vrm-eb-carte" {...flEb} data-regle-envoi={envoiRegle || undefined} data-ouverte={open ? '1' : undefined}>
+    <div className="vrm-eb-carte sb-rangee-site" {...flEb} {...avEb} data-regle-envoi={envoiRegle || undefined} data-ouverte={open ? '1' : undefined}>
       {/* ── (6 nov., Julien : « eBay, c'est vraiment pas ouf ») LA CARTE : photo ·
           titre (2 lignes) · N° · prix ; UNE ligne d'état ; UN geste (« Relier »
           quand le lien manque) et « … » pour la fiche. « Pas reliée » n'est plus
@@ -2521,7 +2525,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           la liste le disent UNE fois (§7). La règle d'offre, la suppression, la
           modification et l'offre aux observateurs vivent dans la fiche. ── */}
       <div className="vrm-eb-tete">
-        <button type="button" className="vrm-eb-ouvrir" data-ebay-carte-ouvrir={it.itemId} aria-expanded={open} onClick={() => setOpen((o) => !o)}
+        <button type="button" className="vrm-eb-ouvrir" data-ebay-carte-ouvrir={it.itemId} aria-expanded={open} onClick={() => { if (basculerAvant(avEb['data-sb-avant-cle'])) return; setOpen((o) => !o); }}
           /* (11 nov., lot accessibilité) Nommé par ce qu'il montre (titre, N°, état) ; ouvert/fermé : aria-expanded. */>
           <PhotoVente src={it.photo} size={56} />
           <span className="vrm-eb-texte">
@@ -2700,6 +2704,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
           {specs.length === 0 && !d.categoryName && !desc && <div style={{ fontSize: 12, color: E.muted, marginTop: 8 }}>Caractéristiques pas encore captées pour cette annonce — rouvre-la sur eBay.</div>}
         </div>
       </DansFiche>)}
+      <div className="sb-avant-place" data-sb-avant-place=""/>
     </div>
   );
 }
@@ -5190,7 +5195,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
     <div className="vrm-ebay-outils vrm-pf-collant" data-pf-outils="ebay" style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: '0 0 10px' }}>
       {/* (14 nov., refonte visible) UNE barre (src/ui/BarreOutils) : le champ, le micro, « Vendre sur eBay » (sa porte
           devenue un « + » ; ouverte, la feuille de vente se déplie sous la barre) et les réglages de l'écran. */}
-      <BarreOutils className="vrm-ebay-recherche-ligne vrm-pf-barre-ebay" valeur={q} onChange={setQ} placeholder="Chercher (titre, N°, SKU)" label="Chercher une annonce eBay" champAttrs={{ 'data-ebay-recherche': '' }}>
+      <BarreOutils className="vrm-ebay-recherche-ligne vrm-pf-barre-ebay" valeur={q} onChange={setQ} placeholder={tr('plateformes.ebay.chercher')} label="Chercher une annonce eBay" champAttrs={{ 'data-ebay-recherche': '' }}>
         <MicDictee titre="Chercher à la voix (« numéro 124 », « chemise bleue »)" onDirect={setQ} onText={(t) => setQ(requeteDeLaVoix(t).requete)}/>
         {/* (6 nov.) Les réglages de l'écran, en feuille (règle d'offre, retrait automatique). */}
         <button type="button" className="vrm-icon-control vrm-ebay-reglages-bouton" aria-label="Réglages eBay" title="Réglages eBay" data-ebay-reglages-ouvrir="" data-geste={gesteRegle ? '1' : undefined} onClick={() => setReglagesEbay('liste')}>
@@ -5206,7 +5211,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
           options={chipsAnn.map(([k, label, n]) => ({ v: k, l: label, n, attrs: { 'data-ebay-filtre': k } }))}/>
       )}
     </div>
-    <div className="vrm-ebay-liste" style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, overflow: 'hidden' }}>
+    <div className="vrm-ebay-liste sb-liste" data-sb-liste="" style={{ background: E.card, border: `1px solid ${E.border}`, borderRadius: 14, overflow: 'hidden' }}>
       {annVus.map((it, i) => {
         const n = numEbayLu(it.sku, it.itemId, null, it.depuis);
         const cle = cleAnnonce(it);
@@ -5225,6 +5230,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
         );
       })}
     </div>
+    <PaireAvantSiteHote site="ebay" achatDe={achatDuNumeroLu}/>
     {itemsAffiches.length > annVus.length && (
       <button type="button" data-ebay-voir-plus onClick={() => setAnnMax((m) => m + 60)}
         style={{ ...lienE, width: '100%', boxSizing: 'border-box', marginTop: 10, padding: '10px', textAlign: 'center' }}>Voir plus — {annVus.length} affichées sur {itemsAffiches.length}</button>
