@@ -95,6 +95,18 @@
   "c_me_connecter": {
     "message": "Sign in"
   },
+  "c_mot_article": {
+    "message": "item"
+  },
+  "c_mot_articles": {
+    "message": "items"
+  },
+  "c_mot_paire": {
+    "message": "pair"
+  },
+  "c_mot_paires": {
+    "message": "pairs"
+  },
   "c_muet": {
     "message": "The extension did not answer. Try again in a moment."
   },
@@ -151,6 +163,12 @@
   },
   "c_r_lbc_pas_lues": {
     "message": "{nom} · listings not read yet"
+  },
+  "c_r_lbc_retirer_1": {
+    "message": "1 {nom} to remove from Leboncoin"
+  },
+  "c_r_lbc_retirer_n": {
+    "message": "{n} {noms} to remove from Leboncoin"
   },
   "c_r_muette": {
     "message": "The extension does not answer"

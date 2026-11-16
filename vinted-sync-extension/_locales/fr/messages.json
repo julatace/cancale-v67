@@ -95,6 +95,18 @@
   "c_me_connecter": {
     "message": "Me connecter"
   },
+  "c_mot_article": {
+    "message": "article"
+  },
+  "c_mot_articles": {
+    "message": "articles"
+  },
+  "c_mot_paire": {
+    "message": "paire"
+  },
+  "c_mot_paires": {
+    "message": "paires"
+  },
   "c_muet": {
     "message": "L’extension n’a pas répondu. Réessaie dans un instant."
   },
@@ -151,6 +163,12 @@
   },
   "c_r_lbc_pas_lues": {
     "message": "{nom} · annonces pas encore lues"
+  },
+  "c_r_lbc_retirer_1": {
+    "message": "1 {nom} à retirer de Leboncoin"
+  },
+  "c_r_lbc_retirer_n": {
+    "message": "{n} {noms} à retirer de Leboncoin"
   },
   "c_r_muette": {
     "message": "L’extension ne répond pas"

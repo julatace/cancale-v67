@@ -670,7 +670,7 @@
     if (e.capte && envoiRefuse(f, v) && !(site.choix === 'non' && e.plateforme === 'vinted')) return { etat: 'geste', texte: T('c_r_refuse', 'Dernier envoi refusé : voir ci-dessous') };
     if (e.plateforme === 'leboncoin') {
       const n = e.aRetirer && Array.isArray(e.aRetirer.liste) ? e.aRetirer.liste.length : 0;
-      if (n) return { etat: 'geste', texte: (() => { const m = (globalThis.VRM_MOTS ? globalThis.VRM_MOTS.mots() : null) || { nom: 'paire', noms: 'paires' }; return n > 1 ? `${n} ${m.noms} à retirer de Leboncoin` : `1 ${m.nom} à retirer de Leboncoin`; })() };
+      if (n) return { etat: 'geste', texte: (() => { const autre = !!(globalThis.VRM_MOTS && globalThis.VRM_MOTS.vend() === 'autre'); return n > 1 ? T('c_r_lbc_retirer_n', '{n} {noms} à retirer de Leboncoin', { n, noms: autre ? T('c_mot_articles', 'articles') : T('c_mot_paires', 'paires') }) : T('c_r_lbc_retirer_1', '1 {nom} à retirer de Leboncoin', { nom: autre ? T('c_mot_article', 'article') : T('c_mot_paire', 'paire') }); })() };
       const l = e.lbc;
       if (l && l.compte && l.compte.ok === false) return { etat: 'geste', texte: T('c_r_lbc_geste', 'Leboncoin attend un geste : voir ci-dessous') };
       if (!site.id && !(l && l.compte && l.compte.ok === true)) return { etat: 'attente', texte: T('c_r_lbc_inconnu', 'Compte Leboncoin pas encore reconnu') };

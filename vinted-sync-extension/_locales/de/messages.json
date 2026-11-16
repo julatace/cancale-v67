@@ -95,6 +95,18 @@
   "c_me_connecter": {
     "message": "Anmelden"
   },
+  "c_mot_article": {
+    "message": "Artikel"
+  },
+  "c_mot_articles": {
+    "message": "Artikel"
+  },
+  "c_mot_paire": {
+    "message": "Paar"
+  },
+  "c_mot_paires": {
+    "message": "Paare"
+  },
   "c_muet": {
     "message": "Die Erweiterung hat nicht geantwortet. Versuch es gleich noch einmal."
   },
@@ -151,6 +163,12 @@
   },
   "c_r_lbc_pas_lues": {
     "message": "{nom} · Anzeigen noch nicht gelesen"
+  },
+  "c_r_lbc_retirer_1": {
+    "message": "1 {nom} von Leboncoin zu entfernen"
+  },
+  "c_r_lbc_retirer_n": {
+    "message": "{n} {noms} von Leboncoin zu entfernen"
   },
   "c_r_muette": {
     "message": "Die Erweiterung antwortet nicht"

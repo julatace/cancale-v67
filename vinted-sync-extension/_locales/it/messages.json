@@ -95,6 +95,18 @@
   "c_me_connecter": {
     "message": "Accedi"
   },
+  "c_mot_article": {
+    "message": "articolo"
+  },
+  "c_mot_articles": {
+    "message": "articoli"
+  },
+  "c_mot_paire": {
+    "message": "paio"
+  },
+  "c_mot_paires": {
+    "message": "paia"
+  },
   "c_muet": {
     "message": "L’estensione non ha risposto. Riprova tra un attimo."
   },
@@ -151,6 +163,12 @@
   },
   "c_r_lbc_pas_lues": {
     "message": "{nom} · annunci non ancora letti"
+  },
+  "c_r_lbc_retirer_1": {
+    "message": "1 {nom} da togliere da Leboncoin"
+  },
+  "c_r_lbc_retirer_n": {
+    "message": "{n} {noms} da togliere da Leboncoin"
   },
   "c_r_muette": {
     "message": "L’estensione non risponde"
