@@ -30,6 +30,9 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'vente-email-particulier', date: '2026-11-16', titre: 'Une vente vue par e-mail est dans Ventes', phrase: 'Même sur un compte particulier, avant que l’extension la lise.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (16 nov., lot argent-mieux) docs/passation/2026-11-16-argent-mieux.md
   { id: 'argent-lisible', date: '2026-11-16', titre: 'Argent : tout se lit, clair ou sombre', phrase: 'Les ventes pas comptées tiennent en une ligne par raison.', tab: 'argent', pour: 'tous', mode: 'tous' },
+  // (16 nov. au soir, lot deux-prix-compter — décision de Julien : les ventes Pro à deux prix comptées au prix de
+  // l'article, l'écart écrit à côté) docs/passation/2026-11-16-argent-mieux.md
+  { id: 'deux-prix-comptees', date: '2026-11-16', titre: 'Ventes Pro à deux prix : comptées', phrase: 'Au prix de l’article ; l’écart est écrit à côté.', tab: 'argent', pour: 'pro', mode: 'tous' },
   // (16 nov., lot barre-achats — Julien : « ajoute les Achats dans la barre » ; « je ne veux pas qu'on puisse glisser
   // entre les onglets ») docs/passation/2026-11-16-barre-achats.md
   { id: 'barre-achats', date: '2026-11-16', titre: 'Achats a son onglet dans la barre', phrase: 'Et glisser du doigt ne change plus d’onglet.', tab: 'achats', pour: 'tous', mode: 'tous' },

@@ -9,7 +9,8 @@ CLAUDE.md §5 « Les chiffres » est intouchable : seule la LECTURE change, aucu
   et sombre, Résumé · Déclarer · Factures, replis fermés puis ouverts) ; ROUGE sur l'arbre d'avant (46 ❌) et sur les
   deux mutations.
 - PR et CI : voir la fin de ce récit (« Mise en ligne »).
-- Décision attendue de Julien : la piste des « deux prix » (ci-dessous) — rien n'a été changé à la règle.
+- ~~Décision attendue de Julien~~ : **décidée le 16 nov. au soir et appliquée** (branche `claude/deux-prix-compter`,
+  à fusionner APRÈS #1216) — voir « Décision de Julien : les deux prix COMPTÉS » à la fin.
 
 ## Le constat, reproduit sur une base inventée (avant)
 
@@ -113,3 +114,44 @@ règle) ; l'écran dit « au moins » la somme des plus bas, qui EST cette somme
 prix de l'article sur la vente — ce n'est PAS la protection acheteurs : veux-tu (A) qu'on les compte au prix de
 l'article (2 864,98 € en plus dans ton CA, l'écart de 44,37 € nommé à côté) ou (B) qu'elles restent à part tant que
 ton relevé Vinted ne tranche pas (comme aujourd'hui) ? »
+
+## Décision de Julien : les deux prix COMPTÉS (16 nov. au soir, lot `deux-prix-compter`)
+
+Sa réponse à la question ci-dessus : (A). **Sur ses comptes Vinted Pro, une vente dont le prix de la LISTE dépasse
+le prix de l'ARTICLE de quelques centimes à 2 € est COMPTÉE au prix de l'article (le plus bas), partout ; l'écart
+(liste − article) est écrit à côté, discret (« dont 44,37 € d'écart non compté »), jamais ajouté.** Rien d'autre ne
+change : une vente à un seul prix ne bouge pas ; un écart négatif, au-delà de 2 €, une transaction pas lue, ou un relevé
+qui dit un troisième prix ⇒ à part comme avant, et dit.
+
+Remesuré le 16 nov. au soir (lecture seule, projections et sommes) : 89 ventes Pro lues, 66 à liste > article
+(+0,47 à +1,45 €, somme liste 2 909,35 € / article 2 864,98 € / écart 44,37 €), 23 égales, aucune hors de ces deux cas.
+Les 21 e-mails de vente Pro reçus portent TOUS le prix de l'article (21/21 = article = liste, ventes pas encore
+finalisées) : l'écart apparaît après la finalisation.
+
+### Ce qui change (la règle UNE fois)
+- `src/vintedPro.js` `prixVentePro` : nouveau cas `deux-prix-ecart` — `compter: true`, `prixArticle` (le prix de la
+  vente devient celui de l'article au chargement, `_prixListe` garde l'autre, exactement comme « relevé = article »),
+  `ecartC` (centimes). Borne `ECART_MAX_C` = 200 (2,00 € compris). `ecartNonCompte(lignes, garde)` somme l'écart.
+- `ventesDeclarables` et `ventesFaites` (App.jsx, recopiés dans `api/_lib/ventes-regle.js` par
+  `audit-bilan-semaine --recopie`) : la ligne porte `ecartC` ; son montant est le prix de l'article. Le CA déclaré
+  reste daté au versement.
+- La ligne publiée `vinted_urssaf_mois.mois[]` gagne `nEcart` / `ecartC` (seulement quand il y en a : la ligne d'un
+  vendeur sans ces ventes ne change pas d'un octet).
+- Écrit à côté (clé `nc.ecart`, 5 langues) : Argent → Résumé (« Vendu et reçu », sous la couverture), Déclarer (carte
+  du mois, et « Mois bouclé » pour le mois choisi), le rapport du mois (sous « CA des ventes finalisées »).
+- Facture Pro : la vente se prouve désormais (« même montant » : l'e-mail porte le prix de l'article) et la facture
+  est au prix de l'article. AVANT, une vente Pro finalisée à deux prix était refusée (« le prix diffère »).
+- Ma journée, Statistiques, le widget : ils lisent les mêmes lignes ; les 66 ventes sortent d'elles-mêmes de « pas
+  comptées ».
+
+### Ce qui n'est PAS fait (dit)
+- Le serveur ne pose PAS `_prixPro` (depuis le 11 nov., la règle Pro vit au chargement dans l'app) : le bilan de la
+  semaine / du mois (`api/ship-reminders.js`) compte ces ventes au prix de la LISTE — comme avant (il les comptait déjà
+  au prix de la liste quand l'app les mettait à part). Écart ≈ quelques euros par mois. Le corriger demande de lire
+  profil + transactions Pro côté serveur et une copie de `typeCompteVinted` : un lot à part.
+- L'envoi AUTOMATIQUE des factures Pro par le serveur (`api/_lib/factures-auto.js`) compare aussi au prix de la liste :
+  pour une vente déjà finalisée à deux prix, il refuse (comme avant) ; l'envoi depuis l'app, lui, passe.
+- Une vente déjà DÉCLARÉE (registre « J'ai déclaré ce mois ») restait comptée dans son mois au prix de la LISTE ;
+  elle y compte maintenant au prix de l'article (même règle partout). Le montant qu'il a noté lors de sa déclaration
+  n'est pas réécrit.
+

@@ -263,6 +263,7 @@ aucun mot de modèle commun écarte la suggestion).
   script** (ex. `api/_lib/ventes-regle.js` par `audit-bilan-semaine.cjs --recopie`,
   `api/_lib/urssaf-regle.js`) — jamais modifiée à la main.
 - **La phrase qui explique un chiffre vient de la même source que lui.**
+- ⚠️ **16 nov. (Julien) : ventes Pro à deux prix comptées au prix de l'article, écart écrit à côté** (liste > article de 2 € au plus, relevé muet ; sinon à part comme avant ; `src/vintedPro.js`, `ecartC`).
 - **Vendu ≠ reçu** : VENDU = `ventesFaites` (date de vente, toutes plateformes) ;
   REÇU = `ventesDeclarables` (date de VERSEMENT). Un `0,00 €` qui veut dire « on ne
   sait pas » s'écrit `—`. « Au moins 0,00 € » ne se dit jamais.
@@ -487,6 +488,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **16 nov. (soir) · Deux prix Pro COMPTÉS (lot deux-prix-compter, décision de Julien)** : 66 ventes Pro à liste > article (≤ 2 €) comptées au prix de l'article partout (CA déclaré daté au versement, vendu, facture Pro) ; « dont 44,37 € d'écart non compté » écrit à côté (Résumé, carte du mois, Mois bouclé, rapport). `2026-11-16-argent-mieux.md`. Geste : aucun.
 - **16 nov. (soir) · PASSATION GÉNÉRALE — À LIRE EN PREMIER** : tout ce que Julien a demandé du 11 au 16 nov., ce qui est en ligne, les 18 PR prêtes à fusionner (ordre et arbitrages), les 15 chantiers mis en pause (limite d'usage à 90 %) avec leur branche, la file validée, les refus et ses gestes : `docs/passation/2026-11-16-passation-generale.md`.
 - **16 nov. · Vente vue par e-mail absente de Ventes (lot vente-email-absente)** : mesuré, l'e-mail de vente d'un compte PARTICULIER n'a jamais de n° (0/13 depuis le 1er nov.) ⇒ la règle du 6 nov. n'admettait que le Pro ; il entre, identifié par SA ligne `email_sale_*` (jamais le titre), sort à la relecture, « bordereau à venir » ; offre Vinted : plus jamais « expire dans 24 h » (Vestiaire seul). `docs/passation/2026-11-16-vente-email-absente.md`. Geste : aucun.
 - **16 nov. · Argent lisible (lot argent-mieux)** : cartes de verre à l'encre du verre (`src/design/verre-argent.css`, 0 texte < 4,5:1), « Copier » plein ; ventes non comptées groupées (une ligne par raison, « au moins », détail replié, `src/composants/NonComptees.jsx`) ; règle inchangée. Piste « deux prix » (écart +0,47–1,45 €, pas la protection) : `docs/passation/2026-11-16-argent-mieux.md`. Geste : décider la piste.
@@ -498,7 +500,6 @@ sans la fonction.
 - **16 nov. · Extension 5.393.0 (vague C)** : verre de la carte du logo, du site et des e-mails ; « même photo · sûr » vérifiée sur les deux images ; dates de versement ; Vestiaire « aimés » comme Vinted ; scanner pour retrouver (disque « + ») ; banc `sante-donnees` réparé (aucune donnée réécrite à l'ouverture d'Achats). Geste : installer 5.393.0.
 - **16 nov. · Nouveautés (vague B)** : transporteur lu sur l'étiquette (jamais « inconnu », `src/colisEnvoyes.js`) ; plus de rangement sur un achat — l'atelier d'arrivée donne le N° puis la case sur la fiche (`casesProposees`) ; contrôle de nuit + santé des comptes + extension en retard (`src/fiabilite/`) ; baisse conseillée, relance des favoris, loupe universelle ; bilan du mois, alertes de seuils, bénéfice réel, sauvegarde zip ; écran de chargement verre. Récits `2026-11-15-*.md`. Geste : aucun.
 - **16 nov. · Écrans refaits sur les maquettes validées (vague A)** : Ma journée (seulement les gestes, « Tout va bien ? · N points », retours et litiges ensemble, paire à sortir en premier), Annonces 72 px, Ventes/Achats (colis cochés d'office, place du Stock par N°, code au comptoir), fiche D (un geste : « Relier · N € » sur son toucher), Argent, Messages (plein « Proposer N € »), Paramètres, rail ordinateur Vendre/Ranger/Compter ; « À envoyer » partout (`src/libelles.js`). `2026-11-15-refonte-journee.md`, `-refonte-ventes.md`, `-fiche-d.md`. Geste : aucun.
-- **15 nov. · « Verre dépoli » partout + Stock en étagères** : Julien a choisi la proposition 9 sur 30 ; couche `studio-verre.css` (contrastes mesurés, banc `verre`) ; Stock en meubles/cases/piles avec sites + compte par identité sur chaque case (`src/stockAnnonces.js`). Maquettes validées de tous les écrans (sauf l'étagère, v3 en cours) ; refonte des dispositions écran par écran en cours. `2026-11-15-verre-depoli.md`, `2026-11-15-stock-etageres.md`. Geste : aucun.
 
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
