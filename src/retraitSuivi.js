@@ -118,9 +118,11 @@ export function pourquoiPasLu({ suivi = '', carrier = '', t = null } = {}) {
     const intl = colisInternational(k);
     if (intl) return { code: 'international', texte: `${intl} : VRM ne lit pas ce suivi`, geste: 'Cherche le n° sur le site de la poste du pays.' };
     const nl = carrierNonLu(carrier);
-    // (13 nov., lot 89) Colissimo / UPS sans clé posée sur le serveur, DPD, GLS, Relais Colis : seuls
-    // leurs e-mails (et SMS) disent où en est le colis — dit tel quel, jamais une erreur.
-    if (nl) return { code: 'non-lu', texte: `${nl} : suivi lu par e-mail seulement`, geste: `Regarde ses e-mails ou le site de ${nl}.` };
+    // (13 nov., lot 89) Colissimo / UPS sans clé, DPD, GLS, Relais Colis : seuls leurs e-mails (et SMS)
+    // disent où en est le colis — dit tel quel, jamais une erreur.
+    // (16 nov., lot transporteurs-suivi) « suivi non lu chez ce transporteur » ; pour Colissimo et UPS le
+    // geste nomme l'endroit où coller SA clé gratuite (api/_lib/cles-transporteurs.js, §2.9).
+    if (nl) return { code: 'non-lu', texte: `${nl} : suivi non lu chez ce transporteur`, geste: /^(Colissimo|UPS)$/.test(nl) ? `Colle ta clé ${nl} gratuite dans Paramètres → Ventes et colis, ou regarde le site de ${nl}.` : `Regarde ses e-mails ou le site de ${nl}.`, ...( /^(Colissimo|UPS)$/.test(nl) ? { cle: nl === 'UPS' ? 'ups' : 'colissimo' } : {}) };
     return { code: 'inconnu', texte: 'Transporteur pas reconnu : VRM ne peut pas lire ce suivi', geste: 'Cherche le n° sur le site du transporteur.' };
   }
   return { code: 'jamais', texte: `${nom} : pas encore lu — VRM le lit tant que l’app est ouverte`, geste: '' };

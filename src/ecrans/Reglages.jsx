@@ -21,7 +21,8 @@ import { lireSaisieObjectif, objectifAEnregistrer } from '../objectifMois.js';
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { HistoriqueModifications } from '../OutilsParcours.jsx';
-import { TravauxPasses } from '../composants/SuiviTravail.jsx';   // (11 nov., lot suivi-travail) les travaux suivis (Republier, publier, baisse…)
+import { TravauxPasses } from '../composants/SuiviTravail.jsx';
+import ClesSuivi from '../parametres/ClesSuivi.jsx';   // (16 nov.) SES clés de suivi Colissimo / UPS   // (11 nov., lot suivi-travail) les travaux suivis (Republier, publier, baisse…)
 import { dateImportValide } from '../brouillonsReglages.js';
 import { preparerLiaisonOAuth } from '../auth/liaisonOAuth.js';
 import { planDelier, refusDelier } from '../auth/delierOAuth.js';
@@ -2129,6 +2130,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (10 nov., Julien : « mets ça avec les e-mails ») Rangé dans « Mes e-mails », sous le transfert des e-mails.
       { id:'sms-colis', type:'panneau', nu:true, ic:'truck', lib:tr('reglages.sms-colis.lib'), desc:tr('reglages.sms-colis.desc'), val: etatJetonSms(jetonSms) === 'actif' ? tr('reglages.sms.actif') : etatJetonSms(jetonSms) === 'coupe' ? tr('reglages.sms.coupe') : tr('reglages.sms.aActiver'), data:{ 'data-reglage-sms':etatJetonSms(jetonSms) },
         el:<SmsColisSetting jeton={jetonSms} onJeton={(v)=>{ save('vrm_sms_token', v); setJetonSms(v); }} toast={toast}/> },
+      // (16 nov., lot transporteurs-suivi) SES clés gratuites La Poste / UPS : le suivi Colissimo et UPS lu par le serveur
+      // avec SA clé seulement (§2.9), rangée chiffrée (api/_lib/cles-transporteurs.js). Session exigée.
+      AUTH.user && { id:'cles-suivi', type:'panneau', nu:true, ic:'truck', lib:tr('reglages.cles-suivi.lib'), desc:tr('reglages.cles-suivi.desc'), data:{ 'data-reglage-cles-suivi':'' },
+        el:<ClesSuivi enTete={enTeteSession} toast={toast}/> },
       proprioInst && { id:'import', type:'panneau', nu:true, ic:'calendar', lib:tr('reglages.import.lib'), desc:tr('reglages.import.desc'), el:<EmailStartSetting key={AUTH.user?.id||'sans-session'} nu/> },
     ]},
     { id:'notifications', titre:tr('reglages.groupe.notifications'), items:[

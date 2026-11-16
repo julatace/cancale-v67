@@ -30,7 +30,7 @@ import { PROPRIETAIRE_NEUTRE } from './proprietaire-email.js';
 // Lignes LOURDES : seul leur résumé part (motifs `like` de PostgREST).
 export const LOURDS = ['harvest_*_txn_*', 'harvest_*_label_*', 'email_bord_*', 'email_html_*', 'email_qpj_*', 'backup_*', 'lbc_catalogue', 'lbc_recon', 'harvest_*_seen_urls', 'harvest_*_wreq_*', 'harvest_*_pickup_points'];
 // Lignes SECRÈTES : rien ne part (ni contenu, ni résumé).
-export const SECRETS = ['ebay_tokens*', 'push_subs', 'vrm_photoroom_cle', 'photoroom_cle', 'vrm_widget_token', 'vrm_sms_token', 'jeton_*', 'vrm_coffre*'];
+export const SECRETS = ['ebay_tokens*', 'push_subs', 'vrm_photoroom_cle', 'photoroom_cle', 'suivi_cle_*', 'vrm_widget_token', 'vrm_sms_token', 'jeton_*', 'vrm_coffre*'];
 // Un champ de jeton, où qu'il soit dans une ligne, est retiré.
 const CLE_SECRETE = /^(access_token|refresh_token|csrf_token|id_token|client_secret|password|mot_de_passe|motDePasse|p256dh|auth|secret|cle_api|api_key|apiKey|token)$/i;
 export function sansSecrets(v, prof = 0) {

@@ -58,24 +58,32 @@ export const CARRIERS_LUS = ['mondialrelay', 'chronopost', 'vinted'];
 export const LECTURE_SERVEUR_TRANSP = Object.freeze({ chronopost: true, vinted: true, mondialrelay: true });
 // ── (13 nov., lot 89) COLISSIMO / LA POSTE ET UPS : LUS PAR LE SERVEUR DÈS QUE LA CLÉ EST POSÉE ──
 // Julien (points 8 et 9) : « on ne fait pas avec l'extension » ⇒ le SERVEUR seulement, par les API
-// OFFICIELLES gratuites (une clé de l'INSTALLATION, posée sur Vercel, jamais collée dans une
-// conversation, jamais une clé personnelle de Julien prêtée aux autres vendeurs, §2.9) :
-//   · La Poste « Suivi v2 » (Colissimo, courrier suivi) : `LAPOSTE_OKAPI_KEY` (en-tête X-Okapi-Key) ;
-//   · UPS « Tracking API » : `UPS_CLIENT_ID` + `UPS_CLIENT_SECRET` (jeton OAuth client_credentials).
-// SANS CLÉ : rien n'est appelé (aucune ligne `transp_` créée, aucune requête), et l'app dit
-// « suivi lu par e-mail seulement » (`pourquoiPasLu`). Jamais l'extension (`aLireParNavigateur` ne
+// OFFICIELLES gratuites :
+//   · La Poste « Suivi v2 » (Colissimo, courrier suivi) : une clé Okapi (en-tête X-Okapi-Key) ;
+//   · UPS « Tracking API » : un Client ID + un Client Secret (jeton OAuth client_credentials).
+// ⚠️ (16 nov., lot transporteurs-suivi) LA CLÉ EST CELLE DU VENDEUR, plus celle de l'installation :
+//   §2.9 — « jamais la clé de Julien pour les autres ». Avant, `LAPOSTE_OKAPI_KEY` / `UPS_CLIENT_*`
+//   posées sur Vercel lisaient les colis de TOUS les vendeurs avec le compte développeur de Julien.
+//   Maintenant chaque vendeur colle SA clé gratuite (Paramètres → Ventes et colis → « Suivi
+//   Colissimo et UPS ») ; elle est CHIFFRÉE dans le coffre du serveur (api/_lib/cles-transporteurs.js),
+//   jamais relue par le navigateur, et ne sert qu'à SES colis. Les variables Vercel ne sont plus lues.
+// SANS SA CLÉ : rien n'est appelé (aucune ligne `transp_` créée, aucune requête), et l'app dit
+// « suivi non lu chez ce transporteur » (`pourquoiPasLu`). Jamais l'extension (`aLireParNavigateur` ne
 // rend que `CARRIERS_LUS`, et la route C4 refuse ces transporteurs).
-// Le serveur lit l'environnement ; l'app, qui ne le voit pas, apprend l'état par la réponse du
+// Le serveur apprend l'état par le passage EN COURS (`fournirLecturesServeur`, posé par
+// api/_lib/transporteurs-lecture.js : les clés du vendeur de CE passage) ; l'app, par la réponse du
 // passage (`lecture`, `noterLecturesServeur`). Avant ça : `null` (pas su) — jamais « lu ».
 export const CARRIERS_CLE = Object.freeze(['colissimo', 'ups']);
 export const CARRIERS_SERVEUR = Object.freeze([...CARRIERS_LUS, ...CARRIERS_CLE]);
-export const VARIABLES_CLE = Object.freeze({ colissimo: Object.freeze(['LAPOSTE_OKAPI_KEY']), ups: Object.freeze(['UPS_CLIENT_ID', 'UPS_CLIENT_SECRET']) });
-// { colissimo: bool, ups: bool } — une variable vide ou faite d'espaces ne compte pas.
-export function lecturesCleDeEnv(env) {
-  const e = env && typeof env === 'object' ? env : {};
-  const pose = (k) => typeof e[k] === 'string' && e[k].trim().length >= 8;
+// Ce que le vendeur colle pour chaque transporteur (les champs du coffre, jamais une variable Vercel).
+export const CHAMPS_CLE = Object.freeze({ colissimo: Object.freeze(['cle']), ups: Object.freeze(['id', 'secret']) });
+// { colissimo: bool, ups: bool } — un champ vide ou fait d'espaces ne compte pas (`cles` : ce que le
+// coffre a rendu pour CE vendeur, `{ colissimo: { cle }, ups: { id, secret } }`).
+export function lecturesCleDe(cles) {
+  const e = cles && typeof cles === 'object' ? cles : {};
+  const pose = (o, k) => !!o && typeof o === 'object' && typeof o[k] === 'string' && o[k].trim().length >= 8;
   const o = {};
-  for (const c of CARRIERS_CLE) o[c] = VARIABLES_CLE[c].every(pose);
+  for (const c of CARRIERS_CLE) o[c] = CHAMPS_CLE[c].every((k) => pose(e[c], k));
   return o;
 }
 let _lecturesConnues = null;   // posé par l'app (réponse du passage) ou par un banc ; jamais par le serveur
@@ -86,12 +94,14 @@ export function noterLecturesServeur(x) {
   for (const c of CARRIERS_CLE) o[c] = x[c] === true ? true : x[c] === false ? false : null;
   _lecturesConnues = o;
 }
-const _envProcess = () => { try { const p = globalThis.process; return p && p.env && typeof p.env === 'object' ? p.env : null; } catch (_) { return null; } };
+// Le serveur : une fonction qui rend `{ colissimo, ups }` pour le vendeur du passage EN COURS (jamais une
+// variable de module partagée entre vendeurs : le cron lit plusieurs vendeurs en parallèle).
+let _fournisseurServeur = null;
+export function fournirLecturesServeur(f) { _fournisseurServeur = typeof f === 'function' ? f : null; }
 // true · false · null (pas su : l'app avant sa première réponse du serveur).
 export function lecturesCle() {
   if (_lecturesConnues) return { ..._lecturesConnues };
-  const env = _envProcess();
-  if (env) return lecturesCleDeEnv(env);   // le serveur (Node) : ce que Vercel lui a posé
+  if (_fournisseurServeur) { try { const x = _fournisseurServeur(); if (x && typeof x === 'object') { const o = {}; for (const c of CARRIERS_CLE) o[c] = x[c] === true; return o; } } catch (_) {} }
   const o = {}; for (const c of CARRIERS_CLE) o[c] = null; return o;
 }
 export const lectureServeurActive = (carrier) => !!LECTURE_SERVEUR_TRANSP[carrier] || (CARRIERS_CLE.includes(carrier) && lecturesCle()[carrier] === true);
@@ -531,7 +541,7 @@ export const MR_LIBELLES = [
   // Vinted) a demandé à REPLACER le colis vers un autre point — il roule, son point change. Jamais « disponible ».
   [/\bsollicitation client\b|\breplace(?:ment)? (?:du |de |le )?colis\b|\bchangement de point (?:relais|de (?:retrait|livraison))\b/, 'replace'],
 ];
-const classeMr = (lib) => { const t = normLibelle(lib); for (const [re, c] of MR_LIBELLES) { const m = re.exec(t); if (m) return { c, jours: m[1] ? Number(m[1]) : null }; } return null; };
+export const classeMr = (lib) => { const t = normLibelle(lib); for (const [re, c] of MR_LIBELLES) { const m = re.exec(t); if (m) return { c, jours: m[1] ? Number(m[1]) : null }; } return null; };
 // (29 oct., revue n° 3) Le premier évènement de PRISE EN CHARGE ou de ROUTE daté
 // APRÈS le dernier évènement d'arrivée (« N jours restants », « disponible au
 // point de retrait ») : le colis a quitté le point relais — « a quitté le point

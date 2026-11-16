@@ -40,7 +40,7 @@ export const CATEGORIES = [
   ] },
   { id: 'ventes', ic: 'truck', groupes: [
     { id: 'impression', titre: 'reglages.groupe.impression', items: ['imprimante'] },
-    { id: 'colis', titre: 'parametres.g.colis', items: ['sms-colis', 'carte-merci'] },
+    { id: 'colis', titre: 'parametres.g.colis', items: ['sms-colis', 'cles-suivi', 'carte-merci'] },
     { id: 'annonces', titre: 'reglages.groupe.annonces-reglages', items: ['modeles'] },
   ] },
   { id: 'stock', ic: 'tag', groupes: [
@@ -136,7 +136,7 @@ export const LIENS_PROFONDS = [
   // `?tab=settings&reglage=…` (src/aideFiches.js `REGLAGES_AIDE`, et les liens écrits dans l'app)
   'push', 'agenda', 'vacances', 'numeros', 'modeles', 'imprimante', 'regime', 'apparence', 'stream', 'zoom', 'corbeille',
   'verifier', 'toutvabien', 'connexions', 'depannage', 'appareils', 'double', 'equipe', 'abonnement', 'widget',
-  'mes-plateformes', 'mes-signalements', 'nouveaux-comptes',
+  'mes-plateformes', 'mes-signalements', 'nouveaux-comptes', 'cles-suivi',
   // `DEMANDE_REGLAGE_SOUS` posé ailleurs (cloche, conseils, ligne de fraîcheur, santé, MFA, sections)
   'sante', 'santecomptes', 'discretion', 'rappels', 'importer', 'demandes-aide', 'fermer', 'signalements', 'ebay', 'securite-comptes', 'historique', 'copieannonces', 'journal-vrm', 'tes-donnees',
 ];

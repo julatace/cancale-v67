@@ -55,7 +55,8 @@
 //    200 application/json (3 lectures à 2 s d'écart ; 404 JSON
 //    `shipment_expired` pour un n° inconnu). Ces deux-là, le serveur les lit.
 // ────────────────────────────────────────────────────────────────────────────
-import { proprietaireCourant } from './owner.js';
+import { proprietaireCourant, contexteVendeur } from './owner.js';
+import { lireClesTransporteurs, noterVerif, demanderJetonUps, UPS_JETON_URL } from './cles-transporteurs.js';
 import { sbCle } from './cle.js';
 import { modifierCas } from './suivi-vinted.js';
 import { normaliserSuivi } from './etat-colis-email.js';
@@ -63,6 +64,7 @@ import { arriveeColisEmail } from './arrivee-colis.js';
 import { relireLigneMeta, SELECT_SUIVI_META, txDuColis, liensDesLignes, suiviDeLigne } from './suivi-colis.js';
 import * as T from './transporteurs.js';
 import * as D from './depart-colis.js';
+import { REQ_RELUS, avecRelus } from './transporteur-anciens.js';   // (16 nov.) le transporteur relu sur l'étiquette des anciens bordereaux
 import { envoyerNotifTransp, notifEncoreValable } from './transporteurs-notif.js';
 import { PROPRIETAIRE_NEUTRE } from './proprietaire-email.js';
 import { ordreStable, finALaFrontiere } from './ordre-stable.js';
@@ -124,7 +126,8 @@ let _pauseInstance = {};
 export const _oublierPauseInstance = () => { _pauseInstance = {}; };
 const pauseConnue = (p) => {
   const out = { ...(p && typeof p === 'object' ? p : {}) };
-  for (const c of T.CARRIERS_SERVEUR) {
+  // (16 nov.) + les pauses des clés de vendeur (`colissimo@{vendeur}`) : toutes les entrées connues.
+  for (const c of new Set([...T.CARRIERS_SERVEUR, ...Object.keys(_pauseInstance)])) {
     const a = out[c], b = _pauseInstance[c];
     const ja = Date.parse(a && a.jusqua || ''), jb = Date.parse(b && b.jusqua || '');
     if (Number.isFinite(jb) && !(Number.isFinite(ja) && ja >= jb)) out[c] = b;
@@ -133,7 +136,7 @@ const pauseConnue = (p) => {
 };
 // Une règle pour les deux points d'arrêt (le tri du passage et la file, juste
 // avant la requête) : la pause rangée en base OU connue de l'instance.
-const pauseEnCours = (p, carrier) => T.enPause(pauseConnue(p), carrier, Date.now());
+const pauseEnCours = (p, carrier) => T.enPause(pauseConnue(p), clePause(carrier), Date.now());
 async function lirePauseServeur() {
   try {
     const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${T.ID_PAUSE}&owner=eq.${PROPRIETAIRE_NEUTRE}&select=data`, { headers: { ...sbCle(SUPABASE_KEY) } });
@@ -292,42 +295,69 @@ const ENTETES = {
 };
 
 // ── (13 nov., lot 89) LES CLÉS DE COLISSIMO / LA POSTE ET D'UPS ──────────────
-// Les clés de l'INSTALLATION (Vercel → Settings → Environment Variables), lues ici seulement, au
-// moment de la requête — jamais rangées en base, jamais renvoyées au navigateur, jamais écrites
-// dans un journal. Sans clé : `T.lectureServeurActive` est faux, aucun n° n'est choisi, rien ne part.
-const envCle = (k) => { const v = process.env[k]; return typeof v === 'string' ? v.trim() : ''; };
-export const UPS_JETON_URL = 'https://onlinetools.ups.com/security/v1/oauth/token';
+// ⚠️ (16 nov., lot transporteurs-suivi) Les clés sont celles DU VENDEUR de ce passage (§2.9 : jamais
+// la clé de Julien pour les autres), lues DÉCHIFFRÉES dans le coffre (api/_lib/cles-transporteurs.js)
+// au début du passage, gardées le temps du passage SEULEMENT, attachées au contexte du vendeur
+// (AsyncLocalStorage : le cron lit plusieurs vendeurs en parallèle). Jamais rangées ailleurs, jamais
+// renvoyées au navigateur, jamais écrites dans un journal. Les variables Vercel `LAPOSTE_OKAPI_KEY` /
+// `UPS_CLIENT_*` ne sont plus lues. Sans SA clé : `T.lectureServeurActive` est faux, aucun n° n'est
+// choisi, rien ne part.
+const _clesParContexte = new WeakMap();
+const clesCourantes = () => { const s = contexteVendeur.getStore(); return s ? (_clesParContexte.get(s) || null) : null; };
+// Hors d'un passage (aucune clé lue pour ce contexte) : `null` — « pas su », jamais « lu ».
+T.fournirLecturesServeur(() => { const s = contexteVendeur.getStore(); return s && _clesParContexte.has(s) ? T.lecturesCleDe(clesCourantes()) : null; });
+// Les clés du vendeur du passage : lues UNE fois (`undefined` : lecture ratée ⇒ aucune, « pas su »).
+async function poserClesDuPassage() {
+  const s = contexteVendeur.getStore();
+  if (!s) return null;
+  if (_clesParContexte.has(s)) return _clesParContexte.get(s);
+  const owner = proprietaireCourant();
+  const c = owner ? await lireClesTransporteurs(owner) : undefined;
+  const v = c && typeof c === 'object' ? c : null;
+  _clesParContexte.set(s, v);
+  return v;
+}
+// Ce que la lecture a appris de SA clé (« acceptée » / « refusée »), noté une fois sur sa ligne.
+async function noterVerifCle(carrier, rep, lu) {
+  if (!T.CARRIERS_CLE.includes(carrier)) return;
+  const c = clesCourantes(); const owner = proprietaireCourant();
+  if (!c || !owner || !c.lignes || !c.lignes[carrier]) return;
+  const st = Number(rep && rep.statut);
+  const verif = (st === 401 || st === 403) ? 'refusee' : (lu && (lu.res === 'ok' || lu.res === 'introuvable')) ? 'ok' : '';
+  if (!verif || c.lignes[carrier].verif === verif) return;
+  const ok = await noterVerif(owner, carrier, verif, c.lignes[carrier]);
+  c.lignes[carrier] = { ...c.lignes[carrier], verif, ...(ok ? { rev: undefined } : {}) };
+}
+// (16 nov.) La pause d'un transporteur À CLÉ est celle de SA clé (un 401 dit « ta clé est refusée »,
+// un 429 « ta clé a trop demandé ») : rangée sous `colissimo@{vendeur}`, jamais pour tous les vendeurs.
+const clePause = (carrier) => (T.CARRIERS_CLE.includes(carrier) ? `${carrier}@${proprietaireCourant() || '?'}` : carrier);
+export { UPS_JETON_URL };
 export const UPS_TRANSACTION_SRC = 'VRM-suivi';
-// Le jeton OAuth d'UPS (client_credentials), gardé dans l'instance jusqu'à 1 min avant sa fin
-// (`expires_in`, ~4 h). Un refus des identifiants (400/401/403) n'est pas redemandé avant 30 min.
-let _jetonUps = null, _jetonUpsRefusJusqua = 0;
-export const _oublierJetonUps = () => { _jetonUps = null; _jetonUpsRefusJusqua = 0; };
+// Le jeton OAuth d'UPS (client_credentials), PAR VENDEUR (et par Client ID), gardé dans l'instance
+// jusqu'à 1 min avant sa fin (`expires_in`, ~4 h). Des identifiants refusés (400/401/403) ne sont pas
+// redemandés avant 30 min.
+const _jetonsUps = new Map();
+export const _oublierJetonUps = () => { _jetonsUps.clear(); };
 export const JETON_UPS_REFUS_MS = 30 * 60000;
 async function jetonUps({ neuf = false, signal = null } = {}) {
-  const maintenant = Date.now();
-  if (!neuf && _jetonUps && _jetonUps.jusqua - 60000 > maintenant) return _jetonUps.jeton;
-  if (maintenant < _jetonUpsRefusJusqua) return null;
-  const id = envCle('UPS_CLIENT_ID'), secret = envCle('UPS_CLIENT_SECRET');
+  const c = clesCourantes();
+  const id = c && c.ups ? c.ups.id : '', secret = c && c.ups ? c.ups.secret : '';
   if (!id || !secret) return null;
-  try {
-    const r = await fetchAvecDelai(UPS_JETON_URL, {
-      method: 'POST', redirect: 'error', ...(signal ? { signal } : {}),
-      headers: { 'User-Agent': UA_HONNETE, Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', Authorization: `Basic ${Buffer.from(`${id}:${secret}`).toString('base64')}` },
-      body: 'grant_type=client_credentials',
-    }, _delaiMs);
-    if (!r.ok) { if (r.status === 400 || r.status === 401 || r.status === 403) _jetonUpsRefusJusqua = Date.now() + JETON_UPS_REFUS_MS; return null; }
-    const j = await r.json().catch(() => null);
-    const jeton = j && typeof j.access_token === 'string' ? j.access_token : '';
-    if (!jeton) return null;
-    const duree = Number(j.expires_in);
-    _jetonUps = { jeton, jusqua: Date.now() + (Number.isFinite(duree) && duree > 0 ? Math.min(duree, 24 * 3600) : 3600) * 1000 };
-    return jeton;
-  } catch (_) { return null; }
+  const k = `${proprietaireCourant()}|${id}`;
+  const maintenant = Date.now();
+  const g = _jetonsUps.get(k) || {};
+  if (!neuf && g.jeton && g.jusqua - 60000 > maintenant) return g.jeton;
+  if (maintenant < (g.refusJusqua || 0)) return null;
+  const j = await demanderJetonUps(id, secret, { signal, delaiMs: _delaiMs });
+  if (j && j.refus) { _jetonsUps.set(k, { refusJusqua: Date.now() + JETON_UPS_REFUS_MS }); return null; }
+  if (!j || !j.jeton) return null;
+  _jetonsUps.set(k, { jeton: j.jeton, jusqua: Date.now() + j.duree * 1000 });
+  return j.jeton;
 }
 let _transId = 0;
 // Les en-têtes propres à un transporteur à clé. `null` : pas de clé (ou pas de jeton) ⇒ rien ne part.
 async function entetesCle(carrier, { neuf = false, signal = null } = {}) {
-  if (carrier === 'colissimo') { const k = envCle('LAPOSTE_OKAPI_KEY'); return k ? { 'X-Okapi-Key': k } : null; }
+  if (carrier === 'colissimo') { const c = clesCourantes(); const k = c && c.colissimo ? c.colissimo.cle : ''; return k ? { 'X-Okapi-Key': k } : null; }
   if (carrier === 'ups') {
     const jeton = await jetonUps({ neuf, signal });
     return jeton ? { Authorization: `Bearer ${jeton}`, transId: `vrm${Date.now().toString(36)}${(++_transId).toString(36)}`.slice(0, 32), transactionSrc: UPS_TRANSACTION_SRC } : null;
@@ -371,7 +401,7 @@ export async function lireTransporteur(carrier, suivi, { cp = '', fin = null, si
       const rep = { statut: r.status, ctype: h('content-type'), corps: await corpsBorne(r, carrier === 'mondialrelay' ? CORPS_MAX_MR : CORPS_MAX), retryAfter: h('retry-after'), defi: /challenge/i.test(h('cf-mitigated')) };
       // Un REFUS se note ICI, avant que la file ne laisse partir la suivante.
       if (rep.defi || T.lireReponse(carrier, rep.statut, rep.ctype, rep.corps, { suivi, cp, voie: T.VOIE_SERVEUR[carrier] }).res === 'bloque') {
-        const p = T.pauseApresRefus(_pauseInstance, carrier, { statut: rep.statut, ctype: rep.ctype, retryAfter: rep.retryAfter, maintenant: Date.now() });
+        const p = T.pauseApresRefus(_pauseInstance, clePause(carrier), { statut: rep.statut, ctype: rep.ctype, retryAfter: rep.retryAfter, maintenant: Date.now() });
         if (p) _pauseInstance = p;
       }
       return rep;
@@ -470,13 +500,15 @@ async function prendreBail(b, it, maintenant = Date.now()) {
   });
   return r === true;
 }
-async function poserPause(rep, carrier, maintenant) {
+async function poserPause(rep, carrierLu, maintenant) {
+  const carrier = clePause(carrierLu);
   const r = await modifierCas(T.ID_PAUSE, (d) => T.pauseApresRefus(d, carrier, { statut: rep && rep.statut, ctype: rep && rep.ctype, retryAfter: rep && rep.retryAfter, maintenant }), 6, { owner: PROPRIETAIRE_NEUTRE });
   const p = T.pauseApresRefus(_pauseInstance, carrier, { statut: rep && rep.statut, ctype: rep && rep.ctype, retryAfter: rep && rep.retryAfter, maintenant });
   if (p) _pauseInstance = p;
   return r;
 }
-async function leverPause(b, carrier) {
+async function leverPause(b, carrierLu) {
+  const carrier = clePause(carrierLu);
   const li = T.pauseLevee(_pauseInstance, carrier); if (li) _pauseInstance = li;
   if (!T.enPause(b.pause, carrier) && !(b.pause[carrier] && b.pause[carrier].palier)) return;
   await modifierCas(T.ID_PAUSE, (d) => T.pauseLevee(d, carrier), 6, { owner: PROPRIETAIRE_NEUTRE });
@@ -504,6 +536,9 @@ export async function passageTransporteurs({ max = MAX_APP, budgetMs = BUDGET_AP
   const fin = t0 + budgetMs;
   const b = await lireBaseTransp();
   if (!b) return { ok: false, raison: 'pas-su', lus: [], besoinNavigateur: [], pause: {} };
+  // (16 nov.) SES clés de suivi (La Poste, UPS), lues une fois pour ce passage : sans elles, aucun
+  // Colissimo / UPS n'est choisi (`carrierLisible` ⇒ `lecturesCle`, le vendeur de CE passage).
+  await poserClesDuPassage();
   const now = maintenant || Date.now();
   // Les notifications restées en attente (un hoquet de la base au moment de
   // sonner) partent d'abord (revue n° 13).
@@ -566,6 +601,7 @@ export async function passageTransporteurs({ max = MAX_APP, budgetMs = BUDGET_AP
         continue;
       }
       let lu = rep.defi ? { res: 'bloque' } : T.lireReponse(carrier, rep.statut, rep.ctype, rep.corps, { suivi: it.suivi, cp, voie: T.VOIE_SERVEUR[carrier] });
+      await noterVerifCle(carrier, rep, lu);
       if (lu.res === 'bloque') {
         await poserPause(rep, carrier, Date.now());
         b.pause = pauseConnue(b.pause);
@@ -611,16 +647,18 @@ export const MAX_DEPARTS_APP = 3;
 export const MAX_DEPARTS_CRON = 6;
 async function lireBaseDeparts() {
   // (15 nov., lot retours-suivi) + les bordereaux de RETOUR de ses achats (le colis qu'il renvoie).
-  const [rows, vc, bords, retours] = await Promise.all([
+  const [rows, vc, bords, retours, relus] = await Promise.all([
     lireTout(`app_data?id=like.depart_*&select=${D.SELECT_DEPART_META}`),
     lireTout('app_data?id=eq.vc_ventes&select=ventes:data->ventes'),
-    lireTout('app_data?id=like.email_bord_*&select=suivi:meta->>suivi,transaction:meta->>transaction,receivedAt:meta->>receivedAt'),
+    // (16 nov.) + le transporteur NOMMÉ par l'e-mail ou l'étiquette (Mondial Relay ne se reconnaît pas à son n°).
+    lireTout('app_data?id=like.email_bord_*&select=suivi:meta->>suivi,transaction:meta->>transaction,receivedAt:meta->>receivedAt,transporteur:meta->>transporteur,transporteurPdf:meta->>transporteurPdf'),
     lireTout('app_data?id=like.email_bordretour_*&select=suivi:meta->>suivi,transaction:meta->>transaction,receivedAt:meta->>receivedAt,transporteurPdf:meta->>transporteurPdf'),
+    lireTout(REQ_RELUS),
   ]);
-  if (![rows, vc, bords, retours].every(Array.isArray)) return null;
+  if (![rows, vc, bords, retours, relus].every(Array.isArray)) return null;
   const departs = D.departsParSuivi(rows) || new Map();
   const vcVentes = vc[0] && vc[0].ventes && typeof vc[0].ventes === 'object' ? vc[0].ventes : {};
-  return { departs, sortants: D.sortantsDuVendeur({ vcVentes, bords, retours }) };
+  return { departs, sortants: D.sortantsDuVendeur({ vcVentes, bords: avecRelus(bords, relus), retours }) };
 }
 // Les n° ENTRANTS connus de ce passage (ses achats) : jamais lus comme départ.
 export function entrantsDe(b) {
@@ -649,6 +687,32 @@ async function prendreBailDepart(id, it, vu, maintenant = Date.now()) {
   });
   return r === true;
 }
+// (16 nov., lot transporteurs-suivi) MONDIAL RELAY : le code postal du point est LU SUR SON
+// ÉTIQUETTE (le PDF du bordereau de CETTE transaction, un PDF par requête, une fois par n°), jamais
+// deviné ; seuls les codes postaux sont gardés (`cpsPdf`), jamais le texte (il porte l'adresse de
+// l'acheteur). Chacun n'est gardé comme PROUVÉ (`cp`) que si Mondial Relay renvoie l'ÉCHO de ce n° à ce
+// code postal ; refusé, il est noté (`cpsRefuses`) et jamais réessayé. Plus rien à essayer ⇒ aucune
+// requête (`D.mrSansCodePostal`).
+// `lirePdf(id)` : le PDF base64 d'une ligne (rendu `null` si la lecture rate, '' s'il n'y en a pas) ;
+// `texteDuPdf` : l'extraction du texte (les bancs servent les leurs).
+export async function lireCpsEtiquette(cle, { lirePdf = lirePdfLigne, texte = null } = {}) {
+  const id = D.idPdfDuSortant(cle);
+  if (!id) return { lu: true, cps: [] };
+  const b64 = await lirePdf(id);
+  if (b64 == null) return { lu: false, cps: [] };          // pas su : relu au passage suivant
+  if (!b64) return { lu: true, cps: [] };                   // aucun PDF (retiré, jamais reçu)
+  let t = null;
+  try { const f = texte || (await import('./texte-pdf.js')).texteDuPdf; t = await f(b64); } catch (_) { t = null; }
+  return { lu: true, cps: t == null ? [] : D.cpsDeLEtiquette(t) };
+}
+async function lirePdfLigne(id) {
+  const rows = await lireTout(`app_data?id=eq.${encodeURIComponent(id)}&select=pdf:data->>pdfB64`);
+  if (!Array.isArray(rows)) return null;
+  return rows[0] && typeof rows[0].pdf === 'string' ? rows[0].pdf : '';
+}
+let _lirePdfBanc = null;
+// Les bancs servent le PDF et son texte (jamais la production : rien ne l'appelle ici).
+export function _pdfPourBanc(o) { _lirePdfBanc = o && typeof o.lire === 'function' ? o : null; }
 export async function passageDeparts(b, { max = MAX_DEPARTS_APP, fin = Date.now() + BUDGET_APP_MS, signal = null, maintenant = Date.now() } = {}) {
   const lus = [];
   const bd = await lireBaseDeparts();
@@ -659,21 +723,54 @@ export async function passageDeparts(b, { max = MAX_DEPARTS_APP, fin = Date.now(
     if (Date.now() + _delaiMs + _ecartMs + MARGE_RANGEMENT_MS > fin) break;
     if (pauseEnCours(b && b.pause, it.carrier)) continue;
     const id = D.cleDepart(it.carrier, it.suivi);
-    if (!(await prendreBailDepart(id, it, bd.departs.get(it.suivi), Date.now()))) continue;
-    const rep = await lireTransporteur(it.carrier, it.suivi, { fin, signal });
+    let vu = bd.departs.get(it.suivi) || null;
+    // Mondial Relay : le code postal à essayer (prouvé, sinon lu sur l'étiquette).
+    let cp = '';
+    if (it.carrier === 'mondialrelay') {
+      if (!(vu && vu.cp) && !(vu && vu.cpsLu)) {
+        const e = await lireCpsEtiquette(it.cle, _lirePdfBanc ? { lirePdf: _lirePdfBanc.lire, texte: _lirePdfBanc.texte } : {});
+        if (!e.lu) continue;
+        let apresPdf = null;
+        const w = await modifierCas(id, (d) => {
+          if (signal && signal.aborted) return undefined;
+          const o = d ? { ...d } : { v: 1, sens: 'sortant', suivi: normaliserSuivi(it.suivi), carrier: 'mondialrelay' };
+          delete o.rev; delete o.enVol;
+          o.cpsPdf = D.listeCp(e.cps).join(','); o.cpsLu = new Date().toISOString();
+          apresPdf = o; return o;
+        });
+        if (w !== true || !apresPdf) continue;
+        vu = D.departDeMeta({ id, ...apresPdf }) || vu;
+      }
+      const c = D.cpDepartMr(vu);
+      if (!c) {
+        // Rien à essayer : AUCUNE requête ; la ligne le dit une fois (Ventes : « code postal pas sur l'étiquette »).
+        if (!(vu && vu.essaiRes === 'cp-inconnu')) {
+          await modifierCas(id, (d) => (signal && signal.aborted ? undefined : D.ligneDepartApresEssai(d, { res: 'cp-inconnu' }, { carrier: it.carrier, suivi: it.suivi, maintenant: Date.now() })));
+          lus.push({ carrier: it.carrier, suivi: it.suivi, res: 'cp-inconnu', prisEnCharge: false, change: false });
+        }
+        continue;
+      }
+      cp = c.cp;
+    }
+    if (!(await prendreBailDepart(id, it, vu, Date.now()))) continue;
+    const rep = await lireTransporteur(it.carrier, it.suivi, { cp, fin, signal });
     if (rep.echec === 'pause' || rep.echec === 'budget') continue;
     if (signal && signal.aborted) break;
     let lu;
     if (rep.echec) lu = { res: 'passu' };
     else {
-      lu = rep.defi ? { res: 'bloque' } : T.lireReponse(it.carrier, rep.statut, rep.ctype, rep.corps, { suivi: it.suivi, voie: T.VOIE_SERVEUR[it.carrier] });
+      lu = rep.defi ? { res: 'bloque' } : T.lireReponse(it.carrier, rep.statut, rep.ctype, rep.corps, { suivi: it.suivi, cp, voie: T.VOIE_SERVEUR[it.carrier] });
+      await noterVerifCle(it.carrier, rep, lu);
       if (lu.res === 'bloque') { await poserPause(rep, it.carrier, Date.now()); if (b) b.pause = pauseConnue(b.pause); }
       else if (lu.res === 'ok' || lu.res === 'introuvable' || lu.res === 'expire') { if (b) await leverPause(b, it.carrier); }
+      // Un code postal de l'étiquette pas encore PROUVÉ : « pas de colis » (ou un écho autre) ne dit rien du
+      // n° — c'est CE code postal qui est refusé (la règle des achats, `resultatMondialRelay`).
+      if (it.carrier === 'mondialrelay') lu = T.resultatMondialRelay(lu, { cp, cpSource: vu && vu.cp === cp ? 'lu' : 'essai', cpEssaye: vu && vu.cp === cp ? '' : cp, transp: vu && vu.cp ? { cp: vu.cp } : null });
     }
     let apres = null;
     const ecrit = await modifierCas(id, (d) => {
       if (signal && signal.aborted) return undefined;
-      apres = D.ligneDepartApresEssai(d, lu, { carrier: it.carrier, suivi: it.suivi, maintenant: Date.now() });
+      apres = D.ligneDepartApresEssai(d, lu, { carrier: it.carrier, suivi: it.suivi, maintenant: Date.now(), cp: lu.res === 'ok' ? cp : '' });
       return apres;
     });
     // (11 nov.) `change` : l'état lu a bougé (en transit → livré…) — l'app relit les départs.

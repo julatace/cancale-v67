@@ -29,7 +29,7 @@ import { jourParis } from './dateParis.js';
 
 // ⚠️ Les mêmes motifs que le serveur (api/_lib/export-rgpd.js `LOURDS`, `SECRETS`) — l'audit le vérifie.
 export const LOURDS = ['harvest_*_txn_*', 'harvest_*_label_*', 'email_bord_*', 'email_html_*', 'email_qpj_*', 'backup_*', 'lbc_catalogue', 'lbc_recon', 'harvest_*_seen_urls', 'harvest_*_wreq_*', 'harvest_*_pickup_points'];
-export const SECRETS = ['ebay_tokens*', 'push_subs', 'vrm_photoroom_cle', 'photoroom_cle', 'vrm_widget_token', 'vrm_sms_token', 'jeton_*', 'vrm_coffre*'];
+export const SECRETS = ['ebay_tokens*', 'push_subs', 'vrm_photoroom_cle', 'photoroom_cle', 'suivi_cle_*', 'vrm_widget_token', 'vrm_sms_token', 'jeton_*', 'vrm_coffre*'];
 const CLE_SECRETE = /^(access_token|refresh_token|csrf_token|id_token|client_secret|password|mot_de_passe|motDePasse|p256dh|auth|secret|cle_api|api_key|apiKey|token)$/i;
 export function sansSecrets(v, prof = 0) {
   if (prof > 60 || v === null || typeof v !== 'object') return v;

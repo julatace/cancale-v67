@@ -13,6 +13,10 @@ require(require('path').join(__dirname, '_horloge-notif.cjs'));   // heures calm
 //     Poste avec `X-Okapi-Key`, UPS avec un jeton OAuth (demandé une fois, gardé, redemandé une fois
 //     sur 401), range `transp_colissimo_…` / `transp_ups_…`, et la réponse dit `lecture` à l'app ;
 //   · jamais l'extension : ni en C3 (`aLireParNavigateur`), ni en C4 (`appliquerReponseBrute`).
+// (16 nov., lot transporteurs-suivi) LA CLÉ EST CELLE DU VENDEUR (§2.9 : jamais la clé de Julien pour les
+// autres) : posée dans SON coffre (`suivi_cle_colissimo` / `suivi_cle_ups`, chiffrée, api/_lib/cles-transporteurs.js),
+// plus jamais une variable Vercel. Ce banc la pose dans la fausse base, chiffrée comme le fait la route, et vérifie
+// qu'un AUTRE vendeur (B) sans clé n'en profite jamais, et qu'une variable Vercel posée n'allume plus rien.
 // Données inventées : 6A12345678901, 1Z999AA10123456784, « BUREAU DE POSTE TEST », 99999 Testville.
 // `--prouve` : réaffaiblit la règle ; chaque mutation doit rendre ROUGE.
 const fs = require('fs'), path = require('path'), os = require('os');
@@ -32,12 +36,17 @@ const MUTATIONS = {
   'ups-dispo-ignore': ['api/_lib/transporteurs.js', "  const estDispo = (a) => a.code === 'ZP' || a.code === '5E' || (UPS_AP.test(a.t) && UPS_ATTENTE.test(a.t));", '  const estDispo = (a) => false;'],
   'ups-limite-ignoree': ['api/_lib/transporteurs.js', 'limite: lim, limiteSure: !!lim, limiteAt: null', 'limite: null, limiteSure: false, limiteAt: null'],
   'ups-echo-ignore': ['api/_lib/transporteurs.js', "  if (!pk) return rendu('forme', { forme: 'trackingNumber:autre' });\n", ''],
-  'ups-jeton-jamais-garde': ['api/_lib/transporteurs-lecture.js', '  if (!neuf && _jetonUps && _jetonUps.jusqua - 60000 > maintenant) return _jetonUps.jeton;\n', ''],
+  'ups-jeton-jamais-garde': ['api/_lib/transporteurs-lecture.js', '  if (!neuf && g.jeton && g.jusqua - 60000 > maintenant) return g.jeton;\n', ''],
+  'cle-de-l-installation': ['api/_lib/transporteurs-lecture.js', 'return s && _clesParContexte.has(s) ? T.lecturesCleDe(clesCourantes()) : null; });', "return { colissimo: !!process.env.LAPOSTE_OKAPI_KEY || !!(clesCourantes() || {}).colissimo, ups: !!(process.env.UPS_CLIENT_ID && process.env.UPS_CLIENT_SECRET) || !!(clesCourantes() || {}).ups }; });"],
+  'cle-d-un-autre-vendeur': ['api/_lib/transporteurs-lecture.js', "const clesCourantes = () => { const s = contexteVendeur.getStore(); return s ? (_clesParContexte.get(s) || null) : null; };", "let _der = null; const clesCourantes = () => { const s = contexteVendeur.getStore(); const v = s ? (_clesParContexte.get(s) || null) : null; if (v && (v.colissimo || v.ups)) _der = v; return v && (v.colissimo || v.ups) ? v : _der; };"],
+  'cle-env-en-repli': ['api/_lib/transporteurs-lecture.js', "const k = c && c.colissimo ? c.colissimo.cle : '';", "const k = (c && c.colissimo ? c.colissimo.cle : '') || process.env.LAPOSTE_OKAPI_KEY || '';"],
+  'pause-de-tous-les-vendeurs': ['api/_lib/transporteurs-lecture.js', "const clePause = (carrier) => (T.CARRIERS_CLE.includes(carrier) ? `${carrier}@${proprietaireCourant() || '?'}` : carrier);", 'const clePause = (carrier) => carrier;'],
   'ups-401-sans-nouveau-jeton': ['api/_lib/transporteurs-lecture.js', "      if (carrier === 'ups' && r.status === 401) {", '      if (false) {'],
   'cle-absente-appelee': ['api/_lib/transporteurs-lecture.js', "      if (cle === null) return { echec: 'cle' };\n", ''],
+  'verif-jamais-notee': ['api/_lib/transporteurs-lecture.js', '      await noterVerifCle(carrier, rep, lu);\n', ''],
   'app-ignore-transp-colissimo': ['api/_lib/transporteurs.js', '/^transp_(mondialrelay|chronopost|vinted|colissimo|ups)_([A-Z0-9]+)$/', '/^transp_(mondialrelay|chronopost|vinted)_([A-Z0-9]+)$/'],
   'lecture-pas-dite': ['api/_lib/transporteurs-lecture.js', 'lecture: T.lecturesCle(), ', ''],
-  'texte-erreur': ['src/retraitSuivi.js', '`${nl} : suivi lu par e-mail seulement`', '`${nl} : VRM ne lit pas ce transporteur`'],
+  'texte-erreur': ['src/retraitSuivi.js', '`${nl} : suivi non lu chez ce transporteur`', '`${nl} : VRM ne lit pas ce transporteur`'],
 };
 const ARG_PROUVE = process.argv.find((x) => x.startsWith('--prouve'));
 if (ARG_PROUVE) {
@@ -76,6 +85,8 @@ process.env.VRM_OWNER_UID = A;
 process.env.VAPID_PRIVATE_KEY = 'YmFuYy1jbGUtcHJpdmVlLWZhY3RpY2UtMzItb2N0ZXQ';
 const CLES = ['LAPOSTE_OKAPI_KEY', 'UPS_CLIENT_ID', 'UPS_CLIENT_SECRET'];
 for (const k of CLES) delete process.env[k];
+process.env.VRM_COFFRE_CLE = 'banc-coffre-de-test-0000000000000000';
+const B = '99999999-8888-7777-6666-555555555555';   // un AUTRE vendeur, sans clé
 const CLE_LP = 'cle-okapi-de-banc-0000', UPS_ID = 'ups-id-de-banc-0000', UPS_SECRET = 'ups-secret-de-banc-0000';
 try { const webpush = require(path.join(R, 'node_modules', 'web-push')); webpush.setVapidDetails = () => {}; webpush.sendNotification = async () => ({ statusCode: 201 }); } catch (_) {}
 
@@ -182,15 +193,17 @@ const UPS_404 = JSON.stringify({ response: { errors: [{ code: '151018', message:
 const UPS_JETON = (j) => JSON.stringify({ token_type: 'Bearer', issued_at: String(Date.now()), client_id: UPS_ID, access_token: j, scope: '', expires_in: '14399', refresh_count: '0', status: 'approved' });
 
 (async () => {
-  let T = null, L = null, RS = null, O = null;
+  let T = null, L = null, RS = null, O = null, CF = null, CT = null;
   await essaie('les modules', async () => {
     T = await importer('api/_lib/transporteurs.js');
     L = await importer('api/_lib/transporteurs-lecture.js');
     RS = await importer('src/retraitSuivi.js');
     O = await importer('api/_lib/owner.js');
+    CF = await importer('api/_lib/coffre.js');
+    CT = await importer('api/_lib/cles-transporteurs.js');
     dit(typeof T.lireReponseLaPoste === 'function' && typeof T.lireReponseUps === 'function' && typeof L.passageTransporteurs === 'function', 'les analyseurs La Poste et UPS existent (api/_lib/transporteurs.js)');
   });
-  if (!T || !L || !RS || !O) { console.log(`\n❌ audit-suivi-cles : ${ko} rouge(s)`); process.exit(1); }
+  if (!T || !L || !RS || !O || !CF || !CT) { console.log(`\n❌ audit-suivi-cles : ${ko} rouge(s)`); process.exit(1); }
   const NOW = Date.now();
   const N_LP = '6A12345678901', N_UPS = '1Z999AA10123456784', N_UPS2 = '1Z999AA10123456791';
 
@@ -261,23 +274,31 @@ const UPS_JETON = (j) => JSON.stringify({ token_type: 'Bearer', issued_at: Strin
   await essaie('la forme du n° et la porte de la clé', async () => {
     if (T.noterLecturesServeur) T.noterLecturesServeur(null);
     for (const k of CLES) delete process.env[k];
+    T.noterLecturesServeur({ colissimo: false, ups: false });
     dit(T.lectureServeurActive('colissimo') === false && T.lectureServeurActive('ups') === false && T.lectureServeurActive('chronopost') === true, 'C1 sans clé : Colissimo et UPS ne sont pas lus par le serveur (Chronopost l’est toujours)');
     dit(T.carrierLisible('colissimo', N_LP) === null && T.carrierLuDeLigne('vinted', N_LP) === null && T.carrierLisible('ups', N_UPS) === null, 'C2 sans clé : aucun n° Colissimo / UPS « lisible » (rien demandé, rien promis)', J([T.carrierLisible('colissimo', N_LP), T.carrierLuDeLigne('vinted', N_LP)]));
     dit(T.carrierLuDeLigne('vinted', N_LP) !== 'vinted', 'C3 un n° de forme Colissimo propre n’est jamais lu chez Vinted Go (même sous l’expéditeur par défaut « vinted »)');
     dit(T.carrierLisible('vinted', '1AB2C3DEFGHIJ') === 'vinted' && T.carrierLisible('vinted', '1AB2C3DEFG4HI') === 'vinted', 'C4 les formes Vinted Go mesurées (13 caractères « 9AA9A… ») restent à Vinted Go');
-    process.env.LAPOSTE_OKAPI_KEY = CLE_LP;
-    dit(T.lectureServeurActive('colissimo') === true && T.lectureServeurActive('ups') === false, 'C5 la clé La Poste posée ⇒ Colissimo lu, UPS toujours pas (deux identifiants)');
+    // (16 nov.) Une variable Vercel posée n'allume PLUS rien (la clé de l'installation = celle de Julien pour tous).
+    process.env.LAPOSTE_OKAPI_KEY = CLE_LP; process.env.UPS_CLIENT_ID = UPS_ID; process.env.UPS_CLIENT_SECRET = UPS_SECRET;
+    T.noterLecturesServeur(null);
+    const sansContexte = T.lecturesCle();
+    dit(sansContexte.colissimo !== true && sansContexte.ups !== true && T.carrierLisible('colissimo', N_LP) === null, 'C5a les variables Vercel posées n’allument plus Colissimo ni UPS (jamais la clé de l’installation pour tous, §2.9)', J(sansContexte));
+    for (const k of CLES) delete process.env[k];
+    T.noterLecturesServeur({ colissimo: true, ups: false });
+    dit(T.lectureServeurActive('colissimo') === true && T.lectureServeurActive('ups') === false, 'C5 SA clé La Poste posée ⇒ Colissimo lu, UPS toujours pas (deux identifiants)');
     dit(T.carrierLisible('colissimo', N_LP) === 'colissimo' && T.carrierLisible('la poste', N_LP) === 'colissimo' && T.carrierLuDeLigne('vinted', N_LP) === 'colissimo' && T.carrierLuDeLigne('', N_LP) === 'colissimo', 'C6 avec la clé : « 6A + 11 chiffres » ⇒ Colissimo, nommé ou par sa forme');
     dit(T.carrierLisible('colissimo', 'CB123456789FR') === 'colissimo' && T.carrierLuDeLigne('', 'CB123456789FR') === null, 'C7 un S10 « …FR » n’est Colissimo que si la ligne le nomme');
-    process.env.UPS_CLIENT_ID = UPS_ID; process.env.UPS_CLIENT_SECRET = UPS_SECRET;
+    T.noterLecturesServeur({ colissimo: true, ups: true });
     dit(T.carrierLisible('ups', N_UPS) === 'ups' && T.carrierLuDeLigne('autre', N_UPS) === 'ups' && T.carrierLisible('ups', '1Z12') === null, 'C8 avec ses identifiants : « 1Z + 16 » ⇒ UPS ; une autre forme ⇒ rien');
     dit(T.carrierLuDeLigne('', '25009612345678') === null && T.carrierLuDeLigne('', '12345678901') === null, 'C9 DPD (14 chiffres) et GLS (11 chiffres) ne se devinent JAMAIS par la forme (elle est partagée)');
     dit(T.carrierNonLu('colissimo') === null && T.carrierNonLu('ups') === null && T.carrierNonLu('dpd') === 'DPD' && T.carrierNonLu('gls') === 'GLS', 'C10 avec la clé, Colissimo / UPS ne sont plus « non lus » ; DPD et GLS le restent', J([T.carrierNonLu('colissimo'), T.carrierNonLu('gls')]));
-    for (const k of CLES) delete process.env[k];
+    T.noterLecturesServeur({ colissimo: false, ups: false });
     const pl = RS.pourquoiPasLu({ suivi: N_LP, carrier: 'colissimo', t: null });
-    dit(pl && pl.code === 'non-lu' && /e-mail seulement/.test(pl.texte) && !/erreur|ne lit pas/i.test(pl.texte), 'C11 sans clé, l’app dit « Colissimo : suivi lu par e-mail seulement » (jamais une erreur)', J(pl));
+    dit(pl && pl.code === 'non-lu' && /suivi non lu chez ce transporteur/.test(pl.texte) && /Paramètres/.test(pl.geste) && pl.cle === 'colissimo' && !/erreur|ne lit pas/i.test(pl.texte), 'C11 sans clé, l’app dit « Colissimo : suivi non lu chez ce transporteur » et où coller SA clé (jamais une erreur)', J(pl));
     const pg = RS.pourquoiPasLu({ suivi: '12345678901', carrier: 'gls', t: null });
-    dit(pg && pg.code === 'non-lu' && /^GLS : suivi lu par e-mail seulement/.test(pg.texte), 'C12 GLS : « suivi lu par e-mail seulement » (plus « transporteur pas reconnu »)', J(pg));
+    dit(pg && pg.code === 'non-lu' && /^GLS : suivi non lu chez ce transporteur/.test(pg.texte) && !pg.cle && !/Paramètres/.test(pg.geste), 'C12 GLS : « suivi non lu chez ce transporteur », sans clé à coller (aucune voie publique)', J(pg));
+    T.noterLecturesServeur(null);
     // L'app ne voit pas l'environnement : elle apprend par la réponse du passage.
     const vraiProcess = globalThis.process; globalThis.process = undefined;
     let appInconnu = null; try { T.noterLecturesServeur(null); appInconnu = T.lecturesCle(); } finally { globalThis.process = vraiProcess; }
@@ -291,7 +312,9 @@ const UPS_JETON = (j) => JSON.stringify({ token_type: 'Bearer', issued_at: Strin
   });
 
   // ══ 4. LE VRAI PASSAGE DU SERVEUR (fausse base, faux transporteurs) ══════
-  const passage = (o = {}) => O.contexteVendeur.run({ owner: A }, () => L.passageTransporteurs({ max: 12, budgetMs: 20000, ...o }));
+  const passage = (o = {}, owner = A) => O.contexteVendeur.run({ owner }, () => L.passageTransporteurs({ max: 12, budgetMs: 20000, ...o }));
+  // SA clé, rangée dans SON coffre comme le fait la route (chiffrée, l'identifiant du vendeur en donnée associée).
+  const poserCle = (owner, carrier, secret, verif = 'pas-su') => base.set(`${owner}|${CT.idCle(carrier)}`, { v: 1, chiffre: CF.chiffrerCoffre(CT.usageCle(carrier), owner, secret), fin: CT.finDe(secret.cle || secret.id), at: iso(NOW), verif, rev: 'rev-' + carrier });
   if (typeof L._reglerPourBanc === 'function') L._reglerPourBanc({ ecartMs: 0 });
   const ligneLp = (n = N_LP, o = {}) => ({ type: 'suivi', carrier: 'colissimo', suivi: n, status: 'available', statusLabel: 'Disponible', subject: `Votre colis ${n} est disponible`, receivedAt: iso(NOW - 3 * H), sens: 'entrant', ...o });
   const ligneUps = (n = N_UPS) => ({ type: 'suivi', carrier: 'ups', suivi: n, status: 'transit', subject: `UPS : votre colis ${n} est en route`, receivedAt: iso(NOW - 3 * H), sens: 'entrant' });
@@ -318,11 +341,17 @@ const UPS_JETON = (j) => JSON.stringify({ token_type: 'Bearer', issued_at: Strin
     dit(!ligneT('colissimo', N_LP) && !ligneT('ups', N_UPS), 'D2 sans clé : aucune ligne `transp_` créée (rien de « jamais lu » à afficher)');
     dit(r.lecture && r.lecture.colissimo === false && r.lecture.ups === false, 'D3 la réponse dit à l’app « pas de clé » (`lecture`), jamais la clé', J(r.lecture));
     dit((r.besoinNavigateur || []).length === 0, 'D4 rien pour l’extension', J(r.besoinNavigateur));
+    // (16 nov.) Les variables Vercel d'AVANT posées, aucune clé du vendeur : toujours rien (§2.9).
+    remise();
+    process.env.LAPOSTE_OKAPI_KEY = CLE_LP; process.env.UPS_CLIENT_ID = UPS_ID; process.env.UPS_CLIENT_SECRET = UPS_SECRET;
+    const r2 = await passage();
+    for (const k of CLES) delete process.env[k];
+    dit(r2.ok && appels.filter((x) => /laposte|ups/.test(x.host)).length === 0 && r2.lecture && r2.lecture.colissimo === false && r2.lecture.ups === false, 'D5 les variables Vercel de l’installation posées, sans clé du vendeur : AUCUNE requête, `lecture` dit « pas de clé »', J({ appels: appels.map((x) => x.host), lecture: r2.lecture }));
   });
 
   await essaie('passage avec la clé La Poste', async () => {
     remise();
-    process.env.LAPOSTE_OKAPI_KEY = CLE_LP;
+    poserCle(A, 'colissimo', { cle: CLE_LP });
     transporteur = (u) => (u.hostname === 'api.laposte.fr' && u.pathname === `/suivi/v2/idships/${N_LP}` ? okLp() : null);
     const r = await passage();
     const lp = appels.filter((x) => x.host === 'api.laposte.fr');
@@ -336,23 +365,52 @@ const UPS_JETON = (j) => JSON.stringify({ token_type: 'Bearer', issued_at: Strin
     dit(tl && tl.etat === 'disponible' && tl.lieuNom === 'BUREAU DE POSTE TEST', 'E6 relue en scalaires (`meta->>`), la ligne garde son état', J(tl && { e: tl.etat }));
     // La clé refusée (401) : la PAUSE, puis plus rien jusqu'à sa fin.
     remise();
-    process.env.LAPOSTE_OKAPI_KEY = CLE_LP;
+    poserCle(A, 'colissimo', { cle: CLE_LP });
     transporteur = (u) => (u.hostname === 'api.laposte.fr' ? { status: 401, ctype: 'application/json', body: '{"code":"UNAUTHORIZED","message":"Invalid api key"}' } : null);
     await passage();
     const pause = base.get(`00000000-0000-0000-0000-000000000000|transp_pause`) || {};
+    const pA = pause[`colissimo@${A}`];
     const n0 = appels.length;
     base.set(`${A}|email_track_colissimo_6A12345678902`, ligneLp('6A12345678902'));
     await passage();
-    dit(pause.colissimo && Date.parse(pause.colissimo.jusqua) > Date.now() && appels.length === n0, 'E7 clé refusée (401) ⇒ pause de Colissimo, plus aucune requête pendant la pause', J({ pause: pause.colissimo, appels: appels.length - n0 }));
+    dit(pA && Date.parse(pA.jusqua) > Date.now() && !(pause.colissimo && pause.colissimo.jusqua) && appels.length === n0, 'E7 SA clé refusée (401) ⇒ pause de SA clé Colissimo (pas celle des autres vendeurs), plus aucune requête pendant la pause', J({ pause, appels: appels.length - n0 }));
+    const ligneCle = base.get(`${A}|suivi_cle_colissimo`) || {};
+    dit(ligneCle.verif === 'refusee' && ligneCle.chiffre && ligneCle.verifAt, 'E7b la première lecture l’a dit : sa clé est notée « refusée » (l’écran Paramètres le montre)', J({ verif: ligneCle.verif }));
+    // Un AUTRE vendeur avec SA clé n'est pas arrêté par la pause de A.
+    base.set(`${B}|email_track_colissimo_6A12345678903`, ligneLp('6A12345678903'));
+    poserCle(B, 'colissimo', { cle: 'cle-okapi-de-B-000000' });
+    transporteur = (u) => (u.hostname === 'api.laposte.fr' ? { status: 200, ctype: 'application/json', body: lpJson('6A12345678903', [{ code: 'PC1', ms: NOW - 30 * H, label: 'Pris en charge' }, { code: 'ET1', ms: NOW - 2 * H, label: 'En cours d’acheminement' }]) } : null);
+    const n1 = appels.length;
+    await passage({}, B);
+    const pourB = appels.slice(n1).filter((x) => x.host === 'api.laposte.fr');
+    dit(pourB.length === 1 && pourB[0].okapi === 'cle-okapi-de-B-000000' && base.get(`${B}|transp_colissimo_6A12345678903`), 'E7c le vendeur B lit SON colis avec SA clé, malgré la pause de la clé de A', J(pourB.map((x) => x.okapi)));
+    T.noterLecturesServeur({ colissimo: true, ups: true });   // (la clé posée : sinon Colissimo n'est même pas choisi)
     const besoin = T.aLireParNavigateur({ lignes: [{ suivi: N_LP, carrier: 'colissimo', status: 'available', sens: 'entrant', receivedAt: iso(NOW) }], transp: new Map([[N_LP, { suivi: N_LP, carrier: 'colissimo', essaiRes: 'bloque', essaiSource: 'serveur', essai: iso(NOW - 3 * H) }]]), pause: { colissimo: { jusqua: iso(NOW + H) } }, maintenant: NOW });
+    T.noterLecturesServeur(null);
     dit(Array.isArray(besoin) && besoin.length === 0, 'E8 refusé ou en pause, Colissimo ne part JAMAIS à l’extension (« on ne fait pas avec l’extension »)', J(besoin));
     const c4 = await O.contexteVendeur.run({ owner: A }, () => L.appliquerReponseBrute({ v: 1, carrier: 'colissimo', suivi: N_LP, voie: 'lp-suivi-v2', statut: 200, ctype: 'application/json', corps: okLp().body }));
     dit(c4 && c4.status === 400, 'E9 une réponse relayée par l’extension pour Colissimo est refusée (400)', J(c4));
   });
 
+  await essaie('la clé de A ne sert jamais à B', async () => {
+    remise();
+    poserCle(A, 'colissimo', { cle: CLE_LP });
+    base.set(`${B}|email_track_colissimo_6A12345678904`, ligneLp('6A12345678904'));
+    transporteur = (u) => (u.hostname === 'api.laposte.fr' ? okLp() : null);
+    await passage();                     // A : lu avec sa clé
+    const nA = appels.filter((x) => x.host === 'api.laposte.fr').length;
+    const rB = await passage({}, B);     // B : aucune clé ⇒ rien
+    const pourB = appels.filter((x) => x.host === 'api.laposte.fr').length - nA;
+    dit(nA === 1 && pourB === 0 && rB.lecture && rB.lecture.colissimo === false && !base.get(`${B}|transp_colissimo_6A12345678904`), 'H1 la clé de A lit SES colis ; B, sans clé, n’envoie AUCUNE requête (jamais la clé d’un autre vendeur, §2.9)', J({ nA, pourB, lecture: rB.lecture }));
+    const coffre = JSON.stringify(base.get(`${A}|suivi_cle_colissimo`) || {});
+    dit(!coffre.includes(CLE_LP) && CF.dechiffrerCoffre(CT.usageCle('colissimo'), B, (base.get(`${A}|suivi_cle_colissimo`) || {}).chiffre) === null, 'H2 le coffre ne garde que le chiffré ; recopié chez B, il ne se déchiffre pas');
+    const vA = (base.get(`${A}|suivi_cle_colissimo`) || {}).verif;
+    dit(vA === 'ok', 'H3 la première lecture réussie note sa clé « acceptée »', J({ vA }));
+  });
+
   await essaie('passage avec les identifiants UPS', async () => {
     remise();
-    process.env.UPS_CLIENT_ID = UPS_ID; process.env.UPS_CLIENT_SECRET = UPS_SECRET;
+    poserCle(A, 'ups', { id: UPS_ID, secret: UPS_SECRET });
     let jetons = 0;
     transporteur = (u, { methode }) => {
       if (u.hostname !== 'onlinetools.ups.com') return null;
@@ -372,7 +430,7 @@ const UPS_JETON = (j) => JSON.stringify({ token_type: 'Bearer', issued_at: Strin
     dit(r.lecture && r.lecture.ups === true, 'F5 `lecture` : UPS lu', J(r.lecture));
     // Un jeton refusé (401) est redemandé UNE fois, puis la requête rejouée.
     remise();
-    process.env.UPS_CLIENT_ID = UPS_ID; process.env.UPS_CLIENT_SECRET = UPS_SECRET;
+    poserCle(A, 'ups', { id: UPS_ID, secret: UPS_SECRET });
     base.delete(`${A}|email_track_ups_${N_UPS2}`);
     jetons = 0;
     transporteur = (u, { methode, h }) => {
@@ -387,7 +445,7 @@ const UPS_JETON = (j) => JSON.stringify({ token_type: 'Bearer', issued_at: Strin
     dit(tok2 === 2 && l3 && l3.etat === 'en_route' && l3.essaiRes === 'ok', 'F6 401 sur le jeton gardé ⇒ un NOUVEAU jeton, la requête rejouée, le colis lu', J({ jetons: tok2, e: l3 && l3.etat, r: l3 && l3.essaiRes }));
     // Identifiants refusés : aucune requête de suivi, et le jeton n'est pas redemandé en rafale.
     remise();
-    process.env.UPS_CLIENT_ID = UPS_ID; process.env.UPS_CLIENT_SECRET = UPS_SECRET;
+    poserCle(A, 'ups', { id: UPS_ID, secret: UPS_SECRET });
     transporteur = (u, { methode }) => (u.hostname === 'onlinetools.ups.com' && methode === 'POST' ? { status: 401, ctype: 'application/json', body: '{"response":{"errors":[{"code":"10401","message":"ClientId is Invalid"}]}}' } : (u.hostname === 'onlinetools.ups.com' ? okUps(N_UPS) : null));
     await passage();
     const tok3 = appels.filter((x) => x.path === '/security/v1/oauth/token').length, trk3 = appels.filter((x) => x.path.startsWith('/api/track/')).length;
@@ -396,13 +454,15 @@ const UPS_JETON = (j) => JSON.stringify({ token_type: 'Bearer', issued_at: Strin
 
   await essaie('la clé annoncée sans valeur : rien ne part', async () => {
     remise();
-    T.noterLecturesServeur({ colissimo: true, ups: true });   // (un banc : l'état dit « lu », l'environnement n'a pas la clé)
-    transporteur = (u) => (u.hostname === 'api.laposte.fr' ? okLp() : null);
+    T.noterLecturesServeur({ colissimo: true, ups: true });   // (un banc : l'état dit « lu », le vendeur n'a pas de clé)
+    process.env.LAPOSTE_OKAPI_KEY = CLE_LP; process.env.UPS_CLIENT_ID = UPS_ID; process.env.UPS_CLIENT_SECRET = UPS_SECRET;
+    transporteur = (u) => (u.hostname === 'api.laposte.fr' ? okLp() : u.hostname === 'onlinetools.ups.com' ? { status: 200, ctype: 'application/json', body: UPS_JETON('jeton-env') } : null);
     await passage();
     T.noterLecturesServeur(null);
-    dit(appels.filter((x) => x.host === 'api.laposte.fr' && !x.okapi).length === 0, 'G1 sans valeur de clé, aucune requête ne part sans `X-Okapi-Key`', J(appels.map((x) => ({ h: x.host, k: !!x.okapi }))));
+    for (const k of CLES) delete process.env[k];
+    dit(appels.filter((x) => x.host === 'api.laposte.fr' || x.host === 'onlinetools.ups.com').length === 0, 'G1 sans clé du vendeur (variables Vercel posées), aucune requête ne part à La Poste ni à UPS', J(appels.map((x) => ({ h: x.host, k: !!x.okapi }))));
   });
 
-  console.log(ko ? `\n❌ audit-suivi-cles : ${ko} rouge(s)` : '\n✅ audit-suivi-cles : Colissimo / La Poste et UPS sont prêts à s’allumer avec leur clé, sans clé rien ne part, jamais par l’extension');
+  console.log(ko ? `\n❌ audit-suivi-cles : ${ko} rouge(s)` : '\n✅ audit-suivi-cles : Colissimo / La Poste et UPS s’allument avec la clé DU VENDEUR (jamais celle de l’installation ni d’un autre), sans clé rien ne part, jamais par l’extension');
   process.exit(ko ? 1 : 0);
 })();

@@ -585,7 +585,7 @@ import OuVendre from './OuVendre.jsx';   // (15 nov., lot securite-ventes) « O�
 import { fraisVintedSelon, statutVinted, tauxEbay, tauxVestiaire } from './ouVendre.js';
 import { etatVenteVc } from './etatVenteVc.js';   // (15 nov.) l'état d'une vente Vestiaire en mots (jamais « IN_PROGRESS »)
 import { texteEtatVc } from './etatVenteVcTexte.js';
-import {SELECT_DEPART_META,departsParSuivi,txVintedParties} from '../api/_lib/depart-colis.js';
+import {SELECT_DEPART_META,departsParSuivi,txVintedParties,mrSansCodePostal} from '../api/_lib/depart-colis.js';
 import {ventesPartiesParPreuve, suiviDuBord} from '../api/_lib/depart-vente.js';
 import { partiParPreuve } from './etiquettesDepart.js';
 import {publierDepartsVinted,raisonDepartPubliee} from './departVente.js';
@@ -1019,6 +1019,7 @@ import { langueNavigateur, poserLangueUneFois, alignerLangueCompte } from "./lan
 // `t` est pris partout dans ce fichier comme nom de variable, d'où l'alias `tr`.
 import ChoixLangue from "./i18n/ChoixLangue.jsx";
 import { tr, aCle as aCleTr, LANGUES, NOMS_LANGUES, choisirLangue, langueCourante, localeCourante, monnaie as monnaieI18n, ajouterSourceApp, abonnerLangue } from "./i18n/index.js";
+const trT = tr;   // (16 nov.) le même `tr`, pour les fonctions dont un paramètre s'appelle déjà `tr` (le transporteur)
 import { offresVestiaire, offresJourneeVc, euros as eurosOffre, resteAvant as resteAvantOffre } from './offresVestiaire.js';
 // La partie « app » du dictionnaire français arrive AVEC l'app (le fichier d'entrée reste léger).
 import frApp from "./i18n/langues/fr.js";
@@ -47011,11 +47012,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // `su` date la TRANSACTION (paiement, finalisation), pas le colis : jamais l'heure du statut d'expédition.
     return { texte: e.ss || '', at: null, cap, luAt: cap, finalisee, retour: e.s === 440 };
   };
-  const raisonPasLuVente = (carrier, tr) => {
+  // (16 nov., lot transporteurs-suivi) Mondial Relay se lit aussi pour un colis VENDU : le code postal du point est
+  // LU sur SON étiquette et prouvé par l'écho de Mondial Relay (api/_lib/depart-colis.js `cpDepartMr`). Ne le dit
+  // « pas lisible » que la ligne `depart_` qui l'a constaté (étiquette lue, chaque code postal refusé ou aucun écrit).
+  const raisonPasLuVente = (carrier, tr, dep) => {
     const nom = (tr && tr.nom) || (carrier ? nomTransporteur(carrier) : '');
-    if (carrier === 'mondialrelay' || /mondial|inpost/i.test(String((tr && (tr.cle || tr.nom)) || ''))) return 'Mondial Relay ne se lit pas pour un colis vendu. Vinted et les e-mails font foi.';
-    if (carrier === 'chronopost' || carrier === 'vinted') return `Pas encore lu chez ${nomTransporteur(carrier)}.`;
-    return nom ? `${nom} ne se lit pas ici. Vinted et les e-mails font foi.` : 'Transporteur pas encore connu.';
+    const estMr = carrier === 'mondialrelay' || /mondial|inpost/i.test(String((tr && (tr.cle || tr.nom)) || ''));
+    if (estMr && dep && dep.carrier === 'mondialrelay' && mrSansCodePostal(dep)) return trT('suiviVente.mrSansCp');
+    if (estMr) return trT('suiviVente.pasEncoreLu', { nom: 'Mondial Relay' });
+    if (carrier === 'chronopost' || carrier === 'vinted' || carrier === 'colissimo' || carrier === 'ups') return trT('suiviVente.pasEncoreLu', { nom: nomTransporteur(carrier) });
+    const nl = carrierNonLu((tr && (tr.cle || tr.nom)) || carrier || '');
+    if (nl === 'Colissimo' || nl === 'UPS') return trT('suiviVente.sansCle', { nom: nl });
+    return nom ? trT('suiviVente.nonLu', { nom }) : trT('suiviVente.inconnu');
   };
   const suiviVente = (x) => {
     const su = normaliserSuivi((x && x.b && x.b.suivi) || (x && x.v && x.v.suivi) || '');
@@ -47034,7 +47042,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const enCours = estEnCours({ transporteur: dep, finalisee: !!(vt && vt.finalisee) });
     const carrier = (dep && dep.carrier) || carrierLisible((x.tr && (x.tr.cle || x.tr.nom)) || '', su) || '';
     const lien = lienPublic(lienSuivi, (x.tr && (x.tr.cle || x.tr.nom)) || carrier, su);
-    return { su, dep, statut, inc, enCours, lien, raison: statut ? '' : raisonPasLuVente(carrier, x.tr) };
+    return { su, dep, statut, inc, enCours, lien, raison: statut ? '' : raisonPasLuVente(carrier, x.tr, dep) };
   };
   const suiviAchat = (o, su, carrier) => {
     const k = normaliserSuivi(su); if (!k) return null;
@@ -65289,7 +65297,7 @@ function AppCoeur() {
             };
             // `ebay_tokens*` (les jetons eBay, de chacun de ses comptes) et `push_subs` (les clés de ses téléphones)
             // ne quittent pas la base.
-            const EXCLUS = ['harvest_*_txn_*','harvest_*_label_*','email_bord_*','email_html_*','lbc_catalogue','lbc_recon','backup_*','harvest_*_seen_urls','harvest_*_wreq_*','harvest_*_pickup_points','ebay_tokens*','push_subs','vrm_photoroom_cle','photoroom_cle'];
+            const EXCLUS = ['harvest_*_txn_*','harvest_*_label_*','email_bord_*','email_html_*','lbc_catalogue','lbc_recon','backup_*','harvest_*_seen_urls','harvest_*_wreq_*','harvest_*_pickup_points','ebay_tokens*','push_subs','vrm_photoroom_cle','photoroom_cle','suivi_cle_*'];
             const [lignes, legeres, comptes] = await Promise.all([
               toutLire(`app_data?select=id,data&and=(${EXCLUS.map(x=>`id.not.like.${x}`).join(',')})&order=id`),
               toutLire(`app_data?select=id,meta&or=(id.like.harvest_*_txn_*,id.like.harvest_*_label_*,id.like.email_bord_*)&order=id`),
