@@ -14745,7 +14745,8 @@ const poserEtiquettesThermiques = async (PL, out, page, z, numero, bold, titre =
     const bloques = [...codes.map((c) => ({ ...elargir(c.boite, MENTION.codes), quoi: 'code' })), ...adresses.map((a) => ({ ...a, quoi: 'adresse' }))];
     const boiteAff = { x: pl.boite.x, y: pl.H - pl.boite.y - pl.boite.h, w: pl.boite.w, h: pl.boite.h };
     const td = tamponDePage({ ...(imp || {}), ts }, d.getPages()[0], true);
-    const choix = choisir ? await choisir(d, { isole: true, k }) : td.libreN;
+    // (16 nov.) Une place posée dans l'aperçu avant impression pour CE bordereau prime sur la place gardée de la forme.
+    const choix = imp && imp.places && imp.places.n !== undefined ? td.libreN : choisir ? await choisir(d, { isole: true, k }) : td.libreN;
     const fiche = { actif: reg.fiche, W: pl.W, H: papier.continu ? Math.max(pl.W * 1.45, 60 * MM_PT) : pl.H, titre, taille: imp && imp.taille, photo: imp && imp.photo, emplacement: imp && imp.emplacement };
     const t = await tamponnerBordereau(PL, d, { numero: contenu.numero, titre: contenu.titre, thermique: true, choix, bloques, fiche, th: { boite: boiteAff, bloques, adresses, marge: papier.marge * MM_PT }, tampon: td.tampon });
     modes.push(t.mode);
@@ -14866,7 +14867,7 @@ const poserBordereau = async (PL, out, src, { numero, title, pos, thermique, cho
   // tampon ; ce qu'il écrit est SON choix (`tamponA4`, ou `tamponTh` en thermique).
   const contenu = texteDuCartouche(imp.ts.contenu, { numero, titre: title, taille: imp.taille });
   const td = tamponDePage(imp, first, false), geo = geoPageA4(PL, first);
-  const choix = pos || (choisir ? await choisir(src, { isole: false, k: 0 }) : td.libreN);
+  const choix = pos || (imp.places && imp.places.n !== undefined ? td.libreN : choisir ? await choisir(src, { isole: false, k: 0 }) : td.libreN);
   const t = await tamponnerBordereau(PL, src, { numero: contenu.numero, titre: contenu.titre, thermique, choix, tampon: { ...td.tampon, adresses: geo.adresses, cadre: geo.cadre } });
   const { w: Wa, h: Ha } = tailleAffichee(src.getPages()[0]);
   const pose = { page: out.getPageCount(), cle: td.cle, W: Wa, H: Ha, mode: t.mode, place: t.place || null, mentionBoite: t.mentionBoite || null, interdits: t.interdits || [], codes: t.codes || [], repousse: !!t.repousse, libre: !!choix };

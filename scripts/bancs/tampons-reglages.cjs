@@ -74,7 +74,9 @@ window.__imprimer = async ({ id, support, tampons = null, store = {}, places = n
   const th = support !== 'a4';
   const imp0 = { format: th && support !== 'planche4' ? support : '10x15', ...(store.vrm_impression || {}) };
   __vrm.store({ ...store, vrm_impression: imp0, ...(tampons ? { vrm_tampons: tampons } : {}) });
-  const r = await __vrm.poserBordereau(PL, out, src, { numero, title: fam.retour ? 'RETOUR · ' + titre : titre, pos: null, thermique: th,
+  // Comme « Imprimer (N) » : un \`choisir\` est toujours passé (la place gardée de la forme, ici aucune) — la place posée
+  // dans l'aperçu pour CE bordereau doit primer quand même.
+  const r = await __vrm.poserBordereau(PL, out, src, { numero, title: fam.retour ? 'RETOUR · ' + titre : titre, pos: null, thermique: th, choisir: places ? async () => null : null,
     impression: { reg: null, famille: fam.id, site: fam.site || '', retour: !!fam.retour, taille, photo: null, emplacement: '', ...(places ? { places } : {}) } });
   const pose = (r.poses || [])[0] || null;
   return { r: { isole: r.isole, tampons: r.tampons, famille: r.famille }, pose, b64: __b64(await out.save()) };

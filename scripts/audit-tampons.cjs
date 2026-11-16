@@ -37,6 +37,7 @@ function juger(src) {
   dit(/setApercuImpr\(\{ choisies, format, tampons, places: \{\}, tous: true, sig \}\)/.test(li) && !/ouvrirPdfLot|attendrePuisOuvrir/.test(li), 'T6 la sélection ouvre l’aperçu, rien n’est imprimé sans « Imprimer »');
   const ia = As.slice(As.indexOf('const imprimerApercu = () =>'), As.indexOf('const poserApercu = '));
   dit(/sigAvecPlaces\(sigImpr\(choisies, format, tampons\), places\)/.test(ia) && /composerLot\(choisies, format, tampons, \{ places,/.test(ia), 'T6 « Imprimer » de l’aperçu : le PDF de SES placements');
+  dit(/const choix = pos \|\| \(imp\.places && imp\.places\.n !== undefined \? td\.libreN : choisir/.test(As) && /const choix = imp && imp\.places && imp\.places\.n !== undefined \? td\.libreN : choisir/.test(As), 'T6 la place posée dans l’aperçu prime sur la place gardée (A4 et thermique)');
   dit(/places: places && places\[l\.cle\] \? places\[l\.cle\] : null/.test(As) && /if \(it\.places\) impIt\.places = it\.places;/.test(As) && /pi = imp\.places \|\| \{\}/.test(As), 'T6 les places de l’aperçu vont jusqu’au tampon');
   // T7 — règles pures, exécutées
   try {
@@ -81,6 +82,7 @@ function juger(src) {
       ['T5', (s) => ({ ...s, app: s.app.replace('JSON.stringify([aEcrire(reglageTamponsChoisi()), reglageImpressionChoisi()])', 'JSON.stringify([reglageImpressionChoisi()])') })],
       ['T6', (s) => ({ ...s, app: s.app.replace("    setApercuImpr({ choisies, format, tampons, places: {}, tous: true, sig });\n  };", "    attendrePuisOuvrir(sig, choisies, [], () => null);\n  };") })],
       ['T6', (s) => ({ ...s, app: s.app.replace('composerLot(choisies, format, tampons, { places, pas:', 'composerLot(choisies, format, tampons, { pas:') })],
+      ['T6', (s) => ({ ...s, app: s.app.replace('const choix = pos || (imp.places && imp.places.n !== undefined ? td.libreN : choisir ?', 'const choix = pos || (false ? td.libreN : choisir ?') })],
       ['T7', (s) => ({ ...s, T: { ...s.T, repousserHorsInterdits: (b) => ({ x: b.x, y: b.y, repousse: true }) } })],
       ['T8', (s) => ({ ...s, langues: { ...s.langues, de: Object.fromEntries(Object.entries(s.langues.de).filter(([k]) => k !== 'tampons.apercu.tous')) } })],
     ];

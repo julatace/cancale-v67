@@ -86,7 +86,8 @@ if (MUT === 'mentionCollee') tampon = muter(tampon, 'if (o.evite) interdits.push
 // (3 nov., soir) LE TAMPON LIBRE : la place choisie à la main, la forme, la
 // mémoire par forme (`choisirTampon`). Absent du code d'avant ⇒ rouge, pas un plantage.
 const opt = (re) => { const x = re.exec(APP); return x ? x[0] : ''; };
-const LIBRE = [opt(/const TYPES_BORDEREAU = \[[\s\S]*?\n\];/), opt(/const typeBordereau = \([\s\S]*?\n\};/),
+// (16 nov.) `typeBordereau` est désormais dans le morceau d'impression extrait (`code`) : pas deux fois.
+const LIBRE = [opt(/const TYPES_BORDEREAU = \[[\s\S]*?\n\];/), /const typeBordereau = /.test(code) ? '' : opt(/const typeBordereau = \([\s\S]*?\n\};/),
   opt(/const TAMPON_ANNULE = [\s\S]*?\nconst choisirTampon = \([\s\S]*?\n\};/)].join('\n');
 if (MUT === 'rotationIgnoree') tampon = muter(tampon, 'const b = page.getCropBox(), r = rotationPage(page);\n  page.resetPosition();\n  const a = versPdfAffiche', 'const b = page.getCropBox(), r = 0;\n  page.resetPosition();\n  const a = versPdfAffiche', MUT);
 if (MUT === 'sansFond') tampon = muter(tampon, 'if (fond) page.drawRectangle(', 'if (false) page.drawRectangle(', MUT);

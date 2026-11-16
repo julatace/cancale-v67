@@ -200,12 +200,13 @@ async function apercu(b, vue) {
     const avant = [];
     for (const c of items) avant.push(await boiteEl(pg, `[data-impr-apercu-item="${c}"] [data-tampon-el="n"]`));
     const ppt = await pg.evaluate((c) => +document.querySelector(`[data-impr-apercu-item="${c}"] [data-tampons-scene]`).getAttribute('data-ppt'), items[1]);
-    const dxp = Math.round(70 * ppt), dyp = Math.round(-60 * ppt);   // ≈ 70 pt à droite, 60 pt plus haut (la notice, blanche par endroits)
+    const dxp = Math.round(40 * ppt), dyp = Math.round(220 * ppt);   // ≈ 40 pt à droite, 220 pt plus bas : le blanc entre la notice et l'étiquette
     await glisser(o, s2, dxp, dyp);
     await apercuStable(pg);
     const apres2 = await boiteEl(pg, s2);
     const bouge = apres2 && avant[1] && Math.hypot(apres2.x - avant[1].x, apres2.y - avant[1].y) > 20;
-    dit(bouge, `${nom} : P2 le N° de la 2ᵉ vignette glissé et redessiné par le vrai code`, JSON.stringify({ avant: avant[1], apres: apres2 }));
+    const diag2 = bouge ? null : await pg.evaluate((c) => ({ refus: (document.querySelector('[data-tampons-refus]') || { getAttribute: () => null }).getAttribute('data-tampons-refus'), interdits: [...document.querySelectorAll(`[data-impr-apercu-item="${c}"] [data-tampon-interdit]`)].map((e) => e.getAttribute('data-tampon-interdit') + ':' + e.style.left + ',' + e.style.top + ',' + e.style.width + ',' + e.style.height) }), items[1]);
+    dit(bouge, `${nom} : P2 le N° de la 2ᵉ vignette glissé et redessiné par le vrai code`, JSON.stringify({ avant: avant[1], apres: apres2, diag2 }));
     await shot(pg, `${vue}-glisse`);
     // P3 sur le QR ⇒ refusé
     const zq = await centreZone(pg, items[0], 'qr');
@@ -247,7 +248,7 @@ async function apercu(b, vue) {
     await attendre(pg, () => document.querySelectorAll('[data-impr-apercu-item] [data-tampons-scene][data-pret="1"] [data-tampon-el="n"]').length === 3, null, 60000);
     const items = await pg.evaluate(() => [...document.querySelectorAll('[data-impr-apercu-item]')].map((e) => e.getAttribute('data-impr-apercu-item')));
     const ppt = await pg.evaluate((c) => +document.querySelector(`[data-impr-apercu-item="${c}"] [data-tampons-scene]`).getAttribute('data-ppt'), items[0]);
-    await glisser(o2, `[data-impr-apercu-item="${items[0]}"] [data-tampon-el="n"]`, Math.round(70 * ppt), Math.round(-60 * ppt));
+    await glisser(o2, `[data-impr-apercu-item="${items[0]}"] [data-tampon-el="n"]`, Math.round(40 * ppt), Math.round(220 * ppt));
     const garde = await attendre(pg, () => { try { const t = JSON.parse(localStorage.getItem('vrm_tampons') || 'null'); return t && Object.keys(t.formes || {}).length === 1; } catch (_) { return false; } }, null, 10000);
     await apercuStable(pg);
     const bx = await boiteEl(pg, `[data-impr-apercu-item="${items[0]}"] [data-tampon-el="n"]`);
