@@ -31,13 +31,16 @@ import { friseVenteFusion } from '../design/friseFusion.js';
 import { attrCible } from '../cibleNotif.js';
 import { nomCompteVente } from '../plateformes.js';
 import { champsFacultatifs, motsVendeur } from '../profilVendeur.js';
-import { achatDuNumeroLu, InfoPop, AUTH, BlocBarrerVc, Bouton, BoutonImprimerVc, BulleConv, C, CadreFil, Card, ComposeConv, CoutAchatVente, DEMANDE_VC_PAIRE, EXT_CAPACITES, FicheConvVolet, Icon, LigneConv, LigneVenteCompacte, MULTI_USER, NAV, PhotoVc, PhotoVinted, PiedSansEnvoi, Pourquoi, RapidesConv, RecapFrise, SUPABASE_URL, TeteFil, __vmrJobs, __vmrNotifier, aLaDemande, ageCourtVc, askConfirm, cleNum, clePhotoLbc, dateCourteVc, defaireVc, emettreClesRelues, enTeteSession, extSait, familleArticle, ficheUniqueDuNumero, fmt, gesteVrm, limiteVcTexte, lireBaseRelue, load, nonLusVestiaire, normTitle, onCloudReady, prixAchatDe, raisonExtGlobale, rangementDuNum, reponsesRapidesPartagees, save, sbAuth, signalerVc, urlPhotoVc, useCompteVcOuvert, useEbayPaires, useExtVivante, useNumerotationVestiaire, useSansSouris, useStateCle, useVcLocal, vcCarte, vcSetter, verifierAvantPublication, vmrCmd, vendActuel, optsNumeroVerif, FermeAuRetour } from '../App.jsx';
+import { achatDuNumeroLu, SheetShell, InfoPop, AUTH, BlocBarrerVc, Bouton, BoutonImprimerVc, BulleConv, C, CadreFil, Card, ComposeConv, CoutAchatVente, DEMANDE_VC_PAIRE, EXT_CAPACITES, FicheConvVolet, Icon, LigneConv, LigneVenteCompacte, MULTI_USER, NAV, PhotoVc, PhotoVinted, PiedSansEnvoi, Pourquoi, RapidesConv, RecapFrise, SUPABASE_URL, TeteFil, __vmrJobs, __vmrNotifier, aLaDemande, ageCourtVc, askConfirm, cleNum, clePhotoLbc, dateCourteVc, defaireVc, emettreClesRelues, enTeteSession, extSait, familleArticle, ficheUniqueDuNumero, fmt, gesteVrm, limiteVcTexte, lireBaseRelue, load, nonLusVestiaire, normTitle, onCloudReady, prixAchatDe, raisonExtGlobale, rangementDuNum, reponsesRapidesPartagees, save, sbAuth, signalerVc, urlPhotoVc, useCompteVcOuvert, useEbayPaires, useExtVivante, useNumerotationVestiaire, useSansSouris, useStateCle, useVcLocal, vcCarte, vcSetter, verifierAvantPublication, vmrCmd, vendActuel, optsNumeroVerif, FermeAuRetour } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import { preuvesFriseVc, preuvesFriseEbay } from "../friseSites.js";
 import ParcoursVestiaire, { LigneArgentVc, etapeEnCoursVc } from "../ParcoursVestiaire.jsx";
 import PhotosVestiaire, { textePhotosManquantes } from "../PhotosVestiaire.jsx";
 const BaissePrixVestiaire = aLaDemande(() => import("../BaissePrixVestiaire.jsx"));
+// (15 nov., lot favoris-sites, 5.392) « Ont aimé tes articles » : une offre aux personnes qui ont aimé, sur son clic.
+import AimesVestiaire from '../AimesVestiaire.jsx';
+import { lignesAimes, etatRecetteFavori } from '../aimesVestiaire.js';
 import { photosExigeesVc } from "../photosVestiaire.js";
 import { tr } from "../i18n/index.js";
 import { AFaireSite } from '../plateformes/AFaireSite.jsx';   // (14 nov., refonte visible) « À faire · N › »
@@ -1045,7 +1048,7 @@ function MessagesVestiaire() {
   const relire = React.useCallback(async () => {
     try {
       // (1er nov.) Relues une fois sur un échec passager (`lireBaseRelue`).
-      const [jm, jl, jf, je, jo, jr] = await Promise.all([
+      const [jm, jl, jf, je, jo, jr, ja] = await Promise.all([
         lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_messages&select=compteur:data->compteur,compteurs:data->compteurs,conversations:data->conversations,lecture:data->lecture`),
         lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=liens:data->liens,items:data->items`),
         // 5.295 : les fils lus, en SCALAIRES (§4.4 : jamais le texte de tous les fils d'un coup).
@@ -1053,7 +1056,9 @@ function MessagesVestiaire() {
         lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_envoi&select=appris:data->appris,raison:data->>raison,at:data->>at,chemin:data->>chemin`),
         // 5.319 : les offres reçues (`vc_offres`) et ce que VRM sait y répondre (`vc_offres_recette`).
         lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_offres&select=offres:data->offres,lecture:data->lecture,capturedAt:data->>capturedAt`),
-        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_offres_recette&select=accepter:data->accepter,refuser:data->refuser,contre:data->contre`),
+        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_offres_recette&select=accepter:data->accepter,refuser:data->refuser,contre:data->contre,favori:data->favori`),
+        // 5.392 : les personnes qui ont aimé, en NOMBRES par article (jamais qui : l'extension les garde dans son navigateur).
+        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_aimes&select=produits:data->produits,envoi:data->envoi,capturedAt:data->>capturedAt`),
       ]);
       if (!Array.isArray(jm) || !Array.isArray(jl)) throw new Error('lecture');
       const r = (jm && jm[0]) || {};
@@ -1061,6 +1066,7 @@ function MessagesVestiaire() {
       for (const x of (Array.isArray(jf) ? jf : [])) { const id = String(x.id || '').replace(/^vc_fil_/, ''); if (id) fils[id] = x; }
       setD({ compteur: r.compteur || null, compteurs: r.compteurs || null, conversations: r.conversations || null, lecture: r.lecture || null, liens: (jl && jl[0] && jl[0].liens) || {}, items: (jl && jl[0] && jl[0].items) || {},
         offres: Array.isArray(jo) ? (jo[0] || {}) : null, recettesOffres: Array.isArray(jr) ? (jr[0] || {}) : null,
+        aimes: Array.isArray(ja) ? (ja[0] || {}) : null,
         fils: Array.isArray(jf) ? fils : null, envoi: Array.isArray(je) ? (je[0] ? { appris: je[0].appris === true,
           // (3 nov.) L'ouverture d'une conversation (`/chat/channel/`) notée à tort comme un essai d'envoi par les 5.295-5.316 : pas un essai.
           raison: /^\/chat\/channel\/?$/.test(String(je[0].chemin || '')) ? '' : (je[0].raison || ''), at: je[0].at || '' } : { appris: false, raison: '' }) : null });
@@ -1118,6 +1124,8 @@ function MessagesVestiaire() {
             : <span><b style={{ color: C.text }}>{n === 0 ? 'Aucun message non lu' : `${n} message${n > 1 ? 's' : ''} non lu${n > 1 ? 's' : ''}`}</b>{nl.comptes > 1 ? <span data-vc-messages-comptes={nl.comptes}> · {nl.comptes} comptes</span> : null}</span>}
           <a data-vc-messages-ouvrir="" href={lien} target="_blank" rel="noreferrer" className="vrm-pied-lien" data-pied-lien="ouvrir-vc">{page ? 'Ouvrir la messagerie ↗' : 'Ouvrir Vestiaire ↗'}</a>
         </div>
+        <AimesVestiaire etat={lignesAimes({ aimes: d.aimes, items: d.items, numDe: (pid) => cleNum((pid && d.liens[pid]) || '') })} recette={etatRecetteFavori(d.recettesOffres && d.recettesOffres.favori)}
+          cap={extSait('vcaimes')} versionExt={String(EXT_CAPACITES.vcaimes || '').replace(/\.0$/, '')} envoyer={async (m) => { const r = await vmrCmd(m, 45000); relire(); return r; }} Photo={PhotoOffreVc} Feuille={SheetShell}/>
         <OffresVestiaire etat={offreFil ? offresDu((p) => p !== pidOuvert) : offresEtat} {...propsOffres}/>
         <div className="vrm-message-workspace">
           <div className="vrm-inbox-column">

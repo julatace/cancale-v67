@@ -168,8 +168,11 @@ async function telephone(nav, sombre, b) {
   ({ ctx, pg, erreurs } = await ouvrir(nav, { W: 390, sombre, b, url: '/?tab=journee' })); await pret(pg);
   await toucher(pg, '[data-sb-disque]'); await pg.waitForTimeout(400);
   await toucher(pg, '[data-sb-lame="scanner"]');
-  await pg.waitForSelector('[data-scan-sheet][data-scan-mode="envoi"]', { timeout: 12000 }).catch(() => {});
-  dit(await visible(pg, '[data-scan-sheet][data-scan-mode="envoi"]') >= 1, 'E Scanner ⇒ le scanner de bordereau de Ventes');
+  // (16 nov., intégration de claude/scanner-colis) Le disque « + » ⇒ Scanner ouvre désormais le scanner
+  // POUR RETROUVER (`ouvrirRetrouver('disque')`, docs/passation/2026-11-15-scanner-colis.md §1) ; le
+  // scanner de dépôt reste sur le bouton « Scanner » de Ventes → À envoyer.
+  await pg.waitForSelector('[data-scan-r]', { timeout: 12000 }).catch(() => {});
+  dit(await visible(pg, '[data-scan-r]') >= 1, 'E Scanner ⇒ le scanner pour retrouver un colis (sa vente, son achat)');
   await ctx.close();
   // O — l'ondulation (et pas en mouvement réduit). Écrans comptés : chaque onglet rend son écran.
   ({ ctx, pg, erreurs } = await ouvrir(nav, { W: 390, sombre, b, url: '/?tab=journee' })); await pret(pg);

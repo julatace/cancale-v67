@@ -28,6 +28,9 @@ const PORT = Number(process.env.BANC_PORT) || 4397;
 const CAPT = process.env.BANC_CAPTURES || path.join(__dirname, 'captures');
 fs.mkdirSync(CAPT, { recursive: true });
 const ATTENDUE = (/const EXT_ATTENDUE = '([\d.]+)'/.exec(fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8')) || [])[1];
+// (16 nov., vague C) Le texte « installe la … » se juge sur CETTE version aussi (il était épinglé à 5.385
+// et rougissait à chaque version servie).
+const ATT_RE = String(ATTENDUE).replace(/\.0$/, '').replace(/\./g, '\\.');   // « 5.393.0 » s'écrit « 5.393 »
 const H = 3600e3, M = 60e3;
 const iso = (ilYa) => new Date(Date.now() - ilYa).toISOString();
 const JULIEN = '11111111-1111-4111-8111-111111111111';
@@ -166,7 +169,7 @@ async function scenario(b, scen, largeur, sombre) {
     const ext = page.locator('[data-fia-ext-ici]');
     dit((await ext.count()) === 1 && (await ext.getAttribute('data-fia-ext-ici')) === '5.329', `${nom} : l’extension de CE navigateur en retard est dite`, await ext.count());
     const t = (await ext.count()) ? await ext.innerText() : '';
-    dit(/Ce (Chrome|navigateur) a la 5\.329 : installe la 5\.385/.test(t) && (await ext.locator('a[href="/VRM-extension.zip"][download]').count()) === 1, `${nom} : « Ce Chrome a la 5.329 : installe la 5.385 » + le zip`, t);
+    dit(new RegExp(`Ce (Chrome|navigateur) a la 5\\.329 : installe la ${ATT_RE}`).test(t) && (await ext.locator('a[href="/VRM-extension.zip"][download]').count()) === 1, `${nom} : « Ce Chrome a la 5.329 : installe la ${ATTENDUE} » + le zip`, t);
     const ctl = page.locator('[data-fia-controle]');
     dit(await ctl.getAttribute('data-fia-controle') === 'probleme' && Number(await ctl.getAttribute('data-fia-controle-n')) === 3, `${nom} : le contrôle de cette nuit : 3 écarts`, await ctl.getAttribute('data-fia-controle-n'));
     dit(await page.locator('[data-fia-controle-ligne="numeros-double"]').getAttribute('data-ton') === 'rouge', `${nom} : le N° porté par deux paires en ROUGE (le seul)`);
@@ -183,7 +186,7 @@ async function scenario(b, scen, largeur, sombre) {
     await f.waitFor({ timeout: 10000 }).catch(() => {});
     const c111 = f.locator('[data-fia-sante="vinted:111"]'), c222 = f.locator('[data-fia-sante="vinted:222"]');
     dit(await c111.getAttribute('data-fia-sante-etat').catch(() => '') === 'arret' && /Arrêté/.test(await c111.innerText().catch(() => '')) && /vérification/.test(await c111.innerText().catch(() => '')), `${nom} : la feuille — atelier_test « Arrêté », le geste de la vérification`);
-    dit(await c222.getAttribute('data-fia-sante-etat').catch(() => '') === 'extension' && /5\.329/.test(await c222.innerText().catch(() => '')) && /Installe la 5\.385/.test(await c222.innerText().catch(() => '')), `${nom} : second_test lu par un Chrome en 5.329 ⇒ « Extension en retard », installe la 5.385`, await c222.innerText().catch(() => ''));
+    dit(await c222.getAttribute('data-fia-sante-etat').catch(() => '') === 'extension' && /5\.329/.test(await c222.innerText().catch(() => '')) && new RegExp(`Installe la ${ATT_RE}`).test(await c222.innerText().catch(() => '')), `${nom} : second_test lu par un Chrome en 5.329 ⇒ « Extension en retard », installe la 5.385`, await c222.innerText().catch(() => ''));
     dit((await f.locator('[data-fia-sante]').count()) === 2 && (await f.locator('[data-fia-sante-geste]').count()) === 2, `${nom} : un compte par carte, UN geste chacun`);
     dit(!/à dater/i.test(await f.innerText().catch(() => '')), `${nom} : la feuille ne parle jamais de ventes à dater`);
     const petites = await cibles(pg, '[data-fia-feuille] button, [data-fia-feuille] a');
@@ -198,7 +201,7 @@ async function scenario(b, scen, largeur, sombre) {
     // avec le paquet à portée de doigt.
     await pg.waitForFunction(() => [...document.querySelectorAll('[data-fraicheur-unique]')].some((e) => e.getAttribute('data-fraicheur-unique') === 'retard'), null, { timeout: 60000 }).catch(() => {});
     const titres = await pg.evaluate(() => [...document.querySelectorAll('[data-fraicheur-unique]')].map((e) => (e.getAttribute('title') || e.textContent || '')).join(' | '));
-    dit(/a la 5\.329 : installe la 5\.385/.test(titres), `${nom} : la ligne de fraîcheur dit « … a la 5.329 : installe la 5.385 »`, titres);
+    dit(new RegExp(`a la 5\\.329 : installe la ${ATT_RE}`).test(titres), `${nom} : la ligne de fraîcheur dit « … a la 5.329 : installe la ${ATTENDUE} »`, titres);
   } else if (scen === 'ok') {
     dit(!(await page.locator('[data-fia-ext-ici]').count()), `${nom} : extension à jour ⇒ aucune alerte d’extension (jamais pour une version publiée à jour)`);
     dit((await page.locator('[data-fia-controle-ok]').count()) === 1, `${nom} : « Tout est en ordre · vérifié cette nuit »`);

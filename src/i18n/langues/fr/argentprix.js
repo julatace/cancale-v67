@@ -133,7 +133,7 @@ export default {
   "ap.vc.article": "Article",
   "ap.vc.montant": "Montant",
   "ap.vc.frais": "Frais lus",
-  "ap.vc.aDater": "Ventes à dater · {n}",
+  "ap.vc.aDater": "Ventes sans date de versement · {n}",
   "ap.vc.achats": "Registre des achats · {n}",
   "ap.vc.coutSaisi": "Coût d’achat saisi : {m}",
   "ap.vc.date": "Date",
