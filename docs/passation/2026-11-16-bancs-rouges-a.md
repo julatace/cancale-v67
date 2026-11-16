@@ -63,9 +63,9 @@ chez eux s'ils ont vu « Target closed ».
 - Branche `claude/bancs-rouges-a`, fusionnée avec `origin/main` (vraie fusion ; un conflit dans `sante-donnees.cjs`
   résolu en prenant la version de main pour G, qui juge déjà au repos ; mes changements S/attendus gardés).
 - Verts ici (dernier passage, un banc à la fois) : `enligne`, `vestiaire-bout-en-bout`, `sante-donnees` (138),
-  `lot1415` (96), `stock-planches`, `stock-2d`, `stock-retrouver`, `stock-juste`, `ventes-e2` ; `reglages-premium`
-  323 ✅ · 2 ❌ au passage d'avant (un clic de 4 s après « Mode sombre », une capture de 30 s — délais portés à 15 s /
-  2 min).
+  `lot1415` (96), `stock-planches`, `stock-2d`, `stock-retrouver`, `stock-juste`, `ventes-e2`, `reglages-premium`
+  (**737 ✅ · 0 ❌**, après la fusion de main : « Mots expliqués » n'était recouvert que pendant la mise en page du
+  groupe redessiné par « Visite des écrans » — mesuré, le point tombait sur le bouton voisin).
 - Passe complète des audits (`lancer-audits`, 2 à la fois) : **66 rouges, tous rouges aussi sur `origin/main`**
   (vérifié un par un sur une copie d'`origin/main` ; un seul vert là-bas, `audit-recherche-unique`, vert ici aussi en le
   relançant seul : charge). Aucun n'est né de ce lot. La CI de main (PR #1181) a ses trois parts d'audits et ses bancs
