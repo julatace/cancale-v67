@@ -26,6 +26,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (16 nov., lot factures-mieux) docs/passation/2026-11-16-factures-mieux.md
+  { id: 'factures-mieux', date: '2026-11-16', titre: 'Factures et reçus d’achat plus nets', phrase: 'E-mail sobre en une langue, PDF à bandeau, reçu accentué.', tab: 'compta', pour: 'pro', mode: 'tous' },
   // (16 nov., lot ventes-selection) docs/passation/2026-11-16-ventes-selection.md
   { id: 'selection-visible', date: '2026-11-16', titre: 'Sélection : seulement les lignes affichées', phrase: '« Tout sélectionner » prend ce que tu vois, rien de caché.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (16 nov., stabilite-iphone — « l'app bug un peu » sur iPhone) docs/passation/2026-11-16-stabilite-iphone.md
