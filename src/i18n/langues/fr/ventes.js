@@ -244,4 +244,6 @@ export default {
   "ventes.basculeCourtOrdi": "Ouvre {login} sur vinted.fr, sur l’ordinateur",
   "ventes.connecteCourt": "Connecte {login} sur vinted.fr",
   "ventes.pourquoiBord": "Pourquoi ce bordereau attend ?",
+  "ventes.puceAchat": "Prix d’achat ?",
+  "ventes.puceRelier": "Relier un achat",
 };

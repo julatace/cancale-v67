@@ -102,4 +102,34 @@
   :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme]:has(> .vrm-rangee-bord > .vrm-fu-imprimer-ligne:only-child) .vrm-ledger-sale-frise .vrm-fu-seg { display: none !important; }
 }
 
+/* ── 5. PLUS DE « ⋯ » SUR UNE LIGNE DE VENTE (Julien, 16 nov.) : toucher la vente ouvre sa fiche (tous les gestes) ;
+   ce qui manque se voit TOUJOURS, en petit : la puce « Prix d'achat ? » (la saisie s'ouvre sur place, « Relier un achat »
+   avec elle) ; « Déposé » reste sur la ligne à côté d'« Imprimer ». */
+:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row[data-fu-forme] > .vrm-ledger-gestes,
+:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row[data-fu-forme] .vrm-fu-apres { display: block !important; }
+:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row[data-fu-forme] .vrm-ledger-sale-plus { display: none !important; }
+:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row[data-fu-forme] [data-cout-vente="ligne"] .vrm-cout-label { display: none !important; }
+:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row[data-fu-forme] [data-cout-vente="ligne"] :is([data-cout-vente-saisir], [data-cout-vente-relier], [data-prix-propose]) {
+  min-height: 44px !important; height: 44px !important; padding: 0 12px !important; border-radius: 22px !important; font: 600 13px/1 Inter, system-ui, sans-serif !important;
+  background: transparent !important; box-shadow: none !important; border: 0 !important; color: var(--sv-ambre) !important; gap: 4px !important; white-space: nowrap !important;
+}
+:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row[data-fu-forme] [data-cout-vente="ligne"] [data-cout-vente-saisir] svg { display: none !important; }
+:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row[data-fu-forme] [data-cout-vente="ligne"] [data-cout-vente-relier] { color: var(--sv-lien) !important; }
+@media (max-width: 767px) {
+  /* La puce au bout de la 2e ligne (la place de l'ancien « ⋯ ») ; en saisie, elle redevient une rangée sous la vente. */
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme]:not(:has(> .vrm-rangee-bord > .vrm-fu-imprimer-ligne:only-child)) > .vrm-ledger-gestes:not(:has(form)) {
+    position: absolute !important; right: 2px !important; top: 26px !important; padding: 0 !important; margin: 0 !important; z-index: 1 !important;
+  }
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > .vrm-ledger-gestes:has(form),
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme]:has(> .vrm-rangee-bord > .vrm-fu-imprimer-ligne:only-child) > .vrm-ledger-gestes { position: static !important; margin: 0 0 0 68px !important; }
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme]:has(> .vrm-ledger-gestes:not(:has(form))):not(:has(> .vrm-rangee-bord > .vrm-fu-imprimer-ligne:only-child)) :is(.vrm-fu-vente-l2, .vrm-ledger-sale-frise) { padding-right: 128px !important; }
+  /* « Déposé » : un rond de 44 px à droite d'« Imprimer » (à la place de l'ancien « ⋯ »). */
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme]:has(> .vrm-rangee-bord > .vrm-fu-imprimer-ligne:only-child) > .vrm-fu-apres {
+    position: absolute !important; right: 2px !important; top: 30px !important; margin: 0 !important; padding: 0 !important; z-index: 1 !important;
+  }
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme]:has(> .vrm-rangee-bord > .vrm-fu-imprimer-ligne:only-child) > .vrm-fu-apres .vrm-depose-bouton {
+    width: 44px !important; min-width: 44px !important; height: 44px !important; min-height: 44px !important; padding: 0 !important; border-radius: 22px !important; font-size: 0 !important; gap: 0 !important; justify-content: center !important;
+  }
+}
+
 } /* fin de @layer vrm-verre */

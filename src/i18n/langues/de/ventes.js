@@ -244,4 +244,6 @@ export default {
   "ventes.basculeCourtOrdi": "Öffne {login} auf vinted.fr, am Computer",
   "ventes.connecteCourt": "Melde {login} auf vinted.fr an",
   "ventes.pourquoiBord": "Warum wartet dieses Etikett?",
+  "ventes.puceAchat": "Einkaufspreis?",
+  "ventes.puceRelier": "Einkauf verknüpfen",
 };
