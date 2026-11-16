@@ -11,6 +11,12 @@ native requise** avant d'ouvrir VRM hors de France.
 - Tout est poussé sur `claude/traduction-restes` ; voir la PR (titre « Traduction, les restes… »).
 - Extension **5.394.0** réservée (`scratchpad/versions-reservees.txt` du coordinateur) ; zips régénérés.
 - Ce qui reste (dit, pas caché) : voir « Ce qui n'est pas fait » en bas.
+- **Reprise du 16 nov. (soir)** : vrai `git merge origin/main` (98 commits ; conflits : CLAUDE.md §9
+  et `src/nouveautes.js` réunis, zips refaits). Les 6 nouveautés arrivées de main (relier-fiable,
+  fiche-delier-recu, vente-email-particulier, barre-achats, selection-visible, iphone-fluide)
+  traduites en en/es/it/de (D2/F2 verts). `vrm-regles-achat.js` recopié des règles de l'app
+  (`regles-achat-extension.cjs --recopie`) : `audit-infos-vinted` I10 était rouge sur main (copie
+  périmée) — pris dans la 5.394.0, jamais servie. Fini, à intégrer (PR #1191).
 
 ## (20) Les chemins d'aide — `scripts/audit-chemins-aide.cjs`
 Mesuré sur main (b8f26f36d) : **4 rouges réels** que personne ne voyait :
