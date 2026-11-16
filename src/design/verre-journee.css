@@ -246,6 +246,10 @@
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-col > .sj-t-envoyer { display: grid !important; grid-template-columns: minmax(0, 1fr) auto !important; grid-template-areas: "lib lien" "face face" "plein plein" !important; align-items: center !important; padding: 6px 16px 14px !important; }
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-t-envoyer .sj-face:has(.sj-v-lignes) { display: block !important; }
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-t-envoyer .sj-face:has(.sj-v-lignes) > :not(.sj-v-lignes) { display: none !important; }
+  /* (16 nov., personnalisation-simple) Cachée par lui mais revenue parce qu'urgente : « Affichée car urgent » reste dite
+     à l'ordinateur aussi (elle se taisait avec le reste de la face — banc journee-perso U 1512). */
+  :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-t-envoyer .sj-face:has(.sj-v-lignes) > .sj-sous:has([data-jp-urgent]) { display: block !important; margin-top: 8px !important; }
+  :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-t-envoyer .sj-face:has(.sj-v-lignes) > .sj-sous:has([data-jp-urgent]) > :not([data-jp-urgent]) { display: none !important; }
   :root:root:root:root:root:root:root body .sj-journee .sj-v-lignes { display: block !important; }
   :root:root:root:root:root:root:root body .sj-journee .sj-v-ligne { display: flex !important; align-items: center !important; gap: 12px !important; min-height: 64px !important; padding: 8px 0 !important; }
   :root:root:root:root:root:root:root body .sj-journee .sj-v-ligne + .sj-v-ligne { border-top: 1px solid rgb(12 29 48 / .10) !important; }
@@ -413,4 +417,22 @@
 :root:root:root:root:root:root body .vrm-fs[data-feuille-tvb] .vrm-tvb-cartes .vrm-day-task-note { font: 550 12.5px/1.3 Inter, system-ui, sans-serif !important; color: var(--sv-encre-2) !important; white-space: normal !important; }
 :root:root:root:root:root:root body .vrm-fs[data-feuille-tvb] .vrm-tvb-cartes .vrm-day-task-action { flex: none !important; margin-left: auto !important; }
 
+/* (16 nov., lot personnalisation-simple — Julien : la grande photo et le bloc pointillé prenaient tout l'écran à 390 px)
+   « La paire à sortir » AU TÉLÉPHONE : compacte (vignette 72 px à gauche, N°, site, rang, date à côté ; le lieu ou
+   « VRM ne sait pas où » en petit ; « Je l'ai sortie » reste le plein). src/PaireASortir.jsx (`compact`). */
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-carte.is-compact { padding: 10px !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-c-tete { display: flex !important; gap: 12px !important; align-items: flex-start !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-carte.is-compact .vrm-so-ph { flex: none !important; width: 72px !important; height: 72px !important; border-radius: 14px !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-carte.is-compact .vrm-so-m { flex: 1 1 auto !important; min-width: 0 !important; padding: 0 !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-carte.is-compact .vrm-so-m > b { font: 700 15px/1.3 Inter, system-ui, sans-serif !important; letter-spacing: -.01em !important; margin-top: 4px !important; overflow: hidden !important; display: -webkit-box !important; -webkit-line-clamp: 2 !important; -webkit-box-orient: vertical !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-c-l1 { display: flex !important; flex-wrap: wrap !important; align-items: center !important; gap: 6px !important; font: 600 12px/1.2 Inter, system-ui, sans-serif !important; color: var(--sv-encre-2) !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-c-site { display: inline-flex !important; align-items: center !important; gap: 4px !important; min-width: 0 !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-c-rang { font: 600 12px/1.2 Inter, system-ui, sans-serif !important; color: var(--sv-encre-2) !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-carte.is-compact .vrm-so-ou { margin-top: 10px !important; padding: 8px 10px !important; gap: 12px !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-carte.is-compact .vrm-so-ou-t > b { font: 700 15px/1.25 Inter, system-ui, sans-serif !important; margin-top: 0 !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-carte.is-compact .vrm-so-ou-t > em { font: normal 600 13px/1.3 Inter, system-ui, sans-serif !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-carte.is-compact .vrm-so-inc { margin-top: 10px !important; padding: 8px 10px !important; border-width: 1px !important; gap: 0 !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-carte.is-compact .vrm-so-inc b { font: 600 13px/1.3 Inter, system-ui, sans-serif !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-carte.is-compact .vrm-so-inc span { font: 400 12px/1.35 Inter, system-ui, sans-serif !important; }
+:root:root:root:root:root:root:root body .sj-journee .vrm-so-carte.is-compact .vrm-so-plein { margin-top: 10px !important; }
 } /* fin de @layer vrm-verre */

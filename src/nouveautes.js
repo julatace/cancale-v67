@@ -26,6 +26,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (16 nov., Julien : « La personnalisation doit être plus simple. ») docs/passation/2026-11-16-personnalisation-simple.md
+  { id: 'personnalisation-simple', date: '2026-11-16', titre: '« Modifier ma journée » plus simple', phrase: 'Un interrupteur pour cacher, ↑ ↓ ou glisser pour ranger.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (16 nov., lot retirer-case-compact) docs/passation/2026-11-16-retirer-case-compact.md
   { id: 'stock-case-allumee', date: '2026-11-16', titre: 'Stock : la case vendue reste allumée', phrase: 'Touche-la quand l’article est sorti ; « Annuler » la remet.', tab: 'garage', pour: 'tous', mode: 'tous' },
   // (16 nov., bancs-rouges-a) docs/passation/2026-11-16-bancs-rouges-a.md
