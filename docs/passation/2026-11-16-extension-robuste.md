@@ -117,4 +117,16 @@ extension-restes, 5.397 plateformes-restes).
 
 ## Vérifié
 
-Voir la section « Passe complète » ajoutée à la fin (sortie recopiée telle quelle).
+- `audit-extension-robuste --prouve` : 41/41 verts, 30/30 mutations ; sur origin/main 37 rouges.
+- Banc Chromium `extension-stockage-cadre` : 6/6 ; sur origin/main 4 rouges.
+- `npm run build` vert. Audits remis au canal (liste plus haut) verts un par un, plus
+  `audit-lbc-details` (l'accusé par le port), `audit-republier-question` (la garde avant le message),
+  `audit-extension-navigateurs` (le banc du pont sert `location`), `audit-exec`, `audit-pont-session`,
+  `audit-import-*`, `audit-coherence`, `audit-diagnostic`, `audit-evt-extension`, `audit-vc-*`,
+  `audit-favoris-sites`, `audit-capture-vc-lbc`.
+- **Passe complète locale impossible** le 16 nov. : le disque de la machine partagée est plein
+  (`df` : 4 à 45 Mo libres, 70 worktrees + /tmp), Chromium y meurt (« Target closed »). Jugé sur la CI
+  de la PR #1186 : les rouges restants sont ceux de `main` (≈ 50 audits app, bancs `nouveau-vendeur`…) —
+  aucun rouge NOUVEAU après les trois bancs remis à la règle.
+- **Pas fusionné** : règle de Julien du 16 nov. (« zéro rouge pour fusionner », y compris ceux déjà sur
+  `main` des jobs touchés) — `main` porte lui-même des dizaines de rouges d'audits app, hors de ce lot.
