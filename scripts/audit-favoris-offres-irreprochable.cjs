@@ -24,8 +24,8 @@
 //    E9  favori sur une annonce vendue (dressing) ⇒ RIEN ne part chez Vinted ;
 //    E10 favori : la transaction relue dit « réservée » ⇒ ni offre ni message ;
 //    E11 jamais deux fois de suite le même texte : seule la salutation change ;
-//    E12 la règle, sur 60 envois d'une seule version : aucun texte identique à l'un
-//        des 3 précédents, et rien d'autre que la salutation ne bouge ;
+//    E12 la règle, sur 60 envois d'une seule version : aucun texte identique au
+//        précédent, et rien d'autre que la salutation ne bouge ;
 //    E13 le message de refus d'une offre suit la même règle.
 //  `--avant` : le même banc sur origin/main (background.js et file serveur) — rouge.
 //  `--mutation=<nom>|toutes` : chaque correction réaffaiblie dans une copie ⇒ rouge.
@@ -260,9 +260,9 @@ const corpsReponse = (j) => { const r = j.vinted.find((v) => /replies$/.test(v.c
       const t = typeof tj === 'function' ? tj(base, 'kiki_42', recents) : base;
       if (t == null || recents.includes(typeof em === 'function' ? em(t) : t)) mauvais++;
       if (t && !t.endsWith(base)) autre++;
-      recents = recents.concat([typeof em === 'function' ? em(t) : t]).slice(-3);
+      recents = recents.concat([typeof em === 'function' ? em(t) : t]).slice(-1);
     }
-    dit(mauvais === 0 && autre === 0, 'E12 — 60 envois d’une seule version : jamais le texte d’un des 3 précédents, et le message lui-même n’est jamais touché', `répétés=${mauvais} modifiés=${autre}`);
+    dit(mauvais === 0 && autre === 0, 'E12 — 60 envois d’une seule version : jamais le texte du précédent, et le message lui-même n’est jamais touché', `répétés=${mauvais} modifiés=${autre}`);
   }
   {
     const f = monterMoteur({ min: null, refuse: 50, msgRefus: 'Désolé, trop bas pour moi.' });

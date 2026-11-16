@@ -59,12 +59,12 @@ function tempsEcritureMs(texte, mode, hasard) {
 }
 // (16 nov., lot favoris-offres-irreprochable, ext. 5.398) JAMAIS DEUX FOIS LE MÊME TEXTE À LA
 // CHAÎNE. Une seule version (ou des versions identiques) faisait partir le même texte, à l'octet
-// près, à chaque favori. Si le texte final est celui d'un des TEXTES_RECENTS derniers messages
-// partis de ce compte, SEULE la salutation change (Bonjour · Salut · Hello, avec ou sans le
+// près, à chaque favori. Si le texte final est celui du DERNIER message parti de ce compte
+// (TEXTES_RECENTS = 1 : ses propres versions ne sont jamais touchées), SEULE la salutation change (Bonjour · Salut · Hello, avec ou sans le
 // pseudo lu dans le fil) : en tête si le message en a une, sinon ajoutée devant (« Bonjour ! »).
 // Aucun autre mot n'est touché, jamais d'IA. On garde des EMPREINTES, jamais le texte.
 // Rend le texte à envoyer, ou null (toutes les salutations déjà parties : rien ne part).
-const TEXTES_RECENTS = 3;
+const TEXTES_RECENTS = 1;
 const SALUTATIONS = ['Bonjour', 'Salut', 'Hello'];
 const SALUT_DEBUT = /^(bonjour|salut|hello|coucou|bonsoir|hey)(?=[\s,!.?;:]|$)/i;
 function empreinteMessage(texte) {
