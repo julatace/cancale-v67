@@ -61,7 +61,8 @@ nBenef === 2 ? ok('Rapports mensuel ET annuel : bénéfice sur le coût connu')
   : ok('aucun rapport ne calcule plus `ca - cout - frais`');
 
 // 7) le PDF imprime la couverture à côté du bénéfice
-((app.match(/ventes au coût connu\)`:''\)/g) || []).length >= 2)
+// (16 nov., lot factures-mieux) Le PDF du rapport mensuel vit dans src/rapportPdf.js (même réserve, mise en page refaite).
+(((app.match(/ventes au coût connu\)`:''\)/g) || []).length + (require('fs').readFileSync(require('path').join(__dirname, '..', 'src/rapportPdf.js'), 'utf8').match(/ventes au coût connu\)` : ''\}/g) || []).length) >= 2)
   ? ok('les PDF impriment la couverture à côté du bénéfice')
   : nok('les 2 PDF impriment `(sur N/M ventes au coût connu)`');
 
