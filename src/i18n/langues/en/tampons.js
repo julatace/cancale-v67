@@ -82,5 +82,18 @@ export default {
   "tampons.apercu.titre": {
     "one": "Print preview · {n} label",
     "other": "Print preview · {n} labels"
+  },
+  "tampons.pret.titre": "Label ready",
+  "tampons.pret.titreFacture": "Label and invoice ready",
+  "tampons.pret.apercu": "Preview of the stamped label",
+  "tampons.pret.ouvert": "The PDF is open in a tab.",
+  "tampons.pret.imprimer": "Print",
+  "tampons.pret.enregistrer": "Save",
+  "tampons.pret.deplacer": "Move the stamp",
+  "tampons.pret.pourquoi": "Why?",
+  "tampons.pret.pourquoiTexte": "On iPhone, “Print” opens sharing: choose Print.",
+  "tampons.pret.titreLot": {
+    "one": "{n} label ready",
+    "other": "{n} labels ready"
   }
 };

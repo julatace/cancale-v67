@@ -82,5 +82,18 @@ export default {
   "tampons.apercu.titre": {
     "one": "Anteprima di stampa · {n} etichetta",
     "other": "Anteprima di stampa · {n} etichette"
+  },
+  "tampons.pret.titre": "Etichetta pronta",
+  "tampons.pret.titreFacture": "Etichetta e fattura pronte",
+  "tampons.pret.apercu": "Anteprima dell’etichetta timbrata",
+  "tampons.pret.ouvert": "Il PDF è aperto in una scheda.",
+  "tampons.pret.imprimer": "Stampa",
+  "tampons.pret.enregistrer": "Salva",
+  "tampons.pret.deplacer": "Sposta il timbro",
+  "tampons.pret.pourquoi": "Perché?",
+  "tampons.pret.pourquoiTexte": "Su iPhone, «Stampa» apre la condivisione: scegli Stampa.",
+  "tampons.pret.titreLot": {
+    "one": "{n} etichetta pronta",
+    "other": "{n} etichette pronte"
   }
 };

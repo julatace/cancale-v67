@@ -599,7 +599,8 @@ import { TAMPONS as TAMPONS_IMPR } from './impression/thermique.js';
 import { CLE_TAMPONS, TAILLES_TAMPON, avecChoix, reglageTampons, aEcrire, resoudreTampon, placesDeForme, avecPlace, familleDe, texteDuCartouche, contenuDuMode, repousserHorsInterdits, CIBLES as CIBLES_TAMPON } from './impression/tampons.js';   // (16 nov., lot tampons-parametres) LE réglage des tampons   // (14 nov.) le tampon par bordereau
 import { pagesDe, formatRetenu, signatureLot, voieOuverture, absentsDuLot } from './impression/lotSimple.js';   // (14 nov.) « Imprimer » en un toucher
 import { ChoixPapier, FeuilleImpression } from './ImpressionSimple.jsx';
-import ApercuAvantImpression from './impression/ApercuAvantImpression.jsx';   // (16 nov., lot tampons-parametres) l'aperçu avant impression   // (14 nov., impression-simple) les deux feuilles
+import ApercuAvantImpression from './impression/ApercuAvantImpression.jsx';
+import BordereauPret from './impression/BordereauPret.jsx';   // (16 nov.) « Bordereau prêt » refait   // (16 nov., lot tampons-parametres) l'aperçu avant impression   // (14 nov., impression-simple) les deux feuilles
 import { CLE_IMPRESSION, reglageImpression, papierThermique, placementEtiquette, carteEncre, boiteEncre, decouperFeuille, fusionnerProches, moduleDuCode, moduleImprimeMm, codeAssezGros, seuillerNoir, tramerNoir, zonesAdresse, CONTRASTES, MODULE_MIN_MM, BANDE_CONTINU_MM } from './impression/thermique.js';
 import { decisionNumeroVenteEmail, numeroEcritDansArticle, colisVentesEmail, MENTION_SANS_NUM, CLE_IMPRIMES_SANS_NUM, phraseImprimeSansNumero } from './bordereauVenteEmail.js';
 // (15 nov., Julien : « on range une ANNONCE, pas un achat ») La feuille « Ranger cet achat » n'est plus montée : la règle
@@ -15020,6 +15021,14 @@ const ouvrirPdfOnglet = (url, nom, titre) => {
 // Le fichier est refait si les octets ont changé (un PDF « Il en manque » hérite des champs du lot : jamais son fichier).
 const fichierPdf = (pret) => { try { if (!pret.file || pret.fileDe !== pret.bytes) { pret.file = new File([pret.bytes], pret.filename || 'bordereaux.pdf', { type: 'application/pdf' }); pret.fileDe = pret.bytes; } return pret.file; } catch (_) { return null; } };
 const partagePdfPossible = (f) => { try { return !!(f && navigator.canShare && navigator.share && navigator.canShare({ files: [f] })); } catch (_) { return false; } };
+// (16 nov., lot tampons-parametres — Julien, capture iPhone : « quand je touche Imprimer, toute la ligne bouge ») UN BOUTON
+// D'IMPRESSION GARDE SA TAILLE PENDANT LA PRÉPARATION : sa largeur est figée, son texte et son icône s'effacent sur place
+// et une roue tourne DEDANS (`[data-occupe]`, styles-tampons.css) — rien autour ne se décale. `f` : le geste (async).
+const occuperPendant = async (el, f) => {
+  if (el && el.hasAttribute && el.hasAttribute('data-occupe')) return undefined;
+  if (el && el.style) { try { const r = el.getBoundingClientRect(); el.style.width = `${r.width}px`; el.style.setProperty('--vrm-roue-c', getComputedStyle(el).color); } catch (_) {} el.setAttribute('data-occupe', ''); el.setAttribute('aria-busy', 'true'); }
+  try { return await f(); } finally { if (el && el.style) { el.removeAttribute('data-occupe'); el.removeAttribute('aria-busy'); el.style.width = ''; } }
+};
 const ouvrirPdfLot = (pret, { geste = true, titre = '' } = {}) => {
   if (!pret || !pret.url) return 'bouton';
   const ios = estIOS(), android = estAndroid();
@@ -15227,7 +15236,7 @@ const annotateAndDownloadBordereauBrut = async (numero, title, pdfArrayBuffer, p
   const ouvert = ouvrirPdfOnglet(url, filename);
   signalerBordereauImprime(false, avantColis);
   const tp = r0.tampons || [];
-  return { url, filename, printed: ouvert, ouvert, thermique, isoles: r0.isole ? 1 : 0, etiquettes: r0.etiquettes,
+  return { url, bytes, filename, printed: ouvert, ouvert, thermique, isoles: r0.isole ? 1 : 0, etiquettes: r0.etiquettes,
            fiches: tp.filter((m) => m === 'fiche').length, bandes: tp.filter((m) => m === 'bande').length,
            entiers: thermique && !r0.isole ? [{ titre: title || '', raison: r0.raison }] : [], ...bilanThermique(r0.details) };
 };
@@ -15343,8 +15352,8 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
   // Ouvert dans un onglet (ordinateur) ; sinon la modale propose « Ouvrir ».
   const printed = ouvrirPdfOnglet(url, r.filename);
   signalerBordereauImprime(true, null);
-  const { bytes: _b, unitBytes: _u, plages: _p, mode: _m, ...reste } = r;
-  return { ...reste, url, printed, ouvert: printed };
+  const { unitBytes: _u, plages: _p, mode: _m, ...reste } = r;
+  return { ...reste, url, printed, ouvert: printed };   // (16 nov.) `bytes` gardés : « Imprimer » de « Bordereau prêt » les partage
 };
 // Un échec (annulé, PDF illisible) referme la visionneuse « préparation… ».
 const mergeAndDownloadBordereaux = async (...a) => { try { return await mergeAndDownloadBordereauxBrut(...a); } catch (e) { libererOngletPdf(); throw e; } };
@@ -22427,7 +22436,7 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
   const base = { display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 12, fontFamily: 'inherit', fontWeight: 700,
     fontSize: grand ? 15 : 13, padding: grand ? '11px 14px' : '7px 11px', cursor: 'pointer', whiteSpace: 'nowrap' };
   if (pdf) {
-    return <button type="button" data-bouton-bord="pdf" data-imprime="1" data-tx={tx} onClick={onImprimer} title={tr('ventes.bordereauTamponneTitre')}
+    return <button type="button" data-bouton-bord="pdf" data-imprime="1" data-tx={tx} onClick={(ev) => occuperPendant(ev.currentTarget, () => onImprimer && onImprimer())} title={tr('ventes.bordereauTamponneTitre')}
       style={{ ...base, border: 'none', background: C.accent, color: C.onAccent || '#fff' }}><Icon name="printer" size={grand ? 16 : 14}/>{grand ? <><span className="vrm-lib-long">{tr('ventes.imprimerBordereau')}</span><span className="vrm-lib-court">{tr('ventes.imprimer')}</span></> : tr('journee.bordereau')}</button>;
   }
   if (!aGenerer || !uid || !tx) return null;
@@ -27440,12 +27449,13 @@ function BoutonImprimerVc({ v, grand = false, carte = false, lectureSeule = fals
     }catch(e){if(AUTH.user?.id===owner){setEtat('refus');setErreur(String(e?.message||e));}libererOngletPdf();}
     finally{enCours.current=false;if(AUTH.user?.id===owner)setEtat(e=>e==='lecture'?'':e);}
   };
-  const libelle = etat === 'lecture' ? 'Lecture du bordereau…' : 'Imprimer';
+  // (16 nov.) Le libellé ne change plus pendant la lecture (la ligne bougeait) : la roue tourne DANS le bouton.
+  const libelle = 'Imprimer';
   return <>
     {!lectureSeule&&(carte
-      ? <button type="button" data-imprime="1" data-vc-imprimer={v.id} disabled={etat === 'lecture'} onClick={()=>go(false)} title="Bordereau tamponné (titre + N°), puis impression"
+      ? <button type="button" data-imprime="1" data-vc-imprimer={v.id} disabled={etat === 'lecture'} onClick={(ev)=>occuperPendant(ev.currentTarget, ()=>go(false))} title="Bordereau tamponné (titre + N°), puis impression"
           className="vrm-colis-primaire" style={{flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:C.onAccent,borderRadius:12,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}><Icon name="printer" size={16}/>{etat === 'lecture' ? libelle : <><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></>}</button>
-      : <Bouton variante={grand ? 'primaire' : 'secondaire'} icone="printer" data-imprime="1" data-vc-imprimer={v.id} disabled={etat === 'lecture'} onClick={()=>go(false)} title="Bordereau tamponné (titre + N°), puis impression">{etat === 'lecture' ? libelle : grand ? <><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></> : 'Imprimer le bordereau'}</Bouton>)}
+      : <Bouton variante={grand ? 'primaire' : 'secondaire'} icone="printer" data-imprime="1" data-vc-imprimer={v.id} disabled={etat === 'lecture'} onClick={(ev)=>occuperPendant(ev.currentTarget, ()=>go(false))} title="Bordereau tamponné (titre + N°), puis impression">{etat === 'lecture' ? libelle : grand ? <><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></> : 'Imprimer le bordereau'}</Bouton>)}
     {!carte&&<button type="button" data-imprime="1" data-vc-original={v.id} disabled={etat==='lecture'} onClick={()=>go(true)} className="vrm-lien-action" style={{minHeight:44,color:C.accentTexte,background:'transparent',border:0,font:'inherit',fontSize:13,cursor:'pointer'}}>Ouvrir le PDF d’origine</button>}
     {erreur&&<span role="alert" data-vc-bordereau-erreur="" style={{flexBasis:'100%',fontSize:12,color:C.warn}}>{erreur}</span>}
     {lien ? <a href={lien.url} target="_blank" rel="noreferrer" data-vc-bordereau-lien="" style={{ color: C.accentTexte, fontWeight: 600, fontSize: 13 }}>Ouvrir le bordereau</a> : null}
@@ -45904,7 +45914,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // Sur ordinateur : le PDF s'ouvre dans un onglet (bouton imprimer de
       // Chrome). Sur iPhone : la modale « Ouvrir → Partager → Imprimer ».
       const printed = ouvrirPdfOnglet(url);
-      setBordResult({ url, filename, numero, title, pdfBuf: buf, key: bordereauFormatKey(width, height), w:width, h:height, withInvoice: joined, printed,
+      setBordResult({ url, bytes, filename, numero, title, pdfBuf: buf, key: bordereauFormatKey(width, height), w:width, h:height, withInvoice: joined, printed,
                       thermique: imprMode(imprimante) === 'thermique', isoles: thermiqueOK ? 1 : 0, ...bilanThermique(r1.details), entiers: thermiqueOK ? [] : (thermiqueRaison ? [{ titre: title || '', raison: thermiqueRaison }] : []) });
     } catch(err){ libererOngletPdf(); if (!estTamponAnnule(err)) toast('Erreur impression : '+String(err)); }
   };
@@ -55876,7 +55886,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         onClick={(ev)=>{ const c = ev.currentTarget.closest('[data-bord-card]'); const o = !c.hasAttribute('data-plus-ouvert'); c.toggleAttribute('data-plus-ouvert', o); ev.currentTarget.setAttribute('aria-expanded', o ? 'true' : 'false'); }}><Icon name="more" size={18}/></button>
                       <PastilleTransporteur t={trV} C={C} data-colis-transporteur={e.txn||e.key}/>
                       {pdf ? (
-                        <button type="button" data-imprime="1" onClick={async ()=>{
+                        <button type="button" data-imprime="1" onClick={(ev)=>occuperPendant(ev.currentTarget, async ()=>{
                           if (b && b.hasPdf && inv) { await printBordAndInvoice(b); return; }
                           // Le PDF vient de l'email s'il y en a un, sinon de la
                           // capture faite par l'extension au moment de générer.
@@ -55889,7 +55899,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           const lu = await octetsBordereau(capte && capte.row, b && b.hasPdf ? b._row : null);
                           if (!lu || !lu.octets) { libererOngletPdf(); toast(messagePdfManquant(lu)); return; }
                           if (await processBordereau(num, titre, lu.octets) && !String(num || '').trim() && e.txn) noterImprimeSansNum([e.txn]);
-                        }} title={inv?'Bordereau tamponné + facture pro, puis impression':'Bordereau tamponné, puis impression'} aria-label={inv?'Imprimer le bordereau et la facture':'Imprimer le bordereau'}
+                        })} title={inv?'Bordereau tamponné + facture pro, puis impression':'Bordereau tamponné, puis impression'} aria-label={inv?'Imprimer le bordereau et la facture':'Imprimer le bordereau'}
                         className="vrm-colis-primaire" style={{flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:C.onAccent,borderRadius:12,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}><Icon name="printer" size={16}/><span className="vrm-lib-long">{inv ? 'Imprimer + facture' : 'Imprimer le bordereau'}</span><span className="vrm-lib-court">Imprimer</span></button>
                       ) : (<>
                         {/* ⚠️ PLUS DE BOUTON « Générer sur Vinted ». C'est l'EXTENSION
@@ -56303,27 +56313,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         </div>
       )}
 
-      {bordResult && (
-        <div onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1250,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
-          <FermeAuRetour fermer={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }}/>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,borderRadius:12,maxWidth:360,width:'100%',padding:20,textAlign:'center'}}>
-            <div style={{fontSize:34,marginBottom:6}}>✅</div>
-            <div style={{fontSize:17,fontWeight:700,color:C.text,marginBottom:4}}>{bordResult.batch?`${bordResult.count} bordereaux prêts`:bordResult.withInvoice?'Bordereau + facture prêts':'Bordereau prêt'}</div>
-            <div style={{fontSize:13,color:C.muted,lineHeight:1.45,marginBottom:16}}>{bordResult.batch?<>Tous les bordereaux{bordResult.nInv>0?<> et <b>{bordResult.nInv} facture{bordResult.nInv>1?'s':''}</b> (comptes pro)</>:null} sont <b>à la suite dans un seul PDF</b> (le N° au même endroit sur chacun). {bordResult.printed?<>Ils sont <b>ouverts dans un nouvel onglet</b> : clique sur l'imprimante en haut à droite. Onglet pas ouvert ? Utilise le bouton ci-dessous.</>:<>Ouvre-le puis <b>Imprimer</b> — tu peux tout imprimer d'un coup.</>}</>:bordResult.printed?<>Le bordereau{bordResult.withInvoice?<> (avec <b>la facture</b>)</>:null} est <b>ouvert dans un nouvel onglet</b> : clique sur l'imprimante en haut à droite. Onglet pas ouvert ? Utilise le bouton ci-dessous.</>:<>{bordResult.withInvoice?<>Le PDF contient le <b>bordereau + la facture</b>. </>:null}Ouvre-le puis <b>Partager → Imprimer</b> (ou enregistre-le). Sur iPhone c'est le bouton de partage en bas.</>}</div>
-            <a href={bordResult.url} target="_blank" rel="noreferrer"
-              style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:12,padding:'13px 16px',fontSize:15,fontWeight:600,textDecoration:'none',marginBottom:8}}>📄 {bordResult.batch?'Ouvrir les bordereaux':bordResult.withInvoice?'Ouvrir bordereau + facture':'Ouvrir le bordereau'}</a>
-            {/* (3 nov.) « Déplacer le tampon » : l'aperçu s'ouvre, la place choisie s'imprime (et se mémorise pour la forme). */}
-            {bordResult.pdfBuf && !bordResult.batch && <button type="button" data-imprime="1" data-tampon-deplacer="1" onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:12,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:400,padding:'11px',marginBottom:8}}>Déplacer le tampon</button>}
-            {bordResult.batch && !bordResult.thermique && !bordResult.planche && <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Ton N° est tamponné sur chaque PDF, sinon sur une fiche juste après.</div>}
-            {/* (14 nov., lot colis-plus 98) 4 par page A4 : ce qui a VRAIMENT été posé (étiquettes, feuilles, échelle, pages entières). */}
+      {/* (16 nov., lot tampons-parametres — Julien : « faite à l'arrache ») « BORDEREAU PRÊT » refait : l'aperçu réel du
+          PDF tamponné, « Imprimer » (le partage au téléphone, sinon le PDF), « Enregistrer », « Déplacer le tampon ».
+          Ce que l'impression a VRAIMENT fait (planche, thermique, fiches) reste dit, en dessous de l'aperçu. */}
+      {bordResult && <BordereauPret r={bordResult} Feuille={SheetShell} Bouton={Bouton} Pourquoi={Pourquoi} dessiner={dessinerPdf}
+          onImprimer={() => { const v = ouvrirPdfLot({ url: bordResult.url, bytes: bordResult.bytes, filename: bordResult.filename }, { titre: bordResult.filename || '' }); if (v === 'bouton') { try { window.open(bordResult.url, '_blank'); } catch (_) {} } }}
+          onDeplacer={adjustBordPlacement} onFermer={() => { URL.revokeObjectURL(bordResult.url); setBordResult(null); }}>
+            {bordResult.batch && !bordResult.thermique && !bordResult.planche && <div className="vrm-aide" style={{fontSize:12,color:C.muted,marginBottom:8,lineHeight:1.4}}>Ton N° est tamponné sur chaque PDF, sinon sur une fiche juste après.</div>}
             {bordResult.batch && bordResult.planche ? <div className="vrm-aide" data-planche-resultat={`${bordResult.planche.etiquettes}/${bordResult.planche.feuilles}/${bordResult.planche.echelle}`} style={{fontSize:13,color:C.text,marginBottom:8,lineHeight:1.4}}>
               {tr('cp.planche.resultat', { etiquettes: bordResult.planche.etiquettes, feuilles: bordResult.planche.feuilles, echelle: bordResult.planche.echelle })}
               {bordResult.planche.entieres ? <> {tr('cp.planche.entieres', { n: bordResult.planche.entieres })}</> : null}</div> : null}
-            {/* ── CE QUE L'IMPRESSION THERMIQUE A VRAIMENT FAIT ────────────────
-                LE CHIFFRE, JAMAIS LA PROMESSE. « Ton étiquette est prête » sur
-                un bordereau qu'on n'a pas su découper, c'est le défaut le plus
-                coûteux du projet. On écrit combien ont été réduits à
-                l'étiquette, combien sont partis entiers, et POURQUOI. */}
             <TamponPose r={bordResult}/>
             {bordResult.thermique && (()=>{ const ent=bordResult.entiers||[]; const iso=bordResult.isoles||0;
               return (
@@ -56341,10 +56340,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {(bordResult.sansTampon||0)>0 && <div data-bord-sans-tampon={bordResult.sansTampon} style={{color:C.warn,marginTop:4}}>{bordResult.sansTampon===1?'1 étiquette part':`${bordResult.sansTampon} étiquettes partent`} sans N° (aucune place sûre, fiche de préparation coupée) : écris-le à la main.</div>}
                 </div>
               ); })()}
-            <button type="button" data-bord-fermer="1" onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{width:'100%',border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:400,padding:'8px'}}>Fermer</button>
-          </div>
-        </div>
-      )}
+      </BordereauPret>}
 
       {showAnnual && (
         <div onClick={()=>setShowAnnual(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>

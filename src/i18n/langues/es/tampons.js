@@ -82,5 +82,18 @@ export default {
   "tampons.apercu.titre": {
     "one": "Vista previa · {n} etiqueta",
     "other": "Vista previa · {n} etiquetas"
+  },
+  "tampons.pret.titre": "Etiqueta lista",
+  "tampons.pret.titreFacture": "Etiqueta y factura listas",
+  "tampons.pret.apercu": "Vista previa de la etiqueta sellada",
+  "tampons.pret.ouvert": "El PDF está abierto en una pestaña.",
+  "tampons.pret.imprimer": "Imprimir",
+  "tampons.pret.enregistrer": "Guardar",
+  "tampons.pret.deplacer": "Mover el sello",
+  "tampons.pret.pourquoi": "¿Por qué?",
+  "tampons.pret.pourquoiTexte": "En iPhone, «Imprimir» abre compartir: elige Imprimir.",
+  "tampons.pret.titreLot": {
+    "one": "{n} etiqueta lista",
+    "other": "{n} etiquetas listas"
   }
 };

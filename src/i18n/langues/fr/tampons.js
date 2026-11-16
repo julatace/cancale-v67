@@ -82,5 +82,18 @@ export default {
   "tampons.apercu.titre": {
     "one": "Aperçu avant impression · {n} bordereau",
     "other": "Aperçu avant impression · {n} bordereaux"
+  },
+  "tampons.pret.titre": "Bordereau prêt",
+  "tampons.pret.titreFacture": "Bordereau et facture prêts",
+  "tampons.pret.apercu": "Aperçu du bordereau tamponné",
+  "tampons.pret.ouvert": "Le PDF est ouvert dans un onglet.",
+  "tampons.pret.imprimer": "Imprimer",
+  "tampons.pret.enregistrer": "Enregistrer",
+  "tampons.pret.deplacer": "Déplacer le tampon",
+  "tampons.pret.pourquoi": "Pourquoi ?",
+  "tampons.pret.pourquoiTexte": "Sur iPhone, « Imprimer » ouvre le partage : choisis Imprimer.",
+  "tampons.pret.titreLot": {
+    "one": "{n} bordereau prêt",
+    "other": "{n} bordereaux prêts"
   }
 };

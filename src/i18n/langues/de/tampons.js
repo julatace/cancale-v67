@@ -82,5 +82,18 @@ export default {
   "tampons.apercu.titre": {
     "one": "Druckvorschau · {n} Etikett",
     "other": "Druckvorschau · {n} Etiketten"
+  },
+  "tampons.pret.titre": "Etikett bereit",
+  "tampons.pret.titreFacture": "Etikett und Rechnung bereit",
+  "tampons.pret.apercu": "Vorschau des gestempelten Etiketts",
+  "tampons.pret.ouvert": "Das PDF ist in einem Tab geöffnet.",
+  "tampons.pret.imprimer": "Drucken",
+  "tampons.pret.enregistrer": "Speichern",
+  "tampons.pret.deplacer": "Stempel verschieben",
+  "tampons.pret.pourquoi": "Warum?",
+  "tampons.pret.pourquoiTexte": "Auf dem iPhone öffnet „Drucken“ das Teilen-Menü: wähle Drucken.",
+  "tampons.pret.titreLot": {
+    "one": "{n} Etikett bereit",
+    "other": "{n} Etiketten bereit"
   }
 };

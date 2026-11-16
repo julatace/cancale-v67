@@ -25,3 +25,17 @@
 .vrm-tampons-apercu-actions{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;}
 .vrm-tampons-apercu-pied{position:sticky;bottom:0;padding-top:10px;margin-top:10px;background:inherit;}
 @media (prefers-reduced-motion: reduce){.vrm-tampons-interdit{transition:none;}}
+/* (16 nov.) Un bouton d'impression OCCUPÉ garde sa taille : texte et icône s'effacent sur place, une roue tourne dedans. */
+[data-occupe]{position:relative;color:transparent !important;}
+[data-occupe] svg,[data-occupe] img{visibility:hidden;}
+[data-occupe]::after{content:'';position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;box-sizing:border-box;border-radius:50%;border:2px solid var(--vrm-roue-c,#fff);border-right-color:transparent;animation:vrm-roue .8s linear infinite;}
+@keyframes vrm-roue{to{transform:rotate(360deg);}}
+@media (prefers-reduced-motion: reduce){[data-occupe]::after{animation:none;opacity:.6;}}
+/* « Bordereau prêt » refait */
+.vrm-bord-pret-apercu{position:relative;display:flex;justify-content:center;line-height:0;margin:4px 0 12px;min-height:120px;}
+.vrm-bord-pret-apercu canvas{display:block;max-width:100%;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.18),0 0 0 1px rgba(0,0,0,.06);background:#fff;}
+.vrm-bord-pret-phrase{margin:0 0 10px;font-size:13px;line-height:1.45;}
+.vrm-bord-pret-actions{display:flex;flex-direction:column;gap:10px;margin-top:6px;}
+.vrm-bord-pret-secondaires{display:flex;gap:10px;flex-wrap:wrap;}
+.vrm-bord-pret-secondaires>*{flex:1 1 140px;justify-content:center;text-align:center;text-decoration:none;}
+.vrm-bord-pret-pied{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
