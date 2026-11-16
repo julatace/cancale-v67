@@ -96,7 +96,8 @@ const charger = async (texte, nom) => {
   dit(typeof M.publicationColisFraiche === 'function' && M.publicationColisFraiche({ at: MAINT - 11 * 3600e3 }, MAINT) && !M.publicationColisFraiche({ at: MAINT - 13 * 3600e3 }, MAINT), 'P4. une seule fonction de fraîcheur (12 h)');
   dit(/publicationColisFraiche\(pub\)\) \? pub\.total : null/.test(app), 'P5. le badge de Colis lit la MÊME fonction');
   const ad = M.raisonCourte({ valeur: 315.4, aDater: 1772 });
-  dit(/^\+ 1\s772 ventes à dater$/.test(ad), 'F1. « + 1 772 ventes à dater » (un nombre de ventes écrit comme les autres, son unité dite — 9 nov.)', ad);
+  // (15 nov., extension 5.390) Julien : « Enlève les 1741 ventes à dater » — le montant est un minimum : « au moins ».
+  dit(ad === 'au moins', 'F1. un montant qui laisse 1 772 ventes sans date : « au moins » (plus « + 1 772 ventes à dater »)', ad);
 
   // ── C. Colis envoyés de la semaine ─────────────────────────────────────────
   const J = await charger(src.journal, 'journal');

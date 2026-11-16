@@ -47,7 +47,16 @@
 //     français reste le texte de référence), `role="presentation"` sur chaque
 //     table de mise en page, un `<h1>` unique ;
 //   · seulement des liens https (une adresse http n'est jamais posée).
+// (15 nov., « Verre dépoli », Julien : « J'aime la 9 ») LA FORME vient d'api/_lib/mail-verre.js,
+// la même que les modèles de compte Supabase (scripts/modeles-email.cjs) : fond bleu profond
+// (couleur unie + dégradé en image de fond), logo HÉBERGÉ sur vrm.center + le mot « VRM »
+// (une image bloquée ne laisse que le mot), TITRE en blanc sur le bleu, carte blanche
+// arrondie (le texte à l'encre), UN plein d'encre de 48 px, le pied en clair sur le bleu.
+// Ce qui précède sur la largeur, l'échappement, le sombre et les liens reste vrai ; le
+// bouton n'est plus bleu (#0071e3) mais d'encre (mot blanc 16,9:1), le gris est #3F5468.
 // 
+
+import { VERRE, teteVerre, boutonVerre, enveloppeVerre } from './mail-verre.js';
 
 export const SITE = 'https://vrm.center';
 // Réglages → Notifications (là où vivent le bilan du mois et les e-mails de l'essai).
@@ -61,8 +70,6 @@ export const urlSure = (u) => (/^https:\/\/[^\s"'<>]+$/i.test(String(u || '').tr
 const majuscule = (t) => (t ? t[0].toUpperCase() + t.slice(1) : t);
 const para = (t) => echapperHtml(t).replace(/\r?\n/g, '<br>');
 
-const POLICE = "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif";
-const ENCRE = '#1d1d1f', DOUX = '#636366', FILET = '#e5e5ea', FOND = '#f5f5f7', CARTE = '#ffffff', BLEU = '#0071e3';
 // La largeur de la carte (600 au plus) : la même pour la table fantôme d'Outlook.
 export const LARGEUR = 600;
 
@@ -114,87 +121,46 @@ export function gabaritMail({ titre, preentete = '', paras = [], liste = [], chi
   if (piedTxt.length) lignes.push('—', ...piedTxt);
   const texte = lignes.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 
-  // ── Le HTML ───────────────────────────────────────────────────────────────
-  const p = (t, style = '') => `<p class="vrm-t" style="margin:0 0 16px;font-size:16px;line-height:1.55;color:${ENCRE};${style}">${para(t)}</p>`;
-  // L'en-tête : un MOT, jamais une image (aucune image distante obligatoire).
-  // Le nom d'une boutique peut être long : il se coupe (jamais de défilement de côté).
-  const tete = marque
-    ? `<div class="vrm-t" style="font-size:17px;line-height:1.3;font-weight:600;color:${ENCRE};letter-spacing:-0.01em;word-break:break-word">${echapperHtml(marque.nom || '')}</div>`
-    : `<div class="vrm-doux" style="font-size:14px;line-height:1.3;font-weight:700;color:${DOUX};letter-spacing:0.06em">VRM</div>`;
+  // ── Le HTML : la forme « Verre dépoli » commune (api/_lib/mail-verre.js) ───────
+  // (15 nov., Julien : « J'aime la 9 ») Le fond bleu profond, le logo et le TITRE en blanc
+  // sur le bleu, la carte blanche (texte à l'encre), UN plein d'encre, le pied en clair.
+  const V = VERRE, P = V.police;
+  const p = (t, style = '') => `<p class="vv-encre" style="margin:0 0 16px;font-family:${P};font-size:16px;line-height:1.55;color:${V.encre};${style}">${para(t)}</p>`;
+  // En tête : le logo et « VRM » ; pour la facture d'un vendeur, le NOM de sa boutique
+  // (rien de VRM : Julien, 11 nov.). Un nom long se coupe.
+  const tete = teteVerre({ titreHtml: echapperHtml(titre), marqueHtml: marque ? echapperHtml(marque.nom || '') : '' });
   const tableChiffres = chiffres.length
-    ? `<table role="presentation" class="vrm-chiffres" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;margin:4px 0 20px;border-collapse:separate;background:${FOND};border-radius:14px">`
+    ? `<table role="presentation" class="vv-puits" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;margin:4px 0 20px;border-collapse:separate;background-color:${V.puits};border-radius:16px">`
       + chiffres.map(([l, v, n], i) => {
-        const filet = i ? `border-top:1px solid ${FILET};` : '';
+        const filet = i ? `border-top:1px solid ${V.filet};` : '';
         // (8 nov., capture 390 px) La note passe SOUS le libellé et le chiffre, sur toute la
         // largeur : au téléphone, la colonne du montant ne l'écrase plus en trois lignes.
         const haut = n ? '13px 16px 2px' : '13px 16px';
-        return `<tr><td class="vrm-filet" style="padding:${haut};${filet}vertical-align:top">`
-          + `<div class="vrm-t" style="font-size:15px;line-height:1.35;color:${ENCRE}">${echapperHtml(l)}</div>`
-          + `</td><td class="vrm-filet vrm-t" align="right" style="padding:${haut};${filet}text-align:right;vertical-align:top;white-space:nowrap;font-size:17px;line-height:1.35;font-weight:600;color:${ENCRE};font-variant-numeric:tabular-nums;font-feature-settings:'tnum'">${echapperHtml(v)}</td></tr>`
-          + (n ? `<tr><td colspan="2" class="vrm-doux" style="padding:0 16px 13px;font-size:14px;line-height:1.4;color:${DOUX}">${echapperHtml(n)}</td></tr>` : '');
+        return `<tr><td class="vv-filet" style="padding:${haut};${filet}vertical-align:top">`
+          + `<div class="vv-encre" style="font-family:${P};font-size:15px;line-height:1.35;color:${V.encre}">${echapperHtml(l)}</div>`
+          + `</td><td class="vv-filet vv-encre" align="right" style="padding:${haut};${filet}text-align:right;vertical-align:top;white-space:nowrap;font-family:${P};font-size:17px;line-height:1.35;font-weight:600;color:${V.encre};font-variant-numeric:tabular-nums;font-feature-settings:'tnum'">${echapperHtml(v)}</td></tr>`
+          + (n ? `<tr><td colspan="2" class="vv-gris" style="padding:0 16px 13px;font-family:${P};font-size:14px;line-height:1.4;color:${V.gris}">${echapperHtml(n)}</td></tr>` : '');
       }).join('')
       + `</table>`
     : '';
-  // Le bouton « à toute épreuve » : une cellule colorée (Outlook) + le lien en bloc.
-  // Le même bleu en clair et en sombre : un mot blanc y reste lisible (4,7:1).
-  const btn = bouton && urlBouton
-    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 20px"><tr><td class="vrm-bouton" align="center" bgcolor="${BLEU}" style="border-radius:12px;background:${BLEU}">`
-      + `<a class="vrm-bouton" href="${echapperHtml(urlBouton)}" style="display:block;padding:0 24px;line-height:44px;min-height:44px;border-radius:12px;background:${BLEU};color:#ffffff;font-size:16px;font-weight:600;text-decoration:none">${echapperHtml(bouton.mot)}</a>`
-      + `</td></tr></table>`
-    : '';
-  const petit = (t) => `<p class="vrm-doux" style="margin:0 0 10px;font-size:14px;line-height:1.5;color:${DOUX}">${t}</p>`;
-  const lienDoux = (url, mot) => `<a href="${echapperHtml(url)}" class="vrm-doux" style="color:${DOUX};text-decoration:underline">${echapperHtml(mot)}</a>`;
+  const btn = bouton && urlBouton ? boutonVerre({ urlHtml: echapperHtml(urlBouton), motHtml: echapperHtml(bouton.mot) }) : '';
+  // Le pied, en clair sur le bleu (hors de la carte) ; ses liens en blanc souligné.
+  const petit = (t) => `<p class="vv-pied" style="margin:0 0 10px;font-family:${P};font-size:13px;line-height:1.55;color:${V.surBleu2}">${t}</p>`;
+  const lienDoux = (url, mot) => `<a href="${echapperHtml(url)}" style="color:${V.surBleu};text-decoration:underline">${echapperHtml(mot)}</a>`;
   const blocsPied = [];
-  if (bouton && urlBouton) blocsPied.push(petit(`Le bouton ne marche pas ? Copie cette adresse dans ton navigateur :<br><span style="word-break:break-all">${echapperHtml(urlBouton)}</span>`));
+  if (bouton && urlBouton) blocsPied.push(petit(`Le bouton ne marche pas ? Copie cette adresse dans ton navigateur :<br><span style="word-break:break-all;color:${V.surBleu}">${echapperHtml(urlBouton)}</span>`));
   if (pied) blocsPied.push(petit(`${echapperHtml(pied.texte)}${lienPied ? ` ${lienDoux(lienPied, majuscule(pied.motLien || 'lien'))}.` : ''}`));
   if (facultatif) blocsPied.push(petit(lienDoux(LIEN_GERER, 'Gérer mes e-mails')));
   if (mentions.length) blocsPied.push(petit(mentions.map(echapperHtml).join('<br>')));
 
-  // Le sombre : la feuille `prefers-color-scheme` (Apple Mail, iOS, Outlook macOS),
-  // puis les MÊMES règles sous les attributs d'Outlook.com (`data-ogsc` : couleur
-  // du texte, `data-ogsb` : fond), qui ne lit pas la requête média.
-  const sombre = (pre) => {
-    const s = (sel) => sel.split(',').map((x) => `${pre}${x}`).join(',');
-    return `${s('.vrm-fond')}{background:#000000!important}${s('.vrm-carte')}{background:#1c1c1e!important}`
-      + `${s('.vrm-t')}{color:#f5f5f7!important}${s('.vrm-doux')}{color:#aeaeb2!important}`
-      + `${s('.vrm-filet')}{border-color:#38383a!important}${s('.vrm-chiffres')}{background:#2c2c2e!important}`
-      + `${s('hr.vrm-filet')}{border-top-color:#38383a!important}`;
-  };
-  const style = `<style>`
-    + `:root{color-scheme:light dark;supported-color-schemes:light dark}`
-    + `@media (prefers-color-scheme:dark){${sombre('')}}`
-    + sombre('[data-ogsc] ').replace(/\{background[^}]*\}/g, '{}').replace(/[^{}]+\{\}/g, '')
-    + sombre('[data-ogsb] ').replace(/\{(color|border-color|border-top-color)[^}]*\}/g, '{}').replace(/[^{}]+\{\}/g, '')
-    + `@media (max-width:480px){.vrm-carte-td{padding:24px 20px!important}.vrm-h1{font-size:22px!important}.vrm-ext{padding:16px 8px 28px!important}}`
-    + `</style>`;
-
-  const html = `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">`
-    + `<meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">`
-    + `<meta name="format-detection" content="telephone=no,date=no,address=no,email=no">`
-    + `<title>${echapperHtml(titre)}</title>${style}</head>`
-    + `<body class="vrm-fond" style="margin:0;padding:0;background:${FOND};-webkit-text-size-adjust:100%;font-family:${POLICE}">`
-    // Le préentête : caché, suivi de blancs pour que la boîte n'y colle pas le corps.
-    + `<div style="display:none;max-height:0;overflow:hidden;opacity:0;mso-hide:all;font-size:1px;line-height:1px;color:${FOND}">${echapperHtml(apercu)}${'&#8199;&#65279;&#847; '.repeat(20)}</div>`
-    + `<table role="presentation" class="vrm-fond" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${FOND}" style="width:100%;background:${FOND}"><tr><td class="vrm-ext" align="center" style="padding:28px 12px 36px">`
-    // Outlook (Windows) ignore `max-width` : une table fantôme fixe la largeur.
-    + `<!--[if mso]><table role="presentation" width="${LARGEUR}" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td><![endif]-->`
-    + `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:${LARGEUR}px">`
-    + `<tr><td style="padding:0 8px 14px;font-family:${POLICE}">${tete}</td></tr>`
-    + `<tr><td class="vrm-carte vrm-carte-td" bgcolor="${CARTE}" style="background:${CARTE};border-radius:18px;padding:32px 28px;font-family:${POLICE}">`
-    + `<h1 class="vrm-t vrm-h1" style="margin:0 0 16px;font-size:24px;line-height:1.25;font-weight:700;letter-spacing:-0.02em;color:${ENCRE};word-break:break-word">${echapperHtml(titre)}</h1>`
-    + paras.map((t) => p(t)).join('')
-    + (liste.length ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 16px">${liste.map((x) => `<tr><td class="vrm-t" valign="top" style="width:18px;padding:0 0 10px;font-size:16px;line-height:1.55;color:${BLEU}">•</td><td class="vrm-t" style="padding:0 0 10px;font-size:16px;line-height:1.55;color:${ENCRE}">${para(x)}</td></tr>`).join('')}</table>` : '')
+  const corps = paras.map((t) => p(t)).join('')
+    + (liste.length ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 16px">${liste.map((x) => `<tr><td class="vv-gris" valign="top" style="width:18px;padding:0 0 10px;font-family:${P};font-size:16px;line-height:1.55;color:${V.gris}">•</td><td class="vv-encre" style="padding:0 0 10px;font-family:${P};font-size:16px;line-height:1.55;color:${V.encre}">${para(x)}</td></tr>`).join('')}</table>` : '')
     + tableChiffres
     + suite.map((t) => p(t)).join('')
     + btn
-    + (apres ? p(apres, `font-size:14px;color:${DOUX}`).replace('class="vrm-t"', 'class="vrm-doux"') : '')
-    + `</td></tr>`
-    + (blocsPied.length
-      ? `<tr><td style="padding:20px 8px 0;font-family:${POLICE}"><hr class="vrm-filet" style="border:0;border-top:1px solid ${FILET};margin:0 0 16px">${blocsPied.join('')}</td></tr>`
-      : '')
-    + `</table>`
-    + `<!--[if mso]></td></tr></table><![endif]-->`
-    + `</td></tr></table></body></html>`;
+    + (apres ? p(apres, `font-size:14px;color:${V.gris}`).replace('class="vv-encre"', 'class="vv-gris"') : '');
+  // (Un e-mail sans rien dans la carte garde sa carte : le titre seul dit ce que c'est.)
+  const html = enveloppeVerre({ lang, titreDoc: echapperHtml(titre), apercuHtml: echapperHtml(apercu), teteHtml: tete, corpsHtml: corps, piedHtml: blocsPied.join('') });
   return { texte, html };
 }
 
