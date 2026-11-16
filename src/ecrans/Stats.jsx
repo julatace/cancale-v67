@@ -1156,12 +1156,14 @@ const OFFRES_STATS_LECTURES = 'id=like.harvest_%25_conv_%25&select=id,cap:data->
 const OFFRES_STATS_TXN = 'id=like.harvest_%25_txn_%25&select=tx:meta->>id,sys:data->payload->transaction->offer->>is_system,op:data->payload->transaction->offer->price->>amount,oc:data->payload->transaction->offer->price->>currency_code,ic:data->payload->transaction->order->>item_count,ip:data->payload->transaction->order->items->0->price->>amount,icur:data->payload->transaction->order->items->0->price->>currency_code';
 const lireOffresStats = async () => {
   const owner = AUTH.user?.id;
-  if (!owner) return { convs: null, lectures: null, txn: null };
+  if (!owner) return { convs: null, lectures: null, txn: null, journal: null };
   if (_offresCache?.owner === owner && Date.now() - _offresCache.at < 10 * 60 * 1000) return _offresCache;
-  const [rc, rl, rt] = await Promise.all([
+  const [rc, rl, rt, rj] = await Promise.all([
     lireTout(OFFRES_STATS_CONV, { strict: true }).catch(() => null),
     lireTout(OFFRES_STATS_LECTURES, { strict: true }).catch(() => null),
     lireTout(OFFRES_STATS_TXN, { strict: true }).catch(() => null),
+    // (16 nov.) Le journal des gestes ACCEPTÉS par Vinted (extension 5.337, `journal_vrm_{uid}_{nav}`, projeté sur `e`).
+    lireTout('id=like.journal_vrm_*&select=id,e:data->e', { strict: true }).catch(() => null),
   ]);
   const uidDe = (id) => { const m = /^harvest_(\d+)_conv_\d+$/.exec(String(id || '')); return m ? m[1] : null; };
   const convs = Array.isArray(rc) && Array.isArray(rl) ? rc.map((r) => ({ compte: uidDe(r.id), side: r.side, opp: r.opp, tx: r.tx == null ? '' : String(r.tx), messages: Array.isArray(r.msgs) ? r.msgs : [] })).filter((c) => c.compte) : null;
@@ -1172,8 +1174,8 @@ const lireOffresStats = async () => {
   }
   let txn = null;
   if (Array.isArray(rt)) { txn = {}; for (const r of rt) if (r && r.tx) txn[String(r.tx)] = { sys: r.sys, op: r.op, oc: r.oc, ic: r.ic, ip: r.ip, icur: r.icur }; }
-  if (AUTH.user?.id !== owner) return { convs: null, lectures: null, txn: null };
-  _offresCache = { owner, at: Date.now(), convs, lectures, txn };
+  if (AUTH.user?.id !== owner) return { convs: null, lectures: null, txn: null, journal: null };
+  _offresCache = { owner, at: Date.now(), convs, lectures, txn, journal: Array.isArray(rj) ? rj : null };
   return _offresCache;
 };
 // ⟦← App.jsx #15⟧
