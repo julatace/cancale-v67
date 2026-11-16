@@ -2202,12 +2202,19 @@ async function captureAllAccounts() {
 // ── JOURNAL D'ACTIVITÉ (l'« interface quand je fais des actions ») ───────────
 // Petit fil des dernières choses faites par l'extension, montré dans le panneau
 // VRM. Anneau de 15 événements dans chrome.storage.local (léger, local).
-async function logActivity(text) {
-  try {
-    const cur = (await chrome.storage.local.get('vrmActivity')).vrmActivity || [];
+// 5.396 (revue, basse 86) : une écriture à la fois (chaîne de module) — deux événements
+// simultanés ne s'écrasent plus ; une lecture ratée n'écrit rien (le fil n'est pas vidé).
+let _chaineActivite = Promise.resolve();
+function logActivity(text) {
+  const suite = _chaineActivite.then(async () => {
+    let cur;
+    try { cur = (await chrome.storage.local.get('vrmActivity')).vrmActivity || []; } catch (_) { return; }
+    if (!Array.isArray(cur)) cur = [];
     cur.unshift({ t: Date.now(), text: String(text || '').slice(0, 90) });
-    await chrome.storage.local.set({ vrmActivity: cur.slice(0, 15) });
-  } catch (_) {}
+    try { await chrome.storage.local.set({ vrmActivity: cur.slice(0, 15) }); } catch (_) {}
+  });
+  _chaineActivite = suite.then(() => {}, () => {});
+  return suite.catch(() => {});
 }
 
 // --- Capture passive des donnees ------------------------------------------
@@ -2250,7 +2257,10 @@ let _diagFlushAt = 0;
 function majTampon(fn) {
   _diagChaine = _diagChaine.then(async () => {
     let buf = {};
-    try { const s = await chrome.storage.local.get(DIAG_BUF); buf = (s && s[DIAG_BUF]) || {}; } catch (_) {}
+    // 5.396 (revue, basse 84) : stockage illisible ⇒ rien n'est écrit (avant : `{}` réécrit
+    // par-dessus le tampon existant, ses compteurs perdus). Ce compteur-ci est perdu, pas les autres.
+    try { const s = await chrome.storage.local.get(DIAG_BUF); buf = (s && s[DIAG_BUF]) || {}; } catch (_) { return; }
+    if (!buf || typeof buf !== 'object') buf = {};
     buf.n = buf.n || {}; buf.rates = buf.rates || {};
     fn(buf);
     try { await chrome.storage.local.set({ [DIAG_BUF]: buf }); } catch (_) {}
@@ -2262,6 +2272,17 @@ function majTampon(fn) {
   return _diagChaine;
 }
 
+const DIAG_N_MAX = 600, DIAG_RATES_MAX = 80;
+// Les compteurs les plus grands, et toujours ceux qu'on vient d'ajouter (`neufs`).
+function bornerCompteurs(n, neufs, max) {
+  const cles = Object.keys(n || {});
+  if (cles.length <= max) return n;
+  const garde = new Set(Object.keys(neufs || {}));
+  const reste = cles.filter((k) => !garde.has(k)).sort((a, b) => (Number(n[b]) || 0) - (Number(n[a]) || 0));
+  for (const k of reste) { if (garde.size >= max) break; garde.add(k); }
+  const out = {}; for (const k of cles) if (garde.has(k)) out[k] = n[k];
+  return out;
+}
 // Envoie le tampon en base et ne le vide QUE si l'écriture a abouti.
 async function viderTampon(buf) {
   const aDesN = Object.keys(buf.n || {}).length, aDesR = Object.keys(buf.rates || {}).length;
@@ -2271,20 +2292,26 @@ async function viderTampon(buf) {
   // (5.362 : la ligne de DIAGNOSTIC reste en lire-fusionner-réécrire — la passer en
   //  comparer-et-échanger, comme `seen_urls` et les statuts d'offres, est noté dans
   //  le récit ; deux Chrome peuvent encore s'y perdre quelques compteurs, rien d'autre.)
-  const rows = await sbGet('app_data?id=eq.panel_diag_capture&select=data');
-  if (rows === null) return;
+  // 5.396 (revue, moyenne 71 et basse 85) : COMPARER-ET-ÉCHANGER sur `data.rev`
+  //  (`modifierLigneCas`) — deux Chrome ne s'écrasent plus leurs compteurs ; et la ligne
+  //  est BORNÉE : 600 compteurs au plus (les plus grands gardés, ceux de ce tampon toujours),
+  //  80 échantillons (les plus récents). « Pas su » (lecture ou écriture ratée, devancé) ⇒
+  //  le tampon local n'est PAS vidé.
   const ver = (() => { try { return String(chrome.runtime.getManifest().version || ''); } catch (_) { return ''; } })();
-  const okDiag = await supabaseUpsert('app_data', [{ id: 'panel_diag_capture', data: ((d) => {
+  const okDiag = await modifierLigneCas('panel_diag_capture', (d) => {
     const tout = Object.assign({}, d || {}); delete tout.rev;
     const n = { ...(tout.n || {}) };
     for (const k in buf.n) n[k] = (n[k] || 0) + buf.n[k];
+    const nBorne = bornerCompteurs(n, buf.n, DIAG_N_MAX);
     // 5.362 (moyenne 49) : les anciens échantillons perdent leur `tete` (un morceau du corps).
-    const rates = {};
+    let rates = {};
     for (const [k, v] of Object.entries(Object.assign({}, tout.rates || {}, buf.rates || {}))) { if (v && typeof v === 'object') { const c = Object.assign({}, v); delete c.tete; rates[k] = c; } }
-    return { ...tout, n, rates, majAt: new Date().toISOString(),
+    const cr = Object.keys(rates);
+    if (cr.length > DIAG_RATES_MAX) rates = Object.fromEntries(cr.map((k) => [k, rates[k]]).sort((a, b) => String(b[1].at || '').localeCompare(String(a[1].at || ''))).slice(0, DIAG_RATES_MAX));
+    return { ...tout, n: nBorne, rates, majAt: new Date().toISOString(),
       ...(ver ? { ver, verAt: new Date().toISOString() } : {}), verCode: CODE_VERSION };
-  })((rows[0] && rows[0].data) || {}) }], 'id');
-  if (okDiag === false) return;
+  });
+  if (okDiag !== true) return;
   buf.n = {}; buf.rates = {};
   try { await chrome.storage.local.set({ [DIAG_BUF]: buf }); } catch (_) {}
 }
@@ -5283,7 +5310,7 @@ async function rangerSuppressions() {
 //     un titre. Inconnu ⇒ rien.
 const RESA_LIGNE = 'panel_num_reserves';
 const RESA_ATTENTE_MS = 3 * 3600e3;
-const RESA_ITEMS_MAX = 400;
+const RESA_ITEMS_MAX = 400, RESA_ITEMS_DUR = 2000, RESA_ITEMS_JOURS = 30;
 const RESA_LOCAL = 'vrmNumResaOnglets';
 let _chaineResa = Promise.resolve();
 const unResaALaFois = (fn) => { const p = _chaineResa.then(fn, fn); _chaineResa = p.catch(() => {}); return p; };
@@ -5329,7 +5356,11 @@ function resaPropre(data, maintenant) {
   for (const h of Object.values(haut)) attente[h.n] = h.v;
   const its = Object.entries((data && data.items) || {}).filter(([id, v]) => /^\d{4,15}$/.test(id) && v && v.numero);
   its.sort((a, b) => String(b[1].at || '').localeCompare(String(a[1].at || '')));
-  for (const [id, v] of its.slice(0, RESA_ITEMS_MAX)) items[id] = v;
+  // 5.396 (revue, basse 92) : une liaison annonce → N° de moins de 30 jours n'est JAMAIS
+  //   coupée par la borne (l'app ne l'a peut-être pas encore reprise) — les 400 plus récentes
+  //   comme avant, plus toutes celles du mois, 2 000 au plus (une ligne qui reste légère).
+  const recent = Date.now() - RESA_ITEMS_JOURS * 86400000;
+  its.forEach(([id, v], i) => { if (i < RESA_ITEMS_MAX || (i < RESA_ITEMS_DUR && Date.parse(String(v.at || '')) >= recent)) items[id] = v; });
   return { attente, items };
 }
 async function lireResa() {
@@ -11653,6 +11684,9 @@ function surAlarme(a) {
   else if (a.name === 'vrm-versement') { lance('versement', () => tickVersements()); lance('bordereaux', () => tickBordereaux()); }   // 5.376 : les bordereaux qui manquent
   // 5.344 : l'historique de départ, onglet Vinted ouvert (voir `tickImport`).
   else if (a.name === 'vrm-import') { lance('import', () => tickImport()); lance('importsites', () => tickImportSites()); }   // 5.365 : et Leboncoin / Vestiaire
+  // 5.396 (basse 94) : le passage « une minute après la visite », par alarme (survit au worker).
+  else if (a.name === 'vrm-import-bientot') { _importMinuteur = null; lance('import', () => tickImport()); }
+  else if (a.name === 'vrm-importsites-bientot') { _impSiteMinuteur = null; lance('importsites', () => tickImportSites()); }
   // 5.358 : l'empreinte des photos de ses annonces (voir `tickEmpreintes`).
   else if (a.name === 'vrm-empreintes') lance('empreintes', () => tickEmpreintes());
   // Le tampon de diagnostic survit au worker (chrome.storage.local) ; encore
@@ -12674,6 +12708,9 @@ async function repondreOffre({ uid, tx, oid, quoi, prix, conv, msg, pseudo = '',
   // tirée au hasard, jamais celle du refus précédent ; puis le temps d'écriture.
   const versionsRefus = Array.isArray(msg) ? msg : (typeof msg === 'string' ? versionsMessage(msg, []) : []);
   if (quoi === 'reject' && r && r.ok && conv && versionsRefus.length) {
+    // 5.396 (revue, basse 96) : la SECONDE requête revérifie le compte de l'onglet et la pause
+    //   429/403 (le refus a pu poser une pause, ou le compte basculer) — sans prendre de place.
+    if (await garde(uid, acc, { compter: false, sorte: 'offre' })) { noterDiag('offre_auto_refus_message_garde'); return { ok: true, status: r.status, error: '', messagePasParti: true }; }
     const c2 = await compterAction(String(uid), ACTIONS_MAX_HEURE - RESERVE_GESTES);
     if (!c2.ok) { noterDiag('offre_auto_refus_message_' + (c2.code === 'stockage' ? 'stockage' : 'plafond')); return { ok: true, status: r.status, error: '', messagePasParti: true }; }
     const version = choisirVariante(versionsRefus, await varianteDerniere(uid, 'refus'));
@@ -12762,7 +12799,11 @@ async function autoAccepterOffresUnPassage(uid, verrou) {
     if (!offres.length) return 0;
     const st = (await chrome.storage.local.get('vrmOffresFaites')).vrmOffresFaites || {};
     const limite = Date.now() - 7 * 86400000;
-    for (const k in st) if (!st[k] || st[k] < limite) delete st[k];
+    // 5.396 (revue, basse 95) : un mémo de plus de 7 jours n'est effacé que si l'offre n'est
+    //   PLUS en attente dans la lecture d'aujourd'hui — sinon une offre restée ouverte plus d'une
+    //   semaine aurait été traitée une seconde fois.
+    const encoreLa = new Set(offres.map((o) => String(o.oid)));
+    for (const k in st) if (!st[k] || (st[k] < limite && !encoreLa.has(String(k)))) delete st[k];
     let faites = 0;
     const pv = (await chrome.storage.local.get('vrmOffresPrevues')).vrmOffresPrevues || {};
     for (const k in pv) if (!pv[k] || st[k] || pv[k].at < Date.now() - 2 * 86400000) delete pv[k];
@@ -20357,6 +20398,9 @@ async function executerCommande(msg) {
   BORD_EN_COURS.add(jobId);
   let parti = false;                              // vrai dès que la file a pris le relais
   let acc = null;
+  // 5.396 (revue, basse 91) : la place réservée pour la génération est RENDUE si aucune
+  //   génération ne part (refus à son tour dans la file, PDF déjà là chez Vinted).
+  const recuBord = {};
   try {
     // ⚠️⚠️ L'ACCUSÉ NE DÉPEND PLUS D'UNE BASE LENTE (revue du 9 octobre). La liste
     //    des comptes et « ce PDF est-il déjà rangé ? » se lisaient SANS délai
@@ -20394,7 +20438,7 @@ async function executerCommande(msg) {
         return { accepte: false, code: 'lot',
                  raison: `${BORD_MAX_PAR_VISITE} bordereaux demandés ces ${Math.round(BORD_CMD_FENETRE_MS / 60000)} dernières minutes sur ce compte — jamais plus d'affilée chez Vinted. La suite dans ${min} min.` };
       }
-      const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, sorte: 'bordereau' });
+      const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, sorte: 'bordereau', recu: recuBord });
       if (stop) return await refusDe(stop);
       await noterBordereauCommande(uid);
       return null;
@@ -20404,6 +20448,7 @@ async function executerCommande(msg) {
     parti = true;
   } finally { if (!parti) BORD_EN_COURS.delete(jobId); }
   // L'exécution part dans la file ; l'app reçoit l'accusé TOUT DE SUITE.
+  let genere = false;
   avecVinted(async () => {
     // 5.162 : un 429/403 reçu EN ROUTE arrête la commande sur place, avec la
     // raison — pas une génération ni une insistance de plus.
@@ -20430,6 +20475,7 @@ async function executerCommande(msg) {
         if (await arretSiPause()) return;
         if (!connu.t) {
           await majCmd(jobId, { etape: 'generation' });
+          genere = true;
           const g = await genererBordereau(uid, tx, { gardeFaite: true });
           if (!g.ok && !g.deja) {
             if (await arretSiPause()) return;
@@ -20453,7 +20499,10 @@ async function executerCommande(msg) {
       }
     } catch (e) {
       await majCmd(jobId, { etape: 'echec', code: 'erreur', raison: String(e && e.message || e).slice(0, 120) });
-    } finally { BORD_EN_COURS.delete(jobId); }
+    } finally {
+      BORD_EN_COURS.delete(jobId);
+      if (!genere && recuBord.at) { try { await rendreActions(String(uid), recuBord.at, 1); } catch (_) {} }
+    }
   });
   return { accepte: true, jobId, etape: 'file', vivant: true };
 }
@@ -22231,9 +22280,23 @@ async function publierImport(uid, st) {
 let _importEnCours = null;
 // UN passage d'import pour le compte `uid` (celui de l'onglet). Rend le nombre
 // de pages lues. `opts.force` : « Tout récupérer » (repart de la page 1).
+// 5.396 (revue, basse 93) : un import à la fois (une requête Vinted à la fois, §3) — mais une
+//   demande pour un AUTRE compte n'est plus perdue (« 0 » sans le dire) : elle passe APRÈS
+//   celui en cours (une seule en attente par compte).
+let _importCompte = null;
+const _importApres = new Map();
 function importerHistorique(uid, opts = {}) {
-  if (_importEnCours) { try { noterDiag('import_deja_en_cours'); } catch (_) {} return _importEnCours.then(() => 0, () => 0); }
-  _importEnCours = importerHistoriqueUn(uid, opts).catch(() => 0).finally(() => { _importEnCours = null; });
+  const u = String(uid);
+  if (_importEnCours) {
+    if (_importCompte === u) { try { noterDiag('import_deja_en_cours'); } catch (_) {} return _importEnCours.then(() => 0, () => 0); }
+    if (_importApres.has(u)) return _importApres.get(u);
+    try { noterDiag('import_autre_compte_apres'); } catch (_) {}
+    const p = _importEnCours.then(() => 0, () => 0).then(() => { _importApres.delete(u); return importerHistorique(u, opts); });
+    _importApres.set(u, p);
+    return p;
+  }
+  _importCompte = u;
+  _importEnCours = importerHistoriqueUn(uid, opts).catch(() => 0).finally(() => { _importEnCours = null; _importCompte = null; });
   return _importEnCours;
 }
 // 5.375 : ce que dit un refus de la garde, dans l'état (pause ou souci).
@@ -22399,8 +22462,13 @@ async function importerAnnonces(uid, acc, st) {
 // Après une visite : un passage 1 min plus tard (la rafale de la visite est
 // passée). Un seul minuteur ; le service worker endormi ⇒ l'alarme de 5 min.
 let _importMinuteur = null;
+// 5.396 (revue, basse 94) : par une ALARME d'une minute (elle survit au service worker,
+//   §4.9) quand le navigateur en a ; sinon le minuteur d'avant (rattrapé par l'alarme de 5 min).
 function planifierImport() {
-  try { if (_importMinuteur) return; _importMinuteur = setTimeout(() => { _importMinuteur = null; tickImport(); }, 60000); } catch (_) {}
+  try {
+    if (chrome.alarms && typeof chrome.alarms.create === 'function') { if (_importMinuteur) return; _importMinuteur = true; chrome.alarms.create('vrm-import-bientot', { delayInMinutes: 1 }); return; }
+    if (_importMinuteur) return; _importMinuteur = setTimeout(() => { _importMinuteur = null; tickImport(); }, 60000);
+  } catch (_) {}
 }
 // Le passage de fond (alarme `vrm-import`, 5 min) : onglet vinted.fr ouvert, le
 // compte de son cookie, une session VRM, aucune pause, une base qui répond, un
@@ -22741,7 +22809,10 @@ async function importerSiteUn(site, compte, opts) {
 }
 let _impSiteMinuteur = null;
 function planifierImportSites() {
-  try { if (_impSiteMinuteur) return; _impSiteMinuteur = setTimeout(() => { _impSiteMinuteur = null; tickImportSites(); }, 60000); } catch (_) {}
+  try {
+    if (chrome.alarms && typeof chrome.alarms.create === 'function') { if (_impSiteMinuteur) return; _impSiteMinuteur = true; chrome.alarms.create('vrm-importsites-bientot', { delayInMinutes: 1 }); return; }
+    if (_impSiteMinuteur) return; _impSiteMinuteur = setTimeout(() => { _impSiteMinuteur = null; tickImportSites(); }, 60000);
+  } catch (_) {}
 }
 // Le passage de fond (alarme `vrm-import`) : chaque compte ouvert dans un onglet
 // Leboncoin / Vestiaire qui a un modèle et quelque chose à lire — un à la fois.

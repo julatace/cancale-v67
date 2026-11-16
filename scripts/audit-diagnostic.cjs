@@ -60,6 +60,17 @@ function demarrerWorker(bloc, magasin, journal) {
       journal.base = JSON.parse(JSON.stringify(rows[0].data));
       journal.ecritures++;
     },
+    // 5.396 (revue, moyenne 71) : la ligne s'écrit par comparer-et-échanger (`modifierLigneCas`,
+    // hors du bloc) — servi ici avec la même base ; réseau coupé ⇒ « pas su » (null), rien d'écrit.
+    modifierLigneCas: async (_id, modifier) => {
+      if (journal.casse) return null;
+      const d = JSON.parse(JSON.stringify(journal.base));
+      const nouveau = await modifier(d);
+      if (nouveau === undefined) return false;
+      journal.base = JSON.parse(JSON.stringify(Object.assign({}, nouveau, { rev: (Number(d.rev) || 0) + 1 })));
+      journal.ecritures++;
+      return true;
+    },
   };
   vm.createContext(ctx);
   vm.runInContext(bloc, ctx);
