@@ -95,13 +95,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # nouveau-vendeur seul : le plus long (chaque écran, 2 largeurs, 2 thèmes).
+          # nouveau-vendeur : le plus long des écrans (chaque écran, 2 largeurs, 2 thèmes), ~6 min.
+          # (16 nov., lot derniers-rouges) budget-vitesse vient ici : mesuré sur la CI du 16 nov., la part 2
+          # durait plus de 45 min (navigation-tache 9 min, budget-vitesse 18 min — 3 essais par écran hors
+          # budget —, accessibilite 8 min et pas finie) et était COUPÉE avant son bilan, alors que la part 1
+          # finissait en 6 min. Rééquilibré : ~25 / ~25 / ~33 min, chacune sous son délai de 45 min.
           - part: 1
-            lot: nouveau-vendeur garde-ecrans
+            lot: nouveau-vendeur garde-ecrans budget-vitesse
           # budget-vitesse (11 nov.) : lectures, octets, doublons, lignes entières et JS par
-          # écran principal, contre scripts/budget-vitesse.json (~5 min).
+          # écran principal, contre scripts/budget-vitesse.json — en part 1 depuis le 16 nov.
           - part: 2
-            lot: navigation-tache ventes-e2 journee-coherence morceau-perime statut-colis budget-vitesse accessibilite
+            lot: navigation-tache ventes-e2 journee-coherence morceau-perime statut-colis accessibilite
           - part: 3
             lot: colis-retirer-propre annonces-actions iphone-reprise argent-mois chiffres-coherents retraits-suivi accessibilite-clavier
     steps:
