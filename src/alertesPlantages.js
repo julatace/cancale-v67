@@ -50,6 +50,13 @@ export const typeADire = (t) => !!t && ((Array.isArray(t.appareils) ? t.appareil
 
 export const ecranAlerte = (v) => { const s = String(v || ''); const e = ECRANS.includes(s) ? s : s.split(':')[0]; return ECRANS.includes(e) ? e : ''; };
 const garde = (origine) => origine === 'ecran' || origine === 'feuille';
+// (16 nov., lot anti-bug) D'où vient l'erreur, dans une liste FERMÉE. `promesse` (un rejet que rien n'a
+// rattrapé) et `morceau` (un morceau de l'app qui n'a pas pu se charger, rattrapé ou non) partent dès la
+// PREMIÈRE fois, comme un écran tombé : avant, ils attendaient 3 répétitions (promesse) ou ne partaient
+// jamais (morceau, compté seulement dans les temps réels) — le journal ne disait rien depuis le 12 nov.
+export const ORIGINES = ['ecran', 'feuille', 'page', 'promesse', 'morceau', 'demarrage', 'ouverture', 'csp'];
+export const origineAlerte = (v) => { const s = String(v == null ? '' : v); return ORIGINES.includes(s) ? s : ''; };
+const tout_de_suite = (origine) => origine === 'promesse' || origine === 'morceau';
 // Le message tel qu'il peut sortir : nettoyé (journal), masqué (signalement),
 // puis `masque` (l'appareil : les jetons du mode stream).
 export const messageAlerte = (m, masque) => {
@@ -71,6 +78,7 @@ export function compterErreur(etat, e, { maintenant = Date.now(), masque } = {})
     n: Math.min(N_MAX, (Number(avant.n) || 0) + 1), garde: (Number(avant.garde) || 0) + (garde(String(e.origine || '')) ? 1 : 0),
     // (15 nov.) l'ouverture bloquée, et l'appareil (liste fermée).
     bloque: (Number(avant.bloque) || 0) + (bloquante(String(e.origine || '')) ? 1 : 0), appareil: appareilAlerte(e.appareil) || avant.appareil || '',
+    immediat: (Number(avant.immediat) || 0) + (tout_de_suite(String(e.origine || '')) ? 1 : 0), origine: origineAlerte(e.origine) || avant.origine || '',
     envoye: Math.min(Number(avant.envoye) || 0, N_MAX), at: new Date(maintenant).toISOString(),
   };
   const cles = Object.keys(out).sort((a, b) => String(out[b].at || '').localeCompare(String(out[a].at || ''))).slice(0, TYPES_MAX_APPAREIL);
@@ -84,8 +92,8 @@ export function evenementsAEnvoyer(etat) {
     if (!x || typeof x !== 'object') continue;
     const n = Number(x.n) || 0, envoye = Number(x.envoye) || 0;
     if (n <= envoye) continue;
-    if (!(Number(x.garde) > 0) && !(Number(x.bloque) > 0) && n < REPETITION_MIN) continue;
-    out.push({ cle, ecran: x.ecran || '', message: x.message, version: x.version || '', n: n - envoye, garde: Number(x.garde) > 0, bloque: Number(x.bloque) > 0, appareil: x.appareil || '' });
+    if (!(Number(x.garde) > 0) && !(Number(x.bloque) > 0) && !(Number(x.immediat) > 0) && n < REPETITION_MIN) continue;
+    out.push({ cle, ecran: x.ecran || '', message: x.message, version: x.version || '', n: n - envoye, garde: Number(x.garde) > 0, bloque: Number(x.bloque) > 0, appareil: x.appareil || '', origine: x.origine || '' });
   }
   return normaliserEvenements(out.slice(0, EVENEMENTS_MAX_LOT)).map((ev, i) => ({ ...ev, cle: out[i].cle }));
 }
@@ -106,7 +114,8 @@ export function normaliserEvenements(liste) {
     const n = Number(x.n);
     if (!message || !Number.isInteger(n) || n < 1) continue;
     out.push({ ecran: ecranAlerte(x.ecran), message, version: versionApp(x.version), n: Math.min(N_MAX, n), garde: x.garde === true,
-      ...(x.bloque === true ? { bloque: true } : {}), ...(appareilAlerte(x.appareil) ? { appareil: appareilAlerte(x.appareil) } : {}) });
+      ...(x.bloque === true ? { bloque: true } : {}), ...(appareilAlerte(x.appareil) ? { appareil: appareilAlerte(x.appareil) } : {}),
+      ...(origineAlerte(x.origine) ? { origine: origineAlerte(x.origine) } : {}) });
   }
   return out;
 }
@@ -115,7 +124,11 @@ export function normaliserEvenements(liste) {
 // data : { v, jour, rev, types: { [cle]: { message, ecrans:{}, versions:{}, n,
 //          garde, appareils:[empreintes du jour], premier, dernier, notifie } },
 //          contrib: { [empreinte]: n }, notifieA }
-export function jourApresEvenements(avant, evts, empreinte, maintenant = Date.now()) {
+// (16 nov., lot anti-bug) `deProprio` : les plantages du PROPRIÉTAIRE de l'installation. Depuis le
+// 15 nov. ils n'étaient rangés NULLE PART (« le propriétaire jamais compté ») : seul vendeur actif,
+// Julien voyait des bugs et le journal restait vide. Ils sont rangés à part (`proprio` par type) :
+// jamais une « personne touchée » (`appareils`), jamais une ouverture bloquée à dire, jamais notifiés.
+export function jourApresEvenements(avant, evts, empreinte, maintenant = Date.now(), { deProprio = false } = {}) {
   const d = avant && typeof avant === 'object' ? avant : {};
   const contrib = { ...(d.contrib && typeof d.contrib === 'object' ? d.contrib : {}) };
   const deja = Number(contrib[empreinte]) || 0;
@@ -129,13 +142,15 @@ export function jourApresEvenements(avant, evts, empreinte, maintenant = Date.no
     const t = types[cle] && typeof types[cle] === 'object' ? { ...types[cle] } : (Object.keys(types).length >= TYPES_MAX_JOUR ? null : { message: e.message, ecrans: {}, versions: {}, n: 0, garde: 0, appareils: [], premier: at, notifie: 0 });
     if (!t) continue;
     t.n = (Number(t.n) || 0) + e.n;
+    if (deProprio) t.proprio = (Number(t.proprio) || 0) + e.n;
+    if (e.origine) t.origines = { ...(t.origines && typeof t.origines === 'object' ? t.origines : {}), [e.origine]: ((t.origines && t.origines[e.origine]) || 0) + e.n };
     if (e.garde) t.garde = (Number(t.garde) || 0) + e.n;
     if (e.ecran) t.ecrans = { ...t.ecrans, [e.ecran]: ((t.ecrans && t.ecrans[e.ecran]) || 0) + e.n };
     if (e.version) t.versions = { ...t.versions, [e.version]: ((t.versions && t.versions[e.version]) || 0) + e.n };
-    if (e.bloque) t.bloque = (Number(t.bloque) || 0) + e.n;
+    if (e.bloque && !deProprio) t.bloque = (Number(t.bloque) || 0) + e.n;
     if (e.appareil) { const nav = t.navigateurs && typeof t.navigateurs === 'object' ? t.navigateurs : {}; if (nav[e.appareil] || Object.keys(nav).length < 8) t.navigateurs = { ...nav, [e.appareil]: (nav[e.appareil] || 0) + e.n }; }
     const ap = Array.isArray(t.appareils) ? t.appareils : [];
-    t.appareils = ap.includes(empreinte) || ap.length >= APPAREILS_MAX_TYPE ? ap : [...ap, empreinte];
+    t.appareils = deProprio || ap.includes(empreinte) || ap.length >= APPAREILS_MAX_TYPE ? ap : [...ap, empreinte];
     t.dernier = at;
     types[cle] = t;
   }

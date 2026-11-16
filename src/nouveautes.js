@@ -26,6 +26,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (16 nov., lot anti-bug) docs/passation/2026-11-16-anti-bug.md
+  { id: 'maj-au-calme', date: '2026-11-16', titre: 'Les mises à jour arrivent sans écran blanc', phrase: 'VRM se recharge au calme, jamais pendant une saisie.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (16 nov., captures iPhone de Julien) docs/passation/2026-11-16-ventes-clair.md
   // (16 nov., Julien : « comme quand on reste appuyé sur une app sur iPhone ») docs/passation/2026-11-16-relier-glisser.md
   { id: 'relier-glisser', date: '2026-11-16', titre: 'Relier un achat en le glissant', phrase: 'Reste appuyé sur l’achat, pose-le sur la vente ou l’annonce.', tab: 'achats', pour: 'tous', mode: 'tous' },

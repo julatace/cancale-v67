@@ -8,6 +8,7 @@
 // garde-fou, et si la notification groupée l'a déjà dit. Anonyme : aucun vendeur.
 // Trois états (§5) : en cours · pas su (la panne et « Réessayer ») · lu.
 import React from 'react';
+import { tr } from '../i18n/index.js';
 
 const S = { muet: { color: 'var(--vrm-muted)', fontSize: 13, lineHeight: 1.45 } };
 const jourLisible = (j) => { try { return new Date(j + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }); } catch (_) { return j; } };
@@ -87,7 +88,7 @@ export function PlantagesTerrain({ entetes, fetcher = (typeof fetch === 'functio
                   <span style={{ fontSize: 15, fontVariantNumeric: 'tabular-nums', color: t.garde ? 'var(--vrm-warn)' : 'var(--vrm-ink)', fontWeight: 600, flex: '0 0 auto' }} data-plantage-n={t.n}>{t.n}×</span>
                 </div>
                 <p style={{ margin: '4px 0', fontSize: 13, lineHeight: 1.45, color: 'var(--vrm-ink)', fontFamily: 'ui-monospace,SFMono-Regular,Menlo,monospace', overflowWrap: 'anywhere' }}>{t.message}</p>
-                <p style={{ ...S.muet, margin: 0 }}>{[t.garde ? `écran tombé ${t.garde}×` : 'erreur répétée', `${t.appareils} appareil${t.appareils > 1 ? 's' : ''}`, t.versions.length ? `version ${t.versions[0]}` : '', t.dit ? 'notifié' : 'pas encore notifié'].filter(Boolean).join(' · ')}</p>
+                <p style={{ ...S.muet, margin: 0 }}>{[t.garde ? `écran tombé ${t.garde}×` : 'erreur répétée', `${t.appareils} appareil${t.appareils > 1 ? 's' : ''}`, t.chezToi ? tr('ab.plantages.chezToi', { n: t.chezToi }) : '', ...Object.keys(t.origines || {}).filter((o) => o === 'promesse' || o === 'morceau').map((o) => tr('ab.plantages.origine.' + o)), t.versions.length ? `version ${t.versions[0]}` : '', t.dit ? 'notifié' : 'pas encore notifié'].filter(Boolean).join(' · ')}</p>
               </li>
             ))}
           </ul>

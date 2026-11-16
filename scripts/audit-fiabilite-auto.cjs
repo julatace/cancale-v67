@@ -225,13 +225,28 @@ async function controles() {
     dit(a.code === 200 && a.corps.ok && Array.isArray(a.corps.types) && a.corps.types[0] && a.corps.types[0].personnes === 1, 'C13 la route rend le rapport au propriétaire (lui-même jamais compté)', a);
     dit(b.code === 403, 'C14 un autre compte : 403', b.code);
     // Les plantages du PROPRIÉTAIRE ne comptent pour aucune personne : rien n'est rangé pour eux.
-    const ecritsT = [];
-    const fetcherT = async (url, o = {}) => { const u = decodeURIComponent(String(url)); if ((o.method || 'GET') !== 'GET' && /plantages_terrain_|on_conflict/.test(u)) ecritsT.push(u); if (/vrm_reglages/.test(u)) return rep([{ valeur: JULIEN }]); if (/rpc\//.test(u)) return rep(true); if ((o.method || 'GET') === 'GET') return rep([]); return rep([{ id: 'x' }], 201); };
+    const ecritsT = [], corpsT = [];
+    const fetcherT = async (url, o = {}) => { const u = decodeURIComponent(String(url)); if ((o.method || 'GET') !== 'GET' && /plantages_terrain_|on_conflict/.test(u)) { ecritsT.push(u); try { corpsT.push(JSON.parse(o.body)); } catch (_) {} } if (/vrm_reglages/.test(u)) return rep([{ valeur: JULIEN }]); if (/rpc\//.test(u)) return rep(true); if ((o.method || 'GET') === 'GET') return rep([]); return rep([{ id: 'x' }], 201); };
     const corps = JSON.stringify({ v: 1, h: {}, p: [{ ecran: 'ventes', message: 'Erreur du propriétaire', version: '15 novembre à 10:00', n: 4, garde: true }], jeton: 'a.b.c' });
     const rp = await MT.recevoirMesures({ corps, verifierJeton: async () => ({ id: JULIEN }), fetcher: fetcherT, maintenant: T0 });
-    dit(rp.code === 200 && ecritsT.length === 0, 'C14b le propriétaire : ses plantages ne sont rangés nulle part comme « personne touchée »', { rp, ecritsT });
+    // (16 nov., lot anti-bug) RANGÉS à part (`proprio`), jamais une « personne touchée », jamais à dire :
+    // avant, rien n'était rangé et le journal restait vide alors que Julien voyait des bugs.
+    const typeP = (() => { const l = corpsT.find((c) => Array.isArray(c) && c[0] && /plantages_terrain_/.test(c[0].id)); const t = l && l[0].data && Object.values(l[0].data.types || {})[0]; return t || null; })();
+    dit(rp.code === 200 && ecritsT.length === 1 && !!typeP && typeP.proprio === 4 && typeP.appareils.length === 0 && !AP.typeADire(typeP), 'C14b le propriétaire : ses plantages sont RANGÉS (proprio ×4), jamais une « personne touchée », jamais à dire', { rp, ecritsT, typeP });
     const rv = await MT.recevoirMesures({ corps, verifierJeton: async () => ({ id: '33333333-3333-4333-8333-333333333333' }), fetcher: fetcherT, maintenant: T0 });
     dit(rv.code === 200 && ecritsT.length >= 1, 'C14c un autre vendeur : rangé', { rv, ecritsT });
+    // (16 nov., lot anti-bug) Une promesse rejetée et un morceau qui ne se charge pas partent dès la 1re fois ;
+    // une erreur de page ordinaire attend toujours 3 répétitions.
+    {
+      const e1 = AP.compterErreur({}, { message: 'Erreur de promesse', ecran: 'ventes', origine: 'promesse' }, { maintenant: T0 });
+      const e2 = AP.compterErreur(e1, { message: 'Failed to fetch dynamically imported module', ecran: 'journee', origine: 'morceau' }, { maintenant: T0 });
+      const e3 = AP.compterErreur(e2, { message: 'Erreur de page', ecran: 'ventes', origine: 'page' }, { maintenant: T0 });
+      const ev = AP.evenementsAEnvoyer(e3);
+      const par = Object.fromEntries(ev.map((x) => [x.origine, x]));
+      dit(ev.length === 2 && par.promesse && par.promesse.n === 1 && par.morceau && par.morceau.n === 1 && !par.page, 'C14d promesse et morceau partent dès la 1re fois (origine dite), la page attend 3 fois', ev);
+      const norm = AP.normaliserEvenements([{ message: 'x', n: 1, origine: 'nimporte' }, { message: 'y', n: 1, origine: 'morceau' }]);
+      dit(!('origine' in norm[0]) && norm[1].origine === 'morceau', 'C14e l’origine passe par une liste fermée', norm);
+    }
     // Le morceau périmé qui revient APRÈS le rechargement : il bloque l'ouverture.
     const store = {}, sess = {};
     global.localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } };
@@ -240,14 +255,16 @@ async function controles() {
     global.window = global.window || { dispatchEvent: () => {} };
     const P = await imp('src/plantages.js');
     P.noterPlantage(new Error('Failed to fetch dynamically imported module: https://vrm.center/assets/Ventes-a.js'), { origine: 'ecran', ecran: 'ventes', version: '15 nov.' });
-    dit(!(store.vrm_alertes_attente && JSON.parse(store.vrm_alertes_attente).length), 'C15 un morceau périmé rattrapé par le rechargement : compté à part, aucune alerte');
+    // (16 nov., lot anti-bug) Rattrapé, il part quand même — origine « morceau », jamais « ouverture » (rien à notifier).
+    const att0 = store.vrm_alertes_attente ? JSON.parse(store.vrm_alertes_attente) : [];
+    dit(att0.length === 1 && att0[0].origine === 'morceau', 'C15 un morceau périmé rattrapé par le rechargement : remonté (origine « morceau »), jamais une ouverture bloquée', att0);
     sess.vrm_recharge_morceau = String(Date.now() - 5000);
     P.noterPlantage(new Error('Failed to fetch dynamically imported module: https://vrm.center/assets/Ventes-a.js'), { origine: 'ecran', ecran: 'ventes', version: '15 nov.' });
     const att = store.vrm_alertes_attente ? JSON.parse(store.vrm_alertes_attente) : [];
-    dit(att.length === 1 && att[0].origine === 'ouverture' && att[0].appareil === 'iOS Safari', 'C16 le même morceau 5 s APRÈS le rechargement : l’ouverture est bloquée, l’alerte attend la collecte (appareil en deux mots)', att);
+    dit(att.length === 2 && att[1].origine === 'ouverture' && att[1].appareil === 'iOS Safari', 'C16 le même morceau 5 s APRÈS le rechargement : l’ouverture est bloquée, l’alerte attend la collecte (appareil en deux mots)', att);
     const recus = [];
     P.brancherAlertes((x) => recus.push(x));
-    dit(recus.length === 1 && JSON.parse(store.vrm_alertes_attente || '[]').length === 0, 'C17 la collecte branchée reprend l’alerte en attente (une fois)', recus);
+    dit(recus.length === 2 && JSON.parse(store.vrm_alertes_attente || '[]').length === 0, 'C17 la collecte branchée reprend les alertes en attente (une fois)', recus);
   });
 
   // ── D. EXTENSION D'ICI, SANTÉ DES COMPTES, POINTS ─────────────────────────────
@@ -330,10 +347,14 @@ const MUTATIONS = [
   ['src/alertesPlantages.js', 'export const PERSONNES_MIN = 3;', 'export const PERSONNES_MIN = 1;', 'une seule personne notifie'],
   ['src/alertesPlantages.js', ' || Number(t.bloque) > 0);', ');', 'l’ouverture bloquée ne notifie plus'],
   ['api/_lib/mesures-terrain.js', "const deProprio = String(u.id).toLowerCase() === String(proprio).toLowerCase();", 'const deProprio = false;', 'le propriétaire compté'],
+  ['src/alertesPlantages.js', "    if (deProprio) t.proprio = (Number(t.proprio) || 0) + e.n;\n", '', 'les plantages du propriétaire plus rangés'],
+  ['src/alertesPlantages.js', '    t.appareils = deProprio || ap.includes(empreinte)', '    t.appareils = ap.includes(empreinte)', 'le propriétaire compté comme une personne'],
+  ['src/alertesPlantages.js', "const tout_de_suite = (origine) => origine === 'promesse' || origine === 'morceau';", 'const tout_de_suite = (origine) => false;', 'promesse et morceau attendent 3 fois'],
   ['api/_lib/plantages-comptes.js', "lignes = (lignes || []).filter((l) => l && !(moi && String(l.owner || '').toLowerCase() === moi));", 'lignes = lignes || [];', 'le propriétaire compté dans le rapport'],
   ['src/fiabilite/regles.js', "if (e !== 'ancienne') return null; }", '}', 'une version à jour dite en retard'],
   ['src/fiabilite/regles.js', 'if (j.captcha && verificationEnCours(j.captcha, R[String(l.id)]))', 'if (j.captcha)', 'son « Reprendre » ignoré'],
   ['src/plantages.js', "  if (contexte && contexte.origine === 'demarrage') return true;\n  let t = 0;", '  return false;\n  let t = 0;', 'le morceau qui revient jamais dit'],
+  ['src/plantages.js', "origine: morceauBloquant(contexte) ? 'ouverture' : 'morceau'", "origine: 'ouverture'", 'tout morceau dit « ouverture bloquée »'],
   ['src/fraicheur.js', "    if (ici && ici.version && versionCourte(a.code || a.ver) === ici.version) continue;\n", '', 'l’extension d’ici dite deux fois'],
 ];
 function prouver() {
