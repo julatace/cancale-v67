@@ -108,10 +108,10 @@ import { AttenteEcran, useEssentiel, useAttenteComplete } from './AttenteEcran.j
 import { JourneeInstantanee } from './JourneeInstantanee.jsx';
 import { capturerJournee, ecrireInstantane, effacerInstantanes, lireInstantane } from './journeeInstantanee.js';
 // (9 nov., soir) Colis et Ventes tout de suite : la même règle d'instantané (src/instantaneEcran.js).
-import { ColisInstantane, VentesInstantanee } from './ColisVentesInstantanes.jsx';
+import { VentesInstantanee } from './ColisVentesInstantanes.jsx';
 import { AnnoncesInstantanee } from './AnnoncesInstantanee.jsx';   // (11 nov., ouverture-legere-2)
 import { capturerAnnonces, ecrireInstantaneAnnonces, lireInstantaneAnnonces } from './annoncesInstantanee.js';
-import { capturerColis, capturerVentes, ecrireInstantaneColis, ecrireInstantaneVentes, lireInstantaneColis, lireInstantaneVentes } from './colisVentesInstantanes.js';
+import { capturerVentes, ecrireInstantaneVentes, lireInstantaneVentes } from './colisVentesInstantanes.js';
 import { SqLignes, SqBarre } from './Squelette.jsx';
 import { usePreparation, useEnPreparation } from './preparations.js';
 import { souvenir, retenir } from './memoireEcrans.js';
@@ -3322,6 +3322,9 @@ const SYNC_KEYS = [
   'vrm_retours_deposes',
   // (15 nov., refonte-journee) « C'est réglé » sur un retour sans nouvelles (Achats → À vérifier, src/retoursAchat.js).
   'vrm_retours_regles',
+  // (16 nov., lot ecrans-restes) « Plus tard » de la carte « Protège ton compte VRM » (Paramètres → Compte) :
+  // posé sur SON clic, vu sur tous ses appareils (il ne la revoyait sur chaque appareil).
+  'vrm_carte_mfa_rangee',
   // (9 nov., lot AF) LE JOURNAL DES N° (src/historiqueNumero.js) : APPEND-ONLY, une ligne par
   // changement de N° d'une fiche, écrite au moment du changement (`noterJournalNumeros`) ;
   // lu par la fiche d'une paire (« L'histoire du N° »). Ne change jamais un N°.
@@ -8828,103 +8831,8 @@ function CarrierBadge({ carrier, size = 22 }) {
   return <span title={c.name} data-carrier-badge={cle || k} style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>{cle ? <LogoTransporteur cle={cle} taille={size} repli={repli}/> : repli}</span>;
 }
 
-// Le fond vectoriel de la mini-carte (MapLibre chargé à la demande).
-function FondMiniCarte({ lat, lon, zoom, sombre }) {
-  const boite = React.useRef(null);
-  const [etat, setEtat] = React.useState('charge');
-  React.useEffect(() => {
-    let vivant = true, carte = null;
-    import('./fondCarte.js').then((f) => {
-      if (!f.webglDispo()) throw new Error('webgl');
-      return f.chargerMaplibre().then((ml) => {
-        if (!vivant || !boite.current) return;
-        // Fond uni d'abord, puis le style OpenFreeMap (poserFond). L'attribution
-        // exigée vient de la TileJSON, repliée en « i » (mini-carte).
-        carte = new ml.Map({ container: boite.current, style: { version: 8, sources: {}, layers: [] }, center: [lon, lat], zoom, interactive: false, attributionControl: { compact: true } });
-        carte.once('load', () => {
-          f.poserFond(carte, { sombre, annule: () => !vivant }).then(() => { if (vivant) setEtat('pret'); }).catch(() => { if (vivant) setEtat('ko'); });
-        });
-      });
-    }).catch(() => { if (vivant) setEtat('ko'); });
-    return () => { vivant = false; if (carte) carte.remove(); };
-  }, [lat, lon, zoom, sombre]);
-  return <div ref={boite} data-mini-fond={etat} aria-hidden="true" style={{ position: 'absolute', inset: 0 }} />;
-}
-
-function OsmMap({ points, height = 230, selected, onSelect }) {
-  const pts = (points || []).filter(p => p && p.lat && p.lon);
-  if (!pts.length) return null;
-  const proj = (lat, lon, zz) => { const n = 2 ** zz; const x = (lon + 180) / 360 * n; const latr = lat * Math.PI / 180; const y = (1 - Math.log(Math.tan(latr) + 1 / Math.cos(latr)) / Math.PI) / 2 * n; return { x, y }; };
-  // Zoom : le plus serré qui contient toutes les épingles… puis on DÉZOOME d'un
-  // cran pour laisser de la marge et voir la ville autour (comme demandé).
-  let z = 16;
-  while (z > 11) {
-    const ts = pts.map(p => proj(p.lat, p.lon, z));
-    const spanX = Math.max(...ts.map(t => t.x)) - Math.min(...ts.map(t => t.x));
-    const spanY = Math.max(...ts.map(t => t.y)) - Math.min(...ts.map(t => t.y));
-    if (spanX < 1.5 && spanY < (height / 256) * 0.72) break;
-    z--;
-  }
-  if (pts.length > 1 && z > 12) z -= 1; // marge : on voit tout d'un coup
-  const clat = (Math.min(...pts.map(p => p.lat)) + Math.max(...pts.map(p => p.lat))) / 2;
-  const clon = (Math.min(...pts.map(p => p.lon)) + Math.max(...pts.map(p => p.lon))) / 2;
-  const c = proj(clat, clon, z);
-  // Fond : OpenFreeMap (sans clé, src/fondCarte.js), MapLibre,
-  // immobile, centré sur le même point et à la même échelle que les épingles
-  // (une tuile MapLibre fait 512 px : zoom MapLibre = z − 1). CARTO retiré (clé
-  // exigée). Injoignable ⇒ un fond uni et les épingles restent, jamais rien.
-  // (29 oct.) La carte garde ses couleurs claires en mode sombre (décision de Julien, comme la communauté).
-  const sombreCarte = false;
-  return (
-    <div data-mini-carte style={{ position: 'relative', width: '100%', height, overflow: 'hidden', background: sombreCarte ? '#1D1D1F' : '#F2F2F7' }}>
-      <FondMiniCarte lat={clat} lon={clon} zoom={z - 1} sombre={sombreCarte} />
-      {(() => {
-        // Anti-chevauchement : on écarte les épingles trop proches en spirale.
-        const placed = [];
-        const R = 30; // distance mini entre 2 épingles (px)
-        const prio = [...pts].sort((a, b) => (b.count || 0) - (a.count || 0)); // colis d'abord, jamais bougés
-        prio.forEach(p => {
-          const t = proj(p.lat, p.lon, z);
-          let ox = (t.x - c.x) * 256, oy = (t.y - c.y) * 256;
-          let tries = 0;
-          while (placed.some(q => Math.hypot(q.ox - ox, q.oy - oy) < R) && tries < 40) {
-            const ang = tries * 2.399, rad = R * (1 + tries * 0.14);
-            ox = (t.x - c.x) * 256 + Math.cos(ang) * rad;
-            oy = (t.y - c.y) * 256 + Math.sin(ang) * rad;
-            tries++;
-          }
-          placed.push({ p, ox, oy });
-        });
-        return placed;
-      })().map(({ p, ox, oy }) => {
-        const isSel = selected === p.key;
-        const car = CARRIERS[carrierKey(p.carrier)];
-        const col = car ? car.bg : (p.picked ? '#2e9e5b' : p.count > 0 ? '#e5484d' : '#8E8E93');
-        const inner = car ? car.short : (p.count > 0 ? String(p.count) : p.picked ? '✓' : '');
-        const innerFg = car ? car.fg : '#fff';
-        const dim = !car && !p.picked && !(p.count > 0);
-        return (
-          <div key={p.key} onClick={() => onSelect && onSelect(p.key)}
-            style={{ position: 'absolute', left: `calc(50% + ${ox}px)`, top: `calc(50% + ${oy}px)`, transform: `translate(-50%, -100%) scale(${isSel ? 1.18 : 1})`, cursor: 'pointer', transition: 'transform .15s', zIndex: isSel ? 4 : car || p.count > 0 ? 3 : 1, opacity: dim ? 0.8 : 1, filter: 'drop-shadow(0 3px 4px rgba(0,0,0,0.28))' }}>
-            {/* Épingle « teardrop » colorée à la marque */}
-            <svg width="34" height="44" viewBox="0 0 34 44" style={{ display: 'block' }}>
-              <path d="M17 0C7.6 0 0 7.5 0 16.8 0 29 17 44 17 44s17-15 17-27.2C34 7.5 26.4 0 17 0z" fill={col} />
-              <circle cx="17" cy="16.5" r="12" fill="#fff" />
-            </svg>
-            <span style={{ position: 'absolute', left: '50%', top: 16.5, transform: 'translate(-50%,-50%)', color: col, fontSize: inner.length > 2 ? 11 : 12, fontWeight: 700, letterSpacing: 0.2 }}>{inner}</span>
-            {/* Pastille « nombre de colis » en coin si c'est une marque */}
-            {car && p.count > 0 && <span style={{ position: 'absolute', top: -5, right: -8, minWidth: 18, height: 18, borderRadius: 999, background: '#e5484d', color: '#fff', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px', boxShadow: '0 1px 3px rgba(0,0,0,0.3)', border: '1.5px solid #fff' }}>{p.count}</span>}
-            {/* Étiquette NOM du point (rend chaque relais distinct d'un coup d'œil) */}
-            {(() => { const lbl = p.label || p.key; return (pts.length <= 14 || isSel || p.count > 0) && lbl && (
-              <span style={{ position: 'absolute', left: '50%', top: '100%', transform: 'translate(-50%, 1px)', whiteSpace: 'nowrap', maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 11, fontWeight: 700, color: p.count > 0 ? '#b3261e' : '#2C2C2E', background: 'rgba(255,255,255,0.92)', borderRadius: 6, padding: '1px 5px', boxShadow: '0 1px 2px rgba(0,0,0,0.18)', border: isSel ? `1.5px solid ${col}` : '1px solid rgba(0,0,0,0.06)' }}>{String(lbl).length > 20 ? String(lbl).slice(0, 19) + '…' : lbl}</span>
-            ); })()}
-          </div>
-        );
-      })}
-      <span data-mini-carte-attribution style={{ position: 'absolute', right: 5, bottom: 3, fontSize: 8, color: '#6E6E73', background: 'rgba(255,255,255,0.8)', padding: '1px 5px', borderRadius: 4 }}>OpenFreeMap · © OpenMapTiles · © OpenStreetMap</span>
-    </div>
-  );
-}
+// (16 nov., lot ecrans-restes) `OsmMap` et son fond `FondMiniCarte` ne servaient qu'à la recherche manuelle de point
+// relais (`relayPicker`, jamais ouverte) : retirés avec elle. La carte des relais est src/CarteRelais.jsx.
 // Décode une chaîne base64 en Uint8Array (pour donner le PDF à pdf-lib).
 const b64ToBytes = (b64) => {
   try { const bin = atob(String(b64 || '')); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; }
@@ -34965,7 +34873,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Points relais HABITUELS, pré-enregistrés : la carte s'affiche en permanence,
   // les badges apparaissent à l'arrivée des colis. Synchronisé.
   const [savedPoints, setSavedPoints] = useStateCle('vrm_points_relais', () => load('vrm_points_relais', []));
-  const persistPoints = (u) => { setSavedPoints(u); save('vrm_points_relais', u); };
   // Points relais OFFICIELS de Vinted, captés par l'extension (source complète,
   // pas OpenStreetMap). S'affichent d'office sur la carte, sans taper de ville.
   const [vintedPoints, setVintedPoints] = useState(null);
@@ -34983,8 +34890,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Achats — et son résultat (`villeCache`) n'était rendu NULLE PART : un appel
   // réseau jeté à chaque ouverture, et un commentaire qui promettait une carte
   // qui n'existe plus. État (`ville`, `villeCache`, `villeInput`, `villeLoading`),
-  // fonction et réveils `onCloudReady` associés supprimés. `relayPicker` et
-  // `savedPoints` (la recherche/ajout manuel) restent, eux sont bien rendus.
+  // fonction et réveils `onCloudReady` associés supprimés. (16 nov.) La recherche
+  // manuelle (`relayPicker`) n'était plus rendue non plus : retirée (voir plus bas).
   const [carriersOnly, setCarriersOnly] = useState(() => load('vrm_relais_carriers_only', true)); // casiers/transporteurs seulement
   // Géocode une adresse précise via l'API Adresse du gouvernement français
   // (data.gouv, gratuite, fiable) ; repli Nominatim. Renvoie {lat,lon} ou null.
@@ -35002,49 +34909,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     } catch (_) {}
     return null;
   };
-  // Ajout MANUEL d'un point relais par son adresse exacte (fiable, pas de
-  // « magasins au hasard »). On géocode l'adresse précise donnée.
-  const addPointByAddress = async () => {
-    const input = await askText({ desc: 'Point relais — nom et adresse exacte :\nex : Maison de la Presse, 12 rue de la Gare, 75010 Paris' });
-    if (!input || !input.trim()) return;
-    const parts = input.split(',');
-    const nom = parts[0].trim();
-    const adresse = parts.slice(1).join(',').trim() || input.trim();
-    const hit = await geocode(adresse) || await geocode(input.trim());
-    if (!hit) { toast('Adresse introuvable. Donne la rue + le code postal + la ville (ex : 12 rue de la Gare, 75010 Paris).'); return; }
-    const byName = new Map(savedPoints.map(s => [s.nom.toLowerCase(), s]));
-    byName.set(nom.toLowerCase(), { nom, full: input.trim(), lat: hit.lat, lon: hit.lon });
-    persistPoints([...byName.values()]);
-  };
-  const removeSavedPoint = (nom) => { persistPoints(savedPoints.filter(sp => sp.nom !== nom)); setOpenPoint(null); };
-  // Recherche d'un point relais par son NOM (+ ville) : fiable, c'est toi qui
-  // nommes le vrai lieu (« Super U Cancale »…). Résultats sur carte, tu confirmes.
-  const [relayPicker, setRelayPicker] = useState(null); // {query, loading, results:[], error, carrier}
-  const openRelayPicker = () => setRelayPicker({ query: '', loading: false, results: [], error: null, carrier: '' });
-  const searchPlaces = async (query) => {
-    if (!query || !query.trim()) return;
-    setRelayPicker(p => p ? { ...p, loading: true, error: null, results: [] } : p);
-    try {
-      const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=6&countrycodes=fr&addressdetails=1&q=${encodeURIComponent(query.trim())}`);
-      const js = await r.json();
-      const results = (js || []).map((x, i) => {
-        const a = x.address || {};
-        const nom = a.shop || a.amenity || (x.display_name || '').split(',')[0].trim();
-        const ville = a.village || a.town || a.city || a.municipality || '';
-        const rue = [a.house_number, a.road].filter(Boolean).join(' ');
-        return { id: String(x.place_id || i), nom, adresse: [rue, a.postcode, ville].filter(Boolean).join(', '), lat: +x.lat, lon: +x.lon, full: x.display_name };
-      });
-      setRelayPicker(p => p ? { ...p, loading: false, results, error: results.length ? null : 'Aucun lieu trouvé. Ajoute le nom de la ville (ex : « Super U Lyon »).' } : p);
-    } catch (_) { setRelayPicker(p => p ? { ...p, loading: false, error: 'Recherche indisponible, réessaie.' } : p); }
-  };
-  const addFoundPlace = (f) => {
-    const carrier = relayPicker && relayPicker.carrier;
-    const nom = carrier ? `${f.nom} (${carrier})` : f.nom;
-    const byName = new Map(savedPoints.map(s => [s.nom.toLowerCase(), s]));
-    byName.set(nom.toLowerCase(), { nom, full: f.adresse ? `${f.nom}, ${f.adresse}` : f.nom, lat: f.lat, lon: f.lon, carrier: carrier || undefined });
-    persistPoints([...byName.values()]);
-    setRelayPicker(null);
-  };
+  // (16 nov., lot ecrans-restes) LA RECHERCHE MANUELLE DE POINT RELAIS EST RETIRÉE (§4.11) : `openRelayPicker`
+  // n'avait plus aucun bouton (constaté le 16 nov. : `grep -c 'openRelayPicker'` = 1, sa définition), et `addPointByAddress` / `removeSavedPoint`
+  // aucun appelant. Tranché : ne PAS la rebrancher sur « point inconnu » (Achats → À retirer). Un point inconnu,
+  // c'est un colis dont AUCUN message ne dit le relais : chercher un magasin par son nom (Nominatim, « Super U
+  // Lyon ») ne dit pas où est CE colis — il faudrait relier le colis au lieu choisi, une identité devinée
+  // (§5 : jamais par ressemblance) ; et le 9 nov. la carte a été rendue « parfaite » en ne rangeant plus
+  // aucun point sans code postal LU. Les points restent ceux LUS dans ses e-mails et chez les transporteurs
+  // (`ensureSavedPoint`, plus bas) ; la carte de Colis dit pourquoi un point n'y est pas (`raisonPasSurCarte`).
   // AUTO : chaque point relais réel qui apparaît dans un email de colis est
   // géocodé (adresse exacte) et ENREGISTRÉ en permanence. La carte se construit
   // ainsi toute seule à partir de tes vrais points, même après retrait du colis.
@@ -55684,62 +55556,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* Modale conversation */}
 
-      {/* Recherche d'un point relais par son nom → carte → confirmer */}
-      {relayPicker && (
-        <div onClick={()=>setRelayPicker(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1200,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-          <FermeAuRetour fermer={()=>setRelayPicker(null)}/>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,height:'88vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
-            <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:700,color:C.text}}>📍 Ajouter un point relais</div>
-                <div style={{fontSize:11,color:C.muted}}>Tape le nom du lieu + la ville, puis choisis-le sur la carte</div>
-              </div>
-              <button type="button" onClick={()=>setRelayPicker(null)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer'}}>×</button>
-            </div>
-            <div style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-              <div style={{display:'flex',gap:6}}>
-                <input autoFocus value={relayPicker.query} onChange={e=>setRelayPicker(p=>({...p,query:e.target.value}))}
-                  onKeyDown={e=>{ if(e.key==='Enter') searchPlaces(relayPicker.query); }}
-                  placeholder="ex : Super U Lyon, Tabac de la Place…"
-                  style={{flex:1,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',fontSize:13,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
-                <button type="button" onClick={()=>searchPlaces(relayPicker.query)} style={{border:'none',borderRadius:12,background:C.accent,color:C.onAccent,fontSize:13,fontWeight:600,padding:'0 16px',cursor:'pointer',fontFamily:'inherit'}}>Chercher</button>
-              </div>
-              <div style={{display:'flex',gap:6,marginTop:8,flexWrap:'wrap',alignItems:'center'}}>
-                <span style={{fontSize:11,color:C.muted}}>Transporteur :</span>
-                {Object.entries(CARRIERS).map(([k,c])=>{ const on=relayPicker.carrier===c.name; return (
-                  <button type="button" key={k} onClick={()=>setRelayPicker(p=>({...p,carrier:on?'':c.name}))} style={{display:'inline-flex',alignItems:'center',gap:5,padding:'3px 9px 3px 4px',borderRadius:12,fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:on?`${c.bg}18`:'transparent',color:on?c.bg:C.muted,border:`1.5px solid ${on?c.bg:C.border}`}}>
-                    <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',minWidth:18,height:18,padding:'0 4px',borderRadius:6,background:c.bg,color:c.fg,fontSize:11,fontWeight:700}}>{c.short}</span>
-                    {c.name}
-                  </button>
-                ); })}
-              </div>
-            </div>
-            {relayPicker.loading && <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted,fontSize:13}}>⏳ Recherche…</div>}
-            {!relayPicker.loading && relayPicker.error && <div style={{flex:1,display:'flex',alignItems:'flex-start',justifyContent:'center',color:C.muted,fontSize:13,textAlign:'center',padding:'28px 20px',lineHeight:1.5}}>{relayPicker.error}</div>}
-            {!relayPicker.loading && !relayPicker.error && relayPicker.results.length>0 && (<>
-              <OsmMap points={relayPicker.results.map(f=>({key:f.id,lat:f.lat,lon:f.lon}))} selected={null} onSelect={id=>{ const f=relayPicker.results.find(x=>x.id===id); if(f) addFoundPlace(f); }}/>
-              <div style={{flex:1,overflow:'auto',padding:'8px 12px'}}>
-                {relayPicker.results.map(f=>(
-                  <button type="button" key={f.id} onClick={()=>addFoundPlace(f)} style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'10px',border:`1px solid ${C.border}`,background:C.card,borderRadius:12,marginBottom:6,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-                    <span style={{fontSize:20,flexShrink:0}}>📍</span>
-                    <span style={{flex:1,minWidth:0}}>
-                      <span style={{display:'block',fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{f.nom}</span>
-                      <span style={{display:'block',fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{f.adresse||f.full}</span>
-                    </span>
-                    <span style={{fontSize:12,fontWeight:600,color:C.accentTexte,flexShrink:0}}>Ajouter</span>
-                  </button>
-                ))}
-              </div>
-            </>)}
-            {!relayPicker.loading && !relayPicker.error && relayPicker.results.length===0 && (
-              <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted,fontSize:13,textAlign:'center',padding:'0 24px',lineHeight:1.6}}>
-                Tes points relais lus dans tes e-mails y sont déjà.<br/>Ajoute un autre : tape son nom + la ville.
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {bordResult && (
         <div onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1250,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
           <FermeAuRetour fermer={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }}/>
@@ -60667,9 +60483,6 @@ const racineEcranPret = (attente, sel) => [...document.querySelectorAll(`[data-a
 function CaptureJournee({ uid }) {
   return <CaptureInstantane uid={uid} ecran="journee" racine={() => racineEcranPret('journee', '.vrm-fu-journee')} capturer={capturerJournee} ecrire={ecrireInstantane}/>;
 }
-function CaptureColis({ uid }) {
-  return <CaptureInstantane uid={uid} ecran="colis" racine={() => { const c = racineEcranPret('cat_bord', '[data-carte-stats="colis"]'); return c ? c.closest('.vrm-attente-pret') : null; }} capturer={capturerColis} ecrire={ecrireInstantaneColis}/>;
-}
 function CaptureVentes({ uid }) {
   return <CaptureInstantane uid={uid} ecran="ventes" racine={() => racineEcranPret('ventes', 'section.vrm-tache[data-tache="ventes"]')} capturer={capturerVentes} ecrire={ecrireInstantaneVentes}/>;
 }
@@ -63624,8 +63437,8 @@ function AppCoeur() {
   // doit être celui que l'écran va montrer. Ventes : seulement sur « Tous ».
   const uidInstantane = (authState.user && authState.user.id) || '';
   const snapJournee = React.useMemo(() => (tab === 'journee' && uidInstantane ? lireInstantane(uidInstantane) : null), [tab, uidInstantane]);
-  const vueColisOuverture = tab === 'cat_bord' && platSub !== 'leboncoin' && !(typeof platSub === 'string' && platSub.startsWith('site:'));
-  const snapColis = React.useMemo(() => (vueColisOuverture && uidInstantane ? lireInstantaneColis(uidInstantane) : null), [vueColisOuverture, uidInstantane]);
+  // (16 nov., lot ecrans-restes) Plus d'instantané de Colis (Colis vit dans Ventes « À expédier » depuis le 11 nov. :
+  // rien ne le rangeait plus, `ColisInstantane` n'était plus montré — code mort retiré, §4.11).
   const vueVentesTous = tab === 'ventes' && siteDeTache('ventes', platSub) === 'toutes';
   const snapVentes = React.useMemo(() => (vueVentesTous && uidInstantane ? lireInstantaneVentes(uidInstantane) : null), [vueVentesTous, uidInstantane]);
   // (11 nov.) Annonces : sur sa vue d'ouverture (Vinted · Annonces) et le compte « Tous » (rien de choisi d'autre).
@@ -63640,8 +63453,6 @@ function AppCoeur() {
     ? <JourneeInstantanee snap={snapJournee} ScreenHead={ScreenHead} Icon={Icon} fmt={REGLES_CARTE.fmt} etat={horsLigne ? 'hors-ligne' : 'panne'}/> : null;
   const instantaneEcranIci = !instantanePermis ? null
     : tab === 'journee' && snapJournee ? <JourneeInstantanee snap={snapJournee} ScreenHead={ScreenHead} Icon={Icon} fmt={REGLES_CARTE.fmt}/>
-    : vueColisOuverture && snapColis && (!ongletColis || ongletColis === snapColis.onglet) && (platSub !== 'retirer' || snapColis.onglet === 'retirer')
-      ? <ColisInstantane snap={snapColis} Icon={Icon} fmt={REGLES_CARTE.fmt} ordi={ordi} dateTete={dateJourFr(new Date())}/>
     : vueVentesTous && snapVentes ? <VentesInstantanee snap={snapVentes} fmt={REGLES_CARTE.fmt} ordi={ordi} dateTete={dateJourFr(new Date())}/>
     : vueAnnoncesOuverture && snapAnnonces ? <AnnoncesInstantanee snap={snapAnnonces} fmt={REGLES_CARTE.fmt}/>
     : null;
