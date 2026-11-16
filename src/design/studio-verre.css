@@ -459,6 +459,17 @@ html:has(.vrm-app-shell[data-espace]) body { background: transparent !important;
 :root:root:root:root body .vrm-app-shell > .vrm-app-header .vrm-header-actions :is(button.vrm-hbtn, .vrm-cn-cloche > button, button.vrm-cn-cloche) svg { color: inherit !important; }
 /* Le fondu sous la barre : vers le bas du dégradé. */
 :root:root:root body .vrm-app-shell .vrm-tabbar.vrm-tabbar::before { background: linear-gradient(to bottom, transparent, color-mix(in oklab, var(--sv-bas) 70%, transparent) 78%) !important; }
+/* (16 nov., stabilite-iphone — « l'app bug un peu » sur iPhone) LE VERRE DE LA BARRE PASSE DEVANT LE FONDU. La barre est
+   un contexte d'empilement (relative, z-index 60) : son fondu `::before` (z-index -1) se peint AU-DESSUS de son propre
+   fond. Avec le fond bleu profond, il recouvrait le verre clair : barre bleu-gris (≈ rgb 75 100 130 mesuré) et libellés
+   `--sv-onglet` à ≈ 1,6:1 — « Aujourd'hui », « Annonces », « Argent » presque invisibles. Le verre est peint par
+   `::after` (même couche, après le fondu dans l'ordre du document) ; le fond de la barre garde son verre (le flou de
+   `backdrop-filter` reste celui de la barre) : la barre redevient le verre clair de la maquette, au-dessus du fondu.
+   Banc : scripts/bancs/stabilite-iphone.cjs (S10, mesuré sur les PIXELS de la capture). */
+:root:root:root body .vrm-app-shell .vrm-tabbar.vrm-tabbar::after {
+  content: "" !important; display: block !important; position: absolute !important; inset: 0 !important; z-index: -1 !important;
+  border-radius: inherit !important; background: var(--sv-verre-barre) !important; pointer-events: none !important;
+}
 :root:root:root body .vrm-app-shell .vrm-tabbar .vrm-nav-badge-barre.vrm-nav-badge-n { color: #FFFFFF !important; box-shadow: 0 0 0 2px var(--sv-verre-barre) !important; }
 :root:root:root[data-theme="dark"] body .vrm-app-shell .vrm-tabbar .vrm-nav-badge-barre.vrm-nav-badge-n { color: #0C1D30 !important; }
 
