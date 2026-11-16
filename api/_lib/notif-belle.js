@@ -70,7 +70,7 @@ export function embellir({ title = '', body = '' } = {}, cat = null) {
     // passe en QUEUE (c'est elle qui sera coupée, jamais le lieu, le code ou le n° du corps).
     // (16 nov.) « Tenir » se juge sur la 1re PHRASE du corps (couperPhrases garde des phrases entières) : la suite du titre
     // (« 2927,47 € à déclarer ») reste devant tant qu'elle tient avec elle — la phrase suivante, elle, peut tomber.
-    const premiere = b ? b.split(/(?<=[.!?])\s+/)[0] : '';
+    const premiere = b ? (/^[\s\S]*?[.!?](?=\s|$)/.exec(b) || [b])[0] : '';   // sans lookbehind (Safari < 16.4, audit-safari)
     if (tete) { const devant = [majuscule(m[2]), b].filter(Boolean).join(' · '); b = devant.length <= CORPS_MAX || !b || [majuscule(m[2]), premiere].join(' · ').length <= CORPS_MAX ? devant : [b, m[2]].join(' · '); t = tete; }
     else { if (!b) b = t; t = couper(t, TITRE_MAX); }
   }
