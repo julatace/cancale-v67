@@ -5,7 +5,8 @@
 //  (le dépôt est public), puis les règles de l'app qui la reçoivent
 //  (`classifyOrderStatus`, `ventesFaites`, `ventesDeclarables`, extraites de
 //  src/App.jsx), et la ligne de fraîcheur des comptes (src/fraicheurComptes.js) :
-//   F1 une vente e-mail sans n° de transaction numérique ⇒ rien ;
+//   F1 une vente e-mail au n° présent mais pas numérique ⇒ rien ;
+//   F10 (16 nov.) une vente e-mail SANS n° (compte particulier) ⇒ une ligne, par SA ligne ;
 //   F2 n° déjà dans la liste Vinted (de CE compte ou d'un autre) ⇒ UNE ligne,
 //      la ligne Vinted ;
 //   F3 e-mail plus vieux que la dernière lecture ⇒ rien (la lecture fait foi) ;
@@ -30,7 +31,12 @@ const R = process.env.AUDIT_RACINE || path.join(__dirname, '..');
 if (process.argv.includes('--prouve')) {
   prouver(__filename, path.join(__dirname, '..'), {
     'sans la condition « après la lecture »': [['src/venteEmailFraiche.js', 'if (!(p.t > lu)) continue;', '']],
-    'n° non numérique admis': [['src/venteEmailFraiche.js', 'if (!RE_TX_VENTE_EMAIL.test(tx)) return null;', '']],
+    'n° non numérique admis': [['src/venteEmailFraiche.js', 'if (brut && !RE_TX_VENTE_EMAIL.test(brut)) return null;', '']],
+    // (16 nov.) La régression vue par Julien : l'e-mail d'un compte PARTICULIER (sans n°) écarté.
+    'vente sans n° écartée (avant le 16 nov.)': [['src/venteEmailFraiche.js', 'if (!tx && !RE_ID_VENTE_EMAIL.test(id)) return null;', 'if (!tx) return null;']],
+    'vente sans n° sans ligne prouvée': [['src/venteEmailFraiche.js', 'if (!tx && !RE_ID_VENTE_EMAIL.test(id)) return null;', '']],
+    'fenêtre ambiguë retirée': [['src/venteEmailFraiche.js', 'if (!p.tx && derniereLue.get(p.uid) >= p.t - FENETRE_AMBIGUE_MS) continue;', '']],
+    'requête qui exige un n°': [['src/venteEmailFraiche.js', "return 'id=like.email_sale_*&meta->>type=eq.vente'", "return 'id=like.email_sale_*&meta->>type=eq.vente&meta->>transaction=neq.'"]],
     'tout type admis (un statut entre)': [['src/venteEmailFraiche.js', "if (String(m.type || '') !== 'vente') return null;", '']],
     'compte non lié admis': [['src/venteEmailFraiche.js', 'const acc = parUid.get(p.uid); if (!acc) continue;', "const acc = parUid.get(p.uid) || { vinted_user_id: p.uid };"]],
     'compte écarté admis': [['src/venteEmailFraiche.js', "if (typeof ecarte === 'function' && ecarte(p.uid)) continue;", '']],
@@ -97,8 +103,29 @@ const APP = charge(['classifyOrderStatus', 'venteFinalisee', 'tsCommande', 'mont
   dit((fraiches({ ...base, mails: [mail({ at: h(0.1) }), mail({ at: h(0.3) })] }) || [])[0]?.date === h(0.3), 'F6 la plus ancienne date des deux e-mails', JSON.stringify(fraiches({ ...base, mails: [mail({ at: h(0.1) }), mail({ at: h(0.3) })] })));
   dit(n([mail({ prix: 'n/c' })]) === 1 && (fraiches({ ...base, mails: [mail({ prix: 'n/c' })] }) || [])[0]?.price?.amount === null, 'F6 un prix illisible ⇒ `null` (jamais 0 €)', '');
 
-  // F1 · sans n° numérique
-  dit(n([mail({ tx: '' })]) === 0 && n([mail({ tx: null })]) === 0 && n([mail({ tx: 'mail:9001:x' })]) === 0 && n([mail({ tx: '12345' })]) === 0, 'F1 sans n° de transaction numérique (vide, absent, inventé, trop court) ⇒ rien', [n([mail({ tx: '' })]), n([mail({ tx: 'mail:9001:x' })]), n([mail({ tx: '12345' })])].join(','));
+  // F1 · un n° présent mais pas sûr ⇒ rien
+  dit(n([mail({ tx: 'mail:9001:x' })]) === 0 && n([mail({ tx: '12345' })]) === 0, 'F1 un n° de transaction présent mais pas numérique (inventé, trop court) ⇒ rien', [n([mail({ tx: 'mail:9001:x' })]), n([mail({ tx: '12345' })])].join(','));
+
+  // F10 · (16 nov., régression vue par Julien) l'e-mail d'un compte PARTICULIER n'a jamais de n°
+  //       (mesuré : 0 sur 13 depuis le 1er nov.) — la vente entre quand même, identifiée par SA ligne.
+  const sansN = (o) => mail({ tx: '', id: 'email_sale_m2b' + Math.random().toString(16).slice(2, 10), ...o });
+  const m10 = sansN({ id: 'email_sale_mabc123' });
+  const r10 = fraiches({ ...base, mails: [m10] }) || [];
+  dit(r10.length === 1 && r10[0]._venteEmail === true && r10[0]._acc === A && r10[0].transaction_id === 'email:email_sale_mabc123' && r10[0]._txMail === '' && r10[0]._sansTx === true, 'F10 vente e-mail SANS n° (compte particulier) ⇒ UNE ligne, sur SON compte, identifiée par sa ligne (jamais un n° inventé)', JSON.stringify(r10));
+  dit(n([sansN({ tx: null })]) === 1, 'F10 `transaction` absent (null) : pareil', '');
+  dit(!/^\d+$/.test(String((r10[0] || {}).transaction_id)), 'F10 la clé d’une vente sans n° n’est jamais un nombre (aucune règle « par n° » ne la prend)', '');
+  dit(n([sansN({ id: '' })]) === 0 && n([sansN({ id: 'autre_chose' })]) === 0, 'F10 sans n° ET sans ligne prouvée (`email_sale_…`) ⇒ rien', '');
+  dit(n([sansN({ titre: 'Même titre' }), sansN({ titre: 'Même titre' })]) === 2, 'F10 deux e-mails de même titre (deux lignes, deux ventes) ⇒ deux lignes — jamais fusionnées au titre', '');
+  dit(n([m10, { ...m10 }]) === 1, 'F10 la même ligne lue deux fois ⇒ une ligne', '');
+  dit(n([sansN({ at: h(19) })]) === 0, 'F10 sans n°, arrivée AVANT la dernière lecture ⇒ rien (la lecture fait foi : jamais deux lignes après une relecture)', '');
+  // L'e-mail en retard sur une lecture : une vente de CE compte lue, datée 10 min avant l'e-mail ⇒ pas su.
+  const lue10 = { ...venteV(70000050, A, 0.4), date: new Date(Date.parse(h(0.2)) - 10 * 60000).toISOString() };
+  dit(n([sansN()], { ventes: [...ventes, lue10], lectures: { ...lectures, 9001: Date.parse(h(0.25)) } }) === 0, 'F10 une vente de ce compte lue juste avant l’e-mail (fenêtre ambiguë) ⇒ rien, jamais deviné', '');
+  dit(n([sansN()], { ventes: [...ventes, { ...lue10, _acc: B }], lectures: { ...lectures, 9001: Date.parse(h(0.25)) } }) === 1, 'F10 la même vente lue sur un AUTRE compte ne gêne pas', '');
+  dit(n([sansN()], { ecarte: (u) => u === '9001' }) === 0 && n([sansN()], { ko: ['9001'] }) === 0 && n([sansN({ uid: '9999' })]) === 0, 'F10 sans n° : compte écarté, pas lu, non lié ⇒ rien (b inchangée)', '');
+  dit(M && typeof M.requeteVentesEmail === 'function' && !/transaction=/.test(M.requeteVentesEmail(T0)) && /select=id,/.test(M.requeteVentesEmail(T0)) && !/select=data/.test(M.requeteVentesEmail(T0)), 'F10 la lecture projetée n’exige plus de n° et porte l’identifiant de la ligne', M && M.requeteVentesEmail && M.requeteVentesEmail(T0));
+  const fus10 = fusion(ventes, r10) || [];
+  dit(fus10.length === 3 && fus10.filter((o) => o._venteEmail).length === 1, 'F10 la liste de Ventes la porte (fusion)', fus10.length);
 
   // F2 · déjà dans la liste Vinted
   dit(n([mail({ tx: '70000001' })]) === 0, 'F2 n° déjà dans la liste Vinted de CE compte ⇒ aucune ligne e-mail', '');
