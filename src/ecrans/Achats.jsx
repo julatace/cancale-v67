@@ -167,7 +167,7 @@ const openReceipt = (a) => {
 // fois le focus sorti, l'écoute du dialogue ne recevait plus rien), et le focus
 // revient à la fermeture sur ce qui l'avait ouverte (« Voir › »). Même motif que
 // le panneau des écrans (`MenuEcrans`).
-function FeuilleRecuAchat({ recu, fermer }) {
+function FeuilleRecuAchat({ recu, fermer, z = 1400 }) {   // (16 nov.) `z` : ouverte au-dessus de la fiche d'une paire
   const r = champsRecuAchat(recu);
   const boite = useRef(null);
   // (29 oct.) LE PDF JOINT À L'EMAIL (s'il y en a un) se lit AU CLIC seulement
@@ -224,7 +224,7 @@ function FeuilleRecuAchat({ recu, fermer }) {
     </div>) : null;
   const cible = { minWidth:44, minHeight:44, boxSizing:'border-box', display:'inline-flex', alignItems:'center', justifyContent:'center', borderRadius:12, border:`1px solid ${C.border}`, background:C.card, color:C.text, cursor:'pointer', fontFamily:'inherit', flexShrink:0 };
   return createPortal(
-    <div data-noswipe="1" data-recu-voile="" onClick={fermer} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1400,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+    <div data-noswipe="1" data-recu-voile="" onClick={fermer} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:z,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
       <FermeAuRetour fermer={fermer}/>
       <div ref={boite} className="vrm-recu-feuille" data-recu-feuille="" role="dialog" aria-modal="true" aria-label={NOM_RECU_ACHAT} tabIndex={-1} onClick={e=>e.stopPropagation()} style={{background:C.bg,color:C.text,width:'100%',maxWidth:520,borderRadius:'18px 18px 0 0',display:'flex',flexDirection:'column',overflow:'hidden',outline:'none'}}>
         <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 12px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>

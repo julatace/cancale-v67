@@ -36,6 +36,10 @@ const MUTS = {
   'taille-tiers': ['src/suggestionsAchat.js', ".replace(/⅔/g, ' 2/3')", ''],
   'refus-piste': ['src/liaisonAchat.js', "if (refus.size && refus.has(P.key + '>' + A.tx)) return null;", ''],
   'app-pistes-ouvertes': ['src/ecrans/Achats.jsx', 'const [pistesOuvertes, setPistesOuvertes] = useState(false);', 'const [pistesOuvertes, setPistesOuvertes] = useState(true);'],
+  'app-delier-sans-confirmer': ['src/App.jsx', '    if(ok!==true) return;\n    const patch=patchDelier(l.e); if(!patch) return;', '    const patch=patchDelier(l.e); if(!patch) return;'],
+  'app-delier-sans-refus': ['src/App.jsx', "    for(const key of l.keys){ const id=cleRefusLiaison(key,l.tx); if(!refus[id]) ops.push({ k:'vrm_liaison_refus', type:'cle', id, apres:new Date().toISOString(), avant:undefined }); }\n", ''],
+  'fiche-recu-lien-mort': ['src/FichePaire.jsx', "{lien.recu === true ? <button", "{lien.recu !== undefined ? <button"],
+  'app-recu-par-titre': ['src/App.jsx', 'achat=Array.isArray(achats)?achats.find((a)=>a&&String(a.transaction_id)===l.tx)||null:null;', 'achat=Array.isArray(achats)?achats.find((a)=>a&&String(a.title||"")===String((l.e.buyFrom&&l.e.buyFrom.title)||""))||null:null;'],
   'app-sans-photo': ['src/App.jsx', 'couleurPhotoDe: (u) => (couleursLiaison && couleursLiaison.get(u)) || null });', '});'],
 };
 if (process.argv.includes('--prouve')) {
@@ -199,6 +203,15 @@ const enLigne = (r) => Object.values(r.parArticle).reduce((n, l) => n + (l || []
     dit(/seriePropositions\(\{ lignes: fillBuyRows/.test(A) && /refus: liaisonRefus/.test(A), 'S4 la saisie en série passe par la même affectation, refus compris');
     dit(/pistesArticle\(/.test(ACH) && /useState\(false\);[^\n]*$/m.test(ACH.split('const [pistesOuvertes')[1] ? 'const [pistesOuvertes' + ACH.split('const [pistesOuvertes')[1].split('\n')[0] : '') && /data-pistes-bouton/.test(ACH), 'S5 la feuille « Relier un achat » : pistes REPLIÉES sous « Autres pistes · N »');
     dit(/liaison\.parAchat\[String\(o\.transaction_id\)\]\[0\]/.test(A), 'S6 Achats : la proposition sous un achat vient de `parAchat` (au plus une, exclusive)');
+    // (16 nov., ajout de Julien) Délier et Reçu dans la fiche, à côté de « Achetée ».
+    const FP = sans(fs.readFileSync(path.join(SRC, 'FichePaire.jsx'), 'utf8'));
+    const corpsDelier = (A.split('const delierAchatFiche=')[1] || '').split('\n  };')[0];
+    dit(/askConfirm\(/.test(corpsDelier) && corpsDelier.indexOf('askConfirm(') < corpsDelier.indexOf('gesteVrm(') && /if\(ok!==true\) return;/.test(corpsDelier), 'D1 « Délier » demande d’abord (une phrase), puis un geste annulable (`gesteVrm`)');
+    dit(/patchDelier\(l\.e\)/.test(corpsDelier) && /k:'vrm_liaison_refus', type:'cle', id, apres:/.test(corpsDelier), 'D2 délier retire le lien (et le prix posé par lui) et range le couple dans « Ce n’est pas lui »');
+    const corpsRecu = (A.split('const [recuFicheDispo,setRecuFicheDispo]')[1] || '').split('const ouvrirRecuFiche')[0];
+    dit(/String\(a\.transaction_id\)===l\.tx/.test(corpsRecu) && /recuDeLAchat\(achat,/.test(corpsRecu) && !/\.find\(\(a\)=>[^\n]*title/.test(corpsRecu), 'D3 le reçu se trouve par le N° DE TRANSACTION de l’achat relié, jamais par titre (§5)');
+    dit(/lien\.recu === true \? <button[^\n]*data-fd-recu/.test(FP) && /lien\.recu === false \? <small[^\n]*data-fd-pas-recu/.test(FP) && /data-fd-delier=\{lien\.tx\}/.test(FP), 'D4 la fiche : « Reçu » seulement s’il y a un reçu, sinon « Pas de reçu » (jamais un lien mort) ; « Délier » toujours');
+    dit(/achatRelie=\{achatRelieFiche\}/.test(A) && /<FeuilleRecuAchat recu=\{recuFicheVue\} z=\{Z_CONFIRMATION \+ 10\}/.test(A), 'D5 branché sur la fiche ; le reçu s’ouvre AU-DESSUS d’elle');
   }
 
   console.log(`\n${ok} ✅ · ${ko} ❌`);

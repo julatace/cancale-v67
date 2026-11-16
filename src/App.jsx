@@ -64822,6 +64822,37 @@ function AppCoeur() {
     else { const ov=(load('vinted_sale_overrides',{})||{})[st.tx]||{}; ops.push({ k:'vinted_sale_overrides', type:'champs', id:st.tx, apres:w, avant:{ buyPrice:ov.buyPrice, buyFromId:ov.buyFromId, buyFrom:ov.buyFrom } }); }
     gesteVrm(tr('fd.relier.fait',{ n:num, prix:pr.texte||'' }), ops, {}, ()=>{ setTimeout(()=>{ emettreClesRelues(['vinted_annonce_numeros','vinted_buyprice_by_num','vinted_sale_overrides']); setFicheTick(t=>t+1); setPrixTick(t=>t+1); },700); }, 'achat.relier');
   };
+  // ── (16 nov., relier-fiable) L'ACHAT RELIÉ D'UNE PAIRE : « Délier » et « Reçu », à côté de « Achetée » ──
+  // Julien (fiche N°215) : « ici j'ai mal relié un achat, je veux pouvoir l'enlever, et tu peux mettre le justificatif
+  // d'achat à côté ». Le lien est lu PAR IDENTITÉ : la fiche de la paire (`buyFromId`), sinon la ligne de SA vente.
+  const lienAchatDe=(numF)=>{
+    let rn=null, p=null; try{ ({ rn, p }=histoirePaire(numF, false)); }catch(_){ return null; }
+    if(!p||p.double||p.ancienNumero) return null;
+    const fiches=load('vinted_annonce_numeros',{})||{}, ov=load('vinted_sale_overrides',{})||{};
+    const v=venteDeLaPaire(rn, venteAnnuleeFiche);
+    const relie=(e)=>!!(e&&e.buyFromId!=null&&String(e.buyFromId)!=='');
+    const keys=[]; if(p.idFiche) keys.push(cleArticleAnnonce(p.idFiche)); if(v&&v._tx!=null) keys.push(cleArticleVente(v._tx));
+    if(p.idFiche&&relie(fiches[p.idFiche])) return { ou:'fiche', id:String(p.idFiche), e:fiches[p.idFiche], tx:String(fiches[p.idFiche].buyFromId), num:String(p.num||''), keys };
+    if(v&&relie(ov[String(v._tx)])) return { ou:'vente', id:String(v._tx), e:ov[String(v._tx)], tx:String(ov[String(v._tx)].buyFromId), num:String(p.num||''), keys };
+    return null;
+  };
+  // « Délier » : confirmé en une phrase, annulable (`gesteVrm`) ; le lien part (le prix posé PAR le lien aussi, `patchDelier` —
+  // un prix tapé par lui reste), et le couple est rangé dans « Ce n'est pas lui » : la même proposition ne revient pas.
+  const delierAchatFiche=async(l)=>{
+    if(!l) return;
+    const titre=String((l.e.buyFrom&&l.e.buyFrom.title)||'').slice(0,60);
+    const ok=await askConfirm({ title:tr('fd.delier.titre'), desc:tr('fd.delier.phrase',{ titre, n:l.num }), ok:tr('fd.delier.ok'), cancel:VERBES.annuler });
+    if(ok!==true) return;
+    const patch=patchDelier(l.e); if(!patch) return;
+    const ops=[{ k:l.ou==='fiche'?'vinted_annonce_numeros':'vinted_sale_overrides', type:'champs', id:l.id, apres:patch, avant:{ buyPrice:l.e.buyPrice, buyFromId:l.e.buyFromId, buyFrom:l.e.buyFrom } }];
+    if(l.ou==='fiche'&&patch.buyPrice===''&&String(l.e.numero||'').trim()){
+      const buy=load('vinted_buyprice_by_num',{})||{}, k=String(l.e.numero).trim(), lu=Number(String(buy[k]==null?'':buy[k]).replace(',','.')), pose=Number(String((l.e.buyFrom&&l.e.buyFrom.price)!=null?l.e.buyFrom.price:l.e.buyPrice||'').replace(',','.'));
+      if(buy[k]!=null&&Number.isFinite(lu)&&Number.isFinite(pose)&&Math.abs(lu-pose)<0.005) ops.push({ k:'vinted_buyprice_by_num', type:'cle', id:k, apres:undefined, avant:buy[k] });
+    }
+    const refus=load('vrm_liaison_refus',{})||{};
+    for(const key of l.keys){ const id=cleRefusLiaison(key,l.tx); if(!refus[id]) ops.push({ k:'vrm_liaison_refus', type:'cle', id, apres:new Date().toISOString(), avant:undefined }); }
+    gesteVrm(tr('fd.delier.fait',{ n:l.num }), ops, {}, ()=>{ setTimeout(()=>{ emettreClesRelues(['vinted_annonce_numeros','vinted_buyprice_by_num','vinted_sale_overrides','vrm_liaison_refus']); setFicheTick(t=>t+1); setPrixTick(t=>t+1); },700); });
+  };
   const histoirePaire=(numF, avecExtra=true)=>{
     // (1er nov.) LA FICHE COMPLÈTE D'UNE PAIRE : la même lecture que « Tout
     // sur le N° » (`rechercheParNumero`), racontée en parcours (`parcoursPaire`).
@@ -64849,6 +64880,27 @@ function AppCoeur() {
       reception: ex ? ex.reception : undefined, receptionRaison: ex ? ex.receptionRaison : '' }) : null;
     return { rn, numeros, nomCompte, ex, p, etat, neuve };
   };
+  // (16 nov., relier-fiable) ⚠️ APRÈS `histoirePaire` (piège TDZ, §4.6) : `lienAchatDe` la lit pendant le rendu.
+  // « Reçu » : le reçu de CET achat, relié par SON n° de transaction seulement (§5) — l'e-mail Vinted rangé, sinon
+  // l'attestation tirée de l'achat lu (la règle de « Reçu » d'un achat relié, Ventes) ; ni l'un ni l'autre ⇒ « Pas de reçu ».
+  const [recuFicheDispo,setRecuFicheDispo]=useState(null);   // { tx, rc, achat } | { tx, aucun:true } ; null = pas encore lu
+  const [recuFicheVue,setRecuFicheVue]=useState(null);
+  const lienFicheOuvert=numOutil&&numData?lienAchatDe(numOutil):null;
+  const txLienFiche=lienFicheOuvert?lienFicheOuvert.tx:'';
+  useEffect(()=>{ if(!txLienFiche){ setRecuFicheDispo(null); return undefined; } let vivant=true; setRecuFicheDispo(null);
+    (async()=>{
+      const l=lienAchatDe(numOutil); if(!l) return;
+      let achat=null; try{ const achats=await lireAchatsFiche(); achat=Array.isArray(achats)?achats.find((a)=>a&&String(a.transaction_id)===l.tx)||null:null; }catch(_){ achat=null; }
+      const s=l.e.buyFrom;
+      if(!achat&&s&&(s.title||s.price!=null)) achat={ transaction_id:l.tx, title:s.title||'', date:s.date||'', status:s.status||'', seller:s.seller, photo:s.photo?{ url:s.photo }:null, price:s.price!=null?{ amount:s.price, currency_code:s.devise||'EUR' }:null };
+      let rc=null;
+      if(achat){ try{ const recus=recusAchatDe(await fetchEmailAchats()); const delies=load('vrm_recus_delies',{})||{};
+        rc=Array.isArray(recus)?recuDeLAchat(achat, indexRecusParTransaction(recus.filter((r)=>!(r&&r.id&&delies[r.id])), (r)=>ventilationRecuAchat(r&&r.texte).trouve)):null; }catch(_){ rc=null; } }
+      if(vivant) setRecuFicheDispo(rc||achat?{ tx:l.tx, rc, achat }:{ tx:l.tx, aucun:true });
+    })();
+    return ()=>{ vivant=false; }; /* eslint-disable-next-line */ },[txLienFiche,ficheTick]);
+  const ouvrirRecuFiche=()=>{ const d=recuFicheDispo; if(!d||d.aucun) return; if(d.rc){ setRecuFicheVue(d.rc); return; }
+    generateAchatJustificatif(d.achat, { account:d.achat._accName||'', regime:load('vinted_regime','micro'), numero:lienFicheOuvert?lienFicheOuvert.num:'', ouvrir:true }); };
   // (14 nov., 160) LA VENTE EN MAIN PROPRE depuis un N° tapé : le verdict de « Vendu ailleurs » de la fiche
   // (`verdictVenteMain`, src/ideesArgent/venteMain.js), sur la MÊME histoire. `numData` pas lu ⇒ « lecture ».
   const verdictVenteMainCoque=(q, choisie=null)=>{
@@ -64902,7 +64954,9 @@ function AppCoeur() {
               // « Choisir un autre achat » : la vente, dans Ventes (où « Relier un achat » ouvre la liste des achats).
               if (c === 'autre') { fermer(); setGsOpen(false); poserCible({ type: 'vente', tx: String(pf.tx), depuisFiche: true }, redirigerOnglet('ventes', null, ONGLETS_DEPLACES).tab); setTab('ventes'); }
             } } : null;
-          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={numF} lecture={!numData} plus={plusFiche} sites={sitesFiche} relier={relierFiche} onFermer={fermer} onRetour={depuis ? fermer : ()=>{ fermer(); setGsQ(String((p && p.num) || numF)); setGsOpen(true); }}
+          const lienF = p ? lienAchatDe(numF) : null;
+          const achatRelieFiche = lienF ? { tx: lienF.tx, recu: recuFicheDispo && recuFicheDispo.tx === lienF.tx ? !recuFicheDispo.aucun : undefined, onRecu: ouvrirRecuFiche, onDelier: () => delierAchatFiche(lienF) } : null;
+          return <FichePaire owner={AUTH.user?.id||''} p={p} etat={etat} histoNum={histoNum} num={numF} lecture={!numData} plus={plusFiche} sites={sitesFiche} relier={relierFiche} achatRelie={achatRelieFiche} onFermer={fermer} onRetour={depuis ? fermer : ()=>{ fermer(); setGsQ(String((p && p.num) || numF)); setGsOpen(true); }}
             onBordereau={(tx)=>{ fermer(); setGsOpen(false); poserCible({ type: 'colis', tx: String(tx) }, redirigerOnglet('cat_bord', null, ONGLETS_DEPLACES).tab); setTab('cat_bord'); }}
             onEmballer={()=>{ fermer(); setGsOpen(false); DEMANDE_EMBALLAGE.at = Date.now(); setTab('cat_bord'); try { window.dispatchEvent(new Event('vrm:emballer')); } catch (_) {} }}
             onPrix={(n)=>setPrixNum(String(n))} onPublierAilleurs={(n)=>setPubAil({ num: String(n), site: null })} neuve={neuve}
@@ -65124,6 +65178,8 @@ function AppCoeur() {
             ouvrirAnnonces={()=>{ setRpOuvert(false); setTab('cat_annonces'); }} onClose={()=>setRpOuvert(false)}/>
         </React.Suspense>}
         {calcOuverte && <GardeEcran nom="calculette" feuille onFermer={()=>setCalcOuverte(false)}><CalculetteAchat Feuille={SheetShell} onClose={()=>setCalcOuverte(false)} contexte={ctxCalculette} emballages={load(CLE_EMBALLAGES, null)}/></GardeEcran>}
+        {/* (16 nov., relier-fiable) « Reçu » de l'achat relié, ouvert depuis la fiche : au-dessus d'elle. */}
+        {recuFicheVue && <FeuilleRecuAchat recu={recuFicheVue} z={Z_CONFIRMATION + 10} fermer={()=>setRecuFicheVue(null)}/>}
         {ficheNum && <GardeEcran nom="fiche" feuille resetKey={ficheNum} onFermer={()=>setFicheNum(null)}><Differe rendre={()=>rendreFichePaire(ficheNum, null, ()=>setFicheNum(null))}/></GardeEcran>}
         {/* (14 nov., proposition 62) Toucher une ligne de liste ouvre LA fiche de la paire (même composant). */}
         {/* (14 nov., propositions 102-107) Studio sur une paire, séance photo, recherche par couleur. */}
