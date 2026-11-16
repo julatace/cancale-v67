@@ -27,6 +27,7 @@ import { CLE_RAPPELS, MEMO_RAPPELS, lireRappels, rappelsDus, memoApres, texteRap
 import { CLE_REMISES, MEMO_REMISES, lireRemises, remisesDues, memoRemisesApres, texteRappelRemise, texteRappelsRemise, TAG_REMISE, instantRemise } from './_lib/remises-main-propre.js';
 import { resumeReveil, ID_REVEIL } from './_lib/reveil-calme.js';
 import { reglageCalme, reglageSoir, soirALHeure, reglageJours, dansHeuresCalmes } from './_lib/notif-textes.js';
+const HEURE_SOIR_DEFAUT = 19;
 import { lireJournal, lireLu } from './_lib/journal-notifs.js';
 import { DESTINATIONS, lienNotif } from './_lib/lien-notif.js';
 import { passageFacturesAuto } from './_lib/factures-auto.js';
@@ -92,6 +93,7 @@ import { compteEcarte } from './_lib/ventes-regle.js';
 import { regleDuVendeur } from './_lib/plan-vendeur.js';
 import { venteHorsPlan, venteAutreHorsPlan } from './_lib/plan-regle.js';
 import { resumeDuSoir, offresVcDemain } from './_lib/resume-soir.js';
+import { colisVintedDuSoir, colisEbayDuSoir, aDireCeSoir, memoColisApres, numerosDesColis } from './_lib/soir-colis.js';   // (16 nov., alerte-soir-colis)
 import { comptesARelire, dernieresCaptures, texteComptesARelire, decisionRelecture, CAT_RELECTURE, ID_MEMO_RELECTURE, SELECT_CAPTURES } from './_lib/comptes-a-relire.js';
 // (6 nov., filet 4) La veille des plantages : le propriétaire prévenu d'un type JAMAIS VU (api/_lib/veille-plantages.js).
 import { passageVeillePlantages, ID_MEMO_VEILLE, passageVeilleLenteurs, ID_MEMO_LENTEURS } from './_lib/veille-plantages.js';
@@ -1341,6 +1343,27 @@ export { texteSoir };
 // deux attendent que l'heure de Paris ait atteint la sienne (`soirALHeure`) ; le mémo du jour
 // fait qu'un seul part. Préférences pas lues : le passage horaire ne fait rien, le cron d'avant
 // garde son défaut (on ne devine pas une heure choisie).
+// (16 nov., lot alerte-soir-colis) Les N° des colis Vinted, PAR IDENTITÉ : l'identifiant d'annonce
+// de la transaction (`meta->>item_id` du détail lu, scalaire), puis `vinted_annonce_numeros[item].numero`
+// projeté article par article (jamais la ligne `main` entière, §4.4). Rien de lu ⇒ {}.
+async function numerosVintedDuSoir(txs) {
+  const ids = [...new Set((txs || []).map(String).filter((t) => /^\d{1,20}$/.test(t)))].slice(0, 40);
+  if (!ids.length) return {};
+  const rows = await fetchPaginated(scoped(`app_data?id=like.harvest_%25_txn_%25&meta->>id=in.(${ids.join(',')})&select=tx:meta->>id,it:meta->>item_id`));
+  if (!Array.isArray(rows)) return {};
+  const itemDeTx = {};
+  for (const r of rows) if (r && ids.includes(String(r.tx)) && /^\d{1,20}$/.test(String(r.it || ''))) itemDeTx[String(r.tx)] = String(r.it);
+  const items = [...new Set(Object.values(itemDeTx))];
+  if (!items.length) return {};
+  const sel = items.map((i) => `n${i}:data->vinted_annonce_numeros->${i}->>numero`).join(',');
+  const r = await fetchAvecDelai(`${SUPABASE_URL}/rest/v1/${scoped(`app_data?id=eq.main&select=${sel}`)}`, { headers: HEADERS });
+  if (!r.ok) return {};
+  const lignes = await r.json();
+  const m = Array.isArray(lignes) && lignes[0] ? lignes[0] : {};
+  const numeroDItem = {};
+  for (const i of items) if (typeof m['n' + i] === 'string') numeroDItem[i] = m['n' + i];
+  return numerosDesColis(ids.map((tx) => ({ tx })), itemDeTx, numeroDItem);
+}
 async function rappelDuSoir(maintenant = Date.now(), { horaire = false } = {}) {
   const today = parisDate(0);
   const deja = await getRow('soir_reminder_dedup');
@@ -1348,7 +1371,10 @@ async function rappelDuSoir(maintenant = Date.now(), { horaire = false } = {}) {
   if (deja && deja.date === today) return { soir: 'déjà envoyé' };
   const prefsSoir = await prefsDuVendeur();
   if (horaire && !prefsSoir) return { soir: 'préférences pas lues — rien envoyé' };
-  if (horaire && reglageSoir(prefsSoir).heure == null) return { soir: 'heure par défaut — le cron du soir' };
+  // (16 nov., lot alerte-soir-colis — mission : « heure réglable, défaut 19 h, heure de Paris ») Sans heure
+  // choisie, le passage horaire sert le défaut à 19 h (l'été, le cron de Vercel tombe à 20 h) ; le cron
+  // reste le filet (le mémo du jour fait qu'un seul part).
+  if (horaire && reglageSoir(prefsSoir).heure == null && !soirALHeure({ soirHeure: HEURE_SOIR_DEFAUT }, maintenant)) return { soir: `pas encore ${HEURE_SOIR_DEFAUT} h (défaut)` };
   if (!soirALHeure(prefsSoir || {}, maintenant)) return { soir: `pas encore son heure (${reglageSoir(prefsSoir).heure} h)` };
   if (!(await pushCategorieActive('soir'))) return { soir: 'désactivé par le vendeur' };
   const d = await lireDonneesColis();
@@ -1363,19 +1389,33 @@ async function rappelDuSoir(maintenant = Date.now(), { horaire = false } = {}) {
   // (10 nov.) « Demain » = les limites LUES seulement (une estimée n'est qu'un
   // plancher) ; l'heure = la plus proche des lues. Bordereaux illisibles ⇒ les
   // dates Vinted ne sont pas sues : Vinted nommé (« au moins »).
-  let retard = 0, aVerifier = 0, demain = 0, heureDemain = null;
+  // (16 nov., lot alerte-soir-colis) COLIS PAR COLIS, par identité (api/_lib/soir-colis.js) : la même
+  // classe que `compterEcheances`, mais chaque colis déjà dit un soir précédent n'est pas redit — sauf
+  // si sa date limite est demain. Vestiaire reste compté en nombres (pas d'identité ici).
   const manqueDates = [...manque];
-  if (Array.isArray(d.bords)) {
-    const c = compterEcheances({ txs: [...t.vinted], ventes: ventesParTx(d), bords: bordsDuVendeur(d), maintenant });
-    retard = c.retard + (c.aujourdhui - c.estimees.aujourdhui);
-    aVerifier = c.estimeeDepassee + c.estimees.aujourdhui;
-    demain = c.demain - c.estimees.demain;
-    heureDemain = c.premierLu.demain ? c.premierLu.demain.heure : null;
-  } else if (t.vinted.size) manqueDates.unshift('Vinted');
-  if (t.ebay) { retard += t.ebay.overdue + t.ebay.today; demain += t.ebay.tomorrow; }
+  let vintedSoir = [];
+  if (Array.isArray(d.bords)) vintedSoir = colisVintedDuSoir({ txs: [...t.vinted], ventes: ventesParTx(d), bords: bordsDuVendeur(d), maintenant });
+  else if (t.vinted.size) manqueDates.unshift('Vinted');
+  let ebaySoir = [];
+  if (t.ebay) { try { const ce = colisEbay(d.ebay); ebaySoir = colisEbayDuSoir(ce && ce.aPoster); } catch (_) { ebaySoir = []; } }
+  const memoColis = deja && typeof deja.colis === 'object' ? deja.colis : {};
+  const tous = [...vintedSoir, ...ebaySoir];
+  const dits = aDireCeSoir(tous, memoColis, today);
+  const deJa = tous.length - dits.length;
+  const nb = (cl) => dits.filter((c) => c.classe === cl).length;
+  let retard = nb('retard'), aVerifier = nb('verifier'), demain = nb('demain');
+  const lusDemain = dits.filter((c) => c.classe === 'demain' && c.heure && c.cle.startsWith('v:')).sort((a, b) => a.at - b.at);
+  const heureDemain = lusDemain.length ? lusDemain[0].heure : null;
   if (t.vestiaire) { retard += t.vestiaire.overdue + t.vestiaire.today; demain += t.vestiaire.tomorrow; }
-  const colis = { demain, retard, aVerifier, manque: manqueDates,
-    heure: (t.ebay && t.ebay.tomorrow) || (t.vestiaire && t.vestiaire.tomorrow) ? null : heureDemain };
+  // Les N° des colis Vinted dits (identité : item_id de la transaction → N°). Pas su ⇒ sans N°.
+  let nums = null;
+  try {
+    const parTx = await numerosVintedDuSoir(dits.filter((c) => c.tx).map((c) => c.tx));
+    const liste = (cl) => dits.filter((c) => c.classe === cl && c.tx && parTx[c.tx]).map((c) => parTx[c.tx]);
+    nums = { demain: liste('demain'), retard: liste('retard') };
+  } catch (_) { nums = null; }
+  const colis = { demain, retard, aVerifier, manque: manqueDates, nums,
+    heure: ebaySoir.some((c) => c.classe === 'demain' && dits.includes(c)) || (t.vestiaire && t.vestiaire.tomorrow) ? null : heureDemain };
   // Les colis à retirer dont le dernier jour (lu) est DEMAIN : la règle du matin, un jour plus loin.
   let retraits = null;
   try {
@@ -1398,10 +1438,10 @@ async function rappelDuSoir(maintenant = Date.now(), { horaire = false } = {}) {
     offres = offresVcDemain(ligne, { maintenant, demain: parisDate(1), horsPlan: (cpt) => venteAutreHorsPlan(regle, 'vestiaire', cpt) });
   } catch (_) { offres = null; }
   const r = resumeDuSoir({ colis, retraits, offres });
-  const bilan = { n, retard, aVerifier, demain, auMoins: manqueDates.length > 0, manque: manqueDates,
+  const bilan = { n, retard, aVerifier, demain, dejaDits: deJa, auMoins: manqueDates.length > 0, manque: manqueDates,
     retraits: retraits === null ? 'pas su' : retraits.length, offres: offres === null ? 'pas su' : offres.length };
   if (!r.envoyer) return { soir: r.raison, ...bilan };
-  if (!(await ecrireDedup('soir_reminder_dedup', { date: today, n, compte: r.compte }))) return { soir: 'mémo non écrit — rien envoyé' };
+  if (!(await ecrireDedup('soir_reminder_dedup', { date: today, n, compte: r.compte, colis: memoColisApres(memoColis, dits, today) }))) return { soir: 'mémo non écrit — rien envoyé' };
   const envoi = await sendPushToAll({ cat: 'soir', title: r.title, body: r.body, tag: 'soir-' + today, url: r.url });
   return { soir: 'envoyé', ...bilan, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
 }
