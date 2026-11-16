@@ -99,5 +99,13 @@ d'iOS n'est pas reproduit par Chromium logiciel : la preuve du gain viendra des 
 - Le « 999+ » du sélecteur de sites à 4,03:1 sur la pastille claire ; « Novembre · Vinted » de la carte d'action
   de Ventes · Vinted (blanc 66 %) à 3,23:1 — rapportés par S3, pas encore corrigés.
 
+## Sous WebKit, après la mise en ligne (workflow `iphone-webkit.yml`, run 43877293536, main 3106f62a1)
+Base inventée, iPhone 15, Ma journée · Ventes · Vinted · eBay À traiter · Achats · Argent · Stock (+ pendant le
+chargement) : **aucune longue tâche > 200 ms** ni au calme ni au défilement sur aucun écran ; défilement avec et
+sans le verre au même rythme (Ma journée 11/11 im/s, Ventes 12/13, Achats 9/11, Stock 9/9 — WebKit logiciel de
+la CI : seules les comparaisons comptent) : le flou ne coûte plus. Restaient : « ResizeObserver loop… » (le grand
+chiffre, corrigé : l'ajustement à l'image suivante) et « vendu » à 3,43:1 dans la carte d'action (corrigé). PR 2 :
+`claude/stabilite-iphone-2` (et « 999+ » du sélecteur, le banc messagerie qui jugeait une rangée pas encore peinte).
+
 ## ÉTAT À LA REPRISE
-Branche `claude/stabilite-iphone`. À relire le lendemain : `mesures_jour_2026-11-17` (Ventes · téléphone · inp).
+PR #1198 fusionnée (3106f62a1, Vercel ✓). PR 2 `claude/stabilite-iphone-2`. Restent : le coût JS d'un changement d'onglet de Ventes (rendus React, à instrumenter), la rangée de chiffres de sa capture (pas reproduite), « Carnet des vendeurs » pendant le chargement d'Achats (2,29:1, à regarder). À relire le lendemain : `mesures_jour_2026-11-17` (Ventes · téléphone · inp).

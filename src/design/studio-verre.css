@@ -694,7 +694,7 @@ html[data-sb-eventail] body .vrm-neuf-hote { visibility: hidden !important; }
 /* (16 nov., stabilite-iphone) « Novembre · Vinted », « Depuis le début · eBay » et « Modifier » de la carte d'action
    (posée sur le fond) : blanc à 66 % (`--p-nuit-texte-2`, la carte de nuit d'avant le verre) sur le haut éclairé du
    dégradé = 3,23:1 (banc stabilite-iphone S3). Le gris clair du verre posé sur le fond (`--sv-clair-2`, ≥ 4,5:1). */
-:root:root:root body .vrm-app-shell[data-espace] .vrm-fu-carte.a-action > :is(.vrm-fu-carte-haut, .vrm-fu-carte-tete) { --p-nuit-texte-2: var(--sv-clair-2) !important; }
+:root:root:root body .vrm-app-shell[data-espace] .vrm-fu-carte.a-action > :is(.vrm-fu-carte-haut, .vrm-fu-carte-tete) { --p-nuit-texte-2: var(--sv-clair-2) !important; --fu-sur-sombre-2: var(--sv-clair-2) !important; }   /* + « vendu » (`.vrm-fu-sous-nom`, blanc à 70 % : 3,43:1 sous WebKit) */
 
 /* (16 nov., stabilite-iphone — capture de Julien PENDANT le chargement de Ma journée : « c'est moche ») LA RANGÉE DE
    CHIFFRES garde sa forme pendant que les données arrivent : chaque case reste dans SA colonne (rien ne déborde chez la
