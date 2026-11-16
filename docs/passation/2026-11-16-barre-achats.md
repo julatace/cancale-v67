@@ -4,15 +4,17 @@
 1. « Je ne veux pas qu'on puisse glisser entre les onglets. »
 2. « Si on peut, ajoute les Achats dans la barre en bas. »
 
-## Ce qui glissait vraiment (mesuré dans le code)
+## Ce qui glissait vraiment (mesuré)
 - Le balayage de VRM entre onglets est retiré depuis le 9 nov. (PR #1074) : aucun `touchstart`
-  de la coque ne change d'onglet (vérifié, et tenu par `audit-barre-achats` B3). Aucun carrousel
-  d'écrans, aucun `scroll-snap` entre écrans (les écrans gardés sont DÉTACHÉS du document,
+  de la coque ne change d'onglet (tenu par `audit-barre-achats` B3). Aucun carrousel d'écrans,
+  aucun `scroll-snap` entre écrans (les écrans gardés sont DÉTACHÉS du document,
   src/ecransGardes.jsx), aucune animation de côté au changement d'écran.
-- Ce qui restait : le **retour du système**. Depuis le 18 oct., chaque toucher de la barre
-  empilait une entrée d'historique (`pushState`). Le glisser depuis le bord gauche (Safari sur
-  iPhone, et l'app installée là où iOS le permet) montre alors l'entrée d'avant, en direct, à
-  moitié pendant le geste : exactement « Argent ⇒ Ma journée à moitié ».
+- Ce qui restait : le **glisser du NAVIGATEUR** (« page précédente »). Depuis le 18 oct., chaque
+  toucher de la barre empilait une entrée d'historique (`pushState`). Un glisser horizontal sur le
+  contenu (Chrome au doigt), ou depuis le bord gauche (Safari sur iPhone), montre alors l'entrée
+  d'avant, en direct, à moitié pendant le geste : exactement « Argent ⇒ Ma journée à moitié ».
+  **Reproduit** par le banc sur le code d'avant : un vrai toucher (CDP `Input.dispatchTouchEvent`)
+  glissé de côté sur Argent ⇒ l'écran devient Ma journée (`A6 … {"avant":"compta","apres":"journee"}`).
 
 ## Ce qui est fait
 - **Historique** (`src/navHistorique.js`, `entreeHistorique`) : d'un onglet de la barre à un autre
@@ -25,9 +27,12 @@
   (la règle du 18 oct., B9 d'`iphone-reprise`, portée sur la nouvelle règle). Si Julien veut
   retrouver ce retour-là, c'est la ligne `replaceState` de la coque — mais il revient alors avec
   le glisser à moitié.
-- **Rien ne part de côté** : `<main>` porte `overscroll-behavior-x: none` (la racine avait déjà
-  `overscroll-behavior: none`) ; les rangées qui défilent de côté gardent leur défilement
-  (`contain`), mesuré au doigt par le banc.
+- **Rien ne part de côté** : `<main>` porte `overscroll-behavior-x: none` et `touch-action: pan-y
+  pinch-zoom` — le navigateur ne fait plus de son glisser horizontal une « page précédente » ; un
+  glisser appartient au premier conteneur qui défile sous le doigt, donc les rangées qui défilent de
+  côté (filtres, photos, frises) gardent le leur (mesuré au vrai toucher par le banc, A8). Le glisser
+  depuis le bord d'iOS est un geste du système (il ne se bloque pas depuis une page) : c'est le
+  remplacement d'historique qui lui retire l'onglet d'avant.
 - **Achats dans la barre** : Aujourd'hui · Annonces · Achats · ( + ) · Ventes · Argent. Même entrée
   que le menu (`ONGLET_ACHATS`, `nav.achats`), icône `cart`, pastille = « À retirer » publié
   (`vrm_colis_retirer`, comme avant sur le segment). « Paires » = Annonces · Stock
@@ -44,10 +49,18 @@
 - « Quoi de neuf » : `barre-achats`.
 
 ## Preuves
-- `node scripts/audit-barre-achats.cjs` : 10 ✅ ; sur origin/main (`--dossier`) : 8 ❌.
-- `scripts/bancs/barre-achats.cjs` (390 tactile et 320 tactile, clair/sombre ; liens 390 et 1512) —
-  chiffres dans la PR.
-- Mutations : voir la PR.
+- `node scripts/audit-barre-achats.cjs` : 11 ✅ ; sur origin/main (`--dossier`) : rouge (barre à 4,
+  Achats allumant « Paires », aucun remplacement d'historique, ni overscroll-x ni touch-action).
+- `scripts/bancs/barre-achats.cjs` (390 et 320 tactiles, clair/sombre ; liens à 390 et 1512) :
+  **81 ✅ 0 ❌** ; sur le code d'avant (dist de origin/main) : **33 ❌** (dont A6 qui reproduit la
+  capture de Julien : Argent ⇒ Ma journée).
+- Mutations (bundle construit, une règle réaffaiblie, `ba-mut.sh`) : historique toujours empilé ⇒
+  A5 rouge (4 ❌, l'historique grossit à chaque onglet) ; `touch-action` retiré ⇒ A6 rouge (12 ❌, le
+  glisser quitte l'app) ; Achats remis dans `ECRANS_PAIRES` ⇒ A4 et L rouges (8 ❌, « Paires »
+  allumé sur Achats).
+- Captures regardées : 390 et 320 (clair, sombre) — cinq libellés entiers, Achats allumé sur Achats ;
+  1512 — Achats allumé dans la colonne. Le disque « + » est un peu à droite du centre (5 onglets +
+  disque : 3 à gauche, 2 à droite) — accepté pour garder chaque cible ≥ 44 px.
 
 ## ÉTAT À LA REPRISE
 - Voir la PR du lot (fusionnée ou non, dit dans le rapport). Geste de Julien : aucun (l'app se met à jour).
