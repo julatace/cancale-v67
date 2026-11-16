@@ -167,6 +167,13 @@ const faireRes = () => { const r = { code: 200, corps: null, entetes: {} }; r.st
       const r5 = await appeler(compte, { method: 'POST', mode: 'checkout', headers: { authorization: 'Bearer ' + W.jeton }, corps: { cgv: true, accesImmediat: true } });
       global.fetch = fetchMonde;
       dit(r5.code === 503 && Object.keys(M.stripe.sessions).length === n2, 'H19 Stripe ne dit pas les paiements en cours ⇒ 503, aucune session (jamais un double prélèvement)', `HTTP ${r5.code}`);
+      // Client connu, la liste de SES abonnements ne se lit pas : rien n'ouvre non plus.
+      M.base.abonnements[W.id] = { owner: W.id, statut: 'canceled', client_stripe: 'cus_W' };
+      global.fetch = (u, o) => (/api\.stripe\.com\/v1\/subscriptions\?/.test(String(u)) ? Promise.resolve(rep({ error: { message: 'panne' } }, 500)) : M.fetch(u, o));
+      const n3 = Object.keys(M.stripe.sessions).length;
+      const r6 = await appeler(compte, { method: 'POST', mode: 'checkout', headers: { authorization: 'Bearer ' + W.jeton }, corps: { cgv: true, accesImmediat: true } });
+      global.fetch = fetchMonde;
+      dit(r6.code === 503 && Object.keys(M.stripe.sessions).length === n3, 'H19 client connu, ses abonnements chez Stripe ne se lisent pas ⇒ 503, rien d’ouvert', `HTTP ${r6.code}`);
     } finally { restaurer(); global.fetch = fetchAvant; }
   });
 
@@ -208,6 +215,16 @@ const faireRes = () => { const r = { code: 200, corps: null, entetes: {} }; r.st
       } });
       const r = await appelRefresh();
       dit(B.T.vinted_accounts[0].refresh_token === 'rt-extension', 'H22 l’extension reconnecte le compte PENDANT le renouvellement ⇒ sa paire n’est jamais écrasée (écriture conditionnelle)', `${B.T.vinted_accounts[0].refresh_token} · ${actions(r)}`);
+    });
+    await essaie('H21 base relue avant de renouveler', async () => {
+      const B = fausseBase(); B.T.vinted_accounts.push({ owner: A, vinted_user_id: '505', domain: 'www.vinted.fr', access_token: expire, refresh_token: 'rt-0' });
+      // Un autre relais vient de finir entre la lecture de la route et le bail : la base porte déjà une paire neuve.
+      let fait = false;
+      B.panne = (t, m, q) => { if (!fait && t === 'vinted_accounts' && m === 'GET' && /select=access_token,refresh_token/.test(q)) { fait = true; Object.assign(B.T.vinted_accounts[0], { access_token: neuf('autre'), refresh_token: 'rt-autre' }); } return null; };
+      let appelsRefresh = 0;
+      global.fetch = monter(B, { vinted: async (u) => { if (/auth\/refresh/.test(u)) { appelsRefresh++; return rep({ access_token: neuf('x'), refresh_token: 'rt-x' }); } return rep({}); } });
+      const r = await appelRefresh();
+      dit(appelsRefresh === 0 && B.T.vinted_accounts[0].refresh_token === 'rt-autre', 'H21 une paire déjà renouvelée par un autre (vue à la relecture) ⇒ reprise telle quelle, Vinted pas rappelé', `${appelsRefresh} appel(s) · ${B.T.vinted_accounts[0].refresh_token} · ${actions(r)}`);
     });
     await essaie('H22 écriture réessayée', async () => {
       const B = fausseBase(); B.T.vinted_accounts.push({ owner: A, vinted_user_id: '503', domain: 'www.vinted.fr', access_token: expire, refresh_token: 'rt-0' });
