@@ -17,7 +17,7 @@
 //     `vrm_tampons.formes` ; glisser sur le QR ⇒ refusé ; « Seulement Mondial Relay » + titre décoché ⇒ exception ;
 //     « Revenir à l'origine » ⇒ ôtée ;
 //  PARTOUT : aucune erreur d'app, rien ne déborde. Captures (SHOTS=dossier), regardées.
-// Lancer : construire dist/, puis node scripts/bancs/tampons-apercu.cjs   (TA_VUES=1512,390)
+// Lancer : construire dist/, puis node scripts/bancs/tampons-apercu.cjs   (TA_VUES=1512,390 ; TA_SOMBRE=1 : mode sombre)
 'use strict';
 const path = require('path'), fs = require('fs'), http = require('http');
 const { pathToFileURL } = require('url');
@@ -98,7 +98,7 @@ async function ouvrir(b, { tactile, LIGNES, url = '/?tab=cat_bord', tampons = nu
   const mainData = LIGNES.find((r) => r.id === 'main').data;
   await pg.addInitScript(({ m, t }) => {
     try {
-      localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_visite_vue', 'true'); localStorage.setItem('vrm_langue', JSON.stringify('fr'));
+      localStorage.setItem('vrm_acces_direct', '1'); if (m.__sombre) { localStorage.setItem('vrm_apparence', JSON.stringify('sombre')); localStorage.setItem('vinted_dark', 'true'); } localStorage.setItem('vrm_visite_vue', 'true'); localStorage.setItem('vrm_langue', JSON.stringify('fr'));
       if (!sessionStorage.getItem('banc_init')) {
         sessionStorage.setItem('banc_init', '1');
         localStorage.setItem('vinted_annonce_numeros', JSON.stringify(m.vinted_annonce_numeros)); localStorage.setItem('vinted_used_numeros', JSON.stringify(m.vinted_used_numeros));
@@ -112,7 +112,7 @@ async function ouvrir(b, { tactile, LIGNES, url = '/?tab=cat_bord', tampons = nu
     try { Object.defineProperty(navigator, 'share', { configurable: true, value: (d) => { window.__ouvertures.push({ voie: 'partage', geste: geste(), blob: d && d.files && d.files[0] }); return Promise.resolve(); } }); } catch (_) {}
     window.open = (u) => { window.__ouvertures.push({ voie: 'onglet', geste: geste(), url: String(u) }); return null; };
     window.print = () => {};
-  }, { m: mainData, t: tampons });
+  }, { m: { ...mainData, __sombre: !!process.env.TA_SOMBRE }, t: tampons });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**://cdn.jsdelivr.net/npm/pdfjs-dist@*/**', (r) => {
     const n = path.basename(new URL(r.request().url()).pathname);

@@ -86,7 +86,7 @@ export default {
   "tampons.pret.titre": "Etichetta pronta",
   "tampons.pret.titreFacture": "Etichetta e fattura pronte",
   "tampons.pret.apercu": "Anteprima dell’etichetta timbrata",
-  "tampons.pret.ouvert": "Il PDF è aperto in una scheda.",
+  "tampons.pret.ouvert": "Il PDF si è aperto in VRM. «Stampa» lo riapre.",
   "tampons.pret.imprimer": "Stampa",
   "tampons.pret.enregistrer": "Salva",
   "tampons.pret.deplacer": "Sposta il timbro",

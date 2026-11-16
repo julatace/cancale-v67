@@ -86,7 +86,7 @@ export default {
   "tampons.pret.titre": "Label ready",
   "tampons.pret.titreFacture": "Label and invoice ready",
   "tampons.pret.apercu": "Preview of the stamped label",
-  "tampons.pret.ouvert": "The PDF is open in a tab.",
+  "tampons.pret.ouvert": "The PDF opened in VRM. “Print” opens it again.",
   "tampons.pret.imprimer": "Print",
   "tampons.pret.enregistrer": "Save",
   "tampons.pret.deplacer": "Move the stamp",
