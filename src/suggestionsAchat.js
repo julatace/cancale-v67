@@ -41,7 +41,7 @@
 // `scripts/audit-suggestions-achat.cjs` exécutent CES fonctions. La marque et
 // les couleurs viennent des règles de l'app (`extractBrand`, `extractColors`),
 // passées en paramètre : une seule définition (§11).
-import { ACHAT_SANS_COUT } from './prixAchatPropose.js';
+import { achatHorsRelier } from './achatsHorsRelier.js';
 import { moisParis } from './dateParis.js';
 
 const txDe = (a) => (a && a.transaction_id != null ? String(a.transaction_id) : '');
@@ -106,7 +106,10 @@ export function achatDisponible(achat, liens, curTx = '') {
   const l = lotDe(achat);
   return l.lot && (l.n == null || n < l.n);
 }
-export const achatAnnule = (achat) => ACHAT_SANS_COUT.test(String((achat && achat.status) || ''));
+// (16 nov., lot achats-retour) Hors relier : annulé, remboursé, en retour, en litige — le statut, et les
+// PREUVES publiées par l'écran qui les lit (bordereau de retour, remboursement, litige ouvert, par SON n°) :
+// src/achatsHorsRelier.js. Un litige clos sans retour (commande finalisée) redevient proposable.
+export const achatAnnule = (achat) => achatHorsRelier(achat);
 // « lot · 2/5 reliés » (ou « lot · 2 reliés » sans nombre écrit). '' hors lot.
 export function etiquetteLot(achat, liens) {
   const l = lotDe(achat); if (!l.lot) return '';
