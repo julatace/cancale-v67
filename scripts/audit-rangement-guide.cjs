@@ -125,15 +125,23 @@ async function controles(racine, silencieux) {
     JSON.stringify(R.numerosAReserver({ fiches: { a: { origine: 'arrivee', numero: '13' }, b: { origine: 'arrivee', numero: '14' }, c: { numero: '99' } }, pool: [1, 13], cleNum })) === '["14"]');
 
   // ── A : App.jsx ──
+  // (15 nov., intégration de claude/pas-ranger-achat et claude/atelier-arrivee) Julien : « on range une ANNONCE,
+  // pas un achat ». « J'ai retiré » ouvre au plus l'atelier sur le N° de l'ARTICLE (aucune case) ; la case vient
+  // APRÈS, sur la fiche numérotée (`casesProposees`). La feuille « Ranger cet achat » n'est plus montée.
   const sansCom = (t) => String(t || '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
   const APPc = sansCom(APP);
+  const f = (APPc.match(/async function ecrireNumero[\s\S]*?\n}\n/) || [''])[0];
+  const prep = (APPc.match(/async function preparerNumero[\s\S]*?\n}\n/) || [''])[0];
   essai('A1 · rattrapage : les N° des fiches déjà rangées entrent au pool (append-only), le rattrapage reste monté', () =>
     /function reserverNumerosRanges\(\)[\s\S]{0,400}numerosAReserver\(/.test(APPc) && /<RattrapageNumerosRanges\/>/.test(APPc));
-  essai('A2 · les N° servis relus (réservés de l’extension compris) pour un gros lot', () =>
-    /async function numerosServisLus[\s\S]*panel_num_reserves[\s\S]*numerosReserves\(/.test(APPc));
-  essai('A3 · (15 nov.) « J’ai retiré » n’ouvre plus « Ranger cet achat » (on range un article, pas un achat)', () =>
-    !/apresRetrait\(|proposerRangement\(|ouvrirRangement\(|retraitsARanger/.test(APPc));
-  essai('A5 · (15 nov.) la feuille « Ranger cet achat » n’est plus montée, Ma journée n’a plus « N achats à ranger »', () => !/<RangerAchatCoque\/>/.test(APPc) && !/id: 'achats-a-ranger'/.test(APPc));
+  essai('A1b · « Donner ce N° » : le pool est écrit AVANT le geste annulable, et jamais dans ses opérations', () => {
+    const iP = f.indexOf("save('vinted_used_numeros'"), iG = f.indexOf('gesteVrm(');
+    return (iP > 0 && iG > iP && !/k:\s*'vinted_used_numeros'/.test(f)) || { iP, iG }; });
+  essai('A2 · les N° servis relus (réservés de l’extension compris) pour un gros lot, avant de proposer et avant d’écrire un N°', () =>
+    /async function numerosServisLus[\s\S]*panel_num_reserves[\s\S]*numerosReserves\(/.test(APPc) && /await numerosServisLus\(\)/.test(prep) && /await numerosServisLus\(\)/.test(f));
+  essai('A3 · le N° d’un achat arrivé ne calcule AUCUNE case (ni `casesEnSerie`, ni habitude)', () => prep.length > 100 && !/casesEnSerie\(|caseHabitude\(/.test(prep) || prep.slice(0, 200));
+  essai('A4 · l’achat d’un colis par IDENTITÉ seulement (`achatDuColis`)', () => /const entreeArriveeColis = \(t\) => \{[\s\S]{0,200}achatDuColis\(t, buysBase, indexSuivisAchats\)/.test(APPc));
+  essai('A5 · la feuille « Ranger cet achat » n’est plus montée ; l’atelier l’est ; Ma journée n’a plus « N achats à ranger »', () => !/<RangerAchatCoque\/>/.test(APPc) && /<AtelierArriveeCoque\/>/.test(APPc) && !/id: 'achats-a-ranger'/.test(APPc));
   essai('A6 · les fiches à publier comptent comme N° servis partout (`ajouterNumerosHorsEcran`)', () => /const ajouterNumerosHorsEcran = [\s\S]{0,900}vrm_fiches_neuves/.test(APP));
   return { ok, ko, rouges };
 }
@@ -152,7 +160,7 @@ const MUTATIONS = [
   ['prix de lot divisé tout seul', 'src/rangementArrivee.js', "return { k, titre: '', marque: '', taille: '', prix: '',", "return { k, titre: '', marque: '', taille: '', prix: prixEnTexte(indicatif),"],
   ['identité de l’achat perdue', 'src/rangementArrivee.js', "achat: { tx, site:", "achat: { tx: '', site:"],
   ['achat rangé deux fois', 'src/rangementArrivee.js', "return { ok: false, raison: 'deja' };", "{}"],
-  ['« J’ai retiré » rouvre la feuille (App.jsx)', 'src/App.jsx', '  const markCollected = (t) => gesteCollecte(t, true);', '  const markCollected = (t) => { const id = gesteCollecte(t, true); try { apresRetrait(entreeRangementColis(t)); } catch (_) {} return id; };'],
+  ['le N° d’un achat arrivé lui calcule une case (App.jsx)', 'src/App.jsx', "  return { ok: true, numeros, numeroEcrit: ecrit, pris: pris.cles, archive: archiveNumeros(), cleNum, cases: [],", "  const cs = casesEnSerie({ meubles: [], slots: {}, n }); return { ok: true, numeros, numeroEcrit: ecrit, pris: pris.cles, archive: archiveNumeros(), cleNum, cases: cs.cases || [],"],
 ];
 
 const copieArbre = (src) => {

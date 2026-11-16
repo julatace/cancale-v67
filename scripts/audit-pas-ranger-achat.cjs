@@ -29,6 +29,7 @@ const RACINE = path.join(__dirname, '..');
 const sansCommentaires = (t) => String(t || '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
 const lire = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch (_) { return ''; } };
 // Le corps d'une déclaration (`const nom = …` ou `function nom(`) jusqu'à la fin de sa ligne / son bloc.
+const corpsFn = (src, debut) => { const i = src.indexOf(debut); if (i < 0) return null; const j = src.indexOf('\n}\n', i); return j > i ? src.slice(i, j) : null; };
 const corpsDe = (src, debut) => { const i = src.indexOf(debut); if (i < 0) return null; const j = src.indexOf('\n  };', i); const k = src.indexOf('\n', i); const fin = src.slice(i, k).trim().endsWith('{') && j > i ? j : k; return src.slice(i, fin); };
 
 async function controles(racine, silencieux) {
@@ -74,11 +75,18 @@ async function controles(racine, silencieux) {
   // ── A : App.jsx ──
   let APP = ''; try { APP = sansCommentaires(sourceAppCode(racine)); } catch (_) { APP = ''; }
   dit(APP.length > 100000, 'A0 · App.jsx (et ses écrans découpés) lu');
-  const ppr = ['proposerRangement(', 'ouvrirRangement(', 'apresRetrait(', "'vrm:ranger-achat'", '<RangerAchatCoque', "from './RangerAchat.jsx'", 'entreeRangementColis('].filter((x) => APP.includes(x));
-  dit(!ppr.length, 'A1 · aucun chemin ne range un ACHAT : ni proposition, ni ouverture de « Ranger cet achat », ni feuille montée', ppr.join(', '));
+  // (15 nov., intégration avec claude/atelier-arrivee) Julien : « on range une ANNONCE, pas un achat ». L'atelier
+  // d'arrivée peut s'ouvrir après « J'ai retiré », mais sur le N° de l'ARTICLE seulement : aucune case n'est calculée
+  // pour un achat (`preparerNumero`), la feuille « Ranger cet achat » n'est plus montée ni importée, et la case vient
+  // APRÈS, sur la fiche numérotée (src/atelierArrivee.js `caseProposee` ⇒ `casesProposees`).
+  const ppr = ['proposerRangement(', 'ouvrirRangement(', 'apresRetrait(', "'vrm:ranger-achat'", '<RangerAchatCoque', "from './RangerAchat.jsx'", 'entreeRangementColis(', 'preparerRangement('].filter((x) => APP.includes(x));
+  const prepN = corpsFn(APP, 'async function preparerNumero(');
+  dit(!ppr.length && prepN != null && !/casesEnSerie\(|caseHabitude\(|premiereCase/.test(prepN), 'A1 · aucun chemin ne range un ACHAT : ni feuille « Ranger cet achat », ni case calculée pour un achat (le N° seulement)', ppr.join(', ') || prepN);
+  const AT = sansCommentaires(lire(path.join(racine, 'src', 'atelierArrivee.js')));
+  dit(/export function caseProposee\([\s\S]{0,700}casesProposees\(\{ meubles, slots: prises, cles: \[c\] \}\)/.test(AT), 'A1c · la case de l’atelier est celle du Stock (`casesProposees`), pour CET article (son N°)');
   const gestes = ['const markCollected = ', 'const markAllCollected = ', 'const markPickupDone = ', 'const markPickupDoneSerie = '].map((d) => [d, corpsDe(APP, d)]);
-  const fautifs = gestes.filter(([, c]) => c == null || /rang/i.test(c)).map(([d, c]) => d + (c == null ? '(absent)' : ''));
-  dit(!fautifs.length, 'A2 · « J’ai retiré » (colis, commande, en série) ne fait que retirer : rien sur le rangement', fautifs.join(', '));
+  const fautifs = gestes.filter(([, c]) => c == null || /rang|case/i.test(c)).map(([d, c]) => d + (c == null ? '(absent)' : ''));
+  dit(!fautifs.length, 'A2 · « J’ai retiré » (colis, commande, en série) retire, et au plus note l’achat pour son N° : rien sur le rangement ni la case', fautifs.join(', '));
   dit(!/id:\s*'achats-a-ranger'/.test(APP) && !/ranger\.carte\.court/.test(APP), 'A3 · Ma journée n’a plus de ligne « N achats à ranger »');
   const coque = (() => { const i = APP.indexOf('function CentreNotifsCoque('); const j = APP.indexOf('\n}\n', i); return i >= 0 ? APP.slice(i, j) : ''; })();
   dit(coque && !/aRanger|enPlus|calculerOuRanger|notifsOuRanger|vrm_ranger_proposes|vrm_ranger_vus|achatsArrives/.test(coque) && !/function calculerOuRanger|achatsArrives\(|notifsOuRanger\(/.test(APP),
@@ -103,8 +111,10 @@ async function controles(racine, silencieux) {
 const MUTATIONS = [
   ['une case proposée ne compte pas comme prise (la même case à deux articles)', 'src/ouRanger.js', "    prises.add(pose.meubleId + ':' + pose.i);\n", ''],
   ['meuble empilé ignoré (une case dans le vide)', 'src/ouRanger.js', "      if (!fond && !prise((r + 1) * cols + c)) continue;\n", ''],
-  ['« J’ai retiré » rouvre « Ranger cet achat »', 'src/App.jsx', '  const markCollected = (t) => gesteCollecte(t, true);', '  const markCollected = (t) => { const id = gesteCollecte(t, true); try { apresRetrait(entreeRangementColis(t)); } catch (_) {} return id; };'],
-  ['Ma journée retrouve « N achats à ranger »', 'src/App.jsx', '        // (15 nov.) Plus de « N achats à ranger » : on range un ARTICLE (au Stock), jamais un achat.\n', "        if (aRangerJournee.length) jobs.push({ id: 'achats-a-ranger', n: aRangerJournee.length });\n"],
+  ['« J’ai retiré » rouvre « Ranger cet achat »', 'src/App.jsx', 'try { apresRetraitAtelier(entreeArriveeColis(t)); } catch (_) {} return id; };', 'try { apresRetraitAtelier(entreeArriveeColis(t)); ouvrirRangement([entreeArriveeColis(t)]); } catch (_) {} return id; };'],
+  ['le N° d’un achat arrivé lui calcule une case', 'src/App.jsx', "  return { ok: true, numeros, numeroEcrit: ecrit, pris: pris.cles, archive: archiveNumeros(), cleNum, cases: [],", "  const cs = casesEnSerie({ meubles: [], slots: {}, n }); return { ok: true, numeros, numeroEcrit: ecrit, pris: pris.cles, archive: archiveNumeros(), cleNum, cases: cs.cases || [],"],
+  ['l’atelier reprend sa propre case (commune) au lieu de celle du Stock', 'src/atelierArrivee.js', "  const r = casesProposees({ meubles, slots: prises, cles: [c] });", "  const r = { [c]: null };"],
+  ['Ma journée retrouve « N achats à ranger »', 'src/App.jsx', "jobs.push({ id: 'achats-a-numeroter',", "jobs.push({ id: 'achats-a-ranger',"],
   ['la pastille recompte les notifications locales', 'src/CentreNotifs.jsx', "export function BoutonCentreNotifs({ nonLues, onOuvrir, Icon, alerte", "export function BoutonCentreNotifs({ nonLues, onOuvrir, Icon, enPlus = 0, alerte"],
   ['le Stock reprend la première case libre commune', 'src/ecrans/Stock.jsx', '      const libre = caseProposeeDe(k);', '      const libre = premiereCaseMeubles({ meubles, slots });'],
 ];

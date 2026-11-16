@@ -41,6 +41,11 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'transporteur-connu', date: '2026-11-15', titre: 'À expédier : chaque colis a son transporteur', phrase: 'Lu sur l’étiquette ; sinon VRM dit quel compte ouvrir.', tab: 'cat_bord', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « Enlève ça, on range une ANNONCE, pas un achat ») docs/passation/2026-11-15-pas-ranger-achat.md
   { id: 'pas-ranger-achat', date: '2026-11-15', titre: 'Plus de rangement proposé sur un achat', phrase: 'Tu ranges l’article au Stock : une case à lui, jamais la même.', tab: 'garage', pour: 'tous', mode: 'tous' },
+  // (15 nov., Julien : « vas-y fais tout ») docs/passation/2026-11-15-atelier-arrivee.md — quatre lots.
+  { id: 'atelier-arrivee', date: '2026-11-15', titre: 'Achat retiré : de la boîte à en ligne', phrase: 'N°, case, photos, prix payé, fiche, publication : une étape après l’autre.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'historique-complet', date: '2026-11-15', titre: 'Toute l’histoire d’un article, datée', phrase: 'Achat, baisses, offres, masquages, vente, retour : sur sa fiche.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  { id: 'note-conversation', date: '2026-11-15', titre: 'Ta note, à côté de la conversation', phrase: 'Écrite ou dictée, elle suit l’article jusqu’au message de l’acheteur.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  { id: 'taille-texte', date: '2026-11-15', titre: 'Taille du texte réglable', phrase: 'Quatre tailles dans Paramètres, toute l’app suit.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « J'aime la 9 ») docs/passation/2026-11-15-verre-depoli.md — le thème « Verre dépoli ».
   { id: 'verre-depoli', date: '2026-11-15', titre: 'Nouveau thème : verre dépoli sur bleu profond', phrase: 'Le chiffre du jour en blanc, tout se lit sur le verre.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « améliore la liaison entre les achats et les articles ») docs/passation/2026-11-15-achats-liaison.md

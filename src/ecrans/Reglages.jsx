@@ -33,6 +33,8 @@ import { L, PAS_SU } from '../libelles.js';
 import { useReglageConseils } from '../Conseils.jsx';
 import { PHRASES_ECRAN } from '../phrasesEcran.js';
 import { APPARENCES, LIBELLES_APPARENCE, PHRASES_APPARENCE } from '../apparence.js';
+import { TAILLES_TEXTE, lireTailleTexte, ecrireTailleTexte, facteurTaille } from '../tailleTexte.js';   // (15 nov.) Taille du texte
+import { echelleTexte } from '../grandTexte.js';
 import { SignalerProblemeFeuille as SignalerProblemeFeuilleBase, SignalementsRecus } from '../composants/SignalerProbleme.jsx';
 import { DemandesAideRecues } from '../composants/EcrireSupport.jsx';   // (13 nov., lot 55) « Demandes d'aide » (propriétaire)
 import { CLE_COMPTES_EXCLUS, estExclu, basculerExclu } from '../../api/_lib/comptes-exclus.js';
@@ -2191,13 +2193,17 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (8 nov., « beauté ») L'apparence : Clair · Sombre · Automatique (le système) · Le soir (19 h–7 h).
       // L'interrupteur ci-dessus reste le choix explicite (il quitte Automatique / Le soir).
       onApparence && { id:'apparence', type:'panneau', nu:true, ic:'contraste', lib:tr('reglages.apparence.lib'), desc:tr('reglages.apparence.desc'), val: LIBELLES_APPARENCE[apparence] || '', data:{ 'data-reglage-apparence': apparence || '' }, el:<ApparenceSetting valeur={apparence} onChoisir={onApparence}/> },
+      // (15 nov.) LA TAILLE DU TEXTE (src/tailleTexte.js) : quatre tailles, toute l'app grandit avec (le mécanisme du
+      // texte en grand de l'appareil, src/grandTexte.js) — rien ne déborde. Propre à CET appareil.
+      { id:'taille-texte', type:'panneau', nu:true, ic:'texte', lib:tr('reglages.tailleTexte.lib'), desc:tr('reglages.tailleTexte.desc'), val: tr('reglages.tailleTexte.' + lireTailleTexte()), data:{ 'data-reglage-taille-texte': lireTailleTexte() }, el:<TailleTexteSetting/> },
       // (5 nov.) Le mode stream PROGRAMMÉ : son sous-écran (catégories, mots, aperçu).
       // (5 nov., chantier H) L'interrupteur DANS la liste (le même état que « Stream » en
       // haut : un réglage), et son programme dans un sous-écran à son nom — le titre
       // « Mode stream » n'est plus écrit deux fois dans le sous-écran.
       { id:'stream-on', type:'switch', ic:'stream', lib:tr('reglages.stream-on.lib'), desc:tr('reglages.stream-on.desc'), on:!!streamOn, onClick:()=>poserStream(!streamOn), data:{ 'data-reglage-stream-on': streamOn ? 'on' : 'off' } },
       { id:'stream', type:'panneau', nu:true, ic:'filter', lib:tr('reglages.stream.lib'), desc:tr('reglages.stream.desc'), data:{ 'data-reglage-stream': streamOn ? 'on' : 'off' }, el:<ReglagesStream/> },
-      { id:'zoom', type:'panneau', nu:true, ic:'texte', lib:tr('reglages.zoom.lib'), desc:tr('reglages.zoom.desc'), val:valZoom, el:<ZoomSetting nu/> },
+      // (15 nov.) Au téléphone, « Taille du texte » (ci-dessus) remplace ce réglage : il ne reste que s'il porte une valeur à défaire.
+      (!etroit || readZoom() !== '1') && { id:'zoom', type:'panneau', nu:true, ic:'grid', lib:tr('reglages.zoom.lib'), desc:tr('reglages.zoom.desc'), val:valZoom, el:<ZoomSetting nu/> },
       urlWidget && { id:'widget', type:'panneau', nu:true, ic:'device', lib:tr('reglages.widget.lib'), desc:tr('reglages.widget.desc'), el:widget },
       // (10 nov., lot AH) Deux raccourcis iPhone par liens profonds (src/raccourcisSiri.js) : une PWA ne déclare pas d'intention Siri.
       { id:'raccourcis-siri', type:'panneau', nu:true, ic:'mic', lib:tr('reglages.raccourcis-siri.lib'), desc:tr('reglages.raccourcis-siri.desc'), data:{ 'data-reglage-raccourcis':'' }, el:<RaccourcisSiri toast={toast}/> },
@@ -4732,6 +4738,25 @@ function LangueSetting() {
           <svg className="vrm-apparence-coche" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3.2L13 4.8"/></svg>
         </button>
       ))}
+    </div>
+  );
+}
+// (15 nov.) Paramètres → TAILLE DU TEXTE : quatre lignes (la coche iOS), chacune écrite À SA taille, et un aperçu.
+// Le choix s'applique tout de suite (`applyZoom`) et reste sur CET appareil (`vrm_taille_texte`).
+function TailleTexteSetting() {
+  const [t, setT] = React.useState(lireTailleTexte);
+  const appareil = (() => { try { return echelleTexte(); } catch (_) { return 1; } })();
+  const choisir = (v) => { setT(ecrireTailleTexte(v)); applyZoom(readZoom()); };
+  return (
+    <div className="vrm-apparence vrm-taille-texte" role="radiogroup" aria-label={tr('reglages.tailleTexte.lib')} data-taille-texte-choix={t}>
+      {TAILLES_TEXTE.map(({ id }) => (
+        <button key={id} type="button" role="radio" aria-checked={t === id} className={'vrm-apparence-ligne' + (t === id ? ' is-choisi' : '')} data-taille-texte={id} onClick={() => choisir(id)}>
+          <span className="vrm-taille-texte-aa" aria-hidden="true" style={{ fontSize: Math.round(15 * facteurTaille(id)) }}>Aa</span>
+          <span className="vrm-apparence-txt"><b>{tr('reglages.tailleTexte.' + id)}</b></span>
+          <svg className="vrm-apparence-coche" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3.2L13 4.8"/></svg>
+        </button>
+      ))}
+      {appareil > 1 ? <p className="vrm-taille-texte-note" data-taille-texte-appareil={appareil}>{tr('reglages.tailleTexte.appareil')}</p> : null}
     </div>
   );
 }

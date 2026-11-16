@@ -23,6 +23,7 @@
 // Module PUR : l'écran (FichePaire.jsx) et `audit-histoire-article.cjs`.
 import { parcoursPaire } from './fichePaire.js';
 import { seriePrix } from './historiquePrix.js';
+import { etatOffreVinted } from './offresVinted.js';   // (15 nov.) l'état d'une offre : acceptée · refusée · en attente…
 
 export const ORDRE_HISTOIRE = ['achat', 'numero', 'stock', 'annonces', 'prix', 'offres', 'favoris', 'vente', 'colis', 'argent', 'retour', 'benefice'];
 // (9 nov., fiche paire) LA FRISE DU COLIS, prouvée par la transaction de LA vente :
@@ -78,7 +79,9 @@ export function histoireArticle(rn, d = {}, o = {}) {
       const relieSansTx = !bid && e.titre === 'Achetée sur Vinted';
       const recu = !bid ? null : d.recus == null ? 'reçu pas lu' : d.recus.has(bid) ? 'reçu rangé' : 'pas de reçu';
       ev.push({ at: iso(e.date || (fiche && fiche.buyFrom && fiche.buyFrom.date)), texte: [e.montant != null ? eur(e.montant / 100) : null, e.detail || null, recu].filter(Boolean).join(' · '),
-        preuve: bid ? `achat n° ${bid}` : relieSansTx ? 'achat relié' : e.gros ? 'achat en gros' : 'prix saisi', cle: 'achat' });
+        preuve: bid ? `achat n° ${bid}` : relieSansTx ? 'achat relié' : e.gros ? 'achat en gros' : 'prix saisi', cle: 'achat',
+        // (15 nov.) Le vendeur de CET achat, tel que l'achat relié l'a gardé (`buyFrom.seller`) ; absent ⇒ rien (jamais deviné).
+        ...(bid && fiche && fiche.buyFrom && str(fiche.buyFrom.seller) && String(fiche.buyFromId) === bid ? { vendeur: str(fiche.buyFrom.seller).slice(0, 60) } : {}) });
     }
     pose('achat', e ? e.etat : 'passu', e ? e.titre : 'Achat', ev, e && e.etat !== 'fait' ? e.detail : null);
   }
@@ -107,7 +110,7 @@ export function histoireArticle(rn, d = {}, o = {}) {
       const c = d.coffres == null ? undefined : d.coffres[a.id];
       if (d.coffres == null) passu = true;
       const f = fiches ? fiches[a.id] : null;
-      if (f && f.recreeAt) ev.push({ at: iso(f.recreeAt), texte: `Republiée sur Vinted${f.recreeDe ? ` (remplace l'annonce ${str(f.recreeDe)})` : ''}`, preuve: `annonce ${a.id}`, lien, cle: 'republie' });
+      if (f && f.recreeAt) ev.push({ at: iso(f.recreeAt), texte: `Republiée sur Vinted${f.recreeDe ? ` (remplace l'annonce ${str(f.recreeDe)})` : ''}`, preuve: `annonce ${a.id}`, lien, cle: 'republie', ...(f.recreeDe ? { recreeDe: str(f.recreeDe) } : {}) });
       else if (c && c.firstSavedAt) ev.push({ at: iso(c.firstSavedAt), texte: 'Vue en ligne sur Vinted', preuve: `annonce ${a.id}`, lien, cle: 'en-ligne' });
       else ev.push({ at: null, texte: 'Sur Vinted', preuve: `annonce ${a.id}`, lien, cle: 'en-ligne' });
       const etat = { 'en-ligne': 'en ligne', 'a-confirmer': 'à confirmer', masquee: 'masquée par Vinted', 'plus-en-ligne': 'plus en ligne', passu: 'état pas lu' }[a.etat];
@@ -147,7 +150,9 @@ export function histoireArticle(rn, d = {}, o = {}) {
   if (d.offres == null) pose('offres', 'passu', 'Offres', [], 'conversations pas lues');
   else {
     const ev = d.offres.filter((x) => x && idsSet.has(str(x.item)) && Number.isFinite(Number(x.prix)))
-      .map((x) => ({ at: iso(x.at), texte: `${x.sens === 'faite' ? 'Faite' : x.sens === 'recue' ? 'Reçue' : 'Offre'} · ${eur(Number(x.prix))}${x.etat ? ' · ' + str(x.etat) : ''}`, preuve: `annonce ${str(x.item)}`, cle: 'offre' }));
+      .map((x) => ({ at: iso(x.at), texte: `${x.sens === 'faite' ? 'Faite' : x.sens === 'recue' ? 'Reçue' : 'Offre'} · ${eur(Number(x.prix))}${x.etat ? ' · ' + str(x.etat) : ''}`, preuve: `annonce ${str(x.item)}`, cle: 'offre',
+        // (15 nov.) En NOMBRES et en clés pour la ligne de temps (jamais relire le texte) : prix, sens, état, annonce.
+        prix: Number(x.prix), sens: x.sens || null, statut: x.statut || null, item: str(x.item) }));
     pose('offres', ev.length ? 'fait' : 'absent', 'Offres', ev, ev.length ? null : 'aucune offre lue');
   }
 
@@ -287,9 +292,12 @@ export function offresDeConversation(conv, moi) {
     const e = m.entity || {};
     const prix = e.price && e.price.amount != null ? Number(e.price.amount) : NaN;
     if (!Number.isFinite(prix)) continue;
-    const at = Number.isFinite(Number(m.created_at_ts)) ? new Date(Number(m.created_at_ts) * (Number(m.created_at_ts) < 1e12 ? 1000 : 1)).toISOString() : null;
+    // (15 nov.) La date d'un message Vinted arrive en secondes OU en texte ISO (`created_at_ts`, mesuré dans statsOffres) :
+    // les deux sont lues ; rien d'autre n'est deviné (illisible ⇒ « date inconnue »).
+    const brut = m.created_at_ts, tIso = typeof brut === 'string' && !/^\d+$/.test(brut.trim()) ? Date.parse(brut) : NaN;
+    const at = brut != null && brut !== '' && Number.isFinite(Number(brut)) ? new Date(Number(brut) * (Number(brut) < 1e12 ? 1000 : 1)).toISOString() : Number.isFinite(tIso) ? new Date(tIso).toISOString() : null;
     const sens = moi != null && e.user_id != null ? (String(e.user_id) === String(moi) ? 'faite' : 'recue') : null;
-    out.push({ item, at, prix, sens, etat: str(e.status_title) || null });
+    out.push({ item, at, prix, sens, etat: str(e.status_title) || null, statut: etatOffreVinted(e).etat });
   }
   return out;
 }
