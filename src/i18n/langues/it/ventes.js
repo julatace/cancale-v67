@@ -2,6 +2,7 @@
 // Écrit par scripts/i18n-migrer.cjs (la source : fr/ventes.js ; méthode : docs/passation/2026-11-11-traduction.md).
 export default {
   "ventes.ventesCompteRelues": "· vendite di questo account rilette",
+  "ventes.venteEmailBordAVenir": "Etichetta in arrivo: l’estensione non l’ha ancora rilevata.",
   "ventes.photoIndisponible": "Foto non disponibile",
   "ventes.montantEurosEx": "Un importo in euro (es.: 25 o 25,50).",
   "ventes.coutAchat": "Costo d’acquisto?",
