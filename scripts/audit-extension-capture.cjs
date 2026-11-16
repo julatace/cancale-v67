@@ -117,7 +117,8 @@ if (!process.argv.includes('--prouve')) (async () => {
     const { ctx, j, store } = monde({ pret: () => false });
     await ctx.genererBordereauxEnAttente(UID);
     const c = await ctx.capturePourCarte('vinted', UID, null);
-    dit(c && c.k === 'manque' && c.phrase === '1 bordereau pas encore récupéré' && c.geste === 'Ouvre tes ventes à expédier' && /^https:\/\/www\.vinted\.fr\//.test(c.lien || ''),
+    // (16 nov.) Le lien « Mes ventes » (/my_orders/sold) rendait 404 : retiré (412048747) ; le geste dit OÙ aller, sans lien mort.
+    dit(c && c.k === 'manque' && c.phrase === '1 bordereau pas encore récupéré' && /^Ouvre tes ventes à expédier( sur Vinted)?$/.test(c.geste || '') && (c.lien == null || /^https:\/\/www\.vinted\.fr\//.test(c.lien)) && !/my_orders\/sold/.test(c.lien || ''),
       'K2 carte : « 1 bordereau pas encore récupéré · Ouvre tes ventes à expédier »', JSON.stringify(c));
     const ecarts = [];
     for (let i = 0; i < 5; i++) {

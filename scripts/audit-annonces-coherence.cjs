@@ -34,7 +34,8 @@ const MUTATIONS = {
   vieux_mots: { f: 'src', m: (s) => s.replace("titre: 'Modifier prix ou titre'", "titre: 'En ligne → en ligne, avec tes modifications'") },
   // (9 nov., lot AL) « Republier » est une VUE d'Annonces (plus une entrée du menu) : l'ancien chemin et « Republier… » y mènent.
   feuille_revenue: { f: 'app', m: (s) => s.replace("if(only==='annonces' && prendreVue('republier')) setAnnSort('republier');", "if(only==='annonces' && prendreVue('republier')) setActionsOpen(true);") },
-  republier_feuille: { f: 'app', m: (s) => s.replace("onClick={()=>setAnnSort('republier')}><Icon name=\"sync\" size={17}/>", "onClick={()=>setActionsOpen(true)}><Icon name=\"sync\" size={17}/>") },
+  // (16 nov.) ancres reportées sur l'écran refait (15 nov.) : le bouton « Republier » de la tête, le texte passé par tr().
+  republier_feuille: { f: 'app', m: (s) => s.replace("data-actions-ouvrir=\"\" aria-pressed={annSort==='republier'} onClick={()=>setAnnSort('republier')}>", "data-actions-ouvrir=\"\" aria-pressed={annSort==='republier'} onClick={()=>setActionsOpen(true)}>") },
   baisser_revenu: { f: 'app', m: (s) => s.replace('<button type="button" className="vrm-fiche-geste" data-fiche-vendue=""', '<a className="vrm-fiche-geste" style={{color:C.accent}}>Baisser à 9 €</a><button type="button" className="vrm-fiche-geste" data-fiche-vendue=""') },
   refuse_chevron: { f: 'app', m: (s) => s.replace('<span style={lib}>Refuser sous</span>', "<span style={lib}>{'refuse <'}</span>") },
   filtre_selection: { f: 'app', m: (s) => s.replace("return `${k} annonce${k>1?'s':''} affichée${k>1?'s':''}`;", "return `${k} annonce${k>1?'s':''} dans cette sélection`;") },
@@ -43,7 +44,7 @@ const MUTATIONS = {
   achat_ambre: { f: 'css', m: (s) => s.replace('border-color: var(--vrm-line) !important; background: var(--vrm-bg) !important;', 'border-color: var(--vrm-warn) !important;') },
   geste_en_trop: { f: 'app', m: (s) => s.replace('<button type="button" className="vrm-fiche-geste vrm-fiche-geste-plus"', '<button type="button" className="vrm-fiche-geste" data-fiche-passeport="">Passeport</button><button type="button" className="vrm-fiche-geste vrm-fiche-geste-plus"') },
   croix_main: { f: 'app', m: (s) => s.replace("<SheetShell onClose={onClose} maxWidth={520} titre={`Actions · ${n} annonce${n > 1 ? 's' : ''}`}>", "<SheetShell onClose={onClose} maxWidth={520}><button type=\"button\" onClick={onClose} aria-label=\"Fermer\">✕</button>") },
-  mot_ecarte: { f: 'app', m: (s) => s.replace('Coche des annonces d’un même compte, puis ', 'Coche des annonces à poster, puis ') },
+  mot_ecarte: { f: 'app', m: (s) => s.replace("onClick={()=>setAnnSort('republier')}>Republier</button>", "onClick={()=>setAnnSort('republier')}>Les annonces à poster</button>") },
 };
 
 async function charger(src, nom) {
@@ -90,7 +91,8 @@ async function auditer(S) {
   dit(/raisonCommune\(actions\)/.test(feuille) && /ACTIONS_TUILES\.map/.test(feuille), 'A4 la feuille Actions lit `raisonCommune` et `ACTIONS_TUILES`');
   dit(/<SheetShell [^>]*titre=\{/.test(feuille) && !/✕/.test(feuille), 'A5 la feuille Actions : `SheetShell titre` (croix partagée), aucune croix faite main');
   // ── Z ── la zone Annonces
-  const ecran = tranche(appN, "{curSub==='annonces' && (<>", 'className="vrm-ann-stock-tools"');
+  // (16 nov.) Depuis le 15 nov. l'écran est enveloppé par `AFaireHote` (les alertes « À faire » d'Annonces) : même zone.
+  const ecran = tranche(appN, "{curSub==='annonces' && (<>", 'className="vrm-ann-stock-tools"') || tranche(appN, "{curSub==='annonces' && (<AFaireHote>", 'className="vrm-ann-stock-tools"');
   const choix = tranche(appN, 'function ChoixAnnoncesVinted(', '\nfunction RepublierALaMain(');
   const zone = ecran + choix;
   dit(ecran.length > 5000 && choix.length > 2000, 'Z0 la zone Annonces est trouvée', `${ecran.length} / ${choix.length}`);

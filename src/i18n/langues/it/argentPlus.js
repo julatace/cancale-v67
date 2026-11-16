@@ -34,7 +34,7 @@ export default {
   "argentPlus.ba.achatManque": "non inserito",
   "argentPlus.ba.reste": "Dopo le spese di vendita",
   "argentPlus.ba.auPlus": "al massimo",
-  "argentPlus.bl.sur": {"one": "su {n} vendita di {m}", "other": "su {n} vendite di {m}"},
+  "argentPlus.bl.sur": {"one": "calcolato su {n} vendita su {m} (quelle con il prezzo d’acquisto)", "other": "calcolato su {n} vendite su {m} (quelle con il prezzo d’acquisto)"},
   "argentPlus.bl.achat": {"one": "{n} prezzo d’acquisto da inserire", "other": "{n} prezzi d’acquisto da inserire"},
   "argentPlus.bl.plateforme": {"one": "{n} commissione non letta", "other": "{n} commissioni non lette"},
   "argentPlus.bl.frais": {"one": "{n} vendita con spese da confermare", "other": "{n} vendite con spese da confermare"},

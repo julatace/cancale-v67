@@ -55,10 +55,14 @@ const SERVICE = {
 const USAGES = {
   achats: { quoi: 'géocodage automatique des points relais (écran Achats)', role: /points? relais/i, donnee: /navigateur/i },
   ville: { quoi: 'recherche de ville de la carte de la communauté (repli du navigateur)', role: /communaut/i, donnee: /navigateur/i },
+  // (16 nov.) La carte de tes ventes (Argent, 14 nov.) : ville + code postal à la BAN, depuis le navigateur.
+  ventes: { quoi: 'villes de la carte de tes ventes (écran Argent)', role: /carte de tes ventes/i, donnee: /navigateur/i },
   fond: { quoi: 'fond de la carte de la communauté (tuiles)', role: /carte de la communaut/i, donnee: /adresse IP/i },
   avatar: { quoi: 'photos de profil Discord sur la carte', role: /communaut/i, donnee: /navigateur|adresse IP/i },
   pdfjs: { quoi: 'aperçu des bordereaux (pdf.js)', role: /pdf\.js|aperçu des bordereaux/i, donnee: /navigateur|adresse IP/i },
   ort: { quoi: 'détourage du Studio photo (onnxruntime)', role: /Studio photo|onnxruntime/i, donnee: /navigateur|adresse IP/i },
+  // (16 nov., bancs-rouges-a) la carte de tes ventes (Argent, 14 nov.) cherche la VILLE à la BAN, depuis le navigateur.
+  carteventes: { quoi: 'villes de la carte de tes ventes (écran Argent)', role: /carte de tes ventes/i, donnee: /navigateur/i },
   base: { quoi: 'la base de données de VRM', role: /./, donnee: /./ },
   // (5 nov.) deux outils de plus chargés de jsDelivr par le navigateur, et les logos des transporteurs.
   zxing: { quoi: 'lecture du code-barres d’un colis à la caméra (ZXing, src/ScannerColis.jsx)', role: /ZXing/, donnee: /navigateur|adresse IP/i },
@@ -76,6 +80,23 @@ const COUPLES = {
   'src/App.jsx|nominatim.openstreetmap.org': ['politique', 'achats'],
   // (1er nov.) La carte des points relais (Colis → À retirer, Tournée) géocode par la même BAN, depuis le navigateur.
   'src/CarteRelais.jsx|api-adresse.data.gouv.fr': ['politique', 'achats'],
+  // (16 nov., audits-vert-main) Arrivés du 9 au 15 nov., lus un à un : une recherche du navigateur (la carte des ventes)
+  // et des liens ouverts d'un clic.
+  'src/CarteVentes.jsx|api-adresse.data.gouv.fr': ['politique', 'ventes'],
+  'src/notifsBonMoment.js|vrm.center': ['vrm', 'VRM lui-même (base pour lire le lien d’une notification, jamais appelé)'],
+  'src/aRetirerAilleurs.js|www.leboncoin.fr': ['lien', LIEN + ' — « retirer » l’annonce sur le site'],
+  'src/aRetirerAilleurs.js|www.ebay.fr': ['lien', LIEN + ' — « retirer » l’annonce sur le site'],
+  'src/aRetirerAilleurs.js|fr.vestiairecollective.com': ['lien', LIEN + ' — « retirer » l’annonce sur le site'],
+  'src/aRetirerAilleurs.js|www.vinted.fr': ['lien', LIEN + ' — « retirer » l’annonce sur le site'],
+  'src/accompagnement.js|www.vinted.fr': ['lien', LIEN + ' — « Créer sur Vinted » (brouillons), ouvert dehors'],
+  'src/alertesSeuils.js|entreprendre.service-public.gouv.fr': ['lien', LIEN + ' — la source officielle d’un seuil'],
+  'src/alertesSeuils.js|eur-lex.europa.eu': ['lien', LIEN + ' — la source officielle d’un seuil (DAC7)'],
+  'src/deuxComptes.js|www.vinted.fr': ['lien', LIEN + ' — l’annonce sur Vinted'],
+  'src/ouVendre.js|www.vinted.fr': ['lien', LIEN + ' — les pages d’aide de Vinted'],
+  'src/ouVendre.js|www.leboncoin.fr': ['lien', LIEN + ' — les pages d’aide de Leboncoin'],
+  'src/parcoursArrivee.js|www.leboncoin.fr': ['lien', LIEN + ' — « Mes annonces » sur le site'],
+  'src/parcoursArrivee.js|www.vestiairecollective.com': ['lien', LIEN + ' — le site Vestiaire'],
+  'src/retoursAchat.js|www.vinted.fr': ['lien', LIEN + ' — la transaction ou la conversation sur Vinted'],
   'src/App.jsx|cdn.jsdelivr.net': ['politique', 'pdfjs'],
   'src/studioPhoto.js|cdn.jsdelivr.net': ['politique', 'ort'],
   'src/communaute/Communaute.jsx|api-adresse.data.gouv.fr': ['politique', 'ville'],
@@ -225,6 +246,22 @@ const COUPLES = {
   'src/ecrans/Vestiaire.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir » l’annonce encore en ligne sur Vinted'],
   'src/ecrans/Vestiaire.jsx|fr.vestiairecollective.com': ['lien', LIEN + ' — « Répondre sur Vestiaire ↗ »'],
   'src/enLigneLbc.js|www.leboncoin.fr': ['lien', LIEN + ' — « Ouvrir « Mes annonces » sur leboncoin.fr ↗ »'],
+  // (16 nov., bancs-rouges-a) couples écrits du 11 au 15 nov. sans être déclarés ici, relus à leur ligne.
+  'src/CarteVentes.jsx|api-adresse.data.gouv.fr': ['politique', 'carteventes'],
+  'src/aRetirerAilleurs.js|www.leboncoin.fr': ['lien', LIEN + ' — « à faire sur le site » (LIEN_SITE, un <a> de ARetirerAilleurs.jsx)'],
+  'src/aRetirerAilleurs.js|www.ebay.fr': ['lien', LIEN + ' — « à faire sur le site » (LIEN_SITE)'],
+  'src/aRetirerAilleurs.js|fr.vestiairecollective.com': ['lien', LIEN + ' — « à faire sur le site » (LIEN_SITE)'],
+  'src/aRetirerAilleurs.js|www.vinted.fr': ['lien', LIEN + ' — « à faire sur le site » (LIEN_SITE)'],
+  'src/accompagnement.js|www.vinted.fr': ['lien', LIEN + ' — « ensuite » de l’accompagnement (`dehors: true`, les brouillons Vinted)'],
+  'src/alertesSeuils.js|entreprendre.service-public.gouv.fr': ['lien', LIEN + ' — la source officielle citée sous un seuil'],
+  'src/alertesSeuils.js|eur-lex.europa.eu': ['lien', LIEN + ' — la directive DAC7 citée sous un seuil'],
+  'src/notifsBonMoment.js|vrm.center': ['vrm', 'VRM lui-même (base de `new URL` pour juger un lien de notification, jamais appelée)'],
+  'src/ouVendre.js|www.vinted.fr': ['lien', LIEN + ' — les sources des frais (OuVendre.jsx)'],
+  'src/ouVendre.js|www.leboncoin.fr': ['lien', LIEN + ' — les sources des frais (OuVendre.jsx)'],
+  'src/parcoursArrivee.js|www.leboncoin.fr': ['lien', LIEN + ' — « Ouvrir Leboncoin » du parcours d’arrivée'],
+  'src/parcoursArrivee.js|www.vestiairecollective.com': ['lien', LIEN + ' — « Ouvrir Vestiaire » du parcours d’arrivée'],
+  'src/retoursAchat.js|www.vinted.fr': ['lien', LIEN + ' — la transaction ou la conversation du retour'],
+  'src/deuxComptes.js|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir sur Vinted » une des deux annonces (deux comptes, même paire)'],
   // (24 oct.) Le SERVEUR lit le statut public des colis (api/_lib/transporteurs-lecture.js).
   'api/_lib/transporteurs-lecture.js|ws.chronopost.fr': ['politique', 'transp'],
   'api/_lib/transporteurs-lecture.js|carrier.vintedgo.com': ['politique', 'transp'],
@@ -303,9 +340,12 @@ if (PROUVE) {
   const MUT = [
     ['la ligne « points relais (écran Achats) » retirée', () => [fichiers, sansLigne('points relais où arrivent tes colis')]],
     ['la ligne Achats dit « le serveur » au lieu du navigateur', () => [fichiers, politique.replace('Adresse du point relais, envoyée par ton navigateur (ton adresse IP)', 'Adresse du point relais, envoyée par le serveur VRM')]],
+    ['la ligne « carte de tes ventes » retirée', () => [fichiers, sansLigne('carte de tes ventes')]],
     ['la ligne jsDelivr retirée', () => [fichiers, sansLigne('jsDelivr')]],
     ['la ligne jsDelivr ne cite plus ZXing ni Tesseract', () => [fichiers, politique.replace(', la lecture du code-barres d’un colis à la caméra quand le téléphone ne sait pas le lire seul (ZXing) et la lecture d’un ticket de dépense photographié (Tesseract)', '')]],
-    ['la ligne des logos des transporteurs retirée', () => [fichiers, sansLigne('Afficher le logo du transporteur')]],
+    // (16 nov.) les logos sont dessinés dans l'app depuis le 10 nov. (aucune requête) : la ligne de la politique est retirée ;
+    // la mutation remet un logo chargé depuis le site du transporteur ⇒ il doit être déclaré.
+    ['un logo de transporteur rechargé depuis son site, non déclaré', () => [fichiers.map(([f, t]) => [f, f === 'src/transporteursVisuels.js' ? t + '\nconst icone = `https://www.chronopost.fr/favicon.ico`;\n' : t]), politique]],
     ['la ligne des photos Discord retirée', () => [fichiers, sansLigne('Photo de profil Discord')]],
     ['la ligne Chronopost / Vinted Go retirée', () => [fichiers, sansLigne('Chronopost \\(groupe La Poste\\)')]],
     ['la ligne Mondial Relay ne dit plus le secours par le navigateur', () => [fichiers, politique.replace('envoyés depuis ton navigateur par l’extension VRM', 'envoyés par le serveur VRM')]],

@@ -9,7 +9,7 @@ require('./_porte-banc.cjs');
 //       (`data-espace` sur la coque, <main> et la racine de l'écran gardé) ;
 //    B  (390) la barre du bas en VERRE dépoli (flou + fond translucide), flottante (rayon ≥ 20, à
 //       ≥ 8 px des bords), le contenu passe DESSOUS ; l'onglet actif porte la pastille ENFONCÉE
-//       (46 × 30) et sa diode ; quatre onglets + le disque au centre ;
+//       (46 × 30) et sa diode ; cinq onglets + le disque (16 nov., Achats dans la barre) ;
 //    E  (390) le disque ⇒ l'éventail : quatre gestes, UN seul plein (« Imprimer N », N = le nombre de
 //       « Tout imprimer (N) » de Ventes, jamais deviné), tous dans l'écran ; puis chaque geste RÉEL :
 //       Chercher ⇒ le champ de la loupe ; Scanner ⇒ le scanner de bordereau de Ventes ; Publier ⇒
@@ -79,7 +79,8 @@ async function telephone(nav, sombre, b) {
   dit(/blur/.test(barre.flou) && /rgba|\/ 0\./.test(barre.fond), 'B la barre du bas est en verre (flou + fond translucide)', barre);
   dit(barre.rayon >= 20 && barre.g >= 8 && barre.d >= 8 && barre.bas >= 8, 'B la barre flotte (rayon ≥ 20, ≥ 8 px des bords)', barre);
   dit(barre.dessous, 'B le contenu passe SOUS la barre (elle ne prend pas de bande à elle)');
-  dit(barre.onglets === 4 && barre.disque, 'B quatre onglets et le disque au centre', barre);
+  // (16 nov., barre-achats) Achats a rejoint la barre : cinq onglets (Aujourd'hui · Annonces · Achats · Ventes · Argent) et le disque.
+  dit(barre.onglets === 5 && barre.disque, 'B cinq onglets et le disque', barre);
   dit(barre.pastille && barre.pastille.w === 46 && barre.pastille.h === 30 && barre.ic && Math.abs(barre.pastille.cx - barre.ic.cx) <= 1 && Math.abs(barre.pastille.cy - barre.ic.cy) <= 1 && /inset/.test(barre.pastille.ombre) && barre.pastille.op !== '0',
     'B la pastille ENFONCÉE (46 × 30, ombre intérieure) est sur l’icône de l’espace actif', barre.pastille && barre.ic ? [barre.pastille, barre.ic] : barre);
   dit(!!barre.diode, 'B sa diode est allumée', barre.diode);
@@ -88,7 +89,7 @@ async function telephone(nav, sombre, b) {
     const f = K.sur(verre, bas); const lab = [...document.querySelectorAll('.vrm-tabbar .vrm-nav-label')].map((l) => K.ratio(K.rgba(getComputedStyle(l).color), f));
     const titre = document.querySelector('.vrm-main :is(.vrm-screen-head .vrm-display, .vrm-tache-tete h1, h1)'); const haut = K.jeton('--sb-haut');
     return { lab: lab.map((x) => Math.round(x * 100) / 100), titre: titre ? Math.round(K.ratio(K.rgba(getComputedStyle(titre).color), haut) * 100) / 100 : null }; }, CONTRASTE);
-  dit(cBarre.lab.length === 4 && cBarre.lab.every((x) => x >= 4.5), `C libellés de la barre ≥ 4,5:1 sur le verre posé sur le bas (${cBarre.lab.join(' · ')})`, cBarre.lab);
+  dit(cBarre.lab.length === 5 && cBarre.lab.every((x) => x >= 4.5), `C libellés de la barre ≥ 4,5:1 sur le verre posé sur le bas (${cBarre.lab.join(' · ')})`, cBarre.lab);
   dit(cBarre.titre == null || cBarre.titre >= 4.5, `C le titre d’écran ≥ 4,5:1 sur le haut de la lumière (${cBarre.titre})`, cBarre.titre);
   dit(nLot != null, 'E Ventes dit combien « Tout imprimer (N) » ferait partir', nLot);
   await pg.screenshot({ path: path.join(SHOTS, `ventes-390-${th}.png`) });

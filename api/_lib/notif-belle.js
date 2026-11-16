@@ -68,7 +68,10 @@ export function embellir({ title = '', body = '' } = {}, cat = null) {
     const tete = m && m[1].length <= TITRE_MAX ? m[1] : null;
     // (15 nov.) Corps ≤ 90 : la suite du titre passe en tête ; si le tout ne tient pas, elle
     // passe en QUEUE (c'est elle qui sera coupée, jamais le lieu, le code ou le n° du corps).
-    if (tete) { const devant = [majuscule(m[2]), b].filter(Boolean).join(' · '); b = devant.length <= CORPS_MAX || !b ? devant : [b, m[2]].join(' · '); t = tete; }
+    // (16 nov.) « Tenir » se juge sur la 1re PHRASE du corps (couperPhrases garde des phrases entières) : la suite du titre
+    // (« 2927,47 € à déclarer ») reste devant tant qu'elle tient avec elle — la phrase suivante, elle, peut tomber.
+    const premiere = b ? (/^[\s\S]*?[.!?](?=\s|$)/.exec(b) || [b])[0] : '';   // sans lookbehind (Safari < 16.4, audit-safari)
+    if (tete) { const devant = [majuscule(m[2]), b].filter(Boolean).join(' · '); b = devant.length <= CORPS_MAX || !b || [majuscule(m[2]), premiere].join(' · ').length <= CORPS_MAX ? devant : [b, m[2]].join(' · '); t = tete; }
     else { if (!b) b = t; t = couper(t, TITRE_MAX); }
   }
   if (!t) {
@@ -120,8 +123,8 @@ export const etiquetteGroupe = (genre) => `vrm-${genre.id}`;
 
 // Le texte regroupé : `k` notifications NON LUES de ce genre (celle-ci comprise).
 // k ≤ 1 ⇒ inchangé. (15 nov.) Le corps dit LA PLUS RÉCENTE en une ligne courte :
-// sa `ligne` quand la règle de rédaction l'a faite (« 9060 vert/blanc T38, expire
-// dans 24 h »), sinon son titre puis son corps. Dans la langue du vendeur.
+// sa `ligne` quand la règle de rédaction l’a faite (« 9060 vert/blanc T38 » — une
+// offre Vinted n’expire pas), sinon son titre puis son corps. Dans la langue du vendeur.
 export function texteGroupe(n, genre, k, langue = 'fr') {
   if (!genre || !(k > 1)) return n;
   const derniere = n.ligne ? n.ligne : (genre.sansTitre && n.body ? [n.body] : [n.title, n.body]).filter(Boolean).join(' · ');

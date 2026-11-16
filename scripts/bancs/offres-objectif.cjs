@@ -252,8 +252,16 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         const contraste = await pg.locator('.vrm-chat-send').first().evaluate(b => {
           const s = getComputedStyle(b), rgb = v => (v.match(/[\d.]+/g) || []).map(Number);
           const lum = v => rgb(v).slice(0, 3).map(x => x / 255).map(x => x <= .04045 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4).reduce((t, x, i) => t + x * [.2126, .7152, .0722][i], 0);
-          const a = lum(s.color), c = lum(s.backgroundColor), bg = rgb(s.backgroundColor);
-          return { ratio: (Math.max(a, c) + .05) / (Math.min(a, c) + .05), couleur: s.color, fond: s.backgroundColor, opaque: bg.length === 3 || bg[3] === 1, actif: !b.disabled };
+          // (16 nov., parcours-vert) Refonte M/E/S (14 nov.) : le disque d'Envoyer est DESSINÉ par un dégradé radial
+          // (36 px pleins dans 44 px au doigt, `background-image`), la couleur de fond reste transparente. Le fond jugé
+          // est celui qui est SOUS l'icône : la couleur de fond si elle est posée, sinon le 1er arrêt du dégradé radial
+          // (son centre). Un dégradé dont le centre est transparent reste « pas opaque ».
+          let fond = s.backgroundColor, bg = rgb(fond);
+          if (!(bg.length === 3 || bg[3] === 1) && /^radial-gradient\(/.test(s.backgroundImage || '')) {
+            const m = /rgba?\([^)]*\)/.exec(s.backgroundImage); if (m) { fond = m[0]; bg = rgb(fond); }
+          }
+          const a = lum(s.color), c = lum(fond);
+          return { ratio: (Math.max(a, c) + .05) / (Math.min(a, c) + .05), couleur: s.color, fond, opaque: bg.length === 3 || bg[3] === 1, actif: !b.disabled };
         });
         dit(contraste.actif && contraste.opaque && contraste.ratio >= 3, 'Envoyer actif : icône contrastée sur un fond opaque', JSON.stringify(contraste));
         if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `ebay-question-fil-${nom}.png`) });

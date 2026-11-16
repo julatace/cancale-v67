@@ -257,7 +257,7 @@ async function rendre(b, { version, tel = false, lignes = rows, offresKO = false
         try{
           const champ=r.pg.getByRole('searchbox',{name:'Rechercher une conversation'});
           await r.pg.selectOption('#vrm-sel-compte','111');await r.pg.waitForTimeout(250);
-          await champ.fill('acheteur_2');await r.pg.locator('[data-conv="402"]').waitFor();
+          await champ.fill('acheteur_2');await r.pg.locator('[data-conv="402"]').waitFor({ state: 'visible' }); await r.pg.waitForFunction(() => ((document.querySelector('[data-conv="402"]') || {}).innerText || '').trim().length > 0, null, { timeout: 5000 }).catch(() => {});   // (16 nov.) la rangée porte `content-visibility: auto` : tant qu'elle n'est pas peinte, son texte (innerText) est vide — on attend qu'elle le soit, la règle jugée reste la même
           dit(await r.pg.locator('#vrm-sel-compte').inputValue()==='111','recherche sur un autre compte : le sélecteur reste inchangé');
           dit((await r.pg.locator('[data-conv="402"]').innerText()).includes('compte_b'),'le compte du résultat est nommé même quand il est seul');
           await champ.fill('N°7');await r.pg.locator('[data-conv="301"]').waitFor();

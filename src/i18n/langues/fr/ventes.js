@@ -2,6 +2,7 @@
 // Écrit par scripts/i18n-migrer.cjs (la source : fr/ventes.js ; méthode : docs/passation/2026-11-11-traduction.md).
 export default {
   "ventes.ventesCompteRelues": "· ventes de ce compte relues",
+  "ventes.venteEmailBordAVenir": "Bordereau à venir : l’extension ne l’a pas encore capté.",
   "ventes.photoIndisponible": "Photo indisponible",
   "ventes.montantEurosEx": "Un montant en euros (ex : 25 ou 25,50).",
   "ventes.coutAchat": "Coût d'achat ?",
@@ -238,4 +239,12 @@ export default {
   "ventes.ventesAchetePeu2": "Sur {total} ventes — achète un peu avant.",
   "ventes.ventesAnnulees2": { one: "{n} vente annulée", other: "{n} ventes annulées" },
   "ventes.moinsVentesSans": { one: "Au moins : {n} vente sans prix lu, pas comptée.", other: "Au moins : {n} ventes sans prix lu, pas comptées." },
+  "ventes.regarder": {"one": "{n} chose à regarder", "other": "{n} choses à regarder"},
+  "ventes.regarderVide": "À regarder",
+  "ventes.basculeCourt": "Ouvre {login} sur vinted.fr",
+  "ventes.basculeCourtOrdi": "Ouvre {login} sur vinted.fr, sur l’ordinateur",
+  "ventes.connecteCourt": "Connecte {login} sur vinted.fr",
+  "ventes.pourquoiBord": "Pourquoi ce bordereau attend ?",
+  "ventes.puceAchat": "Prix d’achat ?",
+  "ventes.puceRelier": "Relier un achat",
 };

@@ -48,6 +48,13 @@ export const anneeParis = (t = Date.now()) => jourParis(t).slice(0, 4);
 // Numéro du mois de Paris, 0 à 11 (comme getMonth) ; -1 si illisible.
 export const indexMoisParis = (t = Date.now()) => { const m = moisParis(t); return m ? Number(m.slice(5, 7)) - 1 : -1; };
 
+// (16 nov.) Arithmétique de jours sur le texte 'AAAA-MM-JJ' (aucun fuseau en jeu : un jour
+// de calendrier + n jours ; '' si illisible).
+export const jourDecale = (jour, n) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(jour || ''));
+  if (!m) return '';
+  return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + Math.trunc(Number(n) || 0))).toISOString().slice(0, 10);
+};
 // Arithmétique de mois sur le texte 'AAAA-MM' (aucun fuseau en jeu).
 export const moisDecale = (ym, delta) => {
   const m = /^(\d{4})-(\d{2})$/.exec(String(ym || ''));
