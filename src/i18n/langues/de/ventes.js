@@ -2,6 +2,7 @@
 // Écrit par scripts/i18n-migrer.cjs (la source : fr/ventes.js ; méthode : docs/passation/2026-11-11-traduction.md).
 export default {
   "ventes.ventesCompteRelues": "· Verkäufe dieses Kontos neu gelesen",
+  "ventes.venteEmailBordAVenir": "Versandetikett folgt: Die Erweiterung hat es noch nicht erfasst.",
   "ventes.photoIndisponible": "Foto nicht verfügbar",
   "ventes.montantEurosEx": "Ein Betrag in Euro (z. B. 25 oder 25,50).",
   "ventes.coutAchat": "Einkaufskosten?",
