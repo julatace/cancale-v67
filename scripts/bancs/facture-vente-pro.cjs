@@ -212,7 +212,7 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
         const r = await pg.evaluate(() => {
           const rect = (el) => el && el.getBoundingClientRect();
           const pe = [...document.querySelectorAll('.vrm-sale-row[data-tx="7001"] [data-fp-pastille]')].find((e) => e.getClientRects().length);
-          const p = rect(pe);
+          const p = rect(pe && pe.querySelector('svg') ? pe : pe);
           const l2 = rect(pe && pe.closest('.vrm-ledger-sale-toggle'));   // DANS la ligne (téléphone : posée à droite de l'état ; ordinateur : rangée du compte)
           // La hauteur de la ligne AVEC la pastille, puis SANS (la pastille retirée un instant).
           const ligne = document.querySelector('.vrm-sale-row[data-tx="7001"]');
@@ -223,7 +223,8 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
           hotes.forEach((h) => { h.style.display = ''; });
           // Elle ne recouvre aucun autre texte de la ligne.
           const touche = [];
-          if (pe && ligne) for (const el of ligne.querySelectorAll('span, b, div')) { if (pe.contains(el) || el.contains(pe) || !el.childNodes.length || ![...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) continue; const q = el.getBoundingClientRect(); if (!q.width) continue; if (q.left < p.right - 1 && q.right > p.left + 1 && q.top < p.bottom - 1 && q.bottom > p.top + 1) touche.push(el.textContent.trim().slice(0, 20)); }
+          // (le rectangle du TEXTE lui-même, par Range — pas celui de son conteneur, qui peut être pleine largeur)
+          if (pe && ligne) { const w = document.createTreeWalker(ligne, NodeFilter.SHOW_TEXT); for (let n = w.nextNode(); n; n = w.nextNode()) { if (!n.textContent.trim() || pe.contains(n)) continue; const rg = document.createRange(); rg.selectNodeContents(n); for (const q of rg.getClientRects()) { if (!q.width) continue; if (q.left < p.right - 1 && q.right > p.left + 1 && q.top < p.bottom - 1 && q.bottom > p.top + 1) touche.push(n.textContent.trim().slice(0, 20)); } } }
           return { p: p && { t: p.top, b: p.bottom }, l2: l2 && { t: l2.top, b: l2.bottom }, h7001: Math.round(avec), h8001: Math.round(sans), touche };
         });
         dit(r.p && r.l2 && r.p.t >= r.l2.t - 2 && r.p.b <= r.l2.b + 2 && r.h7001 <= r.h8001 + 1 && !r.touche.length, 'V1 la pastille tient DANS la ligne sans rien recouvrir (état au téléphone, compte à l’ordinateur) : aucune hauteur de ligne ajoutée', JSON.stringify(r));

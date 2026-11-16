@@ -24971,10 +24971,9 @@ function LigneVenteCompacte({ photo, photoNoeud = null, titre: titreNom, numTitr
       {/* (11 nov., lot ventes-achats-visuel) La frise FINE, dans la ligne : sous l'état au téléphone,
           dans la colonne « État » à l'ordinateur (une grille alignée : photo · N° + titre · état · prix ·
           bénéfice). Rien d'interactif dedans (des <span>) : un toucher ouvre la vente, comme avant. */}
-      {friseEtat ? <span className="vrm-ledger-sale-frise" data-frise-ligne="">{friseEtat}</span> : null}
-      {/* (16 nov., lot factures-mieux) Au téléphone, la facture en PASTILLE posée à droite de la ligne de l'état
-          (position absolue : aucune hauteur ajoutée) ; à l'ordinateur, dans la rangée du compte (`factureBureau`). */}
-      {fusion && fusion.facture ? fusion.facture : null}
+      {/* (16 nov., lot factures-mieux) Au téléphone, la facture en PASTILLE posée à droite de la ligne de l'état, sous
+          la frise (position absolue : aucune hauteur ajoutée) ; à l'ordinateur, dans la rangée du compte (`factureBureau`). */}
+      {friseEtat ? <span className="vrm-ledger-sale-frise" data-frise-ligne="">{friseEtat}{fusion && fusion.facture ? fusion.facture : null}</span> : (fusion && fusion.facture ? fusion.facture : null)}
       <span className="vrm-ledger-sale-amount" data-prix-vente={montantCentimes ?? undefined}>{montant}</span>
       {benef ? <span className="vrm-ledger-sale-achat" data-achat-ligne={benef.achatCentimes ?? ''} data-achat-etat={benef.achatCentimes == null ? 'manque' : 'lu'}>{benef.achatTxt}</span> : null}
       {benef ? <span className="vrm-ledger-sale-benef" data-benef-ligne={benef.benefCentimes ?? ''} data-benef-etat={benef.etat} aria-label={benef.aria || undefined}>{benef.etat === 'partiel' ? <><span className="vrm-benef-borne">{tr('ventes.plus')} </span>{benef.benefTxt}</> : benef.benefTxt}</span> : null}
