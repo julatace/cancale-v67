@@ -167,6 +167,9 @@ async function contrastePixels(pg, el) {
       await pg.evaluate(() => { const m = document.querySelector('[data-meuble="mA"]'); if (m) m.scrollIntoView({ block: 'start' }); window.scrollBy(0, -70); });
       await pg.waitForTimeout(500);
       if (CAPT) await pg.screenshot({ path: path.join(CAPT, `sm-${v}-1-garage.png`) });
+      if (CAPT) { await pg.evaluate(() => { const b = document.querySelector('[data-stock-barre-plan]') || document.querySelector('[data-stock-legende]'); if (b) b.scrollIntoView({ block: 'center' }); }); await pg.waitForTimeout(300); await pg.screenshot({ path: path.join(CAPT, `sm-${v}-0-barre.png`) });
+        await pg.evaluate(() => { const b = document.querySelector('[data-stock-section="plus"]'); if (b) b.scrollIntoView({ block: 'start' }); window.scrollBy(0, -80); }); await pg.waitForTimeout(300); await pg.screenshot({ path: path.join(CAPT, `sm-${v}-4-plus.png`) });
+        await pg.evaluate(() => { const m = document.querySelector('[data-meuble="mA"]'); if (m) m.scrollIntoView({ block: 'start' }); window.scrollBy(0, -70); }); await pg.waitForTimeout(300); }
 
       // ── P : les « + » au repos ──
       const plus = await pg.evaluate(() => {

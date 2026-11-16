@@ -262,3 +262,23 @@
   .vrm-etag .vrm-s2d-case.is-vide .vrm-s2d-plus, .vrm-etag-onglet { transition: none; }
   .vrm-etag-onglet:active { transform: none; }
 }
+/* La tête sur UNE ligne : nom et « 12 / 32 rangées · 2 à sortir » à gauche, les gestes à droite. */
+.vrm-etag-carte > .vrm-s2d-tete { flex-wrap: nowrap; align-items: center; }
+.vrm-etag-carte .vrm-etag-titre-m { flex: 1 1 auto; }
+.vrm-etag-compte-l { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; min-width: 0; }
+.vrm-etag-carte .vrm-etag-actions { align-self: center; }
+/* Au téléphone, chaque meuble prend toute la largeur (sa tête n'est plus serrée sur la largeur de ses cases). */
+@media (max-width: 767px) {
+  .vrm-etag-piece > .vrm-etag-place { flex: 1 1 100% !important; }
+  .vrm-etag-carte .vrm-etag-modifier { padding: 0 12px; }
+}
+/* Une petite case (44–56 px) : la plaque se serre (16 px, interligne 1) pour laisser voir la photo. */
+.vrm-etag .vrm-s2d-case:not(.is-vide) { container-type: inline-size; }
+@container (max-width: 58px) {
+  .vrm-etag .vrm-s2d-case .vrm-s2d-num.vrm-etag-plaque { font-size: 16px !important; line-height: 1 !important; padding: 1px 1px 2px !important; letter-spacing: -.03em !important; }
+}
+/* L'aide de la barre : son propre bleu (jamais le bleu clair des titres posés sur le fond) — ≥ 4,5:1 sur la carte. */
+:root { --etag-lien: #0055B8; }
+:root[data-theme="dark"] { --etag-lien: #8CC4FF; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --etag-lien: #8CC4FF; } }
+:root:root:root body .vrm-etag-barre .vrm-etag-aide { color: var(--etag-lien) !important; font-weight: 600; }

@@ -802,10 +802,12 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
               « Modifier » (un seul meuble : l'éditeur ; plusieurs : un menu Modifier / Monter / Descendre) ; la poignée reste. */}
           <span className="vrm-etag-titre-m">
             <span className="vrm-etag-nom-l">{coulM ? <i className="vrm-etag-pastille" data-couleur={coulM} aria-hidden="true" /> : null}<span className="vrm-s2d-nom">{m.name}</span></span>
-            <span className="vrm-s2d-compte" data-meuble-plein={filled} data-meuble-total={T}>{tr('etag.rangeesSur', { n: String(filled), total: String(T) })}{piles.size ? (piles.size === m.cols ? tr('stock.empile') : tr('etag.colonnesPile', { n: piles.size })) : ''}</span>
+            <span className="vrm-etag-compte-l">
+              <span className="vrm-s2d-compte" data-meuble-plein={filled} data-meuble-total={T}>{tr('etag.rangeesSur', { n: String(filled), total: String(T) })}{piles.size ? (piles.size === m.cols ? tr('stock.empile') : tr('etag.colonnesPile', { n: piles.size })) : ''}</span>
+            {nVenduesIci > 0 && !cherche && <span className="vrm-s2d-pastille" data-meuble-vendues={nVenduesIci}>{trj('stock.sortir', { nVenduesIci: nVenduesIci })}</span>}
+            {cherche && <span className="vrm-s2d-pastille" data-vide={nIci ? undefined : '1'}>{nIci ? tr('stock.ici', { nIci: String(nIci) }) : tr('stock.rienIci')}</span>}
+            </span>
           </span>
-          {nVenduesIci > 0 && !cherche && <span className="vrm-s2d-pastille" data-meuble-vendues={nVenduesIci}>{trj('stock.sortir', { nVenduesIci: nVenduesIci })}</span>}
-          {cherche && <span className="vrm-s2d-pastille" data-vide={nIci ? undefined : '1'}>{nIci ? tr('stock.ici', { nIci: String(nIci) }) : tr('stock.rienIci')}</span>}
           <span className="vrm-etag-actions">
           {meublesVus.length > 1 && <button className="sb-rond vrm-etag-rond vrm-etag-poignee" type="button" data-meuble-glisser={m.id} onPointerDown={(e) => glisserMeuble(e, m.id)}
               onKeyDown={(e) => { if (e.key === 'ArrowUp') { e.preventDefault(); deplacer(m.id, -1); } else if (e.key === 'ArrowDown') { e.preventDefault(); deplacer(m.id, 1); } }}
