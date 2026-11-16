@@ -96,7 +96,14 @@ const code = [
   }
   // Le parcours « Imprimer » en un toucher : il n'ouvre DANS le geste que si la sonde ne doit rien ; sinon il DEMANDE.
   const geste = (APP.match(/if \(pret && !numerosDemandent\(numeros\) && \(!numeros\.some\(Boolean\) \|\| versionFraiche\(\)\)\) \{/g) || []).length;
-  const attente = /const attendrePuisOuvrir = [\s\S]{0,900}if \(!\(await confirmerNumerosAVerifier\(numeros\)\)\) throw new Error\(NUM_A_VERIFIER_ANNULE\);/.test(APP);
+  // (16 nov., lot impression-retours) Jugé sur la RÈGLE (dans le corps de `attendrePuisOuvrir`, la question passe AVANT
+  // la fabrication du PDF), plus sur une distance en caractères : des commentaires ajoutés le 15 nov. l'avaient fait rougir.
+  const attente = (() => {
+    const i = APP.indexOf('const attendrePuisOuvrir = '); if (i < 0) return false;
+    const fin = APP.indexOf('\n  const ouvrirApres', i), corps = APP.slice(i, fin > i ? fin : i + 6000);
+    const q = corps.indexOf('if (!(await confirmerNumerosAVerifier(numeros))) throw new Error(NUM_A_VERIFIER_ANNULE);'), p = corps.indexOf('preparer(sig, fabrique)');
+    return q > 0 && p > q;
+  })();
   dit(geste === 1 && attente, '« Imprimer » : le PDF ne s’ouvre dans le geste que si aucune question n’est due ; sinon la question passe AVANT', JSON.stringify({ geste, attente }));
   // Les trois chemins d'impression l'appellent, juste après la garde de version.
   const appels = (APP.match(/await confirmerNumerosAVerifier\(/g) || []).length;

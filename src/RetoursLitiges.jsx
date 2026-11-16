@@ -268,17 +268,17 @@ export function RetoursLot({ lignes, coches, onBascule, Case = null, attrs = {},
   if (!L.length) return null;
   const n = L.filter((l) => coches && coches.has(l.cle)).length;
   return (
-    <section className="vrm-tip-groupe vrm-ret-tip vrm-ret-lot" data-lot-section="retours" data-retours-lot={L.length} data-retours-coches={n} aria-label={tr('impr.retour.section')} {...attrs}>
-      <h3><span className="vrm-ret-mot" data-retour-mot="">{tr('impr.retour.mot')}</span> {tr('impr.retour.sousTitre')} <span>{L.length}</span></h3>
+    <section className="vrm-ret-lot" data-lot-section="retours" data-retours-lot={L.length} data-retours-coches={n} aria-label={tr('impr.retour.section')} {...attrs}>
+      <h3><b className="vrm-ret-mot" data-retour-mot="">{tr('impr.retour.mot')}</b> {tr('impr.retour.sousTitre')} <em className="vrm-ret-lot-n">{L.length}</em></h3>
       {L.map((l) => {
         const c = l.carte || l, coche = !!(coches && coches.has(l.cle)), q = quandLimite(c, now);
         const ambre = !!(q && (c.presse || c.depassee));
         const lab = tr('impr.retour.caseAria', { qui: l.num ? tr('retours.numero', { n: l.num }) : (l.titre || tr('retours.article')) });
         return (
-          <div key={l.cle} className={'vrm-ret-tip-ligne vrm-ret-lot-ligne' + (coche ? ' is-on' : '')} data-lot-retour={l.tx} data-lot-ligne={l.cle} data-lot-site="retour" data-coche={coche ? '1' : '0'} data-retour-ambre={ambre ? '1' : '0'}>
+          <div key={l.cle} className={'vrm-ret-lot-ligne' + (coche ? ' is-on' : '')} data-lot-retour={l.tx} data-lot-ligne={l.cle} data-lot-site="retour" data-coche={coche ? '1' : '0'} data-retour-ambre={ambre ? '1' : '0'}>
             {Case ? <Case coche={coche} onBascule={() => onBascule && onBascule(l.cle)} label={lab} attrs={{ 'data-retour-coche': l.cle }}/>
               : <input type="checkbox" className="vrm-tip-case" data-retour-coche={l.cle} checked={coche} aria-label={lab} onChange={() => onBascule && onBascule(l.cle)}/>}
-            <span className="vrm-ret-tip-corps">
+            <span className="vrm-ret-lot-corps">
               <span className="vrm-ret-lot-tete">
                 <span className={'vrm-ret-pastille' + (ambre ? ' is-presse' : '')} data-retour-pastille="">{tr('impr.retour.mot')}</span>
                 <b data-retour-num={l.num || ''}>{l.num ? tr('retours.numero', { n: l.num }) : tr('retours.sansNumero')}</b>

@@ -40,9 +40,9 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? 'OK  ' : 'KO
 const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom + ' — le contrôle a pu s’exécuter', String(e && e.message).replace(/\s+/g, ' ').slice(0, 400)); } };
 
 async function lignes({ avecRetour = true } = {}) {
-  const { PDFDocument, StandardFonts } = require(path.join(NM, 'pdf-lib'));
+  const { PDFDocument, StandardFonts, rgb } = require(path.join(NM, 'pdf-lib'));
   const pdf = async (t) => { const d = await PDFDocument.create(); const p = d.addPage([595.28, 841.89]); const f = await d.embedFont(StandardFonts.Helvetica);
-    p.drawRectangle({ x: 300, y: 430, width: 260, height: 380, borderWidth: 1 }); p.drawText('ETIQUETTE ' + t, { x: 320, y: 780, size: 14, font: f }); p.drawText('Mondial Relay', { x: 320, y: 760, size: 10, font: f });
+    p.drawRectangle({ x: 300, y: 430, width: 260, height: 380, borderWidth: 1, borderColor: rgb(0, 0, 0), color: rgb(1, 1, 1) }); p.drawText('ETIQUETTE ' + t, { x: 320, y: 780, size: 14, font: f }); p.drawText('Mondial Relay', { x: 320, y: 760, size: 10, font: f });
     return Buffer.from(await d.save()).toString('base64'); };
   const achat = (tx, title, eur, status, h, extra = {}) => ({ transaction_id: tx, title, price: { amount: String(eur), currency_code: 'EUR' }, status, transaction_user_status: 'completed', date: ilYaH(h), photo: { url: PH('#636366') }, ...extra });
   const vente = (tx, title, status, tus, h) => ({ transaction_id: tx, title, status, transaction_user_status: tus, conversation_id: '2461867' + tx, date: ilYaH(h), price: { amount: '70.0', currency_code: 'EUR' } });
@@ -145,6 +145,8 @@ async function ouvrir(b, { vp, sombre = false, ROWS }) {
   ctx.on('page', (p) => { if (p !== pg) p.close().catch(() => {}); });
   await pg.goto(`http://localhost:${PORT}/?tab=ventes`, { waitUntil: 'domcontentloaded' });
   await pg.waitForFunction(() => document.body.innerText.includes('N°40'), null, { timeout: 45000 }).catch(() => {});
+  // Les compteurs publiés par l'écran (`vrm_colis_prets`, `vrm_colis_aposter`) et le bouton : attendus, jamais lus trop tôt.
+  await pg.waitForFunction(() => !!localStorage.getItem('vrm_colis_prets') && !!localStorage.getItem('vrm_colis_aposter') && !!document.querySelector('[data-colis-barre-btn="imprimer"]'), null, { timeout: 30000 }).catch(() => {});
   await pg.waitForTimeout(1500);
   return { ctx, pg, errs };
 }
@@ -171,6 +173,7 @@ const shot = async (pg, nom) => { if (SHOTS) { try { await pg.screenshot({ path:
     const AVEC = await lignes({ avecRetour: true }), SANS = await lignes({ avecRetour: false });
     for (const [vp, sombre] of [[{ width: 1512, height: 950 }, false], [{ width: 390, height: 844 }, false], [{ width: 390, height: 844 }, true]]) {
       const nom = `${vp.width} ${sombre ? 'sombre' : 'clair'}`;
+      if (process.env.IR_VUES && !process.env.IR_VUES.split(',').includes(nom.replace(' ', '-'))) continue;   // ex. IR_VUES=390-clair
       console.log('── ' + nom);
       // Le témoin : le MÊME compte sans retour ⇒ les compteurs des ventes.
       const t = await ouvrir(b, { vp, sombre, ROWS: SANS });
@@ -189,6 +192,7 @@ const shot = async (pg, nom) => { if (SHOTS) { try { await pg.screenshot({ path:
             vendeur: l && (l.querySelector('[data-retour-vendeur]') || {}).innerText, limite: l && (l.querySelector('[data-retour-limite]') || {}).innerText, pastille: past && past.innerText, ambre: past ? getComputedStyle(past).color : '', encre: getComputedStyle(s.querySelector('h3')).color,
             dansVentes: !!l && !!document.querySelector('[data-vv-coche="9501"], [data-lot-ligne="9501"]') };
         });
+        if (process.env.IR_SONDE) console.log(await pg.evaluate(() => { const out = []; let e = document.querySelector('[data-retours-lot] .vrm-ret-titre'); while (e && out.length < 8) { const c = getComputedStyle(e); out.push(`${e.tagName}.${String(e.className).slice(0, 40)} color=${c.color} sv=${c.getPropertyValue('--sv-encre')} sv2=${c.getPropertyValue('--sv-encre-2')} sb=${c.getPropertyValue('--sb-encre')} ret=${c.getPropertyValue('--ret-encre')} amb=${c.getPropertyValue('--sv-ambre')}`); e = e.parentElement; } return out.join('\n'); }));
         dit(!sansSection, `${nom} : sans bordereau de retour, aucune section « RETOUR » (rien d’inventé)`);
         dit(r && /RETOUR/.test(r.titre) && /tu renvoies un achat/.test(r.titre), `${nom} : R1 la section « RETOUR · tu renvoies un achat »`, JSON.stringify(r));
         dit(r && r.tx === '9501' && r.coche === '1' && /N°\s*31/.test(r.num || '') && /RETOUR/.test(r.pastille || ''), `${nom} : R1 la ligne 9501, N°31 (par l’achat), pastille RETOUR, cochée d’office`, JSON.stringify(r));
@@ -238,7 +242,8 @@ const shot = async (pg, nom) => { if (SHOTS) { try { await pg.screenshot({ path:
         await pg.waitForTimeout(800);
         await shot(pg, `${vp.width}-apres`);
         const c2 = await compteurs(pg);
-        dit(c2.lot === cSans.lot && c2.total === cSans.total, `${nom} : R2 après l’impression, les compteurs des ventes n’ont pas bougé à cause du retour`, JSON.stringify({ c2, cSans }));
+        // Après l'impression, la vente imprimée n'est plus « à imprimer » (lot 0) ; « à envoyer » ne bouge pas.
+        dit(c2.total === cSans.total && c2.prets === cSans.prets && c2.aposter === cSans.aposter && c2.lot === 0, `${nom} : R2 après l’impression, « à envoyer » est inchangé (le retour n’y entre pas) ; la vente imprimée sort du lot`, JSON.stringify({ c2, cSans }));
       });
       dit(!o.errs.length, `${nom} : aucune erreur de page`, o.errs.join(' | ').slice(0, 300));
       await o.ctx.close();
