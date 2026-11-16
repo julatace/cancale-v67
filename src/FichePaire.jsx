@@ -237,7 +237,10 @@ function CarteAction({ a, I, Photo, relier, onBordereau, onPrix, onSaisir, num }
 }
 
 // LA VUE « ARGENT » : deux chiffres, chacun une fois (les data-* d'avant gardés).
-function VueArgent({ cases, etat }) {
+// (16 nov., bancs-rouges-a) §5 « le chiffre faux est la porte pour le corriger » : une paire EN VENTE sans prix d'achat
+// a pour action « Baisser le prix » — la fiche D n'offrait alors plus aucun moyen de saisir ce prix. Le « ? » d'« Achetée »
+// devient la porte de la saisie (`onSaisir`), seulement quand la grande action n'est pas déjà « Saisir ».
+function VueArgent({ cases, etat, onSaisir = null }) {
   if (!cases.length) return null;
   const grand = cases.some((c) => c.gros);
   return (
@@ -246,6 +249,13 @@ function VueArgent({ cases, etat }) {
         const attrs = c.cle === 'achat' ? { 'data-fiche-resume-achat': c.cents == null ? '' : c.cents, ...(etat ? { 'data-etat-ligne': 'prix-achat', 'data-etat-val': etat.prixAchat.cents == null ? '' : etat.prixAchat.cents, 'data-etat-source': etat.prixAchat.source || '' } : {}) }
           : c.cle === 'benefice' ? { 'data-fiche-resume-benefice': c.cents == null ? '' : c.cents, 'data-fiche-benefice-partiel': c.partiel ? '1' : undefined }
           : { 'data-fiche-resume-benefice': '', 'data-fiche-si-vendue': c.cents == null ? '' : c.cents, 'data-fiche-benefice-partiel': c.partiel ? '1' : undefined };
+        if (c.cle === 'achat' && c.cents == null && onSaisir) return (
+          <button key={c.cle} type="button" className="fd-arg-c fd-arg-porte is-manque" data-fiche-saisir-achat="" onClick={onSaisir} {...attrs}>
+            <span>{tr(c.lib)}</span>
+            <b className="num is-am">{eurFd(c.cents)}</b>
+            <small className="fd-arg-n">{tr('fd.saisir.plein')}</small>
+          </button>
+        );
         return (
           <div key={c.cle} className={'fd-arg-c' + (c.gros ? ' is-gros' : '') + (c.cents == null ? ' is-manque' : '')} {...attrs}>
             <span>{tr(c.lib)}</span>
@@ -471,7 +481,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
               {['argent', 'sites', 'histoire'].map((v) => <button key={v} type="button" role="tab" className="fd-seg-b" aria-selected={vueOuverte === v} data-fd-seg={v} onClick={() => setVue(v)}>{tr('fd.seg.' + v)}</button>)}
             </div>
             <div className="fd-v" role="tabpanel" data-fd-vue-ouverte={vueOuverte}>
-              {vueOuverte === 'argent' ? (double ? <p className="fd-vide">{tr('fd.argent.double')}</p> : <VueArgent cases={cases} etat={etat}/>)
+              {vueOuverte === 'argent' ? (double ? <p className="fd-vide">{tr('fd.argent.double')}</p> : <VueArgent cases={cases} etat={etat} onSaisir={saisir && !(action && action.sorte === 'saisir') ? saisir : null}/>)
                 : vueOuverte === 'sites' ? <VueSites sites={lignesSites} I={I}/>
                 : <VueHistoire lignes={hist}/>}
             </div>

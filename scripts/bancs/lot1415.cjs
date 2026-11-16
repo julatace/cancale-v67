@@ -147,12 +147,20 @@ const lireQD = (pg) => pg.evaluate(() => { const s = document.querySelector('[da
       benef: bf ? bf.getAttribute('data-qd-benef') : null, benefTxt: bf ? bf.innerText.replace(/\s+/g, ' ') : '', saisir: !!e.querySelector('[data-qd-saisir]'), plus: !!e.querySelector('[data-qd-agir]') }; }),
     petits: [...s.querySelectorAll('[data-qd-geste], [data-qd-agir], [data-qd-saisir]')].filter((x) => { const r = x.getBoundingClientRect(); return r.width > 0 && (r.height < 43.5 || r.width < 43.5); }).map((x) => x.textContent.slice(0, 24) + ':' + Math.round(x.getBoundingClientRect().height)),
     deb: document.documentElement.scrollWidth - document.documentElement.clientWidth }; });
+// (16 nov., bancs-rouges-a) La fiche « D » (15 nov., docs/passation/2026-11-15-fiche-d.md) n'a plus de tuiles
+// (`.vrm-fp-tuiles`) : le prix affiché est dans la LIGNE D'ÉTAT (`data-fd-etat` = fd.etat.enVente…, « En vente 100 € »),
+// l'argent dans la vue « Argent » (`data-fd-vue-argent` : achat, si-vendue ou bénéfice — chacun UNE fois, mêmes data-*),
+// le manque dans l'action « Prix d'achat pas saisi » (`data-fd-action="saisir"`). La règle jugée ne change pas.
 const lireFiche = (pg) => pg.evaluate(() => { const el = document.querySelector('[data-fiche-paire]'); if (!el) return null;
   const at = (s, a) => { const x = el.querySelector(s); return x ? x.getAttribute(a) : null; };
-  return { num: el.getAttribute('data-fiche-paire'), lecture: el.getAttribute('data-fiche-lecture-en-cours'), achat: at('[data-fiche-resume-achat]', 'data-fiche-resume-achat'), affiche: at('[data-fiche-prix-affiche]', 'data-fiche-prix-affiche'),
-    si: at('[data-fiche-si-vendue]', 'data-fiche-si-vendue'), siEtat: at('[data-fiche-si-vendue]', 'data-fiche-si-vendue-etat'), benef: at('[data-fiche-resume-benefice]', 'data-fiche-resume-benefice'),
-    saisir: !!el.querySelector('[data-fiche-saisir-achat]'), tuiles: (el.querySelector('.vrm-fp-tuiles') || {}).innerText || '',
-    petits: [...el.querySelectorAll('.vrm-fp-tuiles button')].filter((x) => x.getBoundingClientRect().height < 43.5).length,
+  const etat = el.querySelector('[data-fd-etat]');
+  const zones = [...el.querySelectorAll('[data-fd-etat], [data-fd-vue-argent], [data-fd-action]')];
+  return { num: el.getAttribute('data-fiche-paire'), lecture: el.getAttribute('data-fiche-lecture-en-cours'), achat: at('[data-fiche-resume-achat]', 'data-fiche-resume-achat'),
+    etat: etat ? etat.getAttribute('data-fd-etat') : null, etatTxt: etat ? etat.textContent.replace(/\s+/g, ' ') : '',
+    cases: at('[data-fd-vue-argent]', 'data-fd-vue-argent'),
+    si: at('[data-fiche-si-vendue]', 'data-fiche-si-vendue'), siEtat: at('[data-fiche-si-vendue]', 'data-fiche-benefice-partiel') === '1' ? 'partiel' : '', benef: at('[data-fiche-resume-benefice]', 'data-fiche-resume-benefice'),
+    saisir: !!el.querySelector('[data-fiche-saisir-achat]'), tuiles: zones.map((z) => z.innerText).join(' | ').replace(/\s+/g, ' '),
+    petits: [...el.querySelectorAll('[data-fd-action] button, [data-fd-vue-argent] button')].filter((x) => x.getBoundingClientRect().height < 43.5).length,
     deb: document.documentElement.scrollWidth - document.documentElement.clientWidth }; });
 async function ouvrirFiche(pg, n) {
   await pg.evaluate(() => { const b = document.querySelector('[data-fiche-fermer]'); if (b) b.click(); });
@@ -160,6 +168,9 @@ async function ouvrirFiche(pg, n) {
   await pg.evaluate((n) => window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: n })), n);
   await pg.waitForSelector('[data-fiche-paire]', { timeout: 8000 });
   await pg.waitForFunction(() => (document.querySelector('[data-fiche-paire]') || { getAttribute: () => '1' }).getAttribute('data-fiche-lecture-en-cours') === '0', null, { timeout: 20000 }).catch(() => {});
+  // (16 nov.) Fiche D : une paire en vente s'ouvre sur « Sites » (`vueInitiale`) ; l'argent est sous « Argent ».
+  const seg = pg.locator('[data-fiche-paire] [data-fd-seg="argent"][aria-selected="false"]').first();
+  if (await seg.count()) await seg.click().catch(() => {});
   await pg.waitForTimeout(300);
   return lireFiche(pg);
 }
@@ -238,13 +249,13 @@ const capture = async (pg, sel, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, 
           await pg.waitForSelector('[data-job]', { timeout: 30000 }).catch(() => {});
           await pg.waitForTimeout(1500);
           let f = await ouvrirFiche(pg, '61');
-          dit(f && f.affiche === '10000' && f.si === '6000' && f.siEtat === 'partiel' && f.benef === '' && /En ligne à/.test(f.tuiles) && /Si vendue/.test(f.tuiles) && !/Bénéfice/.test(f.tuiles),
-            'D1 N°61 en ligne : « En ligne à 100 € », « Si vendue +60 € » (au plus), aucun « Bénéfice » inventé', f && JSON.stringify(f));
-          await capture(pg, '[data-fiche-paire] .vrm-fp-cadre', `fiche-61-${suf}`);
+          dit(f && /^fd\.etat\.enVente/.test(f.etat || '') && /100\s€/.test(f.etatTxt) && f.si === '6000' && f.siEtat === 'partiel' && f.benef === '' && f.cases === 'achat,si-vendue' && /si vendue/i.test(f.tuiles),
+            'D1 N°61 en ligne : « En vente 100 € », « Bénéfice si vendue +60 € » (au plus), aucun « Bénéfice » (vendue) inventé', f && JSON.stringify(f));
+          await capture(pg, '[data-fiche-paire]', `fiche-61-${suf}`);
           f = await ouvrirFiche(pg, '62');
-          dit(f && f.achat === '' && f.saisir && f.si === '' && /prix d.achat pas saisi/.test(f.tuiles), 'D2 N°62 sans achat : « — », « Saisir », le manque NOMMÉ', f && JSON.stringify(f));
+          dit(f && f.achat === '' && f.saisir && f.si === '' && /prix d.achat pas saisi/i.test(f.tuiles), 'D2 N°62 sans achat : « — », « Saisir », le manque NOMMÉ', f && JSON.stringify(f));
           dit(f && !f.petits, 'F5 « Saisir » fait 44 px au moins', f && String(f.petits));
-          await capture(pg, '[data-fiche-paire] .vrm-fp-cadre', `fiche-62-avant-${suf}`);
+          await capture(pg, '[data-fiche-paire]', `fiche-62-avant-${suf}`);
           await pg.locator('[data-fiche-saisir-achat]').first().click();
           await pg.waitForSelector('[data-prix-achat-feuille]', { timeout: 8000 }).catch(() => {});
           const feuille = await pg.evaluate(() => { const s = document.querySelector('[data-prix-achat-feuille]'); return s ? { n: s.getAttribute('data-prix-achat-feuille'), num: (s.querySelector('[data-prix-achat-num]') || { getAttribute: () => null }).getAttribute('data-prix-achat-num'), texte: s.innerText.replace(/\s+/g, ' ') } : null; });
@@ -259,7 +270,7 @@ const capture = async (pg, sel, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, 
           const ecrit = await pg.evaluate(() => { try { return [JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}')['800002'].buyPrice, (JSON.parse(localStorage.getItem('vinted_buyprice_by_num') || '{}'))['62']]; } catch (_) { return null; } });
           const eu = (v) => Number(String(v == null ? '' : v).replace(',', '.'));
           dit(ecrit && eu(ecrit[0]) === 25 && eu(ecrit[1]) === 25, 'D5 écrit sur LA fiche de l’annonce 800002 et le miroir du N°62 (rien ailleurs)', JSON.stringify(ecrit));
-          await capture(pg, '[data-fiche-paire] .vrm-fp-cadre', `fiche-62-apres-${suf}`);
+          await capture(pg, '[data-fiche-paire]', `fiche-62-apres-${suf}`);
           dit(f && f.deb <= 0, 'F6 la fiche ne déborde pas', f && f.deb);
           // E. Ma journée : le rappel discret
           await pg.evaluate(() => { const b = document.querySelector('[data-fiche-fermer]'); if (b) b.click(); });

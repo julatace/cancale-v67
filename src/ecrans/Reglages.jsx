@@ -2368,7 +2368,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   const ouvert = sous ? panneaux.find((it) => it.id === sous) : null;
   // Le retour d'un panneau : sa catégorie (téléphone), ou « Paramètres » (ordinateur : tout est sur une page).
   const catDuPanneau = ouvert ? categorieDeRangee(ouvert.id) : null;
-  const titreRetour = etroit && catDuPanneau ? titreCat(catDuPanneau) : tr('ecran.settings');
+  // (16 nov., bancs-rouges-a) Un panneau qui porte le NOM de sa catégorie (« Sécurité des comptes », « Sécurité des
+  // données ») redisait son titre juste au-dessus (§7, banc reglages-premium) : le chemin remonte alors à « Paramètres ».
+  const titreRetour0 = etroit && catDuPanneau ? titreCat(catDuPanneau) : tr('ecran.settings');
+  const titreRetour = ouvert && String(titreRetour0).trim() === String(ouvert.lib || '').trim() ? tr('ecran.settings') : titreRetour0;
 
   // ── TON COMPTE VRM ──────────────────────────────────────────────────────
   // Toujours présent en multi-vendeurs, y compris quand on est entré par la
