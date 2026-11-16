@@ -141,7 +141,9 @@ async function interrupteurs(pg, T) {
     const dessus = libre ? '' : await s.evaluate((el) => { const r = el.getBoundingClientRect(); const h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return h ? `${h.tagName.toLowerCase()}.${String(h.className || '').split(' ').slice(0, 2).join('.')} « ${String(h.textContent || '').trim().slice(0, 40)} » dans ${[h.parentElement, h.parentElement && h.parentElement.parentElement].filter(Boolean).map((p) => p.tagName.toLowerCase() + '.' + String(p.className || '').split(' ')[0] + [...p.attributes].filter((a) => a.name.startsWith('data-')).map((a) => '[' + a.name + ']').join('')).join(' < ')} à y=${Math.round(r.top)}/${innerHeight}` : 'rien'; });
     if (await s.isDisabled()) { dit(libre, `${T} interrupteur « ${nom} » (désactivé : réglage pas lu) rien ne le recouvre`); continue; }
     const avant = await s.getAttribute('aria-checked');
-    await s.click({ timeout: 4000 });
+    // (16 nov.) 15 s : après « Mode sombre », toute la page change de thème (transitions) — sous charge, l'interrupteur
+    // suivant n'était pas « stable » en 4 s. La règle jugée reste : cliquable, rien dessus, et son état change.
+    await s.click({ timeout: 15000 });
     // (9 nov.) Pas un délai fixe (§6.5) : on attend que l'état change, 3 s au plus (sous charge,
     // 450 ms ne suffisaient pas toujours à un réglage synchronisé, « Ce que le stream cache »).
     const s2 = pg.locator('.vrm-set [role="switch"]').nth(i);
@@ -171,10 +173,10 @@ async function interrupteurs(pg, T) {
           const { ctx, pg, erreurs } = await ouvrir(nav, vp, vue);
           const m = await mesurer(pg, mobile);
           if (SHOTS) {
-            await pg.screenshot({ path: path.join(SHOTS, `reglages-${vue}-${vp.width}-ecran.png`) });
+            await pg.screenshot({ path: path.join(SHOTS, `reglages-${vue}-${vp.width}-ecran.png`), timeout: 120000 });
             const haut = await pg.evaluate(() => Math.ceil((document.querySelector('.vrm-set') || document.body).getBoundingClientRect().height + 300));
             await pg.setViewportSize({ width: vp.width, height: Math.min(Math.max(haut, vp.height), 9000) }); await pg.waitForTimeout(400);
-            await pg.screenshot({ path: path.join(SHOTS, `reglages-${vue}-${vp.width}.png`) });
+            await pg.screenshot({ path: path.join(SHOTS, `reglages-${vue}-${vp.width}.png`), timeout: 120000 });
             await pg.setViewportSize(vp); await pg.waitForTimeout(300);
           }
           dit(!m.tombe && erreurs.length === 0, `${T} : l’écran s’affiche, sans erreur d’app`, erreurs.join(' | ').slice(0, 160));
@@ -236,7 +238,7 @@ async function interrupteurs(pg, T) {
               if (SHOTS) {
                 const haut = await pg.evaluate(() => Math.ceil((document.querySelector('.vrm-set') || document.body).getBoundingClientRect().height + 300));
                 await pg.setViewportSize({ width: vp.width, height: Math.min(Math.max(haut, vp.height), 6000) }); await pg.waitForTimeout(300);
-                await pg.screenshot({ path: path.join(SHOTS, `reglages-${vue}-${vp.width}-sous-${id}.png`) });
+                await pg.screenshot({ path: path.join(SHOTS, `reglages-${vue}-${vp.width}-sous-${id}.png`), timeout: 120000 });
                 await pg.setViewportSize(vp); await pg.waitForTimeout(200);
               }
               dit(!s.tombe && s.deb <= 1 && s.panneauxVisibles === 1 && !!titre, `${T} › « ${titre} » : un seul panneau, sans débordement`, `déb ${s.deb} · ${s.panneauxVisibles} panneau(x)`);

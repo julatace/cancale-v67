@@ -44,6 +44,34 @@ chez eux s'ils ont vu « Target closed ».
 - La feuille « ⋯ » entre avec une animation (`fd-monte`) ; sous une charge de 45+, Chromium n'en produit pas les
   images (animation en attente, opacité 0,6) : mesuré au banc, pas un défaut de l'app.
 
+## Preuves (rouge avant / mutation)
+
+- `bra-dist-avant` (build d'`origin/main` au départ du lot) : `stock-planches` rouge (« Retirer de la case » invisible, 30 s) ;
+  `lot1415` D2 rouge (« Saisir » absent pour une paire en vente sans prix d'achat) — les autres sections de lot1415
+  vertes sur ce build (les attendus refaits suivent bien l'app d'avant).
+- Build MUTANT (copie de l'arbre, deux mutations) : `if (!l) continue;` retiré de `enLigneDuCompte` ⇒ `enligne` 2 rouges
+  (7004 entre dans la grille, 1512 et 390) ; l'effet de retour de `FiltreSites` retiré ⇒ `vestiaire-bout-en-bout`
+  8 rouges (B2, quatre onglets × deux tailles), tout le reste vert.
+- `audit-politique-hotes --prouve` 12/12 ; `audit-plateformes-logo --prouve` 36/36 ; `audit-revue-fin` 37 → 38.
+- `reglages-premium` : les deux « titre écrit deux fois » rouges avant (390), verts après ; capture regardée
+  (« Paramètres » au-dessus de « Sécurité des données »).
+- Captures regardées : fiche D du N°62 (390 clair, 1512 sombre) — « Achetée ? » en ambre, « Saisir le prix d'achat »
+  souligné ; feuille « ⋯ » du Stock (1512) ; Ventes 390 sombre (plaque blanche lisible) ; tableau de bord (volet Argent).
+
 ## ÉTAT À LA REPRISE
 
-(complété à la fin du lot — voir la dernière section)
+- Branche `claude/bancs-rouges-a`, fusionnée avec `origin/main` (vraie fusion ; un conflit dans `sante-donnees.cjs`
+  résolu en prenant la version de main pour G, qui juge déjà au repos ; mes changements S/attendus gardés).
+- Verts ici (dernier passage, un banc à la fois) : `enligne`, `vestiaire-bout-en-bout`, `sante-donnees` (138),
+  `lot1415` (96), `stock-planches`, `stock-2d`, `stock-retrouver`, `stock-juste`, `ventes-e2` ; `reglages-premium`
+  323 ✅ · 2 ❌ au passage d'avant (un clic de 4 s après « Mode sombre », une capture de 30 s — délais portés à 15 s /
+  2 min).
+- Passe complète des audits (`lancer-audits`, 2 à la fois) : **66 rouges, tous rouges aussi sur `origin/main`**
+  (vérifié un par un sur une copie d'`origin/main` ; un seul vert là-bas, `audit-recherche-unique`, vert ici aussi en le
+  relançant seul : charge). Aucun n'est né de ce lot. La CI de main (PR #1181) a ses trois parts d'audits et ses bancs
+  rouges.
+- **Règle du 16 nov. (Julien) : zéro rouge pour fusionner.** Ces 66 audits rouges hérités de main (et les bancs
+  rouges de la CI de main) dépassent ce lot : la PR est ouverte, **pas fusionnée**.
+- À faire ensuite : au téléphone, le titre d'un panneau de Paramètres se coupe en plein mot (« Sécurit / é des /
+  donnée ») quand l'état de sauvegarde (« Pas encore synchro… Réessayer ») partage sa ligne — vu sur la capture,
+  hors de ce lot.
