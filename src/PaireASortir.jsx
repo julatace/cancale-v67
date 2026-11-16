@@ -55,7 +55,7 @@ function MiniPile({ col, cible = -1, descendus = [] }) {
 
 const lieuEnMots = (lieu) => {
   if (!lieu) return '';
-  if (lieu.pile) return tr('sortir.pileN', { n: lieu.depuisBas });
+  if (lieu.pile) return (lieu.depuisBas === 1 ? tr('sortir.pileBas') : tr('sortir.pileN', { n: lieu.depuisBas }));
   return tr('sortir.rangeeCase', { r: lieu.rangee, c: lieu.colonne });
 };
 const aideEnMots = (lieu) => { const a = aideLieu(lieu); return a ? tr(a.cle, a) : ''; };
@@ -100,7 +100,7 @@ function Carte({ v, total, rang, slots, Photo, Icon, mots, onSortir, onImprimer,
         </div>
       )}
       <button type="button" className="sb-btn-plein vrm-so-plein" data-sortir-geste="sortie" data-sortir-cle={v.cle} onClick={() => onSortir(v)}>
-        {Icon ? <Icon name="check" size={20}/> : null}<span>{tr('sortir.jeLaiSortie', { e: mots.e })}</span>
+        {Icon ? <Icon name="check" size={20}/> : null}<span>{tr(mots.e ? 'sortir.jeLaiSortieF' : 'sortir.jeLaiSortie')}</span>
       </button>
       {lieu
         ? (onImprimer ? <button type="button" className="sb-touche vrm-so-touche" data-sortir-imprimer="" onClick={onImprimer}>{Icon ? <Icon name="printer" size={18}/> : null}<span>{tr('sortir.puisImprimer')}</span></button> : null)
@@ -127,7 +127,7 @@ export default function PaireASortir({ liste, nSorties = 0, slots, Photo, Icon, 
             <span className="vrm-so-ok3" aria-hidden="true">{Array.from({ length: Math.min(total, 5) }, (_, k) => <i key={k} className={k < nSorties ? 'is-ok' : ''}>{Icon && k < nSorties ? <Icon name="check" size={10}/> : null}</i>)}</span></div>
           <div className="vrm-so-carte vrm-so-d" data-sortir-apres={apres.num || ''} data-sortir-descendus={(apres.descendus || []).join(',')}>
             <div className="vrm-so-d-h"><span className="vrm-so-d-ok" aria-hidden="true">{Icon ? <Icon name="check" size={22}/> : null}</span>
-              <div><b>{tr('sortir.estSortie', { num: apres.num || '', e: mots.e, nom: mots.Le })}</b><span>{apres.lieu ? tr('sortir.caseLibre', { meuble: nomMeuble(apres.lieu) }) : tr('sortir.declaree')}</span></div></div>
+              <div><b>{tr(mots.e ? 'sortir.estSortieF' : 'sortir.estSortie', { num: apres.num || '' })}</b><span>{apres.lieu ? tr('sortir.caseLibre', { meuble: nomMeuble(apres.lieu) }) : tr('sortir.declaree')}</span></div></div>
             {apres.descendus && apres.descendus.length ? (<>
               <div className="vrm-so-d-p">
                 <div className="vrm-so-d-c"><span className="vrm-so-ds">{tr('sortir.avant')}</span><MiniPile col={apres.colAvant} cible={apres.cible}/></div>
@@ -140,15 +140,15 @@ export default function PaireASortir({ liste, nSorties = 0, slots, Photo, Icon, 
           </div>
           {!l.length && toutesImprimer ? (
             <div className="vrm-so-carte vrm-so-fin" data-sortir-fin={String(nSorties)}>
-              <div><b>{tr(nSorties > 1 ? 'sortir.toutesSorties' : 'sortir.laSortie', { n: nSorties, noms: mots.noms, Le: mots.Le, e: mots.e, es: mots.es })}</b>
+              <div><b>{tr((nSorties > 1 ? 'sortir.toutesSorties' : 'sortir.laSortie') + (mots.e ? 'F' : ''), { n: nSorties })}</b>
                 {toutesImprimer.nums && toutesImprimer.nums.length ? <span>{tr('sortir.bordereauxPrets', { liste: toutesImprimer.nums.map((n) => 'N°' + n).join(', ') })}</span> : null}</div>
               <button type="button" className="sb-btn-plein vrm-so-plein" data-sortir-imprimer-tout="" onClick={toutesImprimer.imprimer}>
-                {Icon ? <Icon name="printer" size={20}/> : null}<span>{tr('sj.imprimerLesN', { n: toutesImprimer.n })}</span></button>
+                {Icon ? <Icon name="printer" size={20}/> : null}<span>{(toutesImprimer.n > 1 ? tr('sj.imprimerLesN', { n: toutesImprimer.n }) : tr('sj.imprimerLe'))}</span></button>
             </div>
           ) : null}
         </>
       ) : (
-        <div className="vrm-so-sec"><b>{uneSeule ? tr('sortir.vendueASortir', { e: mots.e }) : tr('sortir.nASortir', { n: total })}</b>{uneSeule ? <span>{tr('sortir.uneVente')}</span> : null}</div>
+        <div className="vrm-so-sec"><b>{uneSeule ? tr(mots.e ? 'sortir.vendueASortirF' : 'sortir.vendueASortir') : tr('sortir.nASortir', { n: total })}</b>{uneSeule ? <span>{tr('sortir.uneVente')}</span> : null}</div>
       )}
       {!apres && !uneSeule ? <p className="vrm-so-regle" data-sortir-regle="">{tr('sortir.regle')}</p> : null}
       {premier ? (

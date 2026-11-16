@@ -93,7 +93,8 @@ async function verifier(racine, { muet = false } = {}) {
   dit(!!fHook && /p\.mode === 'simple'/.test(fHook[1]) && /categories/.test(fHook[1]) && /regimeFiscal\(\)/.test(fHook[1]) && /save\(CLE_NOUVEAUTES_VUES/.test(fHook[1]), 'le contexte : Simple/Complet, ce qu’il vend, son statut ; « Vu » enregistré par save (synchronisé)');
   dit(!!fHook && /reg == null \? null/.test(fHook[1]), 'statut pas choisi ⇒ « pas su » (null), jamais « pas pro »');
   dit(!!fHook && /aVoir: pret \? nouveautesAVoir\(ctx, vues\) : \[\]/.test(fHook[1]) && /const pret = p\.uid === \(AUTH\.user\?\.id \|\| ''\) && !!p\.uid && isCloudReady\(\);/.test(fHook[1]), 'profil pas posé ou nuage pas lu ⇒ aucune carte (pas un compte qui change sous ses yeux)');
-  const jour = /<ScreenHead icon="soleilLevant" title="Ma journée"\/>([\s\S]*?)\{AF\.section\}/.exec(A);
+  // (16 nov.) le titre passe par tr() et « À faire » se pose `… : AF.section}` (sur ordinateur dans sa colonne) : la règle reste « la carte avant À faire ».
+  const jour = /<ScreenHead icon="soleilLevant" title=(?:"Ma journée"|\{tr\('reglages\.ma-journee\.lib'\)\})\/>([\s\S]*?)[{:] ?AF\.section\}/.exec(A);
   dit(!!jour && /<QuoiDeNeufJournee onNav=\{onNav\}\/>/.test(jour[1]), 'la carte est en haut de Ma journée (avant « À faire »)');
   const fJ = /function QuoiDeNeufJournee\(\{ onNav \}\) \{([\s\S]*?)\n\}/.exec(A);
   dit(!!fJ && /<QuoiDeNeufFeuille[^>]*SheetShell=\{SheetShell\}/.test(fJ[1]) && /\{ouvert && <QuoiDeNeufFeuille/.test(fJ[1]), 'la feuille passe par SheetShell (portail, FermeAuRetour), seulement sur son toucher');
