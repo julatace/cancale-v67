@@ -225,6 +225,12 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
       'Accueil :: "/logo-vrm-96.png"': 'logo de l’app (page d’accueil)',
       'Plateau :: "/logo-vrm-192.png"': 'logo de l’app (scène du film d’accueil, src/AccueilFilm.jsx)',
       'CarteJourEcran :: "/logo-vrm-96.png"': 'logo de l’app (carte « Ma journée » de l’accueil, src/accueil-carte.jsx)',
+      // (16 nov., audits-vert-main) cinq <img> arrivés du 14 au 16 nov., lus un à un :
+      'AuthScreen :: "/accueil/journee-clair.webp"': 'capture de Ma journée sur l’écran de connexion : fichier du site (public/accueil/)',
+      'PhotoStockHl :: a': 'photo du Stock hors ligne : adressePhotoHl ⇒ /hl-photo?u=… servi par la réserve du service worker (même origine, src/stockHorsLigne.js), onError ⇒ carton dessiné',
+      'EtapePhotos :: p.detoure || p.img': 'photos du studio sous CE N° (arrivée) : prises sur l’appareil et détourées dans la page (data:image, src/studioPhoto.js), jamais une adresse Vinted',
+      'PhotosPaire :: p.detoure || p.img': 'photos du studio de la paire (atelier) : les mêmes que EtapePhotos (data:image prises et détourées sur l’appareil)',
+      'RechercheCouleur :: e.src': 'vignette de la recherche par couleur : rendue en <img> SEULEMENT si data:image (test juste avant), sinon par le Photo de l’écran',
     };
     const fichiers = fs.readdirSync(path.join(R, 'src')).filter((f) => /\.jsx?$/.test(f));
     const trouves = [], inconnus = [];

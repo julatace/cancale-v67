@@ -48,7 +48,7 @@ export default {
   "glo.aexpedier.mot": "à envoyer",
   "glo.aexpedier.def": "Une vente dont le colis doit partir : le bordereau à imprimer, le colis à déposer avant la date limite.",
   "glo.adater.mot": "sans date de versement",
-  "glo.adater.def": "Une vente dont la date de versement n’est pas encore lue : elle n’est dans aucun mois déclaré. L’extension récupère cette date toute seule.",
+  "glo.adater.def": "Une vente dont la date de versement n’est pas encore lue : elle n’est dans aucun mois déclaré. L’extension la récupère seule.",
   "glo.enligne.mot": "en ligne",
   "glo.enligne.def": "Une annonce vue dans la dernière lecture complète de ton dressing, il y a moins de 24 h.",
   "glo.vendue.mot": "vendue",
