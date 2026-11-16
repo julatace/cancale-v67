@@ -3288,7 +3288,7 @@ const SYNC_KEYS = [
   // navigateur envoie). Synchronisé pour être LU : série d'archive, version.
   // (11 nov., lot securite-vinted) SES réglages de sécurité des comptes + « Tout arrêter » (src/securiteComptes.js), écrits sur SON geste, lus par l'extension.
   'vrm_securite_comptes',
-  'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vinted_discretion','vinted_offre_refus_msg','vinted_offre_refus_variantes','vinted_offres_garde','vrm_photo_presets','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
+  'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vinted_offres_contre','vinted_discretion','vinted_offre_refus_msg','vinted_offre_refus_variantes','vinted_offres_garde','vrm_photo_presets','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
   // (5 nov.) Les QR Mondial Relay qu'il a posés sur un colis depuis une capture de l'app
   // (src/qrCapture.js) : clé = n° de suivi, écrits sur SON clic seulement.
   'vrm_colis_qr_poses',
@@ -35429,6 +35429,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // une confirmation qui dit le risque (un programme qui accepte sur Vinted).
   const [offresAuto, setOffresAuto] = useStateCle('vinted_offres_auto', () => load('vinted_offres_auto', false) === true);
   React.useEffect(() => onCloudReady(() => setOffresAuto(load('vinted_offres_auto', false) === true)), []);
+  // (16 nov., lot aide-decision — validé par Julien, ext. 5.402) La CONTRE-OFFRE automatique au prix
+  // mini : une option À PART, éteinte par défaut, synchronisée (`vinted_offres_contre`) ; l'extension
+  // ne la lit que moteur allumé. Allumer demande une confirmation qui dit le risque (elle VEND si
+  // l'acheteur la prend) ; éteindre, jamais.
+  const [offresContre, setOffresContre] = useStateCle('vinted_offres_contre', () => load('vinted_offres_contre', false) === true);
+  React.useEffect(() => onCloudReady(() => setOffresContre(load('vinted_offres_contre', false) === true)), []);
+  const basculerOffresContre = async () => {
+    if (offresContre) { setOffresContre(false); save('vinted_offres_contre', false); return; }
+    const ok = await askConfirm({ title: tr('ad.contre.confirmeTitre'), desc: tr('ad.contre.confirmeDesc'), ok: tr('ad.contre.confirmeOk'), cancel: tr('oa.annuler') });
+    if (!ok) return;
+    setOffresContre(true); save('vinted_offres_contre', true);
+  };
   // (27 oct., refus auto) Le message envoyé à l'acheteur quand VRM refuse une offre
   // trop basse — SON texte, vide par défaut (refus sans message). Synchronisé ;
   // rattrapé au nuage et SEULEMENT s'il est resté vide (§5.49 : jamais par-dessus
@@ -53811,7 +53823,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <div hidden={zoneMessages!=='favoris'} style={{display:zoneMessages==='favoris'?undefined:'none'}}>
         {/* (11 nov., lot DJ8) « Offres auto » : l'interrupteur, ce que le moteur ferait, les seuils par paire, l'historique. */}
         <div className="vrm-fav-zones"><Segmente label="Favoris ou offres automatiques" value={zoneFav} onChange={setZoneFav} options={[{ v: 'favoris', l: 'Favoris' }, { v: 'offres', l: 'Offres auto' }]}/></div>
-        {zoneMessages==='favoris' && zoneFav==='offres' && <OffresAuto actif={offresAuto} virguleLue={extSait('offrespage')==='ok'} basculer={basculerOffresAuto} eteindreOffres={()=>{ setOffresAuto(false); save('vinted_offres_auto', false); }}
+        {zoneMessages==='favoris' && zoneFav==='offres' && <OffresAuto actif={offresAuto} virguleLue={extSait('offrespage')==='ok'} basculer={basculerOffresAuto} eteindreOffres={()=>{ setOffresAuto(false); save('vinted_offres_auto', false); setOffresContre(false); save('vinted_offres_contre', false); }}
+          contre={offresContre} basculerContre={basculerOffresContre} contreExt={extSait('contreauto')}
           refusMsg={refusMsg} setRefusMsg={ecrireRefusMsg}
           refusVariantes={refusVariantes} setRefusVariantes={changerRefusVariantes} variantesOk={extSait('variantes')==='ok'}
           annonces={Array.isArray(listings.items) && !listings.error ? annSelectionnables.filter(a=>a.etat==='en-ligne') : null} numeros={numeros}

@@ -130,17 +130,23 @@ export const cleAxe = (l, axe) => {
 export const classementRapporte = (lignes, axe = 'modele') => {
   if (!Array.isArray(lignes)) return null;
   const par = new Map();
-  let n = 0, nCout = 0, nDelai = 0, ecartees = 0;
+  let n = 0, nCout = 0, nDelai = 0, ecartees = 0, nNet = 0;
   lignes.forEach((l, i) => {
     if (!l) return;
     const eur = Number(l.eur);
     if (l.eur == null || !isFinite(eur) || !isFinite(Number(l.ts)) || (l.devise && String(l.devise).toUpperCase() !== 'EUR')) { ecartees += 1; return; }
     n += 1;
     const { k, nom } = cleAxe(l, axe);
-    const g = par.get(k) || (par.set(k, { k, nom, n: 0, ca: 0, nCout: 0, caCouvert: 0, cout: 0, js: [], idx: [] }), par.get(k));
+    const g = par.get(k) || (par.set(k, { k, nom, n: 0, ca: 0, nCout: 0, caCouvert: 0, cout: 0, nNet: 0, net: 0, js: [], idx: [] }), par.get(k));
     g.n += 1; g.ca += cents(eur); g.idx.push(i);
     const connu = l.achat != null && String(l.achat).trim() !== '' && isFinite(Number(l.achat));
     if (connu) { nCout += 1; g.nCout += 1; g.caCouvert += cents(eur); g.cout += cents(l.achat); }
+    // (16 nov., lot aide-decision) « Après frais de vente » (src/beneficeNoms.js) PAR ARTICLE :
+    // ce qui reste = vente − prix d'achat − frais notés (commission, boost, port payé, emballage
+    // saisi — `coutsVente`) ; seulement quand le prix d'achat ET les frais sont SUS (frais
+    // `null` = pas lus, eBay : la vente sort de cette moyenne, comptée dans la couverture).
+    const fraisSus = l.frais != null && String(l.frais).trim() !== '' && isFinite(Number(l.frais));
+    if (connu && fraisSus) { nNet += 1; g.nNet += 1; g.net += cents(eur) - cents(l.achat) - cents(l.frais); }
     const e = Number(l.enLigne);
     if (l.enLigne != null && isFinite(e) && e > 0 && Number(l.ts) >= e) { const j = (Number(l.ts) - e) / J; g.js.push(j); nDelai += 1; }
   });
@@ -152,6 +158,9 @@ export const classementRapporte = (lignes, axe = 'modele') => {
       brut, moyen: brut == null ? null : Math.round((g.caCouvert - g.cout) / g.nCout) / 100,
       marge: brut == null || !g.caCouvert ? null : Math.round((g.caCouvert - g.cout) / g.caCouvert * 1000) / 10,
       mediane: s.length ? Math.round(mediane(s) * 10) / 10 : null, nDelai: s.length,
+      // (16 nov.) ce qui reste par article vendu (moyenne, centimes arrondis) et les jours MOYENS en ligne.
+      nNet: g.nNet, apresFrais: g.nNet ? g.net / 100 : null, resteMoyen: g.nNet ? Math.round(g.net / g.nNet) / 100 : null,
+      joursMoyen: s.length ? Math.round(s.reduce((a, b) => a + b, 0) / s.length * 10) / 10 : null,
       lignes: g.idx.slice().sort((a, b) => Number(lignes[b].ts) - Number(lignes[a].ts) || a - b),
     };
   }).sort((a, b) => {
@@ -166,7 +175,7 @@ export const classementRapporte = (lignes, axe = 'modele') => {
     const c = {}; for (const i of g.lignes) { const s = nomMarqueAffiche(lignes[i].marque); c[s] = (c[s] || 0) + 1; }
     g.nom = Object.entries(c).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))[0][0];
   }
-  return { n, nCout, nDelai, ecartees, groupes };
+  return { n, nCout, nDelai, ecartees, nNet, groupes };
 };
 
 // ── LE RELEVÉ (déplacé tel quel de l'écran Ventes, 3 nov.) ──────────────────

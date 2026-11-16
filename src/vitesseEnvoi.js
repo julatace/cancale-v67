@@ -88,6 +88,40 @@ export function vitesseParCompte(lignes, { maintenant = Date.now(), jours = JOUR
   return { etat: 'lu', comptes, tout: resume(tous, sansDateTout) };
 }
 
+// ── UN COMPTE QUI RALENTIT NETTEMENT (16 nov., lot aide-decision) ───────────
+// Validé par Julien : « alerte douce si un compte ralentit nettement ». Par compte,
+// la MOYENNE vente → dépôt des 30 derniers jours (dates PROUVÉES, la même règle que
+// `vitesseParCompte`) contre celle des 30 jours d'avant. Une alerte seulement si :
+//   · chaque période porte au moins RALENTI_MIN colis datés (sinon rien n'est dit :
+//     deux colis ne font pas une tendance) ;
+//   · la moyenne récente vaut au moins RALENTI_FOIS × l'ancienne ET au moins
+//     RALENTI_ECART_MS de plus (un passage de 2 h à 5 h n'est pas « nettement »).
+// Rend null (pas su) ou [{ cle, nom, avant, maintenant, nAvant, nMaintenant }],
+// le plus net d'abord. Une MESURE dite doucement (ambre), jamais une erreur.
+export const RALENTI_MIN = 5;
+export const RALENTI_FOIS = 1.5;
+export const RALENTI_ECART_MS = 24 * H;
+export function ralentissements(lignes, { maintenant = Date.now(), jours = JOURS_VITESSE } = {}) {
+  if (!Array.isArray(lignes)) return null;
+  const fin = maintenant, mi = maintenant - jours * J, debut = maintenant - 2 * jours * J;
+  const g = new Map();
+  for (const l of lignes) {
+    if (!l || !Number.isFinite(l.vente) || !Number.isFinite(l.depart) || l.vente < debut || l.vente > fin) continue;
+    const k = str(l.compte);
+    const e = g.get(k) || { cle: k, nom: str(l.nom || k), a: [], m: [] };
+    (l.vente >= mi ? e.m : e.a).push(Math.max(0, l.depart - l.vente));
+    g.set(k, e);
+  }
+  const moy = (xs) => Math.round(xs.reduce((s, x) => s + x, 0) / xs.length);
+  const out = [];
+  for (const e of g.values()) {
+    if (e.a.length < RALENTI_MIN || e.m.length < RALENTI_MIN) continue;
+    const avant = moy(e.a), apres = moy(e.m);
+    if (apres >= avant * RALENTI_FOIS && apres - avant >= RALENTI_ECART_MS) out.push({ cle: e.cle, nom: e.nom, avant, maintenant: apres, nAvant: e.a.length, nMaintenant: e.m.length });
+  }
+  return out.sort((x, y) => (y.maintenant - y.avant) - (x.maintenant - x.avant) || x.nom.localeCompare(y.nom));
+}
+
 // « 18 h », « 1 j 4 h », « 3 j » ; moins d'une heure ⇒ « < 1 h » ; null ⇒ « — ».
 export function texteDuree(ms) {
   if (ms == null || !Number.isFinite(ms)) return '—';
