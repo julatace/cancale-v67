@@ -224,15 +224,21 @@ export function EbayOffres({compte='principal',cible,onClearCible,headers,confir
  </section>;
 }
 
-export function EbayAgent({compte='principal',headers,theme:C,onSection}){
- const S=styleUI(C),[data,setData]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[search,setSearch]=useState(''),[allHistory,setAllHistory]=useState(false),[sectionFilter,setSectionFilter]=useState('all');
- async function charger(){setBusy(true);setError('');try{setData(await appelerEbay('agent',{compte},headers));}catch(e){setError(e.message);}finally{setBusy(false);}}
+// (16 nov., ebay-a-traiter) Vu en production : « Compte eBay mal désigné » sous
+// « Actualiser » — ce bloc envoyait `compte:'principal'` (le nom que l'app donne
+// au principal), et l'action `agent` répondait 410 depuis le 11 nov. Il lit
+// désormais l'action `taches` (lecture seule) et désigne le compte comme tous
+// les autres blocs : absent pour le principal, sa clé sinon.
+export const corpsCompteGestion=compte=>(compte && compte!=='principal'?{compte}:{});
+export function EbayAgent({compte='principal',headers,theme:C,onSection,onReconnecter}){
+ const S=styleUI(C),[data,setData]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[raison,setRaison]=useState(''),[search,setSearch]=useState(''),[allHistory,setAllHistory]=useState(false),[sectionFilter,setSectionFilter]=useState('all');
+ async function charger(){setBusy(true);setError('');setRaison('');try{setData(await appelerEbay('taches',corpsCompteGestion(compte),headers));}catch(e){setError(e.message);setRaison(e.reason || '');}finally{setBusy(false);}}
  useEffect(()=>{charger();},[]);
  const labels={agentpublie:'Publiée par l’agent',expedier:'Expédition',messageacheteur:'Message acheteur',repondre:'Réponse',repondreoffre:'Offre',modifierannonce:'Annonce modifiée',terminerannonce:'Fin d’annonce',get corrigeraspects(){return trEbt('ebt.journal.corrigeraspects');},get lierproduit(){return trEbt('ebt.journal.lierproduit');},get ajouterphotos(){return trEbt('ebt.journal.ajouterphotos');}};
  const matchingTasks=(data?.tasks || []).filter(t=>`${t.title || ''} ${t.ref} ${t.label}`.toLowerCase().includes(search.toLowerCase()));
  const tasks=matchingTasks.filter(t=>sectionFilter==='all' || t.section===sectionFilter);
  const history=data?.journal || [],incertains=history.filter(j=>['incertain','en_cours'].includes(j.etat)),autres=history.filter(j=>!['incertain','en_cours'].includes(j.etat));
- return <section className="vrm-ebay-tasks"><div className="vrm-ebay-heading" style={{display:'flex',gap:8,alignItems:'center'}}><h3 data-ebay-titre-taches="" style={{fontSize:15,margin:0,color:C.text}}>Tâches à traiter</h3><button type="button" disabled={busy} onClick={charger} style={{...S.button,marginLeft:'auto'}}>{busy?'Lecture…':'Actualiser'}</button></div><Erreur message={error}/>
+ return <section className="vrm-ebay-tasks"><div className="vrm-ebay-heading" style={{display:'flex',gap:8,alignItems:'center'}}><h3 data-ebay-titre-taches="" style={{fontSize:15,margin:0,color:C.text}}>Tâches à traiter</h3><button type="button" disabled={busy} onClick={charger} style={{...S.button,marginLeft:'auto'}}>{busy?'Lecture…':'Actualiser'}</button></div><div data-ebay-taches-erreur={raison || undefined}><Erreur message={error}/>{onReconnecter && GESTE_RECONNECTER.has(raison) && <button type="button" data-ebay-reconnecter="" onClick={onReconnecter} style={{...S.button,minHeight:44}}>{trEbt('ebt.reconnecter')}</button>}</div>
  {data && <>
  {(data.sources || []).some(s=>!s.ok || s.ancien) && <p role="status" style={{fontSize:12,color:C.muted}}>Données anciennes ou absentes : tâches peut-être incomplètes. Actualise dans Compte.</p>}
  <input type="search" aria-label="Rechercher une tâche eBay" placeholder="Rechercher un article ou une commande…" value={search} onChange={e=>setSearch(e.target.value)} style={{...S.input,marginTop:12}}/>
@@ -290,12 +296,15 @@ export function EbayEvaluations({compte='principal',headers,confirm,theme:C}){
 const euros=m=>!m?'':m.currency==='EUR'?`${String(m.value).replace('.',',')}\u00a0€`:`${m.value} ${m.currency}`;
 const MOTIFS_RETOUR={DOES_NOT_FIT:'ne convient pas (taille)',NOT_AS_DESCRIBED:'pas conforme à l’annonce',DEFECTIVE_ITEM:'défectueux',WRONG_ITEM:'mauvais article',ORDERED_ACCIDENTALLY:'commandé par erreur',CHANGED_MIND:'a changé d’avis',ARRIVED_DAMAGED:'arrivé abîmé',FOUND_BETTER_PRICE:'moins cher ailleurs',MISSING_PARTS:'incomplet'};
 const issueTexte=(f,C)=>f==='fait'?<p role="status" style={{fontSize:12,margin:'8px 0 0'}}>Fait, confirmé par eBay.</p>:f==='incertain'?<p role="status" style={{fontSize:12,margin:'8px 0 0',color:C.warn}}>Je ne sais pas si c’est parti : regarde sur eBay avant de recommencer.</p>:null;
-export function EbayRetours({compte='principal',headers,confirm,theme:C,onCommandeAnnulee}){
+// Les refus qui se règlent en reconnectant le compte eBay (droit manquant,
+// jeton expiré, compte déconnecté ou mal désigné) : un bouton y mène.
+const GESTE_RECONNECTER=new Set(['scope','compte','compte-deconnecte','compte-inconnu','reconnecter','not-connected']);
+export function EbayRetours({compte='principal',headers,confirm,theme:C,onCommandeAnnulee,onReconnecter}){
  const call=(action,payload,headers,options)=>appelerEbay(action,{...payload,...(compte && compte!=='principal'?{compte}:{})},headers,options);
  const S=styleUI(C),[ret,setRet]=useState(undefined),[ann,setAnn]=useState(undefined),[message,setMessage]=useState(''),[raisons,setRaisons]=useState({}),[busy,setBusy]=useState(false),[faits,setFaits]=useState({}),[motifs,setMotifs]=useState({});
  async function charger(){setBusy(true);setMessage('');
   const [r,a]=await Promise.all([call('retours',{},headers).then(j=>({ok:j.retours}),e=>({ko:e})),call('annulations',{},headers).then(j=>({ok:j.annulations}),e=>({ko:e}))]);
-  setRet(r.ok || null);setAnn(a.ok || null);setRaisons({r:r.ko?.message || '',a:a.ko?.message || ''});setBusy(false);}
+  setRet(r.ok || null);setAnn(a.ok || null);setRaisons({r:r.ko?.message || '',a:a.ko?.message || '',rr:r.ko?.reason || '',ar:a.ko?.reason || ''});setBusy(false);}
  useEffect(()=>{charger();},[]);
  async function agir(k,action,payload,dialog){if(!await confirm(dialog))return;setBusy(true);setMessage('');
   try{const j=await call(action,{...payload,confirme:true},headers,{write:true});setFaits(f=>({...f,[k]:'fait'}));if(action==='decannulation' && payload.decision==='accepter'){onCommandeAnnulee&&onCommandeAnnulee(j.orderId,j.commandeRangee);if(j.commandeRangee!==true)setMessage('Annulation acceptée par eBay. La commande sortira des colis à faire à la prochaine synchro eBay.');}}
@@ -307,8 +316,9 @@ export function EbayRetours({compte='principal',headers,confirm,theme:C,onComman
   <div style={{display:'flex',alignItems:'center',gap:8,margin:'18px 0 10px'}}><h3 style={{margin:0,fontSize:15,color:C.text}}>Retours et annulations</h3><button type="button" onClick={charger} disabled={busy} style={{...S.button,marginLeft:'auto'}}>Actualiser</button></div>
   <Erreur message={message}/>
   {(ouverts===undefined || aDecider===undefined) && <p style={{fontSize:12,color:C.muted}}>Lecture des demandes…</p>}
-  {aDecider===null && <p style={{fontSize:12,color:C.muted}} data-pas-su="annulations">Annulations : {raisons.a || 'pas pu les lire.'}</p>}
-  {ouverts===null && <p style={{fontSize:12,color:C.muted}} data-pas-su="retours">Retours : {raisons.r || 'pas pu les lire.'}</p>}
+  {aDecider===null && <p style={{fontSize:12,color:C.text}} data-pas-su="annulations">Annulations : {raisons.a || 'pas pu les lire.'}</p>}
+  {ouverts===null && <p style={{fontSize:12,color:C.text}} data-pas-su="retours" data-raison={raisons.rr || undefined}>Retours : {raisons.r || 'pas pu les lire.'}</p>}
+  {onReconnecter && (GESTE_RECONNECTER.has(raisons.rr) || GESTE_RECONNECTER.has(raisons.ar)) && <button type="button" data-ebay-reconnecter="" onClick={onReconnecter} style={{...S.button,minHeight:44}}>{trEbt('ebt.reconnecter')}</button>}
   {Array.isArray(ouverts) && Array.isArray(aDecider) && !ouverts.length && !aDecider.length && <p style={{fontSize:12,color:C.muted}}>Aucune demande de retour ni d’annulation en cours.</p>}
   <div style={{display:'grid',gap:8}}>
    {(aDecider||[]).map(c=>{const k='c:'+c.cancelId,f=faits[k];return <article key={k} data-ebay-annulation={c.cancelId} style={carte}>
