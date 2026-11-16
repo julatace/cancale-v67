@@ -64792,7 +64792,7 @@ function AppCoeur() {
             info = [etat, e.numero ? `N°${e.numero}` : '', e.date ? jourCourt(e.date) : '', type !== 'colis' && e.montants && e.montants[0] ? prixCourt(e.montants[0] / 100) : ''].filter(Boolean).join(' · ');
           }
           return (
-            <button key={type+(e.cle||i)} type="button" className="vrm-recherche-ligne" onClick={()=>ouvrir(r, type)} data-recherche-resultat={type} data-recherche-par={r.par} title={MOTIFS_RECHERCHE[r.par] || motifRecherche(r.par)} data-recherche-cle={e.cle}
+            <button key={type+(e.cle||i)} type="button" className="vrm-recherche-ligne" onClick={()=>ouvrir(r, type)} data-recherche-resultat={type} data-recherche-par={r.par} data-recherche-proche={r.proche ? '1' : undefined} title={r.proche ? tr('vp.loupe.proche', { mot: String(r.valeur || '') }) : (MOTIFS_RECHERCHE[r.par] || motifRecherche(r.par))} data-recherche-cle={e.cle}
               data-recherche-vente={type==='vente'&&e.tx?e.tx:undefined} data-recherche-achat={type==='achat'&&e.tx?e.tx:undefined} data-recherche-num={e.numero || undefined} data-recherche-statut={etat || undefined}
               data-recherche-site={e.site || undefined} data-recherche-commande={e.site ? e.id : undefined} data-recherche-conv={type==='message' ? e.id : undefined}
               style={styleLigne}>

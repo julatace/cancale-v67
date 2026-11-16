@@ -61,4 +61,5 @@ export default {
   "vp.loupe.stockSeul": "Riposto, senza annuncio",
   "vp.loupe.retourInfo": "Reso da rispedire",
   "vp.loupe.parRangement": "magazzino",
+  "vp.loupe.proche": "Trovato nonostante un errore di battitura: «{mot}»",
 };

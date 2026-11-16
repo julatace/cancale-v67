@@ -150,6 +150,8 @@ export function emailsDeLaReponse(j) {
 const eur = (c) => { const v = c / 100; return (Number.isInteger(v) ? String(v) : v.toFixed(2).replace('.', ',')) + '\u00a0€'; };
 export function motPastille(r) {
   if (!r) return '';
+  // (16 nov.) Trouvée « à une faute près » : le mot LU qui a été compris (« ≈ jordan »), jamais exact.
+  if (r.proche) return r.valeur ? `≈ ${r.valeur}` : '';
   switch (r.par) {
     case 'pseudo': return str(r.valeur);
     case 'suivi': return `Suivi ${r.valeur}`;

@@ -61,4 +61,5 @@ export default {
   "vp.loupe.stockSeul": "Gelagert, ohne Anzeige",
   "vp.loupe.retourInfo": "Rücksendung zu verschicken",
   "vp.loupe.parRangement": "Lagerplatz",
+  "vp.loupe.proche": "Trotz Tippfehler gefunden: „{mot}“",
 };
