@@ -48,17 +48,16 @@
 //    est noté et jamais réessayé ; aucun code postal sur l'étiquette ⇒ aucune
 //    requête, et Ventes le dit. Le texte du PDF n'est jamais gardé : seuls les
 //    codes postaux essayés (`cpsPdf`) et celui que l'écho a prouvé (`cp`) ;
-//  · Colissimo, UPS : lus seulement avec la clé DU VENDEUR (api/_lib/cles-transporteurs.js) ;
-//  · DHL, DPD, GLS, Relais Colis… : aucune route publique documentée ⇒ pas lus.
+//  · Colissimo, UPS, DHL, DPD, GLS, Relais Colis… : pas lus chez le transporteur (16 nov., décision de
+//    Julien : aucun suivi par clé ; Vinted et les e-mails font foi).
 // ─────────────────────────────────────────────────────────────────────────────
 import { normaliserSuivi } from './etat-colis-email.js';
 import { carrierLisible, nomTransporteur, RECUL_MS, INTROUVABLE_MS, INTROUVABLE_MAX, RESULTATS, ETATS, CP_SIEGE_MR, classeMr } from './transporteurs.js';
 import { etapeMotVc } from './vestiaire-regle.js';
 
-// (16 nov.) + Mondial Relay (code postal lu sur l'étiquette, prouvé par l'écho) ; Colissimo et UPS (seulement avec
-// la clé du vendeur : `carrierLisible` ne les rend pas sans elle).
-export const DEPART_CARRIERS = ['chronopost', 'vinted', 'mondialrelay', 'colissimo', 'ups'];
-const RE_ID_DEPART = /^depart_(chronopost|vinted|mondialrelay|colissimo|ups)_([A-Z0-9]+)$/;
+// (16 nov.) + Mondial Relay (code postal lu sur l'étiquette, prouvé par l'écho).
+export const DEPART_CARRIERS = ['chronopost', 'vinted', 'mondialrelay'];
+const RE_ID_DEPART = /^depart_(chronopost|vinted|mondialrelay)_([A-Z0-9]+)$/;
 export const cleDepart = (carrier, suivi) => `depart_${carrier}_${normaliserSuivi(suivi)}`;
 // (11 nov., suivi des commandes) + le DERNIER évènement lu (libellé, lieu, date)
 // et le lieu du point : ce que Ventes affiche (« Pris en charge · Vannes · hier 18:02 »).
@@ -110,10 +109,9 @@ export function priseEnCharge(lu, carrier) {
   if (!prouve) return null;
   const evs = Array.isArray(lu.evenements) ? lu.evenements : [];
   // (16 nov.) Mondial Relay n'a pas de code : son LIBELLÉ mesuré (`classeMr`, hors « en préparation chez
-  // l'expéditeur ») ; Colissimo : tout sauf DR1 (« prêt à être expédié ») ; UPS : tout sauf l'étiquette (M / MP).
+  // l'expéditeur »).
   const premier = evs.find((x) => x && msDe(x.at) != null && (carrier === 'mondialrelay' ? ['route', 'disponible', 'livre'].includes((classeMr(x.libelle) || {}).c)
-    : x.code && (carrier === 'chronopost' ? !CP_PAS_DEPART.has(String(x.code).toUpperCase()) : carrier === 'vinted' ? !VG_PAS_DEPART.has(String(x.code))
-      : carrier === 'colissimo' ? String(x.code).toUpperCase() !== 'DR1' : carrier === 'ups' ? !['M', 'MP'].includes(String(x.code).toUpperCase()) : false)));
+    : x.code && (carrier === 'chronopost' ? !CP_PAS_DEPART.has(String(x.code).toUpperCase()) : carrier === 'vinted' ? !VG_PAS_DEPART.has(String(x.code)) : false)));
   const at = premier ? msDe(premier.at) : msDe(lu.etatAt);
   return at != null ? at : null;
 }
@@ -334,12 +332,12 @@ export function departsAInterroger({ sortants = [], departs = new Map(), entrant
 // (15 nov., lot retours-suivi) + `retours` : les bordereaux de RETOUR de ses achats (`email_bordretour_*` :
 // { suivi, transaction, receivedAt, transporteurPdf }) — un colis qu'IL poste : lu comme un départ, jusqu'à la
 // fin (déposé, au point relais du vendeur, livré), jamais en `transp_` (jamais « à retirer »).
-// Le transporteur NOMMÉ d'un champ de bordereau : 'mondialrelay' · 'colissimo' · 'ups' · '' (un autre nom :
-// Chronopost, Vinted Go…) · null (champ vide).
+// Le transporteur NOMMÉ d'un champ de bordereau : 'mondialrelay' · '' (un autre nom : Chronopost, Vinted Go…)
+// · null (champ vide).
 export function nomDuBordereau(v) {
   const t = String(v == null ? '' : v).trim();
   if (!t) return null;
-  return /mondial|inpost/i.test(t) ? 'mondialrelay' : /coliss|la\s*poste|laposte/i.test(t) ? 'colissimo' : /(^|[^a-z])ups([^a-z]|$)/i.test(t) ? 'ups' : '';
+  return /mondial|inpost/i.test(t) ? 'mondialrelay' : '';
 }
 export function sortantsDuVendeur({ vcVentes = null, bords = [], retours = [] } = {}) {
   const out = [];

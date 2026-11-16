@@ -47,7 +47,7 @@ export const LECTURE_FRAICHE_MS = 24 * H;
 const msDe = (v) => { if (Number.isFinite(v)) return v; const x = Date.parse(String(v || '')); return Number.isFinite(x) ? x : null; };
 const propre = (s, n = 80) => String(s == null ? '' : s).replace(/\s+/g, ' ').trim().slice(0, n);
 
-export const NOMS = { mondialrelay: 'Mondial Relay', chronopost: 'Chronopost', vinted: 'Vinted Go', colissimo: 'Colissimo', ups: 'UPS' };
+export const NOMS = { mondialrelay: 'Mondial Relay', chronopost: 'Chronopost', vinted: 'Vinted Go' };
 export const nomDe = (c) => NOMS[String(c || '')] || 'Le transporteur';
 
 // ── L'HEURE, À PARIS ─────────────────────────────────────────────────────────

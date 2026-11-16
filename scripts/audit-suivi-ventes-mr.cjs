@@ -32,7 +32,7 @@ const MUTATIONS = {
   'cp-refuse-reessaye': [['api/_lib/depart-colis.js', "  const c = listeCp(t.cpsPdf).find((x) => !refuses.includes(x));", '  const c = listeCp(t.cpsPdf)[0];']],
   'mr-par-la-forme': [['api/_lib/depart-colis.js', "  if (/^VGS\\d{13}$/.test(n)) return 'vinted';", "  if (/^VGS\\d{13}$/.test(n)) return 'vinted';\n  if (/^\\d{8}$/.test(n)) return 'mondialrelay';"]],
   'sans-cp-requete-quand-meme': [['api/_lib/transporteurs-lecture.js', "      const c = D.cpDepartMr(vu);\n      if (!c) {", "      const c = D.cpDepartMr(vu) || { cp: '00000', source: 'devine' };\n      if (!c) {"]],
-  'mr-pas-lu-en-vente': [['api/_lib/depart-colis.js', "export const DEPART_CARRIERS = ['chronopost', 'vinted', 'mondialrelay', 'colissimo', 'ups'];", "export const DEPART_CARRIERS = ['chronopost', 'vinted', 'colissimo', 'ups'];"]],
+  'mr-pas-lu-en-vente': [['api/_lib/depart-colis.js', "export const DEPART_CARRIERS = ['chronopost', 'vinted', 'mondialrelay'];", "export const DEPART_CARRIERS = ['chronopost', 'vinted'];"]],
   'prise-datee-du-dernier': [['api/_lib/depart-colis.js', "(carrier === 'mondialrelay' ? ['route', 'disponible', 'livre'].includes((classeMr(x.libelle) || {}).c)", "(carrier === 'mondialrelay' ? false"]],
   'texte-garde': [['api/_lib/transporteurs-lecture.js', "          o.cpsPdf = D.listeCp(e.cps).join(','); o.cpsLu = new Date().toISOString();", "          o.cpsPdf = D.listeCp(e.cps).join(','); o.cpsLu = new Date().toISOString(); o.texte = String(globalThis.__texteEtiquette || '');"], ['api/_lib/transporteurs-lecture.js', "  return { lu: true, cps: t == null ? [] : D.cpsDeLEtiquette(t) };", "  globalThis.__texteEtiquette = t;\n  return { lu: true, cps: t == null ? [] : D.cpsDeLEtiquette(t) };"]],
   'phrase-sans-cp-oubliee': [['src/App.jsx', "    if (estMr && dep && dep.carrier === 'mondialrelay' && mrSansCodePostal(dep)) return trT('suiviVente.mrSansCp');\n", '']],
@@ -236,7 +236,7 @@ const LIGNES_SANS_CP = ['EXPEDITEUR : VENDEUR TEST', 'DESTINATAIRE : ACHETEUR TE
     const src = fs.readFileSync(path.join(R, 'src/App.jsx'), 'utf8');
     const i = src.indexOf('const raisonPasLuVente = (carrier, tr, dep) => {');
     const corps = i >= 0 ? src.slice(i, src.indexOf('\n  };', i)) : '';
-    const fr = (await importer('src/i18n/langues/fr/clesSuivi.js')).default;
+    const fr = (await importer('src/i18n/langues/fr/suiviVente.js')).default;
     dit(/mrSansCodePostal\(dep\)/.test(corps) && /trT\('suiviVente\.mrSansCp'\)/.test(corps) && /étiquette/.test(fr['suiviVente.mrSansCp']) && !/ne se lit pas pour un colis vendu/.test(src), 'M9b Ventes : « pas de code postal lisible sur l’étiquette » vient de la ligne `depart_` ; plus jamais « ne se lit pas pour un colis vendu »', corps.slice(0, 120));
   });
 

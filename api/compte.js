@@ -25,8 +25,6 @@ import {verifierConfidentialite} from './_lib/confidentialite.js';
 //                                 chiffrée dans le coffre : statut (4 derniers
 //                                 caractères, date) · poser · verifier · retirer
 //                                 — voir api/_lib/photoroom-cle.js
-//   /api/compte?mode=cles-suivi   (GET/POST, session) SES clés de suivi (La Poste, UPS), rangées
-//                                 CHIFFRÉES — voir api/_lib/cles-transporteurs.js
 //   /api/compte?mode=facture-pro  (GET/POST, session) LA FACTURE PRO : sa boîte
 //                                 d'envoi (chiffrée), émettre, envoyer, avoir —
 //                                 voir api/_lib/facture-pro.js
@@ -83,7 +81,6 @@ import { sbCle } from './_lib/cle.js';
 import { lirePhoto } from './_lib/photos.js';
 import { routeSuperPdp } from './_lib/superpdp.js';
 import { routePhotoroom } from './_lib/photoroom-cle.js';
-import { routeClesTransporteurs } from './_lib/cles-transporteurs.js';   // (16 nov.) SES clés de suivi Colissimo / UPS
 import { routeFacturePro } from './_lib/facture-pro.js';
 import { routeFactureAutre } from './_lib/facture-autres.js';
 import { routeEntreprise } from './_lib/entreprise.js';
@@ -2028,14 +2025,6 @@ async function photoroom(req, res) {
   return routePhotoroom(req, res, { vendeur, corps, acces: await accesVendeur(vendeur.id), cloisonnee: await baseCloisonnee() });
 }
 
-// ── (16 nov.) Les clés de suivi du vendeur (La Poste, UPS) : la session d'abord (api/_lib/cles-transporteurs.js)
-async function clesSuivi(req, res) {
-  const vendeur = await vendeurExige(req, res);
-  if (!vendeur) return;
-  const corps = req.method === 'POST' ? await lireCorpsJson(req) : null;
-  return routeClesTransporteurs(req, res, { vendeur, corps, acces: await accesVendeur(vendeur.id), cloisonnee: await baseCloisonnee() });
-}
-
 // ── La facture Pro : émettre, numéroter, envoyer depuis SA boîte (api/_lib/facture-pro.js)
 async function facturePro(req, res) {
   const vendeur = await vendeurExige(req, res);
@@ -2375,7 +2364,6 @@ export default async function handler(req, res) {
   if (mode === 'superpdp') return (m === 'GET' || m === 'POST') ? superpdp(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'facture-autre') return m === 'POST' ? factureAutre(req, res) : repondre(res, 405, { erreur: 'POST' });
   if (mode === 'facture-pro') return (m === 'GET' || m === 'POST') ? facturePro(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
-  if (mode === 'cles-suivi') return (m === 'GET' || m === 'POST') ? clesSuivi(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'photoroom') return (m === 'GET' || m === 'POST') ? photoroom(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'equipe') return (m === 'GET' || m === 'POST') ? equipe(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });
   if (mode === 'communaute') return (m === 'GET' || m === 'POST') ? communaute(req, res) : repondre(res, 405, { erreur: 'GET ou POST' });

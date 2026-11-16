@@ -141,7 +141,7 @@ import {arriveesRelues} from './arriveesRelues.js';
 import { preuveDeLigne } from '../api/_lib/etat-colis.js';
 import { urlQrDuColis } from '../api/_lib/qr-retrait.js';
 import {avecSuiviDuSujet,finsDesLignes,sortiParSuivis,sortiParSuivi,suiviDeLigne,lienSuivi,codePostalLu,nouvelleVinted,transporteurDeForme,colisInternational,suiviValide,TRANSPORTEURS_SAISIE,normaliserCodePostal,idSuiviManuel,relireLigneSuivi,finDeCommandeAchat,txAchatsEnRetour,achatEnRetour,fusionTransporteur,ligneDuTransporteur,ligneDeSuiviTransporteur,leverGarde,SELECT_TRANSP_META,ligneTranspDeMeta,sensDeLigne,incidentDeSuivis,incidentDeLigne,repartiAffichable,nomTransporteurSuivi} from '../api/_lib/suivi-colis.js';
-import {ligneTransporteur,texteCodePostalMr,carrierLisible,carrierNonLu,nomTransporteur,LECTURE_SERVEUR_TRANSP,heureParis,indexTranspParSuivi,carrierLuDeLigne,noterLecturesServeur,lecturesCle} from '../api/_lib/transporteurs.js';
+import {ligneTransporteur,texteCodePostalMr,carrierLisible,carrierNonLu,nomTransporteur,LECTURE_SERVEUR_TRANSP,heureParis,indexTranspParSuivi,carrierLuDeLigne} from '../api/_lib/transporteurs.js';
 // ⟦→ ecrans/Reglages.jsx #6⟧
 import PorteConfidentialite from './PorteConfidentialite.jsx';
 import { AlerteDejaRelie } from './AlerteDejaRelie.jsx';
@@ -17442,8 +17442,6 @@ const ICON_PATHS = {
   invite: <><circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19.5a5.5 5.5 0 0 1 11 0"/><path d="M18.5 8v6M15.5 11h6"/></>,
   // (15 nov.) « Nouveaux comptes » (le propriétaire) : un téléphone et la personne qui arrive.
   nouveauCompte: <><rect x="6.5" y="2.5" width="11" height="19" rx="2.6"/><circle cx="12" cy="10" r="2.4"/><path d="M8.6 16.4a3.6 3.6 0 0 1 6.8 0"/></>,
-  // (16 nov., lot transporteurs-suivi) « Suivi Colissimo et UPS » (Paramètres) : un colis et une loupe.
-  suiviColis: <><path d="M3 7 9.5 3.5 16 7v6.5L9.5 17 3 13.5V7Z"/><path d="M3 7l6.5 3.5L16 7M9.5 10.5V17"/><circle cx="17" cy="17" r="3"/><path d="m19.2 19.2 2.3 2.3"/></>,
   ampoule: <><path d="M9.5 17.5h5"/><path d="M10.5 20.5h3"/><path d="M12 3.5a5.8 5.8 0 0 0-3.4 10.5c.6.5.9 1.1.9 1.8v.2h5v-.2c0-.7.3-1.3.9-1.8A5.8 5.8 0 0 0 12 3.5Z"/></>,
 };
 // Tuile d'icône façon réglages iOS : un carré arrondi teinté, une icône au
@@ -25698,9 +25696,6 @@ function useRelectureEbay() {
 //     recule (10 min, 6 h) ; rien n'est vidé ;
 //   · un état CHANGÉ ⇒ `vrm:transp-maj` (les écrans relisent `transp_*`).
 const RELECTURE_TRANSP_MS = 5 * 60 * 1000;
-// (13 nov., lot 89) Ce que le serveur a dit de Colissimo / UPS (lu ou non), retenu sur l'appareil
-// (une commodité : la réponse du passage suivant le remplace) — avant toute réponse : « pas su ».
-try { const x = lireLocalJson('vrm_transp_lecture'); if (x && Object.keys(x).length) noterLecturesServeur(x); } catch (_) {}
 // (9 nov., retraits frais) La dernière lecture RÉUSSIE chez un transporteur (ms) parmi les lignes `transp_`
 // lues, ou null (rien lu, ou pas su). Et l'âge en mots, une règle pour la ligne « Suivi vérifié … ».
 function derniereLectureTransp(lignes) {
@@ -25747,9 +25742,6 @@ function relireTransporteursSiVieux({ force = false } = {}) {
         ecrireLocalJson('vrm_transp_vol', { at: maintenant, prochain: maintenant + attente });
         return { fait: false, raison: st ? `http-${st}` : 'reseau' };
       }
-      // (13 nov., lot 89) Colissimo / UPS lus par le serveur (leur clé est posée sur Vercel) : la règle
-      // partagée le sait (`carrierLisible`, `pourquoiPasLu`) — sinon « suivi lu par e-mail seulement ».
-      if (j.lecture && typeof j.lecture === 'object') { const avant = JSON.stringify(lecturesCle()); noterLecturesServeur(j.lecture); ecrireLocalJson('vrm_transp_lecture', lecturesCle()); if (JSON.stringify(lecturesCle()) !== avant) { try { window.dispatchEvent(new Event('vrm:transp-lu')); } catch (_) {} } }
       const change = Array.isArray(j.lus) && j.lus.some((x) => x && x.change);
       // (8 nov.) Un colis VENDU pris en charge chez le transporteur : Colis, Ma
       // journée et la cloche relisent les départs (jamais « à retirer »).
@@ -47022,9 +47014,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const estMr = carrier === 'mondialrelay' || /mondial|inpost/i.test(String((tr && (tr.cle || tr.nom)) || ''));
     if (estMr && dep && dep.carrier === 'mondialrelay' && mrSansCodePostal(dep)) return trT('suiviVente.mrSansCp');
     if (estMr) return trT('suiviVente.pasEncoreLu', { nom: 'Mondial Relay' });
-    if (carrier === 'chronopost' || carrier === 'vinted' || carrier === 'colissimo' || carrier === 'ups') return trT('suiviVente.pasEncoreLu', { nom: nomTransporteur(carrier) });
+    if (carrier === 'chronopost' || carrier === 'vinted') return trT('suiviVente.pasEncoreLu', { nom: nomTransporteur(carrier) });
     const nl = carrierNonLu((tr && (tr.cle || tr.nom)) || carrier || '');
-    if (nl === 'Colissimo' || nl === 'UPS') return trT('suiviVente.sansCle', { nom: nl });
     return nom ? trT('suiviVente.nonLu', { nom }) : trT('suiviVente.inconnu');
   };
   const suiviVente = (x) => {
@@ -65299,7 +65290,7 @@ function AppCoeur() {
             };
             // `ebay_tokens*` (les jetons eBay, de chacun de ses comptes) et `push_subs` (les clés de ses téléphones)
             // ne quittent pas la base.
-            const EXCLUS = ['harvest_*_txn_*','harvest_*_label_*','email_bord_*','email_html_*','lbc_catalogue','lbc_recon','backup_*','harvest_*_seen_urls','harvest_*_wreq_*','harvest_*_pickup_points','ebay_tokens*','push_subs','vrm_photoroom_cle','photoroom_cle','suivi_cle_*'];
+            const EXCLUS = ['harvest_*_txn_*','harvest_*_label_*','email_bord_*','email_html_*','lbc_catalogue','lbc_recon','backup_*','harvest_*_seen_urls','harvest_*_wreq_*','harvest_*_pickup_points','ebay_tokens*','push_subs','vrm_photoroom_cle','photoroom_cle'];
             const [lignes, legeres, comptes] = await Promise.all([
               toutLire(`app_data?select=id,data&and=(${EXCLUS.map(x=>`id.not.like.${x}`).join(',')})&order=id`),
               toutLire(`app_data?select=id,meta&or=(id.like.harvest_*_txn_*,id.like.harvest_*_label_*,id.like.email_bord_*)&order=id`),

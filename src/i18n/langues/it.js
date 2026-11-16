@@ -1,5 +1,5 @@
 // ITALIANO — traduzione di fr.js (la fonte). Stesse chiavi, stesse {variabili}.
-import ecran_cles_suivi from './it/clesSuivi.js';   // (16 nov.) SES clés de suivi Colissimo / UPS
+import ecran_suivi_vente from './it/suiviVente.js';   // (16 nov.) le suivi des colis vendus
 import ecran_ventesVerre from './it/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
 import ecran_journee from './it/journee.js';
 import ecran_confort from './it/confort.js';   // (14 nov., lots 117–130) confort et sécurité
@@ -2300,7 +2300,7 @@ export default {
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_liaison,
-  ...ecran_cles_suivi,
+  ...ecran_suivi_vente,
   ...ecran_transporteur_connu,
   ...ecran_vendre,
   ...ecran_ebaytableau,

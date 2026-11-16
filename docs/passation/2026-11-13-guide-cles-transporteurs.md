@@ -1,13 +1,9 @@
 # Allumer le suivi Colissimo et UPS dans VRM — le pas-à-pas (13 nov. 2026, revu le 16 nov.)
 
-> ⚠️ **16 nov. (lot `transporteurs-suivi`) : la clé se colle maintenant DANS VRM, plus sur Vercel.**
-> Chaque vendeur colle SA clé gratuite dans **Paramètres → Ventes et colis → « Suivi Colissimo et UPS »** ;
-> elle est chiffrée sur le serveur et ne sert qu'à SES colis (§2.9 : jamais la clé de Julien pour les
-> autres vendeurs). Les variables Vercel `LAPOSTE_OKAPI_KEY`, `UPS_CLIENT_ID`, `UPS_CLIENT_SECRET` ne sont
-> **plus lues** : si Julien les a posées, il peut les supprimer (Vercel → Settings → Environment Variables).
-> Les étapes 1 à 4 ci-dessous (créer la clé chez le transporteur) ne changent pas ; les étapes « Vercel »
-> sont remplacées par : **ouvrir VRM → Paramètres → Ventes et colis → Suivi Colissimo et UPS → coller → « Ranger ma clé »**.
-> Pas de Redeploy. Détail : `docs/passation/2026-11-16-transporteurs-suivi.md`.
+> ⛔ **16 nov. — ABANDONNÉ (décision de Julien : « on laisse tomber, enlève, on garde le suivi de Vinted »).**
+> VRM ne lit plus Colissimo ni UPS par clé : ni variables Vercel, ni clé du vendeur. **Aucun geste à faire** ;
+> les variables `LAPOSTE_OKAPI_KEY`, `UPS_CLIENT_ID`, `UPS_CLIENT_SECRET` peuvent être supprimées de Vercel.
+> Ce guide n'est gardé que pour l'historique. Détail : `docs/passation/2026-11-16-transporteurs-suivi.md`.
 
 
 **Pour qui :** Julien, une seule fois. **Durée :** 10 minutes par transporteur. **Coût :** 0 €.

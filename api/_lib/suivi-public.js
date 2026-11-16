@@ -7,7 +7,7 @@
 // (`LECTURE_SERVEUR_TRANSP`, api/_lib/transporteurs.js). Pour Colissimo / La Poste, DPD, UPS,
 // GLS et Relais Colis, AUCUNE réponse n'a été MESURÉE (le conteneur de développement ne joint
 // pas leurs sites) : on n'écrit pas de lecteur de page inventé. (13 nov., lot 89 : Colissimo / La Poste et UPS
-// ont désormais leur lecture serveur par API officielle, allumée par la clé ; DPD et GLS restent à mesurer.)
+// ont eu une lecture serveur par API officielle à clé, RETIRÉE le 16 nov. sur décision de Julien ; DPD et GLS restent à mesurer.)
 // Ce module fixe donc :
 //   · `VOIES_A_OUVRIR` : par transporteur, la page publique à lire, si une clé est exigée
 //     (refusée, §2.9 : jamais la clé de Julien pour les autres) et qui doit la lire ;
@@ -21,12 +21,11 @@ import { normaliserSuivi } from './etat-colis-email.js';
 
 // (12 nov., Julien : « on ne fait pas avec l'extension ») TOUT CÔTÉ SERVEUR. `voie` : ce que le serveur peut lire ;
 // `geste` : ce qu'il faut faire une fois (jamais une clé collée dans une conversation ; jamais la clé de Julien
-// pour les autres vendeurs : une clé de DÉVELOPPEUR de VRM, gratuite, sans coût à l'usage, posée sur Vercel).
+// pour les autres vendeurs, §2.9 ; et depuis le 16 nov., aucun suivi par clé du tout).
 export const VOIES_A_OUVRIR = Object.freeze({
-  // (13 nov., lot 89) Colissimo et UPS : la lecture serveur est ÉCRITE et s'allume seule quand la clé est
-  // posée (api/_lib/transporteurs.js `lireReponseLaPoste` / `lireReponseUps`, `lectureServeurActive`) —
-  // guide pas à pas : docs/passation/2026-11-13-guide-cles-transporteurs.md.
-  colissimo: { nom: 'Colissimo / La Poste', page: 'https://api.laposte.fr/suivi/v2/idships/{n}?lang=fr_FR', cle: 'API officielle « Suivi » v2 : clé Okapi de développeur, gratuite — en-tête X-Okapi-Key', voie: 'serveur : prête, s’allume dès que LE VENDEUR a posé SA clé (16 nov. : plus jamais la clé de l’installation, §2.9 ; sans clé : rien n’est appelé, « suivi non lu chez ce transporteur »)', geste: 'le vendeur crée un compte sur developer.laposte.fr, souscrit à « Suivi v2 » et colle SA clé dans Paramètres → Ventes et colis → Suivi Colissimo et UPS' },
+  // (16 nov.) Colissimo et UPS : la lecture par clé (lot 89 du 13 nov., puis la clé du vendeur) est RETIRÉE sur
+  // décision de Julien — aucun appel à La Poste ni à UPS, aucun écran qui propose une clé.
+  colissimo: { nom: 'Colissimo / La Poste', page: 'https://www.laposte.fr/outils/suivre-vos-envois?code={n}', cle: 'aucune', voie: 'aucune voie serveur (16 nov., décision de Julien : « on laisse tomber », aucun suivi par clé) : suivi Vinted et e-mails seulement ; la page publique s’ouvre seulement par le lien « Suivre », sur le clic du vendeur', geste: 'aucun' },
   // (13 nov., lot 89) DPD et GLS : JAMAIS MESURÉS. Le conteneur ne joint pas leurs hôtes, et le bac à sable
   // Vercel (la voie de mesure du 24 oct.) est épuisé jusqu'au 1er déc. (plan Hobby, 402). Aucun lecteur de
   // page inventé : e-mails et SMS seulement. Leur n° ne se reconnaît pas à sa forme (DPD : 14 chiffres comme
@@ -36,7 +35,7 @@ export const VOIES_A_OUVRIR = Object.freeze({
   // expéditeurs sous contrat ; leurs pages publiques ne sont pas une API documentée et n'ont jamais été mesurées. Rien n'est
   // branché (on n'invente pas un lecteur de page) : e-mails et SMS seulement, et la ligne dit « suivi non lu chez ce transporteur ».
   dpd: { nom: 'DPD', page: 'https://tracking.dpd.de/rest/plc/fr_FR/{n}', cle: 'aucune annoncée (service de la page de suivi publique)', voie: 'serveur, réponse jamais mesurée : e-mails et SMS seulement en attendant', geste: 'mesurer la réponse depuis un bac à sable Vercel (dub1, User-Agent honnête) après le 1er déc., vérifier les conditions d’utilisation, puis brancher la lecture' },
-  ups: { nom: 'UPS', page: 'https://onlinetools.ups.com/api/track/v1/details/{n}', cle: 'API officielle « Tracking » : identifiants OAuth d’une application UPS Developer (gratuite) ; la page publique bloque les robots', voie: 'serveur : prête, s’allume dès que LE VENDEUR a posé SES deux identifiants (jeton OAuth mis en cache, par vendeur)', geste: 'le vendeur crée une application sur developer.ups.com (produit « Tracking ») et colle son Client ID et son Client Secret dans Paramètres → Ventes et colis → Suivi Colissimo et UPS' },
+  ups: { nom: 'UPS', page: 'https://www.ups.com/track?loc=fr_FR&tracknum={n}', cle: 'aucune', voie: 'aucune voie serveur (16 nov., décision de Julien : « on laisse tomber », aucun suivi par clé) : suivi Vinted et e-mails seulement ; la page publique s’ouvre seulement par le lien « Suivre », sur le clic du vendeur', geste: 'aucun' },
   gls: { nom: 'GLS', page: 'https://gls-group.eu/app/service/open/rest/FR/fr/rstt001?match={n}', cle: 'aucune (service de la page de suivi publique)', voie: 'serveur, réponse jamais mesurée : e-mails et SMS seulement en attendant', geste: 'mesurer la réponse depuis un bac à sable Vercel (dub1, User-Agent honnête) après le 1er déc., vérifier les conditions d’utilisation, puis brancher la lecture' },
   relaiscolis: { nom: 'Relais Colis', page: 'https://www.relaiscolis.com/suivi-de-colis/', cle: 'aucune API publique connue ; formulaire de la page', voie: 'aucune voie serveur sûre connue : e-mails et SMS seulement', geste: 'aucun pour l’instant (raison : pas de service de suivi public documenté)' },
   shop2shop: { nom: 'Shop2Shop', page: 'https://www.chronopost.fr/tracking-no-cms/suivi-page?listeNumerosLT={n}', cle: 'aucune', voie: 'serveur (route Chronopost, déjà lue)', geste: 'aucun' },

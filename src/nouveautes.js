@@ -28,7 +28,6 @@ export const PHRASE_MOTS_MAX = 12;
 export const NOUVEAUTES = Object.freeze([
   // (16 nov., lot transporteurs-suivi) docs/passation/2026-11-16-transporteurs-suivi.md
   { id: 'mondial-relay-ventes', date: '2026-11-16', titre: 'Tes colis Mondial Relay vendus sont suivis', phrase: 'Le code postal du point est lu sur ton étiquette.', tab: 'ventes', pour: 'tous', mode: 'tous' },
-  { id: 'cles-suivi', date: '2026-11-16', titre: 'Colissimo et UPS lus avec ta clé', phrase: 'Colle ta clé gratuite dans Paramètres, Ventes et colis.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (15 nov., maquettes validées : « tout est parfait ») docs/passation/2026-11-15-refonte-ventes.md
   { id: 'ventes-verre', date: '2026-11-15', titre: 'Ventes : colis cochés, place dans le stock', phrase: 'Chaque colis dit où est le carton ; imprime les cochés.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'achats-code-comptoir', date: '2026-11-15', titre: 'Le code de retrait en grand au comptoir', phrase: 'Un chiffre par case, « Je l’ai retiré » juste dessous.', tab: 'achats', pour: 'tous', mode: 'tous' },

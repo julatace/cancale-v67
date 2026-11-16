@@ -113,8 +113,8 @@ const vgJson = (evs) => JSON.stringify({ tracking_events: evs.map((e, i) => ({ i
       { cle: 'vc:5', suivi: 'XW000000812TS', transporteur: 'Chronopost', venteMs: NOW - 40 * 24 * H },
     ], departs: new Map(), entrants: new Set(['XW000000811TS']), maintenant: NOW, max: 10, parTransporteur: 10 });
     // (16 nov., lot transporteurs-suivi) Mondial Relay NOMMÉ est lu comme départ (le code postal vient de SON
-    // étiquette, prouvé par l'écho : audit-suivi-ventes-mr) ; Colissimo seulement avec la clé du vendeur.
-    dit(it.length === 2 && it.some((x) => x.suivi === 'XW000000810TS' && x.carrier === 'chronopost') && it.some((x) => x.suivi === '87654322' && x.carrier === 'mondialrelay'), 'lus comme départ : Chronopost, et Mondial Relay nommé avec SON étiquette à lire ; ni Mondial Relay sans étiquette (Vestiaire), ni Colissimo sans clé du vendeur, ni un n° d’achat, ni une vente de plus de 21 jours', JSON.stringify(it));
+    // étiquette, prouvé par l'écho : audit-suivi-ventes-mr) ; Colissimo jamais (16 nov. : aucun suivi par clé).
+    dit(it.length === 2 && it.some((x) => x.suivi === 'XW000000810TS' && x.carrier === 'chronopost') && it.some((x) => x.suivi === '87654322' && x.carrier === 'mondialrelay'), 'lus comme départ : Chronopost, et Mondial Relay nommé avec SON étiquette à lire ; ni Mondial Relay sans étiquette (Vestiaire), ni Colissimo (jamais lu chez le transporteur), ni un n° d’achat, ni une vente de plus de 21 jours', JSON.stringify(it));
     const fin = fn(D, 'departsAInterroger')({ sortants: [{ cle: 'vc:1', suivi: 'XW000000810TS', transporteur: 'Chronopost' }], departs: carte(ligne('XW000000810TS', NOW - 20 * H)), maintenant: NOW });
     dit(fin.length === 0, 'pris en charge ⇒ plus jamais relu');
     const tot = fn(D, 'departsAInterroger')({ sortants: Array.from({ length: 20 }, (_, i) => ({ cle: 'vc:' + i, suivi: `XW${String(900000000 + i)}TS`, transporteur: 'Chronopost', venteMs: NOW - 48 * H })), maintenant: NOW, max: 3, parTransporteur: 3 });

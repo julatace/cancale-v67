@@ -37,8 +37,6 @@ const SERVICE = {
   'carrier.vintedgo.com': /Vinted Go/,
   'www.mondialrelay.fr': /Mondial Relay/,
   // (13 nov., lot 89) les API officielles lues par le serveur quand leur clé est posée
-  'api.laposte.fr': /La Poste/,
-  'onlinetools.ups.com': /UPS/,
   // (5 nov.) les icônes de site des transporteurs (src/transporteursVisuels.js, PastilleTransporteur)
   'www.chronopost.fr': /Chronopost/,
   'www.laposte.fr': /La Poste/,
@@ -91,9 +89,6 @@ const COUPLES = {
   'src/App.jsx|discord.com': ['lien','connexion Discord : le navigateur y va sur le clic de la personne'],
   'src/communaute/Communaute.jsx|discord.com': ['lien', 'connexion Discord : le navigateur y va sur le clic de la personne'],
   'src/photoroomCle.js|app.photoroom.com': ['lien', LIEN + ' — créer sa clé Photoroom (carte « Ta clé Photoroom »)'],
-  // (16 nov., lot transporteurs-suivi) Paramètres → « Suivi Colissimo et UPS » : où le vendeur crée SA clé gratuite.
-  'src/parametres/ClesSuivi.jsx|developer.laposte.fr': ['lien', LIEN + ' — créer SA clé La Poste « Suivi » (Paramètres → Suivi Colissimo et UPS)'],
-  'src/parametres/ClesSuivi.jsx|developer.ups.com': ['lien', LIEN + ' — créer SON application UPS « Tracking » (Paramètres → Suivi Colissimo et UPS)'],
   'src/photoroomCle.js|www.photoroom.com': ['lien', LIEN + ' — les tarifs de Photoroom (même carte)'],
   'src/App.jsx|supabase.com': ['lien', LIEN],
   'src/agendaEcheances.js|calendar.google.com': ['lien', LIEN + ' — « Ajouter à Google Agenda » (le lien de SON calendrier)'],
@@ -233,9 +228,6 @@ const COUPLES = {
   'api/_lib/transporteurs-lecture.js|carrier.vintedgo.com': ['politique', 'transp'],
   'api/_lib/transporteurs-lecture.js|www.mondialrelay.fr': ['politique', 'transpmr'],
   // (13 nov., lot 89) Colissimo / La Poste (« Suivi v2 ») et UPS (« Tracking »), lus par le serveur avec la clé de l'installation.
-  'api/_lib/transporteurs-lecture.js|api.laposte.fr': ['politique', 'transp'],
-  'api/_lib/transporteurs-lecture.js|onlinetools.ups.com': ['politique', 'transp'],
-  'api/_lib/cles-transporteurs.js|onlinetools.ups.com': ['politique', 'transp'],   // (16 nov.) le jeton UPS, avec les identifiants DU VENDEUR
   'api/_lib/transporteurs-lecture.js|lgonxzrzjcqthjtbdpzo.supabase.co': ['politique', 'base'],
   'api/_lib/transporteurs-lecture.js|vrm.center': ['vrm', 'le User-Agent honnête de VRM'],
 };
