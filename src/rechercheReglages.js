@@ -17,7 +17,7 @@ const termes={
  regime:'regime fiscal statut urssaf cotisation impot declaration micro entreprise societe particulier taux',
  connexions:'etat extension synchro capture relu relecture fraicheur connexion',
  securite:'securite donnees acces protection base rls supabase expert',
- 'securite-comptes':'securite compte bannir ban blocage robot vintex plafond nuit pause captcha',
+ 'securite-comptes':'securite compte bannir ban blocage robot plafond nuit pause captcha',
  discretion:'discretion plafond limite jour frein vinted',
  vacances:'vacances conges pause absence fermer boutique',
  santecomptes:'sante compte note envois annulations moderation',

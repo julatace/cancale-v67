@@ -49,7 +49,7 @@ import { CLE_MODELES } from '../modelesDescription.js';
 import { MesModeles } from '../ModelesDescription.jsx';
 import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroEcrit as lireNumeroEcritRegle, lireNumeroTexte, apercuNumeroEcrit, basculerOu, OU_NUMERO, NOM_OU } from '../numeroEcrit.js';
 // (9 nov.) Les sources cochées (« Où est ton numéro ? ») passent à chaque lecture.
-const lireNumeroEcrit = (o) => lireNumeroEcritRegle({ ou: lireReglageNumeroEcrit(load(CLE_NUMERO_ECRIT, null)).ou, ...o });
+const lireNumeroEcritReglages = (o) => lireNumeroEcritRegle({ ou: lireReglageNumeroEcrit(load(CLE_NUMERO_ECRIT, null)).ou, ...o });
 import { CLE_AFFICHAGE, CLE_JE_VENDS, motsVendeur, lireReglageAffichage, lireReglageJeVends, SEUIL_VENTES_SIMPLE, JOURS_VENTES_SIMPLE, reglageJeVendsDepuisChoix, nomsCategories } from '../profilVendeur.js';
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, FORMES as FORMES_ETIQUETTE, QUESTIONS as QUESTIONS_ETIQUETTE, ANNONCE_EXEMPLE, lireReglageEtiquette, etiquetteDe, poserEtiquette, proposition as propositionEtiquette } from '../etiquetteNumero.js';
 import { bilanThermique } from '../App.jsx';   // (11 nov., lot thermique) ce que l'aperçu a fait
@@ -3115,7 +3115,7 @@ async function annulerSuppressionCompte() {
   } catch (_) { return { ok: false, message: "Pas de réponse (connexion coupée) : la suppression n'est pas annulée. Réessaie quand tu as du réseau." }; }
 }
 const dateLongue = (iso) => { const t = Date.parse(iso || ''); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', day: 'numeric', month: 'long', year: 'numeric' }) : ''; };
-const joursAvant = (iso) => { const t = Date.parse(iso || ''); return Number.isFinite(t) ? Math.max(0, Math.ceil((t - Date.now()) / 864e5)) : null; };
+const joursAvantEffacement = (iso) => { const t = Date.parse(iso || ''); return Number.isFinite(t) ? Math.max(0, Math.ceil((t - Date.now()) / 864e5)) : null; };
 // Le bandeau de la coque relit l'état quand il change ici.
 const signalerSuppression = () => { try { window.dispatchEvent(new Event('vrm:suppression-prevue')); } catch (_) {} };
 async function lireInventaireSuppression() {
@@ -3233,7 +3233,7 @@ function FermerCompte({ onExporter }) {
               {annonce && !annonce.ok && <div role="status" data-supprimer-annonce="echec" data-acc-echec="compte.supprimer" style={{ ...txt, color: C.warn, marginBottom: 8 }}>{annonce.message}</div>}
               <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>Suppression prévue le {dateLongue(info.prevue.effaceLe)}</div>
               <div style={{ ...txt, marginTop: 4 }}>
-                {joursAvant(info.prevue.effaceLe) ? `Dans ${joursAvant(info.prevue.effaceLe)} jour${joursAvant(info.prevue.effaceLe) > 1 ? 's' : ''}. ` : 'Elle a lieu au prochain passage du matin. '}
+                {joursAvantEffacement(info.prevue.effaceLe) ? `Dans ${joursAvantEffacement(info.prevue.effaceLe)} jour${joursAvantEffacement(info.prevue.effaceLe) > 1 ? 's' : ''}. ` : 'Elle a lieu au prochain passage du matin. '}
                 D’ici là, rien n’est effacé : ton compte et tes données restent là.
                 {['resilie', 'deja-resilie'].includes(info.prevue.abonnement) && <span data-supprimer-abonnement-prevue=""> Ton abonnement est résilié : aucun nouveau prélèvement.</span>}
               </div>
@@ -4232,14 +4232,14 @@ function NumeroEcritSetting({ onAnnonces }) {
         const L = jl[0] || {}; const items = L.items && typeof L.items === 'object' ? L.items : {};
         const donnes = numerosVcEffectifs() || {}; const liensMain = vcCarte('vrm_vc_liens') || {};
         const connuVc = (id) => { const m = liensMain[id]; const v = (m && typeof m === 'object' ? m.numero : m) || (L.liens || {})[id] || donnes[id] || ''; return cleNum(v); };
-        out.vestiaire = apercuNumeroEcrit(Object.entries(items).filter(([, it]) => it && typeof it === 'object').map(([id, it]) => ({ id: String(id), site: 'vestiaire', titre: it.titre || '', lecture: lireNumeroEcrit({ titre: it.titre || '' }), connu: connuVc(id), presente: true })), { reprenable: rep });
+        out.vestiaire = apercuNumeroEcrit(Object.entries(items).filter(([, it]) => it && typeof it === 'object').map(([id, it]) => ({ id: String(id), site: 'vestiaire', titre: it.titre || '', lecture: lireNumeroEcritReglages({ titre: it.titre || '' }), connu: connuVc(id), presente: true })), { reprenable: rep });
       } else out.vestiaire = null;
     } catch (_) { out.vestiaire = null; }
     try {
       const e = await lireEbayTous('ebay_listings', SEL_EBAY_ANNONCES, 'items');
       if (e && !e.illisibles.length) {
         const fiches = load('vinted_annonce_numeros', {}) || {};
-        out.ebay = apercuNumeroEcrit(e.items.filter((a) => a && a.itemId != null).map((a) => { const lien = lienEbay(a.itemId); const f = lien ? fiches[lien.pairId] : null; return { id: String(a.itemId), site: 'ebay', titre: a.title || '', lecture: lireNumeroEcrit({ ref: a.sku, titre: a.title || '' }), connu: f && f.numero != null ? cleNum(f.numero) : '', presente: true }; }), { reprenable: rep });
+        out.ebay = apercuNumeroEcrit(e.items.filter((a) => a && a.itemId != null).map((a) => { const lien = lienEbay(a.itemId); const f = lien ? fiches[lien.pairId] : null; return { id: String(a.itemId), site: 'ebay', titre: a.title || '', lecture: lireNumeroEcritReglages({ ref: a.sku, titre: a.title || '' }), connu: f && f.numero != null ? cleNum(f.numero) : '', presente: true }; }), { reprenable: rep });
       } else out.ebay = null;
     } catch (_) { out.ebay = null; }
     if (!stop) setAutres(out);
