@@ -56,7 +56,7 @@ const MUTATIONS = {
   codeDouteux: ['src/photoOrigine.js', "    if (douteux.has(n)) continue;\n", ''],
   ressemblanceAllumee: ['src/photoIdentite.js', 'export const IDENTITE_PAR_RESSEMBLANCE = false;', 'export const IDENTITE_PAR_RESSEMBLANCE = true;'],
   fondAutreCompte: ['vinted-sync-extension/background.js', "filter((e) => e && String(e.uid) === String(uid) && codeOrigineValide(e.code))", "filter((e) => e && codeOrigineValide(e.code))"],
-  fondLecture: ['vinted-sync-extension/background.js', "    if (r === null) { restent.push(...liste); noterDiag('origine_lecture_ratee'); continue; }\n    const carte", "    const carte"],
+  fondLecture: ['vinted-sync-extension/background.js', "    if (r === null) { restent.push(...liste); noterDiag('origine_lecture_ratee'); continue; }\n    const carte = Object.assign({}, (r[0]", "    const carte = Object.assign({}, ((r || [])[0]"], // lecture KO traitée comme vide : le cas qui détruit
   pageRefus: ['vinted-sync-extension/inject.js', "      if (!codeP || String(method || '').toUpperCase() !== 'POST') return;\n      const st = Number(status);\n      if (!(st >= 200 && st < 300)) return;", "      if (!codeP || String(method || '').toUpperCase() !== 'POST') return;\n      const st = Number(status);"],
   compte: ['src/App.jsx', "return i && i.owner && i.owner === AUTH.user?.id ? i : null;", 'return i;'],
 };
