@@ -129,6 +129,7 @@ jobs:
       - name: Lancer les bancs
         env:
           BANCS_PORT_BASE: '10000'
+          BANCS_TIMEOUT_S: '4000'
         run: node scripts/lancer-bancs.cjs ${{ matrix.lot }}
 
   bancs-webkit:
