@@ -6,7 +6,7 @@
 // On y lisait « n° 37451417 est relié à VRM » (l'identifiant d'un compte, pas un
 // nom), « Vendu 62 € · N°215 » (sans la paire), « à déposer avant le 23/11/2026 »
 // (une date de machine), « Dernier : Nouvelle offre · « New balance 9060 vert et
-// blanc taille 38 » · loladupuis35260 — expire en 24h. » (trop long, et le pseudo
+// blanc taille 38 » · <pseudo de l’acheteuse> — expire en 24h. » (trop long, et le pseudo
 // de l'acheteur). Récit : docs/passation/2026-11-15-notifications-belles.md.
 //
 // LA RÈGLE (chaque texte de notification la suit) :
@@ -220,7 +220,7 @@ export const PLATEFORME_COURTE = { vinted: 'Vinted', leboncoin: 'Leboncoin', ves
 
 // ── LES TEXTES, langue par langue ───────────────────────────────────────────
 // Chaque sorte rend { title, body, ligne } : `ligne` est ce que dit un regroupement
-// (« 8 offres à trancher · la plus récente : 9060 vert/blanc T38, expire dans 24 h »).
+// (« 8 offres à trancher · la plus récente : 9060 vert/blanc T38 » ; une offre Vinted n'expire pas).
 const joindre = (...xs) => xs.filter((x) => x && str(x).trim()).join(' · ');
 const TXT = {
   fr: {
@@ -561,10 +561,14 @@ const SORTES = {
     const { title, reste } = titreAvecObjet(T.offre(e), a, d.article);
     const j = d.juge && typeof d.juge === 'object' ? d.juge : null;
     const conseil = j && j.etat === 'ambigu' ? T.conseilAmbigu : j && j.etat === 'unique' && montantClair(j.prix, ctx.langue) ? T.conseilPrix(montantClair(j.prix, ctx.langue)) : '';
-    const corps = joindre(reste, conseil ? conseil.charAt(0).toUpperCase() + conseil.slice(1) : T.offreCorps, T.expire24);
-    // Le regroupement dit l'article et l'échéance (« 9060 vert/blanc T38, expire dans 24 h ») ;
-    // le montant seulement si l'article n'est pas lu.
-    return { title, body: corps, ligne: [a || e, T.expire24].filter(Boolean).join(', ') };
+    // (16 nov., lot vente-email-absente) UNE OFFRE VINTED N'EXPIRE PAS (Julien, 11 nov.) : seules
+    // les offres Vestiaire expirent. L'échéance « expire dans 24 h » ne se dit que pour
+    // `site: 'vestiaire'` — jamais par défaut (l'e-mail « Nouvelle offre » est celui de Vinted).
+    const ech = str(d.site).toLowerCase() === 'vestiaire' ? T.expire24 : '';
+    const corps = joindre(reste, conseil ? conseil.charAt(0).toUpperCase() + conseil.slice(1) : T.offreCorps, ech);
+    // Le regroupement dit l'article (« 9060 vert/blanc T38 ») et, pour Vestiaire seulement,
+    // l'échéance ; le montant seulement si l'article n'est pas lu.
+    return { title, body: corps, ligne: [a || e, ech].filter(Boolean).join(', ') };
   },
   argent: (d, T, ctx) => {
     const e = montantClair(d.montant, ctx.langue), a = nomCourt(d.article);
@@ -618,7 +622,7 @@ export function rediger(r, { langue = 'fr', maintenant = Date.now(), relatif = t
 }
 
 // La notification REGROUPÉE (plusieurs non lues du même genre) : « 8 offres à
-// trancher » / « La plus récente : 9060 vert/blanc T38, expire dans 24 h ».
+// trancher » / « La plus récente : 9060 vert/blanc T38 » (une offre Vinted n'expire pas).
 export const titreGroupe = (genre, k, langue = 'fr') => { const f = TXT[langueNotif(langue)].groupe[genre]; return f ? couperMot(f(k), TITRE_MAX) : ''; };
 export function corpsGroupe(derniere, langue = 'fr') {
   const T = TXT[langueNotif(langue)];

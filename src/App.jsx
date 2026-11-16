@@ -8073,7 +8073,7 @@ function useVentesEmailFraiches(ventes, ko, comptes, ecarte, cleEcarte) {
 // La ligne d'une vente vue par e-mail : ce qu'elle est, depuis quand la liste
 // n'a pas été relue, et LE geste (où la relire — le navigateur nommé par
 // `motsNavigateur`, ou l'ordinateur de l'extension quand elle n'est pas ici).
-function NoteVenteEmail({ o }) {
+function NoteVenteEmail({ o, bordLa = false }) {
   const lu = Number(o && o._lectureVentes);
   // La date dite comme dans l'indicateur des comptes (`quandRelu`, une règle) : « hier 15 h 11 ».
   const quand = Number.isFinite(lu) ? quandRelu(lu) : '';
@@ -8084,6 +8084,8 @@ function NoteVenteEmail({ o }) {
       <span style={{ color: C.text, fontWeight: 600 }}>{STATUT_VENTE_EMAIL}</span>
       {quand ? <> {tr('ventes.ventesCompteRelues')} {quand}</> : null}
       <br/><span data-vente-email-geste="" style={{ color: C.warn }}>{gesteVenteEmail(dans).replace(/^./, (c) => c.toUpperCase())}.</span>
+      {/* (16 nov.) Pas encore de bordereau (aucun avec CE n°, ou vente sans n°) : il le dit. */}
+      {bordLa ? null : <><br/><span data-vente-email-bord-a-venir="">{tr('ventes.venteEmailBordAVenir')}</span></>}
     </div>
   );
 }
@@ -8091,7 +8093,7 @@ function NoteVenteEmail({ o }) {
 // affichées d'un compte sont « vues par e-mail » (`groupesVentesEmailEnTete`), ce qui est dit
 // sur `NoteVenteEmail` — l'état, la date de lecture du compte, le geste — se dit ici, en tête
 // de la liste ; la ligne ne garde que ce qui lui est propre (son état court, son bordereau).
-function NoteVentesEmailTete({ g, nom }) {
+function NoteVentesEmailTete({ g, nom, sansBord = 0 }) {
   const lu = Number(g && g.lu);
   const quand = Number.isFinite(lu) ? quandRelu(lu) : '';
   const dans = vmrExtPresent() ? NAV.dans : 'sur l’ordinateur où est l’extension VRM';
@@ -8102,6 +8104,7 @@ function NoteVentesEmailTete({ g, nom }) {
       {nom ? <> · <span className="vrm-sensible" data-stream-type="compte">{nom}</span></> : null}
       {quand ? <> {tr('ventes.ventesCompteRelues')} {quand}</> : null}
       <br/><span data-ventes-email-tete-geste="" style={{ color: C.warn }}>{gesteVenteEmail(dans).replace(/^./, (c) => c.toUpperCase())}.</span>
+      {sansBord > 0 ? <><br/><span data-ventes-email-tete-bord-a-venir={String(sansBord)}>{tr('ventes.venteEmailBordAVenir')}</span></> : null}
     </div>
   );
 }
@@ -50484,7 +50487,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           onPro={() => { voirAbonnement(null); onNav && onNav('settings'); }}/>}
         {/* (8 nov., « restes ventes ») UNE PHRASE PAR GROUPE (§7) : ce que plusieurs lignes diraient
             à l'identique — la note « vue par e-mail » d'un compte, un refus de facture commun. */}
-        {[...ventesEmailTete.values()].map((g) => <NoteVentesEmailTete key={g.uid} g={g} nom={g.acc ? accNameOf(g.acc) : ''}/>)}
+        {[...ventesEmailTete.values()].map((g) => <NoteVentesEmailTete key={g.uid} g={g} nom={g.acc ? accNameOf(g.acc) : ''} sansBord={g.txs.filter((t) => !toShipEmailTx.has(t)).length}/>)}
         <FactureRaisonsTete deps={DEPS_FACTURE} ventes={groupeFacture}/>
         {ventesAffichees.length>1 && <div className="vrm-serie-entree" style={{display:'flex',justifyContent:'flex-end'}}><OuvrirSerie serie={serieVentes}/></div>}
         <BarreSerie serie={serieVentes} actions={actionsSerieVentes()} rendreIcone={iconeApp}/>
@@ -50763,7 +50766,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 fl={{ tx: txL, item: String(identiteAnnonce(o) || '') }} data-fu-ligne="" fusion={{ lot: lot ? { n: lot.n, nums: lot.nums || [], nonRelies: lot.nonRelies || 0 } : null, transp: fuTransp, prix: montant(sell, { devise: o.price?.currency_code || 'EUR' }), /* (16 nov., relier-glisser) le bénéfice, discret, à côté du prix (la règle de la ligne) */ benefSu: lb.benefice!=null && st!=='cancelled' ? texteBenefice(lb) : '', nom: String(o.title||'').replace(/[\s,·-]*(?:taille|t\.?)\s*[\d.,/ ]+(?:\s*(?:eu|fr|us|uk))?\s*$/i,'').trim() || o.title, num, site: 'vinted', siteNom: 'Vinted', taille: lot ? '' : String((e&&e.size)||o.size||'').trim() || ((String(o.title||'').match(/taille\s*([\d.,/]+)/i)||[])[1]||'') }} friseEtat={fuEtapes ? <Frise inline etapes={fuEtapes} cle={txL} className="vrm-fu-ligne-frise" label={tr('ventes.vente3')}/> : null} frise={<>{(o._fromEmail ? o._txMail : o.transaction_id != null) ? <FactureVenteLigne deps={DEPS_FACTURE} groupe={groupeFacture} vente={{ tx: String(o._fromEmail ? o._txMail : o.transaction_id), uid: o._acc && o._acc.vinted_user_id, compte: o._acc && o._acc.login, titre: o.title || '', venteLe: o.date || '', commandes: commandesParTx.get(String(o._fromEmail ? o._txMail : o.transaction_id)) || [] }}/> : null}</>}
                 data-vente-email-tete={o._venteEmail && emailEnTete ? String(o._acc.vinted_user_id) : undefined}
                 bas={o._venteEmail && emailEnTete && !toShipEmailTx.has(txL) ? null : o._venteEmail ? <>
-                  {emailEnTete ? null : <NoteVenteEmail o={o}/>}
+                  {emailEnTete ? null : <NoteVenteEmail o={o} bordLa={toShipEmailTx.has(txL)}/>}
                   {/* (8 nov.) Le bordereau reçu par e-mail porte le MÊME n° de transaction : il s'imprime
                       tout de suite, avec le N° seulement s'il est sûr (src/bordereauVenteEmail.js). */}
                   {toShipEmailTx.has(txL) ? <div className="vrm-rangee-bord" data-rangee-bord="" data-sans-glisse="" data-vente-email-bord={txL}>

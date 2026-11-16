@@ -2,6 +2,7 @@
 // Écrit par scripts/i18n-migrer.cjs (la source : fr/ventes.js ; méthode : docs/passation/2026-11-11-traduction.md).
 export default {
   "ventes.ventesCompteRelues": "· ventes de ce compte relues",
+  "ventes.venteEmailBordAVenir": "Bordereau à venir : l’extension ne l’a pas encore capté.",
   "ventes.photoIndisponible": "Photo indisponible",
   "ventes.montantEurosEx": "Un montant en euros (ex : 25 ou 25,50).",
   "ventes.coutAchat": "Coût d'achat ?",
