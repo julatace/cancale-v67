@@ -111,12 +111,13 @@ if (arg.includes('--prouve')) {
     // a3 et a7 : même fichier ⇒ même photo exacte ; même N° aussi.
     dit(ids(r).join() === 'sur:9000003+9000007', 'la même photo EXACTE sur deux annonces du compte ⇒ un groupe « sûr »', ids(r));
     const t = DC.texteDoublonsCompte(r.res.groupes);
-    dit(t && t.titre === '2 annonces de tomj606 sont la même paire (N°124)' && t.geste === 'Voir les deux', '… « 2 annonces de tomj606 sont la même paire (N°124) » · « Voir les deux »', t);
+    dit(t && t.phrase === '2 annonces de tomj606 sont la même paire (N°124)' && t.complet.startsWith(t.phrase) && t.geste === 'Voir les deux', '… la phrase « 2 annonces de tomj606 sont la même paire (N°124) » (infobulle, feuille) · « Voir les deux »', t);
+    dit(t && t.titre === 'N°124 · 2 annonces de tomj606' && t.detail === 'La même paire · retire celle en trop', '… la carte, courte : « N°124 · 2 annonces de tomj606 » / « La même paire · retire celle en trop »', t);
     const h = hexa();
     r = scene({ comptes: [{ uid: '1', nom: 'tomj606', annonces: cinquante({ 10: { h }, 20: { h } }) }] });
     dit(ids(r).join() === 'verifier:9000010+9000020', 'la même photo à l’EMPREINTE (unique et mutuelle) ⇒ un groupe « à vérifier »', ids(r));
     const tv = DC.texteDoublonsCompte(r.res.groupes);
-    dit(tv && /peut-être/.test(tv.titre) && tv.detail === 'Photo presque identique · à vérifier', '… dit « peut-être » et « à vérifier », jamais « sûr »', tv);
+    dit(tv && /peut-être/.test(tv.phrase) && tv.detail === 'Peut-être la même paire · à vérifier', '… dit « peut-être » et « à vérifier », jamais « sûr »', tv);
     r = scene({ comptes: [{ uid: '1', nom: 'tomj606', annonces: cinquante(Object.fromEntries(Array.from({ length: 50 }, (_, i) => [i, { h }]))) }] });
     dit(r.res.groupes.length === 0, '50 paires photographiées au même endroit (empreintes proches entre toutes) ⇒ rien', ids(r));
     r = scene({ comptes: [{ uid: '1', nom: 'tomj606', annonces: cinquante({ 5: { numero: '124' }, 6: { numero: '124' } }) }] });
@@ -156,7 +157,7 @@ if (arg.includes('--prouve')) {
 
   essaie('textes', () => {
     const t = DC.texteDoublonsCompte([{ etat: 'sur', nom: 'tomj606', numeros: [], annonces: [{}, {}] }, { etat: 'verifier', nom: 'x', numeros: [], annonces: [{}, {}] }]);
-    dit(t && t.titre === '2 paires en ligne deux fois sur un même compte' && t.geste === 'Voir', 'plusieurs groupes : « 2 paires en ligne deux fois sur un même compte »', t);
+    dit(t && t.titre === '2 paires en double sur un compte' && t.geste === 'Voir', 'plusieurs groupes : « 2 paires en double sur un compte »', t);
     dit(DC.texteDoublonsCompte([]) === null, 'rien ⇒ aucune carte');
   });
 

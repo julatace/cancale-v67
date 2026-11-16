@@ -122,20 +122,25 @@ export function doublonsMemeCompte({ enLigneDeux = null, photos = null, infoDe =
 }
 
 // La carte de Ma journée (une source pour le titre, la ligne, l'infobulle — §7). null s'il n'y a rien.
-// « 2 annonces de tomj606 sont la même paire (N°124) » ; un indice dit « peut-être ».
-export function texteDoublonsCompte(groupes) {
+// La carte tient sur une ligne à 390 px : « N°124 · 2 annonces de tomj606 » / « La même paire · retire celle
+// en trop » ; la PHRASE entière (infobulle, lecteur d'écran, feuille) : « 2 annonces de tomj606 sont la même
+// paire (N°124) » — un indice dit « peut-être ». `complet` : ce que l'app ajoute après la phrase (le texte
+// d'« en ligne deux fois », qui nomme tous les N° et le compte), sinon le geste.
+export function texteDoublonsCompte(groupes, { complet = '' } = {}) {
   const g = arr(groupes);
   if (!g.length) return null;
+  const suite = complet || tr('doublons.geste');
   if (g.length === 1) {
     const x = g[0];
     const n = arr(x.annonces).length, compte = x.nom || x.uid || '';
     const num = arr(x.numeros)[0] || '';
-    const cle = x.etat === 'verifier' ? (num ? 'doublons.titreVerifierNum' : 'doublons.titreVerifier') : (num ? 'doublons.titreNum' : 'doublons.titre');
-    const titre = tr(cle, { n, compte, num });
-    const detail = tr(x.etat === 'verifier' ? 'doublons.detailVerifier' : 'doublons.detailSur');
-    return { titre, detail, complet: `${titre} — ${detail}`, geste: tr('doublons.voirLesDeux') };
+    const verif = x.etat === 'verifier';
+    const phrase = tr(verif ? (num ? 'doublons.titreVerifierNum' : 'doublons.titreVerifier') : (num ? 'doublons.titreNum' : 'doublons.titre'), { n, compte, num });
+    const titre = tr(num ? 'doublons.carteNum' : 'doublons.carte', { n, compte, num });
+    const detail = tr(verif ? 'doublons.detailVerifier' : 'doublons.detailSur');
+    return { titre, detail, phrase, complet: `${phrase} — ${suite}`, geste: tr('doublons.voirLesDeux') };
   }
   const titre = tr('doublons.titrePlusieurs', { n: g.length });
   const detail = tr(g.every((x) => x.etat === 'verifier') ? 'doublons.detailVerifier' : 'doublons.detailSur');
-  return { titre, detail, complet: `${titre} — ${detail}`, geste: tr('doublons.voir') };
+  return { titre, detail, phrase: titre, complet: `${titre} — ${suite}`, geste: tr('doublons.voir') };
 }

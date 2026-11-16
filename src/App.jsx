@@ -49353,7 +49353,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               };
               const carteDeuxFois = () => {
                 // (16 nov.) Tout sur un même compte : « 2 annonces de tomj606 sont la même paire (N°124) » · « Voir les deux ».
-                const t = (deuxFois.every((g) => g.memeCompte) && texteDoublonsCompte(deuxFois)) || texteEnLigneDeuxFois(deuxFois);
+                const t0 = texteEnLigneDeuxFois(deuxFois);
+                const t = (deuxFois.every((g) => g.memeCompte) && texteDoublonsCompte(deuxFois, { complet: deuxFois.every((g) => g.etat !== 'verifier') && t0 ? t0.complet : '' })) || t0;
                 return (
                   <button key="en-ligne-deux-fois" type="button" className="vrm-day-task vrm-fu-tache" data-en-ligne-deux-fois={deuxFois.map((g) => g.annonces.map((a) => a.id).join('+')).join(' ')} data-n={String(deuxFois.length)}
                     data-doublons-compte={deuxFois.filter((g) => g.memeCompte).map((g) => `${g.etat || 'sur'}:${g.annonces.map((a) => a.id).join('+')}`).join(' ') || undefined}
