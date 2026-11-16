@@ -9119,7 +9119,9 @@ let TXN_ETATS_LU;
 const RETOURS_EBAY_CACHE = { v: undefined, at: 0 };
 // (3 nov.) Les e-mails de litige (src/litiges.js) : une lecture par 10 min, partagée par les écrans.
 const EMAILS_LITIGES_CACHE = { v: undefined, at: 0 };
-const noterEtatsTxn = (rows) => { for (const r of (rows || [])) if (r && r.tx && r.s != null && isFinite(Number(r.s))) TXN_ETATS.set(String(r.tx), { s: Number(r.s), ss: String(r.ss || ''), su: r.su || null, cap: r.cap || null }); };
+// (16 nov., vitesse-volume) `TXN_ETATS.ver` : la version de TXN_ETATS — tout ce qui garde une réponse lue
+// dans TXN_ETATS (`aExpedier`) repart de zéro dès qu'une transaction est notée.
+const noterEtatsTxn = (rows) => { for (const r of (rows || [])) if (r && r.tx && r.s != null && isFinite(Number(r.s))) { TXN_ETATS.set(String(r.tx), { s: Number(r.s), ss: String(r.ss || ''), su: r.su || null, cap: r.cap || null }); TXN_ETATS.ver = (TXN_ETATS.ver || 0) + 1; } };
 const lireEtatsTxn = async () => { try { const rows = await lireTxnMeta(); if (rows === null) return false; noterEtatsTxn(rows); return true; } catch (_) { return false; } };
 const etatTxn = (tx) => (tx == null ? null : TXN_ETATS.get(String(tx)) || null);
 const txnBloqueEnvoi = (tx) => { const e = etatTxn(tx); return !!(e && (e.s === 220 || e.s >= 430)); };
@@ -10780,17 +10782,27 @@ const venteQuiRevient = (o) => /non\s+r[ée]clam|retour\s+initi|retour\s+en\s+co
 // de sa base (« Bordereau envoyé au vendeur », « Le paiement a été validé ») ne
 // sont pas touchés. MÊME RÈGLE dans le widget et l'extension (§11).
 const COLIS_DEJA_BOUGE = /d[ée]pos[ée]|exp[ée]di[ée]|achemin|transit|livr[ée]e?\b|non\s+r[ée]clam|r[ée]ceptionn/i;
+// (16 nov., vitesse-volume) Gardée par vente (identité de l'objet — une commande lue n'est jamais modifiée
+// en place) tant que TXN_ETATS ne change pas (`TXN_ETATS.ver`) : la règle ne lit rien d'autre. Mesuré à
+// 20 000 ventes : appelée des dizaines de milliers de fois par rendu (Colis, Ma journée, Ventes).
 const aExpedier = (o) => {
-  if (!o) return false;
-  const s = String(o.status || '');
-  if (PAS_UN_ENVOI.test(s)) return false;
-  // Le détail de la transaction, plus frais que la liste (litige, retour,
-  // suspension, annulation, finalisée) : jamais un colis à poster.
-  if (o.transaction_id != null && txnBloqueEnvoi(o.transaction_id)) return false;
-  const t = tusDe(o);
-  if (t === 'needs_action') return !COLIS_DEJA_BOUGE.test(s);
-  if (t === 'waiting' || t === 'completed' || t === 'failed') return false;
-  return needsBordereau(s);
+  const memo = o && typeof o === 'object' ? (aExpedier.memo || (aExpedier.memo = new WeakMap())) : null;
+  const ver = TXN_ETATS.ver || 0;
+  if (memo) { const m = memo.get(o); if (m && m[0] === ver) return m[1]; }
+  const r = ((o) => {
+    if (!o) return false;
+    const s = String(o.status || '');
+    if (PAS_UN_ENVOI.test(s)) return false;
+    // Le détail de la transaction, plus frais que la liste (litige, retour,
+    // suspension, annulation, finalisée) : jamais un colis à poster.
+    if (o.transaction_id != null && txnBloqueEnvoi(o.transaction_id)) return false;
+    const t = tusDe(o);
+    if (t === 'needs_action') return !COLIS_DEJA_BOUGE.test(s);
+    if (t === 'waiting' || t === 'completed' || t === 'failed') return false;
+    return needsBordereau(s);
+  })(o);
+  if (memo) memo.set(o, [ver, r]);
+  return r;
 };
 // ── L'ÉTIQUETTE D'UNE VENTE / D'UN ACHAT, UNE RÈGLE (§11) ─────────────────
 // Sortie des composants le 16 octobre : la recherche globale (dans la coque)
