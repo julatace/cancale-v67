@@ -487,6 +487,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **16 nov. · Extension 5.396.0 : fin de la revue de robustesse** : canal privé Vestiaire (ordres, résultats, recettes, `vcpublie`), accusé LBC par le canal, plus aucun `postMessage('*')` ; `local` réservé à l'extension (`setAccessLevel`, miroir sans jeton dans `session` pour les pages) ; `frame-ancestors` ; dépôt eBay/LBC lié à son onglet ; diagnostic en comparer-et-échanger et borné ; offres, bordereaux, import, csrf. `docs/passation/2026-11-16-extension-robuste.md` (audit `extension-robuste`, banc `extension-stockage-cadre`). Geste : installer 5.396.0, recharger les onglets quand l'encart le dit.
 - **16 nov. · Extension 5.393.0 (vague C)** : verre de la carte du logo, du site et des e-mails ; « même photo · sûr » vérifiée sur les deux images ; dates de versement ; Vestiaire « aimés » comme Vinted ; scanner pour retrouver (disque « + ») ; banc `sante-donnees` réparé (aucune donnée réécrite à l'ouverture d'Achats). Geste : installer 5.393.0.
 - **16 nov. · Nouveautés (vague B)** : transporteur lu sur l'étiquette (jamais « inconnu », `src/colisEnvoyes.js`) ; plus de rangement sur un achat — l'atelier d'arrivée donne le N° puis la case sur la fiche (`casesProposees`) ; contrôle de nuit + santé des comptes + extension en retard (`src/fiabilite/`) ; baisse conseillée, relance des favoris, loupe universelle ; bilan du mois, alertes de seuils, bénéfice réel, sauvegarde zip ; écran de chargement verre. Récits `2026-11-15-*.md`. Geste : aucun.
 - **16 nov. · Écrans refaits sur les maquettes validées (vague A)** : Ma journée (seulement les gestes, « Tout va bien ? · N points », retours et litiges ensemble, paire à sortir en premier), Annonces 72 px, Ventes/Achats (colis cochés d'office, place du Stock par N°, code au comptoir), fiche D (un geste : « Relier · N € » sur son toucher), Argent, Messages (plein « Proposer N € »), Paramètres, rail ordinateur Vendre/Ranger/Compter ; « À envoyer » partout (`src/libelles.js`). `2026-11-15-refonte-journee.md`, `-refonte-ventes.md`, `-fiche-d.md`. Geste : aucun.
@@ -501,7 +502,7 @@ sans la fonction.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.393.0** (16 nov. : regroupe 5.386 verre de la carte, 5.388 même photo sûre, 5.390 versements, 5.392 deux comptes/aimés Vestiaire — jamais servies seules). **À lire en premier : `docs/passation/2026-11-16-passation.md`** (en ligne, en cours, reste à faire, gestes), puis `2026-11-10-passation-finale.md` et `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
+**Extension servie : 5.396.0** (16 nov., robustesse ; avant 5.393.0 : regroupe 5.386 verre de la carte, 5.388 même photo sûre, 5.390 versements, 5.392 deux comptes/aimés Vestiaire — jamais servies seules). **À lire en premier : `docs/passation/2026-11-16-passation.md`** (en ligne, en cours, reste à faire, gestes), puis `2026-11-10-passation-finale.md` et `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
