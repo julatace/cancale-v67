@@ -46,6 +46,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'historique-complet', date: '2026-11-15', titre: 'Toute l’histoire d’un article, datée', phrase: 'Achat, baisses, offres, masquages, vente, retour : sur sa fiche.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'note-conversation', date: '2026-11-15', titre: 'Ta note, à côté de la conversation', phrase: 'Écrite ou dictée, elle suit l’article jusqu’au message de l’acheteur.', tab: 'messages', pour: 'tous', mode: 'tous' },
   { id: 'taille-texte', date: '2026-11-15', titre: 'Taille du texte réglable', phrase: 'Quatre tailles dans Paramètres, toute l’app suit.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (15 nov., lot fiabilite-auto) docs/passation/2026-11-15-fiabilite-auto.md — VRM se vérifie chaque nuit.
+  { id: 'fiabilite-auto', date: '2026-11-15', titre: 'VRM se vérifie seul chaque nuit', phrase: 'Un écart ? Il est dans Tout va bien, avec le geste.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « J'aime la 9 ») docs/passation/2026-11-15-verre-depoli.md — le thème « Verre dépoli ».
   { id: 'verre-depoli', date: '2026-11-15', titre: 'Nouveau thème : verre dépoli sur bleu profond', phrase: 'Le chiffre du jour en blanc, tout se lit sur le verre.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « améliore la liaison entre les achats et les articles ») docs/passation/2026-11-15-achats-liaison.md

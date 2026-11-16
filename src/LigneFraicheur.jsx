@@ -24,6 +24,8 @@ import { horsLigneActif, suivreHorsLigne } from './porteHorsLigne.js';
 import { EXT_ATTENDUE, DEMANDE_REGLAGE_SOUS, useEtatEmailsComptes, useComptesExclus, fetchTranspLignes, relireTransporteursSiVieux } from './App.jsx';
 import { tr } from './i18n/index.js';
 import { trj } from './i18n/react.js';
+// (15 nov., lot fiabilite-auto) L'extension de CE navigateur en retard : la ligne le dit, le paquet à côté.
+import { useRetardIci, phraseRetardIci } from './fiabilite/Fiabilite.jsx';
 
 const RELECTURE_MS = 5 * 60 * 1000;   // la ligne se revérifie toutes les 5 min, page visible
 const DEPART_MS = 1800;               // jamais pendant l'ouverture (src/AttenteEcran : ~2,5 s)
@@ -96,8 +98,10 @@ export default function LigneFraicheur({ baseKO = false, comptes, onNav, publier
 
   const maintenant = Date.now();
   const cap = derniere.current;
+  const rIci = useRetardIci();
+  const ici = rIci ? { ...rIci, nom: tr('fiab.ext.nom'), texte: phraseRetardIci(rIci), geste: tr('fiab.ext.gestes'), libelleLien: rIci.boutique ? tr('fiab.ext.boutique', { boutique: rIci.nomBoutique }) : tr('fiab.ext.telecharger', { fichier: rIci.nomLien }) } : null;
   const f = fraicheurUnique({ baseKO, horsLigne, capture: cap, achats: cap ? cap.achats : undefined, emails, transp,
-    exclu: (p, id) => estExclu(exclus, p, id), attendue: EXT_ATTENDUE, verifieAt: cap ? cap.at : null, maintenant });
+    exclu: (p, id) => estExclu(exclus, p, id), attendue: EXT_ATTENDUE, verifieAt: cap ? cap.at : null, maintenant, ici });
   // (10 nov., lot BK) La ligne PUBLIE son résultat : « Mois bouclé » (Argent → Déclarer) y lit les
   // comptes pas relus, sans recalculer (§5 : une règle, un propriétaire).
   const signature = `${f.etat}|${f.raison || ''}|${f.retards.map((r) => r.cle).join(',')}|${f.passu.join(',')}`;
@@ -146,7 +150,8 @@ export default function LigneFraicheur({ baseKO = false, comptes, onNav, publier
               {autres > 0 ? <span className="vrm-fraicheur-autres" data-fraicheur-autres={autres} aria-hidden="true">{ouvert ? '⌃' : '⌄'}</span> : null}
             </button>
           : <span className="vrm-bandeau-abo-texte vrm-fraicheur-texte"><span className="vrm-fraicheur-phrase">{texte}</span></span>}
-        {g && autres === 0 ? <button type="button" className="vrm-lien-action vrm-bandeau-abo-geste" data-fraicheur-geste={premier.source} data-alerte-voir={panne ? '' : undefined} onClick={g.faire}>{g.libelle}</button> : null}
+        {premier && premier.lien && autres === 0 ? <a className="vrm-lien-action vrm-bandeau-abo-geste" href={premier.lien} {...(/^https?:/.test(premier.lien) ? { target: '_blank', rel: 'noreferrer' } : { download: '' })} data-fraicheur-lien={premier.lien}>{premier.libelleLien}</a>
+          : g && autres === 0 ? <button type="button" className="vrm-lien-action vrm-bandeau-abo-geste" data-fraicheur-geste={premier.source} data-alerte-voir={panne ? '' : undefined} onClick={g.faire}>{g.libelle}</button> : null}
         {f.etat === 'passu' ? <button type="button" className="vrm-lien-action vrm-bandeau-abo-geste" data-fraicheur-reessayer="" onClick={() => { relire(); lireTransp(true); }}>{tr('commun.reessayer')}</button> : null}
       </div>
       {ouvert && depliable ? (
@@ -160,7 +165,8 @@ export default function LigneFraicheur({ baseKO = false, comptes, onNav, publier
               </button>
               {la ? <div className="vrm-fraicheur-rangee-suite">
                 {r.geste ? <span className="vrm-fraicheur-rangee-geste">{r.geste.charAt(0).toUpperCase() + r.geste.slice(1)}.</span> : null}
-                {gg ? <button type="button" className="vrm-lien-action vrm-fraicheur-rangee-bouton" onClick={gg.faire}>{gg.libelle}</button> : null}
+                {r.lien ? <a className="vrm-lien-action vrm-fraicheur-rangee-bouton" href={r.lien} {...(/^https?:/.test(r.lien) ? { target: '_blank', rel: 'noreferrer' } : { download: '' })} data-fraicheur-lien={r.lien}>{r.libelleLien}</a>
+                  : gg ? <button type="button" className="vrm-lien-action vrm-fraicheur-rangee-bouton" onClick={gg.faire}>{gg.libelle}</button> : null}
               </div> : null}
             </div>); })}
           {f.etat === 'retard' && f.passu.length ? <div className="vrm-fraicheur-rangee" data-fraicheur-rangee="passu"><div className="vrm-fraicheur-rangee-texte"><span>{trj('commun.puVerifierRien', { n: f.passu.length, x: f.passu.join(', ') })}</span></div></div> : null}

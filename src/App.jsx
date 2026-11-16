@@ -710,7 +710,10 @@ import { bilanSources, publierMeilleures, lireMeilleures } from "./meilleuresSou
 import { lignesVitesse, publierVitesse } from "./vitesseEnvoi.js";   // (10 nov., lot BM) vitesse d'envoi
 import { LigneVitesse } from "./VitesseEnvoi.jsx";
 import { lignesEnvois, publierEnvois } from "./santeComptes.js";
-import { useSanteComptes, titreJournee, texteRaison } from "./SanteComptes.jsx";   // (11 nov., lot sante-comptes) les envois et leur date limite lue
+import { useSanteComptes, titreJournee, texteRaison } from "./SanteComptes.jsx";
+// (16 nov., intégration de claude/fiabilite-auto) Le contrôle de cette nuit : plus une carte de Ma journée, des points
+// derrière « Tout va bien ? » (la même lecture partagée que Paramètres → Tout va bien ?).
+import { usePointsToutVaBien, ControleNuitLignes } from './fiabilite/Fiabilite.jsx';   // (11 nov., lot sante-comptes) les envois et leur date limite lue
 import { contenuDossierLitige, pdfDossierLitige, nomFichierDossier, imageEnOctets, echangesDossier } from "./dossierLitige.js";   // (10 nov., lot BJ) dossier de litige en PDF
 import { suivisAmbigus } from "../api/_lib/depart-colis.js";
 // ⟦→ ecrans/Reglages.jsx #15⟧
@@ -47079,6 +47082,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (la case libérée, la pile qui descend) jusqu'à « Compris » — un état de l'écran, jamais une donnée.
   const [apresSortie, setApresSortie] = useState(null);
   const [feuilleTvb, setFeuilleTvb] = useState(false);   // (15 nov.) la feuille « Tout va bien ? » de Ma journée
+  // (16 nov., fiabilite-auto) Les écarts du contrôle de cette nuit (N° en double, vente sans N°, totaux…) comptent dans la
+  // ligne « Tout va bien ? · N points » et se lisent dans sa feuille. L'extension en retard est dite par la ligne de fraîcheur.
+  const pointsFiab = usePointsToutVaBien();
+  const nCtlFiab = pointsFiab && Array.isArray(pointsFiab.points) ? pointsFiab.points.filter((x) => x.source === 'controle').length : 0;
   // Le meuble de la dernière paire sortie : à date égale, la suivante dans CE meuble vient d'abord (il est devant).
   const [dernierMeubleSorti, setDernierMeubleSorti] = useState(null);
   const [sortiesVues, setSortiesVues] = useState(() => { try { const v = JSON.parse(localStorage.getItem('vrm_journee_sorties_vues') || '{}'); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; } catch (_) { return {}; } });
@@ -49213,12 +49220,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {!baseKO && !premierJour && <QuoiDeNeufJournee onNav={onNav}/>}
 
             {ordiJournee && !baseKO && !premierJour ? null : AF.section}
-            {!baseKO && !premierJour && AF.tvb && AF.tvb.length ? (
-              <button type="button" className="sb-lien vrm-tvb-ligne" data-tvb-ligne={String(AF.tvb.length)} onClick={() => setFeuilleTvb(true)}>{trj('tvb.ligne', { n: AF.tvb.length })} ›</button>
+            {!baseKO && !premierJour && ((AF.tvb && AF.tvb.length) || nCtlFiab) ? (
+              <button type="button" className="sb-lien vrm-tvb-ligne" data-tvb-ligne={String(((AF.tvb && AF.tvb.length) || 0) + nCtlFiab)} data-tvb-controle={nCtlFiab ? String(nCtlFiab) : undefined} onClick={() => setFeuilleTvb(true)}>{trj('tvb.ligne', { n: ((AF.tvb && AF.tvb.length) || 0) + nCtlFiab })} ›</button>
             ) : null}
             {feuilleTvb ? (
               <SheetShell titre={tr('tvb.titre')} sousTitre={tr('tvb.sous')} onClose={() => setFeuilleTvb(false)} maxWidth={560} data-feuille-tvb="">
                 <div className="vrm-day-task-list vrm-tvb-cartes">{AF.tvb || null}</div>
+                {nCtlFiab ? <ControleNuitLignes/> : null}
                 {!loading && accountsReady && Array.isArray(accounts) && accounts.length ? <ImportDepart comptes={accounts} variante="journee"/> : null}
                 <button type="button" className="sb-lien" data-tvb-parametres="" onClick={() => { setFeuilleTvb(false); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=settings&reglage=toutvabien' })); } catch (_) {} }}>{tr('tvb.parametres')} ›</button>
               </SheetShell>

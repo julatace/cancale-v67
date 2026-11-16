@@ -108,7 +108,7 @@ import { groupeProduction, SIGNAUX as SIGNAUX_PROD, ECHECS_COLIS, refusEnSerie, 
 import { pushConfigure } from './_lib/push.js';
 import { fetchAvecDelai } from './_lib/fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 // (11 nov., lot agent2-veille) Le contrôle de nuit (lecture seule) et la veille des chiffres.
-import { controleVendeur, controleInstallation } from './_lib/controle-nuit.js';
+import { controleVendeur, controleInstallation, notifierControle } from './_lib/controle-nuit.js';
 import { notifierAlertesChiffres } from './_lib/veille-chiffres.js';
 import { CAT_VEILLE } from '../src/veilleChiffres.js';
 import { stripeApi, stripePret } from './_lib/stripe.js';
@@ -873,8 +873,15 @@ async function traiterVendeur() {
   // (11 nov., lot agent2-veille) Le contrôle de nuit, en LECTURE SEULE (api/_lib/controle-nuit.js) :
   // une seule écriture, SA ligne `vrm_controle_nuit` ; un échec n'empêche aucun rappel.
   let controle = null;
-  try { controle = await controleVendeur({ lireTout: (p) => fetchPaginated(scoped(p)), ecrire: ecrireDedup }); }
+  // (15 nov., lot fiabilite-auto) + ventes récentes sans N°, liste des N° rétrécie, annonces lues il y a
+  // plus de 24 h, totaux du mois publiés comparés à leur source (la lecture et la règle du bilan).
+  try { controle = await controleVendeur({ lireTout: (p) => fetchPaginated(scoped(p)), ecrire: ecrireDedup, lireBilan: lireDonneesBilan, calculer: calculerBilan }); }
   catch (e) { controle = { ecrit: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
+  // UNE notification du matin, seulement pour un écart RÉEL et NOUVEAU qui demande un geste.
+  let controleDit = null;
+  try { controleDit = await notifierControle({ data: controle && controle.data, getRow, ecrire: ecrireDedup, pousser: sendPushToAll, active: () => pushCategorieActive(CAT_VEILLE) }); }
+  catch (e) { controleDit = { envoye: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
+  if (controle) { delete controle.data; controle.dit = { envoye: !!controleDit.envoye, raison: controleDit.raison || null }; }
   // Un chiffre qui a chuté sans raison et n'a pas encore sonné (le filet de `/api/push` action `veille`).
   let veilleChiffres = null;
   try { veilleChiffres = await notifierAlertesChiffres({ getRow, ecrire: ecrireDedup, pousser: sendPushToAll, active: () => pushCategorieActive(CAT_VEILLE) }); }

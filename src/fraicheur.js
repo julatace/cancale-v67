@@ -99,7 +99,10 @@ export function signeExtension(appareils, ancien) {
 //   · `transp` : les lignes `transp_` ;
 //   · `exclu(plateforme, id)` : un compte retiré des totaux (son choix) — jamais nommé.
 // Sortie : { etat: 'cache'|'encours'|'a-jour'|'retard'|'passu', retards[], passu[], verifieAt }.
-export function fraicheurUnique({ baseKO = false, horsLigne = false, capture, achats, emails, transp, exclu, attendue = '', verifieAt = null, maintenant = Date.now() } = {}) {
+// (15 nov., lot fiabilite-auto) `ici` : l'extension de CE navigateur en retard (`retardIci`,
+// src/fiabilite/regles.js) avec ses mots déjà traduits ({ nom, texte, lien, nomLien, boutique }) —
+// « Ce Chrome a la 5.329 : installe la 5.385 » sur l'appareil même, le paquet à portée de doigt.
+export function fraicheurUnique({ baseKO = false, horsLigne = false, capture, achats, emails, transp, exclu, attendue = '', verifieAt = null, maintenant = Date.now(), ici = null } = {}) {
   if (horsLigne) return { etat: 'cache', raison: 'hors-ligne', retards: [], passu: [] };
   if (baseKO) return { etat: 'cache', raison: 'base', retards: [], passu: [] };
   // Tant qu'une source est EN COURS de lecture, rien n'est affirmé (ni « à jour », ni un retard partiel).
@@ -173,9 +176,13 @@ export function fraicheurUnique({ baseKO = false, horsLigne = false, capture, ac
       geste: 'sur Vinted, connecté sur ce compte : Paramètres → Notifications, active les e-mails ; puis vérifie que sa boîte les fait suivre (Comptes liés → E-mails)', gesteCourt: 'relie sa boîte', vers: 'vintedaccounts' });
   }
 
-  // 6. Une extension trop ancienne sur un appareil actif.
+  // 6 bis. L'extension de CE navigateur (la plus actionnable : on est dessus).
+  if (ici && ici.nom && ici.texte) retards.push({ cle: 'version:ici', source: 'version', gravite: GRAVITE.version, depuisMs: 0, nom: String(ici.nom), texte: String(ici.texte),
+    geste: String(ici.geste || ''), gesteCourt: String(ici.gesteCourt || ''), lien: String(ici.boutique || ici.lien || ''), libelleLien: String(ici.libelleLien || ''), vers: 'toutvabien' });
+  // 6. Une extension trop ancienne sur un appareil actif (celle d'ici, déjà dite, n'est pas répétée).
   for (const a of (Array.isArray(capture.appareils) ? capture.appareils : [])) {
     if (!a || maintenant - a.at > ACTIF_MS || etatVersion(a, attendue) !== 'ancienne') continue;
+    if (ici && ici.version && versionCourte(a.code || a.ver) === ici.version) continue;
     retards.push({ cle: `version:${a.id}`, source: 'version', gravite: GRAVITE.version, depuisMs: a.at, nom: `Extension ${versionCourte(a.code || a.ver)}`,
       texte: `sur ${a.nom}`, geste: `installe la ${versionCourte(attendue)} sur ${a.nom} (Réglages → Tout va bien ?)`, gesteCourt: `installe la ${versionCourte(attendue)}`, vers: 'toutvabien' });
   }

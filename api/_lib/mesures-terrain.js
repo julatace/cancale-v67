@@ -34,6 +34,7 @@ import { normaliserEvenements } from '../../src/alertesPlantages.js';
 import { recevoirAlertesPlantages, listerPlantagesTerrain } from './alertes-plantages.js';
 import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 import { listerPlantagesComptes } from './plantages-comptes.js';
+import { rapportPlantages } from './rapport-plantages.js';   // (15 nov., lot fiabilite-auto)
 
 export const PREFIXE_MESURES = 'mesures_jour_';
 export const JOURS_LUS = 14;
@@ -136,7 +137,11 @@ export async function recevoirMesures({ corps, jetonEntete = '', verifierJeton, 
   const { url, service } = cfg(env);
   // (8 nov.) Les alertes d'abord : leur ligne est à part, leur sort ne change
   // rien aux mesures (et l'inverse).
-  const alertes = evts.length ? await recevoirAlertesPlantages({ evenements: evts, empreinte: emp, proprio, env, fetcher, pousser: pousser ? (n) => pousser(n, proprio) : null, maintenant }) : null;
+  // (15 nov., lot fiabilite-auto) Les plantages des AUTRES vendeurs seulement : ceux du
+  // propriétaire ne comptent pour aucune « personne touchée » (il a son propre journal).
+  const deProprio = String(u.id).toLowerCase() === String(proprio).toLowerCase();
+  if (deProprio && !lot) return { code: 200, corps: { ok: true, jour, mesures: 0, alertes: { fait: false, raison: 'proprietaire' } } };
+  const alertes = evts.length && !deProprio ? await recevoirAlertesPlantages({ evenements: evts, empreinte: emp, proprio, env, fetcher, pousser: pousser ? (n) => pousser(n, proprio) : null, maintenant }) : null;
   const avecAlertes = (o) => (alertes ? { ...o, alertes: { fait: alertes.fait, ...(alertes.fait ? { due: alertes.due } : { raison: alertes.raison }) } } : o);
   if (!lot) return alertes && alertes.fait ? { code: 200, corps: avecAlertes({ ok: true, jour, mesures: 0 }) } : { code: alertes && alertes.raison === 'plafond-du-jour' ? 429 : 503, corps: avecAlertes({ ok: false, raison: (alertes && alertes.raison) || 'base' }) };
   const id = idEclat(jour, eclatDe(emp));   // l'éclat de CET appareil ce jour-là
@@ -231,9 +236,20 @@ export async function listerMesures({ utilisateur, quoi = '', env = process.env,
   // (11 nov., lot agent2-veille) `quoi=plantages-comptes` : les plantages de TOUS les comptes sur
   // 7 jours, par type, triés par nombre de comptes touchés (api/_lib/plantages-comptes.js).
   if (quoi === 'plantages-comptes') {
-    const types = await listerPlantagesComptes({ env, fetcher });
+    const types = await listerPlantagesComptes({ env, fetcher, proprio });
     if (!types) return { code: 503, corps: { ok: false, raison: 'base' } };
     return { code: 200, corps: { ok: true, types } };
+  }
+  // (15 nov., lot fiabilite-auto) `quoi=rapport-plantages` : LE rapport du propriétaire — par type,
+  // message, écran, version, appareil, personnes touchées (jamais qui), ouvertures bloquées, et les
+  // morceaux périmés comptés par les appareils (api/_lib/rapport-plantages.js). Une partie pas lue
+  // reste `null` (dite « pas su »), les autres s'affichent.
+  if (quoi === 'rapport-plantages') {
+    const [comptes, terrain, mesures] = await Promise.all([
+      listerPlantagesComptes({ env, fetcher, proprio }), listerPlantagesTerrain({ proprio, env, fetcher }), lireDerniersJours({ env, fetcher, proprio, n: 7 }),
+    ]);
+    if (!comptes && !terrain && !mesures) return { code: 503, corps: { ok: false, raison: 'base' } };
+    return { code: 200, corps: { ok: true, ...rapportPlantages({ comptes, terrain, mesures: mesures ? joursPourPanneau(mesures) : null }) } };
   }
   const rows = await lireDerniersJours({ env, fetcher, proprio });
   if (!rows) return { code: 503, corps: { ok: false, raison: 'base' } };

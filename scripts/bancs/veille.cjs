@@ -8,7 +8,8 @@
 //   A. Le stock passé de 180 à 120 en une nuit : une carte AMBRE, le titre, « Vérifie »,
 //      le geste (44 px) ; « C'est vérifié » écrit `vus` en comparer-et-échanger
 //      (`data->>rev=eq.`) et la carte s'en va ; contrôle tout lu à 0 ⇒ « Tout est en ordre ✓ ».
-//   B. Le contrôle : deux paires sous le N°12 (ROUGE), un compte pas relu (ambre), un
+//   B. (15 nov., fiabilite-auto) 1 741 ventes à dater + la quarantaine : RIEN dans Ma journée (le contrôle vit dans
+//      « Tout va bien ? », banc fiabilite-auto ; « à dater » n'est dit nulle part). Avant : deux paires sous le N°12 (ROUGE), un compte pas relu (ambre), un
 //      contrôle pas lu ⇒ dit à part, et JAMAIS « Tout est en ordre ».
 //   C. Rien (aucune ligne) ⇒ Ma journée ne montre rien de la veille.
 //   D. La base refuse la ligne des chiffres (500) ⇒ aucune alerte, rien écrit (« pas su »).
@@ -64,7 +65,9 @@ async function page(b, T, { sombre = false } = {}) {
   const ctx = await b.newContext({ viewport: T.vp, isMobile: !!T.isMobile, hasTouch: !!T.hasTouch, colorScheme: sombre ? 'dark' : 'light' });
   const pg = await ctx.newPage();
   const errs = [], ecrits = [], lus = []; pg.on('pageerror', (e) => errs.push(e.message));
-  await pg.addInitScript(({ sombre }) => { try { if (sessionStorage.getItem('__banc')) return; sessionStorage.setItem('__banc', '1'); localStorage.setItem('vrm_acces_direct', '1'); if (sombre) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, { sombre });
+  // (16 nov., intégration vague B) Le parcours de premier lancement (« Tu vends quoi ? ») est déjà fait : il couvrirait
+  // tout l'écran (comme scripts/bancs/fiabilite-auto.cjs).
+  await pg.addInitScript(({ sombre }) => { try { if (sessionStorage.getItem('__banc')) return; sessionStorage.setItem('__banc', '1'); localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_je_vends', JSON.stringify({ choix: 'sneakers', at: '2026-11-01T10:00:00Z', vu: 'banc' })); localStorage.setItem('vrm_configuration', JSON.stringify({ etat: 'fait', at: '2026-11-01T10:00:00.000Z', statut: null, version: 1 })); localStorage.setItem('vrm_bienvenue_vue', JSON.stringify({ at: new Date().toISOString() })); { const t = new Date().toISOString(); localStorage.setItem('vrm_parcours_plus_tard', JSON.stringify({ extension: t, emails: t, vinted: t, premiere: t, configuration: t, at: Date.now() })); } if (sombre) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, { sombre });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const req = route.request();
@@ -158,7 +161,9 @@ const capture = async (pg, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, { rec
           dit(a && a.bord === s.ambre && s.ambre !== s.rouge, 'A2 son bord est AMBRE, le jeton --vrm-warn (un geste à faire, pas une alarme rouge)', a && `${a.bord} / ${s.ambre}`);
           dit(s && /Vérifie tes annonces Vinted/.test(s.texte), 'A3 le geste est dit (« Vérifie tes annonces Vinted »)', s && s.texte.slice(0, 160));
           dit(a && a.geste && a.geste.height >= CIBLE && a.vu && a.vu.height >= CIBLE, 'A4 « Voir mes annonces » et « C’est vérifié » : 44 px', a && JSON.stringify([a.geste && a.geste.height, a.vu && a.vu.height]));
-          dit(s && s.ok && s.controle === 'ok', 'A5 contrôle de nuit tout lu à 0 ⇒ « Tout est en ordre ✓ »', s && s.controle);
+          // (15 nov., lot fiabilite-auto) Le contrôle de nuit ne s'affiche PLUS dans Ma journée (Julien :
+          // « encombrée de cases ») : il vit dans Paramètres → Tout va bien ? (banc fiabilite-auto).
+          dit(s && !s.ok && !s.controle && !s.lignes.length, 'A5 Ma journée ne porte plus le contrôle de nuit (il vit dans « Tout va bien ? »)', s && s.controle);
           dit(s && s.deb <= 0, 'A6 aucun défilement horizontal', s && s.deb);
           await capture(pg, `journee-stock-${suf}`);
           await pg.locator('[data-veille-vu]').first().click();
@@ -166,48 +171,21 @@ const capture = async (pg, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, { rec
           const s2 = await lire(pg);
           const patch = ecrits.find((e) => /vrm_veille_chiffres/.test(e.u) && e.data);
           dit(patch && /data->>rev=eq\.3/.test(patch.u) && patch.data.vus && patch.data.vus[a.k] && patch.data.rev === 4, 'A8 « C’est vérifié » écrit `vus` en comparer-et-échanger (rev 3 → 4)', patch && patch.u.slice(-80));
-          dit(s2 && s2.alertes.length === 0 && s2.ok, 'A9 la carte s’en va, « Tout est en ordre ✓ » reste', s2 && JSON.stringify(s2.alertes));
+          dit(s2 === null || s2.alertes.length === 0, 'A9 la carte s’en va (rien d’autre de la veille dans Ma journée)', s2 && JSON.stringify(s2.alertes));
           dit(!errs.length, 'A10 aucune erreur de page', errs.join(' | ').slice(0, 200));
           await ctx.close();
         });
         await essaie('B' + suf, async () => {
-          ROWS = [ctlPb(), { id: C.CLE_CONTROLE_INSTALLATION, data: C.resultatControle({ 'emails-quarantaine': ['email_quarantaine_a'], stripe: [] }, {}, auj - 3600e3) }]; PANNE = null;
+          // (15 nov., lot fiabilite-auto) Deux paires sous le N°12, un compte pas relu, 1 741 ventes à dater :
+          // RIEN dans Ma journée (le contrôle vit dans « Tout va bien ? », « à dater » n'est dit nulle part).
+          ROWS = [ctlVers(), { id: C.CLE_CONTROLE_INSTALLATION, data: C.resultatControle({ 'emails-quarantaine': ['email_quarantaine_a'], stripe: [] }, {}, auj - 3600e3) }]; PANNE = null;
           const { ctx, pg, errs } = await page(b, T, { sombre });
-          await ouvrir(pg);
+          await ouvrir(pg, false);
           const s = await lire(pg);
-          const L = s ? Object.fromEntries(s.lignes.map((l) => [l.cle, l])) : {};
-          dit(s && s.controle === 'probleme' && !s.ok, 'B1 des problèmes ⇒ jamais « Tout est en ordre »', s && s.controle);
-          dit(L['numeros-double'] && L['numeros-double'].ton === 'rouge' && L['numeros-double'].couleur === s.rouge && /N°12/.test(L['numeros-double'].texte), 'B2 deux paires sous le N°12 : en ROUGE, le N° nommé', L['numeros-double'] && JSON.stringify([L['numeros-double'].couleur, L['numeros-double'].texte]));
-          dit(L['comptes-48h'] && L['comptes-48h'].ton === 'geste' && L['comptes-48h'].n === '1' && L['comptes-48h'].couleur === s.ambre, 'B3 un compte pas relu depuis 48 h : ambre, « 1 »', L['comptes-48h'] && JSON.stringify(L['comptes-48h']));
-          dit(L['emails-quarantaine'] && L['emails-quarantaine'].n === '1', 'B4 la quarantaine (ligne de l’installation) est dite à qui la lit', JSON.stringify(Object.keys(L)));
-          dit(s && s.passu && /ventes sans versement \(ouvre Ventes pour le compter\)/.test(s.texte) && !L['versement-30j'], 'B5 le contrôle pas lu est dit à part avec sa raison, jamais compté 0', s && s.texte.slice(-160));
-          dit(s && s.lignes.every((l) => l.btn && l.btn.height >= CIBLE), 'B6 chaque geste fait 44 px', s && JSON.stringify(s.lignes.map((l) => l.btn && l.btn.height)));
-          dit(s && s.deb <= 0, 'B7 aucun défilement horizontal', s && s.deb);
-          dit(!errs.length, 'B8 aucune erreur de page', errs.join(' | ').slice(0, 200));
-          await capture(pg, `journee-controle-${suf}`);
-          await pg.locator('[data-controle-geste="comptes-48h"]').click();
-          await pg.waitForFunction(() => /tab=vintedaccounts|vintedaccounts/.test(location.search) || !!document.querySelector('[data-ecran="vintedaccounts"],[data-comptes-lies]'), null, { timeout: 8000 }).catch(() => {});
-          const ici = await pg.evaluate(() => !document.querySelector('[data-veille]'));
-          dit(ici, 'B9 « Mes comptes » quitte Ma journée vers Comptes liés');
-          await ctx.close();
-        });
-        await essaie('F' + suf, async () => {
-          ROWS = [ctlVers()]; PANNE = null;
-          const { ctx, pg, errs } = await page(b, T, { sombre });
-          await ouvrir(pg);
-          const s = await lire(pg);
-          const l = s && s.lignes.find((x) => x.cle === 'versement-30j');
-          const d = await pg.evaluate(() => { const e = document.querySelector('[data-controle-ligne="versement-30j"]'); if (!e) return null;
-            const q = (k) => e.querySelector(k); return { cause: e.getAttribute('data-versement-cause'), datees: q('[data-versement-datees]') && q('[data-versement-datees]').getAttribute('data-versement-datees'),
-              heures: q('[data-versement-heures]') ? q('[data-versement-heures]').innerText : '', pourquoi: q('[data-versement-pourquoi]') ? q('[data-versement-pourquoi]').innerText : '' }; });
-          dit(l && l.n === '1741' && d && d.cause === 'vinted-detail', 'F1 la ligne des ventes à dater : 1741, cause « pas encore lue »', JSON.stringify(d));
-          dit(l && l.ton === 'info' && l.couleur !== s.ambre && l.couleur !== s.rouge, 'F2 ton NEUTRE (ni ambre ni rouge) : rien n’est en faute, la lecture est en cours', l && `${l.ton} ${l.couleur} / ${s.ambre}`);
-          dit(d && d.datees === '356' && /356 déjà datées ✓/.test(l.texte), 'F3 elle dit combien sont DÉJÀ datées', l && l.texte);
-          dit(d && /ouvrant chaque vente/.test(d.pourquoi) && /vinted\.fr est ouvert sur ce compte/.test(d.pourquoi) && /aucune n’est devinée/.test(d.pourquoi), 'F4 elle dit POURQUOI et le geste (Vinted ouvert sur ce compte), jamais devinée', d && d.pourquoi);
-          dit(d && /Environ 146 h avec vinted\.fr ouvert/.test(d.heures) && !/jour/.test(d.heures), 'F5 et combien de temps : « environ 146 h avec vinted.fr ouvert » (1 741 ÷ 12 par heure)', d && d.heures);
-          dit(l && !/sans date de versement depuis 30 jours/.test(l.texte) && /Voir le détail/.test(l.texte) && l.btn && l.btn.height >= CIBLE, 'F6 plus l’ancienne phrase alarmante ; « Voir le détail » à 44 px', l && l.texte.slice(0, 120));
-          dit(s && s.deb <= 0 && !errs.length, 'F7 aucun défilement horizontal, aucune erreur', `${s && s.deb} ${errs.join(' | ').slice(0, 120)}`);
-          await capture(pg, `journee-versement-${suf}`);
+          const texte = await pg.locator('main').innerText().catch(() => '');
+          dit(s === null, 'B1 des écarts cette nuit ⇒ aucune carte de contrôle dans Ma journée', s && s.texte);
+          dit(!/à dater|1\s?741|sans date de versement/i.test(texte), 'B2 « ventes à dater » n’est écrit nulle part dans Ma journée', texte.slice(0, 160));
+          dit(!errs.length, 'B3 aucune erreur de page', errs.join(' | ').slice(0, 200));
           await ctx.close();
         });
         await essaie('C' + suf, async () => {
