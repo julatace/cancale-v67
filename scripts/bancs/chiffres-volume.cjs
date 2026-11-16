@@ -68,7 +68,7 @@ const PUBLIE = /^(vinted_urssaf_mois|vrm_benefice_jours|vrm_colis_aposter|vrm_co
     const pg = await ctx.newPage();
     pg.on('pageerror', (e) => res.erreurs.push(e.message.slice(0, 200)));
     for (const tab of ONGLETS) {
-      await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'commit' });
+      await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'commit', timeout: 240000 });   // (16 nov.) machine chargée : l'écran d'avant peut tenir la page longtemps
       await pg.waitForSelector('.vrm-main', { timeout: 90000 }).catch(() => {});
       derniere = Date.now(); const fin = Date.now() + 120000;
       while (Date.now() - derniere < 4000 && Date.now() < fin) await attendre(250);
