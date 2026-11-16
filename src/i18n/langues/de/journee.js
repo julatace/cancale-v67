@@ -83,7 +83,7 @@ export default {
   "journee.colisRetirerAujourd": "{hd} Pakete heute oder morgen abzuholen",
   "journee.colisVerifier": "{x} Pakete zu prüfen",
   "journee.colisVerifier2": "Pakete zu prüfen",
-  "journee.colisVerifier.suivi": { one: "Prüfe die Sendungsverfolgung, bevor du zum Paketshop gehst", other: "Prüfe die Sendungsverfolgung, bevor du zum Paketshop gehst" },
+  "journee.colisVerifier.suivi": { one: "Prüfe die Sendung, bevor du hingehst", other: "Prüfe die Sendungen, bevor du hingehst" },
   "journee.colisVerifier.relier": { one: "Noch nicht verknüpft: öffne den Kauf auf Vinted", other: "Noch nicht verknüpft: öffne die Käufe auf Vinted" },
   "journee.supprimeVinted": "Nr. {numero} bei Vinted gelöscht",
   "journee.annoncesNumeroteesSans": { one: "{n} nummerierte Anzeige ohne Einkaufspreis", other: "{n} nummerierte Anzeigen ohne Einkaufspreis" },

@@ -77,10 +77,12 @@ async function defiler(pg, sel) { await pg.evaluate((s) => { const el = document
           for (const u of ['/?tab=cat_bord&onglet=envoyer', '/?tab=cat_annonces']) { await o.pg.goto(`http://localhost:${P.PORT}${u}`, { waitUntil: 'domcontentloaded' }); await P.pret(o.pg); }
           await poserTrancher(o.pg);
           await o.pg.goto(`http://localhost:${P.PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' }); await P.pret(o.pg);
+          await o.pg.waitForSelector('[data-job]', { timeout: 20000 }).catch(() => {});
           await o.pg.waitForTimeout(2500);
           const r = await o.pg.evaluate(([JS, visTxt]) => {
-            const vis = eval(visTxt);
-            const jobs = [...document.querySelectorAll('[data-job]')].filter(vis);
+            // Les cartes PRÉSENTES dans Ma journée (à 1512, la colonne « À faire » sous la ligne de flottaison n'est pas
+            // mise en page tant qu'on n'y descend pas : présente compte, pas « vue à l'écran »).
+            const jobs = [...document.querySelectorAll('[data-job]')].filter((x) => !x.closest('[hidden], [inert]'));
             const ids = new Set(jobs.map((j) => j.getAttribute('data-job')));
             let pubs = {}; try { pubs = (JSON.parse(localStorage.getItem('vrm_a_trancher') || '{}').s) || {}; } catch (_) {}
             const dites = new Set([...ids].map((i) => JS[i]).filter(Boolean));
@@ -110,10 +112,16 @@ async function defiler(pg, sel) { await pg.evaluate((s) => { const el = document
       {
         const o = await P.ouvrir(nav, { W, sombre: th === 'sombre', b: B, url: '/?tab=cat_bord&onglet=envoyer' });
         try {
-          await P.pret(o.pg); await o.pg.waitForTimeout(1500);
+          await P.pret(o.pg);
+          // Machine partagée et chargée : la liste peut arriver tard — on l'attend (jusqu'à 3 × 30 s, rechargée entre deux).
+          for (let k = 0; k < 3; k++) {
+            if (await o.pg.waitForFunction(() => [...document.querySelectorAll('.vv-liste .vrm-colis-titre')].some((x) => x.clientWidth > 0), null, { timeout: 30000 }).then(() => true, () => false)) break;
+            await o.pg.reload({ waitUntil: 'domcontentloaded' }); await P.pret(o.pg);
+          }
+          await o.pg.waitForTimeout(1500);
           const e = await o.pg.evaluate((visTxt) => {
             const vis = eval(visTxt);
-            const ts = [...document.querySelectorAll('.vv-liste .vrm-colis-titre')].filter(vis).slice(0, 12);
+            const ts = [...document.querySelectorAll('.vv-liste .vrm-colis-titre')].filter((x) => x.clientWidth > 0 && x.getClientRects().length > 0).slice(0, 12);
             const coupes = ts.filter((x) => x.scrollWidth > x.clientWidth + 1 || x.scrollHeight > x.clientHeight + 2).map((x) => x.textContent.trim());
             const lignes = ts.map((x) => Math.round(x.getBoundingClientRect().height / parseFloat(getComputedStyle(x).lineHeight)));
             return { n: ts.length, coupes, lignes };

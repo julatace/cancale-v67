@@ -83,7 +83,7 @@ export default {
   "journee.colisRetirerAujourd": "{hd} pacchi da ritirare oggi o domani",
   "journee.colisVerifier": "{x} pacchi da verificare",
   "journee.colisVerifier2": "Pacchi da verificare",
-  "journee.colisVerifier.suivi": { one: "Controlla la tracciabilità prima di andare al punto di ritiro", other: "Controlla la tracciabilità prima di andare al punto di ritiro" },
+  "journee.colisVerifier.suivi": { one: "Controlla il tracciamento prima di andare", other: "Controlla il tracciamento prima di andare" },
   "journee.colisVerifier.relier": { one: "Non ancora collegato: apri l’acquisto su Vinted", other: "Non ancora collegati: apri gli acquisti su Vinted" },
   "journee.supprimeVinted": "N°{numero} eliminato da Vinted",
   "journee.annoncesNumeroteesSans": { one: "{n} annuncio numerato senza prezzo d’acquisto", other: "{n} annunci numerati senza prezzo d’acquisto" },
