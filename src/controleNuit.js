@@ -43,9 +43,10 @@ export const CONTROLES = [
   { cle: 'numeros-double', ou: 'vendeur', ton: 'rouge', notifie: true, get nom() { return `Deux ${motsVendeur().noms} sous un N°`; },
     phrase: (n) => `${n} N° ${pl(n, 'porté', 'portés')} par deux ${motsVendeur().noms} en ligne`,
     geste: { libelle: 'Corriger', aller: '/?tab=cat_bord' } },
-  { cle: 'versement-30j', ou: 'vendeur', nom: 'Ventes sans versement',
-    phrase: (n) => `${n} ${pl(n, 'vente', 'ventes')} sans date de versement depuis 30 jours`,
-    geste: { libelle: 'Voir pourquoi', aller: '/?tab=compta&cible=urssaf' } },
+  // (15 nov., extension 5.390) Julien : « Enlève les 1741 ventes à dater […] le but est que l'extension récupère ces infos, pas que ça soit à nous de le faire. »
+  // « N ventes sans date de versement depuis 30 jours » n'est plus un contrôle de la nuit : ce
+  // n'est pas un problème qu'il corrige, l'extension récupère ces dates (`versementsEnRetard`
+  // reste exporté pour mesurer).
   { cle: 'comptes-48h', ou: 'vendeur', nom: 'Comptes pas relus',
     phrase: (n) => `${n} ${pl(n, 'compte pas relu', 'comptes pas relus')} depuis 48 h`,
     geste: { libelle: 'Mes comptes', aller: '/?tab=vintedaccounts' } },
@@ -74,8 +75,9 @@ export const CONTROLES = [
 ];
 export const CLES_CONTROLES = CONTROLES.map((c) => c.cle);
 // (15 nov., Julien) « N ventes à dater » ne s'affiche NULLE PART : l'extension les date sans
-// rien lui demander. Le contrôle reste COMPTÉ (la réponse du cron), jamais montré ni notifié.
-export const CONTROLES_MUETS = new Set(['versement-30j']);
+// rien lui demander. (16 nov., intégration vague C) Le lot versements-auto (5.390) a retiré ce
+// contrôle de CONTROLES : une ligne rangée par un cron d'avant qui le porte encore n'est plus
+// lue (etatControle ne parcourt que CONTROLES). L'ancienne liste « muets » est retirée avec lui.
 export const CONTROLES_NOTIFIES = new Set(CONTROLES.filter((c) => c.notifie).map((c) => c.cle));
 
 // ── (15 nov., lot fiabilite-auto) LES NOUVELLES RÈGLES ─────────────────────────────
@@ -304,11 +306,7 @@ export function etatControle(vendeur, installation, maintenant = Date.now()) {
     if (!c) continue;
     if (!Number.isInteger(c.n)) { passu.push({ cle: C.cle, nom: C.nom, raison: c.raison || 'pas lu' }); continue; }
     if (c.n > 0) {
-      // (14 nov.) Des ventes « en cours de lecture » (Vinted les donne une par une, l'extension
-      // les lit) ne sont pas un geste à faire : ton neutre, la phrase dit le reste (VeilleJournee).
-      const lecture = C.cle === 'versement-30j' && c.cause === 'vinted-detail';
-      const detail = C.cle === 'versement-30j' ? { datees: Number.isInteger(c.datees) ? c.datees : null, cause: c.cause || null, comptes: Number.isInteger(c.comptes) ? c.comptes : null, total: Number.isInteger(c.total) ? c.total : null } : null;
-      lignes.push({ cle: C.cle, n: c.n, ton: lecture ? 'info' : (C.ton || 'geste'), phrase: C.phrase(c.n), geste: C.geste, ids: Array.isArray(c.ids) ? c.ids : [], ...(detail ? { detail } : {}) });
+      lignes.push({ cle: C.cle, n: c.n, ton: C.ton || 'geste', phrase: C.phrase(c.n), geste: C.geste, ids: Array.isArray(c.ids) ? c.ids : [] });
     }
   }
   return { etat: lignes.length ? 'probleme' : passu.length ? 'passu' : 'ok', lignes, passu, at };

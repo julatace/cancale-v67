@@ -84,13 +84,17 @@ const lire = (f) => { try { return fs.readFileSync(path.join(RACINE, f), 'utf8')
   dit(/ad\.raisons = raisonsADater\(aDater, \{ etat: \(tx\) => etatTxn\(tx\)/.test(app), 'Ventes PUBLIE les raisons (`vinted_urssaf_mois.aDater.raisons`), d’après l’état RANGÉ des transactions');
   dit(/ad\.datees = venteDatees\(lignes, versementsParReleve\(versements\)(?:, sourcesDeVersement\(versements\))?\)/.test(app), 'Ventes PUBLIE les datées, dont par le relevé');
   const compta = sans(lire('src/ecrans/Compta.jsx'));
-  const i = compta.indexOf('function ADaterRaisons('), j = compta.indexOf('function PrevisionUrssafCarte(');
-  const comp = i > 0 && j > i ? compta.slice(i, j) : '';
+  // (15 nov., extension 5.390) Julien : « Enlève les 1741 ventes à dater […] pas que ça soit à nous de le
+  // faire ». La carte des raisons et ses gestes sont RETIRÉS ; « Déclarer » lit la MÊME publication par
+  // une ligne discrète (`LigneDatesVersement` → `ligneDatesVersement`), sans geste.
+  const j = compta.indexOf('function PrevisionUrssafCarte(');
   const carte = j > 0 ? compta.slice(j, compta.indexOf('function ComptaFusion(', j)) : '';
-  dit(/<ADaterRaisons ad=\{ligne\.aDater\}/.test(carte), '« Déclarer » LIT la ligne publiée (aucun second calcul)');
-  dit(/data-adater-geste="vinted"/.test(comp) && /href="https:\/\/www\.vinted\.fr\/"/.test(comp), 'détail pas relu ⇒ « Ouvrir Vinted », par compte');
-  dit(/data-adater-geste="main"[^>]*onClick=\{onDater\}/.test(comp), 'Leboncoin ⇒ « Dater à la main » (SON clic)');
-  dit(/data-adater-datees=/.test(comp) && /data-adater-sans=/.test(comp), 'la carte dit « N datées ✓ · M sans date »');
+  const ligneC0 = () => sans(lire('src/composants/LigneDatesVersement.jsx')) + sans(lire('src/versementRaisons.js'));
+  const comp = ligneC0();
+  const ligneC = sans(lire('src/composants/LigneDatesVersement.jsx')) + sans(lire('src/versementRaisons.js'));
+  dit(/<LigneDatesVersement [^>]*ad=\{ligne && ligne\.aDater/.test(carte) && /ligneDatesVersement\(ad\)/.test(ligneC), '« Déclarer » LIT la ligne publiée (aucun second calcul), par la ligne discrète');
+  dit(compta.indexOf('function ADaterRaisons(') < 0 && !/data-adater-geste|data-urssaf-dater/.test(compta), 'plus aucun geste de datation (ni « Ouvrir Vinted », ni « Dater à la main », ni « Les dater »)');
+  dit(!/<button|<a |Bouton|onClick/.test(ligneC), 'la ligne n’a ni bouton ni lien');
   dit(!/encaiss/i.test(comp) && !/Date\.now|new Date\(/.test(comp), 'jamais « encaissé », aucune date fabriquée à l’écran');
 
   console.log(`\n${ko ? `❌ ${ko} échec(s)` : '✅ tout est vert'} · ${ok} ✅`);

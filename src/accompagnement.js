@@ -338,6 +338,8 @@ export const GESTES_ACC = {
   'colis.generer':    { ecran: 'colis',     ensuite: { lien: '?tab=cat_bord' } },
   'colis.depose':     { ecran: 'colis',     ensuite: { lien: '?tab=cat_bord' } },
   'colis.retire':     { ecran: 'colis',     sorte: 'retirer-ailleurs',      ensuite: { lien: '?tab=garage' } },
+  // (15 nov.) Scanner pour retrouver : lu, pas reconnu, pas trouvé (src/ScannerRetrouver.jsx) — la suite est « Ouvrir ».
+  'colis.retrouver':  { ecran: 'colis',     ensuite: null },
   'achat.relier':     { ecran: 'achats',    ensuite: { lien: '?tab=argent' } },
   'prix.achat':       { ecran: 'annonces',  ensuite: { lien: '?tab=argent' } },
   'offre.vinted':     { ecran: 'messages',  ensuite: { lien: '?tab=messages' } },
