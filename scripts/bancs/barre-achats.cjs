@@ -15,7 +15,8 @@
 //       jamais d'écran, l'écran ne bouge pas de côté ;
 //   A7. un glisser vertical défile, jamais de côté ; overscroll-behavior-x: none ;
 //   A8. une rangée qui défile de côté (filtres…) défile toujours au doigt ;
-//   A9. le retour reste entier : il ferme le menu ; Messages (menu) ⇒ retour ⇒ Argent.
+//   A9. le retour reste entier : il ferme le menu ; Messages (menu) ⇒ retour ⇒ Argent ;
+//   A10. le disque « + » (plus au milieu) ouvre son éventail, toutes ses lames dans l'écran.
 // L. LES LIENS ?tab= (390 et 1512) : chaque écran, anciens liens compris (retraits, cat_achats),
 //    allume SON onglet ; Achats dans la colonne de l'ordinateur ; le sélecteur de Paires sans Achats.
 //
@@ -256,6 +257,15 @@ const ECRANS = [
         dit(!!m && m.entrees.some((e) => e.id === 'achats') && nJuste, `A3 ${qui} : l'onglet Achats porte le nombre « À retirer » publié (${pub}), une fois`, JSON.stringify({ pub, badges: m && m.badges }));
         const nombres = m ? m.badges.map(([, n]) => n).filter((n) => /^\d+$/.test(n)) : [];
         dit(new Set(m ? m.badges.map(([k]) => k) : []).size === (m ? m.badges.length : 0), `A3 ${qui} : une pastille par onglet au plus`, JSON.stringify(m && m.badges));
+        // A10 · le disque « + » n'est plus au milieu (3 onglets à gauche, 2 à droite) : son éventail reste DANS l'écran.
+        await toucher(pg, '.vrm-tabbar > .sb-disque');
+        await pg.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => {})))).catch(() => {});
+        const lames = await pg.evaluate(() => [...document.querySelectorAll('[data-sb-lame]')].map((b) => { const r = b.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.right)]; }));
+        const vw = await pg.evaluate(() => innerWidth);
+        await capture(pg, `eventail-${mode}-${sombre ? 'sombre' : 'clair'}`);
+        dit(lames.length >= 3 && lames.every(([g, d]) => g >= 0 && d <= vw), `A10 ${qui} : l'éventail du « + » s'ouvre, toutes ses lames dans l'écran`, JSON.stringify({ vw, lames }));
+        await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(400);
+        if (await pg.locator('[data-sb-lame]').count()) { await toucher(pg, '.vrm-tabbar > .sb-disque'); }
         // A4 · l'onglet allumé = l'écran, pour chaque écran (au toucher de la barre).
         const vus = [];
         for (const id of ['paires', 'achats', 'ventes', 'compta', 'journee']) {
