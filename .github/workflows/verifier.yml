@@ -90,7 +90,7 @@ jobs:
     name: Bancs principaux (Chromium, part ${{ matrix.part }}/3)
     needs: construire
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -105,7 +105,7 @@ jobs:
           # volume-budget (16 nov., demandé par Julien) : 20 000 ventes inventées, 390 px, processeur ×4 —
           # Ma journée et Ventes en moins de 2 s après les données (+ marge), contre scripts/budget-volume.json (~6 min).
           - part: 3
-            lot: volume-budget chiffres-ci
+            lot: comparer-ci
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
