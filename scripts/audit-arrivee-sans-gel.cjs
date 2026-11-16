@@ -70,7 +70,10 @@ vm.runInNewContext([bout('const KNOWN_BRANDS=[', '];'), bout('function extractBr
   appels = 0; const r2 = L.propositionsArticle({ cible, achats, ...regles }); const a2 = appels;
   dit(a1 >= achats.length, `L0 le 1er appel prépare chaque achat (${a1} lectures de marque pour ${achats.length} achats)`);
   dit(a2 <= 2, `L1 le 2e appel sur les MÊMES achats n'en re-prépare aucun`, `${a2} lecture(s) de marque (avant : une par achat)`);
-  dit(resume(r1) === resume(r2) && r1.length > 0, 'L2 le même résultat, à l’identique', `${resume(r1).slice(0, 80)} | ${resume(r2).slice(0, 80)}`);
+  // (16 nov., relier-fiable + achats-retour) Ici plusieurs achats identiques : en ligne, aucune « très probable » (la règle
+  // d'exclusivité) — le même résultat se juge sur les propositions ET les pistes repliées, recalculées sur les mêmes achats.
+  const p1 = L.pistesArticle ? L.pistesArticle({ cible, achats, ...regles }) : [], p2 = L.pistesArticle ? L.pistesArticle({ cible, achats, ...regles }) : [];
+  dit(resume(r1) === resume(r2) && resume(p1) === resume(p2) && r1.length + p1.length > 0, 'L2 le même résultat, à l’identique', `${resume(r1.concat(p1)).slice(0, 80)} | ${resume(r2.concat(p2)).slice(0, 80)}`);
   achats[3] = { ...achats[3] }; achats[7].title = 'Salomon XT-6 noir taille 42 état neuf';
   appels = 0; L.propositionsArticle({ cible, achats, ...regles }); const a3 = appels;
   dit(a3 >= 1 && a3 <= 4, 'L3 un achat changé (nouvel objet, ou titre modifié) est re-préparé — lui seul', `${a3} lecture(s)`);
