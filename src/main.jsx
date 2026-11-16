@@ -75,7 +75,13 @@ if (typeof window !== 'undefined') {
 // L'app n'est téléchargée que par ceux qui y entrent : un visiteur qui lit la
 // page d'accueil ne charge pas 340 Ko compressés pour rien (§ montée en charge).
 // (11 nov., lot app-installable) « Mettre à jour » discret et l'aide d'installation.
-import { PiluleMiseAJour, AideInstallation } from './AppInstallable.jsx';
+// (16 nov., lot vitesse-lectures) « Mettre à jour » et l'aide d'installation ne se montrent que DANS l'app
+// (jamais sur la page d'accueil) : un morceau à part, chargé avec l'app — le fichier d'entrée de la page
+// d'accueil (budget du banc `accueil`) n'emporte plus ces deux composants, leurs règles et leur style.
+// Un morceau qui ne vient pas ne montre rien (jamais un écran tombé pour une pastille).
+const morceauInstallable = () => import('./AppInstallable.jsx').catch(() => ({}));
+const PiluleMiseAJour = React.lazy(() => morceauInstallable().then((m) => ({ default: m.PiluleMiseAJour || (() => null) })));
+const AideInstallation = React.lazy(() => morceauInstallable().then((m) => ({ default: m.AideInstallation || (() => null) })));
 import { decisionMaj, estSaisie, CLE_MAJ_REFUSEE } from './miseAJour.js';
 // Android (Chrome, Edge, Samsung) offre l'installation : gardée pour l'aide,
 // qui la propose UNE fois (src/aideInstallation.js). Plus de mini-bandeau surprise.
@@ -237,8 +243,7 @@ function Racine() {
   }
   return <>
     <React.Suspense fallback={<FondApp />}><App /></React.Suspense>
-    <PiluleMiseAJour />
-    <AideInstallation actif={aUneSession()} />
+    <React.Suspense fallback={null}><PiluleMiseAJour /><AideInstallation actif={aUneSession()} /></React.Suspense>
   </>;
 }
 

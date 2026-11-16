@@ -41582,6 +41582,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     window.addEventListener('vrm:transp-lu', transpMaj);
     if (ecrans.includes(curSub) && ventesPerimees.current) relire();
     const vus = vusSonde.current;
+    // ⚠️ (16 nov., lot vitesse-lectures — TRANCHÉ : la sonde RESTE) Elle double la veille (src/tempsReel.js)
+    //    seulement quand tout va bien ; elle seule couvre encore quatre cas, mesurés dans le code :
+    //    1. une installation sans comptes séparés (`MULTI_USER` faux) : la veille n'est pas montée ;
+    //    2. une ligne écrite par un appareil dont l'horloge retarde de plus de 10 min (la fenêtre de la
+    //       veille part de l'heure de CET appareil) — la sonde compare la date de capture, sans fenêtre ;
+    //    3. un signal de la veille arrivé pendant que cet écran était GARDÉ caché (`cache()` ⇒ jeté) : la
+    //       sonde repart au retour de l'écran (`vivant.surRetour`) et voit la capture changée ;
+    //    4. une veille en panne plus de 10 min (une lecture ratée ⇒ rien) : à la reprise, une ligne écrite
+    //       avant la fenêtre n'est plus vue par elle, la sonde la voit.
+    //    Son coût : une lecture scalaire (< 1 Ko) par minute, onglet visible, partagée avec l'âge des
+    //    ventes de la coque. Récit : docs/passation/2026-11-16-vitesse-lectures.md.
     const sonde = async () => {
       if (document.hidden || !ecrans.includes(curSub) || cache()) return;
       try {
