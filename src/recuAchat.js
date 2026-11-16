@@ -6,11 +6,12 @@
 // reçu fabriqué d'après la COMMANDE (aucun e-mail reçu) prend donc la même forme,
 // dans l'app (src/ecrans/Achats.jsx, `FeuilleRecuAchat`) et en PDF (ci-dessous) :
 //   bandeau à la couleur de Vinted · « Reçu d'achat Vinted » + l'article en grand ·
-//   « Montant payé » en très grand · les lignes du détail · Vendeur, Mode de
+//   « Montant payé » en très grand · Article, Port, Frais Vinted · Vendeur, Mode de
 //   paiement, Date, N° de transaction, Compte · le pied.
-// ⚠️ Rien d'inventé : la commande ne dit ni le port, ni les frais Vinted, ni le
-//    moyen de paiement — ces lignes ne s'écrivent PAS (une phrase dit pourquoi) ;
-//    un vendeur inconnu s'écrit « — ». Un vrai reçu e-mail reste prioritaire
+// ⚠️ Rien d'inventé : la commande ne dit ni le prix de l'article seul, ni le port,
+//    ni les frais Vinted, ni le moyen de paiement. Le modèle validé par Julien
+//    (16 nov., reprise) garde ces lignes À LEUR PLACE et y écrit « — » (une phrase
+//    dit pourquoi) ; un vendeur inconnu s'écrit « — ». Jamais un chiffre deviné. Un vrai reçu e-mail reste prioritaire
 //    (règle de l'appelant : `receiptFor` / `recuDeLAchat`).
 // ⚠️ Le pied ne dit jamais « reconstruit depuis l'e-mail » : « Récapitulatif établi
 //    par VRM d'après la commande Vinted — ce n'est pas une facture émise par Vinted. »
@@ -21,6 +22,13 @@
 
 export const COULEUR_VINTED = '#007782';
 export const PIED_RECU_GENERE = "Récapitulatif établi par VRM d'après la commande Vinted — ce n'est pas une facture émise par Vinted.";
+// Les lignes du détail du modèle, toujours là, montant inconnu (« — ») : le libellé
+// français sert le PDF, `cle` sert la feuille de l'app (tr()).
+export const LIGNES_DETAIL_INCONNU = Object.freeze([
+  Object.freeze({ libelle: 'Article', cle: 'achats.recuLigneArticle', centimes: null }),
+  Object.freeze({ libelle: 'Port', cle: 'achats.recuLignePort', centimes: null }),
+  Object.freeze({ libelle: 'Frais Vinted', cle: 'achats.recuLigneFrais', centimes: null }),
+]);
 export const PHRASE_SANS_DETAIL = "Le détail (article, port, frais Vinted) n'est pas dans les données de la commande.";
 
 // « 11,95 € » — format français, espace insécable avant l'euro, espace fine des milliers.
@@ -47,11 +55,11 @@ export function champsRecuGenere(o, opts = {}) {
     genere: true,
     article: String(x.title || '').trim() || 'Article',
     paye,
-    lignes: [],                              // la commande ne porte pas le détail
+    lignes: LIGNES_DETAIL_INCONNU.map((l) => ({ ...l })), // la commande ne porte pas le détail : « — »
     somme: paye == null ? 'inconnu' : 'sans-detail',
     phrase: PHRASE_SANS_DETAIL,
     vendeur: vendeur || '—',
-    mode: '',                                // jamais deviné
+    mode: '—',                               // jamais deviné : « — »
     datePaie,
     trans: x.transaction_id != null ? String(x.transaction_id) : '',
     compte: String(opts.account || ''),

@@ -61,8 +61,11 @@ Aucune mention retirée (audit-factures-mieux L1 les relève une par une au dess
   Date, N° de transaction, Compte, N° de rangement. Dans l'app : la MÊME feuille que le reçu
   e-mail (`FeuilleRecuAchat`, `recu._genere`) ; son bouton PDF fabrique le PDF de la même mise en
   page. Un vrai reçu e-mail reste prioritaire (règle inchangée de l'appelant).
-- **Rien d'inventé** : la commande ne dit ni le port, ni les frais Vinted, ni le moyen de paiement
-  ⇒ ces lignes ne s'écrivent pas, une phrase le dit ; vendeur inconnu « — » ; autre devise « — ».
+- **Rien d'inventé** : la commande ne dit ni le prix de l'article seul, ni le port, ni les frais
+  Vinted, ni le moyen de paiement ⇒ (reprise du 16 nov., le modèle de Julien) les lignes **Article,
+  Port, Frais Vinted et Mode de paiement restent à leur place avec « — »** (`LIGNES_DETAIL_INCONNU`,
+  libellés par `tr()` dans la feuille), une phrase dit pourquoi ; vendeur inconnu « — » ; autre
+  devise « — ».
 - Pied : « Récapitulatif établi par VRM d'après la commande Vinted — ce n'est pas une facture
   émise par Vinted. » Mentions gardées (« pas de TVA déductible », marge, « Établi le »).
 - **Accents** : Helvetica de pdf-lib écrit le WinAnsi (é, ç, à, —, €) ; le défaut venait du TEXTE
@@ -112,7 +115,23 @@ rapport ; e-mails rendus.
 
 ## ÉTAT À LA REPRISE
 
-Voir la fin de ce fichier (complétée à la mise en ligne).
+Reprise du 16 nov. (soir, session youthful-wozniak) sur la branche existante :
+- `git merge origin/main` (vrai merge ; CLAUDE.md : la ligne de la passation générale et celle du
+  lot gardées, deux lignes du 15 nov. déplacées telles quelles dans `historique-divers.md`).
+- ⚠️ Le commit 9f4c4f1e2 avait régénéré les 4 zips d'extension (même numéro, autre contenu : une
+  version publiée ne change jamais) ⇒ remis à ceux de `main`.
+- Reçu généré au modèle exact : Article / Port / Frais Vinted / Mode de paiement écrits « — »
+  (avant : lignes absentes). `audit-factures-mieux` R1 + R6 nouveaux, ROUGES sur le code d'avant
+  (archive du commit précédent), 10/10 mutations (+ « ligne Frais Vinted retirée », « paiement vide »).
+  PDF relu en image (scratchpad, données inventées).
+- Verts : build, audit-factures-mieux 29, emails-verre, facture-en-tva, justificatif, facture-pro,
+  mails-envoyes, facture-mobile, achats-relier, chiffres, urssaf, traduction, coherence,
+  quoi-de-neuf, tdz, icones, variables, xss-facture, factures-pro-2, export-zip, factures-autres,
+  facture-siret, config-facture, registres.
+- Banc `scripts/bancs/achats-relier.cjs` : rouge à l'étape B (`.vrm-ledger-sale-toggle` introuvable :
+  les lignes de Ventes ouvrent désormais la fiche, décision du 16 nov.) — banc hors CI, périmé par
+  la refonte de Ventes, pas par ce lot ; la feuille du reçu généré n'a pas de capture d'app dédiée
+  (le PDF de même mise en page est regardé).
 
 ## Geste de Julien
 

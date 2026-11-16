@@ -12,7 +12,7 @@
 //   M  une vente produit la même facture par la feuille, la série et l'envoi automatique
 //      (la même règle de langue) ;
 //   R  le reçu d'achat généré : la forme du modèle, les accents ÉCRITS (« Reçu »,
-//      « déductible »…), rien d'inventé (ni port, ni frais, ni moyen de paiement) ;
+//      « déductible »…), rien d'inventé (article, port, frais, paiement inconnus ⇒ « — ») ;
 //   P  le rapport comptable : montants au format français (jamais « 11.95 »), à l'écran
 //      comme dans le PDF.
 //   node scripts/audit-factures-mieux.cjs            l'audit
@@ -100,11 +100,15 @@ async function verifier(racine, { dire = true } = {}) {
   else {
     const o = { title: 'Paire achetée de banc', price: { amount: '11.95', currency_code: 'EUR' }, date: '2026-11-14T10:47:00Z', transaction_id: 17000000001 };
     const ch = ra.champsRecuGenere(o, { account: 'compte_banc', numero: '124' });
-    dit(ch.paye === 1195 && ch.lignes.length === 0 && ch.mode === '' && ch.vendeur === '—', 'R1 rien d’inventé : ni port, ni frais, ni moyen de paiement ; vendeur inconnu « — »', JSON.stringify(ch).slice(0, 200));
+    // Le modèle validé (16 nov., reprise) : Article, Port, Frais Vinted À LEUR PLACE, montant inconnu ⇒ « — ».
+    const libs = (ch.lignes || []).map((l) => l.libelle).join('|');
+    dit(ch.paye === 1195 && libs === 'Article|Port|Frais Vinted' && ch.lignes.every((l) => l.centimes === null) && ch.mode === '—' && ch.vendeur === '—', 'R1 le modèle : Article, Port, Frais Vinted et le paiement à leur place, « — » (rien d’inventé) ; vendeur inconnu « — »', JSON.stringify(ch).slice(0, 260));
     dit(ra.champsRecuGenere({ ...o, price: { amount: '10', currency_code: 'GBP' } }).paye === null, 'R1 une autre devise n’est jamais convertie (« — »)');
     const tR = await texteDe(() => ra.pdfRecuAchat(ch, { PDFLib, notes: ['Achat de seconde main à un particulier : pas de TVA déductible.', 'Établi le 16/11/2026.'] }));
     dit(/REÇU D'ACHAT VINTED/.test(tR) && /Montant payé/.test(tR) && tR.includes(ra.eurosFr(11.95).replace(/[ ]/g, ' ')) && /N° de transaction/.test(tR), 'R2 la forme du modèle : « Reçu d’achat Vinted », « Montant payé », n° de transaction', tR.slice(0, 200));
     dit(/déductible/.test(tR) && /Établi le/.test(tR) && /facture émise par/.test(tR) && !/Recu|deductible|Etabli|Recapitulatif/.test(tR), 'R3 les accents sont ÉCRITS dans le PDF (« Reçu », « déductible », « Établi », « émise »)', (tR.match(/Recu|deductible|Etabli|Recapitulatif/) || [])[0]);
+    const tiret = (k) => new RegExp(k + '\\s*—').test(tR);
+    dit(tiret('Article') && tiret('Port') && tiret('Frais Vinted') && tiret('Mode de paiement'), 'R6 le PDF écrit Article, Port, Frais Vinted, Mode de paiement suivis de « — »', tR.slice(0, 300));
     dit(!/reconstruit depuis l/.test(tR), 'R4 le pied d’un reçu généré ne dit pas « reconstruit depuis l’e-mail »');
   }
   const ach = lire('src/ecrans/Achats.jsx');
@@ -128,7 +132,9 @@ const MUTATIONS = [
   ['mention 293 B retirée du PDF', 'src/facturePro/pdf.js', '  contenu.mentions.forEach((m, i) => {', '  [].forEach((m, i) => {'],
   ['montant du récapitulatif retiré', 'src/facturePro/regle.js', '    ...(total ? [total] : []),\n  ];', '  ];'],
   ['accent perdu dans le reçu', 'src/recuAchat.js', `ecrire("REÇU D'ACHAT VINTED"`, `ecrire("RECU D'ACHAT VINTED"`],
-  ['port inventé sur le reçu', 'src/recuAchat.js', '    lignes: [],', "    lignes: [{ libelle: 'Frais de port', centimes: 288 }],"],
+  ['port inventé sur le reçu', 'src/recuAchat.js', "libelle: 'Port', cle: 'achats.recuLignePort', centimes: null", "libelle: 'Port', cle: 'achats.recuLignePort', centimes: 288"],
+  ['ligne Frais Vinted retirée du reçu', 'src/recuAchat.js', "  Object.freeze({ libelle: 'Frais Vinted', cle: 'achats.recuLigneFrais', centimes: null }),\n", ''],
+  ['paiement vide au lieu de « — »', 'src/recuAchat.js', "    mode: '—',", "    mode: '',"],
   ['montant à point dans le rapport', 'src/rapportPdf.js', "  if (n == null || !Number.isFinite(Number(n))) return '—';\n  let t;", "  if (n == null || !Number.isFinite(Number(n))) return '—';\n  return Number(n).toFixed(2);\n  let t;"],
   ['facture revenue sous la ligne', 'src/App.jsx', '{friseEtat}{fusion && fusion.facture ? fusion.facture : null}</span>', '{friseEtat}</span>'],
   ['série en français forcé', 'api/_lib/facture-pro.js', ": langueFactureParDefaut(vente.acheteur.adresse);", ": 'fr';"],

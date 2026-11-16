@@ -169,7 +169,8 @@ const openReceipt = (a) => {
 // le panneau des écrans (`MenuEcrans`).
 function FeuilleRecuAchat({ recu, fermer }) {
   // (16 nov., lot factures-mieux) Un reçu GÉNÉRÉ d'après la commande (`_genere`, src/recuAchat.js)
-  // prend exactement cette forme ; ses lignes inconnues ne s'écrivent pas, son pied le dit.
+  // prend exactement cette forme ; ses lignes inconnues (article, port, frais, paiement) s'écrivent
+  // « — », la phrase et le pied disent pourquoi.
   const r = recu && recu._genere ? recu._genere : champsRecuAchat(recu);
   const boite = useRef(null);
   // (29 oct.) LE PDF JOINT À L'EMAIL (s'il y en a un) se lit AU CLIC seulement
@@ -256,7 +257,7 @@ function FeuilleRecuAchat({ recu, fermer }) {
                     <span style={{fontSize:28,fontWeight:700,color:C.text,whiteSpace:'nowrap'}}>{r.paye == null ? '—' : texteCentimesRecu(r.paye)}</span>
                   </div>
                 )}
-                {r.lignes.map((l, i) => <Row key={i} montant label={l.libelle} val={l.centimes == null ? '—' : texteCentimesRecu(l.centimes)} attrs={{ 'data-recu-ligne': l.libelle, 'data-recu-centimes': l.centimes == null ? '' : String(l.centimes) }}/>)}
+                {r.lignes.map((l, i) => <Row key={i} montant label={l.cle ? tr(l.cle) : l.libelle} val={l.centimes == null ? '—' : texteCentimesRecu(l.centimes)} attrs={{ 'data-recu-ligne': l.libelle, 'data-recu-centimes': l.centimes == null ? '' : String(l.centimes) }}/>)}
                 <div data-recu-somme={r.somme} hidden={!r.phrase} style={{fontSize:13,lineHeight:1.5,color:C.muted,padding:'10px 0 2px'}}>{r.genere ? tr('achats.recuSansDetail') : r.phrase}</div>
                 <div style={{height:10}}/>
                 {r.numero ? <Row label={tr('achats.numeroRangement')} val={`N°${r.numero}`}/> : null}
