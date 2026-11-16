@@ -30626,8 +30626,9 @@ function ChoixPlanches({ cols, rows, planches, setPlanches, plateau = false, fix
       </div>
       </div>
       {rows > 1 && <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 10 }}>
-        <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" data-planches-toutes="" onClick={() => setPlanches(Array.from({ length: rows - 1 }, (_, i) => i + 1))}>Une à chaque rangée</button>
-        <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" onClick={() => setPlanches([])}>Aucune</button>
+        {/* (16 nov., bancs-rouges-a) 44 px au doigt (§7) : ces deux boutons « petits » faisaient 30 px. */}
+        <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" data-planches-toutes="" onClick={() => setPlanches(Array.from({ length: rows - 1 }, (_, i) => i + 1))} style={{ minHeight: 44 }}>Une à chaque rangée</button>
+        <button className="vrm-b vrm-b-secondaire vrm-b-petit" type="button" data-planches-aucune="" onClick={() => setPlanches([])} style={{ minHeight: 44 }}>Aucune</button>
       </div>}
   </>);
 }
@@ -47877,7 +47878,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (15 nov., refonte-journee) « La paire à sortir en premier » : ce qui est DIT juste après « Je l'ai sortie »
   // (la case libérée, la pile qui descend) jusqu'à « Compris » — un état de l'écran, jamais une donnée.
   const [apresSortie, setApresSortie] = useState(null);
-  const [feuilleTvb, setFeuilleTvb] = useState(false);   // (15 nov.) la feuille « Tout va bien ? » de Ma journée
+  const [feuilleTvb, setFeuilleTvb] = useState(() => trancherChoix === true);   // (15 nov.) la feuille « Tout va bien ? » de Ma journée
+  // (16 nov., bancs-rouges-a) « À trancher » vit dans cette feuille depuis le 15 nov. : le lien `?tab=trancher` (SMS,
+  // notifications) ouvrait la carte… dans une feuille fermée — il ne montrait rien. Il ouvre maintenant la feuille aussi.
+  useEffect(() => { const f = () => setFeuilleTvb(true); window.addEventListener('vrm:trancher-ouvrir', f); return () => window.removeEventListener('vrm:trancher-ouvrir', f); }, []);
   // (16 nov., fiabilite-auto) Les écarts du contrôle de cette nuit (N° en double, vente sans N°, totaux…) comptent dans la
   // ligne « Tout va bien ? · N points » et se lisent dans sa feuille. L'extension en retard est dite par la ligne de fraîcheur.
   const pointsFiab = usePointsToutVaBien();
