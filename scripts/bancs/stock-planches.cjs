@@ -91,7 +91,14 @@ async function rendre(b, tel) {
   return { ctx, pg, errs };
 }
 const ou = (pg, n) => pg.evaluate((n) => { const el = document.querySelector(`[data-case-num="${n}"]`); if (!el) return null; const m = /rangée (\d+), colonne (\d+)/.exec(el.getAttribute('aria-label') || ''); return m ? `${el.closest('[data-meuble]').getAttribute('data-meuble')}:${m[1]}.${m[2]}` : null; }, n);
-const retirer = async (pg, n) => { await pg.click(`[data-case-num="${n}"]`); await pg.click('button:has-text("Retirer de la case")'); await pg.waitForTimeout(300); };
+// (16 nov., lot retirer-case-compact — Julien : « dans l'onglet Stock, la case doit être en surbrillance si l'article n'est
+// pas rangé/retiré ») « Retirer de la case » n'est plus dans la fiche : une paire sort de sa case quand elle est VENDUE, par
+// le toucher de sa case allumée. Le banc la dit vendue (la preuve publiée, `vrm_stock_vendus`), attend la surbrillance,
+// puis touche la case — le même geste de case (la pile tassée, le N° jamais touché).
+const direVendue = (pg, n) => pg.evaluate((n) => { let v = null; try { v = JSON.parse(localStorage.getItem('vrm_stock_vendus') || 'null'); } catch (_) {}
+  const nums = new Set(((v && Array.isArray(v.nums)) ? v.nums : []).map(String)); nums.add(String(n));
+  localStorage.setItem('vrm_stock_vendus', JSON.stringify({ nums: [...nums], at: Date.now() })); window.dispatchEvent(new Event('vrm:stock-slots')); }, n);
+const retirer = async (pg, n) => { await direVendue(pg, n); await pg.waitForSelector(`[data-case-num="${n}"].is-vendue`, { timeout: 8000 }).catch(() => {}); await pg.click(`[data-case-num="${n}"]`); await pg.waitForTimeout(600); };
 
 (async () => {
   let b;

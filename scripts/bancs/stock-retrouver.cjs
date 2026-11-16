@@ -134,6 +134,9 @@ const res = (pg) => pg.evaluate(() => ({
         const ci = await r.pg.evaluate(() => [...document.querySelectorAll('[data-stock-cibles] [data-aller-chercher]')].map((x) => x.getAttribute('data-aller-chercher')).join(','));
         dit(ci === '12,7', `${t} : les Nike montrées ensemble, dans l'ordre du meuble (N°12 rangée 2 puis N°7 rangée 3)`, ci);
         // « 2 vendues à sortir — où sont-elles ? »
+        // (16 nov., lot retirer-case-compact) Le bloc « Vendues à sortir » n'est plus posé : « À faire » désigne leurs cases.
+        await r.pg.evaluate(() => { const l = document.querySelector('button[data-stock-afaire]'); if (l && !document.querySelector('[data-vendues-chercher]')) l.click(); });
+        await r.pg.waitForSelector('[data-vendues-chercher]', { timeout: 5000 }).catch(() => {});
         await r.pg.click('[data-vendues-chercher]');
         await r.pg.waitForTimeout(300);
         const ve = await r.pg.evaluate(() => [...document.querySelectorAll('[data-stock-cibles] [data-aller-chercher]')].map((x) => x.getAttribute('data-aller-chercher')).join(','));

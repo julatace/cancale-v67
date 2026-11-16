@@ -6,7 +6,7 @@ import { unParArticle, planchesCases, planchesRangees } from '../stockRegles.js'
 // (15 nov., étagères) Meubles libres (forme, taille, couleurs, ordre) et LA RÈGLE DES PILES : une règle pure, partagée
 // avec la sortie automatique, « Enlever du stock », « Vendu ailleurs » et « Où ranger » (src/stockEtageres.js).
 import { tasserApres, ordonner, deplacerMeuble, couleurCase, colonnesEnPile, typeDe, TYPES, TYPES_ORDRE, COULEURS, COLS_MAX, RANGEES_MAX, peindre, couleursDans } from '../stockEtageres.js';
-import { phraseDescentes, listeNumeros } from '../etageresTextes.js';
+import { phraseDescentes, listeNumeros, descentesDesOps } from '../etageresTextes.js';
 import { annuaireLbc, nomPlateforme } from '../plateformes.js';
 import MarquePlateforme from '../plateformes/Marque.jsx';   // (15 nov.) les logos des sites où la paire est en ligne, sur sa case
 import '../styles-etageres.css';   // (15 nov.) formes, couleurs, piles — chargée avec l'écran, donc après le studio
@@ -28,7 +28,7 @@ import { EmballagesCarte } from '../EmballagesCarte.jsx';
 import { useSelectionSerie, CaseSerie, BarreSerie, OuvrirSerie } from '../composants/SelectionSerie.jsx';   // (11 nov., lot actions-serie)
 import { trierSerie, resumeSerie, csvDe } from '../selectionSerie.js';   // (10 nov., lot L) le stock d'emballages
 import { CLE_EMBALLAGES, colisFaits } from '../emballages.js';
-import { useMotsArticle, useExemplesVendeur, NotePaireCoque, InfoPop, Pourquoi, AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, fetchTxnItemIds, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
+import { useMotsArticle, useExemplesVendeur, NotePaireCoque, gesteVrm, sortieCaseStock, InfoPop, Pourquoi, AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, fetchTxnItemIds, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import StockExplication from "../StockExplication.jsx";
@@ -596,11 +596,27 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   };
   // Rend la phrase des descentes (vide si rien n'a bougé) : l'appelant l'ajoute à SON message.
   const retirerCase = (cle) => { const u = { ...slots }; delete u[cle]; return ecrireSlots(u).phrase; };
-  const sortir = (f) => {
-    const cle = cleDeclarationPartie(f.numero, f.id, numeros);
-    setPairsLost((prev) => { const u = { ...prev, [cle]: { id: String(f.id), at: new Date().toISOString(), title: f.title || '', from: 'stock' } }; save('vinted_pairs_lost', u); return u; });
-    retirerCase(cleDeFiche(f));
-    toast(tr('stock.sortieStockNumero', { numero: String(f.numero) }), 'ok');
+
+  // (16 nov., lot retirer-case-compact) Le toucher d'une case ALLUMÉE (vendue, encore dans sa case) : le geste « Je l'ai
+  // sortie » d'avant — la déclaration `vinted_pairs_lost` de CE N° (par identité) et la case libérée, la pile tassée
+  // (`sortieCaseStock`) — en un geste ANNULABLE (la pilule « Annuler », `stock.sortir`). Le N° n'est jamais redonné (§5).
+  const sortirAnnulable = (f) => {
+    const k = cleDeFiche(f);
+    const perdues = load('vinted_pairs_lost', {}) || {};
+    const slotsAv = load('vrm_slots', {}) || {};
+    const cleD = cleDeclarationPartie(f.numero, f.id, numeros);
+    const ops = [{ k: 'vinted_pairs_lost', type: 'cle', id: cleD, apres: { ...(perdues[cleD] || {}), id: String(f.id), at: new Date().toISOString(), title: f.title || '', from: 'stock' }, avant: perdues[cleD] }];
+    if (k && slotsAv[k]) ops.push(...sortieCaseStock(k));
+    // La descente d'une pile est DITE une fois, sur le meuble (le bandeau, comme « Ranger ») — pas dans la pilule.
+    const desc = descentesDesOps(ops); const m0 = slotsAv[k] ? slotsAv[k].m : null;
+    gesteVrm(tr(motsVendeur().e ? 'sortir.faitF' : 'sortir.fait', { num: String(f.numero) }), ops, { vinted_pairs_lost: setPairsLost, vrm_slots: setSlots }, (sens) => {
+      if (sens === 'apres' && desc.length) {
+        const b = {}; desc.forEach((d) => { b[d.cle] = (b[d.cle] || 0) + d.crans; }); setTombes(b); setTimeout(() => setTombes({}), 700);
+        setDescente({ m: m0, texte: phraseDescentes(desc.map((d) => ({ ...d, m: m0 }))), cles: [...new Set(desc.map((d) => d.cle))] });
+      } else if (sens === 'avant') setDescente(null);
+      // ⚠️ Pas de `vrm:stock-slots` ici : la vue passe AVANT l'écriture (src/gesteAnnulable.js) — relire `vrm_slots`
+      // maintenant rendrait la case d'avant (mesuré : la case restait allumée). Le setter `vrm_slots` suffit.
+    }, 'stock.sortir');
   };
   const cliquerCase = (mid, i) => {
     setChoisie(null);
@@ -608,6 +624,10 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     if (place) { const p = place; setPlace(null); poser(p, mid, i); return; }
     // (14 nov., proposition 62) La fiche de la paire s'ouvre TOUT DE SUITE (le magasin de la fiche) ; l'état du Stock
     // (ses gestes dans la fiche) suit en transition — à 1 000 articles, redessiner le Stock ne retarde pas la fiche.
+    // (16 nov., lot retirer-case-compact — Julien : « dans l'onglet Stock, la case doit être en surbrillance si l'article
+    // n'est pas rangé/retiré — pas de pop-up ») La case ALLUMÉE d'une vendue : son toucher la SORT (la déclaration + la
+    // case libérée, la pile tassée), annulable 5 s par la pilule — ni fenêtre, ni fiche, ni bloc.
+    if (occ && estVendu(occ)) { sortirAnnulable(occ); return; }
     if (occ) { ouvrirLigne(ligneFicheCase(cleDeFiche(occ), occ)); React.startTransition(() => setModal({ type: 'fiche', cle: cleDeFiche(occ) })); }
     else if (noteeIci(mid, i)) toast(tr('etag.caseNoteeToucher', { num: String(noteeIci(mid, i)) }));   // (15 nov.) une case prise par un N° pas montré ici
     else setModal({ type: 'placer', m: mid, i });
@@ -624,7 +644,9 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   //    rendu, elle était un composant NEUF à chaque rendu — React recréait chaque photo, dont le fondu d'arrivée
   //    (`img[loading=lazy]`, index.html) repartait de l'opacité 0 : à l'ordinateur, les photos des cases restaient
   //    invisibles (mesuré : 35 sur 35 à 0, fondu « en cours »), et 1 000 photos recréées à chaque geste.
-  const Vignette = ({ f, sold, hors = false, mini = false }) => (
+  // (16 nov., lot retirer-case-compact) `dansCase` : sur le plan, la case d'une vendue est EN SURBRILLANCE (`is-vendue`), sans
+  // aucun mot en plus (Julien : « la case doit juste être en surbrillance ») ; le mot « Vendue » reste sur la fiche et les listes.
+  const Vignette = ({ f, sold, hors = false, mini = false, dansCase = false }) => (
     <>
       {/* (13 nov., point 45) Sans réseau : la photo gardée par le service worker (déjà vue), sinon l'initiale.
           En ligne : une photo AFFICHÉE est retenue pour la prochaine coupure (`retenirPhoto`). */}
@@ -638,7 +660,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           l'écrit aussi en clair, d'où `aria-hidden` (lu une fois). */}
       <span className="vrm-s2d-num" data-vendue={sold ? '1' : undefined} data-hors-ligne={!sold && hors ? '1' : undefined}
         {...(mini ? { title: `N°${f.numero}`, 'aria-hidden': 'true', 'data-mini': '' } : {})}>N°{f.numero}</span>
-      {sold && !mini && <span className="vrm-s2d-vendue">{tr('ventes.vendue2')}</span>}
+      {sold && !mini && !dansCase && <span className="vrm-s2d-vendue">{tr('ventes.vendue2')}</span>}
       {!sold && hors && !mini && <span className="vrm-s2d-horsligne">{tr('stock.plusLigne2')}</span>}
     </>
   );
@@ -751,7 +773,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
                 data-case-num={kOcc || undefined} data-case-notee={notee || undefined} data-case-double={dbl ? '' : undefined} data-couleur={cc.couleur || undefined} data-couleur-propre={cc.propre ? '' : undefined} data-case-vise={vise ? '' : undefined} data-case-choisie={estChoisie ? '' : undefined} aria-current={estChoisie ? 'location' : undefined} data-cible={attrCible(['case', m.id, i])} data-case-etat={etat} data-case-ici={m.id + ':' + i} data-tombe={kOcc && tombes[kOcc] ? tombes[kOcc] : undefined} className={classes}
                 {...(occ ? dragProps(kOcc) : {})} {...dropProps(m.id, i)}
                 style={kOcc && tombes[kOcc] ? { '--vrm-tombe': `calc(${-tombes[kOcc]} * (100% + ${gap}px))` } : undefined}>
-                {occ ? Vignette({ f: occ, sold: sold, hors: hors }) : null}
+                {occ ? Vignette({ f: occ, sold: sold, hors: hors, dansCase: true }) : null}
                 {occ ? bandeSites(occ) : null}
                 {occ ? null : (notee ? <span className="vrm-s2d-num vrm-etag-notee" aria-hidden="true">N°{notee}</span> : <span className="vrm-s2d-plus" aria-hidden="true">+</span>)}
               </button>
@@ -862,9 +884,10 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           {/* (1er nov.) Une paire PAS rangée : « Déplacer » et « Retirer de la case »
               ne voulaient rien dire. Le geste est de la ranger. */}
           <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-ranger={m ? 'deplacer' : 'ranger'} onClick={() => { setPlace(modal.cle); fermerModal(); fermerLigne(); }} style={btnSec}>{m ? tr('stock.deplacer') : (!sold && caseProposeeDe(modal.cle) ? tr('stock.autreCase') : tr('stock.rangerDansCase'))}</button>
-          {m && <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-retirer="" onClick={() => { const n = f.numero; retirerCase(modal.cle); fermerModal(); fermerLigne(); toast(tr('stock.retireeRepasseDans', { x: String(n), name: String(m.name) })); }} style={btnSec}>{tr('stock.retirerCase')}</button>}
+          {/* (16 nov., lot retirer-case-compact) « Retirer de la case » n'est plus dans la fiche (Julien : « ça prend trop de
+              place ») : une vendue se sort en touchant sa case allumée ; une « Plus en ligne », par sa rangée. */}
         </div>
-        {sold && <button className="vrm-b vrm-b-primaire" type="button" onClick={() => { sortir(f); fermerModal(); fermerLigne(); }} style={{ ...btnPri, width: '100%', marginTop: 9 }}>{tr('stock.jeAiSorti')}</button>}
+        {/* (16 nov.) Plus de « Je l'ai sorti » ici : le toucher de la case allumée (`sortirAnnulable`). */}
         {hors && <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-encore-la="" onClick={() => { encoreLa(f); fermerModal(); }} style={{ width: '100%', marginTop: 9 }}>{tr('stock.encore')}</button>}
       </>);
     }
@@ -1000,7 +1023,9 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   // ligne (« Je l'ai sortie » pour une vendue : partie + case libérée ; « Je l'ai retirée »
   // pour une plus en ligne : la case seule), écrit EN UNE FOIS (une écriture des cases,
   // pas N écritures qui s'écrasent), après une confirmation qui nomme les N°.
-  const serieStock = useSelectionSerie(useMemo(() => [...vendSortir, ...plusEnLigne].map(cleDeFiche), [vendSortir.map(cleDeFiche).join('|'), plusEnLigne.map(cleDeFiche).join('|')]), { nom: 'stock' });
+  // (16 nov., lot retirer-case-compact) Les vendues n'ont plus de rangée (la case allumée + la petite fenêtre) : la série ne
+  // porte que les « Plus en ligne » (une vendue invisible ne se coche pas).
+  const serieStock = useSelectionSerie(useMemo(() => plusEnLigne.map(cleDeFiche), [plusEnLigne.map(cleDeFiche).join('|')]), { nom: 'stock' });
   const actionsSerieStock = () => {
     const parCle = new Map([...vendSortir, ...plusEnLigne].map((f) => [cleDeFiche(f), f]));
     const lignes = (cles) => cles.map((k) => parCle.get(k)).filter(Boolean);
@@ -1046,18 +1071,10 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         {retoursANumeroter > 0 && <p data-stock-retours-sans-num="" style={{ fontSize: 13, color: C.muted, margin: '6px 0 0', lineHeight: 1.45 }}>{retoursANumeroter > 1 ? `${retoursANumeroter} sans N° connu : à numéroter` : 'Un sans N° connu : à numéroter'} — {retoursANumeroter > 1 ? 'ils recevront' : 'il recevra'} un N° à la remise en ligne.</p>}
       </div>
     </Card>) : null;
-  const blocVendues = vendSortir.length ? (
-    <Card style={{ padding: '12px 13px' }}>
-      <div data-stock-vendues-sortir={vendSortir.length}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
-          <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{trj('stock.venduesSortir', { vendSortirN: vendSortir.length })}</span>
-          <span style={{ flex: 1 }} />
-          <OuvrirSerie serie={serieStock}/>
-          {vendSortir.length > 1 && <button className="vrm-b vrm-b-discret" type="button" data-vendues-chercher={vendSortir.length} onClick={() => { setQ(''); setCibles(vendSortir.map(cleDeFiche)); try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (_) {} }}>{tr('stock.cheminSortir')}</button>}
-        </div>
-        {vendSortir.map((f) => ligneRangee(f, <button className="vrm-b vrm-b-primaire" type="button" data-stock-sortir={cleDeFiche(f)} onClick={() => sortir(f)}>{tr('stock.jeAiSortie')}</button>))}
-      </div>
-    </Card>) : null;
+  // (16 nov., lot retirer-case-compact — Julien : « enlever la paire de sa case ça prend trop de place », puis « la case
+  // doit être en surbrillance si l'article n'est pas rangé/retiré — pas de pop-up ») Le bloc « Vendues à sortir » (une
+  // ligne par paire, « Je l'ai sortie ») n'est plus posé : la case de chaque vendue est allumée sur le plan (`is-vendue`),
+  // son toucher la sort (`sortirAnnulable`). « À faire » désigne ces cases.
   const barreSerieStock = <BarreSerie serie={serieStock} actions={actionsSerieStock()} rendreIcone={(n, t) => <Icon name={n} size={t}/>}/>;
   const blocPlusEnLigne = plusEnLigne.length ? (
     <Card style={{ padding: '12px 13px' }}>
@@ -1211,7 +1228,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       onFermer={() => { setInventaire(false); if (retourAnnuel.current) { retourAnnuel.current = false; setAnnuel(true); } }}
       onFiche={(n) => { try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(n) })); } catch (_) {} }}
       onVoirCase={(k) => { const f = ficheDe(k); setInventaire(false); montrer(f ? { ...f, numero: f.numero } : { numero: k }); }}
-      peutSortir={(k) => !!ficheDe(k)} onSortir={(k) => { const f = ficheDe(k); if (f) sortir({ ...f, id: f.id, numero: f.numero, title: f.title || '' }); }}/>;
+      peutSortir={(k) => !!ficheDe(k)} onSortir={(k) => { const f = ficheDe(k); if (f) sortirAnnulable({ ...f, id: f.id, numero: f.numero, title: f.title || "" }); }}/>;
   })() : null;
 
   // (5 nov.) Qui découvre : l'explication animée (données inventées), puis le
@@ -1330,7 +1347,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   // (la vue 2D, ses cases, le glisser) et « Plus » (valeur, emballages, inventaire de l'année) suivent.
   // Rien n'est retiré : on déplace.
   const aFaire = [
-    vendSortir.length ? { k: 'vendues', cible: '[data-stock-vendues-sortir]', mot: tr('ms.stock.af.vendues', { n: vendSortir.length }) } : null,
+    // (16 nov.) Les vendues : leurs cases allumées, désignées sur le plan (le « chemin pour les sortir » d'avant).
+    vendSortir.length ? { k: 'vendues', cible: '[data-case-etat="vendue"]', avant: () => { setQ(''); setCibles(vendSortir.map(cleDeFiche)); }, mot: tr('ms.stock.af.vendues', { n: vendSortir.length }) } : null,
     (revenus.length || retoursANumeroter) ? { k: 'retours', cible: '[data-stock-retours]', mot: tr('ms.stock.af.retours', { n: revenus.length + retoursANumeroter }) } : null,
     plusEnLigne.length ? { k: 'plusenligne', cible: '[data-stock-plus-en-ligne]', mot: tr('ms.stock.af.plusEnLigne', { n: plusEnLigne.length }) } : null,
     rangeesPasSu.length && aa ? { k: 'passu', cible: '[data-stock-rangees-passu]', mot: tr('ms.stock.af.pasVerifiees', { n: rangeesPasSu.length }) } : null,
@@ -1355,16 +1373,17 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
 
     <LigneAFaire n={aFaire.length} ouvert={aFaireOuvert} onOuvert={setAFaireOuvert} data-stock-afaire={aFaire.length}>
       <ul className="vrm-ui-choix vrm-ms-afaire-liste">
-        {aFaire.map((x) => <li key={x.k}><button type="button" data-stock-afaire-aller={x.k} onClick={() => allerA(x.cible)}><span>{x.mot}</span><span className="vrm-ms-chevron" aria-hidden="true">›</span></button></li>)}
+        {aFaire.map((x) => <li key={x.k}><button type="button" data-stock-afaire-aller={x.k} data-vendues-chercher={x.k === 'vendues' ? vendSortir.length : undefined} onClick={() => { if (x.avant) x.avant(); allerA(x.cible); }}><span>{x.mot}</span><span className="vrm-ms-chevron" aria-hidden="true">›</span></button></li>)}
       </ul>
     </LigneAFaire>
     {blocListe}
     {blocAPart}
     {nEcartes > 0 && <div data-stock-ecartes={nEcartes} style={{ fontSize: 12, color: C.muted }}>{nEcartes} {nEcartes > 1 ? motsStock.noms : motsStock.nom} d'un compte retiré ou masqué {nEcartes > 1 ? 'ne sont' : "n'est"} pas montré{motsStock.e}{nEcartes > 1 ? 's' : ''} ici.</div>}
 
-    {aFaire.length ? <section className="vrm-ms-section" data-stock-section="afaire" aria-label={tr('listes.afaire')}>
+    {/* (16 nov., lot retirer-case-compact) La section ne se pose que si elle a un bloc : sans « Vendues à sortir », « À
+        faire » pouvait ne compter que des cibles ailleurs (« À ranger », les cases allumées) — un titre sur du vide. */}
+    {aFaire.length && (blocRetours || blocPlusEnLigne || blocPasSu || blocSortis) ? <section className="vrm-ms-section" data-stock-section="afaire" aria-label={tr('listes.afaire')}>
       <h2 className="vrm-ms-h2">{tr('listes.afaire')}</h2>
-      {blocVendues}
       {blocRetours}
       {blocPlusEnLigne}
       {barreSerieStock}
