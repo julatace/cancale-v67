@@ -158,7 +158,7 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   const crochet = extraire(APPs, 'useObjectifMois');
   dit(/onCloudReady\(/.test(crochet) && /cur == null \? lireObjectifRange\(\) : cur/.test(crochet), 'rattrapage nuage seulement si rien n’est rangé (onCloudReady)');
   const jsx = sansCommentaires(CARTE_JSX);
-  dit(/objectifSurPage\(objectif, page\) \? progressionObjectif\(objectif, valeurObjectif\(objectif, sources, regles\)\) : null/.test(jsx) && /\{prog \? <BarreObjectif/.test(jsx), 'la carte ne dessine la barre que s’il y a un objectif pour CETTE page');
+  dit(/objectifSurPage\(objectif, page\) \? progressionObjectif\(objectif, valeurObjectif\(objectif, sources, regles\)\) : null/.test(jsx) && /\{prog \? (?:\(page === 'journee'\s*\?\s*<AnneauObjectif\b[\s\S]{0,300}?:\s*)?<BarreObjectif/.test(jsx), 'la carte ne dessine la barre (Ma journée : l’anneau, 15 nov.) que s’il y a un objectif pour CETTE page');
   dit(/data-carte-objectif-ouvrir/.test(jsx) && />Objectif</.test(jsx), '« Objectif » se fixe dans « Modifier »');
   dit(!/Fixe un montant/.test(APPs) && !/Viser \{prop\}/.test(APPs), 'aucune phrase d’invitation ni proposition calculée sur l’archive Vinted seule');
 

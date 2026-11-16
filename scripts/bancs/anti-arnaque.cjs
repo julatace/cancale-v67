@@ -134,10 +134,11 @@ const attendre = async (pg, sel, ms = 15000) => pg.waitForSelector(sel, { timeou
       // B — 301 ouverte
       await r.pg.click('[data-conv="301"]');
       const ban = await attendre(r.pg, '.vrm-chat-panel [data-arnaque]', 10000);
-      const info = ban ? await ban.evaluate((x) => ({ m: x.getAttribute('data-arnaque'), ms: x.getAttribute('data-arnaque-motifs'), n: x.getAttribute('data-arnaque-n'), sig: (x.querySelector('[data-arnaque-signaler]') || {}).getAttribute ? x.querySelector('[data-arnaque-signaler]').getAttribute('href') : null, bord: getComputedStyle(x).borderTopColor })) : null;
+      const info = ban ? await ban.evaluate((x) => ({ m: x.getAttribute('data-arnaque'), ms: x.getAttribute('data-arnaque-motifs'), n: x.getAttribute('data-arnaque-n'), sig: (x.querySelector('[data-arnaque-signaler]') || {}).getAttribute ? x.querySelector('[data-arnaque-signaler]').getAttribute('href') : null, bord: getComputedStyle(x).boxShadow + ' ' + getComputedStyle(x).backgroundColor + ' ' + ((x.querySelector('svg') && getComputedStyle(x.querySelector('svg')).stroke) || '') })) : null;
       dit(info && info.m === 'codeSms' && /horsPlateforme/.test(info.ms) && info.n === '1', `B · ${nom} : 301 ⇒ bannière codeSms en tête, horsPlateforme gardé`, JSON.stringify(info));
       dit(info && /vinted\.fr\/inbox\/301/.test(info.sig || ''), `B · ${nom} : « Signale-le sur Vinted » mène à la conversation sur Vinted`, info && info.sig);
-      dit(info && /rgb\((178, 80, 0|255, 179, 64)\)/.test(info.bord), `B · ${nom} : ambre (geste à faire)`, info && info.bord);
+      // (15 nov., lot securite-ventes) Sobre : un voile et un trait AMBRE (le point du studio), jamais de rouge.
+      dit(info && /rgb\((224, 138, 18|242, 163, 58)\)|srgb 0\.87|srgb 0\.94/.test(info.bord) && !/rgb\((215, 0, 21|255, 59, 48|255, 69, 58)\)/.test(info.bord), `B · ${nom} : ambre (geste à faire), jamais rouge`, info && info.bord);
       await r.pg.waitForTimeout(300);
       await r.pg.screenshot({ path: path.join(CAP, 'anti-arnaque-fil-' + nom + '.png') });
       if (principal) {

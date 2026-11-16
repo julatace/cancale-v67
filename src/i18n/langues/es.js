@@ -18,6 +18,7 @@ import ecran_finition from './es/finition.js';   // (15 nov.) la finition écran
 import ecran_parametres from './es/parametres.js';   // (15 nov.) Paramètres rangés en dix catégories
 import ecran_numeros_nouvelles from './es/numeros-nouvelles.js';   // (15 nov.) Les nouvelles annonces sans N°
 import ecran_republie_telephone from './es/republie-telephone.js';   // (15 nov.) Republiée dans l'app Vinted   // (15 nov.) Les nouvelles annonces sans N°
+import ecran_securite_ventes from './es/securite-ventes.js';   // (15 nov.) Sécurité des ventes : arnaque, où vendre, anneau
 import ecran_idees from './es/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './es/ventes.js';
 import ecran_commun from './es/commun.js';
@@ -2300,4 +2301,5 @@ export default {
   ...ecran_fiched,
   ...ecran_numeros_nouvelles,
   ...ecran_republie_telephone,
+  ...ecran_securite_ventes,
 };
