@@ -131,11 +131,11 @@ const phraseRepere = (rp) => <>Repère du modèle « {rp.modele} »{rp.partiel ?
 // (16 nov., refonte) Une annonce : photo, titre, prix (port compris ou dit), lien eBay. Les couleurs
 // viennent de la carte (src/ebay/achats-ebay.css), plus du thème JS posé sur le fond bleu.
 function Resultat({ x, nouveau, rp }) {
-  return <div className="vrm-buy-row vrm-ebay-res eba-annonce" data-ebay-resultat={x.itemId} data-nouveau={nouveau ? 'oui' : 'non'}>
-    <div className="vrm-buy-ph">{x.photo ? <img src={x.photo} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}</div>
-    <div className="vrm-buy-main">
-      <div className="vrm-buy-title" title={x.titre}>{nouveau && <span data-badge-nouveau="" className="eba-nouveau">{tr('ebayAchats.nouveau')}</span>}{x.titre || tr('ebayAchats.annonce', { id: x.itemId })}</div>
-      <div className="vrm-buy-meta">
+  return <div className="eba-annonce" data-ebay-resultat={x.itemId} data-nouveau={nouveau ? 'oui' : 'non'}>
+    <div className="eba-ph">{x.photo ? <img src={x.photo} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}</div>
+    <div className="vrm-buy-main eba-a-main">
+      <div className="eba-a-titre" title={x.titre}>{nouveau && <span data-badge-nouveau="" className="eba-nouveau">{tr('ebayAchats.nouveau')}</span>}{x.titre || tr('ebayAchats.annonce', { id: x.itemId })}</div>
+      <div className="eba-a-meta">
         <span data-ebay-prix={x.prix} data-ebay-port={x.port == null ? 'inconnu' : x.port}>{x.port == null ? <><span className="eba-prix">{eur(x.prix)}</span> {tr('alertesEbay.portInconnu')}</> : x.port === 0 ? <><span className="eba-prix">{eur(x.prix)}</span> {tr('alertesEbay.portCompris')}</> : <><span className="eba-prix">{eur(x.total)}</span> {tr('alertesEbay.dontPort', { prix: eur(x.prix), port: eur(x.port) })}</>}</span>
         {x.etat && <span>· {x.etat}</span>}
         {x.enchere && !x.achatImmediat && <span>· {tr('ebayAchats.enchere')}</span>}
@@ -143,7 +143,7 @@ function Resultat({ x, nouveau, rp }) {
       </div>
       {rp && <div data-ebay-repere={rp.modele} className="eba-gris" style={{ fontSize: 12 }}>{phraseRepere(rp)}</div>}
     </div>
-    <div className="vrm-buy-act"><a className="eba-lien" href={x.url} target="_blank" rel="noreferrer noopener" data-voir-ebay="">{tr('alertesEbay.voir')}</a></div>
+    <div className="eba-a-act"><a className="eba-lien" href={x.url} target="_blank" rel="noreferrer noopener" data-voir-ebay="">{tr('alertesEbay.voir')}</a></div>
   </div>;
 }
 
@@ -176,7 +176,7 @@ function Liste({ r, nouveaux, repere, max = 8, cle }) {
       ? tr('ebayAchats.toutesEcartees', { n: ecartees, raisons: filtres.join(' · ') })
       : tr('ebayAchats.aucuneAnnonce')}</p>
       : <>{commun && <p data-ebay-repere={commun.modele} data-ebay-repere-liste={commun.partiel ? 'partiel' : 'tout'} className="eba-gris" style={{ fontSize: 12 }}>{phraseRepere(commun)}</p>}
-        <div className="vrm-buy-list">{vus.map((x, i) => <Resultat key={x.itemId} x={x} nouveau={nouveaux && nouveaux.has(x.itemId)} rp={parLigne[i]} />)}</div></>}
+        <div className="eba-annonces">{vus.map((x, i) => <Resultat key={x.itemId} x={x} nouveau={nouveaux && nouveaux.has(x.itemId)} rp={parLigne[i]} />)}</div></>}
     {items.length > max && <button type="button" className="eba-lien eba-plus-liste" onClick={() => setTout((v) => !v)}>{tout ? tr('ebayAchats.voirMoins') : tr('ebayAchats.voirTout', { n: items.length })}</button>}
     {items.length > 0 && filtres.length > 0 && <p className="eba-gris" style={{ fontSize: 12 }}>{tr('ebayAchats.ecartees', { raisons: filtres.join(' · ') })}</p>}
   </div>;

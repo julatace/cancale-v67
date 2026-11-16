@@ -156,7 +156,9 @@ const mesurer = (pg) => pg.evaluate(() => {
   // donne CHACUNE de ses couleurs (on garde la pire).
   const fonds = (el) => {
     const couches = [];
+    let fond = null;
     for (let e = el; e; e = e.parentElement) {
+      fond = e;
       const cs = getComputedStyle(e);
       const bi = cs.backgroundImage;
       if (bi && /gradient/.test(bi)) { const cols = (bi.match(/rgba?\([^)]+\)/g) || []).map(rgba).filter(Boolean); if (cols.length) { couches.push({ grad: cols }); if (cols.every((c) => c[3] >= 0.99)) break; } }
@@ -164,6 +166,14 @@ const mesurer = (pg) => pg.evaluate(() => {
       if (c && c[3] > 0) { couches.push({ c }); if (c[3] >= 0.99) break; }
     }
     let bases = [[255, 255, 255, 1]];
+    // Le fond du verre est peint par un pseudo-élément (dégradé --sv-haut → --sv-bas) : arrivé à
+    // la page, chaque arrêt du dégradé est un fond possible (le plus clair compris).
+    if (fond && (fond === document.documentElement || fond === document.body) && document.querySelector('.vrm-app-shell[data-espace]')) {
+      const rs = getComputedStyle(document.documentElement);
+      const hex = (h) => { const m = /^#([0-9a-f]{6})$/i.exec(String(h || '').trim()); return m ? [parseInt(m[1].slice(0, 2), 16), parseInt(m[1].slice(2, 4), 16), parseInt(m[1].slice(4), 16), 1] : null; };
+      const arrets = ['--sv-haut', '--sv-milieu', '--sv-bas'].map((v) => hex(rs.getPropertyValue(v))).filter(Boolean);
+      if (arrets.length) { couches.pop(); bases = arrets; }
+    }
     for (let i = couches.length - 1; i >= 0; i--) {
       const k = couches[i];
       if (k.grad) bases = k.grad.flatMap((g) => bases.map((b) => mel(g, b)));
@@ -200,11 +210,22 @@ const mesurer = (pg) => pg.evaluate(() => {
       reinit(true);
       const { ctx, pg, errs } = await ouvrir(b, vp, sombre);
       await essaie('ouvrir eBay → Achats', () => ouvrirAchats(pg));
+      if (process.env.BANC_INSPECT) await essaie('inspecter', async () => {
+        const cdp = await pg.context().newCDPSession(pg);
+        await cdp.send('DOM.enable'); await cdp.send('CSS.enable');
+        const { root } = await cdp.send('DOM.getDocument', { depth: -1 });
+        const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: process.env.BANC_INSPECT });
+        const m = await cdp.send('CSS.getMatchedStylesForNode', { nodeId });
+        for (const r of m.matchedCSSRules || []) { const props = r.rule.style.cssProperties.filter((x) => /background|border|color|box-shadow/.test(x.name) && x.value).map((x) => x.name + ':' + x.value + (x.important ? '!' : '')); if (props.length) console.log('RÈGLE ' + r.rule.selectorList.text.slice(0, 160) + ' {' + props.join('; ').slice(0, 300) + '} ' + (r.rule.origin) + ' ' + ((r.rule.layers || []).map((l) => l.text).join('/'))); }
+      });
       // ── M · mesures (la vue telle qu'elle s'ouvre) ─────────────────────────
-      const m = await essaie('mesurer', () => mesurer(pg));
+      // (Une entrée animée en fondu rend la vue invisible quelques instants : on attend des textes.)
+      let m = null;
+      for (let i = 0; i < 20 && !(m && m.textes >= 10); i++) { if (i) await pg.waitForTimeout(500); m = await essaie('mesurer', () => mesurer(pg)); }
+      dit(!!m && m.textes >= 10, 'la mesure voit les textes de la partie eBay', m && String(m.textes));
       mesures[nom] = m;
       console.log('MESURE ' + nom + ' · hauteur ' + (m && m.hauteur) + ' px · ' + (m && m.mots) + ' mots · contraste mini ' + (m && m.contraste) + ':1 (' + (m && m.pire) + ') · ' + (m && m.textes) + ' textes');
-      if (CAPT) { fs.mkdirSync(CAPT, { recursive: true }); await pg.locator('[data-ebay-achats-onglet]').screenshot({ path: path.join(CAPT, 'achats-ebay-' + nom + '.png') }).catch(() => {}); }
+      if (CAPT) { fs.mkdirSync(CAPT, { recursive: true }); await pg.screenshot({ path: path.join(CAPT, 'achats-ebay-' + nom + '.png'), fullPage: true }).catch(() => {}); }
       // ── A · structure ────────────────────────────────────────────────────
       await essaie('structure', async () => {
         const blocs = await pg.$$eval('[data-ebay-bloc]', (l) => l.map((e) => e.getAttribute('data-ebay-bloc')));
@@ -242,7 +263,7 @@ const mesurer = (pg) => pg.evaluate(() => {
         await pg.waitForSelector('[data-ebay-liste="manuel"]', { timeout: 10000 });
         const a = appels[avant] || {};
         dit(a.mots === 'adidas spezial' && a.pointure === '42' && a.maximum === 2000 && a.achatImmediat === true && a.livraisonFR === true && a.source !== 'fil', 'Entrée = Chercher : la recherche part avec ses critères (prix en centimes)', JSON.stringify(a));
-        const r = await pg.$$eval('[data-ebay-liste="manuel"] [data-ebay-resultat]', (l) => l.map((e) => ({ ph: !!e.querySelector('.vrm-buy-ph'), prix: e.querySelector('[data-ebay-prix]') && e.querySelector('[data-ebay-prix]').getAttribute('data-ebay-prix'), port: e.querySelector('[data-ebay-port]') && e.querySelector('[data-ebay-port]').getAttribute('data-ebay-port'), lien: (e.querySelector('[data-voir-ebay]') || {}).href || '', h: e.querySelector('[data-voir-ebay]') ? e.querySelector('[data-voir-ebay]').getBoundingClientRect().height : 0 })));
+        const r = await pg.$$eval('[data-ebay-liste="manuel"] [data-ebay-resultat]', (l) => l.map((e) => ({ ph: !!e.querySelector('.eba-ph'), prix: e.querySelector('[data-ebay-prix]') && e.querySelector('[data-ebay-prix]').getAttribute('data-ebay-prix'), port: e.querySelector('[data-ebay-port]') && e.querySelector('[data-ebay-port]').getAttribute('data-ebay-port'), lien: (e.querySelector('[data-voir-ebay]') || {}).href || '', h: e.querySelector('[data-voir-ebay]') ? e.querySelector('[data-voir-ebay]').getBoundingClientRect().height : 0 })));
         dit(r.length === 2 && r.every((x) => x.ph && x.prix && /^https:\/\/www\.ebay\.fr\/itm\//.test(x.lien) && x.h >= 44) && r[1].port === 'inconnu', 'résultats : photo, prix, port (inconnu dit), lien eBay 44 px', JSON.stringify(r));
         if (CAPT) await pg.locator('[data-ebay-bloc="chercher"]').screenshot({ path: path.join(CAPT, 'chercher-' + nom + '.png') }).catch(() => {});
       });
@@ -294,6 +315,7 @@ const mesurer = (pg) => pg.evaluate(() => {
       await essaie('nouvelles annonces', async () => {
         const l = await pg.$$eval('[data-ebay-bloc="nouvelles"] [data-alerte-ebay]', (x) => x.map((e) => ({ id: e.getAttribute('data-alerte-ebay'), lien: (e.querySelector('[data-voir-ebay]') || {}).href || '', prix: (e.querySelector('[data-alerte-prix]') || { getAttribute: () => '' }).getAttribute('data-alerte-prix') })));
         dit(l.length === 1 && l[0].id === 'v1|801|0' && /^https:\/\/www\.ebay\.fr\/itm\//.test(l[0].lien) && l[0].prix === '4500', 'une nouvelle annonce se voit dans « Nouvelles annonces » (prix, lien eBay)', JSON.stringify(l));
+        if (CAPT) await pg.locator('[data-ebay-bloc="nouvelles"]').screenshot({ path: path.join(CAPT, 'nouvelles-' + nom + '.png') }).catch(() => {});
         await pg.click('[data-alerte-ebay="v1|801|0"] [data-alerte-retirer]');
         await pg.waitForSelector('[data-alerte-ebay="v1|801|0"]', { state: 'detached', timeout: 10000 });
         const vide = await pg.$eval('[data-ebay-bloc="nouvelles"]', (e) => e.innerText.replace(/\s+/g, ' ').trim()).catch(() => '');

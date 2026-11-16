@@ -18,11 +18,11 @@ const jourHeure = (iso) => { const t = Date.parse(iso || ''); return Number.isFi
 
 function LigneAlerte({ x, veille, revente, contexte, onRetirer, occupe }) {
   const m = margePossible(x, veille, { revente, contexte });
-  return <div className="vrm-buy-row vrm-alerte-ebay eba-annonce" data-alerte-ebay={x.itemId}>
-    <div className="vrm-buy-ph">{x.photo ? <img src={x.photo} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}</div>
-    <div className="vrm-buy-main">
-      <div className="vrm-buy-title" title={x.titre}>{x.titre || x.itemId}</div>
-      <div className="vrm-buy-meta">
+  return <div className="eba-annonce" data-alerte-ebay={x.itemId}>
+    <div className="eba-ph">{x.photo ? <img src={x.photo} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}</div>
+    <div className="vrm-buy-main eba-a-main">
+      <div className="eba-a-titre" title={x.titre}>{x.titre || x.itemId}</div>
+      <div className="eba-a-meta">
         <span data-alerte-prix={x.prix} data-alerte-port={x.port == null ? 'inconnu' : x.port}>
           {x.port == null ? <><span className="eba-prix">{eurosCalc(x.prix)}</span> {tr('alertesEbay.portInconnu')}</>
             : x.port === 0 ? <><span className="eba-prix">{eurosCalc(x.prix)}</span> {tr('alertesEbay.portCompris')}</>
@@ -30,12 +30,12 @@ function LigneAlerte({ x, veille, revente, contexte, onRetirer, occupe }) {
         </span>
         <span>· {x.recherche}{x.etat ? ' · ' + x.etat : ''}</span>
       </div>
-      <div className="vrm-buy-meta" data-alerte-marge={m.etat === 'ok' ? m.benefice : m.etat} data-alerte-borne={m.etat === 'ok' ? m.borne : ''}>
+      <div className="eba-a-meta" data-alerte-marge={m.etat === 'ok' ? m.benefice : m.etat} data-alerte-borne={m.etat === 'ok' ? m.borne : ''}>
         {m.etat === 'ok' ? <span>{tr('alertesEbay.marge')} <span className="eba-prix">{m.borne === 'au-plus' ? tr('alertesEbay.auPlus') + ' ' : m.borne === 'environ' ? tr('alertesEbay.environ') + ' ' : ''}{eurosCalc(m.benefice)}</span> · {m.base.source === 'toi' ? tr('alertesEbay.baseToi', { prix: eurosCalc(m.base.montant), site: tr('alertesEbay.site.' + m.base.site) }) : tr('alertesEbay.baseMediane', { prix: eurosCalc(m.base.montant), n: m.base.n })}</span>
           : <span>{tr('alertesEbay.marge')} — {tr(m.etat === 'pas-su' ? 'alertesEbay.margePasSu' : 'alertesEbay.margeSansBase')}</span>}
       </div>
     </div>
-    <div className="vrm-buy-act vrm-alerte-act">
+    <div className="eba-a-act">
       <a className="eba-lien" href={x.url} target="_blank" rel="noreferrer noopener" data-voir-ebay="">{tr('alertesEbay.voir')}</a>
       <button type="button" className="eba-lien" disabled={occupe} onClick={() => onRetirer([x.itemId])} data-alerte-retirer="">{tr('alertesEbay.retirer')}</button>
     </div>
@@ -87,7 +87,7 @@ export default function AlertesEbay({ headers, revente = () => undefined, contex
     </p>}
     {vue && !nouvelles.length && pourquoi}
     {nouvelles.length > 0 && <>
-      <div className="vrm-buy-list" data-alertes-liste="">
+      <div className="eba-annonces" data-alertes-liste="">
         {nouvelles.map((x) => <LigneAlerte key={x.itemId} x={x} veille={parId.get(x.veille) || null} revente={revente} contexte={contexte} onRetirer={retirer} occupe={occupe} />)}
       </div>
       <p className="eba-gris" style={{ fontSize: 12 }}>{tr('alertesEbay.margeExplique')}{' '}

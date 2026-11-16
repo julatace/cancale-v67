@@ -58,17 +58,23 @@
 
 /* Le formulaire : un champ principal, deux petits côte à côte, le reste replié. */
 .eba-form { display: grid; gap: 10px; min-width: 0; }
-.eba-duo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.eba-duo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; align-items: end; }
 .eba-duo.is-seul { grid-template-columns: minmax(0, 1fr); }
+.eba-form .eba-duo:not(.is-seul) { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); }
 .eba-champ { display: grid; gap: 5px; min-width: 0; font-size: 13px; font-weight: 500; color: var(--eba-gris); }
-.eba .eba-champ :is(input, select, textarea), .eba input.eba-input {
-  width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border-radius: 12px;
-  border: 1px solid var(--eba-bord); background: var(--eba-champ); color: var(--eba-champ-encre);
-  font: inherit; font-size: 17px; font-weight: 400; line-height: 1.3; box-shadow: none; appearance: none; -webkit-appearance: none;
+/* Sur téléphone, une règle commune pose un fond teinté sans bord sur tout champ de .vrm-main
+   (`.vrm-app-shell .vrm-main input…{background:var(--ep-teinte)!important}`) : sur le verre bleu,
+   le texte d'exemple tombait à 3,9:1 et le champ ne se voyait plus. Ici le champ reste
+   porcelaine, bordé (mesuré par scripts/bancs/ebay-achats-refonte.cjs). */
+:root body .vrm-app-shell .eba .eba-champ :is(input, select, textarea), .eba .eba-champ :is(input, select, textarea) {
+  width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border-radius: 12px !important;
+  border: 1px solid var(--eba-bord) !important; background-color: var(--eba-champ) !important; color: var(--eba-champ-encre) !important;
+  font: inherit; font-size: 17px; font-weight: 400; line-height: 1.3; box-shadow: none !important; appearance: none; -webkit-appearance: none;
 }
-.eba .eba-champ select { padding-right: 34px; background-image: linear-gradient(45deg, transparent 50%, var(--eba-champ-gris) 50%), linear-gradient(135deg, var(--eba-champ-gris) 50%, transparent 50%); background-position: calc(100% - 18px) 50%, calc(100% - 12px) 50%; background-size: 6px 6px; background-repeat: no-repeat; }
-.eba .eba-champ :is(input, select, textarea)::placeholder { color: var(--eba-champ-gris); opacity: 1; }
-.eba .eba-champ :is(input, select, textarea):focus-visible { outline: 2px solid var(--eba-lien); outline-offset: 1px; border-color: var(--eba-lien); }
+:root body .vrm-app-shell .eba .eba-champ select, .eba .eba-champ select { padding-right: 36px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%234E5D6C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important; background-position: right 14px center !important; background-size: 12px 8px !important; background-repeat: no-repeat !important; }
+:root[data-theme="dark"] body .vrm-app-shell .eba .eba-champ select, :root[data-theme="dark"] .eba .eba-champ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23A9BBCE' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important; }
+:root body .vrm-app-shell .eba .eba-champ :is(input, textarea)::placeholder, .eba .eba-champ :is(input, textarea)::placeholder { color: var(--eba-champ-gris) !important; opacity: 1; }
+:root body .vrm-app-shell .eba .eba-champ :is(input, select, textarea):focus-visible { outline: 2px solid var(--eba-lien); outline-offset: 1px; border-color: var(--eba-lien) !important; }
 .eba-coche { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 15px; color: var(--eba-encre); cursor: pointer; }
 .eba-coche input { width: 22px; height: 22px; margin: 0; accent-color: var(--eba-plein); flex-shrink: 0; }
 
@@ -93,16 +99,17 @@
 .eba-envoi { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; }
 .eba-quota { font-size: 12px; color: var(--eba-gris); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-/* Les annonces (résultats et nouvelles) : photo, titre, prix, port, lien. */
-.eba .vrm-buy-list { display: grid; background: transparent !important; border: 0 !important; border-radius: 0 !important; }
-.eba .eba-annonce { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 4px 12px; padding: 10px 0; border-top: 1px solid var(--eba-trait); align-items: start; }
-.eba .eba-annonce:first-child { border-top: 0; }
-.eba .eba-annonce .vrm-buy-ph { width: 56px; height: 56px; border-radius: 10px; overflow: hidden; background: var(--eba-trait) !important; grid-row: span 2; }
-.eba .eba-annonce .vrm-buy-main { min-width: 0; display: grid; gap: 2px; }
-.eba .eba-annonce .vrm-buy-title { font-size: 15px; font-weight: 600; line-height: 1.3; color: var(--eba-encre) !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.eba .eba-annonce .vrm-buy-meta { display: flex; flex-wrap: wrap; gap: 0 6px; font-size: 13px; line-height: 1.4; color: var(--eba-gris) !important; }
+/* Les annonces (résultats et nouvelles) : photo, titre, prix, port, lien. Des classes à elles
+   (plus .vrm-buy-row : sa grille à 4 colonnes posait « Voir sur eBay » sur le prix). */
+.eba-annonces { display: grid; min-width: 0; }
+.eba-annonce { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 4px 12px; padding: 10px 0; border-top: 1px solid var(--eba-trait); align-items: start; min-width: 0; }
+.eba-annonce:first-child { border-top: 0; }
+.eba-ph { width: 56px; height: 56px; border-radius: 10px; overflow: hidden; background: var(--eba-trait); grid-row: span 2; }
+.eba-a-main { min-width: 0; display: grid; gap: 2px; }
+.eba-a-titre { font-size: 15px; font-weight: 600; line-height: 1.3; color: var(--eba-encre); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eba-a-meta { display: flex; flex-wrap: wrap; gap: 0 6px; font-size: 13px; line-height: 1.4; color: var(--eba-gris); min-width: 0; }
 .eba .eba-prix { color: var(--eba-encre); font-weight: 600; font-variant-numeric: tabular-nums; }
-.eba .eba-annonce .vrm-buy-act { grid-column: 2; display: flex; align-items: center; gap: 4px; margin-left: -6px; flex-wrap: wrap; }
+.eba-a-act { grid-column: 2; display: flex; align-items: center; gap: 4px; margin-left: -6px; flex-wrap: wrap; }
 .eba .eba-nouveau { font-size: 11px; font-weight: 700; color: var(--eba-lien); margin-right: 6px; text-transform: uppercase; letter-spacing: .3px; }
 .eba-plus-liste { justify-self: start; }
 
