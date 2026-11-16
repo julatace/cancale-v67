@@ -26,6 +26,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (16 nov., Julien : « Reprendre là où j'étais ») docs/passation/2026-11-16-reprendre-ou-jetais.md
+  { id: 'reprendre-12h', date: '2026-11-16', titre: 'VRM rouvre là où tu étais', phrase: 'Même écran, même filtre, même position, jusqu’à 12 h après.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (16 nov., lot retirer-case-compact) docs/passation/2026-11-16-retirer-case-compact.md
   { id: 'stock-case-allumee', date: '2026-11-16', titre: 'Stock : la case vendue reste allumée', phrase: 'Touche-la quand l’article est sorti ; « Annuler » la remet.', tab: 'garage', pour: 'tous', mode: 'tous' },
   // (16 nov., bancs-rouges-a) docs/passation/2026-11-16-bancs-rouges-a.md

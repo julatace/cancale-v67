@@ -15,7 +15,7 @@ import {lireBordereauVestiaire} from './bordereauVestiaire.js';
 import {lireParcours,garderParcours,noterChangements,viderParcours,motifRecherche,restaurerVue} from './parcoursQuotidien.js';
 import {stockageParcours,garderReprise} from './repriseEcran.js';
 // (11 nov., reprise-ecrans) La reprise SYNCHRONISÉE, par compte VRM (src/repriseSynchro.js).
-import { CLE_REPRISE_ECRANS, DELAI_ECRITURE as DELAI_REPRISE, DUREE_RECHERCHE as DUREE_RECHERCHE_REPRISE, lireCarte as lireCarteReprise, poserCarte as poserCarteReprise, cumulerPatch as cumulerPatchReprise, vueReprise, compteReprise, siteReprise, repriseLocale, ecranAOuvrir, vueSynchronisee, estRecherche as estRechercheVue, ecransDeVue, retenusAffiches } from './repriseSynchro.js';
+import { CLE_REPRISE_ECRANS, DELAI_ECRITURE as DELAI_REPRISE, DUREE_RECHERCHE as DUREE_RECHERCHE_REPRISE, lireCarte as lireCarteReprise, poserCarte as poserCarteReprise, cumulerPatch as cumulerPatchReprise, vueReprise, compteReprise, siteReprise, repriseLocale, ecranAOuvrir, vueSynchronisee, estRecherche as estRechercheVue, ecransDeVue, retenusAffiches, positionReprise } from './repriseSynchro.js';
 import {RecapSelection,CompteurListe,HistoriqueModifications} from './OutilsParcours.jsx';
 import { useSelectionSerie, CaseSerie, BarreSerie, OuvrirSerie, avecSerie } from './composants/SelectionSerie.jsx';
 import { trierSerie, resumeSerie, csvDe, clesSelectionnables, portee } from './selectionSerie.js';
@@ -3142,7 +3142,7 @@ const SYNC_KEYS = [
   // (src/visuelsReseaux.js `reglagesValides` ; boutique vide par défaut).
   'vrm_visuels_reglages',
   // (11 nov., reprise-ecrans) Chaque écran se rouvre comme on l'a laissé, sur tous ses appareils :
-  // filtres, tri, recherche (10 min), compte par site, dernier écran (30 min) — src/repriseSynchro.js.
+  // filtres, tri, recherche (10 min), compte par site, dernier écran (12 h) — src/repriseSynchro.js.
   CLE_REPRISE_ECRANS,
   'vrm_vc_etiquettes','vrm_lbc_dates',
   // (11 nov., lot stats-categories) La catégorie qu'IL a choisie pour une vente sans
@@ -19816,8 +19816,9 @@ function MemoireDefilement({ ecran }) {
     if(!main) return;
     // (5 nov., reprise) La position est rangée sur l'APPAREIL (src/repriseEcran.js) :
     // l'app installée qu'iOS ferme puis rouvre retrouve aussi son défilement.
-    const owner=AUTH.user?.id||'';const st=stockageParcours();let gardee=0;try{if(st)gardee=Number(lireParcours(st,owner,'position:'+ecran,0))||0;}catch(_){}
-    const cible=positions.current.get(owner+':'+ecran)??Math.max(0,Math.min(1000000,gardee));
+    // (16 nov., « Reprendre là où j'étais ») Gardée 12 h au plus, comme l'écran (`positionReprise`).
+    const owner=AUTH.user?.id||'';const st=stockageParcours();let gardee=0;try{gardee=positionReprise(st,owner,ecran);}catch(_){}
+    const cible=positions.current.get(owner+':'+ecran)??gardee;
     let position=cible, restauration=cible>0, arrete=false;   // rien à tenir à 0
     // On ne s'arrête pas au premier succès : l'écran peut se raccourcir le temps
     // d'un chargement (le navigateur ramène alors la position à 0). On tient la
@@ -61147,7 +61148,7 @@ function AppCoeur() {
   // `?tab=` reçu gagne : la reprise se tait et `goto` mène au lien. Rien de
   // lisible ⇒ Ma journée, comme avant.
   // (11 nov., reprise-ecrans) Et SUR N'IMPORTE QUEL APPAREIL : le plus frais de cet appareil
-  // et du compte (`vrm_reprise_ecrans`), s'il a moins de 30 min — sinon Ma journée. Un lien
+  // et du compte (`vrm_reprise_ecrans`), s'il a moins de 12 h (16 nov. ; 30 min avant) — sinon Ma journée. Un lien
   // `?tab=` reçu gagne toujours (ecranAOuvrir se tait).
   const [search0]=useState(()=>{ try{ return window.location.search||''; }catch(_){ return ''; } });
   const [reprise0]=useState(()=>{ try{ const owner=AUTH.user?.id||readSession()?.user?.id||''; const st=stockageParcours(); return ecranAOuvrir({ carte:carteReprise(), locale:st?repriseLocale(st,owner):null, ongletsOk:ONGLETS_LIENS, search:search0 }); }catch(_){ return null; } });
