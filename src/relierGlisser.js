@@ -29,6 +29,7 @@ export const SEUIL_DEFILEMENT_PX = 10; // un doigt qui bouge plus avant le déla
 export const SEUIL_SOURIS_PX = 6;      // à la souris, un glisser franc démarre sans attendre
 export const BORD_DEFILEMENT_PX = 56;  // la zone près du bord qui fait défiler la liste cible
 export const VITESSE_MAX_PX = 18;      // px par image au bord même
+export const ATTENTE_BORD_MS = 300;    // le doigt doit RESTER près du bord : le traverser ne fait rien défiler
 
 // ── L'appui : une petite machine d'états ────────────────────────────────────
 // etat : null · { phase: 'appui', x0, y0, t0, souris } · { phase: 'leve', … } · { phase: 'defile' }
@@ -54,7 +55,7 @@ export function appuiSuivant(etat, evt) {
 // Rend px par image : négatif vers le haut, positif vers le bas, 0 au milieu (ou hors liste).
 export function vitesseBord(y, haut, bas) {
   if (!Number.isFinite(y) || !Number.isFinite(haut) || !Number.isFinite(bas) || bas - haut < 2 * BORD_DEFILEMENT_PX) return 0;
-  if (y < haut - BORD_DEFILEMENT_PX || y > bas + BORD_DEFILEMENT_PX) return 0;
+  if (y < haut || y > bas) return 0;                    // hors de la liste : jamais (entrer par le haut ne la fait pas remonter)
   if (y < haut + BORD_DEFILEMENT_PX) return -Math.round(VITESSE_MAX_PX * Math.min(1, (haut + BORD_DEFILEMENT_PX - y) / BORD_DEFILEMENT_PX));
   if (y > bas - BORD_DEFILEMENT_PX) return Math.round(VITESSE_MAX_PX * Math.min(1, (y - (bas - BORD_DEFILEMENT_PX)) / BORD_DEFILEMENT_PX));
   return 0;

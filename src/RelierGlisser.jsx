@@ -15,7 +15,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { tr, monnaie } from './i18n/index.js';
-import { appuiSuivant, vitesseBord, listesGlisser, phraseConfirmation, vibrerSiPossible, DELAI_APPUI_MS } from './relierGlisser.js';
+import { appuiSuivant, vitesseBord, listesGlisser, phraseConfirmation, vibrerSiPossible, DELAI_APPUI_MS, ATTENTE_BORD_MS } from './relierGlisser.js';
 import { lotDe } from './suggestionsAchat.js';
 import './styles-relier-glisser.css';
 
@@ -31,7 +31,7 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
   const [confirme, setConfirme] = useState(null);  // { a, cible }
   const [enCours, setEnCours] = useState(false);
   const [large, setLarge] = useState(() => (typeof window !== 'undefined' ? window.innerWidth >= 900 : false));
-  const vientDeGlisser = useRef(false), appui = useRef(null), minuteur = useRef(0), raf = useRef(0), pos = useRef({ x: 0, y: 0 }), listeCibles = useRef(null), carteSource = useRef(null), survolRef = useRef('');
+  const bordDepuis = useRef(0), vientDeGlisser = useRef(false), appui = useRef(null), minuteur = useRef(0), raf = useRef(0), pos = useRef({ x: 0, y: 0 }), listeCibles = useRef(null), carteSource = useRef(null), survolRef = useRef('');
   const parTx = useMemo(() => new Map((L.achats || []).map((x) => [x.tx, x])), [L.achats]);
   const parCle = useMemo(() => new Map(L.cibles.map((c) => [String(c.key), c])), [L.cibles]);
   useEffect(() => { const f = () => setLarge(window.innerWidth >= 900); window.addEventListener('resize', f); return () => window.removeEventListener('resize', f); }, []);
@@ -57,7 +57,10 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
     if (l && appui.current && appui.current.phase === 'leve') {
       const r = l.getBoundingClientRect();
       const v = vitesseBord(pos.current.y, r.top, r.bottom);
-      if (v) { l.scrollTop += v; poserSurvol(cibleSous(pos.current.x, pos.current.y)); }
+      const now = performance.now();
+      if (!v) bordDepuis.current = 0;
+      else if (!bordDepuis.current) bordDepuis.current = now;
+      if (v && now - bordDepuis.current >= ATTENTE_BORD_MS) { l.scrollTop += v; poserSurvol(cibleSous(pos.current.x, pos.current.y)); }
       raf.current = requestAnimationFrame(boucle);
     }
   };

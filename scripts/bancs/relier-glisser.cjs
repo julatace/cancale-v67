@@ -126,6 +126,7 @@ async function tactile(b) {
   await t('touchMove', 20, 30); await t('touchEnd'); await pause(300);
   await pg.evaluate(() => { document.querySelector('[data-glisser-cibles]').scrollTop = 0; }); await pause(200);
   // ── relier : glisser sur l'annonce N°2 ──
+  await pg.evaluate(() => document.querySelector('[data-glisser-cible="a:pa1"]').scrollIntoView({ block: 'center' })); await pause(300);
   a1 = await centre(pg, `[data-glisser-achat="${T1}"]`);
   const c2 = await centre(pg, '[data-glisser-cible="a:pa1"]');
   await t('touchStart', a1.x, a1.y); await pause(650);
@@ -142,7 +143,7 @@ async function tactile(b) {
   dit(/^Relier N°2 à cet achat de 40,00\s€ \?$/.test(qt.replace(/\u00a0|\u202f/g, ' ')), `${nom} · « Relier N°2 à cet achat de 40,00 € ? »`, JSON.stringify(qt));
   dit(JSON.stringify(await liensTous(pg)) === '[]', `${nom} · rien n'est écrit avant « Oui »`);
   await pg.screenshot({ path: path.join(SHOTS, `relier-glisser-${nom}-question.png`) });
-  await pg.locator('[data-glisser-oui]').tap(); await pause(900);
+  if (await pg.locator('[data-glisser-oui]').count()) await pg.locator('[data-glisser-oui]').tap(); await pause(900);
   dit(await lien(pg, 'pa1') === T1, `${nom} · « Oui » : la fiche N°2 porte le lien vers ${T1}`, String(await lien(pg, 'pa1')));
   dit(JSON.stringify(await liensTous(pg)) === JSON.stringify([`pa1:${T1}`]), `${nom} · …et aucune autre fiche`, JSON.stringify(await liensTous(pg)));
   dit(!(await pg.locator('[data-glisser-cible="a:pa1"]').count()) && !(await pg.locator(`[data-glisser-achat="${T1}"]`).count()), `${nom} · l'annonce et l'achat sortent des listes`);
@@ -179,14 +180,17 @@ async function souris(b) {
   await pg.mouse.move(a1.x, 20, { steps: 6 }); await pg.mouse.up(); await pg.waitForTimeout(300);
   dit(!(await pg.locator('[data-glisser-question]').count()) && JSON.stringify(await liensTous(pg)) === '[]', `${nom} · lâché dans le vide : rien`);
   // relier sur la VENTE (sans fiche) — puis Annuler
+  await pg.evaluate(() => document.querySelector('[data-glisser-cible="v:7200001"]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(300);
   a1 = await centre(pg, `[data-glisser-achat="${T1}"]`);
   const cv = await centre(pg, '[data-glisser-cible="v:7200001"]');
   await pg.mouse.move(a1.x, a1.y); await pg.mouse.down(); await pg.mouse.move(cv.x, cv.y, { steps: 14 }); await pg.waitForTimeout(150);
   dit(await pg.locator('[data-glisser-cible="v:7200001"][data-glisser-survol="1"]').count() === 1, `${nom} · au-dessus de la vente : elle s'éclaire`);
   await pg.screenshot({ path: path.join(SHOTS, `relier-glisser-${nom}-pendant.png`) });
   await pg.mouse.up(); await pg.waitForTimeout(300);
-  dit(/« Salomon Speedcross gris 43 »/.test(await pg.locator('.vrm-rg-question-texte').innerText().catch(() => '')), `${nom} · la question nomme la vente (sans N°)`);
-  await pg.locator('[data-glisser-oui]').click(); await pg.waitForTimeout(900);
+  const qv = (await pg.locator('.vrm-rg-question-texte').innerText().catch(() => '')).replace(/\u00a0|\u202f/g, ' ');
+  const qa = await pg.locator('[data-glisser-question]').getAttribute('data-glisser-question').catch(() => null);
+  dit(qa === `${T1}>v:7200001` && /^Relier (N°\d+|« Salomon Speedcross gris 43 ») à cet achat de 40,00 € \?$/.test(qv), `${nom} · la question porte CET achat et CETTE vente (son N° ou son titre)`, `${qa} ${JSON.stringify(qv)}`);
+  if (await pg.locator('[data-glisser-oui]').count()) await pg.locator('[data-glisser-oui]').click(); await pg.waitForTimeout(900);
   const ov = await pg.evaluate(() => { try { const v = JSON.parse(localStorage.getItem('vinted_sale_overrides') || '{}'); return v['7200001'] ? v['7200001'].buyFromId : ''; } catch (_) { return null; } });
   dit(ov === T1, `${nom} · « Oui » : la vente (son n° de transaction) porte le lien`, String(ov));
   const an = pg.locator('[data-pilule-annuler]').first(); await an.waitFor({ timeout: 3000 }).catch(() => {});
@@ -197,11 +201,12 @@ async function souris(b) {
   await pg.locator(`[data-glisser-achat="${T1}"]`).focus(); await pg.keyboard.press('Enter'); await pg.waitForTimeout(200);
   dit(await pg.locator(`[data-glisser-achat="${T1}"][aria-pressed="true"]`).count() === 1, `${nom} · clavier : Entrée choisit l'achat`);
   const ici = pg.locator('[data-glisser-ici="a:pa1"]');
+  await ici.scrollIntoViewIfNeeded().catch(() => {});
   dit(await ici.count() === 1, `${nom} · …chaque cible offre « Relier ici »`);
   if (await ici.count()) { await ici.focus(); await pg.keyboard.press('Enter'); await pg.waitForTimeout(300); }
   dit(await pg.locator('[data-glisser-question]').getAttribute('data-glisser-question').catch(() => null) === `${T1}>a:pa1`, `${nom} · …la même question (rien relié avant « Oui »)`);
   await pg.screenshot({ path: path.join(SHOTS, `relier-glisser-${nom}-clavier.png`) });
-  await pg.locator('[data-glisser-non]').click(); await pg.waitForTimeout(200);
+  if (await pg.locator('[data-glisser-non]').count()) await pg.locator('[data-glisser-non]').click(); await pg.waitForTimeout(200);
   dit(!(await pg.locator('[data-glisser-question]').count()) && JSON.stringify(await liensTous(pg)) === '[]', `${nom} · « Annuler » de la question : rien écrit`);
   dit(!errs.length, `${nom} · aucune erreur de page`, errs.slice(0, 2).join(' | '));
   await o.ctx.close();

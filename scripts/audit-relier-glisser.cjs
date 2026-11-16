@@ -27,6 +27,7 @@ const R = path.join(__dirname, '..');
 const MUTS = {
   'appui-sans-delai': ['src/relierGlisser.js', "      if (d > SEUIL_DEFILEMENT_PX) return evt.t - etat.t0 >= DELAI_APPUI_MS ? { ...etat, phase: 'leve' } : { phase: 'defile' };", "      if (d > SEUIL_DEFILEMENT_PX) return { ...etat, phase: 'leve' };"],
   'delai-court': ['src/relierGlisser.js', 'export const DELAI_APPUI_MS = 400;', 'export const DELAI_APPUI_MS = 0;'],
+  'bord-dehors': ['src/relierGlisser.js', '  if (y < haut || y > bas) return 0;', '  if (y < haut - BORD_DEFILEMENT_PX || y > bas + BORD_DEFILEMENT_PX) return 0;'],
   'bord-inverse': ['src/relierGlisser.js', "  if (y < haut + BORD_DEFILEMENT_PX) return -Math.round(", "  if (y < haut + BORD_DEFILEMENT_PX) return Math.round("],
   'achats-tous': ['src/relierGlisser.js', '  const libres = tousAchatsLibres({ achats, liens });', '  const libres = achats.filter((a) => a && a.transaction_id != null);'],
   'propose-ailleurs': ['src/relierGlisser.js', "x.niveau === 'tres-probable' && cles.has(String(x.key))", "x.niveau === 'tres-probable'"],
@@ -89,6 +90,8 @@ const sans = (s) => s.replace(/\/\/[^\n]*/g, '');
   dit(G.vitesseBord(110, 100, 700) < 0 && G.vitesseBord(690, 100, 700) > 0, 'D2 près du haut ⇒ monte, près du bas ⇒ descend');
   dit(Math.abs(G.vitesseBord(101, 100, 700)) > Math.abs(G.vitesseBord(150, 100, 700)), 'D3 plus près du bord ⇒ plus vite');
   dit(G.vitesseBord(10, 100, 700) === 0 && G.vitesseBord(NaN, 100, 700) === 0, 'D4 loin hors de la liste ou position inconnue ⇒ rien');
+  dit(G.vitesseBord(95, 100, 700) === 0 && G.vitesseBord(705, 100, 700) === 0, 'D5 juste au-dessus (on y entre par le haut) ou au-dessous de la liste ⇒ rien');
+  dit(G.ATTENTE_BORD_MS >= 200, 'D6 le doigt doit RESTER près du bord (≥ 200 ms) : le traverser ne fait rien défiler');
 
   // ── L · les listes ──
   const A = [
