@@ -307,7 +307,8 @@ const garde = (x, k, v) => {
     const tabs = (/const (?:TABS_OK|ONGLETS_LIENS)=\[([^\]]*)\]/.exec(APP) || [])[1] || '';
     dit(/'emails'/.test(tabs), '`?tab=emails` accepté (liste blanche de `goto`)');
     dit(/\{id:'emails',\s*icon:'mail',\s*label:'E-mails'\}/.test(APP), 'l’écran est dans la navigation (icône « mail », nom nu)');
-    dit((APP.match(/tab==='emails'&&(?:<GardeEcran nom="emails">)?<Suspense/g) || []).length === 1 && /lazy\(\(\) => import\("\.\/BoiteEmails\.jsx"\)\)/.test(APP), 'l’écran est MONTÉ (une fois, chargé à la demande)');
+    // (16 nov.) Depuis le 15 nov. : `lazySur` (src/chargementSur.js), et l'écran posé dans son espace (`data-espace="autres"`).
+    dit((APP.match(/tab==='emails'&&(?:<div data-espace="[a-z]+" style=\{\{display:'contents'\}\}>)?(?:<GardeEcran nom="emails">)?<Suspense/g) || []).length === 1 && /(?:lazy|lazySur)\(\(\) => import\("\.\/BoiteEmails\.jsx"\)\)/.test(APP), 'l’écran est MONTÉ (une fois, chargé à la demande)');
     const css = fs.readFileSync(path.join(R, 'src/boite-emails.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
     dit(!/inline-flex/.test(css) && !/-webkit-overflow-scrolling/.test(css) && !/#(?:FF3B30|FF453A|D70015|C00|E00)/i.test(css), 'styles : pas d’inline-flex, pas de défilement tactile WebKit, pas de rouge');
   }

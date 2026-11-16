@@ -84,7 +84,8 @@ async function principal() {
 
   console.log('── P. la page');
   const acc = lire('src/Accueil.jsx').replace(/\/\/.*$/gm, '');
-  dit(/React\.lazy\(\(\) => import\('\.\/accueil\/TempsGagne\.jsx'\)\)/.test(acc), 'P le calculateur est chargé à la demande (React.lazy)');
+  // (16 nov.) Depuis le 15 nov., tout morceau à part passe par `lazySur` (src/chargementSur.js : relancé, puis rechargement propre).
+  dit(/(?:React\.lazy|lazySur)\(\(\) => import\('\.\/accueil\/TempsGagne\.jsx'\)\)/.test(acc), 'P le calculateur est chargé à la demande (lazySur)');
   dit(!/^\s*import[^;]*TempsGagne/m.test(acc) && !/^\s*import[^;]*accueil\/tempsGagne/m.test(acc), 'P Accueil.jsx ne l’importe jamais en dur');
   dit(/id="temps"/.test(acc) && /<TempsGagne \/>/.test(acc), 'P la section #temps rend le calculateur');
 }
@@ -98,7 +99,7 @@ function prouve() {
     ['src/i18n/langues/fr-accueil.js', 'pas des résultats de clients', 'comme nos clients'],
     ['src/i18n/langues/en-accueil.js', '"The time VRM saves you"', '"The only tool that saves you time"'],
     ['src/i18n/langues/de-accueil.js', '"accueil.temps.geste.codes"', '"accueil.temps.geste.codez"'],
-    ['src/Accueil.jsx', "const TempsGagne = React.lazy(() => import('./accueil/TempsGagne.jsx'));", "import TempsGagne from './accueil/TempsGagne.jsx';"],
+    ['src/Accueil.jsx', "const TempsGagne = lazySur(() => import('./accueil/TempsGagne.jsx'));", "import TempsGagne from './accueil/TempsGagne.jsx';"],
   ];
   let rouges = 0;
   for (const [f, a, b] of muts) {
