@@ -716,4 +716,8 @@ export default {
   "compta.environHeuresVinted": { one: "Environ {n} h avec vinted.fr ouvert sur ce compte.", other: "Environ {n} h avec vinted.fr ouvert sur ce compte." },
   "compta.releveAVerifier": { one: "{n} vente dans le relevé du porte-monnaie : dates du relevé pas encore vérifiées ({accords} sur {min} accords avec le détail des ventes). Rien n’en est daté d’ici là.", other: "{n} ventes dans le relevé du porte-monnaie : dates du relevé pas encore vérifiées ({accords} sur {min} accords avec le détail des ventes). Rien n’en est daté d’ici là." },
   "compta.releveDesaccord": { one: "{n} vente dans le relevé du porte-monnaie : sa date ne tombe pas le même jour que le détail de la vente ({desaccords} désaccord). Le relevé de ce compte ne date rien.", other: "{n} ventes dans le relevé du porte-monnaie : leur date ne tombe pas le même jour que le détail des ventes ({desaccords} désaccord(s)). Le relevé de ce compte ne date rien." },
+  "facturePro.serieVrmTitre": {"one": "Envoyer {n} facture avec VRM ?", "other": "Envoyer {n} factures avec VRM ?"},
+  "facturePro.serieVrmDesc": "Ta boîte n’est pas connectée : VRM les envoie à ta place, chacune à SON acheteur prouvé, toi en copie. Ton réglage « depuis ma boîte » ne change pas.",
+  "facturePro.envoyerAvecVrm": "Envoyer avec VRM",
+  "facturePro.toutEnvoyerVrm": "Tout envoyer avec VRM ({n})",
 };

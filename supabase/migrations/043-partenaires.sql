@@ -17,10 +17,14 @@
 --   partenaire_commissions   une ligne par FACTURE payée (clé primaire : la facture ⇒
 --                            un webhook rejoué n'ajoute rien) ; un client = une
 --                            commission par mois au plus (index unique partiel) ;
---                            annulée = marquée, jamais effacée.
---   partenaire_annulations   un remboursement / litige / avoir reçu AVANT la facture
---                            payée (événements dans le désordre) : la clé Stripe
---                            (facture, paiement), pour que la commission naisse annulée.
+--                            annulée = marquée, jamais effacée ; (16 nov.) un
+--                            remboursement PARTIEL la réduit au prorata
+--                            (`rembourse_centimes`, il ne fait que monter).
+--   partenaire_annulations   chaque remboursement / litige / avoir reçu (une ligne par
+--                            clé Stripe — facture, paiement — et par geste de Stripe,
+--                            `signal`, avec son montant `centimes`) : la règle rejuge la
+--                            commission sur tous ses signaux, même reçus AVANT la
+--                            facture payée (événements dans le désordre).
 --   partenaire_versements    « Versé », noté sur le clic de Julien (date, montant).
 --                            VRM ne verse RIEN.
 -- RLS activée ET forcée, aucune policy, aucun droit pour anon ni authenticated :
@@ -63,7 +67,9 @@ create table if not exists public.partenaire_commissions (
   payment_intent    text,
   annulee_le        timestamptz,
   annulee_raison    text check (annulee_raison is null or annulee_raison in ('remboursement', 'litige', 'avoir')),
+  rembourse_centimes integer not null default 0 check (rembourse_centimes >= 0),
   cree              timestamptz not null default now(),
+  check (rembourse_centimes < facture_centimes or annulee_le is not null),
   check (due_le >= paye_le + interval '14 days'),
   check ((annulee_le is null) = (annulee_raison is null))
 );
@@ -74,9 +80,12 @@ create index if not exists partenaire_commissions_charge on public.partenaire_co
 create index if not exists partenaire_commissions_pi on public.partenaire_commissions (payment_intent) where payment_intent is not null;
 
 create table if not exists public.partenaire_annulations (
-  cle     text primary key check (cle ~ '^(in|ch|py|pi)_[A-Za-z0-9]+$'),
-  raison  text not null check (raison in ('remboursement', 'litige', 'avoir')),
-  le      timestamptz not null default now()
+  cle      text not null check (cle ~ '^(in|ch|py|pi)_[A-Za-z0-9]+$'),
+  signal   text not null check (signal ~ '^(total|litige|cumul:[0-9]{1,9}|(re|pyr|cn)_[A-Za-z0-9]+)$'),
+  raison   text not null check (raison in ('remboursement', 'litige', 'avoir')),
+  centimes integer check (centimes is null or centimes > 0),
+  le       timestamptz not null default now(),
+  primary key (cle, signal)
 );
 
 create table if not exists public.partenaire_versements (

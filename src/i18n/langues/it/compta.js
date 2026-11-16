@@ -716,4 +716,8 @@ export default {
   "compta.environHeuresVinted": { one: "Circa {n} h con vinted.fr aperto su questo account.", other: "Circa {n} h con vinted.fr aperto su questo account." },
   "compta.releveAVerifier": { one: "{n} vendita nell’estratto del portafoglio: date dell’estratto non ancora verificate ({accords} su {min} corrispondenze con il dettaglio delle vendite). Fino ad allora non viene datato nulla.", other: "{n} vendite nell’estratto del portafoglio: date dell’estratto non ancora verificate ({accords} su {min} corrispondenze con il dettaglio delle vendite). Fino ad allora non viene datato nulla." },
   "compta.releveDesaccord": { one: "{n} vendita nell’estratto del portafoglio: la sua data non cade nello stesso giorno del dettaglio della vendita ({desaccords} disaccordo). L’estratto di questo account non data nulla.", other: "{n} vendite nell’estratto del portafoglio: le loro date non cadono nello stesso giorno del dettaglio delle vendite ({desaccords} disaccordi). L’estratto di questo account non data nulla." },
+  "facturePro.serieVrmTitre": {"one": "Inviare {n} fattura con VRM?", "other": "Inviare {n} fatture con VRM?"},
+  "facturePro.serieVrmDesc": "La tua casella non è collegata: VRM le invia al posto tuo, ognuna al SUO acquirente verificato, con te in copia. La tua impostazione «dalla mia casella» non cambia.",
+  "facturePro.envoyerAvecVrm": "Invia con VRM",
+  "facturePro.toutEnvoyerVrm": "Invia tutto con VRM ({n})",
 };
