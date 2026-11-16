@@ -307,3 +307,93 @@
   .av-nav .av-btn{display:none}
 }
 @media (max-width:359px){.av-marque b{display:none}}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   15 nov. — « VERRE DÉPOLI » (Julien : « J'aime la 9 ») : toute la page sur un BLEU PROFOND
+   dégradé (posé en fond fixe, opaque) ; les titres et le chiffre phare se lisent en BLANC sur le
+   bleu ; chaque section (tuiles, panneaux, offres, questions, fin) est une plaque de VERRE où le
+   texte est à l'encre (la nuit : verre sombre, texte clair). Un seul plein par vue : blanc sur le
+   bleu, encre sur le verre. Contraste AA mesuré sur les couleurs CALCULÉES (banc
+   verre-extension-site : le blanc sur la partie la plus CLAIRE du dégradé, l'encre sur le verre
+   posé sur la partie la plus SOMBRE). Sans flou ou transparence réduite : verre opaque.
+   Contenu inchangé. Aucun violet, aucun rouge.
+   ════════════════════════════════════════════════════════════════════════════ */
+.av{
+  --bleu-uni:#174C88;
+  --fond-bleu:radial-gradient(120% 60% at 12% 0%,rgb(120 180 240 / .16) 0%,rgb(120 180 240 / 0) 55%),radial-gradient(70% 45% at 100% 38%,rgb(61 139 224 / .16) 0%,rgb(61 139 224 / 0) 70%),linear-gradient(170deg,#1E5DA4 0%,#174C88 45%,#0F2F57 100%);
+  --verre-c:rgb(247 250 253 / .9);--verre-o:#D7DEE6;--verre-bord:rgb(255 255 255 / .75);
+  --verre-ombre:inset 0 1px 0 rgb(255 255 255 / .9),0 18px 40px -18px rgb(8 26 50 / .55);
+  --sur:#FFFFFF;--sur-2:#EEF4FB;
+  /* Sur le bleu (par défaut) : le blanc. */
+  --encre:#FFFFFF;--gris:#EEF4FB;--lien:#FFFFFF;--accent-texte:#FFFFFF;--accent:#FFFFFF;--diode:#FFFFFF;
+  --filet:rgb(255 255 255 / .16);
+  --plein-fond:linear-gradient(180deg,#FFFFFF,#E9F1FA);--plein-uni:#FFFFFF;--plein-encre:#0C1D30;
+  --plein-ombre:inset 0 -.5px 0 rgb(18 52 96 / .12),0 1px 2px rgb(0 0 0 / .25),0 14px 26px -12px rgb(4 16 32 / .7);
+  isolation:isolate;
+  background-color:var(--bleu-uni);background-image:none;
+}
+/* Le dégradé : un fond FIXE derrière toute la page (iPhone compris : pas de background-attachment). */
+.av:before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background-color:var(--bleu-uni);background-image:var(--fond-bleu)}
+@media (prefers-color-scheme:dark){
+  .av{
+    --bleu-uni:#0C2848;
+    --fond-bleu:radial-gradient(120% 60% at 12% 0%,rgb(90 150 220 / .14) 0%,rgb(90 150 220 / 0) 60%),linear-gradient(170deg,#133A68 0%,#0C2848 50%,#06142A 100%);
+    --verre-c:rgb(8 18 33 / .72);--verre-o:#0E2139;--verre-bord:rgb(255 255 255 / .12);
+    --verre-ombre:inset 0 .5px 0 rgb(255 255 255 / .10),0 18px 40px -18px rgb(0 0 0 / .85);
+    --sur-2:#D6E4F3;
+    --encre:#FFFFFF;--gris:#D6E4F3;--lien:#FFFFFF;--accent-texte:#FFFFFF;--accent:#FFFFFF;--diode:#FFFFFF;
+    --filet:rgb(255 255 255 / .12);
+    --plein-fond:linear-gradient(180deg,#FFFFFF,#DCE8F5);--plein-uni:#FFFFFF;--plein-encre:#0C1D30;
+    background-image:none;
+  }
+}
+/* Les plaques de verre : le texte y est à l'encre (la nuit, clair) ; le plein, d'encre (la nuit, blanc). */
+.av .av-tuile,.av .av-panneau,.av .av-offre-solo,.av .av-fin-plaque,.av .av-tg,.av .av-faq-texte{
+  --encre:#0C1D30;--gris:#3F5468;--lien:#0055B8;--accent-texte:#0055B8;--accent:#0C1D30;--diode:#0060CC;
+  --filet:rgb(18 52 96 / .10);--porc:#FFFFFF;--porc2:#F7FAFD;--creux:rgb(18 52 96 / .07);
+  --plein-fond:radial-gradient(120% 90% at 50% 0%,#3D4B5B 0%,#0C1D30 55%);--plein-uni:#0C1D30;--plein-encre:#FFFFFF;
+  --plein-ombre:inset 0 .5px 0 rgb(255 255 255 / .25),0 1px 2px rgb(18 52 96 / .25),0 12px 22px -10px rgb(18 52 96 / .6);
+  color:var(--encre);
+  background:var(--verre-c);-webkit-backdrop-filter:blur(26px) saturate(1.4);backdrop-filter:blur(26px) saturate(1.4);
+  border:1px solid var(--verre-bord);box-shadow:var(--verre-ombre);
+}
+@media (prefers-color-scheme:dark){
+  .av .av-tuile,.av .av-panneau,.av .av-offre-solo,.av .av-fin-plaque,.av .av-tg,.av .av-faq-texte{
+    --encre:#EAF2FB;--gris:#A9BBCF;--lien:#6CB4FF;--accent-texte:#6CB4FF;--accent:#EAF2FB;--diode:#4AA3FF;
+    --filet:rgb(255 255 255 / .08);--porc:rgb(255 255 255 / .06);--porc2:rgb(255 255 255 / .04);--creux:rgb(255 255 255 / .07);
+    --plein-fond:linear-gradient(180deg,#FFFFFF,#DCE8F5);--plein-uni:#EAF2FB;--plein-encre:#0C1D30;
+    --plein-ombre:inset 0 -.5px 0 rgb(0 0 0 / .12),0 1px 2px rgb(0 0 0 / .5),0 12px 22px -10px rgb(0 0 0 / .8);
+  }
+}
+@supports not ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){
+  .av .av-tuile,.av .av-panneau,.av .av-offre-solo,.av .av-fin-plaque,.av .av-tg,.av .av-faq-texte{background:var(--verre-o)}
+}
+@media (prefers-reduced-transparency:reduce){
+  .av .av-tuile,.av .av-panneau,.av .av-offre-solo,.av .av-fin-plaque,.av .av-tg,.av .av-faq-texte{background:var(--verre-o);-webkit-backdrop-filter:none;backdrop-filter:none}
+  .av-nav.defile{background:var(--bleu-uni);-webkit-backdrop-filter:none;backdrop-filter:none}
+}
+/* La barre : du verre BLEU quand on défile (le blanc y reste lisible, quoi qu'il passe dessous). */
+.av-nav.defile{background:rgb(12 36 70 / .74);box-shadow:0 .5px 0 rgb(255 255 255 / .12)}
+@media (prefers-color-scheme:dark){.av-nav.defile{background:rgb(6 20 42 / .78)}}
+/* Sur le bleu : la touche « Découvrir » est du verre à l'encre ; les pictogrammes, des pastilles givrées. */
+/* Sur le bleu, la touche est du verre FUMÉ (le blanc s'y lit ; jamais un second « plein ») ; posée sur une
+   plaque de verre (la fin de page), elle redevient la porcelaine à l'encre. */
+.av .av-btn.av-btn-exemple{background:rgb(6 20 42 / .34);background-image:none;color:#FFFFFF;border:1px solid rgb(255 255 255 / .34);box-shadow:inset 0 1px 0 rgb(255 255 255 / .12),0 10px 22px -14px rgb(0 0 0 / .6);-webkit-backdrop-filter:blur(18px) saturate(1.4);backdrop-filter:blur(18px) saturate(1.4)}
+.av .av-btn.av-btn-exemple:after{color:#FFFFFF}
+.av :is(.av-fin-plaque,.av-tuile,.av-panneau) .av-btn.av-btn-exemple{background:var(--porc);background-image:var(--touche-fond,none);color:var(--encre);border:1px solid var(--verre-bord);box-shadow:0 1px 2px rgb(18 52 96 / .12),0 8px 18px -12px rgb(18 52 96 / .4)}
+.av :is(.av-fin-plaque,.av-tuile,.av-panneau) .av-btn.av-btn-exemple:after{color:var(--gris)}
+.av-picto{background:rgb(255 255 255 / .16);box-shadow:inset 0 0 0 1px rgb(255 255 255 / .32)}
+.av-tuile .av-picto{background:var(--porc);box-shadow:var(--ombre-pose)}
+.av-scene:before{background:radial-gradient(48% 50% at 55% 45%,rgb(156 200 242 / .28),transparent 72%)}
+.av-ecran-bureau{border-color:rgb(255 255 255 / .85);background:#FFFFFF}
+.av-h1,.av-h2,.av-montant b{font-variant-numeric:tabular-nums}
+.av .av-tg{border-radius:28px;padding:32px}
+.av .av-tg-champs{background:rgb(255 255 255 / .55)}
+@media (prefers-color-scheme:dark){.av .av-tg-champs{background:rgb(255 255 255 / .05)}}
+.av .av-faq-texte{border-radius:28px;padding:36px}
+.av-offre-pro{border:1px solid rgb(255 255 255 / .12)}
+.av-pied{border-top-color:rgb(255 255 255 / .16)}
+@media (max-width:759px){
+  .av .av-tg{padding:24px 20px;border-radius:26px}
+  .av .av-faq-texte{padding:26px 22px;border-radius:26px}
+}

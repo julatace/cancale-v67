@@ -40,3 +40,57 @@
 /* Au téléphone, la barre des tarifs ne tient pas « VRM » + « Se connecter » + « Essayer gratuitement » :
    le mot « VRM » se tait (le logo reste et garde son nom lu), plus aucun chevauchement. */
 @media (max-width: 440px) { :root:root .vt .vt-marque b { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } }
+/* ════════════════════════════════════════════════════════════════════════════
+   15 nov. — « VERRE DÉPOLI » (Julien : « J'aime la 9 ») — les tarifs comme l'accueil
+   (src/accueil/accueil.css) : un bleu profond dégradé, opaque ; les titres et les phrases du
+   haut en BLANC sur le bleu ; offres, tableau, frise et cartes sur des plaques de VERRE (encre
+   la journée, clair la nuit) ; Pro garde sa carte d'encre. Un plein par vue : blanc sur le bleu.
+   Contraste AA mesuré (banc verre-extension-site). Sans flou ou transparence réduite : opaque.
+   ════════════════════════════════════════════════════════════════════════════ */
+:root:root .vt {
+  --vt-bleu: #174C88;
+  --vt-fond-bleu: radial-gradient(120% 60% at 12% 0%, rgb(120 180 240 / .16) 0%, rgb(120 180 240 / 0) 55%), radial-gradient(70% 45% at 100% 38%, rgb(61 139 224 / .16) 0%, rgb(61 139 224 / 0) 70%), linear-gradient(170deg, #1E5DA4 0%, #174C88 45%, #0F2F57 100%);
+  --vt-verre: rgb(247 250 253 / .9); --vt-verre-o: #D7DEE6; --vt-verre-bord: rgb(255 255 255 / .75);
+  --vt-verre-ombre: inset 0 1px 0 rgb(255 255 255 / .9), 0 18px 40px -18px rgb(8 26 50 / .55);
+  --vt-encre: #FFFFFF; --vt-gris: #EEF4FB; --vt-lien: #FFFFFF; --vt-accent: #FFFFFF; --vt-filet: rgb(255 255 255 / .16); --vt-teinte: rgb(255 255 255 / .16);
+  --vt-lumiere: none;
+  isolation: isolate; background: var(--vt-bleu);
+}
+:root:root[data-theme="dark"] .vt {
+  --vt-bleu: #0C2848;
+  --vt-fond-bleu: radial-gradient(120% 60% at 12% 0%, rgb(90 150 220 / .14) 0%, rgb(90 150 220 / 0) 60%), linear-gradient(170deg, #133A68 0%, #0C2848 50%, #06142A 100%);
+  --vt-verre: rgb(8 18 33 / .72); --vt-verre-o: #0E2139; --vt-verre-bord: rgb(255 255 255 / .12);
+  --vt-verre-ombre: inset 0 .5px 0 rgb(255 255 255 / .10), 0 18px 40px -18px rgb(0 0 0 / .85);
+  --vt-encre: #FFFFFF; --vt-gris: #D6E4F3; --vt-lien: #FFFFFF; --vt-accent: #FFFFFF; --vt-filet: rgb(255 255 255 / .12); --vt-teinte: rgb(255 255 255 / .12);
+  --vt-lumiere: none; background: var(--vt-bleu);
+}
+@media (prefers-color-scheme: dark) {
+  :root:root:not([data-theme="light"]) .vt {
+    --vt-bleu: #0C2848;
+    --vt-fond-bleu: radial-gradient(120% 60% at 12% 0%, rgb(90 150 220 / .14) 0%, rgb(90 150 220 / 0) 60%), linear-gradient(170deg, #133A68 0%, #0C2848 50%, #06142A 100%);
+    --vt-verre: rgb(8 18 33 / .72); --vt-verre-o: #0E2139; --vt-verre-bord: rgb(255 255 255 / .12);
+    --vt-verre-ombre: inset 0 .5px 0 rgb(255 255 255 / .10), 0 18px 40px -18px rgb(0 0 0 / .85);
+    --vt-encre: #FFFFFF; --vt-gris: #D6E4F3; --vt-lien: #FFFFFF; --vt-accent: #FFFFFF; --vt-filet: rgb(255 255 255 / .12); --vt-teinte: rgb(255 255 255 / .12);
+    --vt-lumiere: none; background: var(--vt-bleu);
+  }
+}
+:root:root .vt::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; background-color: var(--vt-bleu); background-image: var(--vt-fond-bleu); }
+/* Les plaques de verre : l'encre (la nuit, le clair). */
+:root:root .vt :is(.vt-etat, .vt-offre:not(.vt-offre-pro), .vt-tableau, .vt-frise li, .vt-carte) {
+  --vt-encre: #0C1D30; --vt-gris: #3F5468; --vt-lien: #0055B8; --vt-accent: #0C1D30; --vt-filet: rgb(18 52 96 / .12); --vt-teinte: rgb(18 52 96 / .08);
+  color: var(--vt-encre); background: var(--vt-verre); -webkit-backdrop-filter: blur(26px) saturate(1.4); backdrop-filter: blur(26px) saturate(1.4);
+  border: 1px solid var(--vt-verre-bord); box-shadow: var(--vt-verre-ombre);
+}
+:root:root[data-theme="dark"] .vt :is(.vt-etat, .vt-offre:not(.vt-offre-pro), .vt-tableau, .vt-frise li, .vt-carte) { --vt-encre: #EAF2FB; --vt-gris: #A9BBCF; --vt-lien: #6CB4FF; --vt-accent: #EAF2FB; --vt-filet: rgb(255 255 255 / .08); --vt-teinte: rgb(255 255 255 / .07); }
+@media (prefers-color-scheme: dark) { :root:root:not([data-theme="light"]) .vt :is(.vt-etat, .vt-offre:not(.vt-offre-pro), .vt-tableau, .vt-frise li, .vt-carte) { --vt-encre: #EAF2FB; --vt-gris: #A9BBCF; --vt-lien: #6CB4FF; --vt-accent: #EAF2FB; --vt-filet: rgb(255 255 255 / .08); --vt-teinte: rgb(255 255 255 / .07); } }
+@supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) { :root:root .vt :is(.vt-etat, .vt-offre:not(.vt-offre-pro), .vt-tableau, .vt-frise li, .vt-carte) { background: var(--vt-verre-o); } }
+@media (prefers-reduced-transparency: reduce) { :root:root .vt :is(.vt-etat, .vt-offre:not(.vt-offre-pro), .vt-tableau, .vt-frise li, .vt-carte) { background: var(--vt-verre-o); -webkit-backdrop-filter: none; backdrop-filter: none; } }
+:root:root .vt .vt-offre-pro { border: 1px solid rgb(255 255 255 / .12); }
+/* Sur le bleu : le plein est BLANC à l'encre ; « Découvrir » est du verre à l'encre. */
+:root:root .vt .vt-btn, :root:root[data-theme="dark"] .vt .vt-btn { background: #FFFFFF; color: #0C1D30; box-shadow: inset 0 -.5px 0 rgb(18 52 96 / .12), 0 1px 2px rgb(0 0 0 / .25), 0 14px 26px -12px rgb(4 16 32 / .7); }
+@media (prefers-color-scheme: dark) { :root:root:not([data-theme="light"]) .vt .vt-btn { background: #FFFFFF; color: #0C1D30; } }
+:root:root .vt .vt-btn.vt-btn-neutre, :root:root[data-theme="dark"] .vt .vt-btn.vt-btn-neutre { background: rgb(6 20 42 / .34); color: #FFFFFF; border: 1px solid rgb(255 255 255 / .34); box-shadow: inset 0 1px 0 rgb(255 255 255 / .12), 0 10px 22px -14px rgb(0 0 0 / .6); -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4); }
+@media (prefers-color-scheme: dark) { :root:root:not([data-theme="light"]) .vt .vt-btn.vt-btn-neutre { background: rgb(6 20 42 / .34); color: #FFFFFF; } }
+:root:root .vt .vt-offre:not(.vt-offre-pro) .vt-inclus svg { color: #0060CC; }
+:root:root[data-theme="dark"] .vt .vt-offre:not(.vt-offre-pro) .vt-inclus svg { color: #6CB4FF; }
+@media (prefers-color-scheme: dark) { :root:root:not([data-theme="light"]) .vt .vt-offre:not(.vt-offre-pro) .vt-inclus svg { color: #6CB4FF; } }

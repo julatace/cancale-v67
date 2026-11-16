@@ -18,11 +18,26 @@
      de fichier ni identifiant interne sur une page publique). -->
 <script src="/confiance.js"></script>
 <style>
-:root{--fond:#EEF6FD;--fond-bas:#D7E9F6;--carte:#FFFFFF;--encre:#0C1D30;--gris:#3F5468;--filet:#E1EAF4;--bleu:#0060CC;--lien:#0055B8;--ombre:inset 0 1px 0 #fff,0 0 0 .5px rgb(18 52 96 / .07),0 12px 26px -16px rgb(18 52 96 / .32);color-scheme:light}
-:root[data-theme="dark"]{--fond:#15263D;--fond-bas:#0C1829;--carte:#16273C;--encre:#EAF2FB;--gris:#A9BBCF;--filet:#24364E;--bleu:#4AA3FF;--lien:#6CB4FF;--ombre:inset 0 .5px 0 rgb(255 255 255 / .09),0 0 0 .5px rgb(0 0 0 / .5),0 12px 26px -12px rgb(0 0 0 / .8);color-scheme:dark}
+/* (15 nov., « Verre dépoli », Julien : « J'aime la 9 ») La forme seulement : un bleu profond dégradé
+   (opaque, fixe) ; le titre, les phrases et les intitulés en BLANC sur le bleu ; chaque liste sur une
+   plaque de VERRE où le texte est à l'encre (la nuit : verre sombre, texte clair). Contraste AA mesuré
+   (banc verre-extension-site) ; sans flou ou transparence réduite : verre opaque. */
+:root{--bleu-uni:#174C88;--fond-bleu:radial-gradient(120% 60% at 12% 0%,rgb(120 180 240 / .16) 0%,rgb(120 180 240 / 0) 55%),radial-gradient(70% 45% at 100% 38%,rgb(61 139 224 / .16) 0%,rgb(61 139 224 / 0) 70%),linear-gradient(170deg,#1E5DA4 0%,#174C88 45%,#0F2F57 100%);
+  --verre:rgb(247 250 253 / .9);--verre-o:#D7DEE6;--verre-bord:rgb(255 255 255 / .75);--ombre:inset 0 1px 0 rgb(255 255 255 / .9),0 18px 40px -18px rgb(8 26 50 / .55);
+  --encre:#FFFFFF;--gris:#EEF4FB;--lien:#FFFFFF;--bleu:#FFFFFF;
+  --v-encre:#0C1D30;--v-gris:#3F5468;--v-filet:rgb(18 52 96 / .12);--v-lien:#0055B8;--v-bleu:#0060CC;color-scheme:light}
+:root[data-theme="dark"]{--bleu-uni:#0C2848;--fond-bleu:radial-gradient(120% 60% at 12% 0%,rgb(90 150 220 / .14) 0%,rgb(90 150 220 / 0) 60%),linear-gradient(170deg,#133A68 0%,#0C2848 50%,#06142A 100%);
+  --verre:rgb(8 18 33 / .72);--verre-o:#0E2139;--verre-bord:rgb(255 255 255 / .12);--ombre:inset 0 .5px 0 rgb(255 255 255 / .10),0 18px 40px -18px rgb(0 0 0 / .85);
+  --encre:#FFFFFF;--gris:#D6E4F3;--lien:#FFFFFF;--bleu:#FFFFFF;
+  --v-encre:#EAF2FB;--v-gris:#A9BBCF;--v-filet:rgb(255 255 255 / .08);--v-lien:#6CB4FF;--v-bleu:#4AA3FF;color-scheme:dark}
 *{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
-body{margin:0;background:var(--fond) linear-gradient(180deg,var(--fond) 0%,var(--fond-bas) 100%) fixed;color:var(--encre);font:17px/1.47 -apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;background:var(--bleu-uni)}
+body:before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background-color:var(--bleu-uni);background-image:var(--fond-bleu)}
+/* Les listes : du verre ; le texte y reprend l'encre. */
+ul{--encre:var(--v-encre);--gris:var(--v-gris);--filet:var(--v-filet);--lien:var(--v-lien);--bleu:var(--v-bleu);color:var(--encre);background:var(--verre)!important;-webkit-backdrop-filter:blur(26px) saturate(1.4);backdrop-filter:blur(26px) saturate(1.4);border:1px solid var(--verre-bord)}
+@supports not ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){ul{background:var(--verre-o)!important}}
+@media (prefers-reduced-transparency:reduce){ul{background:var(--verre-o)!important;-webkit-backdrop-filter:none;backdrop-filter:none}}
+body{isolation:isolate;margin:0;background:var(--bleu-uni);color:var(--encre);font:17px/1.47 -apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh}
 main{max-width:680px;margin:0 auto;padding:max(32px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(48px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
 .tete{display:flex;align-items:center;gap:12px;margin:0 0 32px}
 .tete a{display:inline-flex;align-items:center;gap:12px;color:inherit;text-decoration:none;min-height:44px}

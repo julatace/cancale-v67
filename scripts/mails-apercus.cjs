@@ -25,6 +25,9 @@ const SORTIE = path.resolve(process.argv[2] || path.join(require('os').tmpdir(),
   const FR = await imp('src/facturePro/regle.js');
   const FP = await imp('api/_lib/facture-pro.js');
   const ME = await imp('api/_lib/mail-essai.js');
+  const SD = await imp('api/_lib/suppression-differee.js');
+  const SC = await imp('api/_lib/suppression-compte.js');
+  const CP = await imp('api/_lib/clients-partis.js');
   globalThis.VRM_EDITEUR = undefined;      // l'éditeur pas rempli : rien d'inventé au pied
 
   const fin = new Date(Date.now() + 3 * 86400e3).toISOString();
@@ -39,7 +42,23 @@ const SORTIE = path.resolve(process.argv[2] || path.join(require('os').tmpdir(),
     'facture-pro': (() => { const m = FR.emailFacture({}, { type: 'facture', numero: 'FA-2026-0001', vendeur: { nom: 'Boutique Démo' }, acheteur: { nom: 'Client Démo' }, lignes: [{ designation: 'Paire de démonstration' }] }, { via: 'vrm' }); return m; })(),
     'boite-factures': { sujet: 'Essai d’envoi de tes factures', ...FP.mailBoiteEssai() },
     'mail-essai': ME.mailEssai(),
+    // (15 nov., « Verre dépoli ») les e-mails du compte qui se ferme, eux aussi.
+    'suppression-prevue': SD.mailDemande({ effaceLe: new Date(Date.now() + 30 * 86400e3).toISOString(), contact: 'contact@exemple.test' }),
+    'suppression-faite': SC.mailSuppression({ fait: ['tes ventes et tes annonces', 'tes réglages'], contact: 'contact@exemple.test' }),
+    'clients-partis': CP.mailAvis({ quand: '15 décembre 2026' }),
   };
+  // Les six modèles de compte Supabase (supabase/templates/*.html), rendus en français ET en anglais :
+  // les variables de Supabase remplacées par des valeurs de DÉMONSTRATION (la vraie forme Go est jugée
+  // par audit-modeles-email.cjs, qui fait tourner le moteur de Go).
+  const { MODELES } = require('./modeles-email.cjs');
+  const demo = { '{{ .ConfirmationURL }}': 'https://exemple.supabase.co/auth/v1/verify?token=demonstration&amp;type=signup', '{{ .Token }}': '482913', '{{ .TokenHash }}': 'demonstration', '{{ .Email }}': 'demo.vendeur@exemple.test', '{{ .NewEmail }}': 'nouvelle.adresse@exemple.test' };
+  for (const m of MODELES) {
+    const src = fs.readFileSync(path.join(RACINE, 'supabase', 'templates', `${m.id}.html`), 'utf8');
+    const i = src.indexOf('\n{{ if $en }}\n'), j = src.indexOf('\n{{ else }}\n', i), k = src.lastIndexOf('\n{{ end }}');
+    const remplir = (h) => Object.entries(demo).reduce((a, [x, y]) => a.split(x).join(y), h);
+    mails[`supabase-${m.id}`] = { sujet: m.sujet.fr, texte: '(modèle Supabase : HTML seulement)', html: remplir(src.slice(j + 12, k)) };
+    mails[`supabase-${m.id}-en`] = { sujet: m.sujet.en, texte: '(Supabase template: HTML only)', html: remplir(src.slice(i + 14, j)) };
+  }
   fs.mkdirSync(SORTIE, { recursive: true });
   for (const [nom, m] of Object.entries(mails)) {
     fs.writeFileSync(path.join(SORTIE, `${nom}.html`), m.html);
@@ -58,7 +77,14 @@ const SORTIE = path.resolve(process.argv[2] || path.join(require('os').tmpdir(),
       await page.screenshot({ path: path.join(SORTIE, `${nom}-${largeur}-${theme === 'light' ? 'clair' : 'sombre'}.png`), fullPage: true });
       await page.close();
     }
+    // Sans images (le réglage par défaut de beaucoup de boîtes) : ni le logo ni le dégradé en image de fond.
+    const page = await nav.newPage({ viewport: { width: 600, height: 900 }, colorScheme: 'light', deviceScaleFactor: 2 });
+    await page.route('**/*.png', (r) => r.abort());
+    await page.goto(pathToFileURL(path.join(SORTIE, `${nom}.html`)).href);
+    await page.addStyleTag({ content: '*{background-image:none!important}' });
+    await page.screenshot({ path: path.join(SORTIE, `${nom}-600-sans-images.png`), fullPage: true });
+    await page.close();
   }
   await nav.close();
-  console.log(`${Object.keys(mails).length} e-mails · ${Object.keys(mails).length * 4} captures dans ${SORTIE}`);
+  console.log(`${Object.keys(mails).length} e-mails · ${Object.keys(mails).length * 5} captures dans ${SORTIE}`);
 })().catch((e) => { console.log('❌ ' + (e && e.stack || e)); process.exit(1); });

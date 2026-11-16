@@ -158,6 +158,7 @@ async function rendre(nav, etat, { carte = false, mode = '', geste = null, faux 
     const b = (document.getElementById('inBtn') && document.getElementById('inBtn').offsetParent ? document.getElementById('inBtn') : null) || document.getElementById('vrmBtn') || document.getElementById('lierBtn');
     return {
       fond: getComputedStyle(document.body).backgroundColor,
+      fondImg: getComputedStyle(document.body).backgroundImage,
       accent: b ? getComputedStyle(b).backgroundColor : '',
       rayon: b ? getComputedStyle(b).borderTopLeftRadius : '',
       cibles: Array.from(document.querySelectorAll('button, input, #mdpLien')).filter(vis).map((el) => ({ id: el.id || el.tagName, h: h(el) })),
@@ -285,7 +286,8 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
       dit(b.length === 2 && b[0].id === 'google' && b[1].id === 'discord' && b[0].txt === 'Continuer avec Google' && b[1].txt === 'Continuer avec Discord', `${scheme} : « Continuer avec Google » puis « Continuer avec Discord »`, JSON.stringify(b));
       dit(b.every((x) => x.svg && x.h >= 44), `${scheme} : chacun avec son logo, au moins 44 px`, JSON.stringify(b));
       dit(r.fourn.formY != null && r.fourn.lierY != null && b.every((x) => x.y > r.fourn.formY && x.y < r.fourn.lierY), `${scheme} : SOUS le mot de passe, AU-DESSUS du dernier recours par le site`, JSON.stringify({ form: r.fourn.formY, lier: r.fourn.lierY, b: b.map((x) => x.y) }));
-      dit(r.look.accent === (scheme === 'dark' ? 'rgb(10, 132, 255)' : 'rgb(0, 113, 227)'), `${scheme} : « Me connecter » porte le bleu de l’app (un seul accent)`, r.look.accent);
+      // 5.386 (« Verre dépoli ») : le bouton principal est le PLEIN — encre le jour, blanc la nuit (jamais un second bleu).
+      dit(r.look.accent === (scheme === 'dark' ? 'rgb(255, 255, 255)' : 'rgb(12, 29, 48)'), `${scheme} : « Me connecter » est le plein (encre le jour, blanc la nuit ; un seul accent, rare)`, r.look.accent);
     }
   });
   for (const [nom, rep, attendu] of [['Google seul', { ok: true, google: true, discord: false }, ['google']], ['Discord seul', { ok: true, google: false, discord: true }, ['discord']], ['aucun activé', { ok: true, google: false, discord: false }, []], ['pas su (ok:false)', { ok: false }, []], ['pas su (fond muet)', 'muet', []], ['pas su (code périmé)', 'ferme', []]]) {
@@ -444,14 +446,21 @@ const ouvrirMdp = async (pg) => { const a = await pg.$('#mdpLien'); if (a) { awa
     // 5.328 : les jetons de l'app (--d-*) — fond iOS #F2F2F7 / #000, bleu Apple
     // #0071E3 / #0A84FF, rayon 12 ; dans la carte, le cadre est transparent (le
     // verre de la carte est derrière).
-    for (const [scheme, fond, accent] of [['dark', 'rgb(0, 0, 0)', 'rgb(10, 132, 255)'], ['light', 'rgb(242, 242, 247)', 'rgb(0, 113, 227)']]) {
+    // 5.386 (« Verre dépoli », Julien 15 nov.) : ces contrôles figeaient les couleurs d'avant ; ils jugent la
+    // RÈGLE — le fond est le dégradé BLEU PROFOND (une couleur unie bleue dessous), propre à chaque teinte
+    // (le système décide) ; le bouton principal est le plein (encre le jour, blanc la nuit), rond. Le verre et
+    // le contraste mesuré : scripts/bancs/verre-extension-site.cjs (F).
+    const fonds = {};
+    for (const [scheme, accent] of [['dark', 'rgb(255, 255, 255)'], ['light', 'rgb(12, 29, 48)']]) {
       for (const carte of [false]) {   // 5.332 : la carte n'affiche plus ce formulaire (cadre)
         const r = await rendre(nav, { ok: true, connecte: false }, { carte, scheme, geste: ouvrirMdp });
         const ou = `${scheme}${carte ? ' · carte' : ''}`;
-        const fondAttendu = carte ? 'rgba(0, 0, 0, 0)' : fond;
-        dit(r.look.fond === fondAttendu, `${ou} : le fond suit le système (${fondAttendu})`, r.look.fond);
-        dit(r.look.accent === accent, `${ou} : le bouton principal porte LE bleu de l’app (${accent})`, r.look.accent);
-        dit(r.look.rayon === '12px', `${ou} : bouton au rayon 12 (contrôles de l’app)`, r.look.rayon);
+        const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(r.look.fond || '');
+        const bleu = !!m && Number(m[3]) - Number(m[1]) >= 50;
+        fonds[scheme] = r.look.fondImg;
+        dit(bleu && /linear-gradient/.test(r.look.fondImg || '') && (scheme === 'dark' || fonds.dark !== r.look.fondImg), `${ou} : le fond est le dégradé bleu profond, propre à la teinte du système`, `${r.look.fond} · ${String(r.look.fondImg).slice(0, 120)}`);
+        dit(r.look.accent === accent, `${ou} : le bouton principal est le plein (${accent}), jamais un second bleu`, r.look.accent);
+        dit(parseFloat(r.look.rayon) >= 22, `${ou} : le plein est rond (studio)`, r.look.rayon);
         const petits = r.look.cibles.filter((c) => c.h < 44);
         dit(r.look.cibles.length >= 4 && !petits.length, `${ou} : chaque cible (boutons, champs, lien) fait au moins 44 px`, JSON.stringify(petits.length ? petits : r.look.cibles));
       }

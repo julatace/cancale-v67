@@ -1,18 +1,30 @@
-/* (15 nov., lot site-public) Les couleurs du studio bleu clair (src/design/studio.css) : la forme seulement. */
-:root{--bg:#EEF6FD;--card:#FFFFFF;--text:#0C1D30;--muted:#3F5468;--border:#D9E5F1;--accent:#0055B8;--todo:#FFF4D6;--todoText:#764300}
-@media (prefers-color-scheme: dark){:root{--bg:#15263D;--card:#16273C;--text:#EAF2FB;--muted:#A9BBCF;--border:#24364E;--accent:#6CB4FF;--todo:#3A2E0B;--todoText:#F2B65E}}
+/* (15 nov., « Verre dépoli », Julien : « J'aime la 9 ») La forme seulement : un bleu profond dégradé
+   (opaque, fixe) ; la marque, les liens des documents et le pied en BLANC sur le bleu ; le document
+   sur une plaque de VERRE où le texte est à l'encre (la nuit : verre sombre, texte clair).
+   Contraste AA mesuré (banc verre-extension-site). Sans flou ou transparence réduite : verre opaque. */
+:root{--bleu:#174C88;--fond-bleu:radial-gradient(120% 60% at 12% 0%,rgb(120 180 240 / .16) 0%,rgb(120 180 240 / 0) 55%),radial-gradient(70% 45% at 100% 38%,rgb(61 139 224 / .16) 0%,rgb(61 139 224 / 0) 70%),linear-gradient(170deg,#1E5DA4 0%,#174C88 45%,#0F2F57 100%);
+  --verre:rgb(247 250 253 / .9);--verre-o:#D7DEE6;--verre-bord:rgb(255 255 255 / .75);--verre-ombre:inset 0 1px 0 rgb(255 255 255 / .9),0 18px 40px -18px rgb(8 26 50 / .55);
+  --sur:#FFFFFF;--sur-2:#EEF4FB;
+  --card:rgb(255 255 255 / .6);--text:#0C1D30;--muted:#3F5468;--border:rgb(18 52 96 / .14);--accent:#0055B8;--todo:#FFF4D6;--todoText:#764300}
+@media (prefers-color-scheme: dark){:root{--bleu:#0C2848;--fond-bleu:radial-gradient(120% 60% at 12% 0%,rgb(90 150 220 / .14) 0%,rgb(90 150 220 / 0) 60%),linear-gradient(170deg,#133A68 0%,#0C2848 50%,#06142A 100%);
+  --verre:rgb(8 18 33 / .72);--verre-o:#0E2139;--verre-bord:rgb(255 255 255 / .12);--verre-ombre:inset 0 .5px 0 rgb(255 255 255 / .10),0 18px 40px -18px rgb(0 0 0 / .85);
+  --sur-2:#D6E4F3;
+  --card:rgb(255 255 255 / .05);--text:#EAF2FB;--muted:#A9BBCF;--border:rgb(255 255 255 / .12);--accent:#6CB4FF;--todo:#3A2E0B;--todoText:#F2B65E}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg) linear-gradient(180deg,var(--bg),var(--bg2,var(--bg))) fixed;color:var(--text);font:16px/1.65 -apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
-:root{--bg2:#D7E9F6}
-@media (prefers-color-scheme: dark){:root{--bg2:#0C1829}}
+html{background:var(--bleu)}
+body{margin:0;background:var(--bleu);color:var(--sur);font:16px/1.65 -apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;isolation:isolate}
+body:before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background-color:var(--bleu);background-image:var(--fond-bleu)}
 .page{max-width:780px;margin:0 auto;padding:28px 16px 64px}
 header{display:flex;align-items:center;gap:12px;margin-bottom:22px}
 header img{width:40px;height:40px;border-radius:9px}
-header a{color:var(--text);text-decoration:none;font-weight:700}
-nav{display:flex;flex-wrap:wrap;gap:0 14px;font-size:14px;margin:0 0 26px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+header a{color:var(--sur);text-decoration:none;font-weight:700}
+nav{display:flex;flex-wrap:wrap;gap:0 14px;font-size:14px;margin:0 0 18px;padding-bottom:6px;border-bottom:1px solid rgb(255 255 255 / .16)}
 nav a{display:inline-flex;align-items:center;min-height:44px}
-nav a{color:var(--muted);text-decoration:none}
-nav a[aria-current="page"]{color:var(--accent);font-weight:600}
+nav a{color:var(--sur-2);text-decoration:none}
+nav a[aria-current="page"]{color:var(--sur);font-weight:600;text-decoration:underline;text-underline-offset:6px;text-decoration-thickness:2px}
+main{color:var(--text);background:var(--verre);-webkit-backdrop-filter:blur(26px) saturate(1.4);backdrop-filter:blur(26px) saturate(1.4);border:1px solid var(--verre-bord);border-radius:24px;box-shadow:var(--verre-ombre);padding:28px 24px 30px}
+@supports not ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){main{background:var(--verre-o)}}
+@media (prefers-reduced-transparency:reduce){main{background:var(--verre-o);-webkit-backdrop-filter:none;backdrop-filter:none}}
 h1{font-size:32px;line-height:1.12;margin:0 0 6px;letter-spacing:-.03em}
 .maj{color:var(--muted);font-size:13px;margin:0 0 26px}
 h2{font-size:18px;margin:32px 0 8px}
@@ -23,6 +35,9 @@ a{color:var(--accent)}
 table{width:100%;border-collapse:collapse;font-size:13.5px;margin:10px 0;background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:block;overflow-x:auto}
 th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--border);vertical-align:top}
 th{font-weight:600;color:var(--muted);font-size:12.5px}
-.encadre{background:var(--card);border:0;border-radius:18px;padding:16px 18px;margin:14px 0;box-shadow:inset 0 1px 0 rgb(255 255 255 / .9),0 0 0 .5px rgb(18 52 96 / .08),0 10px 24px -16px rgb(18 52 96 / .35)}
+.encadre{background:var(--card);border:0;border-radius:18px;padding:16px 18px;margin:14px 0;box-shadow:inset 0 0 0 .5px var(--border)}
 .todo{background:var(--todo);color:var(--todoText);border-radius:5px;padding:0 5px;font-weight:600}
-footer{margin-top:44px;font-size:12.5px;color:var(--muted)}
+footer{margin-top:28px;font-size:12.5px;color:var(--sur-2)}
+footer a{color:var(--sur)}
+@media (max-width:480px){main{padding:22px 18px 24px;border-radius:20px}}
+@media print{body{background:#fff;color:#000}body:before{display:none}main{background:#fff;box-shadow:none;border:0;padding:0}}

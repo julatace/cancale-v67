@@ -4,13 +4,18 @@
    `data-theme` est posé par aide.js (le choix fait dans l'app, sinon le système).
    ═══════════════════════════════════════════════════════════════════════════ */
 /* (15 nov., lot site-public) Les couleurs du studio bleu clair (src/design/studio.css) : bleu clair éclairé du haut, porcelaine, encre ; la nuit, bleu-nuit. */
-:root{--fond:#EEF6FD;--fond-bas:#D7E9F6;--carte:#FFFFFF;--encre:#0C1D30;--gris:#3F5468;--filet:rgba(18,52,96,.14);--remplir:#E4EEF7;--lien:#0055B8;--bleu:#0060CC;--ambre:#764300;color-scheme:light}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--fond:#15263D;--fond-bas:#0C1829;--carte:#16273C;--encre:#EAF2FB;--gris:#A9BBCF;--filet:rgba(255,255,255,.10);--remplir:#091320;--lien:#6CB4FF;--bleu:#4AA3FF;--ambre:#F2B65E;color-scheme:dark}}
-:root[data-theme="dark"]{--fond:#15263D;--fond-bas:#0C1829;--carte:#16273C;--encre:#EAF2FB;--gris:#A9BBCF;--filet:rgba(255,255,255,.10);--remplir:#091320;--lien:#6CB4FF;--bleu:#4AA3FF;--ambre:#F2B65E;color-scheme:dark}
+/* (15 nov., « Verre dépoli », Julien : « J'aime la 9 ») Un bleu profond dégradé (opaque, fixe) ; la page sur une plaque de VERRE où le texte est à l'encre (la nuit : verre sombre, texte clair). Contraste AA mesuré (banc verre-extension-site) ; sans flou ou transparence réduite : verre opaque. */
+:root{--bleu-uni:#174C88;--fond-bleu:radial-gradient(120% 60% at 12% 0%,rgb(120 180 240 / .16) 0%,rgb(120 180 240 / 0) 55%),radial-gradient(70% 45% at 100% 38%,rgb(61 139 224 / .16) 0%,rgb(61 139 224 / 0) 70%),linear-gradient(170deg,#1E5DA4 0%,#174C88 45%,#0F2F57 100%);--verre:rgb(247 250 253 / .9);--verre-o:#D7DEE6;--verre-bord:rgb(255 255 255 / .75);--verre-ombre:inset 0 1px 0 rgb(255 255 255 / .9),0 18px 40px -18px rgb(8 26 50 / .55);--carte:rgb(255 255 255 / .6);--encre:#0C1D30;--gris:#3F5468;--filet:rgba(18,52,96,.14);--remplir:rgb(18 52 96 / .07);--lien:#0055B8;--bleu:#0060CC;--ambre:#764300;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bleu-uni:#0C2848;--fond-bleu:radial-gradient(120% 60% at 12% 0%,rgb(90 150 220 / .14) 0%,rgb(90 150 220 / 0) 60%),linear-gradient(170deg,#133A68 0%,#0C2848 50%,#06142A 100%);--verre:rgb(8 18 33 / .72);--verre-o:#0E2139;--verre-bord:rgb(255 255 255 / .12);--verre-ombre:inset 0 .5px 0 rgb(255 255 255 / .10),0 18px 40px -18px rgb(0 0 0 / .85);--carte:rgb(255 255 255 / .05);--encre:#EAF2FB;--gris:#A9BBCF;--filet:rgba(255,255,255,.10);--remplir:rgb(255 255 255 / .07);--lien:#6CB4FF;--bleu:#4AA3FF;--ambre:#F2B65E;color-scheme:dark}}
+:root[data-theme="dark"]{--bleu-uni:#0C2848;--fond-bleu:radial-gradient(120% 60% at 12% 0%,rgb(90 150 220 / .14) 0%,rgb(90 150 220 / 0) 60%),linear-gradient(170deg,#133A68 0%,#0C2848 50%,#06142A 100%);--verre:rgb(8 18 33 / .72);--verre-o:#0E2139;--verre-bord:rgb(255 255 255 / .12);--verre-ombre:inset 0 .5px 0 rgb(255 255 255 / .10),0 18px 40px -18px rgb(0 0 0 / .85);--carte:rgb(255 255 255 / .05);--encre:#EAF2FB;--gris:#A9BBCF;--filet:rgba(255,255,255,.10);--remplir:rgb(255 255 255 / .07);--lien:#6CB4FF;--bleu:#4AA3FF;--ambre:#F2B65E;color-scheme:dark}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
-body{margin:0;background:var(--fond) linear-gradient(180deg,var(--fond) 0%,var(--fond-bas) 100%) fixed;color:var(--encre);font:17px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh}
-main{max-width:680px;margin:0 auto;padding:max(20px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(48px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+html{background:var(--bleu-uni)}
+body:before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background-color:var(--bleu-uni);background-image:var(--fond-bleu)}
+body{isolation:isolate;margin:0;background:var(--bleu-uni);color:var(--encre);font:17px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh}
+main{max-width:680px;margin:max(16px,env(safe-area-inset-top)) auto max(32px,env(safe-area-inset-bottom));width:calc(100% - 2 * max(12px,env(safe-area-inset-left)));padding:20px 20px 32px;background:var(--verre);-webkit-backdrop-filter:blur(26px) saturate(1.4);backdrop-filter:blur(26px) saturate(1.4);border:1px solid var(--verre-bord);border-radius:26px;box-shadow:var(--verre-ombre)}
+@supports not ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){main{background:var(--verre-o)}}
+@media (prefers-reduced-transparency:reduce){main{background:var(--verre-o);-webkit-backdrop-filter:none;backdrop-filter:none}}
 a{color:var(--lien);text-decoration:none}
 a:hover{text-decoration:underline}
 a:focus-visible,input:focus-visible{outline:2px solid var(--bleu);outline-offset:2px;border-radius:6px}
@@ -72,4 +77,4 @@ article p{margin:0 0 14px;text-wrap:pretty}
 .liens{margin-top:14px;display:flex;flex-wrap:wrap;gap:0 20px;font-size:15px}
 .liens a{min-height:44px;display:flex;align-items:center}
 @media (max-width:420px){h1{font-size:30px}.titre-index{font-size:32px}.chapo{font-size:17px}}
-@media print{.tete .ouvrir,.recherche,.pied .liens{display:none}body{background:#fff}}
+@media print{.tete .ouvrir,.recherche,.pied .liens{display:none}body{background:#fff}body:before{display:none}main{background:#fff;box-shadow:none;border:0}}
