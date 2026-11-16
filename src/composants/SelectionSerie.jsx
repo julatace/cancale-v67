@@ -15,12 +15,17 @@ import { createPortal } from 'react-dom';
 import { BoutonBase as Bouton } from './Bouton.jsx';
 import { basculer, plage, toutSelectionner, garderVisibles, APPUI_LONG_MS } from '../selectionSerie.js';
 import '../selection-serie.css';
+import { tr } from '../i18n/index.js';
 
 const feuilleOuverte = () => {
   try { return !!document.querySelector('[role="dialog"][aria-modal="true"], .vrm-sheet-voile, [data-sheet-ouverte]'); } catch (_) { return false; }
 };
 
-export function useSelectionSerie(ordre, { nom = '' } = {}) {
+// `ordre` = les clés des lignes SÉLECTIONNABLES, dans l'ordre affiché : celles DESSINÉES à l'écran
+// (`clesSelectionnables`, src/selectionSerie.js), jamais l'historique entier (16 nov., lot
+// ventes-selection). `vue` = ce qui définit la liste montrée (filtre, compte, période) : quand elle
+// change, la sélection se VIDE — une action ne part jamais sur des lignes choisies dans une autre vue.
+export function useSelectionSerie(ordre, { nom = '', vue = '' } = {}) {
   const [sel, setSel] = useState([]);
   const [actif, setActif] = useState(false);
   const ancre = useRef(null);
@@ -29,6 +34,10 @@ export function useSelectionSerie(ordre, { nom = '' } = {}) {
   // Une ligne qui n'est plus affichée (filtre changé) sort de la sélection.
   useEffect(() => { setSel((s) => garderVisibles(s, ordreS)); }, [ordreS]);
   const vider = useCallback(() => { setSel([]); setActif(false); ancre.current = null; }, []);
+  // Une autre vue (filtre, compte, période) ⇒ la sélection se vide (rien ne reste choisi hors de l'écran).
+  const vueAvant = useRef(vue);
+  useEffect(() => { if (vueAvant.current !== vue) { vueAvant.current = vue; vider(); } }, [vue, vider]);
+  const visibles = useMemo(() => new Set(ordreS), [ordreS]);
   // Échap sort de la sélection — sauf si une feuille est ouverte (elle se ferme d'abord).
   useEffect(() => {
     if (!actif) return undefined;
@@ -39,27 +48,32 @@ export function useSelectionSerie(ordre, { nom = '' } = {}) {
   const estCoche = useCallback((cle) => sel.includes(String(cle)), [sel]);
   const cocher = useCallback((cle, e) => {
     const k = String(cle);
+    if (!visibles.has(k)) return;   // une ligne pas sélectionnable (estompée, repliée) ne se coche pas
     setActif(true);
     setSel((s) => {
       if (e && e.shiftKey && ancre.current != null) return plage(ordreS, ancre.current, k, s, !s.includes(k));
       return basculer(s, k);
     });
     ancre.current = k;
-  }, [ordreS]);
+  }, [ordreS, visibles]);
   const tout = useCallback(() => { setActif(true); setSel(toutSelectionner(ordreS)); }, [ordreS]);
   const commencer = useCallback((cle) => {
+    if (!visibles.has(String(cle))) return;
     setActif(true); ancre.current = String(cle);
     setSel((s) => (s.includes(String(cle)) ? s : [...s, String(cle)]));
     try { navigator.vibrate && navigator.vibrate(12); } catch (_) {}
-  }, []);
+  }, [visibles]);
   // Les props d'une ligne : appui long au doigt ; sélection ouverte ⇒ le tap coche.
   // Au repos (rien d'ouvert), les props d'une ligne ne changent pas : gardées par clé,
   // une ligne mémoïsée (React.memo) ne se redessine pas pour rien.
   const repos = useRef(new Map());
+  useEffect(() => { repos.current = new Map(); }, [visibles]);
   const ligne = useCallback((cle) => {
     const k = String(cle);
     if (!actif && !sel.length && repos.current.has(k)) return repos.current.get(k);
-    const annulerAppui = () => { if (appui.current) { clearTimeout(appui.current.t); appui.current = null; } };
+    // ⚠️ (16 nov.) Le doigt posé AVANT de faire défiler (iPhone) ouvrait la sélection en 450 ms :
+    // « 1 sélectionné » sans l'avoir voulu. Tout défilement pendant l'appui l'annule.
+    const annulerAppui = () => { const a = appui.current; if (a) { clearTimeout(a.t); if (a.off) a.off(); appui.current = null; } };
     const props = {
       'data-serie-ligne': k,
       'data-serie-coche': sel.includes(k) ? '1' : '0',
@@ -67,7 +81,10 @@ export function useSelectionSerie(ordre, { nom = '' } = {}) {
         if (e.pointerType !== 'touch' || actif) return;
         annulerAppui();
         const x = e.clientX, y = e.clientY;
-        appui.current = { x, y, t: setTimeout(() => { appui.current = { fait: true }; commencer(k); }, APPUI_LONG_MS) };
+        const surDefile = () => annulerAppui();
+        try { document.addEventListener('scroll', surDefile, { capture: true, passive: true }); } catch (_) {}
+        const off = () => { try { document.removeEventListener('scroll', surDefile, { capture: true }); } catch (_) {} };
+        appui.current = { x, y, off, t: setTimeout(() => { off(); appui.current = { fait: true }; commencer(k); }, APPUI_LONG_MS) };
       },
       onPointerMove: (e) => { const a = appui.current; if (a && !a.fait && (Math.abs(e.clientX - a.x) > 8 || Math.abs(e.clientY - a.y) > 8)) annulerAppui(); },
       onPointerUp: () => { if (appui.current && !appui.current.fait) annulerAppui(); },
@@ -82,9 +99,10 @@ export function useSelectionSerie(ordre, { nom = '' } = {}) {
         e.preventDefault(); e.stopPropagation(); cocher(k, e);
       },
     };
+    if (!visibles.has(k)) { const p = { ...props }; delete p.onPointerDown; delete p.onClickCapture; p['data-serie-hors'] = '1'; return p; }
     if (!actif && !sel.length) repos.current.set(k, props);
     return props;
-  }, [sel, actif, commencer, cocher]);
+  }, [sel, actif, commencer, cocher, visibles]);
   const choisies = useMemo(() => ordreS.filter((k) => sel.includes(k)), [ordreS, sel]);
   return { nom, actif, sel, choisies, n: choisies.length, total: ordreS.length, estCoche, cocher, tout, vider, commencer, ligne, ouvrir: () => setActif(true) };
 }
@@ -124,9 +142,30 @@ export function OuvrirSerie({ serie, libelle = 'Sélectionner' }) {
 
 // La barre flottante. `actions` = [{ k, libelle, icone?, desactive?, raison?, faire }]
 // `faire(choisies)` rend (ou promet) un résumé (texte) ; il est dit dans la barre.
-export function BarreSerie({ serie, actions = [], unite = { un: 'sélectionné', plusieurs: 'sélectionnés' }, rendreIcone }) {
+export function BarreSerie({ serie, actions = [], unite = null, rendreIcone }) {
+  if (!unite) unite = { un: tr('serie.un'), plusieurs: tr('serie.plusieurs') };
   const [resume, setResume] = useState('');
   const [occupe, setOccupe] = useState(false);
+  const barreRef = useRef(null);
+  // (16 nov., lot ventes-selection) Sélection ouverte : la racine le dit (`data-serie-ouverte`) et porte
+  // la hauteur de la barre (`--vrm-serie-h`) — au téléphone la barre PREND LA PLACE de la barre du bas
+  // et la page garde cet espace en bas (rien de caché dessous) ; la ligne touchée reste au-dessus d'elle.
+  useEffect(() => {
+    if (!serie.actif || typeof document === 'undefined') return undefined;
+    const racine = document.documentElement;
+    racine.setAttribute('data-serie-ouverte', serie.nom || '1');
+    const poser = () => { const b = barreRef.current; if (b) racine.style.setProperty('--vrm-serie-h', Math.ceil(b.getBoundingClientRect().height) + 'px'); };
+    poser();
+    let ro = null; try { if (typeof ResizeObserver === 'function' && barreRef.current) { ro = new ResizeObserver(poser); ro.observe(barreRef.current); } } catch (_) {}
+    const t = setTimeout(() => {
+      try {
+        poser();
+        const b = barreRef.current, l = document.querySelector('[data-serie-coche="1"]');
+        if (b && l) { const rb = b.getBoundingClientRect(), rl = l.getBoundingClientRect(); if (rl.bottom > rb.top - 8) l.scrollIntoView({ block: 'center' }); }
+      } catch (_) {}
+    }, 60);
+    return () => { clearTimeout(t); if (ro) ro.disconnect(); racine.removeAttribute('data-serie-ouverte'); racine.style.removeProperty('--vrm-serie-h'); };
+  }, [serie.actif, serie.nom]);
   // Le résumé reste lisible quelques secondes après la fermeture de la sélection.
   useEffect(() => { if (!resume || serie.actif) return undefined; const t = setTimeout(() => setResume(''), 8000); return () => clearTimeout(t); }, [resume, serie.actif]);
   if (typeof document === 'undefined') return null;
@@ -157,20 +196,29 @@ export function BarreSerie({ serie, actions = [], unite = { un: 'sélectionné',
     setOccupe(false);
   };
   return createPortal(
-    <div className="vrm-serie-barre" role="toolbar" aria-label="Actions sur la sélection" data-serie-barre={serie.nom} data-serie-n={n} data-serie-total={serie.total}>
+    <div ref={barreRef} className="vrm-serie-barre" role="toolbar" aria-label={tr('serie.barre')} data-serie-barre={serie.nom} data-serie-n={n} data-serie-total={serie.total}>
       <div className="vrm-serie-tete">
         <b role="status" data-serie-compte={n}>{n} {n > 1 ? unite.plusieurs : unite.un}</b>
+        <Bouton variante="discret" taille="petit" data-serie-annuler="" onClick={() => serie.vider()} title="Échap">{tr('serie.annuler')}</Bouton>
         {n < serie.total
-          ? <Bouton variante="discret" taille="petit" data-serie-tout={serie.total} onClick={() => serie.tout()}>Tout sélectionner · {serie.total}</Bouton>
+          ? <Bouton variante="discret" taille="petit" className="vrm-serie-tout" data-serie-tout={serie.total} onClick={() => serie.tout()}>{tr('serie.tout', { n: serie.total })}</Bouton>
           : null}
-        <Bouton variante="discret" taille="petit" data-serie-annuler="" onClick={() => serie.vider()} title="Échap">Annuler</Bouton>
       </div>
       {resume ? <p className="vrm-serie-resume" role="status" data-serie-resume="">{resume}</p> : null}
-      <div className="vrm-serie-actions">
-        {actions.filter(Boolean).map((a) => (
-          <Bouton key={a.k} variante={a.variante || 'secondaire'} taille="petit" icone={a.icone} {...(rendreIcone ? { rendreIcone } : {})} data-serie-action={a.k}
-            disabled={!n || occupe || !!a.desactive} title={a.desactive ? a.raison : undefined} onClick={() => lancer(a)}>{a.libelle}</Bouton>
-        ))}
+      <div className="vrm-serie-actions" style={{ '--vrm-serie-nb': actions.filter(Boolean).length }}>
+        {actions.filter(Boolean).map((a) => {
+          // (16 nov.) Ce que l'action ferait VRAIMENT : « 2 sur 3 » (la règle de l'action, `portee`) ; 0 ⇒ grisée, la raison au survol.
+          let p = null; try { p = n && typeof a.portee === 'function' ? a.portee(serie.choisies) : null; } catch (_) { p = null; }
+          const zero = !!(p && p.n === 0);
+          return (
+            <Bouton key={a.k} variante={a.variante || 'secondaire'} taille="petit" icone={a.icone} {...(rendreIcone ? { rendreIcone } : {})} data-serie-action={a.k}
+              data-serie-portee={p ? `${p.n}/${p.m}` : undefined}
+              disabled={!n || occupe || !!a.desactive || zero} title={a.desactive ? a.raison : zero ? (a.raisonZero || tr('serie.aucune')) : undefined} onClick={() => lancer(a)}>
+              <span className="vrm-serie-action-nom">{a.libelle}</span>
+              {p && p.n !== p.m ? <span className="vrm-serie-action-portee">{tr('serie.portee', { n: p.n, m: p.m })}</span> : null}
+            </Bouton>
+          );
+        })}
       </div>
     </div>,
     document.body,

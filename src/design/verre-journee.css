@@ -196,7 +196,8 @@
    1re : le chiffre du jour et sa semaine, « À sortir en premier » (photo à gauche, mini-plan, « Je l'ai sortie »,
    « Ensuite, dans l'ordre »), le mois ; 2e : « À envoyer » en rangées (photo, plaque N°, site, compte, la date et la place
    dans le Stock, le prix) puis les pastilles ; 3e : « À retirer », « Messages », « À faire ». (`BentoJournee colonnes`) */
-@media (min-width: 744px) {
+/* (16 nov.) La coque ordinateur (src/coque.js MQ_ORDINATEUR, recopiée mot pour mot) : jamais « ≥ 744 px » seul, qui allumait ces règles sur un iPhone couché. */
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-grille.sj-grille-colonnes {
     display: grid !important; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, .95fr) !important; grid-auto-rows: auto !important; gap: 16px !important; align-items: start !important;
   }
@@ -267,11 +268,14 @@
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-col > .sj-t:not(.sj-t-mois):not(.sj-t-envoyer):not(.sj-t-retirer):not(.sj-t-messages) .sj-face .sj-sous { display: none !important; }
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-col > .sj-t:not(.sj-t-mois):not(.sj-t-envoyer):not(.sj-t-retirer):not(.sj-t-messages) .sj-face .sj-n { font: 750 15.5px/1 Inter, system-ui, sans-serif !important; color: var(--sv-encre) !important; }
 }
-@media (min-width: 744px) and (max-width: 1399px) {
+/* (16 nov.) La coque ordinateur (src/coque.js MQ_ORDINATEUR, recopiée mot pour mot) : jamais « ≥ 744 px » seul, qui allumait ces règles sur un iPhone couché. */
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
+@media (max-width: 1399px) {
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] :is(.vrm-jv2-grand, .vrm-jv2-grand.vrm-fu-grand) { font-size: 52px !important; }
   :root:root:root:root:root:root:root body .sj-journee .vrm-so[data-sortir-ordi] :is(.vrm-so-site, .vrm-so-rang) { display: none !important; }
   :root:root:root:root:root:root:root body .sj-journee .vrm-so[data-sortir-ordi] .vrm-so-carte:not(.vrm-so-d):not(.vrm-so-fin) { grid-template-columns: 110px minmax(0, 1fr) !important; }
   :root:root:root:root:root:root:root body .sj-journee .vrm-so[data-sortir-ordi] .vrm-so-ph { width: 110px !important; height: 110px !important; }
+}
 }
 
 /* ══ 5. « LA PAIRE À SORTIR EN PREMIER » (`e-sortir.cjs`) ═══════════════════════════════════════ */
@@ -367,7 +371,8 @@
 :root:root:root:root:root:root body .sj-journee .vrm-so-fin { padding: 14px !important; margin-top: 10px !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-fin b { display: block !important; font: 750 16px/1.25 Inter, system-ui, sans-serif !important; color: var(--sv-encre) !important; }
 :root:root:root:root:root:root body .sj-journee .vrm-so-fin > div > span { display: block !important; font: 550 13px/1.3 Inter, system-ui, sans-serif !important; color: var(--sv-encre-2) !important; margin-top: 2px !important; }
-@media (min-width: 744px) {
+/* (16 nov.) La coque ordinateur (src/coque.js MQ_ORDINATEUR, recopiée mot pour mot) : jamais « ≥ 744 px » seul, qui allumait ces règles sur un iPhone couché. */
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
   :root:root:root:root:root:root body .sj-journee .vrm-so { max-width: 560px !important; }
   :root:root:root:root:root:root body .sj-journee .vrm-so-carte .vrm-so-ph { height: 200px !important; }
 }

@@ -223,7 +223,8 @@ const ATTENDU = {"MR suggestions sous un en-tête, vrai point sous un autre": ["
     const carte = sansCom(fs.readFileSync(path.join(R, 'src/CarteRelais.jsx'), 'utf8'));
     // (intégration journee-perso, 11 nov.) Plus de bouton « Code » : le code est ÉCRIT sur la ligne (« QR » pour un QR),
     // le glisser à gauche le copie (voirCode) — la règle est la même : lisible sans toucher, copiable d'un geste.
-    dit(/data-rp-code-visible=\{x\.code\}>\{x\.code\}/.test(carte) && /data-rp-code-visible="qr">QR</.test(carte) && /faire: \(\) => \(desaccord \? setOuvert\(true\) : voirCode\(\)\)/.test(carte), 'le code est LISIBLE sur la ligne (0 toucher), un geste le copie');
+    // (16 nov.) Verre (15 nov.) : à l'ordinateur un chiffre par case (`<i className="va-c">`), le texte du code inchangé — lisible pareil.
+    dit(/data-rp-code-visible=\{x\.code\}>(?:\{\s*\})?(?:\{x\.code\}|\{String\(x\.code\)\.split\(''\)\.map\(\(c, i\) => <i key=\{i\} className="va-c">\{c\}<\/i>\))/.test(carte) && /data-rp-code-visible="qr">QR</.test(carte) && /faire: \(\) => \(desaccord \? setOuvert\(true\) : voirCode\(\)\)/.test(carte), 'le code est LISIBLE sur la ligne (0 toucher), un geste le copie');
     dit(/data-relais-masques=\{masquesIci\.length\}/.test(carte) && /!pressant\(p\)/.test(carte), 'un point masqué laisse sa trace (« N points masqués · Afficher ») ; un colis du dernier jour n’est jamais masqué');
     dit(/data-rp-pas-confirme/.test(carte) && /verifieAncien\(x\.verifieMs\)/.test(carte), 'la ligne dit « pas confirmé depuis » en ambre');
     dit(/data-relais-adresse-pas-lue/.test(carte), 'la carte d’un point au nom seul dit « Adresse pas lue »');
