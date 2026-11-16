@@ -463,6 +463,8 @@ sans la fonction.
 | `avishisto` | `historiqueAvis` | **5.340.0** (11 nov.) | un point daté par lecture des avis (`payload.historique` : total, étoiles, 90 j, aucun texte) ⇒ « Depuis le … : +N avis » |
 | `jauge` | `publierJaugeVisite` | **5.337.0** (10 nov.) | « 12/50 cette heure · repart à … » : la ligne `actions_compte_{uid}_{nav}` publiée aussi à la visite (0 compris), somme de tous les Chrome ; pas de ligne ⇒ « — » |
 | `journal` | `noterJournal` | **5.337.0** (10 nov.) | gestes ACCEPTÉS par Vinted notés dans `journal_vrm_{uid}_{nav}` (sorte, heure, n°, prix ; jamais texte ni pseudo), lus par « Ce que VRM a fait » |
+| `relueoffre` | `relireOffre` | **5.398.0** (16 nov.) | l'offre auto relue depuis l'onglet juste avant le geste ; plus en attente ⇒ rien |
+| `salutation` | `texteJamaisRepete` | **5.398.0** (16 nov.) | jamais deux fois de suite le même texte (favoris, refus) : seule la salutation change |
 | `avisnegatif` | `signalerAvisLus` | **5.352.0** (11 nov.) | après une lecture d'avis RÉUSSIE, `/api/push {action:'avis', uid}` (le serveur décide, une fois par avis ≤ seuil) ; `transaction_id` gardé s'il est en chiffres ; aucune requête Vinted de plus |
 | `importdepart` | `importerHistorique` | **5.344.0** (11 nov.) | « Ton historique Vinted · 400 sur 1 250 » : tout l'historique (ventes, achats) du compte de l'onglet, 20 lectures/h, reprise ; `import_vinted_{uid}` |
 | `moderation` | `guetterDressing` | **5.350.0** (11 nov.) | « Vinted a masqué / fait disparaître / limite » : deux lectures COMPLÈTES comparées, aucune requête de plus ; `moderation_vinted_{uid}` |
@@ -487,6 +489,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **16 nov. · Favoris et offres irréprochables (ext. 5.398)** : revue adverse ; arrêt anti-robot À LA SOURCE (`requeteVinted`, toute requête) ; « Tout arrêter »/captcha pendant l'écriture ; offre auto RELUE depuis l'onglet juste avant le geste (`relireOffre`) ; annonce réservée/masquée/fermée/supprimée prouvée ⇒ ni acceptation ni favori (`annonceIndisponible`) ; refus après écriture jamais recontacté ; temps fixe jamais une minute ronde ; jamais 2 fois le même texte (seule la salutation change, `texteJamaisRepete`). `docs/passation/2026-11-16-favoris-offres-irreprochable.md`. Geste : installer 5.398.0.
 - **16 nov. · Extension 5.393.0 (vague C)** : verre de la carte du logo, du site et des e-mails ; « même photo · sûr » vérifiée sur les deux images ; dates de versement ; Vestiaire « aimés » comme Vinted ; scanner pour retrouver (disque « + ») ; banc `sante-donnees` réparé (aucune donnée réécrite à l'ouverture d'Achats). Geste : installer 5.393.0.
 - **16 nov. · Nouveautés (vague B)** : transporteur lu sur l'étiquette (jamais « inconnu », `src/colisEnvoyes.js`) ; plus de rangement sur un achat — l'atelier d'arrivée donne le N° puis la case sur la fiche (`casesProposees`) ; contrôle de nuit + santé des comptes + extension en retard (`src/fiabilite/`) ; baisse conseillée, relance des favoris, loupe universelle ; bilan du mois, alertes de seuils, bénéfice réel, sauvegarde zip ; écran de chargement verre. Récits `2026-11-15-*.md`. Geste : aucun.
 - **16 nov. · Écrans refaits sur les maquettes validées (vague A)** : Ma journée (seulement les gestes, « Tout va bien ? · N points », retours et litiges ensemble, paire à sortir en premier), Annonces 72 px, Ventes/Achats (colis cochés d'office, place du Stock par N°, code au comptoir), fiche D (un geste : « Relier · N € » sur son toucher), Argent, Messages (plein « Proposer N € »), Paramètres, rail ordinateur Vendre/Ranger/Compter ; « À envoyer » partout (`src/libelles.js`). `2026-11-15-refonte-journee.md`, `-refonte-ventes.md`, `-fiche-d.md`. Geste : aucun.
@@ -501,7 +504,7 @@ sans la fonction.
 Une ligne par chantier ou décision, le plus récent d'abord. Détail : le fichier
 d'historique du thème (cherche le titre ou la date).
 
-**Extension servie : 5.393.0** (16 nov. : regroupe 5.386 verre de la carte, 5.388 même photo sûre, 5.390 versements, 5.392 deux comptes/aimés Vestiaire — jamais servies seules). **À lire en premier : `docs/passation/2026-11-16-passation.md`** (en ligne, en cours, reste à faire, gestes), puis `2026-11-10-passation-finale.md` et `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
+**Extension servie : 5.398.0** (16 nov. : favoris et offres ; contient aussi 5.386 verre de la carte, 5.388 même photo sûre, 5.390 versements, 5.392 deux comptes/aimés Vestiaire — jamais servies seules). **À lire en premier : `docs/passation/2026-11-16-passation.md`** (en ligne, en cours, reste à faire, gestes), puis `2026-11-10-passation-finale.md` et `2026-11-09-passation-generale.md` (puis, pour l'ancien, `2026-11-07-passation-generale.md` et `2026-11-02-liste.md`). **Production** : https://vrm.center,
 vérifier par `curl https://vrm.center/api/sante`.
 
 ### Gestes encore attendus de Julien
