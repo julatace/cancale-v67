@@ -700,7 +700,9 @@ html[data-sb-eventail] body .vrm-neuf-hote { visibility: hidden !important; }
   background: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; border-radius: 22px !important;
   box-shadow: var(--sv-ombre) !important; color: var(--sv-encre) !important;
 }
-:root:root:root body .vrm-app-shell[data-espace] .vrm-ebay-panneau { margin: 0 16px 16px !important; }
+:root:root:root body .vrm-app-shell[data-espace] .vrm-ebay-panneau { margin: 0 16px 16px !important; width: auto !important; max-width: calc(100% - 32px) !important; box-sizing: border-box !important; }
+/* le lien « Comment faire ? » sur ce verre : le lien du verre (5,5:1), pas le bleu du thème eBay (4,4:1) */
+:root:root:root body .vrm-app-shell[data-espace] :is(.vrm-ebay-panneau, .vrm-ebay-sales > [data-ebay-guides]) [data-ebay-guides] button, :root:root:root body .vrm-app-shell[data-espace] .vrm-ebay-sales > [data-ebay-guides] button { color: var(--sv-lien) !important; }
 :root:root:root body .vrm-app-shell[data-espace] .vrm-ebay-sales > [data-ebay-guides] { padding: 8px 14px !important; margin: 0 0 12px !important; }
 :root:root:root body .vrm-app-shell[data-espace] [data-ebay-brouillons] { padding: 14px 16px !important; }
 

@@ -162,6 +162,7 @@ function sousLaBarre() {
     const rb = barre.getBoundingClientRect();
     const cibles = [...document.querySelectorAll('.vrm-main :is(button, a[href], [role="button"], input, select, summary)')].filter((el) => {
       if (el.closest('.vrm-fs, [role="dialog"], [aria-hidden="true"]')) return false;
+      if (el.closest('details:not([open])') && !el.closest('summary')) return false;   // repli fermé : pas montré
       const c = getComputedStyle(el); if (c.visibility === 'hidden' || c.display === 'none') return false;
       const r = el.getBoundingClientRect(); return r.width > 4 && r.height > 4 && r.top < innerHeight && r.bottom > 0;
     });
@@ -182,7 +183,7 @@ function sousLaBarre() {
 
 // S7 : chaque cible amenée au centre se touche.
 async function ciblesCouvertes(pg) {
-  const n = await pg.evaluate(() => { const l = [...document.querySelectorAll('.vrm-main :is(button, a[href], [role="button"], [role="tab"], summary)')].filter((el) => !el.closest('[aria-hidden="true"], .vrm-fs, [role="dialog"]') && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden'); window.__vrmCibles = l.filter((_, i) => i % Math.max(1, Math.ceil(l.length / 40)) === 0).slice(0, 40); return window.__vrmCibles.length; });
+  const n = await pg.evaluate(() => { const l = [...document.querySelectorAll('.vrm-main :is(button, a[href], [role="button"], [role="tab"], summary)')].filter((el) => !el.closest('[aria-hidden="true"], .vrm-fs, [role="dialog"]') && !(el.closest('details:not([open])') && !el.closest('summary')) && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden'); window.__vrmCibles = l.filter((_, i) => i % Math.max(1, Math.ceil(l.length / 40)) === 0).slice(0, 40); return window.__vrmCibles.length; });
   const couvertes = [];
   for (let i = 0; i < n; i++) {
     const r = await pg.evaluate((i) => {
@@ -256,9 +257,14 @@ const TEXTES_PIXELS = () => {
   return out;
 };
 async function contrastePixels(o) {
-  const textes = await o.pg.evaluate(TEXTES_PIXELS);
-  if (!textes.length) return [];
+  const textes0 = await o.pg.evaluate(TEXTES_PIXELS);
+  if (!textes0.length) return [];
   const png = (await o.pg.screenshot()).toString('base64');
+  // l'écran a pu bouger entre la mesure et la capture (des données qui arrivent) : seuls les textes restés à la même
+  // place (± 2 px) sont jugés sur la capture
+  const apres = await o.pg.evaluate(TEXTES_PIXELS);
+  const textes = textes0.filter((t) => apres.some((u) => u.t === t.t && Math.abs(u.x - t.x) <= 2 && Math.abs(u.y - t.y) <= 2));
+  if (!textes.length) return [];
   const dsf = await o.pg.evaluate(() => devicePixelRatio);
   // une page vierge (sans la politique de contenu de l'app) décode la capture ; fermée aussitôt, l'app revient devant
   // (une page passée derrière voit ses images ralenties à 1 par seconde : la mesure du défilement serait fausse).
@@ -346,6 +352,9 @@ async function juger(o, suf, { perf }) {
   const s = await pg.evaluate(stabilite);
   dit(!s.garde, `S2 ${suf} : l'écran n'est pas tombé sur le garde-fou`, s.garde || '');
   const m = await pg.evaluate(V.mesurer);
+  // un bouton DÉSACTIVÉ n'est pas tenu au contraste (WCAG 1.4.3, exception « composant inactif »)
+  const inactifs = await pg.evaluate(() => [...document.querySelectorAll('button:disabled, [aria-disabled="true"]')].map((b) => b.textContent.replace(/\s+/g, ' ').trim().slice(0, 40)));
+  m.contraste = m.contraste.filter((x) => !inactifs.includes(x.t));
   dit(m.contraste.length === 0, `S3 ${suf} : contraste ≥ 4,5:1 sur le fond réel (${m.textes} textes)`,
     m.contraste.length ? `${m.contraste.length} sous le seuil : ` + m.contraste.slice(0, DETAIL).map((x) => `${x.k}<${x.seuil} « ${x.t} » ${x.el} (${x.c} sur ${x.f})`).join(' | ') : '');
   const px = await contrastePixels(o).catch((e) => [{ t: 'mesure impossible : ' + String(e.message || e).slice(0, 80), k: 0, seuil: 4.5 }]);
