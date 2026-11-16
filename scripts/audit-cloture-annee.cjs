@@ -235,7 +235,8 @@ const proche = (a, b) => (a == null && b == null) || (a != null && b != null && 
   dit(/<ClotureAnnee portes=\{portesCloture\(\{ onNav \}\)\} \/>/.test(sansCommentaires(SRC.compta)), 'la liste est montée dans Argent → Déclarer');
   dit(/jobs\.push\(\{ id: 'cloture-annee',[^\n]*tab: 'argent_declarer'/.test(sansCommentaires(SRC.app)) && /carteJourneeCloture\(\{/.test(SRC.app), 'la carte de Ma journée est poussée par `carteJournee` et ouvre Déclarer');
   const portes = extraire(SRC.compta, 'portesCloture');
-  dit(['adater', 'prix', 'inventaire', 'ca', 'urssaf', 'revenus', 'seuils', 'export'].every((k) => new RegExp(`\\b${k}: `).test(portes)), 'chaque étape a sa porte vers l’écran existant');
+  // (15 nov., extension 5.390) « Dates de versement » n'a plus de porte : l'extension les récupère, rien ne lui est demandé.
+  dit(['prix', 'inventaire', 'ca', 'urssaf', 'revenus', 'seuils', 'export'].every((k) => new RegExp(`\\b${k}: `).test(portes)) && !/\badater: /.test(portes), 'chaque étape a sa porte vers l’écran existant, sauf les dates de versement (aucun geste)');
   dit(/'vrm_cloture_annee', 'vrm_cloture_vue'/.test(APP), 'clôture et carte vue : synchronisées (SYNC_KEYS)');
 
   console.log(`\n${ko ? '❌' : '✅'} audit-cloture-annee : ${ok} vert(s), ${ko} rouge(s)`);

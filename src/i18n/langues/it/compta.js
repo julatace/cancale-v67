@@ -717,4 +717,11 @@ export default {
   "compta.environHeuresVinted": { one: "Circa {n} h con vinted.fr aperto su questo account.", other: "Circa {n} h con vinted.fr aperto su questo account." },
   "compta.releveAVerifier": { one: "{n} vendita nell’estratto del portafoglio: date dell’estratto non ancora verificate ({accords} su {min} corrispondenze con il dettaglio delle vendite). Fino ad allora non viene datato nulla.", other: "{n} vendite nell’estratto del portafoglio: date dell’estratto non ancora verificate ({accords} su {min} corrispondenze con il dettaglio delle vendite). Fino ad allora non viene datato nulla." },
   "compta.releveDesaccord": { one: "{n} vendita nell’estratto del portafoglio: la sua data non cade nello stesso giorno del dettaglio della vendita ({desaccords} disaccordo). L’estratto di questo account non data nulla.", other: "{n} vendite nell’estratto del portafoglio: le loro date non cadono nello stesso giorno del dettaglio delle vendite ({desaccords} disaccordi). L’estratto di questo account non data nulla." },
+  // (15 nov., extension 5.390) La ligne discrète : l’extension récupère les dates de versement, aucun geste.
+  "versement.ligne": { one: "Date di versamento: l’estensione le recupera (≈ {n} rimanente · circa {h} h con vinted.fr aperto).", other: "Date di versamento: l’estensione le recupera (≈ {n} rimanenti · circa {h} h con vinted.fr aperto)." },
+  "versement.ligneSans": { one: "Date di versamento: l’estensione le recupera (≈ {n} rimanente).", other: "Date di versamento: l’estensione le recupera (≈ {n} rimanenti)." },
+  "versement.court": "date in lettura",
+  "versement.lbcReleve": "l’estensione rileva la data di vendita passando su leboncoin.fr",
+  "versement.lbcSans": { one: "{n} vendita Leboncoin senza data di vendita: in nessun periodo per ora (l’estensione la rileva su leboncoin.fr).", other: "{n} vendite Leboncoin senza data di vendita: in nessun periodo per ora (l’estensione le rileva su leboncoin.fr)." },
+  "versement.dac7Si": "senza data di versamento contano",
 };

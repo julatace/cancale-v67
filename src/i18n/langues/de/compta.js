@@ -717,4 +717,11 @@ export default {
   "compta.environHeuresVinted": { one: "Etwa {n} Std. mit offenem vinted.fr in diesem Konto.", other: "Etwa {n} Std. mit offenem vinted.fr in diesem Konto." },
   "compta.releveAVerifier": { one: "{n} Verkauf im Kontoauszug der Geldbörse: Daten des Auszugs noch nicht geprüft ({accords} von {min} Übereinstimmungen mit den Verkaufsdetails). Bis dahin wird nichts damit datiert.", other: "{n} Verkäufe im Kontoauszug der Geldbörse: Daten des Auszugs noch nicht geprüft ({accords} von {min} Übereinstimmungen mit den Verkaufsdetails). Bis dahin wird nichts damit datiert." },
   "compta.releveDesaccord": { one: "{n} Verkauf im Kontoauszug der Geldbörse: sein Datum fällt nicht auf denselben Tag wie die Verkaufsdetails ({desaccords} Abweichung). Der Auszug dieses Kontos datiert nichts.", other: "{n} Verkäufe im Kontoauszug der Geldbörse: ihre Daten fallen nicht auf denselben Tag wie die Verkaufsdetails ({desaccords} Abweichung(en)). Der Auszug dieses Kontos datiert nichts." },
+  // (15 nov., extension 5.390) La ligne discrète : l’extension récupère les dates de versement, aucun geste.
+  "versement.ligne": { one: "Auszahlungsdaten: die Erweiterung holt sie (≈ {n} übrig · etwa {h} Std. mit offenem vinted.fr).", other: "Auszahlungsdaten: die Erweiterung holt sie (≈ {n} übrig · etwa {h} Std. mit offenem vinted.fr)." },
+  "versement.ligneSans": { one: "Auszahlungsdaten: die Erweiterung holt sie (≈ {n} übrig).", other: "Auszahlungsdaten: die Erweiterung holt sie (≈ {n} übrig)." },
+  "versement.court": "Daten werden gelesen",
+  "versement.lbcReleve": "die Erweiterung liest ihr Verkaufsdatum nebenbei auf leboncoin.fr",
+  "versement.lbcSans": { one: "{n} Leboncoin-Verkauf ohne Verkaufsdatum: vorerst in keinem Zeitraum (die Erweiterung liest es auf leboncoin.fr).", other: "{n} Leboncoin-Verkäufe ohne Verkaufsdatum: vorerst in keinem Zeitraum (die Erweiterung liest sie auf leboncoin.fr)." },
+  "versement.dac7Si": "ohne Auszahlungsdatum mitzählen",
 };

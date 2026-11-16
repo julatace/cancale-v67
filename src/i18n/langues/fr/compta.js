@@ -717,4 +717,11 @@ export default {
   "compta.environHeuresVinted": { one: "Environ {n} h avec vinted.fr ouvert sur ce compte.", other: "Environ {n} h avec vinted.fr ouvert sur ce compte." },
   "compta.releveAVerifier": { one: "{n} vente dans le relevé du porte-monnaie : dates du relevé pas encore vérifiées ({accords} sur {min} accords avec le détail des ventes). Rien n’en est daté d’ici là.", other: "{n} ventes dans le relevé du porte-monnaie : dates du relevé pas encore vérifiées ({accords} sur {min} accords avec le détail des ventes). Rien n’en est daté d’ici là." },
   "compta.releveDesaccord": { one: "{n} vente dans le relevé du porte-monnaie : sa date ne tombe pas le même jour que le détail de la vente ({desaccords} désaccord). Le relevé de ce compte ne date rien.", other: "{n} ventes dans le relevé du porte-monnaie : leur date ne tombe pas le même jour que le détail des ventes ({desaccords} désaccord(s)). Le relevé de ce compte ne date rien." },
+  // (15 nov., extension 5.390) La ligne discrète : l’extension récupère les dates de versement, aucun geste.
+  "versement.ligne": { one: "Dates de versement : l’extension les récupère (≈ {n} restante · environ {h} h avec vinted.fr ouvert).", other: "Dates de versement : l’extension les récupère (≈ {n} restantes · environ {h} h avec vinted.fr ouvert)." },
+  "versement.ligneSans": { one: "Dates de versement : l’extension les récupère (≈ {n} restante).", other: "Dates de versement : l’extension les récupère (≈ {n} restantes)." },
+  "versement.court": "dates en lecture",
+  "versement.lbcReleve": "l’extension relève leur date de vente au passage sur leboncoin.fr",
+  "versement.lbcSans": { one: "{n} vente Leboncoin sans date de vente : dans aucune période pour l’instant (l’extension la relève sur leboncoin.fr).", other: "{n} ventes Leboncoin sans date de vente : dans aucune période pour l’instant (l’extension les relève sur leboncoin.fr)." },
+  "versement.dac7Si": "sans date de versement comptent",
 };

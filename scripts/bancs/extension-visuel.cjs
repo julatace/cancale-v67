@@ -114,6 +114,10 @@ const lire = (pg) => pg.evaluate(() => {
     ouvrirVrm: !!q('[data-ouvrir-vrm]'),
     hauteursRaccourcis: Array.from(r.querySelectorAll('[data-ouvrir-ecran]')).map((b) => Math.round(b.getBoundingClientRect().height)),
     // 5.379 (Studio bleu clair) : le fond de la carte est un DÉGRADÉ opaque ; sa première couleur fait foi.
+    // 5.386 (« Verre dépoli ») : la carte est un bleu profond dans les DEUX teintes ; la teinte se lit
+    // sur le VERRE où vit le texte — clair : verre clair à l'encre ; sombre : verre sombre, texte clair.
+    texte: carte ? getComputedStyle(carte).color : '',
+    verre: carte ? (() => { const p = carte.querySelector('.contenu > :not(.tete):not(.fermer):not(.b)'); return p ? getComputedStyle(p).backgroundColor : ''; })() : '',
     fond: carte ? (() => { const s = getComputedStyle(carte), c = s.backgroundColor; if (!/^rgba\(0, 0, 0, 0\)$/.test(c)) return c; const m = /rgba?\([^)]*\)/.exec(s.backgroundImage || ''); return m ? m[0] : c; })() : '',
     animation: carte ? getComputedStyle(carte).animationName : '',
     theme: h.getAttribute('data-theme'), mini: h.hasAttribute('data-mini'), haut: h.hasAttribute('data-haut'), gauche: h.hasAttribute('data-gauche'),
@@ -239,8 +243,10 @@ const mots = (t) => String(t || '').replace(/[✓·:—]/g, ' ').trim().split(/\
     for (const [mode, scheme, clair] of [['clair', 'dark', true], ['sombre', 'light', false], ['auto', 'dark', false], ['auto', 'light', true]]) {
       const { ctx, pg } = await ouvrir(nav, ETATS.ok, { scheme, store: { vrmApparence: mode } });
       const l0 = await lire(pg); await survoler(pg, l0.btn); const l = await lire(pg);
-      const L = lum(l.fond);
-      dit(L != null && (clair ? L > 0.7 : L < 0.3), `VRM « ${mode} », système ${scheme} : carte ${clair ? 'claire' : 'sombre'}`, `${l.fond} · theme=${l.theme}`);
+      // 5.386 : la RÈGLE (la teinte choisie dans VRM passe avant le système), lue sur le verre et le
+      // texte (le fond de la carte est le bleu profond dans les deux teintes).
+      const L = lum(l.verre), T = lum(l.texte);
+      dit(L != null && T != null && (clair ? L > 0.7 && T < 0.3 : L < 0.3 && T > 0.7), `VRM « ${mode} », système ${scheme} : carte ${clair ? 'claire' : 'sombre'}`, `verre ${l.verre} · texte ${l.texte} · theme=${l.theme}`);
       await ctx.close();
     }
   });
@@ -263,10 +269,11 @@ const mots = (t) => String(t || '').replace(/[✓·:—]/g, ' ').trim().split(/\
       }, mode);
       await pg.goto('https://ext.test/popup.html');
       await pg.waitForTimeout(500);
-      const fond = await pg.evaluate(() => getComputedStyle(document.body).backgroundColor);
+      // 5.386 : le fond est le bleu profond dans les deux teintes ; la teinte se lit sur le texte (encre ⇒ claire).
+      const fond = await pg.evaluate(() => getComputedStyle(document.body).color);
       await pg.screenshot({ path: path.join(SORTIE, `fenetre-${mode || 'systeme'}-${scheme}.png`) }).catch(() => {});
       const L = lum(fond);
-      dit(L != null && (clair ? L > 0.7 : L < 0.3), `fenêtre : VRM « ${mode || 'pas su'} », système ${scheme} ⇒ ${clair ? 'claire' : 'sombre'}`, fond);
+      dit(L != null && (clair ? L < 0.3 : L > 0.7), `fenêtre : VRM « ${mode || 'pas su'} », système ${scheme} ⇒ ${clair ? 'claire' : 'sombre'}`, fond);
       await ctx.close();
     }
   });
