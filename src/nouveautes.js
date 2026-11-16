@@ -27,6 +27,8 @@ export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
   // (16 nov., captures iPhone de Julien) docs/passation/2026-11-16-ventes-clair.md
+  // (16 nov., Julien : « comme quand on reste appuyé sur une app sur iPhone ») docs/passation/2026-11-16-relier-glisser.md
+  { id: 'relier-glisser', date: '2026-11-16', titre: 'Relier un achat en le glissant', phrase: 'Reste appuyé sur l’achat, pose-le sur la vente ou l’annonce.', tab: 'achats', pour: 'tous', mode: 'tous' },
   { id: 'ventes-clair', date: '2026-11-16', titre: 'Ventes plus clair : la liste tout de suite', phrase: 'Les infos sont rangées dans « À regarder » ; une vente, trois lignes.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (16 nov., Julien : « La personnalisation doit être plus simple. ») docs/passation/2026-11-16-personnalisation-simple.md
   { id: 'personnalisation-simple', date: '2026-11-16', titre: '« Modifier ma journée » plus simple', phrase: 'Un interrupteur pour cacher, ↑ ↓ ou glisser pour ranger.', tab: 'journee', pour: 'tous', mode: 'tous' },
