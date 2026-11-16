@@ -129,6 +129,7 @@ import './design/sms-colis.css'; // (8 nov.) style de ./SmsColis.jsx, gardé à 
 import './design/studio-ventes.css';
 import { TeteStudio, BoutonPlein, Rond, TuilesFiltres } from './design/StudioVentes.jsx';
 import {achatDuColis,suivisAchat,entreeIndexAchat} from './liensColis.js';
+import { achatsARelier, ecritureRelierColis } from './relierColis.js';
 import {sourcesDuColis,codeLuDeLigne,verdictCode,codesDesLignes,NOMS_SOURCES,texteVerifie} from './sourcesRetrait.js';
 import { dateLocale } from './formatsDate.js';
 import {achatParConversation, regrouperArrivees, temoinsDe, texteDuBrut} from '../api/_lib/achat-arrive-relais.js';
@@ -717,7 +718,7 @@ import CarteRelaisColis, { ColonneRetirer, selecteurVilles } from "./CarteRelais
 // redirigé est UNE ligne sous son nouveau point, dans « En route » (src/CarteRelais.jsx, `redirige`).
 import { colisRelaisChange } from "./relaisChange.js";
 import { placeDesColis, ecranDeCible, ID_SECTION_COLIS } from "./colisPlace.js";
-import { delaiRetrait } from "./delaiRetrait.js";
+import { delaiRetrait, joursRestantsRetrait } from "./delaiRetrait.js";
 import PastilleTransporteur, { LogoTransporteur, LogoInconnu, BadgeTransporteur } from "./PastilleTransporteur.jsx";
 import { transporteurDuColis, cleStatTransporteur, cleTransporteur } from "./transporteursVisuels.js";
 import { transporteurDeVente, quandEnvoye, rangerEnvoyes, filtresTransporteurs, filtrerEnvoyes, nomEnvoye, INCONNU as TRANSP_INCONNU, raisonInconnu, compterRaisons, libelleTransp, transporteurDeLigne, transporteurParTx, txDeLigne, tuilesTransporteursConnus, pourquoiSansTransporteur, resumePasLus } from "./colisEnvoyes.js";
@@ -34809,6 +34810,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [lotOuvert]);
   // Colis RETIRÉS à la main (par n° de suivi) : disparaissent de « à retirer ».
   const [collected, setCollected] = useStateCle('vrm_colis_collected', () => new Set(load('vrm_colis_collected', [])));
+  // (16 nov., lot achats-qr) Le colis « Achat pas encore relié » dont on choisit l'achat ({ suivi, transporteur, cle }).
+  const [relierColis, setRelierColis] = useState(null);
+  const [relierEtat, setRelierEtat] = useState({ q: '', envoi: '', msg: '' });
   const [qrView, setQrView] = useState(null); // colis affiché en grand pour le scan { title, code, suivi, carrier, img }
   // ⚠️ QUAND le colis a été coché — le Set seul ne le dit pas, et sans la date on
   //    ne peut pas le garder EN GRIS « le temps que ce soit confirmé ». Clé à
@@ -34876,7 +34880,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (5 nov.) Un colis vu par Vinted (conversation lue par l'extension) présenté comme une ligne de
   // suivi, pour la même vue en grand : son code, son lieu, son QR si la conversation en donne un vrai.
   const ligneRetraitVinted = (o) => { const r = relaisDe(o) || {}; return { carrier: carrierKey(r.transporteur || ''), code: r.code || null, qrUrl: r.qr || null, lieu: r.lieu || null, artTitle: (o && o.title) || '', photo: (o && orderPhoto(o)) || null, suivi: suivisAchat(o, indexSuivisAchats)[0] || '', _o: o }; };
-  const openQrView = async (t) => {
+  // (16 nov., lot achats-qr) `extra.delai` : le délai que la LIGNE affiche (`delaiRetrait`, la même source) — la feuille
+  // dit le même « encore N j » que la ligne qui l'ouvre, jamais un second calcul.
+  const openQrView = async (t, extra = {}) => {
     // UNE seule règle décide quoi présenter au comptoir, selon le transporteur
     // (retraitMode) — plus de logique QR/code éparpillée ici.
     const r = retraitMode(t);
@@ -34895,7 +34901,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       limite: t.limite || '', consigne: !!t.consigne,
       carrier: t.carrier || '', carrierName: r.carrier, lieu: cleanLieu(t.lieu).display || '',
       photo: t.photo || orderPhoto(ph) || null,
-      mode: r.mode, _t: t,
+      mode: r.mode, _t: t, delai: (extra && extra.delai && Number.isFinite(extra.delai.jours) && extra.delai.jour) ? extra.delai : null,
       // (5 nov.) Où trouver le QR qu'on n'a pas, le compte (Mondial Relay ou adresse), l'accord des codes.
       qrOu: ouTrouverQr(t.carrier), compte: compteDuRetrait(t, mrColis), accord: accordCodes(trackingRetrait, suiviDeLigne(t)), codeMr: codeDuCompteMr(trackingRetrait, suiviDeLigne(t)),
       // (5 nov.) Le QR d'un compte Mondial Relay n'existe pas (« c'est que dans l'app ») : un QR Mondial
@@ -54323,8 +54329,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // (12 nov., finitions) Le QR d'un colis (Pickup Pass Chronopost, Vinted Go…) se TOUCHE depuis sa ligne : la même
           // ouverture en grand que « En grand » du détail (`openQrView`), les mêmes sources. Pas de QR lu ⇒ rien.
           const qrRetrait = (x) => { const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null;
-            const qi = t ? qrVivant(t) : ''; if (qi) return () => openQrView(x.code && codeRetrait(t.code) !== x.code ? { ...t, code: x.code } : t);
-            const relV = !t && o ? relaisDe(o) : null; return relV && relV.qr ? () => openQrView(ligneRetraitVinted(o)) : null; };
+            // (16 nov., lot achats-qr) La ligne passe le délai qu'elle AFFICHE (`d`) : la feuille dit les mêmes jours.
+            const qi = t ? qrVivant(t) : ''; if (qi) return (d) => openQrView(x.code && codeRetrait(t.code) !== x.code ? { ...t, code: x.code } : t, { delai: d || delaiColisRetrait(x) });
+            const relV = !t && o ? relaisDe(o) : null; return relV && relV.qr ? (d) => openQrView(ligneRetraitVinted(o), { delai: d || delaiColisRetrait(x) }) : null; };
+          // (16 nov., lot achats-qr) « Achat pas encore relié · Relier » : un colis d'e-mail (n° de suivi lu) qu'AUCUNE
+          // identité ne relie à un achat (`commandeRetrait` : n° de suivi, conversation, code — jamais le titre). Son clic
+          // choisira l'achat ; un colis déjà relié, d'un autre site, ou sans n° n'a pas ce geste.
+          const relierRetrait = (x) => { const t = (x.src && x.src.t) || null; if (!t || x.achatAutre || (x.site && x.site !== 'vinted') || x.redirige) return null;
+            const su = suiviDeLigne(t); if (!su || commandeRetrait(t)) return null;
+            return () => { setRelierEtat({ q: '', envoi: '', msg: '' }); setRelierColis({ suivi: su, transporteur: carrierKey(t.carrier) || '', cle: x.cle, nom: CARRIERS[carrierKey(t.carrier)] ? carrierName(t.carrier) : '' }); }; };
           const delaiColisRetrait = (x) => { if (x.horsCompte) return null; const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null;
             const ev = !t && o ? (etatColisVinted(o, Date.now(), transpMap) || {}) : null;
             const arr = t ? arriveeColisEmail(t) : (ev ? ev.arr : null);
@@ -54631,7 +54644,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     <button type="button" className="vrm-lien-action" data-pickup-sans-compte-geste="" onClick={() => onNav && onNav('vintedaccounts')} style={{border:0,background:'transparent',padding:0,minHeight:44,color:C.text,fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:'inherit',textDecoration:'underline'}}>Paramètres → Comptes liés</button></p>; })()}
                 {colRet && (colRet.cartes.length > 0 || ((groupesRelais && groupesRelais.enRouteSansRelais) || 0) > 0)
                   ? <ColonneRetirer vue={parPoint} C={C} Photo={photoCarte} gestes={gestesRetrait} detail={arriveeRetrait} nomTransporteur={(k) => (CARRIERS[k] && CARRIERS[k].name) || ''} avecCarte={false} ordi={ordiColis} delai={delaiColisRetrait} enRouteSansRelais={(groupesRelais && groupesRelais.enRouteSansRelais) || 0}
-                      fusion echeance={echeanceRetrait} statut={statutAVerifier} retirer={retirerColis} suiviDe={suiviRetrait} ville={villeRetrait} onVille={setVilleRetrait} titreDe={titreRetrait} qrDe={qrRetrait} enRoute={(groupesRelais && groupesRelais.sansRelais) || []}
+                      fusion echeance={echeanceRetrait} statut={statutAVerifier} retirer={retirerColis} suiviDe={suiviRetrait} ville={villeRetrait} onVille={setVilleRetrait} titreDe={titreRetrait} qrDe={qrRetrait} relierDe={relierRetrait} enRoute={(groupesRelais && groupesRelais.sansRelais) || []}
                       redirige={(colisRelaisChange(tracking, { transp: transpMap }) || []).map((r) => { const t = (tracking || []).find((l) => l && l.relaisChange && suiviDeLigne(l) === r.suivi) || { suivi: r.suivi, carrier: r.carrier, emailRecu: r.emailRecu };
                         return { cle: 'r:rc:' + r.suivi, suivi: r.suivi, titre: '', nom: r.nom, adresse: r.adresse, code: r.code || '', codeDe: r.codeDe || '', transp: transporteurColis(r.carrier, r.suivi), jours: null, redirige: true, src: { t } }; })}/>
                   : (toutLuRet ? <p className="vrm-colis-vide" data-retraits-vide="">Aucun colis à aller chercher pour l’instant.</p> : null)}
@@ -57743,6 +57756,45 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           navigateur. Son titre est l'article (relié par identité) ou « Colis <transporteur> » — jamais le
           sujet d'un e-mail (`titreEnGrand`). Une phrase par idée : la façon de présenter le colis est
           dite UNE fois (dans l'encadré « QR … » quand il y en a un, sinon sous le code). Aucun emoji. */}
+      {relierColis && (()=>{
+        // (16 nov., lot achats-qr) LE CHOIX DE L'ACHAT D'UN COLIS : ses achats EN ATTENTE sans n° de suivi
+        // (`achatsARelier`, src/relierColis.js), le plus avancé d'abord. SON clic sur UNE ligne relie par le n° de
+        // transaction de CETTE ligne (50 achats au même titre : le clic décide seul) ; le n° du colis est gardé
+        // (`colis_suivi_*` + tx/uid) et `achatDuColis` le retrouve partout. Une écriture ratée ne change rien et le dit.
+        const liste = achatsARelier(Array.isArray(buys.items) && !buys.error ? buysBase : null, indexSuivisAchats);
+        const q = String(relierEtat.q || '').trim().toLowerCase();
+        const vus = liste ? liste.filter((o) => !q || String(o.title || '').toLowerCase().includes(q)).slice(0, 60) : null;
+        const choisir = async (o) => {
+          const w = ecritureRelierColis(relierColis, o); if (!w) return;
+          setRelierEtat((e) => ({ ...e, envoi: String(o.transaction_id), msg: '' }));
+          const r = await ecrireSuiviManuel(w.id, w.patch);
+          if (!r.ok) { setRelierEtat((e) => ({ ...e, envoi: '', msg: tr('achats.relier.rate') })); return; }
+          setRelierEtat({ q: '', envoi: '', msg: '' }); setRelierColis(null);
+          relireSuivisManuelsPartout();
+        };
+        return (
+        <SheetShell onClose={() => setRelierColis(null)} titre={tr('achats.relier.titre')} sousTitre={[relierColis.nom, `n° ${relierColis.suivi}`].filter(Boolean).join(' · ')} maxWidth={520} z={Z_CONFIRMATION - 3}
+          aria-label={tr('achats.relier.titre')} data-relier-colis={relierColis.suivi} data-relier-colis-n={vus ? vus.length : 'pas-su'}>
+          <p className="vrm-aide" style={{ fontSize: 13, color: C.muted, margin: '0 0 10px', lineHeight: 1.45 }}>{tr('achats.relier.aide')}</p>
+          {liste === null ? <p data-relier-colis-pas-su="" style={{ fontSize: 13, color: C.warn }}>{tr('achats.relier.pasSu')}</p> : <>
+            <input type="search" aria-label={tr('achats.relier.chercher')} placeholder={tr('achats.relier.chercher')} value={relierEtat.q} onChange={(e) => setRelierEtat((x) => ({ ...x, q: e.target.value }))} data-relier-colis-recherche=""
+              style={{ width: '100%', minHeight: 44, boxSizing: 'border-box', border: `1px solid ${C.border}`, borderRadius: 12, padding: '0 12px', fontSize: 17, background: C.card, color: C.text, fontFamily: 'inherit', marginBottom: 8 }}/>
+            {!vus.length ? <p data-relier-colis-aucun="" style={{ fontSize: 13, color: C.muted }}>{tr('achats.relier.aucun')}</p> : null}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {vus.map((o) => { const ph = orderPhoto(o); const m = montantCommande(o); const tx = String(o.transaction_id);
+                return <button key={(o._acc && o._acc.vinted_user_id || '') + ':' + tx} type="button" data-relier-colis-achat={tx} disabled={!!relierEtat.envoi} onClick={() => choisir(o)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 56, padding: '6px 10px', border: `1px solid ${C.border}`, borderRadius: 12, background: relierEtat.envoi === tx ? C.card2 : 'transparent', color: C.text, textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', opacity: relierEtat.envoi && relierEtat.envoi !== tx ? .5 : 1 }}>
+                  {ph && !imgMortes.has(ph) ? <PhotoVinted src={ph} alt="" loading="lazy" onError={() => noterImgMorte(ph)} style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }}/> : <span style={{ width: 44, height: 44, borderRadius: 10, flexShrink: 0, background: C.card2 || C.bg, display: 'grid', placeItems: 'center', color: C.muted }}><Icon name="bag" size={18}/></span>}
+                  <span style={{ minWidth: 0, flex: 1 }}>
+                    <span style={{ display: 'block', fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{relierEtat.envoi === tx ? tr('achats.relier.enCours') : (o.title || 'Achat')}</span>
+                    <span style={{ display: 'block', fontSize: 12, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{[o._acc ? accName(o._acc) : '', o.date ? dateFr(o.date) : '', m > 0 ? m.toFixed(2).replace('.', ',') + '\u00a0€' : '', String(o.status || '').replace(/\s+-\s+.*/, '').slice(0, 60)].filter(Boolean).join(' · ')}</span>
+                  </span>
+                </button>; })}
+            </div>
+          </>}
+          {relierEtat.msg ? <p role="status" data-relier-colis-msg="" style={{ fontSize: 13, color: C.warn, marginTop: 8 }}>{relierEtat.msg}</p> : null}
+        </SheetShell>
+        ); })()}
       {qrView && (()=>{
         const cn = qrView.carrierName || carrierName(qrView.carrier);
         const ck = carrierKey(qrView.carrier) || '';
@@ -57753,9 +57805,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           : qrView.real ? 'Présente ce QR au comptoir : le scan suffit.'
           : qrView.code ? 'Donne ce code au comptoir avec ta pièce d’identité.'
           : 'Ni QR ni code reçus : donne le numéro de colis et ta pièce d’identité.';
-        const lim = (() => { if (!qrView.limite) return null; const j = Math.ceil((new Date(qrView.limite + 'T23:59:59') - Date.now()) / 86400000); if (!Number.isFinite(j)) return null;
-          const d = new Date(qrView.limite + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
-          return { j, t: j < 0 ? 'Délai de retrait dépassé' : j === 0 ? 'Dernier jour pour le retirer' : j === 1 ? 'À retirer demain au plus tard' : `À retirer avant le ${d} · encore ${j} j` }; })();
+        // (16 nov., lot achats-qr) LES JOURS DE LA LIGNE : le délai qu'elle affiche (`qrView.delai`), sinon la MÊME règle
+        // (`joursRestantsRetrait` : jours civils de Paris, src/delaiRetrait.js) — avant, `Math.ceil` d'instants disait
+        // « encore 4 j » ici quand la ligne disait « encore 3 j ».
+        const lim = (() => { const dl = qrView.delai; const jour = dl ? dl.jour : String(qrView.limite || '').slice(0, 10); if (!jour) return null;
+          const j = dl ? (dl.code === 'depasse' ? -1 : dl.jours) : joursRestantsRetrait(jour); if (!Number.isFinite(j)) return null;
+          const d = new Date(jour + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+          const est = dl && dl.estimee ? ' · estimée' : '';
+          return { j, t: (j < 0 ? 'Délai de retrait dépassé' : j === 0 ? 'Dernier jour pour le retirer' : j === 1 ? 'À retirer demain au plus tard' : `À retirer avant le ${d} · encore ${j} j`) + est }; })();
         const compteTxt = qrView.compte && (qrView.compte.libelle || qrView.compte.horsComptes)
           ? (qrView.compte.source === 'mondialrelay' ? `Compte Mondial Relay · ${qrView.compte.libelle}` : [qrView.compte.libelle ? `Reçu sur ${qrView.compte.libelle}` : 'Reçu par e-mail', qrView.compte.horsComptes ? 'dans aucun de tes comptes Mondial Relay relus' : ''].filter(Boolean).join(' · '))
           : '';

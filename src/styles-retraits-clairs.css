@@ -46,9 +46,23 @@
 /* (12 nov., finitions) Le QR : une petite icône à côté du code, sur la ligne ; au doigt une zone de 44 px autour
    (sans grandir la ligne) ⇒ le QR en grand. Plus de tuile QR sous la vignette. */
 :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-comptoir { overflow: visible !important; }
-:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-qr-mini { position: relative; display: inline-grid; place-items: center; width: 26px; height: 26px; margin-left: 10px; border-radius: 7px; background: var(--d-remplir, rgba(118,118,128,.12)); color: var(--p-encre, currentColor); cursor: pointer; flex: none; }
-:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-qr-mini svg { width: 16px; height: 16px; }
-:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-qr-mini::after { content: ''; position: absolute; inset: -9px; }
+/* (16 nov., lot achats-qr — Julien : « le QR code doit être bien mieux placé ») Plus de petite icône grise : un vrai
+   bouton « Afficher le QR » (icône + texte, 44 px) dans la rangée des gestes, à côté de « J'ai retiré ». Au téléphone
+   la ligne d'un colis AVEC QR passe sur deux étages : le colis en entier, puis [Afficher le QR] [J'ai retiré]. */
+:root:root:root:root:root:root:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-qr { display: flex !important; align-items: center !important; justify-content: center !important; gap: 8px !important; min-height: 44px !important; height: 44px !important; padding: 0 14px !important; font-weight: 650 !important; }
+:root:root:root:root:root:root:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-qr svg { width: 20px; height: 20px; flex: none; }
+@media (max-width: 767px) {
+  :root:root:root:root:root:root:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne[data-rp-a-qr]:not(.vrm-reparti-court) > .vrm-rpf-rang { flex-wrap: wrap !important; row-gap: 8px !important; column-gap: 8px !important; }
+  :root:root:root:root:root:root:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne[data-rp-a-qr]:not(.vrm-reparti-court) > .vrm-rpf-rang > .vrm-rpf-ouvrir { flex: 1 1 100% !important; }
+  :root:root:root:root:root:root:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne[data-rp-a-qr]:not(.vrm-reparti-court) > .vrm-rpf-rang > .vrm-rpf-qr { flex: 1 1 auto !important; font-size: 15px !important; padding: 0 14px !important; }
+  :root:root:root:root:root:root:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne[data-rp-a-qr]:not(.vrm-reparti-court) > .vrm-rpf-rang > .vrm-rpf-retire { flex: 0 0 auto !important; font-size: 15px !important; padding: 0 16px !important; }
+}
+/* Le n° de suivi : coupé à l'écran, copié en entier au toucher (le tiret du bas dit qu'il se touche). */
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-suivi-copie { cursor: copy; text-decoration: underline dotted; text-underline-offset: 3px; }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-ligne .vrm-rpf-suivi-copie[data-rp-suivi-copie-etat="copie"] { text-decoration: none; color: var(--p-encre, currentColor); }
+/* « Achat pas encore relié · Relier » : sous la ligne, aligné sur le texte, le geste en lien (44 px). */
+.vrm-rpf-relier { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: -6px 0 6px 60px; font-size: 13px; color: var(--p-gris, #6E6E73); }
+:root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-relier .vrm-rpf-relier-b { min-height: 44px; padding: 0 6px; border: 0; background: transparent; color: var(--p-encre, #1d1d1f); font: 650 13px/1 var(--vrm-police, system-ui); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 /* « QR en grand » dans la rangée des gestes : une vignette du QR + le mot. */
 :root:root:root body .vrm-app-shell .vrm-main .vrm-rpf-detail .vrm-rp-qr-grand img { width: 22px !important; height: 22px !important; border-radius: 3px; background: #fff; }
 /* Au téléphone, le NOM du point garde toute sa ligne (« Phone C… » était rogné par « 4 colis · 1 code à venir ·

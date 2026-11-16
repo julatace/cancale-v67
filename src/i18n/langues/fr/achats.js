@@ -356,4 +356,18 @@ export default {
   "achats.ms.marge": "Marge",
   "achats.ms.pourRevendre": "Pour revendre",
   "achats.selectionner": "Sélectionner",
+  // (16 nov., lot achats-qr) « Afficher le QR », le n° copiable, « Achat pas encore relié · Relier ».
+  "achats.qr.afficher": "Afficher le QR",
+  "achats.qr.afficherAria": "Afficher le QR de retrait en grand",
+  "achats.suivi.copierAria": "N° de suivi {su} — touche pour le copier",
+  "achats.suivi.copie": "copié",
+  "achats.relier.pasRelie": "Achat pas encore relié",
+  "achats.relier.bouton": "Relier",
+  "achats.relier.titre": "Quel achat est dans ce colis ?",
+  "achats.relier.aide": "Choisis l’achat : c’est toi qui relies, VRM ne devine rien. Le n° de suivi est gardé pour cet achat.",
+  "achats.relier.aucun": "Aucun achat en attente sans n° de suivi.",
+  "achats.relier.pasSu": "Tes achats n’ont pas pu être lus — rien n’est relié. Réessaie.",
+  "achats.relier.enCours": "Je relie…",
+  "achats.relier.rate": "La base n’a pas enregistré le lien — rien n’a changé. Réessaie.",
+  "achats.relier.chercher": "Chercher dans mes achats",
 };
