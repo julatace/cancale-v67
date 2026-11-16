@@ -96,7 +96,8 @@ const code = [
   }
   // Le parcours « Imprimer » en un toucher : il n'ouvre DANS le geste que si la sonde ne doit rien ; sinon il DEMANDE.
   const geste = (APP.match(/if \(pret && !numerosDemandent\(numeros\) && \(!numeros\.some\(Boolean\) \|\| versionFraiche\(\)\)\) \{/g) || []).length;
-  const attente = /const attendrePuisOuvrir = [\s\S]{0,900}if \(!\(await confirmerNumerosAVerifier\(numeros\)\)\) throw new Error\(NUM_A_VERIFIER_ANNULE\);/.test(APP);
+  // (16 nov.) Le geste porte ses moments (accompagner, 15 nov.) : la question reste AVANT toute fabrique, plus bas dans le corps.
+  const attente = /const attendrePuisOuvrir = (?:(?!fabrique\()[\s\S]){0,2000}if \(!\(await confirmerNumerosAVerifier\(numeros\)\)\) throw new Error\(NUM_A_VERIFIER_ANNULE\);/.test(APP);
   dit(geste === 1 && attente, '« Imprimer » : le PDF ne s’ouvre dans le geste que si aucune question n’est due ; sinon la question passe AVANT', JSON.stringify({ geste, attente }));
   // Les trois chemins d'impression l'appellent, juste après la garde de version.
   const appels = (APP.match(/await confirmerNumerosAVerifier\(/g) || []).length;
