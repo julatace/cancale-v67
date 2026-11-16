@@ -845,7 +845,7 @@ import { histoireArticle, offresDeConversation, colisDesVentes } from "./histoir
 import { etatArticle } from "./etatArticle.js";
 // ⟦→ ecrans/Stock.jsx #1⟧
 import './styles-stock-2d.css'; // (8 nov.) style de ./StockExplication.jsx, gardé à sa place (son écran est chargé à la demande)
-import { libererCasesPartis, remettreCase, resteAuStock, etatCase } from "./stockSortie.js";
+import { libererCasesPartis, remettreCase, resteAuStock, etatCase, partieDuStock } from "./stockSortie.js";
 import { opsSortieCases } from "./stockEtageres.js";   // (15 nov., étagères) la case vidée + la descente des piles, en un geste
 import { phraseDescentes, descentesDesOps } from "./etageresTextes.js";
 import { annoncesActuelles, annoncesVcStock, classerRangees } from "./stockAnnonces.js";
@@ -45355,11 +45355,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!Array.isArray(listings.items) || listings.loading || listings.incomplet || listings.error) return;
     const parCle = new Map();
     for (const o of sales.items) {
-      if (!venteSortieDuStock(o)) continue;
+      // (16 nov., lot retirer-case-compact) UNE règle (`partieDuStock`, src/stockSortie.js) : le statut Vinted parti, OU la
+      // preuve du transporteur pour le n° EXACT de son bordereau (`partisVinted` : e-mail de dépôt, prise en charge) ;
+      // jamais une vente annulée/qui revient, jamais « Colis fait » seul, jamais une absence.
+      if (!o || o.transaction_id == null || !String(o.status || '')) continue;
+      const annulee = classifyOrderStatus(String(o.status)) === 'cancelled' || venteQuiRevient(o);
+      const statutParti = venteSortieDuStock(o), raisonDepart = partisVinted.get(String(o.transaction_id)) || null;
+      if (!partieDuStock({ statutParti, annulee, raison: raisonDepart })) continue;
       const num = effEntry(o)?.numero; const cle = cleNum(num || ''); if (!cle) continue;
       // Encore porté par une annonce présente ou une autre vente à envoyer : on ne touche à rien.
       if ((porteursNum[cle] || []).some(p => p.type !== 'garage')) continue;
-      parCle.set(cle, { cle, num: String(num), tx: String(o.transaction_id), titre: o.title || '', statut: o.status || '', plateforme: 'Vinted' });
+      parCle.set(cle, { cle, num: String(num), tx: String(o.transaction_id), titre: o.title || '', statut: statutParti ? (o.status || '') : (raisonDepart.type === 'email' ? 'colis déposé (e-mail du transporteur)' : 'pris en charge par le transporteur'), plateforme: 'Vinted' });
     }
     // (27 oct., « pareil pour Leboncoin et eBay ») Même règle, par IDENTITÉ :
     // Leboncoin = lien posé à la main ou référence VRM (`numeroLbcIdentite`),
@@ -45402,7 +45408,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     for (const { v, num, cle } of vcSorties) ajouter(cle, { cle, num: String(num), tx: 'vc:' + String(v.id || ''), titre: '', statut: v.etat || 'colis parti', plateforme: 'Vestiaire' });
     if (parCle.size) sortirPartisDuStock([...parCle.values()]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sales.items, listings.items, porteursNum, baseKO, lbcLu, lbcVentes, ebayCmd, lbcItemsBenef, ventesVc]);
+  }, [sales.items, listings.items, porteursNum, baseKO, lbcLu, lbcVentes, ebayCmd, lbcItemsBenef, ventesVc, partisVinted]);
   // ── (1er nov.) « DÉPOSÉ » DEPUIS VENTES : glissé (téléphone) ou bouton ─────
   // Rien n'est écrit pendant DELAI_ANNULER_DEPOSE (« Annuler » ⇒ rien) ; puis LE
   // geste de Colis (`marquerPoste`). Écran quitté entre-temps : la même écriture

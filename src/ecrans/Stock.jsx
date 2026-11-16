@@ -6,7 +6,7 @@ import { unParArticle, planchesCases, planchesRangees } from '../stockRegles.js'
 // (15 nov., étagères) Meubles libres (forme, taille, couleurs, ordre) et LA RÈGLE DES PILES : une règle pure, partagée
 // avec la sortie automatique, « Enlever du stock », « Vendu ailleurs » et « Où ranger » (src/stockEtageres.js).
 import { tasserApres, ordonner, deplacerMeuble, couleurCase, colonnesEnPile, typeDe, TYPES, TYPES_ORDRE, COULEURS, COLS_MAX, RANGEES_MAX, peindre, couleursDans } from '../stockEtageres.js';
-import { phraseDescentes, listeNumeros } from '../etageresTextes.js';
+import { phraseDescentes, listeNumeros, descentesDesOps } from '../etageresTextes.js';
 import { annuaireLbc, nomPlateforme } from '../plateformes.js';
 import MarquePlateforme from '../plateformes/Marque.jsx';   // (15 nov.) les logos des sites où la paire est en ligne, sur sa case
 import '../styles-etageres.css';   // (15 nov.) formes, couleurs, piles — chargée avec l'écran, donc après le studio
@@ -28,7 +28,7 @@ import { EmballagesCarte } from '../EmballagesCarte.jsx';
 import { useSelectionSerie, CaseSerie, BarreSerie, OuvrirSerie } from '../composants/SelectionSerie.jsx';   // (11 nov., lot actions-serie)
 import { trierSerie, resumeSerie, csvDe } from '../selectionSerie.js';   // (10 nov., lot L) le stock d'emballages
 import { CLE_EMBALLAGES, colisFaits } from '../emballages.js';
-import { useMotsArticle, useExemplesVendeur, NotePaireCoque, gesteVrm, sortieCaseStock, texteAvecDescentes, InfoPop, Pourquoi, AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, fetchTxnItemIds, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
+import { useMotsArticle, useExemplesVendeur, NotePaireCoque, gesteVrm, sortieCaseStock, InfoPop, Pourquoi, AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, fetchTxnItemIds, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import StockExplication from "../StockExplication.jsx";
@@ -607,8 +607,15 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     const cleD = cleDeclarationPartie(f.numero, f.id, numeros);
     const ops = [{ k: 'vinted_pairs_lost', type: 'cle', id: cleD, apres: { ...(perdues[cleD] || {}), id: String(f.id), at: new Date().toISOString(), title: f.title || '', from: 'stock' }, avant: perdues[cleD] }];
     if (k && slotsAv[k]) ops.push(...sortieCaseStock(k));
-    gesteVrm(texteAvecDescentes(tr(motsVendeur().e ? 'sortir.faitF' : 'sortir.fait', { num: String(f.numero) }), ops), ops, { vinted_pairs_lost: setPairsLost, vrm_slots: setSlots }, () => {
-      try { window.dispatchEvent(new Event('vrm:stock-slots')); } catch (_) {}
+    // La descente d'une pile est DITE une fois, sur le meuble (le bandeau, comme « Ranger ») — pas dans la pilule.
+    const desc = descentesDesOps(ops); const m0 = slotsAv[k] ? slotsAv[k].m : null;
+    gesteVrm(tr(motsVendeur().e ? 'sortir.faitF' : 'sortir.fait', { num: String(f.numero) }), ops, { vinted_pairs_lost: setPairsLost, vrm_slots: setSlots }, (sens) => {
+      if (sens === 'apres' && desc.length) {
+        const b = {}; desc.forEach((d) => { b[d.cle] = (b[d.cle] || 0) + d.crans; }); setTombes(b); setTimeout(() => setTombes({}), 700);
+        setDescente({ m: m0, texte: phraseDescentes(desc.map((d) => ({ ...d, m: m0 }))), cles: [...new Set(desc.map((d) => d.cle))] });
+      } else if (sens === 'avant') setDescente(null);
+      // ⚠️ Pas de `vrm:stock-slots` ici : la vue passe AVANT l'écriture (src/gesteAnnulable.js) — relire `vrm_slots`
+      // maintenant rendrait la case d'avant (mesuré : la case restait allumée). Le setter `vrm_slots` suffit.
     }, 'stock.sortir');
   };
   const cliquerCase = (mid, i) => {
@@ -1373,7 +1380,9 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     {blocAPart}
     {nEcartes > 0 && <div data-stock-ecartes={nEcartes} style={{ fontSize: 12, color: C.muted }}>{nEcartes} {nEcartes > 1 ? motsStock.noms : motsStock.nom} d'un compte retiré ou masqué {nEcartes > 1 ? 'ne sont' : "n'est"} pas montré{motsStock.e}{nEcartes > 1 ? 's' : ''} ici.</div>}
 
-    {aFaire.length ? <section className="vrm-ms-section" data-stock-section="afaire" aria-label={tr('listes.afaire')}>
+    {/* (16 nov., lot retirer-case-compact) La section ne se pose que si elle a un bloc : sans « Vendues à sortir », « À
+        faire » pouvait ne compter que des cibles ailleurs (« À ranger », les cases allumées) — un titre sur du vide. */}
+    {aFaire.length && (blocRetours || blocPlusEnLigne || blocPasSu || blocSortis) ? <section className="vrm-ms-section" data-stock-section="afaire" aria-label={tr('listes.afaire')}>
       <h2 className="vrm-ms-h2">{tr('listes.afaire')}</h2>
       {blocRetours}
       {blocPlusEnLigne}
