@@ -82,4 +82,5 @@ export default {
   "plus.aide.puceSemelle.art": "Largo {cm} cm",
   "plus.aide.manque.semelle.art": "Medida en cm",
   "plus.sujet.mesures.art": "¿medidas?",
+  "fd.delier.phrase.art": "«{titre}» dejará de estar vinculada al N.º {n}: el precio de compra vuelve a estar por introducir y esta compra no se volverá a proponer para este artículo.",
 };

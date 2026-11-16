@@ -82,4 +82,5 @@ export default {
   "plus.aide.puceSemelle.art": "Länge {cm} cm",
   "plus.aide.manque.semelle.art": "Maß in cm",
   "plus.sujet.mesures.art": "Maße?",
+  "fd.delier.phrase.art": "„{titre}“ ist nicht mehr mit Nr. {n} verknüpft: Der Einkaufspreis ist wieder einzugeben und dieser Kauf wird für diesen Artikel nicht mehr vorgeschlagen.",
 };
