@@ -67,6 +67,12 @@ async function ouvrir(nav, vp, { sombre = false, chemin = '/?tab=journee', journ
   const pg = await ctx.newPage();
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(e.message));
   const ecrits = [];
+  // (16 nov., finitions) La ligne `push_prefs` de la fausse base GARDE ce qu'on y écrit (comparer-et-échanger sur
+  // `data.rev`, comme PostgREST) : l'app écrit PAR DIFFÉRENCE sur la ligne RELUE (src/ligneCas.js, `ecrireDifference`,
+  // 12 nov.) ; une base qui rendait toujours la ligne du départ faisait croire qu'un autre appareil avait retiré
+  // `calme` — F11 réécrivait alors « heures calmes » allumées (faux rouge du banc, pas un défaut de l'app).
+  const base = { prefs: JSON.parse(JSON.stringify(PREFS)) };
+  const revDe = (d) => (d && Number.isSafeInteger(d.rev) ? d.rev : null);
   await pg.addInitScript(([s, d]) => { try { localStorage.setItem('vrm_session', JSON.stringify(s)); localStorage.setItem('vinted_dark', JSON.stringify(d)); localStorage.setItem('vinted_last_backup', String(Date.now())); } catch (_) {} }, [SESSION, sombre]);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: 'jeton-de-banc', refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
@@ -77,11 +83,18 @@ async function ouvrir(nav, vp, { sombre = false, chemin = '/?tab=journee', journ
     if (req.method() === 'PATCH') {
       // (5 nov.) « lu » s'écrit en comparer-et-échanger : PATCH filtré sur la ligne.
       const id = (/[?&]id=eq\.([^&]+)/.exec(u) || [])[1];
-      try { const b = JSON.parse(req.postData() || '{}'); ecrits.push({ id, data: b.data }); } catch (_) {}
+      let b = null; try { b = JSON.parse(req.postData() || '{}'); ecrits.push({ id, data: b.data }); } catch (_) {}
+      if (id === 'push_prefs') {
+        const g = /data->>rev=(is\.null|eq\.(\d+))/.exec(u);
+        const r0 = revDe(base.prefs);
+        const passe = g && (g[1] === 'is.null' ? r0 === null : r0 === Number(g[2]));
+        if (!passe) return r.fulfill({ status: 200, contentType: 'application/json', body: '[]' });   // devancé : 0 ligne
+        base.prefs = b && b.data;
+      }
       return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ id }]) });
     }
     if (req.method() !== 'GET') {
-      try { for (const l of JSON.parse(req.postData() || '[]')) ecrits.push(l); } catch (_) {}
+      try { const c = JSON.parse(req.postData() || '[]'); for (const l of (Array.isArray(c) ? c : [c])) { ecrits.push(l); if (l && l.id === 'push_prefs') base.prefs = l.data; } } catch (_) {}
       return r.fulfill({ status: 201, contentType: 'application/json', body: '[]' });
     }
     if (/select=owner/.test(u)) return j([]);
@@ -93,7 +106,7 @@ async function ouvrir(nav, vp, { sombre = false, chemin = '/?tab=journee', journ
       if (/select=n:data->n/.test(u)) return j([{ n: journal.n, ...(/depuis:data->depuis/.test(u) ? { depuis: journal.depuis } : {}) }]);
       return j([{ data: journal }]);
     }
-    if (u.includes('id=eq.push_prefs')) return j([{ data: PREFS }]);
+    if (u.includes('id=eq.push_prefs')) return j(base.prefs ? [{ data: base.prefs }] : []);
     return j([]);
   });
   await pg.route('**/api/**', (r) => {
@@ -107,7 +120,7 @@ async function ouvrir(nav, vp, { sombre = false, chemin = '/?tab=journee', journ
   await pg.goto(`http://localhost:${PORT}${chemin}`, { waitUntil: 'domcontentloaded' });
   await pg.waitForFunction(() => document.querySelector('.vrm-main') || /pas pu s'afficher/.test(document.body.innerText), null, { timeout: 20000 }).catch(() => {});
   await pg.waitForTimeout(2500);
-  return { ctx, pg, erreurs, ecrits };
+  return { ctx, pg, erreurs, ecrits, base };
 }
 
 const mesurer = (pg, mobile, racineSel) => pg.evaluate(([mobile, racineSel]) => {
@@ -207,7 +220,7 @@ const mesurer = (pg, mobile, racineSel) => pg.evaluate(([mobile, racineSel]) => 
         });
         // F — Réglages → Notifications
         await essaie(`${T} · réglages`, async () => {
-          const { ctx, pg, erreurs, ecrits } = await ouvrir(nav, vp, { sombre, chemin: '/?tab=settings' });
+          const { ctx, pg, erreurs, ecrits, base } = await ouvrir(nav, vp, { sombre, chemin: '/?tab=settings' });
           const sous = pg.locator('[data-sous-ouvrir="push"]');
           if (await sous.count()) { await sous.first().click(); await pg.waitForTimeout(800); }
           await pg.locator('[data-famille-notif]').first().waitFor({ state: 'attached', timeout: 6000 }).catch(() => {});
@@ -286,8 +299,19 @@ const mesurer = (pg, mobile, racineSel) => pg.evaluate(([mobile, racineSel]) => 
           await pg.waitForTimeout(500);
           const ef = ecrits.filter((l) => l.id === 'push_prefs').pop();
           dit(!!ef && ef.data.calme.conges === null && JSON.stringify(ef.data.calme.jours) === '["sam","dim","mer"]', `${T} · F14 « Effacer » retire les congés, les jours restent`, JSON.stringify(ef && ef.data.calme));
+          // F15 — (16 nov., finitions) Un AUTRE appareil change la ligne entre deux gestes (seuil d'avis, début des heures
+          // calmes) : le geste suivant d'ici (« Regrouper · 15 min ») ne pose QUE le sien, sur la ligne relue — rien de
+          // l'autre appareil n'est écrasé, et ce qu'on avait réglé ici (heures calmes coupées, jours) reste.
+          const lui = JSON.parse(JSON.stringify(base.prefs || {}));
+          base.prefs = { ...lui, avisSeuil: 2, calme: { ...(lui.calme || {}), debut: '23:00' }, rev: (Number.isSafeInteger(lui.rev) ? lui.rev : 0) + 1 };
+          ecrits.length = 0;
           await pg.locator('[data-np-fenetre-choix="15"]').click().catch(() => {});
-          await pg.waitForTimeout(400);
+          await pg.waitForTimeout(600);
+          const g15 = ecrits.filter((l) => l.id === 'push_prefs').pop();
+          const d15 = g15 && g15.data;
+          dit(!!d15 && d15.groupe && d15.groupe.fenetre === 15 && d15.avisSeuil === 2 && d15.calme && d15.calme.debut === '23:00' && d15.calme.actif === false
+            && JSON.stringify(d15.calme.jours) === '["sam","dim","mer"]' && d15.familles && d15.familles.messages === false,
+            `${T} · F15 un réglage changé sur un autre appareil entre deux gestes RESTE (seul le geste d’ici est posé)`, JSON.stringify(d15));
           const rel = await pg.evaluate(() => { const e = document.querySelector('[data-relances-essai]'); return e ? { etat: e.getAttribute('data-relances-essai'), codes: e.querySelectorAll('code').length } : null; });
           dit(!!rel && rel.etat === 'non-configure' && rel.codes === 4, `${T} · F6 e-mails de l’essai : « pas configurés » et ce qui manque (au propriétaire)`, JSON.stringify(rel));
           const m = await mesurer(pg, mobile, '.vrm-set');
