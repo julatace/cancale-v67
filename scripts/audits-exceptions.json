@@ -8,6 +8,55 @@
       "raison": "rouge sur main : l’app ne dit pas le plafond plein / la pause après un 429 (scénario 4) — réparé par la PR #1203 (bancs-rouges-b)",
       "depuis": "2026-11-16",
       "rouges": "^4 : (l’app dit le plafond|un 429 de Vinted pose la pause)"
+    },
+    {
+      "banc": "journee-coherence",
+      "navigateur": "webkit",
+      "raison": "rouge sur main sous WebKit (CI du 16 nov., PR #1222) — la plupart aussi rouges sous Chromium ; réparés par #1203 (bancs-rouges-b), #1204 (bancs-rouges-a), #1215 (derniers-rouges). Retirer dès « exception à retirer ».",
+      "depuis": "2026-11-16",
+      "rouges": "^(E0 \\[plein 390px clair\\] aucune erreur JS|E6 \\[calme 390px clair\\] « Modifier » \\(journee\\) ne chevauche rien et fait 44 px|E6 \\[calme 390px sombre\\] « Modifier » \\(journee\\) ne chevauche rien et fait 44 px|E6 \\[plein 390px clair\\] « Modifier » \\(journee\\) ne chevauche rien et fait 44 px|E6 \\[plein 390px sombre\\] « Modifier » \\(journee\\) ne chevauche rien et fait 44 px|E7 \\[plein 390px clair\\] « Reçu » sans date de versement : «|E7 \\[plein 390px sombre\\] « Reçu » sans date de versement : «|E8 \\[calme 390px clair\\] les surtitres suivent une règle \\(2 vus\\)|E8 \\[calme 390px sombre\\] les surtitres suivent une règle \\(2 vus\\)|E8 \\[plein 390px clair\\] les surtitres suivent une règle \\(2 vus\\)|E8 \\[plein 390px sombre\\] les surtitres suivent une règle \\(2 vus\\))( — |$)"
+    },
+    {
+      "banc": "ventes-e2",
+      "navigateur": "webkit",
+      "raison": "rouge sur main sous WebKit (CI du 16 nov., PR #1222) — la plupart aussi rouges sous Chromium ; réparés par #1203 (bancs-rouges-b), #1204 (bancs-rouges-a), #1215 (derniers-rouges). Retirer dès « exception à retirer ».",
+      "depuis": "2026-11-16",
+      "rouges": "^(G \\[gros 390px clair\\] Tous : titre très long à la ligne, prix « 249,50 € » entier|G \\[gros 390px sombre\\] Tous : titre très long à la ligne, prix « 249,50 € » entier|V7 \\[jeu 390px sombre\\] Vinted : chaque N° est `Numero` \\(8\\), jamais blanc en sombre)( — |$)"
+    },
+    {
+      "banc": "colis-retirer-propre",
+      "navigateur": "webkit",
+      "raison": "rouge sur main sous WebKit (CI du 16 nov., PR #1222) — la plupart aussi rouges sous Chromium ; réparés par #1203 (bancs-rouges-b), #1204 (bancs-rouges-a), #1215 (derniers-rouges). Retirer dès « exception à retirer ».",
+      "depuis": "2026-11-16",
+      "rouges": "^(de l’air entre les sections \\(20–40 px\\)|le nombre publié \\(vrm_colis_retirer\\) = 8 colis du jeu|retirer|toucher la ligne ouvre son détail \\(code, gestes\\)|« Ton achat t’attend » : titre de l’e-mail, « Code à venir », dans le relais lu|« À retirer » : les colis avec code et ceux au code à venir, dans la même section|« À vérifier · 3 » ouvert, juste sous « À retirer »|À vérifier : statut en puce \\(« Fin d’instance » ⇒ « Retour à l’expéditeur \\? »\\))( — |$)"
+    },
+    {
+      "banc": "retraits-suivi",
+      "navigateur": "webkit",
+      "raison": "rouge sur main sous WebKit (CI du 16 nov., PR #1222) — la plupart aussi rouges sous Chromium ; réparés par #1203 (bancs-rouges-b), #1204 (bancs-rouges-a), #1215 (derniers-rouges). Retirer dès « exception à retirer ».",
+      "depuis": "2026-11-16",
+      "rouges": "^(R5 Colissimo ⇒ « suivi lu par e-mail seulement » \\+ le geste|R7 deux lignes du transporteur ⇒ la lue \\(Chronopost\\), jamais « Vinted Go n’a pas répondu »|R8 introuvable 3 fois ⇒ « VRM ne le relit plus » \\+ le geste)( — |$)"
+    },
+    {
+      "banc": "tout-imprimer",
+      "navigateur": "webkit",
+      "raison": "rouge sur main sous WebKit (CI du 16 nov., PR #1222) — la plupart aussi rouges sous Chromium ; réparés par #1203 (bancs-rouges-b), #1204 (bancs-rouges-a), #1215 (derniers-rouges). Retirer dès « exception à retirer ».",
+      "depuis": "2026-11-16",
+      "rouges": "^(390 : les N° des ventes Vinted sont lus \\(transaction → annonce → fiche\\) avant le lot)( — |$)"
+    },
+    {
+      "banc": "iphone-reprise",
+      "navigateur": "webkit",
+      "raison": "rouge sur main sous WebKit (CI du 16 nov., PR #1222) — la plupart aussi rouges sous Chromium ; réparés par #1203 (bancs-rouges-b), #1204 (bancs-rouges-a), #1215 (derniers-rouges). Retirer dès « exception à retirer ».",
+      "depuis": "2026-11-16",
+      "rouges": "^(B 375×667 clair|B 375×667 sombre|B 390×844 clair|B 390×844 sombre|B1 375×667 clair : rien ne déborde, la barre touche le bas|B1 375×667 sombre : rien ne déborde, la barre touche le bas|B1 390×844 clair : rien ne déborde, la barre touche le bas|B1 390×844 sombre : rien ne déborde, la barre touche le bas|B3 375×667 clair : entrées ≥ 44 px, touchables, libellés entiers|B3 375×667 clair : le panneau ne recouvre pas la barre|B3 375×667 clair : toutes les entrées visibles sans défiler|B3 375×667 clair : « Plus » ouvert le dit \\(aria-expanded\\)|B3 375×667 sombre : entrées ≥ 44 px, touchables, libellés entiers|B3 375×667 sombre : le panneau ne recouvre pas la barre|B3 375×667 sombre : toutes les entrées visibles sans défiler|B3 375×667 sombre : « Plus » ouvert le dit \\(aria-expanded\\)|B3 390×844 clair : entrées ≥ 44 px, touchables, libellés entiers|B3 390×844 clair : le panneau ne recouvre pas la barre|B3 390×844 clair : toutes les entrées visibles sans défiler|B3 390×844 clair : « Plus » ouvert le dit \\(aria-expanded\\)|B3 390×844 sombre : entrées ≥ 44 px, touchables, libellés entiers|B3 390×844 sombre : le panneau ne recouvre pas la barre|B3 390×844 sombre : toutes les entrées visibles sans défiler|B3 390×844 sombre : « Plus » ouvert le dit \\(aria-expanded\\)|B4 375×667 clair : « retour » ferme « Plus » et reste dans VRM, sur Ma journée|B4 375×667 sombre : « retour » ferme « Plus » et reste dans VRM, sur Ma journée|B4 390×844 clair : « retour » ferme « Plus » et reste dans VRM, sur Ma journée|B4 390×844 sombre : « retour » ferme « Plus » et reste dans VRM, sur Ma journée|O 1008×633 clair : les groupes Gérer · Moi sont là, en entier, sans doublon « Plateformes » ni « Vendre » vide \\(lot AL : Republier et Favoris & offres vivent dans Annonces et Messages\\)|O 1008×633 clair : « VRM » entier et aucun libellé de la colonne coupé|O 1512×830 clair : les groupes Gérer · Moi sont là, en entier, sans doublon « Plateformes » ni « Vendre » vide \\(lot AL : Republier et Favoris & offres vivent dans Annonces et Messages\\)|O 1512×950 clair : les groupes Gérer · Moi sont là, en entier, sans doublon « Plateformes » ni « Vendre » vide \\(lot AL : Republier et Favoris & offres vivent dans Annonces et Messages\\)|O 1512×950 sombre : les groupes Gérer · Moi sont là, en entier, sans doublon « Plateformes » ni « Vendre » vide \\(lot AL : Republier et Favoris & offres vivent dans Annonces et Messages\\)|O 1512×950 zoom 1\\.25 clair : les groupes Gérer · Moi sont là, en entier, sans doublon « Plateformes » ni « Vendre » vide \\(lot AL : Republier et Favoris & offres vivent dans Annonces et Messages\\)|R 390 clair|R 390 sombre)( — |$)"
+    },
+    {
+      "banc": "nouveau-vendeur",
+      "navigateur": "webkit",
+      "raison": "rouge sur main sous WebKit (CI du 16 nov., PR #1222) — la plupart aussi rouges sous Chromium ; réparés par #1203 (bancs-rouges-b), #1204 (bancs-rouges-a), #1215 (derniers-rouges). Retirer dès « exception à retirer ».",
+      "depuis": "2026-11-16",
+      "rouges": "^(\\[jeu 390px clair\\] Achats : chaque cible au doigt fait 44 px|\\[jeu 390px clair\\] Annonces : chaque cible au doigt fait 44 px|\\[jeu 390px clair\\] Colis à retirer \\(lien ancien ⇒ Achats · À retirer\\) : chaque cible au doigt fait 44 px|\\[jeu 390px clair\\] Comptabilité : chaque cible au doigt fait 44 px|\\[jeu 390px clair\\] aucune erreur JS|\\[jeu 390px sombre\\] Achats : chaque cible au doigt fait 44 px|\\[jeu 390px sombre\\] Annonces : chaque cible au doigt fait 44 px|\\[jeu 390px sombre\\] Colis à retirer \\(lien ancien ⇒ Achats · À retirer\\) : chaque cible au doigt fait 44 px|\\[jeu 390px sombre\\] Comptabilité : chaque cible au doigt fait 44 px|\\[jeu 390px sombre\\] aucune erreur JS|\\[vide 390px clair\\] Comptabilité : aucune ligne qui commence par « · »|\\[vide 390px clair\\] Statistiques : chaque cible au doigt fait 44 px|\\[vide 390px clair\\] aucune erreur JS|\\[vide 390px sombre\\] Comptabilité : aucune ligne qui commence par « · »|\\[vide 390px sombre\\] Statistiques : chaque cible au doigt fait 44 px|\\[vide 390px sombre\\] aucune erreur JS)( — |$)"
     }
   ]
 }
