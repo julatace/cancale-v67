@@ -55,6 +55,8 @@ const SERVICE = {
 const USAGES = {
   achats: { quoi: 'géocodage automatique des points relais (écran Achats)', role: /points? relais/i, donnee: /navigateur/i },
   ville: { quoi: 'recherche de ville de la carte de la communauté (repli du navigateur)', role: /communaut/i, donnee: /navigateur/i },
+  // (16 nov.) La carte de tes ventes (Argent, 14 nov.) : ville + code postal à la BAN, depuis le navigateur.
+  ventes: { quoi: 'villes de la carte de tes ventes (écran Argent)', role: /carte de tes ventes/i, donnee: /navigateur/i },
   fond: { quoi: 'fond de la carte de la communauté (tuiles)', role: /carte de la communaut/i, donnee: /adresse IP/i },
   avatar: { quoi: 'photos de profil Discord sur la carte', role: /communaut/i, donnee: /navigateur|adresse IP/i },
   pdfjs: { quoi: 'aperçu des bordereaux (pdf.js)', role: /pdf\.js|aperçu des bordereaux/i, donnee: /navigateur|adresse IP/i },
@@ -78,6 +80,23 @@ const COUPLES = {
   'src/App.jsx|nominatim.openstreetmap.org': ['politique', 'achats'],
   // (1er nov.) La carte des points relais (Colis → À retirer, Tournée) géocode par la même BAN, depuis le navigateur.
   'src/CarteRelais.jsx|api-adresse.data.gouv.fr': ['politique', 'achats'],
+  // (16 nov., audits-vert-main) Arrivés du 9 au 15 nov., lus un à un : une recherche du navigateur (la carte des ventes)
+  // et des liens ouverts d'un clic.
+  'src/CarteVentes.jsx|api-adresse.data.gouv.fr': ['politique', 'ventes'],
+  'src/notifsBonMoment.js|vrm.center': ['vrm', 'VRM lui-même (base pour lire le lien d’une notification, jamais appelé)'],
+  'src/aRetirerAilleurs.js|www.leboncoin.fr': ['lien', LIEN + ' — « retirer » l’annonce sur le site'],
+  'src/aRetirerAilleurs.js|www.ebay.fr': ['lien', LIEN + ' — « retirer » l’annonce sur le site'],
+  'src/aRetirerAilleurs.js|fr.vestiairecollective.com': ['lien', LIEN + ' — « retirer » l’annonce sur le site'],
+  'src/aRetirerAilleurs.js|www.vinted.fr': ['lien', LIEN + ' — « retirer » l’annonce sur le site'],
+  'src/accompagnement.js|www.vinted.fr': ['lien', LIEN + ' — « Créer sur Vinted » (brouillons), ouvert dehors'],
+  'src/alertesSeuils.js|entreprendre.service-public.gouv.fr': ['lien', LIEN + ' — la source officielle d’un seuil'],
+  'src/alertesSeuils.js|eur-lex.europa.eu': ['lien', LIEN + ' — la source officielle d’un seuil (DAC7)'],
+  'src/deuxComptes.js|www.vinted.fr': ['lien', LIEN + ' — l’annonce sur Vinted'],
+  'src/ouVendre.js|www.vinted.fr': ['lien', LIEN + ' — les pages d’aide de Vinted'],
+  'src/ouVendre.js|www.leboncoin.fr': ['lien', LIEN + ' — les pages d’aide de Leboncoin'],
+  'src/parcoursArrivee.js|www.leboncoin.fr': ['lien', LIEN + ' — « Mes annonces » sur le site'],
+  'src/parcoursArrivee.js|www.vestiairecollective.com': ['lien', LIEN + ' — le site Vestiaire'],
+  'src/retoursAchat.js|www.vinted.fr': ['lien', LIEN + ' — la transaction ou la conversation sur Vinted'],
   'src/App.jsx|cdn.jsdelivr.net': ['politique', 'pdfjs'],
   'src/studioPhoto.js|cdn.jsdelivr.net': ['politique', 'ort'],
   'src/communaute/Communaute.jsx|api-adresse.data.gouv.fr': ['politique', 'ville'],

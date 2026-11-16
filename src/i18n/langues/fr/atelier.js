@@ -76,7 +76,7 @@ export default {
   "atelier.fusion.action.conflit": "Deux valeurs différentes : aucune n’est changée",
   "atelier.fusion.rienACompleter": "Rien à compléter : chaque fiche garde ce qu’elle a.",
   "atelier.fusion.carton": "Le carton porte",
-  "atelier.fusion.choisisCarton": "Choisis le N° écrit sur le carton.",
+  "atelier.fusion.choisisCarton": "Choisis le N° écrit là où l’article est rangé.",
   "atelier.fusion.alias": "N°{autre} restera visible, comme alias du N°{carton}.",
   "atelier.fusion.valider": "Fusionner",
   "atelier.fusion.autreFiche": "Choisir une autre fiche",

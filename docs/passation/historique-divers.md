@@ -1958,6 +1958,21 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Lignes déplacées de CLAUDE.md §9 (16 nov., train de mise en ligne)
 
-- **15 nov. · Retours : reconnus, une seule carte « À renvoyer »** : bordereaux de retour et « Retourne ta commande d'ici le … » reconnus (sens lu dans le corps), e-mails gardés « inconnu » reclassés tout seuls (`api/_lib/reclasser-retours.js`, mode de `/api/email-rattacher`) ; `src/retoursAchat.js` : une liste « À renvoyer » (Achats + tête de Ma journée), photo, date limite en clair, « Imprimer le bordereau », « Déposé ». `2026-11-15-retours.md`. Geste : aucun.
 - **15 nov. · Programme partenaire (3 €/mois/client payant, à vie)** : `api/_lib/partenaires-regle.js`, lien `vrm.center/p/CODE`, page `/pa/<jeton>` (nombres seuls), Réglages → Abonnement → Partenaires (« Versé » sur son clic, rien ne part seul). Migration **043 PAS appliquée**. `2026-11-15-partenaires.md`. Geste : contrat écrit, migration 043, 5 événements webhook Stripe, créer le partenaire (copier sa page privée tout de suite).
 - **15 nov. · Extension 5.380.0 : carte du logo + Leboncoin sûr (5.379 jamais publiée seule)** : « Mes ventes » (`/my_orders/sold`, jamais attestée) retiré, liens sur liste blanche `CHEMINS_ATTESTES` ; favoris listés même sans message ; plaque N° seulement si connue ; studio ; LBC : lecture bornée (`lisible`), enveloppes `commeNatif`, disjoncteur `vrm_lbc_de_cote`, cadres étrangers ignorés ; Vinted : plus de double envoi sur exception. `2026-11-15-carte-extension.md`, `2026-11-15-lbc-orion.md`. Geste : installer 5.380.0 ; donner l'URL de sa page « Mes ventes » Vinted.
+
+
+## Lignes déplacées de CLAUDE.md §9 (16 nov., train de mise en ligne)
+
+- **15 nov. · Retours : reconnus, une seule carte « À renvoyer »** : bordereaux de retour et « Retourne ta commande d'ici le … » reconnus (sens lu dans le corps), e-mails gardés « inconnu » reclassés tout seuls (`api/_lib/reclasser-retours.js`, mode de `/api/email-rattacher`) ; `src/retoursAchat.js` : une liste « À renvoyer » (Achats + tête de Ma journée), photo, date limite en clair, « Imprimer le bordereau », « Déposé ». `2026-11-15-retours.md`. Geste : aucun.
+
+
+## Lignes déplacées de CLAUDE.md §9 (16 nov., train de mise en ligne)
+
+- **15 nov. · Retirer ailleurs, finition, republier guidé, « Sans achat relié »** : vendue sur un site ⇒ UNE entrée « À retirer ailleurs » accompagnée (plus de faux « colis retiré », Vestiaire « c'est fait »), aucune extension neuve ; finition écran par écran (`src/design/studio-finition.css`, couche `vrm-finition` nommée la première) ; republier/publier à la main guidés, photos retouchées envoyées à la galerie, aucune retouche d'évitement ; Annonces → prix d'achat : barre collée opaque, cartes `vrm-aar-*` (plus de débordement). `2026-11-15-retrait-ailleurs.md`, `-finition-ecrans.md`, `-republier-main.md`, `-annonces-achats.md`. Geste : dire s'il garde « lettre au hasard » en fin de description.
+
+
+## Lignes déplacées de CLAUDE.md §9 (16 nov., train de mise en ligne)
+
+- **15 nov. · Nouvelles annonces numérotées (extension 5.382.0)** : une annonce publiée hors de VRM (app Vinted) reçoit son N° à la prochaine lecture (« VRM numérote » : dit une fois — bandeau, notification, carte du logo — et « Nouveaux N° à écrire » avec « C'est écrit ») ; « je numérote moi-même » ⇒ l'app demande le N° de chaque nouvel article (photo en tête). Mots « paires »/« articles » selon le profil. `2026-11-15-numeros-nouvelles.md`. Geste : installer 5.382.0.
+- **15 nov. · Retirer ailleurs, finition, republier guidé, « Sans achat relié »** : vendue sur un site ⇒ UNE entrée « À retirer ailleurs » accompagnée (plus de faux « colis retiré », Vestiaire « c'est fait »), aucune extension neuve ; finition écran par écran (`src/design/studio-finition.css`, couche `vrm-finition` nommée la première) ; republier/publier à la main guidés, photos retouchées envoyées à la galerie, aucune retouche d'évitement ; Annonces → prix d'achat : barre collée opaque, cartes `vrm-aar-*` (plus de débordement). `2026-11-15-retrait-ailleurs.md`, `-finition-ecrans.md`, `-republier-main.md`, `-annonces-achats.md`. Geste : dire s'il garde « lettre au hasard » en fin de description.
