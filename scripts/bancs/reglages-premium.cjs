@@ -135,8 +135,15 @@ async function interrupteurs(pg, T) {
     if (!(await s.isVisible())) continue;
     vus++;
     const nom = (await s.getAttribute('aria-label')) || `n°${i}`;
-    await s.scrollIntoViewIfNeeded();
-    const libre = await s.evaluate((el) => { const r = el.getBoundingClientRect(); const x = r.left + r.width / 2, y = r.top + r.height / 2; const h = document.elementFromPoint(x, y); return !!h && (h === el || el.contains(h)); });
+    // (16 nov.) Le changement de thème (« Mode sombre ») redessine la liste : l'élément peut être remplacé PENDANT le
+    // défilement (« not attached ») — le localisateur le retrouve au second essai.
+    for (let k = 0; k < 3; k++) { try { await s.scrollIntoViewIfNeeded({ timeout: 10000 }); break; } catch (e) { if (k === 2) throw e; await pg.waitForTimeout(500); } }
+    // (16 nov., bancs-rouges-a) MESURÉ : l'interrupteur d'avant (« Visite des écrans ») redessine son groupe ; mesuré tout
+    // de suite, le point tombait parfois sur le bouton VOISIN (span d'un `vrm-ar-switch`) pendant la mise en page. On
+    // laisse la mise en page se poser (1,5 s au plus) : un interrupteur vraiment recouvert reste rouge.
+    const libreIci = () => s.evaluate((el) => { const r = el.getBoundingClientRect(); const x = r.left + r.width / 2, y = r.top + r.height / 2; const h = document.elementFromPoint(x, y); return !!h && (h === el || el.contains(h)); });
+    let libre = await libreIci();
+    for (let k = 0; k < 10 && !libre; k++) { await pg.waitForTimeout(150); await s.scrollIntoViewIfNeeded().catch(() => {}); libre = await libreIci(); }
     // (15 nov., rouges-connus) Ce qui recouvre, NOMMÉ (le rapport dit quoi corriger) : classe et position.
     const dessus = libre ? '' : await s.evaluate((el) => { const r = el.getBoundingClientRect(); const h = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return h ? `${h.tagName.toLowerCase()}.${String(h.className || '').split(' ').slice(0, 2).join('.')} « ${String(h.textContent || '').trim().slice(0, 40)} » dans ${[h.parentElement, h.parentElement && h.parentElement.parentElement].filter(Boolean).map((p) => p.tagName.toLowerCase() + '.' + String(p.className || '').split(' ')[0] + [...p.attributes].filter((a) => a.name.startsWith('data-')).map((a) => '[' + a.name + ']').join('')).join(' < ')} à y=${Math.round(r.top)}/${innerHeight}` : 'rien'; });
     if (await s.isDisabled()) { dit(libre, `${T} interrupteur « ${nom} » (désactivé : réglage pas lu) rien ne le recouvre`); continue; }
