@@ -275,3 +275,29 @@ export const lignesTamponRetour = ({ num, titre } = {}) => {
   const n = str(num).trim();
   return { haut: n ? `RETOUR · N°${n}` : 'RETOUR', bas: str(titre).replace(/\s+/g, ' ').trim().slice(0, 60) };
 };
+
+// ── (15 nov., refonte-journee — Julien : « on n'a pas forcément d'infos sur ces cases ») UN RETOUR SANS NOUVELLES ──
+// Un retour d'achat dont la date limite est passée depuis plus de RETOUR_PERIME_J jours SANS bordereau, sans dépôt
+// noté, sans fait du transporteur ni remboursement lu ne demande plus un geste aujourd'hui : il quitte Ma journée et
+// va dans Achats → « À vérifier » (« Ce retour n'a plus de nouvelles depuis le … : vérifie sur Vinted »), où « C'est
+// réglé » (SON clic, `vrm_retours_regles`, synchronisé) l'archive. Rien n'est deviné : un seul fait connu ⇒ il reste.
+export const RETOUR_PERIME_J = 7;
+export function retourPerime(c, now = Date.now()) {
+  if (!c || !c.limiteIso) return false;
+  const lm = Date.parse(String(c.limiteIso)); if (!isFinite(lm)) return false;
+  if (now - lm <= RETOUR_PERIME_J * 86400000) return false;
+  if (c.pdf || c.depose || c.faits || (c.rembourse && c.rembourse.etat === 'oui')) return false;
+  return c.etape === 'a-deposer';
+}
+// { actifs, perimes, regles } : les retours de Ma journée et d'Achats, ceux « à vérifier », ceux qu'il a dits réglés.
+export function classerRetoursAchat(r, { regles = null, maintenant = Date.now() } = {}) {
+  const R = regles && typeof regles === 'object' ? regles : {};
+  const out = { actifs: [], perimes: [], regles: [] };
+  if (!r || r.etat !== 'lu') return out;
+  for (const c of r.cartes || []) {
+    if (R[c.cle]) out.regles.push(c);
+    else if (retourPerime(c, maintenant)) out.perimes.push(c);
+    else out.actifs.push(c);
+  }
+  return out;
+}
