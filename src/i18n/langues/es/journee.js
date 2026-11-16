@@ -98,6 +98,8 @@ export default {
   "journee.noter": "Valorar",
   "journee.dontAujourdHui": "de ellos {nAuj} hoy",
   "journee.dontDemain": "de ellos {x} mañana",
+  "journee.limiteAVerifier": "comprueba el plazo real en Vinted",
+  "journee.limiteAVerifierCourt": "Comprobar en Vinted",
   "journee.verifier2": "+ {aVerifier} por revisar",
   "journee.nomsEtAutres": { one: "{noms} y {n} más", other: "{noms} y {n} más" },
   "journee.emballer": "Empaquetar",

@@ -1,7 +1,7 @@
 // (14 nov., Studio bleu clair) Ventes · À expédier et Achats · À retirer : la tête, les tuiles-filtres,
 // l'échéance courte des rangées (src/design/StudioVentes.jsx).
 export default {
-  "sv.titre.expedier": "À expédier",
+  "sv.titre.expedier": "À envoyer",
   "sv.titre.retirer": "À retirer",
   "sv.auMoins": "au moins",
   "sv.lib.envoyer": { one: "colis à envoyer", other: "colis à envoyer" },

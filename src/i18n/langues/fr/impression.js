@@ -41,7 +41,7 @@ export default {
   "impr.raison.illisible": "PDF illisible : retélécharge-le depuis la vente",
   "impr.entiers": { one: "{n} imprimé en page entière (étiquette pas trouvée).", other: "{n} imprimés en pages entières (étiquette pas trouvée)." },
   "impr.prets": { one: "{n} prêt à déposer.", other: "{n} prêts à déposer." },
-  "impr.disparus": { one: "{n} bordereau n’est plus à expédier : rouvre la liste. Rien n’est imprimé.", other: "{n} bordereaux ne sont plus à expédier : rouvre la liste. Rien n’est imprimé." },
+  "impr.disparus": { one: "{n} bordereau n’est plus à envoyer : rouvre la liste. Rien n’est imprimé.", other: "{n} bordereaux ne sont plus à envoyer : rouvre la liste. Rien n’est imprimé." },
   "impr.change": "Un article, son N° ou son état a changé : rien n’est imprimé. Réessaie.",
   "impr.vide": "Aucun de ces PDF n’a pu être lu : retélécharge-les depuis les ventes.",
   "impr.basePasLue": "La base n’a pas répondu : réessaie dans un instant.",

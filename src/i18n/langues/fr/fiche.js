@@ -14,7 +14,7 @@ export default {
   "fiche.gesteRelier.achat": "Pour la relier : pose le N° de la paire sur son annonce, ou relie cet achat depuis la vente.",
   "fiche.gesteRelier.annonce": "Pour la relier : donne un N° à cette annonce.",
   "fiche.ctx.vente": "Vente",
-  "fiche.ctx.colis": "Colis à expédier",
+  "fiche.ctx.colis": "Colis à envoyer",
   "fiche.ctx.achat": "Achat",
   "fiche.ctx.annonce": "Annonce",
   "fiche.ctx.stock": "Stock",

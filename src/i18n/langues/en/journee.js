@@ -98,6 +98,8 @@ export default {
   "journee.noter": "Rate",
   "journee.dontAujourdHui": "incl. {nAuj} today",
   "journee.dontDemain": "incl. {x} tomorrow",
+  "journee.limiteAVerifier": "check the real deadline on Vinted",
+  "journee.limiteAVerifierCourt": "Check on Vinted",
   "journee.verifier2": "+ {aVerifier} to check",
   "journee.nomsEtAutres": { one: "{noms} and {n} other", other: "{noms} and {n} others" },
   "journee.emballer": "Pack",

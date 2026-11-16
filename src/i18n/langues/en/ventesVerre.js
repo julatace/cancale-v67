@@ -1,9 +1,9 @@
 // en · Sales and Purchases, "frosted glass" (15 Nov.) — src/ventes/VentesVerre.jsx, src/ventes/AchatsVerre.jsx.
 export default {
-  "vv.seg.expedier": "To ship",
+  "vv.seg.expedier": "To send",
   "vv.seg.route": "On the way",
   "vv.seg.toutes": "All",
-  "vv.seg.label": "Sales: to ship, on the way or all",
+  "vv.seg.label": "Sales: to send, on the way or all",
   "vv.hero.sous": "labels ready · ticked for printing",
   "vv.hero.sousAttente": "waiting for the label",
   "vv.coche.label": "Print the label for {titre}",

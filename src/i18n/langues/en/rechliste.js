@@ -15,7 +15,7 @@ export default {
   "listes.phrase.etat.en-ligne": "Not sold · online",
   "listes.phrase.etat.vendue": "Sold",
   "listes.phrase.etat.a-retirer": "To pick up",
-  "listes.phrase.etat.a-expedier": "To ship",
+  "listes.phrase.etat.a-expedier": "To send",
   "listes.phrase.etat.brouillon": "Draft",
   "listes.phrase.etat.masquee": "Hidden",
   "listes.phrase.jour.aujourdhui": "Today",

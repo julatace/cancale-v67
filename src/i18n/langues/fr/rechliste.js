@@ -15,7 +15,7 @@ export default {
   "listes.phrase.etat.en-ligne": "Pas vendue · en ligne",
   "listes.phrase.etat.vendue": "Vendue",
   "listes.phrase.etat.a-retirer": "À retirer",
-  "listes.phrase.etat.a-expedier": "À expédier",
+  "listes.phrase.etat.a-expedier": "À envoyer",
   "listes.phrase.etat.brouillon": "Brouillon",
   "listes.phrase.etat.masquee": "Masquée",
   "listes.phrase.jour.aujourdhui": "Aujourd’hui",

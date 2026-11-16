@@ -16,7 +16,7 @@ export default {
   "nouveaux.bilan.auMoins.manque": "Not read yet: {noms}.",
   "nouveaux.bilan.auMoins.montant": { one: "{n} sale with an unread amount, not in the total.", other: "{n} sales with an unread amount, not in the total." },
   "nouveaux.bilan.auMoins.attente": "A platform is still being read.",
-  "nouveaux.bilan.aExpedier": "to ship",
+  "nouveaux.bilan.aExpedier": "to send",
   "nouveaux.bilan.aRetirer": "to pick up",
   "nouveaux.bilan.enLigne": "listed",
   "nouveaux.bilan.matin.surtitre": "And then",

@@ -44,7 +44,7 @@ export default {
   "glo.aretirer.def": "A parcel that reached the pickup point, not yet collected. Its code is in Purchases.",
   "glo.numero.mot": "No.",
   "glo.numero.def": "The storage number written on the box. It is never given to another item.",
-  "glo.aexpedier.mot": "to ship",
+  "glo.aexpedier.mot": "to send",
   "glo.aexpedier.def": "A sale to send: the label to print, the parcel to drop off before the deadline.",
   "glo.adater.mot": "to date",
   "glo.adater.def": "A sale whose payout date is not known yet: it is in no declared month.",

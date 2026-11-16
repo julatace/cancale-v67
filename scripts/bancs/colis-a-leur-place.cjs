@@ -173,7 +173,7 @@ const attendre = async (pg, q) => { await pg.waitForSelector(q, { timeout: 30000
           await attendre(pg, '[data-colis-section="ventes"] ~ *, [data-bord-card]');
           const m = await mesure(pg);
           dit(m.tache === 'ventes' && m.section === 'ventes', 'V `?tab=cat_bord` ouvre Ventes, section « À expédier »', `${m.tache} · ${m.section}`);
-          dit(/À expédier/.test(m.titre), 'V l’intertitre dit « À expédier »', m.titre);
+          dit(/À envoyer/.test(m.titre), 'V l’intertitre dit « À envoyer » (le mot de src/libelles.js, 16 nov.)', m.titre);
           dit(m.avant === true, 'V la section est EN TÊTE (avant la liste des ventes)', String(m.avant));
           dit(m.choixEnvoyer === 1 && m.choixEnvoyes === 1 && m.choixRetirer === 0, 'V À envoyer · Envoyés, jamais « À retirer » dans Ventes', `${m.choixEnvoyer}/${m.choixEnvoyes}/${m.choixRetirer}`);
           dit(m.cartesEnvoi === 2, 'V les 2 colis à envoyer, chacun une fois', String(m.cartesEnvoi));

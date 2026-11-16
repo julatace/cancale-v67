@@ -47137,13 +47137,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // le rouge est pour deux paires sous un même N° — ici l'ambre, comme
             // l'urgence de Colis (`data-colis-urgence`, 21 oct.).
             const verif = p.depasse && !p.retard;
-            const titreL = presses.length===1 ? `1 colis${verif?' :':''} ${quand}` : `${presses.length} colis pressés — le plus urgent${verif?' :':''} ${quand}`;
+            // (16 nov., intégration vague A) CLAUDE.md §5 Colis : vente + 7 j n'est qu'une ESTIMATION (un plancher), jamais
+            // « en retard » ni « dépassée » sur cette carte : elle dit le geste (vérifier la vraie limite sur Vinted). Une
+            // limite LUE dans l'e-mail du bordereau garde ses mots (`texteLimiteEnvoi` : « 2 j de retard »).
+            const quandJ = verif ? tr('journee.limiteAVerifier') : quand;
+            const titreL = presses.length===1 ? `1 colis${verif?' :':''} ${quandJ}` : `${presses.length} colis pressés — le plus urgent${verif?' :':''} ${quandJ}`;
             const subL = `${num}${o.title||''}${qui?` · ${qui}`:''}${p.limite==='estimee'?' · date estimée (vente + 7 j)':''}`;
             // (15 nov., finition) La ligne de Ma journée coupait « Le plus urgent : date estimée… » : elle porte SA
             // forme courte (le nombre ; la limite du plus pressé en trois mots, `limiteCourte`), la phrase entière reste dans
             // l'infobulle et le nom du bouton (`plein`). Même source, aucun mot inventé.
             const courtL = presses.length===1 ? '1 colis' : `${presses.length} colis pressés`;
-            const quandC = limiteCourte(quand);
+            const quandC = verif ? tr('journee.limiteAVerifierCourt') : limiteCourte(quand);
             jobs.push({ id:'colis-limite', n:presses.length, icon:'truck', color:C.warn, urgent:!!p.depasse,
               title: titreL, sub: subL, court: courtL, detail: quandC.charAt(0).toUpperCase() + quandC.slice(1), plein: `${titreL} — ${subL}`,
               tab:'cat_bord', prio:p.depasse?0.15:0.6, limiteHeure:p.heure||'',

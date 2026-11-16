@@ -1,9 +1,9 @@
 // fr · Ventes et Achats « Verre dépoli » (15 nov., maquettes validées) — src/ventes/VentesVerre.jsx, src/ventes/AchatsVerre.jsx.
 export default {
-  "vv.seg.expedier": "À expédier",
+  "vv.seg.expedier": "À envoyer",
   "vv.seg.route": "En route",
   "vv.seg.toutes": "Toutes",
-  "vv.seg.label": "Ventes : à expédier, en route ou toutes",
+  "vv.seg.label": "Ventes : à envoyer, en route ou toutes",
   "vv.hero.sous": "bordereaux prêts · cochés pour l’impression",
   "vv.hero.sousAttente": "en attente du bordereau",
   "vv.coche.label": "Imprimer le bordereau de {titre}",

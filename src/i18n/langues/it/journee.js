@@ -98,6 +98,8 @@ export default {
   "journee.noter": "Valuta",
   "journee.dontAujourdHui": "di cui {nAuj} oggi",
   "journee.dontDemain": "di cui {x} domani",
+  "journee.limiteAVerifier": "verifica la scadenza reale su Vinted",
+  "journee.limiteAVerifierCourt": "Da verificare su Vinted",
   "journee.verifier2": "+ {aVerifier} da verificare",
   "journee.nomsEtAutres": { one: "{noms} e {n} altro", other: "{noms} e altri {n}" },
   "journee.emballer": "Imballa",
