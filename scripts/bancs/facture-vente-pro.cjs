@@ -180,7 +180,7 @@ const ouvrirVente = async (pg, tx) => {
   return id;
 };
 const fermerVente = async (pg) => { const croix = pg.locator('.vrm-ledger-drawer-host:not([hidden]) .vrm-recap-fermer'); if (await croix.count()) { await croix.first().click(); await pg.waitForTimeout(300); } };
-const ligneFacture = (pg, tx) => pg.locator(`.vrm-sale-row[data-tx="${tx}"] [data-fp-forme="ligne"]`).first();
+const ligneFacture = (pg, tx) => pg.locator(`.vrm-sale-row[data-tx="${tx}"] [data-fp-forme="ligne"]:visible`).first();
 
 const mesurer = (pg, sel) => pg.evaluate((sel) => {
   const d = document.querySelector(sel); if (!d) return null;
@@ -211,8 +211,9 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
         // Les rectangles : la pastille DANS la rangée du N° (l2), la ligne pas plus haute que celle d'un compte particulier.
         const r = await pg.evaluate(() => {
           const rect = (el) => el && el.getBoundingClientRect();
-          const p = rect(document.querySelector('.vrm-sale-row[data-tx="7001"] [data-fp-pastille]'));
-          const l2 = rect(document.querySelector('.vrm-sale-row[data-tx="7001"] .vrm-fu-vente-l2'));
+          const pe = [...document.querySelectorAll('.vrm-sale-row[data-tx="7001"] [data-fp-pastille]')].find((e) => e.getClientRects().length);
+          const p = rect(pe);
+          const l2 = rect(pe && pe.closest('.vrm-fu-vente-l2, .vrm-ledger-sale-sous'));   // la rangée du N° (téléphone) ou du compte (ordinateur)
           const h = (tx) => { const e = document.querySelector(`.vrm-sale-row[data-tx="${tx}"]`); return e ? Math.round(e.getBoundingClientRect().height) : -1; };
           return { p: p && { t: p.top, b: p.bottom }, l2: l2 && { t: l2.top, b: l2.bottom }, h7001: h('7001'), h8001: h('8001') };
         });
@@ -251,7 +252,7 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
       await essaie('V4 bon de retour dessiné par VRM', async () => {
         const avant = lectures.length;
         // (16 nov.) Plus sous la ligne : dans la fiche de la vente (toucher la ligne).
-        await pg.locator('.vrm-sale-row[data-tx="7006"] .vrm-ledger-sale-toggle').first().click();
+        await pg.locator('.vrm-sale-row[data-tx="7006"] .vrm-ledger-sale-toggle').first().dispatchEvent('click');
         const bon = pg.locator('[data-fp-bon-retour="vrm"]').first();
         await bon.waitFor({ timeout: 8000 });
         await bon.click();
