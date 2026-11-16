@@ -83,7 +83,7 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   const fuites = ext.filter((f) => /vrm_notes_paires|notePaire/.test(lire(f)));
   dit(ext.length > 0 && fuites.length === 0, 'BD 6 · ni l’extension ni le serveur ne lisent la note (jamais envoyée à une plateforme)', fuites.join(','));
   const usages = ['src/NotePaire.jsx', 'src/FichePaire.jsx', 'src/PreparerColis.jsx', 'src/ScannerColis.jsx', 'src/ecrans/Stock.jsx'].filter((f) => /note/i.test(lire(f)));
-  dit(/<NotePaireCoque numero=\{num\} itemId=\{it\.id\}/.test(app) && /data-vente-notes/.test(app) && /note=\{p && p\.num/.test(app) && /note=\{\(c\) =>/.test(app) && /<NotePaireCoque numero=\{a\.numero\}/.test(lire('src/ecrans/Stock.jsx')),
+  dit(/<NotePaireCoque numero=\{num\} itemId=\{it\.id\}/.test(app) && /data-vente-notes/.test(app) && (/note=\{p && p\.num/.test(app) || /note: <NotePaireCoque numero=\{p\.num\}/.test(app)) &&   /* (16 nov.) fiche D (15 nov.) : la note passe par `plus.note` */ /note=\{\(c\) =>/.test(app) && /<NotePaireCoque numero=\{a\.numero\}/.test(lire('src/ecrans/Stock.jsx')),
     'BD 6 · visible partout où la paire apparaît : Annonces, Ventes, fiche paire, Préparer/scan, Stock', usages.join(','));
 
   if (D) {

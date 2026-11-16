@@ -24,7 +24,7 @@
 //   B7. un balayage parti du bord gauche (le « retour » d'iOS) ne change pas
 //       d'onglet ; un balayage au milieu en change toujours (rien de coupé) ;
 //   B8. toucher l'onglet où l'on est ramène en haut, sans changer d'écran ;
-//   B9. le retour entre écrans marche : Journée → Ventes → Colis, ← Ventes, ← Journée.
+//   B9. (16 nov.) passer d'un onglet de la barre à l'autre n'empile rien : le retour ne montre pas l'onglet d'avant.
 // R. LA REPRISE (390 tactile) :
 //   R1. rechargement : même écran, même filtre de site, même compte choisi ;
 //   R2. app rouverte (nouvelle page, `sessionStorage` vide, même appareil) :
@@ -234,7 +234,9 @@ const PLUS_ATTENDUES = (() => {
 const mesureBarre = (pg) => pg.evaluate(() => {
   const nav = document.querySelector('.vrm-tabbar'); if (!nav) return null;
   const r = nav.getBoundingClientRect();
-  const entrees = [...nav.querySelectorAll(':scope > button')].map((x) => {
+  // (16 nov., barre-achats) Les ENTRÉES de la barre : ses onglets (`.vrm-tab`) — cinq depuis qu'Achats y est —, pas
+  // le disque « + » du centre (14 nov.), qui comptait jusqu'ici pour la 5ᵉ entrée.
+  const entrees = [...nav.querySelectorAll(':scope > .vrm-tab, :scope > .vrm-nav-more')].map((x) => {
     const q = x.getBoundingClientRect(); const lab = x.querySelector('.vrm-nav-label');
     const hit = document.elementFromPoint(q.left + q.width / 2, q.top + q.height / 2);
     return { id: x.getAttribute('data-nav-entree') || 'plus', h: Math.round(q.height), w: Math.round(q.width), coupe: lab ? lab.scrollWidth > lab.clientWidth + 1 : true, touche: !!hit && x.contains(hit) };
@@ -351,14 +353,20 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         const e8 = await ecran(pg);
         dit(avant8.defile > 100 && e8.ecran === 'annonces' && e8.defile < 5, `B8 ${qui} : toucher l'onglet courant ramène en haut, même écran`, JSON.stringify({ avant: avant8.defile, apres: e8.defile, ecran: e8.ecran }));
         // B9 · le retour entre écrans
+        // ⚠️ (16 nov., lot barre-achats — Julien : « je ne veux pas qu'on puisse glisser entre les onglets ») Le
+        // glisser-retour depuis le bord (iPhone) montrait l'onglet d'avant à moitié (Argent ⇒ Ma journée) : passer
+        // d'un onglet de la barre à l'autre n'empile plus rien (src/navHistorique.js). Règle portée : le retour
+        // depuis Argent ne montre AUCUN autre onglet de la barre ; il reste entier pour un écran du menu
+        // (scripts/bancs/barre-achats.cjs A9) et pour les feuilles (B4).
         await toucher(pg, '.vrm-tabbar [data-nav-entree="journee"]');
+        const h9 = await pg.evaluate(() => history.length);
         await toucher(pg, '.vrm-tabbar [data-nav-entree="ventes"]');
-        // (11 nov., intégration colis) Colis n'est plus dans la barre : Achats (« À retirer » en tête) a pris sa place (lot DJ3).
-        // (14 nov., n° 61) Achats est dans « Paires » : le retour se juge sur Argent, un onglet de la barre.
         await toucher(pg, '.vrm-tabbar [data-nav-entree="compta"]');
-        await pg.goBack().catch(() => {}); await pg.waitForTimeout(700); const r1 = (await ecran(pg)).ecran;
-        await pg.goBack().catch(() => {}); await pg.waitForTimeout(700); const r2 = (await ecran(pg)).ecran;
-        dit(r1 === 'ventes' && r2 === 'journee', `B9 ${qui} : retour Argent → Ventes → Journée`, `${r1} puis ${r2}`);
+        const h9b = await pg.evaluate(() => history.length);
+        await pg.goBack().catch(() => {}); await pg.waitForTimeout(700);
+        const r1 = await ecran(pg).catch(() => ({ ecran: '', url: 'perdu' }));
+        const autreOnglet = /^http:\/\/localhost/.test(r1.url || '') && r1.ecran && r1.ecran !== 'compta';
+        dit(h9b === h9 && !autreOnglet, `B9 ${qui} : Journée → Ventes → Argent n'empile rien ; le retour ne montre pas l'onglet d'avant`, JSON.stringify({ avant: h9, apres: h9b, retour: r1.ecran || r1.url }));
         dit(errs.length === 0, `B ${qui} : aucune erreur de page`, errs.join(' | '));
         await ctx.close();
       });
@@ -385,7 +393,8 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         const r1b = await ecran(pg);
         dit(r1b.ecran === 'ventes' && r1b.site === 'vinted' && r1b.puce === '222', `R1 ${qui} : rechargé, même compte choisi`, JSON.stringify(r1b));
         // R2 · Colis · À retirer, app rouverte
-        await allerPaire(pg, 'achats');
+        // (16 nov., barre-achats) Achats a son onglet dans la barre.
+        await toucher(pg, '.vrm-tabbar [data-nav-entree="achats"]');
         await pg.evaluate(() => window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=retraits' }))); /* (11 nov., lot DJ3) « À retirer » est en tête d'Achats */ await pg.locator('[data-colis-section="achats"]').first().waitFor({ timeout: 30000 });
         const r2avant = await ecran(pg);
         await pg.close();

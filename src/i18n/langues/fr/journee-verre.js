@@ -21,7 +21,7 @@ export default {
   "sortir.aide.milieu": "rangée {r} depuis le haut, case {c} depuis la gauche",
   "sortir.inconnu.titre": "VRM ne sait pas où est ce carton",
   "sortir.inconnu.sansNumero": "Cette vente n’a pas de N° sûr : sa case ne se retrouve pas sans deviner.",
-  "sortir.inconnu.pasRange": "Le N°{num} n’a jamais été rangé dans le Stock. Cherche-le parmi tes cartons.",
+  "sortir.inconnu.pasRange": "Le N°{num} n’a jamais été rangé dans le Stock. Cherche-le parmi tes rangements.",
   "sortir.inconnu.meubleAbsent": "Le meuble où le N°{num} était rangé n’existe plus.",
   "sortir.inconnu.horsMeuble": "La case notée pour le N°{num} n’existe plus dans son meuble.",
   "sortir.inconnu.doublon": "Le N°{num} est porté par deux fiches : la case pourrait être celle de l’autre. Regarde le carton.",

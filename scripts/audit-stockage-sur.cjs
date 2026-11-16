@@ -116,19 +116,44 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log(`${c ? '✅' : '�
     dit(!fuites.length, 'chaque effet retire ses écouteurs window/document et arrête ses intervalles', fuites.slice(0, 6).join(' · '));
   }
 
+  const clesIndex = (t) => {
+    let n = 0;
+    for (const m of t.matchAll(/key=\{(i|idx|ix|index|j|k|n)\}/g)) {
+      const v = m[1], avant = t.slice(Math.max(0, m.index - 4000), m.index);
+      const lien = new RegExp(`\\(\\s*(?:[\\w$]+|_|\\[[^\\]]*\\]|\\{[^}]*\\})\\s*,\\s*${v}\\s*\\)\\s*=>|\\(\\s*${v}\\s*\\)\\s*=>|\\(\\s*\\[\\s*${v}\\s*[,\\]]|\\(\\s*${v}\\s*,\\s*[\\w$]+\\s*\\)\\s*=>|\\b(?:const|let|var)\\s+${v}\\b|\\bfor\\s*\\(\\s*(?:let|const)\\s+${v}\\b`, 'g');
+      let der = null; for (const l of avant.matchAll(lien)) der = l[0];
+      // index : 2e paramètre d'une flèche, ou compteur `for (let i = 0…` ; élément : 1er paramètre, déstructuré, ou `const k = …`
+      // (une identité calculée) ; aucune liaison trouvée ⇒ compté (prudence).
+      const estIndex = !der || new RegExp(`,\\s*${v}\\s*\\)\\s*=>$`).test(der) || (/^for/.test(der) && new RegExp(`${v}\\s*=\\s*0`).test(t.slice(m.index - 4000 + avant.lastIndexOf(der), m.index)));
+      if (estIndex) n++;
+    }
+    return n;
+  };
   console.log('\n── D · Cliquet : clés React d’index');
   {
     // Plafonds au 11 nov. (après corrections ; Stats : la liste des ventes d'un mois a sa clé).
     // (12 nov., intégration 12nov-a) relevés pour les lots du paquet g2 (Créer sur Vinted, gros lot, sécurité
     // des comptes, suivi-travail, eBay, Leboncoin, Réglages…) : dette NOMMÉE, mesurée à l'intégration.
-    const PLAFOND = {'src/ATrancher.jsx':1, 'src/Accueil.jsx':1, 'src/AccueilFilm.jsx':4, 'src/AdresseReception.jsx':3, 'src/AnnoncesACompleter.jsx':1, 'src/AnnoncesInstantanee.jsx':2, 'src/App.jsx':55, 'src/AvisVente.jsx':1, 'src/AvisVinted.jsx':1, 'src/Bienvenue.jsx':2, 'src/BoiteEmails.jsx':9, 'src/CarteRelais.jsx':1, 'src/Chargement.jsx':1, 'src/ChoixPeriode.jsx':5, 'src/ColisVentesInstantanes.jsx':3, 'src/ConfigurationDepart.jsx':1, 'src/ConfigurerTransfert.jsx':1, 'src/EnLigneDeuxFois.jsx':1, 'src/FacturePro.jsx':9, 'src/FavorisVinted.jsx':4, 'src/FichePaire.jsx':4, 'src/InventaireStock.jsx':3, 'src/JourneeInstantanee.jsx':1, 'src/LigneGlissable.jsx':2, 'src/LivrePoliceCarte.jsx':1, 'src/MeilleuresSources.jsx':1, 'src/ModeAutoFavoris.jsx':2, 'src/ModeEmballage.jsx':1, 'src/ModeRelais.jsx':1, 'src/OutilsArticlesVinted.jsx':1, 'src/OutilsParcours.jsx':1, 'src/ParcoursArrivee.jsx':2, 'src/PreparerColis.jsx':2, 'src/RelierBoite.jsx':2, 'src/RepartitionAnneau.jsx':1, 'src/Room3D.jsx':1, 'src/Squelette.jsx':8, 'src/Tournee.jsx':3, 'src/ToutVaBien.jsx':3, 'src/Visionneuse.jsx':1, 'src/VisiteBulles.jsx':1, 'src/accueil-carte.jsx':1, 'src/accueil-scenes.jsx':3, 'src/communaute/Accompagnement.jsx':4, 'src/communaute/Communaute.jsx':3, 'src/communaute/Formateur.jsx':1, 'src/composants/AideEcran.jsx':3, 'src/composants/ImportAchats.jsx':1, 'src/composants/ImportStock.jsx':2, 'src/composants/InfoPop.jsx':1, 'src/composants/MesuresTerrain.jsx':1, 'src/composants/NoteSatisfaction.jsx':1, 'src/composants/SignalerProbleme.jsx':5, 'src/composants/TableauProprietaire.jsx':1, 'src/design/CarteMois.jsx':1, 'src/design/CarteStats.jsx':2, 'src/ebayGestion.jsx':4, 'src/ecrans/Achats.jsx':1, 'src/ecrans/Compta.jsx':9, 'src/ecrans/Ebay.jsx':5, 'src/ecrans/Leboncoin.jsx':10, 'src/ecrans/PrixMarche.jsx':1, 'src/ecrans/Reglages.jsx':10, 'src/ecrans/Republier.jsx':6, 'src/ecrans/Stats.jsx':10, 'src/ecrans/Stock.jsx':5, 'src/operations/Operations.jsx':1, 'src/operations/Syntheses.jsx':1, 'src/ArgentPlus.jsx':4, 'src/CreerSurVinted.jsx':2, 'src/FavorisEtapes.jsx':2, 'src/GrosLot.jsx':1, 'src/HistoriqueSites.jsx':1, 'src/PasEnLigne.jsx':1, 'src/RangerAchat.jsx':2, 'src/RepubProgramme.jsx':1, 'src/SecuriteComptes.jsx':2, 'src/composants/SuiviTravail.jsx':3, 'src/ebay/ConnexionEbayGuidee.jsx':1, 'src/ebay/FenetresEbay.jsx':1, 'src/ecrans/FilsTous.jsx':1};
+    // (16 nov., audits-vert-main) Relevés pour les lots du 14 au 16 nov., chacun lu (comptage précis : un `k` qui est
+    // l'élément n'est plus compté) : des listes SANS id — chiffres d'un code (AchatsVerre, CarteRelais), chemins SVG (Marque,
+    // FichePaire), squelette (EspaceEbay), pastilles d'un compte (PaireASortir), puces et barres (ParcoursNouveau), lignes d'un
+    // export comptable (VueComptable), N° en cours de saisie (AtelierArrivee), journal d'accès (ArgentPrix), ventes d'une
+    // bulle de la carte (CarteVentes), sites et évènements de la fiche (FichePaire). Dette NOMMÉE, comme le 12 nov.
+    // (16 nov.) Plafonds RESSERRÉS au comptage précis (chaque fichier à son compte exact du jour : pas une clé de plus).
+    const PLAFOND = {'src/Accueil.jsx':1, 'src/AccueilFilm.jsx':4, 'src/AdresseReception.jsx':2, 'src/AnnoncesInstantanee.jsx':2, 'src/App.jsx':41, 'src/ArgentPrix.jsx':1, 'src/AtelierArrivee.jsx':1, 'src/Bienvenue.jsx':1, 'src/BoiteEmails.jsx':7, 'src/CarteRelais.jsx':2, 'src/CarteVentes.jsx':1, 'src/Chargement.jsx':1, 'src/ChoixPeriode.jsx':5, 'src/ColisVentesInstantanes.jsx':3, 'src/ConfigurationDepart.jsx':1, 'src/CreerSurVinted.jsx':1, 'src/FacturePro.jsx':7, 'src/FavorisEtapes.jsx':2, 'src/FichePaire.jsx':5, 'src/GrosLot.jsx':1, 'src/InventaireStock.jsx':1, 'src/JourneeInstantanee.jsx':1, 'src/LigneGlissable.jsx':2, 'src/MeilleuresSources.jsx':1, 'src/ModeAutoFavoris.jsx':1, 'src/OutilsArticlesVinted.jsx':1, 'src/OutilsParcours.jsx':1, 'src/PaireASortir.jsx':1, 'src/PasEnLigne.jsx':1, 'src/PreparerColis.jsx':1, 'src/RangerAchat.jsx':2, 'src/RelierBoite.jsx':2, 'src/RepartitionAnneau.jsx':1, 'src/RepubProgramme.jsx':1, 'src/Room3D.jsx':1, 'src/Squelette.jsx':6, 'src/Tournee.jsx':3, 'src/ToutVaBien.jsx':3, 'src/Visionneuse.jsx':1, 'src/VueComptable.jsx':3, 'src/accueil-carte.jsx':1, 'src/accueil-scenes.jsx':2, 'src/communaute/Accompagnement.jsx':2, 'src/communaute/Communaute.jsx':1, 'src/composants/AideEcran.jsx':3, 'src/composants/ImportAchats.jsx':1, 'src/composants/ImportStock.jsx':1, 'src/composants/InfoPop.jsx':1, 'src/composants/SignalerProbleme.jsx':4, 'src/composants/SuiviTravail.jsx':2, 'src/composants/TableauProprietaire.jsx':1, 'src/design/CarteMois.jsx':1, 'src/design/CarteStats.jsx':1, 'src/ebay/EspaceEbay.jsx':1, 'src/ebayGestion.jsx':1, 'src/ecrans/Achats.jsx':1, 'src/ecrans/Compta.jsx':1, 'src/ecrans/Ebay.jsx':2, 'src/ecrans/FilsTous.jsx':1, 'src/ecrans/Leboncoin.jsx':5, 'src/ecrans/PrixMarche.jsx':1, 'src/ecrans/Reglages.jsx':5, 'src/ecrans/Republier.jsx':2, 'src/ecrans/Stats.jsx':8, 'src/ecrans/Stock.jsx':4, 'src/operations/Operations.jsx':1, 'src/parcoursNouveau/ParcoursNouveau.jsx':2, 'src/plateformes/Marque.jsx':2, 'src/ventes/AchatsVerre.jsx':1};
     const trop = [];
+    const releve = {};
     let total = 0;
     for (const [rel, t] of textes) {
-      const n = (t.match(/key=\{(?:i|idx|ix|index|j|k|n)\}/g) || []).length; total += n;
+      // (16 nov., audits-vert-main) Une clé `key={k}` n'est une clé D'INDEX que si `k` est l'index du `.map` (2e paramètre,
+      // `Array.from({ length }, (_, k)`) ; `.map((k) => …)` sur des noms, ou `([k, v])` d'`Object.entries`, est l'IDENTITÉ
+      // de l'élément (son nom) — la règle « liste à id ⇒ son id » est tenue. La liaison la plus proche avant la clé décide.
+      const n = clesIndex(t); total += n;
       const max = PLAFOND[rel] || 0;
       if (n > max) trop.push(`${rel} ${n} > ${max}`);
+      if (process.env.RELEVER) releve[rel] = n;
     }
+    if (process.env.RELEVER) console.log('RELEVE ' + JSON.stringify(Object.fromEntries(Object.entries(releve).filter(([, n]) => n > 0).sort())));
     dit(!trop.length, `pas une clé d’index de plus (${total} au total, liste d’éléments à id ⇒ son id)`, trop.join(', '));
   }
 

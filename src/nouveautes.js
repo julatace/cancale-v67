@@ -26,6 +26,11 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (16 nov., lot barre-achats — Julien : « ajoute les Achats dans la barre » ; « je ne veux pas qu'on puisse glisser
+  // entre les onglets ») docs/passation/2026-11-16-barre-achats.md
+  { id: 'barre-achats', date: '2026-11-16', titre: 'Achats a son onglet dans la barre', phrase: 'Et glisser du doigt ne change plus d’onglet.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (16 nov., lot ventes-selection) docs/passation/2026-11-16-ventes-selection.md
+  { id: 'selection-visible', date: '2026-11-16', titre: 'Sélection : seulement les lignes affichées', phrase: '« Tout sélectionner » prend ce que tu vois, rien de caché.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (16 nov., stabilite-iphone — « l'app bug un peu » sur iPhone) docs/passation/2026-11-16-stabilite-iphone.md
   { id: 'iphone-fluide', date: '2026-11-16', titre: 'Ventes plus fluide sur iPhone', phrase: 'La barre du bas se lit ; eBay « À traiter » aussi.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (15 nov., maquettes validées : « tout est parfait ») docs/passation/2026-11-15-refonte-ventes.md

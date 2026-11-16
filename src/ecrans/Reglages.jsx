@@ -49,7 +49,7 @@ import { CLE_MODELES } from '../modelesDescription.js';
 import { MesModeles } from '../ModelesDescription.jsx';
 import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroEcrit as lireNumeroEcritRegle, lireNumeroTexte, apercuNumeroEcrit, basculerOu, OU_NUMERO, NOM_OU } from '../numeroEcrit.js';
 // (9 nov.) Les sources cochées (« Où est ton numéro ? ») passent à chaque lecture.
-const lireNumeroEcrit = (o) => lireNumeroEcritRegle({ ou: lireReglageNumeroEcrit(load(CLE_NUMERO_ECRIT, null)).ou, ...o });
+const lireNumeroEcritReglages = (o) => lireNumeroEcritRegle({ ou: lireReglageNumeroEcrit(load(CLE_NUMERO_ECRIT, null)).ou, ...o });
 import { CLE_AFFICHAGE, CLE_JE_VENDS, motsVendeur, lireReglageAffichage, lireReglageJeVends, SEUIL_VENTES_SIMPLE, JOURS_VENTES_SIMPLE, reglageJeVendsDepuisChoix, nomsCategories } from '../profilVendeur.js';
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, FORMES as FORMES_ETIQUETTE, QUESTIONS as QUESTIONS_ETIQUETTE, ANNONCE_EXEMPLE, lireReglageEtiquette, etiquetteDe, poserEtiquette, proposition as propositionEtiquette } from '../etiquetteNumero.js';
 import { bilanThermique } from '../App.jsx';   // (11 nov., lot thermique) ce que l'aperçu a fait
@@ -2206,7 +2206,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'stream-on', type:'switch', ic:'stream', lib:tr('reglages.stream-on.lib'), desc:tr('reglages.stream-on.desc'), on:!!streamOn, onClick:()=>poserStream(!streamOn), data:{ 'data-reglage-stream-on': streamOn ? 'on' : 'off' } },
       { id:'stream', type:'panneau', nu:true, ic:'filter', lib:tr('reglages.stream.lib'), desc:tr('reglages.stream.desc'), data:{ 'data-reglage-stream': streamOn ? 'on' : 'off' }, el:<ReglagesStream/> },
       // (15 nov.) Au téléphone, « Taille du texte » (ci-dessus) remplace ce réglage : il ne reste que s'il porte une valeur à défaire.
-      (!etroit || readZoom() !== '1') && { id:'zoom', type:'panneau', nu:true, ic:'grid', lib:tr('reglages.zoom.lib'), desc:tr('reglages.zoom.desc'), val:valZoom, el:<ZoomSetting nu/> },
+      (!etroit || readZoom() !== '1') && { id:'zoom', type:'panneau', nu:true, ic:'agrandir', lib:tr('reglages.zoom.lib'), desc:tr('reglages.zoom.desc'), val:valZoom, el:<ZoomSetting nu/> },
       urlWidget && { id:'widget', type:'panneau', nu:true, ic:'device', lib:tr('reglages.widget.lib'), desc:tr('reglages.widget.desc'), el:widget },
       // (10 nov., lot AH) Deux raccourcis iPhone par liens profonds (src/raccourcisSiri.js) : une PWA ne déclare pas d'intention Siri.
       { id:'raccourcis-siri', type:'panneau', nu:true, ic:'mic', lib:tr('reglages.raccourcis-siri.lib'), desc:tr('reglages.raccourcis-siri.desc'), data:{ 'data-reglage-raccourcis':'' }, el:<RaccourcisSiri toast={toast}/> },
@@ -4232,14 +4232,14 @@ function NumeroEcritSetting({ onAnnonces }) {
         const L = jl[0] || {}; const items = L.items && typeof L.items === 'object' ? L.items : {};
         const donnes = numerosVcEffectifs() || {}; const liensMain = vcCarte('vrm_vc_liens') || {};
         const connuVc = (id) => { const m = liensMain[id]; const v = (m && typeof m === 'object' ? m.numero : m) || (L.liens || {})[id] || donnes[id] || ''; return cleNum(v); };
-        out.vestiaire = apercuNumeroEcrit(Object.entries(items).filter(([, it]) => it && typeof it === 'object').map(([id, it]) => ({ id: String(id), site: 'vestiaire', titre: it.titre || '', lecture: lireNumeroEcrit({ titre: it.titre || '' }), connu: connuVc(id), presente: true })), { reprenable: rep });
+        out.vestiaire = apercuNumeroEcrit(Object.entries(items).filter(([, it]) => it && typeof it === 'object').map(([id, it]) => ({ id: String(id), site: 'vestiaire', titre: it.titre || '', lecture: lireNumeroEcritReglages({ titre: it.titre || '' }), connu: connuVc(id), presente: true })), { reprenable: rep });
       } else out.vestiaire = null;
     } catch (_) { out.vestiaire = null; }
     try {
       const e = await lireEbayTous('ebay_listings', SEL_EBAY_ANNONCES, 'items');
       if (e && !e.illisibles.length) {
         const fiches = load('vinted_annonce_numeros', {}) || {};
-        out.ebay = apercuNumeroEcrit(e.items.filter((a) => a && a.itemId != null).map((a) => { const lien = lienEbay(a.itemId); const f = lien ? fiches[lien.pairId] : null; return { id: String(a.itemId), site: 'ebay', titre: a.title || '', lecture: lireNumeroEcrit({ ref: a.sku, titre: a.title || '' }), connu: f && f.numero != null ? cleNum(f.numero) : '', presente: true }; }), { reprenable: rep });
+        out.ebay = apercuNumeroEcrit(e.items.filter((a) => a && a.itemId != null).map((a) => { const lien = lienEbay(a.itemId); const f = lien ? fiches[lien.pairId] : null; return { id: String(a.itemId), site: 'ebay', titre: a.title || '', lecture: lireNumeroEcritReglages({ ref: a.sku, titre: a.title || '' }), connu: f && f.numero != null ? cleNum(f.numero) : '', presente: true }; }), { reprenable: rep });
       } else out.ebay = null;
     } catch (_) { out.ebay = null; }
     if (!stop) setAutres(out);

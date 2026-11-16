@@ -124,6 +124,10 @@ async function passe(mut) {
   for (const m of listeAFaire.matchAll(/\.\.\.(\w+)\.map\(/g)) rendues.push(m[1] + '.length');
   for (const m of blocsAFaire.matchAll(/: (\w+(?:\.length)?) \? \[(?:carte\w+|tache)\(/g)) rendues.push(m[1] + ' ? 1 : 0');
   for (const m of blocsAFaire.matchAll(/: (\w+)\.map\(\([^)]*\) => (?:carte\w+|tache)\(/g)) rendues.push(m[1] + '.length');
+  // (16 nov.) Depuis le 15 nov. (lot deux-comptes), une entrée de `blocsAF` peut réunir deux cartes
+  // (`'deux-fois': [...(deuxComptesJ.length ? [carteDeuxComptes()] : []), ...(deuxFois.length ? [carteDeuxFois()] : [])]`) :
+  // chacune est une carte rendue, chacune a son terme.
+  for (const m of blocsAFaire.matchAll(/\.\.\.\((\w+(?:\.length)?) \? \[carte\w+\(\)\] : \[\]\)/g)) rendues.push(m[1] + ' ? 1 : 0');
   if (/\bcases\.filter\(/.test(blocsAFaire)) rendues.push('cases.length');
   const tireDeBlocs = !blocsAFaire || /blocsAF\[id\]/.test(listeAFaire.length ? z.split(/const (?:listeAF|resteAF) = \[/)[0].split('const blocsAF = {')[1] || '' : '');
   const ensuite = (z.split('data-barre-jour=""')[1] || '').split('</div>)')[0];
@@ -131,7 +135,8 @@ async function passe(mut) {
   const nonComptees = rendues.filter((t) => !compte(t));
   if (process.env.DEBUG_A4) console.log('A4 rendues:', rendues.join(' · '), '| tire:', tireDeBlocs, '| termes:', termes.join(' · '));
   const exigees = ['cases.length', 'alertesArgent.length', 'autres.length', 'urssafJob ? 1 : 0', 'carteAilleurs ? 1 : 0', 'sortiesStock.length ? 1 : 0', 'deuxFois.length ? 1 : 0'];
-  const formeDeux = /\.\.\.\(deuxFois\.length \? \[\{ el: carteDeuxFois\(\) \}\]/.test(z) || /'deux-fois': deuxFois\.length \? \[carteDeuxFois\(\)\]/.test(blocsAFaire);
+  const formeDeux = /\.\.\.\(deuxFois\.length \? \[\{ el: carteDeuxFois\(\) \}\]/.test(z) || /'deux-fois': deuxFois\.length \? \[carteDeuxFois\(\)\]/.test(blocsAFaire)
+    || /'deux-fois': \[[^\n]*\.\.\.\(deuxFois\.length \? \[carteDeuxFois\(\)\] : \[\]\)\]/.test(blocsAFaire);
   dit(exprGestes && rendues.length >= exigees.length && !nonComptees.length && exigees.every(compte) && !horsListe && tireDeBlocs && formeDeux, 'A4 « N gestes » compte toutes les cartes (dont « Vendus ailleurs », la sortie du Stock et « en ligne deux fois »)', nonComptees.length ? 'rendues sans être comptées : ' + nonComptees.join(', ') : (BAVARD_A4 ? rendues.join(' · ') : ''));
   dit((/\.\.\.\(carteAilleurs \? \[\{ el: carteVendusAilleurs\(\) \}\]/.test(z) || /ailleurs: carteAilleurs \? \[carteVendusAilleurs\(\)\]/.test(blocsAFaire)
     /* (15 nov., rouges-connus) Depuis « À retirer ailleurs » EN TÊTE (docs/passation/2026-11-15-retrait-ailleurs.md) la carte
