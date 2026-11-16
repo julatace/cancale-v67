@@ -28,6 +28,12 @@ const SCOPES = [
   // (17 octobre) La promotion des annonces (Marketing API). Comme `sell.finances`,
   // il n'arrive qu'au PROCHAIN consentement ; sans lui l'écran dit « reconnecte ».
   'https://api.ebay.com/oauth/api_scope/sell.marketing',
+  // (15 nov., eBay complet 2) Le trafic des annonces et la santé du compte (Analytics API,
+  // lecture seule), et les litiges de paiement (Fulfillment `payment_dispute`, lus seulement).
+  // Comme les deux d'avant : seulement au PROCHAIN consentement ; sans eux, l'écran dit
+  // « reconnecte » pour CES parties, le reste marche comme avant.
+  'https://api.ebay.com/oauth/api_scope/sell.analytics.readonly',
+  'https://api.ebay.com/oauth/api_scope/sell.payment.dispute',
 ].join(' ');
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://lgonxzrzjcqthjtbdpzo.supabase.co';

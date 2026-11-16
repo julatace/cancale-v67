@@ -468,6 +468,34 @@ const EbayConnexion = aLaDemande(() => import('./ecrans/Ebay.jsx').then((m) => (
 const GuidesEbay = aLaDemande(() => import('./ecrans/Ebay.jsx').then((m) => ({ default: m.GuidesEbay })));
 const EbayRemises = aLaDemande(() => import('./ecrans/Ebay.jsx').then((m) => ({ default: m.EbayRemises })));
 const EbayVentes = aLaDemande(() => import('./ecrans/Ebay.jsx').then((m) => ({ default: m.EbayVentes })));
+// (15 nov., eBay complet 2) L'espace eBay : Tableau · Argent · Trafic · Santé (src/ebay/EspaceEbay.jsx), à la demande.
+const TableauEbay = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.TableauEbay })));
+const ArgentEbay = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.ArgentEbay })));
+const TraficEbay = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.TraficEbay })));
+const SanteEbay = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.SanteEbay })));
+const VersementsEbayJournee = aLaDemande(() => import('./ebay/EspaceEbay.jsx').then((m) => ({ default: m.VersementsEbayJournee })));
+// (15 nov., 2e tour) Les photos de la FICHE d'un N° (par identité : une seule fiche porte ce N°), lues
+// en projection dans `vinted_item_details` (§4.4, la forme de Republier) : « Ajouter les photos de ta
+// fiche » sur une annonce eBay qui en a peu. Deux fiches ou aucune ⇒ null (rien proposé).
+async function photosFicheEbay(num) {
+  const k = cleNum(num); if (!k) return null;
+  const fs = Object.entries(fichesPourEbay() || {}).filter(([, f]) => f && f.numero != null && cleNum(f.numero) === k);
+  if (fs.length !== 1 || !/^\d{4,15}$/.test(fs[0][0])) return null;
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_item_details&select=ph:data->${encodeURIComponent('"' + fs[0][0] + '"')}->photos`, { headers: sbAuth() });
+    if (!r.ok) return null;
+    const j = await r.json(); const l = Array.isArray(j) && j[0] && Array.isArray(j[0].ph) ? j[0].ph : [];
+    const urls = l.map((x) => (typeof x === 'string' ? x : x && (x.full_size_url || x.url))).filter((u) => /^https:\/\//.test(String(u || '')));
+    return urls.length ? urls : null;
+  } catch (_) { return null; }
+}
+// Ma journée : les versements eBay rangés (`ebay_versements{suffixe}`, la seule liste `versements`), tous comptes.
+async function lireVersementsEbayJournee() {
+  const r = await lireEbayParCompte('ebay_versements', 'v:data->versements');
+  if (!r || !Array.isArray(r.lignes)) return null;
+  const out = []; for (const { ligne } of r.lignes) if (ligne && Array.isArray(ligne.v)) out.push(...ligne.v);
+  return out.length ? out : null;
+}
 const Garage = aLaDemande(() => import('./ecrans/Stock.jsx').then((m) => ({ default: m.Garage })));
 const StockVinted = aLaDemande(() => import('./ecrans/Stock.jsx').then((m) => ({ default: m.StockVinted })));
 const Inventory = aLaDemande(() => import('./ecrans/Stock.jsx').then((m) => ({ default: m.Inventory })));
@@ -901,6 +929,7 @@ import { CLE_PRIX_PARTOUT, reglagePrix, CLE_PARAMS_PARTOUT, reglageParams, ligne
 import { suiviPourPartout } from "./publierPartoutSuivi.js";
 import { CLE_CORRESPONDANCES, lireMemoire as lireCorrespondances, retenir as retenirCorrespondance, TABLE_VINTED } from "./correspondances.js";   // (15 nov.) Vinted → Leboncoin · eBay · Vestiaire
 import { CLE_DEFAUTS_EBAY as CLE_DEFAUTS_EBAY_PP, defautsDepuis as defautsEbayDepuis, resume as resumeReglagesEbayPP } from "./ebay/parametres.js";
+import { datesVersementEbay } from "./ebay/tableau.js";   // (15 nov., eBay complet 2) le CA eBay daté au versement
 import { chargerSuivi } from "./suiviBranchement.js";
 import { optionsSelecteur, nomCompteVente, identiteCompteVente, annuaireLbc, ongletSansDonnee, nomPlateforme, logoPlateforme } from "./plateformes.js";
 import { MR_SELECT, lireColisMondialRelay, suivisAvecMondialRelay, accordCodes, codeDuCompteMr, ouTrouverQr, ilYa as ilYaLecture, compteDuRetrait, indexAchatsAutresSites } from "./retraitQr.js";
@@ -981,7 +1010,7 @@ import { langueNavigateur, poserLangueUneFois, alignerLangueCompte } from "./lan
 // (11 nov., lot traduction) Les textes visibles passent par `tr()` (src/i18n/index.js) :
 // `t` est pris partout dans ce fichier comme nom de variable, d'où l'alias `tr`.
 import ChoixLangue from "./i18n/ChoixLangue.jsx";
-import { tr, LANGUES, NOMS_LANGUES, choisirLangue, langueCourante, localeCourante, monnaie as monnaieI18n, ajouterSourceApp, abonnerLangue } from "./i18n/index.js";
+import { tr, aCle as aCleTr, LANGUES, NOMS_LANGUES, choisirLangue, langueCourante, localeCourante, monnaie as monnaieI18n, ajouterSourceApp, abonnerLangue } from "./i18n/index.js";
 import { offresVestiaire, offresJourneeVc, euros as eurosOffre, resteAvant as resteAvantOffre } from './offresVestiaire.js';
 // La partie « app » du dictionnaire français arrive AVEC l'app (le fichier d'entrée reste léger).
 import frApp from "./i18n/langues/fr.js";
@@ -10198,12 +10227,15 @@ const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu, exclu
     // « reçu », le CA déclaré et la carte URSSAF disent « au moins » et la nomment.
     if (recu.eur == null) { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'eBay', raison: recu.raison, titre: '', manque: true, ts: Date.parse(e.creationDate || '') || null }); } continue; }
     const eur = recu.eur;
-    const t = Date.parse(e.creationDate || '');
+    // (15 nov., eBay complet 2) DATÉE AU VERSEMENT quand eBay l'a dit (Finances API : le versement
+    // ARRIVÉ qui l'a payée, `_versementEbay`, AAAA-MM-JJ) ; sinon comme avant, à la date de la commande.
+    const tVers = /^\d{4}-\d{2}-\d{2}$/.test(String(e._versementEbay || '')) ? Date.parse(e._versementEbay + 'T12:00:00Z') : NaN;
+    const t = Number.isFinite(tVers) ? tVers : Date.parse(e.creationDate || '');
     if (!t) { if (!vus.has(id)) { vus.add(id); aDaterOuDeclaree({ id, plateforme: 'eBay', eur, titre: '', masquee: false }); } continue; }
     const titre = (Array.isArray(e.lineItems) && e.lineItems[0] && e.lineItems[0].title) || '';
     // (11 nov., export comptable) Les frais eBay LUS (`totalMarketplaceFee`, en euros : `montantRecuEbay` l'a vérifié).
     const frais = Math.round(Number(e.totalMarketplaceFee.value) * 100) / 100;
-    const l = { id, plateforme: 'eBay', ts: t, ym: ymDeTs(t), eur, frais, titre, masquee: false };
+    const l = { id, plateforme: 'eBay', ts: t, ym: ymDeTs(t), eur, frais, titre, masquee: false, dateeAu: Number.isFinite(tVers) ? 'versement' : 'commande' };
     if (garde(l)) lignes.push(place(l));
   }
   // (1er nov., audit A2) VESTIAIRE : une vente compte si son montant REÇU est
@@ -34210,7 +34242,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (only === 'journee') setEbayMsg(etatMessagesEbay(rm));
     // Contenu identique ⇒ même objet : aucun rendu de plus (banc `vitesse.cjs`).
     if (only === 'journee' || only === 'bordereaux') setVcEtat((v) => (v !== undefined && JSON.stringify(v) === JSON.stringify(rv)) ? v : rv);
-    setEbayCmd((!r || r.illisibles.length) ? null : r.items);
+    // (15 nov., eBay complet 2) La date du VERSEMENT de chaque commande (Finances API, rangée par la
+    // route : `ebay_versements{suffixe}`, la seule carte `dates`, §4.4) est posée sur la commande
+    // (`_versementEbay`, une annotation jamais réécrite en base) : le CA déclaré la date au versement.
+    // Une ligne illisible ou absente ⇒ la commande reste datée comme avant (sa date de commande).
+    let datesV = {};
+    if (r && !r.illisibles.length) { try { const rv2 = await lireEbayParCompte('ebay_versements', 'd:data->dates', r.comptes); datesV = datesVersementEbay(rv2 && rv2.lignes); } catch (_) { datesV = {}; } }
+    setEbayCmd((!r || r.illisibles.length) ? null : r.items.map((o) => (o && o.orderId && datesV[o.orderId]) ? { ...o, _versementEbay: datesV[o.orderId] } : o));
     if (r && !r.illisibles.length) {
       const ts = r.lignes.filter((x) => x.ligne).map((x) => Number(x.ligne.capturedAt) || Date.parse(x.ligne.capturedAt || '')).filter((t) => Number.isFinite(t) && t > 0);
       setEbayLuA(ts.length ? Math.min(...ts) : null);
@@ -63889,7 +63927,7 @@ function AppCoeur() {
           {t==='annonces' && site==='vinted' && !baseKO && <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} compact court/>}
           {/* Les sections propres du site, sous son filtre (31 oct., soir) : la
               même forme que les rubriques de l'app (`PlatSubNav`). */}
-          {sous && <div className="vrm-tache-sous" data-tache-sous={t+'.'+site}><PlatSubNav sub={sec} setSub={(x)=>{ setEbayCible(null); setPlatSub(subDeTache(site,x)); }} sections={sous}/></div>}
+          {sous && <div className="vrm-tache-sous" data-tache-sous={t+'.'+site}><PlatSubNav sub={sec} setSub={(x)=>{ setEbayCible(null); setPlatSub(subDeTache(site,x)); }} sections={sous.map(([id,l,p])=>[id, aCleTr('nav.sous.'+site+'.'+id) ? tr('nav.sous.'+site+'.'+id) : l, p])}/></div>}
         </div>
         {/* (11 nov., lot DJ3) En tête : les colis à expédier (Ventes, section principale du site) ou à retirer (Achats). */}
         {/* (14 nov., refonte des listes) LA carte héros de Ventes EN HAUT (« une chose principale par écran ») : elle
@@ -64034,6 +64072,8 @@ function AppCoeur() {
             const note = illVue.length ? `Je n'ai pas pu lire les ventes ${illVue.length > 1 ? 'des comptes eBay' : 'du compte eBay'} ${illVue.map(nomCompteEbay).join(', ')} — rien n'est perdu, réessaie dans un moment.` : null;
             // (5 nov., chantier G) Ni sur Messages : des montants de ventes au-dessus des conversations n'aident à répondre à personne.
             if (sec === 'ventes' || sec === 'achats' || sec === 'messages') return null;   // les trois cases de « Ventes » le disent (§7) ; Achats : des montants de ventes
+            // (15 nov., eBay complet 2) Le tableau, l'argent, le trafic et la santé ont leur propre bande de chiffres.
+            if (sec === 'tableau' || sec === 'argent' || sec === 'sante' || sec === 'trafic') return null;
             return <PlatResume dark baseKO={baseKO} note={note} cases={[[lib, ca != null ? fmt(ca) : null]]}/>;
           })()}
           {/* Le SÉLECTEUR DE COMPTE : seulement à partir de deux comptes reliés
@@ -64044,6 +64084,20 @@ function AppCoeur() {
               attrs={{ 'data-ebay-vue': ebayVueEff }}
               options={comptesEbay.map((c) => ({ val: c.ref, nom: nomCompteEbay(c) + (typeCompteEbayTexte(c) ? ` · ${typeCompteEbayTexte(c)}` : '') + (siteCompteEbayTexte(c) ? ` · ${siteCompteEbayTexte(c)}` : '') }))} />
           )}
+          {/* (15 nov., eBay complet 2) LE TABLEAU eBAY et ses sections (lecture seule) : à expédier (la règle `colisEbay`,
+              par compte), offres, messages, versé ce mois, « À faire », argent, trafic, santé — chacun mène à sa section. */}
+          {(sec==='tableau'||sec==='argent'||sec==='sante'||sec==='trafic')&&(baseKO?<div style={{padding:16}}><LignePanne>Je n'ai pas pu lire tes données — rien n'est perdu, c'est la lecture qui a échoué.</LignePanne></div>:<EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=>{
+            const c=(comptesEbay||[]).find((x)=>x.ref===ref);
+            const domaine=(c&&c.marche&&c.marche.domaine)||'www.ebay.fr';
+            const ill=ebayCmdTous&&Array.isArray(ebayCmdTous.illisibles)&&ebayCmdTous.illisibles.some((x)=>x.ref===ref);
+            const cmd=ebayCmdTous&&Array.isArray(ebayCmdTous.items)&&!ill?ebayCmdTous.items.filter((o)=>(o._compte||'principal')===ref||(ref==='principal'&&!o._compte)):null;
+            const colis=cmd?colisEbay(cmd):null;
+            const numDe=(a)=>{ if(a&&Array.isArray(a.lineItems)){ const l0=a.lineItems[0]||{}; return numEbayLu(l0.sku,l0.legacyItemId||l0.itemId,null,null)||''; } return numEbayLu(a&&a.sku,a&&a.itemId,null,a&&a.debut)||''; };
+            return sec==='tableau'?<TableauEbay key={'tb-'+ref} compte={ref} headers={enTeteSession} aExpedier={colis?colis.aPoster.length:null} onSection={allerSec} onMessages={()=>{ setEbayVue(ref); setTab('ebay_messages'); }} onReconnecter={allerComptesEbay}/>
+              :sec==='argent'?<ArgentEbay key={'ar-'+ref} compte={ref} headers={enTeteSession} commandes={cmd} numDe={numDe} onReconnecter={allerComptesEbay}/>
+              :sec==='trafic'?<TraficEbay key={'tf-'+ref} compte={ref} headers={enTeteSession} numDe={numDe} domaine={domaine} onReconnecter={allerComptesEbay} onPromotion={()=>allerSec('promo')} onAnnonces={()=>allerSec('annonces')} confirm={askConfirm} photosDe={photosFicheEbay}/>
+              :<SanteEbay key={'sa-'+ref} compte={ref} headers={enTeteSession} domaine={domaine} onReconnecter={allerComptesEbay} onAnnonces={()=>allerSec('annonces')} confirm={askConfirm} photosDe={photosFicheEbay}/>;
+          }}</EbayActionCompte>)}
           {sec==='ventes'&&<EbayVentes baseKO={baseKO} vue={ebayVueEff} comptesEbay={comptesEbay} cible={ebayCible?.section==='ventes'?ebayCible:null} onClearCible={()=>setEbayCible(null)}/>}
           {sec==='messages'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayMessagesVolets key={ref} comptesEbay={comptesEbay} owner={AUTH.user?.id || 'installation'} cible={ebayCible?.compte===ref && ebayCible.section==='messages'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
           {sec==='agent'&&<div style={{padding:16}}><GuidesEbay ids={['vente','retour']}/><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayRetours key={'rt-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onSection={(section,t)=>{setEbayVue(ref);setEbayCible(cibleEbay(ref,{...t,section}));allerSec(section);}}/><EbayEvaluations key={'ev-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/></>}</EbayActionCompte></div>}
@@ -65103,6 +65157,8 @@ function AppCoeur() {
         {tab==='journee'&&<GardeEcran nom="journee:forme"><Suspense fallback={null}><AlerteFormeVinted/></Suspense></GardeEcran>}
         {tab==='journee'&&<GardeEcran nom="journee:verification"><Suspense fallback={null}><AlertesVerificationJournee/></Suspense></GardeEcran>}
         {tab==='journee'&&<GardeEcran nom="journee"><Comptabilite key="journee" panelOff={panelOffCoque} accounts={vintedAccounts} only="journee" alertes={notifItems} alertesLues={notifsLus||baseKO||(accountsLoaded&&!vintedAccounts.length)} cycle={cycleCartes} onCycle={()=>setPreuveTick(t=>t+1)} liveStats={liveStatsVus} aTrancher={aTrancherEtat} onAllerTrancher={allerTrancher} onTrancherAT={trancherAT} onNav={setTab} baseKO={baseKO} accountsReady={accountsLoaded} premierJour={premierJour} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
+        {/* (15 nov., eBay complet 3) Un versement eBay en route (ou arrivé depuis 3 jours) : UNE ligne, lue en base. */}
+        {tab==='journee'&&!baseKO&&Array.isArray(comptesEbay)&&comptesEbay.some((c)=>c&&!c.implicite)&&<GardeEcran nom="journee:versements-ebay"><VersementsEbayJournee lire={lireVersementsEbayJournee} onOuvrir={()=>allerSection('plat_ebay','argent')}/></GardeEcran>}
         {tab==='journee'&&<GardeEcran nom="journee:note"><NoteSatisfactionJournee/></GardeEcran>}
         {/* ⚠️ « Bienvenue 👋 · connecte ton compte Vinted pour commencer » à
             quelqu'un qui a neuf comptes : c'est ce qu'il voyait quand la base

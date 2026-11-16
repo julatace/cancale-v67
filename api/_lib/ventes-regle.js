@@ -215,12 +215,15 @@ export const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu
     // « reçu », le CA déclaré et la carte URSSAF disent « au moins » et la nomment.
     if (recu.eur == null) { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'eBay', raison: recu.raison, titre: '', manque: true, ts: Date.parse(e.creationDate || '') || null }); } continue; }
     const eur = recu.eur;
-    const t = Date.parse(e.creationDate || '');
+    // (15 nov., eBay complet 2) DATÉE AU VERSEMENT quand eBay l'a dit (Finances API : le versement
+    // ARRIVÉ qui l'a payée, `_versementEbay`, AAAA-MM-JJ) ; sinon comme avant, à la date de la commande.
+    const tVers = /^\d{4}-\d{2}-\d{2}$/.test(String(e._versementEbay || '')) ? Date.parse(e._versementEbay + 'T12:00:00Z') : NaN;
+    const t = Number.isFinite(tVers) ? tVers : Date.parse(e.creationDate || '');
     if (!t) { if (!vus.has(id)) { vus.add(id); aDaterOuDeclaree({ id, plateforme: 'eBay', eur, titre: '', masquee: false }); } continue; }
     const titre = (Array.isArray(e.lineItems) && e.lineItems[0] && e.lineItems[0].title) || '';
     // (11 nov., export comptable) Les frais eBay LUS (`totalMarketplaceFee`, en euros : `montantRecuEbay` l'a vérifié).
     const frais = Math.round(Number(e.totalMarketplaceFee.value) * 100) / 100;
-    const l = { id, plateforme: 'eBay', ts: t, ym: ymDeTs(t), eur, frais, titre, masquee: false };
+    const l = { id, plateforme: 'eBay', ts: t, ym: ymDeTs(t), eur, frais, titre, masquee: false, dateeAu: Number.isFinite(tVers) ? 'versement' : 'commande' };
     if (garde(l)) lignes.push(place(l));
   }
   // (1er nov., audit A2) VESTIAIRE : une vente compte si son montant REÇU est

@@ -57,8 +57,13 @@ export const estTacheSite = (tab) => Object.prototype.hasOwnProperty.call(TACHES
 //   Annonces · eBay  : Annonces · Promotion.
 // Leboncoin · Colis va dans Colis (sous-rangée), eBay · Compte dans Paramètres.
 export const SOUS_SECTIONS = {
-  'ventes.ebay': [['ventes', 'Commandes'], ['agent', 'À traiter'], ['offres', 'Offres']],
-  'annonces.ebay': [['annonces', 'Annonces'], ['promo', 'Promotion']],
+  // (15 nov., eBay complet 2 — Julien : « tu peux faire 10 fois mieux ») Le TABLEAU de bord eBay
+  // ouvre Ventes · eBay (à expédier, offres, messages, versements, trafic, santé), puis Commandes,
+  // À traiter, Offres, Argent (versements et frais réels), Santé (niveau, annonces à corriger,
+  // évaluations reçues, litiges) ; Annonces · eBay gagne Trafic. Un lien qui visait les commandes
+  // (`ebay_ventes`, `?tab=plat_ebay&section=ventes`) y mène toujours (PLACE_SECTION).
+  'ventes.ebay': [['tableau', 'Tableau'], ['ventes', 'Commandes'], ['agent', 'À traiter'], ['offres', 'Offres'], ['argent', 'Argent'], ['sante', 'Santé']],
+  'annonces.ebay': [['annonces', 'Annonces'], ['trafic', 'Trafic'], ['promo', 'Promotion']],
 };
 export const sousSections = (tab, site) => SOUS_SECTIONS[tab + '.' + site] || null;
 
@@ -95,7 +100,9 @@ const PLACE_SECTION = {
   // (section « À expédier », `LeboncoinColis`). L'ancienne cible `cat_bord` ici n'était pas redirigée (`setTab`
   // applique `placeDesColis` AVANT cette table) : `?tab=plat_leboncoin&section=colis` ouvrait un écran BLANC.
   leboncoin: { colis: ['ventes', 'leboncoin'] },
-  ebay: { agent: ['ventes', 'ebay.agent'], offres: ['ventes', 'ebay.offres'], promo: ['annonces', 'ebay.promo'], compte: ['settings', 'ebay'] },
+  ebay: { agent: ['ventes', 'ebay.agent'], offres: ['ventes', 'ebay.offres'], promo: ['annonces', 'ebay.promo'], compte: ['settings', 'ebay'],
+    // (15 nov., eBay complet 2) les commandes restent joignables par leur nom ; les nouvelles sections aussi.
+    ventes: ['ventes', 'ebay.ventes'], tableau: ['ventes', 'ebay.tableau'], argent: ['ventes', 'ebay.argent'], sante: ['ventes', 'ebay.sante'], trafic: ['annonces', 'ebay.trafic'] },
 };
 // Sans section (ou une section inconnue), l'espace d'un site ouvrait sur ses
 // ventes ; Vestiaire (une page qui commençait par « Publier ») sur ses annonces.
@@ -118,6 +125,10 @@ export function redirigerOnglet(id, sub, deplaces) {
     const p = PLACE_SECTION[site] && sub ? PLACE_SECTION[site][sub] : null;
     if (p) return { tab: p[0], sub: p[1] };
     const s = SECTIONS_TACHE.includes(sub) ? sub : DEFAUT_SITE[site];
+    // (15 nov., eBay complet 2) Un ANCIEN lien vers l'espace eBay (`?tab=plat_ebay`, la notification
+    // « N ventes eBay à expédier », les rappels) visait ses commandes : il y mène toujours. Le Tableau
+    // s'ouvre quand il choisit eBay dans Ventes (le filtre des sites), et par « Tableau ».
+    if (site === 'ebay' && s === 'ventes' && sub == null) return { tab: 'ventes', sub: 'ebay.ventes' };
     return { tab: s, sub: site };
   }
   return { tab: id, sub: sub == null ? null : sub };
