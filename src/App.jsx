@@ -1006,7 +1006,7 @@ import "./design/studio-journee.css";
 import "./design/studio-finition.css";   // (15 nov.) La passe de finition écran par écran — `@layer vrm-finition`, la PREMIÈRE couche (index.html) : docs/passation/2026-11-15-finition-ecrans.md
 import "./design/studio-verre.css";   // (15 nov., Julien : « J'aime la 9 ») VERRE DÉPOLI — le fond bleu profond, le verre, l'encre claire sur le fond — `@layer vrm-verre`, la PREMIÈRE couche (index.html) : docs/passation/2026-11-15-verre-depoli.md
 import "./design/ventes-verre.css";   // (15 nov.) Ventes et Achats « Verre dépoli » (maquettes validées) : APRÈS la couche verre
-import "./design/ventes-clair.css";   // (16 nov., lot ventes-clair) Ventes plus clair : « N choses à regarder », la ligne en trois lignes, filtres jamais coupés — `@layer vrm-verre` : docs/passation/2026-11-16-ventes-clair.md
+import "./design/verre-ventes.css";   // (16 nov., lot ventes-clair) Ventes plus clair : « N choses à regarder », la ligne en trois lignes, filtres jamais coupés — `@layer vrm-verre` : docs/passation/2026-11-16-ventes-clair.md
 import "./design/verre-ecrans.css";   // (15 nov., maquettes validées : « tout est parfait sauf étagères ») Argent, à venir, Messages, Paramètres, la fiche — des classes `vg-*` neuves, `@layer vrm-verre` : docs/passation/2026-11-15-ecrans-verre-2.md
 import "./design/verre-journee.css";   // (15 nov., refonte-journee) Ma journée comme la maquette validée, « La paire à sortir en premier » — docs/passation/2026-11-15-refonte-journee.md
 import "./design/verre-annonces.css";   // (15 nov., refonte-journee) Annonces comme la maquette validée : la rangée de 72 px, la recherche et les vues
