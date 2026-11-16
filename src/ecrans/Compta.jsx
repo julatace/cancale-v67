@@ -2413,7 +2413,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
 
         <div className="vrm-fe-trois" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', borderBottom: `1px solid ${C.border}` }}>
           {[
-            ['Ce que VRM prépare', 'Une facture électronique par vente, et le récapitulatif du mois de tes ventes aux particuliers.'],
+            ['Ce que VRM prépare', 'Une facture électronique par vente, et le récap du mois de tes ventes aux particuliers.'],
             ["Où l'envoyer", "Super PDP : connecte TON compte ci-dessous. Ailleurs : dépose-les toi-même."],
             ['À partir de quand', 'Septembre 2027 pour les micro-entreprises — à vérifier sur impots.gouv.fr.'],
           ].map(([t, d], i) => (
@@ -3450,7 +3450,7 @@ function RecapComptableMensuel({ liveStats, compta: comptaEcran, panelOff, accou
           <Bouton variante="secondaire" icone="doc" data-recap-pdf="" disabled={!!recapEnCours} onClick={()=>exporterRecap('pdf')} style={{flex:'1 1 140px'}}>{recapEnCours==='pdf'?'…':tr('compta.telechargerPdf2')}</Bouton>
           <Bouton variante="secondaire" icone="save" data-recap-csv="" disabled={!!recapEnCours} onClick={()=>exporterRecap('csv')} style={{flex:'1 1 140px'}} title={tr('compta.fichierExcelNumbers')}>{recapEnCours==='csv'?'…':tr('compta.telechargerTableur2')}</Bouton>
         </div>
-        <p data-recap-imprimer-note="" style={{margin:'8px 0 0',fontSize:13,color:C.muted,lineHeight:1.5}}>{tr('compta.recapImprimerNote')}</p>
+        <div data-recap-imprimer-note="" style={{margin:'8px 0 0',fontSize:13,color:C.muted,lineHeight:1.5}}><Pourquoi ecrit label={tr('compta.recapImprimerAide')}>{tr('compta.recapImprimerNote')}</Pourquoi></div>
       </div></Card>
       {/* Récap comptable mensuel */}
       {moisRecap.length>0&&(
@@ -3635,7 +3635,7 @@ function AVenirVerre({ A }) {
   return (
     <section className="vrm-a-venir vg-a-venir vg-carte" data-a-venir={T.valeur == null ? '' : c(T.valeur)} data-a-venir-n={String(T.n)} data-a-venir-site="toutes" data-a-venir-partiel={T.partiel ? '1' : undefined}>
       <button type="button" className="vg-a-venir-btn" data-a-venir-ouvrir="" onClick={ouvrirArgentAVenir}
-        aria-label={`${tr('avenir.ouvrir')} — ${T.partiel && T.valeur != null ? tr('journee.moins') + ' ' : ''}${T.valeur == null ? '—' : montant(T.valeur)}`}>
+        title={`${tr('avenir.ouvrir')} — ${T.partiel && T.valeur != null ? tr('journee.moins') + ' ' : ''}${T.valeur == null ? '—' : montant(T.valeur)}`}>
         <span className="vg-a-venir-tete">
           <span className="vg-ds">{tr('journee.venir')}</span>
           <b className="vg-a-venir-total" data-a-venir-total="">{T.partiel && T.valeur != null ? <small>{tr('journee.moins')} </small> : null}{T.valeur == null ? '—' : montant(T.valeur)}</b>
@@ -3693,7 +3693,9 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
     ? tr('compta.su', { libelle: String(q.libelle), x: String(q.note ? q.note + ', ' : ''), question: String(q.question) })
     : `${q.libelle} : ${q.valeur == null ? q.texte : (q.partiel ? 'au moins ' : '') + somme(q.valeur)}${q.note ? ', ' + q.note : ''} — ${q.question}`);
   const attrs = (q) => ({ 'data-argent-q': q.id, 'data-argent-valeur': q.valeur == null ? '' : String(Math.round(q.valeur * 100)), 'data-argent-partiel': q.partiel ? '1' : undefined,
-    'data-argent-raison': q.raison || undefined, 'data-argent-echeance': q.echeance ? String(q.echeance) : undefined, 'aria-label': nom(q), onClick: () => aller(q) });
+    'data-argent-raison': q.raison || undefined, 'data-argent-echeance': q.echeance ? String(q.echeance) : undefined, title: nom(q), onClick: () => aller(q) });
+  // (16 nov.) Le nom d'une case = son texte visible (WCAG 2.5.3 : un aria-label différent cachait le chiffre lu) ;
+  // la phrase complète (« au moins », la question) reste en `title`.
   const chiffre = (q, affiche = false) => (
     <b className="vrm-argent-w-n" data-argent-pas-su={q.valeur == null && !q.texte ? '' : undefined}>
       {q.valeur != null ? <>{q.partiel ? <small>{tr('journee.moins')} </small> : null}{affiche ? sommeAffiche(somme(q.valeur)) : somme(q.valeur)}</> : (q.texte || '—')}
