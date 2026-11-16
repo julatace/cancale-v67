@@ -745,4 +745,7 @@ html[data-sb-eventail] body .vrm-neuf-hote { visibility: hidden !important; }
 :root:root:root body .vrm-app-shell[data-espace] .vrm-ebay-sales > [data-ebay-guides] { padding: 8px 14px !important; margin: 0 0 12px !important; }
 :root:root:root body .vrm-app-shell[data-espace] [data-ebay-brouillons] { padding: 14px 16px !important; }
 
+/* (16 nov., stabilite-iphone, passe de contraste) Le nombre d'annonces du sélecteur de sites (« 999+ ») : le gris du verre à
+   78 % d'opacité sur la pastille claire = 4,03:1 (banc S3, Annonces · Leboncoin) ; plein, il tient l'AA. */
+:root:root:root body .vrm-app-shell[data-espace] .vrm-sel-sites .vrm-ss-n { opacity: 1 !important; }
 } /* fin de @layer vrm-verre */

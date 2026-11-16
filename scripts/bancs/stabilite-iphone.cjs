@@ -55,6 +55,8 @@ const ECRANS = {
   ventes_ebay_agent: ['/?tab=plat_ebay&section=agent', 'seul'],
   ventes_vestiaire: ['/?tab=ventes&site=vestiaire'],
   achats: ['/?tab=achats'],
+  achats_lbc: ['/?tab=achats&site=leboncoin'],
+  achats_vestiaire: ['/?tab=achats&site=vestiaire'],
   stock: ['/?tab=garage'],
   argent: ['/?tab=compta'],
   messages: ['/?tab=messages'],
@@ -302,6 +304,8 @@ const TEXTES_PIXELS = () => {
     if (!r || r.width < 8 || r.height < 6 || r.top < 0 || r.bottom > innerHeight || r.left < 0 || r.right > innerWidth) continue;
     // le texte doit être VU (rien de posé dessus)
     const h = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2); if (!h || !(h === el || el.contains(h))) continue;
+    // sous le fondu de la barre du bas (la liste s'y efface EXPRÈS, la page défile dessous) : pas jugé, sauf la barre elle-même
+    { const tb = document.querySelector('.vrm-tabbar'); if (tb && !el.closest('.vrm-tabbar')) { const rb = tb.getBoundingClientRect(); if (r.bottom > rb.top - 70) continue; } }
     const px = parseFloat(c.fontSize), w = parseInt(c.fontWeight, 10) || 400;
     out.push({ x: r.left, y: r.top, w: r.width, h: r.height, t: tn.nodeValue.trim().slice(0, 30), gros: px >= 24 || (px >= 18.66 && w >= 700), barre: !!el.closest('.vrm-tabbar') });
     if (out.length >= 60) break;
