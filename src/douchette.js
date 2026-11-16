@@ -123,3 +123,47 @@ export function prendreDemande(maintenant = Date.now()) {
   if (!d.code || maintenant - d.at > ATTENTE_MS) { d.code = ''; d.at = 0; return ''; }
   const c = d.code; d.code = ''; d.at = 0; return c;
 }
+
+// ── (16 nov., lot plateformes-restes) eBAY ET LEBONCOIN, PAR IDENTITÉ ─────────
+// Les ventes eBay et Leboncoin que la douchette sait désigner, sous la forme de
+// `venteDuCode` ({ cle, site, tx, suivis, codes }). Chaque identité est un n° que la
+// vente PORTE elle-même ; jamais un titre, jamais un N° de rangement nu :
+//   · eBay      : le n° de commande (`orderId`, et `legacyOrderId` s'il est rangé), et le
+//                 SKU « VRM-{N°} » d'une de SES lignes (la forme stricte de `numDeSkuEbay`,
+//                 telle quelle : « VRM-124 », jamais « 124 »). Le n° de suivi d'une commande
+//                 eBay n'est PAS dans nos lignes (l'API Fulfillment ne le porte pas dans la
+//                 commande ; l'étiquette se prend chez eBay) : il n'est pas inventé. Une
+//                 commande annulée ou remboursée (`engagee` faux) ne prête pas son SKU (le même
+//                 SKU revient sur la vente suivante de la paire) — son n° de commande reste.
+//   · Leboncoin : le n° de transaction (`txId`), et le n° du bordereau Mondial Relay —
+//                 `label.reference` et le `exp=` du lien de suivi (MESURÉ le 16 nov. en lecture
+//                 seule : 9 transactions sur 9 portent les deux, égaux, 8 chiffres ; le code-barres
+//                 de 26 chiffres de l'étiquette les porte aux chiffres 3 à 10, `candidatsDuScan`).
+//                 Seulement une VENTE prouvée (`isSeller === true`, §5) : un achat n'est jamais
+//                 « la vente à envoyer ».
+// Deux ventes qui portent le même n° ⇒ `venteDuCode` rend « ambigu » (rien n'est ouvert).
+const RE_SKU_VRM = /^\s*VRM[-\s]?(?:[A-Z]{1,3})?\d{1,6}\s*$/i;
+export const expDeLienSuivi = (url) => {
+  const m = /[?&]exp=([0-9]{6,14})(?:&|$)/i.exec(String(url || ''));
+  return m && /mondialrelay\./i.test(String(url)) ? m[1] : '';
+};
+export function lignesAutresSites({ ebay = null, lbc = null, numEbay = null, numLbc = null, engagee = null } = {}) {
+  const L = [];
+  for (const o of (Array.isArray(ebay) ? ebay : [])) {
+    if (!o || o.orderId == null || String(o.orderId).trim() === '') continue;
+    const lignes = Array.isArray(o.lineItems) ? o.lineItems : [];
+    const prete = typeof engagee === 'function' ? engagee(o) !== false : true;
+    const skus = prete ? lignes.map((l) => (l && typeof l.sku === 'string' && RE_SKU_VRM.test(l.sku) ? l.sku : '')).filter(Boolean) : [];
+    const nums = typeof numEbay === 'function' ? lignes.map((l) => { try { return numEbay(o, l) || ''; } catch (_) { return ''; } }).filter(Boolean) : [];
+    L.push({ cle: 'e:' + (o._compte || 'principal') + ':' + String(o.orderId), site: 'ebay', tx: String(o.orderId), orderId: String(o.orderId), compte: o._compte || 'principal',
+      suivis: [o.legacyOrderId].filter((x) => x != null && String(x).trim() !== ''), codes: skus, num: [...new Set(nums)].join(' · '), titre: (lignes[0] && lignes[0].title) || '' });
+  }
+  for (const v of (Array.isArray(lbc) ? lbc : [])) {
+    if (!v || v.isSeller !== true || v.txId == null || String(v.txId).trim() === '') continue;
+    const lb = v.label && typeof v.label === 'object' ? v.label : {};
+    const suivis = [lb.reference, expDeLienSuivi(lb.trackingUrl)].filter((x) => x != null && String(x).trim() !== '');
+    let num = ''; if (typeof numLbc === 'function') { try { num = numLbc(v) || ''; } catch (_) { num = ''; } }
+    L.push({ cle: 'l:' + String(v.txId), site: 'leboncoin', tx: String(v.txId), suivis, codes: [], num: String(num || ''), titre: v.title || '' });
+  }
+  return L;
+}

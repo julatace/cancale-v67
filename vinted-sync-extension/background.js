@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.385.0';
+const CODE_VERSION = '5.397.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -23902,8 +23902,30 @@ async function markVcPosted(id, on) {
   if (on === false) s.delete(String(id)); else s.add(String(id));
   return await supabaseUpsert('app_data', [{ id: VC_POSTED, data: { ids: [...s], updatedAt: new Date().toISOString() } }], 'id');
 }
+// 5.397 (16 nov., lot plateformes-restes) — LA CATÉGORIE DEMANDÉE PAR VRM (« Publier
+// partout », src/correspondances.js) : { univers, categorie, sous }, des LIBELLÉS. Elle
+// n'est posée que si CHACUN existe tel quel (casse et espaces mis à part) dans le
+// catalogue de dépôt capté sur SON navigateur (`_catVc`, 5.243) : l'univers, la catégorie
+// DE cet univers, la sous-catégorie DE cette catégorie. Un libellé absent, un catalogue
+// pas capté, une forme inconnue ⇒ `null` : la règle d'avant (`categorieVcDe`) reprend et
+// la publication automatique s'arrête (« à finir sur Vestiaire ») — jamais une catégorie
+// approchée, jamais une autre.
+function categorieVcDemandee(dem, catalogue) {
+  if (!dem || typeof dem !== 'object' || !catalogue || !Array.isArray(catalogue.data)) return null;
+  const lib = (v) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : '');
+  const norm = (v) => lib(v).toLowerCase();
+  const U = lib(dem.univers), Cg = lib(dem.categorie), S = lib(dem.sous);
+  if (!U || !Cg || !S || U.length > 80 || Cg.length > 80 || S.length > 80) return null;
+  const us = catalogue.data.filter((u) => u && norm(u.title) === norm(U));
+  if (us.length !== 1) return null;
+  const cs = (us[0].categories || []).filter((c) => c && norm(c.title) === norm(Cg));
+  if (cs.length !== 1) return null;
+  const ss = (cs[0].subCategories || []).filter((x) => x && norm(x.title) === norm(S));
+  if (ss.length !== 1) return null;
+  return { univers: lib(us[0].title), categorie: lib(cs[0].title), sous: lib(ss[0].title), ids: { univers: us[0].id, categorie: cs[0].id, sous: ss[0].id }, manque: [], verifie: true, demandee: true };
+}
 // Une seule paire, celle du clic — jamais une file entière (rien ne part seul).
-async function annonceVestiaire(id) {
+async function annonceVestiaire(id, demande = null) {
   const main = (await lireMain(MAIN_FILE)) || {};
   const numeros = main.vinted_annonce_numeros || {};
   const labels = main.vinted_account_labels || {};
@@ -23949,6 +23971,13 @@ async function annonceVestiaire(id) {
   // (§ « familleArticle ») et vérifiée contre le catalogue de dépôt capté.
   const fam = familleArticle({ chemin: cheminDeLAnnonce(trouve.it, det), titre: firstDefined(det.title, trouve.it.title), description: det.description || '', taille: ad.taille, marque: ad.marque });
   ad.vcCategorie = categorieVcDe(fam, _catVc);
+  // 5.397 : la catégorie choisie dans VRM (vérifiée contre le catalogue capté) ; introuvable ⇒
+  // la règle d'avant, et `categorieDemandee: 'introuvable'` arrête la publication automatique.
+  if (demande) {
+    const dc = categorieVcDemandee(demande, _catVc);
+    if (dc) { ad.vcCategorie = dc; ad.categorieDemandee = 'posee'; }
+    else { ad.categorieDemandee = 'introuvable'; ad.vcCategorie = { ...ad.vcCategorie, manque: [...((ad.vcCategorie && ad.vcCategorie.manque) || []), 'catégorie choisie dans VRM (pas trouvée telle quelle sur Vestiaire)'] }; }
+  }
   // (28 oct.) Vestiaire veut la photo de l'ÉTIQUETTE en 2ᵉ (case « Étiquette »,
   // mesurée dans le smart listing). C'est Julien qui la désigne dans VRM
   // (`vrm_vc_etiquettes[id]` = la clé de la photo, `clePhotoLbc` ; une clé à
@@ -23996,16 +24025,16 @@ async function publierVestiaire(msg) {
     try { const cu = await compteConnecte('www.vinted.fr'); if (cu) await avecVinted(() => completerPhotosSiManque(cu, id)).catch(() => {}); } catch (_) {}
     await viderFiches({ force: true }).catch(() => {});
     await chargerCataloguesPlateformes();
-    const r = await annonceVestiaire(id);
+    const r = await annonceVestiaire(id, msg.categorie && typeof msg.categorie === 'object' ? msg.categorie : null);
     if (!r.ad) return { accepte: false, code: r.code || 'absente', raison: r.raison || 'annonce introuvable' };
     let tab = null;
     try { tab = await chrome.tabs.create({ url: VC_PAGE_VENDRE, active: true }); } catch (_) { tab = null; }
     // 5.236 : Julien veut que ça PUBLIE tout seul, sans booster (vc-depot.js,
     // `publierSansBooster`). Une app d'avant (sans `publier`) le veut aussi.
-    r.ad.publier = msg.publier !== false;
+    r.ad.publier = msg.publier !== false && r.ad.categorieDemandee !== 'introuvable';
     await chrome.storage.local.set({ vrmPendingVc: { ad: r.ad, at: Date.now(), tabId: tab && tab.id != null ? tab.id : null } });
     await majCmd(cleJob, { etape: 'depot', id, numero: r.ad.numero || '', tabId: tab && tab.id != null ? tab.id : null, raison: null });
-    return { accepte: true, jobId: cleJob, etape: 'depot' };
+    return { accepte: true, jobId: cleJob, etape: 'depot', ...(r.ad.categorieDemandee ? { categorie: r.ad.categorieDemandee } : {}) };
   } finally { PUBLICATIONS_EN_VOL.delete(cleJob); }
 }
 // 28 oct. (5.268) : Julien — « ça m'amène juste sur Vestiaire, sur Vendre un

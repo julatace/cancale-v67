@@ -305,4 +305,12 @@ export default {
   "stats.cv.nonComptees": {"one": "{n} sale with unread price, not in the table.", "other": "{n} sales with unread price, not in the table."},
   "stats.cv.delaiTitre": {"one": "median, over {n} dated sale", "other": "median, over {n} dated sales"},
   "stats.cv.offresTitre": {"one": "over {n} offer received", "other": "over {n} offers received"},
+  // (16 nov., lot plateformes-restes) Vestiaire : une seule règle du finalisé
+  "stats.vcFin.lecture": "loading",
+  "stats.vcFin.pasLu": "Vestiaire sales not read",
+  "stats.vcFin.aucune": "no completed sale yet",
+  "stats.vcFin.pasSur": {"one": "{n} completed sale with an uncertain amount", "other": "{n} completed sales with an uncertain amount"},
+  "stats.vcFin.auMoins": {"one": "at least: {n} completed sale with an uncertain amount, not in the total", "other": "at least: {n} completed sales with an uncertain amount, not in the total"},
+  "stats.vcFin.lu": "completed sales (amount paid out)",
+  "stats.totalAuMoins": "at least: sales with an uncertain amount are not in the total",
 };
