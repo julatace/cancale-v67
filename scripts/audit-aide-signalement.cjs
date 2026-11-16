@@ -258,7 +258,8 @@ const SECRETS = {
     const brut = JSON.stringify(rows);
     dit(!brut.includes(A) && !brut.includes(B) && !brut.includes(SECRETS.email) && !brut.includes('87,50'), 'aucun identifiant de vendeur ni donnée dans la base (empreintes du jour, message masqué)');
     const types = ligne ? Object.values(ligne.data.types) : [];
-    dit(types.length === 2 && types.find((t) => t.n === 20 && t.appareils.length === 1) && types.find((t) => t.garde === 1), 'additionnés par type : 20 fois la même erreur (1 personne : le propriétaire exclu), un écran tombé', types.map((t) => ({ n: t.n, g: t.garde, ap: t.appareils.length })));
+    // (16 nov., lot anti-bug) Les 10 du propriétaire sont RANGÉS à part (`proprio`), jamais une personne.
+    dit(types.length === 2 && types.find((t) => t.n === 30 && t.proprio === 10 && t.appareils.length === 1) && types.find((t) => t.garde === 1), 'additionnés par type : 30 fois la même erreur dont 10 chez le propriétaire (rangés à part : 1 personne), un écran tombé', types.map((t) => ({ n: t.n, p: t.proprio, g: t.garde, ap: t.appareils.length })));
     const rc = await MT.recevoirMesures({ corps: JSON.stringify({ v: 1, h: {}, p: evA, jeton: 'j.c.x' }), verifierJeton, pousser, maintenant: T0 + 30 * 60e3 });
     const rd = await MT.recevoirMesures({ corps: JSON.stringify({ v: 1, h: {}, p: evA, jeton: 'j.d.x' }), verifierJeton, pousser, maintenant: T0 + 31 * 60e3 });
     dit(rc.code === 200 && rd.code === 200 && envois.length === 1 && /3 personnes/.test(envois[0].n.title) && envois[0].proprio === JULIEN && envois[0].n.tag === 'vrm-alerte-plantages', 'la TROISIÈME personne : UNE notification « Un plantage touche 3 personnes » ; la quatrième : rien de plus (dit pour la journée)', envois[0] && envois[0].n.title);

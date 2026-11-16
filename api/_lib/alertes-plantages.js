@@ -67,7 +67,7 @@ async function ecrireCas(env, fetcher, proprio, id, avant, data, maintenant) {
 
 // Range les événements d'un lot, puis prévient si l'heure est venue.
 // `pousser(notif)` envoie au propriétaire (le chemin push existant).
-export async function recevoirAlertesPlantages({ evenements, empreinte, proprio, env = process.env, fetcher = fetchAvecDelai, pousser = null, maintenant = Date.now() }) {
+export async function recevoirAlertesPlantages({ evenements, empreinte, proprio, env = process.env, fetcher = fetchAvecDelai, pousser = null, maintenant = Date.now(), deProprio = false }) {
   const evts = normaliserEvenements(evenements);
   if (!evts.length) return { fait: false, raison: 'rien' };
   if (!cfg(env).service || !proprio) return { fait: false, raison: 'non-configure' };
@@ -76,7 +76,7 @@ export async function recevoirAlertesPlantages({ evenements, empreinte, proprio,
   for (let essai = 0; essai < ESSAIS; essai++) {
     const avant = await lireLigne(env, fetcher, proprio, id);
     if (avant === undefined) return { fait: false, raison: 'base' };     // lecture ratée : rien n'est écrit
-    const r = jourApresEvenements(avant ? { ...avant, jour } : { jour }, evts, empreinte, maintenant);
+    const r = jourApresEvenements(avant ? { ...avant, jour } : { jour }, evts, empreinte, maintenant, { deProprio });
     if (r.refus) return { fait: false, raison: r.refus };
     // La notification groupée est-elle due ? Alors la ligne part DÉJÀ marquée « dite ».
     const { enAttente, due } = alerteDue(r.data, maintenant);
@@ -125,6 +125,8 @@ export function terrainPourPanneau(rows) {
       ecrans: Object.entries(t.ecrans || {}).map(([e, n]) => ({ ecran: e, nom: nomEcran(e), n: Number(n) || 0 })).sort((a, b) => b.n - a.n),
       versions: Object.keys(t.versions || {}).slice(0, 5), premier: t.premier || null, dernier: t.dernier || null, dit: (Number(t.notifie) || 0) > 0,
       // (15 nov., lot fiabilite-auto) l'ouverture bloquée et les navigateurs (liste fermée, nombres).
+      // (16 nov., lot anti-bug) chez le propriétaire lui-même (jamais une « personne »), et d'où (liste fermée).
+      chezToi: Number(t.proprio) || 0, origines: Object.fromEntries(Object.entries(t.origines && typeof t.origines === 'object' ? t.origines : {}).filter(([k]) => /^[a-z]{2,12}$/.test(k)).map(([k, n]) => [k, Number(n) || 0])),
       bloque: Number(t.bloque) || 0, navigateurs: Object.fromEntries(Object.entries(t.navigateurs && typeof t.navigateurs === 'object' ? t.navigateurs : {}).filter(([k]) => /^[\w ]{1,30}$/.test(k)).map(([k, n]) => [k, Number(n) || 0])),
     })).sort((a, b) => b.n - a.n);
     return { jour, notifieA: d.notifieA || null, types };
