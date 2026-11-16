@@ -174,7 +174,9 @@ async function ouvrir(b, vp, sc, { sombre = false, tab = 'journee', images }) {
   // Les photos INVENTÉES, servies comme les quatre sites (enregistrée APRÈS : Playwright la prend en premier).
   await pg.route(/^https:\/\/(images1\.vinted\.net|img\.leboncoin\.fr|i\.ebayimg\.com|images\.vestiairecollective\.com)\//, (r) => {
     const m = /05_([a-z0-9]+)_banc/.exec(r.request().url());
-    const k = m && Object.keys(images).find((x) => x.toLowerCase() === m[1]);
+    // Les annonces Leboncoin reconnues par le code d'origine portent le nom rendu par Leboncoin (40 hex) : même photo inventée que la paire Vinted.
+    const parNom = r.request().url().includes(NOM_5004) ? 'P2' : r.request().url().includes(NOM_5005) ? 'P3' : null;
+    const k = parNom || (m && Object.keys(images).find((x) => x.toLowerCase() === m[1]));
     const im = k && images[k];
     return im ? r.fulfill({ status: 200, contentType: im.type, headers: { 'access-control-allow-origin': '*' }, body: Buffer.from(im.b64, 'base64') }) : r.abort();
   });

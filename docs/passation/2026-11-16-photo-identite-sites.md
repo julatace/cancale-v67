@@ -17,6 +17,13 @@ du code du fichier d'origine : « vas-y, fais ça au moins ».
   `scripts/bancs/photo-identite-seuil.cjs` (vert, 88 s), `scripts/bancs/meme-photo.cjs` (essai O ajouté).
 - Geste de Julien : installer l'extension 5.401.0 ; ensuite, chaque paire qu'il met en ligne DEPUIS SON
   CHROME avec l'extension (Vinted puis Leboncoin, avec le même fichier) est reconnue toute seule.
+- **Reprise du 16 nov. au soir** (session youthful-wozniak) : vrai `git merge origin/main` (Quoi de neuf et §9
+  gardés des deux côtés, la plus ancienne ligne §9 déplacée telle quelle dans `historique-divers.md`, zips 5.401.0
+  régénérés) ; la mutation `fondLecture` traitait la lecture ratée par un plantage (rouge « TypeError ») : elle
+  traite maintenant la lecture KO comme VIDE (le cas qui détruit) et rougit **E4 par son nom** ; banc `meme-photo` :
+  les annonces Leboncoin reconnues par le code (nom 40 hex) n'avaient pas de photo servie (vignette cassée sur la
+  capture) ⇒ servies ; fiche de la paire : « Aussi sur Leboncoin · reconnue par la photo d’origine » était coupée
+  à 390 px (« reconnue par la ph… ») ⇒ la ligne passe à la ligne, la limite se lit en entier.
 - Ce qui reste (forme jamais vue, rien inventé) : eBay et Vestiaire (le chemin d'envoi de leurs photos
   n'a jamais été vu dans ses captures) ; un autre compte Vinted (la reprise d'un N° sur Vinted passe par
   `repriseNumero`, non touchée).
