@@ -64,6 +64,8 @@ const USAGES = {
   zxing: { quoi: 'lecture du code-barres d’un colis à la caméra (ZXing, src/ScannerColis.jsx)', role: /ZXing/, donnee: /navigateur|adresse IP/i },
   tesseract: { quoi: 'lecture d’un ticket de dépense photographié (Tesseract, src/depensesTicket.js)', role: /Tesseract/, donnee: /navigateur|adresse IP/i },
   logos: { quoi: 'logo du transporteur (icône de son site, src/transporteursVisuels.js)', role: /logo du transporteur/i, donnee: /navigateur/i },
+  // (16 nov., finitions) La carte de tes ventes (src/CarteVentes.jsx) place les VILLES de livraison par la BAN, depuis le navigateur.
+  carteventes: { quoi: 'villes de la carte de tes ventes (Statistiques)', role: /carte de tes ventes/i, donnee: /navigateur/i },
   // (24 oct.) Le statut public d'un colis, lu par le SERVEUR (Chronopost, Vinted Go).
   transp: { quoi: 'statut public des colis, lu par le serveur', role: /statut public des colis/i, donnee: /n° de suivi[\s\S]*serveur VRM/i },
   // (24 oct., suite) Mondial Relay lu par le SERVEUR (route `_mvc`) : n° ET code postal.
@@ -226,6 +228,24 @@ const COUPLES = {
   'src/ecrans/Vestiaire.jsx|fr.vestiairecollective.com': ['lien', LIEN + ' — « Répondre sur Vestiaire ↗ »'],
   'src/enLigneLbc.js|www.leboncoin.fr': ['lien', LIEN + ' — « Ouvrir « Mes annonces » sur leboncoin.fr ↗ »'],
   // (24 oct.) Le SERVEUR lit le statut public des colis (api/_lib/transporteurs-lecture.js).
+  // (16 nov., finitions) Hôtes écrits depuis le 12 nov. sans être déclarés ici — chacun relu à sa ligne :
+  //   · contacté TOUT SEUL par le navigateur ⇒ une ligne de la politique (ajoutée le 16 nov.) :
+  'src/CarteVentes.jsx|api-adresse.data.gouv.fr': ['politique', 'carteventes'],
+  //   · des liens ouverts d'un clic (un <a href>, un bouton « … ↗ ») — rien ne part tout seul :
+  'src/aRetirerAilleurs.js|www.leboncoin.fr': ['lien', LIEN + ' — « Ouvrir Leboncoin » (À retirer ailleurs, LIEN_SITE → <a href> de src/ARetirerAilleurs.jsx)'],
+  'src/aRetirerAilleurs.js|www.ebay.fr': ['lien', LIEN + ' — « Ouvrir eBay » (À retirer ailleurs)'],
+  'src/aRetirerAilleurs.js|fr.vestiairecollective.com': ['lien', LIEN + ' — « Ouvrir Vestiaire » (À retirer ailleurs)'],
+  'src/aRetirerAilleurs.js|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted » (À retirer ailleurs)'],
+  'src/accompagnement.js|www.vinted.fr': ['lien', LIEN + ' — la suite d’un geste accompagné (« Ensuite : … », un bouton, src/ui/Accompagne.jsx)'],
+  'src/alertesSeuils.js|entreprendre.service-public.gouv.fr': ['lien', LIEN + ' — la source officielle d’un seuil (fiches F32353, F21746 ; <a href> de src/AlertesSeuils.jsx)'],
+  'src/alertesSeuils.js|eur-lex.europa.eu': ['lien', LIEN + ' — la directive DAC7 citée comme source (<a href> de src/AlertesSeuils.jsx)'],
+  'src/ouVendre.js|www.vinted.fr': ['lien', LIEN + ' — les pages de frais citées comme source (« Où vendre », <a href> de src/OuVendre.jsx)'],
+  'src/ouVendre.js|www.leboncoin.fr': ['lien', LIEN + ' — les CGU Leboncoin citées comme source (« Où vendre »)'],
+  'src/parcoursArrivee.js|www.leboncoin.fr': ['lien', LIEN + ' — « Ouvrir Leboncoin » (Mes annonces) du parcours d’arrivée'],
+  'src/parcoursArrivee.js|www.vestiairecollective.com': ['lien', LIEN + ' — « Ouvrir Vestiaire » du parcours d’arrivée'],
+  'src/retoursAchat.js|www.vinted.fr': ['lien', LIEN + ' — la transaction ou la conversation d’un retour (« À renvoyer », <a href> de src/RetoursLitiges.jsx)'],
+  //   · VRM lui-même, jamais contacté : l'origine de base pour LIRE une adresse relative (`new URL(href, base)`).
+  'src/notifsBonMoment.js|vrm.center': ['vrm', 'origine de base d’un `new URL()` (lire un lien de notification), jamais contactée'],
   'api/_lib/transporteurs-lecture.js|ws.chronopost.fr': ['politique', 'transp'],
   'api/_lib/transporteurs-lecture.js|carrier.vintedgo.com': ['politique', 'transp'],
   'api/_lib/transporteurs-lecture.js|www.mondialrelay.fr': ['politique', 'transpmr'],
@@ -311,6 +331,8 @@ if (PROUVE) {
     ['la ligne Mondial Relay ne dit plus le secours par le navigateur', () => [fichiers, politique.replace('envoyés depuis ton navigateur par l’extension VRM', 'envoyés par le serveur VRM')]],
     ['la ligne Mondial Relay ne dit plus que le serveur VRM l’appelle', () => [fichiers, politique.replace('envoyés par le serveur VRM (son adresse IP, pas la tienne) ; en secours, quand Mondial Relay refuse le serveur, ', '')]],
     ['un nouvel hôte contacté par le serveur des transporteurs, non déclaré', () => [fichiers.map(([f, t]) => [f, f === 'api/_lib/transporteurs-lecture.js' ? t + '\nconst sonde = () => fetch(`https://suivi.exemple-tiers.com/v1/x`);\n' : t]), politique]],
+    ['la ligne « carte de tes ventes » retirée (16 nov.)', () => [fichiers, sansLigne('Placer les villes de tes ventes')]],
+    ['la ligne « carte de tes ventes » dit « le serveur » au lieu du navigateur', () => [fichiers, politique.replace('jamais une rue, un nom ou un pseudo), envoyés par ton navigateur', 'jamais une rue, un nom ou un pseudo), envoyés par le serveur VRM')]],
     ['un nouvel hôte appelé par le navigateur, non déclaré', () => [fichiers.map(([f, t]) => [f, f === 'src/App.jsx' ? t + '\nconst sonde = () => fetch(`https://api.exemple-tiers.com/v1/x`);\n' : t]), politique]],
   ];
   let prouvees = 0;

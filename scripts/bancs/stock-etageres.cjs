@@ -196,6 +196,16 @@ async function retirerCase(pg, n) {
         if (complet) {
           await toucher(pg, '[data-case-num="20"]');
           await pg.waitForSelector('.vrm-etag-fiche-sites[data-fiche-sites]', { state: 'attached', timeout: 8000 }).catch(() => {});
+          // ── K6 (16 nov., finitions) : la vue « Sites » de la FICHE D dit les MÊMES sites et comptes que la case du Stock
+          //    (une source par identité, src/stockAnnonces.js) ; ce qui n'a pas été lu est dit « pas su », jamais « pas en ligne ».
+          await toucher(pg, '[data-fd-seg="sites"]');
+          await pg.waitForFunction(() => { const s = document.querySelector('.vrm-fp .fd-sites'); return s && !s.hasAttribute('data-fd-sites-lecture'); }, null, { timeout: 15000 }).catch(() => {});
+          const K6 = await pg.evaluate(() => { const l = [...document.querySelectorAll('.vrm-fp .fd-sites .fd-site')]; return l.map((x) => [x.getAttribute('data-fiche-site'), x.getAttribute('data-fiche-site-etat'), x.getAttribute('data-fiche-site-compte') || ''].join(':')); });
+          const enL6 = K6.filter((x) => /:en-ligne:/.test(x));
+          dit(enL6.length === 2 && enL6.includes('vinted:en-ligne:compte_invente') && enL6.includes('leboncoin:en-ligne:nord_lbc'), `${t} · K6 : la fiche D (vue Sites) de N°20 = la case du Stock — Vinted · compte_invente ET Leboncoin · nord_lbc`, K6);
+          // Vestiaire n'est pas servi par ce banc (jamais lu) : la fiche le DIT « pas su », comme le Stock le nomme — sans le taire.
+          dit(K6.some((x) => /^vestiaire:pas-su/.test(x)) && !K6.some((x) => /^vestiaire:en-ligne/.test(x)), `${t} · K7 : Vestiaire, jamais lu, est dit « pas su » sur la fiche (jamais tu, jamais « en ligne »)`, K6);
+          if (CAPT) await pg.screenshot({ path: path.join(CAPT, `etag-${v}-0a-fiche-d-sites.png`) });
           await ouvrirPlus(pg);
           // les rangées du STOCK (src/stockAnnonces.js, par identité) ; la vue « Sites » de la fiche D a sa propre règle (Prix partout)
           const fs2 = await pg.evaluate(() => { const l = [...document.querySelectorAll('.vrm-etag-fiche-site[data-fiche-site]')]; return l.map((x) => x.getAttribute('data-fiche-site') + ':' + (x.getAttribute('data-compte') || '') + ':' + x.textContent.replace(/\s+/g, ' ').trim()); });

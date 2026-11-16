@@ -233,6 +233,21 @@ if (arg.includes('--prouve')) {
     const pasDemande = R.annoncesActuelles({ ...base });
     dit(!pasDemande.manque.some((x) => x.plateforme === 'vestiaire'), 'un appelant qui ne passe pas Vestiaire (undefined) : rien de dit sur lui');
   });
+  // (16 nov., finitions) LA FICHE D'UNE PAIRE lit ses sites ICI (`sitesStockDuNumero`) : les MÊMES sites et comptes que
+  // la case du Stock, par identité (N°, ou l'un de ses N°), et ce qui n'a pas été lu à part — « pas su » ≠ « pas en ligne ».
+  essaie('sitesStockDuNumero — la fiche dit ce que dit le Stock', () => {
+    const aa = R.annoncesActuelles({
+      vinted: [{ uid: '111', nom: 'alpha', pseudo: 'alpha', ok: true, lu: Date.now(), enLigne: [it(102, 'Adidas 40')], aConfirmer: [], masquees: [] },
+        { uid: '222', nom: 'beta', ok: false }],
+      numeros, ebay: null, lbc: [{ numero: '2', title: 'Adidas LBC', pseudo: 'nord_lbc' }], vendus: new Set(), cle, clePhoto,
+    });
+    const r = R.sitesStockDuNumero(aa, '02', cle);
+    dit(!!r && r.sites.map((x) => `${x.plat}:${x.etat}:${x.pseudo}`).join(',') === 'vinted:enligne:alpha,leboncoin:enligne:nord_lbc', 'N°2 : Vinted · alpha ET Leboncoin · nord_lbc (les sites de la case)', JSON.stringify(r && r.sites));
+    dit(!!r && r.manque.some((m) => m.plateforme === 'vinted' && m.nom === 'beta' && m.raison === 'lecture ratée') && r.manque.some((m) => m.plateforme === 'ebay' && m.raison === 'pas lu'), 'ce qui n’a pas été lu est rendu à part (compte beta, eBay)', JSON.stringify(r && r.manque));
+    const r9 = R.sitesStockDuNumero(aa, '9', cle);
+    dit(!!r9 && r9.sites.length === 0 && r9.manque.length === 2, 'un N° vu nulle part : aucun site, et le « pas su » reste dit (jamais « en ligne nulle part » tout court)', JSON.stringify(r9));
+    dit(R.sitesStockDuNumero(null, '2', cle) === null && R.sitesStockDuNumero({ su: false, articles: [], manque: [] }, '2', cle) === null, 'rien lu ⇒ null (pas su), jamais une liste vide');
+  });
   essaie('App.jsx — Vestiaire', () => {
     const app = fs.readFileSync(APP, 'utf8').replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
     const lireVc = app.slice(app.indexOf('async function lireVcStock('), app.indexOf('async function lireAnnoncesStock('));
@@ -240,7 +255,10 @@ if (arg.includes('--prouve')) {
     const meubles = app.slice(app.indexOf('function StockMeubles('), app.indexOf('function ChoixPlanches('));
     dit(/id=eq\.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt,complet:data->complet/.test(lireVc) && !/select=data[&`,]/.test(lireVc) && /id=eq\.vc_ventes&select=ventes:data->ventes/.test(lireVc), 'le Stock lit vc_listings et vc_ventes PROJETÉS (jamais select=data)');
     dit(/lireVcStock\(/.test(lire), 'lireAnnoncesStock lit Vestiaire');
-    dit(/annoncesVcStock\(\{[^}]*auto: vcLocStock\.auto/.test(meubles) && /const vcLocStock = useVcLocal\(\)/.test(meubles) && /vestiaire: vcStock/.test(meubles), 'le Stock juge Vestiaire avec les N° du moment (donnés et RELIÉS : useVcLocal → numerosVcEffectifs → vrm_vc_liens)');
+    // (16 nov., finitions) Le calcul du Stock vit dans `articlesDeLecture` (partagé avec la fiche d'une paire) : le Stock
+    // l'appelle avec les N° du moment (`vcAuto: vcLocStock.auto`), et c'est LUI qui juge Vestiaire par `annoncesVcStock`.
+    const calc = app.slice(app.indexOf('function articlesDeLecture('), app.indexOf('function StockMeubles('));
+    dit(/articlesDeLecture\([^)]*vcAuto: vcLocStock\.auto/.test(meubles) && /const vcLocStock = useVcLocal\(\)/.test(meubles) && /annoncesVcStock\(\{[^}]*auto: vcAuto/.test(calc) && /vestiaire: vcStock/.test(calc), 'le Stock juge Vestiaire avec les N° du moment (donnés et RELIÉS : useVcLocal → numerosVcEffectifs → vrm_vc_liens)');
     dit(/numerosVcAvecLiens\(vcCarte\('vrm_vc_numeros'\), vcCarte\('vrm_vc_liens'\)\)/.test(app), 'numerosVcEffectifs porte les liens qu’IL a posés (vrm_vc_liens)');
     dit(/aa\.manque\.some\(\(m\) => m\.plateforme === 'vestiaire'\)/.test(meubles), 'une lecture Vestiaire qui manque ⇒ aucune paire rangée dite « plus en ligne »');
   });
@@ -248,9 +266,10 @@ if (arg.includes('--prouve')) {
     const app = fs.readFileSync(APP, 'utf8').replace(/\/\/[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '');
     const meubles = app.slice(app.indexOf('function StockMeubles('), app.indexOf('function ChoixPlanches('));
     const lire = app.slice(app.indexOf('async function lireAnnoncesStock('), app.indexOf('function StockMeubles('));
-    dit(/annoncesActuelles\(/.test(meubles) && /classerRangees\(/.test(meubles), 'le Stock passe par annoncesActuelles et classerRangees');
+    const calc = app.slice(app.indexOf('function articlesDeLecture('), app.indexOf('function StockMeubles('));
+    dit(/articlesDeLecture\(/.test(meubles) && /annoncesActuelles\(/.test(calc) && /classerRangees\(/.test(meubles), 'le Stock passe par annoncesActuelles (via articlesDeLecture, partagé avec la fiche) et classerRangees');
     dit(/fetchVintedListings\(/.test(lire) && /lireEbayEnLigne\(/.test(lire) && /lireLbcEnVente\(/.test(lire), 'le Stock lit par les MÊMES lectures que l’écran Annonces (fetchVintedListings, eBay, Leboncoin)');
-    dit(/masqueesPresentes\(/.test(meubles), 'les masquées déclarées parties sortent (masqueesPresentes)');
+    dit(/masqueesPresentes\(/.test(calc) && /articlesDeLecture\(/.test(meubles), 'les masquées déclarées parties sortent (masqueesPresentes)');
     dit(!/ajouterAutresPresents\(/.test(meubles) && !/numsPresents\(/.test(meubles), 'le Stock ne se fabrique plus depuis toutes les fiches numérotées ni la liste publiée');
     const comp = app.slice(app.indexOf('function Comptabilite('), app.indexOf('function Comptabilite(') + 400000);
     dit(/lireLbcEnVente\(/.test(comp) && /lireEbayEnLigne\(/.test(comp), 'l’écran Annonces lit eBay et Leboncoin par les mêmes fonctions (§11)');

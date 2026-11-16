@@ -259,21 +259,38 @@ function VueArgent({ cases, etat }) {
 }
 
 // LA VUE « SITES » : une rangée par site (en ligne, ou la vente), son compte, son prix ou ce qui s'y passe.
+// (16 nov., finitions) Les annonces viennent du STOCK (src/stockAnnonces.js, `sitesStockDuNumero`) : site, compte, état
+// (en ligne · à confirmer · masquée par Vinted), et ce qui n'a PAS été lu, dit à part (`pas-su`, sa raison) — « pas su »
+// n'est jamais « pas en ligne ». `lecture` : la lecture des annonces n'a pas encore répondu.
 function VueSites({ sites, I }) {
-  if (!sites.length) return <p className="fd-vide" data-fd-sites="0">{tr('fd.sites.aucun')}</p>;
+  const lignes = sites.filter((s) => s.etat !== 'lecture' && !(s.etat === 'pas-su' && !s.site));
+  const enLecture = sites.some((s) => s.etat === 'lecture');
+  const pasSuTout = sites.find((s) => s.etat === 'pas-su' && !s.site) || null;
+  const pasSu = lignes.some((s) => s.etat === 'pas-su');
+  const vus = lignes.filter((s) => s.etat !== 'pas-su');
+  if (!lignes.length && !enLecture && !pasSuTout) return <p className="fd-vide" data-fd-sites="0">{tr('fd.sites.aucun')}</p>;
   // Chaque info UNE fois : un prix partout le même est déjà dans la ligne d'état — la rangée ne le redit pas.
   const enL = sites.filter((s) => s.etat === 'en-ligne');
   const memePrix = enL.length > 0 && enL.every((s) => s.prix != null && s.prix === enL[0].prix);
+  const detail = (s) => {
+    if (s.etat === 'vendue') return [s.date ? tr('fd.sites.vendueLe', { date: dateFd(s.date) }) : tr('fd.sites.vendue'), prixFd(s.prix)].filter(Boolean).join(' · ');
+    if (s.etat === 'pas-su') return tr('fd.sites.pasSu', { raison: tr(s.raison || 'fd.sites.raison.ratee') });
+    if (s.etat === 'a-confirmer') return [tr('fd.sites.aConfirmer'), prixFd(s.prix)].filter(Boolean).join(' · ');
+    if (s.etat === 'masquee') return tr('fd.sites.masquee');
+    return [memePrix ? '' : prixFd(s.prix), Number.isFinite(s.favoris) ? tr('fd.sites.favoris', { n: s.favoris }) : ''].filter(Boolean).join(' · ') || tr('fd.sites.enLigne');
+  };
   return (
-    <div className="fd-sites" data-fd-sites={sites.length} data-fiche-sites={sites.length}>
-      {sites.map((s, i) => (
-        <div key={i} className="fd-site" data-fiche-site={s.site} data-fiche-site-etat={s.etat}>
+    <div className="fd-sites" data-fd-sites={vus.length} data-fiche-sites={vus.length} data-fd-sites-passu={pasSuTout ? 'tout' : pasSu ? 'partiel' : ''} data-fd-sites-lecture={enLecture ? '1' : undefined}>
+      {lignes.map((s, i) => (
+        <div key={i} className={'fd-site' + (s.etat === 'pas-su' ? ' is-passu' : '')} data-fiche-site={s.site} data-fiche-site-etat={s.etat} data-fiche-site-compte={s.compte || undefined}>
           <span className="fd-site-logo" aria-hidden="true">{MarqueSite(s.site, I)}</span>
           <span className="fd-site-txt"><b>{NOM_SITE_FD[s.site] || s.site}{s.compte ? ` · ${s.compte}` : ''}</b>
-            <span>{s.etat === 'vendue' ? [s.date ? tr('fd.sites.vendueLe', { date: dateFd(s.date) }) : tr('fd.sites.vendue'), prixFd(s.prix)].filter(Boolean).join(' · ')
-              : [memePrix ? '' : prixFd(s.prix), Number.isFinite(s.favoris) ? tr('fd.sites.favoris', { n: s.favoris }) : ''].filter(Boolean).join(' · ') || tr('fd.sites.enLigne')}</span></span>
+            <span>{detail(s)}</span></span>
         </div>
       ))}
+      {enLecture ? <p className="fd-vide" data-fd-sites-etat="lecture">{tr('fd.sites.lecture')}</p> : null}
+      {pasSuTout ? <p className="fd-vide" data-fd-sites-etat="passu">{tr('fd.sites.pasSuTout', { raison: tr(pasSuTout.raison || 'fd.sites.raison.ratee') })}</p> : null}
+      {!enLecture && !pasSuTout && !vus.length && pasSu ? <p className="fd-vide" data-fd-sites-etat="aucun-lu">{tr('fd.sites.aucunLu')}</p> : null}
     </div>
   );
 }
@@ -439,7 +456,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
   return createPortal(<>
     {!enPlan && ordi ? <button type="button" className="fd-fond" data-fd-fond="" aria-label="Fermer la fiche" tabIndex={-1} onClick={onFermer}/> : null}
     <div ref={racine} className={'vrm-fp fd' + (depuis ? ' is-depuis-ligne' : '') + (enPlan ? ' sb-plan fd-plan' : '') + (ordi ? ' fd-ordi' : '')} role="dialog" aria-modal={enPlan ? 'false' : 'true'} data-sb-plan={enPlan ? '1' : undefined} aria-label={nomFiche ? `Tout sur le N°${nomFiche}` : tr('fiche.heros')} data-fiche-paire={nomFiche} data-fiche-contexte-ouvert={ctx || undefined}
-      data-fiche-ligne-cle={depuis ? depuis.cle : undefined} data-fiche-identite={depuis ? (ligneRes ? ligneRes.etat + ':' + (ligneRes.par || '') : '') : 'numero'} data-fiche-lecture-en-cours={lecture ? '1' : '0'} data-fd-vue={p ? vueOuverte : undefined} data-noswipe="1">
+      data-fiche-ligne-cle={depuis ? depuis.cle : undefined} data-fiche-identite={depuis ? (ligneRes ? ligneRes.etat + ':' + (ligneRes.par || '') : '') : 'numero'} data-fiche-lecture-en-cours={lecture || lignesSites.some((x) => x && x.etat === 'lecture') ? '1' : '0'} data-fd-vue={p ? vueOuverte : undefined} data-noswipe="1">
       {Retour ? <Retour fermer={onFermer}/> : null}
       <div className="fd-cadre" ref={cadre}>
         <div className={'fd-ph' + (photo ? '' : ' is-sans-photo')} data-fiche-heros={ctx || 'numero'} data-fiche-photo-vedette={photo ? '1' : '0'}>

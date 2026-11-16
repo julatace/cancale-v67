@@ -28,7 +28,7 @@ import { EmballagesCarte } from '../EmballagesCarte.jsx';
 import { useSelectionSerie, CaseSerie, BarreSerie, OuvrirSerie } from '../composants/SelectionSerie.jsx';   // (11 nov., lot actions-serie)
 import { trierSerie, resumeSerie, csvDe } from '../selectionSerie.js';   // (10 nov., lot L) le stock d'emballages
 import { CLE_EMBALLAGES, colisFaits } from '../emballages.js';
-import { useMotsArticle, useExemplesVendeur, NotePaireCoque, InfoPop, Pourquoi, AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, fetchTxnItemIds, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
+import { useMotsArticle, useExemplesVendeur, NotePaireCoque, InfoPop, Pourquoi, AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, fetchTxnItemIds, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, numerosVcEffectifs, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import StockExplication from "../StockExplication.jsx";
@@ -184,7 +184,25 @@ export async function lireAnnoncesStock(accounts) {
     lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_accounts&select=a:data->accounts`).then((r) => (Array.isArray(r) ? annuaireLbc((r[0] && r[0].a) || {}) : null)).catch(() => null),
   ]);
   const lbcNoms = Array.isArray(lbc) ? lbc.map((a) => (a && typeof a === 'object' ? { ...a, pseudo: (annuaire && a.compteLbc && annuaire[a.compteLbc]) || '' } : a)) : lbc;
-  return { vinted, ebay, lbc: lbcNoms, vc, at: Date.now() };
+  const lu = { vinted, ebay, lbc: lbcNoms, vc, at: Date.now() };
+  _derniereLecture = lu;
+  return lu;
+}
+// (16 nov., finitions) UNE source par identité pour « où est cette paire » : le Stock ET la fiche d'une paire (vue
+// « Sites ») font le MÊME calcul sur la MÊME lecture. `articlesDeLecture` est ce calcul (les annonces actuelles réunies
+// par identité, src/stockAnnonces.js) ; la dernière lecture faite ici reste en mémoire quelques minutes : la fiche
+// ouverte depuis le Stock dit exactement ce que le Stock vient de dire, sans relire.
+let _derniereLecture = null;
+export const lectureStockRecente = (maxMs = 120000) => (_derniereLecture && Number.isFinite(_derniereLecture.at) && Date.now() - _derniereLecture.at <= maxMs ? _derniereLecture : null);
+export function articlesDeLecture(lecture, { numeros = load('vinted_annonce_numeros', {}) || {}, pairsLost = load('vinted_pairs_lost', {}) || {}, vendus = null, vcAuto = numerosVcEffectifs() } = {}) {
+  if (!lecture) return null;
+  const venduSig = vendus ? null : load('vrm_stock_vendus', null);
+  const v = vendus || new Set((venduSig && Array.isArray(venduSig.nums) ? venduSig.nums : []).map((x) => cleNum(x)).filter(Boolean));
+  const vcStock = lecture.vc ? annoncesVcStock({ lst: lecture.vc.lst, ventes: lecture.vc.ventes, auto: vcAuto }) : null;
+  return annoncesActuelles({
+    vinted: lecture.vinted.map((c) => (c.ok ? { ...c, masquees: masqueesPresentes(c.masquees, numeros, pairsLost) } : c)),
+    numeros, ebay: lecture.ebay, lbc: lecture.lbc, vestiaire: vcStock, vendus: v, cle: cleNum, clePhoto: photoKey,
+  });
 }
 const NOM_PLAT_FILTRE = { vinted: 'Vinted', leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
 const depuisQuand = (ms) => { if (!Number.isFinite(ms)) return 'jamais lu'; const h = (Date.now() - ms) / 3600000; return h < 48 ? `lu il y a ${Math.max(1, Math.round(h))} h` : `lu il y a ${Math.round(h / 24)} j`; };
@@ -372,11 +390,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   const garder = { ...(load('vrm_stock_garde_hors_ligne', {}) || {}), ...(load('vrm_stock_garder', {}) || {}) };
   // Vestiaire : ses annonces jugées par la règle de Vestiaire, avec les N° du
   // moment (donnés par VRM, ou celui de Vinted qu'il a relié — `vrm_vc_liens`).
-  const vcStock = lecture ? (lecture.vc ? annoncesVcStock({ lst: lecture.vc.lst, ventes: lecture.vc.ventes, auto: vcLocStock.auto }) : null) : undefined;
-  const aa = lecture ? annoncesActuelles({
-    vinted: lecture.vinted.map((c) => (c.ok ? { ...c, masquees: masqueesPresentes(c.masquees, numeros, pairsLost) } : c)),
-    numeros, ebay: lecture.ebay, lbc: lecture.lbc, vestiaire: vcStock, vendus, cle: cleNum, clePhoto: photoKey,
-  }) : null;
+  // (16 nov., finitions) Le calcul partagé avec la fiche d'une paire (`articlesDeLecture`, plus haut) : une seule source.
+  const aa = lecture ? articlesDeLecture(lecture, { numeros, pairsLost, vendus, vcAuto: vcLocStock.auto }) : null;
   // Une paire sous deux N° (même photo exacte, `aussi`) : chacun de ses N° est actuel.
   const actuellesCles = aa ? new Set(aa.articles.flatMap((a) => [a.cle, ...(a.aussi || []).map(cleNum)]).filter(Boolean)) : null;
   // Les fiches numérotées par N° : pour montrer une paire rangée qui n'est plus

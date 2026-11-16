@@ -848,7 +848,7 @@ import './styles-stock-2d.css'; // (8 nov.) style de ./StockExplication.jsx, gar
 import { libererCasesPartis, remettreCase, resteAuStock, etatCase } from "./stockSortie.js";
 import { opsSortieCases, sortirDeCases } from "./stockEtageres.js";   // (15 nov., étagères) la case vidée + la descente des piles, en un geste
 import { phraseDescentes, descentesDesOps } from "./etageresTextes.js";
-import { annoncesActuelles, annoncesVcStock, classerRangees } from "./stockAnnonces.js";
+import { annoncesActuelles, annoncesVcStock, classerRangees, sitesStockDuNumero } from "./stockAnnonces.js";
 import { PasEnLigneDetail, texteCartePasEnLigne } from "./PasEnLigne.jsx";   // (11 nov., lot pas-en-ligne)
 import { DEMANDE_OUVRIR_ACHAT, candidatsPasEnLigne, jugerPasEnLigne, presentsDe as presentsPasEnLigne, seuilValide as seuilValidePasEnLigne, SEUIL_DEFAUT as SEUIL_PAS_EN_LIGNE_DEFAUT, CLE_SEUIL_PAS_EN_LIGNE } from "./pasEnLigne.js";   // (11 nov., lot pas-en-ligne)
 // ⟦→ ecrans/Stock.jsx #2⟧
@@ -61657,6 +61657,16 @@ function AppCoeur() {
   const [ficheTick,setFicheTick]=useState(0);
 
   const numOutil=ficheNum||(ficheLigneActive&&ficheLigneActive.num)||prixNum||(pubAil&&pubAil.num)||null;
+  // (16 nov., finitions) LES SITES DE LA PAIRE, LUS COMME LE STOCK : la même lecture (`lireAnnoncesStock`, gardée quelques
+  // minutes si le Stock vient de la faire) et le même calcul (`articlesDeLecture` → src/stockAnnonces.js) — une source par
+  // identité. { num, r } — r : undefined lecture · null pas su · { sites, ids, manque }.
+  const [sitesStock,setSitesStock]=useState(null);
+  const cleComptesFiche=(vintedAccounts||[]).map((a)=>String((a&&a.vinted_user_id)||'')).filter(Boolean).sort().join(',');
+  useEffect(()=>{ if(!numOutil){ setSitesStock(null); return undefined; } let vivant=true; setSitesStock({ num:numOutil, r:undefined });
+    (async()=>{ let r=null;
+      try { const m=await import('./ecrans/Stock.jsx'); const lu=m.lectureStockRecente()||await m.lireAnnoncesStock(vintedAccounts||[]); r=lu?sitesStockDuNumero(m.articlesDeLecture(lu), numOutil, cleNum):null; } catch(_) { r=null; }
+      if(vivant) setSitesStock({ num:numOutil, r }); })();
+    return ()=>{ vivant=false; }; /* eslint-disable-next-line */ },[numOutil,cleComptesFiche,ficheTick]);
   useEffect(()=>{ if(!numOutil||!numData){ setFicheExtra(null); return undefined; } let vivant=true; setFicheExtra(null);
     (async()=>{ const { rn }=rechercheParNumero(numOutil, numData, vintedAccounts); const x=await lireExtraFiche(rn); if(vivant) setFicheExtra({ ...x, num: numOutil }); })();
     return ()=>{ vivant=false; }; /* eslint-disable-next-line */ },[numOutil,numData]);
@@ -64860,8 +64870,23 @@ function AppCoeur() {
               const st = numData && numData.stats ? numData.stats : null;
               // Le prix : celui que la règle de « Prix partout » lit, sinon le prix LU dans le dressing (la lecture la plus fraîche).
               const prixLu = (x) => { const v = x.site === 'vinted' && st && st[x.id] ? st[x.id].prix : null; const n = v == null ? null : Number(typeof v === 'object' ? v.amount : v); return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : null; };
-              for (const x of sitesPrixDe(numF, rn, ex).sites) out.push({ site: x.site, etat: 'en-ligne', compte: x.site === 'vinted' ? (nomCompte(x.compte) || '') : (x.compte || ''), prix: x.prix != null ? Math.round(x.prix * 100) : prixLu(x),
-                favoris: x.site === 'vinted' && st && st[x.id] && Number.isFinite(st[x.id].favoris) ? st[x.id].favoris : undefined });
+              // (16 nov., finitions) Les annonces : celles du STOCK pour cette identité (site, compte, état), et ce qui n'a
+              // pas été lu, dit à part (« pas su » ≠ « pas en ligne ») — plus la règle de « Prix partout », qui en oubliait.
+              const ss = sitesStock && String(sitesStock.num) === String(numF) ? sitesStock.r : undefined;
+              const ETAT_SS = { enligne: 'en-ligne', aconfirmer: 'a-confirmer', masquee: 'masquee' };
+              const RAISON_SS = { 'lecture ratée': 'fd.sites.raison.ratee', 'pas lu': 'fd.sites.raison.pasLu', 'jamais lu': 'fd.sites.raison.jamais', 'lue en partie': 'fd.sites.raison.partie' };
+              if (ss === undefined) out.push({ site: '', etat: 'lecture' });
+              else if (ss === null) out.push({ site: '', etat: 'pas-su', raison: 'fd.sites.raison.ratee' });
+              else {
+                const idsV = (ss.ids || []).filter((i) => /^v:/.test(i)).map((i) => i.slice(2));
+                const favV = idsV.length === 1 && st && st[idsV[0]] && Number.isFinite(st[idsV[0]].favoris) ? st[idsV[0]].favoris : undefined;
+                let favPose = false;
+                for (const x of ss.sites) {
+                  const fav = x.plat === 'vinted' && !favPose && favV !== undefined ? favV : undefined; if (fav !== undefined) favPose = true;
+                  out.push({ site: x.plat, etat: ETAT_SS[x.etat] || 'en-ligne', compte: x.pseudo || '', prix: x.prix != null ? Math.round(x.prix * 100) : null, favoris: fav });
+                }
+                for (const m of ss.manque) out.push({ site: m.plateforme, etat: 'pas-su', compte: m.plateforme === 'vinted' || /·/.test(m.nom) ? m.nom : '', raison: RAISON_SS[m.raison] || 'fd.sites.raison.ratee' });
+              }
             } catch (_) {}
             return out; })();
           const pf = propFiche && p && propFiche.num === String(numF) ? propFiche : null;

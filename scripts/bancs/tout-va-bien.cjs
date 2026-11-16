@@ -26,6 +26,8 @@ fs.mkdirSync(CAPT, { recursive: true });
 const ATTENDUE = (/const EXT_ATTENDUE = '([\d.]+)'/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8')) || [])[1];
 
 const H = 3600e3, M = 60e3;
+const UID = '11111111-2222-3333-4444-555555555555';
+const SESSION = { access_token: 'jeton-de-banc', refresh_token: 'r', expires_at: Date.now() + 3600e3, user: { id: UID, email: 'banc@exemple.test' } };
 const iso = (ilYa) => new Date(Date.now() - ilYa).toISOString();
 const ACCOUNTS = [
   { id: 1, vinted_user_id: '111', login: 'shop_test', domain: 'www.vinted.fr', updated_at: iso(0) },
@@ -92,8 +94,12 @@ async function scenario(b, scen, largeur, sombre) {
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   // (16 nov., intégration vague B) Le parcours de premier lancement (« Tu vends quoi ? ») est déjà fait : il couvrirait
   // tout l'écran (comme scripts/bancs/fiabilite-auto.cjs).
-  await pg.addInitScript((s) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_je_vends', JSON.stringify({ choix: 'sneakers', at: '2026-11-01T10:00:00Z', vu: 'banc' })); localStorage.setItem('vrm_configuration', JSON.stringify({ etat: 'fait', at: '2026-11-01T10:00:00.000Z', statut: null, version: 1 })); localStorage.setItem('vrm_bienvenue_vue', JSON.stringify({ at: new Date().toISOString() })); { const t = new Date().toISOString(); localStorage.setItem('vrm_parcours_plus_tard', JSON.stringify({ extension: t, emails: t, vinted: t, premiere: t, configuration: t, at: Date.now() })); } localStorage.setItem('vinted_dark', s ? 'true' : 'false'); } catch (_) {} }, sombre);
+  // (16 nov., finitions) Une SESSION, comme scripts/bancs/fiabilite-auto.cjs : sans elle la base passe pour injoignable
+  // (`baseKO`) et la feuille de la cloche ne porte pas la ligne de fraîcheur — « Voir » restait introuvable (4 rouges).
+  await pg.addInitScript(([s, sess]) => { try { localStorage.setItem('vrm_session', JSON.stringify(sess)); localStorage.setItem('vrm_mfa_plus_tard_' + sess.user.id, String(Date.now())); localStorage.setItem('vrm_je_vends', JSON.stringify({ choix: 'sneakers', at: '2026-11-01T10:00:00Z', vu: 'banc' })); localStorage.setItem('vrm_configuration', JSON.stringify({ etat: 'fait', at: '2026-11-01T10:00:00.000Z', statut: null, version: 1 })); localStorage.setItem('vrm_bienvenue_vue', JSON.stringify({ at: new Date().toISOString() })); { const t = new Date().toISOString(); localStorage.setItem('vrm_parcours_plus_tard', JSON.stringify({ extension: t, emails: t, vinted: t, premiere: t, configuration: t, at: Date.now() })); } localStorage.setItem('vinted_dark', s ? 'true' : 'false'); } catch (_) {} }, [sombre, SESSION]);
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
+  // (Playwright prend la DERNIÈRE route enregistrée en premier : celle de la connexion vient après la route générale.)
+  await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: SESSION.access_token, refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(d) });
@@ -121,20 +127,27 @@ async function scenario(b, scen, largeur, sombre) {
     await pg.screenshot({ path: path.join(CAPT, `tout-va-bien-alerte-${nom}.png`) });
     // (16 nov., intégration vague B) Julien, 14 nov. (AJOUT 3, 56e1ec66) : la ligne de fraîcheur quitte la tête de page — la
     // cloche porte son point ambre, SA feuille porte la ligne entière. On ouvre donc la cloche, puis « Voir ».
-    if (await alerte.count() && !(await alerte.locator('[data-alerte-voir]').first().isVisible().catch(() => false))) {
-      await pg.locator('[data-centre-notifs-cloche]:visible').first().click({ timeout: 5000 }).catch(async () => { await pg.evaluate(() => { const b = document.querySelector('[data-centre-notifs-cloche]'); if (b) b.click(); }); });
-      await pg.waitForSelector('[data-centre-fraicheur] [data-alerte-capture]', { timeout: 12000 }).catch(() => {});
+    // (16 nov., finitions) La coque garde une COPIE de la ligne, masquée (`.vrm-fraicheur-hote`, clip-path inset(50%)) :
+    // Playwright la dit « visible » (une boîte de 6 × 44 px) et le banc sautait la cloche, puis attendait un clic
+    // impossible. Tout se cherche donc DANS la feuille de la cloche (`[data-centre-fraicheur]`), jamais dans la copie.
+    const F = '[data-centre-fraicheur] ';
+    if (await alerte.count()) {
+      if (!(await pg.locator(F + '[data-alerte-capture]').count())) {
+        await pg.locator('[data-centre-notifs-cloche]:visible').first().click({ timeout: 5000 }).catch(async () => { await pg.evaluate(() => { const b = document.querySelector('[data-centre-notifs-cloche]'); if (b) b.click(); }); });
+      }
+      await pg.waitForSelector(F + '[data-alerte-capture]', { timeout: 12000 }).catch(() => {});
       await pg.waitForTimeout(400);
+      dit((await pg.locator(F + '[data-alerte-capture]').count()) === 1, `${nom} : la feuille de la cloche porte la ligne de fraîcheur`);
+      if (largeur === 390 && !sombre) await pg.screenshot({ path: path.join(CAPT, `tout-va-bien-cloche-${nom}.png`) });
     }
     // Plusieurs choses à revoir : la ligne se déplie, la rangée en panne s'ouvre, son geste (le même « Voir »).
-    if (await alerte.count() && !(await pg.locator('[data-alerte-capture] [data-alerte-voir]:visible').count())) {
-      // (la ligne de la feuille de la cloche, pas la copie masquée de la coque)
-      await pg.locator('[data-alerte-capture] [data-fraicheur-deplier]:visible').first().click().catch(() => {});
+    if (await alerte.count() && !(await pg.locator(F + '[data-alerte-voir]:visible').count())) {
+      await pg.locator(F + '[data-fraicheur-deplier]:visible').first().click().catch(() => {});
       await pg.waitForTimeout(400);
-      await pg.locator('[data-fraicheur-rangee="panne"] .vrm-fraicheur-rangee-tete:visible').first().click().catch(() => {});
+      await pg.locator(F + '[data-fraicheur-rangee="panne"] .vrm-fraicheur-rangee-tete:visible').first().click().catch(() => {});
       await pg.waitForTimeout(400);
     }
-    if (await alerte.count()) await pg.locator('[data-alerte-capture] [data-alerte-voir]:visible, [data-fraicheur-rangee="panne"] .vrm-fraicheur-rangee-bouton:visible').first().click({ timeout: 10000 });
+    if (await alerte.count()) await pg.locator(`${F}[data-alerte-voir]:visible, ${F}[data-fraicheur-rangee="panne"] .vrm-fraicheur-rangee-bouton:visible`).first().click({ timeout: 10000 });
   } else {
     await pg.waitForTimeout(2500);
     dit(!(await alerte.count()), `${nom} : aucune ligne ambre`);
