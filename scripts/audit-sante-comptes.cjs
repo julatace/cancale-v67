@@ -162,7 +162,8 @@ const dit = (ok, l, d) => { n++; if (!ok) ko++; console.log(`${ok ? '✅' : '❌
   const app = sansCommentaires(lire('src/App.jsx')), reg = sansCommentaires(lire('src/ecrans/Reglages.jsx')), stats = sansCommentaires(lire('src/ecrans/Stats.jsx'));
   dit(/<SanteComptes variante="reglages"/.test(reg) && /id:'santecomptes'/.test(reg), 'placement : Paramètres → Mes comptes');
   dit(/<SanteComptes variante="stats"\/>/.test(stats), 'placement : une carte dans Statistiques');
-  dit(/'sante-comptes': santeSurv\.length \? \[carteSanteComptes\(\)\] : \[\]/.test(app) && /className="vrm-day-task-note is-urgent" data-sous-ligne="sante-comptes"/.test(app), 'placement : Ma journée, seulement quand un compte glisse (ambre `is-urgent`)');
+  // (15 nov., refonte-journee, décision de Julien) la carte vit dans « Tout va bien ? » (`tvbCartes`), plus dans la liste.
+  dit(/\.\.\.\(santeSurv\.length \? \[carteSanteComptes\(\)\] : \[\]\)/.test(app) && /className="vrm-day-task-note is-urgent" data-sous-ligne="sante-comptes"/.test(app), 'placement : Ma journée → « Tout va bien ? », seulement quand un compte glisse (ambre `is-urgent`)');
   dit(!/method:\s*['"](POST|PATCH|PUT|DELETE)/i.test(jsx) && !/withOwner|modifierDonnee|save\(/.test(jsx), 'l’écran n’écrit rien en base');
   dit(!/api\/push|Notification\(|showNotification/.test(jsx), 'aucune nouvelle notification');
   dit(!/select=data(&|$|')/.test(jsx), 'jamais `select=data` (projections seulement)');

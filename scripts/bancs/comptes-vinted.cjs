@@ -142,10 +142,14 @@ const captureEl=async(pg,sel,nom)=>{ if(!CAPT) return; fs.mkdirSync(CAPT,{recurs
 const CARTE='[data-sv-carte="comptes-vinted"]';
 const lireTableau=(pg)=>pg.evaluate((sel)=>{ const c=document.querySelector(sel); if(!c) return null;
   const lignes=[...c.querySelectorAll('[data-cv-compte]')].map((r)=>({ uid:r.getAttribute('data-cv-compte'), n:r.getAttribute('data-cv-n'), prix:r.getAttribute('data-cv-prix'), delai:r.getAttribute('data-cv-delai'), dr:r.getAttribute('data-cv-delai-raison'), offres:r.getAttribute('data-cv-offres'), or:r.getAttribute('data-cv-offres-raison'), vrm:(r.querySelector('[data-cv-offres-vrm]')||{getAttribute:()=>null}).getAttribute('data-cv-offres-vrm'), vrmP:!!r.querySelector('[data-cv-offres-vrm-partiel]'), h:r.getBoundingClientRect().height }));
-  const couleurs=[...c.querySelectorAll('th,td')].map((e)=>getComputedStyle(e).color);
+  const couleurs=[...c.querySelectorAll('th,td,small')].map((e)=>getComputedStyle(e).color);
+  // (16 nov.) Les jetons NEUTRES de l'app (`--vrm-ink`, `--vrm-muted`) tels que la page les résout : le Verre dépoli
+  // les a teintés d'encre bleutée ; « aucune couleur » = rien d'autre que ces deux jetons (jamais l'accent, l'ambre, le rouge).
+  const jeton=(v)=>{ const x=document.createElement('span'); x.style.color=`var(${v})`; c.appendChild(x); const k=getComputedStyle(x).color; x.remove(); return k; };
+  const neutres=[jeton('--vrm-ink'), jeton('--vrm-muted')];
   const deb=c.scrollWidth>c.clientWidth+1 || document.documentElement.scrollWidth>window.innerWidth+1;
   const choix=[...c.querySelectorAll('[data-cv-choix]')].map((b)=>b.getBoundingClientRect().height);
-  return { periode:c.getAttribute('data-cv-periode'), etat:(c.querySelector('[data-cv-etat]')||{}).getAttribute?.('data-cv-etat'), lignes, couleurs:[...new Set(couleurs)], deb, choix, notes:[...c.querySelectorAll('[data-cv-note]')].map((n)=>n.getAttribute('data-cv-note')) };
+  return { periode:c.getAttribute('data-cv-periode'), etat:(c.querySelector('[data-cv-etat]')||{}).getAttribute?.('data-cv-etat'), lignes, couleurs:[...new Set(couleurs)], neutres, deb, choix, notes:[...c.querySelectorAll('[data-cv-note]')].map((n)=>n.getAttribute('data-cv-note')) };
 },CARTE);
 const attendreLu=(pg)=>pg.waitForFunction((sel)=>{ const c=document.querySelector(sel); return c && c.querySelector('[data-cv-etat="lu"]') && c.querySelector('[data-cv-compte="111"][data-cv-offres-raison]')===null; },CARTE,{timeout:20000}).catch(()=>{});
 
@@ -175,7 +179,7 @@ const attendreLu=(pg)=>pg.waitForFunction((sel)=>{ const c=document.querySelecto
         dit(L('222').vrm==='2' && !L('222').vrmP && r.notes.includes('offresvrm') && L('111').vrm===null, 'A6b paris_kicks : sous le « — », « 2 acceptées par VRM » (journal des gestes acceptés) et la note qui dit pourquoi ce n’est pas un taux ; atelier_sneak (taux lu) n’en a pas', JSON.stringify({ v:L('222').vrm, p:L('222').vrmP, n:r.notes }));
         // « Aucune couleur » : chaque texte du tableau est NEUTRE (gris ou encre, r ≈ g ≈ b), jamais teinté.
         const neutre=(c)=>{ const m=/rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(c); if(!m) return false; const v=[+m[1],+m[2],+m[3]]; return Math.max(...v)-Math.min(...v)<=10; };
-        dit(r.couleurs.length>0 && r.couleurs.every(neutre), 'A7 aucune couleur dans le tableau (encre ou gris seulement)', r.couleurs.join(' | '));
+        dit(r.couleurs.length>0 && r.couleurs.every((k)=>neutre(k) || r.neutres.includes(k)), 'A7 aucune couleur dans le tableau (encre ou gris de l’app seulement)', r.couleurs.join(' | ')+' · jetons '+r.neutres.join(' | '));
         dit(!r.deb, 'A8 aucun débordement horizontal');
         dit(r.choix.length===3 && r.choix.every((h)=>h>=(T.hasTouch?43.5:32)), `A9 trois choix de période, cibles ≥ ${T.hasTouch?44:32} px`, r.choix.join(','));
         dit(errs.length===0, 'A10 aucune erreur de page', errs.slice(0,2).join(' | '));

@@ -202,12 +202,20 @@ const publier = async (pg) => {
         });
         await essaie('journee', async () => {
           await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+          // (15 nov., refonte-journee, décision de Julien) La santé des comptes ne demande pas de geste AUJOURD'HUI :
+          // sa carte vit dans la feuille « Tout va bien ? » (la ligne discrète `data-tvb-ligne` de Ma journée).
+          await attendre(pg, '[data-tvb-ligne]');
+          await pg.click('[data-tvb-ligne]').catch(() => {});
           await attendre(pg, '[data-journee-sante]');
           await pg.waitForTimeout(600);
           const s = await pg.evaluate(() => { const x = document.querySelector('[data-journee-sante]'); if (!x) return null; const n = x.querySelector('[data-sous-ligne="sante-comptes"]'); return { uids: x.getAttribute('data-journee-sante'), t: x.innerText, c: n && getComputedStyle(n, '::before').backgroundColor, urgent: !!(n && n.classList.contains('is-urgent')), geste: x.getAttribute('data-sc-geste'), h: x.getBoundingClientRect().height }; });
-          dit(s && s.uids === '222' && /compte_b à surveiller/.test(s.t) && /2 colis envoyés après la date limite/.test(s.t), 'Ma journée : UNE ligne « compte_b à surveiller » et LA raison', JSON.stringify(s));
+          dit(s && s.uids === '222' && /compte_b à surveiller/.test(s.t) && /2 colis envoyés après la date limite/.test(s.t), 'Ma journée → « Tout va bien ? » : UNE ligne « compte_b à surveiller » et LA raison', JSON.stringify(s));
           const ambre = s && (() => { const [r, g, bb] = (/rgba?\(([^)]+)\)/.exec(s.c) || [, ''])[1].split(',').map(Number); return r > 150 && g > 60 && g < 160 && bb < 80; })();
-          dit(ambre && s.urgent, 'Ma journée : la raison porte le point AMBRE (`is-urgent`, la forme des autres gestes)', s && s.c);
+          // (15 nov., refonte « Tout va bien ? ») La feuille ne dessine plus de point (ses cartes ne sont pas des gestes du
+          // jour) : la raison reste MARQUÉE `is-urgent` (la même forme que les autres), jamais rouge (§7).
+          void ambre;
+          const rouge = s && (() => { const m = /rgba?\(([^)]+)\)/.exec(s.c || ''); if (!m) return false; const [r, g, bb, a] = m[1].split(',').map(Number); return a !== 0 && r > 180 && g < 80 && bb < 80; })();
+          dit(s && s.urgent && !rouge, 'Ma journée → « Tout va bien ? » : la raison est marquée `is-urgent` (la forme des autres gestes), jamais rouge', s && s.c);
           const el = await pg.$('[data-journee-sante]'); if (el) await el.screenshot({ path: path.join(SHOTS, `journee-${suf}.png`) });
           await sain(pg, `${nom} Ma journée`, '[data-journee-sante]');
         });
