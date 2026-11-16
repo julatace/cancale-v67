@@ -13884,11 +13884,17 @@ const placeMentionVrm = (rendu, bw, bh, interdits) => {
 const MM_M = 72 / 25.4;   // (MM_PT est déclaré plus bas : une constante lue à l'initialisation ne peut pas s'en servir)
 const MENTION2 = { gris: 0.42, tailleTh: 5.5, marge: 1.2 * MM_M, gardeQrMin: 3 * MM_M, glisse: 8 * MM_M, pas: 0.5 * MM_M };
 // Une boîte (points) de `rendu` touche-t-elle l'encre ? (luminance < 200, comme la recherche du tampon)
+// Comme la recherche du tampon (`trouverZoneBlanche`) : par cases de 3 px, une case est de l'encre si au moins 2 de ses
+// pixels le sont — un point isolé (le grain d'un scan) n'en est pas, un trait l'est. Rend le nombre de cases d'encre.
 const encreDans = (rendu, b) => {
-  const { pixels: d, w, h, s } = rendu; let n = 0;
+  const { pixels: d, w, h, s } = rendu; let n = 0; const k = TAMPON.cellule;
   const x0 = Math.max(0, Math.floor(b.x * s)), y0 = Math.max(0, Math.floor(b.y * s)), x1 = Math.min(w, Math.ceil((b.x + b.w) * s)), y1 = Math.min(h, Math.ceil((b.y + b.h) * s));
   if (x1 <= x0 || y1 <= y0) return 1e9;
-  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) { const i = (y * w + x) * 4; if (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2] < 200) n++; }
+  for (let cy = y0; cy < y1; cy += k) for (let cx = x0; cx < x1; cx += k) {
+    let m = 0;
+    for (let y = cy; y < Math.min(y1, cy + k) && m < 2; y++) for (let x = cx; x < Math.min(x1, cx + k) && m < 2; x++) { const i = (y * w + x) * 4; if (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2] < 200) m++; }
+    if (m >= 2) n++;
+  }
   return n;
 };
 // Un QR (ou un DataMatrix) : un code à peu près carré. Sa boîte est AFFINÉE sur ses vrais pixels noirs : la carte
@@ -13966,7 +13972,7 @@ const placerMentionDefaut = (rendu, bw, bh, o = {}) => {
   const interdits = o.interdits || [];
   const libre = (x, y) => x >= B && y >= B && x + bw <= W - B && y + bh <= H - B
     && !interdits.some((z) => x < z.x + z.w && x + bw > z.x && y < z.y + z.h && y + bh > z.y)
-    && encreDans(rendu, { x: x - M, y: y - M, w: bw + 2 * M, h: bh + 2 * M }) <= 2;
+    && encreDans(rendu, { x: x - M, y: y - M, w: bw + 2 * M, h: bh + 2 * M }) === 0;
   const qrs = (o.codes || []).filter((q) => q.qr).sort((a, b) => (b.w * b.h - a.w * a.h) || (a.y - b.y) || (a.x - b.x));
   const q = qrs[0];
   if (q) {
@@ -13975,10 +13981,14 @@ const placerMentionDefaut = (rendu, bw, bh, o = {}) => {
     for (let d = 0; d <= MENTION2.glisse; d += MENTION2.pas) { const y = q.y - garde - bh - d; if (libre(x, y)) return { x, y, via: 'qr-dessus', qr: q }; }
     for (let d = 0; d <= MENTION2.glisse; d += MENTION2.pas) { const y = q.y + q.h + garde + d; if (libre(x, y)) return { x, y, via: 'qr-dessous', qr: q }; }
   }
-  const C = o.cadre || { x: 0, y: 0, w: W, h: H }, x = C.x + C.w / 2 - bw / 2;
+  // ③ Centrée sur l'étiquette, sous l'adresse (sinon sous la moitié haute) ; on DESCEND jusqu'à la première bande blanche
+  // suffisante (Julien : « descends jusqu'à la première bande blanche suffisante, toujours centré »), avec 3 mm de blanc
+  // autour (jamais collée à un texte qu'on ne sait pas lire : un scan n'a pas de texte).
+  const C = o.cadre || { x: 0, y: 0, w: W, h: H }, x = C.x + C.w / 2 - bw / 2, M2 = 3 * MM_M;
+  const libre2 = (xx, y) => libre(xx, y) && encreDans(rendu, { x: xx - M2, y: y - M2, w: bw + 2 * M2, h: bh + 2 * M2 }) === 0;
   const ad = (o.adresses || []).filter((z) => z.x < C.x + C.w && z.x + z.w > C.x && z.y < C.y + C.h && z.y + z.h > C.y);
-  const y0 = ad.length ? Math.max(...ad.map((z) => z.y + z.h)) + M : C.y + C.h / 2;
-  for (let y = y0; y + bh <= C.y + C.h; y += MENTION2.pas) if (libre(x, y)) return { x, y, via: ad.length ? 'adresse' : 'milieu', qr: null };
+  const y0 = ad.length ? Math.max(...ad.map((z) => z.y + z.h)) + M2 : C.y + C.h / 2;
+  for (let y = y0; y + bh <= H - B; y += MENTION2.pas) if (libre2(x, y)) return { x, y, via: ad.length ? 'adresse' : 'milieu', qr: null };
   return null;
 };
 // Pose la mention sur la page 1 (après ou avant le cartouche, voir `tamponnerBordereau`). `rendu` : la page AVANT
@@ -14187,11 +14197,14 @@ const tamponnerBordereau = async (PL, pdf, { numero, titre, thermique = false, c
   let rendu = null, renduErr = null; try { rendu = await rendrePremierePage(pdf); } catch (e) { renduErr = e; }
   const adresses = [...((th && th.adresses) || []), ...(T.adresses || [])];
   const zi = rendu ? zonesInterditesTampon(rendu, adresses) : { codes: [], interdits: adresses.map((a) => ({ ...a, quoi: 'adresse' })) };
-  const interdits = [...zi.interdits, ...(bloques || []).map((z) => ({ ...z, quoi: z.quoi || 'bloque' }))];
+  // Les « codes » de l'étiquette posée (thermique) repassent le même tri : un pavé de texte serré n'est pas un code.
+  const bloquesVrais = (bloques || []).filter((z) => z.quoi !== 'code' || !rendu || estUnCode(rendu, z));
+  const interdits = [...zi.interdits, ...bloquesVrais.map((z) => ({ ...z, quoi: z.quoi || 'bloque' }))];
   const cadre = (th && th.boite) || T.cadre || null;
   // (La mention garde la zone de silence MESURÉE de chaque QR, pas les 5 mm forfaitaires du cartouche.)
-  const interditsM = [...zi.interdits, ...(bloques || []).filter((z) => z.quoi !== 'code')];
-  const mentionO = { th: !!th, marge: th && th.marge, k: T.kMention, place: T.placeMention, libre: T.libreMention, codes: zi.codes, interdits: interditsM, cadre, adresses };
+  const interditsM = [...zi.interdits, ...bloquesVrais.filter((z) => z.quoi !== 'code')];
+  // (Sur une imprimante thermique, même la page entière : la mention en noir fin — une tête thermique tramerait le gris.)
+  const mentionO = { th: !!th || !!thermique, marge: th && th.marge, k: T.kMention, place: T.placeMention, libre: T.libreMention, codes: zi.codes, interdits: interditsM, cadre, adresses };
   const fin = (r, mb) => ({ ...r, mention: !!mb, mentionBoite: mb || null, interdits, codes: zi.codes });
   // ① Le cartouche posé À LA MAIN : à sa place (fond blanc dessous, même sur du texte — son choix), repoussé hors
   // des codes, des QR et de l'adresse ; la mention vient ensuite, à côté de lui.
@@ -46856,7 +46869,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const imprimerApercu = () => {
     const a = apercuRef.current; if (!a || imprBusy) return;
     const { choisies, format, tampons, places } = a;
-    const sig = sigAvecPlaces(sigImpr(choisies, format, tampons), places);
+    // LE PDF que l'aperçu montre (sa signature, posée au dernier geste) : pas une signature recalculée — un réglage écrit
+    // un instant après (`save`) la changerait, et le PDF prêt ne serait plus reconnu (au téléphone, plus rien ne s'ouvrirait
+    // dans le geste).
+    const sig = a.sig || sigAvecPlaces(sigImpr(choisies, format, tampons), places);
     const numeros = choisies.map((l) => l.num);
     const pret = pretPour(sig);
     setApercuImpr(null);

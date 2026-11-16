@@ -99,7 +99,55 @@ recouvre le bas et les bords. »
 Textes par `tr()` (src/i18n/langues/*/tampons.js, 5 langues). Quoi de neuf : `tampons-apercu`, `tampons-mention-qr`.
 
 ## 3. Preuves
-(complétées ci-dessous au fil des passages)
+
+### La mention : planches AVANT / APRÈS (rendues par le vrai code, regardées)
+Bordereaux d'exemple de chaque type (formes reconstruites, aucune donnée réelle), imprimés par `poserBordereau` puis
+rendus à 203 dpi (`scripts/bancs/tampons-reglages.cjs`, `CAPTURES=`) :
+
+| | |
+|---|---|
+| AVANT (main) — A4 : la mention minuscule en bas à droite de la notice, loin de tout, ou nulle part | ![avant A4](img/2026-11-16-tampons/avant-a4.png) |
+| AVANT (main) — 10×15 : jamais de mention sur une page-étiquette | ![avant 10×15](img/2026-11-16-tampons/avant-10x15.png) |
+| APRÈS — A4 | ![après A4](img/2026-11-16-tampons/apres-a4.png) |
+| APRÈS — 4 par page | ![après 4 par page](img/2026-11-16-tampons/apres-planche4.png) |
+| APRÈS — thermique 10×15 | ![après 10×15](img/2026-11-16-tampons/apres-10x15.png) |
+| APRÈS — 10×10 | ![après 10×10](img/2026-11-16-tampons/apres-10x10.png) |
+| APRÈS — 100×150 avec marge | ![après 10×15 marge](img/2026-11-16-tampons/apres-10x15m.png) |
+| APRÈS — Dymo 4XL | ![après Dymo](img/2026-11-16-tampons/apres-dymo4xl.png) |
+| APRÈS — Brother 62 mm continu | ![après Brother](img/2026-11-16-tampons/apres-ql62.png) |
+
+Compte du banc sur les 11 types × 7 supports (77 bordereaux) : AVANT **0 au-dessus du QR, 7 ailleurs, 15 absentes** (sur
+A4 + 10×15) ; APRÈS **67 au-dessus du QR, 10 juste dessous** (dessus pris : Vestiaire tourné, Relais Colis couché,
+étiquettes serrées), **0 ailleurs, 0 absente**. Vu sur les planches : un premier passage avait pris le code-barres agrandi
+d'une Dymo pour un QR (mention au-dessus du code-barres) — corrigé (`alterneDeuxSens` : un QR alterne dans les deux sens),
+puis un titre gras et « 24R » pris pour des codes (refus d'un tampon posé sur du texte) — corrigé (`estUnCode` : barres
+pleines, ou QR sans ligne ni colonne vide, page tournée comprise).
+
+### Bancs et tests
+- **`tampons-reglages.cjs`** (vrai code, Chromium + pdf.js, 203 dpi) : **703 verts, 0 rouge** sur 11 types × 7 supports
+  + les réglages. Par bordereau : QR décodé après tampons (jsQR, chaque QR d'une feuille à deux), code-barres lu (ITF),
+  **aucun pixel changé** sur QR + 4 modules et code-barres + zone de silence (comparé au même sans tampon), mention
+  écrite, **centrée sur l'axe du QR (écart ≤ 2 %)**, juste au-dessus (ou dessous) hors zone de silence (2,5–16 mm),
+  petite (4,5–7,5 pt), N° écrit hors du QR, RETOUR marqué. Réglages : N° seul sans mention, taille L, place « bas-droite »,
+  place à la main imprimée à cet endroit, place à la main SUR le QR repoussée (QR lu), mention SUR le QR repoussée,
+  exception « seulement Mondial Relay », migration (`tamponA4`, `vrm_tampon_positions`), place de l'aperçu pour CE
+  bordereau (avec un `choisir` comme le lot), RETOUR même tout décoché (A4 et thermique).
+  - **Arbre d'avant** (`git archive origin/main`, banc copié) : **142 verts, 29 rouges** (mention absente ou ailleurs).
+  - **Mutations** : `mentionSurQr` 45 rouges (QR touché, mention pas au-dessus) · `ignoreReglage` 9 rouges · `retourSansRetour`
+    2 rouges · `sansRepousse` 2 rouges.
+- **`tampons-apercu.cjs`** (app construite, 1512 souris et 390 tactile par vrais points de contact CDP) : voir « ÉTAT ».
+- **`tampon-bordereau.cjs`** (CI) porté sur la nouvelle règle (mention au-dessus du QR, centrée ; référence sans tampon
+  vraiment vide ; places dans `vrm_tampons`) ; mutation `mentionAveugle` : 18 rouges.
+- **`thermique.cjs`** : 403 verts, 0 rouge (mutation `sansBloques` portée : les codes sont gardés deux fois).
+- **`audit-tampons.cjs`** (neuf) : 20 verts ; `--prouve` 11/11 mutations rouges (SYNC_KEYS, ancien réglage relu, appel
+  sans tampon, réglage ignoré, RETOUR, empreinte, impression sans aperçu, places ignorées ×2, repousser, textes).
+- Portés sur la règle (Julien a changé le parcours : l'aperçu avant impression) : `impression-simple` (33 verts sur
+  A, B, C), `tout-imprimer` (29), `selection-bordereaux` (49), `colis-plus`, `lot-bordereaux`, `lbc-bordereau`,
+  `ventes-bordereau`, `vestiaire-parite`, `colis-a-leur-place`, `accompagnement`, `feuilles-coque`, `imprimante`,
+  `tampon-libre` (son parcours est joué par `tampons-apercu`), `scripts/tests/lot-preparation-reprise.cjs` (vert),
+  `scripts/tests/bordereau-qr-lecture.cjs` (règles d'impression jointes ; la 10×15 porte désormais la mention, le QR doit
+  se lire), audits `impression`, `colis-plus`, `colis-trois`, `selection-bordereaux`, `impression-carton` (sa fenêtre de
+  recherche était trop courte : rouge aussi sur main, réparé).
 
 ## Non fait, dit
 - **Rotation du tampon** : pas proposée. Le cartouche s'écrit toujours dans le sens de lecture de la page (rotation /Rotate

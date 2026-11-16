@@ -34,9 +34,9 @@ function juger(src) {
   dit(/if \(imp\.retour\) imp\.ts = \{ \.\.\.imp\.ts, contenu: \{ \.\.\.imp\.ts\.contenu, num: true, titre: true \} \}/.test(pb), 'T4 un RETOUR garde toujours « RETOUR » (N° et titre écrits)');
   dit(/empreinteReglagesImpr = \(\) => [^\n]*reglageTamponsChoisi\(\)/.test(As), 'T5 l’empreinte du PDF préparé compte le réglage des tampons');
   const li = As.slice(As.indexOf('const lancerImpression = (cles, format'), As.indexOf('const imprimerApercu = () =>'));
-  dit(/setApercuImpr\(\{ choisies, format, tampons, places: \{\}, tous: true, sig \}\)/.test(li) && !/ouvrirPdfLot|attendrePuisOuvrir/.test(li), 'T6 la sélection ouvre l’aperçu, rien n’est imprimé sans « Imprimer »');
+  dit(/setApercuImpr\(\{ choisies, format, tampons, places: \{\}, tous: true, sig(?:, proprio)? \}\)/.test(li) && !/ouvrirPdfLot|attendrePuisOuvrir/.test(li), 'T6 la sélection ouvre l’aperçu, rien n’est imprimé sans « Imprimer »');
   const ia = As.slice(As.indexOf('const imprimerApercu = () =>'), As.indexOf('const poserApercu = '));
-  dit(/sigAvecPlaces\(sigImpr\(choisies, format, tampons\), places\)/.test(ia) && /composerLot\(choisies, format, tampons, \{ places,/.test(ia), 'T6 « Imprimer » de l’aperçu : le PDF de SES placements');
+  dit(/const sig = a\.sig \|\| sigAvecPlaces\(sigImpr\(choisies, format, tampons\), places\)/.test(ia) && /composerLot\(choisies, format, tampons, \{ places,/.test(ia), 'T6 « Imprimer » de l’aperçu : le PDF de SES placements');
   dit(/const choix = pos \|\| \(imp\.places && imp\.places\.n !== undefined \? td\.libreN : choisir/.test(As) && /const choix = imp && imp\.places && imp\.places\.n !== undefined \? td\.libreN : choisir/.test(As), 'T6 la place posée dans l’aperçu prime sur la place gardée (A4 et thermique)');
   dit(/places: places && places\[l\.cle\] \? places\[l\.cle\] : null/.test(As) && /if \(it\.places\) impIt\.places = it\.places;/.test(As) && /pi = imp\.places \|\| \{\}/.test(As), 'T6 les places de l’aperçu vont jusqu’au tampon');
   // T7 — règles pures, exécutées
@@ -80,7 +80,7 @@ function juger(src) {
       ['T4', (s) => ({ ...s, app: s.app.replace('imp.tampons = (impression && impression.tampons) || reglageTamponsChoisi();', 'imp.tampons = reglageTampons(null);') })],
       ['T4', (s) => ({ ...s, app: s.app.replace('if (imp.retour) imp.ts = { ...imp.ts, contenu: { ...imp.ts.contenu, num: true, titre: true } };', '') })],
       ['T5', (s) => ({ ...s, app: s.app.replace('JSON.stringify([aEcrire(reglageTamponsChoisi()), reglageImpressionChoisi()])', 'JSON.stringify([reglageImpressionChoisi()])') })],
-      ['T6', (s) => ({ ...s, app: s.app.replace("    setApercuImpr({ choisies, format, tampons, places: {}, tous: true, sig });\n  };", "    attendrePuisOuvrir(sig, choisies, [], () => null);\n  };") })],
+      ['T6', (s) => ({ ...s, app: s.app.replace("    setApercuImpr({ choisies, format, tampons, places: {}, tous: true, sig, proprio });", "    attendrePuisOuvrir(sig, choisies, [], () => null);") })],
       ['T6', (s) => ({ ...s, app: s.app.replace('composerLot(choisies, format, tampons, { places, pas:', 'composerLot(choisies, format, tampons, { pas:') })],
       ['T6', (s) => ({ ...s, app: s.app.replace('const choix = pos || (imp.places && imp.places.n !== undefined ? td.libreN : choisir ?', 'const choix = pos || (false ? td.libreN : choisir ?') })],
       ['T7', (s) => ({ ...s, T: { ...s.T, repousserHorsInterdits: (b) => ({ x: b.x, y: b.y, repousse: true }) } })],

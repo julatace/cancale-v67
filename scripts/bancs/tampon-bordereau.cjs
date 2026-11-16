@@ -81,7 +81,7 @@ if (MUT === 'seuilStrict') tampon = muter(tampon, 'encre: 200, cellule: 3,', 'en
 // (11 nov.) LA MENTION « Créé par VRM » : posée à l'aveugle (rien n'est de l'encre,
 // aucune zone gardée) ou sans masquer l'étiquette à découper ⇒ rouge.
 // (16 nov., lot tampons-parametres) La mention au-dessus du QR : sans regarder l'encre ⇒ rouge ; sans s'écarter du cartouche ⇒ rouge.
-if (MUT === 'mentionAveugle') tampon = muter(tampon, '    && encreDans(rendu, { x: x - M, y: y - M, w: bw + 2 * M, h: bh + 2 * M }) <= 2;', '    && true;', MUT);
+if (MUT === 'mentionAveugle') tampon = muter(tampon, '    && encreDans(rendu, { x: x - M, y: y - M, w: bw + 2 * M, h: bh + 2 * M }) === 0;', '    && true;', MUT);
 if (MUT === 'mentionCollee') tampon = muter(tampon, 'if (o.evite) interdits.push(elargir(o.evite, 3 * MM_M));', '', MUT);
 // (3 nov., soir) LE TAMPON LIBRE : la place choisie à la main, la forme, la
 // mémoire par forme (`choisirTampon`). Absent du code d'avant ⇒ rouge, pas un plantage.
@@ -273,7 +273,11 @@ async function libre(pg, pdfs) {
   const b64 = (n) => Buffer.from(pdfs[n]).toString('base64');
   const imprimer = (n, th, o) => pg.evaluate(([x, t, nu, ti, oo]) => __libreImprimer(x, t, nu, ti, oo), [b64(n), th, NUMERO, TITRE, o]);
   const N = (r) => r.items.find((x) => /B125/.test(x.s));
-  const posJuste = (t, r, ch) => { const n = N(r), e = attenduN(r, ch); dit(!!n && proche(n.x, e.x, 2) && proche(n.y, e.y, 2) && proche(n.t, e.t, 0.8), `${t} : le N° est à la place choisie (±2 pt)`, n ? `N° à (${n.x.toFixed(1)}, ${n.y.toFixed(1)}) ${n.t.toFixed(1)} pt, attendu (${e.x.toFixed(1)}, ${e.y.toFixed(1)}) ${e.t.toFixed(1)} pt` : 'N° absent'); dit(!!n && n.droit, `${t} : le N° se lit à l'endroit`); };
+  // (16 nov., garde-fou de Julien) Une place qui toucherait un code, un QR ou une adresse est REPOUSSÉE (dit : `repousse`) :
+  // le N° est alors à la place libre la plus proche, à la même taille ; sinon à la place choisie, au point près.
+  const posJuste = (t, r, ch) => { const n = N(r), e = attenduN(r, ch), pose = r.r0 && r.r0.poses && r.r0.poses[0];
+    if (pose && pose.repousse) { dit(!!n && proche(n.t, e.t, 0.8) && pose.mode === 'libre', `${t} : la place touchait un code ou une adresse ⇒ repoussée juste à côté, même taille`, n ? `N° à (${n.x.toFixed(1)}, ${n.y.toFixed(1)})` : 'N° absent'); dit(!!n && n.droit, `${t} : le N° se lit à l'endroit`); return; }
+    dit(!!n && proche(n.x, e.x, 2) && proche(n.y, e.y, 2) && proche(n.t, e.t, 0.8), `${t} : le N° est à la place choisie (±2 pt)`, n ? `N° à (${n.x.toFixed(1)}, ${n.y.toFixed(1)}) ${n.t.toFixed(1)} pt, attendu (${e.x.toFixed(1)}, ${e.y.toFixed(1)}) ${e.t.toFixed(1)} pt` : 'N° absent'); dit(!!n && n.droit, `${t} : le N° se lit à l'endroit`); };
   // L1 — sur du TEXTE (A4 couverte d'un bord à l'autre) : posé, fond opaque, rien d'autre ne bouge.
   const CH = { vx: 0.25, vy: 0.45, vw: 0.4, v: 0 };
   const r1 = await imprimer('a4-pleine', false, { choix: CH });
@@ -300,9 +304,10 @@ async function libre(pg, pdfs) {
   const r2b = await imprimer('tournee-90-pleine', false, { choix: CH2 });
   posJuste('page /Rotate 90', r2b, CH2);
   // L3 — thermique, étiquette découpée en 100×150 : posé sur l'étiquette, pas de fiche.
-  const r3 = await imprimer('pleine-10x15', true, { choix: { vx: 0.05, vy: 0.55, vw: 0.6, v: 0 } });
-  dit(r3.r0 && r3.r0.tampons.every((x) => x === 'libre') && proche(r3.W, 283.46, 1) && proche(r3.H, 425.2, 1), 'thermique : posé sur l\'étiquette 100×150, aucune fiche, même taille', JSON.stringify(r3.r0) + ` ${r3.pages} p. ${r3.W}×${r3.H}`);
-  posJuste('thermique', r3, { vx: 0.05, vy: 0.55, vw: 0.6, v: 0 });
+  // (16 nov.) Hors de la zone de silence du QR (à droite) : une place sur du texte seulement, posée telle quelle.
+  const r3 = await imprimer('pleine-10x15', true, { choix: { vx: 0.05, vy: 0.55, vw: 0.45, v: 0 } });
+  dit(r3.r0 && r3.r0.tampons.every((x) => x === 'libre') && proche(r3.W, 283.46, 1) && proche(r3.H, 425.2, 1), 'thermique : posé sur l\'étiquette 100×150, aucune fiche, même taille', JSON.stringify(r3.r0 && r3.r0.poses ? r3.r0.poses.map((p) => (p.interdits || []).map((z) => [z.quoi, Math.round(z.x), Math.round(z.y), Math.round(z.w), Math.round(z.h)])) : r3.r0) + ` ${r3.pages} p. ${r3.W}×${r3.H}`);
+  posJuste('thermique', r3, { vx: 0.05, vy: 0.55, vw: 0.45, v: 0 });
   // L4 — « Toujours ici » : la forme suivante reprend la place ; une autre forme ⇒ choix auto.
   await pg.evaluate(() => { __libre.vider(); window.__appels = 0; __libre.placeur((q) => { window.__appels++; window.__derniere = q.forme; q.resolve({ choix: { vx: 0.3, vy: 0.5, vw: 0.35, v: 0 }, toujours: true }); }); });
   const CH4 = { vx: 0.3, vy: 0.5, vw: 0.35, v: 0 };
@@ -390,7 +395,8 @@ async function juger(pg, nom, b64, thermique, attendu) {
   // en zone libre. Les zones gardées (code, QR, adresse, suivi) : contrôle 3.
   {
     const men = z.pages.flatMap((p, i) => p.items.filter((x) => /Créé par vrm\.center/.test(x.s)).map((x) => ({ ...x, page: i, pw: p.w, ph: p.h })));
-    const att = thermique ? (issue === 'blanc' ? null : false) : MENTION_ATTENDUE[nom];
+    // (16 nov.) En thermique aussi, la mention est posée dès qu'une place SÛRE existe (au-dessus du QR, sinon dessous, sinon sous l'adresse).
+    const att = thermique ? null : MENTION_ATTENDUE[nom];
     if (att === true) dit(men.length === 1, `${t} : la mention « Créé par vrm.center » est posée (place sûre)`, `${men.length} mention(s)`);
     if (att === false) dit(men.length === 0, `${t} : pas de place sûre ⇒ aucune mention`, `${men.length} mention(s)`);
     dit(men.length <= 1 && men.every((m) => m.page === 0), `${t} : la mention n'existe qu'une fois, page 1`, men.map((m) => `p${m.page + 1}`).join(' ') || 'aucune');
@@ -400,11 +406,14 @@ async function juger(pg, nom, b64, thermique, attendu) {
       const boite = { x: m.x, y: m.y - m.t, w: m.l, h: m.t * 1.25 };
       const nn = items.filter((x) => /B125|Nike Air Max 1/.test(x.s) && z.pages[0].items.includes(x));
       const loin = nn.every((x) => { const dx = Math.max(0, x.x - (boite.x + boite.w), boite.x - (x.x + x.l)), dy = Math.max(0, (x.y - x.t) - (boite.y + boite.h), boite.y - x.y); return Math.hypot(dx, dy) >= 2 * 72 / 25.4; });
-      dit(nn.length > 0 && loin, `${t} : mention jamais collée au N°/titre (≥ 2 mm)`, `mention à (${m.x.toFixed(0)}, ${m.y.toFixed(0)})`);
-      const q = !thermique && QR_AFFICHE[nom];
+      dit(loin, `${t} : mention jamais collée au N°/titre (≥ 2 mm)`, `mention à (${m.x.toFixed(0)}, ${m.y.toFixed(0)})`);
+      const q = !thermique && QR_AFFICHE[nom], e = !thermique && ETIQUETTE_AFFICHEE[nom];
       if (q) {
-        const ecart = Math.abs((boite.x + boite.w / 2) - (q.x + q.w / 2)) / m.pw, gap = q.y - (boite.y + boite.h);
-        dit(ecart <= 0.02 && gap >= 2.5 * 72 / 25.4 && gap <= 16 * 72 / 25.4, `${t} : mention juste AU-DESSUS du QR, centrée sur son axe (écart ${(ecart * 100).toFixed(2)} %, ${(gap * 25.4 / 72).toFixed(1)} mm)`);
+        // Au-dessus du QR (dessus libre), sinon juste dessous, sinon centrée sur l'étiquette en descendant (bande blanche).
+        const mm = 72 / 25.4, cx = boite.x + boite.w / 2, ecart = Math.abs(cx - (q.x + q.w / 2)) / m.pw, dessus = q.y - (boite.y + boite.h), dessous = boite.y - (q.y + q.h);
+        const pres = ecart <= 0.02 && ((dessus >= 2.5 * mm && dessus <= 16 * mm) || (dessous >= 2.5 * mm && dessous <= 16 * mm));
+        const centreEtiq = e && Math.abs(cx - (e.x + e.w / 2)) / m.pw <= 0.02;
+        dit(pres || centreEtiq, `${t} : mention au-dessus (ou dessous) du QR, centrée sur son axe — sinon centrée sous l'étiquette`, `écart QR ${(ecart * 100).toFixed(1)} % · dessus ${(dessus / mm).toFixed(1)} mm · dessous ${(dessous / mm).toFixed(1)} mm`);
       }
       const bord = thermique ? 4 : 14;   // thermique : 1,5 mm ; A4 : 5 mm
       dit(boite.x >= bord && boite.y >= bord && boite.x + boite.w <= m.pw - bord && boite.y + boite.h <= m.ph - bord, `${t} : mention hors de la marge non imprimable`);
