@@ -131,8 +131,16 @@ async function contexte(b, vp, theme) {
 const shot = (pg, nom) => pg.screenshot({ path: path.join(SHOTS, nom + '.png'), fullPage: false }).catch(() => {});
 const aller = (pg, tab) => pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
 const CARTE = '[data-a-trancher-carte="supprimes-vinted"][data-a-trancher-id="7002"]';
+// (16 nov., bancs-rouges-a) « À trancher » a quitté la liste de Ma journée (15 nov., refonte-journee : ce qui ne demande pas
+// de geste aujourd'hui) pour la feuille « Tout va bien ? » (`data-tvb-ligne`) — les MÊMES cartes. Le banc l'ouvre comme lui.
+const voirTrancher = async (pg) => {
+  if (await pg.locator('[data-job="a-trancher"]').first().isVisible().catch(() => false)) return;
+  await pg.waitForSelector('[data-tvb-ligne]', { timeout: 40000 });
+  await pg.click('[data-tvb-ligne]');
+  await pg.waitForSelector('[data-job="a-trancher"]', { timeout: 20000 });
+};
 const ouvrirTrancher = async (pg) => {
-  await pg.waitForSelector('[data-job="a-trancher"]', { timeout: 40000 });
+  await voirTrancher(pg);
   if ((await pg.getAttribute('[data-job="a-trancher"]', 'aria-expanded')) !== 'true') await pg.click('[data-job="a-trancher"]');
   await pg.waitForSelector(CARTE, { timeout: 20000 });
 };
@@ -184,7 +192,7 @@ const attendrePartie = async (pg, ms) => { const vu = []; for (let t = 0; t < ms
     const { ctx, MAIN } = await contexte(b, vp, theme);
     const pg = await ctx.newPage(); const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
     await aller(pg, 'journee');
-    await pg.waitForSelector('[data-job="a-trancher"]', { timeout: 40000 });
+    await voirTrancher(pg);
     await pg.waitForTimeout(1500);
     const avant = await pg.evaluate(() => ({ cycle: !!document.querySelector('[data-job="supprime-vinted"], [data-cycle-groupe]'), ouvert: document.querySelector('[data-job="a-trancher"]').getAttribute('aria-expanded') }));
     dit(!avant.cycle, `J ${nom} : plus de seconde carte « supprimé de Vinted » (le doute est dans « à trancher », une fois)`);
@@ -224,7 +232,12 @@ const attendrePartie = async (pg, ms) => { const vu = []; for (let t = 0; t < ms
     await aller(pg, 'journee'); await ouvrirTrancher(pg);
     await pg.click(CARTE + ' [data-a-trancher-oui]');
     await pg.waitForSelector('[data-pilule-annuler]', { timeout: 5000 });
-    if (vp.width < 600) await pg.tap('[data-pilule-annuler]'); else await pg.click('[data-pilule-annuler]');
+    // (16 nov., bancs-rouges-a) Sous charge, l'entrée animée de la pilule n'était pas « stable » avant qu'elle parte toute
+    // seule (Playwright : « not stable », puis « detached »). On juge ce qui compte — rien ne recouvre « Annuler » au point
+    // touché — puis on touche sans attendre la fin de l'animation.
+    const libre = await pg.evaluate(() => { const b = document.querySelector('[data-pilule-annuler]'); const q = b.getBoundingClientRect(); const h = document.elementFromPoint(q.x + q.width / 2, q.y + q.height / 2); return !!h && (h === b || b.contains(h)); });
+    dit(libre, `P ${nom} : rien ne recouvre « Annuler » de la pilule`);
+    if (vp.width < 600) await pg.tap('[data-pilule-annuler]', { force: true }); else await pg.click('[data-pilule-annuler]', { force: true });
     if (vp.width >= 600) await pg.mouse.move(vp.width / 2, 200);
     await pg.waitForSelector(CARTE, { timeout: 15000 }).catch(() => {});
     const t1 = await attendrePartie(pg, 7000);
