@@ -254,10 +254,15 @@ async function widget() {
       const toutes = [];
       // Ma journée
       { const { ctx, pg, errs } = await ouvrir(b, vp, 'journee');
-        await attendre(pg, () => { const e = document.querySelector('[data-tuile="envoyer"]'); return e && e.getAttribute('data-n') && document.querySelector('[data-journee-a-imprimer]') && document.querySelector('[data-journee-a-imprimer]').getAttribute('data-exact') === '1'; }, null, 40000);
+        // (16 nov., lot derniers-rouges) Depuis le 14 nov. (Studio, grille de Ma journée) la tuile « À envoyer » porte son
+        // geste « Imprimer les N bordereaux » (`data-sj-imprimer` = N, les PRÊTS pas encore imprimés, la règle `emballer`) ;
+        // l'ancienne ligne (`data-journee-a-imprimer`, `data-exact`) reste lue si elle est là.
+        await attendre(pg, () => { const e = document.querySelector('[data-tuile="envoyer"]'); if (!e || !e.getAttribute('data-n')) return false; const a = document.querySelector('[data-journee-a-imprimer]'); const t = e.querySelector('[data-sj-imprimer]'); return (a && a.getAttribute('data-exact') === '1') || (!!t && t.getAttribute('data-sj-imprimer-exact') === '1'); }, null, 40000);
         const n = await attr(pg, '[data-tuile="envoyer"]', 'data-n');
         dit(n === String(ATT.envoyer), `${T} E Ma journée : ${ATT.envoyer} colis à envoyer`, n);
-        const ai = await attr(pg, '[data-journee-a-imprimer]', 'data-journee-a-imprimer'), ex = await attr(pg, '[data-journee-a-imprimer]', 'data-exact');
+        const ancienne = await pg.locator('[data-journee-a-imprimer]').count();
+        const ai = ancienne ? await attr(pg, '[data-journee-a-imprimer]', 'data-journee-a-imprimer') : await attr(pg, '[data-tuile="envoyer"] [data-sj-imprimer]', 'data-sj-imprimer');
+        const ex = await attr(pg, ancienne ? '[data-journee-a-imprimer]' : '[data-tuile="envoyer"] [data-sj-imprimer]', ancienne ? 'data-exact' : 'data-sj-imprimer-exact');
         dit(ai === String(ATT.imprimer) && ex === '1', `${T} I Ma journée : ${ATT.imprimer} à imprimer (pas encore imprimés), exact — jamais les prêts déjà imprimés`, `${ai} exact=${ex}`);
         toutes.push(...(await cartes(pg)).map((c) => ({ ...c, ecran: 'journee' })));
         await shot(pg, `chiffres-journee-${T}`);
@@ -283,7 +288,13 @@ async function widget() {
         const mImp = /(\d+)\s+bordereaux?\s+à imprimer/.exec(recTxt);
         dit(!!mImp && Number(mImp[1]) === ATT.imprimer, `${T} I le récapitulatif lu dit ${ATT.imprimer} à imprimer`, recTxt.replace(/\s+/g, ' ').slice(0, 140));
         toutes.push(...(await cartes(pg)).map((c) => ({ ...c, ecran: 'cat_bord' })));
-        await pg.click('[data-tournee-ouvrir]').catch(() => {});
+        // (16 nov., lot derniers-rouges) Depuis le 14 nov. (refonte des listes), « Préparer la tournée de dépôt » est une
+        // alerte de l'écran, rangée dans « À faire · N » (src/ui/AFaire.jsx : au téléphone une feuille qu'ouvre son bouton).
+        if (!(await pg.locator('[data-tournee-ouvrir]').first().isVisible().catch(() => false)) && (await pg.locator('[data-ui-afaire]').count())) {
+          await pg.locator('[data-ui-afaire]').first().click().catch(() => {});
+          await attendre(pg, () => { const b = document.querySelector('[data-tournee-ouvrir]'); return !!b && b.getClientRects().length > 0; }, null, 6000);
+        }
+        await pg.locator('[data-tournee-ouvrir]').first().click({ timeout: 8000 }).catch(() => {});
         await attendre(pg, () => !!document.querySelector('[data-tournee-sheet]'), null, 8000);
         await pg.waitForTimeout(500);
         const st = await pg.evaluate(() => { const e = document.querySelector('[data-tournee-sheet]'); return e ? e.innerText : ''; });

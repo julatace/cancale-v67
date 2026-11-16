@@ -49813,7 +49813,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // est là, SON « Je l'ai sortie » est le plein de l'écran : l'impression devient une touche (un plein par écran).
                 const sortirLa = !!(sortirJ && (sortirJ.aSortir.length || apresSortie));
                 const plein = em && em.n > 0 ? (
-                  <button type="button" className={sortirLa ? 'sb-touche sj-imprimer-touche' : 'sb-btn-plein'} data-sj-imprimer={String(em.n)} data-fu-principal="" title={em.phrase}
+                  <button type="button" className={sortirLa ? 'sb-touche sj-imprimer-touche' : 'sb-btn-plein'} data-sj-imprimer={String(em.n)} data-sj-imprimer-exact={em.exact ? '1' : '0'} data-fu-principal="" title={em.phrase}
                     aria-label={tr('sj.imprimerN', { n: em.n })} onClick={imprimer}>
                     <Icon name="printer" size={24}/><span>{(em.n > 1 ? tr('sj.imprimerLesN', { n: em.n }) : tr('sj.imprimerLe'))}</span>
                   </button>) : null;
