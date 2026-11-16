@@ -809,4 +809,12 @@
   :root:root:root:root:root body [data-espace="paires"] .vrm-ann-grid.sb-liste[data-sb-vue="liste"] { background: var(--sbp-feuille) !important; }
 }
 
+
+/* (16 nov., intégration) Une paire MONTÉE au téléphone (la carte posée en bas, ses gestes « Baisser le prix · Republier · ⋯ »
+   juste au-dessus de la barre) : un message passager (`.vrm-toasts` en bas — « 36 nouvelles paires numérotées », lot 5.385)
+   se posait 6 s sur ces gestes et prenait le toucher (banc studio-paires « ⋯ ⇒ la fiche »). Le temps qu'une paire est
+   montée, les messages passent EN HAUT, comme quand une feuille est ouverte. */
+@media (max-width: 760px) {
+  body:has([data-espace="paires"] [data-sb-avant="1"]) .vrm-toasts[data-toasts-place="bas"] { top: calc(12px + env(safe-area-inset-top)) !important; bottom: auto !important; }
+}
 }
