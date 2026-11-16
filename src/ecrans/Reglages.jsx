@@ -2206,7 +2206,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       { id:'stream-on', type:'switch', ic:'stream', lib:tr('reglages.stream-on.lib'), desc:tr('reglages.stream-on.desc'), on:!!streamOn, onClick:()=>poserStream(!streamOn), data:{ 'data-reglage-stream-on': streamOn ? 'on' : 'off' } },
       { id:'stream', type:'panneau', nu:true, ic:'filter', lib:tr('reglages.stream.lib'), desc:tr('reglages.stream.desc'), data:{ 'data-reglage-stream': streamOn ? 'on' : 'off' }, el:<ReglagesStream/> },
       // (15 nov.) Au téléphone, « Taille du texte » (ci-dessus) remplace ce réglage : il ne reste que s'il porte une valeur à défaire.
-      (!etroit || readZoom() !== '1') && { id:'zoom', type:'panneau', nu:true, ic:'grid', lib:tr('reglages.zoom.lib'), desc:tr('reglages.zoom.desc'), val:valZoom, el:<ZoomSetting nu/> },
+      (!etroit || readZoom() !== '1') && { id:'zoom', type:'panneau', nu:true, ic:'ecrans', lib:tr('reglages.zoom.lib'), desc:tr('reglages.zoom.desc'), val:valZoom, el:<ZoomSetting nu/> },
       urlWidget && { id:'widget', type:'panneau', nu:true, ic:'device', lib:tr('reglages.widget.lib'), desc:tr('reglages.widget.desc'), el:widget },
       // (10 nov., lot AH) Deux raccourcis iPhone par liens profonds (src/raccourcisSiri.js) : une PWA ne déclare pas d'intention Siri.
       { id:'raccourcis-siri', type:'panneau', nu:true, ic:'mic', lib:tr('reglages.raccourcis-siri.lib'), desc:tr('reglages.raccourcis-siri.desc'), data:{ 'data-reglage-raccourcis':'' }, el:<RaccourcisSiri toast={toast}/> },
@@ -3115,7 +3115,7 @@ async function annulerSuppressionCompte() {
   } catch (_) { return { ok: false, message: "Pas de réponse (connexion coupée) : la suppression n'est pas annulée. Réessaie quand tu as du réseau." }; }
 }
 const dateLongue = (iso) => { const t = Date.parse(iso || ''); return Number.isFinite(t) ? new Date(t).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', day: 'numeric', month: 'long', year: 'numeric' }) : ''; };
-const joursAvant = (iso) => { const t = Date.parse(iso || ''); return Number.isFinite(t) ? Math.max(0, Math.ceil((t - Date.now()) / 864e5)) : null; };
+const joursAvantIso = (iso) => { const t = Date.parse(iso || ''); return Number.isFinite(t) ? Math.max(0, Math.ceil((t - Date.now()) / 864e5)) : null; };
 // Le bandeau de la coque relit l'état quand il change ici.
 const signalerSuppression = () => { try { window.dispatchEvent(new Event('vrm:suppression-prevue')); } catch (_) {} };
 async function lireInventaireSuppression() {
@@ -3233,7 +3233,7 @@ function FermerCompte({ onExporter }) {
               {annonce && !annonce.ok && <div role="status" data-supprimer-annonce="echec" data-acc-echec="compte.supprimer" style={{ ...txt, color: C.warn, marginBottom: 8 }}>{annonce.message}</div>}
               <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>Suppression prévue le {dateLongue(info.prevue.effaceLe)}</div>
               <div style={{ ...txt, marginTop: 4 }}>
-                {joursAvant(info.prevue.effaceLe) ? `Dans ${joursAvant(info.prevue.effaceLe)} jour${joursAvant(info.prevue.effaceLe) > 1 ? 's' : ''}. ` : 'Elle a lieu au prochain passage du matin. '}
+                {joursAvantIso(info.prevue.effaceLe) ? `Dans ${joursAvantIso(info.prevue.effaceLe)} jour${joursAvantIso(info.prevue.effaceLe) > 1 ? 's' : ''}. ` : 'Elle a lieu au prochain passage du matin. '}
                 D’ici là, rien n’est effacé : ton compte et tes données restent là.
                 {['resilie', 'deja-resilie'].includes(info.prevue.abonnement) && <span data-supprimer-abonnement-prevue=""> Ton abonnement est résilié : aucun nouveau prélèvement.</span>}
               </div>
