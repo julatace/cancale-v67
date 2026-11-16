@@ -273,7 +273,9 @@ async function contrastePixels(pg, el) {
         await inp.fill('118');
         await pg.waitForSelector('[data-stock-res="118"]', { timeout: 8000 }).catch(() => {});
         if (await pg.$('[data-stock-res="118"]')) await pg.click('[data-stock-res="118"]'); else await inp.press('Enter');
-        await pg.waitForTimeout(1200);
+        // (reprise) on attend la CONDITION (case dans l'écran), pas un délai fixe : sous charge, le défilement doux dépasse 1,2 s.
+        await pg.waitForFunction(() => { const c = document.querySelector('[data-case-num="118"]'); if (!c) return false; const q = c.getBoundingClientRect(); return q.top >= 0 && q.bottom <= innerHeight; }, null, { timeout: 8000 }).catch(() => {});
+        await pg.waitForTimeout(300);
         const vise = await pg.evaluate(() => { const c = document.querySelector('[data-case-num="118"]'); if (!c) return null; const q = c.getBoundingClientRect(); const dans = q.top >= 0 && q.bottom <= innerHeight && q.left >= 0 && q.right <= innerWidth; return { allume: c.classList.contains('vrm-case-flash') || c.hasAttribute('data-case-vise'), dans }; });
         dit(!!vise && vise.allume && vise.dans, `${t} · R : chercher « 118 » allume SA case et la fait venir dans l'écran`, vise);
         if (CAPT) await pg.screenshot({ path: path.join(CAPT, `sm-${v}-3-recherche.png`) });
@@ -287,7 +289,8 @@ async function contrastePixels(pg, el) {
         await inp.fill('1024');
         await pg.waitForSelector('[data-stock-res="1024"]', { timeout: 8000 }).catch(() => {});
         if (await pg.$('[data-stock-res="1024"]')) await pg.click('[data-stock-res="1024"]'); else await inp.press('Enter');
-        await pg.waitForTimeout(1500);
+        await pg.waitForFunction(() => { const c = document.querySelector('[data-case-num="1024"]'); if (!c) return false; const d = c.closest('.vrm-s2d-defile'); const q = c.getBoundingClientRect(), z = d.getBoundingClientRect(); return q.top >= 0 && q.bottom <= innerHeight && q.right <= z.right - (/droite/.test(d.getAttribute('data-deborde') || '') ? 36 : 0); }, null, { timeout: 8000 }).catch(() => {});
+        await pg.waitForTimeout(300);
         const v2 = await pg.evaluate(() => { const c = document.querySelector('[data-case-num="1024"]'); if (!c) return null; const d = c.closest('.vrm-s2d-defile'); const q = c.getBoundingClientRect(), z = d.getBoundingClientRect(); const fondu = /droite/.test(d.getAttribute('data-deborde') || '') ? 36 : 0; return { allume: c.hasAttribute('data-case-vise'), dans: q.top >= 0 && q.bottom <= innerHeight && q.left >= z.left - 0.5 && q.right <= z.right - fondu + 0.5, q: [Math.round(q.left), Math.round(q.right)], z: [Math.round(z.left), Math.round(z.right)], fondu }; });
         dit(!!v2 && v2.allume && v2.dans, `${t} · R : chercher « 1024 » (8e colonne) la fait venir dans l'écran, hors du fondu`, v2);
         if (CAPT) await pg.screenshot({ path: path.join(CAPT, `sm-${v}-5-recherche-1024.png`) });
