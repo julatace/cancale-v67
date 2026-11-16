@@ -265,6 +265,7 @@ import {appelerFavorisDirect} from './favorisTransport.js';
 import { ventesPourHistorique } from './favorisParcours.js';   // (11 nov., lot favoris-clair)
 import { useNouveauxFavoris, preparerEnvoiFavoris } from './favorisJournee.js';
 import React, { useState, useMemo, useEffect, useRef, Suspense } from "react";
+import { unParRendu } from './lotRendus.js';   // (16 nov., vitesse-volume)
 // (15 nov., chantier « ouverture ») JAMAIS `React.lazy` nu : un morceau qui rate (une mise en ligne entre-temps)
 // rendait « Cet écran a un souci » ou `undefined … default`. `lazySur` le relance, puis recharge proprement vers la
 // nouvelle version, sinon « Mettre à jour VRM » (src/chargementSur.js ; banc ouverture, audit-ouverture).
@@ -33919,6 +33920,8 @@ function usePasEnLigne({ actif = false, accounts = [], achats = null, hors = [],
   return { r, seuil, setSeuil, relire: () => { setLecture(undefined); setTic((x) => x + 1); } };
 }
 
+// (16 nov., vitesse-volume) La première commande de chaque n° de transaction, par liste lue (identité) — `numFromTxn`.
+const _indexPremiereParTx = new WeakMap();
 function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, onFreeNum, liveStats, accountsReady, baseKO, premierJour: premierJourProp, compteSel = '', setCompteSel = null, compteConnecte = '', alertes = null, alertesLues = true, cycle = null, onCycle = null, panelOff = null, dansPlateforme = false, vueAchats, siteColisDemande = null, onColisLeboncoin = null, sitesPresents = null, ongletColis = null, onOngletColis = null, onOngletVu = null, retraitsOutils = false, aTrancher = null, onAllerTrancher = null, onTrancherAT = null, filTous = false, colisDans = null }) {
   // (11 nov., saisie rapide) Les ventes prouvées sans prix d'achat (publiées par la coque) : Ma journée.
   const prixAFaire = React.useSyncExternalStore(abonnerDemandesPrix, lireDemandesPrix);
@@ -45556,8 +45559,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // (7 nov., vitesse) Index par transaction, refait seulement quand la liste change
     // (avant : un balayage de toutes les ventes PAR bordereau, à chaque rendu).
     const items = sales.items || [];
-    if (numFromTxn._items !== items) { const m = new Map(); for (const o of items) { const k = String(o.transaction_id); if (!m.has(k)) m.set(k, o); } numFromTxn._items = items; numFromTxn._m = m; }
-    const so = numFromTxn._m.get(String(b.transaction));
+    // (16 nov., vitesse-volume) `numFromTxn` est redéclarée à chaque rendu : l'index rangé SUR elle repartait
+    // de zéro à chaque rendu (20 000 ventes balayées). Il est gardé par liste, au niveau du module.
+    let m = _indexPremiereParTx.get(items);
+    if (!m) { m = new Map(); for (const o of items) { const k = String(o.transaction_id); if (!m.has(k)) m.set(k, o); } _indexPremiereParTx.set(items, m); }
+    const so = m.get(String(b.transaction));
     if (!so) return '';
     const e = effEntry(so);
     return e && e.numero ? String(e.numero) : '';
@@ -45678,7 +45684,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // s'affiche que sous « Tous les sites » ou sous SON site. Seul le rouge « deux
   // paires sous un N° » reste partout (le seul risque irréversible, §5).
   const voitSite = (s) => siteColis === 'toutes' || siteColis === s;
-  const cartesColis = () => {
+  // (16 nov., vitesse-volume) UNE réponse par rendu (`unParRendu`) : demandée jusqu'à trois fois par rendu.
+  const cartesColis = unParRendu(() => {
     const L = [];
     const nomAvecTaille = (titre, o) => { const t = String(titre || '').trim(); const e = o ? effEntry(o) : null; const tl = e && e.taille ? String(e.taille) : ''; return tl && !tailleDansTitre(t, tl) ? `${t} · ${tl}` : t; };
     const lectureFinie = labelsPrets && emailBords !== null;
@@ -45858,7 +45865,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         .forEach(({ o, st }) => L.push({ cle: 'p:' + o.transaction_id, groupe: 'parti', site: 'vinted', nom: nomAvecTaille(o.title || 'Vente', o), photo: orderPhoto(o), num: effEntry(o)?.numero || '', etat: TXT[st.label] || st.label, ambre: ordre[st.label] === 0, ouvrir: false }));
     }
     return L;
-  };
+  });
   // ── (1er nov.) LE MODE EMBALLAGE ────────────────────────────────────────
   // Les colis de la colonne « Prêts à imprimer », DANS SON ORDRE (jamais triés
   // par emplacement — refus du 11 oct.), un par un. Chaque colis porte : son N°
@@ -46660,7 +46667,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // coche, déposé = « Colis fait » ou un statut qui a bougé, en route / livré = les preuves lues).
   // ── (3 nov.) LES COLIS « À ENVOYER », TOUS SITES — une construction pour l'écran ET pour
   // « Tout imprimer » (l'ordre des groupes de transporteurs est le même, `src/lotTransporteurs.js`).
-  const colisAEnvoyerBase = () => {
+  // (16 nov., vitesse-volume) UNE réponse par rendu (`unParRendu`) : demandée jusqu'à cinq fois par rendu.
+  const colisAEnvoyerBase = unParRendu(() => {
     const vintedLu = voitSite('vinted') && !sales.loading && !sales.error;
     const exTout = vintedLu ? expeditions().filter(e => !e.o || matchOrd(e.o)) : [];
     const lbcParTx = new Map(((lbcVentes && lbcVentes.ventes) || []).map((o) => [String(o && o.txId != null ? o.txId : ''), o]));
@@ -46670,7 +46678,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       ...((siteColis === 'toutes' && colisAutres.leboncoin) || []).map((x) => { const o = lbcParTx.get(String(x.txId)) || {}; const tr = transporteurDuColis({ declare: o.deliveryMethod || o.deliveryLabel || '' }); return { __autre: 'lbc', key: 'l:' + x.txId, x, o, tr, trNom: nomEnvoye(tr), dl: null }; }),
     ];
     return { vintedLu, exTout, autresColis };
-  };
+  });
   const trNomColis = (x) => { if (x.__autre) return x.trNom; return nomEnvoye(trDeLigne(x)); };
   // (15 nov.) Pourquoi une ligne n'a pas de transporteur, et le geste (jamais « inconnu ») : src/colisEnvoyes.js `pourquoiSansTransporteur`.
   const pasLuDeLigne = (x) => { const tx = txDeLigne(x); const et = pdfEtiquettesParTx() || {}, vus = pdfVusParTx() || {}; const acc = x && x.o && x.o._acc;
@@ -46729,7 +46737,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Les colis à envoyer rangés comme l'écran : le plus récent en haut (lot AJ).
   const colisAEnvoyerRanges = () => { const { exTout, autresColis } = colisAEnvoyerBase(); return rangerColisEnvoi([...exTout.filter(x => !estPosteColis(x)), ...autresColis], trNomColis); };
   const LIMITE_ENVOYES_J = 45;
-  const listeEnvoyes = () => {
+  // (16 nov., vitesse-volume) UNE réponse par rendu (`unParRendu`, src/lotRendus.js) : Ma journée, Ventes et les
+  // vérifications la demandent jusqu'à trois fois par rendu, pour les mêmes valeurs.
+  const listeEnvoyes = unParRendu(() => {
     const out = [];
     try {
       if (voitSite('vinted') && Array.isArray(sales.items)) {
@@ -46764,11 +46774,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // il est ICI, avec la raison — jamais caché. Un colis déjà coché reste dans sa ligne « coche ».
         for (const o of sales.items) {
           const tx = o && o.transaction_id != null ? String(o.transaction_id) : '';
+          // (16 nov., vitesse-volume) La preuve de départ d'abord (une lecture de table) : les mêmes conditions,
+          // toutes sans effet, dans un autre ordre — `aExpedier` ne tourne plus sur les 20 000 ventes.
+          const rv = tx ? partisVinted.get(tx) : null;
+          const dp = rv && (rv.type === 'email' || rv.type === 'transporteur') ? rv : null; if (!dp) continue;
           if (!tx || hiddenSales.has(tx) || !aExpedier(o) || isShipDone(o)) continue;
           // (8 nov., « à envoyer » prouvé) + l'e-mail du transporteur pour le n° de SON bordereau
           // (api/_lib/depart-vente.js) : la même règle que la sortie de « À envoyer ».
-          const rv = partisVinted.get(tx);
-          const dp = rv && (rv.type === 'email' || rv.type === 'transporteur') ? rv : null; if (!dp) continue;
           const b = bordsParTxn[tx] || null;
           if (b && isBordShippedManual(b)) continue;
           const j = o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null;
@@ -46820,7 +46832,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const vente = x.site === 'vinted' ? (x.o && x.o.date) : x.site === 'vestiaire' ? (x.v && x.v.date) : (x.lo && x.lo.dateVente);
       return { ...x, quand: quandEnvoye({ depart, coche, vente }) };
     });
-  };
+  });
   // ── (11 nov., lot suivi-commandes) LE SUIVI D'UNE COMMANDE EN COURS ────────────────────────
   // Julien : « intègre les numéros de suivi sur les commandes en cours […] pour voir la
   // cohérence ». Le n° vient d'une IDENTITÉ prouvée (le bordereau de SA transaction, `b.suivi` ;
