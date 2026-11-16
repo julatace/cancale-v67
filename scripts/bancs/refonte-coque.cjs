@@ -195,7 +195,8 @@ async function regles(nav) {
       journee: [['.vrm-tabbar [data-nav-entree="journee"]']], ventes: [['.vrm-tabbar [data-nav-entree="ventes"]']], compta: [['.vrm-tabbar [data-nav-entree="compta"]']],
       annonces: [['.vrm-tabbar [data-nav-entree="paires"]'], ['.vrm-tabbar [data-nav-entree="paires"]', '[data-paires-segment="annonces"]'], ['[data-profil-tete]', '[data-menu-profil] [data-nav-entree="annonces"]']],
       garage: [['.vrm-tabbar [data-nav-entree="paires"]', '[data-paires-segment="garage"]'], ['[data-profil-tete]', '[data-menu-profil] [data-nav-entree="garage"]']],
-      achats: [['.vrm-tabbar [data-nav-entree="paires"]', '[data-paires-segment="achats"]'], ['[data-profil-tete]', '[data-menu-profil] [data-nav-entree="achats"]']],
+      // (16 nov., barre-achats) Achats a son onglet dans la barre.
+      achats: [['.vrm-tabbar [data-nav-entree="achats"]'], ['[data-profil-tete]', '[data-menu-profil] [data-nav-entree="achats"]']],
       messages: [['[data-profil-tete]', '[data-menu-profil] [data-nav-entree="messages"]']], emails: [['[data-profil-tete]', '[data-menu-profil] [data-nav-entree="emails"]']],
       communaute: [['[data-profil-tete]', '[data-menu-profil] [data-nav-entree="communaute"]']], settings: [['[data-profil-tete]', '[data-profil-menu="parametres"]']],
     };
@@ -212,16 +213,14 @@ async function regles(nav) {
       }
       dit(!!atteint, `N « ${cible} » joignable en ≤ 2 touchers depuis Ma journée`, atteint || 'introuvable');
     }
-    // Sur Achats : le segment porte le nombre, l'onglet Paires se tait (un nombre une fois).
-    await toucher(pg, '.vrm-tabbar [data-nav-entree="paires"]'); await pg.waitForTimeout(900);
-    await toucher(pg, '[data-paires-segment="achats"]'); await pg.waitForTimeout(1500);
-    // (14 nov., intégration) Le nombre d'Achats est « À retirer » PUBLIÉ (vrm_colis_retirer.total). Depuis la règle
-    // de main du 14 nov. (aucun colis sans code dans « À retirer »), cette base n'a rien à retirer (60 « à vérifier ») :
-    // le segment porte alors exactement ce nombre — aucun s'il est 0, jamais un nombre inventé.
-    const surPaires = await pg.evaluate(() => { let pub = null; try { pub = JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) {} return { seg: (document.querySelector('[data-paires-segment="achats"] .vrm-seg-n') || {}).textContent || '', publie: pub && typeof pub.total === 'number' ? pub.total : null, segAnnonces: (document.querySelector('[data-paires-segment="annonces"] .vrm-seg-n') || {}).textContent || '', onglet: !!document.querySelector('.vrm-tabbar [data-badge-nav="paires"]'), actif: (document.querySelector('.vrm-tabbar [aria-current="page"]') || {}).getAttribute?.('data-nav-entree') }; });
-    const segJuste = surPaires.publie == null ? /\d/.test(surPaires.seg) : (surPaires.publie > 0 ? surPaires.seg === String(surPaires.publie > 99 ? '99+' : surPaires.publie) : surPaires.seg === '');
-    dit(segJuste && !surPaires.onglet, 'N sur Achats : le segment porte le nombre d\'Achats (« À retirer » publié, aucun s\'il est 0), l\'onglet Paires se tait', JSON.stringify(surPaires));
-    dit(surPaires.actif === 'paires', 'N sur Achats, l\'onglet allumé est Paires', String(surPaires.actif));
+    // (16 nov., lot barre-achats) Achats a son onglet dans la barre : SON onglet porte son nombre et s'allume.
+    await toucher(pg, '.vrm-tabbar [data-nav-entree="achats"]'); await pg.waitForTimeout(1500);
+    // (14 nov., intégration) Le nombre d'Achats est « À retirer » PUBLIÉ (vrm_colis_retirer.total) : aucun s'il est 0,
+    // jamais un nombre inventé.
+    const surAchats = await pg.evaluate(() => { let pub = null; try { pub = JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) {} const b = document.querySelector('.vrm-tabbar [data-badge-nav="achats"]'); return { n: b ? b.getAttribute('data-badge-n') : '', publie: pub && typeof pub.total === 'number' ? pub.total : null, segments: document.querySelectorAll('[data-paires-segment]').length, actif: (document.querySelector('.vrm-tabbar [aria-current="page"]') || {}).getAttribute?.('data-nav-entree') }; });
+    const nJuste = surAchats.publie == null ? /\d/.test(surAchats.n) : (surAchats.publie > 0 ? surAchats.n === String(surAchats.publie) : surAchats.n === '');
+    dit(nJuste && !surAchats.segments, 'N sur Achats : son onglet porte le nombre d\'Achats (« À retirer » publié, aucun s\'il est 0), aucun sélecteur de Paires', JSON.stringify(surAchats));
+    dit(surAchats.actif === 'achats', 'N sur Achats, l\'onglet allumé est Achats', String(surAchats.actif));
     // Le menu du haut : tout ce que « Plus » portait, groupé ; il ne répète pas les onglets de la barre.
     await toucher(pg, '[data-profil-tete]'); await pg.waitForSelector('[data-menu-profil] [data-nav-entree]', { timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(400);
     const menu = await pg.evaluate(() => [...document.querySelectorAll('[data-menu-profil] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
