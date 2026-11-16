@@ -39,8 +39,11 @@ const VUES = {
   'fiche-vendue': '/?tab=journee', 'fiche-reliee': '/?tab=journee', 'fiche-2sites': '/?tab=journee',
   // la vue Histoire de la vendue, et sa feuille « ⋯ » ouverte (tuiles + Tout voir)
   'fiche-histoire': '/?tab=journee', 'fiche-plus': '/?tab=journee',
+  // (16 nov., finitions) la vente reliée (N°3120, bordereau prêt) OUVERTE DEPUIS SA LIGNE de Ventes, « ⋯ » puis « Tout voir » :
+  // le récapitulatif de la vente y est rendu (sa rangée « transporteur · Imprimer le bordereau »).
+  'fiche-vente-tout': '/?tab=ventes',
 };
-const NUM_FICHE = { 'fiche-paire': '1205', 'fiche-vendue': '3119', 'fiche-reliee': '3120', 'fiche-2sites': '3102', 'fiche-histoire': '3119', 'fiche-plus': '3119' };
+const NUM_FICHE = { 'fiche-vente-tout': '3120', 'fiche-paire': '1205', 'fiche-vendue': '3119', 'fiche-reliee': '3120', 'fiche-2sites': '3102', 'fiche-histoire': '3119', 'fiche-plus': '3119' };
 // LES TROIS PAIRES DE LA FICHE D (inventées) ajoutées à la base de volume : le premier compte, ses lignes de toujours.
 const J = 86400000;
 function baseFiches() {
@@ -66,7 +69,7 @@ function baseFiches() {
     sold.data.payload.my_orders.unshift({ transaction_id: v.tx, title: v.titre, price: { amount: v.prix, currency_code: 'EUR' }, status: 'Le paiement a été validé', date: iso(0.2), item_id: v.item,
       transaction_user_status: 'needs_action', photo: { url: photo(v.item) } });
     b.rows.push({ id: `harvest_${uid}_txn_${v.tx}`, data: { capturedAt: iso(0.2), payload: { transaction: { id: v.tx, item_id: v.item, status: 300, status_title: 'Le paiement a été validé', status_updated_at: iso(0.2), shipment: { status_title: 'En attente' }, item: { id: v.item, title: v.titre } } } } });
-    b.rows.push({ id: `email_bord_${v.tx}`, data: { filename: `bordereau-${v.tx}.pdf`, transaction: String(v.tx), receivedAt: iso(0.1), suivi: 'XW' + v.tx, modele: 'x', numero: v.n, dateLimite: new Date(Date.now() + 4 * J).toISOString(), pdfB64: 'JVBERi0xLjQK' } });
+    b.rows.push({ id: `email_bord_${v.tx}`, data: { filename: `bordereau-${v.tx}.pdf`, transaction: String(v.tx), receivedAt: iso(0.1), suivi: 'XW' + v.tx, modele: 'x', numero: v.n, ...(v.relie ? { transporteurPdf: 'Mondial Relay' } : {}), dateLimite: new Date(Date.now() + 4 * J).toISOString(), pdfB64: 'JVBERi0xLjQK' } });
   }
   sold.data.nItems = sold.data.payload.my_orders.length;
   // L'ACHAT qui ressemble à la paire N°3119 (même marque, même modèle, même taille, commandé AVANT la mise en ligne) : proposé, jamais relié seul.
@@ -121,14 +124,29 @@ async function preparer(o, vue) {
     if (!ok) await toucher('[data-cat="ventes"]');
     await pg.waitForTimeout(1200);
   }
+  if (vue === 'fiche-vente-tout') {
+    // Ventes → « Toutes » → la vente (elle mène à la vue Vinted) → SA ligne (son n° de transaction : `data-fl-tx`) : la fiche
+    // s'ouvre DEPUIS la ligne, son récapitulatif rendu dans « Tout voir » (la rangée « transporteur · Imprimer le bordereau »).
+    await pg.waitForSelector('[data-ventes-seg-choix]', { timeout: 15000 }).catch(() => {});
+    await toucher('[data-ventes-seg-choix="toutes"]'); await pg.waitForTimeout(2000);
+    await pg.evaluate(() => { const b = [...document.querySelectorAll('.vrm-toutes-ligne')].find((e) => e.getClientRects().length && /Terminator Low taille 37/.test(e.textContent)); if (b) b.click(); });
+    await pg.waitForTimeout(2500);
+    await pg.evaluate(() => { const l = [...document.querySelectorAll('[data-fiche-ligne][data-fl-tx="64000000002"]')].find((e) => e.getClientRects().length); if (l) { l.scrollIntoView({ block: 'center' }); l.click(); } });
+  }
   if (vue.startsWith('fiche-')) {
-    await pg.evaluate((n) => window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: n })), NUM_FICHE[vue]);
+    if (vue !== 'fiche-vente-tout') await pg.evaluate((n) => window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: n })), NUM_FICHE[vue]);
     await pg.waitForSelector('[data-fiche-paire] .fd-s', { timeout: 8000 }).catch(() => {});
     // la fiche a fini de lire (l'achat proposé, les sites) : plus de « lecture » sur la carte d'action
     await pg.waitForFunction(() => !document.querySelector('[data-fd-propose="lecture"], [data-fiche-lecture-en-cours="1"]'), null, { timeout: 12000 }).catch(() => {});
     await pg.waitForTimeout(1200);
     if (vue === 'fiche-histoire') { await toucher('[data-fd-seg="histoire"]'); await pg.waitForTimeout(500); }
     if (vue === 'fiche-plus') { await toucher('[data-fd-plus-ouvrir]'); await pg.waitForTimeout(700); }
+    if (vue === 'fiche-vente-tout') {
+      await toucher('[data-fd-plus-ouvrir]'); await pg.waitForTimeout(700);
+      await toucher('.fd-plus .fd-tout > summary'); await pg.waitForTimeout(700);
+      await pg.evaluate(() => { const r = document.querySelector('.fd-plus .fd-tout [data-rangee-bord]'); if (r) r.scrollIntoView({ block: 'center' }); });
+      await pg.waitForTimeout(400);
+    }
   }
 }
 
@@ -230,6 +248,19 @@ function mesurer(vue) {
       rangees: [...racine.querySelectorAll('.vrm-pm-cat .vrm-set-ligne')].filter(vis).map((l) => Math.round(l.getBoundingClientRect().height)),
       titre: (() => { const h = racine.querySelector('.vg-pm-nav-txt h2'); return h ? { fs: parseFloat(getComputedStyle(h).fontSize), clair: lum(getComputedStyle(h).color) > 0.8 } : null; })(),
       retour: (() => { const b = racine.querySelector('[data-categorie-retour]'); return b && vis(b) ? R(b) : null; })() };
+  }
+  if (vue === 'fiche-vente-tout') {
+    // (16 nov., finitions) « Tout voir » d'une vente : la rangée « transporteur · Imprimer le bordereau » du récapitulatif.
+    // Le geste ne touche pas la marque du transporteur (8 px au moins, aucun recouvrement), et ce n'est pas un SECOND plein
+    // (la fiche a déjà le sien, sa carte d'action « Imprimer le bordereau » : un fond opaque n'est permis qu'au principal).
+    const opaque = (e) => { const c = getComputedStyle(e).backgroundColor; const m = String(c).match(/[\d.]+/g); return !!m && (m.length < 4 || Number(m[3]) > 0.5) && !/^rgba\(0, 0, 0, 0\)$/.test(c); };
+    out.toutVoirBord = [...racine.querySelectorAll('.fd-plus .fd-tout [data-rangee-bord]')].filter(vis).map((r) => {
+      const puce = r.querySelector('.vrm-puce-transp'); const g = [...r.querySelectorAll('button, a[href]')].filter(vis).find((b) => !b.closest('.vrm-puce-transp'));
+      if (!puce || !g) return { puce: !!puce, geste: !!g };
+      const a = R(puce), b = R(g);
+      return { ecart: b.x - a.r, recouvre: a.x < b.r && b.x < a.r && a.y < b.b && b.y < a.b, plein: opaque(g) && !g.hasAttribute('data-fiche-principal'), h: b.h };
+    });
+    return out;
   }
   if (racineFiche) {
     // (15 nov., fiche D) Ce qui est VU : la hauteur de la fiche (la feuille « ⋯ » fermée), la photo pleine largeur et la plaque,
@@ -343,6 +374,11 @@ function juger(m, suf, tel) {
     dit(K.titres > 0 && K.titresClairs === K.titres, `P3 ${suf} : les titres de groupe en blanc sur le fond`, `${K.titresClairs}/${K.titres}`);
     dit(K.icones === 0 && K.rangees.length > 0 && K.rangees.every((h) => h >= 44), `P3 ${suf} : des rangées sans icône, ≥ 44 px`, `${K.icones} icône(s) · ${K.rangees.join(',')}`);
     dit(!!K.retour && K.retour.w >= 44 && K.retour.h >= 44, `P3 ${suf} : le rond « ‹ » ≥ 44 px`, JSON.stringify(K.retour));
+  }
+  if (m.toutVoirBord) {
+    const T = m.toutVoirBord;
+    dit(T.length >= 1 && T.every((x) => x.ecart >= 8 && !x.recouvre), `FV1 ${suf} : « Tout voir » d'une vente — « Imprimer le bordereau » ne touche pas la marque du transporteur (≥ 8 px)`, JSON.stringify(T));
+    dit(T.length >= 1 && T.every((x) => x.plein === false), `FV2 ${suf} : … et ce n'est pas un second plein (la fiche porte déjà le sien)`, JSON.stringify(T));
   }
   if (m.fd) {
     const F = m.fd, v = m.vue;
