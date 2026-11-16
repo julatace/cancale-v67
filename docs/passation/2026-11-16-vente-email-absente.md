@@ -67,4 +67,7 @@ belles ») l'ajoutait à TOUTE offre (`T.expire24`, corps et ligne du regroupeme
   dit l'échéance pour Vestiaire seulement ; mutation `offre-vinted-expire`.
 
 ## ÉTAT À LA REPRISE
-Voir le rapport de la PR (chiffres des bancs et de la CI). Geste de Julien : aucun.
+- Audit `vente-email-fraiche` : 54 verts ; arbre de main 7 rouges ; `--prouve` 15/15 mutations attrapées (ancre « CA déclaré » repointée sur `src/ecrans/Compta.jsx`).
+- Banc `vente-email-fraiche` : E4 16/16 verts (390 et 1512, clair et sombre, captures regardées) ; sur le `dist/` de main : E4 8/8 rouges, VENDU identique avec ou sans l’e-mail. Rouges déjà présents sur main, sans lien : E3 (indicateur à 390 px) et E1 (ambre en sombre).
+- Audit `notifs-redaction` : la règle et « jamais expire » verts ; la section 4 (regroupement des 8 offres) est rouge AUSSI sur main (le regroupement ne se fait pas — sans lien, à reprendre par le lot notifications).
+- Geste de Julien : aucun. Mesure qui reste : aucune.
