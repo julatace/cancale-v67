@@ -52,6 +52,15 @@
   const vivant = () => { try { return !!(chrome.runtime && chrome.runtime.id); } catch (_) { return false; } };
   if (!vivant()) return;
 
+  // 5.394 (16 nov., lot traduction-restes) : les textes de la connexion et de l'état passent par
+  // `T(clé, français, vars)` — chrome.i18n (_locales/<langue>/messages.json, le français par défaut),
+  // le français écrit ici en repli (le texte d'avant, mot pour mot). Clés et traductions :
+  // scripts/extension-langues.cjs. Le reste de la carte (favoris, listes, mois) est encore en français.
+  const T = (cle, fr, vars) => {
+    let s = ''; try { s = (chrome.i18n && chrome.i18n.getMessage(cle)) || ''; } catch (_) { s = ''; }
+    if (!s) s = fr;
+    return vars ? String(s).replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m)) : s;
+  };
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   // 5.188 : le HTML de nos propres gabarits (valeurs passées par `esc`) est posé
   // par DOMParser plutôt que `innerHTML =` — même résultat, et c'est la forme que
@@ -62,11 +71,11 @@
     const ms = Date.now() - Number(t || 0);
     if (!t || !isFinite(ms) || ms < 0) return '';
     const min = Math.round(ms / 60000);
-    if (min < 1) return "à l'instant";
-    if (min < 60) return `il y a ${min} min`;
+    if (min < 1) return T('c_instant', "à l'instant");
+    if (min < 60) return T('c_il_y_a_min', 'il y a {n} min', { n: min });
     const h = Math.round(min / 60);
-    if (h < 48) return `il y a ${h} h`;
-    return `il y a ${Math.round(h / 24)} j`;
+    if (h < 48) return T('c_il_y_a_h', 'il y a {n} h', { n: h });
+    return T('c_il_y_a_j', 'il y a {n} j', { n: Math.round(h / 24) });
   };
   // 5.379 : la marque du disjoncteur Leboncoin (lbc-relay.js), lue telle quelle — 30 min au plus.
   const deCoteLbc = () => { try { if (!/(^|\.)leboncoin\.fr$/i.test(String(location.hostname || ''))) return null; const v = JSON.parse(sessionStorage.getItem('vrm_lbc_de_cote') || 'null'); const age = Date.now() - Number(v && v.t); return v && typeof v === 'object' && age >= 0 && age < 1800000 ? v : null; } catch (_) { return null; } };
@@ -638,45 +647,45 @@
   // à faire. Tout vient de l'état que la carte avait déjà (aucune lecture de plus) :
   // la ligne ne dit jamais plus que les lignes du détail. `geste` = ambre, `pause` =
   // Vinted freine (gris), `ok` (gris, ✓), `attente` (gris, pas su ou rien encore).
-  const heureCourte = (t) => { try { const n = Number(t); if (!(n > 0)) return ''; if (Date.now() - n > 20 * 3600000) return depuis(n); return 'à ' + new Date(n).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
+  const heureCourte = (t) => { try { const n = Number(t); if (!(n > 0)) return ''; if (Date.now() - n > 20 * 3600000) return depuis(n); return T('c_a_heure', 'à {h}', { h: new Date(n).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) }); } catch (_) { return ''; } };
   const heureFin = (t) => { try { return new Date(Number(t)).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
   const envoiRefuse = (f, v) => !!(f && f.koAt && (!f.okAt || f.koAt > f.okAt) && f.koStatut !== 'sans_session' && !refusAvantConnexion(f, v));
   function resumeEtat(e) {
-    if (perime) return { etat: 'geste', texte: 'Extension à redémarrer — voir ci-dessous' };
-    if (!e) return { etat: 'attente', texte: pasSu ? 'L’extension ne répond pas' : 'Vérification…' };
+    if (perime) return { etat: 'geste', texte: T('c_r_redemarrer', 'Extension à redémarrer — voir ci-dessous') };
+    if (!e) return { etat: 'attente', texte: pasSu ? T('c_r_muette', 'L’extension ne répond pas') : T('c_r_verif', 'Vérification…') };
     const v = e.vrm;
-    if (!v) return { etat: 'attente', texte: 'Connexion à VRM pas sue pour l’instant' };
-    if (v.connecte === false) return { etat: 'geste', texte: v.expiree ? 'Session VRM expirée : reconnecte-toi' : 'À connecter à VRM' };
-    if (e.bascule) return { etat: 'geste', texte: 'Compte VRM changé : vérifie ci-dessous' };
+    if (!v) return { etat: 'attente', texte: T('c_r_pas_su', 'Connexion à VRM pas sue pour l’instant') };
+    if (v.connecte === false) return { etat: 'geste', texte: v.expiree ? T('c_r_expiree', 'Session VRM expirée : reconnecte-toi') : T('c_r_a_connecter', 'À connecter à VRM') };
+    if (e.bascule) return { etat: 'geste', texte: T('c_r_bascule', 'Compte VRM changé : vérifie ci-dessous') };
     const site = e.site || {};
     const nom = site.nom || '';
     if (e.plateforme === 'vinted') {
-      if (!site.id) return { etat: 'attente', texte: 'Aucun compte Vinted connecté ici' };
-      if (site.choix === 'non') return { etat: 'attente', texte: (nom || 'Ce compte') + ' ignoré : ton choix' };
+      if (!site.id) return { etat: 'attente', texte: T('c_r_aucun_vinted', 'Aucun compte Vinted connecté ici') };
+      if (site.choix === 'non') return { etat: 'attente', texte: T('c_r_ignore', '{nom} ignoré : ton choix', { nom: nom || T('c_ce_compte', 'Ce compte') }) };
       const maint = Date.now();
-      if (site.pause && Number(site.pause.jusqua) > maint) return { etat: 'pause', texte: 'Pause : Vinted freine · reprise à ' + heureFin(site.pause.jusqua) };
-      if (site.frein && Number(site.frein.jusqua) > maint) return { etat: 'pause', texte: (site.frein.restreint ? 'Mises en ligne bloquées 24 h' : 'Mises en ligne en pause') + ' · reprise à ' + heureFin(site.frein.jusqua) };
+      if (site.pause && Number(site.pause.jusqua) > maint) return { etat: 'pause', texte: T('c_r_pause', 'Pause : Vinted freine · reprise à {h}', { h: heureFin(site.pause.jusqua) }) };
+      if (site.frein && Number(site.frein.jusqua) > maint) return { etat: 'pause', texte: (site.frein.restreint ? T('c_r_bloquees', 'Mises en ligne bloquées 24 h') : T('c_r_en_pause', 'Mises en ligne en pause')) + T('c_r_reprise', ' · reprise à {h}', { h: heureFin(site.frein.jusqua) }) };
     }
     const f = e.flux || {};
-    if (e.capte && envoiRefuse(f, v) && !(site.choix === 'non' && e.plateforme === 'vinted')) return { etat: 'geste', texte: 'Dernier envoi refusé : voir ci-dessous' };
+    if (e.capte && envoiRefuse(f, v) && !(site.choix === 'non' && e.plateforme === 'vinted')) return { etat: 'geste', texte: T('c_r_refuse', 'Dernier envoi refusé : voir ci-dessous') };
     if (e.plateforme === 'leboncoin') {
       const n = e.aRetirer && Array.isArray(e.aRetirer.liste) ? e.aRetirer.liste.length : 0;
       if (n) return { etat: 'geste', texte: (() => { const m = (globalThis.VRM_MOTS ? globalThis.VRM_MOTS.mots() : null) || { nom: 'paire', noms: 'paires' }; return n > 1 ? `${n} ${m.noms} à retirer de Leboncoin` : `1 ${m.nom} à retirer de Leboncoin`; })() };
       const l = e.lbc;
-      if (l && l.compte && l.compte.ok === false) return { etat: 'geste', texte: 'Leboncoin attend un geste : voir ci-dessous' };
-      if (!site.id && !(l && l.compte && l.compte.ok === true)) return { etat: 'attente', texte: 'Compte Leboncoin pas encore reconnu' };
-      if (l && l.annonces && l.annonces.ok === true) return { etat: 'ok', texte: (nom || 'Leboncoin') + ' · annonces lues', coche: true };
-      return { etat: 'attente', texte: (nom || 'Leboncoin') + ' · annonces pas encore lues' };
+      if (l && l.compte && l.compte.ok === false) return { etat: 'geste', texte: T('c_r_lbc_geste', 'Leboncoin attend un geste : voir ci-dessous') };
+      if (!site.id && !(l && l.compte && l.compte.ok === true)) return { etat: 'attente', texte: T('c_r_lbc_inconnu', 'Compte Leboncoin pas encore reconnu') };
+      if (l && l.annonces && l.annonces.ok === true) return { etat: 'ok', texte: T('c_r_lbc_lues', '{nom} · annonces lues', { nom: nom || 'Leboncoin' }), coche: true };
+      return { etat: 'attente', texte: T('c_r_lbc_pas_lues', '{nom} · annonces pas encore lues', { nom: nom || 'Leboncoin' }) };
     }
     if (e.plateforme === 'vestiaire') {
       const c = e.vcCapte || {};
       const ats = Object.keys(c).map((k) => Number(c[k] && c[k].at) || 0).filter((x) => x > 0);
-      if (Object.keys(c).some((k) => c[k] && c[k].inconnu)) return { etat: 'attente', texte: 'Vestiaire : une page pas encore lue' };
-      return ats.length ? { etat: 'ok', texte: 'Vestiaire lu ' + depuis(Math.max(...ats)), coche: true } : { etat: 'attente', texte: 'Vestiaire pas encore lu' };
+      if (Object.keys(c).some((k) => c[k] && c[k].inconnu)) return { etat: 'attente', texte: T('c_r_vc_page', 'Vestiaire : une page pas encore lue') };
+      return ats.length ? { etat: 'ok', texte: T('c_r_vc_lu', 'Vestiaire lu {quand}', { quand: depuis(Math.max(...ats)) }), coche: true } : { etat: 'attente', texte: T('c_r_vc_pas_lu', 'Vestiaire pas encore lu') };
     }
-    if (!e.capte) return { etat: 'attente', texte: `VRM ne lit pas encore ${NOM_SITE[e.plateforme] || 'ce site'}` };
-    if (f.okAt) return { etat: 'ok', texte: (nom || 'Compte ' + (NOM_SITE[e.plateforme] || '')) + ' · à jour ' + heureCourte(f.okAt), coche: true };
-    return { etat: 'attente', texte: (nom || 'Ce compte') + ' · rien envoyé pour l’instant' };
+    if (!e.capte) return { etat: 'attente', texte: T('c_r_pas_lu_site', 'VRM ne lit pas encore {site}', { site: NOM_SITE[e.plateforme] || T('c_ce_site', 'ce site') }) };
+    if (f.okAt) return { etat: 'ok', texte: T('c_r_a_jour', '{nom} · à jour {quand}', { nom: nom || T('c_compte_site', 'Compte {site}', { site: NOM_SITE[e.plateforme] || '' }), quand: heureCourte(f.okAt) }), coche: true };
+    return { etat: 'attente', texte: T('c_r_rien', '{nom} · rien envoyé pour l’instant', { nom: nom || T('c_ce_compte', 'Ce compte') }) };
   }
   // 5.354 : le mini-résumé du mois. Chaque nombre est celui de VRM, ou « — ».
   let moisOuvert = false;
@@ -1324,7 +1333,7 @@
     const avecListes = connecte && ['vinted', 'leboncoin', 'vestiaire'].includes(e.plateforme) && !(e.plateforme === 'vinted' && (!e.site || !e.site.id || e.site.choix === 'non'));
     const gestes = (connecte
       ? `<div class="gestes">${avecListes ? listesHtml(e) : favorisFileHtml(e)}</div>`
-      : (v && v.connecte) || formulaire ? '' : `<button class="b" data-montrer-connexion>Me connecter</button>`) + (formulaire ? '' : liensHtml(e, fileFav));
+      : (v && v.connecte) || formulaire ? '' : `<button class="b" data-montrer-connexion>${T('c_me_connecter', 'Me connecter')}</button>`) + (formulaire ? '' : liensHtml(e, fileFav));
     const resume = resumeEtat(e);
     // Leboncoin (5.335, sa décision du 9 nov.) : les trois lignes Compte · Annonces ·
     // Ventes SONT le message principal — visibles, jamais repliées, pas doublées.
@@ -1736,38 +1745,38 @@
     if (formulaireEl) { const m = champ('vrm-cx-mail'); if (m) mailSaisi = String(m.value || '').trim(); viderSecrets(); }
     clearInterval(minuteurRenvoi);
     if (!mailSaisi && etat && etat.vrm && etat.vrm.expiree && etat.vrm.email) mailSaisi = etat.vrm.email;
-    const mail = `<label class="lab" for="vrm-cx-mail">E-mail de ton compte VRM</label>
+    const mail = `<label class="lab" for="vrm-cx-mail">${T('c_email', 'E-mail de ton compte VRM')}</label>
       <input id="vrm-cx-mail" name="vrm-carte-identifiant" type="email" inputmode="email" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="${modeCx === 'mdp' ? 'next' : 'send'}" placeholder="prenom@exemple.fr" value="${esc(mailSaisi)}" data-1p-ignore data-lpignore="true">`;
-    const pied = `<button type="button" class="b sec" data-annuler-changer hidden>Annuler</button>
+    const pied = `<button type="button" class="b sec" data-annuler-changer hidden>${T('c_annuler', 'Annuler')}</button>
       <div class="err" id="vrm-cx-err" role="alert" hidden></div>
       <div class="etat" id="vrm-cx-etat" role="status" aria-live="polite" hidden></div>`;
     let corps;
     if (modeCx === 'saisie' && codeEnvoi) {
-      corps = `<div class="envoye">Code envoyé à <b>${esc(codeEnvoi.email)}</b>. Regarde ta boîte mail (et les indésirables).</div>
-      <label class="lab" for="vrm-cx-code">Code reçu par e-mail</label>
+      corps = `<div class="envoye">${T('c_code_envoye', 'Code envoyé à <b>{email}</b>. Regarde ta boîte mail (et les indésirables).', { email: esc(codeEnvoi.email) })}</div>
+      <label class="lab" for="vrm-cx-code">${T('c_code_recu', 'Code reçu par e-mail')}</label>
       <div class="cases" data-cases>${Array.from({ length: LONG_CODE }, () => '<span class="case" aria-hidden="true"></span>').join('')}
         <input id="vrm-cx-code" name="vrm-carte-code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="10" autocomplete="one-time-code" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" aria-describedby="vrm-cx-aide-code" data-1p-ignore data-lpignore="true">
       </div>
-      <div class="aide" id="vrm-cx-aide-code">6 chiffres. Seul le dernier code reçu marche.</div>
-      <button type="submit" class="b" data-principal data-code-valider disabled>Valider le code</button>
+      <div class="aide" id="vrm-cx-aide-code">${T('c_code_aide', '6 chiffres. Seul le dernier code reçu marche.')}</div>
+      <button type="submit" class="b" data-principal data-code-valider disabled>${T('c_code_valider', 'Valider le code')}</button>
       ${pied}
-      <button type="button" class="b sec" data-code-renvoyer disabled>Renvoyer le code</button>
-      <button type="button" class="lien" data-code-changer>Changer d’e-mail</button>`;
+      <button type="button" class="b sec" data-code-renvoyer disabled>${T('c_code_renvoyer', 'Renvoyer le code')}</button>
+      <button type="button" class="lien" data-code-changer>${T('c_changer_email', 'Changer d’e-mail')}</button>`;
     } else if (modeCx === 'mdp' && MDP_PERMIS) {
       corps = `${mail}
-      <label class="lab" for="vrm-cx-mdp">Mot de passe VRM</label>
-      <input id="vrm-cx-mdp" name="vrm-carte-secret" type="password" autocomplete="off" enterkeyhint="go" placeholder="Mot de passe VRM" data-1p-ignore data-lpignore="true">
-      <div class="aide">Ceux de vrm.center — pas ceux de Vinted.</div>
-      <button type="submit" class="b" data-principal data-me-connecter>Me connecter</button>
+      <label class="lab" for="vrm-cx-mdp">${T('c_mdp', 'Mot de passe VRM')}</label>
+      <input id="vrm-cx-mdp" name="vrm-carte-secret" type="password" autocomplete="off" enterkeyhint="go" placeholder="${T('c_mdp', 'Mot de passe VRM')}" data-1p-ignore data-lpignore="true">
+      <div class="aide">${T('c_mdp_aide', 'Ceux de vrm.center — pas ceux de Vinted.')}</div>
+      <button type="submit" class="b" data-principal data-me-connecter>${T('c_me_connecter', 'Me connecter')}</button>
       ${pied}
-      <button type="button" class="b sec" data-basculer-mode>Recevoir un code à la place</button>
-      <a class="oubli" href="https://vrm.center/?connexion&amp;mot-de-passe-oublie" target="_blank" rel="noreferrer" data-oubli>Mot de passe oublié ?</a>`;
+      <button type="button" class="b sec" data-basculer-mode>${T('c_code_a_la_place', 'Recevoir un code à la place')}</button>
+      <a class="oubli" href="https://vrm.center/?connexion&amp;mot-de-passe-oublie" target="_blank" rel="noreferrer" data-oubli>${T('c_oubli', 'Mot de passe oublié ?')}</a>`;
     } else {
       corps = `${mail}
-      <button type="submit" class="b" data-principal data-code-demander>Me connecter avec un code</button>
-      <div class="aide">Un code à 6 chiffres arrive sur cet e-mail. Marche aussi si tu as créé ton compte avec Google ou Discord.</div>
+      <button type="submit" class="b" data-principal data-code-demander>${T('c_code_demander', 'Me connecter avec un code')}</button>
+      <div class="aide">${T('c_code_demander_aide', 'Un code à 6 chiffres arrive sur cet e-mail. Marche aussi si tu as créé ton compte avec Google ou Discord.')}</div>
       ${pied}
-      ${MDP_PERMIS ? '<button type="button" class="b sec" data-basculer-mode>J’ai un mot de passe</button>' : ''}`;
+      ${MDP_PERMIS ? '<button type="button" class="b sec" data-basculer-mode>' + T('c_j_ai_mdp', 'J’ai un mot de passe') + '</button>' : ''}`;
     }
     poserHtml(connexion, `<form class="cx" data-connexion-carte data-mode="${modeCx}" novalidate autocomplete="off">${corps}
       <div data-fournisseurs-carte hidden></div></form>`);
@@ -1843,8 +1852,8 @@
     if (!ren || !codeEnvoi) return;
     const tic = () => {
       const reste = Math.ceil((60000 - (Date.now() - Number(codeEnvoi.at || 0))) / 1000);
-      if (reste > 0 && reste <= 60) { ren.disabled = true; ren.textContent = `Renvoyer le code (dans ${reste} s)`; return; }
-      ren.disabled = false; ren.textContent = 'Renvoyer le code'; clearInterval(minuteurRenvoi);
+      if (reste > 0 && reste <= 60) { ren.disabled = true; ren.textContent = T('c_code_renvoyer_dans', 'Renvoyer le code (dans {s} s)', { s: reste }); return; }
+      ren.disabled = false; ren.textContent = T('c_code_renvoyer', 'Renvoyer le code'); clearInterval(minuteurRenvoi);
     };
     tic(); minuteurRenvoi = setInterval(tic, 1000);
   }
@@ -1864,41 +1873,41 @@
     if (envoiEnVol || !formulaireEl) return;
     const m = champ('vrm-cx-mail');
     const email = renvoi && codeEnvoi ? codeEnvoi.email : String((m && m.value) || '').trim();
-    if (!email) { direErreur('Tape l’e-mail de ton compte VRM.'); try { m.focus(); } catch (_) {} return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { direErreur('Cet e-mail n’a pas la bonne forme (exemple : prenom@exemple.fr).'); return; }
+    if (!email) { direErreur(T('c_tape_email', 'Tape l’e-mail de ton compte VRM.')); try { m.focus(); } catch (_) {} return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { direErreur(T('c_email_forme', 'Cet e-mail n’a pas la bonne forme (exemple : prenom@exemple.fr).')); return; }
     mailSaisi = email;
     const b = formulaireEl.querySelector(renvoi ? '[data-code-renvoyer]' : '[data-code-demander]');
     const texte = b ? b.textContent : '';
     envoiEnVol = true; direErreur(''); direEtat('');
-    if (b) { b.disabled = true; b.textContent = 'Envoi du code…'; }
+    if (b) { b.disabled = true; b.textContent = T('c_code_envoi', 'Envoi du code…'); }
     demanderAuFond({ from: 'vrm-badge', action: 'authCodeDemande', email }, (r, muet) => {
       envoiEnVol = false;
       if (r && r.ok) {
         codeEnvoi = { email: r.email || email.toLowerCase(), at: Number(r.at) || Date.now() };
         modeCx = 'saisie'; poserFormulaire(true, true);
-        if (renvoi) direEtat('Nouveau code envoyé. Seul ce dernier code marche.');
+        if (renvoi) direEtat(T('c_code_nouveau', 'Nouveau code envoyé. Seul ce dernier code marche.'));
         focaliser(); return;
       }
       if (b) { b.textContent = texte; b.disabled = false; }
       if (renvoi) minuterRenvoi();
-      direErreur(muet ? 'L’extension n’a pas répondu. Réessaie dans un instant.' : ((r && r.error) || 'Le code n’a pas pu partir.'));
+      direErreur(muet ? T('c_muet', 'L’extension n’a pas répondu. Réessaie dans un instant.') : ((r && r.error) || T('c_code_pas_parti', 'Le code n’a pas pu partir.')));
     });
   }
   function validerCode() {
     if (envoiEnVol || !formulaireEl || !codeEnvoi) return;
     const c = champ('vrm-cx-code'), b = formulaireEl.querySelector('[data-code-valider]');
     const code = String((c && c.value) || '').replace(/\D+/g, '');
-    if (!/^\d{6,10}$/.test(code)) { direErreur('Tape les 6 chiffres du code reçu par e-mail.'); return; }
+    if (!/^\d{6,10}$/.test(code)) { direErreur(T('c_code_tape', 'Tape les 6 chiffres du code reçu par e-mail.')); return; }
     envoiEnVol = true; direErreur(''); direEtat('');
     if (b) { b.disabled = true; b.textContent = 'Vérification…'; }
     demanderAuFond({ from: 'vrm-badge', action: 'authCodeVerif', email: codeEnvoi.email, code }, (r, muet) => {
       envoiEnVol = false;
       // Le code ne reste nulle part : le champ est vidé dès la réponse.
       try { if (c) { c.value = ''; c.dispatchEvent(new Event('blur')); } } catch (_) {}
-      if (b) { b.textContent = 'Valider le code'; b.disabled = true; }
+      if (b) { b.textContent = T('c_code_valider', 'Valider le code'); b.disabled = true; }
       if (r && r.ok) { justeConnecte = true; changerCompte = false; formulaireDemande = false; modeCx = 'code'; codeEnvoi = null; rafraichir(); return; }
       if (r && r.expire) { modeCx = 'code'; poserFormulaire(true, true); }
-      direErreur(muet ? 'L’extension n’a pas répondu. Réessaie dans un instant.' : ((r && r.error) || 'Code refusé.'));
+      direErreur(muet ? T('c_muet', 'L’extension n’a pas répondu. Réessaie dans un instant.') : ((r && r.error) || T('c_code_refuse', 'Code refusé.')));
       focaliser();
     });
   }
@@ -1906,19 +1915,19 @@
     if (envoiEnVol || !formulaireEl) return;
     const m = champ('vrm-cx-mail'), p = champ('vrm-cx-mdp'), b = formulaireEl.querySelector('[data-me-connecter]');
     const email = String((m && m.value) || '').trim(), password = String((p && p.value) || '');
-    if (!email || !password) { direErreur(!email && !password ? 'Tape l’e-mail et le mot de passe de ton compte VRM.' : !email ? 'Tape l’e-mail de ton compte VRM.' : 'Tape ton mot de passe VRM.'); try { (!email ? m : p).focus(); } catch (_) {} return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { direErreur('Cet e-mail n’a pas la bonne forme (exemple : prenom@exemple.fr).'); return; }
+    if (!email || !password) { direErreur(!email && !password ? T('c_tape_les_deux', 'Tape l’e-mail et le mot de passe de ton compte VRM.') : !email ? T('c_tape_email', 'Tape l’e-mail de ton compte VRM.') : T('c_tape_mdp', 'Tape ton mot de passe VRM.')); try { (!email ? m : p).focus(); } catch (_) {} return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { direErreur(T('c_email_forme', 'Cet e-mail n’a pas la bonne forme (exemple : prenom@exemple.fr).')); return; }
     mailSaisi = email;
     envoiEnVol = true; direErreur(''); direEtat('');
     if (b) { b.disabled = true; b.textContent = 'Connexion…'; }
     demanderAuFond({ from: 'vrm-badge', action: 'authLogin', email, password }, (r, muet) => {
       envoiEnVol = false;
-      if (b) { b.disabled = false; b.textContent = 'Me connecter'; }
+      if (b) { b.disabled = false; b.textContent = T('c_me_connecter', 'Me connecter'); }
       try { if (p) p.value = ''; } catch (_) {}
       if (r && r.ok) { justeConnecte = true; changerCompte = false; formulaireDemande = false; modeCx = 'code'; rafraichir(); return; }
-      if (muet) { direErreur('L’extension n’a pas répondu. Réessaie dans un instant.'); return; }
-      if (r && r.captcha) { direErreur('VRM demande une vérification anti-robot que la carte ne sait pas afficher. Touche l’icône VRM dans les réglages de l’extension pour te connecter.'); return; }
-      direErreur((r && r.error) || 'Connexion refusée.');
+      if (muet) { direErreur(T('c_muet', 'L’extension n’a pas répondu. Réessaie dans un instant.')); return; }
+      if (r && r.captcha) { direErreur(T('c_captcha', 'VRM demande une vérification anti-robot que la carte ne sait pas afficher. Touche l’icône VRM dans les réglages de l’extension pour te connecter.')); return; }
+      direErreur((r && r.error) || T('c_refusee', 'Connexion refusée.'));
       try { if (p) p.focus(); } catch (_) {}
     });
   }
@@ -1945,7 +1954,7 @@
     box.setAttribute('data-oauth', etat && etat.oauthFenetre === true ? 'fenetre' : 'meme-onglet');
     if (!actifs.length) { box.hidden = true; return; }
     if (box.querySelector('[data-fournisseur]')) { box.hidden = false; return; }
-    poserHtml(box, `<div class="ou"><span>ou</span></div>` + actifs.map((f) => `<button type="button" class="b sec fourn" data-fournisseur="${f}">${LOGO_FOURN[f]}<span>Continuer avec ${NOM_FOURN[f]}</span></button>`).join(''));
+    poserHtml(box, `<div class="ou"><span>${T('c_ou', 'ou')}</span></div>` + actifs.map((f) => `<button type="button" class="b sec fourn" data-fournisseur="${f}">${LOGO_FOURN[f]}<span>${T('c_continuer', 'Continuer avec {nom}', { nom: NOM_FOURN[f] })}</span></button>`).join(''));
     box.querySelectorAll('[data-fournisseur]').forEach((el) => el.addEventListener('click', () => connexionFournisseur(el.getAttribute('data-fournisseur'))));
     box.hidden = false;
   }
@@ -1953,14 +1962,14 @@
   function connexionFournisseur(f) {
     if (!NOM_FOURN[f] || envoiEnVol) return;
     const fenetre = !!(etat && etat.oauthFenetre === true);
-    direErreur(''); direEtat(fenetre ? `Une petite fenêtre ${NOM_FOURN[f]} s’ouvre. Connecte-toi : elle se ferme toute seule.` : `Je t’emmène chez ${NOM_FOURN[f]}, dans cet onglet. Tu reviendras ici, connecté.`);
+    direErreur(''); direEtat(fenetre ? T('c_oauth_fenetre', 'Une petite fenêtre {nom} s’ouvre. Connecte-toi : elle se ferme toute seule.', { nom: NOM_FOURN[f] }) : T('c_oauth_onglet', 'Je t’emmène chez {nom}, dans cet onglet. Tu reviendras ici, connecté.', { nom: NOM_FOURN[f] }));
     demanderAuFond({ from: 'vrm-badge', action: 'oauthDepart', fournisseur: f }, (r, muet) => {
-      if (muet || !r) { direEtat(''); direErreur('L’extension n’a pas répondu. Connecte-toi avec un code reçu par e-mail.'); return; }
-      if (!r.ok) { direEtat(''); direErreur(r.message || 'La connexion n’a pas pu démarrer.'); return; }
+      if (muet || !r) { direEtat(''); direErreur(T('c_oauth_muet', 'L’extension n’a pas répondu. Connecte-toi avec un code reçu par e-mail.')); return; }
+      if (!r.ok) { direEtat(''); direErreur(r.message || T('c_oauth_demarrer', 'La connexion n’a pas pu démarrer.')); return; }
       // Sans fenêtre : CET onglet navigue (jamais un onglet de plus, jamais window.open).
       if (r.memeOnglet && typeof r.url === 'string' && URL_AUTORISE.test(r.url) && r.url.split('?provider=')[1].startsWith(f + '&')) {
         if (CADRE) { direAuSite({ __vrmCarte: 'aller', url: r.url }); return; }   // c'est l'onglet du site qui part, pas le cadre
-        try { location.assign(r.url); } catch (_) { direEtat(''); direErreur('La connexion n’a pas pu démarrer.'); }
+        try { location.assign(r.url); } catch (_) { direEtat(''); direErreur(T('c_oauth_demarrer', 'La connexion n’a pas pu démarrer.')); }
       }
     });
   }

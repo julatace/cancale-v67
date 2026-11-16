@@ -104,7 +104,7 @@ const MIGRES = [
   // des propriétés (ou constantes) dont la valeur EST un texte affiché ; `@data-x` = l'élément JSX qui porte data-x.
   ['src/prochainGesteAnnonces.js', ['*'], { champs: ['texte', 'bouton'] }],
   ['src/facturationElectronique.js', ['etatFacturation'], { champs: ['raison', 'geste'] }],
-  ['src/design/QuiDorment.jsx', ['*']],
+  ['src/design/QuiDorment.jsx', ['*'], { champs: ['titre'] }],
   ['src/QuoiDeNeuf.jsx', ['*']],
   ['src/periodeLangue.js', ['*']],
   ['src/App.jsx', ['@data-colis-bordereau-frais']],   // le bandeau « Bordereau téléchargé il y a N min »

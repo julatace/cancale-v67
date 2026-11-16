@@ -252,6 +252,7 @@ import { aDaterParAnnee, anneeSureDeVente, tsVenteADater, periodeADater } from '
 import { plus30De } from './controleNuit.js';
 import { brancherVeille, noterReleveVeille } from './veilleLigne.js';
 import { prochainGesteAnnonces } from './prochainGesteAnnonces.js';
+import { trm, motsLangue } from './motsLangues.js';   // (16 nov.) « paire / article » dans chaque langue (tr() + les mots du vendeur)
 import AnnoncesMasquees from "./AnnoncesMasquees.jsx";
 import VueACompleter from "./AnnoncesACompleter.jsx";
 import AvisVente from "./AvisVente.jsx";
@@ -1071,7 +1072,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.385.0';
+const EXT_ATTENDUE = '5.394.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -1503,7 +1504,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { memephoto: '5.384.0', numerotes: '5.382.0', lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
+const EXT_CAPACITES = { langues: '5.394.0', memephoto: '5.384.0', numerotes: '5.382.0', lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -38946,8 +38947,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <span aria-hidden="true" style={{flexShrink:0,color:C.muted,display:'flex'}}><Icon name="eye" size={17}/></span>
               <span style={{flex:1,minWidth:0}}>
                 <span style={{display:'block',fontSize:13,fontWeight:600,color:C.text}}>{masqueesBloc.presentes.length > 0
-                  ? `${motArticle(masqueesBloc.presentes.length)} masqué${motsVendeur().e}${masqueesBloc.presentes.length>1?'s':''} par Vinted, compté${motsVendeur().e}${masqueesBloc.presentes.length>1?'s':''} sur ton étagère`
-                  : `${motArticle(masqueesBloc.parties.length)} masqué${motsVendeur().e}${masqueesBloc.parties.length>1?'s':''} par Vinted, déclaré${motsVendeur().e}${masqueesBloc.parties.length>1?'s':''} partie${masqueesBloc.parties.length>1?'s':''}`}</span>
+                  ? trm(masqueesBloc.presentes.length>1 ? 'mv.masquees.presentes.plusieurs' : 'mv.masquees.presentes.un', { n: String(masqueesBloc.presentes.length) })
+                  : trm(masqueesBloc.parties.length>1 ? 'mv.masquees.parties.plusieurs' : 'mv.masquees.parties.un', { n: String(masqueesBloc.parties.length) })}</span>
                 <span style={{display:'block',fontSize:11,color:C.muted,marginTop:2}}>Plus en vente, mais leur numéro reste protégé. Si l'une n'est plus chez toi, dis-le.</span>
               </span>
               <span style={{color:C.muted,fontSize:17}}>{masqOpen?'▾':'▸'}</span>
@@ -42194,13 +42195,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <span className="vrm-remise-egal" aria-hidden="true">=</span>
           {vignetteRemise(photoNouvelleRemise(r.nouvelle), '', r.titre || 'Nouvelle annonce')}
         </div>
-        <div className="vrm-remise-q"><b>Même {motsVendeur().nom}{r.options.length === 1 ? ` que N°${o0.numero}` : ''} ?</b>
-          <Pourquoi label="Pourquoi ?" titre={`Même ${motsVendeur().nom} ?`}>
-            {r.titre || 'Nouvelle annonce'} — {r.options.length === 1 ? <>c’est {motsVendeur().meme} que N°{o0.numero} « {o0.titre || 'ancienne annonce'} » ?</> : `c’est ${motsVendeur().meme} qu’${motsVendeur().une} de ${motsVendeur().celles}-ci ?`}
+        <div className="vrm-remise-q"><b>{r.options.length === 1 ? trm('mv.remise.qNum', { num: String(o0.numero) }) : trm('mv.remise.q')}</b>
+          <Pourquoi label="Pourquoi ?" titre={trm('mv.remise.q')}>
+            {r.titre || trm('mv.remise.nouvelle')} — {r.options.length === 1 ? trm('mv.remise.cest.un', { num: String(o0.numero), titre: o0.titre || trm('mv.remise.ancienne') }) : trm('mv.remise.cest.plusieurs')}
             {' '}{PHRASE_REMISE[o0.force]}
             {r.plusieurs && r.options.length > 1 ? ' Plusieurs anciennes lui ressemblent : seule l’étiquette dit laquelle.' : ''}
             {r.concurrence ? ' Une autre nouvelle annonce lui ressemble aussi.' : ''}
-            {' '}Tu as supprimé une annonce, puis tu en as mis une nouvelle. Si c’est {motsVendeur().meme}, {motsVendeur().elle} garde son numéro : rien à réécrire là où {motsVendeur().elle} est rangé{motsVendeur().e}.
+            {' '}{trm('mv.remise.pourquoi')}
           </Pourquoi>
         </div>
         <div className="vrm-remise-boutons">
@@ -42221,15 +42222,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return (<>
       {nSur > 0 && (
         <span className="vrm-pop-puce-hote" data-remise-resume={nSur} data-remise-bloc={tete.length ? undefined : nSur}>
-          <button type="button" className="vrm-pop-puce is-ambre" onClick={allerVignette} aria-label={`${nSur} annonce${nSur > 1 ? 's' : ''} : même ${motsVendeur().nom} qu’une ancienne ? Voir dans la grille`}>
+          <button type="button" className="vrm-pop-puce is-ambre" onClick={allerVignette} aria-label={trm('mv.remise.puce', { n: String(nSur) })}>
             <span className="vrm-pop-puce-n">{nSur}</span>
-            <span className="vrm-pop-puce-txt">Même {motsVendeur().nom} ?</span>
+            <span className="vrm-pop-puce-txt">{trm('mv.remise.q')}</span>
             <svg className="vrm-pop-puce-chev" width="7" height="12" viewBox="0 0 8 14" aria-hidden="true" focusable="false"><path d="M1.2 1.2 6.8 7l-5.6 5.8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </button>
         </span>
       )}
       {tete.length > 0 && (
-        <div className="vrm-remise-cartes" data-remise-bloc={tete.length} role="group" aria-label={`Annonces remises en ligne : même ${motsVendeur().nom} ?`}>
+        <div className="vrm-remise-cartes" data-remise-bloc={tete.length} role="group" aria-label={trm('mv.remise.cartes')}>
           {tete.slice(0, 20).map((r) => carteRemise(r, false))}
         </div>
       )}
@@ -44434,7 +44435,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     retirer: async (id) => {
       const reg = lireRegistre(registreFo); const p = reg.personnes[id]; if (!p) return false;
       const ids = Object.keys(reg.achats).filter((k) => reg.achats[k].fournisseur === id);
-      const ok = await askConfirm({ title: `Retirer ${p.nom} ?`, desc: ids.length ? `${ids.length} achat${ids.length > 1 ? 's' : ''} en gros partent avec lui et ses ${motsVendeur().noms} sont délié${motsVendeur().e}s. Un prix d’achat saisi à la main reste.` : 'Ses achats déjà saisis restent dans Achats.', ok: 'Retirer', cancel: 'Garder', danger: true });
+      const ok = await askConfirm({ title: trm('mv.gros.retirer.titre', { source: String(p.nom) }), desc: ids.length ? trm('mv.gros.retirer.desc', { n: String(ids.length) }) : trm('mv.gros.retirer.sansAchat'), ok: trm('mv.gros.retirer.ok'), cancel: trm('mv.gros.garder'), danger: true });
       if (!ok) return false;
       // (10 nov., lot Y) La confirmation reste (plusieurs prix d'un coup, §2.5) ; le retrait va ensuite à la
       // corbeille 30 jours : lui, ses achats en gros, ses rattachements et les liens de ses paires reviennent
@@ -44457,7 +44458,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     modifierAchat: async (aid, c) => {
       const a = achatGros(registreFo, aid); if (!a) return { erreur: 'Cet achat n’existe plus' };
       const n = reliesDuLot(numeros, aid).length;
-      if (Number(String(c.paires).trim()) < n) return { erreur: `${n} ${motsVendeur().noms} sont déjà relié${motsVendeur().e}s : délie-en d’abord` };
+      if (Number(String(c.paires).trim()) < n) return { erreur: trm('mv.gros.dejaRelies', { n: String(n) }) };
       const t = avecAchatGros(registreFo, aid, { ...c, fournisseur: a.fournisseur });
       if (t.erreur) return { erreur: t.erreur };
       poserRegistreFo((p) => avecAchatGros(p, aid, { ...c, fournisseur: a.fournisseur }).registre || p);
@@ -44466,7 +44467,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     retirerAchat: async (aid) => {
       const a = achatGros(registreFo, aid); if (!a) return false;
       const n = reliesDuLot(numeros, aid).length;
-      const ok = await askConfirm({ title: 'Retirer cet achat en gros ?', desc: n ? `${motArticle(n)} relié${motsVendeur().e}${n > 1 ? 's' : ''} : le prix posé par cet achat part aussi. Un prix d’achat saisi à la main reste.` : '', ok: 'Retirer', cancel: 'Garder', danger: true });
+      const ok = await askConfirm({ title: trm('mv.gros.retirerAchat.titre'), desc: n ? trm(n > 1 ? 'mv.gros.retirerAchat.desc.plusieurs' : 'mv.gros.retirerAchat.desc.un', { n: String(n) }) : '', ok: trm('mv.gros.retirer.ok'), cancel: trm('mv.gros.garder'), danger: true });
       if (!ok) return false;
       // (10 nov., lot Y) À la corbeille 30 jours, avec les liens de ses paires (un prix retapé depuis est gardé).
       const brut = load(CLE_FOURNISSEURS, {}) || {};
@@ -44482,7 +44483,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (!a || !entree) return;
       const relies = reliesDuLot(numeros, aid);
       const lien = ecritureLienGros(entree, a, { at: new Date().toISOString(), nRelies: relies.length });
-      if (!lien) { toast(relies.length >= a.paires ? `${motsVendeur().Toutes} les ${motsVendeur().noms} de cet achat sont relié${motsVendeur().e}s` : `N°${fiche.numero} est déjà relié à un achat`); return; }
+      if (!lien) { toast(relies.length >= a.paires ? trm('mv.gros.tousRelies') : trm('mv.gros.dejaRelieNum', { num: String(fiche.numero) })); return; }
       // Le prix de CETTE paire, s'il se pose sans rien remplacer (fiche sans prix) : la règle des prix, sur le lot avec elle.
       const avec = { ...numeros, [fiche.cle]: { ...entree, ...lien } };
       const w = ecrituresPrixGros({ achat: a, relies: reliesDuLot(avec, aid), prixParNum: prixParNumFo, confirme: true });
@@ -47030,7 +47031,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if(openConv.loading||openConv.error) return <FicheConvVolet site="vinted" etat="attente"/>;
     const pc=paireDeConv(String(openConv.acc?.vinted_user_id||''),openConv.convId,openConv.conversation);
     const fc=ficheDeConv(pc,openConv.acc);
-    if(!fc) return <FicheConvVolet site="vinted" etat="non-reliee" raison={`Vinted ne rattache aucun article à cette conversation : VRM ne devine pas ${motsVendeur().le} d’après le titre.`}/>;
+    if(!fc) return <FicheConvVolet site="vinted" etat="non-reliee" raison={trm('mv.conv.vinted')}/>;
     const attention=[fc.favoris!=null?`${fc.favoris} favori${fc.favoris>1?'s':''}`:null, fc.vues!=null?`${fc.vues} vue${fc.vues>1?'s':''}`:null].filter(Boolean);
     return <FicheConvVolet site="vinted" etat="reliee" fc={{ item: fc.item, num: fc.num, photo: fc.photo, titre: fc.titre, taille: fc.taille,
       sous: [fc.prix!=null?prix(fc.prix,fc.devise):null,fc.compte||null],
@@ -47736,11 +47737,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // (1er nov.) LE MODE EMBALLAGE, d'ici : il s'ouvre sur Colis, sur les
           // colis de la colonne « Prêts à imprimer », dans son ordre.
           if (pretsImpr > 0) jobs.push({ id:'emballer', n:pretsImpr, icon:'box', color:C.text,
-            title:tr('journee.emballerColisPrets'), sub:`${combien} — un par un : le N°, la photo, où est ${motsVendeur().le}`,
+            title:tr('journee.emballerColisPrets'), sub:trm('mv.emballer.sub', { combien: String(combien) }),
             action:'Emballer', tab:'cat_bord', prio:1, avant:()=>{ DEMANDE_EMBALLAGE.at = Date.now(); } });
           // (1er nov., « très répétitif ») Le même geste porté par la case « À envoyer »
           // quand elle se voit : la ligne d'« À faire » n'est alors plus redite (§7).
-          if (pretsImpr > 0) tuiles.envoyer.emballer = { n: pretsImpr, exact, phrase: `${combien} — un par un : le N°, la photo, où est ${motsVendeur().le}` };
+          if (pretsImpr > 0) tuiles.envoyer.emballer = { n: pretsImpr, exact, phrase: trm('mv.emballer.sub', { combien: String(combien) }) };
         }
         // (19 oct.) LES VENTES eBAY À POSTER comptent dans « À envoyer » — la
         // même règle que Colis (`colisEb`, §11). L'étiquette se prend dans eBay
@@ -47841,7 +47842,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if(conflitsNum.length){
           const nb=conflitsNum.length;
           jobs.push({id:'numeros-en-double',n:nb,icon:'alert',color:C.doublon,urgent:true,
-            title:`${nb} numéro${nb>1?'s':''} porté${nb>1?'s':''} par deux ${motsVendeur().noms}`,
+            title:trm('mv.doublons.titre', { n: String(nb) }),
             sub:`N°${conflitsNum.slice(0,4).map(c=>c.numero).join(', N°')}${nb>4?'…':''} — corrige avant d'expédier`,
             tab:'cat_bord',prio:0.05});
         }
@@ -48002,7 +48003,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             if (oj.reste > 0) jobs.push({ id: 'vestiaire-offres-reste', n: oj.reste, icon: 'tag', color: C.text, court: tr('journee.vcOffres.autres', { n: oj.reste }), detail: tr('journee.vcOffres.autresDetail'),
               action: tr('journee.vcOffre.voir'), tab: 'messages', avant: allerMessagesVc, prio: 1.26 + oj.lignes.length / 1000 });
           } }
-        tuiles.prix = { n: repriceList.length, sub: repriceList.length ? `Des ${motsVendeur().noms} vu${motsVendeur().e}s mais qui ne partent pas` : `${motsVendeur().Aucune} à baisser` };
+        tuiles.prix = { n: repriceList.length, sub: repriceList.length ? trm('mv.prix.vus') : trm('mv.prix.aucune') };
         // ⚠️⚠️ SES EMAILS MIS DE CÔTÉ QUE PERSONNE NE PEUT RÉCUPÉRER. Au seul
         //    propriétaire de l'installation (la route ne le dit qu'à lui), UNE
         //    ligne tant qu'il y en a, avec le geste : déclarer ses adresses.
@@ -48821,7 +48822,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const stock=lu?resumerStockJournee(annBase.filter(it=>!emailSoldIds.has(String(it.id)) && !annoncesVendues.has(String(it.id))),numeros):null;
           return <section className="vrm-day-stock vrm-day-card" aria-label={tr('journee.apercuStockVinted')} style={{background:C.card,border:`1px solid ${C.border}`,color:C.text}}>
             <div className="vrm-day-head"><h3>{tr('journee.stockActuel')} <span>Vinted</span></h3><Icon name="box" size={18}/></div>
-            <div className="vrm-day-stock-total" data-stock-en-ligne={stock?.total}><strong>{stock?stock.total:'—'}</strong><span>{stock?.total===1?motsVendeur().nom:motsVendeur().noms} en ligne</span></div>
+            <div className="vrm-day-stock-total" data-stock-en-ligne={stock?.total}><strong>{stock?stock.total:'—'}</strong><span>{trm(stock?.total===1 ? 'mv.enLigne.un' : 'mv.enLigne.plusieurs')}</span></div>
             {stock ? <>
               <div className="vrm-day-stock-meter" role="img" aria-label={tr('journee.annoncesAvecPrix', { renseignes: String(stock.renseignes), total: String(stock.total) })}><span style={{width:(stock.total?stock.renseignes/stock.total*100:0)+'%',background:C.accent}}/></div>
               <div className="vrm-day-stock-prices"><span>{tr('journee.coutAchatRenseigne')}</span><b>{stock.renseignes?stock.cout.toLocaleString('fr-FR',{style:'currency',currency:'EUR'}):'—'}</b></div>
@@ -50658,7 +50659,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <div style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:8}}>
             {perf.joursMoy!=null && <StatBox label={tr('ventes.tempsVente')} value={`${perf.joursMoy.toFixed(0)} j`} sub={`moyenne sur ${perf.joursNb}`}/>}
             {perf.ecoul!=null && <StatBox label={tr('ventes.ecoulement')} value={`${perf.ecoul.toFixed(0)}\u00a0%`} sub={`${perf.vendues} vendu / ${perf.online} en ligne`}/>}
-            {perf.bestBrand && <StatBox label={tr('ventes.topMarque')} value={perf.bestBrand.brand} sub={`+${perf.bestBrand.moy.toFixed(0)} €/${motsVendeur().nom}`}/>}
+            {perf.bestBrand && <StatBox label={tr('ventes.topMarque')} value={perf.bestBrand.brand} sub={trm('mv.ventes.parNom', { x: perf.bestBrand.moy.toFixed(0) })}/>}
             {/* (5 nov.) « Compte qui vend le mieux » : une seule place, Statistiques → « Quel compte vend le mieux ». */}
           </div>
         )}
@@ -52355,7 +52356,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {offresAuto && ext!=='ok' && (
               <div data-offres-auto-ext={ext} className="vrm-offres-auto-ext" style={{color:C.warn}}>{ext==='absente'
                 ? tr('annonces.rienPartIci')
-                : `Mets l'extension à jour (${EXT_CAPACITES.offresgarde.replace(/\.0$/,'')}) : une plus ancienne pourrait accepter une offre sur ${motsVendeur().un} déjà vendu${motsVendeur().e} ailleurs.`}</div>
+                : trm('mv.offres.extAJour', { v: EXT_CAPACITES.offresgarde.replace(/\.0$/,'') })}</div>
             )}
           </div>
           );
@@ -53100,7 +53101,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {annStats.pretLbc>0 && (annStats.aRecapturer===0 || annStats.prepaCommun==='prete') ? <span data-prepa-pretes={annStats.pretLbc}>{tr('annonces.pretesLeboncoin', { pretLbc: String(annStats.pretLbc) })}</span> : ''}
           </div>
           <div className="vrm-rangee" style={{display:'flex',gap:8,marginBottom:10,alignItems:'center',WebkitOverflowScrolling:'touch',scrollbarWidth:'none',msOverflowStyle:'none',paddingBottom:2}}>
-            {annStats.sansNum>0 && <span data-sans-num={annStats.sansNum} title={`Le N° est la référence qui retrouve ${motsVendeur().le} sur Leboncoin : touche « + N° » sur sa fiche.`} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'4px 11px'}}>{trj('annonces.sansLeurFaut', { n: annStats.sansNum })}</span>}
+            {annStats.sansNum>0 && <span data-sans-num={annStats.sansNum} title={trm('mv.annonces.sansNumTitre')} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'4px 11px'}}>{trj('annonces.sansLeurFaut', { n: annStats.sansNum })}</span>}
             {/* ⚠️ « Toute l'annonce captée ? » — même base que la grille (§11). */}
             {annStats.aRecapturer>0 && <span data-prepa-resume={annStats.aRecapturer} data-prepa-commun={annStats.prepaCommun||''} title={tr('annonces.articleOntToutes', { pretLbc: String(annStats.pretLbc), aRecapturer: String(annStats.aRecapturer) })} style={{flexShrink:0,whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:C.warn,background:`${C.warn}14`,border:`1px solid ${C.warn}55`,borderRadius:12,padding:'4px 11px'}}>{trj('annonces.recapturerLeboncoin', { aRecapturer: annStats.aRecapturer })}</span>}
             {/* Une paire qui dort se rattrape : de l'ambre, jamais du rouge (§5.56). */}
@@ -55976,11 +55977,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {lotView && (
         <div onClick={()=>setLotView(null)} style={{position:'fixed',inset:0,zIndex:1300,background:'rgba(0,0,0,0.55)',display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setLotView(null)}/>
-          <div ref={lotPanneauRef} role="dialog" aria-modal="true" aria-label={`${motsVendeur().Noms} du lot`} tabIndex={-1} data-lot-paires=""
+          <div ref={lotPanneauRef} role="dialog" aria-modal="true" aria-label={trm('mv.lot.titre')} tabIndex={-1} data-lot-paires=""
             onKeyDown={e=>{ if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); setLotView(null); } }}
             onClick={e=>e.stopPropagation()} style={{outline:'none',width:'min(560px,100%)',maxHeight:'82vh',overflowY:'auto',background:C.bg,borderRadius:'18px 18px 0 0',padding:'16px 16px calc(28px + env(safe-area-inset-bottom))'}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
-              <div style={{fontSize:17,fontWeight:700,color:C.text}}>📦 {motsVendeur().Noms} du lot</div>
+              <div style={{fontSize:17,fontWeight:700,color:C.text}}>📦 {trm('mv.lot.titre')}</div>
               <button className="vrm-icon-control" type="button" onClick={()=>setLotView(null)} aria-label="Fermer" style={{border:`1px solid ${C.border}`,background:'transparent',color:C.text,borderRadius:12,width:34,height:34,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}><Icon name="close" size={15}/></button>
             </div>
             <div style={{fontSize:12,color:C.muted,marginBottom:12}}>{lotView.order?.title||''}{lotView.order?.price?.amount!=null?` · ${Number(lotView.order.price.amount).toFixed(0)}\u00a0${cur(lotView.order.price?.currency_code)}`:''}{classifyOrderStatus(lotView.order?.status)==='cancelled'?' · ❌ remboursé (hors CA)':''}</div>

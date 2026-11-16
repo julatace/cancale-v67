@@ -25,6 +25,7 @@ import { FilLeboncoin } from './MessagesLeboncoin.jsx';
 import { FilVestiaire, ficheDuNumero } from './Vestiaire.jsx';
 import { CLE_FILS_RELIES, convVinted, convLeboncoin, convVestiaire, convEbay, regrouperFils, suggestionsFils, relierFils, refuserFils, delierFil, messagesDuFil, conversationDeReponse } from '../filUnique.js';
 import { trj } from '../i18n/react.js';
+import { trm } from '../motsLangues.js';   // (16 nov.) « paire / article » dans chaque langue
 import { heureListe } from '../ordreConversations.js';   // (15 nov., verre 2) la même heure que la liste Vinted
 import { montant } from '../format.js';
 const montantCourt = (v) => montant(v);
@@ -309,7 +310,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
                 <div key={p.cle} data-fil-proposition={p.sorte} data-fil-a={p.a} data-fil-b={p.b} style={{ border: `1px solid ${C.border}`, borderRadius: 16, background: C.card, padding: 12, marginBottom: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 600, color: C.text }}>
                     <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 999, background: C.warn, flexShrink: 0 }}/>
-                    {p.sorte === 'paire' ? `Peut-être ${motsVendeur().meme} ?` : tr('messages.peutEtreMeme2')}
+                    {p.sorte === 'paire' ? trm('mv.messages.peutEtre') : tr('messages.peutEtreMeme2')}
                   </div>
                   <div style={{ ...muted, marginTop: 4 }}>
                     {[A, B].map((f, i) => <div key={f.cle} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}><Marques plateformes={f.plateformes}/><span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{nomDe(f)}{f.num ? ` · N°${f.num}` : ''}</span></div>)}

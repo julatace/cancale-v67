@@ -115,6 +115,7 @@ import { DEMANDE_INVENTAIRE_ANNUEL } from '../inventaireAnnuel.js';
 import { jourParis } from '../dateParis.js';   // (11 nov.) jour à l'heure de Paris
 import { valeurSue } from '../sommeConnue.js';   // (11 nov.) « pas su » ≠ 0
 import { trj } from '../i18n/react.js';
+import { motsLangue } from '../motsLangues.js';   // (16 nov.) le mot « paires / articles » dans la langue de l'écran
 import DeclarationAnnuelle from '../composants/DeclarationAnnuelle.jsx';   // (14 nov., lot argent-choix — proposition 82)
 import { declarationAnnuelle } from '../declarationAnnuelle.js';
 // ⟦← App.jsx #4⟧
@@ -4041,7 +4042,7 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
     : B.raison === 'cotisations' ? <>{tr('compta.attenteChiffreAffaires')}</>
     : B.raison === 'rien' ? <>{tr('compta.aucuneVenteFinalisee2')}</>
     : B.n === 0 ? <>{tr('compta.aucuneVenteFinalisee3')}{B.depenses === 'jamais' ? '' : tr('compta.seulesDepensesComptent')}.</>
-    : <>{tr('compta.reste')}{B.depenses === 'jamais' ? tr('compta.avantDepenses') : ''} {tr('compta.ventesFinaliseesMoins2')} {motsVendeur().noms}{B.fraisCouverts > 0 ? tr('compta.fraisVente') : ''}{B.depenses === 'jamais' ? '' : tr('compta.depenses')}{B.sansCotis ? '' : tr('compta.urssaf')}.</>;
+    : <>{tr('compta.reste')}{B.depenses === 'jamais' ? tr('compta.avantDepenses') : ''} {tr('compta.ventesFinaliseesMoins2')} {motsLangue().noms}{B.fraisCouverts > 0 ? tr('compta.fraisVente') : ''}{B.depenses === 'jamais' ? '' : tr('compta.depenses')}{B.sansCotis ? '' : tr('compta.urssaf')}.</>;
   // La couverture n'est redite que si la phrase ne la dit pas déjà (raison « achats »).
   const couverture = !B || B.n === 0 || B.raison === 'achats' ? null
     : B.nCout === B.n ? <>{tr('annonces.prixAchat')} {B.n === 1 ? tr('compta.connu1Vente') : tr('compta.connusVentes', { x: String(B.n) })}.</>

@@ -60,9 +60,11 @@ import ecran_etageres from './de/etageres.js';   // (15 nov.) le Stock en étag�
 import ecran_journee_verre from './de/journee-verre.js';   // (15 nov.) Ma journée verre, la paire à sortir
 import ecran_arrivee from './de/arrivee.js';   // (15 nov.) atelier d'arrivée, historique, taille du texte
 import ecran_restes from './de/restes.js';   // (16 nov.) textes restés hors tr()
+import ecran_mots from './de/mots.js';   // (16 nov.) textes restés hors tr()
 import ecran_nouveautes from './de/nouveautes.js';   // (16 nov.) « Quoi de neuf », chaque nouveauté
 export default {
   ...ecran_restes,
+  ...ecran_mots,
   ...ecran_nouveautes,
   ...ecran_ventesVerre,
   ...ecran_studio_paires,

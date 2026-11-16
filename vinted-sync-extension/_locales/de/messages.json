@@ -1,0 +1,407 @@
+{
+  "c_a_heure": {
+    "message": "um {h}"
+  },
+  "c_annuler": {
+    "message": "Abbrechen"
+  },
+  "c_captcha": {
+    "message": "VRM verlangt eine Anti-Roboter-Prüfung, die die Karte nicht anzeigen kann. Tipp in den Einstellungen der Erweiterung auf das VRM-Symbol, um dich anzumelden."
+  },
+  "c_ce_compte": {
+    "message": "Dieses Konto"
+  },
+  "c_ce_site": {
+    "message": "diese Seite"
+  },
+  "c_changer_email": {
+    "message": "E-Mail ändern"
+  },
+  "c_code_a_la_place": {
+    "message": "Stattdessen einen Code erhalten"
+  },
+  "c_code_aide": {
+    "message": "6 Ziffern. Nur der zuletzt erhaltene Code gilt."
+  },
+  "c_code_demander": {
+    "message": "Mit einem Code anmelden"
+  },
+  "c_code_demander_aide": {
+    "message": "Ein 6-stelliger Code kommt an diese E-Mail. Geht auch, wenn du dein Konto mit Google oder Discord erstellt hast."
+  },
+  "c_code_envoi": {
+    "message": "Code wird gesendet…"
+  },
+  "c_code_envoye": {
+    "message": "Code an <b>{email}</b> gesendet. Schau in dein Postfach (und den Spam)."
+  },
+  "c_code_nouveau": {
+    "message": "Neuer Code gesendet. Nur dieser letzte gilt."
+  },
+  "c_code_pas_parti": {
+    "message": "Der Code konnte nicht gesendet werden."
+  },
+  "c_code_recu": {
+    "message": "Per E-Mail erhaltener Code"
+  },
+  "c_code_refuse": {
+    "message": "Code abgelehnt."
+  },
+  "c_code_renvoyer": {
+    "message": "Code erneut senden"
+  },
+  "c_code_renvoyer_dans": {
+    "message": "Code erneut senden (in {s} s)"
+  },
+  "c_code_tape": {
+    "message": "Gib die 6 Ziffern des per E-Mail erhaltenen Codes ein."
+  },
+  "c_code_valider": {
+    "message": "Code bestätigen"
+  },
+  "c_compte_site": {
+    "message": "{site}-Konto"
+  },
+  "c_continuer": {
+    "message": "Weiter mit {nom}"
+  },
+  "c_email": {
+    "message": "E-Mail deines VRM-Kontos"
+  },
+  "c_email_forme": {
+    "message": "Diese E-Mail hat nicht die richtige Form (Beispiel: name@beispiel.de)."
+  },
+  "c_il_y_a_h": {
+    "message": "vor {n} Std."
+  },
+  "c_il_y_a_j": {
+    "message": "vor {n} T."
+  },
+  "c_il_y_a_min": {
+    "message": "vor {n} Min."
+  },
+  "c_instant": {
+    "message": "gerade eben"
+  },
+  "c_j_ai_mdp": {
+    "message": "Ich habe ein Passwort"
+  },
+  "c_mdp": {
+    "message": "VRM-Passwort"
+  },
+  "c_mdp_aide": {
+    "message": "Die von vrm.center — nicht die von Vinted."
+  },
+  "c_me_connecter": {
+    "message": "Anmelden"
+  },
+  "c_muet": {
+    "message": "Die Erweiterung hat nicht geantwortet. Versuch es gleich noch einmal."
+  },
+  "c_oauth_demarrer": {
+    "message": "Die Anmeldung konnte nicht starten."
+  },
+  "c_oauth_fenetre": {
+    "message": "Ein kleines {nom}-Fenster öffnet sich. Melde dich an: es schließt sich von selbst."
+  },
+  "c_oauth_muet": {
+    "message": "Die Erweiterung hat nicht geantwortet. Melde dich mit einem per E-Mail erhaltenen Code an."
+  },
+  "c_oauth_onglet": {
+    "message": "Ich bringe dich zu {nom}, in diesem Tab. Du kommst angemeldet hierher zurück."
+  },
+  "c_ou": {
+    "message": "oder"
+  },
+  "c_oubli": {
+    "message": "Passwort vergessen?"
+  },
+  "c_r_a_connecter": {
+    "message": "Mit VRM zu verbinden"
+  },
+  "c_r_a_jour": {
+    "message": "{nom} · aktuell {quand}"
+  },
+  "c_r_aucun_vinted": {
+    "message": "Hier ist kein Vinted-Konto angemeldet"
+  },
+  "c_r_bascule": {
+    "message": "VRM-Konto gewechselt: unten prüfen"
+  },
+  "c_r_bloquees": {
+    "message": "Einstellen 24 Std. gesperrt"
+  },
+  "c_r_en_pause": {
+    "message": "Einstellen pausiert"
+  },
+  "c_r_expiree": {
+    "message": "VRM-Sitzung abgelaufen: melde dich neu an"
+  },
+  "c_r_ignore": {
+    "message": "{nom} ignoriert: deine Wahl"
+  },
+  "c_r_lbc_geste": {
+    "message": "Leboncoin wartet auf einen Schritt: siehe unten"
+  },
+  "c_r_lbc_inconnu": {
+    "message": "Leboncoin-Konto noch nicht erkannt"
+  },
+  "c_r_lbc_lues": {
+    "message": "{nom} · Anzeigen gelesen"
+  },
+  "c_r_lbc_pas_lues": {
+    "message": "{nom} · Anzeigen noch nicht gelesen"
+  },
+  "c_r_muette": {
+    "message": "Die Erweiterung antwortet nicht"
+  },
+  "c_r_pas_lu_site": {
+    "message": "VRM liest {site} noch nicht"
+  },
+  "c_r_pas_su": {
+    "message": "VRM-Verbindung im Moment unbekannt"
+  },
+  "c_r_pause": {
+    "message": "Pause: Vinted bremst · weiter um {h}"
+  },
+  "c_r_redemarrer": {
+    "message": "Erweiterung neu starten — siehe unten"
+  },
+  "c_r_refuse": {
+    "message": "Letzte Sendung abgelehnt: siehe unten"
+  },
+  "c_r_reprise": {
+    "message": " · weiter um {h}"
+  },
+  "c_r_rien": {
+    "message": "{nom} · bisher nichts gesendet"
+  },
+  "c_r_vc_lu": {
+    "message": "Vestiaire gelesen {quand}"
+  },
+  "c_r_vc_page": {
+    "message": "Vestiaire: eine Seite noch nicht gelesen"
+  },
+  "c_r_vc_pas_lu": {
+    "message": "Vestiaire noch nicht gelesen"
+  },
+  "c_r_verif": {
+    "message": "Prüfung…"
+  },
+  "c_refusee": {
+    "message": "Anmeldung abgelehnt."
+  },
+  "c_tape_email": {
+    "message": "Gib die E-Mail deines VRM-Kontos ein."
+  },
+  "c_tape_les_deux": {
+    "message": "Gib E-Mail und Passwort deines VRM-Kontos ein."
+  },
+  "c_tape_mdp": {
+    "message": "Gib dein VRM-Passwort ein."
+  },
+  "p_ancien_code": {
+    "message": "Die Erweiterung dieses Chrome läuft noch mit altem Code: öffne chrome://extensions und klick ⟳ bei VRM — oder melde dich hier mit deinem VRM-Passwort an."
+  },
+  "p_avec_vrm": {
+    "message": "Mit VRM anmelden"
+  },
+  "p_captcha": {
+    "message": "Die Anmeldung mit Passwort ist über die Erweiterung nicht mehr möglich: nutze « Mit VRM anmelden »."
+  },
+  "p_compte_neuf": {
+    "message": "Dieses Konto war mit keinem VRM-Konto verknüpft: gerade wurde ein neues VRM-Konto erstellt. Hast du schon eins, klick « Abmelden » und melde dich mit dessen E-Mail und Passwort an."
+  },
+  "p_connecte": {
+    "message": "angemeldet"
+  },
+  "p_connectee": {
+    "message": "Die Erweiterung ist verbunden: deine Daten gehen raus, wenn du Vinted, Leboncoin oder Vestiaire öffnest."
+  },
+  "p_continuer": {
+    "message": "Weiter mit {nom}"
+  },
+  "p_cree_avec_plusieurs": {
+    "message": "Konto mit {noms} erstellt? Nutze die Knöpfe oben."
+  },
+  "p_cree_avec_un": {
+    "message": "Konto mit {noms} erstellt? Nutze den Knopf oben."
+  },
+  "p_deconnecter": {
+    "message": "Abmelden"
+  },
+  "p_diag_1": {
+    "message": "Zeichne deinen Weg auf: Glocke → Mitteilung → Gespräch. Kein automatischer Klick, keine Eingabe und kein Nachrichteninhalt gespeichert."
+  },
+  "p_diag_2": {
+    "message": "Ein einziger Vinted-Tab, höchstens drei Minuten. Lokaler, löschbarer Bericht, nie an VRM gesendet. Der Bericht läuft 30 Minuten nach dem Start beim nächsten Aufruf ab."
+  },
+  "p_diag_arreter": {
+    "message": "Stoppen und Bericht ansehen"
+  },
+  "p_diag_copier": {
+    "message": "Bericht kopieren"
+  },
+  "p_diag_demarrer": {
+    "message": "Weg aufzeichnen"
+  },
+  "p_diag_effacer": {
+    "message": "Bericht löschen"
+  },
+  "p_diag_rapport": {
+    "message": "Bericht vor dem Teilen lesen"
+  },
+  "p_diag_rapport_aria": {
+    "message": "Bericht des Vinted-Wegs"
+  },
+  "p_diag_titre": {
+    "message": "Favoriten-Diagnose"
+  },
+  "p_email": {
+    "message": "E-Mail deines VRM-Kontos"
+  },
+  "p_email_forme": {
+    "message": "Diese E-Mail hat nicht die richtige Form (Beispiel: name@beispiel.de)."
+  },
+  "p_expiree": {
+    "message": "Sitzung abgelaufen"
+  },
+  "p_langue": {
+    "message": "de"
+  },
+  "p_maj_c1": {
+    "message": "Öffne die geladene Datei: sie wird entpackt."
+  },
+  "p_maj_c2": {
+    "message": "Ersetze den alten VRM-Ordner durch den neuen."
+  },
+  "p_maj_c3": {
+    "message": "chrome://extensions → ⟳ bei VRM."
+  },
+  "p_maj_o1": {
+    "message": "Tipp auf « Herunterladen »."
+  },
+  "p_maj_o2": {
+    "message": "Orion → Erweiterungen → + → diese Datei."
+  },
+  "p_maj_o3": {
+    "message": "Öffne dieses Fenster erneut."
+  },
+  "p_maj_telecharger": {
+    "message": "Herunterladen"
+  },
+  "p_maj_titre": {
+    "message": "Neue Version verfügbar · {v}"
+  },
+  "p_mdp": {
+    "message": "VRM-Passwort"
+  },
+  "p_me_connecter": {
+    "message": "Anmelden"
+  },
+  "p_muet": {
+    "message": "Die Erweiterung hat nicht geantwortet. Versuch es gleich noch einmal; wenn es anhält, nutze « Mit VRM anmelden » weiter unten."
+  },
+  "p_non_connecte": {
+    "message": "Nicht angemeldet"
+  },
+  "p_oauth_abouti": {
+    "message": "Die Anmeldung ist nicht gelungen."
+  },
+  "p_oauth_demarrer": {
+    "message": "Die Anmeldung konnte nicht starten."
+  },
+  "p_oauth_ouvre": {
+    "message": "{nom} öffnet sich in einem neuen Tab. Melde dich an: der Tab schließt sich von selbst und die Erweiterung ist verbunden."
+  },
+  "p_ou": {
+    "message": "oder"
+  },
+  "p_ou_liste": {
+    "message": " oder "
+  },
+  "p_oubli": {
+    "message": "Passwort vergessen?"
+  },
+  "p_ouvre": {
+    "message": "Ich öffne VRM…"
+  },
+  "p_ouvrir_vrm": {
+    "message": "VRM öffnen"
+  },
+  "p_pas_de_compte": {
+    "message": "Noch kein Konto? <a href=\"https://vrm.center/?inscription\" target=\"_blank\" rel=\"noreferrer\">Öffne vrm.center</a> und erstelle es in einer Minute."
+  },
+  "p_pas_repondu_temps": {
+    "message": "Die Erweiterung hat nicht rechtzeitig geantwortet. VRM ist offen: passiert nichts, melde dich hier mit deinem VRM-Passwort an."
+  },
+  "p_quel_compte": {
+    "message": "Deine <b>VRM</b>-E-Mail und dein Passwort (die von vrm.center) — nicht dein Vinted-Passwort."
+  },
+  "p_refusee": {
+    "message": "Anmeldung abgelehnt."
+  },
+  "p_renouvelle": {
+    "message": "Verbunden — deine Sitzung wird erneuert, einen Moment."
+  },
+  "p_rien_ne_marche": {
+    "message": "Nichts klappt? Über die VRM-Seite anmelden"
+  },
+  "p_tape_email": {
+    "message": "Gib die E-Mail deines VRM-Kontos ein."
+  },
+  "p_tape_les_deux": {
+    "message": "Gib E-Mail und Passwort deines VRM-Kontos ein."
+  },
+  "p_tape_mdp": {
+    "message": "Gib dein VRM-Passwort ein."
+  },
+  "p_titre": {
+    "message": "Anmeldung bei VRM"
+  },
+  "p_transp_autoriser": {
+    "message": "VRM erlauben, die Sendungsverfolgung zu lesen"
+  },
+  "p_transp_icone": {
+    "message": "Um die Sendungsverfolgung bei den Versanddiensten zu lesen, klick auf das VRM-Symbol in der Browserleiste und erlaube es."
+  },
+  "p_transp_ok": {
+    "message": "Erlaubt: die Erweiterung kann jetzt die Sendungsverfolgung auf diesen Seiten lesen."
+  },
+  "p_transp_pourquoi": {
+    "message": "Um die Sendungsverfolgung auf den Seiten der Versanddienste (Mondial Relay, Chronopost, Vinted Go) zu lesen, muss dieser Browser es zuerst erlauben. VRM liest dort nur den Status der Pakete, die du erwartest."
+  },
+  "p_transp_refus": {
+    "message": "Nicht erlaubt: von diesem Browser wird auf diesen Seiten nichts gelesen. VRM liest, was es auf seiner Seite kann."
+  },
+  "pp_arrete": {
+    "message": "Aufzeichnung gestoppt · {n} Schritte. Lies den Bericht, bevor du ihn kopierst."
+  },
+  "pp_copie": {
+    "message": "Bericht kopiert. Du kannst ihn mit dem VRM-Support teilen."
+  },
+  "pp_en_cours": {
+    "message": "Aufzeichnung läuft. Schließ dieses Fenster und öffne auf Vinted die Glocke, dann den Favoriten."
+  },
+  "pp_indispo": {
+    "message": "Der lokale Bericht ist nicht verfügbar."
+  },
+  "pp_muet": {
+    "message": "Die Erweiterung hat nicht geantwortet. Kein Start bestätigt."
+  },
+  "pp_navigateur": {
+    "message": "Dieser Browser erlaubt diesen Befehl nicht."
+  },
+  "pp_ouvre": {
+    "message": "Öffne Vinted im aktiven Tab, dann starte."
+  },
+  "pp_pas_confirme": {
+    "message": "Der lokale Bericht konnte nicht bestätigt werden."
+  },
+  "pp_selectionne": {
+    "message": "Markier den Bericht unten und kopier ihn."
+  },
+  "pp_verif": {
+    "message": "Prüfung…"
+  }
+}

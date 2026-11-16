@@ -122,7 +122,7 @@ const T = {
   'argent-prix-comptable': ['A read-only link for your accountant', 'Accounts only, expiring, revocable; and the monthly review.'],
   'refonte-sites-reglages': ['Sites and Settings: the list first', 'Leboncoin, eBay, Vestiaire: « To do » in one line, dense rows.'],
   'argent-choix': ['Paste your prices, what to rebuy, return ready', 'A pasted « No.; price » table, profit by model and size.'],
-  'recherche-phrase': ['Search in a sentence: « nike 42 not sold »', 'Your sentence becomes filters you change in one tap.'],
+  'recherche-phrase': ['Search in a sentence: « blue 42 not sold »', 'Your sentence becomes filters you change in one tap.'],
   'glisser-selection': ['Tick several listings by sliding your finger', 'In Select, slide from a box, like in Photos.'],
   'epingles': ['Pin your pairs at the top', 'Up to 20, the same on all your devices.'],
   'comparer-paires': ['Compare two pairs side by side', 'Purchase, price, margin, online since, condition: aligned.'],

@@ -122,7 +122,7 @@ const T = {
   'argent-prix-comptable': ['Un enlace de solo lectura para tu contable', 'Solo la contabilidad, caduca, revocable; y la revisión del mes.'],
   'refonte-sites-reglages': ['Sitios y Ajustes: la lista primero', 'Leboncoin, eBay, Vestiaire: « Por hacer » en una línea, filas densas.'],
   'argent-choix': ['Pegar tus precios, qué recomprar, declaración lista', 'Una tabla « N.º; precio » pegada, el beneficio por modelo y talla.'],
-  'recherche-phrase': ['Buscar con una frase: « nike 42 no vendida »', 'Tu frase se vuelve filtros que cambias de un toque.'],
+  'recherche-phrase': ['Buscar con una frase: « azul 42 no vendida »', 'Tu frase se vuelve filtros que cambias de un toque.'],
   'glisser-selection': ['Marcar varios anuncios deslizando el dedo', 'En Seleccionar, desliza desde una casilla, como en Fotos.'],
   'epingles': ['Fija tus pares arriba', 'Hasta 20, los mismos en todos tus dispositivos.'],
   'comparer-paires': ['Comparar dos pares lado a lado', 'Compra, precio, margen, en línea desde, estado: alineado.'],
