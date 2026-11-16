@@ -232,7 +232,12 @@ const attendrePartie = async (pg, ms) => { const vu = []; for (let t = 0; t < ms
     await aller(pg, 'journee'); await ouvrirTrancher(pg);
     await pg.click(CARTE + ' [data-a-trancher-oui]');
     await pg.waitForSelector('[data-pilule-annuler]', { timeout: 5000 });
-    if (vp.width < 600) await pg.tap('[data-pilule-annuler]'); else await pg.click('[data-pilule-annuler]');
+    // (16 nov., bancs-rouges-a) Sous charge, l'entrée animée de la pilule n'était pas « stable » avant qu'elle parte toute
+    // seule (Playwright : « not stable », puis « detached »). On juge ce qui compte — rien ne recouvre « Annuler » au point
+    // touché — puis on touche sans attendre la fin de l'animation.
+    const libre = await pg.evaluate(() => { const b = document.querySelector('[data-pilule-annuler]'); const q = b.getBoundingClientRect(); const h = document.elementFromPoint(q.x + q.width / 2, q.y + q.height / 2); return !!h && (h === b || b.contains(h)); });
+    dit(libre, `P ${nom} : rien ne recouvre « Annuler » de la pilule`);
+    if (vp.width < 600) await pg.tap('[data-pilule-annuler]', { force: true }); else await pg.click('[data-pilule-annuler]', { force: true });
     if (vp.width >= 600) await pg.mouse.move(vp.width / 2, 200);
     await pg.waitForSelector(CARTE, { timeout: 15000 }).catch(() => {});
     const t1 = await attendrePartie(pg, 7000);
