@@ -55,7 +55,16 @@ VRM ne l'appelle que si elle existe (`vibrerSiPossible` : Android / Chrome, 12 m
 
 ## Mesures
 
-(remplies au dernier passage du banc : voir le rapport de PR)
+- Banc `relier-glisser` : **39/0** (390 doigt : défilement rapide ⇒ la liste défile, rien ne se lève ; appui
+  long 650 ms ⇒ levé ; lâché dans le vide ⇒ rien ; bord bas tenu ⇒ la liste cible défile seule ; glissé sur
+  N°2 ⇒ elle seule s'éclaire, « Relier N°2 à cet achat de 40,00 € ? », « Oui » ⇒ fiche N°2 seule reliée,
+  annonce et achat sortent des listes ; pilule « Annuler » ⇒ lien retiré, l'annonce revient. 1512 souris :
+  deux colonnes, molette ⇒ aucun glisser, vide ⇒ rien, glissé sur la vente ⇒ lien sur la vente (son n°),
+  Annuler ⇒ retiré ; clavier : Entrée choisit, « Relier ici » ⇒ même question, rien écrit avant « Oui »).
+- Défauts trouvés par le banc et corrigés : (1) traverser le bord haut de la liste cible en arrivant des
+  achats la faisait remonter (on lâchait sur N°4 au lieu de N°2) ⇒ défilement seulement si le doigt RESTE
+  300 ms dans la zone ; (2) « Annuler » ne rendait pas le prix par N° à l'écran (l'annonce ne revenait pas)
+  ⇒ le setter `vinted_buyprice_by_num` est passé au geste.
 
 ## ÉTAT À LA REPRISE
 
