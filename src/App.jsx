@@ -1043,6 +1043,7 @@ import { trj, useLangue } from './i18n/react.js';
 import { CollerPrixAchatFeuille } from "./composants/CollerPrixAchat.jsx";   // (14 nov., lot argent-choix — proposition 75)
 import { verifierAvantEcriture } from "./collerPrixAchat.js";
 // (15 nov., parcours nouveau) Le parcours d'un nouveau en huit étapes, un écran plein (src/parcoursNouveau/).
+import { CLE_MESURE_DEMARRAGE, CLE_MESURE_COUPEE, noterEtape as noterEtapeDemarrage, tempsDejaPasse as tempsDejaPasseDemarrage, mesureCoupee as mesureDemarrageCoupee } from "./mesureDemarrage.js";   // (16 nov., satisfaction-clients) les 10 premières minutes, anonymes et coupables
 import { CLE_PARCOURS_NOUVEAU, parcoursNouveauAOuvrir, lireParcoursNouveau, positionApres as positionParcoursNouveau, etatsEtapes as etatsParcoursNouveau, appareilIci as appareilParcoursNouveau, dansOrionIci, reglageNumerotation, reglagePlateformes, ETAPES_NOUVEAU } from "./parcoursNouveau/regle.js";
 import { bacASableActif, bacASableEtape, bacASableAppareil } from "./modeExemple.js";
 import { CLE_AIDES as CLE_AIDES_PN, noterVisiteVue as noterVisiteVuePN } from "./accueilReste/aides.js";
@@ -3226,6 +3227,9 @@ const SYNC_KEYS = [
   // (15 nov., parcours nouveau) Le parcours d'un nouveau en huit étapes (src/parcoursNouveau/regle.js) :
   // { etape, vues, fini, finiLe, plusTard, at } — repris à la même étape sur n'importe quel appareil.
   'vrm_parcours_nouveau',
+  // (16 nov., satisfaction-clients) Les 10 premières minutes (src/mesureDemarrage.js) : { v, t: { etape: secondes } }
+  // — l'étape atteinte et le temps passé dans le parcours, rien d'autre — et son interrupteur (coupée ⇒ rien écrit).
+  CLE_MESURE_DEMARRAGE, CLE_MESURE_COUPEE,
   // (14 nov., accueil des nouveaux) Par compte VRM, vu sur un appareil, vu partout : les écrans
   // déjà ouverts (« Nouveau », src/ecransVus.js), le bilan en une minute vu (src/bilanMinute.js),
   // le premier colis accompagné vu (src/premierColis.js), la réponse à la question des
@@ -23268,7 +23272,20 @@ function ParcoursNouveauApp({ comptes, onFermer, etapeForcee = null }) {
   const numerotation = pret ? load(CLE_NUMERO_ECRIT, null) : undefined;
   const etats = etatsParcoursNouveau({ session: !!(AUTH.user && AUTH.user.id), plateformes, arrivee, numerotation, imports, abonnement: etatAbonnement(abo) });
   const ranger = (geste, etape) => save(CLE_PARCOURS_NOUVEAU, positionParcoursNouveau(load(CLE_PARCOURS_NOUVEAU, null), geste, { etape }));
-  const aller = (e) => { if (!ETAPES_NOUVEAU.includes(e)) return; setIci(e); ranger('aller', e); try { window.dispatchEvent(new Event('vrm:parcours')); } catch (_) {} };
+  // (16 nov., satisfaction-clients, point 4) L'étape atteinte et le temps passé DANS le parcours pour y arriver (repris
+  // de là où il en était, jamais une date) : `vrm_mesure_demarrage`, seulement si la mesure n'est pas coupée.
+  const mesureOuverte = React.useRef(null);
+  const noterMesure = (e) => {
+    try {
+      if (etapeForcee || mesureDemarrageCoupee(load(CLE_MESURE_COUPEE, false))) return;
+      const avant = load(CLE_MESURE_DEMARRAGE, null);
+      if (!mesureOuverte.current) mesureOuverte.current = { t0: Date.now(), deja: tempsDejaPasseDemarrage(avant, ici) };
+      const v = noterEtapeDemarrage(avant, e, mesureOuverte.current.deja + (Date.now() - mesureOuverte.current.t0) / 1000);
+      if (v) save(CLE_MESURE_DEMARRAGE, v);
+    } catch (_) {}
+  };
+  React.useEffect(() => { if (pret) noterMesure(ici); }, [pret]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const aller = (e) => { if (!ETAPES_NOUVEAU.includes(e)) return; setIci(e); ranger('aller', e); noterMesure(e); try { window.dispatchEvent(new Event('vrm:parcours')); } catch (_) {} };
   const ecrire = (cle, v) => new Promise((res) => save(cle, v, (ok) => res(ok !== false)));
   const sombre = (() => { try { return document.documentElement.getAttribute('data-theme') === 'dark'; } catch (_) { return false; } })();
   const prenom = String(load('vrm_prenom', '') || '').trim().slice(0, 30);
@@ -23278,7 +23295,7 @@ function ParcoursNouveauApp({ comptes, onFermer, etapeForcee = null }) {
       plateformesDepart={plateformes && plateformes.sites ? plateformes.sites : []} numerosDepart={etats.numeros.choix || null}
       onAller={aller}
       onPlusTard={() => { ranger('plusTard'); if (onFermer) onFermer('plusTard'); }}
-      onFin={() => { save(CLE_PARCOURS_NOUVEAU, positionParcoursNouveau(load(CLE_PARCOURS_NOUVEAU, null), 'fin')); if (onFermer) onFermer('fin'); }}
+      onFin={() => { save(CLE_PARCOURS_NOUVEAU, positionParcoursNouveau(load(CLE_PARCOURS_NOUVEAU, null), 'fin')); noterMesure('fini'); if (onFermer) onFermer('fin'); }}
       onChoisirPlateformes={(sites) => { const v = reglagePlateformes(sites); return v ? ecrire(CLE_PLATEFORMES, v) : Promise.resolve(false); }}
       onChoisirNumeros={(choix) => { const v = reglageNumerotation(choix, new Date().toISOString(), load(CLE_NUMERO_ECRIT, null)); return v ? ecrire(CLE_NUMERO_ECRIT, v) : Promise.resolve(false); }}
       onOuvrirReglage={(id) => { ranger('aller', ici); if (onFermer) onFermer('plusTard'); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: id === 'ebay' ? '?tab=plat_ebay&section=compte' : '?tab=settings' })); } catch (_) {} }}
@@ -32862,6 +32879,8 @@ function EcranMaSemaine({ liveStats, onNav, entete }) {
     maintenant, lundi, vendu, joursBenef: pub, dorment,
     colisFaits: pret ? { vinted: ship, lbc: lbcF, vc: vcF } : {},
     recuEntre: (de, a) => ligneUrssaf === undefined ? { valeur: null, raison: 'encours' } : recuAvecADater(recuPublieEntre(ligneUrssaf, { de, a }, maintenant), ligneUrssaf),
+    // (16 nov., satisfaction-clients) L'argent à venir : la règle de la coque, telle quelle (« au moins », « — »).
+    aVenir: aVenirPour(liveStats && liveStats.aVenir),
     R: REGLES_SEMAINE,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [maintenant, lundi, liveStats, pub, dorment, pret, ship, lbcF, vcF, ligneUrssaf]);

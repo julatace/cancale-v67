@@ -86,7 +86,12 @@ const SEUIL_TACHE = Number(process.env.SEUIL_TACHE || 200);
 const ONGLETS_MAX = Number(process.env.ONGLETS_MAX || 8);
 const SHOTS = process.env.SHOTS || path.join(require('os').tmpdir(), 'banc-stabilite-iphone');
 fs.mkdirSync(SHOTS, { recursive: true });
-const IPHONE = PW.devices['iPhone 15'];
+// (16 nov., satisfaction-clients) `LARGEUR=390` : le contrôle de nuit passe aussi Chromium à 390 px (le téléphone
+// le plus étroit des bancs) ; sans elle, l'appareil « iPhone 15 » tel quel (393 px).
+const IPHONE = (() => {
+  const d = PW.devices['iPhone 15'], l = Number(process.env.LARGEUR);
+  return Number.isInteger(l) && l >= 320 && l <= 1600 ? Object.assign({}, d, { viewport: Object.assign({}, d.viewport, { width: l }), screen: Object.assign({}, d.screen || d.viewport, { width: l }) }) : d;
+})();
 const LENT = { ms: 0 };
 // La base : celle du volume, + un compte eBay présent (ses lignes de commandes et d'annonces existent, vides) — sans
 // elles, Ventes · eBay ne montre que « Aucun compte eBay relié » et ses sections (À traiter, Offres…) ne sont jamais
@@ -520,7 +525,7 @@ if (require.main === module) (async () => {
       finally { if (o) await o.ctx.close().catch(() => {}); }
     }
   } finally { await nav.close(); P.srv.close(); }
-  fs.writeFileSync(path.join(SHOTS, 'mesures.json'), JSON.stringify({ moteur: NAVIGATEUR, mesures, ko }, null, 1));
+  fs.writeFileSync(path.join(SHOTS, 'mesures.json'), JSON.stringify({ moteur: NAVIGATEUR, largeur: IPHONE.viewport.width, ecrans: VOULUS.length, themes: THEMES, bilan, mesures, ko }, null, 1));
   console.log(`\n${bilan.ok} ✅ · ${bilan.ko} ❌ (moteur ${NAVIGATEUR} ; captures et mesures : ${SHOTS})`);
   process.exit(bilan.ko ? 1 : 0);
 })();

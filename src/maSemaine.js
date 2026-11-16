@@ -23,6 +23,20 @@
 // d'écart (jamais une flèche fausse). Exécuté par scripts/audit-ma-semaine.cjs.
 import { semaineCourante, minuitParis, dateParis, plusJours, dormentDe } from '../api/_lib/bilan-semaine.js';
 import { journalSemaine, titreSemaine } from './journalSemaine.js';
+// (16 nov., satisfaction-clients, point 6) « Temps gagné » : LA règle du calculateur (src/accueil/tempsGagne.js,
+// durées de RÉFÉRENCE raisonnées, jamais un résultat de client), sur SES ventes de la semaine — une estimation, dite.
+import { tempsGagne, CHAMPS as CHAMPS_TEMPS, arrondiSemaine } from './accueil/tempsGagne.js';
+
+// Le temps gagné de la semaine : les gestes « par vente » et le suivi de ses colis, pour `ventes` ventes
+// (`{ valeur, partiel }` de `journalSemaine`). Pas su ⇒ pas su ; au-delà du plafond du calculateur, ou des
+// ventes partielles ⇒ « au moins » (jamais plus que ce que la règle sait compter). En minutes, arrondi du calculateur.
+const MAX_VENTES_TEMPS = (CHAMPS_TEMPS.find((c) => c.id === 'ventes') || { max: 100 }).max;
+export function tempsSemaine(ventes) {
+  if (!ventes || ventes.valeur == null) return { valeur: null, partiel: false, manque: [], raison: (ventes && ventes.raison) || 'pasSu' };
+  const n = Math.max(0, Math.round(Number(ventes.valeur) || 0));
+  const t = tempsGagne({ ventes: Math.min(n, MAX_VENTES_TEMPS), achats: 0, comptes: 1, plateformes: 1, baisses: 0 });
+  return { valeur: arrondiSemaine(t.secondes), partiel: !!ventes.partiel || n > MAX_VENTES_TEMPS, manque: ventes.manque || [], estimation: true };
+}
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 const lundiDe = (ymd) => { const [y, m, d] = ymd.split('-').map(Number); const j = (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7; return plusJours(ymd, -j); };
@@ -73,7 +87,9 @@ export function ecart(x, y) {
 //   dorment    la publication `vrm_paires_dorment` | null
 //   recuEntre  (de, a) → { valeur, partiel, manque, raison } (a = dernier instant compté)
 //   R          { bilanLignes, beneficeDesJours, chiffreBrut } (les fonctions d'App.jsx)
-export function maSemaine({ maintenant = Date.now(), lundi = null, vendu, joursBenef, colisFaits = {}, dorment = null, recuEntre = null, R } = {}) {
+// (16 nov., satisfaction-clients) `aVenir` : `aVenirPour(liveStats.aVenir)` (src/argentAVenir.js, la règle de la coque) —
+// un chiffre d'AUJOURD'HUI : seulement montré pour la semaine en cours.
+export function maSemaine({ maintenant = Date.now(), lundi = null, vendu, joursBenef, colisFaits = {}, dorment = null, recuEntre = null, aVenir = null, R } = {}) {
   const S = bornesSemaine(lundi, maintenant);
   const A = semaineAvant(S, maintenant);
   const lire = (sem) => journalSemaine({ maintenant, vendu, joursBenef, colisFaits, R: { ...R, semainePassee: () => sem } });
@@ -102,5 +118,7 @@ export function maSemaine({ maintenant = Date.now(), lundi = null, vendu, joursB
     premiere: S.lundi <= plusJours(semaineCourante(maintenant).lundi, -7 * SEMAINES_MAX),
     chiffres, avant, ecarts, jours,
     dorment: dormentDe(dorment, maintenant),
+    aVenir: S.enCours ? (aVenir || { valeur: null, partiel: false, manque: [], raison: 'pasSu' }) : null,
+    temps: tempsSemaine(J.ventes),
   };
 }

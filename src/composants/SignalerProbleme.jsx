@@ -20,7 +20,7 @@
 import React from 'react';
 import { SheetShell as SheetShellBase } from './SheetShell.jsx';
 import { BoutonBase, SegmenteBase } from './Bouton.jsx';
-import { normaliserSignalement, lignesApercu, posterSignalement, phraseRefus, TEXTE_MAX } from '../../api/_lib/signalement.js';
+import { normaliserSignalement, lignesApercu, posterSignalement, phraseRefus, TEXTE_MAX, etatDe } from '../../api/_lib/signalement.js';
 import { contactEmail } from '../contact.js';
 import { tr, date as dateI18n } from '../i18n/index.js';   // (15 nov.) « Reçu · on te répond ici », la réponse
 
@@ -203,15 +203,18 @@ export function SignalementsRecus({ entetes, Bouton = BoutonBase, fetcher = (typ
     setListe(null);
   }, []);   // eslint-disable-line react-hooks/exhaustive-deps
   React.useEffect(() => { lireListe(); }, [lireListe]);
-  const marquer = async (s, traite) => {
+  // (16 nov., satisfaction-clients) Reçu · en cours · corrigé (+ un mot) : le serveur range l'état et, au passage à
+  // « corrigé », prévient celui qui l'a envoyé (api/_lib/signalement.js, `changerEtatSignalement`).
+  const changer = async (s, etat, mot = '') => {
     setOccupe(s.id); setMsg('');
     try {
-      const r = await fetcher('/api/compte?mode=signalement', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(entetes ? entetes() : {}) }, body: JSON.stringify({ action: 'traite', id: s.id, traite }) });
+      const r = await fetcher('/api/compte?mode=signalement', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(entetes ? entetes() : {}) }, body: JSON.stringify({ action: 'etat', id: s.id, etat, mot }) });
       const j = await r.json().catch(() => null);
-      if (r.ok && j && j.ok === true) setListe((l) => (Array.isArray(l) ? l.map((x) => (x.id === s.id ? { ...x, traite, traiteLe: traite ? new Date().toISOString() : null } : x)) : l));
-      else setMsg('Pas enregistré : le serveur n’a pas confirmé. Réessaie.');
-    } catch (_) { setMsg('Pas enregistré : pas de connexion. Réessaie.'); }
+      if (r.ok && j && j.ok === true) { setListe((l) => (Array.isArray(l) ? l.map((x) => (x.id === s.id ? { ...x, etat: j.etat, etatLe: j.etatLe, mot: j.mot, traite: j.etat === 'corrige' } : x)) : l)); setOccupe(''); return true; }
+      setMsg(tr('sg.etat.pasEnregistre'));
+    } catch (_) { setMsg(tr('sg.etat.pasEnregistre')); }
     setOccupe('');
+    return false;
   };
   // (8 nov.) Le détail d'UN signalement (capture schématique, erreurs, requêtes) :
   // lu à la demande — la liste ne porte que ses nombres (§4.4).
@@ -226,7 +229,7 @@ export function SignalementsRecus({ entetes, Bouton = BoutonBase, fetcher = (typ
   };
   if (liste === undefined) return <p style={S.muet} data-signalements="lecture">Lecture des signalements…</p>;
   if (liste === null) return PanneEl ? <PanneEl quoi="Les signalements" raison={raison} onReessayer={lireListe}/> : <p style={S.muet} data-signalements="pas-su">Les signalements : pas su pour l’instant. {raison} <button type="button" className="vrm-lien-action" onClick={lireListe}>Réessayer</button></p>;
-  const aTraiter = liste.filter((s) => !s.traite);
+  const aTraiter = liste.filter((s) => etatDe(s) !== 'corrige');
   const montres = vue === 'atraiter' ? aTraiter : liste;
   return (
     <div data-signalements={liste.length} data-signalements-a-traiter={aTraiter.length}>
@@ -236,7 +239,7 @@ export function SignalementsRecus({ entetes, Bouton = BoutonBase, fetcher = (typ
       {montres.length === 0 ? <p style={S.muet}>{vue === 'atraiter' ? 'Rien à traiter.' : 'Aucun signalement reçu.'}</p> : (
         <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 10 }}>
           {montres.map((s) => (
-            <li key={s.id} data-signalement={s.id} data-signalement-traite={s.traite ? '1' : '0'} style={{ ...S.carte, padding: '12px 14px' }}>
+            <li key={s.id} data-signalement={s.id} data-signalement-traite={etatDe(s) === 'corrige' ? '1' : '0'} data-signalement-etat={etatDe(s)} style={{ ...S.carte, padding: '12px 14px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
                 <b style={{ fontSize: 15, color: 'var(--vrm-ink)' }}>{s.ecran || 'écran inconnu'}{s.ecranAvant ? <span style={{ fontWeight: 400, color: 'var(--vrm-muted)' }}> · avant : {s.ecranAvant}</span> : null}</b>
                 <span style={{ ...S.muet, flex: '0 0 auto' }}>{dateCourte(s.at)}</span>
@@ -250,17 +253,52 @@ export function SignalementsRecus({ entetes, Bouton = BoutonBase, fetcher = (typ
               {detail[s.id] === 'ko' ? <p role="alert" style={{ ...S.muet, color: 'var(--vrm-warn)' }}>Le détail n’a pas pu être lu. Réessaie.</p> : null}
               <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {!detail[s.id] || detail[s.id] === 'ko' ? <Bouton variante="discret" taille="petit" onClick={() => ouvrirDetail(s)} data-signalement-ouvrir={s.id}>Voir le détail</Bouton> : null}
-                <RepondreSignalement s={s} entetes={entetes} fetcher={fetcher} Bouton={Bouton} onRepondu={(rep, le) => setListe((l) => (Array.isArray(l) ? l.map((x) => (x.id === s.id ? { ...x, reponse: rep, reponduLe: le } : x)) : l))}/>
+                <RepondreSignalement s={s} entetes={entetes} fetcher={fetcher} Bouton={Bouton} onRepondu={(rep, le) => setListe((l) => (Array.isArray(l) ? l.map((x) => (x.id === s.id ? { ...x, reponse: rep, reponduLe: le, etat: etatDe(x) === 'corrige' ? 'corrige' : 'en_cours' } : x)) : l))}/>
                 {s.repondre ? <a className="vrm-lien-action" href={'mailto:' + s.repondre + '?subject=' + encodeURIComponent('Ton signalement VRM')} data-signalement-repondre={s.id} style={{ display: 'inline-block', padding: '12px 0' }}>Répondre par e-mail</a> : null}
-                <Bouton variante={s.traite ? 'discret' : 'secondaire'} taille="petit" occupe={occupe === s.id} onClick={() => marquer(s, !s.traite)} data-signalement-traiter={s.id}>
-                  {s.traite ? 'Rouvrir' : 'Traité'}
-                </Bouton>
+                <EtatSignalement s={s} occupe={occupe === s.id} onChanger={changer} Bouton={Bouton}/>
               </div>
             </li>
           ))}
         </ul>
       )}
     </div>
+  );
+}
+
+// ── (16 nov., satisfaction-clients, point 3) L'ÉTAT D'UN SIGNALEMENT ────────────────────────
+// Le propriétaire : « En cours », « Corrigé » (+ un mot, facultatif, que le vendeur lira), « Rouvrir ».
+// Le vendeur : la même pastille, lue chez le serveur filtrée sur SA session.
+export function PastilleEtat({ etat }) {
+  const e = etat === 'en_cours' || etat === 'corrige' ? etat : 'recu';
+  return <span data-signalement-statut={e} style={{ fontSize: 13, fontWeight: 600, color: e === 'recu' ? 'var(--vrm-muted)' : 'var(--vrm-ink)', whiteSpace: 'nowrap' }}>{e === 'corrige' ? tr('sg.etat.corrige') : e === 'en_cours' ? tr('sg.etat.enCours') : tr('sg.etat.recu')}</span>;
+}
+function EtatSignalement({ s, occupe, onChanger, Bouton = BoutonBase }) {
+  const [ouvert, setOuvert] = React.useState(false);
+  const [mot, setMot] = React.useState('');
+  const etat = etatDe(s);
+  if (etat === 'corrige') return (
+    <>
+      <PastilleEtat etat="corrige"/>
+      {s.mot ? <span style={{ ...S.muet, flexBasis: '100%' }} data-signalement-mot={s.id}>{s.mot}</span> : null}
+      <Bouton variante="discret" taille="petit" occupe={occupe} onClick={() => onChanger(s, 'recu')} data-signalement-rouvrir={s.id}>{tr('sg.etat.rouvrir')}</Bouton>
+    </>
+  );
+  if (ouvert) return (
+    <div style={{ width: '100%', display: 'grid', gap: 8, marginTop: 4 }} data-signalement-mot-champ={s.id}>
+      <input value={mot} onChange={(e) => setMot(e.target.value)} maxLength={280} aria-label={tr('sg.etat.motPlace')} placeholder={tr('sg.etat.motPlace')}
+        style={{ width: '100%', boxSizing: 'border-box', fontSize: 16, minHeight: 44, padding: '10px 12px', borderRadius: 12, border: '1px solid var(--vrm-line)', background: 'var(--vrm-surface)', color: 'var(--vrm-ink)', fontFamily: 'inherit' }}/>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <Bouton variante="primaire" taille="petit" occupe={occupe} onClick={async () => { if (await onChanger(s, 'corrige', mot)) setOuvert(false); }} data-signalement-corriger={s.id}>{tr('sg.etat.marquerCorrige')}</Bouton>
+        <Bouton variante="discret" taille="petit" onClick={() => setOuvert(false)}>{tr('sg.etat.annuler')}</Bouton>
+      </div>
+    </div>
+  );
+  return (
+    <>
+      <PastilleEtat etat={etat}/>
+      {etat !== 'en_cours' ? <Bouton variante="secondaire" taille="petit" occupe={occupe} onClick={() => onChanger(s, 'en_cours')} data-signalement-en-cours={s.id}>{tr('sg.etat.enCours')}</Bouton> : null}
+      <Bouton variante="secondaire" taille="petit" onClick={() => setOuvert(true)} data-signalement-traiter={s.id}>{tr('sg.etat.corrige')}</Bouton>
+    </>
   );
 }
 
@@ -315,12 +353,13 @@ export function MesSignalements({ entetes, fetcher = (typeof fetch === 'function
   return (
     <ul data-mes-signalements={liste.length} style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 10 }}>
       {liste.map((x) => (
-        <li key={x.id} data-mon-signalement={x.id} data-repondu={x.reponse ? '1' : '0'} style={{ ...S.carte, padding: '12px 14px' }}>
+        <li key={x.id} data-mon-signalement={x.id} data-repondu={x.reponse ? '1' : '0'} data-signalement-etat={etatDe(x)} style={{ ...S.carte, padding: '12px 14px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'baseline' }}>
             <b style={{ fontSize: 13, color: 'var(--vrm-muted)', fontWeight: 600 }}>{quand(x.at)}</b>
-            <span data-signalement-statut={x.reponse ? 'repondu' : 'recu'} style={{ fontSize: 13, fontWeight: 600, color: x.reponse ? 'var(--vrm-ink)' : 'var(--vrm-muted)' }}>{x.reponse ? tr('sg.suivi.repondu') : tr('sg.suivi.recu')}</span>
+            <PastilleEtat etat={etatDe(x)}/>
           </div>
           <p style={{ margin: '6px 0 0', fontSize: 15, lineHeight: 1.45, color: 'var(--vrm-ink)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{x.texte}</p>
+          {etatDe(x) === 'corrige' ? <p data-signalement-corrige-lu="" style={{ ...S.muet, margin: '6px 0 0', color: 'var(--vrm-ink)' }}><b>{tr('sg.etat.corrigeLe', { date: quand(x.etatLe) || '—' })}</b>{x.mot ? ' · ' + x.mot : ''}</p> : null}
           {x.reponse ? <div data-signalement-reponse-lue="" style={{ marginTop: 10, padding: '10px 12px', borderRadius: 12, background: 'var(--vrm-fill, rgba(118,118,128,.12))' }}>
             <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: 'var(--vrm-muted)' }}>{tr('sg.suivi.repondu')} · {quand(x.reponduLe)}</p>
             <p style={{ margin: '4px 0 0', fontSize: 15, lineHeight: 1.45, color: 'var(--vrm-ink)', whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{x.reponse}</p>
