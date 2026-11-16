@@ -178,14 +178,35 @@ export function poidsMots(listeDeMots) {
 }
 
 // ── Préparer un achat une fois (titre lu, marque, taille, couleurs, dates) ──
-function preparerAchat(a, { marqueDe, couleursDe, receptionDe, modeleDe }) {
+// (16 nov., stabilite-iphone — « l'app bug énormément », touchers de 1,25 à 4 s sur Ventes) Ventes demande, pour
+// CHAQUE vente sans achat relié et à CHAQUE rendu, la proposition d'achat (`propositionsArticle`) : chaque appel
+// re-préparait TOUS les achats (marque, mots, couleurs, normalisation du titre). Profil de l'ouverture de Ventes
+// (base de 1 000 paires) : 1,3 s sur 1,5 s dans cette préparation. Ce qui ne dépend QUE de l'achat et des règles de
+// texte (titre, marque, mots, couleurs, prix, dates, lot, annulé, modèle, tailles lues) est gardé par achat (même
+// objet, mêmes champs lus, mêmes règles) ; la date de réception (`receptionDe`, qui peut changer) est relue à
+// chaque appel. Même résultat, aucune ressemblance de plus : seule la répétition est retirée.
+const PREP_ACHAT = new WeakMap();
+function baseAchat(a, marqueDe, couleursDe, couleursCle, modeleDe) {
+  const peutGarder = !!a && typeof a === 'object';
+  if (peutGarder) {
+    const g = PREP_ACHAT.get(a);
+    if (g && g.marqueDe === marqueDe && g.couleursCle === couleursCle && g.modeleDe === modeleDe && g.titre === a.title && g.prixBrut === a.price
+      && g.dateBrute === a.date && g.statut === a.status && g.txBrut === a.transaction_id) return g.base;
+  }
   const t = String((a && a.title) || '');
   const marque = normMots(marqueDe(t));
+  const base = { tx: txDe(a), t, norm: ' ' + normMots(t) + ' ', marque, couleurs: couleursTexte(t, couleursDe, true), date: dateMs(a && a.date), prix: prixNum(a && a.price),
+    lot: lotDe(a).lot, annule: achatAnnule(a), mots: motsCles(t, marque, couleursDe), modele: typeof modeleDe === 'function' ? modeleDe(t) : null, tailles: new Map() };
+  base.motsArr0 = [...base.mots]; base.versions0 = versionsDe(base.mots);
+  if (peutGarder) PREP_ACHAT.set(a, { marqueDe, couleursCle, modeleDe, titre: a.title, prixBrut: a.price, dateBrute: a.date, statut: a.status, txBrut: a.transaction_id, base });
+  return base;
+}
+function preparerAchat(a, { marqueDe, couleursDe, couleursCle = couleursDe, receptionDe, modeleDe }) {
+  const base = baseAchat(a, marqueDe, couleursDe, couleursCle, modeleDe);
   const rec = typeof receptionDe === 'function' ? receptionDe(a) : null;
   const recMs = rec == null ? NaN : dateMs(typeof rec === 'object' ? rec.ms : rec);
-  return { a, tx: txDe(a), t, norm: ' ' + normMots(t) + ' ', marque, couleurs: couleursTexte(t, couleursDe, true), date: dateMs(a && a.date), prix: prixNum(a && a.price),
-    recMs, recSource: rec && typeof rec === 'object' && rec.source ? rec.source : (Number.isFinite(recMs) ? 'livraison' : ''), lot: lotDe(a).lot,
-    annule: achatAnnule(a), mots: motsCles(t, marque, couleursDe), versions: null, motsArr: null, dispo: true, modele: typeof modeleDe === 'function' ? modeleDe(t) : null, tailles: new Map() };
+  return { ...base, a, recMs, recSource: rec && typeof rec === 'object' && rec.source ? rec.source : (Number.isFinite(recMs) ? 'livraison' : ''),
+    versions: null, motsArr: null, dispo: true };
 }
 
 // ── Préparer un article (annonce en vente, ou vente) ─────────────────────────
@@ -293,8 +314,8 @@ export function affecterPropositions({ cibles, achats, liens = null, refus = nul
   const memo = new Map();
   const couleursM = (x) => { const k = String(x || ''); let v = memo.get(k); if (!v) { v = couleursDe(k) || []; memo.set(k, v); } return v; };
   const lz = liens || new Map();
-  const As = achats.filter((a) => a && txDe(a)).map((a) => preparerAchat(a, { marqueDe, couleursDe: couleursM, receptionDe, modeleDe }));
-  for (const A of As) { A.motsArr = [...A.mots]; A.versions = versionsDe(A.mots); A.dispo = achatDisponible(A.a, lz, ''); }
+  const As = achats.filter((a) => a && txDe(a)).map((a) => preparerAchat(a, { marqueDe, couleursDe: couleursM, couleursCle: couleursDe, receptionDe, modeleDe }));
+  for (const A of As) { A.motsArr = A.motsArr0; A.versions = A.versions0; A.dispo = achatDisponible(A.a, lz, ''); }
   // Le poids d'un mot : 1. (MESURÉ sur ses 11 liaisons : la rareté parmi ses achats, `poidsMots`, donnait
   // top-1 73 % / top-3 73 % ; le poids plat 82 % / 91 %. `poidsMots` reste pour une mesure future.)
   const poids = () => 1;

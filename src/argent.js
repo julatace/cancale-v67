@@ -69,6 +69,9 @@ export function questionsArgent({ vendu, recu, benefice, prevision, profil, rais
     if (!x) return { valeur: null, partiel: false, note: 'pas lu', raison: 'pasSu' };
     if (x.valeur == null) return { valeur: null, partiel: false, note: rc(x) || 'pas lu', raison: x.raison || 'pasSu' };
     const note = x.aDater > 0 ? rc(x) : x.partiel && x.manque && x.manque.length ? `sans ${x.manque[0]}` : '';
+    // (16 nov., capture de Julien : « Reçu · au moins 1 062 € » puis « au moins » une 2e fois dessous) Le minimum se
+    // dit UNE fois, sur le montant (`partiel`) : la note ne le répète pas.
+    if (note === 'au moins') return { valeur: x.valeur, partiel: true, note: '', raison: '' };
     return { valeur: x.valeur, partiel: !!x.partiel, note, raison: '' };
   };
   const Q = [
