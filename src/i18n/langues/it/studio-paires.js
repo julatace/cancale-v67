@@ -15,4 +15,6 @@ export default {
   "studio.paires.grille": "Griglia",
   "studio.paires.dansStock": "in magazzino",
   "studio.paires.ranger": "da sistemare",
+  "studio.paires.observateurs": "osservatori",
+  "studio.paires.voirSur": "Vedi su {site}",
 };

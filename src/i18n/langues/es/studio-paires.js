@@ -15,4 +15,6 @@ export default {
   "studio.paires.grille": "Cuadrícula",
   "studio.paires.dansStock": "en el Stock",
   "studio.paires.ranger": "por guardar",
+  "studio.paires.observateurs": "observadores",
+  "studio.paires.voirSur": "Ver en {site}",
 };
