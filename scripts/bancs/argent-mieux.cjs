@@ -128,12 +128,17 @@ function mesurerArgent(seg) {
   // L — un libellé coupé en « … » (hors rangées de liste)
   out.coupes = [...part.querySelectorAll('*')].filter(vis).filter((x) => { const c = getComputedStyle(x); return c.textOverflow === 'ellipsis' && x.scrollWidth > x.clientWidth + 1; }).map((x) => (x.textContent || '').trim().slice(0, 30));
   out.points = (texte.match(/…/g) || []).length;
+  // M — chaque montant rendu (« 1 234,56 € »), dans l'ordre, pour comparer avant/après (MONTANTS=<fichier>).
+  const montantsDe = (t) => (String(t || '').match(/-?\d{1,3}(?:[\s\u202f\u00a0]\d{3})*(?:,\d{2})?[\s\u202f\u00a0]?€/g) || []).map((x) => x.replace(/[\s\u202f\u00a0]/g, ''));
+  out.montants = montantsDe(part.innerText);
+  out.montantsDetail = [...part.querySelectorAll('[data-nc-detail]')].flatMap((d) => montantsDe(d.textContent));
   return out;
 }
 
 const bilan = { ok: 0, ko: 0 };
 const dit = (ok, quoi, detail = '') => { if (ok) bilan.ok++; else bilan.ko++; console.log(`${ok ? '✅' : '❌'} ${quoi}${detail ? ' — ' + detail : ''}`); };
 const mesures = [];
+const montants = {};
 
 (async () => {
   await new Promise((r) => P.srv.listen(P.PORT, r));
@@ -162,6 +167,7 @@ const mesures = [];
           await capture(o.pg, seg, path.join(SHOTS, `${ici}.png`));
           const v = await o.pg.evaluate(mesurerVerre);
           const ko = v.contraste;
+          montants[ici] = { ferme: m.montants, detail: m.montantsDetail };
           mesures.push({ ici, hauteur: m.hauteur, mots: m.mots, contrasteKo: ko.length, contrasteMin: ko.length ? Math.min(...ko.map((x) => x.k)) : null, groupes: m.groupes.length, murs: m.murs.length });
           dit(ko.length === 0, `C ${ici} : contraste AA de chaque texte, replis fermés (${v.textes} textes)`, ko.slice(0, 6).map((x) => `${x.k}<${x.seuil} « ${x.t} » ${x.el} (${x.c} sur ${x.f})`).join(' | '));
           if (seg === 'declarer' || seg === 'resume') {
@@ -179,6 +185,7 @@ const mesures = [];
           const ouverts = await o.pg.evaluate((seg) => { const p = document.querySelector(`[data-argent-vue="${seg}"]`); let n = 0; for (const d of p.querySelectorAll('details:not([open])')) { if (d.closest('[data-nc-detail]') === d) continue; d.open = true; n++; } for (const d of p.querySelectorAll('[data-nc-detail]')) d.open = true; return n; }, seg);
           await o.pg.waitForTimeout(900);
           const v2 = await o.pg.evaluate(mesurerVerre);
+          montants[ici].ouvert = (await o.pg.evaluate(mesurerArgent, seg)).montants;
           await capture(o.pg, seg, path.join(SHOTS, `${ici}-ouvert.png`));
           dit(v2.contraste.length === 0, `C ${ici} : contraste AA, ${ouverts} repli(s) ouvert(s) (${v2.textes} textes)`, v2.contraste.slice(0, 6).map((x) => `${x.k}<${x.seuil} « ${x.t} » ${x.el} (${x.c} sur ${x.f})`).join(' | '));
           if (seg === 'declarer' || seg === 'resume') {
@@ -193,6 +200,7 @@ const mesures = [];
     }
   } finally { await nav.close(); P.srv.close(); }
   console.log('\nMESURES ' + JSON.stringify(mesures));
+  if (process.env.MONTANTS) fs.writeFileSync(process.env.MONTANTS, JSON.stringify(montants, null, 1));
   console.log(`\n${bilan.ok} ✅ · ${bilan.ko} ❌ (captures : ${SHOTS})`);
   process.exit(bilan.ko ? 1 : 0);
 })();
