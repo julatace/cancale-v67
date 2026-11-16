@@ -16,6 +16,9 @@
 //  RENDUS=1 (9 nov.) : crochet React posé avant l'app — chaque rendu validé et chaque
 //  rendu de `Comptabilite` (le moteur de Ma journée) avant « prêt », avec son heure
 //  (diagnostic : le parcours de l'arbre à chaque validation ralentit la page).
+//  (16 nov.) COMPLET_MAX_MS : combien attendre l'écran complet après les 90 s (défaut 20 s).
+//  (16 nov.) Chaque résultat porte `apresDonnees_ms` : écran prêt (complet avec COMPLET=1) − arrivée de la dernière
+//  lecture servie avant lui (le calcul, réseau mis à part).
 //  COMPLET=1 (9 nov.) : ouvert au plafond (~2,5 s), l'heure où TOUTES ses données
 //  essentielles sont arrivées (`complet_ms`, l'attribut passe à « pret »).
 //  JALONS=1 (9 nov.) : les marques `vrm:*` posées par l'app (performance.mark) et les
@@ -94,7 +97,7 @@ async function ouvrir(ctx, tab, etiquette) {
   }
   // COMPLET=1 (9 nov.) : ouvert au plafond, quand TOUTES ses données essentielles sont-elles là ?
   let tComplet = etat === 'pret' ? tPret : null;
-  if (process.env.COMPLET && etat === 'plafond') { while (Date.now() < fin + 20000) { const e3 = await pg.evaluate(() => { const ae = document.querySelector('[data-attente]'); return ae ? ae.getAttribute('data-attente') : '-'; }).catch(() => '?'); if (e3 === 'pret') { tComplet = Date.now() - t0; break; } await attendre(100); } }
+  if (process.env.COMPLET && etat === 'plafond') { while (Date.now() < fin + (Number(process.env.COMPLET_MAX_MS) || 20000)) { const e3 = await pg.evaluate(() => { const ae = document.querySelector('[data-attente]'); return ae ? ae.getAttribute('data-attente') : '-'; }).catch(() => '?'); if (e3 === 'pret') { tComplet = Date.now() - t0; break; } await attendre(100); } }
   let n = reqs.length, tCalme = Date.now();
   while (Date.now() - tCalme < 3000 && Date.now() < fin + 30000) { await attendre(250); if (reqs.length !== n) { n = reqs.length; tCalme = Date.now(); } }
   const m = await pg.evaluate(() => {
@@ -118,6 +121,10 @@ async function ouvrir(ctx, tab, etiquette) {
   };
   if (jalons) res.jalons = jalons;
   if (process.env.COMPLET) res.complet_ms = tComplet;
+  // (16 nov., lot vitesse-volume) « APRÈS LES DONNÉES » : le temps entre l'arrivée de la DERNIÈRE lecture
+  // servie avant l'écran complet (ou prêt) et cet écran — ce que coûte le calcul, réseau mis à part.
+  { const tFin = (process.env.COMPLET ? tComplet : null) ?? tPret; const arr = reqs.filter(r => r.m === 'GET' && tFin != null && r.f != null && r.f <= tFin).map(r => r.f);
+    res.derniereDonnee_ms = arr.length ? Math.max(...arr) : null; res.apresDonnees_ms = tFin != null && arr.length ? tFin - Math.max(...arr) : null; }
   if (process.env.RENDUS) res.rendus = await pg.evaluate((tp) => ({ commits: (window.__commits || []).filter(t => t <= tp).length, compta: (window.__compta || []).filter(t => parseInt(t, 10) <= tp).join(' ') }), tPret || 1e9).catch(() => null);
   if (process.env.EVAL) res.eval = await pg.evaluate(process.env.EVAL).catch(e => String(e));
   if (process.env.ETATS) res.etats = etats.map(x => x.t + ':' + x.e).join(' ; ');
