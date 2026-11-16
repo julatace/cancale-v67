@@ -13,8 +13,8 @@ import { createPortal } from 'react-dom';
 import './pilule-annuler.css';
 
 const TEXTES = {
-  envoi: (v) => ({ titre: v.texte }),
-  enregistre: (v) => ({ titre: v.texte, ok: true }),
+  envoi: (v) => ({ titre: v.titre || v.texte, sous: v.sous || '', resultat: !!v.sous }),
+  enregistre: (v) => ({ titre: v.titre || v.texte, sous: v.sous || '', resultat: !!v.sous, ok: true }),
   garde: (v) => ({ titre: v.texte, sous: 'Pas encore envoyé — gardé sur cet appareil' }),
   annulation: () => ({ titre: 'Annulation…' }),
   annule: () => ({ titre: 'Annulé' }),
@@ -66,7 +66,7 @@ export function PiluleAnnuler({ gestes, enHaut = false }) {
   return createPortal(
     <div ref={zone} className="vrm-pil-zone" data-pilule-place={enHaut ? 'haut' : 'bas'} role="status" aria-live="polite" aria-atomic="true">
       {montree ? (
-        <div key={montree.id} className={'vrm-pil' + (v ? '' : ' is-sortie') + (t.alerte ? ' is-alerte' : '')} data-pilule={montree.id} data-pilule-etat={montree.etat}
+        <div key={montree.id} className={'vrm-pil' + (v ? '' : ' is-sortie') + (t.alerte ? ' is-alerte' : '') + (t.resultat ? ' is-resultat' : '')} data-pilule={montree.id} data-pilule-etat={montree.etat}
           data-acc-apres={montree.acc && !t.alerte && montree.etat !== 'annule' ? montree.acc : undefined} data-acc-echec={montree.acc && t.alerte ? montree.acc : undefined}
           onPointerEnter={(e) => { if (e.pointerType === 'mouse') { raisons.current.survol = true; suspendre(); } }}
           onPointerLeave={(e) => { if (e.pointerType === 'mouse') { raisons.current.survol = false; suspendre(); } }}
@@ -77,6 +77,7 @@ export function PiluleAnnuler({ gestes, enHaut = false }) {
             <span className="vrm-pil-titre">{t.titre}</span>
             {t.sous ? <span className="vrm-pil-sous">{t.sous}</span> : null}
           </span>
+          {v && v.action ? <button type="button" className="vrm-pil-action" data-pilule-autre={v.action.cle || ''} onClick={() => { try { v.action.faire(); } catch (_) {} }}>{v.action.libelle}</button> : null}
           {v && v.peutAnnuler ? <button type="button" className="vrm-pil-action" data-pilule-annuler={v.id} aria-label={`Annuler : ${v.texte}`} onClick={() => gestes.annuler(v.id)}>Annuler</button> : null}
           {v && v.peutReessayer ? <button type="button" className="vrm-pil-action" data-pilule-reessayer={v.id} aria-label={`Réessayer : ${v.texte}`} onClick={() => gestes.reessayer(v.id)}>Réessayer</button> : null}
         </div>
