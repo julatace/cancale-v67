@@ -9128,10 +9128,13 @@ function retraitDeConversation(conv) {
     // message (« Mondial Relay », « Vinted Go »…). Jamais déduit du mot « point
     // relais » (tous le disent) : sans nom, on laisse vide.
     const TRANSP = [[/vinted\s*go/i, 'vinted'], [/mondial\s*relay/i, 'mondialrelay'], [/relais\s*colis/i, 'relaiscolis'],
-      [/chronopost|pickup\s*station/i, 'chronopost'], [/inpost/i, 'inpost'], [/colissimo|la\s+poste/i, 'colissimo'],
+      [/chronopost|pickup\s*station/i, 'chronopost'], [/inpost/i, 'mondialrelay'], [/colissimo|la\s+poste/i, 'colissimo'],
       [/\bups\b/i, 'ups'], [/\bdpd\b/i, 'dpd'], [/\bgls\b/i, 'gls'], [/\bdhl\b/i, 'dhl'], [/shop2shop/i, 'shop2shop']];
-    const vus = TRANSP.filter(([re]) => re.test(txt)).map(([, k]) => k);
-    const transporteur = vus.length === 1 ? vus[0] : '';   // deux noms dans le texte = on ne choisit pas
+    // (5.395) En France, « InPost » EST le réseau Mondial Relay (« Mondial Relay by
+    // InPost », mesuré dans ses e-mails, 2026-11-11-colis-a-leur-place.md) : les deux
+    // noms donnent la même clé, comptée une fois. Deux réseaux différents = on ne choisit pas.
+    const vus = [...new Set(TRANSP.filter(([re]) => re.test(txt)).map(([, k]) => k))];
+    const transporteur = vus.length === 1 ? vus[0] : '';
     const cid = String(c.id || '');
     return {
       tx: String(t.id || ''), item: String(t.item_id || ''),
