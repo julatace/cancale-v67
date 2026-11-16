@@ -242,7 +242,7 @@
   background: transparent !important; background-image: none !important; box-shadow: none !important; color: #FFFFFF !important; font: 600 14px/1 var(--sb-police-texte, Inter, sans-serif) !important; white-space: nowrap; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 :root:root:root:root:root body .vg-ms-vue.is-on { background: rgb(247 250 253 / .96) !important; color: #0C1D30 !important; box-shadow: 0 4px 10px -4px rgb(8 26 50 / .45) !important; }
 :root:root:root:root:root[data-theme="dark"] body .vg-ms-vue.is-on { background: rgb(238 244 251 / .95) !important; }
-:root:root:root:root:root body .vg-ms-n { font-style: normal; font: 750 11.5px/20px var(--sb-police-texte, Inter, sans-serif); min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; display: inline-grid; place-items: center; background: rgb(255 255 255 / .2); }
+:root:root:root:root:root body .vg-ms-n { font-style: normal; font: 750 11.5px/20px var(--sb-police-texte, Inter, sans-serif); min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; display: inline-grid; place-items: center; background: rgb(255 255 255 / .12); }
 :root:root:root:root:root body .vg-ms-vue.is-on .vg-ms-n { background: rgb(12 29 48 / .08); }
 :root:root:root:root:root body .vg-ms-n.is-ambre { background: #FFE2B8 !important; color: #5E3900 !important; }
 :root:root:root:root:root body .vg-ms-groupe { margin: 0; }
