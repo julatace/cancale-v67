@@ -98,9 +98,13 @@ export function ajusterChiffre(el, plancher = 22) {
   };
   ajuste();
   if (typeof ResizeObserver === 'undefined') return undefined;
-  const ro = new ResizeObserver(() => ajuste());
+  // (16 nov., stabilite-iphone) L'ajustement change la taille du chiffre, donc parfois celle de son parent observé :
+  // fait DANS le rappel, il relançait l'observateur dans la même image — sous WebKit, « ResizeObserver loop completed
+  // with undelivered notifications » à chaque ouverture de Ma journée (banc stabilite-iphone S1). À l'image suivante.
+  let image = 0;
+  const ro = new ResizeObserver(() => { if (image) return; image = requestAnimationFrame(() => { image = 0; ajuste(); }); });
   ro.observe(el.parentElement || el);
-  return () => ro.disconnect();
+  return () => { ro.disconnect(); if (image) cancelAnimationFrame(image); };
 }
 
 // Le même ajustement pour un grand chiffre posé hors de `CarteMois` (Ma journée).
