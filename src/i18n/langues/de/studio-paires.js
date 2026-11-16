@@ -17,4 +17,5 @@ export default {
   "studio.paires.ranger": "einzulagern",
   "studio.paires.observateurs": "Beobachter",
   "studio.paires.voirSur": "Auf {site} ansehen",
+  "studio.paires.ouvrirFiche": "Karte öffnen",
 };

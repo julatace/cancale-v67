@@ -5,7 +5,7 @@ import { useEssentiel } from '../AttenteEcran.jsx';
 import { unParArticle, planchesCases, planchesRangees } from '../stockRegles.js';
 // (15 nov., étagères) Meubles libres (forme, taille, couleurs, ordre) et LA RÈGLE DES PILES : une règle pure, partagée
 // avec la sortie automatique, « Enlever du stock », « Vendu ailleurs » et « Où ranger » (src/stockEtageres.js).
-import { tasserApres, ordonner, deplacerMeuble, couleurCase, colonnesEnPile, typeDe, TYPES, TYPES_ORDRE, COULEURS, COLS_MAX, RANGEES_MAX, peindre, couleursDans } from '../stockEtageres.js';
+import { tasserApres, ordonner, deplacerMeuble, placerMeuble, couleurCase, colonnesEnPile, typeDe, TYPES, TYPES_ORDRE, COULEURS, COLS_MAX, RANGEES_MAX, peindre, couleursDans } from '../stockEtageres.js';
 import { phraseDescentes, listeNumeros } from '../etageresTextes.js';
 import { annuaireLbc, nomPlateforme } from '../plateformes.js';
 import MarquePlateforme from '../plateformes/Marque.jsx';   // (15 nov.) les logos des sites où la paire est en ligne, sur sa case
@@ -14,7 +14,9 @@ import { requeteDeLaVoix } from '../rechercheVocale.js';
 import React, { useState, useMemo, useEffect } from 'react';
 import { tr, nombre, monnaie, localeCourante } from '../i18n/index.js';   // (11 nov., lot rangement-guide) ; (14 nov.) `nombre` : « 1 024 » dans la langue
 import DansFiche, { useLigneIci } from '../DansFiche.jsx';
-import { ouvrirLigne, fermerLigne } from '../ficheLigne.js';   // (15 nov.) la fiche se referme après un geste de case : il voit la pile bouger
+import { ouvrirLigne, fermerLigne, attrsFicheLigne } from '../ficheLigne.js';   // (15 nov.) la fiche se referme après un geste de case : il voit la pile bouger
+import { attrsAvantSite, clicAvantSite, PaireAvantSiteHote } from '../paires/PaireAvantSite.jsx';   // (16 nov.) la rangée touchée monte à sa place, comme Annonces
+import { montant } from '../format.js';
 import { ChiffreConseil } from '../Conseils.jsx';
 import { casesProposees, caseEnMots } from '../ouRanger.js';
 import { attrCible } from '../cibleNotif.js';
@@ -28,7 +30,7 @@ import { EmballagesCarte } from '../EmballagesCarte.jsx';
 import { useSelectionSerie, CaseSerie, BarreSerie, OuvrirSerie } from '../composants/SelectionSerie.jsx';   // (11 nov., lot actions-serie)
 import { trierSerie, resumeSerie, csvDe } from '../selectionSerie.js';   // (10 nov., lot L) le stock d'emballages
 import { CLE_EMBALLAGES, colisFaits } from '../emballages.js';
-import { useMotsArticle, useExemplesVendeur, NotePaireCoque, InfoPop, Pourquoi, AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, fetchTxnItemIds, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
+import { achatDuNumeroLu, useMotsArticle, useExemplesVendeur, NotePaireCoque, InfoPop, Pourquoi, AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, fetchTxnItemIds, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import StockExplication from "../StockExplication.jsx";
@@ -614,6 +616,33 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   };
   // (15 nov., étagères) Monter / descendre un meuble dans la pièce (son clic ; `ordre`, fusionné champ par champ).
   const deplacer = (id, sens) => { const u = deplacerMeuble(meubles, id, sens); if (u) ecrireMeubles(u); };
+  // (16 nov., lot design-restes) « Monter / descendre » AU DOIGT : la poignée du meuble se glisse vers le haut ou le bas ;
+  // au lâcher, le meuble prend la place où il est posé (`placerMeuble`, même écriture `ordre` que les touches, une fois).
+  // Le meuble suit le doigt ; aucun délai fixe ; le clavier garde ↑ / ↓ (et les deux touches restent).
+  const glisserMeuble = (e, id) => {
+    if (e.button > 0) return;
+    const poignee = e.currentTarget; const sec = poignee.closest('[data-meuble]'); const parent = sec && sec.parentElement;
+    if (!sec || !parent) return;
+    e.preventDefault();
+    try { poignee.setPointerCapture(e.pointerId); } catch (_) {}
+    const autres = [...parent.querySelectorAll(':scope > [data-meuble]')].filter((x) => x !== sec);
+    const milieux = autres.map((x) => { const r = x.getBoundingClientRect(); return r.top + r.height / 2; });
+    const y0 = e.clientY; let vers = null;
+    sec.setAttribute('data-meuble-glisse', '1');
+    const bouge = (ev) => {
+      const dy = ev.clientY - y0; sec.style.transform = `translateY(${dy}px)`;
+      const haut = sec.getBoundingClientRect(); const c = haut.top + haut.height / 2;
+      vers = milieux.filter((y) => y < c).length;
+      autres.forEach((x, n) => { if (n === vers) x.setAttribute('data-meuble-cible', '1'); else x.removeAttribute('data-meuble-cible'); });
+    };
+    const fin = (ev) => {
+      poignee.removeEventListener('pointermove', bouge); poignee.removeEventListener('pointerup', fin); poignee.removeEventListener('pointercancel', fin);
+      sec.style.transform = ''; sec.removeAttribute('data-meuble-glisse'); autres.forEach((x) => x.removeAttribute('data-meuble-cible'));
+      if (ev.type !== 'pointerup' || vers == null) return;
+      const u = placerMeuble(meubles, id, vers); if (u) ecrireMeubles(u);
+    };
+    poignee.addEventListener('pointermove', bouge); poignee.addEventListener('pointerup', fin); poignee.addEventListener('pointercancel', fin);
+  };
   const meublesVus = ordonner(meubles);
 
   // ── Vignette d'un article dans une case ────────────────────────────────
@@ -717,6 +746,9 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           {cherche && <span className="vrm-s2d-pastille" data-vide={nIci ? undefined : '1'}>{nIci ? tr('stock.ici', { nIci: String(nIci) }) : tr('stock.rienIci')}</span>}
           <span className="vrm-etag-actions">
           {meublesVus.length > 1 && <>
+            <button className="sb-rond vrm-etag-rond vrm-etag-poignee" type="button" data-meuble-glisser={m.id} onPointerDown={(e) => glisserMeuble(e, m.id)}
+              onKeyDown={(e) => { if (e.key === 'ArrowUp') { e.preventDefault(); deplacer(m.id, -1); } else if (e.key === 'ArrowDown') { e.preventDefault(); deplacer(m.id, 1); } }}
+              aria-label={tr('etag.glisser', { nom: String(m.name) })} title={tr('etag.glisser', { nom: String(m.name) })}><Icon name="menu" size={16}/></button>
             <button className="sb-rond vrm-etag-rond" type="button" data-meuble-monter={m.id} disabled={rang === 0} onClick={() => deplacer(m.id, -1)} aria-label={tr('etag.monter', { nom: String(m.name) })}><Icon name="chevron" size={16} style={{ transform: 'rotate(-90deg)' }} /></button>
             <button className="sb-rond vrm-etag-rond" type="button" data-meuble-descendre={m.id} disabled={rang === meublesVus.length - 1} onClick={() => deplacer(m.id, 1)} aria-label={tr('etag.descendre', { nom: String(m.name) })}><Icon name="chevron" size={16} style={{ transform: 'rotate(90deg)' }} /></button>
           </>}
@@ -1089,13 +1121,21 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   // autour (un groupe blanc inset, filets indentés) ; même contenu, mêmes attributs, même tri, 60 par 60.
   const blocListe = aa && aa.su && articlesVus.length ? (
     <section className="vrm-ms-section" aria-label={tr('stock.ligne')}>
-      <div className="vrm-ms-groupe" data-stock-liste={articlesVus.length}>
+      <div className="vrm-ms-groupe sb-liste" data-sb-liste="" onClick={clicAvantSite} data-stock-liste={articlesVus.length}>
         {articlesVus.slice().sort((a, b) => (articleRange(a) - articleRange(b)) || triNum(a.numero, b.numero)).slice(0, maxListe).map((a, i) => {
           const f = a.cle ? ficheParCle[a.cle] : null;
           const fOu = f ? ((ouEst(f) ? f : null) || (a.aussi || []).map((n) => ficheParCle[cleNum(n)]).filter(Boolean).find((x) => ouEst(x)) || null) : null;
           const ou = fOu ? ouEst(fOu) : null;
+          // (16 nov.) Une paire NUMÉROTÉE monte à sa place au toucher (téléphone) ; à l'ordinateur sa fiche s'ouvre en plan.
+          // Son identité : son N° (`a.cle`, par identité) ; le prix et la date lus par le premier site qui les donne ; la place
+          // du Stock ; le prix d'achat saisi de ce N°. Sans N° : rien ne monte (aucune identité à ouvrir).
+          const siteLu = (a.sites || []).find((x) => x && x.prix != null) || null;
+          const depuisMs = siteLu && siteLu.depuis != null ? (typeof siteLu.depuis === 'number' ? siteLu.depuis : Date.parse(siteLu.depuis)) : NaN;
+          const flS = a.cle ? attrsFicheLigne({ contexte: 'stock', site: 'stock', cle: 's' + a.cle, nums: [String(a.numero)], photo: a.photo || '', titre: a.titre || '' }) : {};
+          const avS = a.cle ? attrsAvantSite({ site: 'stock', id: a.cle, prix: siteLu ? montant(siteLu.prix) : '', jours: Number.isFinite(depuisMs) && depuisMs <= Date.now() ? Math.floor((Date.now() - depuisMs) / 86400000) : null, num: a.numero,
+            place: ou ? trj('stock.rangeeColonne', { name: ou.meuble.name, rangee: ou.rangee, colonne: ou.colonne }) : '' }) : {};
           return (
-            <div key={a.ids[0]} className="vrm-s2d-liste-ligne vrm-ms-rangee vrm-at-entree" style={{ '--i': i }} data-stock-annonce={a.cle || 'sans:' + a.ids[0]} data-stock-annonce-etat={a.etat} data-stock-annonce-plats={a.plateformes.join(',')} data-stock-annonce-place={ou ? `${ou.meuble.name}|${ou.rangee}|${ou.colonne}` : (a.cle ? 'non-range' : 'sans-numero')}>
+            <div key={a.ids[0]} {...flS} {...avS} className={'vrm-s2d-liste-ligne vrm-ms-rangee vrm-at-entree' + (a.cle ? ' sb-rangee-site' : '')} style={{ '--i': i }} data-stock-annonce={a.cle || 'sans:' + a.ids[0]} data-stock-annonce-etat={a.etat} data-stock-annonce-plats={a.plateformes.join(',')} data-stock-annonce-place={ou ? `${ou.meuble.name}|${ou.rangee}|${ou.colonne}` : (a.cle ? 'non-range' : 'sans-numero')}>
               <span className="vrm-s2d-vig">{Vignette({ f: { numero: a.numero || '—', title: a.titre, photo: a.photo }, sold: false, mini: true })}</span>
               <span className="vrm-s2d-txt">
                 <span className="vrm-s2d-txt-t">{a.cle ? <b className="vrm-ms-num">N°{a.numero}</b> : null}<span className="vrm-ms-titre">{a.titre || '—'}</span></span>
@@ -1109,8 +1149,10 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
                 </span>
               </span>
               {a.cle && f && <button className="vrm-ms-geste" type="button" data-stock-annonce-geste={ou ? 'voir' : 'ranger'} onClick={() => { if (ou) montrer(fOu); else { setPlace(a.cle); const c = caseProposeeDe(a.cle); if (c) { viserCase(c.meubleId, c.i); toast(tr('stock.toucheCaseRanges', { placeNum: String(a.numero), caseEnMots: String(caseEnMots(c)) })); } else toast(tr('stock.toucheCaseRanges3', { numero: String(a.numero) })); } }}>{ou ? tr('stock.voir') : tr('stock.ranger2')}</button>}
+              {a.cle ? <span className="sb-avant-place" data-sb-avant-place=""/> : null}
             </div>); })}
       </div>
+      <PaireAvantSiteHote site="stock" achatDe={achatDuNumeroLu}/>
       {articlesVus.length > maxListe && <button className="vrm-ms-plus" type="button" data-stock-liste-plus="" onClick={() => setMaxListe((x) => x + 60)}>{trj('stock.voirPlus', { maxListe: maxListe, articlesVusN: articlesVus.length })}</button>}
     </section>) : null;
 

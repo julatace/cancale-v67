@@ -384,7 +384,7 @@ function AnnoncesVestiaire() {
               </li>
             );
           }}/></ul>
-          <PaireAvantSiteHote achatDe={achatDuNumeroLu}/>
+          <PaireAvantSiteHote site="vestiaire" achatDe={achatDuNumeroLu}/>
         </section>
         {/* (2 nov., soir) Chaque annonce reçoit un N° (comme Vinted et Leboncoin) : celui de
             la paire publiée depuis VRM ou de sa référence VRM-n°, sinon un N° neuf — par

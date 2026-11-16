@@ -17,4 +17,5 @@ export default {
   "studio.paires.ranger": "to store",
   "studio.paires.observateurs": "watchers",
   "studio.paires.voirSur": "View on {site}",
+  "studio.paires.ouvrirFiche": "Open the item card",
 };

@@ -5230,7 +5230,7 @@ function EbayAnnonces({ baseKO, comptes = [], vue = '*', comptesEbay }) {
         );
       })}
     </div>
-    <PaireAvantSiteHote achatDe={achatDuNumeroLu}/>
+    <PaireAvantSiteHote site="ebay" achatDe={achatDuNumeroLu}/>
     {itemsAffiches.length > annVus.length && (
       <button type="button" data-ebay-voir-plus onClick={() => setAnnMax((m) => m + 60)}
         style={{ ...lienE, width: '100%', boxSizing: 'border-box', marginTop: 10, padding: '10px', textAlign: 'center' }}>Voir plus — {annVus.length} affichées sur {itemsAffiches.length}</button>

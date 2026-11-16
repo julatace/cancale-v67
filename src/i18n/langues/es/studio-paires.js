@@ -17,4 +17,5 @@ export default {
   "studio.paires.ranger": "por guardar",
   "studio.paires.observateurs": "observadores",
   "studio.paires.voirSur": "Ver en {site}",
+  "studio.paires.ouvrirFiche": "Abrir la ficha",
 };

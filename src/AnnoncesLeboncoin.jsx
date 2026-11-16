@@ -94,7 +94,7 @@ export default function AnnoncesLeboncoin({outils=null,annonces=[],ventes={},lec
      {typeof onSupprimer==='function'&&SUPPRIMABLE.has(etat)&&ad.status!=='deleted'&&<button type="button" data-lbc-supprimer={ad.id} disabled={!!enVol} onClick={()=>onSupprimer({id:String(ad.id),numero:num,title:ad.subject||ad.title||'',prix:ad.price})} aria-label={`Supprimer de Leboncoin : ${ad.subject||ad.title||ad.id}`}>{enVol===String(ad.id)?'Suppression…':'Supprimer'}</button>}</span></DansFiche>
      <span className="sb-avant-place" data-sb-avant-place=""/>
     </li>;}}/></ul>}
-   <PaireAvantSiteHote achatDe={achatDe}/>
+   <PaireAvantSiteHote site="leboncoin" achatDe={achatDe}/>
    <div className="vrm-pf-pied"><span>{`${lignes.length} reçue${lignes.length>1?'s':''}`}</span><details className="vrm-pourquoi vrm-lbc-catalog-note" data-pourquoi><summary aria-label="D’où viennent ces états ?" title="D’où viennent ces états ?">ⓘ</summary><div>Les états reflètent la dernière lecture. « Gérer » ouvre l’annonce sur Leboncoin ; une annonce absente d’une page n’est pas supprimée de ton historique.</div></details></div>
   </>}
   <BilanSynchronisation owner={owner} sources={bilan}/>

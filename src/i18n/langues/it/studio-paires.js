@@ -17,4 +17,5 @@ export default {
   "studio.paires.ranger": "da sistemare",
   "studio.paires.observateurs": "osservatori",
   "studio.paires.voirSur": "Vedi su {site}",
+  "studio.paires.ouvrirFiche": "Apri la scheda",
 };

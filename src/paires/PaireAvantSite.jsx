@@ -22,6 +22,7 @@ const str = (v) => String(v == null ? '' : v).trim();
 const nombre = (v) => { if (v == null || v === '') return null; const n = Number(v); return Number.isFinite(n) && n >= 0 ? n : null; };
 const lienSur = (u) => { try { const x = new URL(str(u)); return x.protocol === 'https:' && !x.username && !x.password ? x.href : ''; } catch (_) { return ''; } };
 export const NOMS_SITES = { leboncoin: 'Leboncoin', ebay: 'eBay', vestiaire: 'Vestiaire' };
+// Le Stock (site `stock`) : sa 4e case dit OÙ la paire est rangée (« Étagère A · r1 c3 »), pas des favoris.
 
 // La clé de la rangée : le site et l'identifiant de l'annonce sur ce site (jamais un titre).
 export const cleAvantSite = (site, id) => (str(site) && str(id) ? `${str(site)}:${str(id)}` : '');
@@ -30,7 +31,7 @@ export const cleAvantSite = (site, id) => (str(site) && str(id) ? `${str(site)}:
 //   prix    le prix affiché, déjà écrit (« 62 € ») ou '' ;
 //   jours   jours en ligne (nombre) ou null ; favoris / observateurs : nombre ou null ;
 //   num     le N° que la liste a trouvé PAR IDENTITÉ ('' sinon) ; lien : l'annonce sur le site (https).
-export function attrsAvantSite({ site, id, prix = '', jours = null, favoris = null, observateurs = null, num = '', lien = '' } = {}) {
+export function attrsAvantSite({ site, id, prix = '', jours = null, favoris = null, observateurs = null, num = '', lien = '', place = null } = {}) {
   const cle = cleAvantSite(site, id);
   if (!cle) return {};
   const a = { 'data-sb-avant-cle': cle, 'data-sb-av-site': str(site) };
@@ -40,6 +41,7 @@ export function attrsAvantSite({ site, id, prix = '', jours = null, favoris = nu
   if (nombre(observateurs) != null) a['data-sb-av-obs'] = String(nombre(observateurs));
   if (str(num)) a['data-sb-av-num'] = str(num);
   const l = lienSur(lien); if (l) a['data-sb-av-lien'] = l;
+  if (place != null) a['data-sb-av-place'] = str(place);   // '' = pas rangée (dit « — · à ranger »)
   return a;
 }
 
@@ -75,22 +77,33 @@ function CarteSite({ cle, fermer, achatDe }) {
   const num = g('data-sb-av-num');
   let achat = null; try { achat = num && typeof achatDe === 'function' ? nombre(achatDe(num)) : null; } catch (_) { achat = null; }
   const lien = lienSur(g('data-sb-av-lien'));
+  const aPlace = row.hasAttribute('data-sb-av-place'); const place = g('data-sb-av-place');
   return (<>
     <button type="button" className="sb-rond sb-avant-fermer" data-sb-avant-fermer="" aria-label={tr('studio.paires.fermer')} onClick={fermer}><Svg d={FERMER} size={21}/></button>
     <div className="sb-avant-ch" data-sb-avant-chiffres="">
       <div className="sb-avant-c is-prix" data-sb-avant-chiffre="prix" data-val={prix}><b className="sb-chiffre-affiche">{prix || '—'}</b><span>{tr('studio.paires.prixAffiche')}</span></div>
       <div className="sb-avant-c" data-sb-avant-chiffre="achat" data-val={achat != null ? String(achat) : ''}><b data-vide={achat != null ? undefined : ''}>{achat != null ? montant(achat) : '—'}</b><span>{tr('studio.paires.achete')}</span></div>
       <div className="sb-avant-c" data-sb-avant-chiffre="jours" data-val={jours != null ? String(jours) : ''}><b>{jours != null ? `${jours} ${tr('studio.paires.j')}` : '—'}</b><span>{tr('studio.paires.enLigne')}</span></div>
-      <div className="sb-avant-c" data-sb-avant-chiffre={obsLu !== '' || site === 'ebay' ? 'observateurs' : 'favoris'} data-val={fav != null ? String(fav) : ''}><b>{fav != null ? fav : '—'}</b><span>{site === 'ebay' ? tr('studio.paires.observateurs') : tr('studio.paires.favoris')}</span></div>
+      {aPlace
+        ? <div className="sb-avant-c is-place" data-sb-avant-chiffre="place" data-val={place}><b data-vide={place ? undefined : ''}>{place || '—'}</b><span>{place ? tr('studio.paires.dansStock') : tr('studio.paires.ranger')}</span></div>
+        : <div className="sb-avant-c" data-sb-avant-chiffre={obsLu !== '' || site === 'ebay' ? 'observateurs' : 'favoris'} data-val={fav != null ? String(fav) : ''}><b>{fav != null ? fav : '—'}</b><span>{site === 'ebay' ? tr('studio.paires.observateurs') : tr('studio.paires.favoris')}</span></div>}
     </div>
-    <div className="sb-avant-gestes sb-avant-gestes-site" data-sb-avant-gestes="">
-      {lien ? <a className="sb-touche" href={lien} target="_blank" rel="noreferrer" data-sb-avant-voir={site}><Svg d={SORTIE} size={16}/>{tr('studio.paires.voirSur', { site: NOMS_SITES[site] || site })}</a> : <span aria-hidden="true"/>}
-      <button type="button" className="sb-rond" data-sb-avant-plus="" aria-label={tr('studio.paires.plus')} onClick={() => { if (!ouvrirFicheDe(cle)) fermer(); }}><Svg d={PLUS} size={21}/></button>
+    {/* Sans lien vers le site (le Stock, une annonce sans adresse lue) : « Ouvrir la fiche » prend la rangée entière. */}
+    <div className={'sb-avant-gestes sb-avant-gestes-site' + (lien ? '' : ' is-seul')} data-sb-avant-gestes="">
+      {lien ? <a className="sb-touche" href={lien} target="_blank" rel="noreferrer" data-sb-avant-voir={site}><Svg d={SORTIE} size={16}/>{tr('studio.paires.voirSur', { site: NOMS_SITES[site] || site })}</a> : null}
+      {lien
+        ? <button type="button" className="sb-rond" data-sb-avant-plus="" aria-label={tr('studio.paires.plus')} onClick={() => { if (!ouvrirFicheDe(cle)) fermer(); }}><Svg d={PLUS} size={21}/></button>
+        : <button type="button" className="sb-touche" data-sb-avant-plus="" onClick={() => { if (!ouvrirFicheDe(cle)) fermer(); }}><Svg d={PLUS} size={16}/>{tr('studio.paires.ouvrirFiche')}</button>}
     </div>
   </>);
 }
 
 // L'hôte de ces listes : posé UNE fois à côté de la liste (le même que celui d'Annonces · Vinted).
-export function PaireAvantSiteHote({ achatDe = null }) {
-  return <PaireAvantHote rendre={(cle, fermer) => <CarteSite cle={cle} fermer={fermer} achatDe={achatDe}/>}/>;
+// `site` : la seule plateforme dont il rend les rangées (deux écrans montés ensemble ne posent jamais deux cartes).
+export function PaireAvantSiteHote({ site, achatDe = null }) {
+  return <PaireAvantHote rendre={(cle, fermer) => {
+    const row = rangeeDe(cle);
+    if (!row || row.getAttribute('data-sb-av-site') !== site) return null;
+    return <CarteSite cle={cle} fermer={fermer} achatDe={achatDe}/>;
+  }}/>;
 }
