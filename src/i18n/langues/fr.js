@@ -58,6 +58,7 @@ import ecran_partenaires from './fr/partenaires.js';   // (15 nov.) programme pa
 import ecran_argentprix from './fr/argentprix.js';   // (14 nov., argent-prix)
 import ecran_argentPlus from './fr/argentPlus.js';   // (15 nov., lot argent-plus)
 import ecran_rechliste from './fr/rechliste.js';
+import ecran_ebay_achats_refonte from './fr/ebayachats.js';
 import ecran_studio_paires from './fr/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
 import ecran_republier_guide from './fr/republierGuide.js';   // (15 nov.) republier / publier à la main, guidés
 import ecran_memePhoto from './fr/memePhoto.js';   // (15 nov., lot meme-photo)
@@ -85,6 +86,7 @@ export default {
   ...ecran_nouveaux,
   ...ecran_atelier,
   ...ecran_rechliste,
+  ...ecran_ebay_achats_refonte,
   ...ecran_accompagnement,
   ...ecran_plus,
   ...ecran_argentprix,

@@ -19,11 +19,23 @@
 //   · Rien n'est acheté par VRM : « Voir sur eBay ↗ ».
 //   · Le repère de revente est celui du MODÈLE (ses ventes Vinted, la règle
 //     `moyennesParModele`), dit comme tel — jamais le prix de cette paire.
+//   · (16 nov., lot ebay-achats-refonte — Julien : « Améliore eBay, c'est de la
+//     merde ») TROIS cartes lisibles : « Chercher sur eBay » (un champ, pointure,
+//     prix max ; le reste sous « Plus de critères ») · « Mes recherches » (une
+//     ligne par recherche, « Me prévenir » en interrupteur, le détail au toucher ;
+//     remplace l'espace Organisation monté ici) · « Nouvelles annonces »
+//     (src/AlertesEbay.jsx). « Les données » repliées sous « Détails », le quota
+//     dit en un coin. Aucune règle eBay ne change (quotas, fil, port, VRM
+//     n'achète jamais). docs/passation/2026-11-16-ebay-achats-refonte.md
 import React,{useEffect,useRef,useState} from 'react';
 import { motsVendeur } from './profilVendeur.js';
 import {appelerEbay} from './ebayRequetes.js';
 import Pourquoi from './composants/PourquoiReplie.jsx';
-import {veillesDuFil,MAX_VEILLES_ACTIVES,criteresDeVeille} from './operations/metier.js';
+import {veillesDuFil,MAX_VEILLES_ACTIVES,criteresDeVeille,veillesEnAlerte,montantSaisi,erreurCriteresEbay,SITES_REVENTE} from './operations/metier.js';
+import { tr } from './i18n/index.js';
+import { useLangue } from './i18n/react.js';
+import AlertesEbay from './AlertesEbay.jsx';
+import './ebay/achats-ebay.css';
 
 export const RELIRE_MS = 15 * 60 * 1000;
 // Le jour de Paris (le plafond du serveur repart à minuit, heure de Paris).
@@ -110,25 +122,28 @@ const cleOctets = (owner) => 'vrm_ebay_octets_' + (owner || 'local');
 const lireOctets = (owner) => { try { const o = JSON.parse(localStorage.getItem(cleOctets(owner)) || 'null'); return o && o.jour === jourParis() ? o : null; } catch (_) { return null; } };
 const noterOctets = (owner, oct) => { if (!oct) return null; try { const a = lireOctets(owner) || { jour: jourParis(), n: 0, ebay: 0, vrm: 0 }; const o = { jour: a.jour, n: a.n + 1, ebay: a.ebay + (Number(oct.ebay) || 0), vrm: a.vrm + (Number(oct.vrm) || 0) }; localStorage.setItem(cleOctets(owner), JSON.stringify(o)); return o; } catch (_) { return null; } };
 
-const eur = (c) => (Number.isFinite(c) ? (c / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '\u00a0€' : '—');
+const eur = (c) => (Number.isFinite(c) ? (c / 100).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €' : '—');
 const ko = (n) => (Number.isFinite(n) ? (Math.max(1, Math.round(n / 102.4)) / 10).toLocaleString('fr-FR') + ' Ko' : '—');
 const heure = (iso) => { const t = Date.parse(iso || ''); return Number.isFinite(t) ? new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ''; };
+const jourHeureCourt = (iso) => { const t = Date.parse(iso || ''); return Number.isFinite(t) ? new Date(t).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : ''; };
 
 const phraseRepere = (rp) => <>Repère du modèle « {rp.modele} »{rp.partiel ? ` (pour les ${motsVendeur().noms} de ce modèle)` : ''} : {eur(Math.round(rp.moyenne * 100))} en moyenne sur {rp.n} de tes ventes — le modèle, pas {motsVendeur().ce}.</>;
-function Resultat({ x, nouveau, rp, C }) {
-  return <div className="vrm-buy-row vrm-ebay-res" data-ebay-resultat={x.itemId} data-nouveau={nouveau ? 'oui' : 'non'}>
-    <div className="vrm-buy-ph" style={{ background: C.card2 || C.bg }}>{x.photo ? <img src={x.photo} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}</div>
-    <div className="vrm-buy-main" style={{ minWidth: 0 }}>
-      <div className="vrm-buy-title" style={{ color: C.text }} title={x.titre}>{nouveau && <span data-badge-nouveau="" style={{ fontSize: 11, fontWeight: 700, color: C.accent, marginRight: 6, textTransform: 'uppercase', letterSpacing: 0.3 }}>nouveau</span>}{x.titre || 'Annonce ' + x.itemId}</div>
-      <div className="vrm-buy-meta" style={{ color: C.muted, flexWrap: 'wrap' }}>
-        <span data-ebay-prix={x.prix} data-ebay-port={x.port == null ? 'inconnu' : x.port} style={{ color: C.text, fontWeight: 600 }}>{x.port == null ? <>{eur(x.prix)} <span style={{ fontWeight: 400, color: C.muted }}>+ port non indiqué</span></> : x.port === 0 ? <>{eur(x.prix)} <span style={{ fontWeight: 400, color: C.muted }}>port compris</span></> : <>{eur(x.total)} <span style={{ fontWeight: 400, color: C.muted }}>({eur(x.prix)} + {eur(x.port)} de port)</span></>}</span>
+// (16 nov., refonte) Une annonce : photo, titre, prix (port compris ou dit), lien eBay. Les couleurs
+// viennent de la carte (src/ebay/achats-ebay.css), plus du thème JS posé sur le fond bleu.
+function Resultat({ x, nouveau, rp }) {
+  return <div className="vrm-buy-row vrm-ebay-res eba-annonce" data-ebay-resultat={x.itemId} data-nouveau={nouveau ? 'oui' : 'non'}>
+    <div className="vrm-buy-ph">{x.photo ? <img src={x.photo} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}</div>
+    <div className="vrm-buy-main">
+      <div className="vrm-buy-title" title={x.titre}>{nouveau && <span data-badge-nouveau="" className="eba-nouveau">{tr('ebayAchats.nouveau')}</span>}{x.titre || tr('ebayAchats.annonce', { id: x.itemId })}</div>
+      <div className="vrm-buy-meta">
+        <span data-ebay-prix={x.prix} data-ebay-port={x.port == null ? 'inconnu' : x.port}>{x.port == null ? <><span className="eba-prix">{eur(x.prix)}</span> {tr('alertesEbay.portInconnu')}</> : x.port === 0 ? <><span className="eba-prix">{eur(x.prix)}</span> {tr('alertesEbay.portCompris')}</> : <><span className="eba-prix">{eur(x.total)}</span> {tr('alertesEbay.dontPort', { prix: eur(x.prix), port: eur(x.port) })}</>}</span>
         {x.etat && <span>· {x.etat}</span>}
-        {x.enchere && !x.achatImmediat && <span>· enchère</span>}
-        {x.vendeur && <span>· {x.vendeur}{Number.isFinite(x.avis) ? ` (${String(x.avis).replace('.', ',')}\u00a0%)` : ''}</span>}
+        {x.enchere && !x.achatImmediat && <span>· {tr('ebayAchats.enchere')}</span>}
+        {x.vendeur && <span>· {x.vendeur}{Number.isFinite(x.avis) ? ` (${String(x.avis).replace('.', ',')} %)` : ''}</span>}
       </div>
-      {rp && <div data-ebay-repere={rp.modele} style={{ fontSize: 12, color: C.muted, marginTop: 3, lineHeight: 1.4 }}>{phraseRepere(rp)}</div>}
+      {rp && <div data-ebay-repere={rp.modele} className="eba-gris" style={{ fontSize: 12 }}>{phraseRepere(rp)}</div>}
     </div>
-    <div className="vrm-buy-act"><a href={x.url} target="_blank" rel="noreferrer noopener" data-voir-ebay="" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, padding: '0 10px', color: C.text, fontSize: 13, fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}>Voir sur eBay ↗</a></div>
+    <div className="vrm-buy-act"><a className="eba-lien" href={x.url} target="_blank" rel="noreferrer noopener" data-voir-ebay="">{tr('alertesEbay.voir')}</a></div>
   </div>;
 }
 
@@ -146,32 +161,103 @@ export function reperesDeListe(titres, repere) {
   const commun = avec.length >= 2 && cles.size === 1 ? { ...avec[0], partiel: avec.length < titres.length } : null;
   return { commun, parLigne: commun ? titres.map(() => null) : rps };
 }
-function Liste({ r, nouveaux, repere, C, max = 8, cle }) {
+function Liste({ r, nouveaux, repere, max = 8, cle }) {
   const [tout, setTout] = useState(false);
   if (!r) return null;
   const items = r.items || [];
   const vus = tout ? items : items.slice(0, max);
   const { commun, parLigne } = reperesDeListe(vus.map((x) => x.titre), repere);
-  const filtres = [r.horsBudget ? `${r.horsBudget} au-dessus du budget (port compris)` : '', r.exclus ? `${r.exclus} avec un mot exclu` : '', r.autreDevise ? `${r.autreDevise} dans une autre devise` : ''].filter(Boolean);
+  const filtres = [r.horsBudget ? tr('ebayAchats.ecarte.budget', { n: r.horsBudget }) : '', r.exclus ? tr('ebayAchats.ecarte.exclus', { n: r.exclus }) : '', r.autreDevise ? tr('ebayAchats.ecarte.devise', { n: r.autreDevise }) : ''].filter(Boolean);
   const ecartees = (r.horsBudget || 0) + (r.exclus || 0) + (r.autreDevise || 0);
-  return <div data-ebay-liste={cle || ''} data-ebay-nb={items.length}>
-    {!items.length ? <p data-ebay-vide={ecartees ? 'ecartees' : ''} style={{ fontSize: 13, color: C.muted, margin: '6px 0' }}>{ecartees
+  return <div data-ebay-liste={cle || ''} data-ebay-nb={items.length} style={{ display: 'grid', gap: 6, minWidth: 0 }}>
+    {!items.length ? <p data-ebay-vide={ecartees ? 'ecartees' : ''} className="eba-gris">{ecartees
       // eBay EN AVAIT : c'est VRM qui les a écartées (le filtre de prix d'eBay
       // ne compte pas le port, VRM l'ajoute ensuite).
-      ? <>Aucune annonce gardée : eBay en avait {ecartees}, toutes écartées — {filtres.join(' · ')}.</>
-      : <>eBay n’a aucune annonce pour ces critères en ce moment.</>}</p>
-      : <>{commun && <p data-ebay-repere={commun.modele} data-ebay-repere-liste={commun.partiel ? 'partiel' : 'tout'} style={{ fontSize: 12, color: C.muted, margin: '0 0 6px', lineHeight: 1.4 }}>{phraseRepere(commun)}</p>}
-        <div className="vrm-buy-list" style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10 }}>{vus.map((x, i) => <Resultat key={x.itemId} x={x} nouveau={nouveaux && nouveaux.has(x.itemId)} rp={parLigne[i]} C={C} />)}</div></>}
-    {items.length > max && <button type="button" onClick={() => setTout((v) => !v)} style={{ marginTop: 6, minHeight: 44, border: 'none', background: 'transparent', color: C.text, fontWeight: 600, fontSize: 13, cursor: 'pointer', padding: 0 }}>{tout ? 'Voir moins' : `Voir les ${items.length}`}</button>}
-    {items.length > 0 && filtres.length > 0 && <p style={{ fontSize: 12, color: C.muted, margin: '6px 0 0' }}>Écartées : {filtres.join(' · ')}.</p>}
+      ? tr('ebayAchats.toutesEcartees', { n: ecartees, raisons: filtres.join(' · ') })
+      : tr('ebayAchats.aucuneAnnonce')}</p>
+      : <>{commun && <p data-ebay-repere={commun.modele} data-ebay-repere-liste={commun.partiel ? 'partiel' : 'tout'} className="eba-gris" style={{ fontSize: 12 }}>{phraseRepere(commun)}</p>}
+        <div className="vrm-buy-list">{vus.map((x, i) => <Resultat key={x.itemId} x={x} nouveau={nouveaux && nouveaux.has(x.itemId)} rp={parLigne[i]} />)}</div></>}
+    {items.length > max && <button type="button" className="eba-lien eba-plus-liste" onClick={() => setTout((v) => !v)}>{tout ? tr('ebayAchats.voirMoins') : tr('ebayAchats.voirTout', { n: items.length })}</button>}
+    {items.length > 0 && filtres.length > 0 && <p className="eba-gris" style={{ fontSize: 12 }}>{tr('ebayAchats.ecartees', { raisons: filtres.join(' · ') })}</p>}
   </div>;
 }
 
-export default function RechercheEbay({ headers, theme: C, owner, repere, session, vend = 'sneakers', exemple = '' }) {
+// L'interrupteur « Me prévenir » (l'alerte d'une recherche : le SERVEUR la relit chaque heure).
+function Interrupteur({ on, titre, disabled, onBasculer }) {
+  return <button type="button" role="switch" aria-checked={on ? 'true' : 'false'} aria-label={tr('alertesEbay.allumer') + ' · ' + titre} className="eba-inter" disabled={disabled} onClick={onBasculer} data-veille-alerte={on ? 'allumee' : 'eteinte'}>
+    <span className="eba-inter-piste" aria-hidden="true" /><span className="eba-inter-libelle">{tr('alertesEbay.allumer')}</span>
+  </button>;
+}
+
+// La création ou la modification d'une recherche (la même règle que l'espace Organisation :
+// `veille.creer` / `veille.modifier`, jugée par metier.js côté serveur).
+const versSaisie = (v) => ({ titre: v ? v.titre || '' : '', mots: v ? v.mots || '' : '', pointure: v ? v.pointure || '' : '', maximum: v && Number.isFinite(v.maximum) ? (v.maximum / 100).toFixed(2).replace('.', ',') : '', minimum: v && Number.isFinite(v.minimum) ? (v.minimum / 100).toFixed(2).replace('.', ',') : '', exclus: v ? v.exclus || '' : '', categorie: v ? v.categorie || '' : '', etatArticle: v ? v.etatArticle || 'tous' : 'tous', pays: v ? v.pays || 'tous' : 'tous', achatImmediat: v ? v.achatImmediat !== false : true, livraisonFR: v ? v.livraisonFR !== false : true });
+function EditionRecherche({ initial, sn, occupe, erreur, onEnregistrer, onAnnuler }) {
+  const [f, setF] = useState(() => versSaisie(initial));
+  const [local, setLocal] = useState('');
+  const ch = (k) => (e) => setF({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
+  const envoyer = (e) => {
+    e.preventDefault(); setLocal('');
+    let maximum, minimum = null;
+    try { maximum = montantSaisi(f.maximum); if (String(f.minimum).trim()) minimum = montantSaisi(f.minimum); } catch (_) { setLocal(tr('ebayAchats.erreurMontant')); return; }
+    const err = erreurCriteresEbay({ mots: f.mots, pointure: f.pointure, categorie: f.categorie });
+    if (err) { setLocal(err); return; }
+    const titre = (f.titre.trim() || (f.mots.trim() + (f.pointure.trim() ? ' · ' + f.pointure.trim() : ''))).slice(0, 160);
+    onEnregistrer({ titre, mots: f.mots, exclus: f.exclus, categorie: f.categorie.trim(), minimum, maximum, etatArticle: f.etatArticle, pays: f.pays, pointure: f.pointure.trim(), achatImmediat: f.achatImmediat, livraisonFR: f.livraisonFR });
+  };
+  return <form className="eba-edition" data-ebay-edition={initial ? initial.id : 'nouvelle'} onSubmit={envoyer}>
+    <div className="eba-edition-titre">{initial ? tr('ebayAchats.modifierTitre') : tr('ebayAchats.nouvelleTitre')}</div>
+    <label className="eba-champ">{tr('ebayAchats.champ.mots')}<input value={f.mots} onChange={ch('mots')} maxLength={200} required enterKeyHint="done" placeholder={tr('ebayAchats.champ.motsExemple')} /></label>
+    <div className={'eba-duo' + (sn || f.pointure ? '' : ' is-seul')}>
+      {(sn ? true : !!f.pointure) ? <label className="eba-champ">{tr('ebayAchats.champ.pointure')}<input value={f.pointure} onChange={ch('pointure')} inputMode="decimal" maxLength={4} placeholder="42" /></label> : null}
+      <label className="eba-champ">{tr('ebayAchats.champ.budget')}<input value={f.maximum} onChange={ch('maximum')} inputMode="decimal" required placeholder="80" /></label>
+    </div>
+    <label className="eba-champ">{tr('ebayAchats.champ.nom')}<input value={f.titre} onChange={ch('titre')} maxLength={160} placeholder={tr('ebayAchats.champ.nomVide')} /></label>
+    <details className="eba-repli"><summary>{tr('ebayAchats.plusCriteres')}</summary><div className="eba-repli-corps">
+      <label className="eba-champ">{tr('ebayAchats.champ.exclus')}<input value={f.exclus} onChange={ch('exclus')} maxLength={200} placeholder={tr('ebayAchats.champ.exclusExemple')} /></label>
+      <div className="eba-duo">
+        <label className="eba-champ">{tr('ebayAchats.champ.minimum')}<input value={f.minimum} onChange={ch('minimum')} inputMode="decimal" placeholder="—" /></label>
+        <label className="eba-champ">{tr('ebayAchats.champ.etat')}<select value={f.etatArticle} onChange={ch('etatArticle')}><option value="tous">{tr('ebayAchats.etat.tous')}</option><option value="neuf">{tr('ebayAchats.etat.neuf')}</option><option value="occasion">{tr('ebayAchats.etat.occasion')}</option></select></label>
+      </div>
+      <div className="eba-duo">
+        <label className="eba-champ">{tr('ebayAchats.champ.pays')}<select value={f.pays} onChange={ch('pays')}>{['tous', 'FR', 'BE', 'DE', 'ES', 'IT'].map((p) => <option key={p} value={p}>{tr('ebayAchats.pays.' + p)}</option>)}</select></label>
+        <label className="eba-champ">{tr('ebayAchats.champ.categorie')}<input value={f.categorie} onChange={ch('categorie')} inputMode="numeric" maxLength={10} placeholder="—" /></label>
+      </div>
+      <label className="eba-coche"><input type="checkbox" checked={f.achatImmediat} onChange={ch('achatImmediat')} />{tr('ebayAchats.achatImmediat')}</label>
+      <label className="eba-coche"><input type="checkbox" checked={f.livraisonFR} onChange={ch('livraisonFR')} />{tr('ebayAchats.livrableFR')}</label>
+    </div></details>
+    {(local || erreur) && <p role="alert" className="eba-alerte is-ambre">{local || erreur}</p>}
+    <div className="eba-actions">
+      <button type="submit" className="eba-btn is-plein" disabled={occupe} data-geste="enregistrer-edition">{occupe ? tr('ebayAchats.enregistrement') : tr('ebayAchats.enregistrer')}</button>
+      <button type="button" className="eba-btn" onClick={onAnnuler} data-geste="annuler-edition">{tr('ebayAchats.annuler')}</button>
+    </div>
+  </form>;
+}
+
+// Le prix de revente d'une recherche en alerte (facultatif : sans lui, la médiane de SES ventes du modèle).
+function PrixRevente({ v, occupe, onEnregistrer }) {
+  const [ouvert, setOuvert] = useState(false);
+  const [prix, setPrix] = useState(Number.isSafeInteger(v.revente) ? (v.revente / 100).toFixed(2).replace('.', ',') : '');
+  const [site, setSite] = useState(v.reventeSite || 'vinted');
+  const [err, setErr] = useState('');
+  const dit = Number.isSafeInteger(v.revente) ? tr('ebayAchats.revente', { prix: eur(v.revente), site: tr('alertesEbay.site.' + (v.reventeSite || 'vinted')) }) : tr('ebayAchats.reventeMediane');
+  if (!ouvert) return <div className="eba-actions" style={{ gap: 4 }}><span className="eba-gris">{dit}</span><button type="button" className="eba-lien" onClick={() => setOuvert(true)} data-geste="prix-revente">{tr('ebayAchats.modifier')}</button></div>;
+  const ok = async (e) => { e.preventDefault(); setErr(''); let r = null; if (String(prix).trim()) { try { r = montantSaisi(prix); } catch (_) { setErr(tr('ebayAchats.erreurMontant')); return; } } if (await onEnregistrer(r, site)) setOuvert(false); };
+  return <form className="eba-edition" onSubmit={ok} data-ebay-revente="">
+    <div className="eba-duo">
+      <label className="eba-champ">{tr('alertesEbay.form.revente')}<input value={prix} onChange={(e) => setPrix(e.target.value)} inputMode="decimal" placeholder={tr('alertesEbay.form.reventeVide')} /></label>
+      <label className="eba-champ">{tr('alertesEbay.form.site')}<select value={site} onChange={(e) => setSite(e.target.value)}>{SITES_REVENTE.map((s) => <option key={s} value={s}>{tr('alertesEbay.site.' + s)}</option>)}</select></label>
+    </div>
+    {err && <p role="alert" className="eba-alerte is-ambre">{err}</p>}
+    <div className="eba-actions"><button type="submit" className="eba-btn is-plein" disabled={occupe}>{tr('ebayAchats.enregistrer')}</button><button type="button" className="eba-btn" onClick={() => setOuvert(false)}>{tr('ebayAchats.annuler')}</button></div>
+  </form>;
+}
+
+export default function RechercheEbay({ headers, theme: C, owner, repere, session, vend = 'sneakers', exemple = '', revente, contexte }) {
+  useLangue();
   // (11 nov., lot DJ2) « Pointure » et l'exemple de basket : seulement pour Sneakers.
   // Hors Sneakers, la taille s'écrit dans les mots (la règle `pointure` attend 2 chiffres).
   const sn = vend !== 'autre';
-  const S = { input: { width: '100%', minHeight: 44, padding: '9px 10px', border: `1px solid ${C.border}`, borderRadius: 12, color: C.text, background: C.card, fontFamily: 'inherit', fontSize: 17, boxSizing: 'border-box' }, bouton: { minHeight: 44, padding: '0 14px', border: `1px solid ${C.border}`, borderRadius: 12, color: C.text, background: C.card, fontFamily: 'inherit', fontSize: 13, fontWeight: 600, cursor: 'pointer' }, label: { display: 'grid', gap: 5, fontSize: 12, color: C.muted } };
   const [f, setF] = useState({ mots: '', pointure: '', maximum: '', etat: 'tous', achatImmediat: true, livraisonFR: true });
   const [manuel, setManuel] = useState(undefined);   // undefined rien · 'encours' · {r} · {erreur}
   const [usage, setUsage] = useState(null);           // { appels, octets, quotaEbay, plafondEbayDoc }
@@ -182,6 +268,13 @@ export default function RechercheEbay({ headers, theme: C, owner, repere, sessio
   const [ajout, setAjout] = useState('');
   const [arret, setArret] = useState(ARRET);           // la panne commune du fil (une phrase, une fois)
   const [octetsJour, setOctetsJour] = useState(() => lireOctets(owner));
+  // (16 nov., refonte) Mes recherches : la ligne ouverte, l'édition, l'historique, l'écriture.
+  const [ouverte, setOuverte] = useState('');
+  const [edition, setEdition] = useState(null);       // null · 'nouvelle' · une recherche
+  const [archives, setArchives] = useState(false);
+  const [occupe, setOccupe] = useState(false);
+  const [erreurOps, setErreurOps] = useState('');
+  const [etatsAlertes, setEtatsAlertes] = useState({}); // vid → état lu par la route `alertes`
   const vusAvant = useRef(lireVus(owner));
   const enVol = useRef(false);
   const vivant = useRef(true);
@@ -200,30 +293,48 @@ export default function RechercheEbay({ headers, theme: C, owner, repere, sessio
       if (e.reason === 'plafond') setPlafondJour(jourParis());
       if (e.reason === 'plafond-fil') setPlafondFilJour(jourParis());
       // Un second 401 juste après un renouvellement réussi : la session est vraiment perdue.
-      return { erreur: e.status === 401 ? MSG_SESSION : (e.message || 'Je n’ai pas pu chercher sur eBay.'), reason: e.reason || '', status: e.status || 0 };
+      return { erreur: e.status === 401 ? MSG_SESSION : (e.message || tr('ebayAchats.pasPuChercher')), reason: e.reason || '', status: e.status || 0 };
     }
   };
 
-  // Les recherches enregistrées (la même liste que l'espace Organisation).
+  // Les recherches enregistrées (la même liste que l'espace Organisation). Chaque lecture et
+  // chaque écriture est annoncée (`vrm:veilles-maj`) : « Nouvelles annonces » lit la même liste.
+  const recevoirVeilles = (d) => {
+    const v = { liste: d.veilles || [], revision: d.revision };
+    if (vivant.current) setVeilles(v);
+    try { window.dispatchEvent(new CustomEvent('vrm:veilles-maj', { detail: { veilles: v.liste, revision: v.revision, source: 'ebay-achats' } })); } catch (_) {}
+  };
   const lireVeilles = async () => {
     try {
       const r = await fetch(ENDPOINT_OPS, { headers: headers(), cache: 'no-store' });
       const j = await r.json().catch(() => null);
       if (!r.ok || !j || !j.ok || !j.donnees) { if (vivant.current) setVeilles(null); return; }
-      if (vivant.current) setVeilles({ liste: j.donnees.veilles || [], revision: j.donnees.revision });
+      recevoirVeilles(j.donnees);
     } catch (_) { if (vivant.current) setVeilles(null); }
   };
   useEffect(() => {
     lireVeilles();
-    const maj = (e) => { const d = e && e.detail; if (d && Array.isArray(d.veilles)) setVeilles({ liste: d.veilles, revision: d.revision }); };
-    // L'espace « Recherches enregistrées » (plus bas) lit la même liste : s'il
-    // échoue, c'est le fil qui le dit, une fois (§7).
-    const echec = () => { if (vivant.current) setVeilles(null); };
+    const maj = (e) => { const d = e && e.detail; if (d && d.source !== 'ebay-achats' && Array.isArray(d.veilles)) setVeilles({ liste: d.veilles, revision: d.revision }); };
     window.addEventListener('vrm:veilles-maj', maj);
-    window.addEventListener('vrm:veilles-echec', echec);
-    return () => { window.removeEventListener('vrm:veilles-maj', maj); window.removeEventListener('vrm:veilles-echec', echec); };
+    return () => { window.removeEventListener('vrm:veilles-maj', maj); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // Une écriture (créer, modifier, archiver, alerte…) : comparer-et-échanger sur la révision
+  // lue (le serveur refuse une révision dépassée). Ratée ⇒ rien n'est supposé : on relit.
+  const envoyerOps = async (type, donnees, id) => {
+    if (occupe) return false;
+    if (!veilles || !Number.isSafeInteger(veilles.revision)) { setErreurOps(tr('ebayAchats.pasLues')); return false; }
+    setOccupe(true); setErreurOps('');
+    try {
+      const corps = { id: id || crypto.randomUUID(), revision: veilles.revision, type, donnees };
+      const r = await fetch(ENDPOINT_OPS, { method: 'POST', headers: { ...headers(), 'Content-Type': 'application/json' }, body: JSON.stringify(corps) });
+      const j = await r.json().catch(() => null);
+      if (!r.ok || !j || !j.ok || !j.donnees) { if (vivant.current) setErreurOps((j && j.message) || tr('ebayAchats.pasEnregistre')); lireVeilles(); return false; }
+      recevoirVeilles(j.donnees);
+      return true;
+    } catch (_) { if (vivant.current) setErreurOps(tr('ebayAchats.connexionCoupee')); lireVeilles(); return false; }
+    finally { if (vivant.current) setOccupe(false); }
+  };
 
   const { fil: dansFil, horsFil } = rechercheDuFil(veilles && veilles.liste);
   const cleV = (v) => `${owner || ''}:${v.id}:${v.version || 1}`;
@@ -297,22 +408,22 @@ export default function RechercheEbay({ headers, theme: C, owner, repere, sessio
   const chercher = async (e) => {
     e && e.preventDefault();
     const c = criteresManuels();
-    if (Number.isNaN(c.maximum)) { setManuel({ erreur: 'Prix maximum : un montant en euros (ex. 80 ou 79,90) — rien n’a été envoyé à eBay.' }); return; }
+    if (Number.isNaN(c.maximum)) { setManuel({ erreur: tr('ebayAchats.prixInvalide') }); return; }
     setManuel('encours'); setAjout('');
     const res = await appeler(c);
     if (vivant.current) setManuel(res);
   };
   const ajouterAuFil = async () => {
     const c = criteresManuels();
-    if (!(c.maximum > 0)) { setAjout('Indique un prix maximum pour l’ajouter au fil.'); return; }
-    if (!veilles || !Number.isSafeInteger(veilles.revision)) { setAjout('Je n’ai pas pu lire tes recherches enregistrées : rien n’est ajouté. Réessaie.'); return; }
+    if (!(c.maximum > 0)) { setAjout(tr('ebayAchats.prixPourEnregistrer')); return; }
+    if (!veilles || !Number.isSafeInteger(veilles.revision)) { setAjout(tr('ebayAchats.pasLues')); return; }
     setAjout('encours');
     try {
       const titre = (c.mots + (c.pointure ? ' · ' + c.pointure : '')).slice(0, 160);
       const corps = { id: crypto.randomUUID(), revision: veilles.revision, type: 'veille.creer', donnees: { titre, mots: c.mots, exclus: '', categorie: '', minimum: null, maximum: c.maximum, etatArticle: c.etat, pays: 'tous', pointure: c.pointure, achatImmediat: c.achatImmediat, livraisonFR: c.livraisonFR } };
       const r = await fetch(ENDPOINT_OPS, { method: 'POST', headers: { ...headers(), 'Content-Type': 'application/json' }, body: JSON.stringify(corps) });
       const j = await r.json().catch(() => null);
-      if (!r.ok || !j || !j.ok) { setAjout((j && j.message) || 'Pas enregistrée : réessaie dans un instant.'); return; }
+      if (!r.ok || !j || !j.ok) { setAjout((j && j.message) || tr('ebayAchats.pasEnregistre')); return; }
       // Le résultat de la recherche qui vient d'être faite EST la première
       // lecture de la nouvelle recherche : pas un second appel à eBay pour la
       // même chose (il compterait dans les 200 du jour).
@@ -324,10 +435,16 @@ export default function RechercheEbay({ headers, theme: C, owner, repere, sessio
         vusAvant.current = { ...vusAvant.current, [nv.id]: { ids } };   // il vient de les voir : rien de « nouveau »
         setFil((p) => ({ ...p, [nv.id]: { etat: 'lu', r: manuel.r, lueA: manuel.r.lueA || new Date().toISOString() } }));
       }
-      setVeilles({ liste: j.donnees.veilles || [], revision: j.donnees.revision });
+      recevoirVeilles(j.donnees);
       setAjout('ok');
-      try { window.dispatchEvent(new Event('vrm:operations-relire')); } catch (_) {}
-    } catch (_) { setAjout('Pas enregistrée : la connexion a coupé. Réessaie.'); }
+    } catch (_) { setAjout(tr('ebayAchats.connexionCoupee')); }
+  };
+  const exporter = () => {
+    try {
+      const blob = new Blob([JSON.stringify({ exporte: new Date().toISOString(), veilles: (veilles && veilles.liste) || [] }, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob), a = document.createElement('a');
+      a.href = url; a.download = 'VRM-recherches-ebay-' + jourParis() + '.json'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (_) {}
   };
 
   const nouveauxV = (v, r) => nouveauxDe(r && r.items, vusAvant.current[v.id]);
@@ -341,64 +458,135 @@ export default function RechercheEbay({ headers, theme: C, owner, repere, sessio
   const etatAffiche = (e) => e.etat === 'criteres' ? 'criteres' : e.etat === 'encours' ? 'encours' : e.etat === 'lu' ? 'lu' : filArrete ? 'plafond' : arret ? 'pas-su' : (e.etat || 'attente');
   const premieres = dansFil.filter((v) => { const e = fil[v.id]; return e && e.r && (e.r.items || []).length > 0 && !vusAvant.current[v.id]; }).length;
   const heureMs = (t) => new Date(t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  const filIds = new Set(dansFil.map((v) => v.id));
+  const actives = veilles && veilles.liste ? veilles.liste.filter((v) => v && v.etat === 'preparee').sort((a, b) => String(b.cree || '').localeCompare(String(a.cree || ''))) : [];
+  const archivees = veilles && veilles.liste ? veilles.liste.filter((v) => v && v.etat === 'archivee') : [];
+  const enAlerte = veillesEnAlerte((veilles && veilles.liste) || []);
 
-  return <section data-ebay-recherche="" style={{ display: 'grid', gap: 18, marginBottom: 18 }}>
-    <div>
-      <h3 style={{ margin: '0 0 4px', fontSize: 15, color: C.text }}>{sn ? 'Chercher des paires sur eBay' : 'Chercher des articles sur eBay'}</h3>
-      <p style={{ margin: '0 0 10px', fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Les plus récentes d’abord. Pour acheter, ouvre l’annonce sur eBay.</p>
-      <form onSubmit={chercher} data-ebay-form-recherche="" style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', alignItems: 'end' }}>
-        <label style={{ ...S.label, gridColumn: '1 / -1' }}>Modèle, marque…<input aria-label="Mots à chercher" value={f.mots} onChange={(e) => setF({ ...f, mots: e.target.value })} placeholder={sn ? 'ex. salomon xt-6' : (exemple || 'ex. lampe vintage').replace(/^ex : /, 'ex. ')} style={S.input} /></label>
-        {sn && <label style={S.label}>Pointure<input aria-label="Pointure" inputMode="decimal" value={f.pointure} onChange={(e) => setF({ ...f, pointure: e.target.value })} placeholder="42 ou 42,5" style={S.input} /></label>}
-        <label style={S.label}>Prix max, port compris (€)<input aria-label="Prix maximum" inputMode="decimal" value={f.maximum} onChange={(e) => setF({ ...f, maximum: e.target.value })} placeholder="ex. 80" style={S.input} /></label>
-        <label style={S.label}>État<select aria-label="État" value={f.etat} onChange={(e) => setF({ ...f, etat: e.target.value })} style={S.input}><option value="tous">Tous</option><option value="neuf">Neuf</option><option value="occasion">Occasion</option></select></label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, fontSize: 13, color: C.text }}><input type="checkbox" checked={f.achatImmediat} onChange={(e) => setF({ ...f, achatImmediat: e.target.checked })} style={{ width: 20, height: 20 }} />Achat immédiat</label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 44, fontSize: 13, color: C.text }}><input type="checkbox" checked={f.livraisonFR} onChange={(e) => setF({ ...f, livraisonFR: e.target.checked })} style={{ width: 20, height: 20 }} />Livrable en France</label>
-        <button type="submit" disabled={manuel === 'encours' || plafondJour === jourParis()} data-geste="chercher" style={{ ...S.bouton, background: C.text, color: C.card, border: 'none' }}>{manuel === 'encours' ? 'Recherche…' : 'Chercher'}</button>
+  // Une ligne de « Mes recherches » : nom ; budget · pointure · ce que le fil en sait ; l'interrupteur.
+  const ligne = (v) => {
+    const dans = filIds.has(v.id), e = fil[v.id] || {}, aff = dans ? etatAffiche(e) : 'hors', nv = e.r ? nouveauxV(v, e.r) : null, n = nv ? nv.size : 0;
+    const ouvert = ouverte === v.id;
+    const etatCourt = aff === 'criteres' ? <span className="eba-ambre">{tr('ebayAchats.etatCourt.criteres')}</span>
+      : aff === 'encours' && !e.r ? tr('ebayAchats.etatCourt.encours')
+      : n > 0 ? <span className="eba-nv">{tr('ebayAchats.nouvelles', { n })}</span>
+      : e.r ? tr('ebayAchats.etatCourt.lue', { n: (e.r.items || []).length })
+      : aff === 'pas-su' || aff === 'plafond' ? tr('ebayAchats.etatCourt.pasLue') : '';
+    const ra = etatsAlertes[v.id];
+    return <article key={v.id} className="eba-rech" data-ebay-fil-recherche={v.id} data-etat={aff} data-ops-fil={dans ? 'dans' : v.etat === 'archivee' ? 'archivee' : 'hors'} data-ebay-nouvelles={n}>
+      <div className="eba-rech-ligne">
+        <button type="button" className="eba-ligne" data-ebay-ligne="" aria-expanded={ouvert ? 'true' : 'false'} onClick={() => { setOuverte(ouvert ? '' : v.id); setEdition(null); }}>
+          <span className="eba-nom">{v.titre}</span>
+          <span className="eba-sous">{tr('ebayAchats.budget', { prix: eur(v.maximum) })}{v.pointure ? ' · ' + v.pointure : ''}{etatCourt ? <> · {etatCourt}</> : null}</span>
+        </button>
+        {dans ? <Interrupteur on={v.alerte === true} titre={v.titre} disabled={occupe || !veilles} onBasculer={() => envoyerOps('veille.alerte', { cible: v.id, alerte: v.alerte !== true, revente: Number.isSafeInteger(v.revente) ? v.revente : null, site: v.reventeSite || 'vinted' })} />
+          : <span className="eba-chip" data-ebay-hors="">{v.etat === 'archivee' ? tr('ebayAchats.archivee') : tr('ebayAchats.horsFil')}</span>}
+      </div>
+      {ouvert && <div className="eba-rech-detail" data-ebay-detail="">
+        {edition && edition !== 'nouvelle' && edition.id === v.id
+          ? <EditionRecherche initial={v} sn={sn} occupe={occupe} erreur={erreurOps} onAnnuler={() => setEdition(null)} onEnregistrer={async (d) => { if (await envoyerOps('veille.modifier', { ...d, cible: v.id, versionAttendue: v.version || 1 })) setEdition(null); }} />
+          : <>
+            {aff === 'criteres' && <p data-ebay-fil-etat="criteres" className="eba-alerte is-ambre">{tr('ebayAchats.criteresRefuses', { raison: e.erreur || '' })}</p>}
+            {(aff === 'pas-su' || aff === 'plafond') && <p data-ebay-fil-etat={aff} className="eba-gris">{e.r ? tr('ebayAchats.pasRelue') : tr('ebayAchats.pasLueLong')}</p>}
+            {aff === 'encours' && !e.r && <p className="eba-gris">{tr('ebayAchats.rechercheEnCours')}</p>}
+            {e.r && <Liste r={e.r} nouveaux={nv} repere={repere} cle={v.id} />}
+            <div className="eba-crit">
+              <span><b>{v.mots}</b>{v.exclus ? ' · ' + tr('ebayAchats.sans', { mots: v.exclus }) : ''}</span>
+              <span>{tr('ebayAchats.etat.' + (v.etatArticle || 'tous'))} · {tr('ebayAchats.pays.' + (v.pays || 'tous'))}</span>
+              {e.lueA && <span>{tr('ebayAchats.lueA', { h: heure(e.lueA) })}</span>}
+            </div>
+            {v.alerte === true && <>
+              <p className="eba-gris" data-alerte-recherche={v.id} data-alerte-recherche-etat={!ra ? 'attente' : ra.refus ? 'refus' : ra.echec ? 'echec' : 'lue'}>{tr('ebayAchats.alerte')} {!ra ? tr('alertesEbay.etat.attente') : ra.refus ? tr('alertesEbay.etat.refus', { raison: ra.refus }) : ra.echec ? tr('alertesEbay.etat.echec', { heure: heure(ra.at) }) : ra.premiere && ra.premiere === ra.at ? tr('alertesEbay.etat.premiere', { heure: heure(ra.at) }) : tr('alertesEbay.etat.lue', { heure: heure(ra.at), n: Number.isSafeInteger(ra.n) ? ra.n : 0 })}</p>
+              <PrixRevente v={v} occupe={occupe} onEnregistrer={(r, site) => envoyerOps('veille.alerte', { cible: v.id, alerte: true, revente: r, site })} />
+            </>}
+            <div className="eba-actions">
+              {v.etat === 'preparee' ? <>
+                <button type="button" className="eba-btn" disabled={occupe} onClick={() => setEdition(v)} data-geste="modifier-recherche">{tr('ebayAchats.modifier')}</button>
+                <button type="button" className="eba-btn" disabled={occupe} onClick={() => envoyerOps('veille.dupliquer', { cible: v.id, titre: (v.titre.slice(0, 150) + ' ' + tr('ebayAchats.copie')).slice(0, 160) })} data-geste="dupliquer-recherche">{tr('ebayAchats.dupliquer')}</button>
+                <button type="button" className="eba-btn" disabled={occupe} onClick={async () => { if (await envoyerOps('veille.archiver', { cible: v.id })) setOuverte(''); }} data-geste="archiver-recherche">{tr('ebayAchats.archiver')}</button>
+              </> : <button type="button" className="eba-btn" disabled={occupe} onClick={() => envoyerOps('veille.restaurer', { cible: v.id })} data-geste="restaurer-recherche">{tr('ebayAchats.restaurer')}</button>}
+            </div>
+            {(v.evenements || []).length > 0 && <details className="eba-repli"><summary>{tr('ebayAchats.modifications', { n: v.evenements.length })}</summary>
+              <div className="eba-details">{(v.evenements || []).slice().reverse().slice(0, 20).map((ev) => <p key={ev.id}>{jourHeureCourt(ev.cree)} · {tr('ebayAchats.histo.' + (['modification', 'archivage', 'restauration', 'alerte', 'alerte-arretee'].includes(ev.nature) ? ev.nature : 'autre'))}{ev.avant && ev.apres && ev.avant.maximum !== ev.apres.maximum ? ' · ' + eur(ev.avant.maximum) + ' → ' + eur(ev.apres.maximum) : ''}</p>)}</div>
+            </details>}
+          </>}
+      </div>}
+    </article>;
+  };
+
+  return <section className="eba" data-ebay-recherche="">
+    {/* ── (a) CHERCHER SUR eBAY ─────────────────────────────────────────── */}
+    <div className="eba-carte" data-ebay-bloc="chercher">
+      <div className="eba-tete"><h3 className="eba-titre">{tr('ebayAchats.chercher.titre')}</h3></div>
+      <form onSubmit={chercher} data-ebay-form-recherche="" className="eba-form">
+        <label className="eba-champ">{sn ? tr('ebayAchats.champ.modele') : tr('ebayAchats.champ.article')}<input type="search" enterKeyHint="search" aria-label="Mots à chercher" value={f.mots} onChange={(e) => setF({ ...f, mots: e.target.value })} placeholder={sn ? 'ex. salomon xt-6' : (exemple || 'ex. lampe vintage').replace(/^ex : /, 'ex. ')} /></label>
+        <div className={'eba-duo' + (sn ? '' : ' is-seul')}>
+          {sn ? <label className="eba-champ">{tr('ebayAchats.champ.pointure')}<input aria-label="Pointure" inputMode="decimal" enterKeyHint="search" value={f.pointure} onChange={(e) => setF({ ...f, pointure: e.target.value })} placeholder="42" /></label> : null}
+          <label className="eba-champ">{tr('ebayAchats.champ.prixMax')}<input aria-label="Prix maximum" inputMode="decimal" enterKeyHint="search" value={f.maximum} onChange={(e) => setF({ ...f, maximum: e.target.value })} placeholder="80" /></label>
+        </div>
+        <details className="eba-repli" data-ebay-plus-criteres=""><summary>{tr('ebayAchats.plusCriteres')}</summary><div className="eba-repli-corps">
+          <label className="eba-champ">{tr('ebayAchats.champ.etat')}<select aria-label="État" value={f.etat} onChange={(e) => setF({ ...f, etat: e.target.value })}><option value="tous">{tr('ebayAchats.etat.tous')}</option><option value="neuf">{tr('ebayAchats.etat.neuf')}</option><option value="occasion">{tr('ebayAchats.etat.occasion')}</option></select></label>
+          <label className="eba-coche"><input type="checkbox" checked={f.achatImmediat} onChange={(e) => setF({ ...f, achatImmediat: e.target.checked })} />{tr('ebayAchats.achatImmediat')}</label>
+          <label className="eba-coche"><input type="checkbox" checked={f.livraisonFR} onChange={(e) => setF({ ...f, livraisonFR: e.target.checked })} />{tr('ebayAchats.livrableFR')}</label>
+        </div></details>
+        <div className="eba-envoi">
+          <button type="submit" className="eba-btn is-plein" disabled={manuel === 'encours' || plafondAuj} data-geste="chercher">{manuel === 'encours' ? tr('ebayAchats.recherche') : tr('ebayAchats.chercher.bouton')}</button>
+          {ap && Number.isFinite(ap.aujourdhui) && Number.isFinite(ap.plafond) ? <span className="eba-quota" data-ebay-quota-court="">{tr('ebayAchats.quotaCourt', { n: ap.aujourdhui, max: ap.plafond })}</span> : null}
+        </div>
       </form>
-      <div aria-live="polite" style={{ marginTop: 10 }}>
-        {manuel && manuel.erreur && <p data-ebay-recherche-etat="pas-su" style={{ fontSize: 13, color: C.muted, lineHeight: 1.5 }}>{manuel.erreur}</p>}
+      <div aria-live="polite" style={{ display: 'grid', gap: 10, minWidth: 0 }}>
+        {manuel && manuel.erreur && <p data-ebay-recherche-etat="pas-su" className="eba-alerte">{manuel.erreur}</p>}
         {manuel && manuel.r && <>
-          <Liste r={manuel.r} repere={repere} C={C} cle="manuel" />
-          {manuel.r.criteres && <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
-            <button type="button" onClick={ajouterAuFil} disabled={ajout === 'encours' || ajout === 'ok'} data-geste="ajouter-fil" style={S.bouton}>{ajout === 'ok' ? 'Ajoutée au fil ✓' : 'Ajouter au fil'}</button>
-            {ajout && ajout !== 'ok' && ajout !== 'encours' && <span style={{ fontSize: 12, color: C.muted }}>{ajout}</span>}
+          <Liste r={manuel.r} repere={repere} cle="manuel" />
+          {manuel.r.criteres && <div className="eba-actions">
+            <button type="button" className="eba-btn" onClick={ajouterAuFil} disabled={ajout === 'encours' || ajout === 'ok'} data-geste="ajouter-fil">{ajout === 'ok' ? tr('ebayAchats.enregistree') : tr('ebayAchats.enregistrerRecherche')}</button>
+            {ajout && ajout !== 'ok' && ajout !== 'encours' && <span className="eba-gris">{ajout}</span>}
           </div>}
         </>}
       </div>
+      <details className="eba-repli" data-ebay-details=""><summary>{tr('ebayAchats.details')}</summary>
+        <div data-ebay-donnees="" className="eba-details">
+          <p data-ebay-appels={ap ? ap.aujourdhui : ''}>{ap ? <>Aujourd’hui : {ap.aujourdhui} recherche{ap.aujourdhui > 1 ? 's' : ''} sur {ap.plafond} (ton plafond dans VRM){Number.isFinite(ap.fil) && Number.isFinite(ap.plafondFil) ? <>, dont {ap.fil} par le fil ({ap.plafondFil} au plus : le reste est gardé pour chercher à la main)</> : null}.</> : <>Chaque recherche = un appel à eBay ; {MAX_FIL} recherches au plus dans le fil, relues au plus toutes les 15 min.</>}</p>
+          <p data-ebay-quota={usage && usage.quotaEbay ? usage.quotaEbay.restant : ''}>{usage && usage.quotaEbay ? <>eBay : {usage.quotaEbay.restant.toLocaleString('fr-FR')} recherches restantes sur {usage.quotaEbay.limite.toLocaleString('fr-FR')} aujourd’hui, pour toute l’application VRM (dit par eBay).</> : <>eBay limite toute l’application VRM à 5 000 recherches par jour (documentation d’eBay — pas encore mesuré).</>}</p>
+          {usage && usage.octets && <p data-ebay-octets={usage.octets.vrm}>Dernière recherche : {ko(usage.octets.ebay)} reçus d’eBay, {ko(usage.octets.vrm)} vers cet appareil (sans les photos).</p>}
+          {octetsJour && octetsJour.n > 0 && <p data-ebay-octets-jour={octetsJour.vrm}>Aujourd’hui sur cet appareil : {octetsJour.n} recherche{octetsJour.n > 1 ? 's' : ''}, {ko(octetsJour.vrm)} reçus ({ko(octetsJour.ebay)} reçus d’eBay, réduits).</p>}
+          <p>{tr('ebayAchats.jamaisAchat')}</p>
+        </div>
+      </details>
     </div>
 
-    <div data-ebay-fil={veilles === undefined ? 'en-cours' : veilles === null ? 'pas-su' : dansFil.length} data-ebay-fil-nouveaux={nbNouveaux}>
-      <h3 style={{ margin: '0 0 4px', fontSize: 15, color: C.text }}>Ton fil{nbNouveaux > 0 ? <span style={{ fontSize: 12, fontWeight: 600, color: C.accent }}> · {nbNouveaux} nouvelle{nbNouveaux > 1 ? 's' : ''}</span> : null}</h3>
-      <div style={{ margin: '0 0 10px', fontSize: 13, color: C.muted, lineHeight: 1.5 }}>Tes recherches, relues ici. « Nouveau » = pas vue depuis ta visite. <Pourquoi>Tes recherches enregistrées, relues à l’ouverture de cet onglet puis au plus toutes les 15 minutes tant que VRM est ouvert et visible. « Nouveau » = pas vue depuis ta dernière visite.</Pourquoi></div>
-      {veilles === undefined && <p style={{ fontSize: 13, color: C.muted }}>Lecture de tes recherches enregistrées…</p>}
-      {veilles === null && <p data-ebay-fil-etat="pas-su" style={{ fontSize: 13, color: C.muted }}>Je n’ai pas pu lire tes recherches enregistrées — rien n’est perdu. <button type="button" onClick={() => { lireVeilles(); try { window.dispatchEvent(new Event('vrm:operations-relire')); } catch (_) {} }} style={{ ...S.bouton, marginLeft: 6 }}>Réessayer</button></p>}
-      {veilles && !dansFil.length && <p data-ebay-fil-vide="" style={{ fontSize: 13, color: C.muted }}>Fil vide : cherche {motsVendeur().un}, puis « Ajouter au fil ».</p>}
-      {horsFil > 0 && <p data-ebay-hors-fil={horsFil} style={{ fontSize: 12, color: C.muted }}>{horsFil > 1 ? `${horsFil} autres recherches actives ne sont pas relues` : '1 autre recherche active n’est pas relue'} : {MAX_FIL} au plus, les plus récentes d’abord — archive celles qui ne servent plus.</p>}
-      {plafondAuj && <p data-ebay-plafond="" style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>Tes recherches eBay du jour sont faites : le fil s’arrête jusqu’à minuit (heure de Paris).</p>}
-      {plafondFilAuj && <div data-ebay-plafond-fil="" style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>Fil arrêté jusqu’à minuit : {(ap && ap.plafondFil) || 150} relectures du jour faites. <Pourquoi>Ton fil a fait ses {(ap && ap.plafondFil) || 150} relectures du jour : il s’arrête jusqu’à minuit (heure de Paris). Les recherches restantes sont gardées pour chercher à la main, ci-dessus.</Pourquoi></div>}
-      {!filArrete && arret && <p data-ebay-fil-panne={arret.raison} style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>{arret.message}{arret.raison !== 'session' && arret.raison !== 'session-renouvel' ? ` Prochain essai vers ${heureMs(arret.ici + RELIRE_MS)}, ou « Relire maintenant ».` : ''}</p>}
-      {premieres > 0 && <p data-ebay-fil-premiere={premieres} style={{ fontSize: 12, color: C.muted, margin: '0 0 8px' }}>{premieres > 1 ? `Première lecture de ${premieres} recherches` : 'Première lecture d’une recherche'} : rien n’y est marqué « nouveau ».</p>}
-      <div style={{ display: 'grid', gap: 14 }}>{dansFil.map((v) => { const e = fil[v.id] || {}; const nv = e.r ? nouveauxV(v, e.r) : null; const aff = etatAffiche(e);
-        return <article key={v.id} data-ebay-fil-recherche={v.id} data-etat={aff}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
-            <b style={{ fontSize: 13, color: C.text }}>{v.titre}</b>
-            <span style={{ fontSize: 12, color: C.muted }}>{v.mots}{v.pointure ? ' · ' + v.pointure : ''} · {eur(v.maximum)} max</span>
-            {e.lueA && <span style={{ fontSize: 12, color: C.muted, marginLeft: 'auto' }}>lue à {heure(e.lueA)}</span>}
+    {/* ── (b) MES RECHERCHES ────────────────────────────────────────────── */}
+    <div className="eba-carte" data-ebay-bloc="recherches" data-ebay-fil={veilles === undefined ? 'en-cours' : veilles === null ? 'pas-su' : dansFil.length} data-ebay-fil-nouveaux={nbNouveaux}>
+      <div className="eba-tete">
+        <h3 className="eba-titre">{tr('ebayAchats.mes.titre')}{veilles && actives.length ? <span className="eba-n"> · {actives.length}</span> : null}</h3>
+        <button type="button" className="eba-btn" disabled={!veilles || occupe} onClick={() => { setEdition('nouvelle'); setOuverte(''); }} data-geste="ajouter-recherche">{tr('ebayAchats.ajouter')}</button>
+        <details className="eba-menu" data-ebay-menu="">
+          <summary aria-label={tr('ebayAchats.menu')}>···</summary>
+          <div className="eba-menu-corps" role="menu">
+            <button type="button" role="menuitem" disabled={!dansFil.length || filArrete} onClick={(e) => { e.currentTarget.closest('details').open = false; relireFil(true); }} data-geste="relire-fil">{tr('ebayAchats.relire')}</button>
+            <button type="button" role="menuitem" onClick={(e) => { e.currentTarget.closest('details').open = false; setArchives((a) => !a); }} data-geste="historique">{archives ? tr('ebayAchats.historiqueCacher') : tr('ebayAchats.historique', { n: archivees.length })}</button>
+            <button type="button" role="menuitem" disabled={!veilles} onClick={(e) => { e.currentTarget.closest('details').open = false; exporter(); }} data-geste="exporter">{tr('ebayAchats.exporter')}</button>
           </div>
-          {e.etat === 'encours' && !e.r && <p style={{ fontSize: 13, color: C.muted }}>Recherche sur eBay…</p>}
-          {(aff === 'pas-su' || aff === 'plafond') && <p data-ebay-fil-etat={aff} style={{ fontSize: 12, color: C.muted, margin: '0 0 6px' }}>{e.r ? 'Pas relue — ce que tu vois date de la dernière lecture.' : 'Pas lue.'}</p>}
-          {aff === 'criteres' && <p data-ebay-fil-etat="criteres" style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>Critères refusés : {e.erreur} Modifie cette recherche plus bas (elle ne sera pas relue avant).</p>}
-          {e.r && <Liste r={e.r} nouveaux={nv} repere={repere} C={C} cle={v.id} />}
-        </article>; })}</div>
-      {dansFil.length > 0 && !filArrete && <button type="button" onClick={() => relireFil(true)} data-geste="relire-fil" style={{ ...S.bouton, marginTop: 10 }}>Relire maintenant</button>}
+        </details>
+      </div>
+      {edition === 'nouvelle' && <EditionRecherche initial={null} sn={sn} occupe={occupe} erreur={erreurOps} onAnnuler={() => setEdition(null)} onEnregistrer={async (d) => { if (await envoyerOps('veille.creer', d)) setEdition(null); }} />}
+      {erreurOps && edition === null && <p role="alert" className="eba-alerte is-ambre">{erreurOps}</p>}
+      {veilles === undefined && <p className="eba-gris">{tr('ebayAchats.lecture')}</p>}
+      {veilles === null && <p data-ebay-fil-etat="pas-su" className="eba-texte">{tr('ebayAchats.pasLuesPhrase')} <button type="button" className="eba-lien" onClick={lireVeilles}>{tr('commun.reessayer')}</button></p>}
+      {veilles && !actives.length && <p data-ebay-fil-vide="" className="eba-gris">{tr('ebayAchats.vide')}</p>}
+      {plafondAuj && <p data-ebay-plafond="" className="eba-alerte">{tr('ebayAchats.plafond')}</p>}
+      {plafondFilAuj && <div data-ebay-plafond-fil="" className="eba-alerte">{tr('ebayAchats.plafondFil', { n: (ap && ap.plafondFil) || 150 })} <Pourquoi label={tr('ebayAchats.pourquoi')}>{tr('ebayAchats.plafondFilPourquoi', { n: (ap && ap.plafondFil) || 150 })}</Pourquoi></div>}
+      {!filArrete && arret && <p data-ebay-fil-panne={arret.raison} className="eba-alerte">{arret.message}{arret.raison !== 'session' && arret.raison !== 'session-renouvel' ? ' ' + tr('ebayAchats.prochainEssai', { h: heureMs(arret.ici + RELIRE_MS) }) : ''}</p>}
+      {premieres > 0 && <p data-ebay-fil-premiere={premieres} className="eba-gris">{tr('ebayAchats.premiere', { n: premieres })}</p>}
+      {horsFil > 0 && <p data-ebay-hors-fil={horsFil} className="eba-gris">{tr('ebayAchats.horsFilPhrase', { n: horsFil, max: MAX_FIL })}</p>}
+      {veilles && actives.length > 0 && <div className="eba-liste">{actives.map(ligne)}</div>}
+      {veilles && archives && <>
+        <p className="eba-gris" data-ebay-archives={archivees.length}>{archivees.length ? tr('ebayAchats.archivees', { n: archivees.length }) : tr('ebayAchats.aucuneArchivee')}</p>
+        {archivees.length > 0 && <div className="eba-liste">{archivees.map(ligne)}</div>}
+      </>}
     </div>
 
-    <div data-ebay-donnees="" style={{ fontSize: 12, color: C.muted, lineHeight: 1.6, borderTop: `1px solid ${C.border}`, paddingTop: 10 }}>
-      <b style={{ color: C.text, fontWeight: 600 }}>Les données</b>
-      <p style={{ margin: '4px 0' }} data-ebay-appels={ap ? ap.aujourdhui : ''}>{ap ? <>Aujourd’hui : {ap.aujourdhui} recherche{ap.aujourdhui > 1 ? 's' : ''} sur {ap.plafond} (ton plafond dans VRM){Number.isFinite(ap.fil) && Number.isFinite(ap.plafondFil) ? <>, dont {ap.fil} par le fil ({ap.plafondFil} au plus : le reste est gardé pour chercher à la main)</> : null}.</> : <>Chaque recherche = un appel à eBay ; {MAX_FIL} recherches au plus dans le fil, relues au plus toutes les 15 min.</>}</p>
-      <p style={{ margin: '4px 0' }} data-ebay-quota={usage && usage.quotaEbay ? usage.quotaEbay.restant : ''}>{usage && usage.quotaEbay ? <>eBay : {usage.quotaEbay.restant.toLocaleString('fr-FR')} recherches restantes sur {usage.quotaEbay.limite.toLocaleString('fr-FR')} aujourd’hui, pour toute l’application VRM (dit par eBay).</> : <>eBay limite toute l’application VRM à 5 000 recherches par jour (documentation d’eBay — pas encore mesuré).</>}</p>
-      {usage && usage.octets && <p style={{ margin: '4px 0' }} data-ebay-octets={usage.octets.vrm}>Dernière recherche : {ko(usage.octets.ebay)} reçus d’eBay, {ko(usage.octets.vrm)} vers cet appareil (sans les photos).</p>}
-      {octetsJour && octetsJour.n > 0 && <p style={{ margin: '4px 0' }} data-ebay-octets-jour={octetsJour.vrm}>Aujourd’hui ici : {octetsJour.n} recherche{octetsJour.n > 1 ? 's' : ''}, {ko(octetsJour.vrm)} reçus ({ko(octetsJour.ebay)} reçus d’eBay, réduits).</p>}
-    </div>
+    {/* ── (c) NOUVELLES ANNONCES (les alertes : le serveur relit chaque heure) ── */}
+    <AlertesEbay headers={headers} theme={C} revente={revente} contexte={contexte} veilles={veilles && veilles.liste} enAlerte={enAlerte.length} onRecherches={setEtatsAlertes} />
   </section>;
 }

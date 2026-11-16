@@ -320,7 +320,6 @@ const InfosPaireFeuilleP = lazySur(() => import('./InfosPaire.jsx').then((m) => 
 // ⟦→ ecrans/Compta.jsx #3⟧
 const RechercheEbay = aLaDemande(() => import('./ebayRecherche.jsx'));
 // (11 nov., lot alertes-ebay) « Nouvelles annonces pour tes recherches » (eBay → Achats), à la demande.
-const AlertesEbay = aLaDemande(() => import('./AlertesEbay.jsx'));
 import { mediane } from './alertesEbayMarge.js';
 // ⟦→ ecrans/Compta.jsx #4⟧
 const FactureVente = aLaDemande(() => import('./FacturePro.jsx').then((m) => ({ default: m.FactureVente })));
@@ -26346,11 +26345,11 @@ function EbayAchatsOnglet({headers,panelOff,vue,comptes,onCompte,contexte={}}){
   },[ventes,panelOff]);
   const [gagnes,setGagnes]=React.useState(false);
   return <div style={{padding:16}} data-ebay-achats-onglet="">
-    <Suspense fallback={null}><AlertesEbay headers={headers} theme={C} revente={revente} contexte={contexte}/></Suspense>
-    <RechercheEbay vend={vendActuel()} exemple={exemplesActuels().achat} headers={headers} theme={C} owner={AUTH.user?.id || ''} repere={repere} session={SESSION_FIL_EBAY}/>
-    <Suspense fallback={<p>Lecture des recherches…</p>}><Operations sombre={C===THEMES.dark} headers={headers} initialSection="veilles" contexteEbay/></Suspense>
+    {/* (16 nov., lot ebay-achats-refonte) UNE section, trois cartes : Chercher · Mes recherches (remplace
+        l'espace Organisation monté ici) · Nouvelles annonces (les alertes, rendues par RechercheEbay). */}
+    <RechercheEbay vend={vendActuel()} exemple={exemplesActuels().achat} headers={headers} theme={C} owner={AUTH.user?.id || ''} repere={repere} session={SESSION_FIL_EBAY} revente={revente} contexte={contexte}/>
     {/* Les achats GAGNÉS (WonList) : gardés, repliés — lus seulement à l'ouverture. */}
-    <details className="vrm-repli" data-ebay-achats-gagnes="" onToggle={e=>{if(e.currentTarget.open)setGagnes(true);}} style={{marginTop:18}}>
+    <details className="vrm-repli eba-gagnes" data-ebay-achats-gagnes="" onToggle={e=>{if(e.currentTarget.open)setGagnes(true);}} style={{marginTop:18}}>
       <summary>Tes achats gagnés sur eBay · 60 derniers jours</summary>
       {gagnes&&<div style={{paddingTop:10}}><EbayActionCompte vue={vue} comptes={comptes} onCompte={onCompte}>{ref=><EbayAchats key={'ac-'+ref} headers={headers} theme={C} compte={ref} sansTitre/>}</EbayActionCompte></div>}
     </details>
