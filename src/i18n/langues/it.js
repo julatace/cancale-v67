@@ -17,6 +17,7 @@ import ecran_retrait_ailleurs from './it/retraitAilleurs.js';   // (15 nov.) « 
 import ecran_finition from './it/finition.js';   // (15 nov.) la finition écran par écran
 import ecran_parametres from './it/parametres.js';   // (15 nov.) Paramètres rangés en dix catégories
 import ecran_numeros_nouvelles from './it/numeros-nouvelles.js';   // (15 nov.) Les nouvelles annonces sans N°
+import ecran_republie_telephone from './it/republie-telephone.js';   // (15 nov.) Republiée dans l'app Vinted   // (15 nov.) Les nouvelles annonces sans N°
 import ecran_idees from './it/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './it/ventes.js';
 import ecran_commun from './it/commun.js';
@@ -2298,4 +2299,5 @@ export default {
   ...ecran_verre2,
   ...ecran_fiched,
   ...ecran_numeros_nouvelles,
+  ...ecran_republie_telephone,
 };

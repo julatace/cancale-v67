@@ -140,7 +140,7 @@ import { finDatee, texteSortie, sortiRecent, pourquoiPasLu, SORTIS_JOURS, jourCo
 import {arriveesRelues} from './arriveesRelues.js';
 import { preuveDeLigne } from '../api/_lib/etat-colis.js';
 import { urlQrDuColis } from '../api/_lib/qr-retrait.js';
-import {avecSuiviDuSujet,finsDesLignes,sortiParSuivis,sortiParSuivi,suiviDeLigne,lienSuivi,codePostalLu,nouvelleVinted,transporteurDeForme,colisInternational,suiviValide,TRANSPORTEURS_SAISIE,normaliserCodePostal,idSuiviManuel,relireLigneSuivi,finDeCommandeAchat,fusionTransporteur,ligneDuTransporteur,ligneDeSuiviTransporteur,leverGarde,SELECT_TRANSP_META,ligneTranspDeMeta,sensDeLigne,incidentDeSuivis,incidentDeLigne,repartiAffichable,nomTransporteurSuivi} from '../api/_lib/suivi-colis.js';
+import {avecSuiviDuSujet,finsDesLignes,sortiParSuivis,sortiParSuivi,suiviDeLigne,lienSuivi,codePostalLu,nouvelleVinted,transporteurDeForme,colisInternational,suiviValide,TRANSPORTEURS_SAISIE,normaliserCodePostal,idSuiviManuel,relireLigneSuivi,finDeCommandeAchat,txAchatsEnRetour,achatEnRetour,fusionTransporteur,ligneDuTransporteur,ligneDeSuiviTransporteur,leverGarde,SELECT_TRANSP_META,ligneTranspDeMeta,sensDeLigne,incidentDeSuivis,incidentDeLigne,repartiAffichable,nomTransporteurSuivi} from '../api/_lib/suivi-colis.js';
 import {ligneTransporteur,texteCodePostalMr,carrierLisible,carrierNonLu,nomTransporteur,LECTURE_SERVEUR_TRANSP,heureParis,indexTranspParSuivi,carrierLuDeLigne,noterLecturesServeur,lecturesCle} from '../api/_lib/transporteurs.js';
 // ⟦→ ecrans/Reglages.jsx #6⟧
 import PorteConfidentialite from './PorteConfidentialite.jsx';
@@ -493,7 +493,8 @@ import VisiteBulles from "./VisiteBulles.jsx";
 import { poserOutilsAccueil } from "./accueilReste/deps.js";
 import { AccueilResteJournee, VisiteEcranHote } from "./accueilReste/AccueilReste.jsx";
 import { retenirNumerosNeufs, clesLuesEnDouble } from "./accueilReste/cartonsNumeros.js";
-import { numeroNeufPermis, lectureCompleteDe, marquerNouveau, marquerEcrit, aEcrireNouveaux, listeNumeros, demandesNumero, propositionNumero, modeNumerotation } from "./numerosNouvelles.js";
+import { ajouterAuRegistre, decisionRepublie, disparuesDuCompte, empreintesDe, majEmpreintesFiches, majAttente as majAttenteRepub, CLE_PHOTOS_VRM, CLE_EMPREINTES_FICHES, CLE_REPUB_REPONSES, CLE_REPUB_ATTENTE } from "./republieTelephone.js";
+import { numeroNeufPermis, lectureCompleteAnnonce, annoncesANumeroter, reserveEnDesaccord, marquerNouveau, marquerEcrit, aEcrireNouveaux, listeNumeros, demandesNumero, propositionNumero, modeNumerotation } from "./numerosNouvelles.js";
 import { publierSansNumero } from "./accueilReste/trouveChezToi.js";
 import { CLE_AIDES } from "./accueilReste/aides.js";
 import { CLE_APPEL } from "./accueilReste/appelBienvenue.js";
@@ -3182,6 +3183,10 @@ const SYNC_KEYS = [
   // (5 nov.) « Republier à la main, accompagné » : { [ancienId]: { uid, num, titre, at, nouvelId?, lieAt? } }.
   // Le lien nouvelle → ancienne est posé par SON clic (src/annoncesActions.js).
   'vrm_repub_main',
+  // (15 nov., src/republieTelephone.js) Republiée dans l'app Vinted : le registre des photos FABRIQUÉES par VRM
+  // ({ [empreinte]: { n, src, uid, at } }, jamais l'image), les empreintes gardées des fiches numérotées, SES
+  // réponses « Non, c'est une autre paire » et la première fois qu'une annonce a attendu (borne de 24 h).
+  'vrm_photos_vrm', 'vrm_empreintes_fiches', 'vrm_republie_reponses', 'vrm_republie_attente',
   // (6 nov.) LES réglages de Republier (photos, prix, titre, lettre) : les mêmes pour
   // l'atelier et « Republier à la main », sur tous ses appareils (src/republierReglages.js).
   'vrm_republier_reglages',
@@ -3961,6 +3966,71 @@ function NouveauxNumerosHost() {
   );
 }
 
+// (15 nov., src/republieTelephone.js) « REPUBLIÉE DANS L'APP VINTED ? » : la feuille ouverte par Ma journée.
+// Une proposition à la fois (« 1 sur 3 ») : AVANT (la paire numérotée qui vient de disparaître, son N° gravé)
+// et MAINTENANT (la nouvelle annonce) côte à côte, au même cadrage ; « Oui, garder N°42 » (le plein) relie
+// par SON clic (le lien de « Republier à la main », `vrm_repub_main`) ; « Non, c'est un autre article »
+// laisse la règle normale donner un N° neuf. Une ancienne encore en ligne ne se relie pas (le dit).
+let _rtListener = null;
+const ouvrirRepubliee = (opts) => { if (_rtListener) _rtListener(opts || null); };
+function RepublieeHost() {
+  const [q, setQ] = React.useState(null);
+  const [i, setI] = React.useState(0);
+  React.useEffect(() => { _rtListener = (o) => { setI(0); setQ(o); }; return () => { _rtListener = null; }; }, []);
+  if (!q || !Array.isArray(q.propositions) || !q.propositions.length) return null;
+  const l = q.propositions, k = Math.min(i, l.length - 1), pr = l[k];
+  const fermer = () => setQ(null);
+  const suite = () => { const reste = l.filter((_, j) => j !== k); if (!reste.length) { setQ(null); return; } setQ({ ...q, propositions: reste }); setI(Math.min(k, reste.length - 1)); };
+  const repondre = (cand) => { try { q.onRepondre(pr, cand); } catch (_) {} suite(); };
+  // (15 nov., codes « verre » : porcelaine, plaque gravée, bandeau ambre pour le geste, un plein d'encre) Les deux
+  // photos au MÊME cadrage (3:4), la plaque N° gravée sur celle d'avant ; jetons `--sb-*` (clair et sombre).
+  const cadre = { position: 'relative', aspectRatio: '3 / 4', borderRadius: 'var(--sb-r-plateau, 16px)', overflow: 'hidden', background: 'var(--sb-porcelaine, ' + C.card2 + ')', boxShadow: 'var(--sb-ombre-pose, 0 1px 2px rgba(0,0,0,.08))' };
+  const legende = { fontSize: 13, fontWeight: 600, color: 'var(--sb-encre-2, ' + C.muted + ')', marginBottom: 6 };
+  const plusieurs = pr.candidats.length > 1;
+  return createPortal(
+    <SheetShell onClose={fermer} z={Z_CONFIRMATION} className="vrm-confirmation vrm-rt-feuille" aria-label={tr('rt.feuille.titre')}>
+      <div data-rt-feuille={pr.id} data-rt-n={l.length}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
+          <div style={{ fontSize: 19, fontWeight: 600, color: C.text, letterSpacing: '-0.02em', lineHeight: 1.3 }}>{tr('rt.feuille.titre')}</div>
+          {l.length > 1 ? <span data-rt-rang="" style={{ fontSize: 13, color: C.muted, flexShrink: 0 }}>{tr('rt.rang', { i: k + 1, n: l.length })}</span> : null}
+        </div>
+        <div data-rt-bandeau="" style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 12, padding: '12px 14px', borderRadius: 'var(--sb-r-plateau, 16px)', background: 'color-mix(in srgb, var(--sb-ambre-point, #E08A12) 15%, transparent)', border: '1px solid color-mix(in srgb, var(--sb-ambre-point, #E08A12) 45%, transparent)', color: 'var(--sb-ambre, #764300)' }}>
+          <span aria-hidden="true" style={{ display: 'flex', flexShrink: 0, marginTop: 1 }}><Icon name="box" size={20}/></span>
+          <span style={{ fontSize: 15, lineHeight: 1.4, fontWeight: 600 }}>{tr('rt.job.detail')}</span>
+        </div>
+        {pr.candidats.map((c) => (
+          <div key={c.id + ':' + c.numero} data-rt-candidat={c.numero} style={{ marginTop: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <div style={legende}>{tr('rt.avant')}</div>
+                <div style={cadre} data-rt-avant={c.id}>
+                  {c.photo ? <PhotoVinted src={c.photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}/> : <PhotoVide remplir rayon={16}/>}
+                  <span style={{ position: 'absolute', left: 10, bottom: 10 }}><Numero n={c.numero} taille="grand"/></span>
+                </div>
+              </div>
+              <div>
+                <div style={legende}>{tr('rt.maintenant')}</div>
+                <div style={cadre} data-rt-maintenant={pr.id}>
+                  {pr.photo ? <PhotoVinted src={pr.photo} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}/> : <PhotoVide remplir rayon={16}/>}
+                </div>
+              </div>
+            </div>
+            <div style={{ fontSize: 13, color: C.text, marginTop: 8, overflowWrap: 'anywhere', lineHeight: 1.4 }}>{pr.titre || c.title || ''}</div>
+            {c.enLigne
+              ? <div data-rt-en-ligne={c.numero} style={{ fontSize: 13, color: C.muted, marginTop: 8 }}>{tr('rt.enLigne', { numero: c.numero })}</div>
+              : <Bouton variante={plusieurs ? 'secondaire' : 'primaire'} plein icone="check" data-rt-oui={c.numero} onClick={() => repondre(c)} style={{ marginTop: 14, minHeight: 56, fontSize: 17 }}>{tr('rt.oui', { numero: c.numero })}</Bouton>}
+          </div>
+        ))}
+        <div style={{ display: 'flex', gap: 9, marginTop: 12 }}>
+          <Bouton variante="discret" onClick={fermer} style={{ flex: 1, minHeight: 44 }}>{tr('rt.plusTard')}</Bouton>
+          <button type="button" className="sb-touche" data-rt-non={pr.id} onClick={() => repondre(null)} style={{ flex: 2, minHeight: 44 }}>{tr(plusieurs ? 'rt.nonPlusieurs' : 'rt.non')}</button>
+        </div>
+        <div data-rt-consequence="" style={{ fontSize: 13, color: 'var(--sb-encre-2, ' + C.muted + ')', textAlign: 'center', marginTop: 12, lineHeight: 1.5 }}>{tr('rt.consequence', { numero: String((pr.candidats[0] || {}).numero || '') })}</div>
+      </div>
+    </SheetShell>, document.body
+  );
+}
+
 // Indicateur de synchro (mis a jour par l'app)
 let _syncListeners = [];
 const onSyncChange = (fn) => { _syncListeners.push(fn); return () => { _syncListeners = _syncListeners.filter(f=>f!==fn); }; };
@@ -4469,6 +4539,20 @@ function noterFicheVinted(f, champs, saisis = null) {
   emettreClesRelues(['vrm_fiches_neuves']);
   return true;
 }
+// (15 nov., src/republieTelephone.js) « Créer sur Vinted » : l'extension envoie les photos de la fiche SANS réglage
+// (`reglagesPhotoSurs(null)` : neutre, ré-encodées seulement) — l'empreinte de chaque photo que VRM a remise est
+// donc celle du fichier produit. Elle entre au registre `vrm_photos_vrm` avec le N° et l'annonce rendue (le
+// brouillon : son identifiant est celui de l'annonce publiée). Une photo illisible ici (CORS) n'entre pas.
+async function enregistrerPhotosProduites(photos, numero, src, uid) {
+  try {
+    if (!String(numero == null ? '' : numero).trim() || !Array.isArray(photos) || !photos.length) return;
+    const entrees = [];
+    for (const u of photos.slice(0, 8)) { const h = await empreinteImageLocale(u); if (h) entrees.push({ h, n: String(numero), src: String(src || ''), uid: String(uid || '') }); }
+    if (!entrees.length) return;
+    const r = ajouterAuRegistre(load(CLE_PHOTOS_VRM, {}), entrees);
+    if (r) save(CLE_PHOTOS_VRM, r);
+  } catch (_) {}
+}
 function FeuilleCreerVinted({ fiches, onFermer, onFait = null, saisie = false }) {
   const vc = vintedDeChrome();
   const rx = raisonExtGlobale(false, { cap: 'creervinted', role: 'prépare tes annonces sur Vinted' });
@@ -4476,7 +4560,7 @@ function FeuilleCreerVinted({ fiches, onFermer, onFait = null, saisie = false })
     extRaison={rx ? rx.texte : ''} reglages={{ etiquette: load('vrm_num_vinted', null), numeroEcrit: load('vrm_numero_ecrit', null) }}
     envoyer={(p) => vmrCmdSuivi(p, 480000)} saisie={saisie}
     onSaisie={(f, t) => { noterFicheVinted(f, null, t); if (onFait) onFait(); }}
-    onCree={(f, r, uid) => { noterFicheVinted(f, { draftId: String(r.draftId), uid: String(uid), at: new Date().toISOString() }, f); if (onFait) onFait(); }}
+    onCree={(f, r, uid, photos) => { noterFicheVinted(f, { draftId: String(r.draftId), uid: String(uid), at: new Date().toISOString() }, f); enregistrerPhotosProduites(photos, f.numero, r.draftId, uid); if (onFait) onFait(); }}
     onFermer={onFermer} Retour={FermeAuRetour}/>;
 }
 // (intégration 11nov-g2) « Achetés, pas en ligne » → « Créer sur Vinted » : la fiche « À publier » de CE N°
@@ -7450,6 +7534,10 @@ const dressingEnLigne = async (uid, row, opts = {}) => {
     // 22 oct. : les annonces MASQUÉES par Vinted (paires présentes, jamais « en
     // ligne ») et l'heure de la lecture qui les a vues masquées.
     _vrmMasquees: masqueesDuCompte(res.fermees, supp, ts), _vrmMasqueesLu: isFinite(ts) ? ts : null,
+    // (15 nov., src/numerosNouvelles.js `lectureMasqueeComplete`) Le DRESSING qui les a vues masquées
+    // porte-t-il tous les articles que Vinted annonce ? Seule une lecture complète (et fraîche) permet un
+    // N° NEUF à une masquée ; ses identités (N° réservé, vente, photo) n'en dépendent pas.
+    _vrmMasqueesComplet: lectureDressingComplete({ source: 'dressing', lu: ts }, payload),
     // (28 oct., 5.252) Ses BROUILLONS : ceux que SON dressing (lu sous sa session,
     // la seule lecture qui les voit) montre, datés de cette lecture ; un brouillon
     // supprimé sur Vinted APRÈS la lecture n'y est plus (règle des suppressions).
@@ -7501,14 +7589,18 @@ const fetchRetoursAchat = () => {
   return c.vol;
 };
 const lireRetoursAchat = async (c) => {
-  const champs = ['transaction', 'suivi', 'dateLimite', 'dateLimiteIso', 'article', 'uid', 'account', 'receivedAt', 'transporteurPdf'].map((k) => `${k}:meta->>${k}`).join(',');
-  const [b, r] = await Promise.all([
+  const champs = ['transaction', 'suivi', 'dateLimite', 'dateLimiteIso', 'article', 'uid', 'account', 'receivedAt', 'transporteurPdf', 'sens'].map((k) => `${k}:meta->>${k}`).join(',');
+  // (15 nov.) + les avis « Retourne ta commande » rangés (scalaires : conversation, sens) — un achat en retour
+  // désigné par SA conversation n'est jamais « à retirer » (api/_lib/suivi-colis.js `txAchatsEnRetour`).
+  const [b, r, d] = await Promise.all([
     lireTout(`id=like.email_bordretour_*&select=id,${champs},pdf:meta->>_pdf`, { strict: true }).catch(() => null),
     lireTout('id=like.email_rembachat_*&select=id,tx:meta->>transaction,montant:meta->>montant,estime:meta->>estime,at:meta->>receivedAt', { strict: true }).catch(() => null),
+    lireTout('id=like.email_retourdemande_*&select=id,conv:meta->>conv,sens:meta->>sens', { strict: true }).catch(() => null),
   ]);
   const v = {
     bords: Array.isArray(b) ? b.map((x) => ({ ...x, tx: x.transaction, at: x.receivedAt, pdf: x.pdf != null && x.pdf !== '' && x.pdf !== false && x.pdf !== 'false' })) : null,
     remb: Array.isArray(r) ? r : null,
+    demandes: Array.isArray(d) ? d : null,
   };
   if (v.bords && v.remb) { c.v = v; c.at = Date.now(); }
   return v;
@@ -10675,7 +10767,7 @@ function phaseAchat(status) {
   if (/finalis|livr[ée]|termin|re[çc]u|complet|arriv/i.test(s)) return 'completed';
   return 'pending';
 }
-function etapeAchat(o, tk, { fini = false } = {}) {
+function etapeAchat(o, tk, { fini = false, retour = false } = {}) {
   const s = o.status || '';
   // ⚠️ « Retour initié » sur un ACHAT = litige, tu dois RENVOYER la paire.
   //    Testé AVANT « annulé/remboursé » : ce n'est pas une commande morte,
@@ -10690,6 +10782,8 @@ function etapeAchat(o, tk, { fini = false } = {}) {
   // dit « livré au destinataire » (même n° de suivi) est ARRIVÉ (`fini`, §11).
   if (/finalis/i.test(s) || tusDe(o) === 'completed') return { label: 'Arrivé', step: 4, color: C.muted };
   if (/commande\s+livr/i.test(s)) return { label: 'Arrivé', step: 4, color: C.muted };
+  // (15 nov.) Un bordereau de retour reçu pour CET achat (par son n°) : il l'a, il le renvoie — jamais « À retirer ».
+  if (retour) return { label: 'À renvoyer', step: 1, color: C.warn, retour: true };
   if (fini && (isAtRelayStatus(s) || (tk && tk.status === 'available'))) return { label: 'Arrivé', step: 4, color: C.muted, parTransporteur: true };
   if (isAtRelayStatus(s) || (tk && tk.status === 'available')) return { label: 'À retirer', step: 3, color: C.warn };
   if (/\blivr[ée]|remis\b|r[ée]ceptionn/i.test(s) || phaseAchat(s) === 'completed') return { label: 'Arrivé', step: 4, color: C.muted };
@@ -12720,7 +12814,7 @@ const fetchVintedListings = async (account, page = 1, opts = {}) => {
                aConfirmer: (h._vrmAConfirmer || []).map(mapWardrobeItem),
                // 22 oct. : masquées par Vinted — paires PRÉSENTES (numéros),
                // jamais « en ligne » (`<masquees-regle>`).
-               masquees: (h._vrmMasquees || []).map((it) => ({ ...mapWardrobeItem(it), _vrmMasquee: true, _vrmVueMasqueeLe: h._vrmMasqueesLu || null })),
+               masquees: (h._vrmMasquees || []).map((it) => ({ ...mapWardrobeItem(it), _vrmMasquee: true, _vrmVueMasqueeLe: h._vrmMasqueesLu || null, _vrmMasqueeComplete: h._vrmMasqueesComplet === true })),
                // 28 oct. : ses BROUILLONS Vinted (`is_draft`), lus dans le même dressing.
                brouillons: (Array.isArray(h._vrmBrouillons) ? h._vrmBrouillons : h.items.filter((x) => x && x.is_draft && !x.is_closed)).map((x) => ({ ...mapWardrobeItem(x), _vrmBrLu: x._vrmBrLu != null ? x._vrmBrLu : null })),
                brLecture: h._vrmBrLecture || null,
@@ -12766,7 +12860,7 @@ const fetchVintedListings = async (account, page = 1, opts = {}) => {
   // Lue à l'instant, page après page : c'est une lecture complète et fraîche.
   // Les annonces masquées par Vinted sont des paires présentes (22 oct.).
   const vueLe = okUn ? Date.now() : null;
-  const masquees = brut.filter(masqueeSurVinted).map((it) => ({ ...mapWardrobeItem(it), _vrmMasquee: true, _vrmVueMasqueeLe: vueLe }));
+  const masquees = brut.filter(masqueeSurVinted).map((it) => ({ ...mapWardrobeItem(it), _vrmMasquee: true, _vrmVueMasqueeLe: vueLe, _vrmMasqueeComplete: complet === true }));
   return { ok: okUn, items, masquees, pagination, lu: vueLe };
 };
 // ⟦→ ecrans/Stock.jsx #3⟧
@@ -15397,7 +15491,8 @@ function direNouveauxNumeros(liste) {
     const vend = motsVendeur().nom === 'paire' ? 'sneakers' : 'autre';
     const titre = tr(`nn.notif.${vend}`, { n: l.length });
     const nums = listeNumeros(l.map((x) => x.numero));
-    toast(`${titre} · ${nums}`, 'ok');
+    // (15 nov., accompagnement) Le moment « après » du geste (la pilule `numero.donne`), plus un bandeau à part.
+    accompagner('numero.donne', { vars: { n: l.length, mot: titre, numeros: nums } }).fini();
     alerteLocale(titre, `${nums} · ${tr('nn.notif.geste')}`, '?tab=journee').catch(() => {});
     if (extSait('numerotes') !== 'ok') return;
     const ext = String((__vmrEtat && __vmrEtat.ok && __vmrEtat.ext) || '');
@@ -15405,6 +15500,18 @@ function direNouveauxNumeros(liste) {
     const parCompte = {};
     for (const x of l) { const u = String(x.uid || ''); if (/^\d{1,15}$/.test(u)) (parCompte[u] = parCompte[u] || []).push(`${x.id}:${x.numero}`); }
     for (const [uid, ids] of Object.entries(parCompte)) versExtension(ext, { type: 'numerotes', uid, ids: ids.slice(0, 60) }, 3000).catch(() => null);
+  } catch (_) {}
+}
+// (15 nov., src/republieTelephone.js) « N°42 reconnu par sa photo » : la nouvelle annonce (republiée dans l'app
+// Vinted) porte la photo que VRM a FABRIQUÉE pour ce N° — le carton n'a rien à changer. Dit une fois, par
+// l'appareil qui l'a repris (bandeau, notification si l'app est en arrière-plan).
+function direNumerosReconnus(liste) {
+  try {
+    const l = (Array.isArray(liste) ? liste : []).filter((x) => x && String(x.numero || '').trim());
+    if (!l.length) return;
+    const titre = l.length === 1 ? tr('rt.reconnu.un', { numero: String(l[0].numero) }) : tr('rt.reconnu.plusieurs', { n: l.length, numeros: listeNumeros(l.map((x) => x.numero)) });
+    accompagner('numero.reconnu', { vars: { mot: titre } }).fini();   // (accompagnement) la pilule `numero.reconnu`
+    alerteLocale(titre, tr('rt.reconnu.geste'), '?tab=journee').catch(() => {});
   } catch (_) {}
 }
 
@@ -35750,7 +35857,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return { ...b, ko };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recusAchat, buys.items, buys.error, buys.failedUids, buysBase, accounts, hiddenAccts, panelAcctOff]);
-  const vintedToPickup = useMemo(() => buysBase.filter(o => isAtRelayStatus(o.status) && !pickupDone[String(o.transaction_id)]), [buysBase, pickupDone]);
+  // (15 nov., audit de fiabilité) UN ACHAT EN RETOUR N'EST JAMAIS « À RETIRER » : son bordereau de retour
+  // reçu par e-mail (par SON n° de transaction, api/_lib/suivi-colis.js `achatEnRetour`) prouve qu'il a le
+  // colis — sa carte vit dans « À renvoyer ». `auRelaisVus` garde TOUS les achats vus « au point relais »
+  // (la publication `vusTx` : le widget n'ajoute jamais un achat que l'app a vu, quelle que soit sa décision).
+  // Pas su (bordereaux pas lus) ⇒ rien n'est écarté.
+  const txRetourAchat = useMemo(() => txAchatsEnRetour(retoursAchatLus ? retoursAchatLus.bords : null, { demandes: retoursAchatLus ? retoursAchatLus.demandes : null, achats: buysBase }), [retoursAchatLus, buysBase]);
+  const auRelaisVus = useMemo(() => buysBase.filter(o => isAtRelayStatus(o.status) && !pickupDone[String(o.transaction_id)]), [buysBase, pickupDone]);
+  const vintedToPickup = useMemo(() => auRelaisVus.filter(o => !achatEnRetour(o, txRetourAchat)), [auRelaisVus, txRetourAchat]);
   // (23 oct.) LES ACHATS QUI PEUVENT RELIER UN COLIS D'E-MAIL À SA COMMANDE (le
   // n° de suivi lu dans la transaction, une identité, §5) : ceux au point relais
   // ET — seulement s'il y a un colis d'e-mail en attente — ceux achetés depuis
@@ -35849,7 +35963,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // un état terminal : 450 finalisée, ≥ 500 annulée, expédition « non réclamée ».
   // (revue du 23 oct., n° 3) La règle vit dans api/_lib/suivi-colis.js
   // (`finDeCommandeAchat`) : le rappel du matin la lit aussi (§11).
-  const finCommandeAchat = (o) => (o ? finDeCommandeAchat({ statut: o.status, etat: etatTxn(o.transaction_id), auRelais: isAtRelayStatus(String(o.status || '')) }) : null);
+  const finCommandeAchat = (o) => (o ? finDeCommandeAchat({ statut: o.status, etat: etatTxn(o.transaction_id), auRelais: isAtRelayStatus(String(o.status || '')), retour: achatEnRetour(o, txRetourAchat) }) : null);
   // (5 nov.) LES LIGNES DE SUIVI DES COLIS À RETIRER = les e-mails + les colis lus dans
   // ses comptes Mondial Relay (src/retraitQr.js), de la MÊME forme, reliés par le n° de
   // suivi seulement (§5). Toute la règle d'en dessous s'applique telle quelle (§11) :
@@ -36238,6 +36352,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const k = String(o.transaction_id || ''); if (!k) return false;
       const quand = pickupDone[k]; if (!quand) return false;          // pas coché
       if (!isAtRelayStatus(o.status)) return false;                   // Vinted a confirmé → plus rien à montrer
+      if (achatEnRetour(o, txRetourAchat)) return false;              // (15 nov.) en retour : sa carte est « À renvoyer »
       const j = (Date.now() - new Date(quand).getTime()) / 86400000;
       return isFinite(j) && j <= PICKUP_CONFIRM_DAYS;                 // au-delà, on n'attend plus
     });
@@ -36340,7 +36455,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
              prets: (emailList.length - sansCodeEmail) + (extra.length - sansCode),
              total: emailList.length + extra.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trackingRetrait, transp, collected, collectedAt, vintedToPickup, buysBase, pickupDone, colisRelais, indexSuivisAchats, suivisVinted, suivisEnvoyes, txSuivisColis, suivisManuels]);
+  }, [trackingRetrait, transp, collected, collectedAt, vintedToPickup, buysBase, pickupDone, colisRelais, indexSuivisAchats, suivisVinted, suivisEnvoyes, txSuivisColis, suivisManuels, txRetourAchat]);
   // (13 nov., lot 7 — Julien : « chaque colis à retirer porte le nom de la paire qui est dedans ») L'ACHAT D'UNE
   // LIGNE « À RETIRER », LE MÊME PARTOUT : la jonction de `pickupUnion` (conversation de SA commande, n° de suivi,
   // code de retrait — `cmdParColis`) et le n° de suivi seul (`achatDuColis`) doivent dire la même commande
@@ -36493,7 +36608,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const vus = [...new Set((tracking || []).filter(t => t && t.status === 'available').map(colisKey).filter(Boolean))].slice(0, 300);
       // `vusTx` : les achats Vinted vus « au point relais » (quelle que soit la
       // décision) — le widget n'ajoute que ceux d'une capture POSTÉRIEURE.
-      const vusTx = [...new Set(vintedToPickup.map(o => String(o.transaction_id)))].slice(0, 300);
+      // (15 nov.) Les achats EN RETOUR y restent (`auRelaisVus`) : écartés par l'app, jamais ajoutés par le widget.
+      const vusTx = [...new Set(auRelaisVus.map(o => String(o.transaction_id)))].slice(0, 300);
       // (23 oct.) + `finis` : les colis d'e-mail que l'app sait retirés ou
       // repartis (identité : n° de suivi) — le rappel du matin ne les annonce pas.
       // ⚠️ (revue du 23 oct., n° 3) Seulement quand ce qui RELIE un colis à sa
@@ -38519,8 +38635,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return { presentes: avecNum.filter((it) => surEtagere.has(String(it.id))), parties, recentes };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listings.masquees, masqueesSurEtagere, numeros, pairsLost, soldManual, emailSoldIds, showEmailSold, blockedAccts, hiddenAccts, annoncesVendues, accountUids]);
-  const aVerifierCarton = useMemo(() => [...annBase, ...annAConfirmer, ...annMasquees].filter((it) => ficheAVerifier(numeros[it.id])),
-  [annBase, annAConfirmer, annMasquees, numeros]);
+  // (15 nov., audit de fiabilité #4, src/numerosNouvelles.js `reserveEnDesaccord`) AUSSI une paire dont
+  // la fiche porte un AUTRE N° que celui que l'extension avait réservé (et lié à SON identifiant) à sa
+  // publication : rien ne change tout seul (un N° est écrit sur un carton) — la ligne dit les deux N°,
+  // SON choix décide (« C'est bien le N°X » ou « Le carton dit N°Y »).
+  const reserveDe = (it) => (reservesNum && reservesNum.parItem ? reserveEnDesaccord(it.id, numeros[it.id], reservesNum.parItem, cleNum) : null);
+  const aVerifierCarton = useMemo(() => [...annBase, ...annAConfirmer, ...annMasquees].filter((it) => ficheAVerifier(numeros[it.id]) || !!reserveDe(it)),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [annBase, annAConfirmer, annMasquees, numeros, reservesNum]);
   // Les paires qui ont reçu un numéro NEUF (doublon réglé) et dont le carton
   // porte encore l'ancien : dites jusqu'à « C'est écrit » (sinon le bordereau
   // dit N°90 et le carton N°51 — la mauvaise paire part).
@@ -38763,7 +38885,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       await donnerNumeroNeuf(it, `Le N°${f.numero} est aussi sur ${autres.map(nomPorteur).join(' et ')}. Deux articles au même numéro, c'est le mauvais qui part.`);
       return;
     }
-    marquerCartonVerifie(String(it.id), cleNum(f.numero)); toast(`N°${f.numero} confirmé pour « ${it.title} »`);
+    marquerCartonVerifie(String(it.id), cleNum(f.numero)); accompagner('numero.carton', { vars: { numero: String(f.numero) } }).fini();
   };
   const corrigerCarton = async (it, valeur) => {
     const brut = String(valeur || '').trim();
@@ -38798,6 +38920,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // servi ou qu'une autre paire le porte encore), puis « vérifié » s'il a été posé.
     await poserNumero(it, brut, f.numero, { carton: true });
     setTimeout(() => marquerCartonVerifie(moi, cle), 700);
+  };
+  // (15 nov., #4) « Le carton dit N°Y » — Y est le N° que l'extension avait réservé pour CETTE annonce
+  // (par son identifiant). Il n'est « déjà servi » que par cette réservation : le geste habituel ne
+  // redemande pas « même article ? » — sauf si une vente ou une autre fiche le porte (alors il demande).
+  const prendreReserve = async (it, y) => {
+    const moi = String(it.id), cle = cleNum(y), f = numeros[moi] || {};
+    if (!cle || !reservesNum || cleNum(reservesNum.parItem[moi]) !== cle) return;
+    const ailleurs = Object.keys(numeros).some((k) => k !== moi && cleNum((numeros[k] || {}).numero) === cle)
+      || Object.values(saleOv || {}).some((o) => o && cleNum(o.numero) === cle);
+    await poserNumero(it, String(y), f.numero, { carton: true, ...(ailleurs ? {} : { memePaire: true }) });
+    setTimeout(() => { marquerCartonVerifie(moi, cle); const apres = (load('vinted_annonce_numeros', {}) || {})[moi]; if (apres && cleNum(apres.numero) === cle) accompagner('numero.carton', { vars: { numero: String(y) } }).fini(); }, 700);
   };
 
   // ⚠️ « pas au garage » SUR CHAQUE LIGNE NE DIT RIEN TANT QUE LE GARAGE EST
@@ -41184,7 +41317,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // lieu, le code et le QR de retrait (ils ne s'affichent qu'à l'étape 3) —
   // 4 achats ce jour-là. `phaseReception` avait déjà la parade ; l'étiquette
   // ne l'avait jamais reprise.
-  const achatStage = (o, tk) => etapeAchat(o, tk && tk.horsRetrait ? { ...tk, status: 'fini' } : tk, { fini: !!(o && pickupUnion.txFinis && pickupUnion.txFinis.has(String(o.transaction_id))) });   // la règle : niveau module (§11)
+  const achatStage = (o, tk) => etapeAchat(o, tk && tk.horsRetrait ? { ...tk, status: 'fini' } : tk, { fini: !!(o && pickupUnion.txFinis && pickupUnion.txFinis.has(String(o.transaction_id))), retour: achatEnRetour(o, txRetourAchat) });   // la règle : niveau module (§11)
   // Statut précis d'une VENTE (pour l'afficher clairement) : à expédier → en
   // transit → livrée → vendue (finalisée). Se base sur le texte Vinted + l'enum
   // machine transaction_user_status. N'affecte PAS la compta (classifyOrderStatus).
@@ -41428,6 +41561,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return { parItem, parPhoto };
   }, [sales.items, saleOv, txnItem]);
 
+  // (15 nov., src/republieTelephone.js) LES EMPREINTES DES PHOTOS VINTED (`photo_emprunte_{uid}`, extension
+  // 5.358) : la numérotation les compare avant un N° neuf quand une annonce du même compte vient de
+  // disparaître (republication faite dans l'app Vinted). Trois états : undefined en cours · null pas su · objet.
+  const [empreintesVinted, setEmpreintesVinted] = useState(undefined);
+  const cleAnnoncesEmpreintes = useMemo(() => (Array.isArray(listings.items) ? listings.items.map((i) => String(i && i.id)).sort().join(',') : null), [listings.items]);
+  useEffect(() => {
+    if (!cloudReady || cleAnnoncesEmpreintes == null) return undefined;
+    let vivant = true;
+    lireEmpreintesPhotos().then((e) => { if (vivant) setEmpreintesVinted(e); }, () => { if (vivant) setEmpreintesVinted(null); });
+    return () => { vivant = false; };
+  }, [cloudReady, cleAnnoncesEmpreintes]);
+  // Les propositions « N°42 republiée ? » (Ma journée) et le signal d'une réponse (relance la numérotation).
+  const [propositionsRepub, setPropositionsRepub] = useState([]);
+  const [reponsesRepubTick, setReponsesRepubTick] = useState(0);
+
   // ── Numérotation AUTOMATIQUE des annonces en ligne ─────────────────────────
   // Chaque annonce sans N° reçoit automatiquement le prochain numéro libre. Deux
   // règles clés :
@@ -41449,7 +41597,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     //    COMPTABILITÉ, ça ne sort pas le carton de l'étagère — sa paire est
     //    physiquement là et il lui faut un numéro sur sa boîte (même règle que
     //    `porteursNum`, §5.33). Mesuré le 23 août : 1 paire en ligne sans numéro.
-    const items = (listings.items || []);
+    // ⚠️ (15 nov., audit de fiabilité #3) ET LES MASQUÉES PAR VINTED encore sur l'étagère
+    //    (`masqueesSurEtagere`) : la paire est chez lui, elle reçoit son N° comme une annonce en
+    //    ligne (identités d'abord ; un N° neuf seulement sur son dressing COMPLET et frais,
+    //    `lectureCompleteAnnonce`). Mesuré : 4 masquées sans fiche chez Julien, liées à un N° réservé.
+    const items = annoncesANumeroter(listings.items, masqueesSurEtagere);
     if (!items.length) return;
     // ⚠️ ON N'ATTRIBUE RIEN TANT QU'ON NE SAIT PAS SI UNE VENTE PORTE DÉJÀ LE
     // NUMÉRO DE CETTE PAIRE. Les ventes et les identités « transaction →
@@ -41462,6 +41614,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (sales.items === null || !txnPret) return;
     if (!reservesNum) return;   // numéros réservés sur Vinted pas encore lus (ou pas su)
     if (recreesEff === undefined) return; // qui remplace qui (republication) pas encore lu
+    // (15 nov., src/republieTelephone.js) Les empreintes des photos pas encore lues : la photo que VRM a fabriquée
+    // pour un N° (une identité) ne pourrait pas être reconnue — un N° neuf serait faux à vie. On attend la
+    // lecture (`null` = pas su : la règle normale, rien n'est retenu).
+    if (empreintesVinted === undefined) return;
     if (!numPasse) setNumPasse(true);     // (6 nov.) dans le même rendu que les N° posés ci-dessous
     // Numérotation NEUVE, propre à la nouvelle app : elle démarre à 1 et suit
     // l'ordre d'ajout des annonces. On ignore volontairement l'ancien catalogue
@@ -41507,6 +41663,33 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // (15 nov., src/numerosNouvelles.js) <numerotation-passage> — `scripts/audit-numeros-nouvelles.cjs`
     // EXÉCUTE ce bloc tel quel (de cette balise à la balise fermante) : ne pas renommer ses variables.
     const nouveauxNum = [];
+    // (15 nov., src/republieTelephone.js) <republie-telephone> LE DERNIER RECOURS AVANT UN N° NEUF : une annonce
+    // du MÊME compte a disparu récemment (vue en ligne, absente de la lecture complète, ni vendue, ni remplacée,
+    // ni sortie) ⇒ la nouvelle attend la comparaison des photos (24 h au plus) ; même photo ⇒ PROPOSÉE (son clic) ;
+    // la photo que VRM a FABRIQUÉE pour un N° (registre `vrm_photos_vrm`, seuil sûr) ⇒ ce N° repris, dit une fois.
+    const reconnusNum = [], republieAttente = [], republiePropositions = [];
+    const presentsRep = new Set([...items, ...(listings.aConfirmer || []), ...(listings.brouillons || [])].map((x) => String(x && x.id)));
+    const vusRep = lireObjet(VUS_EN_LIGNE), decisionsRep = lireObjet(CYCLE_DECISIONS);
+    const registreRep = lireObjet(CLE_PHOTOS_VRM), memRep = lireObjet(CLE_EMPREINTES_FICHES), reponsesRep = lireObjet(CLE_REPUB_REPONSES), attenteRep = lireObjet(CLE_REPUB_ATTENTE);
+    const remplaceesRep = new Set(Object.values(recreesEff || {}).map(String));
+    const numVenduRep = (k) => Object.values(saleOv || {}).some((o) => o && cleNum(o.numero) === k);
+    const empRep = (uid, id) => { const e = empreintesVinted && empreintesVinted[`vinted:${uid}`]; return (e && e[String(id)]) || null; };
+    const disparuesRep = {};
+    const disparuesDe = (uid) => {
+      if (!disparuesRep[uid]) disparuesRep[uid] = disparuesDuCompte({ uid, fiches: nextNum, presentes: presentsRep, vus: vusRep, lu: (listings.lues || {})[uid],
+        vendue: (id, f) => !!numVentesParIdentite.parItem[id] || !!(venduesVinted && venduesVinted.has(id)) || numVenduRep(cleNum(f.numero)),
+        remplacees: remplaceesRep, sortie: (id) => annonceDeclareePartie(id, nextNum, pairsLost) || ['vendu-main', 'separe'].includes((decisionsRep[id] || {}).choix),
+        reprenable: (n) => !!numeroReprenable(n) }).map((d) => ({ ...d, hexes: (memRep[d.id] && Array.isArray(memRep[d.id].h) && memRep[d.id].h.length) ? memRep[d.id].h : empreintesDe(empRep(uid, d.id)) }));
+      return disparuesRep[uid];
+    };
+    const republieDe = (it) => {
+      const uid = String(it._acc?.vinted_user_id ?? '');
+      return decisionRepublie({ id: it.id, hexes: empreintesDe(empRep(uid, it.id)), disparues: disparuesDe(uid), registre: registreRep, reponse: reponsesRep[String(it.id)], depuis: attenteRep[String(it.id)],
+        sourcePresente: (src) => presentsRep.has(String(src)),
+        numeroPresentAilleurs: (k) => [...presentsRep].some((pid) => pid !== String(it.id) && nextNum[pid] && cleNum(nextNum[pid].numero) === k),
+        numeroVendu: numVenduRep, ficheDe: (src) => nextNum[src] || null, cle: cleNum });
+    };
+    // </republie-telephone>
     // La paire REPUBLIÉE reprend le numéro de l'annonce qu'elle remplace (et
     // une annonce renumérotée automatiquement par erreur le retrouve).
     if (recreesEff) {
@@ -41535,7 +41718,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const ecritsEnDouble = ecritOn ? clesLuesEnDouble(items.map((it) => lectureEcriteVinted(it))) : new Set();
     // (15 nov., src/numerosNouvelles.js) LE N° NEUF, dernier recours : « VRM numérote » et la lecture COMPLÈTE
     // du compte de l'annonce (règle <enligne-regle>, `complets[uid]`). Une lecture partielle ⇒ aucun N° neuf.
-    const neufPermis = (it) => numeroNeufPermis({ mode: ecritOn ? 'moi' : 'vrm', complet: lectureCompleteDe(it, listings) });
+    const neufPermis = (it) => numeroNeufPermis({ mode: ecritOn ? 'moi' : 'vrm', complet: lectureCompleteAnnonce(it, listings) });
     for (const it of sorted) {
       const cur = nextNum[it.id];
       const pk = photoKey(it.photo);
@@ -41562,8 +41745,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const dec = decisionEcrite({ lecture: lectureEcriteVinted(it), ident: num || numeroReprenable(pk && byPhoto[pk]) || '', reprenable: (k) => !!numeroReprenable(k) });
         if (!dec) continue;
         const n = dec.numero;
-        if (dec.ecrit && (ecritsEnDouble.has(cleNum(n)) || Object.keys(nextNum).some((k) => k !== String(it.id) && nextNum[k] && cleNum(nextNum[k].numero) === cleNum(n)))) continue;
-        nextNum[it.id] = ficheEcrite(cur, it, pk, dec);
+        // (15 nov., <republie-telephone>) Le N° écrit porté par la fiche d'une annonce de CE compte qui vient de DISPARAÎTRE
+        // (ni vendue, ni remplacée, ni sortie) : c'est elle, republiée dans l'app Vinted — le N° écrit fait foi, rien demandé.
+        const autresN = dec.ecrit ? Object.keys(nextNum).filter((k) => k !== String(it.id) && nextNum[k] && cleNum(nextNum[k].numero) === cleNum(n)) : [];
+        const disparuesIds = autresN.length ? new Set(disparuesDe(String(it._acc?.vinted_user_id ?? '')).map((d) => d.id)) : null;
+        const republieeEcrite = autresN.length > 0 && autresN.every((k) => disparuesIds.has(String(k)));
+        if (dec.ecrit && (ecritsEnDouble.has(cleNum(n)) || (autresN.length && !republieeEcrite))) continue;
+        nextNum[it.id] = republieeEcrite ? { ...ficheEcrite(cur, it, pk, dec), recreeDe: String(autresN[0]), recreeAt: new Date().toISOString(), recreeOrigine: 'numero-ecrit' } : ficheEcrite(cur, it, pk, dec);
         { const ep = entreePool(n); if (ep != null) nextUsed.add(ep); }
         if (pk && !byPhoto[pk]) byPhoto[pk] = n;
         changed = true;
@@ -41582,6 +41770,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (!num && retenueCartons) continue;   // (14 nov., 134) il n'a pas encore dit si ses cartons portent déjà leurs N°
       const neuf = !num;
       if (neuf && !neufPermis(it)) continue;
+      // (15 nov., <republie-telephone>) Avant un N° neuf : republiée dans l'app Vinted ?
+      if (neuf) {
+        const dr = republieDe(it);
+        if (dr.action === 'attendre' || dr.action === 'proposer') {
+          republieAttente.push(String(it.id));
+          if (dr.action === 'proposer') republiePropositions.push({ id: String(it.id), titre: it.title || '', photo: it.photo || null, uid: String(it._acc?.vinted_user_id ?? ''), candidats: dr.candidats, raison: dr.raison });
+          continue;
+        }
+        if (dr.action === 'reprendre') {
+          const at = new Date().toISOString();
+          nextNum[it.id] = { ...(cur || {}), numero: String(dr.numero), title: it.title, photo: it.photo || null, photoK: pk || (cur && cur.photoK) || null, price: it.price ?? null, size: it.size ?? (cur && cur.size) ?? null, accountId: it._acc?.vinted_user_id, numberedAt: at, auto: true, recreeDe: String(dr.source), recreeAt: at, recreeOrigine: 'photo-vrm' };
+          reconnusNum.push({ id: String(it.id), numero: String(dr.numero), title: it.title || '', photo: it.photo || null });
+          { const ep = entreePool(dr.numero); if (ep != null) nextUsed.add(ep); }
+          changed = true;
+          continue;
+        }
+      }
       if (!num) num = prochainLibre(taken, takenK, prefNum);
       nextNum[it.id] = { ...(cur || {}), numero: String(num), title: it.title, photo: it.photo || null, photoK: pk || (cur && cur.photoK) || null, price: it.price ?? null, size: it.size ?? (cur && cur.size) ?? null, accountId: it._acc?.vinted_user_id, numberedAt: (cur && cur.numberedAt) || new Date().toISOString(), auto: true };
       // Un N° NEUF est « à écrire sur son carton » jusqu'à « C'est écrit » ; l'appareil qui l'a donné le dit.
@@ -41591,6 +41796,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       changed = true;
     }
     // </numerotation-passage>
+    // (15 nov.) L'attente « republiée ? » (la première fois vue sans N°, synchronisée : la borne de 24 h vaut
+    // pour tous ses appareils) et les propositions de Ma journée.
+    { const att = majAttenteRepub(attenteRep, { attendent: republieAttente, numerotees: items.filter((x) => String((nextNum[x.id] || {}).numero || '').trim()).map((x) => String(x.id)) });
+      if (att) save(CLE_REPUB_ATTENTE, att);
+      setPropositionsRepub((p) => (JSON.stringify(p) === JSON.stringify(republiePropositions) ? p : republiePropositions)); }
     // (6 nov., finitions) Une paire remise en vente dont le carton porte un N° d'ARCHIVE (B…) :
     // sa nouvelle annonce a un N° neuf ⇒ « nouveaux numéros à écrire sur tes cartons »
     // (src/repriseNumero.js `archivesAEcrire` ; la liste est `reattribueAEcrire`, inchangée).
@@ -41612,12 +41822,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const ua = [...nextUsed].sort(triPool); setUsedNumeros(ua); save('vinted_used_numeros', ua);
       // (15 nov.) « 3 nouveaux articles numérotés · N°216, 217, 218 » — une fois, par l'appareil qui les a donnés.
       if (nouveauxNum.length) direNouveauxNumeros(nouveauxNum);
+      // (15 nov.) « N°42 reconnu par sa photo » — une fois, par l'appareil qui l'a repris.
+      if (reconnusNum.length) direNumerosReconnus(reconnusNum);
     }
   // ⚠️ `numVentesParIdentite` DOIT être dans les dépendances : les ventes
   // arrivent souvent APRÈS les annonces. Sans elle, une annonce déjà rendue
   // garderait le numéro neuf qu'on vient justement d'éviter.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings.items, listings.complets, cloudReady, numVentesParIdentite, sales.items, txnPret, verNumTick, listingDates, reservesNum, recreesEff, repubMain]);
+  }, [listings.items, masqueesSurEtagere, listings.complets, cloudReady, numVentesParIdentite, sales.items, txnPret, verNumTick, listingDates, reservesNum, recreesEff, repubMain, empreintesVinted, venduesVinted, pairsLost, reponsesRepubTick]);
+  // (15 nov., src/republieTelephone.js) LA MÉMOIRE DES EMPREINTES DES FICHES NUMÉROTÉES : l'extension efface
+  // celle d'une annonce supprimée ; VRM la garde (60 jours) pour reconnaître sa republication.
+  useEffect(() => {
+    if (!cloudReady || !empreintesVinted) return;
+    const vues = annoncesPresentes.map((it) => { const uid = String(it._acc?.vinted_user_id ?? ''); const e = empreintesVinted[`vinted:${uid}`]; return { id: String(it.id), numero: (numeros[it.id] || {}).numero, uid, hexes: e && e[String(it.id)] }; });
+    const m = majEmpreintesFiches(lireObjet(CLE_EMPREINTES_FICHES), vues);
+    if (m) save(CLE_EMPREINTES_FICHES, m);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloudReady, empreintesVinted, annoncesPresentes, numeros]);
   // (6 nov., v36-raccords · banc chargement) LA LISTE D'ANNONCES ATTEND SA NUMÉROTATION :
   // des annonces numérotables sans N° et la numérotation pas encore passée ⇒ la liste
   // (prochain geste, N° à vérifier, grille) garde son squelette, à sa place. Sinon elle
@@ -41650,9 +41871,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // une par une (le champ pré-rempli avec la proposition, SA validation par `poserNumero`).
   const modeNum = ecritOnUi ? 'moi' : 'vrm';
   const nouveauxAEcrire = useMemo(() => aEcrireNouveaux(annoncesPresentes, numeros), [annoncesPresentes, numeros]);
-  const numerosADemander = useMemo(() => demandesNumero({ items: listings.items, fiches: numeros, listings, mode: modeNum,
+  // (15 nov.) Les masquées encore sur l'étagère aussi (`annoncesANumeroter`) : un article masqué par Vinted est chez lui.
+  const numerosADemander = useMemo(() => demandesNumero({ items: annoncesANumeroter(listings.items, masqueesSurEtagere), fiches: numeros, listings, mode: modeNum,
     numerotable: (it) => annonceNumerotable(it, listingDates), lectureEcrite: lectureEcriteVinted }),
-  [listings, numeros, modeNum, listingDates]);
+  [listings, masqueesSurEtagere, numeros, modeNum, listingDates]);
   const vendMots = () => (motsVendeur().nom === 'paire' ? 'sneakers' : 'autre');
   const ecrireNouveaux = (ids) => {
     const at = new Date().toISOString();
@@ -41662,6 +41884,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     gesteVrm(ids.length === 1 ? tr('nn.geste.ecrit', { numero: String(n1.numero || '') }) : tr('nn.geste.tous', { n: ids.length }), ops, { vinted_annonce_numeros: setNumeros });
   };
   const ouvrirAEcrire = () => ouvrirNouveauxNumeros({ vend: vendMots(), lignes: nouveauxAEcrire, onEcrit: ecrireNouveaux });
+  // (15 nov., src/republieTelephone.js) SA réponse à « N°42 republiée ? ». « Oui » : le lien nouvelle → ancienne de
+  // « Republier à la main » (`vrm_repub_main`, synchronisé), la reprise (`repriseNumerosRecreation`) remet le N°.
+  // « Non » : `vrm_republie_reponses[nouvelId]` ⇒ la règle normale (un N° neuf). Un geste annulable, dit une fois.
+  const repondreRepubliee = (pr, cand) => {
+    const now = new Date().toISOString();
+    if (cand && cand.id && !cand.enLigne) {
+      const avant = (repubMain || {})[String(cand.id)];
+      const apres = { ...(avant || {}), uid: String(pr.uid || ''), num: String(cand.numero || ''), titre: String(cand.title || ''), nouvelId: String(pr.id), nouveauTitre: String(pr.titre || ''), lieAt: now, at: (avant && avant.at) || now, origine: 'photo' };
+      gesteVrm(tr('acc.numero.republie.apres', { numero: String(cand.numero) }), [{ k: 'vrm_repub_main', type: 'cle', id: String(cand.id), apres, avant }], { vrm_repub_main: setRepubMain }, () => setReponsesRepubTick((n) => n + 1), 'numero.republie');
+      return;
+    }
+    const reps = lireObjet(CLE_REPUB_REPONSES);
+    const avant = reps[String(pr.id)];
+    const apres = { choix: 'non', anciens: (pr.candidats || []).map((c) => String(c.id)).filter(Boolean), at: now };
+    gesteVrm(tr('acc.numero.autre.apres'), [{ k: CLE_REPUB_REPONSES, type: 'cle', id: String(pr.id), apres, avant }], {}, () => setReponsesRepubTick((n) => n + 1), 'numero.autre');
+  };
+  const ouvrirPropositionsRepub = () => ouvrirRepubliee({
+    propositions: propositionsRepub.map((pr) => ({ ...pr, candidats: (pr.candidats || []).map((c) => ({ ...c, enLigne: (listings.items || []).some((x) => String(x.id) === String(c.id)) })) })),
+    onRepondre: repondreRepubliee });
   const demanderNumerosManquants = async () => {
     const liste = numerosADemander.slice(0, 30);
     const deja = []; let faits = 0;
@@ -41673,7 +41914,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       for (;;) {
         const desc = [`« ${String(it.title || '—')} »`, tr('nn.demande.proposition', { numero: prop }), rappel ? tr('nn.demande.rappel', { numero: prop }) : ''].filter(Boolean).join('\n');
         const rep = await askText({ title: tr(`nn.demande.titre.${vendMots()}`, { i: i + 1, n: liste.length }), desc, value: prop, numeric: clavierNum() === 'numeric', data: 'numero-demande', ok: tr('nn.demande.ok'), cancel: tr('nn.demande.plusTard'), photo: it.photo || null });
-        if (rep == null || typeof rep !== 'string' || !rep.trim()) { if (faits) toast(tr('nn.demande.fini', { n: faits }), 'ok'); return; }
+        if (rep == null || typeof rep !== 'string' || !rep.trim()) { if (faits) accompagner('numero.demande', { vars: { n: faits } }).fini(); return; }
         const k = cleNum(rep);
         if (deja.some((d) => cleNum(d) === k)) { toast(tr('nn.demande.dejaDonne', { numero: k })); prop = propositionNumero({ pris, prisCles: prisK, pref: prefNum, prochainLibre, deja }); continue; }
         await poserNumero(it, rep, '');
@@ -41684,7 +41925,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         break;
       }
     }
-    if (faits) toast(tr('nn.demande.fini', { n: faits }), 'ok');
+    if (faits) accompagner('numero.demande', { vars: { n: faits } }).fini();
   };
   const apercuEcrit = useMemo(() => {
     if (!Array.isArray(listings.items)) return null;
@@ -43466,9 +43707,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (Array.isArray(sales.items)) publierATrancher('colis-postes', cochesNonPartis.length);
     // (11 nov., lot sante-donnees) Les annonces « à confirmer » (compte pas relu depuis 24 h), le nombre de `FraicheurAnnonces`.
     if (lu) publierSanteApp('annonces-a-confirmer', annAConfirmer.length);
-    if (only === 'journee' && cycle && Array.isArray(cycle.cartes)) { const cs = cycle.cartes.filter((c) => !cycleRepondus[c.id]); publierATrancher('supprimes-vinted', cs.length, cs.slice(0, 4).map((c) => ({ id: c.id, num: c.numero, photo: c.photo || '' }))); }
+    if (only === 'journee' && cycle && Array.isArray(cycle.cartes)) { const cs = cycle.cartes.filter((c) => !cycleRepondus[c.id] && !propositionsRepub.some((p) => (p.candidats || []).some((k) => String(k.id) === String(c.id)))); publierATrancher('supprimes-vinted', cs.length, cs.slice(0, 4).map((c) => ({ id: c.id, num: c.numero, photo: c.photo || '' }))); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cloudReady, listings.items, listings.loading, listings.incomplet, listings.error, sales.items, numAttente, conflitsNum, aEcrireCarton, aVerifierCarton, fileAchat, supprTous, remises, cochesNonPartis, only, cycle, cycleRepondus, annAConfirmer]);
+  }, [cloudReady, listings.items, listings.loading, listings.incomplet, listings.error, sales.items, numAttente, conflitsNum, aEcrireCarton, aVerifierCarton, fileAchat, supprTous, remises, cochesNonPartis, only, cycle, cycleRepondus, annAConfirmer, propositionsRepub]);
   // Ventes et la saisie en série lisent les achats captés (relecture de l'extension
   // seulement, `harvestOnly`) ; les reçus ne partent que s'il y a une proposition.
   useEffect(() => { if (curSub === 'ventes' && accounts.length && !buys.items) chargerAchats(); /* eslint-disable-next-line */ }, [curSub, accounts.length]);
@@ -47563,11 +47804,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         //    passent ici, après les tuiles (§4.11 : rien ne disparaît en silence).
         if (Array.isArray(alertes)) for (const a of alertes) {
           if (!a || !(a.dv || a.jr)) continue;
-          // (15 nov., retrait-ailleurs) Déjà dans « À retirer ailleurs » (en tête, avec son geste) : pas redite ici.
-          if (a.dv && a.retrait && alerteCouverte(fusionPlan(RA.plan, RA.gardes), a.retrait.plat, a.retrait.nums, cleNum)) continue;
           // (15 nov.) « N annonces sans numéro » de la cloche (compté à SON passage, souvent avant la
           // numérotation) : la ligne des nouvelles annonces le dit déjà, à jour — jamais deux fois (§7).
           if (a.job === 'sans-numero' && (modeNum === 'moi' || nouveauxAEcrire.length > 0)) continue;
+          // (15 nov.) … ni quand ce sont les annonces de « N°x republiée ? » (elles attendent SA réponse : dit une fois).
+          if (a.job === 'sans-numero' && propositionsRepub.length > 0 && Number(a.n) <= propositionsRepub.length) continue;
+          // (15 nov., retrait-ailleurs) Déjà dans « À retirer ailleurs » (en tête, avec son geste) : pas redite ici.
+          if (a.dv && a.retrait && alerteCouverte(fusionPlan(RA.plan, RA.gardes), a.retrait.plat, a.retrait.nums, cleNum)) continue;
           if (a.dv) jobs.push({id:'double-vente', n:a.n, icon:a.ic||'alert', color:a.dv==='num'?C.doublon:C.warn, urgent:true, title:a.text, tab:a.tab, prio:-1, avant:a.avant, lbcSuppr:Array.isArray(a.lbcSuppr)&&a.lbcSuppr.length?a.lbcSuppr:null, photos:a.photos});
           else jobs.push({id:a.job||('a-faire-'+a.ic), n:a.n, icon:a.ic||'info', color:a.urssaf&&a.urssaf.proche?C.warn:C.text, title:a.text, sub:a.sub, tab:a.tab, prio:3, urssaf:a.urssaf,
             // (1er nov., « très répétitif ») Le rappel URSSAF en court : « Déclarer
@@ -47671,6 +47914,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // (src/cycleArticle.js), avec ses trois réponses. Rien sur « pas su ».
         if (cycle && Array.isArray(cycle.cartes)) for (const c of cycle.cartes) {
           if (cycleRepondus[c.id]) continue;
+          // (15 nov., src/republieTelephone.js) Proposée comme l'ancienne d'une republication (« N°x republiée ? ») : le même
+          // sujet, une fois (§7) — sa réponse là-bas règle aussi celle-ci.
+          if (propositionsRepub.some((p) => (p.candidats || []).some((k) => String(k.id) === String(c.id)))) continue;
           jobs.push({ id: 'supprime-vinted', cycle: c, icon: 'tag', color: C.text, court: tr('journee.supprimeVinted', { numero: String(c.numero) }), detail: enArticles(String(c.title || '').slice(0, 80)), title: tr('journee.supprimeVinted', { numero: String(c.numero) }), sub: c.title, photos: c.photo ? [c.photo] : null, prio: 0.8 });
         }
         // (6 nov., vague 2 · point 1) Les ventes annulées AVANT l'envoi (paire chez lui), dites
@@ -47692,6 +47938,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (modeNum === 'moi' && numerosADemander.length) {
           const court = tr('nn.demande.court.autre', { n: numerosADemander.length });   // « articles » sur Ma journée (voir plus haut)
           jobs.push({ id: 'numeros-a-donner', n: numerosADemander.length, icon: 'pencil', color: C.warn, court, detail: tr('nn.demande.detail'), title: court, photos: numerosADemander.map((it) => it.photo || null), tab: null, prio: 0.3, action: tr('nn.demande.action'), avant: () => { demanderNumerosManquants(); } });
+        }
+        // (15 nov., src/republieTelephone.js) « N°42 republiée ? » : une nouvelle annonce a la même photo qu'une
+        // annonce numérotée qui vient de disparaître (republiée dans l'app Vinted ?). Rien n'est relié sans SON clic.
+        if (modeNum === 'vrm' && propositionsRepub.length) {
+          const c0 = (propositionsRepub[0].candidats || [])[0] || {};
+          const court = propositionsRepub.length === 1 ? tr('rt.job.un', { numero: String(c0.numero || '') }) : tr('rt.job.plusieurs', { n: propositionsRepub.length });
+          jobs.push({ id: 'numeros-republiee', n: propositionsRepub.length, icon: 'pencil', color: C.warn, court, detail: tr('rt.job.detail'), title: court, photos: propositionsRepub.map((p) => p.photo || null), tab: null, prio: 0.25, action: tr('rt.job.action'), avant: ouvrirPropositionsRepub });
         }
         // (6 nov., vague 2 · point 4) Les annonces numérotées sans achat relié : le nombre, une fois ;
         // « Voir » ouvre Annonces sur « Sans achat relié » (une suggestion par annonce, SON tap relie).
@@ -52192,6 +52445,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             )}
             {aVerifierCarton.map((it) => (
               <LigneVerifCarton key={it.id} it={it} fiche={numeros[it.id] || {}} onPlusLa={masqueePlusLa} preuve={ebayVerif && ebayVerif.preuves ? ebayVerif.preuves[String(it.id)] : ''}
+                reserve={(reserveDe(it) || {}).reserve || ''} onPrendreReserve={prendreReserve}
                 onConfirmer={confirmerCarton} onCorriger={corrigerCarton}/>
             ))}
           </details>
@@ -58402,7 +58656,7 @@ function doublesVenteEbay({ annonces, commandes, numeros, enLigne, vendusVinted,
 //    (api/_lib/push.js). Ce n'est donc pas un filtre d'affichage : la
 //    notification n'est pas envoyée du tout.
 // Une ligne de « Numéros à vérifier sur tes cartons » (écran Annonces).
-function LigneVerifCarton({ it, fiche, preuve, onConfirmer, onCorriger, onPlusLa }) {
+function LigneVerifCarton({ it, fiche, preuve, reserve = '', onConfirmer, onCorriger, onPlusLa, onPrendreReserve }) {
   const [v, setV] = React.useState('');
   const [occupe, setOccupe] = React.useState(false);
   const agir = async (f) => { if (occupe) return; setOccupe(true); try { await f(); } finally { setOccupe(false); } };
@@ -58415,10 +58669,15 @@ function LigneVerifCarton({ it, fiche, preuve, onConfirmer, onCorriger, onPlusLa
         {/* (11 nov., pire cas) Le titre ENTIER : c'est lui qu'on compare au carton (coupé, « Größe 42 Sportschuh… » ne disait plus quelle paire). */}
         <div data-verif-titre="" style={{ fontSize: 13, fontWeight: 600, color: C.text, overflowWrap: 'anywhere' }}>{it.title}</div>
         <div style={{ fontSize: 12, color: C.muted }}>
-          {tr('annonces.vrmDit')} <b data-verif-actuel style={{ color: C.text }}>N°{fiche.numero}</b>
+          {/* (15 nov., #4) La réservation liée qui dit un autre N° : les deux N°, côte à côte (jamais l'un caché). */}
+          {reserve
+            ? <span data-verif-reserve={String(reserve)} data-verif-actuel={String(fiche.numero)}>{tr('annonces.reserveDesaccord', { fiche: String(fiche.numero), reserve: String(reserve) })}</span>
+            : <>{tr('annonces.vrmDit')} <b data-verif-actuel style={{ color: C.text }}>N°{fiche.numero}</b></>}
           {it._vrmMasquee ? <> · <span data-verif-masquee>{tr('annonces.masqueeVinted')}</span></> : null}
           {preuve ? <> · <span data-verif-preuve>{preuve}</span></> : null}
         </div>
+        {/* (15 nov., #4) SON second choix, sous la phrase (la rangée des gestes est pleine sur un téléphone). */}
+        {reserve && onPrendreReserve ? <div style={{ marginTop: 8 }}><button type="button" className="sb-touche" data-verif-prendre-reserve={String(reserve)} disabled={occupe} onClick={() => agir(() => onPrendreReserve(it, reserve))} style={{ minHeight: 44, whiteSpace: 'nowrap' }}>{tr('annonces.reserveCarton', { reserve: String(reserve) })}</button></div> : null}
       </div>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
         <button type="button" disabled={occupe} onClick={() => agir(() => onConfirmer(it))} style={{ padding: '7px 10px', borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>{trj('annonces.bien', { numero: fiche.numero })}</button>
@@ -64159,6 +64418,7 @@ function AppCoeur() {
           retomberait silencieusement sur la boîte grise du navigateur. */}
       <ConfirmHost/>
       <NouveauxNumerosHost/>
+      <RepublieeHost/>
       {/* (11 nov., lot suivi-travail) VRM figé pendant un travail long : détail, barre, pause / arrêt. */}
       <SuiviTravailCoque/>
       <FileReseauExt/>{/* (12 nov., ext. 5.371) gestes en attente de réseau, avec « Annuler » */}

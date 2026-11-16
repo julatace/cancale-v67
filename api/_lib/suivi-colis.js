@@ -135,7 +135,7 @@ export function relireLigneMeta(x) {
 // l'expédition }) ; `auRelais` = le statut dit « au point relais » (la règle
 // `isAtRelayStatus` de l'app, ou le résumé de l'extension, la même — §11).
 const RETOUR_OUVERT = /retour\s+(?:initi|demand|en\s+cours)/i;
-export function finDeCommandeAchat({ statut = '', etat = null, auRelais = false } = {}) {
+export function finDeCommandeAchat({ statut = '', etat = null, auRelais = false, retour = false } = {}) {
   if (etat && /non\s+r[ée]clam/i.test(etat.ss || '')) return 'reparti';
   if (etat && etat.s >= 500 && etat.s < 600) return 'reparti';
   if (etat && etat.s === 450) return 'retire';
@@ -145,12 +145,64 @@ export function finDeCommandeAchat({ statut = '', etat = null, auRelais = false 
   // Par la transaction de CET achat seulement (jamais le titre). La suspension 430 (« en attente de vérification »)
   // n'en est pas une : une réclamation peut dire « pas reçu ».
   if (etat && (etat.s === 440 || RETOUR_OUVERT.test(etat.ss || ''))) return 'retire';
+  // (15 nov., audit de fiabilité) LE BORDEREAU DE RETOUR DE CET ACHAT, reçu par e-mail (`email_bordretour_{tx}`,
+  // sens « achat » prouvé par le serveur, par SON n° de transaction) : Vinted ne donne un bordereau de retour
+  // qu'à l'acheteur qui A le colis. Mesuré : l'achat « Autry » (retour ouvert, bordereau reçu le 15 nov.) restait
+  // « La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais » (needs_action) dans
+  // la liste des achats, lue AVANT le retour ⇒ compté « au point relais ». Un achat en retour n'est jamais à
+  // retirer (sa carte vit dans « À renvoyer », src/retoursAchat.js). `retour` : `achatEnRetour` ci-dessous.
+  if (retour === true) return 'retire';
   if (auRelais === true) return null;
   const st = String(statut || '');
   if (RETOUR_OUVERT.test(st)) return 'retire';
   if (/non\s+r[ée]clam|rembours|annul/i.test(st)) return 'reparti';
   if (/finalis|termin|commande\s+livr|a\s+[ée]t[ée]\s+livr|re[çc]u\s+(?:sa|ta|la)\s+commande/i.test(st)) return 'retire';
   return null;
+}
+
+// ── UN ACHAT EN RETOUR (15 nov.) — une règle pour l'app, le widget et le rappel du matin (§11) ──
+// `bords` : les lignes `email_bordretour_*` projetées ({ transaction | tx, sens }) — `null` pas su.
+// Rend le Set des n° de transaction d'ACHATS en retour (jamais par le titre : par SON n°, §5), ou
+// `null` (pas su ⇒ rien n'est écarté : un colis caché est un colis perdu). Un bordereau dont le
+// serveur a lu le sens « vente » (un acheteur lui renvoie) n'en est pas un.
+// (15 nov.) + `demandes` : les avis « Retourne ta commande d'ici le … » (`email_retourdemande_*` : { conv, sens })
+// SANS bordereau. Un avis ne porte pas de n° de transaction (mesuré) : il ne désigne un achat que par SA
+// CONVERSATION (une identité), et seulement quand UN seul achat lu (`achats` : { transaction_id,
+// conversation_id }) la porte. Sans conversation (les 3 avis rangés le 15 nov.), il n'écarte rien : jamais
+// par le titre ni par la date (§5). `achats` pas lus ⇒ les avis ne comptent pas (pas su).
+export function txAchatsEnRetour(bords, { demandes = null, achats = null } = {}) {
+  if (!Array.isArray(bords)) return null;
+  const out = new Set();
+  for (const b of bords) {
+    if (!b || String(b.sens || '').toLowerCase() === 'vente') continue;
+    const v = b.transaction != null ? b.transaction : b.tx;
+    const tx = String(v == null ? '' : v).trim();
+    if (/^\d{3,20}$/.test(tx)) out.add(tx);
+  }
+  if (Array.isArray(demandes) && Array.isArray(achats)) {
+    const parConv = new Map();
+    for (const o of achats) {
+      const c = String((o && o.conversation_id) == null ? '' : o.conversation_id).trim().toLowerCase();
+      const tx = String((o && o.transaction_id) == null ? '' : o.transaction_id).trim();
+      if (!c || !/^\d{3,20}$/.test(tx)) continue;
+      if (!parConv.has(c)) parConv.set(c, new Set());
+      parConv.get(c).add(tx);
+    }
+    for (const d of demandes) {
+      if (!d || String(d.sens || '').toLowerCase() === 'vente') continue;
+      const c = String(d.conv == null ? '' : d.conv).trim().toLowerCase();
+      const txs = c ? parConv.get(c) : null;
+      if (txs && txs.size === 1) out.add([...txs][0]);
+    }
+  }
+  return out;
+}
+// Cet achat est-il en retour ? Son propre statut (« Retour initié / demandé / en cours ») ou un
+// bordereau de retour reçu pour SON n°.
+export function achatEnRetour(o, txs) {
+  if (!o) return false;
+  if (RETOUR_OUVERT.test(String(o.status || ''))) return true;
+  return !!(txs && typeof txs.has === 'function' && o.transaction_id != null && txs.has(String(o.transaction_id)));
 }
 
 // ── LE N° D'UNE LIGNE ────────────────────────────────────────────────────────
@@ -579,7 +631,7 @@ export function liensDesLignes(suivisVinted, suivisManuels) {
 // `harvest_{uid}_orders_purchased` projetées ({ orders, txns, … }) ; `etats` =
 // Map(tx → { s, ss }) des transactions. Une commande introuvable ne dit que ce
 // que dit sa transaction.
-export function finDesTransactions(txs, achats, etats) {
+export function finDesTransactions(txs, achats, etats, retours = null) {
   if (!txs || !txs.size) return null;
   if (!Array.isArray(achats) || !(etats instanceof Map)) return undefined;
   for (const tx of txs) {
@@ -590,7 +642,7 @@ export function finDesTransactions(txs, achats, etats) {
       o = ord; auRelais = Array.isArray(row.txns) ? row.txns.map(String).includes(tx) : false;
       break;
     }
-    const f = finDeCommandeAchat({ statut: o ? o.status : '', etat: etats.get(tx) || null, auRelais });
+    const f = finDeCommandeAchat({ statut: o ? o.status : '', etat: etats.get(tx) || null, auRelais, retour: !!(retours && typeof retours.has === 'function' && retours.has(String(tx))) });
     if (f) return f;
   }
   return null;

@@ -192,7 +192,7 @@ async function auditer(src) {
   const iM = ecran.indexOf('function RepublierALaMain'), jM = ecran.indexOf('\nfunction CarteKit');
   const main = iM >= 0 ? ecran.slice(iM, jM < 0 ? undefined : jM) : '';
   dit(/onALaMain=\{\(choisies\)=>\{[\s\S]{0,900}?setRepubMainOuvert\(choisies\[0\]\)/.test(app) && !/onALaMain=\{\(choisies\)=>\{[\s\S]{0,900}?setKitMain\(choisies/.test(app), 'D1 « À la main » ouvre la feuille guidée tout de suite (le kit reste à un toucher dedans)');
-  dit(/navigator\.share\(\{ files/.test(main) && /usePhotosReglees\(choisies, regs\.photo, paire\.numero, \{ auto: fiche !== undefined && detail !== undefined \}\)/.test(main) && /if \(auto && photos\.length && !ph\) preparer\(\);/.test(main), 'D2 les photos préparées d’avance, puis UN toucher ouvre le partage de fichiers dans le geste');
+  dit(/navigator\.share\(\{ files/.test(main) && /usePhotosReglees\(choisies, regs\.photo, paire\.numero, \{ auto: fiche !== undefined && detail !== undefined(?:, source: \{[^}]*\})? \}\)/.test(main) && /if \(auto && photos\.length && !ph\) preparer\(\);/.test(main), 'D2 les photos préparées d’avance, puis UN toucher ouvre le partage de fichiers dans le geste');
   dit(/const lecturePh = photosDeLAnnonce\(\{ coffre: f\.photos, detail, liste: paire\.photos, couverture: paire\.photo/.test(main) && /id=eq\.vinted_item_details&select=ph:data->/.test(main) && !/select=data[&`]/.test(main)
     && /const choisies = photosChoisies\(photos, exclues\)/.test(main) && !/paire\.photo \? \[paire\.photo\]/.test(main) && /photos: \(Array\.isArray\(it\.photosDetail\)/.test(app),
     'D6 la feuille prend TOUTES les photos (coffre, fiche de la page en projection, dressing), plus jamais la vignette seule par défaut ; il peut en retirer');
