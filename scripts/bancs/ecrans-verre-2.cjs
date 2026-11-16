@@ -203,6 +203,16 @@ function mesurer(vue) {
       offre: carte ? carte.getAttribute('data-offre') : null,
       proposer: (() => { const b = racine.querySelector('[data-offre-geste="proposer"]'); return b ? b.classList.contains('vrm-chat-btn-p') : null; })(),
       pleinsCarte: carte ? carte.querySelectorAll('.vrm-chat-btn-p').length : null };
+    // (16 nov., finitions) Un message passager dit PENDANT une conversation (« 24 nouvelles paires numérotées ») se posait
+    // sur la tête du fil (‹, Retirer) au téléphone. Même sonde que la fiche (F8) : une bulle de la vraie forme posée dans
+    // la VRAIE zone `.vrm-toasts`, chaque bulle déjà là jugée aussi, contre chaque geste VISIBLE de la tête du fil.
+    out.toastFil = (() => { const z = document.querySelector('.vrm-toasts'); const tete = racine.querySelector('.vrm-chat-head'); if (!z || !tete) return null;
+      const b = document.createElement('div'); b.className = 'vrm-toast'; b.setAttribute('data-sonde-toast', '');
+      b.style.cssText = 'display:flex;align-items:center;gap:10px;padding:12px 16px;max-width:520px;width:100%;box-sizing:border-box;border:1px solid transparent';
+      b.innerHTML = '<span class="vrm-toast-icon">i</span><span>24 nouvelles paires numérotées · N°2323, 2324, 2325 · à écrire sur leurs cartons</span>'; z.prepend(b);
+      const bulles = [...z.children].filter(vis).map(R), gestes = [...tete.querySelectorAll('button, a[href], [role="button"]')].filter(vis).map(R); b.remove();
+      const coupe = (a, c) => a.x < c.r && c.x < a.r && a.y < c.b && c.y < a.b;
+      return { place: z.getAttribute('data-toasts-place'), tete: R(tete), bulles, gestes: gestes.length, couvre: gestes.filter((g) => bulles.some((t) => coupe(t, g))).length }; })();
   }
   if (vue === 'parametres') {
     const cats = [...document.querySelectorAll('[data-categories-reglages] [data-categorie-ouvrir]')].filter(vis);
@@ -314,6 +324,7 @@ function juger(m, suf, tel) {
   if (m.vue === 'messages-offre') {
     const K = m.conv;
     dit(K.paire && K.paireAvant, `M6 ${suf} : la paire en tête du fil`, JSON.stringify(K));
+    dit(!!m.toastFil && m.toastFil.gestes >= 1 && m.toastFil.couvre === 0, `M8 ${suf} : un message passager ne couvre aucun geste de la tête du fil (‹, Retirer)`, JSON.stringify(m.toastFil));
     if (K.proposer != null) dit(K.proposer === true && K.pleinsCarte === 1, `M7 ${suf} : le plein va à « Proposer N € », un seul`, JSON.stringify(K));
     else console.log(`   ℹ️ M7 ${suf} : pas d'offre à trancher ICI (offre ${K.offre || 'aucune'} : l'extension n'est pas dans ce navigateur) — la règle est jugée sur le code (audit).`);
   }

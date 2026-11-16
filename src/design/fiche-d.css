@@ -216,4 +216,15 @@
   top: calc(max(14px, calc(env(safe-area-inset-top) + 8px)) + 44px + 10px) !important;
 }
 
+/* (16 nov., finitions) MÊME RÈGLE POUR UNE CONVERSATION DE MESSAGES (téléphone) : le fil ouvert compte comme une feuille,
+   la coque met ses messages en haut… sur la tête du fil (‹, Retirer, ⟳), qu'ils couvraient 6 s en prenant le toucher.
+   Tant qu'un fil est ouvert, les messages se posent JUSTE SOUS sa tête (56 px, sous l'encoche : le panneau porte
+   `padding-top: env(safe-area-inset-top)`). Seulement à la largeur d'un téléphone (la requête de la coque,
+   styles-gestion.css : à l'ordinateur ils restent en bas à droite). Banc ecrans-verre-2, M8. */
+@media (max-width: 743px), (max-width: 767px) and (hover: hover) and (pointer: fine), (max-width: 1023px) and (max-height: 599px) and (hover: none), (max-width: 1023px) and (max-height: 599px) and (pointer: coarse), (max-width: 1023px) and (max-height: 599px) and (pointer: none) {
+  :root:root:root:root:root:root:root:root body:has(.vrm-chat-overlay .vrm-chat-panel > .vrm-chat-head) .vrm-toasts[data-toasts-place="haut"] {
+    top: calc(env(safe-area-inset-top) + 56px + 8px) !important;
+  }
+}
+
 } /* fin de @layer vrm-verre */
