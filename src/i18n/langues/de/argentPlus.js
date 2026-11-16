@@ -34,7 +34,7 @@ export default {
   "argentPlus.ba.achatManque": "nicht eingetragen",
   "argentPlus.ba.reste": "Nach Verkaufskosten",
   "argentPlus.ba.auPlus": "höchstens",
-  "argentPlus.bl.sur": {"one": "auf {n} von {m} Verkäufen", "other": "auf {n} von {m} Verkäufen"},
+  "argentPlus.bl.sur": {"one": "berechnet aus {n} von {m} Verkäufen (die mit bekanntem Einkaufspreis)", "other": "berechnet aus {n} von {m} Verkäufen (die mit bekanntem Einkaufspreis)"},
   "argentPlus.bl.achat": {"one": "{n} Einkaufspreis fehlt", "other": "{n} Einkaufspreise fehlen"},
   "argentPlus.bl.plateforme": {"one": "{n} Gebühr nicht gelesen", "other": "{n} Gebühren nicht gelesen"},
   "argentPlus.bl.frais": {"one": "{n} Verkauf mit offenen Kosten", "other": "{n} Verkäufe mit offenen Kosten"},
