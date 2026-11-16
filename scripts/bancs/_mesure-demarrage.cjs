@@ -16,6 +16,7 @@
 //  RENDUS=1 (9 nov.) : crochet React posé avant l'app — chaque rendu validé et chaque
 //  rendu de `Comptabilite` (le moteur de Ma journée) avant « prêt », avec son heure
 //  (diagnostic : le parcours de l'arbre à chaque validation ralentit la page).
+//  (16 nov., vitesse-moteur) « p » : un rendu venu du PARENT (props neuves, état inchangé).
 //  (16 nov.) RESEAU=libre : ni débit ni délai simulés ; `donnees_ms` = écran complet − première lecture.
 //  (16 nov.) COMPLET_MAX_MS : combien attendre l'écran complet après les 90 s (défaut 20 s).
 //  (16 nov.) Chaque résultat porte `apresDonnees_ms` : écran prêt (complet avec COMPLET=1) − arrivée de la dernière
@@ -130,7 +131,7 @@ async function ouvrir(ctx, tab, etiquette) {
   // (16 nov.) `donnees_ms` : de la PREMIÈRE lecture de la base à l'écran complet (prêt sans COMPLET) — avec RESEAU=libre,
   // le temps que l'app passe à demander, recevoir, calculer et rendre ses données, réseau mis à part.
   { const tFin = (process.env.COMPLET ? tComplet : null) ?? tPret; res.donnees_ms = tFin != null && reqs.length ? tFin - reqs[0].t : null; }
-  if (process.env.RENDUS) res.rendus = await pg.evaluate((tp) => ({ commits: (window.__commits || []).filter(t => t <= tp).length, compta: (window.__compta || []).filter(t => parseInt(t, 10) <= tp).join(' ') }), tPret || 1e9).catch(() => null);
+  if (process.env.RENDUS) res.rendus = await pg.evaluate((tp) => ({ commits: (window.__commits || []).filter(t => t <= tp).length, compta: (window.__compta || []).filter(t => parseInt(t, 10) <= tp).join(' '), comptaTout: (window.__compta || []).length, comptaParent: (window.__compta || []).filter(t => /p$/.test(t)).length, commitsTout: (window.__commits || []).length }), tPret || 1e9).catch(() => null);
   if (process.env.EVAL) res.eval = await pg.evaluate(process.env.EVAL).catch(e => String(e));
   if (process.env.ETATS) res.etats = etats.map(x => x.t + ':' + x.e).join(' ; ');
   if (process.env.DETAIL) {
@@ -153,9 +154,9 @@ async function ouvrir(ctx, tab, etiquette) {
     if (process.env.RENDUS) await ctx.addInitScript(() => {
       window.__commits = []; window.__compta = [];
       const estCompta = (p) => p && typeof p === 'object' && 'only' in p && 'accounts' in p && 'garageGrid' in p;
-      const vus = new WeakMap();
+      const vus = new WeakMap(), vusP = new WeakMap();
       window.__REACT_DEVTOOLS_GLOBAL_HOOK__ = { supportsFiber: true, renderers: new Map(), isDisabled: false, inject() { return 1; }, checkDCE() {}, onScheduleFiberRoot() {}, onCommitFiberUnmount() {}, onPostCommitFiberRoot() {},
-        onCommitFiberRoot(id, root) { const t = Math.round(performance.now()); window.__commits.push(t); try { const pile = [root.current]; while (pile.length) { const f = pile.pop(); if (!f) continue; if (f.child) pile.push(f.child); if (f.sibling) pile.push(f.sibling); if (estCompta(f.memoizedProps)) { const av = vus.has(f) ? vus.get(f) : (f.alternate && vus.has(f.alternate) ? vus.get(f.alternate) : undefined); if (av === undefined || av !== f.memoizedState) window.__compta.push(t + (av === undefined ? 'm' : '')); vus.set(f, f.memoizedState); if (f.alternate) vus.set(f.alternate, f.memoizedState); } } } catch (_) {} } };
+        onCommitFiberRoot(id, root) { const t = Math.round(performance.now()); window.__commits.push(t); try { const pile = [root.current]; while (pile.length) { const f = pile.pop(); if (!f) continue; if (f.child) pile.push(f.child); if (f.sibling) pile.push(f.sibling); if (estCompta(f.memoizedProps)) { const av = vus.has(f) ? vus.get(f) : (f.alternate && vus.has(f.alternate) ? vus.get(f.alternate) : undefined); const avP = vusP.has(f) ? vusP.get(f) : (f.alternate && vusP.has(f.alternate) ? vusP.get(f.alternate) : undefined); if (av === undefined || av !== f.memoizedState) window.__compta.push(t + (av === undefined ? 'm' : '')); else if (avP !== undefined && avP !== f.memoizedProps) window.__compta.push(t + 'p'); vus.set(f, f.memoizedState); if (f.alternate) vus.set(f.alternate, f.memoizedState); vusP.set(f, f.memoizedProps); if (f.alternate) vusP.set(f.alternate, f.memoizedProps); } } } catch (_) {} } };
     });
     console.log(JSON.stringify(await ouvrir(ctx, tab, tab)));
     // REPRISE=2 (11 nov.) : une 3e ouverture aussi (une lecture faite tard à la 1re n'est gardée qu'à la 2e).

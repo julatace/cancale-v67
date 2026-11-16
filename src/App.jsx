@@ -266,6 +266,7 @@ import { ventesPourHistorique } from './favorisParcours.js';   // (11 nov., lot 
 import { useNouveauxFavoris, preparerEnvoiFavoris } from './favorisJournee.js';
 import React, { useState, useMemo, useEffect, useRef, Suspense } from "react";
 import { unParRendu } from './lotRendus.js';   // (16 nov., vitesse-volume)
+import { recentesOuSansDate, filtreParVersion, parTransaction } from './indexVentes.js';   // (16 nov., vitesse-moteur)
 // (15 nov., chantier « ouverture ») JAMAIS `React.lazy` nu : un morceau qui rate (une mise en ligne entre-temps)
 // rendait « Cet écran a un souci » ou `undefined … default`. `lazySur` le relance, puis recharge proprement vers la
 // nouvelle version, sinon « Mettre à jour VRM » (src/chargementSur.js ; banc ouverture, audit-ouverture).
@@ -37189,9 +37190,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // compte range la compta, ça ne fait pas disparaître un carton de
     // l'étagère (même règle que `toShip` — avant, Colis écartait le compte et
     // Ma journée le gardait : deux nombres pour la même obligation, §11).
-    const items = (sales.items || [])
+    // (16 nov., vitesse-moteur) Les ventes à expédier, gardées PAR LISTE tant que `TXN_ETATS` ne change pas
+    // (src/indexVentes.js — `aExpedier` ne lit que la vente et TXN_ETATS) : les deux mêmes filtres purs,
+    // dans l'autre ordre (même résultat, même ordre), sans reparcourir les 20 000 ventes à chaque rendu.
+    const items = filtreParVersion(sales.items || [], 'aExpedier', aExpedier, TXN_ETATS.ver || 0)
       .filter(o => !hiddenSales.has(String(o.transaction_id)))
-      .filter(o => aExpedier(o))
       .map(o => {
         const b = o.transaction_id != null ? parTxn[String(o.transaction_id)] || null : null;
         return { key: 'v' + o.transaction_id, o, b, txn: String(o.transaction_id || '') };
@@ -46011,7 +46014,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const TXT = { 'Retournée': 'Retour à vérifier', 'Retour en cours': 'Retour en cours', 'Au relais': 'Au relais de l’acheteur', 'En transit': 'En transit', 'Livrée': 'Livré' };
       // (13 nov., moteur-compta) La fenêtre des 45 jours est jugée AVANT `aExpedier` et `venteStage` (la même règle,
       // dans un autre ordre : trois filtres purs) — à 20 000 ventes, l'étape n'est plus calculée pour les vieilles.
-      sales.items
+      // (16 nov., vitesse-moteur) Seulement les ventes qui PEUVENT passer la fenêtre des 45 jours (src/indexVentes.js,
+      // dans l'ordre de la liste) : les filtres ci-dessous, inchangés, tranchent.
+      recentesOuSansDate(sales.items, 45, msDateCommande)
         .filter(o => o && !hiddenSales.has(String(o.transaction_id)))
         .map(o => ({ o, j: o.date ? Math.floor((Date.now() - msDateCommande(o)) / 86400000) : null }))
         .filter(x => (x.j == null || x.j <= 45) && !aExpedier(x.o))
@@ -46987,7 +46992,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             num: (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : ''), tr: transporteurVente(b, e.txn || tx),
             lues: { imprime: !!((e.txn && bordsPrinted[e.txn]) || (b && isBordPrinted(b))), depose: true, enroute: !!(pv && pv.bougeLu), livre: !!(pv && pv.livreeLue), valide: !!(pv && pv.finalisee) } });
         }
-        for (const o of sales.items) {
+        // (16 nov., vitesse-moteur) Seulement les ventes qui PEUVENT passer la fenêtre (src/indexVentes.js : un
+        // sur-ensemble, dans l'ordre de la liste) — la règle ci-dessous, inchangée, tranche.
+        for (const o of recentesOuSansDate(sales.items, LIMITE_ENVOYES_J, msDateCommande)) {
           // (13 nov., moteur-compta) La fenêtre des 45 jours d'abord (même règle, autre ordre) : à 20 000 ventes,
           // `aExpedier` et `venteStage` ne tournent plus sur les vieilles.
           if (!o || hiddenSales.has(String(o.transaction_id))) continue;
@@ -47004,7 +47011,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // (8 nov.) Encore « à expédier » chez Vinted (pas relu), mais le n° du bordereau de CETTE
         // transaction est pris en charge chez le transporteur (`partisTransp`) : sorti de « À envoyer »,
         // il est ICI, avec la raison — jamais caché. Un colis déjà coché reste dans sa ligne « coche ».
-        for (const o of sales.items) {
+        // (16 nov., vitesse-moteur) Seulement les ventes dont la transaction a une preuve de départ (l'index
+        // n° ⇒ positions de src/indexVentes.js), dans l'ordre de la liste : la règle ci-dessous, inchangée, tranche.
+        const posPartis = []; { const ix = parTransaction(sales.items); for (const tx of partisVinted.keys()) { const l = ix.get(String(tx)); if (l) posPartis.push(...l); } }
+        posPartis.sort((a, b) => a - b);
+        for (const o of posPartis.filter((p, k) => k === 0 || posPartis[k - 1] !== p).map((p) => sales.items[p])) {
           const tx = o && o.transaction_id != null ? String(o.transaction_id) : '';
           // (16 nov., vitesse-volume) La preuve de départ d'abord (une lecture de table) : les mêmes conditions,
           // toutes sans effet, dans un autre ordre — `aExpedier` ne tourne plus sur les 20 000 ventes.
