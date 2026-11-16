@@ -73,6 +73,10 @@ const pub = (u) => path.join(R, 'public', u.replace(/^\//, ''));
   dit(decisionMaj({ ...V, cacheeDepuisMs: 11 * 60000, saisieEnCours: true }) === 'proposer', 'revenue avec une saisie ⇒ proposer');
   dit(decisionMaj({ ...V, refusee: 'b.js' }) === 'rien' && decisionMaj({ ...V, refusee: 'a.js' }) === 'proposer', 'refusée ⇒ plus pour CETTE version, oui pour la suivante');
   dit(decisionMaj({ actuelle: 'a.js', serveur: 'a.js', demarrageVisible: true }) === 'rien' && decisionMaj({ actuelle: 'a.js', serveur: null }) === 'rien', 'même version ou pas su ⇒ rien');
+  // (16 nov., lot anti-bug) Ouverte et visible : rechargée au CALME (30 s sans geste), jamais sous une feuille ni une saisie.
+  dit(decisionMaj({ ...V, calmeDepuisMs: 31000 }) === 'recharger' && decisionMaj({ ...V, calmeDepuisMs: 5000 }) === 'proposer', 'ouverte, 30 s sans geste ⇒ recharger ; un geste il y a 5 s ⇒ proposer');
+  dit(decisionMaj({ ...V, calmeDepuisMs: 31000, feuilleOuverte: true }) === 'proposer' && decisionMaj({ ...V, calmeDepuisMs: 31000, saisieEnCours: true }) === 'proposer', 'une feuille ouverte ou une saisie ⇒ JAMAIS recharger (proposer)');
+  dit(decisionMaj({ ...V, calmeDepuisMs: 31000, refusee: 'b.js' }) === 'rien', '« Plus tard » sur CETTE version ⇒ jamais rechargée au calme');
   dit(estSaisie({ tagName: 'INPUT', type: 'text' }) && estSaisie({ tagName: 'TEXTAREA' }) && !estSaisie({ tagName: 'INPUT', type: 'checkbox' }) && !estSaisie({ tagName: 'BUTTON' }) && !estSaisie(null), 'saisie = un champ texte touché');
   const A = await import(path.join(R, 'src', 'aideInstallation.js'));
   const SAF = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1';

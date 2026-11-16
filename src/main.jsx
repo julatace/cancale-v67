@@ -79,7 +79,7 @@ if (typeof window !== 'undefined') {
 // page d'accueil ne charge pas 340 Ko compressés pour rien (§ montée en charge).
 // (11 nov., lot app-installable) « Mettre à jour » discret et l'aide d'installation.
 import { PiluleMiseAJour, AideInstallation } from './AppInstallable.jsx';
-import { decisionMaj, estSaisie, CLE_MAJ_REFUSEE } from './miseAJour.js';
+import { decisionMaj, estSaisie, CLE_MAJ_REFUSEE, SELECTEUR_FEUILLE } from './miseAJour.js';
 // Android (Chrome, Edge, Samsung) offre l'installation : gardée pour l'aide,
 // qui la propose UNE fois (src/aideInstallation.js). Plus de mini-bandeau surprise.
 if (typeof window !== 'undefined') {
@@ -365,6 +365,11 @@ if ('serviceWorker' in navigator) {
   // src/miseAJour.js décide (recharger si rien n'est en cours, sinon « Mettre à
   // jour » discret, une fois par version).
   let cacheeA = null;
+  // (16 nov., lot anti-bug) Le dernier geste (toucher, touche, molette) : on ne recharge jamais sous le doigt.
+  let gesteA = Date.now();
+  const geste = () => { gesteA = Date.now(); };
+  for (const ev of ['pointerdown', 'keydown', 'wheel', 'touchstart']) { try { window.addEventListener(ev, geste, { capture: true, passive: true }); } catch (_) {} }
+  const feuilleOuverte = () => { try { return !!document.querySelector(SELECTEUR_FEUILLE) || !!(window.history.state && window.history.state.vrmFeuille); } catch (_) { return true; } };
   const check = async () => {
     if (reloading) return;
     const fp = await fingerprint();
@@ -378,6 +383,8 @@ if ('serviceWorker' in navigator) {
       demarrageVisible: !!(demarrage && !demarrage.hasAttribute('data-sortie')),
       saisieEnCours: estSaisie(document.activeElement),
       cacheeDepuisMs: cacheeA == null ? null : Date.now() - cacheeA,
+      feuilleOuverte: feuilleOuverte(),
+      calmeDepuisMs: document.hidden ? null : Date.now() - gesteA,
     });
     cacheeA = null;
     // (15 nov., chantier « ouverture ») Le rechargement OUBLIE la coquille gardée par le service worker : sans
