@@ -46503,7 +46503,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (lbl && lbl.octets) {
       const age = lbl.capturedAt ? (Date.now()-new Date(lbl.capturedAt).getTime())/60000 : 999;
       const mins = Math.max(0, Math.round(age));
-      if (age<60 && await askConfirm({ title: `Tamponner le bordereau téléchargé il y a ${mins} min ?`, desc: `Avec le N°${numero} (${title}).`, ok: "Tamponner", cancel: "Choisir un fichier" })) {
+      if (age<60 && await askConfirm({ title: tr('bordFrais.confirmer.titre', { mins: String(mins) }), desc: tr('bordFrais.confirmer.desc', { numero: String(numero), titre: String(title) }), ok: tr('bordFrais.tamponner'), cancel: tr('bordFrais.confirmer.fichier') })) {
         try { await processBordereau(numero, title, lbl.octets); return; } catch(_){}
       }
     }
@@ -54715,12 +54715,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <div data-colis-bordereau-frais="" style={{border:`1px solid ${C.border}`,background:C.card,borderRadius:12,padding:'10px 12px 10px 14px',marginBottom:10,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
               <span aria-hidden="true" style={{display:'flex',color:C.muted,flexShrink:0}}><Icon name="doc" size={20}/></span>
               <div style={{flex:'1 1 200px',minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:600,color:C.text}}>Bordereau téléchargé il y a {freshLabel.mins} min</div>
+                <div style={{fontSize:15,fontWeight:600,color:C.text}}>{tr('bordFrais.titre', { mins: String(freshLabel.mins) })}</div>
                 <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4,overflowWrap:'anywhere'}}>{one
-                  ? <>Pour {num ? <><Numero n={num} taille="petit"/>{' '}</> : null}{one.title} · {freshLabel.name}</>
-                  : <>{freshLabel.name} · touche « J’ai le PDF » sur la vente concernée : il se tamponne avec son N°.</>}</div>
+                  ? <>{tr('bordFrais.pour')} {num ? <><Numero n={num} taille="petit"/>{' '}</> : null}{one.title} · {freshLabel.name}</>
+                  : <>{freshLabel.name} · {tr('bordFrais.sansVente')}</>}</div>
               </div>
-              {one && <Bouton variante="secondaire" icone="doc" onClick={()=>startBordereau(num, one.title, freshLabel.acc, one.transaction_id)}>Tamponner</Bouton>}
+              {one && <Bouton variante="secondaire" icone="doc" onClick={()=>startBordereau(num, one.title, freshLabel.acc, one.transaction_id)}>{tr('bordFrais.tamponner')}</Bouton>}
             </div></VersAFaire>
           );
         })()}

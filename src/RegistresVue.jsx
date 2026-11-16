@@ -10,7 +10,7 @@ import React from 'react';
 import { Bouton, C, SheetShell, Segmente, fmt } from './App.jsx';
 import { tr } from './i18n/index.js';
 import { parMois, totauxPeriodes, filtrerLignes, plateformesDe, manquesNommes, OBLIGATIONS, SOURCES, etatSource } from './registresConformes.js';
-import { libellePeriode } from './registres.js';
+import { libellePeriodeLangue as libellePeriode } from './periodeLangue.js';   // (16 nov.) l'écran dans sa langue ; le PDF reste en français
 
 const aller = (q) => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: q })); } catch (_) {} };
 const GESTES = {

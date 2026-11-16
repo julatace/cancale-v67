@@ -1,5 +1,10 @@
 import { jourParis } from './dateParis.js';
-import { L } from './libelles.js';   // (14 nov.) « Statut », jamais « Régime fiscal » (une notion = UN mot, src/libelles.js)
+import { L } from './libelles.js';
+// (16 nov., lot traduction-restes) Ce que l'ÉCRAN dit (état, raison, geste, manques affichés) passe par tr() ;
+// la facture, le récapitulatif CSV/JSON et leurs manques restent en français (documents fiscaux français).
+import { t as tr, ajouterSourceApp } from './i18n/index.js';
+import frRestes from './i18n/langues/fr/restes.js';
+ajouterSourceApp(frRestes);   // (14 nov.) « Statut », jamais « Régime fiscal » (une notion = UN mot, src/libelles.js)
 // ════════════════════════════════════════════════════════════════════════════
 //  FACTURATION ÉLECTRONIQUE — ce que VRM PRÉPARE, gratuitement (16 octobre)
 // ════════════════════════════════════════════════════════════════════════════
@@ -54,19 +59,19 @@ export const frJour = (t) => { const j = jourParis(t); return j ? `${j.slice(8, 
 // de l'app (une seule règle de SIREN, §11).
 // Rend { ok, etat, raison, geste, vendeur? }.
 export const etatFacturation = ({ cfg, regime, verifier }) => {
-  if (cfg === undefined) return { ok: false, etat: 'encours', raison: 'Je lis ton profil fiscal…', geste: '' };
-  if (cfg === null) return { ok: false, etat: 'passu', raison: "Ton profil fiscal n'a pas pu être lu (la base n'a pas répondu).", geste: 'Rouvre cet écran dans un moment : aucune facture ne part sur un profil que je n\'ai pas lu.' };
-  if (regime == null || regime === '') return { ok: false, etat: 'regime', raison: `${L.statut} pas renseigné.`, geste: 'Choisis-le dans « Ton entreprise » (Argent → Déclarer).' };
-  if (regime === 'marge') return { ok: false, etat: 'regime', raison: "Le régime de la marge n'est pas encore pris en charge par cette facture (sa mention de TVA est différente).", geste: 'Émets-la depuis ta plateforme agréée, ou vois-la avec ton comptable.' };
-  if (regime !== 'micro') return { ok: false, etat: 'regime', raison: `${L.statut} inconnu.`, geste: 'Choisis-le dans « Ton entreprise » (Argent → Déclarer).' };
-  if (String(cfg.tva || '').trim()) return { ok: false, etat: 'tva', raison: "Un n° de TVA est renseigné : tu es assujetti, la mention « art. 293 B » ne s'applique pas et VRM ne sait pas encore faire une facture avec TVA.", geste: 'Si tu es en franchise de TVA, vide le champ « N° TVA » de ton profil fiscal.' };
-  const s = typeof verifier === 'function' ? verifier(cfg.siret) : { etat: 'invalide', raison: 'vérification indisponible' };
-  if (s.etat === 'vide') return { ok: false, etat: 'siren', raison: 'Ton SIREN est absent : une facture doit le porter.', geste: 'Renseigne-le dans « Ton entreprise » (Argent → Déclarer) : 9 chiffres, sur ton avis de situation INSEE.' };
-  if (s.etat !== 'ok') return { ok: false, etat: 'siren', raison: `Ton SIREN ne semble pas valide (${s.raison || 'clé de contrôle'}).`, geste: 'Corrige-le dans « Ton entreprise » (Argent → Déclarer).' };
+  if (cfg === undefined) return { ok: false, etat: 'encours', raison: tr('fe.encours'), geste: '' };
+  if (cfg === null) return { ok: false, etat: 'passu', raison: tr('fe.passu.raison'), geste: tr('fe.passu.geste') };
+  if (regime == null || regime === '') return { ok: false, etat: 'regime', raison: tr('fe.regime.vide', { statut: L.statut }), geste: tr('fe.geste.choisir') };
+  if (regime === 'marge') return { ok: false, etat: 'regime', raison: tr('fe.marge.raison'), geste: tr('fe.marge.geste') };
+  if (regime !== 'micro') return { ok: false, etat: 'regime', raison: tr('fe.regime.inconnu', { statut: L.statut }), geste: tr('fe.geste.choisir') };
+  if (String(cfg.tva || '').trim()) return { ok: false, etat: 'tva', raison: tr('fe.tva.raison'), geste: tr('fe.tva.geste') };
+  const s = typeof verifier === 'function' ? verifier(cfg.siret) : { etat: 'invalide', raison: tr('fe.siren.indisponible') };
+  if (s.etat === 'vide') return { ok: false, etat: 'siren', raison: tr('fe.siren.absent'), geste: tr('fe.siren.absent.geste') };
+  if (s.etat !== 'ok') return { ok: false, etat: 'siren', raison: tr('fe.siren.invalide', { raison: s.raison || tr('fe.siren.cle') }), geste: tr('fe.siren.geste') };
   const nom = String(cfg.nom || '').trim();
-  if (!nom) return { ok: false, etat: 'nom', raison: 'Ta raison sociale (ou ton nom) est vide.', geste: 'Renseigne-la dans « Ton entreprise » (Argent → Déclarer).' };
-  const manque = [['adresse', "l'adresse"], ['codePostal', 'le code postal'], ['ville', 'la ville']].filter(([k]) => !String(cfg[k] || '').trim()).map(([, l]) => l);
-  if (manque.length) return { ok: false, etat: 'adresse', raison: `Ton adresse est incomplète (${manque.join(', ')}) : une facture doit la porter.`, geste: 'Complète-la dans « Ton entreprise » (Argent → Déclarer).' };
+  if (!nom) return { ok: false, etat: 'nom', raison: tr('fe.nom.raison'), geste: tr('fe.nom.geste') };
+  const manque = [['adresse', 'fe.adresse.adresse'], ['codePostal', 'fe.adresse.cp'], ['ville', 'fe.adresse.ville']].filter(([k]) => !String(cfg[k] || '').trim()).map(([, l]) => tr(l));
+  if (manque.length) return { ok: false, etat: 'adresse', raison: tr('fe.adresse.raison', { manque: manque.join(', ') }), geste: tr('fe.adresse.geste') };
   return {
     ok: true, etat: 'ok', raison: '', geste: '',
     vendeur: { nom, siren: s.siren, siret: String(cfg.siret || '').replace(/[\s.-]/g, ''), adresse: String(cfg.adresse).trim(), codePostal: String(cfg.codePostal).trim(), ville: String(cfg.ville).trim(), mention: MENTION_293B },
@@ -255,13 +260,14 @@ export const recapEReporting = ({ lignes, aDater, ym, ymDe, manque = [], attente
     const p = l.plateforme || 'Autre'; parPlateforme[p] = parPlateforme[p] || { centimes: 0, n: 0 }; parPlateforme[p].centimes += c; parPlateforme[p].n += 1;
     const j = isoJour(l.ts); parJour[j] = parJour[j] || { centimes: 0, n: 0 }; parJour[j].centimes += c; parJour[j].n += 1;
   }
-  const manques = [];
-  for (const m of manque) manques.push(`les ventes de ${m} (pas pu les lire)`);
-  if (attente) manques.push('une source encore en lecture (Leboncoin ou eBay)');
-  if (!versementsLus) manques.push('les ventes Vinted (dates de versement illisibles)');
+  // `manques` : le texte des FICHIERS (français, tel quel) ; `manquesAffiches` : le même, dans la langue de l'écran.
+  const manques = [], manquesAffiches = [];
+  for (const m of manque) { manques.push(`les ventes de ${m} (pas pu les lire)`); manquesAffiches.push(tr('fe.manque.source', { site: m })); }
+  if (attente) { manques.push('une source encore en lecture (Leboncoin ou eBay)'); manquesAffiches.push(tr('fe.manque.attente')); }
+  if (!versementsLus) { manques.push('les ventes Vinted (dates de versement illisibles)'); manquesAffiches.push(tr('fe.manque.versements')); }
   const nADater = (aDater || []).length, cADater = (aDater || []).reduce((s, l) => s + (centimesDe(l.eur) || 0), 0);
-  if (nADater) manques.push(`${nADater} vente${nADater > 1 ? 's' : ''} finalisée${nADater > 1 ? 's' : ''} sans date de versement (${eurDe(cADater).replace('.', ',')}\u00a0€) — elles peuvent appartenir à ce mois`);
-  return { ym, lignes: duMois, n: duMois.length, centimes: total, parPlateforme, parJour, partiel: manques.length > 0, manques, nADater, cADater };
+  if (nADater) { manques.push(`${nADater} vente${nADater > 1 ? 's' : ''} finalisée${nADater > 1 ? 's' : ''} sans date de versement (${eurDe(cADater).replace('.', ',')}\u00a0€) — elles peuvent appartenir à ce mois`); manquesAffiches.push(tr('fe.manque.aDater', { n: String(nADater), montant: eurDe(cADater).replace('.', ',') })); }
+  return { ym, lignes: duMois, n: duMois.length, centimes: total, parPlateforme, parJour, partiel: manques.length > 0, manques, manquesAffiches, nADater, cADater };
 };
 
 const csvCase = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`;

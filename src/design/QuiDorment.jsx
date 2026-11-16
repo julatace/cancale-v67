@@ -15,6 +15,10 @@ import { SEUILS_QUI_DORMENT } from '../quiDorment.js';
 import { SEUILS_FAVORIS, texteCompteur } from '../vendrePlus.js';
 import LigneGlissable from '../LigneGlissable.jsx';
 import { texteBeneficeSiVendue } from '../dormantes.js';
+// (16 nov., lot traduction-restes) Le texte par tr() (src/i18n/langues/<l>/restes.js, `qd.*`) : le français d'avant, mot pour mot.
+import { tr, ajouterSourceApp } from '../i18n/index.js';
+import frRestes from '../i18n/langues/fr/restes.js';
+ajouterSourceApp(frRestes);   // le français lu même sans l'app (un banc qui rend ce composant seul)
 
 // (10 nov., lot C) `selection` (Set d'identifiants) + `onSelection` + `onBaisser` : une case
 // par ligne et « Baisser le prix (N) » — la feuille de baisse en série (src/BaissePrixSerie.jsx).
@@ -29,34 +33,34 @@ export default function QuiDorment({ liste, seuil, onSeuil, onAgir, onGeste, onP
   const ids = liste ? liste.map((a) => a.id) : [];
   const nSel = avecCases ? ids.filter((id) => selection.has(id)).length : 0;
   const basculer = (id) => { const n = new Set(selection); if (n.has(id)) n.delete(id); else n.add(id); onSelection(n); };
-  const titre = fav ? 'Favoris sans vente' : 'Articles qui dorment';
+  const titre = tr(fav ? 'qd.titre.favoris' : 'qd.titre.dort');
   return (
     <section className="vrm-qd" data-qui-dorment="" data-qd-mode={mode} data-qd-seuil={fav ? seuilFavoris : seuil} data-qd-n={liste ? liste.length : ''} {...(attrs || {})}>
       {onMode ? (
-        <Segmente label="Quelle liste" className="vrm-qd-modes" value={mode} onChange={(v) => onMode(v)}
+        <Segmente label={tr('qd.modes')} className="vrm-qd-modes" value={mode} onChange={(v) => onMode(v)}
           options={[
-            { v: 'dort', l: <>Qui dorment{nDort != null ? <span className="vrm-of-n">{nDort}</span> : null}</>, data: { 'data-qd-mode-choix': 'dort' } },
-            { v: 'favoris', l: <>Favoris sans vente{nFavoris != null ? <span className="vrm-of-n">{nFavoris}</span> : null}</>, data: { 'data-qd-mode-choix': 'favoris' } },
+            { v: 'dort', l: <>{tr('qd.mode.dort')}{nDort != null ? <span className="vrm-of-n">{nDort}</span> : null}</>, data: { 'data-qd-mode-choix': 'dort' } },
+            { v: 'favoris', l: <>{tr('qd.titre.favoris')}{nFavoris != null ? <span className="vrm-of-n">{nFavoris}</span> : null}</>, data: { 'data-qd-mode-choix': 'favoris' } },
           ]}/>
       ) : null}
       <div className="vrm-qd-tete">
         <h2 className="vrm-display vrm-qd-titre">{titre}{liste ? <span className="vrm-qd-n">{liste.length}</span> : null}</h2>
         {fav
-          ? <Segmente label="Au moins" className="vrm-qd-seuils" value={String(seuilFavoris)} onChange={(v) => onSeuilFavoris && onSeuilFavoris(Number(v))}
-              options={SEUILS_FAVORIS.map((s) => ({ v: String(s), l: `${s} favoris`, data: { 'data-qd-choix': s } }))}/>
-          : <Segmente label="En ligne depuis" className="vrm-qd-seuils" value={String(seuil)} onChange={(v) => onSeuil(Number(v))}
-              options={SEUILS_QUI_DORMENT.map((s) => ({ v: String(s), l: `${s} j`, data: { 'data-qd-choix': s } }))}/>}
+          ? <Segmente label={tr('qd.seuils.favoris')} className="vrm-qd-seuils" value={String(seuilFavoris)} onChange={(v) => onSeuilFavoris && onSeuilFavoris(Number(v))}
+              options={SEUILS_FAVORIS.map((s) => ({ v: String(s), l: tr('qd.seuil.favoris', { s: String(s) }), data: { 'data-qd-choix': s } }))}/>
+          : <Segmente label={tr('qd.seuils.jours')} className="vrm-qd-seuils" value={String(seuil)} onChange={(v) => onSeuil(Number(v))}
+              options={SEUILS_QUI_DORMENT.map((s) => ({ v: String(s), l: tr('qd.seuil.jours', { s: String(s) }), data: { 'data-qd-choix': s } }))}/>}
       </div>
       <p className="vrm-qd-sous vrm-qd-note" data-qd-note="">
-        {fav ? 'Toujours en ligne, donc pas vendues. ' : ''}Offres reçues par annonce : pas lues par VRM.{pasLus ? ` ${pasLus}` : ''}
+        {fav ? tr('qd.note.favoris') + ' ' : ''}{tr('qd.note.offres')}{pasLus ? ` ${pasLus}` : ''}
       </p>
       {!liste ? <div className="vrm-qd-vide">—</div>
-        : !liste.length ? <div className="vrm-qd-vide" data-qd-vide="">{fav ? `Aucune annonce en ligne avec ${seuilFavoris} favoris ou plus.` : `Aucun article en ligne depuis ${seuil} jours ou plus.`}</div>
+        : !liste.length ? <div className="vrm-qd-vide" data-qd-vide="">{fav ? tr('qd.vide.favoris', { s: String(seuilFavoris) }) : tr('qd.vide.dort', { s: String(seuil) })}</div>
           : (<>
             {avecCases ? (
               <div className="vrm-qd-barre" data-qd-barre={nSel}>
-                <button type="button" className="vrm-qd-tout" data-qd-tout="" onClick={() => onSelection(nSel === ids.length ? new Set() : new Set(ids))}>{nSel === ids.length ? 'Tout décocher' : 'Tout cocher'}</button>
-                <button type="button" className="vrm-qd-baisser" data-qd-baisser={nSel} disabled={!nSel} onClick={() => onBaisser(liste.filter((a) => selection.has(a.id)))}>{nSel ? `Baisser le prix (${nSel})` : 'Baisser le prix'}</button>
+                <button type="button" className="vrm-qd-tout" data-qd-tout="" onClick={() => onSelection(nSel === ids.length ? new Set() : new Set(ids))}>{tr(nSel === ids.length ? 'qd.toutDecocher' : 'qd.toutCocher')}</button>
+                <button type="button" className="vrm-qd-baisser" data-qd-baisser={nSel} disabled={!nSel} onClick={() => onBaisser(liste.filter((a) => selection.has(a.id)))}>{nSel ? tr('qd.baisserN', { n: String(nSel) }) : tr('qd.baisser')}</button>
               </div>
             ) : null}
             <ul className="vrm-qd-liste">
@@ -64,26 +68,26 @@ export default function QuiDorment({ liste, seuil, onSeuil, onAgir, onGeste, onP
                   confirmation — rien ne part au glisser) et « Agir » (le choix existant). Les MÊMES gestes que
                   « Baisser le prix (N) » et « Agir » : `onBaisser`, `onAgir`. */}
               {liste.map((a) => (
-                <LigneGlissable key={a.id} cle={a.id} libelle={a.numero ? `N°${a.numero}` : (a.titre || 'annonce')} actions={[
-                  onBaisser ? { cle: 'baisser', libelle: 'Baisser', icone: <IconeBaisse/>, faire: () => onBaisser([a]), data: { 'data-lg-baisser': a.id } } : null,
-                  onAgir ? { cle: 'agir', libelle: 'Agir', icone: <IconePlus/>, faire: () => onAgir(a), data: { 'data-lg-agir': a.id } } : null,
+                <LigneGlissable key={a.id} cle={a.id} libelle={a.numero ? `N°${a.numero}` : (a.titre || tr('qd.annonce'))} actions={[
+                  onBaisser ? { cle: 'baisser', libelle: tr('qd.glisser.baisser'), icone: <IconeBaisse/>, faire: () => onBaisser([a]), data: { 'data-lg-baisser': a.id } } : null,
+                  onAgir ? { cle: 'agir', libelle: tr('qd.agir'), icone: <IconePlus/>, faire: () => onAgir(a), data: { 'data-lg-agir': a.id } } : null,
                 ]}>{(gp, tiroirG) => (
                 <li className="vrm-qd-ligne" {...gp} data-qd-ligne={a.id} data-qd-age={a.age == null ? '' : a.age} data-qd-vues={a.vues == null ? '' : a.vues} data-qd-favoris={a.favoris == null ? '' : a.favoris} data-qd-coche={avecCases ? (selection.has(a.id) ? '1' : '0') : undefined}>
-                  {avecCases ? <label className="vrm-qd-coche-zone"><input type="checkbox" className="vrm-qd-coche" checked={selection.has(a.id)} onChange={() => basculer(a.id)} data-qd-case={a.id} aria-label={`Cocher ${a.numero ? 'le N°' + a.numero : a.titre || 'cette annonce'}`}/></label> : null}
+                  {avecCases ? <label className="vrm-qd-coche-zone"><input type="checkbox" className="vrm-qd-coche" checked={selection.has(a.id)} onChange={() => basculer(a.id)} data-qd-case={a.id} aria-label={a.numero ? tr('qd.cocher.num', { num: String(a.numero) }) : a.titre ? tr('qd.cocher.titre', { titre: a.titre }) : tr('qd.cocher.annonce')}/></label> : null}
                   {a.photo ? <img className="vrm-qd-photo" data-vrm-vignette="" src={a.photo} alt="" loading="lazy"/> : <span className="vrm-qd-photo" aria-hidden="true"/>}
                   <span className="vrm-qd-centre">
-                    <span className="vrm-qd-nom">{a.numero ? <span className="vrm-qd-num">N°{a.numero}</span> : null}{a.titre || 'Sans titre'}</span>
+                    <span className="vrm-qd-nom">{a.numero ? <span className="vrm-qd-num">N°{a.numero}</span> : null}{a.titre || tr('qd.sansTitre')}</span>
                     <span className="vrm-qd-sous">
-                      <span className="vrm-qd-age vrm-qd-bloc">{a.age == null ? 'date pas lue' : `${a.age} j`}</span>
+                      <span className="vrm-qd-age vrm-qd-bloc">{a.age == null ? tr('qd.datePasLue') : tr('qd.age', { n: String(a.age) })}</span>
                       {a.prix != null ? <> · <span className="vrm-qd-bloc">{fmt(a.prix)}</span></> : null}
-                      {' · '}<span className="vrm-qd-bloc" data-qd-vues-txt="">{texteCompteur(a.vues, 'vue', 'vues', 'vues pas lues')}</span>
-                      {' · '}<span className="vrm-qd-bloc" data-qd-favoris-txt="">{texteCompteur(a.favoris, 'favori', 'favoris', 'favoris pas lus')}</span>
+                      {' · '}<span className="vrm-qd-bloc" data-qd-vues-txt="">{texteCompteur(a.vues, tr('qd.vue'), tr('qd.vues'), tr('qd.vuesPasLues'))}</span>
+                      {' · '}<span className="vrm-qd-bloc" data-qd-favoris-txt="">{texteCompteur(a.favoris, tr('qd.favori'), tr('qd.favoris'), tr('qd.favorisPasLus'))}</span>
                     </span>
                     {a.valeur ? (
                       <span className="vrm-qd-sous vrm-qd-benef" data-qd-benef={a.valeur.benefice == null ? '' : a.valeur.benefice} data-qd-benef-etat={a.valeur.etat}>
-                        {a.valeur.benefice != null ? <span className="vrm-qd-bloc">{texteBeneficeSiVendue(a.valeur)} si vendue</span>
-                          : a.valeur.etat === 'achat' && onPrixAchat ? <button type="button" className="vrm-qd-saisir" data-qd-saisir={a.id} onClick={() => onPrixAchat(a)}>Prix d’achat ?</button>
-                            : <span className="vrm-qd-bloc">bénéfice —</span>}
+                        {a.valeur.benefice != null ? <span className="vrm-qd-bloc">{tr('qd.siVendue', { x: texteBeneficeSiVendue(a.valeur) })}</span>
+                          : a.valeur.etat === 'achat' && onPrixAchat ? <button type="button" className="vrm-qd-saisir" data-qd-saisir={a.id} onClick={() => onPrixAchat(a)}>{tr('qd.prixAchat')}</button>
+                            : <span className="vrm-qd-bloc">{tr('qd.beneficeInconnu')}</span>}
                       </span>
                     ) : null}
                     {a.compte ? <span className="vrm-qd-sous">{a.compte}</span> : null}
@@ -93,8 +97,8 @@ export default function QuiDorment({ liste, seuil, onSeuil, onAgir, onGeste, onP
                     ) : null}
                   </span>
                   {a.geste && onGeste
-                    ? <button type="button" className="vrm-qd-agir vrm-qd-plus" data-qd-agir={a.id} aria-haspopup="dialog" aria-label="Autres gestes" onClick={() => onAgir(a)}><IconePlus/></button>
-                    : <button type="button" className="vrm-qd-agir" data-qd-agir={a.id} aria-haspopup="dialog" onClick={() => onAgir(a)}>Agir</button>}
+                    ? <button type="button" className="vrm-qd-agir vrm-qd-plus" data-qd-agir={a.id} aria-haspopup="dialog" aria-label={tr('qd.autres')} onClick={() => onAgir(a)}><IconePlus/></button>
+                    : <button type="button" className="vrm-qd-agir" data-qd-agir={a.id} aria-haspopup="dialog" onClick={() => onAgir(a)}>{tr('qd.agir')}</button>}
                   {tiroirG}
                 </li>
                 )}</LigneGlissable>
