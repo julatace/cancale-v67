@@ -30,7 +30,12 @@ export const ICONES_EVENTAIL = {
 export const ARC = Object.freeze({ rayon: 156, dessus: 14, angles: [152, 111, 69, 28] });
 export function placesEventail(cx, cy, largeur = 390) {
   const R = Math.min(ARC.rayon, Math.max(110, (largeur - 2 * 52) / 2 / Math.cos((28 * Math.PI) / 180)));
-  return ARC.angles.map((a) => { const r = (a * Math.PI) / 180; return { x: cx + R * Math.cos(r), y: cy - ARC.dessus - R * Math.sin(r) }; });
+  // (16 nov., lot barre-achats) Avec Achats dans la barre, le disque n'est plus au milieu (3 onglets à gauche, 2 à
+  // droite) : l'arc garde ses lames (100 px, centrées) DANS l'écran, à 8 px des bords — sinon la dernière sortait à
+  // droite (banc studio-coque D). Trop étroit pour les deux bords : l'arc au milieu de l'écran.
+  const bord = 8 + 50 + R * Math.cos((28 * Math.PI) / 180);
+  const x0 = bord <= largeur - bord ? Math.min(largeur - bord, Math.max(bord, cx)) : largeur / 2;
+  return ARC.angles.map((a) => { const r = (a * Math.PI) / 180; return { x: x0 + R * Math.cos(r), y: cy - ARC.dessus - R * Math.sin(r) }; });
 }
 
 export function DisqueEventail({ gestes = {}, nImprimer, Retour = null, ecran = '' }) {
