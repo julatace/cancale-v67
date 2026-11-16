@@ -27,7 +27,7 @@ function Barre({ pct, attr }) {
   );
 }
 
-const VERDICT = { atteint: 'Au-dessus du seuil', atteintSi: 'Au-dessus si les ventes à dater comptent', sous: 'Sous le seuil' };
+const VERDICT = { atteint: 'Au-dessus du seuil', atteintSi: 'Au-dessus si les ventes sans date de versement comptent', sous: 'Sous le seuil' };
 
 function Carte({ k, annee, blocage, onExport, enCours }) {
   const lu = k.etat === 'lu';

@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 //  BANC : « SANTÉ DE TES DONNÉES » (11 nov., lot sante-donnees)
 //        npm run build && node scripts/bancs/sante-donnees.cjs [dist]
-//        BANC_CAPTURES=dossier  BANC_PORT=4398  SD_SEUL=S|C|G|P|Z
+//        BANC_CAPTURES=dossier  BANC_PORT=4398  SD_SEUL=S|C|G|P|Z  SD_CLE=<geste G seul>
 //  La VRAIE app (`dist`), une fausse base qui applique la projection `select=`.
 //  Données INVENTÉES (dépôt public). Les publications des écrans propriétaires
 //  sont rangées sur l'appareil SOUS LEUR FORME RÉELLE ; les attendus sont faits
@@ -15,6 +15,10 @@
 //      la toucher ouvre la Santé de tes données.
 //   G  Chaque bouton OUVRE le bon parcours (1512) et n'écrit aucune donnée : Colis
 //      (onglet), Annonces + la saisie en série, Achats, Déclarer, E-mails, Tout va bien ?
+//      « Aucune donnée » se juge sur une ligne `main` RÉALISTE (des fiches numérotées, le
+//      pool, les comptes) et AU REPOS (la première synchronisation de l'appareil finie) :
+//      une clé qui existait ne change pas, aucune clé de données n'apparaît ; seules les
+//      publications d'écran déclarées (`ETAT_ECRANS`, `LIGNES_PUBLIEES`) peuvent bouger.
 //   P  Rien publié, e-mails muets (503) : chaque ligne « — · pas lu », aucune à 0,
 //      jamais « Tout est à jour ».
 //   Z  Tout publié à 0, comptes relus, extension à jour, e-mails à 0 : « Tout est à jour ✓ ».
@@ -89,9 +93,9 @@ const projette = (row, sel) => {
 };
 
 // scen : 's' (des choses à corriger) · 'p' (rien publié, e-mails muets) · 'z' (tout à 0)
-async function contexte(b, largeur, sombre, scen = 's') {
+async function contexte(b, largeur, sombre, scen = 's', opts = {}) {
   const ctx = await b.newContext({ viewport: { width: largeur, height: largeur < 600 ? 844 : 950 }, colorScheme: sombre ? 'dark' : 'light', ...(largeur < 600 ? { isMobile: true, hasTouch: true } : {}) });
-  const MAIN = { vinted_dark: sombre, vinted_account_emails: {} };
+  const MAIN = { vinted_dark: sombre, vinted_account_emails: {}, ...(opts.main || {}) };
   const ROWS = lignesBase(scen === 'z' ? M : 3 * 86400e3);
   const zero = scen === 'z';
   const semis = scen === 'p' ? null : {
@@ -212,16 +216,52 @@ const actif = (pg) => pg.evaluate(() => { const e = document.querySelector('.vrm
   });
 
   // ── G ──
+  // (15 nov., achats-ecriture-main) Le rouge « colis-a-confirmer réécrit vinted_annonce_numeros,
+  // vinted_sales, vinted_accounts… » était un EFFET DU BANC, mesuré : la ligne `main` servie ne
+  // portait que deux clés, et la PREMIÈRE synchronisation de l'appareil (lancée au chargement, avant
+  // tout geste) y ajoute ce que l'appareil sait — `vinted_annonce_numeros: {}`, `vinted_sales: []`,
+  // la copie sans jetons de `vinted_accounts`, `vrm_je_vends`… (absent ⇒ vide, rien perdu). Sur une
+  // machine chargée cet envoi arrivait APRÈS la photo « avant » : le banc l'attribuait au bouton
+  // (CPU ×6 : envoi 2 s avant la photo ⇒ vert ; plus lent ⇒ rouge). Une vraie ligne `main` porte
+  // déjà ces clés. D'où : (1) une ligne `main` réaliste (fiches numérotées, pool, comptes sous la
+  // forme que l'app écrit) — une fiche qui existe doit rester IDENTIQUE, c'est la règle qui compte ;
+  // (2) la photo « avant » prise AU REPOS (aucune écriture depuis 2,5 s) ; (3) le jugement par règle.
+  const MAIN_SEME = () => ({
+    vinted_annonce_numeros: {
+      '9101': { numero: '5', auto: false, manuelAt: iso(30 * 86400e3), numberedAt: iso(40 * 86400e3), buyPrice: '25' },
+      '9102': { numero: '12', auto: true, numberedAt: iso(20 * 86400e3), title: 'Nike Air Max 90 blanc 42', price: 70 },
+    },
+    vinted_used_numeros: [5, 12],
+    vinted_accounts: ACCOUNTS.map(({ updated_at, ...c }) => c),
+  });
+  // Les publications d'écran et l'état de navigation (pas des données qu'il a saisies) : un écran
+  // OUVERT publie ce qu'il a calculé de ses lectures (§11) et la reprise retient le dernier écran.
+  //   · `vrm_reprise_ecrans` : le dernier écran ouvert (src/repriseSynchro.js) — ouvrir un écran l'écrit ;
+  //   · `vrm_achats_jours` : la publication de l'écran Achats, jour par jour (App.jsx, « Dépensé ») ;
+  //   · `vrm_annonces_achetees` : la publication de src/achatMemeAnnonce.js (`CLE_ANNONCES_ACHETEES`).
+  const ETAT_ECRANS = [...PUBLIEES, 'vrm_reprise_ecrans', 'vrm_achats_jours', 'vrm_annonces_achetees'];
+  // Les lignes hors `main` qu'un écran publie (§5 « un écran publie ») ou le point de restauration posé
+  // AVANT une action en série (src/restauration.js, `restore_{0..23}`, une sauvegarde — jamais une donnée).
+  const LIGNES_PUBLIEES = /^(widget_stats|lbc_a_retirer|restore_\d+)$/;
+  // Au repos : aucune écriture vers la base depuis 2,5 s (borné à 40 s ; sinon dit).
+  const auRepos = async (ecritures, t0) => {
+    const fin = Date.now() + 40000;
+    while (Date.now() < fin) { const der = ecritures.length ? ecritures[ecritures.length - 1].t : t0; if (Date.now() - Math.max(der, t0) > 2500) return true; await new Promise((r) => setTimeout(r, 250)); }
+    return false;
+  };
+  const court = (v) => { const t = JSON.stringify(v === undefined ? null : v); return t.length > 240 ? t.slice(0, 240) + '…' : t; };
   const ATTENDU_G = {
     'numeros-double': { ecran: 'cat_bord', onglet: 'envoyer' }, 'colis-postes': { ecran: 'cat_bord', onglet: 'envoyes' },
     'achats-sans-prix': { ecran: 'annonces', saisie: true }, 'ventes-sans-achat': { ecran: 'annonces', saisie: true },
     'colis-a-confirmer': { ecran: 'achats' }, 'ventes-a-dater': { ecran: 'compta' }, 'emails-mis-de-cote': { ecran: 'emails' },
     'comptes-a-relire': { reglage: 'toutvabien' }, 'annonces-a-confirmer': { ecran: 'annonces' },
   };
-  if (!SEUL || SEUL === 'G') for (const cle of Object.keys(ATTENDU_G)) await essaie('G ' + cle, async () => {
-    const { ctx, ecritures, MAIN } = await contexte(b, 1512, false);
+  if (!SEUL || SEUL === 'G') for (const cle of Object.keys(ATTENDU_G).filter((k) => !process.env.SD_CLE || k === process.env.SD_CLE)) await essaie('G ' + cle, async () => {
+    const { ctx, ecritures, MAIN } = await contexte(b, 1512, false, 's', { main: MAIN_SEME() });
     const pg = await ctx.newPage();
+    const t0 = Date.now();
     await ouvrirSante(pg);
+    const repos = await auRepos(ecritures, t0);
     const avantMain = JSON.parse(JSON.stringify(MAIN));
     const e0 = ecritures.length;
     await pg.click(`[data-sante-geste="${cle}"]`);
@@ -239,9 +279,18 @@ const actif = (pg) => pg.evaluate(() => { const e = document.querySelector('.vrm
       if (A.saisie) dit(!!(await pg.$('[role="dialog"][aria-label="Prix d\'achat à compléter"]')), `G ${cle} : la saisie en série s'ouvre`);
     }
     await pg.waitForTimeout(1500);
-    const changees = Object.keys({ ...avantMain, ...MAIN }).filter((k) => k !== 'rev' && !PUBLIEES.includes(k) && JSON.stringify(avantMain[k]) !== JSON.stringify(MAIN[k]));
-    const autres = ecritures.slice(e0).filter((w) => !w.ids.includes('main') && !/id=eq\.main/.test(w.url)).map((w) => w.ids.join(','));
-    dit(!changees.length && !autres.length, `G ${cle} : le bouton n'écrit aucune donnée (il ouvre)`, JSON.stringify({ changees, autres }));
+    await auRepos(ecritures, Date.now());
+    const changees = Object.keys({ ...avantMain, ...MAIN }).filter((k) => k !== 'rev' && !ETAT_ECRANS.includes(k) && JSON.stringify(avantMain[k]) !== JSON.stringify(MAIN[k]));
+    // Une clé qui existait et a changé (perdue, écrasée, remise en forme) · une clé de données apparue (inventée).
+    const touchees = changees.filter((k) => avantMain[k] !== undefined).map((k) => ({ k, avant: court(avantMain[k]), apres: court(MAIN[k]) }));
+    const apparues = changees.filter((k) => avantMain[k] === undefined).map((k) => ({ k, apres: court(MAIN[k]) }));
+    const autres = ecritures.slice(e0).filter((w) => !w.ids.includes('main') && !/id=eq\.main/.test(w.url)).flatMap((w) => w.ids).filter((id) => !LIGNES_PUBLIEES.test(String(id)));
+    dit(repos, `G ${cle} : la ligne est au repos avant le geste (première synchronisation finie)`);
+    dit(!touchees.length && !apparues.length && !autres.length, `G ${cle} : le bouton n'écrit aucune donnée (il ouvre)`, JSON.stringify({ touchees, apparues, autres }));
+    // La règle, en plus du « rien n'a bougé » : les fiches et le pool servis sont toujours là, à l'identique.
+    const semees = MAIN_SEME();
+    dit(Object.entries(semees.vinted_annonce_numeros).every(([id, f]) => JSON.stringify((MAIN.vinted_annonce_numeros || {})[id]) === JSON.stringify(f)) && semees.vinted_used_numeros.every((n) => (MAIN.vinted_used_numeros || []).map(String).includes(String(n))),
+      `G ${cle} : les fiches numérotées et le pool de la base sont intacts`, court({ fiches: MAIN.vinted_annonce_numeros, pool: MAIN.vinted_used_numeros }));
     await shot(pg, 'G-' + cle);
     await ctx.close();
   });

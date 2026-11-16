@@ -37,8 +37,11 @@ const photo = (dossier, fichier, taille = 'f800') => `https://images1.vinted.net
 const annonce = (id, title, ph) => ({ id, title, photo: ph, url: `https://www.vinted.fr/items/${id}-annonce`, price: { amount: '60.0', currency_code: 'EUR' }, is_closed: false, is_hidden: false, is_draft: false, created_at_ts: iso(240), favourite_count: 1, view_count: 10 });
 
 // Les scénarios : { listings: { uid: { cap, items } }, fiches }.
+// (15 nov., lot deux-comptes) La même paire sur DEUX comptes a sa carte à elle (« Deux comptes, une paire »,
+// banc deux-comptes.cjs) : la carte « en ligne deux fois » garde le MÊME compte. `X` = l'ancien A (deux comptes),
+// pour D, E, F, C ; A = la même photo exacte deux fois sur compte-alpha.
 const SCENARIOS = {
-  A: (() => {
+  X: (() => {
     const pA = [annonce(5000001, 'Nike Air Max 90 blanc 42', photo('05_aaa_dossiera', '1700000001')), annonce(5000002, 'Adidas Samba noir 41', photo('05_bbb_dossierb', '1700000002')), annonce(5000003, 'Puma Suede bleu 40', photo('05_ccc_dossierc', '1700000003'))];
     const pB = [annonce(6000001, 'Air Max 90 blanche', photo('05_aaa_dossiera', '1700000001', 'f310')), annonce(6000002, 'Asics Gel bleu 43', photo('05_ddd_dossierd', '1700000004'))];
     return { listings: { [A]: { cap: iso(1), items: pA }, [B]: { cap: iso(2), items: pB } },
@@ -55,11 +58,13 @@ const SCENARIOS = {
     return { listings: { [A]: { cap: iso(1), items: lA }, [B]: { cap: iso(1), items: lB } }, fiches };
   })(),
 };
-SCENARIOS.C = { listings: { [A]: SCENARIOS.A.listings[A], [B]: { ...SCENARIOS.A.listings[B], cap: iso(30) } }, fiches: SCENARIOS.A.fiches };
+SCENARIOS.A = { listings: { [A]: { cap: iso(1), items: [...SCENARIOS.X.listings[A].items, SCENARIOS.X.listings[B].items[0]] }, [B]: { cap: iso(2), items: [SCENARIOS.X.listings[B].items[1]] } },
+  fiches: { ...SCENARIOS.X.fiches, 6000001: { ...SCENARIOS.X.fiches[6000001], accountId: A } } };
+SCENARIOS.C = { listings: { [A]: SCENARIOS.X.listings[A], [B]: { ...SCENARIOS.X.listings[B], cap: iso(30) } }, fiches: SCENARIOS.X.fiches };
 // (6 nov., finitions) D : la même paire (photo exacte) sous le MÊME N°12 sur les deux comptes.
-SCENARIOS.D = { listings: SCENARIOS.A.listings, fiches: { ...SCENARIOS.A.fiches, 6000001: { ...SCENARIOS.A.fiches[6000001], numero: '12' } } };
+SCENARIOS.D = { listings: SCENARIOS.X.listings, fiches: { ...SCENARIOS.X.fiches, 6000001: { ...SCENARIOS.X.fiches[6000001], numero: '12' } } };
 // E : le N°12 sur une AUTRE photo (Asics, 6000002) : peut-être deux paires.
-SCENARIOS.E = { listings: SCENARIOS.A.listings, fiches: { ...SCENARIOS.A.fiches, 6000002: { ...SCENARIOS.A.fiches[6000002], numero: '12' } } };
+SCENARIOS.E = { listings: SCENARIOS.X.listings, fiches: { ...SCENARIOS.X.fiches, 6000002: { ...SCENARIOS.X.fiches[6000002], numero: '12' } } };
 // F : D, le second compte lu il y a 30 h.
 SCENARIOS.F = { listings: SCENARIOS.C.listings, fiches: SCENARIOS.D.fiches };
 
@@ -151,13 +156,18 @@ const ouvrir = async (b, vp, sc) => {
             nCartes: document.querySelectorAll('.vrm-day-task-list > .vrm-day-task, .vrm-day-task-list [data-job], .vrm-day-task-list [data-tuile]').length,
             visible: box.width > 2 && box.height > 2, deborde: document.documentElement.scrollWidth > window.innerWidth + 1, h: Math.round(box.height) };
         });
-        dit(r.carte, 'même photo exacte sur deux comptes : la carte « en ligne deux fois » est dans « À faire »', r.texte);
+        dit(r.carte, 'même photo exacte deux fois sur UN compte : la carte « en ligne deux fois » est dans « À faire »', r.texte);
         if (r.carte) {
           dit(r.n === '1' && r.ids === '5000001+6000001', 'une paire, ses deux annonces (5000001 + 6000001)', `${r.n} ${r.ids}`);
           dit(r.titre === 'N°12 en ligne deux fois', 'le titre : « N°12 en ligne deux fois »', r.titre);
-          dit(r.note === '2 comptes · supprimes-en une', 'la ligne : les deux comptes et le geste', r.note);
-          dit(/N°12 et N°40/.test(r.complet || '') && /compte-alpha et compte-beta/.test(r.complet || ''), 'l’infobulle nomme les deux N° et les deux comptes', r.complet);
-          dit(r.lt === 1 && r.ln === 1 && !r.coupeT && !r.coupeN, 'titre et ligne tiennent chacun sur UNE ligne, sans être coupés', JSON.stringify({ lt: r.lt, ln: r.ln, coupeT: r.coupeT, coupeN: r.coupeN }));
+          dit(r.note === 'Même compte · supprimes-en une', 'la ligne : le même compte et le geste', r.note);
+          dit(/N°12 et N°40/.test(r.complet || '') && /deux annonces sur compte-alpha/.test(r.complet || ''), 'l’infobulle nomme les deux N° et le compte', r.complet);
+          // (16 nov., intégration vague C) À l'ordinateur, la carte vit dans la colonne « À faire » de Ma journée
+          // (refonte-journee, ≈ 340 px) où CHAQUE rangée garde sa ligne d'une ligne, coupée au besoin (« 4 annonces
+          // numérotées… Saisis le prix ou relie l'achat (une… ») : là, la ligne peut être coupée SI l'infobulle porte la
+          // phrase entière (contrôlé juste au-dessus) ; le titre, lui, n'est jamais coupé. Au téléphone : une ligne chacun.
+          if (nomVp === '390') dit(r.lt === 1 && r.ln === 1 && !r.coupeT && !r.coupeN, 'titre et ligne tiennent chacun sur UNE ligne, sans être coupés', JSON.stringify({ lt: r.lt, ln: r.ln, coupeT: r.coupeT, coupeN: r.coupeN }));
+          else dit(r.lt <= 2 && !r.coupeT && r.ln === 1 && (!r.coupeN || /N°12 et N°40/.test(r.complet || '')), 'colonne « À faire » : titre entier (2 lignes au plus), ligne d’une ligne — coupée seulement avec l’infobulle entière', JSON.stringify({ lt: r.lt, ln: r.ln, coupeT: r.coupeT, coupeN: r.coupeN }));
           const rgb = (s) => (/rgba?\(([^)]+)\)/.exec(s || '') || [])[1];
           dit(!!rgb(r.couleurNote) && rgb(r.couleurNote) !== rgb(r.couleurTitre) && !/255,\s*59,\s*48|255,\s*69,\s*58/.test(r.couleurNote), 'la ligne est en AMBRE (pas l’encre, jamais le rouge du doublon)', `${r.couleurNote} / titre ${r.couleurTitre} / --vrm-warn ${r.warn}`);
           dit(r.visible && !r.deborde, 'visible, aucun débordement horizontal');
@@ -203,7 +213,8 @@ const ouvrir = async (b, vp, sc) => {
         // Le rouge de Ma journée : le bloc (`numeros-en-double`) ET l'alerte « N° porté par deux annonces »
         // (`double-vente` en rouge doublon, issue de la cloche) — les deux disent « deux paires sous un N° ».
         const j = document.querySelector('[data-job="numeros-en-double"]') || [...document.querySelectorAll('[data-job="double-vente"]')].find((x) => /numéro/i.test(x.textContent || '')) || null;
-        return { ambre: !!document.querySelector('[data-en-ligne-deux-fois]'), rouge: !!j, rougeTxt: j ? j.textContent.replace(/\s+/g, ' ').slice(0, 120) : '', rendu: !!document.querySelector('.vrm-fu-afaire, [data-tout-a-jour]') };
+        // (15 nov.) Sur deux comptes, l'ambre est la carte « Deux comptes, une paire ».
+        return { ambre: !!document.querySelector('[data-en-ligne-deux-fois], [data-journee-deux-comptes]'), rouge: !!j, rougeTxt: j ? j.textContent.replace(/\s+/g, ' ').slice(0, 120) : '', rendu: !!document.querySelector('.vrm-fu-afaire, [data-tout-a-jour]') };
       });
       await essaie(`D ${nomVp}`, async () => {
         const { ctx, pg, errs } = await ouvrir(b, vp, SCENARIOS.D);
@@ -234,7 +245,7 @@ const ouvrir = async (b, vp, sc) => {
       });
       await essaie(`C ${nomVp}`, async () => {
         const { ctx, pg, errs } = await ouvrir(b, vp, SCENARIOS.C);
-        const r = await pg.evaluate(() => ({ carte: !!document.querySelector('[data-en-ligne-deux-fois]'), rendu: !!document.querySelector('.vrm-fu-afaire, [data-tout-a-jour]') }));
+        const r = await pg.evaluate(() => ({ carte: !!document.querySelector('[data-en-ligne-deux-fois], [data-journee-deux-comptes]'), rendu: !!document.querySelector('.vrm-fu-afaire, [data-tout-a-jour]') }));
         dit(r.rendu && !r.carte, 'second compte lu il y a 30 h : aucune carte (« pas su »)', JSON.stringify(r));
         dit(errs.length === 0, 'aucune erreur JS', errs.slice(0, 2).join(' | '));
         await ctx.close();

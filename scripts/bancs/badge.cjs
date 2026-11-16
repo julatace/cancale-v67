@@ -124,6 +124,7 @@ const lire = (pg) => pg.evaluate(() => {
     fondQ: r.querySelector('.question') ? getComputedStyle(r.querySelector('.question')).backgroundColor : '',
     fondQImg: r.querySelector('.question') ? getComputedStyle(r.querySelector('.question')).backgroundImage : '',
     accentQImg: r.querySelector('.question [data-choix="oui"]') ? getComputedStyle(r.querySelector('.question [data-choix="oui"]')).backgroundImage : '',
+    accentQCol: r.querySelector('.question [data-choix="oui"]') ? getComputedStyle(r.querySelector('.question [data-choix="oui"]')).backgroundColor : '',
     accentQ: r.querySelector('.question [data-choix="oui"]') ? getComputedStyle(r.querySelector('.question [data-choix="oui"]')).backgroundColor : '',
     hauteursQ: Array.from(r.querySelectorAll('.question button')).map((b) => Math.round(b.getBoundingClientRect().height)),
     // Le mot de passe ne doit JAMAIS être un champ du DOM de la page (5.329 : il
@@ -487,12 +488,18 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
     await d.ctx.close();
   });
   await essaie('graphisme', async () => {
-    // 5.328 : verre (fond translucide) clair et sombre. 5.379 : « Studio bleu clair » (src/design/studio.css) —
-    // un fond OPAQUE bleu clair / bleu-nuit (dégradé, lumière du haut) et le plein en rond d'encre.
-    for (const [scheme, fond, accent] of [['dark', 'rgb(21, 38, 61)', 'rgb(234, 242, 251)'], ['light', 'rgb(238, 246, 253)', 'rgb(12, 29, 48)']]) {
+    // 5.328 : verre (fond translucide) clair et sombre. 5.379 : « Studio bleu clair » (src/design/studio.css).
+    // 5.386 (« Verre dépoli », Julien 15 nov.) : le contrôle figeait les couleurs du studio ; il juge
+    // désormais la RÈGLE : un fond OPAQUE en dégradé qui SUIT le système (deux thèmes ⇒ deux dégradés
+    // différents) et le plein qui SE DÉTACHE de ce fond (blanc sur le bleu). Les valeurs du verre :
+    // scripts/bancs/verre-extension-site.cjs (dégradé, opacité, contraste mesuré sur les pixels).
+    const fonds = {};
+    for (const scheme of ['dark', 'light']) {
       const { ctx, pg } = await rendre(nav, AC(), { scheme });
       const l = await lire(pg);
-      dit(/gradient/.test(l.fondQImg) && l.fondQImg.includes(fond) && l.accentQImg.includes(accent), `${scheme} : la carte suit le système (studio bleu clair, jetons de l’app, le plein à l’encre)`, JSON.stringify({ fond: l.fondQImg, accent: l.accentQImg }));
+      fonds[scheme] = l.fondQImg;
+      const plein = /^rgb\(255, 255, 255\)$/.test(l.accentQCol) || /rgb\(255, 255, 255\)/.test(l.accentQImg);
+      dit(/linear-gradient/.test(l.fondQImg) && plein && (scheme === 'dark' || fonds.dark !== l.fondQImg), `${scheme} : la carte suit le système (dégradé opaque propre au thème, le plein se détache du fond)`, JSON.stringify({ fond: l.fondQImg, accent: l.accentQImg, col: l.accentQCol }));
       if (scheme === 'light') await pg.screenshot({ path: path.join(SORTIE, 'badge-question-clair.png') });
       await ctx.close();
     }
@@ -596,7 +603,9 @@ const cliquer = async (pg) => { await pg.mouse.click(1512 - 16 - 22, 900 - 16 - 
       const d = await pg.evaluate(() => { const x = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-dates-versement]'); return x ? { n: x.getAttribute('data-dates-versement'), t: x.innerText } : null; });
       dit(!!d && d.n === '1751' && /1\s?751 restantes · environ 146 h avec Vinted ouvert sur ce compte/.test(d.t) && !/jour/.test(d.t), `${scheme} ${mobile ? 390 : 1512} : « 1 751 restantes · environ 146 h avec Vinted ouvert sur ce compte »`, JSON.stringify(d));
       const r = await pg.evaluate(() => { const x = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-releve-sans-recette]'); return x ? x.innerText : null; });
-      dit(!!r && /3 mois à lire/.test(r) && /Porte-monnaie → Historique/.test(r), `${scheme} ${mobile ? 390 : 1512} : « Relevé : 3 mois à lire · ouvre Porte-monnaie → Historique »`, String(r));
+      // 5.390 (15 nov.) : plus aucun geste demandé sur la carte (« ouvre Porte-monnaie → Historique » retiré).
+      dit(r === null, `${scheme} ${mobile ? 390 : 1512} : aucune ligne « ouvre Porte-monnaie → Historique » (aucun geste demandé)`, String(r));
+      dit(!!d && /l'extension les récupère/.test(d.t), `${scheme} ${mobile ? 390 : 1512} : « Dates de versement : l’extension les récupère »`, JSON.stringify(d));
       await pg.screenshot({ path: path.join(SORTIE, `badge-dates-${mobile ? 390 : 1512}-${scheme}.png`) });
       await ctx.close();
     }
