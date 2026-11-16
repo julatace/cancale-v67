@@ -134,6 +134,33 @@ function marquer(err, vide) {
 export const moduleValide = (m) => !!m && (typeof m.default === 'function' || (typeof m.default === 'object' && m.default !== null));
 
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+// (16 nov., parcours-vert, banc session-reveil D) Une feuille de style refusée UNE fois (déploiement, réseau) :
+// le préchargeur de Vite garde son adresse pour « déjà vue » et la seconde tentative rend le module SANS sa
+// feuille — l'app s'affichait sans aucune mise en forme. Avant de relancer, chaque feuille `/assets/` qui n'a
+// pas chargé (aucune `sheet`) est reposée à neuf, à la même adresse (fichier immuable), une seule fois.
+export function relancerFeuilles(doc = (typeof document !== 'undefined' ? document : null)) {
+  if (!doc) return 0;
+  let n = 0;
+  try {
+    for (const l of [...doc.querySelectorAll('link[rel="stylesheet"][href*="/assets/"]')]) {
+      if (l.sheet || l.dataset.vrmRelance) continue;
+      const neuf = doc.createElement('link');
+      neuf.rel = 'stylesheet'; neuf.href = l.href; neuf.dataset.vrmRelance = '1';
+      if (l.crossOrigin) neuf.crossOrigin = l.crossOrigin;
+      l.replaceWith(neuf); n++;
+    }
+  } catch (_) {}
+  return n;
+}
+const attendreFeuilles = (doc, ms) => new Promise((r) => {
+  try {
+    const l = [...doc.querySelectorAll('link[data-vrm-relance]')].filter((x) => !x.sheet);
+    if (!l.length) return r();
+    let reste = l.length; const fin = () => { if (--reste <= 0) r(); };
+    l.forEach((x) => { x.addEventListener('load', fin, { once: true }); x.addEventListener('error', fin, { once: true }); });
+    setTimeout(r, ms);
+  } catch (_) { r(); }
+});
 export async function chargerSur(charger, { relance = 450, verifier = verifierMorceauPerime } = {}) {
   let err = null, vide = false;
   for (let i = 0; i < 2; i++) {
@@ -142,7 +169,7 @@ export async function chargerSur(charger, { relance = 450, verifier = verifierMo
       if (moduleValide(m)) return m;
       err = null; vide = true;
     } catch (e) { err = e; vide = false; }
-    if (i === 0) await pause(relance);
+    if (i === 0) { await pause(relance); if (typeof document !== 'undefined' && relancerFeuilles(document)) await attendreFeuilles(document, 4000); }
   }
   // Deux fois raté. Une nouvelle version en ligne ⇒ la page se recharge : on ne rend RIEN (l'attente
   // reste à l'écran jusqu'au rechargement), jamais un écran tombé le temps qu'il parte.
