@@ -66,12 +66,22 @@ async function controler(racine) {
 
   // ── P ──
   const o = (tx, prix) => ({ transaction_id: tx, price: { amount: prix, currency_code: 'EUR' }, status: 'Commande finalisée', date: '2026-09-01T10:00:00Z', title: 'Paire inventée' });
-  const txns = new Map([['1', { tx: '1', side: 'seller', prix: '40.0', devise: 'EUR' }], ['2', { tx: '2', side: 'seller', prix: '29.0', devise: 'EUR' }], ['3', { tx: '3', side: 'seller', prix: '15.0', devise: 'EUR' }], ['4', { tx: '4', side: 'seller', prix: '50.0', devise: 'EUR' }]]);
+  const txns = new Map([['1', { tx: '1', side: 'seller', prix: '40.0', devise: 'EUR' }], ['2', { tx: '2', side: 'seller', prix: '27.0', devise: 'EUR' }], ['3', { tx: '3', side: 'seller', prix: '15.0', devise: 'EUR' }], ['4', { tx: '4', side: 'seller', prix: '50.0', devise: 'EUR' }]]);
   const releve = new Map([['3', { tx: '3', montant: 15 }], ['4', { tx: '4', montant: 50.48 }]]);
   const items = [o('1', '40.00'), o('2', '29.73'), o('3', '15.48'), o('4', '50.48'), o('5', '12.00')];
   const pr = V.appliquerPrixPro(items, { pro: true, txns, releve });
   ok('P1 prix égaux ⇒ compté', pr[0]._prixPro.compter === true && pr[0].price.amount === '40.00');
-  ok('P2 deux prix, pas de relevé ⇒ mis à part et nommé', pr[1]._prixPro.compter === false && /deux prix/.test(pr[1]._prixPro.raison) && /29,73/.test(pr[1]._prixPro.raison));
+  // (16 nov., lot argent-mieux) La raison est UNE phrase pour toutes ces ventes (sinon chaque vente fait son groupe :
+  // le « mur ») ; les deux prix lus sont portés À CÔTÉ, en centimes.
+  // (16 nov. au soir, décision de Julien) Écart > 2 € (ici 2,73 €) : toujours à part.
+  ok('P2 deux prix (écart > 2 €), pas de relevé ⇒ mis à part, nommé, les deux prix gardés', pr[1]._prixPro.compter === false && /deux prix/.test(pr[1]._prixPro.raison) && pr[1]._prixPro.listeC === 2973 && pr[1]._prixPro.artC === 2700);
+  { const a = V.appliquerPrixPro([o('6', '29.73')], { pro: true, txns: new Map([['6', { tx: '6', side: 'seller', prix: '26.0', devise: 'EUR' }]]), releve: null });
+    ok('P8 la raison des « deux prix » ne dépend pas des montants (une seule par cas : les ventes se groupent)', a[0]._prixPro.raison === pr[1]._prixPro.raison && !/\d/.test(pr[1]._prixPro.raison)); }
+  // (16 nov. au soir, décision de Julien) Liste AU-DESSUS de l'article de 2 € au plus, relevé muet ⇒ comptée au prix de l'article,
+  // l'écart gardé à côté ; liste SOUS l'article ⇒ à part.
+  { const a = V.appliquerPrixPro([o('7', '31.48'), o('8', '30.00'), o('9', '22.00')], { pro: true, txns: new Map([['7', { tx: '7', side: 'seller', prix: '31.0', devise: 'EUR' }], ['8', { tx: '8', side: 'seller', prix: '30.5', devise: 'EUR' }], ['9', { tx: '9', side: 'seller', prix: '20.0', devise: 'EUR' }]]), releve: null });
+    ok('P9 écart ≤ 2 € ⇒ compté au prix de l\'article, écart gardé, liste gardée', a[0]._prixPro.compter === true && a[0].price.amount === '31.00' && a[0]._prixPro.ecartC === 48 && a[0]._prixListe.amount === '31.48' && a[2]._prixPro.compter === true && a[2]._prixPro.ecartC === 200);
+    ok('P10 liste sous l\'article ⇒ à part', a[1]._prixPro.compter === false && a[1].price.amount === '30.00'); }
   ok('P3 relevé = article ⇒ prix de l\'article, liste gardée', pr[2]._prixPro.compter === true && pr[2].price.amount === '15.00' && pr[2]._prixListe.amount === '15.48');
   ok('P4 relevé = liste ⇒ compté tel quel', pr[3]._prixPro.compter === true && pr[3].price.amount === '50.48');
   ok('P5 transaction pas lue ⇒ mis à part', pr[4]._prixPro.compter === false && /pas lu/.test(pr[4]._prixPro.raison));
@@ -109,6 +119,8 @@ const MUTATIONS = [
   ['src/vintedPro.js', "  for (const d of doubles) m.delete(d);\n", "", 'deux lignes au même n° : une choisie'],
   ['src/vintedPro.js', "if (art === liste) return { compter: true };", "if (art !== null) return { compter: true };", 'deux prix comptés quand même'],
   ['src/vintedPro.js', "if (cr != null && cr === art) return { compter: true, tranche: 'releve', prixArticle: art };", "", 'relevé = article ignoré'],
+  ['src/vintedPro.js', "if (cr == null && liste > art && liste - art <= ECART_MAX_C) {", "if (false) {", 'deux prix ≤ 2 € à part (décision du 16 nov. ignorée)'],
+  ['src/vintedPro.js', "if (cr == null && liste > art && liste - art <= ECART_MAX_C) {", "if (cr == null && liste !== art) {", 'tout écart compté'],
   ['src/vintedPro.js', "if (pro !== true || !Array.isArray(items)) return items;", "if (!Array.isArray(items)) return items;", 'particulier touché'],
   ['api/_lib/ventes-regle.js', "if (o._prixPro && o._prixPro.compter === false && !(idx && idx.get(id)))", "if (false)", 'CA ignore _prixPro'],
   ['api/_lib/ventes-regle.js', "if (o._prixPro && o._prixPro.compter === false && !(idx && idx.get(id)))", "if (o._prixPro && o._prixPro.compter === false)", 'vente déclarée retirée'],

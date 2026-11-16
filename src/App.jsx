@@ -1032,6 +1032,7 @@ import "./design/ventes-verre.css";   // (15 nov.) Ventes et Achats « Verre dé
 import "./design/verre-ecrans.css";   // (15 nov., maquettes validées : « tout est parfait sauf étagères ») Argent, à venir, Messages, Paramètres, la fiche — des classes `vg-*` neuves, `@layer vrm-verre` : docs/passation/2026-11-15-ecrans-verre-2.md
 import "./design/verre-journee.css";   // (15 nov., refonte-journee) Ma journée comme la maquette validée, « La paire à sortir en premier » — docs/passation/2026-11-15-refonte-journee.md
 import "./design/verre-annonces.css";   // (15 nov., refonte-journee) Annonces comme la maquette validée : la rangée de 72 px, la recherche et les vues
+import "./design/verre-argent.css";   // (16 nov., lot argent-mieux) Argent lisible partout : cartes de verre, encre du verre, « Copier » plein, ventes non comptées groupées — `@layer vrm-verre` : docs/passation/2026-11-16-argent-mieux.md
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
@@ -1048,7 +1049,7 @@ import { offresVestiaire, offresJourneeVc, euros as eurosOffre, resteAvant as re
 import frApp from "./i18n/langues/fr.js";
 ajouterSourceApp(frApp);
 import { detenteursAchat, texteDejaRelie, patchDelier, ecrituresDeplacer } from "./relierAutreAchat.js";
-import { appliquerPrixPro, relevesParTx as relevesProParTx, SELECT_TXN_PRO } from "./vintedPro.js";   // (11 nov., lot vinted-pro)
+import { appliquerPrixPro, relevesParTx as relevesProParTx, SELECT_TXN_PRO, ecartNonCompte } from "./vintedPro.js";   // (11 nov., lot vinted-pro)
 import { AlerteArnaque, CompteurArnaque, PastilleArnaque } from "./AlerteArnaque.jsx";
 import { motifDeLApercu } from "./antiArnaque.js";
 // (11 nov., anti-arnaque) Un fil Vinted lu pour la règle : seuls les messages PROUVÉS de l'autre (`autre`) comptent.
@@ -10241,11 +10242,17 @@ const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu, exclu
     const v = (versements && tx != null) ? versements[String(tx)] : null;
     const t = v ? Date.parse(v) : 0;
     if (eur == null) { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'Vinted', raison: 'prix pas lu', titre: o.title || '', manque: true, ts: t || null, tsVente: tsCommande(o) || null }); } continue; }
-    if (!t) { if (!vus.has(id)) { vus.add(id); aDaterOuDeclaree({ id, plateforme: 'Vinted', eur, titre: o.title || '', masquee: masq, o, dateVente: o.date }); } continue; }
+    // (16 nov. au soir, décision de Julien, lot deux-prix-compter) Une vente Pro à deux prix dont la liste
+    // dépasse l'article de 2 € au plus est COMPTÉE au prix de l'article (`o.price`, posé par src/vintedPro.js) ;
+    // l'écart (liste − article, centimes) suit la ligne (`ecartC`) pour être ÉCRIT à côté, jamais ajouté.
+    const ecartPro = o._prixPro && o._prixPro.compter === true && Number.isSafeInteger(o._prixPro.ecartC) && o._prixPro.ecartC > 0 ? { ecartC: o._prixPro.ecartC } : null;
+    if (!t) { if (!vus.has(id)) { vus.add(id); aDaterOuDeclaree({ id, plateforme: 'Vinted', eur, titre: o.title || '', masquee: masq, o, dateVente: o.date, ...ecartPro }); } continue; }
     // (11 nov., lot vinted-pro) Compte Vinted PRO : un prix que Vinted contredit (liste ≠ article,
     // relevé muet) n'est pas su ⇒ mise à part et NOMMÉE — sauf une vente déjà déclarée, qui garde son mois.
-    if (o._prixPro && o._prixPro.compter === false && !(idx && idx.get(id))) { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'Vinted', raison: o._prixPro.raison || 'prix pas lu', titre: o.title || '', manque: true, ts: t || null, tsVente: tsCommande(o) || null }); } continue; }
-    const l = { id, plateforme: 'Vinted', ts: t, ym: ymDeTs(t), eur, titre: o.title || '', masquee: masq, o, dateVente: o.date };
+    // (16 nov., lot argent-mieux) Les deux prix LUS sont gardés à côté (`deux`, centimes) : la liste groupée
+    // dit « au moins » la somme du plus bas (jamais un des deux choisi pour le total, qui reste sans elles).
+    if (o._prixPro && o._prixPro.compter === false && !(idx && idx.get(id))) { if (!vus.has(id)) { vus.add(id); const pp = o._prixPro; const deux = Number.isSafeInteger(pp.listeC) && Number.isSafeInteger(pp.artC) ? { listeC: pp.listeC, artC: pp.artC, releveC: Number.isSafeInteger(pp.releveC) ? pp.releveC : null } : null; ecartees.push({ id, plateforme: 'Vinted', raison: pp.raison || 'prix pas lu', code: pp.code || '', ...(deux ? { deux, auMoinsC: Math.min(deux.listeC, deux.artC) } : {}), titre: o.title || '', manque: true, ts: t || null, tsVente: tsCommande(o) || null, itemId: o.item_id != null ? String(o.item_id) : '' }); } continue; }
+    const l = { id, plateforme: 'Vinted', ts: t, ym: ymDeTs(t), eur, titre: o.title || '', masquee: masq, o, dateVente: o.date, ...ecartPro };
     if (garde(l)) lignes.push(place(l));
   }
   for (const v of (lbc || [])) {
@@ -10418,7 +10425,9 @@ const ventesFaites = ({ vinted, lbc, ebay, vestiaire, cachee, excluAutre, import
     if (eurV == null) { nonComptees.push({ plateforme: 'Vinted', raison: 'prix pas lu', ts: t }); continue; }
     // (31 oct.) `compte` : le compte qui a vendu (Statistiques → « Par compte »), le même nom que le relevé des ventes.
     // (4 nov.) `tx` et `uid` : l'identité de la vente et de son compte, pour les statistiques des offres (src/statsOffres.js).
-    lignes.push({ plateforme: 'Vinted', ts: t, eur: eurV, compte: String((o._acc && (o._acc.login || o._acc.vinted_user_id)) || ''), uid: String((o._acc && o._acc.vinted_user_id) || ''), tx: tx != null ? String(tx) : '' });
+    // (16 nov. au soir, décision de Julien) Vente Pro à deux prix comptée au prix de l'article : l'écart suit la ligne, jamais compté.
+    const ecartPro = o._prixPro && o._prixPro.compter === true && Number.isSafeInteger(o._prixPro.ecartC) && o._prixPro.ecartC > 0 ? { ecartC: o._prixPro.ecartC } : null;
+    lignes.push({ plateforme: 'Vinted', ts: t, eur: eurV, compte: String((o._acc && (o._acc.login || o._acc.vinted_user_id)) || ''), uid: String((o._acc && o._acc.vinted_user_id) || ''), tx: tx != null ? String(tx) : '', ...ecartPro });
   }
   for (const v of (lbc || [])) {
     if (!v || v.isSeller !== true || !v.txId || lbcAnnulee(v)) continue;
@@ -38043,6 +38052,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // a changé depuis, sur les MÊMES lignes que le total (§5).
             nApres: m.nApres, caApres: r2(m.caApres), nDouble: m.nDouble, caDouble: r2(m.caDouble),
             nAilleurs: m.nAilleurs, caAilleurs: r2(m.caAilleurs), ailleurs: m.ailleurs,
+            // (16 nov. au soir, décision de Julien) Ventes Pro à deux prix COMPTÉES au prix de l'article :
+            // l'écart (centimes) publié à côté, jamais dans `ca` ; absent quand il n'y en a pas.
+            ...(() => { const ec = ecartNonCompte(lignes, (l) => l.ym === m.ym); return ec.n ? { nEcart: ec.n, ecartC: ec.c } : {}; })(),
             declare: d ?{ ca: d.ca, montant: d.montant != null ? d.montant : null, at: d.at || null } : null };
         })
         .sort((a,b)=> a.ym < b.ym ? 1 : -1);
@@ -38071,8 +38083,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // disent « au moins » et NOMMENT le manque, des MÊMES lignes (§5).
       const sources = { Vinted: 'lu', Leboncoin: lbcLu ? 'lu' : 'pasSu', eBay: ebayCmd ? 'lu' : 'pasSu', Vestiaire: ventesVc === null ? 'pasSu' : 'lu' };
       const ncP = {};
-      for (const x of recuNonComptees) { const k = `${x.plateforme}|${x.raison}`; ncP[k] = (ncP[k] || 0) + 1; }
-      const nonComptees = { n: recuNonComptees.length, par: ncP };
+      // (16 nov., lot argent-mieux) + `parC` : par raison, la somme « au moins » (centimes) quand CHAQUE vente du
+      // groupe la porte (les deux prix lus d'une vente Pro) ; sinon `null` (pas su, jamais 0).
+      const ncC = {};
+      for (const x of recuNonComptees) { const k = `${x.plateforme}|${x.raison}`; ncP[k] = (ncP[k] || 0) + 1; ncC[k] = ncC[k] === null || !Number.isSafeInteger(x.auMoinsC) ? null : (ncC[k] || 0) + x.auMoinsC; }
+      // + `det` : le détail des ventes aux deux prix (identité, date, les deux prix en centimes, l'annonce pour son N°),
+      // 300 au plus — la liste repliée de Déclarer (jamais de titre ni de pseudo dans cette ligne).
+      const det = recuNonComptees.filter((x) => x && x.deux).slice(0, 300).map((x) => ({ k: `${x.plateforme}|${x.raison}`, id: x.id, t: x.tsVente || x.ts || null, l: x.deux.listeC, a: x.deux.artC, r: x.deux.releveC, it: x.itemId || '' }));
+      const nonComptees = { n: recuNonComptees.length, par: ncP, parC: ncC, ...(det.length ? { det } : {}) };
       // L'argent REÇU par mois (date de VERSEMENT), par `recuDuMois` — la règle
       // même de « Reçu en {mois} » sur Ma journée. Le widget de l'iPhone le LIT
       // (api/widget.js) au lieu de le recalculer sur les emails (§11, 17 oct.).
@@ -44904,6 +44922,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // ⚠️ (revue du 6 octobre) Via `declRapport` : dates de versement illisibles,
     //    Leboncoin et eBay restent comptés et Vinted est DIT absent (`vinted`).
     let nApres=0, caApres=0, nDouble=0, caDouble=0, nAilleurs=0, caAilleurs=0, nVenteAvant=0, caVenteAvant=0;
+    // (16 nov. au soir, décision de Julien) Ventes Pro à deux prix comptées au prix de l'article : l'écart du mois, dit, jamais compté.
+    const ecartMois = ecartNonCompte(declRapport.lignes, (l) => l.ym === reportMonth);
     const ailleurs = {}, doubles = new Set(), venteAvant = {};
     const parPlateforme = { Vinted: { n: 0, ca: 0 } };
     for (const l of declRapport.lignes) {
@@ -44979,7 +44999,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // d'aujourd'hui (un compte lié depuis) ⇒ « lecture en cours », jamais noté.
     const incomplet = lectureIncomplete({ registre: declUrssaf, ventes: ventesComptees, ventesErreur: !!sales.error, comptesEchec, versements, lbc: lbcLu, ebay: ebayCmd, vestiaire: ventesVc });
     return { regime, tvaRate, monthLabel, ca, cout, frais, nb, nbCout, benefNet, marge, tvaMarge, margeHT, taux, urssaf, nMasq, caMasq, nAttente, caAttente, caAttentePasLu, saleLines, buyLines, achatsTotal, achatsPasLu, parPlateforme, aDater, sourcesKO,
-      nApres, caApres, nDouble, caDouble, doubles: [...doubles].sort(), nAilleurs, caAilleurs, ailleurs, nVenteAvant, caVenteAvant, venteAvant, declaration, declarePasSu: declUrssaf == null, enCours,
+      nApres, caApres, nDouble, caDouble, doubles: [...doubles].sort(), nAilleurs, caAilleurs, ailleurs, nVenteAvant, caVenteAvant, venteAvant, declaration, declarePasSu: declUrssaf == null, enCours, nEcart: ecartMois.n, ecartC: ecartMois.c,
       vinted: declRapport.vinted, incomplet };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showReport, sales.items, sales.failedUids, sales.error, ventesComptees, accounts, buysBase, reportMonth, numeros, saleOv, buyByNum, hiddenSales, hiddenAccts, panelAcctOff, lbcLu, lbcVentes, ebayCmd, versements, declarables, declRapport, declUrssaf, excluAutre, autresParIdRapport, ventesVc]);
@@ -56658,7 +56678,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div data-rapport-vinted={report.enCours ? 'encours' : report.vinted} style={{display:'flex',flexWrap:'wrap',gap:10,marginBottom:14}}>
                 <StatBox label="CA des ventes finalisées" value={report.enCours ? '…' : (report.vinted === 'passu' && !report.nb) ? '—' : fmtE(report.ca)}
                   subColor={report.vinted === 'passu' ? C.warn : undefined}
-                  sub={report.enCours ? 'lecture des ventes en cours' : report.vinted === 'passu' ? `sans Vinted (dates de versement illisibles)${report.nb ? ` · ${report.nb} vente${report.nb>1?'s':''} Leboncoin/eBay` : ''}` : `${report.nb} vente${report.nb>1?'s':''}`}/>
+                  sub={report.enCours ? 'lecture des ventes en cours' : report.vinted === 'passu' ? `sans Vinted (dates de versement illisibles)${report.nb ? ` · ${report.nb} vente${report.nb>1?'s':''} Leboncoin/eBay` : ''}` : `${report.nb} vente${report.nb>1?'s':''}${report.nEcart ? ' · ' + tr('nc.ecart', { n: report.nEcart, x: fmtE(report.ecartC / 100) }) : ''}`}/>
                 {report.regime==='marge' ? (<>
                   <StatBox label="Marge TTC" value={inc ?? fmtE(report.marge)} color={inc ? C.muted : INV_STATUS.online.color}/>
                   <StatBox label={`TVA marge ${report.tvaRate}%`} value={inc ?? fmtE(report.tvaMarge)} color={inc ? C.muted : C.warn}/>

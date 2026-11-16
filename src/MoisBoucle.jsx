@@ -15,6 +15,7 @@ import { fraicheurPubliee, suivreFraicheur } from './fraicheur.js';
 import { moisCouvertParPublication } from './beneficeNoms.js';
 import { useLigneSynchro, useLigneUrssaf, lireBeneficeJours, lireDeclarations, montantPeriodeUrssaf, moisDeclare, beneficeDesJours, tauxUrssaf, useRegimeFiscal, DEMANDE_SAISIE_PRIX } from './App.jsx';
 import './styles-mois-boucle.css';
+import { tr } from './i18n/index.js';
 
 const REGLES = { montantPeriodeUrssaf, moisDeclare, beneficeDesJours, moisCouvert: moisCouvertParPublication };
 const MOIS_COURT = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
@@ -31,6 +32,7 @@ const NOMS = {
 };
 // Réglée, la ligne se dit au passé (une liste cochée).
 const NOMS_OK = { adater: 'Ventes datées', prix: 'Prix d’achat saisis', comptes: 'Comptes relus', frais: 'Frais connus' };
+const GESTES_MB = { adater: 'nc.mb.adater', prix: 'nc.mb.prix', comptes: 'nc.mb.comptes', frais: 'nc.mb.frais', montant: 'nc.mb.montant' };
 const RAISONS = {
   absente: 'ouvre Ventes une fois',
   publication: 'ouvre Ventes une fois',
@@ -82,6 +84,11 @@ export default function MoisBoucle({ portes = {} }) {
         {tete}
         {K.montant && K.montant.ca != null ? <span className="vrm-mb-montant" data-mb-a-declarer={String(Math.round(K.montant.ca * 100))}>{somme(K.montant.ca)}<small>à déclarer</small></span> : null}
       </div>
+      {/* (16 nov. au soir, décision de Julien) Ventes Pro à deux prix COMPTÉES au prix de l'article : l'écart du mois
+          (la ligne publiée `vinted_urssaf_mois`), écrit à côté du montant, jamais ajouté. */}
+      {(() => { const m = ligneU && Array.isArray(ligneU.mois) ? ligneU.mois.find((x) => x && x.ym === K.ym) : null;
+        return m && Number(m.nEcart) > 0 && Number.isSafeInteger(m.ecartC)
+          ? <p className="vrm-mb-ecart" data-mb-ecart-pro={m.ecartC} data-mb-ecart-n={m.nEcart}>{tr('nc.ecart', { n: Number(m.nEcart), x: somme(m.ecartC / 100) })}</p> : null; })()}
       {K.etat === 'declare' ? null : (
         <ul className="vrm-mb-liste">
           {K.lignes.map((l) => {
@@ -93,16 +100,20 @@ export default function MoisBoucle({ portes = {} }) {
               : l.cle === 'montant' && l.etat === 'manque' ? (l.raison === 'nonComptees' ? 'ventes au montant pas lu' : 'recalcule dans Ventes')
               : l.cle === 'comptes' && l.etat === 'manque' && l.noms && l.noms.length ? l.noms.slice(0, 2).join(', ') + (l.noms.length > 2 ? ` +${l.noms.length - 2}` : '')
               : l.cle === 'prix' && l.etat === 'manque' && l.sur ? `sur ${l.sur} ventes` : '';
+            // (16 nov., lot argent-mieux) Chaque ligne à régler dit SON geste, en une ligne (le « 1731 » des dates de
+            // versement : l'extension les lit petit à petit — rien à faire de sa main).
+            const geste = l.etat === 'manque' && GESTES_MB[l.cle] ? tr(GESTES_MB[l.cle]) : '';
             const corps = <>
               <span className={'vrm-mb-rond is-' + (l.cle === 'fini' ? 'attente' : l.etat)} aria-hidden="true">{rond}</span>
               <span className="vrm-mb-l">
                 <span className="vrm-mb-nom">{(l.etat === 'ok' && NOMS_OK[l.cle]) || NOMS[l.cle] || l.cle}</span>
                 {sous ? <span className={'vrm-mb-sous' + (l.cle === 'comptes' ? ' vrm-sensible' : '')}>{sous}</span> : null}
+                {geste ? <span className="vrm-mb-geste" data-mb-geste={l.cle}>{geste}</span> : null}
               </span>
               {action ? <span className="vrm-mb-chev" aria-hidden="true">›</span> : null}
             </>;
             const attrs = { 'data-mb-ligne': l.cle, 'data-mb-ligne-etat': l.etat, 'data-mb-n': l.n == null ? '' : String(l.n) };
-            const aria = `${(l.etat === 'ok' && NOMS_OK[l.cle]) || NOMS[l.cle] || l.cle} : ${l.etat === 'ok' ? 'réglé' : l.etat === 'manque' ? (l.n != null ? l.n : 'à régler') : l.etat === 'encours' ? 'vérification' : 'pas su'}${sous ? ', ' + sous : ''}`;
+            const aria = `${(l.etat === 'ok' && NOMS_OK[l.cle]) || NOMS[l.cle] || l.cle} : ${l.etat === 'ok' ? 'réglé' : l.etat === 'manque' ? (l.n != null ? l.n : 'à régler') : l.etat === 'encours' ? 'vérification' : 'pas su'}${sous ? ', ' + sous : ''}${geste ? '. ' + geste : ''}`;
             return (
               <li key={l.cle} className={'vrm-mb-ligne is-' + l.etat}>
                 {action ? <button type="button" className="vrm-mb-porte" {...attrs} data-mb-porte={l.cle} aria-label={aria} onClick={() => ouvrir(l.cle)}>{corps}</button>

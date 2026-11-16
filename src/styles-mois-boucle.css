@@ -101,3 +101,4 @@
 :root:root body .vrm-cm .vrm-cm-pourquoi b { font-weight: 600 !important; color: var(--mb-encre) !important; }
 :root:root body .vrm-cm .vrm-cm-vide { margin: 0 !important; font: 400 13px/1.4 var(--mb-police) !important; color: var(--mb-gris) !important; }
 }
+:root:root body .vrm-mb .vrm-mb-ecart { margin: -2px 0 8px !important; font: 400 12px/1.4 var(--mb-police) !important; color: var(--mb-gris) !important; }

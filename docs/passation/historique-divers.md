@@ -2010,3 +2010,9 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Lignes déplacées de CLAUDE.md §9 (16 nov., train de mise en ligne)
 
 - **16 nov. · CI « Parcours critiques » + « Reprise des chantiers » au vert (PR #1183, `claude/parcours-vert`)** : vrais défauts corrigés (photo Vinted des fils par `PhotoVinted`, deux noms en double dans le texte recollé, 44 px des questions eBay, titre des ventes à 1024 px, fil ≥ 400 px) ; bancs portés sur les écrans refaits (impression en un toucher, Argent à venir, Ma journée en colonnes, Envoyer en dégradé, journal vide caché). ⚠️ `NODE_OPTIONS` n'est plus accepté dans `$GITHUB_ENV` : la garde réseau du job `comptes-et-reception` ne s'applique pas (non touchée). `verifier.yml` reste rouge sur main (dizaines d'audits). Geste : aucun.
+
+
+## Lignes déplacées de CLAUDE.md §9 (16 nov. au soir, lot deux-prix-compter)
+
+- **16 nov. · iPhone : Ventes sans flou sur ses listes (lot stabilite-iphone)** : ses mesures (Ventes · tél. · toucher) : 7/9 entre 1,25 et 4 s le 16, ≤ 650 ms le 15 ; flou retiré des listes et du segment de Ventes (invisible sur le dégradé), barre du bas lisible (son fondu passait devant son verre), eBay « À traiter / Offres / Promotion » sur une carte, Argent « au moins » une fois. `docs/passation/2026-11-16-stabilite-iphone.md`. Geste : aucun.
+- **16 nov. · Sélection en série (lot ventes-selection, bug iPhone)** : « Tout sélectionner » = les lignes DESSINÉES du compte mis en avant (`clesSelectionnables`), jamais l'historique (2 185) ; filtre/compte/période changés ⇒ sélection vidée ; un défilement annule l'appui long ; « Imprimer · 0 sur 3 » grisé (`portee`) ; barre opaque qui prend la place de la barre du bas au téléphone. `docs/passation/2026-11-16-ventes-selection.md`. Geste : aucun.
