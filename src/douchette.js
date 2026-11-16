@@ -79,7 +79,8 @@ export function identitesDe(ligne) {
 export function candidatsDouchette(brut) {
   const out = candidatsDuScan(brut);
   const s = normaliserN(brut);
-  if (s && s.length >= LONGUEUR_MIN && !out.includes(s)) out.push(s);
+  // (16 nov.) Un SKU « VRM-{N°} » (forme stricte, src/douchette.js `RE_SKU_VRM`) est une identité même court (« VRM-12 »).
+  if (s && (s.length >= LONGUEUR_MIN || RE_SKU_VRM.test(String(brut || ''))) && !out.includes(s)) out.push(s);
   return out;
 }
 
