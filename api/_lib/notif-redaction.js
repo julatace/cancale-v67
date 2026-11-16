@@ -26,6 +26,8 @@
 // Pur : aucune lecture, aucune écriture, aucun module Node — l'app l'importe.
 // ────────────────────────────────────────────────────────────────────────────
 
+import { redigerBilanMois, redigerSeuil } from './argent-notif.js';   // (15 nov., lot argent-plus)
+
 export const TITRE_MAX = 40;
 export const CORPS_MAX = 90;
 export const LANGUES_NOTIF = ['fr', 'en', 'es', 'it', 'de'];
@@ -454,6 +456,10 @@ const num = (n) => { const s = str(n).trim(); return /^[A-Za-z]?\d{1,6}$/.test(s
 
 // ── LES SORTES ──────────────────────────────────────────────────────────────
 const SORTES = {
+  // (15 nov., lot argent-plus) Le bilan de fin de mois et un seuil de l'année (api/_lib/argent-notif.js) :
+  // les données viennent des règles (src/bilanFinMois.js, src/alertesSeuils.js), les mots d'ici.
+  bilanMois: (d, T, ctx) => redigerBilanMois(d, { langue: ctx.langue, max: CORPS_MAX }),
+  seuil: (d, T, ctx) => redigerSeuil(d, { langue: ctx.langue }),
   // Un compte relié pour la première fois. `comptes` : [{ plateforme, nom }] — le
   // nom est SON pseudo (le compte du vendeur, jamais un acheteur) ; sans nom, la
   // plateforme (« Ton compte Vestiaire est relié »), jamais l'identifiant.

@@ -283,7 +283,8 @@ function branchements() {
   console.log('\n── 7. Le branchement : cron, route, Réglages, canal');
   const cron = lire('api/ship-reminders.js') || '';
   dit(/bilanMoisVendeur\(/.test(cron) && /partBilan\(/.test(cron) && /relances && relances\.envoyes/.test(cron), 'le cron du matin appelle le bilan par vendeur, avec la part du jour après les e-mails de l’essai');
-  dit(/lireDonnees:\s*lireDonneesBilan/.test(cron) && /'vrm_benefice_jours'/.test(cron), '… avec les lectures du bilan de la semaine (projetées) et la publication du bénéfice');
+  // (15 nov., lot argent-plus) les MÊMES lectures, faites une fois pour l'e-mail et la notification (`lireDonneesUneFois`).
+  dit((/lireDonnees:\s*lireDonneesBilan/.test(cron) || (/lireDonnees = lireDonneesBilan\)/.test(cron) && /memoBilan = lireDonneesBilan\(\)/.test(cron) && /bilanDuMoisVendeur\(Date\.now\(\), lireDonneesUneFois\)/.test(cron))) && /'vrm_benefice_jours'/.test(cron), '… avec les lectures du bilan de la semaine (projetées) et la publication du bénéfice');
   dit(/configurationRelances\(\)/.test(cron) && /RELANCES_SMTP_HOTE/.test(cron), '… par le canal existant (RELANCES_SMTP_*)');
   const cpt = lire('api/compte.js') || '';
   dit(/mode === 'bilan-mois'/.test(cpt) && /lireJetonBilan/.test(cpt), 'la route `/api/compte?mode=bilan-mois` existe (Réglages, lien signé)');

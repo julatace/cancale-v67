@@ -52,6 +52,11 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'baisses-conseillees', date: '2026-11-15', titre: 'Baisses conseillées pour les annonces qui dorment', phrase: 'Baisser ou garder, la raison, ton plancher ; tu appliques.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'relance-favoris', date: '2026-11-15', titre: 'Relancer les favoris au bon moment', phrase: 'Des gens l’aiment, rien depuis 7 jours : une offre, ton clic.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'loupe-stock-retours', date: '2026-11-15', titre: 'La loupe trouve le stock et les retours', phrase: 'Un lieu de rangement, un suivi de retour : tout se trouve.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (15 nov., lot argent-plus) docs/passation/2026-11-15-argent-plus.md — bilan de fin de mois, seuils, bénéfice, sauvegarde.
+  { id: 'bilan-fin-mois', date: '2026-11-15', titre: 'Ton bilan du mois, le 1er', phrase: 'Vendu, reçu, URSSAF, qui dorment : en notification, PDF et tableur.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  { id: 'alertes-seuils', date: '2026-11-15', titre: 'Prévenu à 80 % de tes seuils', phrase: 'Plafond micro, TVA, DAC7 : une alerte, une phrase sourcée.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  { id: 'benefice-article', date: '2026-11-15', titre: 'Le vrai bénéfice de chaque article', phrase: 'Frais du site et frais notés déduits, le manque nommé.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  { id: 'sauvegarde-toutes-donnees', date: '2026-11-15', titre: 'Télécharger toutes tes données en un zip', phrase: 'Tableaux, données par catégorie et bordereaux, faits dans ton navigateur.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « J'aime la 9 ») docs/passation/2026-11-15-verre-depoli.md — le thème « Verre dépoli ».
   { id: 'verre-depoli', date: '2026-11-15', titre: 'Nouveau thème : verre dépoli sur bleu profond', phrase: 'Le chiffre du jour en blanc, tout se lit sur le verre.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « améliore la liaison entre les achats et les articles ») docs/passation/2026-11-15-achats-liaison.md

@@ -68,6 +68,8 @@ import { passageClientsPartis } from './_lib/clients-partis.js';
 import { passageSuppressionsPrevues } from './_lib/suppression-differee.js';   // (13 nov., lot 51) « Supprimer mon compte » : 30 jours de grâce
 // (8 nov.) Le bilan du mois par e-mail, pour qui l'a ACTIVÉ (api/_lib/bilan-mois.js).
 import { bilanMoisVendeur, partBilan, ID_CHOIX as ID_CHOIX_BILAN_MOIS, ID_ENVOIS as ID_ENVOIS_BILAN_MOIS } from './_lib/bilan-mois.js';
+// (15 nov., lot argent-plus) Le bilan de fin de mois en NOTIFICATION, et les seuils de l'année (80 % puis 100 %).
+import { passeBilanMoisPush, passeSeuilsPush, ID_BILAN_PUSH, ID_SEUILS, MAIN_ARGENT } from './_lib/argent-passes.js';
 import { envoyerSmtp } from './_lib/smtp.js';
 import { lireMentions } from './_lib/mentions-legales.js';
 // (5 nov.) « Compte Vinted pas relu » : la règle (api/_lib/comptes-a-relire.js).
@@ -824,7 +826,7 @@ async function lireTransporteursDuVendeur({ max = MAX_CRON, maxDeparts = MAX_DEP
 // (12 nov., M79) Elle voyage dans le contexte du vendeur (`contexteVendeur`,
 // `compteurBilan`), plus dans une variable de module : deux passages simultanés
 // sur la même instance ne se volent plus le plafond. Sans compteur : rien.
-async function bilanDuMoisVendeur(maintenant = Date.now()) {
+async function bilanDuMoisVendeur(maintenant = Date.now(), lireDonnees = lireDonneesBilan) {
   const owner = proprietaireCourant();
   if (!owner) return null;
   const store = contexteVendeur.getStore && contexteVendeur.getStore();
@@ -835,7 +837,7 @@ async function bilanDuMoisVendeur(maintenant = Date.now()) {
     owner, maintenant, compteur, config: cfg, service: process.env.SUPABASE_SERVICE_KEY || '',
     lireChoix: () => getRow(ID_CHOIX_BILAN_MOIS), lireEnvois: () => getRow(ID_ENVOIS_BILAN_MOIS),
     ecrireEnvois: (data) => ecrireDedup(ID_ENVOIS_BILAN_MOIS, data),
-    lireDonnees: lireDonneesBilan,
+    lireDonnees,
     lirePub: async () => { const m = await getRowProjete('main', ['vrm_benefice_jours']); return m === undefined ? undefined : (m && m.vrm_benefice_jours) || null; },
     adresse: () => adresseDuCompte(owner),
     envoyer: (m) => envoyerSmtp({ hote: process.env.RELANCES_SMTP_HOTE, port: cfg.port, utilisateur: process.env.RELANCES_SMTP_UTILISATEUR, motDePasse: process.env.RELANCES_SMTP_MOT_DE_PASSE,
@@ -853,7 +855,30 @@ async function traiterVendeur() {
   const [relu, transp] = await Promise.all([relireEbayDuVendeur(), lireTransporteursDuVendeur()]);
   // Un échec du bilan du mois n'empêche aucun rappel (et inversement).
   let bilanMois = null;
-  try { bilanMois = await bilanDuMoisVendeur(); } catch (e) { bilanMois = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
+  // (15 nov., lot argent-plus) Les lectures du bilan, UNE fois pour l'e-mail ET la notification.
+  let memoBilan = null;
+  const lireDonneesUneFois = () => (memoBilan || (memoBilan = lireDonneesBilan()));
+  try { bilanMois = await bilanDuMoisVendeur(Date.now(), lireDonneesUneFois); } catch (e) { bilanMois = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
+  // (15 nov., lot argent-plus) Le bilan de fin de mois en notification (le 1er, rattrapage au 7)
+  // et les seuils de l'année (chaque matin) — api/_lib/argent-passes.js. Un échec n'empêche rien.
+  let bilanMoisPush = null, seuils = null;
+  const lireMainArgent = () => getRowProjete('main', MAIN_ARGENT);
+  try {
+    bilanMoisPush = await passeBilanMoisPush({
+      actif: () => pushCategorieActive('bilan'), lireDedup: () => getRow(ID_BILAN_PUSH),
+      reserver: (deja, nouveau) => reserverDedup(ID_BILAN_PUSH, deja, nouveau),
+      lireDonnees: lireDonneesUneFois,
+      lirePub: async () => { const m = await getRowProjete('main', ['vrm_benefice_jours']); return m === undefined ? undefined : (m && m.vrm_benefice_jours) || null; },
+      lireMain: lireMainArgent, pousser: sendPushToAll,
+    });
+  } catch (e) { bilanMoisPush = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
+  try {
+    seuils = await passeSeuilsPush({
+      actif: () => pushCategorieActive('seuil'), lireDedup: () => getRow(ID_SEUILS),
+      reserver: (deja, nouveau) => reserverDedup(ID_SEUILS, deja, nouveau),
+      lireMain: lireMainArgent, pousser: sendPushToAll,
+    });
+  } catch (e) { seuils = 'échec : ' + String((e && e.message) || e).slice(0, 120); }
   // (9 nov.) Le transporteur des ANCIENS bordereaux, relu dans le texte gardé de
   // LEUR e-mail (api/_lib/transporteur-anciens.js) : N par passage, idempotent ;
   // une lecture ratée n'écrit rien, et un échec n'empêche aucun rappel.
@@ -888,7 +913,7 @@ async function traiterVendeur() {
   catch (e) { veilleChiffres = { envoye: false, raison: 'échec : ' + String((e && e.message) || e).slice(0, 120) }; }
   const out = await traiterVendeurApresRelecture();
   const rappels = await rappelsPersoSur();
-  return { ...out, rappels, ...(bilanMois ? { bilanMois } : {}), ebayRelu: resumeRelecture(relu), transporteurs: transp, transporteursAnciens, transporteursPdf, controle, veilleChiffres: { envoye: veilleChiffres.envoye, n: veilleChiffres.n || 0, raison: veilleChiffres.raison || null } };
+  return { ...out, rappels, ...(bilanMois ? { bilanMois } : {}), ...(bilanMoisPush ? { bilanMoisPush } : {}), seuils, ebayRelu: resumeRelecture(relu), transporteurs: transp, transporteursAnciens, transporteursPdf, controle, veilleChiffres: { envoye: veilleChiffres.envoye, n: veilleChiffres.n || 0, raison: veilleChiffres.raison || null } };
 }
 async function traiterVendeurApresRelecture() {
     const today = parisDate(0);

@@ -14,6 +14,7 @@ import { escalierPrix, eurosPrix } from './historiquePrix.js';
 import { motsInsecables } from './motsInsecables.jsx';
 import { tr } from './i18n/index.js';
 import MarquePlateforme from './plateformes/Marque.jsx';   // (15 nov., verre 2) la ligne par site
+import { BeneficeArticleDetail } from './BeneficeArticle.jsx';   // (15 nov., lot argent-plus) le bénéfice réel, frais du site inclus
 import { poserSlot } from './ficheLigne.js';
 import LigneDeTemps, { OngletsFiche, useVueFiche } from './paireHistoire/LigneDeTemps.jsx';   // (14 nov., idée 154) « Dans l'ordre »
 // (15 nov., direction D « fiche produit ») la règle de rangement (pure) et sa matière.
@@ -467,7 +468,10 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
               {['argent', 'sites', 'histoire'].map((v) => <button key={v} type="button" role="tab" className="fd-seg-b" aria-selected={vueOuverte === v} data-fd-seg={v} onClick={() => setVue(v)}>{tr('fd.seg.' + v)}</button>)}
             </div>
             <div className="fd-v" role="tabpanel" data-fd-vue-ouverte={vueOuverte}>
-              {vueOuverte === 'argent' ? (double ? <p className="fd-vide">{tr('fd.argent.double')}</p> : <VueArgent cases={cases} etat={etat}/>)
+              {vueOuverte === 'argent' ? (double ? <p className="fd-vide">{tr('fd.argent.double')}</p> : <><VueArgent cases={cases} etat={etat}/>
+                  {/* (15 nov., lot argent-plus ; intégré à la fiche D le 16 nov.) Ce que le site et les frais saisis retirent
+                      (src/beneficeArticle.js) — sur un article VENDU, seulement ce que les cases ne disent pas déjà (§7). */}
+                  {r && r.detail && !cases.some((c) => c.cle === 'si-vendue') ? <BeneficeArticleDetail b={r.detail} seulement={r.detail.plateforme === 'eBay' ? ['vente', 'site', 'saisis'] : ['site', 'saisis']}/> : null}</>)
                 : vueOuverte === 'sites' ? <VueSites sites={lignesSites} I={I}/>
                 : <VueHistoire lignes={hist}/>}
             </div>

@@ -61,6 +61,8 @@ export const FAMILLE_DE = {
   offre: 'offres', offremini: 'offres',
   message: 'messages', action: 'messages', favoris: 'messages',
   soir: 'rappels', urssaf: 'rappels', bilan: 'rappels', facture: 'rappels',
+  // (15 nov., lot argent-plus) Un seuil de l'année (plafond micro, TVA, DAC7) à 80 % puis 100 % (api/_lib/argent-passes.js).
+  seuil: 'rappels',
   // (5 nov.) Un compte Vinted gardé dans les totaux pas relu depuis plus de 24 h
   // (api/_lib/comptes-a-relire.js) : un rappel, une fois par jour au plus.
   relecture: 'rappels',
