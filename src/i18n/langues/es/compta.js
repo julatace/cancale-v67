@@ -716,4 +716,11 @@ export default {
   "compta.environHeuresVinted": { one: "Unas {n} h con vinted.fr abierto en esta cuenta.", other: "Unas {n} h con vinted.fr abierto en esta cuenta." },
   "compta.releveAVerifier": { one: "{n} venta en el extracto del monedero: fechas del extracto aún no verificadas ({accords} de {min} coincidencias con el detalle de las ventas). Mientras tanto no se fecha nada con él.", other: "{n} ventas en el extracto del monedero: fechas del extracto aún no verificadas ({accords} de {min} coincidencias con el detalle de las ventas). Mientras tanto no se fecha nada con él." },
   "compta.releveDesaccord": { one: "{n} venta en el extracto del monedero: su fecha no cae el mismo día que el detalle de la venta ({desaccords} desacuerdo). El extracto de esta cuenta no fecha nada.", other: "{n} ventas en el extracto del monedero: sus fechas no caen el mismo día que el detalle de las ventas ({desaccords} desacuerdo(s)). El extracto de esta cuenta no fecha nada." },
+  // (15 nov., extension 5.390) La ligne discrète : l’extension récupère les dates de versement, aucun geste.
+  "versement.ligne": { one: "Fechas de pago: la extensión las recupera (≈ {n} restante · unas {h} h con vinted.fr abierto).", other: "Fechas de pago: la extensión las recupera (≈ {n} restantes · unas {h} h con vinted.fr abierto)." },
+  "versement.ligneSans": { one: "Fechas de pago: la extensión las recupera (≈ {n} restante).", other: "Fechas de pago: la extensión las recupera (≈ {n} restantes)." },
+  "versement.court": "fechas en lectura",
+  "versement.lbcReleve": "la extensión recoge su fecha de venta al pasar por leboncoin.fr",
+  "versement.lbcSans": { one: "{n} venta de Leboncoin sin fecha de venta: en ningún periodo por ahora (la extensión la recoge en leboncoin.fr).", other: "{n} ventas de Leboncoin sin fecha de venta: en ningún periodo por ahora (la extensión las recoge en leboncoin.fr)." },
+  "versement.dac7Si": "sin fecha de pago cuentan",
 };

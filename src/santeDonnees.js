@@ -65,9 +65,8 @@ export const LIGNES = [
   { cle: 'ventes-sans-achat', de: 'ventes', ecran: 'Ventes', nom: 'Ventes non reliées à un achat',
     phrase: (n) => `${n} ${pl(n, 'vente', 'ventes')} sans achat relié : leur bénéfice n’est pas sûr`,
     geste: { libelle: 'Relier', tab: 'vinted_annonces', saisiePrix: true } },
-  { cle: 'ventes-a-dater', de: 'trancher', nom: 'Ventes sans date de versement',
-    phrase: (n) => `${n} ${pl(n, 'vente', 'ventes')} sans date de versement : dans aucun mois déclaré`,
-    geste: { libelle: 'Voir pourquoi', tab: 'compta', clic: '[data-urssaf-dater]' } },
+  // (15 nov., extension 5.390) Julien : « Enlève les 1741 ventes à dater […] le but est que l'extension récupère ces infos, pas que ça soit à nous de le faire. »
+  // Les ventes sans date de versement ne sont plus une ligne « qui cloche » : l'extension les date.
   { cle: 'comptes-a-relire', de: 'capture', nom: 'Comptes pas relus',
     phrase: (n) => `${n} ${pl(n, 'compte pas relu', 'comptes pas relus')} depuis plus d’un jour (ou bloqué)`,
     geste: { libelle: 'Voir', reglage: 'toutvabien' } },

@@ -10,20 +10,23 @@
 // MESURÉ le 11 nov. (lecture seule) : 1 751 des ventes sans date sont d'un seul
 // compte, dont le détail de transaction n'a JAMAIS été relu (51 relus sur
 // 1 789 finalisées) ; aucun relevé de porte-monnaie rangé ne porte de vente.
-// ⇒ La raison est « détail pas encore relu », le geste « ouvre Vinted sur ce
-//   compte » (l'extension relit le détail, `capterDatesVersement`).
+// ⇒ La raison est « détail pas encore relu » : l'extension relit le détail toute seule
+//   (`capterDatesVersement`), onglet vinted.fr ouvert sur ce compte — aucun geste (15 nov.).
 // Règle PURE : l'écran Ventes la publie (`vinted_urssaf_mois.aDater.raisons`,
 // `.datees`), « Déclarer » la lit (§11 : un propriétaire, les autres lisent).
 
-// Les raisons, de la plus utile à la moins utile. `geste` : ce que l'écran propose.
+// Les raisons, de la plus utile à la moins utile (l'ordre de la publication).
+// ⚠️ (15 nov.) Plus aucun `geste` : l'écran ne demande plus rien (ni « Ouvrir Vinted », ni
+//    « Dater à la main ») — l'extension récupère les dates ; les raisons restent publiées
+//    pour mesurer (audits, contrôle), jamais pour pousser un geste.
 export const RAISONS_A_DATER = {
-  'vinted-detail': { geste: 'vinted' },          // détail de la transaction jamais relu
-  'vinted-attente': { geste: null },             // relu : Vinted ne la dit pas (encore) finalisée
-  'vinted-passu': { geste: null },               // les états des transactions n'ont pas été lus
-  leboncoin: { geste: 'main' },                  // Leboncoin : la date se recopie à la main
-  vestiaire: { geste: 'vestiaire' },
-  ebay: { geste: null },
-  importee: { geste: 'importer' },              // (11 nov.) importée sans date de versement dans son fichier
+  'vinted-detail': {},           // détail de la transaction pas encore lu (l'extension le lit)
+  'vinted-attente': {},          // lu : Vinted ne la dit pas (encore) finalisée
+  'vinted-passu': {},            // les états des transactions n'ont pas été lus
+  leboncoin: {},                 // Leboncoin : la date de vente pas encore relevée par l'extension
+  vestiaire: {},
+  ebay: {},
+  importee: {},                  // (11 nov.) importée sans date de versement dans son fichier
 };
 
 const r2 = (x) => Math.round(x * 100) / 100;
@@ -89,12 +92,32 @@ export function sourcesDeVersement(map) {
   const s = map && map.__vrmSources;
   return s instanceof Map ? s : new Map();
 }
-// (14 nov.) Le rythme de la relecture de fond, onglet vinted.fr ouvert sur le compte :
-// 12 lectures/h (20 moins la réserve des codes, preuves et relevés).
+// (14 nov.) Le rythme de la relecture de fond, onglet vinted.fr ouvert sur le compte.
 // ⚠️ (15 nov.) L'ESTIMATION EST EN HEURES DE VINTED OUVERT, plus en jours : « environ 7 jours »
 //    (1 741 ÷ 288) supposait vinted.fr ouvert 24 h sur 24 sur CE compte — mesuré le 15 nov.,
 //    son grand compte n'avait pas été ouvert depuis deux jours. Le vrai délai dépend du temps
 //    où l'onglet est ouvert : on dit ce temps-là (la même règle que la carte de l'extension,
 //    `VERSEMENT_PAR_HEURE_ESTIME`), jamais une date de fin.
-export const VERSEMENTS_PAR_HEURE = 12;
+// ⚠️ (15 nov., extension 5.390) 18 PAR HEURE : l'argent a tout le budget de lecture (20/h) et
+//    20 détails par visite ; 2 de marge pour la réserve des codes, preuves et relevés. La même
+//    valeur que `VERSEMENT_PAR_HEURE_ESTIME` (background.js) — audit-versements-auto les compare.
+export const VERSEMENTS_PAR_HEURE = 18;
 export const heuresPourDater = (n) => (Number.isFinite(Number(n)) && Number(n) > 0 ? Math.max(1, Math.ceil(Number(n) / VERSEMENTS_PAR_HEURE)) : 0);
+
+// ══ (15 nov.) LA LIGNE DISCRÈTE, À LA PLACE DE « 1 741 VENTES À DATER » ═══════════════
+// Julien : « Enlève les 1741 ventes à dater, cela n'a aucun sens. Le but est que
+// l'extension récupère ces infos, pas que ça soit à nous de le faire. »
+// La règle §5 ne bouge pas (une vente sans date de versement n'est dans aucun mois, le
+// total dit « au moins ») ; l'écran ne demande plus RIEN : une seule ligne, sans bouton,
+// « Dates de versement : l'extension les récupère (≈ N restantes · environ X h avec
+// vinted.fr ouvert) », et RIEN quand tout est daté. Lit la publication de Ventes
+// (`vinted_urssaf_mois.aDater`, §11) : `n` = les ventes sans date ; les heures se comptent
+// sur celles que l'extension lit une par une (`vinted-detail`) — sans raisons publiées
+// (ligne d'avant), sur toutes. Rend `null` (rien à dire) ou { n, heures }.
+export function ligneDatesVersement(ad) {
+  const n = ad && typeof ad === 'object' && Number.isInteger(Number(ad.n)) ? Number(ad.n) : 0;
+  if (!(n > 0)) return null;
+  const raisons = Array.isArray(ad.raisons) ? ad.raisons.filter((r) => r && Number(r.n) > 0) : [];
+  const lues = raisons.length ? raisons.filter((r) => r.cle === 'vinted-detail').reduce((t, r) => t + Number(r.n), 0) : n;
+  return { n, heures: heuresPourDater(lues) };
+}
