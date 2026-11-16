@@ -1,0 +1,20 @@
+/* (16 nov., lot aide-decision) « L'argent qui dort, par meuble » (src/ArgentDort.jsx) — neutre (§7) :
+   aucune couleur d'accent, ni rouge ni vert ; un montant pas su s'écrit « — ». */
+.vrm-ad-vide { margin: 4px 0 0; font-size: 15px; color: var(--vrm-muted, #6E6E73); }
+.vrm-ad-tout { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 2px 0 12px; }
+.vrm-ad-tout b { font-size: 30px; font-weight: 700; line-height: 1.05; color: var(--vrm-ink, #1D1D1F); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.vrm-ad-tout span { font-size: 13px; color: var(--vrm-muted, #6E6E73); }
+.vrm-ad-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.vrm-ad-meuble { border-top: .5px solid var(--vrm-line, rgba(60, 60, 67, .18)); }
+.vrm-ad-ligne { all: unset; box-sizing: border-box; width: 100%; min-height: 52px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 8px 0; cursor: pointer; }
+.vrm-ad-ligne:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: 2px; border-radius: 8px; }
+.vrm-ad-centre { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.vrm-ad-nom { font-size: 15px; font-weight: 600; color: var(--vrm-ink, #1D1D1F); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vrm-ad-sous { font-size: 13px; color: var(--vrm-muted, #6E6E73); font-variant-numeric: tabular-nums; }
+.vrm-ad-montant { font-size: 17px; font-weight: 700; color: var(--vrm-ink, #1D1D1F); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vrm-ad-montant[data-vide] { color: var(--vrm-muted, #6E6E73); }
+.vrm-ad-articles { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.vrm-ad-article { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 32px; font-size: 14px; color: var(--vrm-ink, #1D1D1F); font-variant-numeric: tabular-nums; }
+.vrm-ad-article-age { color: var(--vrm-muted, #6E6E73); }
+.vrm-ad-article-prix[data-vide] { color: var(--vrm-muted, #6E6E73); }
+.vrm-ad-note { margin: 12px 0 0; font-size: 13px; line-height: 1.45; color: var(--vrm-muted, #6E6E73); }

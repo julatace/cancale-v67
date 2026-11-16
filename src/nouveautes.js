@@ -26,6 +26,10 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (16 nov., lot aide-decision) docs/passation/2026-11-16-aide-decision.md
+  { id: 'argent-dort-meuble', date: '2026-11-16', titre: 'L’argent qui dort, meuble par meuble', phrase: 'Statistiques : ce que tes prix d’achat immobilisent, par meuble.', tab: 'dashboard', pour: 'tous', mode: 'tous' },
+  { id: 'reste-par-modele', date: '2026-11-16', titre: 'Ce qui reste vraiment, par modèle', phrase: 'Après achat et frais, avec les jours en ligne.', tab: 'dashboard', pour: 'tous', mode: 'tous' },
+  { id: 'contre-offre-auto', date: '2026-11-16', titre: 'Contre-offre automatique au prix mini', phrase: 'Offres auto : une option, éteinte tant que tu ne l’allumes pas.', tab: 'messages', pour: 'tous', mode: 'tous' },
   // (16 nov., Julien : « la liaison pour relier l'achat beaucoup plus fiable ») docs/passation/2026-11-16-relier-fiable.md
   { id: 'fiche-delier-recu', date: '2026-11-16', titre: 'Fiche : délier un achat, ouvrir son reçu', phrase: 'À côté de « Achetée » : « Reçu » et « Délier », confirmé.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'relier-fiable', date: '2026-11-16', titre: 'Relier un achat : seulement les propositions sûres', phrase: 'Même taille, même couleur, un seul achat ; le reste dans « Autres pistes ».', tab: 'achats', pour: 'tous', mode: 'tous' },
