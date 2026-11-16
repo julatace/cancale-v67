@@ -103,7 +103,7 @@ A 1–16, s ≤ 0,699 (seuil 0,85), r ≤ 0,989 (seuil 0,998) ⇒ **0 « sûr »
   par la vraie règle d'App.jsx), E1–E5 (la VRAIE page inject.js / lbc-inject.js dans un vm : SHA-256 = celui des
   octets, aucune requête de plus, 403 ⇒ rien ; le VRAI fond dans `_fond-vm` : lignes rangées, autre compte ⇒ rien,
   lecture ratée ⇒ rien écrit), S1 (jamais écrit, lecteurs branchés). Sur l'arbre d'avant : rouge (P0 :
-  `src/photoIdentite.js` absent). Mutations `--mutation=toutes` : voir le résultat en fin de passe ci-dessous.
+  `src/photoIdentite.js` absent). Mutations `--mutation=toutes` : **23/23 rouges** (proche, ambigu, generique, manuel, delier, vcnumero, ebay, passu, sansReconnues, ecrit, demarrageEbay, lecteurs, codeDeuxPaires, codeGenerique, codeDelier, codeRefus, codePasSu, codeDouteux, ressemblanceAllumee, fondAutreCompte, fondLecture, pageRefus, compte).
 - `scripts/bancs/photo-identite-seuil.cjs` — I1–I4 verts.
 - `scripts/bancs/meme-photo.cjs` — essai O (390 et 1512) : O1 reconnue sans geste, O2 ambiguïté dite, O3 la
   ressemblance reste une proposition, O4 limite dite, O5 rien écrit, O6 la fiche N°125.

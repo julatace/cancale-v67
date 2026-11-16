@@ -44,7 +44,7 @@ const MUTATIONS = {
   vcnumero: ['src/photoIdentite.js', "      if (plein(NV[id])) continue;                                         // un N° déjà donné : jamais changé tout seul\n", ''],
   ebay: ['src/photoIdentite.js', "export const SITES_IDENTITE_PHOTO = ['Leboncoin', 'Vestiaire'];", "export const SITES_IDENTITE_PHOTO = ['Leboncoin', 'Vestiaire', 'eBay'];"],
   passu: ['src/photoIdentite.js', "  if (!res || !res.lu) return out;\n  out.lu = true;", "  if (!res) return out;\n  out.lu = true;"],
-  sansReconnues: ['src/photoIdentite.js', "  const propositions = arr(res.propositions).filter((p) => !ids.has(cleA(p)));", "  const propositions = arr(res.propositions);"],
+  sansReconnues: ['src/photoIdentite.js', "  const propositions = arr(res.propositions).filter((p) => !ids.has(cleA(p)) && !ambCode.has(cleA(p)));", "  const propositions = arr(res.propositions);"],
   ecrit: ['src/App.jsx', '    poserIdentitesPhoto(ident.lu ? { ...ident, owner } : null);\n', "    poserIdentitesPhoto(ident.lu ? { ...ident, owner } : null);\n    if (ident.lu) save('vrm_lbc_liens', liensLbcAvecPhoto(load('vrm_lbc_liens', {}) || {}, ident));\n"],
   demarrageEbay: ['src/App.jsx', "chargerMemePhoto(false,{ sansEbay:true });", 'chargerMemePhoto(false);'],
   lecteurs: ['src/App.jsx', "const liensR=liensLbcLus();", "const liensR=load('vrm_lbc_liens',{})||{};"],
