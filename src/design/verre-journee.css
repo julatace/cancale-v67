@@ -245,6 +245,10 @@
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-col > .sj-t-envoyer { display: grid !important; grid-template-columns: minmax(0, 1fr) auto !important; grid-template-areas: "lib lien" "face face" "plein plein" !important; align-items: center !important; padding: 6px 16px 14px !important; }
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-t-envoyer .sj-face:has(.sj-v-lignes) { display: block !important; }
   :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-t-envoyer .sj-face:has(.sj-v-lignes) > :not(.sj-v-lignes) { display: none !important; }
+  /* (16 nov., personnalisation-simple) Cachée par lui mais revenue parce qu'urgente : « Affichée car urgent » reste dite
+     à l'ordinateur aussi (elle se taisait avec le reste de la face — banc journee-perso U 1512). */
+  :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-t-envoyer .sj-face:has(.sj-v-lignes) > .sj-sous:has([data-jp-urgent]) { display: block !important; margin-top: 8px !important; }
+  :root:root:root:root:root:root:root body .sj-journee[data-sj-ordi="1"] .sj-t-envoyer .sj-face:has(.sj-v-lignes) > .sj-sous:has([data-jp-urgent]) > :not([data-jp-urgent]) { display: none !important; }
   :root:root:root:root:root:root:root body .sj-journee .sj-v-lignes { display: block !important; }
   :root:root:root:root:root:root:root body .sj-journee .sj-v-ligne { display: flex !important; align-items: center !important; gap: 12px !important; min-height: 64px !important; padding: 8px 0 !important; }
   :root:root:root:root:root:root:root body .sj-journee .sj-v-ligne + .sj-v-ligne { border-top: 1px solid rgb(12 29 48 / .10) !important; }
