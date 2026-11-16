@@ -9665,15 +9665,16 @@ const venteRecente = (o) => {
 // (16 nov., vitesse-volume) Les deux lectures de la date d'une commande, gardées par commande (identité de
 // l'objet : une commande lue n'est jamais modifiée en place). À 20 000 ventes, la même date était relue des
 // dizaines de fois par rendu. Mêmes formules qu'avant, mêmes réponses (NaN compris).
-const _tsCommandeM = new WeakMap(), _msDateM = new WeakMap();
 const tsCommande = (o) => {
   if (!o || typeof o !== 'object') return Date.parse((o && o.date) || '') || 0;
-  let v = _tsCommandeM.get(o); if (v === undefined) { v = Date.parse(o.date || '') || 0; _tsCommandeM.set(o, v); } return v;
+  const m = tsCommande.memo || (tsCommande.memo = new WeakMap());
+  let v = m.get(o); if (v === undefined) { v = Date.parse(o.date || '') || 0; m.set(o, v); } return v;
 };
 // `new Date(o.date).getTime()` (NaN si illisible) — pour les fenêtres « il y a N jours ».
 const msDateCommande = (o) => {
   if (!o || typeof o !== 'object') return new Date(o && o.date).getTime();
-  let v = _msDateM.get(o); if (v === undefined) { v = new Date(o.date).getTime(); _msDateM.set(o, v); } return v;
+  const m = msDateCommande.memo || (msDateCommande.memo = new WeakMap());
+  let v = m.get(o); if (v === undefined) { v = new Date(o.date).getTime(); m.set(o, v); } return v;
 };
 // ⚠️ LE MONTANT D'UNE COMMANDE VINTED EST UN OBJET `{amount, currency_code}`,
 // pas un nombre. Une lecture naïve (`Number(o.price)`) rend NaN et une somme
