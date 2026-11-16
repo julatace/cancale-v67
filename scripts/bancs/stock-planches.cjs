@@ -9,7 +9,7 @@
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
-const DIST = path.join(__dirname, '..', '..', 'dist');
+const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');   // (16 nov.) BANC_DIST : un autre build (preuve §6.1)
 const PORT = Number(process.env.BANC_PORT) || 6481;
 
 const MAIN = {
@@ -98,7 +98,11 @@ const ou = (pg, n) => pg.evaluate((n) => { const el = document.querySelector(`[d
 const direVendue = (pg, n) => pg.evaluate((n) => { let v = null; try { v = JSON.parse(localStorage.getItem('vrm_stock_vendus') || 'null'); } catch (_) {}
   const nums = new Set(((v && Array.isArray(v.nums)) ? v.nums : []).map(String)); nums.add(String(n));
   localStorage.setItem('vrm_stock_vendus', JSON.stringify({ nums: [...nums], at: Date.now() })); window.dispatchEvent(new Event('vrm:stock-slots')); }, n);
-const retirer = async (pg, n) => { await direVendue(pg, n); await pg.waitForSelector(`[data-case-num="${n}"].is-vendue`, { timeout: 8000 }).catch(() => {}); await pg.click(`[data-case-num="${n}"]`); await pg.waitForTimeout(600); };
+// (16 nov., train : bancs-rouges-a × retirer-case-compact) Le toucher de la case allumée sort la paire SANS ouvrir de
+// fiche (aucune fenêtre, décision de Julien) : une fiche ouverte couvrirait la case suivante au téléphone.
+let fichesRestees = 0;
+const retirer = async (pg, n) => { await direVendue(pg, n); await pg.waitForSelector(`[data-case-num="${n}"].is-vendue`, { timeout: 8000 }).catch(() => {}); await pg.click(`[data-case-num="${n}"]`); await pg.waitForTimeout(600);
+  if (await pg.locator('[data-fiche-paire]').count()) fichesRestees++; };
 
 (async () => {
   let b;
@@ -127,6 +131,9 @@ const retirer = async (pg, n) => { await direVendue(pg, n); await pg.waitForSele
         // L'éditeur : poser une planche sous la rangée 3, enregistrer.
         await r.pg.click('[data-meuble="mG"] button[aria-label="Modifier le meuble"]');
         const avant = await r.pg.getAttribute('[data-planche-choix="3"]', 'aria-pressed');
+        // (16 nov.) Au doigt, chaque touche de l'éditeur fait 44 px (§7) — « Une à chaque rangée » et « Aucune » faisaient 30 px.
+        if (tel) { const h = await r.pg.evaluate(() => [...document.querySelectorAll('[data-editeur-planches] button, [data-planches-toutes], [data-planches-toutes] + button')].filter((x) => x.offsetParent).map((x) => { const q = x.getBoundingClientRect(); return Math.min(Math.round(q.height), Math.round(q.width)); }));
+          dit(h.length > 2 && h.every((x) => x >= 44), `${t} : chaque touche de l'éditeur de planches fait 44 px au doigt`, JSON.stringify(h)); }
         await r.pg.click('[data-planche-choix="3"]');
         await r.pg.click('[data-meuble-enregistrer]');
         await r.pg.waitForTimeout(1200);  // save() écrit l'appareil après 500 ms
@@ -160,6 +167,7 @@ const retirer = async (pg, n) => { await direVendue(pg, n); await pg.waitForSele
         dit(sauveP2 === '[1,"2:2"]', `${t} : ⟷ pose la planche sur toute la largeur`, sauveP2);
         const x = await r.pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
         dit(x.sw <= x.cw + 1, `${t} : aucun débordement`, `${x.sw} > ${x.cw}`);
+        dit(fichesRestees === 0, `${t} : sortir une paire par sa case allumée n'ouvre aucune fiche`, `${fichesRestees} fiche(s) ouverte(s)`); fichesRestees = 0;
         dit(r.errs.length === 0, `${t} : aucune erreur d'app`, r.errs.join(' | ').slice(0, 200));
         await r.ctx.close();
       });

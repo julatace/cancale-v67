@@ -884,8 +884,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
           {/* (1er nov.) Une paire PAS rangée : « Déplacer » et « Retirer de la case »
               ne voulaient rien dire. Le geste est de la ranger. */}
           <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-ranger={m ? 'deplacer' : 'ranger'} onClick={() => { setPlace(modal.cle); fermerModal(); fermerLigne(); }} style={btnSec}>{m ? tr('stock.deplacer') : (!sold && caseProposeeDe(modal.cle) ? tr('stock.autreCase') : tr('stock.rangerDansCase'))}</button>
-          {/* (16 nov., lot retirer-case-compact) « Retirer de la case » n'est plus dans la fiche (Julien : « ça prend trop de
-              place ») : une vendue se sort en touchant sa case allumée ; une « Plus en ligne », par sa rangée. */}
+          {/* (16 nov., train — décision de Julien) « Retirer de la case » n'est plus dans la fiche ni dans sa feuille ⋯ :
+              la case s'allume dans le Stock (lot retirer-case-compact) ; « Déplacer » reste. */}
         </div>
         {/* (16 nov.) Plus de « Je l'ai sorti » ici : le toucher de la case allumée (`sortirAnnulable`). */}
         {hors && <button className="vrm-b vrm-b-secondaire" type="button" data-fiche-encore-la="" onClick={() => { encoreLa(f); fermerModal(); }} style={{ width: '100%', marginTop: 9 }}>{tr('stock.encore')}</button>}

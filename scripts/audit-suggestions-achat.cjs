@@ -33,7 +33,8 @@ const MUTS = {
   // (6 nov., vague 2 · point 7) La saisie en série passe par la MÊME règle.
   'serie-sans-date': ["const s = suggestionsAchat({ cible: { titre: l.titre || '', marque: l.marque || '', taille: l.taille || '', couleur: l.couleur || '', dateRef: l.dateRef || null, curTx: '' },", "const s = suggestionsAchat({ cible: { titre: l.titre || '', marque: l.marque || '', taille: l.taille || '', couleur: l.couleur || '', dateRef: null, curTx: '' },"],
   'serie-sur-rang2': ['if (s.length) out[String(l.key)] = s.map((x) => ({ ...x, sur: x.rang === 1 }));', 'if (s.length) out[String(l.key)] = s.map((x) => ({ ...x, sur: true }));'],
-  'app-bareme': ['    const s = suggestionsSaisieSerie({ lignes: fillBuyRows.map((r) => ({ key: r.key, titre: r.titre, marque: r.marque, taille: r.taille, dateRef: r.dateRef })),', '    const s0 = scoreAchatPrep; const s = suggestionsSaisieSerie({ lignes: fillBuyRows.map((r) => ({ key: r.key, titre: r.titre })),', 'App.jsx'],
+  // (16 nov., relier-fiable) La saisie en série passe par l'affectation de src/liaisonAchat.js (`seriePropositions`).
+  'app-bareme': ['    const s = seriePropositions({ lignes: fillBuyRows.map((r) => ({ key: r.key, titre: r.titre, marque: r.marque, taille: r.taille, dateRef: r.dateRef,', '    const s0 = scoreAchatPrep; const s = seriePropositions({ lignes: fillBuyRows.map((r) => ({ key: r.key, titre: r.titre,', 'App.jsx'],
   'app-lien-brut': ["onClick={()=>relierAchatCle(r.key,p)}", "onClick={()=>linkBuyForKey(r.key,p)}", 'App.jsx'],
   'prix-lot-devine': ["if (!String(saisi == null ? '' : saisi).trim() || !Number.isFinite(v) || v <= 0) return null;", "if (!Number.isFinite(v) || v <= 0) { const p = prixDe(achat), l0 = lotDe(achat); if (p == null || !l0.n) return null; return ecritureLot(achat, String(p / l0.n), { accNom, photo }); }"],
 };
@@ -164,7 +165,7 @@ const { extractBrand: marqueDe, extractColors: couleursDe, extractModel: modeleD
     dit(!serie([{ key: 'f', titre: 'Adidas Spezial noire 42,5', dateRef: ref }], [ach(25, 'Adidas Spezial noire 42.5', -3, { status: 'Commande remboursée' })]).f, 'F6 un achat remboursé n’est jamais proposé');
     const APPS = fs.readFileSync(APP_F, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
     const i = APPS.indexOf('const fillBuySugg = useMemo(() => {'); const corps = i >= 0 ? APPS.slice(i, APPS.indexOf('}, [fillBuyOpen', i)) : '';
-    dit(/suggestionsSaisieSerie\(\{ lignes: fillBuyRows\.map\(\(r\) => \(\{ key: r\.key, titre: r\.titre, marque: r\.marque, taille: r\.taille, dateRef: r\.dateRef \}\)\)/.test(corps) && !/scoreAchatPrep|scoreAchat\(/.test(corps), 'F7 la saisie en série (`fillBuySugg`) passe par `suggestionsSaisieSerie`, plus par le barème', corps.slice(0, 160));
+    dit(/seriePropositions\(\{ lignes: fillBuyRows\.map\(\(r\) => \(\{ key: r\.key, titre: r\.titre, marque: r\.marque, taille: r\.taille, dateRef: r\.dateRef,/.test(corps) && !/scoreAchatPrep|scoreAchat\(/.test(corps), 'F7 la saisie en série (`fillBuySugg`) passe par `seriePropositions` (l’affectation de src/liaisonAchat.js), plus par le barème', corps.slice(0, 160));
     dit(/onClick=\{\(\)=>relierAchatCle\(r\.key,p\)\}/.test(APPS) && !/linkBuyForKey\(/.test(APPS), 'F8 SON tap sur une piste relie par l’écriture de « Relier un achat » (un lot demande le prix de l’article)');
     dit(/dateRef: ds\.length \? new Date\(Math\.min\(\.\.\.ds\)\)\.toISOString\(\) : null/.test(APPS), 'F9 la borne de chaque ligne : la date la plus ANCIENNE connue de l’article (mise en ligne, vente, N° posé)');
   }

@@ -2,6 +2,7 @@
 // Écrit par scripts/i18n-migrer.cjs (la source : fr/ventes.js ; méthode : docs/passation/2026-11-11-traduction.md).
 export default {
   "ventes.ventesCompteRelues": "· this account’s sales re-read",
+  "ventes.venteEmailBordAVenir": "Shipping label to come: the extension hasn’t picked it up yet.",
   "ventes.photoIndisponible": "Photo unavailable",
   "ventes.montantEurosEx": "An amount in euros (e.g. 25 or 25.50).",
   "ventes.coutAchat": "Purchase cost?",
