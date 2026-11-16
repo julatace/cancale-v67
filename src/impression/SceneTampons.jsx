@@ -46,7 +46,9 @@ export default function SceneTampons({ octets, pose, page, largeur, dessiner, on
     if (qr) { a.push({ cx: qr.x + qr.w / 2, nom: 'axe-qr' }); if (qrZone) a.push({ Y: qrZone.y, nom: 'dessus-qr' }); }
     return a;
   };
-  const surInterdit = (b) => (p && b ? (p.interdits || []).find((z) => chevauche(b, z)) : null);
+  // Le N° garde 5 mm autour de tout code ; la mention, la zone de silence mesurée du QR (elle se pose juste au-dessus).
+  const zonesDe = (quoi) => (p ? (quoi === 'm' && p.interditsMention ? p.interditsMention : p.interdits) || [] : []);
+  const surInterdit = (b, quoi = 'n') => (p && b ? zonesDe(quoi).find((z) => chevauche(b, z)) : null);
   const geste = React.useRef(null), pointeurs = React.useRef(new Map());
   const enPoints = (e) => { const r = scene.current.getBoundingClientRect(); return { x: (e.clientX - r.left) / ppt, y: (e.clientY - r.top) / ppt }; };
   const borner = (b) => (p ? { ...b, x: Math.max(0, Math.min(p.W - b.w, b.x)), y: Math.max(0, Math.min(p.H - b.h, b.y)) } : b);
@@ -88,7 +90,7 @@ export default function SceneTampons({ octets, pose, page, largeur, dessiner, on
     setBoites((x) => ({ ...x, [G.quoi]: n }));
   };
   const lacher = (quoi, b, avant, facteur) => {
-    const z = surInterdit(b);
+    const z = surInterdit(b, quoi);
     if (z) { setBoites((x) => ({ ...x, [quoi]: avant })); if (onRefus) onRefus(z.quoi || 'code'); return; }
     if (onPoser) onPoser(quoi, b, facteur);
   };
@@ -110,7 +112,7 @@ export default function SceneTampons({ octets, pose, page, largeur, dessiner, on
   };
   const boite = (quoi) => {
     const b = boites[quoi]; if (!b) return null;
-    const refusee = actif === quoi && !!surInterdit(b);
+    const refusee = actif === quoi && !!surInterdit(b, quoi);
     return (
       <div key={quoi} data-tampon-el={quoi} data-x={b.x.toFixed(2)} data-y={b.y.toFixed(2)} data-w={b.w.toFixed(2)} data-h={b.h.toFixed(2)} data-libre={libres[quoi] ? '1' : '0'}
         tabIndex={0} role="slider" aria-label={libelles[quoi] || quoi} aria-valuetext={`${Math.round(b.x)}, ${Math.round(b.y)}`} onKeyDown={clavier(quoi)}
@@ -125,7 +127,7 @@ export default function SceneTampons({ octets, pose, page, largeur, dessiner, on
       data-page={p ? (page != null ? page : p.page) : ''} style={{ width: largeur }}
       onPointerDown={bas} onPointerMove={bouge} onPointerUp={haut} onPointerCancel={haut}>
       <canvas ref={cv} className="vrm-tampon-page" aria-hidden="true" data-stream-image="bordereau"/>
-      {p && dessins > 0 && (p.interdits || []).map((z, i) => (
+      {p && dessins > 0 && zonesDe(actif || 'n').map((z, i) => (
         <i key={i} data-tampon-interdit={z.quoi || 'code'} className={'vrm-tampons-interdit' + (actif ? ' vrm-tampons-interdit-vu' : '')}
           style={{ left: Math.max(0, z.x) * ppt, top: Math.max(0, z.y) * ppt, width: Math.max(0, Math.min(p.W, z.x + z.w) - Math.max(0, z.x)) * ppt, height: Math.max(0, Math.min(p.H, z.y + z.h) - Math.max(0, z.y)) * ppt }}/>
       ))}

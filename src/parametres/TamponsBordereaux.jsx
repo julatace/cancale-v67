@@ -55,6 +55,7 @@ async function rendreExemple(fam, support, tampons) {
   });
   return { octets: await out.save(), pose: (r.poses || [])[0] || null, isole: !!r.isole };
 }
+const pc = (b, p, m) => ({ left: `${((b.x - m) / p.W) * 100}%`, top: `${((b.y - m) / p.H) * 100}%`, width: `${((b.w + 2 * m) / p.W) * 100}%`, height: `${((b.h + 2 * m) / p.H) * 100}%` });
 const boiteTexte = (b) => (b ? `${b.x.toFixed(1)},${b.y.toFixed(1)},${b.w.toFixed(1)},${b.h.toFixed(1)}` : '');
 
 // Une vignette : le bordereau rendu (pdf.js), les tampons cerclés par-dessus.
@@ -84,7 +85,7 @@ function Vignette({ fam, support, tampons, ouvrir, nomSupport }) {
     }).catch(() => { if (vivant) setSt({ etat: 'ko' }); });
     return () => { vivant = false; };
   }, [cle, vue]);   // eslint-disable-line react-hooks/exhaustive-deps
-  const p = st.pose, k = st.ppt || 0;
+  const p = st.pose;
   const pl = p ? placesDeForme(tampons, p.cle) : { n: null, m: null };
   const statut = !p ? '' : (pl.n || pl.m) ? tr('tampons.statut.main') : (tampons.types && tampons.types[fam.id]) ? tr('tampons.statut.type') : tr('tampons.statut.auto');
   const nom = tr(`tampons.famille.${fam.id}`);
@@ -94,8 +95,9 @@ function Vignette({ fam, support, tampons, ouvrir, nomSupport }) {
       aria-label={tr('tampons.vignette.aria', { nom, support: nomSupport })} onClick={() => ouvrir(fam)} disabled={st.etat === 'charge' && false}>
       <span className="vrm-tampons-vignette-page" style={{ background: '#fff' }}>
         <canvas ref={cv} aria-hidden="true" data-stream-image="bordereau"/>
-        {st.etat === 'ok' && p && p.place && <i className="vrm-tampons-cadre" style={{ left: p.place.x * k, top: p.place.y * k, width: p.place.w * k, height: p.place.h * k }}/>}
-        {st.etat === 'ok' && p && p.mentionBoite && <i className="vrm-tampons-cadre vrm-tampons-cadre-m" style={{ left: p.mentionBoite.x * k - 2, top: p.mentionBoite.y * k - 2, width: p.mentionBoite.w * k + 4, height: p.mentionBoite.h * k + 4 }}/>}
+        {/* En pourcentage de la page : le cadre reste sur le tampon même quand la vignette est réduite (téléphone). */}
+        {st.etat === 'ok' && p && p.place && <i className="vrm-tampons-cadre" style={pc(p.place, p, 0)}/>}
+        {st.etat === 'ok' && p && p.mentionBoite && <i className="vrm-tampons-cadre vrm-tampons-cadre-m" style={pc(p.mentionBoite, p, 1.5)}/>}
         {st.etat === 'charge' && <span className="vrm-tampons-attente">{tr('tampons.dessin')}</span>}
         {st.etat === 'ko' && <span className="vrm-tampons-attente">{tr('tampons.ko')}</span>}
       </span>
@@ -133,9 +135,11 @@ function ChoixTampons({ tampons, portee, support, changer }) {
         <div style={aide}>{tr('tampons.contenu.voit')}</div>
       </fieldset>
       <div style={{ marginTop: 12 }}>
+        <div style={{ ...lib, marginBottom: 6 }}>{tr('tampons.texte.n')}</div>
         <Segmente label={tr('tampons.texte.n')} value={r.texte} onChange={(v) => changer({ texte: v })} options={tailles.map((o) => ({ ...o, data: { 'data-tampons-texte': o.v } }))}/>
       </div>
-      <div style={{ marginTop: 8 }}>
+      <div style={{ marginTop: 10 }}>
+        <div style={{ ...lib, marginBottom: 6 }}>{tr('tampons.texte.m')}</div>
         <Segmente label={tr('tampons.texte.m')} value={r.texteMention} onChange={(v) => changer({ texteMention: v })} options={tailles.map((o) => ({ ...o, data: { 'data-tampons-texte-mention': o.v } }))}/>
       </div>
       <div style={ligne}>

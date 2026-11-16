@@ -161,4 +161,20 @@ pleines, ou QR sans ligne ni colonne vide, page tournée comprise).
 - WebKit absent du conteneur : l'iPhone est simulé (agent, `window.event`).
 
 ## ÉTAT À LA REPRISE
-(voir la fin du fichier)
+
+- Branche `claude/tampons-parametres`, poussée, `origin/main` fusionné (vrai merge) ; PR ouverte (voir le rapport).
+- Tout le code est là : `src/impression/tampons.js` (réglage, pur), `src/impression/SceneTampons.jsx` (la scène qu'on
+  glisse), `src/impression/ApercuAvantImpression.jsx` (la feuille), `src/parametres/TamponsBordereaux.jsx` (galerie +
+  éditeur), App.jsx (« LE TAMPON DU BORDEREAU » : mention, garde-fou, `tamponnerBordereau` ; `poserBordereau`,
+  `tamponDePage`, `geoPageA4`, `tamponPourPage` ; moteur de Colis : `lancerImpression` → aperçu, `imprimerApercu`,
+  `poserApercu`, `origineApercu` ; `ApercuUnCoque` pour un bordereau seul).
+- **Fusion avec `claude/impression-retours` (PR #1194, ouverte)** : elle change aussi `tamponnerBordereau` (paramètre
+  `retour`, cartouche RETOUR cerné) et le chemin du retour d'achat. Au merge : garder les DEUX (`retour` ET `tampon`),
+  passer `tamponPourPage(PL, pdf, { famille: 'retour' })` au chemin du retour, et `impression.retour` reste ce qui fait la
+  famille « retour » dans `poserBordereau` (RETOUR toujours écrit, `audit-tampons` T4).
+- **`claude/impression-directe`** (« Imprimer les N » sans étape) contredit la précision de Julien qui prime ici (l'aperçu
+  avant impression à chaque sélection) : à trancher par lui si les deux arrivent.
+- CI : les jobs « Audits » sont rouges sur `main` (64 audits, PR #1196 en cours) ; ce lot n'en ajoute aucun (comparé
+  audit par audit, `audit-notifs-redaction` rouge aussi sur `main`). Règle du 16 nov. : pas de fusion tant qu'un rouge reste.
+- Geste de Julien : imprimer un vrai bordereau Mondial Relay et un Chronopost avec un N° et regarder la mention au-dessus
+  du QR (aucun vrai PDF dans ce dépôt public : tout est prouvé sur des formes reconstruites).

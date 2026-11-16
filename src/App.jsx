@@ -13961,9 +13961,13 @@ const estUnCode = (rendu, q) => {
 };
 const zonesInterditesTampon = (rendu, adresses = []) => {
   const codes = zonesCodesTampon(rendu).filter((q) => estUnCode(rendu, q)).map((q) => (estCarreCode(q) && alterneDeuxSens(rendu, q) ? { ...affinerCode(rendu, q), qr: true } : { ...q, qr: false }));
-  const interdits = codes.map((q) => ({ ...elargir(q, q.qr ? gardeQr(rendu, q) : MENTION.codes), quoi: q.qr ? 'qr' : 'code' }));
-  for (const a of adresses || []) interdits.push({ ...a, quoi: 'adresse' });
-  return { codes, interdits };
+  // Le cartouche garde 5 mm autour de TOUT code (la règle de toujours) ; la mention, collée au QR par la décision de
+  // Julien, garde sa zone de silence mesurée (`interditsMention`).
+  const gardes = codes.map((q) => (q.qr ? gardeQr(rendu, q) : MENTION.codes));
+  const interdits = codes.map((q, i) => ({ ...elargir(q, Math.max(gardes[i], MENTION.codes)), quoi: q.qr ? 'qr' : 'code' }));
+  const interditsMention = codes.map((q, i) => ({ ...elargir(q, gardes[i]), quoi: q.qr ? 'qr' : 'code' }));
+  for (const a of adresses || []) { interdits.push({ ...a, quoi: 'adresse' }); interditsMention.push({ ...a, quoi: 'adresse' }); }
+  return { codes, interdits, interditsMention };
 };
 // Pur (la page déjà rendue) : où poser une boîte bw × bh de mention, par la règle par défaut ①②③.
 // `o` : { codes, interdits, cadre, adresses, bord }. Rend { x, y, via, qr } (points) ou null.
@@ -14196,16 +14200,17 @@ const tamponnerBordereau = async (PL, pdf, { numero, titre, thermique = false, c
   const page = pdf.getPages()[0], { w: W0, h: H0 } = tailleAffichee(page);
   let rendu = null, renduErr = null; try { rendu = await rendrePremierePage(pdf); } catch (e) { renduErr = e; }
   const adresses = [...((th && th.adresses) || []), ...(T.adresses || [])];
-  const zi = rendu ? zonesInterditesTampon(rendu, adresses) : { codes: [], interdits: adresses.map((a) => ({ ...a, quoi: 'adresse' })) };
+  const zi = rendu ? zonesInterditesTampon(rendu, adresses) : { codes: [], interdits: adresses.map((a) => ({ ...a, quoi: 'adresse' })), interditsMention: adresses.map((a) => ({ ...a, quoi: 'adresse' })) };
   // Les « codes » de l'étiquette posée (thermique) repassent le même tri : un pavé de texte serré n'est pas un code.
-  const bloquesVrais = (bloques || []).filter((z) => z.quoi !== 'code' || !rendu || estUnCode(rendu, z));
+  // (jugé sur la boîte du code elle-même : les bloques sont élargis de leur garde de 5 mm)
+  const bloquesVrais = (bloques || []).filter((z) => z.quoi !== 'code' || !rendu || estUnCode(rendu, { x: z.x + MENTION.codes, y: z.y + MENTION.codes, w: Math.max(1, z.w - 2 * MENTION.codes), h: Math.max(1, z.h - 2 * MENTION.codes) }));
   const interdits = [...zi.interdits, ...bloquesVrais.map((z) => ({ ...z, quoi: z.quoi || 'bloque' }))];
   const cadre = (th && th.boite) || T.cadre || null;
   // (La mention garde la zone de silence MESURÉE de chaque QR, pas les 5 mm forfaitaires du cartouche.)
-  const interditsM = [...zi.interdits, ...bloquesVrais.filter((z) => z.quoi !== 'code')];
+  const interditsM = [...zi.interditsMention, ...bloquesVrais.filter((z) => z.quoi !== 'code')];
   // (Sur une imprimante thermique, même la page entière : la mention en noir fin — une tête thermique tramerait le gris.)
   const mentionO = { th: !!th || !!thermique, marge: th && th.marge, k: T.kMention, place: T.placeMention, libre: T.libreMention, codes: zi.codes, interdits: interditsM, cadre, adresses };
-  const fin = (r, mb) => ({ ...r, mention: !!mb, mentionBoite: mb || null, interdits, codes: zi.codes });
+  const fin = (r, mb) => ({ ...r, mention: !!mb, mentionBoite: mb || null, interdits, interditsMention: interditsM, codes: zi.codes });
   // ① Le cartouche posé À LA MAIN : à sa place (fond blanc dessous, même sur du texte — son choix), repoussé hors
   // des codes, des QR et de l'adresse ; la mention vient ensuite, à côté de lui.
   if ((n || t) && choixTamponValide(choix)) {
@@ -14766,7 +14771,7 @@ const poserEtiquettesThermiques = async (PL, out, page, z, numero, bold, titre =
     const mms = codes.map((c) => c.mm).filter((x) => x != null);
     details.push({ mode: t.mode, raison: t.raison || '', echelle: pl.s, tourne: pl.tourne, noir, W: pl.W, H: pl.H, codes: codes.length, retrouves,
       moduleMm: mms.length ? Math.min(...mms) : null, fins: codes.filter((c) => !codeAssezGros(c.mm)).length, mention: !!t.mention, place: t.place || null, boite: boiteAff, bloques });
-    poses.push({ page: out.getPageCount(), cle: td.cle, W: pl.W, H: pl.H, mode: t.mode, place: t.place || null, mentionBoite: t.mentionBoite, interdits: t.interdits, codes: t.codes, repousse: !!t.repousse, libre: !!choix });
+    poses.push({ page: out.getPageCount(), cle: td.cle, W: pl.W, H: pl.H, mode: t.mode, place: t.place || null, mentionBoite: t.mentionBoite, interdits: t.interdits, interditsMention: t.interditsMention, codes: t.codes, repousse: !!t.repousse, libre: !!choix });
     (await out.copyPages(d, d.getPageIndices())).forEach((p) => out.addPage(p));
     k++;
   }
@@ -14883,7 +14888,7 @@ const poserBordereau = async (PL, out, src, { numero, title, pos, thermique, cho
   const choix = pos || (imp.places && imp.places.n !== undefined ? td.libreN : choisir ? await choisir(src, { isole: false, k: 0 }) : td.libreN);
   const t = await tamponnerBordereau(PL, src, { numero: contenu.numero, titre: contenu.titre, thermique, choix, tampon: { ...td.tampon, adresses: geo.adresses, cadre: geo.cadre } });
   const { w: Wa, h: Ha } = tailleAffichee(src.getPages()[0]);
-  const pose = { page: out.getPageCount(), cle: td.cle, W: Wa, H: Ha, mode: t.mode, place: t.place || null, mentionBoite: t.mentionBoite || null, interdits: t.interdits || [], codes: t.codes || [], repousse: !!t.repousse, libre: !!choix };
+  const pose = { page: out.getPageCount(), cle: td.cle, W: Wa, H: Ha, mode: t.mode, place: t.place || null, mentionBoite: t.mentionBoite || null, interdits: t.interdits || [], interditsMention: t.interditsMention || t.interdits || [], codes: t.codes || [], repousse: !!t.repousse, libre: !!choix };
   (await out.copyPages(src, src.getPageIndices())).forEach((p) => out.addPage(p));
   return { isole: false, etiquettes: 0, raison: thermique ? (z.raison || 'mise en page inconnue') : '', tampons: [t.mode], details: [], poses: [pose], famille: imp.famille };
 };
