@@ -60,6 +60,7 @@ import { totauxVentesManuelles, beneficeVenteManuelle } from '../venteManuelle.j
 import { ecrireLocal } from '../stockageSur.js';   // (11 nov.) Safari privé / quota : le bouton ferme quand même
 import { tr } from '../i18n/index.js';
 import { trj } from '../i18n/react.js';
+import { trm } from '../motsLangues.js';   // (16 nov.) « paire / article » dans chaque langue
 import ComptesVinted from '../ComptesVinted.jsx';   // (13 nov., lot 36-27) « Tes comptes Vinted » sur 30 j / 90 j / année
 
 // ⟦← App.jsx #6⟧
@@ -197,7 +198,7 @@ function MonthDetail({mois,type,C,fmt,catMap,catalog,onClose}){
       </div>
       <div style={{maxHeight:260,overflowY:'auto'}}>
         {ventes.map((v,i)=>{
-          const nom=catName[v.productId]||(v.productId?(motsVendeur().Nom+' '+v.productId):'—');
+          const nom=catName[v.productId]||(v.productId?trm('mv.stats.produit', { id: String(v.productId) }):'—');
           const dateAff=(type==='encaisse'?v.receiveDate:v.saleDate)||'';
           const benef=beneficeVenteManuelle(v);
           return (
@@ -1049,7 +1050,7 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
       {/* (31 oct.) Rythme, marges par groupe, temps de vente, jours et heures,
           stock qui dort, rotation, annulations — chacun avec sa couverture. */}
       </RepliStats>
-      <RepliStats id="vente" titre={tr('stats.vendRythmeStock')} phrase={`Marges par marque, temps de vente, jours et heures où tu vends, ${motsVendeur().noms} en ligne depuis longtemps, boost.`}>
+      <RepliStats id="vente" titre={tr('stats.vendRythmeStock')} phrase={trm('mv.stats.vente')}>
       <StatsDetaillees liveStats={liveStats} panelOff={panelOff} onVoirDorment={onGo ? () => { demanderVue('dorment'); onGo('vinted_annonces'); } : null}/>
       <AnalysesStatistiques panelOff={panelOff}/>
 
@@ -1993,7 +1994,7 @@ function StatsVitrine({ liveStats, panelOff, periode, onSaisirPrix = null, onGo 
       : `${BP.n === 0 ? 'aucune vente finalisée · ' : ''}après prix d’achat, frais${BP.depenses === 'jamais' ? '' : ', dépenses'}${BP.sansCotis ? '' : ' et URSSAF'}${BP.depenses === 'jamais' ? ' · avant tes dépenses' : ''}`;
     return tuile('benefice', NOM_BENEFICE, CB.valeur == null ? '—' : fmt(CB.valeur), sous,
       { 'data-sv-etat': BP ? 'lu' : etatBP, 'data-sv-n': BP ? BP.n : undefined, 'data-sv-ncout': BP ? BP.nCout : undefined, 'data-sv-brut': BP && BP.nCout > 0 ? cents(BP.brut) : '', ...CB.attrs },
-      `Bénéfice : tes ventes finalisées moins le prix d’achat des ${motsVendeur().noms}, les frais de vente, tes dépenses et l’URSSAF — la même règle que Comptabilité et Ma journée.`);
+      trm('mv.stats.benefice'));
   })();
   const tDelai = !releve
     ? tuile('delai', tr('stats.tempsVendre'), '—', 'pas encore calculé', { 'data-sv-etat': 'passu' })

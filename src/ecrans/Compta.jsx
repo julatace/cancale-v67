@@ -30,6 +30,7 @@ import { aVenirPour } from '../argentAVenir.js';   // (15 nov., verre 2) la part
 import { resumeEtapes, ouvrirArgentAVenir, Groupe as GroupeAVenir } from '../ArgentAVenirEcran.jsx';
 import LivrePoliceCarte from '../LivrePoliceCarte.jsx';   // (10 nov., lot R) le livre de police
 import { lireFactures, lireContenuFacture } from '../factureAchat.js';   // (10 nov., lot AN) les factures d'achat jointes, mentionnées dans l'export
+import { libellePeriodeLangue } from '../periodeLangue.js';   // (16 nov.) le choix de la période dans la langue de l'écran
 import { TYPES_PERIODE, periodesExport, libellePeriode, donneesExportComptable, resumeExport, couvertureExport, csvExportComptable, pdfExportComptable, nomFichierExport } from '../exportComptable.js';
 import { periodeBouclee, lireJustificatifs, zipExportComptable, partagerOuTelecharger } from '../exportComptableZip.js';   // (11 nov.) le zip « Pour mon comptable »
 import { Badge, Bouton, Btn, C, COMPTA_DEFAUT, Card, CarteStatsApp, ChoixDepenses, DEMANDE_DEPENSE, DEMANDE_SAISIE_PRIX, DEPS_FACTURE, ENTREPRISE_VIDE, EXT_CAPACITES, FermeAuRetour, Icon, IconeReglage, MOIS_COMPTA, PRIX_CGV_LISIBLE, Pourquoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SERIE_DECLARATION, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, VENTES_MASQUEES_AUCUNE, _startOfDay, aLaDemande, aPayerUrssaf, askConfirm, avecDatesLbc, beneficeDesJours, beneficeDuMoisPub, bilanLignes, buildFacturXBytes, chargeAbonnement, chercherEntreprise, cleNum, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, couvertureBenefice, dateLocaleISO, debutPeriode, decalerPeriode, demanderDeclaration, echeancesAbonnement, ecouterFenetreCsp, enTeteSession, entForInvoice, extSait, fetchEmailAchats, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, isCloudReady, lbcAnnulee, lbcFinalisee, libellePeriodeCa, libelleRegime, libelleSourceAchat, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireComptaSynchro, lireDatesLbc, lireDeclarations, lireMontantSaisi, lireReglage, lireReglageMontage, lireReleveVentes, lireTout, load, logoFacture, moisDeclare, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, onCloudReady, payeDe, pctFr, phraseNonComptees, prixAchatHorsNombre, recuAvecADater, recusAchatDe, regimeFiscal, repondreSansDepenses, save, sbAuth, tauxUrssaf, telechargerFichier, toast, tod, tsCommande, uid, uidsLies, useBeneficeCalcul, useComptesAutresSites, useComptesExclus, useExcluAutre, useLigneSynchro, useLigneUrssaf, useRegimeFiscal, useStateCle, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, ventesDeclarables, ventesFaites, ventilationRecuAchat, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs, ventesAilleursDe } from '../App.jsx';
@@ -113,6 +114,7 @@ import { DEMANDE_INVENTAIRE_ANNUEL } from '../inventaireAnnuel.js';
 import { jourParis } from '../dateParis.js';   // (11 nov.) jour à l'heure de Paris
 import { valeurSue } from '../sommeConnue.js';   // (11 nov.) « pas su » ≠ 0
 import { trj } from '../i18n/react.js';
+import { motsLangue } from '../motsLangues.js';   // (16 nov.) le mot « paires / articles » dans la langue de l'écran
 import DeclarationAnnuelle from '../composants/DeclarationAnnuelle.jsx';   // (14 nov., lot argent-choix — proposition 82)
 import { declarationAnnuelle } from '../declarationAnnuelle.js';
 // ⟦← App.jsx #4⟧
@@ -2143,7 +2145,7 @@ function ExportComptableCorps({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, 
       data-export-sans-cout={D && D.sansCout != null ? D.sansCout : ''} data-export-adater={D && D.nADater != null ? D.nADater : ''}>
       <Segmente label={tr('compta.periodeExport')} value={type} onChange={setType} options={TYPES_PERIODE.map(([v, l]) => ({ v, l, data: { 'data-export-type': v } }))} />
       <select aria-label={tr('stats.periode')} data-export-choix="" value={periode} onChange={(e) => setPeriode(e.target.value)} style={{ marginTop: 10, width: '100%', height: 44, borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontSize: 15, padding: '0 10px', fontFamily: 'inherit' }}>
-        {choix.map((p) => <option key={p} value={p}>{libellePeriode(p)}</option>)}
+        {choix.map((p) => <option key={p} value={p}>{libellePeriodeLangue(p)}</option>)}
       </select>
       <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 0 }}>
         {D === undefined ? <div style={{ fontSize: 13, color: C.muted, padding: '8px 0' }}>{tr('compta.jeLisVentes')}</div>
@@ -2469,7 +2471,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
             {parPlat.length > 0 && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
               {parPlat.map(([p, x]) => <span key={p} data-recap-plateforme={p} style={{ fontSize: 11, color: C.text, border: `1px solid ${C.border}`, borderRadius: 999, padding: '3px 10px' }}>{p} · {fmt(x.centimes / 100)} · {x.n}</span>)}
             </div>}
-            {recap.partiel && <div data-fe-manque style={{ fontSize: 11, color: C.muted, lineHeight: 1.55, marginTop: 8 }}>{trj('compta.totalPartielManque', { x: recap.manques.join(' ; ') })}</div>}
+            {recap.partiel && <div data-fe-manque style={{ fontSize: 11, color: C.muted, lineHeight: 1.55, marginTop: 8 }}>{trj('compta.totalPartielManque', { x: (recap.manquesAffiches || recap.manques).join(' ; ') })}</div>}
             <div className="vrm-aide" style={{ fontSize: 11, color: C.muted, lineHeight: 1.5, marginTop: 8 }}>{tr('compta.toutesVentesMois')} <Pourquoi>{tr('compta.vrmSaitAcheteur')}</Pourquoi></div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
               <button type="button" onClick={() => exporter('csv')} data-fe-recap-csv className="sb-touche" style={btn2(true)} title={tr('compta.recapitulatifFacturesExcel')}><Icon name="save" size={14} />{tr('compta.recapitulatifTableur')}</button>
@@ -3953,7 +3955,7 @@ function BeneficeCompta({ compta, onNav, onSansDepenses, onAjouterDepense, sansC
     : B.raison === 'cotisations' ? <>{tr('compta.attenteChiffreAffaires')}</>
     : B.raison === 'rien' ? <>{tr('compta.aucuneVenteFinalisee2')}</>
     : B.n === 0 ? <>{tr('compta.aucuneVenteFinalisee3')}{B.depenses === 'jamais' ? '' : tr('compta.seulesDepensesComptent')}.</>
-    : <>{tr('compta.reste')}{B.depenses === 'jamais' ? tr('compta.avantDepenses') : ''} {tr('compta.ventesFinaliseesMoins2')} {motsVendeur().noms}{B.fraisCouverts > 0 ? tr('compta.fraisVente') : ''}{B.depenses === 'jamais' ? '' : tr('compta.depenses')}{B.sansCotis ? '' : tr('compta.urssaf')}.</>;
+    : <>{tr('compta.reste')}{B.depenses === 'jamais' ? tr('compta.avantDepenses') : ''} {tr('compta.ventesFinaliseesMoins2')} {motsLangue().noms}{B.fraisCouverts > 0 ? tr('compta.fraisVente') : ''}{B.depenses === 'jamais' ? '' : tr('compta.depenses')}{B.sansCotis ? '' : tr('compta.urssaf')}.</>;
   // La couverture n'est redite que si la phrase ne la dit pas déjà (raison « achats »).
   const couverture = !B || B.n === 0 || B.raison === 'achats' ? null
     : B.nCout === B.n ? <>{tr('annonces.prixAchat')} {B.n === 1 ? tr('compta.connu1Vente') : tr('compta.connusVentes', { x: String(B.n) })}.</>

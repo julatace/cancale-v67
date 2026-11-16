@@ -46,6 +46,7 @@ import { motsVendeur } from '../profilVendeur.js';
 import { jourParis } from '../dateParis.js';   // (11 nov.) jour à l'heure de Paris
 import { planSynchroInventaire, relierProposition } from "../inventaireSynchro.js";   // (11 nov.) synchro par identité
 import { trj } from '../i18n/react.js';
+import { trm } from '../motsLangues.js';   // (16 nov.) « paire / article » dans chaque langue
 import { BandeChiffres, Filtres, MenuCompte, LigneAFaire, BoutonIcone } from '../ui/index.js';   // (14 nov., refonte) les briques communes des écrans de liste
 
 // ⟦← App.jsx #3⟧
@@ -951,7 +952,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         <BandeChiffres className="vrm-ms-bande" items={[
           { cle: 'enligne', garderVide: true, attrs: { className: 'vrm-ui-bande-item vrm-s2d-resume-n' },
             n: lecture === undefined ? '…' : (aa && aa.su && !(aa.auMoins && nAffiche === 0) ? <>{aa.auMoins ? <small className="vrm-ms-au-moins">{tr('journee.moins')} </small> : null}{nombre(nAffiche)}</> : null),
-            l: <>{nAffiche === 1 && aa && aa.su ? `${motsVendeur().nom} en ligne` : `${motsVendeur().noms} en ligne`}{filtreActif ? tr('stock.filtrees') : ''}</> },
+            l: <>{trm(nAffiche === 1 && aa && aa.su ? 'mv.enLigne.un' : 'mv.enLigne.plusieurs')}{filtreActif ? tr('stock.filtrees') : ''}</> },
           aa && aa.su && nAffiche > 0 ? { cle: 'rangees', n: nombre(nRangees), l: `rangé${motsStock.e}${nRangees > 1 ? 's' : ''}` } : null,
           aa && aa.su && nAffiche > 0 ? { cle: 'aranger', n: nombre(nARanger), l: tr('ms.stock.aRanger') } : null,
         ]}/>
@@ -1009,7 +1010,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         const { ok, pasFaits } = trierSerie(lignes(cles), (f) => (ouEst(f) || slots[cleDeFiche(f)]) ? true : 'case introuvable');
         if (!ok.length) return resumeSerie({ faits: [], pasFaits }, { un: 'enlevée', plusieurs: 'enlevées' });
         const nv = ok.filter((f) => rangeeEtat(f) === 'vendue').length;
-        if (!(await askConfirm({ title: `Enlever ${ok.length} ${ok.length > 1 ? motsVendeur().noms : motsVendeur().nom} du stock ?`, desc: `${ok.map((f) => 'N°' + f.numero).join(', ')}\n${nv ? `${nv} vendu${motsVendeur().e}${nv > 1 ? 's' : ''} : sorti${motsVendeur().e}${nv > 1 ? 's' : ''} du stock. ` : ''}${ok.length - nv ? `${ok.length - nv} plus en ligne : la case se libère. ` : ''}Les numéros restent pris, jamais redonnés.`, ok: 'Enlever', cancel: 'Annuler' }))) return { annule: true };
+        if (!(await askConfirm({ title: trm(ok.length > 1 ? 'mv.stock.enlever.titre.plusieurs' : 'mv.stock.enlever.titre.un', { n: String(ok.length) }), desc: `${ok.map((f) => 'N°' + f.numero).join(', ')}\n${nv ? `${trm('mv.stock.vendus', { n: String(nv) })} ` : ''}${ok.length - nv ? `${trm('mv.stock.plusEnLigne', { n: String(ok.length - nv) })} ` : ''}${trm('mv.stock.numerosPris')}`, ok: trm('mv.stock.enlever.ok'), cancel: trm('mv.stock.annuler') }))) return { annule: true };
         const u = { ...slots }; for (const f of ok) delete u[cleDeFiche(f)];
         const vendues = ok.filter((f) => rangeeEtat(f) === 'vendue');
         if (vendues.length) setPairsLost((prev) => { const n = { ...prev }; const at = new Date().toISOString(); for (const f of vendues) n[cleDeclarationPartie(f.numero, f.id, numeros)] = { id: String(f.id), at, title: f.title || '', from: 'stock' }; save('vinted_pairs_lost', n); return n; });
@@ -1021,7 +1022,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
         const csv = csvDe(['N°', 'Article', 'État', 'Meuble', 'Rangée', 'Colonne'], L.map((f) => { const ou = ouEst(f); return [f.numero, f.title || '', rangeeEtat(f) === 'vendue' ? 'vendue à sortir' : 'plus en ligne', ou ? ou.meuble.name : '', ou ? ou.rangee : '', ou ? ou.colonne : '']; }));
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' }); const url = URL.createObjectURL(blob); const a = document.createElement('a');
         a.href = url; a.download = `stock-${jourParis()}.csv`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000);
-        return resumeSerie({ faits: L, pasFaits: [] }, { un: `${motsVendeur().nom} exporté${motsVendeur().e}`, plusieurs: `${motsVendeur().noms} exporté${motsVendeur().es}` });
+        return resumeSerie({ faits: L, pasFaits: [] }, { un: trm('mv.stock.exporte.un'), plusieurs: trm('mv.stock.exporte.plusieurs') });
       } },
     ];
   };
@@ -2231,7 +2232,7 @@ function Inventory({ inventory, setInventory, accounts, garageGrid, labels, onLo
             : ((syncResult.sold + syncResult.pending) > 0
                 ? `✅ ${syncResult.sold} vente(s) finalisée(s) comptée(s)${syncResult.pending?`, ${syncResult.pending} en cours (non comptée(s), en attente de validation)`:''} — sur ${syncResult.scanned} commandes analysées.`
                 : tr('stock.aucuneVenteReporter2', { scanned: String(syncResult.scanned) }))}
-          {syncResult.annulees ? ` ${syncResult.annulees} vente(s) annulée(s) : ${motsVendeur().le} revient en stock.` : ''}
+          {syncResult.annulees ? ` ${trm('mv.stock.annulees', { n: String(syncResult.annulees) })}` : ''}
         </div>
       )}
       {propositions.length > 0 && (

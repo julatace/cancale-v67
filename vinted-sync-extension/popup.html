@@ -120,20 +120,20 @@
 <body class="decide">
   <div class="head">
     <img class="logo" src="logo-vrm-96.png" alt="VRM">
-    <h1>Connexion à VRM</h1>
+    <h1 data-i18n="p_titre">Connexion à VRM</h1>
   </div>
   <div id="auth"></div>
   <section id="parcours-favoris" hidden style="border-top:1px solid var(--bord);margin-top:16px;padding-top:12px">
-    <h2 style="font-size:14px;margin:0 0 8px">Diagnostic des favoris</h2>
-    <p>Enregistre ton parcours : cloche → notification → conversation. Aucun clic automatique, aucune saisie ni contenu de message enregistré.</p>
-    <p>Un seul onglet Vinted, trois minutes maximum. Rapport local, effaçable, sans envoi à VRM. Le rapport expire 30 minutes après le démarrage, à la prochaine consultation.</p>
+    <h2 style="font-size:14px;margin:0 0 8px" data-i18n="p_diag_titre">Diagnostic des favoris</h2>
+    <p data-i18n="p_diag_1">Enregistre ton parcours : cloche → notification → conversation. Aucun clic automatique, aucune saisie ni contenu de message enregistré.</p>
+    <p data-i18n="p_diag_2">Un seul onglet Vinted, trois minutes maximum. Rapport local, effaçable, sans envoi à VRM. Le rapport expire 30 minutes après le démarrage, à la prochaine consultation.</p>
     <p id="parcours-statut" role="status"></p>
-    <button id="parcours-demarrer" type="button">Enregistrer le parcours</button>
-    <button id="parcours-arreter" type="button" disabled>Arrêter et voir le rapport</button>
-    <label for="parcours-rapport">Rapport à consulter avant partage</label>
-    <textarea id="parcours-rapport" readonly hidden rows="9" style="width:100%;font:11px monospace;resize:vertical" aria-label="Rapport du parcours Vinted"></textarea>
-    <button id="parcours-copier" type="button" disabled>Copier le rapport</button>
-    <button id="parcours-effacer" type="button" disabled>Effacer le rapport</button>
+    <button id="parcours-demarrer" type="button" data-i18n="p_diag_demarrer">Enregistrer le parcours</button>
+    <button id="parcours-arreter" type="button" disabled data-i18n="p_diag_arreter">Arrêter et voir le rapport</button>
+    <label for="parcours-rapport" data-i18n="p_diag_rapport">Rapport à consulter avant partage</label>
+    <textarea id="parcours-rapport" readonly hidden rows="9" style="width:100%;font:11px monospace;resize:vertical" aria-label="Rapport du parcours Vinted" data-i18n-aria="p_diag_rapport_aria"></textarea>
+    <button id="parcours-copier" type="button" disabled data-i18n="p_diag_copier">Copier le rapport</button>
+    <button id="parcours-effacer" type="button" disabled data-i18n="p_diag_effacer">Effacer le rapport</button>
   </section>
   <script src="popup.js"></script>
   <script src="parcours-popup.js"></script>

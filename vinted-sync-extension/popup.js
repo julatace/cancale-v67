@@ -20,6 +20,26 @@
 // oublié ? », puis « Continuer avec Google / Discord » (seulement activés), puis
 // « Se connecter avec VRM » en dernier recours. Le mot de passe part UNE fois au
 // service worker (`authLogin`), jamais gardé, jamais dans une adresse.
+// 5.394 (16 nov., lot traduction-restes) : chaque texte visible passe par `T(clé, français, vars)` —
+// chrome.i18n (_locales/<langue>/messages.json, le français par défaut : la langue du navigateur),
+// le français écrit ici en repli (une API muette, un banc sans _locales : le texte d'avant, mot pour mot).
+// Les clés et leurs traductions : scripts/extension-langues.cjs (qui écrit _locales et le vérifie).
+const T = (cle, fr, vars) => {
+  let s = ''; try { s = (chrome.i18n && chrome.i18n.getMessage(cle)) || ''; } catch (_) { s = ''; }
+  if (!s) s = fr;
+  return vars ? String(s).replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m)) : s;
+};
+// Le HTML de la fenêtre (popup.html) : chaque élément `data-i18n="clé"` reçoit son texte (le français y est déjà).
+function traduirePage() {
+  try {
+    for (const el of document.querySelectorAll('[data-i18n]')) el.textContent = T(el.getAttribute('data-i18n'), el.textContent);
+    for (const el of document.querySelectorAll('[data-i18n-aria]')) el.setAttribute('aria-label', T(el.getAttribute('data-i18n-aria'), el.getAttribute('aria-label') || ''));
+    // <html lang> suit la langue servie (celle de messages.json : `@@ui_locale` ⇒ « fr », « en »…).
+    const l = String((chrome.i18n && chrome.i18n.getMessage('p_langue')) || 'fr');
+    if (/^(fr|en|es|it|de)$/.test(l)) document.documentElement.lang = l;
+  } catch (_) {}
+}
+traduirePage();
 const CARTE = /[?&]mode=carte\b/.test(location.search);
 const REPARER = /[?&]mode=reparer\b/.test(location.search);
 const FORCE = REPARER && /[?&]force=1\b/.test(location.search);   // 5.371 : « Réparer » sur une extension muette
@@ -152,7 +172,7 @@ function ouvrirVRMPourLier(urlActive, connexion) {
 async function lierAvecVRM(fournisseur) {
   const connexion = typeof fournisseur === 'string' && FOURNISSEURS.some((f) => f.id === fournisseur) ? fournisseur : '';
   const st = document.getElementById('lierEtat');
-  if (st) { st.textContent = 'J’ouvre VRM…'; st.hidden = false; }
+  if (st) { st.textContent = T('p_ouvre', 'J’ouvre VRM…'); st.hidden = false; }
   const urlActive = CARTE ? '' : await ongletActif();
   const r = await new Promise((res) => {
     const t = setTimeout(() => res(null), 4000);
@@ -171,8 +191,8 @@ async function lierAvecVRM(fournisseur) {
   try { document.body.setAttribute('data-lier-secours', rep); } catch (_) {}
   if (rep === 'recharge') return;
   if (st) st.textContent = rep === 'a-jour'
-    ? 'L’extension n’a pas répondu à temps. VRM est ouvert : si rien ne se passe, connecte-toi ici avec ton mot de passe VRM.'
-    : 'L’extension de ce Chrome tourne encore sur son ancien code : ouvre chrome://extensions et clique ⟳ sur VRM — ou connecte-toi ici avec ton mot de passe VRM.';
+    ? T('p_pas_repondu_temps', 'L’extension n’a pas répondu à temps. VRM est ouvert : si rien ne se passe, connecte-toi ici avec ton mot de passe VRM.')
+    : T('p_ancien_code', 'L’extension de ce Chrome tourne encore sur son ancien code : ouvre chrome://extensions et clique ⟳ sur VRM — ou connecte-toi ici avec ton mot de passe VRM.');
   const f = document.getElementById('mdpForm');
   if (f) { f.hidden = false; const m = document.getElementById('mail'); if (m) m.focus(); }
 }
@@ -222,7 +242,7 @@ function connexionFournisseur(id) {
   const f = FOURNISSEURS.find((x) => x.id === id);
   if (!f) return;
   oauthEnCours = id;
-  direOAuth(`${f.nom} s’ouvre dans un nouvel onglet. Connecte-toi : l’onglet se ferme tout seul et l’extension est connectée.`);
+  direOAuth(T('p_oauth_ouvre', '{nom} s’ouvre dans un nouvel onglet. Connecte-toi : l’onglet se ferme tout seul et l’extension est connectée.', { nom: f.nom }));
   let fini = false;
   const t = setTimeout(() => { if (!fini) { fini = true; lierAvecVRM(id); } }, 5000);
   try {
@@ -230,7 +250,7 @@ function connexionFournisseur(id) {
       let e = null; try { e = chrome.runtime.lastError; } catch (_) { e = null; }
       if (fini) return; fini = true; clearTimeout(t);
       if (e || !r) { lierAvecVRM(id); return; }
-      if (!r.ok) { oauthEnCours = ''; direOAuth(r.message || 'La connexion n’a pas pu démarrer.', true); return; }
+      if (!r.ok) { oauthEnCours = ''; direOAuth(r.message || T('p_oauth_demarrer', 'La connexion n’a pas pu démarrer.'), true); return; }
       if (r.ouvrirIci && r.url) ouvrirSansTabs(r.url);
       if (!CARTE && !globalThis.__vrmOrionCompat) { try { window.close(); } catch (_) {} }
     });
@@ -243,7 +263,7 @@ try {
     if (zone !== 'local') return;
     if (ch.vrmSession && !REPARER) chargerAuth(true);
     const v = ch.vrmOAuthEtat && ch.vrmOAuthEtat.newValue;
-    if (v && v.etat === 'erreur' && oauthEnCours) { oauthEnCours = ''; direOAuth(v.message || 'La connexion n’a pas abouti.', true); }
+    if (v && v.etat === 'erreur' && oauthEnCours) { oauthEnCours = ''; direOAuth(v.message || T('p_oauth_abouti', 'La connexion n’a pas abouti.'), true); }
     if (v && v.etat === 'ok' && v.neuf) { try { sessionStorage.setItem('vrmOAuthNeuf', '1'); } catch (_) {} }
   });
 } catch (_) {}
@@ -253,14 +273,14 @@ function rendreFournisseurs(r) {
   const actifs = r ? FOURNISSEURS.filter((f) => r[f.id] === true) : [];
   try { document.body.setAttribute('data-fournisseurs', r ? (actifs.map((f) => f.id).join(',') || 'aucun') : 'pas-su'); } catch (_) {}
   if (!actifs.length) { box.hidden = true; return; }
-  poserHtml(box, actifs.map((f) => `<button class="sec fourn" id="oauth-${f.id}" data-fournisseur="${f.id}" aria-label="Continuer avec ${f.nom}">${f.logo}<span>Continuer avec ${f.nom}</span></button>`).join(''));
+  poserHtml(box, actifs.map((f) => `<button class="sec fourn" id="oauth-${f.id}" data-fournisseur="${f.id}" aria-label="${T('p_continuer', 'Continuer avec {nom}', { nom: f.nom })}">${f.logo}<span>${T('p_continuer', 'Continuer avec {nom}', { nom: f.nom })}</span></button>`).join(''));
   for (const f of actifs) document.getElementById('oauth-' + f.id).addEventListener('click', () => connexionFournisseur(f.id));
   box.hidden = false;
   // Le formulaire du mot de passe le dit : un compte Google/Discord n'en a pas.
   const mot = document.getElementById('mdpOauthMot');
   if (mot) {
-    const noms = actifs.map((f) => f.nom).join(' ou ');
-    mot.textContent = `Compte créé avec ${noms} ? Utilise ${actifs.length > 1 ? 'les boutons' : 'le bouton'} au-dessus.`;
+    const noms = actifs.map((f) => f.nom).join(T('p_ou_liste', ' ou '));
+    mot.textContent = actifs.length > 1 ? T('p_cree_avec_plusieurs', 'Compte créé avec {noms} ? Utilise les boutons au-dessus.', { noms }) : T('p_cree_avec_un', 'Compte créé avec {noms} ? Utilise le bouton au-dessus.', { noms });
     box.after(mot);
     mot.hidden = false;
   }
@@ -273,18 +293,18 @@ function rendreAuth(e) {
   //    voit « Email / Mot de passe »… et on tape son mot de passe VINTED. La
   //    fenêtre le dit, et les placeholders aussi (c'est eux qu'on lit en tapant).
   // 5.328 : une phrase — ceux de vrm.center, pas ceux de Vinted.
-  const quelCompte = "Ton email et ton mot de passe <b>VRM</b> (ceux de vrm.center) — pas ton mot de passe Vinted.";
+  const quelCompte = T('p_quel_compte', 'Ton email et ton mot de passe <b>VRM</b> (ceux de vrm.center) — pas ton mot de passe Vinted.');
   const titre = document.querySelector('h1');
-  if (titre) titre.textContent = e && e.connecte ? 'VRM' : 'Connexion à VRM';
+  if (titre) titre.textContent = e && e.connecte ? 'VRM' : T('p_titre', 'Connexion à VRM');
   if (e && e.connecte) {
     // Connecté dans la carte : on NOMME le compte (c'est ce qui permet de voir
     // qu'on s'est trompé), et le geste suivant est d'ouvrir VRM.
-    poserHtml(box, `<div class="who"><span class="dot"></span><span class="nom">${esc(e.email || 'connecté')}</span></div>
-      <div class="muted" style="margin-top:4px"${e.renouvellement ? ' data-renouvellement' : ''}>${e.renouvellement ? 'Connectée — ta session se renouvelle, un instant.' : 'L’extension est connectée : tes données partent quand tu ouvres Vinted, Leboncoin ou Vestiaire.'}</div>
-      ${(() => { let n = false; try { n = sessionStorage.getItem('vrmOAuthNeuf') === '1'; } catch (_) {} return n ? '<div class="err" data-compte-neuf>Ce compte n’était relié à aucun compte VRM : un compte VRM neuf vient d’être créé. Si tu as déjà un compte VRM, clique « Se déconnecter » et connecte-toi avec son email et son mot de passe.</div>' : ''; })()}
+    poserHtml(box, `<div class="who"><span class="dot"></span><span class="nom">${esc(e.email || T('p_connecte', 'connecté'))}</span></div>
+      <div class="muted" style="margin-top:4px"${e.renouvellement ? ' data-renouvellement' : ''}>${e.renouvellement ? T('p_renouvelle', 'Connectée — ta session se renouvelle, un instant.') : T('p_connectee', 'L’extension est connectée : tes données partent quand tu ouvres Vinted, Leboncoin ou Vestiaire.')}</div>
+      ${(() => { let n = false; try { n = sessionStorage.getItem('vrmOAuthNeuf') === '1'; } catch (_) {} return n ? '<div class="err" data-compte-neuf>' + T('p_compte_neuf', 'Ce compte n’était relié à aucun compte VRM : un compte VRM neuf vient d’être créé. Si tu as déjà un compte VRM, clique « Se déconnecter » et connecte-toi avec son email et son mot de passe.') + '</div>' : ''; })()}
       <div id="transpBox" hidden></div>
-      <button id="vrmBtn">Ouvrir VRM</button>
-      <button class="sec" id="outBtn">Se déconnecter</button>`);
+      <button id="vrmBtn">${T('p_ouvrir_vrm', 'Ouvrir VRM')}</button>
+      <button class="sec" id="outBtn">${T('p_deconnecter', 'Se déconnecter')}</button>`);
     document.getElementById('vrmBtn').addEventListener('click', ouvrirVRM);
     rendreTranspPermis(e.transp);
     direALaCarte('prete'); direALaCarte('hauteur');
@@ -294,27 +314,27 @@ function rendreAuth(e) {
     return;
   }
   const expiree = e && e.expiree;
-  poserHtml(box, `<div class="who deco"><span class="dot warn"></span><span class="nom">${expiree ? 'Session expirée' : 'Non connecté'}</span></div>
+  poserHtml(box, `<div class="who deco"><span class="dot warn"></span><span class="nom">${expiree ? T('p_expiree', 'Session expirée') : T('p_non_connecte', 'Non connecté')}</span></div>
     <div class="muted" style="margin-top:6px">${quelCompte}</div>
     <div id="mdpForm">
-      <label class="lab" for="mail">Email de ton compte VRM</label>
-      <input id="mail" type="email" inputmode="email" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Email de ton compte VRM" autocomplete="username" value="${esc(expiree && e.email ? e.email : '')}">
-      <label class="lab" for="pw">Mot de passe VRM</label>
-      <input id="pw" type="password" placeholder="Mot de passe VRM" autocomplete="current-password" enterkeyhint="go">
-      <button id="inBtn">Me connecter</button>
+      <label class="lab" for="mail">${T('p_email', 'Email de ton compte VRM')}</label>
+      <input id="mail" type="email" inputmode="email" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="${T('p_email', 'Email de ton compte VRM')}" autocomplete="username" value="${esc(expiree && e.email ? e.email : '')}">
+      <label class="lab" for="pw">${T('p_mdp', 'Mot de passe VRM')}</label>
+      <input id="pw" type="password" placeholder="${T('p_mdp', 'Mot de passe VRM')}" autocomplete="current-password" enterkeyhint="go">
+      <button id="inBtn">${T('p_me_connecter', 'Me connecter')}</button>
       <div class="err" id="authErr" role="alert" hidden></div>
-      <div class="muted" style="margin-top:4px"><a href="${APP}/?connexion&mot-de-passe-oublie" target="_blank" rel="noreferrer" id="oubliLien">Mot de passe oublié ?</a></div>
+      <div class="muted" style="margin-top:4px"><a href="${APP}/?connexion&mot-de-passe-oublie" target="_blank" rel="noreferrer" id="oubliLien">${T('p_oubli', 'Mot de passe oublié ?')}</a></div>
     </div>
     <div id="captchaBox" hidden>
       <div class="err" id="captchaMsg"></div>
-      <button id="captchaLierBtn">Se connecter avec VRM</button>
+      <button id="captchaLierBtn">${T('p_avec_vrm', 'Se connecter avec VRM')}</button>
     </div>
-    <div class="ou" id="ouSep"><span>ou</span></div>
+    <div class="ou" id="ouSep"><span>${T('p_ou', 'ou')}</span></div>
     <div id="oauthBox" hidden></div>
     <div class="muted" id="mdpOauthMot" hidden></div>
     <div class="muted" id="lierEtat" role="status" hidden></div>
-    <button class="lien" id="lierBtn">Rien ne marche ? Se connecter en passant par le site VRM</button>
-    <div class="muted">Pas encore de compte ? <a href="https://vrm.center/?inscription" target="_blank" rel="noreferrer">Ouvre vrm.center</a> et crée-le en une minute.</div>`);
+    <button class="lien" id="lierBtn">${T('p_rien_ne_marche', 'Rien ne marche ? Se connecter en passant par le site VRM')}</button>
+    <div class="muted">${T('p_pas_de_compte', 'Pas encore de compte ? <a href="https://vrm.center/?inscription" target="_blank" rel="noreferrer">Ouvre vrm.center</a> et crée-le en une minute.')}</div>`);
   document.getElementById('lierBtn').addEventListener('click', lierAvecVRM);
   // « Mot de passe oublié ? » : VRM s'ouvre sur la récupération. Fenêtre de
   // l'icône sans `target` utilisable (Orion : une feuille) ⇒ comme une page.
@@ -336,7 +356,7 @@ function rendreAuth(e) {
   const montrerRefusCaptcha = () => {
     document.getElementById('mdpForm').hidden = true;
     const box = document.getElementById('captchaBox');
-    document.getElementById('captchaMsg').textContent = 'La connexion par mot de passe n’est plus possible depuis l’extension : utilise « Se connecter avec VRM ».';
+    document.getElementById('captchaMsg').textContent = T('p_captcha', 'La connexion par mot de passe n’est plus possible depuis l’extension : utilise « Se connecter avec VRM ».');
     box.hidden = false;
     try { document.body.setAttribute('data-captcha', 'refus'); } catch (_) {}
   };
@@ -351,21 +371,21 @@ function rendreAuth(e) {
     const email = document.getElementById('mail').value, password = document.getElementById('pw').value;
     // 5.328 : les champs vides se disent ici, sans rien envoyer.
     if (!String(email).trim() || !password) {
-      dire(!String(email).trim() && !password ? 'Tape l’email et le mot de passe de ton compte VRM.' : !String(email).trim() ? 'Tape l’email de ton compte VRM.' : 'Tape ton mot de passe VRM.');
+      dire(!String(email).trim() && !password ? T('p_tape_les_deux', 'Tape l’email et le mot de passe de ton compte VRM.') : !String(email).trim() ? T('p_tape_email', 'Tape l’email de ton compte VRM.') : T('p_tape_mdp', 'Tape ton mot de passe VRM.'));
       try { document.getElementById(!String(email).trim() ? 'mail' : 'pw').focus(); } catch (_) {}
       return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) { dire('Cet email n’a pas la bonne forme (exemple : prenom@exemple.fr).'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) { dire(T('p_email_forme', 'Cet email n’a pas la bonne forme (exemple : prenom@exemple.fr).')); return; }
     const btn = document.getElementById('inBtn');
     enVol = true; btn.textContent = 'Connexion…'; btn.disabled = true; err.hidden = true;
     let fini = false;
     const finir = (r, muet) => {
       if (fini) return; fini = true; clearTimeout(attente);
-      enVol = false; btn.textContent = 'Me connecter'; btn.disabled = false;
+      enVol = false; btn.textContent = T('p_me_connecter', 'Me connecter'); btn.disabled = false;
       if (r && r.ok) { rendreAuth({ connecte: true, email: r.email || email.trim() }); direALaCarte('hauteur'); }
       else if (refusCaptcha(r)) montrerRefusCaptcha();
-      else if (muet) dire('L’extension n’a pas répondu. Réessaie dans un instant ; si ça dure, utilise « Se connecter avec VRM » plus bas.');
-      else dire((r && r.error) || 'Connexion refusée.');
+      else if (muet) dire(T('p_muet', 'L’extension n’a pas répondu. Réessaie dans un instant ; si ça dure, utilise « Se connecter avec VRM » plus bas.'));
+      else dire((r && r.error) || T('p_refusee', 'Connexion refusée.'));
     };
     // iOS peut suspendre le service worker en route : jamais un bouton figé.
     const attente = setTimeout(() => finir(null, true), 20000);
@@ -452,12 +472,12 @@ function rendreTranspPermis(t) {
   // la place d'un second bouton.
   if (CARTE) {
     box.setAttribute('data-transp-permis', 'manque-carte');
-    poserHtml(box, '<div class="muted">Pour lire le suivi de tes colis chez les transporteurs, clique l’icône VRM de la barre du navigateur et autorise-le.</div>');
+    poserHtml(box, '<div class="muted">' + T('p_transp_icone', 'Pour lire le suivi de tes colis chez les transporteurs, clique l’icône VRM de la barre du navigateur et autorise-le.') + '</div>');
     return;
   }
   box.setAttribute('data-transp-permis', 'manque');
-  poserHtml(box, `<div class="muted">Pour lire le suivi de tes colis sur les sites des transporteurs (Mondial Relay, Chronopost, Vinted Go), ce navigateur doit d'abord l'autoriser. VRM n'y lit que le statut des colis que tu attends.</div>
-    <button id="transpPermisBtn">Autoriser VRM à lire le suivi des transporteurs</button>
+  poserHtml(box, `<div class="muted">${T('p_transp_pourquoi', 'Pour lire le suivi de tes colis sur les sites des transporteurs (Mondial Relay, Chronopost, Vinted Go), ce navigateur doit d\'abord l\'autoriser. VRM n\'y lit que le statut des colis que tu attends.')}</div>
+    <button id="transpPermisBtn">${T('p_transp_autoriser', 'Autoriser VRM à lire le suivi des transporteurs')}</button>
     <div class="muted" id="transpPermisEtat" hidden></div>`);
   const origines = t.origines.slice();
   document.getElementById('transpPermisBtn').addEventListener('click', () => {
@@ -468,8 +488,8 @@ function rendreTranspPermis(t) {
       if (etat) {
         etat.hidden = false;
         etat.textContent = ok
-          ? 'C’est autorisé : l’extension peut maintenant lire le suivi de tes colis sur ces sites.'
-          : 'Ce n’est pas autorisé : rien n’est lu sur ces sites depuis ce navigateur. VRM lit ce qu’il peut de son côté.';
+          ? T('p_transp_ok', 'C’est autorisé : l’extension peut maintenant lire le suivi de tes colis sur ces sites.')
+          : T('p_transp_refus', 'Ce n’est pas autorisé : rien n’est lu sur ces sites depuis ce navigateur. VRM lit ce qu’il peut de son côté.');
       }
       // `hidden` ne suffit pas : la règle `button { display: block }` l'emporte.
       if (btn && ok) btn.remove();
@@ -573,13 +593,13 @@ function montrerMiseAJour() {
       bloc.className = 'maj';
       bloc.setAttribute('data-maj', String(m.servie || ''));
       bloc.style.cssText = 'margin:0 0 14px;padding:12px 14px;border-radius:12px;background:var(--remplir)';
-      const t = document.createElement('div'); t.style.fontWeight = '600'; t.textContent = 'Nouvelle version disponible · ' + String(m.servie || '');
+      const t = document.createElement('div'); t.style.fontWeight = '600'; t.textContent = T('p_maj_titre', 'Nouvelle version disponible · {v}', { v: String(m.servie || '') });
       const a = document.createElement('a');
       a.href = m.lien; a.target = '_blank'; a.rel = 'noopener'; a.setAttribute('download', ''); a.setAttribute('data-maj-telecharger', '');
-      a.textContent = 'Télécharger';
+      a.textContent = T('p_maj_telecharger', 'Télécharger');
       a.style.cssText = 'display:flex;align-items:center;justify-content:center;min-height:44px;margin-top:10px;border-radius:12px;background:var(--accent);color:#fff;font-weight:600;text-decoration:none';
       const ol = document.createElement('ol'); ol.style.cssText = 'margin:8px 0 0;padding-left:18px;font-size:13px;color:var(--doux)';
-      for (const x of (orion ? ['Touche « Télécharger ».', 'Orion → Extensions → + → ce fichier.', 'Rouvre cette fenêtre.'] : ['Ouvre le fichier téléchargé : il se dézippe.', 'Remplace l’ancien dossier VRM par le nouveau.', 'chrome://extensions → ⟳ sur VRM.'])) { const li = document.createElement('li'); li.textContent = x; ol.appendChild(li); }
+      for (const x of (orion ? [T('p_maj_o1', 'Touche « Télécharger ».'), T('p_maj_o2', 'Orion → Extensions → + → ce fichier.'), T('p_maj_o3', 'Rouvre cette fenêtre.')] : [T('p_maj_c1', 'Ouvre le fichier téléchargé : il se dézippe.'), T('p_maj_c2', 'Remplace l’ancien dossier VRM par le nouveau.'), T('p_maj_c3', 'chrome://extensions → ⟳ sur VRM.')])) { const li = document.createElement('li'); li.textContent = x; ol.appendChild(li); }
       bloc.append(t, a, ol);
       const tete = document.querySelector('.head');
       if (tete && tete.parentNode) tete.parentNode.insertBefore(bloc, tete.nextSibling); else document.body.prepend(bloc);

@@ -14,6 +14,7 @@ import { etatEnvoiExtension, dejaDansFil, filPasLu } from '../envoiFil.js';   //
 import { EnvoiDansFil, FilPasLu, FilIllisible } from '../composants/EnvoiDansFil.jsx';
 import { Bouton, BulleConv, C, CadreFil, ComposeConv, EXT_CAPACITES, FicheConvVolet, Icon, LigneConv, PhotoVinted, PiedSansEnvoi, RapidesConv, SUPABASE_URL, TeteFil, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, comptesLbcProuves, comptesLbcSession, extSait, ilYaBr, lbcListingsSession, lireBaseRelue, reponsesRapidesPartagees, useCompteLbcOuvert, useVueSession, vmrCmd } from '../App.jsx';
 import { tr } from '../i18n/index.js';
+import { trm } from '../motsLangues.js';   // (16 nov.) « paire / article » dans chaque langue
 
 
 // ⟦← App.jsx #1⟧
@@ -268,7 +269,7 @@ function ConversationsLeboncoin() {
             <PiedSansEnvoi raison="Pour lire et répondre, ouvre ta messagerie Leboncoin." lien="https://www.leboncoin.fr/messages" texteLien="Répondre sur Leboncoin ↗"/>
           </CadreFil>
         ) : <div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>{fils.length ? tr('messages.choisisConversation') : tr('messages.choisisCompte')}</span></div>}</div>
-        <FicheConvVolet site="leboncoin" etat={choisi || filChoisi ? 'non-reliee' : 'aucune'} raison={`Leboncoin ne dit pas à VRM de quelle annonce parle un message : VRM ne devine pas ${motsVendeur().le}.`}/>
+        <FicheConvVolet site="leboncoin" etat={choisi || filChoisi ? 'non-reliee' : 'aucune'} raison={trm('mv.conv.lbc')}/>
       </div>
     </div>
   );

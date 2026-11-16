@@ -1,0 +1,425 @@
+{
+  "c_a_heure": {
+    "message": "alle {h}"
+  },
+  "c_annuler": {
+    "message": "Annulla"
+  },
+  "c_captcha": {
+    "message": "VRM chiede una verifica anti-robot che la scheda non sa mostrare. Tocca l’icona VRM nelle impostazioni dell’estensione per accedere."
+  },
+  "c_ce_compte": {
+    "message": "Questo account"
+  },
+  "c_ce_site": {
+    "message": "questo sito"
+  },
+  "c_changer_email": {
+    "message": "Cambia e-mail"
+  },
+  "c_code_a_la_place": {
+    "message": "Ricevi un codice invece"
+  },
+  "c_code_aide": {
+    "message": "6 cifre. Funziona solo l’ultimo codice ricevuto."
+  },
+  "c_code_demander": {
+    "message": "Accedi con un codice"
+  },
+  "c_code_demander_aide": {
+    "message": "Un codice di 6 cifre arriva a questa e-mail. Funziona anche se hai creato l’account con Google o Discord."
+  },
+  "c_code_envoi": {
+    "message": "Invio del codice…"
+  },
+  "c_code_envoye": {
+    "message": "Codice inviato a <b>{email}</b>. Guarda la tua casella (e lo spam)."
+  },
+  "c_code_nouveau": {
+    "message": "Nuovo codice inviato. Funziona solo quest’ultimo."
+  },
+  "c_code_pas_parti": {
+    "message": "Il codice non è potuto partire."
+  },
+  "c_code_recu": {
+    "message": "Codice ricevuto via e-mail"
+  },
+  "c_code_refuse": {
+    "message": "Codice rifiutato."
+  },
+  "c_code_renvoyer": {
+    "message": "Invia di nuovo il codice"
+  },
+  "c_code_renvoyer_dans": {
+    "message": "Invia di nuovo il codice (tra {s} s)"
+  },
+  "c_code_tape": {
+    "message": "Scrivi le 6 cifre del codice ricevuto via e-mail."
+  },
+  "c_code_valider": {
+    "message": "Conferma il codice"
+  },
+  "c_compte_site": {
+    "message": "Account {site}"
+  },
+  "c_continuer": {
+    "message": "Continua con {nom}"
+  },
+  "c_email": {
+    "message": "E-mail del tuo account VRM"
+  },
+  "c_email_forme": {
+    "message": "Questa e-mail non ha la forma giusta (esempio: nome@esempio.it)."
+  },
+  "c_il_y_a_h": {
+    "message": "{n} h fa"
+  },
+  "c_il_y_a_j": {
+    "message": "{n} g fa"
+  },
+  "c_il_y_a_min": {
+    "message": "{n} min fa"
+  },
+  "c_instant": {
+    "message": "proprio ora"
+  },
+  "c_j_ai_mdp": {
+    "message": "Ho una password"
+  },
+  "c_mdp": {
+    "message": "Password VRM"
+  },
+  "c_mdp_aide": {
+    "message": "Quelli di vrm.center — non quelli di Vinted."
+  },
+  "c_me_connecter": {
+    "message": "Accedi"
+  },
+  "c_mot_article": {
+    "message": "articolo"
+  },
+  "c_mot_articles": {
+    "message": "articoli"
+  },
+  "c_mot_paire": {
+    "message": "paio"
+  },
+  "c_mot_paires": {
+    "message": "paia"
+  },
+  "c_muet": {
+    "message": "L’estensione non ha risposto. Riprova tra un attimo."
+  },
+  "c_oauth_demarrer": {
+    "message": "L’accesso non è potuto partire."
+  },
+  "c_oauth_fenetre": {
+    "message": "Si apre una piccola finestra {nom}. Accedi: si chiude da sola."
+  },
+  "c_oauth_muet": {
+    "message": "L’estensione non ha risposto. Accedi con un codice ricevuto via e-mail."
+  },
+  "c_oauth_onglet": {
+    "message": "Ti porto su {nom}, in questa scheda. Tornerai qui, connesso."
+  },
+  "c_ou": {
+    "message": "o"
+  },
+  "c_oubli": {
+    "message": "Password dimenticata?"
+  },
+  "c_r_a_connecter": {
+    "message": "Da collegare a VRM"
+  },
+  "c_r_a_jour": {
+    "message": "{nom} · aggiornato {quand}"
+  },
+  "c_r_aucun_vinted": {
+    "message": "Nessun account Vinted connesso qui"
+  },
+  "c_r_bascule": {
+    "message": "Account VRM cambiato: verifica sotto"
+  },
+  "c_r_bloquees": {
+    "message": "Pubblicazioni bloccate per 24 h"
+  },
+  "c_r_en_pause": {
+    "message": "Pubblicazioni in pausa"
+  },
+  "c_r_expiree": {
+    "message": "Sessione VRM scaduta: accedi di nuovo"
+  },
+  "c_r_ignore": {
+    "message": "{nom} ignorato: una tua scelta"
+  },
+  "c_r_lbc_geste": {
+    "message": "Leboncoin aspetta un gesto: vedi sotto"
+  },
+  "c_r_lbc_inconnu": {
+    "message": "Account Leboncoin non ancora riconosciuto"
+  },
+  "c_r_lbc_lues": {
+    "message": "{nom} · annunci letti"
+  },
+  "c_r_lbc_pas_lues": {
+    "message": "{nom} · annunci non ancora letti"
+  },
+  "c_r_lbc_retirer_1": {
+    "message": "1 {nom} da togliere da Leboncoin"
+  },
+  "c_r_lbc_retirer_n": {
+    "message": "{n} {noms} da togliere da Leboncoin"
+  },
+  "c_r_muette": {
+    "message": "L’estensione non risponde"
+  },
+  "c_r_pas_lu_site": {
+    "message": "VRM non legge ancora {site}"
+  },
+  "c_r_pas_su": {
+    "message": "Connessione a VRM non nota per ora"
+  },
+  "c_r_pause": {
+    "message": "Pausa: Vinted rallenta · ripresa alle {h}"
+  },
+  "c_r_redemarrer": {
+    "message": "Estensione da riavviare — vedi sotto"
+  },
+  "c_r_refuse": {
+    "message": "Ultimo invio rifiutato: vedi sotto"
+  },
+  "c_r_reprise": {
+    "message": " · ripresa alle {h}"
+  },
+  "c_r_rien": {
+    "message": "{nom} · niente inviato per ora"
+  },
+  "c_r_vc_lu": {
+    "message": "Vestiaire letto {quand}"
+  },
+  "c_r_vc_page": {
+    "message": "Vestiaire: una pagina non ancora letta"
+  },
+  "c_r_vc_pas_lu": {
+    "message": "Vestiaire non ancora letto"
+  },
+  "c_r_verif": {
+    "message": "Verifica…"
+  },
+  "c_refusee": {
+    "message": "Accesso rifiutato."
+  },
+  "c_tape_email": {
+    "message": "Scrivi l’e-mail del tuo account VRM."
+  },
+  "c_tape_les_deux": {
+    "message": "Scrivi l’e-mail e la password del tuo account VRM."
+  },
+  "c_tape_mdp": {
+    "message": "Scrivi la tua password VRM."
+  },
+  "p_ancien_code": {
+    "message": "L’estensione di questo Chrome usa ancora il vecchio codice: apri chrome://extensions e clicca ⟳ su VRM — oppure accedi qui con la tua password VRM."
+  },
+  "p_avec_vrm": {
+    "message": "Accedi con VRM"
+  },
+  "p_captcha": {
+    "message": "L’accesso con password non è più possibile dall’estensione: usa « Accedi con VRM »."
+  },
+  "p_compte_neuf": {
+    "message": "Questo account non era collegato a nessun account VRM: ne è appena stato creato uno nuovo. Se hai già un account VRM, clicca « Esci » e accedi con la sua email e password."
+  },
+  "p_connecte": {
+    "message": "connesso"
+  },
+  "p_connectee": {
+    "message": "L’estensione è collegata: i tuoi dati partono quando apri Vinted, Leboncoin o Vestiaire."
+  },
+  "p_continuer": {
+    "message": "Continua con {nom}"
+  },
+  "p_cree_avec_plusieurs": {
+    "message": "Account creato con {noms}? Usa i pulsanti qui sopra."
+  },
+  "p_cree_avec_un": {
+    "message": "Account creato con {noms}? Usa il pulsante qui sopra."
+  },
+  "p_deconnecter": {
+    "message": "Esci"
+  },
+  "p_diag_1": {
+    "message": "Registra il tuo percorso: campanella → notifica → conversazione. Nessun clic automatico, nessun input né contenuto di messaggio registrato."
+  },
+  "p_diag_2": {
+    "message": "Una sola scheda Vinted, tre minuti al massimo. Rapporto locale, cancellabile, senza invio a VRM. Il rapporto scade 30 minuti dopo l’avvio, alla consultazione successiva."
+  },
+  "p_diag_arreter": {
+    "message": "Ferma e vedi il rapporto"
+  },
+  "p_diag_copier": {
+    "message": "Copia il rapporto"
+  },
+  "p_diag_demarrer": {
+    "message": "Registra il percorso"
+  },
+  "p_diag_effacer": {
+    "message": "Cancella il rapporto"
+  },
+  "p_diag_rapport": {
+    "message": "Rapporto da leggere prima di condividere"
+  },
+  "p_diag_rapport_aria": {
+    "message": "Rapporto del percorso Vinted"
+  },
+  "p_diag_titre": {
+    "message": "Diagnostica dei preferiti"
+  },
+  "p_email": {
+    "message": "Email del tuo account VRM"
+  },
+  "p_email_forme": {
+    "message": "Questa email non ha la forma giusta (esempio: nome@esempio.it)."
+  },
+  "p_expiree": {
+    "message": "Sessione scaduta"
+  },
+  "p_langue": {
+    "message": "it"
+  },
+  "p_maj_c1": {
+    "message": "Apri il file scaricato: si decomprime."
+  },
+  "p_maj_c2": {
+    "message": "Sostituisci la vecchia cartella VRM con la nuova."
+  },
+  "p_maj_c3": {
+    "message": "chrome://extensions → ⟳ su VRM."
+  },
+  "p_maj_o1": {
+    "message": "Tocca « Scarica »."
+  },
+  "p_maj_o2": {
+    "message": "Orion → Estensioni → + → questo file."
+  },
+  "p_maj_o3": {
+    "message": "Riapri questa finestra."
+  },
+  "p_maj_telecharger": {
+    "message": "Scarica"
+  },
+  "p_maj_titre": {
+    "message": "Nuova versione disponibile · {v}"
+  },
+  "p_mdp": {
+    "message": "Password VRM"
+  },
+  "p_me_connecter": {
+    "message": "Accedi"
+  },
+  "p_muet": {
+    "message": "L’estensione non ha risposto. Riprova tra un attimo; se continua, usa « Accedi con VRM » più sotto."
+  },
+  "p_non_connecte": {
+    "message": "Non connesso"
+  },
+  "p_oauth_abouti": {
+    "message": "L’accesso non è andato a buon fine."
+  },
+  "p_oauth_demarrer": {
+    "message": "L’accesso non è potuto partire."
+  },
+  "p_oauth_ouvre": {
+    "message": "{nom} si apre in una nuova scheda. Accedi: la scheda si chiude da sola e l’estensione è collegata."
+  },
+  "p_ou": {
+    "message": "o"
+  },
+  "p_ou_liste": {
+    "message": " o "
+  },
+  "p_oubli": {
+    "message": "Password dimenticata?"
+  },
+  "p_ouvre": {
+    "message": "Apro VRM…"
+  },
+  "p_ouvrir_vrm": {
+    "message": "Apri VRM"
+  },
+  "p_pas_de_compte": {
+    "message": "Ancora senza account? <a href=\"https://vrm.center/?inscription\" target=\"_blank\" rel=\"noreferrer\">Apri vrm.center</a> e crealo in un minuto."
+  },
+  "p_pas_repondu_temps": {
+    "message": "L’estensione non ha risposto in tempo. VRM è aperto: se non succede nulla, accedi qui con la tua password VRM."
+  },
+  "p_quel_compte": {
+    "message": "La tua email e la tua password <b>VRM</b> (quelle di vrm.center) — non la password di Vinted."
+  },
+  "p_refusee": {
+    "message": "Accesso rifiutato."
+  },
+  "p_renouvelle": {
+    "message": "Collegata — la tua sessione si rinnova, un attimo."
+  },
+  "p_rien_ne_marche": {
+    "message": "Non funziona niente? Accedi passando dal sito VRM"
+  },
+  "p_tape_email": {
+    "message": "Scrivi l’email del tuo account VRM."
+  },
+  "p_tape_les_deux": {
+    "message": "Scrivi l’email e la password del tuo account VRM."
+  },
+  "p_tape_mdp": {
+    "message": "Scrivi la tua password VRM."
+  },
+  "p_titre": {
+    "message": "Accesso a VRM"
+  },
+  "p_transp_autoriser": {
+    "message": "Consenti a VRM di leggere il tracciamento dei corrieri"
+  },
+  "p_transp_icone": {
+    "message": "Per leggere il tracciamento dei tuoi pacchi presso i corrieri, clicca l’icona VRM nella barra del browser e autorizzalo."
+  },
+  "p_transp_ok": {
+    "message": "Autorizzato: l’estensione ora può leggere il tracciamento dei tuoi pacchi su questi siti."
+  },
+  "p_transp_pourquoi": {
+    "message": "Per leggere il tracciamento dei tuoi pacchi sui siti dei corrieri (Mondial Relay, Chronopost, Vinted Go), questo browser deve prima autorizzarlo. VRM legge solo lo stato dei pacchi che aspetti."
+  },
+  "p_transp_refus": {
+    "message": "Non autorizzato: niente viene letto su questi siti da questo browser. VRM legge quello che può dal suo lato."
+  },
+  "pp_arrete": {
+    "message": "Registrazione fermata · {n} passi. Leggi il rapporto prima di copiarlo."
+  },
+  "pp_copie": {
+    "message": "Rapporto copiato. Puoi condividerlo con l’assistenza VRM."
+  },
+  "pp_en_cours": {
+    "message": "Registrazione in corso. Chiudi questa finestra e apri la campanella poi il preferito su Vinted."
+  },
+  "pp_indispo": {
+    "message": "Il rapporto locale non è disponibile."
+  },
+  "pp_muet": {
+    "message": "L’estensione non ha risposto. Nessun avvio confermato."
+  },
+  "pp_navigateur": {
+    "message": "Questo browser non consente questo comando."
+  },
+  "pp_ouvre": {
+    "message": "Apri Vinted nella scheda attiva, poi avvia."
+  },
+  "pp_pas_confirme": {
+    "message": "Il rapporto locale non è stato confermato."
+  },
+  "pp_selectionne": {
+    "message": "Seleziona e copia il rapporto qui sotto."
+  },
+  "pp_verif": {
+    "message": "Verifica…"
+  }
+}

@@ -127,7 +127,9 @@ function enFrancais(texte, racine) {
   const jsxSur = (v) => !/[{}<>]/.test(v);
   let out = '';
   let i = 0;
-  const re = /\b(trj?)\('([\w.-]+)'/g;
+  // (16 nov.) `trm('k', vars)` (src/motsLangues.js) : tr() avec les mots du vendeur — une variable qui
+  // n'est pas passée est un MOT (« {nom} ») et redevient `motsVendeur().nom`, la forme d'avant.
+  const re = /\b(trj?|trm)\('([\w.-]+)'/g;
   let m;
   while ((m = re.exec(texte))) {
     const fn = m[1], k = m[2]; if (!(k in D)) continue;
@@ -145,6 +147,13 @@ function enFrancais(texte, racine) {
     }
     const v = D[k];
     let rempl, a0 = debut, a1 = fin;
+    if (fn === 'trm') {
+      const vs = vars || {};
+      const enJsx = texte[debut - 1] === '{' && texte[debut - 2] !== '$' && texte[fin] === '}' && !/[\w-]=\{$/.test(texte.slice(Math.max(0, debut - 40), debut)) && jsxSur(v.replace(/\{\w+\}/g, ''));
+      if (enJsx) { a0 = debut - 1; a1 = fin + 1; rempl = v.replace(/\{(\w+)\}/g, (mm, n) => '{' + (n in vs ? vs[n] : 'motsVendeur().' + n) + '}'); }
+      else rempl = '`' + v.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${').replace(/\{(\w+)\}/g, (mm, n) => '${' + (n in vs ? vs[n] : 'motsVendeur().' + n) + '}') + '`';
+      out += texte.slice(i, a0) + rempl; i = a1; re.lastIndex = fin; continue;
+    }
     // trj('k', { a: e }) — une phrase JSX : `{trj(…)}` redevient `texte {e} texte`, comme avant.
     if (fn === 'trj' && vars && texte[debut - 1] === '{' && texte[fin] === '}' && jsxSur(v.replace(/\{\w+\}/g, ''))) { a0 = debut - 1; a1 = fin + 1; rempl = v.replace(/\{(\w+)\}/g, (mm, n) => (n in vars ? '{' + vars[n] + '}' : mm)); }
     else if (vars) rempl = '`' + v.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$\{/g, '\\${').replace(/\{(\w+)\}/g, (mm, n) => (n in vars ? '${' + vars[n] + '}' : mm)) + '`';

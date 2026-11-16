@@ -100,6 +100,14 @@ const MIGRES = [
   ['src/composants/ChampRecherche.jsx', ['*']],
   ['src/LitigesEnCours.jsx', ['*']],
   ['src/LigneFraicheur.jsx', ['*']],
+  // (16 nov., lot traduction-restes) les textes restés en dur hors tr(). Un 3e élément `{ champs }` ajoute
+  // des propriétés (ou constantes) dont la valeur EST un texte affiché ; `@data-x` = l'élément JSX qui porte data-x.
+  ['src/prochainGesteAnnonces.js', ['*'], { champs: ['texte', 'bouton'] }],
+  ['src/facturationElectronique.js', ['etatFacturation'], { champs: ['raison', 'geste'] }],
+  ['src/design/QuiDorment.jsx', ['*'], { champs: ['titre'] }],
+  ['src/QuoiDeNeuf.jsx', ['*']],
+  ['src/periodeLangue.js', ['*']],
+  ['src/App.jsx', ['@data-colis-bordereau-frais']],   // le bandeau « Bordereau téléchargé il y a N min »
 ];
 // Ce qui n'est PAS du texte à traduire (noms propres, marques, données, symboles).
 const PROPRES = /\b(?:VRM|Google|Discord|Vinted|Leboncoin|eBay|Vestiaire Collective|Scriptable|URSSAF|PDF|SIRET|SIREN|DAC7|ACRE|CFE)\b/g;
@@ -205,7 +213,8 @@ async function principal() {
   const APPELS = new Set(['setErr', 'setInfo', 'toast', 'setLierFournisseurMot']);
   const estTexte = (s) => { const v = String(s).replace(PROPRES, '').replace(/\s+/g, ' ').trim(); return /[A-Za-zÀ-ÿ]{2,}/.test(v) && !PERMIS.some((re) => re.test(v)); };
   const durs = [];
-  for (const [rel, quoi] of MIGRES) {
+  for (const [rel, quoi, extra] of MIGRES) {
+    const champs = new Set(['lib', 'desc', 'titre', 'pied', 'val', ...((extra && extra.champs) || [])]);
     let src; try { src = lire(rel); } catch (_) { durs.push(`${rel} absent`); continue; }
     const ast = parser.parse(src, { sourceType: 'module', plugins: ['jsx'] });
     const zones = [];
@@ -219,14 +228,21 @@ async function principal() {
       if (quoi.includes(nom)) zones.push(n);
       for (const q of quoi) { const [fn, sous] = q.split(':'); if (sous === 'groupes' && fn === nom) visiter(n, (m) => { if (m.type === 'VariableDeclarator' && m.id && /^GROUPES_/.test(m.id.name || '')) zones.push(m.init); }); }
     });
+    for (const q of quoi) if (q.startsWith('@')) visiter(ast.program, (n) => { if (n.type === 'JSXElement' && (n.openingElement.attributes || []).some((a) => a.type === 'JSXAttribute' && a.name && a.name.name === q.slice(1))) zones.push(n); });
     if (!zones.length) durs.push(`${rel} : aucune zone ${quoi.join(',')} trouvée`);
     for (const z of zones) visiter(z, (n) => {
       const ligne = n.loc ? n.loc.start.line : 0;
       if (n.type === 'JSXText' && estTexte(n.value)) durs.push(`${rel}:${ligne} texte « ${n.value.trim().slice(0, 60)} »`);
       if (n.type === 'JSXAttribute' && n.name && ATTR.has(n.name.name) && n.value && n.value.type === 'StringLiteral' && estTexte(n.value.value)) durs.push(`${rel}:${ligne} ${n.name.name}="${n.value.value.slice(0, 60)}"`);
-      if (n.type === 'ObjectProperty' && n.key && ['lib', 'desc', 'titre', 'pied', 'val'].includes(n.key.name) && n.value && (n.value.type === 'StringLiteral' || n.value.type === 'TemplateLiteral')) {
-        const v = n.value.type === 'StringLiteral' ? n.value.value : n.value.quasis.map((q) => q.value.cooked).join('');
-        if (estTexte(v)) durs.push(`${rel}:${ligne} ${n.key.name}:'${v.slice(0, 60)}'`);
+      // Une propriété (ou une constante, pour les champs ajoutés) dont la valeur est un texte affiché —
+      // conditions et gabarits compris (`texte: ecrit ? '…' : '…'`).
+      const valeurTexte = n.type === 'ObjectProperty' && n.key && champs.has(n.key.name) ? n.value
+        : n.type === 'VariableDeclarator' && extra && extra.champs && n.id && extra.champs.includes(n.id.name) ? n.init : null;
+      if (valeurTexte) {
+        const lits = [];
+        const prendre = (x) => { if (!x) return; if (x.type === 'StringLiteral') lits.push(x.value); else if (x.type === 'TemplateLiteral') lits.push(x.quasis.map((q) => q.value.cooked).join('')); else if (x.type === 'ConditionalExpression') { prendre(x.consequent); prendre(x.alternate); } else if (x.type === 'LogicalExpression') prendre(x.right); };
+        prendre(valeurTexte);
+        for (const v of lits) if (estTexte(v)) durs.push(`${rel}:${ligne} ${(n.key || n.id).name}:'${v.slice(0, 60)}'`);
       }
       // Une phrase passée en argument (« ligne('deconnexion','door','Se déconnecter',…) ») : majuscule et espace.
       if (n.type === 'CallExpression') for (const a of n.arguments || []) if (a.type === 'StringLiteral' && /^[A-ZÀ-Ü]/.test(a.value) && /\s/.test(a.value) && estTexte(a.value)) durs.push(`${rel}:${ligne} argument '${a.value.slice(0, 60)}'`);
@@ -244,6 +260,19 @@ async function principal() {
       }
     });
   }
+  // F2 (16 nov.) « Quoi de neuf » : chaque nouveauté a son titre et sa phrase dans les cinq langues (le français
+  // EST src/nouveautes.js) et la feuille les montre par tr() ; les périodes affichées du livre et du registre
+  // passent par libellePeriodeLangue (le PDF garde libellePeriode, en français).
+  try {
+    const N = await import(pathToFileURL(path.join(R, 'src', 'nouveautes.js')).href + '?v=' + Math.random());
+    const sans = N.NOUVEAUTES.flatMap((n) => LANGUES.flatMap((l) => ['titre', 'phrase'].filter((c) => !(D[l] && typeof D[l][`qdn.n.${n.id}.${c}`] === 'string' && D[l][`qdn.n.${n.id}.${c}`].trim())).map((c) => `${l} : qdn.n.${n.id}.${c} (src/i18n/langues/${l}/nouveautes.js)`)));
+    const frEgal = N.NOUVEAUTES.filter((n) => D.fr && (D.fr[`qdn.n.${n.id}.titre`] !== n.titre || D.fr[`qdn.n.${n.id}.phrase`] !== n.phrase)).map((n) => n.id);
+    dit(!sans.length && !frEgal.length, `F2 les ${N.NOUVEAUTES.length} nouveautés ont leur titre et leur phrase dans les cinq langues (le français = src/nouveautes.js)`, [...sans.slice(0, 20), ...frEgal]);
+    const q = lire('src/QuoiDeNeuf.jsx');
+    dit(!/\{\s*(?:n|aVoir\[0\])\.(?:titre|phrase)\s*\}/.test(q) && /texteDe\(/.test(q), 'F2 la feuille « Quoi de neuf » montre chaque nouveauté par tr() (jamais `{n.titre}` en dur)');
+    const options = ['src/RegistresVue.jsx', 'src/ecrans/Compta.jsx'].filter((f) => { const src = lire(f); return /<option[^>]*>\{libellePeriode\(/.test(src) && !/import \{ libellePeriodeLangue as libellePeriode \}/.test(src); });
+    dit(!options.length, 'F2 les périodes du livre et du registre s’affichent dans la langue (libellePeriodeLangue)', options);
+  } catch (e) { dit(false, 'F2 « Quoi de neuf » et les périodes se lisent', e.message); }
   dit(!durs.length, `F1 aucun texte français en dur dans les ${MIGRES.length} fichiers migrés`, durs.slice(0, 30).join('\n   ') + (durs.length > 30 ? `\n   … et ${durs.length - 30} autres` : ''));
 
   // ── R. la règle ──
@@ -283,6 +312,8 @@ async function principal() {
 if (process.argv.includes('--prouve')) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'trad-'));
   const copier = (rel) => { const d = path.join(tmp, rel); fs.mkdirSync(path.dirname(d), { recursive: true }); fs.copyFileSync(path.join(R, rel), d); };
+  // (16 nov.) tout src/ est copié : le français vit aussi dans src/i18n/langues/<l>/*.js (sans eux, chaque
+  // mutation rougissait d'office — elle ne prouvait rien).
   const FICHIERS = ['src/i18n/index.js', 'src/i18n/react.js', 'src/i18n/ChoixLangue.jsx', 'src/Accueil.jsx', 'src/profil/MenuProfil.jsx', 'src/composants/GardeEcran.jsx', 'src/main.jsx', 'src/App.jsx', 'src/ecrans/Reglages.jsx', 'api/_lib/plan-regle.js', ...LANGUES.map((l) => `src/i18n/langues/${l}.js`), ...LANGUES.map((l) => `src/i18n/langues/${l}-accueil.js`)];
   const MUTS = [
     ['une clé manque en allemand', 'src/i18n/langues/de.js', /\n\s*"nav\.ventes": [^\n]*/, ''],
@@ -297,11 +328,24 @@ if (process.argv.includes('--prouve')) {
     ['la phrase Solo recopiée de travers', 'src/i18n/langues/fr-accueil.js', /("accueil\.offre\.solo\.phrase": "Un compte)/, '$1 et demi'],
     ['le repli sur le français retiré', 'src/i18n/index.js', 'if (e == null) e = fr[cle];', ''],
     ['la langue du navigateur ignorée', 'src/i18n/index.js', "if (estLangue(l)) return l;", ''],
+    // (16 nov., lot traduction-restes) les textes rendus à tr() ne reviennent pas en dur.
+    ['le prochain geste d’Annonces remis en dur', 'src/prochainGesteAnnonces.js', "texte: tr('pga.dorment')", "texte: 'Des annonces dorment : republie-les ou baisse le prix.'"],
+    ['« Articles qui dorment » remis en dur', 'src/design/QuiDorment.jsx', "tr(fav ? 'qd.titre.favoris' : 'qd.titre.dort')", "fav ? 'Favoris sans vente' : 'Articles qui dorment'"],
+    ['une raison de facture remise en dur', 'src/facturationElectronique.js', "raison: tr('fe.siren.absent')", "raison: 'Ton SIREN est absent : une facture doit le porter.'"],
+    ['le bandeau du bordereau remis en dur', 'src/App.jsx', "{tr('bordFrais.titre', { mins: String(freshLabel.mins) })}", "Bordereau téléchargé il y a {freshLabel.mins} min"],
+    ['« Quoi de neuf » montre le titre en dur', 'src/QuoiDeNeuf.jsx', "{texteDe(n, 'titre')}", "{n.titre}"],
+    ['une nouveauté sans sa traduction allemande', 'src/i18n/langues/de/nouveautes.js', /\n\s*'chercher-photo': \[[^\n]*/, ''],
   ];
   let rouges = 0;
+  // Le témoin : la copie SANS mutation est verte (sinon une mutation rouge ne prouverait rien).
+  { fs.rmSync(tmp, { recursive: true, force: true }); fs.mkdirSync(tmp); fs.cpSync(path.join(R, 'src'), path.join(tmp, 'src'), { recursive: true }); FICHIERS.filter((f) => !f.startsWith('src/')).forEach(copier);
+    try { fs.symlinkSync(path.join(R, 'node_modules'), path.join(tmp, 'node_modules')); } catch (_) {}
+    const r = spawnSync(process.execPath, [__filename], { env: { ...process.env, TRAD_RACINE: tmp }, encoding: 'utf8', timeout: 180000 });
+    console.log(`${r.status === 0 ? '✅' : '❌'} témoin : la copie sans mutation est ${r.status === 0 ? 'verte' : 'ROUGE (les mutations ne prouvent rien)'}`);
+    if (r.status !== 0) { console.log(r.stdout.split('\n').filter((l) => l.startsWith('❌')).join('\n')); process.exit(1); } }
   for (const [nom, rel, avant, apres] of MUTS) {
     fs.rmSync(tmp, { recursive: true, force: true }); fs.mkdirSync(tmp);
-    FICHIERS.forEach(copier);
+    fs.cpSync(path.join(R, 'src'), path.join(tmp, 'src'), { recursive: true }); FICHIERS.filter((f) => !f.startsWith('src/')).forEach(copier);
     try { fs.symlinkSync(path.join(R, 'node_modules'), path.join(tmp, 'node_modules')); } catch (_) {}
     const f = path.join(tmp, rel); const src = fs.readFileSync(f, 'utf8');
     const nouv = src.replace(avant, apres);
