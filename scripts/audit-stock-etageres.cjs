@@ -106,6 +106,7 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { ko++; n++; con
     texte[m[0]] = texte[m[0]].replace(m[1], m[2]);
   }
   for (const f of FICHIERS) if (texte[f] != null && f.endsWith('.js')) fs.writeFileSync(path.join(dir, f), texte[f]);
+  require('./_copie-imports.cjs').completerImports(R, dir);   // (16 nov.) ce qu'importe api/_lib depuis src/ (argent-notif → alertesSeuils)
   const imp = async (f) => { if (texte[f] == null) return { __absent: true }; try { return await import(pathToFileURL(path.join(dir, f)).href); } catch (e) { return { __erreur: String(e && e.message || e) }; } };
   const E = await imp('src/stockEtageres.js'), S = await imp('src/stockSortie.js'), Y = await imp('src/cycleArticle.js'), G = await imp('src/gesteAnnulable.js');
   const A = await imp('src/stockAnnonces.js');

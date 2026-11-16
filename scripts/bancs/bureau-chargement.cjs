@@ -22,10 +22,22 @@ const TB = require('./tous-boutons.cjs');
           return {overflow:document.documentElement.scrollWidth>innerWidth+1,main:main?.getBoundingClientRect().width,day:day?.getBoundingClientRect().width,hero:rect('.vrm-fu-tete'),tasks:rect('.vrm-fu-afaire'),chat:rect('.vrm-chat-column'),fiche:rect('.vrm-msg-fiche'),recherche:rect('.vrm-barre-recherche'),filtres:rect('.vrm-barre-haut-droite')};
         });
         assert.equal(box.overflow,false,`${width} ${tab} : pas de défilement horizontal de page`);
-        if(tab==='journee' && width>=1024) assert.ok(box.day>Math.min(box.main*.85,1300),`${width} : la journée utilise la largeur du bureau`);
+        // (16 nov., parcours-vert) La maquette ordinateur validée (15 nov., studio-journee.css §10) tient Ma journée dans
+        // 1 180 px, centrée : au-delà, la règle est « toute la largeur de la maquette, au milieu » (avant : 1 300 px).
+        if(tab==='journee' && width>=1024) {
+          const centre=await pg.evaluate(()=>{const e=document.querySelector('.vrm-main'),m=e?.getBoundingClientRect(),d=document.querySelector('.vrm-day-layout')?.getBoundingClientRect();if(!m||!d)return 999;const cs=getComputedStyle(e);return Math.abs((d.left-m.left-parseFloat(cs.paddingLeft))-(m.right-parseFloat(cs.paddingRight)-d.right));});
+          assert.ok(box.day>=Math.min(box.main*.85,1180)-1&&(box.day>box.main-100||centre<24),`${width} : la journée utilise la largeur du bureau (${Math.round(box.day)} sur ${Math.round(box.main)}, écart au centre ${Math.round(centre)})`);
+        }
         if(tab==='journee' && width>=1280) {
-          assert.ok(box.tasks.left>=box.hero.right,`${width} : tâches à côté du résumé, sans chevauchement`);
-          assert.ok(Math.abs(box.tasks.top-box.hero.top)<35,`${width} : actions visibles en haut`);
+          // (16 nov., parcours-vert) Ma journée à l'ordinateur (15 nov., 8e7b78080, maquette validée) : la tête est une
+          // bande de titre sur toute la largeur, puis TROIS colonnes (`data-sj-col` c1 le chiffre du jour et le mois ·
+          // c2 À envoyer… · c3 À retirer, Messages, À faire). Les règles jugées restent : les gestes à côté du résumé,
+          // sans chevauchement, et visibles en haut (sous la tête, dans le premier écran).
+          const col=await pg.evaluate(()=>['c1','c2','c3'].map(c=>{const r=document.querySelector(`[data-sj-col="${c}"]`)?.getBoundingClientRect();return r?{left:r.left,right:r.right,top:r.top}:null}));
+          assert.ok(col.every(Boolean),`${width} : les trois colonnes de Ma journée sont rendues`);
+          assert.ok(col[0].right<=col[1].left+1&&col[1].right<=col[2].left+1,`${width} : tâches à côté du résumé, sans chevauchement`);
+          assert.ok(Math.abs(col[1].top-col[0].top)<35&&Math.abs(col[2].top-col[0].top)<35&&col[0].top-(box.hero.top)<120&&col[0].top<475,`${width} : actions visibles en haut`);
+          if(box.tasks) assert.ok(box.tasks.left>=col[2].left-1,`${width} : « À faire » dans la colonne des gestes`);
         }
         if(tab==='messages' && width>=1024 && box.chat) {
           assert.ok(box.chat.width>=400,`${width} : le fil garde une largeur lisible`);

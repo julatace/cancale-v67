@@ -54,6 +54,33 @@ export function plage(ordre, ancre, cle, sel, coche = true) {
 // « Tout sélectionner » : les lignes du filtre courant, rien d'autre.
 export const toutSelectionner = (ordre) => [...new Set((Array.isArray(ordre) ? ordre : []).map(S).filter(Boolean))];
 
+// (16 nov., lot ventes-selection — Julien, iPhone : « je ne comprends pas pourquoi ça me dit de
+// sélectionner plus de 2000 articles ») LES LIGNES QU'ON PEUT SÉLECTIONNER sont celles DESSINÉES à
+// l'écran (`dessinees`, dans l'ordre affiché) — jamais l'historique entier qui attend derrière
+// « Afficher les suivantes », ni un groupe replié, ni une ligne estompée d'un autre compte
+// (`exclue`). « Tout sélectionner · N », le Maj-clic et le nombre de la barre lisent CETTE liste.
+export function clesSelectionnables(dessinees, { cle = (l) => l, exclue = null } = {}) {
+  const out = [], vu = new Set();
+  for (const l of (Array.isArray(dessinees) ? dessinees : [])) {
+    if (l == null) continue;
+    let ex = false; try { ex = typeof exclue === 'function' && !!exclue(l); } catch (_) { ex = true; }
+    if (ex) continue;
+    let k = ''; try { k = S(cle(l)); } catch (_) { k = ''; }
+    if (!k || k === 'undefined' || k === 'null' || vu.has(k)) continue;
+    vu.add(k); out.push(k);
+  }
+  return out;
+}
+
+// Ce qu'une action ferait sur la sélection : `peut(ligne)` (la même règle que `trierSerie`)
+// ⇒ { n: lignes où elle a un sens, m: lignes choisies }. Sert au bouton (« 2 sur 3 », grisé à 0).
+export function portee(lignes, peut) {
+  const L = Array.isArray(lignes) ? lignes : [];
+  let n = 0;
+  for (const l of L) { let p; try { p = typeof peut === 'function' ? peut(l) : true; } catch (_) { p = false; } if (p === true) n++; }
+  return { n, m: L.length };
+}
+
 // Le filtre a changé : une ligne qui n'est plus affichée sort de la sélection
 // (une action ne part jamais sur une ligne qu'il ne voit pas).
 export function garderVisibles(sel, ordre) {
