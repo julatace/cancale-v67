@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.393.0';
+const CODE_VERSION = '5.395.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -8687,7 +8687,7 @@ async function empreintesSitesUnTour() {
 //     fois (le verrou de `tickEmpreintes`) ; un couple raté n'est repris qu'après 24 h ;
 //   · sans cookie (`credentials: 'omit'`), au plus `EMPREINTES_SITES_MAX_OCTETS` par image ;
 //   · lire-fusionner-réécrire : une lecture ratée de la ligne n'écrit RIEN (le score reste en file).
-//   · eBay : aucune vérification (i.ebayimg.com n'est pas un hôte de l'extension) — l'app dit
+//   · eBay : aucune vérification fine (5.395 : l'hôte i.ebayimg.com sert l'EMPREINTE seule, pour l'app) — l'app dit
 //     « à vérifier », jamais « sûr ».
 // <photo-fine-regle> — COPIE de src/photoFine.js (scripts/audit-meme-photo.cjs --recopie). Ne pas modifier ici.
 // La version de la mesure : un score d'une autre version n'est pas relu (recalculé).
