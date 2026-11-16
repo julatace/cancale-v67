@@ -123,7 +123,7 @@ function regle(nom, f) {
     const fus = C.fusionnerVersements(avant, m);
     dit(A.sourcesDeVersement(fus).get('13') === 'conversation' && fus.__vrmParReleve instanceof Set && fus.__vrmParReleve.has('12'), 'la fusion « une date connue ne redevient jamais pas lue » GARDE d’où vient chaque date', JSON.stringify([...A.sourcesDeVersement(fus)]));
     // (15 nov.) En HEURES de Vinted ouvert (12 lectures/h) : « 7 jours » supposait l'onglet ouvert 24 h sur 24.
-    dit(A.heuresPourDater(1741) === 146 && A.heuresPourDater(0) === 0 && A.heuresPourDater(10) === 1 && typeof A.joursPourDater !== 'function', '« environ X h avec vinted.fr ouvert » : 1 741 ventes ⇒ 146 h (12 par heure) — plus de « jours » de 24 h', String(A.heuresPourDater && A.heuresPourDater(1741)));
+    dit(A.heuresPourDater(1741) === 97 && A.heuresPourDater(0) === 0 && A.heuresPourDater(10) === 1 && typeof A.joursPourDater !== 'function', '« environ X h avec vinted.fr ouvert » : 1 741 ventes ⇒ 97 h (18 par heure, 5.390) — plus de « jours » de 24 h', String(A.heuresPourDater && A.heuresPourDater(1741)));
   });
 
   // ── 3. L'extension ──
@@ -155,8 +155,9 @@ function regle(nom, f) {
     const now = Date.parse('2026-11-14T12:00:00Z');
     const L = [{ transaction_id: 1, date: '2025-06-01T10:00:00Z' }, { transaction_id: 2, date: '2026-11-10T10:00:00Z' }, { transaction_id: 3, date: '2025-05-17T10:00:00Z' },
       { transaction_id: 4, date: '2026-11-01T10:00:00Z' }, { transaction_id: 5 }, { transaction_id: 6, date: '2026-06-01T10:00:00Z' }];
-    const o = f.ctx.ordreVersements(L, now).map((x) => x.transaction_id).join(',');
-    dit(o === '2,4,3,1,6,5', '3. l’ordre : les 45 derniers jours (le plus récent d’abord), puis LES PLUS ANCIENNES, sans date en dernier', o);
+    const o = f.ctx.ordrePlusRecentes(L, now).map((x) => x.transaction_id).join(',');
+    // (15 nov., 5.390) La plus RÉCENTE d'abord, partout ; sans date en dernier.
+    dit(o === '2,4,6,1,3,5', '3. l’ordre : la plus récente d’abord (le mois en cours, le précédent, puis l’historique), sans date en dernier', o);
   });
   await essaie('repli', async () => {
     const UID = '111';
@@ -171,7 +172,7 @@ function regle(nom, f) {
       const m = /\/api\/v2\/conversations\/(\d+)$/.exec(r.chemin);
       if (!m) return { status: 404, body: {} };
       const tx = String(Number(m[1]) - 8800000 + 9300000);
-      return { status: 200, body: conv(tx === '9300000' ? '9399999' : tx) };   // la plus ancienne : lue la 1re
+      return { status: 200, body: conv(tx === '9300008' ? '9399999' : tx) };   // (5.390) la plus RÉCENTE : lue la 1re
     };
     const f = faireFond({ src: bgSrc, lignes, vinted, store });
     f.ctx.__vrmPausesVues = [];
@@ -180,12 +181,12 @@ function regle(nom, f) {
     const tx_ = f.j.vinted.filter((x) => /\/transactions\//.test(x.chemin)).length;
     const rang = Object.keys(f.lignes).filter((k) => /^harvest_111_versement_\d+$/.test(k));
     dit(conv_ > 0 && rang.length > 0, '3. le détail répond 404 ⇒ la conversation de CETTE vente est lue, la date rangée', `${tx_} détail(s), ${conv_} conversation(s), ${rang.length} rangée(s)`);
-    dit(tx_ + conv_ <= 15 && ((f.store.vrmLectures || {})[UID] || []).length <= 20, '3. dans le budget : 15 lectures d’argent par heure au plus (détails + conversations), 20 en tout', `${tx_ + conv_} lecture(s) d’argent`);
+    dit(tx_ + conv_ <= 20 && ((f.store.vrmLectures || {})[UID] || []).length <= 20, '3. dans le budget : 20 lectures d’argent par heure au plus (détails + conversations ; 5.390), 20 en tout', `${tx_ + conv_} lecture(s) d’argent`);
     dit(f.j.vinted.every((x) => x.methode === 'GET'), '3. rien n’est écrit chez Vinted (des GET seulement)');
     const l = rang.length ? f.lignes[rang[0]] : null;
     dit(!!l && l.source === 'conversation' && /^\d+$/.test(l.tx) && l.at === J3 && !JSON.stringify(l).includes('acheteuse_x') && !JSON.stringify(l).includes('Paire secrète') && !JSON.stringify(l).includes('45'),
       '3. la ligne rangée : n°, date, source — jamais un pseudo, un titre ni un montant', JSON.stringify(l));
-    dit(f.j.vinted.some((x) => /\/conversations\/8800000$/.test(x.chemin)) && !f.lignes['harvest_111_versement_9300000'] && !f.lignes['harvest_111_versement_9399999'],'3. une conversation qui porte une AUTRE transaction n’écrit rien (l’identité prime)');
+    dit(f.j.vinted.some((x) => /\/conversations\/8800008$/.test(x.chemin)) && !f.lignes['harvest_111_versement_9300008'] && !f.lignes['harvest_111_versement_9399999'],'3. une conversation qui porte une AUTRE transaction n’écrit rien (l’identité prime)');
   });
 
   // ── 4. Le contrôle de nuit ──
@@ -195,22 +196,16 @@ function regle(nom, f) {
     const aDater = { n: 1741, plus30: { n: 1741, ca: 1 }, datees: { n: 356, releve: 0 }, raisons: [{ cle: 'vinted-detail', n: 1741, ca: 1, comptes: [{ uid: '42', nom: 'boutique_x', n: 1741 }] }] };
     const d = typeof N.detailVersement === 'function' ? N.detailVersement(aDater) : null;
     dit(!!d && d.datees === 356 && d.cause === 'vinted-detail' && d.comptes === 1 && d.total === 1741, '4. le contrôle garde combien sont datées et la cause (des nombres et une clé)', JSON.stringify(d));
+    // (15 nov., 5.390) Julien ne date plus rien lui-même : ce n'est plus un contrôle de la nuit.
     const res = N.resultatControle({ 'versement-30j': 1741 }, {}, Date.now(), { 'versement-30j': d });
-    dit(!JSON.stringify(res).includes('boutique_x'), '4. jamais un pseudo dans la ligne rangée');
+    dit(!res.controles['versement-30j'] && !N.CLES_CONTROLES.includes('versement-30j'), '4. « ventes sans date de versement depuis 30 jours » n’est plus un contrôle (rien rangé)', JSON.stringify(res.controles));
     const e = N.etatControle(res, null, Date.now());
-    const l = e.lignes.find((x) => x.cle === 'versement-30j');
-    dit(!!l && l.ton === 'info' && l.detail && l.detail.datees === 356, '4. « en cours de lecture » : ton neutre (pas un geste ambre), le détail passe à l’écran', JSON.stringify(l && { ton: l.ton, detail: l.detail }));
-    const autre = N.etatControle(N.resultatControle({ 'versement-30j': 3 }, {}, Date.now(), { 'versement-30j': { datees: 2, cause: 'leboncoin', comptes: null, total: 3 } }), null, Date.now()).lignes[0];
-    dit(!!autre && autre.ton === 'geste', '4. une autre cause (Leboncoin à dater à la main) reste un geste');
-    const vieux = N.etatControle(N.resultatControle({ 'versement-30j': 9 }, {}, Date.now()), null, Date.now()).lignes[0];
-    dit(!!vieux && vieux.ton === 'geste' && /9 ventes sans date de versement/.test(vieux.phrase), '4. une ligne d’avant ce lot (sans détail) garde la phrase d’avant');
+    dit(!e.lignes.some((x) => x.cle === 'versement-30j'), '4. et Ma journée n’en montre aucune ligne', JSON.stringify(e.lignes));
   });
   await essaie('phrase', async () => {
     const F = (await import(pathToFileURL(path.join(RACINE, 'src', 'i18n', 'langues', 'fr', 'journee.js')).href)).default;
     const vj = sans(lire('src/VeilleJournee.jsx'));
-    // (15 nov., lot fiabilite-auto — décision de Julien) « N ventes à dater » n'est plus dit NULLE PART :
-    // l'extension les date sans rien lui demander. Ma journée ne porte plus la ligne (ni le contrôle de nuit).
-    dit(['veille.versement.titre', 'veille.versement.datees', 'veille.versement.pourquoi1', 'veille.versement.heures', 'veille.versement.geste'].every((k) => F[k] && !vj.includes(`'${k}`)) && !/versement-30j/.test(vj), '4. Ma journée ne dit plus « ventes à dater » (décision de Julien, 15 nov.)');
+    dit(!/veille\.versement\./.test(vj) && !/versement-30j/.test(vj), '4. (5.390) Ma journée ne dit plus « ventes à dater » ni son geste');
     const tout = Object.values(F).map((x) => (typeof x === 'object' ? Object.values(x).join(' ') : x)).join(' ');
     dit(!/encaiss/i.test(tout), '4. jamais « encaissé » (§5)');
     dit(['en', 'es', 'it', 'de'].every((l) => { const t = lire(`src/i18n/langues/${l}/journee.js`) + lire(`src/i18n/langues/${l}/compta.js`); return ['veille.versement.titre', 'veille.versement.pourquoiN', 'compta.dontConversation', 'compta.environHeuresVinted', 'compta.releveAVerifier', 'compta.releveDesaccord'].every((k) => t.includes(`"${k}"`)); }), '4. les textes neufs existent dans les 5 langues');
@@ -231,7 +226,8 @@ function regle(nom, f) {
   { const v = (re, t) => ((re.exec(t) || [])[1] || ''); const num = (x) => x.split('.').map(Number); const sup = (a, b) => { const A = num(a), B = num(b); for (let i = 0; i < 3; i++) if ((A[i] || 0) !== (B[i] || 0)) return (A[i] || 0) > (B[i] || 0); return true; };
     const cv = v(/CODE_VERSION = '([\d.]+)'/, bg), mv = v(/"version": "([\d.]+)"/, lire('vinted-sync-extension/manifest.json')), ea = v(/EXT_ATTENDUE = '([\d.]+)'/, app);
     dit(!!cv && cv === mv && mv === ea && sup(cv, '5.376.0') && /versementconv: '5\.376\.0'/.test(app), `extension ${cv} (≥ 5.376.0), \`EXT_CAPACITES.versementconv\` = 5.376.0`); }
-  dit(/heuresPourDater\(c\.n\)/.test(sans(lire('src/ecrans/Compta.jsx'))) && /data-adater-conversation/.test(lire('src/ecrans/Compta.jsx')) && /data-adater-raison="releve-non-verifie"/.test(lire('src/ecrans/Compta.jsx')), 'Déclarer : « dont N par la conversation », « environ X h avec vinted.fr ouvert » et « dates du relevé pas encore vérifiées »');
+  // (15 nov., extension 5.390) « Déclarer » : une ligne discrète, « environ X h avec vinted.fr ouvert » par la même règle (`heuresPourDater`).
+  dit(/<LigneDatesVersement /.test(sans(lire('src/ecrans/Compta.jsx'))) && /heuresPourDater\(lues\)/.test(sans(lire('src/versementRaisons.js'))) && !/data-adater-raison/.test(lire('src/ecrans/Compta.jsx')), 'Déclarer : la ligne discrète, « environ X h avec vinted.fr ouvert » par `heuresPourDater`, plus la carte des raisons');
 
   console.log(ko ? `\n❌ dates de versement, quatre sources : ${ok} vert(s), ${ko} rouge(s)` : `\n✅ dates de versement, quatre sources : ${ok} vert(s), 0 rouge(s)`);
   process.exit(ko ? 1 : 0);

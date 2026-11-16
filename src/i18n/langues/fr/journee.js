@@ -89,7 +89,7 @@ export default {
   "journee.republierPreparerAilleurs": "Republier, préparer ailleurs ou changer le prix toi-même : tu choisis, rien ne part seul",
   "journee.inventaireCours": "Inventaire en cours",
   "journee.vusReprendsT": { one: "{n} N° vu — reprends là où tu t’es arrêté", other: "{n} N° vus — reprends là où tu t’es arrêté" },
-  "journee.listeGuideeVentes": "Une liste guidée : ventes à dater, inventaire, chiffre d’affaires, URSSAF, impôts, export",
+  "journee.listeGuideeVentes": "Une liste guidée : dates de versement, inventaire, chiffre d’affaires, URSSAF, impôts, export",
   "journee.venteVestiaire": "Vente Vestiaire",
   "journee.supprimerLeboncoin": "Supprimer de Leboncoin",
   "journee.supprimer": "Supprimer",

@@ -19,7 +19,7 @@
 // Les mots passent par `tr()` dans les composants : ici, des CLÉS et des nombres.
 // ════════════════════════════════════════════════════════════════════════════
 import { etatVersion, versionCourte, LIENS_PAQUET } from '../../api/_lib/garde-capture.js';
-import { etatControle, CONTROLES_MUETS } from '../controleNuit.js';
+import { etatControle } from '../controleNuit.js';
 import { jaugeDuCompte } from '../jaugeActions.js';
 import { verificationEnCours } from '../discretion.js';
 
@@ -102,14 +102,13 @@ export function santeDesComptes({ lignes, comptes = [], appareils = [], pannes =
 // lues (undefined = en cours, null = absente) ; `sante` : `santeDesComptes` (ou null : pas
 // lue — elle n'ajoute rien) ; `ici` : `retardIci` (ou null).
 // Rend { etat: 'lecture'|'ok'|'points', n, points: [{ cle, source, ton, n }] } — un point =
-// une chose qui demande un geste. Jamais « N ventes à dater » (CONTROLES_MUETS).
+// une chose qui demande un geste. Jamais « N ventes à dater » (plus un contrôle, src/controleNuit.js).
 export function pointsToutVaBien({ controle, installation = null, sante = null, ici = null, maintenant = Date.now() } = {}) {
   if (controle === undefined) return { etat: 'lecture', n: 0, points: [] };
   const points = [];
   const ctl = etatControle(controle, installation === undefined ? null : installation, maintenant);
   const lues = new Set(ctl.lignes.map((l) => l.cle));
   for (const l of ctl.lignes) {
-    if (CONTROLES_MUETS.has(l.cle)) continue;
     // Le même compte pas relu, dit deux fois (48 h et la lecture « en ligne » de 24 h) : une seule.
     if (l.cle === 'comptes-48h' && lues.has('enligne-24h')) continue;
     points.push({ cle: `controle:${l.cle}`, source: 'controle', controle: l.cle, ton: l.ton === 'rouge' ? 'rouge' : 'geste', n: l.n, ids: l.ids || [] });

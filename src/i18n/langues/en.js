@@ -1870,7 +1870,7 @@ export default {
   "registres.nRecettes": {"one": "{n} sale", "other": "{n} sales"},
   "registres.nAchats": {"one": "{n} purchase", "other": "{n} purchases"},
   "registres.aucune": "No line in this period.",
-  "registres.horsRecettes": {"one": "In no month · to date ({n})", "other": "In no month · to date ({n})"},
+  "registres.horsRecettes": {"one": "In no month · no payout date ({n})", "other": "In no month · no payout date ({n})"},
   "registres.horsAchats": {"one": "No date ({n})", "other": "No date ({n})"},
   "registres.loi": "What the law says",
   "registres.aVerifier": "to check",

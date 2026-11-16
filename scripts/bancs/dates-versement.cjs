@@ -18,8 +18,8 @@
 // Juge, 390 tactile et 1512, clair et sombre :
 //   D1 Ventes PUBLIE `aDater.datees` (4 datées, 1 par le relevé) et `aDater.raisons`
 //      (47 « détail pas relu » sur vendeuse_b, 1 « pas finalisée ») ;
-//   D2 « Déclarer » : « 4 datées ✓ dont 1 par ton porte-monnaie · 48 ventes sans
-//      date », une ligne par raison, « Ouvrir Vinted » sur vendeuse_b (44 px) ;
+//   D2 (retiré le 15 nov., extension 5.390 : plus de carte des raisons ni de geste — la ligne
+//      discrète de « Déclarer » est jugée par scripts/bancs/versements-auto.cjs) ;
 //   D3 aucune des 47 n'est datée par ressemblance (le CA du mois = les 4 datées) ;
 //   T  aucune erreur de page, aucun « undefined / NaN / null ».
 // `SHOTS=<dossier>` : captures (à regarder). `BANC_PORT` (défaut 10671).
@@ -96,38 +96,9 @@ const capture = async (pg, nom) => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { r
         const moisPub = pub && Array.isArray(pub.mois) ? pub.mois.find((m) => m.ym === YM) : null;
         dit(!!(moisPub && moisPub.n === 11 && Math.round(moisPub.ca * 100) === 4500 * 9 + (68 + 80) * 100), `D3 ${T} : le CA de ${YM} = les 11 ventes datées, aucune datée par ressemblance (49 e-mails au même montant sans n°)`, JSON.stringify(moisPub && { n: moisPub.n, ca: moisPub.ca }));
 
-        await aller(pg, 'compta', 3500);
-        await pg.locator('[data-argent-q="declarer"]').click().catch(() => {});
-        await pg.waitForTimeout(1200);
-        const K = await pg.evaluate(() => {
-          const c = document.querySelector('[data-adater-raisons]');
-          if (!c) return null;
-          const v = c.querySelector('[data-adater-geste="vinted"]'); const r = v ? v.getBoundingClientRect() : null;
-          return {
-            datees: (c.querySelector('[data-adater-datees]') || { getAttribute: () => null }).getAttribute('data-adater-datees'),
-            releve: (c.querySelector('[data-adater-releve]') || { getAttribute: () => null }).getAttribute('data-adater-releve'),
-            conv: (c.querySelector('[data-adater-conversation]') || { getAttribute: () => null }).getAttribute('data-adater-conversation'),
-            mail: (c.querySelector('[data-adater-email]') || { getAttribute: () => null }).getAttribute('data-adater-email'),
-            heures: (c.querySelector('[data-adater-heures]') || { getAttribute: () => null }).getAttribute('data-adater-heures'),
-            sans: (c.querySelector('[data-adater-sans]') || { getAttribute: () => null }).getAttribute('data-adater-sans'),
-            raisons: [...c.querySelectorAll('[data-adater-raison]')].map((e) => `${e.getAttribute('data-adater-raison')}:${e.getAttribute('data-adater-compte') || ''}:${e.getAttribute('data-n')}`),
-            texte: c.innerText, href: v ? v.getAttribute('href') : null, h: r ? r.height : 0, vis: !!(r && r.width > 0),
-          };
-        });
-        dit(!!K, `D2 ${T} : « Déclarer » montre la carte des ventes sans date`);
-        if (K) {
-          dit(K.datees === '11' && K.releve === '1' && K.conv === '1' && K.mail === '1' && K.sans === '41', `D2 ${T} : « 11 datées ✓ dont 1 par ton porte-monnaie · 1 par la conversation · 1 par l’e-mail · 41 ventes sans date »`, JSON.stringify(K));
-          dit(K.raisons.join(',') === 'vinted-detail:222:40,vinted-attente::1', `D2 ${T} : une ligne par raison, le compte nommé`, K.raisons.join(','));
-          dit(/vendeuse_b/.test(K.texte) && /41 ventes sans date/.test(K.texte) && /par la conversation de la vente/.test(K.texte), `D2 ${T} : le compte, le nombre et la source sont écrits`, K.texte.slice(0, 260));
-          // (15 nov.) En HEURES de Vinted ouvert : 40 ÷ 12 par heure ⇒ 4 h (avant : « 1 jour », des jours de 24 h).
-          dit(K.heures === '4' && /Environ 4 h avec vinted\.fr ouvert sur ce compte/.test(K.texte) && !/jour avec vinted/.test(K.texte), `D2 ${T} : « environ 4 h avec vinted.fr ouvert sur ce compte »`, `${K.heures} ${K.texte.slice(0, 260)}`);
-          // (14 nov.) La règle de la passe design : 44 px au doigt (390, tactile), 36 px à la souris.
-          dit(K.vis && K.href === 'https://www.vinted.fr/' && K.h >= (W < 600 ? 43.5 : 35.5), `D2 ${T} : « Ouvrir Vinted » visible, ${W < 600 ? 44 : 36} px`, `${K.href} ${K.h}`);
-          dit(!/\bundefined\b|\bNaN\b|\bnull\b|encaiss/i.test(K.texte), `T ${T} : ni « undefined/NaN/null », ni « encaissé »`, K.texte);
-        }
-        await capture(pg, `declarer-${W}-${th}`);
-        const el = await pg.$('[data-adater-raisons]');
-        if (el && SHOTS) await el.screenshot({ path: path.join(SHOTS, `carte-${W}-${th}.png`) }).catch(() => {});
+        // (15 nov., extension 5.390) La carte « ce qui est daté / pourquoi / Ouvrir Vinted » est RETIRÉE
+        // (Julien : « Enlève les 1741 ventes à dater ») : « Déclarer » montre une ligne discrète, jugée par
+        // scripts/bancs/versements-auto.cjs. Ici : la publication (D1, D3), qui ne change pas.
         dit(!o.journal.erreurs.length, `T ${T} : aucune erreur de page`, o.journal.erreurs.slice(0, 3).join(' | '));
       } catch (e) { dit(false, `${T} : le banc a tourné`, e && e.message); }
       await o.ctx.close().catch(() => {});
@@ -146,12 +117,7 @@ const capture = async (pg, nom) => { if (!SHOTS) return; fs.mkdirSync(SHOTS, { r
         dit(!!(ad && ad.datees && ad.datees.releve === 0 && ad.datees.n === 10 && ad.n === 42), `V ${T} : la n° 93007 n'est PAS datée par le relevé (10 datées, 42 à dater)`, JSON.stringify(ad && { n: ad.n, datees: ad.datees }));
         const rv = ad && Array.isArray(ad.releve) ? ad.releve[0] : null;
         dit(!!(rv && rv.uid === '222' && rv.accords === 4 && rv.etat === 'a-verifier' && rv.lignes === 5), `V ${T} : publié « relevé pas encore vérifié » sur vendeuse_b (4 accords sur 5)`, JSON.stringify(ad && ad.releve));
-        await aller(pg, 'compta', 3500);
-        await pg.locator('[data-argent-q="declarer"]').click().catch(() => {});
-        await pg.waitForTimeout(1200);
-        const L = await pg.evaluate(() => { const e = document.querySelector('[data-adater-raison="releve-non-verifie"]'); return e ? { t: e.innerText, a: e.getAttribute('data-releve-accords'), c: e.getAttribute('data-adater-compte') } : null; });
-        dit(!!(L && L.c === '222' && L.a === '4' && /pas encore vérifiées/.test(L.t) && /4 sur 5 accords/.test(L.t) && /vendeuse_b/.test(L.t)), `V ${T} : « Déclarer » dit « dates du relevé pas encore vérifiées (4 sur 5 accords) » sur vendeuse_b`, JSON.stringify(L));
-        await capture(pg, `declarer-4accords-${W}`);
+        // (15 nov., 5.390) « relevé pas encore vérifié » n'est plus dit à l'écran (aucun geste) : la publication suffit.
         dit(!o.journal.erreurs.length, `V ${T} : aucune erreur de page`, o.journal.erreurs.slice(0, 3).join(' | '));
       } catch (e) { dit(false, `${T} : le banc a tourné`, e && e.message); }
       await o.ctx.close().catch(() => {});

@@ -44,7 +44,8 @@ async function juger(srcArgent, srcApp) {
   const mi = d(P, { etat: 'micro' });
   dit(mi.valeur === 148 && /avant le 30 nov\./.test(mi.note) && !mi.partiel, 'A2 micro ⇒ le CA de la prévision, et sa date', JSON.stringify(mi));
   const mp = d({ ...P, partiel: true, aDater: 2 }, { etat: 'micro' });
-  dit(mp.valeur === 148 && mp.partiel && /2 ventes à dater/.test(mp.note), 'A2 micro partiel ⇒ « au moins » et les ventes à dater nommées', JSON.stringify(mp));
+  // (15 nov., extension 5.390) Julien : « Enlève les 1741 ventes à dater » : le montant partiel dit « au moins », sans compteur.
+  dit(mp.valeur === 148 && mp.partiel && !/dater/.test(mp.note), 'A2 micro partiel ⇒ « au moins » (plus « N ventes à dater »)', JSON.stringify(mp));
   const m0 = d({ ...P, ca: 0, partiel: true }, { etat: 'micro' });
   dit(m0.valeur == null, 'A2 jamais « au moins 0 »', JSON.stringify(m0));
   const mr = d({ etat: 'rythme' }, { etat: 'micro' });

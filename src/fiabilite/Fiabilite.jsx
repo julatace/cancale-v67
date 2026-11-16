@@ -17,7 +17,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { retardIci, santeDesComptes, pointsToutVaBien } from './regles.js';
-import { etatControle, CONTROLES, CONTROLES_MUETS } from '../controleNuit.js';
+import { etatControle, CONTROLES } from '../controleNuit.js';
 import { lireControleNuit, lireControleInstallation } from '../veilleLigne.js';
 import { nomPlateforme } from '../plateformes.js';
 import { lireLignesActions } from '../JaugeActions.jsx';
@@ -103,7 +103,7 @@ export function ControleNuitLignes({ vendeur: vDonne, installation: iDonne, main
   if (ctl.etat === 'lecture' || ctl.etat === 'absent' || ctl.etat === 'vieux') return null;
   const p = pointsToutVaBien({ controle: vendeur, installation, maintenant });
   const lignes = p.points.filter((x) => x.source === 'controle');
-  const passu = ctl.passu.filter((x) => !CONTROLES_MUETS.has(x.cle));
+  const passu = ctl.passu;
   const nom = (cle) => { const C = CONTROLES.find((c) => c.cle === cle); return C ? C.nom : cle; };
   return (
     <section className="vrm-fia-groupe" data-fia-controle={lignes.length ? 'probleme' : passu.length ? 'passu' : 'ok'} data-fia-controle-n={lignes.length}>

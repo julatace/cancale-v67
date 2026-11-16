@@ -30,7 +30,7 @@ const eur = (v) => fmtMontant(v);
 const dateFr = (t) => new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
 
 const NOMS = {
-  adater: ['Ventes à dater', 'Ventes datées'],
+  adater: ['Dates de versement en lecture', 'Ventes datées'],   // (15 nov., 5.390) aucune porte : l’extension les récupère
   prix: ['Prix d’achat à saisir', 'Prix d’achat saisis'],
   inventaire: ['Inventaire au 31 décembre', 'Inventaire au 31 décembre'],
   ca: ['Chiffre d’affaires de l’année', 'Chiffre d’affaires de l’année'],
@@ -52,7 +52,7 @@ const RAISONS = {
   'inventaire-publication': 'liste pas encore lue : ouvre Annonces',
   'seuils-partiel': 'sur un chiffre d’affaires minimum',
 };
-const VERDICT = { atteint: 'seuil atteint', atteintSi: 'atteint si les ventes à dater y sont', sous: 'sous le seuil' };
+const VERDICT = { atteint: 'seuil atteint', atteintSi: 'atteint si les ventes sans date de versement y sont', sous: 'sous le seuil' };
 const ETAT_SEUIL = { ok: 'sous le seuil', proche: 'proche', base_depasse: 'dépassé', majore_depasse: 'seuil majoré dépassé', due_depuis_janvier: 'TVA due depuis janvier', depasse: 'dépassé', sortie: 'dépassé deux ans de suite' };
 
 // Le texte sous chaque étape : ce qui a été CONSTATÉ.
@@ -61,7 +61,7 @@ function sousTexte(e, K) {
   if (e.etat === 'passu' && e.raison && e.cle !== 'inventaire' && e.cle !== 'seuils') return RAISONS[e.raison] || 'pas su';
   if (e.etat === 'na') return RAISONS[e.raison] || '';
   switch (e.cle) {
-    case 'adater': return e.n > 0 ? `${nb(e.n)} vente${pl(e.n)} sans date de versement : dans aucun mois` : 'toutes les ventes ont leur date';
+    case 'adater': return e.n > 0 ? `${nb(e.n)} vente${pl(e.n)} : l’extension récupère leur date de versement, dans aucun mois d’ici là` : 'toutes les ventes ont leur date';
     case 'prix': return e.n > 0 ? `${nb(e.n)} vente${pl(e.n)} de ${K.annee} sur ${nb(e.sur)} sans prix d’achat` : `${nb(e.sur)} vente${pl(e.sur)} de ${K.annee}, toutes avec un prix`;
     case 'inventaire': {
       const val = e.v && e.v.centimes != null ? `${e.v.nSans > 0 || e.partiel ? 'au moins ' : ''}${eur(e.v.centimes / 100)} sur ${nb(e.v.n)} ${e.v.n > 1 ? motsVendeur().noms : motsVendeur().nom}` : '';
@@ -175,16 +175,7 @@ export default function ClotureAnnee({ portes = {}, maintenant: maintenantProp }
                       </li>))}
                   </ol>
                 ) : null}
-                {e.cle === 'adater' && e.n > 0 && Array.isArray(e.raisons) && e.raisons.length ? (
-                  <ul className="vrm-ca-raisons" data-cloture-raisons="">
-                    {e.raisons.slice(0, 4).map((r) => (
-                      <li key={r.cle} data-cloture-raison={r.cle} data-n={r.n}>
-                        <span>{nb(r.n)} · {r.cle === 'vinted-detail' ? `Vinted, détail pas encore relu${r.comptes.length ? ' (' + r.comptes.slice(0, 2).map((c) => c.nom).filter(Boolean).join(', ') + ')' : ''}` : r.cle === 'vinted-attente' ? 'Vinted, pas encore finalisée' : r.cle === 'vinted-passu' ? 'Vinted, pas su' : r.cle === 'leboncoin' ? 'Leboncoin, date à recopier' : r.cle === 'vestiaire' ? 'Vestiaire, versement pas lu' : 'eBay, sans date'}</span>
-                        {r.cle === 'vinted-detail' ? <a className="vrm-lien-action" href="https://www.vinted.fr/" target="_blank" rel="noopener noreferrer" data-cloture-geste="vinted">Ouvrir Vinted ↗</a> : null}
-                      </li>))}
-                    {e.toutes > e.n ? <li className="vrm-ca-note">{nb(e.toutes - e.n)} autre{pl(e.toutes - e.n)}, vendue{pl(e.toutes - e.n)} après {K.annee}, ne compte{e.toutes - e.n > 1 ? 'nt' : ''} pas ici.</li> : null}
-                  </ul>
-                ) : null}
+                {/* (15 nov., 5.390) Plus la liste des raisons ni « Ouvrir Vinted ↗ » / « date à recopier » : aucun geste demandé. */}
                 {e.cle === 'revenus' && e.etat !== 'na' && e.cases ? (
                   <p className="vrm-ca-note" data-cloture-source="">
                     Cases de la notice {NOTICE_LUE.notice} ({NOTICE_LUE.source}, lue le {NOTICE_LUE.lue}).{e.aReverifier ? ` Pour tes revenus ${K.annee}, revérifie la case sur la notice de l’année avant de la reporter.` : ''}

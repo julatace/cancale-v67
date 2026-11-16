@@ -1,10 +1,9 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
-import { heuresPourDater } from '../versementRaisons.js';   // (15 nov.) « environ X h avec vinted.fr ouvert » (avant : des jours de 24 h)
+import { LigneDatesVersement } from '../composants/LigneDatesVersement.jsx';   // (15 nov., 5.390) « Dates de versement : l’extension les récupère », aucun geste
 import { CLE_FOURNISSEURS, lireRegistre } from '../fournisseurs.js';
 import { motsVendeur } from '../profilVendeur.js';
 import { CLE_HORS_MASQUES, horsVisibles } from '../achatsDoubles.js';
-import { periodeADater } from '../aDaterAnnee.js';
 import { DEMANDE_COMMANDE } from '../annulerCommandes.js';
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
@@ -33,7 +32,7 @@ import LivrePoliceCarte from '../LivrePoliceCarte.jsx';   // (10 nov., lot R) le
 import { lireFactures, lireContenuFacture } from '../factureAchat.js';   // (10 nov., lot AN) les factures d'achat jointes, mentionnées dans l'export
 import { TYPES_PERIODE, periodesExport, libellePeriode, donneesExportComptable, resumeExport, couvertureExport, csvExportComptable, pdfExportComptable, nomFichierExport } from '../exportComptable.js';
 import { periodeBouclee, lireJustificatifs, zipExportComptable, partagerOuTelecharger } from '../exportComptableZip.js';   // (11 nov.) le zip « Pour mon comptable »
-import { Badge, Bouton, Btn, C, COMPTA_DEFAUT, Card, CarteStatsApp, ChoixDepenses, DATE_LBC_OK, DEMANDE_DEPENSE, DEMANDE_SAISIE_PRIX, DEPS_FACTURE, ENTREPRISE_VIDE, EXT_CAPACITES, FermeAuRetour, Icon, IconeReglage, MOIS_COMPTA, PRIX_CGV_LISIBLE, Pourquoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SERIE_DECLARATION, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, VENTES_MASQUEES_AUCUNE, _startOfDay, aLaDemande, aPayerUrssaf, askConfirm, avecDatesLbc, beneficeDesJours, beneficeDuMoisPub, bilanLignes, buildFacturXBytes, chargeAbonnement, chercherEntreprise, cleNum, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, couvertureBenefice, dateLocaleISO, debutPeriode, decalerPeriode, demanderDeclaration, echeancesAbonnement, ecouterFenetreCsp, enTeteSession, entForInvoice, extSait, fetchEmailAchats, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, isCloudReady, lbcAnnulee, lbcFinalisee, libellePeriodeCa, libelleRegime, libelleSourceAchat, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireComptaSynchro, lireDatesLbc, lireDeclarations, lireMontantSaisi, lireReglage, lireReglageMontage, lireReleveVentes, lireTout, load, logoFacture, moisDeclare, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, onCloudReady, payeDe, pctFr, phraseNonComptees, prixAchatHorsNombre, recuAvecADater, recusAchatDe, regimeFiscal, repondreSansDepenses, save, sbAuth, tauxUrssaf, telechargerFichier, toast, tod, tsCommande, uid, uidsLies, useBeneficeCalcul, useComptesAutresSites, useComptesExclus, useExcluAutre, useLigneSynchro, useLigneUrssaf, useRegimeFiscal, useStateCle, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, ventesDeclarables, ventesFaites, ventilationRecuAchat, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs, ventesAilleursDe } from '../App.jsx';
+import { Badge, Bouton, Btn, C, COMPTA_DEFAUT, Card, CarteStatsApp, ChoixDepenses, DEMANDE_DEPENSE, DEMANDE_SAISIE_PRIX, DEPS_FACTURE, ENTREPRISE_VIDE, EXT_CAPACITES, FermeAuRetour, Icon, IconeReglage, MOIS_COMPTA, PRIX_CGV_LISIBLE, Pourquoi, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, SB_CONFLICT, SERIE_DECLARATION, SUPABASE_URL, ScreenHead, Segmente, SheetShell, TAUX_URSSAF_DEFAUT, VENTES_MASQUEES_AUCUNE, _startOfDay, aLaDemande, aPayerUrssaf, askConfirm, avecDatesLbc, beneficeDesJours, beneficeDuMoisPub, bilanLignes, buildFacturXBytes, chargeAbonnement, chercherEntreprise, cleNum, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, couvertureBenefice, dateLocaleISO, debutPeriode, decalerPeriode, demanderDeclaration, echeancesAbonnement, ecouterFenetreCsp, enTeteSession, entForInvoice, extSait, fetchEmailAchats, fetchProInvoices, fetchVersementsVinted, fmt, fmtDate, isCloudReady, lbcAnnulee, lbcFinalisee, libellePeriodeCa, libelleRegime, libelleSourceAchat, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireComptaSynchro, lireDatesLbc, lireDeclarations, lireMontantSaisi, lireReglage, lireReglageMontage, lireReleveVentes, lireTout, load, logoFacture, moisDeclare, moisPeriodeUrssaf, montantPeriodeUrssaf, netApresUrssafDe, nextUrssafDeadline, onCloudReady, payeDe, pctFr, phraseNonComptees, prixAchatHorsNombre, recuAvecADater, recusAchatDe, regimeFiscal, repondreSansDepenses, save, sbAuth, tauxUrssaf, telechargerFichier, toast, tod, tsCommande, uid, uidsLies, useBeneficeCalcul, useComptesAutresSites, useComptesExclus, useExcluAutre, useLigneSynchro, useLigneUrssaf, useRegimeFiscal, useStateCle, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, ventesDeclarables, ventesFaites, ventilationRecuAchat, withOwner, xmlEsc, ymCompta, ymCourant, ymDeTs, ventesAilleursDe } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import {jaugeSeuils,optionsMicro,calendrierUrssaf,phraseRythme,seuilsDe,declarationRevenus,rappelCfe} from '../microEntreprise.js';
@@ -1558,40 +1557,11 @@ const caParPeriodes = (series, p, n = 6, maintenant = Date.now()) => {
 // Leboncoin, eBay) : aucune lecture de plus, sauf les dates de versement.
 // Trois états partout : `undefined` lecture en cours · `null` pas su · lu.
 const PERIODES_CA = [['semaine', 'Semaine'], ['mois', 'Mois'], ['trimestre', 'Trimestre'], ['annee', 'Année']];
-// Dater une vente Leboncoin à la main (29 oct.) : la date se recopie depuis
-// « Mes transactions » sur leboncoin.fr. Une date lue par l'extension gagne
-// toujours ; une date dans l'avenir ou avant 2015 est refusée.
-function DaterVentesLbc({ ventes, dates }) {
-  const liste = (ventes || []).filter((v) => v && v.isSeller === true && v.txId && !v.dateVente && !lbcAnnulee(v) && lbcFinalisee(v));
-  const [saisie, setSaisie] = React.useState({});
-  const [msg, setMsg] = React.useState(null);
-  if (!liste.length) return null;
-  const auj = new Date(); const max = `${auj.getFullYear()}-${String(auj.getMonth() + 1).padStart(2, '0')}-${String(auj.getDate()).padStart(2, '0')}`;
-  const poser = (tx, d) => {
-    if (d && (!DATE_LBC_OK.test(d) || d > max || d < '2015-01-01')) { setMsg({ tx, t: 'Une date entre 2015 et aujourd\'hui.' }); return; }
-    const u = { ...(dates || {}) }; if (d) u[String(tx)] = d; else delete u[String(tx)];
-    save('vrm_lbc_dates', u); setMsg(null);
-  };
-  const eur = (v) => v.price != null && isFinite(Number(v.price)) ? `${(Number(v.price) / 100).toFixed(2).replace('.', ',')}\u00a0€` : '—';
-  return (
-    <div data-dater-lbc={liste.length} style={{ padding: '10px 16px 14px', borderTop: `1px solid ${C.border}`, fontSize: 13, color: C.text }}>
-      <div style={{ fontWeight: 600 }}>{tr('compta.daterVentesLeboncoin')}</div>
-      <div style={{ fontSize: 12, color: C.muted, marginTop: 2, lineHeight: 1.5 }}>{tr('compta.recopieDateMes')}</div>
-      {liste.map((v) => {
-        const tx = String(v.txId), cur = (dates || {})[tx] || '';
-        const val = saisie[tx] != null ? saisie[tx] : cur;
-        return (
-          <div key={tx} data-dater-lbc-tx={tx} data-dater-lbc-date={cur} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 10 }}>
-            <span style={{ flex: '1 1 180px', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.title || tr('compta.venteLeboncoin')} · {eur(v)}</span>
-            <input type="date" aria-label={`Date de vente de ${v.title || 'cette vente'}`} max={max} min="2015-01-01" value={val} onChange={(e) => setSaisie((x) => ({ ...x, [tx]: e.target.value }))} style={{ border: `1px solid ${C.border}`, borderRadius: 12, padding: '8px 10px', fontSize: 17, minHeight: 44, background: C.bg, color: C.text, fontFamily: 'inherit' }}/>
-            <button type="button" data-dater-lbc-ok={tx} disabled={!val || val === cur} onClick={() => poser(tx, val)} style={{ border: 'none', borderRadius: 12, background: C.accent, color: C.onAccent || '#fff', padding: '8px 14px', minHeight: 44, fontSize: 13, fontWeight: 600, cursor: 'pointer', opacity: (!val || val === cur) ? 0.5 : 1, fontFamily: 'inherit' }}>{tr('lbcplus.remise.enregistrer')}</button>
-            {cur ? <button type="button" data-dater-lbc-retirer={tx} onClick={() => { setSaisie((x) => ({ ...x, [tx]: '' })); poser(tx, ''); }} style={{ border: `1px solid ${C.border}`, borderRadius: 12, background: 'transparent', color: C.text, padding: '8px 12px', minHeight: 44, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>{tr('achats.retirer')}</button> : null}
-            {msg && msg.tx === tx ? <div role="alert" style={{ flexBasis: '100%', fontSize: 12, color: C.warn }}>{msg.t}</div> : null}
-          </div>);
-      })}
-    </div>
-  );
-}
+// (15 nov., extension 5.390) « Dater une vente Leboncoin à la main » (29 oct.) est RETIRÉ de
+// l'écran : Julien ne date plus rien lui-même. MESURÉ (base de prod, lecture seule) : aucun
+// compte n'a jamais écrit `vrm_lbc_dates` (clé absente de toutes les lignes `main`). La clé
+// reste LUE (une date posée par « Remis en main propre », SON geste de remise, compte encore ;
+// une date relevée par l'extension gagne toujours).
 // (29 oct.) Le nom de la carte, UNE source : son titre, le sommaire de
 // Comptabilité et les phrases qui y renvoient (la carte URSSAF du mois) le lisent.
 const TITRE_CARTE_CA = 'Vendu et reçu';
@@ -1665,7 +1635,6 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
     ['finalise', 'Finalisé', 'ventes finalisées, au jour de la vente'],
     ['recu', 'Reçu (versé)', versements === undefined ? 'dates de versement en lecture…' : versements === null ? 'dates de versement illisibles' : "au jour où l'argent a été versé"],
   ];
-  const aDaterEur = calc.etat === 'lu' ? calc.aDater.reduce((t, l) => t + (Number(l.eur) || 0), 0) : 0;
   return (
     <Card style={{ padding: 0, overflow: 'hidden' }}>
       <div data-ca-periode={periode} data-ca-etat={calc.etat} data-ca-partiel={partiel ? '1' : '0'}>
@@ -1725,15 +1694,15 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
               {calc.manque.length > 0 && <div>{trj('compta.totauxPartielsSans', { x: calc.manque.join(', ') })}</div>}
               {!calc.manque.length && calc.attente && <div>{tr('compta.leboncoinEbayLit')}</div>}
               {versements === null && <div>{tr('compta.datesVersementVinted')}</div>}
-              {calc.aDater.length > 0 && <div>{trj('compta.ventesFinaliseesSans', { n: calc.aDater.length, fmt: fmt(aDaterEur) })}</div>}
-              {calc.venduSansDate > 0 && <div>{trj('compta.ventesLeboncoinSans', { n: calc.venduSansDate })}</div>}
+              {/* (15 nov., 5.390) Plus « N ventes finalisées sans date de versement » : la ligne discrète, sans geste. */}
+              {calc.aDater.length > 0 && <LigneDatesVersement avecDelai={extSait('versementsauto') === 'ok'} as="div" ad={{ n: calc.aDater.length, raisons: [{ cle: 'vinted-detail', n: calc.aDater.filter((l) => l && l.plateforme === 'Vinted').length }] }} style={{ fontSize: 'inherit' }}/>}
+              {calc.venduSansDate > 0 && <div>{tr('versement.lbcSans', { n: calc.venduSansDate })}</div>}
               {/* (2 nov., audit des données G1) La commande eBay au montant pas lu est dans « non comptées » ci-dessous (une phrase, §7). */}
               {/* (1er nov., audits A2/A10) Des ventes faites dont l'argent ne se lit pas : dans AUCUNE colonne, dites (jamais 0 €). */}
               {calc.venduNonComptees.length > 0 && <div data-ca-non-comptees={calc.venduNonComptees.length}>{trj('compta.dansVenduChaque', { phraseNonComptees: phraseNonComptees(calc.venduNonComptees) })}</div>}
               {calc.recuNonComptees.length > 0 && <div data-ca-recu-non-comptees={calc.recuNonComptees.length}>{trj('compta.dansFinaliseNi', { phraseNonComptees: phraseNonComptees(calc.recuNonComptees) })}</div>}
             </div>
           )}
-          {lbcCoqueLu === true ? <DaterVentesLbc ventes={(lbcVentes && lbcVentes.ventes) || []} dates={datesLbc}/> : null}
         </>)}
       </div>
     </Card>
@@ -2768,7 +2737,7 @@ function Dac7Plateformes({ ligne, annee }) {
         const pct = p.etat !== 'lu' ? 0 : Math.min(100, Math.max(p.n / 30, p.centimes / 200000) * 100);
         const droite = p.etat !== 'lu' ? '—'
           : p.verdict === 'atteint' ? <b style={{ color: C.text }}>{tr('compta.atteint')}</b>
-          : p.verdict === 'atteintSi' ? <>{tr('compta.atteint2')} {p.nAd} {tr('compta.dater')}</>
+          : p.verdict === 'atteintSi' ? <>{tr('compta.atteint2')} {p.nAd} {tr('versement.dac7Si')}</>
           // (11 nov., restes) Aucune vente sur cette plateforme : le reste EST le seuil, déjà écrit dans
           // l'en-tête — le redire sur chaque ligne l'écrivait trois fois (§7). La jauge vide le dit.
           : p.verdict === 'sous' ? (p.n === 0 && p.centimes === 0 ? null : <>{tr('compta.encore')} {p.reste.n} {tr('journee.vente')}{p.reste.n > 1 ? 's' : ''} {tr('annonces.texte5')} {eur(p.reste.centimes)}</>)
@@ -3232,8 +3201,8 @@ function CarteUrssafMois({ liveStats, onNav }) {
           // Vinted pas lu, montant Vestiaire pas sûr…) : comptées NULLE PART, dites
           // ici, des mêmes lignes que le total — le chiffre est un minimum (§5).
           if (ncInfo && ncInfo.n > 0) morceaux.push(<Puce key="nc" warn><span data-urssaf-non-comptees={ncInfo.n}>{trj('compta.dansAucunChiffre', { phraseNonCompteesPar: phraseNonCompteesPar(ncInfo.par) })}</span>{ncInfo.par && Object.keys(ncInfo.par).some(k => k.startsWith('Vestiaire|')) ? <>{tr('compta.vrmSaitEncore')}</> : null}</Puce>);
-          if (adV && adV.n > 0) morceaux.push(<Puce key="av">{adV.n} {tr('journee.vente')}{adV.n>1?'s':''} {tr('compta.vintedFinalisee')}{adV.n>1?'s':''} {tr('compta.sansDateVersement')}<Mt v={adV.ca}/>{tr('compta.dansAucunMois')}{extSait('versement')==='retard' && <span style={{color:C.warn}}>{trj('compta.metsExtensionJour', { versement: EXT_CAPACITES.versement })}</span>}</Puce>);
-          if (adL && adL.n > 0) morceaux.push(<Puce key="a">{adL.n} {tr('journee.vente')}{adL.n>1?'s':''} {tr('compta.leboncoinSansDate')}<Mt v={adL.ca}/>{tr('compta.dansAucunMois2')}{adL.n>1?tr('compta.texte6'):tr('compta.texte7')} {tr('compta.dans')} <button type="button" className="vrm-lien-action" data-renvoi-carte-ca="" onClick={() => ouvrirRepliCompta('compta-ca')} style={{background:'none',border:0,padding:0,color:C.accentTexte,fontWeight:600,cursor:'pointer',fontSize:'inherit',fontFamily:'inherit',minHeight:0}}>« {TITRE_CARTE_CA} »</button> {tr('compta.dansDetail')}{extSait('lbcdate')==='retard' && <span style={{color:C.warn}}>{trj('compta.metsAbordExtension', { lbcdate: EXT_CAPACITES.lbcdate })}</span>}</Puce>);
+          // (15 nov., 5.390) Les ventes sans date de versement : UNE ligne, sans geste (ni « mets l’extension à jour », ni renvoi pour dater à la main).
+          if (ad && Number(ad.n) > 0) morceaux.push(<Puce key="av"><LigneDatesVersement avecDelai={extSait('versementsauto') === 'ok'} as="span" ad={ad} style={{fontSize:'inherit',color:'inherit'}}/></Puce>);
           // (29 oct.) « Vestiaire Co : pas encore relié » retiré : affiché à tous, même sans compte Vestiaire, il n'apprenait rien.
         }
         return (
@@ -3306,7 +3275,6 @@ function CarteUrssafMois({ liveStats, onNav }) {
                       sur le même écran (septembre : 0,00 € ici, 4 224,77 € là). */}
                   <span>{tr('compta.declarerArgentRecu')}</span><span data-echeance-ca={urssafPeriodCA==null?'':String(urssafPeriodCA)} data-echeance-de={urssafDue.periodStart.toISOString()} data-echeance-a={urssafDue.periodEnd.toISOString()} data-echeance-partiel={echeancePartiel||undefined} style={{color:urssafPeriodCA==null?C.muted:C.text,fontWeight:400,textAlign:'right'}}>{urssafPeriodCA==null?'—':<>{echeancePartiel>0?tr('journee.moins3'):''}<Mt v={urssafPeriodCA}/></>}</span>
                   <span>{tr('compta.payer2')}</span><span data-echeance-apayer={urssafPeriodCA==null?'':String(aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100))} style={{color:urssafPeriodCA==null?C.muted:C.text,fontWeight:700,textAlign:'right'}}>{urssafPeriodCA==null?'—':<>{echeancePartiel>0?tr('journee.moins3'):''}<Mt v={aPayerUrssaf(urssafPeriodCA, TAUX_URSSAF*100)}/></>}</span>
-                  {prevIci && prevIci.aDater > 0 ? <><span>{tr('compta.dater2')}</span><span data-prevision-adater={prevIci.aDater} style={{color:C.text,textAlign:'right'}}>{trj('compta.ventes4', { n: prevIci.aDater })}</span></> : null}
                   {prevIci && prevIci.declares.length > 0 ? <><span>{tr('compta.dejaDeclare')}</span><span data-prevision-declares={prevIci.declares.join(',')} style={{color:C.muted,textAlign:'right'}}>{prevIci.declares.map(ym=>new Date(Number(ym.slice(0,4)),Number(ym.slice(5,7))-1,1).toLocaleDateString('fr-FR',{month:'long'})).join(', ')}</span></> : null}
                 </div>
                 {(
@@ -3349,7 +3317,7 @@ function CarteUrssafMois({ liveStats, onNav }) {
           <div style={{...sNote,display:'flex',flexDirection:'column',gap:8,padding:'4px 0 6px'}}>
             {moisCourantCA!=null && <div>{tr('compta.additionneVentes')} <b>{tr('compta.finalisees')}</b> {tr('compta.argentVerse')} {moisCourant.nom}, <b>{tr('compta.toutesPlateformes2')}</b>{tr('compta.ventesMasqueesComprises')}{nA > 0 && <> — {nA>1?tr('compta.ventesVersees'):tr('compta.venteVersee')} {tr('compta.moisCiMais')}{ou ? <> {tr('annonces.texte7')} {ou}</> : null} {nA>1?tr('compta.sontRecomptees'):tr('compta.recomptee')} {tr('compta.ici')}</>}{tr('compta.sommeVerserFin')}</div>}
             {moisCourantCA!=null && adV && adV.n > 0 && extSait('versement')!=='retard' && <div>{tr('compta.ventesVintedSans')} {extSait('versement')==='ok' ? <>{tr('compta.extensionVaChercher')}</> : <>{tr('compta.extensionInstalleeVa')}</>}.</div>}
-            {moisCourantCA!=null && adL && adL.n > 0 && <div>{tr('compta.ventesLeboncoinSans2')} {extSait('lbcdate')==='ok' ? <>{tr('compta.ouvreMesTransactions')}</> : extSait('lbcdate')==='retard' ? <>{tr('compta.foisExtensionJour')}</> : <>{tr('compta.depuisOrdinateurExtension')}</>}.</div>}
+            {moisCourantCA!=null && adL && adL.n > 0 && <div>{tr('compta.ventesLeboncoinSans2')} {tr('versement.lbcReleve')}.</div>}
             {moisCourantCA!=null && (e.par||{}).Leboncoin && <div>{tr('compta.leboncoinDateJour')}</div>}
             {/* (2 nov., audit P7) eBay ne transmet pas la date de son versement : le dire. */}
             {moisCourantCA!=null && (e.par||{}).eBay && <div data-ca-ebay-date="">{tr('compta.ebayDateJour')}</div>}
@@ -3781,64 +3749,11 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
     </section>
   );
 }
-// (11 nov., lot DJ7) « 1 756 ventes sans date de versement » ⇒ ce qui est daté, ce qui
-// manque, POURQUOI (src/versementRaisons.js, publié par Ventes avec la ligne), et LE geste.
-// Rien n'est daté ici : une vente reste dans aucun mois tant que sa date n'est pas lue (§5).
-const nbAd = (n) => Number(n || 0).toLocaleString('fr-FR');
-const plAd = (n, s = 's') => (Number(n) > 1 ? s : '');
-function ADaterRaisons({ ad, n, periodeAd, label, onDater }) {
-  const d = ad.datees && Number.isFinite(Number(ad.datees.n)) ? ad.datees : null;
-  const lignes = [];
-  for (const r of ad.raisons) {
-    if (!r || !(r.n > 0)) continue;
-    if (r.cle === 'vinted-detail') {
-      const comptes = Array.isArray(r.comptes) && r.comptes.length ? r.comptes : [{ uid: '', nom: '', n: r.n }];
-      for (const c of comptes) lignes.push(
-        <li key={'d' + c.uid} data-adater-raison="vinted-detail" data-adater-compte={c.uid || ''} data-n={c.n}>
-          <span><b>{nbAd(c.n)}</b> {c.nom ? <>{tr('journee.texte2')} <b>{c.nom}</b></> : tr('compta.vinted')} {tr('compta.vente3')}{plAd(c.n)} {tr('compta.encoreRelue')}{plAd(c.n)}.{heuresPourDater(c.n) ? <> <span data-adater-heures={heuresPourDater(c.n)}>{tr('compta.environHeuresVinted', { n: heuresPourDater(c.n) })}</span></> : null}</span>
-          <Bouton variante="discret" href="https://www.vinted.fr/" target="_blank" rel="noopener noreferrer" data-adater-geste="vinted">{tr('annonces.ouvrirVinted')}</Bouton>
-        </li>);
-    } else if (r.cle === 'leboncoin') lignes.push(
-      <li key="lbc" data-adater-raison="leboncoin" data-n={r.n}>
-        <span><b>{nbAd(r.n)}</b> {tr('compta.leboncoinDateRecopier')}</span>
-        <Bouton variante="discret" data-urssaf-dater="" data-adater-geste="main" onClick={onDater}>{tr('compta.daterMain')}</Bouton>
-      </li>);
-    else if (r.cle === 'importee') lignes.push(
-      <li key="imp" data-adater-raison="importee" data-n={r.n}>
-        <span><b>{nbAd(r.n)}</b> {tr('compta.importee')}{plAd(r.n)} {tr('compta.sansDateVersement2')}</span>
-        <Bouton variante="discret" data-adater-geste="importer" onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=settings&section=importer' })); } catch (_) {} }}>{tr('reglages.importer.lib')}</Bouton>
-      </li>);
-    else if (r.cle === 'vestiaire') lignes.push(
-      <li key="vc" data-adater-raison="vestiaire" data-n={r.n}>
-        <span><b>{nbAd(r.n)}</b> {tr('compta.vestiaireVersementEncore')}</span>
-        <Bouton variante="discret" href="https://fr.vestiairecollective.com/" target="_blank" rel="noopener noreferrer" data-adater-geste="vestiaire">{tr('compta.ouvrirVestiaire')}</Bouton>
-      </li>);
-    else lignes.push(
-      <li key={r.cle} data-adater-raison={r.cle} data-n={r.n}>
-        <span><b>{nbAd(r.n)}</b> {r.cle === 'vinted-attente' ? 'Vinted : pas encore finalisée' + plAd(r.n) + ', relue' + plAd(r.n) + ' seule' + plAd(r.n) + '.' : r.cle === 'vinted-passu' ? tr('compta.vintedSuLecture') : tr('compta.ebayCommandeSans')}</span>
-      </li>);
-  }
-  // (15 nov.) Le relevé du porte-monnaie porte des ventes de ce compte, mais il n'est pas
-  // encore VÉRIFIÉ (src/versementReleve.js) : rien n'en est daté — dit, jamais deviné.
-  for (const rv of (Array.isArray(ad.releve) ? ad.releve : [])) {
-    if (!rv || !(rv.lignes > 0)) continue;
-    lignes.push(
-      <li key={'rv' + rv.uid} data-adater-raison="releve-non-verifie" data-adater-compte={rv.uid || ''} data-releve-etat={rv.etat} data-releve-accords={rv.accords} data-n={rv.lignes}>
-        <span>{rv.nom ? <><b>{rv.nom}</b> · </> : null}{tr(rv.etat === 'desaccord' ? 'compta.releveDesaccord' : 'compta.releveAVerifier', { n: rv.lignes, accords: rv.accords, min: rv.min, desaccords: rv.desaccords })}</span>
-      </li>);
-  }
-  return (
-    <div className="vrm-adater" data-adater-raisons="">
-      <span>
-        {d ? <><b data-adater-datees={d.n}>{trj('compta.datee', { nbAd: nbAd(d.n), plAd: plAd(d.n) })}</b>{d.releve > 0 ? <span data-adater-releve={d.releve}>{trj('compta.dontPorteMonnaie', { nbAd: nbAd(d.releve) })}</span> : null}{d.conversation > 0 ? <span data-adater-conversation={d.conversation}>{trj('compta.dontConversation', { nbAd: nbAd(d.conversation) })}</span> : null}{d.email > 0 ? <span data-adater-email={d.email}>{trj('compta.dontEmail', { nbAd: nbAd(d.email) })}</span> : null} · </> : null}
-        <b data-adater-sans={n}>{trj('compta.venteSansDate', { nbAd: nbAd(n), plAd: plAd(n) })}</b> {tr('compta.dansMontant')}
-        {periodeAd ? <> {tr('compta.ellesOntEte')} <span data-urssaf-adater-periode="">{periodeAd}</span> {tr('compta.venteVersee2')} {label} {tr('compta.manquerait')}</> : null}
-      </span>
-      <ul className="vrm-adater-liste">{lignes}</ul>
-      <Pourquoi ecrit>{tr('compta.dateCompteCelle')}</Pourquoi>
-    </div>
-  );
-}
+// (15 nov., extension 5.390) Julien : « Enlève les 1741 ventes à dater, cela n'a aucun sens.
+// Le but est que l'extension récupère ces infos, pas que ça soit à nous de le faire. »
+// La carte « ce qui est daté / pourquoi / le geste » (lot DJ7) est RETIRÉE : plus aucun
+// « Ouvrir Vinted », « Dater à la main », « Les dater ». Il reste UNE ligne discrète
+// (`LigneDatesVersement`), et le total dit sa couverture (« au moins », §5).
 function PrevisionUrssafCarte({ onNav }) {
   const { P, ligne, regLu, regPret } = usePrevisionUrssaf();
   const [copie, setCopie] = React.useState('');
@@ -3869,7 +3784,7 @@ function PrevisionUrssafCarte({ onNav }) {
       <section className="vrm-fu-declaration is-calme vrm-fu-prevision" {...attrs} aria-label={tr('compta.prochaineEcheanceUrssaf')}>
         <div>
           <b className="vrm-fu-prevision-montant">{P.etat === 'lu' ? <>{P.partiel ? <small>{tr('journee.moins')} </small> : null}{fmt(P.apayer)}</> : '—'}</b>
-          <span>URSSAF · {periode} {tr('compta.declarerAvant')} {date}{P.aDater > 0 ? tr('compta.dater3', { aDater: String(P.aDater) }) : ''}</span>
+          <span>URSSAF · {periode} {tr('compta.declarerAvant')} {date}</span>
         </div>
       </section>
     );
@@ -3886,7 +3801,6 @@ function PrevisionUrssafCarte({ onNav }) {
   for (const m of moisP) for (const [k, v] of Object.entries(m.par || {})) parP[k] = (parP[k] || 0) + (Number(v && v.n) || 0);
   const parL = Object.entries(parP).filter(([, n]) => n > 0);
   const parTxt = parL.length > 1 ? parL.map(([k, n]) => `${n} ${k}`).join(', ') : '';   // une seule plateforme : rien à détailler
-  const periodeAd = P.aDater > 0 ? periodeADater(ligne && ligne.aDater) : '';
   const tauxTxt = String(tauxUrssaf()).replace('.', ',');
   return (
     <section className={'vrm-urssaf-geste' + (urgent ? ' is-urgent' : '')} {...attrs} data-urssaf-parcours="3" aria-label={tr('compta.declarationUrssaf', { label: String(P.label) })}>
@@ -3909,8 +3823,7 @@ function PrevisionUrssafCarte({ onNav }) {
       {(P.ca == null || P.partiel || P.aDater > 0) ? (
         <div className="vrm-urssaf-manque" data-urssaf-manque={P.aDater > 0 ? String(P.aDater) : P.ca == null ? 'passu' : 'partiel'}>
           {P.ca == null ? <><span>{tr('stats.encoreCalculeOuvre')}</span>{onNav ? <Bouton variante="discret" data-urssaf-ventes="" onClick={() => onNav('cat_ventes')}>{tr('compta.ouvrirVentes')}</Bouton> : null}</>
-            : P.aDater > 0 && ligne && ligne.aDater && Array.isArray(ligne.aDater.raisons) && ligne.aDater.raisons.length ? <ADaterRaisons ad={ligne.aDater} n={P.aDater} periodeAd={periodeAd} label={P.label} onDater={() => vers('compta-ca')}/>
-            : P.aDater > 0 ? <><span>{P.aDater} {tr('journee.vente')}{P.aDater > 1 ? 's' : ''} {tr('compta.sansDateVersement3')}{periodeAd ? <> {tr('compta.ellesOntEte')} <span data-urssaf-adater-periode="">{periodeAd}</span> {tr('compta.venteVersee2')} {P.label} {tr('compta.manqueraitVerifieAvant')}</> : null}</span><Bouton variante="discret" data-urssaf-dater="" onClick={() => vers('compta-ca')}>{P.aDater > 1 ? tr('compta.dater4') : tr('compta.dater5')}</Bouton></>
+            : P.aDater > 0 ? <LigneDatesVersement avecDelai={extSait('versementsauto') === 'ok'} ad={ligne && ligne.aDater && Number(ligne.aDater.n) > 0 ? ligne.aDater : { n: P.aDater }}/>
             : <>{tr('compta.manqueVentesEncore')}</>}
         </div>
       ) : <div className="vrm-urssaf-manque" data-urssaf-rien-manque="">{tr('compta.rienToutesVentes')}</div>}
@@ -4401,7 +4314,7 @@ const viserCompta = (sel, ouvrirDetails = true, essai = 0) => {
   } catch (_) {}
 };
 const portesCloture = ({ onNav }) => ({
-  adater: () => ouvrirRepliCompta('compta-ca'),
+  // (15 nov., 5.390) Plus de porte « à dater » : l’extension récupère les dates de versement.
   prix: () => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); },
   inventaire: () => { DEMANDE_INVENTAIRE_ANNUEL.at = Date.now(); if (onNav) onNav('garage'); },
   ca: () => ouvrirRepliCompta('compta-ca'),

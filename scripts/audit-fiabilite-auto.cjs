@@ -63,7 +63,7 @@ async function controles() {
     dit(n1 && n1.lignes.map((l) => l.cle).join() === 'numeros-double,vente-sans-numero', 'A10 la notification : seulement les écarts RÉELS qui demandent un geste (jamais les totaux, jamais « à dater »)', n1);
     dit(C.aNotifierControle(data, C.memoControleApres(n1, T0), T0 + 2 * 60e3) === null, 'A11 la même signature qu’hier ⇒ rien de neuf, rien envoyé');
     dit(C.aNotifierControle({ ...data, at: new Date(T0 - 40 * H).toISOString() }, null, T0) === null, 'A12 un contrôle de plus de 36 h ne notifie pas');
-    dit(C.CONTROLES_MUETS.has('versement-30j') && !C.CONTROLES_NOTIFIES.has('versement-30j') && !C.CONTROLES_NOTIFIES.has('totaux-mois'), 'A13 « ventes à dater » muet (décision de Julien), les totaux jamais notifiés');
+    dit(!C.CLES_CONTROLES.includes('versement-30j') && !C.CONTROLES_NOTIFIES.has('versement-30j') && !C.CONTROLES_NOTIFIES.has('totaux-mois'), 'A13 « ventes à dater » n’est plus un contrôle (décision de Julien, 5.390), les totaux jamais notifiés');
   });
 
   // ── B. LE SERVEUR ─────────────────────────────────────────────────────────────
@@ -324,7 +324,7 @@ const MUTATIONS = [
   ['src/controleNuit.js', 'if (Number.isInteger(avant) && avant > P.size)', 'if (false)', 'la liste plus courte que la nuit d’avant passe'],
   ['src/controleNuit.js', 'const frais = (at) => Number.isFinite(at) && Number.isFinite(sourceAt) && at >= sourceAt;', 'const frais = (at) => true;', 'une publication ancienne comparée'],
   ['src/controleNuit.js', '  if (m && m.sig === sig) return null;\n', '', 'la même signature renvoyée'],
-  ['src/controleNuit.js', "export const CONTROLES_MUETS = new Set(['versement-30j']);", 'export const CONTROLES_MUETS = new Set([]);', '« ventes à dater » affiché'],
+  ['src/controleNuit.js', 'export const CLES_CONTROLES = CONTROLES.map((c) => c.cle);', "CONTROLES.push({ cle: 'versement-30j', ou: 'vendeur', nom: 'Ventes sans versement', phrase: (n) => `${n} ventes à dater`, geste: { libelle: 'Voir', aller: '/?tab=compta' } });\nexport const CLES_CONTROLES = CONTROLES.map((c) => c.cle);", '« ventes à dater » redevenu un contrôle'],
   ['api/_lib/controle-nuit.js', '      ajouterMasquees(parNum,', '      void (parNum,', 'les masquées oubliées'],
   ['api/_lib/controle-nuit.js', "  if (!(await ecrire(MEMO_CONTROLE, memoControleApres(n, maintenant)))) return", "  if (!(await ecrire(MEMO_CONTROLE, memoControleApres(n, maintenant))) && false) return", 'mémo pas écrit mais envoi'],
   ['src/alertesPlantages.js', 'export const PERSONNES_MIN = 3;', 'export const PERSONNES_MIN = 1;', 'une seule personne notifie'],
@@ -334,7 +334,6 @@ const MUTATIONS = [
   ['src/fiabilite/regles.js', "if (e !== 'ancienne') return null; }", '}', 'une version à jour dite en retard'],
   ['src/fiabilite/regles.js', 'if (j.captcha && verificationEnCours(j.captcha, R[String(l.id)]))', 'if (j.captcha)', 'son « Reprendre » ignoré'],
   ['src/plantages.js', "  if (contexte && contexte.origine === 'demarrage') return true;\n  let t = 0;", '  return false;\n  let t = 0;', 'le morceau qui revient jamais dit'],
-  ['src/fiabilite/regles.js', "    if (CONTROLES_MUETS.has(l.cle)) continue;\n", '', 'un point « à dater »'],
   ['src/fraicheur.js', "    if (ici && ici.version && versionCourte(a.code || a.ver) === ici.version) continue;\n", '', 'l’extension d’ici dite deux fois'],
 ];
 function prouver() {

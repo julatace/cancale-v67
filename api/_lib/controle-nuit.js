@@ -18,7 +18,7 @@ import { cleNum } from './numerotation.js';
 import { DESTINATIONS } from './lien-notif.js';
 import { comptesARelire, dernieresCaptures, SELECT_CAPTURES } from './comptes-a-relire.js';
 import { PROPRIETAIRE_NEUTRE } from './proprietaire-email.js';
-import { CLE_CONTROLE, CLE_CONTROLE_INSTALLATION, numerosEnDouble, comptesPasRelus, versementsEnRetard, detailVersement, incoherencesStripe, resultatControle,
+import { CLE_CONTROLE, CLE_CONTROLE_INSTALLATION, numerosEnDouble, comptesPasRelus, incoherencesStripe, resultatControle,
   ventesSansNumero, poolRetreci, enLigneVieux, ecartsTotaux, aNotifierControle, memoControleApres } from '../../src/controleNuit.js';
 // (15 nov., lot fiabilite-auto) La règle « en ligne », la règle des ventes (miroir de l'app).
 import { enLigneDesLignes } from './enligne-regle.js';
@@ -61,7 +61,7 @@ export function ajouterMasquees(parNum, { lignesL, lignesP, supp, fiches, retire
 // `lireDonneesBilan`) ; `calculer` : `calculerBilan` (api/_lib/bilan-semaine.js). Absents ⇒ « pas su ».
 export async function controleVendeur({ lireTout, ecrire, maintenant = Date.now(), lireBilan = null, calculer = null }) {
   const [mainL, vL, vP, vS, comptesL, panneau, etats, noirs, captures, widgetL, avantL, bilan] = await Promise.all([
-    lireTout('app_data?id=eq.main&select=fiches:data->vinted_annonce_numeros,retirees:data->vrm_annonces_retirees,masques:data->vinted_accounts_hidden,aDater:data->vinted_urssaf_mois->aDater'
+    lireTout('app_data?id=eq.main&select=fiches:data->vinted_annonce_numeros,retirees:data->vrm_annonces_retirees,masques:data->vinted_accounts_hidden'
       // (15 nov.) la liste des N°, les N° posés sur une vente et ses liens, les publications du mois (projetées)
       + ',pool:data->vinted_used_numeros,ov:data->vinted_sale_overrides,liens:data->vinted_txn_link,recu:data->vinted_urssaf_mois->recu,urssafAt:data->vinted_urssaf_mois->>at,benef:data->vrm_benefice_jours->jours,benefAt:data->vrm_benefice_jours->>at,perdues:data->vinted_pairs_lost'),
     lireTout('app_data?id=like.harvest_%25_listings&select=id,cap:data->>capturedAt,uid:data->uid,items:data->payload->items'),
@@ -98,12 +98,9 @@ export async function controleVendeur({ lireTout, ecrire, maintenant = Date.now(
       valeurs['numeros-double'] = numerosEnDouble(parNum);
     }
   }
-  // 2. Ventes sans versement depuis 30 jours : le nombre publié par l'écran Ventes.
-  valeurs['versement-30j'] = m0 ? versementsEnRetard(objetJson(m0.aDater)) : null;
-  if (valeurs['versement-30j'] == null) raisons['versement-30j'] = m0 ? 'ouvre Ventes pour le compter' : 'pas lu';
-  // (14 nov., lot dates-versement) + combien sont déjà datées et pourquoi le reste attend.
+  // 2. (15 nov., extension 5.390) « Ventes sans versement depuis 30 jours » n'est plus un contrôle :
+  //    Julien ne date rien lui-même, l'extension récupère ces dates (src/controleNuit.js).
   const details = {};
-  if (valeurs['versement-30j'] != null) { const d = detailVersement(objetJson(m0.aDater)); if (d) details['versement-30j'] = d; }
   // 3. Comptes pas relus depuis 48 h : la règle de « Tout va bien ? ».
   valeurs['comptes-48h'] = null;
   if (!m0 || !Array.isArray(comptesL) || !Array.isArray(panneau) || !Array.isArray(etats) || !Array.isArray(noirs) || !Array.isArray(captures)) raisons['comptes-48h'] = 'tes comptes n’ont pas pu être lus';

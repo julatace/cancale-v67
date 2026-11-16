@@ -89,7 +89,7 @@ export default {
   "journee.republierPreparerAilleurs": "Neu einstellen, woanders vorbereiten oder Preis selbst ändern: Du entscheidest, nichts geht von allein raus",
   "journee.inventaireCours": "Inventur läuft",
   "journee.vusReprendsT": { one: "{n} Nr. gesehen — mach weiter, wo du aufgehört hast", other: "{n} Nr. gesehen — mach weiter, wo du aufgehört hast" },
-  "journee.listeGuideeVentes": "Eine geführte Liste: Verkäufe datieren, Inventur, Umsatz, URSSAF, Steuern, Export",
+  "journee.listeGuideeVentes": "Eine geführte Liste: Auszahlungsdaten, Inventur, Umsatz, URSSAF, Steuern, Export",
   "journee.venteVestiaire": "Vestiaire-Verkauf",
   "journee.supprimerLeboncoin": "Bei Leboncoin löschen",
   "journee.supprimer": "Löschen",

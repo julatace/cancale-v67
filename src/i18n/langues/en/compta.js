@@ -716,4 +716,11 @@ export default {
   "compta.environHeuresVinted": { one: "About {n} h with vinted.fr open on this account.", other: "About {n} h with vinted.fr open on this account." },
   "compta.releveAVerifier": { one: "{n} sale in the wallet statement: statement dates not verified yet ({accords} of {min} matches with the sale details). Nothing is dated from it until then.", other: "{n} sales in the wallet statement: statement dates not verified yet ({accords} of {min} matches with the sale details). Nothing is dated from it until then." },
   "compta.releveDesaccord": { one: "{n} sale in the wallet statement: its date does not fall on the same day as the sale details ({desaccords} mismatch). This account’s statement dates nothing.", other: "{n} sales in the wallet statement: their dates do not fall on the same day as the sale details ({desaccords} mismatch(es)). This account’s statement dates nothing." },
+  // (15 nov., extension 5.390) La ligne discrète : l’extension récupère les dates de versement, aucun geste.
+  "versement.ligne": { one: "Payout dates: the extension is fetching them (≈ {n} left · about {h} h with vinted.fr open).", other: "Payout dates: the extension is fetching them (≈ {n} left · about {h} h with vinted.fr open)." },
+  "versement.ligneSans": { one: "Payout dates: the extension is fetching them (≈ {n} left).", other: "Payout dates: the extension is fetching them (≈ {n} left)." },
+  "versement.court": "dates being read",
+  "versement.lbcReleve": "the extension picks up their sale date on leboncoin.fr as you browse",
+  "versement.lbcSans": { one: "{n} Leboncoin sale without a sale date: in no period for now (the extension picks it up on leboncoin.fr).", other: "{n} Leboncoin sales without a sale date: in no period for now (the extension picks them up on leboncoin.fr)." },
+  "versement.dac7Si": "without a payout date count",
 };

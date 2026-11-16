@@ -1870,7 +1870,7 @@ export default {
   "registres.nRecettes": {"one": "{n} incasso", "other": "{n} incassi"},
   "registres.nAchats": {"one": "{n} acquisto", "other": "{n} acquisti"},
   "registres.aucune": "Nessuna riga nel periodo.",
-  "registres.horsRecettes": {"one": "In nessun mese · da datare ({n})", "other": "In nessun mese · da datare ({n})"},
+  "registres.horsRecettes": {"one": "In nessun mese · senza data di versamento ({n})", "other": "In nessun mese · senza data di versamento ({n})"},
   "registres.horsAchats": {"one": "Senza data ({n})", "other": "Senza data ({n})"},
   "registres.loi": "Cosa dice la legge",
   "registres.aVerifier": "da verificare",

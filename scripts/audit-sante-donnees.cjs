@@ -94,7 +94,7 @@ if (process.argv.includes('--mutations')) {
   const tr = (cle) => trancher.lignes.find((l) => l.cle === cle).n;
   const attendu = {
     'numeros-double': tr('numeros-double'), 'numeros-a-ecrire': tr('numeros-a-ecrire'), 'colis-postes': tr('colis-postes'),
-    'achats-sans-prix': tr('achats-sans-prix'), 'ventes-a-dater': tr('ventes-a-dater'),
+    'achats-sans-prix': tr('achats-sans-prix'),
     'ventes-sans-achat': SA.beneficeParSource(sources.lignes).sansAchat,
     'comptes-a-relire': lignesF.filter((l) => l.geste).length,
     'extension-en-retard': appareils.filter((a) => G.etatVersion(a, ATT) === 'ancienne').length,
@@ -105,8 +105,9 @@ if (process.argv.includes('--mutations')) {
   dit(SA.beneficeParSource(sources.lignes).sansAchat === 3, '1 · (contrôle du banc d’essai) 3 ventes sans achat relié, faites à la main');
   dit(lignesF.filter((l) => l.geste).length === 1, '1 · (contrôle) la fraîcheur dit 1 compte à relire (3 jours), le banni et le frais non');
   dit(r.lignes.length === S.LIGNES.length && new Set(r.lignes.map((l) => l.cle)).size === S.LIGNES.length, '1 · une ligne par vérification, aucune en double');
-  const cles = ['numeros-double', 'numeros-a-ecrire', 'achats-sans-prix', 'ventes-sans-achat', 'ventes-a-dater', 'comptes-a-relire', 'extension-en-retard', 'emails-mis-de-cote', 'emails-a-verifier', 'colis-postes', 'annonces-a-confirmer'];
-  dit(cles.every((c) => S.CLES_LIGNES.includes(c)), '1 · les dix vérifications demandées sont toutes là', cles.filter((c) => !S.CLES_LIGNES.includes(c)).join(','));
+  // (15 nov., extension 5.390) « Ventes à dater » n'est plus une ligne qui cloche : l'extension les date (Julien).
+  const cles = ['numeros-double', 'numeros-a-ecrire', 'achats-sans-prix', 'ventes-sans-achat', 'comptes-a-relire', 'extension-en-retard', 'emails-mis-de-cote', 'emails-a-verifier', 'colis-postes', 'annonces-a-confirmer'];
+  dit(cles.every((c) => S.CLES_LIGNES.includes(c)) && !S.CLES_LIGNES.includes('ventes-a-dater'), '1 · les vérifications demandées sont toutes là (plus « ventes à dater », 15 nov.)', cles.filter((c) => !S.CLES_LIGNES.includes(c)).join(','));
 
   // ── 2 : pas su ⇒ null, jamais 0 ──
   const vide = S.lignesSante({ trancher: A.lignesATrancher({ pubs: {}, colisRetirer: null, urssafMois: null, comptes: undefined, maintenant: T }),
@@ -150,7 +151,7 @@ if (process.argv.includes('--mutations')) {
   dit(melange.lignes.every((l, i, t) => i === 0 || rang[t[i - 1].etat] <= rang[l.etat]), '4 · à corriger, puis pas lu, puis à jour', melange.lignes.map((l) => l.etat[0]).join(''));
   const gestes = r.lignes.filter((l) => l.etat === 'geste').map((l) => S.CLES_LIGNES.indexOf(l.cle));
   dit(gestes.every((v, i, t) => i === 0 || t[i - 1] < v), '4 · les gestes dans l’ordre de gravité de LIGNES');
-  dit(S.CLES_LIGNES.indexOf('numeros-a-ecrire') < S.CLES_LIGNES.indexOf('achats-sans-prix') && S.CLES_LIGNES.indexOf('colis-a-confirmer') < S.CLES_LIGNES.indexOf('ventes-a-dater'), '4 · un N° et un colis avant l’argent');
+  dit(S.CLES_LIGNES.indexOf('numeros-a-ecrire') < S.CLES_LIGNES.indexOf('achats-sans-prix') && S.CLES_LIGNES.indexOf('colis-a-confirmer') < S.CLES_LIGNES.indexOf('ventes-sans-achat'), '4 · un N° et un colis avant l’argent');
   dit(S.resumeSante(r).titre === `${r.nAFaire} choses à corriger` && r.nAFaire === r.lignes.filter((l) => l.n > 0).length, '4 · le résumé compte les lignes à corriger', S.resumeSante(r).titre);
 
   // ── 5 : `aVoirCapture` = l'ancien calcul de « Tout va bien ? » ──
