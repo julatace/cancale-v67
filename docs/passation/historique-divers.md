@@ -1967,6 +1967,7 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **15 nov. · Retours : reconnus, une seule carte « À renvoyer »** : bordereaux de retour et « Retourne ta commande d'ici le … » reconnus (sens lu dans le corps), e-mails gardés « inconnu » reclassés tout seuls (`api/_lib/reclasser-retours.js`, mode de `/api/email-rattacher`) ; `src/retoursAchat.js` : une liste « À renvoyer » (Achats + tête de Ma journée), photo, date limite en clair, « Imprimer le bordereau », « Déposé ». `2026-11-15-retours.md`. Geste : aucun.
 
 
+## Lignes déplacées de CLAUDE.md §9 (16 nov., lot achats-qr)
 ## Lignes déplacées de CLAUDE.md §9 (16 nov., train de mise en ligne)
 
 - **15 nov. · Retirer ailleurs, finition, republier guidé, « Sans achat relié »** : vendue sur un site ⇒ UNE entrée « À retirer ailleurs » accompagnée (plus de faux « colis retiré », Vestiaire « c'est fait »), aucune extension neuve ; finition écran par écran (`src/design/studio-finition.css`, couche `vrm-finition` nommée la première) ; republier/publier à la main guidés, photos retouchées envoyées à la galerie, aucune retouche d'évitement ; Annonces → prix d'achat : barre collée opaque, cartes `vrm-aar-*` (plus de débordement). `2026-11-15-retrait-ailleurs.md`, `-finition-ecrans.md`, `-republier-main.md`, `-annonces-achats.md`. Geste : dire s'il garde « lettre au hasard » en fin de description.
