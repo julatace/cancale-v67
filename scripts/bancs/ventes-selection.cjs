@@ -94,7 +94,7 @@ const GEO = (pg) => pg.evaluate(() => {
   return {
     tuilesTouchees: tuiles.filter(inter).length, nTuiles: tuiles.length,
     navTouchee: !!(rn && inter(rn)), navVisible: !!rn, alpha,
-    annulerACote: !!(rc && ra && Math.abs(rc.top - ra.top) < 12 && ra.left - rc.right < 40 && ra.left > rc.left),
+    annulerACote: !!(rc && ra && Math.abs((rc.top + rc.bottom) / 2 - (ra.top + ra.bottom) / 2) < 8 && ra.left - rc.right < 40 && ra.left > rc.left),   // centres alignés, juste après le compte
     rangee, nActions: acts.length, coupe, petits, debord: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
     barreHaut: rb.top,
   };
