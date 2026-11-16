@@ -267,6 +267,7 @@ import { useNouveauxFavoris, preparerEnvoiFavoris } from './favorisJournee.js';
 import React, { useState, useMemo, useEffect, useRef, Suspense } from "react";
 import { unParRendu } from './lotRendus.js';   // (16 nov., vitesse-volume)
 import { recentesOuSansDate, filtreParVersion, parTransaction } from './indexVentes.js';   // (16 nov., vitesse-moteur)
+import { gardeSiMeme } from './memeValeur.js';   // (16 nov., vitesse-moteur)
 // (15 nov., chantier « ouverture ») JAMAIS `React.lazy` nu : un morceau qui rate (une mise en ligne entre-temps)
 // rendait « Cet écran a un souci » ou `undefined … default`. `lazySur` le relance, puis recharge proprement vers la
 // nouvelle version, sinon « Mettre à jour VRM » (src/chargementSur.js ; banc ouverture, audit-ouverture).
@@ -4681,7 +4682,9 @@ function useSystemeSombre(ecouter) {
 function useStateCle(k, init) {
   const [v, setV] = React.useState(init);
   const initRef = React.useRef(init); initRef.current = init;
-  React.useEffect(() => onCleRelue(k, () => { try { setV(initRef.current()); } catch (_) {} }), [k]);
+  // (16 nov., vitesse-moteur) Relue À L'IDENTIQUE (nuage relu, même contenu) ⇒ la valeur d'avant est gardée
+  // (src/memeValeur.js) : aucun rendu, aucun calcul refait pour la même réponse. Contenu différent ⇒ la neuve.
+  React.useEffect(() => onCleRelue(k, () => { try { const n = initRef.current(); setV((avant) => gardeSiMeme(avant, n)); } catch (_) {} }), [k]);
   return [v, setV];
 }
 const emettreClesRelues = (cles) => {
@@ -35081,7 +35084,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   // Géocodage des points relais (nom → coordonnées) pour la carte à épingle.
   // Nominatim (OpenStreetMap), gratuit, 1 requête/seconde, cache local.
-  const [geo, setGeo] = useState(() => load('vrm_geo_cache_v2', {}));
+  // (16 nov., vitesse-moteur) Le cache de géocodage n'est plus un ÉTAT : aucun rendu ne le lisait, et chaque point
+  // géocodé (ou raté) redessinait tout le moteur — mesuré à 20 000 ventes, 8 rendus de Ma journée sur 38 rien que
+  // pour lui. Il vit dans `vrm_geo_cache_v2` seul (lu et écrit par le géocodage ci-dessous).
   const [openPoint, setOpenPoint] = useState(null); // lieu déplié (liste des colis)
   // Points relais HABITUELS, pré-enregistrés : la carte s'affiche en permanence,
   // les badges apparaissent à l'arrivée des colis. Synchronisé.
@@ -35194,7 +35199,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const cpLu = (String(c.adresse || '') + ' ' + String(c.display || '')).match(/\b\d{5}\b/);
       if (!cpLu) continue;
       const hit = (c.adresse && await geocode(c.adresse, cpLu[0])) || await geocode(c.display, cpLu[0]);
-      setGeo(prev => { const u = { ...prev, [nom]: hit || { failedAt: Date.now() } }; save('vrm_geo_cache_v2', u); return u; });
+      { const u = { ...(load('vrm_geo_cache_v2', {}) || {}), [nom]: hit || { failedAt: Date.now() } }; save('vrm_geo_cache_v2', u); }
       if (hit) ensureSavedPoint(nom, c.adresse, hit.lat, hit.lon);
       await new Promise(r2 => setTimeout(r2, 400));
     }
@@ -41286,7 +41291,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // NEUF : sans ça elle grave d'abord et découvre l'identité ensuite, et comme
   // un numéro n'est jamais repris (§5.40) l'erreur est définitive.
   const [txnPret, setTxnPret] = useState(false);
-  useEffect(() => { let mort = false; fetchTxnItemIds().then(m => { if (mort) return; if (m && Object.keys(m).length) setTxnItem(m); setTxnPret(true); }).catch(() => { if (!mort) setTxnPret(true); }); return () => { mort = true; }; }, [sales.items]);
+  // (16 nov., vitesse-moteur) Relu à chaque arrivée de ventes : le même contenu garde la même valeur (src/memeValeur.js) —
+  // sinon l'identité de chaque vente (`identiteAnnonce`) et tout ce qui la lit repartaient de zéro pour la même réponse.
+  useEffect(() => { let mort = false; fetchTxnItemIds().then(m => { if (mort) return; if (m && Object.keys(m).length) setTxnItem((avant) => gardeSiMeme(avant, m)); setTxnPret(true); }).catch(() => { if (!mort) setTxnPret(true); }); return () => { mort = true; }; }, [sales.items]);
   // Sources déjà capturées : lire les petites photos projetées, jamais les transactions entières.
   useEffect(()=>{
     if(!['ventes','journee','bordereaux'].includes(curSub) || !sales.items?.length)return;
