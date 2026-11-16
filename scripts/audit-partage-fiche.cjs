@@ -221,8 +221,17 @@ async function audit(racine, bavard) {
   const ar = await appeler(handler, { method: 'POST', query: { mode: 'partage' }, jwt: 'jwt.a.x', body: { action: 'arreter', ligne: ligne1 } });
   const apres = await appeler(handler, { query: { mode: 'partage', p: j1 } });
   dit(ar.corps && ar.corps.arrete === true && apres.statusCode === 404 && apres.corps === inconnu.corps && !db.get(A, ligne1) && !db.rows.some((r) => r === idxCle), 'D6 « Arrêter le partage » : le lien meurt tout de suite (la même page), index et ligne retirés');
-  // Expirer
+  // (16 nov., revue de sécurité) L'expiration est SCELLÉE par le serveur : le vendeur qui écrit
+  // lui-même sa ligne (RLS) et y pose 2099 n'allonge rien.
   const l2 = c2.corps.partage.ligne;
+  const vraie = db.get(A, l2).data.expire;
+  const avantTriche = await appeler(handler, { query: { mode: 'partage', p: j2 } });
+  db.get(A, l2).data.expire = '2099-01-01T00:00:00.000Z';
+  const triche = await appeler(handler, { query: { mode: 'partage', p: j2 } });
+  db.get(A, l2).data.expire = vraie;
+  const remis = await appeler(handler, { query: { mode: 'partage', p: j2 } });
+  dit(avantTriche.statusCode === 200 && triche.statusCode === 404 && triche.corps === inconnu.corps && remis.statusCode === 200, 'D7a une expiration réécrite hors du serveur (2099) ⇒ la même page 404 ; l’expiration du serveur ⇒ servie', `${avantTriche.statusCode}/${triche.statusCode}/${remis.statusCode}`);
+  // Expirer
   db.get(A, l2).data.expire = new Date(Date.now() - 1000).toISOString();
   const ex = await appeler(handler, { query: { mode: 'partage', p: j2 } });
   dit(ex.statusCode === 404 && ex.corps === inconnu.corps, 'D7 expiré ⇒ la même page 404');
@@ -275,6 +284,7 @@ async function audit(racine, bavard) {
     ['api/_lib/partage-fiche.js', "if (idx === undefined) return { status: 503, type: 'html', body: pagePanne() };", "if (idx === undefined) return { status: 404, type: 'html', body: pageAbsente() };", 'panne dite « plus actif »'],
     ['api/_lib/partage-fiche.js', "if (deps.acces) { const a = await deps.acces(owner); if (a === false) return { status: 404, type: 'html', body: pageAbsente() }; }", '', 'abonnement ignoré'],
     ['src/partageFiche.js', "if (!Number.isFinite(exp) || exp <= maintenant) return { etat: 'absent' };", '', 'expiration ignorée'],
+    ['api/_lib/partage-fiche.js', "    if (!sceauValide(cle, owner, ligne, r.t, r.e, r.s)) return { status: 404, type: 'html', body: pageAbsente() };", '', 'expiration du vendeur crue (sceau ignoré)'],
     ['src/partageFiche.js', "if (!HOTES_PHOTO.some((re) => re.test(x.hostname))) return '';", '', 'photo d’un hôte inconnu'],
     ['src/partageFiche.js', 'return `https://${x.hostname}${x.pathname}`;', 'return x.href;', 'paramètres de suivi gardés'],
     ['src/partageFiche.js', "perime: date == null || maintenant - date > PERIME_MS", 'perime: false', 'jamais « à confirmer »'],

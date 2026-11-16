@@ -42,7 +42,18 @@ const RE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export const nouveauJetonPartage = () => crypto.randomBytes(32).toString('base64url');
 const nouvelleLigne = () => LIGNE_PREFIXE + crypto.randomBytes(12).toString('base64url');
 // La page publique ne lit QUE ceci (jamais `ident`).
-export const SELECT_PAGE = 't:data->>jeton,f:data->fiche,e:data->>expire,v:data->>vendu,m:data->>maj,c:data->>verifie';
+export const SELECT_PAGE = 't:data->>jeton,f:data->fiche,e:data->>expire,v:data->>vendu,m:data->>maj,c:data->>verifie,s:data->>sceau';
+// (16 nov., revue de sécurité du 11 nov.) L'EXPIRATION EST SCELLÉE PAR LE SERVEUR. La ligne vit
+// chez le vendeur (owner = lui) : il peut l'écrire lui-même (RLS) et y poser `expire` en 2099.
+// La page publique ne croit donc QUE l'expiration que le serveur a calculée (durée 1/7/30 j) et
+// scellée à la création (HMAC sur owner · ligne · jeton · expire, clé du serveur) : une
+// expiration touchée hors du serveur ⇒ la même page 404 qu'un lien expiré.
+export const sceauPartage = (cle, owner, ligne, jeton, expire) => (cle ? crypto.createHmac('sha256', 'vrm-partage|' + cle).update([owner, ligne, jeton, expire].map(String).join('|')).digest('base64url') : '');
+export function sceauValide(cle, owner, ligne, jeton, expire, sceau) {
+  const attendu = sceauPartage(cle, owner, ligne, jeton, expire);
+  const a = Buffer.from(String(attendu)), b = Buffer.from(String(sceau || ''));
+  return !!attendu && a.length === b.length && crypto.timingSafeEqual(a, b);
+}
 export const CSP_PAGE = "default-src 'none'; img-src https: data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
 const echap = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -146,6 +157,7 @@ export async function traiterPartage(deps) {
     if (rows === undefined) return { status: 503, type: 'html', body: pagePanne() };
     const r = rows[0];
     if (!r || !r.t || !memeJeton(jeton, r.t)) return { status: 404, type: 'html', body: pageAbsente() };
+    if (!sceauValide(cle, owner, ligne, r.t, r.e, r.s)) return { status: 404, type: 'html', body: pageAbsente() };   // (16 nov.) expiration scellée par le serveur
     if (deps.acces) { const a = await deps.acces(owner); if (a === false) return { status: 404, type: 'html', body: pageAbsente() }; }
     const e = etatPage({ fiche: r.f, expire: r.e, vendu: r.v, maj: r.m, verifie: r.c }, maintenant);
     if (e.etat === 'absent') return { status: 404, type: 'html', body: pageAbsente() };
@@ -210,7 +222,8 @@ export async function traiterPartage(deps) {
     if (rows.filter((r) => Date.parse(r.e || '') > maintenant && r.t).length >= MAX_ACTIFS) return { status: 409, type: 'json', body: { erreur: 'trop', message: `${MAX_ACTIFS} liens actifs au plus. Arrête un ancien partage.` } };
     const jeton = nouveauJetonPartage(), ligne = nouvelleLigne();
     const duree = dureeValide(c.duree);
-    const data = { jeton, fiche, ident: nettoyerIdent(c.ident), cree: iso(maintenant), maj: iso(maintenant), verifie: iso(maintenant), expire: iso(maintenant + duree * 86400000), duree, vendu: false };
+    const expire = iso(maintenant + duree * 86400000);
+    const data = { jeton, fiche, ident: nettoyerIdent(c.ident), cree: iso(maintenant), maj: iso(maintenant), verifie: iso(maintenant), expire, duree, vendu: false, sceau: sceauPartage(cle, uid, ligne, jeton, expire) };
     // L'ordre : SA ligne d'abord (elle fait foi), puis l'index. Index raté ⇒ la ligne part.
     if (!(await ecrire([{ owner: uid, id: ligne, data, updated_at: iso(maintenant) }]))) return KO;
     if (!(await ecrire([{ owner: PROPRIETAIRE_NEUTRE, id: idIndexJeton('partage', jeton), data: { owner: uid, genre: 'partage', ligne, at: iso(maintenant) }, updated_at: iso(maintenant) }]))) { await effacer(uid, ligne); return KO; }
