@@ -1,4 +1,7 @@
-[
+// L'inventaire des réglages d'AVANT la refonte de Paramètres (origin/main, 14 nov.) : noms d'attributs et de
+// lignes relevés par INVENTAIRE=1 (refonte-plateformes-reglages.cjs). Aucune donnée : un module, pas une fixture .json
+// (audit-bancs : aucun .json dans scripts/bancs, dépôt PUBLIC).
+module.exports = [
  "attr:data-reglage-abonnement",
  "attr:data-reglage-adresse-vrm",
  "attr:data-reglage-affichage",
@@ -162,4 +165,4 @@
  "sous:verifier",
  "sous:widget",
  "sous:zoom"
-]
+];
