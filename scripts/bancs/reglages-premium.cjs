@@ -95,6 +95,8 @@ async function ouvrir(nav, vp, vue) {
   await pg.goto(`http://localhost:${PORT}/?tab=settings`, { waitUntil: 'domcontentloaded' });
   await pg.waitForFunction(() => document.querySelector('.vrm-set') || /pas pu s'afficher/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
   await pg.waitForTimeout(2500);
+  // (15 nov., Paramètres en dix catégories) Au téléphone, une rangée vit dans SA catégorie : on la touche, comme lui.
+  if (vp.width < 600 && vue && vue !== 'reglages') { await pg.locator(`[data-categorie-ouvrir="${vue}"]`).first().click({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(700); }
   return { ctx, pg, erreurs };
 }
 
@@ -157,8 +159,10 @@ async function interrupteurs(pg, T) {
   try {
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 950 }]) {
       const mobile = vp.width < 600;
-      for (const vue of ['reglages', 'compte']) {
-        const T = `${vp.width} px · ${vue === 'compte' ? 'Mon compte' : 'Réglages'}`;
+      // (15 nov.) Téléphone : chaque catégorie (src/parametres/categories.js) ; ordinateur : la page entière, deux fois.
+      const VUES = mobile ? ['plateformes', 'ventes', 'stock', 'argent', 'notifications', 'apparence', 'securite-comptes', 'aide', 'donnees', 'compte'] : ['reglages', 'compte'];
+      for (const vue of VUES) {
+        const T = `${vp.width} px · ${vue === 'compte' ? 'Mon compte' : vue === 'reglages' ? 'Réglages' : vue}`;
         console.log(`\n── ${T}`);
         await essaie(T, async () => {
           const { ctx, pg, erreurs } = await ouvrir(nav, vp, vue);
@@ -178,11 +182,12 @@ async function interrupteurs(pg, T) {
           }
           // Depuis le 28 oct. (77633d9, « Clarifier les paramètres ») les panneaux longs
           // s'ouvrent dans un écran dédié AUSSI sur ordinateur : la liste reste courte.
-          dit(m.sous.length >= 3 && m.panneauxVisibles === 0, `${T} : les panneaux longs sont derrière un chevron (rien de déplié sur la liste)`, `${m.sous.length} sous-écrans · ${m.panneauxVisibles} panneau(x) visible(s)`);
+          dit(m.sous.length >= (mobile ? 1 : 3) && m.panneauxVisibles === 0, `${T} : les panneaux longs sont derrière un chevron (rien de déplié sur la liste)`, `${m.sous.length} sous-écrans · ${m.panneauxVisibles} panneau(x) visible(s)`);
           const n = await interrupteurs(pg, T);
           if (vue === 'reglages') dit(n >= 3, `${T} : les interrupteurs de la page sont là (sombre, stream, alertes)`, `${n} vu(s)`);
+          if (vue === 'apparence') dit(n >= 2, `${T} : les interrupteurs de la catégorie sont là (sombre, stream)`, `${n} vu(s)`);
           // (1er nov.) Revue « logique et simple » : chaque ligne dit ce qu'elle porte.
-          if (vue === 'reglages') {
+          if (vue === 'reglages' || vue === 'argent' || vue === 'plateformes') {
             const r = await pg.evaluate(() => {
               const m = document.querySelector('[data-reglage-masques]');
               const g = document.querySelector('[data-reglage-regime]');
@@ -200,12 +205,12 @@ async function interrupteurs(pg, T) {
               };
             });
             // Une vente ne se masque plus (29 oct.) : la ligne ne parle que des achats.
-            dit(r.masques != null && /achat/i.test(r.masques) && !/vente/i.test(r.masques), `${T} : la ligne des masqués ne promet plus de « ventes » masquées`, String(r.masques).replace(/\s+/g, ' '));
+            if (vue !== 'plateformes') dit(r.masques != null && /achat/i.test(r.masques) && !/vente/i.test(r.masques), `${T} : la ligne des masqués ne promet plus de « ventes » masquées`, String(r.masques).replace(/\s+/g, ' '));
             // Le régime n'est jamais deviné : pas choisi ⇒ la ligne le DIT à droite.
-            dit(r.regime === 'aucun' && !!r.regimeVal, `${T} : le régime fiscal pas choisi se voit sur sa ligne`, `${r.regime} · « ${r.regimeVal} »`);
-            dit(r.importAvecEmails, `${T} : l’import des emails est rangé avec la réception des emails`);
-            dit(!r.importVendeur, `${T} : l’import des emails (boîte du propriétaire seulement) n’est pas proposé à un vendeur`);
-          } else {
+            if (vue !== 'plateformes') dit(r.regime === 'aucun' && !!r.regimeVal, `${T} : le régime fiscal pas choisi se voit sur sa ligne`, `${r.regime} · « ${r.regimeVal} »`);
+            if (vue !== 'argent') dit(r.importAvecEmails, `${T} : l’import des emails est rangé avec la réception des emails`);
+            if (vue !== 'argent') dit(!r.importVendeur, `${T} : l’import des emails (boîte du propriétaire seulement) n’est pas proposé à un vendeur`);
+          } else if (vue === 'compte') {
             const p = await pg.evaluate(() => {
               const c = document.querySelector('[data-photo-profil]');
               const ent = document.querySelector('[data-profil-compte] .vrm-set-avatar');

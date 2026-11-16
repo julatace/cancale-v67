@@ -1,3 +1,4 @@
+require('./_reglages-compat.cjs');   // (15 nov.) Paramètres en catégories : la catégorie d'une rangée touchée avant elle
 // ═══════════════════════════════════════════════════════════════════════════
 // BANC : LE JOURNAL DES PLANTAGES (src/plantages.js) — SANS FOURNISSEUR
 //        node scripts/bancs/plantages.cjs

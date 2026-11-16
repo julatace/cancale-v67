@@ -1,3 +1,4 @@
+require('./_reglages-compat.cjs');   // (15 nov.) Paramètres en catégories : la catégorie d'une rangée touchée avant elle
 // ═══════════════════════════════════════════════════════════════════════════
 // BANC : LE RÉGLAGE « DÉTOURER MES PHOTOS » N'EST PLUS DANS LES PARAMÈTRES
 //        node scripts/bancs/detourage-reglage.cjs   (BANC_PORT pour changer de port)
@@ -69,13 +70,16 @@ async function rendre(nav, largeur, vue = '') {
   const erreurs = [];
   pg.on('pageerror', (e) => erreurs.push(String(e).slice(0, 140)));
   await pg.goto(`http://localhost:${PORT}/?tab=settings${vue ? '&vue=' + vue : ''}`, { waitUntil: 'domcontentloaded' });
-  await pg.waitForTimeout(4000);
+  // (15 nov.) Pas un délai fixe seul (§6.5) : on attend que Paramètres soit RENDU (ses catégories), 20 s au plus — sous charge, 4 s ne suffisaient pas.
+  await pg.waitForFunction(() => !!document.querySelector('.vrm-set [data-categorie-ouvrir], .vrm-set [data-categorie-ecran], [data-onglets-reglages]'), null, { timeout: 20000 }).catch(() => {});
+  await pg.waitForTimeout(1500);
   const r = await pg.evaluate(() => ({
     cartes: document.querySelectorAll('[data-detourage-etat],[data-detourage-choix],[data-detourage-mode]').length,
     texte: document.body.innerText,
     reglages: !!document.querySelector('[data-onglets-reglages]') || /Notifications/.test(document.body.innerText),
     cleCarte: !!document.querySelector('[data-photoroom-cle]'),
-    monCompte: !!document.querySelector('[data-onglets-reglages] [aria-selected="true"]') && /Mon compte/.test((document.querySelector('[data-onglets-reglages] [aria-selected="true"]') || {}).innerText || ''),
+    // (15 nov.) Plus d'onglets : « Mon compte » est une catégorie (ouverte au téléphone, dépliée au bureau).
+    monCompte: !!document.querySelector('.vrm-set[data-categorie-ouverte="compte"], [data-categorie-ecran="compte"]'),
   }));
   await ctx.close();
   return { r, erreurs, vues };

@@ -5,11 +5,15 @@ import ecran_confort from './it/confort.js';   // (14 nov., lots 117–130) conf
 import ecran_studio from './it/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
 import ecran_correspondances from './it/correspondances.js';   // (15 nov.) Publier partout : catégories qui correspondent
 import ecran_capte from './it/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
-import ecran_vcventes from './it/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
+import ecran_avenir from './it/avenir.js';
+import ecran_verre2 from './it/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
+import ecran_fiched from './it/fiched.js';   // (15 nov.) la fiche d'un article, direction D
 import ecran_renvoyer from './it/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_liaison from './it/liaison.js';   // (15 nov.) La liaison achat ⇄ article
 import ecran_retrait_ailleurs from './it/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
 import ecran_finition from './it/finition.js';   // (15 nov.) la finition écran par écran
+import ecran_parametres from './it/parametres.js';   // (15 nov.) Paramètres rangés en dix catégories
+import ecran_vcventes from './it/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
 import ecran_numeros_nouvelles from './it/numeros-nouvelles.js';   // (15 nov.) Les nouvelles annonces sans N°
 import ecran_idees from './it/idees.js';   // (14 nov., idées 154, 157, 158) ligne de temps, autre taille, meilleure heure
 import ecran_ventes from './it/ventes.js';
@@ -475,10 +479,10 @@ export default {
   "reglages.donnees.droits": "I tuoi altri diritti:",
   "reglages.donnees.exporter": "Esporta",
   "reglages.donnees.exporterOu.dessous": "«Backup completo» qui sotto",
-  "reglages.donnees.exporterOu.reglages": "«Backup completo» (Impostazioni)",
+  "reglages.donnees.exporterOu.reglages": "«Backup completo», più in alto",
   "reglages.donnees.lib": "Esporta i miei dati",
   "reglages.donnees.supprimer": "Elimina il tuo account",
-  "reglages.donnees.supprimerOu": "«Elimina il mio account», in fondo",
+  "reglages.donnees.supprimerOu": "«Elimina il mio account», in fondo a Il mio account",
   "reglages.double.active": "Attiva",
   "reglages.double.activeN": { one: "Attiva · {n} dispositivo", other: "Attiva · {n} dispositivi" },
   "reglages.double.inactive": "Disattivata",
@@ -573,8 +577,6 @@ export default {
   "reglages.sauvegarde.aRefaire": " · da rifare",
   "reglages.sauvegarde.derniere": "Ultimo backup: {quand}",
   "reglages.sauvegarde.jamais": "Mai salvato — tocca «Backup completo»",
-  "reglages.securite.desc": "Verifica che solo tu possa leggere e scrivere i tuoi dati.",
-  "reglages.securite.lib": "Sicurezza dei dati",
   "reglages.signalements.lib": "Segnalazioni ricevute",
   "reglages.simulation.lib": "Simula la creazione di un account",
   "reglages.simulation.desc": "Il percorso di un nuovo venditore, su account fittizi.",
@@ -2279,5 +2281,9 @@ export default {
   ...ecran_renvoyer,
   ...ecran_liaison,
   ...ecran_finition,
+  ...ecran_parametres,
+  ...ecran_avenir,
+  ...ecran_verre2,
+  ...ecran_fiched,
   ...ecran_numeros_nouvelles,
 };

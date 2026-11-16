@@ -201,6 +201,11 @@ async function forme(nav, W, theme) {
       await o.pg.locator('[data-sb-avant-plus]').click({ timeout: 5000, force: true, noWaitAfter: true }).catch(() => {});
       await o.pg.waitForSelector('.vrm-fp [data-fiche-menu-ouvrir]', { timeout: 8000 }).catch(() => {});
       await o.pg.waitForTimeout(600);
+      // (15 nov., fiche D) les gestes de la ligne vivent derrière « ⋯ » (feuille de tuiles, « Tout voir ») : un toucher les montre.
+      await o.pg.evaluate(() => { const b = document.querySelector('.vrm-fp [data-fd-plus-ouvrir]'); if (b) b.click(); });
+      await o.pg.waitForTimeout(300);
+      await o.pg.evaluate(() => { const d = document.querySelector('.vrm-fp [data-fiche-plus]'); if (d) d.open = true; });
+      await o.pg.waitForTimeout(300);
       const fi = await joignables(o.pg, GESTES_FICHE);
       if (fi.length) fautes.push('pas joignable dans la fiche : ' + fi.join(', '));
       await o.pg.screenshot({ path: path.join(SHOTS, `paires-${W}-${theme}-fiche.png`) }).catch(() => {});
@@ -225,7 +230,7 @@ async function forme(nav, W, theme) {
     else {
       await o.pg.waitForTimeout(700);
       const e = await o.pg.evaluate((cle) => {
-        const f = document.querySelector('.vrm-fp.sb-plan .vrm-fp-cadre').getBoundingClientRect();
+        const f = document.querySelector('.vrm-fp.sb-plan .vrm-fp-cadre, .vrm-fp.sb-plan .fd-cadre').getBoundingClientRect();
         const rows = [...document.querySelectorAll('[data-sb-liste] > [data-sb-avant-cle]')].filter((x) => { const r = x.getBoundingClientRect(); return r.height > 8 && r.top < innerHeight && r.bottom > 0; });
         const gauche = rows.filter((x) => x.getBoundingClientRect().right <= f.left + 2).length;
         return { droite: f.left > innerWidth / 2, gauche, choisie: !!document.querySelector(`[data-sb-avant-cle="${cle}"][data-sb-choisie]`) };
@@ -233,6 +238,11 @@ async function forme(nav, W, theme) {
       if (!e.droite) fautes.push('la fiche n’est pas à droite');
       if (e.gauche < 4) fautes.push(`la liste ne reste pas visible à gauche (${e.gauche} rangées)`);
       if (!e.choisie) fautes.push('la rangée touchée n’est pas désignée');
+      // (15 nov., fiche D) les gestes de la ligne vivent derrière « ⋯ » (feuille de tuiles, « Tout voir ») : un toucher les montre.
+      await o.pg.evaluate(() => { const b = document.querySelector('.vrm-fp [data-fd-plus-ouvrir]'); if (b) b.click(); });
+      await o.pg.waitForTimeout(300);
+      await o.pg.evaluate(() => { const d = document.querySelector('.vrm-fp [data-fiche-plus]'); if (d) d.open = true; });
+      await o.pg.waitForTimeout(300);
       const fi = await joignables(o.pg, GESTES_FICHE);
       if (fi.length) fautes.push('pas joignable dans la fiche : ' + fi.join(', '));
       await o.pg.screenshot({ path: path.join(SHOTS, `paires-${W}-${theme}-plan.png`) }).catch(() => {});

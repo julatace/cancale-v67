@@ -1,3 +1,4 @@
+require('./_reglages-compat.cjs');   // (15 nov.) Paramètres en catégories : la catégorie d'une rangée touchée avant elle
 // ════════════════════════════════════════════════════════════════════════════
 //  BANC « LE N° SUR L'ANNONCE ET LE N° CHANGÉ À LA MAIN » (5 nov., v31).
 //  Julien, 5 novembre : « les numéros sur les annonces Vinted doivent être bien

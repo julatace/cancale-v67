@@ -168,7 +168,11 @@ const lireStats = (pg) => pg.evaluate(() => {
             && Qy.vendu.w > Qy.recu.w * 1.8 && Qy.declarer.w > Qy.recu.w * 1.8 && Qy.vendu.h >= Qy.recu.h;
           dit(bento && tete.q.every((x) => x.h >= 44), `N7 ${T} : le Bento (Vendu en grand, Reçu · Bénéfice, À déclarer), ≥ 44 px`, JSON.stringify(tete.q.map((x) => [x.id, x.x, x.y, Math.round(x.w), Math.round(x.h)])));
           dit(!tete.deborde, `N7 ${T} : rien ne déborde`);
-        } else dit(new Set(tete.q.map((x) => x.y)).size === 1, `N7 ${T} : les 4 widgets sur une ligne`, JSON.stringify(tete.q.map((x) => [x.x, x.y])));
+        } else {
+          // (15 nov., maquette ORDINATEUR « Verre dépoli » validée) « Vendu » en affiche AU-DESSUS ; Reçu · Bénéfice · URSSAF sur UNE ligne.
+          const Qo = Object.fromEntries(tete.q.map((x) => [x.id, x]));
+          dit(Qo.vendu && Qo.recu && Qo.benefice && Qo.declarer && Qo.vendu.y < Qo.recu.y && new Set([Qo.recu.y, Qo.benefice.y, Qo.declarer.y]).size === 1, `N7 ${T} : « Vendu » au-dessus, Reçu · Bénéfice · URSSAF sur une ligne`, JSON.stringify(tete.q.map((x) => [x.id, x.x, x.y])));
+        }
         const longues = tete.resumes.filter((t) => t.split(/\s+/).length > 12);
         dit(!longues.length, `N7 ${T} : les phrases des replis font ≤ 12 mots`, longues.join(' ¦ '));
         await capture(pg, `resume-${scen}-${W}${sombre ? '-sombre' : '-clair'}`);

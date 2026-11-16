@@ -29,6 +29,10 @@ export const NOUVEAUTES = Object.freeze([
   // (15 nov., maquettes validées : « tout est parfait ») docs/passation/2026-11-15-refonte-ventes.md
   { id: 'ventes-verre', date: '2026-11-15', titre: 'Ventes : colis cochés, place dans le stock', phrase: 'Chaque colis dit où est le carton ; imprime les cochés.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'achats-code-comptoir', date: '2026-11-15', titre: 'Le code de retrait en grand au comptoir', phrase: 'Un chiffre par case, « Je l’ai retiré » juste dessous.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (15 nov., Julien choisit la direction D « fiche produit ») docs/passation/2026-11-15-fiche-d.md
+  { id: 'fiche-d', date: '2026-11-15', titre: 'La fiche d’un article tient en un écran', phrase: 'La photo, son état, la seule chose à faire ; le reste derrière ⋯.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (15 nov., maquettes validées : « tout est parfait sauf étagères ») docs/passation/2026-11-15-ecrans-verre-2.md
+  { id: 'ecrans-verre-2', date: '2026-11-15', titre: 'Argent, Messages, Paramètres : le verre aussi', phrase: 'Le mois en trois chiffres, tes messages par compte, des tuiles.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (15 nov., refonte-journee) docs/passation/2026-11-15-refonte-journee.md — la maquette validée par Julien.
   { id: 'paire-a-sortir', date: '2026-11-15', titre: 'Une vente tombe : VRM montre le carton', phrase: 'Le meuble, la case allumée, puis « Je l’ai sortie ».', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'journee-verre', date: '2026-11-15', titre: 'Ma journée refaite comme la maquette', phrase: 'Le mois en un verre, les colis avec N°, codes, messages.', tab: 'journee', pour: 'tous', mode: 'tous' },
@@ -45,6 +49,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'finition-ecrans', date: '2026-11-15', titre: 'Chaque écran repassé : rien ne déborde', phrase: 'Moins de phrases, plus rien de coupé, des cibles au doigt.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « le retrait sur Leboncoin… hyper intuitif, accompagné ») docs/passation/2026-11-15-retrait-ailleurs.md
   { id: 'retrait-ailleurs', date: '2026-11-15', titre: 'Vendue ? Retire-la ailleurs en un toucher', phrase: 'En tête de Ma journée : un bouton par site, VRM suit tout.', tab: 'journee', pour: 'tous', mode: 'tous' },
+  // (15 nov.) docs/passation/2026-11-15-argent-attente.md — l'écran « Argent à venir ».
+  { id: 'argent-a-venir-etapes', date: '2026-11-15', titre: 'L’argent à venir, étape par étape', phrase: 'Touche « À venir » : par étape, par site, par compte.', tab: 'cat_ventes', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien) docs/passation/2026-11-15-numeros-nouvelles.md — les annonces publiées hors de VRM.
   { id: 'numeros-nouvelles-annonces', date: '2026-11-15', titre: 'Tes nouvelles annonces reçoivent leur N°', phrase: 'VRM numérote et te le dit, ou te demande le N°.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., extension 5.383) Ventes Vestiaire : l'état le plus frais gagne, l'état en mots, le prix de vente.
@@ -63,6 +69,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'carte-extension-studio', date: '2026-11-15', titre: 'La carte VRM sur Vinted, refaite', phrase: 'Favoris en liste, ventes sans tiret, liens qui marchent, bleu clair.', tab: 'messages', pour: 'tous', mode: 'tous' },
   // (15 nov., extension 5.379, Julien sur Orion iPhone : « Leboncoin marche pas ») docs/passation/2026-11-15-lbc-orion.md
   { id: 'lbc-orion-de-cote', date: '2026-11-15', titre: 'Leboncoin vide sur iPhone : VRM s’écarte', phrase: 'Page vide ? VRM se met de côté et le dit.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (15 nov., Julien : « pratique et compréhensible ») docs/passation/2026-11-15-parametres.md
+  { id: 'parametres-categories', date: '2026-11-15', titre: 'Paramètres rangés en dix catégories', phrase: 'Cherche « papier » ou « URSSAF » : le bon réglage s’ouvre.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (15 nov., extension 5.378) Dates de versement : relevé vérifié avant de dater, délai en heures de Vinted ouvert.
   { id: 'versements-releve-verifie', date: '2026-11-15', titre: 'Dates de versement : relevé vérifié, délai honnête', phrase: 'Le relevé ne date rien avant cinq accords ; délai en heures.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « horriblement moche », « ne mets pas paires, tu mets annonces ») docs/passation/2026-11-15-annonces-propre.md

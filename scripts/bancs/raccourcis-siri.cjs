@@ -1,3 +1,4 @@
+require('./_reglages-compat.cjs');   // (15 nov.) Paramètres en catégories : la catégorie d'une rangée touchée avant elle
 // ── BANC : SIRI / RACCOURCIS (10 novembre, lot AH) ─────────────────────────────
 // Deux liens profonds que l'app Raccourcis de l'iPhone ouvre (src/raccourcisSiri.js).
 // Données INVENTÉES (aucune fx/). Aux deux tailles (390 tactile, 1512), clair et sombre :

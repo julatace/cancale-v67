@@ -25,6 +25,9 @@ import { FilLeboncoin } from './MessagesLeboncoin.jsx';
 import { FilVestiaire, ficheDuNumero } from './Vestiaire.jsx';
 import { CLE_FILS_RELIES, convVinted, convLeboncoin, convVestiaire, convEbay, regrouperFils, suggestionsFils, relierFils, refuserFils, delierFil, messagesDuFil, conversationDeReponse } from '../filUnique.js';
 import { trj } from '../i18n/react.js';
+import { heureListe } from '../ordreConversations.js';   // (15 nov., verre 2) la même heure que la liste Vinted
+import { montant } from '../format.js';
+const montantCourt = (v) => montant(v);
 import { BarreOutils, LigneAFaire } from '../ui/index.js';   // (14 nov., refonte) les briques communes des écrans de liste
 
 const NOM_SITE = { vinted: 'Vinted', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire', ebay: 'eBay' };
@@ -190,7 +193,7 @@ function FilEbay({ x, onFerme, onEnvoye }) {
   );
 }
 
-export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, rendreVinted, lireVinted }) {
+export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, rendreVinted, lireVinted, compteOnglet = '' }) {
   const autres = useAutresSites();
   const [ebayTous, relireEbay] = useEbayTous();
   const [relies, setRelies] = React.useState(lireRelies);
@@ -207,23 +210,46 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
   // Même règle (src/filUnique.js), mêmes entrées : seul le moment du calcul change.
   // La signature des conversations Vinted (la liste peut être complétée SUR PLACE — sa paire arrive après) :
   // le regroupement se refait dès qu'une conversation, son aperçu ou sa paire change.
-  const sigVinted = Array.isArray(vinted) ? vinted.map((x) => { const c = x.c || {}; let p = ''; try { p = JSON.stringify(x.paire || null); } catch (_) {} const u = c.opposite_user || {}; return [c.id, c.updated_at, c.unread, c.description, u.id, u.login, c._acc && c._acc.vinted_user_id, x.compte, p].join("§"); }).join('¶') : String(vinted);
+  const sigVinted = Array.isArray(vinted) ? vinted.map((x) => { const c = x.c || {}; let p = ''; try { p = JSON.stringify(x.paire || null); } catch (_) {} const u = c.opposite_user || {}; return [c.id, c.updated_at, c.unread, c.description, u.id, u.login, c._acc && c._acc.vinted_user_id, x.compte, x.offre ? x.offre.prix : '', p].join("§"); }).join('¶') : String(vinted);
   const { parCle, fils, propositions } = React.useMemo(() => {
     const parCle = new Map();
     const entrees = [];
-    for (const x of (Array.isArray(vinted) ? vinted : [])) { const e = convVinted(x.c, x.paire); if (e) { e.compteNom = x.compte || ''; parCle.set(e.cle, { e, c: x.c }); entrees.push(e); } }
+    for (const x of (Array.isArray(vinted) ? vinted : [])) { const e = convVinted(x.c, x.paire); if (e) { e.compteNom = x.compte || ''; if (x.offre && Number(x.offre.prix) > 0) e.offre = { prix: Number(x.offre.prix) }; parCle.set(e.cle, { e, c: x.c }); entrees.push(e); } }
     for (const f of ((autres.lbc && autres.lbc.fils) || [])) { const e = convLeboncoin(f); if (e) { e.compteNom = f.nom || ''; parCle.set(e.cle, { e }); entrees.push(e); } }
     for (const v of ((autres.vc && autres.vc.fils) || [])) { const e = convVestiaire(v); if (e) { parCle.set(e.cle, { e }); entrees.push(e); } }
     for (const x of ((ebayTous && ebayTous.items) || [])) { const e = convEbay(x.m, x.compte); if (e) { parCle.set(e.cle, { e }); entrees.push(e); } }
     const fils = regrouperFils(entrees, relies.liens);
     return { parCle, fils, propositions: suggestionsFils(fils, relies.liens, relies.refus) };
   }, [vinted, sigVinted, autres, ebayTous, relies]);
+  // (15 nov., maquette « Verre dépoli » validée) « Toutes · Offres · Non lues » : un filtre, rien d'autre (aucune lecture).
+  const [vue, setVue] = React.useState('toutes');
+  const offreDe = (f) => { const o = f.convs.filter((c) => c.offre).map((c) => c.offre); return o.length ? o[o.length - 1] : null; };
+  const nOffres = fils.filter((f) => offreDe(f)).length;
+  const nNonLues = fils.filter((f) => f.nonLu === true).length;
   const motCherche = cherche.trim().toLowerCase().replace(/^n°\s*/, '');
   const filsVus = motCherche ? fils.filter((f) => {
     const d = f.dernier || f.convs[f.convs.length - 1];
     const t = [f.num ? 'n°' + f.num : '', f.num || '', ...f.convs.map((c) => [c.nom, c.titre, c.compteNom].join(' ')), d ? d.apercu : ''].join(' ').toLowerCase();
     return t.includes(motCherche);
   }) : fils;
+  const filsMontres = vue === 'offres' ? filsVus.filter((f) => offreDe(f)) : vue === 'nonlues' ? filsVus.filter((f) => f.nonLu === true) : filsVus;
+  // (12 nov., Julien, CLAUDE.md §3 « Messages, comptes ») LES COMPTES SÉPARÉS : le compte de l'onglet d'abord, puis
+  // chaque autre compte (le plus récent d'abord) ; DANS chaque compte, du plus récent au plus ancien. Le compte d'un
+  // fil est celui de son DERNIER message (un fil relié de deux sites se range une fois). Rien n'est mélangé.
+  const groupesFils = (() => {
+    const m = new Map();
+    for (const f of filsMontres) {
+      const d = f.dernier || f.convs[f.convs.length - 1] || {};
+      const k = `${d.plateforme || ''}:${d.compte == null ? '' : d.compte}`;
+      const g = m.get(k) || { cle: k, plateforme: d.plateforme || '', compte: d.compte == null ? '' : String(d.compte), nom: d.compteNom || '', fils: [] };
+      if (!g.nom && d.compteNom) g.nom = d.compteNom;
+      g.fils.push(f); m.set(k, g);
+    }
+    const t = (f) => (Number.isFinite(Number(f.at)) ? Number(f.at) : -Infinity);
+    const L = [...m.values()].map((g) => ({ ...g, onglet: g.plateforme === 'vinted' && !!compteOnglet && g.compte === String(compteOnglet), fils: g.fils.slice().sort((a, b) => t(b) - t(a)) }));
+    L.sort((a, b) => (b.onglet - a.onglet) || (t(b.fils[0]) - t(a.fils[0])) || a.cle.localeCompare(b.cle));
+    return L;
+  })();
   const filDe = (cle) => fils.find((f) => f.cle === cle) || null;
   const vintedDe = (e) => (parCle.get(e.cle) || {}).c || null;
   const nomDe = (f) => {
@@ -300,23 +326,60 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
           {chargement && !fils.length ? <div role="status" style={{ ...muted, padding: '12px 0' }}>{tr('messages.lecture')}</div>
             : !fils.length ? <div data-fils-vide="" style={{ ...muted, padding: '12px 0' }}>{tr('messages.aucuneConversationLue')}</div>
             : motCherche && !filsVus.length ? <div data-fils-rien="" className="vrm-ms-rien">{tr('ms.msg.rien', { x: cherche.trim() })}</div>
-            : <><CompteurArnaque n={fils.filter((f) => { const d = f.dernier || f.convs[f.convs.length - 1]; return d && motifDeLApercu(d.apercu, d.deMoi); }).length}/><div className="vrm-msg-list" style={{ border: `1px solid ${C.border}`, background: C.card }}>
-                {filsVus.slice(0, 80).map((f, i) => {
-                  const d = f.dernier || f.convs[f.convs.length - 1];
-                  const titre = f.convs.find((c) => c.titre);
-                  return (
-                    <LigneConv key={f.cle} actif={ouvert === f.cle} style={i < 12 ? { '--i': i } : undefined}
-                      attrs={{ 'data-fil': f.cle, 'data-fil-convs': String(f.convs.length), 'data-fil-sites': f.plateformes.join(','), 'data-fil-num': f.num || undefined, 'data-nonlu': f.nonLu === true ? '1' : undefined }}
-                      onClick={() => ouvrir(f)} ariaLabel={`Ouvrir le fil ${nomDe(f)}`}
-                      photo={(f.convs.find((c) => c.photo) || {}).photo || null} nom={nomDe(f)} sensible={f.convs.some((c) => c.plateforme === 'vinted')}
-                      quand={f.at} couleurHeure={f.nonLu === true ? C.text : C.muted}
-                      titre={titre && titre.titre !== nomDe(f) ? titre.titre : ''} num={f.num || ''}
-                      extrait={d ? d.apercu : ''} toi={!!(d && d.apercu && d.deMoi === true)} couleurExtrait={f.nonLu === true ? C.text : C.muted}
-                      apres={<>{f.convs.length > 1 ? <span className="vrm-msg-etat" data-fil-relie="" style={{ color: C.muted, borderColor: C.border }}>{trj('messages.conv', { x: f.convs.length })}</span> : null}<PastilleArnaque motif={d ? motifDeLApercu(d.apercu, d.deMoi) : null}/><Marques plateformes={f.plateformes}/></>}
-                      point={f.nonLu === true ? C.accent : null}/>
-                  );
-                })}
-              </div></>}
+            : <><CompteurArnaque n={fils.filter((f) => { const d = f.dernier || f.convs[f.convs.length - 1]; return d && motifDeLApercu(d.apercu, d.deMoi); }).length}/>
+              <div className="vg-ms-vues" role="group" aria-label={tr('verre2.msg.filtre')} data-msg-vues={vue}>
+                {[['toutes', tr('verre2.msg.toutes'), null], ['offres', tr('verre2.msg.offres'), nOffres], ['nonlues', tr('verre2.msg.nonLues'), nNonLues]].map(([k, l, n]) => (
+                  <button key={k} type="button" className={'vg-ms-vue' + (vue === k ? ' is-on' : '')} aria-pressed={vue === k} data-msg-vue={k} onClick={() => setVue(k)}>
+                    {l}{n ? <i className={'vg-ms-n' + (k === 'offres' ? ' is-ambre' : '')}>{n}</i> : null}
+                  </button>
+                ))}
+              </div>
+              {!filsMontres.length ? <div data-fils-filtre-vide={vue} className="vrm-ms-rien">{tr(vue === 'offres' ? 'verre2.msg.aucuneOffre' : 'verre2.msg.aucuneNonLue')}</div> : null}
+              {(() => { let reste = 80; return groupesFils.map((g) => {
+                if (reste <= 0) return null;
+                const vus = g.fils.slice(0, reste); reste -= vus.length;
+                return (
+                  <section key={g.cle} className="vg-ms-groupe" data-msg-groupe={g.cle} data-msg-groupe-onglet={g.onglet ? '1' : undefined} data-msg-groupe-n={g.fils.length}>
+                    <h3 className="vg-ms-groupe-h">
+                      {g.plateforme ? <span className="vg-ms-logo" aria-hidden="true"><LogoSite site={g.plateforme}/></span> : null}
+                      <b className={g.plateforme === 'vinted' ? 'vrm-sensible' : undefined}>{g.nom || NOM_SITE[g.plateforme] || tr('avenir.compteSans')}</b>
+                      {g.onglet ? <span className="vg-ms-onglet">{tr('verre2.msg.compteOnglet')}</span> : null}
+                    </h3>
+                    <div className="vrm-msg-list vg-ms-liste">
+                      {vus.map((f, i) => {
+                        const d = f.dernier || f.convs[f.convs.length - 1];
+                        const offre = offreDe(f);
+                        const photo = (f.convs.find((c) => c.photo) || {}).photo || null;
+                        const nomF = nomDe(f);
+                        const sensible = f.convs.some((c) => c.plateforme === 'vinted');
+                        const motif = d ? motifDeLApercu(d.apercu, d.deMoi) : null;
+                        return (
+                          <button key={f.cle} type="button" className={'vg-fil' + (ouvert === f.cle ? ' is-current' : '')} style={i < 12 ? { '--i': i } : undefined}
+                            data-fil={f.cle} data-fil-convs={String(f.convs.length)} data-fil-sites={f.plateformes.join(',')} data-fil-num={f.num || undefined} data-nonlu={f.nonLu === true ? '1' : undefined}
+                            data-fil-at={f.at != null ? String(f.at) : ''} data-fil-offre={offre ? String(offre.prix) : undefined}
+                            onClick={() => ouvrir(f)} aria-label={`Ouvrir le fil ${nomF}`}>
+                            <span className="vg-fil-ph" aria-hidden="true">{photo ? <img src={photo} alt="" loading="lazy" decoding="async" width={44} height={44}/> : <span className={sensible ? 'vrm-sensible' : undefined}>{String(nomF || '').trim().charAt(0).toUpperCase() || '·'}</span>}</span>
+                            <span className="vg-fil-mid">
+                              <span className="vg-fil-1">
+                                <b className={sensible ? 'vrm-sensible' : undefined} data-stream-type={sensible ? 'acheteur' : undefined}>{nomF}</b>
+                                <span className="vg-fil-quand">{f.nonLu === true ? <i className="vg-fil-nl" aria-label={tr('messages.nonLu')}/> : null}{f.at ? heureListe(f.at) : ''}</span>
+                              </span>
+                              <span className="vg-fil-2">
+                                {f.num ? <span className="sb-plaque vg-fil-plaque"><small>N°</small>{f.num}</span> : null}
+                                <span className={'vg-fil-extrait' + (offre ? ' is-offre' : '')}>{offre ? tr('verre2.msg.offreDe', { m: montantCourt(offre.prix) }) : <>{d && d.apercu && d.deMoi === true ? <span className="vg-fil-toi">{tr('messages.toi')} </span> : null}{d ? d.apercu : ''}</>}</span>
+                                {f.convs.length > 1 ? <span className="vrm-msg-etat vg-fil-etat" data-fil-relie="">{trj('messages.conv', { x: f.convs.length })}</span> : null}
+                                <PastilleArnaque motif={motif}/>
+                                {f.plateformes.length > 1 ? <Marques plateformes={f.plateformes}/> : null}
+                              </span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                );
+              }); })()}
+            </>}
           {pasLus.length ? <p data-fils-pas-lus={pasLus.join(',')} style={{ ...muted, marginTop: 8 }}>{trj('messages.puLireRien', { x: pasLus.map((p) => NOM_SITE[p]).join(', ') })}</p> : null}
           {ebayTous === undefined ? <p data-fils-ebay="charge" style={{ ...muted, marginTop: 8 }}>{tr('ebay.fil.lecture')}</p> : null}
         </div>
