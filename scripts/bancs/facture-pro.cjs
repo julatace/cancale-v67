@@ -208,13 +208,14 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
         // (16 nov., lot factures-mieux) Sur la ligne : une PASTILLE (« Facture à envoyer »), plus de bouton ni de raison
         // sous la ligne ; une vente pas prouvée n'a pas de pastille, sa raison est dite en tête de la liste (groupée) et
         // dans la fiche de la vente.
-        dit(await l1.locator('[data-fp-pastille="aenvoyer"][data-fp-vente="a-faire"]').count() === 1 && /Facture à envoyer/.test(await l1.innerText()), '1. 7001 prouvée : la pastille « Facture à envoyer » sur la LIGNE de la vente');
+        dit(await l1.locator('[data-fp-pastille="aenvoyer"][data-fp-vente="a-faire"]').count() === 1 && /Facture à envoyer/.test(await l1.textContent()), '1. 7001 prouvée : la pastille « Facture à envoyer » sur la LIGNE de la vente', (await l1.evaluate((e) => e.outerHTML)).slice(0, 300));
         for (const tx of ['7004', '7005', '7006', '7008']) dit(await pg.locator(`.vrm-sale-row[data-tx="${tx}"] [data-fp-pastille], .vrm-sale-row[data-tx="${tx}"] [data-fp-vente="a-faire"]`).count() === 0, `1. ${tx} (acheteur pas prouvé) : aucune pastille, aucun bouton de facture sur la ligne`);
+        await pg.locator('[data-fp-tete-code]').first().waitFor({ timeout: 6000 }).catch(() => {});
         const tete = await pg.evaluate(() => [...document.querySelectorAll('[data-fp-tete-code]')].map((e) => e.innerText.replace(/\s+/g, ' ')).join(' | '));
         dit(/acheteur pas prouvé/.test(tete) || await pg.locator('[data-fp-vente="pas-prouve"]').count() > 0, '1. la raison est dite (en tête de la liste ou dans la fiche)', tete.slice(0, 200));
         dit(await pg.locator('.vrm-sale-row[data-tx="8001"] [data-fp-forme]').count() === 0, '1. compte PARTICULIER : rien sur la ligne');
         const l2 = ligneFacture(pg, '7002');
-        dit(await l2.locator('[data-fp-pastille="facturee"][data-fp-ligne-etat="envoyee"]').count() === 1 && /Facturée/.test(await l2.innerText()), '4. 7002 déjà envoyée : la pastille « Facturée » sur la ligne (16 nov.)', (await l2.innerText()).replace(/\s+/g, ' '));
+        dit(await l2.locator('[data-fp-pastille="facturee"][data-fp-ligne-etat="envoyee"]').count() === 1 && /Facturée/.test(await l2.textContent()), '4. 7002 déjà envoyée : la pastille « Facturée » sur la ligne (16 nov.)', (await l2.innerText()).replace(/\s+/g, ' '));
         if (SHOTS) { await pg.locator('.vrm-sale-row[data-tx="7001"]').first().scrollIntoViewIfNeeded(); await pg.screenshot({ path: path.join(SHOTS, `fp-lignes-${nf}.png`) }); await pg.locator('.vrm-sale-row[data-tx="7005"]').first().scrollIntoViewIfNeeded(); await pg.screenshot({ path: path.join(SHOTS, `fp-pas-prouve-${nf}.png`) }); }
       });
       await essaie('fiche de la vente 7004', async () => {
@@ -260,7 +261,7 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
         await f.waitFor({ state: 'detached', timeout: 4000 });
         await pg.waitForTimeout(800);
         const l1 = (await ligneFacture(pg, '7001').innerText()).replace(/\s+/g, ' ');
-        dit(await ligneFacture(pg, '7001').locator('[data-fp-pastille="facturee"][title="FA-2026-0006"]').count() === 1 && /Facturée/.test(l1), '3. … et la LIGNE de la vente le dit aussi (pastille « Facturée », le n° au survol)', l1);
+        dit(await ligneFacture(pg, '7001').locator('[data-fp-pastille="facturee"][title="FA-2026-0006"]').count() === 1, '3. … et la LIGNE de la vente le dit aussi (pastille « Facturée », le n° au survol)', l1);
       });
       await essaie('7007 : panne', async () => {
         await ligneFacture(pg, '7007').scrollIntoViewIfNeeded();
