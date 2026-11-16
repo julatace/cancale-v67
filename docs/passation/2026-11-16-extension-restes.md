@@ -31,7 +31,9 @@ zips régénérés (Chrome, Orion dossier/zip/xpi). Garde-fous §3 intacts (aucu
 | `audit-extension-restes` (neuf, vrai background.js dans `_fond-vm`) | 24 ✅ | 3 rouges sur le background.js de main (F0, E0, C…) | 7/7 rouges |
 | `audit-repub-programme-notif` (neuf, LA VRAIE ROUTE `?moment=groupe`, fausse base à la vraie forme) | 24 ✅ | n'existe pas (route sans le passage) | 5/5 rouges |
 | `audit-anti-arnaque` | vert (+2) | 2 rouges | `deMoi` forcé ⇒ rouge |
-| `audit-sante-comptes` | 41 ✅ ; 1 rouge IDENTIQUE sur main (placement Ma journée `is-urgent`) | — | 8/8 (dont `avis-dates`, `avis-fenetre`) |
+| `audit-sante-comptes` | 42 ✅ (le contrôle « placement » porté sur la règle : la carte vit dans « Tout va bien ? » depuis la refonte du 15 nov. — il était rouge sur main) | — | 8/8 (dont `avis-dates`, `avis-fenetre`) ; retirer la carte de « Tout va bien ? » ⇒ rouge |
+| banc `sante-comptes` (390 tactile + 1512, clair + sombre) | tout vert, + « l'avis bas DATÉ est dit » ; les contrôles Ma journée portés sur « Tout va bien ? » (rouges sur main) | | |
+| banc `comptes-vinted` (390 + 1512, clair + sombre) | 80 ✅ ; + A6b / A11b (« 2 acceptées par VRM », « au moins » sur l'année) ; A7 « aucune couleur » jugé contre les jetons neutres de l'app (rouge sur main depuis le Verre dépoli) | | |
 | `audit-traduction`, `quoi-de-neuf`, `coherence`, `confiance`, `extension-zip`, `logos-bordereaux`, `fonctions-api`, `republier-programme`, `fil-unique`, `photos-comptes`, `meme-photo`, `photo-vrm`, `numero-vinted`, `numero-ecrit`, `republie-telephone`, `stats-offres`, `variables` | verts | | |
 
 Voir « ÉTAT À LA REPRISE » pour le build, la passe complète, les bancs et la PR.
@@ -52,4 +54,7 @@ Chrome ne redemande rien pour les hôtes (extension non empaquetée).
 
 ## ÉTAT À LA REPRISE
 
-(complété en fin de lot)
+Tout est poussé sur `claude/extension-restes` (merge `origin/main` fait, 5.393 ⇒ 5.395). Build vert. Captures
+regardées : Statistiques → Santé des comptes 390 clair (« 0 sur les 10 derniers · dont 1 arrivé avant-hier »),
+« Tes comptes Vinted » 390 sombre (« — » puis « 2 acceptées par VRM »), « Tout va bien ? » 390 clair.
+Règle de Julien du 16 nov. : ZÉRO rouge pour fusionner. La PR suit (voir le rapport final du lot).
