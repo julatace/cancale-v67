@@ -390,7 +390,7 @@ async function a2a6() {
 async function a7() {
   const APP = fs.readFileSync(F.app, 'utf8');
   const cap = /const EXT_CAPACITES\s*=\s*\{([^}]*)\}/.exec(APP);
-  dit(!!cap && /\bvcaimes:\s*'5\.392\.0'/.test(cap[1]), 'A7 · `EXT_CAPACITES.vcaimes` = 5.392.0');
+  dit(!!cap && /\bvcaimes:\s*'5\.393\.0'/.test(cap[1]), 'A7 · `EXT_CAPACITES.vcaimes` = 5.393.0 (servie avec la vague C)');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-favoris-regle-'));
   fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"module"}');
   fs.copyFileSync(F.regle, path.join(dir, 'aimesVestiaire.js'));

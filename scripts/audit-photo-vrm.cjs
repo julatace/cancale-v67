@@ -129,7 +129,7 @@ const seq = (f) => f.j.vinted.filter((v) => !/\/item_upload\/(colors|attributes)
   try {
     const APP = fs.readFileSync(F.app, 'utf8');
     const cap = /const EXT_CAPACITES\s*=\s*\{([^}]*)\}/.exec(APP);
-    dit(!!cap && /\bphotovrm:\s*'5\.392\.0'/.test(cap[1]), 'P5 · `EXT_CAPACITES.photovrm` = 5.392.0');
+    dit(!!cap && /\bphotovrm:\s*'5\.393\.0'/.test(cap[1]), 'P5 · `EXT_CAPACITES.photovrm` = 5.393.0 (servie avec la vague C)');
     dit(/useEffect\(\(\) => onCloudReady\(\(\) => \{ if \(AUTH\.user\?\.id\) verserPhotosVrmExtension\(\); \}\), \[\]\);/.test(APP)
       && /lireTout\(`id=like\.photo_vrm_\*\$\{o\}&select=id,p:data->payload->photos`\)/.test(APP) && /ajouterAuRegistre\(load\(CLE_PHOTOS_VRM, \{\}\), entrees\)/.test(APP),
       'P5 · l’app lit `photo_vrm_*` (projeté) et le verse au registre `vrm_photos_vrm` par `ajouterAuRegistre`');
