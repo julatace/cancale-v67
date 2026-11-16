@@ -17,7 +17,11 @@
 //   G chercher un N° ⇒ sa case s'allume ; monter / descendre un meuble ;
 //   H 44 px au doigt, aucune page plus large que l'écran, aucune erreur ; la dernière écriture
 //     de `vrm_meubles` garde les champs d'origine des meubles d'hier.
-//   BANC_PORT (6493), BANC_DIST (dist/), CAPTURES=dossier (captures à regarder), VARIANTES=390c,390s,1512c,1512s
+//   W (15 nov., étagère v4 — maquettes validées) « Personnaliser » : l'aperçu EN DIRECT suit les réglages ; Rayonnage +
+//     « de loin » + prix ⇒ plus aucune photo, le N° en grand, le prix LU ; « À sortir » (ambre) et « En double » (rouge)
+//     se disent TOUJOURS ; Enregistrer écrit `reglages` dans CE meuble (et rien d'autre) ; « La pièce » (de face /
+//     isométrique, « 1 » à sortir) ; à l'ordinateur (1512 et 1280) trois volets : la pièce, LE meuble, la fiche de la case.
+//   BANC_PORT (6493), BANC_DIST (dist/), CAPTURES=dossier (captures à regarder), VARIANTES=390c,390s,1512c,1512s,1280c,1280s
 const path = require('path');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
@@ -25,7 +29,7 @@ const fs = require('fs'), http = require('http');
 const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 6493;
 const CAPT = process.env.CAPTURES || '';
-const VARIANTES = (process.env.VARIANTES || '390c,1512s,390s,1512c').split(',');
+const VARIANTES = (process.env.VARIANTES || '390c,1512s,390s,1512c,1280c,1280s').split(',');
 
 const N = 1000;
 const fiches = {}, enLigne = [];
@@ -48,6 +52,8 @@ const MAIN = {
   vrm_slots: Object.assign({ '12': { m: 'mB', i: 22 }, '9999': { m: 'mQ', i: 3 }, '61': { m: 'mQ', i: 2 }, '62': { m: 'mQ', i: 1 } },
     Object.fromEntries(Array.from({ length: 30 }, (_, k) => [String(k + 20), { m: 'mA', i: k }]))),
   vrm_num_doublons: { nums: ['21'], at: Date.now() },
+  // (v4) N°22 est VENDUE : son carton est « À sortir » (ambre), quel que soit l'affichage.
+  vrm_stock_vendus: { nums: ['22'], at: Date.now() },
 };
 // (15 nov., sites sur la case) Par IDENTITÉ : N°23 vit sur un 2e compte Vinted SANS login connu (aucun pseudo ne doit
 // s'écrire, jamais l'identifiant « 333 ») ; N°20 est aussi sur Leboncoin par SA référence « VRM-20 » (compte « nord_lbc ») ;
@@ -97,8 +103,8 @@ const srv = http.createServer((q, r) => {
 srv.on('error', (e) => { console.log('KO  le port ' + PORT + ' est pris (' + e.code + ')'); process.exit(1); });
 srv.listen(PORT);
 
-async function rendre(b, tel, sombre) {
-  const ctx = await b.newContext({ viewport: tel ? { width: 390, height: 844 } : { width: 1512, height: 950 }, ...(tel ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}), colorScheme: sombre ? 'dark' : 'light' });
+async function rendre(b, tel, sombre, larg = 1512) {
+  const ctx = await b.newContext({ viewport: tel ? { width: 390, height: 844 } : { width: larg, height: 950 }, ...(tel ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}), colorScheme: sombre ? 'dark' : 'light' });
   const pg = await ctx.newPage();
   const errs = [], ecrits = [];
   pg.on('pageerror', (e) => errs.push(e.message));
@@ -123,16 +129,32 @@ async function rendre(b, tel, sombre) {
   await pg.addInitScript(([m, sombre]) => { try { localStorage.setItem('vrm_acces_direct', '1'); for (const k in m) localStorage.setItem(k, JSON.stringify(m[k])); localStorage.setItem('vinted_dark', JSON.stringify(!!sombre)); localStorage.setItem('vrm_meubles_zoom', 'loin'); } catch (_) {} }, [MAIN, sombre]);
   const t0 = Date.now();
   await pg.goto(`http://localhost:${PORT}/?tab=garage`, { waitUntil: 'domcontentloaded' });
-  await pg.waitForSelector('[data-meuble="mB"] [data-case-ici="mB:22"]', { timeout: 60000 }).catch(() => {});
+  await pg.waitForSelector('[data-meuble] [data-case-ici]', { timeout: 60000 }).catch(() => {});
   const tGrille = Date.now() - t0;
   await pg.waitForTimeout(1500);
   return { ctx, pg, errs, ecrits, tGrille };
 }
-const ou = (pg, n) => pg.evaluate((n) => { const el = document.querySelector(`[data-case-num="${n}"]`); return el ? el.getAttribute('data-case-ici') : null; }, n);
+const ouIci = (pg, n) => pg.evaluate((n) => { const el = document.querySelector(`[data-case-num="${n}"]`); return el ? el.getAttribute('data-case-ici') : null; }, n);
+const BUREAU = (pg) => pg.evaluate(() => !!document.querySelector('[data-stock-volets]'));
+// Montrer un meuble : à l'ordinateur, sa rangée dans « La pièce » (le volet de gauche) le met au centre ; au téléphone, tous sont là.
+async function voir(pg, id) {
+  if (!(await BUREAU(pg))) return true;
+  const ici = await pg.evaluate((id) => !!document.querySelector(`.vrm-st4-centre [data-meuble="${id}"]`), id);
+  if (ici) return true;
+  try { await pg.click(`[data-piece-rangee="${id}"]`, { timeout: 15000 }); } catch (_) { return false; }
+  await pg.waitForSelector(`.vrm-st4-centre [data-meuble="${id}"]`, { timeout: 30000 }).catch(() => {}); await pg.waitForTimeout(300);
+  return true;
+}
+const meublesListe = (pg) => pg.evaluate(() => [...document.querySelectorAll('[data-piece-rangee]')].map((x) => x.getAttribute('data-piece-rangee')));
+async function ou(pg, n) {
+  const a = await ouIci(pg, n); if (a || !(await BUREAU(pg))) return a;
+  for (const id of await meublesListe(pg)) { await voir(pg, id); const b2 = await ouIci(pg, n); if (b2) return b2; }
+  return null;
+}
 const bloque = (pg, sel) => pg.evaluate((sel) => { const b = document.querySelector(sel); if (!b) return 'absent'; b.scrollIntoView({ block: 'center' }); const q = b.getBoundingClientRect(); const e = document.elementFromPoint(q.x + q.width / 2, q.y + q.height / 2); return e ? (e.closest(sel) ? '' : (e.className || e.tagName) + '') : 'rien'; }, sel);
 let nBloque = 0;
 async function toucher(pg, sel) {
-  try { await pg.click(sel, { timeout: 8000 }); return true; } catch (e) { console.log('    (toucher ' + sel + ' : ' + (await bloque(pg, sel)) + ')'); if (CAPT) await pg.screenshot({ path: path.join(CAPT, 'etag-bloque-' + (++nBloque) + '.png') }).catch(() => {}); return false; }
+  try { await pg.click(sel, { timeout: 25000 }); return true; } catch (e) { console.log('    (toucher ' + sel + ' : ' + (await bloque(pg, sel)) + ' — ' + String(e && e.message).split('\n').slice(0, 9).join(' ').slice(0, 700) + ')'); if (CAPT) await pg.screenshot({ path: path.join(CAPT, 'etag-bloque-' + (++nBloque) + '.png') }).catch(() => {}); return false; }
 }
 // La fiche de la paire (ouverte par une case) : refermée pour revenir au Stock.
 async function fermerFiche(pg) {
@@ -151,12 +173,90 @@ async function ouvrirPlus(pg) {
   await pg.waitForTimeout(300);
 }
 async function retirerCase(pg, n) {
+  const ici = await ou(pg, n); if (ici) await voir(pg, ici.split(':')[0]);
   if (!(await toucher(pg, `[data-case-num="${n}"]`))) return false;
+  // (16 nov., intégration) v4 : à l'ordinateur la case touchée se montre d'abord dans le volet de droite ; « La fiche »
+  // ouvre la fiche D, dont les gestes de la case (Retirer…) vivent derrière « ⋯ ».
+  if (await BUREAU(pg)) { await pg.waitForSelector(`[data-cote-fiche="${n}"]`, { timeout: 6000 }).catch(() => {}); await toucher(pg, `[data-cote-fiche="${n}"]`); }
   await pg.waitForSelector('[data-fiche-retirer]', { state: 'attached', timeout: 8000 }).catch(() => {});
   await ouvrirPlus(pg);
   await toucher(pg, '[data-fiche-retirer]');
   await pg.waitForTimeout(500); await fermerFiche(pg); await pg.waitForTimeout(300);
   return (await ou(pg, n)) === null;   // jugé sur la case (un clic qui se détache en partant n'est pas un échec)
+}
+
+// ── W : « La pièce » — de face / isométrique, les meubles dans leur ordre, « 1 » à sortir (N°22) sur le Garage ──
+async function piece(pg, t, v, bureau) {
+  const p = await pg.evaluate(() => { const s = document.querySelector('.vrm-p4-piece'); if (!s) return null; const b = s.querySelector('[data-piece-a-sortir]'); return { minis: [...s.querySelectorAll('[data-piece-meuble]')].map((x) => x.getAttribute('data-piece-meuble')).join(','), rangees: [...s.querySelectorAll('[data-piece-rangee]')].map((x) => x.getAttribute('data-piece-rangee')).join(','), sortir: b ? b.getAttribute('data-piece-a-sortir') + '@' + b.closest('[data-piece-rangee]').getAttribute('data-piece-rangee') : null, faces: s.querySelectorAll('.vrm-p4-face').length }; });
+  dit(!!p && p.minis === p.rangees && p.rangees.split(',').length >= 3 && p.sortir === '1@mA' && p.faces >= 3, `${t} · W6 : « La pièce » montre chaque meuble (de face), leur ordre, et « 1 » à sortir sur le Garage (N°22 vendue)`, p);
+  await pg.click('[data-piece-choix="iso"]').catch(() => {});
+  await pg.waitForTimeout(400);
+  const iso = await pg.evaluate(() => { const s = document.querySelector('.vrm-p4-piece'); return s ? { vue: s.getAttribute('data-piece-vue'), svg: s.querySelectorAll('svg.vrm-p4-iso').length, poly: s.querySelectorAll('svg.vrm-p4-iso polygon').length } : null; });
+  dit(!!iso && iso.vue === 'iso' && iso.svg >= 3 && iso.poly > 50, `${t} · W6 : « Isométrique » dessine les meubles en volume (cartons compris)`, iso);
+  if (CAPT) { await pg.evaluate(() => { const s = document.querySelector('.vrm-p4-piece'); if (s) s.scrollIntoView({ block: 'start' }); }); await pg.waitForTimeout(300); await pg.screenshot({ path: path.join(CAPT, `etag-${v}-7-piece-iso.png`) }); }
+  await pg.click('[data-piece-choix="face"]').catch(() => {});
+  await pg.waitForTimeout(300);
+  if (CAPT) await pg.screenshot({ path: path.join(CAPT, `etag-${v}-7b-piece-face.png`) });
+}
+// ── W : « Personnaliser » le Garage — l'aperçu suit, Enregistrer écrit `reglages` dans CE meuble ──
+async function personnaliser(pg, t, v, tel, r) {
+  await voir(pg, 'mA');
+  await pg.evaluate(() => { const m = document.querySelector('[data-meuble="mA"]'); if (m) m.scrollIntoView({ block: 'start' }); });
+  const avant = await pg.evaluate(() => { const s = document.querySelector('[data-meuble="mA"]'); return s ? s.getAttribute('data-affichage') + '|' + s.getAttribute('data-densite') + '|' + s.querySelectorAll('.vrm-b4').length : null; });
+  dit(/^cartons\|confortable\|\d+$/.test(avant || '') && +avant.split('|')[2] >= 30, `${t} · W1 : un meuble d'hier se lit en Cartons, confortable (le défaut d'un meuble neuf), sans rien réécrire`, avant);
+  const sortir = await pg.evaluate(() => { const c = document.querySelector('[data-case-num="22"]'); if (!c) return null; const l = c.querySelector('[data-case-ligne]'); const e = c.querySelector('.vrm-eti4'); return { ligne: l ? l.getAttribute('data-case-ligne') + ':' + l.textContent : null, fond: e ? getComputedStyle(e).backgroundColor : null }; });
+  dit(!!sortir && /^sortir:/.test(sortir.ligne || '') && /rgb\(255, 231, 196\)/.test(sortir.fond || ''), `${t} · W3 : N°22 vendue — « À sortir », l'étiquette ambre`, sortir);
+  if (CAPT) await pg.screenshot({ path: path.join(CAPT, `etag-${v}-8-cartons.png`) });
+  const n0 = r.ecrits.length;
+  if (!(await toucher(pg, '[data-meuble-perso="mA"]'))) return;
+  await pg.waitForSelector('[data-perso-meuble="mA"] [data-perso-apercu]', { timeout: 8000 }).catch(() => {});
+  const ap0 = await pg.evaluate(() => { const a = document.querySelector('[data-perso-apercu]'); return a ? { cle: a.getAttribute('data-perso-apercu'), rendu: !!a.querySelector('[data-meuble-apercu="mA"]'), photos: a.querySelectorAll('.vrm-ph4 img').length } : null; });
+  dit(!!ap0 && ap0.cle === 'cartons|melees|confortable' && ap0.rendu && ap0.photos > 0, `${t} · W1 : « Personnaliser » montre l'aperçu EN DIRECT du vrai meuble (cartons, teintes mêlées, confortable, photos)`, ap0);
+  if (CAPT) await pg.screenshot({ path: path.join(CAPT, `etag-${v}-9-perso.png`) });
+  const mini = tel ? 43.5 : 39.5;
+  const petits = await pg.evaluate((mini) => [...document.querySelectorAll('[data-perso-meuble] button, [data-perso-meuble] input')].filter((x) => x.offsetParent && !x.closest('[data-perso-apercu]')).map((x) => [x.getAttribute('aria-label') || x.textContent.trim().slice(0, 14), Math.round(x.getBoundingClientRect().width), Math.round(x.getBoundingClientRect().height)]).filter((q) => q[1] < mini || q[2] < mini), mini);
+  dit(petits.length === 0, `${t} · H : chaque touche de « Personnaliser » fait ${tel ? 44 : 40} px au moins`, petits);
+  const pleins = await pg.evaluate(() => document.querySelectorAll('[data-perso-meuble] .sb-btn-plein').length);
+  dit(pleins === 1, `${t} · H : UN plein dans « Personnaliser » (Enregistrer)`, pleins);
+  // Rayonnage · de loin · N° en grand + prix (photo cochée : « de loin » la retire)
+  await toucher(pg, '[data-perso-affichage="rayonnage"]');
+  await toucher(pg, '[data-perso-densite="loin"]');
+  await toucher(pg, '[data-perso-etiquette="grand"]');
+  await toucher(pg, '[data-perso-etiquette="prix"]');
+  await toucher(pg, '[data-perso-teinte="sauge"]');
+  await pg.waitForTimeout(300);
+  const ap1 = await pg.evaluate(() => { const a = document.querySelector('[data-perso-apercu]'); return a ? { cle: a.getAttribute('data-perso-apercu'), photos: a.querySelectorAll('.vrm-ph4').length, labs: a.querySelectorAll('.vrm-lab4').length, sortir: !!a.querySelector('[data-case-ligne="sortir"]'), double: !!a.querySelector('[data-case-ligne="double"]') } : null; });
+  dit(!!ap1 && ap1.cle === 'rayonnage|sauge|loin' && ap1.photos === 0 && ap1.labs >= 30 && ap1.sortir && ap1.double, `${t} · W2 : l'aperçu suit : rayonnage, de loin ⇒ AUCUNE photo ; « À sortir » et « En double » toujours dits`, ap1);
+  dit(r.ecrits.length === n0, `${t} · W2 : rien n'est écrit avant « Enregistrer »`, r.ecrits.length - n0);
+  if (CAPT) { await pg.evaluate(() => { const a = document.querySelector('[data-perso-apercu]'); if (a) a.scrollIntoView({ block: 'start' }); }); await pg.screenshot({ path: path.join(CAPT, `etag-${v}-9b-perso-rayonnage.png`) }); }
+  await toucher(pg, '[data-perso-enregistrer]');
+  await pg.waitForTimeout(1200);
+  const apres = await pg.evaluate(() => { const s = document.querySelector('[data-meuble="mA"]'); if (!s) return null; const c20 = s.querySelector('[data-case-num="20"]'); const c21 = s.querySelector('[data-case-num="21"]'); const c22 = s.querySelector('[data-case-num="22"]'); return { aff: s.getAttribute('data-affichage') + '|' + s.getAttribute('data-densite') + '|' + s.getAttribute('data-teinte'), photos: s.querySelectorAll('.vrm-ph4').length, n20: c20 ? c20.textContent.replace(/\s+/g, ' ').trim() : null, grand: c20 && c20.querySelector('.vrm-n4') ? parseFloat(getComputedStyle(c20.querySelector('.vrm-n4')).fontSize) : 0, sortir: c22 ? [c22.querySelector('[data-case-ligne]') && c22.querySelector('[data-case-ligne]').getAttribute('data-case-ligne'), getComputedStyle(c22.querySelector('.vrm-lab4')).backgroundColor] : null, double: c21 ? c21.querySelector('[data-case-ligne]') && c21.querySelector('[data-case-ligne]').getAttribute('data-case-ligne') : null }; });
+  // N°20 : 30 + 20 % 50 = 50 € lus chez Vinted (le prix de l'annonce en ligne) ; jamais deviné.
+  dit(!!apres && apres.aff === 'rayonnage|loin|sauge' && apres.photos === 0 && /N°\s?20/.test(apres.n20 || '') && /(50|95)\s?€/.test(apres.n20 || '') && apres.grand >= 24, `${t} · W2 : enregistré — le Garage en rayonnage, de loin : N° en grand (≥ 24 px), le prix LU (50 € chez Vinted, 95 € chez Leboncoin), aucune photo`, apres);
+  dit(!!apres && apres.sortir && apres.sortir[0] === 'sortir' && /rgb\(255, 213, 150\)/.test(apres.sortir[1]) && apres.double === 'double', `${t} · W3 : en rayonnage aussi, « À sortir » (étiquette ambre) et « En double »`, apres && { sortir: apres.sortir, double: apres.double });
+  const lu = await pg.evaluate(() => { try { const l = JSON.parse(localStorage.getItem('vrm_meubles')); const a = l.find((m) => m.id === 'mA'), b = l.find((m) => m.id === 'mB'); return { a: a && a.reglages, aCols: a && a.cols, aNom: a && a.name, bReg: b ? ('reglages' in b) : null }; } catch (_) { return null; } });
+  dit(!!lu && lu.a && lu.a.affichage === 'rayonnage' && lu.a.densite === 'loin' && lu.a.teinte === 'sauge' && lu.a.etiquette && lu.a.etiquette.grand === true && lu.a.etiquette.prix === true && lu.a.etiquette.photo === true && lu.aCols === 4 && lu.aNom === 'Garage' && lu.bReg === false,
+    `${t} · W2 : « Enregistrer » écrit les réglages DANS le Garage (\`vrm_meubles\`, synchronisé : la fusion champ par champ est jugée par audit-stock-etageres R4), rien dans les autres meubles`, lu);
+  if (CAPT) { await pg.evaluate(() => { const m = document.querySelector('[data-meuble="mA"]'); if (m) m.scrollIntoView({ block: 'start' }); }); await pg.waitForTimeout(300); await pg.screenshot({ path: path.join(CAPT, `etag-${v}-10-rayonnage.png`) }); }
+  // Plan, puis retour en Cartons confortable (la suite du banc lit les cartons du Garage)
+  await toucher(pg, '[data-meuble-perso="mA"]');
+  await pg.waitForSelector('[data-perso-meuble="mA"]', { timeout: 8000 }).catch(() => {});
+  await toucher(pg, '[data-perso-affichage="plan"]');
+  await toucher(pg, '[data-perso-enregistrer]');
+  await pg.waitForTimeout(900);
+  const plan = await pg.evaluate(() => { const s = document.querySelector('[data-meuble="mA"]'); if (!s) return null; const c = s.querySelector('[data-case-num="20"]').getBoundingClientRect(); return { aff: s.getAttribute('data-affichage'), carre: Math.abs(c.width - c.height) < 2, w: Math.round(c.width), regle: s.querySelectorAll('[data-regle-col]').length }; });
+  dit(!!plan && plan.aff === 'plan' && plan.carre && plan.w >= 44 && plan.regle === 4, `${t} · W5 : « Plan » : vu de dessus, une case = un carré (≥ 44 px), les colonnes numérotées`, plan);
+  if (CAPT) await pg.screenshot({ path: path.join(CAPT, `etag-${v}-11-plan.png`) });
+  await toucher(pg, '[data-meuble-perso="mA"]');
+  await pg.waitForSelector('[data-perso-meuble="mA"]', { timeout: 8000 }).catch(() => {});
+  await toucher(pg, '[data-perso-affichage="cartons"]');
+  await toucher(pg, '[data-perso-densite="confortable"]');
+  await toucher(pg, '[data-perso-teinte="melees"]');
+  await toucher(pg, '[data-perso-etiquette="grand"]');
+  await toucher(pg, '[data-perso-etiquette="prix"]');
+  await toucher(pg, '[data-perso-enregistrer]');
+  await pg.waitForTimeout(900);
 }
 
 (async () => {
@@ -166,36 +266,51 @@ async function retirerCase(pg, n) {
     b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
     for (const v of VARIANTES) {
       const tel = v.startsWith('390'), sombre = v.endsWith('s'); const complet = v === '390c' || v === '1512s';
-      const t = `${tel ? '390' : '1512'} ${sombre ? 'sombre' : 'clair'}`;
+      const larg = Number(v.slice(0, -1)) || 1512;
+      const t = `${tel ? '390' : larg} ${sombre ? 'sombre' : 'clair'}`;
       await essaie(t, async () => {
-        const r = await rendre(b, tel, sombre); const pg = r.pg;
+        const r = await rendre(b, tel, sombre, larg); const pg = r.pg;
+        const bureau = await BUREAU(pg);
+        dit(tel ? !bureau : bureau, `${t} · W0 : ${tel ? 'au téléphone, « La pièce » puis chaque meuble' : 'à l’ordinateur, les trois volets (pièce · meuble · fiche)'}`, bureau);
+        await voir(pg, 'mB');
         // ── A ──
         dit(await ou(pg, '12') === 'mB:22', `${t} · A : N°12 est dans SA case d'hier (Bureau, rangée 4, colonne 2)`, await ou(pg, '12'));
-        const ordre = await pg.evaluate(() => [...document.querySelectorAll('[data-meuble]')].map((x) => x.getAttribute('data-meuble')).join(','));
+        const ordre = (await meublesListe(pg)).join(',');
         dit(ordre === 'mA,mB,mQ', `${t} · A : les meubles d'hier dans leur ordre`, ordre);
-        const nCases = await pg.evaluate(() => document.querySelectorAll('.vrm-s2d-case').length);
+        let nCases = 0;
+        if (bureau) { for (const id of await meublesListe(pg)) { await voir(pg, id); nCases += await pg.evaluate((id) => document.querySelectorAll(`[data-meuble="${id}"] .vrm-s2d-case`).length, id); } await voir(pg, 'mA'); }
+        else nCases = await pg.evaluate(() => document.querySelectorAll('[data-meuble] .vrm-s2d-case').length);
         dit(nCases === 32 + 70 + 4, `${t} · A : toutes leurs cases dessinées (106)`, nCases);
         dit(r.ecrits.length === 0, `${t} · A : AUCUNE écriture de la ligne main au montage (reprise sans migration)`, r.ecrits.length);
         console.log(`    (1 000 paires : la grille est là en ${r.tGrille} ms)`);
         // ── B ──
+        await voir(pg, 'mQ');
         const notee = await pg.evaluate(() => { const c = document.querySelector('[data-case-notee="9999"]'); return c ? c.getAttribute('data-case-ici') + '|' + c.getAttribute('data-case-etat') + '|' + (c.textContent || '').trim() : null; });
         dit(notee === 'mQ:3|notee|N°9999', `${t} · B : la case d'un N° pas montré est PRISE (« N°9999 », jamais « + »)`, notee);
-        const rouge = await pg.evaluate(() => { const c = document.querySelector('[data-case-num="21"]'); if (!c) return null; return { dbl: c.classList.contains('is-double'), sh: getComputedStyle(c).boxShadow }; });
+        await voir(pg, 'mA');
+        const rouge = await pg.evaluate(() => { const c = document.querySelector('[data-case-num="21"]'); if (!c) return null; const l = [c, ...c.querySelectorAll('*')]; const sh = l.map((e) => getComputedStyle(e).boxShadow).filter((x) => /rgb\((\d+), (\d+), (\d+)\)/.test(x) && x !== 'none').find((x) => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(x); return +m[1] > 150 && +m[2] < 120 && +m[3] < 110; }) || 'none'; return { dbl: c.classList.contains('is-double'), sh, mot: (c.querySelector('[data-case-ligne="double"]') || {}).textContent || '' }; });
         const estRouge = rouge && /rgb\((\d+), (\d+), (\d+)\)/.exec(rouge.sh); const rr = estRouge ? estRouge.slice(1).map(Number) : null;
         dit(!!(rouge && rouge.dbl && rr && rr[0] > 150 && rr[1] < 120 && rr[2] < 110), `${t} · B : la case du N° en doublon est rouge (le seul rouge)`, rouge);
-        const autresRouges = await pg.evaluate(() => [...document.querySelectorAll('.vrm-s2d-case')].filter((c) => !c.classList.contains('is-double')).filter((c) => { const m = /rgb\((\d+), (\d+), (\d+)\)/.exec(getComputedStyle(c).boxShadow + ' ' + getComputedStyle(c).backgroundColor); if (!m) return false; const [x, y, z] = m.slice(1).map(Number); return x > 170 && y < 90 && z < 90; }).length);
+        const autresRouges = await pg.evaluate(() => [...document.querySelectorAll('.vrm-s2d-case')].filter((c) => !c.classList.contains('is-double')).filter((c) => [c, ...c.querySelectorAll('*')].some((e) => { const k = getComputedStyle(e); const re = /rgb\((\d+), (\d+), (\d+)\)/g; let m; const s = k.boxShadow + ' ' + k.backgroundColor + ' ' + k.color + ' ' + k.borderTopColor; while ((m = re.exec(s))) { const [x, y, z] = m.slice(1).map(Number); if (x > 170 && y < 90 && z < 90) return true; } return false; })).length);
         dit(autresRouges === 0, `${t} · B : aucune autre case rouge`, autresRouges);
         if (CAPT) { await pg.evaluate(() => { const m = document.querySelector('[data-meuble="mA"]'); if (m) m.scrollIntoView({ block: 'start' }); }); await pg.waitForTimeout(300); await pg.screenshot({ path: path.join(CAPT, `etag-${v}-1-repris.png`), fullPage: false }); }
         // ── K : les sites et le compte sur la case (par identité) ──
-        const K = await pg.evaluate(() => { const c = (n) => { const e = document.querySelector(`[data-case-num="${n}"]`); if (!e) return null; const b = e.querySelector('.vrm-etag-sites'); const t = b && b.querySelector('.vrm-etag-compte'); const sv = b ? [...b.querySelectorAll('svg[data-marque]')] : []; return { sites: b ? b.getAttribute('data-case-sites') : null, compte: b ? b.getAttribute('data-case-compte') : null, texte: t ? t.textContent : '', logos: sv.map((x) => Math.round(x.getBoundingClientRect().height)), police: t ? parseFloat(getComputedStyle(t).fontSize) : 0, coupe: t ? t.scrollWidth > t.clientWidth + 1 : false, dedans: b ? b.getBoundingClientRect().right <= e.getBoundingClientRect().right + 0.5 : true }; }; return { n20: c('20'), n21: c('21'), n23: c('23') }; });
+        const K = await pg.evaluate(() => { const c = (n) => { const e = document.querySelector(`[data-case-num="${n}"]`); if (!e) return null; const b = e.querySelector('.vrm-etag-sites'); const t = e.querySelector('.vrm-etag-compte'); const sv = b ? [...b.querySelectorAll('svg[data-marque]')] : []; return { sites: b ? b.getAttribute('data-case-sites') : null, compte: b ? b.getAttribute('data-case-compte') : null, texte: t ? t.textContent : '', logos: sv.map((x) => Math.round(x.getBoundingClientRect().height)), police: t ? parseFloat(getComputedStyle(t).fontSize) : 0, coupe: t ? t.scrollWidth > t.clientWidth + 1 : false, dedans: b ? b.getBoundingClientRect().right <= e.getBoundingClientRect().right + 0.5 : true }; }; return { n20: c('20'), n21: c('21'), n23: c('23') }; });
         dit(!!K.n20 && /vinted:enligne/.test(K.n20.sites || '') && /leboncoin:enligne/.test(K.n20.sites || '') && K.n20.compte === 'compte_invente', `${t} · K1 : N°20 montre Vinted ET Leboncoin (sa référence VRM-20) et son compte « compte_invente »`, K.n20);
         dit(!!K.n21 && K.n21.sites === 'vinted:enligne', `${t} · K2 : N°21 — une annonce Leboncoin au MÊME titre (autre paire, VRM-999) ne lui donne aucun logo`, K.n21);
         dit(!!K.n23 && K.n23.sites === 'vinted:enligne' && !K.n23.compte && K.n23.texte === '', `${t} · K3 : N°23, compte sans pseudo connu ⇒ aucun nom (jamais l'identifiant « 333 »)`, K.n23);
-        dit(!!K.n20 && K.n20.logos.length === 2 && K.n20.logos.every((h) => h >= 13 && h <= 16) && K.n20.police >= 10 && K.n20.dedans, `${t} · K4 : logos 14 px, compte ≥ 10 px, tenus dans la case`, K.n20);
+        dit(!!K.n20 && K.n20.logos.length === 2 && K.n20.logos.every((h) => h >= 10 && h <= 13) && K.n20.police >= 10 && K.n20.dedans && K.n20.texte === 'compte_invente', `${t} · K4 : logos 10,5 px (la maquette v4), le compte ≥ 10 px sur l'étiquette, tenus dans la case`, K.n20);
         if (CAPT) { await pg.evaluate(() => document.querySelector('[data-case-num="20"]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(300); await pg.screenshot({ path: path.join(CAPT, `etag-${v}-0-sites.png`) }); }
         if (complet) {
           await toucher(pg, '[data-case-num="20"]');
-          await pg.waitForSelector('.vrm-etag-fiche-sites[data-fiche-sites]', { state: 'attached', timeout: 8000 }).catch(() => {});
+          if (bureau) {
+            await pg.waitForSelector('[data-stock-cote="20"]', { timeout: 6000 }).catch(() => {});
+            const cote = await pg.evaluate(() => { const a = document.querySelector('[data-stock-cote="20"]'); if (!a) return null; return { sites: [...a.querySelectorAll('[data-fiche-site]')].map((x) => x.getAttribute('data-fiche-site')).join(','), num: (a.querySelector('[data-cote-num]') || {}).textContent, place: (a.querySelector('[data-cote-place]') || { getAttribute: () => null }).getAttribute('data-cote-place'), gestes: [...a.querySelectorAll('.vrm-st4-gestes > button')].map((x) => Math.round(x.getBoundingClientRect().height)) }; });
+            dit(!!cote && cote.sites === 'vinted,leboncoin' && cote.num === 'N°20' && cote.place === '1:1' && cote.gestes.length === 3 && cote.gestes.every((h) => h >= 44), `${t} · W7 : la case touchée se montre dans le volet de droite (N°, une ligne par site, sa place, trois gestes de 44 px)`, cote);
+            if (CAPT) await pg.screenshot({ path: path.join(CAPT, `etag-${v}-0c-volets.png`) });
+            await toucher(pg, '[data-cote-fiche="20"]');
+          }
+          await pg.waitForSelector('[data-stock-fiche] .vrm-etag-fiche-sites[data-fiche-sites]', { state: 'attached', timeout: 8000 }).catch(() => {});
           // ── K6 (16 nov., finitions) : la vue « Sites » de la FICHE D dit les MÊMES sites et comptes que la case du Stock
           //    (une source par identité, src/stockAnnonces.js) ; ce qui n'a pas été lu est dit « pas su », jamais « pas en ligne ».
           await toucher(pg, '[data-fd-seg="sites"]');
@@ -208,12 +323,20 @@ async function retirerCase(pg, n) {
           if (CAPT) await pg.screenshot({ path: path.join(CAPT, `etag-${v}-0a-fiche-d-sites.png`) });
           await ouvrirPlus(pg);
           // les rangées du STOCK (src/stockAnnonces.js, par identité) ; la vue « Sites » de la fiche D a sa propre règle (Prix partout)
-          const fs2 = await pg.evaluate(() => { const l = [...document.querySelectorAll('.vrm-etag-fiche-site[data-fiche-site]')]; return l.map((x) => x.getAttribute('data-fiche-site') + ':' + (x.getAttribute('data-compte') || '') + ':' + x.textContent.replace(/\s+/g, ' ').trim()); });
+          const fs2 = await pg.evaluate(() => { const l = [...document.querySelectorAll('[data-stock-fiche] .vrm-etag-fiche-site[data-fiche-site]')]; return l.map((x) => x.getAttribute('data-fiche-site') + ':' + (x.getAttribute('data-compte') || '') + ':' + x.textContent.replace(/\s+/g, ' ').trim()); });
           dit(fs2.length === 2 && /^vinted:compte_invente:/.test(fs2[0]) && /^leboncoin:nord_lbc:.*95/.test(fs2[1]), `${t} · K5 : la fiche de N°20 dit une ligne par site (logo · compte · prix · depuis)`, fs2);
           if (CAPT) await pg.screenshot({ path: path.join(CAPT, `etag-${v}-0b-fiche-sites.png`) });
           await fermerFiche(pg); await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(400);
         }
         if (!complet) {
+          await piece(pg, t, v, bureau);
+          if (bureau) {
+            const vol = await pg.evaluate(() => { const q = (s) => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.right), Math.round(r.width)]; }; return { g: q('.vrm-st4-gauche'), c: q('.vrm-st4-centre'), d: q('.vrm-st4-droite'), rail: !!document.querySelector('nav[data-rail-verre]'), cw: document.documentElement.clientWidth }; });
+            const okV = vol.g && vol.c && vol.d && vol.g[1] <= vol.c[0] && vol.c[1] <= vol.d[0] && vol.d[1] <= vol.cw && vol.c[2] >= 420;
+            dit(!!okV, `${t} · W7 : trois volets côte à côte, sans chevauchement, dans l'écran (centre ≥ 420 px)`, vol);
+            await toucher(pg, '[data-case-num="20"]'); await pg.waitForTimeout(400);
+            if (CAPT) await pg.screenshot({ path: path.join(CAPT, `etag-${v}-0c-volets.png`) });
+          }
           const x = await pg.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
           dit(x.sw <= x.cw + 1, `${t} · H : aucune page plus large que l'écran`, x);
           await pg.evaluate(() => { const s = document.querySelector('[data-meuble="mQ"]'); if (s) s.scrollIntoView({ block: 'center' }); });
@@ -222,22 +345,27 @@ async function retirerCase(pg, n) {
           await r.ctx.close(); return;
         }
         // ── F : la pile d'hier, le haut retiré : le N° pas montré garde sa case ──
+        await voir(pg, 'mQ');
         await retirerCase(pg, '62');
         const hier = [await ou(pg, '61'), await pg.evaluate(() => { const c = document.querySelector('[data-case-notee="9999"]'); return c ? c.getAttribute('data-case-ici') : null; })];
         dit(hier[0] === 'mQ:2' && hier[1] === 'mQ:3', `${t} · F : N°61 reste posé sur le carton N°9999 (pas montré) : personne ne passe au travers`, hier);
         // ── V : le visuel (revue du 15 nov.) ──
+        await voir(pg, 'mA');
         await pg.evaluate(() => { const m = document.querySelector('[data-meuble="mA"]'); if (m) m.scrollIntoView({ block: 'center' }); });
         await pg.waitForTimeout(1500);
         const barre = await pg.evaluate(() => { const b = document.querySelector('[data-stock-recherche]'); if (!b) return null; const cs = getComputedStyle(b); const c = cs.backgroundColor; const m = /rgba?\(([^)]+)\)/.exec(c) || /color\(srgb ([^)]+)\)/.exec(c); let a = 1; if (m) { const p = m[1].split(/[\s,\/]+/).filter(Boolean); if (p.length >= 4) a = Number(p[3]); } if (/transparent/.test(c)) a = 0; const q = b.getBoundingClientRect(); const vue = q.bottom > 0 && q.top < innerHeight; const e = vue ? document.elementFromPoint(q.left + q.width - 70, q.top + q.height / 2) : null; const img = (() => { const c = document.querySelector('[data-meuble="mA"] .vrm-s2d-case[data-case-num] img'); if (!c) return null; const r = c.getBoundingClientRect(), k = getComputedStyle(c); return { vu: c.hasAttribute('data-vu'), pv: c.getAttribute('data-photo-vinted'), anim: k.animationName + ' ' + k.animationPlayState + ' ' + k.animationDelay, tr: k.transition.slice(0, 60), w: Math.round(r.width), h: Math.round(r.height), op: k.opacity, vis: k.visibility, src: (c.currentSrc || c.src || '').slice(-22), nat: c.naturalWidth, z: k.zIndex, pos: k.position, sous: (() => { const el = document.elementFromPoint(r.left + r.width / 2, r.top + 8); return el ? (el.tagName + '.' + String(el.className).slice(0, 40)) : null; })() }; })(); return { a, z: cs.zIndex, vue, top: Math.round(q.top), dessus: vue ? !!(e && b.contains(e)) : null, par: e ? (e.tagName + '.' + String(e.className).slice(0, 40)) : null, pos: cs.position, img }; });
         if (process.env.BANC_DEBUG) console.log('    (barre ' + JSON.stringify(barre) + ')');
         dit(!!barre && barre.a >= 0.9 && barre.dessus !== false, `${t} · V1 : la recherche collée est opaque et passe AU-DESSUS des cases`, barre);
-        const vig = await pg.evaluate(() => { const cs = [...document.querySelectorAll('[data-meuble="mA"] .vrm-s2d-case[data-case-num]')].filter((c) => { const q = c.getBoundingClientRect(); return q.top >= 0 && q.bottom <= innerHeight; }); const im = cs.filter((c) => { const i = c.querySelector('img'); return i && i.complete && i.naturalWidth > 0; }).length; const lettres = cs.filter((c) => { const t = [...c.childNodes].filter((n) => !(n.classList && (n.classList.contains('vrm-s2d-num') || n.classList.contains('vrm-etag-sites')))).map((n) => n.textContent || '').join('').trim(); return t.length > 0; }).length; const pl = cs[0] && cs[0].querySelector('.vrm-s2d-num'); return { n: cs.length, im, lettres, plaque: pl ? parseFloat(getComputedStyle(pl).fontSize) : 0 }; });
+        const vig = await pg.evaluate(() => { const cs = [...document.querySelectorAll('[data-meuble="mA"] .vrm-s2d-case[data-case-num]')].filter((c) => { const q = c.getBoundingClientRect(); return q.top >= 0 && q.bottom <= innerHeight; }); const im = cs.filter((c) => { const i = c.querySelector('img'); return i && i.complete && i.naturalWidth > 0; }).length; const lettres = cs.filter((c) => !!c.querySelector('.vrm-s2d-sansphoto, [data-sans-photo]') || !c.querySelector('img')).length; const pl = cs[0] && cs[0].querySelector('.vrm-s2d-num'); return { n: cs.length, im, lettres, plaque: pl ? parseFloat(getComputedStyle(pl).fontSize) : 0 }; });
         dit(vig.n > 0 && vig.im === vig.n && vig.lettres === 0 && vig.plaque >= 11, `${t} · V2 : chaque case montre la PHOTO de sa paire, aucune lettre, le N° en plaque (≥ 11 px)`, vig);
-        const pied = await pg.evaluate(() => { const a = document.querySelector('[data-creer-meuble]'), b = document.querySelector('[data-stock-explication-ouvrir]'); if (!a || !b) return null; const p = a.getBoundingClientRect(), q = b.getBoundingClientRect(); const recouvre = !(p.right <= q.left || q.right <= p.left || p.bottom <= q.top || q.bottom <= p.top); return { recouvre, ligne: Math.abs((p.top + p.bottom) / 2 - (q.top + q.bottom) / 2) < 4, h: [Math.round(p.height), Math.round(q.height)] }; });
-        dit(!!pied && !pied.recouvre && pied.ligne && pied.h[0] >= (tel ? 44 : 40), `${t} · V3 : « Ajouter un meuble » et « Comment ça marche ? » sur une ligne, sans se chevaucher`, pied);
+        const pied = bureau ? await pg.evaluate(() => { const a = document.querySelector('.vrm-st4-gauche [data-creer-meuble]'); if (!a) return null; const p = a.getBoundingClientRect(); return { recouvre: false, ligne: true, h: [Math.round(p.height), 0] }; }) : await pg.evaluate(() => { const a = document.querySelector('[data-creer-meuble]'), b = document.querySelector('[data-stock-explication-ouvrir]'); if (!a || !b) return null; const p = a.getBoundingClientRect(), q = b.getBoundingClientRect(); const recouvre = !(p.right <= q.left || q.right <= p.left || p.bottom <= q.top || q.bottom <= p.top); return { recouvre, ligne: Math.abs((p.top + p.bottom) / 2 - (q.top + q.bottom) / 2) < 4, h: [Math.round(p.height), Math.round(q.height)] }; });
+        dit(!!pied && !pied.recouvre && pied.ligne && pied.h[0] >= (tel ? 44 : 40), `${t} · V3 : ${bureau ? '« Ajouter un meuble » au pied du volet de la pièce' : '« Ajouter un meuble » et « Comment ça marche ? » sur une ligne, sans se chevaucher'}`, pied);
+        await voir(pg, 'mQ');
         const pq = await pg.evaluate(() => { const s = document.querySelector('[data-meuble="mQ"]'); if (!s) return null; const c = s.querySelector('.vrm-s2d-case').getBoundingClientRect(); const coupees = [...s.querySelectorAll('.vrm-s2d-num')].filter((x) => x.scrollWidth > x.clientWidth + 1).length; return { w: Math.round(s.querySelector('.vrm-s2d-etagere').getBoundingClientRect().width), ch: Math.round(c.height), cw: Math.round(c.width), coupees }; });
-        dit(!!pq && pq.w <= 200 && pq.ch <= 56 && pq.cw <= 64 && pq.coupees === 0, `${t} · V4 : une pile est compacte (colonne de cartons ≤ 200 px, cartons ≤ 64 × 56), ses N° entiers (« N°9999 » pas coupé)`, pq);
+        dit(!!pq && pq.w <= 200 && pq.ch <= 110 && pq.cw <= 100 && pq.coupees === 0, `${t} · V4 : une pile reste étroite (≤ 200 px), ses cartons ceux de la maquette v4 (≤ 100 × 110), ses N° entiers (« N°9999 » pas coupé)`, pq);
         if (CAPT) await pg.screenshot({ path: path.join(CAPT, `etag-${v}-1b-piece.png`) });
+        await piece(pg, t, v, bureau);
+        await personnaliser(pg, t, v, tel, r);
         // ── C : une étagère 4×3, « sauge », rangée 1 « ciel » ──
         await toucher(pg, '[data-creer-meuble]');
         await pg.waitForSelector('[data-editeur-meuble]', { timeout: 8000 });
@@ -292,7 +420,7 @@ async function retirerCase(pg, n) {
         const reste = await pg.evaluate(() => !!document.querySelector('[data-descente]'));
         dit(fois === 0 && reste, `${t} · V5 : la descente est dite UNE fois (le bandeau du meuble, qui reste jusqu'à « Compris »), aucun message par-dessus`, { fois, reste });
         const cote = await pg.evaluate(() => { const ss = [...document.querySelectorAll('[data-meuble]')]; const e = ss.find((x) => x.querySelector('.vrm-s2d-nom') && x.querySelector('.vrm-s2d-nom').textContent === 'Étagère test'); const p = ss.find((x) => x.querySelector('.vrm-s2d-nom') && x.querySelector('.vrm-s2d-nom').textContent === 'Pile test'); if (!e || !p) return null; const a = e.getBoundingClientRect(), b = p.getBoundingClientRect(); const g = p.querySelector('.vrm-s2d-etagere').getBoundingClientRect(), tt = p.querySelector('.vrm-s2d-tete').getBoundingClientRect(); return { memeLigne: Math.abs(a.bottom - b.bottom) < 3 && b.left > a.right - 1, ew: Math.round(a.width), pw: Math.round(g.width), teteADroite: tt.left >= g.right - 1 }; });
-        dit(!!cote && (tel ? cote.pw <= 200 && cote.teteADroite : cote.memeLigne), `${t} · V4 : ${tel ? 'la pile garde la largeur de ses cartons, son nom et ses gestes à côté (pas de grand vide)' : 'l’étagère et la pile côte à côte, posées au même sol'}`, cote);
+        if (tel) dit(!!cote && cote.pw <= 200 && cote.teteADroite, `${t} · V4 : la pile garde la largeur de ses cartons, son nom et ses gestes à côté (pas de grand vide)`, cote);
         const fichesApres = await pg.evaluate(() => { try { const f = JSON.parse(localStorage.getItem('vinted_annonce_numeros')); return Object.values(f).filter((x) => x && x.numero).length; } catch (_) { return -1; } });
         dit(fichesApres === N + 1, `${t} · E : aucun N° touché (1 001 fiches, mêmes numéros)`, fichesApres);
         if (CAPT) { await pg.evaluate((P) => document.querySelector(`[data-meuble="${P}"]`).scrollIntoView({ block: 'center' }), P); await pg.screenshot({ path: path.join(CAPT, `etag-${v}-5-descente.png`) }); }
@@ -307,12 +435,16 @@ async function retirerCase(pg, n) {
         dit(allume === true, `${t} · G : chercher « 12 » allume la case du N°12`, allume);
         if (CAPT) await pg.screenshot({ path: path.join(CAPT, `etag-${v}-6-recherche.png`) });
         await pg.waitForTimeout(4200);
+        await voir(pg, 'mA');
+        await toucher(pg, '[data-meuble-perso="mA"]');
+        await pg.waitForSelector('[data-perso-meuble="mA"]', { timeout: 6000 }).catch(() => {});
         await toucher(pg, '[data-meuble-descendre="mA"]');
         await pg.waitForTimeout(500);
-        const ordre2 = await pg.evaluate(() => [...document.querySelectorAll('[data-meuble]')].map((x) => x.getAttribute('data-meuble')).slice(0, 2).join(','));
+        const ordre2 = (await meublesListe(pg)).slice(0, 2).join(',');
         dit(ordre2 === 'mB,mA', `${t} · G : « Descendre » le Garage le met après le Bureau`, ordre2);
         const rondPetit = await pg.evaluate((mini) => [...document.querySelectorAll('[data-meuble-monter],[data-meuble-descendre],[data-meuble-modifier]')].map((x) => x.getBoundingClientRect()).filter((q) => q.width < mini || q.height < mini).length, tel ? 43.5 : 39.5);
         dit(rondPetit === 0, `${t} · H : monter / descendre / modifier font ${tel ? 44 : 40} px au moins`, rondPetit);
+        await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(500);
         // ── H ──
         await pg.waitForTimeout(1500);
         const garde = await pg.evaluate(() => { try { const l = JSON.parse(localStorage.getItem('vrm_meubles')); const b = l.find((m) => m.id === 'mB'); return b && b.gravite === false && Array.isArray(b.planches) && b.cols === 7 && b.rows === 10 && b.name === 'Bureau' && l.length === 5; } catch (_) { return false; } });

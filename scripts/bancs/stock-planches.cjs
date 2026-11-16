@@ -9,7 +9,7 @@
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path');
-const DIST = path.join(__dirname, '..', '..', 'dist');
+const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 6481;
 
 const MAIN = {
@@ -90,8 +90,30 @@ async function rendre(b, tel) {
   if (process.env.SHOT) { await pg.screenshot({ path: process.env.SHOT + (tel ? '-390' : '-1512') + '.png' }); console.log((await pg.evaluate(() => document.body.innerText)).slice(0, 600)); }
   return { ctx, pg, errs };
 }
-const ou = (pg, n) => pg.evaluate((n) => { const el = document.querySelector(`[data-case-num="${n}"]`); if (!el) return null; const m = /rangée (\d+), colonne (\d+)/.exec(el.getAttribute('aria-label') || ''); return m ? `${el.closest('[data-meuble]').getAttribute('data-meuble')}:${m[1]}.${m[2]}` : null; }, n);
-const retirer = async (pg, n) => { await pg.click(`[data-case-num="${n}"]`); await pg.click('button:has-text("Retirer de la case")'); await pg.waitForTimeout(300); };
+const ouIci = (pg, n) => pg.evaluate((n) => { const el = document.querySelector(`[data-case-num="${n}"]`); if (!el) return null; const m = /rangée (\d+), colonne (\d+)/.exec(el.getAttribute('aria-label') || ''); return m ? `${el.closest('[data-meuble]').getAttribute('data-meuble')}:${m[1]}.${m[2]}` : null; }, n);
+// (15 nov., v4) À l'ordinateur, trois volets : un seul meuble au centre (choisi dans « La pièce ») ; la case touchée se
+// montre dans le volet de droite, « Fiche » ouvre la fiche (ses gestes). Au téléphone, rien ne change.
+const BUREAU = (pg) => pg.evaluate(() => !!document.querySelector('[data-stock-volets]'));
+async function voir(pg, id) {
+  if (!(await BUREAU(pg))) return;
+  if (await pg.evaluate((id) => !!document.querySelector(`.vrm-st4-centre [data-meuble="${id}"]`), id)) return;
+  await pg.click(`[data-piece-rangee="${id}"]`, { timeout: 20000 }).catch(() => {});
+  await pg.waitForSelector(`.vrm-st4-centre [data-meuble="${id}"]`, { timeout: 30000 }).catch(() => {}); await pg.waitForTimeout(300);
+}
+async function ou(pg, n) {
+  const a = await ouIci(pg, n); if (a || !(await BUREAU(pg))) return a;
+  for (const id of await pg.evaluate(() => [...document.querySelectorAll('[data-piece-rangee]')].map((x) => x.getAttribute('data-piece-rangee')))) { await voir(pg, id); const b2 = await ouIci(pg, n); if (b2) return b2; }
+  return null;
+}
+const retirer = async (pg, n) => {
+  const ici = await ou(pg, n); if (ici) await voir(pg, ici.split(':')[0]);
+  await pg.click(`[data-case-num="${n}"]`);
+  if (await BUREAU(pg)) await pg.click(`[data-cote-fiche="${n}"]`, { timeout: 20000 });
+  await pg.click('button:has-text("Retirer de la case")'); await pg.waitForTimeout(300);
+  if (await BUREAU(pg)) { await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(300); }
+};
+// « Modifier le meuble » (l'éditeur : forme, planches) s'ouvre depuis « Personnaliser ».
+const modifier = async (pg, id) => { await voir(pg, id); await pg.click(`[data-meuble-perso="${id}"]`, { timeout: 20000 }); await pg.click(`[data-meuble-modifier="${id}"]`, { timeout: 20000 }); };
 
 (async () => {
   let b;
@@ -102,6 +124,7 @@ const retirer = async (pg, n) => { await pg.click(`[data-case-num="${n}"]`); awa
       const t = tel ? '390 px' : '1512 px';
       await essaie(t, async () => {
         const r = await rendre(b, tel);
+        await voir(r.pg, 'mG');
         const pl = await r.pg.evaluate(() => [...document.querySelectorAll('[data-meuble="mG"] [data-planche]')].map((x) => x.getAttribute('data-planche')).join(','));
         dit(pl === '2', `${t} : la planche sous la rangée 2 est dessinée`, pl);
         await retirer(r.pg, '1');
@@ -110,6 +133,7 @@ const retirer = async (pg, n) => { await pg.click(`[data-case-num="${n}"]`); awa
         await retirer(r.pg, '3');
         dit(await ou(r.pg, '4') === 'mG:2.1', `${t} : N°3 retirée ⇒ N°4 descend sur la planche (rangée 2)`, await ou(r.pg, '4'));
         // Poser N°5 dans une case du HAUT de la colonne 2 : elle tombe en bas.
+        await voir(r.pg, 'mG');
         await r.pg.click('[data-meuble="mG"] button[aria-label="Case vide — rangée 3, colonne 2"]');
         await r.pg.click('[data-stock-modale] button:has-text("N°5")');
         await r.pg.waitForTimeout(300);
@@ -118,34 +142,37 @@ const retirer = async (pg, n) => { await pg.click(`[data-case-num="${n}"]`); awa
         await retirer(r.pg, '6');
         dit(await ou(r.pg, '7') === 'mF:2.1', `${t} : meuble non empilé — N°7 ne bouge pas`, await ou(r.pg, '7'));
         // L'éditeur : poser une planche sous la rangée 3, enregistrer.
-        await r.pg.click('[data-meuble="mG"] button[aria-label="Modifier le meuble"]');
+        await modifier(r.pg, 'mG');
         const avant = await r.pg.getAttribute('[data-planche-choix="3"]', 'aria-pressed');
         await r.pg.click('[data-planche-choix="3"]');
         await r.pg.click('[data-meuble-enregistrer]');
         await r.pg.waitForTimeout(1200);  // save() écrit l'appareil après 500 ms
+        await voir(r.pg, 'mG');
         const pl2 = await r.pg.evaluate(() => [...document.querySelectorAll('[data-meuble="mG"] [data-planche]')].map((x) => x.getAttribute('data-planche')).join(','));
         const sauve = await r.pg.evaluate(() => { try { return JSON.stringify((JSON.parse(localStorage.getItem('vrm_meubles')) || []).find((m) => m.id === 'mG')); } catch (_) { return ''; } });
         dit(avant === 'false' && pl2 === '2,3' && /"planches":\[2,3\]/.test(sauve) && /"gravite":true/.test(sauve), `${t} : l'éditeur pose la planche, elle est dessinée et enregistrée`, `${avant} ${pl2} ${sauve}`);
         dit(await ou(r.pg, '2') === 'mG:4.1' && await ou(r.pg, '4') === 'mG:2.1', `${t} : les articles restent à leur place après l'enregistrement`, `${await ou(r.pg, '2')} ${await ou(r.pg, '4')}`);
         if (process.env.SHOT) { await r.pg.evaluate(() => document.querySelector('[data-meuble="mG"]').scrollIntoView()); await r.pg.screenshot({ path: process.env.SHOT + (tel ? '-390' : '-1512') + '.png' }); }
         // Planche PARTIELLE (colonne par colonne).
+        await voir(r.pg, 'mP');
         const pc = await r.pg.evaluate(() => ({ cases: [...document.querySelectorAll('[data-meuble="mP"] [data-planche-case]')].map((x) => x.getAttribute('data-planche-case')).join(','), pleines: document.querySelectorAll('[data-meuble="mP"] [data-planche]').length }));
         dit(pc.cases === '1:1' && pc.pleines === 0, `${t} : la planche partielle n'est dessinée que sous la colonne 1`, JSON.stringify(pc));
         await retirer(r.pg, '9');
         dit(await ou(r.pg, '8') === 'mP:1.1', `${t} : colonne 1 — N°8 reste posée sur SA planche partielle`, await ou(r.pg, '8'));
         await retirer(r.pg, '11');
         dit(await ou(r.pg, '10') === 'mP:3.2', `${t} : colonne 2 (sans planche) — N°10 descend tout en bas`, await ou(r.pg, '10'));
-        await r.pg.click('[data-meuble="mP"] button[aria-label="Modifier le meuble"]');
+        await modifier(r.pg, 'mP');
         await r.pg.click('[data-planche-case-choix="2:2"]');
         if (process.env.DBG) { console.log(await r.pg.evaluate(() => { const b = document.querySelector('[data-planche-case-choix="2:2"]'); const q = b.getBoundingClientRect(); const e = document.elementFromPoint(q.x + q.width / 2, q.y + q.height / 2); return JSON.stringify({ q, press: b.getAttribute('aria-pressed'), top: e && e.outerHTML.slice(0, 120) }); })); }
         await r.pg.click('[data-meuble-enregistrer]');
         await r.pg.waitForTimeout(1200);
         const sauveP = await r.pg.evaluate(() => { try { return JSON.stringify((JSON.parse(localStorage.getItem('vrm_meubles')) || []).find((m) => m.id === 'mP').planches); } catch (_) { return ''; } });
+        await voir(r.pg, 'mP');
         const pc2 = await r.pg.evaluate(() => [...document.querySelectorAll('[data-meuble="mP"] [data-planche-case]')].map((x) => x.getAttribute('data-planche-case')).join(','));
         dit(sauveP === '["1:1","2:2"]' && pc2 === '1:1,2:2', `${t} : l'éditeur pose une planche sous une seule colonne, dessinée et enregistrée`, `${sauveP} ${pc2}`);
         dit(await ou(r.pg, '10') === 'mP:3.2', `${t} : N°10, sous la nouvelle planche, reste en bas`, await ou(r.pg, '10'));
         // Le bouton ⟷ fait toute la largeur : rangée 1 devient pleine (rangée en nombre).
-        await r.pg.click('[data-meuble="mP"] button[aria-label="Modifier le meuble"]');
+        await modifier(r.pg, 'mP');
         await r.pg.click('[data-planche-choix="1"]');
         await r.pg.click('[data-meuble-enregistrer]');
         await r.pg.waitForTimeout(1200);

@@ -17360,6 +17360,10 @@ const ICON_PATHS = {
   camera:  <><path d="M3.5 8.6h3.1l1.3-2.1h8.2l1.3 2.1h3.1v9.4a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5Z"/><circle cx="12" cy="13.2" r="3.2"/></>,
   calendar:<><rect x="3.5" y="5.5" width="17" height="15" rx="2"/><path d="M3.5 10h17"/><path d="M8 3.5v4M16 3.5v4"/></>,
   filter:  <><path d="M3.8 5.5h16.4l-6.4 7.4v5.6l-3.6 2v-7.6Z"/></>,
+  // (15 nov., étagère v4) « Personnaliser » : deux curseurs.
+  sliders: <><path d="M4 8h9M17 8h3M4 16h3M11 16h9"/><circle cx="15" cy="8" r="2.2"/><circle cx="9" cy="16" r="2.2"/></>,
+  move: <><path d="M12 3v18M3 12h18"/><path d="M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></>,
+  plus: <path d="M12 5v14M5 12h14"/>,
   sleep:   <><path d="M20 14.5A8 8 0 0 1 9.5 4 8.2 8.2 0 1 0 20 14.5Z"/></>,
   target:  <><circle cx="12" cy="12" r="8.2"/><circle cx="12" cy="12" r="4.2"/><circle cx="12" cy="12" r="0.9"/></>,
   qr:      <><rect x="3.5" y="3.5" width="6.5" height="6.5" rx="1"/><rect x="14" y="3.5" width="6.5" height="6.5" rx="1"/><rect x="3.5" y="14" width="6.5" height="6.5" rx="1"/><path d="M14 14h3v3h-3zM20.5 14v3M17.5 20.5h3M14 20.5h0.01"/></>,
