@@ -29,6 +29,7 @@
 //   `scripts/audit-meme-photo.cjs` exécutent les MÊMES fonctions (§11).
 // ══════════════════════════════════════════════════════════════════════════
 import { empreinteValide } from './photoEmpreinte.js';
+import { cleCoupleFin, verdictFin, mesureValide, SEUIL_EMPREINTE_SUR } from './photoFine.js';
 
 // LE SEUIL D'UNE PROPOSITION — plus STRICT que `SEUIL_PHOTO` (16), qui sert l'alerte « la même photo
 // sur deux comptes » (là, mieux vaut prévenir de trop). MESURÉ le 15 nov. (photos-comptes-seuil.cjs,
@@ -46,6 +47,21 @@ export const GENERIQUE_ANNONCES = 6;
 export const GENERIQUE_PAIRES = 3;
 // Les sites qu'on relie à une paire Vinted (le nom tel que l'app l'écrit partout).
 export const SITES_MEME_PHOTO = ['Leboncoin', 'eBay', 'Vestiaire'];
+// (15 nov., lot meme-photo-sure) Le nom court d'un site dans les clés de la deuxième mesure
+// (`photo_meme_verif`, écrite par l'extension : src/photoFine.js `cleCoupleFin`).
+export const SITE_COURT = { Leboncoin: 'lbc', Vestiaire: 'vc', eBay: 'ebay' };
+// « Même photo · sûr » exige LES DEUX mesures, nettes (src/photoFine.js) :
+//   1. l'empreinte ≤ `SEUIL_EMPREINTE_SUR` (10 ; entre 11 et 12 : « à vérifier ») ;
+//   2. la mesure fine (extension 5.388) « sûre » sur CE couple de photos (src/photoFine.js `verdictFin`).
+// Une seule mesure, ou l'une proche de son seuil ⇒ « à vérifier » (montré, les deux photos
+// côte à côte, JAMAIS compté sûr). La mesure fine NETTEMENT contraire (< `SEUIL_FINE_NON`) ⇒
+// le couple n'est pas la même photo : écarté. Rien n'est relié tout seul (§5) : « sûr » propose.
+export function etatCouple(distance, mesure) {
+  const v = verdictFin(mesure);
+  if (v === 'non') return 'non';
+  if (v === 'sur' && typeof distance === 'number' && distance <= SEUIL_EMPREINTE_SUR) return 'sur';
+  return 'verifier';
+}
 
 const arr = (a) => (Array.isArray(a) ? a : []);
 const objet = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : null);
@@ -94,14 +110,18 @@ export const cleAnnonceMemePhoto = (a) => `${a.plateforme}:${a.id}`;
 // `refus`   : { [cleRefusMemePhoto]: date } — ses « Ce n'est pas la même » ;
 // `numerosDouteux` : Set des N° (cleNum) portés par deux paires présentes ;
 // `cle`     : cleNum de l'app (« 007 » = « 7 », « b125 » = « B125 »).
+// `verifs`  : { [cleCoupleFin]: { s, r } | { s: null } } — la deuxième mesure (`photo_meme_verif`) ;
+//             absente / `null` (pas lue) ⇒ aucune mesure fine : tout reste « à vérifier ».
 // Rend { lu, propositions, ambigus, nGeneriques, nSansEmpreinte, nVerifiees,
 //        nARelier, parNumero } :
 //   proposition = { id, annonce, numero, vinted: [annonce Vinted…], photoAutre,
-//                   photoVinted, distance } ;
+//                   photoVinted, distance, etat: 'sur'|'verifier', fine: score|null,
+//                   raison: 'pas-mesure'|'proche'|'doute'|null } ;
 //   ambigu      = { id, annonce, raison: 'deux-paires'|'numero-double'|'sans-numero',
 //                   paires: [{ numero, vinted: [annonce…], photoAutre, photoVinted, distance }] }.
-export function propositionsMemePhoto({ vinted = [], autres = [], empreintes = null, refus = {}, numerosDouteux = null, cle = cleNumDefaut, seuil = SEUIL_MEME_PHOTO } = {}) {
-  const vide = { lu: false, propositions: [], ambigus: [], nGeneriques: 0, nSansEmpreinte: 0, nVerifiees: 0, nARelier: 0, parNumero: new Map() };
+export function propositionsMemePhoto({ vinted = [], autres = [], empreintes = null, refus = {}, numerosDouteux = null, cle = cleNumDefaut, seuil = SEUIL_MEME_PHOTO, verifs = null } = {}) {
+  const vide = { lu: false, propositions: [], ambigus: [], nGeneriques: 0, nSansEmpreinte: 0, nVerifiees: 0, nARelier: 0, nSurs: 0, nAVerifier: 0, nEcartees: 0, parNumero: new Map() };
+  const V = objet(verifs) || {};
   const E = objet(empreintes);
   if (!E) return vide;
   const douteux = numerosDouteux instanceof Set ? numerosDouteux : new Set(arr(numerosDouteux).map((x) => cle(x)));
@@ -133,6 +153,7 @@ export function propositionsMemePhoto({ vinted = [], autres = [], empreintes = n
     candidats.push({ a, debut: avant, fin: points.length });
   }
   const propositions = [], ambigus = [];
+  const ecartes = new Set();                  // couples annonce × annonce Vinted écartés par la mesure fine
   let nGeneriques = 0;
   for (const c of candidats) {
     const parPaire = new Map();               // clé de paire ⇒ { numero, vinted: Map, photoAutre, photoVinted, distance }
@@ -143,20 +164,30 @@ export function propositionsMemePhoto({ vinted = [], autres = [], empreintes = n
         if (q.cleA === p.cleA) continue;      // l'annonce elle-même (ses autres photos)
         const d = distanceMots(p.w, q.w);
         if (d == null || d > seuil) continue;
+        // La deuxième mesure sur CE couple de photos (Vinted seulement : c'est elle qu'on relie).
+        let fine = null;
+        if (q.cote === 'vinted') {
+          const x = V[cleCoupleFin(SITE_COURT[c.a.plateforme], c.a.id, p.k, q.a.compte, q.a.id, q.k)];
+          fine = mesureValide(x);
+          // NETTEMENT pas la même photo (autre prise de vue, même modèle au même endroit) : écarté.
+          if (etatCouple(d, fine) === 'non') { ecartes.add(c.a.id + '|' + q.a.id); continue; }
+        }
         annoncesVues.add(q.cleA);
         if (q.cote !== 'vinted') continue;
         const n = cle(q.a.numero || '');
         const kp = n ? `n:${n}` : `a:${q.a.id}`;
-        const x = paires.get(kp) || { numero: n, q, distance: d, toutes: new Map() };
+        const x = paires.get(kp) || { numero: n, q, distance: d, toutes: new Map(), couples: [] };
         x.toutes.set(String(q.a.id), q.a);
+        x.couples.push({ photoAutre: p.k, photoVinted: q.k, vinted: String(q.a.id), distance: d, fine, etat: etatCouple(d, fine) });
         if (d < x.distance) { x.q = q; x.distance = d; }
         paires.set(kp, x);
       }
       // Générique : vue sur plus de N annonces (elle comprise), ou sur 3 paires et plus.
       if (annoncesVues.size + 1 > GENERIQUE_ANNONCES || paires.size >= GENERIQUE_PAIRES) { nGeneriques++; continue; }
       for (const [kp, x] of paires) {
-        const e = parPaire.get(kp) || { numero: x.numero, vinted: new Map(), photoAutre: p.k, photoVinted: x.q.k, distance: x.distance };
+        const e = parPaire.get(kp) || { numero: x.numero, vinted: new Map(), photoAutre: p.k, photoVinted: x.q.k, distance: x.distance, couples: [] };
         for (const [vid, va] of x.toutes) e.vinted.set(vid, va);
+        e.couples.push(...x.couples);
         if (x.distance < e.distance) { e.distance = x.distance; e.photoAutre = p.k; e.photoVinted = x.q.k; }
         parPaire.set(kp, e);
       }
@@ -164,26 +195,42 @@ export function propositionsMemePhoto({ vinted = [], autres = [], empreintes = n
     // Ses « Ce n'est pas la même » : ce couple ne revient plus.
     for (const [kp, e] of [...parPaire]) if (e.numero && refuses[cleRefusMemePhoto(c.a.plateforme, c.a.id, e.numero, cle)]) parPaire.delete(kp);
     if (!parPaire.size) continue;
-    const paires = [...parPaire.values()].map((e) => ({ numero: e.numero, vinted: [...e.vinted.values()], photoAutre: e.photoAutre, photoVinted: e.photoVinted, distance: e.distance }))
+    const paires = [...parPaire.values()].map((e) => ({ numero: e.numero, vinted: [...e.vinted.values()], photoAutre: e.photoAutre, photoVinted: e.photoVinted, distance: e.distance, ...etatPaire(e.couples) }))
       .sort((x, y) => x.distance - y.distance || String(x.numero).localeCompare(String(y.numero), 'fr', { numeric: true }));
     const id = cleAnnonceMemePhoto(c.a);
     if (paires.length >= 2) { ambigus.push({ id, annonce: c.a, raison: 'deux-paires', paires }); continue; }
     const seule = paires[0];
     if (!seule.numero) { ambigus.push({ id, annonce: c.a, raison: 'sans-numero', paires }); continue; }
     if (douteux.has(seule.numero)) { ambigus.push({ id, annonce: c.a, raison: 'numero-double', paires }); continue; }
-    propositions.push({ id, annonce: c.a, numero: seule.numero, vinted: seule.vinted, photoAutre: seule.photoAutre, photoVinted: seule.photoVinted, distance: seule.distance });
+    propositions.push({ id, annonce: c.a, numero: seule.numero, vinted: seule.vinted, photoAutre: seule.photoAutre, photoVinted: seule.photoVinted, distance: seule.distance,
+      etat: seule.etat, fine: seule.fine, raison: seule.raison, couples: seule.couples });
   }
   const ordre = (x, y) => SITES_MEME_PHOTO.indexOf(x.annonce.plateforme) - SITES_MEME_PHOTO.indexOf(y.annonce.plateforme) || String(x.id).localeCompare(String(y.id));
-  propositions.sort((x, y) => x.distance - y.distance || ordre(x, y));
+  // « Sûr » d'abord (les deux mesures concordent), puis les plus proches.
+  propositions.sort((x, y) => (x.etat === 'sur' ? 0 : 1) - (y.etat === 'sur' ? 0 : 1) || x.distance - y.distance || ordre(x, y));
   ambigus.sort(ordre);
   // L'autre sens (la fiche de la paire) : N° ⇒ les annonces d'ailleurs à relier.
   const parNumero = new Map();
   for (const p of propositions) { if (!parNumero.has(p.numero)) parNumero.set(p.numero, []); parNumero.get(p.numero).push(p); }
   // Une annonce sans N° Vinted (« sans-numero ») n'a rien à relier : elle n'est pas comptée à faire.
   const nARelier = propositions.length + ambigus.filter((x) => x.raison !== 'sans-numero').length;
-  return { lu: true, propositions, ambigus, nGeneriques, nSansEmpreinte, nVerifiees, nARelier, parNumero };
+  // « Sûr » ne se compte que sur une proposition SEULE (une paire, un N° sûr) ; un cas ambigu
+  // n'est jamais sûr, même si l'une de ses paires l'est (il choisit).
+  const nSurs = propositions.filter((p) => p.etat === 'sur').length;
+  return { lu: true, fineLue: verifs != null, propositions, ambigus, nGeneriques, nSansEmpreinte, nVerifiees, nARelier, nSurs, nAVerifier: nARelier - nSurs, nEcartees: ecartes.size, parNumero };
 }
 
+// L'état d'une paire candidate d'après TOUS ses couples de photos : « sûr » si UN couple a les
+// deux mesures nettes ; sinon « à vérifier », avec la raison (aucune mesure fine · empreinte
+// proche du seuil · mesure fine entre les deux seuils). Le meilleur score fin est rendu.
+function etatPaire(couples) {
+  const l = arr(couples);
+  const fines = l.map((c) => c.fine).filter(Boolean);
+  const fine = fines.length ? Math.max(...fines.map((m) => m.s)) : null;
+  if (l.some((c) => c.etat === 'sur')) return { etat: 'sur', fine, raison: null, couples: l };
+  const raison = !fines.length ? 'pas-mesure' : l.some((c) => c.fine && verdictFin(c.fine) === 'sur') ? 'proche' : 'doute';
+  return { etat: 'verifier', fine, raison, couples: l };
+}
 // Les propositions d'UN site (la file « À relier » de son écran).
 export function duSite(res, plateforme) {
   if (!res || !res.lu) return { propositions: [], ambigus: [] };

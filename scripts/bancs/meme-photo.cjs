@@ -54,8 +54,11 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom
 const SEUIL_SRC = fs.readFileSync(path.join(__dirname, 'photos-comptes-seuil.cjs'), 'utf8');
 const DESSIN = SEUIL_SRC.slice(SEUIL_SRC.indexOf('function alea('), SEUIL_SRC.indexOf('window.__cinquante') > 0 ? SEUIL_SRC.indexOf('window.__cinquante') : SEUIL_SRC.indexOf('window.__mesure'));
 const REGLE = fs.readFileSync(path.join(RACINE, 'src', 'photoEmpreinte.js'), 'utf8').replace(/^export /gm, '');
+// (15 nov., lot meme-photo-sure) La deuxième mesure, la VRAIE (src/photoFine.js), calculée sur les mêmes images.
+const FINE = fs.existsSync(path.join(RACINE, 'src', 'photoFine.js')) ? fs.readFileSync(path.join(RACINE, 'src', 'photoFine.js'), 'utf8').replace(/^import [^\n]*\n/gm, '').replace(/^export /gm, '') : '';
 const PAGE_GEN = `<!doctype html><meta charset="utf-8"><body><script>
 ${REGLE}
+${FINE}
 ${DESSIN}
 if (typeof webp !== 'function') window.webp = async (c, q) => charge(c.toDataURL('image/webp', q));
 window.__fabrique = async (liste) => {
@@ -74,6 +77,11 @@ window.__fabrique = async (liste) => {
   return out;
 };
 window.__distance = (a, b) => distanceEmpreintes(a, b);
+window.__fine = async (a, b) => {
+  if (typeof comparerFine !== 'function') return null;
+  const prep = async (u) => { const im = await charge(u); const t = tailleLectureFine(im.width, im.height); const c = document.createElement('canvas'); c.width = t.w; c.height = t.h; const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0, t.w, t.h); return preparerFine(x.getImageData(0, 0, t.w, t.h).data, t.w, t.h); };
+  return comparerFine(await prep(a), await prep(b));
+};
 window.__seuil = SEUIL_PHOTO;
 </script>`;
 const PHOTOS = [
@@ -104,6 +112,9 @@ function scenario(F, o = {}) {
     { id: 'photo_empreinte_lbc', data: { capturedAt: iso(1), payload: { annonces: { 5001: { [cleDe(uL('P1cdn'))]: h('P1cdn') }, 5002: { [cleDe(uL('P1v3'))]: h('P1v3') }, 5003: { [cleDe(uL('P6'))]: h('P6') }, 5009: { [cleDe(uL('P1cdn'))]: h('P1cdn') } } } } },
     { id: 'photo_empreinte_ebay', data: { capturedAt: iso(1), payload: { annonces: { 2001: { [cleDe(uE('P2vig'))]: h('P2vig') } } } } },
     { id: 'photo_empreinte_vc', data: { capturedAt: iso(1), payload: { annonces: { 'vc-9': { [cleDe(uC('P3cdn'))]: h('P3cdn') } } } } },
+    // (15 nov., lot meme-photo-sure) La deuxième mesure, à la forme de l'extension 5.388 : Leboncoin 5001 × N°124
+    // mesuré (le VRAI score des deux images) ⇒ « sûr » ; eBay 2001 jamais mesuré (pas d'hôte) ⇒ « à vérifier ».
+    ...(o.fine != null ? [{ id: 'photo_meme_verif', data: { capturedAt: iso(1), payload: { version: 1, couples: { [`lbc|5001|${cleDe(uL('P1cdn'))}#111|9001|${cleDe(uV('P1'))}`]: { ...o.fine, v: 1, at: iso(1) } } } } }] : []),
     { id: 'lbc_listings', data: { items: { ...lbc,
       // L'annonce d'un AUTRE vendeur vue en naviguant (mesuré chez lui : 49 sur 60) — même photo que N°124 : jamais proposée.
       5009: { id: 5009, account: 'lbc-account:inconnu', accountName: 'quelqu-un', subject: 'Basket blanche', status: 'active', images: [uL('P1cdn')], seenAt: iso(1) } },
@@ -198,14 +209,16 @@ const lireFeuille = (pg) => pg.evaluate(() => {
     const ia = autre && autre.querySelector('img'), iv = vin && vin.querySelector('img');
     const ra = autre && autre.getBoundingClientRect(), rv = vin && vin.getBoundingClientRect();
     const g = p.querySelector('[data-meme-photo-relier]'), n = p.querySelector('[data-meme-photo-non]');
-    return { id: p.getAttribute('data-meme-photo-prop'), numero: p.getAttribute('data-numero'), d: Number(p.getAttribute('data-distance')), phrase: (p.querySelector('.vrm-mph-phrase') || {}).textContent || '',
+    const et = p.querySelector('[data-mph-verdict]');
+    return { etat: p.getAttribute('data-etat'), etatVu: et ? et.getAttribute('data-mph-verdict') : '', raison: et ? et.getAttribute('data-mph-raison') || '' : '', etatTexte: et ? et.textContent : '', etatCouleur: et ? getComputedStyle(et).color : '', etatH: et ? Math.round(et.getBoundingClientRect().height) : 0,
+      id: p.getAttribute('data-meme-photo-prop'), numero: p.getAttribute('data-numero'), d: Number(p.getAttribute('data-distance')), phrase: (p.querySelector('.vrm-mph-phrase') || {}).textContent || '',
       srcA: ia ? ia.getAttribute("src").slice(0, 120) : "", chargees: !!(ia && ia.complete && ia.naturalWidth > 0 && iv && iv.complete && iv.naturalWidth > 0), coteACote: !!(ra && rv && Math.abs(ra.top - rv.top) < 2 && rv.left >= ra.right),
       hPhoto: ra ? Math.round(ra.height) : 0, hRelier: g ? Math.round(g.getBoundingClientRect().height) : 0, hNon: n ? Math.round(n.getBoundingClientRect().height) : 0, relier: g ? g.textContent : '' };
   });
   const ambs = [...s.querySelectorAll('[data-meme-photo-ambigu]')].map((a) => ({ id: a.getAttribute('data-meme-photo-ambigu'), raison: a.getAttribute('data-raison'), choix: [...a.querySelectorAll('[data-meme-photo-choisir]')].map((x) => x.getAttribute('data-meme-photo-choisir')),
     hChoix: Math.min(...[...a.querySelectorAll('[data-meme-photo-choisir]')].map((x) => x.getBoundingClientRect().height)) }));
   const coupe = [...s.querySelectorAll('*')].some((e) => { const r = e.getBoundingClientRect(); return r.width > 0 && r.right > window.innerWidth + 1 && !e.closest('.is-choix'); });
-  return { feuille: true, lu: s.getAttribute('data-mph-lu'), props, ambs, verifiees: Number(s.getAttribute('data-mph-verifiees')), etat: (s.querySelector('[data-mph-etat]') || {}).textContent || '', coupe, deborde: document.documentElement.scrollWidth > window.innerWidth + 1 };
+  return { feuille: true, surs: Number(s.getAttribute('data-mph-surs')), lu: s.getAttribute('data-mph-lu'), props, ambs, verifiees: Number(s.getAttribute('data-mph-verifiees')), etat: (s.querySelector('[data-mph-etat]') || {}).textContent || '', coupe, deborde: document.documentElement.scrollWidth > window.innerWidth + 1 };
 });
 const ecrit = (ecritures, re) => ecritures.some((e) => re.test(e.corps));
 
@@ -221,11 +234,13 @@ const ecrit = (ecritures, re) => ecritures.some((e) => re.test(e.corps));
     const dist = (x, y) => gen.evaluate(([a, c]) => window.__distance(a, c), [F[x].h, F[y].h]);
     const seuil = await gen.evaluate(() => window.__seuil);
     const d = { P1: await dist('P1', 'P1cdn'), P2: await dist('P2', 'P2vig'), P3: await dist('P3', 'P3cdn'), autreVue: await dist('P1', 'P1v3') };
-    await gen.close();
     console.log(`── jeu inventé : P1~P1(autre site) ${d.P1} · P2~vignette ${d.P2} · P3~P3(autre site) ${d.P3} · P1~P1 autre vue ${d.autreVue} (seuil de l’alerte entre comptes ${seuil} ; une proposition exige ≤ 12, src/memePhoto.js)`);
     dit(d.P1 <= seuil && d.P2 <= seuil && d.P3 <= seuil && d.autreVue > seuil, 'le jeu : la même photo passée par un autre site est PROCHE, une autre photo de la même paire LOIN', JSON.stringify(d));
     if (CAPT) for (const n of ['P1', 'P1cdn', 'P1v3']) fs.writeFileSync(path.join(CAPT, `photo-${n}.${F[n].type === 'image/webp' ? 'webp' : 'jpg'}`), Buffer.from(F[n].b64, 'base64'));
-    const A = scenario(F), C = scenario(F, { empreintesKO: true });
+    const fineP1 = await gen.evaluate(([a, c]) => window.__fine(a, c), [`data:${F.P1.type};base64,${F.P1.b64}`, `data:${F.P1cdn.type};base64,${F.P1cdn.b64}`]);
+    console.log(`── deuxième mesure (src/photoFine.js) : P1 ~ P1 passée par un autre site ${JSON.stringify(fineP1)}`);
+    await gen.close();
+    const A = scenario(F, { fine: fineP1 }), C = scenario(F, { empreintesKO: true });
 
     for (const vp of [{ width: 390, height: 844 }, { width: 1512, height: 945 }].filter((v) => !process.env.BANC_SEUL || String(v.width) === process.env.BANC_SEUL)) {
       const tel = vp.width < 600, nomVp = tel ? '390' : '1512';
@@ -240,6 +255,7 @@ const ecrit = (ecritures, re) => ecritures.some((e) => re.test(e.corps));
             const n = e.querySelector('.vrm-day-task-note'), t = e.querySelector('.vrm-day-task-title'); return { carte: true, n: e.getAttribute('data-n'), titre: t && t.textContent, note: n && n.textContent, cNote: n && getComputedStyle(n).color, cTitre: t && getComputedStyle(t).color }; });
           dit(c.carte && c.n === '3', 'M1 Ma journée : la carte « Même photo · à relier », data-n = 3', JSON.stringify(c));
           dit(c.carte && /3 annonces à relier/.test(c.titre || '') && /Leboncoin/.test(c.note || '') && /eBay/.test(c.note || '') && /Vestiaire/.test(c.note || ''), 'M1 le titre et les sites nommés', `${c.titre} · ${c.note}`);
+          dit(c.carte && /^1 sûre · 2 à vérifier/.test((c.note || '').trim()), 'S1 Ma journée dit d’abord « 1 sûre · 2 à vérifier » (visible avant la coupe)', c.note);
           dit(c.carte && c.cNote !== c.cTitre && !/255,\s*59,\s*48|255,\s*69,\s*58/.test(c.cNote || ''), 'M1 la ligne en ambre, jamais le rouge du doublon de N°', `${c.cNote} / ${c.cTitre}`);
           const avant = ecritures.length;
           await toucher(pg, tel, '[data-journee-meme-photo]').catch(() => {});
@@ -258,6 +274,12 @@ const ecrit = (ecritures, re) => ecritures.some((e) => re.test(e.corps));
             dit(f.props.every((p) => p.chargees && p.coteACote && p.hPhoto >= 120), 'M2 les deux photos CHARGÉES, côte à côte, grandes (≥ 120 px)', JSON.stringify(f.props.map((p) => [p.chargees, p.coteACote, p.hPhoto, p.srcA])));
             dit(f.props.every((p) => p.hRelier >= 44 && p.hNon >= 44) && f.ambs.every((a) => a.hChoix >= 44), 'M2 chaque geste ≥ 44 px', JSON.stringify(f.props.map((p) => [p.hRelier, p.hNon])));
             dit(/N°124/.test((f.props.find((p) => p.numero === '124') || {}).phrase || ''), 'M2 « Même photo que N°124 (Vinted) »', (f.props[0] || {}).phrase);
+            // (15 nov., lot meme-photo-sure) Les deux états, VISIBLES et DIFFÉRENTS.
+            const pl = f.props.find((p) => p.id === 'Leboncoin:5001') || {}, pe = f.props.find((p) => p.id === 'eBay:2001') || {};
+            dit(pl.etat === 'sur' && pl.etatVu === 'sur' && /sûr/.test(pl.etatTexte) && pl.etatH > 0, 'S1 Leboncoin 5001 (les deux mesures concordent) ⇒ « Même photo · sûr », visible', JSON.stringify({ e: pl.etat, t: pl.etatTexte, h: pl.etatH }));
+            dit(pe.etat === 'verifier' && pe.etatVu === 'verifier' && pe.raison === 'ebay' && /vérifier/.test(pe.etatTexte), 'S1 eBay 2001 (une seule mesure) ⇒ « À vérifier » et la raison, jamais « sûr »', JSON.stringify({ e: pe.etat, r: pe.raison, t: pe.etatTexte }));
+            dit(pl.etatCouleur && pe.etatCouleur && pl.etatCouleur !== pe.etatCouleur && !/255,\s*59,\s*48|255,\s*69,\s*58/.test(pe.etatCouleur + pl.etatCouleur), 'S1 « sûr » et « à vérifier » se distinguent à l’œil (couleur), jamais le rouge', `${pl.etatCouleur} / ${pe.etatCouleur}`);
+            dit(f.surs === 1, 'S1 la feuille compte 1 « sûr » (data-mph-surs)', String(f.surs));
             dit(!f.deborde && !f.coupe, 'M2 aucun débordement', JSON.stringify({ deborde: f.deborde, coupe: f.coupe }));
           }
           dit(!ecritures.slice(avant).some((e) => /vrm_lbc_liens|vrm_ebay_liens|vrm_vc_liens|vrm_meme_photo_non/.test(e.corps)), 'M2 ouvrir la feuille : rien relié, rien noté', '');

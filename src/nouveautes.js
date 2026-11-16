@@ -73,6 +73,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'ebay-tableau', date: '2026-11-15', titre: 'eBay : tableau, versements, trafic et santé', phrase: 'Frais réels, annonces qui ne se voient pas, litiges : tout ici.', tab: 'plat_ebay', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « J'aime la 9 ») docs/passation/2026-11-15-verre-extension-site.md — carte, fenêtre, site.
   { id: 'verre-extension-site', date: '2026-11-15', titre: 'Extension et site en verre dépoli', phrase: 'La carte du logo et vrm.center : bleu profond, plaques de verre.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (15 nov., extension 5.388, Julien : « que ça soit parfaitement fiable ») docs/passation/2026-11-15-meme-photo-sure.md
+  { id: 'meme-photo-sure', date: '2026-11-15', titre: 'Même photo : « sûr » ou « à vérifier »', phrase: 'Deux mesures différentes doivent dire la même photo pour « sûr ».', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « J'aime la 9 ») docs/passation/2026-11-15-verre-depoli.md — le thème « Verre dépoli ».
   { id: 'verre-depoli', date: '2026-11-15', titre: 'Nouveau thème : verre dépoli sur bleu profond', phrase: 'Le chiffre du jour en blanc, tout se lit sur le verre.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « imagine que la personne publie sur l'app Vinted… ») docs/passation/2026-11-15-numeros-masquees.md

@@ -5,6 +5,9 @@
 // deux, IL choisit. « Ce n'est pas la même » ⇒ la proposition ne revient plus (§5 : la photo
 // propose, SON toucher relie). Aucun titre, aucune marque, aucune taille n'entre en jeu.
 // Ce fichier ne lit ni n'écrit la base : `charger`, `onRelier`, `onRefuser` viennent de l'app.
+// (15 nov., lot meme-photo-sure) DEUX mesures (src/photoFine.js) : « Même photo · sûr » quand les
+// deux concordent nettement ; sinon « À vérifier » avec la raison — jamais compté sûr. Les deux
+// gardent les mêmes gestes : c'est TOUJOURS son toucher qui relie.
 import React from 'react';
 import { PhotoVide } from './composants/PhotoVide.jsx';
 import { tr } from './i18n/index.js';
@@ -24,7 +27,10 @@ const nSite = (res, site) => { const d = site ? duSite(res, site) : res; return 
 export function texteMemePhoto(res, site = null) {
   const n = res && res.lu ? nSite(res, site) : 0;
   const sites = [...new Set([...(res && res.propositions || []), ...(res && res.ambigus || [])].filter((x) => x.raison !== 'sans-numero').map((x) => x.annonce.plateforme))];
-  return { n, titre: tr('memePhoto.aRelier', { n }), detail: tr('memePhoto.detail', { sites: (site ? [site] : sites).join(' · ') || '—' }) };
+  const props = res && res.lu ? (site ? duSite(res, site).propositions : res.propositions || []) : [];
+  const surs = props.filter((p) => p.etat === 'sur').length;
+  const detail = tr('memePhoto.detail', { sites: (site ? [site] : sites).join(' · ') || '—' });
+  return { n, surs, verifier: n - surs, titre: tr('memePhoto.aRelier', { n }), detail: n ? `${[surs ? tr('memePhoto.nSurs', { n: surs }) : '', n - surs ? tr('memePhoto.nAVerifier', { n: n - surs }) : ''].filter(Boolean).join(' · ')} · ${detail}` : detail };
 }
 
 // La ligne compacte d'un écran de site (Annonces → Leboncoin / eBay / Vestiaire) : rien s'il n'y a rien.
@@ -71,13 +77,22 @@ function Cote({ src, Photo, legende, sous, lien, attrs }) {
 }
 const legendeAutre = (a) => `${a.plateforme}${a.compteNom && a.compteNom !== a.plateforme ? ' · ' + a.compteNom : ''}`;
 const photoVintedDe = (paire) => { const v = (paire.vinted || [])[0] || {}; return v.photo || paire.photoVinted || ''; };
+// L'état d'une proposition (ou d'une paire d'un cas ambigu) : « sûr » (diode) ou « à vérifier »
+// (point ambre + la raison). Lu par le banc sur `data-mph-verdict` / `data-mph-raison`, jamais sur le texte.
+const raisonVerifier = (x, plateforme) => (x.raison === 'pas-mesure' && plateforme === 'eBay' ? 'ebay' : x.raison === 'proche' ? 'proche' : x.raison === 'doute' ? 'doute' : 'pasMesure');
+function Etat({ x, plateforme, court = false }) {
+  if (x.etat === 'sur') return <p className="vrm-mph-sur" data-mph-verdict="sur" data-mph-fine={x.fine == null ? '' : String(x.fine)}><span className="vrm-mph-diode" aria-hidden="true"/>{tr('memePhoto.sur')}</p>;
+  const r = raisonVerifier(x, plateforme);
+  return <p className="vrm-mph-averifier" data-mph-verdict="verifier" data-mph-raison={r} data-mph-fine={x.fine == null ? '' : String(x.fine)}><span className="sb-point-ambre" aria-hidden="true"/><b>{tr('memePhoto.aVerifier')}</b>{court ? null : <span className="vrm-mph-raison">{tr('memePhoto.pourquoi.' + r)}</span>}</p>;
+}
 
 function Proposition({ p, Photo, onRelier, onRefuser }) {
   const [enCours, setEnCours] = React.useState(false);
   const v = (p.vinted || [])[0] || {};
   const relier = async () => { setEnCours(true); try { await onRelier({ annonce: p.annonce, numero: p.numero, vintedId: v.id }); } finally { setEnCours(false); } };
   return (
-    <section className="vrm-mph-prop" data-meme-photo-prop={p.id} data-numero={p.numero} data-distance={String(p.distance)}>
+    <section className={`vrm-mph-prop ${p.etat === 'sur' ? 'is-sur' : 'is-verifier'}`} data-meme-photo-prop={p.id} data-numero={p.numero} data-distance={String(p.distance)} data-etat={p.etat === 'sur' ? 'sur' : 'verifier'}>
+      <Etat x={p} plateforme={p.annonce.plateforme}/>
       <p className="vrm-mph-phrase">{tr('memePhoto.memeQue', { numero: p.numero, site: 'Vinted' })}</p>
       <div className="vrm-mph-cotes">
         <Cote src={p.annonce.photo} Photo={Photo} legende={legendeAutre(p.annonce)} sous={p.annonce.titre} lien={p.annonce.lien} attrs={{ 'data-mph-autre': p.annonce.id }}/>
@@ -101,7 +116,8 @@ function Ambigu({ x, Photo, onRelier, onRefuser }) {
         {x.paires.map((p) => {
           const v = (p.vinted || [])[0] || {};
           return (
-            <div key={p.numero || v.id} className="vrm-mph-choix">
+            <div key={p.numero || v.id} className="vrm-mph-choix" data-etat={p.etat === 'sur' ? 'sur' : 'verifier'}>
+              <Etat x={p} plateforme={x.annonce.plateforme} court/>
               <Cote src={photoVintedDe(p)} Photo={Photo} legende={p.numero ? `N°${p.numero} · Vinted` : tr('memePhoto.sansNumero')} sous={v.titre} lien={v.lien} attrs={{ 'data-mph-vinted': v.id || '' }}/>
               {p.numero && x.raison !== 'numero-double' ? <button type="button" className="sb-touche" data-meme-photo-choisir={`${x.id}|${p.numero}`} onClick={() => onRelier({ annonce: x.annonce, numero: p.numero, vintedId: v.id })}>{tr('memePhoto.cestLui', { numero: p.numero })}</button> : null}
             </div>
@@ -116,7 +132,7 @@ function Ambigu({ x, Photo, onRelier, onRefuser }) {
 }
 
 // Le contenu de la feuille. `site` null = tous les sites.
-export function MemePhotoDetail({ res, site = null, Photo, onRelier, onRefuser, extension = 'ok', versionExt = '' }) {
+export function MemePhotoDetail({ res, site = null, Photo, onRelier, onRefuser, extension = 'ok', versionExt = '', extensionSure = 'ok', versionSure = '' }) {
   useLangue();
   if (!res) return <p className="vrm-mph-etat" data-mph-pas-pret="">{tr('memePhoto.lecture')}</p>;
   if (!res.lu) return <p className="vrm-mph-etat" data-mph-lu="0">{tr('memePhoto.lectureRatee')}</p>;
@@ -125,7 +141,8 @@ export function MemePhotoDetail({ res, site = null, Photo, onRelier, onRefuser, 
   const ambs = res.ambigus.filter((p) => sites.includes(p.annonce.plateforme) && p.raison !== 'sans-numero');
   const illisibles = (res.illisibles || []).filter((s) => sites.includes(s));
   return (
-    <div className="vrm-mph" data-meme-photo="" data-mph-lu="1" data-mph-props={props.length} data-mph-ambigus={ambs.length} data-mph-verifiees={res.nVerifiees} data-mph-pas-verifiees={res.nSansEmpreinte} data-mph-generiques={res.nGeneriques}>
+    <div className="vrm-mph" data-meme-photo="" data-mph-lu="1" data-mph-props={props.length} data-mph-ambigus={ambs.length} data-mph-verifiees={res.nVerifiees} data-mph-pas-verifiees={res.nSansEmpreinte} data-mph-generiques={res.nGeneriques}
+      data-mph-surs={props.filter((p) => p.etat === 'sur').length} data-mph-ecartees={res.nEcartees || 0} data-mph-fine-lue={res.fineLue ? '1' : '0'}>
       <p className="vrm-mph-etat" data-mph-etat="">
         {props.length + ambs.length ? null : <span>{tr('memePhoto.rien', { n: res.nVerifiees })}</span>}
         {res.nSansEmpreinte > 0 ? <span data-mph-manque={res.nSansEmpreinte}>{tr('memePhoto.pasVerifiees', { n: res.nSansEmpreinte })}</span> : null}
@@ -134,13 +151,14 @@ export function MemePhotoDetail({ res, site = null, Photo, onRelier, onRefuser, 
       {extension !== 'ok' ? <p className="vrm-mph-etat is-ext" data-mph-ext={extension}>{tr('memePhoto.extension', { v: versionExt })}</p> : null}
       {props.map((p) => <Proposition key={p.id} p={p} Photo={Photo} onRelier={onRelier} onRefuser={onRefuser}/>)}
       {ambs.map((x) => <Ambigu key={x.id} x={x} Photo={Photo} onRelier={onRelier} onRefuser={onRefuser}/>)}
-      <p className="vrm-mph-aide">{tr('memePhoto.aide')}</p>
+      {extensionSure !== 'ok' ? <p className="vrm-mph-etat is-ext" data-mph-ext-sure={extensionSure}>{tr('memePhoto.extensionSure', { v: versionSure })}</p> : null}
+      <p className="vrm-mph-aide">{tr('memePhoto.aideSure')}</p>
     </div>
   );
 }
 
 // L'hôte de la feuille, monté une fois dans la coque : s'ouvre sur `ouvrirMemePhoto(site)`.
-export function MemePhotoHote({ charger, SheetShell, Photo, onRelier, onRefuser, extension, versionExt }) {
+export function MemePhotoHote({ charger, SheetShell, Photo, onRelier, onRefuser, extension, versionExt, extensionSure, versionSure }) {
   useLangue();
   const [ouvert, setOuvert] = React.useState(undefined);   // undefined = fermée ; null = tous ; 'Leboncoin'…
   const res = useMemePhoto(ouvert === undefined ? null : charger);
@@ -152,7 +170,7 @@ export function MemePhotoHote({ charger, SheetShell, Photo, onRelier, onRefuser,
   if (ouvert === undefined || !SheetShell) return null;
   return (
     <SheetShell titre={tr('memePhoto.titre')} sousTitre={ouvert || tr('memePhoto.tousSites')} onClose={() => setOuvert(undefined)} maxWidth={640} data-feuille-meme-photo={ouvert || 'tous'}>
-      <MemePhotoDetail res={res} site={ouvert} Photo={Photo} onRelier={onRelier} onRefuser={onRefuser} extension={extension} versionExt={versionExt}/>
+      <MemePhotoDetail res={res} site={ouvert} Photo={Photo} onRelier={onRelier} onRefuser={onRefuser} extension={extension} versionExt={versionExt} extensionSure={extensionSure} versionSure={versionSure}/>
     </SheetShell>
   );
 }
