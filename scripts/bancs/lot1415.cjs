@@ -194,12 +194,17 @@ const capture = async (pg, sel, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, 
           dit(ordre === '800006,800001,800004,800002,800003', 'A1 rangées par ce qui rapporte : +150 €, +50 €, puis sans achat par prix (150, 70, 60) ; la paire de 5 j n’y est pas', ordre);
           const L = Object.fromEntries((q ? q.lignes : []).map((x) => [x.id, x]));
           const g = (id) => (L[id] || {}).geste;
-          dit(g('800006') === 'baisser' && L['800006'].sugg === '180' && g('800001') === 'baisser' && L['800001'].sugg === '90' && /Baisser à 90/.test(L['800001'].gTxt),
-            'A2 la baisse MESURÉE (−10 %, achat connu) : « Baisser à 180 € », « Baisser à 90 € »', JSON.stringify([L['800006'], L['800001']].map((x) => x && [x.geste, x.sugg, x.gTxt])));
+          // (16 nov., bancs-rouges-a) Depuis le 15 nov. la baisse proposée est la BAISSE CONSEILLÉE (src/baisseConseillee.js,
+          // « vendre plus », validée par Julien) : DOUCE (−5 %) par défaut, PLEINE (−10 %, la borne du conseil mesuré) quand
+          // elle a dormi 3 × son délai habituel ou qu'elle est vue sans être aimée ; ≥ 3 favoris lus ⇒ une offre aux favoris
+          // d'abord. Attendus refaits À LA MAIN : 800006 (300 vues en 90 j, 1 favori) 200 → 180 ; 800001 (2 favoris,
+          // 80 vues en 50 j) 100 → 95 ; 800002 (3 favoris) : offre aux favoris, même avec son prix d'achat.
+          dit(g('800006') === 'baisser' && L['800006'].sugg === '180' && g('800001') === 'baisser' && L['800001'].sugg === '95' && /Baisser à 95/.test(L['800001'].gTxt),
+            'A2 la baisse CONSEILLÉE (achat connu) : « Baisser à 180 € » (pleine), « Baisser à 95 € » (douce)', JSON.stringify([L['800006'], L['800001']].map((x) => x && [x.geste, x.sugg, x.gTxt])));
           dit(g('800004') === 'lbc' && g('800002') === 'favoris' && g('800003') === 'republier',
             'A3 un geste chacune : vues/favoris pas lus ⇒ « Sur Leboncoin » ; 3 favoris ⇒ « Offre aux favoris » ; peu vue ⇒ « Republier »', ['800004', '800002', '800003'].map((id) => id + ':' + g(id)).join(' '));
-          dit(L['800006'] && L['800006'].benef === '15000' && /au plus \+150/.test(L['800006'].benefTxt) && L['800001'].benef === '5000',
-            'A4 le bénéfice si vendue au prix du geste : « au plus +150 € », +50 € (frais pas confirmés)', JSON.stringify([L['800006'], L['800001']].map((x) => x && [x.benef, x.benefTxt])));
+          dit(L['800006'] && L['800006'].benef === '15000' && /au plus \+150/.test(L['800006'].benefTxt) && L['800001'].benef === '5500',
+            'A4 le bénéfice si vendue au prix du geste : « au plus +150 € », +55 € (frais pas confirmés)', JSON.stringify([L['800006'], L['800001']].map((x) => x && [x.benef, x.benefTxt])));
           dit(['800004', '800002', '800003'].every((id) => L[id] && L[id].benef === '' && L[id].saisir && !/0\s?€/.test(L[id].benefTxt)), 'A5 sans achat : « Prix d’achat ? » (la porte), jamais « 0 € »', ['800004', '800002', '800003'].map((id) => L[id] && L[id].benefTxt).join(' / '));
           dit(q && q.lignes.every((x) => x.plus), 'A6 « … » garde le choix complet sur chaque ligne');
           dit(q && !q.petits.length, 'F1 chaque geste, « … » et « Prix d’achat ? » font 44 px au moins', q && q.petits.join(' | '));
@@ -218,8 +223,8 @@ const capture = async (pg, sel, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, 
           const bp = await pg.evaluate(() => { const s = document.querySelector('[data-baisse-serie]'); if (!s) return null;
             return { lignes: [...s.querySelectorAll('[data-bp-ligne]')].map((e) => [e.getAttribute('data-bp-ligne'), e.getAttribute('data-bp-ancien'), e.getAttribute('data-bp-nouveau'), e.getAttribute('data-bp-coche')]),
               varier: (s.querySelector('[data-bp-varier]') || {}).checked, phase: s.getAttribute('data-bp-phase') }; });
-          dit(bp && bp.lignes.length === 1 && bp.lignes[0][0] === '800001' && bp.lignes[0][2] === '90' && bp.varier === false && bp.phase === 'choix',
-            'B1 « Baisser à 90 € » : la feuille sur CETTE annonce seule, 100 → 90, sans « Varier », à confirmer', JSON.stringify(bp));
+          dit(bp && bp.lignes.length === 1 && bp.lignes[0][0] === '800001' && bp.lignes[0][2] === '95' && bp.varier === false && bp.phase === 'choix',
+            'B1 « Baisser à 95 € » : la feuille sur CETTE annonce seule, 100 → 95, sans « Varier », à confirmer', JSON.stringify(bp));
           await capture(pg, null, `baisse-proposee-${suf}`);
           const c1 = await pg.evaluate(() => window.__cmds.filter((c) => c.cmd === 'baisserPrixVinted').length);
           dit(c1 === 0, 'B2 rien n’est parti vers Vinted avant SA confirmation', String(c1));
@@ -234,8 +239,8 @@ const capture = async (pg, sel, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, 
           await pg.waitForFunction(() => { const e = document.querySelector('[data-qd-ligne="800002"] [data-qd-benef]'); return e && e.getAttribute('data-qd-benef') !== ''; }, null, { timeout: 10000 }).catch(() => {});
           q = await lireQD(pg);
           const L2 = Object.fromEntries((q ? q.lignes : []).map((x) => [x.id, x]));
-          dit(L2['800002'] && L2['800002'].geste === 'baisser' && L2['800002'].sugg === '63' && L2['800002'].benef === '4300',
-            'C1 prix d’achat saisi (20 €) ⇒ « Baisser à 63 € », +43 € au plus', JSON.stringify(L2['800002']));
+          dit(L2['800002'] && L2['800002'].geste === 'favoris' && L2['800002'].benef === '5000' && /au plus \+50/.test(L2['800002'].benefTxt),
+            'C1 prix d’achat saisi (20 €) ⇒ son bénéfice si vendue (+50 € au plus) ; 3 favoris : l’offre aux favoris d’abord', JSON.stringify(L2['800002']));
           const ordre2 = q ? q.lignes.map((x) => x.id).join(',') : '';
           dit(ordre2 === '800006,800001,800002,800004,800003', 'C2 elle remonte au-dessus des paires sans achat', ordre2);
           const c2 = await pg.evaluate(() => window.__cmds.filter((c) => /baisser|republier|recreer|favori/i.test(c.cmd || '')).length);

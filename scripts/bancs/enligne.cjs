@@ -33,7 +33,7 @@ require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lec
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http'), path = require('path'), os = require('os');
-const DIST = path.join(__dirname, '..', '..', 'dist');
+const DIST = process.env.BANC_DIST || path.join(__dirname, '..', '..', 'dist');   // (16 nov.) BANC_DIST : un autre build (preuve §6.1)
 const PORT = Number(process.env.BANC_PORT) || 4771;
 
 const now = Date.now();
