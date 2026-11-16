@@ -38,6 +38,8 @@ const chargerZxing = () => {
   return chargementZx;
 };
 
+// (15 nov.) Les zones lues à tour de rôle par ZXing : le centre (là où l'on vise), puis l'image entière.
+export const ZONES_LECTURE = { zone: [{ x: 0.15, y: 0.3, l: 0.7, h: 0.4 }, null] };
 // Un lecteur `{ detect(video) → Promise<[rawValue…]> }`, ou null.
 export async function creerLecteur() {
   try {
@@ -57,12 +59,27 @@ export async function creerLecteur() {
     hints.set(Z.DecodeHintType.TRY_HARDER, true);
     const lecteur = new Z.MultiFormatReader(); lecteur.setHints(hints);
     const cv = document.createElement('canvas');
-    return { source: 'zxing', detect: async (v) => {
-      const w = v.videoWidth, h = v.videoHeight; if (!w || !h) return [];
+    let tourZone = 0, lum = null;
+    return { source: 'zxing', detect: async (v, zone) => {
+      const W = v.videoWidth, H = v.videoHeight; if (!W || !H) return [];
+      // (15 nov.) La zone visée seulement, si l'appelant la donne (fractions de l'image) ; sinon l'image entière.
+      // Une LISTE de zones : une par tour, à tour de rôle. MESURÉ (banc scan-colis) : le lecteur 1D de ZXing ne
+      // trouve pas un Code 128 net quand l'étiquette blanche est posée sur un fond sombre (carton, table) et que
+      // ce fond entre dans l'image ; la même image recadrée sur le viseur se lit. D'où : le centre, puis large.
+      const zz = Array.isArray(zone) ? (zone.length ? zone[(tourZone++) % zone.length] : null) : zone;
+      const z = zz && zz.l > 0 && zz.h > 0 ? zz : null;
+      const sx = z ? Math.round(W * Math.max(0, z.x)) : 0, sy = z ? Math.round(H * Math.max(0, z.y)) : 0;
+      const w = z ? Math.min(W - sx, Math.round(W * z.l)) : W, h = z ? Math.min(H - sy, Math.round(H * z.h)) : H;
       const k = Math.min(1, 1280 / w); cv.width = Math.round(w * k); cv.height = Math.round(h * k);
-      const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.drawImage(v, 0, 0, cv.width, cv.height);
+      const ctx = cv.getContext('2d', { willReadFrequently: true }); ctx.drawImage(v, sx, sy, w, h, 0, 0, cv.width, cv.height);
       try {
-        const bmp = new Z.BinaryBitmap(new Z.HybridBinarizer(new Z.HTMLCanvasElementLuminanceSource(cv)));
+        // (15 nov.) La luminance est calculée ICI (RGBLuminanceSource). MESURÉ (banc scan-colis, Chromium) : sur la
+        // MÊME image, `HTMLCanvasElementLuminanceSource` de ZXing 0.20 ne trouve aucun Code 128 ni EAN-13 net, la
+        // luminance donnée telle quelle les lit (les codes 2D passaient par les deux).
+        const n = cv.width * cv.height, px = ctx.getImageData(0, 0, cv.width, cv.height).data;
+        if (!lum || lum.length !== n) lum = new Uint8ClampedArray(n);
+        for (let i = 0, j = 0; i < n; i++, j += 4) lum[i] = (px[j] * 77 + px[j + 1] * 150 + px[j + 2] * 29) >> 8;
+        const bmp = new Z.BinaryBitmap(new Z.HybridBinarizer(new Z.RGBLuminanceSource(lum, cv.width, cv.height)));
         const r = lecteur.decode(bmp); return r && r.getText ? [r.getText()] : [];
       } catch (_) { return []; } finally { try { lecteur.reset(); } catch (_) {} }
     } };
@@ -108,8 +125,12 @@ const brancher = (v, flux) => {
   v.setAttribute('playsinline', ''); v.setAttribute('webkit-playsinline', ''); v.muted = true;
   const p = v.play(); if (p && p.catch) p.catch(() => {});
 };
-export function useLectureCamera(video, traiter) {
+// (15 nov., scanner pour retrouver) `opts.surFlux(flux)` : le flux ouvert est donné à l'appelant (la lampe
+// lit la piste) ; `opts.pause` : le temps entre deux lectures (220 ms par défaut) ; `opts.zone` : { x, y, l, h } en fractions de l'image — ZXing ne lit que la zone visée
+// (moins de pixels, lecture plus rapide). Sans `opts`, rien ne change.
+export function useLectureCamera(video, traiter, opts = null) {
   const [camera, setCamera] = React.useState('demarrage');
+  const optsRef = React.useRef(opts); optsRef.current = opts;
   React.useEffect(() => {
     let vivant = true, flux = null, minuterie = null;
     const nouveau = filtreRepetition(2500);
@@ -121,6 +142,7 @@ export function useLectureCamera(video, traiter) {
         if (!vivant) { flux.getTracks().forEach((t) => t.stop()); return; }
         if (!video.current) return;
         brancher(video.current, flux);
+        try { const o = optsRef.current; if (o && typeof o.surFlux === 'function') o.surFlux(flux); } catch (_) {}
         const lecteur = await creerLecteur();
         if (!vivant) return;
         if (!lecteur) { derniereRaison = 'lecteur'; setCamera('sans'); return; }
@@ -129,9 +151,9 @@ export function useLectureCamera(video, traiter) {
           if (!vivant) return;
           const v = video.current;
           try {
-            if (v) { brancher(v, flux); if (v.readyState >= 2) { const vals = await lecteur.detect(v); for (const x of vals) if (nouveau(x)) traiter(x); } }
+            if (v) { brancher(v, flux); if (v.readyState >= 2) { const o = optsRef.current; const vals = await lecteur.detect(v, o && o.zone); for (const x of vals) if (nouveau(x)) traiter(x); } }
           } catch (_) {}
-          if (vivant) minuterie = setTimeout(tour, 220);
+          if (vivant) { const o = optsRef.current; minuterie = setTimeout(tour, o && Number.isFinite(o.pause) ? o.pause : 220); }
         };
         tour();
       } catch (e) { derniereRaison = raisonDe(e); if (vivant) setCamera('sans'); }
@@ -221,7 +243,8 @@ export default function ScannerColis({ Photo = null, mode = 'envoi', trouver, on
     setRes({ etat: r.etat, colis: r.colis || null, n, lu: String(brut) });
     noter(n, r.colis || null, r.etat === 'autre' ? 'inconnu' : r.etat, r.etat === 'deja');
   }, [noter]);
-  const camera = useLectureCamera(video, traiter);
+  // (15 nov.) Le centre du viseur, puis l'image entière, à tour de rôle (voir `creerLecteur` : ZXing et le fond sombre).
+  const camera = useLectureCamera(video, traiter, ZONES_LECTURE);
   React.useEffect(() => {
     const f = (e) => { if (e.key === 'Escape') onFermer && onFermer(); };
     window.addEventListener('keydown', f); return () => window.removeEventListener('keydown', f);

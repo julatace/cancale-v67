@@ -77,6 +77,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'meme-photo-sure', date: '2026-11-15', titre: 'Même photo : « sûr » ou « à vérifier »', phrase: 'Deux mesures différentes doivent dire la même photo pour « sûr ».', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., extension 5.390) Julien : « Enlève les 1741 ventes à dater » — l'extension les récupère, aucun geste.
   { id: 'versements-auto', date: '2026-11-15', titre: 'Dates de versement : l’extension s’en occupe', phrase: 'Plus rien à dater toi-même : une ligne dit où elle en est.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  // (15 nov., Julien : « tu scannes le code-barres d'un colis… VRM ouvre directement la bonne vente ») docs/passation/2026-11-15-scanner-colis.md
+  { id: 'scanner-retrouver', date: '2026-11-15', titre: 'Scanne un colis : VRM ouvre sa vente', phrase: 'Code-barres du colis ou du bordereau : la bonne vente, le bon achat.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (15 nov., Julien : « J'aime la 9 ») docs/passation/2026-11-15-verre-depoli.md — le thème « Verre dépoli ».
   { id: 'verre-depoli', date: '2026-11-15', titre: 'Nouveau thème : verre dépoli sur bleu profond', phrase: 'Le chiffre du jour en blanc, tout se lit sur le verre.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (15 nov., lot deux-comptes) docs/passation/2026-11-15-deux-comptes-favoris.md — la même paire sur deux comptes Vinted.

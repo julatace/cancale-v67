@@ -95,3 +95,8 @@
 @media (max-height: 700px) { .vrm-scan-res.is-verif .vrm-scan-photo { min-height: 110px; } .vrm-scan-res.is-verif .vrm-scan-num { font-size: 60px; } }
 @media (prefers-reduced-motion: no-preference) { .vrm-scan-res.is-verif .vrm-scan-paire { animation: vrmScanVerif .22s ease-out; } }
 @keyframes vrmScanVerif { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* (15 nov.) Scanner pour retrouver : le rond de la tête de Ventes et d'Achats (à droite du grand titre).
+   Le scanner lui-même a sa feuille (src/design/scanner-retrouver.css, chargée avec lui). */
+:root:root body .vrm-main .vrm-tache > .vrm-tache-tete { position: relative !important; }
+:root:root body .vrm-main .vrm-tache > .vrm-tache-tete > .vrm-tache-retrouver { position: absolute !important; right: 16px; top: 50%; transform: translateY(-50%); margin: 0 !important; flex: none !important; width: auto !important; }
