@@ -100,7 +100,7 @@ const lireArgent = async (pg) => {
       const T = `${W} ${th}`;
       const o = await NV.ouvrir(nav, { W, sombre: th === 'sombre', base: jeu(), tab: 'dashboard' });
       const pg = o.pg;
-      await avecExtension(pg, '5.393.0');
+      await avecExtension(pg, '5.402.0');
       try {
         const pub = await publie(pg);
         const ad = pub && pub.aDater;

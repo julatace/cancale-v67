@@ -63,6 +63,8 @@ const MUTATIONS = {
 async function chargerRegle(src) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'offres-sures-'));
   fs.writeFileSync(path.join(dir, 'offresGarde.js'), src.garde);
+  // (16 nov., lot aide-decision) la règle importe aussi `contreOffreMini` (la contre-offre au mini).
+  fs.writeFileSync(path.join(dir, 'messagesVolets.js'), lire(path.join(RAC, 'src', 'messagesVolets.js')));
   const f = path.join(dir, 'offresSures.mjs');
   fs.writeFileSync(f, src.regle.replace("from './offresGarde.js'", "from './offresGarde.js'"));
   try { return await import(url.pathToFileURL(f).href); } finally { setTimeout(() => { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {} }, 2000); }

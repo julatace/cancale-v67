@@ -93,7 +93,8 @@ export default function OffresAuto({ actif, virguleLue = false, basculer, refusM
   // (l'extension ne la lit que là) ; le prix affiché vient des annonces lues (par identifiant).
   const prixParId = React.useMemo(() => new Map((Array.isArray(annonces) ? annonces : []).map((x) => [String(x.id), Number.isFinite(Number(x.prix)) && Number(x.prix) > 0 ? Number(x.prix) : null])), [annonces]);
   const contreActive = !!(actif && contre === true);
-  const apercu = apercuMoteur({ offres, numeros, garde, comptes: uids.size ? uids : null, virgule: virguleLue === true, contre: contreActive, prixDe: (id) => prixParId.get(String(id)) ?? null });
+  const prixDe = (id) => prixParId.get(String(id)) ?? null;
+  const apercu = apercuMoteur({ offres, numeros, garde, comptes: uids.size ? uids : null, contre: contreActive, prixDe, virgule: virguleLue === true });
   // 3. Les paires.
   const [filtre, setFiltre] = React.useState('toutes');
   const [recherche, setRecherche] = React.useState('');
