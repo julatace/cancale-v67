@@ -212,6 +212,10 @@ html body .vrm-act .vrm-act-choix span { font-size: 12px; }
 .vrm-act-main > .vrm-b { flex: none; }
 /* (16 nov., lot derniers-rouges) Dans le carré des actions, chaque geste fait 44 px au doigt comme les tuiles,
    à toute largeur (les boutons de 40 px du bureau rendaient « Prix mini… », « Baisser le prix… »… trop petits). */
+/* (16 nov., reprise) La hauteur des boutons vient de `--d-h-ctrl` (styles-systeme.css §2.3, dans @layer vrm-premium et
+   !important : un min-height posé ici, hors couche, perdait — 36 px mesurés à 1512). On donne au carré SA hauteur de
+   contrôle, la règle commune la lit. */
+html body .vrm-act .vrm-act-main { --d-h-ctrl: 44px; --vrm-b-h: 44px; }
 html body .vrm-act .vrm-act-main > .vrm-b { min-height: 44px; }
 /* « Republier à la main » grisé : en gris, jamais un bleu éteint illisible la nuit. */
 html body .vrm-act-main > .vrm-b:disabled { color: var(--vrm-muted) !important; opacity: 1 !important; }

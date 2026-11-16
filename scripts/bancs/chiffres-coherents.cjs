@@ -290,6 +290,13 @@ async function widget() {
         toutes.push(...(await cartes(pg)).map((c) => ({ ...c, ecran: 'cat_bord' })));
         // (16 nov., lot derniers-rouges) Depuis le 14 nov. (refonte des listes), « Préparer la tournée de dépôt » est une
         // alerte de l'écran, rangée dans « À faire · N » (src/ui/AFaire.jsx : au téléphone une feuille qu'ouvre son bouton).
+        // (16 nov., reprise) Depuis la refonte des Ventes en verre (vague A, src/design/ventes-verre.css §9), « Préparer mes
+        // colis », « Je dépose » et la tournée sont derrière « … » (les outils des colis, `data-colis-outils-bascule`), au
+        // téléphone comme à l'ordinateur : on l'ouvre comme lui avant de chercher la tournée.
+        if (!(await pg.locator('[data-tournee-ouvrir]').first().isVisible().catch(() => false)) && (await pg.locator('[data-colis-outils-bascule]').count())) {
+          await pg.locator('[data-colis-outils-bascule]').first().click().catch(() => {});
+          await attendre(pg, () => { const b = document.querySelector('[data-tournee-ouvrir]'); return !!b && b.getClientRects().length > 0; }, null, 6000);
+        }
         if (!(await pg.locator('[data-tournee-ouvrir]').first().isVisible().catch(() => false)) && (await pg.locator('[data-ui-afaire]').count())) {
           await pg.locator('[data-ui-afaire]').first().click().catch(() => {});
           await attendre(pg, () => { const b = document.querySelector('[data-tournee-ouvrir]'); return !!b && b.getClientRects().length > 0; }, null, 6000);
