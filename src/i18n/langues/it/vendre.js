@@ -61,4 +61,15 @@ export default {
   "vp.loupe.stockSeul": "Riposto, senza annuncio",
   "vp.loupe.retourInfo": "Reso da rispedire",
   "vp.loupe.parRangement": "magazzino",
+  // (16 nov., lot doublons-meme-compte) deux annonces d’un même compte, une paire
+  "doublons.titre": "{n} annunci di {compte} sono lo stesso paio",
+  "doublons.titreNum": "{n} annunci di {compte} sono lo stesso paio (N°{num})",
+  "doublons.titreVerifier": "{n} annunci di {compte} forse sono lo stesso paio",
+  "doublons.titreVerifierNum": "{n} annunci di {compte} forse sono lo stesso paio (N°{num})",
+  "doublons.titrePlusieurs": "{n} paia online due volte sullo stesso account",
+  "doublons.detailSur": "Rimuovi quello in più su Vinted",
+  "doublons.detailVerifier": "Foto quasi identica · da verificare",
+  "doublons.voirLesDeux": "Vedi entrambi",
+  "doublons.voir": "Vedi",
+  "doublons.preuveEmpreinte": "foto quasi identica, da verificare",
 };

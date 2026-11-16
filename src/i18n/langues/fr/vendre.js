@@ -62,4 +62,15 @@ export default {
   "vp.loupe.stockSeul": "Rangé, sans annonce",
   "vp.loupe.retourInfo": "Retour à renvoyer",
   "vp.loupe.parRangement": "rangement",
+  // (16 nov., lot doublons-meme-compte) deux annonces d’un même compte, une paire
+  "doublons.titre": "{n} annonces de {compte} sont la même paire",
+  "doublons.titreNum": "{n} annonces de {compte} sont la même paire (N°{num})",
+  "doublons.titreVerifier": "{n} annonces de {compte} sont peut-être la même paire",
+  "doublons.titreVerifierNum": "{n} annonces de {compte} sont peut-être la même paire (N°{num})",
+  "doublons.titrePlusieurs": "{n} paires en ligne deux fois sur un même compte",
+  "doublons.detailSur": "Retire celle en trop sur Vinted",
+  "doublons.detailVerifier": "Photo presque identique · à vérifier",
+  "doublons.voirLesDeux": "Voir les deux",
+  "doublons.voir": "Voir",
+  "doublons.preuveEmpreinte": "photo presque identique, à vérifier",
 };
