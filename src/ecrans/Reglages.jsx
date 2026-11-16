@@ -32,7 +32,7 @@ import { EtatPanne } from '../composants/EtatPanne.jsx';
 import { L, PAS_SU } from '../libelles.js';
 import { useReglageConseils } from '../Conseils.jsx';
 import { PHRASES_ECRAN } from '../phrasesEcran.js';
-import { APPARENCES, LIBELLES_APPARENCE, PHRASES_APPARENCE } from '../apparence.js';
+import { APPARENCES } from '../apparence.js';
 import { TAILLES_TEXTE, lireTailleTexte, ecrireTailleTexte, facteurTaille } from '../tailleTexte.js';   // (15 nov.) Taille du texte
 import { echelleTexte } from '../grandTexte.js';
 import { SignalerProblemeFeuille as SignalerProblemeFeuilleBase, SignalementsRecus, MesSignalements } from '../composants/SignalerProbleme.jsx';
@@ -2192,10 +2192,10 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (11 nov., lot traduction) La langue de VRM (src/i18n/) : Français · English · Español · Italiano · Deutsch.
       { id:'langue', type:'panneau', nu:true, ic:'langue', lib:tr('reglages.langue.lib'), desc:tr('reglages.langue.desc'), val: NOMS_LANGUES[langueCourante()] || '', data:{ 'data-reglage-langue': langueCourante() }, el:<LangueSetting/> },
       { id:'je-vends', type:'panneau', nu:true, ic:'bag', lib:tr('reglages.je-vends.lib'), desc:tr('reglages.je-vends.desc'), val: (() => { const n = nomsCategories(profilV.categories || [], lireReglageJeVends(load(CLE_JE_VENDS, null)).autre); return n.length ? (n.length > 2 ? `${n.slice(0, 2).join(', ')}…` : n.join(', ')) : (profilV.vend === 'sneakers' ? 'Sneakers' : 'Autre'); })(), data:{ 'data-reglage-vends': profilV.vend || 'autre' }, el:<JeVendsSetting/> },
-      { id:'sombre', type:'switch', ic:'moon', lib:tr('reglages.sombre.lib'), desc: apparence === 'auto' || apparence === 'soir' ? `${LIBELLES_APPARENCE[apparence]} : ${PHRASES_APPARENCE[apparence].replace(/\.$/, '').toLowerCase()}.` : tr('reglages.sombre.desc'), on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
+      { id:'sombre', type:'switch', ic:'moon', lib:tr('reglages.sombre.lib'), desc: apparence === 'auto' || apparence === 'soir' ? `${tr('reglages.apparence.' + apparence + '.lib')} : ${tr('reglages.apparence.' + apparence + '.phrase').replace(/\.$/, '').toLowerCase()}.` : tr('reglages.sombre.desc'), on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
       // (8 nov., « beauté ») L'apparence : Clair · Sombre · Automatique (le système) · Le soir (19 h–7 h).
       // L'interrupteur ci-dessus reste le choix explicite (il quitte Automatique / Le soir).
-      onApparence && { id:'apparence', type:'panneau', nu:true, ic:'contraste', lib:tr('reglages.apparence.lib'), desc:tr('reglages.apparence.desc'), val: LIBELLES_APPARENCE[apparence] || '', data:{ 'data-reglage-apparence': apparence || '' }, el:<ApparenceSetting valeur={apparence} onChoisir={onApparence}/> },
+      onApparence && { id:'apparence', type:'panneau', nu:true, ic:'contraste', lib:tr('reglages.apparence.lib'), desc:tr('reglages.apparence.desc'), val: APPARENCES.includes(apparence) ? tr('reglages.apparence.' + apparence + '.lib') : '', data:{ 'data-reglage-apparence': apparence || '' }, el:<ApparenceSetting valeur={apparence} onChoisir={onApparence}/> },
       // (15 nov.) LA TAILLE DU TEXTE (src/tailleTexte.js) : quatre tailles, toute l'app grandit avec (le mécanisme du
       // texte en grand de l'appareil, src/grandTexte.js) — rien ne déborde. Propre à CET appareil.
       { id:'taille-texte', type:'panneau', nu:true, ic:'texte', lib:tr('reglages.tailleTexte.lib'), desc:tr('reglages.tailleTexte.desc'), val: tr('reglages.tailleTexte.' + lireTailleTexte()), data:{ 'data-reglage-taille-texte': lireTailleTexte() }, el:<TailleTexteSetting/> },
@@ -4715,12 +4715,12 @@ function ReglagesStream() {
 // Le choix est le sien, jamais posé tout seul ; « Le soir » suit l'heure de l'appareil.
 function ApparenceSetting({ valeur, onChoisir }) {
   return (
-    <div className="vrm-apparence" role="radiogroup" aria-label="Apparence" data-apparence-choix={valeur || ''}>
+    <div className="vrm-apparence" role="radiogroup" aria-label={tr('reglages.apparence.lib')} data-apparence-choix={valeur || ''}>
       {APPARENCES.map((m) => (
         <button key={m} type="button" role="radio" aria-checked={valeur === m} className={'vrm-apparence-ligne' + (valeur === m ? ' is-choisi' : '')}
           data-apparence={m} onClick={() => onChoisir && onChoisir(m)}>
           <span className={'vrm-apparence-apercu is-' + m} aria-hidden="true"><span/></span>
-          <span className="vrm-apparence-txt"><b>{LIBELLES_APPARENCE[m]}</b><small>{PHRASES_APPARENCE[m]}</small></span>
+          <span className="vrm-apparence-txt"><b>{tr('reglages.apparence.' + m + '.lib')}</b><small>{tr('reglages.apparence.' + m + '.phrase')}</small></span>
           <svg className="vrm-apparence-coche" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3.2L13 4.8"/></svg>
         </button>
       ))}

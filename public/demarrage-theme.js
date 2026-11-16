@@ -12,7 +12,8 @@
   var BOOT_CLAIR = '#2563A8', BOOT_NUIT = '#133460';
   function lire(k) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
   function sombreAuDemarrage(mode, ancien, heure, systeme) {
-    if (mode !== 'clair' && mode !== 'sombre' && mode !== 'auto' && mode !== 'soir') mode = ancien === true ? 'sombre' : 'clair';
+    // (16 nov., lot sombre-auto) Rien de choisi ⇒ Automatique ; un ancien choix explicite (true OU false) est gardé.
+    if (mode !== 'clair' && mode !== 'sombre' && mode !== 'auto' && mode !== 'soir') mode = ancien === true ? 'sombre' : ancien === false ? 'clair' : 'auto';
     if (mode === 'sombre') return true;
     if (mode === 'auto') return systeme === true;
     if (mode === 'soir') return heure >= 19 || heure < 7;
