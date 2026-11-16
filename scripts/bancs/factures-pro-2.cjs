@@ -8,6 +8,7 @@
 // Lancer : npm run build && BANC_PORT=$((20000+RANDOM%20000)) node scripts/bancs/factures-pro-2.cjs
 // Captures : SHOTS=<dossier> …   Un seul format : SEUL="390 clair"
 const path = require('path');
+const { corpsEcrit } = require('./_ecriture-representee.cjs');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http');
@@ -32,6 +33,7 @@ const mail = (id, tx, nom, prix, recu) => ({ id, data: { type: 'vente', pro: tru
 let contenuDe = null;      // fabriqué avec la VRAIE règle (src/facturePro/regle.js), au premier lancement
 const facture = (tx, numero, d, extra = {}) => ({ id: 'email_invoice_tx' + tx, data: { type: 'facture_pro', number: numero, status: 'emise', transaction: String(tx), emiseLe: d.toISOString(), preuve: { tx: String(tx) }, buyerEmail: extra.email || '', contenu: contenuDe(numero, tx, d, extra), ...(extra.data || {}) } });
 let ecritures = [];
+let cfgBanc = CFG;   // (16 nov.) la fiche servie : « depuis ma boîte » pour la scène « avec VRM »
 let emis = {};
 const lignes = () => { const m = new Map(); for (const r of lignesBrutes()) m.set(r.id, r); return [...m.values()]; };
 const lignesBrutes = () => [
@@ -51,7 +53,7 @@ const lignesBrutes = () => [
   facture(7003, 'FA-2026-0007', il(1, 11), { nom: 'Paul Banc', email: 'paul.banc@exemple.test', centimes: 8000 }),
   facture(7010, 'FA-2026-0006', il(3, 10), { nom: 'Tom Banc', email: 'tom.banc@exemple.test', centimes: 5500 }),
   ...Object.entries(emis).map(([id, d]) => ({ id, data: d })),
-  { id: 'vrm_pro_facture', data: CFG },
+  { id: 'vrm_pro_facture', data: cfgBanc },
 ];
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d ? ' — ' + d : '')); };
@@ -94,7 +96,7 @@ const ouvrir = async (b, vp, sombre) => {
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1|[^/]*vinted\.net)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
-    if (route.request().method() !== 'GET') { ecritures.push({ url: u, corps: route.request().postData() || '' }); return route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' }); }
+    if (route.request().method() !== 'GET') { ecritures.push({ url: u, corps: route.request().postData() || '' }); return route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: corpsEcrit(route.request()) }); }   // (16 nov.) la forme de PostgREST
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': `0-${Math.max(0, d.length - 1)}/${d.length}` }, body: JSON.stringify(d) });
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);
@@ -253,8 +255,8 @@ const confirmer = async (pg, nom) => { const b = pg.getByRole('button', { name: 
         await confirmer(pg, 'Activer');
         await pg.waitForFunction(() => document.querySelector('[data-fp-auto="on"]'), null, { timeout: 4000 });
         await pg.waitForTimeout(1200);
-        const w = ecritures.find((e) => /vrm_pro_facture/.test(e.corps) && /envoiAuto/.test(e.corps));
-        const d = w ? JSON.parse(w.corps)[0].data : {};
+        const w = ecritures.find((e) => /vrm_pro_facture/.test(e.url + e.corps) && /envoiAuto/.test(e.corps));
+        const d = w ? (((c) => (Array.isArray(c) ? c[0] : c))(JSON.parse(w.corps)) || {}).data || {} : {};   // (16 nov.) PATCH gardé par data.rev : { data }
         dit(d.envoiAuto === true && Math.abs(Date.parse(d.envoiAutoDepuis) - maintenant.getTime()) < 120000 && d.siret === SIRET, '7. allumé : `envoiAuto` + sa date écrits, la fiche relue et fusionnée (rien d’écrasé)', JSON.stringify({ a: d.envoiAuto, depuis: d.envoiAutoDepuis }));
         dit(await pg.locator('[data-fp-auto-pause="smtp"]').count() === 1 && /rien n'est parti/.test(await pg.locator('[data-fp-auto-pause]').innerText()), '7. la pause est DITE (serveur d’envoi absent : rien n’est parti)');
         dit(await pg.locator('[data-fp-auto-ratees="1"]').count() === 1, '7. la vente pas envoyée seule est nommée avec sa raison');
@@ -263,6 +265,40 @@ const confirmer = async (pg, nom) => { const b = pg.getByRole('button', { name: 
       dit(!errs.length, '6. aucune erreur d’app', errs.join(' | ').slice(0, 300));
       await ctx.close();
     }
+    // (16 nov., lot compta-donnees) « Depuis ma boîte » choisi, boîte PAS connectée, envoi VRM ouvert :
+    // « À envoyer » propose « Tout envoyer avec VRM » à côté de « Connecter ma boîte » ; son clic, une
+    // confirmation qui le dit, chaque envoi `via: 'vrm'` ; le réglage n'est pas réécrit.
+    for (const [vp, sombre, nom] of [[{ width: 390, height: 844 }, false, '390 clair'], [{ width: 1512, height: 982 }, true, '1512 sombre']].filter((c) => !SEUL || c[2] === SEUL)) {
+      console.log(`\n— avec VRM, ${nom}`);
+      requetesApi = []; emis = {}; ecritures = []; cfgBanc = { ...CFG, envoiPar: 'boite' };
+      const { ctx, pg, errs } = await ouvrir(b, vp, sombre);
+      const tel = vp.width < 600; const nf = 'vrm-' + nom.replace(/\s+/g, '-');
+      await essaie('Tout envoyer avec VRM', async () => {
+        const s = pg.locator('[data-fp-a-envoyer]');
+        await s.waitFor({ timeout: 30000 });
+        const bv = s.locator('[data-fp-tout-envoyer-vrm="2"]');
+        await bv.waitFor({ timeout: 15000 });
+        dit(await s.locator('[data-fp-geste-manque="boite"]').count() === 1 && await s.locator('[data-fp-tout-envoyer]').count() === 0, 'V1. « Connecter ma boîte » ET « Tout envoyer avec VRM (2) », pas le « Tout envoyer » ordinaire', (await bv.innerText()).trim());
+        const m = await mesurer(pg, '[data-fp-a-envoyer]');
+        dit(m.deb <= 1 && !m.hors.length, 'V1. aucun débordement', `${m.deb}px ${m.hors.join(' | ')}`);
+        if (tel) dit(!m.petites.length, 'V1. cibles de 44 px', m.petites.join(' | '));
+        if (SHOTS) { await s.scrollIntoViewIfNeeded(); await pg.screenshot({ path: path.join(SHOTS, `fq-a-envoyer-${nf}.png`) }); }
+        requetesApi = [];
+        await bv.click();
+        const ok = pg.getByRole('button', { name: 'Envoyer avec VRM', exact: true }).last();
+        await ok.waitFor({ timeout: 4000 });
+        dit(requetesApi.filter((x) => x.action).length === 0, 'V2. une confirmation « Envoyer avec VRM » AVANT tout appel');
+        if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `fq-confirmer-${nf}.png`) });
+        await ok.click();
+        await pg.locator('[data-fp-lot]').waitFor({ timeout: 10000 });
+        const env = requetesApi.filter((x) => x.action === 'envoyer');
+        dit(env.length === 2 && env.every((x) => x.via === 'vrm'), 'V3. chaque envoi part avec VRM (`via: vrm`), pour CES factures', JSON.stringify(env));
+        dit(!ecritures.some((e) => /vrm_pro_facture/.test(e.url + e.corps)), 'V3. le réglage « depuis ma boîte » n’est PAS réécrit');
+      });
+      dit(!errs.length, 'V. aucune erreur d’app', errs.join(' | ').slice(0, 300));
+      await ctx.close();
+    }
+    cfgBanc = CFG;
   } finally { await b.close(); srv.close(); }
   console.log(`\n${ok} vert(s), ${ko} rouge(s)`);
   process.exit(ko ? 1 : 0);
