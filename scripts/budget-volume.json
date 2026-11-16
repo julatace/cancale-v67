@@ -2,6 +2,8 @@
   "_quoi": "Budget du banc scripts/bancs/volume-budget.cjs (16 nov. 2026, lot vitesse-volume) : 20 000 ventes inventées, 390 px tactile, processeur ×4. Chiffre jugé : médiane de `apresDonnees_ms` (écran complet − arrivée de la dernière lecture). Rouge au-delà de budget_ms + marge_ms. Ne jamais relever le budget pour faire passer : corriger l'app.",
   "ventes": 20000,
   "cpu": 4,
+  "reseau": "libre",
+  "mesure": "donnees_ms",
   "passes": 3,
   "complet_max_ms": 240000,
   "budget_ms": 2000,

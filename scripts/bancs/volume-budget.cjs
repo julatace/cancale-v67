@@ -38,14 +38,14 @@ for (let p = 0; p < PASSES; p++) {
     let out = '';
     try {
       out = execFileSync(process.execPath, [path.join(__dirname, '_mesure-demarrage.cjs'), DIST, String(basePort + p * 7 + ECRANS.indexOf(tab))], {
-        env: { ...process.env, VENTES: String(B.ventes || 20000), CPU: String(B.cpu || 4), COMPLET: '1', COMPLET_MAX_MS: String(B.complet_max_ms || 240000), TABS: tab },
+        env: { ...process.env, VENTES: String(B.ventes || 20000), CPU: String(B.cpu || 4), COMPLET: '1', RESEAU: B.reseau || '', COMPLET_MAX_MS: String(B.complet_max_ms || 240000), TABS: tab },
         encoding: 'utf8', timeout: 900000, stdio: ['ignore', 'pipe', 'pipe'],
       });
     } catch (e) { out = String(e.stdout || ''); }
     const l = out.split('\n').find((x) => x.startsWith('{'));
     const x = l ? JSON.parse(l) : null;
     res[tab].push(x);
-    console.log(`  passe ${p + 1} · ${tab} : ${x ? `après les données ${x.apresDonnees_ms} ms · complet ${x.complet_ms} ms · prêt ${x.pret_ms} ms (${x.etat}) · tâches longues ${x.longues_ms} ms` : 'aucune mesure'}`);
+    console.log(`  passe ${p + 1} · ${tab} : ${x ? `données ${x.donnees_ms} ms · après la dernière ${x.apresDonnees_ms} ms · complet ${x.complet_ms} ms · prêt ${x.pret_ms} ms (${x.etat}) · tâches longues ${x.longues_ms} ms` : 'aucune mesure'}`);
   }
 }
 for (const tab of ECRANS) {
@@ -53,10 +53,11 @@ for (const tab of ECRANS) {
   const mes = res[tab].filter(Boolean);
   // Seule une ouverture COMPLÈTE (toutes ses données essentielles là) se juge : sans elle, « après les données »
   // ne veut rien dire — « pas su » n'est jamais un feu vert.
-  const completes = mes.filter((x) => x.complet_ms != null && x.apresDonnees_ms != null);
-  const apres = completes.length === mes.length ? med(completes.map((x) => x.apresDonnees_ms)) : null;
+  const CH = B.mesure || 'apresDonnees_ms';
+  const completes = mes.filter((x) => x.complet_ms != null && x[CH] != null);
+  const apres = completes.length === mes.length ? med(completes.map((x) => x[CH])) : null;
   dit(completes.length === PASSES, `${tab} · l'écran a toutes ses données (${completes.length}/${PASSES} ouvertures complètes)`);
-  dit(apres != null && apres <= budget + marge, `${tab} · ${apres == null ? '—' : apres} ms après les données (médiane de ${mes.length} : ${mes.map((x) => x.complet_ms == null ? 'pas complet' : x.apresDonnees_ms).join(' · ')}) — budget ${budget} ms + marge ${marge} ms`);
+  dit(apres != null && apres <= budget + marge, `${tab} · ${apres == null ? '—' : apres} ms après les données (médiane de ${mes.length} : ${mes.map((x) => x.complet_ms == null ? 'pas complet' : x[CH]).join(' · ')}) — budget ${budget} ms + marge ${marge} ms`);
 }
 console.log(ko ? `\n❌ ${ko} contrôle(s) rouge(s)` : '\n✅ volume-budget : Ma journée et Ventes sous le budget à 20 000 ventes');
 process.exit(ko ? 1 : 0);

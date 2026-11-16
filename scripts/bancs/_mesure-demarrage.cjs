@@ -16,6 +16,7 @@
 //  RENDUS=1 (9 nov.) : crochet React posé avant l'app — chaque rendu validé et chaque
 //  rendu de `Comptabilite` (le moteur de Ma journée) avant « prêt », avec son heure
 //  (diagnostic : le parcours de l'arbre à chaque validation ralentit la page).
+//  (16 nov.) RESEAU=libre : ni débit ni délai simulés ; `donnees_ms` = écran complet − première lecture.
 //  (16 nov.) COMPLET_MAX_MS : combien attendre l'écran complet après les 90 s (défaut 20 s).
 //  (16 nov.) Chaque résultat porte `apresDonnees_ms` : écran prêt (complet avec COMPLET=1) − arrivée de la dernière
 //  lecture servie avant lui (le calcul, réseau mis à part).
@@ -64,7 +65,8 @@ async function ouvrir(ctx, tab, etiquette) {
   const cdp = await ctx.newCDPSession(pg);
   await cdp.send('Network.enable');
   if (process.env.PILE) { await cdp.send('Debugger.enable'); await cdp.send('Debugger.setAsyncCallStackDepth', { maxDepth: 40 }); }
-  await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 60, downloadThroughput: 9e6 / 8, uploadThroughput: 3e6 / 8 });
+  // (16 nov.) RESEAU=libre : aucun réseau simulé (ni débit, ni délai) — ce qui reste est le CALCUL de l'app.
+  if (process.env.RESEAU !== 'libre') await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 60, downloadThroughput: 9e6 / 8, uploadThroughput: 3e6 / 8 });
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: +(process.env.CPU || 4) });
   if (process.env.PROFIL) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 500 }); await cdp.send('Profiler.start'); }
   if (process.env.TRACE) await ctx.browser().startTracing(pg, { path: process.env.TRACE + '-' + etiquette + '.json', categories: ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'blink', 'v8.execute', 'v8', 'disabled-by-default-v8.compile'] });
@@ -82,7 +84,7 @@ async function ouvrir(ctx, tab, etiquette) {
     if (rq.method() !== 'GET') { try { const j = JSON.parse(rq.postData() || 'null'); rec.u += ' ⇐ ' + (Array.isArray(j) ? j : [j]).map(x => x && x.id).join(','); } catch (_) {} rec.o = 2; rec.f = rec.t; return route.fulfill({ status: 201, contentType: 'application/json', body: '[]' }); }
     const h = await rq.allHeaders(); const rep = repondre(rq.url(), h.range, base);
     const body = JSON.stringify(rep.body); rec.o = Buffer.byteLength(body);
-    await attendre(80); rec.f = Date.now() - t0;
+    if (process.env.RESEAU !== 'libre') await attendre(80); rec.f = Date.now() - t0;
     return route.fulfill({ status: rep.status, contentType: 'application/json', headers: { ...(rep.headers || {}) }, body });
   });
   await pg.route('**/api/**', r => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
@@ -125,6 +127,9 @@ async function ouvrir(ctx, tab, etiquette) {
   // servie avant l'écran complet (ou prêt) et cet écran — ce que coûte le calcul, réseau mis à part.
   { const tFin = (process.env.COMPLET ? tComplet : null) ?? tPret; const arr = reqs.filter(r => r.m === 'GET' && tFin != null && r.f != null && r.f <= tFin).map(r => r.f);
     res.derniereDonnee_ms = arr.length ? Math.max(...arr) : null; res.apresDonnees_ms = tFin != null && arr.length ? tFin - Math.max(...arr) : null; }
+  // (16 nov.) `donnees_ms` : de la PREMIÈRE lecture de la base à l'écran complet (prêt sans COMPLET) — avec RESEAU=libre,
+  // le temps que l'app passe à demander, recevoir, calculer et rendre ses données, réseau mis à part.
+  { const tFin = (process.env.COMPLET ? tComplet : null) ?? tPret; res.donnees_ms = tFin != null && reqs.length ? tFin - reqs[0].t : null; }
   if (process.env.RENDUS) res.rendus = await pg.evaluate((tp) => ({ commits: (window.__commits || []).filter(t => t <= tp).length, compta: (window.__compta || []).filter(t => parseInt(t, 10) <= tp).join(' ') }), tPret || 1e9).catch(() => null);
   if (process.env.EVAL) res.eval = await pg.evaluate(process.env.EVAL).catch(e => String(e));
   if (process.env.ETATS) res.etats = etats.map(x => x.t + ':' + x.e).join(' ; ');
