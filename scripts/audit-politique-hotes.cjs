@@ -100,6 +100,8 @@ const COUPLES = {
   'src/FavorisEtapes.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted » (favoris, la cloche)'],
   'src/RegistresVue.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir Vinted » (registres, geste à faire)'],
   'src/RetoursLitiges.jsx|www.vinted.fr': ['lien', LIEN + ' — la transaction du retour sur vinted.fr'],
+  // (16 nov., intégration) lot deux-comptes : l'annonce à retirer, ouverte d'un clic (src/DeuxComptes.jsx « Retirer » / la photo)
+  'src/deuxComptes.js|www.vinted.fr': ['lien', LIEN + ' — l’annonce Vinted d’un des deux comptes (« Deux comptes, une paire »)'],
   // (intégration 11nov-g2) lots vestiaire-plus et annonce-vinted : liens de la feuille « VRM travaille ».
   'src/BaissePrixVestiaire.jsx|fr.vestiairecollective.com': ['lien', LIEN + ' — « Regarde l’annonce sur Vestiaire » (baisse de prix pas relue)'],
   'src/CreerSurVinted.jsx|www.vinted.fr': ['lien', LIEN + ' — « Ouvrir » le brouillon créé sur vinted.fr'],
