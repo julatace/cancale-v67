@@ -155,3 +155,27 @@ finalisées) : l'écart apparaît après la finalisation.
   elle y compte maintenant au prix de l'article (même règle partout). Le montant qu'il a noté lors de sa déclaration
   n'est pas réécrit.
 
+
+### Les preuves (deux-prix-compter)
+- `scripts/audit-deux-prix-compter.cjs` (base inventée, vraies règles : `src/vintedPro.js` puis le miroir serveur) :
+  42 verts ; sur l'arbre d'`origin/claude/argent-mieux` : **28 rouges** (deux prix à part, total 14 790 c au lieu de
+  24 090 c, écart absent, facture refusée « le prix diffère », rien d'écrit) — les ventes à un prix y sont VERTES avant
+  comme après (inchangées au centime). `--prouve` : 7/7 mutations rouges (règle d'avant, prix HAUT, écart AJOUTÉ au CA,
+  écart > 2 € compté, liste sous l'article comptée, écart pas sommé, Résumé muet).
+- `audit-vinted-pro` porté (P2/P8 sur un écart > 2 €, P9/P10 neufs) : 32 verts, `--prouve` 15/15.
+- `audit-bilan-semaine` (miroir = app) 57 OK ; `audit-traduction`, `audit-quoi-de-neuf`, `audit-urssaf` verts ;
+  passe des 68 audits qui lisent ces règles : seul `audit-vendeur-generaliste` rouge (déjà rouge sur main, §9).
+- Banc `argent-mieux`, base d'AVANT (60 ventes Pro à écart 0,47–1,25 €), montants relevés avant/après (390, clair et
+  sombre ; 1512 en partie — captures en délai dépassé sous la charge, avant comme après). SEULS changent les montants
+  de la règle : CA du mois dernier 1 635 € → 4 725 € (+ 3 090 €, le prix de l'article des 60 ventes), cotisations
+  219,09 → 633,15 €, année 2 889 → 5 979 €, finalisé 2 103 → 5 193 €, restes avant seuils (82 111 → 79 021 €,
+  200 211 → 197 121 €), net 1 415,91 → 4 091,85 €, vendu 5 563,11 → 5 511 € (− 52,11 € : l'écart n'est plus dans le
+  vendu) ; « au moins 3 090 € » et les 120 prix par vente disparaissent (plus à part) ; « dont 52,11 € d'écart non
+  compté » apparaît ; les ventes Pro entrent dans la Révision du mois au prix de l'article. Factures : identiques.
+- Banc `argent-mieux` porté (60 ventes à écart > 2 €, toujours à part + 20 à écart ≤ 2 €, comptées) : **72 ✅ · 0 ❌**
+  (390 et 1512, clair et sombre) ; sur le build d'avant : E et G rouges (4 ❌ à 390 clair).
+- `chiffres-volume` (base de 20 000 ventes, aucun compte Pro) avant/après : 34 identiques, montants, comptes et
+  lignes publiées identiques partout ; 1 différence = l'ORDRE de deux attributs de Ma journée (`data-ebay` /
+  `data-presses`, mêmes valeurs) — aucun chiffre ne bouge.
+- Captures regardées : Déclarer 390 clair et sombre, 1512 clair (Mois bouclé : « dont 9,47 € d'écart non compté (10
+  ventes Vinted Pro comptées au prix de l'article) »), Résumé 390 sombre ouvert (sous « Vendu et reçu »).
