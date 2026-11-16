@@ -61,4 +61,5 @@ export default {
   "vp.loupe.stockSeul": "Stored, no listing",
   "vp.loupe.retourInfo": "Return to send back",
   "vp.loupe.parRangement": "storage",
+  "vp.loupe.proche": "Found despite a typo: “{mot}”",
 };

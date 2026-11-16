@@ -20,7 +20,9 @@
 //   · TEMPS : de la frappe à la ligne affichée < 300 ms (mesuré dans la page) ;
 //   · une frappe lettre à lettre n'envoie qu'UNE requête e-mails (les autres annulées) ;
 //   · en mode stream : pseudo et code masqués, récents tus ;
-//   · lignes ≥ 44 px, aucun débordement, aucune erreur de page.
+//   · lignes ≥ 44 px, aucun débordement, aucune erreur de page ;
+//   · (16 nov.) une faute de frappe pardonnée (« jordn chicgo », « nike air mxa » : « ≈ … »),
+//     jamais sur une identité (« 1924 » parmi 50 jumelles, code de retrait inversé).
 // Captures : $TMPDIR/loupe-*.png (À REGARDER).
 const { chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData, metaDe, filtreData } = require('./_meta.cjs');
@@ -245,6 +247,33 @@ const ouvrirLoupe = async (pg, tel) => {
         dit(p.length === 50 && new Set(p.map((r) => r.cle)).size === 50 && new Set(p.map((r) => r.num)).size === 50, `${TT} « Voir les 38 autres » : 50 lignes, 50 N° distincts, jamais fusionnées`, `${p.length} / ${new Set(p.map((r) => r.num)).size}`);
         dit(x.r.filter((r) => r.type === 'vente').map((r) => r.cle).sort().join() === 'vente:22999990001,vente:22999990002', `${TT} les deux ventes au même titre : deux lignes`);
         await pg.screenshot({ path: path.join(SHOTS, `loupe-jumelles-${suf}.png`) });
+      });
+      // (16 nov., lot recherche-tolerante) Une faute de frappe pardonnée — jamais sur une identité.
+      await essaie('fautes de frappe', async () => {
+        let m = await mesurer(pg, 'jordn chicgo', '[data-recherche-groupe="paire"]');
+        await pg.waitForTimeout(300);
+        let x = await res(pg);
+        const prochesP = await pg.evaluate(() => [...document.querySelectorAll('[data-recherche-resultat="paire"]')].map((e) => e.getAttribute('data-recherche-proche')));
+        dit(m.vu && x.groupes.paire && x.groupes.paire.total === '50' && prochesP.length && prochesP.every((p) => p === '1'), `${TT} « jordn chicgo » (deux fautes) ⇒ les 50 paires Jordan Chicago, dites « à une faute près »`, JSON.stringify({ g: x.groupes.paire, p: prochesP.slice(0, 3) }));
+        dit(x.r.filter((r) => r.type === 'paire').every((r) => /^≈ /.test(r.pastille)), `${TT} … la pastille dit le mot compris (« ≈ jordan »)`, x.r.slice(0, 2).map((r) => r.pastille).join(' | '));
+        dit(m.ms < 300, `${TT} « jordn chicgo » : affiché en ${m.ms} ms (< 300 ms)`, String(m.ms));
+        await pg.screenshot({ path: path.join(SHOTS, `loupe-faute-${suf}.png`) });
+        m = await mesurer(pg, 'nike air mxa', '[data-recherche-groupe="vente"]');
+        await pg.waitForTimeout(300);
+        x = await res(pg);
+        const v = x.r.filter((r) => r.type === 'vente');
+        dit(m.vu && v.length > 0 && v.every((r) => r.par === 'titre' && r.pastille === '≈ max'), `${TT} « nike air mxa » ⇒ les ventes Nike Air Max (« ≈ max »)`, JSON.stringify(v.slice(0, 2)));
+        // Un N° tapé parmi 50 paires au même titre : LA paire, en tête (bloc « Tout sur le N° »), jamais à peu près.
+        m = await mesurer(pg, '1924', '[data-tout-num]');
+        await pg.waitForTimeout(300);
+        const tn = await pg.evaluate(() => [...document.querySelectorAll('[data-tout-num]')].map((e) => e.getAttribute('data-tout-num')));
+        x = await res(pg);
+        dit(m.vu && tn.join() === '1924' && !x.r.some((r) => r.type === 'paire' && r.num === '1924') && !x.r.some((r) => r.num === '1942' || r.num === '1294'), `${TT} « 1924 » parmi 50 jumelles ⇒ LA N°1924 seule en tête, ni la 1942 ni la 1294`, JSON.stringify({ tn, r: x.r.slice(0, 3) }));
+        // Un code de retrait inversé ne trouve PAS le colis (une identité n'est jamais « à peu près »).
+        m = await mesurer(pg, '500132', '[data-recherche-q="500132"]');
+        await pg.waitForTimeout(400);
+        x = await res(pg);
+        dit(!x.r.some((r) => r.cle === 'colis:MR7000123'), `${TT} « 500132 » (code inversé) ne sort PAS le colis du code 500123`, JSON.stringify(x.r.slice(0, 3)));
       });
       await essaie('frappe lettre à lettre', async () => {
         await pg.locator('[data-recherche-champ]').first().fill('');

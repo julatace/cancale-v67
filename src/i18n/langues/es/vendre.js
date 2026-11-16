@@ -61,4 +61,5 @@ export default {
   "vp.loupe.stockSeul": "Guardado, sin anuncio",
   "vp.loupe.retourInfo": "Devolución por enviar",
   "vp.loupe.parRangement": "almacén",
+  "vp.loupe.proche": "Encontrado pese a un error de escritura: «{mot}»",
 };

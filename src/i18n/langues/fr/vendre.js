@@ -62,4 +62,5 @@ export default {
   "vp.loupe.stockSeul": "Rangé, sans annonce",
   "vp.loupe.retourInfo": "Retour à renvoyer",
   "vp.loupe.parRangement": "rangement",
+  "vp.loupe.proche": "Trouvé à une faute de frappe près : « {mot} »",
 };

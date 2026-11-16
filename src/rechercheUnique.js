@@ -303,6 +303,7 @@ export function indexMemo(sources) {
   const cles = [S.ventes, S.achats, S.pseudos, S.bordereaux, S.colis, S.fiches, S.annonces, S.factures, S.numerosTx, S.autres, S.messages, S.stock, S.retours];
   if (_memo.cles && _memo.cles.length === cles.length && _memo.cles.every((x, i) => x === cles[i])) return _memo.index;
   const index = indexRecherche(S);
+  vocabulaire(index);   // (16 nov.) le vocabulaire des fautes de frappe, préparé avec l’index (pas à la 1re frappe)
   _memo = { cles, index };
   return index;
 }
@@ -311,11 +312,108 @@ export function indexMemo(sources) {
 // partielle, le pseudo, enfin le titre.
 // (15 nov.) `rangement` : le lieu où la paire est rangée (« étagère B »), entre le pseudo et le titre.
 const RANG = { code: 0, numero: 0.5, suivi: 1, transaction: 1, commande: 1, facture: 1, montant: 2, pseudo: 3, rangement: 3.5, titre: 4 };
+// (16 nov.) « À une faute près » : APRÈS toute trouvaille exacte (titre compris), le pseudo avant le titre.
+const RANG_PROCHE = { pseudo: 4.6, titre: 4.8 };
 // (15 nov., vendre plus) LE PLUS PROBABLE D'ABORD, dans le titre : des mots ENTIERS (« dunk low »
 // dans « nike dunk low panda ») passent devant un morceau de mot (« dunk » dans « dunkerque ») ;
 // à égalité, une paire EN LIGNE passe devant une paire qui ne l'est plus. Ce n'est qu'un ordre :
 // chaque ligne ouvre SON objet, rien n'est relié par ressemblance (§5).
 const motsEntiers = (t, mots) => { const x = ' ' + t + ' '; for (const m of mots) if (!x.includes(' ' + m + ' ')) return false; return true; };
+
+// ── (16 nov., lot recherche-tolerante) LA FAUTE DE FRAPPE PARDONNÉE ──────────
+// Julien : « la loupe trouve tout, MÊME avec une faute de frappe ou sans accent ».
+// Les accents sont déjà retirés (`normaliser`). Ici, un MOT DU TITRE (ou un pseudo)
+// tapé avec une faute : « air mxa » ⇒ Air Max, « jordn chicgo » ⇒ Jordan Chicago.
+// Combien de fautes, selon la longueur du mot TAPÉ (lettres seulement) :
+//   · 3 ou 4 lettres : deux lettres voisines inversées seulement (« mxa » = « max ») ;
+//   · 5 à 7 lettres : une faute (lettre en trop, en moins, changée, ou deux inversées) ;
+//   · 8 lettres et plus : deux fautes.
+// ⚠️ §5 : une ressemblance PROPOSE, elle ne désigne jamais. Aucune identité n'est
+//    tolérée (N°, n° de suivi, code de retrait, transaction, commande, facture,
+//    montant : égalité seulement) ; un mot qui porte un CHIFFRE (« 42 », « 90 ») ne
+//    l'est pas non plus (une taille 43 n'est pas la 42). Une trouvaille « à une faute
+//    près » passe APRÈS toutes les trouvailles exactes, n'est jamais une
+//    « correspondance exacte », et ouvre SON objet comme les autres.
+export function fautesPermises(mot) {
+  const n = str(mot).length;
+  if (!/^[a-z]+$/.test(str(mot)) || n < 3) return 0;
+  return n >= 8 ? 2 : n >= 5 ? 1 : -1;   // -1 : une inversion de deux lettres voisines seulement
+}
+// Distance de Damerau (inversion de deux voisines = une faute), arrêtée dès qu'elle dépasse `k`.
+export function distanceFautes(a, b, k = 2) {
+  const la = a.length, lb = b.length;
+  if (Math.abs(la - lb) > k) return k + 1;
+  if (a === b) return 0;
+  let p2 = null, p1 = new Array(lb + 1), c = new Array(lb + 1);
+  for (let j = 0; j <= lb; j++) p1[j] = j;
+  for (let i = 1; i <= la; i++) {
+    c[0] = i; let min = i;
+    for (let j = 1; j <= lb; j++) {
+      const cout = a[i - 1] === b[j - 1] ? 0 : 1;
+      let v = Math.min(p1[j] + 1, c[j - 1] + 1, p1[j - 1] + cout);
+      if (p2 && i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) v = Math.min(v, p2[j - 2] + 1);
+      c[j] = v; if (v < min) min = v;
+    }
+    if (min > k) return k + 1;
+    const t = p2 || new Array(lb + 1); p2 = p1; p1 = c; c = t;
+  }
+  return p1[lb];
+}
+const inversionVoisine = (a, b) => {
+  if (a.length !== b.length || a === b) return false;
+  let i = 0; while (i < a.length && a[i] === b[i]) i++;
+  return i < a.length - 1 && a[i] === b[i + 1] && a[i + 1] === b[i] && a.slice(i + 2) === b.slice(i + 2);
+};
+// Le mot tapé `m` vaut-il le mot lu `w` à une faute près (selon `fautesPermises`) ?
+export function motProche(m, w) {
+  if (!m || !w || m === w) return false;
+  const k = fautesPermises(m);
+  if (k === 0 || !/^[a-z]+$/.test(w)) return false;
+  if (k < 0) return inversionVoisine(m, w);
+  return distanceFautes(m, w, k) <= k;
+}
+// Le VOCABULAIRE de l'index (chaque mot de lettres des titres, lu une fois), et
+// les mots de chaque entrée — préparés à la PREMIÈRE recherche tolérante, puis gardés
+// avec l'index (même index ⇒ même vocabulaire). Les mots proches d'un mot tapé sont
+// gardés aussi : une lettre ajoutée ne refait que le mot qui change.
+const _vocab = new WeakMap();
+function vocabulaire(index) {
+  let v = _vocab.get(index);
+  if (v) return v;
+  const mots = new Set(); const parLongueur = new Map(); const motsDe = new Array(index.entrees.length);
+  const vus = new Map();   // le même titre (50 jumelles) ⇒ le même tableau de mots, découpé une fois
+  for (let i = 0; i < index.entrees.length; i++) {
+    const t = index.entrees[i].t || '';
+    let l = vus.get(t);
+    if (!l) {
+      l = [];
+      for (const w of t.split(' ')) if (w.length >= 3 && /^[a-z]+$/.test(w)) l.push(w);
+      vus.set(t, l);
+      for (const w of l) if (!mots.has(w)) { mots.add(w); const n = w.length; if (!parLongueur.has(n)) parLongueur.set(n, []); parLongueur.get(n).push(w); }
+    }
+    motsDe[i] = l;
+  }
+  v = { parLongueur, motsDe, proches: new Map() };
+  _vocab.set(index, v);
+  return v;
+}
+function prochesDe(v, m) {
+  if (v.proches.has(m)) return v.proches.get(m);
+  const k = fautesPermises(m); const out = new Set();
+  if (k !== 0) {
+    const ecart = k < 0 ? 0 : k;
+    for (let n = m.length - ecart; n <= m.length + ecart; n++) for (const w of v.parLongueur.get(n) || []) if (motProche(m, w)) out.add(w);
+  }
+  v.proches.set(m, out);
+  return out;
+}
+// Un pseudo (lettres ET chiffres, « tomj606 ») : la même tolérance, comptée sur sa longueur,
+// seulement s'il a 5 signes au moins (« tomj660 » ⇒ tomj606 ; « tom » ne trouve rien de proche).
+function pseudoProche(m, p) {
+  if (!m || !p || m === p || m.length < 5 || !/^[a-z0-9._-]+$/.test(m)) return false;
+  const k = m.length >= 8 ? 2 : 1;
+  return distanceFautes(m, p, k) <= k;
+}
 
 // Cherche `q` dans l'index. Rend { q, groupes: { paire: [...], vente: [...], … }, totaux, total }
 // chaque résultat = { e (l'entrée), par: 'code'|'numero'|'suivi'|'transaction'|'facture'|'montant'|'pseudo'|'titre', exact, valeur }.
@@ -324,7 +422,7 @@ const motsEntiers = (t, mots) => { const x = ' ' + t + ' '; for (const m of mots
 // (10 nov., lot AX) `exactesEnTete` : les correspondances EXACTES d'identité
 // (`estIdentiteExacte`) sortent de leur groupe et vont dans `exactes` (rendu en tête,
 // jamais deux fois) ; sans l'option, `exactes` est rempli aussi mais les groupes gardent tout.
-export function chercherPartout(index, q, { max = MAX_PAR_GROUPE, numero = null, exactesEnTete = false } = {}) {
+export function chercherPartout(index, q, { max = MAX_PAR_GROUPE, numero = null, exactesEnTete = false, tolerance = true } = {}) {
   const groupes = {}; for (const t of TYPES) groupes[t] = [];
   const totaux = {}; for (const t of TYPES) totaux[t] = 0;
   const qn = normaliser(q);
@@ -335,8 +433,15 @@ export function chercherPartout(index, q, { max = MAX_PAR_GROUPE, numero = null,
   const cents = montantCherche(q);
   const kNum = numero ? cleNumero(numero) : '';
   const numeroLike = cents == null && /^[A-Z]{0,3}\d{1,6}$/.test(qa) && qa.length <= 7;
+  // (16 nov.) Les mots qui PEUVENT se pardonner (lettres seulement, 3 et plus) et leurs voisins lus.
+  const pseudoTape = cents == null && tolerance !== false && mots.length === 1 && qn.length >= 5 && /^[a-z0-9._-]+$/.test(qn) ? qn : '';
+  const tolere = cents == null && tolerance !== false && (!!pseudoTape || mots.some((m) => fautesPermises(m) !== 0));
+  const voc = tolere ? vocabulaire(index) : null;
+  const proches = tolere ? mots.map((m) => (fautesPermises(m) !== 0 ? prochesDe(voc, m) : null)) : null;
   const trouve = [];
+  let ie = -1;
   for (const e of index.entrees) {
+    ie++;
     let par = null, exact = false, valeur = '';
     // Un MONTANT ne cherche QUE les montants : « 52,00 » n'est ni un code ni un suivi.
     if (cents != null) { if (e.montants && e.montants.includes(cents)) trouve.push({ e, par: 'montant', exact: true, valeur: cents, rang: RANG.montant - 0.5 }); continue; }
@@ -353,7 +458,21 @@ export function chercherPartout(index, q, { max = MAX_PAR_GROUPE, numero = null,
     if (!par && qn.length >= 2 && e.lieux && e.lieux.length) { const i = e.lieux.findIndex((l) => mots.every((m) => l.includes(m))); if (i >= 0) { par = 'rangement'; exact = e.lieux[i] === qn; valeur = e.lieuxAff[i]; } }
     let bonus = 0;
     if (!par && e.t && mots.every((m) => e.t.includes(m))) { par = 'titre'; bonus = (motsEntiers(e.t, mots) ? 0 : 0.2) + (e.enLigne === false ? 0.1 : 0); }
-    if (par) trouve.push({ e, par, exact, valeur, rang: RANG[par] - (exact ? 0.5 : 0) + bonus });
+    if (par) { trouve.push({ e, par, exact, valeur, rang: RANG[par] - (exact ? 0.5 : 0) + bonus }); continue; }
+    // (16 nov.) Rien d'exact : à une faute près — chaque mot tapé est DANS le texte lu, ou un mot lu
+    // lui est proche (au moins un mot pardonné). Jamais exact, jamais une identité.
+    if (!tolere) continue;
+    if (pseudoTape && e.pseudos.length) { const i = e.pseudos.findIndex((p) => pseudoProche(pseudoTape, p)); if (i >= 0) { trouve.push({ e, par: 'pseudo', exact: false, proche: true, valeur: e.pseudosAff[i], rang: RANG_PROCHE.pseudo }); continue; } }
+    const lus = voc.motsDe[ie];
+    if (!e.t || !lus || !lus.length) continue;
+    let pardonne = '', ok = true;
+    for (let i = 0; i < mots.length && ok; i++) {
+      const m = mots[i];
+      if (e.t.includes(m)) continue;
+      const pr = proches[i]; const w = pr && pr.size ? lus.find((x) => pr.has(x)) : null;
+      if (w) { if (!pardonne) pardonne = w; } else ok = false;
+    }
+    if (ok && pardonne) trouve.push({ e, par: 'titre', exact: false, proche: true, valeur: pardonne, rang: RANG_PROCHE.titre + (e.enLigne === false ? 0.1 : 0) });
   }
   const numVal = (e) => { const m = /(\d+)$/.exec(e.numK || ''); return m ? Number(m[1]) : Infinity; };
   trouve.sort((a, b) => a.rang - b.rang || (a.e.date < b.e.date ? 1 : a.e.date > b.e.date ? -1 : 0) || numVal(a.e) - numVal(b.e));
