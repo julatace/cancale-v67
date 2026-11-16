@@ -1008,6 +1008,7 @@ import "./design/ventes-verre.css";   // (15 nov.) Ventes et Achats « Verre dé
 import "./design/verre-ecrans.css";   // (15 nov., maquettes validées : « tout est parfait sauf étagères ») Argent, à venir, Messages, Paramètres, la fiche — des classes `vg-*` neuves, `@layer vrm-verre` : docs/passation/2026-11-15-ecrans-verre-2.md
 import "./design/verre-journee.css";   // (15 nov., refonte-journee) Ma journée comme la maquette validée, « La paire à sortir en premier » — docs/passation/2026-11-15-refonte-journee.md
 import "./design/verre-annonces.css";   // (15 nov., refonte-journee) Annonces comme la maquette validée : la rangée de 72 px, la recherche et les vues
+import "./design/argent-mieux.css";   // (16 nov., lot argent-mieux) Argent lisible partout : cartes de verre, encre du verre, « Copier » plein, ventes non comptées groupées — `@layer vrm-verre` : docs/passation/2026-11-16-argent-mieux.md
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
@@ -10217,7 +10218,9 @@ const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu, exclu
     if (!t) { if (!vus.has(id)) { vus.add(id); aDaterOuDeclaree({ id, plateforme: 'Vinted', eur, titre: o.title || '', masquee: masq, o, dateVente: o.date }); } continue; }
     // (11 nov., lot vinted-pro) Compte Vinted PRO : un prix que Vinted contredit (liste ≠ article,
     // relevé muet) n'est pas su ⇒ mise à part et NOMMÉE — sauf une vente déjà déclarée, qui garde son mois.
-    if (o._prixPro && o._prixPro.compter === false && !(idx && idx.get(id))) { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'Vinted', raison: o._prixPro.raison || 'prix pas lu', titre: o.title || '', manque: true, ts: t || null, tsVente: tsCommande(o) || null }); } continue; }
+    // (16 nov., lot argent-mieux) Les deux prix LUS sont gardés à côté (`deux`, centimes) : la liste groupée
+    // dit « au moins » la somme du plus bas (jamais un des deux choisi pour le total, qui reste sans elles).
+    if (o._prixPro && o._prixPro.compter === false && !(idx && idx.get(id))) { if (!vus.has(id)) { vus.add(id); const pp = o._prixPro; const deux = Number.isSafeInteger(pp.listeC) && Number.isSafeInteger(pp.artC) ? { listeC: pp.listeC, artC: pp.artC, releveC: Number.isSafeInteger(pp.releveC) ? pp.releveC : null } : null; ecartees.push({ id, plateforme: 'Vinted', raison: pp.raison || 'prix pas lu', code: pp.code || '', ...(deux ? { deux, auMoinsC: Math.min(deux.listeC, deux.artC) } : {}), titre: o.title || '', manque: true, ts: t || null, tsVente: tsCommande(o) || null, itemId: o.item_id != null ? String(o.item_id) : '' }); } continue; }
     const l = { id, plateforme: 'Vinted', ts: t, ym: ymDeTs(t), eur, titre: o.title || '', masquee: masq, o, dateVente: o.date };
     if (garde(l)) lignes.push(place(l));
   }
@@ -38024,8 +38027,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // disent « au moins » et NOMMENT le manque, des MÊMES lignes (§5).
       const sources = { Vinted: 'lu', Leboncoin: lbcLu ? 'lu' : 'pasSu', eBay: ebayCmd ? 'lu' : 'pasSu', Vestiaire: ventesVc === null ? 'pasSu' : 'lu' };
       const ncP = {};
-      for (const x of recuNonComptees) { const k = `${x.plateforme}|${x.raison}`; ncP[k] = (ncP[k] || 0) + 1; }
-      const nonComptees = { n: recuNonComptees.length, par: ncP };
+      // (16 nov., lot argent-mieux) + `parC` : par raison, la somme « au moins » (centimes) quand CHAQUE vente du
+      // groupe la porte (les deux prix lus d'une vente Pro) ; sinon `null` (pas su, jamais 0).
+      const ncC = {};
+      for (const x of recuNonComptees) { const k = `${x.plateforme}|${x.raison}`; ncP[k] = (ncP[k] || 0) + 1; ncC[k] = ncC[k] === null || !Number.isSafeInteger(x.auMoinsC) ? null : (ncC[k] || 0) + x.auMoinsC; }
+      // + `det` : le détail des ventes aux deux prix (identité, date, les deux prix en centimes, l'annonce pour son N°),
+      // 300 au plus — la liste repliée de Déclarer (jamais de titre ni de pseudo dans cette ligne).
+      const det = recuNonComptees.filter((x) => x && x.deux).slice(0, 300).map((x) => ({ k: `${x.plateforme}|${x.raison}`, id: x.id, t: x.tsVente || x.ts || null, l: x.deux.listeC, a: x.deux.artC, r: x.deux.releveC, it: x.itemId || '' }));
+      const nonComptees = { n: recuNonComptees.length, par: ncP, parC: ncC, ...(det.length ? { det } : {}) };
       // L'argent REÇU par mois (date de VERSEMENT), par `recuDuMois` — la règle
       // même de « Reçu en {mois} » sur Ma journée. Le widget de l'iPhone le LIT
       // (api/widget.js) au lieu de le recalculer sur les emails (§11, 17 oct.).
