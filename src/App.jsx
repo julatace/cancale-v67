@@ -9662,7 +9662,19 @@ const venteRecente = (o) => {
 // moisson sans aucun tri : plusieurs comptes mis bout à bout s'entremêlaient et
 // l'ordre n'avait plus de sens. Une date illisible part en bas plutôt que de
 // remonter en tête.
-const tsCommande = (o) => Date.parse((o && o.date) || '') || 0;
+// (16 nov., vitesse-volume) Les deux lectures de la date d'une commande, gardées par commande (identité de
+// l'objet : une commande lue n'est jamais modifiée en place). À 20 000 ventes, la même date était relue des
+// dizaines de fois par rendu. Mêmes formules qu'avant, mêmes réponses (NaN compris).
+const _tsCommandeM = new WeakMap(), _msDateM = new WeakMap();
+const tsCommande = (o) => {
+  if (!o || typeof o !== 'object') return Date.parse((o && o.date) || '') || 0;
+  let v = _tsCommandeM.get(o); if (v === undefined) { v = Date.parse(o.date || '') || 0; _tsCommandeM.set(o, v); } return v;
+};
+// `new Date(o.date).getTime()` (NaN si illisible) — pour les fenêtres « il y a N jours ».
+const msDateCommande = (o) => {
+  if (!o || typeof o !== 'object') return new Date(o && o.date).getTime();
+  let v = _msDateM.get(o); if (v === undefined) { v = new Date(o.date).getTime(); _msDateM.set(o, v); } return v;
+};
 // ⚠️ LE MONTANT D'UNE COMMANDE VINTED EST UN OBJET `{amount, currency_code}`,
 // pas un nombre. Une lecture naïve (`Number(o.price)`) rend NaN et une somme
 // tombe à 0 — c'est déjà arrivé deux fois (§5.27 : « aucune vente en cours »
@@ -10728,24 +10740,31 @@ const aGenererBordereau = (s) => {
   return /paiement.*valid/i.test(t);
 };
 
+// (16 nov., vitesse-volume) Mémoire par chaîne, comme `classifyOrderStatus` : pure, même entrée, même sortie.
 const needsBordereau = (status) => {
-  const s = (status || '').toLowerCase();
-  if (!s) return true;
-  if (/annul|refus|rembours|cancel|retour|suspend/.test(s)) return false;
-  // « Le paiement a échoué » : aucune paire ne part (mesuré : statut 220 en base).
-  if (/paiement\s+a\s+[ée]chou|[ée]chec\s+du\s+paiement/.test(s)) return false;
-  if (/finalis|termin|complet|cl[oô]tur/.test(s)) return false;            // vente finie
-  // ⚠️ « BORDEREAU ENVOYÉ AU VENDEUR » N'EST PAS UN COLIS PARTI. Le test
-  // « déjà expédié » ci-dessous attrape le mot « envoyé » — donc au moment
-  // EXACT où Vinted te donne l'étiquette, l'app répondait « plus besoin de
-  // bordereau ». Deux conséquences mesurées : le numéro de cette paire
-  // retombait dans le pool alors que le carton est encore sur l'étagère
-  // (deux paires dans la même boîte, §19), et le même statut valait
-  // « à expédier » ailleurs dans l'app. La vente qui attend TON envoi passe
-  // donc en premier.
-  if (isAwaitingShipStatus(s)) return true;
-  if (/exp[eé]di|envoy|transit|achemin|en route|livr|remis|r[ée]ception/.test(s)) return false; // déjà parti/arrivé
-  return true;                                                              // à expédier
+  const memo = typeof status === 'string' ? (needsBordereau.memo || (needsBordereau.memo = new Map())) : null;
+  if (memo && memo.has(status)) return memo.get(status);
+  const r = ((status) => {
+    const s = (status || '').toLowerCase();
+    if (!s) return true;
+    if (/annul|refus|rembours|cancel|retour|suspend/.test(s)) return false;
+    // « Le paiement a échoué » : aucune paire ne part (mesuré : statut 220 en base).
+    if (/paiement\s+a\s+[ée]chou|[ée]chec\s+du\s+paiement/.test(s)) return false;
+    if (/finalis|termin|complet|cl[oô]tur/.test(s)) return false;            // vente finie
+    // ⚠️ « BORDEREAU ENVOYÉ AU VENDEUR » N'EST PAS UN COLIS PARTI. Le test
+    // « déjà expédié » ci-dessous attrape le mot « envoyé » — donc au moment
+    // EXACT où Vinted te donne l'étiquette, l'app répondait « plus besoin de
+    // bordereau ». Deux conséquences mesurées : le numéro de cette paire
+    // retombait dans le pool alors que le carton est encore sur l'étagère
+    // (deux paires dans la même boîte, §19), et le même statut valait
+    // « à expédier » ailleurs dans l'app. La vente qui attend TON envoi passe
+    // donc en premier.
+    if (isAwaitingShipStatus(s)) return true;
+    if (/exp[eé]di|envoy|transit|achemin|en route|livr|remis|r[ée]ception/.test(s)) return false; // déjà parti/arrivé
+    return true;                                                              // à expédier
+  })(status);
+  if (memo) { if (memo.size > 5000) memo.clear(); memo.set(status, r); }
+  return r;
 };
 
 // ── « CETTE VENTE ATTEND-ELLE MON ENVOI ? » — UNE SEULE RÈGLE (4 octobre) ──
@@ -28191,12 +28210,20 @@ const libererNumeroDuPlan = (plan, itemId, num) => {
 // une autre vente à envoyer n'est pas touché. Une « boîte seule » (un meuble à
 // elle seule) n'est pas retirée : elle reste dans « vendues mais au garage ».
 const COLIS_PARTI_VINTED = /achemin|en\s+transit|livr|remis|d[eé]pos|exp[eé]di[eé]|finalis|termin/i;
+// (16 nov., vitesse-volume) Gardée par vente tant que TXN_ETATS ne change pas (elle lit `aExpedier`), comme lui.
 const venteSortieDuStock = (o) => {
-  if (!o || o.transaction_id == null) return false;
-  const st = String(o.status || ''); if (!st) return false;
-  if (classifyOrderStatus(st) === 'cancelled' || venteQuiRevient(o)) return false;
-  if (aExpedier(o) || needsBordereau(st)) return false;
-  return COLIS_PARTI_VINTED.test(st);
+  const memo = o && typeof o === 'object' ? (venteSortieDuStock.memo || (venteSortieDuStock.memo = new WeakMap())) : null;
+  const ver = TXN_ETATS.ver || 0;
+  if (memo) { const m = memo.get(o); if (m && m[0] === ver) return m[1]; }
+  const r = ((o) => {
+    if (!o || o.transaction_id == null) return false;
+    const st = String(o.status || ''); if (!st) return false;
+    if (classifyOrderStatus(st) === 'cancelled' || venteQuiRevient(o)) return false;
+    if (aExpedier(o) || needsBordereau(st)) return false;
+    return COLIS_PARTI_VINTED.test(st);
+  })(o);
+  if (memo) memo.set(o, [ver, r]);
+  return r;
 };
 const retirerPileDuPlan = (plan, itemId, idx) => {
   let fait = false;
@@ -37102,17 +37129,19 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // compte range la compta, ça ne fait pas disparaître un carton de
     // l'étagère (même règle que `toShip` — avant, Colis écartait le compte et
     // Ma journée le gardait : deux nombres pour la même obligation, §11).
-    const items = (sales.items || [])
-      .filter(o => !hiddenSales.has(String(o.transaction_id)))
-      .filter(o => aExpedier(o))
-      .map(o => {
-        const b = o.transaction_id != null ? parTxn[String(o.transaction_id)] || null : null;
-        return { key: 'v' + o.transaction_id, o, b, txn: String(o.transaction_id || '') };
-      })
-      .filter(e => !(e.b && isBordDone(e.b)))             // colis déjà parti : il sort tout seul
+    // (16 nov., vitesse-volume) Les mêmes filtres en un seul passage, `aExpedier` (gardée par vente) d'abord :
+    // un filtre pur de plus ou de moins devant ne change ni la liste ni son ordre.
+    const items = [];
+    for (const o of (sales.items || [])) {
+      if (!aExpedier(o) || hiddenSales.has(String(o.transaction_id))) continue;
+      const b = o.transaction_id != null ? parTxn[String(o.transaction_id)] || null : null;
+      const e = { key: 'v' + o.transaction_id, o, b, txn: String(o.transaction_id || '') };
+      if (e.b && isBordDone(e.b)) continue;                // colis déjà parti : il sort tout seul
       // (11 nov., lot DJ3) …même sans bordereau e-mail : la preuve de SA transaction (e-mail de dépôt du n° de
       // son étiquette, prise en charge, panneau, expédié à la main). « Colis fait » garde sa carte « posté ».
-      .filter(e => !partiParPreuve(partisVinted.get(e.txn)));
+      if (partiParPreuve(partisVinted.get(e.txn))) continue;
+      items.push(e);
+    }
     // (8 nov.) LA VENTE VUE PAR E-MAIL ET SON BORDEREAU (src/bordereauVenteEmail.js) : le même n°
     //    de transaction (l'identité) ⇒ un colis à envoyer, prêt à imprimer, sans attendre que
     //    l'extension relise Vinted. La liste Vinted, dès qu'elle porte le n°, la remplace.
@@ -45857,7 +45886,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // dans un autre ordre : trois filtres purs) — à 20 000 ventes, l'étape n'est plus calculée pour les vieilles.
       sales.items
         .filter(o => o && !hiddenSales.has(String(o.transaction_id)))
-        .map(o => ({ o, j: o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null }))
+        .map(o => ({ o, j: o.date ? Math.floor((Date.now() - msDateCommande(o)) / 86400000) : null }))
         .filter(x => (x.j == null || x.j <= 45) && !aExpedier(x.o))
         .map(x => ({ o: x.o, st: venteStage(x.o), j: x.j }))
         .filter(x => ordre[x.st.label] != null)
@@ -46759,7 +46788,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // (13 nov., moteur-compta) La fenêtre des 45 jours d'abord (même règle, autre ordre) : à 20 000 ventes,
           // `aExpedier` et `venteStage` ne tournent plus sur les vieilles.
           if (!o || hiddenSales.has(String(o.transaction_id))) continue;
-          const j = o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null;
+          const j = o.date ? Math.floor((Date.now() - msDateCommande(o)) / 86400000) : null;
           if (j != null && j > LIMITE_ENVOYES_J) continue;
           if (aExpedier(o)) continue;
           const st = venteStage(o); if (ordre[st.label] == null) continue;
@@ -46783,7 +46812,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // (api/_lib/depart-vente.js) : la même règle que la sortie de « À envoyer ».
           const b = bordsParTxn[tx] || null;
           if (b && isBordShippedManual(b)) continue;
-          const j = o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null;
+          const j = o.date ? Math.floor((Date.now() - msDateCommande(o)) / 86400000) : null;
           out.push({ cle: 'v:' + tx, site: 'vinted', type: 'transp', o, b, j, depart: dp, rang: 1.5,
             photo: orderPhoto(o), titre: o.title || 'Vente', num: (b ? numForBord(b) : '') || (effEntry(o)?.numero || ''), tr: transporteurVente(b, tx),
             lues: { imprime: !!(b && isBordPrinted(b)), depose: true, enroute: true } });
