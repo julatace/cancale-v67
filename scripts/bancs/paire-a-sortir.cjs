@@ -157,8 +157,11 @@ async function scenario(nav, { W, th, sortir }) {
   await P.pret(o.pg);
   await o.pg.waitForSelector('[data-sortir] [data-sortir-premier]', { timeout: 30000 }).catch(() => {});
   await o.pg.waitForTimeout(1500);
-  const m = await mesurer(o.pg);
   await o.pg.screenshot({ path: path.join(SHOTS, `sortir-${W}-${th}.png`) }).catch(() => {});
+  // (16 nov.) Au téléphone elle est sous la grille et « À faire » : on la fait venir à l'écran (les cartes se dévoilent en
+  // défilant) avant de la mesurer ; les positions se comparent entre elles, dans la même vue.
+  if (W < 600) { await o.pg.locator('[data-sortir]').first().scrollIntoViewIfNeeded().catch(() => {}); await o.pg.waitForTimeout(900); await o.pg.screenshot({ path: path.join(SHOTS, `sortir-${W}-${th}-defile.png`) }).catch(() => {}); }
+  const m = await mesurer(o.pg);
   dit(m.la, `${T} A1 « La paire à sortir » est sur Ma journée`, JSON.stringify(m).slice(0, 200));
   if (!m.la) { await o.ctx.close(); return; }
   // (16 nov., lot personnalisation-simple — Julien : « je ne veux pas qu'elle soit tout en haut ») La règle a CHANGÉ : au

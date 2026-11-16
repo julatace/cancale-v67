@@ -179,6 +179,7 @@ async function main() {
         await attendreJournee(pg);
         await ouvrirEditeur(pg);
         let ed = await editeur(pg);
+        await pg.waitForTimeout(700);   // la feuille finit de monter avant la capture
         await shot(pg, `ps-editeur-${vp.width}`);
         mesures[T] = { cartes: ed.n, groupes: ed.groupes, mots: ed.mots, phrases: ed.phrases, sousTitres: ed.sousTitres };
         console.log(`    mesure ${T} : ${ed.n} cartes · ${ed.groupes} groupes · ${ed.mots} mots lus · ${ed.phrases} phrase(s) · ${ed.sousTitres} carte(s) avec une phrase sous le nom`);
