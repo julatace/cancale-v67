@@ -54,11 +54,38 @@ est TOUT EN HAUT de Ma journée et il ne la veut pas tout en haut.
 
 ## Mesures avant / après (banc `personnalisation-simple`, 390 tactile et 1512)
 
-MESURES
+Mesuré sur l'app rendue (feuille « Modifier ma journée », texte VISIBLE, hors lecteur d'écran), `main` (5a9abe571)
+contre cette branche, les mêmes données :
+
+| | avant (`main`) | après |
+|---|---|---|
+| cartes dans la liste | 25 | 26 (+ « Ventes à sortir du stock ») — aucune perdue |
+| groupes | 3 | 3 |
+| phrases d'en-tête | 2 (sous-titre de feuille + aide de 2 lignes) | **1** |
+| phrases sous les noms | 25 cartes | **0** |
+| phrases (≥ 25 caractères) dans la feuille | 23 | **1** |
+| mots lus | 281 | **106** (−62 %) |
+| bouton « Enregistrer » | 0 | 0 |
+| cacher une carte | 2 touchers (ouvrir, interrupteur) | 2 touchers (ouvrir, interrupteur) — banc C : 1 toucher dans la feuille |
+| remonter une carte d'une place | glisser seulement (ou clavier) | **1 toucher ↑**, ou glisser |
+| revenir au départ | 1 toucher (« réglage d'origine ») | 1 toucher (« réglage de départ ») |
+| contrôles par carte | interrupteur + poignée | interrupteur + poignée + ↑ ↓ (44 px chacun) |
+| « La paire à sortir » à l'ouverture (390) | 1re carte sous le titre (haut 65 px), carte 455 px | sous la grille et « À faire », carte **343 px** (compacte) |
 
 ## Preuves
 
-PREUVES
+- `npm run build` vert.
+- `audit-journee-perso --prouve` : vert, **30/30 mutations** (dont 9 neuves : ordre de départ gardé / trop large, ↑ de
+  deux places, carte en haut, flèches muettes, phrase revenue, texte en dur, carte remise tout en haut, carte incachable).
+  Sur `main` : 3 rouges (formes périmées) et 4 mutations qui ne s'appliquaient plus — portées, même règle.
+- `audit-traduction` 45/45 · `audit-quoi-de-neuf` vert · `audit-tdz`, `audit-variables`, `audit-vendeurs-differents` verts ·
+  `audit-textes-courts` (Ebay.jsx l.2605), `audit-boutons` (rayons), `audit-journee-coherence` (A4) : 1/2/1 rouges, **les
+  mêmes sur `main`**, hors de ce lot.
+- **Banc `personnalisation-simple`** (390 tactile + 1512, `locale fr-FR`) : **41 verts, 0 rouge** ; sur le build de `main` :
+  **15 rouges** (aucune flèche, une phrase par carte, sous-titre, pas de carte `sortir`, noms non traduits).
+- **Banc `paire-a-sortir`** (390 clair/sombre, 1512) : vert ; sur `main` : **4 rouges** (A1 tout en haut, pas compacte,
+  B cachée impossible, B en haut).
+- Captures regardées : l'éditeur 390 / 1512 / anglais, la carte compacte (390 clair et sombre), Ma journée.
 
 ## Fichiers
 
