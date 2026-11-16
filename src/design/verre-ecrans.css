@@ -273,17 +273,20 @@
 :root:root:root:root:root body .vg-fil-toi { color: var(--sv-encre-2) !important; }
 :root:root:root:root:root body .vg-fil-etat { flex: none; }
 /* La conversation (maquette « ms2 ») : l'offre comparée, le plein à « Proposer N € », Accepter · Refuser en touches. */
-:root:root:root:root:root body .vrm-chat-offre .vrm-chat-offre-actions.vg-offre-gestes { display: grid !important; grid-template-columns: 1fr 1fr; gap: 10px; }
-:root:root:root:root:root body .vrm-chat-offre .vg-offre-gestes .vg-offre-plein { grid-column: 1 / -1; height: 52px !important; min-height: 52px !important; border-radius: 16px !important; font: 650 15.5px/1 var(--sb-police-texte, Inter, sans-serif) !important; }
+/* (16 nov., intégration vague A) Ces règles n'étaient jamais montées sur une vraie carte (le banc ecrans-verre-2 n'a pas
+   l'extension) : sans `!important`, les règles hors couche gagnaient (grille 3 colonnes, « Accepter 1… » coupé, le plein
+   en touche blanche, « 10 0 € »). Banc messages-volets, captures 390 et 1512 vérifiées. */
+:root:root:root:root:root body .vrm-chat-offre .vrm-chat-offre-actions.vg-offre-gestes { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
+:root:root:root:root:root body .vrm-chat-offre .vg-offre-gestes .vg-offre-plein { grid-column: 1 / -1 !important; height: 52px !important; min-height: 52px !important; border-radius: 16px !important; font: 650 15.5px/1 var(--sb-police-texte, Inter, sans-serif) !important;  background: var(--sv-encre) !important; background-image: none !important; color: var(--sv-feuille) !important; border-color: transparent !important; box-shadow: none !important; }
 :root:root:root:root:root body .vrm-chat-offre .vg-offre-gestes .vrm-chat-btn:not(.vg-offre-plein) { height: 48px !important; min-height: 48px !important; border-radius: 14px !important; font: 600 14.5px/1 var(--sb-police-texte, Inter, sans-serif) !important; }
-:root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp .vrm-offre-comparer-corps { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 12px; row-gap: 4px; }
-:root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp .vrm-offre-article { display: none; }
-:root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp dl { display: contents; }
-:root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp dl > div { display: flex; align-items: baseline; gap: 4px; margin: 0; font: 600 12.5px/1.3 var(--sb-police-texte, Inter, sans-serif); color: var(--sv-encre-2); }
-:root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp dl > div :is(dt, dd) { margin: 0; font: inherit; color: inherit; }
-:root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp dl > div[data-offre-prix="recue"] { order: -1; flex-basis: 100%; justify-content: space-between; }
-:root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp dl > div[data-offre-prix="recue"] dd { font: 750 26px/1.1 var(--sb-police-affiche, Inter, sans-serif); letter-spacing: -.03em; color: var(--sv-encre); }
-:root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp .vrm-offre-repere { margin: 0; font: 700 12.5px/1.3 var(--sb-police-texte, Inter, sans-serif); }
+:root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp .vrm-offre-comparer-corps { display: flex !important; flex-wrap: wrap !important; align-items: baseline !important; column-gap: 12px !important; row-gap: 4px !important; }
+:root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp .vrm-offre-article { display: none !important; }
+:root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp dl { display: contents !important; }
+:root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp dl > div { display: flex !important; align-items: baseline !important; gap: 4px !important; margin: 0 !important; font: 600 12.5px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; color: var(--sv-encre-2) !important; }
+:root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp dl > div :is(dt, dd) { margin: 0 !important; font: inherit !important; color: inherit !important; }
+:root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp dl > div[data-offre-prix="recue"] { order: -1 !important; flex-basis: 100% !important; justify-content: space-between !important; }
+:root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp dl > div[data-offre-prix="recue"] dd { font: 750 26px/1.1 var(--sb-police-affiche, Inter, sans-serif) !important; letter-spacing: -.03em !important; color: var(--sv-encre) !important; }
+:root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp .vrm-offre-repere { margin: 0 !important; font: 700 12.5px/1.3 var(--sb-police-texte, Inter, sans-serif) !important; }
 :root:root:root:root:root body .vrm-offre-comparer.vg-offre-cmp .vrm-offre-repere[data-offre-niveau="sous-minimum"] { color: var(--sv-ambre) !important; }
 
 /* La conversation sur le bleu (maquette « ms2 ») : la tête posée sur le fond (le pseudo en blanc), la paire en verre
