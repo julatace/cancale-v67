@@ -53,7 +53,7 @@ export function RangeeJ({ num, photo, Photo, icone = null, titre, meta, droite, 
     <button type="button" className="sb-rangee sj-rangee" onClick={onClick} {...(attrs || {})}>
       <Plaque num={num}/>
       <span className={'sb-vignette' + (photo && Photo ? '' : ' is-vide')} aria-hidden="true">
-        {/* (16 nov.) Une photo passe par le `Photo` de l’écran (PhotoVinted : référent, secours) ; sans lui, l’icône. */}
+        {/* (16 nov.) Toujours par `Photo` (PhotoVinted : sans référent, secours, pictogramme) : sans elle, l'icône — jamais un <img> nu (audit-photos-vinted). */}
         {photo && Photo ? <Photo src={photo} alt="" loading="lazy" decoding="async" width={40} height={40}/> : icone}
       </span>
       <span className="sj-r-txt">
