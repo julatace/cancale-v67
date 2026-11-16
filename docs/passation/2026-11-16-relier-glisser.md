@@ -61,6 +61,8 @@ VRM ne l'appelle que si elle existe (`vibrerSiPossible` : Android / Chrome, 12 m
   annonce et achat sortent des listes ; pilule « Annuler » ⇒ lien retiré, l'annonce revient. 1512 souris :
   deux colonnes, molette ⇒ aucun glisser, vide ⇒ rien, glissé sur la vente ⇒ lien sur la vente (son n°),
   Annuler ⇒ retiré ; clavier : Entrée choisit, « Relier ici » ⇒ même question, rien écrit avant « Oui »).
+- Mutation au banc (build muté : un doigt qui bouge lève l'achat sans attendre 400 ms) : **2 rouges** (« aucun
+  achat ne se lève », « la liste défile » 0 → 0). Arbre d'avant : pas de bouton, le banc rougit dès l'entrée.
 - Défauts trouvés par le banc et corrigés : (1) traverser le bord haut de la liste cible en arrivant des
   achats la faisait remonter (on lâchait sur N°4 au lieu de N°2) ⇒ défilement seulement si le doigt RESTE
   300 ms dans la zone ; (2) « Annuler » ne rendait pas le prix par N° à l'écran (l'annonce ne revenait pas)
