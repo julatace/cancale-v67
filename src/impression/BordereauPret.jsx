@@ -14,8 +14,9 @@ import { tr } from '../i18n/index.js';
 import { useLangue } from '../i18n/react.js';
 import '../styles-tampons.css';
 
-export default function BordereauPret({ r, Feuille, Bouton, Pourquoi, dessiner, onImprimer, onDeplacer, onFermer, children }) {
+export default function BordereauPret({ onMonte, r, Feuille, Bouton, Pourquoi, dessiner, onImprimer, onDeplacer, onFermer, children }) {
   useLangue();
+  React.useEffect(() => { if (onMonte) onMonte(); }, []);   // eslint-disable-line react-hooks/exhaustive-deps
   const cv = React.useRef(null);
   const [vu, setVu] = React.useState('charge');
   React.useEffect(() => {

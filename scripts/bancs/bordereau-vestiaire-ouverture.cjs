@@ -4,7 +4,7 @@ const {build}=require('esbuild'),{chromium}=require('playwright'),fs=require('fs
 const root=path.resolve(__dirname,'../..'),s=fs.readFileSync(path.join(root,'src/App.jsx'),'utf8');
 const code=s.slice(s.indexOf('async function imprimerBordereauVc('),s.indexOf('// Le prix d\'achat d\'une vente Vestiaire'));
 (async()=>{const pdf=await PL.PDFDocument.create();pdf.addPage();const b64=Buffer.from(await pdf.save()).toString('base64');
- const bundle=await build({stdin:{resolveDir:root,loader:'jsx',contents:`import React,{useState}from'react';import{createRoot}from'react-dom/client';import{lireBordereauVestiaire}from'./src/bordereauVestiaire.js';
+ const bundle=await build({stdin:{resolveDir:root,loader:'jsx',contents:`import React,{useState}from'react';import{createRoot}from'react-dom/client';import{lireBordereauVestiaire}from'./src/bordereauVestiaire.js';import{occuperPendant}from'./src/impression/occuper.js';
  window.owner='A';window.mode='reseau';window.lus=0;window.ouverts=0;window.marques=0;
  const AUTH={get user(){return{id:window.owner}}},readSession=()=>({user:{id:window.owner}}),SUPABASE_URL='https://base.invalid',C={accent:'#0066cc',muted:'#6e6e73',warn:'#9a5200'},Icon=()=>null,Bouton=p=><button {...p}/>;
  const lireBaseRelue=async()=>{window.lus++;if(window.mode==='reseau')throw Error('Réseau');if(window.mode==='lent')await new Promise(r=>window.fin=r);return window.mode==='absent'?[]:[{b64:${JSON.stringify(b64)}}]};

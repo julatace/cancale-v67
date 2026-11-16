@@ -600,7 +600,8 @@ import { CLE_TAMPONS, TAILLES_TAMPON, avecChoix, reglageTampons, aEcrire, resoud
 import { pagesDe, formatRetenu, signatureLot, voieOuverture, absentsDuLot } from './impression/lotSimple.js';   // (14 nov.) « Imprimer » en un toucher
 import { ChoixPapier, FeuilleImpression } from './ImpressionSimple.jsx';
 import ApercuAvantImpression from './impression/ApercuAvantImpression.jsx';
-import BordereauPret from './impression/BordereauPret.jsx';   // (16 nov.) « Bordereau prêt » refait   // (16 nov., lot tampons-parametres) l'aperçu avant impression   // (14 nov., impression-simple) les deux feuilles
+import BordereauPret from './impression/BordereauPret.jsx';
+import { occuperPendant, figerBouton, libererBoutonsImprime } from './impression/occuper.js';   // (16 nov.) un bouton d'impression garde sa taille   // (16 nov.) « Bordereau prêt » refait   // (16 nov., lot tampons-parametres) l'aperçu avant impression   // (14 nov., impression-simple) les deux feuilles
 import { CLE_IMPRESSION, reglageImpression, papierThermique, placementEtiquette, carteEncre, boiteEncre, decouperFeuille, fusionnerProches, moduleDuCode, moduleImprimeMm, codeAssezGros, seuillerNoir, tramerNoir, zonesAdresse, CONTRASTES, MODULE_MIN_MM, BANDE_CONTINU_MM } from './impression/thermique.js';
 import { decisionNumeroVenteEmail, numeroEcritDansArticle, colisVentesEmail, MENTION_SANS_NUM, CLE_IMPRIMES_SANS_NUM, phraseImprimeSansNumero } from './bordereauVenteEmail.js';
 // (15 nov., Julien : « on range une ANNONCE, pas un achat ») La feuille « Ranger cet achat » n'est plus montée : la règle
@@ -14998,13 +14999,13 @@ const estIOS = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.pl
 // aucun bloqueur de fenêtres, la confirmation passe au-dessus (z 20000), et
 // « Imprimer » / « Ouvrir dans un onglet » sont de vrais clics.
 let _visionneuse = null; const _ecoutesVisionneuse = new Set();
-const _poserVisionneuse = (v) => { _visionneuse = v; for (const f of _ecoutesVisionneuse) { try { f(v); } catch (_) {} } };
+const _poserVisionneuse = (v) => { if (!v || !v.prep) libererBoutonsImprime(); _visionneuse = v; for (const f of _ecoutesVisionneuse) { try { f(v); } catch (_) {} } };
 // Au clic : la visionneuse s'ouvre tout de suite, « préparation… ».
 const reserverOngletPdf = () => { try { if (estIOS()) return; const at = Date.now(); _poserVisionneuse({ prep: true, at }); setTimeout(() => { if (_visionneuse && _visionneuse.prep && _visionneuse.at === at) _poserVisionneuse(null); }, 25000); } catch (_) {} };
 const libererOngletPdf = () => { if (_visionneuse && _visionneuse.prep) _poserVisionneuse(null); };
 if (typeof document !== 'undefined') {
   document.addEventListener('click', (e) => {
-    try { const b = e.target && e.target.closest && e.target.closest('[data-imprime]'); if (b && !b.disabled) reserverOngletPdf(); } catch (_) {}
+    try { const b = e.target && e.target.closest && e.target.closest('[data-imprime]'); if (b && !b.disabled) { reserverOngletPdf(); if (!b.closest('[data-impr-apercu],[data-bord-pret],[data-placeur-tampon]')) figerBouton(b); } } catch (_) {}
   }, true);
 }
 const ouvrirPdfOnglet = (url, nom, titre) => {
@@ -15021,14 +15022,6 @@ const ouvrirPdfOnglet = (url, nom, titre) => {
 // Le fichier est refait si les octets ont changé (un PDF « Il en manque » hérite des champs du lot : jamais son fichier).
 const fichierPdf = (pret) => { try { if (!pret.file || pret.fileDe !== pret.bytes) { pret.file = new File([pret.bytes], pret.filename || 'bordereaux.pdf', { type: 'application/pdf' }); pret.fileDe = pret.bytes; } return pret.file; } catch (_) { return null; } };
 const partagePdfPossible = (f) => { try { return !!(f && navigator.canShare && navigator.share && navigator.canShare({ files: [f] })); } catch (_) { return false; } };
-// (16 nov., lot tampons-parametres — Julien, capture iPhone : « quand je touche Imprimer, toute la ligne bouge ») UN BOUTON
-// D'IMPRESSION GARDE SA TAILLE PENDANT LA PRÉPARATION : sa largeur est figée, son texte et son icône s'effacent sur place
-// et une roue tourne DEDANS (`[data-occupe]`, styles-tampons.css) — rien autour ne se décale. `f` : le geste (async).
-const occuperPendant = async (el, f) => {
-  if (el && el.hasAttribute && el.hasAttribute('data-occupe')) return undefined;
-  if (el && el.style) { try { const r = el.getBoundingClientRect(); el.style.width = `${r.width}px`; el.style.setProperty('--vrm-roue-c', getComputedStyle(el).color); } catch (_) {} el.setAttribute('data-occupe', ''); el.setAttribute('aria-busy', 'true'); }
-  try { return await f(); } finally { if (el && el.style) { el.removeAttribute('data-occupe'); el.removeAttribute('aria-busy'); el.style.width = ''; } }
-};
 const ouvrirPdfLot = (pret, { geste = true, titre = '' } = {}) => {
   if (!pret || !pret.url) return 'bouton';
   const ios = estIOS(), android = estAndroid();
@@ -19358,6 +19351,7 @@ const dismissToast = (id) => { _toasts = _toasts.filter(t => t.id !== id); _emit
 // type : 'ok' | 'err' | 'info'. Le ton est déduit du texte quand il n'est pas
 // précisé, pour que les appels existants restent courts.
 const toast = (msg, type) => {
+  try { libererBoutonsImprime(); } catch (_) {}   // (16 nov.) un message dit la suite : le bouton d'impression figé est rendu
   const text = String(msg == null ? '' : msg);
   if (!text.trim()) return;
   const t = type || (/^(⚠|❌|erreur|échec|impossible|invalide)/i.test(text.trim()) ? 'err'
@@ -33757,7 +33751,7 @@ function TamponPose({ r }) {
 // vrai code (`composerBordereaux`), le N° et la mention qu'on déplace (refusés sur un code, un QR, l'adresse), « tous de
 // ce type » (la place gardée pour sa forme, `vrm_tampons`). « Imprimer » rend les places ; fermer rend null (rien).
 let _apercuUn = null;
-const demanderApercuUn = (o) => new Promise((resolve) => { if (!_apercuUn) return resolve(undefined); _apercuUn({ ...o, resolve }); });
+const demanderApercuUn = (o) => new Promise((resolve) => { if (!_apercuUn) return resolve(undefined); libererBoutonsImprime(); _apercuUn({ ...o, resolve }); });
 function ApercuUnCoque() {
   const [q, setQ] = React.useState(null);
   React.useEffect(() => { _apercuUn = (o) => setQ(o); return () => { _apercuUn = null; }; }, []);
@@ -51012,7 +51006,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {/* (8 nov.) Le bordereau reçu par e-mail porte le MÊME n° de transaction : il s'imprime
                       tout de suite, avec le N° seulement s'il est sûr (src/bordereauVenteEmail.js). */}
                   {toShipEmailTx.has(txL) ? <div className="vrm-rangee-bord" data-rangee-bord="" data-sans-glisse="" data-vente-email-bord={txL}>
-                    <button type="button" className="vrm-fu-imprimer-ligne" data-fu-geste="" data-fu-imprimer={txL} data-fu-imprimer-num={num || ''} aria-label={`Imprimer le bordereau${num ? ' du N°' + num : ''}`} title={tr('ventes.imprimerBordereau')} onClick={()=>imprimerBordereauVente(o)}><Icon name="printer" size={16}/><span>{tr('ventes.imprimer')}</span></button>
+                    <button type="button" className="vrm-fu-imprimer-ligne" data-fu-geste="" data-fu-imprimer={txL} data-fu-imprimer-num={num || ''} aria-label={`Imprimer le bordereau${num ? ' du N°' + num : ''}`} title={tr('ventes.imprimerBordereau')} onClick={(ev)=>occuperPendant(ev.currentTarget, ()=>imprimerBordereauVente(o))}><Icon name="printer" size={16}/><span>{tr('ventes.imprimer')}</span></button>
                   </div> : null}
                   {toShipEmailTx.has(txL) && (!num || bordsSansNum[txL]) ? <div data-vente-sans-num={num ? 'avec' : 'sans'} data-sans-glisse="" style={{fontSize:12,fontWeight:600,color:C.warn,overflowWrap:'anywhere'}}>{phraseImprimeSansNumero(bordsSansNum, txL, num) || MENTION_SANS_NUM}</div> : null}
                 </> : peutDeposer ? <>
@@ -51021,7 +51015,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       « Générer le bordereau », l'extension) ; « Déposé » vient après. */}
                   <div className="vrm-rangee-bord" data-rangee-bord="" data-sans-glisse="">
                     {fuPdf
-                      ? <button type="button" className="vrm-fu-imprimer-ligne" data-fu-geste="" data-fu-imprimer={txL} aria-label={`Imprimer le bordereau${num ? ' du N°' + num : ''}`} title={tr('ventes.imprimerBordereau')} onClick={()=>imprimerBordereauVente(o)}><Icon name="printer" size={16}/><span>{tr('ventes.imprimer')}</span></button>
+                      ? <button type="button" className="vrm-fu-imprimer-ligne" data-fu-geste="" data-fu-imprimer={txL} aria-label={`Imprimer le bordereau${num ? ' du N°' + num : ''}`} title={tr('ventes.imprimerBordereau')} onClick={(ev)=>occuperPendant(ev.currentTarget, ()=>imprimerBordereauVente(o))}><Icon name="printer" size={16}/><span>{tr('ventes.imprimer')}</span></button>
                       : <BoutonBordereau grand uid={o._acc && o._acc.vinted_user_id} tx={txL} conv={o.conversation_id} login={accNameOf(o._acc)} aGenerer pdf={false} onFait={(u)=>actionsVentesProxy.rechargerLabels(u)}/>}
                   </div>
                   {gesteDepose ? <div className="vrm-fu-apres" data-sans-glisse="">{gesteDepose}</div> : null}
@@ -54750,9 +54744,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {/* (14 nov., impression-simple) « Imprimer (N) » IMPRIME : le PDF du lot (préparé d'avance) s'ouvre dans
                       CE toucher. Plus rien de neuf ⇒ il ouvre « Choisir » (réimprimer, voir pourquoi). */}
                   <Bouton variante={nLot > 0 ? 'primaire' : 'secondaire'} icone="printer" className={imprBusy ? 'vrm-impr-enfonce' : undefined} data-colis-barre-btn="imprimer" data-impr-lot={nLot} data-impr-pret={nLot > 0 && sigDefaut && pretPour(sigDefaut) ? '1' : '0'} data-imprimer-prets={nLot}
-                    aria-pressed={imprBusy ? 'true' : undefined}
-                    title={nLot > 0 ? tr('impr.boutonTitre', { n: nLot, format: tr(`impr.format.${formatLot}`) }) : resLot.total > 0 ? tr('impr.rienDeNeuf') : tr('impr.rien')}
-                    onClick={() => { if (nLot > 0) imprimerLot(); else ouvrirLot(); }} disabled={batchBusy || !!imprBusy || resLot.total === 0}>{imprBusy ? tr('impr.enCours', { fait: imprBusy.fait || 0, total: imprBusy.total || 0 }) : nLot > 0 ? tr('impr.bouton', { n: nLot }) : tr('impr.boutonSeul')}</Bouton>
+                    aria-pressed={imprBusy ? 'true' : undefined} data-occupe={imprBusy ? '' : undefined} aria-busy={imprBusy ? 'true' : undefined}
+                    // (16 nov., Julien : « toute la ligne bouge ») le libellé ne change plus pendant la lecture : la roue tourne DANS le bouton.
+                    title={imprBusy ? tr('impr.enCours', { fait: imprBusy.fait || 0, total: imprBusy.total || 0 }) : nLot > 0 ? tr('impr.boutonTitre', { n: nLot, format: tr(`impr.format.${formatLot}`) }) : resLot.total > 0 ? tr('impr.rienDeNeuf') : tr('impr.rien')}
+                    onClick={() => { if (nLot > 0) imprimerLot(); else ouvrirLot(); }} disabled={batchBusy || !!imprBusy || resLot.total === 0}>{nLot > 0 ? tr('impr.bouton', { n: nLot }) : tr('impr.boutonSeul')}</Bouton>
                   {/* (6 nov.) Pour le conseil « Un envoi presse » (src/accompagnement.js) : le compte du bouton,
                       et la règle de « Prochain geste » (`gesteEnvoi`) — un bordereau pour aujourd'hui ou demain. */}
                   <ChiffreConseil cle="colis.imprimer" valeur={baseKO ? null : { nLot, presse: !!gesteEnvoi({ aImprimer: bordereauxAImprimer(lignesImpr).map((l) => ({ jours: l.e && Number.isFinite(l.e.dl) ? l.e.dl : null })) }, { urgentSeul: true }) }}/>
@@ -54855,7 +54850,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <button type="button" className="vrm-impr-lien" data-lot-ouvrir="1" data-impr-autres={resLot.autres} disabled={!!imprBusy || batchBusy} onClick={ouvrirLot}>{resLot.autres > 0 ? tr('impr.choisirAutres', { n: resLot.autres }) : tr('impr.choisir')}</button>
             </div> : null}
             {choixPapier ? <ChoixPapier Feuille={SheetShell} valeur={formatRetenu(load('vrm_imprimante', null)) ? formatLot : null} puisImprimer={!!choixPapier.puis} onChoisir={choisirPapier} onFermer={() => setChoixPapier(null)}/> : null}
-            {apercuImpr ? <ApercuAvantImpression Feuille={SheetShell} Bouton={Bouton} etat={apercuImpr} entree={prepsRef.current.get(apercuImpr.sig) || null} dessiner={dessinerPdf} occupe={!!imprBusy}
+            {apercuImpr ? <ApercuAvantImpression onMonte={libererBoutonsImprime} Feuille={SheetShell} Bouton={Bouton} etat={apercuImpr} entree={prepsRef.current.get(apercuImpr.sig) || null} dessiner={dessinerPdf} occupe={!!imprBusy}
               onPoser={poserApercu} onOrigine={origineApercu} onTous={(v) => setApercuImpr((x) => (x ? { ...x, tous: v } : x))} onImprimer={imprimerApercu} onFermer={() => setApercuImpr(null)}/> : null}
             {imprEtat ? <FeuilleImpression Feuille={SheetShell} Bouton={Bouton} etat={imprEtat} dessiner={dessinerPdf} occupe={!!imprBusy}
               pretManque={!!(imprEtat.manque && imprEtat.manque.size && pretPour(sigManque(imprEtat, imprEtat.manque)))}
@@ -56022,8 +56017,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 return (<div className="vv-pied" data-vv-pied="">
                   <PleinLarge icone="printer" enCours={!!batchBusy || !!imprBusy} disabled={batchBusy || !!imprBusy || nC === 0}
                     onClick={() => { if (nC <= 0) return; if (defaut) { if (nLot > 0) imprimerLot(); else ouvrirLot(); } else imprimerLot(choix); }}
-                    libelle={batchBusy || imprBusy ? tr('sv.imprimer.enCours') : nC > 0 ? tr('vv.imprimer.n', { n: nC }) : tr('vv.imprimer.aucun')}
-                    titre={nC > 0 ? tr('vv.imprimer.titre', { n: nC }) : tr('vv.imprimer.aucun')}
+                    libelle={nC > 0 ? tr('vv.imprimer.n', { n: nC }) : tr('vv.imprimer.aucun')}
+                    titre={batchBusy || imprBusy ? tr('sv.imprimer.enCours') : nC > 0 ? tr('vv.imprimer.titre', { n: nC }) : tr('vv.imprimer.aucun')}
                     attrs={{ 'data-colis-barre-btn': 'imprimer', 'data-imprimer-prets': nC, 'data-impr-lot': nC, 'data-vv-coches': nC, 'data-impr-pret': defaut && nLot > 0 && sigDefaut && pretPour(sigDefaut) ? '1' : '0', 'aria-pressed': imprBusy ? 'true' : undefined }}/>
                   <ChiffreConseil cle="colis.imprimer" valeur={baseKO ? null : { nLot, presse: !!gesteEnvoi({ aImprimer: bordereauxAImprimer(lignesImpr).map((l) => ({ jours: l.e && Number.isFinite(l.e.dl) ? l.e.dl : null })) }, { urgentSeul: true }) }}/>
                   <button type="button" className="vrm-impr-lien vv-choisir" data-lot-ouvrir="1" data-impr-autres={resLot.autres} disabled={!!imprBusy || batchBusy} onClick={ouvrirLot}>{resLot.autres > 0 ? tr('impr.choisirAutres', { n: resLot.autres }) : tr('vv.choisir')}</button>
@@ -56338,7 +56333,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {/* (16 nov., lot tampons-parametres — Julien : « faite à l'arrache ») « BORDEREAU PRÊT » refait : l'aperçu réel du
           PDF tamponné, « Imprimer » (le partage au téléphone, sinon le PDF), « Enregistrer », « Déplacer le tampon ».
           Ce que l'impression a VRAIMENT fait (planche, thermique, fiches) reste dit, en dessous de l'aperçu. */}
-      {bordResult && <BordereauPret r={bordResult} Feuille={SheetShell} Bouton={Bouton} Pourquoi={Pourquoi} dessiner={dessinerPdf}
+      {bordResult && <BordereauPret onMonte={libererBoutonsImprime} r={bordResult} Feuille={SheetShell} Bouton={Bouton} Pourquoi={Pourquoi} dessiner={dessinerPdf}
           onImprimer={() => { const v = ouvrirPdfLot({ url: bordResult.url, bytes: bordResult.bytes, filename: bordResult.filename }, { titre: bordResult.filename || '' }); if (v === 'bouton') { try { window.open(bordResult.url, '_blank'); } catch (_) {} } }}
           onDeplacer={adjustBordPlacement} onFermer={() => { URL.revokeObjectURL(bordResult.url); setBordResult(null); }}>
             {bordResult.batch && !bordResult.thermique && !bordResult.planche && <div className="vrm-aide" style={{fontSize:12,color:C.muted,marginBottom:8,lineHeight:1.4}}>Ton N° est tamponné sur chaque PDF, sinon sur une fiche juste après.</div>}

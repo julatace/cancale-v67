@@ -24,8 +24,9 @@ import { useLangue } from '../i18n/react.js';
 import SceneTampons from './SceneTampons.jsx';
 import '../styles-tampons.css';
 
-export default function ApercuAvantImpression({ Feuille, Bouton, etat, entree, dessiner, onPoser, onOrigine, onTous, onImprimer, onFermer, occupe = false }) {
+export default function ApercuAvantImpression({ onMonte, Feuille, Bouton, etat, entree, dessiner, onPoser, onOrigine, onTous, onImprimer, onFermer, occupe = false }) {
   useLangue();
+  React.useEffect(() => { if (onMonte) onMonte(); }, []);   // eslint-disable-line react-hooks/exhaustive-deps
   const [vu, setVu] = React.useState(null);      // le dernier PDF prêt montré (pas d'éclair pendant qu'on refait)
   React.useEffect(() => { if (entree && entree.etat === 'pret' && entree.res) setVu(entree.res); }, [entree && entree.res, entree && entree.etat]);   // eslint-disable-line react-hooks/exhaustive-deps
   const [refus, setRefus] = React.useState(null);

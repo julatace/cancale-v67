@@ -268,46 +268,84 @@ async function apercu(b, vue) {
 // bordereau seul s'ouvre ; « Imprimer » ⇒ « Bordereau prêt » refait : aperçu réel dessiné, aucun émoji, « Imprimer »
 // ouvre le partage AVEC le PDF dans le geste (iPhone), « Enregistrer », « Déplacer le tampon ».
 async function unSeul(b, vue) {
+  // S · « Imprimer » : RIEN NE BOUGE (Julien, capture iPhone : « toute la ligne bouge ») — le bouton garde sa taille,
+  // la roue tourne dedans ; les lignes des ventes restent à leur place, avant / pendant / après.
   const tactile = vue === '390', nom = `${vue}${tactile ? ' tactile' : ''}`;
   const LIGNES = await donnees();
   const o = await ouvrir(b, { tactile, LIGNES });
   const { pg } = o;
   try {
-    const sel = '[data-bord-card] button.vrm-colis-primaire[data-imprime]';
-    await pg.waitForSelector(sel, { timeout: 60000 });
+    await attendre(pg, () => [...document.querySelectorAll('[data-impr-lot]')].some((e) => !e.disabled && e.getAttribute('data-impr-lot') === '3' && e.getBoundingClientRect().width > 0), null, 60000);
+    await pg.evaluate(() => { const e = [...document.querySelectorAll('[data-impr-lot]')].find((x) => x.getBoundingClientRect().width > 0); if (e) e.setAttribute('data-banc-lot', '1'); });
+    const sel = '[data-banc-lot="1"]';
     await pg.locator(sel).first().scrollIntoViewIfNeeded();
-    const rects = () => pg.evaluate((q) => { const bt = document.querySelector(q); if (!bt) return null; const c = bt.closest('[data-bord-card]'); const r = (e) => { const x = e.getBoundingClientRect(); return [Math.round(x.x), Math.round(x.y), Math.round(x.width), Math.round(x.height)].join(','); }; return { carte: r(c), bouton: r(bt), occupe: bt.hasAttribute('data-occupe') }; }, sel);
+    // Coordonnées de la PAGE (le défilement retiré) : un défilement n'est pas un déplacement ; le bouton (barre collante) :
+    // sa taille seulement.
+    const rects = () => pg.evaluate(([q, titres]) => { const bt = document.querySelector(q); if (!bt) return null; const sy = window.scrollY || 0, sc = document.querySelector('.vrm-main'), sy2 = sc ? sc.scrollTop : 0; const r = (e) => { const x = e.getBoundingClientRect(); return [Math.round(x.x), Math.round(x.y + sy + sy2), Math.round(x.width), Math.round(x.height)].join(','); }; const t = (e) => { const x = e.getBoundingClientRect(); return [Math.round(x.width), Math.round(x.height)].join('×'); };
+      const lignes = titres.map((t) => { const el = [...document.querySelectorAll('body *')].find((e) => e.children.length === 0 && (e.textContent || '').trim() === t && e.getBoundingClientRect().width > 0); return el ? r(el) : '—'; });
+      return { bouton: t(bt), lignes: lignes.join(' | '), occupe: bt.hasAttribute('data-occupe'), texte: bt.innerText.trim() }; }, [sel, V.map((v) => v.titre)]);
     const avant = await rects();
-    await shot(pg, `${vue}-un-avant`);
+    await shot(pg, `${vue}-rien-ne-bouge-avant`);
     await toucher(o, sel);
-    await pg.waitForTimeout(60);
+    await pg.waitForTimeout(80);
     const pendant = await rects();
-    await shot(pg, `${vue}-un-pendant`);
-    const ap = await attendre(pg, () => !!document.querySelector('[data-impr-apercu="pret"] [data-impr-apercu-imprimer]:not([disabled])'), null, 60000);
+    await shot(pg, `${vue}-rien-ne-bouge-pendant`);
+    await attendre(pg, () => !!document.querySelector('[data-impr-apercu="pret"]'), null, 60000);
     const pendant2 = await rects();
-    dit(avant && pendant && pendant2 && avant.carte === pendant.carte && avant.bouton === pendant.bouton && avant.carte === pendant2.carte && avant.bouton === pendant2.bouton && (pendant.occupe || pendant2.occupe),
-      `${nom} : S1 « Imprimer » d'une carte : ni la carte ni le bouton ne bougent (roue DANS le bouton)`, JSON.stringify({ avant, pendant, pendant2 }));
-    dit(ap, `${nom} : S2 l'aperçu avant impression du bordereau seul s'ouvre`);
+    dit(avant && pendant && pendant2 && avant.bouton === pendant.bouton && avant.lignes === pendant.lignes && avant.bouton === pendant2.bouton && avant.lignes === pendant2.lignes && pendant.texte === avant.texte,
+      `${nom} : S1 « Imprimer » : ni le bouton ni les lignes ne bougent, le libellé reste (la roue tourne dedans)`, JSON.stringify({ avant, pendant, pendant2 }));
+    await pg.evaluate(() => { const f = [...document.querySelectorAll('[data-impr-apercu] button')].find((x) => /fermer|close/i.test(x.getAttribute('aria-label') || '')); if (f) f.click(); });
+    await pg.waitForTimeout(600);
+    const apres = await rects();
+    dit(apres && apres.bouton === avant.bouton && apres.lignes === avant.lignes && !apres.occupe, `${nom} : S2 après : tout à la même place, la roue partie`, JSON.stringify(apres));
+    dit(o.errs.length === 0, `${nom} : S aucune erreur d'app`, o.errs.join(' | ').slice(0, 300));
+  } catch (e) { dit(false, `${nom} : S s'exécute`, String(e.message).slice(0, 300)); await shot(pg, `${vue}-rien-ne-bouge-erreur`); }
+  await o.ctx.close();
+}
+
+// B · UN bordereau imprimé seul (Ma journée, ou la ligne d'une vente) : l'aperçu du bordereau seul ; puis « Bordereau
+// prêt » refait : l'aperçu réel dessiné, aucun émoji, Imprimer · Enregistrer · Déplacer le tampon ; « Imprimer » ouvre la
+// feuille de partage AVEC le PDF dans le geste (iPhone), la visionneuse sur ordinateur.
+async function bordPret(b, vue) {
+  const tactile = vue === '390', nom = `${vue}${tactile ? ' tactile' : ''}`;
+  const LIGNES = await donnees();
+  const SEL = '[data-sortir-imprimer], .vrm-fu-imprimer-ligne, [data-bouton-bord="pdf"], [data-bord-card] button.vrm-colis-primaire[data-imprime]';
+  // Le geste « Imprimer » d'UNE vente : un bouton à l'écran, sinon l'action de la ligne (glisser / « … » : `data-lg-imprimer`).
+  const o = await ouvrir(b, { tactile, LIGNES, url: '/?tab=cat_bord' });
+  const { pg } = o;
+  try {
+    await attendre(pg, () => document.querySelectorAll('[data-impr-lot]').length > 0, null, 60000);
+    const visible = await pg.locator(SEL).first().isVisible().catch(() => false);
+    if (visible) {
+      const r0 = await pg.locator(SEL).first().boundingBox();
+      await toucher(o, SEL);
+      await pg.waitForTimeout(80);
+      const r1 = await pg.locator(SEL).first().boundingBox().catch(() => null);
+      dit(r0 && r1 && Math.abs(r0.width - r1.width) < 1 && Math.abs(r0.height - r1.height) < 1, `${nom} : B0 le bouton d'UN bordereau garde sa taille pendant la préparation`, JSON.stringify({ r0, r1 }));
+    } else {
+      const ok = await pg.evaluate(() => { const e = document.querySelector('[data-lg-imprimer]'); if (!e) return false; e.click(); return true; });
+      dit(ok, `${nom} : B0 le geste « Imprimer » d'UNE vente existe (action de la ligne)`);
+    }
+    const ap = await attendre(pg, () => !!document.querySelector('[data-impr-apercu="pret"] [data-impr-apercu-imprimer]:not([disabled])'), null, 60000);
+    dit(ap, `${nom} : B1 l'aperçu avant impression du bordereau seul s'ouvre`);
     await shot(pg, `${vue}-un-apercu`);
-    await toucher(o, '[data-impr-apercu-imprimer]');
+    if (ap) await toucher(o, '[data-impr-apercu-imprimer]');
     const pret = await attendre(pg, () => { const f = document.querySelector('[data-bord-pret]'); return f && f.querySelector('[data-bord-pret-apercu="ok"]'); }, null, 60000);
     await pg.evaluate(() => { const f = document.querySelector('[data-visionneuse-fermer]'); if (f) f.click(); });
-    await pg.waitForTimeout(400);
-    const apres = await rects();
-    dit(apres && apres.carte === avant.carte && apres.bouton === avant.bouton && !apres.occupe, `${nom} : S3 après : la carte et le bouton à la même place, la roue partie`, JSON.stringify(apres));
+    await pg.waitForTimeout(500);
     const feuille = await pg.evaluate(() => { const f = document.querySelector('[data-bord-pret]'); if (!f) return null; return { texte: f.innerText, emoji: /[\u{1F300}-\u{1FAFF}\u{2705}\u{2600}-\u{27BF}]/u.test(f.innerText), imprimer: !!f.querySelector('[data-bord-imprimer]'), enregistrer: !!f.querySelector('[data-bord-enregistrer][download]'), deplacer: !!f.querySelector('[data-tampon-deplacer]') }; });
-    dit(pret && feuille && !feuille.emoji && feuille.imprimer && feuille.enregistrer && feuille.deplacer, `${nom} : S4 « Bordereau prêt » : l'aperçu réel dessiné, aucun émoji, Imprimer · Enregistrer · Déplacer le tampon`, JSON.stringify(feuille && { ...feuille, texte: feuille.texte.slice(0, 160) }));
-    await shot(pg, `${vue}-un-pret`);
+    dit(pret && feuille && !feuille.emoji && feuille.imprimer && feuille.enregistrer && feuille.deplacer, `${nom} : B2 « Bordereau prêt » : l'aperçu réel dessiné, aucun émoji, Imprimer · Enregistrer · Déplacer le tampon`, JSON.stringify(feuille && { ...feuille, texte: feuille.texte.slice(0, 160) }));
+    await shot(pg, `${vue}-bordereau-pret`);
     const n0 = await pg.evaluate(() => window.__ouvertures.length);
-    await toucher(o, '[data-bord-pret] [data-bord-imprimer]');
+    if (feuille) await toucher(o, '[data-bord-pret] [data-bord-imprimer]');
     await attendre(pg, (n) => window.__ouvertures.length > n || !!document.querySelector('[data-visionneuse-cadre]'), n0, 10000);
     const ouv = await pg.evaluate(() => window.__ouvertures.map((x) => ({ voie: x.voie, geste: x.geste, pdf: !!(x.blob && x.blob.type === 'application/pdf') })));
     const vis = await pg.evaluate(() => !!document.querySelector('[data-visionneuse-cadre]'));
-    if (tactile) dit(ouv.length > n0 && ouv[ouv.length - 1].voie === 'partage' && ouv[ouv.length - 1].geste === 'click' && ouv[ouv.length - 1].pdf, `${nom} : S5 « Imprimer » ouvre la feuille de partage AVEC le PDF, dans le geste`, JSON.stringify(ouv));
-    else dit(vis || ouv.length > n0, `${nom} : S5 « Imprimer » ouvre le PDF (visionneuse)`, JSON.stringify({ vis, ouv }));
-    dit((await deborde(pg)) <= 1, `${nom} : S rien ne déborde`);
-    dit(o.errs.length === 0, `${nom} : S aucune erreur d'app`, o.errs.join(' | ').slice(0, 300));
-  } catch (e) { dit(false, `${nom} : S s'exécute`, String(e.message).slice(0, 300)); await shot(pg, `${vue}-un-erreur`); }
+    if (tactile) dit(ouv.length > n0 && ouv[ouv.length - 1].voie === 'partage' && ouv[ouv.length - 1].geste === 'click' && ouv[ouv.length - 1].pdf, `${nom} : B3 « Imprimer » ouvre la feuille de partage AVEC le PDF, dans le geste`, JSON.stringify(ouv));
+    else dit(vis || ouv.length > n0, `${nom} : B3 « Imprimer » ouvre le PDF (visionneuse)`, JSON.stringify({ vis, ouv }));
+    dit((await deborde(pg)) <= 1, `${nom} : B rien ne déborde`);
+    dit(o.errs.length === 0, `${nom} : B aucune erreur d'app`, o.errs.join(' | ').slice(0, 300));
+  } catch (e) { dit(false, `${nom} : B s'exécute`, String(e.message).slice(0, 300)); await shot(pg, `${vue}-un-erreur`); }
   await o.ctx.close();
 }
 
@@ -364,7 +402,7 @@ async function editeur(b, vue) {
   try {
     srvPret = new Promise((r) => srv.listen(PORT, r));
     b = await lancer(PW, { executablePath: process.env.VRM_CHROMIUM_PATH || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
-    for (const v of VUES) { if (!process.env.TA_SEUL || process.env.TA_SEUL.includes('P')) await apercu(b, v); if (!process.env.TA_SEUL || process.env.TA_SEUL.includes('S')) await unSeul(b, v); if (!process.env.TA_SEUL || process.env.TA_SEUL.includes('E')) await editeur(b, v); }
+    for (const v of VUES) { if (!process.env.TA_SEUL || process.env.TA_SEUL.includes('P')) await apercu(b, v); if (!process.env.TA_SEUL || process.env.TA_SEUL.includes('S')) await unSeul(b, v); if (!process.env.TA_SEUL || process.env.TA_SEUL.includes('B')) await bordPret(b, v); if (!process.env.TA_SEUL || process.env.TA_SEUL.includes('E')) await editeur(b, v); }
   } catch (e) { dit(false, 'le banc tourne', String(e.stack || e).slice(0, 300)); }
   try { await b.close(); } catch (_) {}
   srv.close();
