@@ -49,12 +49,10 @@ const ECRANS = {
   ventes: ['/?tab=ventes'],
   ventes_vinted: ['/?tab=ventes&site=vinted'],
   ventes_lbc: ['/?tab=ventes&site=leboncoin'],
-  ventes_ebay_tableau: ['/?tab=plat_ebay&section=tableau'],
-  ventes_ebay_ventes: ['/?tab=plat_ebay&section=ventes'],
-  ventes_ebay_agent: ['/?tab=plat_ebay&section=agent'],
-  ventes_ebay_offres: ['/?tab=plat_ebay&section=offres'],
-  ventes_ebay_argent: ['/?tab=plat_ebay&section=argent'],
-  ventes_ebay_sante: ['/?tab=plat_ebay&section=sante'],
+  // Ventes · eBay : le Tableau, puis CHAQUE sous-onglet touché (Commandes, À traiter, Offres, Argent, Santé) ;
+  // « À traiter » ouvert directement aussi (la capture de Julien).
+  ventes_ebay: ['/?tab=plat_ebay&section=tableau'],
+  ventes_ebay_agent: ['/?tab=plat_ebay&section=agent', 'seul'],
   ventes_vestiaire: ['/?tab=ventes&site=vestiaire'],
   achats: ['/?tab=achats'],
   stock: ['/?tab=garage'],
@@ -167,8 +165,9 @@ function sousLaBarre() {
       const r = el.getBoundingClientRect(); return r.width > 4 && r.height > 4 && r.top < innerHeight && r.bottom > 0;
     });
     out.cibles = cibles.length;
+    const rogne = (el) => { const r = el.getBoundingClientRect(); for (let a = el.parentElement; a && a !== document.body; a = a.parentElement) { const c = getComputedStyle(a); if (/hidden|clip|auto|scroll/.test(c.overflowX + c.overflowY) && a !== se) { const ra = a.getBoundingClientRect(); if (r.top >= ra.bottom - 1 || r.bottom <= ra.top + 1) return true; } } return false; };
     // les plus basses du document
-    const basses = cibles.sort((a, b) => b.getBoundingClientRect().bottom - a.getBoundingClientRect().bottom).slice(0, 3);
+    const basses = cibles.filter((x) => !rogne(x)).sort((a, b) => b.getBoundingClientRect().bottom - a.getBoundingClientRect().bottom).slice(0, 3);
     for (const el of basses) {
       const r = el.getBoundingClientRect();
       const cx = Math.min(innerWidth - 2, Math.max(2, (r.left + r.right) / 2)), cy = Math.min(innerHeight - 1, (r.top + r.bottom) / 2);
@@ -236,9 +235,12 @@ async function defiler(pg, sansVerre) {
 // éloigné du fond (en luminance) ; ratio WCAG. Seuil 4,5:1 (3:1 gros texte ≥ 24 px ou ≥ 18,66 px en 700).
 const TEXTES_PIXELS = () => {
   const out = [];
-  const sel = '.vrm-tabbar .vrm-nav-label, .vrm-app-header .vrm-hdr-titre, .vrm-main :is(h1, h2, h3, h4, .sb-ecran-titre, .sb-surtitre, small, p)';
-  for (const el of document.querySelectorAll(sel)) {
-    if (el.closest('.vrm-fs, [role="dialog"], [aria-hidden="true"], svg, button:not(.vrm-tab), a, input, select, textarea')) continue;
+  // la barre et la tête d'abord ; puis tout texte direct de l'écran (un sur deux au-delà de 60)
+  const tete = [...document.querySelectorAll('.vrm-tabbar .vrm-nav-label, .vrm-app-header .vrm-hdr-titre')];
+  const corps = [...document.querySelectorAll('.vrm-main *')].filter((el) => { for (const n of el.childNodes) if (n.nodeType === 3 && /[\p{L}\p{N}]/u.test(n.nodeValue)) return true; return false; });
+  const pas = Math.max(1, Math.ceil(corps.length / 120));
+  for (const el of tete.concat(corps.filter((_, i) => i % pas === 0))) {
+    if (el.closest('.vrm-fs, [role="dialog"], [aria-hidden="true"], svg, input, select, textarea, :disabled')) continue;
     const c = getComputedStyle(el); if (c.visibility === 'hidden' || parseFloat(c.opacity) < 0.3) continue;
     let tn = null; for (const n of el.childNodes) if (n.nodeType === 3 && /[\p{L}\p{N}]/u.test(n.nodeValue)) { tn = n; break; }
     if (!tn) continue;
@@ -248,7 +250,7 @@ const TEXTES_PIXELS = () => {
     const h = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2); if (!h || !(h === el || el.contains(h))) continue;
     const px = parseFloat(c.fontSize), w = parseInt(c.fontWeight, 10) || 400;
     out.push({ x: r.left, y: r.top, w: r.width, h: r.height, t: tn.nodeValue.trim().slice(0, 30), gros: px >= 24 || (px >= 18.66 && w >= 700), barre: !!el.closest('.vrm-tabbar') });
-    if (out.length >= 30) break;
+    if (out.length >= 60) break;
   }
   return out;
 };
@@ -304,7 +306,7 @@ async function geste(o, g) {
     await pg.evaluate(() => window.dispatchEvent(new Event('vrm:centre-notifs')));
     await pg.waitForTimeout(1500);
   } else if (g === 'plus') {
-    const b = pg.locator('[data-nouveau], button[aria-label*="Nouvel"], button[aria-label*="Ajouter"], .vrm-fab').first();
+    const b = pg.locator('[data-sb-disque]').first();
     if (await b.count()) await b.tap().catch(() => {});
     await pg.waitForTimeout(1200);
   } else if (g === 'menu') {

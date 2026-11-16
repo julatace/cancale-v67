@@ -677,4 +677,31 @@ html[data-sb-eventail] body .vrm-neuf-hote { visibility: hidden !important; }
   :root:root:root:root:root:root:root body .vrm-app-shell:has(nav.vrm-sidebar[data-rail-verre]) main.vrm-main { margin-left: 112px !important; }
 }
 
+/* ══ 12 bis. LE FLOU SEULEMENT LÀ OÙ IL SE VOIT (16 nov., stabilite-iphone — « l'app bug énormément ») ══════════
+   Mesuré sur l'iPhone de Julien (mesures_jour_2026-11-16, Ventes · téléphone · réponse au toucher) : 7 touchers sur 9
+   entre 1,25 et 4 s, contre 650 ms au pire la veille. Ventes portait DEUX `backdrop-filter: blur(24px) saturate(175%)`
+   sur ses LISTES entières (À envoyer : 358 × 3 067 px mesurés ; Toutes les ventes : une rangée par vente) et un
+   `blur(18px)` sur le segment : sous WebKit, un flou se recalcule sur toute sa surface à chaque image et à chaque
+   rendu de la liste. Ces trois éléments ne flottent pas : ils sont posés sur le dégradé lisse du fond, où le flou ne
+   change rien à l'œil (même principe que les cartes, §« La vitesse » du récit Verre dépoli). Leur verre (même couleur,
+   mêmes bords, même ombre) reste ; le flou part. Il reste là où le contenu passe DESSOUS : la barre du bas, la tête au
+   défilement, la pastille « Mis à jour », les filtres collés d'Achats, les ronds de la tête. */
+:root:root:root body .vrm-app-shell .vrm-main :is(.vrm-colis-grille, .vrm-toutes-liste, .vv-seg, .vv-liste) { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+
+/* ══ 13. eBAY : CE QUI EST FAIT POUR UNE CARTE CLAIRE A SA CARTE (16 nov., stabilite-iphone) ══════════════
+   Capture de Julien (iPhone) : Ventes · eBay → « À traiter » — « Retours et annulations », « Tâches à traiter »,
+   « Évaluations à laisser », « Vendue ? Comment faire ? », « Retours : … » posés DIRECTEMENT sur le bleu, à l'encre
+   sombre du thème eBay (`EBAY_SKIN`, des couleurs EN LIGNE) : 1,2 à 1,7:1 mesuré. Ces écrans (À traiter, Offres,
+   Promotion) et ces lignes (les guides « Comment faire ? » des commandes, « Aucun brouillon eBay ») sont dessinés pour une
+   surface claire : ils retrouvent LA carte de verre (même verre, même rayon, même ombre que les panneaux), leur encre
+   sombre y tient l'AA (banc stabilite-iphone S3 et S10, sur le fond réel). Le reste de l'écran (tête, onglets, tuiles)
+   est inchangé. */
+:root:root:root body .vrm-app-shell[data-espace] :is(.vrm-ebay-panneau, .vrm-ebay-sales > [data-ebay-guides], [data-ebay-brouillons]) {
+  background: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; border-radius: 22px !important;
+  box-shadow: var(--sv-ombre) !important; color: var(--sv-encre) !important;
+}
+:root:root:root body .vrm-app-shell[data-espace] .vrm-ebay-panneau { margin: 0 16px 16px !important; }
+:root:root:root body .vrm-app-shell[data-espace] .vrm-ebay-sales > [data-ebay-guides] { padding: 8px 14px !important; margin: 0 0 12px !important; }
+:root:root:root body .vrm-app-shell[data-espace] [data-ebay-brouillons] { padding: 14px 16px !important; }
+
 } /* fin de @layer vrm-verre */
