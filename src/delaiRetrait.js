@@ -13,12 +13,23 @@
 //  Les codes (`code`) sont ceux de la puce d'échéance de la ligne : depasse ·
 //  dernier · demain · date.
 // ════════════════════════════════════════════════════════════════════════════
+import { jourParis } from './dateParis.js';
 const H24 = 24 * 3600e3;
 const jourValide = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || '').slice(0, 10)) ? String(s).slice(0, 10) : '';
 const msIso = (v) => { if (v == null || v === '') return null; const t = typeof v === 'number' ? v : Date.parse(String(v)); return Number.isFinite(t) ? t : null; };
 const jourLocal = (ms) => { const d = new Date(ms); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const finDuJour = (jour) => { const t = new Date(`${jour}T23:59:59.999`).getTime(); return Number.isFinite(t) ? t : null; };
 const ecartJours = (a, b) => Math.round((new Date(`${a}T12:00:00`).getTime() - new Date(`${b}T12:00:00`).getTime()) / 864e5);
+// (16 nov., lot achats-qr — Julien : la ligne disait « encore 3 j », la feuille du QR « encore 4 j » pour le MÊME
+// colis) UNE règle pour « encore N j » : des JOURS CIVILS de Paris, de la date limite ('AAAA-MM-JJ') à aujourd'hui
+// (Europe/Paris). Jamais un arrondi d'instants (`Math.ceil((limite 23:59 − maintenant) / 24 h)` donnait un jour de
+// plus l'après-midi). La ligne (`delaiRetrait`) ET la feuille du QR (App.jsx) lisent cette fonction. Illisible ⇒ null.
+export function joursRestantsRetrait(jour, maintenant = Date.now()) {
+  const j = jourValide(jour); const auj = jourParis(maintenant);
+  if (!j || !auj) return null;
+  const n = ecartJours(j, auj);
+  return Number.isFinite(n) ? n : null;
+}
 
 // { arriveeMs, limite: 'AAAA-MM-JJ', limiteAt?: ISO, estimee?: bool } → barre ou null.
 export function delaiRetrait({ arriveeMs = null, limite = null, limiteAt = null, estimee = false } = {}, maintenant = Date.now()) {
@@ -34,7 +45,7 @@ export function delaiRetrait({ arriveeMs = null, limite = null, limiteAt = null,
   const ecoule = Math.min(Math.max(maintenant - arr, 0), total);
   const pct = Math.round((ecoule / total) * 100);
   const restantMs = fin - maintenant;
-  const jours = ecartJours(jour, jourLocal(maintenant));
+  const jours = joursRestantsRetrait(jour, maintenant);
   const depasse = restantMs < 0;
   const code = depasse ? 'depasse' : jours <= 0 ? 'dernier' : jours === 1 ? 'demain' : 'date';
   const texte = depasse ? 'délai dépassé' : jours <= 0 ? 'dernier jour' : `encore ${jours} j`;
