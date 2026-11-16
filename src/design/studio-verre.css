@@ -694,7 +694,7 @@ html[data-sb-eventail] body .vrm-neuf-hote { visibility: hidden !important; }
 /* (16 nov., stabilite-iphone) « Novembre · Vinted », « Depuis le début · eBay » et « Modifier » de la carte d'action
    (posée sur le fond) : blanc à 66 % (`--p-nuit-texte-2`, la carte de nuit d'avant le verre) sur le haut éclairé du
    dégradé = 3,23:1 (banc stabilite-iphone S3). Le gris clair du verre posé sur le fond (`--sv-clair-2`, ≥ 4,5:1). */
-:root:root:root body .vrm-app-shell[data-espace] .vrm-fu-carte.a-action > :is(.vrm-fu-carte-haut, .vrm-fu-carte-tete) { --p-nuit-texte-2: var(--sv-clair-2) !important; }
+:root:root:root body .vrm-app-shell[data-espace] .vrm-fu-carte.a-action > :is(.vrm-fu-carte-haut, .vrm-fu-carte-tete) { --p-nuit-texte-2: var(--sv-clair-2) !important; --fu-sur-sombre-2: var(--sv-clair-2) !important; }   /* + « vendu » (`.vrm-fu-sous-nom`, blanc à 70 % : 3,43:1 sous WebKit) */
 
 /* (16 nov., stabilite-iphone — capture de Julien PENDANT le chargement de Ma journée : « c'est moche ») LA RANGÉE DE
    CHIFFRES garde sa forme pendant que les données arrivent : chaque case reste dans SA colonne (rien ne déborde chez la
@@ -703,7 +703,7 @@ html[data-sb-eventail] body .vrm-neuf-hote { visibility: hidden !important; }
 @media (max-width: 743px) {
   :root:root:root body .vrm-app-shell .vrm-main .vrm-fu-cases > .vrm-fu-case { min-width: 0 !important; overflow: hidden !important; }
   :root:root:root body .vrm-app-shell .vrm-main .vrm-fu-cases > .vrm-fu-case > :is(b, [data-fu-case-chiffre]) { max-width: 100% !important; }
-  :root:root:root body .vrm-app-shell .vrm-main .vrm-fu-cases > .vrm-fu-case > span:first-child { white-space: normal !important; text-overflow: clip !important; overflow-wrap: normal !important; overflow: visible !important; }
+  :root:root:root body .vrm-app-shell .vrm-main .vrm-fu-cases > .vrm-fu-case > :is(span:not(.vrm-sr-seul), small) { white-space: normal !important; text-overflow: clip !important; overflow-wrap: normal !important; overflow: visible !important; min-width: 0 !important; }   /* le libellé (après le chiffre) passe à la ligne : jamais « Bénéfice · mo » rogné */
 }
 /* Posés SUR LE FOND pendant la lecture (banc stabilite-iphone, base lente) : « Je lis tes annonces Vinted, Leboncoin… »
    du Stock (gris sombre sur le bleu : 1,05:1 lu sur la capture) et l'en-tête « Pour mieux acheter » d'Achats (1,5:1) —
@@ -745,4 +745,25 @@ html[data-sb-eventail] body .vrm-neuf-hote { visibility: hidden !important; }
 :root:root:root body .vrm-app-shell[data-espace] .vrm-ebay-sales > [data-ebay-guides] { padding: 8px 14px !important; margin: 0 0 12px !important; }
 :root:root:root body .vrm-app-shell[data-espace] [data-ebay-brouillons] { padding: 14px 16px !important; }
 
+/* (16 nov., stabilite-iphone, passe de contraste) Le nombre d'annonces du sélecteur de sites (« 999+ ») : le gris du verre à
+   78 % d'opacité sur la pastille claire = 4,03:1 (banc S3, Annonces · Leboncoin) ; plein, il tient l'AA. */
+:root:root:root body .vrm-app-shell[data-espace] .vrm-sel-sites .vrm-ss-n { opacity: 1 !important; }
+/* (16 nov., stabilite-iphone — capture de Julien à 15 h 34, Ma journée PENDANT le chargement : c'est L'INSTANTANÉ,
+   src/JourneeInstantanee.jsx, les derniers chiffres montrés le temps de tout relire)
+   · la « prochaine chose » est posée dans la tête (encre claire du §6) : sur sa carte claire, « 30 colis à envoyer » et
+     « Vérification… » sortaient en blanc sur le verre (illisibles), l'icône blanche sur sa case blanche (« carré vide ») ;
+     la carte remet l'encre du verre ;
+   · le grand chiffre à 78 % d'opacité (« 62 € » délavé) : plein — « Mis à jour il y a… » dit déjà qu'il est ancien ;
+   · les squelettes (`.vrm-sq-carte`, « Ensuite · 6 gestes ») : la carte de verre, plus une plaque blanche opaque. */
+:root:root:root:root body .vrm-app-shell .vrm-ji .vrm-jv2-prochain .vrm-day-task,
+:root:root:root:root body .vrm-app-shell .vrm-ji .vrm-jv2-prochain .vrm-day-task :is(.vrm-day-task-title, svg, .vrm-pile-icone, .vrm-pile-icone *) { color: var(--sv-encre) !important; }
+:root:root:root:root body .vrm-app-shell .vrm-ji .vrm-jv2-prochain .vrm-day-task :is(.vrm-day-task-note, .vrm-ji-geste, .vrm-ji-geste *) { color: var(--sv-encre-2) !important; opacity: 1 !important; }
+:root:root:root:root body .vrm-app-shell .vrm-ji .vrm-ji-chiffres .vrm-fu-grand { opacity: 1 !important; }
+:root:root:root:root body .vrm-app-shell .vrm-ji :is(.vrm-fu-phrase-tete, .vrm-jv2-jour > span) { color: var(--sv-clair-2) !important; opacity: 1 !important; }   /* la phrase et les lettres des jours, délavées (55–70 % de blanc : 2,7 à 3,4:1) : comme l'écran vrai */
+:root:root:root body .vrm-app-shell .vrm-sq-carte:not(.is-sombre) { background: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)) !important; border-color: transparent !important; box-shadow: var(--sv-ombre) !important; border-radius: 22px !important; }
+:root:root:root body .vrm-app-shell .vrm-sq-carte:not(.is-sombre) .vrm-sq-barre { background: color-mix(in oklab, var(--sv-encre) 12%, transparent) !important; }
+/* La rangée de trois chiffres du mois : les colonnes .9 / 1 / 1,4 étaient taillées pour « Vendu · Reçu · Bénéfice » ;
+   dans SON ordre (« Bénéfice » d'abord, sa capture) le libellé insécable « Bénéfice · mois » (90 px) débordait de sa
+   colonne de 69 px et se faisait rogner. Chaque colonne fait au moins la largeur de son libellé, le reste se partage. */
+:root:root:root:root:root:root:root body .vrm-app-shell .sj-journee :is(.sj-t-mois, [data-ji-cases]) .vrm-fu-cases:has(> .vrm-fu-case:nth-child(3):last-child) { grid-template-columns: repeat(3, minmax(min-content, 1fr)) !important; }
 } /* fin de @layer vrm-verre */
