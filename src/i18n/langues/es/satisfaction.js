@@ -3,6 +3,7 @@ export default {
   "sg.etat.recu": "Recibido",
   "sg.etat.enCours": "En curso",
   "sg.etat.corrige": "Corregido",
+  "sg.etat.passerEnCours": "Pasar a en curso",
   "sg.etat.rouvrir": "Reabrir",
   "sg.etat.motPlace": "Una palabra sobre lo corregido (opcional)",
   "sg.etat.marquerCorrige": "Marcar corregido",

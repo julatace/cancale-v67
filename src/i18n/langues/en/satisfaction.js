@@ -3,6 +3,7 @@ export default {
   "sg.etat.recu": "Received",
   "sg.etat.enCours": "In progress",
   "sg.etat.corrige": "Fixed",
+  "sg.etat.passerEnCours": "Mark in progress",
   "sg.etat.rouvrir": "Reopen",
   "sg.etat.motPlace": "A word on what was fixed (optional)",
   "sg.etat.marquerCorrige": "Mark as fixed",

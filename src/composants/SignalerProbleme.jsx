@@ -296,8 +296,8 @@ function EtatSignalement({ s, occupe, onChanger, Bouton = BoutonBase }) {
   return (
     <>
       <PastilleEtat etat={etat}/>
-      {etat !== 'en_cours' ? <Bouton variante="secondaire" taille="petit" occupe={occupe} onClick={() => onChanger(s, 'en_cours')} data-signalement-en-cours={s.id}>{tr('sg.etat.enCours')}</Bouton> : null}
-      <Bouton variante="secondaire" taille="petit" onClick={() => setOuvert(true)} data-signalement-traiter={s.id}>{tr('sg.etat.corrige')}</Bouton>
+      {etat !== 'en_cours' ? <Bouton variante="secondaire" taille="petit" occupe={occupe} onClick={() => onChanger(s, 'en_cours')} data-signalement-en-cours={s.id}>{tr('sg.etat.passerEnCours')}</Bouton> : null}
+      <Bouton variante="secondaire" taille="petit" onClick={() => setOuvert(true)} data-signalement-traiter={s.id}>{tr('sg.etat.marquerCorrige')}</Bouton>
     </>
   );
 }

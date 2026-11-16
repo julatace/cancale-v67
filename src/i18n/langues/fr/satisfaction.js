@@ -3,6 +3,7 @@ export default {
   "sg.etat.recu": "Reçu",
   "sg.etat.enCours": "En cours",
   "sg.etat.corrige": "Corrigé",
+  "sg.etat.passerEnCours": "Passer en cours",
   "sg.etat.rouvrir": "Rouvrir",
   "sg.etat.motPlace": "Un mot sur ce qui est corrigé (facultatif)",
   "sg.etat.marquerCorrige": "Marquer corrigé",

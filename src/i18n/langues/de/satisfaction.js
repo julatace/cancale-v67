@@ -3,6 +3,7 @@ export default {
   "sg.etat.recu": "Erhalten",
   "sg.etat.enCours": "In Arbeit",
   "sg.etat.corrige": "Behoben",
+  "sg.etat.passerEnCours": "Als in Arbeit markieren",
   "sg.etat.rouvrir": "Wieder öffnen",
   "sg.etat.motPlace": "Ein Wort dazu, was behoben ist (optional)",
   "sg.etat.marquerCorrige": "Als behoben markieren",

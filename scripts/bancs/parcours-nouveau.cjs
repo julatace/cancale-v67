@@ -483,7 +483,8 @@ async function partieSignalement(nav, W, theme) {
     await p.pg.click('[data-signalement-traiter]');
     await p.pg.fill('[data-signalement-mot-champ] input', 'Colis se remplit de nouveau.');
     await p.pg.click('[data-signalement-corriger]');
-    const corr = await p.pg.waitForSelector('[data-signalement-etat="corrige"]', { timeout: 10000 }).then(() => true).catch(() => false);
+    // Corrigé, il quitte « À traiter » (la vue par défaut) : le compteur tombe à 0.
+    const corr = await p.pg.waitForFunction(() => { const l = document.querySelector('[data-signalements]'); return l && l.getAttribute('data-signalements-a-traiter') === '0'; }, null, { timeout: 10000 }).then(() => true).catch(() => false);
     const ligne = SDB.app_data.find((x) => x.owner === PROPRIO && /^signalement_/.test(x.id));
     dit(corr && ligne && ligne.data.etat === 'corrige' && ligne.data.mot === 'Colis se remplit de nouveau.', `${etq} « Corrigé » + un mot : rangé sur la ligne du signalement`, ligne && JSON.stringify({ etat: ligne.data.etat, mot: ligne.data.mot }));
     const nCorr = SDB.pousses.slice(avantCorr).filter((x) => x.a === AUTRE && /corrigé/.test(x.notif.title));
