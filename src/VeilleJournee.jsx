@@ -26,7 +26,7 @@ export function useVeille() {
   const [tour, relire] = React.useReducer((n) => n + 1, 0);
   React.useEffect(() => {
     let vivant = true;
-    Promise.all([lireLigneVeille(CLE_VEILLE), lireControleNuit(), lireControleInstallation()]).then(([c, v, i]) => {
+    Promise.all([lireLigneVeille(CLE_VEILLE), lireControleNuit(tour > 0), lireControleInstallation(tour > 0)]).then(([c, v, i]) => {
       if (!vivant) return;
       setChiffres(c); setVendeur(v); setInstallation(i);
     });

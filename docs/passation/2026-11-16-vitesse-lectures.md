@@ -5,7 +5,16 @@ base réelle, pas d'extension touchée, toujours 12 fonctions `api/`.
 
 ## ÉTAT À LA REPRISE
 
-Voir la section « Preuves » (chiffres) et « Ce qui reste » en bas. Geste de Julien : aucun.
+PR #1195 ouverte, **NON fusionnée** (règle de Julien du 16 nov. : zéro rouge pour fusionner). La CI de la PR
+(commit a50e0bf) : `budget-vitesse` ne montre plus AUCUNE des adresses de ce lot (Messages : seulement le JS ;
+Ma journée : `vrm_controle_nuit`/`installation` ×3 — corrigé ensuite, `src/veilleLigne.js`, lecture partagée
+60 s) ; restent des rouges NÉS D'AUTRES LOTS sur `origin/main` : JS +342 Ko sur tous les écrans,
+`email_bord_*`, `vinted_listing_dates`, octets d'Annonces, Achats ; et dans les autres jobs ~70 audits rouges
+(identiques avant/après ce lot, comptés un par un pour ceux qui touchent ses fichiers), `regles`
+(`lot-preparation-reprise` : React is not defined), `comptes-et-reception` (`memesPairesFiches`,
+`codeParrainGarde` is not defined), navigation-tache, statut-colis, accessibilite. À la reprise : quand `main`
+est revenu au vert, vrai merge de `origin/main`, relever le budget du JS (BUDGET_RELEVER, raison « JS des lots
+du 16 nov. ») s'il reste rouge, attendre la CI, fusionner. Geste de Julien : aucun.
 
 ## 1. Ce qui change pour Julien
 
