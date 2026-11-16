@@ -121,11 +121,11 @@ async function rendre(b, tel, sombre) {
 // fond (10e centile du contraste) fait foi. Un fond photo, verre ou dégradé est donc mesuré tel qu'il est vu.
 async function contrastePixels(pg, el) {
   const info = await el.evaluate((e) => {
-    const cs = getComputedStyle(e); const r = e.getBoundingClientRect();
+    const couleur = getComputedStyle(e).color; const r = e.getBoundingClientRect();   // lue AVANT d'effacer le texte (le style calculé est vivant)
     const garde = e.getAttribute('style') || '';
     e.setAttribute('data-banc-style', garde);
     e.style.setProperty('color', 'transparent', 'important'); e.style.setProperty('text-shadow', 'none', 'important'); e.style.setProperty('-webkit-text-fill-color', 'transparent', 'important');
-    return { couleur: cs.color, x: r.left, y: r.top, w: r.width, h: r.height };
+    return { couleur, x: r.left, y: r.top, w: r.width, h: r.height };
   });
   if (!info || info.w < 2 || info.h < 2) { await el.evaluate((e) => { e.setAttribute('style', e.getAttribute('data-banc-style') || ''); e.removeAttribute('data-banc-style'); }); return null; }
   await pg.waitForTimeout(30);
@@ -211,11 +211,11 @@ async function contrastePixels(pg, el) {
         if (ct != null) cmin = Math.min(cmin, ct);
         if (d.px) pxMin = Math.min(pxMin, d.px);
         const court = d.num.replace(/^N°/, '').length <= 4;
-        if (!d.trouve || !d.visible || !d.entier || (court && d.px < 16) || ct == null || ct < 4.5) fautes.push({ ...d, ct });
-        if (d.coupes.length) fautes.push({ num: d.num, coupes: d.coupes });
+        if (!d.trouve || !d.visible || !d.entier || (court && d.px < 16) || ct == null || ct < 4.5) fautes.push({ sorte: 'num', ...d, ct });
+        if (d.coupes.length) fautes.push({ sorte: 'coupe', num: d.num, coupes: d.coupes });
       }
-      dit(nums.length >= 8 && fautes.filter((f) => !f.coupes).length === 0, `${t} · N : chaque case pleine vue écrit son N° en entier, ≥ 16 px, ≥ 4,5:1 aux pixels (${nums.length} cases ; mini ${pxMin} px, ${cmin}:1)`, fautes.filter((f) => !f.coupes));
-      dit(fautes.filter((f) => f.coupes).length === 0, `${t} · T : aucun texte coupé dans une case (pseudo, N°)`, fautes.filter((f) => f.coupes));
+      dit(nums.length >= 8 && fautes.filter((f) => f.sorte === 'num').length === 0, `${t} · N : chaque case pleine vue écrit son N° en entier, ≥ 16 px, ≥ 4,5:1 aux pixels (${nums.length} cases ; mini ${pxMin} px, ${cmin}:1)`, fautes.filter((f) => f.sorte === 'num'));
+      dit(fautes.filter((f) => f.sorte === 'coupe').length === 0, `${t} · T : aucun texte coupé dans une case (pseudo, N°)`, fautes.filter((f) => f.sorte === 'coupe'));
 
       // ── S : la surbrillance des vendues ──
       const allumees = await pg.evaluate(() => [...document.querySelectorAll('.vrm-s2d-case.is-vendue')].map((c) => c.getAttribute('data-case-num')).sort().join(','));
