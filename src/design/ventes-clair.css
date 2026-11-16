@@ -1,0 +1,86 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   VENTES PLUS CLAIR (16 nov. 2026, lot ventes-clair — captures iPhone de Julien : « tout peut être amélioré »).
+   La lecture seulement : aucune règle métier, aucun data-* changé. On ACHÈVE le verre, on n'en change rien.
+   1. « N choses à regarder » (src/ventes/ARegarder.jsx) : UNE ligne repliée en verre, au lieu de six cartes.
+   2. Les filtres de la liste ne sont jamais coupés (« Finalis… ») : ils passent à la ligne au téléphone.
+   3. « Sélectionner » posé sur le bleu : l'encre claire du fond (il était bleu sur bleu).
+   4. LA LIGNE DE VENTE EN TROIS LIGNES au téléphone : titre · prix ; N° · site · compte · T38 (une ligne, coupée
+      proprement) ; état · date · frise fine. « Imprimer » devient un rond de 40 px sur la 3e ligne, plus une
+      ligne à lui seul. « ⋯ » sur la 2e ligne, comme avant.
+   Couche `vrm-verre` (la première, index.html) : `!important` partout. Récit : docs/passation/2026-11-16-ventes-clair.md.
+   ════════════════════════════════════════════════════════════════════════════ */
+@layer vrm-verre {
+
+/* ── 1. « N choses à regarder » ── */
+:root:root:root:root:root:root:root body .vrm-ventes-regarder[hidden] { display: none !important; }
+:root:root:root:root:root:root:root body .vrm-ventes-regarder {
+  margin: 0 0 12px !important; border-radius: 18px !important; background: var(--sv-verre) !important;
+  -webkit-backdrop-filter: var(--sv-flou); backdrop-filter: var(--sv-flou); box-shadow: var(--sv-ombre) !important; color: var(--sv-encre) !important;
+}
+:root:root:root:root:root:root:root body .vrm-ventes-regarder > summary {
+  list-style: none !important; display: flex !important; align-items: center !important; gap: 10px !important; min-height: 48px !important;
+  padding: 0 16px !important; cursor: pointer !important; font: 600 15px/20px Inter, system-ui, sans-serif !important; color: var(--sv-encre) !important;
+}
+:root:root:root:root:root:root:root body .vrm-ventes-regarder > summary::-webkit-details-marker { display: none !important; }
+:root:root:root:root:root:root:root body .vrm-ventes-regarder-point { width: 8px !important; height: 8px !important; border-radius: 50% !important; background: var(--sv-encre-2) !important; flex: none !important; }
+:root:root:root:root:root:root:root body .vrm-ventes-regarder > summary > span:nth-child(2) { flex: 1 1 auto !important; min-width: 0 !important; }
+:root:root:root:root:root:root:root body .vrm-ventes-regarder-chev { color: var(--sv-encre-2) !important; font-size: 20px !important; transition: transform 160ms ease !important; }
+:root:root:root:root:root:root:root body .vrm-ventes-regarder[open] .vrm-ventes-regarder-chev { transform: rotate(90deg) !important; }
+:root:root:root:root:root:root:root body .vrm-ventes-regarder-corps { display: flex !important; flex-direction: column !important; gap: 10px !important; padding: 0 12px 12px !important; }
+:root:root:root:root:root:root:root body .vrm-ventes-regarder-corps > * { margin: 0 !important; }
+@media (prefers-reduced-motion: reduce) { :root:root:root:root:root:root:root body .vrm-ventes-regarder-chev { transition: none !important; } }
+
+/* La puce courte sous « Générer le bordereau » (« Ouvre tomj606 sur vinted.fr ») et son « Pourquoi ? ». */
+:root:root:root:root:root:root:root body .vrm-bord-puce { display: inline-flex !important; align-items: center !important; gap: 4px !important; flex-wrap: wrap !important; }
+
+@media (max-width: 767px) {
+  /* ── 2. Les filtres : jamais coupés ── */
+  :root:root:root:root:root:root:root body .vrm-sales-workbar .vrm-filtres-et-outils { flex-wrap: wrap !important; align-items: flex-start !important; }
+  :root:root:root:root:root:root:root body .vrm-sales-workbar .vrm-filtres { flex-wrap: wrap !important; overflow: visible !important; row-gap: 6px !important; }
+
+  /* ── 3. « Sélectionner », posé sur le fond ── */
+  :root:root:root:root:root:root:root body .vrm-serie-entree [data-serie-ouvrir] { color: var(--sv-clair-lien) !important; min-height: 44px !important; }
+
+  /* ── 4. La ligne de vente en trois lignes ── */
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle {
+    display: grid !important; grid-template-columns: 56px minmax(0, 1fr) auto !important; grid-template-rows: auto auto auto !important;
+    column-gap: 12px !important; row-gap: 3px !important; align-items: center !important;
+  }
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-photo-empty { grid-column: 1 !important; grid-row: 1 / 4 !important; align-self: start !important; }
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-fu-vente-txt { display: contents !important; }
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] .vrm-fu-vente-l1 { grid-column: 2 / 4 !important; grid-row: 1 !important; margin: 0 !important; min-width: 0 !important; }
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] .vrm-fu-vente-l2 {
+    grid-column: 2 / 4 !important; grid-row: 2 !important; margin: 0 !important; display: flex !important; flex-wrap: nowrap !important; align-items: center !important;
+    gap: 6px !important; min-width: 0 !important; overflow: hidden !important; white-space: nowrap !important; padding-right: 44px !important;
+  }
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] .vrm-fu-vente-l2 > * { flex: none !important; }
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] .vrm-fu-vente-l2 > .vrm-fu-vente-compte { flex: 0 1 auto !important; min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] .vrm-fu-vente-l2 > .vrm-fu-vente-compte * { overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] .vrm-fu-vente-l3 { grid-column: 2 !important; grid-row: 3 !important; margin: 0 !important; min-width: 0 !important; }
+  /* L'état, la date et la frise fine sur la MÊME ligne (la légende « Vendue · 11 nov. » d'abord, puis les 4 traits). */
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-frise {
+    grid-column: 2 / 4 !important; grid-row: 3 !important; margin: 0 !important; max-width: none !important; min-width: 0 !important; width: auto !important; height: auto !important;
+  }
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme]:has(.vrm-fu-vente-l3[data-ton="action"]) > button.vrm-ledger-sale-toggle > .vrm-ledger-sale-frise { grid-column: 3 !important; }
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] .vrm-ledger-sale-frise .vrm-fu-frise { display: flex !important; align-items: center !important; gap: 3px !important; width: 100% !important; height: auto !important; }
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] .vrm-ledger-sale-frise .vrm-fu-seg { flex: 0 0 12px !important; width: 12px !important; height: 3px !important; margin: 0 !important; }
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] .vrm-ledger-sale-frise .vrm-fu-legende {
+    order: -1 !important; flex: 1 1 auto !important; min-width: 0 !important; margin: 0 6px 0 0 !important; position: static !important; width: auto !important; height: auto !important;
+    white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important; font: 500 12px/17px Inter, system-ui, sans-serif !important; color: var(--sv-encre-2) !important; clip: auto !important;
+  }
+  /* « ⋯ » : sur la 2e ligne, à droite. */
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > .vrm-fu-plus-vente { top: 30px !important; right: 4px !important; }
+  /* « Imprimer » : un rond de 40 px au bout de la 3e ligne (son nom reste lu : aria-label). */
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > .vrm-rangee-bord:has(> .vrm-fu-imprimer-ligne:only-child) {
+    position: absolute !important; right: 8px !important; bottom: 8px !important; padding: 0 !important; margin: 0 !important; width: auto !important; z-index: 1 !important;
+  }
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > .vrm-rangee-bord:has(> .vrm-fu-imprimer-ligne:only-child) > .vrm-fu-imprimer-ligne {
+    width: 44px !important; min-width: 44px !important; height: 44px !important; min-height: 44px !important; padding: 0 !important; border-radius: 22px !important; justify-content: center !important;
+  }
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > .vrm-rangee-bord:has(> .vrm-fu-imprimer-ligne:only-child) > .vrm-fu-imprimer-ligne > span {
+    position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; white-space: nowrap !important;
+  }
+  :root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme]:has(> .vrm-rangee-bord > .vrm-fu-imprimer-ligne:only-child) > button.vrm-ledger-sale-toggle { padding-right: 48px !important; }
+}
+
+} /* fin de @layer vrm-verre */
