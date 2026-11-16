@@ -13,7 +13,7 @@ require('./_porte-banc.cjs');
 //  R  « N choses à regarder » (`data-ventes-regarder` = N ≥ 1) : fermé, ses cartes (prix d'achat, après frais…)
 //     ne se voient pas ; un toucher l'ouvre et elles se voient ;
 //  L  une ligne de vente tient en trois lignes (≤ 96 px au téléphone), rien n'y dépasse à droite ;
-//  F  les filtres de la liste sont entiers (aucun coupé par son conteneur) ;
+//  F  les filtres de la liste sont entiers (aucun coupé par son conteneur) et tiennent avec « Outils » sur UNE ligne ;
 //  C  contraste ≥ 4,5:1 : les chiffres de la bande du mois, « Sélectionner », la tête du repli.
 //  `LARGEURS=390,1512` `THEMES=clair,sombre` ; `BANC_DIST=` le build jugé ; `SHOTS=` les captures.
 //  Un banc ne meurt pas, il rapporte.
@@ -79,6 +79,7 @@ function mesurer() {
     redits: [...document.querySelectorAll('.vrm-fu-ventes :is([data-fu-case="aposter"], [data-fu-case="enroute"])')].filter(vis).length,
     regarder: regarder ? { n: regarder.getAttribute('data-ventes-regarder'), ouvert: regarder.open, cachee: !!regarder.hidden, visibles: cartesRepli.filter(vis).length, total: cartesRepli.length } : null,
     hauteurs, debord, coupes, nFiltres: filtres.length,
+    uneLigne: (() => { const o = document.querySelector('.vrm-sales-workbar .vrm-outils-ventes'); const tops = [...filtres, o].filter(Boolean).filter(vis).map((x) => Math.round(x.getBoundingClientRect().top)); return tops.length ? Math.max(...tops) - Math.min(...tops) : null; })(),
     bandes, sel: sel && vis(sel) ? contraste(sel) : null, tete: tete && vis(tete) ? contraste(tete.querySelector('span:nth-child(2)') || tete) : null,
   };
 }
@@ -96,7 +97,9 @@ function mesurer() {
         if (!(await pg.evaluate(() => /site=vinted/.test(location.search)))) { await pg.goto(`http://localhost:${P.PORT}${URL}`, { waitUntil: 'domcontentloaded' }); await P.pret(pg); }
         await pg.evaluate(() => { const b = document.querySelector('[data-ventes-seg-choix="toutes"]'); if (b) b.click(); });
         for (let k = 0; k < 80; k++) { if (await pg.evaluate(() => document.querySelectorAll('.vrm-ventes-liste .vrm-sale-row[data-fu-forme]').length > 5)) break; await pg.waitForTimeout(400); }
-        await pg.waitForTimeout(1500);
+        // L'écran est jugé STABLE (la carte « À venir », la bande arrivent après la liste) : la 1re vente ne bouge plus
+        // pendant 3 relevés de suite (1 s), 25 s au plus — jamais un délai fixe (§6.5).
+        { let avant = null, calme = 0; for (let k = 0; k < 25 && calme < 3; k++) { await pg.waitForTimeout(1000); const y = await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 0; const l = document.querySelector('.vrm-ventes-liste .vrm-sale-row[data-fu-forme]'); return l ? Math.round(l.getBoundingClientRect().top) : null; }); calme = y != null && y === avant ? calme + 1 : 0; avant = y; } }
         await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) m.scrollTop = 0; window.scrollTo(0, 0); });
         await pg.waitForTimeout(300);
         const m = await pg.evaluate(mesurer);
@@ -110,6 +113,7 @@ function mesurer() {
         if (W < 600) dit(m.hauteurs.length > 3 && Math.max(...m.hauteurs) <= 96, `L ${t} : chaque ligne de vente tient en trois lignes (≤ 96 px)`, m.hauteurs);
         dit(m.debord === 0, `L ${t} : rien ne dépasse d'une ligne de vente`, m.debord);
         dit(m.nFiltres >= 3 && m.coupes.length === 0, `F ${t} : les filtres sont entiers`, m.coupes);
+        dit(m.uneLigne != null && m.uneLigne <= 4, `F ${t} : les filtres et « Outils » tiennent sur UNE ligne`, m.uneLigne);
         const bas = m.bandes.filter((x) => x.c != null && x.c < 4.5);
         dit(m.bandes.length > 0 && !bas.length, `C ${t} : chiffres de la bande lisibles (≥ 4,5:1)`, m.bandes);
         dit(m.sel == null || m.sel >= 4.5, `C ${t} : « Sélectionner » lisible`, m.sel);

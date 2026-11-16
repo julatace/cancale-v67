@@ -45,6 +45,11 @@
   /* ── 2. Les filtres : jamais coupés ── */
   :root:root:root:root:root:root:root body .vrm-sales-workbar .vrm-filtres-et-outils { flex-wrap: wrap !important; align-items: flex-start !important; }
   :root:root:root:root:root:root:root body .vrm-sales-workbar .vrm-filtres { flex-wrap: wrap !important; overflow: visible !important; row-gap: 6px !important; }
+  /* Sur une ligne à 390 : des capsules plus serrées (44 px de haut au doigt) et « Outils » en rond de 44 px (son nom reste lu). */
+  :root:root:root:root:root:root:root body .vrm-sales-workbar .vrm-filtres { column-gap: 4px !important; }
+  :root:root:root:root:root:root:root body .vrm-sales-workbar .vrm-filtres > button { padding: 0 8px !important; min-height: 44px !important; }
+  :root:root:root:root:root:root:root body .vrm-sales-workbar .vrm-outils-ventes > .vrm-b { width: 44px !important; min-width: 44px !important; height: 44px !important; padding: 0 !important; font-size: 0 !important; justify-content: center !important; gap: 0 !important; }
+  :root:root:root:root:root:root:root body .vrm-sales-workbar .vrm-outils-ventes > .vrm-b svg { width: 18px !important; height: 18px !important; }
 
 
   /* ── 4. La ligne de vente en trois lignes ── */
