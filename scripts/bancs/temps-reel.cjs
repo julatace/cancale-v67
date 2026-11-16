@@ -91,7 +91,10 @@ async function passe(b, { nom, largeur, hauteur, mobile, sombre }) {
     const o = await ouvrir('ventes');
     // (16 nov., vitesse-lectures) Ventes s'ouvre sur « À envoyer » depuis la refonte (g1, VentesVerre) :
     // la vente écrite plus bas (copie d'une vente déjà finie) est dans « Toutes ». Le banc y va d'abord.
-    await o.pg.click('[data-ventes-seg-choix="toutes"]', { timeout: 10000 }).catch(() => {});
+    for (let i = 0; i < 4; i++) {
+      await o.pg.click('[data-ventes-seg-choix="toutes"]', { timeout: 10000 }).catch(() => {});
+      if (await o.pg.waitForFunction(() => { const s = document.querySelector('[data-ventes-seg]'); return !!s && s.getAttribute('data-ventes-seg') === 'toutes'; }, null, { timeout: 4000 }).then(() => true, () => false)) break;
+    }
     juge(await o.pg.evaluate(() => { const s = document.querySelector('[data-ventes-seg]'); return !s || s.getAttribute('data-ventes-seg') === 'toutes'; }), `[${nom}] V : la liste « Toutes » est ouverte`);
     juge(!(await texte(o.pg)).includes(TITRE), `[${nom}] V : la vente n'est pas là avant l'écriture`);
     // Au calme : la veille ne lit que des versions.

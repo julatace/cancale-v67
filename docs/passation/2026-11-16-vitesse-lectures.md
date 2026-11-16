@@ -81,7 +81,8 @@ coque. La raison est écrite à côté du code (src/App.jsx, au-dessus de `sonde
 Ajouté seulement ce dont l'écran a déjà un chemin de relecture (src/tempsReel.js, `REGLES`) :
 - `harvest_{uid}_inbox` ⇒ `messages` (par compte) : Messages / Ma journée oublient la boîte de CE
   compte et relisent (`loadConvs`, moisson seulement, aucune requête Vinted) ;
-- `lbc_(listings|ventes|accounts|messages|a_retirer)` ⇒ `lbc`, `vc_(listings|ventes|session|offres|
+- `lbc_(listings|ventes|accounts|messages)` ⇒ `lbc` (jamais `lbc_a_retirer` : l'APP l'écrit — mesuré au banc, son signal
+  rejoué faisait relire puis réécrire, en boucle, et la pastille restait allumée pour rien), `vc_(listings|ventes|session|offres|
   messages|achats)` ⇒ `vestiaire` : la passerelle (`src/passerelleVeille.js`) rejoue le signal de
   l'extension `vrm:ext {type:'maj', quoi, source:'veille'}` — chaque écran Leboncoin/Vestiaire relit
   par son chemin habituel. Une famille au plus une fois / 20 s, et jamais juste après un VRAI signal

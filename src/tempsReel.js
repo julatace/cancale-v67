@@ -65,7 +65,9 @@ const REGLES = [
   //     « Actualiser » (aucune lecture de la route sans son geste).
   // Pas de `uid` pour ces trois-là (une ligne par vendeur, pas par compte).
   [/^harvest_(\d{1,20})_inbox$/, 'messages'],
-  [/^lbc_(?:listings|ventes|accounts|messages|a_retirer)$/, 'lbc'],
+  // ⚠️ Jamais une ligne que l'APP écrit elle-même (`lbc_a_retirer`, publiée par Ventes/Ma journée) : son
+  // signal rejoué ferait relire, donc réécrire — une boucle, et la pastille allumée pour rien.
+  [/^lbc_(?:listings|ventes|accounts|messages)$/, 'lbc'],
   [/^vc_(?:listings|ventes|session|offres|messages|achats)$/, 'vestiaire'],
   [/^email_reception_[0-9a-f]{16,64}$/, 'emails'],
 ];

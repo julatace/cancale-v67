@@ -140,7 +140,7 @@ test('quoiDe : Messages (par compte), Leboncoin, Vestiaire, e-mails ; le reste d
   assert.deepEqual(quoiDe('lbc_listings'), { quoi: 'lbc', uid: null });
   assert.deepEqual(quoiDe('vc_offres'), { quoi: 'vestiaire', uid: null });
   assert.deepEqual(quoiDe('email_reception_0123456789abcdef'), { quoi: 'emails', uid: null });
-  for (const bruit of ['lbc_recon', 'lbc_catalogue', 'vc_recon', 'vc_brut_x', 'vc_envoi', 'email_journal', 'email_reception_zz', 'harvest_42_conv_9', 'harvest_42_inbox_x']) assert.equal(quoiDe(bruit), null, bruit);
+  for (const bruit of ['lbc_a_retirer', 'lbc_recon', 'lbc_catalogue', 'vc_recon', 'vc_brut_x', 'vc_envoi', 'email_journal', 'email_reception_zz', 'harvest_42_conv_9', 'harvest_42_inbox_x']) assert.equal(quoiDe(bruit), null, bruit);
 });
 test('passerelle : une famille rejouée une fois, jamais juste après un vrai signal de l\'extension', () => {
   const t = 1e6;
