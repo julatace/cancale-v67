@@ -200,7 +200,8 @@ async function souris(b) {
   const a5 = await centre(pg, '[data-glisser-achat="7100005"]');
   await pg.mouse.move(a5.x, a5.y); await pg.mouse.wheel(0, 300); await pg.waitForTimeout(300);
   dit(!(await pg.locator('[data-glisser-flotte]').count()), `${nom} · molette sur la liste : aucun glisser`);
-  await pg.evaluate(() => { document.querySelector('[data-glisser-achats]').scrollTop = 0; }); await pg.waitForTimeout(200);
+  await pg.waitForTimeout(500); await pg.evaluate(() => { document.querySelector('[data-glisser-achats]').scrollTop = 0; }); await pg.waitForTimeout(300);
+  await pg.evaluate((t) => document.querySelector(`[data-glisser-achat="${t}"]`).scrollIntoView({ block: 'center' }), T1); await pg.waitForTimeout(200);
   // lâché dans le vide
   let a1 = await centre(pg, `[data-glisser-achat="${T1}"]`);
   await pg.mouse.move(a1.x, a1.y); await pg.mouse.down(); await pg.mouse.move(a1.x + 40, a1.y + 10, { steps: 4 });
@@ -209,6 +210,7 @@ async function souris(b) {
   dit(!(await pg.locator('[data-glisser-question]').count()) && JSON.stringify(await liensTous(pg)) === '[]', `${nom} · lâché dans le vide : rien`);
   // relier sur la VENTE (sans fiche) — puis Annuler
   await pg.evaluate(() => document.querySelector('[data-glisser-cible="v:7200001"]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(300);
+  await pg.evaluate((t) => document.querySelector(`[data-glisser-achat="${t}"]`).scrollIntoView({ block: 'center' }), T1); await pg.waitForTimeout(200);
   a1 = await centre(pg, `[data-glisser-achat="${T1}"]`);
   const cv = await centre(pg, '[data-glisser-cible="v:7200001"]');
   await pg.mouse.move(a1.x, a1.y); await pg.mouse.down(); await pg.mouse.move(cv.x, cv.y, { steps: 14 }); await pg.waitForTimeout(150);
@@ -258,6 +260,7 @@ async function souris(b) {
   const nv = pg.locator('[data-nav-entree="ventes"]').first();
   if (await nv.count()) await nv.click().catch(() => {});
   for (let i = 0; i < 30 && !(await pg.locator('[data-benef-ligne]').count()); i++) await pg.waitForTimeout(300);
+  const vt = pg.locator('[data-tache-site="vinted"], [data-site="vinted"]').first(); if (await vt.count()) { await vt.click().catch(() => {}); await pg.waitForTimeout(800); }
   const toutes = pg.locator('button', { hasText: /^Toutes$/ }).first(); if (await toutes.count()) { await toutes.click().catch(() => {}); await pg.waitForTimeout(800); }
   const bl = await pg.evaluate(() => { const r = [...document.querySelectorAll('[data-fiche-ligne]')].find((x) => /Salomon Speedcross/.test(x.innerText)); if (!r) return null; const b = r.querySelector('[data-benef-ligne]'); const su = r.querySelector('[data-fu-benef-su]'); return { b: b ? b.getAttribute('data-benef-ligne') : null, su: su ? su.innerText : null }; });
   dit(bl && bl.b === '5000', `${nom} · Ventes : la ligne de la vente reliée porte son bénéfice (50 €, la règle)`, JSON.stringify(bl));

@@ -68,6 +68,32 @@ VRM ne l'appelle que si elle existe (`vibrerSiPossible` : Android / Chrome, 12 m
   300 ms dans la zone ; (2) « Annuler » ne rendait pas le prix par N° à l'écran (l'annonce ne revenait pas)
   ⇒ le setter `vinted_buyprice_by_num` est passé au geste.
 
+
+## Ajout de Julien : le bénéfice et le reçu à portée de main
+
+Capture iPhone : après une liaison, la bulle « ✓ Achat relié · 13,43 € · Ensuite : voir le bénéfice › · × »
+recouvrait la liste. « Quand je relie un achat, je veux avoir le bénéfice avec la facture d'achat à portée de main. »
+
+- **Toute liaison** (feuille « Relier un achat » depuis Ventes/Annonces, propositions « Sans achat relié », vente
+  proposée, glisser) passe par `confirmerLiaison` : UN geste annulable 5 s (`gesteVrm`, pilule du bas), dont le texte
+  est le RÉSULTAT — « Achat relié · Bénéfice +22,57 € » (la règle de la ligne de vente, `beneficeLigneVente` →
+  `beneficePaire`, sur l'entrée APRÈS la liaison ; frais pas confirmés ⇒ « au plus » ; prix pas lu ⇒ « — » ; une
+  annonce pas vendue : « … au prix affiché ») — et qui offre **« Reçu »** (`ouvrirRecuRelie` : le reçu e-mail de CET
+  achat par son n° de transaction, sinon l'attestation VRM) à côté d'**« Annuler »**. La bulle d'accompagnement
+  `achat.relier` n'est plus posée. « Déplacer ici » (achat relié ailleurs) se fait dans le MÊME geste (annulé ensemble).
+- La pilule gagne un second geste générique (`action` de `creerGestes().lancer`, `data-pilule-autre`).
+- Dans le mode glisser, le bas de l'écran est une bande réservée (question, puis pilule) : aucune ligne dessous.
+  Ailleurs, la pilule reste en bas au-dessus de la barre (la feuille se ferme, la ligne se met à jour).
+- La **ligne de la vente** reliée montre son bénéfice discret à côté du prix au téléphone (`benefSu`, la règle de la
+  ligne ; la colonne « Bénéfice » existait déjà à l'ordinateur) ; le reçu reste à un toucher depuis sa fiche (« Reçu »
+  de #1199). La feuille du reçu passe au-dessus du mode glisser (z 1500).
+- Preuves : `audit-relier-glisser` 48 verts, 18/18 mutations (dont : pilule sans « Reçu », reçu qui n'ouvre rien,
+  bénéfice sans les frais, feuille revenue à la bulle, ligne sans bénéfice) ; banc : 390 « Achat relié · Bénéfice au
+  plus +31 € au prix affiché » + « Reçu » + rectangles (aucune ligne sous la pilule) ; 1512 vente « au plus +50 € »,
+  « Reçu » ouvre le reçu n° 7100001, la ligne de Ventes porte 50 € (`data-benef-ligne`).
+- Le point « empreintes de photos » pour relier les achats a été ANNULÉ par Julien (ses photos diffèrent de celles du
+  vendeur) : rien n'a été fait.
+
 ## ÉTAT À LA REPRISE
 
 - Branche `claude/relier-glisser` poussée ; PR vers `main` après celle de `claude/achats-retour`.

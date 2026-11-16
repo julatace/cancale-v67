@@ -39,6 +39,7 @@ const MUTS = {
   'app-sans-recu': ['src/App.jsx', "cle: String(a.transaction_id || ''), faire: () => ouvrirRecuRelie(a, num) });", "cle: '', faire: () => {} });"],
   'app-feuille-bulle': ['src/App.jsx', "    const ok = confirmerLiaison(a, cible._saleTx ?", "    const ok = false && confirmerLiaison(a, cible._saleTx ?"],
   'benefice-sans-frais': ['src/relierGlisser.js', "  const r = typeof ligne === 'function' ? ligne(prix, entree || {}) : null;", "  const r = typeof ligne === 'function' ? ligne(prix, { buyPrice: (entree || {}).buyPrice, fraisComplets: true }) : null;"],
+  'ligne-sans-benef': ['src/App.jsx', "benefSu: lb.benefice!=null && st!=='cancelled' ? texteBenefice(lb) : '',", "benefSu: '',"],
   'pilule-sans-action': ['src/PiluleAnnuler.jsx', "{v && v.action ? <button", "{false && v.action ? <button"],
   'ecran-defile-pendant': ['src/RelierGlisser.jsx', "if (appui.current && appui.current.phase === 'leve' && e.cancelable) e.preventDefault();", 'void e;'],
   'ecran-bloque-toujours': ['src/RelierGlisser.jsx', "if (appui.current && appui.current.phase === 'leve' && e.cancelable) e.preventDefault();", 'if (e.cancelable) e.preventDefault();'],
@@ -174,6 +175,8 @@ const sans = (s) => s.replace(/\/\/[^\n]*/g, '');
   }
   dit(/const confirmerLiaison = [\s\S]{0,3000}?\{ libelle: [^,]+, cle: String\(a\.transaction_id \|\| ''\), faire: \(\) => ouvrirRecuRelie\(a, num\) \}/.test(app), 'R7 « Reçu » ouvre le reçu de CET achat (son n° de transaction)');
   dit(['const relierAchat = async', 'const relierAchatAnnonce = async', 'const relierAchatVente = async', 'const relierGlisse = async'].every((f) => new RegExp(f.replace(/[()]/g, '\\$&') + '[\\s\\S]{0,900}?(?:const ok = |if \\(!|\\|\\| !|return )confirmerLiaison\\(').test(app)) && !/accompagner\('achat\.relier'/.test(app), 'R8 feuille, propositions, ventes et glisser : la même confirmation (plus de bulle sur la liste)');
+
+  dit(/benefSu: lb\.benefice!=null && st!=='cancelled' \? texteBenefice\(lb\) : ''/.test(app), 'R9 la LIGNE de la vente reliée montre son bénéfice, discret à côté du prix (la règle de la ligne)');
 
   // ── S · le branchement ──
   let ecran = ''; try { ecran = sans(fs.readFileSync(path.join(SRC, 'RelierGlisser.jsx'), 'utf8')); } catch (_) {}
