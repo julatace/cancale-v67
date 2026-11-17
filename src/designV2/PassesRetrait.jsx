@@ -12,6 +12,13 @@ import { tr } from '../i18n/index.js';
 import { BoutonV2 } from './BoutonV2.jsx';
 import './design-v2.css';
 
+// Le QR lu (e-mail ou capture). Une image qui ne se charge pas ne se montre pas (jamais une image cassée au comptoir).
+function QrPasse({ src }) {
+  const [ko, setKo] = React.useState(false);
+  if (ko) return null;
+  return <img className="v2-passe-qr" src={src} alt={tr('v2.passe.qr')} width={168} height={168} decoding="async" data-v2-qr="" onError={() => setKo(true)}/>;
+}
+
 function Passe({ p, Icon, Photo, Plaque, aides }) {
   const colis = p.arrives || [];
   const [i, setI] = React.useState(0);
@@ -44,7 +51,7 @@ function Passe({ p, Icon, Photo, Plaque, aides }) {
               <div className={'v2-passe-limite' + (ech && ech.ambre ? ' is-ambre' : '')} data-v2-limite={ech ? ech.code : ''}>
                 {ech ? <><i className="v2-point" aria-hidden="true" hidden={!ech.ambre}/>{ech.t}</> : <span className="v2-muet">{tr('v2.passe.limiteInconnue')}</span>}
               </div>
-              {qr ? <img className="v2-passe-qr" src={qr} alt={tr('v2.passe.qr')} width={168} height={168} decoding="async" data-v2-qr=""/> : null}
+              {qr ? <QrPasse src={qr}/> : null}
               {x.code ? <b className="v2-passe-code" data-v2-code-grand="">{x.code}</b> : x.code2 ? <b className="v2-passe-code">{x.code2}</b> : <span className="v2-passe-sans" data-v2-sans-code="">{tr('v2.passe.codeAVenir')}</span>}
               <div className="v2-passe-paire">
                 <span className="v2-vignette" style={{ width: 40, height: 40 }} aria-hidden="true">{x.photo && Photo ? Photo(x.photo) : <Icon name="cintre" size={18}/>}</span>

@@ -28,6 +28,7 @@
   --v2-anneau: 0 0 0 3px rgb(0 96 204 / .45);
   --v2-muet: #4A5B6D;                /* gris lisible (≥ 4,5:1 sur la porcelaine ET sur l'aplat) */
   --v2-carte: #FFFFFF;
+  --v2-feuille-fond: #F4F8FC;
   --v2-carte-ombre: 0 .5px 0 rgb(18 52 96 / .06), 0 1px 2px rgb(18 52 96 / .07), 0 10px 24px -14px rgb(18 52 96 / .28);
   --v2-filet: rgb(18 52 96 / .12);
   --v2-socle: #EEF3F8;
@@ -51,6 +52,7 @@
   --v2-anneau: 0 0 0 3px rgb(140 196 255 / .55);
   --v2-muet: #A7B8CB;
   --v2-carte: #16273C;
+  --v2-feuille-fond: #101E32;
   --v2-carte-ombre: 0 0 0 .5px rgb(255 255 255 / .06), 0 12px 26px -14px rgb(0 0 0 / .8);
   --v2-filet: rgb(255 255 255 / .10);
   --v2-socle: #1E3149;
@@ -91,15 +93,17 @@ html body button.v2b-destructif { background: transparent; color: var(--v2-rouge
 /* icône — 44 × 44, glyphe 24 */
 html body button.v2b-icone { width: var(--v2-cible); height: var(--v2-cible); min-width: var(--v2-cible); padding: 0; border-radius: 50%; background: transparent; color: inherit; }
 html body button.v2b-icone .v2b-ic { width: var(--v2-glyphe); height: var(--v2-glyphe); }
-html body button.v2b-icone:active { background: var(--v2-teinte-fond); }
+html body button.v2b-icone:active, html body button.v2b-icone[data-v2b-force="appui"] { background: color-mix(in srgb, currentColor 16%, transparent); }
 @media (hover: hover) and (pointer: fine) {
   html body button.v2b-secondaire:hover:not([aria-disabled="true"]) { background: var(--v2-teinte-fond-appui); }
   html body button.v2b-texte:hover:not([aria-disabled="true"]), html body button.v2b-destructif:hover:not([aria-disabled="true"]) { text-decoration: underline; text-underline-offset: 3px; }
-  html body button.v2b-icone:hover { background: var(--v2-teinte-fond); }
+  html body button.v2b-icone:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
 }
 /* indisponible — la raison est DITE dessous ; le bouton s'éteint sans disparaître */
 html body button.v2b[aria-disabled="true"][data-v2b-etat="indisponible"] { cursor: not-allowed; opacity: .5; }
 html body .v2b-raison { font-size: 13px; line-height: 1.35; color: var(--v2-muet); white-space: normal; }
+/* Le plein vit sur la coque bleue : sa raison s'écrit à l'encre de la coque. */
+html body .v2b-hote-plein .v2b-raison { color: var(--v2-page-muet); }
 /* chargement — la roue remplace l'icône, la largeur ne saute pas */
 html body button.v2b[data-v2b-etat="chargement"] { cursor: progress; }
 html body .v2b-roue { display: grid; place-items: center; width: 22px; height: 22px; flex: none; }
@@ -235,7 +239,7 @@ html body button.v2-rangee.v2-menu { width: auto; max-width: 100%; gap: 6px; pad
 .v2-feuille-hote { position: fixed; inset: 0; z-index: 2400; }
 .v2-feuille-hote[hidden] { display: none; }
 .v2-voile { position: absolute; inset: 0; background: rgb(6 17 31 / .38); animation: v2-voile 200ms ease-out both; }
-.v2-feuille { position: absolute; left: 0; right: 0; bottom: 0; max-height: 82vh; overflow: auto; background: var(--sb-haut, #EEF6FD); border-radius: 22px 22px 0 0; padding: 6px 16px calc(16px + env(safe-area-inset-bottom)); box-shadow: 0 -10px 40px rgb(0 0 0 / .2); animation: v2-monte 320ms cubic-bezier(.32, .72, 0, 1) both; }
+.v2-feuille { position: absolute; left: 0; right: 0; bottom: 0; max-height: 82vh; overflow: auto; background: var(--v2-feuille-fond); color: var(--sv-encre, #0C1D30); border-radius: 22px 22px 0 0; padding: 6px 16px calc(16px + env(safe-area-inset-bottom)); box-shadow: 0 -10px 40px rgb(0 0 0 / .2); animation: v2-monte 320ms cubic-bezier(.32, .72, 0, 1) both; }
 @media (min-width: 1024px) { .v2-feuille { left: 50%; right: auto; bottom: auto; top: 12vh; width: 520px; transform: translateX(-50%); border-radius: 22px; animation: v2-voile 200ms ease-out both; } }
 .v2-feuille-tete { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 14px 0 8px; }
 .v2-feuille-poignee { position: absolute; left: 50%; top: 4px; width: 36px; height: 5px; border-radius: 3px; background: var(--v2-filet); transform: translateX(-50%); }
@@ -249,8 +253,10 @@ html body button.v2-rangee.v2-menu { width: auto; max-width: 100%; gap: 6px; pad
 /* ══ 6. LA COQUE (seulement allumé) ════════════════════════════════════════════ */
 /* Le titre de chaque tâche : grand titre iOS, et le menu juste dessous. La rangée de pastilles d'hier n'est plus
    posée à l'écran (elle vit dans la feuille du menu). */
-html[data-design="v2"] body .vrm-tache-tete h1 { font-size: 34px; letter-spacing: -.02em; }
-html[data-design="v2"] body .vrm-tache-tete .vrm-phrase-ecran { display: none; }
+html[data-design="v2"] body .vrm-tache-tete h1 { font-size: 34px; letter-spacing: -.02em; flex-basis: 100%; }
+/* Sous le grand titre, sur UNE ligne : le menu plateforme · compte et le « ? » de l'écran. */
+html[data-design="v2"] body .vrm-tache-tete { display: flex; flex-wrap: wrap; align-items: center; column-gap: 4px; }
+html[data-design="v2"] body .vrm-tache-tete > .vrm-fu-date-tete { flex-basis: 100%; }
 html[data-design="v2"] body .vrm-barre-haut-droite:empty { display: none; }
 /* Sous la barre flottante du bas, rien ne doit rester caché : la page garde une marge de la hauteur de la barre. */
 html[data-design="v2"] body .vrm-main > :last-child { scroll-margin-bottom: calc(var(--vrm-barre-bas, 84px) + 16px); }
@@ -262,3 +268,6 @@ html body button.v2b[data-v2b-force="appui"] { transform: scale(.97); filter: br
 html body button.v2b-principal[data-v2b-force="appui"] { background: var(--v2-plein-fond-appui); }
 html body button.v2b-secondaire[data-v2b-force="appui"] { background: var(--v2-teinte-fond-appui); }
 html body button.v2b[data-v2b-force="focus"] { box-shadow: var(--v2-anneau); }
+/* Un message passager (« toast ») ne couvre jamais le geste du jour : posé au-dessus du plein quand il y en a un. */
+html[data-design="v2"] body:has(.v2-pouce) .vrm-toasts[data-toasts-place="bas"] { bottom: calc(var(--vrm-barre-bas, 84px) + var(--v2-bouton-h) + 40px) !important; }
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) { html[data-design="v2"] body:has(.v2-pouce) .vrm-toasts[data-toasts-place="bas"] { bottom: 24px !important; } }

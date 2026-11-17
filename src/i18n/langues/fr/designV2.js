@@ -23,7 +23,7 @@ export default {
     "one": "Imprimer {n} bordereau",
     "other": "Imprimer {n} bordereaux"
   },
-  "v2.bande.aria": "Les paires à envoyer",
+  "v2.bande.aria": "Les colis à envoyer",
   "v2.retirer.titre": "À retirer",
   "v2.retirer.voir": "Voir les codes de retrait",
   "v2.retirer.resume": {

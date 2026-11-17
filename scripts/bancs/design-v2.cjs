@@ -55,12 +55,14 @@ const CONTRASTE = `(() => {
 
 // La signature d'un écran : balises, classes triées et NOMS des data-* (jamais les valeurs ni le texte : l'heure bouge).
 const SIGNATURE = () => { const m = document.querySelector('.vrm-main'); if (!m) return null; const out = [];
-  const pas = (e, d) => { if (d > 60 || e.matches('.vrm-fraicheur-hote, [data-temps-reel-neuf], [data-fraicheur-unique]')) return; const cl = [...e.classList].sort().join('.'); const da = [...e.attributes].map((a) => a.name).filter((n) => n.startsWith('data-') && !/^data-(sb-|v2)/.test(n)).sort().join(',');
+  const pas = (e, d) => { if (d > 60 || e.matches('.vrm-fraicheur-hote, [data-temps-reel-neuf], [data-fraicheur-unique]')) return; const cl = [...e.classList].sort().join('.'); const da = [...e.attributes].map((a) => a.name).filter((n) => n.startsWith('data-') && !/^data-(sb-|v2|vu$)/.test(n)).sort().join(',');
     out.push(d + ':' + e.tagName + (cl ? '.' + cl : '') + (da ? '[' + da + ']' : '')); for (const c of e.children) pas(c, d + 1); };
   pas(m, 0); return out; };
 
 const ECRANS = [['journee', '/?tab=journee'], ['achats', '/?tab=achats'], ['ventes', '/?tab=ventes'], ['annonces', '/?tab=annonces'], ['compta', '/?tab=compta']];
 
+// Les messages passagers (« toasts ») d'avant la capture sont touchés (ils se ferment) : la capture montre l'écran.
+async function sansToasts(pg) { await pg.evaluate(() => { for (const t of document.querySelectorAll('.vrm-toast')) t.click(); }).catch(() => {}); await pg.waitForTimeout(400); }
 async function allumer(pg) { await pg.evaluate(() => localStorage.setItem('vrm_design_v2', '1')); await pg.reload({ waitUntil: 'domcontentloaded' }); await pret(pg); }
 
 // Les mesures communes d'un écran allumé : cibles, composant, troncatures, débordement, contraste, pleins.
@@ -109,13 +111,15 @@ async function telephone(nav, sombre, b, sigs) {
     x.sig = sig; avant[id] = x;
     if (!sombre) sigs[id] = x.sig;
     if (id === 'journee') dit(x.attr == null && !erreurs.length, `E éteint : aucun data-design sur <html>, aucune erreur (${th})`, { attr: x.attr, erreurs });
-    if (!sombre && id === 'journee') await pg.screenshot({ path: path.join(SHOTS, `eteint-journee-390-${th}.png`) });
+    if (!sombre && id === 'journee') await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `eteint-journee-390-${th}.png`) });
     await ctx.close();
   }
   if (!sombre && SIG_AVANT && fs.existsSync(SIG_AVANT)) {
     const ref = JSON.parse(fs.readFileSync(SIG_AVANT, 'utf8'));
     for (const [id] of ECRANS) {
-      const a = ref[id] || [], c = sigs[id] || [];
+      // `data-vu` (une image chargée ou pas encore) suit le réseau, pas le code : retiré des deux côtés.
+      const net = (l) => (l || []).map((x) => x.replace(/,data-vu(?=[,\]])|\[data-vu\]|(?<=\[)data-vu,/g, ''));
+      const a = net(ref[id]), c = net(sigs[id]);
       let i = 0; while (i < a.length && i < c.length && a[i] === c[i]) i++;
       dit(a.length > 20 && a.length === c.length && i === a.length, `E éteint : ${id} a le DOM de origin/main (${c.length} nœuds)`, i < Math.max(a.length, c.length) ? { n: [a.length, c.length], ecart: i, main: a[i], ici: c[i] } : undefined);
     }
@@ -132,7 +136,7 @@ async function telephone(nav, sombre, b, sigs) {
     if (vu) { await bt.scrollIntoViewIfNeeded().catch(() => {}); await bt.tap().catch(() => {}); await pg.waitForTimeout(500); }
     const etat = await pg.evaluate(() => ({ ls: localStorage.getItem('vrm_design_v2'), attr: document.documentElement.getAttribute('data-design') }));
     dit(vu > 0 && etat.ls === '1' && etat.attr === 'v2', `R Paramètres → Apparence → « Nouveau design (essai) » l’allume (${th})`, { vu, ...etat });
-    if (!sombre) await pg.screenshot({ path: path.join(SHOTS, `reglage-390-${th}.png`) });
+    if (!sombre) await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `reglage-390-${th}.png`) });
   }
   await ctx.close();
 
@@ -156,13 +160,13 @@ async function telephone(nav, sombre, b, sigs) {
   dit(j.plein && /\d/.test(j.pleinTexte) && j.pleinTexte.includes(j.plein), `J le plein dit son nombre : « ${j.pleinTexte} »`, j);
   dit(j.pouce && j.pouce.bas <= j.pouce.barre - 4, 'J le plein est au pouce, AU-DESSUS de la barre du bas', j.pouce);
   dit(j.afaire > 0 && j.gestes <= j.afaire, `J « À faire » : ${j.afaire} groupes, UN geste au plus chacun`, j);
-  await pg.screenshot({ path: path.join(SHOTS, `aujourdhui-390-${th}.png`) });
+  await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `aujourdhui-390-${th}.png`) });
   // Le bas du contenu, défilé tout en bas, reste au-dessus du plein (la marge est posée).
   const bas = await pg.evaluate(async () => { const m = document.querySelector('.vrm-main'); m.scrollTo(0, m.scrollHeight); await new Promise((r) => setTimeout(r, 400));
     const e = document.querySelector('.v2-ecran'); const pp = document.querySelector('[data-v2-pouce]'); if (!e || !pp) return null; const enf = [...e.children].filter((x) => !x.matches('[data-v2-pouce]') && x.getClientRects().length); const der = enf[enf.length - 1];
     const po = pp.getBoundingClientRect(); return { der: Math.round(der.getBoundingClientRect().bottom), pouce: Math.round(po.top) }; });
   dit(!!bas && bas.der <= bas.pouce, 'J défilé en bas, le dernier groupe passe au-dessus du plein (rien de caché)', bas);
-  await pg.screenshot({ path: path.join(SHOTS, `aujourdhui-bas-390-${th}.png`) });
+  await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `aujourdhui-bas-390-${th}.png`) });
   await pg.evaluate(() => document.querySelector('.vrm-main').scrollTo(0, 0));
   await mesurerEcran(pg, 'Aujourd’hui', true);
   dit(!erreurs.length, 'aucune erreur JS (Aujourd’hui)', erreurs);
@@ -184,8 +188,8 @@ async function telephone(nav, sombre, b, sigs) {
   dit(a.qr <= avant.achats.qr && a.qr <= nFaces, `A QR seulement s’il existe (${a.qr} ici, ${avant.achats.qr} lignes « QR » avant)`, a);
   dit(a.limiteAvantQr, 'A la date limite est AU-DESSUS du QR');
   dit(a.passes.every((p) => p.n < 2) || a.pages.some((t) => /1/.test(t)), 'A plusieurs colis au même point : « 1 sur N », on glisse de code en code', a.pages);
-  await pg.screenshot({ path: path.join(SHOTS, `achats-390-${th}.png`) });
-  await pg.screenshot({ path: path.join(SHOTS, `achats-plein-390-${th}.png`), fullPage: false });
+  await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `achats-390-${th}.png`) });
+  await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `achats-plein-390-${th}.png`), fullPage: false });
   await mesurerEcran(pg, 'Achats', true);
   dit(!erreurs.length, 'aucune erreur JS (Achats)', erreurs);
   await ctx.close();
@@ -197,11 +201,11 @@ async function telephone(nav, sombre, b, sigs) {
     return { menu: !!me, sous: me && h ? Math.round(me.getBoundingClientRect().top - h.getBoundingClientRect().bottom) : null, texte: me ? me.textContent.trim() : '', pastilles }; });
   dit(m.menu && m.sous != null && m.sous >= -2 && m.sous <= 24, `M UN menu sous le grand titre : « ${m.texte} »`, m);
   dit(m.pastilles === 0, 'M la rangée de pastilles n’est plus à l’écran', m);
-  await pg.screenshot({ path: path.join(SHOTS, `ventes-390-${th}.png`) });
+  await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `ventes-390-${th}.png`) });
   await pg.locator('[data-v2-menu]').first().tap({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(600);
   const f = await pg.evaluate(() => { const h = document.querySelector('[data-v2-feuille]:not([hidden])'); return { ouverte: !!h, controles: h ? h.querySelectorAll('.v2-feuille-corps button').length : 0 }; });
   dit(f.ouverte && f.controles > 0, `M la feuille s’ouvre avec les mêmes contrôles (${f.controles})`, f);
-  await pg.screenshot({ path: path.join(SHOTS, `menu-390-${th}.png`) });
+  await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `menu-390-${th}.png`) });
   await pg.locator('[data-v2-feuille-fermer]').first().tap({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(400);
   dit(await pg.evaluate(() => !document.querySelector('[data-v2-feuille]:not([hidden])')), 'M la feuille se referme');
   dit(await pg.evaluate(() => document.documentElement.scrollWidth - innerWidth <= 1), 'X Ventes (écran d’hier dans la coque neuve) : rien ne déborde');
@@ -209,7 +213,7 @@ async function telephone(nav, sombre, b, sigs) {
   for (const [id, url] of [['annonces', '/?tab=annonces'], ['argent', '/?tab=compta']]) {
     await pg.goto(`http://localhost:${PORT}${url}`, { waitUntil: 'domcontentloaded' }); await pret(pg);
     dit(await pg.evaluate(() => document.documentElement.scrollWidth - innerWidth <= 1 && (document.querySelector('.vrm-main').innerText || '').trim().length > 40), `X ${id} (écran d’hier) se rend dans la coque neuve, sans débordement`);
-    await pg.screenshot({ path: path.join(SHOTS, `${id}-390-${th}.png`) });
+    await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `${id}-390-${th}.png`) });
   }
   await ctx.close();
 }
@@ -222,13 +226,13 @@ async function ordinateur(nav, sombre, b) {
     return { rail: !!document.querySelector('.vrm-sidebar'), plein: q ? { haut: Math.round(q.top), droite: Math.round(innerWidth - q.right), titre: tq ? Math.round(tq.top) : null } : null, disque: !!document.querySelector('[data-sb-disque]') }; });
   dit(r.rail && !r.disque, 'N 1512 : la colonne de gauche, pas de disque', r);
   dit(r.plein && r.plein.haut < 200, 'N 1512 : le plein est EN HAUT (sur la ligne du titre), à droite', r.plein);
-  await pg.screenshot({ path: path.join(SHOTS, `aujourdhui-1512-${th}.png`) });
+  await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `aujourdhui-1512-${th}.png`) });
   await mesurerEcran(pg, 'Aujourd’hui 1512', false);
   await pg.goto(`http://localhost:${PORT}/?tab=achats`, { waitUntil: 'domcontentloaded' }); await pret(pg);
-  await pg.screenshot({ path: path.join(SHOTS, `achats-1512-${th}.png`) });
+  await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `achats-1512-${th}.png`) });
   await mesurerEcran(pg, 'Achats 1512', false);
   await pg.goto(`http://localhost:${PORT}/?tab=ventes`, { waitUntil: 'domcontentloaded' }); await pret(pg);
-  await pg.screenshot({ path: path.join(SHOTS, `ventes-1512-${th}.png`) });
+  await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `ventes-1512-${th}.png`) });
   dit(!erreurs.length, 'aucune erreur JS (1512)', erreurs);
   await ctx.close();
 }
@@ -244,7 +248,7 @@ async function planche(nav) {
   } catch (e) { dit(false, 'Z la planche se construit', String(e.message || e).slice(0, 300)); return; }
   fs.writeFileSync(path.join(dossier, 'index.html'), '<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="p.css"><body style="margin:0;min-height:100vh;background:linear-gradient(180deg,var(--sv-haut),var(--sv-bas))"><div id="r"></div><script src="p.js"></script>');
   for (const sombre of [false, true]) {
-    const ctx = await nav.newContext({ viewport: { width: 1520, height: 700 }, deviceScaleFactor: 1 });
+    const ctx = await nav.newContext({ viewport: { width: 1520, height: 1300 }, deviceScaleFactor: 1 });
     const pg = await ctx.newPage();
     await pg.goto('file://' + path.join(dossier, 'index.html'));
     await pg.evaluate((s) => document.documentElement.setAttribute('data-theme', s ? 'dark' : 'light'), sombre);
@@ -254,7 +258,10 @@ async function planche(nav) {
       plein: (() => { const b = document.querySelector('[data-planche="principal:repos"] button'); return b ? Math.round(b.getBoundingClientRect().height) : null; })(),
       raisons: document.querySelectorAll('[data-v2b-raison]').length, petitsQui: [...document.querySelectorAll('button[data-v2b]')].filter((b) => b.offsetHeight < 44 || b.offsetWidth < 44).map((b) => b.closest('[data-planche]').getAttribute('data-planche') + ':' + Math.round(b.getBoundingClientRect().width) + 'x' + Math.round(b.getBoundingClientRect().height)), roues: document.querySelectorAll('.v2b-roue').length }));
     dit(z.n === 23 && z.petits === 0 && z.plein === 50 && z.raisons === 4 && z.roues === 4, `Z planche ${sombre ? 'sombre' : 'claire'} : ${z.boutons} boutons, plein 50 px, raison dite ×4, roue ×4, cibles ≥ 44`, z);
-    await pg.screenshot({ path: path.join(SHOTS, `planche-boutons-${sombre ? 'sombre' : 'clair'}.png`), fullPage: true });
+    await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `planche-boutons-${sombre ? 'sombre' : 'clair'}.png`), fullPage: true });
+    const rien = await pg.evaluate(() => { const r = document.querySelector('[data-planche-rien] [data-v2-rien]'); return r ? r.textContent.trim() : ''; });
+    dit(/Rien à faire/.test(rien), `Z « Rien à faire », calme, quand tout est fait (${sombre ? 'sombre' : 'clair'})`, rien);
+    const el = await pg.$('[data-planche-rien]'); if (el) await el.screenshot({ path: path.join(SHOTS, `rien-a-faire-${sombre ? 'sombre' : 'clair'}.png`) });
     await ctx.close();
   }
 }

@@ -23,7 +23,7 @@ export default {
     "one": "{n} Etikett drucken",
     "other": "{n} Etiketten drucken"
   },
-  "v2.bande.aria": "Paare zu versenden",
+  "v2.bande.aria": "Pakete zu versenden",
   "v2.retirer.titre": "Abzuholen",
   "v2.retirer.voir": "Abholcodes ansehen",
   "v2.retirer.resume": {

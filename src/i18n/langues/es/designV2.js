@@ -23,7 +23,7 @@ export default {
     "one": "Imprimir {n} etiqueta",
     "other": "Imprimir {n} etiquetas"
   },
-  "v2.bande.aria": "Pares por enviar",
+  "v2.bande.aria": "Paquetes por enviar",
   "v2.retirer.titre": "Por recoger",
   "v2.retirer.voir": "Ver los códigos de recogida",
   "v2.retirer.resume": {

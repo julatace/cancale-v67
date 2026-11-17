@@ -6,6 +6,9 @@ import { createRoot } from 'react-dom/client';
 import '../../src/design/studio.css';
 import '../../src/design/studio-verre.css';
 import { BoutonV2, BoutonIconeV2 } from '../../src/designV2/BoutonV2.jsx';
+import Aujourdhui from '../../src/designV2/Aujourdhui.jsx';
+// L'état « Rien à faire » d'Aujourd'hui, rendu par le VRAI composant (tout lu, tout fait).
+const IconeStub = () => <svg width="20" height="20" viewBox="0 0 24 24"/>;
 
 const ic = (d) => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">{d}</svg>;
 const imprimante = ic(<><path d="M7 9V4h10v5"/><rect x="4" y="9" width="16" height="8" rx="2"/><path d="M7 14h10v6H7z"/></>);
@@ -14,7 +17,7 @@ const ETATS = [['repos', {}], ['enfonce', { 'data-v2b-force': 'appui' }], ['focu
 const ROLES = [['principal', 'Imprimer 5 bordereaux', imprimante], ['secondaire', 'Voir les codes', null], ['texte', 'J’ai retiré', null], ['destructif', 'Supprimer l’annonce', null]];
 function Planche() {
   return (
-    <div style={{ padding: 24, display: 'grid', gridTemplateColumns: '120px repeat(5, 260px)', gap: '18px 16px', alignItems: 'start', fontFamily: '-apple-system, system-ui, sans-serif', color: 'var(--v2-page-texte)' }}>
+    <div style={{ padding: 24, display: 'grid', gridTemplateColumns: '96px repeat(5, 276px)', gap: '18px 16px', alignItems: 'start', fontFamily: '-apple-system, system-ui, sans-serif', color: 'var(--v2-page-texte)' }}>
       <span/>{ETATS.map(([e]) => <b key={e} style={{ fontSize: 13 }}>{e}</b>)}
       {ROLES.map(([r, lib, icone]) => (
         <React.Fragment key={r}>
@@ -30,4 +33,9 @@ function Planche() {
     </div>
   );
 }
-createRoot(document.getElementById('r')).render(<Planche/>);
+function Rien() {
+  return <div data-planche-rien="" style={{ width: 390, margin: '0 24px 24px', borderRadius: 28, overflow: 'hidden', background: 'linear-gradient(180deg,var(--sv-haut),var(--sv-bas))' }}>
+    <Aujourdhui titre="Aujourd’hui" affiche={{ n: 0, pasSu: false, sous: '' }} colis={[]} retraits={{ n: 0, pasSu: false, points: [] }} groupes={[]} plein={null} Icon={IconeStub} Plaque={() => null}/>
+  </div>;
+}
+createRoot(document.getElementById('r')).render(<><Planche/><Rien/></>);

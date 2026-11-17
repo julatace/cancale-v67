@@ -23,7 +23,7 @@ export default {
     "one": "Print {n} label",
     "other": "Print {n} labels"
   },
-  "v2.bande.aria": "Pairs to send",
+  "v2.bande.aria": "Parcels to send",
   "v2.retirer.titre": "To pick up",
   "v2.retirer.voir": "See pickup codes",
   "v2.retirer.resume": {

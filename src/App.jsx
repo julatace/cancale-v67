@@ -1050,12 +1050,12 @@ import "./design/verre-annonces.css";   // (15 nov., refonte-journee) Annonces c
 import "./design/verre-restes.css";   // (16 nov., lot design-restes) les restes du verre : la carte qui monte sur Leboncoin, eBay, Vestiaire… — `@layer vrm-verre` : docs/passation/2026-11-16-design-restes.md
 import "./design/verre-argent.css";   // (16 nov., lot argent-mieux) Argent lisible partout : cartes de verre, encre du verre, « Copier » plein, ventes non comptées groupées — `@layer vrm-verre` : docs/passation/2026-11-16-argent-mieux.md
 // (17 nov.) LE NOUVEAU DESIGN « Studio Premium », en essai derrière Paramètres → Apparence (`vrm_design_v2`, éteint par
-// défaut : éteint, rien ne change). Ses règles sont toutes sous `html[data-design="v2"]` ou des classes `.v2-*` neuves.
+// défaut : éteint, rien ne change). Ses règles (src/designV2/design-v2.css, importée par ses composants) sont toutes sous
+// `html[data-design="v2"]` ou des classes `.v2-*` neuves.
 import { useDesignV2, designV2Actif } from "./designV2/reglage.js";
 import AujourdhuiV2 from "./designV2/Aujourdhui.jsx";
 import { PassesRetrait as PassesRetraitV2, EnRouteListe as EnRouteListeV2 } from "./designV2/PassesRetrait.jsx";
 import MenuPlateformeV2 from "./designV2/MenuPlateforme.jsx";
-import "./designV2/design-v2.css";
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
@@ -20189,9 +20189,10 @@ function SelecteurPaires({ tab, setTab, badges, sites }) {
   </div>;
 }
 const lireColisPretsBarre = () => { try { const v = load('vrm_colis_prets', null); return v && typeof v === 'object' ? v : null; } catch (_) { return null; } };
-function BottomBar({tab,setTab,sites,badges,gestes=null}) {
+function BottomBar({tab,setTab,sites,badges,gestes:gestesDisque=null}) {
   // (17 nov., nouveau design) Allumé : pas de disque « + » (les gestes globaux sont dans l'écran, au pouce).
   const designV2=useDesignV2();
+  const gestes=designV2?null:gestesDisque;
   const [plusOuvert,setPlusOuvert]=React.useState(false);
   // (14 nov., Studio bleu clair) « Imprimer N » de l'éventail : ce que « Tout imprimer (N) » de Ventes ferait partir, tel que
   // Ventes le publie (`vrm_colis_prets.lot`, §11 : le même nombre que son bouton) ; pas su ⇒ undefined (jamais un 0 deviné).
@@ -20292,7 +20293,7 @@ function BottomBar({tab,setTab,sites,badges,gestes=null}) {
         <React.Fragment key={t.id}>
         {/* (14 nov., Studio bleu clair) Le DISQUE « + » au centre de la barre : l'éventail des gestes globaux
             (Chercher · Scanner · Publier · Imprimer N), chacun branché sur un geste qui existait déjà. */}
-        {i===POS_DISQUE&&gestes&&!designV2 ? <DisqueEventail gestes={gestes} nImprimer={nImprimer} Retour={FermeAuRetour} ecran={tab}/> : null}
+        {i===POS_DISQUE&&gestes ? <DisqueEventail gestes={gestes} nImprimer={nImprimer} Retour={FermeAuRetour} ecran={tab}/> : null}
         <button type="button" className="vrm-tab" data-nav-entree={t.id} onClick={(e)=>{ setPlusOuvert(false);
           const ic=e.currentTarget.querySelector('.vrm-tab-ic')||e.currentTarget;
           // (14 nov., n° 61) « Paires » ouvre le dernier de ses trois écrans ; retouché sur l'un d'eux, il remonte en haut.
@@ -33135,6 +33136,8 @@ const CLE_RETIRER_OUVERT = 'vrm_achats_retirer_ouvert';
 // colis « à vérifier » ⇒ la ligne reste visible (fermée), avec leur nombre : jamais cachés.
 function RepliRetirerAchats({ children, sansLigne = false }) {
   const [pub] = useLigneSynchro('vrm_colis_retirer', lireColisARetirer);
+  // (17 nov., nouveau design) Allumé : les passes sont compactes — « À retirer » est TOUJOURS ouvert, sans ligne de repli.
+  const designV2 = useDesignV2();
   const lireChoix = () => { try { return localStorage.getItem(CLE_RETIRER_OUVERT); } catch (_) { return null; } };
   const [choix, setChoix] = React.useState(lireChoix);
   const [demande, setDemande] = React.useState(() => Date.now() - DEMANDE_RETIRER.at < 8000);
@@ -33145,13 +33148,13 @@ function RepliRetirerAchats({ children, sansLigne = false }) {
     try { localStorage.setItem(CLE_RETIRER_OUVERT, v); } catch (_) {}
     setDemande(false); setChoix(v);
   };
-  const { n, presse, nVerif, ouvert } = e;
+  const { n, presse, nVerif } = e; const ouvert = designV2 ? true : e.ouvert;
   // Fermée sur Achats · Vinted, la ligne ne se montre que pour des colis « à vérifier » (la bande ne les dit pas).
   const ligneVisible = !sansLigne || ouvert || (!(n > 0) && nVerif > 0);
   const nombreLigne = sansLigne && !ouvert ? null : (n == null ? '—' : n);
   return (
     <div className="vrm-achats-retirer-repli" data-retirer-repli={ouvert ? 'ouvert' : 'ferme'} data-retirer-n={n == null ? '' : String(n)} data-retirer-verif={String(nVerif)}>
-      <button type="button" className="vrm-achats-retirer-ligne" hidden={!ligneVisible} aria-expanded={ouvert} aria-controls="vrm-achats-retirer-corps" onClick={basculer} data-retirer-n={n == null ? '' : String(n)} data-retirer-presse={presse ? '1' : '0'}>
+      <button type="button" className="vrm-achats-retirer-ligne" hidden={!ligneVisible || designV2} aria-expanded={ouvert} aria-controls="vrm-achats-retirer-corps" onClick={basculer} data-retirer-n={n == null ? '' : String(n)} data-retirer-presse={presse ? '1' : '0'}>
         {presse ? <span className="vrm-achats-retirer-point" aria-hidden="true"/> : null}
         <span className="vrm-achats-retirer-titre">{tr('journee.retirer')}</span>
         {nombreLigne != null ? <span className="vrm-achats-retirer-n">{nombreLigne}</span> : null}

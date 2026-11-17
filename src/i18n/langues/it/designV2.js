@@ -23,7 +23,7 @@ export default {
     "one": "Stampa {n} etichetta",
     "other": "Stampa {n} etichette"
   },
-  "v2.bande.aria": "Paia da spedire",
+  "v2.bande.aria": "Pacchi da spedire",
   "v2.retirer.titre": "Da ritirare",
   "v2.retirer.voir": "Vedi i codici di ritiro",
   "v2.retirer.resume": {
