@@ -212,9 +212,10 @@ async function chargementEtMouvement(nav, b) {
   // Ouvert sur une page SANS l'app (aucune lecture, aucun cache), puis la lecture des ventes retenue, puis Ventes.
   const { ctx, pg } = await ouvrir(nav, { W: 390, sombre: false, b, url: '/apple-touch-icon.png' });
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_design_v2', '1'); } catch (_) {} });
-  // La lecture des ventes retenue 5 s (page ET contexte : le service worker de l'app passe par le contexte).
+  // Les lectures retenues 5 s (page ET contexte : le service worker de l'app passe par le contexte).
   const lent = async (r) => { await new Promise((ok) => setTimeout(ok, 5000)); return r.fallback(); };
-  const ventesLues = (u) => /\/rest\/v1\//.test(String(u)) && /orders_sold/.test(decodeURIComponent(String(u)));
+  // Toutes les lectures de la base (ventes, bordereaux, e-mails…) sauf la ligne `main` : rien n'est su pendant 5 s.
+  const ventesLues = (u) => /\/rest\/v1\/app_data/.test(String(u)) && !/id=eq\.main\b/.test(decodeURIComponent(String(u)));
   await pg.route(ventesLues, lent); await ctx.route(ventesLues, lent);
   await pg.goto(`http://localhost:${PORT}/?tab=ventes`, { waitUntil: 'domcontentloaded' });
   const vu = { squelette: false, blanc: 0, ligne: false };
