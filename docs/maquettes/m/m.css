@@ -1,0 +1,181 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   MAQUETTE M « UNE MAIN » (17 nov.) — page autonome, rien de src/.
+   Une AUTRE app : papier, encre, un champ vert bouteille en haut ; un serif d'étiquette (Fraunces)
+   pour ce qu'on LIT de loin (le chiffre, le N°, le prix, le code) ; un grotesque net (Instrument Sans)
+   pour le reste. Ni dégradé, ni verre, ni capsule : des filets, des aplats, des angles de 10 px.
+   Trois tailles de texte : 72 · 22 · 16. Une grille de 8. Un seul accent (le vert du champ), rare :
+   le filtre choisi, l'onglet courant. Ambre = un geste à faire. Rouge = deux paires sous un N°.
+   Ce qu'on prend : Safari (chercher EN BAS, la barre qui se replie) · Plans (la feuille à deux crans) ·
+   Things 3 (le calme, l'air, des lignes qui ne crient pas).
+   ════════════════════════════════════════════════════════════════════════════ */
+@font-face { font-family: 'Fraunces M'; src: url('polices/fraunces.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: 'Instrument M'; src: url('polices/instrument-sans.woff2') format('woff2'); font-weight: 400 700; font-display: swap; }
+
+:root {
+  --papier: #FBFAF7; --papier-2: #F2F0EA; --champ: #1D3A2E; --champ-encre: #F4F1E8; --champ-encre-2: #B9C7BC;
+  --encre: #141414; --encre-2: #66655E; --filet: #E3E0D8; --accent: #1D3A2E;
+  --ambre: #8F5200; --point: #D98A1C; --rouge: #B3261E;
+  --plein: #141414; --plein-encre: #FBFAF7; --geste: #141414; --geste-encre: #FBFAF7;
+  --ph-fond: #ECEAE3; --ph-trait: #2A2A27; --ph-semelle: #FBFAF7;
+  --serif: 'Fraunces M', 'Iowan Old Style', Georgia, serif; --sans: 'Instrument M', -apple-system, 'Helvetica Neue', sans-serif;
+  --g: 16px; --r: 10px;
+  --ease: cubic-bezier(.23, 1, .32, 1); --ease-feuille: cubic-bezier(.32, .72, 0, 1);
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --papier: #0F100E; --papier-2: #191A17; --champ: #10241B; --champ-encre: #EDEBE3; --champ-encre-2: #93A699;
+  --encre: #EDEBE5; --encre-2: #9C9A92; --filet: #2A2B27; --accent: #8CC7A5;
+  --ambre: #E8A94E; --point: #E8A94E; --rouge: #FF8A80;
+  --plein: #EDEBE5; --plein-encre: #0F100E; --geste: #EDEBE5; --geste-encre: #0F100E;
+  --ph-fond: #1E1F1C; --ph-trait: #0B0B0A; --ph-semelle: #D9D6CC;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; background: var(--champ); overscroll-behavior-y: none; }
+body { margin: 0; background: var(--papier); color: var(--encre); font: 400 16px/1.4 var(--sans); font-feature-settings: 'tnum' 1; -webkit-font-smoothing: antialiased; }
+::selection { background: color-mix(in oklab, var(--accent) 25%, transparent); }
+button { font: inherit; color: inherit; background: none; border: 0; margin: 0; padding: 0; cursor: pointer; text-align: inherit; touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+:is(button, input):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+p, h2, ol, ul, dl, dd { margin: 0; }
+.ico { flex: none; display: block; }
+.pt { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--point); margin-right: 8px; vertical-align: 1px; flex: none; }
+
+/* ── EN HAUT, À LIRE : le champ vert. Le nom (16), LE chiffre (72, serif), sa légende (16). ── */
+.lire { background: var(--champ); color: var(--champ-encre); padding: calc(env(safe-area-inset-top) + 8px) var(--g) 32px; }
+.lire-l { display: flex; align-items: center; justify-content: space-between; min-height: 44px; }
+.sur { font-size: 16px; font-weight: 600; color: var(--champ-encre-2); }
+.sur::first-letter { text-transform: uppercase; }
+.aide { width: 44px; height: 44px; margin-right: -11px; display: grid; place-items: center; color: var(--champ-encre-2); border-radius: 22px; }
+.affiche { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.chiffre { font: 300 72px/.95 var(--serif); font-variation-settings: 'opsz' 144, 'SOFT' 100; letter-spacing: -.035em; font-feature-settings: 'lnum' 1, 'tnum' 1; white-space: nowrap; }
+.legende { font-size: 16px; color: var(--champ-encre-2); }
+
+/* ── LA LISTE, sur papier. Elle passe SOUS le bas (qui est plein, pas en verre). ── */
+.liste { padding: 0 0 calc(196px + env(safe-area-inset-bottom)); min-height: 60vh; }
+.gr + .gr { margin-top: 16px; }
+.gr-t { position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 24px var(--g) 8px; background: var(--papier);
+  font-size: 16px; font-weight: 600; border-bottom: 1px solid var(--filet); }
+.gr-t span:first-child::first-letter { text-transform: uppercase; }
+.gr-n { font-weight: 400; color: var(--encre-2); }
+.ls { list-style: none; padding: 0; }
+.lieu-t { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 24px var(--g) 0; font: 500 22px/1.2 var(--serif); font-variation-settings: 'opsz' 48; letter-spacing: -.01em; }
+.lieu-t .li-etat { font: 600 16px var(--sans); }
+.lieu-a { padding: 4px var(--g) 8px; color: var(--encre-2); border-bottom: 1px solid var(--filet); }
+
+/* LA LIGNE : 88 px, photo 56 à angle de 6, N° en serif 22, titre 16 (deux lignes au plus, jamais coupé), prix serif 22 à droite. */
+.li { position: relative; overflow: hidden; border-bottom: 1px solid var(--filet); content-visibility: auto; contain-intrinsic-size: auto 88px; }
+.li-corps { position: relative; z-index: 1; display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; align-items: center; column-gap: 16px; width: 100%; min-height: 88px; padding: 16px var(--g);
+  background: var(--papier); transition: transform 380ms var(--ease); touch-action: pan-y; }
+.li.is-tenue .li-corps { transition: none; }
+.li.is-ouverte .li-corps { transform: translateX(-96px); }
+.li-corps:active { background: var(--papier-2); }
+.li-v { display: block; width: 56px; height: 56px; }
+.li-m { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.li-n { font: 500 22px/1.15 var(--serif); font-variation-settings: 'opsz' 36; font-feature-settings: 'lnum' 1, 'tnum' 1; letter-spacing: -.01em; white-space: nowrap; }
+.li-npre { font: 500 16px var(--sans); color: var(--encre-2); margin-right: 6px; letter-spacing: 0; }
+.li-sansn { font: 600 16px var(--sans); color: var(--ambre); }
+.li-mot { font-size: 16px; font-weight: 600; line-height: 1.3; text-wrap: balance; }
+.li-sous { font-size: 16px; line-height: 1.3; color: var(--encre-2); text-wrap: pretty; overflow-wrap: anywhere; }
+.li-sous:empty { display: none; }
+.li-d { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.li-val { font: 400 22px/1.15 var(--serif); font-variation-settings: 'opsz' 36; font-feature-settings: 'lnum' 1, 'tnum' 1; white-space: nowrap; color: var(--encre); }
+.li-val .ico { color: var(--encre-2); }
+.li-etat { display: inline-flex; align-items: center; font-size: 16px; color: var(--encre-2); white-space: nowrap; }
+.li-etat.is-ambre { color: var(--ambre); font-weight: 600; }
+.li-geste { position: absolute; inset: 0 0 0 auto; width: 96px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  background: var(--geste); color: var(--geste-encre); font-size: 16px; font-weight: 600; }
+.code { font: 500 22px/1.15 var(--serif); font-variation-settings: 'opsz' 36; font-feature-settings: 'lnum' 1, 'tnum' 1; letter-spacing: .08em; }
+.badge-qr { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--filet); border-radius: 6px; color: var(--encre); }
+.tuile { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 6px; background: var(--papier-2); color: var(--encre); box-shadow: inset 0 0 0 1px var(--filet); }
+.ph { display: block; border-radius: 6px; }
+.ph-fond { fill: var(--ph-fond); }
+.ph-trait { stroke: var(--ph-trait); stroke-width: 1.6; stroke-linejoin: round; }
+.ph-semelle { fill: var(--ph-semelle); }
+.ph-ligne { fill: none; stroke: var(--ph-trait); stroke-width: 1.4; stroke-linecap: round; opacity: .55; }
+.pile { position: relative; display: block; width: 56px; height: 56px; }
+.pile-p { position: absolute; left: calc(var(--i) * 6px); top: calc(var(--i) * 6px); width: 44px; height: 44px; border-radius: 6px; box-shadow: 0 0 0 2px var(--papier); }
+.pile-p:nth-child(1) { z-index: 3; } .pile-p:nth-child(2) { z-index: 2; } .pile-p:nth-child(3) { z-index: 1; }
+
+/* ── EN BAS, AU POUCE : filtres · chercher + LE geste · onglets. Un aplat, un filet, rien qui flotte. ── */
+.pouce { position: fixed; z-index: 20; left: 0; right: 0; bottom: 0; background: var(--papier-2); border-top: 1px solid var(--filet); padding-bottom: env(safe-area-inset-bottom); }
+.filtres { display: flex; gap: 24px; overflow-x: auto; scrollbar-width: none; padding: 0 var(--g); overscroll-behavior-x: contain; }
+.filtres::-webkit-scrollbar { display: none; }
+.filtre { position: relative; flex: none; display: inline-flex; align-items: center; gap: 6px; height: 48px; font-size: 16px; color: var(--encre-2); white-space: nowrap; }
+.filtre[aria-selected="true"] { color: var(--encre); font-weight: 600; }
+.filtre[aria-selected="true"]::after { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--accent); }
+.filtre-n { color: var(--encre-2); font-weight: 400; }
+.filtre-c { color: var(--encre-2); }
+.pouce-l { display: flex; gap: 8px; padding: 0 var(--g) 8px; }
+.cherche { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 8px; height: 52px; padding: 0 14px; border-radius: var(--r); background: var(--papier); color: var(--encre-2); box-shadow: inset 0 0 0 1px var(--filet); }
+.cherche input { flex: 1; min-width: 0; height: 100%; border: 0; background: none; outline: 0; font: 400 16px var(--sans); color: var(--encre); -webkit-appearance: none; }
+.cherche input::placeholder { color: var(--encre-2); }
+.cherche:focus-within { box-shadow: inset 0 0 0 2px var(--accent); }
+.plein { flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 52px; padding: 0 20px; border-radius: var(--r); background: var(--plein); color: var(--plein-encre);
+  font-size: 16px; font-weight: 600; white-space: nowrap; transition: transform 120ms var(--ease); }
+.plein:active, .onglet:active, .filtre:active { transform: scale(.97); }
+.plein-l { width: 100%; height: 56px; }
+.onglets { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border-top: 1px solid var(--filet); }
+.onglet { position: relative; display: grid; place-items: center; height: 52px; font-size: 16px; color: var(--encre-2); white-space: nowrap; }
+.onglet[aria-current] { color: var(--encre); font-weight: 600; }
+.onglet[aria-current]::before { content: ''; position: absolute; top: 8px; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+body.is-replie .filtres, body.is-replie .onglets { display: none; }
+body.is-replie .pouce-l { padding-top: 8px; }
+
+/* ── LA FEUILLE : monte du bas, deux crans (moyen 64 %, grand). ── */
+.voile { position: fixed; inset: 0; z-index: 40; background: rgb(10 12 10 / .42); animation: fondu 220ms ease-out; }
+.feuille { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; background: var(--papier); border-radius: 14px 14px 0 0; animation: monte 420ms var(--ease-feuille);
+  transition: transform 360ms var(--ease-feuille), height 360ms var(--ease-feuille); }
+.feuille.is-tenue { transition: none; }
+.feuille.is-moyen { height: 66dvh; }
+.feuille.is-grand { height: calc(100dvh - env(safe-area-inset-top) - 48px); }
+.poignee { flex: none; display: grid; place-items: center; height: 28px; touch-action: none; cursor: grab; }
+.poignee span { width: 36px; height: 5px; border-radius: 3px; background: var(--filet); }
+.feuille-c { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 8px var(--g) 16px; }
+.feuille-p { flex: none; padding: 8px var(--g) calc(env(safe-area-inset-bottom) + 16px); border-top: 1px solid var(--filet); }
+@keyframes monte { from { transform: translateY(100%); } }
+@keyframes fondu { from { opacity: 0; } }
+
+.fi-tete { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 16px; align-items: center; }
+.fi-n { font: 300 72px/.95 var(--serif); font-variation-settings: 'opsz' 144, 'SOFT' 100; letter-spacing: -.035em; font-feature-settings: 'lnum' 1; white-space: nowrap; }
+.fi-n .li-npre { vertical-align: 32px; }
+.fi-titre { margin-top: 8px; text-wrap: pretty; }
+.fi-compte { color: var(--encre-2); }
+.trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 24px; border-top: 1px solid var(--filet); border-bottom: 1px solid var(--filet); }
+.trio div { padding: 16px 0; }
+.trio div + div { padding-left: 16px; border-left: 1px solid var(--filet); }
+.trio dt { color: var(--encre-2); }
+.trio dd { margin-top: 4px; font: 400 22px/1.15 var(--serif); font-variation-settings: 'opsz' 36; font-feature-settings: 'lnum' 1, 'tnum' 1; white-space: nowrap; }
+.vie { list-style: none; padding: 8px 0 0; }
+.vie-e { position: relative; display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; column-gap: 16px; align-items: center; min-height: 48px; }
+.vie-e + .vie-e::before { content: ''; position: absolute; left: 11.5px; top: -12px; height: 24px; width: 1px; background: var(--filet); }
+.vie-p { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--filet); color: var(--papier); }
+.vie-e.is-fait .vie-p { background: var(--encre); box-shadow: none; }
+.vie-e.is-geste .vie-p { box-shadow: inset 0 0 0 2px var(--point); }
+.vie-e.is-passu, .vie-e.is-avenir { color: var(--encre-2); }
+.vie-d { color: var(--encre-2); white-space: nowrap; }
+.vie-d.is-ambre { color: var(--ambre); font-weight: 600; }
+
+.re { display: flex; flex-direction: column; align-items: center; text-align: center; padding-top: 8px; }
+.re-lieu { font: 500 22px/1.2 var(--serif); font-variation-settings: 'opsz' 48; }
+.re-adr { margin-top: 4px; color: var(--encre-2); }
+.re-code { margin-top: 24px; font: 300 72px/1 var(--serif); font-variation-settings: 'opsz' 144, 'SOFT' 100; font-feature-settings: 'lnum' 1, 'tnum' 1; letter-spacing: .02em; -webkit-user-select: all; user-select: all; }
+.re-esp { display: inline-block; width: 16px; }
+.qr { display: block; width: 208px; height: 208px; margin-top: 24px; border-radius: 6px; box-shadow: 0 0 0 1px var(--filet); shape-rendering: crispEdges; }
+.re-art { margin-top: 24px; color: var(--encre-2); }
+
+/* ══ L'ORDINATEUR (≥ 1100) : le champ vert devient une colonne (on lit à gauche), la liste au centre, le bas sous la liste. ══ */
+@media (min-width: 1100px) {
+  html { background: var(--papier); }
+  .app { display: grid; grid-template-columns: 440px minmax(0, 1fr); min-height: 100vh; }
+  .lire { position: sticky; top: 0; height: 100vh; padding: 48px 48px; }
+  .chiffre, .fi-n { font-size: 72px; }
+  .affiche { margin-top: 48px; }
+  .liste { max-width: 760px; width: 100%; margin: 0 auto; padding-top: 24px; padding-bottom: 200px; }
+  .pouce { left: calc(440px + (100vw - 440px - 760px) / 2); right: auto; width: 760px; border: 1px solid var(--filet); border-bottom: 0; border-radius: 12px 12px 0 0; }
+  .feuille { left: auto; right: calc((100vw - 440px - 760px) / 2); width: 760px; }
+  .li-corps:hover { background: var(--papier-2); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .feuille, .voile { animation: fondu 200ms ease-out; }
+  .li-corps, .feuille { transition: none; }
+}
