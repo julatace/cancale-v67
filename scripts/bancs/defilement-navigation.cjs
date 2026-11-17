@@ -115,6 +115,7 @@ const segment = async (pg, libelle) => {
       await barre(pg, 'journee');
       await pg.waitForSelector('.vrm-main [data-tuile]', { timeout: 15000 }).catch(() => {});
       const cartes = await pg.evaluate(() => [...document.querySelectorAll('.vrm-main [data-tuile], .vrm-main [data-sj-lien]')].filter((x) => x.getClientRects().length).map((x, i) => { x.setAttribute('data-banc-carte', String(i)); return { i, t: (x.innerText || '').split('\n')[0].slice(0, 30) }; }));
+      console.log(`   (N3 : ${cartes.length} cartes : ${cartes.map((c) => c.t).join(' | ')})`);
       let vues = 0;
       for (const c of cartes) {
         await barre(pg, 'journee');
@@ -124,7 +125,7 @@ const segment = async (pg, libelle) => {
         await l.first().tap({ timeout: 4000 }).catch(() => {});
         await attendre(pg, 2200);
         const e = await etat(pg);
-        if (e.ecran === avant.ecran) continue;   // une carte qui ne change pas d'écran (feuille, geste)
+        if (e.ecran === avant.ecran) { console.log(`   (N3 « ${c.t} » : reste sur ${e.ecran})`); continue; }   // une carte qui ne change pas d'écran (feuille, geste)
         vues++;
         dit(e.top === 0, `N3 Ma journée → carte « ${c.t} » ouvre ${e.ecran} EN HAUT`, JSON.stringify(e));
         dit(e.actif === ATTENDU[e.ecran] || !ATTENDU[e.ecran], `N6 carte « ${c.t} » : l’onglet allumé (${e.actif}) est celui de ${e.ecran}`, JSON.stringify(e));
@@ -137,7 +138,8 @@ const segment = async (pg, libelle) => {
       await barre(pg, id);
       const e = await etat(pg);
       dit(e.actif === ATTENDU[e.ecran], `N6 ${id} : l’onglet allumé (${e.actif}) est celui de l’écran montré (${e.ecran})`, JSON.stringify(e));
-      await defiler(pg, 1e7); await attendre(pg, 700); await defiler(pg, 1e7); await attendre(pg, 500);
+      // Tout en bas, une fois le contenu arrivé (la hauteur ne bouge plus).
+      for (let k = 0, h0 = -1; k < 8; k++) { await defiler(pg, 1e7); await attendre(pg, 700); const h = await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); return m.scrollHeight; }); if (h === h0) break; h0 = h; }
       const b = await pg.evaluate(() => {
         const bar = document.querySelector('.vrm-tabbar'); const m = document.querySelector('.vrm-main'); if (!bar || !m) return null;
         const haut = bar.getBoundingClientRect().top;

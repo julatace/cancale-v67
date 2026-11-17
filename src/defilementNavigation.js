@@ -16,16 +16,18 @@
 // ════════════════════════════════════════════════════════════════════════════
 
 const etat = { garderAt: 0 };
-const VALIDITE_MS = 4000;
+// Un toucher de la barre vaut pour l'écran qui s'ouvre JUSTE après (sa clé peut changer deux fois de suite :
+// l'onglet, puis son site/segment) — pas pour un geste fait plus tard.
+const VALIDITE_MS = 1500;
 
 // La barre / la colonne : le prochain écran monté garde SA position (s'il en a une).
 export function revenirSurOnglet(now = Date.now()) { etat.garderAt = now; }
-// Lu une fois par l'écran qui s'ouvre (puis oublié) : vrai seulement juste après un toucher de la barre.
+// Lu par l'écran qui s'ouvre : vrai seulement juste après un toucher de la barre (1,5 s).
 export function prendreRetourOnglet(now = Date.now()) {
-  const g = etat.garderAt > 0 && now - etat.garderAt >= 0 && now - etat.garderAt < VALIDITE_MS;
-  etat.garderAt = 0;
-  return g;
+  return etat.garderAt > 0 && now - etat.garderAt >= 0 && now - etat.garderAt < VALIDITE_MS;
 }
+// Un geste qui n'est pas la barre (une carte, un bouton) efface le toucher d'avant.
+export function oublierRetourOnglet() { etat.garderAt = 0; }
 // La position où ouvrir : la position gardée seulement pour une reprise ou un retour par la barre ; sinon 0.
 export function positionAOuvrir({ premier = false, retourOnglet = false, memorisee = 0 } = {}) {
   const m = Number(memorisee);
