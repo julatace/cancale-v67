@@ -97,3 +97,8 @@
 .v2l-a { content-visibility: auto; contain-intrinsic-size: auto 88px; }
 .v2l-c { content-visibility: auto; contain-intrinsic-size: auto 144px; }
 @media (prefers-reduced-motion: reduce) { .v2l-photo img, .v2-bande-photo img, .v2-vignette img { animation: none; } }
+
+/* 7. L'ATTENTE DU CHIFFRE : la même boîte (56 de haut), un pavé calme ; la ligne du dessous toujours réservée. */
+.v2-affiche-reserve { min-height: calc(56px + 4px + 20px); }
+.v2-affiche-attente { display: inline-block; width: 1.4em; height: 44px; margin-top: 6px; vertical-align: top; border-radius: 12px; background: rgb(255 255 255 / .16); }
+html body .v2-affiche-sig-sous { min-height: 20px; }

@@ -124,5 +124,6 @@ export default {
   },
   "v2.tousPrets": "tutti pronti da stampare",
   "v2.achats.ajouterCourt": "Aggiungi",
-  "v2.reessayer": "Riprova"
+  "v2.reessayer": "Riprova",
+  "v2.achats.annules": "Annullati"
 };

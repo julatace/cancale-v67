@@ -198,7 +198,7 @@ html body button.v2-rangee.v2-passe-mini { flex-direction: column; align-items: 
 
 /* Le geste plein AU POUCE : collé au-dessus de la barre du bas (téléphone). */
 .v2-pouce { position: fixed; left: 16px; right: 16px; bottom: calc(var(--vrm-barre-bas, 84px) + 24px); z-index: 30; }
-@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
   .v2-ecran { padding: 12px 32px 32px; max-width: 1080px; }
   .v2-ecran[data-v2-plein="1"] { padding-bottom: 32px; }
   /* L'ordinateur : le plein EN HAUT À DROITE, sur la ligne du titre. */
@@ -273,7 +273,7 @@ html body button.v2b-secondaire[data-v2b-force="appui"] { background: var(--v2-t
 html body button.v2b[data-v2b-force="focus"] { box-shadow: var(--v2-anneau); }
 /* Un message passager (« toast ») ne couvre jamais le geste du jour : posé au-dessus du plein quand il y en a un. */
 html[data-design="v2"] body:has(.v2-pouce) .vrm-toasts[data-toasts-place="bas"] { bottom: calc(var(--vrm-barre-bas, 84px) + var(--v2-bouton-h) + 40px) !important; }
-@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) { html[data-design="v2"] body:has(.v2-pouce) .vrm-toasts[data-toasts-place="bas"] { bottom: 24px !important; } }
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) { html[data-design="v2"] body:has(.v2-pouce) .vrm-toasts[data-toasts-place="bas"] { bottom: 24px !important; } }
 
 /* ══ 7. ANNONCES (nouveau design, 17 nov. — la capture de Julien : « les boutons sont dégueulasses, mal proportionné ») ══
    Ordre : grand titre · « Vinted · Tous les comptes ⌄ » · UN segmenté · la recherche et « ⋯ » à la même hauteur · la liste. */
@@ -482,3 +482,73 @@ html[data-grand-texte] body button.v2b-principal { height: auto; min-height: var
   html[data-design="v2"] body .vrm-neuf-hote { top: auto; bottom: calc(var(--vrm-barre-bas, 84px) + 16px + env(safe-area-inset-bottom, 0px)); }
   html[data-design="v2"] body:has(.v2-pouce) .vrm-neuf-hote { bottom: var(--v2-pile-bas); }
 }
+/* Constat 10. Sur ordinateur, « Extension à installer » (la pastille d'état de l'île du haut) n'est plus un plein : teintée, comme un secondaire. */
+@media (min-width: 1024px) {
+  html[data-design="v2"]:root body .vrm-app-header .vrm-etat-pastille[data-etat-code] { background: var(--v2-teinte-fond) !important; color: var(--v2-teinte-texte) !important; border-color: transparent !important; box-shadow: none !important; }
+}
+
+/* ══ 14. L'AIR (17 nov. soir, Julien : « c'est trop compacté, ça doit être moins compact ») ═════════════════════
+   L'échelle d'espacement OBLIGATOIRE du nouveau design, en jetons partagés (les écrans de la phase 2 les reprennent),
+   mesurée par le banc design-v2-chargement (§ AIR) : marge intérieure d'une carte ≥ 20 (24 à l'ordinateur), 16 entre
+   deux cartes, 32 entre deux sections, 12 du titre de section au contenu, ≥ 12 entre deux boutons, rangée ≥ 64,
+   interligne 1,4. Une carte = un groupe de lignes ; jamais une carte vide. */
+:root {
+  --v2-air-carte: 20px;       /* marge intérieure d'une carte (texte jamais à moins du bord) */
+  --v2-air-cartes: 16px;      /* entre deux cartes */
+  --v2-air-sections: 32px;    /* entre deux sections */
+  --v2-air-titre: 12px;       /* titre de section → contenu */
+  --v2-air-boutons: 12px;     /* entre deux boutons voisins */
+  --v2-air-rangee: 64px;      /* hauteur minimale d'une rangée de liste */
+  --v2-air-interligne: 1.4;   /* texte courant */
+}
+@media (min-width: 1024px) { :root { --v2-air-carte: 24px; } }
+/* Sections : 32 entre elles ; le titre de section → contenu : 12. */
+html body .v2-affiche-sig { margin: 16px 0 var(--v2-air-sections); }
+.v2-bande, .v2-groupe, .v2-afaire, .v2-passes, [data-v2-en-route] { margin-bottom: var(--v2-air-sections); }
+.v2-groupe-titre { margin: 0 4px var(--v2-air-titre); }
+/* Cartes : 16 entre elles. */
+.v2-passes { gap: var(--v2-air-cartes); }
+html body .v2-bande { gap: var(--v2-air-cartes); }
+/* Rangées : ≥ 64, le texte à 20 du bord de la carte. */
+.v2-afaire-ligne { min-height: var(--v2-air-rangee); padding: 12px var(--v2-air-carte); gap: 16px; }
+html body button.v2-rangee.v2-ligne, div.v2-ligne { min-height: max(76px, var(--v2-air-rangee)); padding: 12px var(--v2-air-carte); gap: 16px; }
+.v2-afaire-ligne + .v2-afaire-ligne::before, .v2-liste > .v2-ligne + .v2-ligne::before { left: calc(var(--v2-air-carte) + 72px); }
+html body button.v2-rangee.v2-passe-mini { padding: var(--v2-air-carte); gap: 12px; }
+.v2-passe-tete { padding: 12px var(--v2-air-carte); }
+.v2-passe-lieu { padding: 16px var(--v2-air-carte) 4px; }
+.v2-passe .v2-ticket-corps { padding: 12px var(--v2-air-carte) var(--v2-air-carte); gap: 12px; }
+.v2-passe-gestes { gap: var(--v2-air-boutons); }
+.v2-passe-pages { padding: 0 var(--v2-air-carte) 16px; }
+.v2-erreur { padding: 24px var(--v2-air-carte); }
+/* Annonces : la rangée A respire (12 dessus/dessous, 20 sur les côtés), C 20 partout. */
+.v2l-a { padding: 12px var(--v2-air-carte); min-height: 88px; }
+.v2l-a + .v2l-a::before, .vrm-ann-card[hidden] + .v2l-a::before { left: calc(var(--v2-air-carte) + 80px); }
+.v2l-c { padding: var(--v2-air-carte); height: calc(88px + 2 * var(--v2-air-carte)); }
+.v2l-c + .v2l-c::before, .vrm-ann-card[hidden] + .v2l-c::before { left: calc(var(--v2-air-carte) + 104px); }
+html body .v2l-c { contain-intrinsic-size: auto calc(88px + 2 * var(--v2-air-carte)); }
+.v2-ann-groupe { padding: 20px var(--v2-air-carte) 8px; }
+html[data-design="v2"] body .v2-ann-segment { margin: 8px 0 16px; }
+/* Le squelette a la forme EXACTE des rangées (mêmes marges, mêmes hauteurs). */
+html body .v2-squelette-rangee { height: auto; min-height: 88px; padding: 12px var(--v2-air-carte); }
+html body .v2-squelette-C .v2-squelette-rangee { height: calc(88px + 2 * var(--v2-air-carte)); padding: var(--v2-air-carte); }
+/* Texte courant : interligne 1,4. */
+html body :is(.v2-afaire-detail, .v2-ligne-meta, .v2-rien-sous, .v2-affiche-sig-sous, .v2-passe-mini-bas, .v2-ann-arelier) { line-height: var(--v2-air-interligne); }
+/* Boutons voisins : 12 au moins. */
+.v2-titre-ligne { column-gap: var(--v2-air-boutons); }
+/* La carte de la bande en attente : la même boîte que la carte décrite (rien ne bouge quand la photo arrive). */
+.v2-bande-attente { display: flex; flex-direction: column; align-items: stretch; gap: 4px; }
+.v2-bande-attente .v2-bande-photo { background: rgb(255 255 255 / .16); }
+/* AIR · boutons voisins ≥ 12 : le menu plateforme et « ? », la recherche et « ⋯ ». */
+html body .v2-sous-titre { gap: var(--v2-air-boutons); }
+html[data-design="v2"] body .vrm-annbar { gap: var(--v2-air-boutons) !important; }
+/* Achats, allumé : la liste d'hier (sous les passes) attend avec elles ⇒ tout arrive d'un coup, rien n'est poussé. */
+html[data-design="v2"] body:has([data-v2-attente-retirer]) .vrm-main .vrm-market-space { display: none !important; }
+/* L'ordinateur : le plein sur la ligne du titre, À GAUCHE du « Scanner » (44 + 12) — il le couvrait (banc T, 1512). */
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
+  .v2-aujourdhui:has([data-v2-scanner]) .v2-pouce { right: calc(32px + 44px + var(--v2-air-boutons, 12px)); }
+}
+/* A : UNE hauteur pour toutes les rangées (titre sur une ligne ou deux, faits ou pas) — 120, le squelette aussi. */
+html body .v2l-a { min-height: 120px; contain-intrinsic-size: auto 120px; }
+html body .v2-squelette-A .v2-squelette-rangee { min-height: 120px; }
+/* L'en-tête de compte que la liste posera : le squelette le réserve déjà (même hauteur), rien ne glisse. */
+.v2-squelette-tete { display: block; height: 44px; }

@@ -11,6 +11,7 @@ import React from 'react';
 import { tr } from '../i18n/index.js';
 import { BoutonV2 } from './BoutonV2.jsx';
 import './design-v2.css';
+import './achats-v2.css';
 import { Etiquette, Ticket, RangeeFaite } from './Signature.jsx';
 
 // Le QR lu (e-mail ou capture). Une image qui ne se charge pas ne se montre pas (jamais une image cassée au comptoir).
@@ -87,7 +88,7 @@ export function PassesRetrait({ points = [], Icon, Photo, Plaque, aides }) {
   const avecColis = points.map((p) => ({ ...p, arrives: (p.arrives || []).filter(aPresenter) })).filter((p) => p.arrives.length > 0);
   if (!avecColis.length) return null;
   return (
-    <div className="v2-passes" data-v2-passes={String(avecColis.length)}>
+    <div className="v2-passes" data-v2-bloc="passes" data-v2-passes={String(avecColis.length)}>
       {avecColis.map((p, k) => <Passe key={(p.numero || 'x') + ':' + k} p={p} Icon={Icon} Photo={Photo} Plaque={Plaque} aides={aides}/>)}
     </div>
   );
@@ -98,7 +99,7 @@ export function PassesRetrait({ points = [], Icon, Photo, Plaque, aides }) {
 export function EnRouteListe({ lignes = [], Icon, Photo, onOuvrir = null, max = 40, touteSansPoint = false }) {
   if (!lignes.length) return null;
   return (
-    <section className="v2-groupe" data-v2-en-route={String(lignes.length)} aria-label={tr('v2.enRoute.titre')}>
+    <section className="v2-groupe" data-v2-bloc="enroute" data-v2-en-route={String(lignes.length)} aria-label={tr('v2.enRoute.titre')}>
       <h2 className="v2-groupe-titre"><span>{tr('v2.enRoute.titre')}</span><span className="v2-groupe-n">{lignes.length}{touteSansPoint ? ' · ' + tr('v2.enRoute.pointPasDit') : ''}</span></h2>
       <div className="v2-liste">
         {lignes.slice(0, max).map((l, k) => {
@@ -110,12 +111,9 @@ export function EnRouteListe({ lignes = [], Icon, Photo, onOuvrir = null, max = 
             </span>
             <span className="v2-ligne-txt">
               <span className="v2-ligne-titre">{l.titre || tr('v2.enRoute.sansTitre')}</span>
-              <span className="v2-ligne-meta">{[l.num ? 'N° ' + l.num : '', l.compte].filter(Boolean).join(' · ') || ' '}</span>
+              <span className="v2-ligne-meta">{[l.num ? 'N° ' + l.num : '', l.compte, l.point].filter(Boolean).join(' · ') || '\u00a0'}</span>
             </span>
-            <span className="v2-ligne-droite">
-              <span className="v2-ligne-valeur">{l.prix || ''}</span>
-              <span className="v2-ligne-meta">{l.point || tr('v2.enRoute.pointPasDit')}</span>
-            </span>
+            {l.prix ? <span className="v2-ligne-droite"><span className="v2-ligne-valeur">{l.prix}</span></span> : null}
             {onOuvrir ? <span className="v2-chevron" aria-hidden="true"><Icon name="chevron" size={16}/></span> : null}
           </Corps>); })}
       </div>

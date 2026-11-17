@@ -28,15 +28,17 @@ export function Etiquette({ num, double = false, taille = 'petit', titre }) {
 
 // 2. LE CHIFFRE D'AFFICHE. `n` : un nombre (formaté fr-FR, espace fine), `null` = pas su (« — »).
 //    `unite` (« € ») se pose collée au chiffre ; `mot` sur la même ligne de base ; `sous` en dessous (l'écart nommé).
-export function ChiffreAffiche({ n, unite = '', mot, sous = '', ambre = false, attrs = {} }) {
+//    `attente` : la lecture est EN COURS (≠ « pas su ») — un pavé de la taille du chiffre, la même boîte, la ligne du
+//    dessous réservée : rien ne bouge quand le chiffre arrive (17 nov., « quand ça charge tout bouge bizarrement »).
+export function ChiffreAffiche({ n, unite = '', mot, sous = '', ambre = false, attrs = {}, attente = false }) {
   const txt = n == null || !Number.isFinite(Number(n)) ? '—' : nombre(Number(n));
   return (
-    <div className="v2-affiche-sig" data-v2-affiche={n == null ? '' : String(n)} {...attrs}>
+    <div className="v2-affiche-sig v2-affiche-reserve" data-v2-affiche={attente || n == null ? '' : String(n)} data-v2-attente={attente ? '1' : undefined} aria-busy={attente ? 'true' : undefined} {...attrs}>
       <div className="v2-affiche-sig-ligne">
-        <b className="v2-affiche-sig-n">{txt}{unite && txt !== '—' ? <span className="v2-affiche-sig-unite">{' ' + unite}</span> : null}</b>
+        <b className="v2-affiche-sig-n">{attente ? <span className="v2-affiche-attente" aria-hidden="true"/> : txt}{unite && txt !== '—' ? <span className="v2-affiche-sig-unite">{' ' + unite}</span> : null}</b>
         {mot ? <span className="v2-affiche-sig-mot">{mot}</span> : null}
       </div>
-      {sous ? <div className={'v2-affiche-sig-sous' + (ambre ? ' is-ambre' : '')} data-v2-ecart="">{sous}</div> : null}
+      <div className={'v2-affiche-sig-sous' + (ambre && !attente ? ' is-ambre' : '')} data-v2-ecart="">{attente ? '\u00a0' : (sous || '\u00a0')}</div>
     </div>
   );
 }
@@ -78,15 +80,28 @@ export function RangeeFaite({ fait = false, onFin, children, className = '', att
 
 // 5. LE SQUELETTE : la forme EXACTE des rangées (photo, titre, ligne de faits) pendant la lecture — jamais d'écran blanc.
 //    `variante` 'A' (Liste, 88 px) ou 'C' (Détaillé, 120 px) ; un balayage lent, coupé en mouvement réduit.
-export function SqueletteRangees({ variante = 'A', n = 8, label = '' }) {
+//    `entete` : la liste posera un en-tête de groupe (le compte) au-dessus de ses rangées ⇒ sa place, réservée.
+export function SqueletteRangees({ variante = 'A', n = 8, label = '', entete = false }) {
   return (
     <div className={'v2-squelette v2-squelette-' + variante} role="status" aria-busy="true" aria-label={label || undefined} data-v2-squelette={variante}>
+      {entete ? <span className="v2-squelette-tete" aria-hidden="true"/> : null}
       {Array.from({ length: n }, (_, i) => (
-        <div key={i} className="v2-squelette-rangee" aria-hidden="true">
+        <div key={'squelette-' + i} className="v2-squelette-rangee" aria-hidden="true">
           <span className="v2-squelette-photo"/>
           <span className="v2-squelette-txt"><span className="v2-squelette-l1"/><span className="v2-squelette-l2"/>{variante === 'C' ? <span className="v2-squelette-l3"/> : null}</span>
         </div>
       ))}
     </div>
   );
+}
+
+// 6. QUAND C'EST LU : rien n'est posé avant que les lectures d'un bloc soient arrivées, puis TOUT d'un coup, à sa place
+//    (17 nov., « quand ça charge tout bouge bizarrement ») ; une lecture qui ne répond pas n'enferme rien : 10 s au plus.
+//    Lu une fois, lu pour de bon (une relecture ne rend pas le bloc vide).
+export function QuandLu({ pret, children, attente = null }) {
+  const deja = React.useRef(false);
+  const [delai, setDelai] = React.useState(false);
+  React.useEffect(() => { if (pret) return undefined; const t = setTimeout(() => setDelai(true), 10000); return () => clearTimeout(t); }, [pret]);
+  if (pret || delai) deja.current = true;
+  return deja.current ? children : attente;
 }

@@ -1108,7 +1108,8 @@ import MenuPlateformeV2 from "./designV2/MenuPlateforme.jsx";
 import { BoutonV2, SegmentV2 } from "./designV2/BoutonV2.jsx";
 import { nombre as nombreV2 } from "./i18n/index.js";
 import LigneAnnonceV2 from "./designV2/LigneAnnonce.jsx";
-import { SqueletteRangees as SqueletteRangeesV2 } from "./designV2/Signature.jsx";
+import { SqueletteRangees as SqueletteRangeesV2, QuandLu as QuandLuV2 } from "./designV2/Signature.jsx";
+import "./design/accessibilite.css";   // (17 nov.) audit WCAG 2.1 AA : focus double, encre claire sur le bleu, 44 px — `@layer vrm-a11y`, nommée AVANT vrm-verre (index.html)
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
@@ -16052,7 +16053,7 @@ function EnLigne({ value, onCommit, rendu, placeholder, inputMode, largeur = 64,
     // (revue du 19 oct.) La zone au doigt fait 44 px de LARGE aussi : sur
     // « achat — » elle faisait 10 px (le tiret), 25 px sur « N°2 ». Le
     // pointillé reste sous le texte seul (le span), pas sous la zone.
-    <button type="button" data-edition={data} onClick={() => setEdit(true)} title={titre || tr('annonces.cliquerModifier')}
+    <button type="button" className="vrm-cible-44" data-edition={data} onClick={() => setEdit(true)} title={titre || tr('annonces.cliquerModifier')}
       style={{border:'none',background:'transparent',padding:0,minHeight:0,minWidth:44,margin:0,color:'inherit',font:'inherit',cursor:'text',lineHeight:'inherit',textAlign:'inherit'}}><span style={{borderBottom:`1px dashed ${C.border}`}}>{rendu}</span></button>
   );
 }
@@ -16475,7 +16476,7 @@ const MARQUES_PLAT = {
 };
 function MarquePlateforme({ p, taille = 18 }) {
   const m = MARQUES_PLAT[p]; if (!m) return null;
-  return <span data-marque={p} title={`En ligne sur ${m.nom}`} aria-label={`En ligne sur ${m.nom}`}
+  return <span data-marque={p} title={tr('a11y.enLigneSur', { site: m.nom })} aria-label={tr('a11y.enLigneSur', { site: m.nom })}
     style={{display:'inline-flex',alignItems:'center',justifyContent:'center',minWidth:taille,height:taille,padding:'0 4px',borderRadius:6,
       background:m.bg,color:m.fg,border:`1px solid ${m.bord||m.bg}`,fontSize:Math.round(taille*0.5),fontWeight:700,letterSpacing:-0.2,lineHeight:1,flexShrink:0}}>{m.court}</span>;
 }
@@ -42386,6 +42387,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       return true; })
     .filter(o => matchOrd(o) || (!!numDeTx && dansPeriode(o, periode) && numDeTx.get(String(o.transaction_id)) === qNum))
     .map(o => { const tk = trackForBuy(o); return { o, tk, st: achatStage(o, tk) }; });
+    // (17 nov., Julien : les achats ANNULÉS cachés par défaut) Nouveau design : ils ne sont que dans « Annulés · N ».
+    // `designV2Actif()` (lu ici, pas le crochet `designV2` déclaré plus bas : piège TDZ, §4.6).
+    if (designV2Actif()) arr = arr.filter((x) => aFilter === 'annules' ? x.st.step === 0 : x.st.step !== 0);
     // ⚠️⚠️ (5 nov., Julien : « dans achat en route c'est le plus récent qui s'affiche en haut peu importe
     // le compte et le filtre ») puis (9 nov., soir, lot AJ — « du plus récent en haut au plus vieux en bas,
     // peu importe le compte ») PARTOUT : le plus RÉCENT en haut (date d'achat lue), et RIEN d'autre ne
@@ -42395,7 +42399,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     arr = ordreRecent(arr, (x) => quandCommandeVinted(x.o));
     return arr; },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [buysBase, aFilter, ordSearchDiff, periode, tracking, colisRelais, numeros, compteSel, compteConnecte, selEff]);
+    [buysBase, aFilter, ordSearchDiff, periode, tracking, colisRelais, numeros, compteSel, compteConnecte, selEff, designV2Actif()]);
   const [achatsMax, setAchatsMax] = useState(60);
   // (lot AJ) Les achats sans date lue vont en bas (src/ordreRecent.js) : dit une fois.
   const achatsSansDate = useMemo(() => ({ i: debutSansDate(achatsAffiches, (x) => quandCommandeVinted(x.o)), n: nbSansDate(achatsAffiches, (x) => quandCommandeVinted(x.o)) }), [achatsAffiches]);
@@ -50673,6 +50677,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           }
           return (
             <AujourdhuiV2 titre={tr('nav.journee.court')} Photo={PhotoVinted} Plaque={PlaqueJ} Icon={Icon}
+              pret={baseKO || [xE, xR, xM, xP].every((x) => !!x && !x.pasSu)}
               affiche={{ n: nE, pasSu: nE == null, sous: ecart, ambre: colisJournee.some((c) => c.e && c.e.ambre) }}
               colis={nE ? colisJournee : []}
               retraits={{ n: nR, pasSu: nR == null, points: pointsJ, nPoints: Math.max(1, pointsJ.length), premier: premierJ }}
@@ -52085,7 +52090,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // `data-n` reste (le nombre de l'onglet, pour qui le lit).
             const surCarte = (dansPlateforme && !baseKO) ? idsCarteAchats() : null;
             const dejaDit = (id) => !!surCarte && surCarte.has(id === 'route' ? 'enroute' : id);
-            return [...(modeListeAchats?[]:[['attente','À retirer',tracking===null?'—':pickupUnion.total]]),['route','En route',n.route],['recus','Arrivés',n.recu],['all','Tous',null]].map(([id,label,cnt])=>(
+            // (17 nov.) Nouveau design : « Annulés · N » (les annulés n'apparaissent plus ailleurs), seulement s'il y en a.
+            const nAnnules = designV2 ? buysBase.filter((o) => achatStage(o, trackForBuy(o)).step === 0).length : 0;
+            return [...(modeListeAchats?[]:[['attente','À retirer',tracking===null?'—':pickupUnion.total]]),['route','En route',n.route],['recus','Arrivés',n.recu],['all','Tous',null],...(nAnnules > 0 || aFilter === 'annules' ? [['annules',tr('v2.achats.annules'),nAnnules]] : [])].map(([id,label,cnt])=>(
             <button type="button" key={id} className="vrm-seg-btn" data-achats-onglet={id} data-n={cnt==null?undefined:String(cnt)} onClick={()=>setAFilter(id)} aria-pressed={aFilter===id} aria-label={cnt?`${label} ${cnt}`:undefined} style={{whiteSpace:'nowrap'}}>{label}{cnt&&!dejaDit(id)?<span className="vrm-seg-n" title={String(cnt)}> {cnt>=1000?`${(Math.floor(cnt/100)/10).toLocaleString('fr-FR')} k`:cnt}</span>:null}</button>
           )); })()}
         </div>
@@ -53474,7 +53481,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {designV2 ? null : <AFaireLigne capsule seulement="telephone" className="vrm-ann-afaire"/>}
         {/* (17 nov., nouveau design) UN contrôle segmenté sous le menu : En ligne · Qui dorment · À publier (les MÊMES vues
             qu'avant, `annSort`) ; les autres vues, le tri, la grille et Stock sont dans « ⋯ ». Le plein au pouce : publier. */}
-        {designV2 && listings.items?.length>0 ? <div className="v2-ann-segment" data-v2-ann-segment="">
+        {/* Posé dès le chargement (au-dessus du squelette), pour que rien ne glisse quand les annonces arrivent. */}
+        {designV2 && (listings.items == null ? !baseKO : listings.items.length>0) ? <div className="v2-ann-segment" data-v2-ann-segment="" data-v2-bloc="segment">
           <SegmentV2 label={tr('v2.ann.vues')} value={annSearch.trim() ? '' : (annSort==='oldest' ? 'oldest' : annSort)} onChange={(v)=>{ if (v==='oldest') { setAnnSort('oldest'); setAnnSearch(''); } else { if (v==='sleeping' && !(annStats.sleeping>0)) setModeDort('favoris'); setAnnSort(v); } }}
             options={[{ v: 'oldest', l: tr('v2.ann.enLigne') }, { v: 'sleeping', l: tr('v2.ann.dorment'), n: annStats.sleeping>0 ? nombreV2(annStats.sleeping) : undefined }, { v: 'brouillons', l: tr('v2.ann.aPublier'), n: (brVinted.liste||[]).length ? nombreV2((brVinted.liste||[]).length) : undefined }]}/>
         </div> : null}
@@ -53857,7 +53865,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             action={<Bouton variante="primaire" href="https://www.vinted.fr/member/general/settings" target="_blank" rel="noreferrer">{tr('annonces.ouvrirVinted')}</Bouton>}/>
         )}
         {listings.items && !listings.error && listings.items.length===0 && blocMasquees()}
-          {numAttente ? <Skeleton variant="card" count={6}/> : (<>
+          {numAttente ? (designV2 ? null : <Skeleton variant="card" count={6}/>) : (<>
           {blocAEcrire()}
           <BlocBarrerVc/>
           {/* (5 nov., chantier C — revue 2.7) UNE ligne d'avis en tête de la liste :
@@ -54341,8 +54349,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         </CacheSiV2>
         {false && designV2 && annSort !== 'sansachat' && fileAchat && fileAchat.length > 0 ? <button type="button" className="v2-rangee v2-ann-arelier" data-v2-rangee="" data-v2-ann-arelier={fileAchat.length} onClick={() => setAnnSort('sansachat')}>
           <Icon name="link" size={18}/><span className="v2-ann-arelier-txt">{trj('v2.ann.sansAchat', { n: fileAchat.length })}</span><span className="v2-ann-arelier-geste">{tr('v2.ann.voir')}</span><Icon name="chevron" size={14}/></button> : null}
-        {designV2 && !baseKO && listings.items == null ? <SqueletteRangeesV2 variante={ligneV2} n={8} label={tr('v2.chargement')}/> : null}
-        {designV2 ? <div className="v2-liste-annonces" data-v2-ligne={ligneV2} role="list" onClick={clicAvant}>{lignesV2}</div> : null}
+        {/* Le squelette et la liste sont LE MÊME bloc (`data-v2-bloc="liste"`) : mêmes rangées, mêmes hauteurs. */}
+        {/* Allumé, le squelette tient AUSSI pendant la numérotation (`numAttente`) : une seule attente, une seule forme. */}
+        {designV2 && !baseKO && (listings.items == null || numAttente) ? <div data-v2-bloc="liste"><SqueletteRangeesV2 variante={ligneV2} n={8} entete label={tr('v2.chargement')}/></div> : null}
+        {designV2 && !(!baseKO && (listings.items == null || numAttente)) ? <div className="v2-liste-annonces" data-v2-ligne={ligneV2} role="list" onClick={clicAvant} data-v2-bloc="liste">{lignesV2}</div> : null}
         <PaireAvantHote rendre={rendreAvantAnnonce}/>
         <SuitePaquets montres={Math.min(annMax, annShown.length)} total={annShown.length} onPlus={annPlus}/>
         </>)}
@@ -55758,7 +55768,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const v = o.price && typeof o.price === 'object' ? o.price.amount : o.price; const pn = Number(String(v == null ? '' : v).replace(',', '.'));
                     return { id: String(o.transaction_id), titre: o.title || '', photo: orderPhoto(o), compte: plusieursComptesRet && o._acc ? accName(o._acc) : '',
                       prix: Number.isFinite(pn) && pn > 0 && !(o.price && o.price.currency_code && o.price.currency_code !== 'EUR') ? montant(pn) : '', point: (e && e.relais && e.relais.nom) || '' }; }) : [];
-                  return <div className="v2-achats-retirer" data-v2-achats-retirer="">
+                  // Rien avant que les codes ET les achats soient lus, puis tout d'un coup (aucun bloc qui pousse l'autre).
+                  return <QuandLuV2 pret={baseKO || (toutLuRet && buys.items != null)} attente={<span data-v2-attente-retirer="" hidden/>}><div className="v2-achats-retirer" data-v2-achats-retirer="">
                     <PassesRetraitV2 points={parPoint.points || []} Icon={Icon} Plaque={PlaqueJ} Photo={photoCarte}
                       aides={{ echeance: echeanceRetrait, titre: titreRetrait, retirer: retirerColis, relier: relierRetrait,
                         nomTransporteur: (k) => (CARRIERS[k] && CARRIERS[k].name) || '',
@@ -55771,7 +55782,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         plateforme, la même que son bouton : `vrm:v2-ajouter-achat`, src/ecrans/Achats.jsx). */}
 
                     {ancienne ? <details className="vrm-repli" data-v2-detail-retraits=""><summary>{tr('v2.passe.detail')}</summary>{ancienne}</details> : null}
-                  </div>; })()}
+                  </div></QuandLuV2>; })()}
                 {/* (8 nov., retraits) LES COLIS SORTIS DE « À RETIRER », AVEC LA RAISON LUE ET SA DATE (§5 : un colis
                     caché est un colis perdu). Le transporteur, l'e-mail ou la commande Vinted ont dit retiré, livré ou
                     reparti — la décision de `pickupUnion`, inchangée ; ici elle se DIT, quelques jours, hors du compte. */}
@@ -61853,9 +61864,11 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
               <React.Fragment key={l.cle}>
               {il === sansDateT.i ? <LigneSansDate n={sansDateT.n}/> : null}
               <button type="button" className="vrm-toutes-ligne" data-toutes-vente={l.site} data-toutes-id={l.id} data-toutes-compte={l.compte || ''} data-ordre-t={l.t != null ? String(l.t) : ''} onClick={() => onOuvrir(l)}
+                aria-label={`${l.titre} — ${NOM[l.site]}${l.compte ? ', ' + l.compte : ''}, ${jour(l.t)}${l.etat ? ', ' + motEtatVente(l.etat) : ''}${l.prix != null ? ', ' + prix(l) : ''}${l.num ? ', N°' + l.num : ''}`}
                 style={{ width: '100%', minHeight: 56, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 2px', background: 'transparent', border: 0, borderBottom: `1px solid ${C.border}`, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: C.text }}>
                 {/* (11 nov., lot accessibilité) Le nom de la ligne est LU ici (tout ce qu'elle montre, N° compris) ;
-                    le dessin est caché au lecteur. Plus d'aria-label qui ne contenait pas le texte affiché. */}
+                    le dessin est caché au lecteur. (17 nov.) Le MÊME texte en aria-label : `content-visibility:auto`
+                    (styles-listes.css) vidait ce texte des lignes hors écran pour le lecteur (nom vide mesuré). */}
                 <span className="vrm-sr-seul">{`${l.titre} — ${NOM[l.site]}${l.compte ? ', ' + l.compte : ''}, ${jour(l.t)}${l.etat ? ', ' + motEtatVente(l.etat) : ''}${l.prix != null ? ', ' + prix(l) : ''}${l.num ? ', N°' + l.num : ''}`}</span>
                 {/* (31 oct., Julien : « pas de photos partout ») La photo de la vente, comme sur l'écran de son site. */}
                 <span className="vrm-toutes-photo" data-toutes-photo={l.photo ? '1' : '0'} aria-hidden="true" style={{ width: 64, height: 80, flexShrink: 0, borderRadius: 12, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -65952,8 +65965,23 @@ function AppCoeur() {
       value={fil.q} onChange={e=>{ setGsQ(e.target.value); if(!gsOpen) setGsOpen(true); }} onFocus={()=>{ if(!gsOpen) setGsOpen(true); }}
       onKeyDown={e=>{ if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); fermerRecherche(); return; } clavierChamp(e); }}/>
   )}/>;
+  // (17 nov., accessibilité WCAG 2.4.3) Au clavier, Tab depuis la barre de recherche ne traverse plus les 7 suggestions
+  // ouvertes au focus (8 arrêts de plus sur chaque écran, mesuré) : il va au contrôle qui SUIT la recherche et referme le
+  // panneau. Les suggestions restent atteignables par ↓ (le clavier de la loupe, ci-dessus).
+  const tabHorsSuggestions = (e) => {
+    if (e.key !== 'Tab' || e.shiftKey || e.altKey || e.metaKey || e.ctrlKey) return;
+    const barre = e.currentTarget.querySelector('[data-barre-recherche]'); const p = document.getElementById('vrm-recherche-resultats');
+    if (!barre || !barre.contains(e.target) || !p || !e.currentTarget.contains(p)) return;
+    const SEL = 'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),summary,[tabindex]:not([tabindex="-1"])';
+    const dansBarre = [...barre.querySelectorAll(SEL)].filter((x) => x.tabIndex >= 0 && x.getClientRects().length);
+    if (dansBarre[dansBarre.length - 1] !== e.target) return;
+    const tous = [...document.querySelectorAll(SEL)].filter((x) => x.tabIndex >= 0 && x.getClientRects().length && !x.closest('[inert],[aria-hidden="true"]'));
+    const suivant = tous.find((x) => !p.contains(x) && !barre.contains(x) && (e.target.compareDocumentPosition(x) & Node.DOCUMENT_POSITION_FOLLOWING));
+    if (!suivant) return;
+    e.preventDefault(); flushSync(() => setGsOpen(false)); try { suivant.focus(); } catch (_) {}
+  };
   const champRechercheOrdi = (
-    <div className="vrm-recherche" data-recherche-zone="" data-recherche-ouverte={gsOpen?'1':'0'}>
+    <div className="vrm-recherche" data-recherche-zone="" data-recherche-ouverte={gsOpen?'1':'0'} onKeyDown={tabHorsSuggestions}>
       <label className="vrm-barre-recherche" data-barre-recherche="">
         <Icon name="search" size={18}/>
         {champRecherche(false)}
@@ -66184,6 +66212,9 @@ function AppCoeur() {
       // doigts ou que je glisse ») PLUS AUCUN CHANGEMENT D'ONGLET AU DOIGT. On change d'écran par la
       // barre du bas (ou les flèches ← → du clavier sur ordinateur). Ne pas remettre de balayage.
 >
+      {/* (17 nov., accessibilité WCAG 2.4.1) Le lien d'évitement : invisible tant qu'on ne tabule pas, il mène au contenu. */}
+      <a href="#vrm-contenu" className="vrm-aller-contenu" data-aller-contenu="" onClick={(e)=>{ e.preventDefault(); const m=document.getElementById('vrm-contenu'); if(m){ m.setAttribute('tabindex','-1'); try{ m.focus({preventScroll:true}); }catch(_){} } }}>{tr('a11y.allerContenu')}</a>
+      {ordi ? <SideBar tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesRail}/> : null}
       {/* Barre de chargement globale : visible dès qu'une donnée est en cours de
           chargement, sur n'importe quel écran. */}
       <TopProgress/>
@@ -66308,7 +66339,7 @@ function AppCoeur() {
           (au-dessus des feuilles, par un portail) : l'exemple ne se confond plus avec ses vraies données. */}
       {exempleActif() && <BandeauExemple sansCompte={exempleSansCompte()} style={ordi ? { marginLeft: NAV_LARGEUR + 36 } : undefined} onBrancher={() => (exempleSansCompte() ? sortirModeExemple(window, '/?inscription') : sortirModeExemple())} onConnexion={() => sortirModeExemple(window, '/?connexion')}/>}
       {exempleActif() && createPortal(<CadreExemple/>, document.body)}
-      <main className="vrm-main" data-ecran={tab} data-espace={espaceDe(tab, BAR_GROUPE)} data-defile="1" style={{
+      <main className="vrm-main" id="vrm-contenu" data-ecran={tab} data-espace={espaceDe(tab, BAR_GROUPE)} data-defile="1" style={{
         // ⚠️ COQUE APP-SHELL : c'est `<main>` qui défile, pas le document. La
         // barre du bas est un frère HORS de ce conteneur → elle ne bouge plus
         // jamais pendant le scroll (bug iOS « barre au milieu de l'écran »).
@@ -66470,7 +66501,7 @@ function AppCoeur() {
             ou la source en retard NOMMÉE avec son geste (src/fraicheur.js). Base injoignable ⇒ elle se tait
             (le bloc ci-dessus parle) ; hors ligne ⇒ cette branche n'est pas rendue (JourneeHorsLigne). La place
             est tenue dès le premier rendu (repli de même hauteur) : rien ne saute à l'arrivée de la réponse. */}
-        {!baseKO && !horsLigne && <Suspense fallback={<div className="vrm-fraicheur-hote" aria-hidden="true"><div className="vrm-bandeau-abo vrm-fraicheur" data-fraicheur-unique="charge" style={{background:'transparent',boxShadow:'none'}}/></div>}><LigneFraicheurParesseuse baseKO={baseKO} comptes={vintedAccounts} onNav={setTab}/></Suspense>}
+        {!baseKO && !horsLigne && <Suspense fallback={<div className="vrm-fraicheur-hote" aria-hidden="true"><div className="vrm-bandeau-abo vrm-fraicheur" data-fraicheur-unique="charge" style={{background:'transparent',boxShadow:'none'}}/></div>}><LigneFraicheurParesseuse baseKO={baseKO} comptes={vintedAccounts} onNav={setTab} horsTab/></Suspense>}
         <BandeauAbonnement setTab={setTab}/>
         {MULTI_USER && authState.user && <BandeauSuppressionPrevue tab={tab}/>}
         <BandeauCompteVendeur enTete={enTeteSession} ventes={ventesCoque} autres={autresSolo}
@@ -66791,7 +66822,9 @@ function AppCoeur() {
       <MemoireDefilement ecran={`${tab}:${(tab.startsWith('plat_')||estTacheSite(tab))?platSub:''}`}/>
       {/* Une seule navigation à la fois : latérale sur ordinateur, en bas sur
           téléphone. Jamais les deux — c'est la même liste d'écrans. */}
-      {ordi ? <SideBar tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesRail}/> : <BottomBar tab={tab} setTab={setTab} sites={sitesPresents} badges={badgesNav} gestes={gestesDisque}/>}
+      {/* (17 nov., accessibilité WCAG 2.4.3) Sur ordinateur, la colonne de navigation est rendue EN TÊTE de la coque
+          (elle est fixe : rien ne bouge à l'écran) — au clavier, Tab la parcourt avant l'écran, comme on la lit. */}
+      {ordi ? null : <BottomBar tab={tab} setTab={setTab} sites={sitesPresents} badges={badgesNav} gestes={gestesDisque}/>}
       {showBackup&&<GardeEcran nom="sauvegarde" feuille onFermer={()=>setShowBackup(false)}><BackupModal
         catalog={catalog} sales={sales} garageGrid={garageGrid} blockedCells={blockedCells}
         onClose={()=>setShowBackup(false)}

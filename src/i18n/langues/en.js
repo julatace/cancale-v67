@@ -1,4 +1,5 @@
 // ENGLISH — translation of fr.js (the source). Same keys, same {variables}.
+import ecran_accessibilite from './en/accessibilite.js';   // (17 nov.) audit d'accessibilité
 import ecran_suivi_vente from './en/suiviVente.js';   // (16 nov.) le suivi des colis vendus
 import ecran_perso from './en/perso.js';   // (16 nov.) « Modifier ma journée » simple
 import ecran_ventesVerre from './en/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
@@ -71,6 +72,7 @@ import ecran_etageres from './en/etageres.js';   // (15 nov.) le Stock en étag�
 import ecran_journee_verre from './en/journee-verre.js';   // (15 nov.) Ma journée verre, la paire à sortir
 import ecran_arrivee from './en/arrivee.js';   // (15 nov.) atelier d'arrivée, historique, taille du texte
 export default {
+  ...ecran_accessibilite,
   ...ecran_perso,
   ...ecran_ventesVerre,
   ...ecran_studio_paires,
