@@ -46,7 +46,7 @@ function sonde(mutation) {
 }
 
 async function mesure(pg) {
-  await pg.waitForTimeout(9000); // toutes les lectures lentes sont arrivées, et les effets qui suivent
+  await pg.waitForTimeout(15000); // toutes les lectures lentes sont arrivées (plusieurs pages en série), et les effets qui suivent
   return pg.evaluate(() => {
     clearInterval(window.__releve);
     const fin = [...document.querySelectorAll('[data-v2-bloc]')].filter((e) => e.getClientRects().length).map((e) => e.getAttribute('data-v2-bloc'));

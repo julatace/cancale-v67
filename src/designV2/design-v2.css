@@ -538,3 +538,8 @@ html body :is(.v2-afaire-detail, .v2-ligne-meta, .v2-rien-sous, .v2-affiche-sig-
 /* La carte de la bande en attente : la même boîte que la carte décrite (rien ne bouge quand la photo arrive). */
 .v2-bande-attente { display: flex; flex-direction: column; align-items: stretch; gap: 4px; }
 .v2-bande-attente .v2-bande-photo { background: rgb(255 255 255 / .16); }
+/* AIR · boutons voisins ≥ 12 : le menu plateforme et « ? », la recherche et « ⋯ ». */
+html body .v2-sous-titre { gap: var(--v2-air-boutons); }
+html[data-design="v2"] body .vrm-annbar { gap: var(--v2-air-boutons) !important; }
+/* Achats, allumé : la liste d'hier (sous les passes) attend avec elles ⇒ tout arrive d'un coup, rien n'est poussé. */
+html[data-design="v2"] body:has([data-v2-attente-retirer]) .vrm-main .vrm-market-space { display: none !important; }

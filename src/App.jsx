@@ -53839,7 +53839,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             action={<Bouton variante="primaire" href="https://www.vinted.fr/member/general/settings" target="_blank" rel="noreferrer">{tr('annonces.ouvrirVinted')}</Bouton>}/>
         )}
         {listings.items && !listings.error && listings.items.length===0 && blocMasquees()}
-          {numAttente ? <Skeleton variant="card" count={6}/> : (<>
+          {numAttente ? (designV2 ? null : <Skeleton variant="card" count={6}/>) : (<>
           {blocAEcrire()}
           <BlocBarrerVc/>
           {/* (5 nov., chantier C — revue 2.7) UNE ligne d'avis en tête de la liste :
@@ -54324,8 +54324,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {false && designV2 && annSort !== 'sansachat' && fileAchat && fileAchat.length > 0 ? <button type="button" className="v2-rangee v2-ann-arelier" data-v2-rangee="" data-v2-ann-arelier={fileAchat.length} onClick={() => setAnnSort('sansachat')}>
           <Icon name="link" size={18}/><span className="v2-ann-arelier-txt">{trj('v2.ann.sansAchat', { n: fileAchat.length })}</span><span className="v2-ann-arelier-geste">{tr('v2.ann.voir')}</span><Icon name="chevron" size={14}/></button> : null}
         {/* Le squelette et la liste sont LE MÊME bloc (`data-v2-bloc="liste"`) : mêmes rangées, mêmes hauteurs. */}
-        {designV2 && !baseKO && listings.items == null ? <div data-v2-bloc="liste"><SqueletteRangeesV2 variante={ligneV2} n={8} label={tr('v2.chargement')}/></div> : null}
-        {designV2 && !(!baseKO && listings.items == null) ? <div className="v2-liste-annonces" data-v2-ligne={ligneV2} role="list" onClick={clicAvant} data-v2-bloc="liste">{lignesV2}</div> : null}
+        {/* Allumé, le squelette tient AUSSI pendant la numérotation (`numAttente`) : une seule attente, une seule forme. */}
+        {designV2 && !baseKO && (listings.items == null || numAttente) ? <div data-v2-bloc="liste"><SqueletteRangeesV2 variante={ligneV2} n={8} label={tr('v2.chargement')}/></div> : null}
+        {designV2 && !(!baseKO && (listings.items == null || numAttente)) ? <div className="v2-liste-annonces" data-v2-ligne={ligneV2} role="list" onClick={clicAvant} data-v2-bloc="liste">{lignesV2}</div> : null}
         <PaireAvantHote rendre={rendreAvantAnnonce}/>
         <SuitePaquets montres={Math.min(annMax, annShown.length)} total={annShown.length} onPlus={annPlus}/>
         </>)}
@@ -55742,7 +55743,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     return { id: String(o.transaction_id), titre: o.title || '', photo: orderPhoto(o), compte: plusieursComptesRet && o._acc ? accName(o._acc) : '',
                       prix: Number.isFinite(pn) && pn > 0 && !(o.price && o.price.currency_code && o.price.currency_code !== 'EUR') ? montant(pn) : '', point: (e && e.relais && e.relais.nom) || '' }; }) : [];
                   // Rien avant que les codes ET les achats soient lus, puis tout d'un coup (aucun bloc qui pousse l'autre).
-                  return <QuandLuV2 pret={baseKO || (toutLuRet && buys.items != null)}><div className="v2-achats-retirer" data-v2-achats-retirer="">
+                  return <QuandLuV2 pret={baseKO || (toutLuRet && buys.items != null)} attente={<span data-v2-attente-retirer="" hidden/>}><div className="v2-achats-retirer" data-v2-achats-retirer="">
                     <PassesRetraitV2 points={parPoint.points || []} Icon={Icon} Plaque={PlaqueJ} Photo={photoCarte}
                       aides={{ echeance: echeanceRetrait, titre: titreRetrait, retirer: retirerColis, relier: relierRetrait,
                         nomTransporteur: (k) => (CARRIERS[k] && CARRIERS[k].name) || '',
