@@ -3,6 +3,10 @@
 // mémoire (src/modeExemple.js) — rien de l'exemple n'est écrit nulle part.
 import { exempleActif } from './modeExemple.js';
 import { garderCodePartenaire } from './partenaires/lien.js';
+// (17 nov., lot onglets-design) Les propositions de disposition des onglets : un réglage de BANC seulement
+// (src/design/ongletsBanc.js) — sans lui, rien ne change.
+import { poserOngletsBanc } from './design/ongletsBanc.js';
+poserOngletsBanc();
 // (8 nov.) Les 30 dernières requêtes de la page (famille, code, durée — jamais une
 // adresse ni un contenu), pour « Signaler un problème » (src/lecturesRecentes.js).
 import { installerJournalLectures } from './lecturesRecentes.js';

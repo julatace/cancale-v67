@@ -1,0 +1,115 @@
+/* (17 nov., lot onglets-design) PROPOSITION A « SOBRE » — DERRIÈRE UN RÉGLAGE DE BANC (src/design/ongletsBanc.js).
+   Rien ne s'applique sans `:root[data-onglets="a"]` : chez Julien, l'app est celle de `main`.
+   La couche `vrm-onglets` est nommée la PREMIÈRE dans index.html : pour une déclaration `!important`, elle passe
+   devant toutes les autres (verre, finition, studio) sans course aux `:root:root:root`.
+
+   Les cinq idées, mesurées sur l'inventaire (scratchpad/onglets/inventaire.md) :
+   1. UNE forme de segment partout (sites, états de Ventes, Annonces·Stock, Argent, états d'Achats, comptes, vues) :
+      une piste translucide fine, l'actif = une touche porcelaine pleine, texte d'encre. Plus de diode bleue.
+   2. Compteurs DISCRETS : un nombre en chiffres simples (pas de capsule) ; le segment allumé ne répète pas le sien
+      (le chiffre de la page le dit) ; l'onglet allumé de la barre ne porte plus sa pastille.
+   3. Barre du bas plus calme : libellés 11 px sans saut de graisse, un seul signe d'actif (encre + capsule),
+      pastilles 16 px, disque « + » rentré dans la barre (il ne déborde plus sur la liste).
+   4. Titres d'écran : un seul rendu (34/700 au téléphone, 28/700 à l'ordinateur) — plus 26/750, 34/400, 34/600.
+   5. Rangées qui défilent : un fondu au bord droit dit qu'il en reste ; un rond « Retrouver » en double de la loupe
+      de l'île n'est plus posé sur la ligne du titre au téléphone (le geste reste dans le disque + : Chercher · Scanner). */
+
+@layer vrm-onglets {
+  :root[data-onglets="a"] {
+    --oa-piste: rgb(255 255 255 / .12);
+    --oa-piste-bord: rgb(255 255 255 / .18);
+    --oa-on: #F7FAFD;
+    --oa-on-encre: #0C1D30;
+    --oa-off: rgb(255 255 255 / .86);
+    --oa-n: rgb(255 255 255 / .62);
+    --oa-n-on: rgb(12 29 48 / .5);
+    --oa-h: 40px;
+  }
+  :root[data-onglets="a"][data-theme="dark"] {
+    --oa-piste: rgb(255 255 255 / .07);
+    --oa-piste-bord: rgb(255 255 255 / .12);
+    --oa-on: rgb(255 255 255 / .9);
+    --oa-off: rgb(255 255 255 / .78);
+  }
+  @media (pointer: coarse) { :root[data-onglets="a"] { --oa-h: 44px; } }
+
+  /* ── 1. LA forme de segment ───────────────────────────────────────────── */
+  :root[data-onglets="a"] body :is(.vrm-seg, .vrm-sel-sites, .vv-seg, .vrm-platform-tabs, .vrm-messages-sections, .vrm-boite-vues) {
+    display: flex !important; gap: 2px !important; padding: 3px !important; border-radius: 13px !important;
+    background: var(--oa-piste) !important; border: 1px solid var(--oa-piste-bord) !important; box-shadow: none !important;
+    -webkit-backdrop-filter: none !important; backdrop-filter: none !important; min-height: 0 !important; height: auto !important;
+  }
+  :root[data-onglets="a"] body :is(.vrm-seg, .vrm-sel-sites, .vv-seg, .vrm-platform-tabs, .vrm-messages-sections, .vrm-boite-vues) > button {
+    flex: 1 1 0 !important; min-width: 0 !important; height: var(--oa-h) !important; min-height: var(--oa-h) !important; padding: 0 10px !important;
+    border: 0 !important; border-radius: 10px !important; background: transparent !important; box-shadow: none !important; transform: none !important;
+    color: var(--oa-off) !important; font: 600 14px/1 Inter, system-ui, sans-serif !important; letter-spacing: -.005em !important; white-space: nowrap !important;
+    display: flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important;
+  }
+  :root[data-onglets="a"] body :is(.vrm-seg, .vrm-sel-sites, .vv-seg, .vrm-platform-tabs, .vrm-messages-sections, .vrm-boite-vues) > button:is([aria-pressed="true"], [aria-current="page"], [aria-selected="true"], .is-actif, .is-on) {
+    background: var(--oa-on) !important; color: var(--oa-on-encre) !important; box-shadow: 0 1px 2px rgb(8 26 50 / .18) !important;
+  }
+  /* Plus de diode bleue sur un segment allumé : l'accent redevient rare. */
+  :root[data-onglets="a"] body :is(.vrm-seg, .vrm-sel-sites, .vv-seg, .vrm-platform-tabs, .vrm-messages-sections, .vrm-boite-vues, .vrm-compte-puces, .vrm-stock-views, .vrm-filtres) > button::after,
+  :root[data-onglets="a"] body :is(.vrm-seg-point, .vrm-compte-puce)::after { display: none !important; content: none !important; }
+  /* Le sélecteur de sites garde ses logos ; le libellé de l'actif suffit. */
+  :root[data-onglets="a"] body .vrm-sel-sites > button :is(img, svg) { opacity: .9 !important; }
+
+  /* ── 2. Compteurs discrets ────────────────────────────────────────────── */
+  :root[data-onglets="a"] body :is(.vv-seg-n, .vrm-seg-n, .vrm-of-n) {
+    background: none !important; box-shadow: none !important; min-width: 0 !important; height: auto !important; padding: 0 !important;
+    font: 500 13px/1 Inter, system-ui, sans-serif !important; font-variant-numeric: tabular-nums !important; color: var(--oa-n) !important;
+  }
+  :root[data-onglets="a"] body .vv-seg-n.is-ambre { color: #FFC56B !important; }
+  :root[data-onglets="a"] body :is(.is-on, [aria-pressed="true"], [aria-current="page"]) > :is(.vv-seg-n, .vrm-seg-n) { display: none !important; }
+
+  /* ── Les rangées de filtres (comptes d'Achats, vues d'Annonces) : la même touche, plus petite, sans piste ── */
+  :root[data-onglets="a"] body :is(.vrm-compte-puces, .vrm-stock-views.vrm-filtres) {
+    gap: 4px !important; padding-right: 28px !important;
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent) !important; mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent) !important;
+  }
+  :root[data-onglets="a"] body :is(.vrm-compte-puces .vrm-compte-puce, .vrm-stock-views.vrm-filtres > button) {
+    height: 36px !important; min-height: 36px !important; padding: 0 12px !important; border-radius: 10px !important;
+    border: 1px solid transparent !important; background: transparent !important; box-shadow: none !important; transform: none !important;
+    color: var(--oa-off) !important; font: 600 14px/1 Inter, system-ui, sans-serif !important; white-space: nowrap !important;
+  }
+  @media (pointer: coarse) {
+    /* 36 px dessinés, 44 px au doigt (marge de toucher posée par un pseudo-élément) */
+    :root[data-onglets="a"] body :is(.vrm-compte-puces .vrm-compte-puce, .vrm-stock-views.vrm-filtres > button) { position: relative !important; margin: 4px 0 !important; }
+    :root[data-onglets="a"] body :is(.vrm-compte-puces .vrm-compte-puce, .vrm-stock-views.vrm-filtres > button)::before { content: "" !important; position: absolute !important; inset: -4px 0 !important; }
+  }
+  :root[data-onglets="a"] body :is(.vrm-compte-puces .vrm-compte-puce, .vrm-stock-views.vrm-filtres > button):is([aria-pressed="true"], .is-actif, [aria-current="page"]) {
+    background: var(--oa-on) !important; color: var(--oa-on-encre) !important;
+  }
+  :root[data-onglets="a"] body .vrm-stock-views.vrm-filtres > button:not([aria-pressed="true"]):not(.is-actif) { border-color: var(--oa-piste-bord) !important; }
+
+  /* ── 3. La barre du bas ───────────────────────────────────────────────── */
+  :root[data-onglets="a"] body .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-nav-label { font: 600 11px/1 Inter, system-ui, sans-serif !important; letter-spacing: -.01em !important; }
+  :root[data-onglets="a"] body .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] .vrm-nav-label { font-weight: 600 !important; }
+  :root[data-onglets="a"] body .vrm-app-shell .vrm-tabbar .vrm-tab-pastille::after { display: none !important; }
+  :root[data-onglets="a"] body .vrm-app-shell .vrm-tabbar .vrm-nav-badge-barre.vrm-nav-badge-n {
+    min-width: 16px !important; height: 16px !important; padding: 0 4px !important; border-radius: 8px !important;
+    font: 700 10px/16px Inter, system-ui, sans-serif !important; top: -2px !important; left: calc(100% - 9px) !important; box-shadow: none !important;
+  }
+  :root[data-onglets="a"] body .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] .vrm-nav-badge-barre { display: none !important; }
+  :root[data-onglets="a"] body .vrm-app-shell .vrm-tabbar > .sb-disque {
+    flex: 0 0 48px !important; width: 48px !important; height: 48px !important; min-height: 48px !important; margin: 0 6px !important; align-self: center !important;
+  }
+  :root[data-onglets="a"] body .vrm-app-shell .vrm-tabbar > .sb-disque::after { display: none !important; }
+
+  /* ── 4. Un seul titre d'écran ─────────────────────────────────────────── */
+  :root[data-onglets="a"] body .vrm-main :is(.vrm-tache-tete h1, .vrm-screen-head-titre > h1, h1.sj-titre, h1.vrm-fu-titre-tete) {
+    font: 700 34px/1.1 Inter, system-ui, sans-serif !important; letter-spacing: -.025em !important;
+  }
+  @media (min-width: 900px) {
+    :root[data-onglets="a"] body .vrm-main :is(.vrm-tache-tete h1, .vrm-screen-head-titre > h1, h1.sj-titre, h1.vrm-fu-titre-tete) { font-size: 28px !important; }
+  }
+
+  /* ── 5. Le rond « Retrouver un colis » en double de la loupe de l'île (téléphone) ── */
+  @media (max-width: 899px) {
+    :root[data-onglets="a"] body .vrm-main .vrm-tache-retrouver { display: none !important; }
+  }
+  /* Ordinateur : le segment des états prend la largeur du contenu (plus 420 px collés à gauche). */
+  @media (min-width: 900px) {
+    :root[data-onglets="a"] body .vrm-main :is(.vv-seg, .vrm-achats-barre > .vrm-seg) { max-width: 560px !important; }
+  }
+}
