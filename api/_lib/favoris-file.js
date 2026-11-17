@@ -118,7 +118,7 @@ export function reserverFile(d,{owner,maintenant,jeton,suivi=''}){
   d.prochainGlobal=g.prochain;
   return {data:d,valeur:{vue:vueFile(d,owner),travail:{...j,jeton,suivi}}};
 }
-export function terminerFile(d,{owner,jeton,resultat,maintenant,raison,ecrits=null,variante=null}){
+export function terminerFile(d,{owner,jeton,resultat,maintenant,raison,ecrits=null,variante=null,apresMs=null}){
   d=initialiserFile(d);const e=d.enCours,g=d.groupes[owner];
   if(!e||e.owner!==owner||e.jeton!==jeton)return {valeur:vueFile(d,owner)};
   const j=g.jobs.find(x=>x.id===e.id);
@@ -157,7 +157,7 @@ export function terminerFile(d,{owner,jeton,resultat,maintenant,raison,ecrits=nu
     if(resultat==='envoye'&&g.auto.demande&&RAISONS_DEMANDE.includes(g.auto.demande.code))delete g.auto.demande;
   }
   const attendQuota=!j.auto&&resultat==='refuse'&&j.raison==='quota_extension'&&j.ecrits===0&&(Number(j.attentesQuota)||0)<QUOTA_ATTENTES_MAX;
-  if(attendQuota){j.etat='attente';delete j.raison;delete j.traiteLe;j.attentesQuota=(Number(j.attentesQuota)||0)+1;g.prochain=Math.max(g.prochain||0,fin+QUOTA_ATTENTE_MS);d.prochainGlobal=g.prochain;g.raison='La limite d’actions de l’heure est atteinte : les messages suivants partent dès qu’une place se libère.';}
+  if(attendQuota){j.etat='attente';delete j.raison;delete j.traiteLe;j.attentesQuota=(Number(j.attentesQuota)||0)+1;const att=Number.isSafeInteger(apresMs)&&apresMs>=5000&&apresMs<=3600000?apresMs:QUOTA_ATTENTE_MS;g.prochain=Math.max(e.prochainAvant||0,fin+att);d.prochainGlobal=g.prochain;g.raison='La limite d’actions de l’heure est atteinte : les messages suivants partent dès qu’une place se libère.';}
   else if(j.auto&&['envoye','ignore'].includes(resultat)){if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;}
   else if(!['envoye','ignore'].includes(resultat)){g.active=false;g.raison=raison==='article_vendu'?'Article vendu : aucun message envoyé pour cette tentative. Les messages restants ne sont pas envoyés.':raison==='annonce_indisponible'?'Annonce réservée, masquée, fermée ou supprimée : aucun message envoyé pour cette tentative. Les messages restants ne sont pas envoyés.':raison==='ecran_inactif'?'Écran des favoris quitté avant le départ. Les messages restants ne sont pas envoyés.':resultat==='incertain'?'Réponse incertaine : vérifie la conversation sur Vinted. Aucun renvoi automatique.':'Vinted ou l’extension a interrompu la file. Les messages restants ne sont pas envoyés.';}
   else {if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;if(!g.active)g.raison='Sélection traitée ou file arrêtée.';}

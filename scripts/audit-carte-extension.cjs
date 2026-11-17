@@ -285,7 +285,7 @@ async function principal() {
     await carte(f, 'lancer', { selection: a.selection, reglages: a.reglages, confirme: true });
     await f.ctx.tickFavorisCarte();
     dit(ecritures(f).length === 0, '50 actions déjà cette heure sur ce compte : RIEN chez Vinted (le plafond de 50/h tient ; la réserve de 5 est jugée par audit-favoris-ecritures)', JSON.stringify(ecritures(f)));
-    { const j = f.b.file().groupes[U].jobs; dit(appelsVrm(f, 'suivant').length >= 1 && !j.some((x) => x.etat === 'envoye') && f.b.file().groupes[U].active === true, '…parce que le plafond a refusé (le tour a bien été joué), et la file attend une place sans rien perdre', JSON.stringify({ s: appelsVrm(f, 'suivant').length, j: j.map((x) => [x.notificationId, x.etat, x.raison]) })); }
+    { const j = f.b.file().groupes[U].jobs, stq = await etatCarte(f); dit(appelsVrm(f, 'suivant').length === 0 && stq && Number(stq.prochain) > Date.now() && stq.quoi === 'heure' && !j.some((x) => x.etat === 'envoye') && f.b.file().groupes[U].active === true, '…parce que le plafond a refusé (5.406 : demandé AVANT de réserver, la vraie attente et sa raison « heure » rangées pour la carte, rien réservé chez VRM), et la file attend une place sans rien perdre', JSON.stringify({ s: appelsVrm(f, 'suivant').length, j: j.map((x) => [x.notificationId, x.etat, x.raison]) })); }
   });
   await essai('C3', async () => {
     const f = monter();
@@ -296,7 +296,7 @@ async function principal() {
     await f.ctx.chrome.storage.local.set({ vrmVerrouCompte: {} });   // le verrou « un compte à la fois » n'est pas jugé ici
     await f.ctx.tickFavorisCarte();
     dit(ecritures(f).length === 0, '15 messages aux favoris déjà cette heure : le 16ᵉ ne part pas (15/h)', JSON.stringify(ecritures(f)));
-    { const j = f.b.file().groupes[U].jobs; dit(appelsVrm(f, 'suivant').length >= 1 && !j.some((x) => x.etat === 'envoye') && f.b.file().groupes[U].active === true, '…parce que le plafond a refusé (le tour a bien été joué), et la file attend une place sans rien perdre', JSON.stringify({ s: appelsVrm(f, 'suivant').length, j: j.map((x) => [x.notificationId, x.etat, x.raison]) })); }
+    { const j = f.b.file().groupes[U].jobs, stq = await etatCarte(f); dit(appelsVrm(f, 'suivant').length === 0 && stq && Number(stq.prochain) > Date.now() && stq.quoi === 'sorte' && !j.some((x) => x.etat === 'envoye') && f.b.file().groupes[U].active === true, '…parce que le plafond a refusé (5.406 : demandé AVANT de réserver, la vraie attente et sa raison « sorte » rangées pour la carte, rien réservé chez VRM), et la file attend une place sans rien perdre', JSON.stringify({ s: appelsVrm(f, 'suivant').length, j: j.map((x) => [x.notificationId, x.etat, x.raison]) })); }
   });
   await essai('C4', async () => {
     let n = 0;

@@ -190,6 +190,13 @@ async function ouvrir(nav, { qui, largeur = 1512, sombre = false, chemin = '/?ta
   pg.on('dialog', (d) => d.accept());
   await pg.addInitScript(({ s, sombre, partage }) => {
     try { localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); localStorage.setItem('vrm_bascule_mineral_v1', '1'); localStorage.setItem('vrm_session', JSON.stringify(s)); } catch (_) {}
+    // Un vendeur déjà installé : ni Bienvenue, ni parcours, ni « Tu vends quoi ? » par-dessus l'écran.
+    try { const at = '2026-11-01T10:00:00.000Z';
+      localStorage.setItem('vrm_bienvenue_vue', JSON.stringify({ at: 'banc' })); localStorage.setItem('vrm_visite_vue', JSON.stringify({ at: 'banc' }));
+      localStorage.setItem('vrm_configuration', JSON.stringify({ etat: 'fait', at, statut: null, version: 1 }));
+      localStorage.setItem('vrm_parcours_nouveau', JSON.stringify({ etape: 'fin', fini: true, at }));
+      localStorage.setItem('vrm_je_vends', JSON.stringify({ choix: 'sneakers', at, vu: at }));
+      localStorage.setItem('vrm_mfa_plus_tard_' + s.user.id, String(Date.now())); } catch (_) {}
     // La feuille de partage d'iOS : un faux qui note ce qu'on lui donne (le banc ne quitte pas la page).
     if (partage) { window.__partages = []; navigator.share = (d) => { window.__partages.push(d); return Promise.resolve(); }; }
     else { try { delete Navigator.prototype.share; } catch (_) {} try { Object.defineProperty(navigator, 'share', { value: undefined, configurable: true }); } catch (_) {} }
@@ -220,6 +227,7 @@ async function ouvrir(nav, { qui, largeur = 1512, sombre = false, chemin = '/?ta
   await pg.goto(`http://localhost:${PORT}${chemin}`, { waitUntil: 'domcontentloaded' });
   await pg.waitForFunction(() => { const e = document.querySelector('[data-communaute-etat]'); return e && e.getAttribute('data-communaute-etat') !== 'charge'; }, null, { timeout: 25000 }).catch(() => {});
   await pg.waitForTimeout(400);
+  if (process.env.BANC_DEBUG) { await pg.screenshot({ path: process.env.BANC_DEBUG }); console.log('DEBUG', erreurs.join(' | ').slice(0, 300)); }
   return { ctx, pg, erreurs };
 }
 const aller = async (pg) => {

@@ -56,7 +56,7 @@
     let el = document.getElementById('vrm-ebay-toast');
     if (!el) {
       el = document.createElement('div'); el.id = 'vrm-ebay-toast';
-      el.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:24px;z-index:2147483647;background:#10141B;color:#E8ECF2;border:1px solid #1E2530;font:600 13px/1.4 system-ui,sans-serif;padding:11px 16px;border-radius:10px;box-shadow:0 1px 2px rgba(0,0,0,.35),0 12px 30px rgba(0,0,0,.3);max-width:min(420px,92vw)';
+      if (globalThis.VRM_UI) globalThis.VRM_UI.habiller(el, 'toast'); else el.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:24px;z-index:2147483647;background:#10141B;color:#E8ECF2;border:1px solid #1E2530;font:600 13px/1.4 system-ui,sans-serif;padding:11px 16px;border-radius:10px;box-shadow:0 1px 2px rgba(0,0,0,.35),0 12px 30px rgba(0,0,0,.3);max-width:min(420px,92vw)';   // 5.406 : la feuille commune (vrm-ui.js)
       document.documentElement.appendChild(el);
     }
     el.textContent = msg; el.style.display = 'block';
@@ -277,7 +277,7 @@
     let el = document.getElementById('vrm-ebay-b');
     if (!el) {
       el = document.createElement('div'); el.id = 'vrm-ebay-b';
-      el.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:2147483646;max-width:min(420px,92vw);background:#10141B;color:#E8ECF2;border:1px solid #1E2530;border-radius:12px;padding:11px 14px;font:13px/1.45 system-ui,sans-serif;box-shadow:0 1px 2px rgba(0,0,0,.35),0 16px 40px rgba(0,0,0,.36)';
+      if (globalThis.VRM_UI) globalThis.VRM_UI.habiller(el, 'bandeau'); else el.style.cssText = 'position:fixed;left:16px;bottom:16px;z-index:2147483646;max-width:min(420px,92vw);background:#10141B;color:#E8ECF2;border:1px solid #1E2530;border-radius:12px;padding:11px 14px;font:13px/1.45 system-ui,sans-serif;box-shadow:0 1px 2px rgba(0,0,0,.35),0 16px 40px rgba(0,0,0,.36)';   // 5.406 : la feuille commune (vrm-ui.js)
       document.documentElement.appendChild(el);
     }
     // ⚠️ ON DIT LE CHIFFRE, PAS « C'EST PRÊT ». Zéro champ reconnu est une
