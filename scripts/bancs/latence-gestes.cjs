@@ -171,15 +171,24 @@ const juge = (m, r) => {
   if (process.env.SONDE_JS) { console.log('SONDE_JS ' + JSON.stringify(await pg.evaluate(process.env.SONDE_JS).catch((e) => String(e)))); if (process.env.SONDE_SEULE) { await b.close(); srv.close(); process.exit(0); } }
   if (process.env.SONDE) { console.log(JSON.stringify(await pg.evaluate(() => { const o = []; let e = [...document.querySelectorAll('main *')].find((x) => x.children.length === 0 && /^Vendue$/.test(x.textContent.trim()) && x.getClientRects().length); while (e && o.length < 9) { o.push(e.tagName + '.' + String(e.className).slice(0, 60) + ' ' + [...e.attributes].filter((a) => a.name.startsWith('data-') || a.name === 'role').map((a) => a.name + '=' + a.value.slice(0, 30)).join(' ')); e = e.parentElement; } return o; }), null, 1)); }
   // ── F : une vente ⇒ sa fiche ──
+  //  Une vente VINTED de la liste de Ventes (« Toutes », `.vrm-toutes-ligne`) touchée : première réponse (INP) ;
+  //  contenu utile = la fiche de la paire (`[data-fiche-paire]`) visible, son identité tranchée et plus rien en lecture
+  //  (`data-fiche-lecture-en-cours="0"`, aucun « Lecture en cours… ») — avant ce lot, le toucher ouvrait l'écran Vinted
+  //  (aucune fiche : « utile » reste vide, la réponse et le calcul sont mesurés quand même). Trois ventes différentes.
   for (let k = 0; k < 3; k++) {
-    const cle = await pg.evaluate((k) => { const l = [...document.querySelectorAll('[data-fiche-ligne][data-fl-ctx="vente"]')].filter((x) => { const r = x.getBoundingClientRect(); return r.top > 120 && r.bottom < innerHeight - 120; }); const x = l[k] || l[0]; return x ? x.getAttribute('data-fiche-ligne') : null; }, k);
-    if (!cle) { dit(false, 'F une vente visible à toucher', 'aucune'); break; }
-    const sel = `[data-fiche-ligne="${cle.replace(/"/g, '\\"')}"]`;
-    const r = await geste(`F vente ${k + 1}`, async () => { const bx = await pg.locator(sel).first().locator('.vrm-ledger-sale-title, .vrm-fu-vente-txt').first().boundingBox(); await pg.touchscreen.tap(bx.x + Math.min(40, bx.width / 2), bx.y + bx.height / 2); },
-      () => { const f = document.querySelector('[data-fiche-paire]'); return !!f && !!f.getClientRects().length && !!f.querySelector('[data-fiche-depuis-ligne]'); });
-    res.push(r); juge(`F vente ${k + 1} touchée ⇒ sa fiche avec son détail`, r);
+    const id = await pg.evaluate((k) => { const l = [...document.querySelectorAll('.vrm-toutes-ligne[data-toutes-vente="vinted"]')].filter((x) => { const r = x.getBoundingClientRect(); return r.top > 140 && r.bottom < innerHeight - 140; }); const x = l[k] || l[0]; return x ? x.getAttribute('data-toutes-id') : null; }, k);
+    if (!id) { dit(false, 'F une vente Vinted visible à toucher dans Ventes', 'aucune'); break; }
+    const sel = `.vrm-toutes-ligne[data-toutes-vente="vinted"][data-toutes-id="${id}"]`;
+    const r = await geste(`F vente ${k + 1}`, async () => { const bx = await pg.locator(sel).first().locator('.vrm-toutes-titre').first().boundingBox(); await pg.touchscreen.tap(bx.x + Math.min(40, bx.width / 2), bx.y + bx.height / 2); },
+      () => { const f = document.querySelector('[data-fiche-paire]'); return !!f && !!f.getClientRects().length && f.getAttribute('data-fiche-lecture-en-cours') === '0' && !f.querySelector('[data-fiche-lecture]') && !/^lecture/.test(f.getAttribute('data-fiche-identite') || ''); }, 4000);
+    r.fiche = await pg.evaluate(() => { const f = document.querySelector('[data-fiche-paire]'); return f && f.getClientRects().length ? { identite: f.getAttribute('data-fiche-identite'), num: f.getAttribute('data-fiche-paire') } : null; });
+    res.push(r); juge(`F vente Vinted ${k + 1} touchée dans Ventes ⇒ sa fiche${r.fiche ? ' (' + r.fiche.identite + ')' : ' — aucune fiche'}`, r);
     if (k === 0) await pg.screenshot({ path: path.join(SHOTS, 'F-fiche-vente.png') });
-    await pg.evaluate(() => { const x = document.querySelector('[data-fiche-fermer]'); if (x) x.click(); }); await attendre(1200);
+    if (r.fiche) { await pg.evaluate(() => { const x = document.querySelector('[data-fiche-fermer]'); if (x) x.click(); }); await attendre(1200); }
+    else { // l'écran Vinted a pris la place : revenir à « Toutes »
+      await pg.locator('.vrm-tabbar .vrm-tab[data-nav-entree="ventes"]').first().tap(); await attendre(4000); await calme(15000);
+      const sg = pg.locator('[data-filtre-site] button[data-site="toutes"], [data-ventes-seg-choix="toutes"]').first(); if (await sg.count()) { await sg.tap().catch(() => {}); await attendre(3000); }
+    }
   }
   // ── D : défiler Ventes ──
   {
