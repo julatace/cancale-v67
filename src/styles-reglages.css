@@ -251,3 +251,11 @@ button.vrm-set-ligne { transition: background-color .12s ease; }
 @media (max-width: 360px) {
   :root:root body .vrm-app-shell .vrm-set-onglets.vrm-seg > .vrm-seg-btn:not(#vrm-seg):not(#vrm-seg-se) { font-size: 13px !important; padding-left: 4px !important; padding-right: 4px !important; letter-spacing: -.01em; }
 }
+/* (16 nov., lot ecrans-restes) « Pas encore synchronisé · Réessayer » était écrasé à 1512 px (« P… » et
+   « Réessayer » lettre par lettre) : la règle d'index.html réserve la place de l'île (`--vrm-ile`, ~300 px)
+   à DROITE de toute `.vrm-settings-status` — une réserve d'avant le 14 nov., quand la ligne d'état était
+   la première ligne de l'écran. Elle vit maintenant dans la ligne du titre (`.vrm-set-tete`, `.vrm-set-nav`),
+   SOUS la barre du haut : l'île ne la recouvre plus, la réserve ne servait qu'à l'étrangler.
+   Et le bouton ne se coupe jamais (banc scripts/bancs/ecrans-restes.cjs, C3). */
+html .vrm-app-shell .vrm-set-tete > .vrm-settings-status, html .vrm-app-shell .vrm-set-nav > .vrm-settings-status { padding-right: 0; }
+.vrm-set-tete > .vrm-settings-status > .vrm-b, .vrm-set-nav > .vrm-settings-status > .vrm-b { flex: none; white-space: nowrap; }
