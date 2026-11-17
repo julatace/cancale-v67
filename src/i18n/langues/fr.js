@@ -4,6 +4,7 @@
 // absente d'une langue, une variable `{x}` qui n'est pas la même partout, ou un pluriel
 // sans `other`. Clés : `<écran>.<élément>[.<précision>]`, jamais le texte lui-même.
 // Pluriel : { one: '…', other: '…' } choisi par `n` (Intl.PluralRules).
+import ecran_accessibilite from './fr/accessibilite.js';   // (17 nov.) audit d'accessibilité
 import ecran_suivi_vente from './fr/suiviVente.js';   // (16 nov.) le suivi des colis vendus
 import ecran_perso from './fr/perso.js';   // (16 nov.) « Modifier ma journée » simple
 import ecran_ventesVerre from './fr/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
@@ -75,6 +76,7 @@ import ecran_etageres from './fr/etageres.js';   // (15 nov.) le Stock en étag�
 import ecran_journee_verre from './fr/journee-verre.js';   // (15 nov.) Ma journée verre, la paire à sortir
 import ecran_arrivee from './fr/arrivee.js';   // (15 nov.) atelier d'arrivée, historique, taille du texte
 export default {
+  ...ecran_accessibilite,
   ...ecran_perso,
   ...ecran_ventesVerre,
   ...ecran_studio_paires,
