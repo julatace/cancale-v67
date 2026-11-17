@@ -48089,7 +48089,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [only, listings.items, listings.error, annBase, numeros, nouveauxFav, articlesVendusFavoris, listingDates]);
   const ventesFavorisHisto = useMemo(() => ventesPourHistorique({ ventes: sales.items || [], txnItem, conversations: convs.items || [], uid: favorisUid, annulee: (v) => classifyOrderStatus(v.status) === 'cancelled' }), [sales.items, txnItem, convs.items, favorisUid]);
   const [zoneMessages,setZoneMessages]=React.useState('conversations');
-  const [feuilleMsgV2,setFeuilleMsgV2]=React.useState(false);   // (17 nov., nouveau design) la feuille « ⋯ » de Messages
+  const [feuilleMsgV2,setFeuilleMsgV2]=React.useState(false);
+  const [plusGroupeV2,setPlusGroupeV2]=React.useState({});   // (17 nov., nouveau design) la suite de CHAQUE compte   // (17 nov., nouveau design) la feuille « ⋯ » de Messages
   // (11 nov., lot DJ8) Favoris & offres : deux vues, « Favoris » et « Offres auto ».
   const [zoneFav,setZoneFav]=useVueSession('favoris-zone','favoris');
   const lireGardeOffres=React.useCallback(()=>load('vinted_offres_garde', null),[]);
@@ -54837,7 +54838,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <BoutonIconeV2 icone={<Icon name="more" size={22}/>} label={tr('v2.msg.plus')} actif={messageFilter!=='all'} onClick={()=>setFeuilleMsgV2(true)} attrs={{'data-v2-msg-plus':''}}/>
         </div> : <ChampRecherche className="vrm-msg-recherche" valeur={messageSearch} onChange={(v)=>setMessageSearch(String(v||'').slice(0,200))} label="Rechercher une conversation" placeholder="Pseudo, article, N°…" micro data-msg-recherche=""/>}
         {!!messageSearch.trim()&&<p className="vrm-msg-recherche-portee" role="status">Sur tous tes comptes.{messageFilter!=='all'&&<> Le filtre reste appliqué. <button type="button" className="vrm-pied-lien" data-pied-lien="tout" onClick={()=>{setMessageFilter('all');setConvMax(40);}}>Afficher tous les résultats</button></>}</p>}
-        {convs.loading && !convs.items && <Skeleton variant="row" count={2}/>}
+        {convs.loading && !convs.items && !(designV2 && (dernieresConvs.current.items||[]).length) && <Skeleton variant="row" count={2}/>}
         {/* (5 nov., chantier G, revue 1.10) La panne dite par `EtatPanne` : une phrase, la raison, UN geste. */}
         {convs.error && <EtatPanne quoi="Tes conversations Vinted" raison="Aucune boîte n’a pu être lue. Rien n’est perdu : c’est la lecture qui a échoué." onReessayer={()=>loadConvs(true)} data-msg-panne=""/>}
         {/* ── LA MESSAGERIE INTÉGRÉE (3 octobre) ─────────────────────────────
@@ -54848,7 +54849,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             Les non lus d'abord, puis les plus récents ; le compte est nommé sur
             chaque ligne (la liste mélange ses comptes). Un clic ouvre le fil :
             répondre et trancher une offre se font là, par l'extension. */}
-        {convs.items && !convs.error && (()=>{
+        {/* (17 nov., nouveau design) Pendant une RELECTURE (items remis à vide le temps de lire), la liste allumée garde la
+            dernière lecture à l'écran au lieu de s'effondrer puis revenir (un saut de 0,23 mesuré, déjà là éteint). */}
+        {(designV2 && convs.loading && !convs.items && Array.isArray(dernieresConvs.current.items) && dernieresConvs.current.items.length ? dernieresConvs.current : convs).items && !convs.error && ((convs)=>{
           // Filtre par compte (sélecteur de l'onglet) : `_acc` d'une conversation
           // est l'OBJET compte. Choisi ⇒ ses conversations seules.
           const uidC = c => String((c._acc&&c._acc.vinted_user_id)||'');
@@ -55058,8 +55061,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // chaque autre compte ; du plus récent au plus ancien DANS chaque groupe (`groupesParCompte`). Les MÊMES
                 // conversations que la liste d'hier (`tri` : mêmes filtres, mêmes retirées), la même pagination (`convMax`).
                 const groupes = groupesParCompteV2(tri, { uidDe: uidC, quand: (c)=>c.updated_at, compteOnglet: prioMsg, nomDe: (c)=>c._acc?accName(c._acc):'' });
-                let reste = convMax;
-                const montres = groupes.map((g)=>{ const convs = g.convs.slice(0, Math.max(0, reste)); reste -= convs.length; return { ...g, convs }; }).filter((g)=>g.convs.length);
+                // Chaque compte a SA suite (15, puis 40 de plus) : une pagination commune ne montrait que le premier compte.
+                const montres = groupes.map((g)=>{ const max = plusGroupeV2[g.uid] || 15; return { ...g, total: g.convs.length, convs: g.convs.slice(0, max) }; }).filter((g)=>g.convs.length);
                 return <div className="v2m-liste" data-v2-msg-liste="" data-v2-msg-groupes={montres.length}>
                   {montres.map((g)=>(
                     <GroupeConversationsV2 key={g.uid} titre={g.nom || tr('v2.msg.compte')} sous={prioMsg ? (g.onglet ? tr('v2.msg.ouvert', { nav: NAV.dansNu }) : tr('v2.msg.lectureSeule')) : ''}
@@ -55088,6 +55091,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           attrs={{'data-conv':c.id,'data-cible':attrCible(['conv',c.id],c._acc?['conv',String(c._acc.vinted_user_id),c.id]:null),'data-conv-acces':prioMsg?(ro?'lecture':'action'):undefined,'data-nonlu':c.unread?'1':undefined,
                             'data-conv-num':paire&&paire.num?paire.num:undefined,'data-conv-quand':tsConv?new Date(tsConv).toISOString():undefined,'data-conv-compte':c._acc?String(c._acc.vinted_user_id):undefined,'data-conv-offre':offre?String(offre.prix):undefined}}/>;
                       })}
+                      {g.total > g.convs.length ? <div className="v2m-suite"><BoutonV2 role="texte" attrs={{'data-v2-msg-suite': g.uid}} onClick={()=>React.startTransition(()=>setPlusGroupeV2((m)=>({ ...m, [g.uid]: (m[g.uid] || 15) + 40 })))}>{tr('v2.msg.suite', { n: Math.min(40, g.total - g.convs.length), total: g.total })}</BoutonV2></div> : null}
                     </GroupeConversationsV2>))}
                 </div>;
               })() : (<div className="vrm-msg-list" style={{border:liste.length?`1px solid ${C.border}`:'none',background:C.card}}>
@@ -55158,7 +55162,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </div>)}
               {nSansDate>0 && <p className="vrm-msg-sans-date" data-conv-sans-date={nSansDate} style={{color:C.muted}}>{nSansDate} sans date lue : en bas de la liste.</p>}
               {/* (5 nov., chantier G, revue 2.23) UN style de lien en pied (`vrm-pied-lien`) ; le compte « 40/200 » reste lisible à côté. */}
-              {tri.length>convMax && <button type="button" className="vrm-msg-more vrm-pied-lien" data-pied-lien="suite" onClick={()=>React.startTransition(()=>setConvMax(m=>m+40))}>Afficher les {Math.min(40,tri.length-convMax)} suivantes <span className="vrm-pied-lien-n">{convMax} sur {tri.length}</span></button>}
+              {tri.length>convMax && !designV2 && <button type="button" className="vrm-msg-more vrm-pied-lien" data-pied-lien="suite" onClick={()=>React.startTransition(()=>setConvMax(m=>m+40))}>Afficher les {Math.min(40,tri.length-convMax)} suivantes <span className="vrm-pied-lien-n">{convMax} sur {tri.length}</span></button>}
               {retireesIci.length>0 && (
                 <p className="vrm-msg-retirees" data-conv-retirees={retireesIci.length} style={{color:C.muted}}>
                   {/* (revue) Pendant une recherche, une conversation retirée qui
@@ -55171,7 +55175,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               )}
             </div>
           );
-        })()}
+        })(designV2 && convs.loading && !convs.items && Array.isArray(dernieresConvs.current.items) && dernieresConvs.current.items.length ? dernieresConvs.current : convs)}
         </div><div className="vrm-chat-column" data-conv-ouverte={openConv?.convId!=null?String(openConv.convId):undefined}>{openConv?rendreConversation():<div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>Choisis une conversation</span><small>La plus récente est en haut.</small></div>}</div>{rendreFicheConv()}</div>
         {/* (11 nov.) Les réponses rapides se RÈGLENT dans une feuille, ouverte par le crayon au bout de la
             rangée du fil (une seule entrée : la barre « Réponses rapides » sous la liste faisait doublon). */}
@@ -62238,7 +62242,7 @@ function AppCoeur() {
   // (17 nov., nouveau design) Annonces au téléphone : la tête de la coque ne prend plus de bande (la cloche seule, sur la ligne du
   // titre ; la recherche est le champ de l'écran ; le profil est ailleurs — Paramètres par le menu ☰ et les autres écrans).
   // (17 nov., nouveau design — Messages) La même tête sur Messages : le grand titre et la cloche sur UNE ligne.
-  const v2Ann = designV2App && !ordi && (tab === 'annonces' || tab === 'messages');
+  const v2Ann = designV2App && !ordi && (tab === 'annonces' || tab === 'messages' || tab === 'emails');
   // (6 nov.) L'écran ouvert et celui d'avant, pour « Signaler un problème ».
   noterEcranVu(tab);
   // (6 nov., v36) Et pour les temps réels : une visite d'écran par onglet ouvert.
@@ -66789,7 +66793,9 @@ function AppCoeur() {
             ne répondait pas. `baseKO` distingue « aucun compte » de « je n'ai
             pas pu lire », et l'écran le DIT au lieu de repartir de zéro. */}
         {/* (3 nov., critique #2/#9) Un grand titre sur CHAQUE écran : la barre du haut ne le dit plus. */}
-        {(tab==='communaute'||tab==='emails')&&<header className="vrm-market-heading vrm-tache-tete" data-espace="autres" data-titre-ecran-grand=""><h1>{titreCourant}</h1><PhraseEcran cle={tab}/></header>}
+        {(tab==='communaute'||(tab==='emails'&&!designV2App))&&<header className="vrm-market-heading vrm-tache-tete" data-espace="autres" data-titre-ecran-grand=""><h1>{titreCourant}</h1><PhraseEcran cle={tab}/></header>}
+        {/* (17 nov., nouveau design) E-mails : le grand titre et la cloche sur une ligne (la tête de Messages). */}
+        {tab==='emails'&&designV2App&&<header className="v2-tete-tache" data-espace="autres" data-titre-ecran-grand=""><div className="v2-titre-ligne" data-v2-mail-titre=""><h1>{titreCourant}</h1></div><div className="v2-sous-titre"><span className="v2-aide"><PhraseEcran cle={tab}/></span></div></header>}
         {/* (5 nov., chantier F, revue 2.25) Le choix « Vue d'ensemble · Prix qui marche » vit SOUS le titre de l'écran (il passait au-dessus). */}
         {tab==='dashboard'&&platSub==='prix'&&<GardeEcran nom="dashboard:prix"><PrixMarche data={pqmData} baseKO={baseKO} sousNav={<><ArgentNav seg="stats" setTab={setTab}/>{!premierJour?<PlatSubNav sub="prix" setSub={setPlatSub} sections={[['stats','Mes ventes'],['prix','Prix qui marche']]}/>:null}</>}/></GardeEcran>}
         {tab==='dashboard'&&premierJour&&<GardeEcran nom="dashboard:bienvenue"><Onboarding setTab={setTab}/></GardeEcran>}

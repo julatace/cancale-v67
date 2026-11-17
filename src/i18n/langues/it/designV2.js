@@ -165,5 +165,8 @@ export default {
   "v2.mail.q.suite": "Mostra altre {n}",
   "v2.mail.q.reseau": "Rete non disponibile: riprova.",
   "v2.mail.q.ok": "Email collegata: ora appare nelle tue schermate.",
-  "v2.mail.q.ko": "Questa email non è stata collegata. Resta conservata."
+  "v2.mail.q.ko": "Questa email non è stata collegata. Resta conservata.",
+  "v2.msg.suite": "Mostra altre {n} · {total} in tutto",
+  "v2.mail.boite": "Posta in arrivo",
+  "v2.mail.relier": "Collega la mia casella"
 };

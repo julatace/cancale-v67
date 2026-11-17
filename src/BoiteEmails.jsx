@@ -367,7 +367,7 @@ const Ligne = memo(function Ligne({ e, delies, ouvert, lu, photo, onOuvrir, onLu
   const code = codeSurLigne(e);
   // L'essentiel, sans le code (il est à droite, en grand) ; le lieu en court.
   const lieu = res && res.lieu ? lieuLisible(res.lieu) : null;
-  const essentiel = l.essentiel.filter((x) => !(code && /^code /.test(x))).map((x) => (lieu && x === res.lieu ? lieu.nom : x));
+  const essentiel0 = l.essentiel.filter((x) => !(code && /^code /.test(x))).map((x) => (lieu && x === res.lieu ? lieu.nom : x));
   const pasLu = lu === false;
   // (17 nov., nouveau design) Ce que la rangée dit en plus, allumé — toujours PAR IDENTITÉ (§5) : le N° LU dans l'e-mail
   // (étiquette kraft), le n° de suivi LU (sans code), et UN geste : celui de la lecture (`gestesEmail`, le principal).
@@ -375,6 +375,8 @@ const Ligne = memo(function Ligne({ e, delies, ouvert, lu, photo, onOuvrir, onLu
   const numV2 = v2 ? numeroEmail(lec, res) : null;
   const suiviV2 = v2 && !code && lec && lec.cible && lec.cible.k === 'suivi' ? String(lec.cible.v) : '';
   const gesteV2 = v2 && !code ? (gestesEmail(e, delies).find((x) => x.principal) || null) : null;
+  // Le N° est dit UNE fois : l'étiquette (allumé) remplace « N°1201 » dans l'essentiel.
+  const essentiel = numV2 ? essentiel0.filter((x) => x !== 'N°' + numV2) : essentiel0;
   // Le glisser (au doigt seulement ; le défilement vertical reste natif).
   const ref = useRef(null), fond = useRef(null), geste = useRef(null), glisse = useRef(false);
   // Le fond « Lu / Non lu » n'existe que pendant le glisser (950 lignes : autant de nœuds en moins).
@@ -794,6 +796,7 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
                 <button key={k} type="button" className="v2-rangee v2m-choix" data-v2-rangee="" role="radio" aria-checked={(k === 'nonlus' ? nonLus : rubrique === k) ? 'true' : 'false'} data-v2-mail-choix={k}
                   onClick={() => { if (k === 'nonlus') { setNonLus((v) => !v); } else { setNonLus(false); setAVerif(false); setRubrique(rubrique === k ? '' : k); } setOuvert(''); setFeuilleV2(false); }}>
                   <span>{l}</span>{n != null && n > 0 ? <span className="v2m-choix-n">{n}</span> : null}</button>))}
+              <button type="button" className="v2-rangee v2m-choix" data-v2-rangee="" data-v2-mail-choix="relier" onClick={() => { setFeuilleV2(false); onRelier && onRelier(); }}><span>{tr('v2.mail.relier')}</span></button>
             </div>
           </SheetShell>}
           <div ref={rangee} className="vrm-boite-rubriques vrm-rangee" role="group" aria-label={tr('emails.trierEMails')} hidden={v2 || undefined} style={v2 ? { display: 'none' } : undefined}>
@@ -884,6 +887,7 @@ const VUES = [['boite', 'Boîte de réception'], ['relier', 'Relier ma boîte']]
 // (6 nov., v36) `ecrireLus(gestes)` : l'écriture des lus (src/emailsLusEcriture.js) ;
 // `photoDe(e)` : la photo de la paire reliée PAR IDENTITÉ (n° de transaction), ou `null`.
 export default function BoiteEmails({ headers, delies: deliesRecus = {}, onAller, onNum, onAdresses, FermeAuRetour, vueInitiale = 'boite', reglages = null, aRelier, boites = [], compteInitial = '', lireDernier, ecrireLus, photoDe, Photo = null, ranges = null, onRanger = null, quarantaine = null }) {
+  const v2 = useDesignV2();
   // L'app repasse un objet neuf à chaque rendu : on le garde tant que son CONTENU ne
   // change pas (sinon les 950 lignes mémoïsées se redessinent à chaque tic de l'app).
   const deliesCle = JSON.stringify(deliesRecus || {});
@@ -921,7 +925,8 @@ export default function BoiteEmails({ headers, delies: deliesRecus = {}, onAller
   return (
     <PhotoBoite.Provider value={Photo}>
     <section className="vrm-boite" data-boite-emails="" data-vue={vue}>
-      <div className="vrm-boite-vues" role="tablist" aria-label={tr('nav.emails')}>
+      {v2 && vue === 'relier' ? <div className="v2e-retour"><BoutonV2 role="texte" attrs={{ 'data-v2-mail-retour': '' }} onClick={() => setVue('boite')}>{'‹ ' + tr('v2.mail.boite')}</BoutonV2></div> : null}
+      <div className="vrm-boite-vues" role="tablist" aria-label={tr('nav.emails')} hidden={v2 || undefined} style={v2 ? { display: 'none' } : undefined}>
         {VUES.map(([k, mot]) => <button key={k} type="button" role="tab" aria-selected={vue === k} data-boite-vue={k} onClick={() => setVue(k)}>{mot}</button>)}
       </div>
       {vue === 'boite' && <Boite headers={headers} delies={delies} onAller={onAller} onNum={onNum} FermeAuRetour={FermeAuRetour} onRelier={() => setVue('relier')} ecrireLus={ecrireLus} photoDe={photoDe} ranges={ranges} onRanger={onRanger} quarantaine={quarantaine}

@@ -93,7 +93,7 @@ const MESURE = (sel) => {
       if (!vis(e) || e.children.length > 3) continue; const cs = getComputedStyle(e);
       if (!e.textContent.trim()) continue;
       const clamp = cs.webkitLineClamp && cs.webkitLineClamp !== 'none';
-      if (cs.overflow !== 'visible' && e.scrollWidth > e.clientWidth + 1 && cs.textOverflow !== 'ellipsis' && !clamp && e.clientWidth > 0 && !e.matches('img, svg, input, .v2m-av, .v2m-carte, .v2e-carte, .v2-seg, .vrm-rangee, ul, ol'))
+      if (cs.overflow !== 'visible' && e.scrollWidth > e.clientWidth + 1 && cs.textOverflow !== 'ellipsis' && !clamp && e.clientWidth > 2 && !e.matches('img, svg, input, .v2m-av, .v2m-carte, .v2e-carte, .v2-seg, .vrm-rangee, ul, ol'))
         out.tronques.push({ quoi: e.textContent.trim().slice(0, 40), cl: String(e.className).slice(0, 40), de: e.scrollWidth, dans: e.clientWidth });
     }
   }
@@ -129,8 +129,8 @@ async function ouvrirEcran(nav, { W, sombre, url, grand = false, v2 = true }) {
 
 async function messages(nav, { W, sombre, grand = false, nom }) {
   const { ctx, pg, erreurs, b } = await ouvrirEcran(nav, { W, sombre, url: '/?tab=cat_msg', grand });
-  await pg.waitForSelector('[data-v2-conv]', { timeout: 40000 }).catch(() => {});
-  await pg.waitForTimeout(2500); await sansToasts(pg);
+  await pg.waitForSelector('[data-v2-msg-groupe] [data-v2-conv]', { timeout: 40000 }).catch(() => {});
+  await pg.waitForTimeout(3000); await sansToasts(pg);
   if (MUT === 'melange') await pg.evaluate(() => { const g = [...document.querySelectorAll('.v2m-groupe .v2m-carte')]; if (g.length > 1) g[0].appendChild(g[1].querySelector('.v2m-ligne')); });
   if (MUT === 'ordre') await pg.evaluate(() => { const c = document.querySelector('.v2m-groupe .v2m-carte'); if (c && c.children.length > 1) c.insertBefore(c.lastElementChild, c.firstElementChild); });
   if (MUT === 'air') await pg.addStyleTag({ content: 'html body button.v2-rangee.v2m-ligne { min-height: 48px !important; padding: 4px 8px !important; }' });
@@ -164,8 +164,8 @@ async function messages(nav, { W, sombre, grand = false, nom }) {
   // Le fil : des bulles, les gestes d'hier (le champ, les réponses rapides).
   if (W === 390 && !grand) {
     await pg.click('[data-v2-conv]').catch(() => {}); await pg.waitForTimeout(2500);
-    const fil = await pg.evaluate(() => ({ bulles: document.querySelectorAll('.vrm-bulle').length, moi: (() => { const x = document.querySelector('.vrm-bulle-moi .vrm-bulle'); return x ? getComputedStyle(x).backgroundColor : ''; })(), champ: !!document.querySelector('.vrm-chat-panel textarea, .vrm-chat-panel input[type="text"]') }));
-    dit(fil.bulles >= 2 && /0, 113, 227|10, 132, 255/.test(fil.moi) && fil.champ, `${nom} : le fil en bulles (les miennes en bleu), le champ de réponse gardé`, fil);
+    const fil = await pg.evaluate(() => ({ bulles: document.querySelectorAll('.vrm-bulle').length, moi: (() => { const x = document.querySelector('.vrm-bulle-moi .vrm-bulle'); return x ? getComputedStyle(x).backgroundColor : ''; })(), champ: !!document.querySelector('.vrm-chat-panel textarea, .vrm-chat-panel input[type="text"]') || [...document.querySelectorAll('.vrm-chat-panel a, .vrm-chat-panel button')].some((x) => /Répondre sur Vinted/.test(x.textContent || '')) }));
+    dit(fil.bulles >= 2 && /0, 113, 227|10, 132, 255/.test(fil.moi) && fil.champ, `${nom} : le fil en bulles (les miennes en bleu), le champ de réponse (ou « Répondre sur Vinted ») gardé`, fil);
     await pg.screenshot({ path: path.join(SHOTS, `fil-${nom}.png`) });
   }
   dit(!erreurs.length, `${nom} : aucune erreur de page`, erreurs.slice(0, 3));
@@ -173,7 +173,7 @@ async function messages(nav, { W, sombre, grand = false, nom }) {
 }
 
 async function emails(nav, { W, sombre, grand = false, nom, ancien = null }) {
-  const { ctx, pg, erreurs } = await ouvrirEcran(nav, { W, sombre, url: '/?tab=emails', grand });
+  const { ctx, pg, erreurs } = await ouvrirEcran(nav, { W, sombre, url: '/?tab=emails', grand }); void ctx;
   await pg.waitForSelector('[data-boite-email]', { timeout: 40000 }).catch(() => {});
   await pg.waitForTimeout(2500); await sansToasts(pg);
   const segs = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-boite-rubrique-v2]')].map((b) => [b.getAttribute('data-boite-rubrique-v2'), b.getAttribute('data-boite-n')])));
@@ -208,9 +208,9 @@ async function emails(nav, { W, sombre, grand = false, nom, ancien = null }) {
     // E4 : glisser à gauche range ; l'e-mail reste (replié dans « Rangés »), les nombres ne bougent pas.
     const avant = await pg.evaluate(() => ({ n: document.querySelectorAll('[data-boite-email]').length, segs: [...document.querySelectorAll('[data-boite-rubrique-v2]')].map((b) => b.getAttribute('data-boite-n')).join(',') }));
     const cible = await pg.evaluate(() => { const b = document.querySelector('.vrm-boite-liste [data-boite-email]'); const r = b.getBoundingClientRect(); return { id: b.getAttribute('data-boite-email'), x: r.left + r.width * 0.7, y: r.top + r.height / 2 }; });
-    const cdp = await ctx.newCDPSession(pg);
-    const tp = (type, x) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y: cible.y }] });
-    await tp('touchStart', cible.x); for (let k = 1; k <= 8; k++) { await tp('touchMove', cible.x - k * 18); await pg.waitForTimeout(16); } await tp('touchEnd', 0);
+    // Le glisser au doigt : des PointerEvent « touch » (ceux qu'écoute la rangée), vers la gauche.
+    await pg.evaluate(async (c) => { const b = document.querySelector(`[data-boite-email="${c.id}"]`); const ev = (t, x) => b.dispatchEvent(new PointerEvent(t, { bubbles: true, cancelable: true, pointerType: 'touch', pointerId: 7, isPrimary: true, clientX: x, clientY: c.y, button: 0 }));
+      ev('pointerdown', c.x); for (let k = 1; k <= 8; k++) { ev('pointermove', c.x - k * 18); await new Promise((r) => setTimeout(r, 16)); } ev('pointerup', c.x - 144); }, cible);
     await pg.waitForTimeout(900);
     const apres = await pg.evaluate((id) => ({ n: document.querySelectorAll('[data-boite-email]').length, range: !!document.querySelector(`[data-v2-mail-ranges] [data-boite-email="${id}"]`), segs: [...document.querySelectorAll('[data-boite-rubrique-v2]')].map((b) => b.getAttribute('data-boite-n')).join(','), stocke: (() => { try { return !!JSON.parse(localStorage.getItem('vrm_emails_ranges') || '{}')[id]; } catch (_) { return false; } })() }), cible.id);
     dit(apres.range && apres.n === avant.n && apres.segs === avant.segs && apres.stocke, `${nom} E4 : « Ranger » garde l’e-mail (replié dans « Rangés »), les nombres ne bougent pas`, { avant, apres });

@@ -165,5 +165,8 @@ export default {
   "v2.mail.q.suite": "Mostrar {n} más",
   "v2.mail.q.reseau": "Red no disponible: inténtalo de nuevo.",
   "v2.mail.q.ok": "Correo asignado: ya aparece en tus pantallas.",
-  "v2.mail.q.ko": "Este correo no se ha podido asignar. Sigue guardado."
+  "v2.mail.q.ko": "Este correo no se ha podido asignar. Sigue guardado.",
+  "v2.msg.suite": "Mostrar {n} más · {total} en total",
+  "v2.mail.boite": "Bandeja de entrada",
+  "v2.mail.relier": "Vincular mi buzón"
 };

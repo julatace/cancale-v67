@@ -165,5 +165,8 @@ export default {
   "v2.mail.q.suite": "Show {n} more",
   "v2.mail.q.reseau": "Network unavailable: try again.",
   "v2.mail.q.ok": "Email claimed: it now shows on your screens.",
-  "v2.mail.q.ko": "This email couldn’t be claimed. It is still kept."
+  "v2.mail.q.ko": "This email couldn’t be claimed. It is still kept.",
+  "v2.msg.suite": "Show {n} more · {total} in all",
+  "v2.mail.boite": "Inbox",
+  "v2.mail.relier": "Link my mailbox"
 };

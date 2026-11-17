@@ -165,5 +165,8 @@ export default {
   "v2.mail.q.suite": "Afficher {n} de plus",
   "v2.mail.q.reseau": "Réseau indisponible : réessaie.",
   "v2.mail.q.ok": "E-mail rattaché : il apparaît maintenant dans tes écrans.",
-  "v2.mail.q.ko": "Cet e-mail n’a pas pu être rattaché. Il reste conservé."
+  "v2.mail.q.ko": "Cet e-mail n’a pas pu être rattaché. Il reste conservé.",
+  "v2.msg.suite": "Afficher {n} de plus · {total} en tout",
+  "v2.mail.boite": "Boîte de réception",
+  "v2.mail.relier": "Relier ma boîte"
 };

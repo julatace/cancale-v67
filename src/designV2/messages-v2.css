@@ -13,7 +13,7 @@ html[data-grand-texte] body .vrm-fs.vrm-confirmation :is(.vrm-fs-corps > div:las
 html[data-grand-texte] body .vrm-fs.vrm-confirmation .vrm-b > * { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }
 
 /* ── La tête de Messages ─────────────────────────────────────────────────────────────────────────────────── */
-.v2m-tete { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px 0; }
+.v2m-tete { display: flex; flex-direction: column; gap: 12px; padding: 0 16px; }
 .v2m-outils { display: flex; align-items: center; gap: 12px; }
 .v2m-outils > :first-child { flex: 1 1 auto; min-width: 0; }
 /* Le champ d'hier (ChampRecherche), posé sur la coque : la porcelaine, 44 px. */
@@ -64,15 +64,18 @@ html body button.v2-rangee.v2m-choix[aria-checked="true"] { background: var(--v2
 .v2m-choix-n { color: var(--v2-muet); font-variant-numeric: tabular-nums; }
 
 /* ── Le fil, allumé : des bulles façon Messages d'iPhone (les gestes d'hier restent tous) ─────────────────── */
-html[data-design="v2"] body .vrm-bulle-l .vrm-bulle { border-radius: 20px !important; padding: 8px 12px !important; font-size: 17px !important; line-height: 1.35 !important; max-width: 78%; box-shadow: none !important; }
-html[data-design="v2"] body .vrm-bulle-l.vrm-bulle-moi .vrm-bulle { background: #0071E3 !important; color: #FFFFFF !important; border-bottom-right-radius: 6px !important; }
-html[data-design="v2"] body .vrm-bulle-l:not(.vrm-bulle-moi) .vrm-bulle { background: var(--v2-socle) !important; color: var(--sv-encre, #0C1D30) !important; border-bottom-left-radius: 6px !important; }
-:root[data-theme="dark"][data-design="v2"] body .vrm-bulle-l:not(.vrm-bulle-moi) .vrm-bulle { color: #EAF2FB !important; }
-:root[data-theme="dark"][data-design="v2"] body .vrm-bulle-l.vrm-bulle-moi .vrm-bulle { background: #0A84FF !important; }
-html[data-design="v2"] body .vrm-bulle-l .vrm-bulle-h { opacity: .82; font-size: 12px !important; }
-html[data-design="v2"] body .vrm-bulle-l + .vrm-bulle-l { margin-top: 4px; }
+@layer vrm-v2 {
+html[data-design="v2"] body .vrm-chat-panel .vrm-bulle-l .vrm-bulle { border-radius: 20px !important; padding: 8px 12px !important; font-size: 17px !important; line-height: 1.35 !important; max-width: 78%; box-shadow: none !important; }
+html[data-design="v2"] body .vrm-chat-panel .vrm-bulle-l.vrm-bulle-moi .vrm-bulle { background: #0071E3 !important; color: #FFFFFF !important; border-bottom-right-radius: 6px !important; }
+html[data-design="v2"] body .vrm-chat-panel .vrm-bulle-l:not(.vrm-bulle-moi) .vrm-bulle { background: var(--v2-socle) !important; color: var(--sv-encre, #0C1D30) !important; border-bottom-left-radius: 6px !important; }
+:root[data-theme="dark"][data-design="v2"] body .vrm-chat-panel .vrm-bulle-l:not(.vrm-bulle-moi) .vrm-bulle { color: #EAF2FB !important; }
+:root[data-theme="dark"][data-design="v2"] body .vrm-chat-panel .vrm-bulle-l.vrm-bulle-moi .vrm-bulle { background: #0A84FF !important; }
+html[data-design="v2"] body .vrm-chat-panel .vrm-bulle-l .vrm-bulle-h { opacity: .82; font-size: 12px !important; }
+html[data-design="v2"] body .vrm-chat-panel .vrm-bulle-l + .vrm-bulle-l { margin-top: 4px; }
 html[data-design="v2"] body .vrm-chat-head { min-height: 56px; padding-inline: 8px 16px !important; }
 html[data-design="v2"] body .vrm-chat-back { min-width: 44px; min-height: 44px; }
+
+}
 
 /* ── E-mails, allumé ────────────────────────────────────────────────────────────────────────────────────── */
 .v2e-tete { display: flex; flex-direction: column; gap: 12px; margin: 0 0 16px; }
@@ -99,3 +102,37 @@ html body .v2e-action button.v2b-texte { min-height: 44px; }
 .v2e-carte { border-radius: 14px; background: var(--v2-carte); box-shadow: var(--v2-carte-ombre); overflow: hidden; }
 /* Le fond du glisser : « Ranger » à droite quand la rangée part vers la gauche. */
 html[data-design="v2"] body .vrm-boite-glisse-fond[data-sens="gauche"] { justify-content: flex-end; padding-inline: 0 24px; }
+
+/* La suite d'un compte : un lien sous SA carte. */
+.v2m-suite { display: flex; justify-content: center; padding: 4px 20px 8px; border-top: .5px solid var(--v2-filet); }
+/* Les champs de recherche, allumé : 44 px au doigt (36 d'hier). */
+@layer vrm-v2 {
+  html[data-design="v2"] body .v2m-outils :is(.vrm-msg-recherche, .vrm-boite-cherche) { min-height: 44px !important; box-sizing: border-box !important; }
+  html[data-design="v2"] body .v2m-outils .vrm-msg-recherche :is(input, button) { min-height: 44px !important; }
+  html[data-design="v2"] body .v2m-outils .vrm-boite-cherche input { min-height: 44px !important; }
+}
+/* À l'ordinateur, la colonne de la liste est claire : les en-têtes de groupe à l'encre. */
+@media (min-width: 1024px) {
+  html[data-design="v2"] .vrm-inbox-column .v2m-groupe-titre { color: var(--sv-encre, #0C1D30); }
+  html[data-design="v2"] .vrm-inbox-column .v2m-groupe-sous { color: var(--v2-muet); }
+  :root[data-theme="dark"][data-design="v2"] .vrm-inbox-column .v2m-groupe-titre { color: #EAF2FB; }
+  .v2m-liste { padding: 16px 0 0; }
+}
+
+/* E-mails : la boîte est une surface claire ⇒ le segmenté à l'encre, et il DÉFILE (jamais rogné, cinq segments). */
+@layer vrm-v2 {
+  html[data-design="v2"] body .vrm-boite .v2-seg { overflow-x: auto; scrollbar-width: none; background: var(--v2-socle) !important; box-shadow: none !important; }
+  html[data-design="v2"] body .vrm-boite .v2-seg::-webkit-scrollbar { display: none; }
+  html[data-design="v2"] body .vrm-boite button.v2-seg-btn { flex: 1 0 auto !important; padding: 0 12px !important; color: var(--sv-encre, #0C1D30) !important; }
+  html[data-design="v2"] body .vrm-boite button.v2-seg-btn.is-on { background: var(--v2-carte) !important; }
+  :root[data-theme="dark"][data-design="v2"] body .vrm-boite button.v2-seg-btn { color: #EAF2FB !important; }
+  :root[data-theme="dark"][data-design="v2"] body .vrm-boite button.v2-seg-btn.is-on { background: #2A4466 !important; }
+  html[data-design="v2"] body .vrm-boite .v2-seg-n { opacity: 1; color: var(--v2-muet); }
+}
+.v2e-action { padding: 0 var(--v2-air-carte, 20px) 8px 86px; margin-top: -8px; }
+.v2e-retour { padding: 0 0 12px; }
+html[data-design="v2"] .vrm-boite .v2e-outils { color: var(--sv-encre, #0C1D30); }
+:root[data-theme="dark"][data-design="v2"] .vrm-boite .v2e-outils { color: #EAF2FB; }
+html[data-design="v2"] .vrm-boite .v2e-quarantaine-titre { color: var(--sv-encre, #0C1D30); }
+html[data-design="v2"] .vrm-boite .v2e-quarantaine-phrase { color: var(--v2-muet); }
+:root[data-theme="dark"][data-design="v2"] .vrm-boite .v2e-quarantaine-titre { color: #EAF2FB; }

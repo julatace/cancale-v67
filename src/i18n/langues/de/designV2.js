@@ -165,5 +165,8 @@ export default {
   "v2.mail.q.suite": "{n} weitere anzeigen",
   "v2.mail.q.reseau": "Netzwerk nicht verfügbar: versuch es erneut.",
   "v2.mail.q.ok": "E-Mail zugeordnet: Sie erscheint jetzt in deinen Ansichten.",
-  "v2.mail.q.ko": "Diese E-Mail konnte nicht zugeordnet werden. Sie bleibt gespeichert."
+  "v2.mail.q.ko": "Diese E-Mail konnte nicht zugeordnet werden. Sie bleibt gespeichert.",
+  "v2.msg.suite": "{n} weitere anzeigen · {total} insgesamt",
+  "v2.mail.boite": "Posteingang",
+  "v2.mail.relier": "Mein Postfach verbinden"
 };
