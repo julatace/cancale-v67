@@ -42,6 +42,7 @@ function PetitPlan({ m, viseI, occupee }) {
 }
 
 // Les lettres de l'étiquette d'un meuble (« Étagère entrée » → « ÉE ») : comme celles écrites au feutre sur un carton.
+const mouvementReduit = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } };
 const initiales = (nom) => String(nom || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '·';
 
 function Plaque({ n, grand = false }) {
@@ -79,18 +80,32 @@ function Seance({ s, seance, fermer }) {
   React.useEffect(() => { setMeubleChoisi(null); setAutre(!!seance.deplacer || !prop); /* eslint-disable-next-line */ }, [cle]);
   // Fin de séance : « Tout est rangé » se dit, puis la feuille se referme seule (aucun toucher de plus).
   React.useEffect(() => { if (cle) return undefined; const t = setTimeout(fermer, 1400); return () => clearTimeout(t); /* eslint-disable-next-line */ }, [cle]);
+  // LE MOUVEMENT INTERRUPTIBLE : pendant les 220 ms où la paire rangée glisse, un toucher (n'importe quel geste de la
+  // séance) fait arriver la suivante TOUT DE SUITE — il ne repose jamais la paire déjà rangée.
+  const attente = React.useRef(null);
+  const finirSortie = () => { const a = attente.current; if (!a) return false; attente.current = null; clearTimeout(a.t); a.fin(); return true; };
+  React.useEffect(() => () => { const a = attente.current; if (a) clearTimeout(a.t); }, []);
   const poser = async (mid, i) => {
+    if (finirSortie()) return;
     if (!cle || enCours) return;
     setEnCours(true);
     let ok = false;
     try { ok = await s.poser(cle, mid, i, { muet: true }); } finally { setEnCours(false); }
     if (ok === false) return;
     // LE MOUVEMENT (la signature) : la paire rangée glisse et se replie avec sa coche, le compteur descend d'un cran.
-    let reduit = false; try { reduit = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) {}
+    const k = cle;
+    const fin = () => { setSortie(false); setFaits((x) => (x.includes(k) ? x : [...x, k])); setDerniere(String(mid)); setAutre(false); };
+    if (mouvementReduit()) { fin(); return; }
     setSortie(true);
-    await new Promise((r) => setTimeout(r, reduit ? 0 : 220));
-    setSortie(false); setFaits((x) => [...x, cle]); setDerniere(String(mid)); setAutre(false);
+    attente.current = { fin, t: setTimeout(() => { attente.current = null; fin(); }, 220) };
   };
+  // L'ARRIVÉE de la suivante : un ressort court (WAAPI : la carte suit, s'annule si une autre arrive avant la fin).
+  const carte = React.useRef(null);
+  React.useLayoutEffect(() => {
+    const el = carte.current; if (!el || !cle || mouvementReduit() || typeof el.animate !== 'function') return undefined;
+    const a = el.animate([{ opacity: 0, transform: 'translateX(28px)' }, { opacity: 1, transform: 'none' }], { duration: 340, easing: 'cubic-bezier(.32, .72, 0, 1)' });
+    return () => { try { a.cancel(); } catch (_) {} };
+  }, [cle]);
   const reste = Math.max(0, total - faits.length);
   // La dernière pose, DITE avec la case finale (relue : dans une pile, l'article a pu descendre).
   const kFait = faits[faits.length - 1] || null; const fFait = kFait ? s.ficheDe(kFait) : null; const ouFait = fFait ? s.ouEst(fFait) : null;
@@ -105,7 +120,7 @@ function Seance({ s, seance, fermer }) {
           <p className="sr-fin-titre">{seance.deplacer ? tr('sr.deplacer.fait') : tr('sr.seance.fin', { n: faits.length, mot: faits.length > 1 ? mots.noms : mots.nom })}</p>
         </div>
       ) : (
-        <div className={'sr-seance' + (sortie ? ' is-sortie' : '')} data-sr-courant={cle} key={cle}>
+        <div ref={carte} className={'sr-seance' + (sortie ? ' is-sortie' : '')} data-sr-courant={cle} key={cle}>
           {fait ? <p className="sr-fait" role="status" data-sr-fait={faits[faits.length - 1]}><Icon name="check" size={16}/><span>{fait}</span></p> : null}
           <div className="sr-paire">
             <span className="sr-paire-photo"><Photo f={f} Photo={s.Photo} Icon={Icon} taille={112}/>{sortie ? <span className="sr-coche" aria-hidden="true"><Icon name="check" size={28}/></span> : null}</span>
@@ -154,8 +169,8 @@ function Seance({ s, seance, fermer }) {
           <div className="sr-gestes">
             {!autre && prop ? <button type="button" className="sr-btn sr-btn-plein" data-sr-ranger-ici="" disabled={enCours} onClick={() => poser(String(prop.meubleId), prop.i)}>{tr('sr.ici.ranger')}</button> : null}
             <div className="sr-gestes-bas">
-              {!seance.deplacer && (prop || autre) ? <button type="button" className="sr-btn sr-btn-teinte" data-sr-autre="" aria-pressed={autre} onClick={() => setAutre((x) => !x)}>{autre ? (prop ? tr('sr.choix.retour') : tr('sr.choix.fermer')) : tr('sr.choix.autre')}</button> : null}
-              {!seance.deplacer && total > 1 ? <button type="button" className="sr-btn sr-btn-texte" data-sr-passer="" onClick={() => setPasses((x) => [...x, cle])}>{tr('sr.seance.passer')}</button> : null}
+              {!seance.deplacer && (prop || autre) ? <button type="button" className="sr-btn sr-btn-teinte" data-sr-autre="" aria-pressed={autre} onClick={() => { if (!finirSortie()) setAutre((x) => !x); }}>{autre ? (prop ? tr('sr.choix.retour') : tr('sr.choix.fermer')) : tr('sr.choix.autre')}</button> : null}
+              {!seance.deplacer && total > 1 ? <button type="button" className="sr-btn sr-btn-texte" data-sr-passer="" onClick={() => { if (!finirSortie()) setPasses((x) => [...x, cle]); }}>{tr('sr.seance.passer')}</button> : null}
               {!s.meubles.length ? <button type="button" className="sr-btn sr-btn-teinte" data-sr-creer-meuble="" onClick={() => { fermer(); s.creerMeuble(); }}>{tr('sr.places.ajouter')}</button> : null}
             </div>
           </div>
