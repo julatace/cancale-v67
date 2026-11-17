@@ -7,7 +7,7 @@ const { chromium } = require(path.join(__dirname, '../../../node_modules/playwri
 const OUT = process.argv[2] || path.join(require('os').tmpdir(), 'maquette-n');
 const PAGE = 'file://' + path.join(__dirname, 'index.html');
 const ECRANS = [['afaire', 'ecran=afaire'], ['ventes', 'ecran=commandes&vue=ventes'], ['achats', 'ecran=commandes&vue=achats'], ['annonces', 'ecran=annonces'], ['argent', 'ecran=argent']];
-const EXTRA = [['rien', 'ecran=afaire&fait=tout'], ['retirer', 'ecran=afaire&focus=' + encodeURIComponent('retirer-Super U Cleunay')], ['offre', 'ecran=afaire&focus=offre-C52999000301']];
+const EXTRA = [['rien', 'ecran=afaire&fait=tout'], ['fiche', 'ecran=commandes&vue=ventes&fiche=1204'], ['glisse', 'ecran=commandes&vue=ventes&glisse=1']];
 (async () => {
   fs.mkdirSync(OUT, { recursive: true });
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader'] });
@@ -20,7 +20,7 @@ const EXTRA = [['rien', 'ecran=afaire&fait=tout'], ['retirer', 'ecran=afaire&foc
       const vis = (el) => { const r = el.getBoundingClientRect(); return r.width > 1 && r.height > 1 && r.bottom > 0 && r.top < innerHeight; };
       const t = [...document.querySelectorAll('button, a, input')].filter(vis);
       return { pleins: [...document.querySelectorAll('[data-plein]')].filter(vis).length, petites: tel ? t.filter((x) => x.getBoundingClientRect().height < 43.5).map((x) => (x.innerText || x.placeholder || '').slice(0, 24)) : [],
-        deborde: document.documentElement.scrollWidth > innerWidth + 1, mauvais: /\bundefined\b|\bNaN\b/.test(document.body.innerText), police: document.fonts.check('16px "Grotesk N"') };
+        deborde: document.documentElement.scrollWidth > innerWidth + 1, mauvais: /\bundefined\b|\bNaN\b/.test(document.body.innerText), police: document.fonts.check('600 16px "Fraunces N"') && document.fonts.check('16px "Texte N"') };
     }, W < 600);
     console.log(path.basename(f), JSON.stringify(m), err.join(' | '));
     await ctx.close();
