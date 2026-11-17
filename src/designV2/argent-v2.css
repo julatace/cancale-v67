@@ -277,4 +277,7 @@ html[data-grand-texte] .v2-tete-argent .v2-titre-ligne h1 { flex: 1 0 100%; padd
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) :has(> :is(.vrm-b, button) + :is(.vrm-b, button) + :is(.vrm-b, button)):not(.v2-seg, .vrm-seg, .v2-ar-barres, .v2-ar-faits, .v2-ar-liste, [role="radiogroup"], [role="group"]) { display: flex !important; flex-direction: column !important; align-items: stretch !important; gap: 12px !important; }
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-liste > button.v2-rangee.v2-pm-rangee { min-height: 64px !important; padding: 12px 20px !important; }
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-liste > button.v2-rangee.v2-pm-rangee.v2-pm-moi { min-height: 80px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) .vrm-ac-sites { padding: 20px !important; border-radius: 20px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) .vrm-compta-carte { padding: 24px 20px 20px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) .vrm-set-liste .vrm-set-ligne { min-height: 64px !important; padding: 12px 20px !important; box-sizing: border-box !important; }
 }
