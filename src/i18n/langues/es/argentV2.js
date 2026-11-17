@@ -42,5 +42,7 @@ export default {
   "v2.ar.pasEncoreLu": "Aún no leído: {quoi}",
   "v2.fac.chercher": "Buscar una factura",
   "v2.reg.exporter": "Exportar: {nom}",
-  "v2.reg.pdf": "PDF"
+  "v2.reg.pdf": "PDF",
+  "v2.st.prix": "Precios que funcionan ›",
+  "v2.st.mesVentes": "‹ Mis ventas"
 };

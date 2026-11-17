@@ -42,5 +42,7 @@ export default {
   "v2.ar.pasEncoreLu": "Noch nicht gelesen: {quoi}",
   "v2.fac.chercher": "Rechnung suchen",
   "v2.reg.exporter": "Exportieren: {nom}",
-  "v2.reg.pdf": "PDF"
+  "v2.reg.pdf": "PDF",
+  "v2.st.prix": "Preise, die laufen ›",
+  "v2.st.mesVentes": "‹ Meine Verkäufe"
 };

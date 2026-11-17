@@ -220,7 +220,7 @@ const ZONES_ARGENT = '.v2-argent, .v2-argent-nav, .vrm-screen-head:has(.v2-argen
           const vis = (e) => !!e && e.getClientRects().length > 0 && !e.closest('[hidden]');
           const h = [...document.querySelectorAll('.vrm-main h1, .vrm-main h2.vrm-display')].find(vis);
           const navs = [...document.querySelectorAll('.v2-argent-nav')].filter(vis);
-          const segs = navs[0] ? [...navs[0].querySelectorAll('[data-section]')].map((b) => ({ id: b.getAttribute('data-section'), on: b.getAttribute('aria-selected') === 'true', l: b.textContent.trim(), w: Math.round(b.getBoundingClientRect().width) })) : [];
+          const segs = navs[0] ? [...navs[0].querySelectorAll('[data-section]')].map((b) => ({ id: b.getAttribute('data-section'), on: b.getAttribute('aria-selected') === 'true', l: b.textContent.trim(), w: Math.round(b.getBoundingClientRect().width), y: Math.round(b.getBoundingClientRect().top) })) : [];
           const segBox = navs[0] && navs[0].querySelector('.v2-seg'); const segL = segBox ? Math.round(segBox.getBoundingClientRect().width) : 0; const mainL = Math.round(document.querySelector('.v2-ar-faits') ? document.querySelector('.v2-ar-faits').getBoundingClientRect().width : 0);
           const vMarge = [...document.querySelectorAll('[data-v2-argent-achat]')].map((e) => ({ a: e.getAttribute('data-v2-argent-achat'), m: e.getAttribute('data-v2-argent-marge'), t: e.textContent.trim() }));
           const etiq = [...document.querySelectorAll('[data-v2-argent-versement] .v2-etiquette')].length;
@@ -238,7 +238,7 @@ const ZONES_ARGENT = '.v2-argent, .v2-argent-nav, .vrm-screen-head:has(.v2-argen
         console.log('     structure', JSON.stringify(s));
         dit(s.titre === 'Argent' && s.nNav === 1 && s.comptes, `S ${T} : « Argent », puis UNE ligne comptes`, s);
         dit(s.segs.length === 4 && s.segs.map((x) => x.l).join('·') === 'Mois·Statistiques·Déclarer·Factures' && s.segs.filter((x) => x.on).map((x) => x.id).join() === 'resume', `S ${T} : UN segmenté Mois · Statistiques · Déclarer · Factures, « Mois » allumé`, s.segs);
-        dit(tres ? Math.abs(s.segL - s.mainL) <= 1 : tel ? Math.abs(s.segL - s.mainL) <= 1 && new Set(s.segs.map((x) => x.w)).size === 1 : s.segL >= 520 && new Set(s.segs.map((x) => x.w)).size === 1, `S ${T} : le segmenté prend toute la largeur (${s.segL} px / contenu ${s.mainL}), segments égaux (${s.segs.map((x) => x.w).join('/')})`, s);
+        dit(tres ? Math.abs(s.segL - s.mainL) <= 1 && new Set(s.segs.map((x) => x.y)).size === 1 : tel ? Math.abs(s.segL - s.mainL) <= 1 && new Set(s.segs.map((x) => x.w)).size === 1 : s.segL >= 520 && new Set(s.segs.map((x) => x.w)).size === 1, `S ${T} : le segmenté prend toute la largeur (${s.segL} px / contenu ${s.mainL}), segments égaux (${s.segs.map((x) => x.w).join('/')})`, s);
         dit(s.barV.length === 1 && /€/.test(s.barV[0]), `S ${T} : le montant écrit au-dessus d’UNE barre seulement (« ${s.barV.join(' | ')} »)`, s.barV);
         dit(s.vMarge.length >= 1 && s.vMarge.some((x) => x.a === '6000' && x.m === '6900' && /acheté 60/.test(x.t) && /\+69/.test(x.t)), `S ${T} : « acheté 60 € → +69 € » sur la vente au prix d’achat connu, rien sur les autres (${s.vMarge.length})`, s.vMarge);
         dit([...new Set(s.faitsH.map((f) => f.y))].every((y) => new Set(s.faitsH.filter((f) => f.y === y).map((f) => f.h)).size === 1), `F ${T} : les faits d’une même rangée ont la même hauteur (${s.faitsH.map((f) => f.h).join('/')})`, s.faitsH);
@@ -322,6 +322,13 @@ const ZONES_ARGENT = '.v2-argent, .v2-argent-nav, .vrm-screen-head:has(.v2-argen
         dit(venduAvant != null && venduApres === venduAvant, `F ${T} : VENDU — « Comparer » de Statistiques identique (${venduAvant})`, { venduAvant, venduApres });
         const segS = await pg.evaluate(() => { const b = document.querySelector('.v2-argent-nav [aria-selected="true"]'); return b ? b.getAttribute('data-section') : null; });
         dit(segS === 'stats', `S ${T} : sur Statistiques, « Statistiques » allumé`, segS);
+        const st = await pg.evaluate(() => { const vis = (e) => e.getClientRects().length && !e.closest('[hidden]'); const h = document.querySelector('.vrm-statistiques-premium');
+          const segs = h ? [...h.querySelectorAll('.vrm-seg, .v2-seg, [role="tablist"]')].filter(vis).filter((e) => e.getBoundingClientRect().top < 500) : [];
+          const lignes = [...new Set([...document.querySelectorAll('.v2-argent-nav [data-section]')].map((b) => Math.round(b.getBoundingClientRect().top)))];
+          return { n: segs.length, periode: !!document.querySelector('[data-v2-stats-periode]'), prix: !!document.querySelector('[data-v2-stats-prix]'), lignes: lignes.length };
+        });
+        dit(st.n === 1 && st.periode && st.prix, `S ${T} : Statistiques n’a qu’UN segmenté (la période en menu « Mois ⌄ », « Prix qui marche › » en lien)`, st);
+        dit(st.lignes === 1, `S ${T} : les quatre segments d’Argent sur UNE ligne (${st.lignes})`, st);
         await mesurer(pg, `Statistiques ${T}`, ZONES_ARGENT);
         await capture(pg, `argent-stats-${W}-${th}`);
         // Paramètres (téléphone : le premier écran est la liste groupée)

@@ -42,5 +42,7 @@ export default {
   "v2.ar.pasEncoreLu": "Not read yet: {quoi}",
   "v2.fac.chercher": "Search invoices",
   "v2.reg.exporter": "Export: {nom}",
-  "v2.reg.pdf": "PDF"
+  "v2.reg.pdf": "PDF",
+  "v2.st.prix": "Prices that sell ›",
+  "v2.st.mesVentes": "‹ My sales"
 };

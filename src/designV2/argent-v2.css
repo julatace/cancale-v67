@@ -174,7 +174,8 @@ html body button.v2-rangee.v2-ar-v:active { background: rgb(18 52 96 / .06); tra
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent button.vrm-urssaf-copier { min-height: 44px !important; border-radius: 12px !important; }
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-argent-nav .v2-seg-btn { flex: 1 1 0 !important; min-width: 0 !important; padding: 0 4px !important; font-size: 13px !important; }
 /* Grand texte : le segmenté passe en 2 × 2 (Argent) ou en colonne (Factures) — jamais un segment rogné. */
-:root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body .v2-argent-nav .v2-seg { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body .v2-argent-nav .v2-seg { display: flex !important; flex-wrap: nowrap !important; overflow-x: auto !important; scrollbar-width: none !important; -webkit-overflow-scrolling: auto !important; scroll-snap-type: x proximity !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body .v2-argent-nav .v2-seg-btn { flex: 0 0 auto !important; padding: 0 16px !important; scroll-snap-align: start !important; }
 :root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body [data-fac-zones].v2-seg { display: grid !important; grid-template-columns: minmax(0, 1fr) !important; }
 :root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body :is(.v2-argent-nav, [data-fac-zones]) .v2-seg-btn { padding: 0 8px !important; }
 /* « Tout va bien ? » en tête de Paramètres : une rangée blanche, un POINT ambre (plus un aplat ambre). */
@@ -289,3 +290,11 @@ html[data-grand-texte] .v2-tete-argent .v2-titre-ligne h1 { flex: 1 0 100%; padd
 :root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body .vrm-argent .vrm-surface :is(div, span, label, input, select, p) { min-width: 0 !important; max-width: 100% !important; overflow-wrap: break-word !important; box-sizing: border-box !important; }
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) :has(> :is(.vrm-b, button) + :is(.vrm-b, button) + :is(.vrm-b, button)):not(.v2-seg, .vrm-seg, .v2-ar-barres, .v2-ar-faits, .v2-ar-liste, [role="radiogroup"], [role="group"]) > * { flex: 0 0 auto !important; width: 100% !important; }
 }
+
+/* Statistiques : UN segmenté (celui d'Argent) ; la période en menu compact « Mois ⌄ », « Prix qui marche › » en lien. */
+.v2-stats-ligne { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; margin: 0 0 8px; color: var(--v2-page-texte); }
+.v2-stats-periode { position: relative; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 4px; font-size: 17px; font-weight: 600; color: var(--v2-page-texte); cursor: pointer; }
+.v2-stats-periode select { appearance: none; -webkit-appearance: none; border: 0; background: transparent; color: inherit; font: inherit; padding: 0 20px 0 0; min-height: 44px; cursor: pointer; }
+.v2-stats-periode select option { color: #0C1D30; }
+.v2-stats-periode svg { position: absolute; right: 4px; transform: rotate(90deg); pointer-events: none; }
+.v2-stats-ligne .v2b-texte { color: var(--v2-page-texte) !important; }
