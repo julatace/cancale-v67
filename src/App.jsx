@@ -19289,11 +19289,17 @@ function CibleNotif({ tab, sub }) {
     const defiler = (el, comportement) => { try { const h = el.getBoundingClientRect().height; el.scrollIntoView({ behavior: comportement, block: h > (window.innerHeight || 800) * 0.7 ? 'start' : 'center' }); } catch (_) {} };
     // Ouvrir l'élément (une ligne qui se déplie sur son code, une conversation) —
     // jamais refermer ce qui est déjà ouvert.
-    const ouvrirEl = (el) => { if (sel.ouvrir == null || (c && c.depuisFiche)) return; const b = sel.ouvrir ? el.querySelector(sel.ouvrir) : el; if (b && typeof b.click === 'function') minuteurs.push(setTimeout(() => { try { if (b.isConnected && b.getAttribute('aria-expanded') !== 'true') b.click(); } catch (_) {} }, 120)); };
+    // (17 nov., lot scan-instantane) La fiche de CETTE ligne déjà ouverte : rien à toucher (le toucher rejoué à 0,7,
+    // 1,6 et 3 s la rouvrait — « ça bug »).
+    const ficheDeja = (el) => { try { const l = ligneOuverte(); return !!(l && el && l.cle && l.cle === el.getAttribute('data-fiche-ligne')); } catch (_) { return false; } };
+    const ouvrirEl = (el) => { if (sel.ouvrir == null || (c && c.depuisFiche) || ficheDeja(el)) return; const b = sel.ouvrir ? el.querySelector(sel.ouvrir) : el; if (b && typeof b.click === 'function') minuteurs.push(setTimeout(() => { try { if (b.isConnected && b.getAttribute('aria-expanded') !== 'true') b.click(); } catch (_) {} }, 120)); };
     const marquer = (el) => {
       const reduit = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const tMarque = Date.now();
-      defiler(el, reduit ? 'auto' : 'smooth');
+      // (17 nov.) La fiche ouverte par le scanner devient celle de la ligne (elle se remplit : récapitulatif, gestes).
+      if (c.fiche) { try { const lo = ligneOuverte(); const x = lireLigne(el); if (lo && lo.cle === c.fiche && x) ouvrirLigne(x); } catch (_) {} }
+      // Sous une fiche ouverte, la liste se place sans animation (rien ne bouge à l'écran, rien ne se recalcule 300 ms).
+      defiler(el, reduit || c.depuisFiche ? 'auto' : 'smooth');
       eclairer(el); el.setAttribute('data-cible-notif', c.type);
       evts.forEach((e) => window.addEventListener(e, geste, { passive: true, once: true }));
       // (1er nov.) L'écran peut se redessiner juste après (données qui arrivent) :

@@ -23,16 +23,22 @@ import { createPortal } from 'react-dom';
 import { tr, monnaie, date as dateLangue } from './i18n/index.js';
 import { useLangue } from './i18n/react.js';
 import { lireCodeColis, retrouverParSuivi, normaliserN } from './scanColis.js';
-import { useLectureCamera, raisonCamera, vibrer, creerBip } from './ScannerColis.jsx';
+import { useLectureCamera, raisonCamera, vibrer, creerBip, zoomDe, poserZoom } from './ScannerColis.jsx';
 import { lireSourcesColis, EV_RETROUVER_CODE, chercherCodeSources } from './retrouverColis.js';
 import { codeCherchable, normaliserCode } from './etiquettesScan.js';
+import { cleLigne, ouvrirLigne } from './ficheLigne.js';
 import './design/scanner-retrouver.css';
 
 const ATTENTE_SOURCES_MS = 10000;
 // Les zones lues par ZXing, à tour de rôle : le centre du viseur (là où il vise), puis large (un bordereau
 // se tient souvent de travers). Voir `creerLecteur` (src/ScannerColis.jsx) : mesuré sur le banc scan-colis.
 const CENTRE = { x: 0.15, y: 0.3, l: 0.7, h: 0.4 };
-const ZONE = [CENTRE, CENTRE, { x: 0.04, y: 0.18, l: 0.92, h: 0.64 }];
+// (17 nov., lot scan-instantane) Le milieu du viseur AGRANDI ×2 (lecteur WebAssembly) : un code tenu loin, dont les
+// barres tombent entre deux pixels, se lit agrandi (banc scan-instantane). Trois zones à tour de rôle, sans pause.
+const LOIN = { x: 0.2, y: 0.38, l: 0.6, h: 0.24, k: 2 };
+const ZONE = [CENTRE, LOIN, { x: 0.04, y: 0.18, l: 0.92, h: 0.64 }];
+// Le zoom posé à l'ouverture quand la caméra en a un (Safari 17+, Chrome Android) : on vise de deux fois plus loin.
+const ZOOM_LOIN = 2;
 const SORTES = ['vente', 'achat', 'retour', 'colis'];
 
 // La phrase quand la caméra manque : un refus dit OÙ l'autoriser (la raison gardée par la caméra du scanner).
@@ -189,6 +195,8 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
   const [saisie, setSaisie] = React.useState('');
   const [clavier, setClavier] = React.useState(false);
   const [lampe, setLampe] = React.useState(null);      // null : pas de lampe ; false / true
+  const [zoom, setZoom] = React.useState(null);        // (17 nov.) null : pas de zoom ; sinon le zoom posé (1, 2…)
+  const [luAt, setLuAt] = React.useState(0);           // (17 nov.) l'instant où un code a été lu (le viseur le montre tout de suite)
   const piste = React.useRef(null);
   const bip = React.useRef(null); if (!bip.current) bip.current = creerBip();
   const n = React.useRef(0);
@@ -265,16 +273,19 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
   // La caméra lit en continu ; une fiche montrée, elle ne remplace plus rien tant qu'il ne rescanne pas.
   const traiter = React.useCallback((brut) => {
     if (resRef.current) return;   // une fiche, une liste, un message ou une attente est montré
+    setLuAt(Date.now());
     resoudre(brut);
   }, [resoudre]);
   const opts = React.useMemo(() => ({
-    zone: ZONE, pause: 90,   // le centre deux fois sur trois, et peu d'attente entre deux lectures : < 1 s sur un code net
+    zone: ZONE, pause: 90,   // (ZXing en JavaScript seulement : le lecteur WebAssembly lit chaque image, sans pause)
     surFlux: (flux) => {
       try {
         const t = flux && flux.getVideoTracks ? flux.getVideoTracks()[0] : null; piste.current = t || null;
         const caps = t && typeof t.getCapabilities === 'function' ? t.getCapabilities() : null;
         setLampe(caps && caps.torch ? false : null);
-      } catch (_) { setLampe(null); }
+        const z = zoomDe(t);
+        if (z && z.max >= ZOOM_LOIN) poserZoom(t, ZOOM_LOIN).then((v) => setZoom(v != null ? v : null)); else setZoom(null);
+      } catch (_) { setLampe(null); setZoom(null); }
     },
   }), []);
   const camera = useLectureCamera(video, traiter, opts);
@@ -302,12 +313,34 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
     const v = !lampe;
     try { await t.applyConstraints({ advanced: [{ torch: v }] }); setLampe(v); } catch (_) { setLampe(null); }
   };
+  // (17 nov.) « 2× / 1× » : de plus loin, ou tout près (une étiquette qui déborde du viseur).
+  const basculerZoom = async () => {
+    const t = piste.current; if (!t || zoom == null) return;
+    const z = zoomDe(t); if (!z) { setZoom(null); return; }
+    const v = await poserZoom(t, zoom >= ZOOM_LOIN ? z.min : ZOOM_LOIN);
+    if (v != null) setZoom(v);
+  };
+  React.useEffect(() => { if (!luAt) return undefined; const t = setTimeout(() => setLuAt(0), 700); return () => clearTimeout(t); }, [luAt]);
   const valider = (e) => { e.preventDefault(); const s = saisie.trim(); if (!s) return; resoudre(s, { tape: true }); setSaisie(''); };
   const autre = () => { setRes(null); setChoisi(null); setIndice(''); };
+  // (17 nov., lot scan-instantane) « Ouvrir la vente » : LA FICHE de la vente s'ouvre À L'INSTANT avec ce que le
+  // scanner sait déjà (N°, transaction, photo, titre, état — les identités de CETTE vente, jamais un titre), puis
+  // Ventes se place dessous sur la ligne de cette vente ; la ligne trouvée, la fiche devient la sienne et se
+  // remplit (récapitulatif, gestes : `fiche=` dans le lien, src/cibleNotif.js). Avant : l'écran Ventes, défiler,
+  // puis un toucher simulé sur la ligne, rejoué à 0,7, 1,6 et 3 s — lent, et la fiche se rouvrait.
   const ouvrir = (e) => {
     if (!e || !e.lien) return;
-    try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: e.lien })); } catch (_) {}
+    let lien = e.lien;
+    const tx = e.sorte === 'vente' && e.site === 'vinted' && /^v:\d+$/.test(String(e.cle || '')) ? String(e.cle).slice(2) : '';
+    if (tx) {
+      const cle = cleLigne({ contexte: 'vente', site: 'vinted', cle: 'scan-' + tx });
+      try {
+        ouvrirLigne({ cle, contexte: 'vente', site: 'vinted', nums: e.num ? [String(e.num)] : [], item: '', tx, suivi: '', photo: e.photo || '', titre: e.titre || '', prix: '', sous: e.etat || '' });
+        lien += '&fiche=' + encodeURIComponent(cle);
+      } catch (_) {}
+    }
     if (onFermer) onFermer();
+    try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: lien })); } catch (_) {}
   };
   const chercher = (lu) => { if (onChercher && lu) onChercher(lu.suivi); if (onFermer) onFermer(); };
   // (16 nov., lot scan-achat) « Ranger » : l'atelier d'arrivée s'ouvre une fois le scanner fermé (il le couvrirait).
@@ -331,7 +364,7 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
         <button type="button" className="vrm-rtv-rond" data-scan-r-fermer="" aria-label={tr('scan.r.fermer')} onClick={onFermer}><Icone d={I_FERMER} taille={20}/></button>
       </header>
       {!sansCam ? (
-        <div className={'vrm-rtv-viseur' + (res && (res.etat === 'un' || res.etat === 'plusieurs') ? ' is-trouve' : '')} aria-hidden="true">
+        <div className={'vrm-rtv-viseur' + (res && (res.etat === 'un' || res.etat === 'plusieurs') ? ' is-trouve' : '') + (luAt || (res && res.etat === 'attente') ? ' is-lu' : '')} aria-hidden="true" data-scan-r-lu-vu={luAt ? '1' : ''}>
           <i/><i/><i/><i/><span className="vrm-rtv-ligne"/>
         </div>
       ) : null}
@@ -389,6 +422,7 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
         ) : (
           <div className="vrm-rtv-outils">
             {lampe != null ? <button type="button" className={'vrm-rtv-rond' + (lampe ? ' is-actif' : '')} data-scan-r-lampe={lampe ? '1' : '0'} aria-pressed={lampe ? 'true' : 'false'} aria-label={tr('scan.r.lampe')} onClick={basculerLampe}><Icone d={I_LAMPE}/></button> : null}
+            {zoom != null ? <button type="button" className={'vrm-rtv-rond vrm-rtv-zoom' + (zoom >= ZOOM_LOIN ? ' is-actif' : '')} data-scan-r-zoom={String(zoom)} aria-pressed={zoom >= ZOOM_LOIN ? 'true' : 'false'} aria-label={tr('scan.r.zoom')} onClick={basculerZoom}>{zoom >= ZOOM_LOIN ? '2×' : '1×'}</button> : null}
             {clavier || sansCam ? (
               <form className="vrm-rtv-saisie" onSubmit={valider}>
                 <input ref={saisieRef} data-scan-r-saisie="" value={saisie} onChange={(e) => setSaisie(e.target.value)} placeholder={tr('scan.r.saisie')} aria-label={tr('scan.r.saisie')}
