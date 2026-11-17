@@ -13946,7 +13946,10 @@ const estUnCode = (rendu, q) => {
   return rv / H < 0.05 && cv / (e - c + 1) < 0.05 && alterneDeuxSens(rendu, { x: c / s, y: a / s, w: (e - c + 1) / s, h: H / s });   // QR, code 2D
 };
 const zonesInterditesTampon = (rendu, adresses = []) => {
-  const codes = zonesCodesTampon(rendu).filter((q) => estUnCode(rendu, q)).map((q) => (estCarreCode(q) && alterneDeuxSens(rendu, q) ? { ...affinerCode(rendu, q), qr: true } : { ...q, qr: false }));
+  // (17 nov.) Une « zone de code » de plus de 75 mm dans les DEUX sens n'est pas un code (un QR d'étiquette fait 20 à 50 mm,
+  // un code-barres est long mais bas) : c'est une page de texte serré qu'un rendu de police a vue comme des barres (vu en CI :
+  // toute l'étiquette interdite, le N° posé à la main renvoyé sur une fiche).
+  const codes = zonesCodesTampon(rendu).filter((q) => !(q.w > 75 * MM_M && q.h > 75 * MM_M) && estUnCode(rendu, q)).map((q) => (estCarreCode(q) && alterneDeuxSens(rendu, q) ? { ...affinerCode(rendu, q), qr: true } : { ...q, qr: false }));
   // Le cartouche garde 5 mm autour de TOUT code (la règle de toujours) ; la mention, collée au QR par la décision de
   // Julien, garde sa zone de silence mesurée (`interditsMention`).
   const gardes = codes.map((q) => (q.qr ? gardeQr(rendu, q) : MENTION.codes));
