@@ -11,12 +11,45 @@ import React from 'react';
 import { tr } from '../i18n/index.js';
 import { BoutonV2 } from './BoutonV2.jsx';
 import './design-v2.css';
+import { Etiquette, Ticket, RangeeFaite } from './Signature.jsx';
 
 // Le QR lu (e-mail ou capture). Une image qui ne se charge pas ne se montre pas (jamais une image cassée au comptoir).
 function QrPasse({ src }) {
   const [ko, setKo] = React.useState(false);
   if (ko) return null;
   return <img className="v2-passe-qr" src={src} alt={tr('v2.passe.qr')} width={168} height={168} decoding="async" data-v2-qr="" onError={() => setKo(true)}/>;
+}
+
+// Une face de la passe = un TICKET (la signature) : la date limite AU-DESSUS (perforée), le QR s'il existe, le code en 44.
+// « J'ai retiré » : la face se replie (220 ms, un coche — `RangeeFaite`), PUIS le geste d'hier part (`retirerColis`).
+function FacePasse({ x, Icon, Photo, aides }) {
+  const [fait, setFait] = React.useState(false);
+  const ech = aides.echeance(x);
+  const qr = aides.qrSrc(x);
+  const ouvrir = aides.enGrand(x);
+  const relier = aides.relier(x);
+  const fin = React.useCallback(() => aides.retirer(x), [aides, x]);
+  return (
+    <RangeeFaite fait={fait} onFin={fin} className="v2-passe-face" attrs={{ 'data-v2-face': x.cle || x.id, 'data-v2-code': x.code || '' }}>
+      <Ticket
+        haut={<div className={'v2-passe-limite' + (ech && ech.ambre ? ' is-ambre' : '')} data-v2-limite={ech ? ech.code : ''}>
+          {ech ? <><i className="v2-point" aria-hidden="true" hidden={!ech.ambre}/>{ech.t}</> : <span className="v2-muet">{tr('v2.passe.limiteInconnue')}</span>}</div>}
+        qr={qr ? <QrPasse src={qr}/> : null}
+        code={x.code || x.code2 || ''}
+        codeVide={<span className="v2-passe-sans" data-v2-sans-code="">{tr('v2.passe.codeAVenir')}</span>}>
+        <div className="v2-passe-paire">
+          <span className="v2-vignette" style={{ width: 40, height: 40 }} aria-hidden="true">{x.photo && Photo ? Photo(x.photo) : <Icon name="cintre" size={18}/>}</span>
+          <span className="v2-passe-titre">{aides.titre(x)}</span>
+          {x.num ? <Etiquette num={x.num}/> : null}
+        </div>
+        <div className="v2-passe-gestes">
+          {ouvrir ? <BoutonV2 role="secondaire" icone={<Icon name="qr" size={20}/>} onClick={() => ouvrir()} attrs={{ 'data-v2-en-grand': '' }}>{tr('v2.passe.enGrand')}</BoutonV2> : null}
+          {relier ? <BoutonV2 role="texte" onClick={relier} attrs={{ 'data-v2-relier': '' }}>{tr('v2.passe.relier')}</BoutonV2> : null}
+          <BoutonV2 role="texte" onClick={() => setFait(true)} attrs={{ 'data-v2-retire': '' }}>{tr('v2.passe.retire')}</BoutonV2>
+        </div>
+      </Ticket>
+    </RangeeFaite>
+  );
 }
 
 function Passe({ p, Icon, Photo, Plaque, aides }) {
@@ -40,32 +73,7 @@ function Passe({ p, Icon, Photo, Plaque, aides }) {
         <span><b>{lieu}</b>{p.adresseCourte || p.adresse ? <small>{p.adresseCourte || p.adresse}</small> : null}</span>
       </div>
       <div className="v2-passe-piste" ref={piste} onScroll={surDefilement} data-v2-piste="">
-        {colis.map((x) => {
-          const ech = aides.echeance(x);
-          const qr = aides.qrSrc(x);
-          const ouvrir = aides.enGrand(x);
-          const relier = aides.relier(x);
-          return (
-            <div key={x.cle || x.id} className="v2-passe-face" data-v2-face={x.cle || x.id} data-v2-code={x.code || ''}>
-              {/* La date limite AU-DESSUS du QR ; inconnue ⇒ rien d'inventé. */}
-              <div className={'v2-passe-limite' + (ech && ech.ambre ? ' is-ambre' : '')} data-v2-limite={ech ? ech.code : ''}>
-                {ech ? <><i className="v2-point" aria-hidden="true" hidden={!ech.ambre}/>{ech.t}</> : <span className="v2-muet">{tr('v2.passe.limiteInconnue')}</span>}
-              </div>
-              {qr ? <QrPasse src={qr}/> : null}
-              {x.code ? <b className="v2-passe-code" data-v2-code-grand="">{x.code}</b> : x.code2 ? <b className="v2-passe-code">{x.code2}</b> : <span className="v2-passe-sans" data-v2-sans-code="">{tr('v2.passe.codeAVenir')}</span>}
-              <div className="v2-passe-paire">
-                <span className="v2-vignette" style={{ width: 40, height: 40 }} aria-hidden="true">{x.photo && Photo ? Photo(x.photo) : <Icon name="cintre" size={18}/>}</span>
-                <span className="v2-passe-titre">{aides.titre(x)}</span>
-                {x.num ? <Plaque num={x.num}/> : null}
-              </div>
-              <div className="v2-passe-gestes">
-                {ouvrir ? <BoutonV2 role="secondaire" icone={<Icon name="qr" size={20}/>} onClick={() => ouvrir()} attrs={{ 'data-v2-en-grand': '' }}>{tr('v2.passe.enGrand')}</BoutonV2> : null}
-                {relier ? <BoutonV2 role="texte" onClick={relier} attrs={{ 'data-v2-relier': '' }}>{tr('v2.passe.relier')}</BoutonV2> : null}
-                <BoutonV2 role="texte" onClick={() => aides.retirer(x)} attrs={{ 'data-v2-retire': '' }}>{tr('v2.passe.retire')}</BoutonV2>
-              </div>
-            </div>
-          );
-        })}
+        {colis.map((x) => <FacePasse key={x.cle || x.id} x={x} Icon={Icon} Photo={Photo} aides={aides}/>)}
       </div>
       {colis.length > 1 ? <div className="v2-passe-pages" data-v2-page={String(i + 1)} aria-live="polite">{tr('v2.passe.page', { i: i + 1, n: colis.length })}</div> : null}
     </article>
