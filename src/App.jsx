@@ -55495,7 +55495,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       onClick={() => { if (nC + nRV <= 0) return; if (defV && defRV) { if (nLot + nRetLot > 0) imprimerLot(); else ouvrirLot(); } else imprimerLot(choixV, { retours: choixRV }); }}>
                       <span className="v2v-plein-long">{nC > 0 ? tr('v2v.imprimerN', { n: nC }) : tr('v2v.imprimer')}</span><span className="v2v-plein-court" aria-hidden="true">{nC > 0 ? tr('v2v.imprimerCourt', { n: nC }) : tr('v2v.imprimer')}</span>
                     </BoutonV2>);
-                  const scanV = <button type="button" className="vrm-champ-recherche-bouton v2v-scan" data-v2v-scanner="" aria-label={tr('scan.r.bouton')} title={tr('scan.r.boutonTitre')} onClick={() => ouvrirRetrouver('ventes')}><Icon name="retrouver" size={19}/></button>;
+                  const scanV = <button type="button" className="vrm-champ-recherche-bouton v2v-scan" data-v2v-scanner="" aria-label={tr('scan.r.bouton')} title={tr('scan.r.boutonTitre')} onClick={() => ouvrirRetrouver('ventes')}><Icon name="scan" size={20}/></button>;
                   return (
                     <div className="v2v-tete vv-tete" id={ID_SECTION_COLIS.ventes} data-colis-section="ventes" data-colis-barre="" data-v2v-tete={toutesSeules ? 'toutes' : onglet}>
                       {slotPleinV2 ? createPortal(pleinV, slotPleinV2) : <div className="v2v-plein-ici">{pleinV}</div>}

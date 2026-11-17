@@ -482,3 +482,10 @@ html[data-design="v2"] body .v2v-tete .v2v-recherche { margin-bottom: 8px; }
 :root:root:root:root body .vrm-main .v2v-recherche .v2v-champ button.v2v-scan { width: 44px !important; min-width: 44px !important; height: 44px !important; min-height: 44px !important; }
 html[data-design="v2"] body .v2v-tete .v2v-segment { margin: 0 0 8px !important; }
 html[data-design="v2"] body .v2v-tete .v2-affiche-sig { margin: 0 0 8px; }
+/* Passe 2 : la 1re rangée vers 300 px — le plateau du segmenté à 2 px (l'ID de la règle d'hier, `:not(#vrm-seg)`, l'emportait),
+   le chiffre d'affiche un peu plus court, la recherche collée à la liste (l'écart de 8 px vient de la colonne d'hier). */
+:root:root:root:root body .vrm-main .v2v-segment .vrm-seg:not(#v2v-seg) { padding: 2px !important; gap: 2px !important; }
+:root:root:root:root body .vrm-main .v2v-segment .vrm-seg:not(#v2v-seg) > button:not(#v2v-seg) { min-height: 44px !important; }
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig { grid-template-rows: 40px auto; margin: 0 0 6px; }
+html[data-design="v2"] body .v2v-tete .v2v-recherche { margin-bottom: 0; }
+.v2v-liste .v2v-groupe:first-child { padding-top: 6px; }
