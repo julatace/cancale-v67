@@ -11,6 +11,7 @@ import React from 'react';
 import { tr } from '../i18n/index.js';
 import { BoutonV2 } from './BoutonV2.jsx';
 import './design-v2.css';
+import './achats-v2.css';
 import { Etiquette, Ticket, RangeeFaite } from './Signature.jsx';
 
 // Le QR lu (e-mail ou capture). Une image qui ne se charge pas ne se montre pas (jamais une image cassée au comptoir).
