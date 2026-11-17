@@ -32,7 +32,7 @@ const MUTATIONS = {
   muet: { f: 'vrm-action.js', a: "if (err || !r || r.ok !== true) { relireLocal(); return; }", b: "if (err || !r || r.ok !== true) { appliquer(null, false); return; }" },
   rien: { f: 'vrm-action.js', a: "if (!nulA) { nulA = Date.now(); setTimeout(lire, 1600); return; }", b: '' },
   surplace: { f: 'vrm-action.js', a: "racine.classList.toggle('anim', entree);", b: "racine.classList.toggle('anim', true);" },
-  molette: { f: 'vrm-action.js', a: 'if (ev.cancelable) ev.preventDefault();\n      return;', b: 'return;' },
+  touches: { f: 'vrm-action.js', a: '    ev.stopImmediatePropagation(); ev.preventDefault();\n  };', b: '  };' },
   verrou: { f: 'vrm-action.js', a: "try { if (h.style.getPropertyValue('overflow') !== 'hidden') h.style.setProperty('overflow', 'hidden', 'important'); } catch (_) {}", b: '' },
   toast: { f: 'vrm-action.js', a: 'return Date.now() - alerteDepuis >= 800 ?', b: 'return Date.now() - alerteDepuis >= 0 ?' },
   gel: { f: 'content.js', a: "if (g && Date.now() - g < 180000 && !document.getElementById('vrm-action-gel')) {", b: 'if (false) {' },
@@ -178,11 +178,13 @@ const UID = '424242', MIN = 60000;
     await pg.evaluate(() => { const d = document.createElement('div'); d.setAttribute('role', 'alert'); d.setAttribute('data-testid', 'toast'); d.textContent = 'Inventé'; document.body.appendChild(d); setTimeout(() => d.remove(), 300); });
     await pg.waitForTimeout(700);
     // 6) molette (pavé tactile) et touches de défilement : la page ne bouge pas
+    await pg.evaluate(() => { window.__touchesPage = 0; document.addEventListener('keydown', () => { window.__touchesPage++; }); document.querySelector('.lien-page').focus(); });
     await pg.mouse.move(640, 400);
     for (let k = 0; k < 6; k++) { await pg.mouse.wheel(0, 300); await pg.waitForTimeout(40); }
     for (const key of ['PageDown', 'Space', 'ArrowDown', 'End']) { await pg.keyboard.press(key); await pg.waitForTimeout(40); }
     await pg.waitForTimeout(200);
     const yPendant = await pg.evaluate(() => window.scrollY);
+    const touchesPage = await pg.evaluate(() => window.__touchesPage);
     const ovf = await pg.evaluate(() => [document.documentElement.style.overflow, document.body.style.overflow]);
     const fin1 = await pg.evaluate(() => Date.now());
     const ech1 = await pg.evaluate(({ a, b }) => window.__ech.filter((x) => x.t >= a && x.t <= b), { a: debut, b: fin1 });
@@ -190,6 +192,7 @@ const UID = '424242', MIN = 60000;
     console.log(`     mesuré : ${ech1.length} échantillons (50 ms) · ${trous.length} sans écran ou sans blocage · scrollY ${y0} → ${yPendant} · overflow ${JSON.stringify(ovf)}`);
     dit(ech1.length > 80 && !trous.length, 'à chaque échantillon : écran plein vu (opacité ≥ 0,98) ET Vinted bloqué au centre — pas, fond muet, « rien » isolé, routes SPA, hôte arraché, message bref', JSON.stringify(trous.slice(0, 5)) + ` (${trous.length}/${ech1.length})`);
     dit(yPendant === y0, 'molette du pavé tactile et touches de défilement : la page ne bouge pas', `${y0} → ${yPendant}`);
+    dit(touchesPage === 0, 'les touches n’atteignent pas Vinted (même avec le focus resté sur un lien de la page)', touchesPage);
     dit(ovf[0] === 'hidden' && ovf[1] === 'hidden', 'html et body verrouillés (overflow: hidden) pendant l’écran', JSON.stringify(ovf));
     // 7) rechargement complet pendant l'action
     await pg.evaluate(() => sessionStorage.removeItem('__ech_tous'));
