@@ -197,6 +197,26 @@ async function allume(nav, b, sombre, W, ref) {
     dit(['choisir', 'papier', 'preparer', 'deposer', 'scanner', 'tous'].every((k) => outils.includes(k)), `O ${th} : « ⋯ » ⇒ ${outils.join(', ')}`, outils);
     await pg.screenshot({ path: path.join(SHOTS, `ventes-outils-${th}.png`) });
     await pg.evaluate(() => { const v = document.querySelector('[data-v2-feuille="ventes-outils"] .v2-voile'); if (v) v.click(); }); await pg.waitForTimeout(400);
+    // F : une rangée imprimée (le geste « Marquer imprimé » de SA carte d'hier, le même état `vinted_bords_printed`) joue le
+    //     mouvement « fait » (coche, glisse, se replie), rejoint « Imprimés, à déposer », le plein descend d'un cran, et le
+    //     chiffre d'affiche ne bouge pas (imprimé n'est pas envoyé).
+    const f0 = await pg.evaluate(() => { const r = document.querySelector('[data-v2v-liste="envoyer"] [data-v2v-ligne][data-v2v-pret="1"][data-v2v-imprime="0"]');
+      const pl = document.querySelector('[data-v2-principal="imprimer"]');
+      return r ? { cle: r.getAttribute('data-v2v-ligne'), plein: Number(pl && pl.getAttribute('data-impr-lot')), affiche: (document.querySelector('[data-v2v-affiche]') || { getAttribute: () => '' }).getAttribute('data-v2v-affiche') } : null; });
+    if (f0) {
+      await pg.evaluate((cle) => { const b = document.querySelector(`.v2-cache [data-colis-ident="${CSS.escape(cle)}"] button[data-geste="imprime"]`); if (b) b.click(); }, f0.cle);
+      const vu = await attendre(pg, (cle) => !!document.querySelector(`[data-v2v-ligne="${CSS.escape(cle)}"][data-v2v-fait="part"]`), 1500).catch(() => false);
+      const enCours = await pg.evaluate(() => !!document.querySelector('.v2-faite.is-faite .v2v-ligne, .v2-faite.is-faite [data-v2v-ligne]') || !!document.querySelector('.v2-faite.is-faite'));
+      await pg.screenshot({ path: path.join(SHOTS, `ventes-fait-${th}.png`) });
+      await pg.waitForTimeout(1200);
+      const f1 = await pg.evaluate((cle) => { const r = [...document.querySelectorAll(`[data-v2v-ligne="${CSS.escape(cle)}"]`)].filter((x) => x.getAttribute('data-v2v-fait') !== 'part');
+        const pl = document.querySelector('[data-v2-principal="imprimer"]');
+        return { groupe: r[0] ? r[0].getAttribute('data-v2v-groupe') : null, n: r.length, part: !!document.querySelector(`[data-v2v-ligne="${CSS.escape(cle)}"][data-v2v-fait="part"]`), plein: Number(pl && pl.getAttribute('data-impr-lot')), affiche: (document.querySelector('[data-v2v-affiche]') || { getAttribute: () => '' }).getAttribute('data-v2v-affiche') }; }, f0.cle);
+      dit(vu && enCours, `F ${th} : la rangée imprimée joue le mouvement « fait » (coche, glisse, se replie)`, { vu, enCours });
+      dit(f1.n === 1 && !f1.part && f1.groupe === 'imprimes', `F ${th} : puis elle est rangée, une fois, dans « Imprimés, à déposer »`, f1);
+      dit(f1.plein === f0.plein - 1 && f1.affiche === f0.affiche, `F ${th} : le plein descend d'un cran (${f0.plein} → ${f1.plein}), l'affiche ne bouge pas (${f1.affiche})`, { f0, f1 });
+      await pg.screenshot({ path: path.join(SHOTS, `ventes-fait-apres-${th}.png`) });
+    } else dit(false, `F ${th} : une rangée prête, pas encore imprimée, à imprimer`);
     // En route.
     await pg.locator('[data-v2v-seg="envoyes"]').first().tap({ timeout: 8000 }).catch(() => {});
     await attendre(pg, () => document.querySelectorAll('[data-v2v-liste="route"] [data-v2v-ligne]').length > 0, 15000); await pg.waitForTimeout(800);
