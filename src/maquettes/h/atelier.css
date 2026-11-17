@@ -1,0 +1,211 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   MAQUETTE H — « L'ATELIER » (17 nov.) — prototype de banc, pas livré.
+   Le style Studio de C (fond bleu « Verre dépoli », verre posé, rail souligné, plaque gravée du N°)
+   sur une organisation neuve : cinq POSTES de travail. UN accent rare (la diode du rail, le lien) ;
+   ambre = un geste à faire ; rouge = deux paires sous un N° et rien d'autre. Cibles 44 px.
+   Les BOUTONS sont sous le pouce : la tête n'a qu'un titre, un « ? » et le rail ; le plateau du bas
+   porte la recherche du poste et LE geste (le seul plein) ; la barre porte les postes et le scanner.
+   Ce qu'on prend : Uber (l'action en bas, au pouce) · Linear (le rail, la densité) · Wise (le
+   chiffre d'affiche de l'argent, en un seul endroit).
+   ════════════════════════════════════════════════════════════════════════════ */
+@import '../../design/studio.css';
+@import '../../design/studio-verre.css';
+
+html[data-maquette="h"] { background: var(--sv-bas) !important; }
+html[data-maquette="h"] body { margin: 0; background: transparent !important; }
+.h-racine {
+  --g: 16px;
+  --c: var(--sv-clair); --c2: var(--sv-clair-2); --cambre: var(--sv-clair-ambre);
+  --e: var(--sv-encre); --e2: var(--sv-encre-2); --eambre: var(--sv-ambre); --elien: var(--sv-lien);
+  --verre: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2));
+  min-height: 100dvh; box-sizing: border-box; color: var(--c); position: relative; isolation: isolate;
+  font-family: var(--sb-police-texte); font-feature-settings: var(--sb-chiffres); -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+.h-racine::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(120% 60% at 15% 0%, var(--sv-reflet) 0%, transparent 55%), radial-gradient(70% 45% at 100% 38%, var(--sv-reflet-2) 0%, transparent 70%),
+    linear-gradient(170deg, var(--sv-haut) 0%, var(--sv-milieu) 45%, var(--sv-bas) 100%); }
+.h-racine *, .h-racine *::before, .h-racine *::after { box-sizing: border-box; }
+:where(.h-racine) button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: inherit; -webkit-user-select: none; user-select: none; }
+:where(.h-racine) :is(button, input):focus-visible { outline: 2px solid var(--sb-diode); outline-offset: 2px; border-radius: 12px; }
+.h-ico { flex: none; display: block; }
+.h-attente { min-height: 100dvh; }
+
+/* ── LA TÊTE : rien à toucher sauf le « ? » et le rail (les gestes sont en bas) ── */
+.h-main { padding: 0 var(--g) calc(184px + env(safe-area-inset-bottom)); }
+.h-tete { padding-top: calc(env(safe-area-inset-top) + 14px); }
+.h-tete-l { display: flex; align-items: center; flex-wrap: wrap; column-gap: 6px; }
+.h-etape { flex-basis: 100%; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--c2); }
+.h-titre { margin: 2px 0 0; font: 400 32px/1.1 var(--sb-police-affiche); letter-spacing: -.02em; color: var(--c); }
+.h-rond-aide { width: 44px; height: 44px; display: grid; place-items: center; color: var(--c2); border-radius: 22px; margin-top: 4px; }
+
+/* LE RAIL SOULIGNÉ (de C) : le texte, le nombre, la diode sous le cran choisi. Le dernier cran = l'historique. */
+.h-rail { display: flex; gap: 2px; margin: 8px calc(-1 * var(--g)) 0; padding: 0 calc(var(--g) - 10px); overflow-x: auto; scrollbar-width: none;
+  border-bottom: 1px solid rgb(255 255 255 / .16); }
+.h-rail::-webkit-scrollbar { display: none; }
+.h-rail-cran { position: relative; flex: none; display: inline-flex; align-items: center; gap: 6px; height: 44px; padding: 0 10px; font-size: 15px; font-weight: 500; color: var(--c2); white-space: nowrap; }
+.h-rail-cran[aria-current] { color: var(--c); font-weight: 600; }
+.h-rail-cran[aria-current]::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: -1px; height: 2.5px; border-radius: 2px; background: var(--c); }
+.h-rail-n { font-variant-numeric: tabular-nums; font-weight: 500; opacity: .85; }
+.h-rail-n.is-ambre { color: var(--cambre); opacity: 1; }
+.h-rail-cran:last-child { margin-left: auto; }
+
+/* ── LA BANDE DE CHIFFRES (≤ 72 px), sur le fond ── */
+.h-bande { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 16px 2px 0; }
+.h-bande-c { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.h-bande-v { font: 300 28px/1.05 var(--sb-police-affiche); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.h-bande-v.is-ambre { color: var(--cambre); }
+.h-bande-l { font-size: 12.5px; color: var(--c2); line-height: 1.25; }
+.h-affiche { display: flex; flex-direction: column; margin: 18px 2px 0; }
+.h-affiche-v { font: 200 60px/1 var(--sb-police-affiche); letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+.h-affiche-l { margin-top: 6px; font-size: 13px; color: var(--c2); }
+
+/* ── SECTIONS ET PLANS DE VERRE ── */
+.h-section { margin-top: 22px; }
+.h-section-titre { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 8px; margin: 0 4px 8px; font-size: 17px; font-weight: 600; color: var(--c); }
+.h-section-titre::first-letter { text-transform: uppercase; }
+.h-section-n { font-weight: 500; font-variant-numeric: tabular-nums; color: var(--c2); }
+.h-section-sous { flex-basis: 100%; font-size: 13px; font-weight: 400; color: var(--c2); margin-top: 1px; }
+.h-plan { background-image: var(--verre); box-shadow: var(--sv-ombre); border-radius: 20px; overflow: hidden; color: var(--e); }
+.h-plan + .h-plan { margin-top: 10px; }
+.h-plan-suite { padding: 12px 16px; font-size: 14px; color: var(--e2); border-top: .5px solid rgb(12 29 48 / .10); }
+.h-vide { padding: 18px 16px; font-size: 15px; color: var(--e2); }
+.h-encore { margin: 14px 4px 0; font-size: 13.5px; color: var(--c2); white-space: pre-wrap; }
+
+/* UNE RANGÉE se touche entière (64–72 px, vignette 52) ; aucun bouton dedans. */
+.h-ligne { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 68px; padding: 8px 14px 8px 10px; position: relative; content-visibility: auto; contain-intrinsic-size: auto 68px; }
+.h-ligne:not(:has(.h-vignette)) { padding-left: 16px; }
+.h-ligne + .h-ligne::before, .h-colis + .h-colis::before { content: ''; position: absolute; top: 0; left: 74px; right: 0; height: .5px; background: rgb(12 29 48 / .10); }
+button.h-ligne:active, button.h-colis:active { background: rgb(255 255 255 / .5); }
+.h-vignette { flex: none; display: block; border-radius: var(--sb-r-vignette); overflow: hidden; background: var(--sb-socle); box-shadow: var(--sb-ombre-pose); }
+.h-vignette img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.h-ligne-corps { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.h-ligne-titre { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.h-ligne-nom { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; font-weight: 500; }
+.h-ligne-sous { font-size: 13.5px; color: var(--e2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.h-ligne-droite { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.h-ligne-val { font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.h-ligne-val.is-ambre { color: var(--eambre); font-weight: 600; }
+.h-ligne-val-sous { font-size: 12.5px; color: var(--e2); white-space: nowrap; }
+.h-point { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--sb-ambre-point); margin-right: 6px; vertical-align: 1px; }
+
+/* LA PLAQUE — le N°, gravé (jamais en couleur). */
+.h-plaque { flex: none; display: inline-flex; align-items: baseline; gap: 1px; padding: 2px 6px; border-radius: var(--sb-r-plaque); font-weight: 650; font-size: 13px; font-variant-numeric: tabular-nums;
+  background: rgb(12 29 48 / .06); color: var(--e); box-shadow: inset 0 .5px 1px rgb(12 29 48 / .25), inset 0 0 0 .5px rgb(12 29 48 / .12); }
+.h-plaque-n { font-size: 10.5px; font-weight: 500; color: var(--e2); margin-right: 1px; }
+.h-plaque--vide { font-weight: 500; color: var(--e2); }
+
+/* RECEVOIR : un point = une carte ; le code de retrait en grand, gravé. */
+.h-point-carte { padding-bottom: 4px; }
+.h-point-tete { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 10px; padding: 14px 16px 6px; }
+.h-point-nom { font-size: 17px; font-weight: 600; }
+.h-point-adr { flex-basis: 100%; font-size: 13.5px; color: var(--e2); }
+.h-colis { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 6px 14px 6px 10px; position: relative; }
+.h-code { flex: none; min-width: 84px; height: 44px; padding: 0 10px; display: grid; place-items: center; border-radius: 10px; font: 600 19px/1 var(--sb-police-affiche); letter-spacing: .08em; font-variant-numeric: tabular-nums;
+  box-shadow: inset 0 0 0 1px rgb(12 29 48 / .18); }
+
+/* RANGER : les cases, en tuiles de verre. */
+.h-cases { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.h-case { display: flex; flex-direction: column; gap: 3px; min-height: 84px; padding: 10px 10px 9px; border-radius: 16px; background-image: var(--verre); box-shadow: var(--sv-ombre); color: var(--e); }
+.h-case-nom { font: 500 20px/1 var(--sb-police-affiche); letter-spacing: -.01em; }
+.h-case-n { font-size: 12.5px; color: var(--e2); }
+.h-case-nums { display: flex; gap: 3px; flex-wrap: wrap; margin-top: auto; }
+.h-case-nums .h-plaque { font-size: 11px; padding: 1px 4px; }
+.h-case-nums .h-plaque-n { display: none; }
+
+/* POSTER : la tournée. */
+.h-tournee { display: grid; grid-template-columns: 1fr 1fr; }
+.h-tournee-l { display: flex; flex-direction: column; gap: 3px; padding: 14px 16px; min-height: 64px; }
+.h-tournee-l + .h-tournee-l { border-left: .5px solid rgb(12 29 48 / .10); }
+.h-tournee-l:nth-child(3) { grid-column: 1 / -1; border-left: 0; border-top: .5px solid rgb(12 29 48 / .10); }
+.h-tournee-v { font: 400 22px/1.1 var(--sb-police-affiche); font-variant-numeric: tabular-nums; }
+
+/* ── LE BAS, SOUS LE POUCE : le plateau (chercher + LE geste) posé sur la barre des postes ── */
+.h-bas { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; padding: 0 10px max(10px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 8px;
+  background: linear-gradient(180deg, transparent, color-mix(in oklab, var(--sv-bas) 70%, transparent) 30%); padding-top: 22px; }
+.h-plateau { display: flex; align-items: center; gap: 8px; }
+.h-champ { display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 14px; border-radius: 24px; color: var(--e2);
+  background: var(--sv-porcelaine); box-shadow: var(--sv-ombre); }
+.h-champ input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: none; font: inherit; font-size: 16px; color: var(--e); }
+.h-champ input::placeholder { color: var(--e2); }
+.h-champ--plateau { flex: 1; min-width: 0; }
+.h-plein { flex: none; display: inline-flex; align-items: center; gap: 8px; height: 48px; padding: 0 18px 0 16px; border-radius: 24px; font-weight: 600; font-size: 16px; white-space: nowrap;
+  background: #0C1D30; color: #FFFFFF !important; box-shadow: 0 1px 2px rgb(0 0 0 / .25), 0 10px 22px -10px rgb(0 0 0 / .6); transition: transform var(--sb-e-appui); }
+.h-plein:active { transform: scale(.97); }
+:root[data-theme="dark"] .h-plein { background: #F2F7FD; color: #0C1D30 !important; }
+.h-barre { display: flex; align-items: stretch; height: 64px; border-radius: 24px; padding: 0 4px;
+  background: var(--sv-verre-barre, rgb(255 255 255 / .72)); -webkit-backdrop-filter: var(--sb-verre-flou); backdrop-filter: var(--sb-verre-flou); box-shadow: var(--sv-ombre); color: var(--e); }
+.h-onglet { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border-radius: 18px; color: var(--e2); }
+.h-onglet[aria-current] { color: var(--e); }
+.h-onglet-i { position: relative; display: grid; place-items: center; width: 44px; height: 30px; border-radius: 12px; }
+.h-onglet[aria-current] .h-onglet-i { background: rgb(12 29 48 / .08); box-shadow: inset 0 1px 2px rgb(12 29 48 / .14); }
+.h-onglet[aria-current] .h-onglet-i::after { content: ''; position: absolute; bottom: -6px; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--sb-diode); }
+.h-onglet-mot { font-size: 11px; font-weight: 600; letter-spacing: -.01em; }
+.h-onglet-n { position: absolute; top: -4px; right: -2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
+  background: var(--e); color: var(--sv-porcelaine); font-variant-numeric: tabular-nums; }
+.h-disque { flex: none; width: 64px; display: grid; place-items: center; }
+.h-disque .h-ico { width: 48px; height: 40px; padding: 7px 11px; border-radius: 14px; background: #0C1D30; color: #FFFFFF; box-shadow: 0 6px 14px -8px rgb(0 0 0 / .7); }
+:root[data-theme="dark"] .h-disque .h-ico { background: #F2F7FD; color: #0C1D30; }
+
+/* ── LE SCANNER (feuille) ── */
+.h-voile { position: fixed; inset: 0; z-index: 50; background: rgb(4 12 24 / .45); display: flex; align-items: flex-end; justify-content: center; }
+.h-feuille { width: 100%; max-width: 560px; border-radius: 28px 28px 0 0; padding: 8px var(--g) calc(24px + env(safe-area-inset-bottom)); background: var(--sv-porcelaine); color: var(--e); box-shadow: 0 -20px 60px -20px rgb(0 0 0 / .6); }
+.h-feuille-poignee { width: 36px; height: 5px; border-radius: 3px; background: rgb(12 29 48 / .18); margin: 0 auto 12px; }
+.h-viseur { position: relative; height: 210px; border-radius: 22px; background: #0B1727; margin-bottom: 14px; overflow: hidden; }
+.h-viseur span { position: absolute; width: 34px; height: 34px; border: 3px solid #FFFFFF; }
+.h-viseur span:nth-child(1) { top: 28px; left: 56px; border-right: 0; border-bottom: 0; border-radius: 10px 0 0 0; }
+.h-viseur span:nth-child(2) { top: 28px; right: 56px; border-left: 0; border-bottom: 0; border-radius: 0 10px 0 0; }
+.h-viseur span:nth-child(3) { bottom: 28px; left: 56px; border-right: 0; border-top: 0; border-radius: 0 0 0 10px; }
+.h-viseur span:nth-child(4) { bottom: 28px; right: 56px; border-left: 0; border-top: 0; border-radius: 0 0 10px 0; }
+.h-viseur-trait { position: absolute; left: 70px; right: 70px; top: 50%; height: 2px; background: rgb(255 255 255 / .7); }
+.h-champ--scan { box-shadow: inset 0 1px 2px rgb(12 29 48 / .14), inset 0 0 0 .5px rgb(12 29 48 / .12); background: var(--sb-creux); }
+.h-scan-aide { padding: 14px 4px 4px; font-size: 14.5px; color: var(--e2); }
+.h-trouve { margin-top: 12px; background: var(--sv-porcelaine-2); }
+.h-trouve-tete { padding: 12px 16px 0; font-size: 13px; font-weight: 600; color: var(--e2); }
+.h-ouvrir { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 48px; padding: 0 16px; font-weight: 600; color: var(--elien) !important; border-top: .5px solid rgb(12 29 48 / .10); }
+
+/* ── LA NUIT ── */
+:root[data-theme="dark"] :is(.h-ligne + .h-ligne, .h-colis + .h-colis)::before { background: rgb(255 255 255 / .08); }
+:root[data-theme="dark"] :is(.h-plan-suite, .h-tournee-l:nth-child(3), .h-ouvrir) { border-color: rgb(255 255 255 / .08); }
+:root[data-theme="dark"] .h-tournee-l + .h-tournee-l { border-color: rgb(255 255 255 / .08); }
+:root[data-theme="dark"] .h-plaque { background: rgb(0 0 0 / .25); box-shadow: inset 0 1px 1.5px rgb(0 0 0 / .6); }
+:root[data-theme="dark"] .h-code { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .2); }
+:root[data-theme="dark"] .h-onglet[aria-current] .h-onglet-i { background: rgb(255 255 255 / .08); box-shadow: inset 0 1px 2px rgb(0 0 0 / .5); }
+:root[data-theme="dark"] button:is(.h-ligne, .h-colis):active { background: rgb(255 255 255 / .06); }
+:root[data-theme="dark"] .h-feuille-poignee { background: rgb(255 255 255 / .2); }
+
+/* ════ L'ORDINATEUR (≥ 1100) : les postes à gauche, numérotés 1–5 (touches), le scanner en tête ════ */
+.h-racine.is-large { display: grid; grid-template-columns: 264px minmax(0, 1fr); min-height: 100dvh; }
+.h-cote { position: sticky; top: 0; height: 100dvh; display: flex; flex-direction: column; gap: 14px; padding: 22px 14px; border-right: 1px solid rgb(255 255 255 / .12); background: rgb(255 255 255 / .04); }
+.h-marque { font-weight: 700; font-size: 17px; letter-spacing: .06em; padding: 0 8px; }
+.h-marque-sous { display: block; font-weight: 400; letter-spacing: 0; font-size: 13px; color: var(--c2); margin-top: 2px; }
+.h-champ--cote { height: 40px; border-radius: 12px; font-size: 14px; }
+.h-champ--cote span { flex: 1; }
+.h-champ--cote kbd { font: 600 12px/1 var(--sb-police-texte); padding: 4px 7px; border-radius: 6px; box-shadow: inset 0 0 0 1px rgb(12 29 48 / .2); }
+.h-postes-cote { display: flex; flex-direction: column; gap: 2px; }
+.h-poste-cote { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 10px; border-radius: 10px; color: var(--c2); font-size: 15px; font-weight: 500; width: 100%; }
+.h-poste-cote:hover { background: rgb(255 255 255 / .08); }
+.h-poste-cote[aria-current] { background: var(--sv-porcelaine); color: var(--e); box-shadow: var(--sv-ombre); }
+:root[data-theme="dark"] .h-poste-cote[aria-current] { background: rgb(255 255 255 / .12); color: var(--c); }
+.h-poste-i { width: 18px; font-size: 12px; font-weight: 600; opacity: .6; font-variant-numeric: tabular-nums; }
+.h-poste-nom { flex: 1; }
+.h-poste-n { font-size: 13px; font-variant-numeric: tabular-nums; }
+.h-cote-pied { margin-top: auto; }
+.is-large .h-main { padding: 0 36px 48px; max-width: 1240px; width: 100%; }
+.is-large .h-tete { position: sticky; top: 0; z-index: 5; padding-top: 22px; background: linear-gradient(180deg, color-mix(in oklab, var(--sv-haut) 92%, transparent) 70%, transparent); }
+.is-large .h-titre { font-size: 30px; }
+.is-large .h-tete-geste { margin-left: auto; }
+.is-large .h-plein { height: 40px; font-size: 15px; border-radius: 20px; }
+.is-large .h-rail { margin: 8px 0 0; padding: 0; }
+.is-large .h-rail-cran { height: 40px; }
+/* Deux colonnes : le « à faire » à gauche, le reste du poste à droite. */
+.is-large .h-corps { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); column-gap: 24px; align-items: start; }
+.is-large .h-corps > :is(.h-bande, .h-affiche) { grid-column: 1 / -1; }
+.is-large .h-bande { grid-template-columns: repeat(3, max-content); column-gap: 48px; }
+.is-large .h-corps > .h-section:nth-of-type(n + 2) { grid-column: 2; }
+.is-large .h-corps > .h-section:first-of-type { grid-column: 1; grid-row: span 6; }
+.is-large .h-cases { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.is-large .h-ligne { min-height: 60px; }
+.is-large .h-encore { grid-column: 2; }
+@media (hover: hover) { .h-ligne:hover, .h-colis:hover { background: rgb(255 255 255 / .35); } :root[data-theme="dark"] :is(.h-ligne, .h-colis):hover { background: rgb(255 255 255 / .05); } }
+@media (prefers-reduced-motion: reduce) { .h-racine * { transition: none !important; } }
