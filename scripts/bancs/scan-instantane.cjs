@@ -339,14 +339,15 @@ async function scene(lettre, fabriquer, fn) {
     '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', `--use-file-for-fake-video-capture=${fichier}`];
   const b = await lancer(PW, { executablePath: process.env.VRM_CHROMIUM_PATH || '/opt/pw-browsers/chromium', args });
   try {
-    const o = await ouvrir(b, { width: 390, height: 844 }, false);
+    // SCAN_VUE=1512 (ordinateur) et SCAN_SOMBRE=1 : les mêmes scènes, pour les captures (les seuils sont ceux du 390).
+    const o = await ouvrir(b, process.env.SCAN_VUE === '1512' ? { width: 1512, height: 950 } : { width: 390, height: 844 }, process.env.SCAN_SOMBRE === '1');
     await essaie(lettre, () => fn(o));
     dit(o.envois.length === 0, `${lettre} : aucune image envoyée`, o.envois.slice(0, 2).join(' '));
     dit(o.errs.length === 0, `${lettre} : aucune erreur d’app`, o.errs.join(' | ').slice(0, 300));
     await o.ctx.close();
   } finally { await b.close(); try { fs.unlinkSync(fichier); } catch (_) {} }
 }
-const shot = async (pg, q) => { if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `scan-instantane-${q}.png`) }); };
+const shot = async (pg, q) => { if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `scan-instantane-${process.env.SCAN_VUE || '390'}${process.env.SCAN_SOMBRE === '1' ? '-sombre' : ''}-${q}.png`) }); };
 
 (async () => {
   // SCAN_PGM=cle:px:fichier.pgm — écrit seulement UNE image (pour la regarder ou la décoder ailleurs).
