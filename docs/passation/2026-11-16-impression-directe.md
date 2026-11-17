@@ -20,12 +20,16 @@ le nombre du lot (`vrm_colis_prets.lot`). Les demandes venues d'ailleurs (⌘K, 
   (`prendreDemandeImpression`) appellent alors le MOTEUR `imprimerLot` (pas la feuille « Choisir ») ; en mode direct,
   `montrerApres` marque comme avant puis dit « N imprimés · Annuler » au lieu de la feuille d'après ; une question
   annulée désarme le mode ; « Annuler » retire CES marques (Vinted, retours, Vestiaire) seulement.
+- (17 nov., après la fusion de `tampons-parametres`) « Imprimer (N) » ouvre maintenant l'APERÇU avant impression
+  (tampons déplaçables). En mode direct, PAS d'aperçu : `lancerImpression` prend le chemin d'attente
+  (`attendrePuisOuvrir` : question des N° §5, puis la visionneuse) avec les tampons et places DÉJÀ gardés — c'est ce
+  que la mission demande (« sans étape intermédiaire »). Le bouton d'À expédier garde l'aperçu.
 - Rien ne s'imprime sans son clic ; §5 tenu (la question du N° à vérifier est celle du moteur).
 - Textes `impdir.*` en 5 langues ; « Quoi de neuf » `impression-directe`.
 
 ## Preuves
-- `node scripts/audit-impression-directe.cjs` (neuf) : vert ; `--prouve` **10/10 mutations**.
-- Banc `scripts/bancs/impression-simple.cjs` (+ D, D-sombre, D1, « Plus tard ») : **84/84** à 1512 et 390
+- `node scripts/audit-impression-directe.cjs` (neuf) : vert ; `--prouve` **11/11 mutations**.
+- Banc `scripts/bancs/impression-simple.cjs` (+ D, D-sombre, D1, « Plus tard ») : **86/86** à 1512 et 390 (après la fusion de main du 17 nov.)
   (A, B, C inchangés et verts). D : bannière « Imprimer les 5 » vraiment visible (point au centre = le bouton),
   UN clic ⇒ visionneuse, impression lancée seule, PDF de 4 bordereaux chacun SON N°, aucune feuille « Choisir » ni
   « Tout est sorti ? », « 4 imprimés · Annuler », 4 marqués puis retirés par « Annuler » ; D1 (papier jamais choisi) :
