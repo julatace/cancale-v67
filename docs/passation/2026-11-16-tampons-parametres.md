@@ -98,6 +98,18 @@ recouvre le bas et les bords. »
 
 Textes par `tr()` (src/i18n/langues/*/tampons.js, 5 langues). Quoi de neuf : `tampons-apercu`, `tampons-mention-qr`.
 
+### Ajout de Julien (capture iPhone) : rien ne bouge, « Bordereau prêt » refait
+- **Un bouton d'impression ne change plus ni de taille ni de mot pendant la préparation** : sa largeur est figée, le
+  texte et l'icône s'effacent sur place, une roue tourne DEDANS (`src/impression/occuper.js`, `[data-occupe]`). Tout
+  bouton `[data-imprime]` touché est figé (écouteur global) jusqu'à ce que la suite se montre (aperçu, visionneuse,
+  « Bordereau prêt », un message) ; « Imprimer (N) » et le grand bouton d'À envoyer (`PleinLarge`) gardent leur mot
+  (« Préparation… » passe dans l'infobulle) ; les boutons des lignes de vente, des cartes Colis et de Vestiaire
+  passent par `occuperPendant`.
+- **« Bordereau prêt »** (`src/impression/BordereauPret.jsx`) : plus d'émoji ni de texte centré ; l'aperçu réel du PDF
+  tamponné, « Imprimer » (le partage AVEC le PDF au téléphone via `ouvrirPdfLot`, sinon le PDF), « Enregistrer »
+  (téléchargement), « Déplacer le tampon » (l'aperçu avant impression), l'explication iPhone en une ligne sous
+  « Pourquoi ? » ; ce que l'impression a vraiment fait (thermique, planche, fiches) reste dit sous l'aperçu.
+
 ## 3. Preuves
 
 ### La mention : planches AVANT / APRÈS (rendues par le vrai code, regardées)
