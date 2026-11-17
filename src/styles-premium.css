@@ -904,12 +904,13 @@
 }
 /* Les réglages de l'atelier : un GROUPE blanc par réglage, sans cadre. */
 [data-republier] :is([data-republier-photos], [data-republier-description], [data-republier-brouillon], [data-republier-esp], div:has(> [data-republier-reductions]), div:has(> [data-republier-titre])) {
-  background: var(--p-carte) !important; border-radius: var(--p-r-ctrl) !important; padding: 12px 14px !important; border: 0 !important; box-shadow: var(--p-ombre) !important;
+  /* (17 nov.) --p-r-ctrl est devenu la PILULE (styles-systeme) : un bloc haut en pilule faisait une « bulle » ⇒ rayon de carte. */
+  background: var(--p-carte) !important; border-radius: var(--p-r-carte, 16px) !important; padding: 12px 14px !important; border: 0 !important; box-shadow: var(--p-ombre) !important;
 }
 [data-republier] .vrm-repub-memes { background: transparent !important; padding: 0 2px !important; border-radius: 0 !important; }
 /* Les listes de l'atelier (le choix, l'aperçu, la file) : un groupe blanc, filets de 0,5 px. */
 [data-republier] :is(div:has(> [data-republier-apercu]), div:has(> [data-republier-ligne]), div:has(> [data-republier-paire])) {
-  background: var(--p-carte) !important; border: 0 !important; border-radius: var(--p-r-ctrl) !important; box-shadow: var(--p-ombre) !important;
+  background: var(--p-carte) !important; border: 0 !important; border-radius: var(--p-r-carte, 16px) !important; box-shadow: var(--p-ombre) !important;
 }
 [data-republier] :is([data-republier-apercu], [data-republier-ligne], [data-republier-ordre]) { border-bottom: .5px solid var(--p-filet) !important; }
 [data-republier] :is([data-republier-apercu], [data-republier-ligne]):last-child { border-bottom: 0 !important; }
@@ -917,7 +918,7 @@
 [data-republier] [data-republier-paire]:last-child { border-bottom: 0 !important; }
 [data-republier] [data-republier-apercu] { padding: 10px 14px !important; font-size: var(--p-t-note) !important; }
 [data-republier] :is([data-republier-ligne], [data-republier-ordre]) { padding-left: 14px !important; padding-right: 6px !important; }
-[data-republier] .vrm-sel-liste { background: var(--p-carte) !important; border: 0 !important; border-radius: var(--p-r-ctrl) !important; box-shadow: var(--p-ombre) !important; }
+[data-republier] .vrm-sel-liste { background: var(--p-carte) !important; border: 0 !important; border-radius: var(--p-r-carte, 16px) !important; box-shadow: var(--p-ombre) !important; }
 [data-republier] .vrm-sel-liste .vrm-sel-ligne { border-color: var(--p-filet) !important; border-width: 0 0 .5px !important; }
 [data-republier] .vrm-sel-liste .vrm-sel-photo { width: 44px !important; height: 44px !important; border-radius: var(--p-r-vignette) !important; }
 [data-republier] input[type="checkbox"] { width: 22px !important; height: 22px !important; }

@@ -162,7 +162,13 @@ async function ecranPlein(b, vp, theme, tag) {
         await plan.waitFor({ timeout: 5000 }).catch(() => {});
         const pl = await plan.first().evaluate((e) => ({ n: e.getAttribute('data-repub-plan-n'), sec: Number(e.getAttribute('data-repub-plan')), t: e.textContent })).catch(() => null);
         dit(pl && pl.n === '3' && pl.sec >= 3 * 45 && /3 annonces · environ \d+ min · fin vers \d\d:\d\d/.test(pl.t), `A1 ${tag} le plan avant de lancer : « 3 annonces · environ … min · fin vers HH:MM »`, pl && pl.t);
-        if (process.env.DIAG) console.log(JSON.stringify(await pg.evaluate(() => { const out = []; for (const sel of ['[data-republier-esp]', '[data-republier-ordre]']) { let e = document.querySelector(sel); for (let i = 0; e && i < 4; i++, e = e.parentElement) { const c = getComputedStyle(e); out.push([sel, i, e.className, c.borderRadius, c.clipPath, c.maskImage || c.webkitMaskImage, c.overflow, c.boxShadow.slice(0, 60)]); } } return out; })));
+        // Pas de « bulle » : un bloc de l'atelier plus haut que 60 px n'a jamais un rayon de pilule.
+        const bulles = await pg.evaluate(() => [...document.querySelectorAll('[data-republier] div')].filter((e) => { const r = e.getBoundingClientRect(); return r.height > 60 && parseFloat(getComputedStyle(e).borderTopLeftRadius) > 40; }).length);
+        dit(bulles === 0, `A3 ${tag} aucune « bulle » (bloc haut au rayon de pilule)`, String(bulles));
+        const esp = await pg.locator('[data-republier-esp-fixe]').inputValue().catch(() => '');
+        await pg.locator('[data-republier-esp-fixe]').blur().catch(() => {}); await pg.waitForTimeout(150);
+        const esp2 = await pg.locator('[data-republier-esp-fixe]').inputValue().catch(() => '');
+        dit(esp2 === '8' && await pg.locator('[data-republier-esp-min="8"]').count() === 1, `A4 ${tag} « 0 s » refusé : 8 s au moins, et c'est dit`, `${esp} → ${esp2}`);
         await plan.first().scrollIntoViewIfNeeded().catch(() => {});
         await shot(pg, `rp1-atelier-plan-${tag}.png`);
         await pg.locator('[data-republier-confirme]').check();
@@ -187,6 +193,9 @@ async function ecranPlein(b, vp, theme, tag) {
         dit(ch.join(',') === '4/,3/enligne,0/', `C3 ${tag} la chaîne sous chaque ligne : 4 étapes · brouillon prêt arrêté avant « en ligne » · rien coché pour la pas partie`, ch.join(','));
         const hb = await pg.$$eval('[data-repub-bilan] button, [data-repub-bilan] a', (els) => els.filter((e) => e.offsetParent).map((e) => Math.round(e.getBoundingClientRect().height)));
         dit(hb.length >= 2 && hb.every((h) => h >= (w < 600 ? 44 : 32)), `C4 ${tag} les gestes du bilan à la bonne taille (44 px au doigt)`, hb.join(','));
+        const coupes = await pg.$$eval('[data-repub-ligne-titre]', (els) => els.filter((e) => e.scrollWidth > e.clientWidth + 1 || getComputedStyle(e).textOverflow === 'ellipsis').length).catch(() => -1);
+        const nTit = await pg.locator('[data-repub-ligne-titre]').count();
+        dit(nTit === 3 && coupes === 0, `C7 ${tag} les titres des lignes sont entiers (aucun « … »)`, `${nTit} titres, ${coupes} coupés`);
         await bil.scrollIntoViewIfNeeded().catch(() => {});
         await shot(pg, `rp3-bilan-${tag}.png`);
         // « Choisir la taille » : SA réponse repart pour CETTE paire seulement.

@@ -29,12 +29,12 @@ Où ça s'est arrêté (classes) :
 | brouillon refusé (avant suppression) | `versbrouillon_brouillon_refuse_400` ×2 | déjà sûr : rien supprimé |
 | frein / pause | `vinted_frein_403` ×56, `vinted_frein_429` ×24 | déjà tenu |
 
-⚠️ **L'ordre.** CLAUDE.md §3 dit « coffre → supprimer → brouillon → mise en ligne » (décision du 28 oct.,
-5.254). Le code fait depuis la 5.277 (29 oct., « fais tout comme Vintex ») **coffre → brouillon →
-supprimer → mise en ligne** : le brouillon AVANT la suppression (un brouillon refusé ne supprime rien —
-mesuré : 2 refus ainsi sans perte). `audit-recreer.cjs` (169) l'exige. **Gardé tel quel** ; à confirmer
-par Julien si la ligne §3 doit être réécrite. « Recréer puis supprimer » (création EN LIGNE d'abord) reste
-retiré.
+⚠️ **L'ordre — tranché par Julien le 17 nov.** : le code fait depuis la 5.277 (29 oct., « comme Vintex »,
+commit c962b2c79) **coffre → brouillon → suppression → mise en ligne** ; la ligne §3 de CLAUDE.md disait encore
+l'ordre du 28 oct. (supprimer avant le brouillon). Julien : **garder « brouillon puis suppression »**. La ligne
+§3 est corrigée (« ne pas inverser (supprimer avant le brouillon) »). L'app et l'écran plein affichent cet ordre
+réel ; `audit-republication-parfaite` A5/A6 exige que l'ordre AFFICHÉ (app, extension, écran plein) soit celui
+des REQUÊTES, rouge par mutation si deux étapes sont permutées (requêtes, app, extension ou écran).
 
 ## 2. Ce qui change (extension 5.408.0)
 
@@ -89,12 +89,18 @@ retiré.
 
 ## 5. Bancs
 
-Voir la fin de ce fichier (ajoutée après les captures).
+`scripts/bancs/republication-parfaite.cjs` (vrai build, vrais vrm-ui.js / vrm-action.js, données inventées) :
+390 tactile, 1280, 1512 × clair, sombre — **72 OK, 0 KO** : A plan avant de lancer, B écran plein (chaîne,
+44 px, « photo 2 sur 3 »), C bilan (1 en ligne · 2 à finir, un geste chacun, « Choisir la taille » repart pour
+CETTE paire avec SA réponse). Captures regardées ; corrigé après les avoir vues : la phrase « rien n'a changé sur
+Vinted » sous « Fini » était fausse pour un brouillon à refaire (retirée quand le bilan est là) ; le geste est
+à un seul endroit (le bilan) ; espacement « Fixe » 8 s au moins (0 s refusé, dit) ; titres des lignes entiers
+(plus de « … ») ; « annonces » au lieu de « paires » (vendeurs pas que de baskets).
+Passe d'audits (169 audits qui touchent la republication, l'extension, les textes) : aucun rouge nouveau par
+rapport à la branche de départ (`renum-b` hors délai, `vendeur-generaliste`, `vocabulaire-article` déjà rouges).
 
 ## Geste de Julien
 
 1. Installer l'extension **5.408.0** (remplacer le dossier, ⟳ dans chaque Chrome).
 2. Annonces → « Brouillons à refaire » : le bouton de chaque ligne (avec la 5.408 il passe par « Reprendre ») sur les 5 paires restées
    supprimées et jamais en ligne depuis le 1er nov. — onglet vinted.fr ouvert sur le bon compte.
-3. Dire si la ligne §3 de CLAUDE.md doit dire « coffre → brouillon → supprimer → en ligne » (le code
-   depuis le 29 oct.) ou s'il veut revenir à la suppression AVANT le brouillon.
