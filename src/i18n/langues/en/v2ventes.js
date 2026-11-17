@@ -54,5 +54,6 @@ export default {
   "v2v.vendue": {"zero": "sold today", "one": "sold yesterday", "other": "sold {n} days ago"},
   "v2v.bord.pret": "label ready",
   "v2v.bord.attente": "label not received yet",
-  "v2v.bord.imprime": "label printed"
+  "v2v.bord.imprime": "label printed",
+  "v2v.erreur": "Your Vinted sales could not be read: nothing is lost, try again in a moment."
 };

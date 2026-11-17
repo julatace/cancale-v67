@@ -54,5 +54,6 @@ export default {
   "v2v.vendue": {"zero": "vendida hoy", "one": "vendida ayer", "other": "vendida hace {n} días"},
   "v2v.bord.pret": "etiqueta lista",
   "v2v.bord.attente": "etiqueta aún no recibida",
-  "v2v.bord.imprime": "etiqueta impresa"
+  "v2v.bord.imprime": "etiqueta impresa",
+  "v2v.erreur": "No se pudieron leer tus ventas de Vinted: no se pierde nada, inténtalo de nuevo en un momento."
 };

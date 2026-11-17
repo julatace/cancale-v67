@@ -525,3 +525,32 @@ html[data-design="v2"] body .v2v-tete .v2-affiche-sig-sous { white-space: nowrap
 .v2v-liste .v2l-a .v2l-a-txt { gap: 6px; }
 /* La 3e ligne de VENTES passe à la ligne (rien de coupé) ; celle d'Annonces reste sur une ligne. */
 .v2v-liste .v2l-a-l3 { height: auto; flex-wrap: wrap; white-space: normal; overflow: visible; gap: 2px 12px; line-height: 18px; }
+
+/* ══ 13. VENTES — QUALITÉ ET FLUIDITÉ (Julien : « ça doit être beaucoup plus quali et fluide ») ═══════════════════
+   Grille de 4/8, rayons 12/14/20, réponse au toucher < 100 ms, 1 000 rangées sans à-coup, images en fondu sans décalage,
+   squelette de la forme exacte des rangées, mouvement réduit respecté. */
+.v2v-liste { border-radius: 20px; }
+.v2v-liste .v2l { transition: background-color 80ms ease; }
+/* 1 000 rangées : le navigateur ne dessine que ce qui est à l'écran ; la place réservée évite tout saut au défilement. */
+.v2v-liste > .v2l { content-visibility: auto; contain-intrinsic-size: auto 104px; }
+/* Une photo arrive en fondu, dans sa boîte de 64 × 64 déjà posée (le texte ne bouge pas). */
+.v2v-liste .v2l-photo img { animation: v2v-fondu 200ms ease-out both; }
+@keyframes v2v-fondu { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .v2v-liste .v2l-photo img { animation: none; } }
+/* La grille de 4 : la tête et la 3e ligne sans demi-pixels de rattrapage. */
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig { grid-template-rows: 40px auto; margin: 0 0 8px; }
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig-mot { margin-bottom: 0; }
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig-sous { margin: 0; }
+.v2v-liste .v2l-a-l3 { margin-top: 0; gap: 4px 12px; }
+.v2v-liste .v2v-groupe:first-child { padding-top: 4px; }
+/* Le squelette : la rangée A elle-même, des formes grises qui respirent doucement (immobiles en mouvement réduit). */
+.v2v-squelette { pointer-events: none; }
+.v2v-sq-groupe { display: block; width: 96px; height: 12px; margin: 12px 16px 8px; border-radius: 12px; background: var(--v2-socle); }
+.v2v-sq { cursor: default; }
+.v2v-sq-bloc, .v2v-sq-ligne { background: var(--v2-socle); animation: v2v-respire 1200ms ease-in-out infinite alternate; }
+.v2v-sq-ligne { display: block; height: 12px; border-radius: 12px; }
+.v2v-sq-ligne.is-titre { width: 72%; height: 16px; margin-top: 4px; }
+.v2v-sq-ligne.is-n { width: 32%; height: 24px; }
+.v2v-sq-ligne.is-l3 { width: 56%; }
+@keyframes v2v-respire { from { opacity: .55; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .v2v-sq-bloc, .v2v-sq-ligne { animation: none; } }

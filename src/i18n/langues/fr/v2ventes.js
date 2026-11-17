@@ -54,5 +54,6 @@ export default {
   "v2v.vendue": {"zero": "vendue aujourd’hui", "one": "vendue hier", "other": "vendue il y a {n} j"},
   "v2v.bord.pret": "bordereau prêt",
   "v2v.bord.attente": "bordereau pas encore reçu",
-  "v2v.bord.imprime": "bordereau imprimé"
+  "v2v.bord.imprime": "bordereau imprimé",
+  "v2v.erreur": "Tes ventes Vinted n’ont pas pu être lues : rien n’est perdu, réessaie dans un instant."
 };
