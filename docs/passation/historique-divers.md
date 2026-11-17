@@ -2035,5 +2035,8 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 - **16 nov. · Scanner un colis d'achat (lot scan-achat)** : le n° de suivi scanné (caméra, douchette, saisie) ⇒ « Dans ce colis » : photo, titre, taille · état, lot en liste (lus dans SA transaction), payé, date, vendeur ; « Ranger » (atelier d'arrivée), « Signaler un problème » (sa conversation Vinted), « Ce n'est pas ça » ; inconnu ⇒ « Colis inconnu · Relier à un achat » (SON toucher, n° gardé comme identité). Mesuré : 43 achats sur 135 (30 j) ont un n°. `2026-11-16-scan-achat.md`. Geste : aucun.
 
-## Ligne du §9 de CLAUDE.md déplacée le 17 nov. (lot groupes-coucou, après fusion de main), telle quelle
+## Ligne du §9 de CLAUDE.md déplacée le 17 nov. (PR #1250, après fusion de main), telle quelle
 - **17 nov. · Scanner un bordereau de vente (lot scan-bordereau-vente, URGENT)** : mesuré sur son étiquette Mondial Relay : 3 grands codes « lettre + 19 chiffres » SANS le n° de suivi (le téléphone lit celui-là) + un « 55… » de 26 chiffres sur le bord ; les étiquettes captées n'ont aucun n°. Un code inconnu est cherché, lettres et chiffres, dans le texte des étiquettes de SES ventes (`src/etiquettesScan.js`, identité exacte) ⇒ sa vente ; caméra, douchette ; inconnu ⇒ « Code lu » + quoi faire ; « 55… » = Mondial Relay. `2026-11-17-scan-bordereau-vente.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée le 17 nov. (lot groupes-coucou, après fusion de #1250), telle quelle
+- **17 nov. · La taille à côté de chaque achat à relier (lot relier-taille)** : Relier un achat, Relier achats et ventes, colis à relier : taille LUE chez Vinted (détail de transaction, par n°) sinon « (titre) », « ✓ Taille 42 » / « ≠ 42 » face à l'article (encre neutre, jamais un lien auto), état, vendeur ; « N achats sans taille lue » une fois. Description : rangée nulle part (reste, extension). `docs/passation/2026-11-17-relier-taille.md`. Geste : aucun.
