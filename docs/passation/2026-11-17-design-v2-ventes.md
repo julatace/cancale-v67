@@ -86,6 +86,26 @@ rangée), partis dans « En route ».
 - **À l'ordinateur**, la barre du haut collante (recherche, plateformes) est un verre plein ; au téléphone, la tête défilée de
   Ventes / Annonces est une barre de verre pleine largeur (jamais une demi-boîte sur la liste).
 
+## La frise d'une vente : le transporteur tranche (LES DEUX DESIGNS — Julien : « ça met livré il y a deux jours mais à côté la barre de progression avance pas »)
+
+- La frise (Déposé · En transit · Livré · Validé) ne lisait que Vinted ; la phrase dessous lisait le transporteur. Règle
+  (src/friseTransporteur.js, décidée les 12–13 nov.) : une étape = Vinted OU la ligne du transporteur OU l'e-mail du MÊME n° de
+  suivi (le bordereau de la vente, `bordsParTxn` — celui de la phrase) ; « Livré » dès « livré au relais de l'acheteur »,
+  retiré ou livré ; « Validé » seulement de Vinted ; une preuve n'est jamais retirée (aucun recul sur une lecture plus vieille).
+  Branchée dans `preuvesFriseDe` (Ventes, En route, Colis — les deux designs) et les colis « partis d'après le transporteur ».
+- Nouveau design : la PISTE (4 segments courts, l'accent pour le fait, même boîte partout, « Étape 3 sur 4 : Livré ») et, à
+  côté, l'étape en mots et son âge (« Livré au relais · il y a 2 j », `statutCourt` — la MÊME source que la phrase du
+  transporteur), puis le n° de suivi ; une ligne au téléphone.
+- Banc `scripts/bancs/frise-transporteur.cjs` (Vinted « en cours d'acheminement », le transporteur « livré au relais ») : vert
+  ici dans les deux designs, rouge sur la base et par mutation (le transporteur ne compte plus pour « Livré »).
+
+## Rangées calmes (la capture de Julien : « c'est moche »)
+
+- 2e ligne « N° · T42 · logo · pseudo » (passe à la ligne, jamais coupée), 3e ligne l'état et la date ; prix à droite ; la
+  facture envoyée (son icône de 24 px, sa cible de 44 invisible autour) ; aucun bouton dans la rangée — gestes au glisser et
+  dans la fiche. Le banc vérifie, pseudos longs et tous les gestes présents, qu'aucune boîte de texte n'en chevauche une autre.
+- Ventes · À envoyer / En route : la liste des ventes (et « Litiges ») reste montée, cachée — elle est la vue « Toutes ».
+
 ## Où est le code
 
 - `src/designV2/VentesV2.jsx` — `AfficheVentes` (sur `ChiffreAffiche`), `RechercheVentes`, `ListeColis`, `ListeEnvoyer`,
