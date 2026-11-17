@@ -305,4 +305,12 @@ export default {
   "stats.cv.nonComptees": {"one": "{n} venta con precio no leído, fuera de la tabla.", "other": "{n} ventas con precio no leído, fuera de la tabla."},
   "stats.cv.delaiTitre": {"one": "mediana, sobre {n} venta fechada", "other": "mediana, sobre {n} ventas fechadas"},
   "stats.cv.offresTitre": {"one": "sobre {n} oferta recibida", "other": "sobre {n} ofertas recibidas"},
+  // (16 nov., lot plateformes-restes) Vestiaire : une seule règle du finalisé
+  "stats.vcFin.lecture": "cargando",
+  "stats.vcFin.pasLu": "ventas de Vestiaire no leídas",
+  "stats.vcFin.aucune": "aún no hay ventas finalizadas",
+  "stats.vcFin.pasSur": {"one": "{n} venta finalizada con importe no seguro", "other": "{n} ventas finalizadas con importe no seguro"},
+  "stats.vcFin.auMoins": {"one": "al menos: {n} venta finalizada con importe no seguro, fuera del total", "other": "al menos: {n} ventas finalizadas con importe no seguro, fuera del total"},
+  "stats.vcFin.lu": "ventas finalizadas (importe abonado)",
+  "stats.totalAuMoins": "al menos: hay ventas con importe no seguro fuera del total",
 };
