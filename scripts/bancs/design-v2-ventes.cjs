@@ -32,10 +32,10 @@ if (process.env.MUTER) {
   const muts = {
     // le plein n'est plus posé sur la ligne du titre (sa place n'est plus trouvée)
     plein: [/\[data-v2-tete-plein="ventes"\]/g, '[data-v2-tete-plein="nulle-part"]'],
-    // un groupe oublié : les colis « sans date » ne sont plus rangés (des colis cachés)
-    groupe: [/"estimee","sansDate","imprimes"/g, '"estimee","imprimes"'],
+    // un groupe oublié : les colis à date estimée ne sont plus rangés (des colis cachés)
+    groupe: [/"plusTard","estimee","sansDate"/g, '"plusTard","sansDate"'],
     // le compte redit sur chaque rangée (ce qui était interdit)
-    compte: [/sous:\[nomPlateforme\(([a-zA-Z]+)\)\]/g, 'sous:[nomPlateforme($1),"vendeur_1"]'],
+    compte: [/cle:"vendue",icone:"clock",texte:/g, 'cle:"vendue",icone:"clock",texte:"vendeur_1 · "+'],
   };
   const m = muts[process.env.MUTER]; let n = 0;
   for (const f of fs.readdirSync(path.join(dst, 'assets'))) {
@@ -342,9 +342,12 @@ async function allume(nav, b, sombre, W, ref) {
       dit(a.length > 20 && a.length === c.length && i === a.length, `E éteint : Ventes a le DOM de la base (${c.length} nœuds)`, i < Math.max(a.length, c.length) ? { n: [a.length, c.length], ecart: i, base: a[i], ici: c[i] } : undefined);
     } else console.log('  (pas de SIGNATURE_AVANT : la comparaison au DOM de la base n\'est pas jouée)');
     await allume(nav, b, false, 390, refC);
-    await allume(nav, b, true, 390, refC);
-    await allume(nav, b, false, 1512, refC);
-    await chargementEtMouvement(nav, b);
+    // RAPIDE=1 (les mutations) : le téléphone clair seulement.
+    if (!process.env.RAPIDE) {
+      await allume(nav, b, true, 390, refC);
+      await allume(nav, b, false, 1512, refC);
+      await chargementEtMouvement(nav, b);
+    }
   } catch (e) { ko++; console.log('  ❌ le banc s’est arrêté : ' + String(e && e.stack || e).slice(0, 1500)); }
   fs.writeFileSync(path.join(SHOTS, 'signature-eteint.json'), JSON.stringify(sigs));
   await nav.close(); srv.close();
