@@ -29,5 +29,9 @@ export function traduireResultatFavori(r){
   const ecrits=Number.isInteger(r?.data?.ecrits)?r.data.ecrits:CODES_REFUS.includes(r?.code)?0:undefined;
   // (5.369) Le n° de la version envoyée (1 à 5), seulement sur un envoi confirmé.
   const variante=resultat==='envoye'&&Number.isInteger(r?.data?.variante)&&r.data.variante>=1&&r.data.variante<=5?r.data.variante:undefined;
-  return {resultat,raison,ecrits,...(variante?{variante}:{})};
+  // (5.406) Un refus d'ATTENTE avant toute écriture dit QUAND réessayer (le vrai temps de la garde
+  // de l'extension : ouverture de Vinted, 15/h, 50/h…) ; borné 5 s – 60 min. Absent ⇒ rien (10 min d'avant).
+  const a=Number(r?.data?.apresMs);
+  const apresMs=resultat==='refuse'&&raison==='quota_extension'&&ecrits===0&&Number.isFinite(a)&&a>0?Math.round(Math.min(3600000,Math.max(5000,a))):undefined;
+  return {resultat,raison,ecrits,...(variante?{variante}:{}),...(apresMs?{apresMs}:{})};
 }

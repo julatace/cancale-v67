@@ -32,6 +32,10 @@ nommément (un autre ajout reste refusé) :
   · 5.347 (lot vocabulaire-article) : `vrm-mots.js` (« paire » / « article »)
     EN TÊTE des blocs de pages qui le portent dans la base commune, juste
     après compat-orion.js — exactement ces blocs-là, rien d'autre ne bouge.
+  · 5.406 (lot extension-carte-v2) : `vrm-ui.js` (surfaces communes de
+    l'extension) EN TÊTE des blocs de pages qui le portent dans la base commune,
+    juste après compat-orion.js ; `vrm-action.js` (écran d'action plein) à la
+    FIN du bloc des infos Vinted — exactement ces blocs-là, rien d'autre.
 """
 from pathlib import Path
 import zipfile
@@ -44,7 +48,7 @@ with zipfile.ZipFile(root/'public/VRM-Orion-reference-5.319.0.xpi') as ancien, z
     AJOUTS_COMMUNS = [  # blocs de la base commune approuvés après la 5.319 (sans compat-orion.js)
         ['vrm-regles-achat.js', 'vinted-infos.js'],
     ]
-    membres_attendus = set(ancien.namelist()) | {'oauth-retour.js'} | {n for b in AJOUTS_COMMUNS for n in b} | {'vrm-mots.js'}
+    membres_attendus = set(ancien.namelist()) | {'oauth-retour.js'} | {n for b in AJOUTS_COMMUNS for n in b} | {'vrm-mots.js'} | {'vrm-ui.js', 'vrm-action.js'}
     assert membres_attendus == noms, f'Membres ajoutés ou retirés : {sorted(membres_attendus ^ noms)}'
     version = json.loads(nouveau.read('manifest.json'))['version']
     attendue = json.loads((ext/'manifest.json').read_text('utf8'))['version']
@@ -62,6 +66,25 @@ with zipfile.ZipFile(root/'public/VRM-Orion-reference-5.319.0.xpi') as ancien, z
     m_ancien = json.loads(ancien.read('manifest.json')); m_nouveau = json.loads(nouveau.read('manifest.json'))
     m_ancien.pop('version'); m_nouveau.pop('version')
     commun = json.loads((ext/'manifest.json').read_text('utf8'))
+    # 5.406 : `vrm-ui.js` en tête des blocs qui le portent (avant vrm-mots.js) et `vrm-action.js`
+    # à la fin du bloc des infos Vinted — dans la base commune ET dans le paquet Orion, retirés ici
+    # avant les autres contrôles (qui jugent donc le reste exactement comme avant).
+    UI, ACTION = 'vrm-ui.js', 'vrm-action.js'
+    assert all(c['js'][0] == UI for c in commun['content_scripts'] if UI in c['js']), f'{UI} doit ouvrir chaque bloc commun qui le porte'
+    ui_communs = sorted(json.dumps(c['js'][1:]) for c in commun['content_scripts'] if UI in c['js'])
+    ui_orion = []
+    for c in m_nouveau['content_scripts']:
+        if UI in c['js']:
+            assert c['js'][:2] == ['compat-orion.js', UI], f'{UI} doit suivre compat-orion.js : {c["js"]}'
+            ui_orion.append(json.dumps(c['js'][2:]))
+            c['js'] = [x for x in c['js'] if x != UI]
+    assert sorted(ui_orion) == ui_communs, f'{UI} : blocs Orion {sorted(ui_orion)} ≠ blocs communs {ui_communs}'
+    for c in commun['content_scripts']:
+        c['js'] = [x for x in c['js'] if x != UI]
+    for blocs, pre in ((commun['content_scripts'], []), (m_nouveau['content_scripts'], ['compat-orion.js'])):
+        avec = [c for c in blocs if ACTION in c['js']]
+        assert len(avec) == 1 and avec[0]['js'] == [*pre, 'vrm-mots.js', 'vrm-regles-achat.js', 'vinted-infos.js', ACTION], f'{ACTION} : seulement à la fin du bloc des infos Vinted ({[c["js"] for c in avec]})'
+        avec[0]['js'] = avec[0]['js'][:-1]
     # 5.347 : `vrm-mots.js` en tête des blocs qui le portent dans la base commune (et seulement eux).
     MOTS = 'vrm-mots.js'
     sans_mots = lambda js: [x for x in js if x != MOTS]
@@ -114,4 +137,4 @@ with zipfile.ZipFile(root/'public/VRM-Orion-reference-5.319.0.xpi') as ancien, z
         if nouveau.read(nom) != source:
             propres.append(nom)
     assert not propres, f'Changements propres à Orion (hors base commune de l’extension) : {propres}'
-    print(f'OK : paquet Orion {version} = base commune de l’extension ; adaptateur et structure 5.319.0 conservés ; ajouts approuvés : retour OAuth commun 5.328, infos Vinted 5.339 ; hôtes seulement retirés ; vérifié octet pour octet.')
+    print(f'OK : paquet Orion {version} = base commune de l’extension ; adaptateur et structure 5.319.0 conservés ; ajouts approuvés : retour OAuth commun 5.328, infos Vinted 5.339, surfaces 5.406 ; hôtes seulement retirés ; vérifié octet pour octet.')
