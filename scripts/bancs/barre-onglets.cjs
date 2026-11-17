@@ -22,8 +22,10 @@ fs.mkdirSync(SHOTS, { recursive: true });
 let ok = 0, ko = 0;
 const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko++; console.log('  ❌ ' + m + (d !== undefined ? ' — ' + JSON.stringify(d).slice(0, 600) : '')); } };
 const MUT = process.env.MUTATION || '';
-const CSS_MUT = { coupe: '.vrm-tabbar .vrm-nav-label{max-width:18px!important;overflow:hidden!important;text-overflow:ellipsis!important;opacity:1!important}',
-  dessous: '.vrm-app-shell>.vrm-main{padding-bottom:0!important}', pale: '.vrm-tabbar>.vrm-tab:not([aria-current]){color:#C9D1DB!important}' }[MUT] || '';
+// (assez précises pour passer devant les règles de barre.css, posées dans la même couche)
+const FORT = 'html[data-barre] body .vrm-app-shell .vrm-tabbar.vrm-tabbar';
+const CSS_MUT = { coupe: FORT + ' > .vrm-tab[aria-current] .vrm-nav-label{display:inline-block!important;max-width:18px!important;overflow:hidden!important;text-overflow:ellipsis!important;opacity:1!important}',
+  dessous: 'html body .vrm-app-shell>.vrm-main.vrm-main{padding-bottom:0!important}', pale: FORT + ' > .vrm-tab.vrm-tab:not([aria-current]){color:#C9D1DB!important}' }[MUT] || '';
 
 async function preparer(pg, style, taille) {
   await pg.evaluate(([s, t]) => { localStorage.setItem('vrm_design_v2', '1'); localStorage.setItem('vrm_barre_style', JSON.stringify(s)); if (t) localStorage.setItem('vrm_taille_texte', t); else localStorage.removeItem('vrm_taille_texte'); }, [style, taille]);
@@ -49,7 +51,8 @@ function mesurer() {
     if (q.width < 44 || q.height < 44) out.petites.push(id + ' ' + Math.round(q.width) + '×' + Math.round(q.height));
     const l = t.querySelector('.vrm-nav-label'); const ls = l && getComputedStyle(l); const lr = l && l.getBoundingClientRect();
     const montre = !!(l && lr.width > 2 && +ls.opacity > .5 && ls.visibility !== 'hidden');
-    if (montre && l.scrollWidth > l.clientWidth + 1) out.coupes.push(id + ' « ' + l.textContent + ' » ' + l.scrollWidth + '>' + l.clientWidth);
+    // Coupé = le TEXTE est plus large que sa boîte (mesuré par une plage : la largeur du texte entier, ellipse ou non).
+    if (montre) { const rg = document.createRange(); rg.selectNodeContents(l); const tw = rg.getBoundingClientRect().width; if (tw > lr.width + 1) out.coupes.push(id + ' « ' + l.textContent + ' » ' + Math.round(tw) + '>' + Math.round(lr.width)); }
     if (montre && (lr.left < q.left - 1 || lr.right > q.right + 1)) out.coupes.push(id + ' déborde de sa colonne');
     const bd = t.querySelector('.vrm-nav-badge-barre'); if (bd && montre) { const b = bd.getBoundingClientRect(); if (b.bottom > lr.top + 1 && b.top < lr.bottom - 1 && b.right > lr.left + 1 && b.left < lr.right - 1) out.collisions.push(id); }
     const on = t.getAttribute('aria-current') === 'page';
