@@ -146,6 +146,9 @@ async function rendre(nav, { largeur, pdfs, pdfjs, panne = false, vide = false, 
   pg.on('pageerror', (e) => erreurs.push(String(e).slice(0, 160)));
   await pg.goto(`http://localhost:${PORT}/?tab=settings&reglage=imprimante`, { waitUntil: 'domcontentloaded' });
   await pg.waitForTimeout(3500);
+  // (16 nov., lot tampons-parametres) Le panneau attendu jusqu'à 15 s (base en panne : la coque attend sa réponse) avant
+  // de conclure qu'il faut l'ouvrir au doigt — un délai fixe de 3,5 s le donnait « absent » sur une machine chargée.
+  await pg.locator('[data-imprimante-reglage]').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
   // Au doigt, les panneaux sont des sous-écrans : on ouvre le nôtre.
   if (!(await pg.locator('[data-imprimante-reglage]').first().isVisible().catch(() => false))) {
     await pg.getByText('Imprimante et bordereaux', { exact: false }).first().click({ timeout: 4000 }).catch(() => {});

@@ -13,6 +13,7 @@ import React from 'react';
 import { tr } from '../i18n/index.js';
 import { useLangue } from '../i18n/react.js';
 import '../styles-tampons.css';
+import { Z_BORD_PRET } from './couches.js';
 
 export default function BordereauPret({ onMonte, r, Feuille, Bouton, Pourquoi, dessiner, onImprimer, onDeplacer, onFermer, children }) {
   useLangue();
@@ -28,7 +29,7 @@ export default function BordereauPret({ onMonte, r, Feuille, Bouton, Pourquoi, d
   if (!r) return null;
   const titre = r.batch ? tr('tampons.pret.titreLot', { n: r.count || 0 }) : r.withInvoice ? tr('tampons.pret.titreFacture') : tr('tampons.pret.titre');
   return (
-    <Feuille onClose={onFermer} maxWidth={420} z={1250} titre={titre} data-bord-pret={r.batch ? 'lot' : 'un'} data-noswipe="1" className="vrm-bord-pret">
+    <Feuille onClose={onFermer} maxWidth={420} z={Z_BORD_PRET} titre={titre} data-bord-pret={r.batch ? 'lot' : 'un'} data-noswipe="1" className="vrm-bord-pret">
       <div className="vrm-bord-pret-apercu" data-bord-pret-apercu={vu}>
         <canvas ref={cv} aria-label={tr('tampons.pret.apercu')} data-stream-image="bordereau"/>
         {vu === 'charge' ? <span className="vrm-tampons-attente">{tr('tampons.dessin')}</span> : null}

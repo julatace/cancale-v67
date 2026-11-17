@@ -86,7 +86,7 @@ export default {
   "tampons.pret.titre": "Etikett bereit",
   "tampons.pret.titreFacture": "Etikett und Rechnung bereit",
   "tampons.pret.apercu": "Vorschau des gestempelten Etiketts",
-  "tampons.pret.ouvert": "Das PDF ist in einem Tab geöffnet.",
+  "tampons.pret.ouvert": "Das PDF wurde in VRM geöffnet. „Drucken“ öffnet es erneut.",
   "tampons.pret.imprimer": "Drucken",
   "tampons.pret.enregistrer": "Speichern",
   "tampons.pret.deplacer": "Stempel verschieben",

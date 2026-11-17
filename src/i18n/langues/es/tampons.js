@@ -86,7 +86,7 @@ export default {
   "tampons.pret.titre": "Etiqueta lista",
   "tampons.pret.titreFacture": "Etiqueta y factura listas",
   "tampons.pret.apercu": "Vista previa de la etiqueta sellada",
-  "tampons.pret.ouvert": "El PDF está abierto en una pestaña.",
+  "tampons.pret.ouvert": "El PDF se abrió en VRM. «Imprimir» lo vuelve a abrir.",
   "tampons.pret.imprimer": "Imprimir",
   "tampons.pret.enregistrer": "Guardar",
   "tampons.pret.deplacer": "Mover el sello",

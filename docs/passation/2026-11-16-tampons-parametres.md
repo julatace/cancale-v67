@@ -161,6 +161,29 @@ pleines, ou QR sans ligne ni colonne vide, page tournée comprise).
   se lire), audits `impression`, `colis-plus`, `colis-trois`, `selection-bordereaux`, `impression-carton` (sa fenêtre de
   recherche était trop courte : rouge aussi sur main, réparé).
 
+### Reprise du soir (16 nov., second passage)
+- **`origin/main` fusionné** (vrai merge : barre-achats, vente-email-absente, passation générale) ; §9 de CLAUDE.md :
+  les trois lignes les plus anciennes déplacées telles quelles dans `historique-divers.md`.
+- **Défaut trouvé et corrigé : « Bordereau prêt » s'ouvrait SOUS la fiche.** Depuis Ventes « verre », un bordereau
+  s'imprime seul par rangée ⇒ fiche ⇒ « ⋯ » ⇒ « Imprimer le bordereau » (les mêmes boutons, `DansFiche`). La fiche est à
+  9000, sa feuille « ⋯ » à 9100 ; « Bordereau prêt » était à 1250 : invisible, son « Imprimer » ne se touchait pas
+  (capture : la feuille « Plus » seule à l'écran). Ordre posé dans `src/impression/couches.js` : « Bordereau prêt » 9200,
+  aperçu avant impression 9300 (« Déplacer le tampon » s'ouvre par-dessus), visionneuse 9500, « Mon compte » 10000.
+- « Bordereau prêt » disait « Le PDF est ouvert dans un onglet » : il s'ouvre dans la visionneuse de VRM ⇒ « Le PDF s’est
+  ouvert dans VRM. « Imprimer » le rouvre. » (5 langues).
+- **Le retour jamais au tampon d'une vente** (contrôle neuf de `tampons-reglages`) : un retour est un Mondial Relay A4
+  comme une vente ; la place posée à la main pour la forme d'une VENTE Mondial Relay et l'exception « seulement Mondial
+  Relay » ne s'appliquent pas à lui (famille « retour », RETOUR écrit). Le banc fait désormais arriver le retour SANS
+  famille, comme l'app (`retour: true`) ; mutation `retourPrendVente` (la règle `familleDe` affaiblie) ⇒ rouge.
+- **Banc `tampons-apercu` renforcé** : S et B étaient ROUGES à la reprise (12 rouges sur l'arbre d'avant la reprise,
+  b5718fc97) — mesure prise sous l'écran de démarrage, et le geste d'UNE vente cherché sur la ligne (il est dans la
+  fiche). Maintenant : écran de démarrage parti, page posée 2 s avant de mesurer ; rangée ⇒ fiche ⇒ « ⋯ » ⇒ Imprimer ;
+  le bouton ne change NI de taille NI de place (≤ 1,5 px) ; « Bordereau prêt » au premier plan (`elementFromPoint`) ;
+  `TA_SOMBRE=1` pour le mode sombre. Résultat : **56 verts, 0 rouge** (clair) ; sombre P+B+E vert ; S stable 3/3.
+  Mutation `Z_BORD_PRET = 1250` ⇒ 6 rouges (B2, B3 × 2 vues).
+- Captures regardées (390 tactile et 1512, clair et sombre) : aperçu, glisser, refus sur le QR, Bordereau prêt, galerie,
+  éditeur.
+
 ## Non fait, dit
 - **Rotation du tampon** : pas proposée. Le cartouche s'écrit toujours dans le sens de lecture de la page (rotation /Rotate
   comprise) ; un tampon tourné à part serait moins lisible et compliquerait le garde-fou. À rouvrir sur sa demande.
@@ -190,3 +213,14 @@ pleines, ou QR sans ligne ni colonne vide, page tournée comprise).
   audit par audit, `audit-notifs-redaction` rouge aussi sur `main`). Règle du 16 nov. : pas de fusion tant qu'un rouge reste.
 - Geste de Julien : imprimer un vrai bordereau Mondial Relay et un Chronopost avec un N° et regarder la mention au-dessus
   du QR (aucun vrai PDF dans ce dépôt public : tout est prouvé sur des formes reconstruites).
+
+### Reprise du 17 nov. (fin)
+- `origin/main` refusionné (ventes-clair, personnalisation-simple…) ; `lot-bordereaux` et `colis-a-leur-place` = parcours de
+  main (papier puis PDF) + l'aperçu avant impression entre les deux : 17 et 184 verts. Verts aussi : impression-simple 59,
+  tout-imprimer 28, selection-bordereaux 48, tampon-bordereau 208, ventes-bordereau, colis-plus 77, lbc-bordereau,
+  tampons-reglages 704, tampons-apercu 56.
+- Retour de Julien (17 nov., bordereau imprimé en production, code de `main`) : mention mal placée ⇒ c'est ce lot qui la
+  pose AU-DESSUS du QR (position du QR lue dans chaque PDF) ; `tampons-reglages` sur l'arbre de `main` : rouge (le code des
+  tampons n'y existe pas).
+- Non comparé à `main` faute de temps (machine à charge 20) : `imprimante` (instable, 4 à 12 rouges selon la charge ; `main`
+  9) et `feuilles-coque` (20 rouges, écrans Annonces/Ventes qui n'ouvrent pas en 6 s : charge).

@@ -22,6 +22,7 @@ import React from 'react';
 import { tr } from '../i18n/index.js';
 import { useLangue } from '../i18n/react.js';
 import SceneTampons from './SceneTampons.jsx';
+import { Z_APERCU_IMPRESSION } from './couches.js';
 import '../styles-tampons.css';
 
 export default function ApercuAvantImpression({ onMonte, Feuille, Bouton, etat, entree, dessiner, onPoser, onOrigine, onTous, onImprimer, onFermer, occupe = false }) {
@@ -38,7 +39,7 @@ export default function ApercuAvantImpression({ onMonte, Feuille, Bouton, etat, 
   const plages = res ? (res.plages || []) : [];
   const items = res ? (res.items || []) : [];
   return (
-    <Feuille onClose={onFermer} maxWidth={560} z={9000} titre={tr('tampons.apercu.titre', { n })} data-impr-apercu={pret ? 'pret' : enCours ? 'encours' : (entree && entree.etat) || 'encours'} data-impr-apercu-n={n} data-noswipe="1" className="vrm-impr-feuille vrm-tampons-apercu">
+    <Feuille onClose={onFermer} maxWidth={560} z={Z_APERCU_IMPRESSION} titre={tr('tampons.apercu.titre', { n })} data-impr-apercu={pret ? 'pret' : enCours ? 'encours' : (entree && entree.etat) || 'encours'} data-impr-apercu-n={n} data-noswipe="1" className="vrm-impr-feuille vrm-tampons-apercu">
       <p className="vrm-impr-phrase" style={{ margin: '0 0 8px' }}>{tr('tampons.apercu.phrase')}</p>
       <label className="vrm-tampon-case">
         <input type="checkbox" data-impr-apercu-tous={etat.tous ? '1' : '0'} checked={!!etat.tous} onChange={(e) => onTous(e.target.checked)}/>

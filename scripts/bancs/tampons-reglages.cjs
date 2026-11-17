@@ -20,7 +20,7 @@
 // puis les RÉGLAGES (`vrm_tampons`) : contenu (cases), taille L, place rapide, place posée à la main (et REPOUSSÉE
 // hors du QR si elle le touche), exception « seulement Mondial Relay », migration des choix d'avant, place posée
 // dans l'aperçu pour UN bordereau, le RETOUR toujours marqué « RETOUR ».
-// `BANC_MUTATION=mentionSurQr|ignoreReglage|retourSansRetour|sansRepousse` : la règle réaffaiblie ⇒ rouge (§6.1).
+// `BANC_MUTATION=mentionSurQr|ignoreReglage|retourSansRetour|sansRepousse|retourPrendVente` : la règle réaffaiblie ⇒ rouge (§6.1).
 // `CAPTURES=dossier` : chaque page en PNG + la planche `planche-<support>.png` (toutes les vignettes).
 require('../_source-app.cjs').brancher();
 const path = require('path'), fs = require('fs'), http = require('http');
@@ -45,6 +45,7 @@ const muter = (s, a, b) => { if (!s.includes(a)) { dit(false, `mutation « ${MUT
 if (MUT === 'mentionSurQr') tampon = muter(tampon, "  if (q) {\n    const garde = gardeQr(rendu, q), x = q.x + q.w / 2 - bw / 2;", "  if (q) { return { x: q.x + q.w / 2 - bw / 2, y: q.y + q.h / 2 - bh / 2, via: 'qr-dessus', qr: q }; }\n  if (q) {\n    const garde = gardeQr(rendu, q), x = q.x + q.w / 2 - bw / 2;");
 if (MUT === 'ignoreReglage') imp = muter(imp, "imp.tampons = (impression && impression.tampons) || reglageTamponsChoisi();", "imp.tampons = reglageTampons(null);");
 if (MUT === 'retourSansRetour') imp = muter(imp, "if (imp.retour) imp.ts = { ...imp.ts, contenu: { ...imp.ts.contenu, num: true, titre: true } };", "");
+if (MUT === 'retourPrendVente') regles = muter(regles, "  if (retour) return 'retour';\n", "");
 if (MUT === 'sansRepousse') regles = muter(regles, "  if (libre(b0.x, b0.y)) return { x: b0.x, y: b0.y, repousse: false };", "  return { x: b0.x, y: b0.y, repousse: false };");
 const SCRIPT = `const chargerPdfjs=async()=>window.pdfjsLib;
 let __store={}; const load=(k,d)=>(k in __store?JSON.parse(JSON.stringify(__store[k])):d); const save=(k,v)=>{__store[k]=JSON.parse(JSON.stringify(v));}; const libererOngletPdf=()=>{};
@@ -74,10 +75,12 @@ window.__imprimer = async ({ id, support, tampons = null, store = {}, places = n
   const th = support !== 'a4';
   const imp0 = { format: th && support !== 'planche4' ? support : '10x15', ...(store.vrm_impression || {}) };
   __vrm.store({ ...store, vrm_impression: imp0, ...(tampons ? { vrm_tampons: tampons } : {}) });
+  // Un retour arrive SANS famille, comme dans l'app (le retour d'achat passe \`retour: true\`) : c'est la règle qui en fait
+  // la famille « retour », jamais le type de son transporteur.
   // Comme « Imprimer (N) » : un \`choisir\` est toujours passé (la place gardée de la forme, ici aucune) — la place posée
   // dans l'aperçu pour CE bordereau doit primer quand même.
   const r = await __vrm.poserBordereau(PL, out, src, { numero, title: fam.retour ? 'RETOUR · ' + titre : titre, pos: null, thermique: th, choisir: places ? async () => null : null,
-    impression: { reg: null, famille: fam.id, site: fam.site || '', retour: !!fam.retour, taille, photo: null, emplacement: '', ...(places ? { places } : {}) } });
+    impression: { reg: null, famille: fam.retour ? '' : fam.id, site: fam.site || '', retour: !!fam.retour, taille, photo: null, emplacement: '', ...(places ? { places } : {}) } });
   const pose = (r.poses || [])[0] || null;
   return { r: { isole: r.isole, tampons: r.tampons, famille: r.famille }, pose, b64: __b64(await out.save()) };
 };
@@ -269,6 +272,15 @@ async function typeSupport(pg, id, support, vignettes) {
     dit(x && x.L.items.some((i) => /RETOUR/.test(i.s)), 'retour : « RETOUR » écrit même titre décoché');
     x = await un(pg, 'retour', '10x15', { tampons: R({ th: { num: false, titre: false, taille: false, mention: false } }), sansTemoin: true });
     dit(x && x.L.items.some((i) => /RETOUR/.test(i.s)), 'retour thermique : « RETOUR » écrit même tout décoché');
+    // (16 nov., Julien : « les retours imprimables avec les ventes mais jamais confondus avec une vente ») Le retour est un
+    // Mondial Relay A4 comme une vente : la place posée à la main pour la forme d'une VENTE Mondial Relay et l'exception
+    // « seulement Mondial Relay » ne s'appliquent JAMAIS à lui (sa famille est « retour », sa forme « retour·… »).
+    { const regV = R({ formes: { [cleMr]: { n: { vx: 0.6, vy: 0.05, vw: 0.25, v: 0 } } }, types: { mondialrelay: { contenu: { num: true, titre: false, taille: false, mention: false } } } });
+      const xv = await un(pg, 'mondialrelay', 'a4', { tampons: regV, sansTemoin: true }), xr = await un(pg, 'retour', 'a4', { tampons: regV, sansTemoin: true });
+      const bv = xv && xv.a.pose && xv.a.pose.place, br = xr && xr.a.pose && xr.a.pose.place;
+      const memePlace = !!(bv && br && Math.abs(bv.x - br.x) < 1 && Math.abs(bv.y - br.y) < 1);
+      dit(xv && xr && bv && Math.abs(bv.x - 0.6 * 595.28) < 1 && !memePlace && xr.a.r.famille === 'retour' && xr.L.items.some((i) => /RETOUR/.test(i.s)) && xr.L.items.some((i) => /vrm\.center/.test(i.s)),
+        'retour : ni la place ni l’exception d’une VENTE Mondial Relay (famille « retour », RETOUR écrit, sa mention gardée)', `vente ${bv ? bv.x.toFixed(0) + ',' + bv.y.toFixed(0) : '—'} · retour ${br ? br.x.toFixed(0) + ',' + br.y.toFixed(0) : '—'} · famille ${xr && xr.a.r.famille}`); }
   }
   await nav.close(); srv.close();
   console.log(`\n${ko ? '❌' : '✅'} tampons-reglages : ${ok} verts, ${ko} rouges${MUT ? ` (mutation ${MUT})` : ''}`);

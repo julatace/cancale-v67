@@ -86,7 +86,7 @@ export default {
   "tampons.pret.titre": "Bordereau prêt",
   "tampons.pret.titreFacture": "Bordereau et facture prêts",
   "tampons.pret.apercu": "Aperçu du bordereau tamponné",
-  "tampons.pret.ouvert": "Le PDF est ouvert dans un onglet.",
+  "tampons.pret.ouvert": "Le PDF s’est ouvert dans VRM. « Imprimer » le rouvre.",
   "tampons.pret.imprimer": "Imprimer",
   "tampons.pret.enregistrer": "Enregistrer",
   "tampons.pret.deplacer": "Déplacer le tampon",
