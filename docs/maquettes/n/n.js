@@ -9,7 +9,8 @@
   const NOW = F.MAINTENANT;
   const J = 864e5;
   const $ = (s) => document.querySelector(s);
-  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const att = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const esc = (s) => String(s == null ? '' : s).replace(/(\w)-(\w)/g, '$1\u2011$2').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const eur = (v, signe) => (v == null ? '—' : (signe && v > 0 ? '+' : '') + v.toLocaleString('fr-FR', { minimumFractionDigits: v % 1 ? 2 : 0, maximumFractionDigits: 2 }) + ' €');
   const nb = (n) => n.toLocaleString('fr-FR');
   const jourParis = (t) => new Date(t).toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' });
@@ -67,7 +68,7 @@
       return `<ul class="tuiles" data-n="${l.length}">${l.map((v) => `<li class="tuile">${basket(v.teinte, 160)}<span class="tuile-n"><span class="no">N°</span>${esc(v.numero)}</span></li>`).join('')}</ul>${x.paires.length > l.length ? `<p class="encore">et ${x.paires.length - l.length} de plus</p>` : ''}`;
     }
     if (x.colis) {
-      return `<ul class="codes">${x.colis.map((c) => `<li class="code"><span class="code-v" data-code="${esc(c.code)}">${esc(c.code)}</span>${c.qr ? `<span class="code-qr" data-qr-reel="">${c.qr}</span>` : `<span class="code-sans">au comptoir, avec ta pièce d’identité</span>`}<span class="code-art">${esc(F.achats.find((a) => a.tx === c.achat).titre)} · ${esc(c.transporteur)}</span></li>`).join('')}</ul>`;
+      return `<ul class="codes">${x.colis.map((c) => `<li class="code"><span class="code-v" data-code="${att(c.code)}">${esc(c.code)}</span>${c.qr ? `<span class="code-qr" data-qr-reel="">${c.qr}</span>` : `<span class="code-sans">au comptoir, avec ta pièce d’identité</span>`}<span class="code-art">${esc(F.achats.find((a) => a.tx === c.achat).titre)} · ${esc(c.transporteur)}</span></li>`).join('')}</ul>`;
     }
     if (x.offre) {
       const a = x.annonce;
@@ -77,13 +78,13 @@
   }
   function focus(x, i, n) {
     const urg = x.quand && presse(x.quand);
-    return `<article class="focus" data-focus="${esc(x.cle)}">
+    return `<article class="focus" data-focus="${att(x.cle)}">
       <p class="focus-meta"><span>${esc(x.sorte)}</span>${x.quand ? `<span class="${urg ? 'ambre' : ''}">${urg ? '<i class="pt"></i>' : ''}${avant(x.quand)}</span>` : x.date ? `<span>${Maj(nomJour(x.date))} à ${heure(x.date)}</span>` : ''}</p>
       <h2 class="focus-titre">${esc(x.titre)}</h2>
       ${x.adresse ? `<p class="focus-sous">${esc(x.adresse)}</p>` : ''}
       ${corpsTache(x, true)}
       <div class="focus-gestes">
-        <button type="button" class="b-plein" data-plein="" data-fait="${esc(x.cle)}">${esc(x.geste)}</button>
+        <button type="button" class="b-plein" data-plein="" data-fait="${att(x.cle)}">${esc(x.geste)}</button>
         ${x.offre ? `<div class="b-deux"><button type="button" class="b-trait">Contre-offre</button><button type="button" class="b-trait">Refuser</button></div>` : ''}
       </div>
       ${x.paires ? `<div class="focus-detail">${x.paires.map((v) => ligne({ n: v.numero, titre: v.titre, sous: `${esc(v.compte)} · ${v.taille}`, val: eur(v.prix), etat: v.cout == null ? 'prix d’achat —' : 'acheté ' + eur(v.cout) })).join('')}</div>` : ''}
@@ -91,7 +92,7 @@
   }
   function ligneTache(x, actif) {
     const urg = x.quand && presse(x.quand);
-    return `<a href="#ecran=afaire&focus=${encodeURIComponent(x.cle)}" class="tache${actif ? ' is-actif' : ''}" data-tache="${esc(x.cle)}">
+    return `<a href="#ecran=afaire&focus=${encodeURIComponent(x.cle)}" class="tache${actif ? ' is-actif' : ''}" data-tache="${att(x.cle)}">
       <span class="tache-sorte">${esc(x.sorteLigne || x.sorte)}</span><span class="tache-titre">${esc(x.titre)}</span>
       <span class="tache-quand${urg ? ' ambre' : ''}">${x.quand ? (urg ? '<i class="pt"></i>' : '') + avant(x.quand).replace(/^avant /, '') : ''}</span></a>`;
   }
