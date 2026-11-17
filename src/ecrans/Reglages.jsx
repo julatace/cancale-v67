@@ -2395,6 +2395,11 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     const sc = par.get('securite-comptes'), dn = par.get('donnees');
     const fus = sc || dn ? { id: 'securite-donnees', ic: 'shield', expert: false, groupes: [...((sc && sc.groupes) || []), ...((dn && dn.groupes) || [])], ids: [...((sc && sc.ids) || []), ...((dn && dn.ids) || [])] } : null;
     if (fus) par.set('securite-donnees', fus);
+    // (17 nov., revue) Apparence et langue sans doublons : l'interrupteur « Mode sombre » fait la même chose que « Apparence »
+    // (Clair / Sombre / comme l'appareil) — il n'est pas montré ici (le lot apparence-rangee, PR #1235, le retire pour tous) ;
+    // « Taille de l'affichage » et « Taille du texte » sont deux réglages différents : leurs noms et leur phrase le disent.
+    const NOMS_V2 = { zoom: ['v2.pm.zoom', 'v2.pm.zoom.desc'], 'taille-texte': ['v2.pm.texte', 'v2.pm.texte.desc'] };
+    for (const [k, c] of [...par]) par.set(k, { ...c, groupes: c.groupes.map((g) => ({ ...g, items: g.items.filter((it) => it && it.id !== 'sombre').map((it) => (NOMS_V2[it.id] ? { ...it, lib: tr(NOMS_V2[it.id][0]), desc: tr(NOMS_V2[it.id][1]) } : it)) })) });
     const connus = ORDRE_V2.map((id) => par.get(id)).filter(Boolean);
     const restes = categories.filter((c) => !ORDRE_V2.includes(c.id) && c.id !== 'securite-comptes' && c.id !== 'donnees');
     return [...connus, ...restes];
@@ -2526,7 +2531,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   const q = rechercheReglage.trim();
   // La recherche : dans TOUTES les catégories (avant : l'onglet « Réglages » seul) ; le nom de la
   // catégorie et celui du groupe comptent (« argent » trouve le statut, l'URSSAF, les prix d'achat).
-  const resultats = q ? filtrerReglages(categories.flatMap((c) => c.groupes.map((g) => ({ id: g.id, titre: [titreCat(c.id), g.titreCle ? tr(g.titreCle) : (g.titre || '')].filter(Boolean).join(' · '), items: g.items }))), q) : null;
+  const resultats = q ? filtrerReglages((designV2 ? catsV2 : categories).flatMap((c) => c.groupes.map((g) => ({ id: g.id, titre: [titreCat(c.id), g.titreCle ? tr(g.titreCle) : (g.titre || '')].filter(Boolean).join(' · '), items: g.items }))), q) : null;
   const nTrouves = resultats ? resultats.reduce((n, g) => n + g.items.length, 0) : 0;
   const catOuverte = etroit && cat ? (designV2 ? catsV2.find((c) => c.id === idV2(cat)) : categories.find((c) => c.id === cat)) || null : null;
 

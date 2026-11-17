@@ -51,5 +51,9 @@ export default {
   "v2.pm.cat.aide": "Aide",
   "parametres.cat.securite-donnees.desc": "Comptes, sauvegarde, tes données",
   "parametres.cat.securite-donnees": "Sécurité et données",
-  "v2.pm.trouve": "dans {section}"
+  "v2.pm.trouve": "dans {section}",
+  "v2.pm.zoom": "Zoom de l’app",
+  "v2.pm.zoom.desc": "Agrandit tout l’écran : textes, boutons, images.",
+  "v2.pm.texte": "Taille du texte",
+  "v2.pm.texte.desc": "Agrandit seulement le texte."
 };

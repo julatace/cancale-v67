@@ -369,7 +369,11 @@ const ZONES_ARGENT = '.v2-argent, .v2-argent-nav, .vrm-screen-head:has(.v2-argen
               cartes: r ? [...r.children[0].children].filter((e) => e.getClientRects().length && !e.matches('[data-v2-pm-sections]')).length : -1 }; });
           dit(top.n === 9 && top.noms.join(' ') === 'compte plateformes ventes stock argent apparence notifications securite-donnees aide' && top.cartes === 0, `R ${T} : le premier écran est UNE liste de 9 sections dans l’ordre d’iOS, aucune carte à part (${top.noms.join(' · ')})`, top);
           const pmApres = await parcourirParametres(pg);
-          const manquent = pmAvant ? pmAvant.ids.filter((id) => !pmApres.ids.includes(id)) : ['(pas de relevé éteint)'];
+          // Retiré EXPRÈS (et seulement lui) : l'interrupteur « Mode sombre », doublon de « Apparence » (revue du 17 nov., PR #1235).
+          const RETIRES = ['sombre'];
+          const manquent = pmAvant ? pmAvant.ids.filter((id) => !RETIRES.includes(id) && !pmApres.ids.includes(id)) : ['(pas de relevé éteint)'];
+          const doublon = pmApres.ids.includes('sombre');
+          dit(!doublon, `R ${T} : Apparence et langue sans le doublon « Mode sombre »`);
           dit(!manquent.length, `R ${T} : chacun des ${pmAvant ? pmAvant.ids.length : 0} réglages d’hier est atteint en deux touchers (une section, la rangée)`, manquent);
           // La recherche mène AU réglage, surligné.
           const champ = await pg.$('[data-recherche-reglages] input, input[data-recherche-reglages]');

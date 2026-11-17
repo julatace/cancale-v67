@@ -51,5 +51,9 @@ export default {
   "v2.pm.cat.aide": "Ayuda",
   "parametres.cat.securite-donnees.desc": "Cuentas, copia, tus datos",
   "parametres.cat.securite-donnees": "Seguridad y datos",
-  "v2.pm.trouve": "en {section}"
+  "v2.pm.trouve": "en {section}",
+  "v2.pm.zoom": "Zoom de la app",
+  "v2.pm.zoom.desc": "Amplía toda la pantalla: textos, botones, imágenes.",
+  "v2.pm.texte": "Tamaño del texto",
+  "v2.pm.texte.desc": "Amplía solo el texto."
 };
