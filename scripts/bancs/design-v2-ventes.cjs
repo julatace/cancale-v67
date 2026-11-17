@@ -158,7 +158,10 @@ async function qualite(pg, th) {
     const px = (v) => String(v || '').split(/\s+/).map(parseFloat).filter((x) => Number.isFinite(x));
     const ms = (v) => Math.max(...String(v || '0s').split(',').map((x) => (x.trim().endsWith('ms') ? parseFloat(x) : parseFloat(x) * 1000)));
     const row = document.querySelector('.v2v-liste .v2l'); const plein = document.querySelector('[data-v2-principal="imprimer"]');
-    const appui = { rangee: row ? ms(getComputedStyle(row).transitionDuration) : null, plein: plein ? ms(getComputedStyle(plein).transitionDuration) : null };
+    // La réponse à l'appui : la durée de la transition de CE qui change à l'appui (fond, transformation), pas des autres.
+    const appuiDe = (e) => { const cs = getComputedStyle(e); const props = cs.transitionProperty.split(',').map((x) => x.trim()); const durs = cs.transitionDuration.split(',').map((x) => ms(x));
+      const v = props.map((p, i) => (/^(all|transform|background-color|background|scale|filter)$/.test(p) ? durs[i % durs.length] : null)).filter((x) => x != null); return v.length ? Math.max(...v) : 0; };
+    const appui = { rangee: row ? appuiDe(row) : null, plein: plein ? appuiDe(plein) : null };
     const repos = (window.__cls || []).filter((x) => x.t > t0 && !x.input).reduce((s, x) => s + x.v, 0);
     const cv = row ? getComputedStyle(row).contentVisibility : null;
     const img = document.querySelector('.v2v-liste .v2l-photo img'); const fondu = img ? getComputedStyle(img).animationName : null;
@@ -175,7 +178,7 @@ async function qualite(pg, th) {
     const restes = [...document.querySelectorAll('.vrm-main :is(.vv-hero, .vv-seg, .vv-pied, .vv-filtres, .vrm-colis-grille, [data-bord-card], .vrm-colis-resume, .vrm-colis-afaire, [data-heros-hote])')].filter(vis).map((e) => String(e.className).slice(0, 30));
     return { appui, repos: Math.round(repos * 1000) / 1000, cv, fondu, boite, tailles, rayons: rayons.slice(0, 5), grille: grille.slice(0, 6), nGrille: grille.length, hauteurs, restes };
   }, t0);
-  dit(q.appui.rangee != null && q.appui.rangee <= 100 && q.appui.plein != null && q.appui.plein <= 100, `Q ${th} : réponse au toucher < 100 ms (rangée ${q.appui.rangee} ms, plein ${q.appui.plein} ms)`, q.appui);
+  dit(q.appui.rangee != null && q.appui.rangee <= 100 && q.appui.plein != null && q.appui.plein <= 100, `Q ${th} : réponse au toucher ≤ 100 ms (rangée ${q.appui.rangee} ms, plein ${q.appui.plein} ms)`, q.appui);
   dit(q.repos === 0, `Q ${th} : au repos, rien ne saute (CLS hors geste = ${q.repos})`, q.repos);
   dit(q.cv === 'auto', `Q ${th} : 1 000 rangées sans à-coup (content-visibility: ${q.cv})`, q.cv);
   dit(/fondu/.test(q.fondu || '') && q.boite && q.boite[0] === 64 && q.boite[1] === 64, `Q ${th} : la photo arrive en fondu dans sa boîte de 64 × 64 (le texte ne bouge pas)`, { f: q.fondu, b: q.boite });
@@ -191,7 +194,10 @@ async function chargementEtMouvement(nav, b) {
   console.log('\n── chargement lent et mouvement réduit (390 clair)');
   const { ctx, pg } = await ouvrir(nav, { W: 390, sombre: false, b, url: '/?tab=ventes' });
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_design_v2', '1'); } catch (_) {} });
-  await pg.route(/\/rest\/v1\/.*orders_sold/, async (r) => { await new Promise((ok) => setTimeout(ok, 5000)); return r.fallback(); });
+  // La lecture des ventes retenue 5 s (page ET contexte : le service worker de l'app passe par le contexte).
+  const lent = async (r) => { await new Promise((ok) => setTimeout(ok, 5000)); return r.fallback(); };
+  const ventesLues = (u) => /\/rest\/v1\//.test(String(u)) && /orders_sold/.test(decodeURIComponent(String(u)));
+  await pg.route(ventesLues, lent); await ctx.route(ventesLues, lent);
   await pg.reload({ waitUntil: 'domcontentloaded' });
   const vu = { squelette: false, blanc: 0, ligne: false };
   for (let k = 0; k < 40; k++) {

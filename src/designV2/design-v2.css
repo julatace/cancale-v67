@@ -556,3 +556,5 @@ html body .v2v-segment .v2-seg { overflow-x: auto; scrollbar-width: none; oversc
 html body .v2v-segment .v2-seg::-webkit-scrollbar { display: none; }
 html body .v2v-segment button.v2-seg-btn { flex: 1 0 auto; padding: 0 12px; }
 html body .v2v-segment .v2-seg-l { overflow: visible; text-overflow: clip; }
+/* Le champ de Ventes sur la grille de 4 (le champ partagé posait 10 px à gauche). */
+:root:root:root body .v2v-recherche .vrm-champ-recherche.v2v-champ { padding-left: 12px; }
