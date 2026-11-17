@@ -80,11 +80,13 @@ export function RangeeFaite({ fait = false, onFin, children, className = '', att
 
 // 5. LE SQUELETTE : la forme EXACTE des rangées (photo, titre, ligne de faits) pendant la lecture — jamais d'écran blanc.
 //    `variante` 'A' (Liste, 88 px) ou 'C' (Détaillé, 120 px) ; un balayage lent, coupé en mouvement réduit.
-export function SqueletteRangees({ variante = 'A', n = 8, label = '' }) {
+//    `entete` : la liste posera un en-tête de groupe (le compte) au-dessus de ses rangées ⇒ sa place, réservée.
+export function SqueletteRangees({ variante = 'A', n = 8, label = '', entete = false }) {
   return (
     <div className={'v2-squelette v2-squelette-' + variante} role="status" aria-busy="true" aria-label={label || undefined} data-v2-squelette={variante}>
+      {entete ? <span className="v2-squelette-tete" aria-hidden="true"/> : null}
       {Array.from({ length: n }, (_, i) => (
-        <div key={i} className="v2-squelette-rangee" aria-hidden="true">
+        <div key={'squelette-' + i} className="v2-squelette-rangee" aria-hidden="true">
           <span className="v2-squelette-photo"/>
           <span className="v2-squelette-txt"><span className="v2-squelette-l1"/><span className="v2-squelette-l2"/>{variante === 'C' ? <span className="v2-squelette-l3"/> : null}</span>
         </div>
