@@ -70,3 +70,25 @@ Légende : 🔴 données/argent faux, bloquant · 🟡 gênant · 🟢 cosmétiq
 | iphone-reprise B1/B3–B6/O | 📋 périmé (barre flottante 14 nov. ; choix n° 61 : menu de l'avatar ; rail commun 15 nov.) — porté ici |
 | journee-coherence E6 | ✅ bug 8 ; E7/E8 WebKit seulement (non jouables ici) |
 | ventes-e2 G, tout-imprimer (WebKit) | WebKit seulement, non jouables ici — restent |
+
+## Demandes prioritaires de Julien ajoutées le 17 nov. au soir (même PR #1252)
+
+### ✅ 🟡 Achats annulés cachés par défaut — « Je veux pas voir les achats annulés sauf si je les sélectionne »
+- Filtre « Annulés · N » (N toujours écrit) ; la règle `achatAnnule` de `src/registres.js` (celle du registre et des chiffres) ; affichage seul.
+- `src/achatsAnnules.js`, App.jsx `achatsAffiches`. Banc `achats-annules` : main 6 rouges, mutation (annulés montrés partout) 2 rouges (A1), après 10/10.
+
+### ✅ 🟡 Ventes au téléphone : « Prix d'achat ? » peint sur la taille, pseudo/état rognés, grosses pilules facture/retour
+- « Prix d'achat ? » sur sa propre ligne (plus en absolu) ; pseudo et état passent à la ligne ; « Envoyer la facture » / « Bon de retour » en liens.
+- `src/design/verre-ventes.css` (fin). Banc `ventes-ligne-propre` (390/375, texte normal et très grand ; « À envoyer » et « Toutes ») :
+  main rouge sur L2 (pseudo/état rognés) ; le chevauchement L1 de la capture n'est pas reproduit avec la base inventée (il est rendu impossible par la mise en page : la puce n'est plus en absolu).
+
+### Défilement : preuves
+- `defilement-navigation` : après 33/33 ; main 4–5 rouges (N1 segments d'Argent revisités, N4 retoucher Argent sur Statistiques, N3 carte → Ventes à 692 px) ;
+  mutation « la position gardée vaut partout » rouge (N3). N7 (bas de page au-dessus de la barre) : vert sous Chromium ; sous WebKit (CI) deux mesures à 13–41 px sous la barre — à surveiller.
+- « Ma journée → carte » : une carte qui vise une section (À envoyer) s'ouvre dessus (≤ 300 px), jamais à la position d'avant.
+
+### Bancs portés (décisions citées dans les commits)
+- `colis-retirer-propre`, `retraits-suivi` : la fiche d'un colis s'ouvre en touchant son TITRE (16 nov., lot achats-qr : toucher le code ouvre le comptoir).
+- `morceau-perime` : la nouvelle version reste servie après le rechargement (un seul rechargement).
+- `iphone-reprise` : B7–B9 repartent d'une page neuve après les visites du menu de l'avatar.
+- Restent rouges (déjà rouges sur main, pas traités ici) : « de l'air entre les sections » de colis-retirer-propre (15 px avant « Argent à vérifier »), journee-coherence E7/E8 sous WebKit.

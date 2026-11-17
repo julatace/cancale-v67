@@ -437,9 +437,12 @@
 :root:root:root:root:root:root:root body .sj-journee .vrm-so-carte.is-compact .vrm-so-plein { margin-top: 10px !important; }
 } /* fin de @layer vrm-verre */
 
+/* (17 nov., chasse-bugs) Dans la couche `vrm-verre`, comme le reste du fichier : hors couche, un `!important` perd contre la couche. */
+@layer vrm-verre {
 /* (17 nov., chasse-bugs) Au téléphone, le crayon « Modifier » (44 px, en haut à droite de la carte du mois) se posait
    SUR « Bénéfice · mois » (banc journee-coherence E6, capture 390). La dernière case lui laisse sa place ; rien d'autre
    ne bouge (mêmes colonnes, même crayon, mêmes 44 px). */
 @media (max-width: 743px) {
   :root:root:root:root:root:root body .sj-journee .sj-t-mois .vrm-fu-cases > .vrm-fu-case:last-child { margin-right: 40px !important; }
+}
 }
