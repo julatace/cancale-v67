@@ -82,5 +82,9 @@ export default {
   "sr.seance.reste": {
     "one": "{nb} to put away",
     "other": "{nb} to put away"
-  }
+  },
+  "sr.place.modifier": "Edit this unit",
+  "sr.place.ordre": "Change the order",
+  "sr.place.monter": "Move up",
+  "sr.place.descendre": "Move down"
 };

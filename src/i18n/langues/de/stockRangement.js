@@ -82,5 +82,9 @@ export default {
   "sr.seance.reste": {
     "one": "{nb} einzuräumen",
     "other": "{nb} einzuräumen"
-  }
+  },
+  "sr.place.modifier": "Möbel bearbeiten",
+  "sr.place.ordre": "Reihenfolge ändern",
+  "sr.place.monter": "Nach oben",
+  "sr.place.descendre": "Nach unten"
 };

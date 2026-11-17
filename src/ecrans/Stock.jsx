@@ -1530,6 +1530,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     poser, montrer, place, setPlace,
     q, setQ: (v) => { setQ(v); setCibles([]); }, resultats, qEstNum, exactNum, cibles, setCibles, cherche: !!(filtre || cibles.length), chercheRef,
     compteMeuble, rendreMeuble: cadreMeuble, creerMeuble: () => setModal({ type: 'meuble' }),
+    modifierMeuble: (m) => { const coulM = COULEURS.includes(m.couleur) ? m.couleur : undefined; setModal({ type: 'meuble', id: m.id, name: m.name, cols: m.cols, rows: m.rows, planches: planchesDe(m), gravite: !!m.gravite, typeM: typeDe(m), couleur: coulM || null, couleurs: couleursDans(m.couleurs, m.cols, m.rows), piles: [...colonnesEnPile({ ...m, gravite: false, type: undefined })] }); },
+    deplacerMeuble: (id, sens) => deplacer(id, sens),
     ouvrirPhoto: ouvrirRecherchePhoto, ouvrirInventaire: () => setInventaire(true),
     blocs: { inventaire: elInventaire, annuel: elAnnuel, horsLigne: blocHorsLigne, explication: <StockExplication sneakers={motsStock.nom === 'paire'} />,
       aFaire: sectionAFaire, liste: blocListe, importees: blocImportees, aPart: blocAPart, plus: sectionPlus, modale: Modale(),

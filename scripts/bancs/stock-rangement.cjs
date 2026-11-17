@@ -110,7 +110,12 @@ const regles = (pg) => pg.evaluate(() => {
   const pleins = [...document.querySelectorAll('.sr-btn-plein, .v2b-principal')].filter(vis).length;
   // La 1re paire de la liste : sa hauteur à l'écran (Julien : elle arrivait à 1 260 px sur 2 000).
   const l1 = document.querySelector('[data-sr-ligne]'); const premiere = l1 ? Math.round(l1.getBoundingClientRect().top) : null;
-  return { petits, coupes, pleins, premiere, ih: innerHeight, glisse: !!document.querySelector('[data-sr-glisse="ranger"]'), sw: document.documentElement.scrollWidth, iw: innerWidth };
+  // L'AIR : rangées ≥ 64 px, cartes ≥ 20 px de marge intérieure ; l'ordinateur en deux colonnes (la liste, la place).
+  const basses = [...document.querySelectorAll('.sr-ecran .sr-ligne, .sr-ecran .sr-rangee, .sr-feuille .sr-plus-ligne')].filter(vis).filter((e) => e.getBoundingClientRect().height < 63.5).length;
+  const serrees = [...document.querySelectorAll('.sr-reponse, .sr-ici, .sr-place-corps')].filter(vis).filter((e) => { const cs = getComputedStyle(e); return parseFloat(cs.paddingRight) < 19.5 || parseFloat(cs.paddingTop) < 3.5; }).length;
+  const liste = document.querySelector('.sr-liste-paires'), cote = document.querySelector('.sr-cote');
+  const deux = !!(liste && cote && cote.getBoundingClientRect().left >= liste.getBoundingClientRect().right - 1);
+  return { petits, coupes, pleins, premiere, ih: innerHeight, basses, serrees, deux, ordi: innerWidth >= 1024, glisse: !!document.querySelector('[data-sr-glisse="ranger"]'), sw: document.documentElement.scrollWidth, iw: innerWidth };
 });
 // La signature de l'écran Stock (éteint) : balises, attributs data-*, textes — pour la comparer à celle de main.
 const signature = (pg) => pg.evaluate(() => {
@@ -288,6 +293,8 @@ async function parcours(b, port, { tel, sombre, v2, nom, petit = false }) {
         dit(!g.coupes.length, `${t} : ${k} — aucun texte coupé`, g.coupes.join(' | '));
         dit(g.sw <= g.iw, `${t} : ${k} — aucun défilement de côté`, `${g.sw}/${g.iw}`);
         dit(g.pleins <= 1, `${t} : ${k} — un seul bouton plein`, String(g.pleins));
+        dit(!g.basses && !g.serrees, `${t} : ${k} — l'air : rangées ≥ 64 px, cartes ≥ 20 px à l'intérieur`, `${g.basses} rangées basses, ${g.serrees} cartes serrées`);
+        if (k === 'écran' && g.ordi) dit(g.deux, `${t} : écran — ordinateur : la liste à gauche, les places à droite`);
         if (k === 'écran') { dit(g.premiere != null && g.premiere <= g.ih * (/^375/.test(t) ? 0.6 : 0.5), `${t} : écran — la 1re paire de la liste dans la moitié haute du premier écran`, `${g.premiere} px / ${g.ih}`);
           if (/^3(90|75)/.test(t)) dit(g.glisse, `${t} : écran — glisser à gauche une paire à ranger : « Ranger »`); }
       }

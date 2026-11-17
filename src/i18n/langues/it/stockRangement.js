@@ -82,5 +82,9 @@ export default {
   "sr.seance.reste": {
     "one": "{nb} da riporre",
     "other": "{nb} da riporre"
-  }
+  },
+  "sr.place.modifier": "Modifica il mobile",
+  "sr.place.ordre": "Cambia l’ordine",
+  "sr.place.monter": "Sposta su",
+  "sr.place.descendre": "Sposta giù"
 };

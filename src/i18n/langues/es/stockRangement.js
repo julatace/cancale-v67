@@ -82,5 +82,9 @@ export default {
   "sr.seance.reste": {
     "one": "{nb} por guardar",
     "other": "{nb} por guardar"
-  }
+  },
+  "sr.place.modifier": "Editar el mueble",
+  "sr.place.ordre": "Cambiar el orden",
+  "sr.place.monter": "Subir un puesto",
+  "sr.place.descendre": "Bajar un puesto"
 };

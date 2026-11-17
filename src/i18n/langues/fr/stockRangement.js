@@ -82,5 +82,9 @@ export default {
   "sr.seance.reste": {
     "one": "{nb} à ranger",
     "other": "{nb} à ranger"
-  }
+  },
+  "sr.place.modifier": "Modifier le meuble",
+  "sr.place.ordre": "Changer l’ordre",
+  "sr.place.monter": "Monter d’un cran",
+  "sr.place.descendre": "Descendre d’un cran"
 };
