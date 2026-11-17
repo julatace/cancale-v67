@@ -15,6 +15,17 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { tr } from '../i18n/index.js';
+import { MAQUETTE } from './maquette.js';
+
+// (17 nov., maquette C « Studio », réglage de banc seulement — src/design/maquette.js) Le « + » nomme SOUS lui le
+// geste de l'écran où l'on est (le plus probable ici), et l'éventail le désigne : aucun geste neuf, les quatre
+// mêmes, rien ne part sans le toucher. Ventes : Imprimer · Annonces : Publier · ailleurs : Chercher.
+export function gesteDuLieu(ecran = '', nImprimer) {
+  if (/^(ventes|cat_expedition|cat_bord)$/.test(ecran)) return 'imprimer';
+  if (/^(paires|annonces|garage|inventaire)$/.test(ecran)) return 'publier';
+  if (ecran === 'journee' && typeof nImprimer === 'number' && nImprimer > 0) return 'imprimer';
+  return 'chercher';
+}
 
 const T = (d, taille = 21) => (
   <svg width={taille} height={taille} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{d}</svg>
@@ -97,6 +108,8 @@ export function DisqueEventail({ gestes = {}, nImprimer, Retour = null, ecran = 
   };
   const surAnnule = () => { glisse.current = { ...glisse.current, actif: false }; setVise(null); };
   const places = ouvert && centre ? placesEventail(centre.x, centre.y, centre.w) : null;
+  const lieu = MAQUETTE === 'c' ? gesteDuLieu(ecran, nImprimer) : '';
+  const motLieu = lieu ? (lames.find((l) => l.id === lieu) || {}).mot : '';
   return (
     <>
       <button ref={disque} type="button" className="sb-rond sb-rond--disque sb-disque" data-sb-disque="" aria-haspopup="menu" aria-expanded={ouvert}
@@ -104,6 +117,7 @@ export function DisqueEventail({ gestes = {}, nImprimer, Retour = null, ecran = 
         onPointerDown={surAppui} onPointerMove={surGlisse} onPointerUp={surRelache} onPointerCancel={surAnnule}
         onClick={(e) => { if (e.detail === 0) { if (ouvert) fermer(); else { mesurer(); setOuvert(true); } } }}>
         {ICONES_EVENTAIL.plus(24)}
+        {motLieu ? <span className="sb-disque-mot" data-sb-lieu={lieu} aria-hidden="true">{motLieu}</span> : null}
       </button>
       {ouvert && places && typeof document !== 'undefined' ? createPortal(
         <>
@@ -116,7 +130,7 @@ export function DisqueEventail({ gestes = {}, nImprimer, Retour = null, ecran = 
               const h = l.plein ? 36 : 30;
               const desactive = typeof l.faire !== 'function';
               return (
-                <button key={l.id} type="button" role="menuitem" className={'sb-lame' + (vise === l.id ? ' is-vise' : '')} data-sb-lame={l.id}
+                <button key={l.id} type="button" role="menuitem" className={'sb-lame' + (vise === l.id ? ' is-vise' : '') + (lieu === l.id ? ' is-lieu' : '')} data-sb-lame={l.id}
                   aria-label={l.aria || l.mot} aria-disabled={desactive || undefined} data-sb-n={l.plein ? (connu ? String(nImprimer) : '') : undefined}
                   style={{ left: p.x, top: p.y - h, '--i': i, '--dx': `${(centre.x - p.x).toFixed(0)}px`, '--dy': `${(centre.y - p.y + h).toFixed(0)}px` }}
                   onClick={() => lancer(l)}>

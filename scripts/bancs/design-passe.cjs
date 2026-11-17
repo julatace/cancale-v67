@@ -87,7 +87,7 @@ async function rest(route, b) {
   const r = servir(lignes, decodeURIComponent(metaVersData(req.url())), req.headers());
   return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': r.range || '0-0/0' }, body: JSON.stringify(r.body) });
 }
-async function ouvrir(nav, { W, sombre, b, url, sansSession = false, api = null, dsf = 1 }) {
+async function ouvrir(nav, { W, sombre, b, url, sansSession = false, api = null, dsf = 1, avantChargement = '' }) {
   const tel = W < 600;
   const ctx = await nav.newContext({ ...(tel ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: dsf } : { viewport: { width: 1512, height: 950 }, deviceScaleFactor: dsf }), colorScheme: sombre ? 'dark' : 'light', locale: 'fr-FR', timezoneId: 'Europe/Paris' });
   const pg = await ctx.newPage();
@@ -107,6 +107,8 @@ async function ouvrir(nav, { W, sombre, b, url, sansSession = false, api = null,
       }
     } catch (_) {}
   }, [SESSION, sombre, sansSession]);
+  // (17 nov., maquette C) Un réglage de banc posé avant le premier rendu (ex. `vrm_maquette`).
+  if (avantChargement) await pg.addInitScript(avantChargement);
   // (14 nov., intégration) La même route AUSSI sur le contexte : les images que le service worker de l'app va
   // chercher (sw.js, sa propre requête) ne passent pas par les routes de la page — elles sortaient sur Internet
   // (garde réseau : « hôte réel », images1.vinted.net). La route de la page reste servie la première.

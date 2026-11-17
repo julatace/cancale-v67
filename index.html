@@ -121,7 +121,9 @@
        règle `!important` et visée par la racine de son écran. */
     /* (15 nov., « J'aime la 9 ») `vrm-verre` devant toutes : la matière « Verre dépoli » (src/design/studio-verre.css) —
        le fond bleu profond, le verre, l'encre claire sur le fond. */
-    @layer vrm-verre, vrm-finition, sj-studio, vrm-studio, vrm-premium;
+    /* (17 nov.) `vrm-maquette` devant toutes : les maquettes d'onglets (src/design/maquette-c.css), visées par
+       `html[data-maquette]` seulement — un réglage de banc ; sans lui, aucune de ses règles ne s'applique. */
+    @layer vrm-maquette, vrm-verre, vrm-finition, sj-studio, vrm-studio, vrm-premium;
     body{margin:0;padding:0;background:#FFFFFF;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Inter',system-ui,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility;}
     /* Le fond n'est plus uniforme : un dégradé très léger vers le haut donne de
        la matière derrière les cartes blanches. À peine perceptible isolément,

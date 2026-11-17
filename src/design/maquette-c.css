@@ -1,0 +1,191 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   MAQUETTE C « STUDIO » (17 nov. 2026) — proposition d'onglets et de design, PAS une décision.
+   Julien (17 nov.) : « améliore la disposition des onglets et le design, ce n'est pas optimal,
+   on peut faire mieux » ; « lance des agents qui vont faire des maquettes ».
+   Visée par `html[data-maquette="c"]` SEULEMENT : un réglage de BANC (src/design/maquette.js,
+   `localStorage.vrm_maquette`), qu'aucun écran ne pose — pour un vendeur, rien ne change.
+
+   L'idée (Revolut × Linear × Wise, dans le Studio bleu) : « le haut se tasse, la liste monte ».
+     1. UNE ligne d'en-tête : le titre de l'écran rejoint la ligne des ronds (loupe, cloche,
+        profil) ; la date et la ligne « Mis à jour » deviennent un point.
+     2. UNE rangée d'outils : les plateformes en petites puces (36 px de haut, 44 au doigt par
+        leur marge), le compte ou le geste de l'écran à droite, sur la même ligne.
+     3. Les onglets internes deviennent un RAIL souligné (comme un sommaire) : le texte, le
+        nombre, et la diode sous l'onglet choisi — plus de grosses capsules grises.
+     4. Le chiffre du haut se range en une bande (≤ 72 px) ; la liste est un seul plan de verre.
+     5. Le « + » est rentré DANS la barre et dit le geste du lieu (« Imprimer 30 », « Publier ») ;
+        les messages passagers tombent du haut, comme une notification, plus sur la barre.
+   AUCUNE fonction retirée, aucun texte neuf (les mots sont ceux de l'app), aucun data-* changé.
+   Couche `vrm-maquette`, nommée la PREMIÈRE dans index.html : ses `!important` passent devant.
+   ════════════════════════════════════════════════════════════════════════════ */
+@layer vrm-maquette {
+
+/* ══ 0. Jetons de la maquette ══ */
+:root[data-maquette="c"] {
+  --mc-rail-h: 44px;
+  --mc-encre-fond: var(--sv-clair, #fff);
+  --mc-encre-fond-2: rgb(237 244 252 / .78);
+  --mc-filet-fond: rgb(255 255 255 / .16);
+}
+
+/* ══ 5. LA BARRE DU BAS : le disque rentre dans la barre et nomme le geste du lieu ══ */
+:root[data-maquette="c"] body .vrm-app-shell .vrm-tabbar.vrm-tabbar { height: 66px !important; min-height: 66px !important; border-radius: 24px !important; padding: 0 4px !important; }
+:root[data-maquette="c"] body .vrm-app-shell .vrm-tabbar > .vrm-tab { min-height: 66px !important; }
+:root[data-maquette="c"] body .vrm-app-shell .vrm-tabbar > .sb-disque {
+  flex: 0 0 72px !important; width: 72px !important; height: 66px !important; min-height: 66px !important; margin: 0 !important;
+  border-radius: 18px !important; background: transparent !important; box-shadow: none !important;
+  display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; gap: 4px !important;
+  color: var(--sb-encre) !important;
+}
+:root[data-maquette="c"] body .vrm-app-shell .vrm-tabbar > .sb-disque > svg {
+  width: 40px !important; height: 30px !important; padding: 3px 9px !important; box-sizing: border-box !important; border-radius: 12px !important;
+  background: var(--sb-encre) !important; color: var(--sv-porcelaine, #fff) !important; stroke-width: 2 !important;
+  box-shadow: 0 6px 14px -8px rgb(var(--sb-o) / .7) !important;
+}
+:root[data-maquette="c"][data-theme="dark"] body .vrm-app-shell .vrm-tabbar > .sb-disque > svg { background: #EAF2FB !important; color: #0B1727 !important; }
+:root[data-maquette="c"] body .vrm-app-shell .vrm-tabbar > .sb-disque:is(:active, [aria-expanded="true"]) { background: var(--sb-creux) !important; box-shadow: var(--sb-enfonce) !important; transform: none !important; }
+:root[data-maquette="c"] body .vrm-app-shell .vrm-tabbar > .sb-disque::after { display: none !important; }
+:root[data-maquette="c"] .sb-disque-mot { font: 700 10.5px/1 var(--sb-police-texte) !important; letter-spacing: -.01em !important; color: var(--sb-encre) !important; white-space: nowrap !important; max-width: 70px !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+/* Dans l'éventail, le geste du lieu porte la diode (le même que le mot sous le « + »). */
+:root[data-maquette="c"] .sb-lame.is-lieu .sb-lame-mot { box-shadow: inset 0 -2px 0 var(--sb-diode) !important; }
+/* La pastille de l'onglet actif : une diode SOUS l'icône (le rail du haut parle la même langue). */
+:root[data-maquette="c"] body .vrm-app-shell .vrm-tabbar .vrm-tab-pastille { border-radius: 12px !important; }
+:root[data-maquette="c"] body .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] .vrm-nav-label { font-weight: 700 !important; }
+
+/* Les messages passagers tombent du HAUT (comme une notification), en une ligne, plus sur la barre ni sur la liste du bas. */
+:root[data-maquette="c"] body .vrm-toasts { top: calc(58px + env(safe-area-inset-top, 0px)) !important; bottom: auto !important; }
+:root[data-maquette="c"] body .vrm-toasts .vrm-toast { padding: 9px 14px !important; border-radius: 16px !important; align-items: center !important; min-height: 44px !important; }
+:root[data-maquette="c"] body .vrm-toasts .vrm-toast > span:last-child { font-size: 13px !important; line-height: 1.3 !important; display: -webkit-box !important; -webkit-line-clamp: 2 !important; -webkit-box-orient: vertical !important; overflow: hidden !important; }
+
+/* ══ 1–4 au TÉLÉPHONE ══ */
+@media (max-width: 767px) {
+  /* ── 1. UNE ligne d'en-tête : le titre de l'écran monte sur la ligne des ronds ── */
+  :root[data-maquette="c"] body .vrm-app-shell > .vrm-app-header { pointer-events: none !important; }
+  :root[data-maquette="c"] body .vrm-app-shell > .vrm-app-header :is(button, a, input, [role="button"], .vrm-header-actions) { pointer-events: auto !important; }
+  :root[data-maquette="c"] body .vrm-app-shell > .vrm-app-header:not(.is-defile) .vrm-hdr-titre { opacity: 0 !important; }
+  :root[data-maquette="c"] body .vrm-app-shell > .vrm-app-header .vrm-header-actions :is(button.vrm-hbtn, .vrm-cn-cloche > button, button.vrm-cn-cloche) { width: 40px !important; height: 40px !important; min-width: 40px !important; }
+  :root[data-maquette="c"] body .vrm-app-shell > .vrm-app-header .vrm-header-actions > div { gap: 4px !important; }
+  /* L'en-tête d'écran (Ventes, Achats, Annonces) : posé SOUS la ligne des ronds, sur la même hauteur (53 px). */
+  :root[data-maquette="c"] .vrm-main .vrm-tache-tete.vrm-market-heading {
+    margin-top: -53px !important; min-height: 53px !important; height: 53px !important; padding: 0 150px 0 16px !important;
+    display: flex !important; flex-wrap: nowrap !important; align-items: center !important; gap: 2px !important; position: relative !important; z-index: 51 !important; pointer-events: none !important;
+  }
+  :root[data-maquette="c"] .vrm-main .vrm-tache-tete.vrm-market-heading > * { pointer-events: auto !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-tache-tete.vrm-market-heading h1 { font: 500 27px/1.05 var(--sb-police-affiche) !important; letter-spacing: -.025em !important; margin: 0 !important; white-space: nowrap !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-tache-tete .vrm-fu-date-tete { display: none !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-tache-tete .vrm-phrase-ecran { margin: 0 !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-tache-tete .vrm-aide-bouton svg { width: 18px !important; height: 18px !important; opacity: .8 !important; }
+  /* Le geste de l'écran posé sur la tête (Retrouver un colis) descend à droite de la rangée d'outils. */
+  :root[data-maquette="c"] .vrm-main .vrm-tache { position: relative !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-tache-tete .vrm-tache-retrouver { position: absolute !important; right: 16px !important; top: 57px !important; }
+  /* Annonces : le choix Annonces / Stock quitte la tête (il devient le rail, plus bas). */
+  :root[data-maquette="c"] .vrm-main .vrm-tache-tete .vrm-paires-selecteur { position: absolute !important; left: 0 !important; right: 0 !important; top: 101px !important; padding: 0 16px !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-tache:has(.vrm-tache-tete .vrm-paires-selecteur) > .vrm-tache-filtres { margin-bottom: var(--mc-rail-h) !important; }
+  /* Écrans « ScreenHead » (Argent…) : même ligne. */
+  :root[data-maquette="c"] .vrm-main .vrm-screen-head { margin: -53px 0 4px !important; min-height: 53px !important; padding-right: 150px !important; position: relative !important; z-index: 51 !important; pointer-events: none !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-screen-head > * , :root[data-maquette="c"] .vrm-main .vrm-screen-head :is(button, a) { pointer-events: auto !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-screen-head .vrm-tete-row { min-height: 53px !important; align-items: center !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-screen-head :is(h1, h2).vrm-display { font: 500 27px/1.05 var(--sb-police-affiche) !important; letter-spacing: -.025em !important; margin: 0 !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-screen-head .vrm-fu-date-tete { display: none !important; }
+  /* Ma journée : « Bonjour · date » au-dessus d'un titre plus court ; la tête ne prend plus de place à elle seule. */
+  :root[data-maquette="c"] .vrm-main .sj-journee .sj-tete { padding-top: 0 !important; margin-top: -45px !important; position: relative !important; z-index: 51 !important; pointer-events: none !important; }
+  :root[data-maquette="c"] .vrm-main .sj-journee .sj-tete :is(button, a, .sj-alertes, .sj-affiche) { pointer-events: auto !important; }
+  :root[data-maquette="c"] .vrm-main .sj-journee .sj-tete .sj-titre { font: 500 27px/1.05 var(--sb-police-affiche) !important; letter-spacing: -.025em !important; }
+  :root[data-maquette="c"] .vrm-main .sj-journee .sj-tete .sj-bonjour { font-size: 12.5px !important; max-width: 220px !important; }
+
+  /* La ligne « Mis à jour à … » : un point à gauche de la loupe (touché ⇒ son geste, le texte reste lu à voix haute). */
+  :root[data-maquette="c"] body .vrm-fraicheur-hote > .vrm-bandeau-abo.vrm-fraicheur {
+    position: fixed !important; top: 4px !important; right: 142px !important; left: auto !important; z-index: 60 !important;
+    width: 44px !important; min-width: 44px !important; height: 44px !important; padding: 0 !important; margin: 0 !important;
+    background: transparent !important; box-shadow: none !important; border: 0 !important; overflow: hidden !important; display: grid !important; place-items: center !important;
+  }
+  :root[data-maquette="c"] body .vrm-fraicheur-hote > .vrm-fraicheur > :not(.vrm-fraicheur-point):not(.vrm-bandeau-abo-geste) { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip-path: inset(50%) !important; white-space: nowrap !important; }
+  :root[data-maquette="c"] body .vrm-fraicheur-hote > .vrm-fraicheur .vrm-fraicheur-point { grid-area: 1 / 1 !important; width: 9px !important; height: 9px !important; box-shadow: 0 0 0 3px rgb(255 255 255 / .22) !important; }
+  :root[data-maquette="c"] body .vrm-fraicheur-hote > .vrm-fraicheur .vrm-bandeau-abo-geste { grid-area: 1 / 1 !important; width: 44px !important; height: 44px !important; min-width: 44px !important; padding: 0 !important; color: transparent !important; background: transparent !important; box-shadow: none !important; overflow: hidden !important; }
+  :root[data-maquette="c"] body .vrm-fraicheur-hote > .vrm-fraicheur .vrm-bandeau-abo-geste * { opacity: 0 !important; }
+
+  /* ── 2. UNE rangée d'outils : les plateformes en petites puces ── */
+  :root[data-maquette="c"] .vrm-main .vrm-tache-filtres { min-height: 48px !important; padding: 2px 16px 4px !important; align-items: center !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-sel-sites.vrm-filtres {
+    width: auto !important; max-width: calc(100% - 64px) !important; flex: 0 1 auto !important; padding: 3px !important; gap: 2px !important; min-height: 0 !important; height: 42px !important;
+    border-radius: 14px !important; background: var(--sv-verre-fin, rgb(255 255 255 / .16)) !important; box-shadow: inset 0 0 0 1px var(--sv-verre-fin-bord, rgb(255 255 255 / .32)) !important;
+  }
+  :root[data-maquette="c"] .vrm-main .vrm-sel-sites.vrm-filtres > button { flex: 0 0 auto !important; width: auto !important; min-width: 44px !important; height: 36px !important; min-height: 36px !important; padding: 0 10px !important; border-radius: 11px !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-sel-sites.vrm-filtres > button .vrm-ss-in { height: 36px !important; padding: 0 !important; gap: 6px !important; font-size: 14px !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-sel-sites.vrm-filtres > button svg { max-height: 18px !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-sel-sites.vrm-filtres > button:is([aria-pressed="true"], .is-actif, [aria-current]) { background: var(--sv-porcelaine, #fff) !important; box-shadow: 0 1px 2px rgb(8 26 50 / .2) !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-sel-sites.vrm-filtres > button::after { display: none !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-tache-filtres .vrm-compte-menu-hote button { height: 40px !important; min-height: 40px !important; }
+
+  /* ── 3. Les onglets internes : un RAIL souligné ── */
+  :root[data-maquette="c"] .vrm-main :is(.vv-seg, .vrm-seg) {
+    display: flex !important; gap: 22px !important; padding: 0 2px !important; margin: 0 !important; height: var(--mc-rail-h) !important; min-height: var(--mc-rail-h) !important;
+    background: transparent !important; box-shadow: inset 0 -1px 0 var(--mc-filet-fond) !important; border: 0 !important; border-radius: 0 !important;
+    overflow-x: auto !important; scrollbar-width: none !important; width: 100% !important;
+  }
+  :root[data-maquette="c"] .vrm-main :is(.vv-seg, .vrm-seg)::before, :root[data-maquette="c"] .vrm-main :is(.vv-seg, .vrm-seg)::after { display: none !important; }
+  :root[data-maquette="c"] .vrm-main :is(.vv-seg-b, .vrm-seg-btn) {
+    flex: 0 0 auto !important; width: auto !important; min-width: 0 !important; height: var(--mc-rail-h) !important; min-height: var(--mc-rail-h) !important; padding: 0 !important; margin: 0 !important;
+    background: transparent !important; box-shadow: none !important; border: 0 !important; border-radius: 0 !important; position: relative !important;
+    font: 600 15px/1 var(--sb-police-texte) !important; letter-spacing: -.01em !important; color: var(--mc-encre-fond-2) !important;
+    display: inline-flex !important; align-items: center !important; gap: 6px !important;
+  }
+  :root[data-maquette="c"] .vrm-main :is(.vv-seg-b, .vrm-seg-btn) * { color: inherit !important; }
+  :root[data-maquette="c"] .vrm-main :is(.vv-seg-b, .vrm-seg-btn)[aria-pressed="true"] { color: var(--mc-encre-fond) !important; }
+  :root[data-maquette="c"] .vrm-main :is(.vv-seg-b, .vrm-seg-btn)[aria-pressed="true"]::after {
+    content: "" !important; display: block !important; position: absolute !important; left: 0 !important; right: 0 !important; bottom: 0 !important; top: auto !important;
+    width: auto !important; height: 3px !important; border-radius: 3px 3px 0 0 !important; background: var(--mc-encre-fond) !important;
+    box-shadow: 0 0 10px rgb(255 255 255 / .55) !important; margin: 0 !important; transform: none !important;
+  }
+  :root[data-maquette="c"] .vrm-main :is(.vv-seg-b, .vrm-seg-btn):not([aria-pressed="true"])::after { display: none !important; }
+  :root[data-maquette="c"] .vrm-main :is(.vv-seg-n, .vrm-seg-n) {
+    font: 700 12px/1 var(--sb-police-texte) !important; font-style: normal !important; padding: 3px 6px !important; min-width: 0 !important; height: auto !important; border-radius: 7px !important;
+    background: rgb(255 255 255 / .16) !important; color: inherit !important; box-shadow: none !important;
+  }
+  :root[data-maquette="c"] .vrm-main .vv-seg-n.is-ambre { background: var(--sv-clair-ambre, #FFF1C0) !important; color: #4A2A00 !important; }
+  :root[data-maquette="c"] .vrm-main :is(.vrm-colis-onglets, .vrm-paires-selecteur) { padding: 0 !important; background: transparent !important; box-shadow: none !important; height: auto !important; }
+  /* Sur le verre (Argent), le rail reste sur le fond : même dessin. */
+
+  /* ── 4. Le chiffre du haut en une bande ; la liste monte ── */
+  :root[data-maquette="c"] .vrm-main .vv-hero.sb-tete { min-height: 0 !important; padding: 12px 0 6px !important; gap: 12px !important; align-items: center !important; }
+  :root[data-maquette="c"] .vrm-main .vv-hero .sb-chiffre-affiche, :root[data-maquette="c"] .vrm-main .vv-hero [class*="chiffre"] { font-size: 46px !important; line-height: 1 !important; }
+  :root[data-maquette="c"] .vrm-main .vv-hero :is(h2, .vv-hero-lib, [class*="lib"]) { font-size: 18px !important; }
+  :root[data-maquette="c"] .vrm-main .vv-hero :is(p, [class*="sous"]) { font-size: 13px !important; line-height: 1.3 !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-colis-pas-lus { font-size: 13px !important; line-height: 1.35 !important; margin: 0 0 8px !important; opacity: .9 !important; display: -webkit-box !important; -webkit-line-clamp: 2 !important; -webkit-box-orient: vertical !important; overflow: hidden !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-colis-section { margin-top: 0 !important; }
+  :root[data-maquette="c"] .vrm-main .sb-tete-hote.vv-tete { padding-top: 0 !important; }
+
+  /* Achats : « À retirer » une ligne fine, les comptes en petites puces, la barre et la recherche serrées. */
+  :root[data-maquette="c"] .vrm-main .vrm-achats-retirer-repli { margin: 0 16px 6px !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-achats-retirer-ligne { min-height: 44px !important; height: 44px !important; border-radius: 14px !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-compte-puces-hote { padding: 0 !important; margin: 0 0 2px !important; min-height: 0 !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-compte-puces { gap: 6px !important; padding: 2px 0 !important; overflow-x: auto !important; flex-wrap: nowrap !important; scrollbar-width: none !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-compte-puce { height: 36px !important; min-height: 36px !important; padding: 0 12px !important; border-radius: 11px !important; font-size: 14px !important; flex: 0 0 auto !important; margin: 4px 0 !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-achats .vrm-carte-stats { min-height: 0 !important; padding-top: 6px !important; padding-bottom: 6px !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-achats > * { margin-top: 0 !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-achats .vrm-achats-filtres { padding-top: 4px !important; padding-bottom: 4px !important; }
+
+  /* Annonces : la bande de chiffres et la barre de travail serrées. */
+  :root[data-maquette="c"] .vrm-main .vrm-ann-workbar { padding-top: 4px !important; padding-bottom: 4px !important; }
+}
+
+/* ══ 1–3 à l'ORDINATEUR : le même rail souligné, une tête plus courte ══ */
+@media (min-width: 768px) {
+  :root[data-maquette="c"] .vrm-main .vrm-tache-tete .vrm-fu-date-tete, :root[data-maquette="c"] .vrm-main .vrm-screen-head .vrm-fu-date-tete { display: none !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-tache-tete.vrm-market-heading h1, :root[data-maquette="c"] .vrm-main .vrm-screen-head :is(h1, h2).vrm-display { font: 500 30px/1.05 var(--sb-police-affiche) !important; letter-spacing: -.025em !important; }
+  :root[data-maquette="c"] .vrm-main :is(.vv-seg, .vrm-seg) {
+    display: inline-flex !important; gap: 26px !important; padding: 0 2px !important; height: 44px !important; min-height: 44px !important; width: auto !important;
+    background: transparent !important; box-shadow: inset 0 -1px 0 var(--mc-filet-fond) !important; border: 0 !important; border-radius: 0 !important;
+  }
+  :root[data-maquette="c"] .vrm-main :is(.vv-seg-b, .vrm-seg-btn) {
+    flex: 0 0 auto !important; width: auto !important; height: 44px !important; min-height: 44px !important; padding: 0 !important; background: transparent !important; box-shadow: none !important; border: 0 !important; border-radius: 0 !important;
+    position: relative !important; font: 600 15px/1 var(--sb-police-texte) !important; color: var(--mc-encre-fond-2) !important; display: inline-flex !important; align-items: center !important; gap: 6px !important;
+  }
+  :root[data-maquette="c"] .vrm-main :is(.vv-seg-b, .vrm-seg-btn) * { color: inherit !important; }
+  :root[data-maquette="c"] .vrm-main :is(.vv-seg-b, .vrm-seg-btn)[aria-pressed="true"] { color: var(--mc-encre-fond) !important; }
+  :root[data-maquette="c"] .vrm-main :is(.vv-seg-b, .vrm-seg-btn)[aria-pressed="true"]::after { content: "" !important; display: block !important; position: absolute !important; left: 0 !important; right: 0 !important; bottom: 0 !important; top: auto !important; width: auto !important; height: 3px !important; border-radius: 3px 3px 0 0 !important; background: var(--mc-encre-fond) !important; margin: 0 !important; transform: none !important; }
+  :root[data-maquette="c"] .vrm-main :is(.vv-seg-b, .vrm-seg-btn):not([aria-pressed="true"])::after { display: none !important; }
+  :root[data-maquette="c"] .vrm-main :is(.vv-seg-n, .vrm-seg-n) { font: 700 12px/1 var(--sb-police-texte) !important; font-style: normal !important; padding: 3px 6px !important; border-radius: 7px !important; background: rgb(255 255 255 / .16) !important; color: inherit !important; box-shadow: none !important; }
+  :root[data-maquette="c"] .vrm-main :is(.vrm-colis-onglets, .vrm-paires-selecteur) { background: transparent !important; box-shadow: none !important; }
+}
+}
