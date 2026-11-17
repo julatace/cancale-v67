@@ -20,7 +20,8 @@ import ecran_scan_retrouver from './it/scanRetrouver.js';   // (15 nov.) Scanner
 import ecran_renvoyer from './it/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_liaison from './it/liaison.js';   // (15 nov.) La liaison achat ⇄ article
 import ecran_retrait_ailleurs from './it/retraitAilleurs.js';   // (15 nov.) « À retirer ailleurs »
-import ecran_finition from './it/finition.js';   // (15 nov.) la finition écran par écran
+import ecran_finition from './it/finition.js';
+import maquette_comptoir from './it/comptoir.js';   // (17 nov.) maquette E « Le comptoir »   // (15 nov.) la finition écran par écran
 import ecran_parametres from './it/parametres.js';   // (15 nov.) Paramètres rangés en dix catégories
 import ecran_numeros_nouvelles from './it/numeros-nouvelles.js';   // (15 nov.) Les nouvelles annonces sans N°
 import ecran_republie_telephone from './it/republie-telephone.js';   // (15 nov.) Republiée dans l'app Vinted   // (15 nov.) Les nouvelles annonces sans N°
@@ -2315,6 +2316,7 @@ export default {
   ...ecran_scan_retrouver,
   ...ecran_serie_selection,
   ...ecran_finition,
+  ...maquette_comptoir,
   ...ecran_parametres,
   ...ecran_avenir,
   ...ecran_verre2,

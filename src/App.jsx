@@ -1032,6 +1032,8 @@ import "./design/studio-achats-relier.css";   // (15 nov.) Annonces → « Sans 
 // (14 nov., Studio bleu clair) Ma journée en grille Bento : la tête, l'affiche, les tuiles et ce qu'elles déplient —
 // portée par `.sj-journee` seulement, EN DERNIER (docs/passation/2026-11-14-studio-journee.md).
 import { BentoJournee, placerTuiles, RangeeJ, LienJ, MontantAffiche, Plaque as PlaqueJ } from "./JourneeStudio.jsx";
+import Comptoir from "./maquettes/Comptoir.jsx";   // (17 nov.) maquette E, derrière ?banc_maquette=e
+import { COMPTOIR, COMPTOIR_GESTES } from "./maquettes/comptoirBanc.js";
 import { ordreDeSortie, emplacementDe } from "./paireASortir.js";
 import MarqueSite from "./plateformes/Marque.jsx";
 import "./design/studio-journee.css";
@@ -50214,7 +50216,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </>);
               if (visT('chiffres').montree) out.mois = { id: 'mois', lib: (() => { const m = new Date().toLocaleDateString(localeCourante(), { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1); })(), interactif: true, aria: tr('sj.l.mois'), face: chiffresMois, tasse: null };
               const tuilesPlacees = placerTuiles(out);
+              // (17 nov., maquette E « Le comptoir ») Derrière `?banc_maquette=e` seulement (src/maquettes/comptoirBanc.js) :
+              // l'accueil en tuiles qui deviennent l'écran. LES MÊMES chiffres et listes que la grille ci-dessous.
+              const comptoirE = COMPTOIR ? (() => {
+                const datesOkC = listingDatesLu === true && Array.isArray(listings.items) && !listings.error;
+                return <Comptoir ordi={ordiJournee} onNav={onNav} Photo={PhotoVinted} Icon={Icon} FermeAuRetour={FermeAuRetour} d={{
+                  T, envoyer: out.envoyer, retirer: out.retirer, colis: colisJournee, photos: photosCase, frise: friseJ,
+                  messages: out.simples.find((t) => t.id === 'messages') || null, prix: out.simples.find((t) => t.id === 'prix') || null,
+                  offres: out.tardives.find((t) => t.id === 'offres') || null, sansprix: out.tardives.find((t) => t.id === 'prix-achat') || null,
+                  codes: (() => { try { return listeCodesRetrait(); } catch (_) { return []; } })(),
+                  argent: { pasSu: !!(loading || sales.items == null), moisN, moisEur, jourN, jourEur, recuMois, cotisMois, caAnnee, jours: jours14, moisNom,
+                    auMoins: !!phraseNcMois, phraseNc: phraseNcMois, detail: chiffresMois },
+                  enligne: { pasSu: !Array.isArray(listings.items), n: annSelectionnables.filter((a) => a && a.etat === 'en-ligne').length,
+                    dort: datesOkC ? cartePairesQuiDorment(stockDort, seuilDort) : null },
+                }}/>;
+              })() : null;
               return (<>
+                {comptoirE}
                 <BentoJournee tuiles={tuilesPlacees} ordi={ordiJournee} FermeAuRetour={FermeAuRetour}
                   colonnes={ordiJournee ? [
                     { cle: 'c1', avant: <>{visibiliteCarte('frise', { reglage: persoJ, mode: PROFIL_VENDEUR.mode }).montree ? <div className="sj-affiche" data-sj-affiche="">{friseJ}</div> : <div hidden data-jp-cachee="frise">{friseJ}</div>}</>, ids: ['mois'] },
@@ -65310,6 +65328,8 @@ function AppCoeur() {
     publier: () => { try { window.dispatchEvent(new CustomEvent('vrm:publier-ailleurs', { detail: {} })); } catch (_) {} },
     imprimer: () => lancerActionRecherche({ id: 'imprimer-jour' }),
   };
+  // (17 nov., maquette E « Le comptoir », derrière ?banc_maquette=e) Le comptoir appelle les MÊMES gestes que le disque.
+  if (COMPTOIR) COMPTOIR_GESTES.actuels = gestesDisque;
   return (
     <LiveStatsCarte.Provider value={liveStatsVus || null}>
     <SansCompteCarte.Provider value={sansAucunCompte}>
@@ -65925,7 +65945,9 @@ function AppCoeur() {
       <MemoireDefilement ecran={`${tab}:${(tab.startsWith('plat_')||estTacheSite(tab))?platSub:''}`}/>
       {/* Une seule navigation à la fois : latérale sur ordinateur, en bas sur
           téléphone. Jamais les deux — c'est la même liste d'écrans. */}
-      {ordi ? <SideBar tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesRail}/> : <BottomBar tab={tab} setTab={setTab} sites={sitesPresents} badges={badgesNav} gestes={gestesDisque}/>}
+      {/* (17 nov., maquette E) Le comptoir remplace la barre et la colonne : hors de lui, un rond « Comptoir » y ramène. */}
+      {COMPTOIR ? (tab !== 'journee' ? <button type="button" className="sb-rond cp-retour-coque" aria-label={tr('cp.revenir')} data-cp-retour="" onClick={() => setTab('journee')}><Icon name="grid" size={20}/></button> : null)
+        : ordi ? <SideBar tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesRail}/> : <BottomBar tab={tab} setTab={setTab} sites={sitesPresents} badges={badgesNav} gestes={gestesDisque}/>}
       {showBackup&&<GardeEcran nom="sauvegarde" feuille onFermer={()=>setShowBackup(false)}><BackupModal
         catalog={catalog} sales={sales} garageGrid={garageGrid} blockedCells={blockedCells}
         onClose={()=>setShowBackup(false)}
