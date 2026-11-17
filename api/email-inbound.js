@@ -47,7 +47,7 @@ import { modifierLigneCas } from './_lib/cas.js';   // (11 nov.) le journal par 
 // (9 nov.) Solo : la vente d'un compte hors offre ne sonne pas (api/_lib/plan-regle.js).
 import { venteHorsPlanServeur } from './_lib/plan-vendeur.js';
 import { adressesDeLivraison, resoudreProprietaire, fusionnerRegistres as fusionnerRegistresLib, PROPRIETAIRE_NEUTRE } from './_lib/proprietaire-email.js';
-import { retenue, cleLiens, jetonLien, lienConfirmation, emailConfirmation, retirerLiensPreuve, PREFIXE_PREUVE, ID_LIENS_JOUR, reserverEnvois, MAX_ECHECS_ENVOI } from './_lib/preuve-adresse.js';
+import { SUJETS_PREUVE, retenue, cleLiens, jetonLien, lienConfirmation, emailConfirmation, retirerLiensPreuve, PREFIXE_PREUVE, ID_LIENS_JOUR, reserverEnvois, MAX_ECHECS_ENVOI } from './_lib/preuve-adresse.js';
 import { modifierNeutre } from './_lib/neutre-cas.js';
 import { normaliserEntrant, formeRecue, demasquerRelais } from './_lib/lire-email.js';
 import { sbCle } from './_lib/cle.js';
@@ -803,6 +803,8 @@ function familleConnue(subject, from) {
   if (/^Re:\s*$/i.test(s) && /vinted\.fr/i.test(f)) return 'questionnaire du support Vinted';
   if (/@team\.vinted|newsletter/i.test(f) || /rentr[ée]e|d[ée]couvre|inspire|nouveaut[ée]s/i.test(s)) return 'newsletter Vinted';
   if (/bienvenue|confirme ton adresse|mot de passe/i.test(s)) return 'email de compte Vinted';
+  // (17 nov.) Le lien de preuve d'adresse de VRM dans une autre langue (renvoyé vers la boîte).
+  if (SUJETS_PREUVE.some((x) => s.includes(x))) return 'email de compte Vinted';
   // (6 nov.) Leboncoin « Suppression de vos annonces » (api/_lib/lbc-suppression.js) :
   // la même famille côté app (`familleEmail`) pour les e-mails déjà gardés.
   if (/^Suppression de vos annonces/i.test(s) && /leboncoin/i.test(f + ' ' + s)) return 'annonce Leboncoin supprimée';
@@ -2201,7 +2203,7 @@ export async function modeScript(mode, req, res) {
       k = resa.valeur || 0;
     }
     const envois = pretes.slice(0, k)
-      .map((l) => { const lien = lienConfirmation(l.id, jetonLien(cle, l.id, l.data.nonce, l.data.expire)); return { id: l.id, adresse: l.data.adresse, ...emailConfirmation(l.data.adresse, lien) }; });
+      .map((l) => { const lien = lienConfirmation(l.id, jetonLien(cle, l.id, l.data.nonce, l.data.expire)); return { id: l.id, adresse: l.data.adresse, ...emailConfirmation(l.data.adresse, lien, l.data.langue) }; });
     res.status(200).json({ ok: true, envois, ...(pretes.length > k ? { plafond: true, enAttente: pretes.length - k } : {}) });
     return;
   }
