@@ -608,17 +608,17 @@
   .fl-tete { display: flex; align-items: center; gap: 4px 8px; flex-wrap: wrap; margin: 2px 2px 6px; }
   .fl-n { font: 600 14px/1.3 var(--vu-police); color: var(--vu-encre); font-variant-numeric: tabular-nums; }
   .fl-n.trop { color: var(--vu-ambre); }
-  .fl-max { font: 500 13px/1.3 var(--vu-police); color: var(--vu-muet); flex: 1; min-width: 0; }
+  .fl-max { font: 500 13px/1.3 var(--vu-police); color: var(--vu-muet); flex: 1; min-width: 0; white-space: nowrap; }
   .fl-tete .vu-lien { padding: 0 6px; }
-  .fl-filtres { display: flex; gap: 8px; margin: 0 0 8px; }
-  .fl-filtres select { flex: 1; min-width: 0; min-height: 44px; padding: 0 10px; border: 0; border-radius: 12px; background: var(--vu-plaque-2); color: var(--vu-encre);
+  .fl-filtres { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; }
+  .fl-filtres select { flex: 1 1 190px; min-width: 0; min-height: 44px; padding: 0 10px; border: 0; border-radius: 12px; background: var(--vu-plaque-2); color: var(--vu-encre);
     font: 500 14px/1.2 var(--vu-police); text-overflow: ellipsis; cursor: pointer; }
-  .fl-puce { flex: none; appearance: none; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: var(--vu-plaque-2); color: var(--vu-encre);
+  .fl-puce { flex: 1 0 auto; appearance: none; min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: var(--vu-plaque-2); color: var(--vu-encre);
     font: 600 13px/1.2 var(--vu-police); cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
   .fl-puce[aria-pressed="true"] { background: var(--vu-teinte); color: var(--vu-teinte-encre); box-shadow: inset 0 0 0 1.5px currentColor; }
   .fl-filtres select:focus-visible, .fl-puce:focus-visible, .fl-case input:focus-visible { outline: none; box-shadow: var(--vu-anneau); }
   .fl-liste { list-style: none; margin: 0 0 8px; padding: 0 2px; border-radius: 16px; background: var(--vu-plaque-2); overflow-y: auto; overscroll-behavior: contain;
-    max-height: min(420px, calc(100vh - 360px)); min-height: 120px; }
+    max-height: min(420px, calc(100vh - 440px)); min-height: 140px; }
   .fl-liste > li + li { border-top: 1px solid var(--vu-filet); }
   .fl-l { display: grid; grid-template-columns: 44px 56px minmax(0, 1fr) auto; align-items: center; gap: 0 10px; min-height: 76px; padding: 8px 10px 8px 2px; cursor: pointer;
     content-visibility: auto; contain-intrinsic-size: auto 76px; -webkit-tap-highlight-color: transparent; }
@@ -650,6 +650,9 @@
   .fl-lbl { margin: 0 2px 4px; font: 600 12.5px/1.35 var(--vu-police); color: var(--vu-muet); }
   .fl-duree { margin: 10px 2px 2px; font: 600 14px/1.4 var(--vu-police); color: var(--vu-encre); font-variant-numeric: tabular-nums; }
   .fl-recap .vu-plein { margin-top: 10px; }
+  /* « Envoyer à N favoris » reste en vue au bas de la carte quand elle défile (jamais caché sous la liste). */
+  .fl-pied { position: sticky; bottom: 0; z-index: 1; margin: 0 -2px; padding: 8px 2px 2px; background: var(--vu-plaque); }
+  .fl-pied .fl-note { margin-top: 0; }
   .fl-recap .fl-retour { display: flex; justify-content: center; margin-top: 2px; }
 </style>
 <div class="carte" part="carte"><div class="contenu"></div><div class="connexion" hidden></div></div>
@@ -1121,14 +1124,14 @@
     return `<section class="fav fl" data-fav="${esc(a.etat)}" data-fav-vue="liste" data-fav-n="${tous.length}">
       <div class="lu" data-fav-ordre>${esc(TU('fl_lu', { n: total.toLocaleString('fr-FR') }))}</div>
       ${pret ? `<div class="fl-tete"><span class="fl-n${p.trop ? ' trop' : ''}" data-fav-coches="${p.n}" aria-live="polite">${esc(p.compte)}</span><span class="fl-max">· ${esc(TU('fl_max', { max: p.max }))}</span><button class="vu-lien" data-fav-tout="tous">${esc(TU('fl_tout'))}</button><button class="vu-lien" data-fav-tout="aucun">${esc(TU('fl_rien'))}</button></div>` : `<div class="fl-note" data-fav-rien>${esc(TU('fl_personne'))}</div>`}
-      <div class="fl-filtres"><select data-fav-annonce aria-label="${esc(TU('fl_annonce'))}"><option value="">${esc(TU('fl_toutes'))} (${tous.length})</option>${options}</select><button class="fl-puce" data-fav-nouveaux aria-pressed="${filtreNouveaux ? 'true' : 'false'}">${esc(TU('fl_nouveaux'))}</button></div>
+      <div class="fl-filtres"><select data-fav-annonce aria-label="${esc(TU('fl_annonce'))}"><option value="">${esc(TU('fl_toutes'))}</option>${options}</select><button class="fl-puce" data-fav-nouveaux aria-pressed="${filtreNouveaux ? 'true' : 'false'}">${esc(TU('fl_nouveaux'))}</button></div>
       <ul class="fl-liste" data-fav-liste="${vis.length}" data-defil="fav">${vis.length ? vis.map(ligneFl).join('') : `<li class="fl-vide" data-fav-vide>${esc(TU('fl_vide'))}</li>`}</ul>
       ${total > tous.length ? `<div class="fl-note" data-fav-reste="${total - tous.length}">${esc(TU('fl_plus', { n: tous.length, total: total.toLocaleString('fr-FR') }))}</div>` : ''}
       ${Number(a.retires) > 0 ? `<div class="fl-note" data-fav-caches="${Number(a.retires)}">${esc(TU('fl_caches', { n: Number(a.retires) }))}</div>` : ''}
       ${a.ventesAilleurs === 'pas_su' ? '<div class="val alerte" data-fav-ailleurs>Tes ventes sur les autres sites n’ont pas été revérifiées récemment : assure-toi que ces articles ne sont pas vendus ailleurs.</div>' : ''}
-      ${pret ? `<div class="fl-note${p.trop ? ' ambre' : ''}" data-fav-note${p.note ? '' : ' hidden'}>${esc(p.note)}</div>
-      <button class="vu-btn vu-plein" data-fav-envoyer${!p.n || p.trop ? ' disabled' : ''}>${esc(p.bouton)}</button>` : ''}
       ${favErreur ? `<div class="err" role="alert">${esc(favErreur)}</div>` : ''}
+      ${pret ? `<div class="fl-pied"><div class="fl-note${p.trop ? ' ambre' : ''}" data-fav-note${p.note ? '' : ' hidden'}>${esc(p.note)}</div>
+      <button class="vu-btn vu-plein" data-fav-envoyer${!p.n || p.trop ? ' disabled' : ''}>${esc(p.bouton)}</button></div>` : ''}
     </section>`;
   }
   // La durée attendue AU VRAI RYTHME : chaque message (ouvrir, l'offre, 8–20 s, le temps de l'écrire)
@@ -1151,7 +1154,7 @@
     const offreTxt = m.offre ? (m.offre.mode === 'pct' ? `−${m.offre.valeur} %` : m.offre.mode === 'euros' ? `−${eurosFav(m.offre.valeur)}` : `${eurosFav(m.offre.valeur)}`) + (m.offre.arrondi ? ', ' + TU('fr_arrondi') : '') : '';
     const premier = choisis.find((x) => x.texte) || null, n = choisis.length;
     return `<section class="fav fl-recap" data-fav="pret" data-fav-vue="recap" data-fav-n="${n}">
-      <div class="fl-r-t">${esc(TU('fr_titre'))} · ${esc(n === 1 ? TU('fl_envoyer1') : TU('fl_envoyer', { n }))}</div>
+      <div class="fl-r-t">${esc(n === 1 ? TU('fl_envoyer1') : TU('fl_envoyer', { n }))}</div>
       <ul class="fl-r-l" data-fav-recap-annonces="${parAnnonce.size}">${[...parAnnonce.values()].map(({ x, n: k }) => `<li data-fav-recap-item="${esc(x.itemId)}">${photoFav(x.photo)}<span class="fl-mil"><span class="fl-ti">${x.num ? U.etiquette(x.num) + ' ' : ''}${esc(x.titre || TU('fl_article'))}</span><span class="fl-me">${esc(k === 1 ? TU('fr_par1') : TU('fr_par', { n: k }))}${m.offre && x.offre != null ? ' · ' + esc(TU('fr_offre', { p: eurosFav(x.offre) })) : ''}</span></span><span class="fl-px">${m.offre && x.offre != null ? `<s>${esc(eurosFav(x.prix))}</s>${esc(eurosFav(x.offre))}` : esc(eurosFav(x.prix))}</span></li>`).join('')}</ul>
       <div class="fl-lbl" data-fav-offre="${m.offre ? esc(m.offre.mode) : 'aucune'}">${esc(m.offre ? TU('fr_offre_mode', { o: offreTxt }) : TU('fr_sans_offre'))}</div>
       <div class="fl-lbl">${esc(TU('fr_message'))}${Number(m.versions) > 1 ? ' · ' + esc(TU('fr_versions', { n: Number(m.versions) })) : ''}</div>
