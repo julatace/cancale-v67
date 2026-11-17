@@ -1,4 +1,5 @@
 require('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
+const { corpsEcrit } = require('./_ecriture-representee.cjs');
 require('./_porte-banc.cjs');
 const { ouvrirAvanceCompta } = require('./_compta.cjs');
 // BANC — SIRET → nom de l'entreprise dans l'en-tête, et le MODE STREAM qui
@@ -84,7 +85,7 @@ async function page(nav, telephone, tab, { stream = false, registre = 'ok', prof
   await pg.route('**/auth/v1/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ access_token: 'jeton-de-banc', refresh_token: 'r', expires_in: 3600, user: SESSION.user }) }));
   await pg.route('**/rest/v1/**', async (r) => {
     const q = r.request(); const u = decodeURIComponent(q.url());
-    if (q.method() !== 'GET') { try { ecrits.push(JSON.parse(q.postData() || 'null')); } catch (_) {} return r.fulfill({ status: 201, contentType: 'application/json', body: '[]' }); }
+    if (q.method() !== 'GET') { try { const b = JSON.parse(q.postData() || 'null'); const id = (/[?&]id=eq\.([^&]*)/.exec(decodeURIComponent(q.url())) || [])[1]; ecrits.push(Array.isArray(b) || !b ? b : { id, ...b }); } catch (_) {}   // (16 nov.) un PATCH porte son id dans l'URL return r.fulfill({ status: 201, contentType: 'application/json', body: corpsEcrit(q) }); }   // (16 nov.) la forme de PostgREST
     if (/vinted_accounts/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(COMPTES) });
     if (/id=eq\.vrm_pro_facture/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(profil ? [{ data: profil }] : []) });
     return r.fulfill({ status: 200, contentType: 'application/json', headers: { 'content-range': '0-0/0' }, body: '[]' });

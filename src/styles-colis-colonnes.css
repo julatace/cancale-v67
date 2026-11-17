@@ -176,6 +176,10 @@ html body .vrm-colis-barre > .vrm-b:disabled { opacity: .45; }
 .vrm-eg-corps { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 4px 0 6px; }
 .vrm-eg-photo { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; box-shadow: inset 0 0 0 1px var(--vrm-line, #E5E5EA); }
 .vrm-eg-qr { width: min(300px, 86%); aspect-ratio: 1; object-fit: contain; image-rendering: pixelated; background: #FFFFFF; }
+/* (16 nov., lot achats-qr) Touché : le QR prend toute la largeur (et le plein écran quand le navigateur le permet). */
+.vrm-eg-qr { cursor: zoom-in; }
+.vrm-eg-qr.is-plein { width: min(96vw, 560px); cursor: zoom-out; }
+.vrm-eg-qr:fullscreen { width: 100vw; height: 100vh; background: #FFFFFF; object-fit: contain; padding: 6vmin; box-sizing: border-box; }
 .vrm-eg-code { display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
 .vrm-eg-code-l { font: 600 12px/1.3 var(--vrm-police, inherit); color: var(--vrm-muted, #6E6E73); letter-spacing: .02em; }
 .vrm-eg-code-v { font: 700 44px/1.1 var(--vrm-police-mono, ui-monospace, monospace); letter-spacing: .08em; color: var(--vrm-ink, #1D1D1F);

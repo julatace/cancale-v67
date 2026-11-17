@@ -58,7 +58,8 @@ const fabrique = (sorte, donnees) => {
 // Une vente Vinted (e-mail « Ton article s'est vendu »). `compte` : SON pseudo.
 // (6 nov.) `verification` : la vente « avec Vérification de l'article » (l'e-mail
 // ne donne pas de prix — il n'est jamais deviné) ; le colis part au centre de Vinted.
-export const texteVendu = ({ article = '', prix = '', compte = '', verification = false } = {}) => fabrique('vendu', { article, prix, compte, verification: !!verification });
+// (16 nov.) `ailleurs` : une vente Leboncoin, eBay ou Vestiaire (l'étiquette se prend sur le site, pas par e-mail).
+export const texteVendu = ({ article = '', prix = '', compte = '', verification = false, ailleurs = false } = {}) => fabrique('vendu', { article, prix, compte, verification: !!verification, ...(ailleurs ? { ailleurs: true } : {}) });
 // L'argent d'une vente arrive (e-mail « Transaction finalisée »).
 export const texteArgentRecu = ({ montant = '', article = '', compte = '' } = {}) => fabrique('argent', { montant, article, compte });
 // Vendu sur Vestiaire (e-mail de vente Vestiaire). `montant` en euros (nombre) ; `limite` AAAA-MM-JJ.
@@ -69,8 +70,10 @@ export const texteBordereau = ({ modele = '', numero = '', tamponne = false, dat
 // Une offre reçue (e-mail « Nouvelle offre »). ⚠️ `qui` (le pseudo de l'acheteur) n'est
 // PLUS dit (15 nov.) : accepté pour les anciens appelants, jamais rangé ni envoyé.
 // `juge` : le copilote ({ etat: 'unique' | 'ambigu', prix }), reconnu AU TITRE (« à vérifier »).
-export const texteOffre = ({ montant = '', qui: _qui = '', article = '', compte: _compte = '', juge = null } = {}) =>
-  fabrique('offre', { montant, article, juge: juge && typeof juge === 'object' ? { etat: juge.etat || '', prix: juge.prix != null ? juge.prix : null } : null });
+// (16 nov.) `site` : 'vestiaire' seulement pour une offre Vestiaire (elle expire) ; une offre
+// Vinted n'expire jamais (Julien, 11 nov.) ⇒ aucune échéance dite par défaut.
+export const texteOffre = ({ montant = '', qui: _qui = '', article = '', compte: _compte = '', juge = null, site = '' } = {}) =>
+  fabrique('offre', { montant, article, juge: juge && typeof juge === 'object' ? { etat: juge.etat || '', prix: juge.prix != null ? juge.prix : null } : null, ...(site === 'vestiaire' ? { site } : {}) });
 // Un message reçu (e-mail « Nouveau message »). Le pseudo de l'acheteur n'est plus dit (15 nov.).
 export const texteMessage = ({ paire = '', qui: _qui = '', compte = '', extrait = '' } = {}) => fabrique('message', { paire, compte, extrait });
 // Une annulation demandée (e-mail « … souhaiterait annuler l'achat … »). Sans pseudo (15 nov.).

@@ -111,11 +111,11 @@ aucune ligne, la sienne comprise).
    lien est noté sur ton compte ; le partenaire ne voit que des nombres ».
 
 ## Pas fait / à savoir
-- Pas de ligne « Quoi de neuf » : l'outil ne sait pas viser le seul propriétaire (`pour` : tous,
+- (16 nov. : `pour: 'proprietaire'` existe, ligne `partenaires-prorata`.) Pas de ligne « Quoi de neuf » : l'outil ne sait pas viser le seul propriétaire (`pour` : tous,
   sneakers, autre, pro) et les clients ne voient rien de neuf ; Julien a ce récit.
 - Pas mesuré : un vrai webhook Stripe (aucune clé dans le conteneur) ; la forme des événements suit
   l'API 2026-08-26 (`parent.subscription_details`, `payments`) ET l'ancienne (`subscription`,
   `charge`, `payment_intent`) ; si le paiement manque à la facture, il est lu chez Stripe
   (`invoice_payments?invoice=`), Stripe muet ⇒ 503.
 - Une remise partielle (remboursement de 1 €) annule toute la commission : choix prudent, à revoir
-  si Julien le veut.
+  si Julien le veut. → (16 nov.) FAIT : commission au prorata, `2026-11-16-compta-donnees.md`.

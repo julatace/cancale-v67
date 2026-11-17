@@ -52,6 +52,10 @@ export function ligneEtat(p, { sites = [], etat = null, dateCourte = (x) => x, a
   if (s === 'vendue') {
     const prix = r.vente != null ? r.vente : null;
     const v = etape(p, 'vente'); const d = premiereDate(v);
+    // (16 nov., lot ecrans-restes) Sa date limite d'envoi, quand la règle de Colis la connaît (`p.limiteEnvoi`) :
+    // « Vendue 110 € · à poster demain » — la phrase de Colis, jamais une date devinée.
+    const lim = p.aPoster && p.limiteEnvoi && p.limiteEnvoi.texte ? p.limiteEnvoi.texte : '';
+    if (p.aPoster && action !== 'bordereau' && lim) return { cle: prix != null ? 'fd.etat.vendueLimite' : 'fd.etat.vendueLimiteSansPrix', vars: { prix, limite: lim }, ambre: true, limite: p.limiteEnvoi };
     if (p.aPoster && action !== 'bordereau') return { cle: prix != null ? 'fd.etat.vendueEnvoyer' : 'fd.etat.vendueEnvoyerSansPrix', vars: { prix }, ambre: true };
     return { cle: prix != null && d != null ? 'fd.etat.vendueLe' : prix != null ? 'fd.etat.vendue' : 'fd.etat.vendueSansPrix', vars: { prix, date: d != null ? dateCourte(d) : '' }, ambre: false };
   }
@@ -84,7 +88,7 @@ export function actionFiche(p, { sites = [], etat = null, proposition = undefine
   if (s === 'vendue' && r.achat == null && peutRelier) return { sorte: 'relier', proposition: proposition === undefined ? undefined : proposition || null };
   if (s === 'vendue' && p.aPoster && peutBordereau) {
     const c = etape(p, 'colis');
-    return { sorte: 'bordereau', tx: p.txAPoster || null, pret: /prêt/.test(str(c && c.detail)) };
+    return { sorte: 'bordereau', tx: p.txAPoster || null, pret: /prêt/.test(str(c && c.detail)), limite: p.limiteEnvoi && p.limiteEnvoi.texte ? p.limiteEnvoi : null };
   }
   if (s === 'en-vente' && peutBaisser) {
     const o = etape(p, 'offres');

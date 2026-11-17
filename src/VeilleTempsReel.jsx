@@ -8,6 +8,7 @@ import { creerVeille, ouvrirCanal, noterNeuf, ecouterNeuf, oublierNeuf, EVENEMEN
 import { rythme } from './rythmeLectures.js';
 import { heureVu } from './copieLignes.js';
 import { trj } from './i18n/react.js';
+import { installerPasserelleVeille } from './passerelleVeille.js';
 
 // ⚠️ (14 nov., refonte de la coque — Julien, capture : « Mis à jour à 08:19 » posé EN PERMANENCE sur la
 // liste) La veille relit toutes les 5 à 30 s ; chaque lecture qui trouvait du neuf rallumait la pastille
@@ -17,7 +18,9 @@ import { trj } from './i18n/react.js';
 const AFFICHAGE_MS = 2000;
 const SILENCE_MS = 60000;
 // Les lignes qui ne font que compter (jauge, journal) ne disent pas « mis à jour ».
-const VISIBLES = new Set(['ventes', 'achats', 'annonces', 'suivi', 'import', 'transp']);
+// (16 nov.) Messages, Leboncoin, Vestiaire : leurs écrans relisent (src/passerelleVeille.js) ; un e-mail
+// rangé ne fait que montrer « Actualiser » (rien n'est relu sans son geste) : pas de pastille.
+const VISIBLES = new Set(['ventes', 'achats', 'annonces', 'suivi', 'import', 'transp', 'messages', 'lbc', 'vestiaire']);
 
 export default function VeilleTempsReel({ uid, lireDepuis, urlBase, cleApi, jeton, cache, realtimePret }) {
   const lire = React.useRef(lireDepuis); lire.current = lireDepuis;
@@ -35,6 +38,8 @@ export default function VeilleTempsReel({ uid, lireDepuis, urlBase, cleApi, jeto
       },
     });
     try { window.__vrmVeille = veille; } catch (_) {}
+    // Leboncoin et Vestiaire : le signal de l'extension rejoué pour leurs écrans (src/passerelleVeille.js).
+    const offPasserelle = installerPasserelleVeille(window);
     // Realtime seulement si la base le dit prête (`vrm_temps_reel()`, migration 040) : avant
     // la migration, ou dans un banc, aucune prise n'est ouverte — le sondage suffit.
     let canal = { fermer() {} }, mort = false;
@@ -55,7 +60,7 @@ export default function VeilleTempsReel({ uid, lireDepuis, urlBase, cleApi, jeto
     const premier = setTimeout(() => { R.noter('veille-temps-reel'); veille.sonder(); }, 4000);
     const t = setInterval(tic, 5000);
     const reveil = R.surReveil(() => { R.noter('veille-temps-reel'); veille.sonder(); });
-    return () => { mort = true; clearTimeout(premier); clearInterval(t); reveil(); veille.arreter(); try { canal.fermer(); } catch (_) {} oublierNeuf(); try { if (window.__vrmVeille === veille) delete window.__vrmVeille; } catch (_) {} };
+    return () => { mort = true; try { offPasserelle(); } catch (_) {} clearTimeout(premier); clearInterval(t); reveil(); veille.arreter(); try { canal.fermer(); } catch (_) {} oublierNeuf(); try { if (window.__vrmVeille === veille) delete window.__vrmVeille; } catch (_) {} };
   }, [uid, urlBase, cleApi]);
   return <PastilleNeuf/>;
 }

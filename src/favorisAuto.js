@@ -39,7 +39,7 @@ export const AUTO_ECART_MS = [3 * 60000, 12 * 60000];
 export const AUTO_FREINS = ['pause_vinted', 'vinted_frein', 'vinted_robot'];
 // Refus survenus AVANT toute écriture chez Vinted : ce favori peut être retenté
 // (rien n'est parti). Tout autre résultat compte pour « déjà contacté », à vie.
-export const AUTO_AVANT_ECRITURE = ['onglet_vinted', 'compte_vinted_absent', 'compte_vinted_different', 'quota_extension', 'extension_indisponible', 'session_extension', 'autorisation_expiree', 'article_vendu'];
+export const AUTO_AVANT_ECRITURE = ['onglet_vinted', 'compte_vinted_absent', 'compte_vinted_different', 'quota_extension', 'extension_indisponible', 'session_extension', 'autorisation_expiree', 'article_vendu', 'annonce_indisponible'];
 export const JOURS_AUTO = [[1, 'Lun'], [2, 'Mar'], [3, 'Mer'], [4, 'Jeu'], [5, 'Ven'], [6, 'Sam'], [7, 'Dim']];
 
 const entier = (v, min, max, msg) => {

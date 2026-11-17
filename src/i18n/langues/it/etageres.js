@@ -57,4 +57,5 @@ export default {
   "etag.site.aconfirmer": "da confermare",
   "etag.site.masquee": "nascosto da Vinted",
   "etag.site.depuis": "dal {date}",
+  "etag.glisser": "Trascina «{nom}» su o giù",
 };

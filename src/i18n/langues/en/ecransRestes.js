@@ -1,0 +1,20 @@
+// en · lot ecrans-restes (16 nov.) — docs/passation/2026-11-16-ecrans-restes.md
+export default {
+  "fd.etat.vendueLimite": "Sold {prix} · {limite}",
+  "fd.etat.vendueLimiteSansPrix": "Sold · {limite}",
+  "er.loupe.importee": "Imported from another tool",
+  "er.loupe.importeeSansTitre": "Imported item",
+  "er.loupe.emplacement": "stored at “{lieu}”",
+  "er.loupe.achat": "bought {prix}",
+  "er.stock.titre": "Imported from another tool",
+  "er.stock.titreN": {"one": "{n} imported from another tool", "other": "{n} imported from another tool"},
+  "er.stock.emplacement": "stored at “{lieu}” (your file)",
+  "er.stock.sansEmplacement": "location not given in your file",
+  "er.stock.achat": "bought €{prix}",
+  "er.stock.voirPlus": "Show {n} more",
+  "er.phrase.aEnvoyer": "Parcels to send",
+  "er.phrase.colisSansTitre": "Parcel",
+  "er.phrase.limite": "post before {d}",
+  "er.phrase.limiteEstimee": "around {d} (estimated)",
+  "er.phrase.envoyerPasSu": "Parcels to send not read here yet: open Sales once.",
+};

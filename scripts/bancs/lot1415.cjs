@@ -147,12 +147,20 @@ const lireQD = (pg) => pg.evaluate(() => { const s = document.querySelector('[da
       benef: bf ? bf.getAttribute('data-qd-benef') : null, benefTxt: bf ? bf.innerText.replace(/\s+/g, ' ') : '', saisir: !!e.querySelector('[data-qd-saisir]'), plus: !!e.querySelector('[data-qd-agir]') }; }),
     petits: [...s.querySelectorAll('[data-qd-geste], [data-qd-agir], [data-qd-saisir]')].filter((x) => { const r = x.getBoundingClientRect(); return r.width > 0 && (r.height < 43.5 || r.width < 43.5); }).map((x) => x.textContent.slice(0, 24) + ':' + Math.round(x.getBoundingClientRect().height)),
     deb: document.documentElement.scrollWidth - document.documentElement.clientWidth }; });
+// (16 nov., bancs-rouges-a) La fiche « D » (15 nov., docs/passation/2026-11-15-fiche-d.md) n'a plus de tuiles
+// (`.vrm-fp-tuiles`) : le prix affiché est dans la LIGNE D'ÉTAT (`data-fd-etat` = fd.etat.enVente…, « En vente 100 € »),
+// l'argent dans la vue « Argent » (`data-fd-vue-argent` : achat, si-vendue ou bénéfice — chacun UNE fois, mêmes data-*),
+// le manque dans l'action « Prix d'achat pas saisi » (`data-fd-action="saisir"`). La règle jugée ne change pas.
 const lireFiche = (pg) => pg.evaluate(() => { const el = document.querySelector('[data-fiche-paire]'); if (!el) return null;
   const at = (s, a) => { const x = el.querySelector(s); return x ? x.getAttribute(a) : null; };
-  return { num: el.getAttribute('data-fiche-paire'), lecture: el.getAttribute('data-fiche-lecture-en-cours'), achat: at('[data-fiche-resume-achat]', 'data-fiche-resume-achat'), affiche: at('[data-fiche-prix-affiche]', 'data-fiche-prix-affiche'),
-    si: at('[data-fiche-si-vendue]', 'data-fiche-si-vendue'), siEtat: at('[data-fiche-si-vendue]', 'data-fiche-si-vendue-etat'), benef: at('[data-fiche-resume-benefice]', 'data-fiche-resume-benefice'),
-    saisir: !!el.querySelector('[data-fiche-saisir-achat]'), tuiles: (el.querySelector('.vrm-fp-tuiles') || {}).innerText || '',
-    petits: [...el.querySelectorAll('.vrm-fp-tuiles button')].filter((x) => x.getBoundingClientRect().height < 43.5).length,
+  const etat = el.querySelector('[data-fd-etat]');
+  const zones = [...el.querySelectorAll('[data-fd-etat], [data-fd-vue-argent], [data-fd-action]')];
+  return { num: el.getAttribute('data-fiche-paire'), lecture: el.getAttribute('data-fiche-lecture-en-cours'), achat: at('[data-fiche-resume-achat]', 'data-fiche-resume-achat'),
+    etat: etat ? etat.getAttribute('data-fd-etat') : null, etatTxt: etat ? etat.textContent.replace(/\s+/g, ' ') : '',
+    cases: at('[data-fd-vue-argent]', 'data-fd-vue-argent'),
+    si: at('[data-fiche-si-vendue]', 'data-fiche-si-vendue'), siEtat: at('[data-fiche-si-vendue]', 'data-fiche-benefice-partiel') === '1' ? 'partiel' : '', benef: at('[data-fiche-resume-benefice]', 'data-fiche-resume-benefice'),
+    saisir: !!el.querySelector('[data-fiche-saisir-achat]'), tuiles: zones.map((z) => z.innerText).join(' | ').replace(/\s+/g, ' '),
+    petits: [...el.querySelectorAll('[data-fd-action] button, [data-fd-vue-argent] button')].filter((x) => x.getBoundingClientRect().height < 43.5).length,
     deb: document.documentElement.scrollWidth - document.documentElement.clientWidth }; });
 async function ouvrirFiche(pg, n) {
   await pg.evaluate(() => { const b = document.querySelector('[data-fiche-fermer]'); if (b) b.click(); });
@@ -160,6 +168,9 @@ async function ouvrirFiche(pg, n) {
   await pg.evaluate((n) => window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: n })), n);
   await pg.waitForSelector('[data-fiche-paire]', { timeout: 8000 });
   await pg.waitForFunction(() => (document.querySelector('[data-fiche-paire]') || { getAttribute: () => '1' }).getAttribute('data-fiche-lecture-en-cours') === '0', null, { timeout: 20000 }).catch(() => {});
+  // (16 nov.) Fiche D : une paire en vente s'ouvre sur « Sites » (`vueInitiale`) ; l'argent est sous « Argent ».
+  const seg = pg.locator('[data-fiche-paire] [data-fd-seg="argent"][aria-selected="false"]').first();
+  if (await seg.count()) await seg.click().catch(() => {});
   await pg.waitForTimeout(300);
   return lireFiche(pg);
 }
@@ -183,12 +194,17 @@ const capture = async (pg, sel, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, 
           dit(ordre === '800006,800001,800004,800002,800003', 'A1 rangées par ce qui rapporte : +150 €, +50 €, puis sans achat par prix (150, 70, 60) ; la paire de 5 j n’y est pas', ordre);
           const L = Object.fromEntries((q ? q.lignes : []).map((x) => [x.id, x]));
           const g = (id) => (L[id] || {}).geste;
-          dit(g('800006') === 'baisser' && L['800006'].sugg === '180' && g('800001') === 'baisser' && L['800001'].sugg === '90' && /Baisser à 90/.test(L['800001'].gTxt),
-            'A2 la baisse MESURÉE (−10 %, achat connu) : « Baisser à 180 € », « Baisser à 90 € »', JSON.stringify([L['800006'], L['800001']].map((x) => x && [x.geste, x.sugg, x.gTxt])));
+          // (16 nov., bancs-rouges-a) Depuis le 15 nov. la baisse proposée est la BAISSE CONSEILLÉE (src/baisseConseillee.js,
+          // « vendre plus », validée par Julien) : DOUCE (−5 %) par défaut, PLEINE (−10 %, la borne du conseil mesuré) quand
+          // elle a dormi 3 × son délai habituel ou qu'elle est vue sans être aimée ; ≥ 3 favoris lus ⇒ une offre aux favoris
+          // d'abord. Attendus refaits À LA MAIN : 800006 (300 vues en 90 j, 1 favori) 200 → 180 ; 800001 (2 favoris,
+          // 80 vues en 50 j) 100 → 95 ; 800002 (3 favoris) : offre aux favoris, même avec son prix d'achat.
+          dit(g('800006') === 'baisser' && L['800006'].sugg === '180' && g('800001') === 'baisser' && L['800001'].sugg === '95' && /Baisser à 95/.test(L['800001'].gTxt),
+            'A2 la baisse CONSEILLÉE (achat connu) : « Baisser à 180 € » (pleine), « Baisser à 95 € » (douce)', JSON.stringify([L['800006'], L['800001']].map((x) => x && [x.geste, x.sugg, x.gTxt])));
           dit(g('800004') === 'lbc' && g('800002') === 'favoris' && g('800003') === 'republier',
             'A3 un geste chacune : vues/favoris pas lus ⇒ « Sur Leboncoin » ; 3 favoris ⇒ « Offre aux favoris » ; peu vue ⇒ « Republier »', ['800004', '800002', '800003'].map((id) => id + ':' + g(id)).join(' '));
-          dit(L['800006'] && L['800006'].benef === '15000' && /au plus \+150/.test(L['800006'].benefTxt) && L['800001'].benef === '5000',
-            'A4 le bénéfice si vendue au prix du geste : « au plus +150 € », +50 € (frais pas confirmés)', JSON.stringify([L['800006'], L['800001']].map((x) => x && [x.benef, x.benefTxt])));
+          dit(L['800006'] && L['800006'].benef === '15000' && /au plus \+150/.test(L['800006'].benefTxt) && L['800001'].benef === '5500',
+            'A4 le bénéfice si vendue au prix du geste : « au plus +150 € », +55 € (frais pas confirmés)', JSON.stringify([L['800006'], L['800001']].map((x) => x && [x.benef, x.benefTxt])));
           dit(['800004', '800002', '800003'].every((id) => L[id] && L[id].benef === '' && L[id].saisir && !/0\s?€/.test(L[id].benefTxt)), 'A5 sans achat : « Prix d’achat ? » (la porte), jamais « 0 € »', ['800004', '800002', '800003'].map((id) => L[id] && L[id].benefTxt).join(' / '));
           dit(q && q.lignes.every((x) => x.plus), 'A6 « … » garde le choix complet sur chaque ligne');
           dit(q && !q.petits.length, 'F1 chaque geste, « … » et « Prix d’achat ? » font 44 px au moins', q && q.petits.join(' | '));
@@ -207,8 +223,8 @@ const capture = async (pg, sel, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, 
           const bp = await pg.evaluate(() => { const s = document.querySelector('[data-baisse-serie]'); if (!s) return null;
             return { lignes: [...s.querySelectorAll('[data-bp-ligne]')].map((e) => [e.getAttribute('data-bp-ligne'), e.getAttribute('data-bp-ancien'), e.getAttribute('data-bp-nouveau'), e.getAttribute('data-bp-coche')]),
               varier: (s.querySelector('[data-bp-varier]') || {}).checked, phase: s.getAttribute('data-bp-phase') }; });
-          dit(bp && bp.lignes.length === 1 && bp.lignes[0][0] === '800001' && bp.lignes[0][2] === '90' && bp.varier === false && bp.phase === 'choix',
-            'B1 « Baisser à 90 € » : la feuille sur CETTE annonce seule, 100 → 90, sans « Varier », à confirmer', JSON.stringify(bp));
+          dit(bp && bp.lignes.length === 1 && bp.lignes[0][0] === '800001' && bp.lignes[0][2] === '95' && bp.varier === false && bp.phase === 'choix',
+            'B1 « Baisser à 95 € » : la feuille sur CETTE annonce seule, 100 → 95, sans « Varier », à confirmer', JSON.stringify(bp));
           await capture(pg, null, `baisse-proposee-${suf}`);
           const c1 = await pg.evaluate(() => window.__cmds.filter((c) => c.cmd === 'baisserPrixVinted').length);
           dit(c1 === 0, 'B2 rien n’est parti vers Vinted avant SA confirmation', String(c1));
@@ -223,8 +239,8 @@ const capture = async (pg, sel, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, 
           await pg.waitForFunction(() => { const e = document.querySelector('[data-qd-ligne="800002"] [data-qd-benef]'); return e && e.getAttribute('data-qd-benef') !== ''; }, null, { timeout: 10000 }).catch(() => {});
           q = await lireQD(pg);
           const L2 = Object.fromEntries((q ? q.lignes : []).map((x) => [x.id, x]));
-          dit(L2['800002'] && L2['800002'].geste === 'baisser' && L2['800002'].sugg === '63' && L2['800002'].benef === '4300',
-            'C1 prix d’achat saisi (20 €) ⇒ « Baisser à 63 € », +43 € au plus', JSON.stringify(L2['800002']));
+          dit(L2['800002'] && L2['800002'].geste === 'favoris' && L2['800002'].benef === '5000' && /au plus \+50/.test(L2['800002'].benefTxt),
+            'C1 prix d’achat saisi (20 €) ⇒ son bénéfice si vendue (+50 € au plus) ; 3 favoris : l’offre aux favoris d’abord', JSON.stringify(L2['800002']));
           const ordre2 = q ? q.lignes.map((x) => x.id).join(',') : '';
           dit(ordre2 === '800006,800001,800002,800004,800003', 'C2 elle remonte au-dessus des paires sans achat', ordre2);
           const c2 = await pg.evaluate(() => window.__cmds.filter((c) => /baisser|republier|recreer|favori/i.test(c.cmd || '')).length);
@@ -238,13 +254,13 @@ const capture = async (pg, sel, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, 
           await pg.waitForSelector('[data-job]', { timeout: 30000 }).catch(() => {});
           await pg.waitForTimeout(1500);
           let f = await ouvrirFiche(pg, '61');
-          dit(f && f.affiche === '10000' && f.si === '6000' && f.siEtat === 'partiel' && f.benef === '' && /En ligne à/.test(f.tuiles) && /Si vendue/.test(f.tuiles) && !/Bénéfice/.test(f.tuiles),
-            'D1 N°61 en ligne : « En ligne à 100 € », « Si vendue +60 € » (au plus), aucun « Bénéfice » inventé', f && JSON.stringify(f));
-          await capture(pg, '[data-fiche-paire] .vrm-fp-cadre', `fiche-61-${suf}`);
+          dit(f && /^fd\.etat\.enVente/.test(f.etat || '') && /100\s€/.test(f.etatTxt) && f.si === '6000' && f.siEtat === 'partiel' && f.benef === '' && f.cases === 'achat,si-vendue' && /si vendue/i.test(f.tuiles),
+            'D1 N°61 en ligne : « En vente 100 € », « Bénéfice si vendue +60 € » (au plus), aucun « Bénéfice » (vendue) inventé', f && JSON.stringify(f));
+          await capture(pg, '[data-fiche-paire]', `fiche-61-${suf}`);
           f = await ouvrirFiche(pg, '62');
-          dit(f && f.achat === '' && f.saisir && f.si === '' && /prix d.achat pas saisi/.test(f.tuiles), 'D2 N°62 sans achat : « — », « Saisir », le manque NOMMÉ', f && JSON.stringify(f));
+          dit(f && f.achat === '' && f.saisir && f.si === '' && /prix d.achat pas saisi/i.test(f.tuiles), 'D2 N°62 sans achat : « — », « Saisir », le manque NOMMÉ', f && JSON.stringify(f));
           dit(f && !f.petits, 'F5 « Saisir » fait 44 px au moins', f && String(f.petits));
-          await capture(pg, '[data-fiche-paire] .vrm-fp-cadre', `fiche-62-avant-${suf}`);
+          await capture(pg, '[data-fiche-paire]', `fiche-62-avant-${suf}`);
           await pg.locator('[data-fiche-saisir-achat]').first().click();
           await pg.waitForSelector('[data-prix-achat-feuille]', { timeout: 8000 }).catch(() => {});
           const feuille = await pg.evaluate(() => { const s = document.querySelector('[data-prix-achat-feuille]'); return s ? { n: s.getAttribute('data-prix-achat-feuille'), num: (s.querySelector('[data-prix-achat-num]') || { getAttribute: () => null }).getAttribute('data-prix-achat-num'), texte: s.innerText.replace(/\s+/g, ' ') } : null; });
@@ -259,7 +275,7 @@ const capture = async (pg, sel, nom) => { if (!CAPT) return; fs.mkdirSync(CAPT, 
           const ecrit = await pg.evaluate(() => { try { return [JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}')['800002'].buyPrice, (JSON.parse(localStorage.getItem('vinted_buyprice_by_num') || '{}'))['62']]; } catch (_) { return null; } });
           const eu = (v) => Number(String(v == null ? '' : v).replace(',', '.'));
           dit(ecrit && eu(ecrit[0]) === 25 && eu(ecrit[1]) === 25, 'D5 écrit sur LA fiche de l’annonce 800002 et le miroir du N°62 (rien ailleurs)', JSON.stringify(ecrit));
-          await capture(pg, '[data-fiche-paire] .vrm-fp-cadre', `fiche-62-apres-${suf}`);
+          await capture(pg, '[data-fiche-paire]', `fiche-62-apres-${suf}`);
           dit(f && f.deb <= 0, 'F6 la fiche ne déborde pas', f && f.deb);
           // E. Ma journée : le rappel discret
           await pg.evaluate(() => { const b = document.querySelector('[data-fiche-fermer]'); if (b) b.click(); });
