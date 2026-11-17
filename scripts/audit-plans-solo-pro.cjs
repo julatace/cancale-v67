@@ -1,3 +1,4 @@
+const RACINE_OFFRES = require('path').join(__dirname, '..');
 // Audit « Solo et Pro » (9 nov.) — Julien : « Ça peut être 1 compte vendeur et
 // plein de comptes achat, donc sur ces comptes on prend que les achats ; pour
 // avoir toutes ses ventes de tous ses comptes il prend l'abonnement du dessus. »
@@ -181,7 +182,9 @@ const MUTATIONS = [
       const m = f(src);
       if (m === src) { dit(false, `mutation « ${nom} » applicable`, 'le texte visé a changé'); continue; }
       const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'plan-mut-'));
-      fs.writeFileSync(path.join(dir, 'plan-regle.mjs'), m);
+      // (16 nov.) les offres vivent dans plan-offres.js (importé par plan-regle.js) : copié à côté, tel quel.
+      fs.writeFileSync(path.join(dir, 'plan-regle.mjs'), m.replace("from './plan-offres.js'", "from './plan-offres.mjs'"));
+      fs.copyFileSync(path.join(RACINE_OFFRES, 'api', '_lib', 'plan-offres.js'), path.join(dir, 'plan-offres.mjs'));
       let rouges = 0;
       try { const RM = await import('file://' + path.join(dir, 'plan-regle.mjs')); await controlesRegle(RM, (c) => { if (!c) rouges++; }); } catch (_) { rouges++; }
       dit(rouges > 0, `mutation « ${nom} » ⇒ rouge`, `${rouges} rouge(s)`);

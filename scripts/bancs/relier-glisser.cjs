@@ -73,12 +73,7 @@ srv.listen(PORT);
 let ko = 0, ok = 0; const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '✅ ' : '❌ ') + m + (c || !d ? '' : ' — ' + d)); };
 const T1 = '7100001';
 
-async function ouvrir(b, nom, ctxOpts, sombre) {
-  const ctx = await b.newContext({ locale: 'fr-FR', ...ctxOpts });
-  const pg = await ctx.newPage();
-  const errs = [];
-  pg.on('pageerror', (e) => errs.push(e.message));
-  await pg.addInitScript((sb) => { try { localStorage.setItem('vrm_acces_direct', '1'); if (sb) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, sombre);
+async function servir(pg, sombre) {
   await pg.route('**/rest/v1/**', (route) => {
     const req = route.request(), u = decodeURIComponent(metaVersData(req.url()));
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(d) });
@@ -93,6 +88,14 @@ async function ouvrir(b, nom, ctxOpts, sombre) {
     return j([]);
   });
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true,"devices":1}' }));
+}
+async function ouvrir(b, nom, ctxOpts, sombre) {
+  const ctx = await b.newContext({ locale: 'fr-FR', ...ctxOpts });
+  const pg = await ctx.newPage();
+  const errs = [];
+  pg.on('pageerror', (e) => errs.push(e.message));
+  await pg.addInitScript((sb) => { try { localStorage.setItem('vrm_acces_direct', '1'); if (sb) localStorage.setItem('vinted_dark', 'true'); } catch (_) {} }, sombre);
+  await servir(pg, sombre);
   await pg.goto(`http://localhost:${PORT}/?tab=achats&site=vinted`, { waitUntil: 'domcontentloaded' });
   const bouton = pg.locator('[data-glisser-ouvrir="achats"]').first();
   await bouton.waitFor({ timeout: 25000 }).catch(() => {});
@@ -110,6 +113,69 @@ async function ouvrir(b, nom, ctxOpts, sombre) {
 const centre = async (pg, sel) => { const bb = await pg.locator(sel).first().boundingBox(); return bb ? { x: bb.x + bb.width / 2, y: bb.y + bb.height / 2, bb } : null; };
 const lien = (pg, id) => pg.evaluate((k) => { try { const f = JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}'); return f[k] ? (f[k].buyFromId || '') : null; } catch (_) { return null; } }, id);
 const liensTous = (pg) => pg.evaluate(() => { try { const f = JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}'); return Object.entries(f).filter(([, v]) => v && v.buyFromId).map(([k, v]) => `${k}:${v.buyFromId}`); } catch (_) { return null; } });
+
+
+// (17 nov., Julien : « je dois rester appuyé sur l'achat ; les trois petits points ne proposent pas de relier ; on ne voit
+// pas ce que j'ai sélectionné ») RELIER EN TOUCHANT, au doigt (390), sans aucun appui long.
+async function toucher(b) {
+  const nom = '390-toucher';
+  console.log(`\n── ${nom}`);
+  const ctx = await b.newContext({ locale: 'fr-FR', viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+  const pg = await ctx.newPage(); const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+  await pg.addInitScript(() => { try { localStorage.setItem('vrm_acces_direct', '1'); } catch (_) {} });
+  await servir(pg, false);
+  await pg.goto(`http://localhost:${PORT}/?tab=achats&site=vinted`, { waitUntil: 'domcontentloaded' });
+  const ligne = pg.locator(`[data-achat-tx="${T1}"]`).first();
+  await ligne.waitFor({ timeout: 25000 }).catch(() => {});
+  const plus = ligne.locator('.vrm-buy-more').first();
+  dit(await plus.count() === 1, `${nom} · la ligne de l'achat a son « ⋯ »`);
+  if (await plus.count()) { await plus.scrollIntoViewIfNeeded(); await plus.tap(); }
+  const it = pg.locator(`[data-achat-relier="${T1}"]`).first();
+  await it.waitFor({ timeout: 5000 }).catch(() => {});
+  dit(await it.count() > 0, `${nom} · « ⋯ » propose « Relier à une vente / annonce »`);
+  await pg.screenshot({ path: path.join(SHOTS, `relier-${nom}-menu.png`) });
+  if (await it.count()) await it.tap();
+  await pg.locator(`[data-glisser-choisi="${T1}"]`).waitFor({ timeout: 20000 }).catch(() => {});
+  const vis = (sel) => pg.evaluate((q) => { const e = document.querySelector(q); if (!e) return false; const r = e.getBoundingClientRect(); return r.height > 0 && r.bottom > 0 && r.top < innerHeight && getComputedStyle(e).display !== 'none'; }, sel);
+  dit(await vis(`[data-glisser-choisi="${T1}"]`), `${nom} · le mode s'ouvre, l'achat CHOISI dans un bandeau fixe en haut`);
+  dit(!(await vis('.vrm-rg-achats')) && await vis('.vrm-rg-cibles'), `${nom} · au téléphone, la liste des ventes / annonces prend la place`);
+  await pg.screenshot({ path: path.join(SHOTS, `relier-${nom}-choisi.png`) });
+  await pg.evaluate(() => document.querySelector('[data-glisser-cible="a:pa1"]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(200);
+  dit(await vis(`[data-glisser-choisi="${T1}"]`), `${nom} · …toujours visible après avoir fait défiler la liste`);
+  await pg.locator('[data-glisser-cible="a:pa1"]').tap(); await pg.waitForTimeout(300);
+  const q = await pg.locator('[data-glisser-question]').getAttribute('data-glisser-question').catch(() => null);
+  dit(q === `${T1}>a:pa1`, `${nom} · un toucher sur N°2 ⇒ la question (cet achat, cette annonce)`, String(q));
+  dit(await vis(`[data-glisser-choisi="${T1}"]`), `${nom} · …le bandeau reste pendant la question`);
+  await pg.screenshot({ path: path.join(SHOTS, `relier-${nom}-question.png`) });
+  if (await pg.locator('[data-glisser-oui]').count()) await pg.locator('[data-glisser-oui]').tap(); await pg.waitForTimeout(900);
+  dit(await lien(pg, 'pa1') === T1, `${nom} · « Oui » : N°2 relié à ${T1} (menu, choix, cible, Oui — aucun appui long)`, String(await lien(pg, 'pa1')));
+  const pt = await piluleLue(pg);
+  dit(pt.titre === 'Achat relié' && pt.sous === 'Bénéfice au plus +31 € au prix affiché' && await pg.locator(`[data-pilule-autre="${T1}"]`).count() === 1, `${nom} · le bénéfice (la règle) et « Reçu » s'affichent`, JSON.stringify(pt));
+  await pg.screenshot({ path: path.join(SHOTS, `relier-${nom}-relie.png`) });
+  const an = pg.locator('[data-pilule-annuler]').first(); if (await an.count()) { await an.tap(); await pg.waitForTimeout(900); }
+  dit(!(await lien(pg, 'pa1')), `${nom} · « Annuler » retire le lien`);
+  // 3 touchers dans le mode : l'achat, la vente / l'annonce, « Oui »
+  await pg.evaluate((t) => document.querySelector(`[data-glisser-achat="${t}"]`) && document.querySelector(`[data-glisser-achat="${t}"]`).scrollIntoView({ block: 'center' }), T1); await pg.waitForTimeout(200);
+  let n = 0;
+  if (await pg.locator(`[data-glisser-achat="${T1}"]`).count()) { await pg.locator(`[data-glisser-achat="${T1}"]`).tap(); n++; }
+  await pg.waitForTimeout(250);
+  dit(await vis(`[data-glisser-choisi="${T1}"]`) && await pg.locator(`[data-glisser-achat="${T1}"][aria-pressed="true"]`).count() === 1, `${nom} · un toucher simple sur l'achat le choisit (bandeau + ligne surlignée)`);
+  await pg.evaluate(() => document.querySelector('[data-glisser-cible="a:pa1"]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(200);
+  await pg.locator('[data-glisser-cible="a:pa1"]').tap(); n++; await pg.waitForTimeout(300);
+  if (await pg.locator('[data-glisser-oui]').count()) { await pg.locator('[data-glisser-oui]').tap(); n++; } await pg.waitForTimeout(900);
+  dit(n === 3 && await lien(pg, 'pa1') === T1, `${nom} · relié en 3 touchers (achat, annonce, Oui)`, `${n} touchers, lien ${await lien(pg, 'pa1')}`);
+  const an2 = pg.locator('[data-pilule-annuler]').first(); if (await an2.count()) { await an2.tap(); await pg.waitForTimeout(900); }
+  // dans l'autre sens : l'annonce d'abord, puis l'achat
+  await pg.evaluate(() => document.querySelector('[data-glisser-cible="a:pa1"]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(200);
+  await pg.locator('[data-glisser-cible="a:pa1"]').tap(); await pg.waitForTimeout(250);
+  dit(await vis('[data-glisser-choisi="a:pa1"]') && !(await vis('.vrm-rg-cibles')), `${nom} · dans l'autre sens : l'annonce choisie (bandeau), la liste des achats prend la place`);
+  await pg.evaluate((t) => document.querySelector(`[data-glisser-achat="${t}"]`).scrollIntoView({ block: 'center' }), T1); await pg.waitForTimeout(200);
+  await pg.locator(`[data-glisser-achat="${T1}"]`).tap(); await pg.waitForTimeout(300);
+  dit(await pg.locator('[data-glisser-question]').getAttribute('data-glisser-question').catch(() => null) === `${T1}>a:pa1`, `${nom} · …un toucher sur l'achat ⇒ la même question`);
+  await pg.screenshot({ path: path.join(SHOTS, `relier-${nom}-inverse.png`) });
+  dit(!errs.length, `${nom} · aucune erreur de page`, errs.slice(0, 2).join(' | '));
+  await ctx.close();
+}
 
 async function tactile(b) {
   const nom = '390';
@@ -283,7 +349,8 @@ async function souris(b) {
 
 (async () => {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
-  const passes = String(process.env.PASSES || '390,1512').split(',');
+  const passes = String(process.env.PASSES || 'toucher,390,1512').split(',');
+  if (passes.includes('toucher')) await toucher(b);
   if (passes.includes('390')) await tactile(b);
   if (passes.includes('1512')) await souris(b);
   await b.close(); srv.close();

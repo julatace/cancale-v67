@@ -57,4 +57,5 @@ export default {
   "etag.site.aconfirmer": "por confirmar",
   "etag.site.masquee": "oculto por Vinted",
   "etag.site.depuis": "desde el {date}",
+  "etag.glisser": "Arrastra «{nom}» arriba o abajo",
 };

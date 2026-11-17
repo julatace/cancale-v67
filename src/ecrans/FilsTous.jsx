@@ -210,11 +210,11 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
   // Même règle (src/filUnique.js), mêmes entrées : seul le moment du calcul change.
   // La signature des conversations Vinted (la liste peut être complétée SUR PLACE — sa paire arrive après) :
   // le regroupement se refait dès qu'une conversation, son aperçu ou sa paire change.
-  const sigVinted = Array.isArray(vinted) ? vinted.map((x) => { const c = x.c || {}; let p = ''; try { p = JSON.stringify(x.paire || null); } catch (_) {} const u = c.opposite_user || {}; return [c.id, c.updated_at, c.unread, c.description, u.id, u.login, c._acc && c._acc.vinted_user_id, x.compte, x.offre ? x.offre.prix : '', p].join("§"); }).join('¶') : String(vinted);
+  const sigVinted = Array.isArray(vinted) ? vinted.map((x) => { const c = x.c || {}; let p = ''; try { p = JSON.stringify(x.paire || null); } catch (_) {} const u = c.opposite_user || {}; return [c.id, c.updated_at, c.unread, c.description, u.id, u.login, c._acc && c._acc.vinted_user_id, x.compte, x.offre ? x.offre.prix : '', p, x.dernier ? `${x.dernier.deMoi}|${x.dernier.texte}` : ''].join("§"); }).join('¶') : String(vinted);
   const { parCle, fils, propositions } = React.useMemo(() => {
     const parCle = new Map();
     const entrees = [];
-    for (const x of (Array.isArray(vinted) ? vinted : [])) { const e = convVinted(x.c, x.paire); if (e) { e.compteNom = x.compte || ''; if (x.offre && Number(x.offre.prix) > 0) e.offre = { prix: Number(x.offre.prix) }; parCle.set(e.cle, { e, c: x.c }); entrees.push(e); } }
+    for (const x of (Array.isArray(vinted) ? vinted : [])) { const e = convVinted(x.c, x.paire, undefined, x.dernier); if (e) { e.compteNom = x.compte || ''; if (x.offre && Number(x.offre.prix) > 0) e.offre = { prix: Number(x.offre.prix) }; parCle.set(e.cle, { e, c: x.c }); entrees.push(e); } }
     for (const f of ((autres.lbc && autres.lbc.fils) || [])) { const e = convLeboncoin(f); if (e) { e.compteNom = f.nom || ''; parCle.set(e.cle, { e }); entrees.push(e); } }
     for (const v of ((autres.vc && autres.vc.fils) || [])) { const e = convVestiaire(v); if (e) { parCle.set(e.cle, { e }); entrees.push(e); } }
     for (const x of ((ebayTous && ebayTous.items) || [])) { const e = convEbay(x.m, x.compte); if (e) { parCle.set(e.cle, { e }); entrees.push(e); } }

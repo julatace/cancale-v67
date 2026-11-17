@@ -37,8 +37,6 @@ const SERVICE = {
   'carrier.vintedgo.com': /Vinted Go/,
   'www.mondialrelay.fr': /Mondial Relay/,
   // (13 nov., lot 89) les API officielles lues par le serveur quand leur clé est posée
-  'api.laposte.fr': /La Poste/,
-  'onlinetools.ups.com': /UPS/,
   // (5 nov.) les icônes de site des transporteurs (src/transporteursVisuels.js, PastilleTransporteur)
   'www.chronopost.fr': /Chronopost/,
   'www.laposte.fr': /La Poste/,
@@ -267,8 +265,6 @@ const COUPLES = {
   'api/_lib/transporteurs-lecture.js|carrier.vintedgo.com': ['politique', 'transp'],
   'api/_lib/transporteurs-lecture.js|www.mondialrelay.fr': ['politique', 'transpmr'],
   // (13 nov., lot 89) Colissimo / La Poste (« Suivi v2 ») et UPS (« Tracking »), lus par le serveur avec la clé de l'installation.
-  'api/_lib/transporteurs-lecture.js|api.laposte.fr': ['politique', 'transp'],
-  'api/_lib/transporteurs-lecture.js|onlinetools.ups.com': ['politique', 'transp'],
   'api/_lib/transporteurs-lecture.js|lgonxzrzjcqthjtbdpzo.supabase.co': ['politique', 'base'],
   'api/_lib/transporteurs-lecture.js|vrm.center': ['vrm', 'le User-Agent honnête de VRM'],
 };

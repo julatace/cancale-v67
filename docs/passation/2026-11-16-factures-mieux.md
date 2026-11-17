@@ -55,6 +55,23 @@ Aucune mention retirée (audit-factures-mieux L1 les relève une par une au dess
   envoyer », envoi automatique). Avant : la feuille pré-cochait l'anglais, la série et l'envoi auto
   émettaient en français.
 
+### La facture en PASTILLE sur la ligne de vente (ajout de Julien : « pour facture envoyée, fais mieux »)
+- Avant : sous la ligne, « Facture envoyée le 16/11/2026 » + « FA-… » + un gros bouton « Bon de retour »
+  (ou « Envoyer la facture ») : la ligne doublait de hauteur.
+- Maintenant : UNE pastille compacte (icône document + « Facturée » neutre, « Facture à envoyer » /
+  « Facture à vérifier » en ambre — §7, un geste à faire), posée à droite de la ligne de l'état, sous la
+  frise, en position absolue : **aucune hauteur ajoutée** (banc : hauteur de la ligne avec / sans la
+  pastille, et aucun texte recouvert, mesuré au rectangle du TEXTE). La toucher ouvre la feuille de la
+  facture (Voir · Partager · Renvoyer · **Bon de retour** · avoir). « Envoyer la facture » et « Bon de
+  retour » ne sont plus sous la ligne : dans cette feuille et dans la fiche de la vente. Vente Pro pas
+  prouvée : pas de pastille (la raison est dite en tête de la liste et dans la fiche).
+- La pastille est un `<span role="button">` DANS la ligne (qui est un `<button>`) : ses événements et
+  ceux de la feuille (portail) sont arrêtés à son hôte, la ligne ne s'ouvre pas en même temps.
+- Coordination ventes-clair (#1202, pas encore fusionnée au moment de ce lot) : la pastille vit dans
+  la frise (`friseEtat`), que #1202 ne touche pas ; seule la prop `frise` (qui portait l'ancienne
+  facture) est vidée. À la fusion de l'un après l'autre, refusionner main : aucun conflit attendu sur
+  la rangée l2 (non touchée).
+
 ### Le reçu d'achat (`src/recuAchat.js`, nouveau ; `src/ecrans/Achats.jsx` ; `src/App.jsx`)
 - Le reçu GÉNÉRÉ d'après la commande (aucun e-mail Vinted) prend la forme du modèle : bandeau
   Vinted, « Reçu d'achat Vinted » + l'article en grand, « Montant payé » en très grand, Vendeur,

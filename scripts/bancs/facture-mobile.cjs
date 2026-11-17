@@ -25,6 +25,7 @@
 // Lancer : npm run build && NODE_OPTIONS=--require=./scripts/bancs/_porte-banc.cjs BANC_PORT=11873 node scripts/bancs/facture-mobile.cjs
 // Captures : SHOTS=<dossier> …   SEUL='390 clair' pour une seule combinaison.
 const path = require('path');
+const { corpsEcrit } = require('./_ecriture-representee.cjs');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http');
@@ -97,7 +98,7 @@ const ouvrir = async (b, vp, sombre, { vrmPret = true } = {}) => {
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1|[^/]*vinted\.net)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) ? r.abort() : r.continue()));
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));
-    if (route.request().method() !== 'GET') return route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '[]' });
+    if (route.request().method() !== 'GET') return route.fulfill({ status: 201, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: corpsEcrit(route.request()) });   // (16 nov.) la forme de PostgREST
     const j = (d) => route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*', 'content-range': `0-${Math.max(0, d.length - 1)}/${d.length}` }, body: JSON.stringify(d) });
     if (/select=owner/.test(u)) return route.fulfill({ status: 400, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: '{"m":1}' });
     if (/\/rest\/v1\/vinted_accounts/.test(u)) return j(ACCOUNTS);

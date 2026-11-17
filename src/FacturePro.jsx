@@ -23,6 +23,7 @@
 // Les outils de l'app (lecture de la base, confirmation, notifications) sont
 // passés par `deps` : ce fichier n'importe rien d'App.jsx.
 import { fetchBorne, DELAI_ROUTE_MS, NOM_DELAI } from './reseauBorne.js';
+import { tr } from './i18n/index.js';
 import React from 'react';
 import './facture-pro.css';
 import './facture-tva.css';
@@ -101,7 +102,7 @@ export async function ecrireChampsFiche(deps, patch) {
     if (frais === null || frais === undefined) return false;
     const p = typeof patch === 'function' ? patch(frais || {}) : patch;
     const fusion = { ...(frais || {}), ...(p || {}) };
-    const ok = await deps.ecrireReglage(ID_CFG, fusion);
+    const ok = await deps.ecrireReglage(ID_CFG, fusion, frais || {});
     if (ok) poserCfg({ ...VIDE, ...migrerAncienne(fusion) });
     return !!ok;
   } catch (_) { return false; }
@@ -336,7 +337,7 @@ export function FicheFacturation({ deps, focus = null, surPrete = null }) {
       const frais = await deps.lireReglage(ID_CFG);
       if (frais !== null) {
         const fusion = { ...frais, ...att };
-        ok = await deps.ecrireReglage(ID_CFG, fusion);
+        ok = await deps.ecrireReglage(ID_CFG, fusion, frais);   // (16 nov.) seul `att` est posé, par comparer-et-échanger
         if (ok) {
           const reste = lireAttenteFp();
           for (const k of Object.keys(att)) if (JSON.stringify(reste[k]) === JSON.stringify(att[k])) delete reste[k];
@@ -1095,9 +1096,15 @@ export async function envoyerFacturesSerie(deps, txs, ventes) {
   }
   const mv = cfg ? manquantsVendeur(cfg) : [{ l: 'ta fiche de facturation' }];
   const bloque = mv.length ? { texte: `il manque ${mv.map((m) => m.l).join(', ')}` } : bloqueEnvoi(cfg, etat);
-  if (prets.length && bloque) { for (const it of prets.splice(0)) pasFaits.push({ cle: String(it.tx), raison: (bloque.texte || bloque.geste || 'envoi pas possible').replace(/\.$/, '').toLowerCase() }); }
+  // (16 nov., lot compta-donnees, reste de 2026-11-12-facture-mobile.md) Boîte pas connectée mais
+  // envoi par VRM possible (`bloque.vrm`, la règle de la feuille unitaire) : la série propose
+  // « Envoyer avec VRM » — son clic, pour CES factures ; le réglage « ma boîte » ne change pas.
+  const viaVrm = !!(bloque && bloque.vrm && !mv.length);
+  if (prets.length && bloque && !viaVrm) { for (const it of prets.splice(0)) pasFaits.push({ cle: String(it.tx), raison: (bloque.texte || bloque.geste || 'envoi pas possible').replace(/\.$/, '').toLowerCase() }); }
   if (!prets.length) return { faits: [], pasFaits };
-  if (!(await deps.askConfirm({ title: `Envoyer ${prets.length} facture${prets.length > 1 ? 's' : ''} ?`, desc: `Chacune à SON acheteur prouvé${cfg && cfg.envoiPar === 'boite' ? '' : ', par VRM, toi en copie'}.${pasFaits.length ? ` ${pasFaits.length} vente${pasFaits.length > 1 ? 's' : ''} de la sélection ne ${pasFaits.length > 1 ? 'partent' : 'part'} pas (raison dite après).` : ''}`, ok: 'Envoyer', cancel: 'Annuler' }))) return null;
+  const resteSel = pasFaits.length ? ` ${pasFaits.length} vente${pasFaits.length > 1 ? 's' : ''} de la sélection ne ${pasFaits.length > 1 ? 'partent' : 'part'} pas (raison dite après).` : '';
+  if (viaVrm) { if (!(await deps.askConfirm({ title: tr('facturePro.serieVrmTitre', { n: prets.length }), desc: `${tr('facturePro.serieVrmDesc')}${resteSel}`, ok: tr('facturePro.envoyerAvecVrm'), cancel: 'Annuler' }))) return null; }
+  else if (!(await deps.askConfirm({ title: `Envoyer ${prets.length} facture${prets.length > 1 ? 's' : ''} ?`, desc: `Chacune à SON acheteur prouvé${cfg && cfg.envoiPar === 'boite' ? '' : ', par VRM, toi en copie'}.${resteSel}`, ok: 'Envoyer', cancel: 'Annuler' }))) return null;
   const faits = [];
   for (let i = 0; i < prets.length; i++) {
     const it = prets[i], tx = String(it.tx);
@@ -1105,7 +1112,7 @@ export async function envoyerFacturesSerie(deps, txs, ventes) {
       const r = await route(deps, { action: 'emettre', confirme: true, tx, compte: it.compte || '' });
       if (r.code !== 200) { pasFaits.push({ cle: tx, raison: r.j.manquants ? `il manque ${r.j.manquants.map((m) => m.l).join(', ')}` : (r.j.message || 'pas émise') }); if (r.code === 503 || r.j.manquants) { for (const x of prets.slice(i + 1)) pasFaits.push({ cle: String(x.tx), raison: 'série arrêtée' }); break; } continue; }
     }
-    const r2 = await route(deps, { action: 'envoyer', confirme: true, tx });
+    const r2 = await route(deps, { action: 'envoyer', confirme: true, tx, ...(viaVrm ? { via: 'vrm' } : {}) });
     if (r2.j.issue === 'envoye') { faits.push(tx); continue; }
     pasFaits.push({ cle: tx, raison: (r2.j.envoi && r2.j.envoi.message) || r2.j.message || 'pas envoyée' });
     if (r2.code === 429 || r2.code === 503 || r2.code === 0) { for (const x of prets.slice(i + 1)) pasFaits.push({ cle: String(x.tx), raison: 'série arrêtée' }); break; }
@@ -1138,8 +1145,12 @@ export function FacturesAEnvoyer({ deps }) {
   const prets = liste.filter((x) => x.etat === 'a-envoyer');
   const mv = cfg ? manquantsVendeur(cfg) : [];
   const bloque = bloqueEnvoi(cfg, etat);
+  // (16 nov.) Boîte pas connectée, envoi VRM possible : « Tout envoyer avec VRM » (son clic, ces factures).
+  const viaVrm = !!(bloque && bloque.vrm && !mv.length);
   const toutEnvoyer = async () => {
-    if (!(await deps.askConfirm({ title: `Envoyer ${prets.length} facture${prets.length > 1 ? 's' : ''} ?`, desc: `Chacune à SON acheteur prouvé${cfg && cfg.envoiPar === 'boite' ? '' : ', par VRM, toi en copie'}. Elles reçoivent leur numéro définitif.`, ok: 'Tout envoyer' }))) return;
+    if (!(await deps.askConfirm(viaVrm
+      ? { title: tr('facturePro.serieVrmTitre', { n: prets.length }), desc: `${tr('facturePro.serieVrmDesc')} Elles reçoivent leur numéro définitif.`, ok: tr('facturePro.envoyerAvecVrm') }
+      : { title: `Envoyer ${prets.length} facture${prets.length > 1 ? 's' : ''} ?`, desc: `Chacune à SON acheteur prouvé${cfg && cfg.envoiPar === 'boite' ? '' : ', par VRM, toi en copie'}. Elles reçoivent leur numéro définitif.`, ok: 'Tout envoyer' }))) return;
     setMsg(null); let parties = 0; const ratees = [];
     for (let i = 0; i < prets.length; i++) {
       const it = prets[i]; setLot({ i: i + 1, n: prets.length });
@@ -1147,7 +1158,7 @@ export function FacturesAEnvoyer({ deps }) {
         const r = await route(deps, { action: 'emettre', confirme: true, tx: it.tx, compte: it.compte || '' });
         if (r.code !== 200) { ratees.push(`${it.tx} : ${r.j.manquants ? `il manque ${r.j.manquants.map((m) => m.l).join(', ')}` : (r.j.message || 'pas émise')}`); if (r.code === 503 || r.j.manquants) break; continue; }
       }
-      const r2 = await route(deps, { action: 'envoyer', confirme: true, tx: it.tx });
+      const r2 = await route(deps, { action: 'envoyer', confirme: true, tx: it.tx, ...(viaVrm ? { via: 'vrm' } : {}) });
       if (r2.j.issue === 'envoye') { parties++; continue; }
       ratees.push(`${it.tx} : ${(r2.j.envoi && r2.j.envoi.message) || r2.j.message || 'pas envoyée'}`);
       if (r2.code === 429 || r2.code === 503 || r2.code === 0) break;
@@ -1166,6 +1177,7 @@ export function FacturesAEnvoyer({ deps }) {
   let geste = null;
   if (prets.length) {
     geste = mv.length ? <button type="button" className="vrm-b vrm-b-secondaire" data-fp-geste-manque="fiche" onClick={() => setFiche(mv[0].champ)}>Compléter ma fiche</button>
+      : viaVrm ? <span className="vrm-fp-gestes"><button type="button" className="vrm-b vrm-b-secondaire" data-fp-geste-manque="boite" onClick={() => setFiche('boite')}>{bloque.geste}</button><button type="button" className="vrm-b vrm-b-primaire" data-fp-tout-envoyer-vrm={prets.length} disabled={!!lot} onClick={toutEnvoyer}>{lot ? `Envoi ${lot.i}/${lot.n}…` : tr('facturePro.toutEnvoyerVrm', { n: prets.length })}</button></span>
       : bloque && bloque.champ ? <button type="button" className="vrm-b vrm-b-secondaire" data-fp-geste-manque={bloque.champ} onClick={() => setFiche(bloque.champ)}>{bloque.geste}</button>
       : <button type="button" className="vrm-b vrm-b-primaire" data-fp-tout-envoyer={prets.length} disabled={!!lot || !!bloque} onClick={toutEnvoyer}>{lot ? `Envoi ${lot.i}/${lot.n}…` : `Tout envoyer (${prets.length})`}</button>;
   }
