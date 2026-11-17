@@ -327,8 +327,10 @@ function baseV2() {
 }
 // Une signature STABLE : relevée jusqu'à ce que deux relevés d'affilée soient égaux (les lectures arrivent par vagues).
 async function signatureStable(pg) {
-  let avant = null;
-  for (let k = 0; k < 14; k++) { const s = await pg.evaluate((f) => eval('(' + f + ')')(), SIGNATURE.toString()); if (avant && JSON.stringify(s) === JSON.stringify(avant)) return s; avant = s; await pg.waitForTimeout(1500); }
+  // Trois relevés égaux d'affilée (1,5 s d'écart), après 3 s : les colis d'« À envoyer » arrivent parfois à 5 s.
+  await pg.waitForTimeout(3000);
+  let avant = null, egaux = 0;
+  for (let k = 0; k < 20; k++) { const s = await pg.evaluate((f) => eval('(' + f + ')')(), SIGNATURE.toString()); if (avant && JSON.stringify(s) === JSON.stringify(avant)) { if (++egaux >= 2) return s; } else egaux = 0; avant = s; await pg.waitForTimeout(1500); }
   return avant;
 }
 (async () => {

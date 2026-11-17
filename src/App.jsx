@@ -130,6 +130,8 @@ import './design/studio-ventes.css';
 import { TeteStudio, BoutonPlein, Rond, TuilesFiltres } from './design/StudioVentes.jsx';
 import {achatDuColis,suivisAchat,entreeIndexAchat} from './liensColis.js';
 import { achatsARelier, ecritureRelierColis } from './relierColis.js';
+import { numerosDeListe, codesDeListe, lienContredit } from '../api/_lib/suivis-multiples.js';
+import { listesDesSuivisVinted, liensContredits, propositionsMemeColis, clePasMeme } from './memeColis.js';
 import {sourcesDuColis,codeLuDeLigne,verdictCode,codesDesLignes,NOMS_SOURCES,texteVerifie} from './sourcesRetrait.js';
 import { dateLocale } from './formatsDate.js';
 import {achatParConversation, regrouperArrivees, temoinsDe, texteDuBrut} from '../api/_lib/achat-arrive-relais.js';
@@ -1133,7 +1135,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.400.0';
+const EXT_ATTENDUE = '5.403.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -1565,7 +1567,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { fichepublier: '5.400.0', empreinteebay: '5.400.0', vccategorie: '5.399.0', relueoffre: '5.398.0', salutation: '5.398.0', photovrm: '5.393.0', vcaimes: '5.393.0', versementsauto: '5.393.0', memephotosure: '5.393.0', memephoto: '5.384.0', numerotes: '5.382.0', lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
+const EXT_CAPACITES = { suivisliste: '5.403.0', fichepublier: '5.400.0', empreinteebay: '5.400.0', vccategorie: '5.399.0', relueoffre: '5.398.0', salutation: '5.398.0', photovrm: '5.393.0', vcaimes: '5.393.0', versementsauto: '5.393.0', memephotosure: '5.393.0', memephoto: '5.384.0', numerotes: '5.382.0', lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -3391,6 +3393,9 @@ const SYNC_KEYS = [
   // (16 nov., lot ecrans-restes) « Plus tard » de la carte « Protège ton compte VRM » (Paramètres → Compte) :
   // posé sur SON clic, vu sur tous ses appareils (il ne la revoyait sur chaque appareil).
   'vrm_carte_mfa_rangee',
+  // (17 nov., suivi multi-transporteurs) « Ce n'est pas le même » sur une proposition « C'est sans doute le même
+  // colis » (src/memeColis.js) : { 'n°|compte:transaction': date }, posé sur SON clic, vu sur tous ses appareils.
+  'vrm_colis_pas_meme',
   // (9 nov., lot AF) LE JOURNAL DES N° (src/historiqueNumero.js) : APPEND-ONLY, une ligne par
   // changement de N° d'une fiche, écrite au moment du changement (`noterJournalNumeros`) ;
   // lu par la fiche d'une paire (« L'histoire du N° »). Ne change jamais un N°.
@@ -36293,11 +36298,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const e = out[`${v.uid}:${v.tx}`] || (out[`${v.uid}:${v.tx}`] = { uid: v.uid });
       // (revue du 24 oct.) `ligne` : la ligne EXISTE (l'extension l'a relevée),
       // même sans étape datée — « relevé, sans date » n'est pas « pas relevé ».
-      Object.assign(e, { suivi: v.suivi || '', transporteur: v.transporteur || '', nv: v.nv || null, nvSansDate: v.nvSansDate || null, ligne: true, relais: v.relais || null, estimee: v.estimee || null });
+      Object.assign(e, { suivi: v.suivi || '', transporteur: v.transporteur || '', nv: v.nv || null, nvSansDate: v.nvSansDate || null, ligne: true, relais: v.relais || null, estimee: v.estimee || null,
+        // (17 nov., 5.403) tous les n° du trajet, leurs transporteurs, et « la liste a été lue » (api/_lib/suivis-multiples.js).
+        suivisV: Array.isArray(v.suivisV) ? v.suivisV : [], transporteursV: Array.isArray(v.transporteursV) ? v.transporteursV : [], listeLue: !!v.listeLue });
     }
     // Un n° ajouté à la main et relié à CET achat (son clic), sous le même compte.
+    // (17 nov.) …sauf si la liste des n° LUE chez Vinted pour cet achat le contredit : la liste tranche, le lien
+    // ne relie plus rien et l'écran le dit (`liensContredits`, « délier ? »).
+    const listes = listesDesSuivisVinted(suivisVinted);
     for (const m of (Array.isArray(suivisManuels) ? suivisManuels : [])) {
       if (!m || !m.tx || !m.suivi) continue;
+      if (lienContredit(m, listes)) continue;
       const cle = m.uid ? `${m.uid}:${m.tx}` : m.tx;
       const e = out[cle] || (out[cle] = m.uid ? { uid: m.uid } : {});
       e.suivis = [...new Set([...(e.suivis || []), m.suivi])];
@@ -36312,7 +36323,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // `de` : le libellé de l'étape la plus RÉCENTE (`etapes[0]`, contrat du
       // 23 oct.) — recopié, présenté « sans date », quand Vinted ne date rien.
       // (31 oct., 5.295) + le point relais où il ARRIVE et l'arrivée estimée, en scalaires (`meta`).
-      const rows = await lireTout(`id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi,transporteur:meta->>transporteur,cap:meta->>capturedAt,dt:data->dernier->>t,dat:data->dernier->>at,de:data->etapes->0->>t,rn:meta->>relaisNom,rr:meta->>relaisRue,rc:meta->>relaisCp,rv:meta->>relaisVille,ae:meta->>arriveeEstimee`, { strict: true });
+      // (17 nov., 5.403) + tous les n° du trajet (`suivisVinted`), leurs transporteurs et « liste lue » — scalaires de `meta`.
+      const rows = await lireTout(`id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi,transporteur:meta->>transporteur,cap:meta->>capturedAt,dt:data->dernier->>t,dat:data->dernier->>at,de:data->etapes->0->>t,rn:meta->>relaisNom,rr:meta->>relaisRue,rc:meta->>relaisCp,rv:meta->>relaisVille,ae:meta->>arriveeEstimee,sv:meta->>suivisVinted,tv:meta->>transporteursVinted,sl:meta->>suivisLusAt`, { strict: true });
       if (!Array.isArray(rows)) return null;
       const m = {};
       for (const r of rows) {
@@ -36324,7 +36336,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         m[`${uid}:${txId}`] = { uid, tx: txId, suivi: normaliserSuivi(r.suivi) || '', transporteur: String(r.transporteur || ''),
           nv, nvSansDate: nd ? { t: nd.t, at: null, cap: nd.cap, sansDate: true } : null,
           relais: r.rn ? { nom: String(r.rn), rue: String(r.rr || ''), cp: /^\d{5}$/.test(String(r.rc || '')) ? String(r.rc) : '', ville: String(r.rv || '') } : null,
-          estimee: /^\d{4}-\d{2}-\d{2}$/.test(String(r.ae || '')) ? String(r.ae) : null };
+          estimee: /^\d{4}-\d{2}-\d{2}$/.test(String(r.ae || '')) ? String(r.ae) : null,
+          suivisV: numerosDeListe(r.sv), transporteursV: codesDeListe(r.tv), listeLue: !!(r.sl && Number.isFinite(Date.parse(r.sl))) };
       }
       return m;
     } catch (_) { return null; }
@@ -36866,7 +36879,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           noterSortie({ kind: 'email', t, o: cmd }, lies, { via, arriveeMs: arriveeDeLigne(t) }); }
         if (fi === 'retire') { noterFini(t); if (cmd) txFinis.add(String(cmd.transaction_id)); continue; }
         if (fi === 'reparti') { noterFini(t); repartis.push({ kind: 'email', t, o: cmd, statut: 'transporteur' }); continue; }
-        if (fi === 'a_verifier') { aVerifier.push({ kind: 'email', t, e: { etat: 'transporteur' }, o: cmd }); continue; } }
+        // (17 nov.) Le n° de CETTE ligne est un des n° de sa commande (un trajet à deux transporteurs) : son état
+        // est celui que SON transporteur dit (jugé juste au-dessus) — l'étape d'un AUTRE transporteur du même trajet
+        // (la première, à l'étranger) n'en fait jamais un « à vérifier ».
+        if (fi === 'a_verifier' && !(cmd && suivisDeAchat(cmd).includes(suiviDeLigne(t)))) { aVerifier.push({ kind: 'email', t, e: { etat: 'transporteur' }, o: cmd }); continue; } }
       const fin = finCommandeAchat(cmd);
       if (fin === 'retire' || fin === 'reparti') noterSortie({ kind: 'email', t, o: cmd }, [suiviDeLigne(t)], { fin: finDatee([suiviDeLigne(t)], { tpm, lignes: trackingRetrait, estSortant: estSortantL }) || finVinted(cmd, fin), arriveeMs: arriveeDeLigne(t) });
       if (fin === 'retire') { noterFini(t); continue; }   // la commande liée dit livrée / finalisée : il l'a eu
@@ -37031,6 +37047,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const ks = suivisAchat(o, indexColis).map(normaliserSuivi).filter(Boolean);
       const ev = etatColisVinted(o, maintenant, tpm);
       { const so = sortiParSuivis(ks, fins, ev.arriveeSure, { borne: ev.borneMs });
+        // (17 nov.) Déjà montré par le colis de SON transporteur, relié par identité (un de ses n°, sa conversation,
+        // son code) : un incident d'un autre n° du trajet ne refait pas une 2e ligne « à vérifier » — le colis est
+        // montré une fois, avec son code (§5 : un colis, une ligne).
+        if (so === 'a_verifier' && txLiesEmail.has(String(o.transaction_id))) continue;
         if (so === 'a_verifier') { aVerifier.push({ kind: 'vinted', o, e: { ...ev, etat: 'transporteur', incident: incidentDeSuivis(ks, fins, ev.arriveeSure, { borne: ev.borneMs }) } }); continue; }
         if (so === 'retire') txFinis.add(String(o.transaction_id));
         if (so === 'retire' || so === 'reparti') noterSortie({ kind: 'vinted', o }, ks, { arriveeMs: ev.arriveeMs });
@@ -37218,6 +37238,47 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     } catch (_) { return null; }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pickupUnion, buysBase, indexSuivisAchats]);
+  // ── (17 nov., suivi multi-transporteurs) « C'EST SANS DOUTE LE MÊME COLIS » ET « CE LIEN NE CORRESPOND PAS » ──
+  // La voie principale est l'identité (tous les n° du trajet, extension 5.403) : rien à proposer quand elle relie.
+  // EN ATTENDANT qu'un achat ait sa liste de n° lue, une PROPOSITION seulement quand rien d'autre n'est possible
+  // (src/memeColis.js : un colis, un achat, même point, même groupe de transporteur, arrivé après l'achat, aucun
+  // autre achat en route vers ce point) — SON toucher relie. Et un lien posé à la main que la liste LUE contredit
+  // ne relie plus rien : la ligne le dit et propose « Délier ».
+  const [colisPasMeme, setColisPasMeme] = useStateCle('vrm_colis_pas_meme', () => load('vrm_colis_pas_meme', {}));
+  const memeColis = useMemo(() => {
+    try {
+      const lieuDeAchat = (o) => { const r = relaisDe(o); if (r && r.lieu) return String(r.lieu); const e = entreeSuiviAchat(o); return e && e.relais && e.relais.nom ? [e.relais.nom, e.relais.rue, [e.relais.cp, e.relais.ville].filter(Boolean).join(' ')].filter(Boolean).join(', ') : ''; };
+      const transpDeAchat = (o) => { const r = relaisDe(o); const e = entreeSuiviAchat(o); return [r && r.transporteur, e && e.transporteur, ...((e && e.transporteursV) || [])].filter(Boolean); };
+      const cleAchat = (o) => `${String((o && o._acc && o._acc.vinted_user_id) || (o && o._acc) || '')}:${String(o.transaction_id)}`;
+      const lignesT = [...(pickupUnion.emailList || []), ...(pickupUnion.aVerifier || []).filter((x) => x.kind === 'email' && x.t).map((x) => x.t)];
+      const colis = [];
+      for (const t of lignesT) {
+        if (!t || t.source === 'vinted-commande' || !suiviDeLigne(t) || commandeRetrait(t)) continue;
+        const a = arriveeColisEmail({ ...t, status: 'available' });
+        colis.push({ cle: colisKey(t), suivi: suiviDeLigne(t), transporteur: carrierKey(t.carrier) || t.carrier || '', lieu: t.lieu || '', arriveeMs: a && Number.isFinite(a.ms) ? a.ms : NaN });
+      }
+      const vus = new Set(); const achats = [];
+      for (const o of [...(pickupUnion.extra || []), ...(pickupUnion.aVerifier || []).filter((x) => x.kind === 'vinted' && x.o).map((x) => x.o), ...(pickupUnion.aConfirmer || [])]) {
+        if (!o || o.transaction_id == null) continue; const k = cleAchat(o); if (vus.has(k)) continue; vus.add(k);
+        const e = entreeSuiviAchat(o); const r = relaisDe(o);
+        achats.push({ cle: k, o, lieu: lieuDeAchat(o), transporteurs: transpDeAchat(o), listeLue: !!(e && e.listeLue), aCode: !!(r && (codeRetrait(r.code) || r.qr)), dateMs: Date.parse(o.date || '') });
+      }
+      const enRoute = [];
+      for (const o of (buysBase || [])) { if (o && o.transaction_id != null && phaseReception(o) === 'route') { const e = entreeSuiviAchat(o); enRoute.push({ cle: cleAchat(o), lieu: e && e.relais && e.relais.nom ? [e.relais.nom, e.relais.cp].filter(Boolean).join(', ') : '', transporteurs: transpDeAchat(o) }); } }
+      const propositions = propositionsMemeColis({ colis, achats, enRoute, pasMeme: new Set(Object.keys(colisPasMeme || {})) });
+      const contredits = new Map(); for (const m of liensContredits(suivisVinted, suivisManuels)) contredits.set(normaliserSuivi(m.suivi), m);
+      return { propositions, contredits };
+    } catch (_) { return { propositions: new Map(), contredits: new Map() }; }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickupUnion, buysBase, indexSuivisAchats, suivisVinted, suivisManuels, colisPasMeme]);
+  const relierMemeColis = async (t, p) => {
+    const w = ecritureRelierColis({ suivi: p.suivi, transporteur: carrierKey(t.carrier) || '' }, p.achat); if (!w) return false;
+    const r = await ecrireSuiviManuel(w.id, { ...w.patch, relieDepuis: 'proposition' });
+    if (!r.ok) return false;
+    await relireSuivisManuelsPartout(); return true;
+  };
+  const pasMemeColis = (p) => setColisPasMeme((prev) => { const u = { ...(prev || {}), [clePasMeme(p.suivi, p.cleAchat)]: new Date().toISOString() }; save('vrm_colis_pas_meme', u); return u; });
+  const delierLienContredit = async (m) => { const ok = await retirerSuiviManuel(m.id); if (ok) await relireSuivisManuelsPartout(); return ok; };
   // Les fins par n° de suivi (la règle de `pickupUnion`), pour dire où en est un
   // n° ajouté à la main (`etapeDuSuiviManuel`).
   // (revue adverse du 5 nov.) Les mêmes lignes que `pickupUnion` (§11) : un retrait lu dans un compte
@@ -55391,6 +55452,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const relierRetrait = (x) => { const t = (x.src && x.src.t) || null; if (!t || x.achatAutre || (x.site && x.site !== 'vinted') || x.redirige) return null;
             const su = suiviDeLigne(t); if (!su || commandeRetrait(t)) return null;
             return () => { setRelierEtat({ q: '', envoi: '', msg: '' }); setRelierColis({ suivi: su, transporteur: carrierKey(t.carrier) || '', cle: x.cle, nom: CARRIERS[carrierKey(t.carrier)] ? carrierName(t.carrier) : '' }); }; };
+          // (17 nov., suivi multi-transporteurs) La proposition « C'est sans doute le même colis » (en attendant la liste
+          // des n° de l'achat) et le lien posé à la main que la liste LUE contredit (`memeColis`, src/memeColis.js).
+          const memeColisDe = (x) => { const t = (x.src && x.src.t) || null; if (!t || x.horsCompte || x.redirige || (x.site && x.site !== 'vinted')) return null;
+            const c = memeColis.contredits.get(suiviDeLigne(t)); if (c) return { sorte: 'contredit', delier: () => delierLienContredit(c) };
+            const p = memeColis.propositions.get(colisKey(t)); if (!p) return null;
+            return { sorte: 'proposition', titre: (p.achat && p.achat.title) || '', tx: String(p.achat.transaction_id), relier: () => relierMemeColis(t, p), pasMeme: () => pasMemeColis(p) }; };
           const delaiColisRetrait = (x) => { if (x.horsCompte) return null; const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null;
             const ev = !t && o ? (etatColisVinted(o, Date.now(), transpMap) || {}) : null;
             const arr = t ? arriveeColisEmail(t) : (ev ? ev.arr : null);
@@ -55769,7 +55836,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     colonne d'hier (ses gestes rares : relier, ville, redirigés) reste entière, repliée dessous. Éteint : rien ne change. */}
                 {(() => { const ancienne = (colRet && (colRet.cartes.length > 0 || ((groupesRelais && groupesRelais.enRouteSansRelais) || 0) > 0)
                   ? <ColonneRetirer vue={parPoint} C={C} Photo={photoCarte} gestes={gestesRetrait} detail={arriveeRetrait} nomTransporteur={(k) => (CARRIERS[k] && CARRIERS[k].name) || ''} avecCarte={false} ordi={ordiColis} delai={delaiColisRetrait} enRouteSansRelais={(groupesRelais && groupesRelais.enRouteSansRelais) || 0}
-                      fusion echeance={echeanceRetrait} statut={statutAVerifier} retirer={retirerColis} suiviDe={suiviRetrait} ville={villeRetrait} onVille={setVilleRetrait} titreDe={titreRetrait} qrDe={qrRetrait} relierDe={relierRetrait} enRoute={(groupesRelais && groupesRelais.sansRelais) || []}
+                      fusion echeance={echeanceRetrait} statut={statutAVerifier} retirer={retirerColis} suiviDe={suiviRetrait} ville={villeRetrait} onVille={setVilleRetrait} titreDe={titreRetrait} qrDe={qrRetrait} relierDe={relierRetrait} memeColisDe={memeColisDe} enRoute={(groupesRelais && groupesRelais.sansRelais) || []}
                       redirige={(colisRelaisChange(tracking, { transp: transpMap }) || []).map((r) => { const t = (tracking || []).find((l) => l && l.relaisChange && suiviDeLigne(l) === r.suivi) || { suivi: r.suivi, carrier: r.carrier, emailRecu: r.emailRecu };
                         return { cle: 'r:rc:' + r.suivi, suivi: r.suivi, titre: '', nom: r.nom, adresse: r.adresse, code: r.code || '', codeDe: r.codeDe || '', transp: transporteurColis(r.carrier, r.suivi), jours: null, redirige: true, src: { t } }; })}/>
                   : (toutLuRet ? <p className="vrm-colis-vide" data-retraits-vide="">Aucun colis à aller chercher pour l’instant.</p> : null));

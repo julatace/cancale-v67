@@ -172,7 +172,7 @@ export async function lireBaseTransp({ avecRelais = true } = {}) {
     lireTout(`app_data?id=like.email_track_*&select=${SELECT_SUIVI_META}`),
     lireTout(`app_data?id=like.transp_*&select=${T.SELECT_TRANSP_META},notifEnAttente:meta->>notifEnAttente`),
     lireTout('app_data?id=like.colis_suivi_*&select=id,suivi:meta->>suivi,transporteur:meta->>transporteur,cp:meta->>codePostal,tx:meta->>tx,uid:meta->>uid,at:meta->>at'),
-    lireTout('app_data?id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi,transporteur:meta->>transporteur,cap:meta->>capturedAt'),
+    lireTout('app_data?id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi,transporteur:meta->>transporteur,cap:meta->>capturedAt,sv:meta->>suivisVinted,sl:meta->>suivisLusAt'),
     lireTout('app_data?id=like.email_bord_*&select=suivi:meta->>suivi'),
     lirePauseServeur(),
     lireTout('app_data?id=eq.main&select=points:data->vrm_points_relais'),
