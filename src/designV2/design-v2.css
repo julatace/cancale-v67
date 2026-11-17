@@ -623,3 +623,16 @@ html[data-design="v2"][data-serie-ouverte] .v2t-liste { margin-bottom: calc(var(
     background: linear-gradient(180deg, var(--sv-haut, #1F5FA8) 0%, color-mix(in srgb, var(--sv-haut, #1F5FA8) 92%, transparent) 100%);
     -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); }
 }
+/* La barre de sélection tient sur UNE ligne au téléphone (le plein prend la largeur de son libellé). */
+@media (max-width: 1023px) {
+  .v2-serie { flex-wrap: nowrap; }
+  .v2-serie-d [data-serie-principal] { min-width: 0; }
+  .v2-serie-d .v2b-lib { white-space: nowrap; }
+}
+/* La tête de la coque sur Ventes / Annonces (la cloche seule) : au défilement, une barre de verre PLEINE LARGEUR avec le
+   petit titre (iOS), jamais une demi-boîte posée sur la liste. */
+@media (max-width: 1023px) {
+  html[data-design="v2"] body .vrm-app-header.v2-entete-cloche.is-defile { position: fixed !important; left: 0 !important; right: 0 !important; top: 0 !important; width: auto !important;
+    padding: calc(env(safe-area-inset-top, 0px) + 6px) 12px 6px 16px !important; background: var(--sv-verre-barre, rgb(240 246 252 / .82)) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important; backdrop-filter: blur(20px) saturate(180%) !important; box-shadow: 0 .5px 0 rgb(18 52 96 / .12) !important; }
+}
