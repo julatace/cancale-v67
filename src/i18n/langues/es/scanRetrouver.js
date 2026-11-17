@@ -11,6 +11,7 @@ export default {
   "scan.r.sansCamera": "No hay cámara: escribe el número de seguimiento.",
   "scan.r.indice": "Este código no es un número de seguimiento: apunta al otro código de barras.",
   "scan.r.lampe": "Linterna",
+  "scan.r.zoom": "Zoom: apuntar desde más lejos",
   "scan.r.taper": "Escribir el número",
   "scan.r.saisie": "Número de seguimiento",
   "scan.r.ok": "OK",
