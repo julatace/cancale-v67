@@ -115,5 +115,14 @@ export default {
   "v2.scanner": "Scan a parcel",
   "v2.achats.ajouter": "Add a purchase",
   "v2.l.achete": "bought {p}",
-  "v2.l.acheteMarge": "Bought {p} · margin {m}"
+  "v2.l.acheteMarge": "Bought {p} · margin {m}",
+  "v2.chargement": "Reading your listings…",
+  "v2.imprimerCourt": "Print the labels",
+  "v2.ecartCourt": {
+    "one": "{r} not ready yet",
+    "other": "{r} not ready yet"
+  },
+  "v2.tousPrets": "all ready to print",
+  "v2.achats.ajouterCourt": "Add",
+  "v2.reessayer": "Try again"
 };

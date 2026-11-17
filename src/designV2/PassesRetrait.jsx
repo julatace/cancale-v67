@@ -95,11 +95,11 @@ export function PassesRetrait({ points = [], Icon, Photo, Plaque, aides }) {
 
 // LES ACHATS EN ROUTE, en lignes iOS : vignette 56, titre sur UNE ligne, « N° · compte » dessous,
 // à droite le point relais (ou « point pas encore dit ») et l'arrivée estimée. La rangée entière se touche.
-export function EnRouteListe({ lignes = [], Icon, Photo, onOuvrir = null, max = 40 }) {
+export function EnRouteListe({ lignes = [], Icon, Photo, onOuvrir = null, max = 40, touteSansPoint = false }) {
   if (!lignes.length) return null;
   return (
     <section className="v2-groupe" data-v2-en-route={String(lignes.length)} aria-label={tr('v2.enRoute.titre')}>
-      <h2 className="v2-groupe-titre"><span>{tr('v2.enRoute.titre')}</span><span className="v2-groupe-n">{lignes.length}</span></h2>
+      <h2 className="v2-groupe-titre"><span>{tr('v2.enRoute.titre')}</span><span className="v2-groupe-n">{lignes.length}{touteSansPoint ? ' · ' + tr('v2.enRoute.pointPasDit') : ''}</span></h2>
       <div className="v2-liste">
         {lignes.slice(0, max).map((l, k) => {
           const Corps = onOuvrir ? 'button' : 'div';

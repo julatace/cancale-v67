@@ -115,5 +115,14 @@ export default {
   "v2.scanner": "Paket scannen",
   "v2.achats.ajouter": "Kauf hinzufügen",
   "v2.l.achete": "gekauft {p}",
-  "v2.l.acheteMarge": "Gekauft {p} · Marge {m}"
+  "v2.l.acheteMarge": "Gekauft {p} · Marge {m}",
+  "v2.chargement": "Deine Anzeigen werden gelesen…",
+  "v2.imprimerCourt": "Etiketten drucken",
+  "v2.ecartCourt": {
+    "one": "{r} noch nicht bereit",
+    "other": "{r} noch nicht bereit"
+  },
+  "v2.tousPrets": "alle druckbereit",
+  "v2.achats.ajouterCourt": "Hinzufügen",
+  "v2.reessayer": "Erneut versuchen"
 };

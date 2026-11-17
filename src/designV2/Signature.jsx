@@ -75,3 +75,18 @@ export function RangeeFaite({ fait = false, onFin, children, className = '', att
     </div>
   );
 }
+
+// 5. LE SQUELETTE : la forme EXACTE des rangées (photo, titre, ligne de faits) pendant la lecture — jamais d'écran blanc.
+//    `variante` 'A' (Liste, 88 px) ou 'C' (Détaillé, 120 px) ; un balayage lent, coupé en mouvement réduit.
+export function SqueletteRangees({ variante = 'A', n = 8, label = '' }) {
+  return (
+    <div className={'v2-squelette v2-squelette-' + variante} role="status" aria-busy="true" aria-label={label || undefined} data-v2-squelette={variante}>
+      {Array.from({ length: n }, (_, i) => (
+        <div key={i} className="v2-squelette-rangee" aria-hidden="true">
+          <span className="v2-squelette-photo"/>
+          <span className="v2-squelette-txt"><span className="v2-squelette-l1"/><span className="v2-squelette-l2"/>{variante === 'C' ? <span className="v2-squelette-l3"/> : null}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
