@@ -126,7 +126,7 @@ function useAppuiLong(f) {
 
 // Une ligne (vignette 56, titre sur UNE ligne, « N° · taille · compte », prix et date à droite).
 // Glisser à droite : le geste principal ; à gauche : « Plus ». Appui long : le menu.
-function Rangee({ x, ouvrir, menu, glissee }) {
+function Rangee({ x, ouvrir, menu, glissee, i }) {
   const [dx, setDx] = React.useState(glissee ? 96 : 0);
   const depart = React.useRef(null);
   const appui = useAppuiLong(() => menu(x.cle));
@@ -141,7 +141,7 @@ function Rangee({ x, ouvrir, menu, glissee }) {
         onPointerMove={(ev) => { if (!depart.current) return; const v = depart.current.d + ev.clientX - depart.current.x; if (Math.abs(v - depart.current.d) > 8) { appui.onPointerCancel(); setDx(Math.max(-120, Math.min(120, v))); } }}
         onPointerUp={() => { appui.onPointerUp(); if (depart.current) fini(); }} onPointerCancel={() => { appui.onPointerCancel(); fini(); }} onContextMenu={appui.onContextMenu}
         aria-label={[x.titre, sousLigne(x), euros(x.prix), x.detail].filter(Boolean).join(', ')}>
-        <span className="l-rangee-photo"><Photo x={x} t={112} /></span>
+        <span className="l-rangee-photo"><Photo x={x} i={i} t={112} /></span>
         <span className="l-rangee-g">
           <span className="l-rangee-titre">{x.titre || '—'}</span>
           <span className="l-rangee-sous">{x.doublon ? <span className="l-plaque is-double is-mini">N° {x.numero}</span> : null}{x.doublon ? sousLigne(x).replace(/^N° \S+ · /, '') : sousLigne(x)}</span>
@@ -157,7 +157,7 @@ function Rangee({ x, ouvrir, menu, glissee }) {
 
 function Liste({ l, ouvrir, menu, glissee }) {
   if (!l.length) return <p className="l-vide">Rien ici pour l’instant.</p>;
-  return <div className="l-liste-paires" role="list">{l.map((x) => <Rangee key={x.cle} x={x} ouvrir={ouvrir} menu={menu} glissee={glissee === x.cle} />)}</div>;
+  return <div className="l-liste-paires" role="list">{l.map((x, i) => <Rangee key={x.cle} x={x} i={i} ouvrir={ouvrir} menu={menu} glissee={glissee === x.cle} />)}</div>;
 }
 function Grille({ l, ouvrir, menu }) {
   if (!l.length) return <p className="l-vide">Rien ici pour l’instant.</p>;
@@ -347,13 +347,14 @@ export default function Dressing() {
   const [cherche, setCherche] = React.useState(() => !!lireHash().q);
   const large = useLarge();
   React.useEffect(() => { document.documentElement.setAttribute('data-maquette', 'l'); try { finDemarrage && finDemarrage(); } catch (_) {} }, []);
-  React.useEffect(() => { let vivant = true; lireDonnees().then((x) => { if (vivant) setD(x); }, () => vivant && setD(null)); return () => { vivant = false; }; }, []);
+  React.useEffect(() => { let vivant = true; lireDonnees().then((x) => { window.__l_donnees = performance.now(); if (vivant) setD(x); }, () => vivant && setD(null)); return () => { vivant = false; }; }, []);
   React.useEffect(() => { const f = () => setH(lireHash()); window.addEventListener('hashchange', f); return () => window.removeEventListener('hashchange', f); }, []);
   const aller = (o) => ecrireHash({ ...h, ...o });
   const ouvrir = (cle) => aller({ p: cle, m: '' });
   const menu = (cle) => aller({ m: cle });
   const fermer = React.useCallback(() => ecrireHash({ ...lireHash(), p: '', m: '' }), []);
 
+  React.useEffect(() => { if (d && !window.__l_rendu) requestAnimationFrame(() => { window.__l_rendu = performance.now(); }); }, [d]);
   if (d === undefined) return <div className="l-racine l-attente" aria-busy="true" />;
   if (d === null) return <div className="l-racine"><p className="l-vide">Les données n’ont pas pu être lues.</p></div>;
   const filtre = d.filtres.find((x) => x.cle === h.f) || d.filtres[0];

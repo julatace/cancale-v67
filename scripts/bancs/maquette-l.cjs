@@ -141,7 +141,7 @@ async function capture(nav, { W, sombre, hash, nom, b, plein = false }) {
     const contrastes = []; for (const x of document.querySelectorAll('.l-racine *')) { if (!vis(x) || x.closest('[inert]') || ![...x.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) continue; const a = lum(getComputedStyle(x).color), b = lum(fondDe(x)); const r = (Math.max(a, b) + .05) / (Math.min(a, b) + .05); if (r < 4.5) contrastes.push(x.textContent.trim().slice(0, 18) + ' ' + r.toFixed(2)); }
     const rangees = [...document.querySelectorAll('.l-rangee')].filter((x) => { const r = x.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight - 76; }).length;
     const t1 = document.querySelector('.l-tuile');
-    return { pleins, petites, coupes: coupes.slice(0, 6), contrastes: [...new Set(contrastes)].slice(0, 8), rangees, tailles, tuilesEntieres: visibles, tuile1: t1 ? Math.round(t1.getBoundingClientRect().top) : null, filtres,
+    return { rendu: window.__l_rendu && window.__l_donnees ? Math.round(window.__l_rendu - window.__l_donnees) + ' ms' : null, noeuds: document.querySelectorAll('.l-racine *').length, pleins, petites, coupes: coupes.slice(0, 6), contrastes: [...new Set(contrastes)].slice(0, 8), rangees, tailles, tuilesEntieres: visibles, tuile1: t1 ? Math.round(t1.getBoundingClientRect().top) : null, filtres,
       doubles: [...document.querySelectorAll('.l-plaque.is-double')].length, mauvais: /\bundefined\b|\bNaN\b|\[object Object\]/.test(document.body.innerText) };
   }, { tel: W < 600 });
   console.log(path.basename(f), ms + ' ms', JSON.stringify(mes), o.erreurs.length ? 'ERREURS ' + o.erreurs.join(' | ') : '');
@@ -162,7 +162,7 @@ async function capture(nav, { W, sombre, hash, nom, b, plein = false }) {
   const ECRANS = [
     ['afaire', ''], ['enligne', 'f=enligne'], ['vendues', 'f=vendues'], ['achats', 'e=achats'], ['argent', 'e=argent'],
     ['fiche-envoyer', 'p=p' + vEnv.item_id], ['fiche-retirer', 'e=achats&p=a' + ret[1].tx],
-    ['glisser', 'v=liste&g=p' + vEnv.item_id], ['menu', 'm=p' + vEnv.item_id], ['chercher', 'q=4821'],
+    ['glisser', 'v=liste&g=p' + vEnv.item_id], ['menu', 'm=p' + vEnv.item_id], ['chercher', 'q=4821'], ['sansphoto', 'f=enligne&v=grille&q=Campus'],
   ];
   const voulus = (process.env.ECRANS || '').split(',').filter(Boolean);
   try {
