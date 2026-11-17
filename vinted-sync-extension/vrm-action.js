@@ -31,7 +31,7 @@
 
   const hote = document.createElement('div');
   hote.id = 'vrm-action';
-  hote.style.cssText = 'all:initial;position:fixed;inset:0;z-index:2147483645;display:none;pointer-events:none;';
+  hote.style.cssText = 'all:initial;position:fixed;inset:0;z-index:2147483647;display:none;pointer-events:none;';
   const ombre = hote.attachShadow({ mode: 'closed' });
   ombre.innerHTML = `<style>
   .voile { position: fixed; inset: 0; pointer-events: auto; display: grid; place-items: center; padding: 16px;
@@ -55,11 +55,10 @@
   .gestes .vu-plein { font-size: 17px; }
   .fini { display: grid; justify-items: center; gap: 10px; text-align: center; }
   .coche { width: 56px; height: 56px; border-radius: 999px; display: grid; place-items: center; background: rgb(255 255 255/.16); color: var(--vu-sur); font: 700 28px/1 var(--vu-police); }
-  .pastille { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); pointer-events: auto; display: flex; align-items: center; gap: 10px;
-    min-height: 48px; padding: 4px 6px 4px 16px; border-radius: 999px; max-width: calc(100vw - 32px); font: 600 14px/1.2 var(--vu-police); animation: vu-in .2s ease; }
+  .pastille { position: fixed; left: 16px; bottom: 20px; pointer-events: auto; width: max-content; display: flex; align-items: center; gap: 10px;
+    min-height: 52px; padding: 4px 4px 4px 16px; border-radius: 999px; max-width: calc(100vw - 96px); font: 600 14px/1.2 var(--vu-police); animation: vu-in .2s ease; }
   .pastille .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--vu-sur); }
-  .pastille .vu-btn { min-height: 40px; padding: 0 14px; font-size: 14px; position: relative; border-radius: 999px; }
-  .pastille .vu-btn::after { content: ''; position: absolute; inset: -2px 0; }
+  .pastille .vu-btn { min-height: 44px; width: auto; padding: 0 16px; font-size: 14px; border-radius: 999px; flex: none; }
   .cote { position: fixed; left: 16px; right: 16px; top: 16px; margin: 0 auto; max-width: 520px; pointer-events: auto; padding: 12px 14px; display: flex; gap: 10px; align-items: center; }
   .cote .t { flex: 1; font: 600 14px/1.35 var(--vu-police); color: var(--vu-sur); }
   @keyframes vu-in { from { opacity: 0; } to { opacity: 1; } }
@@ -118,7 +117,7 @@
     const prochain = Number(a.prochain) > Date.now() ? Number(a.prochain) : 0;
     const suite = a.enCours ? esc(T('a_en_cours')) : prochain ? `<b data-action-dans="${prochain}">${esc(T('a_ensuite', { dans: U.duree(prochain - Date.now()) }))}</b>${QUOI[a.quoi] ? ' · ' + esc(T(QUOI[a.quoi])) : ''}` : esc(T('a_en_cours'));
     if (reduit) {
-      poser(`<div class="pastille vu-coque" role="status" data-action-pastille><span class="vu-point"></span><span class="t">${esc(nom)} · ${esc(compte(a))}</span><button class="vu-btn vu-sec" data-agrandir>${esc(T('a_agrandir'))}</button><button class="vu-btn vu-plein" style="width:auto" data-arreter>${esc(T('c_tout_arreter'))}</button></div>`);
+      poser(`<div class="pastille vu-coque" role="status" data-action-pastille><span class="vu-point"></span><span class="t">${esc(nom)} · ${esc(compte(a))}</span><button class="vu-btn vu-plein" data-agrandir>${esc(T('a_agrandir'))}</button></div>`);
     } else {
       const it = a.item || {};
       const photo = it.photo && /^https:\/\/[\w.-]*vinted\.net\//.test(String(it.photo)) ? `<img src="${esc(it.photo)}" alt="" referrerpolicy="no-referrer" decoding="async">` : '<span class="ph" aria-hidden="true"></span>';

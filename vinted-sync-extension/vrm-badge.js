@@ -524,7 +524,7 @@
   .carte:has(.q4), .carte:has(.listes), .carte:has(.apercu) { width: min(380px, calc(100vw - 24px)); }
   .contenu > :not(.tete):not(.fermer):not(.b):not(style), .carte > .connexion, .question > .err {
     background: var(--vu-plaque); color: var(--vu-encre); border: 0; border-radius: 18px; box-shadow: var(--vu-ombre); -webkit-backdrop-filter: none; backdrop-filter: none; margin: 8px 0 0; }
-  .contenu > .t5, .contenu > .vu-sous, .contenu > .maj5, .contenu > .fermer { background: transparent; box-shadow: none; padding: 0; border-radius: 0; color: var(--vu-sur); }
+  .contenu > .t5, .contenu > .vu-sous, .contenu > .maj5, .contenu > .fermer { background: transparent !important; box-shadow: none !important; padding: 0; border-radius: 0; color: var(--vu-sur) !important; }
   .contenu > .principal { padding: 14px; }
   .t5 { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 44px 0 6px !important; margin: 0 !important; }
   .t5 .nom { font: 700 18px/1.2 var(--vu-police); letter-spacing: -.02em; color: var(--vu-sur); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -535,12 +535,19 @@
   .vu-sous .sep { opacity: .7; padding: 0 2px; }
   .vu-sous [data-capture] a { color: var(--vu-sur); }
   .maj5 { margin: 8px 0 0 !important; }
-  .maj5 .vu-bandeau a.vu-btn { min-height: 36px; padding: 0 14px; font-size: 13px; background: var(--vu-plein); color: var(--vu-plein-encre); border-radius: 11px; position: relative; }
+  .maj5 .vu-bandeau a.vu-btn { min-height: 44px; padding: 0 14px; font-size: 13px; background: var(--vu-plein); color: var(--vu-plein-encre); border-radius: 11px; position: relative; }
   .maj5 .vu-bandeau a.vu-btn::after { content: ''; position: absolute; inset: -4px 0; }
   .maj5 details > summary { list-style: none; display: inline-flex; align-items: center; min-height: 44px; padding: 0 6px; color: var(--vu-sur); font: 600 13px/1.2 var(--vu-police); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
   .maj5 details > summary::-webkit-details-marker { display: none; }
   .maj5 ol { margin: 0 0 4px; padding-left: 26px; font-size: 12.5px; color: var(--vu-sur-2); }
   .principal .p-t { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 6px; font: 600 15px/1.35 var(--vu-police); color: var(--vu-encre); }
+  .principal .p-t { justify-content: space-between; }
+  .principal .p-t .p-n { font-size: 17px; font-feature-settings: "tnum" 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .principal .p-l2 { margin-top: 8px; font: 600 14px/1.35 var(--vu-police); color: var(--vu-encre); font-variant-numeric: tabular-nums; }
+  .principal .p-l2:empty { display: none; }
+  .principal .p-l2::first-letter { text-transform: uppercase; }
+  .principal .p-l2 .p-dans { color: var(--vu-encre); font-weight: 600; }
+  .principal .p-pour { margin-top: 2px; }
   .principal .p-t b { font-weight: 700; }
   .principal .p-t .p-dans { color: var(--vu-muet); font-weight: 500; }
   .principal .vu-barre { margin-top: 10px; }
@@ -553,8 +560,7 @@
   .listes5 { padding: 10px !important; }
   .listes5 .vu-seg + .vu-seg { margin-top: 8px; }
   .listes5 .panneau { margin-top: 10px; }
-  .listes5 .seg-portee button { min-height: 36px; font-size: 13px; }
-  .listes5 .seg-portee button::after { inset: -4px 0; }
+  .listes5 .seg-portee button { font-size: 13px; }
   .fav-t, .lib, .lu, .me, .val.gris, .ap-lbl, .refus, .pied, .detail > summary { color: var(--vu-muet); }
   .val.alerte, .me .ambre, .err { color: var(--vu-ambre); }
   .contenu .b { min-height: 50px; border-radius: 14px; background: var(--vu-plein-sur-plaque); color: var(--vu-plein-sur-plaque-encre); box-shadow: 0 1px 2px rgb(0 0 0/.18); font: 600 16px/1.2 var(--vu-police); }
@@ -910,8 +916,9 @@
       const pour = QUOI_FAV[st.quoi] ? TU(QUOI_FAV[st.quoi]) : '';
       const etat = st.enCours ? `<span class="p-dans">· ${esc(TU('f_part'))}</span>` : dans ? `<span class="p-dans">· ${esc(TU('f_prochain', { dans: '\u0000' })).replace('\u0000', `<span data-fav-dans="${Number(st.prochain)}">${esc(dans)}</span>`)}</span>` : '';
       return `<section class="fav principal" data-fav="encours" data-fav-envoyes="${faits}" data-fav-total="${total}"${st.attente ? ` data-fav-attente="${esc(st.attente)}"` : ''}${st.quoi ? ` data-fav-quoi="${esc(st.quoi)}"` : ''}>
-        <div class="p-t fav-l" role="status"><span>${esc(TU('f_titre'))}</span><span>· <b>${esc(TU('f_sur', { n: faits, total }))}</b></span>${pas ? `<span class="p-dans">· ${esc(TU('f_pas', { n: pas }))}</span>` : ''}${etat}</div>
+        <div class="p-t fav-l" role="status"><span class="p-nom">${esc(TU('f_titre'))}</span><b class="p-n">${esc(TU('f_sur', { n: faits, total }))}</b></div>
         ${U.barre(total ? 100 * faits / total : 0, ' aria-label="' + esc(TU('f_titre')) + '"')}
+        <div class="p-l2">${etat.replace('· ', '')}${pas ? `<span class="p-dans"> · ${esc(TU('f_pas', { n: pas }))}</span>` : ''}</div>
         ${att ? `<div class="p-pour ambre" data-fav-attente-texte>${esc(att)}</div>` : `<div class="p-pour" data-fav-pour>${esc(pour || TU('f_garde'))}</div>`}
         <button class="vu-btn vu-plein" data-fav-arreter>${esc(TU('c_tout_arreter'))}</button>
       </section>`;
@@ -1443,8 +1450,11 @@
       : '';
     // 5.366 (Julien : « faire comme Vintex, pour ne pas se faire bannir ») : l'état du compte
     // en UNE phrase (calculée par le fond, la même que dans VRM) et « Tout arrêter ».
+    // 5.406 : pendant un envoi, « Tout arrêter » est LE plein de la ligne principale : la ligne de
+    // sécurité garde sa phrase, sans second bouton du même nom.
+    const enCoursFav = !!(e.site && e.site.favoris && e.site.favoris.file && e.site.favoris.file.actif);
     const ligneSecu = e.secu && e.secu.texte && v && v.connecte
-      ? `<div class="ligne secu" data-secu="${esc(e.secu.niveau || '')}"><div class="secu-t"><div class="lib">Sécurité du compte</div><div class="val${e.secu.niveau === 'robot' ? ' alerte' : (e.secu.niveau === 'ok' ? '' : ' gris')}">${esc(e.secu.texte)}</div></div><button class="touche secu-b" data-secu-arret="${e.secu.arrete ? 'relancer' : 'arreter'}">${e.secu.arrete ? 'Relancer' : 'Tout arrêter'}</button></div>`
+      ? `<div class="ligne secu" data-secu="${esc(e.secu.niveau || '')}"><div class="secu-t"><div class="lib">Sécurité du compte</div><div class="val${e.secu.niveau === 'robot' ? ' alerte' : (e.secu.niveau === 'ok' ? '' : ' gris')}">${esc(e.secu.texte)}</div></div>${enCoursFav && !e.secu.arrete ? '' : `<button class="touche secu-b" data-secu-arret="${e.secu.arrete ? 'relancer' : 'arreter'}">${e.secu.arrete ? esc(TU('c_reprendre')) : esc(TU('c_tout_arreter'))}</button>`}</div>`
       : '';
     let bascule = '';
     if (e.bascule) {
@@ -1526,7 +1536,7 @@
       ${gestes}
       ${ligneSecu}
       ${moisHtml}
-      <details class="detail" data-detail${ouvert ? ' open' : ''}><summary>${esc(TU('c_details'))}${e.version ? ` · <span class="ver">${esc(e.version)}</span>` : ''}</summary>
+      <details class="detail" data-detail${ouvert ? ' open' : ''}><summary><span>${esc(TU('c_details'))}${e.version ? ' · ' + esc(e.version) : ''}</span></summary>
       <div class="ligne"><div class="lib">Compte VRM utilisé</div>${compteVrm}</div>
       ${lbcVisible ? '' : `<div class="ligne"><div class="lib">Compte ${esc(nomSite)}</div>${compteSite}</div>`}
       ${e.capte && !(e.plateforme === 'leboncoin' && e.lbc) ? `<div class="ligne"><div class="lib">Tes données</div>${flux}</div>` : ''}

@@ -15,7 +15,7 @@
 //  (étiquette kraft), `.vu-barre` (progression), `.vu-point` (état), `.vu-bandeau`,
 //  `.vu-toast`, `.vu-sous` (ligne secondaire).
 //  Textes : `T(clé, vars)` — fr, en, es, it, de, choisis par la langue du NAVIGATEUR
-//  (la règle de chrome.i18n) ; une clé absente ⇒ le français ; `scripts/audit-extension-ui.cjs`
+//  (la règle de chrome.i18n) ; une clé absente ⇒ le français ; `scripts/audit-extension-feuille.cjs`
 //  exige les cinq langues et les mêmes {variables} pour chaque clé.
 //  Contraste ≥ 4,5:1 mesuré (scripts/bancs/extension-surfaces.cjs), cibles ≥ 44 px.
 //  Aucune lecture de la page, aucune requête : des styles et du texte.
@@ -93,10 +93,10 @@
     a_ensuite: { fr: 'Ensuite dans {dans}', en: 'Next in {dans}', es: 'Después en {dans}', it: 'Poi tra {dans}', de: 'Weiter in {dans}' },
     a_reduire: { fr: 'Réduire', en: 'Minimise', es: 'Reducir', it: 'Riduci', de: 'Verkleinern' },
     a_agrandir: { fr: 'Afficher', en: 'Show', es: 'Mostrar', it: 'Mostra', de: 'Anzeigen' },
-    a_bloque: { fr: 'Vinted est en pause pendant que VRM agit. « Réduire » pour continuer à naviguer.', en: 'Vinted is paused while VRM works. “Minimise” to keep browsing.', es: 'Vinted está en pausa mientras VRM actúa. «Reducir» para seguir navegando.', it: 'Vinted è in pausa mentre VRM agisce. «Riduci» per continuare a navigare.', de: 'Vinted pausiert, während VRM arbeitet. „Verkleinern“, um weiterzusurfen.' },
+    a_bloque: { fr: 'Vinted est verrouillé pendant que VRM agit. « Réduire » pour continuer à naviguer.', en: 'Vinted is locked while VRM works. “Minimise” to keep browsing.', es: 'Vinted queda bloqueado mientras VRM actúa. «Reducir» para seguir navegando.', it: 'Vinted è bloccato mentre VRM agisce. «Riduci» per continuare a navigare.', de: 'Vinted ist gesperrt, während VRM arbeitet. „Verkleinern“, um weiterzusurfen.' },
     a_arrete: { fr: 'Arrêté. Rien d’autre ne part.', en: 'Stopped. Nothing else is sent.', es: 'Detenido. No sale nada más.', it: 'Fermato. Non parte nient’altro.', de: 'Gestoppt. Nichts weiter wird gesendet.' },
     a_fini: { fr: 'Terminé', en: 'Done', es: 'Terminado', it: 'Finito', de: 'Fertig' },
-    a_verif: { fr: 'Vinted demande une vérification : fais-la sur la page. VRM est arrêté.', en: 'Vinted asks for a check: do it on the page. VRM is stopped.', es: 'Vinted pide una verificación: hazla en la página. VRM está detenido.', it: 'Vinted chiede una verifica: falla sulla pagina. VRM è fermo.', de: 'Vinted verlangt eine Prüfung: Erledige sie auf der Seite. VRM ist gestoppt.' },
+    a_verif: { fr: 'Vinted demande une vérification : fais-la sur la page. VRM attend, rien ne part.', en: 'Vinted asks for a check: do it on the page. VRM waits, nothing is sent.', es: 'Vinted pide una verificación: hazla en la página. VRM espera, no sale nada.', it: 'Vinted chiede una verifica: falla sulla pagina. VRM aspetta, non parte nulla.', de: 'Vinted verlangt eine Prüfung: Erledige sie auf der Seite. VRM wartet, nichts wird gesendet.' },
     a_vinted_dit: { fr: 'Vinted affiche un message : lis-le, VRM se met de côté.', en: 'Vinted shows a message: read it, VRM steps aside.', es: 'Vinted muestra un mensaje: léelo, VRM se aparta.', it: 'Vinted mostra un messaggio: leggilo, VRM si fa da parte.', de: 'Vinted zeigt eine Meldung: Lies sie, VRM tritt zur Seite.' },
     // ── messages brefs, bandeaux, alertes ──
     t_ok: { fr: 'C’est fait', en: 'Done', es: 'Hecho', it: 'Fatto', de: 'Erledigt' },
@@ -172,9 +172,8 @@
   /* Le contrôle segmenté : une piste, l'onglet choisi en porcelaine. */
   .vu-seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0,1fr); gap: 2px; padding: 3px; border-radius: 14px; background: var(--vu-socle); }
   .vu-sur-coque .vu-seg, .vu-coque > .vu-seg { background: rgb(0 0 0/.22); }
-  .vu-seg button { appearance: none; border: 0; min-height: 40px; padding: 0 8px; border-radius: 11px; background: transparent; color: var(--vu-muet);
+  .vu-seg button { appearance: none; border: 0; min-height: 44px; padding: 0 8px; border-radius: 11px; background: transparent; color: var(--vu-muet);
     font: 600 14px/1.2 var(--vu-police); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-tap-highlight-color: transparent; touch-action: manipulation; position: relative; }
-  .vu-seg button::after { content: ''; position: absolute; inset: -2px 0; }   /* la cible au doigt : 44 px */
   .vu-sur-coque .vu-seg button, .vu-coque > .vu-seg button { color: var(--vu-sur-2); }
   .vu-seg button[aria-selected="true"], .vu-seg button[aria-pressed="true"] { background: var(--vu-plaque); color: var(--vu-encre); box-shadow: 0 1px 2px rgb(0 0 0/.16), 0 3px 8px -4px rgb(0 0 0/.3); }
   /* L'étiquette N° en kraft : coin coupé, œillet, chiffres tabulaires (la signature de VRM). */
@@ -196,7 +195,7 @@
   .vu-point[data-k="geste"] { background: var(--vu-ambre-point); box-shadow: 0 0 0 3px rgb(224 138 18/.25); }
   .vu-point[data-k="pause"], .vu-point[data-k="prudence"], .vu-point[data-k="attente"], .vu-point[data-k="reseau"], .vu-point[data-k="arrete"] { background: transparent; box-shadow: inset 0 0 0 2px currentColor; }
   /* Le bandeau fin (une nouvelle version) et la ligne secondaire. */
-  .vu-bandeau { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 4px 0 14px; border-radius: 14px; background: rgb(255 255 255/.12); color: var(--vu-sur); font: 600 13px/1.3 var(--vu-police); }
+  .vu-bandeau { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 4px 4px 4px 14px; border-radius: 14px; background: rgb(255 255 255/.12); color: var(--vu-sur); font: 600 13px/1.3 var(--vu-police); }
   .vu-bandeau > span { flex: 1; min-width: 0; }
   .vu-sous { font: 500 12.5px/1.4 var(--vu-police); color: var(--vu-sur-2); font-feature-settings: "tnum" 1; font-variant-numeric: tabular-nums; }
   .vu-sous b { color: var(--vu-sur); font-weight: 600; }

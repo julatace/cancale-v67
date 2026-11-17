@@ -104,7 +104,7 @@ async function monter(pg, { etat, apercu = null, action = null, fichiers = ['ui'
           window.__envoyes.push(copie(msg));
           let rep = { ok: true };
           if (msg.action === 'etat' && msg.from === 'vrm-action') rep = { ok: true, action: window.__etatAction || null };
-          else if (msg.action === 'arreter' && msg.from === 'vrm-action') { window.__arrete = (window.__arrete || 0) + 1; rep = { ok: true }; }
+          else if (msg.action === 'arreter' && msg.from === 'vrm-action') { window.__arrete = (window.__arrete || 0) + 1; if (window.__etatAction) window.__etatAction = Object.assign({}, window.__etatAction, { actif: false, fin: { at: Date.now(), raison: 'arret' } }); rep = { ok: true }; }   // comme le fond (finirActionEnCours)
           else if (msg.action === 'etat') rep = e ? copie(e) : null;
           else if (msg.action === 'carteListes') rep = copie(L);
           else if (msg.action === 'favorisCarte' && msg.quoi === 'apercu') rep = ap ? { ok: true, uid: '424242', apercu: copie(ap) } : { ok: false, raison: 'pas su' };
@@ -164,7 +164,7 @@ const CONTRASTE = (hoteId) => {
   }
   return { n: out.length, mauvais: out.filter((x) => x.ratio < x.seuil) };
 };
-const CIBLES = (hoteId, sel) => {
+const CIBLES = ({ hoteId, sel }) => {
   const r = document.getElementById(hoteId).shadowRoot;
   return Array.from(r.querySelectorAll(sel)).filter((b) => b.getClientRects().length && getComputedStyle(b).visibility !== 'hidden' && !b.closest('[inert]') && !b.closest('details:not([open]) > :not(summary)'))
     .map((b) => { const x = b.getBoundingClientRect(); return { t: (b.innerText || b.getAttribute('aria-label') || b.className).trim().slice(0, 30), h: Math.round(x.height), w: Math.round(x.width) }; })
@@ -178,7 +178,8 @@ const CIBLES = (hoteId, sel) => {
   const neuf = !!UI;
   try {
     // ── 1. La carte Vinted : favoris en cours (sa capture), trois largeurs, clair et sombre ──
-    if (fait('carte')) for (const [largeur, hauteur, mobile] of [[1280, 800, false], [1512, 900, false], [390, 844, true]]) for (const nuit of [false, true]) {
+    const TAILLES = [[1280, 800, false], [1512, 900, false], [390, 844, true]].filter(([l]) => !process.env.BANC_LARGEURS || process.env.BANC_LARGEURS.split(',').includes(String(l)));
+    if (fait('carte')) for (const [largeur, hauteur, mobile] of TAILLES) for (const nuit of [false, true]) {
       const tag = `${largeur}-${nuit ? 'sombre' : 'clair'}`;
       console.log(`\nCarte Vinted · favoris en cours · ${tag}`);
       const { ctx, pg, erreurs } = await page(nav, { nuit, largeur, hauteur, mobile });
@@ -212,7 +213,7 @@ const CIBLES = (hoteId, sel) => {
         dit(m.dedans && !m.debord, 'L · la carte tient dans la fenêtre, rien ne déborde');
         const c = await pg.evaluate(CONTRASTE, 'vrm-badge');
         dit(c.n > 10 && !c.mauvais.length, `C · contraste ≥ 4,5:1 (${c.n} textes)`, JSON.stringify(c.mauvais.slice(0, 6)));
-        const g = await pg.evaluate(CIBLES, 'vrm-badge', '.carte button, .carte a[href], .carte summary');
+        const g = await pg.evaluate(CIBLES, { hoteId: 'vrm-badge', sel: '.carte button, .carte a[href], .carte summary' });
         dit(!g.length, 'G · cibles ≥ 44 px', JSON.stringify(g.slice(0, 6)));
       }
       dit(!erreurs.length, 'aucune erreur de page', erreurs.join(' | '));
@@ -245,7 +246,7 @@ const CIBLES = (hoteId, sel) => {
       if (neuf) {
         const c = await pg.evaluate(CONTRASTE, 'vrm-badge');
         dit(!c.mauvais.length, `C · contraste (${c.n} textes)`, JSON.stringify(c.mauvais.slice(0, 6)));
-        const g = await pg.evaluate(CIBLES, 'vrm-badge', '.carte .b, .carte .vu-btn, .carte .vu-seg button, .carte .fermer');
+        const g = await pg.evaluate(CIBLES, { hoteId: 'vrm-badge', sel: '.carte .b, .carte .vu-btn, .carte .vu-seg button, .carte .fermer' });
         dit(!g.length, 'G · cibles ≥ 44 px', JSON.stringify(g.slice(0, 6)));
       }
       dit(!erreurs.length, 'aucune erreur de page', erreurs.join(' | '));
@@ -280,7 +281,7 @@ const CIBLES = (hoteId, sel) => {
       dit((await pg.evaluate(() => window.__clicPage || 0)) === clics0, 'O · un clic sur Vinted n’atteint pas la page pendant l’action');
       const c = await pg.evaluate(CONTRASTE, 'vrm-action');
       dit(c.n > 5 && !c.mauvais.length, `C · contraste (${c.n} textes)`, JSON.stringify(c.mauvais.slice(0, 6)));
-      const g = await pg.evaluate(CIBLES, 'vrm-action', 'button');
+      const g = await pg.evaluate(CIBLES, { hoteId: 'vrm-action', sel: 'button' });
       dit(!g.length, 'G · cibles ≥ 44 px', JSON.stringify(g));
       // Réduire ⇒ pastille, la page reçoit le clic.
       await pg.evaluate(() => document.getElementById('vrm-action').shadowRoot.querySelector('[data-reduire]').click());
