@@ -55497,7 +55497,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </BoutonV2>);
                   const scanV = <button type="button" className="vrm-champ-recherche-bouton v2v-scan" data-v2v-scanner="" aria-label={tr('scan.r.bouton')} title={tr('scan.r.boutonTitre')} onClick={() => ouvrirRetrouver('ventes')}><Icon name="retrouver" size={19}/></button>;
                   return (
-                    <div className="v2v-tete" id={ID_SECTION_COLIS.ventes} data-colis-section="ventes" data-colis-barre="" data-v2v-tete={toutesSeules ? 'toutes' : onglet}>
+                    <div className="v2v-tete vv-tete" id={ID_SECTION_COLIS.ventes} data-colis-section="ventes" data-colis-barre="" data-v2v-tete={toutesSeules ? 'toutes' : onglet}>
                       {slotPleinV2 ? createPortal(pleinV, slotPleinV2) : <div className="v2v-plein-ici">{pleinV}</div>}
                       <div className="v2-ann-segment v2v-segment" data-v2v-segment="">
                         <Segmente label={tr('v2v.vues')} plein value={toutesSeules ? 'toutes' : onglet} onChange={(v) => onOngletColis && onOngletColis(v)}

@@ -473,3 +473,12 @@ html[data-design="v2"] body .v2v-tete .v2-affiche-sig-mot { grid-column: 2; grid
 html[data-design="v2"] body .v2v-tete .v2-affiche-sig-sous { grid-column: 2; grid-row: 2; align-self: start; margin: 2px 0 0; font-size: 13px; line-height: 16px; }
 html[data-design="v2"] body .v2v-tete .v2v-segment { margin: 0 0 12px !important; }
 html[data-design="v2"] body .v2v-tete .v2v-recherche { margin-bottom: 8px; }
+/* Passe 1 (captures 390 / 1512) : la loupe et le scanner du champ étaient peints au gris de la page (invisibles sur le champ
+   clair) ; le plateau du segmenté plus serré (2 px) ; 44 px au doigt ET à la souris pour les gestes de Ventes ; la tête resserrée. */
+:root:root:root body .vrm-main .v2v-recherche .v2v-champ :is(.vrm-champ-recherche-loupe, button.v2v-scan) { color: var(--v2-muet) !important; }
+:root:root:root:root body .vrm-main .v2v-segment .vrm-seg { padding: 2px !important; gap: 2px !important; }
+:root:root:root:root body .vrm-main .v2v-segment .vrm-seg > button { min-height: 44px !important; }
+:root:root:root:root body .vrm-main .v2v-recherche .v2v-champ { --cr-h: 44px; min-height: 44px; }
+:root:root:root:root body .vrm-main .v2v-recherche .v2v-champ button.v2v-scan { width: 44px !important; min-width: 44px !important; height: 44px !important; min-height: 44px !important; }
+html[data-design="v2"] body .v2v-tete .v2v-segment { margin: 0 0 8px !important; }
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig { margin: 0 0 8px; }

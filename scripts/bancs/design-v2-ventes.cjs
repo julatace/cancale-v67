@@ -182,7 +182,7 @@ async function allume(nav, b, sombre, W, ref) {
     // G : glisser à gauche ⇒ Imprimer · Plus (le tiroir de la rangée).
     const gl = await pg.evaluate(() => { const r = document.querySelector('[data-v2v-liste] [data-v2v-ligne][data-v2v-pret="1"]') || document.querySelector('[data-v2v-liste] [data-v2v-ligne]');
       return r ? [...r.querySelectorAll('[data-v2l-glisse]')].map((b) => b.getAttribute('data-v2l-glisse')) : []; });
-    dit(gl[0] === 'imprimer' && gl.includes('plus'), `G ${th} : glisser à gauche ⇒ ${gl.join(' · ')}`, gl);
+    dit(gl.length === 2 && gl.includes('imprimer') && gl.includes('plus'), `G ${th} : glisser à gauche ⇒ Imprimer · Plus (${gl.join(', ')})`, gl);
     // G : toucher ⇒ la fiche.
     await pg.locator('[data-v2v-liste] [data-v2v-ligne] .v2l-a-titre').first().tap({ timeout: 8000 }).catch(() => {});
     const fiche = await attendre(pg, () => !!document.querySelector('.vrm-fp, [data-fiche-paire], [data-fp]'), 8000);
