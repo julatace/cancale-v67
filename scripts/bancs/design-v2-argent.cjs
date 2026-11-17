@@ -80,6 +80,8 @@ const aller = async (pg, q, attente = 3200) => {
   await pg.waitForTimeout(300);
 };
 const capture = async (pg, nom) => { await pg.evaluate(() => { window.scrollTo(0, 0); for (const e of document.querySelectorAll('.vrm-main, .vrm-main *')) if (e.scrollTop) e.scrollTop = 0; }); await pg.waitForTimeout(250); await pg.screenshot({ path: path.join(SHOTS, nom + '.png'), fullPage: false }); };
+// La signature RELEVÉE STABLE : deux relevés égaux à 1,5 s d'écart (une lecture encore en cours change un état, pas le code).
+const sigStable = async (pg) => { let a = await pg.evaluate(SIGNATURE); for (let i = 0; i < 5; i++) { await pg.waitForTimeout(1500); const b = await pg.evaluate(SIGNATURE); if (b === a) return a; a = b; } return a; };
 const allumer = (pg, on) => pg.evaluate((x) => { if (x) localStorage.setItem('vrm_design_v2', '1'); else localStorage.removeItem('vrm_design_v2'); }, on);
 
 // Les chiffres d'hier (éteint) et ceux du nouvel écran (allumé), lus sur les data-* de LEURS règles.
@@ -152,12 +154,12 @@ const ZONES_ARGENT = '.v2-argent, .v2-argent-nav, .vrm-screen-head:has(.v2-argen
         await aller(pg, 'cat_ventes', 4500);
         await aller(pg, 'dashboard', 3600);
         const venduAvant = await lireVendu(pg);
-        const sigs = { stats: await pg.evaluate(SIGNATURE) };
+        const sigs = { stats: await sigStable(pg) };
         await aller(pg, 'compta', 3600);
         const avant = await lireAvant(pg);
-        sigs.mois = await pg.evaluate(SIGNATURE);
-        await aller(pg, 'argent_declarer', 3000); sigs.declarer = await pg.evaluate(SIGNATURE);
-        await aller(pg, 'settings', 2500); sigs.settings = await pg.evaluate(SIGNATURE);
+        sigs.mois = await sigStable(pg);
+        await aller(pg, 'argent_declarer', 3000); sigs.declarer = await sigStable(pg);
+        await aller(pg, 'settings', 2500); sigs.settings = await sigStable(pg);
         releve[T] = sigs;
         if (REF && REF[T]) for (const k of Object.keys(REF[T])) {
           const a = String(REF[T][k] || '').split('\n'), b = String(sigs[k] || '').split('\n');

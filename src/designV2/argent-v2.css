@@ -10,6 +10,12 @@
 
 /* ══ 1. MOIS : l'affiche (la signature), les six mois ═══════════════════════════════════════════════════════ */
 .v2-ar-mois { display: flex; flex-direction: column; color: var(--v2-page-texte); font-family: var(--sb-police-texte, -apple-system, system-ui, sans-serif); }
+.v2-ar-col { display: flex; flex-direction: column; min-width: 0; }
+/* Ordinateur : deux colonnes — à gauche le mois (affiche, six mois, faits, geste), à droite les versements. */
+@media (min-width: 1024px) {
+  .v2-ar-mois { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); column-gap: 40px; align-items: start; max-width: 1120px; }
+  .v2-ar-col-versements .v2-ar-h:first-child { margin-top: 8px; }
+}
 .v2-ar-affiche { margin: 8px 0 0; }
 .v2-ar-auMoins { display: block; font-size: 15px; line-height: 20px; font-weight: 600; color: var(--v2-page-muet); }
 .v2-ar-affiche .v2-affiche-sig-sous { font-size: 15px; line-height: 20px; }
@@ -181,6 +187,7 @@ html body button.v2-rangee.v2-ar-v:active { background: rgb(18 52 96 / .06); tra
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-pm-alerte :is(b, small) { color: inherit !important; }
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-pm-alerte small { color: var(--v2-muet) !important; font-size: 13px !important; }
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-pm-alerte b { font-size: 17px !important; font-weight: 400 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent-partie > .v2-ar-mois { width: 100% !important; max-width: 1120px !important; align-self: stretch !important; margin: 0 !important; }
 } /* fin @layer vrm-verre */
 
 /* ── Paramètres : les rangées du nouveau design (RangeeTouchable) — icône teintée, nom 17/400, valeur, chevron ── */

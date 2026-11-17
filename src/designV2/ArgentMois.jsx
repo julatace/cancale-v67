@@ -114,6 +114,7 @@ export default function ArgentMois({ poster, phrase, moisLong, barres, faits, ge
   const connus = faits.filter((f) => !f.pasSu), inconnus = faits.filter((f) => f.pasSu);
   return (
     <section className="v2-argent v2-ar-mois" data-v2-argent-mois="" aria-label={tr('v2.ar.seg.resume')}>
+      <div className="v2-ar-col">
       <Affiche poster={poster} phrase={phrase} montant={montant} moisLong={moisLong}/>
       <Barres barres={barres} montant={montant}/>
       {/* Un fait pas su n'est pas une carte « — » (AJOUT 3.3) : il est NOMMÉ sur une ligne sous les faits lus. */}
@@ -122,6 +123,8 @@ export default function ArgentMois({ poster, phrase, moisLong, barres, faits, ge
       </div> : null}
       {inconnus.length ? <p className="v2-ar-passu" data-v2-argent-passu={inconnus.map((f) => f.id).join(' ')}>{tr('v2.ar.pasEncoreLu', { quoi: inconnus.map((f) => f.l).join(' · ') })}</p> : null}
       {geste ? <div className="v2-ar-geste"><BoutonV2 role="principal" plein onClick={geste.onClick} attrs={{ 'data-v2-principal': geste.id, 'data-v2-argent-geste': String(geste.n) }}>{geste.libelle}</BoutonV2></div> : null}
+      </div>
+      <div className="v2-ar-col v2-ar-col-versements">
       <h2 className="v2-ar-h">{tr('v2.ar.versements', { mois: moisLong })}</h2>
       {versements.etat === 'encours' ? <Squelette/>
         : versements.etat === 'passu' ? <div className="v2-ar-vide" data-v2-argent-versements="passu"><b>{tr('v2.ar.versementsPasSu')}</b></div>
@@ -130,6 +133,7 @@ export default function ArgentMois({ poster, phrase, moisLong, barres, faits, ge
             {versements.lignes.map((l) => <LigneVersement key={l.id} l={l} montant={montant}/>)}
           </div>}
       {versements.etat === 'lu' && versements.reste > 0 ? <p className="v2-ar-reste">{tr('v2.ar.autres', { n: versements.reste })}</p> : null}
+      </div>
     </section>
   );
 }
