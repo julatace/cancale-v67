@@ -1451,10 +1451,15 @@ async function appareils(req, res) {
   }
   // (10 nov., lot H) « Nouvel appareil » : l'app le demande à chaque ouverture (api/_lib/appareil-nouveau.js).
   if (req.method === 'POST' && corps.action === 'verifier') {
-    const v = await verifierNouvelAppareil({ base: SUPABASE_URL, cle: process.env.SUPABASE_SERVICE_KEY || '', user: u, pousser: (notif) => contexteVendeur.run({ owner: u.id }, () => sendPushToAll(notif)) });
+    // (16 nov., confiance-clients) + l'e-mail au titulaire, par la voie des relances SEULEMENT si elle est configurée.
+    const cm = configurationRelances(process.env);
+    const envoyerMail = cm.pret ? (m) => envoyerSmtp({ hote: process.env.RELANCES_SMTP_HOTE, port: cm.port, utilisateur: process.env.RELANCES_SMTP_UTILISATEUR, motDePasse: process.env.RELANCES_SMTP_MOT_DE_PASSE, de: process.env.RELANCES_EXPEDITEUR, nomDe: 'VRM', a: m.a, sujet: m.sujet, texte: m.texte, html: m.html, entetes: { 'Auto-Submitted': 'auto-generated' } }) : null;
+    const v = await verifierNouvelAppareil({ base: SUPABASE_URL, cle: process.env.SUPABASE_SERVICE_KEY || '', user: u, pousser: (notif) => contexteVendeur.run({ owner: u.id }, () => sendPushToAll(notif)), envoyerMail });
     return repondre(res, v.status, v.body);
   }
   const r = await traiterAppareils({ base: SUPABASE_URL, cle: process.env.SUPABASE_SERVICE_KEY || '', user: u, jeton: jetonDe(req), methode: req.method, corps });
+  // (16 nov., confiance-clients) La liste dit comment une nouvelle connexion est signalée (e-mail configuré ou non).
+  if (req.method === 'GET' && r.status === 200 && r.body && typeof r.body === 'object') r.body.alerteEmail = configurationRelances(process.env).pret;
   return repondre(res, r.status, r.body);
 }
 // (10 nov., lot H) « Échéances dans l'agenda » (api/_lib/agenda-ics.js) : le calendrier

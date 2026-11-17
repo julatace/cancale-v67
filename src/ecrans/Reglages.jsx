@@ -2926,7 +2926,7 @@ function AppareilsConnectes() {
   const [ouverts, setOuverts] = React.useState({});
   const lire = React.useCallback(async () => {
     const { status, j } = await appelSecurite('appareils');
-    setEtat(status === 200 && j && Array.isArray(j.appareils) ? { appareils: j.appareils } : { erreur: (j && j.erreur) || 'reseau', message: (j && j.message) || "Je n'ai pas pu lire tes appareils — réessaie dans un instant." });
+    setEtat(status === 200 && j && Array.isArray(j.appareils) ? { appareils: j.appareils, alerteEmail: typeof j.alerteEmail === 'boolean' ? j.alerteEmail : undefined } : { erreur: (j && j.erreur) || 'reseau', message: (j && j.message) || "Je n'ai pas pu lire tes appareils — réessaie dans un instant." });
   }, []);
   React.useEffect(() => { lire(); }, [lire]);
   const fermerUne = async (a) => {
@@ -3018,6 +3018,8 @@ function AppareilsConnectes() {
           )}
         </>
       )}
+      {/* (16 nov., confiance-clients) Comment une connexion depuis un appareil jamais vu est signalée — le serveur le dit. */}
+      {etat && !etat.erreur && typeof etat.alerteEmail === 'boolean' ? <p className="vrm-sec-sous" data-appareils-alerte={etat.alerteEmail ? 'email' : 'notification'} style={{ whiteSpace: 'normal', margin: '12px 4px 0' }}>{etat.alerteEmail ? tr('confiance.alerte.email') : tr('confiance.alerte.notif')}</p> : null}
       <div style={{ marginTop: 12, textAlign: 'center' }}>
         <button type="button" className="vrm-lien-action" data-deconnexion-partout="" onClick={seDeconnecterPartout} style={{ minHeight: 44, border: 0, background: 'transparent', font: 'inherit', fontSize: 15, padding: '0 12px', cursor: 'pointer' }}>Se déconnecter partout</button>
       </div>
