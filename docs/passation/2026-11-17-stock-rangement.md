@@ -78,7 +78,29 @@ aucun texte coupé, aucun défilement de côté, un seul plein, la 1re paire dan
 glisser « Ranger » présent ; avec `BANC_REF=<dist de main>`, réglage éteint = signature DOM de main et mêmes touchers.
 Rouge sur `main` (3 KO : l'écran neuf n'existe pas) et par mutation (voir ÉTAT À LA REPRISE).
 
+## Suites du 17 nov. (soir) : retours de Julien et du coordinateur
+
+- « Toujours pas ouf » (capture du Stock actuel) : la liste d'abord (1re paire à ~280 px sur 844), rangée A du nouveau
+  design, plus de « Ranger › » par ligne, « ⋯ » qui dit le geste de chaque état, plus de disque « + » (design-v2 fusionné).
+- SIGNATURE : l'étiquette N° kraft PARTAGÉE (`Etiquette`, src/designV2/Signature.jsx) sur chaque rangée et dans la
+  séance ; une place = une étiquette kraft plus grande (coin coupé, œillet) ; « Où est N°178 » l'allume ; le mouvement
+  « fait » (coche, 220 ms) et « 10 à ranger » → 9.
+- QUALITÉ ET FLUIDITÉ : la carte suivante arrive en ressort (WAAPI, annulée si une autre arrive) ; un toucher pendant
+  le mouvement fait arriver la suivante SANS reposer la paire ; mouvement réduit = aucune animation ; rangées en
+  `content-visibility` ; segmenté Paires · Places à soi (iOS, jour et nuit).
+- Audit visuel : « Pas tout lu » en gris, trois graisses, étapes de l'explication en 13 px ; 375 px « Très grand » :
+  le titre ne se casse plus, la photo se retire d'un champ étroit.
+- Défaut trouvé au banc : l'en-tête à la cloche (`.v2-entete-cloche`, transparent, posé sur la ligne du titre)
+  recevait le toucher destiné à « Ranger 10 » (`elementFromPoint` = HEADER). `pointer-events: none` sur lui, `auto`
+  sur ses boutons (stock-v2.css ; passé à design-v2 pour la feuille commune).
+
 ## ÉTAT À LA REPRISE
 
-Voir le rapport de fin de lot (PR) : mutations jouées, audits, captures. Planche :
-`scratchpad/onglets/stock-planche.png` (hors dépôt).
+- PR #1249 (`claude/stock-rangement`), `origin/main` fusionnée (ab3b27997 puis e00943cba), `claude/design-v2` fusionnée.
+- Banc `stock-rangement.cjs` : 390 clair, 390 sombre, 1512, 375 « Très grand » ; réglage éteint = signature DOM de main
+  (860 nœuds) et mêmes touchers. Rouge sur main (3 KO, l'écran neuf absent). Mutations, toutes ROUGES :
+  M1 la proposition ignore la dernière place ⇒ P7 rouge (mA:6 au lieu de mB:1) ; M2 la séance ne pose plus ⇒ P1, P2,
+  P4, P7, Q rouges ; M3 un 2e toucher pendant le mouvement repose la paire ⇒ Q rouge (N°201 bougée en mA:7).
+- Audits verts : traduction (45/0), quoi-de-neuf, icones, tdz, studio, textes-courts, variables, ligne-glissable,
+  pas-ranger-achat, coque-parametres.
+- Reste : fusion après #1246 (design-v2) ; « Très grand » 375 : le texte d'aide du champ tient sans la photo (dans « ⋯ »).

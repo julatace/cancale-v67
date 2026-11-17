@@ -35,7 +35,7 @@ function PetitPlan({ m, viseI, occupee }) {
   return (
     <div className="sr-plan" aria-hidden="true" data-sr-plan={String(m.id)} style={{ gridTemplateColumns: `repeat(${cols}, ${cote}px)`, gridAutoRows: `${Math.round(cote * 0.72)}px` }}>
       {Array.from({ length: cols * rows }).map((_, i) => (
-        <i key={i} className={'sr-plan-case' + (i === viseI ? ' is-vise' : (occupee(m.id, i) ? ' is-prise' : ''))} data-sr-plan-vise={i === viseI ? '' : undefined}/>
+        <i key={String(m.id) + ':' + i} className={'sr-plan-case' + (i === viseI ? ' is-vise' : (occupee(m.id, i) ? ' is-prise' : ''))} data-sr-plan-vise={i === viseI ? '' : undefined}/>
       ))}
     </div>
   );
@@ -155,7 +155,7 @@ function Seance({ s, seance, fermer }) {
                       const occ = s.occupantNum(mAutre.id, i); const p = s.placeCase(i, mAutre);
                       const ici = ou && String(ou.meuble.id) === String(mAutre.id) && ou.i === i;
                       return (
-                        <button key={i} type="button" className={'sr-case' + (occ ? ' is-prise' : '') + (ici ? ' is-ici' : '')} data-sr-case={mAutre.id + ':' + i} disabled={ici || enCours}
+                        <button key={String(mAutre.id) + ':' + i} type="button" className={'sr-case' + (occ ? ' is-prise' : '') + (ici ? ' is-ici' : '')} data-sr-case={mAutre.id + ':' + i} disabled={ici || enCours}
                           aria-label={occ ? tr('sr.case.prise', { num: occ, r: p.rangee, c: p.colonne }) : tr('sr.case.libre', { r: p.rangee, c: p.colonne })} onClick={() => poser(String(mAutre.id), i)}>
                           {occ ? <span className="sr-case-n">{occ}</span> : null}
                         </button>);
