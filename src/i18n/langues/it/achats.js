@@ -370,5 +370,12 @@ export default {
   "achats.relier.pasSu": "Non è stato possibile leggere i tuoi acquisti: nulla è collegato. Riprova.",
   "achats.relier.enCours": "Collegamento…",
   "achats.relier.rate": "Il database non ha salvato il collegamento: nulla è cambiato. Riprova.",
+  "achats.memeColis.propose": "Probabilmente è lo stesso pacco del tuo acquisto Vinted.",
+  "achats.memeColis.proposeTitre": "Probabilmente è lo stesso pacco di «{titre}».",
+  "achats.memeColis.pasMeme": "Non è lo stesso",
+  "achats.memeColis.contredit": "Questo collegamento non corrisponde al tracciamento Vinted: scollegare?",
+  "achats.memeColis.delier": "Scollega",
+  "achats.memeColis.delierEnCours": "Scollego…",
+  "achats.memeColis.delierRate": "Il database non ha rimosso il collegamento: nulla è cambiato. Riprova.",
   "achats.relier.chercher": "Cerca nei miei acquisti",
 };

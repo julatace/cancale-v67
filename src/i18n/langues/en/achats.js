@@ -370,5 +370,12 @@ export default {
   "achats.relier.pasSu": "Your purchases couldn’t be read — nothing linked. Try again.",
   "achats.relier.enCours": "Linking…",
   "achats.relier.rate": "The database didn’t save the link — nothing changed. Try again.",
+  "achats.memeColis.propose": "This is probably the same parcel as your Vinted purchase.",
+  "achats.memeColis.proposeTitre": "This is probably the same parcel as “{titre}”.",
+  "achats.memeColis.pasMeme": "It’s not the same",
+  "achats.memeColis.contredit": "This link doesn’t match the Vinted tracking — unlink?",
+  "achats.memeColis.delier": "Unlink",
+  "achats.memeColis.delierEnCours": "Unlinking…",
+  "achats.memeColis.delierRate": "The database didn’t remove the link — nothing changed. Try again.",
   "achats.relier.chercher": "Search my purchases",
 };
