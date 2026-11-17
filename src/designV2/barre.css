@@ -30,7 +30,7 @@
   html:is([data-barre="A"], [data-barre="D"], [data-barre="E"]) body .vrm-app-shell .vrm-tabbar > .vrm-tab { flex: 1 1 0 !important; flex-direction: column !important; gap: 3px !important; padding: 6px 0 0 !important; justify-content: flex-start !important; min-height: 56px !important; }
 
   /* ── A · iOS classique ── */
-  html[data-barre="A"] body .vrm-app-shell .vrm-tabbar.vrm-tabbar { background: rgb(246 248 251 / .86) !important; -webkit-backdrop-filter: blur(20px) saturate(180%) !important; backdrop-filter: blur(20px) saturate(180%) !important; box-shadow: inset 0 .5px 0 rgb(0 0 0 / .15) !important; }
+  html[data-barre="A"] body .vrm-app-shell .vrm-tabbar.vrm-tabbar { --b-gris: #4A5666; background: rgb(246 248 251 / .86) !important; -webkit-backdrop-filter: blur(20px) saturate(180%) !important; backdrop-filter: blur(20px) saturate(180%) !important; box-shadow: inset 0 .5px 0 rgb(0 0 0 / .15) !important; }
   :root[data-theme="dark"][data-barre="A"] body .vrm-app-shell .vrm-tabbar.vrm-tabbar { background: rgb(18 24 34 / .88) !important; box-shadow: inset 0 .5px 0 rgb(255 255 255 / .12) !important; }
 
   /* ── D · Trait au-dessus ── */
@@ -58,7 +58,7 @@
 
   /* ── C · Épurée (défaut) : icônes seules, l'actif « icône + nom » dans une capsule teintée (14 % jour, 22 % nuit). ── */
   html[data-barre="C"] body .vrm-app-shell .vrm-tabbar.vrm-tabbar { border-radius: 22px !important; padding: 0 8px !important; align-items: center !important; justify-content: space-between !important; }
-  html[data-barre="C"] body .vrm-app-shell .vrm-tabbar > .vrm-tab { flex: 0 0 auto !important; flex-direction: row !important; gap: 0 !important; height: 44px !important; padding: 0 10px !important; border-radius: 14px !important;
+  html[data-barre="C"] body .vrm-app-shell .vrm-tabbar > .vrm-tab { flex: 0 0 auto !important; flex-direction: row !important; gap: 0 !important; height: 48px !important; min-height: 48px !important; min-width: 48px !important; justify-content: center !important; padding: 0 10px !important; border-radius: 14px !important;
     transition: background-color 150ms ease, padding 150ms cubic-bezier(.32, 1.25, .5, 1) !important; }
   html[data-barre="C"] body .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-nav-label { font-size: 14px !important; max-width: 0 !important; opacity: 0 !important; overflow: hidden !important;
     transition: max-width 150ms cubic-bezier(.32, 1.25, .5, 1), opacity 120ms ease, margin 150ms ease !important; }

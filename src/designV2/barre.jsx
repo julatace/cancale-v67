@@ -35,7 +35,10 @@ if (typeof document !== 'undefined') appliquer(lireBarre());
 // Posé par SON choix (Paramètres → Apparence) ; `enregistrer` est le `save` d'App.jsx (qui synchronise).
 export function poserBarre(v, enregistrer) {
   const x = STYLES_BARRE.includes(v) ? v : BARRE_DEFAUT;
-  try { if (enregistrer) enregistrer(CLE_BARRE, x); else localStorage.setItem(CLE_BARRE, JSON.stringify(x)); } catch (_) {}
+  // Écrit TOUT DE SUITE ici (le `save` d'App.jsx écrit après un court délai : la barre relirait l'ancien choix),
+  // puis confié à `save` pour la synchronisation.
+  try { localStorage.setItem(CLE_BARRE, JSON.stringify(x)); } catch (_) {}
+  try { if (enregistrer) enregistrer(CLE_BARRE, x); } catch (_) {}
   appliquer(x);
   try { window.dispatchEvent(new Event(EVT)); } catch (_) {}
 }

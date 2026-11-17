@@ -102,6 +102,12 @@ async function unStyle(nav, b, style, cas) {
     const CAS = [{ W: 390, sombre: false, nom: '390-clair' }, { W: 390, sombre: true, nom: '390-sombre' }, { W: 375, sombre: false, taille: 'tresGrand', nom: '375-tres-grand' }];
     for (const style of (process.env.STYLES || 'C,A,B,D,E').split(',')) for (const cas of (MUT ? CAS.slice(0, 1) : CAS)) { console.log(`\n${style} · ${cas.nom}`); await unStyle(nav, b, style, cas); }
     if (!MUT) {
+      // L'ordinateur (1512) : la colonne de gauche, mêmes icônes, mêmes pastilles, même onglet allumé — capture.
+      { const { ctx, pg } = await ouvrir(nav, { W: 1512, sombre: false, b, url: '/?tab=journee' }); await pret(pg);
+        await pg.evaluate(() => localStorage.setItem('vrm_design_v2', '1')).catch(() => {}); await pg.reload({ waitUntil: 'domcontentloaded' }); await pret(pg);
+        const r = await pg.evaluate(() => { const a = document.querySelector('.vrm-sidebar [aria-current="page"], .vrm-rail [aria-current="page"]'); return a ? a.getAttribute('data-nav-entree') : null; });
+        dit(r === 'journee', `O8 1512 : la colonne de gauche allume l’écran ouvert (${r})`);
+        await pg.screenshot({ path: path.join(SHOTS, 'colonne-1512.png') }); await ctx.close(); }
       // O7 : Paramètres → Apparence → « Barre d'onglets » : tout de suite, puis après un rechargement.
       console.log('\nRéglage');
       const { ctx, pg } = await ouvrir(nav, { W: 390, sombre: false, b, url: '/?tab=settings' }); await pret(pg);
@@ -112,7 +118,9 @@ async function unStyle(nav, b, style, cas) {
       if (await ap.count()) { await ap.click().catch(() => {}); await pg.waitForTimeout(900); }
       const sel = pg.locator('[data-barre-choix]').first();
       const vu = await sel.count();
-      if (vu) { await sel.scrollIntoViewIfNeeded().catch(() => {}); await sel.selectOption('D').catch(() => {}); await pg.waitForTimeout(300); }
+      let errSel = null;
+      if (vu) { await sel.scrollIntoViewIfNeeded().catch(() => {}); await sel.selectOption('D', { timeout: 8000 }).catch((e) => { errSel = String(e.message || e).slice(0, 300); }); await pg.waitForTimeout(400); }
+      if (errSel) console.log('     (selectOption : ' + errSel + ')');
       const tout = await pg.evaluate(() => ({ racine: document.documentElement.getAttribute('data-barre'), apercu: (document.querySelector('[data-barre-apercu]') || {}).getAttribute?.('data-barre-apercu') || null,
         options: [...document.querySelectorAll('[data-barre-choix] option')].map((o) => o.value).join(',') }));
       await pg.screenshot({ path: path.join(SHOTS, 'reglage-barre.png') });
