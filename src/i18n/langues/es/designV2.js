@@ -125,5 +125,6 @@ export default {
   "v2.tousPrets": "todos listos para imprimir",
   "v2.achats.ajouterCourt": "Añadir",
   "v2.reessayer": "Reintentar",
-  "v2.achats.annules": "Cancelados"
+  "v2.achats.annules": "Cancelados",
+  "v2.passe.qrKo": "QR no legible aquí — basta con el código de abajo"
 };

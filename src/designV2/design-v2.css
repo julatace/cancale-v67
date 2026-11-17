@@ -556,3 +556,4 @@ html body .v2-squelette-A .v2-squelette-rangee { min-height: 120px; }
 @layer vrm-v2 {
   html[data-design="v2"] body .vrm-annbar, html[data-design="v2"] body .vrm-annbar .vrm-annbar-gestes { gap: var(--v2-air-boutons, 12px) !important; }
 }
+.v2-passe-qr-ko { display: grid; place-items: center; text-align: center; font-size: 13px; line-height: 1.4; color: var(--v2-muet, #4A5B6D); background: var(--v2-socle, #EEF3F8); image-rendering: auto; }

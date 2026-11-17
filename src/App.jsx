@@ -55758,7 +55758,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         qrSrc: (x) => { const t = (x.src && x.src.t) || null; return t ? qrVivant(t) : ''; },
                         enGrand: (x) => { const f = qrRetrait(x); if (f) return f; const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null;
                           if (!x.code) return null; return () => openQrView(t ? (codeRetrait(t.code) !== x.code ? { ...t, code: x.code } : t) : ligneRetraitVinted(o)); } }}/>
-                    {!avecColis && toutLuRet ? <p className="vrm-colis-vide" data-retraits-vide="">{tr('v2.passe.aucun')}</p> : null}
+                    {/* (17 nov.) Plus de « Aucun colis à aller chercher » ici : « À retirer · 0 » le dit déjà en tête, et cette ligne
+                        posée après « En route » le poussait (banc design-v2-chargement). */}
                     <EnRouteListeV2 lignes={enRouteV2} Icon={Icon} Photo={photoCarte} touteSansPoint={enRouteV2.length > 0 && enRouteV2.every((l) => !l.point)}/>
                     {/* Rien n'attend au relais : le geste plein d'Achats est « Ajouter un achat » (la saisie d'un achat hors
                         plateforme, la même que son bouton : `vrm:v2-ajouter-achat`, src/ecrans/Achats.jsx). */}
