@@ -1,7 +1,7 @@
 // fr · le nouveau design « Studio Premium » (17 nov.), en essai : src/designV2/.
 export default {
-  "v2.reglage.lib": "Nouveau design (essai)",
-  "v2.reglage.desc": "Aujourd’hui, Achats en passes, un menu par plateforme. Sur cet appareil seulement ; éteins-le pour revenir.",
+  "v2.reglage.lib": "Ancien design",
+  "v2.reglage.desc": "Revenir à l'apparence d'avant, sur cet appareil. Tes données et tes réglages ne changent pas.",
   "v2.aEnvoyer.aria": "{n} colis à envoyer",
   "v2.aEnvoyer.mot": {
     "one": "colis à envoyer",
@@ -126,5 +126,15 @@ export default {
   "v2.achats.ajouterCourt": "Ajouter",
   "v2.reessayer": "Réessayer",
   "v2.achats.annules": "Annulés",
-  "v2.passe.qrKo": "QR pas lisible ici — le code dessous suffit"
+  "v2.passe.qrKo": "QR pas lisible ici — le code dessous suffit",
+  "v2.barre.lib": "Barre d'onglets",
+  "v2.barre.C": "C · Épurée (par défaut)",
+  "v2.barre.A": "A · iOS classique",
+  "v2.barre.B": "B · Pilule flottante",
+  "v2.barre.D": "D · Trait au-dessus",
+  "v2.barre.E": "E · Kraft",
+  "v2.barre.ann": "Annonces",
+  "v2.barre.ach": "Achats",
+  "v2.barre.ven": "Ventes",
+  "v2.barre.arg": "Argent"
 };

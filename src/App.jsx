@@ -1109,6 +1109,7 @@ import { BoutonV2, SegmentV2 } from "./designV2/BoutonV2.jsx";
 import { nombre as nombreV2 } from "./i18n/index.js";
 import LigneAnnonceV2 from "./designV2/LigneAnnonce.jsx";
 import { SqueletteRangees as SqueletteRangeesV2, QuandLu as QuandLuV2 } from "./designV2/Signature.jsx";
+import { reprendreBarre } from "./designV2/barre.js";   // (17 nov.) le style de la barre d'onglets, posé sur <html> dès l'import
 import "./design/accessibilite.css";   // (17 nov.) audit WCAG 2.1 AA : focus double, encre claire sur le bleu, 44 px — `@layer vrm-a11y`, nommée AVANT vrm-verre (index.html)
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
@@ -3222,6 +3223,7 @@ const VENTES_MASQUEES_AUCUNE = () => [];
 const SYNC_KEYS = [
   // (17 nov., nouveau design) L'affichage des annonces : « Liste » (A, par défaut) ou « Détaillé » (C) — son choix, sur tous ses appareils.
   'vrm_annonces_affichage',
+  'vrm_barre_style',   // (17 nov.) le style de la barre d'onglets (src/designV2/barre.js)
   // (11 nov., lot visuels-reseaux) Format, modèle, couleur et nom de SA boutique des visuels réseaux
   // (src/visuelsReseaux.js `reglagesValides` ; boutique vide par défaut).
   'vrm_visuels_reglages',
@@ -20281,6 +20283,8 @@ function BottomBar({tab,setTab,sites,badges,gestes:gestesDisque=null}) {
   // (17 nov., nouveau design) Allumé : pas de disque « + » (les gestes globaux sont dans l'écran, au pouce).
   const designV2=useDesignV2();
   const [plusOuvert,setPlusOuvert]=React.useState(false);
+  // (17 nov.) Le style de la barre : après la lecture du nuage, la valeur rangée ailleurs reprend le défaut (src/designV2/barre.js).
+  React.useEffect(()=>onCloudReady(()=>reprendreBarre()),[]);
   // (14 nov., Studio bleu clair) « Imprimer N » de l'éventail : ce que « Tout imprimer (N) » de Ventes ferait partir, tel que
   // Ventes le publie (`vrm_colis_prets.lot`, §11 : le même nombre que son bouton) ; pas su ⇒ undefined (jamais un 0 deviné).
   const [colisPrets]=useLigneSynchro('vrm_colis_prets', lireColisPretsBarre);

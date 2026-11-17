@@ -29,7 +29,8 @@ const LOT = ['nouveau-vendeur', 'navigation-tache', 'ventes-e2', 'colis-retirer-
   'annonces-actions', 'journee-coherence', 'iphone-reprise', 'argent-mois', 'garde-ecrans', 'morceau-perime',
   'chiffres-coherents', 'retraits-suivi', 'budget-vitesse', 'accessibilite', 'accessibilite-clavier',
   'barre-achats',   // (16 nov.) la barre du bas : Achats dedans, aucun glisser entre onglets
-  'design-v2-chargement'];   // (17 nov.) nouveau design : chargement immobile (CLS ≤ 0,02) et l'AIR (marges, rangées, sections)
+  'design-v2-chargement',
+  'barre-onglets'];   // (17 nov.) les cinq styles de la barre d'onglets : onglet allumé, cibles, coupes, place gardée, contraste, réglage   // (17 nov.) nouveau design : chargement immobile (CLS ≤ 0,02) et l'AIR (marges, rangées, sections)
 const noms = process.argv.slice(2).length ? process.argv.slice(2) : LOT;
 const BASE = Number(process.env.BANCS_PORT_BASE) || 10000;
 const TIMEOUT_MS = (Number(process.env.BANCS_TIMEOUT_S) || 1200) * 1000;
