@@ -165,12 +165,13 @@ const CIBLES = ({ hoteId, sel }) => {
 // ── L'aperçu inventé : 120 favoris sur 8 annonces ─────────────────────────────
 const TITRES = ['Baskets cuir blanc 42', 'Running bleu nuit 43', 'Sneakers montantes 41', 'Air rétro gris 44', 'Mocassins daim 40', 'Basket toile écrue 38', 'Trail noir 45', 'Tennis vintage 39'];
 const NUMS = ['124', 'B230', '87', '', '9', '1032', '56', ''];
+const MINIS = [30, 50, null, 40, 60, null, 55, 45];   // prix mini posés à côté du N° (inventés) ; null = pas posé
 const TOUS = Array.from({ length: 250 }, (_, i) => {
   const k = i % 8, envoi = i % 11 === 3 ? 'envoye' : i % 17 === 5 ? 'en_cours' : 'a_envoyer';
   const raison = envoi === 'a_envoyer' && i % 13 === 7 ? 'non_prouve' : '';
   const cochable = envoi === 'a_envoyer' && !raison;
   return { id: 'n' + i, itemId: String(9000 + k), pseudo: 'acheteur_' + (i + 1), titre: TITRES[k], prix: 40 + k * 5, date: new Date(T0 - (i * 37 + 5) * MIN).toISOString(), photo: PHOTO,
-    num: NUMS[k] || undefined, envoi, ...(envoi === 'envoye' && i % 2 ? { offreFaite: true } : {}), ...(raison ? { raison } : {}), cochable,
+    num: NUMS[k] || undefined, mini: MINIS[k], envoi, ...(envoi === 'envoye' && i % 2 ? { offreFaite: true } : {}), ...(raison ? { raison } : {}), cochable,
     ...(cochable ? { offre: Math.round((40 + k * 5) * 0.9), texte: 'Bonjour acheteur_' + (i + 1) + ', ça te plaît toujours ? Je te fais une petite offre.' } : {}) };
 });
 const APERCU = { etat: 'pret', total: TOUS.filter((x) => x.cochable).length, max: 15, totalTous: 250, retires: 4,
@@ -215,7 +216,9 @@ const LIGNE = (r, id) => r.querySelector(`.fl-l[data-fav-qui="${id}"]`);
         const cv = document.createElement('canvas').getContext('2d'); if (cs) cv.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
         const selTient = !!sel && cv.measureText(sel.options[sel.selectedIndex].text).width <= sel.clientWidth - parseFloat(cs.paddingLeft) - 26;
         const sb = q('[data-fav-suite]');
-        return { enVue, selTient, suite: sb ? Number(sb.getAttribute('data-fav-suite')) : 0, maxTxt: /15 par heure maximum/.test((q('[data-fav-max]') || {}).textContent || ''), n: lignes.length, vue: q('[data-fav-vue]') && q('[data-fav-vue]').getAttribute('data-fav-vue'), trie: dates.every((d, i) => isFinite(d) && (i === 0 || dates[i - 1] >= d)),
+        const minis = lignes.slice(0, 8).map((l) => (l.querySelector('[data-fav-mini]') || {}).textContent || '');
+        const sansMini = q('[data-fav-sans-mini]'), fixer = q('[data-fav-fixer]');
+        return { minis, sansMini: sansMini ? Number(sansMini.getAttribute('data-fav-sans-mini')) : 0, fixer: fixer ? fixer.getAttribute('href') : '', enVue, selTient, suite: sb ? Number(sb.getAttribute('data-fav-suite')) : 0, maxTxt: /15 par heure maximum/.test((q('[data-fav-max]') || {}).textContent || ''), n: lignes.length, vue: q('[data-fav-vue]') && q('[data-fav-vue]').getAttribute('data-fav-vue'), trie: dates.every((d, i) => isFinite(d) && (i === 0 || dates[i - 1] >= d)),
           offOk: off.length > 0 && off.every((l) => l.querySelector('input').disabled && (l.querySelector('.fl-etat') || {}).textContent),
           offreTxt: !!lignes.find((l) => l.getAttribute('data-fav-envoi') === 'envoye' && /offre/.test((l.querySelector('.fl-etat') || {}).textContent || '')),
           msgTxt: !!lignes.find((l) => l.getAttribute('data-fav-envoi') === 'envoye' && /message/.test((l.querySelector('.fl-etat') || {}).textContent || '')),
@@ -226,6 +229,8 @@ const LIGNE = (r, id) => r.querySelector(`.fl-l[data-fav-qui="${id}"]`);
       });
       console.log(`     mesuré : ${m.n} rangées · ${m.coches} cochés · « ${m.bouton} » · ${m.kraft} étiquettes N° · cases ${JSON.stringify(m.cases.slice(0, 2))}`);
       dit(m.vue === 'liste' && m.n === 100 && m.suite === 100, 'F1 · la liste : les 100 plus récents, puis « Voir les 100 suivants »', `${m.vue} ${m.n} ${m.suite}`);
+      dit(m.minis[0] === 'mini 30 €' && m.minis[1] === 'mini 50 €' && m.minis[2] === 'mini —', 'F7 · à côté de chaque article : son prix mini (« mini 50 € »), « mini — » s’il n’est pas posé', JSON.stringify(m.minis));
+      dit(m.sansMini === TOUS.filter((x) => x.cochable && x.mini == null).length && /tab=annonces/.test(m.fixer), 'F7 · « N sans prix mini · Fixer » (ouvre l’endroit où il se pose)', `${m.sansMini} ${m.fixer}`);
       dit(m.maxTxt, 'F2 · la raison du plafond à côté du compteur : « 15 par heure maximum »');
       dit(m.trie, 'F1 · du plus récent au plus ancien');
       dit(m.photos >= 100 && m.kraft > 0 && m.quand, 'F1 · photo, étiquette N° en kraft, « il y a … »', `${m.photos} ${m.kraft} ${m.quand}`);
@@ -314,6 +319,25 @@ const LIGNE = (r, id) => r.querySelector(`.fl-l[data-fav-qui="${id}"]`);
         const l = await pg.evaluate(() => window.__envoyes.filter((m) => m.quoi === 'lancer'));
         dit(l.length === 1 && l[0].confirme === true && JSON.stringify(l[0].selection.slice().sort()) === JSON.stringify(choix.slice().sort()) && l[0].items.length === 3,
           'F4 · « Confirmer l’envoi » : l’extension reçoit EXACTEMENT les 3 favoris cochés, confirmés', JSON.stringify(l).slice(0, 300));
+        // F7 : une offre SOUS le prix mini est dite au récapitulatif, et se décoche d'un toucher.
+        {
+          const p4 = await page(nav, { nuit, largeur, hauteur, mobile });
+          await p4.pg.evaluate(OUVRIR_OMBRES);
+          await monter(p4.pg, { etat: ETATS.favorisPret(), apercu: APERCU });
+          await ouvrirCarte(p4.pg, mobile); await p4.pg.waitForTimeout(400);
+          await touche(p4.pg, mobile, '[data-fav-tout="aucun"]');
+          const sous = TOUS.find((x) => x.cochable && x.itemId === '9001'), bon = TOUS.find((x) => x.cochable && x.itemId === '9000');
+          await touche(p4.pg, mobile, `.fl-l[data-fav-qui="${sous.id}"] .fl-ti`);
+          await touche(p4.pg, mobile, `.fl-l[data-fav-qui="${bon.id}"] .fl-ti`);
+          await touche(p4.pg, mobile, '[data-fav-envoyer]'); await p4.pg.waitForTimeout(250);
+          await cap(p4.pg, `recap-mini-${tag}`);
+          const w = await p4.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; return { n: Number((r.querySelector('[data-fav-sous]') || { getAttribute: () => 0 }).getAttribute('data-fav-sous')), t: (r.querySelector('[data-fav-sous-mini]') || {}).textContent || '' }; });
+          dit(w.n === 1 && /offre 41 € < mini 50 €/.test(w.t), 'F7 · récapitulatif : « offre 41 € < mini 50 € », dit avant « Confirmer »', JSON.stringify(w));
+          await touche(p4.pg, mobile, '[data-fav-decocher-sous]'); await p4.pg.waitForTimeout(200);
+          const w2 = await p4.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; return { sous: !!r.querySelector('[data-fav-sous]'), n: Number(r.querySelector('[data-fav-vue="recap"]') && r.querySelector('[data-fav-vue="recap"]').getAttribute('data-fav-n')), lances: window.__envoyes.filter((m) => m.quoi === 'lancer').length }; });
+          dit(!w2.sous && w2.n === 1 && w2.lances === 0, 'F7 · « Les décocher » : il ne reste que le favori au-dessus de son mini, rien n’est parti', JSON.stringify(w2));
+          await p4.ctx.close();
+        }
         // F5 : rien hors d'atteinte — « Voir les 100 suivants » jusqu'au dernier.
         {
           const p3 = await page(nav, { nuit, largeur, hauteur, mobile });

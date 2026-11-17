@@ -118,9 +118,11 @@
   // (bandeau), tenue au moins 3 s — jamais un éclair.
   let vue = '', lotVu = '', nulA = 0, asideA = 0, alerteDepuis = 0;
   const lotDe = (a) => (a ? `${a.sorte || ''}:${a.uid || ''}:${a.debut || ''}` : '');
+  // Rechargée PENDANT ce lot : l'entrée calme ne se rejoue pas (le lot est déjà « vu »).
+  let lotAvant = ''; try { lotAvant = String(sessionStorage.getItem('vrm_action_gel') || '').split('|').slice(1).join('|'); } catch (_) {}
   const GEL = 'vrm_action_gel';
   const gel = (on) => {
-    try { if (on) sessionStorage.setItem(GEL, String(Date.now())); else sessionStorage.removeItem(GEL); } catch (_) {}
+    try { if (on) sessionStorage.setItem(GEL, Date.now() + '|' + lotVu); else sessionStorage.removeItem(GEL); } catch (_) {}
     // Le voile posé par content.js au rechargement s'en va dès que CET écran a décidé (posé, ou rien à montrer).
     try { const g = document.getElementById('vrm-action-gel'); if (g) g.remove(); } catch (_) {}
   };
@@ -281,8 +283,9 @@
     const titre = a.sorte === 'favoris' ? T('f_titre') : nom;
     const pc = a.total > 0 ? 100 * (Number(a.fait) || 0) / Number(a.total) : 0;
     const sv = suivantsHtml(a), sh = suiteHtml(a);
-    racine.classList.toggle('anim', neuf);
-    if (neuf) setTimeout(() => racine.classList.remove('anim'), 450);
+    const entree = neuf && lot !== lotAvant;
+    racine.classList.toggle('anim', entree);
+    if (entree) setTimeout(() => racine.classList.remove('anim'), 450);
     lotVu = lot; vue = 'plein';
     poser(`<div class="voile" data-action-plein data-lot="${esc(lot)}" role="dialog" aria-modal="true" aria-label="${esc(titre)}"><div class="boite vu-coque vu-sur-coque">
         <div class="h"><span class="vu-point"></span><span>VRM · ${esc(T('a_en_direct'))}</span></div>

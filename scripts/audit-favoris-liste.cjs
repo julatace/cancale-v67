@@ -40,6 +40,9 @@ const MUTATIONS = {
   confirme: { dans: 'bg', a: "if (msg.confirme !== true) return", b: 'if (false) return' },
   max: { dans: 'bg', a: 'sel.length > FAVORIS_CARTE_MAX ||', b: '' },
   vendus: { dans: 'serveur', a: "if (annonce) { retires++; if (e.code === 'a_envoyer') ecartes++; continue; }", b: '' },
+  pause: { dans: 'bg', a: "if (st.robot) return attendre('verification');", b: '' },
+  repriseCaptcha: { dans: 'bg', a: "if (captchaVu === true) return", b: 'if (false) return' },
+  repriseLu: { dans: 'bg', a: "if (!(Number(flux.okAt) > depuis)) return", b: 'if (false) return' },
   contactes: { dans: 'serveur', a: "const cochable = e.code === 'a_envoyer' && !raison;", b: 'const cochable = !raison;' },
 };
 if (args.includes('--prouve')) {
@@ -272,6 +275,7 @@ const badge = (quoi, extra) => Object.assign({ from: 'vrm-badge', action: 'favor
     const nV = vinted.length, prud = JSON.stringify(f.store.vrmPrudence || null);
     await f.ctx.tickFavorisCarte(); await f.ctx.tickFavorisCarte();
     dit(vinted.length === nV, 'aucune reprise toute seule : les tours suivants n’envoient rien', `${nV} → ${vinted.length}`);
+    { const s2 = f.store.vrmFavorisCarte || {}; dit(s2.actif === true && !!s2.robot && !s2.fin && s2.attente === 'verification', 'et la pause TIENT (la file n’est pas close par les tours suivants : elle reste à reprendre)', JSON.stringify({ a: s2.actif, r: !!s2.robot, fin: s2.fin })); }
     const r1 = await f.envoyer(badge('reprendre', { captcha: true }), ONGLET);
     dit(r1 && r1.ok === false && r1.code === 'captcha', '« Reprendre » refusé tant que la vérification est affichée', JSON.stringify(r1));
     const r2 = await f.envoyer(badge('reprendre', { captcha: false }), ONGLET);

@@ -31,7 +31,7 @@ const MUTATIONS = {
   battement: { f: 'background.js', a: 'if (tour === 0) await battreActionEnCours(st.uid);', b: '' },
   muet: { f: 'vrm-action.js', a: "if (err || !r || r.ok !== true) { relireLocal(); return; }", b: "if (err || !r || r.ok !== true) { appliquer(null, false); return; }" },
   rien: { f: 'vrm-action.js', a: "if (!nulA) { nulA = Date.now(); setTimeout(lire, 1600); return; }", b: '' },
-  surplace: { f: 'vrm-action.js', a: "racine.classList.toggle('anim', neuf);", b: "racine.classList.toggle('anim', true);" },
+  surplace: { f: 'vrm-action.js', a: "racine.classList.toggle('anim', entree);", b: "racine.classList.toggle('anim', true);" },
   molette: { f: 'vrm-action.js', a: 'if (ev.cancelable) ev.preventDefault();\n      return;', b: 'return;' },
   verrou: { f: 'vrm-action.js', a: "try { if (h.style.getPropertyValue('overflow') !== 'hidden') h.style.setProperty('overflow', 'hidden', 'important'); } catch (_) {}", b: '' },
   toast: { f: 'vrm-action.js', a: 'return Date.now() - alerteDepuis >= 800 ?', b: 'return Date.now() - alerteDepuis >= 0 ?' },
@@ -120,7 +120,7 @@ const UID = '424242', MIN = 60000;
             if (m === 'muet') { chrome.runtime.lastError = { message: 'Could not establish connection. Receiving end does not exist.' }; try { cb && cb(undefined); } finally { chrome.runtime.lastError = null; } return; }
             if (m === 'rien') { localStorage.setItem('__mode', 'ok'); cb && cb({ ok: true, action: null }); return; }
             const a = lireS().vrmActionEnCours || null; cb && cb({ ok: true, action: a && Object.assign({}, a, { actif: a.actif === true && Date.now() - Number(a.maj || 0) < 180000 }) });
-          } else if (msg.action === 'arreter') { cb && cb({ ok: true }); } else cb && cb({ ok: false });
+          } else if (msg.action === 'arreter') { cb && cb({ ok: true }); } else if (msg.action === 'reprendre') { localStorage.setItem('__reprise', JSON.stringify({ captcha: msg.captcha === true, at: Date.now() })); cb && cb({ ok: true }); } else cb && cb({ ok: false });
         }, m === 'muet' ? 30 : 5);
       } }, i18n: { getUILanguage: () => 'fr' },
       storage: { local: { get: (k, cb) => { const s = lireS(); setTimeout(() => cb && cb(s), 0); return Promise.resolve(s); }, set: (x, cb) => { const s = Object.assign(lireS(), x); localStorage.setItem('__store', JSON.stringify(s)); cb && setTimeout(cb, 0); return Promise.resolve(); } }, onChanged: { addListener: (f) => ecoutes.push(f) } } };
@@ -213,6 +213,23 @@ const UID = '424242', MIN = 60000;
     await pg.waitForTimeout(2200);
     const retour = await pg.evaluate(() => { const r = document.getElementById('vrm-action').shadowRoot; return { plein: !!r.querySelector('.voile[data-action-plein]'), fin: !!r.querySelector('[data-action-fin]'), ovf: document.documentElement.style.overflow }; });
     dit(retour.plein && !retour.fin && retour.ovf === 'hidden', 'après la vérification : l’écran plein revient (pas de « Terminé »), verrou reposé', JSON.stringify(retour) + ` (${Date.now() - tCap} ms)`);
+    // 8b) Julien : « Arrêté : Vinted demande une vérification » — la file en PAUSE (`robot`) : une carte calme
+    //     (ce qui est parti, ce qui attend), jamais un éclair ; vérification faite ⇒ « Reprendre », SON toucher.
+    await pg.evaluate((a) => window.__poser(a), etat({ fait: 6, total: 15, verification: true, robot: true, robotAt: Date.now(), attente: 'verification' }));
+    await pg.evaluate(() => { const f = document.createElement('iframe'); f.src = 'https://geo.captcha-delivery.com/captcha/?banc=2'; f.id = 'cap2'; f.style.cssText = 'width:300px;height:200px;position:fixed;left:0;top:0'; document.body.appendChild(f); });
+    await pg.waitForTimeout(600);
+    const cv = await pg.evaluate(() => { const r = document.getElementById('vrm-action').shadowRoot; const c = r.querySelector('[data-action-robot]'); return { etat: c && c.getAttribute('data-action-robot'), t: c ? c.textContent : '', bouton: !!r.querySelector('[data-action-reprendre]') }; });
+    dit(cv.etat === 'attente' && /anti-robot/.test(cv.t) && /6 sur 15 envoyés · 9 en attente/.test(cv.t) && !cv.bouton, 'vérification : carte calme « Vinted demande une vérification (anti-robot) » + « 6 sur 15 envoyés · 9 en attente », pas de « Reprendre » tant qu’elle est là', JSON.stringify(cv));
+    await pg.evaluate(() => { document.getElementById('cap2').remove(); const s = JSON.parse(localStorage.getItem('__store') || '{}'); s.vrmFlux = { vinted: { okAt: Date.now() + 10 } }; localStorage.setItem('__store', JSON.stringify(s)); });
+    await pg.waitForTimeout(2200);
+    const cv2 = await pg.evaluate(() => { const r = document.getElementById('vrm-action').shadowRoot; const c = r.querySelector('[data-action-robot]'); return { etat: c && c.getAttribute('data-action-robot'), t: c ? c.textContent : '', bouton: !!r.querySelector('[data-action-reprendre]'), reprise: localStorage.getItem('__reprise') }; });
+    dit(cv2.etat === 'faite' && /Vérification faite/.test(cv2.t) && /plus doucement pendant 24 h/.test(cv2.t) && cv2.bouton && !cv2.reprise, 'vérification faite (plus de captcha + Vinted a répondu) : « Vérification faite · Reprendre », rien ne repart tout seul', JSON.stringify(cv2));
+    await pg.evaluate(() => document.getElementById('vrm-action').shadowRoot.querySelector('[data-action-reprendre]').click());
+    await pg.waitForTimeout(300);
+    const rep = await pg.evaluate(() => JSON.parse(localStorage.getItem('__reprise') || 'null'));
+    dit(!!rep && rep.captcha === false, 'son toucher « Reprendre » demande la reprise (page sans captcha)', JSON.stringify(rep));
+    await pg.evaluate((a) => window.__poser(a), etat({ fait: 6, total: 15 }));
+    await pg.waitForTimeout(3300);
     // 9) la fin : tout est rendu exactement
     await pg.evaluate((a) => window.__poser(a), etat({ actif: false, fait: 5, fin: { at: Date.now(), raison: 'fini' } }));
     await pg.waitForTimeout(2600);

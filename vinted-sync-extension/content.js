@@ -11,12 +11,14 @@
   // si l'écran plein était là il y a moins de 3 min (`vrm_action_gel`, posé par vrm-action.js) ;
   // vrm-action.js le retire dès qu'il a pris la place (ou si l'action est finie), 8 s au plus.
   try {
-    const g = Number(sessionStorage.getItem('vrm_action_gel'));
+    const g = Number(String(sessionStorage.getItem('vrm_action_gel') || '').split('|')[0]);
     if (g && Date.now() - g < 180000 && !document.getElementById('vrm-action-gel')) {
       const st = document.createElement('style');
       st.id = 'vrm-action-gel';
       st.textContent = 'html{overflow:hidden!important}html::after{content:"";position:fixed;inset:0;z-index:2147483647;background:rgb(8 20 38/.6);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}';
-      (document.head || document.documentElement).appendChild(st);
+      const poser = () => (document.head || document.documentElement).appendChild(st);
+      if (document.documentElement) poser();
+      else new MutationObserver((m, o) => { if (document.documentElement) { o.disconnect(); poser(); } }).observe(document, { childList: true });
       setTimeout(() => { try { st.remove(); } catch (_) {} }, 8000);
     }
   } catch (_) {}

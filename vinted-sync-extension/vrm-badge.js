@@ -1300,8 +1300,10 @@
       // 5.407 : cocher ne redessine RIEN (300 rangées, défilement gardé) : le compteur et le bouton suivent sur place.
       const liste = carte.querySelector('.fl-liste');
       if (liste) {
-        liste.addEventListener('change', (ev) => { const el = ev.target; if (!el || !el.matches || !el.matches('[data-fav-coche]') || el.disabled) return; const id = el.getAttribute('data-fav-coche'); if (el.checked) selFav.add(id); else selFav.delete(id); majPiedFl(); garderSelection(uid); });
-        liste.addEventListener('click', (ev) => { const li = ev.target && ev.target.closest ? ev.target.closest('li.fl-l') : null; if (!li || (ev.target.closest && ev.target.closest('label.fl-case'))) return; const c = li.querySelector('[data-fav-coche]'); if (c && !c.disabled) { c.checked = !c.checked; c.dispatchEvent(new Event('change', { bubbles: true })); } });
+        // La case et SON état (aucun évènement fabriqué : la rangée touchée bascule la case et le compte directement).
+        const suivre = (el) => { const id = el.getAttribute('data-fav-coche'); if (el.checked) selFav.add(id); else selFav.delete(id); majPiedFl(); garderSelection(uid); };
+        liste.addEventListener('change', (ev) => { const el = ev.target; if (!el || !el.matches || !el.matches('[data-fav-coche]') || el.disabled) return; suivre(el); });
+        liste.addEventListener('click', (ev) => { const li = ev.target && ev.target.closest ? ev.target.closest('li.fl-l') : null; if (!li || (ev.target.closest && ev.target.closest('label.fl-case'))) return; const c = li.querySelector('[data-fav-coche]'); if (c && !c.disabled) { c.checked = !c.checked; suivre(c); } });
       }
       carte.querySelectorAll('[data-fav-tout]').forEach((b) => b.addEventListener('click', () => {
         if (b.getAttribute('data-fav-tout') === 'aucun') selFav = new Set();

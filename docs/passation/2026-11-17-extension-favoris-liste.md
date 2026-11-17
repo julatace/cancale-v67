@@ -79,3 +79,60 @@ après un lancement l'aperçu gardé est vidé (un second envoi exige une liste 
 Installer l'extension **5.407.0** (remplacer le dossier, ⟳ dans chaque Chrome ; Orion :
 `VRM-Orion-dossier.zip`). Le serveur doit être déployé (la liste vient de `apercu.tous`) : sans lui, la
 carte garde l'aperçu d'avant (15 à cocher).
+
+## Ajouts du même lot (retours de Julien sur la 5.406 en usage réel, relayés par le coordinateur)
+
+### « L'affichage qui bloque de l'extension disparaît 1 s » (écran « action en cours »)
+Causes trouvées (toutes corrigées, `vrm-action.js`, `content.js`, `background.js`) :
+1. **Vinted bloqué = l'écran tombe** : pendant une attente qui ne change rien (pause 429/403, vérification,
+   autre compte…), la file ne réécrivait pas l'état ; au bout de 3 min il passait pour « fond mort » ⇒
+   l'écran affichait « Terminé » et s'effaçait, puis revenait au geste suivant. ⇒ battement : chaque tour
+   d'une file active rafraîchit `maj` (`battreActionEnCours`, ≤ 1 écriture / 20 s).
+2. **Service worker endormi / en réveil** : une réponse absente valait « rien » ⇒ écran éteint jusqu'à la
+   lecture suivante. ⇒ « pas su ≠ fini » : l'état du MÊME lot se relit dans `chrome.storage.local`.
+3. **Une lecture « rien » isolée** éteignait l'écran ⇒ il faut deux lectures à 1,5 s d'écart.
+4. **Chaque pas redessinait tout et rejouait le fondu** (opacité 0 → 1, flou réappliqué) ⇒ mise à jour
+   SUR PLACE (compteur, barre, article, suite, suivants), l'entrée calme une fois par lot (`.anim`), pas
+   rejouée après un rechargement du même lot.
+5. **Route SPA / document réécrit** ⇒ le MÊME hôte (même shadow root) se raccroche, le verrou se repose.
+6. **Rechargement complet** : l'écran n'arrivait qu'à `document_idle` ⇒ `content.js` (document_start) pose
+   un voile bloquant si l'écran plein était là il y a < 3 min (`sessionStorage.vrm_action_gel`), retiré dès
+   que l'écran a repris (8 s au plus).
+7. **Un message bref de Vinted** (`role=alert`) écartait l'écran ⇒ une alerte doit tenir 800 ms ; la mise de
+   côté (vérification ou alerte) est DITE en bandeau et tenue ≥ 3 s — jamais un éclair.
+
+### « Le pavé tactile permet de descendre dans Vinted »
+La molette au-dessus de l'écran n'était pas retenue (le bouclier laissait passer tout évènement visant
+l'écran) et la page défilait derrière. ⇒ `html`/`body` en `overflow: hidden` (valeurs en ligne d'avant et
+position gardées, rendues exactement à la fin, sur « Réduire », « Tout arrêter », et pendant une
+vérification), molette / `touchmove` / touches de défilement retenues hors de la boîte (`passive:false`,
+capture), `overscroll-behavior: contain` sur l'écran et sa boîte.
+
+### « Arrêté : Vinted demande une vérification »
+Lecture seule de la base (17 nov.) : **2 arrêts « vérification » aujourd'hui** (un par compte, `vinted_robot`),
+**0 message parti aujourd'hui** ; avant le second, 2 actions dans l'heure sur ce compte (bien sous 15/h et
+50/h). Ce n'est pas une panne d'envoi : c'est la garde « arrêt au premier captcha ». L'expérience :
+- la file n'est plus ARRÊTÉE mais **en pause** (`st.robot`) ; rien ne part (l'arrêt « captcha » de
+  l'extension tient) ; l'écran s'écarte en carte calme : « Vinted demande une vérification (anti-robot).
+  Fais-la ici sur la page. » + « 6 sur 15 envoyés · 9 en attente » ;
+- vérification FAITE (plus de captcha dans la page ET Vinted a répondu normalement depuis,
+  `vrmFlux.vinted.okAt`) ⇒ « Vérification faite · On reprend plus doucement pendant 24 h · Reprendre » ;
+  SON toucher reprend la MÊME file (`reprendre`, `api/_lib/favoris-file.js` `reprendreFile` : seuls les
+  favoris encore en attente de ce lot) ; jamais tout seul ; la prudence de 24 h (20/h, délais doublés) reste ;
+- onglet fermé : la file reste en pause ; l'app lit chez VRM « Vinted demande une vérification… puis
+  « Reprendre » sur la carte VRM de vinted.fr ».
+
+### Le prix mini à côté du N°
+Chaque favori de la liste (et du récapitulatif) : étiquette N° kraft + « mini 42 € » (le prix mini
+d'acceptation posé à côté du N°, `vinted_annonce_numeros[id].min`, lu par `offreAutoReglages`) ; pas posé ⇒
+« mini — » et « N sans prix mini · Fixer » (ouvre Annonces, où il se pose) — jamais deviné. Au
+récapitulatif, une offre sous le mini est dite (« offre 41 € < mini 50 € ») avec « Les décocher » / « Fixer ».
+
+### Preuves ajoutées
+- `scripts/audit-action-continu.cjs` : vrai `background.js` (pause de Vinted, worker redémarré) + vrais
+  `vrm-action.js`/`vrm-ui.js`/bloc de `content.js` dans Chromium, échantillons toutes les 50 ms (écran vu,
+  centre bloqué) à travers pas, fond muet, « rien » isolé, routes SPA, hôte arraché, toast, rechargement ;
+  molette et touches sans effet ; carte de vérification, « Reprendre » ; fin rendue exactement. Rouge sur
+  5.406, `--prouve` 9/9.
+- `audit-favoris-liste` B5 (pause, reprise seulement vérification faite, même lot, prudence intacte).
+- banc `extension-favoris-liste` F7 (mini, « Fixer », offre sous le mini, « Les décocher »).
