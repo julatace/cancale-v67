@@ -13,7 +13,7 @@
   const $app = document.getElementById('app');
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const nb = (n) => (n == null ? '—' : Number(n).toLocaleString('fr-FR'));
-  const euros = (c, signe) => { if (c == null) return '—'; const s = (Math.abs(c) / 100).toLocaleString('fr-FR', { minimumFractionDigits: c % 100 ? 2 : 0, maximumFractionDigits: 2 }); return (c < 0 ? '−' : signe ? '+' : '') + s + ' €'; };
+  const euros = (c, signe) => { if (c == null) return '—'; const s = (Math.abs(c) / 100).toLocaleString('fr-FR', { minimumFractionDigits: c % 100 ? 2 : 0, maximumFractionDigits: 2 }); return (c < 0 ? '−' : signe ? '+' : '') + s + '<span class="eur">€</span>'; };
   const tz = { timeZone: 'Europe/Paris' };
   const debutJour = (t) => { const d = new Date(new Date(t).toLocaleString('en-US', tz)); d.setHours(0, 0, 0, 0); return t - (new Date(new Date(t).toLocaleString('en-US', tz)) - d); };
   const jour = (iso) => { const t = Date.parse(iso); if (!t) return ''; const dj = Math.round((debutJour(t) - debutJour(NOW)) / J);
@@ -67,7 +67,7 @@
   const groupe = (titre, n, lignes, cle) => `<section class="gr" data-groupe="${esc(cle || titre || '')}">${titre ? `<h2 class="gr-t"><span>${esc(titre)}</span>${n != null ? `<span class="gr-n">${nb(n)}</span>` : ''}</h2>` : ''}<ul class="ls">${lignes.join('')}</ul></section>`;
   const venteLigne = (v, etat, ambre, o = {}) => ligne({ cle: v.tx, visuel: paire(v.teinte), n: v.numero, sous: v.titre, valeur: euros(v.prix), etat, ambre, ouvrir: v.numero, ...o });
   const tache = (cle, mot, sous, visuel, etat, versEcran) => ligne({ cle, visuel, mot: esc(mot), sous, valeur: etat ? null : I('chevron', 18), etat: etat ? `<i class="pt"></i>${esc(etat)}` : '', ambre: !!etat, ouvrir: 'ecran:' + versEcran });
-  const pile = (teintes) => `<span class="pile">${teintes.slice(0, 3).map((t, i) => `<span class="pile-p" style="--i:${i}">${paire(t, 44)}</span>`).join('')}</span>`;
+  const pile = (teintes) => `<span class="pile">${[...new Set(teintes)].slice(0, 3).map((t, i) => `<span class="pile-p" style="--i:${i}">${paire(t, 44)}</span>`).join('')}</span>`;
   const tuile = (n) => `<span class="tuile">${I(n, 24)}</span>`;
 
   // ══ LES CINQ ÉCRANS ══ chacun : sur (nom), chiffre, légende, filtres, plein, corps.
@@ -77,14 +77,14 @@
       const corps = r.filtre === 'vendu' ? groupe(null, null, duJour.map((v) => venteLigne(v, heure(v.date))))
         : r.filtre === 'attente' ? groupe(null, null, aEnvoyer.filter((v) => !v.bordereau).map((v) => venteLigne(v, `vendue ${jour(v.date)}`)))
         : groupe(null, null, [
-          tache('retirer', `Retirer ${F.colis.length} colis`, `${points.length} points relais · ${p0.nom} d’abord`, tuile('qr'), `avant ${jour(new Date(p0.limite).toISOString())}`, 'achats'),
+          tache('retirer', `Retirer ${F.colis.length} colis`, `${p0.nom} d’abord, puis ${points.length - 1} autre`, tuile('qr'), `avant ${jour(new Date(p0.limite).toISOString())}`, 'achats'),
           tache('ranger', `Ranger ${F.sansCase.length} paires`, 'numérotées, sans case notée', pile(annonces.filter((a) => a.numero && !a.cas).map((a) => a.teinte)), '', 'annonces'),
           tache('publier', `Publier ${F.aPublier.length} paires`, 'rangées, en ligne nulle part', pile(F.aPublier.map((a) => a.teinte)), '', 'annonces'),
           tache('prix', `Saisir ${sansCout.length} prix d’achat`, 'paires vendues sans coût', pile(sansCout.map((v) => v.teinte)), '', 'argent'),
           tache('dorment', `Revoir ${dorment.length} annonces`, 'en ligne depuis plus de 60 jours', pile(dorment.map((a) => a.teinte)), '', 'annonces'),
         ], 'faire') + (duJour.length ? groupe('Vendu aujourd’hui', null, duJour.map((v) => venteLigne(v, heure(v.date))), 'vendu-jour') : '');
       return { sur: new Date(NOW).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', ...tz }), chiffre: euros(duJour.reduce((t, v) => t + v.prix, 0)), legende: `vendu aujourd’hui · ${duJour.length} ventes`,
-        filtres: [['', 'À faire'], ['vendu', 'Vendu aujourd’hui', duJour.length], ['attente', 'Bordereau attendu', aEnvoyer.filter((v) => !v.bordereau).length]],
+        filtres: [['', 'À faire'], ['vendu', 'Vendu aujourd’hui', duJour.length], ['attente', 'Sans bordereau', aEnvoyer.filter((v) => !v.bordereau).length]],
         plein: aImprimer.length ? { mot: `Imprimer ${aImprimer.length}`, ico: 'imprimer' } : null, corps };
     },
     ventes(r) {
@@ -93,10 +93,10 @@
       else if (r.filtre === 'payees') corps = groupe(null, null, payees.map((v) => venteLigne(v, v.verseLe ? `versée ${jour(v.verseLe)}` : '—')));
       else {
         const g = new Map();
-        for (const v of aEnvoyer) { const k = v.bordereau ? 'À poster avant ' + jour(v.bordereau.limite) : 'Bordereau pas encore reçu'; if (!g.has(k)) g.set(k, []); g.get(k).push(v); }
+        for (const v of aEnvoyer) { const k = v.bordereau ? 'À poster ' + jour(v.bordereau.limite) : 'Bordereau pas encore reçu'; if (!g.has(k)) g.set(k, []); g.get(k).push(v); }
         let i = 0;
         corps = [...g.entries()].map(([k, vs]) => groupe(k, vs.length, vs.map((v) => { const h = v.bordereau ? (Date.parse(v.bordereau.limite) - NOW) / H : null; i++;
-          return venteLigne(v, v.bordereau ? `${h < 36 ? '<i class="pt"></i>' : ''}${heure(v.bordereau.limite)}` : `vendue ${jour(v.date)}`, h != null && h < 36,
+          return venteLigne(v, v.bordereau ? `${h < 36 ? '<i class="pt"></i>' : ''}avant ${heure(v.bordereau.limite)}` : `vendue ${jour(v.date)}`, h != null && h < 36,
             { geste: v.bordereau ? { mot: 'Imprimer', ico: 'imprimer' } : null, glisse: r.glisse === '1' && i === 2 }); }), k)).join('');
       }
       return { sur: 'Ventes', chiffre: nb(aEnvoyer.length), legende: 'à envoyer', filtres: [['', 'À envoyer'], ['route', 'En route', enRoute.length], ['payees', 'Payées', payees.length]],
@@ -142,7 +142,7 @@
     vie.push(o.cas ? ['fait', `Case ${o.cas}`, ''] : ['passu', 'Case', '—']);
     vie.push(['fait', v ? 'Était en ligne' : 'En ligne', o.enLigneLe ? `${Math.floor(((v ? Date.parse(v.date) : NOW) - Date.parse(o.enLigneLe)) / J)} j · ${o.fav} favoris` : '—']);
     if (v) {
-      vie.push(['fait', 'Vendue', `${jour(v.date)} · ${euros(v.prix)}`]);
+      vie.push(['fait', 'Vendue', jour(v.date)]);
       if (v.etat === 'a_envoyer') { vie.push(v.bordereau ? ['fait', 'Bordereau reçu', jour(v.bordereau.recu)] : ['passu', 'Bordereau', 'pas encore reçu']); vie.push(['geste', 'À poster', v.bordereau ? `avant ${jour(v.bordereau.limite)} ${heure(v.bordereau.limite)}` : '—']); }
       else vie.push(['fait', v.etat === 'payee' ? 'Livrée' : 'Envoyée', '']);
       vie.push(v.verseLe ? ['fait', 'Argent versé', jour(v.verseLe)] : ['avenir', 'Argent', 'à la confirmation']);
@@ -150,7 +150,7 @@
     const marge = v && v.cout != null ? v.prix - v.cout : null;
     const corps = `<div class="fi-tete">${paire(o.teinte, 112)}<div class="fi-id"><div class="fi-n"><span class="li-npre">N°</span>${esc(numero)}</div><p class="fi-titre">${esc(o.titre)}</p><p class="fi-compte">${esc(o.compte)}</p></div></div>
 <dl class="trio"><div><dt>${v ? 'Vendue' : 'Prix'}</dt><dd>${euros(o.prix)}</dd></div><div><dt>Coût</dt><dd>${euros(v ? v.cout : null)}</dd></div><div><dt>Marge</dt><dd>${marge == null ? '—' : euros(marge, true)}</dd></div></dl>
-<ol class="vie">${vie.map(([e, t, d]) => `<li class="vie-e is-${e}"><span class="vie-p">${e === 'fait' ? I('coche', 14) : ''}</span><span class="vie-t">${esc(t)}</span><span class="vie-d${e === 'geste' ? ' is-ambre' : ''}">${esc(d)}</span></li>`).join('')}</ol>`;
+<ol class="vie">${vie.map(([e, t, d]) => `<li class="vie-e is-${e}"><span class="vie-p">${e === 'fait' ? I('coche', 14) : ''}</span><span class="vie-t">${esc(t)}</span><span class="vie-d${e === 'geste' ? ' is-ambre' : ''}">${d}</span></li>`).join('')}</ol>`;
     const pied = v && v.etat === 'a_envoyer' && v.bordereau ? `<button class="plein plein-l" type="button" data-plein="">${I('imprimer', 20)}<span>Imprimer le bordereau</span></button>` : !v ? `<button class="plein plein-l" type="button" data-plein="">${I('republier', 20)}<span>Republier</span></button>` : '';
     return { corps, pied, label: `N° ${numero}` };
   };
@@ -158,7 +158,7 @@
     const c = F.colis.find((x) => x.id === id); if (!c) return null;
     const qr = c.qr ? `<svg class="qr" viewBox="-2 -2 ${c.qr.n + 4} ${c.qr.n + 4}" role="img" aria-label="QR de retrait envoyé par ${esc(c.transporteur)}"><rect x="-2" y="-2" width="${c.qr.n + 4}" height="${c.qr.n + 4}" fill="#fff"/><path d="${c.qr.d}" fill="#111"/></svg>` : '';
     const corps = `<div class="re"><p class="re-lieu">${esc(c.point)}</p><p class="re-adr">${esc(c.adresse)} · ${esc(c.transporteur)}</p><div class="re-code" aria-label="Code de retrait ${esc(c.code)}">${esc(c.code.slice(0, 3))}<span class="re-esp"></span>${esc(c.code.slice(3))}</div>${qr}<p class="re-art">${esc(c.art)} · avant ${esc(jour(c.limite))}</p></div>`;
-    return { corps, pied: `<button class="plein plein-l" type="button" data-plein="">${I('coche', 20)}<span>C’est retiré</span></button>`, label: `Code ${c.code}`, cran: 'grand' };
+    return { corps, pied: `<button class="plein plein-l" type="button" data-plein="">${I('coche', 20)}<span>C’est retiré</span></button>`, label: `Code ${c.code}`, cran: 'ajuste' };
   };
 
   // ══ LE RENDU ══
