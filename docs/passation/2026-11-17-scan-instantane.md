@@ -75,8 +75,13 @@ le double avec le zoom 2× (non mesurable au banc : la caméra factice n'a pas d
 - Banc `scan-instantane` : vert sur la branche (25 conformes) ; rouge sur main (N jamais lu, O 1 582 ms et
   4 ouvertures, D 128 3,5, DM 1,97, QR 1,57, V 418 ms/s) ; rouge par mutation (voir ci-dessous).
 - Les temps ne sont jugés que si la machine respire (charge ≤ 1,5 par cœur), sinon dits (⚠️).
-- `audit-scan-colis` 52/52 ; `audit-traduction`, `audit-quoi-de-neuf`, `audit-qr-capture-mr`,
-  `audit-inventaire-annuel` verts ; bancs `scan-colis`, `scan-bordereau-vente`, `scan-achat` : voir le PR.
+- Dernière passe (même machine) : branche 25/25 verts (fiche 378 ms, Code 128 lu dès 1,0 px/module, 14 ms/s
+  bloqués) ; main 5 rouges (N jamais lu, 4 ouvertures, Code 128 3,5, DataMatrix 1,4, 428 ms/s) ; mutation
+  (lecteur WebAssembly coupé, fiche immédiate coupée, garde de réouverture coupée) les 5 mêmes rouges.
+- `audit-scan-colis` 52/52 ; `audit-traduction`, `audit-quoi-de-neuf`, `audit-qr-capture-mr`, `audit-qr-csp`,
+  `audit-morceau-app`, `audit-inventaire-annuel` verts ; bancs `scan-bordereau-vente` 54/54, `scan-achat` 34/34 ;
+  `scan-colis` 89/91 — les 2 rouges (E : le texte « Colis inconnu… » du lot scan-achat) sont AUSSI rouges sur main,
+  rien à voir avec ce lot.
 - Captures regardées (390) : la feuille de la vente, la fiche ouverte, le viseur.
 
 ## Ce que Julien doit essayer
