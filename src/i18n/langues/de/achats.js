@@ -370,5 +370,12 @@ export default {
   "achats.relier.pasSu": "Deine Käufe konnten nicht gelesen werden – nichts verknüpft. Versuch es erneut.",
   "achats.relier.enCours": "Verknüpfe…",
   "achats.relier.rate": "Die Datenbank hat die Verknüpfung nicht gespeichert – nichts geändert. Versuch es erneut.",
+  "achats.memeColis.propose": "Das ist wahrscheinlich dasselbe Paket wie dein Vinted-Kauf.",
+  "achats.memeColis.proposeTitre": "Das ist wahrscheinlich dasselbe Paket wie „{titre}“.",
+  "achats.memeColis.pasMeme": "Nicht dasselbe",
+  "achats.memeColis.contredit": "Diese Verknüpfung passt nicht zur Vinted-Sendungsverfolgung – lösen?",
+  "achats.memeColis.delier": "Lösen",
+  "achats.memeColis.delierEnCours": "Wird gelöst …",
+  "achats.memeColis.delierRate": "Die Datenbank hat die Verknüpfung nicht entfernt – nichts geändert. Versuch es erneut.",
   "achats.relier.chercher": "In meinen Käufen suchen",
 };
