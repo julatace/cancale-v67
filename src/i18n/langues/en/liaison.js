@@ -104,6 +104,7 @@ export default {
   "relierTout.aucuneSuggestion": "No suggestion: VRM finds no purchase sure enough for this pair. Pick it from all your purchases, just below.",
   "relierTout.tous": "All my purchases · {n}",
   "relierTout.recherche": "Title, brand, size, seller, price, date, no., account",
+  "relierTout.chercherCourt": "Search my purchases",
   "relierTout.chercher": "Search all my purchases",
   "relierTout.masques": {"one": "{n} returned, disputed, refunded or cancelled purchase hidden: it cannot be linked.", "other": "{n} returned, disputed, refunded or cancelled purchases hidden: they cannot be linked."},
   "relierTout.dejaRelieA": "Already linked to {qui}",

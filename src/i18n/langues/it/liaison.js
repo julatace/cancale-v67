@@ -104,6 +104,7 @@ export default {
   "relierTout.aucuneSuggestion": "Nessun suggerimento: VRM non trova un acquisto abbastanza sicuro per questo paio. Sceglilo tra tutti i tuoi acquisti, qui sotto.",
   "relierTout.tous": "Tutti i miei acquisti · {n}",
   "relierTout.recherche": "Titolo, marca, taglia, venditore, prezzo, data, n°, account",
+  "relierTout.chercherCourt": "Cerca nei miei acquisti",
   "relierTout.chercher": "Cerca in tutti i miei acquisti",
   "relierTout.masques": {"one": "{n} acquisto reso, in contestazione, rimborsato o annullato nascosto: non può essere collegato.", "other": "{n} acquisti resi, in contestazione, rimborsati o annullati nascosti: non possono essere collegati."},
   "relierTout.dejaRelieA": "Già collegato a {qui}",

@@ -802,6 +802,7 @@ function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, recep
     );
   };
   const sel = { minHeight: 44, border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, color: C.text, fontSize: 13, fontFamily: 'inherit', padding: '0 8px', flex: '1 1 0', minWidth: 0 };
+  const selR = { ...sel, flex: '1 1 150px' };
   const titreSection = { fontSize: 13, fontWeight: 700, color: C.text, margin: '12px 0 4px' };
   const montrerSugg = !autre && sugg.length > 0;
   const vus = rangs.slice(0, nVus);
@@ -837,12 +838,13 @@ function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, recep
       ) : null}
       <section data-tous-achats={liste.length} data-tous-achats-pris={prisL.length} data-relier-section="tous">
         <h3 style={titreSection}>{tr('relierTout.tous', { n: String(liste.length + prisL.length) })}</h3>
-        <input value={q} onChange={(e) => setQ(e.target.value)} onFocus={() => setRechercheD(true)} placeholder={tr('relierTout.recherche')} data-tous-achats-recherche autoFocus={!!autre && rechercheD} type="search" enterKeyHint="search" aria-label={tr('relierTout.chercher')}
+        <input value={q} onChange={(e) => setQ(e.target.value)} onFocus={() => setRechercheD(true)} placeholder={tr('relierTout.chercherCourt')} data-tous-achats-recherche autoFocus={!!autre && rechercheD} type="search" enterKeyHint="search" aria-label={tr('relierTout.chercher')}
           style={{ width: '100%', boxSizing: 'border-box', minHeight: 44, padding: '0 11px', border: `1px solid ${C.border}`, borderRadius: 12, background: C.card, color: C.text, fontSize: 17, fontFamily: 'inherit' }}/>
+        <div data-relier-recherche-aide style={{ fontSize: 12, color: C.muted, marginTop: 4, lineHeight: 1.4 }}>{tr('relierTout.recherche')}</div>
         <div data-filtres-rapides style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-          {filtres.comptes.length > 1 && <select aria-label={tr('ventes.compte4')} data-filtre-compte value={compte} onChange={(e) => setCompte(e.target.value)} style={sel}><option value="">{tr('achats.tousComptes')}</option>{filtres.comptes.map((c) => <option key={c} value={c}>{c}</option>)}</select>}
-          {filtres.mois.length > 1 && <select aria-label={tr('achats.mois')} data-filtre-mois value={mois} onChange={(e) => setMois(e.target.value)} style={sel}><option value="">{tr('achats.tousMois')}</option>{filtres.mois.map((m) => <option key={m} value={m}>{new Date(m + '-15').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</option>)}</select>}
-          {filtres.tailles.length > 1 && <select aria-label={tr('achats.taille')} data-filtre-taille value={taille} onChange={(e) => setTaille(e.target.value)} style={sel}><option value="">{tr('achats.toutesTailles')}</option>{filtres.tailles.map((t) => <option key={t} value={t}>{String(t).replace('.', ',')}</option>)}</select>}
+          {filtres.comptes.length > 1 && <select aria-label={tr('ventes.compte4')} data-filtre-compte value={compte} onChange={(e) => setCompte(e.target.value)} style={selR}><option value="">{tr('achats.tousComptes')}</option>{filtres.comptes.map((c) => <option key={c} value={c}>{c}</option>)}</select>}
+          {filtres.mois.length > 1 && <select aria-label={tr('achats.mois')} data-filtre-mois value={mois} onChange={(e) => setMois(e.target.value)} style={selR}><option value="">{tr('achats.tousMois')}</option>{filtres.mois.map((m) => <option key={m} value={m}>{new Date(m + '-15').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</option>)}</select>}
+          {filtres.tailles.length > 1 && <select aria-label={tr('achats.taille')} data-filtre-taille value={taille} onChange={(e) => setTaille(e.target.value)} style={selR}><option value="">{tr('achats.toutesTailles')}</option>{filtres.tailles.map((t) => <option key={t} value={t}>{String(t).replace('.', ',')}</option>)}</select>}
           <Bouton variante="discret" data-filtres-plus={nFiltres} aria-expanded={plus} onClick={() => { setPlus((v) => !v); if (onFiltres) onFiltres(); }} style={{ minHeight: 44, flex: '0 0 auto' }}>{nFiltres ? tr('achats.filtres', { nFiltres: String(nFiltres) }) : tr('achats.filtres2')}</Bouton>
         </div>
         {plus && (

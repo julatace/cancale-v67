@@ -104,6 +104,7 @@ export default {
   "relierTout.aucuneSuggestion": "Ninguna sugerencia: VRM no encuentra una compra lo bastante segura para este par. Elígela entre todas tus compras, justo debajo.",
   "relierTout.tous": "Todas mis compras · {n}",
   "relierTout.recherche": "Título, marca, talla, vendedor, precio, fecha, n.º, cuenta",
+  "relierTout.chercherCourt": "Buscar en mis compras",
   "relierTout.chercher": "Buscar en todas mis compras",
   "relierTout.masques": {"one": "{n} compra devuelta, en disputa, reembolsada o cancelada oculta: no se puede vincular.", "other": "{n} compras devueltas, en disputa, reembolsadas o canceladas ocultas: no se pueden vincular."},
   "relierTout.dejaRelieA": "Ya vinculada a {qui}",

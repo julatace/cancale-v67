@@ -104,6 +104,7 @@ export default {
   "relierTout.aucuneSuggestion": "Kein Vorschlag: VRM findet keinen Kauf, der für dieses Paar sicher genug ist. Wähle ihn direkt darunter aus all deinen Käufen.",
   "relierTout.tous": "Alle meine Käufe · {n}",
   "relierTout.recherche": "Titel, Marke, Größe, Verkäufer, Preis, Datum, Nr., Konto",
+  "relierTout.chercherCourt": "Meine Käufe durchsuchen",
   "relierTout.chercher": "In allen meinen Käufen suchen",
   "relierTout.masques": {"one": "{n} zurückgeschickter, strittiger, erstatteter oder stornierter Kauf ausgeblendet: Er kann nicht verknüpft werden.", "other": "{n} zurückgeschickte, strittige, erstattete oder stornierte Käufe ausgeblendet: Sie können nicht verknüpft werden."},
   "relierTout.dejaRelieA": "Bereits verknüpft mit {qui}",

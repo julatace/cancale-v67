@@ -104,6 +104,7 @@ export default {
   "relierTout.aucuneSuggestion": "Aucune suggestion : VRM ne trouve pas d’achat assez sûr pour cette paire. Choisis-le dans tous tes achats, juste en dessous.",
   "relierTout.tous": "Tous mes achats · {n}",
   "relierTout.recherche": "Titre, marque, taille, vendeur, prix, date, n°, compte",
+  "relierTout.chercherCourt": "Chercher dans mes achats",
   "relierTout.chercher": "Chercher dans tous mes achats",
   "relierTout.masques": {"one": "{n} achat retourné, en litige, remboursé ou annulé masqué : il ne peut pas être relié.", "other": "{n} achats retournés, en litige, remboursés ou annulés masqués : ils ne peuvent pas être reliés."},
   "relierTout.dejaRelieA": "Déjà relié à {qui}",

@@ -145,7 +145,7 @@ async function passe(b, nom, ctxOpts, sombre) {
       dit: !!(sug && (sug.querySelector('[data-suggestions-achat]') || sug.querySelector('[data-suggestions-aucune]'))),
       nLibres: t ? Number(t.getAttribute('data-tous-achats')) : -1, nPris: t ? Number(t.getAttribute('data-tous-achats-pris')) : -1,
       masques: (f.querySelector('[data-relier-masques]') || {}).textContent || '', nMasques: f.querySelector('[data-relier-masques]') ? Number(f.querySelector('[data-relier-masques]').getAttribute('data-relier-masques')) : -1,
-      recherche: !!(t && t.querySelector('[data-tous-achats-recherche]')), filtres: ['compte', 'mois', 'taille'].filter((k) => t && t.querySelector(`[data-filtre-${k}]`)),
+      recherche: !!(t && t.querySelector('[data-tous-achats-recherche]')) && (() => { const a = t.querySelector('[data-relier-recherche-aide]'); const r = a && a.getBoundingClientRect(); return !!(r && r.height > 8 && /vendeur/.test(a.textContent)); })(), filtres: ['compte', 'mois', 'taille'].filter((k) => t && t.querySelector(`[data-filtre-${k}]`)),
       verrou: getComputedStyle(document.documentElement).overflow === 'hidden' || getComputedStyle(document.body).overflow === 'hidden' };
   });
   dit(!!S, `${nom} · la feuille « Relier un achat » s'ouvre`);
@@ -154,7 +154,7 @@ async function passe(b, nom, ctxOpts, sombre) {
   dit(s.tous && s.ordre, `${nom} · « Tous mes achats » est affiché sous les suggestions, sans rien toucher`, JSON.stringify({ tous: s.tous, ordre: s.ordre }));
   dit(s.nLibres + s.nPris === reliables.length && s.nPris === reliesTx.length, `${nom} · « Tous mes achats » compte les ${reliables.length} achats qu'on peut relier (dont ${reliesTx.length} déjà reliés)`, `${s.nLibres} + ${s.nPris}`);
   dit(s.nMasques === exclusTx.length && /5 achats/.test(s.masques) && /masqu/.test(s.masques), `${nom} · « 5 achats retournés, en litige, remboursés ou annulés masqués » est dit`, s.masques);
-  dit(s.recherche && s.filtres.length === 3, `${nom} · une recherche et les filtres rapides compte, mois, taille`, JSON.stringify(s.filtres));
+  dit(s.recherche && s.filtres.length === 3, `${nom} · une recherche (ce qu'elle lit est écrit dessous, visible) et les filtres rapides compte, mois, taille`, JSON.stringify(s.filtres));
   dit(s.verrou, `${nom} · la page derrière ne défile plus tant que la feuille est ouverte`);
   dit(!ecritures.length, `${nom} · rien n'est écrit en ouvrant la feuille`, ecritures.slice(0, 2).join(' | '));
   await pg.screenshot({ path: path.join(SHOTS, `relier-tout-${nom}-ouverte.png`) });
@@ -172,6 +172,16 @@ async function passe(b, nom, ctxOpts, sombre) {
       const cs = getComputedStyle(e); if (cs.textOverflow !== 'ellipsis' && cs.webkitLineClamp === 'none') continue;
       if (e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1) coupes.push((e.textContent || '').trim().slice(0, 30));
     }
+    // Un menu ou un champ dont le texte (l'option choisie, l'invite) dépasse sa largeur est coupé sans « … » visible au DOM :
+    // on MESURE le texte dans la police du champ.
+    const cv = document.createElement('canvas').getContext('2d');
+    for (const e of f.querySelectorAll('select, input[placeholder]')) {
+      const r = e.getBoundingClientRect(); if (!r.width) continue;
+      const cs = getComputedStyle(e); cv.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+      const txt = e.tagName === 'SELECT' ? ((e.options[e.selectedIndex] || {}).text || '') : e.placeholder;
+      const dispo = e.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - (e.tagName === 'SELECT' ? 22 : 0);
+      if (cv.measureText(txt).width > dispo + 0.5) coupes.push(`${e.tagName.toLowerCase()} « ${txt} » ${Math.round(cv.measureText(txt).width)}>${Math.round(dispo)}`);
+    }
     const box = (f.querySelector('.vrm-relier-feuille-boite') || corps).getBoundingClientRect();
     const x = box.left + box.width / 2, y = box.bottom - 6;
     const dessus = document.elementFromPoint(x, y);
@@ -179,7 +189,7 @@ async function passe(b, nom, ctxOpts, sombre) {
       dansEcran: box.top >= -1 && box.bottom <= window.innerHeight + 1, basVisible: !!(dessus && f.contains(dessus)), haut: Math.round(box.top), bas: Math.round(box.bottom), vh: window.innerHeight };
   });
   dit(!V.petits.length, `${nom} · chaque bouton, champ et filtre fait au moins 44 px`, V.petits.slice(0, 4).join(' | '));
-  dit(!V.coupes.length, `${nom} · rien n'est coupé par « … »`, V.coupes.slice(0, 3).join(' | '));
+  dit(!V.coupes.length, `${nom} · rien n'est coupé (« … », menus, invite de la recherche)`, V.coupes.slice(0, 3).join(' | '));
   dit(!V.hDoc && !V.hCorps, `${nom} · aucun défilement horizontal`);
   dit(V.dansEcran && V.basVisible, `${nom} · la feuille est entière dans l'écran, rien ne la recouvre en bas (barre d'onglets)`, JSON.stringify(V));
 
@@ -246,8 +256,11 @@ async function passe(b, nom, ctxOpts, sombre) {
   // Une taille : celle écrite dans un titre, et celle LUE chez Vinted d'un achat dont le titre n'en dit rien.
   const t43Titre = tous.find((x) => / taille 43$/.test(x.titre) && !EXCLUS.has(x.i));
   const t43Lue = tous.find((x) => AVEC_DETAIL.has(x.i) && x.i % 4 === 0 && 38 + (x.i % 9) === 43);
-  const rt = await cherche('taille 43');
-  dit(rt.includes(t43Titre.tx) && (!t43Lue || rt.includes(t43Lue.tx)), `${nom} · chercher « taille 43 » trouve un 43 écrit dans le titre ET un 43 lu chez Vinted (titre muet)`, `${rt.length} · ${t43Lue ? t43Lue.tx : '—'}`);
+  // (le modèle et la couleur avec : moins de 60 réponses, toutes rendues d'un coup)
+  const mc = (x) => x.titre.replace(/ taille \d+$/, '');
+  const rt1 = await cherche(`taille 43 ${mc(t43Titre)}`), rt2 = await cherche(`taille 43 ${mc(t43Lue)}`);
+  dit(rt1.includes(t43Titre.tx) && rt2.includes(t43Lue.tx) && [...rt1, ...rt2].every((t) => { const x = tous[Number(t) - 8100000]; return / taille 43$/.test(x.titre) || (AVEC_DETAIL.has(x.i) && 38 + (x.i % 9) === 43); }),
+    `${nom} · chercher « taille 43 » trouve un 43 écrit dans le titre ET un 43 lu chez Vinted (titre muet), et rien d'autre`, `${rt1.length}/${rt2.length} · ${t43Lue.tx}`);
   for (const t of exclusTx) {
     const r = await cherche(t);
     if (r.length) { dit(false, `${nom} · chercher le n° d'un achat hors relier (${t}) ne le montre pas`, r.join(',')); break; }

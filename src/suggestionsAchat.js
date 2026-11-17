@@ -292,7 +292,11 @@ export function foinAchat(a, { compteDe = null, marqueDe = null, tailleDe = null
 export function tousAchatsLibresDetail({ achats, liens, curTx = '', q = '', compte = '', mois = '', compteDe = null, marqueDe = null,
   prixMin = null, prixMax = null, prixAchat = null, recuDu = '', recuAu = '', receptionDe = null, marque = '', taille = '', tailleDe = null, vendeurDe = null } = {}) {
   const sansAccent = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  const mots = sansAccent(q).split(/\s+/).filter(Boolean);
+  // « taille 43 » / « pointure 42,5 » / « T43 » dans la recherche : la TAILLE de l'achat (lue, sinon écrite), pas deux mots
+  // qui se trouveraient n'importe où (« 43 » est aussi dans des n° et des prix).
+  let qq = sansAccent(q), tq2 = '';
+  qq = qq.replace(/(?:^|\s)(?:taille|pointure|size|t)\s*((?:3[0-9]|4[0-9]|5[0-2])(?:\s*[.,]\s*5|\s*[12]\s*\/\s*3)?)(?=\s|$)/, (m0, t) => { tq2 = tailleNorm(t); return ' '; });
+  const mots = qq.split(/\s+/).filter(Boolean);
   const exclus = { total: 0, parRaison: {} };
   const tailleLue = (a) => { let t = ''; try { t = typeof tailleDe === 'function' ? String(tailleDe(a) || '') : ''; } catch (_) { t = ''; } return t ? (tailleNorm(t) || t) : tailleDuTitre(String((a && a.title) || '')); };
   const pMin = euroBorne(prixMin), pMax = euroBorne(prixMax);
@@ -317,6 +321,7 @@ export function tousAchatsLibresDetail({ achats, liens, curTx = '', q = '', comp
     }
     if (mq && !(typeof marqueDe === 'function' && String(marqueDe(String(a.title || '')) || '').trim().toLowerCase() === mq)) continue;
     if (tq && tailleLue(a) !== tq) continue;
+    if (tq2 && tailleLue(a) !== tq2) continue;
     if (pMin != null || pMax != null) {
       const px = typeof prixAchat === 'function' ? Number(prixAchat(a)) : prixDe(a);
       if (px == null || !Number.isFinite(px) || px <= 0) continue;
