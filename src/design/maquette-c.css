@@ -73,6 +73,15 @@
   /* « Mis à jour à … » : un point dans un rond (touché ⇒ son panneau ; le mot reste lu à voix haute). */
   :root[data-maquette="c"] body .vrm-app-shell > .vrm-app-header .vrm-hdr-sync > button.vrm-hbtn { width: 40px !important; min-width: 40px !important; height: 40px !important; padding: 0 !important; justify-content: center !important; gap: 0 !important; }
   :root[data-maquette="c"] body .vrm-app-shell > .vrm-app-header .vrm-hdr-sync .vrm-sync-mot { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip-path: inset(50%) !important; white-space: nowrap !important; }
+  /* La ligne de fraîcheur (« Mis à jour à … · Voir ») : un point à gauche des ronds ; touché ⇒ son geste, le texte reste lu à voix haute. */
+  :root[data-maquette="c"] body .vrm-fraicheur-hote > .vrm-bandeau-abo.vrm-fraicheur {
+    position: fixed !important; top: calc(7px + env(safe-area-inset-top, 0px)) !important; right: 146px !important; left: auto !important; z-index: 60 !important;
+    width: 40px !important; min-width: 40px !important; height: 40px !important; min-height: 40px !important; padding: 0 !important; margin: 0 !important; border-radius: 50% !important;
+    background: var(--sv-verre-fin, rgb(255 255 255 / .16)) !important; box-shadow: inset 0 0 0 1px var(--sv-verre-fin-bord, rgb(255 255 255 / .32)) !important; border: 0 !important; overflow: hidden !important; display: grid !important; place-items: center !important;
+  }
+  :root[data-maquette="c"] body .vrm-fraicheur-hote > .vrm-fraicheur > :not(.vrm-fraicheur-point):not(.vrm-bandeau-abo-geste) { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip-path: inset(50%) !important; white-space: nowrap !important; }
+  :root[data-maquette="c"] body .vrm-fraicheur-hote > .vrm-fraicheur .vrm-fraicheur-point { grid-area: 1 / 1 !important; position: static !important; width: 9px !important; height: 9px !important; margin: 0 !important; }
+  :root[data-maquette="c"] body .vrm-fraicheur-hote > .vrm-fraicheur .vrm-bandeau-abo-geste { grid-area: 1 / 1 !important; position: static !important; width: 40px !important; height: 40px !important; min-width: 40px !important; min-height: 40px !important; padding: 0 !important; margin: 0 !important; font-size: 0 !important; color: transparent !important; background: transparent !important; box-shadow: none !important; }
   :root[data-maquette="c"] body .vrm-app-shell > .vrm-main { padding-top: env(safe-area-inset-top, 0px) !important; }
   /* L'en-tête d'écran (Ventes, Achats, Annonces) : la ligne du haut, le titre à gauche, la place des ronds réservée à droite. */
   :root[data-maquette="c"] .vrm-main .vrm-tache-tete.vrm-market-heading {
@@ -83,8 +92,9 @@
   :root[data-maquette="c"] .vrm-main .vrm-tache-tete .vrm-fu-date-tete { display: none !important; }
   :root[data-maquette="c"] .vrm-main .vrm-tache-tete .vrm-phrase-ecran { margin: 0 !important; }
   :root[data-maquette="c"] .vrm-main .vrm-tache-tete .vrm-aide-bouton svg { width: 18px !important; height: 18px !important; opacity: .8 !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-tache-tete.vrm-market-heading { position: relative !important; }
   /* Le geste de l'écran (Retrouver un colis) : sur la même ligne, juste avant les ronds de l'app. */
-  :root[data-maquette="c"] .vrm-main .vrm-tache-tete .vrm-tache-retrouver { position: absolute !important; right: 142px !important; top: calc(5px + env(safe-area-inset-top, 0px)) !important; margin: 0 !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-tache-tete .vrm-tache-retrouver { position: absolute !important; right: 142px !important; top: 7px !important; margin: 0 !important; }
   :root[data-maquette="c"] .vrm-main .vrm-tache-tete .vrm-tache-retrouver .sb-rond { width: 40px !important; height: 40px !important; min-width: 40px !important; }
   /* Annonces : le choix Annonces / Stock passe sous le titre, en rail, sur toute la largeur. */
   :root[data-maquette="c"] .vrm-main .vrm-tache-tete .vrm-paires-selecteur { flex: 0 0 calc(100% + 170px) !important; margin: 0 -170px 0 0 !important; }
@@ -96,7 +106,7 @@
   /* Ma journée : « Bonjour · date » et le titre à gauche des ronds. */
   :root[data-maquette="c"] .vrm-main .sj-journee { padding-top: 0 !important; margin-top: 0 !important; }
   :root[data-maquette="c"] .vrm-main .sj-journee .sj-tete { padding-top: 4px !important; margin-top: 0 !important; }
-  :root[data-maquette="c"] .vrm-main .sj-journee .sj-tete :is(.sj-bonjour, .sj-titre) { max-width: calc(100% - 170px) !important; }
+  :root[data-maquette="c"] .vrm-main .sj-journee .sj-tete :is(.sj-bonjour, .sj-titre) { white-space: nowrap !important; }
   :root[data-maquette="c"] .vrm-main .sj-journee .sj-tete .sj-titre { font: 500 27px/1.05 var(--sb-police-affiche) !important; letter-spacing: -.025em !important; }
   :root[data-maquette="c"] .vrm-main .sj-journee .sj-tete .sj-bonjour { font-size: 12.5px !important; }
 
@@ -162,7 +172,7 @@
   :root[data-maquette="c"] .vrm-main .vrm-achats .vrm-achats-filtres { padding-top: 4px !important; padding-bottom: 4px !important; }
 
   /* Achats : les gestes de la tête (Relier en glissant, calculette) en touches de 36 px, sur la ligne du rail. */
-  :root[data-maquette="c"] .vrm-main .vrm-achats-gestes :is(button, a) { height: 36px !important; min-height: 36px !important; padding: 0 12px !important; font-size: 14px !important; border-radius: 12px !important; }
+  :root[data-maquette="c"] .vrm-main :is(.vrm-achats-gestes, .vrm-screen-actions) :is(button, a) { height: 36px !important; min-height: 36px !important; padding: 0 12px !important; font-size: 14px !important; border-radius: 12px !important; }
   :root[data-maquette="c"] .vrm-main .vrm-screen-head:has(.vrm-achats-gestes) { padding-right: 0 !important; }
 
   /* Annonces : la bande de chiffres et la barre de travail serrées. */
