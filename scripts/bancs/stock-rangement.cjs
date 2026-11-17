@@ -58,8 +58,8 @@ const serveur = (dist) => http.createServer((q, r) => {
 });
 const ecouter = (srv) => new Promise((ok) => srv.listen(0, () => ok(srv.address().port)));
 
-async function rendre(b, port, { tel, sombre = false, v2, reduit = false }) {
-  const ctx = await b.newContext({ viewport: tel ? { width: 390, height: 844 } : { width: 1512, height: 950 }, ...(tel ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}), colorScheme: sombre ? 'dark' : 'light', reducedMotion: reduit ? 'reduce' : 'no-preference', locale: 'fr-FR', serviceWorkers: 'block' });
+async function rendre(b, port, { tel, sombre = false, v2, reduit = false, petit = false }) {
+  const ctx = await b.newContext({ viewport: petit ? { width: 375, height: 667 } : tel ? { width: 390, height: 844 } : { width: 1512, height: 950 }, ...(tel ? { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : {}), colorScheme: sombre ? 'dark' : 'light', reducedMotion: reduit ? 'reduce' : 'no-preference', locale: 'fr-FR', serviceWorkers: 'block' });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => r.abort());
@@ -83,7 +83,7 @@ async function rendre(b, port, { tel, sombre = false, v2, reduit = false }) {
     addEventListener('pointerdown', (e) => { if (e.target && e.target.closest && e.target.closest('[data-sr-ranger-ici]')) t0 = performance.now(); }, true);
     new MutationObserver(() => { if (t0 && document.querySelector('.sr-coche')) { window.__reponses.push(Math.round(performance.now() - t0)); t0 = 0; } }).observe(document, { childList: true, subtree: true });
   });
-  await pg.addInitScript(({ m, sombre, v2 }) => { try { localStorage.setItem('vrm_acces_direct', '1'); for (const k in m) localStorage.setItem(k, JSON.stringify(m[k])); localStorage.setItem('vinted_dark', JSON.stringify(!!sombre)); localStorage.setItem('vrm_meubles_zoom', 'normal'); if (v2) localStorage.setItem('vrm_design_v2', '1'); else localStorage.removeItem('vrm_design_v2'); } catch (_) {} }, { m: MAIN, sombre, v2 });
+  await pg.addInitScript(({ m, sombre, v2, petit }) => { try { localStorage.setItem('vrm_acces_direct', '1'); for (const k in m) localStorage.setItem(k, JSON.stringify(m[k])); localStorage.setItem('vinted_dark', JSON.stringify(!!sombre)); localStorage.setItem('vrm_meubles_zoom', 'normal'); if (v2) localStorage.setItem('vrm_design_v2', '1'); else localStorage.removeItem('vrm_design_v2'); if (petit) localStorage.setItem('vrm_taille_texte', 'tresGrand'); } catch (_) {} }, { m: MAIN, sombre, v2, petit });
   await pg.goto(`http://localhost:${port}/?tab=garage`, { waitUntil: 'domcontentloaded' });
   await pg.waitForSelector(v2 ? '[data-sr-ecran] [data-sr-lancer]' : '[data-case-ici="mA:0"]', { timeout: 40000 }).catch(() => {});
   await pg.waitForTimeout(1200);
@@ -91,8 +91,10 @@ async function rendre(b, port, { tel, sombre = false, v2, reduit = false }) {
   let n = 0;
   const toucher = async (sel) => { const el = pg.locator(sel).locator('visible=true').first(); try { await el.waitFor({ state: 'visible', timeout: 10000 }); } catch (e) { await shot(pg, 'echec'); throw new Error('introuvable : ' + sel); } await el.scrollIntoViewIfNeeded(); n++; if (tel) await el.tap(); else await el.click(); await pg.waitForTimeout(260); };
   const taper = async (sel, texte) => { await toucher(sel); await pg.keyboard.type(texte, { delay: 30 }); await pg.waitForTimeout(400); };
+  // `vrm_slots` est écrit sur l'appareil 500 ms après le geste (`save`) : on attend la clé voulue, jamais un délai fixe.
+  const attendreSlots = (cles) => pg.waitForFunction((ks) => { try { const s = JSON.parse(localStorage.getItem('vrm_slots') || 'null'); return !!s && ks.every((k) => !!s[k]); } catch (_) { return false; } }, cles, { timeout: 6000 }).catch(() => {});
   const lireLs = () => pg.evaluate(() => ({ slots: JSON.parse(localStorage.getItem('vrm_slots') || 'null'), numeros: localStorage.getItem('vinted_annonce_numeros') }));
-  return { ctx, pg, errs, toucher, taper, lireLs, touchers: () => n, zero: () => { n = 0; } };
+  return { ctx, pg, errs, toucher, taper, lireLs, attendreSlots, touchers: () => n, zero: () => { n = 0; } };
 }
 const shot = async (pg, nom) => { if (process.env.SHOT) await pg.screenshot({ path: `${process.env.SHOT}-${nom}.png`, fullPage: false }).catch(() => {}); };
 // Une case libre d'un meuble, sur l'écran d'avant (la première dans l'ordre de lecture).
@@ -115,17 +117,20 @@ const signature = (pg) => pg.evaluate(() => {
   const el = document.querySelector('[data-refonte-ms="stock"]'); if (!el) return '';
   const out = [];
   const walk = (n, d) => { if (n.nodeType === 3) { const t = n.textContent.replace(/\s+/g, ' ').trim(); if (t) out.push(d + '#' + t); return; } if (n.nodeType !== 1) return;
-    out.push(d + n.tagName + [...n.attributes].filter((a) => /^(data-|aria-|class$|role$|type$)/.test(a.name) && !/^data-(tombe|ms-vise)/.test(a.name)).map((a) => a.name + '=' + a.value).sort().join(','));
+    out.push(d + n.tagName + [...n.attributes].filter((a) => /^(data-|aria-|class$|role$|type$)/.test(a.name) && !/^data-(tombe|ms-vise|vu)$/.test(a.name)).map((a) => a.name + '=' + a.value).sort().join(','));
     n.childNodes.forEach((c) => walk(c, d + ' ')); };
   walk(el, ''); return out.join('\n');
 });
 
-async function parcours(b, port, { tel, sombre, v2, nom }) {
+async function parcours(b, port, { tel, sombre, v2, nom, petit = false }) {
   const res = {};
   const t = `${nom} ${v2 ? 'ALLUMÉ' : 'éteint'}`;
   // P1 — une paire.
-  { const r = await rendre(b, port, { tel, sombre, v2 }); const avant = await r.lireLs();
+  { const r = await rendre(b, port, { tel, sombre, v2, petit }); const avant = await r.lireLs();
     await shot(r.pg, nom + (v2 ? '-apres' : '-avant') + '-ecran');
+    // Le geste plein reçoit VRAIMENT le doigt (mesuré : la boîte transparente de l'en-tête à la cloche le couvrait).
+    if (v2) { const pt = await r.pg.evaluate(() => { const b = document.querySelector('[data-sr-lancer]'); if (!b) return null; const q = b.getBoundingClientRect(); const e = document.elementFromPoint(q.left + q.width / 2, q.top + q.height / 2); return { dans: !!(e && b.contains(e)), tag: e && e.tagName }; });
+      dit(!!pt && pt.dans, `${t} : écran — « Ranger » reçoit le toucher (rien ne le couvre)`, JSON.stringify(pt)); }
     if (v2) { await r.toucher('[data-sr-lancer]'); await shot(r.pg, nom + '-apres-seance'); await r.toucher('[data-sr-ranger-ici]'); }
     else { await r.toucher('[data-a-ranger="201"]'); await r.toucher(caseLibreAvant('mA')); }
     await r.pg.waitForTimeout(400); const ap = await r.lireLs();
@@ -136,7 +141,7 @@ async function parcours(b, port, { tel, sombre, v2, nom }) {
     if (v2) { const g = await regles(r.pg); res.regles = g; }
     await r.ctx.close(); }
   // P2 — dix paires.
-  { const r = await rendre(b, port, { tel, sombre, v2 }); const avant = await r.lireLs();
+  { const r = await rendre(b, port, { tel, sombre, v2, petit }); const avant = await r.lireLs();
     const cles = ['201', '202', '203', '204', '205', '206', '207', '208', '209', '210'];
     let suite = true, regl = null;
     if (v2) {
@@ -153,7 +158,7 @@ async function parcours(b, port, { tel, sombre, v2, nom }) {
     } else {
       for (const k of cles) { await r.toucher(`[data-a-ranger="${k}"]`); await r.toucher(`${caseLibreAvant('mA')}, ${caseLibreAvant('mB')}`); }
     }
-    await r.pg.waitForTimeout(500); const ap = await r.lireLs();
+    await r.attendreSlots(cles); const ap = await r.lireLs();
     res.p2 = r.touchers();
     const places = cles.map((k) => ap.slots && ap.slots[k] ? ap.slots[k].m + ':' + ap.slots[k].i : null);
     dit(places.every(Boolean) && new Set(places).size === 10 && !Object.values(MAIN.vrm_slots).some((v) => places.includes(v.m + ':' + v.i)), `${t} : P2 — les 10 paires rangées, chacune dans SA case libre`, places.join(' '));
@@ -162,13 +167,13 @@ async function parcours(b, port, { tel, sombre, v2, nom }) {
     await r.ctx.close(); }
   // P7 (allumé) — LA DERNIÈRE PLACE : la 1re paire posée par « Autre place » dans l'Armoire (mB:0) ; la suivante doit se
   // voir proposer l'Armoire (mB:1), pas la première case libre de l'Étagère (mA:6).
-  if (v2) { const r = await rendre(b, port, { tel, sombre, v2 });
+  if (v2) { const r = await rendre(b, port, { tel, sombre, v2, petit });
     await r.toucher('[data-sr-lancer]'); await r.toucher('[data-sr-autre]'); await r.toucher('[data-sr-onglet="mB"]');
     await shot(r.pg, nom + '-apres-autre-place');
     await r.toucher('[data-sr-grille="mB"] [data-sr-case="mB:0"]');
     await r.pg.waitForSelector('[data-sr-courant="202"]', { timeout: 8000 }).catch(() => {});
     const prop = await r.pg.getAttribute('[data-sr-propose]', 'data-sr-propose').catch(() => null);
-    const ap = await r.lireLs();
+    await r.attendreSlots(['201']); const ap = await r.lireLs();
     dit(ap.slots && ap.slots['201'] && ap.slots['201'].m === 'mB' && ap.slots['201'].i === 0, `${t} : P7 — N°201 posée dans l'Armoire par « Autre place »`, JSON.stringify(ap.slots && ap.slots['201']));
     dit(prop === 'mB:1', `${t} : P7 — la suivante se voit proposer la case d'à côté dans l'Armoire (la dernière place utilisée)`, String(prop));
     await r.ctx.close(); }
@@ -176,21 +181,24 @@ async function parcours(b, port, { tel, sombre, v2, nom }) {
   // la suivante sans reposer la paire ; mouvement réduit = aucune animation ; rangées en content-visibility, photos
   // paresseuses ; aucun décalage de mise en page (CLS < 0,05) en passant Paires → Places → Paires.
   if (v2) {
-    { const r = await rendre(b, port, { tel, sombre, v2 });
+    { const r = await rendre(b, port, { tel, sombre, v2, petit });
       const q = await r.pg.evaluate(() => { const l = document.querySelector('.sr-liste-paires > .sr-ligne'); const imgs = [...document.querySelectorAll('.sr-liste-paires img')];
         return { cv: l ? getComputedStyle(l).contentVisibility : null, lazy: imgs.length > 0 && imgs.every((i) => i.loading === 'lazy') }; });
       dit(q.cv === 'auto' && q.lazy, `${t} : Q — rangées en content-visibility, photos paresseuses`, JSON.stringify(q));
       await r.toucher('[data-sr-seg="places"]'); await r.toucher('[data-sr-seg="paires"]');
       await r.toucher('[data-sr-lancer]');
       const el = r.pg.locator('[data-sr-ranger-ici]').first(); await el.waitFor({ state: 'visible' });
-      if (tel) { await el.tap(); await el.tap(); } else { await el.click(); await el.click(); }
+      // Le 2e toucher arrive PENDANT les 220 ms du mouvement (un toucher de Playwright attend la stabilité : il pourrait
+      // arriver après) — il est donc rejoué dans la page, 60 ms après le premier.
+      if (tel) await el.tap(); else await el.click();
+      await r.pg.evaluate(() => new Promise((ok) => setTimeout(() => { const b = document.querySelector('[data-sr-ranger-ici]'); if (b) b.click(); ok(); }, 60)));
       await r.pg.waitForTimeout(120);
       const apres = await r.pg.evaluate(() => ({ courant: document.querySelector('[data-sr-courant]') && document.querySelector('[data-sr-courant]').getAttribute('data-sr-courant'), rep: window.__reponses.slice(), cls: window.__cls, slots: JSON.parse(localStorage.getItem('vrm_slots') || 'null') }));
       dit(apres.rep.length && Math.max(...apres.rep) < 100, `${t} : Q — la coche « fait » arrive < 100 ms après le toucher`, apres.rep.join(',') + ' ms');
       dit(apres.courant === '202' && apres.slots['201'] && apres.slots['201'].m === 'mA' && apres.slots['201'].i === 6 && !apres.slots['202'], `${t} : Q — un 2e toucher pendant le mouvement : la suivante arrive, rien n'est reposé`, JSON.stringify({ c: apres.courant, s201: apres.slots['201'], s202: apres.slots['202'] }));
       dit(apres.cls < 0.05, `${t} : Q — aucun saut de mise en page (CLS hors geste)`, apres.cls.toFixed(4));
       await r.ctx.close(); }
-    { const r = await rendre(b, port, { tel, sombre, v2, reduit: true });
+    { const r = await rendre(b, port, { tel, sombre, v2, petit, reduit: true });
       await r.toucher('[data-sr-lancer]'); await r.toucher('[data-sr-ranger-ici]');
       const q = await r.pg.evaluate(() => ({ anims: document.getAnimations().filter((a) => a.playState === 'running' && a.effect && a.effect.target && a.effect.target.closest && a.effect.target.closest('.sr-feuille, .sr-ecran')).length,
         courant: document.querySelector('[data-sr-courant]') && document.querySelector('[data-sr-courant]').getAttribute('data-sr-courant') }));
@@ -198,7 +206,7 @@ async function parcours(b, port, { tel, sombre, v2, nom }) {
       await r.ctx.close(); }
   }
   // P3 + P4 — trouver N°178, puis la déplacer.
-  { const r = await rendre(b, port, { tel, sombre, v2 }); const avant = await r.lireLs();
+  { const r = await rendre(b, port, { tel, sombre, v2, petit }); const avant = await r.lireLs();
     let trouve = false;
     if (v2) {
       await r.taper('[data-sr-cherche]', '178');
@@ -229,7 +237,7 @@ async function parcours(b, port, { tel, sombre, v2, nom }) {
     dit(ap.numeros === avant.numeros, `${t} : P4 — aucun N° changé`);
     await r.ctx.close(); }
   // P5 — voir ce qu'il y a dans l'Armoire ; P6 — la vendue allumée.
-  { const r = await rendre(b, port, { tel, sombre, v2 });
+  { const r = await rendre(b, port, { tel, sombre, v2, petit });
     if (v2) { await r.toucher('[data-sr-seg="places"]'); await r.toucher('[data-sr-place-ouvrir="mB"]'); }
     await r.pg.waitForTimeout(300);
     // La distance à faire défiler pour AVOIR l'Armoire sous les yeux (le haut de ses cases), mesurée avant de défiler.
@@ -254,7 +262,8 @@ async function parcours(b, port, { tel, sombre, v2, nom }) {
   const srv = serveur(DIST); const port = await ecouter(srv);
   let srvRef = null, portRef = null; if (REF) { srvRef = serveur(REF); portRef = await ecouter(srvRef); }
   const lancer = () => chromium.launch({ executablePath: CHROMIUM, args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
-  const tous = [{ tel: true, sombre: false, nom: '390-clair' }, { tel: true, sombre: true, nom: '390-sombre' }, { tel: false, sombre: false, nom: '1512-clair' }];
+  const tous = [{ tel: true, sombre: false, nom: '390-clair' }, { tel: true, sombre: true, nom: '390-sombre' }, { tel: false, sombre: false, nom: '1512-clair' },
+    { tel: true, sombre: false, nom: '375-tresgrand', petit: true }];   // 375 × 667, Paramètres → Taille du texte « Très grand » (×1,36)
   // `BANC_SEUL=390-clair` : un seul cas (les mutations).
   const cas = process.env.BANC_SEUL ? tous.filter((c) => c.nom === process.env.BANC_SEUL) : tous;
   const tableau = [];
@@ -277,8 +286,8 @@ async function parcours(b, port, { tel, sombre, v2, nom }) {
         dit(!g.coupes.length, `${t} : ${k} — aucun texte coupé`, g.coupes.join(' | '));
         dit(g.sw <= g.iw, `${t} : ${k} — aucun défilement de côté`, `${g.sw}/${g.iw}`);
         dit(g.pleins <= 1, `${t} : ${k} — un seul bouton plein`, String(g.pleins));
-        if (k === 'écran') { dit(g.premiere != null && g.premiere <= g.ih * 0.5, `${t} : écran — la 1re paire de la liste dans la moitié haute du premier écran`, `${g.premiere} px / ${g.ih}`);
-          if (/^390/.test(t)) dit(g.glisse, `${t} : écran — glisser à gauche une paire à ranger : « Ranger »`); }
+        if (k === 'écran') { dit(g.premiere != null && g.premiere <= g.ih * (/^375/.test(t) ? 0.6 : 0.5), `${t} : écran — la 1re paire de la liste dans la moitié haute du premier écran`, `${g.premiere} px / ${g.ih}`);
+          if (/^3(90|75)/.test(t)) dit(g.glisse, `${t} : écran — glisser à gauche une paire à ranger : « Ranger »`); }
       }
       if (REF) {
         const ref = await parcours(b, portRef, { ...c, v2: false, nom: c.nom + '-main' });

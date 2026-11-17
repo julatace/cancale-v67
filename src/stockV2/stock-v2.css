@@ -236,7 +236,7 @@
 .sr-kraft-anneau > .sr-ici.sr-kraft { clip-path: polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% 100%, 0 100%); }
 @keyframes sr-allume { from { transform: scale(.97); opacity: .4; } 60% { transform: scale(1.015); opacity: 1; } to { transform: none; } }
 /* Mes places : l'étiquette du meuble, ses lettres au feutre. */
-.sr-place-etiquette { display: grid; place-items: center; width: 56px; height: 44px; padding-left: 8px; box-sizing: border-box; flex: none; font-size: 17px; font-weight: 800; letter-spacing: .02em; clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 0 100%); border-radius: 4px; }
+.sr-place-etiquette { display: grid; place-items: center; width: 56px; height: 44px; padding-left: 8px; box-sizing: border-box; flex: none; font-size: 17px; font-weight: 700; letter-spacing: .02em; clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 0 100%); border-radius: 4px; }
 .sr-place-etiquette.sr-kraft::before { left: 7px; width: 6px; height: 6px; margin-top: -3px; }
 .sr-liste > .sr-place + .sr-place::before, .sr-liste > .sr-place + .sr-rangee::before { left: 76px; }
 /* LE MOUVEMENT « fait » : la paire rangée glisse et se replie (220 ms, un ressort court), une coche sur sa photo ; le
@@ -259,7 +259,7 @@
 :root:root:root:root:root:root:root body .sr-segment .vrm-seg-btn { background: transparent !important; color: #FFFFFF !important; border: 0 !important; box-shadow: none !important; border-radius: 9px !important; min-height: 38px !important; font-size: 15px !important; font-weight: 600 !important; }
 :root:root:root:root:root:root:root body .sr-segment .vrm-seg-btn::before, :root:root:root:root:root:root:root body .sr-segment .vrm-seg-btn::after { display: none !important; }
 :root:root:root:root:root:root:root body .sr-segment .vrm-seg-btn[aria-pressed="true"] { background: #FFFFFF !important; color: #0C1D30 !important; box-shadow: 0 1px 2px rgb(0 0 0 / .14), 0 3px 8px rgb(0 0 0 / .10) !important; }
-:root:root:root:root:root:root:root body .sr-segment .vrm-seg-n { opacity: .72; font-weight: 500; }
+:root:root:root:root:root:root:root body .sr-segment .vrm-seg-n { opacity: .72; font-weight: 400; }
 :root[data-theme="dark"]:root:root:root:root:root:root body .sr-segment .vrm-seg { background: rgb(0 0 0 / .28) !important; box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .10) !important; }
 :root[data-theme="dark"]:root:root:root:root:root:root body .sr-segment .vrm-seg-btn { color: #EAF2FB !important; }
 :root[data-theme="dark"]:root:root:root:root:root:root body .sr-segment .vrm-seg-btn[aria-pressed="true"] { background: #3A5072 !important; color: #FFFFFF !important; box-shadow: 0 1px 3px rgb(0 0 0 / .35) !important; }
@@ -269,3 +269,13 @@
 /* Une photo arrive en fondu, dans SA place (taille fixée : le texte ne bouge pas). */
 .sr-liste-paires .v2l-photo img { animation: sr-ouvre 200ms ease both; }
 @media (prefers-reduced-motion: reduce) { .sr-liste-paires .v2l-photo img { animation: none; } }
+
+/* La coque, allumé, sur Stock (et Annonces) : l'en-tête qui porte la cloche est POSÉ sur la ligne du titre — sa boîte
+   transparente couvrait « Ranger 10 » (mesuré : le toucher tombait sur <header>). Seuls ses boutons prennent le doigt. */
+html[data-design="v2"] body .vrm-app-header.v2-entete-cloche { pointer-events: none; }
+html[data-design="v2"] body .vrm-app-header.v2-entete-cloche :is(button, a, [role="button"], input) { pointer-events: auto; }
+
+/* L'explication du Stock (premier meuble pas encore créé) dans le nouveau design : les numéros d'étapes lisibles (13 px,
+   gris du nouveau design ≥ 4,5:1), trois graisses seulement. */
+.sr-ecran .vrm-sx-etape > b { font-size: 13px !important; font-weight: 600 !important; color: var(--v2-muet, #4A5B6D) !important; }
+.sr-ecran .vrm-sx-etape > span { font-size: 15px; font-weight: 400; }

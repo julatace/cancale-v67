@@ -1500,7 +1500,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   const nSansTout = aa ? nSansNum + sansNumAutres + vcSansNum.length : 0;
   const etatsV2 = !designV2 || !(aa && aa.su) ? [] : [
     nAConf > 0 ? { k: 'aconfirmer', ambre: true, titre: tr('sr.etat.aConf', { n: nAConf }), geste: tr('sr.etat.aConfGeste', { qui: aConfVoir.map((c) => (c.plateforme === 'vinted' ? c.nom : nomPlateforme(c.plateforme))).filter(Boolean).join(', ') }) } : null,
-    aa.manque.length > 0 ? { k: 'pastoutlu', ambre: true, titre: tr('sr.etat.pasLu'), geste: tr('sr.etat.pasLuGeste', { liste: manqueTxt }) } : null,
+    aa.manque.length > 0 ? { k: 'pastoutlu', titre: tr('sr.etat.pasLu'), geste: tr('sr.etat.pasLuGeste', { liste: manqueTxt }) } : null,
     nSansTout > 0 ? { k: 'sansnum', titre: tr('sr.etat.sansNum', { n: nSansTout }), geste: tr('sr.etat.sansNumGeste'), faire: () => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vinted_annonces' })); } catch (_) {} } } : null,
     nMasq > 0 ? { k: 'masquees', titre: tr('sr.etat.masquees', { n: nMasq }), geste: tr('sr.etat.masqueesGeste') } : null,
   ].filter(Boolean);
