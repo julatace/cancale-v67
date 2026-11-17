@@ -30,6 +30,11 @@ export const NOUVEAUTES = Object.freeze([
   // (16 nov., lot compta-donnees) docs/passation/2026-11-16-compta-donnees.md
   { id: 'partenaires-prorata', date: '2026-11-16', titre: 'Partenaires : remboursement partiel, commission au prorata', phrase: '1 € rendu sur 16,99 € : il reste 2,82 € dus.', tab: 'settings', pour: 'proprietaire', mode: 'tous' },
   { id: 'serie-facture-vrm', date: '2026-11-16', titre: 'Factures en série : envoyer avec VRM', phrase: 'Ta boîte pas connectée ? VRM les envoie, toi en copie.', tab: 'compta', pour: 'pro', mode: 'tous' },
+  // (16 nov., lot vitesse-lectures) docs/passation/2026-11-16-vitesse-lectures.md
+  { id: 'veille-sites', date: '2026-11-16', titre: 'Leboncoin, Vestiaire, messages : à jour tout seuls', phrase: 'Ce que l’extension lit arrive sans recharger, même sur iPhone.', tab: 'messages', pour: 'tous', mode: 'tous' },
+  // (16 nov., lot ecrans-restes) docs/passation/2026-11-16-ecrans-restes.md
+  { id: 'stock-importe-visible', date: '2026-11-16', titre: 'Ton stock importé se voit au Stock', phrase: 'Sous son N°, avec l’emplacement de ton fichier ; la loupe le trouve.', tab: 'garage', pour: 'tous', mode: 'tous' },
+  { id: 'fiche-date-limite', date: '2026-11-16', titre: 'La fiche dit avant quand poster', phrase: 'La date limite du bordereau, sinon l’estimation, comme Colis.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (16 nov., ebay-a-traiter) docs/passation/2026-11-16-ebay-a-traiter.md
   { id: 'ebay-a-traiter', date: '2026-11-16', titre: 'eBay À traiter : tâches et retours relus', phrase: 'Aucun retour s’écrit « aucun » ; un refus mène à la reconnexion.', tab: 'ebay_agent', pour: 'tous', mode: 'tous' },
   // (16 nov., Julien : « irréprochable, on ne peut pas se faire bloquer ») docs/passation/2026-11-16-favoris-offres-irreprochable.md

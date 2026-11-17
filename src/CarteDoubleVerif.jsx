@@ -3,10 +3,12 @@
 // cadre 1 px écrit ici ne tenait que par la règle du système (styles-systeme.css §2.2).
 // Montrée seulement quand la double vérification est LUE inactive (la session porte
 // `totp: []`) ; « pas su » (pas de liste) ⇒ rien. Jamais au démarrage, jamais forcée
-// (décision du 21 oct.) : « Plus tard » la range pour de bon sur cet appareil.
+// (décision du 21 oct.) : « Plus tard » la range pour de bon — (16 nov., lot ecrans-restes) SUR TOUS SES APPAREILS :
+// la clé est synchronisée (`SYNC_KEYS`, ligne `main` du vendeur), il ne la revoit pas sur l'iPhone après l'ordinateur.
+// L'ancienne valeur de l'appareil (« 1 » posé par `localStorage`) se lit pareil et part au nuage au prochain envoi.
 // « Activer » ouvre le panneau existant (Paramètres → Compte → Double vérification).
 import React from 'react';
-import { AUTH, Bouton, C, DEMANDE_REGLAGE_SOUS, Icon } from './App.jsx';
+import { AUTH, Bouton, C, DEMANDE_REGLAGE_SOUS, Icon, load, save, useStateCle } from './App.jsx';
 import { tr } from './i18n/index.js';
 
 export const CLE_CARTE_MFA = 'vrm_carte_mfa_rangee';
@@ -16,12 +18,14 @@ export const etatDoubleVerif = (session) => {
   if (!Array.isArray(t)) return null;
   return t.length ? 'active' : 'inactive';
 };
-const lireRangee = () => { try { return window.localStorage.getItem(CLE_CARTE_MFA) === '1'; } catch (_) { return false; } };
+// Rangée = une valeur vraie (1 ou true) dans la clé synchronisée ; « pas su » (rien lu) = montrée, jamais cachée par défaut.
+const lireRangee = () => { const v = load(CLE_CARTE_MFA, null); return v === 1 || v === true || v === '1'; };
 
 export default function CarteDoubleVerif() {
-  const [rangee, setRangee] = React.useState(lireRangee);
+  // `useStateCle` : relue quand le nuage rapporte la clé (rangée sur un autre appareil ⇒ elle disparaît ici aussi).
+  const [rangee, setRangee] = useStateCle(CLE_CARTE_MFA, lireRangee);
   if (rangee || etatDoubleVerif(AUTH.session) !== 'inactive') return null;
-  const ranger = () => { try { window.localStorage.setItem(CLE_CARTE_MFA, '1'); } catch (_) {} setRangee(true); };
+  const ranger = () => { save(CLE_CARTE_MFA, 1); setRangee(true); };
   const activer = () => { DEMANDE_REGLAGE_SOUS.id = 'double'; try { window.dispatchEvent(new Event('vrm:reglage-sous')); } catch (_) {} };
   const etape = { display: 'flex', gap: 8, alignItems: 'baseline', fontSize: 13, lineHeight: 1.45, color: C.text };
   const n = { flex: '0 0 auto', width: 20, height: 20, borderRadius: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, background: C.card2 || C.border, color: C.text };

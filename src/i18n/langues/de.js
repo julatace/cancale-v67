@@ -8,7 +8,8 @@ import ecran_correspondances from './de/correspondances.js';   // (15 nov.) Publ
 import ecran_capte from './de/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_avenir from './de/avenir.js';
 import ecran_verre2 from './de/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
-import ecran_fiched from './de/fiched.js';   // (15 nov.) la fiche d'un article, direction D
+import ecran_fiched from './de/fiched.js';
+import ecran_ecrans_restes from './de/ecransRestes.js';   // (16 nov.) lot ecrans-restes : stock importé, date limite, loupe   // (15 nov.) la fiche d'un article, direction D
 import ecran_vcventes from './de/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
 import ecran_transporteur_connu from './de/transporteurConnu.js';   // (15 nov.) « À expédier » : transporteur connu
 import ecran_vendre from './de/vendre.js';   // (15 nov., vendre plus) baisses conseillées, relance des favoris, loupe
@@ -2313,6 +2314,7 @@ export default {
   ...ecran_avenir,
   ...ecran_verre2,
   ...ecran_fiched,
+  ...ecran_ecrans_restes,
   ...ecran_numeros_nouvelles,
   ...ecran_republie_telephone,
   ...ecran_securite_ventes,

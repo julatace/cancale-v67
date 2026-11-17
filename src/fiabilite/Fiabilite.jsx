@@ -82,7 +82,7 @@ const abonnesCtl = new Set();
 function lireControles(force = false) {
   if (!force && memoCtl && Date.now() - memoCtl.at < 60000) return Promise.resolve(memoCtl);
   if (promesseCtl) return promesseCtl;
-  promesseCtl = Promise.all([lireControleNuit(), lireControleInstallation()]).then(([v, i]) => {
+  promesseCtl = Promise.all([lireControleNuit(force), lireControleInstallation(force)]).then(([v, i]) => {
     memoCtl = { vendeur: v, installation: i, at: Date.now() }; promesseCtl = null;
     abonnesCtl.forEach((f) => { try { f(); } catch (_) {} });
     return memoCtl;
