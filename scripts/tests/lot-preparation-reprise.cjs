@@ -14,9 +14,12 @@ assert(a>0&&b>a,'le bloc du lot (batchBordereaux … imprimerLotRef.current = im
 const bloc=src.slice(a,b);
 assert(/imprimerLotRef\.current = imprimerLot;/.test(bloc)&&/const attendrePuisOuvrir =/.test(bloc),'le bloc ne porte plus imprimerLot / attendrePuisOuvrir');
 // useState nommé par son setter : le banc lit chaque état posé.
+// (16 nov., lot tampons-parametres) La sélection ouvre l'APERÇU AVANT IMPRESSION : la lecture des PDF (et sa progression,
+// ses pannes, le changement de compte) se fait pour l'aperçu ; « Imprimer » de l'aperçu (`imprimerApercu`) ouvre le PDF.
+// Le banc joue ce toucher (`imprimer()`), la réf de l'aperçu posée comme le rendu la poserait.
 // (16 nov., train : ecrans-restes) le bloc lit `numerosDeLigne`, déclaré juste avant lui dans App.jsx : la MÊME ligne, recopiée de la source.
 const numerosDeLigneSrc=(src.match(/  const numerosDeLigne = .*\n/)||[''])[0];
-const code=numerosDeLigneSrc+bloc.replace(/const \[(\w*), (set\w+)\] = useState\(/g,(_,v,s)=>`const [${v||'_'+s}, ${s}] = __etat('${s}', `)+'\nglobalThis.executer = batchBordereaux;\n';
+const code=numerosDeLigneSrc+bloc.replace(/const \[(\w*), (set\w+)\] = useState\(/g,(_,v,s)=>`const [${v||'_'+s}, ${s}] = __etat('${s}', `)+'\nglobalThis.executer = batchBordereaux;\nglobalThis.imprimerApercu = imprimerApercu;\nglobalThis.__apercuRef = apercuRef;\n';
 let regles=null;
 // Les objets nés dans le contexte vm n'ont pas le même prototype : on compare leur forme JSON.
 const eg=(x,y,m)=>assert.equal(JSON.stringify(x),JSON.stringify(y),m);
@@ -27,7 +30,8 @@ function banc(){
  Object.assign(c,{...regles,Set,Map,Array,Number,String,Date,Error,Math,Object,JSON,Promise,Uint8Array,Blob,
   URL:{createObjectURL:()=>'blob:banc',revokeObjectURL:()=>{}},
   React:{useRef:(v)=>({current:v}),useEffect:()=>{}},
-  __etat:(nom,init)=>[init,(v)=>{(poses[nom]=poses[nom]||[]).push(v);if(nom==='setImprBusy'&&v===null&&fini)fini();}],
+  __etat:(nom,init)=>[init,(v)=>{(poses[nom]=poses[nom]||[]).push(v);if(nom==='setApercuImpr'&&c.__apercuRef)c.__apercuRef.current=v;if(nom==='setImprBusy'&&v===null&&fini)fini();}],
+  TAILLES_TAMPON:{S:0.8,M:1,L:1.25},reglageTamponsChoisi:()=>({}),ecrireReglageTampons:()=>{},avecPlace:(r)=>r,avecChoix:(r)=>r,resoudreTampon:()=>({texteMention:'M'}),aEcrire:(r)=>r,
   AUTH:{user:{id:'A'}},SUPABASE_URL:'https://base.example.test',imprimante:null,imprMode:(f)=>f||'normale',
   /* (16 nov., train : impression-retours) aucun retour dans ce jeu : la sélection des retours est vide */retoursChoisis:()=>[],lignesRetoursImpr:()=>[],_octetsLot:new Map(),_verNum:{etat:'attente',at:0},_visionneuse:null,_pendingBordPrint:false,emailBords:[],only:'bordereaux',colisDans:'',labelsPrets:true,sales:{items:[]},
   tr:(k)=>k,toast:(m)=>{if(/^Erreur/.test(String(m)))erreurs.push(m);},
@@ -46,7 +50,9 @@ function banc(){
   marquerVc:(_,id)=>marques.push(id)});
  vm.createContext(c);vm.runInContext(code,c);
  const dernier=(nom)=>{const l=poses[nom]||[];return l[l.length-1];};
- return{c,poses,marques,echecs,erreurs,fin,dernier};
+ // Son toucher sur « Imprimer » de l'aperçu (s'il est ouvert) ; rend la fin du geste.
+ const imprimer=async()=>{if(!c.__apercuRef||!c.__apercuRef.current)return false;const f2=fin();c.imprimerApercu();await Promise.race([f2,new Promise(r=>setTimeout(r,50))]);return true;};
+ return{c,poses,marques,echecs,erreurs,fin,dernier,imprimer};
 }
 (async()=>{
  const imp=async(f)=>(await import(url.pathToFileURL(path.join(racine,f)).href));
@@ -61,6 +67,7 @@ function banc(){
   liberer([{b64:'YQ=='}]);await new Promise(setImmediate);
   assert.equal(n,2);eg(f.dernier('setImprBusy'),{fait:1,total:2},'la progression avance après la 1re lecture');
   liberer([{b64:'Yg=='}]);await fin;
+  assert.ok(await f.imprimer(),'l’aperçu avant impression s’est ouvert');
   const e=f.dernier('setImprEtat');assert.ok(e&&e.res,'la feuille d’après s’ouvre');
   eg(e.res.reussies,['a']);eg(e.absents.map(x=>[x.cle,x.raison]),[['b','illisible']],'le raté est NOMMÉ avec sa raison');
   eg(f.marques,['a'],'seul le bordereau sorti est marqué imprimé');assert.equal(f.echecs.length,0,'aucun échec : '+JSON.stringify(f.echecs.map(x=>String(x.err&&x.err.message||x.err))));eg(f.erreurs,[],'aucune erreur de code avalée');
@@ -72,6 +79,7 @@ function banc(){
   assert.equal(e.poses.setImprEtat,undefined,'rien ne s’ouvre sur une panne');assert.equal(e.marques.length,0);
   assert.equal(e.echecs.length,1);assert.equal(e.echecs[0].err.message,'Réseau','la vraie panne est dite (pas une erreur de code)');assert.equal(typeof e.echecs[0].o.reessayer,'function','la panne est dite avec « Réessayer »');
   e.c.lireBaseRelue=async()=>[{b64:'YQ=='}];fin=e.fin();e.echecs[0].o.reessayer();await fin;
+  assert.ok(await e.imprimer(),'Réessayer rouvre l’aperçu');
   eg(e.marques,['a','b'],'Réessayer reprend la même sélection');eg(e.dernier('setImprEtat').absents,[]);
  }
  // 4 : le compte change pendant la préparation ⇒ rien ouvert, rien marqué.

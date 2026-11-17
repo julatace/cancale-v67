@@ -236,11 +236,11 @@ action('colis.imprimer', async (nav) => {
     // Imprimer », une fois par bordereau) ; il répond, puis vient « C'est imprimé ? ».
     let r = await moment(o.pg, 'apres', 'colis.imprimer', { ms: 4000 });
     for (let k = 0; !r && k < 3; k++) {
-      const imp = o.pg.locator('[data-tampon-imprimer]').last();
+      const imp = o.pg.locator('[data-tampon-imprimer],[data-impr-apercu="pret"] [data-impr-apercu-imprimer]').last();
       if (await imp.count()) await imp.click().catch(() => {});
       r = await moment(o.pg, 'apres', 'colis.imprimer', { ms: 3000 });
     }
-    if (!r && await o.pg.locator('[data-tampon-imprimer]').count()) noter('colis.imprimer', 'apres', null, { raisonNonJoue: 'le PDF inventé n’a pas de forme connue : la feuille « Placer le tampon » attend un vrai bordereau' });
+    if (!r && await o.pg.locator('[data-tampon-imprimer],[data-impr-apercu-imprimer]').count()) noter('colis.imprimer', 'apres', null, { raisonNonJoue: 'le PDF inventé n’a pas de forme connue : la feuille « Placer le tampon » attend un vrai bordereau' });
     else noter('colis.imprimer', 'apres', r);
     await shot(o.pg, 'colis-imprimer-apres');
   } finally { await o.ctx.close(); }
