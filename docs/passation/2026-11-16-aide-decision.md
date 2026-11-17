@@ -64,8 +64,12 @@ couverture dite. Branche `claude/aide-decision`. Extension **5.402.0** (numéro 
 
 ## ÉTAT À LA REPRISE
 
-- Fait et poussé : tout ce qui précède, extension 5.402.0 (zips régénérés), CLAUDE.md §8 et §9.
-- Reste : voir le rapport de PR (captures, passe complète, CI).
+- Fait et poussé : tout ce qui précède, extension 5.402.0 (zips régénérés), CLAUDE.md §8 et §9 ; PR #1231.
+- 17 nov. : vrai merge d'origin/main (main servait 5.400.0 ; le moteur y relit le fil avant le geste,
+  « relireOffre », et refuse d'accepter une annonce lue réservée/vendue/fermée — la contre-offre suit
+  les deux). Audit 56 verts, 28/28 mutations ; banc aide-decision tout OK après le merge.
+- Passe complète locale abandonnée (678 audits, 2 à la fois, machine saturée : ~2 h) : la CI la fait.
+  Rouges CI sans lien, aussi rouges sur l'arbre de main : audit-notifs-redaction, audit-vendeur-generaliste.
 
 ## Geste de Julien
 
