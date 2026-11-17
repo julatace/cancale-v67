@@ -73,7 +73,7 @@
   const numero = (n) => (n ? `<span class="j-num" data-numero="${esc(n)}">N° ${esc(n)}</span>` : '');
   const ambre = (t) => `<span class="j-ambre"><i class="j-point"></i>${t}</span>`;
   const limiteTexte = (v) => (v.limite ? (v.limite - NOW < 2 * J ? ambre('avant ' + quand(v.limite)) : 'avant ' + quand(v.limite)) : 'date estimée, ' + quand(v.estimee));
-  const heros = (n, mot, sous) => `<section class="j-heros" data-heros><p class="j-heros-n" data-chiffre>${n}</p><p class="j-heros-mot">${mot}</p>${sous ? `<p class="j-heros-sous">${sous}</p>` : ''}</section>`;
+  const heros = (n, mot, sous) => `<section class="j-heros" data-heros><p class="j-heros-n" data-chiffre>${n}</p><div class="j-heros-txt"><p class="j-heros-mot">${mot}</p>${sous ? `<p class="j-heros-sous">${sous}</p>` : ''}</div></section>`;
   const onglets = (items, actif, ecran, extra = '') => `<div class="j-onglets-ligne"><nav class="j-onglets" role="tablist">${items.map(([cle, nom]) => `<a role="tab" class="j-onglet" href="#ecran=${ecran}&vue=${cle}" aria-selected="${cle === actif}" data-vue="${cle}">${nom}</a>`).join('')}</nav>${extra}</div>`;
   const rangee = (p, droite, sous, cle) => `<a class="j-rangee" href="#" data-ligne="${esc(cle)}"><span class="j-rangee-photo">${img(p)}</span><span class="j-rangee-corps"><span class="j-rangee-titre">${esc(titreDe(p))}</span><span class="j-rangee-sous">${sous}</span></span><span class="j-rangee-droite">${droite}</span></a>`;
   const groupe = (titre, n, corps) => `<section class="j-groupe"><h2 class="j-entete">${titre}<span>${nb(n)}</span></h2>${corps}</section>`;
@@ -165,7 +165,7 @@
     argent() {
       const [ent, dec] = (euros(recuMois).replace(/ €$/, '')).split(',');
       return `<div class="j-ecran j-e-argent"><div class="j-col-a">
-        <section class="j-heros" data-heros><p class="j-heros-n" data-chiffre>${ent}${dec ? `<span class="j-dec">,${dec}</span>` : ''}<span class="j-eur">€</span></p><p class="j-heros-mot">reçus en novembre</p><p class="j-heros-sous">${nb(ceMois.length)} versements</p></section>
+        <section class="j-heros" data-heros><p class="j-heros-n" data-chiffre>${ent}${dec ? `<span class="j-dec">,${dec}</span>` : ''}<span class="j-eur">€</span></p><div class="j-heros-txt"><p class="j-heros-mot">reçus en novembre</p><p class="j-heros-sous">${nb(ceMois.length)} versements</p></div></section>
         ${courbe()}
         <dl class="j-quatre" data-quatre>
           <div><dt>disponible sur Vinted</dt><dd>${euros(D.porteMonnaie.disponible)}</dd></div>

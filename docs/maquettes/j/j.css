@@ -57,12 +57,12 @@ h1, h2, h3, p, dl, dd, figure { margin: 0; }
 
 /* ── Le chiffre ── */
 .j-heros { padding: 24px 0 32px; display: grid; grid-template-columns: auto 1fr; column-gap: 16px; align-items: end; }
-.j-heros-n { grid-row: 1 / 3; align-self: end; }
+.j-heros-txt { display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: 2px; }
 .j-heros-n { font-size: var(--affiche); font-weight: 500; line-height: .78; letter-spacing: -.055em; margin-left: -4px; }
 .j-dec { color: var(--faible); }
 .j-eur { font-weight: 400; color: var(--doux); margin-left: 8px; letter-spacing: -.02em; }
-.j-heros-mot { grid-column: 2; font-size: var(--texte); font-weight: 500; line-height: 1.2; }
-.j-heros-sous { margin-top: 4px; font-size: var(--legende); color: var(--doux); grid-column: 2; padding-bottom: 2px; }
+.j-heros-mot { font-size: var(--texte); font-weight: 500; line-height: 1.2; }
+.j-heros-sous { margin-top: 4px; font-size: var(--legende); color: var(--doux); }
 
 /* ── Onglets en mots (soulignés), jamais des capsules ── */
 .j-onglets-ligne { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--filet); margin-bottom: 8px; }
@@ -128,11 +128,11 @@ h1, h2, h3, p, dl, dd, figure { margin: 0; }
 .j-pass-suivi { letter-spacing: .01em; }
 .j-pass-pages { margin-top: 16px; font-size: var(--legende); color: var(--pass-doux); }
 .j-pass-pages b { color: var(--pass-encre); }
-.j-pile.is-mini { position: relative; display: block; padding-top: 0; height: 156px; }
+.j-pile.is-mini { position: relative; display: block; padding-top: 0; height: 124px; }
 .j-pile.is-mini .j-pass.is-dos { position: absolute; left: calc(var(--k) * 8px + 8px); right: calc(var(--k) * 8px + 8px); top: calc(var(--k) * 10px); height: 60px; margin: 0; padding: 0; }
 .j-pile.is-mini .j-pass.is-dos:first-child { left: 16px; right: 16px; top: 0; }
 .j-pile.is-mini .j-pass.is-dos:nth-child(2) { left: 8px; right: 8px; top: 10px; }
-.j-pass.is-mini-devant { position: absolute; left: 0; right: 0; top: 20px; height: 136px; background: var(--pass); color: var(--pass-encre); padding: 16px 20px; display: grid; grid-template-columns: 1fr auto; align-content: space-between; box-shadow: 0 -8px 20px rgba(0, 0, 0, .35); transition: transform 160ms var(--ease); }
+.j-pass.is-mini-devant { position: absolute; left: 0; right: 0; top: 20px; height: 104px; background: var(--pass); color: var(--pass-encre); padding: 16px 20px; display: grid; grid-template-columns: 1fr auto; align-content: start; row-gap: 16px; box-shadow: 0 -8px 20px rgba(0, 0, 0, .35); transition: transform 160ms var(--ease); }
 :root[data-theme='clair'] .j-pass.is-mini-devant { box-shadow: 0 -4px 12px rgba(0, 0, 0, .08), 0 10px 24px rgba(0, 0, 0, .08); }
 .j-pile.is-mini:active .j-pass.is-mini-devant { transform: scale(.98); }
 .j-mini-nom { font-weight: 600; }
@@ -156,7 +156,7 @@ h1, h2, h3, p, dl, dd, figure { margin: 0; }
 /* ── Argent ── */
 .j-courbe { position: relative; margin: 0 calc(-1 * var(--m)); overflow: hidden; }
 .j-courbe svg { display: block; width: 100%; height: 160px; }
-.j-courbe-aire { fill: var(--accent); opacity: .16; }
+.j-courbe-aire { fill: var(--accent); opacity: .12; }
 .j-courbe-trait { fill: none; stroke: var(--accent); stroke-width: 2; }
 .j-courbe-pt { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -10px; border-radius: 50%; background: var(--accent); }
 .j-courbe figcaption { display: flex; justify-content: space-between; padding: 8px var(--m) 0; font-size: var(--legende); color: var(--faible); }
@@ -202,7 +202,9 @@ h1, h2, h3, p, dl, dd, figure { margin: 0; }
   .j-e-journee, .j-e-achats, .j-e-argent { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 64px; align-items: start; }
   .j-e-journee .j-vedette { margin: 0; }
   .j-e-journee .j-vedette-texte { padding: 16px 0 0; }
-  .j-e-journee .j-col-b, .j-e-argent .j-col-b { padding-top: 40px; }
+  .j-e-journee .j-col-b { padding-top: 0; }
+  .j-e-journee .j-col-b > .j-groupe:first-child { margin-top: 24px; }
+  .j-e-argent .j-col-b { padding-top: 0; }
   .j-e-achats .j-col-a { max-width: 440px; position: sticky; top: 24px; }
   .j-e-achats .j-col-b > .j-groupe:first-child { margin-top: 24px; }
   .j-e-argent .j-courbe { margin: 0; }
