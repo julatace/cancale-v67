@@ -53,7 +53,7 @@ fs.mkdirSync(SHOTS, { recursive: true });
 const SIG_AVANT = process.env.SIGNATURE_AVANT || '';
 let ok = 0, ko = 0;
 const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko++; console.log('  ❌ ' + m + (d !== undefined ? ' — ' + (typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 500) : '')); } return c; };
-const attendre = async (pg, f, ms = 30000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await pg.evaluate(f).catch(() => false)) return true; await pg.waitForTimeout(400); } return false; };
+const attendre = async (pg, f, ms = 30000, arg) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await pg.evaluate(f, arg).catch(() => false)) return true; await pg.waitForTimeout(arg !== undefined ? 50 : 400); } return false; };
 const sansToasts = async (pg) => { await pg.evaluate(() => { for (const t of document.querySelectorAll('.vrm-toast')) t.click(); }).catch(() => {}); await pg.waitForTimeout(400); };
 
 // Le contraste au fond EFFECTIF (fonds composés jusqu'au premier opaque, sinon la lumière du Studio) — la règle du banc design-v2.
@@ -205,7 +205,7 @@ async function allume(nav, b, sombre, W, ref) {
       return r ? { cle: r.getAttribute('data-v2v-ligne'), plein: Number(pl && pl.getAttribute('data-impr-lot')), affiche: (document.querySelector('[data-v2v-affiche]') || { getAttribute: () => '' }).getAttribute('data-v2v-affiche') } : null; });
     if (f0) {
       await pg.evaluate((cle) => { const b = document.querySelector(`.v2-cache [data-colis-ident="${CSS.escape(cle)}"] button[data-geste="imprime"]`); if (b) b.click(); }, f0.cle);
-      const vu = await attendre(pg, (cle) => !!document.querySelector(`[data-v2v-ligne="${CSS.escape(cle)}"][data-v2v-fait="part"]`), 1500).catch(() => false);
+      const vu = await attendre(pg, (cle) => !!document.querySelector(`[data-v2v-ligne="${CSS.escape(cle)}"][data-v2v-fait="part"]`), 1500, f0.cle).catch(() => false);
       const enCours = await pg.evaluate(() => !!document.querySelector('.v2-faite.is-faite .v2v-ligne, .v2-faite.is-faite [data-v2v-ligne]') || !!document.querySelector('.v2-faite.is-faite'));
       await pg.screenshot({ path: path.join(SHOTS, `ventes-fait-${th}.png`) });
       await pg.waitForTimeout(1200);
