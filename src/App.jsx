@@ -25072,8 +25072,13 @@ function SuivisManuels({ liste, tracking, achats, accName, relire, etapeDe, tran
 //    vide) ; le code reste écrit en gros à côté.
 const CLE_QR_LOCAL = 'vrm_qr_local_';
 const lireQrLocal = (u) => { try { return u && !/^data:/.test(u) ? localStorage.getItem(CLE_QR_LOCAL + u) : null; } catch (_) { return null; } };
+// (17 nov., fiabilité-vitesse) SEULEMENT une adresse que la page a le droit de lire (sa politique de sécurité du
+// contenu, `connect-src` de vercel.json : la même origine, la base). Mesuré au journal des plantages (16 nov.) : la
+// copie d'un QR de p.vintedgo.com / pickup-services.com partait quand même, refusée à CHAQUE affichage (« CSP
+// connect-src ← … »), sans jamais rien garder. Ces QR-là, le service worker les range (`/hl-qr`, rechaufferQr).
+const qrLisibleParLaPage = (u) => { try { const o = new URL(u, window.location.href).origin; return o === window.location.origin || o === new URL(SUPABASE_URL).origin; } catch (_) { return false; } };
 const garderQrLocal = async (u) => {
-  if (!u || /^data:/.test(u) || lireQrLocal(u)) return;
+  if (!u || /^data:/.test(u) || lireQrLocal(u) || !qrLisibleParLaPage(u)) return;
   try {
     const r = await fetch(u, { mode: 'cors', credentials: 'omit' }); if (!r.ok) return;
     const b = await r.blob(); if (!/^image\//.test(b.type) || b.size > 60000) return;
