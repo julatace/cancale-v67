@@ -24,6 +24,7 @@ import './_lib/sans-bruit.js';
 import crypto from 'node:crypto';
 import { sendPushToAll, pushCategorieActive, prefsDuVendeur, vidangerResume, instantNotif, instantCalme } from './_lib/push.js';
 import { CLE_RAPPELS, MEMO_RAPPELS, lireRappels, rappelsDus, memoApres, texteRappel, texteRappels, lienRappel, TAG_RAPPEL } from './_lib/rappels-perso.js';
+import { LIGNE_PROGRAMME as LIGNE_REPUB_PROG, MEMO_PROGRAMME as MEMO_REPUB_PROG, programmesManques, memoApres as memoRepubApres, texteManque as texteRepubManque, cleManque as cleRepubManque, URL_REPUBLIER, FENETRE_DEPART_MS as FENETRE_REPUB_MS, MARGE_APPAREIL_MS as MARGE_REPUB_MS, MAX_AGE_MS as AGE_REPUB_MS } from './_lib/repub-programme-notif.js';
 import { CLE_REMISES, MEMO_REMISES, lireRemises, remisesDues, memoRemisesApres, texteRappelRemise, texteRappelsRemise, TAG_REMISE, instantRemise } from './_lib/remises-main-propre.js';
 import { resumeReveil, ID_REVEIL } from './_lib/reveil-calme.js';
 import { reglageCalme, reglageSoir, soirALHeure, reglageJours, dansHeuresCalmes } from './_lib/notif-textes.js';
@@ -1589,6 +1590,43 @@ async function passageRemises(maintenant = instantNotif()) {
   }
   return { fait: true, vendeurs: owners.length, envoyees, echecs, budgetAtteint };
 }
+// (16 nov., lot extension-restes) LA REPUBLICATION PROGRAMMÉE QU'AUCUN APPAREIL N'A LANCÉE
+// (api/_lib/repub-programme-notif.js) : seuls les vendeurs dont l'index de `vrm_repub_programme`
+// (`prochaineFin`, posé par l'app) est passé depuis plus de 15 min et moins de 24 h sont visités
+// (filtre de la base, §4.4) ; la ligne lue PROJETÉE sur `attentes` seule (jamais les réglages) ;
+// le mémo `repub_programme_notif` lu en trois états (illisible ⇒ rien) et écrit AVANT l'envoi,
+// confirmé. Famille « Rappels » coupée ⇒ rien. Le serveur ne lance rien, n'écrit jamais la ligne.
+async function repubProgrammeSur(maintenant = instantNotif()) {
+  try {
+    const l = await getRowProjete(LIGNE_REPUB_PROG, ['attentes']);
+    if (l === undefined) return { etat: 'pas-su' };
+    const attentes = l && Array.isArray(l.attentes) ? l.attentes : [];
+    const memo = await getRow(MEMO_REPUB_PROG);
+    if (memo === undefined) return { etat: 'memo-illisible' };
+    const envoyes = memo && memo.envoyes;
+    const dus = programmesManques(attentes, envoyes, maintenant);
+    if (!dus || !dus.length) return { etat: 'rien-de-du' };
+    if (!(await pushCategorieActive('rappel'))) return { etat: 'coupe', n: dus.length };
+    if (!(await ecrireDedup(MEMO_REPUB_PROG, { envoyes: memoRepubApres(envoyes, dus, maintenant), at: new Date(maintenant).toISOString() }))) return { etat: 'memo-non-ecrit', n: dus.length };
+    const t = texteRepubManque(dus);
+    const envoi = await sendPushToAll({ cat: 'rappel', title: t.title, body: t.body, tag: 'repub-prog-' + dus.map((a) => a.id).sort().join('-').slice(0, 60), cle: 'repub-prog-' + dus.map(cleRepubManque).sort().join('|').slice(0, 120), url: URL_REPUBLIER });
+    return { etat: 'envoye', n: dus.length, envoi: envoi && (envoi.coupe || envoi.erreur || envoi.sent) };
+  } catch (e) { return { etat: 'echec' }; }
+}
+async function passageRepubProgramme(maintenant = instantNotif()) {
+  const debut = Date.now();
+  const avant = new Date(maintenant - MARGE_REPUB_MS).toISOString(), apres = new Date(maintenant - AGE_REPUB_MS + FENETRE_REPUB_MS).toISOString();
+  const lignes = await fetchPaginated(`app_data?id=eq.${LIGNE_REPUB_PROG}&and=(data->>prochaineFin.lt.${encodeURIComponent(avant)},data->>prochaineFin.gt.${encodeURIComponent(apres)})&select=owner`);
+  if (!lignes) return { fait: false, raison: 'pas su' };
+  const owners = [...new Set(lignes.map((x) => x && x.owner && String(x.owner)).filter(Boolean))];
+  let envoyees = 0, echecs = 0, budgetAtteint = false;
+  for (let i = 0; i < owners.length; i += VENDEURS_EN_PARALLELE) {
+    if (Date.now() - debut > 60000) { budgetAtteint = true; break; }
+    const out = await Promise.all(owners.slice(i, i + VENDEURS_EN_PARALLELE).map((o) => contexteVendeur.run({ owner: o }, () => repubProgrammeSur(maintenant)).catch(() => ({ etat: 'echec' }))));
+    out.forEach((r) => { if (r && r.etat === 'envoye') envoyees += 1; if (r && r.etat === 'echec') echecs += 1; });
+  }
+  return { fait: true, vendeurs: owners.length, envoyees, echecs, budgetAtteint };
+}
 // (11 nov., décision C8) Le passage horaire : le résumé seul (ni eBay relu, ni bilan de la semaine).
 async function traiterVendeurSoirHeure() {
   const out = await rappelDuSoir(Date.now(), { horaire: true });
@@ -1839,10 +1877,13 @@ async function passageDuCron(req, res, moment, bailEtat) {
     // des remises en main propre. Un échec de l'un n'empêche pas l'autre.
     let remises = null;
     try { remises = await passageRemises(instantNotif()); } catch (e) { remises = { fait: false, raison: String((e && e.message) || e).slice(0, 120) }; }
+    // (16 nov.) Et la republication programmée qu'aucun appareil n'a lancée (un échec n'empêche rien d'autre).
+    let repubProg = null;
+    try { repubProg = await passageRepubProgramme(instantNotif()); } catch (e) { repubProg = { fait: false, raison: String((e && e.message) || e).slice(0, 120) }; }
     // (16 nov., lot plateformes-restes) « Vendu ! » Leboncoin, eBay, Vestiaire : le même passage de 15 min.
     let ventesSites = null;
     try { ventesSites = await passageVentesSites(Date.now()); } catch (e) { ventesSites = { fait: false, raison: String((e && e.message) || e).slice(0, 120) }; }
-    res.status(r && r.fait ? (r.echecs ? 500 : 200) : 503).json({ ok: !!(r && r.fait) && !r.echecs, moment: 'groupe', ...r, remises, ventesSites });
+    res.status(r && r.fait ? (r.echecs ? 500 : 200) : 503).json({ ok: !!(r && r.fait) && !r.echecs, moment: 'groupe', ...r, remises, repubProg, ventesSites });
     return;
   }
   // (11 nov., lot alertes-ebay) `?moment=alertes` : les ALERTES D'ACHAT eBAY, et RIEN d'autre —

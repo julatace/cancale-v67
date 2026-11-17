@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "VRM — outil du revendeur",
-  "version": "5.399.0",
+  "version": "5.400.0",
   "description": "Relie tes comptes Vinted, Leboncoin, eBay et Vestiaire à VRM : annonces, ventes, colis et bordereaux, depuis ton navigateur.",
   "homepage_url": "https://vrm.center",
   "minimum_chrome_version": "111",
@@ -26,6 +26,8 @@
     "https://vrm.center/*",
     "https://*.ebay.fr/*",
     "https://*.ebay.com/*",
+    "https://i.ebayimg.com/*",
+    "https://*.vestiairecollective.com/*",
     "https://www.mondialrelay.be/*",
     "https://www.mondialrelay.fr/*",
     "https://ws.chronopost.fr/*",

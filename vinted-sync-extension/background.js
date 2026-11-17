@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.399.0';
+const CODE_VERSION = '5.400.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -1209,6 +1209,8 @@ try {
         if (msg.type === 'deconnexion') { sendResponse(await deconnexionAdressee(msg)); return; }
         if (msg.type === 'reglageCapte') { sendResponse(await poserCapteCoupe(msg.coupe === true)); return; }   // 5.377
         if (msg.type === 'numerotes') { sendResponse(await annoncerNumerotes(msg)); return; }   // 5.382
+        if (msg.type === 'empreinteImage') { sendResponse(await empreintesImagesPourApp(msg)); return; }   // 5.395
+        if (msg.type === 'ficheAPublier') { sendResponse(await annoncerFicheAPublier(msg)); return; }   // 5.395
         if(msg.type==='favorisEtat'){const e=await etatPourApp();sendResponse(e);if(Date.now()-dernierPontFavoris>60000){dernierPontFavoris=Date.now();reinjecterPont().catch(()=>{});}return;}
         if(msg.type==='favorisExec'&&msg.endpoint==='/vrm/favoris'){sendResponse(await executerPourApp({...msg,method:'POST'},sender));return;}
         if(msg.type==='favorisOuvrir'){sendResponse(await executerPourApp({...msg,method:'POST',endpoint:'/vrm/favoris/ouvrir'},sender));return;}
@@ -5297,6 +5299,44 @@ async function modifierLigneCas(id, modifier, essais = 6) {
   return null;
 }
 const corpsResa = (r) => ({ attente: r.attente, items: r.items, capturedAt: new Date().toISOString(), ver: EXT_VERSION });
+// (16 nov., 5.395) « PUBLIER CETTE FICHE » (2026-11-11-rangement-guide.md) : SUR SON CLIC, dans
+// l'app (« Ouvrir Vinted » d'une fiche « À publier »), la page de dépôt qui s'ouvre ensuite dans CE
+// navigateur affiche et réserve LE N° DE LA FICHE (celui de sa boîte), pas le suivant ; la publication
+// relie ce N° à l'annonce créée par l'identifiant que Vinted rend (`items[itemId].fiche`) — une identité,
+// jamais un titre. Une fois, 30 min au plus, la PREMIÈRE page de dépôt qui s'ouvre. Un N° déjà porté par
+// une annonce ⇒ refusé (rien d'annoncé). Aucune requête vers Vinted.
+const FICHE_A_PUBLIER = 'vrmFicheAPublier';           // { fiche, numero, at }
+const FICHE_A_PUBLIER_MS = 30 * 60000;
+function numeroPorteAilleurs(main, resa, numero) {
+  const c = cleNum(numero);
+  if (!c) return true;
+  if (Object.values((main && main.vinted_annonce_numeros) || {}).some((e) => e && cleNum(e.numero) === c)) return true;
+  if (Object.values((resa && resa.items) || {}).some((v) => v && cleNum(v.numero) === c)) return true;
+  return false;
+}
+async function annoncerFicheAPublier(msg) {
+  const fiche = String((msg && msg.fiche) || ''), numero = String((msg && msg.numero) || '').trim();
+  if (!/^[\w-]{1,80}$/.test(fiche) || !/^[A-Z]{0,3}\d{1,6}$/.test(cleNum(numero))) return { ok: false, code: 'invalide' };
+  return unResaALaFois(async () => {
+    const main = await lireMain(['vinted_annonce_numeros', 'vrm_numero_ecrit']);
+    if (main === null) return { ok: false, code: 'lecture' };
+    if (numeroEcritAllume(main)) return { ok: false, code: 'ecrit' };
+    const resa = await lireResa();
+    if (resa === null) return { ok: false, code: 'lecture' };
+    if (numeroPorteAilleurs(main, resa, numero)) { noterDiag('fiche_publier_numero_pris'); return { ok: false, code: 'pris' }; }
+    try { await chrome.storage.local.set({ [FICHE_A_PUBLIER]: { fiche, numero, at: Date.now() } }); } catch (_) { return { ok: false, code: 'stockage' }; }
+    noterDiag('fiche_publier_annoncee');
+    return { ok: true, numero };
+  });
+}
+async function prendreFicheAPublier() {
+  let f = null;
+  try { f = (await chrome.storage.local.get(FICHE_A_PUBLIER))[FICHE_A_PUBLIER] || null; } catch (_) { return null; }
+  if (!f) return null;
+  try { await chrome.storage.local.remove(FICHE_A_PUBLIER); } catch (_) {}
+  const age = Date.now() - Number(f.at || 0);
+  return age >= 0 && age < FICHE_A_PUBLIER_MS && f.fiche && f.numero ? f : null;
+}
 async function reserverNumeroPourOnglet(tabId, domain) {
   return unResaALaFois(async () => {
     if (tabId == null) return { ok: false, raison: 'onglet' };
@@ -5320,15 +5360,20 @@ async function reserverNumeroPourOnglet(tabId, domain) {
     if (numeroEcritAllume(main)) { noterDiag('resa_numero_ecrit'); return { ok: false, raison: 'ecrit' }; }
     // 5.356 : le N° est calculé SUR la ligne lue, et écrit seulement si personne
     // n'a réservé entre-temps (comparer-et-échanger) — sinon relu et recalculé.
-    let numero = null;
+    let numero = null, ficheLiee = '';
+    // 5.395 : la fiche annoncée par SON clic dans l'app (une fois, 30 min) donne SON N° à cette page.
+    const ficheP = await prendreFicheAPublier();
     const ecrit = await modifierLigneCas(RESA_LIGNE, (d) => {
       const r = resaPropre(d);
-      numero = prochainNumeroDe(main, r);
-      r.attente[numero] = { at: new Date().toISOString(), uid: String(uid) };
+      ficheLiee = '';
+      if (ficheP && !numeroPorteAilleurs(main, r, ficheP.numero)) { numero = String(ficheP.numero); ficheLiee = String(ficheP.fiche); }
+      else numero = prochainNumeroDe(main, r);
+      r.attente[numero] = { at: new Date().toISOString(), uid: String(uid), ...(ficheLiee ? { fiche: ficheLiee } : {}) };
       return corpsResa(r);
     });
     if (ecrit !== true || !numero) { noterDiag(ecrit === null ? 'resa_ecriture_ratee' : 'resa_rien'); return { ok: false, raison: 'ecriture' }; }
-    loc[tabId] = { numero, at: Date.now(), uid: String(uid) };
+    if (ficheP) noterDiag(ficheLiee ? 'fiche_publier_reservee' : 'fiche_publier_numero_pris');
+    loc[tabId] = { numero, at: Date.now(), uid: String(uid), ...(ficheLiee ? { fiche: ficheLiee } : {}) };
     try { await chrome.storage.local.set({ [RESA_LOCAL]: loc }); } catch (_) {}
     noterDiag('resa_posee');
     notifierApp({ type: 'maj', quoi: 'numeros' });
@@ -5392,7 +5437,7 @@ async function lierPublicationsEnAttente() {
   const ecrit = await modifierLigneCas(RESA_LIGNE, (d) => {
     const r = resaPropre(d);
     for (const [, v] of aLier) {
-      if (!r.items[v.item]) r.items[v.item] = { numero: v.numero, at: new Date().toISOString(), uid: v.uid };
+      if (!r.items[v.item]) r.items[v.item] = { numero: v.numero, at: new Date().toISOString(), uid: v.uid, ...(v.fiche ? { fiche: String(v.fiche) } : {}) };
       delete r.attente[v.numero];
     }
     return corpsResa(r);
@@ -8338,6 +8383,38 @@ async function rangerEmpreintes(force = false) {
   try { await chrome.storage.local.set({ [EMPREINTES_FILE]: restent }); } catch (_) {}
   return !restent.length;
 }
+// (16 nov., 5.395) « MÊME PHOTO » SUR eBAY : la page VRM ne peut pas lire les pixels d'une
+// photo `i.ebayimg.com` (CORS) — elle demande ici l'EMPREINTE (jamais l'image). Le droit
+// d'hôte `https://i.ebayimg.com/*` (manifeste) ne sert qu'à ça. Bornes : seulement
+// `https://i.ebayimg.com/` (le serveur public des photos d'annonces, aucun compte, aucun
+// cookie : `credentials:'omit'`), 5 adresses au plus par demande, une à la fois, ≤ 900 Ko,
+// `EMPREINTES_EBAY_HEURE` par heure ; une photo refusée ⇒ `null` (« pas vérifiée »).
+// Aucune requête vers eBay ni Vinted, aucune action, rien écrit : l'app range elle-même.
+const EMPREINTES_EBAY_HEURE = 60;
+const EMPREINTES_EBAY_CLE = 'vrmEmpreintesEbayHeure';     // [ms] — les images lues cette heure
+const urlImageEbay = (u) => typeof u === 'string' && u.length < 600 && /^https:\/\/i\.ebayimg\.com\/[^\s?#]+(\?[^\s#]*)?$/i.test(u);
+async function empreintesImagesPourApp(msg) {
+  const urls = (Array.isArray(msg && msg.urls) ? msg.urls : []).filter(urlImageEbay).slice(0, 5);
+  if (!urls.length) return { ok: false, code: 'adresse' };
+  const t = Date.now();
+  let vues = [];
+  try { vues = ((await chrome.storage.local.get(EMPREINTES_EBAY_CLE))[EMPREINTES_EBAY_CLE] || []).filter((x) => t - Number(x) >= 0 && t - Number(x) < 3600e3); } catch (_) { return { ok: false, code: 'stockage' }; }
+  const h = {};
+  let lues = 0;
+  for (const u of urls) {
+    if (vues.length >= EMPREINTES_EBAY_HEURE) { h[u] = null; continue; }
+    vues.push(Date.now()); lues++;
+    try { await chrome.storage.local.set({ [EMPREINTES_EBAY_CLE]: vues }); } catch (_) {}
+    try {
+      const r = await fetch(u, { credentials: 'omit', cache: 'no-store', signal: AbortSignal.timeout(20000) });
+      if (!r.ok) { h[u] = null; noterDiag(`empreintes_ebay_refusee_${r.status || 0}`); continue; }
+      const b = await r.blob();
+      if (!b || !(b.size > 0) || b.size > EMPREINTES_SITES_MAX_OCTETS || !/^image\//i.test(String(b.type || 'image/'))) { h[u] = null; continue; }
+      h[u] = await empreinteDeBlob(b);
+    } catch (_) { h[u] = null; }
+  }
+  return { ok: true, h, lues, plein: vues.length >= EMPREINTES_EBAY_HEURE };
+}
 // UN tour : une image au plus. Rend 1 (une image lue), 0 (rien à faire / refus).
 async function empreintesUnTour() {
   const tabs = await chrome.tabs.query({ url: ['https://*.vinted.fr/*', 'https://*.vinted.com/*', 'https://*.vinted.it/*', 'https://*.vinted.de/*'] });
@@ -8620,7 +8697,7 @@ async function empreintesSitesUnTour() {
 //     fois (le verrou de `tickEmpreintes`) ; un couple raté n'est repris qu'après 24 h ;
 //   · sans cookie (`credentials: 'omit'`), au plus `EMPREINTES_SITES_MAX_OCTETS` par image ;
 //   · lire-fusionner-réécrire : une lecture ratée de la ligne n'écrit RIEN (le score reste en file).
-//   · eBay : aucune vérification (i.ebayimg.com n'est pas un hôte de l'extension) — l'app dit
+//   · eBay : aucune vérification fine (5.395 : l'hôte i.ebayimg.com sert l'EMPREINTE seule, pour l'app) — l'app dit
 //     « à vérifier », jamais « sûr ».
 // <photo-fine-regle> — COPIE de src/photoFine.js (scripts/audit-meme-photo.cjs --recopie). Ne pas modifier ici.
 // La version de la mesure : un score d'une autre version n'est pas relu (recalculé).
@@ -9614,10 +9691,13 @@ function retraitDeConversation(conv) {
     // message (« Mondial Relay », « Vinted Go »…). Jamais déduit du mot « point
     // relais » (tous le disent) : sans nom, on laisse vide.
     const TRANSP = [[/vinted\s*go/i, 'vinted'], [/mondial\s*relay/i, 'mondialrelay'], [/relais\s*colis/i, 'relaiscolis'],
-      [/chronopost|pickup\s*station/i, 'chronopost'], [/inpost/i, 'inpost'], [/colissimo|la\s+poste/i, 'colissimo'],
+      [/chronopost|pickup\s*station/i, 'chronopost'], [/inpost/i, 'mondialrelay'], [/colissimo|la\s+poste/i, 'colissimo'],
       [/\bups\b/i, 'ups'], [/\bdpd\b/i, 'dpd'], [/\bgls\b/i, 'gls'], [/\bdhl\b/i, 'dhl'], [/shop2shop/i, 'shop2shop']];
-    const vus = TRANSP.filter(([re]) => re.test(txt)).map(([, k]) => k);
-    const transporteur = vus.length === 1 ? vus[0] : '';   // deux noms dans le texte = on ne choisit pas
+    // (5.395) En France, « InPost » EST le réseau Mondial Relay (« Mondial Relay by
+    // InPost », mesuré dans ses e-mails, 2026-11-11-colis-a-leur-place.md) : les deux
+    // noms donnent la même clé, comptée une fois. Deux réseaux différents = on ne choisit pas.
+    const vus = [...new Set(TRANSP.filter(([re]) => re.test(txt)).map(([, k]) => k))];
+    const transporteur = vus.length === 1 ? vus[0] : '';
     const cid = String(c.id || '');
     return {
       tx: String(t.id || ''), item: String(t.item_id || ''),
