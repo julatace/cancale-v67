@@ -204,15 +204,20 @@ async function allume(nav, b, sombre, W, ref) {
       const pl = document.querySelector('[data-v2-principal="imprimer"]');
       return r ? { cle: r.getAttribute('data-v2v-ligne'), plein: Number(pl && pl.getAttribute('data-impr-lot')), affiche: (document.querySelector('[data-v2v-affiche]') || { getAttribute: () => '' }).getAttribute('data-v2v-affiche') } : null; });
     if (f0) {
+      // Un témoin posé AVANT le geste note chaque état vu de la rangée qui part (le mouvement dure ~0,5 s).
+      await pg.evaluate((cle) => { window.__fait = { part: false, faite: false, coche: false };
+        const voir = () => { const r = document.querySelector(`[data-v2v-ligne="${CSS.escape(cle)}"][data-v2v-fait="part"]`); if (!r) return; window.__fait.part = true;
+          const h = r.closest('.v2-faite'); if (h && h.classList.contains('is-faite')) window.__fait.faite = true; if (h && h.querySelector('.v2-faite-coche')) window.__fait.coche = true; };
+        new MutationObserver(voir).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'data-v2v-fait'] }); }, f0.cle);
       await pg.evaluate((cle) => { const b = document.querySelector(`.v2-cache [data-colis-ident="${CSS.escape(cle)}"] button[data-geste="imprime"]`); if (b) b.click(); }, f0.cle);
-      const vu = await attendre(pg, (cle) => !!document.querySelector(`[data-v2v-ligne="${CSS.escape(cle)}"][data-v2v-fait="part"]`), 1500, f0.cle).catch(() => false);
-      const enCours = await attendre(pg, () => !!document.querySelector('.v2-faite.is-faite [data-v2v-fait="part"]'), 400, 0);
+      await pg.waitForTimeout(300);
+      const temoin = await pg.evaluate(() => window.__fait); const vu = temoin.part, enCours = temoin.faite && temoin.coche;
       await pg.screenshot({ path: path.join(SHOTS, `ventes-fait-${th}.png`) });
       await pg.waitForTimeout(1200);
       const f1 = await pg.evaluate((cle) => { const r = [...document.querySelectorAll(`[data-v2v-ligne="${CSS.escape(cle)}"]`)].filter((x) => x.getAttribute('data-v2v-fait') !== 'part');
         const pl = document.querySelector('[data-v2-principal="imprimer"]');
         return { groupe: r[0] ? r[0].getAttribute('data-v2v-groupe') : null, n: r.length, part: !!document.querySelector(`[data-v2v-ligne="${CSS.escape(cle)}"][data-v2v-fait="part"]`), plein: Number(pl && pl.getAttribute('data-impr-lot')), affiche: (document.querySelector('[data-v2v-affiche]') || { getAttribute: () => '' }).getAttribute('data-v2v-affiche') }; }, f0.cle);
-      dit(vu && enCours, `F ${th} : la rangée imprimée joue le mouvement « fait » (coche, glisse, se replie)`, { vu, enCours });
+      dit(vu && enCours, `F ${th} : la rangée imprimée joue le mouvement « fait » (coche, glisse, se replie)`, temoin);
       dit(f1.n === 1 && !f1.part && f1.groupe === 'imprimes', `F ${th} : puis elle est rangée, une fois, dans « Imprimés, à déposer »`, f1);
       dit(f1.plein === f0.plein - 1 && f1.affiche === f0.affiche, `F ${th} : le plein descend d'un cran (${f0.plein} → ${f1.plein}), l'affiche ne bouge pas (${f1.affiche})`, { f0, f1 });
       await pg.screenshot({ path: path.join(SHOTS, `ventes-fait-apres-${th}.png`) });
