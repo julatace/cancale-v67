@@ -13,4 +13,8 @@ export default {
   "studio.rienAImprimer": "nothing ready",
   "studio.rienAImprimerAria": "Print: no label ready yet",
   "studio.astuce": "Slide your thumb to an action, then let go",
+  "studio.c3.plus": "More",
+  "studio.c3.plusAria": "The screen’s other actions",
+  "studio.c3.feuille": "Screen actions",
+  "studio.c3.fermer": "Close",
 };

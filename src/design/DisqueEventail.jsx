@@ -15,7 +15,8 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { tr } from '../i18n/index.js';
-import { MAQUETTE } from './maquette.js';
+import { MAQUETTE, MAQUETTE_C3 } from './maquette.js';
+import { BarrePouce } from './BarrePouce.jsx';
 
 // (17 nov., maquette C « Studio », réglage de banc seulement — src/design/maquette.js) Le « + » nomme SOUS lui le
 // geste de l'écran où l'on est (le plus probable ici), et l'éventail le désigne : aucun geste neuf, les quatre
@@ -119,6 +120,8 @@ export function DisqueEventail({ gestes = {}, nImprimer, Retour = null, ecran = 
         {ICONES_EVENTAIL.plus(24)}
         {motLieu ? <span className="sb-disque-mot" data-sb-lieu={lieu} aria-hidden="true">{motLieu}</span> : null}
       </button>
+      {/* (17 nov., maquette C3, réglage de banc seulement) la barre au pouce : le geste du lieu en grand + « Plus ». */}
+      {MAQUETTE_C3 ? <BarrePouce lieu={lieu} lames={lames} lancer={lancer} ecran={ecran} Retour={Retour}/> : null}
       {ouvert && places && typeof document !== 'undefined' ? createPortal(
         <>
           <div className="sb-voile" data-sb-voile="" onClick={fermer} aria-hidden="true"/>

@@ -13,4 +13,8 @@ export default {
   "studio.rienAImprimer": "rien de prêt",
   "studio.rienAImprimerAria": "Imprimer : aucun bordereau prêt pour l’instant",
   "studio.astuce": "Glisse le pouce vers une action, relâche",
+  "studio.c3.plus": "Plus",
+  "studio.c3.plusAria": "Les autres gestes de l’écran",
+  "studio.c3.feuille": "Gestes de l’écran",
+  "studio.c3.fermer": "Fermer",
 };

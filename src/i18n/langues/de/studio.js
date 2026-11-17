@@ -13,4 +13,8 @@ export default {
   "studio.rienAImprimer": "nichts bereit",
   "studio.rienAImprimerAria": "Drucken: noch kein Etikett bereit",
   "studio.astuce": "Daumen zu einer Aktion ziehen, dann loslassen",
+  "studio.c3.plus": "Mehr",
+  "studio.c3.plusAria": "Die weiteren Aktionen des Bildschirms",
+  "studio.c3.feuille": "Aktionen des Bildschirms",
+  "studio.c3.fermer": "Schließen",
 };

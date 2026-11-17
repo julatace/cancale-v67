@@ -13,4 +13,8 @@ export default {
   "studio.rienAImprimer": "nada listo",
   "studio.rienAImprimerAria": "Imprimir: ninguna etiqueta lista por ahora",
   "studio.astuce": "Desliza el pulgar hasta una acción y suelta",
+  "studio.c3.plus": "Más",
+  "studio.c3.plusAria": "Las demás acciones de la pantalla",
+  "studio.c3.feuille": "Acciones de la pantalla",
+  "studio.c3.fermer": "Cerrar",
 };

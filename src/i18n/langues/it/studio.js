@@ -13,4 +13,8 @@ export default {
   "studio.rienAImprimer": "niente di pronto",
   "studio.rienAImprimerAria": "Stampa: nessuna etichetta pronta per ora",
   "studio.astuce": "Fai scorrere il pollice su un’azione, poi rilascia",
+  "studio.c3.plus": "Altro",
+  "studio.c3.plusAria": "Le altre azioni della schermata",
+  "studio.c3.feuille": "Azioni della schermata",
+  "studio.c3.fermer": "Chiudi",
 };
