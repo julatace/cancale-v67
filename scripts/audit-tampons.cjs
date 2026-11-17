@@ -25,7 +25,7 @@ function juger(src) {
   const lecteurs = [['src/App.jsx', As], ...src.autres.map(([f, s]) => [f, sans(s)])].filter(([f, s]) => /\.tampon(A4|Th)\b/.test(s));
   dit(!lecteurs.length, 'T2 aucune impression ne lit `.tamponA4`/`.tamponTh`' + (lecteurs.length ? ' — ' + lecteurs.map((x) => x[0]).join(', ') : ''));
   const posLu = (As.match(/load\(TAMPON_POSITIONS/g) || []).length;
-  dit(posLu === 1 && /const reglageTamponsChoisi = \(\) => \{ try \{ return reglageTampons\(load\(CLE_TAMPONS, null\), \{ impression: load\(CLE_IMPRESSION, null\), positions: load\(TAMPON_POSITIONS, null\) \}\)/.test(As), 'T2 `vrm_tampon_positions` lu par la seule migration');
+  dit(posLu === 1 && /const reglageTamponsChoisi = \(\) => \{ try \{ return reglageTampons\((?:load\(CLE_TAMPONS, null\)|brutTampons\(\)), \{ impression: load\(CLE_IMPRESSION, null\), positions: load\(TAMPON_POSITIONS, null\) \}\)/.test(As), 'T2 `vrm_tampon_positions` lu par la seule migration');
   const appels = As.split('\n').filter((l) => /await tamponnerBordereau\(PL, /.test(l));
   dit(appels.length >= 4 && appels.every((a) => /\btampon:/.test(a)), `T3 chaque appel de tamponnerBordereau reçoit le tampon résolu (${appels.filter((a) => /\btampon:/.test(a)).length}/${appels.length})`);
   const pb = As.slice(As.indexOf('const poserBordereau = async'), As.indexOf('// ⟦→ ecrans/Reglages.jsx #25⟧'));
@@ -76,7 +76,7 @@ function juger(src) {
     const mut = [
       ['T1', (s) => ({ ...s, app: s.app.replace("'vrm_tampon_positions','vrm_tampons',", "'vrm_tampon_positions',") })],
       ['T2', (s) => ({ ...s, app: s.app.replace('const contenu = texteDuCartouche(imp.ts.contenu,', 'const contenu = contenuTampon(reg.tamponA4,') })],
-      ['T3', (s) => ({ ...s, app: s.app.replace('choix: tp.choix, tampon: tp.tampon });\n      posePrefs', 'choix: tp.choix });\n      posePrefs') })],
+      ['T3', (s) => ({ ...s, app: s.app.replace('choix: tp.choix, tampon: tp.tampon, retour: true });', 'choix: tp.choix, retour: true });') })],
       ['T4', (s) => ({ ...s, app: s.app.replace('imp.tampons = (impression && impression.tampons) || reglageTamponsChoisi();', 'imp.tampons = reglageTampons(null);') })],
       ['T4', (s) => ({ ...s, app: s.app.replace('if (imp.retour) imp.ts = { ...imp.ts, contenu: { ...imp.ts.contenu, num: true, titre: true } };', '') })],
       ['T5', (s) => ({ ...s, app: s.app.replace('JSON.stringify([aEcrire(reglageTamponsChoisi()), reglageImpressionChoisi()])', 'JSON.stringify([reglageImpressionChoisi()])') })],
