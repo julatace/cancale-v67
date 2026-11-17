@@ -14,6 +14,7 @@ import React from 'react';
 import { santeComptes, lireEnvois, EVT_ENVOIS, SEUILS, FENETRE_J } from './santeComptes.js';
 import { SUPABASE_URL, sbAuth, AUTH, load, onCloudReady, useVentesCoque, classifyOrderStatus } from './App.jsx';
 import { lireEtatsComptes } from './etatsComptesLecture.js';
+import { lireAlertesAvisBas } from './lectureAvisBas.js';
 // (12 nov., ext. 5.370) Les freins de Vinted sur 7 jours (src/discretion.js, `carnetDuCompte`).
 import { useLignesActions } from './JaugeActions.jsx';
 import { carnetDuCompte } from './discretion.js';
@@ -34,7 +35,8 @@ export async function lireSourcesSante() {
     lireEtatsComptes(),   // (11 nov., intégration) partagée avec « Tout va bien ? »
     get('app_data?id=like.moderation_vinted_*&select=id,e:data->e'),
     // (16 nov.) Les avis bas DATÉS par leur arrivée (le serveur, lot avis-negatif) : projection des alertes seules.
-    get('app_data?id=eq.vrm_avis_bas&select=a:data->alertes'),
+    // (17 nov.) Partagée avec la carte de Ma journée (src/lectureAvisBas.js) : une lecture, pas deux.
+    lireAlertesAvisBas(get),
   ]);
   let profils = null;
   if (p) {

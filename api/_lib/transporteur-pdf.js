@@ -20,7 +20,10 @@
 // ════════════════════════════════════════════════════════════════════════════
 import { transporteursNommes } from './transporteur-bordereau.js';
 import { transporteurDeForme, FORME_CHRONOPOST_PROPRE } from './suivi-colis.js';
-import { texteDuPdf } from './texte-pdf.js';
+// (17 nov., fiabilité-vitesse) texte-pdf.js (et pdf-lib, ≈ 180 Ko compressés) chargé À LA DEMANDE, dans
+// `transporteurDuPdf` : l'app importe ce module (par transporteur-anciens.js) pour ses constantes, et cet
+// import statique collait pdf-lib dans le morceau App, téléchargé à chaque démarrage. Même décision, même
+// « illisible » si le chargement échoue (le try l'attrape).
 
 const sansAccents = (s) => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '');
 
@@ -94,7 +97,7 @@ export function decisionTexteBordereau(texte) {
 
 // Le PDF (base64 ou octets) ⇒ la décision. Ne lève jamais.
 export async function transporteurDuPdf(pdf) {
-  try { return decisionTexteBordereau(await texteDuPdf(pdf)); }
+  try { const { texteDuPdf } = await import('./texte-pdf.js'); return decisionTexteBordereau(await texteDuPdf(pdf)); }
   catch (_) { return { etat: 'illisible', t: '', s: '' }; }
 }
 
