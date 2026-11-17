@@ -333,6 +333,16 @@ async function toutes(nav, b0, W) {
   dit(r.icones === 1 && r.factureTexte === 0 && /rgb\(30, 122, 69\)/.test(r.vert), `T ${th} : la facture envoyée = UNE icône verte à côté du prix (plus de texte « Facture envoyée le … »)`, r);
   dit(r.orphelins === 0, `T ${th} : la taille sortie du titre (« T. »), aucun « taille 40 » seul`, r.orphelins);
   await pg.screenshot({ path: path.join(SHOTS, `toutes-${th}.png`) });
+  if (!tel) {
+    // La barre du haut collante (recherche, plateformes) : un verre plein — jamais une demi-rangée lisible dessous.
+    const h = await pg.evaluate(async () => { const m = document.querySelector('.vrm-main'); m.scrollTo(0, 600); await new Promise((r) => setTimeout(r, 400));
+      const b = document.querySelector('.vrm-main > .vrm-barre-haut'); if (!b) return null; const cs = getComputedStyle(b);
+      const a = (() => { const x = cs.backgroundColor.match(/rgba?\(([^)]+)\)/); if (!x) return 0; const p = x[1].split(/[ ,/]+/).filter(Boolean).map(Number); return p.length > 3 ? p[3] : 1; })();
+      return { alpha: a, flou: cs.backdropFilter }; });
+    dit(h && h.alpha >= 0.85 && /blur/.test(h.flou || ''), `T ${th} : la barre du haut collante est un verre plein (opacité ${h && h.alpha}, flou)`, h);
+    await pg.screenshot({ path: path.join(SHOTS, `toutes-defile-${th}.png`) });
+    await pg.evaluate(() => document.querySelector('.vrm-main').scrollTo(0, 0)); await pg.waitForTimeout(300);
+  }
   // La sélection : « Sélectionner », puis 3 rangées.
   await pg.locator('[data-serie-ouvrir]').first().click({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(400);
   const lignes = pg.locator('.v2t-liste:not([data-v2-toutes]) [data-v2t-ligne]');
