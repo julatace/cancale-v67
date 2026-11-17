@@ -219,9 +219,11 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
           const ligne = document.querySelector('.vrm-sale-row[data-tx="7001"]');
           const avec = ligne ? ligne.getBoundingClientRect().height : -1;
           const hotes = [...document.querySelectorAll('.vrm-sale-row[data-tx="7001"] .vrm-fp-pastille-hote')];
-          hotes.forEach((h) => { h.style.display = 'none'; });
+          // retirée du DOM un instant (un style en ligne ne gagne pas sur un `!important`), puis remise à sa place
+          const places = hotes.map((h) => [h, h.parentNode, h.nextSibling]);
+          places.forEach(([h, par]) => par.removeChild(h));
           const sans = ligne ? ligne.getBoundingClientRect().height : -1;
-          hotes.forEach((h) => { h.style.display = ''; });
+          places.forEach(([h, par, suiv]) => par.insertBefore(h, suiv));
           // Elle ne recouvre aucun autre texte de la ligne.
           const touche = [];
           // (le rectangle du TEXTE lui-même, par Range — pas celui de son conteneur, qui peut être pleine largeur)
