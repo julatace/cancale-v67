@@ -82,7 +82,7 @@ const aller = async (pg, q, attente = 3200) => {
 const capture = async (pg, nom) => { await pg.evaluate(() => { window.scrollTo(0, 0); for (const e of document.querySelectorAll('.vrm-main, .vrm-main *')) if (e.scrollTop) e.scrollTop = 0; }); await pg.waitForTimeout(250); await pg.screenshot({ path: path.join(SHOTS, nom + '.png'), fullPage: false }); };
 // La signature RELEVÉE STABLE : deux relevés égaux à 1,5 s d'écart (une lecture encore en cours change un état, pas le code).
 const sigStable = async (pg) => { let a = await pg.evaluate(SIGNATURE); for (let i = 0; i < 5; i++) { await pg.waitForTimeout(1500); const b = await pg.evaluate(SIGNATURE); if (b === a) return a; a = b; } return a; };
-const allumer = (pg, on) => pg.evaluate((x) => { if (x) localStorage.setItem('vrm_design_v2', '1'); else localStorage.removeItem('vrm_design_v2'); }, on);
+const allumer = (pg, on) => pg.evaluate((x) => { localStorage.setItem('vrm_design_v2', x ? '1' : '0'); }, on);   // (17 nov.) allumé par défaut : seul « 0 » l'éteint
 
 // Les chiffres d'hier (éteint) et ceux du nouvel écran (allumé), lus sur les data-* de LEURS règles.
 const lireAvant = (pg) => pg.evaluate(() => {
