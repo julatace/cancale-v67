@@ -61,6 +61,14 @@ graphe, BÉNÉFICE, VENDU de « Comparer », URSSAF à payer et CA de Déclarer,
 un plein, cibles ≥ 44, rien de tronqué ni de débordant, contraste, Paramètres, et la signature DOM éteinte = celle du
 build de `origin/claude/design-v2` (`BANC_REFERENCE`). Chiffres exacts : le corps de la PR.
 
+### AIR (Julien : « c'est trop compacté »), mesuré par le banc (A)
+Texte ≥ 20 px du bord de SA carte (les cartes d'hier d'Argent passent à 20 px : `vrm-surface`, `vrm-urssaf-geste`,
+`vrm-mb`, `vrm-compta-carte`, `vrm-ac-*`, `vrm-d7-*`, `vrm-stva`, `vrm-fp-section`…), 16 px entre deux cartes, 32 entre
+deux sections, rangées de liste ≥ 64 px, ≥ 12 px entre deux boutons, jamais 3 boutons ou plus sur une rangée (empilés),
+interligne 1,4. Registres : « PDF · Tableur · Voir » ⇒ « Voir » + « ⋯ » (PDF, Tableur : la même `exporter`). Les replis
+voisins (Tes déclarations URSSAF, Ta micro-entreprise, DAC7 ; le Détail du Mois) forment UNE liste groupée de rangées de
+64 px avec leur résumé. Tout dans `@layer vrm-verre`, seulement allumé.
+
 ### Qualité et fluidité (la grille du 17 nov. soir), mesurée par le banc
 Appui < 100 ms (le fond change à 60 ms), CLS hors geste 0 au changement de segment, jamais d'écran blanc, mouvement réduit
 respecté, texte en 13 · 15 · 17 (+ chiffres 22 et 56), rayons 12 · 14 · 20, faits d'une rangée de même hauteur, aucun mot
