@@ -184,7 +184,7 @@ function regle(nom, f) {
     dit(tx_ + conv_ <= 20 && ((f.store.vrmLectures || {})[UID] || []).length <= 20, '3. dans le budget : 20 lectures d’argent par heure au plus (détails + conversations ; 5.390), 20 en tout', `${tx_ + conv_} lecture(s) d’argent`);
     dit(f.j.vinted.every((x) => x.methode === 'GET'), '3. rien n’est écrit chez Vinted (des GET seulement)');
     const l = rang.length ? f.lignes[rang[0]] : null;
-    dit(!!l && l.source === 'conversation' && /^\d+$/.test(l.tx) && l.at === J3 && !JSON.stringify(l).includes('acheteuse_x') && !JSON.stringify(l).includes('Paire secrète') && !JSON.stringify(l).includes('45'),
+    dit(!!l && l.source === 'conversation' && /^\d+$/.test(l.tx) && l.at === J3 && !JSON.stringify(l).includes('acheteuse_x') && !JSON.stringify(l).includes('Paire secrète') && !JSON.stringify({ ...l, capturedAt: '' }).includes('45'), // l'heure de capture (« 17:45 ») n'est pas un montant
       '3. la ligne rangée : n°, date, source — jamais un pseudo, un titre ni un montant', JSON.stringify(l));
     dit(f.j.vinted.some((x) => /\/conversations\/8800008$/.test(x.chemin)) && !f.lignes['harvest_111_versement_9300008'] && !f.lignes['harvest_111_versement_9399999'],'3. une conversation qui porte une AUTRE transaction n’écrit rien (l’identité prime)');
   });
