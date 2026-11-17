@@ -53203,7 +53203,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* (Ancien bloc « Colis en route » retiré : le suivi est maintenant DANS
             chaque ligne d'achat ci-dessous — photo + statut + progression + Suivre.) */}
         {/* (la barre d'outils est remontée sous le titre, comme sur Ventes) */}
-        {buys.loading && !buys.items && <Skeleton variant="row" count={5}/>}
+        {/* (17 nov.) Nouveau design : l'attente d'Achats est celle de son bloc (rien de posé puis retiré, banc design-v2-chargement). */}
+        {buys.loading && !buys.items && !designV2 && <Skeleton variant="row" count={5}/>}
         {buys.error && <LoadError onRetry={()=>loadOrders('purchased',setBuys,true)}/>}
         {!modeRetraits && buys.items && !buys.error && buysBase.length===0 && (buys.items.length>0
           // (5 nov.) Des achats existent, mais tous sur des comptes écartés : « aucun achat » serait faux.
