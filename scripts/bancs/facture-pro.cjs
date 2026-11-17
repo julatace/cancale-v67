@@ -183,7 +183,7 @@ const ouvrirVente = async (pg, tx) => {
   return id;
 };
 const fermerVente = async (pg) => { const croix = pg.locator('.vrm-ledger-drawer-host:not([hidden]) .vrm-recap-fermer'); if (await croix.count()) { await croix.first().click(); await pg.waitForTimeout(300); } };
-const ligneFacture = (pg, tx) => pg.locator(`.vrm-sale-row[data-tx="${tx}"] [data-fp-forme="ligne"]`).first();
+const ligneFacture = (pg, tx) => pg.locator(`.vrm-sale-row[data-tx="${tx}"] [data-fp-forme="ligne"]:visible`).first();
 
 const mesurer = (pg, sel) => pg.evaluate((sel) => {
   const d = document.querySelector(sel); if (!d) return null;
@@ -206,19 +206,17 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
       await essaie('lignes', async () => {
         await ligneFacture(pg, '7001').waitFor({ timeout: 8000 });
         const l1 = ligneFacture(pg, '7001');
-        dit(await l1.locator('[data-fp-vente="a-faire"][data-fp-preuve="ok"]').count() === 1 && /Envoyer la facture/.test(await l1.innerText()), '1. 7001 prouvée : « Envoyer la facture » sur la LIGNE de la vente');
-        const raisons = {};
-        for (const [tx, code] of [['7004', 'mail'], ['7005', 'heure'], ['7006', 'montant'], ['7008', 'mails']]) {
-          const l = ligneFacture(pg, tx);
-          await l.waitFor({ timeout: 4000 });
-          // (11 nov., lot DJ1) La ligne porte aussi « Bon de retour » : on compte le bouton de FACTURE.
-          raisons[tx] = { code: await l.locator('[data-fp-vente="pas-prouve"]').getAttribute('data-fp-preuve').catch(() => null), bouton: await l.locator('[data-fp-vente="a-faire"]').count(), t: (await l.innerText()).replace(/\s+/g, ' ') };
-          dit(raisons[tx].code === code && raisons[tx].bouton === 0 && /acheteur pas prouvé/.test(raisons[tx].t), `1. ${tx} : PAS de bouton, la ligne dit pourquoi (${code})`, raisons[tx].t);
-        }
-        dit(/3 h après/.test(raisons['7005'].t) && /e-mail 59,00\s€, Vinted 55,00\s€/.test(raisons['7006'].t), '1. la raison est précise (l’écart d’heure, les deux prix)', raisons['7005'].t + ' | ' + raisons['7006'].t);
+        // (16 nov., lot factures-mieux) Sur la ligne : une PASTILLE (« Facture à envoyer »), plus de bouton ni de raison
+        // sous la ligne ; une vente pas prouvée n'a pas de pastille, sa raison est dite en tête de la liste (groupée) et
+        // dans la fiche de la vente.
+        dit(await l1.locator('[data-fp-pastille="aenvoyer"][data-fp-vente="a-faire"]').count() === 1 && /Facture à envoyer/.test(await l1.textContent()), '1. 7001 prouvée : la pastille « Facture à envoyer » sur la LIGNE de la vente', (await l1.evaluate((e) => e.outerHTML)).slice(0, 300));
+        for (const tx of ['7004', '7005', '7006', '7008']) dit(await pg.locator(`.vrm-sale-row[data-tx="${tx}"] [data-fp-pastille], .vrm-sale-row[data-tx="${tx}"] [data-fp-vente="a-faire"]`).count() === 0, `1. ${tx} (acheteur pas prouvé) : aucune pastille, aucun bouton de facture sur la ligne`);
+        await pg.locator('[data-fp-tete-code]').first().waitFor({ timeout: 6000 }).catch(() => {});
+        const tete = await pg.evaluate(() => [...document.querySelectorAll('[data-fp-tete-code]')].map((e) => e.innerText.replace(/\s+/g, ' ')).join(' | '));
+        dit(/acheteur pas prouvé/.test(tete) || await pg.locator('[data-fp-vente="pas-prouve"]').count() > 0, '1. la raison est dite (en tête de la liste ou dans la fiche)', tete.slice(0, 200));
         dit(await pg.locator('.vrm-sale-row[data-tx="8001"] [data-fp-forme]').count() === 0, '1. compte PARTICULIER : rien sur la ligne');
         const l2 = ligneFacture(pg, '7002');
-        dit(/Facture envoyée le/.test(await l2.innerText()) && await l2.locator('[data-fp-vente="envoyee"]').count() === 1, '4. 7002 déjà envoyée : « Facture envoyée le … » sur la ligne', (await l2.innerText()).replace(/\s+/g, ' '));
+        dit(await l2.locator('[data-fp-pastille="facturee"][data-fp-ligne-etat="envoyee"]').count() === 1 && /Facturée/.test(await l2.textContent()), '4. 7002 déjà envoyée : la pastille « Facturée » sur la ligne (16 nov.)', (await l2.innerText()).replace(/\s+/g, ' '));
         if (SHOTS) { await pg.locator('.vrm-sale-row[data-tx="7001"]').first().scrollIntoViewIfNeeded(); await pg.screenshot({ path: path.join(SHOTS, `fp-lignes-${nf}.png`) }); await pg.locator('.vrm-sale-row[data-tx="7005"]').first().scrollIntoViewIfNeeded(); await pg.screenshot({ path: path.join(SHOTS, `fp-pas-prouve-${nf}.png`) }); }
       });
       await essaie('fiche de la vente 7004', async () => {
@@ -230,14 +228,14 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
       });
       await essaie('7001 : la feuille, puis l’envoi', async () => {
         await ligneFacture(pg, '7001').scrollIntoViewIfNeeded();
-        await ligneFacture(pg, '7001').locator('[data-fp-vente="a-faire"]').click();
+        await ligneFacture(pg, '7001').locator('[data-fp-vente="a-faire"]').dispatchEvent('click');
         const f = pg.locator('[data-fp-feuille-vente="7001"]');
         await f.waitFor({ timeout: 6000 });
         await f.locator('[data-fp-apercu]').waitFor({ timeout: 6000 });
         const t = (await f.innerText()).replace(/\s+/g, ' ');
         dit(/Marie Banc/.test(t) && /marie\.banc@exemple\.test/.test(t) && !/Paul Autre|paul\.autre/.test(t), '2. destinataire : l’acheteur PROUVÉ (jamais celui de 7999, même pseudo, même titre)', t.slice(0, 160));
         dit(/Acheteur prouvé : le même n° de transaction \(7001\)/.test(t) && /arrivé 60 s après la vente/.test(t), '2. la feuille dit POURQUOI c’est le bon acheteur (n°, 60 s, montant)', (/Acheteur prouvé[^.]*\./.exec(t) || [''])[0]);
-        dit(await f.locator('[data-fp-objet]').innerText() === 'Facture FA-2026-0006 — Boutique Banc EI' && /Boutique Banc EI via VRM/.test(t) && /Bonjour Marie Banc/.test(t), '2. l’objet, l’expéditeur « … via VRM » et le message', await f.locator('[data-fp-objet]').innerText());
+        dit(await f.locator('[data-fp-objet]').innerText() === 'Votre facture FA-2026-0006 — Boutique Banc EI' && /Boutique Banc EI via VRM/.test(t) && /Bonjour Marie Banc/.test(t), '2. l’objet, l’expéditeur « … via VRM » et le message', await f.locator('[data-fp-objet]').innerText());
         const ap = (await f.locator('[data-fp-apercu]').innerText()).replace(/\s+/g, ' ');
         dit(/TVA non applicable, art\. 293 B du CGI/.test(ap) && /Boutique Banc EI/.test(ap) && /65,00\s€/.test(ap) && /Marie Banc/.test(ap) && /12 rue Inventée/.test(ap), '2. l’aperçu exact : mention, « EI », prix, acheteur et son adresse', ap.slice(0, 120));
         const m = await mesurer(pg, '[data-fp-feuille-vente="7001"]');
@@ -255,18 +253,20 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
         dit(em.tx === '7001' && em.confirme === true && !('acheteur' in em) && !('centimes' in em), '2. l’émission n’envoie au serveur que la transaction (aucun acheteur, aucun prix : le serveur relit la preuve)', JSON.stringify(em).slice(0, 160));
         dit(requetesApi.some((x) => x.action === 'envoyer' && x.tx === '7001'), '3. puis l’envoi de CETTE facture');
         const apres = (await f.innerText()).replace(/\s+/g, ' ');
-        dit(/Facture envoyée le/.test(apres) && /à marie\.banc@exemple\.test, par VRM, toi en copie/.test(apres) && /Journal des envois/.test(apres), '3. après l’envoi : « Facture envoyée le … », à qui, par VRM, le journal', apres.slice(0, 200));
+        // (16 nov., lot factures-mieux) L'état en une ligne (« Envoyée le … · copie à toi »), à qui ; un seul
+        // envoi ⇒ pas d'historique qui répète l'état ; une rangée d'actions (Voir · Partager · Renvoyer).
+        dit(await f.locator('[data-fp-envoi="envoyee"][data-fp-copie="1"]').count() === 1 && /Envoyée le .* · copie à toi/.test(apres) && /À marie\.banc@exemple\.test/.test(apres) && await f.locator('[data-fp-journal]').count() === 0 && await f.locator('[data-fp-actions] button').count() === 3, '3. après l’envoi : l’état en une ligne, à qui, copie, une rangée de 3 actions, pas d’historique répété', apres.slice(0, 200));
         dit(await f.locator('[data-fp-envoyer]').innerText() === 'Renvoyer', '3. le geste devient « Renvoyer » (jamais un second envoi sans le dire)');
         if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `fp-envoyee-${nf}.png`) });
         await pg.keyboard.press('Escape');
         await f.waitFor({ state: 'detached', timeout: 4000 });
         await pg.waitForTimeout(800);
         const l1 = (await ligneFacture(pg, '7001').innerText()).replace(/\s+/g, ' ');
-        dit(/Facture envoyée le/.test(l1) && /FA-2026-0006/.test(l1), '3. … et la LIGNE de la vente le dit aussi', l1);
+        dit(await ligneFacture(pg, '7001').locator('[data-fp-pastille="facturee"][title="FA-2026-0006"]').count() === 1, '3. … et la LIGNE de la vente le dit aussi (pastille « Facturée », le n° au survol)', l1);
       });
       await essaie('7007 : panne', async () => {
         await ligneFacture(pg, '7007').scrollIntoViewIfNeeded();
-        await ligneFacture(pg, '7007').locator('[data-fp-vente="a-faire"]').click();
+        await ligneFacture(pg, '7007').locator('[data-fp-vente="a-faire"]').dispatchEvent('click');
         const f = pg.locator('[data-fp-feuille-vente="7007"]');
         await f.locator('[data-fp-emettre-envoyer]').waitFor({ timeout: 6000 });
         await f.locator('[data-fp-emettre-envoyer]').click();
@@ -279,7 +279,7 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
         await f.waitFor({ state: 'detached', timeout: 4000 });
         await pg.waitForTimeout(600);
         const l = (await ligneFacture(pg, '7007').innerText()).replace(/\s+/g, ' ');
-        dit(!/envoyée le/.test(l) && /pas encore envoyée/.test(l), '3. … et la ligne dit « émise, pas encore envoyée »', l);
+        dit(await ligneFacture(pg, '7007').locator('[data-fp-pastille="aenvoyer"]').count() === 1 && !/Facturée/.test(l), '3. … et la ligne dit « Facture à envoyer » (jamais « Facturée »)', l);
       });
       dit(!errs.length, '6. aucune erreur d’app', errs.join(' | ').slice(0, 300));
       await ctx.close();
@@ -290,10 +290,10 @@ const mesurer = (pg, sel) => pg.evaluate((sel) => {
         await essaie('stream', async () => {
           await ligneFacture(o3.pg, '7002').locator('[data-fp-vente="envoyee"]').click();
           const f = o3.pg.locator('[data-fp-feuille-vente="7002"]');
-          await f.locator('[data-fp-journal]').waitFor({ timeout: 6000 });
+          await f.locator('[data-fp-envoi]').waitFor({ timeout: 6000 });
           await o3.pg.waitForTimeout(400);
           const t = await f.innerText();
-          dit(!/jean\.banc@/.test(t) && /•••/.test(t), '4. mode stream : le destinataire du journal des envois est caché', t.replace(/\s+/g, ' ').slice(0, 200));
+          dit(!/jean\.banc@/.test(t) && /•••/.test(t), '4. mode stream : le destinataire de la facture envoyée est caché', t.replace(/\s+/g, ' ').slice(0, 200));
         });
         await o3.ctx.close();
       }

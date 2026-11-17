@@ -1,5 +1,5 @@
-import { gabaritMail } from '../../api/_lib/mail-gabarit.js';
-import { traductionContenu, MESSAGE_DEFAUT_EN, bi } from './anglais.js';
+import { gabaritFacture } from '../../api/_lib/mail-facture.js';
+import { traductionContenu, MESSAGE_DEFAUT_EN, MENTIONS_EN, MOTS_EMAIL, EN, bi } from './anglais.js';
 // ════════════════════════════════════════════════════════════════════════════
 //  LA FACTURE PRO — la règle (2 novembre)
 // ════════════════════════════════════════════════════════════════════════════
@@ -296,15 +296,25 @@ export const nomFichier = (contenu) => `${contenu.type === 'avoir' ? 'Avoir' : '
 // Le texte par défaut ; le vendeur peut le réécrire (`cfg.message`). Les seuls
 // remplacements : {numero}, {acheteur}, {article}, {boutique}.
 export const MESSAGE_DEFAUT = 'Bonjour {acheteur},\n\nVous trouverez ci-joint la facture {numero} pour votre achat « {article} ».\n\nMerci pour votre confiance,\n{boutique}';
+// (16 nov., lot factures-mieux) UNE langue par e-mail : l'anglais quand la facture
+// est en anglais (son clic, ou la case pré-cochée pour un acheteur à l'étranger),
+// sinon le français. Jamais les deux empilés (Julien, capture du 16 nov.).
+export const langueEmail = (contenu) => (contenu && contenu.anglais ? 'en' : 'fr');
 export function messageEmail(cfg, contenu) {
-  // (10 nov.) Facture en anglais : le message par défaut est anglais PUIS français ;
-  // un message écrit par le vendeur reste le sien, jamais traduit.
-  const modele = String((cfg && cfg.message) || '').trim() || (contenu.anglais ? `${MESSAGE_DEFAUT_EN}\n\n—\n\n${MESSAGE_DEFAUT}` : MESSAGE_DEFAUT);
-  const r = { numero: contenu.numero, acheteur: contenu.acheteur.nom, article: (contenu.lignes[0] || {}).designation || '', boutique: contenu.vendeur.nom };
+  const langue = langueEmail(contenu);
+  const M = MOTS_EMAIL[langue];
+  // Un message écrit par le vendeur reste le sien, jamais traduit.
+  const modele = String((cfg && cfg.message) || '').trim() || (langue === 'en' ? MESSAGE_DEFAUT_EN : MESSAGE_DEFAUT);
+  const lignes = Array.isArray(contenu.lignes) ? contenu.lignes : [];
+  const r = { numero: contenu.numero, acheteur: (contenu.acheteur || {}).nom, article: (lignes[0] || {}).designation || '', boutique: (contenu.vendeur || {}).nom };
   const corps = modele.replace(/\{(numero|acheteur|article|boutique)\}/g, (_, k) => r[k] || '').slice(0, 3000);
-  const libDoc = contenu.type === 'avoir' ? 'Avoir' : 'Facture';
-  const sujet = `${contenu.anglais ? `${libDoc} / ${contenu.type === 'avoir' ? 'Credit note' : 'Invoice'}` : libDoc} ${contenu.numero} — ${contenu.vendeur.nom}`.slice(0, 200);
-  return { sujet, corps };
+  // L'objet : « Votre facture FA-2026-0006 — Boutique », 60 caractères au plus (le nom
+  // de la boutique se coupe, jamais le numéro).
+  const debut = `${contenu.type === 'avoir' ? M.sujetAvoir : M.sujetFacture} ${contenu.numero}`;
+  const nom = String(r.boutique || '').trim();
+  const place = 60 - debut.length - 3;
+  const sujet = !nom || place < 4 ? debut.slice(0, 200) : `${debut} — ${nom.length > place ? `${nom.slice(0, place - 1).trimEnd()}…` : nom}`;
+  return { sujet, corps, langue };
 }
 
 // ── L'ADRESSE DE L'ACHETEUR, TELLE QUE VINTED L'ÉCRIT DANS L'E-MAIL PRO ─────
@@ -418,46 +428,65 @@ export const mentionsManquantes = (contenu) => MENTIONS_OBLIGATOIRES.filter((m) 
 // transactionnel (la facture d'un achat), pas une lettre d'information.
 // La dernière ligne du PDF (./pdf.js) : son libellé et son montant, tels quels.
 // Un total illisible ⇒ rien (jamais un « 0,00 € » qui voudrait dire « pas su »).
-export function totalDocument(contenu) {
+export function totalDocument(contenu, langue = null) {
   const T = contenu && contenu.totaux;
   if (!T || !Number.isInteger(T.ttc)) return null;
   const avoir = contenu.type === 'avoir';
   const lib = contenu.regime === 'normal' ? (avoir ? 'Total TTC à rembourser' : 'Total TTC')
     : contenu.regime === 'franchise' ? (avoir ? 'Montant à rembourser' : 'Net à payer')
       : (avoir ? 'Montant à rembourser' : 'Total à payer');
+  // `langue` : l'e-mail (une langue) ; sinon le libellé du PDF (bilingue s'il l'est).
+  if (langue === 'en') return [EN[lib] || lib, euros(T.ttc)];
+  if (langue === 'fr') return [lib, euros(T.ttc)];
   return [bi(lib, !!contenu.anglais), euros(T.ttc)];   // la traduction du PDF (./anglais.js)
 }
-export function emailFacture(cfg, contenu, { via = 'vrm' } = {}) {
-  const { sujet, corps } = messageEmail(cfg, contenu);
-  const nom = contenu.vendeur.nom;
+// La mention de TVA du récapitulatif de l'e-mail : celle que porte la facture (art. 293 B,
+// régime de la marge), ou « dont TVA » de son total — rien de recalculé ici.
+export function mentionTvaEmail(contenu, langue = 'fr') {
+  const M = MOTS_EMAIL[langue === 'en' ? 'en' : 'fr'];
+  const mentions = Array.isArray(contenu && contenu.mentions) ? contenu.mentions : [];
+  if (mentions.length) return langue === 'en' ? (MENTIONS_EN[mentions[0]] || mentions[0]) : mentions[0];
+  const T = contenu && contenu.totaux;
+  if (contenu && contenu.regime === 'normal' && T && Number.isInteger(T.tva) && contenu.taux != null) return M.dontTva(String(contenu.taux).replace('.', langue === 'en' ? '.' : ','), euros(T.tva));
+  return '';
+}
+// `opts.pieces` : les noms des fichiers vraiment joints (le serveur, à l'envoi) ;
+// sinon le PDF seul (l'aperçu de l'app).
+export function emailFacture(cfg, contenu, { via = 'vrm', pieces = null } = {}) {
+  const { sujet, corps, langue } = messageEmail(cfg, contenu);
+  const M = MOTS_EMAIL[langue];
+  const v = contenu.vendeur || {};
+  const nom = v.nom || '';
   // (11 nov., lot DJ1 — Julien : « Cette facture vous est envoyée par VRM pour le compte
-  // de … Pour toute question, répondez simplement à cet e-mail … Je veux pas de ce
-  // message. ») PLUS AUCUN PIED : l'e-mail ne garde que SON texte (signé de sa boutique)
-  // et la pièce jointe. La réponse de l'acheteur arrive toujours chez lui, sans le dire :
-  // c'est l'en-tête Reply-To (= l'e-mail du vendeur, api/_lib/facture-pro.js) qui le tient.
-  const texte = corps;
-  // (8 nov.) Le HTML passe par le gabarit commun des e-mails (api/_lib/mail-gabarit.js) :
-  // le NOM du vendeur en tête (c'est SA facture, pas un e-mail de VRM), son texte
-  // échappé, la pièce jointe dite, aucun bouton, aucun pied (`marque` : pas de mentions de VRM).
-  const doc = contenu.type === 'avoir' ? (contenu.anglais ? 'Avoir / Credit note' : 'Avoir') : (contenu.anglais ? 'Facture / Invoice' : 'Facture');
-  // (11 nov., lot emails-envoyes) Sous son message, l'essentiel du document d'un coup
-  // d'œil : son numéro et le montant — le MÊME chiffre et le même libellé que la
-  // dernière ligne du PDF (`totalDocument`), jamais recalculé ici — puis le nom du
-  // PDF joint. Aucun bouton (le document EST la pièce jointe), rien de VRM.
-  // Le texte brut reste exactement SON message (l'aperçu « Message » de l'app).
-  const total = totalDocument(contenu);
-  const en = (fr, an) => (contenu.anglais ? `${fr} / ${an}` : fr);   // deux mots que le PDF n'a pas
-  const { html } = gabaritMail({
-    titre: `${doc} ${contenu.numero}`,
-    preentete: `${doc} ${contenu.numero} en pièce jointe (PDF)${contenu.anglais ? ' / attached (PDF)' : ''}.`,
+  // de … Je veux pas de ce message. ») AUCUN pied de VRM : la réponse de l'acheteur
+  // arrive chez lui par l'en-tête Reply-To (api/_lib/facture-pro.js), sans le dire.
+  // (16 nov., lot factures-mieux) Une forme SOBRE à part (api/_lib/mail-facture.js) :
+  // le courrier d'une entreprise à son client, plus le cadre bleu des e-mails de VRM.
+  const avoir = contenu.type === 'avoir';
+  const doc = avoir ? M.avoir : M.facture;
+  const lignesDoc = Array.isArray(contenu.lignes) ? contenu.lignes : [];
+  const total = totalDocument(contenu, langue);
+  const recap = [
+    [avoir ? M.numeroAvoir : M.numeroFacture, String(contenu.numero)],
+    ...(avoir && contenu.origine ? [[M.annule, String(contenu.origine)]] : []),
+    ...(contenu.emiseJour ? [[M.date, String(contenu.emiseJour)]] : []),
+    ...(lignesDoc.length > 1 ? [[M.article, M.articles(lignesDoc.length)]] : lignesDoc.length && lignesDoc[0].designation ? [[M.article, String(lignesDoc[0].designation)]] : []),
+    ...(total ? [total] : []),
+  ];
+  const noms = Array.isArray(pieces) && pieces.length ? pieces.map(String) : [nomFichier(contenu)];
+  const phrasePieces = `${noms.length > 1 ? M.pieces : M.piece}${langue === 'en' ? ':' : '\u00a0:'} ${noms.join(', ')}`;
+  const coordonnees = [nom, ...(Array.isArray(v.adresse) ? v.adresse : []), (Array.isArray(v.legal) ? v.legal.filter((x) => typeof x === 'string') : []).join(' · '), v.telephone || ''].filter((x) => String(x || '').trim());
+  const { html, texte } = gabaritFacture({
+    titre: avoir ? M.sujetAvoir : M.sujetFacture,
+    preentete: M.preentete(doc, contenu.numero),
+    boutique: nom,
     paras: corps.split(/\n{2,}/).map((x) => x.trim()).filter(Boolean),
-    chiffres: [
-      [en('Numéro', 'Number'), String(contenu.numero)],
-      ...(total ? [total] : []),
-    ],
-    apres: `${en('Pièce jointe', 'Attachment')} : ${nomFichier(contenu)}`,
-    pied: null,
-    marque: { nom },
+    lignes: recap,
+    note: mentionTvaEmail(contenu, langue),
+    pieces: phrasePieces,
+    coordonnees,
+    email: v.email || '',
+    langue,
   });
-  return { sujet, texte, html, nomExpediteur: via === 'vrm' ? `${nom} via VRM`.slice(0, 120) : nom };
+  return { sujet, texte, html, message: corps, langue, nomExpediteur: via === 'vrm' ? `${nom} via VRM`.slice(0, 120) : nom };
 }

@@ -29,6 +29,8 @@ export const PHRASE_MOTS_MAX = 12;
 export const NOUVEAUTES = Object.freeze([
   // (17 nov., Julien : « je dois rester appuyé sur l'achat […] on ne voit pas ce que j'ai sélectionné ») docs/passation/2026-11-17-relier-toucher.md
   { id: 'relier-toucher', date: '2026-11-17', titre: 'Relier un achat en deux touchers', phrase: 'Touche l’achat, puis la vente : le choix reste affiché en haut.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (16 nov., lot factures-mieux) docs/passation/2026-11-16-factures-mieux.md
+  { id: 'factures-mieux', date: '2026-11-16', titre: 'Factures et reçus d’achat plus nets', phrase: 'E-mail sobre en une langue, PDF à bandeau, reçu accentué.', tab: 'compta', pour: 'pro', mode: 'tous' },
   // (16 nov., lot tampons-parametres) docs/passation/2026-11-16-tampons-parametres.md
   { id: 'tampons-apercu', date: '2026-11-16', titre: 'Place ton N° avant d’imprimer', phrase: 'Chaque bordereau en vignette : glisse le tampon, puis Imprimer.', tab: 'cat_bord', pour: 'tous', mode: 'tous' },
   { id: 'tampons-mention-qr', date: '2026-11-16', titre: '« Créé par vrm.center » au-dessus du QR', phrase: 'Visible même sous le scotch ; réglable dans Paramètres → Imprimante.', tab: 'settings', pour: 'tous', mode: 'tous' },
