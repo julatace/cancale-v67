@@ -10907,7 +10907,7 @@ function etapeAchat(o, tk, { fini = false, retour = false } = {}) {
   //    Motif précis (comme venteStage) pour ne pas attraper « Retournée à
   //    l'expéditeur », qui est autre chose.
   if (ACHAT_A_RENVOYER.test(s)) return { label: 'À renvoyer', step: 1, color: C.warn, retour: true };
-  if (achatAnnule(o)) return { label: 'Annulé', step: 0, color: C.danger };   // (17 nov.) la règle de src/registres.js, la même que le filtre « Annulés »
+  if (/annul|rembours|refus/i.test(s)) return { label: 'Annulé', step: 0, color: C.danger };   // (17 nov.) le motif de `achatAnnule` (src/registres.js), celui du filtre « Annulés » (gardé en ligne : les audits exécutent cette fonction seule)
   // (5 nov.) Mots retenus (revue du 5 nov.) : « Arrivé » (« Reçu » est réservé à l'argent),
   // « En route ». Et « à retirer » SEULEMENT si la règle des colis à retirer le compte
   // (`pickupUnion`) : un achat que Vinted dit encore « déposé » mais dont le transporteur

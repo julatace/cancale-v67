@@ -312,6 +312,8 @@ const mesurePanneau = (pg) => pg.evaluate(() => {
         }
         const groupe = { garage: 'paires', annonces: 'paires', achats: 'achats' };
         dit(vus.length >= 2 && vus.every((v) => !v.actif || v.actif === (groupe[v.ecran] || v.ecran)), `B6 ${qui} : sur chaque écran du menu, la barre n’allume que l’onglet de cet écran (ou aucun)`, JSON.stringify(vus));
+        // Les visites du menu ont empilé leurs écrans : B7–B9 repartent d'une page neuve (comme avant, où « Plus » n'empilait rien).
+        await pg.close().catch(() => {}); ({ pg } = await ouvrirPage(ctx, '?tab=journee'));
         // B7 · balayages
         await toucher(pg, '.vrm-tabbar [data-nav-entree="ventes"]');
         // Le milieu de l'écran, HORS d'une commande : un geste qui part d'un bouton, d'un lien,
