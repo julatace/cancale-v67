@@ -43,9 +43,9 @@
 @media (min-width:1024px){.vrm-tampons-galerie{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;}}
 .vrm-tampons-vignette{display:flex;flex-direction:column;align-items:stretch;gap:10px;padding:12px;min-height:44px;min-width:0;border:1px solid var(--vrm-bordure,rgba(0,0,0,.12));border-radius:18px;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer;}
 .vrm-tampons-vignette-tete{display:flex;align-items:center;gap:8px;min-width:0;}
-.vrm-tampons-vignette-nom{font-size:15px;font-weight:600;line-height:1.25;min-width:0;overflow-wrap:anywhere;}
+.vrm-tampons-vignette-nom{font-size:15px;font-weight:600;line-height:1.25;min-width:0;overflow-wrap:break-word;hyphens:manual;}
 .vrm-tampons-vignette-page{position:relative;display:block;line-height:0;width:100%;}
 .vrm-tampons-vignette:not([data-etat="ok"]) .vrm-tampons-vignette-page{min-height:120px;}
 .vrm-tampons-vignette-page canvas{display:block;width:100% !important;height:auto !important;border-radius:8px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.14),0 0 0 1px rgba(0,0,0,.06);}
-.vrm-tampons-vignette-statut{font-size:13px;line-height:1.35;overflow-wrap:anywhere;}
-.vrm-tampons-exemple{margin-left:auto;flex:none;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;line-height:1.4;color:var(--vrm-muted,#6e6e73);box-shadow:inset 0 0 0 1px currentColor;}
+.vrm-tampons-vignette-statut{font-size:13px;line-height:1.35;overflow-wrap:break-word;}
+.vrm-tampons-exemple{display:inline-block;margin:0 6px 4px 0;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:600;line-height:1.5;vertical-align:1px;box-shadow:inset 0 0 0 1px currentColor;}

@@ -165,7 +165,9 @@ async function vueApp(b, vue, avecReel) {
     await pg.locator('[data-tampons-reglage]').scrollIntoViewIfNeeded();
     for (const id of IDS) { await pg.locator(`[data-tampons-vignette="${id}"]`).scrollIntoViewIfNeeded().catch(() => {}); await attendre(pg, (i) => { const e = document.querySelector(`[data-tampons-vignette="${i}"]`); return e && e.getAttribute('data-etat') !== 'charge'; }, id, 60000); }
     const t = await pg.evaluate(() => [...document.querySelectorAll('[data-tampons-vignette]:not([data-tampons-vignette="ebay"])')].map((e) => ({ id: e.getAttribute('data-tampons-vignette'), etat: e.getAttribute('data-etat'), m: e.getAttribute('data-m'), src: e.getAttribute('data-source'), ex: !!e.querySelector('[data-tampons-exemple]'), x: Math.round(e.getBoundingClientRect().x), y: Math.round(e.getBoundingClientRect().y),
-      coupe: [...e.querySelectorAll('.vrm-tampons-vignette-nom,.vrm-tampons-vignette-statut')].some((n) => n.scrollWidth > n.clientWidth + 1 || n.scrollHeight > n.clientHeight + 1) })));
+      coupe: [...e.querySelectorAll('.vrm-tampons-vignette-nom,.vrm-tampons-vignette-statut')].some((n) => n.scrollWidth > n.clientWidth + 1 || n.scrollHeight > n.clientHeight + 1
+        // un MOT coupé en deux (« Rela / is Coli / s ») : un mot plus large que sa boîte
+        || n.textContent.split(/\s+/).filter(Boolean).some((w) => { const t = document.createElement('span'); t.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;font:inherit'; t.textContent = w; n.appendChild(t); const L = t.getBoundingClientRect().width; t.remove(); return L > n.clientWidth + 1; })) })));
     const dessinees = t.filter((x) => x.etat === 'ok');
     dit(dessinees.length === IDS.length, `${nom} : chaque type dessiné`, t.map((x) => `${x.id}:${x.etat}`).join(' '));
     dit(dessinees.every((x) => x.m), `${nom} : A1 réglage rangé « sans mention » ⇒ « Créé par vrm.center » sur CHAQUE tuile`, dessinees.filter((x) => !x.m).map((x) => x.id).join(',') || 'toutes');
@@ -177,7 +179,7 @@ async function vueApp(b, vue, avecReel) {
     dit(autres.every((x) => x.src === 'exemple' && x.ex), `${nom} : A3 sans bordereau reçu ⇒ l’exemple, marqué « Exemple »`, autres.filter((x) => !(x.src === 'exemple' && x.ex)).map((x) => x.id).join(',') || 'tous');
     const ligne1 = t.filter((x) => Math.abs(x.y - t[0].y) < 4).length;
     dit(ligne1 === (tactile ? 2 : 4), `${nom} : A4 ${tactile ? 2 : 4} tuiles par rangée`, `${ligne1}`);
-    dit(t.every((x) => !x.coupe), `${nom} : A4 aucun nom ni état tronqué`, t.filter((x) => x.coupe).map((x) => x.id).join(','));
+    dit(t.every((x) => !x.coupe), `${nom} : A4 aucun nom ni état tronqué ni mot coupé`, t.filter((x) => x.coupe).map((x) => x.id).join(','));
     dit(await pg.evaluate(() => !document.querySelector('[data-tampons-reglage] [data-tampons-contenu="mention"],[data-tampons-reglage] [data-tampons-place-mention],[data-tampons-reglage] [data-tampons-texte-mention]')), `${nom} : A2 aucun contrôle de la page n’enlève ni ne déplace la mention`);
     await pg.locator('[data-tampons-reglage]').evaluate((e) => e.scrollIntoView({ block: 'start' }));
     await pg.waitForTimeout(300);

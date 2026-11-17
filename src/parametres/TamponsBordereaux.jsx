@@ -130,8 +130,7 @@ function Vignette({ fam, support, tampons, ouvrir, nomSupport }) {
     <button type="button" ref={boite} className="vrm-tampons-vignette" data-tampons-vignette={fam.id} data-etat={st.etat} data-cle={p ? p.cle : ''}
       data-source={st.source || ''} data-n={p ? boiteTexte(p.place) : ''} data-m={p ? boiteTexte(p.mentionBoite) : ''}
       aria-label={tr('tampons.vignette.aria', { nom, support: nomSupport })} onClick={() => ouvrir(fam)}>
-      <span className="vrm-tampons-vignette-tete"><Logo fam={fam}/><span className="vrm-tampons-vignette-nom">{nom}</span>
-        {st.etat === 'ok' && st.source === 'exemple' && <span className="vrm-tampons-exemple" data-tampons-exemple="" title={tr('tampons.exemple.phrase')}>{tr('tampons.exemple')}</span>}</span>
+      <span className="vrm-tampons-vignette-tete"><Logo fam={fam}/><span className="vrm-tampons-vignette-nom">{nom}</span></span>
       <span ref={page} className="vrm-tampons-vignette-page">
         <canvas ref={cv} aria-hidden="true" data-stream-image="bordereau"/>
         {/* En pourcentage de la page : le cadre reste sur le tampon même quand la vignette est réduite (téléphone). */}
@@ -141,6 +140,7 @@ function Vignette({ fam, support, tampons, ouvrir, nomSupport }) {
         {st.etat === 'ko' && <span className="vrm-tampons-attente">{tr('tampons.ko')}</span>}
       </span>
       <span className="vrm-tampons-vignette-statut" data-tampons-statut={main ? 'main' : 'auto'} style={{ color: C.muted }}>
+        {st.etat === 'ok' && st.source === 'exemple' && <span className="vrm-tampons-exemple" data-tampons-exemple="" title={tr('tampons.exemple.phrase')}>{tr('tampons.exemple')}</span>}
         {main ? <>{tr('tampons.statut.main')} · <span style={{ color: C.accentTexte || C.accent }}>{tr('tampons.modifier')}</span></> : tr('tampons.statut.auto2')}
       </span>
     </button>
