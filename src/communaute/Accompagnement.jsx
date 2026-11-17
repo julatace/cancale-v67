@@ -130,11 +130,11 @@ export function VueMembre({ vue, pour = 'createur', nomCreateur = '' }) {
         {vue.chiffres.ventes && vue.chiffres.horsVc > 0 && <p className="vrm-cm-note" data-cm-accomp-hors-vc={vue.chiffres.horsVc}>{tr('grp.vue.horsVc', { n: vue.chiffres.horsVc })}</p>}
         <div className="vrm-cm-note">{tr('grp.vue.publieLe', { quand: jourHeure(vue.chiffres_le) || '—' })} <Pourquoi>{tr('grp.vue.pourquoi')}</Pourquoi></div>
         {e === 'detail' && (vue.detail ? <div data-cm-accomp-detail={vue.detail.ventes.length}>
-          <h4>{tr('grp.vue.ventesRecentes', { n: vue.detail.ventes.length })}</h4>
+          <h4>{vue.detail.ventes.length > 1 ? tr('grp.vue.ventesRecentes', { n: vue.detail.ventes.length }) : tr('grp.vue.venteRecente')}</h4>
           {vue.detail.ventes.length === 0 ? <p className="vrm-cm-note">{tr('grp.vue.aucuneVente')}</p> :
             <ul className="vrm-cm-liste vrm-cm-detail">{vue.detail.ventes.slice(0, 50).map((l, i) => <li key={i} data-cm-accomp-vente>
               <div><b>{l[3] || tr('grp.vue.article')}</b><small>{jourCourt(l[0])} · {l[1]}{l[2] ? ' · ' + l[2] : ''}</small></div><span>{eurC(l[4])}</span></li>)}</ul>}
-          <h4>{tr('grp.vue.achatsRecents', { n: vue.detail.achats.length })}</h4>
+          <h4>{vue.detail.achats.length > 1 ? tr('grp.vue.achatsRecents', { n: vue.detail.achats.length }) : tr('grp.vue.achatRecent')}</h4>
           {vue.detail.achats.length === 0 ? <p className="vrm-cm-note">{tr('grp.vue.aucunAchat')}</p> :
             <ul className="vrm-cm-liste vrm-cm-detail">{vue.detail.achats.slice(0, 50).map((l, i) => <li key={i} data-cm-accomp-achat>
               <div><b>{l[2] || tr('grp.vue.achat')}</b><small>{jourCourt(l[0])}{l[1] ? ' · ' + l[1] : ''}</small></div><span>{eurC(l[3])}</span></li>)}</ul>}
@@ -266,7 +266,7 @@ function Inviter({ api, g, discord = '', photo = '', coucouPret, onToast, onHabi
     <h4 className="vrm-gc-titre-section">{tr('grp.inviter.discordTitre')}</h4>
     {coucouPret ? <form onSubmit={enregistrer} className="vrm-gc-discord">
       <label className="vrm-cm-champ"><span>{tr('grp.inviter.discordChamp')} <small>{tr('grp.facultatif')}</small></span>
-        <input value={d} onChange={(e) => setD(e.target.value)} inputMode="url" autoCapitalize="off" autoComplete="off" spellCheck={false} placeholder="https://discord.gg/…" data-cm-accomp-discord-champ /></label>
+        <input value={d} onChange={(e) => setD(e.target.value)} inputMode="url" autoCapitalize="off" autoComplete="off" spellCheck={false} placeholder={tr('grp.inviter.discordExemple')} data-cm-accomp-discord-champ /></label>
       <p className="vrm-cm-note">{tr('grp.inviter.discordNote')}</p>
       {msg && <p className="vrm-cm-msg" role="alert">{msg}</p>}
       <button type="submit" disabled={occupe || (d || '').trim() === (pose || '')} data-cm-accomp-discord-enregistrer>{occupe ? tr('grp.unInstant') : tr('grp.enregistrer')}</button>
@@ -586,7 +586,7 @@ function Rejoindre({ api, prenom, codeInitial = '', onFait, onFerme, FermeAuReto
   };
   return <Feuille titre={tr('grp.rejoindreTitre')} onFerme={onFerme} FermeAuRetour={FermeAuRetour} data={{ 'data-cm-accomp-feuille': 'rejoindre' }}>
     {!apercu ? <form onSubmit={(e) => { e.preventDefault(); voir(code); }}>
-      <label className="vrm-cm-champ"><span>{tr('grp.rejoindre.code')}</span><input value={code} maxLength={12} autoCapitalize="characters" autoComplete="off" onChange={(e) => setCode(e.target.value)} placeholder="ABCD-2345" data-cm-accomp-code-tape /></label>
+      <label className="vrm-cm-champ"><span>{tr('grp.rejoindre.code')}</span><input value={code} maxLength={12} autoCapitalize="characters" autoComplete="off" onChange={(e) => setCode(e.target.value)} placeholder={tr('grp.rejoindre.codeExemple')} data-cm-accomp-code-tape /></label>
       {msg && <p className="vrm-cm-msg" role="alert">{msg}</p>}
       <button type="submit" className="vrm-cm-primaire vrm-gc-plein" disabled={occupe || !code.trim()} data-cm-accomp-voir>{occupe ? tr('grp.unInstant') : tr('grp.rejoindre.voir')}</button>
     </form> : <div data-cm-accomp-apercu={apercu.code}>

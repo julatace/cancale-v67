@@ -27,6 +27,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (17 nov., Julien : « que les personnes puissent se faire coucou […] sur Discord ») docs/passation/2026-11-17-groupes-coucou.md
+  { id: 'groupes-coucou', date: '2026-11-17', titre: 'Groupes en trois étapes, et le coucou', phrase: 'Photo, QR code, Discord ; un coucou, puis on s’écrit sur Discord.', tab: 'communaute', pour: 'tous', mode: 'tous' },
   // (17 nov., audit d'accessibilité WCAG 2.1 AA) docs/passation/2026-11-17-accessibilite.md
   { id: 'accessibilite-clavier', date: '2026-11-17', titre: 'Plus lisible, et tout au clavier', phrase: 'Focus visible partout, textes sur le bleu éclaircis, « Aller au contenu ».', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (17 nov., Julien : un colis arrivé, deux lignes — envoi à deux transporteurs) docs/passation/2026-11-17-suivi-multi-transporteurs.md
