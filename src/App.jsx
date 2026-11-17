@@ -567,7 +567,7 @@ import { entreeHistorique } from "./navHistorique.js";   // (16 nov., barre-acha
 // (14 nov., Studio bleu clair) L'espace d'un écran, le disque et son éventail, l'ondulation au changement d'espace.
 import { espaceDe } from "./design/espace.js";
 import { DisqueEventail } from "./design/DisqueEventail.jsx";
-import { onduler } from "./design/ondulation.js";
+import { onduler, preparerOndulation } from "./design/ondulation.js";
 // Importés ICI une fois pour les chantiers C à H (aucun n'a à retoucher cette ligne).
 import { ChampRecherche } from "./composants/ChampRecherche.jsx";
 import { SuitePaquets, groupesBornes, PAQUET_LISTE } from "./composants/SuitePaquets.jsx";   // (11 nov., limites-client) longues listes par paquets
@@ -20256,6 +20256,7 @@ function BottomBar({tab,setTab,sites,badges,gestes=null}) {
   // (déjà vu, src/ecransGardes.jsx) revient tel quel, sans calcul.
   // (14 nov., Studio bleu clair) Changer d'ESPACE : l'ondulation de lumière part de l'onglet touché (src/design/ondulation.js).
   const allerA=(id,depuis)=>{ if(depuis&&espaceDe(id,BAR_GROUPE)!==espaceDe(tab,BAR_GROUPE)) onduler(depuis); noterNavigationSimple(id); setVise(id); demarrer(()=>setTab(id)); };
+  React.useEffect(()=>{ preparerOndulation(); },[]);   // (17 nov.) l'anneau posé au repos : un toucher ne l'insère plus (ondulation.js)
   const tabMontre=vise||tab;
   const navRef=React.useRef(null);
   // (8 nov.) LA PASTILLE DE L'ONGLET CHOISI GLISSE vers l'onglet touché (Julien : « vraiment
