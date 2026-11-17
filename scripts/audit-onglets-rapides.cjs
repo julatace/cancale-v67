@@ -23,6 +23,9 @@ const MUTS = {
   'mise-en-page-forcee': ['src/design/ondulation.js', "    clearTimeout(main.__sbEntree);\n", "    clearTimeout(main.__sbEntree); void main.offsetWidth;\n"],
   'a-trancher-perime': ['src/ecransGardes.jsx', ", 'vrm_reprise_ecrans', 'vrm_a_trancher'];", ", 'vrm_reprise_ecrans'];"],
   'lecteur-fige': ['src/App.jsx', "if (k === CLE_A_TRANCHER) setPubs(lirePubs());", "if (false) setPubs(lirePubs());"],
+  'en-vol-oublie': ['src/lectureEnVol.js', '  enVol.set(k, p);\n', ''],
+  'en-vol-garde': ['src/lectureEnVol.js', 'const fin = () => { if (enVol.get(k) === p) enVol.delete(k); };', 'const fin = () => {};'],
+  'reserves-en-direct': ['src/App.jsx', '        lireReservesNum(),', '        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`),'],
   'autre-lecteur-fige': ['src/SanteDonnees.jsx', "if (k === CLE_A_TRANCHER || k === CLE_SANTE) relire();", "if (k === CLE_SANTE) relire();"],
 };
 const muter = (k) => { const [f, a, b] = MUTS[k]; const t = fs.readFileSync(path.join(R, f), 'utf8'); if (!t.includes(a)) throw new Error('mutation introuvable : ' + k); return [f, t.replace(a, b)]; };
@@ -31,7 +34,7 @@ if (process.argv.includes('--prouve')) {
   let n = 0;
   for (const k of Object.keys(MUTS)) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'onglets-mut-'));
-    for (const f of ['src/design/ondulation.js', 'src/ecransGardes.jsx', 'src/App.jsx', 'src/SanteDonnees.jsx', 'src/aTrancher.js']) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); if (fs.existsSync(path.join(R, f))) fs.copyFileSync(path.join(R, f), path.join(dir, f)); }
+    for (const f of ['src/design/ondulation.js', 'src/ecransGardes.jsx', 'src/App.jsx', 'src/SanteDonnees.jsx', 'src/aTrancher.js', 'src/lectureEnVol.js']) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); if (fs.existsSync(path.join(R, f))) fs.copyFileSync(path.join(R, f), path.join(dir, f)); }
     const [f, t] = muter(k); fs.writeFileSync(path.join(dir, f), t);
     let code = 0; try { execFileSync(process.execPath, [__filename], { stdio: 'pipe', env: { ...process.env, AUDIT_RACINE: dir } }); } catch (e) { code = e.status; }
     console.log(`${code === 1 ? '✅' : '❌'} mutation « ${k} » ⇒ ${code === 1 ? 'ROUGE' : 'pas attrapée (' + code + ')'}`); if (code === 1) n++;
@@ -98,6 +101,29 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   const pas = (p) => { for (const f of fs.readdirSync(p, { withFileTypes: true })) { const q = path.join(p, f.name); if (f.isDirectory()) pas(q); else if (/\.(jsx?|mjs)$/.test(f.name) && !/aTrancher\.js$|App\.jsx$|ecransGardes\.jsx$/.test(f.name)) { const t = sansCommentaires(fs.readFileSync(q, 'utf8')); if (/lirePublications|vrm_a_trancher/.test(t)) { lecteursAilleurs.push(path.relative(R, q)); if (!(/addEventListener\('vrm:save'/.test(t) && /k === CLE_A_TRANCHER/.test(t))) figes.push(path.relative(R, q)); } } } };
   try { pas(path.join(R, 'src')); } catch (_) {}
   dit(!figes.length, 'K3 tout autre lecteur l’écoute aussi en direct (un lecteur figé la montrerait périmée)', (lecteursAilleurs.join(', ') || 'aucun') + (figes.length ? ' — figés : ' + figes.join(', ') : ''));
+  // ── L : une lecture en vol par ligne (`panel_num_reserves` lue 5 fois à l'ouverture d'Achats) ──
+  console.log('L — une lecture en vol par ligne');
+  const srcL = lire('src/lectureEnVol.js');
+  if (!srcL) dit(false, 'L src/lectureEnVol.js existe');
+  else {
+    const ec = {}; global.window = { addEventListener: (t, f) => { (ec[t] = ec[t] || []).push(f); } };
+    fs.writeFileSync(path.join(tmp, 'lectureEnVol.mjs'), srcL);
+    const E = await import(pathToFileURL(path.join(tmp, 'lectureEnVol.mjs')).href + '?v=' + Math.random());
+    let n = 0; const lent = () => new Promise((r) => { n++; setTimeout(() => r([{ data: { n } }]), 5); });
+    global.setTimeout = (f, ms) => { const t = require('timers'); return t.setTimeout(f, ms); };
+    const [x, y, z] = await Promise.all([E.lireEnVol('r', lent), E.lireEnVol('r', lent), E.lireEnVol('r', lent)]);
+    dit(n === 1 && x === y && y === z, 'L1 trois lecteurs pendant le vol : UNE lecture, la même réponse', `${n} lecture(s)`);
+    await E.lireEnVol('r', lent);
+    dit(n === 2, 'L2 le vol arrivé, la lecture suivante repart au serveur (rien gardé au-delà)', `${n} lecture(s)`);
+    n = 0; const p1 = E.lireEnVol('r', lent); (ec['vrm:ext'] || []).forEach((f) => f()); const p2 = E.lireEnVol('r', lent); await Promise.all([p1, p2]);
+    dit(n === 2, 'L3 un signal de l’extension pendant le vol : la lecture suivante repart', `${n} lecture(s)`);
+    n = 0; let r1 = 'x'; try { await E.lireEnVol('k', () => { n++; return Promise.reject(new Error('panne')); }); } catch (_) { r1 = 'rejet'; }
+    await E.lireEnVol('k', () => { n++; return null; });
+    dit(r1 === 'rejet' && n === 2, 'L4 un échec est rendu, jamais gardé', `${n} lecture(s)`);
+  }
+  const appL = lire('src/App.jsx'); const aL = appL ? sansCommentaires(appL) : '';
+  const directes = (aL.match(/id=eq\.panel_num_reserves&select=data/g) || []).length;
+  dit(directes === 1 && /function lireReservesNum\(\) \{ return lireEnVol\('panel_num_reserves'/.test(aL), 'L5 App.jsx : `panel_num_reserves` lue par un seul chemin, en vol partagé', `${directes} adresse(s)`);
   fs.rmSync(tmp, { recursive: true, force: true });
   console.log(`\naudit-onglets-rapides : ${ok} vert(s), ${ko} rouge(s)`);
   process.exit(ko ? 1 : 0);

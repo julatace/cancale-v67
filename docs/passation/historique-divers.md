@@ -2025,3 +2025,9 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 - **16 nov. · Restes du design** : Leboncoin/eBay/Vestiaire/Stock — la rangée touchée monte à sa place (`src/paires/PaireAvantSite.jsx`, « acheté » du N° par `achatDuNumeroLu`) ; recherches courtes à 390 ; encre claire sur le fond ; un meuble se glisse au doigt (`placerMeuble`). `2026-11-16-design-restes.md`. Geste : aucun.
 
 - **16 nov. · Argent lisible (lot argent-mieux)** : cartes de verre à l'encre du verre (`src/design/verre-argent.css`, 0 texte < 4,5:1), « Copier » plein ; ventes non comptées groupées (une ligne par raison, « au moins », détail replié, `src/composants/NonComptees.jsx`) ; règle inchangée. Piste « deux prix » (écart +0,47–1,45 €, pas la protection) : `docs/passation/2026-11-16-argent-mieux.md`. Geste : décider la piste.
+
+## Lignes déplacées de CLAUDE.md §9 (17 nov., lot accessibilite)
+
+- **16 nov. · Tampons des bordereaux (lot tampons-parametres)** : UN réglage `vrm_tampons` (SYNC_KEYS, migration des choix d'avant) lu par TOUTES les impressions ; « Créé par vrm.center » juste AU-DESSUS du QR, centrée (sinon dessous, sinon sous l'adresse) ; la sélection ouvre l'APERÇU AVANT IMPRESSION (vignettes, tampon déplacé au doigt, codes/QR/adresse refusés, « tous de ce type ») ; Paramètres → Imprimante : galerie de tous les types × papiers, même éditeur. `docs/passation/2026-11-16-tampons-parametres.md`. Geste : aucun.
+
+- **16 nov. · Scanner un colis d'achat (lot scan-achat)** : le n° de suivi scanné (caméra, douchette, saisie) ⇒ « Dans ce colis » : photo, titre, taille · état, lot en liste (lus dans SA transaction), payé, date, vendeur ; « Ranger » (atelier d'arrivée), « Signaler un problème » (sa conversation Vinted), « Ce n'est pas ça » ; inconnu ⇒ « Colis inconnu · Relier à un achat » (SON toucher, n° gardé comme identité). Mesuré : 43 achats sur 135 (30 j) ont un n°. `2026-11-16-scan-achat.md`. Geste : aucun.

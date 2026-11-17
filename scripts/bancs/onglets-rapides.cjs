@@ -80,7 +80,7 @@ const juge = (m, r) => {
   const reqs = [];
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (/\.(jpe?g|png|webp)(\?|$)/i.test(r.request().url()) ? r.fulfill({ status: 200, contentType: 'image/png', body: PIXEL }) : r.abort()));
   await pg.route('**/rest/v1/**', async (route) => {
-    const rq = route.request(); reqs.push({ t: Date.now(), m: rq.method() });
+    const rq = route.request(); reqs.push({ t: Date.now(), m: rq.method(), u: decodeURIComponent(rq.url()) });
     if (rq.method() !== 'GET') return route.fulfill({ status: 201, contentType: 'application/json', body: '[]' });
     const h = await rq.allHeaders(); const rep = repondre(rq.url(), h.range, base);
     await attendre(80);
@@ -98,8 +98,13 @@ const juge = (m, r) => {
   console.log(`démarrage ${Date.now() - t0} ms · charge de la machine ${charge} sur ${os.cpus().length} cœurs`);
   const onglets = await pg.evaluate(() => [...document.querySelectorAll('.vrm-tabbar .vrm-tab[data-nav-entree]')].filter((x) => x.getClientRects().length).map((x) => x.getAttribute('data-nav-entree')));
   console.log('onglets : ' + onglets.join(', '));
+  // Les lignes lues EN DOUBLE (chasse aux bugs, 17 nov.) : chacune au plus une fois par changement d'onglet.
+  const SUIVIES = { avis_bas: /id=eq\.vrm_avis_bas&/, reserves: /id=eq\.panel_num_reserves&/ };
+  const compter = (depuisI) => { const o = {}; for (const [k, re] of Object.entries(SUIVIES)) o[k] = reqs.slice(depuisI).filter((r) => r.m === 'GET' && re.test(r.u)).length; return o; };
+  console.log('    lectures au démarrage : ' + JSON.stringify(compter(0)));
+  if (JUGER) { const c = compter(0); dit(c.avis_bas <= 1 && c.reserves <= 1, 'démarrage : `vrm_avis_bas` et `panel_num_reserves` lues au plus une fois chacune', JSON.stringify(c)); }
   const toucher = async (id, fenetre) => {
-    const depuis = (await ecranIci()).e;
+    const depuis = (await ecranIci()).e; const i0 = reqs.length;
     await pg.evaluate((depuis) => { window.__g0 = performance.now(); window.__ev = []; window.__utile = null;
       const z = () => { if (window.__utile != null) return; const d = document.getElementById('vrm-demarrage'); const m = document.querySelector('.vrm-app-shell > .vrm-main'); const e = m && m.getAttribute('data-ecran'); const a = e && e !== depuis && [...document.querySelectorAll(`[data-attente-ecran="${e}"]`)].find((x) => x.getClientRects().length && !x.closest('.vrm-attente-cache'));
         if (!d && a && /pret|plafond/.test(a.getAttribute('data-attente') || '')) { window.__utile = performance.now() - window.__g0; return; } requestAnimationFrame(z); };
@@ -109,11 +114,12 @@ const juge = (m, r) => {
     await attendre(700);
     return pg.evaluate(() => { const g0 = window.__g0; const ev = window.__ev.filter((e) => e.s >= g0 - 5); const par = new Map(); for (const e of ev) par.set(e.id, Math.max(par.get(e.id) || 0, e.d));
       const lt = window.__lt.filter((x) => x[0] >= g0 - 5);
-      return { reponse: par.size ? Math.round(Math.max(...par.values())) : (window.__utile != null ? 16 : null), utile: window.__utile == null ? null : Math.round(window.__utile), longues: Math.round(lt.reduce((a, x) => a + x[1], 0)) }; });
+      return { reponse: par.size ? Math.round(Math.max(...par.values())) : (window.__utile != null ? 16 : null), utile: window.__utile == null ? null : Math.round(window.__utile), longues: Math.round(lt.reduce((a, x) => a + x[1], 0)) }; }).then((r) => ({ ...r, lectures: compter(i0) }));
   };
   // Échauffement : chaque onglet ouvert une fois (le premier montage, dit, pas jugé ici).
   const res = { premiers: {}, paires: [] };
-  for (const id of [...onglets.filter((t) => t !== 'journee'), 'journee']) { const r = await toucher(id, 20000); res.premiers[id] = r; console.log(`    1re ouverture ${id} — réponse ${r.reponse ?? '—'} ms · utile ${r.utile ?? '—'} ms · longues ${r.longues} ms`); await calme(15000); }
+  for (const id of [...onglets.filter((t) => t !== 'journee'), 'journee']) { const r = await toucher(id, 20000); res.premiers[id] = r; console.log(`    1re ouverture ${id} — réponse ${r.reponse ?? '—'} ms · utile ${r.utile ?? '—'} ms · longues ${r.longues} ms · ${JSON.stringify(r.lectures)}`);
+    if (JUGER) dit(r.lectures.avis_bas <= 1 && r.lectures.reserves <= 1, `1re ouverture ${id} : \`vrm_avis_bas\` et \`panel_num_reserves\` lues au plus une fois chacune`, JSON.stringify(r.lectures)); await calme(15000); }
   // Chaque paire, dans les deux sens : aller sur A (sans mesure), puis toucher B (mesuré).
   for (const a of onglets) for (const bb of onglets) {
     if (a === bb) continue;

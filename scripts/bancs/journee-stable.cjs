@@ -63,6 +63,13 @@ const juge = (m, r) => {
 
 
 const S_CLS = 0.02;
+// L'ordre VISUEL (de gauche à droite) des sortes de chiffres du mois : l'instantané (`[data-ji-case]`) ou l'écran vrai.
+const STRUCT = () => {
+  const ji = document.querySelector('[data-journee-instantane]');
+  const cases = ji ? [...ji.querySelectorAll('[data-ji-case]')] : [...document.querySelectorAll('.sj-t-mois [data-fu-case]')].filter((x) => x.getClientRects().length && !x.closest('.vrm-attente-cache'));
+  const sorte = (x) => x.getAttribute('data-carte-chiffre') || String(x.getAttribute('data-ji-case') || x.getAttribute('data-fu-case') || '').split('-')[0];
+  return { ordre: cases.map((x) => [x.getBoundingClientRect().left, sorte(x)]).sort((a, b) => a[0] - b[0]).map((x) => x[1]).join(',') };
+};
 (async () => {
   const b = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader'] });
   const ctx = await b.newContext({ serviceWorkers: 'block', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
@@ -92,15 +99,21 @@ const S_CLS = 0.02;
     await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
     const t0 = Date.now();
     await pg.goto(`http://localhost:${PORT}/?tab=journee`, { waitUntil: 'commit' });
-    let vuInstantane = false, tPret = null;
+    let vuInstantane = false, tPret = null, structPendant = null;
     while (Date.now() - t0 < 120000) {
       const e = await pg.evaluate(() => { const a = [...document.querySelectorAll('[data-attente-ecran="journee"]')].find((x) => x.getClientRects().length); return { ji: !!document.querySelector('[data-journee-instantane]'), pret: !document.getElementById('vrm-demarrage') && !!a && a.getAttribute('data-attente') === 'pret' }; }).catch(() => ({}));
-      if (e.ji && !vuInstantane) { vuInstantane = true; await attendre(300); await pg.screenshot({ path: path.join(SHOTS, `${etiq}-pendant.png`) }); }
+      if (e.ji && !vuInstantane) { vuInstantane = true; await attendre(300); await pg.screenshot({ path: path.join(SHOTS, `${etiq}-pendant.png`) }); structPendant = await pg.evaluate(STRUCT).catch(() => null); }
       if (e.pret) { tPret = Date.now() - t0; break; }
       await attendre(120);
     }
     let n = reqs.length, tc = Date.now(); while (Date.now() - tc < 3000 && Date.now() - t0 < 150000) { await attendre(250); if (reqs.length !== n) { n = reqs.length; tc = Date.now(); } }
     await pg.screenshot({ path: path.join(SHOTS, `${etiq}-apres.png`) });
+    const structApres = await pg.evaluate(STRUCT).catch(() => null);
+    if (etiq === 'avec-copie' && JUGER && structPendant) {
+      // La STRUCTURE (17 nov.) : un remplacement n'est pas un « décalage » pour le CLS — l'ordre des chiffres du mois et la
+      // place de leur tuile sont comparés entre l'instantané et l'écran vrai.
+      dit(!!structApres && structPendant.ordre === structApres.ordre, 'avec la copie : les chiffres du mois dans le MÊME ordre pendant et après', `pendant « ${structPendant.ordre} » · après « ${structApres && structApres.ordre} »`);
+    }
     const c = await pg.evaluate(() => window.__cls);
     const cls = c.reduce((a, x) => a + x.v, 0);
     const parNoeud = {}; for (const x of c) for (const s of x.s) parNoeud[s] = (parNoeud[s] || 0) + x.v;
