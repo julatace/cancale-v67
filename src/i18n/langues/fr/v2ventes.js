@@ -49,5 +49,10 @@ export default {
   "v2v.outils.emballer": "Emballer",
   "v2v.outils.tous": "Tous les outils des colis",
   "v2v.outils.masquer": "Masquer les outils des colis",
-  "v2v.litiges": {"one": "{n} colis : l’e-mail et la vente ne disent pas le même N° — VRM garde celui de la vente.", "other": "{n} colis : l’e-mail et la vente ne disent pas le même N° — VRM garde celui de la vente."}
+  "v2v.litiges": {"one": "{n} colis : l’e-mail et la vente ne disent pas le même N° — VRM garde celui de la vente.", "other": "{n} colis : l’e-mail et la vente ne disent pas le même N° — VRM garde celui de la vente."},
+  "v2v.versLe": "vers le {date}",
+  "v2v.vendue": {"zero": "vendue aujourd’hui", "one": "vendue hier", "other": "vendue il y a {n} j"},
+  "v2v.bord.pret": "bordereau prêt",
+  "v2v.bord.attente": "bordereau pas encore reçu",
+  "v2v.bord.imprime": "bordereau imprimé"
 };

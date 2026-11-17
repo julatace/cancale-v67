@@ -47822,10 +47822,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const ouvrirFicheV2 = (cle) => { try { const el = document.querySelector(`[data-v2v-ligne="${CSS.escape(cle)}"]`); const l = el ? lireLigne(el) : null; if (l) ouvrirLigne(l); } catch (_) {} };
   // Le geste « Imprimer » d'une rangée : LE bouton de la carte d'hier (montée, cachée) — le même PDF, le même tampon.
   const imprimerCarteV2 = (ident) => { try { const b = document.querySelector(`.v2-cache [data-colis-ident="${CSS.escape(ident)}"] button[data-imprime="1"]`); if (b) b.click(); } catch (_) {} };
+  // La 3e ligne d'une rangée (Julien : « il doit y avoir plusieurs infos ») : seulement ce qui est LU, chaque fait une fois.
+  //  · l'échéance : celle de la rangée d'hier (`echeanceCourteColis`), ambre à 2 jours ou moins d'une limite LUE ; une limite
+  //    ESTIMÉE dit « vers le … » (jamais « en retard », §5) ; une estimée dépassée dit « à vérifier » ;
+  //  · depuis quand elle est vendue (`attenteColis`, date de vente lue) ; l'état du bordereau ; l'acheteur.
+  const jourCourtV2 = (jour) => { try { return new Date(String(jour).slice(0, 10) + 'T12:00:00').toLocaleDateString(localeCourante(), { day: 'numeric', month: 'short' }); } catch (_) { return ''; } };
+  const echeanceV2 = (e) => {
+    if (e && e.lim && e.lim.jour) {
+      if (e.lim.limite === 'estimee') { const ec = echeanceCourteColis(e.lim); if (ec && ec.code === 'estimee-depassee') return { cle: 'limite', icone: 'calendar', texte: ec.texte }; const j = jourCourtV2(e.lim.jour); return j ? { cle: 'limite', icone: 'calendar', texte: tr('v2v.versLe', { date: j }) } : null; }
+      const ec = echeanceCourteColis(e.lim); if (!ec) return null;
+      const dl = e.dl;
+      return { cle: 'limite', icone: 'calendar', texte: ec.code === 'date' ? tr('vv.ech.avantLe', { date: ec.texte }) : ec.texte, ambre: Number.isFinite(dl) && dl <= 2 };
+    }
+    if (e && Number.isFinite(e.dl)) return { cle: 'limite', icone: 'calendar', texte: e.dl < 0 ? tr('sv.ech.retard', { n: Math.max(1, -e.dl) }) : e.dl === 0 ? tr('sv.ech.aujourdhui') : e.dl === 1 ? tr('sv.ech.demain') : tr('vv.ech.dans', { n: e.dl }), ambre: e.dl <= 2 };
+    return null;
+  };
+  const vendueV2 = (att) => (att == null || !Number.isFinite(att) ? null : { cle: 'vendue', icone: 'clock', texte: tr('v2v.vendue', { n: att }) });
+  // Plusieurs plateformes dans la liste : le logo de la plateforme sur chaque rangée (le nom écrit n'est plus redit).
+  const avecLogosV2 = (rows) => { if (new Set(rows.map((r) => r.site)).size < 2) return rows;
+    return rows.map((r) => ({ ...r, logo: <MarquePlateforme p={r.site} taille={13}/>, sous: (r.sous || []).filter((x) => x !== nomPlateforme(r.site)) })); };
   const lignesEnvoyerV2 = () => {
     const groupeDl = (dl) => (dl == null || !Number.isFinite(dl) ? 'sansDate' : dl <= 1 ? 'presse' : dl <= 7 ? 'semaine' : 'plusTard');
     // L'ordre de la liste d'hier (`colisAEnvoyerRanges` : la vente la plus récente en haut — Julien, 9 nov.), dans chaque groupe.
-    return colisAEnvoyerRanges().map((e) => {
+    return avecLogosV2(colisAEnvoyerRanges().map((e) => {
       if (e.__autre) {
         const site = { vc: 'vestiaire', eb: 'ebay', lbc: 'leboncoin' }[e.__autre] || e.__autre;
         const x = e.x || {}, v = e.v || {}, o = e.o || {};
@@ -47836,8 +47855,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const titre = e.__autre === 'vc' ? (v.titre || '') : (x.titre || o.title || '');
         const photo = e.__autre === 'eb' ? (x.ordre ? photoCommande(x.ordre) : null) : e.__autre === 'lbc' ? photoArticle(o) : (v.photo || null);
         const cle = String(e.key);
-        return { cle, site, titre, photo, num, prix: '', groupe: groupeDl(e.dl), fait: false, pret: null, imprime: false,
-          sous: [nomPlateforme(site)].filter(Boolean),
+        const tf = tailleEnFin(titre);
+        return { cle, site, titre: tf ? tf.nom : titre, titreComplet: titre, photo, num, prix: '', groupe: groupeDl(e.dl), fait: false, pret: null, imprime: false,
+          sous: [tf ? tr('v2v.taille', { t: tf.taille }) : '', nomPlateforme(site)].filter(Boolean),
+          l3: [vendueV2(attenteColis(e)), echeanceV2(e)].filter(Boolean),
           attrs: { 'data-colis-ident': cle, ...attrsFicheLigne({ contexte: 'colis', site, cle: 'c' + cle, nums: num ? [num] : [], photo: typeof photo === 'string' ? photo : '', titre }) },
           plus: () => ouvrirFicheV2(cle) };
       }
@@ -47848,39 +47869,45 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const capte = e.txn ? labelsCaptes[e.txn] : null;
       const pdf = !!(b && b.hasPdf) || !!capte;
       const imprime = !!((e.txn && bordsPrinted[e.txn]) || (b && isBordPrinted(b)));
-      const taille = o && typeof o.size_title === 'string' ? o.size_title : '';
+      const tf = tailleEnFin(titre);
+      const taille = (o && typeof o.size_title === 'string' && o.size_title) || (tf ? tf.taille : '');
       const lue = !!(e.lim && e.lim.jour && e.lim.limite !== 'estimee');
       const presse = avantDemainColis(e);
-      const retard = !!(e.lim && e.lim.retard);
       const groupe = imprime ? 'imprimes' : presse ? 'presse' : (e.dl == null || !e.lim) ? 'sansDate' : !lue ? 'estimee' : e.dl <= 7 ? 'semaine' : 'plusTard';
       const ident = 'v:' + (e.txn || e.key);
       const lit = b && !e.venteEmail ? numLitige(b) : null;
-      return { cle: ident, site: 'vinted', titre, photo, num, groupe, fait: imprime, pret: pdf, imprime,
+      const pseudo = pseudoAcheteur(o);
+      return { cle: ident, site: 'vinted', titre: tf ? tf.nom : titre, titreComplet: titre, photo, num, groupe, fait: imprime, pret: pdf, imprime,
         double: !!(num && conflitsNum.some((x) => String(x.numero) === String(num))),
         prix: o && o.price ? montant(o.price, { etrangere: 'ecarter' }) : '',
-        sous: [retard ? tr('v2v.enRetard') : (imprime && presse ? tr('v2v.avantDemain') : ''), taille ? tr('v2v.taille', { t: taille }) : '', !pdf ? tr('v2v.sansBordereau') : '', pseudoAcheteur(o)].filter(Boolean),
-        sousAmbre: retard || (imprime && presse),
+        sous: [taille ? tr('v2v.taille', { t: taille }) : ''].filter(Boolean),
+        l3: [pseudo ? { cle: 'acheteur', icone: 'users', texte: pseudo } : null, vendueV2(attenteColis(e)),
+          { cle: 'bordereau', icone: imprime ? 'printer' : 'doc', texte: imprime ? tr('v2v.bord.imprime') : pdf ? tr('v2v.bord.pret') : tr('v2v.bord.attente') },
+          echeanceV2(e)].filter(Boolean),
         attrs: { 'data-colis-ident': ident, 'data-tx-colis': e.txn || '', 'data-v2v-pret': pdf ? '1' : '0', 'data-v2v-imprime': imprime ? '1' : '0',
           ...attrsFicheLigne({ contexte: 'colis', site: 'vinted', cle: 'c' + (e.txn || e.key), nums: num ? [num] : [], tx: e.txn || '', photo: typeof photo === 'string' ? photo : '', titre, sous: '' }) },
         imprimer: pdf ? () => imprimerCarteV2(ident) : null,
         // Glisser : Imprimer · Plus (deux gestes au plus) ; sans bordereau et N° en désaccord e-mail / vente : Choisir la vente · Plus.
         choisir: !pdf && lit && b ? () => { setLinkPickFor(b); setLinkSearch(''); } : null, litige: !!lit,
         plus: () => ouvrirFicheV2(ident) };
-    });
+    }));
   };
-  const lignesRouteV2 = (L) => (L || []).map((x) => {
+  const lignesRouteV2 = (L) => avecLogosV2((L || []).map((x) => {
     const lab = x.st && x.st.label ? x.st.label : '';
     const groupe = /Retour/.test(lab) ? 'retour' : x.type === 'coche' ? 'coche' : lab === 'Au relais' ? 'relais' : (lab === 'Livrée' || (x.lues && x.lues.livre)) ? 'livre' : 'route';
     const o = x.o || null; const cle = String(x.cle);
     const tx = o && o.transaction_id != null ? String(o.transaction_id) : '';
-    return { cle, site: x.site, titre: x.titre || '', photo: x.photo || null, num: x.num || '', groupe, fait: false,
+    return { cle, site: x.site, photo: x.photo || null, num: x.num || '', groupe, fait: false,
       prix: o && o.price ? montant(o.price, { etrangere: 'ecarter' }) : '',
-      sous: [x.tr && x.tr.nom ? x.tr.nom : '', x.site !== 'vinted' ? nomPlateforme(x.site) : '', pseudoAcheteur(o)].filter(Boolean),
+      titre: (tailleEnFin(x.titre || '') || { nom: x.titre || '' }).nom, titreComplet: x.titre || '',
+      sous: [(() => { const t = (o && typeof o.size_title === 'string' && o.size_title) || ((tailleEnFin(x.titre || '') || {}).taille) || ''; return t ? tr('v2v.taille', { t }) : ''; })(), x.site !== 'vinted' ? nomPlateforme(x.site) : ''].filter(Boolean),
+      l3: [pseudoAcheteur(o) ? { cle: 'acheteur', icone: 'users', texte: pseudoAcheteur(o) } : null, x.tr && x.tr.nom ? { cle: 'transporteur', icone: 'truck', texte: x.tr.nom } : null,
+        x.j != null && Number.isFinite(x.j) ? vendueV2(x.j) : null].filter(Boolean),
       sousAmbre: false,
       attrs: { 'data-colis-ident': cle, 'data-v2v-parti': x.type === 'parti' ? lab : x.type,
         ...attrsFicheLigne({ contexte: 'colis', site: x.site, cle: 'c' + (tx || cle), nums: x.num ? [x.num] : [], tx, photo: typeof x.photo === 'string' ? x.photo : '', titre: x.titre || '' }) },
       plus: () => ouvrirFicheV2(cle) };
-  });
+  }));
   // ── (11 nov., lot suivi-commandes) LE SUIVI D'UNE COMMANDE EN COURS ────────────────────────
   // Julien : « intègre les numéros de suivi sur les commandes en cours […] pour voir la
   // cohérence ». Le n° vient d'une IDENTITÉ prouvée (le bordereau de SA transaction, `b.suivi` ;
@@ -65379,7 +65406,9 @@ function AppCoeur() {
             (15 nov., Ventes « Verre dépoli », maquette validée) Le segment À expédier · En route · Toutes et le grand chiffre
             ouvrent l'écran ; la bande du mois passe JUSTE SOUS les colis (en tête de « Toutes », qui replie les colis). */}
         {(t==='achats' || (t==='ventes' && (!sous || sec==='ventes'))) ? rendreColisSection(t,site) : null}
-        {site==='toutes' && t==='ventes' && !baseKO && <div className="vrm-heros-hote" data-heros-hote="ventes" style={{padding:'12px 16px 0'}}><CarteStatsApp page="ventes-toutes" aide bande className="vrm-fu-ecran" ici="cat_ventes" onNav={setTab} sel={{ site: 'toutes', compte: null, periode: null }}/></div>}
+        {/* (17 nov., nouveau design — Ventes) La bande des chiffres d'hier n'est pas rendue à l'écran (Argent porte les chiffres de
+            synthèse) ; elle reste MONTÉE, cachée, pour ce qu'elle publie. */}
+        {site==='toutes' && t==='ventes' && !baseKO && <CacheSiV2 si={designV2App}><div className="vrm-heros-hote" data-heros-hote="ventes" style={{padding:'12px 16px 0'}}><CarteStatsApp page="ventes-toutes" aide bande className="vrm-fu-ecran" ici="cat_ventes" onNav={setTab} sel={{ site: 'toutes', compte: null, periode: null }}/></div></CacheSiV2>}
         {/* (10 nov., lot BB) L'entrée de « Litiges en cours » : sur Ventes, quel que soit le site. */}
         {t==='ventes' && !baseKO && <div className="vrm-entree-litiges-hote" style={{padding:'12px 16px 0'}}><EntreeLitiges ligne={aTrancherEtat && Array.isArray(aTrancherEtat.lignes) ? aTrancherEtat.lignes.find((l)=>l.cle==='litiges-en-cours') : null} onOuvrir={()=>setTab('litiges')}/></div>}
         {site==='toutes' && t==='ventes' && !baseKO && <div className="vrm-a-venir-hote" style={{padding:'12px 16px 0'}}><ArgentAVenirCarte A={liveStatsVus && liveStatsVus.aVenir} reserve/></div>}

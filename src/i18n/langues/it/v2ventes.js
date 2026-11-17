@@ -49,5 +49,10 @@ export default {
   "v2v.outils.emballer": "Imballa",
   "v2v.outils.tous": "Tutti gli strumenti",
   "v2v.outils.masquer": "Nascondi gli strumenti",
-  "v2v.litiges": {"one": "{n} pacco: l’e-mail e la vendita non danno lo stesso N° — VRM tiene quello della vendita.", "other": "{n} pacchi: l’e-mail e la vendita non danno lo stesso N° — VRM tiene quello della vendita."}
+  "v2v.litiges": {"one": "{n} pacco: l’e-mail e la vendita non danno lo stesso N° — VRM tiene quello della vendita.", "other": "{n} pacchi: l’e-mail e la vendita non danno lo stesso N° — VRM tiene quello della vendita."},
+  "v2v.versLe": "verso il {date}",
+  "v2v.vendue": {"zero": "venduta oggi", "one": "venduta ieri", "other": "venduta {n} giorni fa"},
+  "v2v.bord.pret": "etichetta pronta",
+  "v2v.bord.attente": "etichetta non ancora ricevuta",
+  "v2v.bord.imprime": "etichetta stampata"
 };

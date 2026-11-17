@@ -49,5 +49,10 @@ export default {
   "v2v.outils.emballer": "Pack",
   "v2v.outils.tous": "All parcel tools",
   "v2v.outils.masquer": "Hide parcel tools",
-  "v2v.litiges": {"one": "{n} parcel: the email and the sale give different numbers — VRM keeps the sale’s.", "other": "{n} parcels: the email and the sale give different numbers — VRM keeps the sale’s."}
+  "v2v.litiges": {"one": "{n} parcel: the email and the sale give different numbers — VRM keeps the sale’s.", "other": "{n} parcels: the email and the sale give different numbers — VRM keeps the sale’s."},
+  "v2v.versLe": "around {date}",
+  "v2v.vendue": {"zero": "sold today", "one": "sold yesterday", "other": "sold {n} days ago"},
+  "v2v.bord.pret": "label ready",
+  "v2v.bord.attente": "label not received yet",
+  "v2v.bord.imprime": "label printed"
 };
