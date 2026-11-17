@@ -221,14 +221,15 @@ async function chargementEtMouvement(nav, b) {
   const vu = { squelette: false, blanc: 0, ligne: false };
   for (let k = 0; k < 40; k++) {
     const x = await pg.evaluate(() => ({ sq: !!document.querySelector('.vrm-colis-section [data-v2-squelette]'), ligne: !!document.querySelector('[data-v2v-liste="envoyer"] [data-v2v-ligne]'),
-      blanc: !((document.querySelector('.vrm-main') || { innerText: '' }).innerText || '').trim() })).catch(() => ({}));
+      // « Blanc » : RIEN à l'écran (ni l'écran de démarrage de l'app, ni Ventes) — pas seulement une zone vide.
+      blanc: !((document.body || { innerText: '' }).innerText || '').trim() && !document.querySelector('svg, img, [data-v2-squelette]') })).catch(() => ({}));
     if (k === 10) await pg.screenshot({ path: path.join(SHOTS, 'ventes-pendant-lecture-390-clair.png') }).catch(() => {});
     if (x.sq) vu.squelette = true; if (x.blanc) vu.blanc++; if (x.ligne) { vu.ligne = true; break; }
     await pg.waitForTimeout(250);
   }
   console.log('   lectures retenues : ' + nLent);
   if (vu.squelette) await pg.screenshot({ path: path.join(SHOTS, 'ventes-squelette-390-clair.png') }).catch(() => {});
-  dit(vu.squelette && vu.blanc <= 4, `Q pendant la lecture : le squelette des rangées (vu : ${vu.squelette}), pas d'écran blanc (${vu.blanc} relevés vides au tout début)`, vu);
+  dit(vu.squelette && vu.blanc === 0, `Q pendant la lecture : le squelette des rangées (vu : ${vu.squelette}), jamais d'écran blanc (${vu.blanc} relevé vide)`, vu);
   await ctx.close();
   const { ctx: c2, pg: p2 } = await ouvrir(nav, { W: 390, sombre: false, b, url: '/?tab=ventes' });
   await p2.emulateMedia({ reducedMotion: 'reduce' });
@@ -325,7 +326,7 @@ async function toutes(nav, b0, W) {
     const ok = [...document.querySelectorAll('[data-v2-facture-ok]')].filter(vis);
     const vert = ok[0] ? getComputedStyle(ok[0]).color : '';
     return { n: lignes.length, prixAchat: lignes.filter((l) => /Prix d.achat \?/.test(l.textContent)).length,
-      boutonsRangee: lignes.flatMap((l) => [...l.querySelectorAll('button')].filter(vis).filter((x) => /Envoyer la facture|Bon de retour|Imprimer|Déposé/.test(x.textContent))).length,
+      boutonsRangee: lignes.flatMap((l) => [...l.querySelectorAll('button')].filter(vis).filter((x) => !x.closest('[data-lg-tiroir]')).filter((x) => /Envoyer la facture|Bon de retour|Imprimer|Déposé/.test(x.textContent))).length,
       factureTexte: lignes.filter((l) => /Facture envoyée le/.test(l.textContent)).length, icones: ok.length, vert,
       orphelins: lignes.filter((l) => /\btaille\s*\d{2}(?:[.,]5)?\s*$/i.test(((l.querySelector('.v2l-a-titre') || {}).textContent || '').trim())).length }; });
   dit(r.n > 2 && r.prixAchat === 0 && r.boutonsRangee === 0, `T ${th} : ${r.n} ventes en rangées A, ni « Prix d'achat ? » ni bouton répété par rangée`, r);
