@@ -1032,6 +1032,7 @@ import "./design/studio-achats-relier.css";   // (15 nov.) Annonces → « Sans 
 // (14 nov., Studio bleu clair) Ma journée en grille Bento : la tête, l'affiche, les tuiles et ce qu'elles déplient —
 // portée par `.sj-journee` seulement, EN DERNIER (docs/passation/2026-11-14-studio-journee.md).
 import { BentoJournee, placerTuiles, RangeeJ, LienJ, MontantAffiche, Plaque as PlaqueJ } from "./JourneeStudio.jsx";
+import { FIL_MAQUETTE, LeFil, FilDock, FilBarreOrdi, FilBiblioTete } from "./maquettes/LeFil.jsx";   // (17 nov.) maquette D « Le fil » — banc seulement
 import { ordreDeSortie, emplacementDe } from "./paireASortir.js";
 import MarqueSite from "./plateformes/Marque.jsx";
 import "./design/studio-journee.css";
@@ -49806,7 +49807,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {alertesAF.length ? <div className="vrm-day-task-list" data-alertes-argent="">{alertesAF}</div> : null}
                 </section>
               ) : null;
-              return { prochain: null, alertes: alertesHaut, jobsTuile, tvb: tvbCartes, section: (
+              return { prochain: null, alertes: alertesHaut, jobsTuile, tvb: tvbCartes, cartesFil: resteAF, alertesFil: alertesAF, section: (
                 <section className="vrm-fu-afaire sj-afaire" aria-label={tr('journee.faire')} data-fu-gestes={nListe}>
                   {nListe ? <div className="vrm-fu-titre-section sj-titre-section"><h2 className="vrm-day-titre-section">{tr('journee.faire')}</h2></div> : null}
                   {/* Le compte des cartes (le nombre dit = les cartes vues) reste publié, pas écrit à côté du titre où il redisait un
@@ -49968,7 +49969,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <section className="vrm-day-greeting vrm-w-tete vrm-fu-tete sj-tete" data-fu-carte="" aria-label={tr('journee.journee2')}>
                 <div className="vrm-day-hello vrm-fu-bonjour sj-bonjour">{hello}{prenomLisible(prenom) ? ' ' + prenomLisible(prenom) : ''}<span className="sj-date"> · {dateStr}</span></div>
                 <h1 className="vrm-fu-titre-tete sj-titre">{tr('reglages.ma-journee.lib')}</h1>
-                {AF.alertes || null}
+                {FIL_MAQUETTE ? null : (AF.alertes || null)}
                 {/* (15 nov., lot retours) « À RENVOYER (N) » : UNE place, en tête, tant qu'un retour attend son dépôt
                     (le plus pressé d'abord) — la même carte qu'Achats (photo + titre par identité, compte, « avant demain
                     10 h », « Imprimer le bordereau », « Déposé »). Plus aucune ligne « Retour » ailleurs dans la journée. */}
@@ -50214,6 +50215,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               </>);
               if (visT('chiffres').montree) out.mois = { id: 'mois', lib: (() => { const m = new Date().toLocaleDateString(localeCourante(), { month: 'long' }); return m.charAt(0).toUpperCase() + m.slice(1); })(), interactif: true, aria: tr('sj.l.mois'), face: chiffresMois, tasse: null };
               const tuilesPlacees = placerTuiles(out);
+              // (17 nov., maquette D « Le fil », BANC SEULEMENT) Les MÊMES tuiles et cartes, rangées en un fil de gestes.
+              if (FIL_MAQUETTE) return (<>
+                <LeFil tuiles={tuilesPlacees} alertes={AF.alertesFil || []} cartes={AF.cartesFil || []} photos={photosCase} Photo={PhotoVinted} Icon={Icon} ordi={ordiJournee}/>
+                {out.mois ? <div hidden data-jp-cachee="chiffres">{out.mois.face}</div> : <div hidden data-jp-cachee="chiffres">{chiffresMois}</div>}
+              </>);
               return (<>
                 <BentoJournee tuiles={tuilesPlacees} ordi={ordiJournee} FermeAuRetour={FermeAuRetour}
                   colonnes={ordiJournee ? [
@@ -50237,7 +50243,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 une mise en ligne seulement), toujours à sa place. Les notifications coupées vivent « En bas ». */}
             {!baseKO && !premierJour && <QuoiDeNeufJournee onNav={onNav}/>}
 
-            {ordiJournee && !baseKO && !premierJour ? null : AF.section}
+            {(ordiJournee || FIL_MAQUETTE) && !baseKO && !premierJour ? null : AF.section}
             {!baseKO && !premierJour && ((AF.tvb && AF.tvb.length) || nCtlFiab) ? (
               <button type="button" className="sb-lien vrm-tvb-ligne" data-tvb-ligne={String(((AF.tvb && AF.tvb.length) || 0) + nCtlFiab)} data-tvb-controle={nCtlFiab ? String(nCtlFiab) : undefined} onClick={() => setFeuilleTvb(true)}>{trj('tvb.ligne', { n: ((AF.tvb && AF.tvb.length) || 0) + nCtlFiab })} ›</button>
             ) : null}
@@ -65472,7 +65478,7 @@ function AppCoeur() {
         width: ordi ? undefined : '100%',
         maxWidth: ordi ? 'none' : 1200,
         margin: ordi ? '0' : '0 auto',
-        marginLeft: ordi ? NAV_LARGEUR + 36 : undefined,
+        marginLeft: ordi ? (FIL_MAQUETTE ? 28 : NAV_LARGEUR + 36) : undefined,
         paddingRight: ordi ? 28 : undefined,
         // Le bandeau flotte : il faut juste de quoi ne pas coller au bord.
         paddingTop: ordi ? 14 : undefined,
@@ -65482,7 +65488,9 @@ function AppCoeur() {
         paddingBottom: ordi ? 40 : 'calc(20px + env(safe-area-inset-bottom))'}}>
         {/* (31 oct., maquette Colis) Sur ordinateur, la barre du haut : la
             recherche (touche « / ») et la place des filtres de site de l'écran. */}
-        {ordi && <BarreHaut champ={champRechercheOrdi} poserSlot={setSlotBarre}/>}
+        {FIL_MAQUETTE ? (ordi ? <FilBarreOrdi tab={tab} setTab={setTab} onChercher={ouvrirRecherche} Icon={Icon} champ={champRechercheOrdi} poserSlot={setSlotBarre}/>
+          : tab !== 'journee' ? <FilBiblioTete tab={tab} setTab={setTab} Icon={Icon}/> : null)
+          : ordi && <BarreHaut champ={champRechercheOrdi} poserSlot={setSlotBarre}/>}
         <RepriseRetenue tab={tab} compteChoisi={!!compteSel&&compteSel!=='*'} effacerCompte={()=>setCompteSel('')}/>
         <BarreHautSlot.Provider value={ordi ? slotBarre : null}>
         <CibleNotif tab={tab} sub={platSub}/>
@@ -65925,7 +65933,9 @@ function AppCoeur() {
       <MemoireDefilement ecran={`${tab}:${(tab.startsWith('plat_')||estTacheSite(tab))?platSub:''}`}/>
       {/* Une seule navigation à la fois : latérale sur ordinateur, en bas sur
           téléphone. Jamais les deux — c'est la même liste d'écrans. */}
-      {ordi ? <SideBar tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesRail}/> : <BottomBar tab={tab} setTab={setTab} sites={sitesPresents} badges={badgesNav} gestes={gestesDisque}/>}
+      {/* (17 nov., maquette D « Le fil », BANC SEULEMENT — src/maquettes/LeFil.jsx) Le dock remplace la barre du bas. */}
+      {FIL_MAQUETTE ? (ordi ? null : <FilDock tab={tab} setTab={setTab} onChercher={ouvrirRecherche} Icon={Icon} FermeAuRetour={FermeAuRetour}/>)
+        : ordi ? <SideBar tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesRail}/> : <BottomBar tab={tab} setTab={setTab} sites={sitesPresents} badges={badgesNav} gestes={gestesDisque}/>}
       {showBackup&&<GardeEcran nom="sauvegarde" feuille onFermer={()=>setShowBackup(false)}><BackupModal
         catalog={catalog} sales={sales} garageGrid={garageGrid} blockedCells={blockedCells}
         onClose={()=>setShowBackup(false)}

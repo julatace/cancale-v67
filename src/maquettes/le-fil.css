@@ -1,0 +1,156 @@
+/* ── MAQUETTE D · « LE FIL » (17 nov.) — prototype de banc, invisible hors banc (src/maquettes/LeFil.jsx) ──
+   Tout est sous html[data-fil] : sans la maquette, aucune de ces règles ne s'applique.
+   Le fond bleu du Studio reste ; une seule couleur d'accent (la diode), rare ; ambre = un geste pressé. */
+
+/* La coque : plus de titre d'écran dans l'en-tête, plus de rail ; Ma journée ne garde que le fil. */
+html[data-fil] .vrm-hdr-titre { display: none !important; }
+html[data-fil] .sj-journee > .vrm-screen-head,
+html[data-fil] .sj-journee .sj-tete,
+html[data-fil] .sj-journee .vrm-a-venir-journee,
+html[data-fil] .sj-journee [data-prevision],
+html[data-fil] .sj-journee .vrm-tvb-ligne { display: none !important; }
+
+/* ── La tête du fil : la date, « Aujourd'hui », LE nombre de gestes en affiche, et les points (un par geste). ── */
+html[data-fil] .fil { --fil-r: 24px; color: var(--sb-encre); padding: 4px 0 12px; }
+html[data-fil] .fil-mast { padding: 8px 4px 18px; display: grid; gap: 2px; }
+html[data-fil] .fil-date { font: 500 13px/1.3 var(--sb-police-texte); color: var(--sb-encre-2); text-transform: capitalize; }
+html[data-fil] .fil-h1 { margin: 0; font: 600 34px/1.05 var(--sb-police-affiche); letter-spacing: -.03em; color: var(--sb-encre); }
+html[data-fil] .fil-compte { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+html[data-fil] .fil-gros { font: 200 72px/.9 var(--sb-police-affiche); letter-spacing: -.05em; font-variant-numeric: tabular-nums; color: var(--sb-encre); }
+html[data-fil] .fil-compte-l { font: 500 17px/1.2 var(--sb-police-texte); color: var(--sb-encre); }
+html[data-fil] .fil-ranges { color: var(--sb-encre-2); font-weight: 400; }
+html[data-fil] .fil-points { flex-basis: 100%; display: flex; gap: 5px; margin-top: 8px; }
+html[data-fil] .fil-points i { width: 18px; height: 4px; border-radius: 2px; background: rgb(var(--sb-o) / .16); }
+html[data-fil] .fil-points i.is-fait { background: var(--sb-diode); }
+html[data-fil] .fil-aide { font: 400 12px/1.3 var(--sb-police-texte); color: var(--sb-encre-2); }
+html[data-fil] .fil-aide-clavier { margin-top: 10px; }
+
+/* ── Les cartes : porcelaine, une seule lumière ; la première est OUVERTE (« maintenant »). ── */
+html[data-fil] .fil-liste { display: grid; gap: 10px; }
+html[data-fil] .fil-carte { position: relative; border-radius: var(--fil-r); }
+html[data-fil] .fil-face {
+  position: relative; z-index: 1; border-radius: var(--fil-r); background: var(--sb-porcelaine-degrade, var(--sb-porcelaine));
+  box-shadow: var(--sb-ombre-pose); touch-action: pan-y; transition: transform 360ms cubic-bezier(.32,.72,0,1), box-shadow 200ms;
+  will-change: transform; overflow: hidden;
+}
+html[data-fil] .fil-carte.is-ouverte .fil-face { box-shadow: var(--sb-ombre-avant); }
+html[data-fil] .fil-zone { position: absolute; inset: 0 0 auto 0; height: 72px; z-index: 2; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; border-radius: var(--fil-r) var(--fil-r) 0 0; }
+html[data-fil] .fil-zone:focus-visible { outline: 2px solid var(--sb-diode); outline-offset: -2px; }
+html[data-fil] .fil-tete { display: flex; align-items: center; gap: 12px; min-height: 72px; padding: 12px 16px; box-sizing: border-box; }
+html[data-fil] .fil-ic { flex: none; width: 40px; height: 40px; border-radius: 13px; display: grid; place-items: center; background: var(--sb-creux); color: var(--sb-encre); }
+html[data-fil] .fil-tete-txt { flex: 1; min-width: 0; display: grid; gap: 1px; }
+html[data-fil] .fil-kicker { display: inline-flex; align-items: center; gap: 6px; font: 600 11.5px/1.2 var(--sb-police-texte); letter-spacing: .06em; text-transform: uppercase; color: var(--sb-encre-2); }
+html[data-fil] .fil-point { width: 7px; height: 7px; border-radius: 50%; background: var(--sb-ambre-point); }
+html[data-fil] .fil-carte.is-urgent .fil-kicker { color: var(--sb-ambre); }
+html[data-fil] .fil-titre { font: 600 17px/1.25 var(--sb-police-texte); letter-spacing: -.01em; color: var(--sb-encre); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html[data-fil] .fil-carte.is-ouverte .fil-titre { font: 600 24px/1.15 var(--sb-police-affiche); letter-spacing: -.025em; white-space: normal; }
+html[data-fil] .fil-carte.is-ouverte .fil-tete { min-height: 88px; align-items: flex-start; padding-top: 16px; }
+html[data-fil] .fil-carte.is-ouverte .fil-zone { height: 88px; }
+
+/* La pile de photos d'un geste (les photos de la tuile, par identité). */
+html[data-fil] .fil-pile { flex: none; display: inline-flex; align-items: center; }
+html[data-fil] .fil-pile-ph { width: 36px; height: 36px; border-radius: 10px; overflow: hidden; margin-left: -12px; box-shadow: 0 0 0 2px var(--sb-porcelaine); background: var(--sb-creux); }
+html[data-fil] .fil-pile-ph:first-child { margin-left: 0; }
+html[data-fil] .fil-pile-ph img { width: 100%; height: 100%; object-fit: cover; display: block; }
+html[data-fil] .fil-pile-plus { margin-left: 6px; font: 600 12px/1 var(--sb-police-texte); color: var(--sb-encre-2); font-variant-numeric: tabular-nums; }
+
+/* Le corps d'une carte ouverte : le geste plein, puis SES listes (le dépli de sa tuile, tel quel). */
+html[data-fil] .fil-corps { padding: 0 16px 14px; display: grid; gap: 12px; }
+html[data-fil] .fil-plein .sb-btn-plein { width: 100%; height: 52px; border-radius: 16px; flex-direction: row; gap: 8px; font-size: 15px; }
+html[data-fil] .fil-deplie .sj-deplie-affiche { display: none; }
+html[data-fil] .fil-deplie .sj-liste { margin: 0 -4px; }
+html[data-fil] .fil-gestes { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding-top: 4px; border-top: .5px solid rgb(var(--sb-o) / .12); padding-top: 12px; }
+html[data-fil] .fil-gestes .sb-touche { min-height: 44px; }
+html[data-fil] .fil-gestes .fil-aide { flex-basis: 100%; }
+html[data-fil] .fil-gestes kbd { margin-left: 6px; font: 600 11px/1 var(--sb-police-texte); padding: 3px 5px; border-radius: 5px; background: var(--sb-creux); color: var(--sb-encre-2); }
+
+/* Une carte « À faire » (déjà rendue par Ma journée) : son surtitre, puis elle-même, sans second cadre. */
+html[data-fil] .fil-el { padding: 12px 6px 6px; }
+html[data-fil] .fil-el > .fil-tete { min-height: 0; padding: 0 10px 6px; }
+html[data-fil] .fil-el .vrm-day-task, html[data-fil] .fil-el > :not(.fil-tete) { box-shadow: none !important; background: transparent !important; margin: 0 !important; }
+
+/* Le dessous révélé par le glisser : « Fait » à gauche (on tire vers la droite), « Plus tard » à droite. */
+html[data-fil] .fil-dessous { position: absolute; inset: 0; z-index: 0; border-radius: var(--fil-r); display: flex; align-items: center; justify-content: space-between; padding: 0 22px; font: 600 15px/1 var(--sb-police-texte); background: var(--sb-creux); color: var(--sb-encre-2); }
+html[data-fil] .fil-dessous span { display: inline-flex; align-items: center; gap: 8px; opacity: .55; transition: opacity 120ms; }
+html[data-fil] .fil-dessous.is-fait .fil-dessous-d, html[data-fil] .fil-dessous.is-tard .fil-dessous-g { visibility: hidden; }
+html[data-fil] .fil-dessous.is-pret span { opacity: 1; }
+html[data-fil] .fil-dessous.is-fait.is-pret { background: var(--sb-diode); color: #fff; }
+html[data-fil] .fil-dessous.is-tard.is-pret { background: color-mix(in oklab, var(--sb-ambre-point) 30%, var(--sb-creux)); color: var(--sb-encre); }
+
+html[data-fil] .fil-vide { display: grid; justify-items: center; gap: 6px; padding: 48px 16px; text-align: center; color: var(--sb-encre-2); font: 400 15px/1.4 var(--sb-police-texte); }
+html[data-fil] .fil-vide b { font: 600 22px/1.2 var(--sb-police-affiche); color: var(--sb-encre); }
+html[data-fil] .fil-vide-rond { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: var(--sb-porcelaine); box-shadow: var(--sb-ombre-pose); color: var(--sb-diode); }
+html[data-fil] .fil-tard { display: grid; gap: 6px; padding: 8px 4px; }
+html[data-fil] .fil-tard-r { display: flex; align-items: center; gap: 10px; min-height: 52px; }
+
+html[data-fil] .fil-toast {
+  position: fixed; left: 50%; bottom: calc(96px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 90;
+  display: flex; align-items: center; gap: 14px; padding: 10px 10px 10px 18px; border-radius: 18px; max-width: calc(100vw - 32px); box-sizing: border-box;
+  background: var(--sb-encre); color: var(--sb-porcelaine); font: 500 14px/1.3 var(--sb-police-texte); box-shadow: 0 12px 32px rgb(0 0 0 / .25);
+}
+html[data-fil] .fil-toast .sb-lien { color: var(--sb-porcelaine); font-weight: 700; min-height: 44px; }
+
+/* ── Le dock du téléphone (remplace la barre du bas) : le fil · chercher · les bibliothèques. ── */
+html[data-fil] .fil-dock {
+  flex: none; display: flex; align-items: center; gap: 10px; margin: 0 12px calc(8px + env(safe-area-inset-bottom)); padding: 8px;
+  border-radius: 30px; background: var(--sb-verre); -webkit-backdrop-filter: var(--sb-verre-flou); backdrop-filter: var(--sb-verre-flou); box-shadow: var(--sb-verre-bord), 0 10px 30px -12px rgb(var(--sb-o) / .45);
+  position: relative; z-index: 40;
+}
+html[data-fil] .fil-dock .sb-rond { position: relative; flex: none; }
+html[data-fil] .fil-dock-n { position: absolute; top: -3px; right: -3px; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 9px; background: var(--sb-encre); color: var(--sb-porcelaine); font: 700 11px/18px var(--sb-police-texte); text-align: center; }
+html[data-fil] .fil-cherche { flex: 1; min-width: 0; min-height: 44px; justify-content: flex-start; gap: 8px; border-radius: 22px; background: var(--sb-creux); box-shadow: var(--sb-enfonce, inset 0 1px 2px rgb(var(--sb-o) / .18)); color: var(--sb-encre-2); font: 400 15px/1 var(--sb-police-texte); }
+html[data-fil] .fil-cherche span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* La feuille des bibliothèques. */
+html[data-fil] .fil-voile { position: fixed; inset: 0; z-index: 95; background: rgb(var(--sb-o) / .28); display: flex; align-items: flex-end; justify-content: center; }
+html[data-fil] .fil-feuille { width: 100%; max-width: 560px; box-sizing: border-box; padding: 8px 16px calc(18px + env(safe-area-inset-bottom)); border-radius: 28px 28px 0 0; background: var(--sb-porcelaine); box-shadow: var(--sb-ombre-avant); color: var(--sb-encre); }
+html[data-fil] .fil-poignee { display: block; width: 38px; height: 5px; border-radius: 3px; margin: 2px auto 12px; background: rgb(var(--sb-o) / .22); }
+html[data-fil] .fil-feuille-h { margin: 0 4px 10px; font: 600 22px/1.2 var(--sb-police-affiche); letter-spacing: -.02em; }
+html[data-fil] .fil-biblio-liste { display: grid; gap: 2px; }
+html[data-fil] .fil-biblio { display: flex; align-items: center; gap: 12px; min-height: 60px; text-align: left; }
+html[data-fil] .fil-biblio-txt { flex: 1; display: grid; gap: 2px; min-width: 0; }
+html[data-fil] .fil-biblio-txt b { font: 600 16px/1.2 var(--sb-police-texte); }
+html[data-fil] .fil-biblio-txt span { font: 400 13px/1.3 var(--sb-police-texte); color: var(--sb-encre-2); }
+html[data-fil] .fil-biblio[aria-current="page"] .fil-ic { box-shadow: inset 0 0 0 1.5px var(--sb-diode); }
+
+/* La tête d'une bibliothèque (téléphone) : « ‹ Le fil » puis les bibliothèques en touches qui défilent. */
+html[data-fil] .fil-biblio-tete { display: grid; gap: 8px; padding: 4px 0 10px; }
+html[data-fil] .fil-retour { justify-self: start; min-height: 44px; display: inline-flex; align-items: center; gap: 4px; font-weight: 600; }
+html[data-fil] .fil-retour-ch { display: inline-flex; transform: scaleX(-1); }
+html[data-fil] .fil-biblio-rang { display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; padding: 2px 2px 4px; margin: 0 -2px; }
+html[data-fil] .fil-biblio-rang::-webkit-scrollbar { display: none; }
+html[data-fil] .fil-biblio-rang .sb-touche { flex: none; min-height: 44px; padding: 0 16px; }
+
+/* ── Ordinateur : la barre du haut (plus de rail), puis le fil à gauche et le panneau du geste à droite. ── */
+html[data-fil] .vrm-sidebar { display: none !important; }
+html[data-fil] .fil-barre-ordi {
+  position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 12px; padding: 10px 14px; margin: 0 0 18px;
+  border-radius: 22px; background: var(--sb-verre); -webkit-backdrop-filter: var(--sb-verre-flou); backdrop-filter: var(--sb-verre-flou); box-shadow: var(--sb-verre-bord);
+}
+html[data-fil] .fil-marque img { display: block; border-radius: 8px; }
+html[data-fil] .fil-barre-n { margin-left: 8px; min-width: 20px; height: 20px; padding: 0 6px; box-sizing: border-box; border-radius: 10px; background: var(--sb-encre); color: var(--sb-porcelaine); font: 700 12px/20px var(--sb-police-texte); }
+html[data-fil] .fil-cherche-ordi { flex: 0 1 380px; }
+html[data-fil] .fil-cherche-ordi kbd { margin-left: auto; font: 600 11px/1 var(--sb-police-texte); padding: 3px 6px; border-radius: 5px; background: var(--sb-porcelaine); color: var(--sb-encre-2); }
+html[data-fil] .fil-barre-biblios { margin-left: auto; display: flex; gap: 4px; }
+html[data-fil] .fil-barre-lien { min-height: 44px; padding: 0 10px; color: var(--sb-encre-2); font-weight: 500; }
+html[data-fil] .fil-barre-lien[aria-current="page"] { color: var(--sb-encre); font-weight: 700; }
+html[data-fil] .fil-champ-ordi { flex: 0 1 400px; min-width: 0; }
+html[data-fil] .fil-slot:empty { display: none; }
+
+html[data-fil] .fil-ordi { display: grid; grid-template-columns: minmax(380px, 460px) minmax(0, 1fr); gap: 24px; align-items: start; }
+html[data-fil] .fil-ordi .fil-col { min-width: 0; }
+html[data-fil] .fil-ordi .fil-carte.is-actif .fil-face { box-shadow: var(--sb-ombre-avant), inset 3px 0 0 var(--sb-diode); }
+html[data-fil] .fil-ordi .fil-zone { height: 100%; border-radius: var(--fil-r); }
+html[data-fil] .fil-panneau {
+  position: sticky; top: 84px; min-height: 420px; max-height: calc(100vh - 110px); overflow: auto; border-radius: 28px; padding: 26px 28px;
+  background: var(--sb-porcelaine-degrade, var(--sb-porcelaine)); box-shadow: var(--sb-ombre-avant); color: var(--sb-encre);
+}
+html[data-fil] .fil-panneau-tete { display: grid; gap: 6px; margin-bottom: 18px; }
+html[data-fil] .fil-panneau-h { margin: 0; font: 600 34px/1.08 var(--sb-police-affiche); letter-spacing: -.03em; }
+html[data-fil] .fil-panneau .fil-gestes { border-top: 0; padding-top: 8px; }
+html[data-fil] .fil-panneau .fil-plein .sb-btn-plein { width: auto; padding: 0 22px; }
+html[data-fil] .fil-panneau-vide { color: var(--sb-encre-2); }
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-fil] .fil-face { transition: none; }
+}

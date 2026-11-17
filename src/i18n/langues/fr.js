@@ -44,6 +44,7 @@ import ecran_compta from './fr/compta.js';
 import ecran_listes from './fr/listes.js';
 import ecran_refonte_ms from './fr/refonte-ms.js';
 import ecran_studio_journee from './fr/studio-journee.js';   // (14 nov.) Ma journée « Studio bleu clair »
+import ecran_le_fil from './fr/le-fil.js';   // (17 nov.) Maquette D « Le fil » (banc seulement)
 import ecran_argent from './fr/argent.js';
 import ecran_fiche from './fr/fiche.js';
 import ecran_ergonomie from './fr/ergonomie.js';
@@ -82,6 +83,7 @@ export default {
   ...ecran_accueilReste,
   ...ecran_refonte_ms,
   ...ecran_studio_journee,
+  ...ecran_le_fil,
   ...ecran_listes,
   ...ecran_fiche,
   ...ecran_ergonomie,
