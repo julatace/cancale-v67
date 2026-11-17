@@ -1,0 +1,256 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   MAQUETTE J2 « Studio × Premium » — page autonome (17 nov.). Aucune feuille de src/.
+   Valeurs du Studio RECOPIÉES (dégradé bleu clair, nuit, porcelaine, encre, ambre) ; rien n'est importé.
+   Police du système (SF Pro ; Inter embarquée pour les captures), chiffres tabulaires.
+   Tailles : affiche 64 · texte 17 · sous-titre 15 · légende 13 · libellés de barre 11 (convention iOS).
+   ════════════════════════════════════════════════════════════════════════════ */
+@font-face { font-family: 'Inter J2'; src: url('polices/inter-latin-400-normal.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Inter J2'; src: url('polices/inter-latin-500-normal.woff2') format('woff2'); font-weight: 500; font-display: swap; }
+@font-face { font-family: 'Inter J2'; src: url('polices/inter-latin-600-normal.woff2') format('woff2'); font-weight: 600; font-display: swap; }
+@font-face { font-family: 'Inter J2'; src: url('polices/inter-latin-700-normal.woff2') format('woff2'); font-weight: 700; font-display: swap; }
+
+:root {
+  --police: -apple-system, 'SF Pro Text', 'Inter J2', system-ui, sans-serif;
+  --affiche: 64px; --texte: 17px; --sous: 15px; --legende: 13px;
+  --m: 16px; --barre: 83px; --geste-zone: 76px; --bas-reserve: calc(var(--barre) + var(--geste-zone) + 24px);
+  --ease: cubic-bezier(.23, 1, .32, 1);
+  /* le Studio, clair */
+  --haut: #EEF6FD; --aplat: #D6E8F5; --bas: #C6DDF0; --halo: rgb(255 255 255 / .55);
+  --porcelaine: #FFFFFF; --porcelaine-2: #F7FAFD; --creux: #EAF1F8; --tuile: #F1F5F9;
+  --encre: #0C1D30; --encre-2: #4E6378; --encre-3: #7A8CA0; --filet: rgb(12 29 48 / .08);
+  --accent: #0071E3; --ambre: #8A4B00; --ambre-point: #E08A00; --ambre-fond: #FFE7C2;
+  --plein: #0C1D30; --sur-plein: #FFFFFF;
+  --barre-fond: rgb(246 250 254 / .82);
+  --ombre: 0 1px 2px rgb(12 29 48 / .06), 0 4px 12px rgb(12 29 48 / .06), 0 16px 32px rgb(12 29 48 / .06);
+  --ombre-pass: 0 2px 4px rgb(12 29 48 / .08), 0 12px 28px rgb(12 29 48 / .14), 0 28px 56px rgb(12 29 48 / .10);
+  --dos-1: #1C2E46; --dos-2: #24395A;
+  color-scheme: light;
+}
+:root[data-theme='sombre'] {
+  --haut: #15263D; --aplat: #0C1829; --bas: #060E19; --halo: rgb(110 160 230 / .10);
+  --porcelaine: #16273C; --porcelaine-2: #122135; --creux: #0E1C2E; --tuile: #1E3149;
+  --encre: #EAF2FB; --encre-2: #9CB0C6; --encre-3: #7489A2; --filet: rgb(234 242 251 / .08);
+  --accent: #4AA3FF; --ambre: #F2B65E; --ambre-point: #F2A33A; --ambre-fond: #3A2A12;
+  --plein: #EAF2FB; --sur-plein: #0C1D30;
+  --barre-fond: rgb(12 24 41 / .82);
+  --ombre: 0 1px 2px rgb(0 0 0 / .30), 0 8px 24px rgb(0 0 0 / .25);
+  --ombre-pass: 0 2px 4px rgb(0 0 0 / .35), 0 16px 40px rgb(0 0 0 / .45);
+  --dos-1: #0E1C2E; --dos-2: #1B2D45;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; overscroll-behavior: none; background: var(--haut); }
+body { margin: 0; min-height: 100dvh; color: var(--encre); font: 400 var(--texte)/1.3 var(--police); font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased;
+  background: radial-gradient(90% 40% at 18% 0%, var(--halo), transparent 70%), linear-gradient(180deg, var(--haut) 0%, var(--aplat) 40%, var(--bas) 100%) fixed; }
+::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+a, button { touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+h1, h2, p, dl, dd, figure { margin: 0; }
+.j-ico, .k-ico { display: block; flex: none; }
+.k-img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.k-point { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ambre-point); margin-right: 6px; flex: none; }
+.k-ambre { display: inline-flex; align-items: center; color: var(--ambre); font-weight: 500; }
+.k-vide { padding: 24px 0; color: var(--encre-2); }
+
+/* ── La plaque N° (le N° écrit sur le carton : gravée, jamais une couleur) ── */
+.k-plaque { display: inline-flex; align-items: center; height: 22px; padding: 0 7px; border-radius: 6px; background: var(--creux); box-shadow: inset 0 1px 1px rgb(12 29 48 / .10); color: var(--encre); font-size: var(--legende); font-weight: 600; white-space: nowrap; letter-spacing: .01em; }
+:root[data-theme='sombre'] .k-plaque { box-shadow: inset 0 1px 1px rgb(0 0 0 / .4); }
+
+/* ── Ossature ── */
+#app { min-height: 100dvh; }
+.k-cote { display: none; }
+.k-page { padding: 0 var(--m) calc(var(--bas-reserve) + env(safe-area-inset-bottom, 0px)); }
+.k-tete { display: flex; justify-content: space-between; align-items: flex-start; padding-top: calc(12px + env(safe-area-inset-top, 0px)); }
+.k-tete h1 { font-size: 34px; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
+.k-tete-d { display: flex; gap: 4px; margin-right: -6px; margin-top: 2px; }
+.k-geste-haut { display: none; }
+.k-rond { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: var(--encre); background: var(--porcelaine); box-shadow: var(--ombre); transition: transform 120ms var(--ease); }
+.k-rond:active { transform: scale(.94); }
+.k-compte { display: inline-flex; align-items: center; gap: 8px; height: 44px; font-size: var(--sous); font-weight: 500; color: var(--encre-2); }
+.k-compte .j-ico { color: var(--encre-3); }
+.k-logos { display: inline-flex; gap: 3px; }
+.k-logo { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; color: #fff; font-size: 11px; font-weight: 700; }
+.k-logo.is-vinted { background: #09B1BA; font-size: 13px; }
+.k-logo.is-lbc { background: #FF6E14; letter-spacing: -.04em; font-size: 9px; }
+
+/* ── Le chiffre en affiche, son mot sur la même ligne de base ── */
+.k-heros { display: flex; align-items: flex-end; gap: 12px; padding: 16px 0 24px; }
+.k-heros-n { font-size: var(--affiche); font-weight: 700; letter-spacing: -.035em; line-height: .8; }
+.k-dec { color: var(--encre-3); }
+.k-eur { font-weight: 500; color: var(--encre-2); letter-spacing: -.02em; }
+.k-heros-txt { display: flex; flex-direction: column; gap: 2px; padding-bottom: 1px; }
+.k-heros-mot { font-size: var(--texte); font-weight: 600; }
+.k-heros-sous { font-size: var(--sous); color: var(--encre-2); }
+
+/* ── Filtres en mots (soulignés), jamais des capsules ── */
+.k-filtres-ligne { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.k-filtres { display: flex; gap: 24px; }
+.k-filtre { position: relative; display: flex; align-items: center; height: 44px; font-size: var(--sous); font-weight: 600; color: var(--encre-2); }
+.k-filtre[aria-selected='true'] { color: var(--encre); }
+.k-filtre[aria-selected='true']::after { content: ''; position: absolute; left: 0; right: 0; bottom: 6px; height: 2px; border-radius: 1px; background: var(--encre); }
+
+/* ── Porcelaine : la liste groupée inset ── */
+.k-groupe { margin-top: 24px; }
+.k-entete { display: flex; gap: 8px; align-items: baseline; padding: 0 4px 8px; font-size: var(--legende); font-weight: 600; color: var(--encre-2); }
+.k-entete span { color: var(--encre-3); font-weight: 500; }
+.k-entete:empty { display: none; }
+.k-porcelaine { background: var(--porcelaine); border-radius: 18px; box-shadow: var(--ombre); overflow: hidden; }
+.k-ligne-cadre { position: relative; overflow: hidden; }
+.k-ligne { position: relative; display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 12px; min-height: 76px; background: var(--porcelaine); transition: background-color 120ms ease, transform 220ms var(--ease); }
+.k-ligne:active { background: var(--porcelaine-2); }
+.k-ligne-cadre + .k-ligne-cadre .k-ligne::before, .k-ligne-simple + .k-ligne-simple::before { content: ''; position: absolute; top: 0; left: 80px; right: 0; height: 1px; background: var(--filet); }
+.k-ligne-simple + .k-ligne-simple::before { left: 52px; }
+.k-vignette { flex: none; width: 56px; height: 56px; border-radius: 12px; background: var(--tuile); padding: 4px; }
+.k-ligne-corps { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.k-ligne-titre { font-size: var(--texte); font-weight: 500; line-height: 1.25; text-wrap: pretty; }
+.k-ligne-sous { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; font-size: var(--sous); color: var(--encre-2); }
+.k-ligne-droite { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.k-ligne-droite b { font-weight: 600; }
+.k-ligne-droite small { font-size: var(--legende); color: var(--encre-2); }
+.k-ligne > .j-ico:last-child { color: var(--encre-3); margin-left: -4px; }
+.k-ligne-ico { flex: none; width: 28px; display: grid; place-items: center; color: var(--encre-2); }
+.k-ligne-simple { min-height: 64px; }
+.k-meta { display: inline-flex; align-items: center; gap: 8px; }
+.k-fav { display: inline-flex; align-items: center; gap: 3px; }
+/* glisser vers la gauche ⇒ les gestes de la ligne (montré ici sur une ligne) */
+.k-glisse-gestes { position: absolute; inset: 0 0 0 auto; display: flex; }
+.k-glisse-gestes > span { width: 84px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: var(--legende); font-weight: 600; color: #fff; }
+.k-glisse-a { background: var(--plein); color: var(--sur-plein) !important; }
+.k-glisse-b { background: #7A8CA0; }
+.k-ligne-cadre.is-glisse .k-ligne { transform: translateX(-168px); }
+
+/* ── Aujourd'hui : la bande des paires à envoyer ── */
+.k-bande { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: var(--m); margin: 0 calc(-1 * var(--m)); padding: 4px var(--m) 8px; scrollbar-width: none; overscroll-behavior-x: contain; }
+.k-bande::-webkit-scrollbar { display: none; }
+.k-bande-paire { flex: 0 0 132px; scroll-snap-align: start; display: flex; flex-direction: column; gap: 2px; transition: transform 160ms var(--ease); }
+.k-bande-paire:active { transform: scale(.97); }
+.k-bande-photo { position: relative; display: block; width: 132px; height: 132px; padding: 10px; border-radius: 18px; background: var(--porcelaine); box-shadow: var(--ombre); }
+.k-bande-photo .k-plaque, .k-tuile-photo .k-plaque { position: absolute; left: 8px; bottom: 8px; }
+.k-bande-prix { margin-top: 8px; font-weight: 600; }
+.k-bande-quand { font-size: var(--sous); color: var(--encre-2); }
+
+/* ── Les passes (Wallet) ── */
+.k-pile { display: flex; flex-direction: column; }
+.k-pass { display: block; border-radius: 20px; }
+.k-pass-ico { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; background: rgb(255 255 255 / .12); flex: none; }
+.k-pass.is-dos { display: flex; align-items: center; gap: 12px; height: 72px; margin-bottom: -16px; padding: 0 20px 16px; color: #EAF2FB; background: var(--dos-2); font-size: var(--sous); }
+.k-pass.is-dos + .k-pass.is-dos { background: var(--dos-1); }
+.k-pass.is-dos b { flex: 1; font-weight: 600; }
+.k-pass.is-dos > span:last-child { font-size: var(--legende); color: rgb(234 242 251 / .7); }
+.k-pass.is-devant { position: relative; z-index: 1; background: var(--porcelaine); box-shadow: var(--ombre-pass); padding: 20px; }
+.k-pass.is-devant .k-pass-ico { background: var(--creux); color: var(--encre); }
+.k-pass-tete { display: flex; gap: 12px; align-items: center; }
+.k-pass-tete b { display: block; font-weight: 600; }
+.k-pass-tete small, .k-pass-pied small { display: block; font-size: var(--sous); color: var(--encre-2); }
+.k-pass-avant { margin-top: 16px; display: flex; justify-content: space-between; gap: 8px; font-size: var(--sous); color: var(--encre-2); padding: 10px 12px; border-radius: 12px; background: var(--creux); }
+.k-pass-qr { width: 176px; height: 176px; margin: 20px auto 0; padding: 12px; background: #fff; border-radius: 16px; box-sizing: content-box; }
+.k-pass-qr svg { display: block; width: 100%; height: 100%; }
+.k-pass-code { margin-top: 16px; text-align: center; font-size: var(--affiche); font-weight: 700; letter-spacing: .02em; line-height: 1; }
+.k-pass-pied { margin-top: 20px; padding-top: 16px; border-top: 1.5px dashed var(--filet); display: flex; gap: 12px; align-items: center; }
+.k-pass-pied b { font-weight: 500; text-wrap: balance; }
+.k-pass-vignette { width: 48px; height: 48px; border-radius: 10px; background: var(--tuile); padding: 4px; flex: none; }
+.k-pass-pages { display: flex; justify-content: center; gap: 6px; margin-top: 16px; }
+.k-pass-pages i { width: 7px; height: 7px; border-radius: 50%; background: var(--encre-3); opacity: .45; }
+.k-pass-pages i.is-actif { opacity: 1; background: var(--encre); }
+.k-pile.is-mini { position: relative; display: block; height: 128px; }
+.k-pile.is-mini .k-pass.is-dos { position: absolute; left: 24px; right: 24px; top: 0; height: 40px; margin: 0; padding: 0; }
+.k-pile.is-mini .k-pass.is-dos + .k-pass.is-dos { left: 12px; right: 12px; top: 10px; }
+.k-pass.is-mini-devant { position: absolute; left: 0; right: 0; top: 20px; padding: 16px; background: var(--porcelaine); box-shadow: var(--ombre-pass); display: flex; flex-direction: column; gap: 10px; transition: transform 160ms var(--ease); }
+.k-pile.is-mini:active .is-mini-devant { transform: scale(.98); }
+.k-mini-haut { display: flex; align-items: center; gap: 12px; }
+.k-mini-haut b { flex: 1; font-weight: 600; }
+.k-mini-haut .k-pass-ico { background: var(--creux); }
+.k-mini-code { font-weight: 700; letter-spacing: .04em; }
+.k-mini-sous { font-size: var(--sous); color: var(--encre-2); display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+
+/* ── Annonces : la grille ── */
+.k-grille { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; margin-top: 8px; }
+.k-tuile { display: flex; flex-direction: column; gap: 8px; min-width: 0; transition: transform 160ms var(--ease); }
+.k-tuile:active { transform: scale(.97); }
+.k-tuile-photo { position: relative; display: block; aspect-ratio: 1; padding: 14px; border-radius: 18px; background: var(--porcelaine); box-shadow: var(--ombre); }
+.k-tuile-texte { display: flex; flex-direction: column; gap: 2px; padding: 0 4px; }
+.k-tuile-haut { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.k-tuile-haut b { font-weight: 600; }
+.k-tuile-haut .k-meta { font-size: var(--legende); color: var(--encre-2); }
+.k-tuile-titre { font-size: var(--legende); color: var(--encre-2); line-height: 1.3; text-wrap: pretty; }
+
+/* ── Argent ── */
+.k-argent-carte { padding: 16px 0 0; }
+.k-courbe { position: relative; padding: 0 16px; }
+.k-courbe svg { display: block; width: 100%; height: 72px; }
+.k-courbe-aire { fill: var(--accent); opacity: .12; }
+.k-courbe-trait { fill: none; stroke: var(--accent); stroke-width: 2; }
+.k-courbe-pt { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 11px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--porcelaine); }
+.k-courbe figcaption { display: flex; justify-content: space-between; padding-top: 6px; font-size: var(--legende); color: var(--encre-3); }
+.k-quatre { display: grid; grid-template-columns: 1fr 1fr; margin-top: 12px; }
+.k-quatre > div { display: flex; flex-direction: column-reverse; justify-content: flex-end; gap: 2px; padding: 14px 16px; border-top: 1px solid var(--filet); }
+.k-quatre > div:nth-child(even) { border-left: 1px solid var(--filet); }
+.k-quatre dt { font-size: var(--legende); color: var(--encre-2); }
+.k-quatre dd { font-weight: 600; }
+
+/* ── LE geste plein, au pouce (encre, comme le Studio) ── */
+.k-geste-zone { position: fixed; left: 0; right: 0; bottom: calc(var(--barre) + env(safe-area-inset-bottom, 0px)); padding: 12px var(--m); z-index: 20; background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--bas) 92%, transparent) 40%); }
+.k-geste { width: 100%; height: 52px; display: flex; align-items: center; justify-content: center; gap: 10px; border-radius: 16px; background: var(--plein); color: var(--sur-plein); font-size: var(--texte); font-weight: 600; box-shadow: 0 2px 4px rgb(12 29 48 / .14), 0 10px 24px rgb(12 29 48 / .22); transition: transform 120ms var(--ease); }
+.k-geste:active { transform: scale(.98); }
+
+/* ── La barre du bas : icônes + libellés (verre dépoli du Studio) ── */
+.k-barre { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; height: calc(var(--barre) + env(safe-area-inset-bottom, 0px)); padding: 6px 4px env(safe-area-inset-bottom, 0px); display: grid; grid-template-columns: repeat(5, 1fr); align-items: start; background: var(--barre-fond); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); box-shadow: 0 -1px 0 var(--filet); }
+.k-onglet { display: flex; flex-direction: column; align-items: center; gap: 3px; min-height: 48px; padding-top: 4px; color: var(--encre-3); font-size: 11px; font-weight: 600; letter-spacing: .01em; }
+.k-onglet[aria-current='page'] { color: var(--encre); }
+.k-onglet-i { position: relative; }
+.k-onglet[aria-current='page'] .k-onglet-i::after { content: ''; position: absolute; left: 50%; bottom: -2px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--accent); opacity: 0; }
+.k-badge { position: absolute; top: -5px; left: 17px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--ambre-point); color: #1B1205; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; box-shadow: 0 0 0 2px var(--barre-fond); }
+
+/* ── La feuille (détente moyenne) ── */
+.k-voile { position: fixed; inset: 0; z-index: 40; background: rgb(6 14 25 / .38); }
+.k-feuille { position: fixed; left: 0; right: 0; bottom: 0; z-index: 41; max-height: 62dvh; padding: 8px var(--m) calc(16px + env(safe-area-inset-bottom, 0px)); border-radius: 22px 22px 0 0; background: var(--haut); box-shadow: 0 -8px 40px rgb(0 0 0 / .25); }
+.k-poignee { display: block; width: 36px; height: 5px; border-radius: 3px; margin: 0 auto 16px; background: var(--encre-3); opacity: .5; }
+.k-feuille-haut { display: flex; gap: 16px; align-items: center; margin-bottom: 16px; }
+.k-feuille-photo { width: 96px; height: 96px; border-radius: 18px; background: var(--porcelaine); padding: 8px; box-shadow: var(--ombre); flex: none; }
+.k-feuille-titre { font-weight: 600; line-height: 1.25; margin-bottom: 8px; }
+.k-fait { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 52px; padding: 0 16px; }
+.k-fait + .k-fait { border-top: 1px solid var(--filet); }
+.k-fait > span { display: flex; align-items: center; gap: 10px; color: var(--encre-2); font-size: var(--sous); }
+.k-fait b { font-weight: 600; text-align: right; }
+.k-geste-feuille { margin-top: 16px; }
+
+/* ── Ordinateur ── */
+@media (min-width: 1100px) {
+  :root { --m: 40px; --affiche: 80px; }
+  #app { display: grid; grid-template-columns: 248px minmax(0, 1fr); }
+  .k-barre, .k-geste-zone { display: none; }
+  .k-cote { display: flex; flex-direction: column; gap: 8px; position: sticky; top: 0; height: 100dvh; padding: 24px 16px; background: rgb(255 255 255 / .45); -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); box-shadow: 1px 0 0 var(--filet); }
+  :root[data-theme='sombre'] .k-cote { background: rgb(12 24 41 / .5); }
+  .k-marque { font-weight: 700; letter-spacing: .06em; padding: 4px 12px 8px; }
+  .k-cote .k-compte { padding: 0 12px; white-space: nowrap; }
+  .k-cote-nav { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
+  .k-cote .k-onglet { flex-direction: row; gap: 12px; min-height: 44px; padding: 0 12px; border-radius: 12px; align-items: center; font-size: var(--sous); color: var(--encre-2); }
+  .k-cote .k-onglet[aria-current='page'] { background: var(--porcelaine); color: var(--encre); box-shadow: var(--ombre); }
+  .k-cote .k-onglet-i { display: contents; }
+  .k-cote .k-onglet-mot { flex: 1; }
+  .k-cote .k-badge { position: static; order: 3; box-shadow: none; }
+  .k-page { padding: 0 var(--m) 64px; max-width: 1240px; }
+  .k-tete { padding-top: 28px; }
+  .k-tete-g .k-compte { display: none; }
+  .k-geste-haut { display: block; }
+  .k-geste-haut .k-geste { height: 44px; padding: 0 18px; width: auto; font-size: var(--sous); }
+  .k-tete-d { gap: 10px; align-items: center; }
+  .k-e-journee, .k-e-achats, .k-e-argent { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 48px; align-items: start; }
+  .k-e-achats .k-col-a { max-width: 440px; }
+  .k-col-b > .k-groupe:first-child { margin-top: 24px; }
+  .k-bande { flex-wrap: wrap; overflow: visible; margin: 0; padding: 4px 0 8px; }
+  .k-grille { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 24px 16px; }
+  .k-filtres-ligne { max-width: 560px; }
+  .k-e-annonces .k-filtres-ligne { max-width: none; }
+}
+@media (hover: hover) and (pointer: fine) {
+  .k-ligne:hover { background: var(--porcelaine-2); }
+  .k-cote .k-onglet:hover { color: var(--encre); }
+}
+@media (prefers-reduced-motion: reduce) { * { transition-duration: 1ms !important; } }
+@media (prefers-reduced-transparency: reduce) { .k-barre, .k-cote { background: var(--porcelaine); -webkit-backdrop-filter: none; backdrop-filter: none; } }
+
+/* une feuille ouverte : le geste et la barre de la page passent derrière (un seul plein visible) */
+.a-feuille .k-geste-zone, .a-feuille .k-barre { display: none; }
