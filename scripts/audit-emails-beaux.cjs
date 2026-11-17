@@ -114,7 +114,14 @@ const PIED = 'data-vv="pied"';
     return f;
   }
 
+  // B9 — le lien de preuve d'adresse renvoyé vers la boîte n'est jamais pris pour une vente :
+  // email-inbound.js reconnaît son sujet dans les cinq langues.
+  const PA = await import(pathToFileURL(path.join(RACINE, 'api/_lib/preuve-adresse.js')).href);
+  const inbound = require('fs').readFileSync(path.join(RACINE, 'api/email-inbound.js'), 'utf8');
+  const reconnus = (PA.SUJETS_PREUVE || []).filter((x) => /confirme ton adresse/i.test(x) || inbound.includes(x));
+  const fautesB9 = (PA.SUJETS_PREUVE || []).length === 5 && reconnus.length === 5 ? [] : ['B9 email-inbound.js ne reconnaît pas les cinq sujets du lien de preuve d’adresse'];
   const fautes = regles(parLangue);
+  fautes.push(...fautesB9);
   for (const x of fautes) console.error('❌ ' + x);
   const n = LANGUES.reduce((s, l) => s + parLangue[l].length, 0);
   if (!fautes.length) console.log(`✅ ${parLangue.fr.length} e-mails × ${LANGUES.length} langues (${n} rendus) : forme commune, un bouton à toute épreuve (VML), texte brut, aucun pixel, montants tels quels, sujets ≤ 70, cinq langues complètes, qui envoie`);
