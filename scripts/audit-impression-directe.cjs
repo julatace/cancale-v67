@@ -23,6 +23,7 @@ const MUTATIONS = {
   'direct-choisir': [APP, 'if (direct) { directImprRef.current = true; imprimerLotRef.current && imprimerLotRef.current(); }', 'if (direct) { directImprRef.current = true; ouvrirLotRef.current && ouvrirLotRef.current(); }'],
   'direct-feuille': [APP, "      if (voie !== 'bouton') { try { window.dispatchEvent(new CustomEvent('vrm:impression-faite', { detail: marquesImpression(res.items, res.reussies) })); } catch (_) {} return; }", '      if (false) {}'],
   'annule-reste': [APP, '        directImprRef.current = false;\n        const annule = estTamponAnnule(err)', '        const annule = estTamponAnnule(err)'],
+  'direct-apercu': [APP, '    if (directImprRef.current) {\n      attendrePuisOuvrir(sig,', '    if (false) {\n      attendrePuisOuvrir(sig,'],
   'banniere-partout': [APP, "      {ordi ? <ImpressionDirecteCoque onImprimer=", "      {true ? <ImpressionDirecteCoque onImprimer="],
   'clic-auto': [JSX, '  if (!proposer({ ordi, publie, ecarte })) return null;', '  React.useEffect(() => { if (onImprimer && proposer({ ordi, publie, ecarte })) onImprimer(nombreAProposer(publie)); }, []);\n  if (!proposer({ ordi, publie, ecarte })) return null;'],
 };
@@ -68,6 +69,7 @@ if (arg.includes('--prouve')) {
   // ── Le branchement ──
   const A = src[APP].replace(/\/\*[\s\S]*?\*\//g, '');
   dit(/if \(direct\) \{ directImprRef\.current = true; imprimerLotRef\.current && imprimerLotRef\.current\(\); \}/.test(A), 'le clic passe par le MOTEUR d’« Imprimer (N) » (`imprimerLot` : papier retenu, question la 1re fois, §5), pas par « Choisir »');
+  dit(/if \(directImprRef\.current\) \{\s*attendrePuisOuvrir\(sig, choisies, choisies\.flatMap\(numerosDeLigne\),/.test(A), 'en direct, pas d’aperçu : les tampons DÉJÀ choisis, le chemin d’attente (question des N° §5, puis la visionneuse)');
   dit((A.match(/prendreDemandeImpression\(\)/g) || []).length >= 2, 'les deux prises de demande (écran déjà ouvert, écran qui s’ouvre) la connaissent');
   dit(/if \(directImprRef\.current\) \{\s*directImprRef\.current = false;\s*if \(voie !== 'bouton'\) \{ try \{ window\.dispatchEvent\(new CustomEvent\('vrm:impression-faite', \{ detail: marquesImpression\(res\.items, res\.reussies\) \}\)\); \} catch \(_\) \{\} return; \}/.test(A),
     'après : les marques posées (`marquerImprimes`, avant), puis « N imprimés · Annuler » au lieu de la feuille d’après');

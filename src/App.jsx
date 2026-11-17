@@ -47173,6 +47173,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!choisies.length) { toast(tr('impr.rien')); return; }
     if (voulues) { const dispo = new Set(choisiesV.map((l) => l.cle)); const partis = [...voulues].filter((c) => !dispo.has(c)); if (partis.length) { toast(tr('impr.disparus', { n: partis.length })); return; } }
     const sig = sigImpr(choisies, format, tampons);
+    // (16 nov., lot impression-directe — Julien : « impression sans réfléchir ») Lancée par « Imprimer les N » de
+    // l'ordinateur : PAS d'aperçu — le papier et les tampons DÉJÀ choisis (places gardées) ; le chemin d'attente
+    // garde la question des N° à vérifier (§5) et ouvre la visionneuse, qui imprime seule.
+    if (directImprRef.current) {
+      attendrePuisOuvrir(sig, choisies, choisies.flatMap(numerosDeLigne), () => composerLot(choisies, format, tampons, { pas: (f) => setImprBusy({ fait: f, total: choisies.length }) }));
+      return;
+    }
     // La lecture des PDF se voit (« Préparation… 1/3 », `imprBusy`) ; une panne est DITE avec « Réessayer » (la même
     // sélection, l'aperçu rouvert) ; rien choisi n'est lisible : dit ; le compte change pendant la lecture : rien.
     const proprio = AUTH.user?.id || null, total = choisies.length;
