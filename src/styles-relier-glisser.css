@@ -57,3 +57,17 @@
 /* (reprise) 116 px : la pilule du résultat, bénéfice en entier (jusqu'à trois lignes dans une autre langue). */
 .vrm-rg-corps { padding-bottom: calc(116px + env(safe-area-inset-bottom, 0px)); }
 body:has(.vrm-rg) .vrm-pil-zone { top: auto !important; bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important; }
+/* (17 nov.) RELIER EN TOUCHANT : le choix se voit tout du long (bandeau fixe sous le titre, ligne surlignée) ; au
+   téléphone, la liste du côté déjà choisi laisse sa place à la liste d'en face. */
+.vrm-rg-choisi { display: flex; align-items: center; gap: 10px; margin: 0 16px 6px; padding: 8px 10px; border-radius: 14px; flex: none;
+  background: var(--rg-carte, #fff); border: 2px solid var(--rg-accent, #0071E3); box-shadow: 0 4px 14px rgba(0,0,0,.08); }
+.vrm-rg-changer { flex: none; min-height: 44px; padding: 0 12px; border: 0; background: transparent; color: var(--rg-accent, #0071E3); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+.vrm-rg-cible { cursor: pointer; }
+.vrm-rg-achat[aria-pressed="true"], .vrm-rg-cible[aria-pressed="true"] { outline: 2px solid var(--rg-accent, #0071E3); outline-offset: -1px; background: color-mix(in srgb, var(--rg-accent, #0071E3) 10%, var(--rg-carte, #fff)); }
+.vrm-rg-ici { pointer-events: none; }
+@media (max-width: 899px) {
+  .vrm-rg[data-glisser-mode="achat"] .vrm-rg-achats, .vrm-rg[data-glisser-mode="cible"] .vrm-rg-cibles { display: none; }
+}
+@media (min-width: 900px) { .vrm-rg-choisi { max-width: 1152px; width: calc(100% - 48px); margin: 0 auto 8px; box-sizing: border-box; } }
+.vrm-rg-ici { display: inline-flex; align-items: center; justify-content: center; }
+@media (max-width: 520px) { .vrm-rg-question-texte { flex-basis: 100%; } .vrm-rg-oui, .vrm-rg-non { flex: 1 1 0; } }

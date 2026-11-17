@@ -23,11 +23,15 @@ const montant = (n) => { try { return monnaie(n); } catch (_) { return `${Number
 const jourCourt = (d) => { const t = Date.parse(d || ''); if (!Number.isFinite(t)) return ''; try { return new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); } catch (_) { return ''; } };
 
 export default function RelierGlisser({ achats, liens, tresProbables = null, cibles = [], prixDe, compteDe = () => '', photoDe = () => '', tailleDe = () => '',
-  onRelier, onListe = null, onFermer, Photo, Icon, Retour = null, zIndex = 1400, C = {} }) {
+  onRelier, onListe = null, onFermer, Photo, Icon, Retour = null, zIndex = 1400, C = {}, achatInitial = '', cibleInitiale = '' }) {
   const L = useMemo(() => listesGlisser({ achats, liens, tresProbables, cibles }), [achats, liens, tresProbables, cibles]);
   const [leve, setLeve] = useState(null);          // { tx, x, y, dx, dy, w, h }
   const [survol, setSurvol] = useState('');        // key de la cible sous le doigt
-  const [choisi, setChoisi] = useState('');        // tx sélectionné (toucher / clavier)
+  // (17 nov., Julien : « je dois rester appuyé sur l'achat […] et après on ne voit pas ce que j'ai sélectionné ») RELIER
+  // EN TOUCHANT : un toucher choisit l'achat (ou la vente / l'annonce), un bandeau fixe le montre tout du long, la liste
+  // d'en face prend la place ; un toucher sur l'autre côté pose la question. Le glisser reste un bonus.
+  const [choisi, setChoisi] = useState(String(achatInitial || ''));        // tx de l'achat choisi
+  const [cibleChoisie, setCibleChoisie] = useState(String(cibleInitiale || ''));   // key de la vente / annonce choisie
   const [confirme, setConfirme] = useState(null);  // { a, cible }
   const [enCours, setEnCours] = useState(false);
   const [large, setLarge] = useState(() => (typeof window !== 'undefined' ? window.innerWidth >= 900 : false));
@@ -36,7 +40,8 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
   const parCle = useMemo(() => new Map(L.cibles.map((c) => [String(c.key), c])), [L.cibles]);
   useEffect(() => { const f = () => setLarge(window.innerWidth >= 900); window.addEventListener('resize', f); return () => window.removeEventListener('resize', f); }, []);
   // Un achat choisi qui n'est plus libre (relié ailleurs) : la sélection tombe.
-  useEffect(() => { if (choisi && !parTx.has(choisi)) setChoisi(''); }, [choisi, parTx]);
+  useEffect(() => { if (choisi && Array.isArray(L.achats) && !parTx.has(choisi)) setChoisi(''); }, [choisi, parTx, L.achats]);
+  useEffect(() => { if (cibleChoisie && !parCle.has(cibleChoisie)) setCibleChoisie(''); }, [cibleChoisie, parCle]);
 
   const cibleSous = (x, y) => {
     const el = typeof document !== 'undefined' && document.elementFromPoint ? document.elementFromPoint(x, y) : null;
@@ -136,9 +141,15 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
     setEnCours(true);
     let ok = false; try { ok = await onRelier(confirme.a, confirme.cible); } catch (_) { ok = false; }
     setEnCours(false); setConfirme(null);
-    if (ok) setChoisi('');
+    if (ok) { setChoisi(''); setCibleChoisie(''); }
   };
   const relierIci = (c) => { const x = parTx.get(choisi); if (x && c) setConfirme({ a: x.a, cible: c }); };
+  // Toucher une vente / annonce : l'achat est choisi ⇒ la question ; sinon elle devient LE choix (sens inverse).
+  const toucherCible = (c) => { if (leve || vientDeGlisser.current || !c) return; if (choisi) relierIci(c); else setCibleChoisie((k) => (k === String(c.key) ? '' : String(c.key))); };
+  const toucherAchat = (x) => { if (leve || vientDeGlisser.current || !x) return; const c = cibleChoisie ? parCle.get(cibleChoisie) : null; if (c) { setConfirme({ a: x.a, cible: c }); return; } setChoisi((v) => (v === x.tx ? '' : x.tx)); };
+  const changer = () => { setChoisi(''); setCibleChoisie(''); setConfirme(null); };
+  const mode = choisi ? 'achat' : cibleChoisie ? 'cible' : '';
+  const xChoisi = choisi ? parTx.get(choisi) : null, cChoisie = cibleChoisie ? parCle.get(cibleChoisie) : null;
 
   const achatLeve = leve ? parTx.get(leve.tx) : null;
   const nA = Array.isArray(L.achats) ? L.achats.length : null;
@@ -159,17 +170,28 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
   };
 
   return createPortal(
-    <div className="vrm-rg" data-relier-glisser="" data-glisser-large={large ? '1' : '0'} data-glisser-leve={leve ? leve.tx : undefined} role="dialog" aria-modal="true" aria-label={tr('glisser.titre')}
+    <div className="vrm-rg" data-relier-glisser="" data-glisser-mode={mode || undefined} data-glisser-large={large ? '1' : '0'} data-glisser-leve={leve ? leve.tx : undefined} role="dialog" aria-modal="true" aria-label={tr('glisser.titre')}
       style={{ zIndex, '--rg-fond': C.bg, '--rg-carte': C.card, '--rg-encre': C.text, '--rg-gris': C.muted, '--rg-filet': C.border, '--rg-accent': C.accent, '--rg-sur-accent': C.onAccent }}>
       {Retour ? <Retour fermer={onFermer}/> : null}
       <header className="vrm-rg-tete">
         <div className="vrm-rg-tete-texte">
           <h2 className="vrm-rg-h">{tr('glisser.titre')}</h2>
-          <p className="vrm-rg-aide" data-glisser-aide="">{choisi ? tr('glisser.aideChoisi') : tr('glisser.aide')}</p>
+          <p className="vrm-rg-aide" data-glisser-aide="">{choisi ? tr('glisser.aideChoisi') : cibleChoisie ? tr('glisser.aideCible') : tr('glisser.aide')}</p>
         </div>
         {onListe ? <button type="button" className="vrm-rg-lien" data-glisser-liste="" onClick={onListe}>{tr('glisser.liste')}</button> : null}
         <button type="button" className="vrm-rg-fermer" data-glisser-fermer="" aria-label={tr('glisser.fermer')} onClick={onFermer}><Icon name="close" size={20}/></button>
       </header>
+      {mode ? (
+        <div className="vrm-rg-choisi" data-glisser-choisi={mode === 'achat' ? choisi : cibleChoisie} data-glisser-choisi-sorte={mode} role="status" aria-live="polite">
+          <span className="vrm-rg-photo" aria-hidden="true">{(() => { const ph = mode === 'achat' ? (xChoisi ? photoDe(xChoisi.a) : '') : (cChoisie && cChoisie.photo) || ''; return ph ? <Photo src={ph} alt="" draggable={false}/> : <Icon name={mode === 'achat' ? 'bag' : 'image'} size={20}/>; })()}</span>
+          <span className="vrm-rg-texte">
+            <span className="vrm-rg-sous">{mode === 'achat' ? tr('glisser.choisiAchat') : tr('glisser.choisiCible')}</span>
+            <span className="vrm-rg-titre">{mode === 'achat' ? ((xChoisi && xChoisi.a.title) || '…') : <>{cChoisie && cChoisie.num ? <b className="vrm-rg-num">N°{cChoisie.num}</b> : null}{(cChoisie && cChoisie.titre) || '—'}</>}</span>
+          </span>
+          {mode === 'achat' && xChoisi ? <span className="vrm-rg-prix">{lotDe(xChoisi.a).lot ? tr('glisser.lot') : prixDe(xChoisi.a) != null ? montant(prixDe(xChoisi.a)) : '—'}</span> : null}
+          <button type="button" className="vrm-rg-changer" data-glisser-changer="" onClick={changer}>{tr('glisser.changer')}</button>
+        </div>
+      ) : null}
       <div className="vrm-rg-corps">
         <section className="vrm-rg-col vrm-rg-achats" aria-label={tr('glisser.achats')}>
           <h3 className="vrm-rg-h3">{tr('glisser.achats')}{nA != null ? <span className="vrm-rg-n">{nA}</span> : null}</h3>
@@ -182,7 +204,7 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
                   <button type="button" className="vrm-rg-carte vrm-rg-achat" data-glisser-achat={x.tx} aria-pressed={choisi === x.tx}
                     data-glisser-source={leve && leve.tx === x.tx ? '1' : undefined}
                     onPointerDown={(e) => debut(e, x)} onContextMenu={(e) => e.preventDefault()}
-                    onClick={() => { if (leve || vientDeGlisser.current) return; setChoisi((v) => (v === x.tx ? '' : x.tx)); }}>
+                    onClick={() => toucherAchat(x)}>
                     {carteAchat(x)}
                   </button>
                 </li>))}
@@ -196,14 +218,15 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
               const propose = achatLeve && achatLeve.propose === String(c.key);
               return (
                 <li key={c.key}>
-                  <div className="vrm-rg-carte vrm-rg-cible" data-glisser-cible={c.key} data-glisser-genre={c.genre} data-glisser-survol={actif ? '1' : undefined} data-glisser-attendue={propose ? '1' : undefined}>
+                  <button type="button" className="vrm-rg-carte vrm-rg-cible" data-glisser-cible={c.key} data-glisser-ici={choisi ? c.key : undefined} aria-pressed={cibleChoisie === String(c.key)} data-glisser-genre={c.genre} data-glisser-survol={actif ? '1' : undefined} data-glisser-attendue={propose ? '1' : undefined}
+                    onClick={() => toucherCible(c)}>
                     <span className="vrm-rg-photo" aria-hidden="true">{c.photo ? <Photo src={c.photo} alt="" loading="lazy" decoding="async" draggable={false}/> : <Icon name="image" size={20}/>}</span>
                     <span className="vrm-rg-texte">
                       <span className="vrm-rg-titre">{c.num ? <b className="vrm-rg-num">N°{c.num}</b> : null}{c.titre || '—'}</span>
                       <span className="vrm-rg-sous">{[c.genre === 'vente' ? tr('glisser.vendue') : tr('glisser.enVente'), c.sous].filter(Boolean).join(' · ')}</span>
                     </span>
-                    {choisi ? <button type="button" className="vrm-rg-ici" data-glisser-ici={c.key} onClick={() => relierIci(c)}>{tr('glisser.relierIci')}</button> : null}
-                  </div>
+                    {choisi ? <span className="vrm-rg-ici" aria-hidden="true">{tr('glisser.relierIci')}</span> : null}
+                  </button>
                 </li>
               );
             })}
