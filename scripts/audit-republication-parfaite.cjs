@@ -263,7 +263,8 @@ async function prouver() {
     ['reprise sans plafond', 'bg', "const stop = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES, actions: 1, recu, sorte: 'republier', secu: { sorte: 'republication', mode: 'clic' } });", "const stop = null;"],
     ['reprise sans quota du jour', 'bg', "const jour = await gardeJourRepub(uid); if (jour) return { accepte: false, code: jour.code, raison: jour.raison };\n      const recu = {};", "const recu = {};"],
     ['reprise sans frein', 'bg', "{ const fr = await lireFreinRepub(uid); if (fr) return { accepte: false, code: 'frein-refus', jusqua: fr.jusqua, raison: phraseFreinRepub(fr) }; }\n  let rows; try { rows = await sbGet(`app_data?id=eq.coffre_${uid}_${id}&select=vb:data->versBrouillon`)", "let rows; try { rows = await sbGet(`app_data?id=eq.coffre_${uid}_${id}&select=vb:data->versBrouillon`)"],
-    ['relecture d\'un autre compte', 'bg', "if (!actif || String(actif) !== String(job.uid)) return null;", ''],
+    // (« relecture d'un autre compte » n'est pas une mutation à part : `pageVintedPour` refuse déjà toute requête quand
+    //  l'onglet est sur un autre compte — la garde de `relireBrouillonRepris` la double ; F6 juge le résultat.)
     ['« Publier » ne règle pas l\'ancienne', 'bg', "try { await majVersBrouillon(uid, String(b.ancienId), { etat: 'fait', draftId: id, nouvelId: itemId }); } catch (_) {}", ''],
     ['nouvelle sans lien recreeDe', 'bg', "recreeDe: String(ancienId), savedAt: t", "savedAt: t"],
     ['écran plein sans étape', 'bg', "try { sansRejet(poserEtapeAction(String(id), etape, extra), 'etape_action'); } catch (_) {}", ''],

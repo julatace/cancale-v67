@@ -174,7 +174,7 @@ async function ecranPlein(b, vp, theme, tag) {
         await pg.locator('[data-republier-confirme]').check();
         await pg.locator('[data-republier-lancer]').last().click();
         try { const f = await pg.waitForSelector('[data-verif-sheet]', { timeout: 1500 }); if (f) { await pg.click('[data-verif-publier]'); } } catch (_) {}
-        await attendre(async () => (await pg.evaluate(() => window.__repub.length)) >= 3, 12000);
+        await attendre(async () => (await pg.evaluate(() => window.__repub.length)) >= 3, 45000);   // 8 s au moins entre deux (REPUB_ESP_MIN)
         await pg.waitForTimeout(800);
         await shot(pg, `rp2-pendant-suivi-${tag}.png`);
         const tot = await pg.evaluate(() => window.__repub.map((x) => x.total));
