@@ -111,5 +111,7 @@ export default {
   "v2.ann.nAnnonces": {
     "one": "{n} listing",
     "other": "{n} listings"
-  }
+  },
+  "v2.scanner": "Scan a parcel",
+  "v2.achats.ajouter": "Add a purchase"
 };

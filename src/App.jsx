@@ -50502,6 +50502,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               retraits={{ n: nR, pasSu: nR == null, points: pointsJ, nPoints: Math.max(1, pointsJ.length), premier: premierJ }}
               groupes={groupesJ}
               plein={nPrets > 0 ? { n: nPrets, txt: tr('v2.imprimer', { n: nPrets }), faire: () => { _pendingBordPrint = true; if (onNav) onNav(xE.tab); } } : null}
+              onScanner={() => ouvrirRetrouver('journee')}
               onColis={() => { if (onNav && xE) onNav(xE.tab); }}
               onRetraits={() => { if (onNav) onNav('retraits'); }}/>
           );
@@ -55582,6 +55583,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           if (!x.code) return null; return () => openQrView(t ? (codeRetrait(t.code) !== x.code ? { ...t, code: x.code } : t) : ligneRetraitVinted(o)); } }}/>
                     {!avecColis && toutLuRet ? <p className="vrm-colis-vide" data-retraits-vide="">{tr('v2.passe.aucun')}</p> : null}
                     <EnRouteListeV2 lignes={enRouteV2} Icon={Icon} Photo={photoCarte}/>
+                    {/* Rien n'attend au relais : le geste plein d'Achats est « Ajouter un achat » (la saisie d'un achat hors
+                        plateforme, la même que son bouton : `vrm:v2-ajouter-achat`, src/ecrans/Achats.jsx). */}
+                    {!avecColis ? <div className="v2-pouce" data-v2-pouce=""><BoutonV2 role="principal" plein icone={<Icon name="plus" size={22}/>} attrs={{ 'data-v2-principal': 'ajouter-achat' }}
+                      onClick={() => { try { window.dispatchEvent(new Event('vrm:v2-ajouter-achat')); } catch (_) {} }}>{tr('v2.achats.ajouter')}</BoutonV2></div> : null}
                     {ancienne ? <details className="vrm-repli" data-v2-detail-retraits=""><summary>{tr('v2.passe.detail')}</summary>{ancienne}</details> : null}
                   </div>; })()}
                 {/* (8 nov., retraits) LES COLIS SORTIS DE « À RETIRER », AVEC LA RAISON LUE ET SA DATE (§5 : un colis

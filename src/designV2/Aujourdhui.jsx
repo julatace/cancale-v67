@@ -13,7 +13,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { tr } from '../i18n/index.js';
-import { BoutonV2, RangeeTouchable } from './BoutonV2.jsx';
+import { BoutonV2, BoutonIconeV2, RangeeTouchable } from './BoutonV2.jsx';
 import './design-v2.css';
 
 function Vignette({ photo, Photo, Icon, taille = 56 }) {
@@ -38,15 +38,17 @@ function RienAFaire({ Icon }) {
   );
 }
 
-export default function Aujourdhui({ affiche, colis = [], retraits = null, groupes = [], plein = null, Photo, Plaque, Icon, onColis, onRetraits, titre }) {
+export default function Aujourdhui({ affiche, colis = [], retraits = null, groupes = [], plein = null, Photo, Plaque, Icon, onColis, onRetraits, onScanner = null, titre }) {
   const n = affiche && !affiche.pasSu ? affiche.n : null;
   const nRet = retraits && !retraits.pasSu ? retraits.n : null;
   const rien = n === 0 && nRet === 0 && groupes.length === 0;
   const premierPoint = retraits && Array.isArray(retraits.points) ? retraits.points[0] : null;
   return (
     <div className="v2-ecran v2-aujourdhui" data-v2-ecran="aujourdhui" data-espace="journee" data-v2-plein={plein ? '1' : '0'}>
-      <header className="v2-tete">
+      <header className="v2-tete v2-titre-ligne">
         <h1 className="v2-titre">{titre}</h1>
+        {/* Le « Scanner » du disque d'hier : un code-barres de colis ⇒ SA vente ou SON achat (le même scanner). */}
+        {onScanner ? <BoutonIconeV2 icone={<Icon name="scan" size={24}/>} label={tr('v2.scanner')} onClick={onScanner} attrs={{ 'data-v2-scanner': '' }}/> : null}
       </header>
 
       {rien ? <RienAFaire Icon={Icon}/> : (<>

@@ -111,5 +111,7 @@ export default {
   "v2.ann.nAnnonces": {
     "one": "{n} annuncio",
     "other": "{n} annunci"
-  }
+  },
+  "v2.scanner": "Scansiona un pacco",
+  "v2.achats.ajouter": "Aggiungi un acquisto"
 };
