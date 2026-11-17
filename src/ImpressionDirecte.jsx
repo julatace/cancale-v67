@@ -23,7 +23,16 @@ export function ImpressionDirecte({ ordi = false, publie = null, onImprimer }) {
     window.addEventListener('vrm:impression-faite', f);
     return () => window.removeEventListener('vrm:impression-faite', f);
   }, []);
-  React.useEffect(() => { if (!apres) return undefined; const t = setTimeout(() => setApres(null), DUREE_APRES); return () => clearTimeout(t); }, [apres]);
+  // Le temps d'« Annuler » ne court que quand il PEUT le voir : pas pendant que la visionneuse du PDF est ouverte.
+  React.useEffect(() => {
+    if (!apres) return undefined;
+    let reste = DUREE_APRES;
+    const t = setInterval(() => {
+      if (document.querySelector('[data-visionneuse-pdf]') || document.visibilityState !== 'visible') return;
+      reste -= 500; if (reste <= 0) setApres(null);
+    }, 500);
+    return () => clearInterval(t);
+  }, [apres]);
   if (apres && ordi) {
     return (
       <div className="vrm-impdir" role="status" data-impression-faite={String(apres.n)}>
