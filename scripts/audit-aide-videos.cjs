@@ -45,7 +45,7 @@ const MUTATIONS = {
   // (17 nov., lot aide-videos)
   'video-autre-ecran': (x) => { x.ecran.dashboard = ['journee']; },
   'sans-reponse': (x) => { delete x.fr['av.garage.reponse']; },
-  'reponse-longue': (x) => { x.fr['av.emails.reponse'] = 'Les e-mails de tes plateformes arrivent ici, rangés par sorte, avec leur code, leur lieu, leur date limite, et le reste encore, et encore une phrase de plus.'; },
+  'reponse-longue': (x) => { x.langues.de['av.emails.reponse'] = 'Les e-mails de tes plateformes arrivent ici, rangés par sorte, avec leur code, leur lieu, leur date limite, et le reste encore, et encore une phrase de plus.'; },
   'langue-oubliee': (x) => { delete x.langues.it['av.ventes.reponse']; },
   'piste-absente': (x) => { x.pistes = { defauts: ['compta.de.vtt absent'] }; },
   'sans-plein-ecran': (x) => { x.sources['src/composants/AideVideo.jsx'] = x.sources['src/composants/AideVideo.jsx'].replace('onClick={() => demanderPleinEcran(ref.current)}', ''); },
@@ -129,12 +129,13 @@ function juger(x) {
   for (const e of x.cles) { const l = x.ecran[e] || []; const autres = l.filter((id) => id !== e && !(PERMIS[e] || []).includes(id)); dit(!autres.length && (!l.length || l[0] === e), `« ? » de ${e} : ${l.length ? 'sa vidéo d’abord' : 'aucune vidéo'}${autres.length ? ' — celle d’un autre écran : ' + autres.join(', ') : ''}`); }
   // (17 nov.) La réponse en deux lignes AU-DESSUS de chaque vidéo, et ses textes dans les 5 langues.
   for (const id of Object.keys(x.aide)) {
-    const r = x.fr['av.' + id + '.reponse'] || '';
-    dit(!!r && r.length <= 125, `${id} : une réponse de deux lignes au plus (${r.length} signes)`);
+    // Deux lignes sur un téléphone (390 px, 14 px) : 95 signes au plus, dans CHAQUE langue.
+    const longues = Object.entries(x.langues).filter(([, d]) => !(d['av.' + id + '.reponse'] || '').trim() || d['av.' + id + '.reponse'].length > 95).map(([l, d]) => `${l} ${(d['av.' + id + '.reponse'] || '').length}`);
+    dit(!longues.length, `${id} : une réponse de deux lignes au plus, dans les 5 langues${longues.length ? ' — ' + longues.join(', ') : ''}`);
     for (const [l, d] of Object.entries(x.langues)) dit(['titre', 'geste', 'reponse'].every((k) => typeof d['av.' + id + '.' + k] === 'string' && d['av.' + id + '.' + k].trim()), `${id} : titre, geste et réponse en ${l}`);
   }
   dit(!(x.pistes.defauts || []).length, `sous-titres en/es/it/de : une piste par vidéo, aux instants de la française, toutes les lignes traduites${(x.pistes.defauts || []).length ? ' — ' + x.pistes.defauts.slice(0, 3).join(' · ') : ''}`);
-  dit(x.chercher('bordereau').includes('ventes') && x.chercher('code comptoir').includes('colis') && x.chercher('URSSAF').includes('compta') && !x.chercher('URSSAF').includes('journee') && !x.chercher('zzzz').length, 'recherche : « bordereau » ⇒ Ventes, « code comptoir » ⇒ Colis, « URSSAF » ⇒ Argent seulement, un mot inconnu ⇒ rien');
+  dit(x.chercher('bordereau').includes('ventes') && x.chercher('code grand').includes('colis') && x.chercher('déclarer').includes('compta') && x.chercher('declarer').length === 1 && !x.chercher('zzzz').length, 'recherche : « bordereau » ⇒ Ventes, « code grand » ⇒ Colis, « déclarer » ⇒ Argent seulement (accents ignorés), un mot inconnu ⇒ rien');
   // 2. Les fichiers.
   const listes = fs.existsSync(DOSSIER) ? fs.readdirSync(DOSSIER) : [];
   for (const id of Object.keys(x.aide)) {
