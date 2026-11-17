@@ -2026,6 +2026,9 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 - **16 nov. · Argent lisible (lot argent-mieux)** : cartes de verre à l'encre du verre (`src/design/verre-argent.css`, 0 texte < 4,5:1), « Copier » plein ; ventes non comptées groupées (une ligne par raison, « au moins », détail replié, `src/composants/NonComptees.jsx`) ; règle inchangée. Piste « deux prix » (écart +0,47–1,45 €, pas la protection) : `docs/passation/2026-11-16-argent-mieux.md`. Geste : décider la piste.
 
-## Lignes du §9 de CLAUDE.md déplacées le 17 nov. (lot extension-carte-v2), telles quelles
+## Lignes déplacées de CLAUDE.md §9 (17 nov., lot accessibilite)
+
 - **16 nov. · Tampons des bordereaux (lot tampons-parametres)** : UN réglage `vrm_tampons` (SYNC_KEYS, migration des choix d'avant) lu par TOUTES les impressions ; « Créé par vrm.center » juste AU-DESSUS du QR, centrée (sinon dessous, sinon sous l'adresse) ; la sélection ouvre l'APERÇU AVANT IMPRESSION (vignettes, tampon déplacé au doigt, codes/QR/adresse refusés, « tous de ce type ») ; Paramètres → Imprimante : galerie de tous les types × papiers, même éditeur. `docs/passation/2026-11-16-tampons-parametres.md`. Geste : aucun.
 
+## Ligne du §9 de CLAUDE.md déplacée le 17 nov. (lot extension-carte-v2, après fusion de main), telle quelle
+- **17 nov. · Relier en touchant (lot relier-toucher)** : plus jamais d'appui long obligatoire — un toucher choisit l'achat (ou la vente/annonce), bandeau fixe « Achat choisi · Changer », la liste d'en face prend la place, un toucher ⇒ « Relier N°… ? » ⇒ bénéfice + Reçu, Annuler 5 s ; « ⋯ » d'un achat (et sa fiche) : « Relier à une vente / annonce ». `docs/passation/2026-11-17-relier-toucher.md`. Geste : aucun.
