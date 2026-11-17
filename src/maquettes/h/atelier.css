@@ -33,6 +33,7 @@ html[data-maquette="h"] body { margin: 0; background: transparent !important; }
 
 /* ── LA TÊTE : rien à toucher sauf le « ? » et le rail (les gestes sont en bas) ── */
 .h-main { padding: 0 var(--g) calc(184px + env(safe-area-inset-bottom)); }
+.h-corps { padding-top: 6px; }
 .h-tete { padding-top: calc(env(safe-area-inset-top) + 14px); }
 .h-tete-l { display: flex; align-items: center; flex-wrap: wrap; column-gap: 6px; }
 .h-etape { flex-basis: 100%; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--c2); }
@@ -61,7 +62,8 @@ html[data-maquette="h"] body { margin: 0; background: transparent !important; }
 .h-affiche-l { margin-top: 6px; font-size: 13px; color: var(--c2); }
 
 /* ── SECTIONS ET PLANS DE VERRE ── */
-.h-section { margin-top: 22px; }
+.h-section { margin-top: 26px; }
+.h-section:not(:has(.h-section-titre)) { margin-top: 20px; }
 .h-section-titre { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 8px; margin: 0 4px 8px; font-size: 17px; font-weight: 600; color: var(--c); }
 .h-section-titre::first-letter { text-transform: uppercase; }
 .h-section-n { font-weight: 500; font-variant-numeric: tabular-nums; color: var(--c2); }
@@ -105,10 +107,10 @@ button.h-ligne:active, button.h-colis:active { background: rgb(255 255 255 / .5)
   box-shadow: inset 0 0 0 1px rgb(12 29 48 / .18); }
 
 /* RANGER : les cases, en tuiles de verre. */
-.h-cases { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.h-cases { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .h-case { display: flex; flex-direction: column; gap: 3px; min-height: 84px; padding: 10px 10px 9px; border-radius: 16px; background-image: var(--verre); box-shadow: var(--sv-ombre); color: var(--e); }
-.h-case-nom { font: 500 20px/1 var(--sb-police-affiche); letter-spacing: -.01em; }
-.h-case-n { font-size: 12.5px; color: var(--e2); }
+.h-case-nom { font: 400 22px/1 var(--sb-police-affiche); letter-spacing: -.01em; }
+.h-case-n { margin-top: auto; font-size: 15px; color: var(--e2); font-variant-numeric: tabular-nums; }
 .h-case-nums { display: flex; gap: 3px; flex-wrap: wrap; margin-top: auto; }
 .h-case-nums .h-plaque { font-size: 11px; padding: 1px 4px; }
 .h-case-nums .h-plaque-n { display: none; }
@@ -141,8 +143,7 @@ button.h-ligne:active, button.h-colis:active { background: rgb(255 255 255 / .5)
 .h-onglet[aria-current] .h-onglet-i { background: rgb(12 29 48 / .08); box-shadow: inset 0 1px 2px rgb(12 29 48 / .14); }
 .h-onglet[aria-current] .h-onglet-i::after { content: ''; position: absolute; bottom: -6px; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: var(--sb-diode); }
 .h-onglet-mot { font-size: 11px; font-weight: 600; letter-spacing: -.01em; }
-.h-onglet-n { position: absolute; top: -4px; right: -2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
-  background: var(--e); color: var(--sv-porcelaine); font-variant-numeric: tabular-nums; }
+.h-onglet-n { position: absolute; top: 0; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--sb-ambre-point); }
 .h-disque { flex: none; width: 64px; display: grid; place-items: center; }
 .h-disque .h-ico { width: 48px; height: 40px; padding: 7px 11px; border-radius: 14px; background: #0C1D30; color: #FFFFFF; box-shadow: 0 6px 14px -8px rgb(0 0 0 / .7); }
 :root[data-theme="dark"] .h-disque .h-ico { background: #F2F7FD; color: #0C1D30; }
@@ -198,14 +199,16 @@ button.h-ligne:active, button.h-colis:active { background: rgb(255 255 255 / .5)
 .is-large .h-plein { height: 40px; font-size: 15px; border-radius: 20px; }
 .is-large .h-rail { margin: 8px 0 0; padding: 0; }
 .is-large .h-rail-cran { height: 40px; }
-/* Deux colonnes : le « à faire » à gauche, le reste du poste à droite. */
-.is-large .h-corps { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); column-gap: 24px; align-items: start; }
-.is-large .h-corps > :is(.h-bande, .h-affiche) { grid-column: 1 / -1; }
-.is-large .h-bande { grid-template-columns: repeat(3, max-content); column-gap: 48px; }
-.is-large .h-corps > .h-section:nth-of-type(n + 2) { grid-column: 2; }
-.is-large .h-corps > .h-section:first-of-type { grid-column: 1; grid-row: span 6; }
+/* Deux colonnes : les groupes (ou les cartes de point) se rangent côte à côte. */
+.is-large .h-corps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; align-items: start; }
+.is-large .h-corps > :is(.h-affiche, .h-vide) { grid-column: 1 / -1; }
+.is-large .h-corps > .h-section:only-of-type { grid-column: 1 / -1; }
+.is-large .h-section[data-section="retirer"] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.is-large .h-section[data-section="retirer"] .h-plan + .h-plan { margin-top: 0; }
+.is-large .h-section:is([data-section="aranger"], [data-section="apublier"], [data-section="stock"], [data-section="annonces"], [data-section="ventes"], [data-section="arrives"], [data-section="route"], [data-section="achats"], [data-section="dorment"], [data-section="versements"]) .h-plan { columns: 2; column-gap: 0; }
 .is-large .h-cases { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .is-large .h-ligne { min-height: 60px; }
 .is-large .h-encore { grid-column: 2; }
 @media (hover: hover) { .h-ligne:hover, .h-colis:hover { background: rgb(255 255 255 / .35); } :root[data-theme="dark"] :is(.h-ligne, .h-colis):hover { background: rgb(255 255 255 / .05); } }
 @media (prefers-reduced-motion: reduce) { .h-racine * { transition: none !important; } }
+.h-plan .h-ligne { break-inside: avoid; }

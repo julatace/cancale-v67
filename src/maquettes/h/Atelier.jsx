@@ -84,7 +84,7 @@ const Ligne = ({ vignette, plaque, titre, sous, droite, droiteSous, ambre, onCli
 );
 const Section = ({ titre, n, sous, children, cle }) => (
   <section className="h-section" data-section={cle}>
-    <h2 className="h-section-titre">{titre}{n != null ? <span className="h-section-n">{n}</span> : null}{sous ? <span className="h-section-sous">{sous}</span> : null}</h2>
+    {titre ? <h2 className="h-section-titre">{titre}{n != null ? <span className="h-section-n">{n}</span> : null}{sous ? <span className="h-section-sous">{sous}</span> : null}</h2> : null}
     {children}
   </section>
 );
@@ -143,138 +143,131 @@ function gesteDe(cle, P) {
   return n && n[1] > 0 ? { mot: n[0], n: n[1] } : null;
 }
 
-function Recevoir({ M, P }) {
-  const r = P.recevoir; const t = M.maintenant;
-  return (
-    <>
-      <Bande items={[[nb(r.aRetirer && r.aRetirer.length), `à retirer${r.points ? ` · ${r.points.length} point${r.points.length > 1 ? 's' : ''}` : ''}`, true], [nb(r.arrives && r.arrives.length), 'arrivés, à numéroter'], [nb(r.enRoute && r.enRoute.length), 'en route']]} />
-      <Section titre="À retirer" sous="un point = une carte · code lu dans l’e-mail" cle="retirer">
-        {!r.points ? <PasLu quoi="e-mails des transporteurs" /> : !r.points.length ? <Vide texte="Rien à retirer." /> : r.points.map((p) => (
-          <div key={p.nom} className="h-plan h-point-carte" data-point="">
-            <div className="h-point-tete">
-              <span className="h-point-nom">{p.nom || 'Point pas lu dans l’e-mail'}</span>
-              <span className="h-ligne-val is-ambre"><span className="h-point" />{p.limite < 9e15 ? `avant ${jourCourt(new Date(p.limite).toISOString(), t)}` : 'date limite pas lue'}</span>
-              {p.adresse ? <span className="h-point-adr">{p.adresse}</span> : null}
-            </div>
-            {p.colis.map((c) => (
-              <button key={c.id} type="button" className="h-colis" data-colis={c.suivi}>
-                <span className="h-code" aria-label={`Code de retrait ${c.code || 'pas lu'}`}>{c.code || '—'}</span>
-                <span className="h-ligne-corps"><span className="h-ligne-nom">{c.art || 'Colis'}</span><span className="h-ligne-sous">{c.carrier === 'chronopost' ? 'Chronopost' : 'Mondial Relay'} · {c.suivi}</span></span>
-              </button>
-            ))}
-          </div>
-        ))}
-      </Section>
-      <Section titre="Arrivés — la paire attend son N°" n={r.arrives ? nb(r.arrives.length) : null} sous="relié par SON n° de transaction, à ton clic" cle="arrives">
-        {!r.arrives ? <PasLu quoi="achats" /> : <Plan max={6} total={r.arrives.length}>
-          {r.arrives.map((a) => <Ligne key={a._tx} cle={'a' + a._tx} vignette={a.photo && a.photo.url} titre={a.title} sous={`acheté sur ${M.loginDe(a._uid) || '—'} · arrivé ${jourCourt(a.date, t)}`} droite={euros(require0(a.price))} droiteSous="à numéroter" />)}
-        </Plan>}
-      </Section>
-    </>
-  );
-}
-const require0 = (p) => { const v = p && typeof p === 'object' ? p.amount : p; const n = Number(v); return Number.isFinite(n) ? Math.round(n * 100) : null; };
+// Julien (17 nov.) : « parfait, minimaliste et simple ». UN cran du rail = UNE liste ; aucun nombre écrit deux fois
+// (le rail porte les comptes, aucune bande ne les répète) ; aucune phrase d'explication (elles sont derrière le « ? »).
+const prix = (p) => { const v = p && typeof p === 'object' ? p.amount : p; const n = Number(v); return Number.isFinite(n) ? Math.round(n * 100) : null; };
+const parJour = (lignes, t) => {
+  const g = new Map();
+  for (const l of lignes) { const k = l.limite ? 'avant ' + jourCourt(new Date(l.limite).toISOString(), t) : 'estimée'; if (!g.has(k)) g.set(k, []); g.get(k).push(l); }
+  return [...g.entries()];
+};
+const LigneVente = ({ l, t }) => (
+  <Ligne cle={l.cle} vignette={l.paire ? l.paire.photo : (l.v.photo && l.v.photo.url)} plaque={l.paire ? l.paire.numero : null} titre={l.v.title}
+    sous={l.compte} droite={l.limite ? heure(l.limite) : 'estimée'} ambre={!!l.limite && l.limite - t < 36 * 3600e3} />
+);
+const LigneAchat = ({ a, M, t }) => (
+  <Ligne cle={'a' + a._tx} vignette={a.photo && a.photo.url} titre={a.title} sous={M.loginDe(a._uid) || '—'} droite={euros(prix(a.price))} droiteSous={jourCourt(a.date, t)} />
+);
+const LignePaire = ({ p, droite, ambre, droiteSous }) => (
+  <Ligne cle={'n' + p.k} vignette={p.photo} plaque={p.numero} titre={p.titre || '—'} sous={p.cases.length ? `case ${p.cases.join(', ')}` : p.compte} droite={droite} ambre={ambre} droiteSous={droiteSous} />
+);
+const LigneAnnonce = ({ a, M, t }) => (
+  <Ligne cle={'d' + a.id} vignette={a.photo} plaque={M.numParItem.has(a.id) ? M.paires.get(M.numParItem.get(a.id)).numero : null} titre={a.title} sous={M.loginDe(a.uid)}
+    droite={euros(prix(a.price))} droiteSous={a.cree ? `${Math.max(0, Math.round((t - Date.parse(a.cree)) / J))} j` : ''} />
+);
+const Groupes = ({ groupes, max, rendre }) => groupes.map(([k, ls], gi) => (
+  <Section key={k} titre={k} n={nb(ls.length)} cle={'g' + gi}><Plan max={max} total={ls.length}>{ls.map(rendre)}</Plan></Section>
+));
 
-function Ranger({ M, P, large }) {
-  const g = P.ranger;
+function Recevoir({ M, P, rail }) {
+  const r = P.recevoir; const t = M.maintenant;
+  if (rail === 'arrives') return !r.arrives ? <PasLu quoi="achats" /> : <Section cle="arrives"><Plan max={9} total={r.arrives.length}>{r.arrives.map((a) => <LigneAchat key={a._tx} a={a} M={M} t={t} />)}</Plan></Section>;
+  if (rail === 'route') return !r.enRoute ? <PasLu quoi="achats" /> : <Section cle="route"><Plan max={9} total={r.enRoute.length}>{r.enRoute.map((a) => <LigneAchat key={a._tx} a={a} M={M} t={t} />)}</Plan></Section>;
+  if (rail === 'histo') return !M.achats ? <PasLu quoi="achats" /> : <Section cle="achats"><Plan max={9} total={M.achats.length}>{[...M.achats].sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0)).map((a) => <LigneAchat key={a._tx} a={a} M={M} t={t} />)}</Plan></Section>;
+  if (!r.points) return <PasLu quoi="e-mails des transporteurs" />;
+  if (!r.points.length) return <Vide texte="Rien à retirer." />;
   return (
-    <>
-      <Bande items={[[nb(g.presentes), 'paires présentes'], [nb(g.cases.length), 'cases'], [nb(g.sansCase.length), 'sans case', g.sansCase.length > 0]]} />
-      <Section titre="À ranger maintenant" n={nb(g.sansCase.length)} sous="numérotées, aucune case notée" cle="aranger">
-        {!g.sansCase.length ? <Vide texte="Tout est rangé." /> : <Plan max={large ? 9 : 6} total={g.sansCase.length}>
-          {g.sansCase.map((p) => <Ligne key={p.k} cle={'n' + p.k} vignette={p.photo} plaque={p.numero} titre={p.titre || '—'} sous={[p.taille && `T${p.taille}`, p.compte].filter(Boolean).join(' · ')} droite="pas de case" ambre />)}
-        </Plan>}
-      </Section>
-      <Section titre="Les cases" sous="touche une case : ses paires" cle="cases">
-        <div className="h-cases">
-          {g.cases.slice(0, large ? 24 : 12).map((c) => (
-            <button key={c.nom} type="button" className="h-case" data-case={c.nom}>
-              <span className="h-case-nom">{c.nom}</span>
-              <span className="h-case-n">{c.nums.length} paire{c.nums.length > 1 ? 's' : ''}</span>
-              <span className="h-case-nums">{c.nums.slice(0, 3).map((n) => <Plaque key={n} n={n} />)}</span>
+    <Section cle="retirer">
+      {r.points.map((p) => (
+        <div key={p.nom} className="h-plan h-point-carte" data-point="">
+          <div className="h-point-tete">
+            <span className="h-point-nom">{p.nom || '—'}</span>
+            <span className="h-ligne-val is-ambre"><span className="h-point" />{p.limite < 9e15 ? `avant ${jourCourt(new Date(p.limite).toISOString(), t)}` : '—'}</span>
+            {p.adresse ? <span className="h-point-adr">{p.adresse}</span> : null}
+          </div>
+          {p.colis.map((c) => (
+            <button key={c.id} type="button" className="h-colis" data-colis={c.suivi}>
+              <span className="h-code" aria-label={`Code de retrait ${c.code || '—'}`}>{c.code || '—'}</span>
+              <span className="h-ligne-corps"><span className="h-ligne-nom">{c.art || '—'}</span></span>
             </button>
           ))}
         </div>
-      </Section>
-    </>
+      ))}
+    </Section>
   );
 }
 
-function Publier({ M, P, large }) {
+function Ranger({ M, P, rail, large }) {
+  const g = P.ranger;
+  if (rail === 'cases') return (
+    <Section cle="cases"><div className="h-cases">
+      {g.cases.slice(0, large ? 24 : 15).map((c) => (
+        <button key={c.nom} type="button" className="h-case" data-case={c.nom}><span className="h-case-nom">{c.nom}</span><span className="h-case-n">{c.nums.length}</span></button>
+      ))}
+    </div></Section>
+  );
+  if (rail === 'doublons') return !g.doublons.length ? <Vide texte="Aucun N° porté par deux paires." /> : <Section cle="doublons"><Plan>{g.doublons.map((p) => <LignePaire key={p.k} p={p} droite="2 annonces" />)}</Plan></Section>;
+  if (rail === 'histo') { const l = [...M.paires.values()].filter((p) => !p.vente).sort((a, b) => b.numero.localeCompare(a.numero, 'fr', { numeric: true })); return <Section cle="stock"><Plan max={9} total={l.length}>{l.map((p) => <LignePaire key={p.k} p={p} />)}</Plan></Section>; }
+  if (!g.sansCase.length) return <Vide texte="Tout est rangé." />;
+  return <Section cle="aranger"><Plan max={9} total={g.sansCase.length}>{g.sansCase.map((p) => <LignePaire key={p.k} p={p} droite="sans case" ambre />)}</Plan></Section>;
+}
+
+function Publier({ M, P, rail }) {
   const u = P.publier; const t = M.maintenant;
-  return (
-    <>
-      <Bande items={[[nb(u.enLigne && u.enLigne.length), 'en ligne'], [nb(u.aPublier.length), 'à publier', u.aPublier.length > 0], [nb(u.dorment && u.dorment.length), 'qui dorment']]} />
-      <Section titre="À publier" n={nb(u.aPublier.length)} sous="rangées, en ligne nulle part" cle="apublier">
-        {!u.aPublier.length ? <Vide texte="Tout ce qui est rangé est en ligne." /> : <Plan max={large ? 8 : 5} total={u.aPublier.length}>
-          {u.aPublier.map((p) => <Ligne key={p.k} cle={'p' + p.k} vignette={p.photo} plaque={p.numero} titre={p.titre || '—'} sous={`case ${p.cases.join(' et ')}${p.cout != null ? ` · achetée ${euros(p.cout)}` : ''}`} droite="à publier" ambre />)}
-        </Plan>}
-      </Section>
-      <Section titre="Qui dorment" n={u.dorment ? nb(u.dorment.length) : null} sous="en ligne depuis plus de 60 j" cle="dorment">
-        {!u.dorment ? <PasLu quoi="annonces" /> : !u.dorment.length ? <Vide texte="Aucune annonce ne dort." /> : <Plan max={large ? 6 : 4} total={u.dorment.length}>
-          {[...u.dorment].sort((a, b) => Date.parse(a.cree) - Date.parse(b.cree)).map((a) => <Ligne key={a.id} cle={'d' + a.id} vignette={a.photo} plaque={M.numParItem.has(a.id) ? M.paires.get(M.numParItem.get(a.id)).numero : null} titre={a.title} sous={`${M.loginDe(a.uid)} · ${a.fav} favoris · ${a.vues} vues`} droite={euros(require0(a.price))} droiteSous={`${Math.round((t - Date.parse(a.cree)) / J)} j`} />)}
-        </Plan>}
-      </Section>
-    </>
-  );
+  if (rail === 'dorment') return !u.dorment ? <PasLu quoi="annonces" /> : <Section cle="dorment"><Plan max={9} total={u.dorment.length}>{[...u.dorment].sort((a, b) => Date.parse(a.cree) - Date.parse(b.cree)).map((a) => <LigneAnnonce key={a.id} a={a} M={M} t={t} />)}</Plan></Section>;
+  if (rail === 'sansnum') return !u.sansNumero ? <PasLu quoi="annonces" /> : !u.sansNumero.length ? <Vide texte="Chaque annonce a son N°." /> : <Section cle="sansnum"><Plan max={9} total={u.sansNumero.length}>{u.sansNumero.map((a) => <LigneAnnonce key={a.id} a={a} M={M} t={t} />)}</Plan></Section>;
+  if (rail === 'histo') return !u.enLigne ? <PasLu quoi="annonces" /> : <Section cle="annonces"><Plan max={9} total={u.enLigne.length}>{[...u.enLigne].sort((a, b) => Date.parse(b.cree || 0) - Date.parse(a.cree || 0)).map((a) => <LigneAnnonce key={a.id} a={a} M={M} t={t} />)}</Plan></Section>;
+  if (!u.aPublier.length) return <Vide texte="Tout ce qui est rangé est en ligne." />;
+  return <Section cle="apublier"><Plan max={9} total={u.aPublier.length}>{u.aPublier.map((p) => <LignePaire key={p.k} p={p} droite={p.cout != null ? euros(p.cout) : '—'} droiteSous="achat" />)}</Plan></Section>;
 }
 
-function Poster({ M, P, large }) {
+function Poster({ M, P, rail, large }) {
   const o = P.poster; const t = M.maintenant; const r = P.recevoir;
   if (!o.envoyer) return <PasLu quoi="ventes" />;
-  const lues = o.envoyer.filter((l) => l.limite);
-  const demain = lues.filter((l) => l.limite - t < 36 * 3600e3).length;
-  // Groupes par jour de la date limite LUE ; « estimation » à part (vente + 7 j, un plancher, jamais « en retard »).
-  const groupes = new Map();
-  for (const l of o.envoyer) { const k = l.limite ? 'avant ' + jourCourt(new Date(l.limite).toISOString(), t) : 'date limite pas lue · estimée'; if (!groupes.has(k)) groupes.set(k, []); groupes.get(k).push(l); }
-  const parTransp = new Map();
-  for (const l of o.aImprimer || []) { const k = /^XW/.test(l.bord.suivi) ? 'Colissimo' : /^\d/.test(l.bord.suivi) ? 'Mondial Relay' : 'Transporteur pas lu'; parTransp.set(k, (parTransp.get(k) || 0) + 1); }
-  const lignes = [...groupes.entries()];
-  const maxG = large ? 3 : 2;
-  return (
-    <>
-      <Bande items={[[nb(o.envoyer.length), 'à envoyer'], [nb(demain), 'avant demain soir', demain > 0], [nb(o.aImprimer.length), 'bordereaux prêts']]} />
-      {lignes.slice(0, maxG).map(([k, ls], gi) => (
-        <Section key={k} titre={k} n={nb(ls.length)} sous={gi === 0 && ls[0].limite ? 'date lue dans l’e-mail du bordereau' : ''} cle={'g' + gi}>
-          <Plan max={gi === 0 ? (large ? 6 : 4) : 3} total={ls.length}>
-            {ls.map((l) => <Ligne key={l.cle} cle={l.cle} vignette={l.paire ? l.paire.photo : (l.v.photo && l.v.photo.url)} plaque={l.paire ? l.paire.numero : null} titre={l.v.title}
-              sous={[l.compte, l.pseudo && `à ${l.pseudo}`].filter(Boolean).join(' · ')} droite={l.limite ? `${heure(l.limite)}` : 'estimée'} ambre={!!l.limite && l.limite - t < 36 * 3600e3}
-              droiteSous={l.bord ? 'bordereau prêt' : 'pas de bordereau'} />)}
-          </Plan>
-        </Section>
-      ))}
-      {lignes.length > maxG ? <div className="h-encore">{lignes.slice(maxG).map(([k, ls]) => `${k} · ${ls.length}`).join('   ')}</div> : null}
-      <Section titre="Ta tournée" sous="une seule sortie" cle="tournee">
-        <div className="h-plan h-tournee">
-          {[...parTransp.entries()].map(([k, n]) => <div key={k} className="h-tournee-l"><span className="h-tournee-v">Déposer {n}</span><span className="h-ligne-sous">{k}</span></div>)}
-          {r.points && r.points.length ? <div className="h-tournee-l"><span className="h-tournee-v">Retirer {r.aRetirer.length}</span><span className="h-ligne-sous">{r.points.map((p) => p.nom).join(' · ')}</span></div> : null}
-        </div>
-      </Section>
-    </>
-  );
+  if (rail === 'histo') return !M.ventes ? <PasLu quoi="ventes" /> : <Section cle="ventes"><Plan max={9} total={M.ventes.length}>{[...M.ventes].sort((a, b) => (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0)).map((v) => { const k = M.numParItem.get(v._item); const p = k ? M.paires.get(k) : null; return <Ligne key={v._tx} cle={'v' + v._tx} vignette={p ? p.photo : (v.photo && v.photo.url)} plaque={p ? p.numero : null} titre={v.title} sous={M.loginDe(v._uid)} droite={euros(prix(v.price))} droiteSous={jourCourt(v.date, t)} />; })}</Plan></Section>;
+  if (rail === 'tournee') {
+    const parTransp = new Map();
+    for (const l of o.aImprimer) { const k = /^XW/.test(l.bord.suivi) ? 'Colissimo' : 'Transporteur pas lu'; parTransp.set(k, (parTransp.get(k) || 0) + 1); }
+    return (
+      <Section cle="tournee"><div className="h-plan h-tournee">
+        {[...parTransp.entries()].map(([k, n]) => <div key={k} className="h-tournee-l"><span className="h-tournee-v">Déposer {n}</span><span className="h-ligne-sous">{k}</span></div>)}
+        {r.points ? r.points.map((p) => <div key={p.nom} className="h-tournee-l"><span className="h-tournee-v">Retirer {p.colis.length}</span><span className="h-ligne-sous">{p.nom}</span></div>) : null}
+      </div></Section>
+    );
+  }
+  const lignes = rail === 'attente' ? o.sansBord : o.aImprimer;
+  if (!lignes.length) return <Vide texte={rail === 'attente' ? 'Chaque vente a son bordereau.' : 'Rien à imprimer.'} />;
+  return <Groupes groupes={parJour(lignes, t).slice(0, large ? 4 : 3)} max={large ? 9 : 5} rendre={(l) => <LigneVente key={l.cle} l={l} t={t} />} />;
 }
 
-function Encaisser({ M, P, large }) {
+function Encaisser({ M, P, rail }) {
   const e = P.encaisser; const t = M.maintenant;
-  const mois = new Date(t).toLocaleDateString('fr-FR', { month: 'long', timeZone: 'Europe/Paris' });
+  const LigneVersee = (x) => <Ligne key={x.v._tx} cle={'v' + x.v._tx} vignette={x.paire ? x.paire.photo : (x.v.photo && x.v.photo.url)} plaque={x.paire ? x.paire.numero : null} titre={x.v.title} sous={jourCourt(x.le, t)} droite={euros(prix(x.v.price))} droiteSous={x.paire && x.paire.marge != null ? euros(x.paire.marge, { signe: true }) : '—'} />;
+  if (rail === 'mois') return (
+    <>
+      <div className="h-affiche" data-affiche=""><span className="h-affiche-v">{e.recuMois == null ? '—' : euros(e.recuMois)}</span><span className="h-affiche-l">reçu en {new Date(t).toLocaleDateString('fr-FR', { month: 'long', timeZone: 'Europe/Paris' })}</span></div>
+      {!e.ceMois ? <PasLu quoi="transactions" /> : <Section cle="mois"><Plan max={7} total={e.ceMois.length}>{e.ceMois.map(LigneVersee)}</Plan></Section>}
+    </>
+  );
+  if (rail === 'urssaf') return (
+    <>
+      <div className="h-affiche" data-affiche=""><span className="h-affiche-v">—</span><span className="h-affiche-l">URSSAF du mois</span></div>
+      <Section cle="urssaf"><Plan><Ligne cle="statut" titre="Choisir ton statut" droite="à faire" ambre /></Plan></Section>
+    </>
+  );
+  if (rail === 'histo') return !e.versees ? <PasLu quoi="transactions" /> : <Section cle="versements"><Plan max={9} total={e.versees.length}>{e.versees.map(LigneVersee)}</Plan></Section>;
   return (
     <>
       <div className="h-affiche" data-affiche="">
         <span className="h-affiche-v">{e.solde ? euros(e.solde.dispo) : '—'}</span>
-        <span className="h-affiche-l">disponible sur Vinted{e.solde ? ` · ${e.solde.n} compte${e.solde.n > 1 ? 's' : ''}` : ''}</span>
+        <span className="h-affiche-l">disponible{e.solde ? ` · ${euros(e.solde.attente)} en attente` : ''}</span>
       </div>
-      <Bande items={[[e.solde ? euros(e.solde.attente) : '—', 'en attente'], [e.recuMois == null ? '—' : euros(e.recuMois), `reçu en ${mois} · ${e.ceMois ? e.ceMois.length : '—'} vers.`], ['—', 'URSSAF · statut pas choisi']]} />
-      <Section titre="À faire" cle="afaire">
+      <Section cle="afaire">
         <Plan>
-          <Ligne cle="couts" titre="Prix d’achat à saisir" sous={`${nb(e.vendues - e.sansCout.length)} sur ${nb(e.vendues)} ventes connus : le bénéfice attend le reste`} droite={nb(e.sansCout.length)} ambre={e.sansCout.length > 0} />
-          <Ligne cle="statut" titre="Ton statut URSSAF" sous="pas choisi : rien n’est deviné, le montant reste « — »" droite="choisir" ambre />
-          <Ligne cle="virer" titre="Virer vers ta banque" sous="se fait sur Vinted, VRM ouvre la page" droite={e.solde ? euros(e.solde.dispo) : '—'} />
+          <Ligne cle="couts" titre="Prix d’achat à saisir" droite={nb(e.sansCout.length)} ambre={e.sansCout.length > 0} />
+          <Ligne cle="statut" titre="Statut URSSAF" droite="à choisir" ambre />
+          <Ligne cle="virer" titre="Virer vers ta banque" droite={e.solde ? euros(e.solde.dispo) : '—'} />
         </Plan>
-      </Section>
-      <Section titre="Derniers versements" sous="datés au jour du versement" cle="versements">
-        {!e.versees ? <PasLu quoi="transactions" /> : <Plan max={large ? 8 : 5} total={e.versees.length}>
-          {e.versees.map((x) => <Ligne key={x.v._tx} cle={'v' + x.v._tx} vignette={x.paire ? x.paire.photo : (x.v.photo && x.v.photo.url)} plaque={x.paire ? x.paire.numero : null} titre={x.v.title} sous={`versé ${jourCourt(x.le, t)} · ${M.loginDe(x.v._uid)}`} droite={euros(require0(x.v.price))} droiteSous={x.paire && x.paire.marge != null ? `marge ${euros(x.paire.marge, { signe: true })}` : 'marge —'} />)}
-        </Plan>}
       </Section>
     </>
   );
@@ -309,7 +302,7 @@ function Scanner({ M, code, fermer, aller }) {
           </div>
         ) : r ? (
           <div className="h-plan"><div className="h-vide">Aucune identité exacte pour « {r.q} ».{r.ressemble.length ? ` ${r.ressemble.length} titre${r.ressemble.length > 1 ? 's' : ''} ressemble${r.ressemble.length > 1 ? 'nt' : ''} — à toi de choisir, rien n’est relié.` : ''}</div></div>
-        ) : <div className="h-scan-aide">Un N° de carton, un n° de suivi, un code de retrait, un n° de transaction : VRM ouvre le bon poste.</div>}
+        ) : null}
       </div>
     </div>
   );
@@ -358,19 +351,18 @@ export default function Atelier() {
       <main className="h-main">
         <header className="h-tete">
           <div className="h-tete-l">
-            {!large ? <span className="h-etape">Poste {POSTES.indexOf(poste) + 1} sur 5</span> : null}
             <h1 className="h-titre">{poste.nom}</h1>
             <button type="button" className="h-rond-aide" aria-label="Comment marche ce poste"><Ico n="aide" t={20} /></button>
             {large ? <span className="h-tete-geste">{Plein}</span> : null}
           </div>
           <Rail items={rail} actif={route.rail || 'faire'} choisir={(c) => aller({ poste: poste.cle, rail: c })} />
         </header>
-        <div className="h-corps"><Ecran M={M} P={P} large={large} /></div>
+        <div className="h-corps"><Ecran M={M} P={P} large={large} rail={route.rail || 'faire'} /></div>
       </main>
       {!large ? (
         <div className="h-bas">
           <div className="h-plateau" data-plateau="">
-            <label className="h-champ h-champ--plateau"><Ico n="loupe" t={18} /><input placeholder={`Chercher dans ${poste.court}`} aria-label={`Chercher dans ${poste.nom}`} /></label>
+            <label className="h-champ h-champ--plateau"><Ico n="loupe" t={18} /><input placeholder="Chercher" aria-label={`Chercher dans ${poste.nom}`} /></label>
             {Plein}
           </div>
           <nav className="h-barre" aria-label="Postes">
@@ -386,7 +378,7 @@ export default function Atelier() {
 }
 const Onglet = ({ p, actif, n, choisir }) => (
   <button type="button" className="h-onglet" aria-current={actif ? 'page' : undefined} onClick={() => choisir(p.cle)} data-poste-nav={p.cle}>
-    <span className="h-onglet-i"><Ico n={ICONE_POSTE[p.cle]} t={23} />{n ? <span className="h-onglet-n">{n > 99 ? '99+' : n}</span> : null}</span>
+    <span className="h-onglet-i"><Ico n={ICONE_POSTE[p.cle]} t={23} />{n ? <span className="h-onglet-n" aria-label={`${n} à faire`} /> : null}</span>
     <span className="h-onglet-mot">{p.court}</span>
   </button>
 );
