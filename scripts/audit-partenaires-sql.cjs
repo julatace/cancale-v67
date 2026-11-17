@@ -39,6 +39,8 @@ const MUTATIONS = {
   'deux-par-mois': { sql: (s) => remplace(s, 'create unique index if not exists partenaire_commissions_un_par_mois\n  on public.partenaire_commissions (filleul, mois) where annulee_le is null;\n', '', 'dpm') },
   'due-immediate': { sql: (s) => remplace(s, "  check (due_le >= paye_le + interval '14 days'),\n", '', 'di') },
   'annulee-sans-raison': { sql: (s) => remplace(s, ',\n  check ((annulee_le is null) = (annulee_raison is null))', '', 'asr') },
+  'rembourse-tout-vivant': { sql: (s) => remplace(s, "  check (rembourse_centimes < facture_centimes or annulee_le is not null),\n", '', 'rtv') },
+  'signal-deux-fois': { sql: (s) => remplace(s, ',\n  primary key (cle, signal)', '', 'sdf') },
   'serveur-supprime': { apres: 'grant delete on public.partenaire_commissions to service_role;' },
 };
 if (args.includes('--prouve')) {
@@ -135,7 +137,10 @@ const com = (o = {}) => `insert into public.partenaire_commissions (facture, par
     Q(SERV + `insert into public.partenaire_filleuls (filleul, partenaire, code) values ('${U.B}', '${PA}', 'LEO');`);
     Q(SERV + com());
     Q(SERV + `insert into public.partenaire_versements (partenaire, mois, montant_centimes, verse_le) values ('${PB}', '2026-10', 900, '2026-11-15');`);
-    Q(SERV + `insert into public.partenaire_annulations (cle, raison) values ('pi_x1', 'litige');`);
+    Q(SERV + `insert into public.partenaire_annulations (cle, signal, raison) values ('pi_x1', 'litige', 'litige');`);
+    // (16 nov.) Un remboursement partiel : une ligne par geste de Stripe, le même deux fois refusé.
+    Q(SERV + `insert into public.partenaire_annulations (cle, signal, raison, centimes) values ('ch_x1', 're_1', 'remboursement', 100), ('ch_x1', 're_2', 'remboursement', 50);`);
+    dit(Q(SERV + `select count(*) from public.partenaire_annulations where cle = 'ch_x1';`) === '2', 'deux remboursements partiels du même paiement : deux lignes (16 nov.)');
     dit(Q(SERV + 'select count(*) from public.partenaire_commissions;') === '1', 'la clé de service range une commission et la relit');
     dit(Q(SERV + `select count(*) from public.partenaires where jeton_empreinte = '${'a'.repeat(64)}';`) === '1' && Q(SERV + `select code from public.partenaires where jeton_empreinte = '${'a'.repeat(64)}';`) === 'LEO', 'un jeton désigne UN partenaire (le sien)');
     const del = run(SERV + `delete from public.partenaire_commissions where facture = 'in_a1';`);
@@ -175,6 +180,10 @@ const com = (o = {}) => `insert into public.partenaire_commissions (facture, par
     refus('un 2e paiement du même client le même mois est refusé', com({ facture: 'in_a3' }), /duplicate|unique/);
     refus('due avant 14 jours est refusée', com({ facture: 'in_a4', mois: '2026-11', paye: '2026-11-08T09:30:00Z', due: '2026-11-10T09:30:00Z' }), /check/);
     refus('« annulée » sans sa raison est refusée', com({ facture: 'in_a5', mois: '2026-09', paye: '2026-09-08T09:30:00Z', due: '2026-09-22T09:30:00Z', annulee: true, raison: null }), /check/);
+    refus('le même geste de Stripe rangé deux fois est refusé (16 nov.)', `insert into public.partenaire_annulations (cle, signal, raison, centimes) values ('ch_x1', 're_1', 'remboursement', 100);`, /duplicate|unique/);
+    refus('un signal sans forme connue est refusé (16 nov.)', `insert into public.partenaire_annulations (cle, signal, raison) values ('ch_x1', 'n importe quoi', 'remboursement');`, /check/);
+    refus('un remboursement de toute la facture sans annulation est refusé (16 nov.)', `update public.partenaire_commissions set rembourse_centimes = 1699 where facture = 'in_a1';`, /check/);
+    dit(run(SERV + `update public.partenaire_commissions set rembourse_centimes = 100 where facture = 'in_a1';`).ok, 'un remboursement partiel se range sur la commission (16 nov.)');
     refus('un code en minuscules est refusé', `insert into public.partenaires (code, nom) values ('leo', 'Leo bis');`, /check/);
     refus('un code déjà pris est refusé', `insert into public.partenaires (code, nom) values ('LEO', 'Leo bis');`, /duplicate|unique/);
     refus('un même jeton pour deux partenaires est refusé', `insert into public.partenaires (code, nom, jeton_empreinte) values ('ZED', 'Zed', '${'a'.repeat(64)}');`, /duplicate|unique/);

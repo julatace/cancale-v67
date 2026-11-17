@@ -4,6 +4,7 @@
 // absente d'une langue, une variable `{x}` qui n'est pas la même partout, ou un pluriel
 // sans `other`. Clés : `<écran>.<élément>[.<précision>]`, jamais le texte lui-même.
 // Pluriel : { one: '…', other: '…' } choisi par `n` (Intl.PluralRules).
+import ecran_suivi_vente from './fr/suiviVente.js';   // (16 nov.) le suivi des colis vendus
 import ecran_perso from './fr/perso.js';   // (16 nov.) « Modifier ma journée » simple
 import ecran_ventesVerre from './fr/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
 import ecran_journee from './fr/journee.js';
@@ -13,7 +14,8 @@ import ecran_correspondances from './fr/correspondances.js';   // (15 nov.) Publ
 import ecran_capte from './fr/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_avenir from './fr/avenir.js';
 import ecran_verre2 from './fr/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
-import ecran_fiched from './fr/fiched.js';   // (15 nov.) la fiche d'un article, direction D
+import ecran_fiched from './fr/fiched.js';
+import ecran_ecrans_restes from './fr/ecransRestes.js';   // (16 nov.) lot ecrans-restes : stock importé, date limite, loupe   // (15 nov.) la fiche d'un article, direction D
 import ecran_vcventes from './fr/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
 import ecran_transporteur_connu from './fr/transporteurConnu.js';   // (15 nov.) « À expédier » : transporteur connu
 import ecran_vendre from './fr/vendre.js';   // (15 nov., vendre plus) baisses conseillées, relance des favoris, loupe
@@ -51,13 +53,15 @@ import ecran_plus from './fr/plus.js';
 import ecran_plateformes from './fr/plateformes.js';
 import ecran_colisplus from './fr/colisplus.js';   // (14 nov., lot colis-plus)
 import ecran_studioventes from './fr/studioventes.js';   // (14 nov., Studio bleu clair) Ventes et Achats
-import ecran_impression from './fr/impression.js';   // (14 nov., impression-simple)
+import ecran_impression from './fr/impression.js';
+import ecran_tampons from './fr/tampons.js';   // (16 nov., lot tampons-parametres)   // (14 nov., impression-simple)
 import ecran_accueilReste from './fr/accueilReste.js';
 import ecran_fraiscarte from './fr/fraiscarte.js';   // (14 nov., frais-carte)
 import ecran_atelier from './fr/atelier.js';
 import ecran_accompagnement from './fr/accompagnement.js';   // (14 nov.) les quatre moments d'un geste
 import ecran_partenaires from './fr/partenaires.js';   // (15 nov.) programme partenaire
 import ecran_argentprix from './fr/argentprix.js';   // (14 nov., argent-prix)
+import ecran_argentMieux from './fr/argentMieux.js';   // (16 nov., argent-mieux)
 import ecran_argentPlus from './fr/argentPlus.js';   // (15 nov., lot argent-plus)
 import ecran_rechliste from './fr/rechliste.js';
 import ecran_studio_paires from './fr/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
@@ -91,6 +95,7 @@ export default {
   ...ecran_accompagnement,
   ...ecran_plus,
   ...ecran_argentprix,
+  ...ecran_argentMieux,
   ...ecran_argentPlus,
   ...ecran_partenaires,
   ...ecran_plateformes,
@@ -100,6 +105,7 @@ export default {
   ...ecran_colisplus,
   ...ecran_studioventes,
   ...ecran_impression,
+  ...ecran_tampons,
   ...ecran_stats,
   ...ecran_emails,
   ...ecran_messages,
@@ -826,6 +832,7 @@ export default {
   "favoris.sousTitreCompte": "Compte {compte} · écris à ceux qui aiment tes annonces.",
   "favoris.actualiser": "Actualiser",
   "favoris.outils": "Plus d’outils",
+  "versions.uneSeule": "Une version : si elle vient de partir, seule la salutation change (Bonjour, Salut, Hello).",   // (16 nov.) une seule version : la salutation varie
   "favoris.duree.secondes": { one: "{n} s", other: "{n} s" },
   "favoris.duree.minutes": { one: "{n} min", other: "{n} min" },
   "favoris.duree.heures": { one: "{n} h", other: "{n} h" },
@@ -1207,6 +1214,7 @@ export default {
   "sante.i.fraicheur": "Dernière lecture",
   "sante.v.note": {one: "{note}/5 · {n} avis", other: "{note}/5 · {n} avis"},
   "sante.v.avisBas": "{n} sur les {sur} derniers",
+  "sante.v.avisArrives": {one: "dont {n} arrivé {quand}", other: "dont {n} arrivés ces 14 jours, le dernier {quand}"},
   "sante.v.delai": {one: "{duree} · sur {n} colis", other: "{duree} · sur {n} colis"},
   "sante.v.retards": "{n} sur {sur} colis",
   "sante.v.enRetard": {one: "{n} encore à poster", other: "{n} encore à poster"},
@@ -1225,6 +1233,7 @@ export default {
   "sante.r.enRetard": {one: "{n} colis à poster après sa date limite", other: "{n} colis à poster après leur date limite"},
   "sante.r.annulees": {one: "{n} vente annulée (30 j)", other: "{n} ventes annulées (30 j)"},
   "sante.r.avisBas": {one: "{n} avis de 3★ ou moins parmi les 10 derniers", other: "{n} avis de 3★ ou moins parmi les 10 derniers"},
+  "sante.r.avisArrives": {one: "{n} avis de 3★ ou moins arrivé ces 14 jours", other: "{n} avis de 3★ ou moins arrivés ces 14 jours"},
   "sante.r.note": "Note Vinted {note}/5",
   "sante.r.delai": "Envoi en {duree} (médiane, 30 j)",
   "sante.journee.un": "{nom} à surveiller",
@@ -2160,6 +2169,7 @@ export default {
   "creerVinted.photo.retirer": "Retirer la photo {n}",
   "creerVinted.photo.lecture": "Lecture…",
   "creerVinted.photo.ajouter": "Ajouter des photos",
+  "creerVinted.photo.studio": {one: "{n} photo de ton studio reprise : retire-la ou ajoutes-en.", other: "{n} photos de ton studio reprises : retire-les ou ajoutes-en."},
   "creerVinted.fait": "Brouillon prêt sur Vinted ✓",
   "creerVinted.ouvrir": "Ouvrir sur Vinted",
   "creerVinted.aFinir": "À choisir sur Vinted : {liste}",
@@ -2307,6 +2317,7 @@ export default {
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_liaison,
+  ...ecran_suivi_vente,
   ...ecran_transporteur_connu,
   ...ecran_vendre,
   ...ecran_ebaytableau,
@@ -2317,6 +2328,7 @@ export default {
   ...ecran_avenir,
   ...ecran_verre2,
   ...ecran_fiched,
+  ...ecran_ecrans_restes,
   ...ecran_numeros_nouvelles,
   ...ecran_republie_telephone,
   ...ecran_securite_ventes,

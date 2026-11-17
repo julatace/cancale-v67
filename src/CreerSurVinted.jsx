@@ -21,7 +21,7 @@ import { tr } from './i18n/index.js';
 import { AccAvant, AccEchec } from './ui/Accompagne.jsx';   // (14 nov.) ce qui va se passer, et ce qui ne se passera pas
 import { useLangue } from './i18n/react.js';
 import { lancerTravail } from './suiviTravail.js';
-import { texteAnnonceVinted, manquesFiche, payloadFiche, issueCreation, questionOk, filtrerOptions, PHOTOS_MAX } from './annonceVinted.js';
+import { texteAnnonceVinted, manquesFiche, payloadFiche, issueCreation, questionOk, filtrerOptions, PHOTOS_MAX, photosStudioPourVinted } from './annonceVinted.js';
 import './styles-creer-vinted.css';
 import ApercuAnnonce from './ApercuAnnonce.jsx';   // (14 nov., lot 128) l'annonce telle que l'acheteur la verra (rendu local, aucune requête)
 
@@ -80,7 +80,7 @@ export function demanderValeurVinted(q, fiche) {
 // TAPENT ici — une fiche née ailleurs (« Achetés, pas en ligne ») n'a souvent ni prix ni description.
 // Rien n'est deviné : ce qu'il tape part dans le brouillon, et `onSaisie` le garde sur sa fiche.
 const CHAMPS_SAISIS = ['titre', 'prix', 'description'];
-export default function CreerSurVinted({ fiches = [], compteOnglet, extRaison = '', reglages = {}, envoyer, onCree, onFermer, Retour = null, demander = demanderValeurVinted, entreMs = null, saisie = false, onSaisie = null }) {
+export default function CreerSurVinted({ fiches = [], compteOnglet, extRaison = '', reglages = {}, envoyer, onCree, onFermer, Retour = null, demander = demanderValeurVinted, entreMs = null, saisie = false, onSaisie = null, lireStudio = null }) {
   useLangue();
   const [tape, setTape] = React.useState({});
   const ficheDe = (f) => (saisie && tape[f.id] ? { ...f, ...Object.fromEntries(Object.entries(tape[f.id]).filter(([, v]) => String(v).trim() !== '')) } : f);
@@ -88,6 +88,26 @@ export default function CreerSurVinted({ fiches = [], compteOnglet, extRaison = 
   const aTaper = (f) => (saisie ? CHAMPS_SAISIS.filter((k) => manquesFiche(f, ['x']).includes(k)) : []);
   const [photos, setPhotos] = React.useState(() => Object.fromEntries(fiches.map((f) => [f.id, (Array.isArray(f.photos) ? f.photos : []).filter((u) => typeof u === 'string').slice(0, PHOTOS_MAX)])));
   const [lecture, setLecture] = React.useState('');
+  // (16 nov., lot extension-restes) Une fiche SANS photo prend celles de SON studio (`studio_photos_{N°}`, par le N°
+  // de la fiche — jamais un titre) : reprises une fois à l'ouverture, dites, retirables. Une photo ajoutée entre-temps
+  // ou une lecture ratée (null) : rien n'est remplacé.
+  const [duStudio, setDuStudio] = React.useState({});
+  React.useEffect(() => {
+    if (typeof lireStudio !== 'function') return undefined;
+    let vivant = true;
+    for (const f of fiches) {
+      if (!f || !f.id || !String(f.numero == null ? '' : f.numero).trim() || (Array.isArray(f.photos) && f.photos.length)) continue;
+      Promise.resolve(lireStudio(f.numero)).then((r) => {
+        if (!vivant) return;
+        const l = photosStudioPourVinted(r);
+        if (!l.length) return;
+        setPhotos((p) => ((p[f.id] || []).length ? p : { ...p, [f.id]: l }));
+        setDuStudio((d) => ({ ...d, [f.id]: l.length }));
+      }, () => {});
+    }
+    return () => { vivant = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [confirme, setConfirme] = React.useState(false);
   const [faits, setFaits] = React.useState({});
   const [enCours, setEnCours] = React.useState(false);
@@ -200,6 +220,7 @@ export default function CreerSurVinted({ fiches = [], compteOnglet, extRaison = 
                   <span className="vrm-cv-num">N°{f.numero}</span>
                   <span className="vrm-cv-txt"><b>{texte.ok ? texte.titre : (f.titre || tr('creerVinted.sansTitre'))}</b><small>{[f.marque, f.taille, f.etat, prixTexte(f.prix)].filter(Boolean).join(' · ')}</small></span>
                 </div>
+                {duStudio[f.id] && !fait ? <p className="vrm-cv-studio" data-creer-vinted-studio={duStudio[f.id]}>{tr('creerVinted.photo.studio', { n: duStudio[f.id] })}</p> : null}
                 <div className="vrm-cv-photos" data-creer-vinted-photos={ph.length}>
                   {ph.map((u, i) => <span key={i} className="vrm-cv-photo" style={{ position: 'relative' }}><img src={u} alt=""/><span className="vrm-cv-avis" style={{ position: 'absolute', left: 4, bottom: 4, maxWidth: 'calc(100% - 8px)' }}><AvisPhoto src={u}/></span>{!fait && !enCours && <button type="button" aria-label={tr('creerVinted.photo.retirer', { n: i + 1 })} onClick={() => retirer(f.id, i)}>×</button>}</span>)}
                   {!fait && <button type="button" className="vrm-cv-ajout" disabled={enCours || lecture === f.id || ph.length >= PHOTOS_MAX} onClick={() => inputs.current[f.id] && inputs.current[f.id].click()} data-creer-vinted-ajouter={f.numero}>{lecture === f.id ? tr('creerVinted.photo.lecture') : tr('creerVinted.photo.ajouter')}</button>}

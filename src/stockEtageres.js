@@ -133,6 +133,19 @@ export function deplacerMeuble(meubles, id, sens) {
   return (Array.isArray(meubles) ? meubles : []).map((m) => (m && m.id != null && place.has(String(m.id)) ? { ...m, ordre: place.get(String(m.id)) } : m));
 }
 
+// (16 nov., lot design-restes) « Monter / descendre » AU DOIGT : le meuble glissé est posé au rang `vers` (0 = en haut),
+// les autres gardent leur ordre relatif. Même écriture que les touches (`ordre` seulement) ; rien ne bouge ⇒ null.
+export function placerMeuble(meubles, id, vers) {
+  const l = ordonner(meubles);
+  const k = l.findIndex((m) => String(m.id) === String(id));
+  if (k < 0 || !Number.isFinite(Number(vers))) return null;
+  const j = Math.max(0, Math.min(l.length - 1, Math.round(Number(vers))));
+  if (j === k) return null;
+  const tri = l.slice(); const [x] = tri.splice(k, 1); tri.splice(j, 0, x);
+  const place = new Map(tri.map((m, n) => [String(m.id), n]));
+  return (Array.isArray(meubles) ? meubles : []).map((m) => (m && m.id != null && place.has(String(m.id)) ? { ...m, ordre: place.get(String(m.id)) } : m));
+}
+
 // ── LA GRAVITÉ ────────────────────────────────────────────────────────────────
 // Tasse chaque colonne en pile de chaque meuble. Rend { slots, descentes } ; `slots` est
 // le MÊME objet si rien ne bouge. `descentes` : [{ cle, m, de, a, crans }] (de/a = index

@@ -1,4 +1,10 @@
-# Allumer le suivi Colissimo et UPS dans VRM — le pas-à-pas (13 nov. 2026)
+# Allumer le suivi Colissimo et UPS dans VRM — le pas-à-pas (13 nov. 2026, revu le 16 nov.)
+
+> ⛔ **16 nov. — ABANDONNÉ (décision de Julien : « on laisse tomber, enlève, on garde le suivi de Vinted »).**
+> VRM ne lit plus Colissimo ni UPS par clé : ni variables Vercel, ni clé du vendeur. **Aucun geste à faire** ;
+> les variables `LAPOSTE_OKAPI_KEY`, `UPS_CLIENT_ID`, `UPS_CLIENT_SECRET` peuvent être supprimées de Vercel.
+> Ce guide n'est gardé que pour l'historique. Détail : `docs/passation/2026-11-16-transporteurs-suivi.md`.
+
 
 **Pour qui :** Julien, une seule fois. **Durée :** 10 minutes par transporteur. **Coût :** 0 €.
 

@@ -175,6 +175,8 @@ async function scenario(b, nom, vue, LIGNES) {
   for (let i = 0; i < 60 && !q; i++) {
     const t = await pg.evaluate(() => document.body.innerText);
     if (/N°23 n.est pas encore vérifié/.test(t)) q = true;
+    // (16 nov., lot tampons-parametres) La sélection ouvre l'APERÇU AVANT IMPRESSION : son « Imprimer » lance le PDF.
+    else if (await pg.evaluate(() => { const b = document.querySelector('[data-impr-apercu="pret"] [data-impr-apercu-imprimer]:not([disabled])'); if (b) { b.click(); return true; } return false; })) { /* aperçu franchi */ }
     else if (/Préparer quand même les PDF/.test(t)) await pg.evaluate(() => { const bs = [...document.querySelectorAll('button')].filter((x) => x.innerText.trim() === 'Préparer quand même les PDF'); if (bs.length) bs[bs.length - 1].click(); });
     if (!q) await pg.waitForTimeout(250);
   }
@@ -187,6 +189,7 @@ async function scenario(b, nom, vue, LIGNES) {
       if (window.__pdfs && window.__pdfs.length) return 'pdf';
       const clic = (l) => { const bs = [...document.querySelectorAll('button')].filter((x) => x.innerText.trim() === l && x.offsetParent); if (bs.length) { bs[bs.length - 1].click(); return true; } return false; };
       if (clic("J'ai vérifié, imprimer") || clic('Préparer quand même les PDF')) return 'clic';
+      { const b = document.querySelector('[data-impr-apercu="pret"] [data-impr-apercu-imprimer]:not([disabled])'); if (b) { b.click(); return 'clic'; } }
       // (4 nov.) La feuille du tampon (un type sans place gardée) : « Imprimer » à la place choisie par VRM.
       const f = document.querySelector('[data-placeur-tampon]:not([data-placeur-tampon="charge"]) [data-tampon-imprimer]'); if (f) { f.click(); return 'clic'; }
       return 'attente';
