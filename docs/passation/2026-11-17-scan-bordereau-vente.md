@@ -42,7 +42,9 @@ Donc :
   lus par ZXing ; étiquettes PDF générées par pdf-lib à la forme mesurée ; 390 tactile, clair et sombre) : **54/54**
   — A grand code ⇒ LA vente parmi 50 au même titre (photo, N°, titre, taille) ; B étiquette captée sans n° ;
   C 26 chiffres « 55… » ; D Chronopost DataMatrix ; V Vinted Go ; E douchette ; F code inconnu tapé. Captures regardées.
-- Code de `main` : voir le rapport (rouge attendu sur A, B, E, F) ; mutation (texte non « collé ») ⇒ rouge.
+- Code de `main` (banc copié dans l'arbre de `main`, build de `main`) : **12 rouges** — A, B, E, F (le symptôme de
+  Julien) ; C, D, V verts. Mutation (le texte de l'étiquette non « collé » : groupes séparés par des espaces) ⇒
+  **5 rouges** (A, B, E). Après fusion de `main` (17 nov.) : rebâti, **54/54**.
 - Audits : scan-colis 52/52 (1b porté : « 55… » = Mondial Relay, mesuré), transporteur-pdf 34/34,
   transporteurs-parfaits, traduction, tdz, variables, identite verts.
 
