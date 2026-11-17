@@ -11,6 +11,7 @@ export default {
   "scan.r.sansCamera": "Keine Kamera: Sendungsnummer eintippen.",
   "scan.r.indice": "Dieser Code ist keine Sendungsnummer: auf den anderen Barcode zielen.",
   "scan.r.lampe": "Taschenlampe",
+  "scan.r.zoom": "Zoom: aus größerer Entfernung zielen",
   "scan.r.taper": "Nummer eintippen",
   "scan.r.saisie": "Sendungsnummer",
   "scan.r.ok": "OK",
