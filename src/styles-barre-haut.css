@@ -48,3 +48,14 @@
 /* Le logo d'eBay EST son nom écrit, aplati : il lui faut plus de largeur. */
 .vrm-nav-logo[data-nav-logo="ebay"] { transform: scale(1.45); }
 .vrm-nav-logo[data-nav-logo="leboncoin"] { transform: scale(.92); }
+
+/* (16 nov., lot ecrans-restes) À la souris entre 768 et 1199 px (iPad avec souris, fenêtre de 900 px), les
+   filtres de site passaient PAR-DESSUS la recherche : `.vrm-barre-haut-droite` (min-width 0) se resserrait
+   sous la largeur de sa rangée, qui débordait vers la gauche. La règle de la tablette au doigt
+   (styles-tablette.css §3) vaut pour toute la coque ordinateur : les filtres gardent leur largeur, c'est la
+   recherche qui se resserre (banc scripts/bancs/ecrans-restes.cjs, C1). */
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
+  .vrm-main > .vrm-barre-haut > .vrm-barre-haut-droite { flex: 0 0 auto; }
+  .vrm-main > .vrm-barre-haut > .vrm-recherche { min-width: 140px; }
+  .vrm-main > .vrm-barre-haut .vrm-barre-recherche { min-width: 0; }
+}

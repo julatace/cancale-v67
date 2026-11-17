@@ -69,13 +69,14 @@ export function JourneeInstantanee({ snap, maintenant = null, ScreenHead = null,
       <section className="vrm-day-greeting vrm-w-tete vrm-fu-tete sj-tete" aria-label="Ta journée — derniers chiffres connus" style={largeurOk && M.hauteur ? { minHeight: M.hauteur } : undefined}>
         <div className="vrm-day-hello vrm-fu-bonjour sj-bonjour">{hello}{M.prenom ? ' ' + M.prenom : ''}</div>
         <h1 className="vrm-fu-titre-tete sj-titre">Ma journée</h1>
-        {M.cases ? null : mention('vrm-ji-age vrm-ji-age-seule')}
+        {/* (16 nov.) « Mis à jour… » dans la tête, toujours (posé dans la tuile des cases, il recouvrait le dernier montant) */}
+        {mention('vrm-ji-age vrm-ji-age-seule')}
         <p className="vrm-phrase-ecran vrm-fu-phrase-tete" data-ji-phrase="">{M.phrase && M.phrase.texte ? M.phrase.texte : 'Tes derniers chiffres, le temps de tout relire'}</p>
         {arret ? <p className="vrm-ji-arret" role="status" data-instantane-panne={etat}>{etat === 'hors-ligne' ? tr('instantane.arret.horsLigne') : tr('instantane.arret.panne')}</p> : null}
         {pr ? (
           <div className="vrm-jv2-prochain">
             <div className={'vrm-day-task vrm-fu-tache is-prochain' + (pr.urgent ? ' is-urgent' : '')} data-ji-prochain={pr.tuile || pr.job || ''} aria-disabled="true">
-              <PileVignettes srcs={[]} n={0} icone={Icon ? <Icon name={pr.tuile === 'retirer' ? 'pin' : pr.tuile === 'envoyer' ? 'box' : 'info'} size={20}/> : null}/>
+              {/* (16 nov.) sans icône, pas de carré blanc vide */}{Icon ? <PileVignettes srcs={[]} n={0} icone={<Icon name={pr.tuile === 'retirer' ? 'pin' : pr.tuile === 'envoyer' ? 'box' : 'info'} size={20}/>}/> : null}
               <span className="vrm-day-task-textes">
                 <span className="vrm-day-task-title">{pr.titre}</span>
                 {pr.note ? <span className="vrm-day-task-note">{pr.note}</span> : null}
@@ -118,14 +119,25 @@ export function JourneeInstantanee({ snap, maintenant = null, ScreenHead = null,
             ) : null}
           </div>
         ) : null}
-        {M.cases ? (
-          <section className="vrm-fu-carte-nu a-action vrm-carte-stats vrm-ji-chiffres" data-ji-cases="">
-            {mention('vrm-fu-modifier vrm-ji-age')}
-            <CasesInstantanees cases={M.cases}/>
-            {prog ? <BarreObjectif prog={prog} fmt={fmt} maintenant={now} prefixe="data-ji-objectif"/> : null}
-          </section>
-        ) : null}
       </section>
+      {/* (16 nov., stabilite-iphone — capture de Julien PENDANT le chargement : « Bén… Ven… Reç… », deux montants l'un sur
+          l'autre) Les cases du mois vivent dans LA MÊME tuile que l'écran vrai (`sj-bento > sj-grille > sb-tuile sj-t-mois >
+          sj-face`, src/JourneeStudio.jsx) : mêmes colonnes, même carte de verre, libellés entiers. Posées dans la tête, elles
+          prenaient ses règles de rangée (flex, encre claire) : colonnes de 38 px, libellés coupés, montants superposés. */}
+      {M.cases ? (
+        <div className="sj-bento" data-ji-bento="">
+          <div className="sj-grille">
+            <div className="sb-tuile sj-t sj-t-mois" data-taille="3x1" data-sj-tuile="mois">
+              <div className="sj-face">
+                <section className="vrm-fu-carte-nu a-action vrm-carte-stats vrm-ji-chiffres" data-ji-cases="">
+                  <CasesInstantanees cases={M.cases}/>
+                  {prog ? <BarreObjectif prog={prog} fmt={fmt} maintenant={now} prefixe="data-ji-objectif"/> : null}
+                </section>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {M.gestes && !arret ? (
         <section className="vrm-fu-afaire" aria-label="À faire" aria-busy="true" data-ji-gestes={String(M.gestes)}>
           {/* Le titre de l'écran vrai : « Ensuite » s'il reste des gestes après la prochaine chose. */}

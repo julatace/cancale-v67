@@ -21,14 +21,14 @@
 //    Imaginaire ») : un vendeur a cru que « Le Fournil, Rennes » était SON colis.
 import { photoDeLaPaire, descriptionDeLaPaire } from './exemplePhotos.js';
 
-export const UID_EXEMPLE = 'e0e0e0e0-0000-4000-8000-00000000e0e0';
-export const EMAIL_EXEMPLE = 'exemple@vrm.invalid';
+import { UID_EXEMPLE, EMAIL_EXEMPLE } from './exempleIdentite.js';
+export { UID_EXEMPLE, EMAIL_EXEMPLE };
 // Les marques qu'un banc cherche pour dire « ceci vient de l'exemple » : elles
 // ne doivent JAMAIS apparaître dans la vraie base ni dans le stockage réel.
 export const TRACES_EXEMPLE = ['vendeuse_a', 'vendeuse_b', 'acheteuse_lyon', EMAIL_EXEMPLE];
 // (14 nov.) Le point relais d'exemple : un nom et une rue INVENTÉS (aucun commerce
 // réel), une ville réelle seulement pour que le code postal se lise comme un vrai.
-export const LIEU_EXEMPLE = ['Relais Exemple', '12 rue Imaginaire', '35000 Rennes'];
+export const LIEU_EXEMPLE = ['Relais Exemple', '12 rue de l’Exemple', '35000 Rennes'];
 
 // (11 nov., page d'accueil publique) `catalogue` : une liste [titre, marque,
 // taille] MÉLANGÉE (vêtements, sacs, chaussures…) que scripts/accueil-captures.cjs

@@ -22,7 +22,7 @@ import Frise from '../design/Frise.jsx';
 import { friseVenteFusion } from '../design/friseFusion.js';
 import { attrCible } from '../cibleNotif.js';
 import { champsFacultatifs, motsVendeur, motArticle } from '../profilVendeur.js';
-import { achatDuNumeroLu, AUTH, Bouton, BoutonBordereau, C, ChipsModeles, CompteVente, CoutAchatVente, DEMANDE_EBAY_PAIRE, EBAY_SKIN, EXT_ATTENDUE, EbayCommande, FiltresVentes, Icon, KpiVentes, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneVente, MOIS_COURTS, NUM_OK, PhotoVente, PhotoVinted, Pourquoi, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SUPABASE_URL, ScreenHead, SheetShell, Skeleton, URL_ITEM_EBAY, _fichesEbayMemo, aExpedier, allerComptesEbay, appelEbay, askConfirm, caEbayPayees, centsR, cheminCatalogueVinted, clavierNum, cleNum, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, connexionExtensionVrm, corpsCompteEbay, dansVueEbay, descriptionDeFaits, descriptionEbayPropre, doublesVenteEbay, ebayTitre, enTeteSession, etatEnClair, etatRegleOffre, eurEbay, extSait, extractBrand, extractSize, familleArticle, fichesPourEbay, fmt, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lienEbay, lienItemEbay, lireEbayParCompte, lireEbayTous, lireFichesPage, lireObjet, lirePreuvesVenteVinted, lireReglesEbay, load, marcheEbayDeRef, marquerEbay, nomCompteEbay, numDeSkuEbay, numEbayLu, numLigneEbay, numerosDejaVendus, onCloudReady, onVmrExt, ouVenduesTexte, prixAchatDe, prixCompatibleRegle, raisonExtGlobale, regleEngage, reglesEngagees, resultatReviseEbay, retraitsEbayAutoPermis, save, sbAuth, seuilTropBas, signalerComptesEbay, siteCompteEbayTexte, skuEbayDe, texteReglesQuiRestent, toast, triNum, typeCompteEbayTexte, useEbayPaires, useEstProprietaire, useSansSouris, useStateCle, useVentesVestiaire, useVueSession, verifierAvantPublication, vmrCmd, vmrExtPresent, withOwner, vendActuel, exemplesActuels, dejaEnLigneEbay, optsNumeroVerif } from '../App.jsx';
+import { achatDuNumeroLu, modifierCle, AUTH, Bouton, BoutonBordereau, C, ChipsModeles, CompteVente, CoutAchatVente, DEMANDE_EBAY_PAIRE, EBAY_SKIN, EXT_ATTENDUE, EbayCommande, FiltresVentes, Icon, KpiVentes, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneVente, MOIS_COURTS, NUM_OK, PhotoVente, PhotoVinted, Pourquoi, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SUPABASE_URL, ScreenHead, SheetShell, Skeleton, URL_ITEM_EBAY, _fichesEbayMemo, aExpedier, allerComptesEbay, appelEbay, askConfirm, caEbayPayees, centsR, cheminCatalogueVinted, clavierNum, cleNum, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, connexionExtensionVrm, corpsCompteEbay, dansVueEbay, descriptionDeFaits, descriptionEbayPropre, doublesVenteEbay, ebayTitre, enTeteSession, etatEnClair, etatRegleOffre, eurEbay, extSait, extractBrand, extractSize, familleArticle, fichesPourEbay, fmt, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lienEbay, lienItemEbay, lireEbayParCompte, lireEbayTous, lireFichesPage, lireObjet, lirePreuvesVenteVinted, lireReglesEbay, load, marcheEbayDeRef, marquerEbay, nomCompteEbay, numDeSkuEbay, numEbayLu, numLigneEbay, numerosDejaVendus, onCloudReady, onVmrExt, ouVenduesTexte, prixAchatDe, prixCompatibleRegle, raisonExtGlobale, regleEngage, reglesEngagees, resultatReviseEbay, retraitsEbayAutoPermis, save, sbAuth, seuilTropBas, signalerComptesEbay, siteCompteEbayTexte, skuEbayDe, texteReglesQuiRestent, toast, triNum, typeCompteEbayTexte, useEbayPaires, useEstProprietaire, useSansSouris, useStateCle, useVentesVestiaire, useVueSession, verifierAvantPublication, vmrCmd, vmrExtPresent, withOwner, vendActuel, exemplesActuels, dejaEnLigneEbay, optsNumeroVerif } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import { PHOTOS_AJOUT_MAX, PHOTOS_EBAY_MAX, estPhotoAjoutee, placesPhotos, deplacerPhoto, avecPhotosAjoutees, photoEnJpegBase64 } from '../photosEbayAjout.js';
@@ -2607,7 +2607,7 @@ function EbayAnnonceCard({ it, first, onSaved, numero = '', eligible, paires = [
         <div data-regle-panneau={it.itemId} data-acc-pendant={envoiRegle ? 'offre.ebay' : undefined} {...(regleSignal === 'prix-change' ? { 'data-regle-prix-change': '1' } : {})} {...(regleSignal === 'existante' ? { 'data-regle-existante': '1' } : {})}
           style={{ margin: '0 0 12px', background: E.card2, borderRadius: 12, padding: '11px 12px' }}>
           <div style={{ fontSize: 12, color: E.muted, lineHeight: 1.5, marginBottom: 8 }}>
-            <span data-acc-avant="offre.ebay">{prixVuN ? <>Prix de l'annonce : <b style={{ color: E.text }}>{eurEbay(prixVuN)}</b>. </> : null}Offre ≥ ce montant : eBay l'accepte, la paire est vendue. En dessous, elle t'arrive. {tr('acc.offre.ebay.pas')}</span>
+            <span data-acc-avant="offre.ebay">{prixVuN ? <>Prix de l'annonce : <b style={{ color: E.text }}>{eurEbay(prixVuN)}</b>. </> : null}Offre ≥ ce montant : eBay l'accepte seul, l'article est vendu. Sinon, elle t'arrive. {tr('acc.offre.ebay.pas')}</span>
             {et.etat === 'pas-su' && et.raison === 'offres-inconnues' && et.lu
               ? <span data-regle-panneau-offres-inconnues={it.itemId}>{` Règle actuelle : eBay montre un seuil${et.lu.accepte != null ? ` dès ${eurEbay(et.lu.accepte)}` : ''}${et.lu.refuse != null ? ` (refus sous ${eurEbay(et.lu.refuse)})` : ''}, offres peut-être éteintes : enregistrer les active.`}</span>
               : (et.etat === 'pas-su' ? ' Règle actuelle pas lue : rien remplacé sans te redemander.' : '')}
@@ -5334,10 +5334,14 @@ const PREUVE_PAR_VISITE = 3;
 // ⟦← App.jsx #27⟧
 const noterLienEbay = (itemId, pairId, numero, quiPose) => {
   if (!itemId || !pairId) return;
-  const l = { ...(load(LIENS_EBAY, {}) || {}) };
-  if (quiPose === 'brouillon' && l[String(itemId)]) return;   // un lien posé à la main gagne
-  l[String(itemId)] = { pairId: String(pairId), numero: numero != null ? String(numero) : null, at: Date.now(), par: quiPose || 'vrm' };
-  save(LIENS_EBAY, l); _fichesEbayMemo.at = 0;
+  // (16 nov.) Par la file de la clé (src/modifierCle.js) : appelée EN BOUCLE sur les brouillons,
+  // chaque lien part du précédent encore en attente — aucun n'efface l'autre.
+  const v = modifierCle(LIENS_EBAY, {}, (l) => {
+    if (quiPose === 'brouillon' && l[String(itemId)]) return undefined;   // un lien posé à la main gagne
+    l[String(itemId)] = { pairId: String(pairId), numero: numero != null ? String(numero) : null, at: Date.now(), par: quiPose || 'vrm' };
+    return l;
+  });
+  if (v) _fichesEbayMemo.at = 0;
 };
 // ⟦← App.jsx #28⟧
 // Le numéro qu'une annonce eBay PORTE (son SKU) n'est pas fiable pour cette paire :

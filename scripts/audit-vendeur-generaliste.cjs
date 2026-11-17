@@ -55,7 +55,8 @@ const PERMIS = [
 const MOTS = /\b(chaussures?|baskets?|sneakers?|pointures?|semelles?|lacets?)\b/i;
 // Les exemples de baskets (S3) et les fichiers qui ne contiennent que des LISTES de lecture
 // (marques, modèles : reconnaître un titre) ou la démo publique de l'accueil (pour Julien).
-const MARQUES_BASKET = /\b(nike|adidas|air ?max|spezial|salomon|gel-lyte|p-6000|jordan|new balance|asics|samba|dunk)\b/i;
+// (16 nov.) Bornes en LETTRES Unicode : « añadidas » (es) n'est pas « adidas » (\b de JS ne voit pas « ñ » comme une lettre).
+const MARQUES_BASKET = /(?<![\p{L}\d])(nike|adidas|air ?max|spezial|salomon|gel-lyte|p-6000|jordan|new balance|asics|samba|dunk)(?![\p{L}\d])/iu;
 const MARQUES_PERMIS_FICHIERS = ['src/vocabulaireVendeur.js', 'src/etiquetteNumero.js', 'src/ceQuiRapporte.js', 'src/agentEbay.js', 'src/repereEbay.js', 'src/accueil-demo.js', 'src/exempleDonnees.js', 'src/dejaEnStock.js', 'src/remiseEnLigne.js'];
 const sansCom = (s) => s.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).split('\n').map((l) => (/^\s*\/\//.test(l) ? '' : l.replace(/(^|[^:'"`\\])\/\/\s.*$/, '$1'))).join('\n');
 const fichiersSrc = (racine) => { const out = []; const w = (d) => { for (const f of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, f.name); if (f.isDirectory()) w(p); else if (/\.jsx?$/.test(f.name)) out.push(p); } }; w(path.join(racine, 'src')); return out; };

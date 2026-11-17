@@ -54,7 +54,7 @@ export const CATEGORIES = [
     { id: 'notifications', items: ['push', 'rappels', 'agenda', 'alertes', 'capte'] },
   ] },
   { id: 'apparence', ic: 'contraste', groupes: [
-    { id: 'langue', items: ['langue', 'apparence', 'sombre', 'zoom'] },
+    { id: 'langue', items: ['langue', 'apparence', 'sombre', 'zoom', 'taille-texte'] },
     { id: 'ecrans', titre: 'parametres.g.ecrans', items: ['affichage-mode', 'ma-journee', 'configuration', 'atelier'] },
     { id: 'stream', titre: 'parametres.g.stream', items: ['stream-on', 'stream'] },
     { id: 'raccourcis', titre: 'parametres.g.raccourcis', items: ['widget', 'raccourcis-siri', 'raccourcis-clavier'] },

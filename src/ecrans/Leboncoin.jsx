@@ -514,7 +514,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] }, enSection = false }) {
     const n = numDe(o);
     const posted = estFait(o);
     return (
-      <div className="vrm-lbc-package" key={o.txId} data-bord-card data-transporteur={cleStatTransporteur(transporteurDuColis({ declare: o.deliveryMethod || o.deliveryLabel || '' }))} style={{ padding: '11px 12px', border: `1px solid ${o.label && o.label.voucherUrl ? INV_STATUS.online.color + '44' : C.border}`, background: C.card, borderRadius: 12, marginBottom: 8, opacity: posted ? 0.55 : 1 }}>
+      <div className="vrm-lbc-package" key={o.txId} data-lbc-vente={o.txId} data-cible={attrCible(['lbcvente', o.txId])} data-bord-card data-transporteur={cleStatTransporteur(transporteurDuColis({ declare: o.deliveryMethod || o.deliveryLabel || '' }))} style={{ padding: '11px 12px', border: `1px solid ${o.label && o.label.voucherUrl ? INV_STATUS.online.color + '44' : C.border}`, background: C.card, borderRadius: 12, marginBottom: 8, opacity: posted ? 0.55 : 1 }}>
         <div className="vrm-lbc-package-head" style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
           <PhotoVente src={photoArticle(o)} size={58} />
           <div style={{ flex: '1 1 150px', minWidth: 0 }}>

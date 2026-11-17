@@ -62,6 +62,11 @@ for (const f of fichiers) {
     // une lettre, ou un helper qui préfixe une lettre. Si la définition change (valeur
     // numérique, préfixe retiré), la clé redevient « nue » ⇒ rouge.
     if (cleNonNumerique(s, expr)) continue;
+    // (16 nov.) Une constante TEXTE qui commence par une lettre (`export const ID_RETOURS_DEPOSES_CHAMP = 'vrm_retours_deposes'`),
+    // vérifiée sur sa définition, ici ou dans un fichier lu ; et un INDEX DE TABLEAU voulu : le 2e paramètre d'un
+    // `Array.from({ length … }, (_, i) =>` de la même expression (`data->photos->${i}`), jamais un identifiant.
+    if (/^[A-Z_][A-Z0-9_]*$/.test(expr) && fichiers.some((g) => new RegExp(`(?:export\\s+)?const\\s+${expr}\\s*=\\s*'[A-Za-z_][\\w-]*'\\s*;`).test(g === f ? s : lire(g)))) continue;
+    if (/^[a-z]$/.test(expr) && new RegExp(`Array\\.from\\(\\{\\s*length:[^}]*\\},\\s*\\(_,\\s*${expr}\\)\\s*=>[^\\n]{0,160}$`).test(s.slice(Math.max(0, m.index - 240), m.index))) continue;
     const ligne = s.slice(0, m.index).split('\n').length;
     fautes.push(`${f}:${ligne} \`${m[0]}\``);
   }

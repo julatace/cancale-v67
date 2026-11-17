@@ -271,7 +271,8 @@ async function regleApp() {
     try { const r = res(); await cron({ method: 'GET', headers: { authorization: 'Bearer cle-banc-cron' }, query: {} }, r); dit(r.code === 200 || r.code === 500, 'le cron a tourné', `HTTP ${r.code}`); }
     finally { Date.now = vraiNow; }
     for (const [L, o] of Object.entries(VENDEURS)) {
-      const b = pushes.filter((p) => /^bilan-/.test(p.tag || '') && p.endpoint.endsWith('/' + L + '1'));
+      // (16 nov.) Le bilan de FIN DE MOIS (15 nov., `bilan-mois-…`) part aussi un lundi 5 : seul le bilan de la SEMAINE est jugé ici.
+      const b = pushes.filter((p) => /^bilan-(?!mois-)/.test(p.tag || '') && p.endpoint.endsWith('/' + L + '1'));
       const e = attendu(o);
       // (8 nov., api/_lib/notif-belle.js) les lignes du corps sont jointes par des espaces.
       const corps = String((b[0] && b[0].body) || '').replace(/\s+/g, ' ');
@@ -302,7 +303,7 @@ async function regleApp() {
     };
     try { const r = res(); await cron({ method: 'GET', headers: { authorization: 'Bearer cle-banc-cron' }, query: {} }, r); }
     finally { Date.now = vraiNow; global.fetch = orig; }
-    const corpsDe = (L) => String((pushes.find((p) => /^bilan-/.test(p.tag || '') && p.endpoint.endsWith('/' + L + '1')) || {}).body || '').replace(/\s+/g, ' ');
+    const corpsDe = (L) => String((pushes.find((p) => /^bilan-(?!mois-)/.test(p.tag || '') && p.endpoint.endsWith('/' + L + '1')) || {}).body || '').replace(/\s+/g, ' ');
     const s = corpsDe('S'), pp = corpsDe('P');
     dit(s.startsWith('Vendu : 1 vente · 40 €. ') && !/au moins|achats/.test(s), 'S (Solo) : le compte d’achat lu jeudi n’est pas réclamé — aucun « au moins », aucun nom', s);
     dit(/au moins/.test(pp) && /achats/.test(pp), 'P (Pro) : le même compte lu jeudi ⇒ « au moins … sans achats (lu jeudi) » (témoin : la donnée déclenche)', pp);
@@ -361,7 +362,7 @@ async function regleApp() {
     const ATT = { S2: [4, 250, 'Solo, un compte vendeur par plateforme', 170], P2: [8, 2850, 'Pro', 1970], A2: [8, 2850, 'Solo d’avant le 9 nov. (plan « pas su »)', 1970],
       X2: [8, 2850, 'offre illisible (pas su)', 1970], N2: [7, 2350, 'Solo, base sans la 030 : Vinted bridé seul', 1470] };
     for (const [L, [n, eur, nom, recu]] of Object.entries(ATT)) {
-      const b = pushes.filter((p) => /^bilan-/.test(p.tag || '') && p.endpoint.endsWith('/' + L + '1'));
+      const b = pushes.filter((p) => /^bilan-(?!mois-)/.test(p.tag || '') && p.endpoint.endsWith('/' + L + '1'));
       const corps = String((b[0] && b[0].body) || '').replace(/\s+/g, ' ');
       const vendu = `Vendu : ${n} vente${n > 1 ? 's' : ''} · ${euros(eur)}.`;
       dit(b.length === 1 && corps.startsWith(vendu + ' '), `${L} — ${nom} : « ${vendu} »`, corps || `${b.length} bilan(s)`);

@@ -709,6 +709,7 @@ export default {
   "compta.recapImprimer": "Print (1 page)",
   "compta.recapImprimerTitre": "One A4 page: sales, received, purchases, expenses, profit, URSSAF",
   "compta.recapImprimerNote": "One A4 page, readable in black and white. For a PDF, choose “Save as PDF” in the print window.",
+  "compta.recapImprimerAide": "Save as PDF?",
   "compta.recapFenetreBloquee": "The browser blocked the print window: allow pop-ups for VRM, then try again.",
   "compta.recapPrepare": "Preparing the recap…",
   "compta.dontConversation": " · {nbAd} through the sale’s conversation",
@@ -716,6 +717,10 @@ export default {
   "compta.environHeuresVinted": { one: "About {n} h with vinted.fr open on this account.", other: "About {n} h with vinted.fr open on this account." },
   "compta.releveAVerifier": { one: "{n} sale in the wallet statement: statement dates not verified yet ({accords} of {min} matches with the sale details). Nothing is dated from it until then.", other: "{n} sales in the wallet statement: statement dates not verified yet ({accords} of {min} matches with the sale details). Nothing is dated from it until then." },
   "compta.releveDesaccord": { one: "{n} sale in the wallet statement: its date does not fall on the same day as the sale details ({desaccords} mismatch). This account’s statement dates nothing.", other: "{n} sales in the wallet statement: their dates do not fall on the same day as the sale details ({desaccords} mismatch(es)). This account’s statement dates nothing." },
+  "facturePro.serieVrmTitre": {"one": "Send {n} invoice with VRM?", "other": "Send {n} invoices with VRM?"},
+  "facturePro.serieVrmDesc": "Your mailbox isn’t connected: VRM sends them for you, each to ITS proven buyer, with you in copy. Your “from my mailbox” setting doesn’t change.",
+  "facturePro.envoyerAvecVrm": "Send with VRM",
+  "facturePro.toutEnvoyerVrm": "Send all with VRM ({n})",
   // (15 nov., extension 5.390) La ligne discrète : l’extension récupère les dates de versement, aucun geste.
   "versement.ligne": { one: "Payout dates: the extension is fetching them (≈ {n} left · about {h} h with vinted.fr open).", other: "Payout dates: the extension is fetching them (≈ {n} left · about {h} h with vinted.fr open)." },
   "versement.ligneSans": { one: "Payout dates: the extension is fetching them (≈ {n} left).", other: "Payout dates: the extension is fetching them (≈ {n} left)." },

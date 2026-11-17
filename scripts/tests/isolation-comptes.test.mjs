@@ -1,5 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';import vm from 'node:vm';
 import {qrMfa} from '../../src/qrMfa.js';
+import {fabriquerModifierCle} from '../../src/modifierCle.js';   // (16 nov., train : compta-donnees) le bloc des sauvegardes fabrique `modifierCle` (comparer-et-échanger) : la vraie fabrique
 import { createRequire as creerRequireSourceApp } from 'node:module';
 creerRequireSourceApp(import.meta.url)('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const app=fs.readFileSync('src/App.jsx','utf8'),ext=fs.readFileSync('vinted-sync-extension/background.js','utf8');
@@ -19,7 +20,7 @@ test('liste des comptes : filtre obligatoire, rejet d’un propriétaire étrang
 });
 test('les sauvegardes différées du vendeur A ne sont pas écrites après une bascule vers B dans un autre onglet',()=>{
  const code=extraire(app,'let _saveTimers = {}','// ── « ANNULER » PARTOUT');let travail,ecrit=0;
- const c=vm.createContext({AUTH:auth(),readSession:()=>({user:{id:B}}),setTimeout:fn=>(travail=fn,1),clearTimeout(){},localStorage:{setItem(){ecrit++;}},SYNC_KEYS:[],window:{dispatchEvent(){}},CustomEvent:class{},cloudPush(){throw Error('Interdit');}});
+ const c=vm.createContext({AUTH:auth(),readSession:()=>({user:{id:B}}),setTimeout:fn=>(travail=fn,1),clearTimeout(){},localStorage:{setItem(){ecrit++;}},SYNC_KEYS:[],window:{dispatchEvent(){}},CustomEvent:class{},cloudPush(){throw Error('Interdit');},fabriquerModifierCle,chargerPublie:()=>null});
  vm.runInContext(code+';globalThis.sauver=save;',c);c.sauver('vinted_sales',[{id:'vente-a'}]);travail();assert.equal(ecrit,0);
 });
 test('cloud privé : jamais choisir la première ligne de plusieurs boutiques',async()=>{

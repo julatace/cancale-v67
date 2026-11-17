@@ -1,3 +1,4 @@
+const RACINE_OFFRES = require('path').join(__dirname, '..');
 // Audit « plusieurs comptes Vinted dès Solo » (13 nov., lot 56).
 // Solo : 1 compte Vinted vendeur inclus · +X €/mois par compte de plus (X =
 // `PRIX_COMPTE_SUP_CENTIMES`, api/_lib/plan-regle.js, la seule valeur ; 3 € à
@@ -312,7 +313,9 @@ const MUTATIONS_ROUTE = [
       const m = f(src);
       if (m === src) { dit(false, `mutation « ${nom} » applicable`, 'le texte visé a changé'); continue; }
       const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sup-mut-'));
-      fs.writeFileSync(path.join(dir, 'plan-regle.mjs'), m);
+      // (16 nov.) les offres vivent dans plan-offres.js (importé par plan-regle.js) : copié à côté, tel quel.
+      fs.writeFileSync(path.join(dir, 'plan-regle.mjs'), m.replace("from './plan-offres.js'", "from './plan-offres.mjs'"));
+      fs.copyFileSync(path.join(RACINE_OFFRES, 'api', '_lib', 'plan-offres.js'), path.join(dir, 'plan-offres.mjs'));
       let rouges = 0;
       try { const RM = await import('file://' + path.join(dir, 'plan-regle.mjs')); await controlesRegle(RM, (c) => { if (!c) rouges++; }); } catch (_) { rouges++; }
       finally { try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {} }

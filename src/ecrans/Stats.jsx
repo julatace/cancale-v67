@@ -9,7 +9,7 @@ import { rythmeVendu, ecartPct, quandTuVends, margesPar, delaisPar, tranchePrix,
 import React, { useState, useMemo } from 'react';
 import { L } from '../libelles.js';
 import { etapeMotVc, vcVenteAnnulee, montantRecuVc, dateVenteVc, fraisVc } from '../../api/_lib/vestiaire-regle.js';
-import { caAutresParJour, sommePlage } from '../caAutresParJour.js';   // (11 nov., parité) le finalisé des autres plateformes par jour
+import { caAutresParJour, sommePlage, resumeFinaliseVestiaire } from '../caAutresParJour.js';   // (11 nov., parité) le finalisé des autres plateformes par jour
 import { phrasePlage } from '../periodeCalendrier.js';
 import { lireSupprimes, CLE_SUPPRIMES } from '../comptesSupprimes.js';
 import { recuPublieEntre, valeurObjectif, valeurObjectifMois } from '../design/carteChiffres.js';
@@ -257,18 +257,16 @@ function nomAffichePlat(n) { return n === 'Vestiaire Collective' ? 'Vestiaire Co
 // versée/terminée) ; un montant pas sûr ⇒ « — » et la raison, jamais un total
 // partiel. Leboncoin : un prix inconnu n'est plus compté 0 €, il est dit.
 const caVestiaireFinalise = (ventesVc) => {
-  if (ventesVc === undefined) return { ca: null, note: 'lecture en cours' };
-  if (!Array.isArray(ventesVc)) return { ca: null, note: 'ventes Vestiaire pas lues' };
-  let ca = 0, n = 0, pasSur = 0;
-  for (const v of ventesVc) {
-    if (!v || vcVenteAnnulee(v)) continue;
-    const et = etapeMotVc(v); if (et !== 'versee' && et !== 'terminee') continue;
-    const r = montantRecuVc(v);
-    if (r.eur == null) { pasSur++; continue; }
-    ca += r.eur; n++;
-  }
-  if (pasSur) return { ca: null, note: `${pasSur} vente${pasSur > 1 ? 's' : ''} finalisée${pasSur > 1 ? 's' : ''} au montant pas sûr` };
-  return n ? { ca: Math.round(ca * 100) / 100, note: 'ventes finalisées (montant versé)' } : { ca: null, note: 'pas encore de vente finalisée' };
+  // (16 nov., lot plateformes-restes) LA règle commune avec « CA entre deux dates »
+  // (`resumeFinaliseVestiaire`, src/caAutresParJour.js) : les sûres sont sommées, les
+  // pas sûres NOMMÉES (« au moins »), plus jamais « — » pour tout dès qu'une manque.
+  const r = resumeFinaliseVestiaire(ventesVc, { etapeMotVc, vcVenteAnnulee, montantRecuVc, dateVenteVc });
+  if (r.etat === 'lecture') return { ca: null, note: tr('stats.vcFin.lecture') };
+  if (r.etat === 'pas-lu') return { ca: null, note: tr('stats.vcFin.pasLu') };
+  if (r.etat === 'aucune') return { ca: null, note: tr('stats.vcFin.aucune') };
+  if (r.etat === 'pas-sur') return { ca: null, note: tr('stats.vcFin.pasSur', { n: r.pasSur }) };
+  if (r.etat === 'au-moins') return { ca: r.ca, auMoins: true, note: tr('stats.vcFin.auMoins', { n: r.pasSur }) };
+  return { ca: r.ca, note: tr('stats.vcFin.lu') };
 };
 // (11 nov., parité) `excluAutre` : le prédicat des comptes écartés (Paramètres → Comptes liés,
 // et l'offre Solo) — le MÊME que `ventesFaites`/`ventesDeclarables`. Avant, cette carte
@@ -296,7 +294,7 @@ function caParPlateforme(liveStats, lbcVentes, ebayCa, ebayCommandes, ventesVc, 
     { nom:'Vinted', ca:caVinted, note:'ventes finalisées, tous comptes' + (liveStats && liveStats.nMasque > 0 ? ` · sans ${liveStats.nMasque} masquée${liveStats.nMasque>1?'s':''}` : '') },
     { nom:'Leboncoin', ca:caLbc, note:lbcSansPrix?`${lbcSansPrix} vente${lbcSansPrix>1?'s':''} finalisée${lbcSansPrix>1?'s':''} au prix inconnu`:caLbc==null?'pas encore de vente finalisée':'ventes finalisées (argent reçu)' },
     { nom:'eBay', ca:caEbay, note: caEbay != null ? NOTE_CA_EBAY.lu : NOTE_CA_EBAY[etatCaEbay(ebayCommandes)] },
-    { nom:'Vestiaire Collective', ca:vc.ca, note:vc.note },
+    { nom:'Vestiaire Collective', ca:vc.ca, note:vc.note, auMoins:!!vc.auMoins },
   ];
 }
 // ⟦← App.jsx #13⟧
@@ -896,12 +894,12 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
           <div className="vrm-stats-comptes" style={{display:'grid',gridTemplateColumns:'repeat(auto-fit, minmax(min(320px,100%), 1fr))',gap:12,marginTop:4}}>
             <div data-stats-carte="plateformes" data-stats-plateformes data-notion="finalise" style={{...sCarte,paddingBottom:12}}>
               <div style={{...sTitre,marginBottom:8}}>{tr('stats.finalisePlateforme')}</div>
-              {plateformes.map(p => <Ligne key={p.nom} label={nomAffichePlat(p.nom)} val={p.ca} note={p.note} part={p.ca!=null && totPlat>0 && plateformes.filter(x=>x.ca!=null).length>1 ? p.ca/totPlat : null}/>)}
+              {plateformes.map(p => <div key={p.nom} data-stats-plat={p.nom} data-stats-plat-cents={p.ca==null?'':String(Math.round(p.ca*100))} data-stats-plat-au-moins={p.auMoins?'1':'0'}><Ligne label={nomAffichePlat(p.nom)} val={p.ca} note={p.note} part={p.ca!=null && totPlat>0 && plateformes.filter(x=>x.ca!=null).length>1 ? p.ca/totPlat : null}/></div>)}
               {/* Total = somme des plateformes captées = le CA global de l'onglet
                   Collectif (§11 : les deux écrans ne peuvent pas se contredire).
                   Affiché seulement quand ≥ 2 plateformes ont des ventes, sinon il
                   répète la seule ligne remplie. */}
-              {(()=>{ const nz=plateformes.filter(p=>p.ca!=null); return nz.length>=2 ? <Ligne label={tr('stats.totalFinalise')} val={nz.reduce((s,p)=>s+p.ca,0)} fort/> : null; })()}
+              {(()=>{ const nz=plateformes.filter(p=>p.ca!=null); return nz.length>=2 ? <div data-stats-total-au-moins={nz.some(p=>p.auMoins)?'1':'0'}><Ligne label={tr('stats.totalFinalise')} val={nz.reduce((s,p)=>s+p.ca,0)} note={nz.some(p=>p.auMoins) ? tr('stats.totalAuMoins') : null} fort/></div> : null; })()}
             </div>
             <div data-stats-carte="comptes" style={{...sCarte,paddingBottom:12}}>
               <div style={{...sTitre,marginBottom:8}}>{tr('stats.caVintedCompte')}</div>
@@ -1744,7 +1742,10 @@ function StatsPlus({ b, V, partielVendu, lp, stock, barres, ligneUrssaf, lib, no
     : (<>
       <GraphiqueVenduRecu VR={VR} lib={lib} titre={tr('stats.venduRecu', { noteBarres: String(noteBarres) })}/>
       <div className="vrm-sv-note" data-sp-vr-note={VR.raison || ''}>
-        {tr('stats.venduDateVente')}{!VR.recuLu ? ` · ${RAISON_RECU[VR.raison] || 'reçu pas lu'}` : !VR.recuComplet ? tr('stats.recuToutLu') : ''}{aDater > 0 ? ` · ${plSP(aDater, 'vente')} sans date de versement (dans aucune barre)` : ''}
+        {/* (16 nov., bancs-rouges-b) Le manque reste DIT à l'écran (§5) ; la définition Vendu / Reçu, toujours la même,
+            passe sous « Pourquoi ? » (textes courts : plus de paragraphe de 130 caractères). */}
+        {[!VR.recuLu ? (RAISON_RECU[VR.raison] || 'reçu pas lu') : !VR.recuComplet ? tr('stats.recuToutLu').replace(/^\s*·\s*/, '') : '', aDater > 0 ? `${plSP(aDater, 'vente')} sans date de versement (dans aucune barre)` : ''].filter(Boolean).join(' · ')}
+        {' '}<Pourquoi>{tr('stats.venduDateVente')}</Pourquoi>
       </div>
     </>);
   // ── Les 10 meilleures ventes ──

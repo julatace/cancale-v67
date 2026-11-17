@@ -1,4 +1,6 @@
 // ESPAÑOL — traducción de fr.js (la fuente). Mismas claves, mismas {variables}.
+import ecran_suivi_vente from './es/suiviVente.js';   // (16 nov.) le suivi des colis vendus
+import ecran_perso from './es/perso.js';   // (16 nov.) « Modifier ma journée » simple
 import ecran_ventesVerre from './es/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
 import ecran_journee from './es/journee.js';
 import ecran_confort from './es/confort.js';   // (14 nov., lots 117–130) confort et sécurité
@@ -7,11 +9,13 @@ import ecran_correspondances from './es/correspondances.js';   // (15 nov.) Publ
 import ecran_capte from './es/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_avenir from './es/avenir.js';
 import ecran_verre2 from './es/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
-import ecran_fiched from './es/fiched.js';   // (15 nov.) la fiche d'un article, direction D
+import ecran_fiched from './es/fiched.js';
+import ecran_ecrans_restes from './es/ecransRestes.js';   // (16 nov.) lot ecrans-restes : stock importé, date limite, loupe   // (15 nov.) la fiche d'un article, direction D
 import ecran_vcventes from './es/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
 import ecran_transporteur_connu from './es/transporteurConnu.js';   // (15 nov.) « À expédier » : transporteur connu
 import ecran_vendre from './es/vendre.js';   // (15 nov., vendre plus) baisses conseillées, relance des favoris, loupe
 import ecran_ebaytableau from './es/ebaytableau.js';   // (15 nov., eBay complet 2) Tableau, Argent, Trafic, Santé
+import ecran_serie_selection from './es/serieSelection.js';   // (16 nov.) la barre de sélection en série
 import ecran_scan_retrouver from './es/scanRetrouver.js';   // (15 nov.) Scanner pour retrouver un colis
 import ecran_renvoyer from './es/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_liaison from './es/liaison.js';   // (15 nov.) La liaison achat ⇄ article
@@ -63,6 +67,7 @@ import ecran_etageres from './es/etageres.js';   // (15 nov.) le Stock en étag�
 import ecran_journee_verre from './es/journee-verre.js';   // (15 nov.) Ma journée verre, la paire à sortir
 import ecran_arrivee from './es/arrivee.js';   // (15 nov.) atelier d'arrivée, historique, taille du texte
 export default {
+  ...ecran_perso,
   ...ecran_ventesVerre,
   ...ecran_studio_paires,
   ...ecran_republier_guide,
@@ -818,6 +823,7 @@ export default {
   "favoris.sousTitreCompte": "Cuenta {compte} · escribe a quienes les gustan tus anuncios.",
   "favoris.actualiser": "Actualizar",
   "favoris.outils": "Más herramientas",
+  "versions.uneSeule": "Una versión: si acaba de enviarse, solo cambia el saludo (Bonjour, Salut, Hello).",   // (16 nov.) une seule version : la salutation varie
   "favoris.duree.secondes": { one: "{n} s", other: "{n} s" },
   "favoris.duree.minutes": { one: "{n} min", other: "{n} min" },
   "favoris.duree.heures": { one: "{n} h", other: "{n} h" },
@@ -2299,15 +2305,18 @@ export default {
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_liaison,
+  ...ecran_suivi_vente,
   ...ecran_transporteur_connu,
   ...ecran_vendre,
   ...ecran_ebaytableau,
   ...ecran_scan_retrouver,
+  ...ecran_serie_selection,
   ...ecran_finition,
   ...ecran_parametres,
   ...ecran_avenir,
   ...ecran_verre2,
   ...ecran_fiched,
+  ...ecran_ecrans_restes,
   ...ecran_numeros_nouvelles,
   ...ecran_republie_telephone,
   ...ecran_securite_ventes,

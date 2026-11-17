@@ -40,20 +40,28 @@
 //    TCPDF ; les bordereaux Vinted par e-mail portent tous un n° Chronopost
 //    strict) : lu par le serveur, n° seul ;
 //  · Vinted Go : lu par le serveur, n° seul ;
-//  · Mondial Relay : sa seule route lisible exige le code postal du point de
-//    DESTINATION (celui de l'acheteur) — VRM ne le connaît pas et ne le devine
-//    jamais ⇒ pas lu comme départ ;
-//  · Colissimo, UPS, DHL, DPD… : aucune route publique sans clé mesurée ⇒ pas lus.
+//  · Mondial Relay : sa seule route lisible exige un code postal. (16 nov., lot
+//    transporteurs-suivi) VRM ne le devine JAMAIS : il le LIT sur SON étiquette
+//    (le PDF du bordereau de CETTE transaction — une identité, §5 — `cpsDeLEtiquette`),
+//    l'essaie, et ne le garde que si la route de Mondial Relay renvoie l'ÉCHO de
+//    CE n° à CE code postal (`lireReponseMondialRelayMvc`). Un code postal refusé
+//    est noté et jamais réessayé ; aucun code postal sur l'étiquette ⇒ aucune
+//    requête, et Ventes le dit. Le texte du PDF n'est jamais gardé : seuls les
+//    codes postaux essayés (`cpsPdf`) et celui que l'écho a prouvé (`cp`) ;
+//  · Colissimo, UPS, DHL, DPD, GLS, Relais Colis… : pas lus chez le transporteur (16 nov., décision de
+//    Julien : aucun suivi par clé ; Vinted et les e-mails font foi).
 // ─────────────────────────────────────────────────────────────────────────────
 import { normaliserSuivi } from './etat-colis-email.js';
-import { carrierLisible, nomTransporteur, RECUL_MS, INTROUVABLE_MS, INTROUVABLE_MAX, RESULTATS, ETATS } from './transporteurs.js';
+import { carrierLisible, nomTransporteur, RECUL_MS, INTROUVABLE_MS, INTROUVABLE_MAX, RESULTATS, ETATS, CP_SIEGE_MR, classeMr } from './transporteurs.js';
 import { etapeMotVc } from './vestiaire-regle.js';
 
-export const DEPART_CARRIERS = ['chronopost', 'vinted'];
+// (16 nov.) + Mondial Relay (code postal lu sur l'étiquette, prouvé par l'écho).
+export const DEPART_CARRIERS = ['chronopost', 'vinted', 'mondialrelay'];
+const RE_ID_DEPART = /^depart_(chronopost|vinted|mondialrelay)_([A-Z0-9]+)$/;
 export const cleDepart = (carrier, suivi) => `depart_${carrier}_${normaliserSuivi(suivi)}`;
 // (11 nov., suivi des commandes) + le DERNIER évènement lu (libellé, lieu, date)
 // et le lieu du point : ce que Ventes affiche (« Pris en charge · Vannes · hier 18:02 »).
-export const SELECT_DEPART_META = 'id,suivi:meta->>suivi,carrier:meta->>carrier,etat:meta->>etat,detail:meta->>detail,etatAt:meta->>etatAt,priseAt:meta->>priseAt,lu:meta->>lu,essai:meta->>essai,essaiRes:meta->>essaiRes,essais:meta->>essais,fini:meta->>fini,clos:meta->>clos,derLib:meta->>derLib,derLieu:meta->>derLieu,derAt:meta->>derAt,lieuNom:meta->>lieuNom,lieuVille:meta->>lieuVille';
+export const SELECT_DEPART_META = 'id,suivi:meta->>suivi,carrier:meta->>carrier,etat:meta->>etat,detail:meta->>detail,etatAt:meta->>etatAt,priseAt:meta->>priseAt,lu:meta->>lu,essai:meta->>essai,essaiRes:meta->>essaiRes,essais:meta->>essais,fini:meta->>fini,clos:meta->>clos,derLib:meta->>derLib,derLieu:meta->>derLieu,derAt:meta->>derAt,lieuNom:meta->>lieuNom,lieuVille:meta->>lieuVille,cp:meta->>cp,cpsPdf:meta->>cpsPdf,cpsRefuses:meta->>cpsRefuses,cpsLu:meta->>cpsLu';
 // Le rythme : une lecture toutes les 2 h tant que le colis n'est pas pris en
 // charge ; un échec recule (30 min → 6 h) ; « introuvable » 3 fois ⇒ on arrête.
 export const RYTHME_DEPART_MS = 2 * 3600000;
@@ -100,7 +108,10 @@ export function priseEnCharge(lu, carrier) {
   const prouve = (e === 'en_route' && lu.detail !== 'prepare') || e === 'disponible' || e === 'retire' || e === 'livre' || e === 'retour_expediteur' || (e === 'incident' && lu.detail === 'quitte_relais');
   if (!prouve) return null;
   const evs = Array.isArray(lu.evenements) ? lu.evenements : [];
-  const premier = evs.find((x) => x && msDe(x.at) != null && x.code && (carrier === 'chronopost' ? !CP_PAS_DEPART.has(String(x.code).toUpperCase()) : carrier === 'vinted' ? !VG_PAS_DEPART.has(String(x.code)) : false));
+  // (16 nov.) Mondial Relay n'a pas de code : son LIBELLÉ mesuré (`classeMr`, hors « en préparation chez
+  // l'expéditeur »).
+  const premier = evs.find((x) => x && msDe(x.at) != null && (carrier === 'mondialrelay' ? ['route', 'disponible', 'livre'].includes((classeMr(x.libelle) || {}).c)
+    : x.code && (carrier === 'chronopost' ? !CP_PAS_DEPART.has(String(x.code).toUpperCase()) : carrier === 'vinted' ? !VG_PAS_DEPART.has(String(x.code)) : false)));
   const at = premier ? msDe(premier.at) : msDe(lu.etatAt);
   return at != null ? at : null;
 }
@@ -108,7 +119,7 @@ export function priseEnCharge(lu, carrier) {
 // ── LA LIGNE `depart_{carrier}_{n°}` APRÈS UN ESSAI ─────────────────────────
 // Une lecture qui échoue ne change rien que l'essai. Une prise en charge prouvée
 // (`priseAt`) ne s'efface jamais ; elle ferme le n° (`fini`).
-export function ligneDepartApresEssai(avant, lu, { carrier, suivi, maintenant = Date.now(), source = 'serveur' } = {}) {
+export function ligneDepartApresEssai(avant, lu, { carrier, suivi, maintenant = Date.now(), source = 'serveur', cp = '' } = {}) {
   const a = avant && typeof avant === 'object' ? avant : {};
   const iso = new Date(maintenant).toISOString();
   const res = RESULTATS.includes(lu && lu.res) ? lu.res : 'passu';
@@ -132,8 +143,12 @@ export function ligneDepartApresEssai(avant, lu, { carrier, suivi, maintenant = 
     out.derAt = der ? isoDe(msDe(der.at)) : out.etatAt;
     out.lieuNom = String(lu.lieuNom || '').slice(0, 60);
     out.lieuVille = String(lu.lieuVille || '').slice(0, 40);
+    // (16 nov.) Mondial Relay : le code postal que l'ÉCHO vient de prouver pour CE n° (le seul gardé comme tel).
+    if (carrier === 'mondialrelay' && /^\d{5}$/.test(String(cp || ''))) out.cp = String(cp);
   } else {
     out.essais = (Number(a.essais) || 0) + 1;
+    // (16 nov.) Un code postal de l'étiquette que Mondial Relay refuse pour ce n° : noté, jamais réessayé.
+    if (res === 'cp-inconnu' && /^\d{5}$/.test(String(lu && lu.cpRefuse || ''))) out.cpsRefuses = listeCp([...listeCp(a.cpsRefuses), lu.cpRefuse]).join(',');
   }
   // `fini` (8 nov.) : la PREUVE de départ est acquise ou le n° est mort — gardé
   // tel quel pour les lecteurs d'avant. `clos` (11 nov.) : le SUIVI est fini
@@ -148,7 +163,7 @@ export function ligneDepartApresEssai(avant, lu, { carrier, suivi, maintenant = 
 // contredit son identifiant ne compte pas.
 export function departDeMeta(x) {
   if (!x || typeof x !== 'object') return null;
-  const m = /^depart_(chronopost|vinted)_([A-Z0-9]+)$/.exec(String(x.id || ''));
+  const m = RE_ID_DEPART.exec(String(x.id || ''));
   if (!m) return null;
   const suivi = normaliserSuivi(x.suivi) || m[2];
   if (suivi !== m[2] || (x.carrier && x.carrier !== m[1])) return null;
@@ -161,7 +176,48 @@ export function departDeMeta(x) {
     derLib: x.derLib ? String(x.derLib).slice(0, 120) : '', derLieu: x.derLieu ? String(x.derLieu).slice(0, 80) : '',
     derAt: msDe(x.derAt) != null ? isoDe(msDe(x.derAt)) : null,
     lieuNom: x.lieuNom ? String(x.lieuNom).slice(0, 60) : '', lieuVille: x.lieuVille ? String(x.lieuVille).slice(0, 40) : '',
+    cp: /^\d{5}$/.test(String(x.cp || '')) ? String(x.cp) : '', cpsPdf: listeCp(x.cpsPdf).join(','), cpsRefuses: listeCp(x.cpsRefuses).join(','), cpsLu: x.cpsLu || null,
   };
+}
+
+// ── (16 nov.) MONDIAL RELAY : LE CODE POSTAL LU SUR SON ÉTIQUETTE ───────────
+// Une liste de codes postaux (« 35260,75011 » ou un tableau) ⇒ tableau propre, sans doublon, borné.
+export const CPS_ETIQUETTE_MAX = 4;
+export function listeCp(v) {
+  const l = Array.isArray(v) ? v : String(v == null ? '' : v).split(',');
+  const out = [];
+  for (const x of l) { const c = String(x == null ? '' : x).trim(); if (/^\d{5}$/.test(c) && !out.includes(c)) out.push(c); }
+  return out.slice(0, 8);
+}
+// Les codes postaux écrits sur l'étiquette : 5 chiffres SUIVIS d'un nom de ville (« 35260 CANCALE »),
+// jamais un morceau de code-barres (un nombre plus long), jamais le siège de Mondial Relay (59650), dans
+// l'ordre de l'étiquette, `CPS_ETIQUETTE_MAX` au plus. Aucun n'est deviné : chacun ne vaudra que si
+// Mondial Relay renvoie l'ÉCHO de ce n° à ce code postal.
+export function cpsDeLEtiquette(texte) {
+  const out = [];
+  for (const m of String(texte == null ? '' : texte).matchAll(/(?:^|[^\d])(\d{5})(?!\d)[ \t\u00a0]*(?:\r?\n[ \t]*)?(?=[A-Za-zÀ-ÿ'’-]{2,})/g)) {
+    if (m[1] === CP_SIEGE_MR || out.includes(m[1])) continue;
+    out.push(m[1]);
+    if (out.length >= CPS_ETIQUETTE_MAX) break;
+  }
+  return out;
+}
+// Le code postal à essayer pour un colis VENDU Mondial Relay : celui que l'écho a PROUVÉ, sinon le
+// premier code de SON étiquette pas encore refusé. Rend { cp, source: 'lu' | 'etiquette' } ou null.
+export function cpDepartMr(t) {
+  if (!t) return null;
+  if (/^\d{5}$/.test(String(t.cp || ''))) return { cp: String(t.cp), source: 'lu' };
+  const refuses = listeCp(t.cpsRefuses);
+  const c = listeCp(t.cpsPdf).find((x) => !refuses.includes(x));
+  return c ? { cp: c, source: 'etiquette' } : null;
+}
+// Plus rien à essayer : l'étiquette a été lue (`cpsLu`) et chacun de ses codes refusé (ou aucun écrit).
+export const mrSansCodePostal = (t) => !!t && !!t.cpsLu && !cpDepartMr(t);
+// Le PDF de l'étiquette d'une vente (sa clé de sortant ⇒ la ligne qui porte le PDF, par SON n° de transaction).
+export function idPdfDuSortant(cle) {
+  const m = /^(vt|rt):(\d{3,20})$/.exec(String(cle || ''));
+  if (!m) return null;
+  return m[1] === 'vt' ? `email_bord_${m[2]}` : `email_bordretour_${m[2]}`;
 }
 // Map n° → ligne (une ligne par n° : deux transporteurs pour le même n° ⇒
 // ambigu, aucun des deux ne compte).
@@ -223,6 +279,8 @@ export function prochainEssaiDepart(t) {
   // état final lu). Pas pris et `fini` (8 nov.) : le n° est mort (expiré,
   // introuvable) — plus lu.
   if (t.clos || etatFinalDepart(t) || (t.fini && !pris)) return Infinity;
+  // (16 nov.) Mondial Relay sans code postal à essayer : aucune requête possible (rien n'est deviné).
+  if (t.carrier === 'mondialrelay' && mrSansCodePostal(t)) return Infinity;
   const e = msDe(t.essai);
   if (e == null) return 0;
   const r = t.essaiRes;
@@ -244,9 +302,12 @@ export function departsAInterroger({ sortants = [], departs = new Map(), entrant
     if (v != null && maintenant - v > FENETRE_DEPART_J * 86400000) continue;
     const t = departs instanceof Map ? departs.get(k) : null;
     if (t && t.carrier && t.carrier !== carrier) continue;
+    // (16 nov.) Mondial Relay sans code postal prouvé ni étiquette à lire (une vente Vestiaire, un bordereau sans
+    // n° de transaction) : rien à essayer, jamais deviné ⇒ pas choisi (aucune place prise, aucune ligne écrite).
+    if (carrier === 'mondialrelay' && !(t && t.cp) && !idPdfDuSortant(s.cle)) continue;
     const quand = prochainEssaiDepart(t);
     if (!(quand <= maintenant)) continue;
-    items.push({ carrier, suivi: k, quand, v: v == null ? Infinity : v, pris: !!(t && msDe(t.priseAt) != null) ? 1 : 0 });
+    items.push({ carrier, suivi: k, cle: String(s.cle == null ? '' : s.cle), quand, v: v == null ? Infinity : v, pris: !!(t && msDe(t.priseAt) != null) ? 1 : 0 });
   }
   // (11 nov.) D'abord les colis PAS ENCORE pris en charge (ils ont une date
   // limite d'envoi), les plus anciens d'abord (la limite la plus proche) ; puis
@@ -258,7 +319,7 @@ export function departsAInterroger({ sortants = [], departs = new Map(), entrant
     parC[it.carrier] = (parC[it.carrier] || 0);
     if (parC[it.carrier] >= parTransporteur) continue;
     parC[it.carrier]++;
-    out.push({ carrier: it.carrier, suivi: it.suivi });
+    out.push({ carrier: it.carrier, suivi: it.suivi, cle: it.cle });
   }
   return out;
 }
@@ -271,6 +332,13 @@ export function departsAInterroger({ sortants = [], departs = new Map(), entrant
 // (15 nov., lot retours-suivi) + `retours` : les bordereaux de RETOUR de ses achats (`email_bordretour_*` :
 // { suivi, transaction, receivedAt, transporteurPdf }) — un colis qu'IL poste : lu comme un départ, jusqu'à la
 // fin (déposé, au point relais du vendeur, livré), jamais en `transp_` (jamais « à retirer »).
+// Le transporteur NOMMÉ d'un champ de bordereau : 'mondialrelay' · '' (un autre nom : Chronopost, Vinted Go…)
+// · null (champ vide).
+export function nomDuBordereau(v) {
+  const t = String(v == null ? '' : v).trim();
+  if (!t) return null;
+  return /mondial|inpost/i.test(t) ? 'mondialrelay' : '';
+}
 export function sortantsDuVendeur({ vcVentes = null, bords = [], retours = [] } = {}) {
   const out = [];
   const vv = vcVentes && typeof vcVentes === 'object' ? vcVentes : {};
@@ -283,7 +351,14 @@ export function sortantsDuVendeur({ vcVentes = null, bords = [], retours = [] } 
   }
   for (const b of Array.isArray(bords) ? bords : []) {
     if (!b || !b.suivi) continue;
-    out.push({ cle: 'vt:' + String(b.transaction || b.suivi), suivi: b.suivi, transporteur: '', venteMs: msDe(b.receivedAt) });
+    // (16 nov.) Le transporteur NOMMÉ par le bordereau (l'e-mail, sinon l'étiquette) : Mondial Relay n'est
+    // jamais reconnu à la forme de son n° (8 chiffres, une forme banale).
+    // Seuls ces noms-là sont repris (Chronopost et Vinted Go restent reconnus à la forme PROPRE de leur n°,
+    // comme avant : « vinted » est le DÉFAUT d'un e-mail shipping@, pas une preuve).
+    // Deux noms différents (l'e-mail dit l'un, l'étiquette l'autre) ⇒ aucun (jamais deviné).
+    const noms = new Set([b.transporteur, b.transporteurPdf].map(nomDuBordereau).filter((x) => x !== null));
+    const nomme = noms.size === 1 ? [...noms][0] : '';
+    out.push({ cle: 'vt:' + String(b.transaction || b.suivi), suivi: b.suivi, transporteur: nomme, venteMs: msDe(b.receivedAt) });
   }
   for (const r of Array.isArray(retours) ? retours : []) {
     if (!r || !r.suivi) continue;

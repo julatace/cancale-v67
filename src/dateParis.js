@@ -48,6 +48,13 @@ export const anneeParis = (t = Date.now()) => jourParis(t).slice(0, 4);
 // Numéro du mois de Paris, 0 à 11 (comme getMonth) ; -1 si illisible.
 export const indexMoisParis = (t = Date.now()) => { const m = moisParis(t); return m ? Number(m.slice(5, 7)) - 1 : -1; };
 
+// (16 nov.) Arithmétique de jours sur le texte 'AAAA-MM-JJ' (aucun fuseau en jeu : un jour
+// de calendrier + n jours ; '' si illisible).
+export const jourDecale = (jour, n) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(jour || ''));
+  if (!m) return '';
+  return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + Math.trunc(Number(n) || 0))).toISOString().slice(0, 10);
+};
 // Arithmétique de mois sur le texte 'AAAA-MM' (aucun fuseau en jeu).
 export const moisDecale = (ym, delta) => {
   const m = /^(\d{4})-(\d{2})$/.exec(String(ym || ''));
@@ -62,6 +69,16 @@ export const moisRecents = (n, maintenant = Date.now()) => {
   const out = [];
   for (let i = 0; i < n; i++) out.push(moisDecale(ym, -i));
   return out;
+};
+
+// (16 nov., lot compta-donnees) Arithmétique de JOUR sur le texte 'AAAA-MM-JJ' (aucun fuseau en
+// jeu : midi UTC, puis les composants UTC) — '' si illisible. Les écrans qui recopiaient
+// `Date.UTC(…).toISOString().slice(0, 10)` passent ici.
+export const decalerJour = (jour, n) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(jour || ''));
+  if (!m) return '';
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + Math.trunc(Number(n) || 0), 12));
+  return Number.isFinite(d.getTime()) ? `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}` : '';
 };
 
 // Clé 'AAAA-MM-JJ' d'une date de CALENDRIER construite par ses composants
