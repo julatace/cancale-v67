@@ -14,20 +14,30 @@
 
   /* ── 1. LE FOCUS SE VOIT PARTOUT (2.4.7, 1.4.11) ─────────────────────────────
      L'anneau `#0060CC` seul tombait à 2,36:1 sur le dégradé bleu (en-tête) et 2,75:1 sur le
-     verre sombre. Un anneau DOUBLE, neutre (aucun accent de plus) : un filet d'encre collé au
-     contrôle + un liseré blanc autour. L'un des deux tient ≥ 3:1 sur la porcelaine, le verre et
-     le bleu profond. Seulement au clavier (`:focus-visible`), jamais au toucher. */
+     verre sombre. Un anneau DOUBLE et NEUTRE (aucun accent de plus) : un filet d'encre + un liseré blanc (sur le
+     bleu et la nuit, l'inverse) — l'un des deux tient ≥ 3:1 sur tout fond (banc accessibilite-clavier K2). Encre FIXE :
+     `--sb-encre` passe au clair sur toute la coque dans la couche verre (1,1:1 mesuré avec elle).
+     Seulement au clavier (`:focus-visible`), jamais au toucher. */
   :focus-visible {
-    outline: 2px solid #FFFFFF !important;
+    outline: 2px solid #0C1D30 !important;
     outline-offset: 1px !important;
-    box-shadow: inset 0 0 0 2px var(--sb-encre, #0C1D30), 0 0 0 3px var(--sb-encre, #0C1D30) !important;
+    box-shadow: 0 0 0 5px #FFFFFF !important;
+    transition: none !important;   /* l'anneau est là tout de suite (une transition d'ombre le faisait partir transparent) */
+  }
+  /* Posé sur le BLEU (la tête, la barre d'Achats, les liens sous le titre) et la nuit : l'inverse — filet blanc, liseré d'encre. */
+  :root[data-theme="dark"] :focus-visible,
+  .vrm-app-header .vrm-header-actions :focus-visible,
+  button.vrm-seg-btn[data-achats-onglet]:focus-visible,
+  [data-compta-pas-calcule] .vrm-b:focus-visible {
+    outline-color: #FFFFFF !important; box-shadow: 0 0 0 5px #0C1D30 !important;
+  }
+  /* Une ZONE qui remplit sa carte ou une rangée de liste (le parent coupe ce qui dépasse) : l'anneau se pose DEDANS. */
+  :is(.sj-zone, .vrm-toutes-ligne, .vrm-day-task, .vrm-av-resume, .vrm-ap-ligne, .vrm-set-ligne, .sb-rangee, .vrm-fu-case, .vrm-recherche-ligne, .vrm-buy-row, .vrm-lit-entree, .vg-carte):focus-visible {
+    outline-offset: -3px !important; box-shadow: inset 0 0 0 6px #FFFFFF !important;
   }
   /* Un contrôle natif TRANSPARENT posé sur son habillage (le champ de photo de profil, à opacité 0) :
      l'anneau se pose sur l'habillage. */
-  label:has(> input[type="file"]:focus-visible) {
-    outline: 2px solid #FFFFFF !important; outline-offset: 1px !important;
-    box-shadow: inset 0 0 0 2px var(--sb-encre, #0C1D30), 0 0 0 3px var(--sb-encre, #0C1D30) !important;
-  }
+  label:has(> input[type="file"]:focus-visible) { outline: 2px solid #0C1D30 !important; outline-offset: 1px !important; box-shadow: 0 0 0 5px #FFFFFF !important; }
   label > input[type="file"] { min-height: 0 !important; }
 
   /* ── 2. RIEN À L'ENCRE SOMBRE POSÉ SUR LE BLEU (1.4.3) ───────────────────────

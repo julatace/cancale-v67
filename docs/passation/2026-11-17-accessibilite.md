@@ -21,8 +21,9 @@ bleu comptent tels qu'ils s'affichent ; axe-core se trompait de fond sur le verr
 
 ## Ce qui change (après)
 - `src/design/accessibilite.css`, couche **`vrm-a11y` nommée AVANT `vrm-verre`** (index.html) : pour un
-  `!important`, la couche nommée la première gagne. Anneau DOUBLE neutre (filet d'encre + liseré blanc) à
-  `:focus-visible` ; encre claire du verre sur ce qui est posé sur le bleu ; « Relier un achat » de nuit ;
+  `!important`, la couche nommée la première gagne. Anneau DOUBLE neutre à `:focus-visible` (filet d'encre `#0C1D30` + liseré blanc ; sur le bleu de la
+  tête et la nuit l'inverse ; DEDANS pour une zone qui remplit sa carte ou une rangée ; `transition: none`, sinon
+  l'ombre partait transparente ; encre FIXE : `--sb-encre` est claire sur toute la coque dans la couche verre) ; encre claire du verre sur ce qui est posé sur le bleu ; « Relier un achat » de nuit ;
   zone de toucher étendue (`button.vrm-cible-44::before`) ; logos du choix de site et ronds de l'en-tête à 44 ;
   lien « Aller au contenu ».
 - `src/FichePaire.jsx` : focus entrant, Tab/Maj+Tab tournent dans la fiche (une feuille posée dessus garde son
@@ -41,6 +42,10 @@ bleu comptent tels qu'ils s'affichent ; axe-core se trompait de fond sur le verr
   `git archive 15f97138c`, dist de main), **114 ✅ / 0 ❌ après**.
 - Mutations (`BANC_MUTATION=`) : `contraste` (Achats rouge), `focus` (38 arrêts sans contour), `cibles`
   (N° 40×22), `noms` (3 lignes muettes), `fiche` (focus hors fiche) — chacune ROUGE.
+- `accessibilite-clavier` (7 écrans) : **20 ❌ sur main → 3** (Z2 « Calculette » et 2 K2 où le banc compose le verre
+  translucide sur le bleu de la coque : « Voir » et « Plus tard », sur verre clair à l'écran, anneau d'encre visible ;
+  les deux déjà rouges sur main). `accessibilite` A (7 écrans) 3 ❌ → 0 ; C inchangé (confirmation non ouverte, 4 ❌
+  sur main aussi) ; `clavier-voiceover` identique à main (8 ❌ des deux côtés, mêmes lignes).
 - `audit-studio` (et `--prouve` 13/13), `audit-traduction`, `audit-quoi-de-neuf`, `audit-tdz`,
   `audit-icones` verts. Captures regardées : 390 clair et sombre, 1512.
 
