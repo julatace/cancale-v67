@@ -37,7 +37,7 @@ process.env.DISCORD_CLIENT_SECRET = 'secret-discord-du-banc';
 
 let ko = 0, ok = 0;
 const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '  ❌ ') + m + (d !== undefined && !c ? ' — ' + String(d).slice(0, 240) : '')); };
-const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom, String(e && e.message || e).split('\n')[0].slice(0, 200)); } };
+const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom, String(e && e.message || e).split('\n').slice(0, 3).join(' / ').slice(0, 400)); } };
 
 // ── Les personnes (inventées) ────────────────────────────────────────────────
 const A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', Bu = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', Ca = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
@@ -291,7 +291,8 @@ const toutesLesVues = async (pg, etq) => {
   return trouves;
 };
 const ouvrirPersonnes = async (pg) => {
-  if (await pg.$('[data-cm-pin]')) await pg.click('[data-cm-pin]');
+  await pg.waitForTimeout(800);
+  if (await pg.$('[data-cm-pin]')) await pg.click('[data-cm-pin]', { force: true });
   else if (await pg.$('[data-cm-liste-secours] button')) await pg.click('[data-cm-liste-secours] button');
   await pg.waitForSelector('[data-cm-personnes]', { timeout: 8000 });
 };
@@ -308,7 +309,7 @@ const ouvrirPersonnes = async (pg) => {
     B.profils[Bu] = { pid: '22222222-bbbb-4bbb-8bbb-222222222222', pseudo: 'bruno_carte', ville: 'Cancale', pays: 'FR', lat: 48.7, lon: -1.85, depuis: '2026-11-02T00:00:00Z', discord: null };
   };
   try {
-    for (const [largeur, sombre, nomTheme] of [[390, false, '390-clair'], [390, true, '390-sombre'], [1512, false, '1512-clair']]) {
+    for (const [largeur, sombre, nomTheme] of [[390, false, '390-clair'], [390, true, '390-sombre'], [1512, false, '1512-clair']].filter((x) => !process.env.BANC_THEME || x[2] === process.env.BANC_THEME)) {
       console.log(`\n── ${nomTheme} · Alice fait coucou à Bruno sur la carte`);
       reset(); surCarte();
       // Un groupe (025/046) où Bruno est membre : la page Groupes est jugée aussi.
@@ -322,7 +323,7 @@ const ouvrirPersonnes = async (pg) => {
         const f = await champsMessage(pg);
         dit(f.length === 0 && !!(await pg.$(`[data-cm-coucou="${B.profils[Bu].pid}"]`)), 'la feuille d’un endroit : un bouton « 👋 Coucou », aucun champ de message', f.join(' | '));
         if (nomTheme !== '1512-clair') await capture(pg, 'carte-personnes-' + nomTheme);
-        await pg.click(`[data-cm-coucou="${B.profils[Bu].pid}"]`);
+        await pg.click(`[data-cm-personnes] [data-cm-coucou="${B.profils[Bu].pid}"]`);
         await pg.waitForFunction(() => /Coucou envoyé/.test(document.body.innerText), null, { timeout: 6000 }).catch(() => {});
         const req = B.reponses.filter((r) => r.action === 'carte-coucou');
         dit(B.ccarte.length === 1 && req.length === 1 && Object.keys(req[0].corps).sort().join() === 'action,pid', 'le coucou part : la requête ne porte que le pid public', req[0] && JSON.stringify(req[0].corps));
@@ -335,7 +336,8 @@ const ouvrirPersonnes = async (pg) => {
         const { ctx, pg } = await ouvrir(nav, { qui: Bu, largeur, sombre });
         await pg.waitForSelector('[data-cm-coucou-recu]', { timeout: 8000 });
         dit(/alice_carte t’a fait coucou/.test(await texte(pg)) && await attr(pg, '[data-cm-coucou-ecrire]', 'data-cm-coucou-ecrire') === 'aucun' && !(await pg.$('[data-cm-coucou-recu] a')), 'Bruno : « alice_carte t’a fait coucou » — pas de Discord relié ⇒ « Pas de Discord lié », AUCUN autre geste');
-        dit(await attr(pg, `[data-cm-coucou="${B.profils[A].pid}"]`, 'data-etat') === 'deja' || !(await pg.$(`[data-cm-coucou="${B.profils[A].pid}"]`)) && await (async () => { await ouvrirPersonnes(pg); return await attr(pg, `[data-cm-coucou="${B.profils[A].pid}"]`, 'data-etat') === 'deja'; })(), 'il ne peut pas le rendre dans les 24 h (une paire, un coucou)');
+        await pg.waitForFunction((pid) => { const e = document.querySelector(`[data-cm-coucou="${pid}"]`); return e && e.getAttribute('data-etat') !== 'charge'; }, B.profils[A].pid, { timeout: 8000 }).catch(() => {});
+        dit(await attr(pg, `[data-cm-coucou="${B.profils[A].pid}"]`, 'data-etat') === 'deja', 'il ne peut pas le rendre dans les 24 h (une paire, un coucou) : « Coucou fait ✓ »', await attr(pg, `[data-cm-coucou="${B.profils[A].pid}"]`, 'data-etat'));
         await pg.keyboard.press('Escape').catch(() => {}); await pg.goto(`http://localhost:${PORT}/?tab=communaute`, { waitUntil: 'domcontentloaded' });
         if (AV.signerIdDiscord) B.discordComptes[A] = { discord: 'alice_banc', did: DID_A, signatureId: AV.signerIdDiscord(A, 'alice_banc', DID_A), avatar: null, pid: '', signatureAvatar: null };
         await pg.waitForSelector('[data-cm-coucou-recu]', { timeout: 15000 });
