@@ -233,7 +233,8 @@ async function tactile(b) {
   // ── relier : glisser sur l'annonce N°2 (repérée une fois l'achat soulevé : c'est là qu'elle est à l'écran) ──
   a1 = await centre(pg, `[data-glisser-achat="${T1}"]`);
   await t('touchStart', a1.x, a1.y); await pause(650);
-  await pause(200);
+  await pg.evaluate(() => document.querySelector('[data-glisser-cible="a:pa1"]').scrollIntoView({ block: 'center' }));
+  await pause(250);
   const c2 = await centre(pg, '[data-glisser-cible="a:pa1"]');
   for (let i = 1; i <= 12; i++) { await t('touchMove', a1.x + (c2.x - a1.x) * i / 12, a1.y + (c2.y - a1.y) * i / 12); await pause(20); }
   await pause(150);
