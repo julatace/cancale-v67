@@ -61,6 +61,29 @@ graphe, BÉNÉFICE, VENDU de « Comparer », URSSAF à payer et CA de Déclarer,
 un plein, cibles ≥ 44, rien de tronqué ni de débordant, contraste, Paramètres, et la signature DOM éteinte = celle du
 build de `origin/claude/design-v2` (`BANC_REFERENCE`). Chiffres exacts : le corps de la PR.
 
+### Paramètres réorganisé (Julien : « c'est beau mais les cases sont dispersées partout »)
+Inventaire d'avant (téléphone, allumé) : une carte « Mon compte », une liste « Réglages » de 8 catégories, une liste
+« Avancé » (Sécurité des données) — trois blocs. Après : UNE liste de neuf sections, dans l'ordre des Réglages d'iOS,
+chacune avec icône, nom, valeur actuelle et chevron ; un toucher ouvre sa page (ses groupes d'hier, tels quels) :
+
+| section (nouveau nom) | avant | ce qu'elle tient |
+|---|---|---|
+| Compte | carte « Mon compte » | profil, abonnement, connexion, équipe, déconnexion, fermer le compte |
+| Plateformes et comptes | « Mes plateformes » | comptes reliés, extension, onglets, e-mails |
+| Ventes et colis | idem | impression, colis (SMS, carte merci), modèles d'annonce |
+| Stock et numéros | idem | numéros, « je vends » |
+| Argent et compta | « Argent » | régime, prix d'achat, ventes masquées, objectif du mois |
+| Apparence et langue | idem (avant Notifications désormais) | langue, thème, nouveau design, zoom, taille du texte, écrans, Stream, raccourcis |
+| Notifications | idem | push, rappels, agenda, alertes, capte |
+| Sécurité et données | « Sécurité des comptes » + « Sécurité des données » (expert) | gardes des comptes (discrétion, vacances, santé, copie) PUIS le panneau technique « Sécurité des données » tel quel, sauvegarde/export/restaurer/corbeille, confidentialité |
+| Aide | « Aide et Tout va bien ? » | Tout va bien ?, aide, revoir, propriétaire |
+
+Déplacés : seulement les deux catégories de sécurité, réunies (leurs rangées et leurs panneaux inchangés). La recherche
+« Chercher un réglage » liste les rangées trouvées (« dans Section ») ; un toucher ouvre la section, amène la rangée au
+centre et la surligne 2,4 s. Ordinateur : deux colonnes, les neuf sections à gauche, la section choisie à droite.
+Banc (R) : 9 sections dans l'ordre, aucune carte à part, CHAQUE rangée d'hier (relevée éteint, section par section)
+atteinte en deux touchers, la recherche « langue » mène à sa rangée surlignée, deux colonnes à 1512.
+
 ### AIR (Julien : « c'est trop compacté »), mesuré par le banc (A)
 Texte ≥ 20 px du bord de SA carte (les cartes d'hier d'Argent passent à 20 px : `vrm-surface`, `vrm-urssaf-geste`,
 `vrm-mb`, `vrm-compta-carte`, `vrm-ac-*`, `vrm-d7-*`, `vrm-stva`, `vrm-fp-section`…), 16 px entre deux cartes, 32 entre
