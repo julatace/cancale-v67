@@ -64,7 +64,7 @@ function monter(o = {}) {
       if (e.methode === 'GET' && /\/api\/v2\/item_upload\/items\/\d+$/.test(e.chemin)) return { status: 200, body: { item: { id: Number(e.chemin.split('/').pop()) } } };
       if (e.methode === 'POST' && /\/api\/v2\/photos$/.test(e.chemin)) return { status: 200, body: { id: ++v.nPhotos } };
       if (e.methode === 'POST' && /\/api\/v2\/item_upload\/drafts\/?$/.test(e.chemin)) { const s = st(o.brouillon || 200); return { status: s, body: s === 200 ? { draft: { id: 88001 } } : { code: 0 } }; }
-      if (e.methode === 'POST' && /\/api\/v2\/item_upload\/drafts\/\d+\/completion$/.test(e.chemin)) { const s = st(o.completion || 200); if (s === 200) v.brouillon = 'en-ligne'; return { status: s, body: s === 200 ? { item: { id: 88001 } } : { code: 0, message: 'refus de test' } }; }
+      if (e.methode === 'POST' && /\/api\/v2\/item_upload\/drafts\/\d+\/completion$/.test(e.chemin)) { const s = st(o.completion || 200); if (s === 200) v.brouillon = 'en-ligne'; return { status: s, body: s === 200 ? { item: { id: 88001 } } : o.refusPhotos ? { code: 99, message: 'Erreurs trouvées', errors: [{ field: 'photos', value: 'La photo 1234567 de « Basket test 42 » est refusée' }] } : { code: 0, message: 'refus de test' } }; }
       if (e.methode === 'POST' && /\/api\/v2\/items\/9101\/delete$/.test(e.chemin)) { const s = st(o.suppression || 200); if (s === 200) v.ancienne = 'partie'; return { status: s, body: {} }; }
       return { status: 404, body: {} };
     } });
@@ -123,6 +123,16 @@ async function auditer() {
     const r = await reprendre(f);
     dit(avant.e === 'a-publier' && /^refuse-400/.test(avant.c || '') && r && r.etape === 'fait' && vb(f).etat === 'fait' && !('cause' in vb(f)), "A4 — mise en ligne refusée (400) puis reprise : « fait » ne garde plus « refuse-400 »", JSON.stringify({ avant, apres: { e: vb(f).etat, c: vb(f).cause }, r: r && (r.etape || r.code), raison: r && r.raison }));
     dit(n(f.j, 'B') === 1 && n(f.j, 'S') === 1 && n(f.j, 'M') === 2, "C2 — la reprise met en ligne le brouillon EXISTANT : un seul brouillon, une seule suppression", `seq=${seq(f.j)}`); }
+
+  // ── T — la TRACE (forme seulement) : la cause d'un refus se prouvera au premier vrai essai
+  { const f = monter({ completion: 400, refusPhotos: true }); await recreer(f); echeance(f); await tick(f);
+    const tr = f.store.vrmTraceRepub || [];
+    const b = tr.find((x) => x.quoi === 'brouillon'), m = tr.find((x) => x.quoi === 'mise_en_ligne');
+    dit(b && m && b.req && b.req.photos === 2 && b.req.photosDistinctes === 2 && JSON.stringify(b.req.photoCles) === '["id","orientation"]' && m.req && ['relu', 'televerse'].includes(m.req.photosDe) && m.req.sessionEgale === true, "T1 — chaque brouillon et chaque mise en ligne laissent leur FORME : nombre de photos (distinctes), clés d'une photo, d'où viennent les photos", JSON.stringify({ b: b && b.req, m: m && m.req && { p: m.req.photos, de: m.req.photosDe } }));
+    const e = m && m.rep && m.rep.erreurs && m.rep.erreurs[0];
+    dit(m && m.rep.status === 400 && e && e.champ === 'photos' && /La photo # de «…» est refusée/.test(e.message), "T2 — un refus garde le champ, le code et le message de Vinted (chiffres et citations masqués)", JSON.stringify(m && m.rep));
+    const brut = JSON.stringify(tr) + JSON.stringify(Object.entries(f.lignes).filter(([k]) => /^repub_trace_111_/.test(k)));
+    dit(Object.keys(f.lignes).some((k) => /^repub_trace_111_[0-9a-f]{16}$/.test(k)) && !/Basket test|Très bon état|1234567|88001|9101|images1\.vinted/.test(brut), "T3 — la trace est publiée sur la ligne de CE Chrome, sans titre, description, identifiant ni photo", brut.slice(0, 300)); }
 
   // ── B — reprise après un service worker tué à chaque étape
   // B1 : tué avant le brouillon (coffre écrit, rien d'autre) — l'ancienne est encore là ⇒ rien ne part.
@@ -276,6 +286,9 @@ async function prouver() {
     ['app : supprimée affichée avant brouillon', 'app', "export const CHAINE = ['coffre', 'brouillon', 'supprimee', 'enligne'];", "export const CHAINE = ['coffre', 'supprimee', 'brouillon', 'enligne'];"],
     ['extension : supprimée annoncée avant brouillon', 'bg', "const ORDRE_ETAPES_REPUB = ['coffre', 'brouillon', 'supprimee', 'enligne'];", "const ORDRE_ETAPES_REPUB = ['coffre', 'supprimee', 'brouillon', 'enligne'];"],
     ['écran plein : supprimée dessinée avant brouillon', 'action', "['coffre', 'brouillon', 'supprimee', 'enligne'].map((k, i)", "['coffre', 'supprimee', 'brouillon', 'enligne'].map((k, i)"],
+    ['trace coupée', 'bg', "try { sansRejet(tracerRepub(acc, String(method || 'POST').toUpperCase(), endpoint, body, o), 'trace_repub'); } catch (_) {}", ''],
+    ['trace sans masque', 'bg', ".replace(/\\d{3,}/g, '#')", ''],
+    ['sans relecture du brouillon dans Refaire', 'bg', "const luR = appliquerBrouillonLu(corpsC.draft, rlR, draftId);", "const luR = { photos: null };"],
     ['sans brouillon : reprendre au lieu de recréer', 'app', "if (x.etat === 'a-refaire' && !x.draftId)", "if (false)"],
   ];
   for (const [nom, cible, de, vers] of M) {

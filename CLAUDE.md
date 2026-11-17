@@ -489,7 +489,7 @@ sans la fonction.
 | `creervinted` | `creerVintedFiche` | **5.367.0** (11 nov.) | « Créer sur Vinted » depuis une fiche « À publier » : sur son clic, UN brouillon par fiche depuis l'onglet vinted.fr (compte de l'onglet, 1 action dans les 45/h) ; champ du catalogue pas au libellé exact ⇒ DEMANDÉ (valeurs de Vinted) ; N° lié à l'id rendu ; il publie |
 | `repubdepart` | `etatDepartRepub` | **5.368.0** (11 nov.) | « Programmer » Republier : l'état dit l'onglet vinted.fr ouvert et le frein de republication du compte (lecture seule, « pas su » ⇒ rien ne part) |
 | `actionplein` `carte5` | `avecActionPlein` · `vrm-ui.js:habiller` | **5.406.0** (17 nov.) | écran plein pendant une action VRM sur vinted.fr (favoris, republier, baisse) : Vinted flouté, clic et clavier retenus, « Tout arrêter » / « Réduire », s'écarte sur un captcha ; carte design v2 et feuille commune `vrm-ui.js` (5 langues) |
-| `repubetapes` `repubreprise` | `vbAvecEtapes` · `reprendreRepub` | **5.408.0** (17 nov.) | chaque étape d'une paire datée sur sa preuve (coffre · brouillon · supprimée · en ligne), dite sur l'écran plein ; « Reprendre » sur son clic relit chez Vinted et finit une paire interrompue (jamais deux en ligne) ; mise en ligne interrompue relue, alarme à l'heure |
+| `repubetapes` `repubreprise` | `vbAvecEtapes` · `reprendreRepub` | **5.408.0** (17 nov.) | chaque étape d'une paire datée sur sa preuve (coffre · brouillon · supprimée · en ligne), dite sur l'écran plein ; « Reprendre » sur son clic relit chez Vinted et finit une paire interrompue (jamais deux en ligne) ; mise en ligne interrompue relue, alarme à l'heure ; forme de chaque requête et refus (sans valeurs) dans `repub_trace_{uid}_{nav}` |
 
 ---
 

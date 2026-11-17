@@ -99,6 +99,44 @@ Vinted » sous « Fini » était fausse pour un brouillon à refaire (retirée q
 Passe d'audits (169 audits qui touchent la republication, l'extension, les textes) : aucun rouge nouveau par
 rapport à la branche de départ (`renum-b` hors délai, `vendeur-generaliste`, `vocabulaire-article` déjà rouges).
 
+## 6. La cause des refus « photos » (enquête du 17 nov., lecture seule)
+
+Ce que disent les lignes rangées (`vinted_brouillon_*` de VRM, leur `coffre_*`, `panel_diag_capture`) :
+
+| hypothèse | verdict | preuve |
+|---|---|---|
+| les photos du brouillon sont celles de l'ANCIENNE annonce, mortes avec elle | **réfutée** | chaque brouillon VRM porte des photos TÉLÉVERSÉES à sa création (`televerserPhotosRecreer` : photos du coffre renvoyées une à une) ; leurs identifiants sont du même moment que le brouillon (9 brouillons sur 9), jamais ceux de l'ancienne |
+| photos en double (même image sous plusieurs liens) | 1 cas sur 9 | le 1er brouillon (28 oct.) : 20 photos envoyées pour 15 vraies (75 liens au coffre). Corrigé le 28 oct. (`photosUniques`, une photo = sa clé) ; les 8 suivants : autant de photos que de vraies |
+| forme longue des photos (`ai_detected`, `c2pa_read_error`, `digital_source_type`) | 6 sur 9 (28 oct.) | Vinted la rend au téléversement ; ses propres brouillons (capturés quand Julien publie à la main) n'envoient que `{id, orientation}`. Corrigé le 29 oct. (5.278) |
+| mise en ligne avec les identifiants du TÉLÉVERSEMENT au lieu de ceux que le brouillon porte chez Vinted | toutes les tentatives mesurées | la relecture du brouillon avant la mise en ligne (`appliquerBrouillonLu`) est arrivée en 5.284 (29 oct. au soir) ; son compteur `brouillon_lu_*` est à **0** en base : **aucune** mise en ligne n'est partie depuis. La 5.408 l'ajoute aussi à « Refaire » (qui ne relisait pas) |
+| `push_up: false` et `feedback_id: null` dans le corps de mise en ligne | pas tranché | absents du corps capturé quand Julien publie lui-même ; présents chez Vintex (relevé du 29 oct.) |
+| la taille | 1 sur 20 | `vinted_refus_champs_photos_size` ×1 |
+
+**Conclusion honnête** : les 20 refus datent tous d'extensions d'AVANT les corrections du 28-29 oct. ; le chemin
+d'aujourd'hui n'a jamais été essayé contre le vrai Vinted, et la réponse de Vinted n'était pas gardée (seulement
+sa longueur). Rien n'est réintroduit de ce que CLAUDE.md liste comme retiré : `photosNeuvesBrouillon` renvoyait
+de NOUVELLES photos après un refus (un second essai en rafale) ; ici les photos sont téléversées UNE fois, à la
+création, comme depuis le 29 oct. — rien n'a changé à ce sujet.
+
+**Ce que la 5.408 ajoute pour prouver la cause au premier essai** : la trace de forme (`tracerRepub`) — pour
+chaque brouillon, mise en ligne, lecture et suppression : clés du corps, nombre de photos (distinctes), clés
+d'une photo, d'où viennent les photos (`relu` / `televerse`), statut, clés de la réponse, et pour un refus le
+champ, le code et le message de Vinted (chiffres et citations masqués). Jamais un titre, une description, un
+prix, un identifiant. Dans `chrome.storage.local` (`vrmTraceRepub`, 30 dernières) et sur
+`repub_trace_{uid}_{navigateur}` en base. Audit T1-T3 (+ 3 mutations).
+
+## 7. Le premier essai réel — la recette pour Julien (UNE paire)
+
+1. Installer la 5.408.0, ⟳. Ouvrir vinted.fr sur le bon compte (un seul onglet Vinted).
+2. VRM → Annonces → Republier : cocher **une** paire (une qui ne craint rien : peu de favoris), « Par VRM · 1 »,
+   Continuer, « Je confirme », Republier. Garder l'onglet vinted.fr ouvert 4 minutes.
+3. Regarder l'écran plein : Coffre ✓ › Brouillon ✓ › Supprimée ✓ › En ligne dans 2 min, puis le bilan.
+4. Dire à Claude « j'ai fait l'essai » : la ligne `repub_trace_*` dit la forme de chaque requête et, si Vinted
+   refuse, le champ et le message — la cause suivante, ou la preuve que c'est réglé.
+5. Les 5 paires restées en brouillon : Annonces → « Brouillons à refaire », le bouton de chaque ligne (il passe
+   par « Reprendre » : brouillon relu chez Vinted, ses photos telles que Vinted les a rangées, puis mise en ligne ;
+   brouillon disparu ⇒ recréé depuis le coffre). À faire APRÈS l'essai réussi d'une paire.
+
 ## Geste de Julien
 
 1. Installer l'extension **5.408.0** (remplacer le dossier, ⟳ dans chaque Chrome).

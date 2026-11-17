@@ -14851,6 +14851,57 @@ const RAISON_ONGLET_VINTED = "ouvre vinted.fr dans ce Chrome, connecté sur ce c
 const RAISON_COMPTE_PAGE = "l'onglet vinted.fr n'est pas (ou plus) connecté sur ce compte — bascule sur ce compte dans l'onglet, puis réessaie. Rien n'est parti.";
 const RAISON_NAVIGATEUR_PAGE = "ce navigateur ne laisse pas VRM agir depuis la page Vinted — republie depuis Chrome sur l'ordinateur. Rien n'a été touché.";
 // `corps` : un objet (JSON) ou { photo: { b64, type, nom, temp } } (multipart).
+// ══ 5.408 — LA TRACE DE LA REPUBLICATION (pour prouver la cause des refus « photos ») ══
+// Mesuré (17 nov.) : 20 mises en ligne refusées (400, champ « photos »), et VRM n'a JAMAIS gardé
+// la réponse de Vinted (seulement sa longueur) : la cause ne se prouve pas après coup. Chaque
+// requête de la republication (brouillon, mise en ligne, lecture d'un brouillon/annonce) laisse
+// ici sa FORME : clés du corps, nombre de photos (distinctes), clés d'une photo, d'où viennent les
+// photos (identifiants pris à la relecture du brouillon ou au téléversement), statut, clés de la
+// réponse, et pour un refus : champ, code, message de Vinted (chiffres et citations masqués,
+// 160 caractères). JAMAIS un titre, une description, un prix, un identifiant, un pseudo.
+// Rangée dans `chrome.storage.local` (30 dernières) et publiée sur la ligne de CE Chrome
+// (`repub_trace_{uid}_{navigateur}`, un seul écrivain) : Claude la lit après son premier essai.
+const TRACE_REPUB = 'vrmTraceRepub';
+// D'où viennent les photos d'un corps envoyé ('relu' : relues sur le brouillon chez Vinted ; 'televerse' : rendues au téléversement) — à côté du corps, jamais DEDANS (rien de plus ne part chez Vinted).
+const PHOTOS_DE = new WeakMap();
+const masquerTexte = (t) => String(t == null ? '' : t).replace(/[«“"][^»”"]{0,200}[»”"]/g, '«…»').replace(/\d{3,}/g, '#').slice(0, 160);
+function formeCorpsRepub(b) {
+  if (!b || typeof b !== 'object') return null;
+  const d = b.draft && typeof b.draft === 'object' ? b.draft : b.item && typeof b.item === 'object' ? b.item : null;
+  const ph = d && Array.isArray(d.assigned_photos) ? d.assigned_photos : null;
+  return { cles: Object.keys(b).sort(), dCles: d ? Object.keys(d).sort() : null,
+    photos: ph ? ph.length : null, photosDistinctes: ph ? new Set(ph.map((p) => String(p && p.id))).size : null,
+    photoCles: ph && ph[0] && typeof ph[0] === 'object' ? Object.keys(ph[0]).sort() : null,
+    pushUp: 'push_up' in b ? b.push_up : undefined, feedback: 'feedback_id' in b, sessionEgale: !!(d && b.upload_session_id && d.temp_uuid === b.upload_session_id),
+    attrs: d && Array.isArray(d.item_attributes) ? d.item_attributes.map((a) => a && a.code).filter(Boolean).sort() : null,
+    taille: !!(d && Array.isArray(d.item_attributes) && d.item_attributes.some((a) => a && a.code === 'size' && Array.isArray(a.ids) && a.ids.length)),
+    couleurs: d && Array.isArray(d.color_ids) ? d.color_ids.length : null, catalogue: !!(d && Number(d.catalog_id) > 0), colis: !!(d && Number(d.package_size_id) > 0),
+    photosDe: PHOTOS_DE.get(b) || undefined };
+}
+function formeReponseRepub(o) {
+  const j = o && o.json && typeof o.json === 'object' ? o.json : null;
+  const errs = j && Array.isArray(j.errors) ? j.errors.slice(0, 8).map((e) => ({ champ: String((e && (e.field || e.name)) || '').slice(0, 40), code: e && e.code != null ? String(e.code).slice(0, 40) : '', message: masquerTexte(e && (e.value || e.message)) })) : null;
+  const it = j && (j.item || j.draft);
+  const ph = it && Array.isArray(it.photos) ? it.photos : it && Array.isArray(it.assigned_photos) ? it.assigned_photos : null;
+  return { status: Number(o && o.status) || 0, cles: j ? Object.keys(j).sort().slice(0, 20) : null, code: j && j.code != null ? String(j.code).slice(0, 40) : undefined,
+    message: j && (j.message || j.message_code) ? masquerTexte(j.message || j.message_code) : undefined, erreurs: errs,
+    itemCles: it && typeof it === 'object' ? Object.keys(it).sort().slice(0, 60) : null, isDraft: it && typeof it.is_draft === 'boolean' ? it.is_draft : undefined,
+    photos: ph ? ph.length : undefined, photoCles: ph && ph[0] && typeof ph[0] === 'object' ? Object.keys(ph[0]).sort().slice(0, 30) : undefined };
+}
+async function tracerRepub(acc, m, endpoint, body, o) {
+  const e = String(endpoint || '');
+  const quoi = m === 'POST' && /\/item_upload\/drafts\/?$/.test(e) ? 'brouillon' : m === 'POST' && /\/item_upload\/drafts\/\d+\/completion$/.test(e) ? 'mise_en_ligne'
+    : m === 'GET' && /\/item_upload\/items\/\d+$/.test(e) ? 'lecture' : m === 'POST' && /\/items\/\d+\/delete$/.test(e) ? 'suppression' : m === 'POST' && /\/photos$/.test(e) ? 'photo' : '';
+  if (!quoi) return;
+  const uid = String((acc && acc.vinted_user_id) || ''); if (!/^\d{1,20}$/.test(uid)) return;
+  const t = { at: Date.now(), quoi, ver: CODE_VERSION, req: quoi === 'photo' || quoi === 'lecture' || quoi === 'suppression' ? null : formeCorpsRepub(body), rep: formeReponseRepub(o) };
+  let l = []; try { l = (await chrome.storage.local.get(TRACE_REPUB))[TRACE_REPUB] || []; } catch (_) { l = []; }
+  l = (Array.isArray(l) ? l : []).concat(t).slice(-30);
+  try { await chrome.storage.local.set({ [TRACE_REPUB]: l }); } catch (_) {}
+  // Publiée seulement pour ce qui JUGE (pas chaque photo) : un brouillon, une mise en ligne, un refus.
+  if (quoi === 'photo' && t.rep.status < 400) return;
+  try { const nav = await idNavigateur(); if (nav) await supabaseUpsert('app_data', [{ id: `repub_trace_${uid}_${nav}`, data: { v: 1, uid, nav, maj: new Date().toISOString(), trace: l.filter((x) => x.quoi !== 'photo' || (x.rep && x.rep.status >= 400)) } }], 'id'); } catch (_) {}
+}
 async function vintedPage(acc, method, endpoint, body, options = {}) {
   const domain = acc.domain || 'www.vinted.fr';
   return requeteVinted('api', async () => {
@@ -14900,6 +14951,7 @@ async function vintedPage(acc, method, endpoint, body, options = {}) {
       if (o.horsVinted || !VINTED_HOTE.test(hote)) { noterDiag('page_hors_vinted'); return { status: 0, ok: false, json: null, horsVinted: true, sansPage: 'onglet' }; }
       const ent = o.entetes && typeof o.entetes === 'object' ? o.entetes : {};
       await secuObserver('vinted', acc && acc.vinted_user_id, { status: o.status, json: o.json, texte: o.texte, entetes: ent });
+      try { sansRejet(tracerRepub(acc, String(method || 'POST').toUpperCase(), endpoint, body, o), 'trace_repub'); } catch (_) {}   // 5.408 : la FORME (jamais les valeurs)
       return { status: o.status, ok: o.ok, json: o.json, viaPage: true, retryAfter: ent['retry-after'] || null };
     } catch (_) { return { status: 0, ok: false, json: null }; }
   }, acc);
@@ -15189,6 +15241,7 @@ async function publierBrouillon(msg) {
       if (rl && rl.sansPage) return { accepte: false, code: 'onglet-vinted', raison: raisonSansPage(rl) };
       if (rl && (rl.status === 404 || rl.status === 410)) return { accepte: false, code: 'pas-dans-dressing', raison: "Vinted dit que ce brouillon n'existe plus — rien n'a été touché." };
       const lu = appliquerBrouillonLu(r.d, rl, id);
+      r.photosDe = lu.photos > 0 ? 'relu' : 'stocke';
       if (lu.photos === 0) return { accepte: false, code: 'incomplet', raison: "Vinted refuserait ce brouillon : il n'a plus aucune photo chez Vinted. Ouvre-le sur Vinted (Mes brouillons → « Modifier »), rajoute les photos, puis réessaie. Rien n'a été touché." };
       r.nPhotos = Array.isArray(r.d.assigned_photos) ? r.d.assigned_photos.length : r.nPhotos;
     } }
@@ -15233,6 +15286,7 @@ async function publierBrouillon(msg) {
       if (await brouillonPlanifie(id) || await lireVerrouRecreer('b' + id)) return { accepte: false, code: 'planifiee', raison: 'une mise en ligne de ce brouillon est déjà en cours — rien n’a été renvoyé' }; }
     const temp = (typeof r.d.temp_uuid === 'string' && r.d.temp_uuid) ? r.d.temp_uuid : uuidRecreer();
     const corpsC = { draft: { ...r.d, id: Number(id) }, feedback_id: null, parcel: null, push_up: false, upload_session_id: temp };
+    try { PHOTOS_DE.set(corpsC, r.photosDe || 'stocke'); } catch (_) {}
     suiviRepub(id); etapeRepub(id, 'en-ligne');
     await poserVerrouRecreer('b' + id);
     let rc = await vintedPage(acc, 'POST', `/api/v2/item_upload/drafts/${id}/completion`, corpsC, { timeoutMs: 60000 });
@@ -15447,6 +15501,7 @@ async function refaireBrouillon(msg) {
     }
     const titre = String(d.title).replace(/\s+/g, ' ').trim();
     const corpsC = { draft: { ...brouillon, id: Number(draftId) }, feedback_id: null, parcel: null, push_up: false, upload_session_id: temp };
+    try { PHOTOS_DE.set(corpsC, 'televerse'); } catch (_) {}
     await rangerBrouillon(draftId, { uid, corps: JSON.stringify(corpsC), titre, prix: prixD, nPhotos: tp.ids.length, parVRM: true, ancienId: id, etat: 'brouillon' });
     if (!enLigneApres) {
       await majVersBrouillon(uid, id, { etat: 'fait', draftId });
@@ -15465,6 +15520,12 @@ async function refaireBrouillon(msg) {
     etapeRepub(id, 'en-ligne');
     const stopC = await gardeStricte(uid, acc, { reserve: RESERVE_GESTES });
     if (stopC) { await majVersBrouillon(uid, id, { etat: 'a-publier' }); return { accepte: true, etape: 'echec', refaire: true, draftId, raison: `le brouillon est rangé sur Vinted, mais il n'a pas été mis en ligne (${stopC.error}) — « Refaire » le remet en ligne, sans en créer un autre.` }; }
+    // 5.408 : comme la mise en ligne planifiée (5.284), le brouillon est RELU d'abord et ses photos (telles que
+    // Vinted les a rangées) partent dans la mise en ligne — jamais seulement les identifiants du téléversement.
+    { const rlR = await vintedPage(acc, 'GET', `/api/v2/item_upload/items/${draftId}`, null, { timeoutMs: 30000 });
+      const luR = appliquerBrouillonLu(corpsC.draft, rlR, draftId);
+      try { PHOTOS_DE.set(corpsC, luR.photos > 0 ? 'relu' : 'televerse'); } catch (_) {}
+      if (luR.photos === 0) { await majVersBrouillon(uid, id, { etat: 'a-publier' }); return { accepte: true, etape: 'echec', refaire: true, draftId, raison: "le brouillon est rangé sur Vinted, mais Vinted ne lui montre plus aucune photo : VRM ne le met pas en ligne. Ouvre-le sur Vinted (Mes brouillons → « Modifier »)." }; } }
     await poserVerrouRecreer('b' + draftId);
     const rc = await vintedPage(acc, 'POST', `/api/v2/item_upload/drafts/${draftId}/completion`, corpsC, { timeoutMs: 60000 });
     if (rc && rc.sansPage) { await leverVerrouRecreer('b' + draftId); await majVersBrouillon(uid, id, { etat: 'a-publier' }); return { accepte: true, etape: 'echec', refaire: true, draftId, raison: `le brouillon est rangé sur Vinted, mais il n'a pas été mis en ligne : ${raisonSansPage(rc)}` }; }
@@ -16531,6 +16592,7 @@ async function finRepubBrouillon(acc, job) {
     const rlB = await vintedPage(acc, 'GET', `/api/v2/item_upload/items/${draftId}`, null, { timeoutMs: 30000 });
     if (corpsCV && corpsCV.draft) {
       const lu = appliquerBrouillonLu(corpsCV.draft, rlB, draftId);
+      try { PHOTOS_DE.set(corpsCV, lu.photos > 0 ? 'relu' : 'televerse'); } catch (_) {}
       const rgF = lu.photos === 0 ? { manque: ['les photos'], question: await questionRepub(uid, corpsCV.draft, ['photos'], { id, draftId }) } : await reglerAvant(uid, acc, corpsCV.draft, [id, draftId], null, { id, draftId });
       const manqueF = rgF.manque;
       const dvF = manqueF.length ? null : await refusDejaVu('b' + draftId, corpsCV.draft);
