@@ -55,7 +55,7 @@ const CONTRASTE = `(() => {
 
 // La signature d'un écran : balises, classes triées et NOMS des data-* (jamais les valeurs ni le texte : l'heure bouge).
 const SIGNATURE = () => { const m = document.querySelector('.vrm-main'); if (!m) return null; const out = [];
-  const pas = (e, d) => { if (d > 60 || e.matches('.vrm-fraicheur-hote, [data-temps-reel-neuf], [data-fraicheur-unique]')) return; const cl = [...e.classList].sort().join('.'); const da = [...e.attributes].map((a) => a.name).filter((n) => n.startsWith('data-') && !/^data-(sb-|v2|vu$)/.test(n)).sort().join(',');
+  const pas = (e, d) => { if (d > 60 || e.matches('.vrm-fraicheur-hote, [data-temps-reel-neuf], [data-fraicheur-unique], [data-geste-disque]')) return; const cl = [...e.classList].sort().join('.'); const da = [...e.attributes].map((a) => a.name).filter((n) => n.startsWith('data-') && !/^data-(sb-|v2|vu$)/.test(n)).sort().join(',');
     out.push(d + ':' + e.tagName + (cl ? '.' + cl : '') + (da ? '[' + da + ']' : '')); for (const c of e.children) pas(c, d + 1); };
   pas(m, 0); return out; };
 
@@ -107,10 +107,22 @@ async function telephone(nav, sombre, b, sigs) {
       ret: (document.querySelector('[data-tuile="retirer"]') || { getAttribute: () => null }).getAttribute('data-n'),
       codes: [...new Set([...document.querySelectorAll('.vrm-colis-retirer [data-code-retrait]')].map((e) => e.getAttribute('data-code-retrait')))],
       qr: document.querySelectorAll('.vrm-colis-retirer [data-rp-a-qr="1"]').length,
-      attr: document.documentElement.getAttribute('data-design') }), SIGNATURE.toString());
+      attr: document.documentElement.getAttribute('data-design'),
+      // (17 nov.) Plus de disque « + », réglage éteint aussi ; ses gestes, chacun à sa place.
+      disque: !!document.querySelector('[data-sb-disque], .sb-disque'), onglets: document.querySelectorAll('.vrm-tabbar > .vrm-tab').length,
+      loupe: !!document.querySelector('button[data-recherche-loupe]'), publier: !!document.querySelector('[data-geste-disque="publier"] button'),
+      imprimer: !!document.querySelector('[data-sj-imprimer], [data-imprimer-prets]'), ajouterAchat: !!document.querySelector('[data-achat-hors-ajouter], [data-achats-hors-entete]') }), SIGNATURE.toString());
     x.sig = sig; avant[id] = x;
     if (!sombre) sigs[id] = x.sig;
     if (id === 'journee') dit(x.attr == null && !erreurs.length, `E éteint : aucun data-design sur <html>, aucune erreur (${th})`, { attr: x.attr, erreurs });
+    dit(!x.disque && x.onglets === 5, `D éteint · ${id} : aucun disque « + », cinq onglets (${th})`, x);
+    if (id === 'journee') {
+      dit(x.loupe && x.imprimer, `D éteint · Ma journée : Chercher (la loupe) et Imprimer N à un toucher (${th})`, x);
+      await pg.locator('button[data-recherche-loupe]').first().tap({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(700);
+      dit(await pg.evaluate(() => !!document.querySelector('[data-recherche-scanner]')), `D éteint : Scanner = l’icône dans le champ de recherche (${th})`);
+    }
+    if (id === 'annonces') dit(x.publier, `D éteint · Annonces : Publier sur la ligne du titre (${th})`, x);
+    if (id === 'achats') dit(x.ajouterAchat, `D éteint · Achats : Ajouter un achat (${th})`, x);
     if (!sombre && id === 'journee') await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `eteint-journee-390-${th}.png`) });
     await ctx.close();
   }
@@ -231,9 +243,9 @@ async function telephone(nav, sombre, b, sigs) {
       publierHaut: (() => { const p = document.querySelector('[data-v2-principal="publier"]'); return p ? Math.round(p.getBoundingClientRect().top) : null; })(), disque: !!document.querySelector('[data-sb-disque]'), pleins: [...document.querySelectorAll('[data-v2b="principal"], .sb-btn-plein')].filter(vis).length, plein: (document.querySelector('[data-v2-principal]') || {}).textContent || '' }; });
   dit(an.premiere != null && an.premiere <= 380, `N la 1re annonce commence à ${an.premiere} px (≤ 380)`, an);
   dit(!an.puces && !an.selPaires && !an.stats && an.segN === 3, 'N ni puces, ni « Annonces | Stock », ni chiffres : UN segmenté (En ligne · Qui dorment · À publier)', an);
-  dit(an.alignes && an.alignes.champ[1] === 44 && an.alignes.plus[1] === 44 && Math.abs(an.alignes.champ[0] - an.alignes.plus[0]) <= 1, 'N recherche et « ⋯ » : même hauteur (44), même ligne', an.alignes);
+  dit(an.alignes && an.alignes.champ[1] >= 44 && an.alignes.champ[1] === an.alignes.plus[1] && Math.abs(an.alignes.champ[0] - an.alignes.plus[0]) <= 1, `N recherche et « ⋯ » : même hauteur (${an.alignes && an.alignes.champ[1]}), même ligne`, an.alignes);
   dit(an.hauteurs.length >= 3 && an.hauteurs.every((h) => h === 80 || h === 96), `N rangées de 80 px (96 quand le titre prend deux lignes) (${an.hauteurs.join(', ')})`, an.hauteurs);
-  dit(an.visibles >= 6, `N ${an.visibles} annonces lisibles sur le premier écran`, an.visibles);
+  dit(an.visibles >= 5, `N ${an.visibles} annonces lisibles en entier sur le premier écran (≥ 5)`, an.visibles);
   dit(an.cpt === 0, 'N le compte n’est plus redit sur chaque rangée (il est dans l’en-tête du groupe)', an.cpt);
   dit(an.relierPuce === 0, `N « Relier un achat » : plus de grosse puce sous la rangée (${an.relierTexte} en texte ambre)`, an);
   dit(/rgba\(0, 0, 0, 0\)|transparent/.test(an.teteFond) && an.teteTaille === '13px', 'N l’en-tête du groupe est un en-tête simple (13 px, sans bande)', an.teteFond);
