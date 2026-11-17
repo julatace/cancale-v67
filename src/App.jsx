@@ -566,7 +566,7 @@ import { ID_PAIRES, ECRANS_PAIRES, estPaires, dernierePaire, noterPaire, groupeB
 import { entreeHistorique } from "./navHistorique.js";   // (16 nov., barre-achats) passer d'un onglet de la barre à un autre n'empile rien   // (14 nov., n° 61) l'onglet « Paires »
 // (14 nov., Studio bleu clair) L'espace d'un écran, le disque et son éventail, l'ondulation au changement d'espace.
 import { espaceDe } from "./design/espace.js";
-import { onduler } from "./design/ondulation.js";
+import { onduler, preparerOndulation } from "./design/ondulation.js";
 // Importés ICI une fois pour les chantiers C à H (aucun n'a à retoucher cette ligne).
 import { ChampRecherche } from "./composants/ChampRecherche.jsx";
 import { SuitePaquets, groupesBornes, PAQUET_LISTE } from "./composants/SuitePaquets.jsx";   // (11 nov., limites-client) longues listes par paquets
@@ -942,6 +942,7 @@ import { enLigneDeuxFois, texteCarte as texteEnLigneDeuxFois, raisonPasSu as rai
 import { useAvisBas, AvisBasDetail, titreAvisBas, detailAvisBas } from "./AvisNegatifJournee.jsx";   // (11 nov., lot avis-negatif) la carte « Avis 2★ reçu »
 import { LIGNE_AVIS_BAS_VUS } from "./avisNegatif.js";
 import { lireAlertesAvisBas } from "./lectureAvisBas.js";
+import { lireEnVol } from "./lectureEnVol.js";   // (17 nov., onglets rapides) une lecture en vol par ligne
 // (11 nov., lot photos-comptes) La même PHOTO sur deux de ses comptes Vinted (empreintes de l'extension 5.358).
 import { annoncesPourPhotos, calculerPhotosComptes, publierPhotosComptes, cibleRepublier } from "./photosComptes.js";
 import { empreinteImageLocale } from "./photosComptes.js";   // (16 nov.) rétabli : la fusion de retour-parfait l’avait perdu (empreintes eBay)
@@ -2001,6 +2002,10 @@ const sbAuth = (extra) => {
 // la règle de `lireReceptionLeboncoin` (src/rafraichissementLeboncoin.js). Rend
 // `null` (« pas su ») au bout, jamais `[]`. Leboncoin et Vestiaire la lisent.
 function lireBaseRelue(url) { return lireReceptionLeboncoin(url, sbAuth, { rafraichir: () => authRefresh() }); }
+// (17 nov., onglets rapides) Les N° réservés par l'extension (`panel_num_reserves`) : chaque lecteur passe par UNE
+// lecture en vol partagée (`lireEnVol('panel_num_reserves', …)`, src/lectureEnVol.js — Achats en lançait 5 à
+// l'ouverture) ; rien gardé au-delà du vol. Même règle : `null` = pas su.
+
 // Complète une ligne à écrire avec son propriétaire. La base a un défaut
 // (auth.uid()) mais on l'envoie explicitement : c'est plus lisible, et la règle
 // `with check` de Postgres vérifie qu'on n'écrit pas au nom d'un autre.
@@ -5739,7 +5744,7 @@ const numeroDImport = (v, ms) => {
 // Les N° déjà servis : cleNum ⇒ la raison dite sur la ligne en conflit. `null` = pas su.
 async function numerosServisImport() {
   if (!isCloudReady()) return null;
-  const jr = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`);
+  const jr = await lireEnVol('panel_num_reserves', () => lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`));
   if (!Array.isArray(jr)) return null;
   const pris = new Map();
   const add = (v, raison) => { const c = cleNum(v); if (c && !pris.has(c)) pris.set(c, raison); };
@@ -13409,7 +13414,7 @@ async function numeroterVestiaire() {
       const [jl, jv, jr] = await Promise.all([
         lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt`),
         lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_ventes&select=ventes:data->ventes`),
-        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`),
+        lireEnVol('panel_num_reserves', () => lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`)),
       ]);
       if (!Array.isArray(jl) || !Array.isArray(jv) || !Array.isArray(jr)) return 0;
       if (!numerotationPermise() || !isCloudReady()) return 0;
@@ -18907,7 +18912,7 @@ async function numerosServisRelus() {
   return numerosServisLus();
 }
 async function numerosServisLus() {
-  let jr = null; try { jr = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`); } catch (_) { jr = null; }
+  let jr = null; try { jr = await lireEnVol('panel_num_reserves', () => lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`)); } catch (_) { jr = null; }
   if (!Array.isArray(jr)) return null;
   const pris = new Set(), prisK = new Set();
   const add = (v) => { const k = cleNum(v); if (!k) return; prisK.add(k); if (/^\d+$/.test(k)) pris.add(Number(k)); };
@@ -20303,6 +20308,7 @@ function BottomBar({tab,setTab,sites,badges,gestes:gestesDisque=null}) {
   // (déjà vu, src/ecransGardes.jsx) revient tel quel, sans calcul.
   // (14 nov., Studio bleu clair) Changer d'ESPACE : l'ondulation de lumière part de l'onglet touché (src/design/ondulation.js).
   const allerA=(id,depuis)=>{ if(depuis&&espaceDe(id,BAR_GROUPE)!==espaceDe(tab,BAR_GROUPE)) onduler(depuis); noterNavigationSimple(id); setVise(id); demarrer(()=>setTab(id)); };
+  React.useEffect(()=>{ preparerOndulation(); },[]);   // (17 nov.) l'anneau posé au repos : un toucher ne l'insère plus (ondulation.js)
   const tabMontre=vise||tab;
   const navRef=React.useRef(null);
   // (8 nov.) LA PASTILLE DE L'ONGLET CHOISI GLISSE vers l'onglet touché (Julien : « vraiment
@@ -38368,9 +38374,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [reservesNum, setReservesNum] = useState(undefined);
   const relireReservesNum = async () => {
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`, { headers: sbAuth() });
-      if (!res.ok) { setReservesNum((v) => (v === undefined ? null : v)); return; }
-      const rows = await res.json();
+      const rows = await lireEnVol('panel_num_reserves', () => lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`));
+      if (!Array.isArray(rows)) { setReservesNum((v) => (v === undefined ? null : v)); return; }
       // Relue à chaque arrivée des annonces : la même réponse ne repose pas un
       // objet neuf (un rendu de Ma journée pour rien, banc `vitesse.cjs`, 22 oct.).
       const n = numerosReserves(Array.isArray(rows) && rows[0] ? rows[0].data : null);
