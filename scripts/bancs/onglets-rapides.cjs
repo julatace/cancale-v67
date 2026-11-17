@@ -10,7 +10,9 @@
 //  puis CHAQUE PAIRE d'onglets, dans les deux sens (5 onglets ⇒ 20 paires) : aller sur A, attendre le calme,
 //  toucher B. Mesuré comme l'INP du navigateur (Event Timing : du toucher à l'image qui suit) et jusqu'à
 //  l'écran UTILE (`.vrm-main[data-ecran]` changé et son attente posée, « pret » ou « plafond », visible).
-//  Seuils (17 nov.) : première réponse < 100 ms, écran utile < 300 ms. Rien de réel ; aucune écriture ne sort.
+//  Visé (17 nov.) : première réponse < 100 ms, écran utile < 300 ms — DIT paire par paire. JUGÉ : les médianes ne
+//  dépassent pas celles de la PR #1250 + 20 % (`onglets-rapides.reference.json`) ; `vrm_avis_bas` et
+//  `panel_num_reserves` au plus une lecture par geste et au démarrage. Rien de réel ; aucune écriture ne sort.
 // ════════════════════════════════════════════════════════════════════════════
 require('./_porte-banc.cjs');
 const path = require('path'), fs = require('fs'), http = require('http'), zlib = require('zlib'), os = require('os');
@@ -127,11 +129,25 @@ const juge = (m, r) => {
     { const f = Date.now() + 20000; while (Date.now() < f && !(await ecranIci()).pret) await attendre(150); } await calme(8000);
     const r = await toucher(bb, 15000); res.paires.push({ de: a, vers: bb, ...r });
     const txt = `réponse ${r.reponse ?? '—'} ms · utile ${r.utile ?? '—'} ms · longues ${r.longues} ms`;
-    if (JUGER) dit(r.reponse != null && r.reponse < S_REPONSE && r.utile != null && r.utile < S_UTILE, `${a} → ${bb} : première réponse < ${S_REPONSE} ms et écran utile < ${S_UTILE} ms`, txt); else console.log(`    ${a} → ${bb} — ${txt}`);
+    // Les seuils visés (100 / 300 ms) sont DITS paire par paire ; le banc juge la non-régression (médianes, plus bas).
+    console.log(`    ${r.reponse != null && r.reponse < S_REPONSE && r.utile != null && r.utile < S_UTILE ? 'visé ' : 'loin '} ${a} → ${bb} — ${txt}`);
+    if (JUGER && r.lectures) dit(r.lectures.avis_bas <= 1 && r.lectures.reserves <= 1, `${a} → ${bb} : \`vrm_avis_bas\` et \`panel_num_reserves\` lues au plus une fois`, JSON.stringify(r.lectures));
   }
   await pg.screenshot({ path: path.join(SHOTS, 'onglets-fin.png') });
   const med = (l) => { const s = l.filter((x) => x != null).sort((x, y) => x - y); return s.length ? s[Math.floor((s.length - 1) / 2)] : null; };
   const pire = (l) => (l.some((x) => x == null) ? null : Math.max(...l));
+  // LA GARDE DU GAIN (17 nov., PR #1250) : les médianes ne repassent pas au-dessus de celles de la PR + 20 %
+  // (scripts/bancs/onglets-rapides.reference.json, mesurées sur la même base, la même machine de banc).
+  const REF = (() => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'onglets-rapides.reference.json'), 'utf8')); } catch (_) { return null; } })();
+  const mR = med(res.paires.map((p) => p.reponse)), mU = med(res.paires.map((p) => p.utile));
+  if (JUGER) {
+    dit(!!REF, 'la référence des médianes existe (onglets-rapides.reference.json)');
+    if (REF) {
+      dit(mR != null && mR <= REF.reponse_mediane * 1.2, `médiane de la première réponse ≤ référence + 20 % (${Math.round(REF.reponse_mediane * 1.2)} ms)`, `${mR} ms`);
+      dit(mU != null && mU <= REF.utile_mediane * 1.2, `médiane de l’écran utile ≤ référence + 20 % (${Math.round(REF.utile_mediane * 1.2)} ms)`, `${mU} ms`);
+    }
+    dit(res.paires.every((p) => p.utile != null), 'chaque paire arrive à son écran utile', res.paires.filter((p) => p.utile == null).map((p) => p.de + '→' + p.vers).join(', ') || 'toutes');
+  }
   console.log(`\nMÉDIANES (paires, ${res.paires.length}) : réponse ${med(res.paires.map((p) => p.reponse))} ms (pire ${pire(res.paires.map((p) => p.reponse)) ?? '—'}) · utile ${med(res.paires.map((p) => p.utile))} ms (pire ${pire(res.paires.map((p) => p.utile)) ?? 'jamais'})`);
   if (erreurs.length) dit(false, 'aucune erreur de page', erreurs.slice(0, 3).join(' | '));
   if (process.env.JSON) fs.writeFileSync(process.env.JSON, JSON.stringify({ charge, ...res }, null, 1));
