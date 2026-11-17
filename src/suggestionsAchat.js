@@ -41,7 +41,7 @@
 // `scripts/audit-suggestions-achat.cjs` exécutent CES fonctions. La marque et
 // les couleurs viennent des règles de l'app (`extractBrand`, `extractColors`),
 // passées en paramètre : une seule définition (§11).
-import { achatHorsRelier } from './achatsHorsRelier.js';
+import { achatHorsRelier, raisonStatut, lireHorsRelier } from './achatsHorsRelier.js';
 import { moisParis } from './dateParis.js';
 
 const txDe = (a) => (a && a.transaction_id != null ? String(a.transaction_id) : '');
@@ -259,10 +259,42 @@ const jourMs = (j, fin) => {
   return Number.isFinite(d.getTime()) ? d.getTime() : null;
 };
 const euroBorne = (v) => { if (v == null || String(v).trim() === '') return null; const n = Number(String(v).replace(/\s/g, '').replace(',', '.')); return Number.isFinite(n) && n >= 0 ? n : null; };
+// (17 nov., lot relier-tout-achat — Julien : « je veux que quand je relie les paires on me laisse choisir autre chose
+// que les articles achetés choisis par VRM ») La recherche couvre AUSSI la taille (lue chez Vinted `tailleDe(a)`, sinon
+// écrite dans le titre), le vendeur (`vendeurDe(a)`, sinon celui de l'achat), le prix (« 45 », « 45,00 », « 45.5 »),
+// la date (« 12/11 », « 12/11/2026 », « novembre », « nov. 2026 ») et le compte (`compteDe`). Le filtre de taille lit
+// la même taille. Les achats hors relier (retour, litige, remboursé, annulé — `achatHorsRelier`) restent écartés,
+// mais ils sont COMPTÉS (`exclus`, par raison) : la feuille dit combien sont masqués et pourquoi (§5 « un total
+// partiel se dit »). Rien n'est relié ici : c'est toujours SON toucher.
+const MOIS_FR = ['janvier', 'fevrier', 'mars', 'avril', 'mai', 'juin', 'juillet', 'aout', 'septembre', 'octobre', 'novembre', 'decembre'];
+export function foinAchat(a, { compteDe = null, marqueDe = null, tailleDe = null, vendeurDe = null } = {}) {
+  const sansAccent = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const parts = [a && a.title, txDe(a)];
+  try { if (typeof marqueDe === 'function') parts.push(marqueDe(String((a && a.title) || '')) || ''); } catch (_) { /* rien */ }
+  try { if (typeof compteDe === 'function') parts.push(compteDe(a) || ''); } catch (_) { /* rien */ }
+  let t = '';
+  try { t = typeof tailleDe === 'function' ? String(tailleDe(a) || '') : ''; } catch (_) { t = ''; }
+  if (!t) t = tailleDuTitre(String((a && a.title) || ''));
+  if (t) parts.push(t, t.replace('.', ','), 'taille ' + t, 't' + t);
+  let v = '';
+  try { v = typeof vendeurDe === 'function' ? String(vendeurDe(a) || '') : ''; } catch (_) { v = ''; }
+  parts.push(v || (a && (a.seller || a.user_login)) || '');
+  const px = prixDe(a);
+  if (px != null) { const e = px.toFixed(2); parts.push(e, e.replace('.', ','), String(px), String(px).replace('.', ','), e + '€', e.replace('.', ',') + '€'); }
+  const d = dateMs(a && a.date);
+  if (Number.isFinite(d)) {
+    const x = new Date(d), j = String(x.getDate()).padStart(2, '0'), m = String(x.getMonth() + 1).padStart(2, '0'), y = String(x.getFullYear());
+    const nm = MOIS_FR[x.getMonth()];
+    parts.push(`${j}/${m}/${y}`, `${j}/${m}`, `${x.getDate()}/${x.getMonth() + 1}`, `${y}-${m}-${j}`, `${y}-${m}`, `${x.getDate()} ${nm} ${y}`, nm, nm.slice(0, 3) + '.', y);
+  }
+  return sansAccent(parts.filter(Boolean).join(' '));
+}
 export function tousAchatsLibresDetail({ achats, liens, curTx = '', q = '', compte = '', mois = '', compteDe = null, marqueDe = null,
-  prixMin = null, prixMax = null, prixAchat = null, recuDu = '', recuAu = '', receptionDe = null, marque = '', taille = '' } = {}) {
+  prixMin = null, prixMax = null, prixAchat = null, recuDu = '', recuAu = '', receptionDe = null, marque = '', taille = '', tailleDe = null, vendeurDe = null } = {}) {
   const sansAccent = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const mots = sansAccent(q).split(/\s+/).filter(Boolean);
+  const exclus = { total: 0, parRaison: {} };
+  const tailleLue = (a) => { let t = ''; try { t = typeof tailleDe === 'function' ? String(tailleDe(a) || '') : ''; } catch (_) { t = ''; } return t ? (tailleNorm(t) || t) : tailleDuTitre(String((a && a.title) || '')); };
   const pMin = euroBorne(prixMin), pMax = euroBorne(prixMax);
   const rDu = jourMs(recuDu, false), rAu = jourMs(recuAu, true);
   const parDate = (rDu != null || rAu != null) && typeof receptionDe === 'function';
@@ -271,7 +303,8 @@ export function tousAchatsLibresDetail({ achats, liens, curTx = '', q = '', comp
   const out = [], pris = [];
   let sansReception = 0;
   for (const a of (Array.isArray(achats) ? achats : [])) {
-    if (!a || !txDe(a) || achatAnnule(a)) continue;
+    if (!a || !txDe(a)) continue;
+    if (achatAnnule(a)) { exclus.total++; const r = raisonStatut(a) || ((lireHorsRelier() || new Map()).get(txDe(a))) || 'annule'; exclus.parRaison[r] = (exclus.parRaison[r] || 0) + 1; continue; }
     // (11 nov., lot DJ5) Un achat déjà relié ailleurs passe les MÊMES filtres et part dans `pris`
     // (« Déjà relié à N°… », après les libres) : visible, jamais mêlé aux libres.
     const libre = achatDisponible(a, liens, curTx);
@@ -279,11 +312,11 @@ export function tousAchatsLibresDetail({ achats, liens, curTx = '', q = '', comp
     const d = dateMs(a.date);
     if (mois && !(Number.isFinite(d) && moisParis(d) === mois)) continue;
     if (mots.length) {
-      const foin = sansAccent([a.title, typeof marqueDe === 'function' ? marqueDe(String(a.title || '')) : '', txDe(a)].join(' '));
+      const foin = foinAchat(a, { compteDe, marqueDe, tailleDe, vendeurDe });
       if (!mots.every((m) => foin.includes(m))) continue;
     }
     if (mq && !(typeof marqueDe === 'function' && String(marqueDe(String(a.title || '')) || '').trim().toLowerCase() === mq)) continue;
-    if (tq && tailleDuTitre(String(a.title || '')) !== tq) continue;
+    if (tq && tailleLue(a) !== tq) continue;
     if (pMin != null || pMax != null) {
       const px = typeof prixAchat === 'function' ? Number(prixAchat(a)) : prixDe(a);
       if (px == null || !Number.isFinite(px) || px <= 0) continue;
@@ -297,17 +330,18 @@ export function tousAchatsLibresDetail({ achats, liens, curTx = '', q = '', comp
     (libre ? out : pris).push({ a, d: Number.isFinite(d) ? d : -Infinity });
   }
   const parDateDesc = (x, y) => y.d - x.d;
-  return { liste: out.sort(parDateDesc).map((x) => x.a), sansReception, pris: pris.sort(parDateDesc).map((x) => x.a) };
+  return { liste: out.sort(parDateDesc).map((x) => x.a), sansReception, pris: pris.sort(parDateDesc).map((x) => x.a), exclus };
 }
 export const tousAchatsLibres = (o = {}) => tousAchatsLibresDetail(o).liste;
 // Les mois, comptes, marques et tailles présents (filtres rapides), du plus récent au plus ancien.
-export function filtresAchats(achats, compteDe, marqueDe = null) {
+export function filtresAchats(achats, compteDe, marqueDe = null, tailleDe = null) {
   const mois = new Set(), comptes = new Set(), marques = new Set(), tailles = new Set();
   for (const a of (Array.isArray(achats) ? achats : [])) {
     const d = dateMs(a && a.date); if (Number.isFinite(d)) mois.add(moisParis(d));
     const c = typeof compteDe === 'function' ? String(compteDe(a) || '') : ''; if (c) comptes.add(c);
     const m = typeof marqueDe === 'function' ? String(marqueDe(String((a && a.title) || '')) || '').trim() : ''; if (m) marques.add(m);
-    const t = tailleDuTitre(String((a && a.title) || '')); if (t) tailles.add(t);
+    let tl = ''; try { tl = typeof tailleDe === 'function' ? String(tailleDe(a) || '') : ''; } catch (_) { tl = ''; }
+    const t = (tl && tailleNorm(tl)) || tailleDuTitre(String((a && a.title) || '')); if (t) tailles.add(t);
   }
   const num = (t) => { const m = /^(\d+)(?:\.5| ([12])\/3)?/.exec(t); return m ? Number(m[1]) + (/\.5/.test(t) ? 0.5 : m[2] ? Number(m[2]) / 3 : 0) : 0; };
   return { mois: [...mois].sort().reverse(), comptes: [...comptes].sort(), marques: [...marques].sort((x, y) => x.localeCompare(y, 'fr')), tailles: [...tailles].sort((x, y) => num(x) - num(y)) };

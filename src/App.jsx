@@ -238,6 +238,7 @@ import './styles-annonces-outils.css';
 import './styles-baisse-prix.css';
 import './styles-reprise-ecrans.css'; // (11 nov.) le bandeau « Affiché avec … · Effacer » (src/repriseSynchro.js)
 import './styles-achats-outils.css';
+import './styles-relier-tout.css';   // (17 nov., lot relier-tout-achat) la feuille « Relier un achat »
 import { CLE_FOURNISSEURS, lireRegistre, avecFournisseur, sansFournisseur, avecAchatGros, sansAchatGros, avecRepartition, achatGros, reliesDuLot, partsDuLot, planPrixGros, ecrituresPrixGros, ecritureLienGros, ecritureDelierGros, origineDuPrix, horsRattachables, avecHors, sansHors, avecGardes, bilanFournisseurs, eurosC as eurosFo } from "./fournisseurs.js";
 import { articlesParAchat, delaisMiseEnLigne, dateReception, estLot as estLotAchat, nombreLot, totalARepartir, ecrituresRepartition, annulationRepartition, ecritureLienAchat, prixAchatCentimes, achatSansCout } from "./achatsSourcing.js";
 // ⟦→ ecrans/Stats.jsx #3⟧
@@ -1115,7 +1116,7 @@ import { offresVestiaire, offresJourneeVc, euros as eurosOffre, resteAvant as re
 // La partie « app » du dictionnaire français arrive AVEC l'app (le fichier d'entrée reste léger).
 import frApp from "./i18n/langues/fr.js";
 ajouterSourceApp(frApp);
-import { detenteursAchat, texteDejaRelie, patchDelier, ecrituresDeplacer } from "./relierAutreAchat.js";
+import { detenteursAchat, texteDejaRelieTr, patchDelier, ecrituresDeplacer } from "./relierAutreAchat.js";
 import { achatsAutresPourRelier, siteDeAchat } from "./achatsAutresRelier.js";   // (16 nov.) achats Leboncoin et Vestiaire dans « Relier »
 import { appliquerPrixPro, relevesParTx as relevesProParTx, SELECT_TXN_PRO } from "./vintedPro.js";   // (11 nov., lot vinted-pro)
 import { AlerteArnaque, CompteurArnaque, PastilleArnaque } from "./AlerteArnaque.jsx";
@@ -44404,6 +44405,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fillBuyAchats.items, accounts]);
   useEffect(() => { if (fillBuyOpen) chargerAchats(); }, [fillBuyOpen, chargerAchats]);
+  // (17 nov., lot relier-tout-achat) La feuille « Relier un achat » ouverte : la page derrière ne défile plus (le doigt qui
+  // arrive au bout de la liste ne fait plus glisser l'écran du dessous).
+  const pickerOuvert = !!pickerFor;
+  useEffect(() => {
+    if (!pickerOuvert) return undefined;
+    const h = document.documentElement, avant = h.style.overflow;
+    h.style.overflow = 'hidden';
+    return () => { h.style.overflow = avant; };
+  }, [pickerOuvert]);
   // (6 nov.) « Mise en ligne numérotée par VRM » ouverte : les achats captés sont relus
   // (relecture seule) pour PROPOSER une suggestion à côté du prix d'achat de chaque ligne.
   useEffect(() => { if (neufsOuverts && numerosNeufs.length && accounts.length && !fillBuyAchats.items) chargerAchats(); /* eslint-disable-next-line */ }, [neufsOuverts, numerosNeufs.length, accounts.length]);
@@ -44773,11 +44783,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const relierAchat = async (a, opts = {}) => {
     const cible = pickerFor; if (!cible || !a) return;
     const autres = ecrituresDeplacer(a, { numeros, saleOv, ici: iciPicker(cible) });
+    // (17 nov., lot relier-tout-achat) « Relier quand même » un achat déjà relié ailleurs : TOUJOURS une question d'abord
+    // (il sera délié de là-bas) — même si ses détenteurs ne se retrouvent pas, rien n'est écrit sans son « Oui ».
     if (opts.deplacer || autres.length) {
-      if (autres.length) {
-        const ok = await askConfirm({ title: texteDejaRelie(autres), desc: 'Il sera délié de là-bas et relié ici.', ok: 'Déplacer ici', cancel: 'Annuler' });
-        if (!ok) return;
-      }
+      const ok = await askConfirm({ title: autres.length ? texteDejaRelieTr(autres, tr) : tr('relierTout.quandMemeTitre'), desc: tr('relierTout.quandMemeDesc'), ok: tr('relierTout.quandMeme'), cancel: tr('relierTout.annuler') });
+      if (ok !== true) return;
     }
     const w = await ecritureRelierAchat(a); if (!w) return;
     // (16 nov.) Un geste annulable qui dit le bénéfice et offre le reçu (`confirmerLiaison`) ; « Déplacer ici » dans le même geste.
@@ -56791,7 +56801,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {pickerFor && createPortal(
         <div data-relier-feuille data-relier-autre={pickerFor._autre ? String(pickerFor._autre) : undefined} onClick={()=>setPickerFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1300,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setPickerFor(null)}/>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'85vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div className="vrm-relier-feuille-boite" role="dialog" aria-modal="true" aria-label={tr('relierTout.titreFeuille')} onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             {/* ⚠️ ON MONTRE LA PAIRE QU'ON RELIE. La modale couvrait l'écran et
                 demandait « quel achat correspond à CETTE paire ? » sans jamais
                 dire laquelle : il fallait se souvenir de la carte sur laquelle
@@ -56806,21 +56816,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{flex:1,minWidth:0}}>
                 <div style={{display:'flex',alignItems:'center',gap:6}}>
                   {numeros[pickerFor.id]?.numero && <span style={{fontSize:12,fontWeight:700,color:C.onAccent||'#fff',background:C.accent,borderRadius:12,padding:'2px 7px',flexShrink:0}}>N°{numeros[pickerFor.id].numero}</span>}
-                  <span style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{pickerFor.title}</span>
+                  <span data-relier-cible-titre style={{fontSize:13,fontWeight:600,color:C.text,overflowWrap:'anywhere',lineHeight:1.3,minWidth:0}}>{pickerFor.title}</span>
                 </div>
                 <div style={{fontSize:12,color:C.muted,marginTop:2}}>
                   {[pickerFor.brand, pickerFor.size && `taille ${pickerFor.size}`, pickerFor.price!=null && `en vente ${eur(pickerFor.price).toFixed(2).replace('.',',')}\u00a0€`].filter(Boolean).join(' · ')}
                 </div>
               </div>
               <button type="button" data-glisser-ouvrir="feuille" onClick={()=>ouvrirGlisser()} style={{flexShrink:0,border:'none',background:'transparent',color:C.accent,fontSize:13,fontWeight:600,cursor:'pointer',minHeight:44,padding:'0 6px',fontFamily:'inherit'}}>{tr('glisser.entree')}</button>
-              <button type="button" onClick={()=>setPickerFor(null)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer'}}>×</button>
+              <button type="button" data-relier-fermer onClick={()=>setPickerFor(null)} aria-label={tr('relierTout.fermer')} style={{flexShrink:0,border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',minWidth:44,minHeight:44,display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>
             </div>
-            <div data-relier-achat-corps style={{flex:1,overflow:'auto',padding:'4px 14px 14px'}}>
+            <div data-relier-achat-corps className="vrm-relier-feuille-corps" style={{flex:1,minHeight:0,overflow:'auto',padding:'4px 14px 14px'}}>
               <AccAvant geste="achat.relier"/>
               <RelierAchatCorps C={C} cible={cibleRelier} achats={purchasesPick.loading ? null : purchasesPick.items} liens={liensAchats}
                 curTx={(entreePicker(pickerFor) || {}).buyFromId || ''} compteDe={(a)=>{ const st = siteDeAchat(a); return st === 'vinted' ? (accNameOf(a._acc)||'') : [st === 'leboncoin' ? 'Leboncoin' : 'Vestiaire', a.compteSite || ''].filter(Boolean).join(' · '); }} prixDe={prixPayeAchat} onRelier={relierAchat}
                 autre={!!pickerFor._autre} actuel={achatRelie(entreePicker(pickerFor))} onDelier={delierAchatPicker}
-                dejaRelie={(a)=>texteDejaRelie(detenteursAchat(a && a.transaction_id, { numeros, saleOv }))}
+                dejaRelie={(a)=>detenteursAchat(a && a.transaction_id, { numeros, saleOv })}
                 receptionDe={receptionAchatMs} receptionEtat={receptionsRelierEtat} onFiltres={()=>setBesoinInfosRelier(true)}
                 details={detailsAchats} marqueDe={extractBrand} couleursDe={extractColors}/>
             </div>

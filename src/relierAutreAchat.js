@@ -45,6 +45,15 @@ export function texteDejaRelie(detenteurs) {
   return `Déjà relié à ${n.length > 1 ? n.slice(0, -1).join(', ') + ' et ' + n[n.length - 1] : n[0]}${nums.length > 3 ? '…' : ''}`;
 }
 
+// (17 nov., lot relier-tout-achat) La même phrase, traduite : `t` = tr ; « Déjà relié à N°12, N°40 » · « … à une vente ».
+export function texteDejaRelieTr(detenteurs, t) {
+  const l = Array.isArray(detenteurs) ? detenteurs.filter(Boolean) : [];
+  const nums = [...new Set(l.map((d) => d.numero).filter(Boolean))];
+  const qui = nums.length ? nums.slice(0, 3).map((x) => 'N°' + x).join(', ') + (nums.length > 3 ? '…' : '')
+    : (l.length > 1 ? t('relierTout.nVentes', { n: String(l.length) }) : t('relierTout.uneVente'));
+  return t('relierTout.dejaRelieA', { qui });
+}
+
 // L'écriture qui délie UNE entrée (fiche ou vente). null si elle n'est reliée à rien.
 export function patchDelier(entree) {
   if (!entree || entree.buyFromId == null || String(entree.buyFromId) === '') return null;
