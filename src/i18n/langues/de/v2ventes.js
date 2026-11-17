@@ -55,5 +55,15 @@ export default {
   "v2v.bord.pret": "Etikett bereit",
   "v2v.bord.attente": "Etikett noch nicht erhalten",
   "v2v.bord.imprime": "Etikett gedruckt",
-  "v2v.erreur": "Deine Vinted-Verkäufe konnten nicht gelesen werden: nichts geht verloren, versuch es gleich noch einmal."
+  "v2v.erreur": "Deine Vinted-Verkäufe konnten nicht gelesen werden: nichts geht verloren, versuch es gleich noch einmal.",
+  "v2s.n": {"one": "{n} ausgewählt", "other": "{n} ausgewählt"},
+  "v2s.tout": "Alle · {n}",
+  "v2s.autres": "Weitere Aktionen",
+  "v2s.rien": "Nichts zu tun für diese Auswahl",
+  "v2s.choisir": "Tippe auf eine Zeile, um sie auszuwählen",
+  "v2s.imprimer": {"one": "{n} Etikett drucken", "other": "{n} Etiketten drucken"},
+  "v2s.deposer": {"one": "Als abgegeben markieren ({n})", "other": "Als abgegeben markieren ({n})"},
+  "v2s.zero.imprimer": "Kein Etikett in der Auswahl bereit",
+  "v2s.zero.deposer": "Kein Verkauf zum Abgeben in der Auswahl",
+  "v2s.facture": "Rechnung {num} am {date} gesendet"
 };

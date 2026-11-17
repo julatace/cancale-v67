@@ -55,5 +55,15 @@ export default {
   "v2v.bord.pret": "etiqueta lista",
   "v2v.bord.attente": "etiqueta aún no recibida",
   "v2v.bord.imprime": "etiqueta impresa",
-  "v2v.erreur": "No se pudieron leer tus ventas de Vinted: no se pierde nada, inténtalo de nuevo en un momento."
+  "v2v.erreur": "No se pudieron leer tus ventas de Vinted: no se pierde nada, inténtalo de nuevo en un momento.",
+  "v2s.n": {"one": "{n} seleccionada", "other": "{n} seleccionadas"},
+  "v2s.tout": "Todo · {n}",
+  "v2s.autres": "Más acciones",
+  "v2s.rien": "Nada que hacer con esta selección",
+  "v2s.choisir": "Toca una fila para elegirla",
+  "v2s.imprimer": {"one": "Imprimir {n} etiqueta", "other": "Imprimir {n} etiquetas"},
+  "v2s.deposer": {"one": "Marcar entregada ({n})", "other": "Marcar entregadas ({n})"},
+  "v2s.zero.imprimer": "Ninguna etiqueta lista en la selección",
+  "v2s.zero.deposer": "Ninguna venta por entregar en la selección",
+  "v2s.facture": "Factura {num} enviada el {date}"
 };

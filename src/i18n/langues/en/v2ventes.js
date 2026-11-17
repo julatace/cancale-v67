@@ -55,5 +55,15 @@ export default {
   "v2v.bord.pret": "label ready",
   "v2v.bord.attente": "label not received yet",
   "v2v.bord.imprime": "label printed",
-  "v2v.erreur": "Your Vinted sales could not be read: nothing is lost, try again in a moment."
+  "v2v.erreur": "Your Vinted sales could not be read: nothing is lost, try again in a moment.",
+  "v2s.n": {"one": "{n} selected", "other": "{n} selected"},
+  "v2s.tout": "All · {n}",
+  "v2s.autres": "More actions",
+  "v2s.rien": "Nothing to do on this selection",
+  "v2s.choisir": "Tap a row to select it",
+  "v2s.imprimer": {"one": "Print {n} label", "other": "Print {n} labels"},
+  "v2s.deposer": {"one": "Mark dropped off ({n})", "other": "Mark dropped off ({n})"},
+  "v2s.zero.imprimer": "No label ready in the selection",
+  "v2s.zero.deposer": "No sale to drop off in the selection",
+  "v2s.facture": "Invoice {num} sent on {date}"
 };

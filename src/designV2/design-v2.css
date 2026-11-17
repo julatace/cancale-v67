@@ -564,3 +564,33 @@ html body .v2v-segment .v2-seg { overflow-x: visible; }
 html body .v2v-segment button.v2-seg-btn { flex: 1 1 0; min-width: 0; padding: 4px 8px; }
 html body .v2v-segment .v2-seg-l { white-space: normal; text-align: center; line-height: 1.15; overflow-wrap: normal; }
 :root:root:root body .v2v-recherche .v2v-champ input { text-overflow: ellipsis; }
+
+/* ══ 14. LA BARRE DE SÉLECTION (nouveau design — Julien : « même le imprimer, le je dépose, etc c'est bizarre ») ════════
+   Une barre fine au-dessus de la barre du bas : le compte et deux liens à gauche, UN plein et « ⋯ » à droite ; elle entre et
+   sort en ressort (fondu en mouvement réduit) ; la liste garde sa place. */
+.v2-serie { position: fixed; z-index: 70; left: 12px; right: 12px; bottom: calc(var(--vrm-barre-bas, 84px) + 12px); display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 8px 8px 8px 16px; border-radius: 20px; background: var(--v2-feuille-fond); color: var(--sv-encre, #0C1D30); box-shadow: 0 12px 32px -12px rgb(6 17 31 / .45), 0 0 0 .5px rgb(18 52 96 / .12);
+  animation: v2-serie-entre var(--v2-ressort-feuille, 380ms cubic-bezier(.32, .72, 0, 1)) both; font-variant-numeric: tabular-nums; }
+:root[data-theme="dark"] .v2-serie { color: var(--v2-page-texte); box-shadow: 0 12px 32px -12px rgb(0 0 0 / .8), 0 0 0 .5px rgb(255 255 255 / .1); }
+.v2-serie.is-sortie { animation: v2-serie-sort 220ms cubic-bezier(.32, .72, 0, 1) both; height: 64px; pointer-events: none; }
+@keyframes v2-serie-entre { from { transform: translateY(calc(100% + 24px)); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes v2-serie-sort { from { transform: none; opacity: 1; } to { transform: translateY(calc(100% + 24px)); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .v2-serie { animation: v2-fondu-img 160ms ease-out both; } .v2-serie.is-sortie { animation: none; opacity: 0; } }
+.v2-serie-g { display: flex; flex-direction: column; gap: 0; min-width: 0; flex: 1 1 auto; }
+.v2-serie-g > b { font-size: 15px; font-weight: 600; line-height: 20px; white-space: nowrap; }
+.v2-serie-liens { display: flex; gap: 12px; }
+html body button.v2-serie-lien { appearance: none; border: 0; background: none; padding: 0; min-height: 28px; font: 600 13px/16px var(--sb-police-texte, system-ui); color: var(--v2-lien); cursor: pointer; touch-action: manipulation; }
+html body button.v2-serie-lien::after { content: ""; position: absolute; inset: -8px -6px; }
+html body button.v2-serie-lien { position: relative; }
+.v2-serie-d { display: flex; align-items: center; gap: 4px; flex: none; }
+.v2-serie-d [data-serie-principal] { min-width: 200px; justify-content: center; }
+.v2-serie-rien { font-size: 13px; color: var(--v2-muet); padding: 0 8px; }
+.v2-serie-resume { flex-basis: 100%; margin: 0; font-size: 13px; color: var(--v2-muet); }
+.v2-serie-indispo { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 8px; color: var(--v2-muet); font-size: 15px; }
+.v2-serie-raison { margin-left: auto; font-size: 13px; text-align: right; max-width: 60%; }
+/* La barre du bas RESTE au téléphone (la barre de sélection se pose au-dessus) ; la liste garde la place des deux. */
+@media (max-width: 1023px) {
+  html[data-design="v2"][data-serie-ouverte] .vrm-app-shell .vrm-tabbar { display: flex !important; }
+  html[data-design="v2"][data-serie-ouverte] .vrm-main::after { height: calc(var(--vrm-serie-h, 64px) + var(--vrm-barre-bas, 84px) + 24px); }
+}
+@media (min-width: 1024px) { .v2-serie { left: calc(var(--vrm-rail-l, 272px) + 24px); right: 24px; bottom: 16px; max-width: 880px; margin: 0 auto; } }

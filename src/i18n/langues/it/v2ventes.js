@@ -55,5 +55,15 @@ export default {
   "v2v.bord.pret": "etichetta pronta",
   "v2v.bord.attente": "etichetta non ancora ricevuta",
   "v2v.bord.imprime": "etichetta stampata",
-  "v2v.erreur": "Le tue vendite Vinted non sono state lette: non si perde nulla, riprova tra poco."
+  "v2v.erreur": "Le tue vendite Vinted non sono state lette: non si perde nulla, riprova tra poco.",
+  "v2s.n": {"one": "{n} selezionata", "other": "{n} selezionate"},
+  "v2s.tout": "Tutte · {n}",
+  "v2s.autres": "Altre azioni",
+  "v2s.rien": "Niente da fare su questa selezione",
+  "v2s.choisir": "Tocca una riga per sceglierla",
+  "v2s.imprimer": {"one": "Stampa {n} etichetta", "other": "Stampa {n} etichette"},
+  "v2s.deposer": {"one": "Segna consegnata ({n})", "other": "Segna consegnate ({n})"},
+  "v2s.zero.imprimer": "Nessuna etichetta pronta nella selezione",
+  "v2s.zero.deposer": "Nessuna vendita da consegnare nella selezione",
+  "v2s.facture": "Fattura {num} inviata il {date}"
 };

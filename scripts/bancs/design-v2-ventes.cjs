@@ -210,7 +210,7 @@ async function qualite(pg, th) {
 async function chargementEtMouvement(nav, b) {
   console.log('\n── chargement lent et mouvement réduit (390 clair)');
   // Ouvert sur une page SANS l'app (aucune lecture, aucun cache), puis la lecture des ventes retenue, puis Ventes.
-  const { ctx, pg } = await ouvrir(nav, { W: 390, sombre: false, b, url: '/vide-banc.txt' });
+  const { ctx, pg } = await ouvrir(nav, { W: 390, sombre: false, b, url: '/VRM-Capture-installation.txt' });
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_design_v2', '1'); } catch (_) {} });
   // La lecture des ventes retenue 5 s (page ET contexte : le service worker de l'app passe par le contexte).
   const lent = async (r) => { await new Promise((ok) => setTimeout(ok, 5000)); return r.fallback(); };

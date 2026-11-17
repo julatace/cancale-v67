@@ -39158,13 +39158,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const peutImprimer = (o) => annulee(o) ? 'annulée' : estParti(o) ? 'déjà partie' : prets().has(String(o.transaction_id)) ? true : 'pas de bordereau prêt';
     const peutDeposer = (o) => annulee(o) ? 'annulée' : estParti(o) ? 'déjà déposée' : !aExpedier(o) ? 'pas à envoyer' : true;
     return [
-      { k: 'imprimer', libelle: 'Imprimer', icone: 'printer', variante: 'primaire', portee: (cles) => portee(lignes(cles), peutImprimer), faire: async (cles) => {
+      // (17 nov., nouveau design) `plein` : le libellé du bouton plein de la barre (le nombre = cochées ET imprimables = imprimées) ;
+      // `raisonZero` : ce que dit le menu « ⋯ » quand rien de la sélection ne s'y prête.
+      { k: 'imprimer', libelle: 'Imprimer', icone: 'printer', variante: 'primaire', plein: (n) => tr('v2s.imprimer', { n }), raisonZero: tr('v2s.zero.imprimer'), portee: (cles) => portee(lignes(cles), peutImprimer), faire: async (cles) => {
         // Les bordereaux prêts du lot « Tout imprimer » (même clé : le n° de transaction).
         const { ok, pasFaits } = trierSerie(lignes(cles), peutImprimer);
         if (ok.length) await batchBordereaux(new Set(ok.map(o => String(o.transaction_id))));
         return resumeSerie({ faits: ok, pasFaits }, { un: 'bordereau préparé', plusieurs: 'bordereaux préparés' });
       } },
-      { k: 'depose', libelle: 'Je dépose', icone: 'check', portee: (cles) => portee(lignes(cles), peutDeposer), faire: (cles) => {
+      { k: 'depose', libelle: 'Je dépose', icone: 'check', plein: (n) => tr('v2s.deposer', { n }), raisonZero: tr('v2s.zero.deposer'), portee: (cles) => portee(lignes(cles), peutDeposer), faire: (cles) => {
         // L'écriture de « Colis déposé » (`gesteColisFait`), en UN geste ⇒ UN « Annuler ».
         const { ok, pasFaits } = trierSerie(lignes(cles), peutDeposer);
         const ops = [];

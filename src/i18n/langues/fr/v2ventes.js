@@ -55,5 +55,15 @@ export default {
   "v2v.bord.pret": "bordereau prêt",
   "v2v.bord.attente": "bordereau pas encore reçu",
   "v2v.bord.imprime": "bordereau imprimé",
-  "v2v.erreur": "Tes ventes Vinted n’ont pas pu être lues : rien n’est perdu, réessaie dans un instant."
+  "v2v.erreur": "Tes ventes Vinted n’ont pas pu être lues : rien n’est perdu, réessaie dans un instant.",
+  "v2s.n": {"one": "{n} sélectionnée", "other": "{n} sélectionnées"},
+  "v2s.tout": "Tout · {n}",
+  "v2s.autres": "Autres actions",
+  "v2s.rien": "Rien à faire sur cette sélection",
+  "v2s.choisir": "Touche une ligne pour la choisir",
+  "v2s.imprimer": {"one": "Imprimer {n} bordereau", "other": "Imprimer {n} bordereaux"},
+  "v2s.deposer": {"one": "Marquer déposée ({n})", "other": "Marquer déposées ({n})"},
+  "v2s.zero.imprimer": "Aucun bordereau prêt dans la sélection",
+  "v2s.zero.deposer": "Aucune vente à déposer dans la sélection",
+  "v2s.facture": "Facture {num} envoyée le {date}"
 };

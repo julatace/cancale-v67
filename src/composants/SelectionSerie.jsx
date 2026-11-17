@@ -16,6 +16,10 @@ import { BoutonBase as Bouton } from './Bouton.jsx';
 import { basculer, plage, toutSelectionner, garderVisibles, APPUI_LONG_MS } from '../selectionSerie.js';
 import '../selection-serie.css';
 import { tr } from '../i18n/index.js';
+// (17 nov., nouveau design) La barre de sélection redessinée (Julien : « même le imprimer, le je dépose, etc c'est bizarre ») :
+// allumé seulement (`vrm_design_v2`) ; éteint, la barre d'hier, inchangée.
+import { useDesignV2 } from '../designV2/reglage.js';
+import { BoutonV2, BoutonIconeV2 } from '../designV2/BoutonV2.jsx';
 
 const feuilleOuverte = () => {
   try { return !!document.querySelector('[role="dialog"][aria-modal="true"], .vrm-sheet-voile, [data-sheet-ouverte]'); } catch (_) { return false; }
@@ -147,6 +151,18 @@ export function BarreSerie({ serie, actions = [], unite = null, rendreIcone }) {
   const [resume, setResume] = useState('');
   const [occupe, setOccupe] = useState(false);
   const barreRef = useRef(null);
+  const v2 = useDesignV2();
+  const [menuV2, setMenuV2] = useState(false);
+  // La barre neuve entre et sort en ressort : elle reste montée 220 ms après la fin de la sélection (la sortie se voit).
+  const [sortieV2, setSortieV2] = useState(false);
+  const etaitActif = useRef(false);
+  useEffect(() => {
+    if (!v2) return undefined;
+    if (serie.actif) { etaitActif.current = true; setSortieV2(false); return undefined; }
+    if (!etaitActif.current) return undefined;
+    etaitActif.current = false; setMenuV2(false); setSortieV2(true);
+    const t = setTimeout(() => setSortieV2(false), 220); return () => clearTimeout(t);
+  }, [serie.actif, v2]);
   // (16 nov., lot ventes-selection) Sélection ouverte : la racine le dit (`data-serie-ouverte`) et porte
   // la hauteur de la barre (`--vrm-serie-h`) — au téléphone la barre PREND LA PLACE de la barre du bas
   // et la page garde cet espace en bas (rien de caché dessous) ; la ligne touchée reste au-dessus d'elle.
@@ -169,6 +185,7 @@ export function BarreSerie({ serie, actions = [], unite = null, rendreIcone }) {
   // Le résumé reste lisible quelques secondes après la fermeture de la sélection.
   useEffect(() => { if (!resume || serie.actif) return undefined; const t = setTimeout(() => setResume(''), 8000); return () => clearTimeout(t); }, [resume, serie.actif]);
   if (typeof document === 'undefined') return null;
+  if (v2 && !serie.actif && sortieV2) return createPortal(<div className="v2-serie is-sortie" aria-hidden="true"/>, document.body);
   if (!serie.actif) {
     return resume ? createPortal(<div className="vrm-serie-barre" data-serie-barre={serie.nom} data-serie-fermee="">
       <p className="vrm-serie-resume" role="status" data-serie-resume="">{resume}</p>
@@ -195,6 +212,51 @@ export function BarreSerie({ serie, actions = [], unite = null, rendreIcone }) {
     } catch (e) { setResume('Pas fait : ' + String((e && e.message) || e)); }
     setOccupe(false);
   };
+  if (v2) {
+    // UNE barre fine, posée au-dessus de la barre du bas : « 3 sélectionnés · Tout · 60 · Annuler » à gauche ; à droite UN
+    // plein — la première action que la sélection permet, avec SON nombre (« Imprimer 3 bordereaux ») — et « ⋯ » pour les
+    // autres, chacune avec son nombre ou la raison (jamais de tuile grisée, jamais « 0 sur 1 »).
+    const vues = actions.filter(Boolean).map((a) => { let p = null; try { p = n && typeof a.portee === 'function' ? a.portee(serie.choisies) : null; } catch (_) { p = null; }
+      const nA = p ? p.n : n; return { a, p, nA, possible: !!n && !a.desactive && nA > 0 }; });
+    const princ = vues.find((x) => x.possible) || null;
+    const autres = vues.filter((x) => x !== princ);
+    const libPlein = (x) => (typeof x.a.plein === 'function' ? x.a.plein(x.nA) : x.a.libelle + ' · ' + x.nA);
+    return createPortal(
+      <div ref={barreRef} className="v2-serie" role="toolbar" aria-label={tr('serie.barre')} data-serie-barre={serie.nom} data-serie-n={n} data-serie-total={serie.total} data-v2-serie="">
+        <div className="v2-serie-g">
+          <b role="status" data-serie-compte={n}>{tr('v2s.n', { n })}</b>
+          <span className="v2-serie-liens">
+            {n < serie.total ? <button type="button" className="v2-serie-lien" data-serie-tout={serie.total} onClick={() => serie.tout()}>{tr('v2s.tout', { n: serie.total })}</button> : null}
+            <button type="button" className="v2-serie-lien" data-serie-annuler="" onClick={() => serie.vider()} title="Échap">{tr('serie.annuler')}</button>
+          </span>
+        </div>
+        {resume ? <p className="v2-serie-resume" role="status" data-serie-resume="">{resume}</p> : null}
+        <div className="v2-serie-d">
+          {princ ? <BoutonV2 role="principal" compact icone={rendreIcone ? rendreIcone(princ.a.icone || 'check', 20) : null} chargement={occupe}
+            attrs={{ 'data-serie-action': princ.a.k, 'data-serie-principal': princ.a.k, 'data-serie-portee': princ.p ? `${princ.p.n}/${princ.p.m}` : undefined }} onClick={() => lancer(princ.a)}>{libPlein(princ)}</BoutonV2>
+            : <span className="v2-serie-rien" data-serie-rien="">{n ? tr('v2s.rien') : tr('v2s.choisir')}</span>}
+          {autres.length ? <BoutonIconeV2 icone={rendreIcone ? rendreIcone('more', 22) : <span aria-hidden="true">⋯</span>} label={tr('v2s.autres')} onClick={() => setMenuV2(true)} attrs={{ 'data-serie-plus': '' }}/> : null}
+        </div>
+        {menuV2 ? createPortal(<div className="v2-feuille-hote is-ouverte" data-v2-feuille="serie">
+          <div className="v2-voile" onClick={() => setMenuV2(false)} aria-hidden="true"/>
+          <div className="v2-feuille v2-outils-feuille" role="dialog" aria-modal="true" aria-label={tr('v2s.autres')}>
+            <div className="v2-feuille-tete"><span className="v2-feuille-poignee" aria-hidden="true"/><h2 className="v2-feuille-titre">{tr('v2s.n', { n })}</h2>
+              <BoutonIconeV2 icone={rendreIcone ? rendreIcone('close', 22) : <span aria-hidden="true">×</span>} label={tr('v2.menu.fermer')} onClick={() => setMenuV2(false)} attrs={{ 'data-v2-feuille-fermer': '' }}/></div>
+            <div className="v2-feuille-corps v2-ann-menu">
+              {autres.map((x) => x.possible
+                ? <button key={x.a.k} type="button" className="vrm-annbar-outil" data-serie-action={x.a.k} onClick={() => { setMenuV2(false); lancer(x.a); }}>
+                    <span aria-hidden="true" className="vrm-annbar-outil-icone">{rendreIcone ? rendreIcone(x.a.icone || 'check', 18) : null}</span>
+                    <span className="vrm-annbar-outil-mot">{x.a.libelle}</span><span className="vrm-annbar-outil-n" style={{ marginLeft: 'auto' }}>{x.nA}</span></button>
+                : <div key={x.a.k} className="v2-serie-indispo" data-serie-indispo={x.a.k}>
+                    <span aria-hidden="true" className="vrm-annbar-outil-icone">{rendreIcone ? rendreIcone(x.a.icone || 'check', 18) : null}</span>
+                    <span className="vrm-annbar-outil-mot">{x.a.libelle}</span><span className="v2-serie-raison">{x.a.desactive ? (x.a.raison || tr('serie.aucune')) : (x.a.raisonZero || tr('serie.aucune'))}</span></div>)}
+            </div>
+          </div>
+        </div>, document.body) : null}
+      </div>,
+      document.body,
+    );
+  }
   return createPortal(
     <div ref={barreRef} className="vrm-serie-barre" role="toolbar" aria-label={tr('serie.barre')} data-serie-barre={serie.nom} data-serie-n={n} data-serie-total={serie.total}>
       <div className="vrm-serie-tete">
