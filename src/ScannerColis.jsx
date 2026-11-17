@@ -21,7 +21,8 @@ import { venteDuColis } from './photoCarton.js';
 import { BoutonPhotoCarton } from './PhotoCarton.jsx';
 import './design/scanner.css';
 
-const FORMATS = ['code_128', 'code_39', 'code_93', 'itf', 'ean_13', 'data_matrix', 'qr_code', 'pdf417'];
+// (17 nov.) Les formats IMPRIMÉS sur les étiquettes (+ EAN-13 : la boîte, « pas un n° de suivi », dit) : chaque format en plus coûte.
+const FORMATS = ['code_128', 'data_matrix', 'qr_code', 'ean_13', 'code_39', 'itf'];
 export const ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js';
 
 let chargementZx = null;
@@ -39,8 +40,81 @@ const chargerZxing = () => {
 };
 
 // (15 nov.) Les zones lues à tour de rôle par ZXing : le centre (là où l'on vise), puis l'image entière.
-export const ZONES_LECTURE = { zone: [{ x: 0.15, y: 0.3, l: 0.7, h: 0.4 }, null] };
-// Un lecteur `{ detect(video) → Promise<[rawValue…]> }`, ou null.
+// (17 nov., lot scan-instantane) Une zone peut porter `k` : agrandie k fois avant la lecture (lecteur WebAssembly
+// seulement). MESURÉ (banc scan-instantane) : un Code 128 tenu loin (1,2 à 1,8 px par module) ne se lit pas tel
+// quel — ses barres tombent entre deux pixels —, agrandi ×2 (lissé) il se lit : on vise de deux fois plus loin.
+export const ZONES_LECTURE = { zone: [{ x: 0.15, y: 0.3, l: 0.7, h: 0.4 }, { x: 0.2, y: 0.38, l: 0.6, h: 0.24, k: 2 }, null] };
+
+// ── (17 nov., lot scan-instantane) LE LECTEUR WebAssembly, HORS DU FIL DE L'ÉCRAN ─────────────────────────────
+// Julien (iPhone) : « il est un peu long et il faut être vraiment très très proche ». Safari n'a pas
+// `BarcodeDetector` : c'était ZXing en JavaScript, sur le fil de l'écran (l'écran se figeait à chaque image, ≈ 4
+// images lues par seconde, un Code 128 lu seulement de très près). Ici : zxing-cpp en WebAssembly dans un worker
+// (src/lecteurCodes.worker.js), chargé à l'ouverture du scanner, gardé ensuite (une 2e ouverture est immédiate).
+// L'image visée est découpée par le navigateur (`createImageBitmap`, sans copie sur le fil de l'écran) et
+// envoyée au worker ; sans `OffscreenCanvas` dans le worker (vieux Safari), la découpe passe par un canvas ici.
+// Le worker ne répond pas (pas de WebAssembly, fichier introuvable) ⇒ ZXing en JavaScript, comme avant.
+let travailleur = null;   // { w: Worker, pret: Promise<{ offscreen }>, attente: Map }
+const lancerTravailleur = () => {
+  if (travailleur) return travailleur;
+  let w;
+  try { w = new Worker(new URL('./lecteurCodes.worker.js', import.meta.url), { type: 'module' }); } catch (_) { return null; }
+  const attente = new Map();
+  const t = { w, attente, mort: false };
+  t.pret = new Promise((ok, ko) => {
+    const minut = setTimeout(() => ko(new Error('délai')), 12000);
+    w.addEventListener('message', (ev) => {
+      const d = ev.data || {};
+      if (d.type === 'pret') { clearTimeout(minut); ok({ offscreen: !!d.offscreen }); return; }
+      if (d.type === 'echec') { clearTimeout(minut); ko(new Error(d.raison || 'échec')); return; }
+      const f = attente.get(d.id); if (f) { attente.delete(d.id); f(d); }
+    });
+    w.addEventListener('error', () => { clearTimeout(minut); t.mort = true; for (const f of attente.values()) f({ vals: [] }); attente.clear(); ko(new Error('worker')); });
+  });
+  t.pret.catch(() => { t.mort = true; if (travailleur === t) travailleur = null; try { w.terminate(); } catch (_) {} });
+  w.postMessage({ type: 'prechauffer' });
+  travailleur = t;
+  return t;
+};
+// Le lecteur se prépare DÈS l'ouverture du scanner, en même temps que la caméra (rien à attendre ensuite).
+export const prechargerLecteur = () => { try { if (typeof Worker !== 'undefined' && typeof WebAssembly !== 'undefined') lancerTravailleur(); } catch (_) {} };
+const MAX_PX = 1700;   // le grand côté d'une zone lue à taille réelle (au-delà : réduite — un code proche est grand)
+async function lecteurWasm() {
+  if (typeof Worker === 'undefined' || typeof WebAssembly === 'undefined') return null;
+  const t = lancerTravailleur(); if (!t) return null;
+  let capa;
+  try { capa = await t.pret; } catch (_) { return null; }
+  const bitmap = capa.offscreen && typeof createImageBitmap === 'function';
+  const cv = bitmap ? null : document.createElement('canvas');
+  let id = 0, tour = 0, tampon = null, bitmapKo = false;
+  const envoyer = (msg, transfert) => new Promise((ok) => { if (t.mort) { ok({ vals: [] }); return; } t.attente.set(msg.id, ok); t.w.postMessage(msg, transfert); });
+  return { source: 'wasm', horsFil: true, detect: async (v, zone) => {
+    const W = v.videoWidth, H = v.videoHeight; if (!W || !H || t.mort) return [];
+    const zz = Array.isArray(zone) ? (zone.length ? zone[(tour++) % zone.length] : null) : zone;
+    const z = zz && zz.l > 0 && zz.h > 0 ? zz : null;
+    const sx = z ? Math.round(W * Math.max(0, z.x)) : 0, sy = z ? Math.round(H * Math.max(0, z.y)) : 0;
+    const sw = z ? Math.min(W - sx, Math.round(W * z.l)) : W, sh = z ? Math.min(H - sy, Math.round(H * z.h)) : H;
+    const k = z && z.k > 1 ? z.k : Math.min(1, MAX_PX / Math.max(sw, sh));
+    const w = Math.max(1, Math.round(sw * k)), h = Math.max(1, Math.round(sh * k));
+    id += 1;
+    if (bitmap && !bitmapKo) {
+      let bm = null;
+      try { bm = await createImageBitmap(v, sx, sy, sw, sh); } catch (_) { bitmapKo = true; }
+      if (bm) { const r = await envoyer({ id, bitmap: bm, w, h }, [bm]); return r.vals || []; }
+    }
+    const c = cv || document.createElement('canvas');
+    c.width = w; c.height = h;
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.imageSmoothingEnabled = true; ctx.drawImage(v, sx, sy, sw, sh, 0, 0, w, h);
+    const px = ctx.getImageData(0, 0, w, h).data;
+    if (!tampon || tampon.byteLength !== px.byteLength) tampon = new ArrayBuffer(px.byteLength);
+    new Uint8ClampedArray(tampon).set(px);
+    const r = await envoyer({ id, buf: tampon, w, h }, [tampon]);
+    tampon = r.buf && r.buf.byteLength ? r.buf : null;
+    return r.vals || [];
+  } };
+}
+
+// Un lecteur `{ detect(video, zone) → Promise<[rawValue…]> }`, ou null.
 export async function creerLecteur() {
   try {
     if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
@@ -51,7 +125,8 @@ export async function creerLecteur() {
         return { source: 'navigateur', detect: async (v) => ((await d.detect(v)) || []).map((x) => x && x.rawValue).filter(Boolean) };
       }
     }
-  } catch (_) { /* détecteur absent ou refusé : ZXing */ }
+  } catch (_) { /* détecteur absent ou refusé : WebAssembly, puis ZXing */ }
+  try { const l = await lecteurWasm(); if (l) return l; } catch (_) { /* WebAssembly absent : ZXing */ }
   try {
     const Z = await chargerZxing();
     const hints = new Map();
@@ -106,7 +181,7 @@ const raisonDe = (e) => {
 // redemande sans taille, puis n'importe quelle caméra (une contrainte trop précise ne doit rien bloquer).
 async function ouvrirFlux() {
   const essais = [
-    { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false },
+    { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } }, audio: false },
     { video: { facingMode: { ideal: 'environment' } }, audio: false },
     { video: true, audio: false },
   ];
@@ -132,9 +207,12 @@ export function useLectureCamera(video, traiter, opts = null) {
   const [camera, setCamera] = React.useState('demarrage');
   const optsRef = React.useRef(opts); optsRef.current = opts;
   React.useEffect(() => {
-    let vivant = true, flux = null, minuterie = null;
+    let vivant = true, flux = null, minuterie = null, rvfc = null;
     const nouveau = filtreRepetition(2500);
     derniereRaison = '';
+    // (17 nov., lot scan-instantane) Le lecteur se prépare EN MÊME TEMPS que la caméra (avant : après elle).
+    prechargerLecteur();
+    const lecteurP = creerLecteur();
     (async () => {
       try {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('pas de caméra');
@@ -142,28 +220,60 @@ export function useLectureCamera(video, traiter, opts = null) {
         if (!vivant) { flux.getTracks().forEach((t) => t.stop()); return; }
         if (!video.current) return;
         brancher(video.current, flux);
+        reglerMiseAuPoint(flux);
         try { const o = optsRef.current; if (o && typeof o.surFlux === 'function') o.surFlux(flux); } catch (_) {}
-        const lecteur = await creerLecteur();
+        const lecteur = await lecteurP;
         if (!vivant) return;
         if (!lecteur) { derniereRaison = 'lecteur'; setCamera('sans'); return; }
         setCamera('active');
+        // Hors du fil de l'écran (WebAssembly) : l'image suivante dès qu'elle arrive (`requestVideoFrameCallback`),
+        // sans pause. Sur le fil de l'écran (ZXing en JavaScript, BarcodeDetector) : la pause d'avant.
+        const suivante = () => {
+          if (!vivant) return;
+          const o = optsRef.current, v = video.current;
+          if (!lecteur.horsFil) { minuterie = setTimeout(tour, o && Number.isFinite(o.pause) ? o.pause : 220); return; }
+          if (v && typeof v.requestVideoFrameCallback === 'function') {
+            let fait = false; const go = () => { if (fait) return; fait = true; if (minuterie) clearTimeout(minuterie); tour(); };
+            rvfc = { v, id: v.requestVideoFrameCallback(go) };
+            minuterie = setTimeout(go, 120);   // une vidéo figée (onglet caché, image identique) ne bloque jamais la boucle
+          } else minuterie = setTimeout(tour, 16);
+        };
         const tour = async () => {
           if (!vivant) return;
           const v = video.current;
           try {
-            if (v) { brancher(v, flux); if (v.readyState >= 2) { const o = optsRef.current; const vals = await lecteur.detect(v, o && o.zone); for (const x of vals) if (nouveau(x)) traiter(x); } }
+            if (v) { brancher(v, flux); if (v.readyState >= 2) { const o = optsRef.current; const vals = await lecteur.detect(v, o && o.zone); if (vivant) for (const x of vals) if (nouveau(x)) traiter(x); } }
           } catch (_) {}
-          if (vivant) { const o = optsRef.current; minuterie = setTimeout(tour, o && Number.isFinite(o.pause) ? o.pause : 220); }
+          suivante();
         };
         tour();
       } catch (e) { derniereRaison = raisonDe(e); if (vivant) setCamera('sans'); }
     })();
     // La caméra est COUPÉE en sortant (le flux est rendu au système).
     const v0 = video.current;
-    return () => { vivant = false; if (minuterie) clearTimeout(minuterie); if (flux) flux.getTracks().forEach((t) => t.stop()); try { if (v0) v0.srcObject = null; } catch (_) {} };
+    return () => {
+      vivant = false; if (minuterie) clearTimeout(minuterie);
+      try { if (rvfc && rvfc.v.cancelVideoFrameCallback) rvfc.v.cancelVideoFrameCallback(rvfc.id); } catch (_) {}
+      if (flux) flux.getTracks().forEach((t) => t.stop()); try { if (v0) v0.srcObject = null; } catch (_) {}
+    };
   }, [traiter]);
   return camera;
 }
+// (17 nov., lot scan-instantane) La mise au point CONTINUE quand la caméra la propose (Android, ordinateur) :
+// sans elle, certaines caméras restent nettes à une seule distance. Safari sur iPhone la fait déjà seul.
+const reglerMiseAuPoint = (flux) => {
+  try {
+    const t = flux && flux.getVideoTracks ? flux.getVideoTracks()[0] : null;
+    const caps = t && typeof t.getCapabilities === 'function' ? t.getCapabilities() : null;
+    if (caps && Array.isArray(caps.focusMode) && caps.focusMode.includes('continuous')) t.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+  } catch (_) {}
+};
+// (17 nov.) LE ZOOM de la caméra (Safari 17+, Chrome Android) : `null` si elle n'en a pas, sinon { min, max, valeur }.
+export const zoomDe = (t) => {
+  try { const c = t && typeof t.getCapabilities === 'function' ? t.getCapabilities() : null; const z = c && c.zoom; if (!z || !(z.max > z.min)) return null;
+    const s = typeof t.getSettings === 'function' ? t.getSettings() : {}; return { min: z.min, max: z.max, valeur: Number.isFinite(s.zoom) ? s.zoom : z.min }; } catch (_) { return null; }
+};
+export const poserZoom = async (t, x) => { const z = zoomDe(t); if (!z) return null; const v = Math.max(z.min, Math.min(z.max, x)); try { await t.applyConstraints({ advanced: [{ zoom: v }] }); return v; } catch (_) { return null; } };
 
 // La phrase quand la caméra manque : un refus dit OÙ l'autoriser (iPhone : Réglages › Safari › Caméra).
 export const phraseSansCamera = (defaut) => {

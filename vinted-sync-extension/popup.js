@@ -1,3 +1,5 @@
+// 5.406 : la feuille COMMUNE de l'extension (vrm-ui.js, chargé avant) sur la fenêtre.
+try { if (globalThis.VRM_UI) { globalThis.VRM_UI.monter(document.head); document.documentElement.classList.add('vu-racine'); } } catch (_) {}
 // popup.js — la connexion à VRM, et rien d'autre.
 //
 // Trois endroits l'affichent, avec LE MÊME code (§11) :
