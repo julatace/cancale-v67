@@ -94,7 +94,7 @@ const Plaque = ({ x }) => (x.numero ? <span className={'l-plaque' + (x.doublon ?
 const Photo = ({ x, i = 0, t = 400 }) => (x.photo
   ? <img src={x.photo} alt="" loading={i < 10 ? 'eager' : 'lazy'} decoding="async" width={t} height={t} />
   : <span className="l-sans-photo" aria-label="Pas de photo"><Ico n="photo" t={Math.round(t / 4)} /></span>);
-const sousLigne = (x) => [x.numero ? `N° ${x.numero}` : 'Sans N°', x.taille ? `T. ${x.taille}` : null, x.compte].filter(Boolean).join(' · ');
+const sousLigne = (x) => [x.numero ? `N° ${x.numero}` : x.achat ? null : 'Sans N°', x.taille ? `T. ${x.taille}` : null, x.compte].filter(Boolean).join(' · ');
 const quand = (x) => (x.etat === 'enligne' ? (x.jours != null ? `${x.jours} j` : '') : x.detail);
 
 // Le geste principal d'une paire (glisser vers la droite) : un seul toucher.
@@ -107,11 +107,11 @@ function Tuile({ x, ouvrir, menu, i }) {
     // La tuile ENTIÈRE se touche (aucun bouton dedans) : elle ouvre la fiche ; un appui long ouvre le menu.
     <button type="button" className={'l-tuile' + (x.doublon ? ' is-double' : '')} data-l-tuile={x.cle} data-etat={x.etat} style={{ '--i': Math.min(i, 11) }} onClick={() => ouvrir(x.cle)} {...appui}
       aria-label={[x.numero ? 'N° ' + x.numero : 'achat sans N°', x.titre, x.taille ? 'taille ' + x.taille : '', e.mot, x.detail, euros(x.prix)].filter(Boolean).join(', ')}>
-      <span className="l-photo"><Photo x={x} i={i} /><Plaque x={x} /><span className={'l-badge' + (e.geste ? ' is-geste' : '')}>{e.mot}</span></span>
+      <span className="l-photo"><Photo x={x} i={i} /><Plaque x={x} />{x.taille ? <span className="l-taille">T.&thinsp;{x.taille}</span> : null}<span className={'l-badge' + (e.geste ? ' is-geste' : '')}>{e.mot}</span></span>
       <span className="l-nom">{x.titre || '—'}</span>
       <span className="l-ligne">
         <span className="l-prix">{euros(x.prix)}</span>
-        <span className={'l-detail' + (x.urgent ? ' is-urgent' : '')}>{[x.taille ? `T. ${x.taille}` : null, quand(x)].filter(Boolean).join(' · ')}</span>
+        <span className={'l-detail' + (x.urgent ? ' is-urgent' : '')}>{quand(x)}</span>
       </span>
     </button>
   );
@@ -196,7 +196,7 @@ const Plein = ({ g }) => (g ? <button type="button" className="l-plein" data-ple
 function Point({ pt, ouvrir }) {
   return (
     <section className="l-point" aria-label={pt.lieu}>
-      <header className="l-point-tete"><Ico n="ticket" t={18} /><span className="l-point-lieu">{pt.lieu}</span><span className="l-point-n">{pt.colis.length} colis</span></header>
+      <header className="l-point-tete"><Ico n="ticket" t={18} /><span className="l-point-noms"><span className="l-point-lieu">{pt.lieu.split(/,| — /)[0]}</span><span className="l-point-adresse">{pt.lieu.split(/,| — /).slice(1).join(',').trim()}</span></span><span className="l-point-n">{pt.colis.length} colis</span></header>
       <div className="l-point-codes">
         {pt.colis.map((x, i) => (
           <button type="button" key={x.cle} className="l-point-code" onClick={() => ouvrir(x.cle)} aria-label={`Code ${x.retrait && x.retrait.code}, ${x.titre}`}>
@@ -240,7 +240,7 @@ function Fiche({ x, fermer, large }) {
     : x.achat ? [['Payé', euros(x.prix)], ['Taille', x.taille || '—']]
       : [['Acheté', euros(x.cout)], ['Vendu', euros(x.prix)], ['Marge', marge == null ? '—' : (marge > 0 ? '+' : '') + euros(marge)]];
   const ligneEtat = x.etat === 'envoyer' ? `À envoyer ${x.detail}` : x.etat === 'retirer' ? `À retirer ${x.limite ? x.detail : ''}`.trim()
-    : x.etat === 'enligne' ? `En ligne depuis ${x.jours} jours` : x.etat === 'vendue' ? (x.detail === 'en route' ? 'Vendue · en route' : 'Vendue · bordereau attendu')
+    : x.etat === 'enligne' ? `En ligne depuis ${x.jours} jours` : x.etat === 'vendue' ? (x.detail === 'en route' ? 'Vendue · en route' : 'Vendue · bordereau pas encore reçu')
       : x.etat === 'enroute' ? 'Achat en route vers toi' : x.etat === 'numeroter' ? `Arrivée ${x.detail.replace('arrivée ', '')}, sans N°` : x.etat === 'publier' ? 'Brouillon · pas en ligne' : e.mot;
   const TR = { mondialrelay: 'Mondial Relay', vintedgo: 'Vinted Go', chronopost: 'Chronopost' };
   const infos = [
@@ -361,7 +361,7 @@ export default function Dressing() {
   const l = chercher(h.q ? d.paires : base, h.q);
   const paire = h.p ? d.paires.find((x) => x.cle === h.p) : null;
   const menuDe = h.m ? d.paires.find((x) => x.cle === h.m) : null;
-  const g = gesteDe(h, base);
+  const g = h.q ? null : gesteDe(h, base);
   const vue = vueDe(h);
   const titre = { argent: 'Argent', achats: 'Achats', messages: 'Messages', moi: 'Moi' }[h.e] || 'Dressing';
   const avecPaires = h.e === 'dressing' || h.e === 'achats';

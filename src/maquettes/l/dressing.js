@@ -122,7 +122,7 @@ export function construire(src, maintenant = Date.now()) {
         if (b) {
           const lim = Date.parse(b.limite || '') || null;
           paires.push(p({ ...base, etat: 'envoyer', prix, limite: lim, suivi: str(b.suivi) || null, detail: lim ? avantLe(lim, maintenant) : 'date pas lue', geste: 'Imprimer le bordereau', vendueLe: v.date }));
-        } else paires.push(p({ ...base, etat: 'vendue', prix, date: v.date, detail: 'bordereau attendu', vendueLe: v.date }));
+        } else paires.push(p({ ...base, etat: 'vendue', prix, date: v.date, detail: 'sans bordereau', vendueLe: v.date }));
       } else paires.push(p({ ...base, etat: 'vendue', prix, date: v.date, detail: 'en route', geste: 'Voir le suivi', vendueLe: v.date }));
     } else if (!a) {
       paires.push(p({ ...base, etat: 'verifier', detail: 'annonce pas lue', raison: 'Cette annonce n’est dans aucune lecture du dressing.', geste: 'Ouvrir sur Vinted' }));

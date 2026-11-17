@@ -253,3 +253,18 @@ html[data-maquette="l"] ::selection { background: rgb(255 255 255 / .85); color:
 .l-ordi .l-tete-ordi .l-plein { margin-left: 8px; }
 .l-rangee-action { visibility: hidden; }
 .l-rangee-cadre:has(.l-rangee[style*="translateX"]) .l-rangee-action { visibility: visible; }
+
+.l-badge { background: #0C1D30; }
+.l-plaque.is-double, .l-plaque.is-double.is-mini { background: #B8261A; color: #FFFFFF; }
+.l-taille { position: absolute; top: 8px; right: 8px; display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border-radius: 7px; background: rgb(255 255 255 / .94); color: #0C1D30; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.l-point-noms { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.l-point-adresse { font-size: 13px; color: #3F5468; }
+.l-point-tete { align-items: flex-start; }
+.l-point-tete .l-ico { margin-top: 2px; }
+/* La barre du bas : ses propres couleurs, mesurées (≥ 4,5:1) en clair et en sombre. */
+html[data-maquette="l"] { --l-barre: rgb(247 250 253 / .97); --l-onglet: #3F5468; --l-onglet-actif: #0C1D30; }
+html[data-maquette="l"][data-theme="dark"] { --l-barre: rgb(14 27 46 / .97); --l-onglet: #A9BBCF; --l-onglet-actif: #FFFFFF; }
+@media (prefers-color-scheme: dark) { html[data-maquette="l"]:not([data-theme]) { --l-barre: rgb(14 27 46 / .97); --l-onglet: #A9BBCF; --l-onglet-actif: #FFFFFF; } }
+.l-barre { background: var(--l-barre) !important; }
+.l-onglet { color: var(--l-onglet) !important; }
+.l-onglet[aria-current="page"] { color: var(--l-onglet-actif) !important; }
