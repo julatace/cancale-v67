@@ -9,8 +9,13 @@ def police(t):
         if os.path.exists(p): return ImageFont.truetype(p, t)
     return ImageFont.load_default()
 f1, f2 = police(30), police(20)
-CAPS = [('ventes-390-clair.png', 'À envoyer · clair'), ('ventes-390-sombre.png', 'À envoyer · sombre'), ('ventes-fait-390-clair.png', 'Imprimée : la rangée part'),
-        ('ventes-route-390-sombre.png', 'En route · sombre'), ('ventes-outils-390-clair.png', '« ⋯ » : les gestes d’hier')]
+import os as _os
+CAPS = [('ventes-390-clair.png', 'À envoyer · clair'), ('ventes-390-sombre.png', 'À envoyer · sombre'), ('ventes-route-390-sombre.png', 'En route · sombre'),
+        ('toutes-390-clair.png', 'Toutes (Vinted) · facture verte'), ('toutes-selection3-390-clair.png', 'Sélection : 3 ventes'), ('toutes-selection1-menu-390-clair.png', '1 vente partie : « ⋯ » dit pourquoi'),
+        ('ventes-375x667-tres-grand.png', '375 · « Très grand »')]
+if _os.environ.get('PLANCHE') == '1512':
+    W, H = 1512 // 2, 950 // 2
+    CAPS = [('ventes-1512-clair.png', 'À envoyer'), ('toutes-selection3-1512-clair.png', 'Toutes : 3 ventes choisies, facture verte'), ('toutes-selection1-menu-1512-clair.png', '1 vente partie : « ⋯ »')]
 marge, tete, col = 32, 150, 24
 board = Image.new('RGB', (marge * 2 + len(CAPS) * W + (len(CAPS) - 1) * col, tete + H + 60), (238, 243, 248))
 d = ImageDraw.Draw(board)

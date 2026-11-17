@@ -63,6 +63,29 @@ rangée), partis dans « En route ».
   à la ligne s'il le faut), la ligne du titre passe à la ligne (le plein sous « Ventes », entier), la 1re vente sur le premier
   écran. « Mis à jour à hh:mm » ne se pose plus sur le grand titre (au-dessus de la barre du bas).
 
+## Toutes, la sélection et la facture (Julien, capture de « Toutes » à l'ordinateur)
+
+- **Toutes les plateformes** : `VentesToutes` en rangées A (le logo de la plateforme sur chaque rangée, la taille en « T. »,
+  état · date · transporteur en 3e ligne). **Vinted** : la liste d'hier (`LigneVenteVinted`) rend une rangée A
+  (`LigneVenteV2`) ; la ligne d'hier reste MONTÉE, cachée — toucher la rangée ouvre SA fiche (récapitulatif, facture, bon de
+  retour, gestes). Plus aucun bouton par rangée (« Envoyer la facture », « Bon de retour » : dans la fiche ; « Imprimer » /
+  « Déposé » : au glisser), plus d'ambre « Prix d'achat ? » (« N prix d'achat à saisir · Compléter » le dit une fois, en tête).
+  La bande des chiffres et « À venir » d'hier ne sont plus à l'écran de Ventes (montées, cachées ; Argent les porte).
+- **Facture envoyée** : une icône verte (document + coche, 20 px) à côté du prix — le seul vert de l'app ; toucher, appui long
+  ou survol : « Facture FA-2026-0006 envoyée le 16 nov. » (`FactureEnvoyeeIcone`, src/FacturePro.jsx, la règle de
+  `FactureVente`). Pas encore envoyée : rien sur la rangée.
+- **Sélection** : la case dans SA colonne de 44 px à gauche de la photo, seulement en sélection (« Sélectionner », ou appui
+  long) ; la rangée choisie se teinte (jamais un cadre gris).
+- **La barre de sélection, redessinée pour tout le nouveau design** (`BarreSerie`, src/composants/SelectionSerie.jsx, branche
+  allumée ; éteint : celle d'hier) : une barre fine au-dessus de la barre du bas (ordinateur : en bas de la colonne de la
+  liste) ; « 3 ventes · Tout · 60 · Annuler » à gauche ; à droite UN plein — la première action que la sélection permet, avec
+  SON nombre (« Imprimer 3 bordereaux » : cochées ET imprimables = imprimées ; sinon « Marquer déposées (2) », sinon
+  « Exporter · 3 ») — et « ⋯ » : chaque autre action avec son nombre, ou la raison (« Aucun bordereau prêt dans la sélection »).
+  Plus de tuiles, plus de grands boutons grisés, plus de « 0 sur 1 ». Entrée et sortie en ressort (fondu en mouvement réduit) ;
+  la liste garde la place de la barre.
+- **À l'ordinateur**, la barre du haut collante (recherche, plateformes) est un verre plein ; au téléphone, la tête défilée de
+  Ventes / Annonces est une barre de verre pleine largeur (jamais une demi-boîte sur la liste).
+
 ## Où est le code
 
 - `src/designV2/VentesV2.jsx` — `AfficheVentes` (sur `ChiffreAffiche`), `RechercheVentes`, `ListeColis`, `ListeEnvoyer`,
