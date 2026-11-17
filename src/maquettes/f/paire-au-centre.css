@@ -1,0 +1,208 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   MAQUETTE F — « LA PAIRE AU CENTRE » (17 nov.) — prototype de banc, pas livré.
+   Sur les jetons du Studio bleu clair (`--sb-*`, src/design/studio.css) : le fond bleu,
+   la porcelaine, la plaque gravée du N°. UN accent rare (le lien, la diode) ; ambre = un
+   geste à faire ; aucune autre teinte. Cibles 44 px au doigt.
+   Ce qu'on prend : Raycast (la barre de commande qui répond par types, le ⌘K) ;
+   Superhuman (les « splits » : une liste = une recherche enregistrée, comptée) ;
+   Linear (trois colonnes denses, la fiche à droite, rien ne bouge de place).
+   ════════════════════════════════════════════════════════════════════════════ */
+@import '../../design/studio.css';
+
+html[data-maquette="f"], html[data-maquette="f"] body { background: var(--sb-haut); }
+html[data-maquette="f"] body { margin: 0; }
+.f-racine {
+  --f-g: 16px;
+  min-height: 100dvh; box-sizing: border-box; color: var(--sb-encre);
+  font-family: var(--sb-police-texte); font-feature-settings: var(--sb-chiffres); -webkit-font-smoothing: antialiased;
+  background: linear-gradient(180deg, var(--sb-haut) 0, var(--sb-aplat) 280px, var(--sb-aplat) 70%, var(--sb-bas) 100%) fixed;
+  padding: 0 var(--f-g) calc(120px + env(safe-area-inset-bottom));
+  -webkit-tap-highlight-color: transparent;
+}
+.f-racine *, .f-racine *::before, .f-racine *::after { box-sizing: border-box; }
+.f-racine button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: inherit; -webkit-user-select: none; user-select: none; }
+.f-racine button:focus-visible { outline: 2px solid var(--sb-diode); outline-offset: 2px; border-radius: 12px; }
+.f-attente { min-height: 100dvh; }
+.f-ico { flex: none; display: block; }
+
+/* ── La tête du téléphone : marque, barre, pastilles (collée en haut) ── */
+.f-tete { position: sticky; top: 0; z-index: 5; margin: 0 calc(-1 * var(--f-g)); padding: calc(env(safe-area-inset-top) + 8px) var(--f-g) 10px;
+  background: color-mix(in oklab, var(--sb-haut) 82%, transparent); -webkit-backdrop-filter: var(--sb-verre-flou); backdrop-filter: var(--sb-verre-flou); }
+.f-tete-l { display: flex; align-items: center; justify-content: space-between; height: 44px; }
+.f-marque { font-weight: 700; font-size: 17px; letter-spacing: .06em; }
+.f-marque-sous { display: block; font-weight: 400; font-size: 12.5px; letter-spacing: 0; color: var(--sb-encre-2); margin-top: 2px; }
+
+/* LA BARRE DE COMMANDE — un puits creusé dans le verre, 52 px, toujours là. */
+.f-barre { display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 6px 0 16px; margin-top: 6px; border-radius: 16px;
+  background: var(--sb-porcelaine); box-shadow: var(--sb-ombre-plan); color: var(--sb-encre-2); }
+.f-barre:focus-within { box-shadow: var(--sb-ombre-plan), 0 0 0 2px color-mix(in oklab, var(--sb-diode) 55%, transparent); }
+.f-barre-champ { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: none; font: inherit; font-size: 17px; color: var(--sb-encre); }
+.f-barre-champ::placeholder { color: var(--sb-encre-2); }
+.f-barre-x { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 12px; color: var(--sb-encre-2); }
+.f-kbd { font: 600 12.5px/1 var(--sb-police-texte); color: var(--sb-encre-2); padding: 6px 8px; border-radius: 8px; box-shadow: var(--sb-grave); margin-right: 8px; }
+.f-jeton { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 8px 0 12px; border-radius: 10px; flex: none;
+  background: var(--sb-creux); box-shadow: var(--sb-enfonce); color: var(--sb-encre); font-weight: 600; font-size: 15px; white-space: nowrap; }
+.f-racine .f-jeton { min-height: 44px; height: 36px; }
+
+/* LES RECHERCHES ENREGISTRÉES — des pastilles comptées (la liste est une recherche). */
+.f-pastilles { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 10px calc(-1 * var(--f-g)) 0; padding: 0 var(--f-g) 2px; }
+.f-pastilles::-webkit-scrollbar { display: none; }
+.f-pastille { flex: none; display: inline-flex; align-items: center; gap: 7px; height: 44px; padding: 0 14px; border-radius: 22px;
+  background: var(--sb-touche-fond); box-shadow: var(--sb-touche-ombre); font-size: 15px; font-weight: 600; white-space: nowrap; transition: transform var(--sb-e-appui); }
+.f-pastille:active { transform: scale(.97); }
+.f-pastille-n { font-weight: 500; color: var(--sb-encre-2); font-variant-numeric: tabular-nums; }
+.f-pastille.is-actif { background: var(--sb-creux); box-shadow: var(--sb-enfonce); }
+.f-pastille.is-actif .f-pastille-nom::after { content: ''; display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--sb-diode); margin: 0 0 2px 6px; vertical-align: middle; }
+.f-point { display: inline-block; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--sb-ambre-point); margin-right: 7px; vertical-align: 1px; }
+
+/* ── Titres, plans, lignes ── */
+.f-titre-section { display: flex; align-items: baseline; gap: 8px; margin: 26px 4px 8px; font-size: 13px; font-weight: 600; letter-spacing: .02em; color: var(--sb-encre-2); }
+.f-titre-sous { font-weight: 400; }
+.f-titre-n { font-weight: 500; font-variant-numeric: tabular-nums; }
+.f-plan { background: var(--sb-porcelaine); border-radius: 20px; box-shadow: var(--sb-ombre-plan); overflow: hidden; }
+.f-ligne { display: grid; grid-template-columns: 52px 1fr auto; gap: 12px; align-items: center; width: 100%; min-height: 72px; padding: 10px 14px 10px 10px; position: relative;
+  content-visibility: auto; contain-intrinsic-size: auto 72px; }
+.f-ligne + .f-ligne::before { content: ''; position: absolute; top: 0; left: 74px; right: 0; height: .5px; background: rgb(var(--sb-o) / .12); }
+:root[data-theme="dark"] .f-ligne + .f-ligne::before { background: rgb(255 255 255 / .08); }
+button.f-ligne:active { background: var(--sb-porcelaine-2); }
+.f-ligne.is-actif { background: var(--sb-creux); }
+.f-ligne.is-actif::after { content: ''; position: absolute; left: 0; top: 14px; bottom: 14px; width: 3px; border-radius: 0 3px 3px 0; background: var(--sb-diode); }
+.f-vignette { display: block; border-radius: var(--sb-r-vignette); overflow: hidden; background: var(--sb-socle); box-shadow: var(--sb-ombre-pose); }
+.f-vignette img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.f-ligne-corps { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.f-ligne-h { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.f-ligne-titre { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; font-weight: 500; }
+.f-ligne-ou { font-size: 14px; color: var(--sb-encre-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.f-ligne-ou.is-geste { color: var(--sb-ambre); font-weight: 500; }
+.f-ligne-val { font-size: 16px; font-weight: 500; font-variant-numeric: tabular-nums; align-self: start; padding-top: 2px; }
+.f-tag { margin-left: 8px; font-size: 12.5px; padding: 2px 7px; border-radius: 6px; background: var(--sb-creux); color: var(--sb-encre-2); font-weight: 500; }
+.f-code { width: 52px; height: 52px; display: grid; place-items: center; border-radius: var(--sb-r-vignette); box-shadow: var(--sb-grave); font-weight: 600; font-size: 14px; font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+
+/* LA PLAQUE — le N°, gravé (jamais en couleur ; le rouge est réservé aux doublons). */
+.f-plaque { flex: none; display: inline-flex; align-items: baseline; gap: 1px; padding: 2px 6px; border-radius: var(--sb-r-plaque); box-shadow: var(--sb-grave);
+  background: var(--sb-creux); font-weight: 650; font-size: 13px; font-variant-numeric: tabular-nums; text-shadow: var(--sb-grave-texte); }
+.f-plaque-n { font-size: 10.5px; font-weight: 500; color: var(--sb-encre-2); margin-right: 1px; }
+.f-plaque--vide { font-weight: 500; color: var(--sb-encre-2); }
+.f-plaque--grand { position: absolute; left: 14px; bottom: 14px; padding: 6px 12px; font-size: 26px; border-radius: 10px; font-weight: 600;
+  background: color-mix(in oklab, var(--sb-porcelaine) 86%, transparent); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); box-shadow: var(--sb-ombre-pose); }
+.f-plaque--grand .f-plaque-n { font-size: 14px; }
+
+/* LE FIL DE VIE — sept marches. Fait : encre · geste : ambre · pas encore : creux · pas su : pointillé. */
+.f-fil { display: flex; gap: 3px; margin-top: 3px; }
+.f-fil-m { width: 14px; height: 3px; border-radius: 2px; background: rgb(var(--sb-o) / .12); }
+:root[data-theme="dark"] .f-fil-m { background: rgb(255 255 255 / .12); }
+.f-fil-m.is-fait { background: var(--sb-encre); opacity: .78; }
+.f-fil-m.is-geste { background: var(--sb-ambre-point); }
+.f-fil-m.is-passu { background: none; box-shadow: inset 0 0 0 1px rgb(var(--sb-o) / .25); }
+:root[data-theme="dark"] .f-fil-m.is-passu { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .25); }
+.f-fil--grand { gap: 4px; margin: 18px 0 0; }
+.f-fil--grand .f-fil-m { flex: 1; width: auto; height: 6px; border-radius: 3px; position: relative; margin-bottom: 22px; }
+.f-fil-l { position: absolute; top: 11px; left: 0; font-size: 11.5px; color: var(--sb-encre-2); white-space: nowrap; }
+.f-fil--grand .is-geste .f-fil-l { color: var(--sb-ambre); font-weight: 600; }
+
+/* ── L'accueil : le geste du moment ── */
+.f-geste { margin-top: 18px; padding: 4px 4px 0; }
+.f-geste-sur { margin: 0; font-size: 14px; color: var(--sb-encre-2); text-transform: capitalize; }
+.f-geste-chiffre, .f-liste-chiffre { display: flex; align-items: baseline; gap: 10px; margin: 6px 0 0; }
+.f-affiche { font-size: 64px; line-height: 1; font-weight: 500; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+.f-geste-unite { font-size: 20px; font-weight: 500; }
+.f-geste-dit { margin: 8px 0 0; font-size: 15px; color: var(--sb-encre-2); }
+.f-geste-actions { display: flex; align-items: center; gap: 16px; margin-top: 16px; }
+.f-plein { display: inline-flex; align-items: center; justify-content: center; height: 52px; padding: 0 24px; border-radius: 26px; font-weight: 600; font-size: 17px;
+  background-image: var(--sb-plein-fond); color: var(--sb-plein-encre) !important; box-shadow: var(--sb-plein-ombre); transition: transform var(--sb-e-appui); }
+.f-plein:active { transform: translateY(1px) scale(.985); }
+.f-plein--large { width: 100%; margin-top: 14px; }
+.f-lien { min-height: 44px; display: inline-flex; align-items: center; color: var(--sb-lien) !important; font-weight: 500; font-size: 16px; }
+.f-lien--petit { min-height: 44px; font-size: 15px; margin-top: -6px; }
+.f-pied { margin: 22px 4px 0; font-size: 13px; color: var(--sb-encre-2); }
+.f-vide { color: var(--sb-encre-2); font-size: 15px; padding: 24px 4px; }
+
+/* ── La recherche ── */
+.f-cherche { margin: 16px 4px 0; font-size: 13px; color: var(--sb-encre-2); }
+.f-raccourcis { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.f-raccourci { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 12px 0 16px; border-radius: 16px; background: var(--sb-porcelaine); box-shadow: var(--sb-ombre-plan); }
+.f-raccourci-quoi { flex: 1; font-weight: 600; font-size: 16px; }
+.f-raccourci-n { font-variant-numeric: tabular-nums; color: var(--sb-encre-2); font-weight: 500; }
+
+/* ── Une liste enregistrée ── */
+.f-liste-tete { margin-top: 18px; padding: 0 4px; }
+.f-flottant { position: fixed; left: 0; right: 0; bottom: 0; padding: 12px var(--f-g) calc(14px + env(safe-area-inset-bottom)); display: flex; justify-content: center; z-index: 6;
+  background: linear-gradient(180deg, transparent, color-mix(in oklab, var(--sb-bas) 92%, transparent) 40%); }
+.f-flottant .f-plein { width: 100%; max-width: 420px; }
+
+/* ── La page d'une paire ── */
+.f-fiche-haut { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; margin: 0 calc(-1 * var(--f-g)); padding: calc(env(safe-area-inset-top) + 6px) var(--f-g) 6px;
+  background: color-mix(in oklab, var(--sb-haut) 82%, transparent); -webkit-backdrop-filter: var(--sb-verre-flou); backdrop-filter: var(--sb-verre-flou); }
+.f-fiche-haut-t { font-size: 15px; font-weight: 600; }
+.f-rond { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; background: var(--sb-touche-fond); box-shadow: var(--sb-touche-ombre); }
+.f-rond--petit { width: 44px; height: 44px; }
+.f-heros { margin-top: 8px; }
+.f-heros-photo { position: relative; aspect-ratio: 4 / 3; border-radius: 26px; overflow: hidden; background: var(--sb-socle); box-shadow: var(--sb-ombre-avant); }
+.f-heros-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.f-heros-txt { padding: 16px 4px 0; }
+.f-heros-titre { margin: 0; font-size: 26px; line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; }
+.f-heros-meta { margin: 6px 0 0; font-size: 15px; color: var(--sb-encre-2); }
+.f-maintenant { margin-top: 8px; padding: 16px; border-radius: 22px; background: var(--sb-porcelaine); box-shadow: var(--sb-ombre-plan); }
+.f-maintenant-t { margin: 0; font-size: 18px; font-weight: 600; color: var(--sb-encre); }
+.f-maintenant-d { margin: 6px 0 0; font-size: 14px; color: var(--sb-encre-2); }
+.f-chiffres { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 18px 0 0; padding: 0 4px; }
+.f-chiffres dt { font-size: 13px; color: var(--sb-encre-2); }
+.f-chiffres dd { margin: 4px 0 0; font-size: 24px; font-weight: 500; letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.f-vie { list-style: none; margin: 0; padding: 4px 0; background: var(--sb-porcelaine); border-radius: 20px; box-shadow: var(--sb-ombre-plan); }
+.f-vie-e { display: grid; grid-template-columns: 74px 18px 1fr; gap: 8px; padding: 0 14px 0 10px; }
+.f-vie-date { padding-top: 13px; text-align: right; font-size: 13px; color: var(--sb-encre-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.f-vie-rail { position: relative; display: flex; justify-content: center; }
+.f-vie-rail::before { content: ''; position: absolute; top: 0; bottom: 0; width: 1.5px; background: rgb(var(--sb-o) / .14); }
+:root[data-theme="dark"] .f-vie-rail::before { background: rgb(255 255 255 / .12); }
+.f-vie-e:first-child .f-vie-rail::before { top: 18px; }
+.f-vie-e:last-child .f-vie-rail::before { bottom: calc(100% - 18px); }
+.f-vie-rail i { position: relative; margin-top: 14px; width: 10px; height: 10px; border-radius: 50%; background: var(--sb-encre); box-shadow: 0 0 0 3px var(--sb-porcelaine); }
+.f-vie-e.is-avenir .f-vie-rail i { background: var(--sb-porcelaine); box-shadow: 0 0 0 3px var(--sb-porcelaine), inset 0 0 0 1.5px rgb(var(--sb-o) / .3); }
+:root[data-theme="dark"] .f-vie-e.is-avenir .f-vie-rail i { box-shadow: 0 0 0 3px var(--sb-porcelaine), inset 0 0 0 1.5px rgb(255 255 255 / .3); }
+.f-vie-e.is-passu .f-vie-rail i { background: var(--sb-porcelaine); box-shadow: 0 0 0 3px var(--sb-porcelaine), inset 0 0 0 1.5px var(--sb-encre-2); }
+.f-vie-e.is-geste .f-vie-rail i { background: var(--sb-ambre-point); box-shadow: 0 0 0 3px var(--sb-porcelaine), 0 0 0 6px color-mix(in oklab, var(--sb-ambre-point) 22%, transparent); }
+.f-vie-corps { display: flex; flex-direction: column; padding: 10px 0 12px; min-width: 0; }
+.f-vie-t { display: flex; justify-content: space-between; gap: 10px; font-size: 16px; font-weight: 500; }
+.f-vie-e.is-avenir .f-vie-t { color: var(--sb-encre-2); font-weight: 400; }
+.f-vie-e.is-geste .f-vie-t { color: var(--sb-ambre); font-weight: 600; }
+.f-vie-v { font-variant-numeric: tabular-nums; }
+.f-vie-d { font-size: 14px; color: var(--sb-encre-2); margin-top: 2px; }
+.f-rangee { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 52px; padding: 0 14px 0 16px; position: relative; color: var(--sb-encre-2) !important; }
+.f-rangee-t { color: var(--sb-encre); font-size: 16px; }
+.f-rangee + .f-rangee::before { content: ''; position: absolute; top: 0; left: 16px; right: 0; height: .5px; background: rgb(var(--sb-o) / .12); }
+
+/* ══ L'ORDINATEUR : recherche · liste · fiche, trois colonnes qui ne bougent pas ══ */
+.f-racine--large { display: grid; grid-template-columns: 300px minmax(400px, 460px) 1fr; gap: 0; padding: 0; height: 100dvh; overflow: hidden; }
+.f-rail { padding: 22px 18px; border-right: .5px solid rgb(var(--sb-o) / .10); background: color-mix(in oklab, var(--sb-haut) 70%, transparent); overflow: auto; }
+.f-rail .f-barre { height: 44px; margin-top: 18px; border-radius: 12px; }
+.f-rail .f-barre-champ { font-size: 15px; }
+.f-rail-t { margin: 24px 6px 8px; font-size: 12.5px; font-weight: 600; letter-spacing: .02em; color: var(--sb-encre-2); }
+.f-pastilles--rail { flex-direction: column; gap: 2px; margin: 0; padding: 0; overflow: visible; }
+.f-pastilles--rail .f-pastille { height: 36px; border-radius: 10px; background: none; box-shadow: none; padding: 0 10px; justify-content: flex-start; font-weight: 500; }
+.f-pastilles--rail .f-pastille-nom { flex: 1; }
+.f-pastilles--rail .f-pastille:hover { background: rgb(var(--sb-o) / .05); }
+.f-pastilles--rail .f-pastille.is-actif { background: var(--sb-porcelaine); box-shadow: var(--sb-ombre-pose); }
+.f-pastilles--rail .f-pastille.is-actif .f-pastille-nom::after { display: none; }
+.f-pastilles--rail .f-pastille:not(:has(.f-point)) .f-pastille-nom { padding-left: 14px; }
+.f-comptes { list-style: none; margin: 0; padding: 0 6px; font-size: 14px; color: var(--sb-encre-2); line-height: 2; }
+.f-milieu { overflow: auto; padding: 4px 18px 40px; border-right: .5px solid rgb(var(--sb-o) / .10); }
+.f-milieu .f-affiche { font-size: 48px; }
+.f-milieu .f-geste, .f-milieu .f-liste-tete { margin-top: 26px; }
+.f-milieu .f-plein { height: 40px; border-radius: 20px; font-size: 15px; padding: 0 18px; }
+.f-milieu .f-ligne { min-height: 64px; padding-top: 8px; padding-bottom: 8px; }
+.f-milieu .f-ligne-titre { font-size: 15px; }
+.f-milieu .f-ligne-ou { font-size: 13px; }
+.f-milieu .f-ligne-val { font-size: 15px; }
+.f-milieu .f-cherche { margin-top: 26px; }
+.f-droite { overflow: auto; padding: 26px 40px 60px; }
+.f-droite .f-fiche { max-width: 760px; margin: 0 auto; }
+.f-droite .f-heros { display: grid; grid-template-columns: 300px 1fr; gap: 28px; align-items: end; margin-top: 0; }
+.f-droite .f-heros-photo { aspect-ratio: 1; }
+.f-droite .f-heros-titre { font-size: 32px; }
+.f-droite .f-maintenant { display: grid; grid-template-columns: 1fr auto; align-items: center; column-gap: 20px; }
+.f-droite .f-maintenant .f-plein--large { grid-row: 1 / span 2; grid-column: 2; width: auto; margin: 0; height: 44px; font-size: 15px; }
+.f-droite .f-maintenant .f-lien { grid-column: 1; }
+.f-droite .f-chiffres dd { font-size: 28px; }
+.f-fiche--vide { display: grid; place-items: center; height: 60vh; }
+@media (hover: hover) { .f-ligne:hover { background: var(--sb-porcelaine-2); } }
+@media (prefers-reduced-motion: reduce) { .f-racine * { transition: none !important; } }
