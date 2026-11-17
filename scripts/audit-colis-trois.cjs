@@ -118,7 +118,7 @@ const dit = (c, m, d) => { n++; if (!c) ko++; console.log(`${c ? '✅' : '❌'} 
   const merge = app.slice(app.indexOf('const composerBordereaux = async'), app.indexOf('const mergeAndDownloadBordereaux = '));
   dit(/confirmerNumerosAVerifier\(/.test(merge) && /poserBordereau\(PL, out, src/.test(merge), '2f App : la fusion demande les N° « à vérifier » et tamponne chaque page (`poserBordereau` → `tamponnerBordereau`)');
 
-  dit(/choisir: (?:it\.tampon === 'rien' \? null : )?choisirTampon\(\{ PL, src, numero: it\.numero, titre: it\.title, apercu: /.test(merge) && /const composerLot = async \(lignes, format, tampons, \{ apercu = false, pas = null \} = \{\}\) =>/.test(app) && /await composerBordereaux\(items, \(w, h\) => posForFormat\(w, h, false\), \{ imprimante: format, apercu \}\)/.test(app), '2g App : chaque bordereau du lot sort à la place gardée pour SA forme (`choisirTampon`, `vrm_tampon_positions`), sans aperçu');
+  dit(/choisir: (?:it\.retour \? null : )?(?:it\.tampon === 'rien' \? null : )?choisirTampon\(\{ PL, src, numero: it\.numero, titre: it\.title, apercu: /.test(merge) && /const composerLot = async \(lignes, format, tampons, \{ apercu = false, pas = null(?:, places = null)? \} = \{\}\) =>/.test(app) && /await composerBordereaux\(items, \(w, h\) => posForFormat\(w, h, false\), \{ imprimante: format, apercu \}\)/.test(app), '2g App : chaque bordereau du lot sort à la place gardée pour SA forme (`choisirTampon`, `vrm_tampon_positions`), sans aperçu');
 
   // ── 3. RETOUR → STOCK ─────────────────────────────────────────────────────
   const etats = { 1: { s: 440, ss: '' }, 2: { s: 440, ss: "La livraison n'a pas encore eu lieu - colis déposé en bureau de Poste ou point relais" }, 3: { s: 440, ss: 'Commande livrée ! ' },

@@ -58,15 +58,16 @@ export const CLE_PRIX_PRO = 'vrm_pro_mensuel';
 // navigateur. ⚠️ LA LIMITE EST CELLE DE LA QUANTITÉ PAYÉE : une liste plus longue
 // (quantité baissée chez Stripe) ne garde que ses N premiers comptes, dans
 // l'ordre où il les a ajoutés. Pro reste illimité (aucune liste lue en Pro).
-export const PRIX_COMPTE_SUP_CENTIMES = 300;
+// (16 nov., lot vitesse-lectures) La valeur, son texte et les OFFRES vivent dans plan-offres.js (la page
+// d'accueil les lit sans emporter toute la règle des plans) ; ré-exportés ici à l'identique.
+import { PRIX_COMPTE_SUP_CENTIMES, prixCompteSupTexte, OFFRES } from './plan-offres.js';
+export { PRIX_COMPTE_SUP_CENTIMES, prixCompteSupTexte, OFFRES };
 export const CLE_PRIX_COMPTE_SUP = 'vrm_compte_sup';
 export const COMPTES_INCLUS_SOLO = 1;
 export const META_COMPTES_SUP = 'vrm_comptes_sup';
 // Au plus 20 comptes de plus (la métadonnée Stripe tient 500 caractères ; au-delà
 // d'un compte de plus, Pro — illimité — coûte de toute façon moins cher).
 export const MAX_COMPTES_SUP = 20;
-// « 3 € » / « 2,50 € » : le texte du supplément, écrit une fois.
-export const prixCompteSupTexte = (c = PRIX_COMPTE_SUP_CENTIMES) => (c % 100 === 0 ? String(c / 100) : (c / 100).toFixed(2).replace('.', ',')) + '\u00a0€';
 // La liste des comptes de plus, propre (uids valides, sans doublon, sans le compte inclus).
 export function listeComptesSup(brut, vendeur = null) {
   const l = Array.isArray(brut) ? brut : String(brut == null ? '' : brut).split(',');
@@ -265,11 +266,3 @@ export function prochainChangement(vendeurLe, maintenant = Date.now()) {
   return fin > maintenant ? new Date(fin).toISOString() : null;
 }
 
-// Les offres, en clair : une phrase par offre, la même dans l'app, la page
-// d'accueil et (en substance) les CGV.
-export const OFFRES = Object.freeze({
-  solo: Object.freeze({ nom: 'Solo', phrase: 'Un compte vendeur par plateforme (un Vinted, un Leboncoin, un eBay, un Vestiaire) — ventes, annonces, colis à envoyer, offres et compta de ce compte — et autant de comptes d’achat que tu veux (leurs achats et leurs retraits).',
-    // (13 nov., lot 56) Le supplément, en une ligne (Paramètres, accueil) : la même valeur partout.
-    supplement: `1 compte Vinted vendeur inclus · +${prixCompteSupTexte()}/mois par compte de plus` }),
-  pro: Object.freeze({ nom: 'Pro', phrase: 'Comptes vendeurs illimités : tous tes comptes vendent, tout entre dans tes totaux.' }),
-});

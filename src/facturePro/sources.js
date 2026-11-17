@@ -100,15 +100,26 @@ export function venteEbay(o) {
   const pay = txt(o.orderPaymentStatus).toUpperCase();
   if (/FAILED|REFUNDED/.test(pay)) return non('annulee', 'la commande est remboursée');
   if (pay !== 'PAID') return non('paiement', 'eBay ne dit pas encore la commande payée');
+  // (16 nov., lot plateformes-restes) UNE commande à PLUSIEURS lignes = UNE facture, une ligne
+  // par article (`lignes`, la forme de `lignesDeVente` — src/facturePro/regle.js). Chaque ligne
+  // doit être lue en entier (titre, quantité 1, prix en euros) : UNE ligne illisible, en autre
+  // devise ou à plusieurs exemplaires ⇒ toute la commande est refusée (jamais une facture partielle).
   const li = Array.isArray(o.lineItems) ? o.lineItems : [];
-  if (li.length !== 1) return non('articles', li.length ? 'la commande a plusieurs articles (pas encore pris en charge)' : 'l’article de la commande n’est pas lu');
+  if (!li.length) return non('articles', 'l’article de la commande n’est pas lu');
+  const lignes = [];
+  for (const l of li) {
+    if (!l || typeof l !== 'object') return non('articles', 'un article de la commande n’est pas lu');
+    if (l.quantity != null && Number(l.quantity) !== 1) return non('articles', 'la commande porte plusieurs exemplaires d’un article (pas encore pris en charge)');
+    const cout = l.lineItemCost && typeof l.lineItemCost === 'object' ? l.lineItemCost : null;
+    if (!cout || cout.value == null || String(cout.value).trim() === '') return non('prix', li.length > 1 ? 'le prix d’un des articles n’est pas lu' : 'le prix de l’article n’est pas lu');
+    if (txt(cout.currency).toUpperCase() !== 'EUR') return non('devise', `la commande est en ${txt(cout.currency) || 'devise inconnue'} : VRM ne facture qu’en euros`);
+    const lc = Math.round(Number(String(cout.value).replace(',', '.')) * 100);
+    if (!(Number.isInteger(lc) && lc > 0)) return non('prix', li.length > 1 ? 'le prix d’un des articles n’est pas lu' : 'le prix de l’article n’est pas lu');
+    if (li.length > 1 && !txt(l.title)) return non('articles', 'le titre d’un des articles n’est pas lu');
+    lignes.push({ designation: txt(l.title), centimes: lc });
+  }
+  const c = lignes.reduce((s, l) => s + l.centimes, 0);
   const l = li[0] || {};
-  if (l.quantity != null && Number(l.quantity) !== 1) return non('articles', 'la commande porte plusieurs exemplaires (pas encore pris en charge)');
-  const cout = l.lineItemCost && typeof l.lineItemCost === 'object' ? l.lineItemCost : null;
-  if (!cout || cout.value == null || String(cout.value).trim() === '') return non('prix', 'le prix de l’article n’est pas lu');
-  if (txt(cout.currency).toUpperCase() !== 'EUR') return non('devise', `la commande est en ${txt(cout.currency) || 'devise inconnue'} : VRM ne facture qu’en euros`);
-  const c = Math.round(Number(String(cout.value).replace(',', '.')) * 100);
-  if (!(Number.isInteger(c) && c > 0)) return non('prix', 'le prix de l’article n’est pas lu');
   const t = date(o.creationDate);
   if (t == null) return non('date', 'la date de la commande n’est pas lue');
   // L'acheteur : seulement ce que CETTE commande porte (même n°), proposé, jamais imposé.
@@ -118,7 +129,7 @@ export function venteEbay(o) {
   const reg2 = reg || null;
   const nom = txt(reg2 ? reg2.fullName : '') || txt(dest ? dest.fullName : '');
   const adresse = adresseEbay(reg2 ? reg2.contactAddress : null) || adresseEbay(dest ? dest.contactAddress : null);
-  return { ok: true, plateforme: 'ebay', ref, centimes: c, venteLe: new Date(t).toISOString(), designation: txt(l.title), compte: txt(o._pseudo || o._compte), acheteurPropose: nom || adresse ? { nom, adresse } : null,
+  return { ok: true, plateforme: 'ebay', ref, centimes: c, venteLe: new Date(t).toISOString(), designation: lignes.length > 1 ? lignes.map((x) => x.designation).join(' · ') : txt(l.title), ...(lignes.length > 1 ? { lignes } : {}), compte: txt(o._pseudo || o._compte), acheteurPropose: nom || adresse ? { nom, adresse } : null,
     sansAcheteur: nom && adresse ? '' : 'eBay ne donne pas l’acheteur complet dans cette commande' };
 }
 
@@ -170,6 +181,8 @@ export function venteFacture(v, acheteur, designation) {
     acheteur: { nom: txt(acheteur && acheteur.nom).slice(0, 200), adresse: String((acheteur && acheteur.adresse) || '').split(/\r?\n/).map(txt).filter(Boolean).join('\n').slice(0, 600), email: '' },
     designation: (txt(designation) || v.designation).slice(0, 400),
     centimes: v.centimes,
+    // (16 nov.) Une commande eBay à plusieurs articles : une ligne par article (somme = prix).
+    ...(Array.isArray(v.lignes) && v.lignes.length > 1 ? { lignes: v.lignes.map((l) => ({ designation: txt(l.designation).slice(0, 400), centimes: l.centimes })) } : {}),
     venteLe: v.venteLe,
     reference: v.ref,
     plateforme: PLATEFORMES[v.plateforme].l,

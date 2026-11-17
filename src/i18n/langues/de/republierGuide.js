@@ -165,6 +165,8 @@ export default {
   "rg.publier.sous": "Du veröffentlichst selbst, von hier geht nichts raus",
   "rg.publier.refus": "Text nicht fertig: {raison}.",
   "rg.publier.num": "Die Nr. {num} ist die des Datenblatts: dieselbe auf der Schachtel.",
+  "rg.publier.reserve": "Die N°{num} der Karte erscheint neben „Hochladen“ auf Vinted: der Artikel bekommt sie.",
+  "rg.publier.pris": "N°{num} ist schon auf einem Vinted-Artikel: nichts reserviert, sieh unter Anzeigen nach.",
   // (15 nov., « je veux TOUTES les photos », « les barres beaucoup mieux »)
   "rg.photos.choix": "{n} von {m} Fotos gewählt · tippe auf ein Foto, um es zu entfernen oder wieder hinzuzufügen",
   "rg.photos.aucuneChoisie": "Kein Foto gewählt: tippe auf ein Foto, um es wieder hinzuzufügen.",

@@ -239,4 +239,12 @@ export default {
   "ventes.ventesAchetePeu2": "Sur {total} ventes — achète un peu avant.",
   "ventes.ventesAnnulees2": { one: "{n} vente annulée", other: "{n} ventes annulées" },
   "ventes.moinsVentesSans": { one: "Au moins : {n} vente sans prix lu, pas comptée.", other: "Au moins : {n} ventes sans prix lu, pas comptées." },
+  "ventes.regarder": {"one": "{n} chose à regarder", "other": "{n} choses à regarder"},
+  "ventes.regarderVide": "À regarder",
+  "ventes.basculeCourt": "Ouvre {login} sur vinted.fr",
+  "ventes.basculeCourtOrdi": "Ouvre {login} sur vinted.fr, sur l’ordinateur",
+  "ventes.connecteCourt": "Connecte {login} sur vinted.fr",
+  "ventes.pourquoiBord": "Pourquoi ce bordereau attend ?",
+  "ventes.puceAchat": "Prix d’achat ?",
+  "ventes.puceRelier": "Relier un achat",
 };

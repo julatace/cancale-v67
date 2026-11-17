@@ -466,7 +466,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] }, enSection = false }) {
   // « Déplacer le tampon » : l'aperçu s'ouvre toujours, la place choisie s'imprime.
   const adjustBordPlacement = async () => {
     const r = bordResult; if (!r?.pdfBuf) return;
-    try { const r2 = await annotateAndDownloadBordereau(r.numero, r.title, r.pdfBuf, null, { apercu: 'force' }); setBordResult({ ...r2, numero: r.numero, title: r.title, pdfBuf: r.pdfBuf, key: r.key, w: r.w, h: r.h }); }
+    try { const r2 = await annotateAndDownloadBordereau(r.numero, r.title, r.pdfBuf, null, { apercu: 'force', site: 'leboncoin' }); setBordResult({ ...r2, numero: r.numero, title: r.title, pdfBuf: r.pdfBuf, key: r.key, w: r.w, h: r.h }); }
     catch (err) { libererOngletPdf(); if (!estTamponAnnule(err)) toast('Erreur : ' + String(err)); }
   };
   const ventes = lbcVentes.ventes || [];
@@ -503,7 +503,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] }, enSection = false }) {
       const { width, height } = await readPdfFirstPageSize(bytes);
       const key = bordereauFormatKey(width, height);
       const pos = posForFormat(width, height);   // emplacement APPRIS pour ce format
-      const r = await annotateAndDownloadBordereau(n || '', o.title || '', bytes, pos);
+      const r = await annotateAndDownloadBordereau(n || '', o.title || '', bytes, pos, { site: 'leboncoin' });
       // On garde le PDF SOUS LA MAIN pour permettre de DÉPLACER ensuite (comme Vinted).
       setBordResult({ ...r, numero: n || '', title: o.title || '', pdfBuf: bytes, key, w: width, h: height });
     } catch (e) { libererOngletPdf(); if (!estTamponAnnule(e)) toast('Impossible de tamponner ce bordereau : ' + String(e)); }
@@ -514,7 +514,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] }, enSection = false }) {
     const n = numDe(o);
     const posted = estFait(o);
     return (
-      <div className="vrm-lbc-package" key={o.txId} data-bord-card data-transporteur={cleStatTransporteur(transporteurDuColis({ declare: o.deliveryMethod || o.deliveryLabel || '' }))} style={{ padding: '11px 12px', border: `1px solid ${o.label && o.label.voucherUrl ? INV_STATUS.online.color + '44' : C.border}`, background: C.card, borderRadius: 12, marginBottom: 8, opacity: posted ? 0.55 : 1 }}>
+      <div className="vrm-lbc-package" key={o.txId} data-lbc-vente={o.txId} data-cible={attrCible(['lbcvente', o.txId])} data-bord-card data-transporteur={cleStatTransporteur(transporteurDuColis({ declare: o.deliveryMethod || o.deliveryLabel || '' }))} style={{ padding: '11px 12px', border: `1px solid ${o.label && o.label.voucherUrl ? INV_STATUS.online.color + '44' : C.border}`, background: C.card, borderRadius: 12, marginBottom: 8, opacity: posted ? 0.55 : 1 }}>
         <div className="vrm-lbc-package-head" style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
           <PhotoVente src={photoArticle(o)} size={58} />
           <div style={{ flex: '1 1 150px', minWidth: 0 }}>

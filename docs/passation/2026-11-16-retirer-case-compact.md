@@ -56,3 +56,7 @@ Nouveau ici : la 2e ligne de preuve (l'e-mail / la prise en charge du transporte
 - Rouges corrigés en passant : `audit-stock-etageres` (il ne copiait pas les règles de `src/` qu'importe `api/_lib/argent-notif.js` ⇒ 56/56 vert).
 - Pour fusionner : attendre que `main` soit vert sur ces jobs (lots `bancs-rouges-a/b`), refusionner `main`, relancer la CI.
 - Conflit possible avec `claude/bancs-rouges-a` sur `scripts/bancs/stock-planches.cjs` (le helper `retirer` passe maintenant par la case allumée d'une paire dite vendue : la fiche n'a plus « Retirer de la case »).
+
+## Correctif du train (16 nov., soir) — perte de rangement à 390 px
+Mesuré (banc `stock-planches`, 390 px) : après des sorties par la case allumée puis « Modifier le meuble → Enregistrer », N°3 sortie réapparaissait et N°5 posée disparaissait. Cause : `relire` (sur `vrm:stock-slots`) REMPLAÇAIT les cases de l'écran par `vrm_slots` de l'appareil, qui peut être en retard (le Stock écrit 500 ms plus tard ; le geste annulable écrit après sa vue) ; et `sortirAnnulable` calculait ses opérations sur cette même copie périmée. L'éditeur réenregistrait ensuite l'état périmé.
+Correctif (`src/ecrans/Stock.jsx`) : `relire` FUSIONNE PAR CASE (base = dernière lecture de l'appareil, `baseSlotsRef` ; une case que l'écran a changée garde la valeur de l'écran, les autres prennent celle de l'appareil) ; `sortirAnnulable` part de l'état courant (`slotsRef`, `opsSortieCases`). `stock-planches` vert à 390 et 1512 (rouge avant, mesuré par le train sur 14f030419) ; `stock-case-a-sortir` reste vert.

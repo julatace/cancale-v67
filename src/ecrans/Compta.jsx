@@ -88,7 +88,8 @@ import { CATEGORIES_DEPENSE, idTicket, montantDuTicket, texteMontantSaisie, text
 
 // ⟦← App.jsx #3⟧
 const Dac7Comptes = aLaDemande(() => import('../Dac7Comptes.jsx'));
-import MoisBoucle, { portesMoisBoucle } from '../MoisBoucle.jsx';   // (10 nov., lot BK)
+import MoisBoucle, { portesMoisBoucle } from '../MoisBoucle.jsx';
+import NonComptees from '../composants/NonComptees.jsx';   // (16 nov., lot argent-mieux)   // (10 nov., lot BK)
 // (14 nov., lot argent-prix — 115 lien comptable, 116 révision du mois)
 import { LienComptable, RevisionMoisCarte } from '../ArgentPrix.jsx';
 import { revisionMois, moisRevision, moisPrecedent } from '../revisionMois.js';
@@ -1700,7 +1701,8 @@ function CaParPeriodeCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, acc
               {/* (2 nov., audit des données G1) La commande eBay au montant pas lu est dans « non comptées » ci-dessous (une phrase, §7). */}
               {/* (1er nov., audits A2/A10) Des ventes faites dont l'argent ne se lit pas : dans AUCUNE colonne, dites (jamais 0 €). */}
               {calc.venduNonComptees.length > 0 && <div data-ca-non-comptees={calc.venduNonComptees.length}>{trj('compta.dansVenduChaque', { phraseNonComptees: phraseNonComptees(calc.venduNonComptees) })}</div>}
-              {calc.recuNonComptees.length > 0 && <div data-ca-recu-non-comptees={calc.recuNonComptees.length}>{trj('compta.dansFinaliseNi', { phraseNonComptees: phraseNonComptees(calc.recuNonComptees) })}</div>}
+              {/* (16 nov., lot argent-mieux) Groupées : une ligne par raison, le nombre, « au moins », le geste ; le détail replié. */}
+              {calc.recuNonComptees.length > 0 && <div data-ca-recu-non-comptees={calc.recuNonComptees.length}><NonComptees liste={calc.recuNonComptees}/></div>}
             </div>
           )}
         </>)}
@@ -2408,7 +2410,7 @@ function FacturationElectroniqueCarte({ data, maj, lbcVentes, lbcCoqueLu, ebayCo
 
         <div className="vrm-fe-trois" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', borderBottom: `1px solid ${C.border}` }}>
           {[
-            ['Ce que VRM prépare', 'Une facture électronique par vente, et le récapitulatif du mois de tes ventes aux particuliers.'],
+            ['Ce que VRM prépare', 'Une facture électronique par vente, et le récap du mois de tes ventes aux particuliers.'],
             ["Où l'envoyer", "Super PDP : connecte TON compte ci-dessous. Ailleurs : dépose-les toi-même."],
             ['À partir de quand', 'Septembre 2027 pour les micro-entreprises — à vérifier sur impots.gouv.fr.'],
           ].map(([t, d], i) => (
@@ -3200,7 +3202,8 @@ function CarteUrssafMois({ liveStats, onNav }) {
           // (1er nov., audits A2/A10) Les ventes dont l'argent ne se lit pas (prix
           // Vinted pas lu, montant Vestiaire pas sûr…) : comptées NULLE PART, dites
           // ici, des mêmes lignes que le total — le chiffre est un minimum (§5).
-          if (ncInfo && ncInfo.n > 0) morceaux.push(<Puce key="nc" warn><span data-urssaf-non-comptees={ncInfo.n}>{trj('compta.dansAucunChiffre', { phraseNonCompteesPar: phraseNonCompteesPar(ncInfo.par) })}</span>{ncInfo.par && Object.keys(ncInfo.par).some(k => k.startsWith('Vestiaire|')) ? <>{tr('compta.vrmSaitEncore')}</> : null}</Puce>);
+          // (16 nov., lot argent-mieux) Plus une phrase par vente (« le mur ») : une ligne par raison, groupée (src/composants/NonComptees.jsx).
+          if (ncInfo && ncInfo.n > 0) morceaux.push(<div key="nc" data-urssaf-non-comptees={ncInfo.n}><NonComptees par={ncInfo.par} parC={ncInfo.parC} det={ncInfo.det}/>{ncInfo.par && Object.keys(ncInfo.par).some(k => k.startsWith('Vestiaire|')) ? <p className="vrm-nc-geste">{tr('compta.vrmSaitEncore').replace(/^\.\s*/, '')}.</p> : null}</div>);
           // (15 nov., 5.390) Les ventes sans date de versement : UNE ligne, sans geste (ni « mets l’extension à jour », ni renvoi pour dater à la main).
           if (ad && Number(ad.n) > 0) morceaux.push(<Puce key="av"><LigneDatesVersement avecDelai={extSait('versementsauto') === 'ok'} as="span" ad={ad} style={{fontSize:'inherit',color:'inherit'}}/></Puce>);
           // (29 oct.) « Vestiaire Co : pas encore relié » retiré : affiché à tous, même sans compte Vestiaire, il n'apprenait rien.
@@ -3442,7 +3445,7 @@ function RecapComptableMensuel({ liveStats, compta: comptaEcran, panelOff, accou
           <Bouton variante="secondaire" icone="doc" data-recap-pdf="" disabled={!!recapEnCours} onClick={()=>exporterRecap('pdf')} style={{flex:'1 1 140px'}}>{recapEnCours==='pdf'?'…':tr('compta.telechargerPdf2')}</Bouton>
           <Bouton variante="secondaire" icone="save" data-recap-csv="" disabled={!!recapEnCours} onClick={()=>exporterRecap('csv')} style={{flex:'1 1 140px'}} title={tr('compta.fichierExcelNumbers')}>{recapEnCours==='csv'?'…':tr('compta.telechargerTableur2')}</Bouton>
         </div>
-        <p data-recap-imprimer-note="" style={{margin:'8px 0 0',fontSize:13,color:C.muted,lineHeight:1.5}}>{tr('compta.recapImprimerNote')}</p>
+        <div data-recap-imprimer-note="" style={{margin:'8px 0 0',fontSize:13,color:C.muted,lineHeight:1.5}}><Pourquoi ecrit label={tr('compta.recapImprimerAide')}>{tr('compta.recapImprimerNote')}</Pourquoi></div>
       </div></Card>
       {/* Récap comptable mensuel */}
       {moisRecap.length>0&&(
@@ -3627,7 +3630,7 @@ function AVenirVerre({ A }) {
   return (
     <section className="vrm-a-venir vg-a-venir vg-carte" data-a-venir={T.valeur == null ? '' : c(T.valeur)} data-a-venir-n={String(T.n)} data-a-venir-site="toutes" data-a-venir-partiel={T.partiel ? '1' : undefined}>
       <button type="button" className="vg-a-venir-btn" data-a-venir-ouvrir="" onClick={ouvrirArgentAVenir}
-        aria-label={`${tr('avenir.ouvrir')} — ${T.partiel && T.valeur != null ? tr('journee.moins') + ' ' : ''}${T.valeur == null ? '—' : montant(T.valeur)}`}>
+        title={`${tr('avenir.ouvrir')} — ${T.partiel && T.valeur != null ? tr('journee.moins') + ' ' : ''}${T.valeur == null ? '—' : montant(T.valeur)}`}>
         <span className="vg-a-venir-tete">
           <span className="vg-ds">{tr('journee.venir')}</span>
           <b className="vg-a-venir-total" data-a-venir-total="">{T.partiel && T.valeur != null ? <small>{tr('journee.moins')} </small> : null}{T.valeur == null ? '—' : montant(T.valeur)}</b>
@@ -3685,7 +3688,9 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
     ? tr('compta.su', { libelle: String(q.libelle), x: String(q.note ? q.note + ', ' : ''), question: String(q.question) })
     : `${q.libelle} : ${q.valeur == null ? q.texte : (q.partiel ? 'au moins ' : '') + somme(q.valeur)}${q.note ? ', ' + q.note : ''} — ${q.question}`);
   const attrs = (q) => ({ 'data-argent-q': q.id, 'data-argent-valeur': q.valeur == null ? '' : String(Math.round(q.valeur * 100)), 'data-argent-partiel': q.partiel ? '1' : undefined,
-    'data-argent-raison': q.raison || undefined, 'data-argent-echeance': q.echeance ? String(q.echeance) : undefined, 'aria-label': nom(q), onClick: () => aller(q) });
+    'data-argent-raison': q.raison || undefined, 'data-argent-echeance': q.echeance ? String(q.echeance) : undefined, title: nom(q), onClick: () => aller(q) });
+  // (16 nov.) Le nom d'une case = son texte visible (WCAG 2.5.3 : un aria-label différent cachait le chiffre lu) ;
+  // la phrase complète (« au moins », la question) reste en `title`.
   const chiffre = (q, affiche = false) => (
     <b className="vrm-argent-w-n" data-argent-pas-su={q.valeur == null && !q.texte ? '' : undefined}>
       {q.valeur != null ? <>{q.partiel ? <small>{tr('journee.moins')} </small> : null}{affiche ? sommeAffiche(somme(q.valeur)) : somme(q.valeur)}</> : (q.texte || '—')}

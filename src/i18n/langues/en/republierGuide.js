@@ -165,6 +165,8 @@ export default {
   "rg.publier.sous": "You publish it yourself, nothing is sent from here",
   "rg.publier.refus": "Text not ready: {raison}.",
   "rg.publier.num": "No. {num} is the record’s number: the same on the box.",
+  "rg.publier.reserve": "The listing card’s N°{num} shows next to “Upload” on Vinted: the listing will take it.",
+  "rg.publier.pris": "N°{num} is already on a Vinted listing: nothing reserved, check Listings.",
   // (15 nov., « je veux TOUTES les photos », « les barres beaucoup mieux »)
   "rg.photos.choix": "{n} of {m} photos chosen · tap a photo to remove it or put it back",
   "rg.photos.aucuneChoisie": "No photo chosen: tap a photo to put it back.",

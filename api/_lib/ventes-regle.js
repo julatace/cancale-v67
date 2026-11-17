@@ -174,7 +174,9 @@ export const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu
     if (!t) { if (!vus.has(id)) { vus.add(id); aDaterOuDeclaree({ id, plateforme: 'Vinted', eur, titre: o.title || '', masquee: masq, o, dateVente: o.date }); } continue; }
     // (11 nov., lot vinted-pro) Compte Vinted PRO : un prix que Vinted contredit (liste ≠ article,
     // relevé muet) n'est pas su ⇒ mise à part et NOMMÉE — sauf une vente déjà déclarée, qui garde son mois.
-    if (o._prixPro && o._prixPro.compter === false && !(idx && idx.get(id))) { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'Vinted', raison: o._prixPro.raison || 'prix pas lu', titre: o.title || '', manque: true, ts: t || null, tsVente: tsCommande(o) || null }); } continue; }
+    // (16 nov., lot argent-mieux) Les deux prix LUS sont gardés à côté (`deux`, centimes) : la liste groupée
+    // dit « au moins » la somme du plus bas (jamais un des deux choisi pour le total, qui reste sans elles).
+    if (o._prixPro && o._prixPro.compter === false && !(idx && idx.get(id))) { if (!vus.has(id)) { vus.add(id); const pp = o._prixPro; const deux = Number.isSafeInteger(pp.listeC) && Number.isSafeInteger(pp.artC) ? { listeC: pp.listeC, artC: pp.artC, releveC: Number.isSafeInteger(pp.releveC) ? pp.releveC : null } : null; ecartees.push({ id, plateforme: 'Vinted', raison: pp.raison || 'prix pas lu', code: pp.code || '', ...(deux ? { deux, auMoinsC: Math.min(deux.listeC, deux.artC) } : {}), titre: o.title || '', manque: true, ts: t || null, tsVente: tsCommande(o) || null, itemId: o.item_id != null ? String(o.item_id) : '' }); } continue; }
     const l = { id, plateforme: 'Vinted', ts: t, ym: ymDeTs(t), eur, titre: o.title || '', masquee: masq, o, dateVente: o.date };
     if (garde(l)) lignes.push(place(l));
   }

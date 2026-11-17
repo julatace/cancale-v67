@@ -280,6 +280,9 @@ export function indexRecherche(sources) {
       let e = seuls.get(k);
       if (!e) { e = { type: 'stock', cle: 'stock:' + k, id: k, tx: '', o: null, titre: '', t: '', numero: str(r.numero).trim(), numK: k, lieux: [], lieuxAff: [], photo: '', pseudos: [], pseudosAff: [], suivis: [], codes: [], montants: [], date: '' }; seuls.set(k, e); entrees.push(e); }
       if (lieu && !e.lieuxAff.includes(lieu)) { e.lieux.push(normaliser(lieu)); e.lieuxAff.push(lieu); }
+      // (16 nov., lot ecrans-restes) Une paire IMPORTÉE d'un autre outil (src/stockImporteVue.js) porte son titre :
+      // trouvée par son N° ET par ses mots ; `importe` le dit à la ligne.
+      if (r.importe) { e.importe = true; if (!e.titre && str(r.titre)) { e.titre = str(r.titre); e.t = normaliser(e.titre); } }
     }
   }
   // (15 nov., vendre plus) LES RETOURS D'ACHAT : une entrée par n° de transaction (l'achat renvoyé) ;
@@ -397,6 +400,8 @@ export function destinationResultat(r) {
   if (e.type === 'colis') {
     const c = e.c || {};
     if (str(c.sens) === 'sortant') return { tab: 'cat_bord', cible: { type: 'colonne', colonne: 'partis' } };
+    // (16 nov.) Un colis À EXPÉDIER trouvé par la phrase (« colis à expédier demain ») : la colonne « À envoyer ».
+    if (str(c.sens) === 'aenvoyer') return { tab: 'cat_bord', cible: { type: 'colonne', colonne: 'envoyer' } };
     // (6 nov.) Trouvé par SON CODE : la carte de CE n° de suivi s'ouvre ET son code
     // passe « En grand » (le comptoir, le casier).
     return { tab: 'cat_bord', cible: str(c.suivi).trim() ? { type: 'retrait', suivi: str(c.suivi).trim(), tx: '', ...(r.par === 'code' ? { grand: true } : {}) } : { type: 'colonne', colonne: 'retirer' } };
@@ -409,7 +414,8 @@ export function destinationResultat(r) {
   // « Factures Pro émises », en tête de l'écran (la recherche de l'écran ne la voit pas).
   if (e.type === 'facture') return { tab: 'invoices', facture: e.x && e.x.pro ? '' : (e.facture || '') };
   // (15 nov.) Un N° rangé sans fiche : le Stock, sur CE N° ; un retour : SON achat (par son n° de transaction).
-  if (e.type === 'stock') return { stock: e.numero };
+  // (16 nov.) Une paire importée d'un autre outil : sa fiche (« Tout sur le N° » la raconte), pas une case du Stock.
+  if (e.type === 'stock') return e.importe ? { fiche: e.numero } : { stock: e.numero };
   if (e.type === 'retour') return { tab: 'achats', cible: e.tx ? { type: 'achat', tx: e.tx } : null };
   return null;
 }

@@ -73,6 +73,7 @@
    s'appliquait ICI (la carte « L'état » portait un cadre, visible la nuit) : la fiche le remet à zéro, `.vrm-fp` devant. */
 .vrm-fp .vrm-fp-etat { margin: 0 0 24px; display: block; padding: 0; border: 0; border-radius: 0; background: none; }
 .vrm-fp-etat-titre { font-size: var(--d-t-20, 20px); font-weight: 700; letter-spacing: var(--d-ap-22, -.016em); margin: 0 4px 8px; color: var(--d-encre, inherit); }
+.vrm-fp-etat-commune { margin: -2px 4px 8px; font-size: var(--d-t-13, 13px); color: var(--d-gris, #6E6E73); line-height: 1.35; }
 .vrm-fp-etat-grille { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0; padding: 16px; background: var(--d-carte, #FFFFFF); border-radius: var(--d-r-carte, 20px); box-shadow: var(--d-ombre-carte, none); }
 .vrm-fp-etat-l { min-width: 0; }
 .vrm-fp-etat-l dt { font-size: var(--d-t-13, 13px); color: var(--d-gris, #6E6E73); margin: 0 0 4px; }
@@ -279,3 +280,8 @@
 .vrm-fp .vrm-fp-contexte .vrm-rpf-fiche-v { text-align: right; font-size: var(--d-t-15, 15px); color: var(--d-encre, #1D1D1F); overflow-wrap: anywhere; }
 /* Le transporteur d'un colis (sa pastille) dans les actions : discret, à sa taille. */
 .vrm-fp .vrm-fp-actions-carte [data-colis-transporteur] { align-self: flex-start; margin: 8px 0 0; }
+/* (16 nov., captures de Julien) Le pictogramme « transporteur pas encore lu » (un carton gris, sans nom) restait seul à
+   gauche d'« Imprimer le bordereau » dans la feuille « Plus » : une icône orpheline qu'on ne comprend pas. Comme sur la
+   ligne de vente (fusion.css), il se tait dans la fiche ; un transporteur LU garde sa marque. */
+html body .vrm-fp-actions-ligne .vrm-puce-transp[data-lu="0"],
+html body .vrm-fp-contexte .vrm-puce-transp[data-lu="0"] { display: none !important; }
