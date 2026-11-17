@@ -161,7 +161,9 @@ const ATTENDU = {
 // (16 nov., lot tampons-parametres) DÉCISION DE JULIEN : la mention va juste AU-DESSUS du QR, centrée sur son axe
 // (sinon juste dessous, sinon sous l'adresse), SUR l'étiquette — plus « hors de l'étiquette ». Attendue là où le
 // dessus du QR est blanc ; ailleurs seulement si une place sûre existe (null).
-const MENTION_ATTENDUE = { 'a4-quart': true, 'a4-moitie': true, 'pleine-10x15': null, 'tournee-90-pleine': null, 'a4-pleine': null };
+// (17 nov., lot tampon-qr) a4-quart : « 24R » occupe le dessus du QR (2,8 mm) — la mention n'y tient pas, et Julien la
+// veut « vraiment juste au-dessus, pas en dessous » ⇒ aucune mention plutôt que dessous (null : posée ou non, jugée par sa place).
+const MENTION_ATTENDUE = { 'a4-quart': null, 'a4-moitie': true, 'pleine-10x15': null, 'tournee-90-pleine': null, 'a4-pleine': null };
 // Le QR de chaque forme fabriquée, sur la page AFFICHÉE (qr(p, ox + w - 92, oy + h - 190, 25, 3.2) : 80 × 80 pt).
 const QR_AFFICHE = { 'a4-quart': { x: 20 + 283 - 92, y: 841.89 - (440 + 380 - 190 + 80), w: 80, h: 80 }, 'a4-moitie': { x: 20 + 555 - 92, y: 841.89 - (20 + 380 - 190 + 80), w: 80, h: 80 } };
 const ETIQUETTE_AFFICHEE = { 'a4-quart': { x: 20, y: 841.89 - 820, w: 283, h: 380 }, 'a4-moitie': { x: 20, y: 841.89 - 400, w: 555, h: 380 }, 'gris-clair': { x: 150, y: 841.89 - 420, w: 283, h: 380 } };
@@ -349,9 +351,10 @@ async function libre(pg, pdfs) {
     const r7 = await imprimer('a4-quart', false, { choix: CH7 });
     const men = r7.items.filter((x) => /Créé par vrm\.center/.test(x.s)), k = attenduN(r7, CH7).k;
     const cad = { x: CH7.vx * r7.W, y: CH7.vy * r7.H, w: r7.cw * k, h: r7.ch * k };
-    dit(r7.r0 && r7.r0.tampons[0] === 'libre' && men.length === 1, 'tampon libre : la mention est posée dans une autre zone libre', `${men.length} mention(s)`);
+    // (17 nov., lot tampon-qr) La mention ne va plus « dans une autre zone libre » : au-dessus du QR, ou nulle part.
+    dit(r7.r0 && r7.r0.tampons[0] === 'libre' && men.length <= 1, 'tampon libre : le N° à sa place ; la mention au plus une fois (au-dessus du QR ou rien)', `${men.length} mention(s)`);
     const loin = men.every((m) => { const dx = Math.max(0, cad.x - (m.x + m.l), m.x - (cad.x + cad.w)), dy = Math.max(0, cad.y - m.y, (m.y - m.t) - (cad.y + cad.h)); return Math.hypot(dx, dy) >= 2.5 * 72 / 25.4; });
-    dit(men.length === 1 && loin, 'tampon libre : la mention n\'est jamais collée au cartouche (≥ 2,5 mm)', men.map((m) => `(${m.x.toFixed(0)}, ${m.y.toFixed(0)}) · cartouche (${cad.x.toFixed(0)}, ${cad.y.toFixed(0)}, ${cad.w.toFixed(0)}×${cad.h.toFixed(0)})`).join(' '));
+    dit(men.length <= 1 && loin, 'tampon libre : la mention n\'est jamais collée au cartouche (≥ 2,5 mm)', men.map((m) => `(${m.x.toFixed(0)}, ${m.y.toFixed(0)}) · cartouche (${cad.x.toFixed(0)}, ${cad.y.toFixed(0)}, ${cad.w.toFixed(0)}×${cad.h.toFixed(0)})`).join(' '));
   }
   // L6 — la puce « recouvre le code-barres » : le code-barres et le QR sont vus, l'adresse non.
   const z = await pg.evaluate(([x]) => __libreCodes(x), [b64('a4-quart')]);
@@ -408,7 +411,9 @@ async function juger(pg, nom, b64, thermique, attendu) {
     if (att === false) dit(men.length === 0, `${t} : pas de place sûre ⇒ aucune mention`, `${men.length} mention(s)`);
     dit(men.length <= 1 && men.every((m) => m.page === 0), `${t} : la mention n'existe qu'une fois, page 1`, men.map((m) => `p${m.page + 1}`).join(' ') || 'aucune');
     for (const m of men) {
-      if (thermique) dit(m.t >= 5 && m.t <= 6 && m.droit, `${t} : mention en tout petit (5–6 pt, noir fin), à l'endroit`, `${m.t.toFixed(2)} pt`);
+      // (17 nov.) Sur une étiquette COUCHÉE posée sur le rouleau, la mention suit le sens de l'étiquette (tampon-qr le juge) ;
+      // réduite jusqu'à 4,5 pt quand la bande au-dessus du code est étroite.
+      if (thermique) dit(m.t >= 4.4 && m.t <= 6, `${t} : mention en tout petit (4,5–6 pt, noir fin)`, `${m.t.toFixed(2)} pt`);
       else dit(m.t >= 6 && m.t <= 7 && m.droit, `${t} : mention en tout petit (6–7 pt), à l'endroit`, `${m.t.toFixed(2)} pt`);
       const boite = { x: m.x, y: m.y - m.t, w: m.l, h: m.t * 1.25 };
       const nn = items.filter((x) => /B125|Nike Air Max 1/.test(x.s) && z.pages[0].items.includes(x));
@@ -418,9 +423,9 @@ async function juger(pg, nom, b64, thermique, attendu) {
       if (q) {
         // Au-dessus du QR (dessus libre), sinon juste dessous, sinon centrée sur l'étiquette en descendant (bande blanche).
         const mm = 72 / 25.4, cx = boite.x + boite.w / 2, ecart = Math.abs(cx - (q.x + q.w / 2)) / m.pw, dessus = q.y - (boite.y + boite.h), dessous = boite.y - (q.y + q.h);
-        const pres = ecart <= 0.02 && ((dessus >= 2.5 * mm && dessus <= 16 * mm) || (dessous >= 2.5 * mm && dessous <= 16 * mm));
-        const centreEtiq = e && Math.abs(cx - (e.x + e.w / 2)) / m.pw <= 0.02;
-        dit(pres || centreEtiq, `${t} : mention au-dessus (ou dessous) du QR, centrée sur son axe — sinon centrée sous l'étiquette`, `écart QR ${(ecart * 100).toFixed(1)} % · dessus ${(dessus / mm).toFixed(1)} mm · dessous ${(dessous / mm).toFixed(1)} mm`);
+        // (17 nov., lot tampon-qr) au-dessus SEULEMENT (2 à 4 mm, ici mesuré à la boîte large : 1 à 5 mm), jamais dessous.
+        const pres = ecart <= 0.02 && dessus >= 1 * mm && dessus <= 5 * mm;
+        dit(pres, `${t} : mention juste au-dessus du QR, centrée sur son axe — jamais dessous`, `écart QR ${(ecart * 100).toFixed(1)} % · dessus ${(dessus / mm).toFixed(1)} mm · dessous ${(dessous / mm).toFixed(1)} mm`);
       }
       const bord = thermique ? 4 : 14;   // thermique : 1,5 mm ; A4 : 5 mm
       dit(boite.x >= bord && boite.y >= bord && boite.x + boite.w <= m.pw - bord && boite.y + boite.h <= m.ph - bord, `${t} : mention hors de la marge non imprimable`);

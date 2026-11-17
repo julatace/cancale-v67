@@ -14139,8 +14139,16 @@ const placerMentionSurCode = (rendu, largeur, o = {}) => {
   const ref = Math.min(C.w, C.h), aire = (q) => q.w * q.h;
   const deuxD = codes.filter((q) => q.qr && Math.min(q.w, q.h) >= MENTION3.decoratif * ref).sort((a, b) => aire(b) - aire(a));
   const barres = codes.filter((q) => !q.qr).sort((a, b) => aire(b) - aire(a));
-  const q = deuxD[0] || barres[0];
-  if (!q) return null;
+  // Plusieurs étiquettes sur la feuille (2 ou 4 par A4) : chaque grand code d'étiquette (au moins 60 % du plus grand) est
+  // essayé ; le premier qui a sa place au-dessus la prend.
+  const cands = deuxD.length ? deuxD.filter((c) => aire(c) >= 0.6 * aire(deuxD[0])) : barres.slice(0, 1);
+  if (!cands.length) return null;
+  let premier = null;
+  for (const q of cands) { const r = placerAuDessusDe(rendu, largeur, o, q, C, centreDans); if (r.via !== 'aucune-place') return r; premier = premier || r; }
+  return premier;
+};
+const placerAuDessusDe = (rendu, largeur, o, q, C, centreDans) => {
+  const s = rendu.s, W = rendu.w / s, H = rendu.h / s;
   // Le sens : les lignes de texte autour du code (dans le cadre), sinon toute la page, sinon l'indice.
   const autour = elargir(q, MENTION3.autour);
   let a = sensDuTexte(rendu.textes, o.cadre ? { x: Math.max(autour.x, o.cadre.x), y: Math.max(autour.y, o.cadre.y), w: Math.min(autour.x + autour.w, o.cadre.x + o.cadre.w) - Math.max(autour.x, o.cadre.x), h: Math.min(autour.y + autour.h, o.cadre.y + o.cadre.h) - Math.max(autour.y, o.cadre.y) } : autour);
@@ -14152,7 +14160,7 @@ const placerMentionSurCode = (rendu, largeur, o = {}) => {
   const interdits = (o.interdits || []).filter((z) => !((z.quoi === 'qr' || z.quoi === 'code') && (centreDans(q, z) || centreDans(z, elargir(q, MM_M)))));
   const T0 = o.T || MENTION.taille, Tmin = Math.min(T0, MENTION3.tailleMin), M = MENTION3.marge;
   for (let T = T0; T >= Tmin - 1e-6; T -= MENTION3.pas) {
-    const l = largeur(T); if (!(l > 0)) return null;
+    const l = largeur(T); if (!(l > 0)) return { via: 'aucune-place', code: q, a };
     for (const g of MENTION3.ecarts) {
       let u0 = qf.x + qf.w / 2 - l / 2, vb = qf.y - g - MENTION3.bas * T;
       /*MUTATION-MENTION*/
