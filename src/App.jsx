@@ -227,7 +227,7 @@ import { poserLienVc, defaireLienVc, numerosABarrer, marquerBarre, lienDe, produ
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : FeuilleLienVc (était importé en statique)
 const FeuilleLienVc = aLaDemandeFeuille(() => import('./LienVestiaire.jsx'));
 // ⟦→ ecrans/Vestiaire.jsx #1⟧
-import { suggestionsAchat, tousAchatsLibres, tousAchatsLibresDetail, filtresAchats, etiquetteLot, liensParAchat, lotDe, prixIndicatifLot, ecritureLot, suggestionsSaisieSerie, tailleDuTitre } from "./suggestionsAchat.js";
+import { suggestionsAchat, tousAchatsLibres, tousAchatsLibresDetail, filtresAchats, etiquetteLot, liensParAchat, lotDe, ecritureLot, suggestionsSaisieSerie, tailleDuTitre } from "./suggestionsAchat.js";
 // (15 nov.) La liaison achat ⇄ article : l'affectation pondérée et globale (src/liaisonAchat.js).
 import { affecterPropositions, propositionsArticle, pistesArticle, publierAffectation, seriePropositions, aValider, morceauxPourquoi, couleursTexte, lectureAchat, cleArticleAnnonce, cleArticleVente, cleRefusLiaison } from "./liaisonAchat.js";
 import { SELECT_DETAILS_ACHATS, detailsDeLignes, sansTailleLue } from "./faitsAchat.js";   // (17 nov., lot relier-taille)
@@ -1116,7 +1116,7 @@ import { offresVestiaire, offresJourneeVc, euros as eurosOffre, resteAvant as re
 // La partie « app » du dictionnaire français arrive AVEC l'app (le fichier d'entrée reste léger).
 import frApp from "./i18n/langues/fr.js";
 ajouterSourceApp(frApp);
-import { detenteursAchat, texteDejaRelieTr, patchDelier, ecrituresDeplacer } from "./relierAutreAchat.js";
+import { detenteursAchat, quiDetient, patchDelier, ecrituresDeplacer } from "./relierAutreAchat.js";
 import { achatsAutresPourRelier, siteDeAchat } from "./achatsAutresRelier.js";   // (16 nov.) achats Leboncoin et Vestiaire dans « Relier »
 import { appliquerPrixPro, relevesParTx as relevesProParTx, SELECT_TXN_PRO } from "./vintedPro.js";   // (11 nov., lot vinted-pro)
 import { AlerteArnaque, CompteurArnaque, PastilleArnaque } from "./AlerteArnaque.jsx";
@@ -44740,9 +44740,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!a) return null;
     const accNom = accNameOf(a._acc) || '';
     if (lotDe(a).lot || estLotApp(a)) {
-      const l = lotDe(a), ind = prixIndicatifLot(a), px = prixPayeAchat(a);
-      const saisi = await askText({ title: "Prix d'achat de cet article", desc: ind != null ? `${prixCourt(px)} ÷ ${l.n} ≈ ${prixCourt(ind)}` : (px != null ? `Lot · ${prixCourt(px)}` : ''), numeric: true, value: '', ok: 'Relier', cancel: 'Annuler' });
+      // (17 nov., lot relier-tout-achat — §2.5 : il saisit ses prix d'achat) Le prix d'un lot n'est JAMAIS partagé tout seul :
+      // « Lot de 2 · 80 € — prix par paire à saisir ». Laissé vide ⇒ l'article est relié, son coût reste « à saisir » (le
+      // chiffre manquant est la porte pour le saisir) ; un montant illisible ⇒ rien n'est relié.
+      const l = lotDe(a), px = prixPayeAchat(a);
+      const saisi = await askText({ title: tr('relierTout.lotPrixTitre'), desc: tr('relierTout.lotPrix', { total: String(l.n || nombreLot(a, { nArticlesTx, declares: lotsDeclares }) || '?'), prix: px != null ? prixCourt(px) : '—' }), numeric: true, value: '', ok: tr('journee.relier'), cancel: tr('relierTout.annuler') });
       if (saisi == null) return null;
+      if (!String(saisi).trim()) {
+        const w0 = ecritureLot(a, '1', { accNom, photo: orderPhoto(a) || '' });
+        return w0 ? { ...w0, buyPrice: '', buyFrom: { ...w0.buyFrom, price: null, aSaisir: true } } : null;
+      }
       const w = ecritureLot(a, saisi, { accNom, photo: orderPhoto(a) || '' });
       if (!w) { toast("Montant illisible : rien n'a été relié"); return null; }
       return w;
@@ -44780,15 +44787,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return true;
   };
   const iciPicker = (cible) => (cible ? (cible._saleTx ? { ou: 'vente', cle: String(cible._saleTx) } : { ou: 'fiche', cle: String(cible.id) }) : null);
+  // Rend les écritures qui détachent l'achat de ses autres détenteurs (vide : rien à détacher), ou null (il a dit non).
+  const detacherAvantRelier = async (a, cible, opts = {}) => {
+    let autres = ecrituresDeplacer(a, { numeros, saleOv, ici: iciPicker(cible) });
+    // (17 nov., Julien : « s'il y a un achat qui comporte 2 articles on le prend en compte ») Un LOT pas encore complet : relier
+    // un de ses articles ne délie JAMAIS un autre article. Un lot complet choisi dans « Déjà reliés » : il dit QUEL article
+    // il détache (un seul), jamais tous.
+    const lot = lotDe(a), nLie = (liensAchats && liensAchats.get(String(a.transaction_id))) || 0;
+    if (lot.lot && (lot.n == null || nLie < lot.n)) autres = [];
+    else if (lot.lot && autres.length > 1) {
+      const k = await askChoix({ title: tr('relierTout.lotQuel'), options: autres.map((x, i) => [String(i), x.numero ? 'N°' + x.numero : tr('relierTout.uneVente')]), cancel: tr('relierTout.annuler') });
+      if (k == null) return null;
+      autres = [autres[Number(k)]].filter(Boolean);
+    }
+    // (17 nov., lot relier-tout-achat) Un article n'appartient qu'à UNE paire : prendre un achat déjà relié le DÉTACHE de
+    // l'autre — toujours après SA confirmation, même si l'autre détenteur ne se retrouve pas.
+    if (autres.length || (opts.deplacer && !(lot.lot && (lot.n == null || nLie < lot.n)))) {
+      const qui = autres.length ? quiDetient(autres, tr) : tr('relierTout.uneVente');
+      const ok = await askConfirm({ title: tr('relierTout.detacherTitre', { qui }), desc: tr('relierTout.detacherDesc', { qui }), ok: tr('relierTout.detacherOk'), cancel: tr('relierTout.annuler') });
+      if (ok !== true) return null;
+    }
+    return autres;
+  };
   const relierAchat = async (a, opts = {}) => {
     const cible = pickerFor; if (!cible || !a) return;
-    const autres = ecrituresDeplacer(a, { numeros, saleOv, ici: iciPicker(cible) });
-    // (17 nov., lot relier-tout-achat) « Relier quand même » un achat déjà relié ailleurs : TOUJOURS une question d'abord
-    // (il sera délié de là-bas) — même si ses détenteurs ne se retrouvent pas, rien n'est écrit sans son « Oui ».
-    if (opts.deplacer || autres.length) {
-      const ok = await askConfirm({ title: autres.length ? texteDejaRelieTr(autres, tr) : tr('relierTout.quandMemeTitre'), desc: tr('relierTout.quandMemeDesc'), ok: tr('relierTout.quandMeme'), cancel: tr('relierTout.annuler') });
-      if (ok !== true) return;
-    }
+    const autres = await detacherAvantRelier(a, cible, opts); if (autres == null) return;
     const w = await ecritureRelierAchat(a); if (!w) return;
     // (16 nov.) Un geste annulable qui dit le bénéfice et offre le reçu (`confirmerLiaison`) ; « Déplacer ici » dans le même geste.
     const o = cible._saleTx ? (sales.items || []).find((x) => String(x.transaction_id) === String(cible._saleTx)) || null : null;
@@ -56832,7 +56855,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 autre={!!pickerFor._autre} actuel={achatRelie(entreePicker(pickerFor))} onDelier={delierAchatPicker}
                 dejaRelie={(a)=>detenteursAchat(a && a.transaction_id, { numeros, saleOv })}
                 receptionDe={receptionAchatMs} receptionEtat={receptionsRelierEtat} onFiltres={()=>setBesoinInfosRelier(true)}
-                details={detailsAchats} marqueDe={extractBrand} couleursDe={extractColors}/>
+                details={detailsAchats} marqueDe={extractBrand} couleursDe={extractColors} declares={lotsDeclares} nArticlesTx={nArticlesTx}/>
             </div>
           </div>
         </div>, document.body)}

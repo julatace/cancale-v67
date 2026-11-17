@@ -51,6 +51,10 @@ const dateMs = (d) => { if (d == null || d === '') return NaN; const t = typeof 
 // ── Le lot ──────────────────────────────────────────────────────────────────
 // { lot: false } · { lot: true, n: 3 } · { lot: true, n: null } (nombre pas écrit).
 export function lotDe(achat) {
+  // (17 nov., lot relier-tout-achat) Le nombre d'articles LU (détail de la transaction, ou déclaré par lui) posé sur l'achat
+  // par la feuille (`_nbArticles`, la règle `nombreLot` de src/achatsSourcing.js) fait foi avant le titre.
+  const nb = Number(achat && achat._nbArticles);
+  if (Number.isInteger(nb) && nb > 1) return { lot: true, n: nb };
   const t = String((achat && achat.title) || '').trim();
   if (!/^lot\b/i.test(t)) return { lot: false, n: null };
   const m = /^lot\s+(?:de\s+)?(\d{1,3})\b/i.exec(t);

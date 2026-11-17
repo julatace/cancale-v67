@@ -25,7 +25,10 @@ const NB_ITEMS = 4;   // mesuré : 4 articles au plus par achat
 // La projection de la lecture (scalaires seulement, §4.4) : les achats dont le détail est rangé (côté acheteur).
 export const SELECT_DETAILS_ACHATS = 'id=like.harvest_%25_txn_%25&data->payload->transaction->>user_side=eq.buyer&select=id,tx:meta->>id,'
   + 'vendeur:data->payload->transaction->seller->>login,nb:data->payload->transaction->>items_count,'
-  + Array.from({ length: NB_ITEMS }, (_, i) => `t${i}:data->payload->transaction->order->items->${i}->>size_title,e${i}:data->payload->transaction->order->items->${i}->>status`).join(',');
+  + Array.from({ length: NB_ITEMS }, (_, i) => `t${i}:data->payload->transaction->order->items->${i}->>size_title,e${i}:data->payload->transaction->order->items->${i}->>status`).join(',')
+  // (17 nov., lot relier-tout-achat) Un LOT (mesuré le 17 nov. : 2 des 43 détails côté acheteur ont `items_count` > 1, jusqu'à 8 ;
+  // 41 sur 43 portent le titre et la 1re photo de chaque article) : le titre et la photo de chaque article, en scalaires.
+  + ',' + Array.from({ length: NB_ITEMS }, (_, i) => `n${i}:data->payload->transaction->order->items->${i}->>title,p${i}:data->payload->transaction->order->items->${i}->photos->0->>url`).join(',');
 
 const court = (v, max) => (typeof v === 'string' && v.trim() && v.trim().length <= max ? v.trim() : '');
 
@@ -45,7 +48,12 @@ export function detailsDeLignes(rows) {
       if (e) etats.push(e);
     }
     const nb = Number(r.nb);
-    out[tx] = { tailles, etats: [...new Set(etats)], vendeur: court(r.vendeur, 60), nb: Number.isFinite(nb) && nb > 0 ? nb : null };
+    const articles = [];
+    for (let i = 0; i < NB_ITEMS; i++) {
+      const ti = court(r[`n${i}`], 160), ph = typeof r[`p${i}`] === 'string' && /^https:\/\//.test(r[`p${i}`]) && r[`p${i}`].length < 600 ? r[`p${i}`] : '';
+      if (ti || ph) articles.push({ titre: ti, photo: ph, taille: court(r[`t${i}`], 30) });
+    }
+    out[tx] = { tailles, etats: [...new Set(etats)], vendeur: court(r.vendeur, 60), nb: Number.isFinite(nb) && nb > 0 ? nb : null, articles };
   }
   return out;
 }
