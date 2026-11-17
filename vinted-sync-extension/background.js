@@ -3809,6 +3809,22 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     secuPresence(pf, Date.now()).then((ok) => sendResponse({ ok: !!ok }), () => sendResponse({ ok: false }));
     return true;
   }
+  // 5.406 : l'écran « action en cours » (vrm-action.js) — l'état, seulement pour l'onglet Vinted
+  // connecté sur le compte qui agit (jamais l'action d'un autre compte) ; « Tout arrêter » depuis l'écran.
+  if (msg && msg.from === 'vrm-action' && (msg.action === 'etat' || msg.action === 'arreter')) {
+    (async () => {
+      let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
+      if (!/(^|\.)vinted\.(fr|com|it|de)$/i.test(hote)) return { ok: false };
+      if (msg.action === 'arreter') return arreterDepuisEcran(sender);
+      const a = await lireActionEnCours();
+      if (!a) return { ok: true, action: null };
+      const uid = await compteConnecte(hote);
+      if (!uid || String(uid) !== String(a.uid)) return { ok: true, action: null };
+      const frais = Date.now() - Number(a.maj || 0) < ACTION_FRAIS_MS;
+      return { ok: true, action: Object.assign({}, a, { actif: a.actif === true && frais }) };
+    })().then(sendResponse, () => sendResponse({ ok: false }));
+    return true;
+  }
   // 5.366 : « Tout arrêter » / « Relancer » depuis la carte du logo (tous les comptes, tous les sites).
   if (msg && msg.from === 'vrm-badge' && msg.action === 'secuArret') {
     secuPoserArret(msg.arret === true, 'carte').then(sendResponse, () => sendResponse({ accepte: false }));
@@ -3958,7 +3974,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return true;
     }
     if (msg && msg.from === 'vrm-badge' && msg.action === 'toutArreter') {
-      poserToutArrete(msg.on === true).then(sendResponse, () => sendResponse({ ok: false }));
+      poserToutArrete(msg.on === true).then(async (r) => { if (msg.on === true) await finirActionEnCours('arret').catch(() => {}); sendResponse(r); }, () => sendResponse({ ok: false }));
       return true;
     }
     // 5.377 : « L'extension a capté » — le lot du compte de L'ONGLET (sender.tab), vu une fois ; le réglage.
@@ -17228,8 +17244,9 @@ async function secuPourCarte(pf, compte) {
     return { niveau: ph.niveau, texte: secuTexte(SECU_PHRASES, ph.cle, ph.v), arrete: arret.arrete };
   } catch (_) { return null; }
 }
-function compterAction(uid, plafond = ACTIONS_MAX_HEURE, n = 1) { return unCompteurALaFois(() => compterActionUn(uid, plafond, n)); }
-async function compterActionUn(uid, plafond, n = 1) {
+function compterAction(uid, plafond = ACTIONS_MAX_HEURE, n = 1, essai = false) { return unCompteurALaFois(() => compterActionUn(uid, plafond, n, essai)); }
+// (5.406) `essai` : la MÊME règle, sans rien prendre ni écrire — « une place est-elle libre, et sinon dans combien ? »
+async function compterActionUn(uid, plafond, n = 1, essai = false) {
   try {
     const cle = 'vrmActions';
     const cur = (await chrome.storage.local.get(cle))[cle] || {};
@@ -17281,6 +17298,7 @@ async function compterActionUn(uid, plafond, n = 1) {
       const nJour = (await actionsDuJour(String(uid), t)).length + (autres ? Number(autres.nJour) || 0 : 0);
       if (nJour + k > capEff) return { ok: false, code: 'plafond-jour', n: tous.length, nJour, maxJour: capJour, resteMs: Math.max(60000, finJourParis(t) - t) };
     }
+    if (essai) return { ok: true, n: tous.length, essai: true };
     for (let i = 0; i < k; i++) list.push(t); cur[uid] = list;
     await chrome.storage.local.set({ [cle]: bornerRegistre(cur, 3600000, 200) });
     if (vinted) await noterActionsJour(String(uid), t, k);
@@ -18006,10 +18024,10 @@ async function gardeStricte(uid, acc, opts = {}) {
     if (refusDiscretion) return refusDiscretion;
     if (c.prudence) return { ok: false, code: 'prudence', prudence: c.prudence, error: phrasePrudence({ jusqua: c.prudence }) };   // 5.357
     if (reserve && c.n < ACTIONS_MAX_HEURE) {
-      return { ok: false, code: 'plafond-bordereaux',
+      return { ok: false, code: 'plafond-bordereaux', attendreMs: Math.max(1000, Number(c.resteMs) || 0),
                error: `${nA > 1 ? `une republication prend ${nA} actions (brouillon, suppression, mise en ligne) et il en reste ${Math.max(0, ACTIONS_MAX_HEURE - reserve - c.n)} sur ` : ''}${ACTIONS_MAX_HEURE - reserve} actions sur ce compte dans l'heure — les ${reserve} dernières sont gardées pour répondre à tes acheteurs. La suite dans ${min} min.` };
     }
-    return { ok: false, code: 'plafond',
+    return { ok: false, code: 'plafond', attendreMs: Math.max(1000, Number(c.resteMs) || 0),
              error: `${ACTIONS_MAX_HEURE} actions sur ce compte dans l'heure — on s'arrête là pour ne pas attirer l'attention. Réessaie dans ${min} min.` };
   }
   return null;
@@ -18121,8 +18139,10 @@ async function executerMessageFavori(uid,acc,body){
   // (5.309, mode auto) `ecrits` = combien d'écritures sont PARTIES chez Vinted : 0 ⇒
   // rien n'est parti, le serveur peut laisser le mode auto reprendre ce favori.
   // (5.369) `variante` = le n° de la version envoyée (1 à 5), rendu au serveur pour le journal (jamais le texte).
-  let ecrits=0,frein='',variante=null,attente=null;
-  const rep=(resultat,status=0,raison=resultat==='incertain'?'reponse_inconnue':resultat==='refuse'?'vinted_refus':'')=>({ok:['envoye','ignore'].includes(resultat),status,json:{resultat,raison:frein&&!['envoye','ignore'].includes(resultat)?frein:raison,ecrits,...(resultat==='envoye'&&Number.isInteger(variante)?{variante}:{})}});
+  let ecrits=0,frein='',variante=null,attente=null,apresMs=0;
+  // (5.406) `apresMs` : un refus d'ATTENTE (discrétion, plafond de l'heure, sécurité du compte) dit
+  // au serveur QUAND réessayer — le vrai temps de la garde, plus les 10 min fixes d'avant.
+  const rep=(resultat,status=0,raison=resultat==='incertain'?'reponse_inconnue':resultat==='refuse'?'vinted_refus':'')=>({ok:['envoye','ignore'].includes(resultat),status,json:{resultat,raison:frein&&!['envoye','ignore'].includes(resultat)?frein:raison,ecrits,...(apresMs>0&&ecrits===0?{apresMs}:{}),...(resultat==='envoye'&&Number.isInteger(variante)?{variante}:{})}});
   if(typeof body?.jeton!=='string'||!/^[0-9a-f-]{36}$/.test(body.jeton))return rep('refuse',400);
   const jeton=body.jeton;
   const session=await authToken();if(!session?.access_token)return rep('refuse',401,'session_extension');
@@ -18172,7 +18192,8 @@ async function executerMessageFavori(uid,acc,body){
   const nA=offre?3:2;
   const recu={};
   const arretPlafond=await gardeStricte(uid,acc,{reserve:RESERVE_GESTES,actions:nA,recu,sorte:'favori',secu:{sorte:'favori',mode:body&&body.auto===true?'auto':'serie'}});
-  if(arretPlafond)return rep('refuse',0,['plafond','plafond-bordereaux','plafond-jour','discretion'].includes(arretPlafond.code)?'quota_extension':arretPlafond.code==='verification'?'vinted_robot':arretPlafond.code==='vinted-pause'?'pause_vinted':arretPlafond.code==='vinted-autre'?'compte_vinted_different':arretPlafond.code==='vinted-absent'?'compte_vinted_absent':'vinted_refus');
+  if(arretPlafond){const at=attenteDeRefus(arretPlafond);if(at>0)apresMs=at;}
+  if(arretPlafond)return rep('refuse',0,['plafond','plafond-bordereaux','plafond-jour','discretion',...SECU_ATTENTES].includes(arretPlafond.code)?'quota_extension':arretPlafond.code==='verification'?'vinted_robot':arretPlafond.code==='vinted-pause'?'pause_vinted':arretPlafond.code==='vinted-autre'?'compte_vinted_different':arretPlafond.code==='vinted-absent'?'compte_vinted_absent':'vinted_refus');
   const tRes=Number(recu.at)||0;
   // Chaque réponse de Vinted passe par `freinFavoriAuto` : 429/403, captcha ou
   // « activité automatisée » ⇒ la raison dite au serveur (pause 24 h du mode auto).
@@ -18332,7 +18353,12 @@ async function apiFavorisCarte(uid, action, donnees) {
 async function lireEtatFavorisCarte() {
   try { const v = (await chrome.storage.local.get(FAVORIS_CARTE_CLE))[FAVORIS_CARTE_CLE]; return v && v.v === 1 && /^[1-9]\d{0,19}$/.test(String(v.uid || '')) ? v : null; } catch (_) { return null; }
 }
-async function poserEtatFavorisCarte(st) { try { await chrome.storage.local.set({ [FAVORIS_CARTE_CLE]: st }); return true; } catch (_) { return false; } }
+async function poserEtatFavorisCarte(st) {
+  try { await chrome.storage.local.set({ [FAVORIS_CARTE_CLE]: st }); } catch (_) { return false; }
+  // (5.406) L'écran « action en cours » suit la file (jamais l'inverse).
+  try { await poserActionEnCours(st); } catch (_) {}
+  return true;
+}
 async function noterApercuCarte(uid, a) {
   try {
     const m = (await chrome.storage.local.get(FAVORIS_CARTE_APERCU))[FAVORIS_CARTE_APERCU] || {};
@@ -18374,7 +18400,15 @@ async function favorisCarte(msg, sender) {
     if (avant && avant.actif) return { ok: false, code: 'deja', raison: 'Des messages partent déjà depuis cette carte.' };
     const r = await apiFavorisCarte(o.uid, 'lancer', { selection: sel, reglages: msg.reglages });
     if (!r.ok || !r.json || !r.json.vue) return { ok: false, code: 'serveur', raison: (r.json && r.json.message) || 'VRM n’a pas confirmé le lancement : rien n’est parti.' };
-    const st = { v: 1, uid: o.uid, dom: o.dom, actif: true, debut: Date.now(), total: sel.length, file: r.json.carte || null, attente: null, prochain: null, fin: null };
+    // (5.406) La photo et le titre de chaque favori choisi, tels que l'aperçu les montrait (photo
+    // Vinted seulement) : l'écran « action en cours » montre l'article qui part.
+    const items = {};
+    for (const x of (Array.isArray(msg.items) ? msg.items.slice(0, FAVORIS_CARTE_MAX) : [])) {
+      const id = x && /^\d{1,20}$/.test(String(x.itemId || '')) ? String(x.itemId) : '';
+      if (!id) continue;
+      items[id] = { photo: /^https:\/\/[\w.-]*vinted\.net\//.test(String(x.photo || '')) ? String(x.photo).slice(0, 500) : '', titre: String(x.titre || '').slice(0, 120) };
+    }
+    const st = { v: 1, uid: o.uid, dom: o.dom, actif: true, debut: Date.now(), total: sel.length, file: r.json.carte || null, attente: null, prochain: null, fin: null, items };
     await poserEtatFavorisCarte(st);
     await noterApercuCarte(o.uid, { etat: 'encours', total: 0 });
     logActivity(`💬 Messages aux favoris lancés depuis la carte : ${sel.length}`);
@@ -18385,6 +18419,7 @@ async function favorisCarte(msg, sender) {
     const r = await apiFavorisCarte(o.uid, 'arreter');
     const st = await lireEtatFavorisCarte();
     if (st && st.uid === o.uid) { st.actif = false; st.attente = null; st.fin = { at: Date.now(), raison: 'arret' }; if (r.json && r.json.carte) st.file = r.json.carte; await poserEtatFavorisCarte(st); }
+    await finirActionEnCours('arret');
     return { ok: !!r.ok, etat: st, raison: r.ok ? '' : ((r.json && r.json.message) || 'VRM n’a pas confirmé l’arrêt. Réessaie.') };
   }
   if (quoi === 'oublier') {
@@ -18393,6 +18428,106 @@ async function favorisCarte(msg, sender) {
     return { ok: true };
   }
   return { ok: false, code: 'inconnu' };
+}
+// ══ 5.406 (Julien, 17 nov. : « tu ne penses pas que 10 mins c'est bcp ») ═══════════════
+// MESURÉ (scripts/audit-action-plein.cjs, vrai background.js + vraie file du serveur) : la file
+// était lancée, le 1er message réservé chez VRM, puis REFUSÉ par une garde d'attente (le plus
+// souvent « Vinted vient d'être ouvert », 2 à 6 min) ; ce refus partait en `quota_extension`
+// et le serveur repoussait la suite de 10 min FIXES (`QUOTA_ATTENTE_MS`), quelle que soit la
+// vraie attente. Désormais : AVANT de réserver, la carte demande aux MÊMES gardes (discrétion,
+// sécurité du compte, 50/h) si une place est libre, sans rien prendre (`attenteAvantFavori`) ;
+// sinon elle attend le VRAI temps et dit POURQUOI. Aucune garde n'est retirée ni assouplie.
+const SECU_ATTENTES = ['secu-type', 'secu-rodage', 'secu-espace', 'secu-reveil', 'secu-jour'];
+function attenteDeRefus(r) {
+  if (!r || r.ok) return 0;
+  if (Number(r.attendreMs) > 0) return Math.round(Number(r.attendreMs));
+  if (Number(r.jusqua) > Date.now()) return Math.round(Number(r.jusqua) - Date.now());
+  return 0;
+}
+// La raison d'une attente, en un code court que la carte traduit (jamais une phrase ici).
+function quoiAttente(r) {
+  if (!r) return '';
+  if (r.code === 'discretion') return String(r.quoi || 'discretion');
+  if (r.code === 'plafond' || r.code === 'plafond-bordereaux') return 'heure';
+  if (r.code === 'plafond-jour' || r.code === 'secu-jour') return 'jour';
+  if (r.code === 'secu-type') return 'sorte';
+  if (r.code === 'secu-rodage') return 'rodage';
+  if (r.code === 'secu-espace' || r.code === 'secu-reveil') return 'espace';
+  return String(r.code || '');
+}
+// Les gardes d'un message aux favoris, en LECTURE : `null` (une place est libre) ou
+// `{ ms, quoi }` (attendre ms) ou `{ stop: code }` (rien ne repart seul : vérification,
+// « Tout arrêter », prudence…). Rien n'est pris, rien n'est écrit, aucune requête Vinted.
+async function attenteAvantFavori(uid, nA = 3) {
+  const p = await porteDiscretion(uid, 'favori');
+  if (p) { const ms = attenteDeRefus(p); return ms > 0 ? { ms, quoi: quoiAttente(p) } : { stop: p.code }; }
+  const c = await compterAction(String(uid), ACTIONS_MAX_HEURE - RESERVE_GESTES, nA, true);
+  if (c && c.ok) return null;
+  if (c && c.code === 'stockage') return { stop: 'stockage' };
+  if (c && (c.code === 'tout-arrete' || c.code === 'verification')) return { stop: c.code };
+  const ms = Math.max(1000, Number(c && c.resteMs) || 0);
+  return { ms, quoi: c && c.code === 'plafond-jour' ? 'jour' : 'heure' };
+}
+// ══ 5.406 — L'ÉCRAN « ACTION EN COURS » (Julien, 17 nov. : « quand on fait une action sur
+// vinted l'extension prend tout le site et qu'on puisse pas faire, vinted autour est flouté ») ══
+// Ce qui tourne VRAIMENT sur vinted.fr (messages aux favoris, republication, baisse de prix),
+// rangé dans `chrome.storage.local.vrmActionEnCours` (§4.9) ; `vrm-action.js` le dessine par-dessus
+// la page de l'onglet du MÊME compte. Rien ici ne pilote la page, ne lit la page, ni n'attend :
+// l'état SUIT les gestes, il n'en déclenche aucun. `maj` : un état non rafraîchi depuis 3 min est
+// tenu pour fini (le service worker a pu mourir) — l'écran ne reste jamais seul allumé.
+const ACTION_CLE = 'vrmActionEnCours';
+const ACTION_FRAIS_MS = 3 * 60000;
+async function lireActionEnCours() { try { const a = (await chrome.storage.local.get(ACTION_CLE))[ACTION_CLE]; return a && typeof a === 'object' && a.v === 1 ? a : null; } catch (_) { return null; } }
+async function poserAction(a) { try { await chrome.storage.local.set({ [ACTION_CLE]: Object.assign({ v: 1 }, a, { maj: Date.now() }) }); } catch (_) {} }
+// La file des favoris de la carte ⇒ l'état de l'écran (nombres, item en cours, prochain pas).
+async function poserActionEnCours(st) {
+  if (!st || !st.uid) return;
+  const fi = st.file || {}, item = st.item && typeof st.item === 'object' ? st.item : null;
+  if (!st.actif) return finirActionEnCours(st.fin && st.fin.raison || 'fini', st);
+  await poserAction({ actif: true, sorte: 'favoris', uid: String(st.uid), debut: Number(st.debut) || Date.now(),
+    fait: Number(fi.envoyes) || 0, total: Number(fi.total) || Number(st.total) || 0, pas: (Number(fi.refuses) || 0) + (Number(fi.ignores) || 0) + (Number(fi.incertains) || 0),
+    enCours: !!st.enCours, prochain: Number(st.prochain) || null, quoi: String(st.quoi || ''), attente: String(st.attente || ''),
+    verification: st.attente === 'verification', item });
+}
+async function finirActionEnCours(raison, st) {
+  const a = await lireActionEnCours();
+  if (!a || a.actif !== true) return;
+  const fi = (st && st.file) || {};
+  await poserAction(Object.assign({}, a, { actif: false, enCours: false, prochain: null, fait: st ? (Number(fi.envoyes) || a.fait || 0) : a.fait,
+    verification: raison === 'robot' || raison === 'verification', fin: { at: Date.now(), raison: String(raison || 'fini') } }));
+}
+// Une commande de l'app qui écrit chez Vinted (republier, baisser un prix) : l'écran pendant la
+// commande ; une série se COMPTE (une commande de la même sorte dans les 3 min ⇒ la même série).
+async function avecActionPlein(sorte, msg, fn) {
+  const uid = String((msg && msg.uid) || '');
+  if (!/^\d{1,20}$/.test(uid)) return fn();
+  const a0 = await lireActionEnCours();
+  const suite = a0 && a0.sorte === sorte && a0.uid === uid && Date.now() - Number(a0.maj || 0) < ACTION_FRAIS_MS && !(a0.fin && a0.fin.raison === 'arret');
+  const total = Number(msg && msg.total) > 0 && Number(msg.total) < 1000 ? Math.round(Number(msg.total)) : (suite ? Number(a0.total) || 0 : 0);
+  const fait = suite ? Number(a0.fait) || 0 : 0;
+  const item = { id: String((msg && (msg.id || msg.itemId)) || ''), num: String((msg && msg.num) || '').slice(0, 12) };
+  await poserAction({ actif: true, sorte, uid, debut: suite ? a0.debut : Date.now(), fait, total, enCours: true, prochain: null, quoi: '', item });
+  let r;
+  try { r = await fn(); }
+  finally {
+    const ok = !!(r && (r.accepte === true || r.ok === true));
+    const stop = r && (r.code === 'verification' || r.code === 'secu-robot' || r.code === 'vinted-pause' || r.code === 'tout-arrete');
+    const a = (await lireActionEnCours()) || {};
+    if (a.fin && a.fin.raison === 'arret') { /* « Tout arrêter » touché pendant : l'écran est déjà éteint */ }
+    else await poserAction(Object.assign({}, a, { actif: !stop, enCours: false, fait: fait + (ok ? 1 : 0), dernier: { ok, at: Date.now() },
+      verification: r && (r.code === 'verification' || r.code === 'secu-robot'), ...(stop ? { fin: { at: Date.now(), raison: r.code === 'tout-arrete' ? 'arret' : 'verification' } } : {}) }));
+  }
+  return r;
+}
+// « Tout arrêter » depuis l'écran : la MÊME porte que celle de la carte (tout le navigateur,
+// jusqu'à « Reprendre »), plus la file des favoris de ce compte arrêtée chez VRM.
+async function arreterDepuisEcran(sender) {
+  const st = await lireEtatFavorisCarte();
+  let favoris = null;
+  if (st && st.actif) favoris = await favorisCarte({ quoi: 'arreter', uid: st.uid }, sender).catch(() => null);
+  let tout = null; try { tout = await poserToutArrete(true); } catch (_) { tout = null; }
+  await finirActionEnCours('arret');
+  return { ok: true, favoris: !!(favoris && favoris.ok), tout: !!(tout && (tout.accepte || tout.ok)) };
 }
 // UN tour (au plus quelques messages quand l'espacement est court) : chaque message
 // passe par toutes les gardes ; la moindre incertitude ⇒ rien ne part et c'est dit.
@@ -18424,9 +18559,18 @@ async function tickFavorisCarte() {
       }
       const reste = (Number(g.json.vue.prochain) || 0) - (Number(g.json.serveur) || Date.now());
       if (reste > 1000) {
-        st.attente = null; st.prochain = Date.now() + reste;
+        st.attente = null; st.prochain = Date.now() + reste; st.quoi = 'rythme';
         await poserEtatFavorisCarte(st);
         if (reste < 25000) planifierFavorisCarte(reste + 300);
+        return;
+      }
+      // (5.406) Les gardes d'abord, en lecture : rien n'est réservé chez VRM si une garde ferait attendre.
+      const av = await attenteAvantFavori(st.uid, 3);
+      if (av && av.stop) return attendre(av.stop === 'tout-arrete' ? 'tout_arrete' : av.stop === 'verification' ? 'verification' : 'garde');
+      if (av && av.ms > 0) {
+        st.attente = null; st.prochain = Date.now() + av.ms; st.quoi = av.quoi;
+        await poserEtatFavorisCarte(st);
+        if (av.ms < 25000) planifierFavorisCarte(av.ms + 300);
         return;
       }
       const s = await apiFavorisCarte(st.uid, 'suivant');
@@ -18434,7 +18578,8 @@ async function tickFavorisCarte() {
       if (s.json.carte) st.file = s.json.carte;
       const t = s.json.travail;
       if (!t || typeof t.jeton !== 'string') { st.attente = null; await poserEtatFavorisCarte(st); return; }
-      st.attente = null; st.prochain = null; st.enCours = Date.now();
+      st.attente = null; st.prochain = null; st.quoi = ''; st.enCours = Date.now();
+      { const it = st.items && st.items[String(t.itemId || '')]; st.item = { id: String(t.itemId || ''), photo: it ? it.photo : '', titre: it ? it.titre : '' }; }
       await poserEtatFavorisCarte(st);
       let r = null;
       try { r = await executerPourAppCoeur({ uid: st.uid, method: 'POST', endpoint: '/vrm/favoris', body: t, __carte: true }); } catch (_) { r = null; }
@@ -20541,9 +20686,9 @@ async function executerCommande(msg) {
   // 11 nov. (5.366) : « Tout arrêter » / « Relancer » depuis VRM — tout de suite dans CE navigateur
   // (les autres le lisent dans sa clé `vrm_securite_comptes` avant chaque geste automatique).
   if (msg && msg.cmd === 'secuArret') return await secuPoserArret(msg.arret === true, 'app');
-  if (msg && msg.cmd === 'republierVinted') { const r = await avecTemoinRepub(() => republierVinted(msg)); await journalCommande(msg, r); return r; }
+  if (msg && msg.cmd === 'republierVinted') { const r = await avecActionPlein('republier', msg, () => avecTemoinRepub(() => republierVinted(msg))); await journalCommande(msg, r); return r; }
   // 10 nov. (5.336) : baisser UN prix, sur son clic (une commande par annonce, voir `baisserPrixVinted`).
-  if (msg && msg.cmd === 'baisserPrixVinted') { const r = await baisserPrixVinted({ ...msg, programme: false }); await journalCommande(msg, r); return r; }
+  if (msg && msg.cmd === 'baisserPrixVinted') { const r = await avecActionPlein('baisse', msg, () => baisserPrixVinted({ ...msg, programme: false })); await journalCommande(msg, r); return r; }
   // 12 nov. (5.370) : les baisses ÉTALÉES dans la journée, sur son clic (voir `planifierBaisses`).
   if (msg && msg.cmd === 'planifierBaisses') return await planifierBaisses(msg);
   // 12 nov. (5.370) : « Tout arrêter » / « Reprendre » depuis l'app (voir `poserToutArrete`).
@@ -20553,7 +20698,7 @@ async function executerCommande(msg) {
   // 10 nov. (5.338) : le mode vacances d'UN compte (celui de l'onglet), sur son clic (voir `mettreVacancesVinted`).
   // 11 nov. (5.340) : posé / retiré au journal SEULEMENT quand Vinted l'a accepté ET relu (« fait » ; « déjà », « écart », « incertain » : rien).
   if (msg && msg.cmd === 'vacancesVinted') { const r = await mettreVacancesVinted(msg); await journalVacances(msg, r); return r; }
-  if (msg && msg.cmd === 'recreerVinted') { const r = await avecTemoinRepub(() => recreerVinted(msg)); await journalCommande(msg, r); return r; }
+  if (msg && msg.cmd === 'recreerVinted') { const r = await avecActionPlein('republier', msg, () => avecTemoinRepub(() => recreerVinted(msg))); await journalCommande(msg, r); return r; }
   if (msg && msg.cmd === 'publierBrouillon') { const r = await avecTemoinRepub(() => publierBrouillon(msg)); await journalCommande(msg, r); return r; }
   // 11 nov. (5.367) : créer UN brouillon sur Vinted depuis une fiche VRM, sur son clic (voir `creerVintedFiche`).
   if (msg && msg.cmd === 'creerVintedFiche') { const r = await avecTemoinRepub(() => creerVintedFiche(msg)); await journalCommande(msg, r); return r; }
