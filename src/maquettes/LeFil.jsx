@@ -54,6 +54,8 @@ export const BIBLIOS = [
 ];
 const biblioDe = (tab) => BIBLIOS.find((b) => b.tab === tab || b.aussi.includes(tab)) || null;
 
+// Un glisser qui finit ne doit pas compter comme un toucher (la carte ne s'ouvre pas en plus).
+const dernierGlisser = { at: 0 };
 // ── Le glisser : à droite « Fait », à gauche « Plus tard ». Le doigt suit, rien ne part sous 96 px. ──
 function useGlisser({ onFait, onTard, actif = true }) {
   const [dx, setDx] = React.useState(0);
@@ -61,7 +63,7 @@ function useGlisser({ onFait, onTard, actif = true }) {
   const SEUIL = 96;
   const bas = (e) => {
     if (!actif || (e.button != null && e.button !== 0)) return;
-    if (e.target.closest && e.target.closest('button, a, input, textarea, select, [role="slider"]')) return;
+    if (e.target.closest && e.target.closest('button:not(.fil-zone), a, input, textarea, select, [role="slider"]')) return;
     g.current = { x: e.clientX, y: e.clientY, on: false, id: e.pointerId };
   };
   const bouge = (e) => {
@@ -70,7 +72,7 @@ function useGlisser({ onFait, onTard, actif = true }) {
     if (!s.on) {
       if (Math.abs(ddy) > 10 && Math.abs(ddy) > Math.abs(ddx)) { g.current = null; return; }
       if (Math.abs(ddx) < 12) return;
-      s.on = true; try { e.currentTarget.setPointerCapture(s.id); } catch (_) {}
+      s.on = true; dernierGlisser.at = Date.now(); try { e.currentTarget.setPointerCapture(s.id); } catch (_) {}
     }
     setDx(Math.max(-180, Math.min(180, ddx)));
   };
@@ -117,7 +119,7 @@ function CarteFil({ c, ouverte, onOuvrir, onFait, onTard, Icon, Photo, ordi, cho
           </div>
         ) : (<>
           <button type="button" className="fil-zone" aria-expanded={ordi ? undefined : ouverte} aria-pressed={ordi ? !!choisie : undefined}
-            data-fil-zone={c.id} onClick={onOuvrir} aria-label={c.titre}/>
+            data-fil-zone={c.id} onClick={() => { if (Date.now() - dernierGlisser.at < 400) return; onOuvrir(); }} aria-label={c.titre}/>
           <div className="fil-tete">
             <span className="fil-ic" aria-hidden="true">{Icon ? <Icon name={ICONE[c.id] || 'check'} size={19}/> : null}</span>
             <span className="fil-tete-txt">
@@ -183,6 +185,7 @@ export function LeFil({ tuiles = [], alertes = [], cartes = [], photos = {}, Pho
   const remises = toutes.filter((c) => !c.fixe && tard.has(c.sig) && !faits.has(c.sig));
   const nRanges = toutes.filter((c) => faits.has(c.sig)).length;
   React.useEffect(() => { publierN(restent.length); }, [restent.length]);
+  React.useEffect(() => () => publierN(null), []);   // hors du fil (une bibliothèque) : aucun nombre, jamais un nombre périmé
 
   // Au téléphone : la première carte qui se traite (pas une alerte, pas une carte déjà faite) est OUVERTE d'office —
   // « maintenant » ; un toucher sur une autre l'ouvre à sa place. À l'ordinateur : la carte choisie va au panneau.

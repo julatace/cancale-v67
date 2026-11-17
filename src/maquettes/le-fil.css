@@ -110,7 +110,7 @@
 
 /* La tête d'une bibliothèque (téléphone) : « ‹ Le fil » puis les bibliothèques en touches qui défilent. */
 :root:root:root:root:root:root:root[data-fil] .fil-biblio-tete { display: grid !important; gap: 8px !important; padding: 4px 0 10px !important; }
-:root:root:root:root:root:root:root[data-fil] .fil-retour { justify-self: start !important; min-height: 44px !important; display: inline-flex !important; align-items: center !important; gap: 4px !important; font-weight: 600 !important; }
+:root:root:root:root:root:root:root[data-fil] .fil-retour { justify-self: start !important; min-height: 44px !important; display: inline-flex !important; align-items: center !important; gap: 4px !important; font-weight: 600 !important; color: var(--sv-clair) !important; }
 :root:root:root:root:root:root:root[data-fil] .fil-retour-ch { display: inline-flex !important; transform: scaleX(-1) !important; }
 :root:root:root:root:root:root:root[data-fil] .fil-biblio-rang { display: flex !important; gap: 8px !important; overflow-x: auto !important; overscroll-behavior-x: contain !important; scrollbar-width: none !important; padding: 2px 2px 4px !important; margin: 0 -2px !important; }
 :root:root:root:root:root:root:root[data-fil] .fil-biblio-rang::-webkit-scrollbar { display: none !important; }
@@ -118,7 +118,7 @@
 
 /* ── Ordinateur : la barre du haut (plus de rail), puis le fil à gauche et le panneau du geste à droite. ── */
 :root:root:root:root:root:root:root[data-fil] .vrm-sidebar { display: none !important; }
-:root:root:root:root:root:root:root[data-fil] .fil-barre-ordi { position: sticky !important; top: 0 !important; z-index: 30 !important; display: flex !important; align-items: center !important; gap: 12px !important; padding: 10px 14px !important; margin: 0 340px 18px 0 !important; border-radius: 22px !important; background: var(--sb-verre) !important; -webkit-backdrop-filter: var(--sb-verre-flou) !important; backdrop-filter: var(--sb-verre-flou) !important; box-shadow: var(--sb-verre-bord) !important; }
+:root:root:root:root:root:root:root[data-fil] .fil-barre-ordi { position: sticky !important; max-width: calc(100% - 330px) !important; box-sizing: border-box !important; top: 0 !important; z-index: 30 !important; display: flex !important; align-items: center !important; gap: 12px !important; padding: 10px 14px !important; margin: 0 340px 18px 0 !important; border-radius: 22px !important; background: var(--sb-verre) !important; -webkit-backdrop-filter: var(--sb-verre-flou) !important; backdrop-filter: var(--sb-verre-flou) !important; box-shadow: var(--sb-verre-bord) !important; }
 :root:root:root:root:root:root:root[data-fil] .fil-marque img { display: block !important; border-radius: 8px !important; }
 :root:root:root:root:root:root:root[data-fil] .fil-barre-n { margin-left: 8px !important; min-width: 20px !important; height: 20px !important; padding: 0 6px !important; box-sizing: border-box !important; border-radius: 10px !important; background: var(--sv-encre) !important; color: var(--sb-porcelaine) !important; font: 700 12px/20px var(--sb-police-texte) !important; }
 :root:root:root:root:root:root:root[data-fil] .fil-cherche-ordi { flex: 0 1 380px !important; }
