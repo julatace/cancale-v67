@@ -91,7 +91,7 @@
 .sr-plan-case.is-prise { background: color-mix(in srgb, var(--sr-encre) 34%, transparent); }
 .sr-plan-case.is-vise { background: var(--sr-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--sr-accent) 35%, transparent); animation: sr-pulse 1600ms ease-in-out 2; }
 .sr-sans { margin: 0; font-size: 15px; line-height: 1.4; color: var(--sr-muet); }
-.sr-segment { margin: 0 0 12px !important; }
+.sr-segment { margin: 0 0 12px; }
 .sr-sans-num { font-size: 13px; font-weight: 600; color: var(--sr-muet); }
 .sr-ligne { outline: none; }
 .sr-ligne:focus-visible { box-shadow: inset var(--sr-anneau); }
@@ -214,6 +214,7 @@
 @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
   .vrm-ms-stock.sr-hote { padding: 12px 32px 32px !important; max-width: 824px; }
   .sr-groupe, .sr-cherche-ligne, .sr-resultats, .sr-liste-paires, .sr-segment { max-width: 760px; }
+  .sr-segment { max-width: 420px; }
 }
 
 /* ══ LA SIGNATURE (17 nov., brief « SIGNATURE ») : l'ÉTIQUETTE KRAFT — une place est une étiquette de carton, en plus grand
@@ -253,16 +254,20 @@
   .sr-coche, .sr-reste, .sr-seance.is-sortie .sr-paire, .sr-seance.is-sortie .sr-ici, .sr-kraft-anneau { animation: none !important; }
 }
 
-/* Le segmenté Paires · Places : le contrôle iOS — un creux translucide sur la coque, l'élu en porcelaine (jour) ou en
-   verre clair (nuit), sans aplat gris lourd ni diode. */
-:root:root:root:root:root:root:root body .sr-segment .vrm-seg { background: rgb(255 255 255 / .16) !important; border: 0 !important; box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .18) !important; border-radius: 12px !important; padding: 3px !important; gap: 2px !important; min-height: 44px !important; }
-:root:root:root:root:root:root:root body .sr-segment .vrm-seg-btn { background: transparent !important; color: #FFFFFF !important; border: 0 !important; box-shadow: none !important; border-radius: 9px !important; min-height: 38px !important; font-size: 15px !important; font-weight: 600 !important; }
-:root:root:root:root:root:root:root body .sr-segment .vrm-seg-btn::before, :root:root:root:root:root:root:root body .sr-segment .vrm-seg-btn::after { display: none !important; }
-:root:root:root:root:root:root:root body .sr-segment .vrm-seg-btn[aria-pressed="true"] { background: #FFFFFF !important; color: #0C1D30 !important; box-shadow: 0 1px 2px rgb(0 0 0 / .14), 0 3px 8px rgb(0 0 0 / .10) !important; }
-:root:root:root:root:root:root:root body .sr-segment .vrm-seg-n { opacity: .72; font-weight: 400; }
-:root[data-theme="dark"]:root:root:root:root:root:root body .sr-segment .vrm-seg { background: rgb(0 0 0 / .28) !important; box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .10) !important; }
-:root[data-theme="dark"]:root:root:root:root:root:root body .sr-segment .vrm-seg-btn { color: #EAF2FB !important; }
-:root[data-theme="dark"]:root:root:root:root:root:root body .sr-segment .vrm-seg-btn[aria-pressed="true"] { background: #3A5072 !important; color: #FFFFFF !important; box-shadow: 0 1px 3px rgb(0 0 0 / .35) !important; }
+/* Le segmenté Paires · Places : le contrôle iOS, À SOI (aucune règle d'hier ne le repeint) — un creux translucide sur la
+   coque, l'élu en porcelaine (jour) ou en verre clair (nuit), sans aplat gris lourd ni diode. */
+.sr-seg { display: flex; gap: 2px; padding: 3px; border-radius: 12px; background: rgb(255 255 255 / .16); box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .18); }
+.sr-seg-btn { appearance: none; border: 0; margin: 0; flex: 1 1 0; min-width: 0; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 6px;
+  border-radius: 10px; background: transparent; color: #FFFFFF; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent; transition: background-color 180ms cubic-bezier(.32, .72, 0, 1), color 180ms ease, box-shadow 180ms ease; }
+.sr-seg-btn:active { background: rgb(255 255 255 / .10); }
+.sr-seg-btn:focus-visible { outline: none; box-shadow: var(--sr-anneau); }
+.sr-seg-btn[aria-selected="true"] { background: #FFFFFF; color: #0C1D30; box-shadow: 0 1px 2px rgb(0 0 0 / .14), 0 3px 8px rgb(0 0 0 / .10); }
+.sr-seg-n { font-weight: 400; opacity: .72; font-variant-numeric: tabular-nums; }
+:root[data-theme="dark"] .sr-seg { background: rgb(0 0 0 / .28); box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .10); }
+:root[data-theme="dark"] .sr-seg-btn { color: #EAF2FB; }
+:root[data-theme="dark"] .sr-seg-btn[aria-selected="true"] { background: #3A5072; color: #FFFFFF; box-shadow: 0 1px 3px rgb(0 0 0 / .35); }
+@media (prefers-reduced-motion: reduce) { .sr-seg-btn { transition: none; } }
 
 /* 1 000 paires : une rangée hors de l'écran n'est ni mise en page ni peinte (sa hauteur réservée : aucun saut). */
 .sr-liste-paires > .sr-ligne { content-visibility: auto; contain-intrinsic-size: auto 96px; }
@@ -287,3 +292,6 @@ html[data-design="v2"] body .vrm-app-header.v2-entete-cloche .vrm-hdr-titre { di
 /* Grand texte (« Très grand », 375 px) : le titre ne se casse jamais en lettres ; le geste plein se resserre. */
 .sr-titre { white-space: nowrap; flex: 0 0 auto; }
 .sr-titre-ligne { flex-wrap: wrap; row-gap: 8px; }
+/* Champ étroit (375 px en « Très grand ») : la photo se retire du champ (elle reste dans « ⋯ ») — le texte d'aide n'est pas coupé. */
+.sr-cherche { container-type: inline-size; }
+@container (max-width: 300px) { .sr-cherche [data-sr-photo] { display: none; } }

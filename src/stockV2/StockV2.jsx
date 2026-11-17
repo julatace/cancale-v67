@@ -364,9 +364,13 @@ export default function StockV2({ s }) {
       {chercheVide ? <>
         {/* Paires · Places : les deux façons de regarder le stock ; leurs nombres sont ceux d'avant (en ligne · meubles). */}
         <div className="v2-ann-segment sr-segment" data-sr-segment={vue}>
-          <s.Segmente label={tr('sr.seg.label')} plein value={vue} onChange={setVue}
-            options={[{ v: 'paires', l: mots.Noms, n: s.nombres.enLigne != null ? (s.nombres.auMoins ? '≥ ' : '') + nombre(s.nombres.enLigne) : undefined, data: { 'data-sr-seg': 'paires' } },
-              { v: 'places', l: tr('sr.seg.places'), n: s.meubles.length ? nombre(s.meubles.length) : undefined, data: { 'data-sr-seg': 'places' } }]}/>
+          <div className="sr-seg" role="tablist" aria-label={tr('sr.seg.label')}>
+            {[{ v: 'paires', l: mots.Noms, n: s.nombres.enLigne != null ? (s.nombres.auMoins ? '≥ ' : '') + nombre(s.nombres.enLigne) : null },
+              { v: 'places', l: tr('sr.seg.places'), n: s.meubles.length ? nombre(s.meubles.length) : null }].map((o) => (
+              <button key={o.v} type="button" role="tab" className="sr-seg-btn" aria-selected={vue === o.v} data-sr-seg={o.v} onClick={() => setVue(o.v)}>
+                <span>{o.l}</span>{o.n != null ? <span className="sr-seg-n">{o.n}</span> : null}
+              </button>))}
+          </div>
         </div>
         {vue === 'paires' ? <>
           {s.nombres.enLigne == null ? <p className="sr-vide-l" data-stock-actuelles={s.nombres.etat}>{s.nombres.attente ? tr('stock.jeLisAnnonces') : tr('sr.pasLu')}</p> : null}
