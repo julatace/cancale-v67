@@ -468,7 +468,8 @@ async function allume(nav, b, sombre, W, ref) {
     const num = await pg.evaluate(() => { const p = document.querySelector('[data-v2v-liste] [data-v2v-ligne] .v2-etiquette'); return p ? p.getAttribute('data-v2-etiquette') : ''; });
     await pg.locator('[data-v2v-champ] input').fill(num, { timeout: 3000 }).catch(() => {}); await pg.waitForTimeout(500);
     const tr = await pg.evaluate((n) => [...document.querySelectorAll('[data-v2v-liste] [data-v2v-ligne] .v2-etiquette')].map((p) => p.getAttribute('data-v2-etiquette')), num);
-    dit(num && tr.length >= 1 && tr.includes(num) && tr.length < 5, `G ${th} : « ${num} » tapé ⇒ ${tr.length} rangée(s), dont N°${num}`, tr);
+    // La recherche CONTIENT le texte tapé : « 12 » montre le N°12 et ceux qui contiennent 12 (120…), jamais un autre.
+    dit(num && tr.length >= 1 && tr.includes(num) && tr.every((x) => String(x).includes(num)), `G ${th} : « ${num} » tapé ⇒ ${tr.length} rangée(s), dont N°${num}, toutes contenant « ${num} »`, tr);
     await pg.screenshot({ path: path.join(SHOTS, `ventes-recherche-${th}.png`) });
     await pg.locator('[data-v2v-champ] input').fill('', { timeout: 3000 }).catch(() => {}); await pg.waitForTimeout(400);
     // G : glisser à gauche ⇒ Imprimer · Plus (le tiroir de la rangée).
