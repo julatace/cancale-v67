@@ -61,7 +61,8 @@ import ecran_argentMieux from './de/argentMieux.js';   // (16 nov., argent-mieux
 import ecran_argentPlus from './de/argentPlus.js';   // (15 nov., lot argent-plus)
 import ecran_rechliste from './de/rechliste.js';
 import ecran_studio_paires from './de/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
-import ecran_republier_guide from './de/republierGuide.js';   // (15 nov.) republier / publier à la main, guidés
+import ecran_republier_guide from './de/republierGuide.js';
+import ecran_republication from './de/republication.js';   // (17 nov.) republier étape par étape (extension 5.408)   // (15 nov.) republier / publier à la main, guidés
 import ecran_memePhoto from './de/memePhoto.js';   // (15 nov., lot meme-photo)
 import ecran_fiabilite from './de/fiabilite.js';   // (15 nov., lot fiabilite-auto)
 import ecran_deuxComptes from './de/deuxComptes.js';   // (15 nov., lot deux-comptes)
@@ -75,6 +76,7 @@ export default {
   ...ecran_ventesVerre,
   ...ecran_studio_paires,
   ...ecran_republier_guide,
+  ...ecran_republication,
   ...ecran_etageres,
   ...ecran_journee_verre,
   ...ecran_arrivee,

@@ -62,6 +62,17 @@
   .mini img, .mini .ph { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; flex: none; background: var(--vu-socle); }
   .mini .mt { font: 500 13px/1.3 var(--vu-police); color: var(--vu-sur-2); overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
   .dit { font: 500 13px/1.4 var(--vu-police); color: var(--vu-sur-2); }
+  /* 5.408 : la chaîne de la paire en cours (coffre › brouillon › supprimée › en ligne). */
+  .chaine { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; font: 600 14px/1.3 var(--vu-police); color: var(--vu-sur-2); font-feature-settings: "tnum" 1; font-variant-numeric: tabular-nums; }
+  .chaine li { display: inline-flex; align-items: center; gap: 6px; }
+  .chaine li + li::before { content: '›'; margin-right: 8px; opacity: .5; }
+  .chaine .pu { width: 20px; height: 20px; border-radius: 999px; display: inline-grid; place-items: center; font: 800 12px/1 var(--vu-police); box-shadow: inset 0 0 0 2px currentColor; opacity: .55; }
+  .chaine [data-etat="faite"] { color: var(--vu-sur); }
+  .chaine [data-etat="faite"] .pu { opacity: 1; box-shadow: none; background: var(--vu-sur); color: rgb(8 20 38); }
+  .chaine [data-etat="encours"] { color: var(--vu-sur); }
+  .chaine [data-etat="encours"] .pu { opacity: 1; animation: vu-pouls 1.4s ease-in-out infinite; }
+  @keyframes vu-pouls { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+  @media (max-width: 560px) { .chaine { justify-content: center; } }
   .gestes { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
   .gestes .vu-btn { min-height: 56px; border-radius: 16px; }
   .gestes .vu-plein { font-size: 18px; }
@@ -86,7 +97,7 @@
   @keyframes vu-in { from { opacity: 0; } to { opacity: 1; } }
   .sort { animation: vu-out .5s ease forwards; }
   @keyframes vu-out { 0%, 60% { opacity: 1; } 100% { opacity: 0; } }
-  @media (prefers-reduced-motion: reduce) { .voile, .boite, .pastille, .sort { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .voile, .boite, .pastille, .sort, .chaine .pu { animation: none; } }
 </style><div class="vu-racine" data-racine></div>`;
   U.monter(ombre);
   const racine = ombre.querySelector('[data-racine]');
@@ -151,6 +162,13 @@
       const pc = a.total > 0 ? 100 * (Number(a.fait) || 0) / Number(a.total) : 0;
       const titre = a.sorte === 'favoris' ? T('f_titre') : nom;
       const suivants = Array.isArray(a.suivants) ? a.suivants.slice(0, 3) : [];
+      // 5.408 (`repubetapes`) : l'étape de LA paire en cours, telle que le service worker l'a annoncée.
+      const rp = a.sorte === 'republier' && a.repub && String(a.repub.id || '') === String(it.id || '') ? a.repub : null;
+      const chaine = rp ? (() => { const fait = Math.max(0, Math.min(4, Number(rp.fait) || 0)); const du = Number(rp.du) > Date.now() ? Number(rp.du) : 0;
+        return `<ol class="chaine" aria-label="${esc(T('r_etapes'))}" data-action-chaine="${fait}">${['coffre', 'brouillon', 'supprimee', 'enligne'].map((k, i) => {
+          const etat = i < fait ? 'faite' : i === fait ? 'encours' : 'attente';
+          const nom = k === 'enligne' && du ? T('r_enligne_dans', { dans: U.duree(du - Date.now()) }) : k === 'coffre' && i === fait && rp.photos && rp.photos.total > 0 ? `${T('r_coffre')} · ${T('r_photos', { fait: Math.min(rp.photos.fait + 1, rp.photos.total), total: rp.photos.total })}` : T('r_' + k);
+          return `<li data-etape="${k}" data-etat="${etat}"${k === 'enligne' && du ? ` data-action-enligne="${du}"` : ''}><span class="pu" aria-hidden="true">${etat === 'faite' ? '✓' : ''}</span>${esc(nom)}</li>`; }).join('')}</ol>`; })() : '';
       const liste = suivants.length ? `<div class="suiv" data-action-suivants="${suivants.length}"><div class="suiv-t">${esc(T('a_suivants'))}</div><div class="suiv-l">${suivants.map((x) => `<span class="mini" title="${esc(x.titre || '')}">${vinted(x.photo) ? `<img src="${esc(x.photo)}" alt="" referrerpolicy="no-referrer" decoding="async">` : '<span class="ph"></span>'}<span class="mt">${esc(x.titre || '')}</span></span>`).join('')}</div></div>` : '';
       poser(`<div class="voile" data-action-plein role="dialog" aria-modal="true" aria-label="${esc(titre)}"><div class="boite vu-coque vu-sur-coque">
         <div class="h"><span class="vu-point"></span><span>VRM · ${esc(T('a_en_direct'))}</span></div>
@@ -162,6 +180,7 @@
             ${a.total > 0 ? U.barre(pc) : ''}
             ${it.titre ? `<div class="ti">${esc(it.titre)}</div>` : ''}
             <div class="suite" role="status">${suite}</div>
+            ${chaine}
           </div>
         </div>
         ${liste}

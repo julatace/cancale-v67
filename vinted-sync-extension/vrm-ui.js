@@ -86,6 +86,14 @@
     // ── l'écran « action en cours » ──
     a_favoris: { fr: 'Envoi des messages aux favoris', en: 'Sending messages to favourites', es: 'Enviando mensajes a favoritos', it: 'Invio dei messaggi ai preferiti', de: 'Nachrichten an Favoriten werden gesendet' },
     a_republier: { fr: 'Republication', en: 'Relisting', es: 'Republicación', it: 'Ripubblicazione', de: 'Neu einstellen' },
+    // ── (5.408) la chaîne d'une paire pendant la republication ──
+    r_coffre: { fr: 'Coffre', en: 'Vault', es: 'Copia', it: 'Archivio', de: 'Tresor' },
+    r_brouillon: { fr: 'Brouillon', en: 'Draft', es: 'Borrador', it: 'Bozza', de: 'Entwurf' },
+    r_supprimee: { fr: 'Supprimée', en: 'Deleted', es: 'Eliminado', it: 'Eliminato', de: 'Gelöscht' },
+    r_enligne: { fr: 'En ligne', en: 'Online', es: 'Publicado', it: 'Online', de: 'Online' },
+    r_enligne_dans: { fr: 'En ligne dans {dans}', en: 'Online in {dans}', es: 'Publicado en {dans}', it: 'Online tra {dans}', de: 'Online in {dans}' },
+    r_photos: { fr: 'photo {fait} sur {total}', en: 'photo {fait} of {total}', es: 'foto {fait} de {total}', it: 'foto {fait} di {total}', de: 'Foto {fait} von {total}' },
+    r_etapes: { fr: 'Étapes de cette paire', en: 'Steps for this pair', es: 'Pasos de este par', it: 'Passaggi di questo paio', de: 'Schritte für dieses Paar' },
     a_baisse: { fr: 'Baisse des prix', en: 'Lowering prices', es: 'Bajada de precios', it: 'Ribasso dei prezzi', de: 'Preise senken' },
     a_offres: { fr: 'Réponse aux offres', en: 'Answering offers', es: 'Respuesta a ofertas', it: 'Risposta alle offerte', de: 'Angebote beantworten' },
     a_faites: { fr: '{n} fait(s)', en: '{n} done', es: '{n} hecho(s)', it: '{n} fatto/i', de: '{n} erledigt' },
