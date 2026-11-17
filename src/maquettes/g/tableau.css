@@ -1,0 +1,134 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   MAQUETTE G — « LE TABLEAU » (17 nov.) — prototype de banc, pas livré.
+   Style Studio de C : le fond bleu « Verre dépoli », le rail souligné, la porcelaine,
+   la plaque gravée du N°. UN accent rare (la diode, le lien) ; ambre = un geste à faire ;
+   rouge = deux paires sous un N°, rien d'autre. Cibles 44 px au doigt.
+   Ce qu'on prend : Linear (colonnes denses qui ne bougent pas, le compte à côté du nom,
+   ⌘K) ; un tableau Kanban (les étapes en colonnes, la carte = l'objet). Ce qu'on refuse
+   d'un Kanban : le glisser-déposer — ici l'étape se PROUVE, elle ne se pose pas.
+   Les boutons (Julien, 17 nov. : « change tout, même la disposition des boutons ») :
+   au téléphone, TOUS en bas, au pouce (Chercher · le geste en série · Argent) ;
+   le geste d'une carte à sa droite ; en haut, rien qu'on touche souvent.
+   ════════════════════════════════════════════════════════════════════════════ */
+@import '../../design/studio.css';
+@import '../../design/studio-verre.css';
+
+html[data-maquette="g"] { background: var(--sv-bas) !important; }
+html[data-maquette="g"] body { margin: 0; background: transparent !important; }
+html[data-maquette="g"] body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(120% 60% at 15% 0%, var(--sv-reflet) 0%, transparent 55%), radial-gradient(70% 45% at 100% 38%, var(--sv-reflet-2) 0%, transparent 70%),
+    linear-gradient(170deg, var(--sv-haut) 0%, var(--sv-milieu) 45%, var(--sv-bas) 100%); }
+
+.g-racine {
+  --g-gout: 16px;
+  --g-filet: rgb(255 255 255 / .22);
+  min-height: 100dvh; box-sizing: border-box; color: var(--sv-clair); position: relative; isolation: isolate;
+  font-family: var(--sb-police-texte); font-feature-settings: var(--sb-chiffres); -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+.g-racine *, .g-racine *::before, .g-racine *::after { box-sizing: border-box; }
+.g-racine h1, .g-racine h2, .g-racine p { margin: 0; }
+.g-attente, .g-pas-su { padding: 40px 16px; }
+
+/* ── La tête du téléphone : le titre, puis le rail des étapes (souligné, comme C) ── */
+.g-tel { padding: 0 0 calc(110px + env(safe-area-inset-bottom)); }
+.g-tete { position: sticky; top: 0; z-index: 5; padding: calc(env(safe-area-inset-top) + 6px) var(--g-gout) 0;
+  background: color-mix(in oklab, var(--sv-haut) 86%, transparent); -webkit-backdrop-filter: var(--sv-flou); backdrop-filter: var(--sv-flou);
+  box-shadow: inset 0 -1px 0 var(--g-filet); }
+.g-tete-l { display: flex; align-items: center; gap: 10px; height: 52px; }
+.g-titre-ecran { font: 400 30px/1 var(--sb-police-affiche); letter-spacing: -.02em; color: var(--sv-clair); }
+.g-tete-sous { font-size: 12.5px; color: var(--sv-clair-2); opacity: .9; margin-top: 6px; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-plus { background: var(--sv-verre-fin) !important; box-shadow: inset 0 0 0 1px var(--sv-verre-fin-bord) !important; color: var(--sv-clair) !important; }
+
+.g-rail { display: flex; gap: 20px; overflow-x: auto; scrollbar-width: none; margin: 0 calc(-1 * var(--g-gout)); padding: 0 var(--g-gout); scroll-behavior: smooth; }
+.g-rail::-webkit-scrollbar { display: none; }
+.g-rail-b { flex: none; position: relative; display: inline-flex; align-items: center; gap: 6px; height: 46px; padding: 0; border: 0; background: none; cursor: pointer;
+  font: 600 15px/1 var(--sb-police-texte); letter-spacing: -.01em; color: rgb(255 255 255 / .72); white-space: nowrap; }
+.g-rail-b[aria-current="page"] { color: var(--sv-clair); }
+.g-rail-b[aria-current="page"]::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; border-radius: 3px 3px 0 0; background: var(--sv-clair); box-shadow: 0 0 10px rgb(255 255 255 / .55); }
+.g-rail-n { font: 700 12px/1 var(--sb-police-texte); padding: 3px 6px; border-radius: 7px; background: rgb(255 255 255 / .16); color: inherit; }
+.g-rail-n.is-ambre { background: var(--sv-clair-ambre); color: #4A2A00; }
+
+/* ── La colonne (un écran) ── */
+.g-colonne { padding: 14px var(--g-gout) 0; touch-action: pan-y; }
+.g-col-tete { display: flex; align-items: baseline; gap: 10px; }
+.g-col-tete h2 { font: 400 26px/1.1 var(--sb-police-affiche); letter-spacing: -.015em; }
+.g-col-n { font: 300 26px/1 var(--sb-police-affiche); color: var(--sv-clair-2); opacity: .85; }
+.g-contexte { margin-top: 4px !important; font-size: 14px; color: var(--sv-clair-2); }
+.g-contexte b { color: var(--sv-clair); font-weight: 600; }
+.g-liste { margin-top: 12px; border-radius: 18px; overflow: hidden; background: var(--sv-porcelaine); box-shadow: var(--sv-ombre); color: var(--sv-encre); }
+.g-pied { margin: 14px 4px 0 !important; font-size: 12.5px; color: var(--sv-clair-2); opacity: .85; text-align: center; }
+.g-vide { padding: 22px 16px; font-size: 14px; color: var(--sv-encre-2); }
+
+/* ── La carte = la paire : vignette, N°, titre, état ; à DROITE le prix et LE geste ── */
+.g-carte { display: flex; align-items: center; gap: 12px; min-height: 76px; padding: 10px 12px 10px 12px; position: relative; outline: none;
+  content-visibility: auto; contain-intrinsic-size: auto 76px; }
+.g-carte + .g-carte::before { content: ''; position: absolute; top: 0; left: 76px; right: 0; height: .5px; background: rgb(var(--sb-o, 12 29 48) / .14); }
+.g-vignette { flex: none; width: 52px; height: 52px; border-radius: 12px; overflow: hidden; background: var(--sb-creux); }
+.g-vignette img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.g-vignette-vide { display: block; width: 100%; height: 100%; }
+.g-corps { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.g-ligne1 { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.g-plaque { height: 20px; line-height: 20px; font-size: 12px; min-width: 0; }
+.g-plaque-vide { font-size: 11.5px; font-weight: 600; color: var(--sv-encre-2); padding: 2px 6px; border-radius: 6px; box-shadow: inset 0 0 0 1px rgb(12 29 48 / .18); }
+.g-compte { font-size: 12.5px; color: var(--sv-encre-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-titre { font-size: 15px; font-weight: 600; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.g-sous { font-size: 12.5px; color: var(--sv-encre-2); line-height: 1.3; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.g-carte.is-ambre .g-sous { color: var(--sv-ambre); font-weight: 600; }
+.g-carte.is-double .g-sous { color: var(--sb-doublon); font-weight: 600; }
+.g-point { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--sb-ambre-point, #E89B00); }
+.g-droite { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.g-prix { font: 400 17px/1 var(--sb-police-affiche); color: var(--sv-encre); white-space: nowrap; }
+.g-geste { min-height: 36px !important; padding: 0 12px !important; font-size: 13.5px !important; }
+@media (pointer: coarse) { .g-tel .g-geste { min-height: 44px !important; } }
+
+/* ── LE POUCE : tous les gestes de l'écran en bas, à portée du pouce ── */
+.g-pouce { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 6; display: flex; align-items: center; gap: 10px;
+  padding: 8px; border-radius: 26px; background: var(--sv-verre-barre); -webkit-backdrop-filter: var(--sv-flou); backdrop-filter: var(--sv-flou); box-shadow: var(--sv-ombre); color: var(--sv-encre); }
+.g-pouce-rond { width: 52px !important; height: 52px !important; }
+.g-pouce-plein { flex: 1; min-width: 0; height: 56px !important; border-radius: 20px !important; font-size: 16px !important; }
+.g-pouce-attente { flex: 1; min-width: 0; text-align: center; font-size: 13.5px; color: var(--sv-encre-2); line-height: 1.25; }
+
+/* ══ L'ORDINATEUR : tout le tableau d'un coup d'œil ══ */
+.g-ord { padding: 0 24px 24px; height: 100dvh; display: flex; flex-direction: column; }
+.g-ord-tete { display: flex; align-items: center; gap: 14px; height: 72px; flex: none; }
+.g-marque { font: 700 15px/1 var(--sb-police-texte); letter-spacing: .08em; opacity: .9; margin-right: 6px; }
+.g-ord .g-titre-ecran { font-size: 28px; }
+.g-ord .g-tete-sous { margin-top: 4px; flex: 0 1 auto; }
+.g-cherche { margin-left: auto; display: flex; align-items: center; gap: 8px; width: 380px; height: 40px; padding: 0 8px 0 12px; border-radius: 12px;
+  background: var(--sv-porcelaine); color: var(--sv-encre-2); box-shadow: var(--sv-ombre); }
+.g-cherche input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font: inherit; font-size: 14px; color: var(--sv-encre); }
+.g-cherche input::placeholder { color: var(--sv-encre-2); }
+.g-cherche kbd { font: 600 11.5px/1 var(--sb-police-texte); padding: 5px 7px; border-radius: 7px; box-shadow: inset 0 0 0 1px rgb(12 29 48 / .18); }
+.g-tableau { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 10px; }
+.g-ord-col { min-width: 0; min-height: 0; display: flex; flex-direction: column; border-radius: 18px; background: var(--sv-verre); -webkit-backdrop-filter: var(--sv-flou); backdrop-filter: var(--sv-flou);
+  box-shadow: var(--sv-ombre); color: var(--sv-encre); overflow: hidden; }
+.g-ord-col.is-verifier { background: color-mix(in oklab, var(--sv-verre) 70%, transparent); }
+.g-ord-col-tete { display: flex; align-items: baseline; gap: 8px; padding: 14px 12px 0; }
+.g-ord-col-tete h2 { font: 600 15px/1.2 var(--sb-police-texte); }
+.g-ord .g-col-n { font: 400 15px/1 var(--sb-police-affiche); color: var(--sv-encre-2); opacity: 1; }
+.g-ord-serie { padding: 8px 12px 10px; min-height: 58px; display: flex; align-items: center; }
+.g-ord-serie .sb-touche { width: 100%; min-height: 36px; font-size: 13px; }
+.g-ord-plein { width: 100%; min-width: 0 !important; height: 40px !important; padding: 0 10px !important; border-radius: 13px !important; font-size: 13.5px !important; }
+.g-ord-attente { font-size: 12px; color: var(--sv-encre-2); line-height: 1.3; }
+.g-ord-liste { flex: 1; min-height: 0; overflow-y: auto; padding: 0 8px 10px; display: flex; flex-direction: column; gap: 6px; scrollbar-width: thin; }
+.g-ord .g-carte { flex-wrap: wrap; align-items: flex-start; gap: 8px; min-height: 0; padding: 9px; border-radius: 12px; background: var(--sv-porcelaine); box-shadow: 0 1px 2px rgb(8 26 50 / .12); contain-intrinsic-size: auto 96px; }
+.g-ord .g-carte + .g-carte::before { display: none; }
+.g-ord .g-carte:hover { box-shadow: 0 1px 2px rgb(8 26 50 / .12), 0 0 0 1.5px color-mix(in oklab, var(--sb-diode) 45%, transparent); }
+.g-ord .g-vignette { width: 36px; height: 36px; border-radius: 9px; }
+.g-ord .g-corps { flex: 1 1 calc(100% - 44px); }
+.g-ord .g-titre { font-size: 13px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.g-ord .g-sous { font-size: 11.5px; }
+.g-ord .g-droite { flex: 1 1 100%; flex-direction: row; justify-content: space-between; align-items: center; padding-left: 44px; }
+.g-ord .g-prix { font-size: 15px; }
+.g-ord .g-geste { min-height: 28px !important; padding: 0 10px !important; font-size: 12.5px !important; }
+.g-ord .g-vide { padding: 8px 4px; font-size: 12.5px; }
+.g-encore { align-self: center; min-height: 36px; font-size: 13px; }
+
+/* ── La nuit : les mêmes rôles (jetons du verre déjà retournés par studio-verre.css) ── */
+:root[data-theme="dark"] .g-liste, :root[data-theme="dark"] .g-ord .g-carte, :root[data-theme="dark"] .g-cherche { background: #13233A; color: #EAF1F9; }
+:root[data-theme="dark"] .g-racine { --sv-encre: #EAF1F9; --sv-encre-2: #A9BBCF; --sv-ambre: #FFC75A; }
+:root[data-theme="dark"] .g-carte + .g-carte::before { background: rgb(255 255 255 / .10); }
+:root[data-theme="dark"] .g-plaque-vide { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .22); }
+
+@media (prefers-reduced-motion: reduce) { .g-rail { scroll-behavior: auto; } }
