@@ -370,5 +370,12 @@ export default {
   "achats.relier.pasSu": "Tes achats n’ont pas pu être lus — rien n’est relié. Réessaie.",
   "achats.relier.enCours": "Je relie…",
   "achats.relier.rate": "La base n’a pas enregistré le lien — rien n’a changé. Réessaie.",
+  "achats.memeColis.propose": "C’est sans doute le même colis que ton achat Vinted.",
+  "achats.memeColis.proposeTitre": "C’est sans doute le même colis que « {titre} ».",
+  "achats.memeColis.pasMeme": "Ce n’est pas le même",
+  "achats.memeColis.contredit": "Ce lien ne correspond pas au suivi Vinted — délier ?",
+  "achats.memeColis.delier": "Délier",
+  "achats.memeColis.delierEnCours": "Je délie…",
+  "achats.memeColis.delierRate": "La base n’a pas retiré le lien — rien n’a changé. Réessaie.",
   "achats.relier.chercher": "Chercher dans mes achats",
 };

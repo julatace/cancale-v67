@@ -548,7 +548,7 @@ async function retraitsDuJour(maintenant = Date.now(), jourCible = 0) {
   if (!candidats.length) return { liste: [], txsPar: new Map() };
   const [relaisRow, suivisV, suivisM] = await Promise.all([
     getRow('panel_colis_relais'),
-    fetchPaginated(scoped('app_data?id=like.harvest_%25_suivi_%25&select=id,tx:meta->>tx,suivi:meta->>suivi')),
+    fetchPaginated(scoped('app_data?id=like.harvest_%25_suivi_%25&select=id,tx:meta->>tx,suivi:meta->>suivi,sv:meta->>suivisVinted,sl:meta->>suivisLusAt')),
     fetchPaginated(scoped('app_data?id=like.colis_suivi_%25&select=id,suivi:meta->>suivi,tx:meta->>tx,uid:meta->>uid')),
   ]);
   const liens = liensDesLignes(suivisV, suivisM);

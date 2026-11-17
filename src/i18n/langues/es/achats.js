@@ -370,5 +370,12 @@ export default {
   "achats.relier.pasSu": "No se pudieron leer tus compras: no se ha vinculado nada. Vuelve a intentarlo.",
   "achats.relier.enCours": "Vinculando…",
   "achats.relier.rate": "La base de datos no guardó el vínculo: nada ha cambiado. Vuelve a intentarlo.",
+  "achats.memeColis.propose": "Seguramente es el mismo paquete que tu compra de Vinted.",
+  "achats.memeColis.proposeTitre": "Seguramente es el mismo paquete que «{titre}».",
+  "achats.memeColis.pasMeme": "No es el mismo",
+  "achats.memeColis.contredit": "Este vínculo no coincide con el seguimiento de Vinted. ¿Desvincular?",
+  "achats.memeColis.delier": "Desvincular",
+  "achats.memeColis.delierEnCours": "Desvinculando…",
+  "achats.memeColis.delierRate": "La base de datos no quitó el vínculo: nada ha cambiado. Vuelve a intentarlo.",
   "achats.relier.chercher": "Buscar en mis compras",
 };

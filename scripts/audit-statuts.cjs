@@ -244,7 +244,9 @@ essaie('(h) dédoublonnage des colis à retirer', () => {
   // (23 oct.) `extra` se construit dans une boucle (les colis vus par Vinted
   // passent aussi par « reparti / à vérifier ») : on lit autour de sa
   // déclaration, AVANT et APRÈS — la règle (le CODE, jamais le titre), pas la forme.
-  const avantExtra = iExtra >= 0 ? code.slice(Math.max(0, iExtra - 600), iExtra + 1400) : '';
+  // (17 nov.) fenêtre 1400 → 1800 : #1242 a ajouté une ligne dans la boucle (achat déjà
+  // montré par son e-mail), le rapprochement par code est resté le même, 69 caractères plus loin.
+  const avantExtra = iExtra >= 0 ? code.slice(Math.max(0, iExtra - 600), iExtra + 1800) : '';
   dit(iExtra >= 0 && !/normTitle\(/.test(avantExtra), 'les colis à retirer ne sont jamais fusionnés sur une ressemblance de TITRE', avantExtra ? '' : 'pickupUnion introuvable');
   dit(/codeRetrait|normCode/.test(avantExtra) && /colisRelais/.test(avantExtra), '… mais sur le CODE de retrait lu des deux côtés (email et conversation Vinted)');
 });
