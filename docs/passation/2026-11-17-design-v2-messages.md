@@ -1,6 +1,6 @@
 # 17 nov. — Messages et E-mails, nouveau design (lot design-v2-messages, branche `claude/design-v2-messages`)
 
-Derrière le même essai que le lot design-v2 (`vrm_design_v2`, Paramètres → Apparence → « Nouveau design (essai) »).
+Derrière le réglage du nouveau design (`vrm_design_v2` ; allumé par défaut depuis #1246, « Ancien design » l'éteint).
 **Éteint : rien ne change** (signature DOM de Messages et d'E-mails comparée au build d'avant, banc ci-dessous).
 Aucune règle métier changée : mêmes conversations, mêmes filtres, mêmes nombres, mêmes gestes, mêmes routes.
 

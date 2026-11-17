@@ -127,7 +127,7 @@ async function ouvrirEcran(nav, { W, sombre, url, grand = false, v2 = true }) {
   await pg.addInitScript(() => { window.__cls = 0; try { new PerformanceObserver((l) => { for (const e of l.getEntries()) { if (e.hadRecentInput) continue;
     const src = (e.sources || []).map((x) => x.node).filter((n) => n && n.nodeType === 1);
     if (src.length && src.every((n) => n.closest('[class*="vrm-boot"]'))) continue; window.__cls += e.value; } }).observe({ type: 'layout-shift', buffered: true }); } catch (_) {} });
-  await pg.evaluate(([v2, grand]) => { if (v2) localStorage.setItem('vrm_design_v2', '1'); else localStorage.removeItem('vrm_design_v2'); if (grand) localStorage.setItem('vrm_taille_texte', 'tresGrand'); }, [v2, grand]);
+  await pg.evaluate(([v2, grand]) => { localStorage.setItem('vrm_design_v2', v2 ? '1' : '0'); if (grand) localStorage.setItem('vrm_taille_texte', 'tresGrand'); }, [v2, grand]);
   await pg.reload({ waitUntil: 'domcontentloaded' });
   await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {});
   return { ...o, b };

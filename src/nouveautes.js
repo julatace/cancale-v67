@@ -31,7 +31,7 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'plus-de-disque', date: '2026-11-17', titre: 'Plus de « + » dans la barre', phrase: 'Scanner dans la recherche, Publier sur Annonces, Imprimer sur ta journée.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (17 nov., lot design-v2) docs/passation/2026-11-17-design-v2.md — l'essai, éteint par défaut
   { id: 'design-v2-essai', date: '2026-11-17', titre: 'Essaie le nouveau design', phrase: 'Paramètres → Apparence : Aujourd’hui, passes de retrait, un menu par plateforme.', tab: 'settings', pour: 'tous', mode: 'tous' },
-  // (17 nov., lot design-v2-messages) docs/passation/2026-11-17-design-v2-messages.md — derrière le même essai
+  // (17 nov., lot design-v2-messages) docs/passation/2026-11-17-design-v2-messages.md — le nouveau design
   { id: 'design-v2-messages', date: '2026-11-17', titre: 'Messages et e-mails, nouveau design', phrase: 'Un compte par groupe, À traiter · Colis · Ventes · Achats, « C’est à moi ».', tab: 'messages', pour: 'tous', mode: 'tous' },
   // (17 nov., Julien : « il faut être très très proche… je veux que ce soit instantané ») docs/passation/2026-11-17-scan-instantane.md
   { id: 'scan-instantane', date: '2026-11-17', titre: 'Le scanner lit de plus loin, aussitôt', phrase: 'Zoom 2×, lecture sans figer ; la fiche de la vente s’ouvre aussitôt.', tab: 'ventes', pour: 'tous', mode: 'tous' },
