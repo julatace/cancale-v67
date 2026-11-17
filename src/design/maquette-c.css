@@ -97,7 +97,7 @@
   :root[data-maquette="c"] .vrm-main .vrm-tache-tete .vrm-aide-bouton svg { width: 18px !important; height: 18px !important; opacity: .8 !important; }
   :root[data-maquette="c"] .vrm-main .vrm-tache-tete.vrm-market-heading { position: relative !important; }
   /* Le geste de l'écran (Retrouver un colis) : sur la même ligne, juste avant les ronds de l'app. */
-  :root[data-maquette="c"] .vrm-main .vrm-tache-tete .vrm-tache-retrouver { position: absolute !important; right: 142px !important; top: 0 !important; height: 54px !important; display: flex !important; align-items: center !important; margin: 0 !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-tache-tete .vrm-tache-retrouver { position: absolute !important; right: 142px !important; top: 0 !important; transform: none !important; height: 54px !important; display: flex !important; align-items: center !important; margin: 0 !important; }
   :root[data-maquette="c"] .vrm-main .vrm-tache-tete .vrm-tache-retrouver .sb-rond { width: 40px !important; height: 40px !important; min-width: 40px !important; }
   /* Annonces : le choix Annonces / Stock passe sous le titre, en rail, sur toute la largeur. */
   :root[data-maquette="c"] .vrm-main .vrm-tache-tete .vrm-paires-selecteur { flex: 0 0 calc(100% + 170px) !important; margin: 0 -170px 0 0 !important; }
@@ -177,6 +177,11 @@
   /* Achats : les gestes de la tête (Relier en glissant, calculette) en touches de 36 px, sur la ligne du rail. */
   :root[data-maquette="c"] .vrm-main :is(.vrm-achats-gestes, .vrm-screen-actions) :is(button, a) { height: 36px !important; min-height: 36px !important; padding: 0 12px !important; font-size: 14px !important; border-radius: 12px !important; }
   :root[data-maquette="c"] .vrm-main .vrm-screen-head:has(.vrm-achats-gestes) { padding-right: 0 !important; }
+
+  /* « Relier en glissant » : un rond (son mot reste son nom lu à voix haute) au bout de la rangée des plateformes. */
+  :root[data-maquette="c"] .vrm-main .vrm-achats-scan { position: absolute !important; top: 56px !important; right: 16px !important; left: auto !important; margin: 0 !important; z-index: 5 !important; width: auto !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-achats-scan :is(button, a) { width: 44px !important; min-width: 44px !important; height: 44px !important; min-height: 44px !important; padding: 0 !important; font-size: 0 !important; border-radius: 50% !important; justify-content: center !important; gap: 0 !important; }
+  :root[data-maquette="c"] .vrm-main .vrm-achats-scan :is(button, a) svg { width: 19px !important; height: 19px !important; margin: 0 !important; }
 
   /* Annonces : la bande de chiffres et la barre de travail serrées. */
   :root[data-maquette="c"] .vrm-main .vrm-ann-workbar { padding-top: 4px !important; padding-bottom: 4px !important; }
