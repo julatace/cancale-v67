@@ -40,5 +40,5 @@ export default {
   "v2.ar.lecture": "Reading payouts…",
   "v2.pm.chercher": "Search settings",
   "v2.ar.pasEncoreLu": "Not read yet: {quoi}",
-  "v2.fac.chercher": "Item no. or sale date"
+  "v2.fac.chercher": "Search invoices"
 };

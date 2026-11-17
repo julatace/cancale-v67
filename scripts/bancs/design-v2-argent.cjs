@@ -111,11 +111,12 @@ async function mesurer(pg, nom, zonesSel) {
     const tronques = textes.filter((e) => { const cs = getComputedStyle(e); return e.scrollWidth > e.clientWidth + 1 && cs.textOverflow !== 'ellipsis' && /hidden|clip/.test(cs.overflowX) && e.clientWidth > 0; }).map((e) => e.className + ':' + e.textContent.trim().slice(0, 30));
     const coupes = textes.filter((e) => { const cs = getComputedStyle(e); return cs.textOverflow === 'ellipsis' && e.scrollWidth > e.clientWidth + 1 && !e.closest('.v2-ar-v-titre, .v2-ar-v-date'); }).map((e) => e.textContent.trim().slice(0, 30));
     // Un mot coupé en deux (titre, montant) : une ligne qui commence au milieu d'un mot (Range par caractère).
-    const coupesMot = textes.filter((e) => !e.closest('.vg-sr')).flatMap((e) => [...e.childNodes].filter((n) => n.nodeType === 3 && n.textContent.trim().length > 3).map((n) => { const t = n.textContent; const r = document.createRange(); let y0 = null, cut = null;
+    const coupesMot = textes.filter((e) => !e.closest('.vg-sr') && !/@/.test(e.textContent)).flatMap((e) => [...e.childNodes].filter((n) => n.nodeType === 3 && n.textContent.trim().length > 3).map((n) => { const t = n.textContent; const r = document.createRange(); let y0 = null, cut = null;
       for (let i = 0; i < t.length; i++) { r.setStart(n, i); r.setEnd(n, i + 1); const q = r.getClientRects()[0]; if (!q) continue; if (y0 != null && q.top > y0 + 4 && i > 0 && /\S/.test(t[i - 1]) && /\S/.test(t[i]) && !/[-–—\/·]/.test(t[i - 1])) { cut = t.slice(Math.max(0, i - 8), i) + '|' + t.slice(i, i + 8); break; } y0 = q.top; }
       return cut; }).filter(Boolean));
     const W = innerWidth; const deb = document.documentElement.scrollWidth - W;
-    const hors = textes.filter((e) => { const q = e.getBoundingClientRect(); return q.right > W + 1 || q.left < -1; }).map((e) => e.textContent.trim().slice(0, 30));
+    const defilant = (e) => { for (let p = e.parentElement; p && p !== document.body; p = p.parentElement) { const ox = getComputedStyle(p).overflowX; if ((ox === 'auto' || ox === 'scroll') && p.scrollWidth > p.clientWidth) return true; } return false; };
+    const hors = textes.filter((e) => !defilant(e)).filter((e) => { const q = e.getBoundingClientRect(); return q.right > W + 1 || q.left < -1; }).map((e) => e.textContent.trim().slice(0, 30));
     const contrastes = textes.map((e) => { const cs = getComputedStyle(e); const c = K.rgba(cs.color); if (!c) return null; const f = K.fond(e); const big = parseFloat(cs.fontSize) >= 24 || (parseFloat(cs.fontSize) >= 18.66 && Number(cs.fontWeight) >= 700);
       if (Number(cs.opacity) === 0) return null; return { t: e.textContent.trim().slice(0, 24), r: Math.round(K.ratio(K.sur(c, f), f) * 100) / 100, min: big ? 3 : 4.5 }; }).filter(Boolean);
     const faibles = contrastes.filter((x) => x.r < x.min);
@@ -186,7 +187,7 @@ const ZONES_ARGENT = '.v2-argent, .v2-argent-nav, .vrm-screen-head:has(.v2-argen
           const vers = [...document.querySelectorAll('[data-v2-argent-versement]')].filter(vis);
           const txt = document.querySelector('.vrm-main').innerText;
           return { titre: h ? h.textContent.trim() : '', nNav: navs.length, comptes: navs[0] ? !!navs[0].querySelector('[data-v2-argent-comptes]') : false, segs, affiche: af ? af.textContent.replace(/\s+/g, ' ').trim() : '',
-            afficheTaille: af ? parseFloat(getComputedStyle(af.querySelector('.v2-affiche-sig-n')).fontSize) : 0, graphe: fig ? Math.round(fig.getBoundingClientRect().height) : null,
+            afficheTaille: af ? parseFloat(getComputedStyle(af.querySelector('.v2-affiche-sig-n')).fontSize) : 0, graphe: fig ? Math.round(fig.getBoundingClientRect().height / (parseFloat(getComputedStyle(document.documentElement).zoom) || 1)) : null,
             faits: document.querySelectorAll('[data-v2-argent-fait]').length + ((document.querySelector('[data-v2-argent-passu]') || { getAttribute: () => '' }).getAttribute('data-v2-argent-passu') || '').split(' ').filter(Boolean).length, faitsTiret: [...document.querySelectorAll('[data-v2-argent-fait] [data-v2-pas-su]')].length, vers: vers.length, versN: vers.filter((v) => v.querySelector('.v2-etiquette')).length, segL, mainL, vMarge, etiq, barV, faitsH,
             versNum: vers.filter((v) => v.tagName === 'BUTTON').length, ancienVisible: [...document.querySelectorAll('[data-argent-questions]')].some(vis),
             encaisse: /encaiss/i.test(txt), auMoins0: /au moins 0[,\s]*0?0?\s*€/i.test(txt), nan: /\bNaN\b|undefined|Invalid Date/.test(txt) };

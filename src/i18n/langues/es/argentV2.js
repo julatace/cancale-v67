@@ -40,5 +40,5 @@ export default {
   "v2.ar.lecture": "Leyendo los pagos…",
   "v2.pm.chercher": "Buscar un ajuste",
   "v2.ar.pasEncoreLu": "Aún no leído: {quoi}",
-  "v2.fac.chercher": "N.º de artículo o fecha de venta"
+  "v2.fac.chercher": "Buscar una factura"
 };

@@ -19,10 +19,11 @@
 html body button.v2-ar-barre { appearance: none; margin: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer;
   display: flex; flex-direction: column; align-items: stretch; gap: 4px; min-width: 0; min-height: 44px; touch-action: manipulation; -webkit-tap-highlight-color: transparent; border-radius: 12px; }
 html body button.v2-ar-barre:focus-visible { outline: none; box-shadow: var(--v2-anneau); }
-.v2-ar-barre-col { position: relative; flex: 1; display: flex; align-items: flex-end; padding-top: 20px; }
-.v2-ar-barre-col i { display: block; width: 100%; border-radius: 4px 4px 2px 2px; background: rgb(255 255 255 / .38); transition: background-color 80ms ease; }
-.v2-ar-barre[aria-pressed="true"] .v2-ar-barre-col i { background: var(--v2-page-texte); }
-.v2-ar-barre[data-vide] .v2-ar-barre-col i { background: transparent; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .5); height: 8px !important; }
+.v2-ar-barre-col { flex: 1; display: flex; flex-direction: column; padding-top: 20px; min-height: 0; }
+.v2-ar-barre-piste { position: relative; flex: 1; display: flex; align-items: flex-end; min-height: 0; }
+.v2-ar-barre-piste i { display: block; width: 100%; border-radius: 4px 4px 2px 2px; background: rgb(255 255 255 / .38); transition: background-color 80ms ease; }
+.v2-ar-barre[aria-pressed="true"] .v2-ar-barre-piste i { background: var(--v2-page-texte); }
+.v2-ar-barre[data-vide] .v2-ar-barre-piste i { background: transparent; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .5); height: 8px !important; }
 .v2-ar-barre-v { position: absolute; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 13px; line-height: 16px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--v2-page-texte); pointer-events: none; }
 .v2-ar-barre:first-child .v2-ar-barre-v { left: 0; transform: none; }
 .v2-ar-barre:last-child .v2-ar-barre-v { left: auto; right: 0; transform: none; }
@@ -166,10 +167,10 @@ html body button.v2-rangee.v2-ar-v:active { background: rgb(18 52 96 / .06); tra
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent button.vrm-urssaf-copier { background: var(--v2-teinte-fond) !important; background-image: none !important; color: var(--v2-teinte-texte) !important; box-shadow: none !important; border-color: transparent !important; }
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent button.vrm-urssaf-copier { min-height: 44px !important; border-radius: 12px !important; }
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-argent-nav .v2-seg-btn { padding: 0 4px !important; font-size: 13px !important; }
-:root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body .v2-argent-nav .v2-seg { overflow-x: auto !important; scrollbar-width: none !important; }
-:root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body .v2-argent-nav .v2-seg-btn { flex: 0 0 auto !important; padding: 0 12px !important; }
-:root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body [data-fac-zones].v2-seg { overflow-x: auto !important; }
-:root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body [data-fac-zones] .v2-seg-btn { flex: 0 0 auto !important; padding: 0 12px !important; }
+/* Grand texte : le segmenté passe en 2 × 2 (Argent) ou en colonne (Factures) — jamais un segment rogné. */
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body .v2-argent-nav .v2-seg { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body [data-fac-zones].v2-seg { display: grid !important; grid-template-columns: minmax(0, 1fr) !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body :is(.v2-argent-nav, [data-fac-zones]) .v2-seg-btn { padding: 0 8px !important; }
 /* « Tout va bien ? » en tête de Paramètres : une rangée blanche, un POINT ambre (plus un aplat ambre). */
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-pm-alerte-liste { background: var(--v2-carte) !important; border: 0 !important; border-radius: 20px !important; box-shadow: var(--v2-carte-ombre) !important; overflow: hidden !important; margin: 0 0 8px !important; }
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-pm-alerte { background: transparent !important; color: var(--sv-encre, #0C1D30) !important; min-height: 52px !important; padding: 8px 16px !important; gap: 12px !important; border: 0 !important; box-shadow: none !important; }
@@ -200,3 +201,17 @@ html body button.v2-rangee.v2-pm-rangee:active { background: rgb(18 52 96 / .06)
 .v2-pm-moi-txt span { font-size: 13px; line-height: 16px; color: var(--v2-muet); overflow-wrap: anywhere; }
 html body button.v2-rangee.v2-pm-rangee.v2-pm-moi { min-height: 72px; }
 :root[data-theme="dark"] .v2-pm-liste { color: #F2F7FD; }
+
+/* ── Grand texte (réglage « Grand » à « Très grand », ou l'appareil) : rien ne se serre jusqu'à couper un mot ── */
+html[data-grand-texte] .v2-ar-v { flex-wrap: wrap; }
+html[data-grand-texte] .v2-ar-v-droite { flex: 1 0 100%; flex-direction: row; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; }
+html[data-grand-texte] body button.v2-rangee.v2-pm-rangee { flex-wrap: wrap; }
+html[data-grand-texte] .v2-pm-lib { flex: 1 1 0; min-width: 0; }
+html[data-grand-texte] .v2-pm-chev { order: 2; }
+html[data-grand-texte] .v2-pm-val { order: 3; flex: 1 0 100%; max-width: none; padding-left: 44px; text-align: left; }
+html[data-grand-texte] .v2-pm-moi .v2-pm-val { padding-left: 60px; }
+.v2-argent-comptes { flex-wrap: wrap; }
+.v2-argent-comptes .v2-menu-sous, .v2-argent-comptes .v2-menu-lib { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; min-width: 0; }
+html[data-grand-texte] .v2-tete-argent .v2-titre-ligne { flex-wrap: wrap; row-gap: 8px; padding-right: 0; }
+html[data-grand-texte] .v2-tete-argent .v2-titre-ligne h1 { flex: 1 0 100%; padding-right: 56px; box-sizing: border-box; }
+.v2-pm-moi .v2-pm-av { background: var(--v2-teinte-fond); color: var(--v2-teinte-texte); font-weight: 600; }

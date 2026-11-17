@@ -54,10 +54,10 @@ function Barres({ barres, montant }) {
         return (
           <button key={b.cle} type="button" className="v2-ar-barre" data-courant={b.courant ? '' : undefined} data-vide={b.v == null ? '' : undefined}
             aria-pressed={i === choisi} aria-label={nom(b)} title={nom(b)} onClick={() => setChoisi(i)}>
-            <span className="v2-ar-barre-col">
-              {i === choisi ? <span className="v2-ar-barre-v" data-v2-argent-barre-v={cents(b.v)} style={{ bottom: `calc(${h}% + 4px)` }}>{texte(b)}</span> : null}
+            <span className="v2-ar-barre-col"><span className="v2-ar-barre-piste">
+              {i === choisi ? <span className="v2-ar-barre-v" data-v2-argent-barre-v={cents(b.v)} style={{ bottom: `calc(${b.v == null ? 0 : h}% + 4px)` }}>{texte(b)}</span> : null}
               <i style={{ height: b.v == null ? '100%' : `${h}%` }}/>
-            </span>
+            </span></span>
             <span className="v2-ar-barre-l" aria-hidden="true">{b.l}</span>
           </button>
         );

@@ -40,5 +40,5 @@ export default {
   "v2.ar.lecture": "Lecture des versements…",
   "v2.pm.chercher": "Chercher un réglage",
   "v2.ar.pasEncoreLu": "Pas encore lu : {quoi}",
-  "v2.fac.chercher": "N° d’article ou date de vente"
+  "v2.fac.chercher": "Chercher une facture"
 };

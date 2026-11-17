@@ -40,5 +40,5 @@ export default {
   "v2.ar.lecture": "Auszahlungen werden gelesen…",
   "v2.pm.chercher": "Einstellung suchen",
   "v2.ar.pasEncoreLu": "Noch nicht gelesen: {quoi}",
-  "v2.fac.chercher": "Artikel-Nr. oder Verkaufsdatum"
+  "v2.fac.chercher": "Rechnung suchen"
 };
