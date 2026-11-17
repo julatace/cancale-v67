@@ -1,0 +1,189 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   MAQUETTE O « GALERIE » — page autonome. Une galerie, pas un tableau de bord :
+   blanc de cimaise (noir la nuit), photos carrées bord à bord, coins droits partout,
+   étiquettes de musée, navigation en mots, un seul geste plein (une barre noire au pouce).
+   Typographie : Inter Display / SF Pro, trois tailles par écran (40 · 15 · 12), chiffres fins.
+   Aucune ombre au repos, aucun dégradé, aucune capsule. Ambre = geste ; rouge = deux paires sous un N°.
+   ════════════════════════════════════════════════════════════════════════════ */
+:root {
+  --fond: #FFFFFF; --encre: #111111; --gris: #6B6B70; --doux: #F3F3F3; --doux-2: #FAFAFA;
+  --silhouette: #B4B4B9; --ambre: #9E5700; --point: #E8920C; --rouge: #D0271D; --plein: #111111; --plein-encre: #FFFFFF;
+  --gout: 16px; --ease: cubic-bezier(0.23, 1, 0.32, 1); --tiroir: cubic-bezier(0.32, 0.72, 0, 1);
+  --affiche: -apple-system, 'SF Pro Display', 'Inter Display', 'Inter', system-ui, sans-serif;
+  --texte: -apple-system, 'SF Pro Text', 'Inter', system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="clair"]) { --fond: #000; --encre: #F5F5F7; --gris: #8E8E93; --doux: #151515; --doux-2: #0C0C0C; --silhouette: #45454B; --ambre: #F2A541; --point: #F2A541; --rouge: #FF5B4F; --plein: #F5F5F7; --plein-encre: #000; color-scheme: dark; } }
+:root[data-theme="sombre"] { --fond: #000; --encre: #F5F5F7; --gris: #8E8E93; --doux: #151515; --doux-2: #0C0C0C; --silhouette: #45454B; --ambre: #F2A541; --point: #F2A541; --rouge: #FF5B4F; --plein: #F5F5F7; --plein-encre: #000; color-scheme: dark; }
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; background: var(--fond); }
+body { margin: 0; background: var(--fond); color: var(--encre); font: 400 15px/20px var(--texte); letter-spacing: -0.005em; -webkit-font-smoothing: antialiased; font-feature-settings: 'tnum' 1; }
+button { font: inherit; color: inherit; background: none; border: 0; border-radius: 0; padding: 0; margin: 0; cursor: pointer; text-align: inherit; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--encre); outline-offset: 2px; }
+.g-fiche:focus { outline: none; }
+ul, dl, p, h1, h2 { margin: 0; padding: 0; list-style: none; }
+dd { margin: 0; }
+::selection { background: var(--encre); color: var(--fond); }
+
+/* ── La page ── */
+.g-entete { display: none; }
+.g-main { padding: calc(env(safe-area-inset-top, 0px) + 28px) var(--gout) 40px; }
+.a-dock .g-main { padding-bottom: 140px; }
+.g:not(.a-dock) .g-main { padding-bottom: 96px; }
+.g-tete { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; margin-bottom: 24px; }
+.g-sur { font-size: 12px; line-height: 16px; color: var(--gris); margin-bottom: 4px; }
+.g-titre { font: 600 40px/44px var(--affiche); letter-spacing: -0.035em; }
+.g-gris { color: var(--gris); }
+.g-encre { color: var(--encre); }
+.g-ambre { color: var(--ambre); font-weight: 600; }
+.g-point { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--point); margin-right: 6px; vertical-align: 2px; }
+.g-lien { min-height: 44px; font-size: 15px; font-weight: 500; text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+.g-choix { min-height: 44px; display: inline-flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 500; }
+.g-aide { width: 44px; height: 44px; background: var(--doux); font: 600 15px/1 var(--texte); text-align: center; }
+
+/* ── Les chiffres : fins, grands, posés sur le blanc comme des cartels ── */
+.g-chiffres { display: flex; gap: 32px; margin: 8px 0 40px; }
+.g-chiffres > div { display: flex; flex-direction: column-reverse; gap: 4px; }
+.g-chiffres dd { font: 300 40px/44px var(--affiche); letter-spacing: -0.035em; white-space: nowrap; }
+.g-chiffres dt { font-size: 12px; line-height: 16px; color: var(--gris); white-space: nowrap; }
+.g-chiffres--argent { flex-wrap: wrap; row-gap: 28px; }
+.g-chiffre-seul { flex-basis: 100%; }
+.g-sur-n { color: var(--gris); }
+
+.g-rubrique { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 44px; margin-bottom: 8px; }
+.g-rubrique h2 { font-size: 15px; line-height: 20px; font-weight: 600; }
+.g-rubrique > span { font-size: 12px; }
+
+/* ── La photo : carrée, coins droits, bord à bord ── */
+.g-photo { position: relative; display: block; width: 100%; aspect-ratio: 1; background: var(--doux); overflow: hidden; }
+.g-photo img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform 300ms var(--ease); }
+.g-photo[data-sans-photo] { display: grid; place-items: center; color: var(--silhouette); }
+.g-silhouette { width: 44%; height: auto; }
+.g-num { position: absolute; left: 0; bottom: 0; padding: 3px 7px; background: #fff; color: #111; font: 600 12px/16px var(--texte); letter-spacing: 0.01em; }
+.g-num.is-double { background: var(--rouge); color: #fff; }
+.g-num--plat { position: static; display: inline-block; background: var(--encre); color: var(--fond); margin-bottom: 12px; }
+.g-num--plat.is-double { background: var(--rouge); color: #fff; }
+
+/* ── La galerie ── */
+.g-grille { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px 2px; margin: 0 calc(-1 * var(--gout)); }
+.g-case { display: flex; flex-direction: column; width: 100%; gap: 6px; }
+.g-case:active .g-photo img { transform: scale(0.98); }
+.g-case.is-ouverte .g-photo { outline: 2px solid var(--encre); outline-offset: -2px; }
+.g-legende { display: flex; justify-content: space-between; align-items: baseline; gap: 4px; padding: 0 8px; font-size: 12px; line-height: 16px; white-space: nowrap; }
+.g-prix { font-size: 15px; line-height: 20px; font-weight: 500; }
+
+/* ── Outils d'Annonces : un champ, des mots soulignés ── */
+.g-outils { position: sticky; top: 0; z-index: 3; margin: 0 calc(-1 * var(--gout)) 12px; padding: 8px var(--gout) 0; background: var(--fond); }
+.g-champ { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 12px; background: var(--doux); color: var(--gris); }
+.g-champ input { flex: 1; min-width: 0; height: 100%; border: 0; background: none; outline: none; font: inherit; font-size: 16px; color: var(--encre); }
+.g-champ input::placeholder { color: var(--gris); }
+.g-champ input::-webkit-search-decoration { -webkit-appearance: none; }
+.g-onglets { display: flex; gap: 24px; margin-bottom: 16px; overflow-x: auto; scrollbar-width: none; }
+.g-outils .g-onglets { margin: 4px 0 0; }
+.g-onglets button { min-height: 44px; display: inline-flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 500; color: var(--gris); white-space: nowrap; box-shadow: inset 0 -2px 0 transparent; transition: color 160ms, box-shadow 160ms var(--ease); }
+.g-onglets button[aria-selected="true"] { color: var(--encre); box-shadow: inset 0 -2px 0 var(--encre); }
+.g-compte { font-size: 12px; color: var(--gris); }
+
+/* ── Les listes : la grande photo à gauche ── */
+.g-liste { display: flex; flex-direction: column; gap: 8px; }
+.g-ligne { display: flex; align-items: flex-start; gap: 16px; width: 100%; padding: 4px 0; content-visibility: auto; contain-intrinsic-size: auto 104px; }
+.g-ligne:active .g-photo img { transform: scale(0.97); }
+.g-photo--liste { width: 96px; height: 96px; flex: none; }
+.g-ligne-textes { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; padding-top: 2px; }
+.g-ligne-titre { font-size: 15px; line-height: 20px; font-weight: 500; overflow-wrap: anywhere; }
+.g-ligne-meta { font-size: 12px; line-height: 16px; }
+.g-ligne-prix { flex: none; font-size: 15px; line-height: 20px; font-weight: 500; padding-top: 2px; }
+.g-ligne--colis { align-items: center; }
+.g-qr { flex: none; width: 96px; height: 96px; padding: 8px; background: #fff; color: #111; }
+:root[data-theme="sombre"] .g-qr { background: #fff; }
+.g-qr svg, .g-fiche-qr svg { display: block; width: 100%; height: 100%; }
+.g-code { font: 300 40px/44px var(--affiche); letter-spacing: 0.01em; }
+.g-points { display: flex; flex-direction: column; gap: 32px; }
+
+/* ── Le bas : le geste plein (barre noire pleine largeur), puis la navigation en mots ── */
+.g-bas { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: var(--fond); }
+.g-plein { min-height: 56px; padding: 0 24px; background: var(--plein); color: var(--plein-encre); font-size: 15px; font-weight: 600; text-align: center; transition: opacity 120ms, transform 120ms var(--ease); }
+.g-plein:active, .g-touche:active { transform: scale(0.985); opacity: 0.88; }
+.g-plein--dock { display: block; width: 100%; }
+.g-navs--bas { display: grid; grid-template-columns: repeat(5, 1fr); padding-bottom: env(safe-area-inset-bottom, 0px); }
+.g-nav { position: relative; min-height: 52px; font-size: 12px; line-height: 16px; font-weight: 600; color: var(--gris); text-align: center; box-shadow: inset 0 2px 0 transparent; transition: color 160ms, box-shadow 160ms var(--ease); }
+.g-nav[aria-current="page"] { color: var(--encre); box-shadow: inset 0 2px 0 var(--encre); }
+.g-nav-long { display: none; }
+.g-point--nav { position: absolute; top: 14px; margin: 0; right: calc(50% - 32px); }
+.g-dock-ordi { display: none; }
+.g-touche { min-height: 56px; padding: 0 20px; background: var(--doux); font-size: 15px; font-weight: 600; text-align: center; }
+
+/* ── La fiche : plein écran, la photo d'abord ── */
+.g-fiche { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; background: var(--fond); animation: g-monte 340ms var(--tiroir); }
+@keyframes g-monte { from { transform: translateY(32px); opacity: 0; } }
+.a-fiche .g-bas, .a-fiche .g-main { visibility: hidden; }
+.g-fiche-defile { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
+.g-fiche-photo { position: relative; }
+.g-photo--grand .g-silhouette { width: 30%; }
+.g-fiche-qr { display: block; aspect-ratio: 1; padding: 22%; background: #fff; }
+.g-carre { position: absolute; top: calc(env(safe-area-inset-top, 0px) + 0px); width: 52px; height: 52px; display: grid; place-items: center; background: #fff; color: #111; }
+.g-carre--gauche { left: 0; }
+.g-carre--droite { right: 0; }
+.g-fiche-corps { padding: 24px var(--gout) 32px; }
+.g-fiche-titre { font: 600 28px/32px var(--affiche); letter-spacing: -0.03em; text-wrap: balance; }
+.g-fiche-titre.g-code { font: 300 40px/44px var(--affiche); letter-spacing: 0.01em; }
+.g-fiche-meta { font-size: 15px; line-height: 20px; margin-top: 8px; text-wrap: pretty; }
+.g-fiche-chiffres { display: flex; gap: 32px; margin-top: 28px; }
+.g-fiche-chiffres > div, .g-fiche-faits > div { display: flex; flex-direction: column-reverse; gap: 2px; }
+.g-fiche-chiffres dd { font-size: 15px; line-height: 20px; font-weight: 600; }
+.g-fiche-chiffres dt, .g-fiche-faits dt { font-size: 12px; line-height: 16px; color: var(--gris); }
+.g-fiche-faits { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 32px; margin-top: 28px; }
+.g-fiche-faits dd { font-size: 15px; line-height: 20px; overflow-wrap: anywhere; }
+.g-gestes { display: flex; padding-bottom: env(safe-area-inset-bottom, 0px); background: var(--fond); }
+.g-gestes > button { flex: 1 1 0; white-space: nowrap; }
+.g-gestes > .g-plein { flex-grow: 1.5; }
+
+/* ── L'ordinateur : une ligne de mots en haut, la galerie à six colonnes, la fiche en panneau ── */
+@media (min-width: 1000px) {
+  :root { --gout: 40px; }
+  .g-entete { position: sticky; top: 0; z-index: 6; display: flex; align-items: center; gap: 40px; height: 64px; padding: 0 var(--gout); background: var(--fond); }
+  .g-marque { font: 700 17px/1 var(--affiche); letter-spacing: 0.04em; }
+  .g-navs--haut { display: flex; gap: 28px; }
+  .g-navs--haut .g-nav { min-height: 64px; font-size: 15px; font-weight: 500; box-shadow: inset 0 -2px 0 transparent; }
+  .g-navs--haut .g-nav[aria-current="page"] { box-shadow: inset 0 -2px 0 var(--encre); }
+  .g-navs--haut .g-nav-court { display: none; }
+  .g-navs--haut .g-nav-long { display: inline; }
+  .g-navs--haut .g-point--nav { position: static; margin-left: 6px; vertical-align: 3px; }
+  .g-bas { display: none; }
+  .g-main, .a-dock .g-main, .g:not(.a-dock) .g-main { position: relative; padding: 32px var(--gout) 80px; }
+  .g-dock-ordi { display: block; position: absolute; top: 40px; right: var(--gout); }
+  .g-dock-ordi .g-plein { min-height: 48px; padding: 0 28px; }
+  .g-chiffres { gap: 72px; }
+  .g-chiffres--argent { flex-wrap: nowrap; }
+  .g-chiffre-seul { flex-basis: auto; }
+  .g-grille { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 24px 2px; }
+  .g-outils { position: static; display: flex; align-items: center; gap: 32px; margin: 0 0 20px; padding: 0; }
+  .g-champ { width: 360px; }
+  .g-outils .g-onglets { margin: 0; }
+  .g-onglets { gap: 32px; }
+  .g-liste { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 48px; }
+  .g-points { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px 48px; }
+  .g-points .g-liste { grid-template-columns: minmax(0, 1fr); }
+  .g-photo--liste, .g-qr { width: 112px; height: 112px; }
+  /* La fiche : un panneau à droite, la galerie reste visible et se resserre. */
+  .a-fiche .g-main { visibility: visible; margin-right: 440px; }
+  .a-fiche .g-grille { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .a-fiche .g-liste { grid-template-columns: minmax(0, 1fr); }
+  .a-fiche .g-dock-ordi { display: none; }
+  .g-fiche { inset: 64px 0 0 auto; width: 440px; background: var(--doux-2); animation: g-glisse 260ms var(--ease); }
+  @keyframes g-glisse { from { transform: translateX(24px); opacity: 0; } }
+  .g-fiche-corps { padding: 28px 32px; }
+  .g-fiche-qr { padding: 18%; }
+  .g-gestes { background: var(--doux-2); }
+}
+@media (hover: hover) and (pointer: fine) {
+  .g-case:hover .g-photo img, .g-ligne:hover .g-photo img { transform: scale(1.03); }
+  .g-nav:hover, .g-onglets button:hover { color: var(--encre); }
+  .g-plein:hover { opacity: 0.9; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .g-fiche { animation: g-fondu 180ms ease; }
+  @keyframes g-fondu { from { opacity: 0; } }
+  .g-photo img, .g-plein, .g-touche { transition: none; transform: none !important; }
+}
