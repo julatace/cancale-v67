@@ -1,0 +1,58 @@
+// fr · Ventes, nouveau design, phase 2 (17 nov.) : src/designV2/VentesV2.jsx.
+export default {
+  "v2v.imprimer": "Imprimer",
+  "v2v.imprimerN": {
+    "one": "Imprimer {n} bordereau",
+    "other": "Imprimer {n} bordereaux"
+  },
+  "v2v.imprimerCourt": "Imprimer {n}",
+  "v2v.choisir": "Choisir",
+  "v2v.vues": "Colis à envoyer, en route ou toutes les ventes",
+  "v2v.seg.envoyer": "À envoyer",
+  "v2v.seg.route": "En route",
+  "v2v.seg.toutes": "Toutes",
+  "v2v.affiche.mot": {
+    "one": "colis à envoyer",
+    "other": "colis à envoyer"
+  },
+  "v2v.rechercher": "N°, modèle, acheteur…",
+  "v2v.ecart.prets": {
+    "one": "{n} prêt à imprimer",
+    "other": "{n} prêts à imprimer"
+  },
+  "v2v.ecart.sans": {
+    "one": "{n} sans bordereau",
+    "other": "{n} sans bordereau"
+  },
+  "v2v.ecart.imprimes": {
+    "one": "{n} imprimé, à déposer",
+    "other": "{n} imprimés, à déposer"
+  },
+  "v2v.enRetard": "en retard",
+  "v2v.avantDemain": "avant demain soir",
+  "v2v.taille": "T. {t}",
+  "v2v.sansBordereau": "sans bordereau",
+  "v2v.g.presse": "Avant demain soir",
+  "v2v.g.semaine": "Cette semaine",
+  "v2v.g.plusTard": "Plus tard",
+  "v2v.g.estimee": "Date estimée",
+  "v2v.g.sansDate": "Sans date limite",
+  "v2v.g.imprimes": "Imprimés, à déposer",
+  "v2v.g.retour": "Retours",
+  "v2v.g.coche": "Déposés, pas encore vus partir",
+  "v2v.g.relais": "Au relais de l’acheteur",
+  "v2v.g.route": "En route",
+  "v2v.g.livre": "Livrés",
+  "v2v.vide.lecture": "Je lis tes ventes…",
+  "v2v.vide.recherche": "Aucun colis pour « {q} »",
+  "v2v.vide.envoyer": "Rien à envoyer",
+  "v2v.vide.route": "Aucun colis en route ces 45 derniers jours",
+  "v2v.outils.titre": "Colis",
+  "v2v.outils.choisir": "Choisir les bordereaux",
+  "v2v.outils.preparer": "Préparer mes colis",
+  "v2v.outils.deposer": "Je dépose",
+  "v2v.outils.tournee": "Tournée de dépôt",
+  "v2v.outils.emballer": "Emballer",
+  "v2v.outils.tous": "Tous les outils des colis",
+  "v2v.outils.masquer": "Masquer les outils des colis"
+};

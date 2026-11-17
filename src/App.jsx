@@ -1057,7 +1057,8 @@ import { useDesignV2, designV2Actif } from "./designV2/reglage.js";
 import AujourdhuiV2 from "./designV2/Aujourdhui.jsx";
 import { PassesRetrait as PassesRetraitV2, EnRouteListe as EnRouteListeV2 } from "./designV2/PassesRetrait.jsx";
 import MenuPlateformeV2 from "./designV2/MenuPlateforme.jsx";
-import { BoutonV2 } from "./designV2/BoutonV2.jsx";
+import { BoutonV2, BoutonIconeV2 } from "./designV2/BoutonV2.jsx";
+import { AfficheVentes as AfficheVentesV2, RechercheVentes as RechercheVentesV2, ListeEnvoyer as ListeEnvoyerBaseV2, ListeRoute as ListeRouteBaseV2 } from "./designV2/VentesV2.jsx";
 import { nombre as nombreV2 } from "./i18n/index.js";
 import LigneAnnonceV2 from "./designV2/LigneAnnonce.jsx";
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
@@ -20213,6 +20214,9 @@ const lireColisPretsBarre = () => { try { const v = load('vrm_colis_prets', null
 function portailSiV2(si, el) {
   return si ? createPortal(<div className="v2-feuille-hote is-ouverte" data-v2-feuille="outils">{el}</div>, document.body) : el;
 }
+// (17 nov., nouveau design — Ventes, phase 2) Les listes neuves de Ventes, avec la photo, les icônes et le glisser de l'app.
+function ListeEnvoyerV2(props) { return <ListeEnvoyerBaseV2 {...props} Photo={PhotoVinted} Icon={Icon} LigneGlissable={LigneGlissable}/>; }
+function ListeRouteV2(props) { return <ListeRouteBaseV2 {...props} Photo={PhotoVinted} Icon={Icon} LigneGlissable={LigneGlissable}/>; }
 function CacheSiV2({ si, children }) {
   return si ? <div className="v2-cache" hidden style={{ display: 'none' }}>{children}</div> : children;
 }
@@ -47810,6 +47814,71 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       return { ...x, quand: quandEnvoye({ depart, coche, vente }) };
     });
   };
+  // ── (17 nov., nouveau design — Ventes, phase 2) LES RANGÉES DE LA LISTE NEUVE. AUCUNE règle neuve : les MÊMES listes
+  // (`colisAEnvoyerListe` — la règle du nombre publié —, `listeEnvoyes`), les mêmes identités (le N° par `numForBord` /
+  // `effEntry`, la fiche par `attrsFicheLigne` comme la carte d'hier), les mêmes états (`pdf`, `bordsPrinted`, `e.lim`,
+  // `avantDemainColis`). On RANGE (groupe par échéance) et on NOMME ; src/designV2/VentesV2.jsx dessine.
+  const pseudoAcheteur = (o) => (o && (o.user_login || (o.buyer && o.buyer.login) || (o.opposite_user && o.opposite_user.login))) || '';
+  const ouvrirFicheV2 = (cle) => { try { const el = document.querySelector(`[data-v2v-ligne="${CSS.escape(cle)}"]`); const l = el ? lireLigne(el) : null; if (l) ouvrirLigne(l); } catch (_) {} };
+  // Le geste « Imprimer » d'une rangée : LE bouton de la carte d'hier (montée, cachée) — le même PDF, le même tampon.
+  const imprimerCarteV2 = (ident) => { try { const b = document.querySelector(`.v2-cache [data-colis-ident="${CSS.escape(ident)}"] button[data-imprime="1"]`); if (b) b.click(); } catch (_) {} };
+  const lignesEnvoyerV2 = () => {
+    const groupeDl = (dl) => (dl == null || !Number.isFinite(dl) ? 'sansDate' : dl <= 1 ? 'presse' : dl <= 7 ? 'semaine' : 'plusTard');
+    return colisAEnvoyerListe().map((e) => {
+      if (e.__autre) {
+        const site = { vc: 'vestiaire', eb: 'ebay', lbc: 'leboncoin' }[e.__autre] || e.__autre;
+        const x = e.x || {}, v = e.v || {}, o = e.o || {};
+        let num = '';
+        try { if (e.__autre === 'eb') num = x.ordre ? (numLigneEbay(x.ordre, (x.ordre.lineItems || [])[0]) || '') : '';
+          else if (e.__autre === 'lbc') { const f = x.itemId ? (load('vinted_annonce_numeros', {}) || {})[x.itemId] : null; num = f && f.numero != null ? String(f.numero).trim() : ''; }
+          else num = v.num || ''; } catch (_) { num = ''; }
+        const titre = e.__autre === 'vc' ? (v.titre || '') : (x.titre || o.title || '');
+        const photo = e.__autre === 'eb' ? (x.ordre ? photoCommande(x.ordre) : null) : e.__autre === 'lbc' ? photoArticle(o) : (v.photo || null);
+        const cle = String(e.key);
+        return { cle, site, titre, photo, num, prix: '', groupe: groupeDl(e.dl), fait: false, pret: null, imprime: false,
+          sous: [nomPlateforme(site)].filter(Boolean),
+          attrs: { 'data-colis-ident': cle, ...attrsFicheLigne({ contexte: 'colis', site, cle: 'c' + cle, nums: num ? [num] : [], photo: typeof photo === 'string' ? photo : '', titre }) },
+          plus: () => ouvrirFicheV2(cle) };
+      }
+      const o = e.o, b = e.b;
+      const photo = o ? orderPhoto(o) : bordPhoto(b);
+      const titre = o ? (o.title || '') : ((b && (b.modele || b.article)) || 'Bordereau');
+      const num = (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : '');
+      const capte = e.txn ? labelsCaptes[e.txn] : null;
+      const pdf = !!(b && b.hasPdf) || !!capte;
+      const imprime = !!((e.txn && bordsPrinted[e.txn]) || (b && isBordPrinted(b)));
+      const taille = o && typeof o.size_title === 'string' ? o.size_title : '';
+      const lue = !!(e.lim && e.lim.jour && e.lim.limite !== 'estimee');
+      const presse = avantDemainColis(e);
+      const retard = !!(e.lim && e.lim.retard);
+      const groupe = imprime ? 'imprimes' : presse ? 'presse' : (e.dl == null || !e.lim) ? 'sansDate' : !lue ? 'estimee' : e.dl <= 7 ? 'semaine' : 'plusTard';
+      const ident = 'v:' + (e.txn || e.key);
+      const lit = b && !e.venteEmail ? numLitige(b) : null;
+      return { cle: ident, site: 'vinted', titre, photo, num, groupe, fait: imprime, pret: pdf, imprime,
+        double: !!(num && conflitsNum.some((x) => String(x.numero) === String(num))),
+        prix: o && o.price ? montant(o.price, { etrangere: 'ecarter' }) : '',
+        sous: [retard ? tr('v2v.enRetard') : (imprime && presse ? tr('v2v.avantDemain') : ''), taille ? tr('v2v.taille', { t: taille }) : '', !pdf ? tr('v2v.sansBordereau') : '', pseudoAcheteur(o)].filter(Boolean),
+        sousAmbre: retard || (imprime && presse),
+        attrs: { 'data-colis-ident': ident, 'data-tx-colis': e.txn || '', 'data-v2v-pret': pdf ? '1' : '0', 'data-v2v-imprime': imprime ? '1' : '0',
+          ...attrsFicheLigne({ contexte: 'colis', site: 'vinted', cle: 'c' + (e.txn || e.key), nums: num ? [num] : [], tx: e.txn || '', photo: typeof photo === 'string' ? photo : '', titre, sous: '' }) },
+        imprimer: pdf ? () => imprimerCarteV2(ident) : null,
+        choisir: lit && b ? () => { setLinkPickFor(b); setLinkSearch(''); } : null,
+        plus: () => ouvrirFicheV2(ident) };
+    });
+  };
+  const lignesRouteV2 = (L) => (L || []).map((x) => {
+    const lab = x.st && x.st.label ? x.st.label : '';
+    const groupe = /Retour/.test(lab) ? 'retour' : x.type === 'coche' ? 'coche' : lab === 'Au relais' ? 'relais' : (lab === 'Livrée' || (x.lues && x.lues.livre)) ? 'livre' : 'route';
+    const o = x.o || null; const cle = String(x.cle);
+    const tx = o && o.transaction_id != null ? String(o.transaction_id) : '';
+    return { cle, site: x.site, titre: x.titre || '', photo: x.photo || null, num: x.num || '', groupe, fait: false,
+      prix: o && o.price ? montant(o.price, { etrangere: 'ecarter' }) : '',
+      sous: [x.tr && x.tr.nom ? x.tr.nom : '', x.site !== 'vinted' ? nomPlateforme(x.site) : '', pseudoAcheteur(o)].filter(Boolean),
+      sousAmbre: false,
+      attrs: { 'data-colis-ident': cle, 'data-v2v-parti': x.type === 'parti' ? lab : x.type,
+        ...attrsFicheLigne({ contexte: 'colis', site: x.site, cle: 'c' + (tx || cle), nums: x.num ? [x.num] : [], tx, photo: typeof x.photo === 'string' ? x.photo : '', titre: x.titre || '' }) },
+      plus: () => ouvrirFicheV2(cle) };
+  });
   // ── (11 nov., lot suivi-commandes) LE SUIVI D'UNE COMMANDE EN COURS ────────────────────────
   // Julien : « intègre les numéros de suivi sur les commandes en cours […] pour voir la
   // cohérence ». Le n° vient d'une IDENTITÉ prouvée (le bordereau de SA transaction, `b.suivi` ;
@@ -48610,6 +48679,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const lignesV2 = [];   // (17 nov.) les rangées neuves d'Annonces, remplies par la boucle de la grille d'hier (mêmes sources)
   // (17 nov.) Le nouveau design (essai, `vrm_design_v2`) : Ma journée devient « Aujourd'hui », Achats montre ses passes.
   const designV2 = useDesignV2();
+  // (17 nov., nouveau design — Ventes, phase 2) La recherche de la liste neuve, sa feuille « ⋯ », et la place du plein sur la
+  // ligne du titre (posée par la tête de la tâche, `data-v2-tete-plein`) : le plein y est rendu par portail.
+  const [rechV2, setRechV2] = useState('');
+  const [outilsV2, setOutilsV2] = useState(false);
+  const [slotPleinV2, setSlotPleinV2] = useState(null);
+  useEffect(() => {
+    if (!designV2 || colisDans !== 'ventes') { if (slotPleinV2) setSlotPleinV2(null); return; }
+    const el = document.querySelector('[data-v2-tete-plein="ventes"]');
+    if (el !== slotPleinV2) setSlotPleinV2(el && el.isConnected ? el : null);
+  });
   const [feuillePerso, setFeuillePerso] = useState(false);
   const ordiJournee = useOrdinateur();   // (14 nov., Studio) la grille de Ma journée : tassée au téléphone, dépliée dessous sur ordinateur
   // (11 nov., lot avis-negatif) Un avis de 3★ ou moins (seuil réglable) arrivé sur un compte : une carte AMBRE
@@ -55394,6 +55473,68 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // posé sur le fond (le même nombre publié, « — » pas su). Le plein et le papier descendent SOUS la liste (pied de
                 // la liste) ; les tuiles-filtres (Avant demain, transporteurs) vivent derrière « … » (et restent dites quand un
                 // filtre est posé) ; Scanner et « … » restent deux ronds, à droite du chiffre.
+                // (17 nov., nouveau design — Ventes, phase 2) ALLUMÉ : UN segmenté (À envoyer · En route · Toutes, les MÊMES onglets),
+                // le chiffre d'affiche « N colis à envoyer » (le nombre PUBLIÉ, « — » pas su, « au moins » partiel) et l'écart NOMMÉ,
+                // la recherche (le scanner dedans) et « ⋯ ». Le plein « Imprimer N bordereaux » monte sur la ligne du titre (portail
+                // dans la tête de la tâche) : le MÊME geste et le MÊME compte que le plein d'hier sous la liste (`resumeLot` des
+                // cases, `imprimerLot`, `ouvrirLot`). Éteint : rien de ceci.
+                if (!achatsSec && designV2) {
+                  const toutesSeules = ongletColis === 'toutes';
+                  const LV = lignesEnvoyerV2();
+                  const nSans = LV.filter((l) => l.pret === false && !l.imprime).length, nDeja = LV.filter((l) => l.imprime).length;
+                  const choixV = cochesEffectives(Ltous, cochesVentes); const defV = memeQueDefaut(Ltous, cochesVentes == null ? null : choixV);
+                  const nC = resumeLot(Ltous, choixV).partent;
+                  const choixRV = cochesEffectives(Lret, cochesRetours), nRV = selectionImprimable(Lret, choixRV).length, defRV = memeQueDefaut(Lret, cochesRetours == null ? null : choixRV);
+                  const occupe = !!batchBusy || !!imprBusy;
+                  const ecartV = nEnv == null ? '' : [nC > 0 ? tr('v2v.ecart.prets', { n: nC }) : '', nSans ? tr('v2v.ecart.sans', { n: nSans }) : '', nDeja ? tr('v2v.ecart.imprimes', { n: nDeja }) : ''].filter(Boolean).join(' · ');
+                  const pleinV = (
+                    <BoutonV2 role="principal" compact icone={<Icon name="printer" size={20}/>} chargement={occupe} indisponible={!occupe && nC + nRV === 0}
+                      titre={nC > 0 ? tr('vv.imprimer.titre', { n: nC }) : tr('vv.imprimer.aucun')}
+                      attrs={{ 'data-v2-principal': 'imprimer', 'data-colis-barre-btn': 'imprimer', 'data-imprimer-prets': nC, 'data-impr-lot': nC, 'data-impr-retours-coches': nRV, 'aria-label': nC > 0 ? tr('v2v.imprimerN', { n: nC }) : tr('vv.imprimer.aucun') }}
+                      onClick={() => { if (nC + nRV <= 0) return; if (defV && defRV) { if (nLot + nRetLot > 0) imprimerLot(); else ouvrirLot(); } else imprimerLot(choixV, { retours: choixRV }); }}>
+                      <span className="v2v-plein-long">{nC > 0 ? tr('v2v.imprimerN', { n: nC }) : tr('v2v.imprimer')}</span><span className="v2v-plein-court" aria-hidden="true">{nC > 0 ? tr('v2v.imprimerCourt', { n: nC }) : tr('v2v.imprimer')}</span>
+                    </BoutonV2>);
+                  const scanV = <button type="button" className="vrm-champ-recherche-bouton v2v-scan" data-v2v-scanner="" aria-label={tr('scan.r.bouton')} title={tr('scan.r.boutonTitre')} onClick={() => ouvrirRetrouver('ventes')}><Icon name="retrouver" size={19}/></button>;
+                  return (
+                    <div className="v2v-tete" id={ID_SECTION_COLIS.ventes} data-colis-section="ventes" data-colis-barre="" data-v2v-tete={toutesSeules ? 'toutes' : onglet}>
+                      {slotPleinV2 ? createPortal(pleinV, slotPleinV2) : <div className="v2v-plein-ici">{pleinV}</div>}
+                      <div className="v2-ann-segment v2v-segment" data-v2v-segment="">
+                        <Segmente label={tr('v2v.vues')} plein value={toutesSeules ? 'toutes' : onglet} onChange={(v) => onOngletColis && onOngletColis(v)}
+                          options={[{ v: 'envoyer', l: tr('v2v.seg.envoyer'), data: { 'data-v2v-seg': 'envoyer' } }, { v: 'envoyes', l: tr('v2v.seg.route'), data: { 'data-v2v-seg': 'envoyes' } }, { v: 'toutes', l: tr('v2v.seg.toutes'), data: { 'data-v2v-seg': 'toutes' } }]}/>
+                      </div>
+                      {!toutesSeules && onglet === 'envoyer' ? <AfficheVentesV2 n={nEnv} mot={tr('v2v.affiche.mot', { n: nEnv || 0 })} auMoins={envPartiel && nEnv != null ? tr('sv.auMoins') : ''} ecart={ecartV}
+                        attrs={{ 'data-v2v-affiche': nEnv == null ? '' : String(nEnv) }}/> : null}
+                      {!toutesSeules ? <RechercheVentesV2 champ={<ChampRecherche className="v2v-champ" valeur={rechV2} onChange={setRechV2} placeholder={tr('v2v.rechercher')} label={tr('v2v.rechercher')} fin={scanV} data-v2v-champ=""/>}
+                        plus={<BoutonIconeV2 icone={<Icon name="more" size={22}/>} label={tr('sv.outils')} actif={!!outilsColis} onClick={() => setOutilsV2(true)} attrs={{ 'data-v2v-plus': '' }}/>}/> : null}
+                      {/* « ⋯ » : une FEUILLE (portail) — les gestes d'hier, chacun le même : choisir les bordereaux, le papier, préparer,
+                          déposer, emballer, la tournée, scanner un envoi, et « Tous les outils » (la rangée d'hier, sous la tête). */}
+                      {outilsV2 ? createPortal(<div className="v2-feuille-hote is-ouverte" data-v2-feuille="ventes-outils">
+                        <FermeAuRetour fermer={() => setOutilsV2(false)}/>
+                        <div className="v2-voile" onClick={() => setOutilsV2(false)} aria-hidden="true"/>
+                        <div className="v2-feuille v2-outils-feuille" role="dialog" aria-modal="true" aria-label={tr('v2v.outils.titre')}>
+                          <div className="v2-feuille-tete"><span className="v2-feuille-poignee" aria-hidden="true"/><h2 className="v2-feuille-titre">{tr('v2v.outils.titre')}</h2>
+                            <BoutonIconeV2 icone={<Icon name="close" size={22}/>} label={tr('v2.menu.fermer')} onClick={() => setOutilsV2(false)} attrs={{ 'data-v2-feuille-fermer': '' }}/></div>
+                          <div className="v2-feuille-corps v2-ann-menu">
+                            {[
+                              resLot.total > 0 ? { k: 'choisir', icon: 'check', lab: resLot.autres > 0 ? tr('impr.choisirAutres', { n: resLot.autres }) : tr('v2v.outils.choisir'), on: ouvrirLot, attrs: { 'data-lot-ouvrir': '1' } } : null,
+                              resLot.total > 0 || Lret.length > 0 ? { k: 'papier', icon: 'printer', lab: tr('vv.format'), val: tr(`impr.format.${formatLot}`), on: () => setChoixPapier({ puis: null }), attrs: { 'data-impr-format': formatLot } } : null,
+                              (nEnv || 0) > 0 ? { k: 'preparer', icon: 'box', lab: tr('v2v.outils.preparer'), on: () => setPreparerOuvert(true) } : null,
+                              (nEnv || 0) > 0 ? { k: 'deposer', icon: 'scan', lab: tr('v2v.outils.deposer'), on: () => setDepotOuvert(true) } : null,
+                              (nEnv || 0) > 0 ? { k: 'tournee', icon: 'pin', lab: tr('v2v.outils.tournee'), on: () => setTourneeDepot(true) } : null,
+                              nPrets > 0 ? { k: 'emballer', icon: 'box', lab: tr('v2v.outils.emballer'), on: () => setEmballage(true) } : null,
+                              { k: 'scanner', icon: 'scan', lab: tr('sv.scanner.envoi'), on: () => setScanOuvert('envoi') },
+                              { k: 'tous', icon: 'more', lab: outilsColis ? tr('v2v.outils.masquer') : tr('v2v.outils.tous'), on: () => setOutilsColis((v) => !v) },
+                            ].filter(Boolean).map((t) => (
+                              <button key={t.k} type="button" className="vrm-annbar-outil" data-v2v-outil={t.k} {...(t.attrs || {})} onClick={() => { setOutilsV2(false); t.on(); }}>
+                                <span aria-hidden="true" className="vrm-annbar-outil-icone"><Icon name={t.icon} size={18}/></span>
+                                <span className="vrm-annbar-outil-mot">{t.lab}</span>
+                                {t.val ? <span className="vrm-annbar-outil-n" style={{ marginLeft: 'auto' }}>{t.val}</span> : null}
+                              </button>))}
+                          </div>
+                        </div>
+                      </div>, document.body) : null}
+                    </div>);
+                }
                 if (!achatsSec) {
                   const toutesSeules = ongletColis === 'toutes';
                   const filtreActif = filtreEnvoyer && filtreEnvoyer !== 'tous';
@@ -55486,6 +55627,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 : [['imprimer', nPrets === nLot ? 0 : nPrets, 'à imprimer'], (() => { const d = gestesDepuis(shipDone, m0.getTime()); return ['deposes', d, d > 1 ? 'déposés aujourd’hui' : 'déposé aujourd’hui']; })()];
               const vus = parts.filter((x) => x[1] > 0);
               if (!vus.length) return null;
+              // (17 nov., nouveau design) Ventes : l'écart est nommé sous le chiffre d'affiche (« 3 imprimés, à déposer ») : pas redit.
+              if (designV2 && colisDans === 'ventes') return null;
               return <VersAFaire><p className="vrm-colis-resume" data-colis-resume={colisDans}>{vus.map((x, i) => <span key={x[0]} data-colis-resume-case={x[0]} data-n={String(x[1])}>{i ? ' · ' : ''}{x[1]} {x[2]}</span>)}</p></VersAFaire>; })() : null}
             {!baseKO && !colisDans && onglet !== 'retirer' && (() => { const m0 = new Date(); m0.setHours(0, 0, 0, 0); const deposes = gestesDepuis(shipDone, m0.getTime());
               // (3 nov., carte réglable par page) Défaut = la carte d'avant : « à poster » (la publication
@@ -55527,9 +55670,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {/* (14 nov., refonte des listes — AJOUT 3) Au téléphone, « 15 à imprimer », « N à envoyer en priorité »,
                   « Préparer mes colis · Je dépose » et la tournée vivent dans « • À faire · N » (src/ui/AFaire.jsx) : la
                   1re vente à expédier monte dans la moitié haute de l'écran. Mêmes éléments, mêmes gestes. */}
-              <AFaireLigne capsule seulement="telephone" className="vrm-colis-afaire"/>
+              {designV2 && colisDans === 'ventes' ? null : <AFaireLigne capsule seulement="telephone" className="vrm-colis-afaire"/>}
             </div>
-            <AFaireLigne seulement="ordinateur" className="vrm-colis-afaire"/>
+            {designV2 && colisDans === 'ventes' ? null : <AFaireLigne seulement="ordinateur" className="vrm-colis-afaire"/>}
             {/* (3 nov.) Les puces du haut : « N en route » (achats dont Vinted ne dit pas encore le point — la liste
                 au toucher) et « N comptes à relire » (la fraîcheur des lectures, `FraicheurDonnees` — elle ouvre
                 les comptes). Remplacent les bandeaux de texte du bas de l'écran. */}
@@ -56319,7 +56462,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   return <CaseCoche coche={ok && cochesVues.has(l.cle)} desactive={!ok} label={ok ? tr('vv.coche.label', { titre: String(titreC || '') }) : tr('vv.coche.sansBordereau', { titre: String(titreC || '') })}
                     onBascule={() => setCochesVentes((c) => basculerCoche(Ltous, c, l.cle))} attrs={{ 'data-vv-coche': String(cle), 'data-vv-coche-on': ok && cochesVues.has(l.cle) ? '1' : '0' }}/>; };
                 const empl = (num) => { try { return emplacementVente(num ? ouDansMeubles(num) : null); } catch (_) { return null; } };
-                return <>{lignePasLus}<div className={'vrm-colis-grille' + (enVentes ? ' vv-liste' : '')} data-cible="colonne:prets colonne:attente" data-colis-lignes="1" style={{display:'flex',flexDirection:'column',gap:6}}>{enVentes ? <div className="vv-tab-tete" aria-hidden="true"><span/><span/><span>{tr('vv.col.paire')}</span><span>{tr('vv.col.limite')}</span><span>{tr('vv.col.ou')}</span><span>{tr('vv.col.transport')}</span><span>{tr('vv.col.montant')}</span></div> : null}{(colisTous ? exT : exT.slice(0, 24)).map((e,ix)=>{
+                // (17 nov., nouveau design — Ventes, phase 2) ALLUMÉ : la liste neuve, groupée par échéance (src/designV2/VentesV2.jsx),
+                // des MÊMES colis (`lignesEnvoyerV2` : la règle du nombre publié). Les cartes d'hier restent MONTÉES, cachées : leurs
+                // gestes vivent dans la fiche (`DansFiche`) et « Imprimer » d'une rangée touche LEUR bouton.
+                const v2Liste = designV2 && enVentes ? <ListeEnvoyerV2 lignes={lignesEnvoyerV2()} q={rechV2} pasLus={lignePasLus} lu={!voitSite('vinted') || (Array.isArray(sales.items) && !sales.loading)}
+                  retours={Lret.length ? <RetoursLot lignes={Lret} coches={cochesEffectives(Lret, cochesRetours)} onBascule={(cle) => setCochesRetours((c) => basculerCoche(Lret, c, cle))} Case={CaseCoche}/> : null}/> : null;
+                return <>{v2Liste ? null : lignePasLus}<CacheSiV2 si={!!v2Liste}><div className={'vrm-colis-grille' + (enVentes ? ' vv-liste' : '')} data-cible="colonne:prets colonne:attente" data-colis-lignes="1" style={{display:'flex',flexDirection:'column',gap:6}}>{enVentes ? <div className="vv-tab-tete" aria-hidden="true"><span/><span/><span>{tr('vv.col.paire')}</span><span>{tr('vv.col.limite')}</span><span>{tr('vv.col.ou')}</span><span>{tr('vv.col.transport')}</span><span>{tr('vv.col.montant')}</span></div> : null}{(colisTous ? exT : exT.slice(0, 24)).map((e,ix)=>{
                 const ouvreSansDate = ix === iSansDateEnv ? <LigneSansDate n={nSansDateEnv}/> : null;
                 const quandE = quandColisAEnvoyer(e);
                 if (e.__autre) return (
@@ -56620,11 +56768,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <span className="vv-format-l"><IconeV nom="printer" taille={18} trait={1.9}/>{tr('vv.format')}</span>
                 <b className="vv-format-v">{tr(`impr.format.${formatLot}`)}<IconeV nom="chevron" taille={14} trait={2.2}/></b>
               </button> : null}
-              </div>
+              </div></CacheSiV2>{v2Liste}
               {/* LE PLEIN de l'écran, sous la liste (maquette) : « Imprimer les N bordereaux » = les colis COCHÉS. Le même geste
                   qu'avant (`imprimerLot`) : rien touché ⇒ le lot d'office (le PDF préparé d'avance part dans CE toucher) ;
                   une case décochée ⇒ SA sélection. Les data-* d'avant (`data-imprimer-prets`, `data-impr-lot`…) suivent le compte. */}
-              {enVentes && (resLot.total > 0 || Lret.length > 0) ? (() => {
+              {!v2Liste && enVentes && (resLot.total > 0 || Lret.length > 0) ? (() => {
                 const choix = cochesEffectives(Ltous, cochesVentes); const defaut = memeQueDefaut(Ltous, cochesVentes == null ? null : choix);
                 const nC = resumeLot(Ltous, choix).partent;
                 // (16 nov.) Les retours cochés partent avec (compteur à part) ; leur choix suit leurs cases.
@@ -56728,6 +56876,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             <RetoursEnCoursBloc res={retoursSuivis} site={siteColis} nomCompte={accNameOf} plusieursComptes={(accounts||[]).length>1} onRecu={basculerRetourRecu} onRemettre={remettreEnStock} onMasquer={masquerRetour} onAnnulerRemise={annulerRemise} onRemettreEnLigne={remettreRetourEnLigne}/>
           </>;
           const L = listeEnvoyes().filter((x) => !(x.site === 'vinted' && x.o && retoursTx.has(String(x.o.transaction_id))));
+          if (!L.length && designV2 && colisDans === 'ventes') return <ListeRouteV2 lignes={[]} q={rechV2} avant={retoursHaut}/>;
           if (!L.length) return <>{retoursHaut}<div className="vrm-colis-vide-envoi" data-colis-envoyes="0" data-colis-partis="0"><span className="vrm-colis-vide-titre">Aucun colis envoyé</span><span className="vrm-colis-vide-sous">Ces {LIMITE_ENVOYES_J} derniers jours. Un colis « Déposé » arrive ici.</span></div></>;
           const plusieursComptes = (accounts || []).length > 1;
           // (9 nov., Julien : « mets le plus récent en haut, comme pour tous les onglets ») UNE liste,
@@ -56752,8 +56901,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             if (x.type === 'transp') return { t: `${x.depart.phrase}${x.j != null ? ` · ${x.j === 0 ? 'vendue aujourd’hui' : `vendue il y a ${x.j} j`}` : ''}`, ambre: false };
             return { t: `Leboncoin · ${lbcExpediee(x.lo) ? (x.lo.stepLabel || 'en livraison') : 'coché « Colis fait »'}`, ambre: false };
           };
+          // (17 nov., nouveau design — Ventes, phase 2) ALLUMÉ : « En route » en rangées A, groupées par état (la MÊME liste,
+          // `listeEnvoyes`) ; les cartes d'hier restent montées, cachées (leurs gestes : « Pas encore posté », la fiche).
+          const v2Route = designV2 && colisDans === 'ventes';
           return (
-            <>{retoursHaut}<section className="vrm-colis-envoyes" data-cible="colonne:partis" data-colis-envoyes={L.length} data-colis-partis={L.length} data-partis-coches={postes.length} data-cc-colonne="partis" data-au-relais={nbAuRelais} data-envoyes-tri="recent" data-envoyes-filtre={filtreT}>
+            <>{v2Route ? <ListeRouteV2 lignes={lignesRouteV2(L)} q={rechV2} avant={retoursHaut}/> : retoursHaut}<CacheSiV2 si={v2Route}><section className="vrm-colis-envoyes" data-cible="colonne:partis" data-colis-envoyes={L.length} data-colis-partis={L.length} data-partis-coches={postes.length} data-cc-colonne="partis" data-au-relais={nbAuRelais} data-envoyes-tri="recent" data-envoyes-filtre={filtreT}>
               {pastillesT.length > 1 && (
                 <div className="vrm-rangee vrm-filtres" role="group" aria-label="Filtrer par transporteur" data-envoyes-filtres="" style={{display:'flex',gap:6,marginBottom:10}}>
                   <button type="button" aria-pressed={filtreT === 'tous'} data-envoyes-filtre-choix="tous" data-envoyes-filtre-n={L.length} onClick={() => setFiltreEnvoyes('tous')} style={{whiteSpace:'nowrap',flexShrink:0,padding:'7px 14px',fontSize:12,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Tous · {L.length}</button>
@@ -56826,7 +56978,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   );
                 })}
               </div>
-            </section></>
+            </section></CacheSiV2></>
           );
         })()}
       </>)}
@@ -62079,6 +62231,10 @@ function AppCoeur() {
     if(reprise0.sub) return reprise0.sub;
     return estTacheSite(reprise0.tab)?(filtreRetenuCompte(reprise0.tab)||siteDeTache(reprise0.tab,null)):'ventes';
   });
+  // (17 nov., nouveau design — Ventes, phase 2) Ventes au téléphone, quand l'écran porte ses colis (sa propre recherche) : la tête
+  // de la coque ne prend plus de bande, comme Annonces (la cloche seule, posée sur la ligne du titre).
+  const v2VentesColis = designV2App && tab === 'ventes' && (() => { const st = siteDeTache('ventes', platSub), sc = sectionDeTache('ventes', platSub), so = sousSections('ventes', st); return st !== 'leboncoin' && (!so || sc === 'ventes'); })();
+  const v2Tete = v2Ann || (v2VentesColis && !ordi);
   // (2 nov.) Colis : « À envoyer » / « À retirer ». `ongletColis` = le choix
   // (son toucher, ou un lien « à retirer » : `retraits`, une carte de Ma journée,
   // une notification) ; null ⇒ l'écran choisit (l'onglet qui a de l'urgent).
@@ -65170,12 +65326,16 @@ function AppCoeur() {
         {/* (17 nov., nouveau design) Allumé : une tête À SOI (`v2-tete-tache`) — les règles d'hier réservaient 150 px à droite
             pour « À faire » et coupaient le titre ; éteint, la tête d'hier, inchangée. */}
         <header className={designV2App ? 'v2-tete-tache' : 'vrm-market-heading vrm-tache-tete'} data-tache-tete={t}>
-          {t === 'ventes' ? <span className="vrm-fu-date-tete" data-date-tete="">{dateJourFr(new Date())}</span> : null}
+          {t === 'ventes' && !(designV2App && v2VentesColis && !baseKO) ? <span className="vrm-fu-date-tete" data-date-tete="">{dateJourFr(new Date())}</span> : null}
           {designV2App && t === 'annonces' && !baseKO
             /* (17 nov., nouveau design) Annonces : la liste d'abord — le geste plein est COMPACT, en haut à droite de la ligne du
                titre (« Publier » : le geste du disque d'hier, `vrm:publier-ailleurs`), jamais posé sur la liste. */
             ? <div className="v2-titre-ligne"><h1>{TITRES_TACHE[t]}</h1><BoutonV2 role="principal" compact icone={<Icon name="plus" size={20}/>} attrs={{ 'data-v2-principal': 'publier' }}
                 onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:publier-ailleurs', { detail: {} })); } catch (_) {} }}>{tr('v2.ann.publierCourt')}</BoutonV2></div>
+            : designV2App && t === 'ventes' && v2VentesColis && !baseKO
+            /* (17 nov., nouveau design — Ventes, phase 2) Le plein « Imprimer N bordereaux » sur la ligne du titre : rendu par l'écran
+               des colis (Comptabilite, son compte et son geste) dans cette place, par portail. */
+            ? <div className="v2-titre-ligne v2v-titre-ligne"><h1>{TITRES_TACHE[t]}</h1><span className="v2v-tete-plein" data-v2-tete-plein="ventes"/></div>
             : <h1>{TITRES_TACHE[t]}</h1>}
           {/* (17 nov., nouveau design) PLATEFORME + COMPTE = UN MENU sous le grand titre : les mêmes contrôles qu'avant
               (FiltreSites, SelecteurCompte), dans sa feuille. Éteint : rien de ceci n'est rendu. */}
@@ -65196,7 +65356,7 @@ function AppCoeur() {
             <Rond icone="plus" label={tr('v2.ann.publierCourt')} titre={tr('v2.ann.publier')} onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:publier-ailleurs', { detail: {} })); } catch (_) {} }} attrs={{ 'data-v2-principal': 'publier' }}/>
           </span> : null}
           {/* (15 nov.) Scanner pour retrouver : le code-barres d'un colis ⇒ SA vente, SON achat (src/ScannerRetrouver.jsx). */}
-          {(t === 'ventes' || t === 'achats') && !baseKO ? <span className="vrm-tache-retrouver" data-scan-retrouver-hote={t}>
+          {(t === 'ventes' || t === 'achats') && !baseKO && !(t === 'ventes' && v2VentesColis) ? <span className="vrm-tache-retrouver" data-scan-retrouver-hote={t}>
             <Rond icone="retrouver" label={tr('scan.r.bouton')} titre={tr('scan.r.boutonTitre')} onClick={() => ouvrirRetrouver(t)} attrs={{ 'data-scan-retrouver-bouton': t }}/>
           </span> : null}
         </header>
@@ -66079,7 +66239,7 @@ function AppCoeur() {
           (styles-coque.css) : téléphone = barre transparente qui prend son verre
           et son filet au défilement (`is-defile`) ; ordinateur = île discrète en
           haut à droite. Ici seulement la structure et la position. */}
-      <header className={`vrm-app-header${defile ? ' is-defile' : ''}${v2Ann ? ' v2-entete-cloche' : ''}`} ref={ileRef} data-defile-tete={defile ? '1' : '0'} style={{position: ordi ? 'fixed' : v2Ann ? 'absolute' : 'sticky',top: ordi ? 12 : v2Ann ? 6 : 0,right: ordi ? 24 : v2Ann ? 12 : undefined,...(v2Ann ? { left: 'auto', width: 'auto', background: 'transparent' } : null),zIndex:50}}>
+      <header className={`vrm-app-header${defile ? ' is-defile' : ''}${v2Tete ? ' v2-entete-cloche' : ''}`} ref={ileRef} data-defile-tete={defile ? '1' : '0'} style={{position: ordi ? 'fixed' : v2Tete ? 'absolute' : 'sticky',top: ordi ? 12 : v2Tete ? 6 : 0,right: ordi ? 24 : v2Tete ? 12 : undefined,...(v2Tete ? { left: 'auto', width: 'auto', background: 'transparent' } : null),zIndex:50}}>
         {/* ⚠️ `display:none` sur ordinateur, pas `visibility:hidden` : un bloc
             invisible occupe quand même sa largeur, et l'île ferait 400 px. */}
         <div className="vrm-header-brand" style={{display: ordi ? 'none' : undefined}}>
@@ -66123,7 +66283,7 @@ function AppCoeur() {
             {((!reglesStream.bouton && !streamOn) || montantsCaches) && (ordi || montantsCaches) ? <BoutonMontants/> : null}
             {/* (5 nov.) La cloche : ce que VRM a envoyé (src/CentreNotifs.jsx). */}
             {AUTH.user && <CentreNotifsCoque onReglages={()=>setTab('settings')} enTete={(fermer)=>!baseKO && !horsLigne ? <Suspense fallback={null}><LigneFraicheurParesseuse baseKO={baseKO} comptes={vintedAccounts} publier={false} onNav={(t)=>{ fermer(); setTab(t); }}/></Suspense> : null}/>}
-            {!ordi && !v2Ann && <button className="vrm-hbtn" type="button" data-recherche-zone="" data-recherche-loupe="" data-recherche-loupe-voix={DICTEE_OK && !VOIX.refus ? '1' : '0'}
+            {!ordi && !v2Tete && <button className="vrm-hbtn" type="button" data-recherche-zone="" data-recherche-loupe="" data-recherche-loupe-voix={DICTEE_OK && !VOIX.refus ? '1' : '0'}
               onPointerDown={(e)=>{ if(!DICTEE_OK || VOIX.refus || (e.button!=null && e.button!==0)) return; clearTimeout(appuiLoupe.current.t); appuiLoupe.current.long=false;
                 appuiLoupe.current.t=setTimeout(()=>{ appuiLoupe.current.long=true; flushSync(()=>setGsOpen(true)); if(!ecouteEnCours('loupe')) dicterLoupe(); }, 550); }}
               onPointerUp={()=>clearTimeout(appuiLoupe.current.t)} onPointerCancel={()=>clearTimeout(appuiLoupe.current.t)} onPointerLeave={()=>clearTimeout(appuiLoupe.current.t)}
@@ -66132,7 +66292,7 @@ function AppCoeur() {
               <Icon name="search" size={21}/>
             </button>}
             {/* (11 nov., lot DJ6) Au téléphone, la photo du profil ferme l'en-tête : elle ouvre le menu du profil (Paramètres…). */}
-            {!ordi && MULTI_USER && !v2Ann && <BoutonProfilTete/>}
+            {!ordi && MULTI_USER && !v2Tete && <BoutonProfilTete/>}
             {/* Messages et Paramètres retirés de l'en-tête (Julien, 16 oct.) : ils sont
                 dans la navigation (rail, menu « Ton espace ») — deux portes de trop. */}
             </>); })()}

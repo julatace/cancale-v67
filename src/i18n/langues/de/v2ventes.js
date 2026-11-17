@@ -1,0 +1,58 @@
+// de · Ventes, nouveau design, phase 2 (17 nov.) : src/designV2/VentesV2.jsx.
+export default {
+  "v2v.imprimer": "Drucken",
+  "v2v.imprimerN": {
+    "one": "{n} Etikett drucken",
+    "other": "{n} Etiketten drucken"
+  },
+  "v2v.imprimerCourt": "{n} drucken",
+  "v2v.choisir": "Wählen",
+  "v2v.vues": "Zu versendende Pakete, unterwegs oder alle Verkäufe",
+  "v2v.seg.envoyer": "Zu versenden",
+  "v2v.seg.route": "Unterwegs",
+  "v2v.seg.toutes": "Alle",
+  "v2v.affiche.mot": {
+    "one": "Paket zu versenden",
+    "other": "Pakete zu versenden"
+  },
+  "v2v.rechercher": "Nr., Modell, Käufer…",
+  "v2v.ecart.prets": {
+    "one": "{n} druckbereit",
+    "other": "{n} druckbereit"
+  },
+  "v2v.ecart.sans": {
+    "one": "{n} ohne Etikett",
+    "other": "{n} ohne Etikett"
+  },
+  "v2v.ecart.imprimes": {
+    "one": "{n} gedruckt, abzugeben",
+    "other": "{n} gedruckt, abzugeben"
+  },
+  "v2v.enRetard": "verspätet",
+  "v2v.avantDemain": "bis morgen Abend",
+  "v2v.taille": "Gr. {t}",
+  "v2v.sansBordereau": "ohne Etikett",
+  "v2v.g.presse": "Bis morgen Abend",
+  "v2v.g.semaine": "Diese Woche",
+  "v2v.g.plusTard": "Später",
+  "v2v.g.estimee": "Geschätztes Datum",
+  "v2v.g.sansDate": "Ohne Frist",
+  "v2v.g.imprimes": "Gedruckt, abzugeben",
+  "v2v.g.retour": "Rücksendungen",
+  "v2v.g.coche": "Abgegeben, noch nicht unterwegs",
+  "v2v.g.relais": "Am Abholpunkt des Käufers",
+  "v2v.g.route": "Unterwegs",
+  "v2v.g.livre": "Zugestellt",
+  "v2v.vide.lecture": "Deine Verkäufe werden gelesen…",
+  "v2v.vide.recherche": "Kein Paket für „{q}“",
+  "v2v.vide.envoyer": "Nichts zu versenden",
+  "v2v.vide.route": "Kein Paket unterwegs in den letzten 45 Tagen",
+  "v2v.outils.titre": "Pakete",
+  "v2v.outils.choisir": "Etiketten auswählen",
+  "v2v.outils.preparer": "Meine Pakete vorbereiten",
+  "v2v.outils.deposer": "Ich gebe ab",
+  "v2v.outils.tournee": "Abgaberunde",
+  "v2v.outils.emballer": "Verpacken",
+  "v2v.outils.tous": "Alle Paket-Werkzeuge",
+  "v2v.outils.masquer": "Paket-Werkzeuge ausblenden"
+};

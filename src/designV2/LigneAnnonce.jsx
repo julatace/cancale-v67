@@ -33,16 +33,19 @@ function Faits({ num, taille, jours, Plaque, sep = ' · ' }) {
 }
 
 // La plaque N° d'une rangée, À SOI (les règles d'hier allumaient `.sb-plaque` en blanc la nuit) : gravée dans la surface.
-function PlaqueV2({ num }) { return <span className="v2-plaque" data-v2-plaque={num}><small>N°</small>{num}</span>; }
+function PlaqueV2({ num, double = false }) { return <span className={'v2-plaque' + (double ? ' is-double' : '')} data-v2-plaque={num}><small>N°</small>{num}</span>; }
 
 export default function LigneAnnonce({ variante = 'A', attrs = {}, cle, photo, Photo, Icon, Plaque, titre, num, taille, jours, prix, favoris = null, vues = null,
-  aRelier = false, relierMot = false, onRelier, onPlus, LigneGlissable }) {
+  aRelier = false, relierMot = false, onRelier, onPlus, LigneGlissable,
+  // (17 nov., Ventes) La MÊME rangée A pour un colis : `sous` remplace « T · j » (« T. 42 · acheteur »), `gestes` ses
+  // actions de glisser, `double` le N° porté par deux paires (le seul rouge), `fait` le mouvement « fait » (coche, repli).
+  sous = null, sousAmbre = false, gestes = null, double = false, fait = false }) {
   const plus = () => onPlus && onPlus();
-  const actions = [
+  const actions = gestes || [
     aRelier ? { cle: 'relier', libelle: tr('v2.l.relier'), icone: <Icon name="link" size={20}/>, faire: () => onRelier && onRelier(), data: { 'data-v2l-glisse': 'relier' } } : null,
     { cle: 'plus', libelle: tr('v2.l.plus'), icone: <Icon name="more" size={20}/>, faire: plus, data: { 'data-v2l-glisse': 'plus' } },
   ].filter(Boolean);
-  const aria = [num ? 'N° ' + num : '', titre, prix, aRelier ? tr('v2.l.aRelier') : ''].filter(Boolean).join(' · ');
+  const aria = [num ? 'N° ' + num : '', titre, prix, ...(sous || []), aRelier ? tr('v2.l.aRelier') : ''].filter(Boolean).join(' · ');
   // « à relier » : sur un vrai compte, la plupart des paires n'ont pas d'achat relié — l'ambre partout ne dirait plus rien.
   // Le mot ambre seulement dans la vue « Sans achat relié » (`relierMot`) ; ailleurs, une petite icône de lien, neutre.
   const relier = !aRelier ? null : relierMot ? <span className="v2l-geste" data-v2l-relier="mot"><i className="v2-point" aria-hidden="true"/>{tr('v2.l.aRelier')}</span>
@@ -69,12 +72,14 @@ export default function LigneAnnonce({ variante = 'A', attrs = {}, cle, photo, P
       {tiroir}
     </div>
   ) : (
-    <div className="v2l v2l-a" data-v2l="A" role="listitem" aria-label={aria} {...attrs} {...(gp || {})}>
+    <div className={"v2l v2l-a" + (fait ? " is-part" : "")} data-v2l="A" role="listitem" aria-label={aria} {...attrs} {...(gp || {})}>
       <Vignette photo={photo} Photo={Photo} Icon={Icon} cls="v2l-photo-a"/>
       <span className="v2l-a-txt">
         <span className="v2l-a-l1"><span className="v2l-a-titre">{titre}</span><span className="v2l-a-prix">{prix || '—'}</span></span>
-        <span className="v2l-a-l2"><Faits num={num} taille={taille} jours={jours} Plaque={Plaque}/>{relier}</span>
+        {sous ? <span className="v2l-a-l2">{num ? <PlaqueV2 num={num} double={double}/> : null}{sous.length ? <span className={'v2l-faits-txt' + (sousAmbre ? ' is-ambre' : '')}>{(num ? ' · ' : '') + sous.join(' · ')}</span> : null}</span>
+          : <span className="v2l-a-l2"><Faits num={num} taille={taille} jours={jours} Plaque={Plaque}/>{relier}</span>}
       </span>
+      {fait ? <span className="v2l-coche" aria-hidden="true"><Icon name="check" size={18}/></span> : null}
       {tiroir}
     </div>
   );

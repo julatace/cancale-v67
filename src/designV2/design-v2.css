@@ -423,3 +423,61 @@ html[data-design="v2"] body .vrm-app-header .vrm-header-actions { gap: 8px !impo
 .v2l-c-txt { gap: 0; }
 .v2l-c-faits { height: 24px; margin-top: 0; }
 @media (max-width: 1023px) { .v2-titre-ligne { padding-right: 64px; } }
+
+/* ══ 12. VENTES (phase 2, 17 nov. — src/designV2/VentesV2.jsx) ════════════════════════════════════════════
+   Grand titre + « Imprimer N » + cloche sur UNE ligne · le menu · UN segmenté · le chiffre d'affiche et l'écart nommé ·
+   la recherche (scanner dedans) et « ⋯ » · les groupes par échéance (dits une fois) · les rangées A. */
+/* Le plein de la ligne du titre : « Imprimer 5 bordereaux » ; au téléphone étroit, « Imprimer 5 » (le nom entier reste son
+   nom accessible). */
+.v2v-plein-court { display: none; }
+@media (max-width: 429px) { .v2v-titre-ligne .v2v-plein-long { display: none; } .v2v-titre-ligne .v2v-plein-court { display: inline; } }
+.v2v-titre-ligne .v2v-tete-plein { display: flex; flex: none; min-width: 0; }
+.v2v-titre-ligne .v2v-tete-plein:empty { display: none; }
+.v2v-titre-ligne h1 { white-space: nowrap; }
+.v2v-tete { display: flex; flex-direction: column; gap: 0; color: var(--v2-page-texte); }
+.v2v-plein-ici { display: flex; justify-content: flex-end; margin: 0 0 8px; }
+html[data-design="v2"] body .v2v-segment { margin: 4px 0 8px !important; }
+/* Le chiffre d'affiche : 56/700 tabulaire, son mot sur la même ligne de base ; l'écart dessous, une ligne. */
+.v2v-affiche { margin: 4px 0 12px; }
+.v2v-affiche-l1 { display: flex; align-items: baseline; gap: 10px; margin: 0; min-width: 0; color: var(--v2-page-texte); }
+.v2v-affiche-n { font-size: 56px; font-weight: 700; line-height: 56px; letter-spacing: -.035em; font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1, "lnum" 1; }
+.v2v-affiche-mot { font-size: 20px; font-weight: 600; line-height: 24px; letter-spacing: -.01em; white-space: nowrap; }
+.v2v-affiche-borne { font-size: 15px; font-weight: 600; align-self: center; }
+.v2v-ecart { margin: 2px 0 0; font-size: 15px; line-height: 20px; color: var(--v2-page-muet); font-variant-numeric: tabular-nums; }
+/* La recherche et « ⋯ » : une hauteur (44), une ligne. Le scanner est DANS le champ, à droite. */
+.v2v-recherche { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; }
+.v2v-recherche .v2v-champ { flex: 1 1 auto; min-width: 0; }
+html[data-design="v2"] body .v2v-recherche .v2v-champ { min-height: 44px; }
+html[data-design="v2"] body .v2v-recherche .v2v-champ input { min-height: 44px; }
+html body .v2v-champ button.v2v-scan { display: grid; place-items: center; flex: none; width: 44px; height: 44px; min-width: 44px; min-height: 44px; margin: 0 -4px 0 0; padding: 0;
+  border: 0; background: transparent; color: var(--v2-muet); cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; border-radius: 12px; }
+html body .v2v-champ button.v2v-scan:active { opacity: .6; }
+/* La liste : UNE carte, les groupes en en-têtes simples, les rangées A. */
+.v2v-liste { background: var(--v2-carte); border-radius: 16px; box-shadow: var(--v2-carte-ombre); overflow: hidden; color: var(--sv-encre, #0C1D30); }
+:root[data-theme="dark"] .v2v-liste { color: var(--v2-page-texte); }
+.v2v-liste .v2v-groupe:not(:first-child) { border-top: .5px solid var(--v2-filet); padding-top: 12px; }
+.v2v-groupe-ambre { color: var(--v2-ambre); }
+.v2l-faits-txt.is-ambre { color: var(--v2-ambre); font-weight: 600; }
+.v2-plaque.is-double { box-shadow: inset 0 0 0 1.5px var(--v2-rouge); color: var(--v2-rouge); }
+.v2v-corps { display: flex; flex-direction: column; gap: 12px; }
+@media (max-width: 1023px) { .v2v-corps { margin-bottom: calc(var(--vrm-barre-bas, 84px) + 24px); } }
+.v2v-note { font-size: 13px; line-height: 18px; color: var(--v2-page-muet); padding: 0 4px; }
+.v2v-note :is(p, span, div) { color: inherit !important; font-size: inherit !important; }
+.v2v-vide { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 32px 16px; text-align: center; color: var(--v2-page-muet); font-size: 15px; }
+.v2v-vide p { margin: 0; }
+.v2v-vide.is-calme { color: var(--v2-page-texte); font-size: 17px; font-weight: 600; }
+.v2v-vide-ic { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: rgb(255 255 255 / .16); }
+/* LE MOUVEMENT « FAIT » : la coche se pose (160 ms), la rangée glisse et se replie (220 ms, ressort sans rebond). Rien d'autre
+   n'anime. Mouvement réduit : un fondu, rien ne bouge. */
+.v2l-coche { position: absolute; right: 16px; top: 50%; display: grid; place-items: center; width: 28px; height: 28px; margin-top: -14px; border-radius: 50%;
+  background: var(--sv-encre, #0C1D30); color: #FFFFFF; transform: scale(.6); opacity: 0; animation: v2-coche 160ms cubic-bezier(.2, .9, .25, 1) forwards; }
+:root[data-theme="dark"] .v2l-coche { background: var(--v2-page-texte); color: #06111F; }
+.v2l.is-part { overflow: hidden; max-height: 120px; pointer-events: none; animation: v2-part 220ms cubic-bezier(.32, .72, 0, 1) 300ms forwards; }
+.v2l.is-part .v2l-a-prix { visibility: hidden; }
+@keyframes v2-coche { to { transform: scale(1); opacity: 1; } }
+@keyframes v2-part { to { transform: translateX(24px); opacity: 0; max-height: 0; min-height: 0; padding-top: 0; padding-bottom: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .v2l-coche { animation: none; transform: none; opacity: 1; }
+  .v2l.is-part { animation: v2-part-fondu 200ms ease forwards; }
+}
+@keyframes v2-part-fondu { to { opacity: 0; } }
