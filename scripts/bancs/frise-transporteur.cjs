@@ -37,7 +37,7 @@ function baseFrise() {
   if (!cible) return { b, tx: null };
   const tx = String(cible.transaction_id); const bord = b.rows.find((r) => r.id === 'email_bord_' + tx); const su = String(bord.data.suivi || ('XW' + tx));
   const il2j = new Date(Date.now() - 2 * 86400e3 - 3600e3).toISOString();
-  b.rows.push({ id: 'depart_' + su, data: { suivi: su, carrier: 'chronopost', etat: 'disponible', etatAt: il2j, derAt: il2j, lu: new Date(Date.now() - 600e3).toISOString(), lieuNom: 'CONSIGNE CARREFOUR', lieuVille: 'SALIES DE BEARN', derLib: 'Livré au relais' } });
+  b.rows.push({ id: 'depart_chronopost_' + su, data: { suivi: su, carrier: 'chronopost', etat: 'disponible', etatAt: il2j, derAt: il2j, lu: new Date(Date.now() - 600e3).toISOString(), lieuNom: 'CONSIGNE CARREFOUR', lieuVille: 'SALIES DE BEARN', derLib: 'Livré au relais' } });
   return { b, tx };
 }
 
