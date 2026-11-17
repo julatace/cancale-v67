@@ -9,7 +9,7 @@
 //   P2  ranger les 10 paires qui viennent d'arriver (N°201…210) ;
 //   P3  trouver où est la N°178 (taper « 178 ») ;
 //   P4  déplacer la N°178 dans une autre case ;
-//   P5  voir ce qu'il y a dans un meuble (« Armoire ») ;
+//   P5  voir ce qu'il y a dans un meuble (« Armoire ») — touchers ET distance à faire défiler ;
 //   P6  une paire vendue (N°3) : sa case reste allumée, aucun geste ; la sortie à l'expédition prouvée est
 //       automatique (bancs stock-case-a-sortir / retour-stock-auto) — 0 toucher des deux côtés.
 // Il exige, réglage ALLUMÉ : chaque parcours abouti (la case écrite dans `vrm_slots`, la bonne) et en MOINS de
@@ -75,7 +75,7 @@ async function rendre(b, port, { tel, sombre = false, v2 }) {
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
   await pg.addInitScript(({ m, sombre, v2 }) => { try { localStorage.setItem('vrm_acces_direct', '1'); for (const k in m) localStorage.setItem(k, JSON.stringify(m[k])); localStorage.setItem('vinted_dark', JSON.stringify(!!sombre)); localStorage.setItem('vrm_meubles_zoom', 'normal'); if (v2) localStorage.setItem('vrm_design_v2', '1'); else localStorage.removeItem('vrm_design_v2'); } catch (_) {} }, { m: MAIN, sombre, v2 });
   await pg.goto(`http://localhost:${port}/?tab=garage`, { waitUntil: 'domcontentloaded' });
-  await pg.waitForSelector(v2 ? '[data-sr-ecran] [data-sr-a-ranger]' : '[data-case-ici="mA:0"]', { timeout: 40000 }).catch(() => {});
+  await pg.waitForSelector(v2 ? '[data-sr-ecran] [data-sr-lancer]' : '[data-case-ici="mA:0"]', { timeout: 40000 }).catch(() => {});
   await pg.waitForTimeout(1200);
   // Compteur de touchers : chaque geste du banc passe par `toucher`.
   let n = 0;
@@ -91,12 +91,14 @@ const caseLibreAvant = (m) => `[data-meuble="${m}"] button[data-case-ici]:not([d
 // Les cibles, les textes coupés, le défilement de côté, le nombre de pleins (seulement les formes du nouveau Stock).
 const regles = (pg) => pg.evaluate(() => {
   const vis = (e) => { const r = e.getBoundingClientRect(); return e.getClientRects().length && r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < innerHeight; };
-  const btns = [...document.querySelectorAll('.sr-ecran button, .sr-feuille button')].filter((b) => /(^| )sr-/.test(b.className) && vis(b) && !b.closest('.sr-place-corps, .sr-ancien'));
+  const btns = [...document.querySelectorAll('.sr-ecran button, .sr-feuille button, .sr-ecran [data-v2l]')].filter((b) => /(^| )(sr-|v2b|v2-rangee|v2l)/.test(b.className) && vis(b) && !b.closest('.sr-place-corps, .sr-ancien'));
   const petits = btns.filter((b) => { const r = b.getBoundingClientRect(); return r.height < 43.5 || r.width < 43.5; }).map((b) => (b.getAttribute('aria-label') || b.textContent || b.className).slice(0, 40) + ' ' + Math.round(b.getBoundingClientRect().width) + '×' + Math.round(b.getBoundingClientRect().height));
-  const coupes = [...document.querySelectorAll('.sr-btn, .sr-h2, .sr-titre, .sr-plaque, .sr-ici-meuble, .sr-ici-case, .sr-affiche-mot, .sr-meuble-onglet, .sr-fin-titre, .sr-rangee-s, .vrm-fs-titre, .vrm-fs-sous-titre')]
+  const coupes = [...document.querySelectorAll('.v2b-lib, .v2-menu-lib, .v2-plaque, .v2-ann-groupe, .sr-plus-txt b, .sr-btn, .sr-h2, .sr-titre, .sr-plaque, .sr-ici-meuble, .sr-ici-case, .sr-affiche-mot, .sr-meuble-onglet, .sr-fin-titre, .sr-rangee-s, .vrm-fs-titre, .vrm-fs-sous-titre')]
     .filter((e) => vis(e) && e.closest('.sr-ecran, .sr-feuille') && !e.closest('.sr-place-corps, .sr-ancien') && (e.scrollWidth > e.clientWidth + 1)).map((e) => (e.textContent || '').trim().slice(0, 50));
-  const pleins = [...document.querySelectorAll('.sr-btn-plein')].filter(vis).length;
-  return { petits, coupes, pleins, sw: document.documentElement.scrollWidth, iw: innerWidth };
+  const pleins = [...document.querySelectorAll('.sr-btn-plein, .v2b-principal')].filter(vis).length;
+  // La 1re paire de la liste : sa hauteur à l'écran (Julien : elle arrivait à 1 260 px sur 2 000).
+  const l1 = document.querySelector('[data-sr-ligne]'); const premiere = l1 ? Math.round(l1.getBoundingClientRect().top) : null;
+  return { petits, coupes, pleins, premiere, ih: innerHeight, glisse: !!document.querySelector('[data-sr-glisse="ranger"]'), sw: document.documentElement.scrollWidth, iw: innerWidth };
 });
 // La signature de l'écran Stock (éteint) : balises, attributs data-*, textes — pour la comparer à celle de main.
 const signature = (pg) => pg.evaluate(() => {
@@ -114,7 +116,7 @@ async function parcours(b, port, { tel, sombre, v2, nom }) {
   // P1 — une paire.
   { const r = await rendre(b, port, { tel, sombre, v2 }); const avant = await r.lireLs();
     await shot(r.pg, nom + (v2 ? '-apres' : '-avant') + '-ecran');
-    if (v2) { await r.toucher('[data-sr-a-ranger] [data-a-ranger="201"]'); await shot(r.pg, nom + '-apres-seance'); await r.toucher('[data-sr-ranger-ici]'); }
+    if (v2) { await r.toucher('[data-sr-lancer]'); await shot(r.pg, nom + '-apres-seance'); await r.toucher('[data-sr-ranger-ici]'); }
     else { await r.toucher('[data-a-ranger="201"]'); await r.toucher(caseLibreAvant('mA')); }
     await r.pg.waitForTimeout(400); const ap = await r.lireLs();
     res.p1 = r.touchers();
@@ -181,7 +183,7 @@ async function parcours(b, port, { tel, sombre, v2, nom }) {
     await r.ctx.close(); }
   // P5 — voir ce qu'il y a dans l'Armoire ; P6 — la vendue allumée.
   { const r = await rendre(b, port, { tel, sombre, v2 });
-    if (v2) await r.toucher('[data-sr-place-ouvrir="mB"]');
+    if (v2) { await r.toucher('[data-sr-seg="places"]'); await r.toucher('[data-sr-place-ouvrir="mB"]'); }
     await r.pg.waitForTimeout(300);
     // La distance à faire défiler pour AVOIR l'Armoire sous les yeux (le haut de ses cases), mesurée avant de défiler.
     const dist = await r.pg.evaluate(() => { const e = document.querySelector('[data-meuble="mB"] [data-meuble-grille]'); if (!e) return null; const q = e.getBoundingClientRect(); return Math.max(0, Math.round(q.bottom - innerHeight)); });
@@ -226,6 +228,8 @@ async function parcours(b, port, { tel, sombre, v2, nom }) {
         dit(!g.coupes.length, `${t} : ${k} — aucun texte coupé`, g.coupes.join(' | '));
         dit(g.sw <= g.iw, `${t} : ${k} — aucun défilement de côté`, `${g.sw}/${g.iw}`);
         dit(g.pleins <= 1, `${t} : ${k} — un seul bouton plein`, String(g.pleins));
+        if (k === 'écran') { dit(g.premiere != null && g.premiere <= g.ih * 0.5, `${t} : écran — la 1re paire de la liste dans la moitié haute du premier écran`, `${g.premiere} px / ${g.ih}`);
+          dit(g.glisse, `${t} : écran — glisser à gauche une paire à ranger : « Ranger »`); }
       }
       if (REF) {
         const ref = await parcours(b, portRef, { ...c, v2: false, nom: c.nom + '-main' });

@@ -2,7 +2,6 @@
 export default {
   "sr.seance.titre": "Ranger",
   "sr.deplacer.titre": "Déplacer",
-  "sr.seance.rang": "{i} sur {n}",
   "sr.deplacer.fait": "C'est déplacé.",
   "sr.seance.fin": {
     "one": "Tout est rangé · {n} {mot}",
@@ -30,17 +29,9 @@ export default {
   "sr.reponse.deplacer": "Déplacer",
   "sr.reponse.ranger": "Ranger maintenant",
   "sr.pasLu": "Annonces pas lues : rien n'est perdu.",
-  "sr.enLigne1": "{mot} en ligne",
-  "sr.enLigne": "{mot} en ligne",
-  "sr.rangees": {
-    "one": "{n} dans une case",
-    "other": "{n} dans une case"
-  },
   "sr.cherche.place": "Où est… un N° ou un modèle",
   "sr.cherche.rienNum": "Aucun N°{num} dans le stock.",
   "sr.cherche.rien": "Rien pour « {q} ».",
-  "sr.bande.aria": "Ranger N°{num} {titre}",
-  "sr.places.titre": "Mes places",
   "sr.places.plein": {
     "one": "{n} case prise sur {t}",
     "other": "{n} cases prises sur {t}"
@@ -49,11 +40,47 @@ export default {
     "one": "{n} à sortir",
     "other": "{n} à sortir"
   },
-  "sr.tout": "Tout le stock",
   "sr.lancer": {
     "one": "Ranger {n} {mot}",
     "other": "Ranger {n} {mot}"
   },
-  "sr.aRanger": "À ranger",
-  "sr.fait": "N°{num} · {ou}"
+  "sr.fait": "N°{num} · {ou}",
+  "sr.glisse.ranger": "Ranger",
+  "sr.glisse.deplacer": "Déplacer",
+  "sr.ligne.aRanger": "à ranger",
+  "sr.ligne.sansNum": "sans N°",
+  "sr.ligne.vendue": "vendue",
+  "sr.menu.titre": "Stock",
+  "sr.menu.verifier": "À vérifier",
+  "sr.menu.outils": "Outils",
+  "sr.menu.annonces": "Voir mes annonces",
+  "sr.menu.ouvrir": "Plus d'options du Stock",
+  "sr.lancerCourt": "Ranger {n}",
+  "sr.seg.label": "Regarder le stock",
+  "sr.seg.places": "Places",
+  "sr.groupe.aRanger": "À ranger",
+  "sr.groupe.rangees": "Dans une case",
+  "sr.liste.plus": "Voir {n} de plus",
+  "sr.reponse.fiche": "Tout sur ce N°",
+  "sr.etat.aConf": {
+    "one": "{n} à confirmer",
+    "other": "{n} à confirmer"
+  },
+  "sr.etat.aConfGeste": "Lues il y a plus de 24 h ({qui}) : repasse sur ce compte, VRM les relira.",
+  "sr.etat.pasLu": "Pas tout lu",
+  "sr.etat.pasLuGeste": "Pas lu : {liste}. Ouvre ce site avec l’extension, VRM relira.",
+  "sr.etat.sansNum": {
+    "one": "{n} sans N°",
+    "other": "{n} sans N°"
+  },
+  "sr.etat.sansNumGeste": "Donne-leur un N° dans Annonces : elles pourront se ranger.",
+  "sr.etat.masquees": {
+    "one": "{n} masquée par Vinted",
+    "other": "{n} masquées par Vinted"
+  },
+  "sr.etat.masqueesGeste": "Toujours chez toi, comptées à part. Rien à faire.",
+  "sr.seance.reste": {
+    "one": "{nb} à ranger",
+    "other": "{nb} à ranger"
+  }
 };

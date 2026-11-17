@@ -2,7 +2,6 @@
 export default {
   "sr.seance.titre": "Einräumen",
   "sr.deplacer.titre": "Umräumen",
-  "sr.seance.rang": "{i} von {n}",
   "sr.deplacer.fait": "Umgeräumt.",
   "sr.seance.fin": {
     "one": "Alles eingeräumt · {n} {mot}",
@@ -30,17 +29,9 @@ export default {
   "sr.reponse.deplacer": "Umräumen",
   "sr.reponse.ranger": "Jetzt einräumen",
   "sr.pasLu": "Anzeigen nicht gelesen: nichts geht verloren.",
-  "sr.enLigne1": "{mot} online",
-  "sr.enLigne": "{mot} online",
-  "sr.rangees": {
-    "one": "{n} in einem Fach",
-    "other": "{n} in einem Fach"
-  },
   "sr.cherche.place": "Wo ist… eine Nr. oder ein Modell",
   "sr.cherche.rienNum": "Keine Nr. {num} im Lager.",
   "sr.cherche.rien": "Nichts für „{q}“.",
-  "sr.bande.aria": "Nr. {num} einräumen {titre}",
-  "sr.places.titre": "Meine Plätze",
   "sr.places.plein": {
     "one": "{n} von {t} Fächern belegt",
     "other": "{n} von {t} Fächern belegt"
@@ -49,11 +40,47 @@ export default {
     "one": "{n} herauszunehmen",
     "other": "{n} herauszunehmen"
   },
-  "sr.tout": "Gesamter Bestand",
   "sr.lancer": {
     "one": "{n} {mot} einräumen",
     "other": "{n} {mot} einräumen"
   },
-  "sr.aRanger": "Einzuräumen",
-  "sr.fait": "Nr. {num} · {ou}"
+  "sr.fait": "Nr. {num} · {ou}",
+  "sr.glisse.ranger": "Einräumen",
+  "sr.glisse.deplacer": "Umräumen",
+  "sr.ligne.aRanger": "einzuräumen",
+  "sr.ligne.sansNum": "ohne Nr.",
+  "sr.ligne.vendue": "verkauft",
+  "sr.menu.titre": "Lager",
+  "sr.menu.verifier": "Zu prüfen",
+  "sr.menu.outils": "Werkzeuge",
+  "sr.menu.annonces": "Meine Anzeigen ansehen",
+  "sr.menu.ouvrir": "Weitere Lageroptionen",
+  "sr.lancerCourt": "{n} einräumen",
+  "sr.seg.label": "Lager ansehen",
+  "sr.seg.places": "Plätze",
+  "sr.groupe.aRanger": "Einzuräumen",
+  "sr.groupe.rangees": "In einem Fach",
+  "sr.liste.plus": "{n} weitere zeigen",
+  "sr.reponse.fiche": "Alles zu dieser Nr.",
+  "sr.etat.aConf": {
+    "one": "{n} zu bestätigen",
+    "other": "{n} zu bestätigen"
+  },
+  "sr.etat.aConfGeste": "Vor mehr als 24 h gelesen ({qui}): öffne dieses Konto erneut, VRM liest sie neu.",
+  "sr.etat.pasLu": "Nicht alles gelesen",
+  "sr.etat.pasLuGeste": "Nicht gelesen: {liste}. Öffne diese Seite mit der Erweiterung, VRM liest neu.",
+  "sr.etat.sansNum": {
+    "one": "{n} ohne Nr.",
+    "other": "{n} ohne Nr."
+  },
+  "sr.etat.sansNumGeste": "Gib ihnen in Anzeigen eine Nr., damit sie eingeräumt werden können.",
+  "sr.etat.masquees": {
+    "one": "{n} von Vinted ausgeblendet",
+    "other": "{n} von Vinted ausgeblendet"
+  },
+  "sr.etat.masqueesGeste": "Noch bei dir, separat gezählt. Nichts zu tun.",
+  "sr.seance.reste": {
+    "one": "{nb} einzuräumen",
+    "other": "{nb} einzuräumen"
+  }
 };

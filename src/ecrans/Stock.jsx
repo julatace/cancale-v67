@@ -35,7 +35,7 @@ import { trierSerie, resumeSerie, csvDe } from '../selectionSerie.js';   // (10 
 import { CLE_EMBALLAGES, colisFaits } from '../emballages.js';
 import { CLE_STOCK_IMPORTE } from '../importStock.js';
 import { importeesAuStock } from '../stockImporteVue.js';   // (16 nov., lot ecrans-restes) le stock importé d'un autre outil, montré
-import { achatDuNumeroLu, useMotsArticle, useExemplesVendeur, NotePaireCoque, gesteVrm, InfoPop, Pourquoi, AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, fetchTxnItemIds, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
+import { achatDuNumeroLu, useMotsArticle, useExemplesVendeur, NotePaireCoque, gesteVrm, InfoPop, Pourquoi, AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, fetchTxnItemIds, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, extractSize, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import StockExplication from "../StockExplication.jsx";
@@ -1488,7 +1488,34 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     for (let i = 0; i < T; i++) { const o = occupant(m.id, i); if (o) { pleines++; if (estVendu(o)) aSortir++; if (cibles.includes(cleDeFiche(o)) || (filtre && correspond(o))) ici++; } else if (noteeIci(m.id, i)) pleines++; }
     return { total: T, pleines, aSortir, ici };
   };
+  // Les paires du nouveau design : les annonces actuelles EN LIGNE (la même liste et le même tri que « blocListe »),
+  // chacune avec sa place par identité de N° (son N° ou l'autre N° de la même paire).
+  const lignesV2 = !designV2 || !(aa && aa.su) ? [] : articlesVus.slice().sort((a, b) => (articleRange(a) - articleRange(b)) || triNum(a.numero, b.numero)).map((a) => {
+    const f = a.cle ? ficheParCle[a.cle] : null;
+    const fOu = f ? ((ouEst(f) ? f : null) || (a.aussi || []).map((n) => ficheParCle[cleNum(n)]).filter(Boolean).find((x) => ouEst(x)) || null) : null;
+    return { key: a.ids[0], cle: a.cle && f ? a.cle : '', numero: a.numero, titre: a.titre, photo: a.photo || (f && f.photo) || null, ou: fOu ? ouEst(fOu) : null,
+      taille: motsStock.nom === 'paire' ? extractSize(a.titre) : null };
+  });
+  // Ce qui n'est pas compté « en ligne », DIT avec son geste (dans « ⋯ ») — les mêmes nombres que la bande d'avant.
+  const nSansTout = aa ? nSansNum + sansNumAutres + vcSansNum.length : 0;
+  const etatsV2 = !designV2 || !(aa && aa.su) ? [] : [
+    nAConf > 0 ? { k: 'aconfirmer', ambre: true, titre: tr('sr.etat.aConf', { n: nAConf }), geste: tr('sr.etat.aConfGeste', { qui: aConfVoir.map((c) => (c.plateforme === 'vinted' ? c.nom : nomPlateforme(c.plateforme))).filter(Boolean).join(', ') }) } : null,
+    aa.manque.length > 0 ? { k: 'pastoutlu', ambre: true, titre: tr('sr.etat.pasLu'), geste: tr('sr.etat.pasLuGeste', { liste: manqueTxt }) } : null,
+    nSansTout > 0 ? { k: 'sansnum', titre: tr('sr.etat.sansNum', { n: nSansTout }), geste: tr('sr.etat.sansNumGeste'), faire: () => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vinted_annonces' })); } catch (_) {} } } : null,
+    nMasq > 0 ? { k: 'masquees', titre: tr('sr.etat.masquees', { n: nMasq }), geste: tr('sr.etat.masqueesGeste') } : null,
+  ].filter(Boolean);
+  const filtresV2 = designV2 && aa && aa.su && (platsPresents.length > 1 || comptesPresents.length > 1) ? {
+    libelle: filtrePlat ? (NOM_PLAT_FILTRE[filtrePlat] || filtrePlat) : tr('v2.menu.toutes'),
+    sous: filtreCompte ? (comptesNoms.get(filtreCompte) || filtreCompte) : (comptesPresents.length > 1 ? tr('v2.menu.tous') : ''),
+    corps: <div className="vrm-s2d-filtres" data-stock-filtres="">
+      {platsPresents.length > 1 && <Filtres className="vrm-rangee vrm-filtres" label={tr('stock.filtrerPlateforme')} data-stock-filtre-plat={filtrePlat || 'toutes'} valeur={filtrePlat}
+        onChange={(v) => setFiltrePlat(v)} options={['', ...platsPresents].map((x) => ({ v: x, l: x ? (NOM_PLAT_FILTRE[x] || x) : tr('journee.toutes'), attrs: { 'data-plat': x || 'toutes' } }))}/>}
+      {comptesPresents.length > 1 && <MenuCompte court data-stock-filtre-compte={filtreCompte || 'tous'} valeur={filtreCompte} onChange={(v) => setFiltreCompte(v || '')}
+        comptes={comptesPresents.map((u) => ({ id: u, nom: comptesNoms.get(u) || u }))}/>}
+    </div> } : null;
   const sV2 = designV2 ? {
+    Segmente, Retour: FermeAuRetour, lignes: lignesV2, etats: etatsV2, filtres: filtresV2,
+    versAnnonces: () => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vinted_annonces' })); } catch (_) {} },
     Icon, Photo: PhotoVinted, Mic: MicDictee, Feuille: SheetShell, dicteeOk: DICTEE_OK, mots: motsStock,
     nombres: { etat: lecture === undefined ? 'encours' : (aa && aa.su ? nAffiche : 'passu'), attente: lecture === undefined,
       enLigne: aa && aa.su && !(aa.auMoins && nAffiche === 0) ? nAffiche : null, auMoins: !!(aa && aa.auMoins), rangees: nRangees },

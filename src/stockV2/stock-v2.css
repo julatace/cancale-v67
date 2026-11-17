@@ -30,7 +30,6 @@
   color: var(--sr-page); font-family: var(--sb-police-texte, -apple-system, system-ui, sans-serif);
   font-feature-settings: "tnum" 1, "lnum" 1; font-variant-numeric: tabular-nums;
 }
-.sr-ecran[data-sr-plein="1"] { padding-bottom: calc(50px + 40px); }
 :root[data-theme="dark"] .sr-ecran, :root[data-theme="dark"] .sr-feuille {
   --sr-page: var(--v2-page-texte, #F2F7FD); --sr-page-muet: var(--v2-page-muet, #B9C8D8);
   --sr-carte: var(--v2-carte, #16273C); --sr-encre: #EAF2FB; --sr-muet: var(--v2-muet, #A7B8CB);
@@ -43,25 +42,17 @@
 }
 .vrm-ms-stock.sr-hote { padding: 4px 16px 24px !important; gap: 0 !important; }
 
-/* La tête : grand titre iOS, deux ronds à droite. */
-.sr-tete { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0 2px; }
-.sr-titre { margin: 0; font-size: 34px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; color: var(--sr-page); }
-.sr-outils { display: flex; gap: 4px; }
+/* La tête : le grand titre, le geste compact à droite (src/designV2 : `.v2-titre-ligne`). */
+.sr-titre-ligne { padding: 6px 0 2px; }
+.sr-titre { margin: 0; font-size: 34px; font-weight: 700; letter-spacing: -.02em; line-height: 40px; color: var(--sr-page); }
+.sr-sous-titre { margin: 2px 0 2px; }
 .sr-rond { appearance: none; border: 0; margin: 0; padding: 0; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
-  background: transparent; color: var(--sr-page); cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; transition: background-color 160ms ease; }
+  background: transparent; color: inherit; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; transition: background-color 160ms ease; }
 .sr-rond:active { background: color-mix(in srgb, currentColor 16%, transparent); }
 .sr-rond:focus-visible { outline: none; box-shadow: var(--sr-anneau); }
-
-/* L'affiche : le chiffre, ses mots à côté. */
-.sr-affiche { display: flex; align-items: center; gap: 12px; margin: 10px 0 14px; min-height: 56px; }
-.sr-affiche-n { font-size: 48px; line-height: 1; font-weight: 700; letter-spacing: -.035em; }
-.sr-affiche-n small { font-size: 15px; font-weight: 600; letter-spacing: 0; }
-.sr-affiche-mots { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.sr-affiche-mot { font-size: 17px; font-weight: 600; line-height: 1.25; }
-.sr-affiche-sous { font-size: 15px; line-height: 1.3; color: var(--sr-page-muet); }
-
-/* « Où est… » : un vrai champ, collé en haut. */
-.sr-cherche { position: sticky; top: 6px; z-index: 25; display: flex; align-items: center; margin: 0 0 14px; background: var(--sr-carte); color: var(--sr-encre);
+/* « Où est… » : un vrai champ (photo et voix dedans) et « ⋯ », collés en haut. */
+.sr-cherche-ligne { position: sticky; top: 6px; z-index: 25; display: flex; align-items: center; gap: 4px; margin: 8px 0 12px; color: var(--sr-page); }
+.sr-cherche { flex: 1; min-width: 0; display: flex; align-items: center; background: var(--sr-carte); color: var(--sr-encre);
   border-radius: 14px; box-shadow: var(--sr-ombre); min-height: 50px; }
 .sr-cherche-ic { display: grid; place-items: center; width: 40px; flex: none; color: var(--sr-muet); }
 .sr-champ { flex: 1; min-width: 0; height: 50px; border: 0; outline: none; background: transparent; color: inherit; font: inherit; font-size: 17px; padding: 0; -webkit-appearance: none; appearance: none; }
@@ -98,6 +89,23 @@
 .sr-plan-case.is-prise { background: color-mix(in srgb, var(--sr-encre) 34%, transparent); }
 .sr-plan-case.is-vise { background: var(--sr-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--sr-accent) 35%, transparent); animation: sr-pulse 1600ms ease-in-out 2; }
 .sr-sans { margin: 0; font-size: 15px; line-height: 1.4; color: var(--sr-muet); }
+.sr-segment { margin: 0 0 12px !important; }
+.sr-sans-num { font-size: 13px; font-weight: 600; color: var(--sr-muet); }
+.sr-ligne { outline: none; }
+.sr-ligne:focus-visible { box-shadow: inset var(--sr-anneau); }
+.sr-liste-paires .v2l-a-l2 { gap: 8px; }
+/* « ⋯ » : ce qui n'est pas compté, avec son geste ; les outils. */
+.sr-plus { display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px; }
+.sr-plus-h { margin: 8px 4px 2px; font-size: 13px; font-weight: 600; color: color-mix(in srgb, currentColor 66%, transparent); }
+.sr-plus-groupe { display: flex; flex-direction: column; border-radius: 14px; overflow: hidden; background: color-mix(in srgb, currentColor 5%, transparent); }
+.sr-plus-ligne { appearance: none; border: 0; margin: 0; width: 100%; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 10px 14px; text-align: left; background: transparent; color: inherit; font: inherit; cursor: pointer; touch-action: manipulation; }
+.sr-plus-ligne + .sr-plus-ligne { box-shadow: inset 0 .5px 0 color-mix(in srgb, currentColor 14%, transparent); }
+.sr-plus-ligne:disabled { cursor: default; }
+.sr-plus-ligne:active:not(:disabled) { background: color-mix(in srgb, currentColor 7%, transparent); }
+.sr-plus-ligne > svg { flex: none; }
+.sr-plus-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sr-plus-txt b { font-size: 15px; font-weight: 600; display: flex; align-items: center; }
+.sr-plus-txt span { font-size: 13px; line-height: 1.4; color: color-mix(in srgb, currentColor 70%, transparent); }
 .sr-vide-l { margin: 0; padding: 14px 4px; font-size: 15px; color: var(--sr-page-muet); }
 
 /* Les boutons : plein (un par écran), teinté, texte. Toujours ≥ 44 px, aucune icône seule sans nom. */
@@ -118,9 +126,6 @@
 .sr-gestes { display: flex; flex-direction: column; gap: 10px; }
 .sr-gestes-bas { display: flex; flex-wrap: wrap; gap: 8px; }
 .sr-gestes-bas > .sr-btn { flex: 1 1 auto; }
-
-/* Le geste au pouce : collé au-dessus de la barre du bas ; sur ordinateur, en haut à droite. */
-.sr-pouce { position: fixed; left: 16px; right: 16px; bottom: calc(var(--vrm-barre-bas, 84px) + 24px); z-index: 30; animation: sr-monte 260ms cubic-bezier(.32, .72, 0, 1) both; }
 
 /* Les groupes et les listes iOS. */
 .sr-groupe { margin: 0 0 24px; }
@@ -149,18 +154,6 @@
 .sr-place-corps .vrm-s2d-meuble { margin: 0; box-shadow: none; background: transparent; }
 .sr-note { font-size: 13px; color: var(--sr-page-muet); margin: 0 4px 16px; }
 .sr-ancien { color: var(--sr-page); }
-
-/* À ranger : la bande des photos (défile de côté, la marge de l'écran gardée). */
-.sr-bande { display: grid; grid-auto-flow: column; grid-auto-columns: 96px; gap: 10px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity;
-  margin: 0 -16px; padding: 2px 16px 6px; scrollbar-width: none; }
-.sr-bande::-webkit-scrollbar { display: none; }
-.sr-bande-carte { appearance: none; border: 0; margin: 0; padding: 0; background: transparent; cursor: pointer; scroll-snap-align: start; border-radius: 16px;
-  touch-action: manipulation; -webkit-tap-highlight-color: transparent; transition: transform var(--sr-retour); }
-.sr-bande-carte:active { transform: scale(.96); transition: transform var(--sr-appui); }
-.sr-bande-carte:focus-visible { outline: none; box-shadow: var(--sr-anneau); }
-.sr-bande-photo { position: relative; display: block; border-radius: 16px; overflow: hidden; box-shadow: var(--sr-ombre); }
-.sr-bande-photo .sr-photo { border-radius: 16px; background: var(--sr-carte); }
-.sr-bande-photo .sr-plaque { position: absolute; left: 6px; bottom: 6px; }
 
 /* LA SÉANCE (dans la feuille commune). */
 .sr-feuille .sr-seance, .sr-feuille .sr-fin { color: var(--sv-encre, inherit); }
@@ -211,18 +204,47 @@
 @keyframes sr-ouvre { from { opacity: 0; } to { opacity: 1; } }
 @keyframes sr-pulse { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--sr-accent) 25%, transparent); } }
 @media (prefers-reduced-motion: reduce) {
-  .sr-seance, .sr-reponse, .sr-fin, .sr-pouce, .sr-place-corps { animation: sr-ouvre 160ms ease both; }
+  .sr-seance, .sr-reponse, .sr-fin, .sr-place-corps { animation: sr-ouvre 160ms ease both; }
   .sr-plan-case.is-vise { animation: none; }
-  .sr-btn, .sr-btn:active, .sr-bande-carte:active, .sr-case:active { transform: none !important; }
+  .sr-btn, .sr-btn:active, .sr-case:active { transform: none !important; }
 }
 
 @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
-  .vrm-ms-stock.sr-hote { padding: 12px 32px 32px !important; max-width: 824px; position: relative; }
-  .sr-ecran[data-sr-plein="1"] { padding-bottom: 0; }
-  .sr-tete { padding-right: 240px; }
-  .sr-pouce { position: absolute; left: auto; right: 32px; bottom: auto; top: 14px; z-index: 2; }
-  .sr-pouce .sr-btn-plein { width: auto; padding: 0 22px; }
-  .sr-bande { margin: 0; padding: 2px 0 6px; grid-auto-columns: 112px; }
-  .sr-bande .sr-photo { width: 112px !important; height: 112px !important; }
-  .sr-groupe, .sr-cherche, .sr-resultats { max-width: 760px; }
+  .vrm-ms-stock.sr-hote { padding: 12px 32px 32px !important; max-width: 824px; }
+  .sr-groupe, .sr-cherche-ligne, .sr-resultats, .sr-liste-paires, .sr-segment { max-width: 760px; }
+}
+
+/* ══ LA SIGNATURE (17 nov., brief « SIGNATURE ») : l'ÉTIQUETTE KRAFT — une place est une étiquette de carton, en plus grand
+   que celle du N° (kraft clair #E9DCC4 / nuit #3A3226, encre, coin coupé, œillet percé) ; et le MOUVEMENT « fait ». ══ */
+.sr-kraft { --sr-kraft: #E9DCC4; --sr-kraft-encre: #2A2116; --sr-kraft-muet: #5E4E36; background: var(--sr-kraft) !important; color: var(--sr-kraft-encre) !important;
+  clip-path: polygon(16px 0, 100% 0, 100% 100%, 0 100%, 0 16px); border-radius: 0 10px 10px 10px; position: relative; }
+:root[data-theme="dark"] .sr-kraft { --sr-kraft: #3A3226; --sr-kraft-encre: #F3EAD9; --sr-kraft-muet: #D6C8AE; }
+.sr-kraft::before { content: ""; position: absolute; left: 9px; top: 9px; width: 7px; height: 7px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--sr-kraft-encre) 45%, transparent), 0 0 0 1px color-mix(in srgb, #FFFFFF 35%, transparent); }
+.sr-ici.sr-kraft { padding: 16px 16px 14px 26px; --sr-muet: var(--sr-kraft-muet); }
+.sr-ici.sr-kraft .sr-ici-l { color: var(--sr-kraft-muet); }
+.sr-ici.sr-kraft .sr-plan-case { background: color-mix(in srgb, var(--sr-kraft-encre) 12%, transparent); }
+.sr-ici.sr-kraft .sr-plan-case.is-prise { background: color-mix(in srgb, var(--sr-kraft-encre) 38%, transparent); }
+.sr-ici.sr-kraft .sr-plan-case.is-vise { background: #0071E3; }
+:root[data-theme="dark"] .sr-ici.sr-kraft .sr-plan-case.is-vise { background: #4AA3FF; }
+.sr-ici.sr-kraft .sr-ici-meuble { font-size: 24px; }
+/* « Où est N°178 » : SA place, l'étiquette en grand et allumée (un liseré bleu qui suit le coin coupé, deux battements). */
+.sr-reponse .sr-ici.sr-kraft { filter: drop-shadow(0 0 1.5px #0071E3) drop-shadow(0 0 1.5px #0071E3); animation: sr-allume 1400ms ease-in-out 1; }
+:root[data-theme="dark"] .sr-reponse .sr-ici.sr-kraft { filter: drop-shadow(0 0 1.5px #4AA3FF) drop-shadow(0 0 1.5px #4AA3FF); }
+@keyframes sr-allume { 30% { filter: drop-shadow(0 0 5px #0071E3) drop-shadow(0 0 2px #0071E3); } 60% { filter: drop-shadow(0 0 1.5px #0071E3) drop-shadow(0 0 1.5px #0071E3); } }
+/* Mes places : l'étiquette du meuble, ses lettres au feutre. */
+.sr-place-etiquette { display: grid; place-items: center; width: 52px; height: 44px; flex: none; font-size: 17px; font-weight: 800; letter-spacing: .02em; font-variant-numeric: tabular-nums; clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%, 0 10px); border-radius: 0 8px 8px 8px; }
+.sr-place-etiquette.sr-kraft::before { left: 6px; top: 6px; width: 5px; height: 5px; }
+.sr-liste > .sr-place + .sr-place::before, .sr-liste > .sr-place + .sr-rangee::before { left: 76px; }
+/* LE MOUVEMENT « fait » : la paire rangée glisse et se replie (220 ms, un ressort court), une coche sur sa photo ; le
+   compteur « N à ranger » descend d'un cran. Mouvement réduit : rien ne glisse, la suivante est là. */
+.sr-paire-photo { position: relative; display: block; flex: none; }
+.sr-coche { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 14px; background: rgb(0 113 227 / .78); color: #FFFFFF; animation: sr-coche 220ms cubic-bezier(.32, 1.25, .5, 1) both; }
+.sr-seance.is-sortie .sr-paire, .sr-seance.is-sortie .sr-ici { animation: sr-range 220ms cubic-bezier(.32, .72, 0, 1) both; }
+.sr-seance.is-sortie .sr-paire { animation-delay: 0ms; }
+@keyframes sr-range { to { opacity: 0; transform: translateX(-28px) scale(.96); } }
+@keyframes sr-coche { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
+.sr-reste { display: inline-block; font-variant-numeric: tabular-nums; animation: sr-cran 220ms cubic-bezier(.32, 1.25, .5, 1) both; }
+@keyframes sr-cran { from { opacity: .3; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .sr-coche, .sr-reste, .sr-seance.is-sortie .sr-paire, .sr-seance.is-sortie .sr-ici, .sr-reponse .sr-ici.sr-kraft { animation: none !important; }
 }

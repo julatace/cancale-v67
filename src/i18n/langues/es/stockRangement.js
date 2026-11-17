@@ -2,7 +2,6 @@
 export default {
   "sr.seance.titre": "Guardar",
   "sr.deplacer.titre": "Mover",
-  "sr.seance.rang": "{i} de {n}",
   "sr.deplacer.fait": "Movido.",
   "sr.seance.fin": {
     "one": "Todo guardado · {n} {mot}",
@@ -30,17 +29,9 @@ export default {
   "sr.reponse.deplacer": "Mover",
   "sr.reponse.ranger": "Guardar ahora",
   "sr.pasLu": "Anuncios no leídos: no se pierde nada.",
-  "sr.enLigne1": "{mot} en línea",
-  "sr.enLigne": "{mot} en línea",
-  "sr.rangees": {
-    "one": "{n} en un hueco",
-    "other": "{n} en un hueco"
-  },
   "sr.cherche.place": "Dónde está… un n.º o un modelo",
   "sr.cherche.rienNum": "Ningún n.º {num} en el stock.",
   "sr.cherche.rien": "Nada para «{q}».",
-  "sr.bande.aria": "Guardar n.º {num} {titre}",
-  "sr.places.titre": "Mis sitios",
   "sr.places.plein": {
     "one": "{n} hueco ocupado de {t}",
     "other": "{n} huecos ocupados de {t}"
@@ -49,11 +40,47 @@ export default {
     "one": "{n} por sacar",
     "other": "{n} por sacar"
   },
-  "sr.tout": "Todo el stock",
   "sr.lancer": {
     "one": "Guardar {n} {mot}",
     "other": "Guardar {n} {mot}"
   },
-  "sr.aRanger": "Por guardar",
-  "sr.fait": "N.º {num} · {ou}"
+  "sr.fait": "N.º {num} · {ou}",
+  "sr.glisse.ranger": "Guardar",
+  "sr.glisse.deplacer": "Mover",
+  "sr.ligne.aRanger": "por guardar",
+  "sr.ligne.sansNum": "sin n.º",
+  "sr.ligne.vendue": "vendido",
+  "sr.menu.titre": "Stock",
+  "sr.menu.verifier": "Por revisar",
+  "sr.menu.outils": "Herramientas",
+  "sr.menu.annonces": "Ver mis anuncios",
+  "sr.menu.ouvrir": "Más opciones del stock",
+  "sr.lancerCourt": "Guardar {n}",
+  "sr.seg.label": "Ver el stock",
+  "sr.seg.places": "Sitios",
+  "sr.groupe.aRanger": "Por guardar",
+  "sr.groupe.rangees": "En un hueco",
+  "sr.liste.plus": "Ver {n} más",
+  "sr.reponse.fiche": "Todo sobre este n.º",
+  "sr.etat.aConf": {
+    "one": "{n} por confirmar",
+    "other": "{n} por confirmar"
+  },
+  "sr.etat.aConfGeste": "Leídos hace más de 24 h ({qui}): vuelve a esa cuenta y VRM los releerá.",
+  "sr.etat.pasLu": "No todo leído",
+  "sr.etat.pasLuGeste": "Sin leer: {liste}. Abre ese sitio con la extensión y VRM lo releerá.",
+  "sr.etat.sansNum": {
+    "one": "{n} sin n.º",
+    "other": "{n} sin n.º"
+  },
+  "sr.etat.sansNumGeste": "Dales un n.º en Anuncios para poder guardarlos.",
+  "sr.etat.masquees": {
+    "one": "{n} oculto por Vinted",
+    "other": "{n} ocultos por Vinted"
+  },
+  "sr.etat.masqueesGeste": "Siguen contigo, contados aparte. Nada que hacer.",
+  "sr.seance.reste": {
+    "one": "{nb} por guardar",
+    "other": "{nb} por guardar"
+  }
 };

@@ -2,7 +2,6 @@
 export default {
   "sr.seance.titre": "Put away",
   "sr.deplacer.titre": "Move",
-  "sr.seance.rang": "{i} of {n}",
   "sr.deplacer.fait": "Moved.",
   "sr.seance.fin": {
     "one": "All put away · {n} {mot}",
@@ -30,17 +29,9 @@ export default {
   "sr.reponse.deplacer": "Move",
   "sr.reponse.ranger": "Put away now",
   "sr.pasLu": "Listings not read: nothing is lost.",
-  "sr.enLigne1": "{mot} online",
-  "sr.enLigne": "{mot} online",
-  "sr.rangees": {
-    "one": "{n} in a slot",
-    "other": "{n} in a slot"
-  },
   "sr.cherche.place": "Where is… a number or a model",
   "sr.cherche.rienNum": "No No. {num} in stock.",
   "sr.cherche.rien": "Nothing for “{q}”.",
-  "sr.bande.aria": "Put away No. {num} {titre}",
-  "sr.places.titre": "My places",
   "sr.places.plein": {
     "one": "{n} of {t} slots taken",
     "other": "{n} of {t} slots taken"
@@ -49,11 +40,47 @@ export default {
     "one": "{n} to take out",
     "other": "{n} to take out"
   },
-  "sr.tout": "All stock",
   "sr.lancer": {
     "one": "Put away {n} {mot}",
     "other": "Put away {n} {mot}"
   },
-  "sr.aRanger": "To put away",
-  "sr.fait": "No. {num} · {ou}"
+  "sr.fait": "No. {num} · {ou}",
+  "sr.glisse.ranger": "Put away",
+  "sr.glisse.deplacer": "Move",
+  "sr.ligne.aRanger": "to put away",
+  "sr.ligne.sansNum": "no number",
+  "sr.ligne.vendue": "sold",
+  "sr.menu.titre": "Stock",
+  "sr.menu.verifier": "To check",
+  "sr.menu.outils": "Tools",
+  "sr.menu.annonces": "See my listings",
+  "sr.menu.ouvrir": "More stock options",
+  "sr.lancerCourt": "Put away {n}",
+  "sr.seg.label": "View stock",
+  "sr.seg.places": "Places",
+  "sr.groupe.aRanger": "To put away",
+  "sr.groupe.rangees": "In a slot",
+  "sr.liste.plus": "Show {n} more",
+  "sr.reponse.fiche": "All about this number",
+  "sr.etat.aConf": {
+    "one": "{n} to confirm",
+    "other": "{n} to confirm"
+  },
+  "sr.etat.aConfGeste": "Read more than 24 h ago ({qui}): visit that account again and VRM will reread them.",
+  "sr.etat.pasLu": "Not all read",
+  "sr.etat.pasLuGeste": "Not read: {liste}. Open that site with the extension and VRM will reread it.",
+  "sr.etat.sansNum": {
+    "one": "{n} without a number",
+    "other": "{n} without a number"
+  },
+  "sr.etat.sansNumGeste": "Give them a number in Listings so they can be put away.",
+  "sr.etat.masquees": {
+    "one": "{n} hidden by Vinted",
+    "other": "{n} hidden by Vinted"
+  },
+  "sr.etat.masqueesGeste": "Still with you, counted separately. Nothing to do.",
+  "sr.seance.reste": {
+    "one": "{nb} to put away",
+    "other": "{nb} to put away"
+  }
 };
