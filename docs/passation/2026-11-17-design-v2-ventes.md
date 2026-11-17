@@ -49,6 +49,20 @@ De haut en bas, au téléphone :
 attente · partis » est celui-ci — prêts / sans bordereau dans « À envoyer » (l'écart nommé, « sans bordereau » sur la
 rangée), partis dans « En route ».
 
+## Qualité et fluidité (Julien : « ça doit être beaucoup plus quali et fluide ») — mesuré par le banc (Q, W)
+
+- Appui ≤ 100 ms (`:active` forcé : rangée 100 ms, plein 100 ms) ; au repos, aucun saut (CLS hors geste = 0) ;
+  1 000 rangées : `content-visibility: auto` + taille réservée ; photos en fondu dans leur boîte 64 × 64 (signature §6) ;
+  pendant la lecture, le SQUELETTE partagé (`SqueletteRangees`, forme des rangées A), jamais d'écran blanc ; lecture ratée :
+  une phrase dessinée (« rien n'est perdu ») ; mouvement réduit : la rangée faite ne glisse pas, photos et squelette immobiles.
+- Finition : textes en 13 · 15 · 17 + 34 (titre) et 56 (affiche) ; rayons 12 · 14 · 20 (ou rond) ; grille de 4 sur tout ce
+  qui est à Ventes ; champ et « ⋯ » à 44, les trois segments à la même hauteur ; aucun reste de l'écran d'hier à l'écran.
+- La palette rendue comparée à l'écran d'hier, même base : tailles, graisses, rayons, part des espacements hors de la grille
+  — toutes en baisse (chiffres dans la PR) ; « Choisir la vente » n'est plus redit (×15 hier, ×0).
+- 375 × 667, normal et « Très grand » (×1,36) : aucun mot coupé, aucun segment ni libellé rogné (les segments passent un mot
+  à la ligne s'il le faut), la ligne du titre passe à la ligne (le plein sous « Ventes », entier), la 1re vente sur le premier
+  écran. « Mis à jour à hh:mm » ne se pose plus sur le grand titre (au-dessus de la barre du bas).
+
 ## Où est le code
 
 - `src/designV2/VentesV2.jsx` — `AfficheVentes` (sur `ChiffreAffiche`), `RechercheVentes`, `ListeColis`, `ListeEnvoyer`,
