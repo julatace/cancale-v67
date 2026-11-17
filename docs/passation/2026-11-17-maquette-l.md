@@ -49,3 +49,17 @@ sous un N° ⇒ plaque rouge, dans « À faire ». Payée ⇒ Argent (date de VE
 par règle, 2 achats au point relais dont un avec QR). Les « photos » sont des **dessins de baskets inventés** (sans
 marque ni logo), servis par le banc. Le prototype n'est monté que si l'appareil porte `vrm_banc_maquette` = 'l'
 (`src/main.jsx`) : invisible pour Julien.
+
+## 17 nov. (soir) — L2 retenue comme base : « applique et améliore, ça doit être PRATIQUE »
+La version au fond bleu (`src/maquettes/l/`, banc `scripts/bancs/maquette-l.cjs`) est la base ; la page blanche
+`docs/maquettes/l/` reste sur la branche comme essai. Appliqué : Achats revient dans la barre (Dressing · Achats ·
+Messages · Argent · Moi) ; bascule grille/liste (liste par défaut pour En ligne, Vendues, Achats ; grille pour À faire ;
+ligne = vignette 56, titre sur UNE ligne, « N° · T. · compte », prix et date à droite ; 9 lignes par écran) ; menu des
+comptes sous le titre ; bouton plein sur sa bande au-dessus de la barre (la page réserve sa place) ; date ≤ 2 jours en
+ambre ; taille sur la ligne du N° et en étiquette sur la photo ; contrastes mesurés par le banc (aucun texte < 4,5:1
+en clair ni en sombre) ; À retirer : le nom en héros (28) sous la photo ; paire sans photo : fond uni, même cadrage.
+Pratique : glisser une ligne à droite = le geste (Imprimer / Retiré / Relier…), à gauche « Plus » ; appui long = menu ;
+la loupe trouve N°, titre, n° de suivi et code ; les codes d'un même point relais = une carte, un code par page.
+Mesures : 1 000 annonces en liste, page prête en ~0,9 s, rendu ~0,6 s (SwiftShader), vignettes paresseuses au-delà
+de 12 ; 21 000 nœuds : une vraie liste fenêtrée reste à faire si L est livrée.
+Restent coupés par « … » : un titre très long (une seule ligne voulue) et un nom de compte long dans la sous-ligne.
