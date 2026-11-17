@@ -32,8 +32,9 @@
 :root:root:root:root:root:root:root[data-fil] .fil-aide-clavier { margin-top: 10px !important; }
 
 /* ── Les cartes : porcelaine, une seule lumière ; la première est OUVERTE (« maintenant »). ── */
-:root:root:root:root:root:root:root[data-fil] .fil-liste { display: grid !important; gap: 10px !important; }
-:root:root:root:root:root:root:root[data-fil] .fil-carte { position: relative !important; border-radius: var(--fil-r) !important; }
+:root:root:root:root:root:root:root[data-fil] .fil-liste { display: grid !important; grid-template-columns: minmax(0, 1fr) !important; gap: 10px !important; min-width: 0 !important; }
+:root:root:root:root:root:root:root[data-fil] .fil-carte { position: relative !important; min-width: 0 !important; max-width: 100% !important; border-radius: var(--fil-r) !important; }
+:root:root:root:root:root:root:root[data-fil] .fil-liste > [role="listitem"] { min-width: 0 !important; }
 :root:root:root:root:root:root:root[data-fil] .fil-face { position: relative !important; z-index: 1 !important; border-radius: var(--fil-r) !important; background: var(--sv-verre) !important; box-shadow: var(--sv-ombre) !important; -webkit-backdrop-filter: var(--sv-flou) !important; backdrop-filter: var(--sv-flou) !important; touch-action: pan-y !important; transition: transform 360ms cubic-bezier(.32,.72,0,1), box-shadow 200ms !important; will-change: transform !important; overflow: hidden !important; }
 :root:root:root:root:root:root:root[data-fil] .fil-carte.is-ouverte .fil-face { box-shadow: var(--sb-ombre-avant) !important; }
 :root:root:root:root:root:root:root[data-fil] .fil-zone { position: absolute !important; inset: 0 0 auto 0 !important; height: 72px !important; z-index: 2 !important; background: none !important; border: 0 !important; padding: 0 !important; margin: 0 !important; cursor: pointer !important; border-radius: var(--fil-r) var(--fil-r) 0 0 !important; }
@@ -117,15 +118,15 @@
 
 /* ── Ordinateur : la barre du haut (plus de rail), puis le fil à gauche et le panneau du geste à droite. ── */
 :root:root:root:root:root:root:root[data-fil] .vrm-sidebar { display: none !important; }
-:root:root:root:root:root:root:root[data-fil] .fil-barre-ordi { position: sticky !important; top: 0 !important; z-index: 30 !important; display: flex !important; align-items: center !important; gap: 12px !important; padding: 10px 14px !important; margin: 0 300px 18px 0 !important; border-radius: 22px !important; background: var(--sb-verre) !important; -webkit-backdrop-filter: var(--sb-verre-flou) !important; backdrop-filter: var(--sb-verre-flou) !important; box-shadow: var(--sb-verre-bord) !important; }
+:root:root:root:root:root:root:root[data-fil] .fil-barre-ordi { position: sticky !important; top: 0 !important; z-index: 30 !important; display: flex !important; align-items: center !important; gap: 12px !important; padding: 10px 14px !important; margin: 0 340px 18px 0 !important; border-radius: 22px !important; background: var(--sb-verre) !important; -webkit-backdrop-filter: var(--sb-verre-flou) !important; backdrop-filter: var(--sb-verre-flou) !important; box-shadow: var(--sb-verre-bord) !important; }
 :root:root:root:root:root:root:root[data-fil] .fil-marque img { display: block !important; border-radius: 8px !important; }
 :root:root:root:root:root:root:root[data-fil] .fil-barre-n { margin-left: 8px !important; min-width: 20px !important; height: 20px !important; padding: 0 6px !important; box-sizing: border-box !important; border-radius: 10px !important; background: var(--sv-encre) !important; color: var(--sb-porcelaine) !important; font: 700 12px/20px var(--sb-police-texte) !important; }
 :root:root:root:root:root:root:root[data-fil] .fil-cherche-ordi { flex: 0 1 380px !important; }
 :root:root:root:root:root:root:root[data-fil] .fil-cherche-ordi kbd { margin-left: auto !important; font: 600 11px/1 var(--sb-police-texte) !important; padding: 3px 6px !important; border-radius: 5px !important; background: var(--sb-porcelaine) !important; color: var(--sv-encre-2) !important; }
 :root:root:root:root:root:root:root[data-fil] .fil-barre-biblios { margin-left: auto !important; display: flex !important; gap: 4px !important; }
-:root:root:root:root:root:root:root[data-fil] .fil-barre-lien { min-height: 44px !important; padding: 0 10px !important; color: var(--sv-encre-2) !important; font-weight: 500 !important; }
+:root:root:root:root:root:root:root[data-fil] .fil-barre-lien { min-height: 44px !important; padding: 0 7px !important; color: var(--sv-encre-2) !important; font-weight: 500 !important; }
 :root:root:root:root:root:root:root[data-fil] .fil-barre-lien[aria-current="page"] { color: var(--sv-encre) !important; font-weight: 700 !important; }
-:root:root:root:root:root:root:root[data-fil] .fil-champ-ordi { flex: 0 1 400px !important; min-width: 0 !important; }
+:root:root:root:root:root:root:root[data-fil] .fil-champ-ordi { flex: 0 1 320px !important; min-width: 0 !important; }
 :root:root:root:root:root:root:root[data-fil] .fil-slot:empty { display: none !important; }
 
 :root:root:root:root:root:root:root[data-fil] .fil-ordi { display: grid !important; grid-template-columns: minmax(380px, 460px) minmax(0, 1fr) !important; gap: 24px !important; align-items: start !important; }
