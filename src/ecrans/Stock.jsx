@@ -1494,7 +1494,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     const f = a.cle ? ficheParCle[a.cle] : null;
     const fOu = f ? ((ouEst(f) ? f : null) || (a.aussi || []).map((n) => ficheParCle[cleNum(n)]).filter(Boolean).find((x) => ouEst(x)) || null) : null;
     return { key: a.ids[0], cle: a.cle && f ? a.cle : '', numero: a.numero, titre: a.titre, photo: a.photo || (f && f.photo) || null, ou: fOu ? ouEst(fOu) : null,
-      taille: motsStock.nom === 'paire' ? extractSize(a.titre) : null };
+      taille: motsStock.nom === 'paire' ? extractSize(a.titre) : null, double: !!(a.cle && doublonsStock.has(a.cle)) };
   });
   // Ce qui n'est pas compté « en ligne », DIT avec son geste (dans « ⋯ ») — les mêmes nombres que la bande d'avant.
   const nSansTout = aa ? nSansNum + sansNumAutres + vcSansNum.length : 0;

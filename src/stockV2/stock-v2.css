@@ -216,11 +216,12 @@
 
 /* ══ LA SIGNATURE (17 nov., brief « SIGNATURE ») : l'ÉTIQUETTE KRAFT — une place est une étiquette de carton, en plus grand
    que celle du N° (kraft clair #E9DCC4 / nuit #3A3226, encre, coin coupé, œillet percé) ; et le MOUVEMENT « fait ». ══ */
-.sr-kraft { --sr-kraft: #E9DCC4; --sr-kraft-encre: #2A2116; --sr-kraft-muet: #5E4E36; background: var(--sr-kraft) !important; color: var(--sr-kraft-encre) !important;
-  clip-path: polygon(16px 0, 100% 0, 100% 100%, 0 100%, 0 16px); border-radius: 0 10px 10px 10px; position: relative; }
-:root[data-theme="dark"] .sr-kraft { --sr-kraft: #3A3226; --sr-kraft-encre: #F3EAD9; --sr-kraft-muet: #D6C8AE; }
-.sr-kraft::before { content: ""; position: absolute; left: 9px; top: 9px; width: 7px; height: 7px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--sr-kraft-encre) 45%, transparent), 0 0 0 1px color-mix(in srgb, #FFFFFF 35%, transparent); }
-.sr-ici.sr-kraft { padding: 16px 16px 14px 26px; --sr-muet: var(--sr-kraft-muet); }
+.sr-kraft { --sr-kraft: var(--v2-kraft, #E9DCC4); --sr-kraft-encre: var(--v2-kraft-encre, #2A2116); --sr-kraft-muet: var(--v2-kraft-doux, #6B5A40); background: var(--sr-kraft) !important; color: var(--sr-kraft-encre) !important;
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%); border-radius: 6px; box-shadow: inset 0 0 0 .5px var(--v2-kraft-bord, rgb(42 33 22 / .22)); position: relative; }
+/* L'œillet percé, à gauche (la géométrie de l'étiquette N° partagée, src/designV2/signature.css, en plus grand). */
+.sr-kraft::before { content: ""; position: absolute; left: 10px; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%; background: var(--sr-trou, var(--v2-kraft-trou, #FFFFFF)); box-shadow: inset 0 0 0 .5px var(--v2-kraft-bord, rgb(42 33 22 / .22)); }
+.sr-feuille .sr-kraft { --sr-trou: var(--v2-feuille-fond, #F4F8FC); }
+.sr-ici.sr-kraft { padding: 14px 18px 14px 30px; --sr-muet: var(--sr-kraft-muet); }
 .sr-ici.sr-kraft .sr-ici-l { color: var(--sr-kraft-muet); }
 .sr-ici.sr-kraft .sr-plan-case { background: color-mix(in srgb, var(--sr-kraft-encre) 12%, transparent); }
 .sr-ici.sr-kraft .sr-plan-case.is-prise { background: color-mix(in srgb, var(--sr-kraft-encre) 38%, transparent); }
@@ -228,13 +229,13 @@
 :root[data-theme="dark"] .sr-ici.sr-kraft .sr-plan-case.is-vise { background: #4AA3FF; }
 .sr-ici.sr-kraft .sr-ici-meuble { font-size: 24px; }
 /* « Où est N°178 » : SA place, l'étiquette en grand et ALLUMÉE — un liseré bleu de 3 px qui suit le coin coupé. */
-.sr-kraft-anneau { padding: 3px; background: #0071E3; clip-path: polygon(17px 0, 100% 0, 100% 100%, 0 100%, 0 17px); border-radius: 0 13px 13px 13px; animation: sr-allume 900ms ease-out 1 both; }
+.sr-kraft-anneau { padding: 3px; background: #0071E3; clip-path: polygon(0 0, calc(100% - 17px) 0, 100% 17px, 100% 100%, 0 100%); border-radius: 9px; animation: sr-allume 900ms ease-out 1 both; }
 :root[data-theme="dark"] .sr-kraft-anneau { background: #4AA3FF; }
-.sr-kraft-anneau > .sr-ici.sr-kraft { clip-path: polygon(15px 0, 100% 0, 100% 100%, 0 100%, 0 15px); border-radius: 0 10px 10px 10px; }
+.sr-kraft-anneau > .sr-ici.sr-kraft { clip-path: polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% 100%, 0 100%); }
 @keyframes sr-allume { from { transform: scale(.97); opacity: .4; } 60% { transform: scale(1.015); opacity: 1; } to { transform: none; } }
 /* Mes places : l'étiquette du meuble, ses lettres au feutre. */
-.sr-place-etiquette { display: grid; place-items: center; width: 52px; height: 44px; flex: none; font-size: 17px; font-weight: 800; letter-spacing: .02em; font-variant-numeric: tabular-nums; clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%, 0 10px); border-radius: 0 8px 8px 8px; }
-.sr-place-etiquette.sr-kraft::before { left: 6px; top: 6px; width: 5px; height: 5px; }
+.sr-place-etiquette { display: grid; place-items: center; width: 56px; height: 44px; padding-left: 8px; box-sizing: border-box; flex: none; font-size: 17px; font-weight: 800; letter-spacing: .02em; clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 0 100%); border-radius: 4px; }
+.sr-place-etiquette.sr-kraft::before { left: 7px; width: 6px; height: 6px; margin-top: -3px; }
 .sr-liste > .sr-place + .sr-place::before, .sr-liste > .sr-place + .sr-rangee::before { left: 76px; }
 /* LE MOUVEMENT « fait » : la paire rangée glisse et se replie (220 ms, un ressort court), une coche sur sa photo ; le
    compteur « N à ranger » descend d'un cran. Mouvement réduit : rien ne glisse, la suivante est là. */
@@ -249,3 +250,14 @@
 @media (prefers-reduced-motion: reduce) {
   .sr-coche, .sr-reste, .sr-seance.is-sortie .sr-paire, .sr-seance.is-sortie .sr-ici, .sr-kraft-anneau { animation: none !important; }
 }
+
+/* Le segmenté Paires · Places : le contrôle iOS — un creux translucide sur la coque, l'élu en porcelaine (jour) ou en
+   verre clair (nuit), sans aplat gris lourd ni diode. */
+:root:root:root:root:root:root:root body .sr-segment .vrm-seg { background: rgb(255 255 255 / .16) !important; border: 0 !important; box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .18) !important; border-radius: 12px !important; padding: 3px !important; gap: 2px !important; min-height: 44px !important; }
+:root:root:root:root:root:root:root body .sr-segment .vrm-seg-btn { background: transparent !important; color: #FFFFFF !important; border: 0 !important; box-shadow: none !important; border-radius: 9px !important; min-height: 38px !important; font-size: 15px !important; font-weight: 600 !important; }
+:root:root:root:root:root:root:root body .sr-segment .vrm-seg-btn::before, :root:root:root:root:root:root:root body .sr-segment .vrm-seg-btn::after { display: none !important; }
+:root:root:root:root:root:root:root body .sr-segment .vrm-seg-btn[aria-pressed="true"] { background: #FFFFFF !important; color: #0C1D30 !important; box-shadow: 0 1px 2px rgb(0 0 0 / .14), 0 3px 8px rgb(0 0 0 / .10) !important; }
+:root:root:root:root:root:root:root body .sr-segment .vrm-seg-n { opacity: .72; font-weight: 500; }
+:root[data-theme="dark"]:root:root:root:root:root:root body .sr-segment .vrm-seg { background: rgb(0 0 0 / .28) !important; box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .10) !important; }
+:root[data-theme="dark"]:root:root:root:root:root:root body .sr-segment .vrm-seg-btn { color: #EAF2FB !important; }
+:root[data-theme="dark"]:root:root:root:root:root:root body .sr-segment .vrm-seg-btn[aria-pressed="true"] { background: #3A5072 !important; color: #FFFFFF !important; box-shadow: 0 1px 3px rgb(0 0 0 / .35) !important; }

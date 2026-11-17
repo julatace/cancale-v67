@@ -42,6 +42,7 @@ const MAIN = {
   vrm_slots: { '1': { m: 'mA', i: 0 }, '2': { m: 'mA', i: 1 }, '3': { m: 'mA', i: 2 }, '4': { m: 'mA', i: 3 }, '5': { m: 'mA', i: 4 }, '6': { m: 'mA', i: 5 }, '178': { m: 'mB', i: 4 } },
   vrm_stock_vendus: { nums: ['3'], at: AUJ },
   vinted_nums_physiques: { nums: NUMS, at: AUJ },
+  vrm_je_vends: { choix: 'sneakers' },   // Julien vend des sneakers : « paire », « T. 44 »
 };
 const enLigne = (n) => ({ id: idDe(n), title: NUMEROS[String(idDe(n))].title, is_closed: false, is_hidden: false, is_draft: false, price: { amount: '80.0', currency_code: 'EUR' }, photo: { url: NUMEROS[String(idDe(n))].photo } });
 const LISTINGS = [{ id: 'harvest_111_listings', data: { capturedAt: new Date(AUJ - 3600000).toISOString(), nItems: NUMS.length - 1, payload: { items: NUMS.filter((n) => n !== '3').map(enLigne) } } }];

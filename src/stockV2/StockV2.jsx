@@ -22,6 +22,7 @@ import { requeteDeLaVoix } from '../rechercheVocale.js';
 import { BoutonV2, BoutonIconeV2 } from '../designV2/BoutonV2.jsx';
 import MenuPlateforme from '../designV2/MenuPlateforme.jsx';
 import LigneGlissable from '../LigneGlissable.jsx';
+import { Etiquette } from '../designV2/Signature.jsx';   // l'étiquette N° kraft partagée du nouveau design
 import './stock-v2.css';
 
 // Le petit plan d'un meuble : les cases en grille, la case visée pleine. Lecture seule (aucun toucher) ;
@@ -44,7 +45,7 @@ function PetitPlan({ m, viseI, occupee }) {
 const initiales = (nom) => String(nom || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '·';
 
 function Plaque({ n, grand = false }) {
-  return <span className={'sr-plaque' + (grand ? ' is-grand' : '')} data-sr-plaque={String(n)}>N°{n}</span>;
+  return <span data-sr-plaque={String(n)}><Etiquette num={String(n)} taille={grand ? 'grand' : 'moyen'}/></span>;
 }
 
 // Une photo de paire (fixe, recadrée) ; sans photo, une boîte au trait sur fond uni (jamais une photo inventée).
@@ -196,8 +197,6 @@ function Reponse({ s, f, onDeplacer, onRanger, onVoir }) {
   );
 }
 
-// La plaque N° d'une rangée : celle du nouveau design (`.v2-plaque`, src/designV2/design-v2.css).
-function PlaqueV2({ num }) { return <span className="v2-plaque" data-v2-plaque={num}><small>N°</small>{num}</span>; }
 
 // ── UNE PAIRE DANS LA LISTE : la rangée A du nouveau design (photo 64, titre sur 2 lignes, « N° · T. · place »).
 // Toucher : sa place (une feuille) ; glisser à gauche : « Ranger » ou « Déplacer » (les mêmes gestes que la feuille).
@@ -215,7 +214,7 @@ function LignePaire({ s, l, onOuvrir, onRanger, onDeplacer }) {
       <span className="v2l-a-txt">
         <span className="v2l-a-l1"><span className="v2l-a-titre">{l.titre || '—'}</span></span>
         <span className="v2l-a-l2">
-          {l.cle ? <PlaqueV2 num={l.numero}/> : <span className="sr-sans-num">{tr('sr.ligne.sansNum')}</span>}
+          {l.cle ? <Etiquette num={l.numero} double={!!l.double}/> : <span className="sr-sans-num">{tr('sr.ligne.sansNum')}</span>}
           <span className="v2l-faits-txt">{[l.taille ? tr('v2.l.taille', { t: l.taille }) : '', place].filter(Boolean).join(' · ')}</span>
           {l.vendue ? <span className="v2l-geste" data-sr-ligne-vendue="">{tr('sr.ligne.vendue')}</span> : null}
         </span>
