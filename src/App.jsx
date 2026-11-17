@@ -1049,6 +1049,7 @@ import "./design/verre-journee.css";   // (15 nov., refonte-journee) Ma journée
 import "./design/verre-annonces.css";   // (15 nov., refonte-journee) Annonces comme la maquette validée : la rangée de 72 px, la recherche et les vues
 import "./design/verre-restes.css";   // (16 nov., lot design-restes) les restes du verre : la carte qui monte sur Leboncoin, eBay, Vestiaire… — `@layer vrm-verre` : docs/passation/2026-11-16-design-restes.md
 import "./design/verre-argent.css";   // (16 nov., lot argent-mieux) Argent lisible partout : cartes de verre, encre du verre, « Copier » plein, ventes non comptées groupées — `@layer vrm-verre` : docs/passation/2026-11-16-argent-mieux.md
+import "./design/accessibilite.css";   // (17 nov.) audit WCAG 2.1 AA : focus double, encre claire sur le bleu, 44 px — `@layer vrm-a11y`, nommée AVANT vrm-verre (index.html)
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
@@ -15985,7 +15986,7 @@ function EnLigne({ value, onCommit, rendu, placeholder, inputMode, largeur = 64,
     // (revue du 19 oct.) La zone au doigt fait 44 px de LARGE aussi : sur
     // « achat — » elle faisait 10 px (le tiret), 25 px sur « N°2 ». Le
     // pointillé reste sous le texte seul (le span), pas sous la zone.
-    <button type="button" data-edition={data} onClick={() => setEdit(true)} title={titre || tr('annonces.cliquerModifier')}
+    <button type="button" className="vrm-cible-44" data-edition={data} onClick={() => setEdit(true)} title={titre || tr('annonces.cliquerModifier')}
       style={{border:'none',background:'transparent',padding:0,minHeight:0,minWidth:44,margin:0,color:'inherit',font:'inherit',cursor:'text',lineHeight:'inherit',textAlign:'inherit'}}><span style={{borderBottom:`1px dashed ${C.border}`}}>{rendu}</span></button>
   );
 }
@@ -16408,7 +16409,7 @@ const MARQUES_PLAT = {
 };
 function MarquePlateforme({ p, taille = 18 }) {
   const m = MARQUES_PLAT[p]; if (!m) return null;
-  return <span data-marque={p} title={`En ligne sur ${m.nom}`} aria-label={`En ligne sur ${m.nom}`}
+  return <span data-marque={p} title={tr('a11y.enLigneSur', { site: m.nom })} aria-label={tr('a11y.enLigneSur', { site: m.nom })}
     style={{display:'inline-flex',alignItems:'center',justifyContent:'center',minWidth:taille,height:taille,padding:'0 4px',borderRadius:6,
       background:m.bg,color:m.fg,border:`1px solid ${m.bord||m.bg}`,fontSize:Math.round(taille*0.5),fontWeight:700,letterSpacing:-0.2,lineHeight:1,flexShrink:0}}>{m.court}</span>;
 }
@@ -61486,9 +61487,11 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
               <React.Fragment key={l.cle}>
               {il === sansDateT.i ? <LigneSansDate n={sansDateT.n}/> : null}
               <button type="button" className="vrm-toutes-ligne" data-toutes-vente={l.site} data-toutes-id={l.id} data-toutes-compte={l.compte || ''} data-ordre-t={l.t != null ? String(l.t) : ''} onClick={() => onOuvrir(l)}
+                aria-label={`${l.titre} — ${NOM[l.site]}${l.compte ? ', ' + l.compte : ''}, ${jour(l.t)}${l.etat ? ', ' + motEtatVente(l.etat) : ''}${l.prix != null ? ', ' + prix(l) : ''}${l.num ? ', N°' + l.num : ''}`}
                 style={{ width: '100%', minHeight: 56, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 2px', background: 'transparent', border: 0, borderBottom: `1px solid ${C.border}`, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: C.text }}>
                 {/* (11 nov., lot accessibilité) Le nom de la ligne est LU ici (tout ce qu'elle montre, N° compris) ;
-                    le dessin est caché au lecteur. Plus d'aria-label qui ne contenait pas le texte affiché. */}
+                    le dessin est caché au lecteur. (17 nov.) Le MÊME texte en aria-label : `content-visibility:auto`
+                    (styles-listes.css) vidait ce texte des lignes hors écran pour le lecteur (nom vide mesuré). */}
                 <span className="vrm-sr-seul">{`${l.titre} — ${NOM[l.site]}${l.compte ? ', ' + l.compte : ''}, ${jour(l.t)}${l.etat ? ', ' + motEtatVente(l.etat) : ''}${l.prix != null ? ', ' + prix(l) : ''}${l.num ? ', N°' + l.num : ''}`}</span>
                 {/* (31 oct., Julien : « pas de photos partout ») La photo de la vente, comme sur l'écran de son site. */}
                 <span className="vrm-toutes-photo" data-toutes-photo={l.photo ? '1' : '0'} aria-hidden="true" style={{ width: 64, height: 80, flexShrink: 0, borderRadius: 12, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -65551,8 +65554,23 @@ function AppCoeur() {
       value={fil.q} onChange={e=>{ setGsQ(e.target.value); if(!gsOpen) setGsOpen(true); }} onFocus={()=>{ if(!gsOpen) setGsOpen(true); }}
       onKeyDown={e=>{ if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); fermerRecherche(); return; } clavierChamp(e); }}/>
   )}/>;
+  // (17 nov., accessibilité WCAG 2.4.3) Au clavier, Tab depuis la barre de recherche ne traverse plus les 7 suggestions
+  // ouvertes au focus (8 arrêts de plus sur chaque écran, mesuré) : il va au contrôle qui SUIT la recherche et referme le
+  // panneau. Les suggestions restent atteignables par ↓ (le clavier de la loupe, ci-dessus).
+  const tabHorsSuggestions = (e) => {
+    if (e.key !== 'Tab' || e.shiftKey || e.altKey || e.metaKey || e.ctrlKey) return;
+    const barre = e.currentTarget.querySelector('[data-barre-recherche]'); const p = document.getElementById('vrm-recherche-resultats');
+    if (!barre || !barre.contains(e.target) || !p || !e.currentTarget.contains(p)) return;
+    const SEL = 'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),summary,[tabindex]:not([tabindex="-1"])';
+    const dansBarre = [...barre.querySelectorAll(SEL)].filter((x) => x.getClientRects().length);
+    if (dansBarre[dansBarre.length - 1] !== e.target) return;
+    const tous = [...document.querySelectorAll(SEL)].filter((x) => x.getClientRects().length && !x.closest('[inert],[aria-hidden="true"]'));
+    const suivant = tous.find((x) => !p.contains(x) && !barre.contains(x) && (e.target.compareDocumentPosition(x) & Node.DOCUMENT_POSITION_FOLLOWING));
+    if (!suivant) return;
+    e.preventDefault(); flushSync(() => setGsOpen(false)); try { suivant.focus(); } catch (_) {}
+  };
   const champRechercheOrdi = (
-    <div className="vrm-recherche" data-recherche-zone="" data-recherche-ouverte={gsOpen?'1':'0'}>
+    <div className="vrm-recherche" data-recherche-zone="" data-recherche-ouverte={gsOpen?'1':'0'} onKeyDown={tabHorsSuggestions}>
       <label className="vrm-barre-recherche" data-barre-recherche="">
         <Icon name="search" size={18}/>
         {champRecherche(false)}
@@ -65781,6 +65799,9 @@ function AppCoeur() {
       // doigts ou que je glisse ») PLUS AUCUN CHANGEMENT D'ONGLET AU DOIGT. On change d'écran par la
       // barre du bas (ou les flèches ← → du clavier sur ordinateur). Ne pas remettre de balayage.
 >
+      {/* (17 nov., accessibilité WCAG 2.4.1) Le lien d'évitement : invisible tant qu'on ne tabule pas, il mène au contenu. */}
+      <a href="#vrm-contenu" className="vrm-aller-contenu" data-aller-contenu="" onClick={(e)=>{ e.preventDefault(); const m=document.getElementById('vrm-contenu'); if(m){ m.setAttribute('tabindex','-1'); try{ m.focus({preventScroll:true}); }catch(_){} } }}>{tr('a11y.allerContenu')}</a>
+      {ordi ? <SideBar tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesRail}/> : null}
       {/* Barre de chargement globale : visible dès qu'une donnée est en cours de
           chargement, sur n'importe quel écran. */}
       <TopProgress/>
@@ -65905,7 +65926,7 @@ function AppCoeur() {
           (au-dessus des feuilles, par un portail) : l'exemple ne se confond plus avec ses vraies données. */}
       {exempleActif() && <BandeauExemple sansCompte={exempleSansCompte()} style={ordi ? { marginLeft: NAV_LARGEUR + 36 } : undefined} onBrancher={() => (exempleSansCompte() ? sortirModeExemple(window, '/?inscription') : sortirModeExemple())} onConnexion={() => sortirModeExemple(window, '/?connexion')}/>}
       {exempleActif() && createPortal(<CadreExemple/>, document.body)}
-      <main className="vrm-main" data-ecran={tab} data-espace={espaceDe(tab, BAR_GROUPE)} data-defile="1" style={{
+      <main id="vrm-contenu" className="vrm-main" data-ecran={tab} data-espace={espaceDe(tab, BAR_GROUPE)} data-defile="1" style={{
         // ⚠️ COQUE APP-SHELL : c'est `<main>` qui défile, pas le document. La
         // barre du bas est un frère HORS de ce conteneur → elle ne bouge plus
         // jamais pendant le scroll (bug iOS « barre au milieu de l'écran »).
@@ -66067,7 +66088,7 @@ function AppCoeur() {
             ou la source en retard NOMMÉE avec son geste (src/fraicheur.js). Base injoignable ⇒ elle se tait
             (le bloc ci-dessus parle) ; hors ligne ⇒ cette branche n'est pas rendue (JourneeHorsLigne). La place
             est tenue dès le premier rendu (repli de même hauteur) : rien ne saute à l'arrivée de la réponse. */}
-        {!baseKO && !horsLigne && <Suspense fallback={<div className="vrm-fraicheur-hote" aria-hidden="true"><div className="vrm-bandeau-abo vrm-fraicheur" data-fraicheur-unique="charge" style={{background:'transparent',boxShadow:'none'}}/></div>}><LigneFraicheurParesseuse baseKO={baseKO} comptes={vintedAccounts} onNav={setTab}/></Suspense>}
+        {!baseKO && !horsLigne && <Suspense fallback={<div className="vrm-fraicheur-hote" aria-hidden="true"><div className="vrm-bandeau-abo vrm-fraicheur" data-fraicheur-unique="charge" style={{background:'transparent',boxShadow:'none'}}/></div>}><LigneFraicheurParesseuse baseKO={baseKO} comptes={vintedAccounts} onNav={setTab} horsTab/></Suspense>}
         <BandeauAbonnement setTab={setTab}/>
         {MULTI_USER && authState.user && <BandeauSuppressionPrevue tab={tab}/>}
         <BandeauCompteVendeur enTete={enTeteSession} ventes={ventesCoque} autres={autresSolo}
@@ -66388,7 +66409,9 @@ function AppCoeur() {
       <MemoireDefilement ecran={`${tab}:${(tab.startsWith('plat_')||estTacheSite(tab))?platSub:''}`}/>
       {/* Une seule navigation à la fois : latérale sur ordinateur, en bas sur
           téléphone. Jamais les deux — c'est la même liste d'écrans. */}
-      {ordi ? <SideBar tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesRail}/> : <BottomBar tab={tab} setTab={setTab} sites={sitesPresents} badges={badgesNav} gestes={gestesDisque}/>}
+      {/* (17 nov., accessibilité WCAG 2.4.3) Sur ordinateur, la colonne de navigation est rendue EN TÊTE de la coque
+          (elle est fixe : rien ne bouge à l'écran) — au clavier, Tab la parcourt avant l'écran, comme on la lit. */}
+      {ordi ? null : <BottomBar tab={tab} setTab={setTab} sites={sitesPresents} badges={badgesNav} gestes={gestesDisque}/>}
       {showBackup&&<GardeEcran nom="sauvegarde" feuille onFermer={()=>setShowBackup(false)}><BackupModal
         catalog={catalog} sales={sales} garageGrid={garageGrid} blockedCells={blockedCells}
         onClose={()=>setShowBackup(false)}
