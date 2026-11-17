@@ -16,8 +16,8 @@
   --sf: -apple-system, 'SF Pro Text', 'Inter', system-ui, sans-serif; --sf-d: -apple-system, 'SF Pro Display', 'Inter Display', 'Inter', system-ui, sans-serif;
   color-scheme: light;
 }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="clair"]) { --fond: #000; --carte: #1C1C1E; --encre: #FFF; --gris: #98989F; --gris-2: #636366; --sep: rgba(84, 84, 88, 0.6); --remplir: rgba(118, 118, 128, 0.24); --appui: #2C2C2E; --accent: #0A84FF; --accent-teinte: rgba(10, 132, 255, 0.18); --ambre: #FFB340; --rouge: #FF453A; --tag: #FFFFFF; --tag-encre: #000; --verre: rgba(22, 22, 24, 0.86); --ombre-haute: 0 1px 2px rgba(0,0,0,.4), 0 16px 48px rgba(0,0,0,.6); color-scheme: dark; } }
-:root[data-theme="sombre"] { --fond: #000; --carte: #1C1C1E; --encre: #FFF; --gris: #98989F; --gris-2: #636366; --sep: rgba(84, 84, 88, 0.6); --remplir: rgba(118, 118, 128, 0.24); --appui: #2C2C2E; --accent: #0A84FF; --accent-teinte: rgba(10, 132, 255, 0.18); --ambre: #FFB340; --rouge: #FF453A; --tag: #FFFFFF; --tag-encre: #000; --verre: rgba(22, 22, 24, 0.86); --ombre-haute: 0 1px 2px rgba(0,0,0,.4), 0 16px 48px rgba(0,0,0,.6); color-scheme: dark; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="clair"]) { --fond: #000; --carte: #1C1C1E; --encre: #FFF; --gris: #98989F; --gris-2: #636366; --sep: rgba(84, 84, 88, 0.6); --remplir: rgba(118, 118, 128, 0.24); --appui: #2C2C2E; --accent: #0A84FF; --accent-teinte: rgba(10, 132, 255, 0.18); --ambre: #FFB340; --rouge: #FF453A; --verre: rgba(22, 22, 24, 0.86); --ombre-haute: 0 1px 2px rgba(0,0,0,.4), 0 16px 48px rgba(0,0,0,.6); color-scheme: dark; } }
+:root[data-theme="sombre"] { --fond: #000; --carte: #1C1C1E; --encre: #FFF; --gris: #98989F; --gris-2: #636366; --sep: rgba(84, 84, 88, 0.6); --remplir: rgba(118, 118, 128, 0.24); --appui: #2C2C2E; --accent: #0A84FF; --accent-teinte: rgba(10, 132, 255, 0.18); --ambre: #FFB340; --rouge: #FF453A; --verre: rgba(22, 22, 24, 0.86); --ombre-haute: 0 1px 2px rgba(0,0,0,.4), 0 16px 48px rgba(0,0,0,.6); color-scheme: dark; }
 
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; background: var(--fond); }
@@ -41,7 +41,7 @@ dd { margin: 0; }
 .tag--grand { top: auto; bottom: 16px; left: 16px; height: 32px; padding: 0 12px 0 24px; font-size: 17px; clip-path: polygon(11px 0, 100% 0, 100% 100%, 11px 100%, 0 50%); border-radius: 0 6px 6px 0; }
 .tag--grand::before { left: 10px; width: 6px; height: 6px; margin-top: -3px; }
 .tag--grand .tag-n::before { content: 'N° '; font-weight: 400; opacity: 0.7; }
-.tag--marque { position: static; height: 28px; padding: 0 12px 0 21px; font-size: 15px; letter-spacing: 0.04em; clip-path: polygon(9px 0, 100% 0, 100% 100%, 9px 100%, 0 50%); }
+.tag--marque { background: var(--encre); color: var(--fond); position: static; height: 28px; padding: 0 12px 0 21px; font-size: 15px; letter-spacing: 0.04em; clip-path: polygon(9px 0, 100% 0, 100% 100%, 9px 100%, 0 50%); }
 .tag--marque::before { left: 8px; width: 5px; height: 5px; margin-top: -2.5px; background: var(--fond); }
 
 /* ── La photo : détourée sur fond de studio ─────────────────────────────────── */
@@ -238,7 +238,17 @@ dd { margin: 0; }
   .feuille, .feuille.is-grande { position: sticky; top: 0; height: 100vh; border-radius: 0; box-shadow: inset 0.5px 0 0 var(--sep); animation: glisse 260ms var(--ease); }
   @keyframes glisse { from { transform: translateX(24px); opacity: 0; } }
   .poignee { visibility: hidden; }
-  .resume { max-width: 760px; }
+  .duo { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 24px; align-items: start; max-width: 1180px; }
+  .duo > div > .entete { padding-top: 0; }
+  .duo--egal { grid-template-columns: 1fr 1fr; max-width: 1180px; }
+  .duo .carte, .duo .entete { max-width: none; }
+  .groupe { max-width: 1180px; }
+  .ph--bande { width: 168px; height: 168px; }
+  .bande-case { width: 168px; }
+  .passes { align-items: stretch; }
+  .passe-btn { height: 100%; }
+  .passe-pied { margin-top: auto; }
+  .passe-code { margin-bottom: 16px; }
 }
 @media (hover: hover) and (pointer: fine) {
   .case:hover .ph img, .bande-case:hover .ph img { transform: scale(1.03); }
@@ -250,3 +260,8 @@ dd { margin: 0; }
   .rg-btn, .ph img, .bt, .act, .passe-btn { transition: none; }
 }
 @media (prefers-reduced-transparency: reduce) { .onglets, .lateral { background: var(--carte); -webkit-backdrop-filter: none; backdrop-filter: none; } }
+
+/* L'état vide : la silhouette au trait, une phrase. */
+.vide { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 48px 16px; color: var(--gris); text-align: center; }
+.vide .sil { width: 96px; color: var(--sil); }
+.vide p { font-size: 15px; line-height: 20px; }

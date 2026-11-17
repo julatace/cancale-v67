@@ -81,6 +81,9 @@
     ${recherche ? `<label class="recherche">${ic('chercher', 18)}<input type="search" placeholder="${recherche}" enterkeyhint="search" aria-label="${recherche}"></label>` : ''}`;
   const menuComptes = `<button type="button" class="menu-titre">Tous les comptes${ic('bas', 16)}</button>`;
   const chevron = ic('droite', 18, 'chev');
+  // L'état vide : une silhouette et une phrase qui dit quoi faire (jamais une liste blanche muette).
+  const vide = (texte) => `<div class="vide">${silhouette}<p>${texte}</p></div>`;
+  const ou = (liste, html, texte) => (liste.length ? html : vide(texte));
 
   // Une ligne de liste iOS : vignette 60, titre 17, sous-titre 15 gris, valeur à droite, chevron ; séparateur inset.
   const rangee = (o, sous, valeur, cle, actions = '') => `<li class="rg${actions ? ' a-glisse' : ''}" data-cle="${cle}">${actions ? `<div class="rg-actions">${actions}</div>` : ''}<button type="button" class="rg-btn" data-f="${cle}">${photo(o.photo, o.numero, 'ph--rg', 'tag--mini')}<span class="rg-txt"><span class="rg-titre">${esc(o.titre)}</span><span class="rg-sous">${sous}</span></span><span class="rg-val">${valeur}</span>${chevron}</button></li>`;
@@ -93,10 +96,10 @@
       ${grandTitre('Ma journée', { sous: `<p class="sous">${date[0].toUpperCase() + date.slice(1)}</p>` })}
       ${groupe('ventes', 'À poster', aEnvoyer.length, aImprimer ? `<button type="button" class="act" data-plein>${ic('imprimer', 18)}Imprimer ${aImprimer}</button>` : '',
         `<ul class="bande">${aEnvoyer.map((v) => `<li><button type="button" class="bande-case" data-f="v:${v.tx}" aria-label="${esc(v.titre)}">${photo(v.photo, v.numero, 'ph--bande')}<span class="bande-l ${presse(v) ? 'ambre' : ''}">${quand(v)}</span></button></li>`).join('')}</ul>`)}
-      ${groupe('lieu', 'À retirer', D.colis.length, `<button type="button" class="act-lien" data-aller="achats">Codes</button>`,
-        `<ul class="liste-simple">${points.map((p) => `<li><button type="button" class="ls" data-aller="achats"><span class="ls-txt"><span class="ls-titre">${esc(p.point)}</span><span class="ls-sous"><span class="${p.limite - M < 3 * J ? 'ambre' : ''}">jusqu’à ${jour(p.limite)}</span> · ${p.colis.length} colis</span></span>${chevron}</button></li>`).join('')}</ul>`)}
+      <div class="duo duo--egal">${groupe('lieu', 'À retirer', D.colis.length, `<button type="button" class="act-lien" data-aller="achats">Codes</button>`,
+        `<ul class="liste-simple">${points.map((p) => `<li><button type="button" class="ls" data-aller="achats"><span class="ls-txt"><span class="ls-titre">${esc(p.point)}</span><span class="ls-sous"><span class="${p.limite - M < 3 * J ? 'ambre' : ''}">jusqu’à ${jour(p.limite)}</span>, ${p.colis.length} colis</span></span>${chevron}</button></li>`).join('')}</ul>`)}
       ${groupe('argent', 'Prix d’achat à saisir', sansCout.length, `<button type="button" class="act-lien">Saisir</button>`,
-        `<ul class="bande">${sansCout.map((v) => `<li><button type="button" class="bande-case" data-f="v:${v.tx}" aria-label="${esc(v.titre)}">${photo(v.photo, v.numero, 'ph--bande')}<span class="bande-l">${euros(v.prix)}</span></button></li>`).join('')}</ul>`)}`;
+        `<ul class="bande">${sansCout.map((v) => `<li><button type="button" class="bande-case" data-f="v:${v.tx}" aria-label="${esc(v.titre)}">${photo(v.photo, v.numero, 'ph--bande')}<span class="bande-l">${euros(v.prix)}</span></button></li>`).join('')}</ul>`)}</div>`;
   }
   function annonces(r) {
     const vue = r.s || 'toutes';
@@ -104,7 +107,7 @@
     return `
       ${grandTitre('Annonces', { sous: menuComptes, boutons: `<button type="button" class="nav-btn" aria-label="Publier une annonce">${ic('plus', 24)}</button>`, recherche: 'N°, modèle, taille' })}
       ${segment([['toutes', 'Toutes'], ['dorment', 'Plus de 60 j'], ['sansphoto', 'Sans photo']], vue, 'Vue')}
-      <ul class="grille">${liste.map((a) => `<li><button type="button" class="case${r.f === 'a:' + a.id ? ' is-ouverte' : ''}" data-f="a:${a.id}" aria-label="N° ${a.numero}, ${esc(a.titre)}, ${euros(a.prix)}">${photo(a.photo, a.numero)}<span class="case-l"><span class="prix">${euros(a.prix)}</span><span class="gris">${a.jours} j</span></span></button></li>`).join('')}</ul>`;
+      ${liste.length ? '' : vide('Aucune annonce ici.')}<ul class="grille">${liste.map((a) => `<li><button type="button" class="case${r.f === 'a:' + a.id ? ' is-ouverte' : ''}" data-f="a:${a.id}" aria-label="N° ${a.numero}, ${esc(a.titre)}, ${euros(a.prix)}">${photo(a.photo, a.numero)}<span class="case-l"><span class="prix">${euros(a.prix)}</span><span class="gris">${a.jours} j</span></span></button></li>`).join('')}</ul>`;
   }
   function ventes(r) {
     const s = r.s || 'envoyer';
@@ -117,7 +120,7 @@
         <h3 class="entete">Date limite pas encore lue</h3><ul class="carte">${sansDate.map((v) => rangee(v, sousV(v), euros(v.prix), 'v:' + v.tx)).join('')}</ul>`;
     } else {
       const l = s === 'route' ? enRoute : toutes;
-      corps = `<ul class="carte">${l.map((v) => rangee(v, `${v.etat === 'envoyer' ? 'À envoyer' : v.etat === 'finie' ? 'Livrée' : 'En route'} · ${jour(v.date)}`, euros(v.prix), 'v:' + v.tx)).join('')}</ul>`;
+      corps = l.length ? '' : vide('Aucune vente ici.'); corps += `<ul class="carte">${l.map((v) => rangee(v, `${v.etat === 'envoyer' ? 'À envoyer' : v.etat === 'finie' ? 'Livrée' : 'En route'}, ${jour(v.date)}`, euros(v.prix), 'v:' + v.tx)).join('')}</ul>`;
     }
     return `${grandTitre('Ventes', { sous: menuComptes, boutons: aImprimer ? `<button type="button" class="nav-txt" data-plein>${ic('imprimer', 20)}Imprimer ${aImprimer}</button>` : '' })}
       ${segment([['envoyer', 'À envoyer'], ['route', 'En route'], ['toutes', 'Toutes']], s, 'Ventes')}${corps}`;
@@ -134,8 +137,8 @@
           <span class="passe-pied">${photo('', '', 'ph--passe')}<span><b>${esc(c.art)}</b><span>${ic('camion', 14)}Mondial Relay</span></span></span>
         </button></article>`).join('')}</div>
         <div class="points-pages" aria-hidden="true">${D.colis.map((_, i) => `<i${i === 0 ? ' class="on"' : ''}></i>`).join('')}</div>
-        <h3 class="entete">Arrivent bientôt</h3><ul class="carte">${route.slice(0, 3).map((a) => rangee(a, `En route · ${jour(a.date)}`, euros(a.prix), 'h:' + a.tx)).join('')}</ul>`;
-    } else corps = `<ul class="carte">${(s === 'route' ? route : recus).map((a) => rangee(a, `${a.etat === 'recu' ? 'Reçu' : 'En route'} · ${jour(a.date)}`, euros(a.prix), 'h:' + a.tx)).join('')}</ul>`;
+        <h3 class="entete">Arrivent bientôt</h3><ul class="carte">${route.slice(0, 3).map((a) => rangee(a, `En route, ${jour(a.date)}`, euros(a.prix), 'h:' + a.tx)).join('')}</ul>`;
+    } else corps = `<ul class="carte">${(s === 'route' ? route : recus).map((a) => rangee(a, `${a.etat === 'recu' ? 'Reçu' : 'En route'}, ${jour(a.date)}`, euros(a.prix), 'h:' + a.tx)).join('')}</ul>`;
     return `${grandTitre('Achats', { sous: menuComptes })}${segment([['retirer', 'À retirer'], ['route', 'En route'], ['recus', 'Reçus']], s, 'Achats')}${corps}`;
   }
   function argent() {
@@ -144,28 +147,28 @@
     const parJour = Array.from({ length: jours }, (_, i) => duMois.filter((v) => new Date(v.date).getDate() === i + 1).reduce((s, v) => s + v.prix, 0));
     const max = Math.max(...parJour, 1);
     return `${grandTitre('Argent', { sous: `<p class="sous">${mois[0].toUpperCase() + mois.slice(1)} 2026</p>`, boutons: `<button type="button" class="nav-btn" aria-label="Comment c’est calculé">${ic('aide', 22)}</button>` })}
-      <section class="carte resume">
+      <div class="duo"><section class="carte resume">
         <div class="resume-tete"><span class="gris">Vendu en ${mois}</span><span class="resume-grand">${euros(vendu)}</span></div>
         <div class="barres" role="img" aria-label="Vendu par jour en ${mois}">${parJour.map((x, i) => `<i style="--h:${x ? Math.max(6, Math.round((x / max) * 100)) : 2}%"${i === jours - 1 ? ' class="auj"' : ''}></i>`).join('')}</div>
         <div class="barres-l gris"><span>1er ${mois}</span><span>aujourd’hui</span></div>
         <dl class="resume-deux"><div><dt>Bénéfice, au moins</dt><dd>${euros(benefice, true)}</dd></div><div><dt>Coût saisi</dt><dd>${couverts.length} sur ${duMois.length}</dd></div></dl>
       </section>
-      <h3 class="entete">Ventes de ${mois}</h3>
-      <ul class="carte">${duMois.map((v) => rangee(v, `${jour(v.date)} · ${v.cout != null ? 'coût ' + euros(v.cout) : '<span class="ambre">coût à saisir</span>'}`, euros(v.prix), 'v:' + v.tx)).join('')}</ul>`;
+      <div><h3 class="entete">Ventes de ${mois}</h3>
+      <ul class="carte">${duMois.map((v) => rangee(v, `${v.cout != null ? 'Coût ' + euros(v.cout) : '<span class="ambre">Coût à saisir</span>'}`, euros(v.prix), 'v:' + v.tx)).join('')}</ul></div></div>`;
   }
 
   // ── La fiche : une feuille à détentes (moyenne, grande), la photo d'abord, les gestes au pouce ──
   function fiche(cle) {
     const t = cle[0], id = cle.slice(2);
     if (t === 'a') { const a = D.annonces.find((x) => x.id === id); if (!a) return null;
-      return { photo: a.photo, numero: a.numero, titre: a.titre, sous: `Taille ${a.taille} · ${a.etat}`, chiffres: [['Achat', euros(a.cout)], ['Prix', euros(a.prix)], ['En ligne', a.jours + ' j']],
+      return { photo: a.photo, numero: a.numero, titre: a.titre, sous: `Taille ${a.taille}, ${a.etat.toLowerCase()}`, chiffres: [['Achat', euros(a.cout)], ['Prix', euros(a.prix)], ['En ligne', a.jours + ' j']],
         lignes: [['coeur', 'Favoris', nb(a.fav)], ['oeil', 'Vues', nb(a.vues)], ['annonces', 'Compte', a.compte]], second: ['republier', 'Republier'], premier: ['baisse', 'Baisser le prix'] }; }
     if (t === 'v') { const v = D.ventes.find((x) => x.tx === id); if (!v) return null;
-      return { photo: v.photo, numero: v.numero, titre: v.titre, sous: `à ${v.pseudo} · vendue ${jour(v.date)}`, chiffres: [['Achat', euros(v.cout)], ['Vente', euros(v.prix)], ['Marge', v.cout != null ? euros(v.prix - v.cout, true) : '—']],
+      return { photo: v.photo, numero: v.numero, titre: v.titre, sous: `Vendue ${jour(v.date)} à ${v.pseudo}`, chiffres: [['Achat', euros(v.cout)], ['Vente', euros(v.prix)], ['Marge', v.cout != null ? euros(v.prix - v.cout, true) : '—']],
         lignes: v.etat === 'envoyer' ? [['horloge', 'Date limite', v.limite ? jour(v.limite) : 'pas lue', presse(v)], ['imprimer', 'Bordereau', v.bordereau ? 'reçu' : 'pas encore reçu'], ['camion', 'Suivi', v.suivi || '—'], ['achats', 'Compte', v.compte]] : [['camion', 'État', v.etat === 'finie' ? 'Livrée' : 'En route'], ['achats', 'Compte', v.compte]],
         second: v.etat === 'envoyer' ? ['coche', 'Déjà parti'] : ['camion', 'Suivre le colis'], premier: v.etat === 'envoyer' && v.bordereau ? ['imprimer', 'Imprimer'] : null }; }
     if (t === 'h') { const a = D.achats.find((x) => x.tx === id); if (!a) return null;
-      return { photo: a.photo, titre: a.titre, sous: `${a.etat === 'recu' ? 'Reçu' : 'En route'} · acheté ${jour(a.date)}`, chiffres: [['Payé', euros(a.prix)]], lignes: [['achats', 'Compte', a.compte]], second: null, premier: ['lien', 'Relier à une paire'] }; }
+      return { photo: a.photo, titre: a.titre, sous: `${a.etat === 'recu' ? 'Reçu' : 'En route'}, acheté ${jour(a.date)}`, chiffres: [['Payé', euros(a.prix)]], lignes: [['achats', 'Compte', a.compte]], second: null, premier: ['lien', 'Relier à une paire'] }; }
     if (t === 'c') { const c = D.colis.find((x) => x.id === id); if (!c) return null;
       return { qr: c.code, titre: c.code.replace(/(\d{3})(\d{3})/, '$1 $2'), code: true, sous: c.art, chiffres: [['Point relais', c.point], ['Jusqu’à', jour(c.limite)]], lignes: [['lieu', 'Adresse', c.adresse], ['camion', 'Suivi', c.id]], second: null, premier: ['coche', 'Je l’ai retiré'] }; }
     return null;
