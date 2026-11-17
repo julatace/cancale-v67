@@ -290,6 +290,78 @@ async function etroit(nav, b, grand) {
   await ctx.close();
 }
 
+// TOUTES (Vinted), la capture de Julien : rangées sans bouton ni ambre, la facture envoyée en icône verte, la sélection
+// (case dans sa colonne, rangée teintée), la barre de sélection neuve (UN plein, « ⋯ » avec nombre ou raison).
+async function toutes(nav, b0, W) {
+  const tel = W < 600, th = (tel ? '390' : '1512') + '-clair';
+  console.log(`\n── allumé · Toutes (Vinted) · ${th}`);
+  const b = JSON.parse(JSON.stringify(b0));
+  // Une facture Pro ENVOYÉE sur une vente (inventée : FA-2026-0006), pour voir son icône.
+  const sold = b.rows.find((r) => /_orders_sold$/.test(r.id)); const v0 = sold && sold.data.payload.my_orders.find((o) => o && !/expédi|envoyer/i.test(String(o.status || '')));
+  if (v0) b.rows.push({ id: 'email_invoice_tx_' + v0.transaction_id, data: { number: 'FA-2026-0006', status: 'emise', transaction: String(v0.transaction_id), emiseLe: new Date(Date.now() - 86400e3).toISOString(), type: 'facture_pro',
+    envoi: { etat: 'envoyee', at: new Date(Date.now() - 86400e3).toISOString(), a: 'acheteur@exemple.test' } } });
+  const { ctx, pg, erreurs } = await ouvrir(nav, { W, sombre: false, b, url: '/?tab=ventes', dsf: tel ? 2 : 1 });
+  await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {});
+  await pg.evaluate(() => localStorage.setItem('vrm_design_v2', '1')); await pg.reload({ waitUntil: 'domcontentloaded' });
+  await attendre(pg, () => !!document.querySelector('[data-v2-menu]'), 30000);
+  await pg.locator('[data-v2-menu]').first().click({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(500);
+  await pg.locator('[data-v2-feuille] [data-filtre-site="vinted"]').first().click({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(800);
+  await pg.evaluate(() => { const v = document.querySelector('[data-v2-feuille]:not([hidden]) .v2-voile'); if (v) v.click(); }); await pg.waitForTimeout(300);
+  await pg.locator('[data-v2v-seg="toutes"]').first().click({ timeout: 8000 }).catch(() => {});
+  await attendre(pg, () => document.querySelectorAll('[data-v2t-ligne]').length > 2, 30000); await pg.waitForTimeout(2000); await sansToasts(pg);
+  const r = await pg.evaluate(() => { const vis = (e) => e.getClientRects().length && !e.closest('[hidden], .v2-cache');
+    const lignes = [...document.querySelectorAll('[data-v2t-ligne]')].filter(vis);
+    const ok = [...document.querySelectorAll('[data-v2-facture-ok]')].filter(vis);
+    const vert = ok[0] ? getComputedStyle(ok[0]).color : '';
+    return { n: lignes.length, prixAchat: lignes.filter((l) => /Prix d.achat \?/.test(l.textContent)).length,
+      boutonsRangee: lignes.flatMap((l) => [...l.querySelectorAll('button')].filter(vis).filter((x) => /Envoyer la facture|Bon de retour|Imprimer|Déposé/.test(x.textContent))).length,
+      factureTexte: lignes.filter((l) => /Facture envoyée le/.test(l.textContent)).length, icones: ok.length, vert,
+      orphelins: lignes.filter((l) => /\btaille\s*\d{2}(?:[.,]5)?\s*$/i.test(((l.querySelector('.v2l-a-titre') || {}).textContent || '').trim())).length }; });
+  dit(r.n > 2 && r.prixAchat === 0 && r.boutonsRangee === 0, `T ${th} : ${r.n} ventes en rangées A, ni « Prix d'achat ? » ni bouton répété par rangée`, r);
+  dit(r.icones === 1 && r.factureTexte === 0 && /rgb\(30, 122, 69\)/.test(r.vert), `T ${th} : la facture envoyée = UNE icône verte à côté du prix (plus de texte « Facture envoyée le … »)`, r);
+  dit(r.orphelins === 0, `T ${th} : la taille sortie du titre (« T. »), aucun « taille 40 » seul`, r.orphelins);
+  await pg.screenshot({ path: path.join(SHOTS, `toutes-${th}.png`) });
+  // La sélection : « Sélectionner », puis 3 rangées.
+  await pg.locator('[data-serie-ouvrir]').first().click({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(400);
+  const lignes = pg.locator('[data-v2t-ligne]');
+  for (let k = 0; k < 3; k++) { await lignes.nth(k).locator('.v2l-a-titre').click({ timeout: 4000 }).catch(() => {}); await pg.waitForTimeout(200); }
+  await pg.waitForTimeout(600);
+  const s3 = await pg.evaluate(() => { const vis = (e) => e && e.getClientRects().length; const q = (e) => e.getBoundingClientRect();
+    const l = document.querySelector('[data-v2t-ligne][data-serie-coche="1"]'); const c = l && l.querySelector('.v2l-avant'), p = l && l.querySelector('.v2l-photo');
+    const bar = document.querySelector('[data-v2-serie]'); const tab = document.querySelector('.vrm-tabbar'); const pl = bar && bar.querySelector('[data-serie-principal]');
+    return { coches: document.querySelectorAll('[data-v2t-ligne][data-serie-coche="1"]').length, colonne: c && p ? Math.round(q(p).left - q(c).right) : null, largeur: c ? Math.round(q(c).width) : null,
+      teinte: l ? getComputedStyle(l).backgroundColor : '', cadre: l ? getComputedStyle(l).outlineStyle + '/' + getComputedStyle(l).borderTopWidth : '',
+      barre: !!bar, plein: pl ? pl.textContent.trim() : '', pleinK: pl ? pl.getAttribute('data-serie-principal') : '', pleins: bar ? bar.querySelectorAll('[data-v2b="principal"]').length : 0,
+      surSur: bar ? /\d+\s*sur\s*\d+/.test(bar.textContent) : null, tuiles: bar ? bar.querySelectorAll('button').length : 0,
+      dessusBarre: bar && tab && vis(tab) ? Math.round(q(tab).top - q(bar).bottom) : null }; });
+  dit(s3.coches === 3 && s3.largeur === 44 && s3.colonne != null && s3.colonne >= 0, `S ${th} : la case de sélection dans SA colonne de 44 px, à gauche de la photo (jamais dessus)`, s3);
+  dit(!/rgba\(0, 0, 0, 0\)|transparent/.test(s3.teinte) && /none\/0px/.test(s3.cadre), `S ${th} : une rangée choisie se teinte (${s3.teinte}), sans cadre`, s3);
+  dit(s3.barre && s3.pleins === 1 && s3.surSur === false && s3.tuiles <= 4, `B ${th} : la barre : UN plein (« ${s3.plein} »), « ⋯ », aucun « 0 sur 1 », aucune tuile`, s3);
+  if (tel) dit(s3.dessusBarre != null && s3.dessusBarre >= 0, `B ${th} : la barre est posée AU-DESSUS de la barre du bas (${s3.dessusBarre} px)`, s3.dessusBarre);
+  await pg.screenshot({ path: path.join(SHOTS, `toutes-selection3-${th}.png`) });
+  // La dernière rangée reste au-dessus de la barre (la liste garde sa place).
+  const bas = await pg.evaluate(async () => { const m = document.querySelector('.vrm-main'); (m && m.scrollHeight > m.clientHeight ? m : document.scrollingElement).scrollTo(0, 1e7); await new Promise((r) => setTimeout(r, 500));
+    const ls = [...document.querySelectorAll('[data-v2t-ligne]')].filter((e) => e.getClientRects().length && !e.closest('.v2-cache')); const der = ls[ls.length - 1]; const bar = document.querySelector('[data-v2-serie]');
+    return der && bar ? { der: Math.round(der.getBoundingClientRect().bottom), bar: Math.round(bar.getBoundingClientRect().top) } : null; });
+  dit(bas && bas.der <= bas.bar, `B ${th} : défilé en bas, la dernière vente passe au-dessus de la barre (place gardée)`, bas);
+  await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); (m && m.scrollHeight > m.clientHeight ? m : document.scrollingElement).scrollTo(0, 0); });
+  // Une seule vente, PAS imprimable (déjà partie) : le plein n'est pas « Imprimer » ; « ⋯ » dit pourquoi.
+  await pg.locator('[data-v2-serie] [data-serie-annuler]').first().click({ timeout: 4000 }).catch(() => {}); await pg.waitForTimeout(500);
+  await pg.locator('[data-serie-ouvrir]').first().click({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(300);
+  const idx = await pg.evaluate(() => [...document.querySelectorAll('[data-v2t-ligne]')].filter((e) => !e.closest('.v2-cache')).findIndex((l) => /En route|Livr|Postée|Au relais/.test(l.textContent)));
+  if (idx >= 0) await lignes.nth(idx).locator('.v2l-a-titre').click({ timeout: 4000 }).catch(() => {});
+  await pg.waitForTimeout(600);
+  await pg.screenshot({ path: path.join(SHOTS, `toutes-selection1-${th}.png`) });
+  await pg.locator('[data-v2-serie] [data-serie-plus]').first().click({ timeout: 4000 }).catch(() => {}); await pg.waitForTimeout(500);
+  const s1 = await pg.evaluate(() => { const bar = document.querySelector('[data-v2-serie]'); const pl = bar && bar.querySelector('[data-serie-principal]');
+    const ind = document.querySelector('[data-v2-feuille="serie"] [data-serie-indispo="imprimer"]');
+    return { plein: pl ? pl.getAttribute('data-serie-principal') : null, raison: ind ? ind.textContent.trim() : '' }; });
+  dit(idx >= 0 && s1.plein && s1.plein !== 'imprimer' && /Aucun bordereau prêt/.test(s1.raison), `B ${th} : 1 vente partie : le plein est « ${s1.plein} », « ⋯ » dit « ${s1.raison} »`, { idx, ...s1 });
+  await pg.screenshot({ path: path.join(SHOTS, `toutes-selection1-menu-${th}.png`) });
+  dit(!erreurs.length, `${th} Toutes : aucune erreur JS`, erreurs);
+  await ctx.close();
+}
+
 async function allume(nav, b, sombre, W, ref) {
   const th = (W < 600 ? '390-' : '1512-') + (sombre ? 'sombre' : 'clair');
   console.log(`\n── allumé · ${th}`);
@@ -412,6 +484,7 @@ async function allume(nav, b, sombre, W, ref) {
   try {
     // SEUL=chargement : le chargement lent et le mouvement réduit seulement (une retouche du banc).
     if (process.env.SEUL === 'chargement') { await chargementEtMouvement(nav, b); throw null; }
+    if (process.env.SEUL === 'toutes') { await toutes(nav, b, 390); await toutes(nav, b, 1512); throw null; }
     console.log('\n── éteint (l\'écran d\'avant, la référence des nombres)');
     const refC = await avant(nav, b, false);
     sigs.ventes = refC.sig;
@@ -434,6 +507,8 @@ async function allume(nav, b, sombre, W, ref) {
       await allume(nav, b, true, 390, refC);
       await allume(nav, b, false, 1512, refC);
       await chargementEtMouvement(nav, b);
+      await toutes(nav, b, 390);
+      await toutes(nav, b, 1512);
       await etroit(nav, b, false);
       await etroit(nav, b, true);
     }
