@@ -1,0 +1,214 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   MAQUETTE I — « L'ÉPURE » (prototype de banc, pas livré).
+   Trois tailles : 34 (titre, fin) · 17 (tout ce qui se lit) · 13 (ce qui précise).
+   Aucune carte, aucune bordure : l'espace sépare. Grille de 8 (marges 24, pas de rangée 8).
+   Une couleur d'accent, une fois par écran : le bouton plein. Ambre = un geste t'attend.
+   ════════════════════════════════════════════════════════════════════════════ */
+:root[data-maquette='i'] {
+  --e-fond: #FCFCFA;          /* blanc presque pur, à peine chaud : on QUITTE le bleu dégradé */
+  --e-voile-fond: rgba(252, 252, 250, 0.92);
+  --e-encre: #1D1D1F;
+  --e-gris: #6E6E73;
+  --e-pale: #C7C7CC;
+  --e-remplir: rgba(118, 118, 128, 0.10);
+  --e-accent: #0071E3;
+  --e-sur-accent: #FFFFFF;
+  --e-ambre: #FF9F0A;
+  --e-ambre-texte: #B25000;
+  --e-feuille: #FFFFFF;
+  --e-scrim: rgba(0, 0, 0, 0.28);
+  --e-ombre: 0 -1px 0 rgba(0, 0, 0, 0.02), 0 -12px 40px rgba(0, 0, 0, 0.10);
+  --e-police: -apple-system, 'SF Pro Text', 'Inter', system-ui, sans-serif;
+  --e-dur: cubic-bezier(0.32, 0.72, 0, 1);
+  color-scheme: light;
+}
+:root[data-maquette='i'][data-fond='bleu'] { --e-fond: #F4F8FD; --e-voile-fond: rgba(244, 248, 253, 0.92); }
+:root[data-maquette='i'][data-theme='dark'] {
+  --e-fond: #0D0D0F;
+  --e-voile-fond: rgba(13, 13, 15, 0.92);
+  --e-encre: #F5F5F7;
+  --e-gris: #98989D;
+  --e-pale: #48484A;
+  --e-remplir: rgba(118, 118, 128, 0.20);
+  --e-accent: #0A84FF;
+  --e-ambre: #FF9F0A;
+  --e-ambre-texte: #FFB340;
+  --e-feuille: #1C1C1E;
+  --e-scrim: rgba(0, 0, 0, 0.55);
+  --e-ombre: none;
+  color-scheme: dark;
+}
+:root[data-maquette='i'][data-theme='dark'][data-fond='bleu'] { --e-fond: #0B0F16; --e-voile-fond: rgba(11, 15, 22, 0.92); }
+
+:root[data-maquette='i'], :root[data-maquette='i'] body {
+  background: var(--e-fond);
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+}
+:root[data-maquette='i'] body { margin: 0; }
+:root[data-maquette='i'] ::selection { background: color-mix(in srgb, var(--e-accent) 22%, transparent); }
+
+.e-racine {
+  min-height: 100dvh;
+  background: var(--e-fond);
+  color: var(--e-encre);
+  font: 400 17px/1.35 var(--e-police);
+  font-feature-settings: 'tnum' 1, 'cv11' 1;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+}
+.e-racine button { font: inherit; color: inherit; letter-spacing: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-align: left;
+  touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.e-racine button:focus-visible { outline: 2px solid var(--e-accent); outline-offset: 2px; border-radius: 8px; }
+.e-racine p, .e-racine h1, .e-racine h2 { margin: 0; }
+.e-ico { display: block; flex: none; }
+.e-panne { padding: 64px 24px; }
+
+/* ── La tête : un titre fin, rien d'autre que la loupe ─────────────────────── */
+.e-main { padding: calc(env(safe-area-inset-top, 0px) + 16px) 0 calc(184px + env(safe-area-inset-bottom, 0px)); }
+.e-tete { display: flex; align-items: flex-end; justify-content: space-between; padding: 24px 24px 0; min-height: 56px; }
+.e-h1 { font-size: 34px; line-height: 1.1; font-weight: 300; letter-spacing: -0.025em; }
+.e-tete-ronds { display: flex; gap: 0; margin-right: -10px; margin-bottom: -4px; }
+.e-rond { width: 44px; height: 44px; display: grid !important; place-items: center; color: var(--e-encre) !important; border-radius: 22px; transition: background-color 120ms ease, transform 120ms var(--e-dur); }
+.e-rond:active { background: var(--e-remplir) !important; transform: scale(0.94); }
+.e-sous { display: flex; align-items: center; gap: 4px; margin: 4px 24px 0; font-size: 13px; line-height: 18px; color: var(--e-gris) !important; }
+.e-filtre { min-height: 44px; margin-top: -4px !important; margin-bottom: -8px !important; }
+.e-filtre .e-ico { opacity: 0.8; }
+.e-sous::first-letter { text-transform: uppercase; }
+
+/* ── Les vues : des mots. L'actif à l'encre, les autres au gris. ─────────── */
+.e-vues { display: flex; gap: 24px; padding: 16px 24px 0; overflow-x: auto; scrollbar-width: none; }
+.e-vues::-webkit-scrollbar { display: none; }
+.e-vue { display: inline-flex !important; align-items: baseline; gap: 6px; min-height: 44px; align-items: center; white-space: nowrap; color: var(--e-gris) !important; transition: color 160ms ease; }
+.e-vue[aria-pressed='true'] { color: var(--e-encre) !important; font-weight: 600; }
+.e-vue-n { font-weight: 400; color: var(--e-gris); }
+
+/* ── Les groupes : un en-tête de 13 gris, puis des rangées que l'espace sépare ── */
+.e-page { padding-top: 8px; }
+.e-groupe { padding: 24px 0 0; }
+.e-entete { display: flex; justify-content: space-between; align-items: baseline; padding: 0 24px 4px; font-size: 13px; line-height: 18px; font-weight: 400; color: var(--e-gris); }
+.e-entete-a { font-variant-numeric: tabular-nums; }
+.e-liste { display: flex; flex-direction: column; }
+.e-rangee {
+  display: grid !important; grid-template-columns: 14px auto 1fr auto; align-items: start; column-gap: 12px;
+  width: 100%; min-height: 56px; padding: 10px 24px !important; box-sizing: border-box;
+  transition: background-color 160ms ease;
+  content-visibility: auto; contain-intrinsic-size: auto 64px;
+}
+.e-rangee:active { background: var(--e-remplir) !important; transition-duration: 0ms; }
+@media (hover: hover) and (pointer: fine) { .e-rangee:hover { background: color-mix(in srgb, var(--e-remplir) 55%, transparent) !important; } }
+.e-rangee > .e-corps { grid-column: 3; }
+.e-rangee:not(:has(.e-num)) { grid-template-columns: 14px 1fr auto; }
+.e-rangee:not(:has(.e-num)) > .e-corps { grid-column: 2; }
+.e-puce { width: 6px; height: 6px; border-radius: 3px; margin: 9px 4px 0; box-sizing: border-box; }
+.e-puce.is-geste { background: var(--e-ambre); }
+.e-puce.is-attente { border: 1.25px solid var(--e-pale); }
+.e-puce.is-rien { visibility: hidden; }
+.e-num { min-width: 40px; color: var(--e-gris); font-variant-numeric: tabular-nums; }
+.e-num.is-vide { color: var(--e-pale); }
+.e-corps { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.e-titre { text-wrap: pretty; overflow-wrap: anywhere; }
+.e-detail { display: block; font-size: 13px; line-height: 18px; color: var(--e-gris); text-wrap: pretty; }
+.e-valeur { display: flex; flex-direction: column; align-items: flex-end; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; padding-left: 8px; }
+.e-ambre { color: var(--e-ambre-texte); }
+.e-plus { padding: 8px 24px 0 50px; font-size: 13px; line-height: 18px; color: var(--e-gris); }
+
+/* Achats · à retirer : un point = un groupe ; le code, en grand registre, et son vrai QR. */
+.e-point { padding-top: 32px; }
+.e-point-nom { padding: 0 24px; font-size: 17px; line-height: 22px; font-weight: 600; }
+.e-point-ou { padding: 2px 24px 4px; font-size: 13px; line-height: 18px; color: var(--e-gris); }
+.e-colis { grid-template-columns: 14px 1fr auto !important; align-items: center !important; }
+.e-colis > .e-corps { grid-column: 2 !important; }
+.e-colis .e-puce { align-self: start; margin-top: 9px; }
+.e-code { font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
+.e-qr { color: var(--e-encre); display: block; }
+
+/* Annonces : la recherche, un creux sans bord. */
+.e-cherche { display: flex; align-items: center; gap: 8px; margin: 12px 24px 0; padding: 0 12px; height: 44px; border-radius: 12px; background: var(--e-remplir); color: var(--e-gris); }
+.e-cherche input { flex: 1; min-width: 0; height: 100%; border: 0; background: none; outline: none; color: var(--e-encre); font: 400 17px var(--e-police); letter-spacing: -0.01em; }
+.e-cherche input::placeholder { color: var(--e-gris); }
+@media (pointer: coarse) { .e-cherche input { font-size: 17px; } }
+
+/* Argent : le chiffre est le titre de la page, au même corps que le titre. */
+.e-affiche { padding: 16px 24px 0; }
+.e-affiche-n { font-size: 34px; line-height: 1.1; font-weight: 300; letter-spacing: -0.025em; font-variant-numeric: tabular-nums; }
+
+/* ── Le pied : UN bouton plein, au pouce, sur un voile qui laisse la liste se fondre ── */
+.e-pied {
+  position: fixed; left: 0; right: 0; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); z-index: 20;
+  padding: 24px 24px 12px;
+  background: linear-gradient(to bottom, transparent, var(--e-fond) 22px);
+  pointer-events: none;
+}
+.e-plein {
+  pointer-events: auto; display: flex !important; align-items: center; justify-content: center;
+  width: 100%; height: 52px; border-radius: 26px; text-align: center !important;
+  background: var(--e-accent) !important; color: var(--e-sur-accent) !important; font-weight: 600 !important;
+  transition: transform 140ms var(--e-dur), filter 140ms ease;
+}
+.e-plein:active { transform: scale(0.97); filter: brightness(0.92); }
+
+/* ── La barre : des MOTS, pas d'icônes. L'actif à l'encre, une puce ambre si un geste attend ── */
+.e-barre {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 21;
+  display: flex; justify-content: space-between; padding: 0 12px env(safe-area-inset-bottom, 0px);
+  height: calc(64px + env(safe-area-inset-bottom, 0px)); box-sizing: border-box;
+  background: var(--e-fond);
+}
+.e-onglet { position: relative; flex: 1 1 auto; display: flex !important; align-items: center; justify-content: center; height: 56px;
+  font-size: 13px !important; color: var(--e-gris) !important; white-space: nowrap; text-align: center !important; transition: color 160ms ease; }
+.e-onglet[aria-current='page'] { color: var(--e-encre) !important; font-weight: 600; }
+.e-onglet .e-puce { position: absolute; top: 12px; left: 50%; margin: 0; transform: translateX(-50%); }
+.e-onglet:active { opacity: 0.6; }
+
+/* ── Les feuilles : un plan qui monte du bas, le fond s'assombrit ─────────── */
+.e-voile { position: fixed; inset: 0; z-index: 50; background: var(--e-scrim); display: flex; align-items: flex-end; justify-content: center;
+  animation: e-fondu 220ms ease-out both; }
+.e-feuille { width: 100%; max-width: 560px; box-sizing: border-box; background: var(--e-feuille); border-radius: 20px 20px 0 0; box-shadow: var(--e-ombre);
+  padding: 8px 0 calc(24px + env(safe-area-inset-bottom, 0px)); animation: e-monte 360ms var(--e-dur) both; overscroll-behavior: contain; }
+.e-voile.is-large { align-items: center; }
+.e-voile.is-large .e-feuille { border-radius: 20px; max-width: 440px; }
+.e-poignee { display: block; width: 36px; height: 5px; border-radius: 3px; background: var(--e-pale); margin: 0 auto 16px; }
+.e-f-tete { display: flex; gap: 16px; align-items: center; padding: 0 24px 16px; }
+.e-f-photo { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; background: var(--e-remplir); flex: none; }
+.e-f-titre { padding: 0 24px 8px; color: var(--e-gris); font-size: 13px; }
+.e-f-gestes { padding: 0 8px; }
+.e-f-geste { min-height: 52px; padding: 0 16px !important; border-radius: 12px; display: flex !important; align-items: center; }
+.e-f-geste:active { background: var(--e-remplir) !important; }
+.e-f-geste[aria-pressed='true'] { font-weight: 600; }
+.e-f-geste:disabled { color: var(--e-pale) !important; cursor: default; }
+.e-f-code { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; padding: 8px 24px 8px; }
+.e-f-code .e-qr { margin-bottom: 16px; padding: 12px; background: #FFFFFF; color: #000000; border-radius: 16px; box-sizing: content-box; }
+.e-code-grand { letter-spacing: 0.04em; }
+.e-f-pas { display: flex; align-items: center; justify-content: space-between; padding: 8px 8px 0; }
+@keyframes e-fondu { from { opacity: 0; } }
+@keyframes e-monte { from { transform: translateY(100%); } }
+
+/* L'apparition : seulement les 12 premières rangées, 24 ms d'écart. */
+@media (prefers-reduced-motion: no-preference) {
+  .e-page .e-rangee { animation: e-entre 280ms var(--e-dur) both; }
+  .e-page .e-liste > .e-rangee:nth-child(n+13) { animation: none; }
+  .e-page .e-liste > .e-rangee:nth-child(2) { animation-delay: 24ms; } .e-page .e-liste > .e-rangee:nth-child(3) { animation-delay: 48ms; }
+  .e-page .e-liste > .e-rangee:nth-child(4) { animation-delay: 72ms; } .e-page .e-liste > .e-rangee:nth-child(5) { animation-delay: 96ms; }
+  .e-page .e-liste > .e-rangee:nth-child(n+6) { animation-delay: 120ms; }
+}
+@keyframes e-entre { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .e-feuille { animation: e-fondu 200ms ease both; } }
+
+/* ── L'ordinateur : une colonne de mots à gauche, la page en colonne de lecture ── */
+.e-racine.is-large { display: grid; grid-template-columns: 248px 1fr; }
+.e-cote { position: sticky; top: 0; height: 100dvh; display: flex; flex-direction: column; padding: 32px 16px 24px; box-sizing: border-box; }
+.e-marque { padding: 0 12px 24px; font-size: 17px; font-weight: 600; letter-spacing: 0.02em; }
+.e-cherche--cote { margin: 0 0 24px; height: 36px; border-radius: 10px; }
+.e-cherche--cote input { font-size: 13px; }
+.e-cote-nav { display: flex; flex-direction: column; gap: 2px; }
+.e-cote-lien { display: flex !important; align-items: center; justify-content: space-between; min-height: 36px; padding: 0 12px !important; border-radius: 8px; color: var(--e-gris) !important; }
+.e-cote-lien .e-puce { margin: 0; }
+.e-cote-lien[aria-current='page'] { color: var(--e-encre) !important; font-weight: 600; background: var(--e-remplir) !important; }
+@media (hover: hover) and (pointer: fine) { .e-cote-lien:hover { color: var(--e-encre) !important; } }
+.e-cote-pied { margin-top: auto; }
+.e-racine.is-large .e-main { width: 100%; max-width: 760px; padding: 48px 48px 160px; box-sizing: border-box; }
+.e-racine.is-large .e-rangee { min-height: 48px; padding: 8px 24px !important; }
+.e-racine.is-large .e-pied { left: 248px; right: auto; width: min(760px, calc(100vw - 248px)); bottom: 0; padding: 24px 72px 32px; }
+.e-racine.is-large .e-plein { width: auto; padding: 0 32px !important; margin-left: auto; height: 44px; border-radius: 22px; }
