@@ -40,7 +40,7 @@
     -webkit-backdrop-filter: none !important; backdrop-filter: none !important; min-height: 0 !important; height: auto !important;
   }
   :root[data-onglets="a"] body :is(.vrm-seg, .vrm-sel-sites, .vv-seg, .vrm-platform-tabs, .vrm-messages-sections, .vrm-boite-vues) > button {
-    flex: 1 1 0 !important; min-width: 0 !important; height: var(--oa-h) !important; min-height: var(--oa-h) !important; padding: 0 10px !important;
+    flex: 1 1 auto !important; min-width: 0 !important; height: var(--oa-h) !important; min-height: var(--oa-h) !important; padding: 0 8px !important;
     border: 0 !important; border-radius: 10px !important; background: transparent !important; box-shadow: none !important; transform: none !important;
     color: var(--oa-off) !important; font: 600 14px/1 Inter, system-ui, sans-serif !important; letter-spacing: -.005em !important; white-space: nowrap !important;
     display: flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important;
