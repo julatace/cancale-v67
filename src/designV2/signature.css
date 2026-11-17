@@ -68,3 +68,32 @@
   .v2-faite.is-faite .v2-faite-dedans { transform: none; }
   .v2-faite-coche { animation: none; }
 }
+
+/* 5. LE SQUELETTE (SqueletteRangees) : la forme des rangées, un balayage lent ; mouvement réduit = immobile. */
+.v2-squelette { background: var(--v2-carte, #FFFFFF); border-radius: 16px; overflow: hidden; }
+.v2-squelette-rangee { display: flex; align-items: center; gap: 16px; height: 88px; padding: 0 16px; box-sizing: border-box; }
+.v2-squelette-C .v2-squelette-rangee { height: 120px; align-items: flex-start; padding-top: 16px; }
+.v2-squelette-photo, .v2-squelette-l1, .v2-squelette-l2, .v2-squelette-l3 { display: block; border-radius: 12px; background: var(--v2-socle, #EEF3F8);
+  background-image: linear-gradient(90deg, transparent, rgb(255 255 255 / .35), transparent); background-size: 200% 100%; animation: v2-balaye 1400ms linear infinite; }
+.v2-squelette-photo { width: 64px; height: 64px; flex: none; }
+.v2-squelette-C .v2-squelette-photo { width: 88px; height: 88px; }
+.v2-squelette-txt { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.v2-squelette-l1 { height: 16px; width: 72%; border-radius: 8px; }
+.v2-squelette-l2 { height: 12px; width: 44%; border-radius: 6px; }
+.v2-squelette-l3 { height: 12px; width: 60%; border-radius: 6px; }
+@keyframes v2-balaye { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@media (prefers-reduced-motion: reduce) { .v2-squelette * { animation: none !important; } }
+
+/* 6. LES JETONS DE MOUVEMENT PARTAGÉS (feuilles en ressort, appui, fondu) — à reprendre tels quels. */
+:root {
+  --v2-ressort-feuille: 380ms cubic-bezier(.32, .72, 0, 1);   /* courbe de tiroir d'iOS, sans rebond */
+  --v2-appui: 100ms cubic-bezier(.2, .9, .25, 1);
+  --v2-fondu: 180ms ease-out;
+}
+/* Les images d'une rangée arrivent en fondu, dans une boîte à taille fixe (aucun texte ne bouge). */
+.v2l-photo img, .v2-bande-photo img, .v2-vignette img { animation: v2-fondu-img var(--v2-fondu) both; }
+@keyframes v2-fondu-img { from { opacity: 0; } to { opacity: 1; } }
+/* 1 000 rangées : le navigateur ne peint que ce qui est à l'écran ; la taille réservée évite tout saut. */
+.v2l-a { content-visibility: auto; contain-intrinsic-size: auto 88px; }
+.v2l-c { content-visibility: auto; contain-intrinsic-size: auto 144px; }
+@media (prefers-reduced-motion: reduce) { .v2l-photo img, .v2-bande-photo img, .v2-vignette img { animation: none; } }
