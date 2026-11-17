@@ -57,6 +57,14 @@ import CadreEmail from './CadreEmail.jsx';
 import { streamAllume } from './modeStream.js';
 import { prendreDemande, DEMANDE_RECHERCHE } from './rechercheEcran.js';
 import './boite-emails.css';
+// (17 nov., nouveau design) La boîte allumée : segments, étiquette N°, un geste par rangée, « Ranger », les e-mails à rattacher.
+import { useDesignV2 } from './designV2/reglage.js';
+import { SegmentV2, BoutonV2, BoutonIconeV2 } from './designV2/BoutonV2.jsx';
+import { Etiquette } from './designV2/Signature.jsx';
+import { SEGMENTS_EMAILS, filtresDuSegment, segmentDesFiltres, numeroEmail, estRange, separerRanges } from './designV2/messagesV2.js';
+import { lectureEmail } from './journalEmail.js';
+import { SheetShell } from './composants/SheetShell.jsx';
+import './designV2/messages-v2.css';
 import {CompteEmailAVerifier} from './ActionsClaires.jsx';
 import { useSelectionSerie, CaseSerie, BarreSerie, OuvrirSerie } from './composants/SelectionSerie.jsx';   // (11 nov., lot actions-serie)
 import { trierSerie, resumeSerie } from './selectionSerie.js';
@@ -85,6 +93,7 @@ async function copier(texte) {
 
 // ── ICÔNES (traits de 1,6, une seule famille) ───────────────────────────────
 const Ic = {
+  plus3: <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></svg>,
   trombone: <svg className="vrm-boite-pj-ic" viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M10.5 4.5 5.8 9.2a1.4 1.4 0 0 0 2 2l5-5a2.8 2.8 0 0 0-4-4l-5.2 5.2a4.2 4.2 0 0 0 6 6l4-4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>,
   actualiser: <svg viewBox="0 0 20 20" width="17" height="17" aria-hidden="true"><path d="M16 10a6 6 0 1 1-1.8-4.3M16 3.5v3.2h-3.2" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>,
   copier: <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><rect x="7" y="7" width="9.5" height="9.5" rx="2.2" fill="none" stroke="currentColor" strokeWidth="1.6"/><path d="M13 4.5A1.5 1.5 0 0 0 11.5 3h-6A2.5 2.5 0 0 0 3 5.5v6A1.5 1.5 0 0 0 4.5 13" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>,
@@ -346,7 +355,7 @@ function Lecture({ id, entetes, delies, onFermer, onAller, onNum, plein, FermeAu
 // droite, le code de retrait en grand (copiable) ou la photo de la paire.
 // Au doigt, glisser vers la droite bascule lu / non lu (rien n'est caché).
 const SEUIL_GLISSE = 76;
-const Ligne = memo(function Ligne({ e, delies, ouvert, lu, photo, onOuvrir, onLu, maintenant, attrsSerie = null, caseSerie = null }) {
+const Ligne = memo(function Ligne({ e, delies, ouvert, lu, photo, onOuvrir, onLu, maintenant, attrsSerie = null, caseSerie = null, v2 = false, range = false, onRanger = null, onGeste = null }) {
   const r = rubriqueEmail(e);
   const t = titreSimple(e, delies);
   const l = ligneEmail(e, delies, maintenant);
@@ -360,6 +369,12 @@ const Ligne = memo(function Ligne({ e, delies, ouvert, lu, photo, onOuvrir, onLu
   const lieu = res && res.lieu ? lieuLisible(res.lieu) : null;
   const essentiel = l.essentiel.filter((x) => !(code && /^code /.test(x))).map((x) => (lieu && x === res.lieu ? lieu.nom : x));
   const pasLu = lu === false;
+  // (17 nov., nouveau design) Ce que la rangée dit en plus, allumé — toujours PAR IDENTITÉ (§5) : le N° LU dans l'e-mail
+  // (étiquette kraft), le n° de suivi LU (sans code), et UN geste : celui de la lecture (`gestesEmail`, le principal).
+  const lec = v2 ? lectureEmail(e, delies) : null;
+  const numV2 = v2 ? numeroEmail(lec, res) : null;
+  const suiviV2 = v2 && !code && lec && lec.cible && lec.cible.k === 'suivi' ? String(lec.cible.v) : '';
+  const gesteV2 = v2 && !code ? (gestesEmail(e, delies).find((x) => x.principal) || null) : null;
   // Le glisser (au doigt seulement ; le défilement vertical reste natif).
   const ref = useRef(null), fond = useRef(null), geste = useRef(null), glisse = useRef(false);
   // Le fond « Lu / Non lu » n'existe que pendant le glisser (950 lignes : autant de nœuds en moins).
@@ -373,15 +388,16 @@ const Ligne = memo(function Ligne({ e, delies, ouvert, lu, photo, onOuvrir, onLu
     const el = ref.current;
     for (const n of [el, el && el.parentElement && el.parentElement.querySelector('.vrm-boite-puce-code')]) if (n) { n.style.transition = reduitMvt() ? 'none' : 'transform .34s cubic-bezier(.32,.72,0,1)'; n.style.transform = ''; }
     if (fond.current) fond.current.dataset.actif = '0';
-    if (bascule && lu !== null) onLu(e, pasLu);
+    if (bascule && gs.gauche) { if (onRanger) onRanger(e, !range); }
+    else if (bascule && lu !== null) onLu(e, pasLu);
     setTimeout(() => { glisse.current = false; }, 0);
     setTimeout(() => setFondVu(false), reduitMvt() ? 0 : 360);
   };
   return <li {...(attrsSerie || {})} className="vrm-boite-item" data-pas-lu={pasLu ? '1' : undefined}>
     {caseSerie}
-    {fondVu && lu !== null && <span ref={fond} className="vrm-boite-glisse-fond" aria-hidden="true" data-actif="0">{Ic.lu}<span>{pasLu ? tr('emails.lu') : tr('emails.nonLu')}</span></span>}
+    {fondVu && lu !== null && <span ref={fond} className="vrm-boite-glisse-fond" aria-hidden="true" data-actif="0" data-sens={geste.current && geste.current.gauche ? 'gauche' : 'droite'}>{Ic.lu}<span>{geste.current && geste.current.gauche ? (range ? tr('v2.mail.sortir') : tr('v2.mail.ranger')) : pasLu ? tr('emails.lu') : tr('emails.nonLu')}</span></span>}
     <button ref={ref} type="button" className="vrm-boite-ligne" data-boite-email={e.id} data-rubrique={r} data-etat={e.etat} data-lu={lu === null ? undefined : lu ? '1' : '0'}
-      data-boite-geste={g ? g.k : undefined} data-boite-proche={g && g.proche ? '1' : undefined} data-boite-rien={l.rien ? '1' : undefined} data-boite-a-code={code ? '1' : undefined} data-boite-a-photo={photo ? '1' : undefined}
+      data-boite-geste={g ? g.k : undefined} data-boite-proche={g && g.proche ? '1' : undefined} data-boite-rien={l.rien ? '1' : undefined} data-boite-a-code={code ? '1' : undefined} data-boite-a-photo={photo ? '1' : undefined} data-v2-range={v2 && range ? '1' : undefined} data-v2-num={numV2 || undefined}
       aria-current={ouvert ? 'true' : undefined}
       aria-label={`${pasLu ? 'Non lu. ' : ''}${titreEnClair(t)}. ${expediteurLisible(e.from)}${e.compte ? ', ' + e.compte.nom : ''}${h ? ', ' + h : ''}`}
       onClick={() => { if (glisse.current) return; onOuvrir(e); }}
@@ -389,9 +405,9 @@ const Ligne = memo(function Ligne({ e, delies, ouvert, lu, photo, onOuvrir, onLu
       onPointerMove={(ev) => {
         const gs = geste.current; if (!gs) return;
         const dx = ev.clientX - gs.x, dy = ev.clientY - gs.y;
-        if (!gs.parti) { if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { geste.current = null; delete ev.currentTarget.dataset.appui; return; } if (dx < 10) return; gs.parti = true; glisse.current = true; setFondVu(true); delete ev.currentTarget.dataset.appui; try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch (_) {} }
+        if (!gs.parti) { if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { geste.current = null; delete ev.currentTarget.dataset.appui; return; } if (dx < 10 && !(v2 && onRanger && dx < -10)) return; gs.gauche = dx < 0; gs.parti = true; glisse.current = true; setFondVu(true); delete ev.currentTarget.dataset.appui; try { ev.currentTarget.setPointerCapture(ev.pointerId); } catch (_) {} }
         // Au-delà du seuil, la ligne résiste (jamais un arrêt sec).
-        const d = Math.max(0, dx); const x = d <= 96 ? d : 96 + ((d - 96) * 0.35);
+        const d = gs.gauche ? Math.max(0, -dx) : Math.max(0, dx); const x0 = d <= 96 ? d : 96 + ((d - 96) * 0.35); const x = gs.gauche ? -x0 : x0;
         gs.dx = d;
         for (const n of [ev.currentTarget, ev.currentTarget.parentElement.querySelector('.vrm-boite-puce-code')]) if (n) { n.style.transition = 'none'; n.style.transform = `translateX(${x}px)`; }
         if (fond.current) fond.current.dataset.actif = d > SEUIL_GLISSE ? '1' : '0';
@@ -407,6 +423,7 @@ const Ligne = memo(function Ligne({ e, delies, ouvert, lu, photo, onOuvrir, onLu
         {essentiel.length > 0 && <span className="vrm-boite-essentiel" data-boite-essentiel="">
           {essentiel.map((x, i) => <span key={i} className={/^(?:de|par) /.test(x) ? 'vrm-sensible' : undefined} data-stream-type={/^(?:de|par) /.test(x) ? 'acheteur' : undefined}>{i ? ' · ' : ''}{x}</span>)}
         </span>}
+        {v2 && (numV2 || suiviV2) ? <span className="v2e-ligne-pied" data-v2-mail-ident="">{numV2 ? <Etiquette num={numV2}/> : null}{suiviV2 ? <span className="v2e-suivi" data-v2-mail-suivi={suiviV2}>{tr('v2.mail.suivi', { n: suiviV2 })}</span> : null}</span> : null}
         <span className="vrm-boite-ligne-pied">
           {g && <span className="vrm-boite-geste" data-boite-geste-mot={g.k} data-ambre={gesteAmbre(g) ? '1' : '0'} data-passe={g.passe ? '1' : undefined} data-boite-averifier={g.k === 'verifier' ? '' : undefined}>{g.mot}</span>}
           {(l.rien || !site || e.compte || e.pj > 0) && <span className="vrm-boite-qui">
@@ -420,6 +437,7 @@ const Ligne = memo(function Ligne({ e, delies, ouvert, lu, photo, onOuvrir, onLu
       {!code && photo ? <PhotoPaire className="vrm-boite-vignette" src={photo} data={{ 'data-boite-vignette': '' }}/> : null}
     </button>
     {code ? <PuceCode code={code}/> : null}
+    {gesteV2 && onGeste ? <div className="v2e-action" data-v2-mail-action={gesteV2.k}><BoutonV2 role="texte" onClick={() => onGeste(gesteV2)}>{gesteV2.mot}</BoutonV2></div> : null}
   </li>;
 });
 
@@ -500,8 +518,36 @@ function ARelier({ comptes, onRelier }) {
 const PASTILLES = ['codes', 'colis', 'ventes', 'achats', 'offres'];
 const COURT = { codes: 'Codes' };
 
+// ── LES E-MAILS À RATTACHER (17 nov., nouveau design) ─────────────────────────────────────────────────────────
+// Ceux qu'aucune adresse de réception n'a pu attribuer (mis de côté, §5 : jamais donnés au hasard, jamais jetés),
+// lus par la route (`/api/email-rattacher?mode=liste`, la même lecture que Paramètres) : une section calme, sous la
+// liste, et le MÊME geste « C'est à moi » (le rejeu de la route, avec SA session). Trois états : en cours (rien),
+// pas su (une phrase), lu (la liste ; vide ⇒ rien).
+function Quarantaine({ q }) {
+  const [occupe, setOccupe] = useState('');
+  const [max, setMax] = useState(5);
+  if (q.emails === undefined) return null;
+  if (q.emails === null) return <section className="v2e-quarantaine" data-v2-mail-quarantaine="pas-su"><EtatPanne compact quoi={tr('v2.mail.q.titre')} raison={tr('v2.mail.q.passu')} onReessayer={q.relire}/></section>;
+  if (!q.emails.length) return null;
+  return (
+    <section className="v2e-quarantaine" data-v2-mail-quarantaine={q.emails.length} aria-label={tr('v2.mail.q.titre')}>
+      <h2 className="v2e-quarantaine-titre">{tr('v2.mail.q.titre')} <span className="v2e-n">{q.emails.length}</span></h2>
+      <p className="v2e-quarantaine-phrase">{tr('v2.mail.q.phrase')}</p>
+      <div className="v2e-carte">
+        {q.emails.slice(0, max).map((x) => <div key={x.id} className="v2e-q-ligne" data-v2-mail-q={x.id}>
+          <span className="v2e-q-txt"><span className="v2e-q-sujet">{x.sujet || tr('emails.eMailSans')}</span>{x.raison ? <span className="v2e-q-raison">{x.raison}</span> : null}</span>
+          <BoutonV2 role="secondaire" compact chargement={occupe === x.id} attrs={{ 'data-v2-mail-amoi': x.id }} onClick={async () => { setOccupe(x.id); try { await q.rattacher(x.id); } finally { setOccupe(''); } }}>{tr('v2.mail.q.amoi')}</BoutonV2>
+        </div>)}
+      </div>
+      {q.emails.length > max ? <BoutonV2 role="texte" onClick={() => setMax((m) => m + 10)}>{tr('v2.mail.q.suite', { n: q.emails.length - max })}</BoutonV2> : null}
+    </section>
+  );
+}
+
 // ── LA BOÎTE ─────────────────────────────────────────────────────────────────
-function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete = null, ecrireLus, photoDe }) {
+function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete = null, ecrireLus, photoDe, ranges = null, onRanger = null, quarantaine = null }) {
+  const v2 = useDesignV2();
+  const [feuilleV2, setFeuilleV2] = useState(false);
   const aideRechercheId=React.useId();
   const [rubrique, setRubrique] = useState('');
   const [adresse, setAdresse] = useState('');
@@ -605,6 +651,13 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
     const l = motLocal ? pages.emails.filter((e) => [e.subject, e.from, e.compte && e.compte.nom, JSON.stringify(e.resume || {})].join(' ').toLowerCase().includes(motLocal)) : pages.emails;
     return groupesParJour(l).map((g) => ({ ...g, items: empiler(g.emails, delies, maintenant) }));
   }, [pages, delies, maintenant, motLocal]);
+  // (17 nov., nouveau design) Rangés à part (mêmes e-mails, même ordre) ; éteint, rien ne change.
+  const { groupesV2, rangesV2 } = useMemo(() => {
+    if (!v2) return { groupesV2: groupes, rangesV2: [] };
+    const tous = [];
+    const gs = groupes.map((g) => { const { visibles, ranges: r } = separerRanges(g.items, ranges); tous.push(...r); return { ...g, items: visibles }; });
+    return { groupesV2: gs, rangesV2: tous };
+  }, [v2, groupes, ranges]);
   const nomCompte = (adr) => { const a = Array.isArray(adresses) ? adresses.find((x) => x.adresse === adr) : null; return (a && a.nom) || adr; };
   const nomsDoubles = useMemo(() => { const n = {}; (adresses || []).forEach((a) => { if (a.nom) n[a.nom] = (n[a.nom] || 0) + 1; }); return n; }, [adresses]);
   const libelleCompte = (a) => (a.nom ? (nomsDoubles[a.nom] > 1 ? `${a.nom} · ${a.adresse}` : a.nom) : a.adresse);
@@ -615,6 +668,11 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
   // et plus de phrase de couverture sous les pastilles (§5). « Non lus » et « À
   // vérifier » gardent le leur, suivi de « + » s'il peut y en avoir d'autres.
   const complet = !!(c && parR && !c.plus);
+  // (17 nov., nouveau design) Les nombres des segments : ceux que la boîte d'hier écrivait sur ses pastilles, sans
+  // filtre (la même réponse de la route) — gardés quand un segment filtre, pour qu'ils ne disparaissent pas au toucher.
+  const nombresV2 = useRef(null);
+  if (!filtre && c) nombresV2.current = { tout: complet ? c.sur : null, colis: complet && Number.isFinite(parR.colis) ? parR.colis : null, ventes: complet && Number.isFinite(parR.ventes) ? parR.ventes : null,
+    achats: complet && Number.isFinite(parR.achats) ? parR.achats : null, atraiter: c.aVerifier > 0 ? c.aVerifier : (Number.isFinite(c.aVerifier) ? 0 : null), plus: !!c.plus };
   const phrase = cherche ? `Recherche « ${cherche} » dans le sujet, l’expéditeur, l’article, le code et le n° de suivi${adresse ? ` de ${nomCompte(adresse)}` : ''}.`
     : complet && !filtre && c.adresse ? `Les nombres sont ceux de ${nomCompte(c.adresse)}.` : '';
   const rangee = useRef(null);
@@ -701,20 +759,44 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
     return resumeSerie({ faits: ok, pasFaits }, valeur ? { un: 'marqué lu', plusieurs: 'marqués lus' } : { un: 'marqué non lu', plusieurs: 'marqués non lus' });
   } }));
   const rendreEmail = (e) => <Ligne key={e.id} e={e} delies={delies} ouvert={ouvert === e.id} lu={luDe(e)} photo={photoLigne(e)} onOuvrir={ouvrir} onLu={onLu} maintenant={maintenant}
-    attrsSerie={serie.ligne(String(e.id))} caseSerie={serie.actif ? <CaseSerie serie={serie} cle={String(e.id)} etiquette={e.subject || 'cet e-mail'}/> : null}/>;
+    attrsSerie={serie.ligne(String(e.id))} caseSerie={serie.actif ? <CaseSerie serie={serie} cle={String(e.id)} etiquette={e.subject || 'cet e-mail'}/> : null}
+    v2={v2} range={v2 && estRange(ranges, e.id)} onRanger={v2 ? onRanger : null} onGeste={v2 ? (g) => (g.k === 'num' ? onNum && onNum(g.num) : onAller && onAller(g.url)) : null}/>;
   const nPastille = (id) => (filtre || !complet ? null : Number.isFinite(parR[id]) ? parR[id] : null);
   return (
     <div ref={corpsRef} className="vrm-boite-corps-ecran" data-boite-large={large ? '1' : '0'} data-boite-ouvert={ouvert ? '1' : '0'} onKeyDown={auClavier}>
       <div className="vrm-boite-liste-col" data-boite-liste-col="">
         {tete}
         <div className="vrm-boite-filtres">
-          <label className="vrm-boite-cherche" data-boite-cherche={cherche ? '1' : '0'}>
+          {v2 ? <div className="v2m-outils" data-v2-mail-outils="">{/* (17 nov.) la recherche + « ⋯ » (non lus, codes, offres) */}<label className="vrm-boite-cherche" data-boite-cherche={cherche ? '1' : '0'}>
+            <span className="vrm-boite-sr">{tr('emails.chercherEMail')}</span>
+            <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.6"/><path d="m13 13 4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
+            <input type="search" value={saisie} onChange={(ev) => { setSaisie(ev.target.value); setOuvert(''); }} placeholder={tr('emails.articleCodeSuivi')} aria-label={tr('emails.chercherEMail')} data-boite-cherche-champ="" enterKeyHint="search" autoComplete="off"/>
+          </label><BoutonIconeV2 icone={Ic.plus3} label={tr('v2.mail.plus')} actif={nonLus || rubrique === 'codes' || rubrique === 'offres'} onClick={() => setFeuilleV2(true)} attrs={{ 'data-v2-mail-plus': '' }}/></div>
+          : <label className="vrm-boite-cherche" data-boite-cherche={cherche ? '1' : '0'}>
             <span className="vrm-boite-sr">{tr('emails.chercherEMail')}</span>
             <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.6"/><path d="m13 13 4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
             <input type="search" value={saisie} onChange={(ev) => { setSaisie(ev.target.value); setOuvert(''); }} placeholder={tr('emails.articleCodeSuivi')} aria-label={tr('emails.chercherEMail')} data-boite-cherche-champ="" aria-describedby={saisie.trim().length===1?aideRechercheId:undefined} enterKeyHint="search" autoComplete="off"/>
-          </label>
+          </label>}
           {saisie.trim().length===1&&<p id={aideRechercheId} className="vrm-boite-aide-recherche" data-boite-aide-recherche="">{tr('emails.saisisMoins2')}</p>}
-          <div ref={rangee} className="vrm-boite-rubriques vrm-rangee" role="group" aria-label={tr('emails.trierEMails')}>
+          {v2 && (() => { const N = nombresV2.current || {}; const actif = nonLus ? '' : segmentDesFiltres({ rubrique, aVerif });
+            const mot = { atraiter: tr('v2.mail.atraiter'), colis: tr('v2.mail.colis'), ventes: tr('v2.mail.ventes'), achats: tr('v2.mail.achats'), tout: tr('v2.mail.tout') };
+            return <div className="v2e-tete" data-v2-mail-tete="">
+              <SegmentV2 label={tr('emails.trierEMails')} value={actif} attrs={{ 'data-v2-mail-seg': '' }}
+                onChange={(v) => { const f = filtresDuSegment(v); setNonLus(false); setAVerif(f.aVerif); setRubrique(f.rubrique); setOuvert(''); }}
+                options={SEGMENTS_EMAILS.map((v) => ({ v, l: mot[v], n: N[v] != null && (v !== 'atraiter' || N[v] > 0) ? String(N[v]) + (v === 'atraiter' && N.plus ? '+' : '') : '', data: { 'data-boite-rubrique-v2': v, 'data-boite-n': N[v] != null ? String(N[v]) : undefined } }))}/>
+              {(rubrique && !['colis', 'ventes', 'achats'].includes(rubrique)) || nonLus || (aVerif && rubrique) ? <div className="v2e-outils" data-v2-mail-filtre="">
+                <span>{[rubrique && !['colis', 'ventes', 'achats'].includes(rubrique) ? motRubrique : '', nonLus ? tr('emails.nonLus') : ''].filter(Boolean).join(' · ') || tr('journee.verifier')}</span>
+                <BoutonV2 role="texte" onClick={() => { setRubrique(''); setNonLus(false); setAVerif(false); setOuvert(''); }}>{tr('v2.mail.tout')}</BoutonV2></div> : null}
+            </div>; })()}
+          {v2 && feuilleV2 && <SheetShell onClose={() => setFeuilleV2(false)} titre={tr('v2.mail.plus')} FermeAuRetour={FermeAuRetour} data-v2-mail-feuille="">
+            <div className="v2m-feuille" role="radiogroup" aria-label={tr('v2.mail.plus')}>
+              {[['nonlus', tr('emails.nonLus'), nNonLus], ['codes', (RUBRIQUES_BOITE.find((x) => x.id === 'codes') || {}).mot, null], ['offres', (RUBRIQUES_BOITE.find((x) => x.id === 'offres') || {}).mot, null]].map(([k, l, n]) => (
+                <button key={k} type="button" className="v2-rangee v2m-choix" data-v2-rangee="" role="radio" aria-checked={(k === 'nonlus' ? nonLus : rubrique === k) ? 'true' : 'false'} data-v2-mail-choix={k}
+                  onClick={() => { if (k === 'nonlus') { setNonLus((v) => !v); } else { setNonLus(false); setAVerif(false); setRubrique(rubrique === k ? '' : k); } setOuvert(''); setFeuilleV2(false); }}>
+                  <span>{l}</span>{n != null && n > 0 ? <span className="v2m-choix-n">{n}</span> : null}</button>))}
+            </div>
+          </SheetShell>}
+          <div ref={rangee} className="vrm-boite-rubriques vrm-rangee" role="group" aria-label={tr('emails.trierEMails')} hidden={v2 || undefined} style={v2 ? { display: 'none' } : undefined}>
             <button type="button" aria-pressed={!rubrique && !nonLus && !aVerif} data-boite-rubrique="tout" onClick={(ev) => { setNonLus(false); setAVerif(false); choisir('', ev.currentTarget); }}>
               <span>{tr('emails.tout')}</span>{!filtre && c && parR && !c.plus ? <span className="vrm-boite-n" data-boite-n={c.sur}>{c.sur}</span> : null}
             </button>
@@ -764,15 +846,22 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
         {groupes.length > 0 && ordreSerie.length > 1 && <div className="vrm-serie-entree" style={{ display: 'flex', justifyContent: 'flex-end' }}><OuvrirSerie serie={serie}/></div>}
         <BarreSerie serie={serie} actions={actionsSerie} unite={{ un: 'e-mail sélectionné', plusieurs: 'e-mails sélectionnés' }}/>
         {groupes.length > 0 && <div className="vrm-boite-liste" data-boite-liste="">
-          {groupes.map((g) => <section key={g.cle} className="vrm-boite-jour" data-boite-jour={g.mot} aria-label={g.mot}>
+          {groupesV2.map((g) => (g.items.length ? <section key={g.cle} className="vrm-boite-jour" data-boite-jour={g.mot} aria-label={g.mot}>
             <h2 className="vrm-boite-jour-titre">{g.mot}</h2>
             <ul>
               {g.items.map((it) => (it.k === 'pile'
                 ? <Pile key={it.cle} p={it} rendre={rendreEmail} lus={luDe} delies={delies} maintenant={maintenant} deplie={deplies.has(it.cle)} onDeplier={() => setDeplies((s) => { const n = new Set(s); if (n.has(it.cle)) n.delete(it.cle); else n.add(it.cle); return n; })}/>
                 : rendreEmail(it.e)))}
             </ul>
-          </section>)}
+          </section> : null))}
+          {/* (17 nov., nouveau design) Les e-mails RANGÉS (glisser à gauche) : jamais jetés, jamais cachés sans un mot —
+              repliés ici, en bas de LEUR vue, comptés dans les nombres d'en haut ; glisser à gauche de nouveau les ressort. */}
+          {rangesV2.length > 0 && <details className="v2e-ranges" data-v2-mail-ranges={rangesV2.length}>
+            <summary><span>{tr('v2.mail.ranges')}</span><span className="v2e-n">{rangesV2.length}</span></summary>
+            <ul>{rangesV2.map((it) => (it.k === 'pile' ? it.emails.map((x) => rendreEmail(x)) : rendreEmail(it.e)))}</ul>
+          </details>}
         </div>}
+        {v2 && quarantaine ? <Quarantaine q={quarantaine}/> : null}
         <div ref={sentinelle} className="vrm-boite-sentinelle" aria-hidden="true"/>
         {pages && pages.suiteKO && <EtatPanne compact className="vrm-boite-panne" role="alert" data-boite-suite="pas-su" quoi="La suite de ta boîte" raison="Les e-mails ci-dessus restent lus." onReessayer={() => charger((pages.page || 0) + 1)}/>}
         {pages && pages.suite && !pages.suiteKO && <button type="button" className="vrm-boite-plus" data-boite-plus="" disabled={lecture} onClick={() => charger((pages.page || 0) + 1)}>{lecture ? tr('messages.lecture') : tr('achats.voirPlus')}</button>}
@@ -794,7 +883,7 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
 const VUES = [['boite', 'Boîte de réception'], ['relier', 'Relier ma boîte']];
 // (6 nov., v36) `ecrireLus(gestes)` : l'écriture des lus (src/emailsLusEcriture.js) ;
 // `photoDe(e)` : la photo de la paire reliée PAR IDENTITÉ (n° de transaction), ou `null`.
-export default function BoiteEmails({ headers, delies: deliesRecus = {}, onAller, onNum, onAdresses, FermeAuRetour, vueInitiale = 'boite', reglages = null, aRelier, boites = [], compteInitial = '', lireDernier, ecrireLus, photoDe, Photo = null }) {
+export default function BoiteEmails({ headers, delies: deliesRecus = {}, onAller, onNum, onAdresses, FermeAuRetour, vueInitiale = 'boite', reglages = null, aRelier, boites = [], compteInitial = '', lireDernier, ecrireLus, photoDe, Photo = null, ranges = null, onRanger = null, quarantaine = null }) {
   // L'app repasse un objet neuf à chaque rendu : on le garde tant que son CONTENU ne
   // change pas (sinon les 950 lignes mémoïsées se redessinent à chaque tic de l'app).
   const deliesCle = JSON.stringify(deliesRecus || {});
@@ -835,7 +924,7 @@ export default function BoiteEmails({ headers, delies: deliesRecus = {}, onAller
       <div className="vrm-boite-vues" role="tablist" aria-label={tr('nav.emails')}>
         {VUES.map(([k, mot]) => <button key={k} type="button" role="tab" aria-selected={vue === k} data-boite-vue={k} onClick={() => setVue(k)}>{mot}</button>)}
       </div>
-      {vue === 'boite' && <Boite headers={headers} delies={delies} onAller={onAller} onNum={onNum} FermeAuRetour={FermeAuRetour} onRelier={() => setVue('relier')} ecrireLus={ecrireLus} photoDe={photoDe}
+      {vue === 'boite' && <Boite headers={headers} delies={delies} onAller={onAller} onNum={onNum} FermeAuRetour={FermeAuRetour} onRelier={() => setVue('relier')} ecrireLus={ecrireLus} photoDe={photoDe} ranges={ranges} onRanger={onRanger} quarantaine={quarantaine}
         tete={<ARelier comptes={bandeau} onRelier={relierCompte}/>}/>}
       {vue === 'relier' && <div className="vrm-boite-relier" data-boite-relier="">
         {/* (10 nov., soir) UN SEUL parcours (src/AdresseReception.jsx) : son adresse VRM, le compte

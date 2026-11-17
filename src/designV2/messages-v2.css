@@ -1,0 +1,101 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   MESSAGES ET E-MAILS, NOUVEAU DESIGN (17 nov.) — src/designV2/LigneConversation.jsx, la boîte e-mails (v2).
+   Grille 4/8, gouttières 16, rayons 12/14/20, l'AIR (§14 de design-v2.css) : rangée ≥ 64, texte à ≥ 20 du bord de
+   sa carte, 16 entre cartes, 32 entre sections, 12 du titre au contenu. Tout est sous html[data-design="v2"] sauf
+   l'audit A8 (la confirmation partagée en très grand texte), qui vaut pour les deux dessins.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── A8 (audit visuel, non attribué) : la confirmation partagée en très grand texte ───────────────────────────
+   « e déconnecter partou » : les deux boutons côte à côte rognaient le plein. En grand texte, ils s'empilent à
+   100 % de largeur, le plein EN HAUT, et leur libellé passe à la ligne (jamais coupé). Éteint comme allumé. */
+html[data-grand-texte] body .vrm-fs.vrm-confirmation :is(.vrm-fs-corps > div:last-child, form > div:last-child, [data-verif-sheet] > div:last-child):has(> .vrm-b-primaire) { flex-direction: column-reverse !important; align-items: stretch !important; gap: 12px !important; }
+html[data-grand-texte] body .vrm-fs.vrm-confirmation :is(.vrm-fs-corps > div:last-child, form > div:last-child, [data-verif-sheet] > div:last-child):has(> .vrm-b-primaire) > .vrm-b { flex: none !important; width: 100% !important; height: auto !important; min-height: 50px !important; padding: 12px 16px !important; white-space: normal !important; overflow: visible !important; text-overflow: clip !important; overflow-wrap: normal !important; word-break: normal !important; }
+html[data-grand-texte] body .vrm-fs.vrm-confirmation .vrm-b > * { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }
+
+/* ── La tête de Messages ─────────────────────────────────────────────────────────────────────────────────── */
+.v2m-tete { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px 0; }
+.v2m-outils { display: flex; align-items: center; gap: 12px; }
+.v2m-outils > :first-child { flex: 1 1 auto; min-width: 0; }
+/* Le champ d'hier (ChampRecherche), posé sur la coque : la porcelaine, 44 px. */
+html[data-design="v2"] body .v2m-outils .vrm-msg-recherche { margin: 0 !important; }
+.v2m-filtre-actif { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 0 4px; color: var(--v2-page-texte); font-size: 15px; line-height: 1.4; }
+.v2m-filtre-actif b { font-weight: 600; }
+
+/* ── Les groupes (un compte = un groupe) ─────────────────────────────────────────────────────────────────── */
+.v2m-liste { display: flex; flex-direction: column; gap: var(--v2-air-sections, 32px); padding: 16px 16px 0; }
+.v2m-groupe { margin: 0; }
+.v2m-groupe-titre { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; margin: 0 4px var(--v2-air-titre, 12px); font-size: 20px; font-weight: 700; line-height: 1.2; letter-spacing: -.01em; color: var(--v2-page-texte); }
+.v2m-groupe-nom { min-width: 0; overflow-wrap: anywhere; }
+.v2m-groupe-sous { font-size: 15px; font-weight: 400; color: var(--v2-page-muet); }
+.v2m-carte { position: relative; border-radius: 14px; background: var(--v2-carte); box-shadow: var(--v2-carte-ombre); overflow: hidden; }
+
+/* ── La rangée (façon Mail) ─────────────────────────────────────────────────────────────────────────────── */
+html body button.v2-rangee.v2m-ligne { position: relative; align-items: flex-start; gap: 12px; min-height: max(88px, var(--v2-air-rangee, 64px)); padding: 12px var(--v2-air-carte, 20px) 12px 24px;
+  color: var(--sv-encre, #0C1D30); font-feature-settings: "tnum" 1; font-variant-numeric: tabular-nums; content-visibility: auto; contain-intrinsic-size: auto 96px; }
+:root[data-theme="dark"] body button.v2-rangee.v2m-ligne { color: #EAF2FB; }
+.v2m-carte > .v2m-ligne + .v2m-ligne::before { content: ""; position: absolute; top: 0; right: 0; left: 92px; height: .5px; background: var(--v2-filet); }
+html body button.v2-rangee.v2m-ligne.is-actif { background: var(--v2-socle); }
+.v2m-point { position: absolute; left: 8px; top: 34px; width: 8px; height: 8px; border-radius: 50%; background: transparent; }
+.v2m-ligne.is-nonlu .v2m-point { background: var(--v2-lien); }
+.v2m-ligne.is-nonlu.is-ro .v2m-point { background: var(--v2-muet); }
+.v2m-av { flex: none; width: 56px; height: 56px; border-radius: 12px; overflow: hidden; background: var(--v2-socle); display: flex; align-items: center; justify-content: center; }
+.v2m-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.v2m-ini { font-size: 20px; font-weight: 600; color: var(--v2-muet); }
+.v2m-txt { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.v2m-l1 { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.v2m-nom { flex: 1 1 auto; min-width: 0; font-size: 17px; font-weight: 600; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* C7 : l'heure garde SA largeur (jamais celle du nom). */
+.v2m-heure { flex: none; font-size: 15px; line-height: 1.3; color: var(--v2-muet); white-space: nowrap; }
+.v2m-ligne.is-nonlu .v2m-heure { color: inherit; font-weight: 600; }
+.v2m-extrait { font-size: 15px; line-height: 1.4; color: var(--v2-muet); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+.v2m-ligne.is-nonlu .v2m-extrait { color: inherit; }
+.v2m-toi { color: var(--v2-muet); }
+.v2m-l3 { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; min-height: 24px; font-size: 13px; line-height: 1.3; color: var(--v2-muet); }
+.v2m-offre { font-weight: 600; color: inherit; }
+.v2m-ligne.is-ro { opacity: 1; }
+.v2m-pied { padding: 16px 20px 0; color: var(--v2-page-muet); font-size: 15px; line-height: 1.4; }
+html[data-grand-texte] .v2m-av { width: 64px; height: 64px; }
+
+/* La feuille « ⋯ » de Messages : une liste de choix (radio), puis les outils. */
+.v2m-feuille { display: flex; flex-direction: column; gap: 4px; }
+.v2m-feuille-titre { margin: 8px 8px 4px; font-size: 13px; font-weight: 600; color: var(--v2-muet); }
+html body button.v2-rangee.v2m-choix { justify-content: space-between; min-height: 52px; padding: 0 12px; border-radius: 12px; font-size: 17px; }
+html body button.v2-rangee.v2m-choix[aria-checked="true"] { background: var(--v2-socle); font-weight: 600; }
+.v2m-choix-n { color: var(--v2-muet); font-variant-numeric: tabular-nums; }
+
+/* ── Le fil, allumé : des bulles façon Messages d'iPhone (les gestes d'hier restent tous) ─────────────────── */
+html[data-design="v2"] body .vrm-bulle-l .vrm-bulle { border-radius: 20px !important; padding: 8px 12px !important; font-size: 17px !important; line-height: 1.35 !important; max-width: 78%; box-shadow: none !important; }
+html[data-design="v2"] body .vrm-bulle-l.vrm-bulle-moi .vrm-bulle { background: #0071E3 !important; color: #FFFFFF !important; border-bottom-right-radius: 6px !important; }
+html[data-design="v2"] body .vrm-bulle-l:not(.vrm-bulle-moi) .vrm-bulle { background: var(--v2-socle) !important; color: var(--sv-encre, #0C1D30) !important; border-bottom-left-radius: 6px !important; }
+:root[data-theme="dark"][data-design="v2"] body .vrm-bulle-l:not(.vrm-bulle-moi) .vrm-bulle { color: #EAF2FB !important; }
+:root[data-theme="dark"][data-design="v2"] body .vrm-bulle-l.vrm-bulle-moi .vrm-bulle { background: #0A84FF !important; }
+html[data-design="v2"] body .vrm-bulle-l .vrm-bulle-h { opacity: .82; font-size: 12px !important; }
+html[data-design="v2"] body .vrm-bulle-l + .vrm-bulle-l { margin-top: 4px; }
+html[data-design="v2"] body .vrm-chat-head { min-height: 56px; padding-inline: 8px 16px !important; }
+html[data-design="v2"] body .vrm-chat-back { min-width: 44px; min-height: 44px; }
+
+/* ── E-mails, allumé ────────────────────────────────────────────────────────────────────────────────────── */
+.v2e-tete { display: flex; flex-direction: column; gap: 12px; margin: 0 0 16px; }
+.v2e-outils { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; color: var(--v2-page-texte); font-size: 15px; }
+.v2e-n { font-variant-numeric: tabular-nums; }
+html[data-design="v2"] body .vrm-boite .v2e-num { margin-left: 4px; }
+.v2e-ligne-pied { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; min-height: 24px; }
+.v2e-suivi { font-size: 13px; color: var(--v2-muet); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.v2e-action { display: flex; justify-content: flex-start; padding: 0 var(--v2-air-carte, 20px) 12px 92px; }
+html body .v2e-action button.v2b-texte { min-height: 44px; }
+.v2e-ranges { margin-top: 16px; }
+.v2e-ranges > summary { display: flex; align-items: center; justify-content: space-between; min-height: 52px; padding: 0 var(--v2-air-carte, 20px); list-style: none; cursor: pointer; border-radius: 14px; background: var(--v2-carte); color: var(--sv-encre, #0C1D30); font-size: 17px; font-weight: 600; }
+.v2e-ranges > summary::-webkit-details-marker { display: none; }
+:root[data-theme="dark"] .v2e-ranges > summary { color: #EAF2FB; }
+.v2e-quarantaine { margin-top: var(--v2-air-sections, 32px); }
+.v2e-quarantaine-titre { margin: 0 4px var(--v2-air-titre, 12px); font-size: 20px; font-weight: 700; color: var(--v2-page-texte); }
+.v2e-quarantaine-phrase { margin: 0 4px 12px; font-size: 15px; line-height: 1.4; color: var(--v2-page-muet); }
+.v2e-q-ligne { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 12px var(--v2-air-carte, 20px); color: var(--sv-encre, #0C1D30); }
+:root[data-theme="dark"] .v2e-q-ligne { color: #EAF2FB; }
+.v2e-carte > .v2e-q-ligne + .v2e-q-ligne { border-top: .5px solid var(--v2-filet); }
+.v2e-q-txt { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; font-size: 15px; line-height: 1.4; }
+.v2e-q-sujet { font-weight: 600; overflow-wrap: anywhere; }
+.v2e-q-raison { font-size: 13px; color: var(--v2-muet); }
+.v2e-carte { border-radius: 14px; background: var(--v2-carte); box-shadow: var(--v2-carte-ombre); overflow: hidden; }
+/* Le fond du glisser : « Ranger » à droite quand la rangée part vers la gauche. */
+html[data-design="v2"] body .vrm-boite-glisse-fond[data-sens="gauche"] { justify-content: flex-end; padding-inline: 0 24px; }

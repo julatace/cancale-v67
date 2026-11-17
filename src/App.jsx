@@ -1105,7 +1105,9 @@ import { useDesignV2, designV2Actif } from "./designV2/reglage.js";
 import AujourdhuiV2 from "./designV2/Aujourdhui.jsx";
 import { PassesRetrait as PassesRetraitV2, EnRouteListe as EnRouteListeV2 } from "./designV2/PassesRetrait.jsx";
 import MenuPlateformeV2 from "./designV2/MenuPlateforme.jsx";
-import { BoutonV2, SegmentV2 } from "./designV2/BoutonV2.jsx";
+import { BoutonV2, SegmentV2, BoutonIconeV2, RangeeTouchable as RangeeTouchableV2 } from "./designV2/BoutonV2.jsx";
+import { GroupeConversations as GroupeConversationsV2, LigneConversation as LigneConversationV2 } from "./designV2/LigneConversation.jsx";
+import { groupesParCompte as groupesParCompteV2, rangerEmails as rangerEmailsV2 } from "./designV2/messagesV2.js";
 import { nombre as nombreV2 } from "./i18n/index.js";
 import LigneAnnonceV2 from "./designV2/LigneAnnonce.jsx";
 import { SqueletteRangees as SqueletteRangeesV2, QuandLu as QuandLuV2 } from "./designV2/Signature.jsx";
@@ -3222,6 +3224,7 @@ const VENTES_MASQUEES_AUCUNE = () => [];
 const SYNC_KEYS = [
   // (17 nov., nouveau design) L'affichage des annonces : « Liste » (A, par défaut) ou « Détaillé » (C) — son choix, sur tous ses appareils.
   'vrm_annonces_affichage',
+  'vrm_emails_ranges',   // (17 nov., nouveau design) les e-mails rangés (glisser à gauche), jamais supprimés
   // (11 nov., lot visuels-reseaux) Format, modèle, couleur et nom de SA boutique des visuels réseaux
   // (src/visuelsReseaux.js `reglagesValides` ; boutique vide par défaut).
   'vrm_visuels_reglages',
@@ -48086,6 +48089,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [only, listings.items, listings.error, annBase, numeros, nouveauxFav, articlesVendusFavoris, listingDates]);
   const ventesFavorisHisto = useMemo(() => ventesPourHistorique({ ventes: sales.items || [], txnItem, conversations: convs.items || [], uid: favorisUid, annulee: (v) => classifyOrderStatus(v.status) === 'cancelled' }), [sales.items, txnItem, convs.items, favorisUid]);
   const [zoneMessages,setZoneMessages]=React.useState('conversations');
+  const [feuilleMsgV2,setFeuilleMsgV2]=React.useState(false);   // (17 nov., nouveau design) la feuille « ⋯ » de Messages
   // (11 nov., lot DJ8) Favoris & offres : deux vues, « Favoris » et « Offres auto ».
   const [zoneFav,setZoneFav]=useVueSession('favoris-zone','favoris');
   const lireGardeOffres=React.useCallback(()=>load('vinted_offres_garde', null),[]);
@@ -54802,13 +54806,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* (9 nov., lot AL — Julien : « les favoris et offres doivent être dans Messages ») L'ancienne
             entrée « Favoris & offres » du menu est CETTE section : même écran (`FavorisConnectes` :
             favoris reçus, offre aux favoris, mode auto), son nom d'hier. */}
-        <div className="vrm-messages-sections" role="group" aria-label="Choisir Conversations ou Favoris & offres">
+        {/* (17 nov., nouveau design) UN segmenté : Conversations · Offres · Favoris — les MÊMES zones qu'hier (`zoneMessages`,
+            `zoneFav`) ; la rangée « Conversations / Favoris & offres » et « Favoris / Offres auto » ne sont pas rendues allumé. */}
+        {designV2 && <div className="v2m-tete" data-v2-msg-tete=""><SegmentV2 label={tr('v2.msg.seg')} value={zoneMessages==='conversations'?'conversations':zoneFav==='offres'?'offres':'favoris'}
+          onChange={(v)=>{ if(v==='conversations') setZoneMessages('conversations'); else { setZoneMessages('favoris'); setZoneFav(v==='offres'?'offres':'favoris'); } }}
+          options={[{ v:'conversations', l:tr('v2.msg.conversations') },{ v:'offres', l:tr('v2.msg.offres') },{ v:'favoris', l:tr('v2.msg.favoris') }]} attrs={{'data-v2-msg-seg':''}}/></div>}
+        {!designV2 && <div className="vrm-messages-sections" role="group" aria-label="Choisir Conversations ou Favoris & offres">
           <button type="button" data-messages-zone="conversations" aria-pressed={zoneMessages==='conversations'} onClick={()=>setZoneMessages('conversations')}><Icon name="chat" size={17}/>Conversations</button>
           <button type="button" data-messages-zone="favoris" aria-pressed={zoneMessages==='favoris'} onClick={()=>setZoneMessages('favoris')}><Icon name="heart" size={17}/>Favoris & offres</button>
-        </div>
+        </div>}
         <div hidden={zoneMessages!=='favoris'} style={{display:zoneMessages==='favoris'?undefined:'none'}}>
         {/* (11 nov., lot DJ8) « Offres auto » : l'interrupteur, ce que le moteur ferait, les seuils par paire, l'historique. */}
-        <div className="vrm-fav-zones"><Segmente label="Favoris ou offres automatiques" value={zoneFav} onChange={setZoneFav} options={[{ v: 'favoris', l: 'Favoris' }, { v: 'offres', l: 'Offres auto' }]}/></div>
+        {!designV2 && <div className="vrm-fav-zones"><Segmente label="Favoris ou offres automatiques" value={zoneFav} onChange={setZoneFav} options={[{ v: 'favoris', l: 'Favoris' }, { v: 'offres', l: 'Offres auto' }]}/></div>}
         {zoneMessages==='favoris' && zoneFav==='offres' && <OffresAuto actif={offresAuto} virguleLue={extSait('offrespage')==='ok'} basculer={basculerOffresAuto} eteindreOffres={()=>{ setOffresAuto(false); save('vinted_offres_auto', false); }}
           refusMsg={refusMsg} setRefusMsg={ecrireRefusMsg}
           refusVariantes={refusVariantes} setRefusVariantes={changerRefusVariantes} variantesOk={extSait('variantes')==='ok'}
@@ -54823,7 +54832,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         </div>
         <div className="vrm-message-workspace" hidden={zoneMessages!=='conversations'} style={{display:zoneMessages==='conversations'?undefined:'none'}}><div className="vrm-inbox-column">
         {/* (5 nov., chantier G) Le champ de recherche commun (`ChampRecherche`) : plus un champ teinté posé dans un champ bordé. */}
-        <ChampRecherche className="vrm-msg-recherche" valeur={messageSearch} onChange={(v)=>setMessageSearch(String(v||'').slice(0,200))} label="Rechercher une conversation" placeholder="Pseudo, article, N°…" micro data-msg-recherche=""/>
+        {designV2 ? <div className="v2m-outils" data-v2-msg-outils="">{/* (17 nov., nouveau design) la recherche + « ⋯ » (filtres, mise à jour, réponses rapides) : une ligne. */}
+          <ChampRecherche className="vrm-msg-recherche" valeur={messageSearch} onChange={(v)=>setMessageSearch(String(v||'').slice(0,200))} label={tr('v2.msg.chercher')} placeholder={tr('v2.msg.chercherPh')} micro data-msg-recherche=""/>
+          <BoutonIconeV2 icone={<Icon name="more" size={22}/>} label={tr('v2.msg.plus')} actif={messageFilter!=='all'} onClick={()=>setFeuilleMsgV2(true)} attrs={{'data-v2-msg-plus':''}}/>
+        </div> : <ChampRecherche className="vrm-msg-recherche" valeur={messageSearch} onChange={(v)=>setMessageSearch(String(v||'').slice(0,200))} label="Rechercher une conversation" placeholder="Pseudo, article, N°…" micro data-msg-recherche=""/>}
         {!!messageSearch.trim()&&<p className="vrm-msg-recherche-portee" role="status">Sur tous tes comptes.{messageFilter!=='all'&&<> Le filtre reste appliqué. <button type="button" className="vrm-pied-lien" data-pied-lien="tout" onClick={()=>{setMessageFilter('all');setConvMax(40);}}>Afficher tous les résultats</button></>}</p>}
         {convs.loading && !convs.items && <Skeleton variant="row" count={2}/>}
         {/* (5 nov., chantier G, revue 1.10) La panne dite par `EtatPanne` : une phrase, la raison, UN geste. */}
@@ -54970,7 +54982,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {/* (16 oct.) UNE barre : le filtre en contrôle segmenté, le nombre
                   (déjà dans « Toutes N ») lu par les lecteurs d'écran seulement,
                   et l'actualisation en icône — plus deux rangées de commandes. */}
-              <div className="vrm-msg-bar">
+              {designV2 && messageFilter!=='all' && <div className="v2m-filtre-actif" data-v2-msg-filtre={messageFilter}><span><b>{messageFilter==='unread'?tr('v2.msg.f.nonlues'):messageFilter==='offres'?tr('v2.msg.f.offres'):tr('v2.msg.f.repondre')}</b></span>
+                <BoutonV2 role="texte" onClick={()=>{setMessageFilter('all');setConvMax(40);}} attrs={{'data-v2-msg-filtre-effacer':''}}>{tr('v2.msg.f.toutes')}</BoutonV2></div>}
+              {designV2 && feuilleMsgV2 && <SheetShell onClose={()=>setFeuilleMsgV2(false)} titre={tr('v2.msg.plus')} data-v2-msg-feuille="">
+                <div className="v2m-feuille" role="radiogroup" aria-label={tr('v2.msg.filtrer')}>
+                  <p className="v2m-feuille-titre">{tr('v2.msg.filtrer')}</p>
+                  {[['all',tr('v2.msg.f.toutes'),liste.length],['repondre',tr('v2.msg.f.repondre'),aRepondre.length],['unread',tr('v2.msg.f.nonlues'),nonLus],...((nOffres>0||messageFilter==='offres')?[['offres',tr('v2.msg.f.offres'),nOffres]]:[])].map(([v,l,n])=>(
+                    <RangeeTouchableV2 key={v} className="v2m-choix" attrs={{role:'radio','aria-checked':(v==='repondre'?messageFilter.startsWith('repondre'):messageFilter===v)?'true':'false','data-v2-msg-choix':v,'data-n':String(n)}}
+                      onClick={()=>{setMessageFilter(v);setConvMax(40);setFeuilleMsgV2(false);}}><span>{l}</span><span className="v2m-choix-n">{nombreV2(n)}</span></RangeeTouchableV2>))}
+                  <p className="v2m-feuille-titre">{tr('v2.msg.outils')}</p>
+                  {!boitesKO.length && <RangeeTouchableV2 className="v2m-choix" attrs={{'data-v2-msg-maj':''}} onClick={()=>{setFeuilleMsgV2(false);loadConvs(true);}}><span>{tr('v2.msg.maj')}</span><Icon name="sync" size={20}/></RangeeTouchableV2>}
+                  <RangeeTouchableV2 className="v2m-choix" attrs={{'data-v2-msg-rapides':''}} onClick={()=>{setFeuilleMsgV2(false);setFeuilleQR(true);}}><span>{tr('v2.msg.rapides')}</span><Icon name="pencil" size={20}/></RangeeTouchableV2>
+                </div>
+              </SheetShell>}
+              {!designV2 && <div className="vrm-msg-bar">
                 {/* (5 nov., chantier G, revue 2.23) Les filtres au dessin des AUTRES filtres de l'app (`.vrm-filtres`). */}
                 <div className="vrm-inbox-filters vrm-filtres" role="group" aria-label="Filtrer les conversations">
                   <button type="button" aria-pressed={messageFilter==='all'} onClick={()=>{setMessageFilter('all');setConvMax(40);}}>Toutes <span>{liste.length}</span></button>
@@ -54983,7 +55008,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
                 {/* (5 nov., revue 3.8) Une boîte en panne a SON « Réessayer » : l'icône de relecture se tait à côté. */}
                 {!boitesKO.length && <button type="button" className="vrm-msg-refresh" onClick={()=>loadConvs(true)} aria-label="Mettre à jour les conversations" title="Mettre à jour les conversations"><Icon name="sync" size={17}/></button>}
-              </div>
+              </div>}
               <CompteurArnaque n={nArnaque}/>
               {messageFilter.startsWith('repondre')&&<ChoixReponses mode={messageFilter} total={aRepondre.length} offres={offresARepondre} onChoix={v=>{setMessageFilter(v);setConvMax(40);}}/>}
               {messageFilter.startsWith('repondre')&&<p className="vrm-inbox-feedback">{aRepondre.length?`${offresARepondre} offre${offresARepondre>1?'s':''} · ${aRepondre.length-offresARepondre} conversation${aRepondre.length-offresARepondre>1?'s':''} sans offre en attente`:'Aucune conversation confirmée comme étant à répondre.'} · Dernier auteur vérifié uniquement. Les fils non vérifiés restent dans Toutes.</p>}
@@ -55028,7 +55053,44 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {tri.length===0 && liste.length>0 && messageFilter!=='all' && <div data-msg-filtre-vide="" className="vrm-vue-vide"><b>Aucune conversation dans ce filtre</b><p>Les conversations sont toujours disponibles dans « Toutes ».</p><Bouton variante="secondaire" onClick={()=>{setMessageFilter('all');setConvMax(40);}}>Voir toutes les conversations</Bouton></div>}
               {/* (5 nov., chantier G) L'état vide dit QUOI FAIRE, en une phrase, et nomme les comptes lus. */}
               {listeBrute.length===0 && !messageSearch.trim() && !boitesKO.length && <div data-msg-vide="" className="vrm-vide-dessin"><Illustration nom="courrier" taille={104}/><p>Aucune conversation pour l’instant</p><p>Ouvre ta messagerie sur vinted.fr {NAV.dans} : elles arrivent ici.</p></div>}
-              <div className="vrm-msg-list" style={{border:liste.length?`1px solid ${C.border}`:'none',background:C.card}}>
+              {designV2 ? (()=>{
+                // (17 nov., nouveau design) LES COMPTES SÉPARÉS (CLAUDE.md §3, 12 nov.) : le compte de l'onglet d'abord, puis
+                // chaque autre compte ; du plus récent au plus ancien DANS chaque groupe (`groupesParCompte`). Les MÊMES
+                // conversations que la liste d'hier (`tri` : mêmes filtres, mêmes retirées), la même pagination (`convMax`).
+                const groupes = groupesParCompteV2(tri, { uidDe: uidC, quand: (c)=>c.updated_at, compteOnglet: prioMsg, nomDe: (c)=>c._acc?accName(c._acc):'' });
+                let reste = convMax;
+                const montres = groupes.map((g)=>{ const convs = g.convs.slice(0, Math.max(0, reste)); reste -= convs.length; return { ...g, convs }; }).filter((g)=>g.convs.length);
+                return <div className="v2m-liste" data-v2-msg-liste="" data-v2-msg-groupes={montres.length}>
+                  {montres.map((g)=>(
+                    <GroupeConversationsV2 key={g.uid} titre={g.nom || tr('v2.msg.compte')} sous={prioMsg ? (g.onglet ? tr('v2.msg.ouvert', { nav: NAV.dansNu }) : tr('v2.msg.lectureSeule')) : ''}
+                      attrs={{ 'data-v2-msg-groupe': g.uid, 'data-v2-msg-onglet': g.onglet ? '1' : '0', 'data-v2-msg-groupe-n': String(g.convs.length) }}>
+                      {g.convs.map((c)=>{
+                        const paire = paireDeConv(uidC(c), c.id, null);
+                        const auteur = auteurDernier(c, paire);
+                        const offre = offreDeConv(c);
+                        const tsConv = Date.parse(c.updated_at||'') || null;
+                        const photo = (c.item_photos&&c.item_photos[0]&&c.item_photos[0].url) || (paire&&paire.photo) || (c.opposite_user&&c.opposite_user.photo&&c.opposite_user.photo.url) || null;
+                        const ro = !!prioMsg && uidC(c)!==prioMsg;
+                        const nom = (c.opposite_user&&c.opposite_user.login)||tr('v2.msg.conversation');
+                        const ex = extraitConversation(c, paire&&paire.r, paire&&paire.titre, normTitle);
+                        const offreDer = !offre && ex.kind==='offer' ? ex.offre : null;
+                        const texteEx = offreDer ? `${libelleOffre(offreDer)} ${prix(offreDer.montant,offreDer.devise)}${etatOffreCourt(offreDer.etat,offreDer.etatLibelle)?' · '+etatOffreCourt(offreDer.etat,offreDer.etatLibelle):''}`
+                          : ex.kind==='event' ? tr('v2.msg.vinted',{ t: ex.texte }) : ex.kind==='message' ? (ex.vinted?tr('v2.msg.equipe',{ t: ex.texte }):ex.texte) : '';
+                        const toi = ex.kind==='message'&&ex.source==='fil'&&(ex.de==='toi'||auteur==='toi');
+                        const titrePaire = (paire&&paire.titre)||c.item_title||c.item?.title||'';
+                        return <LigneConversationV2 key={uidC(c)+'_'+c.id} Photo={PhotoVinted} photo={photo} nom={nom} heure={tsConv?heureListe(tsConv):''} quandIso={tsConv?new Date(tsConv).toISOString():''}
+                          extrait={texteEx || titrePaire} toi={toi?tr('messages.toi'):''} num={paire&&paire.num?String(paire.num):''}
+                          offre={offre?tr('v2.msg.offreAttente',{ p: prix(offre.prix) }):''} etat={paire&&paire.etat?paire.etat.t:''}
+                          nonLu={!!c.unread} lectureSeule={ro} actif={openConv?.convId===c.id && String(openConv.acc?.vinted_user_id)===uidC(c)}
+                          label={[c.unread?tr('messages.nonLu'):'', nom, texteEx, paire&&paire.num?'N° '+paire.num:''].filter(Boolean).join(' · ')}
+                          apres={<PastilleArnaque motif={ex.kind==='message'&&ex.source==='fil'&&!ex.vinted?motifDeLApercu(ex.texte, ex.de==='eux'?false:ex.de==='toi'?true:null):null}/>}
+                          onClick={()=>openConversation(c)}
+                          attrs={{'data-conv':c.id,'data-cible':attrCible(['conv',c.id],c._acc?['conv',String(c._acc.vinted_user_id),c.id]:null),'data-conv-acces':prioMsg?(ro?'lecture':'action'):undefined,'data-nonlu':c.unread?'1':undefined,
+                            'data-conv-num':paire&&paire.num?paire.num:undefined,'data-conv-quand':tsConv?new Date(tsConv).toISOString():undefined,'data-conv-compte':c._acc?String(c._acc.vinted_user_id):undefined,'data-conv-offre':offre?String(offre.prix):undefined}}/>;
+                      })}
+                    </GroupeConversationsV2>))}
+                </div>;
+              })() : (<div className="vrm-msg-list" style={{border:liste.length?`1px solid ${C.border}`:'none',background:C.card}}>
                 {affiches.map((c,i)=>{
                   const paire = paireDeConv(uidC(c), c.id, null);
                   const auteur = auteurDernier(c, paire);
@@ -55093,7 +55155,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </React.Fragment>
                   );
                 })}
-              </div>
+              </div>)}
               {nSansDate>0 && <p className="vrm-msg-sans-date" data-conv-sans-date={nSansDate} style={{color:C.muted}}>{nSansDate} sans date lue : en bas de la liste.</p>}
               {/* (5 nov., chantier G, revue 2.23) UN style de lien en pied (`vrm-pied-lien`) ; le compte « 40/200 » reste lisible à côté. */}
               {tri.length>convMax && <button type="button" className="vrm-msg-more vrm-pied-lien" data-pied-lien="suite" onClick={()=>React.startTransition(()=>setConvMax(m=>m+40))}>Afficher les {Math.min(40,tri.length-convMax)} suivantes <span className="vrm-pied-lien-n">{convMax} sur {tri.length}</span></button>}
@@ -61347,7 +61409,25 @@ function EcranEmails({ comptes, ...props }) {
   //    (chargé à la demande) suspend et React rejoue l'initialiseur — la demande était déjà vidée.
   const [compteInitial] = useState(() => DEMANDE_ADRESSES.compte || '');
   useEffect(() => { DEMANDE_ADRESSES.compte = ''; const f = () => { DEMANDE_ADRESSES.compte = ''; }; window.addEventListener('vrm:relier-compte', f); return () => window.removeEventListener('vrm:relier-compte', f); }, []);
-  return <BoiteEmails {...props} Photo={PhotoVinted} aRelier={liste} boites={boites} compteInitial={compteInitial} lireDernier={lireDernierEmailCompte}/>;
+  // (17 nov., nouveau design) « Ranger » (glisser à gauche) : une marque synchronisée (`vrm_emails_ranges`, { id: date }),
+  // jamais une suppression ; au retour du nuage, seule une valeur vide est remplacée. Et les e-mails à rattacher : la
+  // MÊME lecture que Paramètres (`useMisDeCote`), le MÊME rejeu « C'est à moi » (POST /api/email-rattacher, SA session).
+  const designV2 = useDesignV2();
+  const [ranges, setRanges] = useStateCle('vrm_emails_ranges', () => load('vrm_emails_ranges', {}) || {});
+  useEffect(() => onCloudReady(() => setRanges((v) => (v && Object.keys(v).length ? v : (load('vrm_emails_ranges', {}) || {})))), []);
+  const ranger = React.useCallback((e, oui) => { setRanges((v) => { const n = rangerEmailsV2(v, e && e.id, oui); save('vrm_emails_ranges', n); return n; }); }, []);
+  const misDeCote = useMisDeCote();
+  useEffect(() => { if (designV2 && _misDeCote === undefined) lireMisDeCote(); }, [designV2]);
+  const quarantaine = designV2 ? { emails: misDeCote === undefined ? undefined : misDeCote ? misDeCote.emails : null, relire: () => lireMisDeCote(),
+    rattacher: async (id) => {
+      let ok = false;
+      try { const r = await fetch('/api/email-rattacher', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ id, silencieux: false }) }); const j = await r.json().catch(() => ({})); ok = !!(j && j.ok); }
+      catch (_) { toast(tr('v2.mail.q.reseau')); return; }
+      toast(ok ? tr('v2.mail.q.ok') : tr('v2.mail.q.ko'));
+      lireMisDeCote();
+    } } : null;
+  return <BoiteEmails {...props} Photo={PhotoVinted} aRelier={liste} boites={boites} compteInitial={compteInitial} lireDernier={lireDernierEmailCompte}
+    ranges={designV2 ? ranges : null} onRanger={designV2 ? ranger : null} quarantaine={quarantaine}/>;
 }
 // (10 nov.) `ComptesARelierColis` (le bandeau « N colis de X : ses e-mails n'arrivent pas ») est retiré :
 // une marque discrète sur la carte du colis (`data-colis-sans-email`), la ligne de fraîcheur dit le reste.
@@ -62157,7 +62237,8 @@ function AppCoeur() {
   const [tab,setTabBrut]=useState(()=>{ if(!reprise0) return 'journee'; const pl=placeDesColis({ tab:reprise0.tab, sub:reprise0.sub, onglet:reprise0.colis }); if(pl&&pl.onglet==='retirer') demanderRetirer(); return pl?pl.tab:reprise0.tab; });
   // (17 nov., nouveau design) Annonces au téléphone : la tête de la coque ne prend plus de bande (la cloche seule, sur la ligne du
   // titre ; la recherche est le champ de l'écran ; le profil est ailleurs — Paramètres par le menu ☰ et les autres écrans).
-  const v2Ann = designV2App && !ordi && tab === 'annonces';
+  // (17 nov., nouveau design — Messages) La même tête sur Messages : le grand titre et la cloche sur UNE ligne.
+  const v2Ann = designV2App && !ordi && (tab === 'annonces' || tab === 'messages');
   // (6 nov.) L'écran ouvert et celui d'avant, pour « Signaler un problème ».
   noterEcranVu(tab);
   // (6 nov., v36) Et pour les temps réels : une visite d'écran par onglet ouvert.
@@ -65322,6 +65403,7 @@ function AppCoeur() {
                titre (« Publier » : le geste du disque d'hier, `vrm:publier-ailleurs`), jamais posé sur la liste. */
             ? <div className="v2-titre-ligne"><h1>{TITRES_TACHE[t]}</h1><BoutonV2 role="principal" compact icone={<Icon name="plus" size={20}/>} attrs={{ 'data-v2-principal': 'publier' }}
                 onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:publier-ailleurs', { detail: {} })); } catch (_) {} }}>{tr('v2.ann.publierCourt')}</BoutonV2></div>
+            : designV2App && t === 'messages' ? <div className="v2-titre-ligne" data-v2-msg-titre=""><h1>{TITRES_TACHE[t]}</h1></div>
             : <h1>{TITRES_TACHE[t]}</h1>}
           {/* (17 nov., nouveau design) PLATEFORME + COMPTE = UN MENU sous le grand titre : les mêmes contrôles qu'avant
               (FiltreSites, SelecteurCompte), dans sa feuille. Éteint : rien de ceci n'est rendu. */}
