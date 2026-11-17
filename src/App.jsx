@@ -533,6 +533,8 @@ import { montant, fmt as fmtMontant, fmtE as fmtEMontant, fmtE0 as fmtE0Montant,
 import { SheetShell as SheetShellBase } from "./composants/SheetShell.jsx";
 import { poserFermeAuRetour } from "./ui/retour.jsx";   // (14 nov., correctif « À faire ») les feuilles de src/ui reçoivent le vrai FermeAuRetour
 import { BoutonBase, SegmenteBase } from "./composants/Bouton.jsx";
+import { PartageAidant } from "./PartageAidant.jsx";   // (16 nov., lot partage-aidant)
+import { vueDuStock } from "./aidantStock.js";
 import { ID_PAIRES, ECRANS_PAIRES, estPaires, dernierePaire, noterPaire, groupeBarre, badgePaires } from "./navPaires.js";
 import { entreeHistorique } from "./navHistorique.js";   // (16 nov., barre-achats) passer d'un onglet de la barre à un autre n'empile rien   // (14 nov., n° 61) l'onglet « Paires »
 // (14 nov., Studio bleu clair) L'espace d'un écran, le disque et son éventail, l'ondulation au changement d'espace.
@@ -28470,6 +28472,19 @@ const stockPourRecherche = (brut, grille) => {
   for (const [box, arr] of Object.entries(grille || {})) if (Array.isArray(arr)) for (const v of arr) if (v != null && String(v).trim()) out.push({ numero: String(v), lieu: String(box) });
   return out;
 };
+// (16 nov., lot partage-aidant) Paramètres → Stock et rangement → « Partager le stock avec un aidant » : le stock
+// publié = chaque N° rangé (`stockPourRecherche`), son lieu, le titre et la photo de SA fiche (src/aidantStock.js) ;
+// le serveur le refiltre (api/_lib/aidant-lien.js : jamais un prix, un pseudo, une adresse).
+export function PartageAidantSetting() {
+  const appel = React.useCallback(async (methode, corps) => {
+    try {
+      const r = await fetch('/api/compte?mode=aidant', { method: methode, headers: { ...enTeteSession(), ...(corps ? { 'Content-Type': 'application/json' } : {}) }, ...(corps ? { body: JSON.stringify(corps) } : {}) });
+      return await r.json().catch(() => null);
+    } catch (_) { return null; }
+  }, []);
+  const vue = () => { let brut = null; try { brut = localStorage.getItem('vrm_room_plan'); } catch (_) {} return vueDuStock(stockPourRecherche(brut, load('vinted_garage_grid', {}) || {}), load('vinted_annonce_numeros', {}) || {}, cleNum); };
+  return <PartageAidant appel={appel} vue={vue} Bouton={Bouton} Segmente={Segmente}/>;
+}
 // Où est posé ce numéro (comparé par IDENTITÉ de numéro, `cleNum`) ?
 const ouEstNumero = (plan, num) => {
   const t = cleNum(num); if (!t) return null;

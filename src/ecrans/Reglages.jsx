@@ -4,6 +4,7 @@ import { modifierLigneCas, ecrireDifference } from '../ligneCas.js';
 import { signalDelai } from '../compatSafari.js';
 import { QuoiDeNeufParametres } from '../App.jsx';   // (11 nov.) « Quoi de neuf »
 import { RappelsSetting } from '../App.jsx';
+import { PartageAidantSetting } from '../App.jsx';   // (16 nov., lot partage-aidant)
 import { useReglageCapte } from '../capteNotif/useReglageCapte.js';   // (14 nov., ext. 5.377) « Dire ce que l'extension capte »
 import { CLE_VERIF_COUPEES, lireCoupees, rallumerAlerte, NOMS_ALERTES } from '../verifAnnonce.js';
 // (9 nov.) L'objectif du mois (src/objectifMois.js) : le MÊME réglage que la barre de Ma journée.
@@ -2160,6 +2161,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     // (GROUPES_COMPTE, `abonnement`), le même composant qu'avant (§11).
     MULTI_USER && { id:'stock', titre:tr('reglages.groupe.stock'), items:[
       { id:'numeros', type:'panneau', nu:true, ic:'tag', lib:tr('reglages.numeros.lib'), desc:tr(profilV.vend === 'sneakers' ? 'reglages.numeros.desc.paires' : 'reglages.numeros.desc.articles'), val:valNumeros, el:<NumerosSetting nu onStock={()=>setTab('garage')} onAnnonces={()=>setTab('cat_annonces')}/> },
+      // (16 nov., lot partage-aidant) Un lien en lecture seule pour un aidant sans compte : où est chaque N°, jamais un prix.
+      { id:'aidant', type:'panneau', nu:true, ic:'link', lib:tr('aidant.reglage.lib'), desc:tr('aidant.reglage.desc'), data:{ 'data-reglage-aidant':'' }, el:<PartageAidantSetting/> },
       // ⛔ Réponse automatique aux messages Vinted retirée (16 oct., sa décision).
       // ⛔ Détourage des photos retiré des Paramètres (17 oct., sa décision) :
       //    il n'existe plus que pour Vestiaire Collective, qui l'exige, sans réglage.
