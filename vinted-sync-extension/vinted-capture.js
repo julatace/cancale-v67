@@ -188,8 +188,10 @@
   // Rien ne clique, rien n'envoie à Vinted : on pose une étiquette dans la page.
   const NUM_ATTR = 'data-vrm-num';
   const STYLE_PILULE = 'display:inline-flex;align-items:center;gap:4px;font:700 11.5px/1 -apple-system,system-ui,sans-serif;'
-    + 'color:#fff;background:rgba(16,20,27,.88);border:1px solid rgba(61,123,255,.9);border-radius:999px;padding:4px 8px;white-space:nowrap;letter-spacing:.01em;'
-    + 'box-shadow:0 1px 3px rgba(0,0,0,.25);flex:none;width:auto;max-width:max-content;box-sizing:border-box;';
+    // 5.406 : l'étiquette N° en KRAFT de VRM (vrm-ui.js, `.vu-n` — mêmes couleurs : 12,6:1),
+    // posée sur la photo de Vinted : opaque, lisible sur une photo claire comme sombre.
+    + 'color:#2A2116;background:#E9DCC4;border:0;border-radius:3px;padding:4px 9px 3px 9px;white-space:nowrap;letter-spacing:.01em;font-variant-numeric:tabular-nums;'
+    + 'clip-path:polygon(0 0,calc(100% - 6px) 0,100% 6px,100% 100%,0 100%);box-shadow:inset 0 0 0 .5px rgba(42,33,22,.22),0 1px 3px rgba(0,0,0,.25);flex:none;width:auto;max-width:max-content;box-sizing:border-box;';
   // (28 oct.) Sur une carte de Vinted, le lien RECOUVRE la photo (sans image
   // dedans) et sa mise en page étirait l'étiquette sur toute la largeur, en bas
   // de la photo. On la pose toujours en petite pastille, en haut à gauche, sans
@@ -289,14 +291,18 @@
     h.style.cssText = 'display:block;max-width:360px;margin:10px 0;';
     const sr = h.attachShadow({ mode: 'closed' });
     const st = document.createElement('style');
-    st.textContent = ':host{all:initial;display:block}*{box-sizing:border-box;margin:0;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif}'
-      + '.b{border-radius:14px;background:#F2F2F7;color:#1D1D1F;padding:10px 12px}.t{font-weight:700;font-size:13px;line-height:1.3;margin-bottom:4px}'
-      + '.l{padding:6px 0;border-top:1px solid rgba(60,60,67,.12)}.l:first-of-type{border-top:0}.x{font-weight:600;font-size:13px;line-height:1.35}.p{font-weight:500;font-size:12px;line-height:1.4;color:#6E6E73}'
-      + 'button{all:unset;box-sizing:border-box;cursor:pointer;min-height:44px;display:block;font-weight:600;font-size:12px;line-height:44px;color:#0071E3}button:focus-visible{outline:2px solid #0071E3;border-radius:6px}'
-      + '@media (prefers-color-scheme:dark){.b{background:#1C1C1E;color:#F5F5F7}.p{color:#98989D}button{color:#0A84FF}.l{border-color:rgba(84,84,88,.6)}}';
+    // 5.406 : la feuille COMMUNE (vrm-ui.js) — une plaque de porcelaine, le liseré ambre d'un geste.
+    st.textContent = ':host{all:initial;display:block}*{box-sizing:border-box;margin:0;font-family:var(--vu-police)}'
+      + '.b{border-radius:16px;background:var(--vu-plaque);color:var(--vu-encre);padding:10px 14px;box-shadow:var(--vu-ombre),inset 3px 0 0 var(--vu-ambre-point);border:1px solid var(--vu-filet)}'
+      + '.t{display:flex;align-items:center;gap:8px;font-weight:700;font-size:13px;line-height:1.3;margin-bottom:4px}'
+      + '.t i{font-style:normal;display:inline-grid;place-items:center;height:20px;padding:0 6px;border-radius:6px;background-color:var(--vu-coque-uni);background-image:var(--vu-coque);color:#fff;font:800 10px/1 var(--vu-police);letter-spacing:.04em}'
+      + '.l{padding:6px 0;border-top:1px solid var(--vu-filet)}.l:first-of-type{border-top:0}.x{font-weight:600;font-size:13px;line-height:1.35}.p{font-weight:500;font-size:12px;line-height:1.4;color:var(--vu-muet)}'
+      + 'button{all:unset;box-sizing:border-box;cursor:pointer;min-height:44px;display:block;font-weight:600;font-size:13px;line-height:44px;color:var(--vu-lien)}button:focus-visible{box-shadow:var(--vu-anneau);border-radius:6px}';
+    if (globalThis.VRM_UI) globalThis.VRM_UI.monter(sr);
     sr.appendChild(st);
     const b = document.createElement('div'); b.className = 'b';
-    const t = document.createElement('div'); t.className = 't'; t.textContent = `VRM · ${vues.length} point${vues.length > 1 ? 's' : ''} à vérifier (tu peux publier)`; b.appendChild(t);
+    const t = document.createElement('div'); t.className = 't'; const marque = document.createElement('i'); marque.textContent = 'VRM'; marque.setAttribute('aria-hidden', 'true');
+    t.append(marque, document.createTextNode(`${vues.length} point${vues.length > 1 ? 's' : ''} à vérifier (tu peux publier)`)); b.appendChild(t);
     for (const a of vues) {
       const l = document.createElement('div'); l.className = 'l';
       const x = document.createElement('div'); x.className = 'x'; x.textContent = a.texte; l.appendChild(x);

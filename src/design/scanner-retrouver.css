@@ -195,3 +195,9 @@ html[data-scan-retrouver] body .vrm-app-shell { visibility: hidden !important; }
 .vrm-rtv-gestes .vrm-rtv-touche { width: 100%; min-height: 44px; text-decoration: none; justify-content: center; text-align: center; }
 .vrm-rtv-gestes .vrm-rtv-touche:only-child { grid-column: 1 / -1; }
 .vrm-rtv-feuille > .vrm-rtv-touche[data-scan-a-relier] { margin-top: 10px; width: 100%; }
+
+/* (17 nov., lot scan-instantane) Un code LU : le viseur le dit à l'instant (avant même la fiche), sans attendre. */
+.vrm-rtv-viseur.is-lu > i { border-color: rgb(140 196 255); }
+.vrm-rtv-viseur.is-lu .vrm-rtv-ligne { animation: none; opacity: 0; }
+/* Le zoom « 2× / 1× » : un rond du même jeu que la lampe, le chiffre au lieu d'une icône. */
+.vrm-rtv-zoom { font-size: 14px; font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }

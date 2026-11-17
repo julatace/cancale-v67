@@ -11,6 +11,7 @@ export default {
   "scan.r.sansCamera": "Pas de caméra ici : tape le n° de suivi.",
   "scan.r.indice": "Ce code n’est pas un n° de suivi : vise l’autre code-barres.",
   "scan.r.lampe": "Lampe",
+  "scan.r.zoom": "Zoom : viser de plus loin",
   "scan.r.taper": "Taper le n°",
   "scan.r.saisie": "N° de suivi",
   "scan.r.ok": "OK",
