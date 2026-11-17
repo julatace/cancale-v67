@@ -1106,7 +1106,6 @@ import AujourdhuiV2 from "./designV2/Aujourdhui.jsx";
 import { PassesRetrait as PassesRetraitV2, EnRouteListe as EnRouteListeV2 } from "./designV2/PassesRetrait.jsx";
 import MenuPlateformeV2 from "./designV2/MenuPlateforme.jsx";
 import { BoutonV2, SegmentV2 } from "./designV2/BoutonV2.jsx";
-import "./designV2/argent-v2.css";   // (17 nov., phase 2) Argent et Paramètres, nouveau design (tout sous html[data-design="v2"] ou .v2-*)
 import { nombre as nombreV2 } from "./i18n/index.js";
 import LigneAnnonceV2 from "./designV2/LigneAnnonce.jsx";
 import { SqueletteRangees as SqueletteRangeesV2 } from "./designV2/Signature.jsx";
