@@ -10,7 +10,7 @@ export default {
   },
   "sr.deplacer.avant": "Ora: {ou}",
   "sr.ici.l": "Mettilo qui",
-  "sr.ici.suite": "Proprio accanto al precedente",
+  "sr.ici.suite": "Subito dopo il precedente",
   "sr.ici.case": "Fila {r} · colonna {c}",
   "sr.ici.plein": "Nessuno scomparto libero: scegli un altro posto o aggiungi un mobile.",
   "sr.ici.aucunMeuble": "Ancora nessun mobile: aggiungi il primo per riporre.",
@@ -41,7 +41,10 @@ export default {
   "sr.cherche.rien": "Niente per «{q}».",
   "sr.bande.aria": "Riponi n. {num} {titre}",
   "sr.places.titre": "I miei posti",
-  "sr.places.plein": "{n} scomparti occupati su {t}",
+  "sr.places.plein": {
+    "one": "{n} scomparto occupato su {t}",
+    "other": "{n} scomparti occupati su {t}"
+  },
   "sr.places.aSortir": {
     "one": "{n} da togliere",
     "other": "{n} da togliere"
@@ -50,5 +53,7 @@ export default {
   "sr.lancer": {
     "one": "Riponi {n} {mot}",
     "other": "Riponi {n} {mot}"
-  }
+  },
+  "sr.aRanger": "Da riporre",
+  "sr.fait": "N. {num} · {ou}"
 };

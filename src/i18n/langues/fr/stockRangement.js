@@ -10,7 +10,7 @@ export default {
   },
   "sr.deplacer.avant": "Aujourd'hui : {ou}",
   "sr.ici.l": "Pose-la ici",
-  "sr.ici.suite": "Juste à côté de la précédente",
+  "sr.ici.suite": "À la suite de la précédente",
   "sr.ici.case": "Rangée {r} · colonne {c}",
   "sr.ici.plein": "Plus aucune case libre : choisis une autre place ou ajoute un meuble.",
   "sr.ici.aucunMeuble": "Aucun meuble encore : ajoute ton premier meuble pour ranger.",
@@ -41,7 +41,10 @@ export default {
   "sr.cherche.rien": "Rien pour « {q} ».",
   "sr.bande.aria": "Ranger N°{num} {titre}",
   "sr.places.titre": "Mes places",
-  "sr.places.plein": "{n} cases prises sur {t}",
+  "sr.places.plein": {
+    "one": "{n} case prise sur {t}",
+    "other": "{n} cases prises sur {t}"
+  },
   "sr.places.aSortir": {
     "one": "{n} à sortir",
     "other": "{n} à sortir"
@@ -50,5 +53,7 @@ export default {
   "sr.lancer": {
     "one": "Ranger {n} {mot}",
     "other": "Ranger {n} {mot}"
-  }
+  },
+  "sr.aRanger": "À ranger",
+  "sr.fait": "N°{num} · {ou}"
 };

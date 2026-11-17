@@ -65,11 +65,14 @@
   border-radius: 14px; box-shadow: var(--sr-ombre); min-height: 50px; }
 .sr-cherche-ic { display: grid; place-items: center; width: 40px; flex: none; color: var(--sr-muet); }
 .sr-champ { flex: 1; min-width: 0; height: 50px; border: 0; outline: none; background: transparent; color: inherit; font: inherit; font-size: 17px; padding: 0; -webkit-appearance: none; appearance: none; }
+:root:root:root:root:root:root:root body .sr-cherche input.sr-champ { background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; border-radius: 0 !important; min-height: 50px !important; color: var(--sr-encre) !important; outline: none !important; }
 .sr-champ::placeholder { color: var(--sr-muet); opacity: 1; }
 .sr-champ::-webkit-search-cancel-button { display: none; }
 .sr-cherche-mic { display: flex; align-items: center; padding-right: 3px; color: var(--sr-muet); }
 .sr-cherche:focus-within { box-shadow: var(--sr-ombre), var(--sr-anneau); }
 .sr-cherche .sr-rond { color: var(--sr-muet); }
+/* Le micro commun (MicDictee) posé DANS le champ : un rond discret de 44, pas un disque blanc. */
+:root:root:root:root:root:root:root body .sr-cherche-mic button { width: 44px !important; height: 44px !important; min-width: 44px !important; padding: 0 !important; background: transparent !important; box-shadow: none !important; border: 0 !important; color: var(--sr-muet) !important; }
 
 /* La réponse « Où est » et la séance partagent la carte « ici ». */
 .sr-resultats { margin: 0 0 22px; }
@@ -175,6 +178,12 @@
 :root[data-theme="dark"] .sr-seance .sr-btn-texte { color: #8CC4FF; }
 .sr-seance .sr-plan-case { background: color-mix(in srgb, currentColor 12%, transparent); }
 .sr-seance .sr-plan-case.is-prise { background: color-mix(in srgb, currentColor 36%, transparent); }
+.sr-seance .sr-plan-case.is-vise { background: #0071E3; }
+:root[data-theme="dark"] .sr-seance .sr-plan-case.is-vise { background: #0A84FF; }
+.sr-fait { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 13px; line-height: 1.35; color: color-mix(in srgb, currentColor 70%, transparent); animation: sr-ouvre 200ms ease both; }
+.sr-fait svg { flex: none; color: #0058B8; }
+:root[data-theme="dark"] .sr-fait svg { color: #8CC4FF; }
+.sr-fait.is-fin { justify-content: center; }
 .sr-choix { display: flex; flex-direction: column; gap: 10px; }
 .sr-meubles { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 0 -2px; padding: 2px; }
 .sr-meuble-onglet { appearance: none; border: 0; margin: 0; flex: none; min-height: 44px; padding: 0 14px; border-radius: 12px; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
@@ -208,9 +217,9 @@
 }
 
 @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
-  .vrm-ms-stock.sr-hote { padding: 12px 32px 32px !important; max-width: 1080px; position: relative; }
+  .vrm-ms-stock.sr-hote { padding: 12px 32px 32px !important; max-width: 824px; position: relative; }
   .sr-ecran[data-sr-plein="1"] { padding-bottom: 0; }
-  .sr-tete { padding-right: 260px; }
+  .sr-tete { padding-right: 240px; }
   .sr-pouce { position: absolute; left: auto; right: 32px; bottom: auto; top: 14px; z-index: 2; }
   .sr-pouce .sr-btn-plein { width: auto; padding: 0 22px; }
   .sr-bande { margin: 0; padding: 2px 0 6px; grid-auto-columns: 112px; }

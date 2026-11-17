@@ -10,7 +10,7 @@ export default {
   },
   "sr.deplacer.avant": "Ahora: {ou}",
   "sr.ici.l": "Déjalo aquí",
-  "sr.ici.suite": "Justo al lado del anterior",
+  "sr.ici.suite": "A continuación del anterior",
   "sr.ici.case": "Fila {r} · columna {c}",
   "sr.ici.plein": "No queda ningún hueco libre: elige otro sitio o añade un mueble.",
   "sr.ici.aucunMeuble": "Aún no hay muebles: añade el primero para guardar.",
@@ -41,7 +41,10 @@ export default {
   "sr.cherche.rien": "Nada para «{q}».",
   "sr.bande.aria": "Guardar n.º {num} {titre}",
   "sr.places.titre": "Mis sitios",
-  "sr.places.plein": "{n} huecos ocupados de {t}",
+  "sr.places.plein": {
+    "one": "{n} hueco ocupado de {t}",
+    "other": "{n} huecos ocupados de {t}"
+  },
   "sr.places.aSortir": {
     "one": "{n} por sacar",
     "other": "{n} por sacar"
@@ -50,5 +53,7 @@ export default {
   "sr.lancer": {
     "one": "Guardar {n} {mot}",
     "other": "Guardar {n} {mot}"
-  }
+  },
+  "sr.aRanger": "Por guardar",
+  "sr.fait": "N.º {num} · {ou}"
 };

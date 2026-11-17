@@ -10,7 +10,7 @@ export default {
   },
   "sr.deplacer.avant": "Now: {ou}",
   "sr.ici.l": "Put it here",
-  "sr.ici.suite": "Right next to the previous one",
+  "sr.ici.suite": "Following on from the previous one",
   "sr.ici.case": "Row {r} · column {c}",
   "sr.ici.plein": "No free slot left: pick another place or add a unit.",
   "sr.ici.aucunMeuble": "No storage unit yet: add your first one to put items away.",
@@ -41,7 +41,10 @@ export default {
   "sr.cherche.rien": "Nothing for “{q}”.",
   "sr.bande.aria": "Put away No. {num} {titre}",
   "sr.places.titre": "My places",
-  "sr.places.plein": "{n} of {t} slots taken",
+  "sr.places.plein": {
+    "one": "{n} of {t} slots taken",
+    "other": "{n} of {t} slots taken"
+  },
   "sr.places.aSortir": {
     "one": "{n} to take out",
     "other": "{n} to take out"
@@ -50,5 +53,7 @@ export default {
   "sr.lancer": {
     "one": "Put away {n} {mot}",
     "other": "Put away {n} {mot}"
-  }
+  },
+  "sr.aRanger": "To put away",
+  "sr.fait": "No. {num} · {ou}"
 };

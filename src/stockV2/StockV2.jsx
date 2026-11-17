@@ -76,19 +76,24 @@ function Seance({ s, seance, fermer }) {
     if (!cle || enCours) return;
     setEnCours(true);
     let ok = false;
-    try { ok = await s.poser(cle, mid, i); } finally { setEnCours(false); }
+    try { ok = await s.poser(cle, mid, i, { muet: true }); } finally { setEnCours(false); }
     if (ok !== false) { setFaits((x) => [...x, cle]); setDerniere(String(mid)); setAutre(false); }
   };
+  // La dernière pose, DITE avec la case finale (relue : dans une pile, l'article a pu descendre).
+  const kFait = faits[faits.length - 1] || null; const fFait = kFait ? s.ficheDe(kFait) : null; const ouFait = fFait ? s.ouEst(fFait) : null;
+  const fait = ouFait ? tr('sr.fait', { num: String(fFait.numero), ou: s.placeEnMots(ouFait) }) : '';
   const titre = seance.deplacer ? tr('sr.deplacer.titre') : tr('sr.seance.titre');
   return (
     <Feuille onClose={fermer} titre={titre} sousTitre={!seance.deplacer && total > 1 && cle ? tr('sr.seance.rang', { i: nombre(rang), n: nombre(total) }) : undefined} maxWidth={520} data-sr-seance={seance.deplacer ? 'deplacer' : 'ranger'} className="sr-feuille">
       {!cle ? (
         <div className="sr-fin" role="status" data-sr-fin={String(faits.length)}>
           <span className="sr-fin-ic" aria-hidden="true"><Icon name="check" size={30}/></span>
+          {fait ? <p className="sr-fait is-fin" data-sr-fait={faits[faits.length - 1]}><span>{fait}</span></p> : null}
           <p className="sr-fin-titre">{seance.deplacer ? tr('sr.deplacer.fait') : tr('sr.seance.fin', { n: faits.length, mot: faits.length > 1 ? mots.noms : mots.nom })}</p>
         </div>
       ) : (
         <div className="sr-seance" data-sr-courant={cle} key={cle}>
+          {fait ? <p className="sr-fait" role="status" data-sr-fait={faits[faits.length - 1]}><Icon name="check" size={16}/><span>{fait}</span></p> : null}
           <div className="sr-paire">
             <Photo f={f} Photo={s.Photo} Icon={Icon} taille={112}/>
             <div className="sr-paire-txt">
@@ -119,7 +124,7 @@ function Seance({ s, seance, fermer }) {
                 <div className="sr-grille-hote">
                   <div className="sr-grille" style={{ gridTemplateColumns: `repeat(${Math.max(1, Number(mAutre.cols) || 1)}, minmax(44px, 56px))` }} data-sr-grille={mAutre.id}>
                     {Array.from({ length: (Number(mAutre.cols) || 1) * (Number(mAutre.rows) || 1) }).map((_, i) => {
-                      const occ = s.occupantNum(mAutre.id, i); const p = s.place(i, mAutre);
+                      const occ = s.occupantNum(mAutre.id, i); const p = s.placeCase(i, mAutre);
                       const ici = ou && String(ou.meuble.id) === String(mAutre.id) && ou.i === i;
                       return (
                         <button key={i} type="button" className={'sr-case' + (occ ? ' is-prise' : '') + (ici ? ' is-ici' : '')} data-sr-case={mAutre.id + ':' + i} disabled={ici || enCours}
@@ -224,7 +229,7 @@ export default function StockV2({ s }) {
       </div>
 
       {/* « Où est… » : le champ, collé en haut ; un N° montre sa place tout de suite. */}
-      <div className="sr-cherche" data-stock-recherche="">
+      <div className="sr-cherche" data-sr-recherche="">
         <span className="sr-cherche-ic" aria-hidden="true"><Icon name="search" size={18}/></span>
         <input ref={s.chercheRef} className="sr-champ" value={s.q} onChange={(e) => s.setQ(e.target.value)} type="search" enterKeyHint="search" autoComplete="off" inputMode="search"
           placeholder={tr('sr.cherche.place')} aria-label={tr('stock.retrouverArticleDans')} data-sr-cherche=""
@@ -264,7 +269,7 @@ export default function StockV2({ s }) {
       {/* À RANGER : les photos ; une photo touchée lance la séance sur elle. */}
       {aRangerCles.length ? (
         <section className="sr-groupe" data-sr-a-ranger={aRangerCles.length}>
-          <h2 className="sr-h2">{tr('ms.stock.aRanger')}</h2>
+          <h2 className="sr-h2">{tr('sr.aRanger')}</h2>
           <div className="sr-bande" data-bande-a-ranger="">
             {s.aRanger.slice(0, 60).map((f) => (
               <button key={f.id} type="button" className="sr-bande-carte" data-a-ranger={s.cleDe(f)} onClick={() => rangerA(s.cleDe(f))} aria-label={tr('sr.bande.aria', { num: f.numero, titre: f.title || '' })}>
@@ -283,7 +288,7 @@ export default function StockV2({ s }) {
               <button type="button" className="sr-rangee" aria-expanded={ouvert} data-sr-place-ouvrir={m.id} onClick={() => ouvrir(String(m.id))}>
                 <span className="sr-place-ic" aria-hidden="true"><Icon name="box" size={22}/></span>
                 <span className="sr-rangee-txt"><span className="sr-rangee-t">{m.name}</span>
-                  <span className="sr-rangee-s">{tr('sr.places.plein', { n: nombre(c.pleines), t: nombre(c.total) })}{c.aSortir ? <span className="sr-a-sortir" data-sr-a-sortir={c.aSortir}> · {tr('sr.places.aSortir', { n: c.aSortir })}</span> : null}</span></span>
+                  <span className="sr-rangee-s">{tr('sr.places.plein', { n: c.pleines, t: nombre(c.total) })}{c.aSortir ? <span className="sr-a-sortir" data-sr-a-sortir={c.aSortir}> · {tr('sr.places.aSortir', { n: c.aSortir })}</span> : null}</span></span>
                 <span className="sr-chevron" aria-hidden="true" data-ouvert={ouvert ? '1' : '0'}><Icon name="chevron" size={16}/></span>
               </button>
               {ouvert ? <div className="sr-place-corps">{s.rendreMeuble(m, k)}</div> : null}

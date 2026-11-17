@@ -584,7 +584,9 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   // qui porte une paire PRÉSENTE (`ficheParCle`) pose la question : échanger (si la
   // paire qu'on range avait une place), choisir la nouvelle case de l'occupante, ou
   // la remettre « À ranger » — chaque issue DITE ; « Annuler » ne change rien.
-  const poser = async (cle, mid, i) => {
+  // (17 nov.) `opts.muet` : la séance « Ranger » du nouveau design dit elle-même la pose (« ✓ N°201 · … », la case FINALE) ;
+  // un échange avec une occupante (`suite`) se dit toujours ici.
+  const poser = async (cle, mid, i, opts = {}) => {
     const u = { ...slots };
     // occupant éventuel de la case cible
     const occ = Object.keys(u).find((c) => u[c] && u[c].m === mid && u[c].i === i);
@@ -624,7 +626,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     // les mots du meuble (rangée, colonne) — la case qui clignote peut être
     // hors de l'écran sur téléphone. (15 nov.) Dans une pile, la case FINALE (elle a pu tomber), et qui est descendu.
     const fin = r.slots[cle] || { m: mid, i };
-    if (m) toast(tr('stock.rangee', { x: String(f ? f.numero : cle), ici: String(ici(m, fin.i)), x2: String(suite ? ' ' + suite : '') }), 'ok');   // (15 nov.) la descente est dite UNE fois : le bandeau du meuble
+    if (m && !(opts.muet && !suite)) toast(tr('stock.rangee', { x: String(f ? f.numero : cle), ici: String(ici(m, fin.i)), x2: String(suite ? ' ' + suite : '') }), 'ok');   // (15 nov.) la descente est dite UNE fois : le bandeau du meuble
     return true;
   };
   // Rend la phrase des descentes (vide si rien n'a bougé) : l'appelant l'ajoute à SON message.
@@ -1494,7 +1496,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     peutRanger: (k) => aRanger.some((f) => cleDeFiche(f) === k),
     occupee: (mid, i) => !!occupant(mid, i) || !!noteeIci(mid, i),
     occupantNum: (mid, i) => { const o = occupant(mid, i); return o ? String(o.numero) : (noteeIci(mid, i) || null); },
-    place: (i, m) => placeDansMeubles(i, m),
+    placeCase: (i, m) => placeDansMeubles(i, m),
     placeEnMots: (ou) => tr('stock.rangeeColonne', { name: String(ou.meuble.name), rangee: String(ou.rangee), colonne: String(ou.colonne) }),
     // La dernière place utilisée d'abord (le même meuble), sinon la première case libre — les règles de src/ouRanger.js.
     caseProposee: (cle, derniere) => (derniere ? caseLibreDans({ meubles: meublesVus, slots, meubleId: derniere }) : null) || premiereCaseLibre({ meubles: meublesVus, slots }),

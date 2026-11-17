@@ -10,7 +10,7 @@ export default {
   },
   "sr.deplacer.avant": "Jetzt: {ou}",
   "sr.ici.l": "Hier ablegen",
-  "sr.ici.suite": "Direkt neben dem vorherigen",
+  "sr.ici.suite": "Gleich nach dem vorherigen",
   "sr.ici.case": "Reihe {r} · Spalte {c}",
   "sr.ici.plein": "Kein Fach mehr frei: wähle einen anderen Platz oder füge ein Möbel hinzu.",
   "sr.ici.aucunMeuble": "Noch kein Möbel: füge dein erstes hinzu, um einzuräumen.",
@@ -41,7 +41,10 @@ export default {
   "sr.cherche.rien": "Nichts für „{q}“.",
   "sr.bande.aria": "Nr. {num} einräumen {titre}",
   "sr.places.titre": "Meine Plätze",
-  "sr.places.plein": "{n} von {t} Fächern belegt",
+  "sr.places.plein": {
+    "one": "{n} von {t} Fächern belegt",
+    "other": "{n} von {t} Fächern belegt"
+  },
   "sr.places.aSortir": {
     "one": "{n} herauszunehmen",
     "other": "{n} herauszunehmen"
@@ -50,5 +53,7 @@ export default {
   "sr.lancer": {
     "one": "{n} {mot} einräumen",
     "other": "{n} {mot} einräumen"
-  }
+  },
+  "sr.aRanger": "Einzuräumen",
+  "sr.fait": "Nr. {num} · {ou}"
 };
