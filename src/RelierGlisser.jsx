@@ -17,13 +17,16 @@ import { createPortal } from 'react-dom';
 import { tr, monnaie } from './i18n/index.js';
 import { appuiSuivant, vitesseBord, listesGlisser, phraseConfirmation, vibrerSiPossible, DELAI_APPUI_MS, ATTENTE_BORD_MS } from './relierGlisser.js';
 import { lotDe } from './suggestionsAchat.js';
+import { FaitsAchat, NoteTailleAchats } from './FaitsAchat.jsx';   // (17 nov., lot relier-taille)
+import { faitsAchat, sansTailleLue } from './faitsAchat.js';
 import './styles-relier-glisser.css';
 
 const montant = (n) => { try { return monnaie(n); } catch (_) { return `${Number(n).toFixed(2).replace('.', ',')} €`; } };
 const jourCourt = (d) => { const t = Date.parse(d || ''); if (!Number.isFinite(t)) return ''; try { return new Date(t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }); } catch (_) { return ''; } };
 
 export default function RelierGlisser({ achats, liens, tresProbables = null, cibles = [], prixDe, compteDe = () => '', photoDe = () => '', tailleDe = () => '',
-  onRelier, onListe = null, onFermer, Photo, Icon, Retour = null, zIndex = 1400, C = {}, achatInitial = '', cibleInitiale = '' }) {
+  onRelier, onListe = null, onFermer, Photo, Icon, Retour = null, zIndex = 1400, C = {}, achatInitial = '', cibleInitiale = '',
+  details = undefined, marqueDe = null, couleursDe = null }) {
   const L = useMemo(() => listesGlisser({ achats, liens, tresProbables, cibles }), [achats, liens, tresProbables, cibles]);
   const [leve, setLeve] = useState(null);          // { tx, x, y, dx, dy, w, h }
   const [survol, setSurvol] = useState('');        // key de la cible sous le doigt
@@ -152,10 +155,22 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
   const xChoisi = choisi ? parTx.get(choisi) : null, cChoisie = cibleChoisie ? parCle.get(cibleChoisie) : null;
 
   const achatLeve = leve ? parTx.get(leve.tx) : null;
+  // (17 nov., lot relier-taille) Un achat choisi : chaque vente / annonce dit si sa taille est la même (« ✓ ») ou non.
+  const accordCible = (c) => {
+    if (!xChoisi) return null;
+    const f = faitsAchat(xChoisi.a, { details: details || null, cible: c, marqueDe, couleursDe });
+    if (!f.accord) return null;
+    return <span className={`vrm-faits-taille vrm-rg-accord is-${f.accord}`} data-taille-accord={f.accord} data-relier-taille={f.taille}>
+      {f.accord === 'meme' ? tr('faits.memeCible') : tr('faits.diffCible', { taille: f.taille })}</span>;
+  };
+  const nSansTaille = useMemo(() => (details && Array.isArray(L.achats) ? sansTailleLue(L.achats.map((x) => x.a), details) : 0), [details, L.achats]);
   const nA = Array.isArray(L.achats) ? L.achats.length : null;
   const carteAchat = (x, flottante = false) => {
-    const a = x.a, ph = photoDe(a), px = prixDe(a), lot = lotDe(a).lot, taille = tailleDe(a);
-    const sous = [taille ? tr('liaison.taille', { taille }) : '', a.date ? jourCourt(a.date) : '', compteDe(a)].filter(Boolean).join(' · ');
+    const a = x.a, ph = photoDe(a), px = prixDe(a), lot = lotDe(a).lot;
+    // (17 nov., lot relier-taille) La taille (lue chez Vinted, sinon celle du titre), comparée à la vente / l'annonce
+    // CHOISIE (« ✓ » ou « ≠ 42 »), l'état, les couleurs, la marque, la date, le compte, le vendeur — src/FaitsAchat.jsx.
+    const sous = <FaitsAchat achat={a} details={details || null} cible={cChoisie || null} marqueDe={marqueDe} couleursDe={couleursDe}
+      date={a.date ? jourCourt(a.date) : ''} compte={compteDe(a)} className="vrm-rg-faits"/>;
     return (
       <>
         <span className="vrm-rg-photo" aria-hidden="true">{ph ? <Photo src={ph} alt="" loading="lazy" decoding="async" draggable={false}/> : <Icon name="bag" size={20}/>}</span>
@@ -195,6 +210,7 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
       <div className="vrm-rg-corps">
         <section className="vrm-rg-col vrm-rg-achats" aria-label={tr('glisser.achats')}>
           <h3 className="vrm-rg-h3">{tr('glisser.achats')}{nA != null ? <span className="vrm-rg-n">{nA}</span> : null}</h3>
+          {details && nSansTaille ? <NoteTailleAchats n={nSansTaille} className="vrm-rg-note"/> : null}
           <ul className="vrm-rg-liste" data-glisser-achats={nA == null ? '' : String(nA)}>
             {L.achats === undefined ? <li className="vrm-rg-vide">…</li>
               : L.achats === null ? <li className="vrm-rg-vide">{tr('glisser.pasSu')}</li>
@@ -223,7 +239,8 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
                     <span className="vrm-rg-photo" aria-hidden="true">{c.photo ? <Photo src={c.photo} alt="" loading="lazy" decoding="async" draggable={false}/> : <Icon name="image" size={20}/>}</span>
                     <span className="vrm-rg-texte">
                       <span className="vrm-rg-titre">{c.num ? <b className="vrm-rg-num">N°{c.num}</b> : null}{c.titre || '—'}</span>
-                      <span className="vrm-rg-sous">{[c.genre === 'vente' ? tr('glisser.vendue') : tr('glisser.enVente'), c.sous].filter(Boolean).join(' · ')}</span>
+                      <span className="vrm-rg-sous">{[c.genre === 'vente' ? tr('glisser.vendue') : tr('glisser.enVente'), c.taille ? tr('faits.taille', { taille: String(c.taille).replace('.', ',') }) : '', c.sous].filter(Boolean).join(' · ')}</span>
+                      {accordCible(c)}
                     </span>
                     {choisi ? <span className="vrm-rg-ici" aria-hidden="true">{tr('glisser.relierIci')}</span> : null}
                   </button>
