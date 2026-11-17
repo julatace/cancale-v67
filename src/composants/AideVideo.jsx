@@ -17,7 +17,7 @@
 //   · `ids` : la liste à montrer (la recherche du « ? » passe les vidéos trouvées).
 // ═══════════════════════════════════════════════════════════════════════════
 import React from 'react';
-import { VIDEOS_AIDE, videosDe, urlVideo, urlSousTitres, dureeLisible, LANGUES_SOUS_TITRES } from '../aideVideos.js';
+import { VIDEOS_AIDE, videosDe, urlVideo, urlSousTitres, dureeLisible, LANGUES_SOUS_TITRES, chercherVideos } from '../aideVideos.js';
 import { tr, langueCourante, NOMS_LANGUES } from '../i18n/index.js';
 import { FermeAuRetour } from '../App.jsx';
 
@@ -28,6 +28,8 @@ const PleinEcran = () => (
   <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" focusable="false"><path d="M2.5 6.5v-4h4M11.5 2.5h4v4M15.5 11.5v4h-4M6.5 15.5h-4v-4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>
 );
 
+// La recherche par mots (le « ? » l'appelle d'ici : seul ce fichier importe la table, audit-aide-videos).
+export { chercherVideos };
 // Le texte d'une vidéo dans la langue de l'app (la recherche lit le même).
 export const texteVideo = (id) => `${tr(`av.${id}.titre`)} ${tr(`av.${id}.geste`)} ${tr(`av.${id}.reponse`)}`;
 
@@ -60,7 +62,7 @@ export function AideVideo({ cle, ids: idsVoulus = null }) {
           <p className="vrm-aide-video-reponse" data-aide-video-reponse={lue}>{tr(`av.${lue}.reponse`)}</p>
           <video ref={ref} key={lue} src={urlVideo(lue)} poster={urlVideo(lue, 'jpg')} controls autoPlay muted playsInline preload="metadata"
             width={720} height={1280} aria-label={tr('av.lecteur', { titre: tr(`av.${lue}.titre`), geste: tr(`av.${lue}.geste`) })} onError={() => setPanne(true)}>
-            {LANGUES_SOUS_TITRES.map((l) => <track key={l} kind="captions" src={urlSousTitres(lue, l)} srcLang={l} label={(NOMS_LANGUES && NOMS_LANGUES[l]) || l} default={l === langue ? true : undefined} data-aide-video-piste={l}/>)}
+            {LANGUES_SOUS_TITRES.map((l) => <track kind="captions" src={urlSousTitres(lue, l)} key={l} srcLang={l} label={(NOMS_LANGUES && NOMS_LANGUES[l]) || l} default={l === langue ? true : undefined} data-aide-video-piste={l}/>)}
           </video>
           <figcaption>
             <span><b>{tr(`av.${lue}.titre`)}</b> · {tr(`av.${lue}.geste`)}</span>

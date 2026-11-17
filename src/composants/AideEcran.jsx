@@ -19,8 +19,7 @@ import { fichesPour, fichesEcran, chercherAide, pourVendeur, emmener, faqAide, F
 // (lot vocabulaire-article) d'abord la phrase « article » écrite en entier (PHRASES_ARTICLE), sinon pourVendeur.
 import { phraseVendeur } from '../profilVendeur.js';
 import { AideAnimation } from './AideAnimation.jsx';
-import { AideVideo, texteVideo } from './AideVideo.jsx';
-import { chercherVideos } from '../aideVideos.js';
+import { AideVideo, texteVideo, chercherVideos } from './AideVideo.jsx';
 import './aide-ecran.css';
 // (14 nov., idées 136 et 139) « Revoir la visite de cet écran » et « Les mots de VRM ».
 import { RevoirVisite, GlossaireListe } from '../accueilReste/AccueilReste.jsx';
