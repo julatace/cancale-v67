@@ -594,3 +594,32 @@ html body button.v2-serie-lien { position: relative; }
   html[data-design="v2"][data-serie-ouverte] .vrm-main::after { height: calc(var(--vrm-serie-h, 64px) + var(--vrm-barre-bas, 84px) + 24px); }
 }
 @media (min-width: 1024px) { .v2-serie { left: calc(var(--vrm-rail-l, 272px) + 24px); right: 24px; bottom: 16px; max-width: 880px; margin: 0 auto; } }
+
+/* ══ 15. VENTES · TOUTES (Julien, capture : « le bouton est sur la photo ça rend pas bien du tout ») ═════════════════════
+   La liste des ventes en rangées A ; la case de sélection dans SA colonne de 44 px à gauche de la photo, seulement en
+   sélection ; une rangée choisie se teinte (jamais un cadre gris) ; la facture envoyée = une petite icône verte. */
+html[data-design="v2"] body .v2t-liste { background: var(--v2-carte) !important; border: 0 !important; border-radius: 20px !important; box-shadow: var(--v2-carte-ombre) !important; overflow: hidden; }
+html[data-design="v2"] body .v2t-liste > .v2l + .v2l::before { content: ""; position: absolute; left: 96px; right: 0; top: 0; height: .5px; background: var(--v2-filet); }
+.v2t-liste .v2l { align-items: flex-start; }
+.v2t-liste .v2l-a-l3 { height: auto; flex-wrap: wrap; white-space: normal; overflow: visible; gap: 4px 12px; line-height: 18px; }
+.v2l-avant { display: grid; place-items: center; flex: none; width: 44px; min-height: 64px; margin: 0 -8px 0 -8px; }
+.v2l-avant .vrm-serie-case { position: static !important; margin: 0 !important; }
+.v2l[data-serie-coche="1"] { background-color: var(--v2-teinte-fond) !important; }
+.v2l[data-v2t-attenue="1"] { opacity: .6; }
+.v2l-apres-prix { display: inline-flex; align-items: center; flex: none; margin: 0 -4px 0 0; }
+/* La facture envoyée : 20 px, vert (le seul vert de l'app), 44 px au doigt ; la phrase apparaît au toucher / appui long. */
+:root { --v2-vert-facture: #1E7A45; }
+:root[data-theme="dark"] { --v2-vert-facture: #5BCB88; }
+html body button.v2-facture-ok { position: relative; appearance: none; display: grid; place-items: center; width: 44px; height: 44px; margin: -10px -6px -10px 0; padding: 0; border: 0; background: none;
+  color: var(--v2-vert-facture); cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; border-radius: 12px; }
+.v2-facture-bulle { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; width: max-content; max-width: 240px; padding: 8px 12px; border-radius: 12px;
+  background: var(--sv-encre, #0C1D30); color: #FFFFFF; font: 600 13px/16px var(--sb-police-texte, system-ui); text-align: left; box-shadow: 0 8px 24px -8px rgb(0 0 0 / .4); }
+:root[data-theme="dark"] .v2-facture-bulle { background: #EAF2FB; color: #06111F; }
+/* Les rangées de la liste d'hier (cachées) ne laissent aucune trace ; la liste garde la place de la barre de sélection. */
+html[data-design="v2"][data-serie-ouverte] .v2t-liste { margin-bottom: calc(var(--vrm-serie-h, 64px) + 24px); }
+/* À l'ordinateur, la tête de la coque est opaque (verre dépoli plein) : jamais une demi-rangée sous la recherche. */
+@media (min-width: 1024px) {
+  html[data-design="v2"] body .vrm-app-header::before { content: ""; position: fixed; z-index: -1; top: 0; right: 0; left: var(--vrm-rail-l, 272px); height: 104px; pointer-events: none;
+    background: linear-gradient(180deg, var(--sv-haut, #1F5FA8) 0%, color-mix(in srgb, var(--sv-haut, #1F5FA8) 92%, transparent) 100%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); }
+}

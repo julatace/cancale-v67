@@ -41,6 +41,15 @@ function Fait({ Icon, icone, children, data }) {
   return <span className="v2l-fait" data-v2l-fait={data}>{icone ? <Icon name={icone} size={14}/> : null}{children}</span>;
 }
 
+// Deux jeux de gestionnaires sur la même rangée (la sélection et le glisser) : chacun est appelé, le premier d'abord ; s'il
+// arrête l'événement, le second ne le voit pas.
+function fusionner(a, b) {
+  if (!a || !b) return { ...(a || {}), ...(b || {}) };
+  const out = { ...a, ...b };
+  for (const k of Object.keys(a)) if (/^on[A-Z]/.test(k) && typeof a[k] === 'function' && typeof b[k] === 'function') out[k] = (e) => { a[k](e); if (e && typeof e.isPropagationStopped === 'function' && e.isPropagationStopped()) return; b[k](e); };
+  return out;
+}
+
 export default function LigneAnnonce({ variante = 'A', attrs = {}, cle, photo, Photo, Icon, Plaque, titre, num, taille, jours, prix, favoris = null, vues = null,
   etat = '', achat = '', marge = '', aRelier = false, relierMot = false, onRelier, onPlus, LigneGlissable,
   // (17 nov., Ventes) La MÊME rangée A pour un colis : `sous` remplace « T · j » (« T. 42 · acheteur »), `gestes` ses
@@ -48,7 +57,10 @@ export default function LigneAnnonce({ variante = 'A', attrs = {}, cle, photo, P
   sous = null, sousAmbre = false, gestes = null, double = false,
   // (17 nov., Ventes — Julien : « il doit y avoir plusieurs infos ») une 3e ligne, petite, grise, chaque fait avec son icône
   // (`l3` : [{ icone, texte, ambre }], rien d'inconnu) ; `logo` : la plateforme, quand plusieurs sont montrées.
-  l3 = null, logo = null }) {
+  l3 = null, logo = null,
+  // (17 nov., Ventes · Toutes) `avant` : la colonne de 44 px À GAUCHE de la photo (la case de sélection, en mode sélection
+  // seulement) ; `apresPrix` : un signe à côté du prix (la facture envoyée, verte).
+  avant = null, apresPrix = null }) {
   const plus = () => onPlus && onPlus();
   const actions = gestes || [
     aRelier ? { cle: 'relier', libelle: tr('v2.l.relier'), icone: <Icon name="link" size={20}/>, faire: () => onRelier && onRelier(), data: { 'data-v2l-glisse': 'relier' } } : null,
@@ -84,10 +96,11 @@ export default function LigneAnnonce({ variante = 'A', attrs = {}, cle, photo, P
       {tiroir}
     </div>
   ) : (
-    <div className="v2l v2l-a" data-v2l="A" role="listitem" aria-label={aria} {...attrs} {...(gp || {})}>
+    <div className="v2l v2l-a" data-v2l="A" role="listitem" aria-label={aria} {...fusionner(attrs, gp)}>
+      {avant ? <span className="v2l-avant">{avant}</span> : null}
       <Vignette photo={photo} Photo={Photo} Icon={Icon} cls="v2l-photo-a"/>
       <span className="v2l-a-txt">
-        <span className="v2l-a-l1"><span className="v2l-a-titre">{titre}</span><span className="v2l-a-prix">{prix || '—'}</span></span>
+        <span className="v2l-a-l1"><span className="v2l-a-titre">{titre}</span>{apresPrix ? <span className="v2l-apres-prix">{apresPrix}</span> : null}<span className="v2l-a-prix">{prix || '—'}</span></span>
         {sous ? <span className="v2l-a-l2">{num ? <PlaqueV2 num={num} double={double}/> : null}{sous.length ? <span className={'v2l-faits-txt' + (sousAmbre ? ' is-ambre' : '')}>{(num ? ' · ' : '') + sous.join(' · ')}</span> : null}{logo ? <span className="v2l-logo" aria-hidden="true">{logo}</span> : null}</span>
           : <span className="v2l-a-l2"><Faits num={num} taille={taille} jours={null} Plaque={Plaque}/>{relier}</span>}
         {l3 && l3.length ? <span className="v2l-a-l3" aria-hidden="true">{l3.map((x, i) => <span key={i} className={'v2l-l3' + (x.ambre ? ' is-ambre' : '')} data-v2l-l3={x.cle || undefined}>{x.icone ? <Icon name={x.icone} size={13}/> : null}{x.texte}</span>)}</span>
