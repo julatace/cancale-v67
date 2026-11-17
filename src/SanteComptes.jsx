@@ -28,11 +28,13 @@ const get = async (q) => {
   try { const r = await fetch(`${SUPABASE_URL}/rest/v1/${q}`, { headers: sbAuth(), cache: 'no-store' }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; }
 };
 export async function lireSourcesSante() {
-  const [p, f, e, m] = await Promise.all([
+  const [p, f, e, m, ab] = await Promise.all([
     get(`app_data?id=like.harvest_*_profile&select=${SEL_PROFIL}`),
     get('app_data?id=like.harvest_*_feedbacks&data->>type=eq.feedbacks&select=id,avis:data->payload->user_feedbacks,pag:data->payload->pagination,hist:data->payload->historique'),
     lireEtatsComptes(),   // (11 nov., intégration) partagée avec « Tout va bien ? »
     get('app_data?id=like.moderation_vinted_*&select=id,e:data->e'),
+    // (16 nov.) Les avis bas DATÉS par leur arrivée (le serveur, lot avis-negatif) : projection des alertes seules.
+    get('app_data?id=eq.vrm_avis_bas&select=a:data->alertes'),
   ]);
   let profils = null;
   if (p) {
@@ -47,7 +49,8 @@ export async function lireSourcesSante() {
   const etats = e === null || e === undefined ? null : e;
   let moderation = null;
   if (m) { moderation = {}; for (const x of m) { const u = String((x && x.id) || '').match(/^moderation_vinted_(\d+)$/); if (u && Array.isArray(x.e)) moderation[u[1]] = { e: x.e }; } }
-  return { profils, etats, moderation };
+  const avisArrives = ab === null ? null : (ab[0] && Array.isArray(ab[0].a) ? ab[0].a : []);
+  return { profils, etats, moderation, avisArrives };
 }
 
 let memo = null, promesse = null;
@@ -92,7 +95,7 @@ export function useSanteComptes({ comptes: liste = null, actif = true } = {}) {
   return React.useMemo(() => {
     if (!actif) return { etat: 'encours', comptes: [], aSurveiller: [] };
     return santeComptes({
-      comptes, profils: memo ? memo.profils : undefined, etats: memo ? memo.etats : undefined, moderation: memo ? memo.moderation : null,
+      comptes, profils: memo ? memo.profils : undefined, etats: memo ? memo.etats : undefined, moderation: memo ? memo.moderation : null, avisArrives: memo ? memo.avisArrives : undefined,
       envois: lireEnvois(owner), ventes, ko, estAnnulee: (o) => classifyOrderStatus(o.status) === 'cancelled',
       freins: rowsActions === undefined ? undefined : Object.fromEntries(comptes.map((c) => [c.uid, carnetDuCompte(rowsActions, c.uid, maintenantA)])),
     });
@@ -116,7 +119,7 @@ export function texteRaison(r) {
     case 'moderation': return r.sorte === 'banni' ? tr('sante.r.banni') : r.sorte === 'restreint' ? tr('sante.r.restreint') : tr('sante.r.masquee', { n: r.masquees || 0 });
     case 'retards': return r.enRetard && r.valeur < SEUILS.retards ? tr('sante.r.enRetard', { n: r.enRetard }) : tr('sante.r.retards', { n: r.valeur });
     case 'annulees': return tr('sante.r.annulees', { n: r.valeur });
-    case 'avisBas': return tr('sante.r.avisBas', { n: r.valeur });
+    case 'avisBas': return r.valeur >= SEUILS.avisBas || !(r.arrives > 0) ? tr('sante.r.avisBas', { n: r.valeur }) : tr('sante.r.avisArrives', { n: r.arrives });
     case 'note': return tr('sante.r.note', { note: virg(r.valeur) });
     case 'delai': return tr('sante.r.delai', { duree: duree(r.valeur) });
     case 'freins': return r.captchas ? tr('sante.r.freinsVerif') : tr('sante.r.freins', { n: r.refus });
@@ -131,7 +134,7 @@ function valeur(i) {
   if (!i.lu) return '—';
   switch (i.k) {
     case 'note': return tr('sante.v.note', { note: virg(i.valeur), n: i.n });
-    case 'avisBas': return tr('sante.v.avisBas', { n: i.valeur, sur: i.sur });
+    case 'avisBas': return tr('sante.v.avisBas', { n: i.valeur, sur: i.sur }) + (i.arrives > 0 ? ' · ' + tr('sante.v.avisArrives', { n: i.arrives, quand: dateRelative(-Math.max(0, Math.round((Date.now() - i.arriveLe) / 86400000)), 'day') }) : '');
     case 'delai': return tr('sante.v.delai', { duree: duree(i.valeur), n: i.n });
     case 'retards': return tr('sante.v.retards', { n: i.valeur, sur: i.sur }) + (i.enRetard ? ' · ' + tr('sante.v.enRetard', { n: i.enRetard }) : '');
     case 'annulees': return tr('sante.v.annulees', { n: i.valeur, total: i.n, taux: nombre(i.taux, { maximumFractionDigits: 1 }) });

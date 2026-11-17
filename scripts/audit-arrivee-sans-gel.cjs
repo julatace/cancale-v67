@@ -61,16 +61,22 @@ vm.runInNewContext([bout('const KNOWN_BRANDS=[', '];'), bout('function extractBr
   const MODELES = ['Salomon XT-6 noir', 'Nike Air Max 1 blanc', 'Adidas Samba beige', 'New Balance 550 vert', 'Asics Gel-1130 gris', 'Adidas Spezial bleu'];
   const achats = [];
   for (let i = 0; i < 300; i++) achats.push({ transaction_id: 5000 + i, title: `${MODELES[i % MODELES.length]} taille ${36 + (i % 10)}`, date: new Date(T0 + i * J / 3).toISOString(), price: { amount: String(30 + (i % 20)) }, status: 'Transaction finalisée' });
+  // (16 nov., train : relier-fiable) une proposition n'est faite que si elle est EXCLUSIVE : la paire cherchée a
+  // UN achat qui lui correspond (taille 47, absente de la série 36–45) — sinon la liste est vide et L2 ne mesure rien.
+  achats.push({ transaction_id: 9999, title: 'Salomon XT-6 noir taille 47', date: new Date(T0 + 150 * J).toISOString(), price: { amount: '40' }, status: 'Transaction finalisée' });
   let appels = 0;
   const marqueDe = (t) => { appels++; return ctx.extractBrand(t); };
   const regles = { marqueDe, couleursDe: ctx.extractColors, modeleDe: ctx.extractModel };
-  const cible = { key: 'v:1', titre: 'Salomon XT-6 noir taille 42', marque: 'Salomon', taille: '42', dateRef: new Date(T0 + 200 * J).toISOString(), dateRefSource: 'vente', prix: { amount: '80' } };
+  const cible = { key: 'v:1', titre: 'Salomon XT-6 noir taille 47', marque: 'Salomon', taille: '47', dateRef: new Date(T0 + 200 * J).toISOString(), dateRefSource: 'vente', prix: { amount: '80' } };
   const resume = (l) => JSON.stringify((l || []).map((p) => [String(p.achat.transaction_id), Math.round(p.score * 1000), p.niveau]));
   appels = 0; const r1 = L.propositionsArticle({ cible, achats, ...regles }); const a1 = appels;
   appels = 0; const r2 = L.propositionsArticle({ cible, achats, ...regles }); const a2 = appels;
   dit(a1 >= achats.length, `L0 le 1er appel prépare chaque achat (${a1} lectures de marque pour ${achats.length} achats)`);
   dit(a2 <= 2, `L1 le 2e appel sur les MÊMES achats n'en re-prépare aucun`, `${a2} lecture(s) de marque (avant : une par achat)`);
-  dit(resume(r1) === resume(r2) && r1.length > 0, 'L2 le même résultat, à l’identique', `${resume(r1).slice(0, 80)} | ${resume(r2).slice(0, 80)}`);
+  // (16 nov., relier-fiable + achats-retour) Ici plusieurs achats identiques : en ligne, aucune « très probable » (la règle
+  // d'exclusivité) — le même résultat se juge sur les propositions ET les pistes repliées, recalculées sur les mêmes achats.
+  const p1 = L.pistesArticle ? L.pistesArticle({ cible, achats, ...regles }) : [], p2 = L.pistesArticle ? L.pistesArticle({ cible, achats, ...regles }) : [];
+  dit(resume(r1) === resume(r2) && resume(p1) === resume(p2) && r1.length + p1.length > 0, 'L2 le même résultat, à l’identique', `${resume(r1.concat(p1)).slice(0, 80)} | ${resume(r2.concat(p2)).slice(0, 80)}`);
   achats[3] = { ...achats[3] }; achats[7].title = 'Salomon XT-6 noir taille 42 état neuf';
   appels = 0; L.propositionsArticle({ cible, achats, ...regles }); const a3 = appels;
   dit(a3 >= 1 && a3 <= 4, 'L3 un achat changé (nouvel objet, ou titre modifié) est re-préparé — lui seul', `${a3} lecture(s)`);

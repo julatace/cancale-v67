@@ -228,7 +228,14 @@ async function baisserDepuisApp(pg, id, { lancer: go = true } = {}) {
   const apres = await attendreQue(async () => { const b = await lireBP(pg); return b && b.L[String(id)] && b.L[String(id)].etat && !/attente|encours|envoi/.test(b.L[String(id)].etat) ? b : null; }, 45000, 500);
   return { avant, apres: apres || await lireBP(pg), lance: true };
 }
-const fermerFeuille = async (pg) => { await pg.keyboard.press('Escape').catch(() => {}); await attendre(300); };
+// (16 nov.) Depuis la feuille « VRM travaille » (11 nov., src/composants/SuiviTravail.jsx, demande de Julien : VRM reste
+// FIGÉ), une série finie se ferme par SON « Fermer » : Échap n'y fait rien (exprès), et la feuille restée ouverte est
+// RELUE au rechargement — la baisse suivante n'ouvrait donc jamais sa feuille (« L2 vide »). On touche « Fermer ».
+const fermerFeuille = async (pg) => {
+  const f = pg.locator('[data-suivi-fermer]');
+  if (await f.count().catch(() => 0)) { await f.first().click().catch(() => {}); await attendre(300); }
+  await pg.keyboard.press('Escape').catch(() => {}); await attendre(300);
+};
 
 // ════════════════════════════════════════════════════════════════════════════
 (async () => {

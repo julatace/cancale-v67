@@ -64,7 +64,15 @@ const LIGNES = (appris) => ({
   vc_fil_C1: [{ messages: VC_FIL, page: '/messages/', at: iso(0) }],
   vc_fil_C2: [{ messages: [{ id: 'W1', t: 'La boîte est incluse ?', deMoi: false, at: iso(1) }], page: '/messages/', at: iso(0) }],
   vc_envoi: appris ? [{ appris: true, raison: '', at: iso(24) }] : [],
+  // (16 nov., vitesse-lectures) La mémoire des comptes reliés d'un vendeur qui a DÉJÀ ouvert VRM
+  // (src/CompteRelie.jsx) : sans elle, chaque ouverture du banc était la toute première de sa vie et
+  // l'app posait son point de départ (`POST app_data` vrm_comptes_relies) — une écriture voulue, UNE
+  // fois par vendeur, qui n'est pas celle d'une ouverture de Messages.
+  vrm_comptes_relies: [{ data: { v: 1, bases: { vinted: Date.parse(iso(24 * 30)), leboncoin: Date.parse(iso(24 * 30)), vestiaire: Date.parse(iso(24 * 30)), ebay: Date.parse(iso(24 * 30)) }, connus: {}, rev: 3 } }],
 });
+// (16 nov.) Une photo servie (1 px) : une photo COUPÉE fait écrire le diagnostic des photos
+// (`diag_photos`, une écriture voulue quand les photos échouent vraiment).
+const PIXEL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=', 'base64');
 const VC_FILS_META = [
   { id: 'vc_fil_C1', n: '3', da: iso(2), ap: 'Vous faites 110 € ?', dm: 'false', pid: '900001', ref: '80' },
   { id: 'vc_fil_C2', n: '1', da: iso(1), ap: 'La boîte est incluse ?', dm: 'false', pid: '900002', ref: '' },
@@ -103,7 +111,7 @@ async function ouvrir(b, tel, site, { appris = true } = {}) {
   const ecritures = [];
   await pg.addInitScript(({ n, m, s }) => { try { localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vinted_annonce_numeros', JSON.stringify(n)); localStorage.setItem('vrm_meubles', JSON.stringify(m)); localStorage.setItem('vrm_slots', JSON.stringify(s)); } catch (_) {} }, { n: NUMEROS, m: MEUBLES, s: SLOTS });
   await pg.addInitScript(PONT, { version: '5.295.0' });
-  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
+  await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (r.request().resourceType() === 'image' ? r.fulfill({ status: 200, contentType: 'image/png', body: PIXEL }) : ['media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   const L = LIGNES(appris);
   await pg.route('**/rest/v1/**', (route) => {
     const u = decodeURIComponent(metaVersData(route.request().url()));

@@ -271,7 +271,11 @@ const corps = (src, nom) => { const i = src.indexOf(`function ${nom}(`); if (i <
     const S = fs.readFileSync(path.join(RACINE, 'api', 'ship-reminders.js'), 'utf8');
     const E = fs.readFileSync(path.join(RACINE, 'api', 'email-inbound.js'), 'utf8');
     dit(/auto: numerosVcAvecLiens\(\(m && m\.vrm_vc_numeros\) \|\| \{\}, m && m\.vrm_vc_liens\)/.test(W) && /'vrm_vc_liens'/.test(W), 'L9 · widget : la liaison lue');
-    dit((S.match(/numerosVcAvecLiens\(/g) || []).length === 3 && (S.match(/'vrm_vc_liens'/g) || []).length === 2, 'L9 · rappels (bilan, colis) : la liaison lue');
+    // (17 nov., train : plateformes-restes ajoute un lecteur — le finalisé Vestiaire du bilan) : chaque ligne qui projette
+    // `vrm_vc_numeros` projette aussi `vrm_vc_liens`, et il y a au moins un appel à numerosVcAvecLiens par projection.
+    { const lignes = S.split('\n'), proj = lignes.filter((l) => /'vrm_vc_numeros'/.test(l)), avecLiens = proj.filter((l) => /'vrm_vc_liens'/.test(l));
+      const appels = (S.match(/numerosVcAvecLiens\(/g) || []).length;
+      dit(proj.length >= 2 && avecLiens.length === proj.length && appels >= proj.length, 'L9 · rappels (bilan, colis) : la liaison lue', `${proj.length} projection(s), ${avecLiens.length} avec la liaison, ${appels} appel(s)`); }
     dit((E.match(/numerosVcAvecLiens\(/g) || []).length === 2 && /vcLiensMain:data->vrm_vc_liens/.test(E) && /liensMain:data->vrm_vc_liens/.test(E), 'L9 · e-mail entrant (N° d’une vente, encore en ligne) : la liaison lue');
   });
 

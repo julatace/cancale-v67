@@ -89,6 +89,7 @@ en texte, une ligne par hôte) :
 | `https://*.amazonaws.com/*` | Les bordereaux PDF de Vinted sont servis par un stockage Amazon S3 ; l'extension les télécharge pour les ranger avec la vente. |
 | `https://*.leboncoin.fr/*` | Les comptes Leboncoin de l'utilisateur. |
 | `https://*.ebay.fr/*`, `https://*.ebay.com/*` | Les comptes eBay de l'utilisateur : remplir une annonce depuis VRM. |
+| `https://i.ebayimg.com/*` | Les photos publiques de SES annonces eBay : l'empreinte d'une photo (jamais l'image, sans cookie) pour reconnaître la même photo qu'une annonce Vinted. |
 | `https://*.vestiairecollective.com/*` (scripts de contenu) | Les comptes Vestiaire Collective de l'utilisateur. |
 | `https://www.mondialrelay.be/*`, `https://www.mondialrelay.fr/*`, `https://ws.chronopost.fr/*`, `https://carrier.vintedgo.com/*` | Lire le statut public des colis que l'utilisateur attend (n° de suivi), quand le serveur de VRM ne peut pas le lire ; 12 lectures par heure et par transporteur au plus. |
 | `https://www.chronopost.fr/tracking-no-cms/*`, `https://vintedgo.com/*` (scripts de contenu) | Sur une page de suivi ouverte par l'utilisateur, lire seulement l'adresse de la page (le n° de suivi), jamais son contenu. |

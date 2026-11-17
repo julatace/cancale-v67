@@ -18,7 +18,7 @@ catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 
 const { metaVersData } = require('./_meta.cjs');
 const fs = require('fs'), http = require('http');
 const DIST = path.join(__dirname, '..', '..', 'dist');
-const PORT = 4341 + 7;   // 4348
+const PORT = Number(process.env.BANC_PORT || 4341 + 7);   // 4348
 
 const auj = new Date();
 const vente = (id, titre) => ({ transaction_id: id, title: titre, price: { amount: '50', currency_code: 'EUR' }, status: 'Le paiement a été validé', transaction_user_status: 'needs_action', date: new Date(auj.getTime() - 86400000).toISOString() });
@@ -122,11 +122,16 @@ const projette = (row, sel) => {
     const bouton = await pg.$('[data-lot] button[data-lot-imprimer]');   // (5 nov., chantier D) la feuille est un portail : le premier « data-imprime » de la page est une carte
     dit(!!bouton && (await bouton.getAttribute('data-lot-imprimer')) === '3', 'le bouton imprime EXACTEMENT les cochés (3)', bouton ? await bouton.getAttribute('data-lot-imprimer') : 'absent');
     if (bouton) {
-      // (11 nov., lot DJ3) Le contrôle se fait sur l'APERÇU A4 (une page par colis coché, tampon N° + titre) ; plus de case
-      // « Contrôlé » ni de question « Préparer quand même » (un geste de moins) — jugé : 3 pages, aucune question.
-      dit(await pg.locator('[data-lot] [data-lot-apercu]').count() === 3, 'l’aperçu A4 montre une page par colis coché (3) — le contrôle avant le PDF');
+      // (16 nov., portage sur « Imprimer en un toucher », docs/passation/2026-11-14-impression-simple.md) L'aperçu A4,
+      // la feuille du tampon d'office et le message « N sur M imprimés » n'existent plus. La RÈGLE du 5 octobre reste
+      // jugée sur ce qui la porte aujourd'hui : la feuille d'après (« Tout est sorti ? ») compte les bordereaux
+      // RÉELLEMENT dans le PDF (`data-impr-n`, une vignette chacun) et NOMME chaque absent avec SA raison
+      // (`absentsDuLot` : sans PDF · PDF illisible) ; seul ce qui est parti est noté imprimé ; les échecs restent
+      // cochés dans « Choisir » pour être relancés.
       await bouton.click();
-      await pg.waitForTimeout(800);
+      // Papier jamais choisi : la question vient une fois (le toucher sur un papier imprime aussitôt).
+      const papier = await pg.waitForSelector('[data-impr-papier-feuille="premiere"]', { timeout: 15000 }).then(() => true).catch(() => false);
+      if (papier) await pg.click('[data-impr-papier-choix="normale"]');
       dit(!(await pg.getByRole('button',{name:'Préparer quand même les PDF',exact:true}).count()), 'aucune question « contrôlé » entre « Imprimer » et le PDF');
       // (4 nov.) Le type de ces bordereaux n'a pas de place gardée : la feuille du tampon s'ouvre UNE fois, « Imprimer ».
       // (16 nov., lot tampons-parametres) La sélection ouvre l'APERÇU AVANT IMPRESSION (une feuille, chaque bordereau en
@@ -135,21 +140,30 @@ const projette = (row, sel) => {
       const nFeuilles = await pg.evaluate(() => document.querySelectorAll('[data-impr-apercu]').length);
       dit(feuille && nFeuilles === 1, 'l’aperçu avant impression s’ouvre, une fois', String(nFeuilles));
       if (feuille) await pg.click('[data-impr-apercu-imprimer]');
-      // Le message du lot : celui qui dit « N sur M ».
-      const msg = await pg.waitForFunction(() => {
-        const t = document.body.innerText; const m = /(\d+) sur (\d+) imprimé[^\n]*/.exec(t); return m ? m[0] : null;
-      }, null, { timeout: 15000 }).then((h) => h.jsonValue()).catch(() => null);
-      dit(!!msg, 'un lot imprimé en partie le DIT', msg || '(aucun message « N sur M »)');
-      const m = /(\d+) sur (\d+)/.exec(msg || '');
-      dit(m && m[1] === '1' && m[2] === '3', 'il annonce le nombre RÉELLEMENT imprimé : 1 sur 3 (le PDF abîmé est écarté par la fusion)', msg || '');
-      dit(/1 sans (PDF|bordereau)/.test(msg || '') && /Paire C/.test(msg || ''), 'il nomme le bordereau qui n’a plus son PDF', msg || '');
-      const illisible = (msg || '').replace(/1 sur 3 imprimé[s]? — /, '').replace(/1 sans (PDF|bordereau)[^,]*/, '');
-      dit(/\b1\b/.test(illisible), 'et celui que la fusion a écarté — compté, jamais passé sous silence', msg || '');
-      await pg.waitForTimeout(600);
-      const reprise = await pg.evaluate(() => { const b = document.querySelector('button[data-lot-imprimer]'); return b ? { n: b.getAttribute('data-lot-imprimer'), t: b.innerText } : null; });
-      dit(reprise && /Réessayer/.test(reprise.t) && reprise.n === '2', 'il propose de relancer les deux échecs : PDF absent et PDF illisible', JSON.stringify(reprise));
+      const vis = await pg.waitForSelector('[data-visionneuse-pdf="pret"]', { timeout: 30000 }).then(() => true).catch(() => false);
+      dit(vis, 'le PDF des bordereaux lisibles s’ouvre (visionneuse de l’ordinateur)');
+      if (vis) await pg.click('[data-visionneuse-fermer]');
+      await pg.waitForSelector('[data-impr-feuille="question"]', { timeout: 15000 }).catch(() => {});
+      const f = await pg.evaluate(() => { const r = document.querySelector('[data-impr-feuille]'); if (!r) return null;
+        return { n: r.getAttribute('data-impr-n'), vign: [...r.querySelectorAll('[data-impr-vignette]')].map((e) => e.getAttribute('data-impr-vignette')),
+          absents: [...r.querySelectorAll('[data-impr-absent]')].map((e) => ({ cle: e.getAttribute('data-impr-absent'), raison: e.getAttribute('data-impr-absent-raison'), txt: e.innerText.replace(/\s+/g, ' ') })),
+          nAbsents: (r.querySelector('[data-impr-absents]') || { getAttribute: () => null }).getAttribute('data-impr-absents') }; });
+      dit(f && f.n === '1' && f.vign.join(',') === '9001', 'la feuille compte le nombre RÉELLEMENT dans le PDF : 1 (le PDF abîmé est écarté par la fusion)', JSON.stringify(f && { n: f.n, vign: f.vign }));
+      const ab = (cle) => (f && f.absents.find((a) => a.cle === cle)) || null;
+      dit(ab('9003') && ab('9003').raison === 'sansPdf' && /Paire C/.test(ab('9003').txt), 'elle nomme le bordereau qui n’a plus son PDF (titre + raison)', JSON.stringify(ab('9003')));
+      dit(ab('9002') && ab('9002').raison === 'illisible', 'et celui que la fusion a écarté (PDF illisible) — compté, jamais passé sous silence', JSON.stringify(ab('9002')));
+      dit(f && f.nAbsents === '2' && f.absents.length === 2, 'les deux absents, exactement (ni la vente d’il y a un mois, restée décochée)', JSON.stringify(f && f.absents.map((a) => a.cle)));
+      await pg.waitForFunction(() => Object.keys(JSON.parse(localStorage.getItem('vinted_bords_printed') || '{}')).length >= 1, null, { timeout: 10000 }).catch(() => {});
+      const imprimes = await pg.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('vinted_bords_printed') || '{}')).sort());
+      dit(JSON.stringify(imprimes) === '["9001"]', 'seul le bordereau PARTI est noté imprimé', JSON.stringify(imprimes));
+      if (await pg.$('[data-impr-oui]')) await pg.click('[data-impr-oui]');
+      await pg.waitForFunction(() => !document.querySelector('[data-impr-feuille]'), null, { timeout: 8000 }).catch(() => {});
+      await pg.click('button[data-lot-ouvrir="1"]').catch(() => {});
+      await pg.waitForSelector('[data-lot-etape="choix"]', { timeout: 15000 }).catch(() => {});
+      await new Promise((r) => setTimeout(r, 600));
+      const reprise = await pg.evaluate(() => { const b = document.querySelector('[data-lot] button[data-lot-imprimer]'); return b ? b.getAttribute('data-lot-imprimer') : null; });
       const cochesRestantes = await pg.locator('[data-lot-ligne][data-coche="1"]').evaluateAll(nodes => nodes.map(n=>n.getAttribute('data-lot-ligne')).sort());
-      dit(JSON.stringify(cochesRestantes) === JSON.stringify(['9002','9003']), 'le PDF réussi est décoché ; les deux échecs restent visibles et sélectionnés', JSON.stringify(cochesRestantes));
+      dit(JSON.stringify(cochesRestantes) === JSON.stringify(['9002','9003']) && reprise === '2', 'le PDF réussi est décoché ; les deux échecs restent visibles et sélectionnés, prêts à relancer (2)', JSON.stringify({ cochesRestantes, reprise }));
     }
     dit(errs.length === 0, 'aucune erreur d’app', errs.join(' | ').slice(0, 160));
     dit(violations.filter(v=>!v.texte.startsWith('[Report-Only]')).length===0,'le parcours PDF respecte la politique de sécurité de production',violations.map(v=>v.texte).join(' | ').slice(0,250));

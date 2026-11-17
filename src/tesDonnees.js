@@ -32,7 +32,7 @@ export const SITES_EXTENSION = [
   { motif: /(^|\.)vinted\.(fr|com|it|de|net)$/, nom: 'Vinted' },
   { motif: /(^|\.)leboncoin\.fr$/, nom: 'Leboncoin' },
   { motif: /(^|\.)vestiairecollective\.com$/, nom: 'Vestiaire Collective' },
-  { motif: /(^|\.)ebay\.(fr|com)$/, nom: 'eBay' },
+  { motif: /(^|\.)ebay\.(fr|com)$|^i\.ebayimg\.com$/, nom: 'eBay' },   // (16 nov.) i.ebayimg.com : les photos de ses annonces eBay (empreinte « même photo »)
   { motif: /^(www\.)?mondialrelay\.(fr|be)$|^(ws|www)\.chronopost\.fr$|^(carrier\.)?vintedgo\.com$/, nom: 'les transporteurs (suivi de tes colis)' },
   { motif: /(^|\.)amazonaws\.com$/, nom: 'les serveurs de photos et de bordereaux de ces sites' },
   { motif: /^lgonxzrzjcqthjtbdpzo\.supabase\.co$/, nom: 'ta base VRM' },

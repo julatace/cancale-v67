@@ -17,7 +17,7 @@ require('./_porte-banc.cjs');
 //    H5 « Tout est à jour » ne prend aucune place en tête de page ;
 //    F  toutes les fonctions de la barre d'hier restent joignables : loupe, cloche, menu du
 //       compte (Paramètres), panneau « Actions Vinted », œil des montants ;
-//    N  la barre du bas : exactement 4 onglets (journee · paires · ventes · compta) ; CHAQUE
+//    N  la barre du bas : exactement 5 onglets (journee · paires · achats · ventes · compta, 16 nov.) ; CHAQUE
 //       écran d'hier joignable en ≤ 2 touchers depuis Ma journée ; pastilles conservées
 //       (segment Achats = son nombre ; onglet Paires = la somme, muet sur un écran de Paires) ;
 //    D  pas de débordement horizontal ;
@@ -185,8 +185,10 @@ async function regles(nav) {
   {
     const o = await ouvrir(nav, { W: 390, sombre: false, b: base(), url: '/?tab=journee' }); await pret(o.pg);
     const pg = o.pg;
-    const onglets = await pg.evaluate(() => [...document.querySelectorAll('.vrm-tabbar > button')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => b.getAttribute('data-nav-entree') || (b.classList.contains('vrm-nav-more') ? 'plus' : '?')));
-    dit(onglets.join(',') === 'journee,paires,ventes,compta', 'N la barre du bas : quatre onglets — Aujourd\'hui · Paires · Ventes · Argent', onglets.join(','));
+    // (16 nov., barre-achats) Les ONGLETS (`.vrm-tab`) : le disque « + » du centre (14 nov.) est un bouton de la barre, pas un onglet.
+    const onglets = await pg.evaluate(() => [...document.querySelectorAll('.vrm-tabbar > .vrm-tab, .vrm-tabbar > .vrm-nav-more')].filter((b) => b.getBoundingClientRect().width > 0).map((b) => b.getAttribute('data-nav-entree') || (b.classList.contains('vrm-nav-more') ? 'plus' : '?')));
+    // (16 nov., barre-achats — Julien : « ajoute les Achats dans la barre en bas »)
+    dit(onglets.join(',') === 'journee,paires,achats,ventes,compta', 'N la barre du bas : cinq onglets — Aujourd\'hui · Annonces · Achats · Ventes · Argent', onglets.join(','));
     await attendre(pg, () => pg.evaluate(() => !!document.querySelector('.vrm-tabbar [data-badge-nav="paires"]')), 12000);
     const pastilles = await pg.evaluate(() => { const b = document.querySelector('.vrm-tabbar [data-badge-nav="paires"]'); return b ? b.getAttribute('data-badge-n') : null; });
     dit(pastilles != null && Number(pastilles) > 0, 'N l\'onglet Paires porte la somme de ses écrans (ailleurs que sur Paires)', String(pastilles));
@@ -195,7 +197,8 @@ async function regles(nav) {
       journee: [['.vrm-tabbar [data-nav-entree="journee"]']], ventes: [['.vrm-tabbar [data-nav-entree="ventes"]']], compta: [['.vrm-tabbar [data-nav-entree="compta"]']],
       annonces: [['.vrm-tabbar [data-nav-entree="paires"]'], ['.vrm-tabbar [data-nav-entree="paires"]', '[data-paires-segment="annonces"]'], ['[data-profil-tete]', '[data-menu-profil] [data-nav-entree="annonces"]']],
       garage: [['.vrm-tabbar [data-nav-entree="paires"]', '[data-paires-segment="garage"]'], ['[data-profil-tete]', '[data-menu-profil] [data-nav-entree="garage"]']],
-      achats: [['.vrm-tabbar [data-nav-entree="paires"]', '[data-paires-segment="achats"]'], ['[data-profil-tete]', '[data-menu-profil] [data-nav-entree="achats"]']],
+      // (16 nov., barre-achats) Achats a son onglet dans la barre.
+      achats: [['.vrm-tabbar [data-nav-entree="achats"]'], ['[data-profil-tete]', '[data-menu-profil] [data-nav-entree="achats"]']],
       messages: [['[data-profil-tete]', '[data-menu-profil] [data-nav-entree="messages"]']], emails: [['[data-profil-tete]', '[data-menu-profil] [data-nav-entree="emails"]']],
       communaute: [['[data-profil-tete]', '[data-menu-profil] [data-nav-entree="communaute"]']], settings: [['[data-profil-tete]', '[data-profil-menu="parametres"]']],
     };
@@ -212,16 +215,14 @@ async function regles(nav) {
       }
       dit(!!atteint, `N « ${cible} » joignable en ≤ 2 touchers depuis Ma journée`, atteint || 'introuvable');
     }
-    // Sur Achats : le segment porte le nombre, l'onglet Paires se tait (un nombre une fois).
-    await toucher(pg, '.vrm-tabbar [data-nav-entree="paires"]'); await pg.waitForTimeout(900);
-    await toucher(pg, '[data-paires-segment="achats"]'); await pg.waitForTimeout(1500);
-    // (14 nov., intégration) Le nombre d'Achats est « À retirer » PUBLIÉ (vrm_colis_retirer.total). Depuis la règle
-    // de main du 14 nov. (aucun colis sans code dans « À retirer »), cette base n'a rien à retirer (60 « à vérifier ») :
-    // le segment porte alors exactement ce nombre — aucun s'il est 0, jamais un nombre inventé.
-    const surPaires = await pg.evaluate(() => { let pub = null; try { pub = JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) {} return { seg: (document.querySelector('[data-paires-segment="achats"] .vrm-seg-n') || {}).textContent || '', publie: pub && typeof pub.total === 'number' ? pub.total : null, segAnnonces: (document.querySelector('[data-paires-segment="annonces"] .vrm-seg-n') || {}).textContent || '', onglet: !!document.querySelector('.vrm-tabbar [data-badge-nav="paires"]'), actif: (document.querySelector('.vrm-tabbar [aria-current="page"]') || {}).getAttribute?.('data-nav-entree') }; });
-    const segJuste = surPaires.publie == null ? /\d/.test(surPaires.seg) : (surPaires.publie > 0 ? surPaires.seg === String(surPaires.publie > 99 ? '99+' : surPaires.publie) : surPaires.seg === '');
-    dit(segJuste && !surPaires.onglet, 'N sur Achats : le segment porte le nombre d\'Achats (« À retirer » publié, aucun s\'il est 0), l\'onglet Paires se tait', JSON.stringify(surPaires));
-    dit(surPaires.actif === 'paires', 'N sur Achats, l\'onglet allumé est Paires', String(surPaires.actif));
+    // (16 nov., lot barre-achats) Achats a son onglet dans la barre : SON onglet porte son nombre et s'allume.
+    await toucher(pg, '.vrm-tabbar [data-nav-entree="achats"]'); await pg.waitForTimeout(1500);
+    // (14 nov., intégration) Le nombre d'Achats est « À retirer » PUBLIÉ (vrm_colis_retirer.total) : aucun s'il est 0,
+    // jamais un nombre inventé.
+    const surAchats = await pg.evaluate(() => { let pub = null; try { pub = JSON.parse(localStorage.getItem('vrm_colis_retirer') || 'null'); } catch (_) {} const b = document.querySelector('.vrm-tabbar [data-badge-nav="achats"]'); return { n: b ? b.getAttribute('data-badge-n') : '', publie: pub && typeof pub.total === 'number' ? pub.total : null, segments: document.querySelectorAll('[data-paires-segment]').length, actif: (document.querySelector('.vrm-tabbar [aria-current="page"]') || {}).getAttribute?.('data-nav-entree') }; });
+    const nJuste = surAchats.publie == null ? /\d/.test(surAchats.n) : (surAchats.publie > 0 ? surAchats.n === String(surAchats.publie) : surAchats.n === '');
+    dit(nJuste && !surAchats.segments, 'N sur Achats : son onglet porte le nombre d\'Achats (« À retirer » publié, aucun s\'il est 0), aucun sélecteur de Paires', JSON.stringify(surAchats));
+    dit(surAchats.actif === 'achats', 'N sur Achats, l\'onglet allumé est Achats', String(surAchats.actif));
     // Le menu du haut : tout ce que « Plus » portait, groupé ; il ne répète pas les onglets de la barre.
     await toucher(pg, '[data-profil-tete]'); await pg.waitForSelector('[data-menu-profil] [data-nav-entree]', { timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(400);
     const menu = await pg.evaluate(() => [...document.querySelectorAll('[data-menu-profil] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
@@ -290,6 +291,9 @@ async function ajout3(nav) {
     const o = await ouvrir(nav, { W: 390, sombre: false, b: base(), url: '/?tab=achats' }); await pret(o.pg);
     await o.pg.evaluate(() => { window.__vrmMajDispo = 'assets/index-banc.js'; window.dispatchEvent(new Event('vrm:maj-dispo')); });
     await o.pg.waitForTimeout(3200);
+    // (16 nov., barre-achats) Achats n'a plus le sélecteur de « Paires » en tête (son onglet est dans la barre) : le
+    // premier contenu de <main> est l'écran lui-même, chargé à la demande — on l'attend (8 s au plus), jamais un délai seul.
+    await o.pg.waitForFunction(() => { const main = document.querySelector('.vrm-main'); return !!main && [...main.children].some((c) => c.getBoundingClientRect().height > 2 && getComputedStyle(c).position !== 'fixed'); }, null, { timeout: 8000 }).catch(() => {});
     const m = await o.pg.evaluate(() => {
       const x = document.querySelector('[data-maj-dispo]'); if (!x) return null;
       const r = x.getBoundingClientRect(); const bar = document.querySelector('.vrm-tabbar'); const rb = bar ? bar.getBoundingClientRect() : null;

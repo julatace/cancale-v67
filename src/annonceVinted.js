@@ -22,6 +22,14 @@ import { lireReglageNumeroEcrit, lireNumeroTexte, numerosMarques, cleNumero } fr
 const str = (v) => String(v == null ? '' : v).trim();
 export const DESCRIPTION_MIN = 5;
 export const PHOTOS_MAX = 20;
+// (16 nov., lot extension-restes) Les photos du STUDIO (`studio_photos_{N°}`, src/studioPhoto.js) reprises par
+// « Créer sur Vinted » quand la fiche n'en a aucune : la photo D'ORIGINE (`img`), jamais la détourée (le
+// détourage sert Vestiaire seul, CLAUDE.md §3), data URL JPEG seulement, dans l'ordre du studio. `r` = la
+// lecture du studio ({ photos } · null pas su) ⇒ [] si rien de sûr.
+export function photosStudioPourVinted(r) {
+  const l = r && Array.isArray(r.photos) ? r.photos : [];
+  return l.map((p) => (p && typeof p === 'object' ? p.img : null)).filter((u) => typeof u === 'string' && /^data:image\/(jpeg|png|webp);base64,/.test(u)).slice(0, PHOTOS_MAX);
+}
 
 // Le texte qui part : { ok, titre, description } ou { ok:false, raison }.
 export function texteAnnonceVinted(fiche, { etiquette = null, numeroEcrit = null } = {}) {

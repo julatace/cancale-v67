@@ -97,10 +97,13 @@ async function main() {
     const srcPh = fs.readFileSync(path.join(R, 'src', 'exemplePhotos.js'), 'utf8');
     fs.writeFileSync(path.join(tmp, 'exemplePhotos.js'), srcPh.replace(/export const PHOTOS_EXEMPLE = \[[\s\S]*?\];/, 'export const PHOTOS_EXEMPLE = ' + JSON.stringify(simulees) + ';'));
     fs.copyFileSync(path.join(R, 'src', 'exempleDonnees.js'), path.join(tmp, 'exempleDonnees.js'));
+    // (16 nov.) exempleDonnees.js prend l'identité de l'exemple dans son petit module.
+    fs.copyFileSync(path.join(R, 'src', 'exempleIdentite.js'), path.join(tmp, 'exempleIdentite.js'));
     fs.writeFileSync(path.join(tmp, 'vide.js'), srcPh.replace(/export const PHOTOS_EXEMPLE = \[[\s\S]*?\];/, 'export const PHOTOS_EXEMPLE = [];'));
     fs.mkdirSync(path.join(tmp, 'v'));
     fs.copyFileSync(path.join(tmp, 'vide.js'), path.join(tmp, 'v', 'exemplePhotos.js'));
     fs.copyFileSync(path.join(R, 'src', 'exempleDonnees.js'), path.join(tmp, 'v', 'exempleDonnees.js'));
+    fs.copyFileSync(path.join(R, 'src', 'exempleIdentite.js'), path.join(tmp, 'v', 'exempleIdentite.js'));
     const { jeuExemple } = await import(pathToFileURL(path.join(tmp, 'exempleDonnees.js')).href);
     const ORI = 'https://vrm.center';
     const jeu = jeuExemple(1.7e12, { origine: ORI });

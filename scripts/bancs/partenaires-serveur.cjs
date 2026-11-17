@@ -39,8 +39,11 @@ const MUTATIONS = {
   'sans-compte-neuf': ["  if (!Number.isFinite(cree) || maintenant - cree > FILLEUL_MAX_JOURS * 86400000) return", "  if (false) return"],
   'pause-ignoree': ["  if (p.pause_le) return { ok: false, http: 409, raison: 'pause', message: \"Ce code partenaire n'est plus actif.\" };\n", ''],
   'deux-recompenses': ["  if (parr.ok && parr.lignes.length) return { ok: false, http: 409, raison: 'deja-parraine', message: 'Ton compte a déjà un parrain.' };\n", ''],
-  'panne-acquittee': ["  return { ok: false };\n}\n\n// ── LE WEBHOOK : REMBOURSEMENT", "  return { ok: true };\n}\n\n// ── LE WEBHOOK : REMBOURSEMENT"],
-  'annulation-perdue': ["    const w = await ecrire('PATCH', `partenaire_commissions?${col}=eq.${enc(val)}&annulee_le=is.null`, { annulee_le: le, annulee_raison: a.raison }, 'return=representation');", "    const w = { ok: true, json: [] };"],
+  'panne-acquittee': ["  return { ok: false };\n}\n\n// Les signaux (remboursement", "  return { ok: true };\n}\n\n// Les signaux (remboursement"],
+  'annulation-perdue': ["      const w = await ecrire('PATCH', `partenaire_commissions?facture=eq.${enc(c.facture)}&annulee_le=is.null`, { annulee_le: le, annulee_raison: rb.raison }, 'return=representation');", "      const w = { ok: true, json: [] };"],
+  // (16 nov.) Le remboursement partiel : la réduction perdue, ou un rendu qui redescend.
+  'partiel-perdu': ["      const w = await ecrire('PATCH', `partenaire_commissions?facture=eq.${enc(c.facture)}&annulee_le=is.null&rembourse_centimes=lt.${rb.centimes}`, { rembourse_centimes: rb.centimes }, 'return=representation');", "      const w = { ok: true, json: [] };"],
+  'partiel-signal-ecrase': ["'partenaire_annulations?on_conflict=cle,signal'", "'partenaire_annulations?on_conflict=cle'"],
   'jeton-de-tous': ["  const c = await lireChiffres(p.id, maintenant);\n  if (!c.ok) return { http: 503, corps: { ok: false, raison: 'pas-su' } };\n  const d = c.chiffres.get(String(p.id)) || vide(maintenant);", "  const c = await lireChiffres(null, maintenant);\n  if (!c.ok) return { http: 503, corps: { ok: false, raison: 'pas-su' } };\n  const d = [...c.chiffres.values()][0] || vide(maintenant);"],
   'page-bavarde': ["    ok: true, nom: p.nom, code: p.code, lien: lienCode(p.code), pause: !!p.pause_le,", "    ok: true, nom: p.nom, code: p.code, lien: lienCode(p.code), pause: !!p.pause_le, contact: p.contact, filleuls: d.commissions,"],
   'coupon-non-verifie': ["    if (!r.ok || !r.data || r.data.id !== brut || r.data.valid === false) return { http: 409, corps: { ok: false, raison: 'coupon-inconnu' } };\n", ''],
@@ -105,7 +108,7 @@ const SCH = {
   partenaire_filleuls: { uniques: [['filleul']] },
   partenaire_commissions: { uniques: [['facture'], { cols: ['filleul', 'mois'], si: (l) => !l.annulee_le }],
     verifier: (l) => (l.montant_centimes !== 300 ? 'montant' : Date.parse(l.due_le) < Date.parse(l.paye_le) + 14 * J ? 'due' : (!!l.annulee_le) !== (!!l.annulee_raison) ? 'annulee' : '') },
-  partenaire_annulations: { uniques: [['cle']] },
+  partenaire_annulations: { uniques: [['cle', 'signal']] },
   partenaire_versements: { defauts: { id: () => crypto.randomUUID() } },
 };
 const FERMEES = new Set(['partenaires', 'partenaire_filleuls', 'partenaire_commissions', 'partenaire_annulations', 'partenaire_versements', 'parrainages', 'essais_gratuits']);
@@ -378,6 +381,51 @@ const facture = (client, o = {}) => {
     dit(l.pause && l.chiffres.totaux.attenteCentimes >= 300, 'la nouvelle commission est « en attente » (moins de 14 jours)');
     await admin({ action: 'pause', id: LEO.id, pause: false });
     dit(!db.t.partenaires.find((x) => x.id === LEO.id).pause_le, '« Reprendre » rouvre le code');
+  });
+
+  // (16 nov., lot compta-donnees) Un remboursement PARTIEL réduit la commission au prorata.
+  await essaie('P4b remboursement partiel', async () => {
+    const id = nouveauCompte(601); await rattacher(id, 'LEO'); vieillir(); abonne(id, 'cus_p401');
+    await webhook('invoice.paid', facture('cus_p401', { id: 'in_p401', pi: 'pi_p401' }));
+    const lire = () => commissions((c) => c.facture === 'in_p401')[0];
+    dit(lire() && lire().rembourse_centimes === 0, 'la commission naît entière (3,00 €)');
+    // Stripe envoie refund.created PUIS charge.refunded pour le MÊME euro rendu.
+    const r1 = await webhook('refund.created', { id: 're_p401a', object: 'refund', amount: 100, charge: 'ch_p401', payment_intent: 'pi_p401', status: 'succeeded' });
+    const r2 = await webhook('charge.refunded', { id: 'ch_p401', object: 'charge', amount_refunded: 100, payment_intent: 'pi_p401' });
+    dit(r1.code === 200 && r2.code === 200 && !lire().annulee_le && lire().rembourse_centimes === 100, '1 € rendu (deux événements du même geste) : réduite de 1 €, PAS annulée', JSON.stringify({ a: lire().annulee_le, r: lire().rembourse_centimes }));
+    await webhook('refund.created', { id: 're_p401a', object: 'refund', amount: 100, charge: 'ch_p401', payment_intent: 'pi_p401', status: 'succeeded' });
+    dit(lire().rembourse_centimes === 100, 'le même webhook rejoué ne compte rien de plus');
+    // Deux remboursements distincts EN MÊME TEMPS : aucun n'efface l'autre.
+    await Promise.all([
+      webhook('refund.created', { id: 're_p401b', object: 'refund', amount: 200, charge: 'ch_p401', payment_intent: 'pi_p401', status: 'succeeded' }),
+      webhook('refund.created', { id: 're_p401c', object: 'refund', amount: 300, charge: 'ch_p401', payment_intent: 'pi_p401', status: 'succeeded' }),
+    ]);
+    dit(lire().rembourse_centimes === 600 && !lire().annulee_le, 'deux remboursements en même temps (2 € et 3 €) : 6 € rendus en tout, jamais redescendu', lire().rembourse_centimes);
+    const ch = (await liste()).partenaires.find((x) => x.code === 'LEO').chiffres;
+    const mo = ch.mois.find((x) => x.nReduites > 0);
+    dit(mo && mo.nReduites === 1, 'la page de Julien dit « 1 réduite »', JSON.stringify(mo && { n: mo.nReduites }));
+    const csv = await appel({ mode: 'partenaires', headers: session(JULIEN), query: { csv: LEO.id } });
+    dit(/;1,94;(due|attente);remboursement partiel 6,00/.test(csv.texte || ''), 'le CSV : 3 € × 10,99 / 16,99 = 1,94 € et « remboursement partiel 6,00 »', ((csv.texte || '').split('\r\n').find((l) => /partiel/.test(l)) || '').slice(0, 140));
+    // Le reste rendu : toute la facture ⇒ annulée.
+    await webhook('charge.refunded', { id: 'ch_p401', object: 'charge', amount_refunded: 1699, payment_intent: 'pi_p401' });
+    dit(lire().annulee_le && lire().annulee_raison === 'remboursement', 'puis toute la facture rendue ⇒ annulée (gardée, dite)');
+    // Rendu partiel reçu AVANT la facture payée : elle naît réduite.
+    const t2 = nouveauCompte(602); await rattacher(t2, 'LEO'); vieillir(); abonne(t2, 'cus_p402');
+    await webhook('refund.created', { id: 're_p402', object: 'refund', amount: 500, charge: 'ch_p402', payment_intent: 'pi_p402', status: 'succeeded' });
+    await webhook('invoice.paid', facture('cus_p402', { id: 'in_p402', pi: 'pi_p402' }));
+    const n2 = commissions((c) => c.facture === 'in_p402')[0];
+    dit(n2 && !n2.annulee_le && n2.rembourse_centimes === 500, 'rendu partiel reçu AVANT la facture : elle naît réduite, pas annulée', JSON.stringify(n2 && { a: n2.annulee_le, r: n2.rembourse_centimes }));
+    // LECTURE KO, ÉCRITURE OK : la relecture des signaux tombe ⇒ rien n'est écrit sur la
+    // commission, 503 (Stripe rejoue) ; le rejeu pose la bonne réduction.
+    const t3 = nouveauCompte(603); await rattacher(t3, 'LEO'); vieillir(); abonne(t3, 'cus_p403');
+    await webhook('invoice.paid', facture('cus_p403', { id: 'in_p403', pi: 'pi_p403' }));
+    db.panne('partenaire_annulations', 'GET', 1);
+    const rk = await webhook('refund.created', { id: 're_p403', object: 'refund', amount: 400, charge: 'ch_p403', payment_intent: 'pi_p403', status: 'succeeded' });
+    const k1 = commissions((c) => c.facture === 'in_p403')[0];
+    dit(rk.code === 503 && k1.rembourse_centimes === 0 && !k1.annulee_le, 'relecture des signaux en panne : 503, la commission n’est PAS touchée (ni annulée, ni réduite au hasard)', JSON.stringify({ code: rk.code, r: k1.rembourse_centimes, a: k1.annulee_le }));
+    const rk2 = await webhook('refund.created', { id: 're_p403', object: 'refund', amount: 400, charge: 'ch_p403', payment_intent: 'pi_p403', status: 'succeeded' });
+    const k2 = commissions((c) => c.facture === 'in_p403')[0];
+    dit(rk2.code === 200 && k2.rembourse_centimes === 400, 'Stripe rejoue : 4 € rendus, posés une fois', JSON.stringify({ code: rk2.code, r: k2.rembourse_centimes }));
   });
 
   await essaie('P9 sans la 043', async () => {

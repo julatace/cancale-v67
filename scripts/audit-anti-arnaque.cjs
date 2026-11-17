@@ -189,6 +189,24 @@ async function verifier(F, { silence = false } = {}) {
   dit(/<AlerteArnaque\b/.test(lire('src/ecrans/Vestiaire.jsx')), 'B · Vestiaire : bannière');
   dit(/<AlerteArnaque\b/.test(lire('src/ebayGestion.jsx')), 'B · eBay : bannière');
   dit(/<AlerteArnaque\b/.test(lire('src/ecrans/FilsTous.jsx')) && /data-arnaque-compteur/.test(lire('src/ecrans/FilsTous.jsx') + ban), 'B · Tous : bannière + compteur');
+  // (16 nov., lot extension-restes) « Tous » : une ligne Vinted compte quand le dernier message du FIL capté est
+  // PROUVÉ de l'autre (`dernier`, la règle de la liste Vinted) — jamais l'aperçu de la boîte (auteur pas su).
+  {
+    const FU = await import(path.join(__dirname, '..', 'src', 'filUnique.js'));
+    const A = await import(path.join(__dirname, '..', 'src', 'antiArnaque.js'));
+    const c = { id: 9, updated_at: '2026-11-16T10:00:00Z', description: 'Ajoute-moi sur WhatsApp', opposite_user: { id: 5, login: 'x' }, _acc: { vinted_user_id: '111' } };
+    const boite = FU.convVinted(c, null);
+    const eux = FU.convVinted(c, null, undefined, { texte: 'Ajoute-moi sur WhatsApp au 06 12 34 56 78', deMoi: false });
+    const moi = FU.convVinted(c, null, undefined, { texte: 'Ajoute-moi sur WhatsApp au 06 12 34 56 78', deMoi: true });
+    const flou = FU.convVinted(c, null, undefined, { texte: 'Ajoute-moi sur WhatsApp', deMoi: null });
+    dit(!A.motifDeLApercu(boite.apercu, boite.deMoi) && !!A.motifDeLApercu(eux.apercu, eux.deMoi) && !A.motifDeLApercu(moi.apercu, moi.deMoi) && !A.motifDeLApercu(flou.apercu, flou.deMoi),
+      'B · Tous : la ligne Vinted compte sur le dernier message PROUVÉ de l’autre (fil capté) ; ses messages, l’aperçu de la boîte et l’auteur pas su ne comptent jamais',
+      JSON.stringify([boite.deMoi, eux.deMoi, moi.deMoi, flou.deMoi]));
+    const appNu = app.replace(/\/\*[\s\S]*?\*\//g, '');
+    dit(/<FilsTous[\s\S]{0,1500}extraitConversation\(c, paire&&paire\.r, paire&&paire\.titre, normTitle\)[\s\S]{0,200}ex\.source==='fil' && !ex\.vinted && \(ex\.de==='eux'\|\|ex\.de==='toi'\)[\s\S]{0,120}dernier \}/.test(appNu)
+      && /convVinted\(x\.c, x\.paire, undefined, x\.dernier\)/.test(lire('src/ecrans/FilsTous.jsx')),
+      'B · Tous : l’app passe à convVinted le dernier message du fil capté (même règle que la liste Vinted)');
+  }
 
   // --prouve : mutation par motif
   if (process.argv.includes('--prouve')) {

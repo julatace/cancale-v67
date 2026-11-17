@@ -27,7 +27,7 @@ import { texteAnnonceVinted } from '../annonceVinted.js';
 import { useLangue } from '../i18n/react.js';
 import '../republier-guide.css';
 import { numeroACopier, texteKit, couvertureKit } from '../republierKit.js';
-import { ACTIONS_REPUB, AUTH, Avancement, Bouton, C, ChipsModeles, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, FermeAuRetour, Icon, NAV, PhotoVinted, Pourquoi, SUPABASE_URL, Segmente, SheetShell, askConfirm, chargerPhotoBoite, demanderQuestionRepub, ecrireJournalRepub, extSait, ilYaBr, load, onCloudReady, poserRepubVivant, prixCourt, questionRepubOk, save, sbAuth, toast, verifierAvantPublication } from '../App.jsx';
+import { annoncerFicheAPublier, ACTIONS_REPUB, AUTH, Avancement, Bouton, C, ChipsModeles, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, FermeAuRetour, Icon, NAV, PhotoVinted, Pourquoi, SUPABASE_URL, Segmente, SheetShell, askConfirm, chargerPhotoBoite, demanderQuestionRepub, ecrireJournalRepub, extSait, ilYaBr, load, onCloudReady, poserRepubVivant, prixCourt, questionRepubOk, save, sbAuth, toast, verifierAvantPublication } from '../App.jsx';
 
 // (9 nov., direction artistique 4) LE VOILE DES ATELIERS : un PORTAIL sur <body> (§7 :
 // une feuille posée dans un conteneur qui crée un contexte d'empilement passe SOUS la
@@ -1399,6 +1399,9 @@ function PublierALaMain({ fiche, vue, onFini, onClose }) {
   const [copie, copies, copier] = useCopies();
   const [etape, setEtape] = useState('photos');
   const [ouvert, setOuvert] = useState(false);
+  // (16 nov., ext. 5.395) « Publier cette fiche » : SON clic sur « Ouvrir Vinted » annonce la fiche à l'extension,
+  // qui réserve CE N° à côté de « Publier » et le relie à l'annonce créée. null = pas encore · { ok, code }.
+  const [resaFiche, setResaFiche] = useState(null);
   const photos = (Array.isArray(f.photos) ? f.photos : []).filter((u) => typeof u === 'string' && u).slice(0, 20);
   const [exclues, setExclues] = useState(() => new Set());
   const choisies = photosChoisies(photos, exclues);
@@ -1429,10 +1432,10 @@ function PublierALaMain({ fiche, vue, onFini, onClose }) {
       {section('creer', <>
         <p className="vrm-acc-avant vrm-rg-avant" data-acc-avant="publier.main">{tr('rg.publier.avant')} <span className="vrm-acc-pas">{tr('rg.creer.pas')}</span></p>
         {!texte.ok ? <div className="vrm-rm-note vrm-rm-ambre" data-rg-texte-refus="">{tr('rg.publier.refus', { raison: texte.raison || '' })}</div> : null}
-        <div className="vrm-b-rangee vrm-rm-gauche"><Bouton variante={etats.creer === 'fait' ? 'secondaire' : 'primaire'} data-main-ouvrir-vinted="" href="https://www.vinted.fr/items/new" target="_blank" rel="noopener noreferrer" onClick={() => { setOuvert(true); const t0 = champs.find((c) => c.k === 'titre'); if (t0 && t0.v) copier('titre', t0.v); }}>{tr('rg.creer.ouvrir')}</Bouton></div>
+        <div className="vrm-b-rangee vrm-rm-gauche"><Bouton variante={etats.creer === 'fait' ? 'secondaire' : 'primaire'} data-main-ouvrir-vinted="" href="https://www.vinted.fr/items/new" target="_blank" rel="noopener noreferrer" onClick={() => { setOuvert(true); if (f.numero && !numEcrit) annoncerFicheAPublier(f).then(setResaFiche, () => setResaFiche({ ok: false })); const t0 = champs.find((c) => c.k === 'titre'); if (t0 && t0.v) copier('titre', t0.v); }}>{tr('rg.creer.ouvrir')}</Bouton></div>
         <p className="vrm-rm-muet" data-rg-copies={`${cvC.faits}/${cvC.n}`}>{tr('rg.creer.copies', { n: cvC.faits, m: cvC.n })}</p>
         {champs.map((c) => <ChampACopier key={c.k} k={c.k} valeur={c.v} copie={copie} copies={copies} copier={copier} multi={c.k === 'description'}/>)}
-        {f.numero ? <p className="vrm-rm-muet" data-rg-num-fiche={f.numero}>{tr('rg.publier.num', { num: f.numero })}</p> : null}
+        {f.numero ? <p className="vrm-rm-muet" data-rg-num-fiche={f.numero} data-rg-resa-fiche={resaFiche ? (resaFiche.ok ? 'ok' : String(resaFiche.code || 'non')) : ''}>{resaFiche && resaFiche.ok ? tr('rg.publier.reserve', { num: f.numero }) : resaFiche && resaFiche.code === 'pris' ? tr('rg.publier.pris', { num: f.numero }) : tr('rg.publier.num', { num: f.numero })}</p> : null}
       </>)}
       {section('fini', <>
         <div data-rg-fin={fin.etat} data-rg-fin-cle={fin.cle}>

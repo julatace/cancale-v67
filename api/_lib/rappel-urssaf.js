@@ -31,7 +31,10 @@ export const RAPPEL_SANS_MONTANT = 'Nouveau mois : pense à déclarer ton chiffr
 export function notificationUrssaf({ today, main }) {
   // (31 oct.) Comptabilité → « Ta déclaration URSSAF » : la carte du mois, son
   // montant et « C'est déclaré » (la même que Ma journée rappelle).
-  const url = DESTINATIONS.urssaf();
+  // (16 nov., lot compta-donnees) Argent → « Déclarer », la section URSSAF en
+  // évidence (`urssafDeclarer`) : `DESTINATIONS.urssaf` ouvrait le Résumé, où la
+  // section URSSAF est cachée — le toucher ne montrait rien.
+  const url = DESTINATIONS.urssafDeclarer();
   // (27 oct.) SEUL un micro-entrepreneur reçoit ce rappel : un particulier, une
   // société, un régime de la marge, ou un statut jamais choisi n'ont rien à
   // déclarer à l'URSSAF (règle de l'app : `urssafConcerne`). Réglages illisibles
