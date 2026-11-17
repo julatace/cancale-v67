@@ -73,13 +73,15 @@ const SCENARIOS = {
     await f.viser('[data-imprimer-prets]', { zoom: 1.38, dur: 0.8 });
     await f.toucher('[data-imprimer-prets]', { avant: 0.4, apres: 0.5 });
     await f.attendreQue('[data-impr-papier-choix="normale"]', 4);
-    f.titre('Ton imprimante, une seule fois.', { sous: 'VRM la garde pour la suite.', duree: 3.6 });
+    f.titre('Ton imprimante, une seule fois.', { sous: 'VRM la garde pour la suite.', duree: 3.4 });
     f.repos_(0.8);
     await f.jouer(1.4); f.cle('imprimante');
-    f.titre('Le N° est tamponné sur chaque bordereau.', { sous: 'Tu emballes la bonne paire.', duree: 3.6 });
-    await f.toucher('[data-impr-papier-choix="normale"]', { avant: 0.4, apres: 0.4 });
-    await f.jouer(1.6); f.cle('imprime');
-    await finir(f, 0.6);
+    f.titre('Le N° est tamponné sur chaque bordereau.', { sous: 'Tu emballes la bonne paire.', duree: 3.4 });
+    await f.viser('[data-impr-papier-choix="normale"]', { zoom: 1.3, dur: 0.8 });
+    await f.jouer(1.2); f.cle('imprime');
+    // Le toucher lance la préparation ; la vidéo s'arrête avant que le PDF ne s'affiche.
+    await f.toucher('[data-impr-papier-choix="normale"]', { avant: 0.3, apres: 0.2 });
+    await f.jouer(0.3);
   },
   // Colis à retirer (Achats, 16 nov. refait) : un toucher sur le colis ⇒ son code en grand,
   // le point relais, « Copier le code » ; au comptoir, il se lit de loin.
