@@ -12,7 +12,8 @@
 //   date    'AAAA-MM-JJ', le jour de la mise en ligne, du plus récent au plus ancien ;
 //   titre   8 mots au plus ;  phrase  12 mots au plus ;
 //   tab     un écran que `?tab=` sait ouvrir (ONGLETS_LIENS d'App.jsx) ;
-//   pour    'tous' · 'sneakers' · 'autre' (pas que des sneakers) · 'pro' (micro, société, marge) ;
+//   pour    'tous' · 'sneakers' · 'autre' (pas que des sneakers) · 'pro' (micro, société, marge) ·
+//           'proprietaire' (16 nov. : le propriétaire de l'installation SEUL — Julien ; pas su ⇒ caché) ;
 //   mode    'tous' · 'complet' (un écran que l'affichage Simple ne montre pas).
 //
 // L'état « vu » : `vrm_nouveautes_vues` = { vues: { [id]: iso } }, dans SYNC_KEYS
@@ -20,7 +21,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 export const CLE_NOUVEAUTES_VUES = 'vrm_nouveautes_vues';
-export const POUR = Object.freeze(['tous', 'sneakers', 'autre', 'pro']);
+export const POUR = Object.freeze(['tous', 'sneakers', 'autre', 'pro', 'proprietaire']);
 export const MODES = Object.freeze(['tous', 'complet']);
 export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
@@ -29,6 +30,9 @@ export const NOUVEAUTES = Object.freeze([
   // (16 nov., lot extension-restes, extension 5.395) docs/passation/2026-11-16-extension-restes.md
   { id: 'fiche-numero-publier', date: '2026-11-16', titre: 'Son N° à côté de « Publier »', phrase: 'Ouvre Vinted depuis la fiche : l’annonce prend son N°.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   { id: 'creer-vinted-studio', date: '2026-11-16', titre: 'Créer sur Vinted reprend tes photos du studio', phrase: 'Une fiche sans photo prend celles de son N°.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (16 nov., lot compta-donnees) docs/passation/2026-11-16-compta-donnees.md
+  { id: 'partenaires-prorata', date: '2026-11-16', titre: 'Partenaires : remboursement partiel, commission au prorata', phrase: '1 € rendu sur 16,99 € : il reste 2,82 € dus.', tab: 'settings', pour: 'proprietaire', mode: 'tous' },
+  { id: 'serie-facture-vrm', date: '2026-11-16', titre: 'Factures en série : envoyer avec VRM', phrase: 'Ta boîte pas connectée ? VRM les envoie, toi en copie.', tab: 'compta', pour: 'pro', mode: 'tous' },
   // (16 nov., lot transporteurs-suivi) docs/passation/2026-11-16-transporteurs-suivi.md
   { id: 'mondial-relay-ventes', date: '2026-11-16', titre: 'Tes colis Mondial Relay vendus sont suivis', phrase: 'Le code postal du point est lu sur ton étiquette.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (16 nov., lot impression-retours) docs/passation/2026-11-16-impression-retours.md
@@ -339,14 +343,16 @@ export const lireVues = (r) => {
 //   vend        'sneakers' | 'autre' | null
 //   categories  les tuiles de « Tu vends quoi ? » (null = pas répondu)
 //   pro         true | false | null (régime micro, société ou marge)
+//   proprietaire true | false | null (le propriétaire de l'installation ; pas su ⇒ caché)
 //   mode        'simple' | 'complet'
-export function pourLui(n, { vend = null, categories = null, pro = null, mode = 'complet' } = {}) {
+export function pourLui(n, { vend = null, categories = null, pro = null, proprietaire = null, mode = 'complet' } = {}) {
   if (!n) return false;
   if (n.mode === 'complet' && mode === 'simple') return false;
   const cats = Array.isArray(categories) ? categories : null;
   if (n.pour === 'sneakers') return vend === 'sneakers' || !!(cats && cats.includes('sneakers'));
   if (n.pour === 'autre') return vend === 'autre' && !(cats && cats.length === 1 && cats[0] === 'sneakers');
   if (n.pour === 'pro') return pro === true;
+  if (n.pour === 'proprietaire') return proprietaire === true;
   return n.pour === 'tous';
 }
 
