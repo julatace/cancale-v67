@@ -50226,7 +50226,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   offres: out.tardives.find((t) => t.id === 'offres') || null, sansprix: out.tardives.find((t) => t.id === 'prix-achat') || null,
                   codes: (() => { try { return listeCodesRetrait(); } catch (_) { return []; } })(),
                   argent: { pasSu: !!(loading || sales.items == null), moisN, moisEur, jourN, jourEur, recuMois, cotisMois, caAnnee, jours: jours14, moisNom,
-                    auMoins: !!phraseNcMois, phraseNc: phraseNcMois, detail: chiffresMois },
+                    auMoins: !!phraseNcMois, phraseNc: phraseNcMois },
                   enligne: { pasSu: !Array.isArray(listings.items), n: annSelectionnables.filter((a) => a && a.etat === 'en-ligne').length,
                     dort: datesOkC ? cartePairesQuiDorment(stockDort, seuilDort) : null },
                 }}/>;

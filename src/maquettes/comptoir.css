@@ -54,7 +54,7 @@ html:has(.cp-racine) body { overflow: hidden; }
 .cp-sous-2 { margin-top: 2px; }
 .cp-echeance { font-size: 13px; font-weight: 600; margin-top: 3px; color: var(--sb-encre-2); }
 .cp-echeance.is-ambre { color: var(--sb-ambre); }
-.cp-t.is-calme { background: color-mix(in oklab, var(--sb-porcelaine) 62%, transparent); box-shadow: none; }
+.cp-t.is-calme { background: color-mix(in oklab, var(--sb-porcelaine) 80%, transparent); box-shadow: none; }
 .cp-t.is-calme .cp-n { color: var(--sb-encre-2); font-weight: 200; }
 
 /* S : le chiffre en bas à gauche, ce qui l'accompagne à droite */
@@ -66,12 +66,12 @@ html:has(.cp-racine) body { overflow: hidden; }
 
 /* L : À envoyer — le chiffre géant, l'éventail des paires, le plein sous le pouce */
 .cp-t[data-taille="L"] .cp-n { font-size: 76px; }
-.cp-t[data-taille="L"] .cp-corps { justify-content: flex-end; padding-right: 92px; }
+.cp-t[data-taille="L"] .cp-corps { justify-content: flex-end; padding-right: 100px; }
 .cp-t[data-taille="M"] .cp-n { font-size: 46px; }
 .cp-t[data-taille="M"] .cp-n.is-euros { font-size: 36px; }
 .cp-plein { position: absolute; right: 14px; bottom: 14px; z-index: 2; }
-.cp-plein .sb-btn-plein { width: 76px; height: 76px; }
-.cp-plein .sb-btn-plein span { max-width: 64px; }
+.cp-plein .sb-btn-plein { width: 88px; height: 88px; font-size: 11px; line-height: 1.12; padding: 0 8px; }
+.cp-plein .sb-btn-plein span { max-width: 74px; }
 .cp-eventail { position: absolute; display: flex; top: -2px; right: 0; }
 .cp-t[data-taille="L"] .cp-eventail { top: 0; right: 4px; }
 .cp-vignette { display: block; width: 54px; height: 54px; border-radius: 14px; overflow: hidden; background: var(--sb-creux); flex: none;
@@ -113,13 +113,17 @@ html:has(.cp-racine) body { overflow: hidden; }
 .cp-scene[data-cp-etat="ferme"] .cp-scene-corps, .cp-scene[data-cp-etat="ferme"] .cp-dock { opacity: 0; transition: opacity 160ms; }
 @keyframes cp-monte { from { opacity: 0; transform: translateY(18px); } }
 .cp-scene-tete { position: sticky; top: 0; z-index: 3; display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 8px;
-  padding: calc(env(safe-area-inset-top, 0px) + 10px) 12px 10px; background: color-mix(in oklab, var(--sb-haut) 78%, transparent);
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) 12px 10px; background: color-mix(in oklab, var(--sb-porcelaine) 84%, transparent);
   -webkit-backdrop-filter: saturate(170%) blur(18px); backdrop-filter: saturate(170%) blur(18px); transition: opacity 200ms; }
 .cp-scene-titre { margin: 0; display: flex; align-items: center; justify-content: center; gap: 7px; font-size: 17px; font-weight: 600; letter-spacing: -.01em; min-width: 0; white-space: nowrap; }
 .cp-scene-titre svg { color: var(--sb-encre-2); flex: none; }
 .cp-scene-ecran { font-size: 15px; min-height: 44px; padding: 0 6px; }
 .cp-scene-corps { flex: 1; padding: 6px 16px calc(env(safe-area-inset-bottom, 0px) + 112px); max-width: 980px; width: 100%; margin: 0 auto; box-sizing: border-box; }
-.cp-scene-corps .sj-deplie-affiche { padding: 6px 2px 14px; }
+.cp-scene-corps .sj-deplie-affiche { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 2px 18px; }
+.cp-scene-corps .sj-deplie-affiche .sj-n { font-family: var(--sb-police-affiche); font-weight: 200; font-size: 84px; line-height: .9; letter-spacing: -.04em; color: var(--sb-encre); }
+.cp-scene-corps .sj-deplie-affiche .sj-sous { margin: 6px 0 0; font-size: 15px; color: var(--sb-encre-2); }
+.cp-scene-corps .sj-deplie-affiche .sb-btn-plein { width: 92px; height: 92px; font-size: 11px; line-height: 1.12; }
+.cp-scene-corps .sj-pied { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 2px; }
 .cp-scene-corps .sj-liste { background: var(--sb-porcelaine); border-radius: var(--sb-r-tuile, 22px); box-shadow: var(--sb-ombre-pose); overflow: hidden; }
 .cp-carte { background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2, var(--sb-porcelaine))); border-radius: var(--sb-r-tuile, 22px); box-shadow: var(--sb-ombre-pose); padding: 16px 18px; margin-bottom: 14px; }
 .cp-heros { padding: 18px 18px 14px; }
@@ -161,7 +165,7 @@ html:has(.cp-racine) body { overflow: hidden; }
 @media (min-width: 1024px) {
   .cp-accueil { padding: 34px 40px 40px; }
   .cp-titre { font-size: 44px; }
-  .cp-grille { grid-template-columns: repeat(12, minmax(0, 1fr)); grid-auto-rows: 124px; gap: 18px; }
+  .cp-grille { grid-template-columns: repeat(12, minmax(0, 1fr)); grid-auto-rows: 150px; gap: 18px; }
   .cp-t { grid-column: span 3; padding: 18px 20px; }
   .cp-t[data-taille="M"] { grid-column: span 3; grid-row: span 2; }
   .cp-t[data-taille="L"] { grid-column: span 6; grid-row: span 2; }

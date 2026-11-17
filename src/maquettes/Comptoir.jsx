@@ -112,7 +112,6 @@ export default function Comptoir({ d, onNav, Photo, Icon, FermeAuRetour = null, 
             <div role="listitem"><span className="cp-lib">{tr('cp.deCote')}</span><b className="cp-n cp-n-bande"><Euros v={A.cotisMois}/></b></div>
             <div role="listitem"><span className="cp-lib">{tr('cp.caAnnee')}</span><b className="cp-n cp-n-bande"><Euros v={A.caAnnee}/></b></div>
           </div>
-          {A.detail ? <section className="cp-carte cp-detail"><h3 className="cp-titre-s">{tr('cp.leDetail')}</h3>{A.detail}</section> : null}
           <button type="button" className="sb-lien cp-lien-ecran" onClick={() => onNav && onNav('compta')}>{tr('cp.toutArgent')}</button>
         </div>
       ),
