@@ -62,4 +62,23 @@ export default {
   "acc.colis.retrouver.apres": "Paket gefunden",
   "acc.colis.retrouver.pasReconnu": "Dieser Code trägt keine bekannte Sendungsnummer. Tippe die Nummer unter dem Barcode ein.",
   "acc.colis.retrouver.pasTrouve": "Kein Verkauf, kein Kauf und keine Rücksendung trägt diese Nummer.",
+  // (16 nov., lot scan-achat) ce qu'il y a dans le colis d'un achat, « Colis inconnu · Relier ».
+  "scan.a.dedans": "In diesem Paket",
+  "scan.a.lot": {"one": "{n} Artikel", "other": "{n} Artikel"},
+  "scan.a.marque": "Marke",
+  "scan.a.paye": "Bezahlt",
+  "scan.a.date": "Gekauft am",
+  "scan.a.vendeur": "Verkäufer",
+  "scan.a.compte": "Dein Konto",
+  "scan.a.ranger": "Einräumen",
+  "scan.a.signaler": "Problem melden",
+  "scan.a.pasCa": "Das ist es nicht",
+  "scan.a.pasCaIndice": "Ziele auf einen anderen Code des Pakets oder tippe die Nummer ein.",
+  "scan.a.inconnu": "Unbekanntes Paket: Nr. {n}, kein Kauf mit dieser Nummer",
+  "scan.a.relier": "Mit einem Kauf verknüpfen",
+  // (17 nov., lot scan-bordereau-vente) un code cherché sur les étiquettes de ses ventes.
+  "scan.b.codeLu": "Gelesener Code",
+  "scan.b.attente": "Suche diesen Code auf deinen Etiketten…",
+  "scan.b.pasSurEtiquette": "Dieser Code ist weder eine bekannte Sendungsnummer noch auf einem deiner Verkaufsetiketten gedruckt. Ziele auf den langen Barcode (oft kleiner, am Rand) oder tippe die Sendungsnummer ein.",
+  "scan.b.pasSu": "Einige Etiketten konnten nicht gelesen werden. Versuche es gleich noch einmal oder tippe die Sendungsnummer ein.",
 };
