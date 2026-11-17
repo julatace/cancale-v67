@@ -14,12 +14,12 @@
 // id → ce que montre la vidéo. `duree` en secondes (mesurée au tournage).
 export const VIDEOS_AIDE = {
   journee: { titre: 'Ma journée', geste: 'Le plus pressé en haut, un geste par ligne', duree: 15 },
-  ventes: { titre: 'Imprimer tes bordereaux', geste: 'Coche, imprime : le N° tamponné sur chacun', duree: 16 },
-  colis: { titre: 'Retirer un colis', geste: 'Le code en grand d’un toucher, copié', duree: 12 },
+  ventes: { titre: 'Imprimer tes bordereaux', geste: 'Coche, imprime : le N° tamponné sur chacun', duree: 11 },
+  colis: { titre: 'Retirer un colis', geste: 'Le code en grand d’un toucher, copié', duree: 11 },
   achats: { titre: 'Ajouter un achat', geste: 'Une brocante, un magasin : titre, prix, N°', duree: 15 },
-  annonces: { titre: 'Tes annonces', geste: 'Chaque annonce et son N°, prix d’achat et marge', duree: 12 },
+  annonces: { titre: 'Tes annonces', geste: 'Chaque annonce et son N°, prix d’achat et marge', duree: 13 },
   garage: { titre: 'Retrouver une paire', geste: 'Tape son N° : le meuble et la case', duree: 14 },
-  compta: { titre: 'Déclarer le mois', geste: 'Le montant daté au versement, noté « déclaré »', duree: 14 },
+  compta: { titre: 'Déclarer le mois', geste: 'Le montant daté au versement, noté « déclaré »', duree: 12 },
   messages: { titre: 'Lire un message et son offre', geste: 'La paire, son N°, l’offre et ce qu’elle te laisse', duree: 13 },
   emails: { titre: 'Tes e-mails rangés', geste: 'Un code copié d’un geste, les codes seulement', duree: 11 },
   settings: { titre: 'Trouver un réglage', geste: 'Cherche-le par son nom, il s’ouvre', duree: 11 },
