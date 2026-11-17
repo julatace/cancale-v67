@@ -55,6 +55,12 @@ plus probable d'abord (`ordre`), exactes en tête. **Il manquait la faute de fra
   seule, « 500132 » ne sort pas le colis du code 500123). Résultat : voir « ÉTAT À LA REPRISE ».
 
 ## ÉTAT À LA REPRISE
-- Fait, poussé, PR ouverte (voir le rapport). Le banc de rendu tourne sur le sémaphore ; son résultat
-  et les captures (`loupe-faute-*.png`) sont notés ci-dessous quand il a fini.
+- Fait, poussé, PR #1220 ouverte (pas fusionnée : l'agent « train » fusionne).
+- Banc `recherche-universelle` (17 nov., 4 tours 390/1512 clair/sombre) : le bloc « fautes de frappe » est VERT
+  partout (« jordn chicgo » ⇒ 50 paires « ≈ jordan », « nike air mxa » ⇒ « ≈ max », « 1924 » parmi 50 jumelles ⇒ LA
+  N°1924 seule, « 500132 » ne sort pas le colis 500123) ; une mesure de temps rouge (874 ms, 1512 sombre, machine
+  chargée ; 126-295 ms ailleurs). Ses autres rouges (« onitsuka 44,5 » en deux lignes par « phrase », « Voir les 38
+  autres » 58/50, « deux ventes au même titre », code « En grand », boutons 36 px, temps) sont **les mêmes sur
+  origin/main** (1b358a738, banc d'origine : 26 rouges) — sans lien avec ce lot. Captures `loupe-faute-*.png` regardées.
+- Lancer un banc avec `TMPDIR` dans le scratchpad fait échouer Chromium (chemin de socket trop long) : garder /tmp.
 - Rien à faire pour Julien.
