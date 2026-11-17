@@ -201,3 +201,14 @@ pleines, ou QR sans ligne ni colonne vide, page tournée comprise).
   audit par audit, `audit-notifs-redaction` rouge aussi sur `main`). Règle du 16 nov. : pas de fusion tant qu'un rouge reste.
 - Geste de Julien : imprimer un vrai bordereau Mondial Relay et un Chronopost avec un N° et regarder la mention au-dessus
   du QR (aucun vrai PDF dans ce dépôt public : tout est prouvé sur des formes reconstruites).
+
+### Reprise du 17 nov. (fin)
+- `origin/main` refusionné (ventes-clair, personnalisation-simple…) ; `lot-bordereaux` et `colis-a-leur-place` = parcours de
+  main (papier puis PDF) + l'aperçu avant impression entre les deux : 17 et 184 verts. Verts aussi : impression-simple 59,
+  tout-imprimer 28, selection-bordereaux 48, tampon-bordereau 208, ventes-bordereau, colis-plus 77, lbc-bordereau,
+  tampons-reglages 704, tampons-apercu 56.
+- Retour de Julien (17 nov., bordereau imprimé en production, code de `main`) : mention mal placée ⇒ c'est ce lot qui la
+  pose AU-DESSUS du QR (position du QR lue dans chaque PDF) ; `tampons-reglages` sur l'arbre de `main` : rouge (le code des
+  tampons n'y existe pas).
+- Non comparé à `main` faute de temps (machine à charge 20) : `imprimante` (instable, 4 à 12 rouges selon la charge ; `main`
+  9) et `feuilles-coque` (20 rouges, écrans Annonces/Ventes qui n'ouvrent pas en 6 s : charge).
