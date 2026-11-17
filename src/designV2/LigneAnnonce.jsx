@@ -17,6 +17,7 @@
 import React from 'react';
 import { tr } from '../i18n/index.js';
 import './design-v2.css';
+import { Etiquette } from './Signature.jsx';
 
 
 function Vignette({ photo, Photo, Icon, cls }) {
@@ -32,11 +33,16 @@ function Faits({ num, taille, jours, Plaque, sep = ' · ' }) {
   return <>{num ? <PlaqueV2 num={num}/> : null}{bouts.length ? <span className="v2l-faits-txt">{(num ? sep : '') + bouts.join(sep)}</span> : null}</>;
 }
 
-// La plaque N° d'une rangée, À SOI (les règles d'hier allumaient `.sb-plaque` en blanc la nuit) : gravée dans la surface.
-function PlaqueV2({ num }) { return <span className="v2-plaque" data-v2-plaque={num}><small>N°</small>{num}</span>; }
+// Le N° d'une rangée : l'ÉTIQUETTE carton de la signature (src/designV2/Signature.jsx), la même partout.
+function PlaqueV2({ num }) { return <Etiquette num={num}/>; }
+
+// Un fait de la rangée : icône + valeur, gris (jamais ambre). Absent ⇒ rien (jamais « 0 » inventé).
+function Fait({ Icon, icone, children, data }) {
+  return <span className="v2l-fait" data-v2l-fait={data}>{icone ? <Icon name={icone} size={14}/> : null}{children}</span>;
+}
 
 export default function LigneAnnonce({ variante = 'A', attrs = {}, cle, photo, Photo, Icon, Plaque, titre, num, taille, jours, prix, favoris = null, vues = null,
-  aRelier = false, relierMot = false, onRelier, onPlus, LigneGlissable }) {
+  etat = '', achat = '', marge = '', aRelier = false, relierMot = false, onRelier, onPlus, LigneGlissable }) {
   const plus = () => onPlus && onPlus();
   const actions = [
     aRelier ? { cle: 'relier', libelle: tr('v2.l.relier'), icone: <Icon name="link" size={20}/>, faire: () => onRelier && onRelier(), data: { 'data-v2l-glisse': 'relier' } } : null,
@@ -47,23 +53,26 @@ export default function LigneAnnonce({ variante = 'A', attrs = {}, cle, photo, P
   // Le mot ambre seulement dans la vue « Sans achat relié » (`relierMot`) ; ailleurs, une petite icône de lien, neutre.
   const relier = !aRelier ? null : relierMot ? <span className="v2l-geste" data-v2l-relier="mot"><i className="v2-point" aria-hidden="true"/>{tr('v2.l.aRelier')}</span>
     : <span className="v2l-lien" data-v2l-relier="icone" title={tr('v2.l.aRelier')}><Icon name="link" size={16}/></span>;
+  // Les faits connus de l'annonce (favoris, vues, jours en ligne ; acheté et marge — la règle de marge de la fiche).
+  const fav = favoris != null ? <Fait Icon={Icon} icone="heart" data="favoris">{favoris}</Fait> : null;
+  const vu = vues != null ? <Fait Icon={Icon} icone="eye" data="vues">{vues}</Fait> : null;
+  const jr = jours != null ? <Fait Icon={Icon} icone="clock" data="jours">{tr('v2.l.jours', { n: jours })}</Fait> : null;
+  const ach = achat ? <Fait Icon={Icon} data="achat">{tr('v2.l.achete', { p: achat })}{marge ? <b className="v2l-marge" data-v2l-marge={marge}>{marge}</b> : null}</Fait> : null;
 
   const corps = (gp, tiroir) => variante === 'C' ? (
     <div className="v2l v2l-c" data-v2l="C" role="listitem" aria-label={aria} {...attrs} {...(gp || {})}>
       <Vignette photo={photo} Photo={Photo} Icon={Icon} cls="v2l-photo-c"/>
       <span className="v2l-c-txt">
         <span className="v2l-c-titre">{titre}</span>
-        <span className="v2l-c-l2">
-          <span className="v2l-c-prix">{prix || '—'}</span>
-          {relier || <span className="v2l-c-stats">
-            {favoris != null ? <span className="v2l-fait"><Icon name="heart" size={16}/>{favoris}</span> : null}
-            {vues != null ? <span className="v2l-fait"><Icon name="eye" size={16}/>{vues}</span> : null}
-          </span>}
-        </span>
-        <span className="v2l-c-faits">
-          {num ? <span className="v2l-fait"><PlaqueV2 num={num}/></span> : null}
-          {taille ? <span className="v2l-fait"><Icon name="tag" size={16}/>{tr('v2.l.taille', { t: taille })}</span> : null}
-          {jours != null ? <span className="v2l-fait"><Icon name="clock" size={16}/>{tr('v2.l.jours', { n: jours })}</span> : null}
+        <span className="v2l-c-l2"><span className="v2l-c-prix">{prix || '—'}</span>{relier}</span>
+        {achat ? <span className="v2l-c-achat" data-v2l-fait="achat">{tr('v2.l.acheteMarge', { p: achat, m: marge || '—' })}</span> : null}
+        <span className="v2l-c-puces">
+          {num ? <span className="v2l-puce"><PlaqueV2 num={num}/></span> : null}
+          {taille ? <span className="v2l-puce"><Fait Icon={Icon} icone="tag" data="taille">{tr('v2.l.taille', { t: taille })}</Fait></span> : null}
+          {etat ? <span className="v2l-puce"><Fait Icon={Icon} icone="star" data="etat">{etat}</Fait></span> : null}
+          {fav ? <span className="v2l-puce">{fav}</span> : null}
+          {vu ? <span className="v2l-puce">{vu}</span> : null}
+          {jr ? <span className="v2l-puce">{jr}</span> : null}
         </span>
       </span>
       {tiroir}
@@ -73,7 +82,8 @@ export default function LigneAnnonce({ variante = 'A', attrs = {}, cle, photo, P
       <Vignette photo={photo} Photo={Photo} Icon={Icon} cls="v2l-photo-a"/>
       <span className="v2l-a-txt">
         <span className="v2l-a-l1"><span className="v2l-a-titre">{titre}</span><span className="v2l-a-prix">{prix || '—'}</span></span>
-        <span className="v2l-a-l2"><Faits num={num} taille={taille} jours={jours} Plaque={Plaque}/>{relier}</span>
+        <span className="v2l-a-l2"><Faits num={num} taille={taille} jours={null} Plaque={Plaque}/>{relier}</span>
+        {fav || vu || jr || ach ? <span className="v2l-a-l3">{fav}{vu}{jr}{ach}</span> : null}
       </span>
       {tiroir}
     </div>

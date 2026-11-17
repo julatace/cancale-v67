@@ -8,7 +8,8 @@
 //                    libellé 17/600, icône à gauche, nombre à droite (chiffres tabulaires) ;
 //    · secondaire  — teinté ;
 //    · texte       — un lien ;
-//    · destructif  — texte rouge, SEULEMENT derrière une confirmation (`confirmer` obligatoire) ;
+//    · destructif  — texte AMBRE (§7 : le rouge n'est que pour deux paires sous un N°), SEULEMENT derrière une
+//                    confirmation (`confirmer` obligatoire) ;
 //  + BoutonIconeV2 : 44 × 44 au doigt, glyphe 24, un seul trait pour toute l'app.
 //
 //  États : repos · enfoncé (0,97 et un peu plus sombre : 100 ms à l'appui, ressort 200 ms au retour) ·
@@ -69,5 +70,23 @@ export function BoutonIconeV2({ icone, label, onClick, attrs = {}, actif = false
 export function RangeeTouchable({ onClick, children, className = '', attrs = {}, label }) {
   return (
     <button type="button" className={'v2-rangee ' + className} data-v2-rangee="" aria-label={label} onClick={onClick} {...attrs}>{children}</button>
+  );
+}
+
+// Le contrôle segmenté du nouveau design : une piste translucide sur la coque, le segment choisi = une pastille de
+// porcelaine claire à l'encre (jour comme nuit) — jamais un bloc gris plein. 44 px, nombres tabulaires.
+export function SegmentV2({ options = [], value, onChange, label, attrs = {} }) {
+  return (
+    <div className="v2-seg" role="tablist" aria-label={label} {...attrs}>
+      {options.map((o) => {
+        const on = o.v === value;
+        return (
+          <button key={o.v} type="button" role="tab" aria-selected={on} className={'v2-seg-btn' + (on ? ' is-on' : '')} data-v2-seg={o.v}
+            onClick={() => onChange && onChange(o.v)} {...(o.data || {})}>
+            <span className="v2-seg-l">{o.l}</span>{o.n != null && o.n !== '' ? <span className="v2-seg-n">{o.n}</span> : null}
+          </button>
+        );
+      })}
+    </div>
   );
 }

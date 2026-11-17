@@ -42,7 +42,7 @@ const ARTICLES = [
         'Touche ce raccourci : vinted.fr s’ouvre dans Orion, avec l’extension VRM.',
       ] },
       { titre: 'La version de l’extension', id: 'version' },
-      'La version servie aujourd’hui est la **5.400.0**. VRM te dit dans **Paramètres → Aide et « Tout va bien ? » → Vérifier mon installation** si la tienne est en retard ; une mise à jour se fait comme une installation, en remplaçant le dossier.',
+      'La version servie aujourd’hui est la **5.403.0**. VRM te dit dans **Paramètres → Aide et « Tout va bien ? » → Vérifier mon installation** si la tienne est en retard ; une mise à jour se fait comme une installation, en remplaçant le dossier.',
       'Firefox : la version de l’extension n’est pas encore publiée dans sa boutique. En attendant, utilise Chrome, Edge, Brave ou Opera.',
     ],
     voir: ['boite-email', 'tout-va-bien'],
