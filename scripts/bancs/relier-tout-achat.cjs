@@ -3,21 +3,23 @@
 //        node scripts/bancs/relier-tout-achat.cjs
 // ════════════════════════════════════════════════════════════════════════════
 // Julien : « je veux que quand je relie les paires on me laisse choisir autre chose que les articles achetés choisis
-// par VRM ».
-// Ventes · une vente « Adidas Spezial noir 42 » sans prix d'achat · « Relier un achat », avec 3 000 achats INVENTÉS
-// sur deux comptes : 5 hors relier (2 remboursés, 1 annulé, 1 retour, 1 litige), 3 déjà reliés à N°7, N°8, N°9,
-// 40 avec un détail de transaction (taille, vendeur) rangé côté acheteur.
+// par VRM » ; puis : « quand un achat est relié je veux qu'il ne soit plus proposé, et qu'on ait un moyen de sélectionner
+// les achats déjà reliés, car s'il y a un achat qui comporte 2 articles on le prend en compte ».
+// Ventes · une vente « Adidas Spezial noir 42 » sans prix d'achat · « Relier un achat », avec 3 002 achats INVENTÉS
+// sur deux comptes : 5 hors relier (2 remboursés, 1 annulé, 1 retour, 1 litige), 3 déjà reliés à N°7, N°8 (la seule
+// « Adidas Spezial noir 42 »), N°9, deux LOTS de 2 articles au titre muet (le détail de transaction dit `items_count` 2) :
+// LOT1 relié une fois (N°10), LOT2 relié deux fois (N°11, N°12) ; 40 détails de transaction (taille, vendeur).
 // Contrôles :
-//   · la feuille a « Suggestions » (ou la phrase « Aucune suggestion ») PUIS « Tous mes achats » — sans toucher rien ;
-//   · « Tous mes achats » compte les 2 995 achats qu'on peut relier, et CHACUN est atteignable en défilant ;
-//   · la recherche trouve un achat par son n°, son vendeur (lu), sa taille, son prix, sa date, son compte ;
-//   · les 5 achats hors relier n'apparaissent jamais (ni en défilant, ni en cherchant leur n°) et la feuille dit
-//     « 5 achats … masqués » ;
-//   · un achat déjà relié est grisé, dit « Déjà relié à N°7 », et « Relier quand même » DEMANDE d'abord ; « Annuler »
-//     n'écrit rien ;
-//   · rien n'est écrit sans son toucher ;
-//   · cibles ≥ 44 px, rien de coupé (« … »), aucun défilement horizontal, la feuille dans l'écran (pas sous la barre),
-//     la page derrière ne défile plus.
+//   · « Suggestions » (ou « Aucune suggestion ») PUIS « Tous mes achats », sans rien toucher ; un achat relié n'est
+//     JAMAIS suggéré (N°8 ressemble à la vente) ;
+//   · « Tous mes achats » = les 2 993 qu'on peut relier (LOT1 compris), tous atteignables en défilant, aucun relié ;
+//   · LOT1 : « Lot · 2 articles · 1 relié », le titre de chaque article, « Lot de 2 · 80 € — prix par paire à saisir » ;
+//   · « Déjà reliés » : les 4 reliés (LOT2 compris), « Relié à N°7 », « Choisir » ⇒ « Le détacher de N°7 ? » ;
+//     LOT2 ⇒ « quel article détacher ? » N°11 ou N°12 ; « Annuler » n'écrit rien (base ET appareil) ;
+//   · relier le 2e article de LOT1 : aucun détachement demandé, prix DEMANDÉ champ vide (jamais 40 €), laissé vide ⇒
+//     relié, coût « à saisir », N°10 garde le sien ;
+//   · recherche (n°, vendeur, prix + date, compte, « taille 43 »), hors relier jamais (même par leur n°) et comptés ;
+//   · cibles ≥ 44 px, rien de coupé (« … », menus, invite), aucun défilement horizontal, feuille dans l'écran.
 // 390 tactile (clair, sombre) et 1512 (clair, sombre). `BANC_DIST=` le build jugé ; `SHOTS=` les captures.
 // Un banc ne meurt pas, il rapporte.
 'use strict';

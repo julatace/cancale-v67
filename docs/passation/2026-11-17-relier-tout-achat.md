@@ -31,9 +31,24 @@ les suggestions (`propositionsArticle`) gardent leurs filtres durs — c'est vou
   au téléphone, rien de coupé) ; « Filtres » garde prix payé, date de réception, marque.
 - **Par tranches de 60** : la suite arrive en défilant (`IntersectionObserver`, 600 px d'avance) ou « Afficher plus · N
   restants ». 3 000 achats : la feuille s'ouvre et défile sans attendre.
-- Les **déjà reliés** sont DANS la liste, après les libres, grisés, « Déjà relié à N°7 » (traduit,
-  `texteDejaRelieTr`), seul bouton « **Relier quand même** » ⇒ l'app DEMANDE toujours (« Il sera délié de là-bas et
-  relié ici. », même si le détenteur ne se retrouve pas) ; « Annuler » n'écrit rien.
+- (2e demande, même jour : « quand un achat est relié je veux qu'il ne soit plus proposé, et qu'on ait un moyen de
+  sélectionner les achats déjà reliés, car s'il y a un achat qui comporte 2 articles on le prend en compte ») Un achat
+  **relié n'est plus proposé** : ni en suggestion (c'était déjà la règle, `achatDisponible`), ni dans « Tous mes achats ».
+  Deux onglets : « **Tous mes achats · N** » / « **Déjà reliés · N** » ; dans « Déjà reliés », chaque achat dit « Relié à
+  N°7 » et se prend par « **Choisir** » ⇒ l'app DEMANDE « Le détacher de N°7 ? » (un article n'appartient qu'à une paire,
+  `detacherAvantRelier` dans App.jsx ; même si le détenteur ne se retrouve pas).
+- **Les lots.** Mesuré en production (lecture seule, projections scalaires, 17 nov.) : `my_orders` n'a AUCUN champ de
+  nombre (0 sur 3 327 achats) ; 103 titres commencent par « Lot » (94 avec un nombre) ; sur les 43 détails de transaction
+  côté acheteur, 2 ont `items_count` > 1 (jusqu'à 8), `order.items[]` porte le titre (41/43) et la 1re photo (41/43) de
+  chaque article. La feuille pose le nombre d'articles sur l'achat (`_nbArticles`) par la règle d'Achats `nombreLot`
+  (déclaré > transaction lue > titre) ; `lotDe` le lit d'abord, donc un lot reste proposé (suggestions comprises) jusqu'à
+  N liens. La ligne : « Lot · 2 articles · 1 relié », le titre (+ taille, photo) de chaque article (projection
+  `n0..n3`, `p0..p3` ajoutée à `SELECT_DETAILS_ACHATS`), « Lot de 2 · 80 € — prix par paire à saisir ». Relier un
+  article d'un lot pas complet ne délie JAMAIS un autre article ; un lot complet pris dans « Déjà reliés » demande QUEL
+  article détacher (un seul).
+- **Le prix d'un lot n'est jamais partagé** (§2.5) : le champ est vide (l'ancienne indication « ÷ 2 ≈ 40 € » est retirée
+  de la feuille) ; laissé vide ⇒ l'article est relié, son coût reste « à saisir » (la porte « Coût d'achat · n/N
+  renseigné ») ; illisible ⇒ rien n'est relié.
 - Les **hors relier** restent exclus, et la feuille le dit : « 5 achats retournés, en litige, remboursés ou annulés
   masqués : ils ne peuvent pas être reliés. » (`exclus`, par raison).
 - Titres sur plusieurs lignes (plus de « … »), y compris l'article visé en tête de feuille.
@@ -57,9 +72,9 @@ Défaut d'affichage trouvé en route : une règle globale de `src/design/studio-
 
 ## Preuves
 
-- Banc `scripts/bancs/relier-tout-achat.cjs` (390 tactile clair et sombre, 1512 clair et sombre ; 3 000 achats sur deux
-  comptes, 5 hors relier, 3 déjà reliés à N°7/8/9, 40 détails de transaction servis en PROJECTION) : **31 contrôles par
-  passe** — deux parties sans rien toucher ; 2 995 comptés ; « 5 … masqués » ; recherche visible + 3 filtres ; page
+- Banc `scripts/bancs/relier-tout-achat.cjs` (390 tactile clair et sombre, 1512 clair et sombre ; 3 002 achats sur deux
+  comptes, 5 hors relier, 3 déjà reliés à N°7/8/9, 2 lots, 40 détails de transaction servis en PROJECTION) : **40 contrôles
+  par passe** (voir l'en-tête du banc) — deux parties sans rien toucher ; 2 995 comptés ; « 5 … masqués » ; recherche visible + 3 filtres ; page
   derrière verrouillée ; rien écrit ; 44 px ; rien de coupé (mesuré aussi : texte des menus et de l'invite) ; pas de
   débord ; feuille entière dans l'écran ; **les 2 995 atteignables en défilant** ; aucun hors relier, même en cherchant
   son n° ; déjà relié grisé « Déjà relié à N°7 » + « Relier quand même » ⇒ confirmation ⇒ Annuler n'écrit rien ;
@@ -70,11 +85,20 @@ Défaut d'affichage trouvé en route : une règle globale de `src/design/studio-
   achats-hors-relier, deja-relie, plateformes-logo, relier-colis, relier-compte, achats-a-relier, geste-annulable,
   traduction, quoi-de-neuf : verts.
 
+## Mutations (banc à 390, une par règle — chacune doit rougir)
+
+Voir le rapport de PR (M1 suggestion d'un relié, M2 reliés dans la liste par défaut, M3 pas de « Déjà reliés », M4 lot pas
+lu dans le détail, M5 prix du lot partagé, M6 détacher sans demander, M7 un article du lot délie l'autre).
+
 ## Reste
 
 1. « Relier achats et ventes » (`RelierGlisser`) et « Relier ce colis à un achat » n'ont pas encore la recherche large
    ni le rendu par tranches (leur liste n'est pas coupée ; à reprendre si Julien s'y perd).
 2. La recherche par date lit l'heure de l'appareil (Paris chez lui).
+3. Un lot dont le nombre n'est écrit nulle part (ni titre, ni transaction lue, ni déclaré) reste un achat simple : il le
+   déclare dans Achats (« C'est un lot ») — la feuille lit cette déclaration.
+4. La page derrière : l'app défile déjà dans un conteneur interne (le `documentElement` est à `overflow: hidden` sur `main`
+   aussi) — le verrou posé ici est donc sans effet mesurable ; le banc ne le compte pas.
 
 ## ÉTAT À LA REPRISE
 
