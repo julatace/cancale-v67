@@ -35,6 +35,8 @@ export const NOUVEAUTES = Object.freeze([
   // (16 nov., lot retirer-case-compact) docs/passation/2026-11-16-retirer-case-compact.md
   { id: 'stock-case-allumee', date: '2026-11-16', titre: 'Stock : la case vendue reste allumée', phrase: 'Touche-la quand l’article est sorti ; « Annuler » la remet.', tab: 'garage', pour: 'tous', mode: 'tous' },
   // (16 nov., bancs-rouges-a) docs/passation/2026-11-16-bancs-rouges-a.md
+  // (16 nov., lot apparence-rangee) docs/passation/2026-11-16-apparence-rangee.md
+  { id: 'apparence-rangee', date: '2026-11-16', titre: 'Apparence et langue mieux rangées', phrase: 'Le mode sombre se choisit dans « Apparence » ; groupes titrés.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (16 nov., lot sombre-auto) docs/passation/2026-11-16-sombre-auto.md
   { id: 'sombre-auto', date: '2026-11-16', titre: 'Le mode sombre suit ton iPhone', phrase: 'Automatique par défaut ; Clair ou Sombre restent au choix.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (16 nov., Julien : « la liaison pour relier l'achat beaucoup plus fiable ») docs/passation/2026-11-16-relier-fiable.md
