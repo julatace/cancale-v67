@@ -79,7 +79,7 @@ const srv = http.createServer((q, r) => {
     await pg.keyboard.press('Escape').catch(() => {});
     await pg.mouse.click(5, 900).catch(() => {});        // referme le panneau
     await pg.waitForTimeout(300);
-    await bascule.click().catch(() => {});
+    await basculerSombre(pg);   // (16 nov.) un autre réglage synchronisé : « Apparence » (l’interrupteur est retiré)
     await pg.waitForFunction(() => (document.querySelector('.vrm-sync-status') || {}).dataset?.syncEtat === 'error', null, { timeout: 6000 }).catch(() => {});
     enPanne = false;
     if (!(await pg.$('[data-sync-panneau]'))) await pg.click('.vrm-sync-status').catch(() => {});
