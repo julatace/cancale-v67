@@ -1,0 +1,127 @@
+// ════════════════════════════════════════════════════════════════════════════
+//  AUJOURD'HUI — le nouveau design (17 nov.), à la place de Ma journée quand l'essai est allumé.
+//  Composition (planche J2, groupes de N) :
+//    1. le CHIFFRE DE L'ÉCRAN en affiche : les colis à envoyer (« — » tant que ce n'est pas lu) et, sur
+//       la même ligne, son mot ; dessous, l'écart NOMMÉ (« 5 prêts · 1 sans bordereau ») ;
+//    2. la BANDE des paires à envoyer (photo, plaque N°, prix, date limite ambre si elle presse) ;
+//    3. « À retirer » : la passe du premier point relais (code en grand), et « N colis à N points » ;
+//    4. « À faire » : un groupe par chose, son nombre et UN geste ;
+//    5. le geste plein au pouce : « Imprimer N bordereaux » (son nombre est celui des bordereaux prêts) ;
+//    6. tout fait ⇒ « Rien à faire », calme.
+//  AUCUNE règle ici : tout arrive calculé par Ma journée (src/App.jsx, `Comptabilite only="journee"`) —
+//  `toShip`, `aExpedier`, `pickupUnion` (src/retraitPreuves.js), le N° par identité, les mêmes gestes.
+// ════════════════════════════════════════════════════════════════════════════
+import React from 'react';
+import { tr } from '../i18n/index.js';
+import { BoutonV2, BoutonIconeV2, RangeeTouchable } from './BoutonV2.jsx';
+import './design-v2.css';
+
+function Vignette({ photo, Photo, Icon, taille = 56 }) {
+  return (
+    <span className="v2-vignette" style={{ width: taille, height: taille }} aria-hidden="true">
+      {photo && Photo ? <Photo src={photo} alt="" loading="lazy" decoding="async" width={taille} height={taille}/> : <Icon name="cintre" size={22}/>}
+    </span>
+  );
+}
+
+function RienAFaire({ Icon }) {
+  return (
+    <section className="v2-rien" data-v2-rien="" aria-label={tr('v2.rien.titre')}>
+      <svg className="v2-rien-dessin" width="120" height="96" viewBox="0 0 120 96" fill="none" aria-hidden="true">
+        <path d="M18 38 L60 22 L102 38 L60 54 Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>
+        <path d="M18 38 V70 L60 86 V54 M102 38 V70 L60 86" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round"/>
+        <path d="M39 30 L81 46" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" opacity=".5"/>
+      </svg>
+      <h2 className="v2-rien-titre">{tr('v2.rien.titre')}</h2>
+      <p className="v2-rien-sous">{tr('v2.rien.sous')}</p>
+    </section>
+  );
+}
+
+export default function Aujourdhui({ affiche, colis = [], retraits = null, groupes = [], plein = null, Photo, Plaque, Icon, onColis, onRetraits, onScanner = null, titre }) {
+  const n = affiche && !affiche.pasSu ? affiche.n : null;
+  const nRet = retraits && !retraits.pasSu ? retraits.n : null;
+  const rien = n === 0 && nRet === 0 && groupes.length === 0;
+  const premierPoint = retraits && Array.isArray(retraits.points) ? retraits.points[0] : null;
+  return (
+    <div className="v2-ecran v2-aujourdhui" data-v2-ecran="aujourdhui" data-espace="journee" data-v2-plein={plein ? '1' : '0'}>
+      <header className="v2-tete v2-titre-ligne">
+        <h1 className="v2-titre">{titre}</h1>
+        {/* Le « Scanner » du disque d'hier : un code-barres de colis ⇒ SA vente ou SON achat (le même scanner). */}
+        {onScanner ? <BoutonIconeV2 icone={<Icon name="scan" size={24}/>} label={tr('v2.scanner')} onClick={onScanner} attrs={{ 'data-v2-scanner': '' }}/> : null}
+      </header>
+
+      {rien ? <RienAFaire Icon={Icon}/> : (<>
+        {/* 1. LE CHIFFRE DE L'ÉCRAN */}
+        <section className="v2-affiche" aria-label={tr('v2.aEnvoyer.aria', { n: n == null ? '—' : String(n) })} data-v2-affiche={n == null ? '' : String(n)}>
+          <div className="v2-affiche-ligne">
+            <b className="v2-affiche-n">{n == null ? '—' : n}</b>
+            <span className="v2-affiche-mots">
+              <span className="v2-affiche-mot">{tr('v2.aEnvoyer.mot', { n: n == null ? 2 : n })}</span>
+              {affiche && affiche.sous ? <span className={'v2-affiche-sous' + (affiche.ambre ? ' is-ambre' : '')} data-v2-ecart="">{affiche.sous}</span> : null}
+            </span>
+          </div>
+        </section>
+
+        {/* 2. LA BANDE DES PAIRES À ENVOYER — une carte par colis, par identité (le N° de SA vente). */}
+        {colis.length ? (
+          <div className="v2-bande" role="list" aria-label={tr('v2.bande.aria')} data-v2-bande={String(colis.length)}>
+            {colis.slice(0, 12).map((c) => (
+              <RangeeTouchable key={c.cle} className="v2-bande-carte" onClick={() => onColis && onColis(c)} label={[c.num ? 'N° ' + c.num : '', c.titre, c.prix, c.e && c.e.txt].filter(Boolean).join(' · ')}
+                attrs={{ role: 'listitem', 'data-v2-colis': c.cle }}>
+                <span className="v2-bande-photo">{c.photo && Photo ? <Photo src={c.photo} alt="" loading="lazy" decoding="async" width={104} height={104}/> : <Icon name="cintre" size={26}/>}
+                  {c.num ? <span className="v2-bande-plaque"><Plaque num={c.num}/></span> : null}</span>
+                <span className="v2-bande-prix">{c.prix || ' '}</span>
+                <span className={'v2-bande-quand' + (c.e && c.e.ambre ? ' is-ambre' : '')}>{c.e && c.e.ambre ? <i className="v2-point" aria-hidden="true"/> : null}{(c.e && c.e.txt) || ' '}</span>
+              </RangeeTouchable>
+            ))}
+          </div>
+        ) : null}
+
+        {/* 3. À RETIRER — la passe du premier point ; le reste dans Achats. */}
+        {nRet ? (
+          <section className="v2-groupe" data-v2-groupe="retirer" aria-label={tr('v2.retirer.titre')}>
+            <h2 className="v2-groupe-titre"><span>{tr('v2.retirer.titre')}</span><span className="v2-groupe-n" data-v2-n={String(nRet)}>{nRet}</span></h2>
+            <RangeeTouchable className="v2-passe-mini" onClick={onRetraits} label={tr('v2.retirer.voir')} attrs={{ 'data-v2-passe-mini': '' }}>
+              <span className="v2-passe-mini-haut">
+                <Icon name="pin" size={18}/>
+                <span className="v2-passe-mini-lieu">{premierPoint ? (premierPoint.lieu || tr('v2.retirer.pointInconnu')) : tr('v2.retirer.codesAVenir')}</span>
+                {premierPoint && premierPoint.code ? <b className="v2-passe-mini-code">{premierPoint.code}</b> : null}
+              </span>
+              <span className="v2-passe-mini-bas">
+                <span>{premierPoint ? tr('v2.retirer.resume', { n: nRet, p: retraits.nPoints || 1 }) : tr('v2.retirer.resumeN', { n: nRet })}</span>
+                {retraits.premier ? <span className={retraits.premier.ambre ? 'is-ambre' : ''}>{retraits.premier.ambre ? <i className="v2-point" aria-hidden="true"/> : null}{retraits.premier.txt}</span> : null}
+              </span>
+            </RangeeTouchable>
+          </section>
+        ) : null}
+
+        {/* 4. À FAIRE — un groupe par chose, son nombre, UN geste. */}
+        {groupes.length ? (
+          <section className="v2-afaire" aria-label={tr('v2.afaire.titre')} data-v2-afaire={String(groupes.length)}>
+            <h2 className="v2-groupe-titre"><span>{tr('v2.afaire.titre')}</span></h2>
+            <div className="v2-liste">
+              {groupes.map((g) => (
+                <div key={g.id} className="v2-afaire-ligne" data-v2-job={g.id} data-n={g.n == null ? '' : String(g.n)}>
+                  {g.photo ? <Vignette photo={g.photo} Photo={Photo} Icon={Icon} taille={40}/> : <span className="v2-afaire-ic" aria-hidden="true"><Icon name={g.icone || 'check'} size={20}/></span>}
+                  <span className="v2-afaire-txt">
+                    <span className="v2-afaire-titre">{g.ambre ? <i className="v2-point" aria-hidden="true"/> : null}{g.titre}</span>
+                    {g.detail ? <span className="v2-afaire-detail">{g.detail}</span> : null}
+                  </span>
+                  {g.geste ? <BoutonV2 role="secondaire" onClick={g.geste.faire} attrs={{ 'data-v2-geste': g.id }}>{g.geste.txt}</BoutonV2> : null}
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+      </>)}
+
+      {/* 5. LE GESTE PLEIN, au pouce (en haut à droite sur l'ordinateur, design-v2.css). */}
+      {plein ? (
+        <div className="v2-pouce" data-v2-pouce="">
+          <BoutonV2 role="principal" plein icone={<Icon name="printer" size={22}/>} onClick={plein.faire} attrs={{ 'data-v2-principal': String(plein.n) }}>{plein.txt}</BoutonV2>
+        </div>
+      ) : null}
+    </div>
+  );
+}

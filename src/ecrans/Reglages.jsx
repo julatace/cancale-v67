@@ -164,6 +164,7 @@ import { useLangue } from '../i18n/react.js';
 import { ReglagesAidesAccueil } from '../accueilReste/AccueilReste.jsx';   // (14 nov., idées 136 139 140 147)
 import MIGRATION_SQL from "../../supabase/migrations/001-multi-utilisateurs.sql?raw";
 import { accompagner } from '../accompagnement.js';   // (14 nov.) pendant, après, échec d'un geste (src/ui/Accompagne.jsx)
+import { useDesignV2, poserDesignV2 } from '../designV2/reglage.js';   // (17 nov.) « Nouveau design (essai) »
 
 // ⟦← App.jsx #10⟧
 const SuiviReceptionEmails = aLaDemande(() => import('../ReceptionEmails.jsx'));
@@ -4725,7 +4726,8 @@ function ReglagesStream() {
 // (8 nov., « beauté ») L'APPARENCE : quatre choix en liste d'iOS (une coche sur le choisi).
 // Le choix est le sien, jamais posé tout seul ; « Le soir » suit l'heure de l'appareil.
 function ApparenceSetting({ valeur, onChoisir }) {
-  return (
+  const designV2 = useDesignV2();
+  return (<>
     <div className="vrm-apparence" role="radiogroup" aria-label="Apparence" data-apparence-choix={valeur || ''}>
       {APPARENCES.map((m) => (
         <button key={m} type="button" role="radio" aria-checked={valeur === m} className={'vrm-apparence-ligne' + (valeur === m ? ' is-choisi' : '')}
@@ -4736,7 +4738,15 @@ function ApparenceSetting({ valeur, onChoisir }) {
         </button>
       ))}
     </div>
-  );
+    {/* (17 nov.) LE NOUVEAU DESIGN, EN ESSAI : sur CET appareil (src/designV2/reglage.js), éteint par défaut ; éteint, rien ne change. */}
+    <div className="vrm-apparence-v2" data-reglage-design-v2={designV2 ? '1' : '0'} style={{display:'flex',alignItems:'center',gap:12,minHeight:56,padding:'8px 4px',marginTop:8,borderTop:`1px solid ${C.border}`}}>
+      <span style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:2}}>
+        <b style={{fontSize:15,fontWeight:600,color:C.text}}>{tr('v2.reglage.lib')}</b>
+        <small style={{fontSize:13,lineHeight:1.35,color:C.muted}}>{tr('v2.reglage.desc')}</small>
+      </span>
+      <Interrupteur on={designV2} onClick={() => poserDesignV2(!designV2)} label={tr('v2.reglage.lib')} data-design-v2-bouton=""/>
+    </div>
+  </>);
 }
 // (11 nov., lot traduction) LA LANGUE : la même liste d'iOS que l'Apparence. Chaque langue
 // est écrite DANS sa langue (on la retrouve sans comprendre la langue courante) ; le choix
