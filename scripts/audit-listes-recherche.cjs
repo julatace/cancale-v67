@@ -24,7 +24,7 @@ const fs = require('fs'), path = require('path'), os = require('os');
 const { spawnSync } = require('child_process');
 const { pathToFileURL } = require('url');
 const SRC = path.join(__dirname, '..', 'src');
-const FICHIERS = ['recherchePhrase.js', 'epingles.js', 'glisserSelection.js', 'comparerPaires.js', 'fusionNuage.js', 'dateParis.js'];   // (16 nov.) recherchePhrase lit le jour de Paris de src/dateParis.js
+const FICHIERS = ['recherchePhrase.js', 'epingles.js', 'glisserSelection.js', 'comparerPaires.js', 'fusionNuage.js', 'dateParis.js'];   // (16 nov.) recherchePhrase importe le jour de Paris
 
 const MUTATIONS = {
   'taille-vs-numero': ['recherchePhrase.js', '    if (v >= 16 && v <= 52) poser(', '    if (false) poser('],

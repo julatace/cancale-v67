@@ -116,7 +116,8 @@ export function rappelVeilleUrssaf({ today, main }) {
   const manque = P.partiel ? (P.aDater > 0 ? ` · ${P.aDater} vente${P.aDater > 1 ? 's' : ''} pas encore datée${P.aDater > 1 ? 's' : ''}` : ' · total pas encore complet') : '';
   const corps = P.ca == null
     ? `${periode}, à faire au plus tard le ${date}. Le montant se calcule dans Ventes (ouvre-le une fois), puis « Déclarer ».`
-    : `${periode}, à faire au plus tard le ${date}${P.apayer != null ? ` · cotisations ≈ ${P.partiel ? 'au moins ' : ''}${eurRecopie(P.apayer)}` : ''}${manque}. Touche pour ouvrir « Déclarer » et copier le montant.`;
+    // (16 nov.) « avant le » : la 1re phrase tient avec le montant devant (≤ 90 sur le téléphone, notif-belle).
+    : `${periode}, avant le ${date}${P.apayer != null ? ` · cotisations ≈ ${P.partiel ? 'au moins ' : ''}${eurRecopie(P.apayer)}` : ''}${manque}. Touche pour ouvrir « Déclarer » et copier le montant.`;
   return { envoyer: true, cle, titre, corps, url: DESTINATIONS.urssafDeclarer(), montant: P.ca == null ? null : P.ca, partiel: !!P.partiel, daysLeft: P.daysLeft,
     raison: (P.daysLeft === 1 ? 'la veille' : 'le jour même (veille manquée)') + (P.ca == null ? ' · sans montant' : P.partiel ? ' · montant partiel' : ' · avec le montant') };
 }

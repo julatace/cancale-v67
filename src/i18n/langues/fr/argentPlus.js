@@ -34,7 +34,7 @@ export default {
   "argentPlus.ba.achatManque": "pas saisi",
   "argentPlus.ba.reste": "Après frais de vente",
   "argentPlus.ba.auPlus": "au plus",
-  "argentPlus.bl.sur": {"one": "sur {n} vente de {m}", "other": "sur {n} ventes de {m}"},
+  "argentPlus.bl.sur": {"one": "compté sur {n} vente sur {m} (celles dont tu connais le prix d’achat)", "other": "compté sur {n} ventes sur {m} (celles dont tu connais le prix d’achat)"},
   "argentPlus.bl.achat": {"one": "{n} prix d’achat à saisir", "other": "{n} prix d’achat à saisir"},
   "argentPlus.bl.plateforme": {"one": "{n} frais du site pas lus", "other": "{n} frais du site pas lus"},
   "argentPlus.bl.frais": {"one": "{n} vente aux frais à confirmer", "other": "{n} ventes aux frais à confirmer"},

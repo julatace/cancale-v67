@@ -709,6 +709,7 @@ export default {
   "compta.recapImprimer": "Print (1 page)",
   "compta.recapImprimerTitre": "One A4 page: sales, received, purchases, expenses, profit, URSSAF",
   "compta.recapImprimerNote": "One A4 page, readable in black and white. For a PDF, choose “Save as PDF” in the print window.",
+  "compta.recapImprimerAide": "Save as PDF?",
   "compta.recapFenetreBloquee": "The browser blocked the print window: allow pop-ups for VRM, then try again.",
   "compta.recapPrepare": "Preparing the recap…",
   "compta.dontConversation": " · {nbAd} through the sale’s conversation",

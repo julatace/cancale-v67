@@ -29,12 +29,12 @@
 // Module PUR (aucun React, aucune horloge cachée : `maintenant` est passé) — exécuté
 // tel quel par scripts/audit-recherche-phrase.cjs.
 
+import { jourParis as jourParisRegle, jourDecale } from './dateParis.js';   // (16 nov.) le jour de Paris, une seule règle
 const str = (v) => String(v == null ? '' : v);
 const COMBINANT = /[̀-ͯ]/g;
 
 // Une normalisation qui garde la LONGUEUR (un signe pour un signe) : les positions
 // trouvées dans le texte normalisé sont celles du texte tapé.
-import { jourParis as jourParisRegle, decalerJour as decalerJourRegle } from './dateParis.js';
 export function normaliserPhrase(s) {
   let out = '';
   for (const c of str(s)) {
@@ -211,11 +211,9 @@ const RE = (() => {
   };
 })();
 
-// La date du jour à Paris (« 2026-11-14 ») et ses voisines — sans horloge cachée.
-// (16 nov., lot compta-donnees) Le jour de Paris et l'arithmétique de jour de src/dateParis.js
-// (une seule règle : Intl Europe/Paris, secours européen sans Intl).
+// La date du jour à Paris (« 2026-11-14 ») et ses voisines — la règle commune (src/dateParis.js, 16 nov.).
 export function jourParis(ms) { return jourParisRegle(ms); }
-export function decalerJour(jour, n) { return decalerJourRegle(jour, n); }
+export function decalerJour(jour, n) { return jourDecale(jour, n); }
 const jourSemaine = (jour) => { const [y, m, d] = jour.split('-').map(Number); return (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7; };   // 0 = lundi
 
 // ══ ANALYSER : la phrase ⇒ des filtres (avec la place de leurs mots) ══

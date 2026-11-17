@@ -709,6 +709,7 @@ export default {
   "compta.recapImprimer": "Stampa (1 pagina)",
   "compta.recapImprimerTitre": "Una pagina A4: vendite, ricevuto, acquisti, spese, utile, URSSAF",
   "compta.recapImprimerNote": "Una pagina A4, leggibile in bianco e nero. Per un PDF, scegli «Salva come PDF» nella finestra di stampa.",
+  "compta.recapImprimerAide": "Salvare in PDF?",
   "compta.recapFenetreBloquee": "Il browser ha bloccato la finestra di stampa: consenti le finestre per VRM e riprova.",
   "compta.recapPrepare": "Preparo il riepilogo…",
   "compta.dontConversation": " · {nbAd} tramite la conversazione della vendita",

@@ -23,6 +23,7 @@ import { jourParis } from './dateParis.js';   // (16 nov.) le jour PRÉVU à l'h
 import { ETAPES_A_VENIR, friseAVenir } from './argentAVenir.js';
 import MarquePlateforme from './plateformes/Marque.jsx';
 import './styles-avenir.css';
+import { jourParis } from './dateParis.js';   // (16 nov.) data-prevu au jour de Paris
 
 const SITE_ID = { Vinted: 'vinted', eBay: 'ebay', Vestiaire: 'vestiaire', Leboncoin: 'leboncoin' };
 const cts = (x) => String(Math.round(Number(x || 0) * 100));

@@ -153,7 +153,13 @@ const PREUVES = {
   // de connexion à VRM dans une shadow root FERMÉE (la page ne la voit pas) et y vide son propre
   // champ (un seul `dispatchEvent(new Event('blur'))`) — rien n'y touche la page de Vinted.
   const CARTE = 'vrm-badge.js', carte = sansCommentaires(lire('vinted-sync-extension/' + CARTE));
-  const carteBornee = /attachShadow\(\{ mode: 'closed' \}\)/.test(carte) && (carte.match(/dispatchEvent\s*\(/g) || []).length === 1 && /c\.dispatchEvent\(new Event\('blur'\)\)/.test(carte) && !/\.click\s*\(\s*\)|new\s+(?:Mouse|Keyboard|Pointer|Touch|Input|Drag)Event\b/.test(carte);
+  // (16 nov.) + la liste cochable des favoris DE LA CARTE (14 nov.) : toucher la ligne coche SA case et lui envoie `change`
+  // (`li.querySelector('[data-fav-coche]')`, dans la même shadow root) — jamais un élément de la page.
+  const envoisCarte = carte.match(/[\w.]+\.dispatchEvent\s*\([^)]*\)\)?/g) || [];
+  const carteBornee = /attachShadow\(\{ mode: 'closed' \}\)/.test(carte) && envoisCarte.length >= 1 && envoisCarte.length <= 2
+    && /c\.dispatchEvent\(new Event\('blur'\)\)/.test(carte)
+    && envoisCarte.every((e) => /^c\.dispatchEvent\(new Event\('(?:blur|change)'\)\)$/.test(e))
+    && (envoisCarte.length === 1 || /const c = li\.querySelector\('\[data-fav-coche\]'\); if \(c\) \{ c\.checked = !c\.checked; c\.dispatchEvent\(new Event\('change'\)\); \}/.test(carte)) && !/\.click\s*\(\s*\)|new\s+(?:Mouse|Keyboard|Pointer|Touch|Input|Drag)Event\b/.test(carte);
   const simulent = ['background.js', ...surVinted].filter((f) => !(f === CARTE && carteBornee) && SIMULE.test(sansCommentaires(lire('vinted-sync-extension/' + f))));
   dit(surVinted.length >= 2 && !simulent.length, `G5 sur Vinted rien n’est simulé : ni clic ni frappe dans ${['background.js', ...surVinted].join(', ')} (la carte VRM : son propre champ, shadow root fermée)`, simulent);
   const bloc = (/const EXEC_PERMIS = \[[\s\S]*?\n\];/.exec(bg) || [''])[0];

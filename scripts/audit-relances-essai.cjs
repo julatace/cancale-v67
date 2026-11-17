@@ -292,7 +292,9 @@ const decoder = (brut) => {
     // ce que c'est, UN bouton d'action, le lien « ne plus recevoir » seulement
     // dans le pied ; le texte brut commence par le même titre.
     const forme = tout.map((t) => {
-      const corps = t.html.split('<hr')[0], piedH = t.html.split('<hr')[1] || '';
+      // (16 nov.) Le gabarit « Verre » (15 nov.) n'a plus de <hr> : le pied commence à `class="vv-pied"`.
+      const coupe = t.html.includes('<hr') ? t.html.indexOf('<hr') : t.html.indexOf('class="vv-pied"');
+      const corps = coupe >= 0 ? t.html.slice(0, coupe) : t.html, piedH = coupe >= 0 ? t.html.slice(coupe) : '';
       const h1 = (t.html.match(/<h1\b[^>]*>([^<]*)<\/h1>/g) || []);
       const titre = ((/<h1\b[^>]*>([^<]*)<\/h1>/.exec(t.html) || [])[1] || '').trim();
       return { h1: h1.length, titre, liensCorps: (corps.match(/<a\s/g) || []).length, desinscritPied: /mode=relances/.test(piedH) && !/mode=relances/.test(corps), texteTitre: t.texte.split('\n')[0].trim() === titre.replace(/&#39;/g, "'").replace(/&amp;/g, '&') };

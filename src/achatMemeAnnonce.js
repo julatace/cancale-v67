@@ -21,7 +21,7 @@
 // Module PUR : exécuté par scripts/audit-messages-achats-plus.cjs et audit-identite.cjs.
 // ══════════════════════════════════════════════════════════════════════════════
 
-import { jourParis } from './dateParis.js';
+import { jourParis } from './dateParis.js';   // (16 nov.) le jour de Paris, jamais le jour UTC
 export const CLE_ANNONCES_ACHETEES = 'vrm_annonces_achetees';
 const idOk = (v) => { const s = String(v == null ? '' : v).trim(); return /^\d{4,15}$/.test(s) ? s : ''; };
 const txOk = (v) => { const s = String(v == null ? '' : v).trim(); return /^\d{4,20}$/.test(s) ? s : ''; };
@@ -42,7 +42,7 @@ export function annoncesAchetees({ achats = [], itemDeTx = {}, estAnnule = null,
     connus++;
     const c = o._acc && o._acc.vinted_user_id != null ? String(o._acc.vinted_user_id) : '';
     const t = Date.parse(o.date || '');
-    (ids[item] || (ids[item] = [])).push({ tx, c, d: Number.isFinite(t) ? jourParis(t) : '' });   // (16 nov.) le jour de PARIS de l'achat (0 h 30 n'est pas la veille)
+    (ids[item] || (ids[item] = [])).push({ tx, c, d: Number.isFinite(t) ? jourParis(t) : '' });
   }
   for (const k of Object.keys(ids)) ids[k].sort((a, b) => String(a.d).localeCompare(String(b.d)) || a.tx.localeCompare(b.tx));
   return { v: 1, at: new Date(maintenant).toISOString(), total, connus, ids };

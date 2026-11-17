@@ -26,16 +26,15 @@
 // Module PUR. Exécuté par scripts/audit-argent-prix.cjs (section 114).
 // ═══════════════════════════════════════════════════════════════════════════
 
+import { jourDecale } from './dateParis.js';
 export const CLE_SOLDES = 'vrm_soldes';
-import { decalerJour } from './dateParis.js';
 export const SITES_SOLDE = ['vinted', 'leboncoin', 'vestiaire'];
 export const SOLDE_MAX_J = 90;
 const c = (v) => { const n = Number(String(v == null ? '' : v).replace(',', '.')); return Number.isFinite(n) ? Math.round(n * 100) : NaN; };
 const RE_JOUR = /^\d{4}-\d{2}-\d{2}$/;
 
 export const jourParis = (ms) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
-// (16 nov.) L'arithmétique de jour de src/dateParis.js (une seule règle).
-const plusJours = (jour, n) => decalerJour(jour, n);
+const plusJours = (jour, n) => jourDecale(jour, n);   // (16 nov.) src/dateParis.js
 export const clePaire = (p) => `${p.site}|${String(p.uid || '')}|${String(p.id || '')}`;
 
 // Le jour de fin tapé : demain au plus tôt, dans SOLDE_MAX_J jours au plus.

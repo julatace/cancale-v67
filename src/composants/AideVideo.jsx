@@ -43,7 +43,7 @@ export function AideVideo({ cle }) {
           const x = VIDEOS_AIDE[id];
           return (
             <li key={id}>
-              <button type="button" className="vrm-aide-video-ouvrir" onClick={() => setLue(id)} data-aide-video={id} aria-label={`Regarder la vidéo : ${x.titre}, ${dureeLisible(x.duree)}`}>
+              <button type="button" className="vrm-aide-video-ouvrir" onClick={() => setLue(id)} data-aide-video={id}>{/* (16 nov., accessibilite-feuilles) son NOM est son texte visible (« Regarder : … · 0:15 ») : un aria-label différent cachait ce qu'on lit (WCAG 2.5.3) */}
                 <span className="vrm-aide-video-apercu" aria-hidden="true">
                   <img src={urlVideo(id, 'jpg')} alt="" width={45} height={80} loading="lazy" decoding="async"/>
                   <span className="vrm-aide-video-play"><Lecture/></span>
