@@ -19,6 +19,7 @@
 // `BANC_MUTATION=mentionOff|caseMention|apercuAutre|mentionLibre|appMention` (R et S) ⇒ rouge (§6.1).
 // Lancer : construire dist/, puis node scripts/bancs/tampons-page.cjs   (TP_VUES=1512,390 ; TP_SOMBRE=1 ; TP_SEUL=R,S,A)
 'use strict';
+require('./_porte-banc.cjs');   // la session de banc (l'accès direct a été retiré de l'app) et la porte de confidentialité
 const path = require('path'), fs = require('fs'), http = require('http');
 const { pathToFileURL } = require('url');
 const RACINE = path.join(__dirname, '..', '..');
@@ -119,6 +120,7 @@ async function ouvrir(b, { tactile, LIGNES }) {
   const ctx = await b.newContext({ ...vue, locale: 'fr-FR', colorScheme: process.env.TP_SOMBRE ? 'dark' : 'light' });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
+  if (process.env.TP_DIAG) { pg.on('console', (m) => console.log('    (console) ' + m.text().slice(0, 200))); pg.on('requestfailed', (r) => console.log('    (échec) ' + r.url().slice(0, 160))); pg.on('response', (r) => { if (/rest\/v1|auth/.test(r.url())) console.log('    (rép) ' + r.status() + ' ' + r.url().slice(0, 140)); }); }
   await pg.addInitScript(({ t, sombre }) => {
     try {
       localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_visite_vue', 'true');
@@ -179,7 +181,7 @@ async function vueApp(b, vue, avecReel) {
     dit(await pg.evaluate(() => !document.querySelector('[data-tampons-reglage] [data-tampons-contenu="mention"],[data-tampons-reglage] [data-tampons-place-mention],[data-tampons-reglage] [data-tampons-texte-mention]')), `${nom} : A2 aucun contrôle de la page n’enlève ni ne déplace la mention`);
     await pg.locator('[data-tampons-reglage]').evaluate((e) => e.scrollIntoView({ block: 'start' }));
     await pg.waitForTimeout(300);
-    const fmt = await pg.evaluate(() => { const s = document.querySelector('.vrm-tampons-formats'); const r = s.getBoundingClientRect(); const el = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return { dessus: !!el && s.contains(el), y: Math.round(r.y), h: Math.round(r.height) }; });
+    const fmt = await pg.evaluate(() => { const c0 = document.querySelector('[data-tampons-reglage] [data-tampons-support-choix]'); const s = document.querySelector('.vrm-tampons-formats') || (c0 && c0.parentElement); if (!s) return { dessus: false, absent: true }; const r = s.getBoundingClientRect(); const el = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return { dessus: !!el && s.contains(el), y: Math.round(r.y), h: Math.round(r.height) }; });
     dit(fmt.dessus, `${nom} : A4 le choix A4 · 4 par page · Thermique se voit (rien dessus)`, JSON.stringify(fmt));
     await shot(`haut${avecReel ? '' : '-sans'}`);
     await pg.locator('[data-tampons-galerie]').scrollIntoViewIfNeeded(); await shot(`galerie${avecReel ? '' : '-sans'}`);

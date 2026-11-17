@@ -130,13 +130,13 @@ function Vignette({ fam, support, tampons, ouvrir, nomSupport }) {
     <button type="button" ref={boite} className="vrm-tampons-vignette" data-tampons-vignette={fam.id} data-etat={st.etat} data-cle={p ? p.cle : ''}
       data-source={st.source || ''} data-n={p ? boiteTexte(p.place) : ''} data-m={p ? boiteTexte(p.mentionBoite) : ''}
       aria-label={tr('tampons.vignette.aria', { nom, support: nomSupport })} onClick={() => ouvrir(fam)}>
-      <span className="vrm-tampons-vignette-tete"><Logo fam={fam}/><span className="vrm-tampons-vignette-nom">{nom}</span></span>
+      <span className="vrm-tampons-vignette-tete"><Logo fam={fam}/><span className="vrm-tampons-vignette-nom">{nom}</span>
+        {st.etat === 'ok' && st.source === 'exemple' && <span className="vrm-tampons-exemple" data-tampons-exemple="" title={tr('tampons.exemple.phrase')}>{tr('tampons.exemple')}</span>}</span>
       <span ref={page} className="vrm-tampons-vignette-page">
         <canvas ref={cv} aria-hidden="true" data-stream-image="bordereau"/>
         {/* En pourcentage de la page : le cadre reste sur le tampon même quand la vignette est réduite (téléphone). */}
         {st.etat === 'ok' && p && p.place && <i className="vrm-tampons-cadre" style={pc(p.place, p, 0)}/>}
         {st.etat === 'ok' && p && p.mentionBoite && <i className="vrm-tampons-cadre vrm-tampons-cadre-m" style={pc(p.mentionBoite, p, 1.5)}/>}
-        {st.etat === 'ok' && st.source === 'exemple' && <span className="vrm-tampons-exemple" data-tampons-exemple="">{tr('tampons.exemple')}</span>}
         {st.etat === 'charge' && <span className="vrm-tampons-attente">{tr('tampons.dessin')}</span>}
         {st.etat === 'ko' && <span className="vrm-tampons-attente">{tr('tampons.ko')}</span>}
       </span>
@@ -285,7 +285,7 @@ export default function TamponsBordereaux() {
       <div style={{ fontSize: 17, fontWeight: 600, color: C.text }}>{tr('tampons.titre')}</div>
       <div style={{ fontSize: 14, color: C.muted, marginTop: 4, lineHeight: 1.5 }}>{tr('tampons.phrase2')}</div>
       <div data-tampons-mention-toujours="" style={{ fontSize: 14, color: C.text, marginTop: 6, lineHeight: 1.5 }}>{tr('tampons.mention.toujours')}</div>
-      <div className="vrm-tampons-formats" style={{ background: C.card }}>
+      <div className="vrm-tampons-formats">
         <Segmente label={tr('tampons.support')} plein value={famille} onChange={(v) => setSupport(v === 'th' ? (papierDuReglage === 'autre' ? '10x15' : papierDuReglage) : v)}
           options={[{ v: 'a4', l: tr('tampons.support.a4'), data: { 'data-tampons-support-choix': 'a4' } }, { v: 'planche4', l: tr('tampons.support.planche4'), data: { 'data-tampons-support-choix': 'planche4' } }, { v: 'th', l: tr('tampons.support.thermique'), data: { 'data-tampons-support-choix': 'th' } }]}/>
       </div>
