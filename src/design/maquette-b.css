@@ -121,15 +121,15 @@
 :root[data-maquette="b"] body .vrm-main :is(.vrm-seg, .vv-seg, .vrm-sel-sites, .vrm-compte-puces, .vrm-stock-views)::before,
 :root[data-maquette="b"] body .vrm-main :is(.vrm-seg, .vv-seg, .vrm-sel-sites, .vrm-compte-puces, .vrm-stock-views)::after { display: none !important; }
 /* Les segments d'écran prennent la largeur ; les rangées longues (comptes, vues) défilent. */
-:root[data-maquette="b"] body .vrm-main :is(.vrm-seg-plein, .vv-seg, .vrm-platform-tabs, .vrm-paires-selecteur .vrm-seg, .vrm-tache-filtres .vrm-sel-sites) { width: 100% !important; }
+:root[data-maquette="b"] body .vrm-main :is(.vrm-seg-plein, .vv-seg, .vrm-platform-tabs, .vrm-paires-selecteur .vrm-seg, .vrm-tache-filtres .vrm-sel-sites) { width: 100% !important; max-width: none !important; flex: 1 1 auto !important; }
 :root[data-maquette="b"] body .vrm-main :is(.vrm-seg, .vv-seg, .vrm-sel-sites, .vrm-compte-puces, .vrm-stock-views) > :is(button, a, [role="tab"], label) {
   flex: 1 0 auto !important; min-width: 0 !important; min-height: 44px !important; height: 44px !important; margin: 0 !important; padding: 0 14px !important;
   display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important;
   position: relative !important; isolation: isolate !important; border: 0 !important; border-radius: 12px !important;
   background: transparent !important; background-image: none !important; box-shadow: none !important; outline-offset: -2px;
-  font: 600 14px/1 Inter, system-ui, sans-serif !important; letter-spacing: -.005em !important; color: var(--mb-piste-t) !important; white-space: nowrap !important; transform: none !important;
+  font: 600 13.5px/1 Inter, system-ui, sans-serif !important; letter-spacing: -.01em !important; color: var(--mb-piste-t) !important; white-space: nowrap !important; transform: none !important;
 }
-:root[data-maquette="b"] body .vrm-main :is(.vrm-seg-plein, .vv-seg, .vrm-platform-tabs, .vrm-paires-selecteur .vrm-seg, .vrm-tache-filtres .vrm-sel-sites) > :is(button, a, [role="tab"]) { flex: 1 1 0 !important; padding: 0 8px !important; }
+:root[data-maquette="b"] body .vrm-main :is(.vrm-seg-plein, .vv-seg, .vrm-platform-tabs, .vrm-paires-selecteur .vrm-seg, .vrm-tache-filtres .vrm-sel-sites) > :is(button, a, [role="tab"]) { flex: 1 1 0 !important; padding: 0 4px !important; }
 /* Le choisi : une porcelaine posée DANS la piste (2 px de marge), une ombre fine — ni diode, ni teinte. */
 :root[data-maquette="b"] body .vrm-main :is(.vrm-seg, .vv-seg, .vrm-sel-sites, .vrm-compte-puces, .vrm-stock-views) > :is(button, a, [role="tab"])::after { display: none !important; }
 :root[data-maquette="b"] body .vrm-main :is(.vrm-seg, .vv-seg, .vrm-sel-sites, .vrm-compte-puces, .vrm-stock-views) > :is(button, a, [role="tab"])::before { display: none !important; }
@@ -145,7 +145,7 @@
 /* Les compteurs d'un segment : le même mot, en plus léger (plus de capsule grise). */
 :root[data-maquette="b"] body .vrm-main :is(.vrm-seg-n, .vv-seg-n) {
   background: transparent !important; box-shadow: none !important; padding: 0 !important; min-width: 0 !important; height: auto !important;
-  font: 500 14px/1 Inter, system-ui, sans-serif !important; opacity: .62 !important; font-variant-numeric: tabular-nums !important; margin: 0 !important;
+  font: 500 13.5px/1 Inter, system-ui, sans-serif !important; opacity: .62 !important; font-variant-numeric: tabular-nums !important; margin: 0 !important;
 }
 :root[data-maquette="b"] body .vrm-main .vv-seg-n.is-ambre { color: var(--sv-clair-ambre, #FFE0A8) !important; opacity: 1 !important; }
 :root[data-maquette="b"] body .vrm-main .vv-seg-b.is-on .vv-seg-n.is-ambre { color: var(--mb-ambre) !important; }
@@ -156,6 +156,8 @@
 :root[data-maquette="b"] body .vrm-app-shell .vrm-barre-haut-droite .vrm-sel-sites > :is([aria-pressed="true"], [aria-current="page"], .is-on)::before {
   content: "" !important; position: absolute !important; inset: 2px !important; z-index: -1 !important; border-radius: 8px !important; background: #FFFFFF !important; box-shadow: 0 2px 6px rgb(0 0 0 / .12) !important; display: block !important;
 }
+/* Annonces · Stock : la pleine largeur (avant : 60 %, plus haut que les autres). */
+:root[data-maquette="b"] body .vrm-main .vrm-paires-selecteur { width: 100% !important; max-width: none !important; flex: 1 0 100% !important; grid-column: 1 / -1 !important; align-self: stretch !important; padding: 0 !important; margin: 10px 0 8px !important; }
 /* Deux segments empilés (sites puis états) : 8 px entre eux, pas 12 + 16. */
 :root[data-maquette="b"] body .vrm-main .vrm-tache-filtres { margin-bottom: 8px !important; }
 :root[data-maquette="b"] body .vrm-main :is(.vrm-colis-onglets, .vv-onglets) { margin-top: 0 !important; }

@@ -29,21 +29,21 @@ const DEFILE = process.env.DEFILE === '1';
       if (MAQ) { await o.pg.evaluate((m) => { try { localStorage.setItem('vrm_banc_maquette', m); } catch (_) {} }, MAQ); await o.pg.reload({ waitUntil: 'domcontentloaded' }); }
       await P.pret(o.pg);
       // Le message « N nouvelles paires numérotées » de la base inventée : fermé par SON ×, comme Julien le ferait.
-      await o.pg.evaluate(() => { for (const b of document.querySelectorAll('.vrm-toast button')) { const t = (b.getAttribute('aria-label') || b.textContent || '').trim(); if (/^×$|^✕$|fermer|ok/i.test(t)) b.click(); } }).catch(() => {});
-      await o.pg.waitForTimeout(900);
+      const fermerMessages = () => o.pg.evaluate(() => { for (const b of document.querySelectorAll('button.vrm-toast, .vrm-acc-x')) b.click(); }).catch(() => {});
+      await fermerMessages(); await o.pg.waitForTimeout(1500); await fermerMessages(); await o.pg.waitForTimeout(700);
       const f = path.join(OUT, `${e}-${W}-${t}.png`);
       await o.pg.screenshot({ path: f });
       // Mesures (lues dans la page, jamais un libellé).
       const m = await o.pg.evaluate(() => {
         const r = document.documentElement;
         const tabs = [...document.querySelectorAll('.vrm-tabbar .vrm-tab')].map((b) => { const q = b.getBoundingClientRect(); return { h: Math.round(q.height), w: Math.round(q.width) }; });
-        const segs = [...document.querySelectorAll('[role="tablist"]')].filter((x) => x.offsetParent).map((x) => Math.round(x.getBoundingClientRect().height));
+        const segs = [...document.querySelectorAll('.vrm-main :is(.vrm-seg, .vv-seg, .vrm-sel-sites, .vrm-compte-puces, .vrm-stock-views)')].filter((x) => x.offsetParent).map((x) => Math.round(x.getBoundingClientRect().height));
         return { maquette: r.getAttribute('data-maquette') || '', tabs, segs };
       });
       rapport.push({ e, W, t, ...m, erreurs: o.erreurs.length });
       if (DEFILE) {
         await o.pg.evaluate(() => { const x = document.querySelector('.vrm-main'); if (x) { x.scrollTop = 420; x.dispatchEvent(new Event('scroll')); } });
-        await o.pg.waitForTimeout(600);
+        await o.pg.waitForTimeout(1300); await fermerMessages(); await o.pg.waitForTimeout(500);
         await o.pg.screenshot({ path: path.join(OUT, `${e}-${W}-${t}-defile.png`) });
       }
       console.log(f, o.erreurs.length ? 'ERREURS ' + o.erreurs.join(' | ') : '');
