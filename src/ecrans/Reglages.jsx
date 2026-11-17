@@ -165,6 +165,7 @@ import { ReglagesAidesAccueil } from '../accueilReste/AccueilReste.jsx';   // (1
 import MIGRATION_SQL from "../../supabase/migrations/001-multi-utilisateurs.sql?raw";
 import { accompagner } from '../accompagnement.js';   // (14 nov.) pendant, après, échec d'un geste (src/ui/Accompagne.jsx)
 import { useDesignV2, poserDesignV2 } from '../designV2/reglage.js';   // (17 nov.) « Nouveau design (essai) »
+import { useBarre, poserBarre, STYLES_BARRE, ApercuBarre } from '../designV2/barre.jsx';   // (17 nov.) « Barre d'onglets » : cinq styles
 
 // ⟦← App.jsx #10⟧
 const SuiviReceptionEmails = aLaDemande(() => import('../ReceptionEmails.jsx'));
@@ -4729,6 +4730,7 @@ function ReglagesStream() {
 // Le choix est le sien, jamais posé tout seul ; « Le soir » suit l'heure de l'appareil.
 function ApparenceSetting({ valeur, onChoisir }) {
   const designV2 = useDesignV2();
+  const barre = useBarre();
   return (<>
     <div className="vrm-apparence" role="radiogroup" aria-label="Apparence" data-apparence-choix={valeur || ''}>
       {APPARENCES.map((m) => (
@@ -4740,13 +4742,24 @@ function ApparenceSetting({ valeur, onChoisir }) {
         </button>
       ))}
     </div>
-    {/* (17 nov.) LE NOUVEAU DESIGN, EN ESSAI : sur CET appareil (src/designV2/reglage.js), éteint par défaut ; éteint, rien ne change. */}
+    {/* (17 nov.) LE NOUVEAU DESIGN est allumé par défaut ; « Ancien design » le ramène sur CET appareil (src/designV2/reglage.js) : rien d autre ne change. */}
     <div className="vrm-apparence-v2" data-reglage-design-v2={designV2 ? '1' : '0'} style={{display:'flex',alignItems:'center',gap:12,minHeight:56,padding:'8px 4px',marginTop:8,borderTop:`1px solid ${C.border}`}}>
       <span style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:2}}>
         <b style={{fontSize:15,fontWeight:600,color:C.text}}>{tr('v2.reglage.lib')}</b>
         <small style={{fontSize:13,lineHeight:1.35,color:C.muted}}>{tr('v2.reglage.desc')}</small>
       </span>
-      <Interrupteur on={designV2} onClick={() => poserDesignV2(!designV2)} label={tr('v2.reglage.lib')} data-design-v2-bouton=""/>
+      <Interrupteur on={!designV2} onClick={() => poserDesignV2(!designV2)} label={tr('v2.reglage.lib')} data-design-v2-bouton="" data-ancien-design={designV2 ? '0' : '1'}/>
+    </div>
+    {/* (17 nov., Julien : « prends la C et propose un menu déroulant, je choisirai le mieux ») LA BARRE D'ONGLETS : cinq
+        dessins de la même barre, un menu natif et un aperçu vivant ; appliqué tout de suite, synchronisé (src/designV2/barre.js). */}
+    <div className="vrm-apparence-barre" data-reglage-barre={barre} style={{display:'flex',flexDirection:'column',gap:8,padding:'12px 4px 4px',borderTop:`1px solid ${C.border}`}}>
+      <label style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,minHeight:44}}>
+        <b style={{fontSize:15,fontWeight:600,color:C.text}}>{tr('v2.barre.lib')}</b>
+        <select value={barre} onChange={(e) => poserBarre(e.target.value, save)} data-barre-choix="" style={{minHeight:44,fontSize:15,borderRadius:12,padding:'0 12px',border:`1px solid ${C.border}`,background:C.card,color:C.text}}>
+          {STYLES_BARRE.map((k) => <option key={k} value={k}>{tr('v2.barre.' + k)}</option>)}
+        </select>
+      </label>
+      <ApercuBarre style={barre} Icon={Icon} onglets={[{ id: 'journee', icon: 'soleilLevant', label: tr('nav.journee.court') }, { id: 'annonces', icon: 'vitrine', label: tr('v2.barre.ann') }, { id: 'achats', icon: 'cart', label: tr('v2.barre.ach'), n: 8 }, { id: 'ventes', icon: 'bag', label: tr('v2.barre.ven'), n: 4 }, { id: 'argent', icon: 'euro', label: tr('v2.barre.arg') }]}/>
     </div>
   </>);
 }

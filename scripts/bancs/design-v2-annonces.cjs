@@ -123,6 +123,8 @@ async function dessin(nav, b, v, sombre, attendus) {
     dit(cls < 0.01, `${v} ${th} : changement d’onglet sans saut de mise en page (CLS ${cls.toFixed(3)})`, cls);
   }
   if (v === 'A') {
+    // Revenir sur Annonces (le changement d'onglet ci-dessus est allé sur Achats puis Stock).
+    await pg.locator('.vrm-tabbar [data-nav-entree="annonces"]').click().catch(() => {}); await pg.waitForTimeout(2500);
     await pg.locator('[data-ann-barre] .vrm-ann-outils > button').first().tap({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(500);
     const aff = await pg.evaluate(() => { const x = document.querySelector('[data-v2-ann-affichage]'); return x ? [...x.querySelectorAll('[data-v2-affichage]')].map((b) => b.getAttribute('data-v2-affichage')).join(',') : ''; });
     dit(aff === 'A,C', `« ⋯ » → Affichage : Liste · Détaillé (${aff})`, aff);

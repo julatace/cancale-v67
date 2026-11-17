@@ -1,7 +1,7 @@
 // en · le nouveau design « Studio Premium » (17 nov.), en essai : src/designV2/.
 export default {
-  "v2.reglage.lib": "New design (preview)",
-  "v2.reglage.desc": "Today, purchases as passes, one menu per platform. This device only; turn it off to go back.",
+  "v2.reglage.lib": "Previous design",
+  "v2.reglage.desc": "Go back to the previous look on this device. Your data and settings stay the same.",
   "v2.aEnvoyer.aria": "{n} parcels to send",
   "v2.aEnvoyer.mot": {
     "one": "parcel to send",
@@ -168,5 +168,16 @@ export default {
   "v2.mail.q.ko": "This email couldn’t be claimed. It is still kept.",
   "v2.msg.suite": "Show {n} more · {total} in all",
   "v2.mail.boite": "Inbox",
-  "v2.mail.relier": "Link my mailbox"
+  "v2.mail.relier": "Link my mailbox",
+  "v2.passe.qrKo": "QR not readable here — the code below is enough",
+  "v2.barre.lib": "Tab bar",
+  "v2.barre.C": "C · Clean (default)",
+  "v2.barre.A": "A · Classic iOS",
+  "v2.barre.B": "B · Floating pill",
+  "v2.barre.D": "D · Line on top",
+  "v2.barre.E": "E · Kraft",
+  "v2.barre.ann": "Listings",
+  "v2.barre.ach": "Purchases",
+  "v2.barre.ven": "Sales",
+  "v2.barre.arg": "Money"
 };

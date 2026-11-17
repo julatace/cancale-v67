@@ -484,7 +484,8 @@ html[data-grand-texte] body button.v2b-principal { height: auto; min-height: var
 }
 /* Constat 10. Sur ordinateur, « Extension à installer » (la pastille d'état de l'île du haut) n'est plus un plein : teintée, comme un secondaire. */
 @media (min-width: 1024px) {
-  html[data-design="v2"]:root body .vrm-app-header .vrm-etat-pastille[data-etat-code] { background: var(--v2-teinte-fond) !important; color: var(--v2-teinte-texte) !important; border-color: transparent !important; box-shadow: none !important; }
+  html[data-design="v2"]:root body .vrm-app-header .vrm-etat-pastille[data-etat-code] { background: var(--v2-carte, #FFFFFF) !important; color: var(--v2-teinte-texte) !important; border-color: transparent !important; box-shadow: 0 0 0 1px rgb(255 255 255 / .6) !important; }
+  /* (sur le bleu de la coque, une teinte à 10 % se perdait : le fond porcelaine d'un secondaire, l'encre d'accent — jamais un plein) */
 }
 
 /* ══ 14. L'AIR (17 nov. soir, Julien : « c'est trop compacté, ça doit être moins compact ») ═════════════════════
@@ -552,3 +553,16 @@ html body .v2l-a { min-height: 120px; contain-intrinsic-size: auto 120px; }
 html body .v2-squelette-A .v2-squelette-rangee { min-height: 120px; }
 /* L'en-tête de compte que la liste posera : le squelette le réserve déjà (même hauteur), rien ne glisse. */
 .v2-squelette-tete { display: block; height: 44px; }
+/* (couche `vrm-v2`, la première nommée : passe devant les `!important` des couches d'hier) */
+@layer vrm-v2 {
+  html[data-design="v2"] body .vrm-annbar, html[data-design="v2"] body .vrm-annbar .vrm-annbar-gestes { gap: var(--v2-air-boutons, 12px) !important; }
+}
+.v2-passe-qr-ko { display: grid; place-items: center; text-align: center; font-size: 13px; line-height: 1.4; color: var(--v2-muet, #4A5B6D); background: var(--v2-socle, #EEF3F8); image-rendering: auto; }
+/* Le plein au pouce ne cache rien : la page garde barre + plein (sa VRAIE hauteur, une ou deux lignes) + 16 ; et sous lui,
+   le contenu s'efface dans le fond (un voile du bas de la page) au lieu d'être coupé net derrière le bouton. */
+:root { --v2-pile-bas: calc(var(--vrm-barre-bas, 84px) + 24px + var(--v2-pouce-h, var(--v2-bouton-h, 50px)) + 16px); }
+@media (max-width: 1023px) {
+  html body .v2-ecran[data-v2-plein="1"] { padding-bottom: calc(var(--v2-pile-bas) + 24px); }
+  html body .v2-pouce::before { content: ""; position: absolute; z-index: -1; pointer-events: none; left: -16px; right: -16px; top: -28px; bottom: calc(-24px - var(--vrm-barre-bas, 84px));
+    background: linear-gradient(to bottom, transparent, var(--sv-bas, #0E2C52) 34px); }
+}
