@@ -64,7 +64,8 @@ export function usePartants(lignes) {
 // signature, `RangeeFaite` : coche, glisse, se replie en 220 ms) ; ensuite la liste la range dans « Imprimés, à déposer ».
 function Partante({ children }) {
   const [f, setF] = React.useState(false);
-  React.useEffect(() => { const r = requestAnimationFrame(() => setF(true)); return () => cancelAnimationFrame(r); }, []);
+  // Un minuteur court plutôt qu'une image d'animation : il part aussi quand le navigateur retient ses images (onglet occupé).
+  React.useEffect(() => { const t = setTimeout(() => setF(true), 20); return () => clearTimeout(t); }, []);
   return <RangeeFaite fait={f}>{children}</RangeeFaite>;
 }
 

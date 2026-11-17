@@ -260,8 +260,13 @@ async function allume(nav, b, sombre, W, ref) {
     dit(refC.attr == null, 'E éteint : aucun data-design sur <html>', refC.attr);
     dit(refC.chiffre != null && refC.chiffre !== '' && refC.lot != null, `E l'écran d'avant donne ses nombres (affiche ${refC.chiffre}, plein ${refC.lot}, envoyés ${refC.envoyes})`, refC);
     if (SIG_AVANT && fs.existsSync(SIG_AVANT)) {
-      const a = (JSON.parse(fs.readFileSync(SIG_AVANT, 'utf8')).ventes || []).map((x) => x.replace(/,data-vu(?=[,\]])|\[data-vu\]|(?<=\[)data-vu,/g, ''));
-      const c = (refC.sig || []).map((x) => x.replace(/,data-vu(?=[,\]])|\[data-vu\]|(?<=\[)data-vu,/g, ''));
+      // Les éléments de la feuille « À faire » (`data-ui-afaire-item`) arrivent dans l'ordre où leurs écrans les posent (le
+      // temps des lectures, pas le code) : comparés comme un ENSEMBLE (blocs triés), tout le reste dans l'ordre.
+      const blocs = (l) => { const out = []; let i = 0; while (i < l.length) { const m = /^(\d+):DIV\[data-ui-afaire-item\]$/.exec(l[i]); if (!m) { out.push(l[i]); i++; continue; }
+        const d = +m[1]; const g = []; while (i < l.length && /^(\d+):DIV\[data-ui-afaire-item\]$/.test(l[i]) && +RegExp.$1 === d) { const b = [l[i++]]; while (i < l.length && +l[i].split(':')[0] > d) b.push(l[i++]); g.push(b.join('\n')); }
+        out.push(...g.sort().join('\n').split('\n')); } return out; };
+      const a = blocs((JSON.parse(fs.readFileSync(SIG_AVANT, 'utf8')).ventes || []).map((x) => x.replace(/,data-vu(?=[,\]])|\[data-vu\]|(?<=\[)data-vu,/g, '')));
+      const c = blocs((refC.sig || []).map((x) => x.replace(/,data-vu(?=[,\]])|\[data-vu\]|(?<=\[)data-vu,/g, '')));
       let i = 0; while (i < a.length && i < c.length && a[i] === c[i]) i++;
       dit(a.length > 20 && a.length === c.length && i === a.length, `E éteint : Ventes a le DOM de la base (${c.length} nœuds)`, i < Math.max(a.length, c.length) ? { n: [a.length, c.length], ecart: i, base: a[i], ici: c[i] } : undefined);
     } else console.log('  (pas de SIGNATURE_AVANT : la comparaison au DOM de la base n\'est pas jouée)');
