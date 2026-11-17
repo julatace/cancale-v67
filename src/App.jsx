@@ -1022,9 +1022,9 @@ import "./styles-refonte-ms.css";   // (14 nov., refonte) Messages, E-mails, Sto
 import "./styles-tablette.css";   // (11 nov., iPad) la coque ordinateur AU DOIGT : 44 px, rien au survol, rail libellé — sous `data-tablette` seulement, EN DERNIER
 // (14 nov., décision de Julien) STUDIO BLEU CLAIR — les deux polices, puis LE studio : EN DERNIER (après styles-vitrine,
 // styles-systeme et styles-tablette). Jetons --sb-*, quatre formes de bouton, la coque (docs/design/studio-bleu-clair.md).
+import "./design/onglets-a.css";   // (17 nov., lot onglets-design) proposition A « sobre », derrière un réglage de banc (`:root[data-onglets="a"]`, src/design/ongletsBanc.js) — `@layer vrm-onglets` (la couche décide, pas l'ordre : posé avant les polices du studio, audit-studio S3)
 import "./design/studio-polices.css";
 import "./design/studio.css";
-import "./design/onglets-a.css";   // (17 nov., lot onglets-design) proposition A « sobre », derrière un réglage de banc (`:root[data-onglets="a"]`, src/design/ongletsBanc.js) — `@layer vrm-onglets`
 import "./design/fiche-d.css";   // (15 nov., Julien choisit la direction D « fiche produit ») la fiche d'un article en UN écran — `@layer vrm-verre` (la couche décide, pas l'ordre ; 16 nov. : juste APRÈS studio.css, toujours avant studio-verre.css dans la couche, audit-studio S3), classes `fd-*` : docs/passation/2026-11-15-fiche-d.md
 import "./design/studio-parametres.css";   // (15 nov.) Paramètres en dix catégories — après studio.css et studio-reste.css
 import "./design/polices.js";   // le préchargement des deux polices, avec le morceau de l'app seulement
