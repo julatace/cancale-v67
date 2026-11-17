@@ -14420,7 +14420,9 @@ const ajouterFichePreparation = async (PL, pdf, bold, reg, { numero = '', titre 
 // de Paramètres les dessine, le banc les juge).
 const tamponnerBordereau = async (PL, pdf, { numero, titre, thermique = false, choix = null, bloques = [], fiche = null, th = null, tampon = null, retour = false } = {}) => {
   const n = String(numero == null ? '' : numero).trim(), t = String(titre == null ? '' : titre).trim();
-  const T = tampon || {}, veutMention = T.mention !== false;
+  // (17 nov., lot tampon-qr) « Créé par vrm.center » ne s'enlève plus (Julien) : posé à CHAQUE impression, quel que soit
+  // le réglage rangé, à sa place de toujours (au-dessus du code) — jamais à la main, jamais une autre place rapide.
+  const T = tampon || {}, veutMention = true;
   if (!n && !t && !veutMention && !retour) return { mode: 'rien', raison: '' };
   const bold = await pdf.embedFont(PL.StandardFonts.HelveticaBold), reg = await pdf.embedFont(PL.StandardFonts.Helvetica);
   const page = pdf.getPages()[0], { w: W0, h: H0 } = tailleAffichee(page);
@@ -14438,7 +14440,7 @@ const tamponnerBordereau = async (PL, pdf, { numero, titre, thermique = false, c
   // (La mention garde la zone de silence MESURÉE de chaque QR, pas les 5 mm forfaitaires du cartouche.)
   const interditsM = [...zi.interditsMention, ...bloquesVrais.filter((z) => z.quoi !== 'code')];
   // (Sur une imprimante thermique, même la page entière : la mention en noir fin — une tête thermique tramerait le gris.)
-  const mentionO = { th: !!th || !!thermique, marge: th && th.marge, sens: th ? th.sens : null, k: T.kMention, place: T.placeMention, libre: T.libreMention, codes: zi.codes, interdits: interditsM, cadre, adresses };
+  const mentionO = { th: !!th || !!thermique, marge: th && th.marge, sens: th ? th.sens : null, k: 1, place: 'qr', libre: null, codes: zi.codes, interdits: interditsM, cadre, adresses };
   const fin = (r, mb) => ({ ...r, mention: !!mb, mentionBoite: mb || null, interdits, interditsMention: interditsM, codes: zi.codes });
   // ① Le cartouche posé À LA MAIN : à sa place (fond blanc dessous, même sur du texte — son choix), repoussé hors
   // des codes, des QR et de l'adresse ; la mention vient ensuite, à côté de lui.
@@ -15019,7 +15021,7 @@ const tamponDePage = (imp, page, isole) => {
   const ts = imp.ts, cle = formeTampon(ts.famille, page, isole).cle, pf = placesDeForme(imp.tampons || reglageTamponsChoisi(), cle);
   const pi = imp.places || {}, pl = { n: pi.n !== undefined ? pi.n : pf.n, m: pi.m !== undefined ? pi.m : pf.m };
   return { cle, libreN: choixTamponValide(pl.n) ? pl.n : null,
-    tampon: { k: ts.k, place: ts.place, mention: !!(ts.contenu && ts.contenu.mention), kMention: ts.kMention, placeMention: ts.placeMention, libreMention: pl.m || null } };
+    tampon: { k: ts.k, place: ts.place, mention: true, kMention: 1, placeMention: 'qr', libreMention: null } };
 };
 // Le tampon d'une page tamponnée HORS de `poserBordereau` (retour d'achat, l'aide de l'équipe) : la même règle.
 const tamponPourPage = (PL, pdf, { famille = '', thermique = false } = {}) => {

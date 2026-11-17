@@ -40,6 +40,9 @@ const dit = (c, m, d) => { if (c) ok++; else ko++; console.log((c ? '  ✅ ' : '
 let regles = CI.regles(), imp = CI.impression(APP);
 const DEBUT = '// ── LE TAMPON DU BORDEREAU', FIN = '// ── IMPRIMANTE NORMALE OU THERMIQUE';
 let tampon = APP.slice(APP.indexOf(DEBUT), APP.indexOf(FIN));
+// (17 nov., lot tampon-qr) Le TÉMOIN sans tampon du banc : la mention ne s'enlève plus dans l'app ; le code extrait pour le banc
+// la coupe seulement quand le banc pose `__vrmBancTemoin` (sur un arbre d'avant, le motif est absent : rien ne change).
+tampon = tampon.split('veutMention = true;').join('veutMention = !globalThis.__vrmBancTemoin;');
 if (!imp || !/const CLE_TAMPONS/.test(regles)) { console.log('❌ code d’impression ou réglage des tampons introuvable (arbre d’avant ?)'); if (!imp) process.exit(1); }
 const muter = (s, a, b) => { if (!s.includes(a)) { dit(false, `mutation « ${MUT} » applicable`, 'motif absent'); return s; } return s.split(a).join(b); };
 // (17 nov., lot tampon-qr) La mention posée SUR le QR (au milieu de sa boîte, repère de l'étiquette) ⇒ rouge.
@@ -69,7 +72,8 @@ const __b64 = (o) => { let s = ''; for (let i = 0; i < o.length; i += 0x8000) s 
 const __oct = (b) => Uint8Array.from(atob(b), (c) => c.charCodeAt(0));
 // Imprime le bordereau d'exemple d'un type sur un support, avec le réglage 'tampons' (null = jamais réglé) et
 // le stockage 'store' (migration). Rend { r, b64, pose }.
-window.__imprimer = async ({ id, support, tampons = null, store = {}, places = null, numero = '124', titre = 'Veste en jean bleue', taille = '42' }) => {
+window.__imprimer = async ({ id, support, tampons = null, store = {}, places = null, numero = '124', titre = 'Veste en jean bleue', taille = '42', temoin = false }) => {
+  globalThis.__vrmBancTemoin = !!temoin;   // (17 nov.) le témoin SANS tampon du banc : la mention, qui ne s'enlève plus, y est coupée
   const PL = window.PDFLib, fam = __vrm.FAMILLES.find((f) => f.id === id);
   const src = await PL.PDFDocument.load(await __vrm.fabriquerBordereau(PL, window.qrcode, fam.mise, { transporteur: fam.transporteur, service: fam.service, rotation: fam.rotation || 0 }));
   const out = await PL.PDFDocument.create();
@@ -153,8 +157,8 @@ async function un(pg, id, support, o = {}) {
   const t = `${id} · ${support}${o.nom ? ' · ' + o.nom : ''}`;
   let a, z;
   try {
-    a = await pg.evaluate((x) => __imprimer(x), { id, support, tampons: o.tampons || null, store: o.store || {}, places: o.places || null, titre: o.titre });
-    z = o.sansTemoin ? null : await pg.evaluate((x) => __imprimer(x), { id, support, tampons: SANS, store: {} });
+    a = await pg.evaluate((x) => __imprimer(x), { id, support, tampons: o.tampons || null, store: o.store || {}, places: o.places || null, titre: o.titre, temoin: false });
+    z = o.sansTemoin ? null : await pg.evaluate((x) => __imprimer(x), { id, support, tampons: SANS, store: {}, temoin: true });
   } catch (e) { dit(false, `${t} : le bordereau sort`, String(e.message || e).split('\n')[0].slice(0, 200)); return null; }
   const n = a.pose ? a.pose.page : 0;
   const L = await pg.evaluate(([b, k, png]) => __lire(b, k, 8, png), [a.b64, n, !!CAPT || !!o.png]);
@@ -173,7 +177,10 @@ async function typeSupport(pg, id, support, vignettes) {
   dit(L.itf.length > 0 || (L0 && L0.itf.length === 0), `${t} : A. le code-barres se lit (s'il se lisait sans tampon)`, L.itf.map((i) => i.t).join(',') || '—');
   // B. aucun pixel changé sur le QR + 4 modules, ni sur le code-barres + 10 modules (comparé au même SANS tampon)
   for (const qq of (L0 ? L0.qrs : [])) {
-    const mod = (qq.box.X - qq.box.x) / 29, zone = elargi(qq.box, 4 * mod);
+    // (17 nov., lot tampon-qr) Julien veut la mention « vraiment juste au-dessus » : 2 à 4 mm du QR. La zone gardée
+    // intacte est donc le QR + 4 modules, au plus 2 mm (les QR d'exemple ont des modules de 0,8 à 1,1 mm) ; le QR se
+    // DÉCODE toujours (A).
+    const mod = (qq.box.X - qq.box.x) / 29, zone = elargi(qq.box, Math.min(4 * mod, 2 * MM));
     const d = await pg.evaluate(([p, q, b]) => __diff(p, q, b), [L.px, L0.px, zone]);
     dit(d === 0, `${t} : B. QR ${qq.data.slice(-2)} + zone de silence intacts (pixels changés : ${d})`);
   }
@@ -192,11 +199,16 @@ async function typeSupport(pg, id, support, vignettes) {
     const mb = texteBoite(m), cx = (mb.x + mb.X) / 2, qcx = (qrb.x + qrb.X) / 2, ecart = Math.abs(cx - qcx) / L.w;
     const dessus = mb.Y <= qrb.y, dessous = mb.y >= qrb.Y, gap = dessus ? qrb.y - mb.Y : dessous ? mb.y - qrb.Y : -1;
     const via = a.pose && a.pose.mentionBoite && a.pose.mentionBoite.via;
+    // (17 nov.) Une étiquette DE TRAVERS (couchée, page tournée) : la mention s'écrit dans SON sens, au-dessus du QR dans
+    // SON repère — jugée là par `tampon-qr.cjs` ; ici seulement le QR intact et décodé.
+    if (a.pose && a.pose.mentionBoite && a.pose.mentionBoite.a) { stats.dessus++; dit(true, `${t} : C. étiquette de travers (${a.pose.mentionBoite.a}°) : la mention suit son sens (tampon-qr)`); }
+    else {
     if (via === 'qr-dessus') stats.dessus++; else if (via === 'qr-dessous') stats.dessous++; else stats.autre++;
     dit(ecart <= 0.02, `${t} : C. mention centrée sur l'axe du QR (écart ${(ecart * 100).toFixed(2)} % ≤ 2 %)`);
     // (17 nov., lot tampon-qr) Julien : « vraiment juste au-dessus du qrcode, pas en dessous ou sur les côtés » ⇒ AU-DESSUS
     // seulement, 2 à 4 mm (mesuré ici du jambage estimé au bord jsQR : 1,5 à 4,5 mm) ; la mesure fine est `tampon-qr.cjs`.
     dit(dessus && gap >= 1.5 * MM && gap <= 4.5 * MM, `${t} : C. mention juste AU-DESSUS du QR (${(gap / MM).toFixed(1)} mm)`, `via=${via}`);
+    }
     dit(m.t <= 7.5 && m.t >= 4.2, `${t} : C. mention petite (${m.t.toFixed(1)} pt)`);
   }
   // D. le N° — sur l'étiquette, ou sur la fiche (colis / préparation) qui la suit quand il n'y a aucune place sûre
@@ -236,7 +248,9 @@ async function typeSupport(pg, id, support, vignettes) {
     const titreDe = (L) => L.items.some((i) => /Veste en jean/.test(i.s));
     // contenu : N° seul, sans mention
     let x = await un(pg, 'mondialrelay', 'a4', { tampons: R({ a4: { num: true, titre: false, taille: false, mention: false } }), sansTemoin: true });
-    dit(x && !titreDe(x.L) && x.L.items.some((i) => /^N° 124/.test(i.s)) && !x.L.items.some((i) => /vrm\.center/.test(i.s)), 'contenu : N° seul, ni titre ni mention (cases du réglage)');
+    // (17 nov., lot tampon-qr) Julien : « ne donne pas la possibilité d'enlever créé par vrm » ⇒ un réglage RANGÉ « sans
+    // mention » est ignoré : la mention s'imprime quand même.
+    dit(x && !titreDe(x.L) && x.L.items.some((i) => /^N° 124/.test(i.s)) && x.L.items.some((i) => /vrm\.center/.test(i.s)), 'contenu : N° seul sans titre — et « Créé par vrm.center » quand même (un « sans mention » rangé est ignoré)');
     // taille L
     const xm = await un(pg, 'colissimo', 'a4', { sansTemoin: true }), xl = await un(pg, 'colissimo', 'a4', { tampons: R({ texte: 'L' }), sansTemoin: true });
     const tn = (y) => { const i = y && y.L.items.find((k) => /^N° 124/.test(k.s)); return i ? i.t : 0; };

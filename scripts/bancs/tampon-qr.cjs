@@ -53,6 +53,9 @@ const dit = (c, m, d) => { if (c) ok++; else { ko++; rouges.push(m); } console.l
 const regles = CI.regles(); let imp = CI.impression(APP);
 const DEBUT = '// ── LE TAMPON DU BORDEREAU', FIN = '// ── IMPRIMANTE NORMALE OU THERMIQUE';
 let tampon = APP.slice(APP.indexOf(DEBUT), APP.indexOf(FIN));
+// (17 nov., lot tampon-qr) Le TÉMOIN sans tampon du banc : la mention ne s'enlève plus dans l'app ; le code extrait pour le banc
+// la coupe seulement quand le banc pose `__vrmBancTemoin` (sur un arbre d'avant, le motif est absent : rien ne change).
+tampon = tampon.split('veutMention = true;').join('veutMention = !globalThis.__vrmBancTemoin;');
 if (!imp || APP.indexOf(DEBUT) < 0) { console.log('❌ code d’impression introuvable'); process.exit(1); }
 const planche = CI.sansExport(fs.readFileSync(path.join(RACINE, 'src', 'impression', 'planche4.js'), 'utf8'));
 // Les mutations : la règle réaffaiblie (la mention reportée sous le code, à côté, ou loin au-dessus) ⇒ rouge.
@@ -197,6 +200,7 @@ const __fx = (() => {
 const __SANS = { v: 1, a4: { num: false, titre: false, taille: false, mention: false }, th: { num: false, titre: false, taille: false, mention: false }, types: {}, formes: {} };
 window.__imprimer = async ({ nom, support, sans = false, coul = false }) => {
   const PL = window.PDFLib, src = await PL.PDFDocument.load(await __fx.fabriquer(PL, window.qrcode, nom, coul));
+  globalThis.__vrmBancTemoin = !!sans;   // (17 nov.) la mention ne s'enlève plus : le témoin du banc la coupe par ce drapeau
   let out = await PL.PDFDocument.create();
   const th = support !== 'a4';
   __vrm.store({ vrm_impression: { format: '10x15', ...(coul ? { encre: 'tel' } : {}) }, ...(sans ? { vrm_tampons: __SANS } : {}) });

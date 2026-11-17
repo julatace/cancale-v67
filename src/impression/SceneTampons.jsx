@@ -62,7 +62,9 @@ export default function SceneTampons({ octets, pose, page, largeur, dessiner, on
     }
     const el = e.target && e.target.closest ? e.target.closest('[data-tampon-el]') : null;
     const quoi = el ? el.getAttribute('data-tampon-el') : null;
-    if (!quoi || !ref.current.boites[quoi]) { pointeurs.current.delete(e.pointerId); return; }
+    // (17 nov., lot tampon-qr) « Créé par vrm.center » est VERROUILLÉ : montré là où il s'imprime (au-dessus du code),
+    // jamais déplacé, agrandi ni ôté (Julien : « ne donne pas la possibilité d'enlever créé par vrm »).
+    if (!quoi || quoi === 'm' || !ref.current.boites[quoi]) { pointeurs.current.delete(e.pointerId); return; }
     e.preventDefault(); e.stopPropagation();
     try { scene.current.setPointerCapture(e.pointerId); } catch (_) {}
     const b = ref.current.boites[quoi], pt = enPoints(e);
@@ -108,7 +110,7 @@ export default function SceneTampons({ octets, pose, page, largeur, dessiner, on
     lacher(G.quoi, b, G.avant, G.type !== 'glisse' ? b.w / G.avant.w : 1, G.brut);
   };
   const clavier = (quoi) => (e) => {
-    const b = ref.current.boites[quoi]; if (!b) return;
+    const b = ref.current.boites[quoi]; if (!b || quoi === 'm') return;
     const pas = e.shiftKey ? 10 : 2, d = { ArrowLeft: [-pas, 0], ArrowRight: [pas, 0], ArrowUp: [0, -pas], ArrowDown: [0, pas] }[e.key];
     if (!d) return;
     e.preventDefault();
@@ -118,6 +120,11 @@ export default function SceneTampons({ octets, pose, page, largeur, dessiner, on
   const boite = (quoi) => {
     const b = boites[quoi]; if (!b) return null;
     const refusee = actif === quoi && !!surInterdit(b, quoi);
+    if (quoi === 'm') return (
+      <div key={quoi} data-tampon-el={quoi} data-verrou="1" data-x={b.x.toFixed(2)} data-y={b.y.toFixed(2)} data-w={b.w.toFixed(2)} data-h={b.h.toFixed(2)}
+        role="img" aria-label={libelles.mVerrou || libelles[quoi] || quoi} className="vrm-tampons-el vrm-tampons-el-m vrm-tampons-el-verrou"
+        style={{ left: b.x * ppt, top: b.y * ppt, width: b.w * ppt, height: b.h * ppt }}/>
+    );
     return (
       <div key={quoi} data-tampon-el={quoi} data-x={b.x.toFixed(2)} data-y={b.y.toFixed(2)} data-w={b.w.toFixed(2)} data-h={b.h.toFixed(2)} data-libre={libres[quoi] ? '1' : '0'}
         tabIndex={0} role="slider" aria-label={libelles[quoi] || quoi} aria-valuetext={`${Math.round(b.x)}, ${Math.round(b.y)}`} onKeyDown={clavier(quoi)}

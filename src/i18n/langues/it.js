@@ -1649,7 +1649,7 @@ export default {
   "impression.tampon.num": "Solo N.",
   "impression.tampon.num_titre": "N. + titolo",
   "impression.tampon.num_titre_taille": "N. + titolo + taglia",
-  "impression.tampon.rien": "Niente",
+  "impression.tampon.rien": "Senza N° (la dicitura resta)",
   "impression.tampon.pourquoi": "Il titolo è nascosto di default: l’etichetta va sul pacco, il corriere lo vedrebbe.",
   "impression.tampon.jamais": "Mai su un codice a barre, un QR o un indirizzo.",
   "impression.fiche": "Scheda di preparazione",

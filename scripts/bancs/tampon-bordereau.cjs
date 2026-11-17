@@ -69,6 +69,8 @@ let code = [m(/const PAS_L_ETIQUETTE = \/[^\n]*\n/, 'PAS_L_ETIQUETTE'), m(/const
   ligne('MM_PT'), ligne('ETIQ_TH'), ligne('TAILLES_ETIQUETTE'), ligne('TH_MARGE'),
   bloc('relevePage'), bloc('_couperSelon'), bloc('estTailleEtiquette'), bloc('avecSens'), bloc('zoneEtiquette'),
   bloc('placementThermique'), bloc('poserEtiquettesThermiques'), bloc('poserBordereau')].join('\n');
+// (17 nov., lot tampon-qr) la référence SANS tampon : le code extrait coupe la mention seulement sous `__vrmBancTemoin`.
+tampon = tampon.split('veutMention = true;').join('veutMention = !globalThis.__vrmBancTemoin;');
 // (11 nov., lot thermique) Le papier choisi, la découpe par l'encre et les règles de
 // src/impression/ : le morceau d'App.jsx entier et le module, quand ils existent.
 { const CI = require('./_code-impression.cjs'); const imp = CI.impression(APP); if (imp) code = CI.regles() + '\n' + imp; }
@@ -184,7 +186,10 @@ window.__imprimer = async (b64, thermique, numero, titre) => {
   // vrm.center » s'écrit aussi seule depuis le réglage des tampons — on la coupe (\`vrm_tampons\`, tout décoché).
   const sansRien = !numero && !titre, garde = __store.vrm_tampons;
   if (sansRien) __store.vrm_tampons = { v: 1, a4: { num: false, titre: false, taille: false, mention: false }, th: { num: false, titre: false, taille: false, mention: false }, types: {}, formes: {} };
-  let r0; try { r0 = await __vrm.poserBordereau(PL, out, src, { numero, title: titre, pos: null, thermique }); } finally { if (sansRien) { if (garde === undefined) delete __store.vrm_tampons; else __store.vrm_tampons = garde; } }
+  // (17 nov., lot tampon-qr) « Créé par vrm.center » ne s'enlève plus dans l'app : la RÉFÉRENCE sans tampon du banc la coupe
+  // par un drapeau de banc (__vrmBancTemoin, posé seulement ici, lu seulement par le code extrait pour le banc).
+  if (sansRien) globalThis.__vrmBancTemoin = true;
+  let r0; try { r0 = await __vrm.poserBordereau(PL, out, src, { numero, title: titre, pos: null, thermique }); } finally { globalThis.__vrmBancTemoin = false; if (sansRien) { if (garde === undefined) delete __store.vrm_tampons; else __store.vrm_tampons = garde; } }
   const o = await out.save(); let s = ''; for (let i = 0; i < o.length; i += 0x8000) s += String.fromCharCode.apply(null, o.subarray(i, i + 0x8000));
   return { r0, b64: btoa(s) };
 };
