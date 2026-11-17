@@ -116,5 +116,14 @@ export default {
   "v2.achats.ajouter": "Aggiungi un acquisto",
   "v2.l.achete": "comprato {p}",
   "v2.l.acheteMarge": "Comprato {p} · margine {m}",
-  "v2.chargement": "Lettura dei tuoi annunci…"
+  "v2.chargement": "Lettura dei tuoi annunci…",
+  "v2.imprimerCourt": "Stampa le etichette",
+  "v2.ecartCourt": {
+    "one": "{r} non ancora pronto",
+    "other": "{r} non ancora pronti"
+  },
+  "v2.tousPrets": "tutti pronti da stampare",
+  "v2.achats.ajouterCourt": "Aggiungi",
+  "v2.reessayer": "Riprova",
+  "v2.achats.annules": "Annullati"
 };

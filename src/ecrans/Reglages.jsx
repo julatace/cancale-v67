@@ -2490,6 +2490,8 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     <div ref={racine} className="vrm-set vrm-pm" data-espace="autres" data-reglages-disposition={etroit ? 'telephone' : 'ordinateur'} data-sous-ecran-ouvert={ouvert ? ouvert.id : ''}
       data-parametres="" data-categorie-ouverte={catOuverte ? catOuverte.id : ''} data-recherche-active={q ? '1' : ''}
       style={{'--vrm-set-filet': C.border, '--vrm-set-appui': `${C.text}0a`}}>
+      {/* (17 nov., accessibilité WCAG 1.3.1) L'écran avait des h2/h3 mais aucun h1 : le titre de l'écran, lu seulement. */}
+      <h1 className="vrm-sr-seul" data-reglages-h1="">{tr('ecran.settings')}</h1>
       {/* (5 nov., chantier H) Appelée, pas montée : `<AcctSheet/>` était un composant
           RECRÉÉ à chaque rendu — chaque lettre tapée remontait la feuille. */}
       {AcctSheet()}

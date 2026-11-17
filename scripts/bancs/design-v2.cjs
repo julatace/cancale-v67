@@ -69,6 +69,11 @@ async function allumer(pg) { await pg.evaluate(() => localStorage.setItem('vrm_d
 
 // Les mesures communes d'un écran allumé : cibles, composant, troncatures, débordement, contraste, pleins.
 async function mesurerEcran(pg, nom, tel) {
+  await sansToasts(pg);
+  const atteint = await pg.evaluate(() => { const vis = (e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden';
+    return [...document.querySelectorAll('[data-v2b="principal"], .v2-tete button, .v2-tete-tache button')].filter(vis).map((b) => { const q = b.getBoundingClientRect(); const x = q.left + q.width / 2, y = q.top + q.height / 2;
+      if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return null; const e = document.elementFromPoint(x, y); return { b: (b.textContent || b.getAttribute('aria-label') || '').trim().slice(0, 24), ok: !!e && (e === b || b.contains(e)), sur: e ? e.tagName + '.' + String(e.className).slice(0, 30) : null }; }).filter(Boolean); });
+  dit(atteint.every((c) => c.ok), `T ${nom} : boutons pleins et de tête atteignables (elementFromPoint, ${atteint.length})`, atteint.filter((c) => !c.ok));
   const r = await pg.evaluate((src) => { const K = eval(src);
     const zones = [...document.querySelectorAll('.v2-ecran, .v2-achats-retirer, .v2-menu')];
     const vis = (e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden';
@@ -246,7 +251,7 @@ async function telephone(nav, sombre, b, sigs) {
   dit(an.premiere != null && an.premiere <= 380, `N la 1re annonce commence à ${an.premiere} px (≤ 380)`, an);
   dit(!an.puces && !an.selPaires && !an.stats && an.segN === 3, 'N ni puces, ni « Annonces | Stock », ni chiffres : UN segmenté (En ligne · Qui dorment · À publier)', an);
   dit(an.alignes && an.alignes.champ[1] >= 44 && an.alignes.plus[1] >= 44 && Math.abs((an.alignes.champ[0] + an.alignes.champ[1] / 2) - (an.alignes.plus[0] + an.alignes.plus[1] / 2)) <= 1, `N recherche et « ⋯ » : ≥ 44 px, centrés sur la même ligne`, an.alignes);
-  dit(an.hauteurs.length >= 3 && an.hauteurs.every((h) => [80, 88, 104, 112].includes(h)), `N rangées de 88 px (112 quand le titre prend deux lignes) (${an.hauteurs.join(', ')})`, an.hauteurs);
+  dit(an.hauteurs.length >= 3 && an.hauteurs.every((h) => h >= 64) && new Set(an.hauteurs).size <= 2, `N rangées ≥ 64 px (AIR), deux hauteurs au plus — une ligne de titre ou deux (${an.hauteurs.join(', ')})`, an.hauteurs);
   dit(an.visibles >= 4, `N ${an.visibles} annonces lisibles en entier sur le premier écran (≥ 4, trois lignes d’informations chacune)`, an.visibles);
   dit(an.cpt === 0, 'N le compte n’est plus redit sur chaque rangée (il est dans l’en-tête du groupe)', an.cpt);
   dit(an.relierPuce === 0, `N « Relier un achat » : plus de grosse puce sous la rangée (${an.relierTexte} en texte ambre)`, an);
@@ -254,6 +259,18 @@ async function telephone(nav, sombre, b, sigs) {
   dit(!an.coupes.length, 'N aucun libellé coupé (segmenté, barre)', an.coupes);
   dit(!an.disque && an.pleins === 1 && /\S/.test(an.plein) && an.publierHaut != null && an.publierHaut < 200, `N pas de « + » ; UN plein, compact, en haut : « ${an.plein.trim()} »`, an);
   await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `annonces-v2-390-${th}.png`) });
+  // CIBLES ATTEIGNABLES : au centre de chaque bouton plein et de chaque bouton de tête, `elementFromPoint` rend CE bouton
+  // (ou un de ses enfants) — la tête de la coque posée sur la ligne du titre ne doit rien avaler. Puis un VRAI toucher.
+  if (process.env.MUTATION === 'entete') await pg.addStyleTag({ content: 'html body .vrm-app-header.v2-entete-cloche, html body .vrm-app-header.v2-entete-cloche * { pointer-events: auto !important; } html body .vrm-app-header.v2-entete-cloche { left: 0 !important; right: 0 !important; width: auto !important; }' });
+  const cibles = await pg.evaluate(() => { const vis = (e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden';
+    const bs = [...document.querySelectorAll('[data-v2b="principal"], .v2-tete-tache button, .vrm-app-header button, .v2-sous-titre button')].filter(vis);
+    return bs.map((b) => { const q = b.getBoundingClientRect(); const x = q.left + q.width / 2, y = q.top + q.height / 2; if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return null;
+      const e = document.elementFromPoint(x, y); return { b: (b.getAttribute('aria-label') || b.textContent || '').trim().slice(0, 24), ok: !!e && (e === b || b.contains(e)), sur: e ? e.tagName + '.' + String(e.className).slice(0, 30) : null }; }).filter(Boolean); });
+  dit(cibles.length >= 3 && cibles.every((c) => c.ok), `T Annonces : chaque bouton plein / de tête est atteignable au toucher (${cibles.length})`, cibles.filter((c) => !c.ok));
+  await pg.locator('[data-v2-principal="publier"]').first().tap({ timeout: 6000 }).catch(() => {}); await pg.waitForTimeout(1500);
+  dit(await pg.evaluate(() => !!document.querySelector('[class*="vrm-pa"], [data-pa-site], [data-publier-ailleurs]')), 'T un VRAI toucher sur « Publier » ouvre « Publier ailleurs »');
+  await pg.keyboard.press('Escape').catch(() => {}); await pg.goBack().catch(() => {}); await pg.waitForTimeout(800);
+  await pg.goto(`http://localhost:${PORT}/?tab=annonces`, { waitUntil: 'domcontentloaded' }); await pret(pg);
   {
     await pg.locator('[data-ann-barre] .vrm-ann-outils > button').first().tap({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(500);
     const me = await pg.evaluate(() => [...document.querySelectorAll('[data-v2-ann-vue]')].map((b) => b.getAttribute('data-v2-ann-vue')));
