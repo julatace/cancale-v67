@@ -26,6 +26,8 @@ const PLEIN = process.env.PLEIN === '1';
       const o = await P.ouvrir(nav, { W, sombre: t === 'sombre', b: P.base(), url: ECR[e], dsf: W < 600 ? 2 : 1, avantChargement: MAQ ? `localStorage.setItem('vrm_maquette', ${JSON.stringify(MAQ)})` : '' });
       await P.pret(o.pg);
       await o.pg.waitForTimeout(900);
+      // Les messages passagers (« 36 nouvelles paires numérotées… ») se ferment comme Julien le ferait : un toucher.
+      for (let k = 0; k < 4; k++) { const t = o.pg.locator('.vrm-toast').first(); if (!(await t.count())) break; await t.click({ timeout: 1500 }).catch(() => {}); await o.pg.waitForTimeout(350); }
       const mesure = await o.pg.evaluate(() => {
         const r = document.querySelector('.vrm-main');
         const l = document.querySelector('.sb-rangee, [data-ligne-vente], [data-annonce-ligne], [data-achat-ligne], .vrm-liste-ligne');
