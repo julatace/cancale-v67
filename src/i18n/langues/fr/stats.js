@@ -305,4 +305,12 @@ export default {
   "stats.cv.nonComptees": {"one": "{n} vente au prix pas lu, hors tableau.", "other": "{n} ventes au prix pas lu, hors tableau."},
   "stats.cv.delaiTitre": {"one": "médiane, sur {n} vente datée", "other": "médiane, sur {n} ventes datées"},
   "stats.cv.offresTitre": {"one": "sur {n} offre reçue", "other": "sur {n} offres reçues"},
+  // (16 nov., lot plateformes-restes) Vestiaire : une seule règle du finalisé
+  "stats.vcFin.lecture": "lecture en cours",
+  "stats.vcFin.pasLu": "ventes Vestiaire pas lues",
+  "stats.vcFin.aucune": "pas encore de vente finalisée",
+  "stats.vcFin.pasSur": {"one": "{n} vente finalisée au montant pas sûr", "other": "{n} ventes finalisées au montant pas sûr"},
+  "stats.vcFin.auMoins": {"one": "au moins : {n} vente finalisée au montant pas sûr, hors total", "other": "au moins : {n} ventes finalisées au montant pas sûr, hors total"},
+  "stats.vcFin.lu": "ventes finalisées (montant versé)",
+  "stats.totalAuMoins": "au moins : des ventes au montant pas sûr sont hors total",
 };
