@@ -227,10 +227,11 @@
 .sr-ici.sr-kraft .sr-plan-case.is-vise { background: #0071E3; }
 :root[data-theme="dark"] .sr-ici.sr-kraft .sr-plan-case.is-vise { background: #4AA3FF; }
 .sr-ici.sr-kraft .sr-ici-meuble { font-size: 24px; }
-/* « Où est N°178 » : SA place, l'étiquette en grand et allumée (un liseré bleu qui suit le coin coupé, deux battements). */
-.sr-reponse .sr-ici.sr-kraft { filter: drop-shadow(0 0 1.5px #0071E3) drop-shadow(0 0 1.5px #0071E3); animation: sr-allume 1400ms ease-in-out 1; }
-:root[data-theme="dark"] .sr-reponse .sr-ici.sr-kraft { filter: drop-shadow(0 0 1.5px #4AA3FF) drop-shadow(0 0 1.5px #4AA3FF); }
-@keyframes sr-allume { 30% { filter: drop-shadow(0 0 5px #0071E3) drop-shadow(0 0 2px #0071E3); } 60% { filter: drop-shadow(0 0 1.5px #0071E3) drop-shadow(0 0 1.5px #0071E3); } }
+/* « Où est N°178 » : SA place, l'étiquette en grand et ALLUMÉE — un liseré bleu de 3 px qui suit le coin coupé. */
+.sr-kraft-anneau { padding: 3px; background: #0071E3; clip-path: polygon(17px 0, 100% 0, 100% 100%, 0 100%, 0 17px); border-radius: 0 13px 13px 13px; animation: sr-allume 900ms ease-out 1 both; }
+:root[data-theme="dark"] .sr-kraft-anneau { background: #4AA3FF; }
+.sr-kraft-anneau > .sr-ici.sr-kraft { clip-path: polygon(15px 0, 100% 0, 100% 100%, 0 100%, 0 15px); border-radius: 0 10px 10px 10px; }
+@keyframes sr-allume { from { transform: scale(.97); opacity: .4; } 60% { transform: scale(1.015); opacity: 1; } to { transform: none; } }
 /* Mes places : l'étiquette du meuble, ses lettres au feutre. */
 .sr-place-etiquette { display: grid; place-items: center; width: 52px; height: 44px; flex: none; font-size: 17px; font-weight: 800; letter-spacing: .02em; font-variant-numeric: tabular-nums; clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%, 0 10px); border-radius: 0 8px 8px 8px; }
 .sr-place-etiquette.sr-kraft::before { left: 6px; top: 6px; width: 5px; height: 5px; }
@@ -246,5 +247,5 @@
 .sr-reste { display: inline-block; font-variant-numeric: tabular-nums; animation: sr-cran 220ms cubic-bezier(.32, 1.25, .5, 1) both; }
 @keyframes sr-cran { from { opacity: .3; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) {
-  .sr-coche, .sr-reste, .sr-seance.is-sortie .sr-paire, .sr-seance.is-sortie .sr-ici, .sr-reponse .sr-ici.sr-kraft { animation: none !important; }
+  .sr-coche, .sr-reste, .sr-seance.is-sortie .sr-paire, .sr-seance.is-sortie .sr-ici, .sr-kraft-anneau { animation: none !important; }
 }

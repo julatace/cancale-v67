@@ -29,7 +29,7 @@ export default {
   "sr.reponse.deplacer": "Déplacer",
   "sr.reponse.ranger": "Ranger maintenant",
   "sr.pasLu": "Annonces pas lues : rien n'est perdu.",
-  "sr.cherche.place": "Où est… un N° ou un modèle",
+  "sr.cherche.place": "N° ou modèle",
   "sr.cherche.rienNum": "Aucun N°{num} dans le stock.",
   "sr.cherche.rien": "Rien pour « {q} ».",
   "sr.places.plein": {

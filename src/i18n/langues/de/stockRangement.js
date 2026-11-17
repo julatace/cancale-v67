@@ -29,7 +29,7 @@ export default {
   "sr.reponse.deplacer": "Umräumen",
   "sr.reponse.ranger": "Jetzt einräumen",
   "sr.pasLu": "Anzeigen nicht gelesen: nichts geht verloren.",
-  "sr.cherche.place": "Wo ist… eine Nr. oder ein Modell",
+  "sr.cherche.place": "Nr. oder Modell",
   "sr.cherche.rienNum": "Keine Nr. {num} im Lager.",
   "sr.cherche.rien": "Nichts für „{q}“.",
   "sr.places.plein": {

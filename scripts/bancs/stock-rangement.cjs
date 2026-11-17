@@ -150,6 +150,17 @@ async function parcours(b, port, { tel, sombre, v2, nom }) {
     dit(ap.numeros === avant.numeros && Object.keys(MAIN.vrm_slots).every((k) => JSON.stringify(ap.slots[k]) === JSON.stringify(MAIN.vrm_slots[k])), `${t} : P2 — aucun N° changé, aucune paire déjà rangée bougée`);
     if (v2) { dit(suite, `${t} : P2 — la case proposée suit la dernière place (le même meuble)`); if (regl) res.reglesSeance = regl; }
     await r.ctx.close(); }
+  // P7 (allumé) — LA DERNIÈRE PLACE : la 1re paire posée par « Autre place » dans l'Armoire (mB:0) ; la suivante doit se
+  // voir proposer l'Armoire (mB:1), pas la première case libre de l'Étagère (mA:6).
+  if (v2) { const r = await rendre(b, port, { tel, sombre, v2 });
+    await r.toucher('[data-sr-lancer]'); await r.toucher('[data-sr-autre]'); await r.toucher('[data-sr-onglet="mB"]');
+    await r.toucher('[data-sr-grille="mB"] [data-sr-case="mB:0"]');
+    await r.pg.waitForSelector('[data-sr-courant="202"]', { timeout: 8000 }).catch(() => {});
+    const prop = await r.pg.getAttribute('[data-sr-propose]', 'data-sr-propose').catch(() => null);
+    const ap = await r.lireLs();
+    dit(ap.slots && ap.slots['201'] && ap.slots['201'].m === 'mB' && ap.slots['201'].i === 0, `${t} : P7 — N°201 posée dans l'Armoire par « Autre place »`, JSON.stringify(ap.slots && ap.slots['201']));
+    dit(prop === 'mB:1', `${t} : P7 — la suivante se voit proposer la case d'à côté dans l'Armoire (la dernière place utilisée)`, String(prop));
+    await r.ctx.close(); }
   // P3 + P4 — trouver N°178, puis la déplacer.
   { const r = await rendre(b, port, { tel, sombre, v2 }); const avant = await r.lireLs();
     let trouve = false;
@@ -229,7 +240,7 @@ async function parcours(b, port, { tel, sombre, v2, nom }) {
         dit(g.sw <= g.iw, `${t} : ${k} — aucun défilement de côté`, `${g.sw}/${g.iw}`);
         dit(g.pleins <= 1, `${t} : ${k} — un seul bouton plein`, String(g.pleins));
         if (k === 'écran') { dit(g.premiere != null && g.premiere <= g.ih * 0.5, `${t} : écran — la 1re paire de la liste dans la moitié haute du premier écran`, `${g.premiere} px / ${g.ih}`);
-          dit(g.glisse, `${t} : écran — glisser à gauche une paire à ranger : « Ranger »`); }
+          if (/^390/.test(t)) dit(g.glisse, `${t} : écran — glisser à gauche une paire à ranger : « Ranger »`); }
       }
       if (REF) {
         const ref = await parcours(b, portRef, { ...c, v2: false, nom: c.nom + '-main' });

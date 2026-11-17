@@ -181,11 +181,11 @@ function Reponse({ s, f, onDeplacer, onRanger, onVoir }) {
         </div>
       </div>
       {ou ? (
-        <div className="sr-ici sr-kraft is-reponse" data-sr-etiquette-place="">
+        <div className="sr-kraft-anneau"><div className="sr-ici sr-kraft is-reponse" data-sr-etiquette-place="">
           <span className="sr-ici-meuble" data-sr-reponse-meuble="">{ou.meuble.name}</span>
           <span className="sr-ici-case">{tr('sr.ici.case', { r: nombre(ou.rangee), c: nombre(ou.colonne) })}</span>
           <PetitPlan m={ou.meuble} viseI={ou.i} occupee={s.occupee}/>
-        </div>
+        </div></div>
       ) : <p className="sr-sans" data-sr-reponse-pas-rangee="">{tr('sr.reponse.pasRangee')}</p>}
       <div className="sr-gestes-bas">
         {ou ? <button type="button" className="sr-btn sr-btn-teinte" data-sr-voir="" onClick={onVoir}>{tr('sr.reponse.voir')}</button> : null}
@@ -217,7 +217,6 @@ function LignePaire({ s, l, onOuvrir, onRanger, onDeplacer }) {
         <span className="v2l-a-l2">
           {l.cle ? <PlaqueV2 num={l.numero}/> : <span className="sr-sans-num">{tr('sr.ligne.sansNum')}</span>}
           <span className="v2l-faits-txt">{[l.taille ? tr('v2.l.taille', { t: l.taille }) : '', place].filter(Boolean).join(' · ')}</span>
-          {l.cle && !l.ou ? <span className="v2l-geste" data-sr-ligne-a-ranger=""><i className="v2-point" aria-hidden="true"/>{tr('sr.ligne.aRanger')}</span> : null}
           {l.vendue ? <span className="v2l-geste" data-sr-ligne-vendue="">{tr('sr.ligne.vendue')}</span> : null}
         </span>
       </span>
@@ -313,7 +312,7 @@ export default function StockV2({ s }) {
             placeholder={tr('sr.cherche.place')} aria-label={tr('stock.retrouverArticleDans')} data-sr-cherche=""
             onKeyDown={(e) => { if (e.key === 'Escape') s.setQ(''); if (e.key === 'Enter' && un && s.ouEst(un)) { e.preventDefault(); voir(un); } }}/>
           <span className="sr-cherche-mic">{s.q ? <button type="button" className="sr-rond is-petit" aria-label={tr('reglages.recherche.effacer')} onClick={() => s.setQ('')}><Icon name="close" size={18}/></button>
-            : <>{s.dicteeOk ? <Mic titre={tr('stock.chercherVoixNumero')} onText={(t) => s.setQ(requeteDeLaVoix(t).requete)}/> : null}
+            : <>{s.dicteeOk ? <Mic nu titre={tr('stock.chercherVoixNumero')} onText={(t) => s.setQ(requeteDeLaVoix(t).requete)}/> : null}
               <button type="button" className="sr-rond is-petit" aria-label={tr('stock.trouverPhoto')} title={tr('stock.trouverPhoto')} data-sr-photo="" onClick={s.ouvrirPhoto}><Icon name="camera" size={20}/></button></>}</span>
         </div>
         <BoutonIconeV2 icone={<Icon name="more" size={22}/>} label={tr('sr.menu.ouvrir')} onClick={() => setPlus(true)} attrs={{ 'data-sr-plus-ouvrir': '', 'data-sr-etats': s.etats.length || undefined }}/>

@@ -29,7 +29,7 @@ export default {
   "sr.reponse.deplacer": "Move",
   "sr.reponse.ranger": "Put away now",
   "sr.pasLu": "Listings not read: nothing is lost.",
-  "sr.cherche.place": "Where is… a number or a model",
+  "sr.cherche.place": "Number or model",
   "sr.cherche.rienNum": "No No. {num} in stock.",
   "sr.cherche.rien": "Nothing for “{q}”.",
   "sr.places.plein": {

@@ -29,7 +29,7 @@ export default {
   "sr.reponse.deplacer": "Mover",
   "sr.reponse.ranger": "Guardar ahora",
   "sr.pasLu": "Anuncios no leídos: no se pierde nada.",
-  "sr.cherche.place": "Dónde está… un n.º o un modelo",
+  "sr.cherche.place": "N.º o modelo",
   "sr.cherche.rienNum": "Ningún n.º {num} en el stock.",
   "sr.cherche.rien": "Nada para «{q}».",
   "sr.places.plein": {
