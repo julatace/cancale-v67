@@ -119,20 +119,21 @@ const segment = async (pg, libelle) => {
       console.log(`   (N3 : ${cartes.length} cartes : ${cartes.map((c) => c.t).join(' | ')})`);
       let vues = 0;
       for (const c of cartes) {
-        await barre(pg, 'journee');
+        // Chaque carte depuis une Ma journée fraîche (une carte qui ouvre une feuille ne gêne pas la suivante).
+        await pg.goto(`http://localhost:${NV.PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' });
+        await pg.waitForSelector('.vrm-main [data-tuile]', { timeout: 20000 }).catch(() => {});
+        await attendre(pg, 1500);
+        await pg.evaluate(() => [...document.querySelectorAll('.vrm-main [data-tuile], .vrm-main [data-sj-lien]')].filter((x) => x.getClientRects().length).forEach((x, i) => x.setAttribute('data-banc-carte', String(i))));
         const l = pg.locator(`[data-banc-carte="${c.i}"]`);
-        if (!(await l.count())) { await pg.waitForSelector('.vrm-main [data-tuile]', { timeout: 15000 }).catch(() => {}); await pg.evaluate(() => [...document.querySelectorAll('.vrm-main [data-tuile], .vrm-main [data-sj-lien]')].filter((x) => x.getClientRects().length).forEach((x, i) => x.setAttribute('data-banc-carte', String(i)))); }
         const avant = await etat(pg);
         await l.first().tap({ timeout: 4000 }).catch((e) => console.log(`   (N3 « ${c.t} » : toucher impossible : ${String(e.message).split('\n')[0]})`));
-        // Le changement d'écran se calcule en tâche interruptible : on attend l'ÉTAT (8 s au plus), jamais un délai fixe seul.
         await pg.waitForFunction((a) => { const m = document.querySelector('.vrm-main'); return m && m.getAttribute('data-ecran') !== a; }, avant.ecran, { timeout: 8000 }).catch(() => {});
         await attendre(pg, 1500);
         const e = await etat(pg);
-        if (e.ecran === avant.ecran) { console.log(`   (N3 « ${c.t} » : reste sur ${e.ecran})`); continue; }   // une carte qui ne change pas d'écran (feuille, geste)
+        if (e.ecran === avant.ecran) { console.log(`   (N3 « ${c.t} » : reste sur ${e.ecran})`); continue; }
         vues++;
         dit(e.top === 0, `N3 Ma journée → carte « ${c.t} » ouvre ${e.ecran} EN HAUT`, JSON.stringify(e));
         dit(e.actif === ATTENDU[e.ecran] || !ATTENDU[e.ecran], `N6 carte « ${c.t} » : l’onglet allumé (${e.actif}) est celui de ${e.ecran}`, JSON.stringify(e));
-        await pg.keyboard.press('Escape').catch(() => {});
       }
       dit(vues >= 2, `N3 au moins deux cartes de Ma journée mènent à un écran (${vues})`);
     });

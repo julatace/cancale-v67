@@ -35,17 +35,21 @@ const mesure = (pg) => pg.evaluate(() => {
     for (let n = tw.nextNode(); n; n = tw.nextNode()) {
       if (!/\S/.test(n.nodeValue)) continue; const p = n.parentElement; if (!p || !vis(p) || p.closest('[aria-hidden="true"], .vrm-sr-seul, svg')) continue;
       const cs = getComputedStyle(p); if (cs.clip !== 'auto' && cs.clip !== '' && cs.position === 'absolute') continue;
+      // Un texte rogné par un parent (overflow) ne se voit que dans la boîte de ce parent : on coupe son rectangle.
+      let cl = { left: -1e9, top: -1e9, right: 1e9, bottom: 1e9 };
+      for (let q = p; q && q !== document.body; q = q.parentElement) { const c = getComputedStyle(q); if (c.overflowX !== 'visible' || c.overflowY !== 'visible') { const b = q.getBoundingClientRect(); cl = { left: Math.max(cl.left, b.left), top: Math.max(cl.top, b.top), right: Math.min(cl.right, b.right), bottom: Math.min(cl.bottom, b.bottom) }; } }
       const rg = document.createRange(); rg.selectNodeContents(n);
-      for (const r of rg.getClientRects()) if (r.width > 2 && r.height > 2) boites.push({ r, t: n.nodeValue.trim().slice(0, 18) });
+      for (const r0 of rg.getClientRects()) { const r = { left: Math.max(r0.left, cl.left), top: Math.max(r0.top, cl.top), right: Math.min(r0.right, cl.right), bottom: Math.min(r0.bottom, cl.bottom) }; if (r.right - r.left > 2 && r.bottom - r.top > 2) boites.push({ r, t: n.nodeValue.trim().slice(0, 18), n }); }
     }
     for (let i = 0; i < boites.length; i++) for (let j = i + 1; j < boites.length; j++) {
+      if (boites[i].n === boites[j].n) continue;   // deux lignes d'un même texte
       const a = boites[i].r, b = boites[j].r;
       const ix = Math.min(a.right, b.right) - Math.max(a.left, b.left), iy = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
       if (ix > 2 && iy > 3) chevauche.push(`« ${boites[i].t} » × « ${boites[j].t} »`);
     }
     for (const e of row.querySelectorAll('.vrm-fu-vente-compte, .vrm-fu-vente-compte *, .vrm-fu-legende, .vrm-ledger-sale-state')) {
       if (!vis(e)) continue; const cs = getComputedStyle(e);
-      if (cs.textOverflow === 'ellipsis' && e.scrollWidth > e.clientWidth + 1) rognes.push((e.innerText || '').slice(0, 30));
+      const tx = (e.innerText || '').trim(); if (tx && cs.textOverflow === 'ellipsis' && e.scrollWidth > e.clientWidth + 1) rognes.push(tx.slice(0, 30) + ' (' + e.className + ')');
     }
   }
   return { n: rows.length, chevauche: [...new Set(chevauche)].slice(0, 8), rognes: [...new Set(rognes)].slice(0, 8) };
@@ -62,8 +66,12 @@ const mesure = (pg) => pg.evaluate(() => {
       await pg.setViewportSize({ width: W, height: W === 375 ? 667 : 844 });
       await pg.evaluate((t) => { try { if (t === 'normal') localStorage.removeItem('vrm_taille_texte'); else localStorage.setItem('vrm_taille_texte', t); } catch (_) {} }, taille);
       await pg.reload({ waitUntil: 'domcontentloaded' });
-      await pg.waitForSelector('.vrm-main .vrm-sale-row', { timeout: 30000 }).catch(() => {});
       await pg.waitForTimeout(3000);
+      // La liste « Toutes » (la capture de Julien) : le segment de Ventes · Vinted.
+      const toutes = pg.locator('.vrm-main').getByRole('button', { name: /^Toutes/ }).first();
+      if (await toutes.count()) { await toutes.tap().catch(() => {}); }
+      await pg.waitForSelector('.vrm-main .vrm-sale-row', { timeout: 30000 }).catch(() => {});
+      await pg.waitForTimeout(2500);
       const m = await mesure(pg);
       if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `ventes-ligne-${W}-${taille}.png`) });
       dit(m.n >= 3, `${T} des lignes de vente sont là (${m.n})`);
