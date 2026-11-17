@@ -97,7 +97,7 @@ async function capture(nav, { W, sombre, hash, nom, focus = false, plein = false
   const o = await P.ouvrir(nav, { W, sombre, b, url: '/', dsf: W < 600 ? 2 : 1 });
   await o.pg.route(/heros-124/, (r) => r.fulfill({ status: 200, contentType: 'image/svg+xml', body: HEROS }));
   await o.pg.evaluate(() => { localStorage.setItem('vrm_banc_maquette', 'f'); });
-  await o.pg.goto(`http://localhost:${P.PORT}/${hash ? '#' + hash : ''}`, { waitUntil: 'domcontentloaded' });
+  await o.pg.goto(`http://localhost:${P.PORT}/?maquette=f${hash ? '#' + hash : ''}`, { waitUntil: 'domcontentloaded' });
   await o.pg.waitForSelector('.f-racine:not(.f-attente)', { timeout: 25000 }).catch(() => {});
   await o.pg.waitForTimeout(900);
   if (focus) { await o.pg.focus('.f-barre-champ').catch(() => {}); await o.pg.waitForTimeout(200); }

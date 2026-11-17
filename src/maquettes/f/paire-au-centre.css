@@ -8,14 +8,22 @@
    Linear (trois colonnes denses, la fiche à droite, rien ne bouge de place).
    ════════════════════════════════════════════════════════════════════════════ */
 @import '../../design/studio.css';
+@import '../../design/studio-verre.css';
 
-html[data-maquette="f"], html[data-maquette="f"] body { background: var(--sb-haut); }
-html[data-maquette="f"] body { margin: 0; }
+/* LE FOND BLEU de l'app (« Verre dépoli », src/design/studio-verre.css) : le même dégradé, posé une fois. */
+html[data-maquette="f"] { background: var(--sv-bas) !important; }
+html[data-maquette="f"] body { margin: 0; background: transparent !important; }
+html[data-maquette="f"] body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(120% 60% at 15% 0%, var(--sv-reflet) 0%, transparent 55%), radial-gradient(70% 45% at 100% 38%, var(--sv-reflet-2) 0%, transparent 70%),
+    linear-gradient(170deg, var(--sv-haut) 0%, var(--sv-milieu) 45%, var(--sv-bas) 100%); }
 .f-racine {
   --f-g: 16px;
-  min-height: 100dvh; box-sizing: border-box; color: var(--sb-encre);
+  /* Deux encres : sur le FOND (claire) et sur le VERRE (sombre le jour). */
+  --f-c: var(--sv-clair); --f-c2: var(--sv-clair-2); --f-cambre: var(--sv-clair-ambre); --f-clien: var(--sv-clair-lien);
+  --f-e: var(--sv-encre); --f-e2: var(--sv-encre-2); --f-eambre: var(--sv-ambre); --f-elien: var(--sv-lien);
+  --f-verre: var(--sv-verre); --f-flou: var(--sv-flou); --f-ombre: var(--sv-ombre);
+  min-height: 100dvh; box-sizing: border-box; color: var(--f-c);
   font-family: var(--sb-police-texte); font-feature-settings: var(--sb-chiffres); -webkit-font-smoothing: antialiased;
-  background: linear-gradient(180deg, var(--sb-haut) 0, var(--sb-aplat) 280px, var(--sb-aplat) 70%, var(--sb-bas) 100%) fixed;
   padding: 0 var(--f-g) calc(120px + env(safe-area-inset-bottom));
   -webkit-tap-highlight-color: transparent;
 }
@@ -102,7 +110,8 @@ button.f-ligne:active { background: var(--sb-porcelaine-2); }
 
 /* ── L'accueil : le geste du moment ── */
 .f-geste { margin-top: 18px; padding: 4px 4px 0; }
-.f-geste-sur { margin: 0; font-size: 14px; color: var(--sb-encre-2); text-transform: capitalize; }
+.f-geste-sur { margin: 0; font-size: 14px; color: var(--sb-encre-2); }
+.f-geste-sur::first-letter { text-transform: uppercase; }
 .f-geste-chiffre, .f-liste-chiffre { display: flex; align-items: baseline; gap: 10px; margin: 6px 0 0; }
 .f-affiche { font-size: 64px; line-height: 1; font-weight: 500; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
 .f-geste-unite { font-size: 20px; font-weight: 500; }
@@ -206,3 +215,86 @@ button.f-ligne:active { background: var(--sb-porcelaine-2); }
 .f-fiche--vide { display: grid; place-items: center; height: 60vh; }
 @media (hover: hover) { .f-ligne:hover { background: var(--sb-porcelaine-2); } }
 @media (prefers-reduced-motion: reduce) { .f-racine * { transition: none !important; } }
+
+/* ══ LA MATIÈRE : le VERRE posé sur le fond bleu (encre sombre le jour), l'encre CLAIRE sur le fond ══
+   (rangée en dernier : elle décide des couleurs de tout ce qui précède). */
+.f-tete, .f-fiche-haut { background: color-mix(in oklab, var(--sv-haut) 70%, transparent); }
+.f-marque, .f-marque-sous { color: var(--f-c); }
+.f-marque-sous { color: var(--f-c2); }
+.f-barre { background: var(--sb-puits); box-shadow: var(--f-ombre); color: var(--f-e2); }
+:root[data-theme="dark"] .f-barre { color: var(--f-c2); }
+.f-barre-champ, .f-barre-champ::placeholder { color: var(--f-e); }
+.f-barre-champ::placeholder { color: var(--f-e2); }
+:root[data-theme="dark"] .f-barre-champ { color: var(--f-c); }
+:root[data-theme="dark"] .f-barre-champ::placeholder, :root[data-theme="dark"] .f-barre-x { color: var(--f-c2); }
+.f-barre-x { color: var(--f-e2); }
+.f-jeton { background: var(--sv-brume); box-shadow: none; color: var(--f-e); }
+:root[data-theme="dark"] .f-jeton { color: var(--f-c); }
+.f-kbd { color: var(--f-e2); box-shadow: inset 0 0 0 1px rgb(12 29 48 / .18); }
+/* Les pastilles posées sur le fond : du verre FIN, encre claire ; choisie = le verre plein, encre sombre. */
+.f-pastille { background: var(--sv-verre-fin); box-shadow: inset 0 0 0 1px var(--sv-verre-fin-bord); color: var(--f-c); }
+.f-pastille-n { color: var(--f-c2); }
+.f-pastille .f-point { background: var(--f-cambre); }
+.f-pastille.is-actif { background: var(--sv-porcelaine); box-shadow: var(--f-ombre); color: var(--f-e); }
+:root[data-theme="dark"] .f-pastille.is-actif { background: var(--sv-feuille); color: var(--f-c); }
+.f-pastille.is-actif .f-pastille-n { color: var(--f-e2); }
+.f-pastille.is-actif .f-point { background: var(--sb-ambre-point); }
+.f-pastille.is-actif .f-pastille-nom::after { background: var(--sb-diode); }
+/* Sur le fond : titres de section, le chiffre, la phrase, le pied. */
+.f-titre-section, .f-geste-sur, .f-geste-dit, .f-pied, .f-vide, .f-cherche, .f-heros-meta, .f-chiffres dt, .f-rail-t, .f-comptes { color: var(--f-c2); }
+.f-affiche, .f-geste-unite, .f-heros-titre, .f-chiffres dd, .f-fiche-haut-t { color: var(--f-c); }
+.f-geste-dit .f-point, .f-titre-section .f-point { background: var(--f-cambre); }
+.f-racine > .f-accueil .f-lien, .f-geste .f-lien, .f-liste-tete .f-lien { color: var(--f-clien) !important; }
+/* Le seul bouton plein : un galet BLANC sur le bleu (le jour comme la nuit), encre profonde. */
+.f-plein { background: #FFFFFF; background-image: none; color: #0C1D30 !important; box-shadow: 0 1px 2px rgb(8 26 50 / .3), 0 14px 28px -12px rgb(8 26 50 / .7); }
+:root[data-theme="dark"] .f-plein { background: #F2F7FD; }
+.f-rond { background: var(--sv-verre-fin); box-shadow: inset 0 0 0 1px var(--sv-verre-fin-bord); color: var(--f-c); }
+/* Le verre : plans, lignes, raccourcis, « maintenant », la vie. Encre sombre le jour, claire la nuit. */
+.f-plan, .f-raccourci, .f-maintenant, .f-vie { background: var(--f-verre); -webkit-backdrop-filter: var(--f-flou); backdrop-filter: var(--f-flou); box-shadow: var(--f-ombre); color: var(--f-e); }
+.f-ligne-titre, .f-ligne-val, .f-raccourci-quoi, .f-maintenant-t, .f-vie-t, .f-rangee-t { color: var(--f-e); }
+.f-ligne-ou, .f-raccourci-n, .f-maintenant-d, .f-vie-d, .f-vie-date, .f-rangee, .f-raccourci .f-ico { color: var(--f-e2) !important; }
+.f-ligne-ou.is-geste, .f-vie-e.is-geste .f-vie-t { color: var(--f-eambre); }
+.f-ligne-ou.is-geste .f-point, .f-maintenant-t .f-point { background: var(--sb-ambre-point); }
+.f-vie-e.is-avenir .f-vie-t { color: var(--f-e2); }
+.f-tag { background: rgb(12 29 48 / .07); color: var(--f-e2); }
+:root[data-theme="dark"] .f-tag { background: rgb(255 255 255 / .08); }
+.f-plan .f-lien, .f-maintenant .f-lien, .f-vie .f-lien { color: var(--f-elien) !important; }
+.f-ligne + .f-ligne::before, .f-rangee + .f-rangee::before { background: rgb(12 29 48 / .10); }
+:root[data-theme="dark"] .f-ligne + .f-ligne::before, :root[data-theme="dark"] .f-rangee + .f-rangee::before { background: rgb(255 255 255 / .08); }
+button.f-ligne:active, .f-ligne.is-actif { background: rgb(255 255 255 / .55); }
+:root[data-theme="dark"] button.f-ligne:active, :root[data-theme="dark"] .f-ligne.is-actif { background: rgb(255 255 255 / .07); }
+@media (hover: hover) { .f-ligne:hover { background: rgb(255 255 255 / .4); } :root[data-theme="dark"] .f-ligne:hover { background: rgb(255 255 255 / .05); } }
+.f-fil-m { background: rgb(12 29 48 / .14); }
+.f-fil-m.is-fait { background: var(--f-e); opacity: .8; }
+.f-fil-m.is-passu { box-shadow: inset 0 0 0 1px rgb(12 29 48 / .35); }
+/* Le grand fil, posé sur le FOND : encre claire. */
+.f-fil--grand .f-fil-m { background: rgb(255 255 255 / .18); }
+.f-fil--grand .f-fil-m.is-fait { background: var(--f-c); opacity: .95; }
+.f-fil--grand .f-fil-m.is-geste { background: var(--f-cambre); }
+.f-fil--grand .f-fil-m.is-passu { background: none; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .45); }
+.f-fil--grand .f-fil-l { color: var(--f-c2); }
+.f-fil--grand .is-geste .f-fil-l { color: var(--f-cambre); }
+:root[data-theme="dark"] .f-fil-m { background: rgb(255 255 255 / .12); }
+:root[data-theme="dark"] .f-fil-m.is-passu { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .3); }
+.f-vie-rail::before { background: rgb(12 29 48 / .14); }
+.f-vie-rail i { background: var(--f-e); box-shadow: none; }
+.f-vie-e.is-avenir .f-vie-rail i, .f-vie-e.is-passu .f-vie-rail i { background: transparent; box-shadow: inset 0 0 0 1.5px var(--f-e2); }
+.f-vie-e.is-geste .f-vie-rail i { background: var(--sb-ambre-point); box-shadow: 0 0 0 4px color-mix(in oklab, var(--sb-ambre-point) 25%, transparent); }
+.f-plaque { background: rgb(12 29 48 / .06); color: var(--f-e); box-shadow: inset 0 .5px 1px rgb(12 29 48 / .25), inset 0 0 0 .5px rgb(12 29 48 / .12); text-shadow: none; }
+.f-plaque-n, .f-plaque--vide { color: var(--f-e2); }
+:root[data-theme="dark"] .f-plaque { background: rgb(0 0 0 / .25); box-shadow: inset 0 1px 1.5px rgb(0 0 0 / .6); }
+.f-plaque--grand { background: rgb(255 255 255 / .86); color: #0C1D30; }
+.f-plaque--grand .f-plaque-n { color: #3F5468; }
+.f-code { color: var(--f-e); box-shadow: inset 0 0 0 1px rgb(12 29 48 / .18); }
+:root[data-theme="dark"] .f-code { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .2); }
+/* L'ordinateur : le rail et les colonnes, sur le fond. */
+.f-rail { background: rgb(255 255 255 / .04); border-right: 1px solid rgb(255 255 255 / .12); }
+.f-milieu { border-right: 1px solid rgb(255 255 255 / .12); }
+.f-pastilles--rail .f-pastille { background: none; box-shadow: none; color: var(--f-c); }
+.f-pastilles--rail .f-pastille:hover { background: rgb(255 255 255 / .08); }
+.f-pastilles--rail .f-pastille.is-actif { background: var(--sv-porcelaine); color: var(--f-e); box-shadow: var(--f-ombre); }
+:root[data-theme="dark"] .f-pastilles--rail .f-pastille.is-actif { background: rgb(255 255 255 / .12); color: var(--f-c); }
+.f-droite .f-maintenant .f-plein { background: var(--f-e); color: #FFFFFF !important; }
+:root[data-theme="dark"] .f-droite .f-maintenant .f-plein { background: #F2F7FD; color: #0C1D30 !important; }
+.f-maintenant .f-plein { background: #0C1D30; color: #FFFFFF !important; }
+:root[data-theme="dark"] .f-maintenant .f-plein { background: #F2F7FD; color: #0C1D30 !important; }

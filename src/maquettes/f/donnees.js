@@ -166,12 +166,12 @@ function completerPaire(p, { couts, achatParTx, bordParTx, pseudoParTx, loginDe,
   const fini = v && /finalis/i.test(str(v.status));
   const e = [];
   // 1. Achat
-  if (achat) e.push({ cle: 'achat', etat: 'fait', titre: 'Achetée', date: achat.date, valeur: centimes(achat.price), detail: `${loginDe(achat._uid) || 'un de tes comptes'} · reliée par son n° de transaction`, preuve: 'transaction' });
+  if (achat) e.push({ cle: 'achat', etat: 'fait', titre: 'Achetée', date: achat.date, valeur: centimes(achat.price), detail: `sur ${loginDe(achat._uid) || 'un de tes comptes'} · reliée par son n° de transaction${coutSaisi != null && coutSaisi !== centimes(achat.price) ? ' · coût saisi frais compris' : ''}`, preuve: 'transaction' });
   else if (coutSaisi != null) e.push({ cle: 'achat', etat: 'fait', titre: 'Achetée', date: null, valeur: coutSaisi, detail: 'coût saisi par toi · achat pas relié', geste: 'Relier l’achat' });
   else e.push({ cle: 'achat', etat: 'passu', titre: 'Achat', detail: 'prix d’achat pas saisi', geste: 'Saisir le prix' });
   // 2. Rangée
   if (p.cases.length > 1) e.push({ cle: 'case', etat: 'fait', titre: `Rangée en ${p.cases.join(' et ')}`, detail: 'deux cases pour ce N° : regarde les cartons' });
-  else if (p.cases.length === 1) e.push({ cle: 'case', etat: v && st !== 'needs_action' ? 'fait' : 'fait', titre: `Case ${p.cases[0]}`, date: fiche.numberedAt || null, detail: `N° ${p.numero} écrit sur le carton` });
+  else if (p.cases.length === 1) e.push({ cle: 'case', etat: 'fait', titre: `Case ${p.cases[0]}`, date: fiche.numberedAt || null, detail: `N° ${p.numero} écrit sur le carton` });
   else e.push({ cle: 'case', etat: 'passu', titre: 'Rangement', detail: 'aucune case notée pour ce N°' });
   // 3. En ligne (chaque site lu)
   if (a) e.push({ cle: 'ligne', etat: 'fait', titre: v ? 'Était en ligne sur Vinted' : 'En ligne sur Vinted', date: a.cree || null, valeur: p.prixAnnonce,
