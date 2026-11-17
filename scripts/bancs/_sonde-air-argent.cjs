@@ -11,7 +11,7 @@ const tab = process.env.TAB || 'argent_declarer';
   const L = JSON.parse(JSON.stringify(NV.JEU_LIGNES)); const main = L.find((r) => r.id === 'main'); main.data.vinted_regime = 'micro'; main.data.vinted_urssaf_freq = 'mensuel';
   const o = await NV.ouvrir(nav, { W: 390, sombre: false, base: { lignes: L, comptes: NV.JEU_COMPTES, ecritures: 0 }, tab: 'cat_ventes' });
   await o.pg.waitForTimeout(4000);
-  await o.pg.evaluate(() => localStorage.setItem('vrm_design_v2', '1'));
+  await o.pg.evaluate((t) => { localStorage.setItem('vrm_design_v2', '1'); if (t) localStorage.setItem('vrm_taille_texte', 'tresGrand'); }, !!process.env.TRES);
   await o.pg.goto(`http://localhost:${NV.PORT}/?tab=${tab}`); await o.pg.waitForTimeout(6000);
   const r = await o.pg.evaluate(() => {
     const vis = (e) => e.getClientRects().length && !e.closest('[hidden]');
