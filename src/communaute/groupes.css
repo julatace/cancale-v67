@@ -127,3 +127,14 @@
 .vrm-gc-repli { margin: 32px 0 0; }
 .vrm-gc-repli > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; color: var(--cm-doux); font-size: 15px; }
 .vrm-gc-repli .vrm-gc-liste { margin-top: 12px; }
+
+/* Sur le fond bleu de l'app (hors des cartes), l'encre claire du Studio — comme
+   l'en-tête de Communauté (src/design/studio-verre.css) : sinon le gris des notes
+   et l'accent des liens se perdent sur le bleu en clair. */
+:root:root:root body .vrm-app-shell[data-espace] .vrm-gc :is(.vrm-gc-barre, .vrm-gc-bloc > .vrm-cm-section, .vrm-gc-bloc > .vrm-cm-note, .vrm-gc-repli > summary),
+:root:root:root body .vrm-app-shell[data-espace] .vrm-gc > .vrm-cm-note {
+  --cm-encre: var(--sv-clair, #fff); --cm-doux: var(--sv-clair-2, rgba(255,255,255,.82)); --cm-accent: var(--sv-clair-lien, #fff);
+  --sb-lien: var(--sv-clair-lien, #fff); --sb-encre-2: var(--sv-clair-2, rgba(255,255,255,.82));
+  color: var(--cm-doux);
+}
+:root:root:root body .vrm-app-shell[data-espace] .vrm-gc .vrm-gc-bloc > .vrm-cm-section { color: var(--cm-encre); }

@@ -57,7 +57,7 @@ const jetonDe = (id) => Object.keys(JETONS).find((k) => JETONS[k].id === id);
 const session = (id) => ({ access_token: jetonDe(id), refresh_token: 'r-' + id, expires_at: Date.now() + 3600e3, user: { id, email: USERS[id].email } });
 const DID_A = '123456789012345678';
 // Une petite image (PNG 8×8, inventée) pour la photo du groupe.
-const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEklEQVR4nGNgYPhPBDKMmiIVAAD/fz8BBbfWtQAAAABJRU5ErkJggg==', 'base64');
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAIAAABt+uBvAAACiElEQVR4nO3aV0oDURTG8XvFxdgbQRD00W6KLiAgYi/P7kPdhZiMKcZYUnQJ6hLcxvgwIIJmvkjuOTMZvh95EJLAuYc/YcbEDp1/Gups0Bo/6hlibdBaLigMCwJYEMCCABYEsCCABQEsCGBBAAsCWBDAggAWBLAggAUBLAhgQQALAlgQwIIAFgSwIIAFASwIYEEACwJiUdBD7qbTU4vFLc1JfouyoHquAF/zvbul4qbwOH+LpqD7bPG/bwm2uezlnA8TTrugWtbr5e3BZle8rJtpujBgra/26HE732pZT23mAWt8ncdd5tbJdgJ3mVudsZUKqmZKDrcTqGZKCSmoki47306gki73fUHldEVoO4FyutLHBZU2qqLbCZQ2qnJHiMWVdO/kTiFYkLdeExr6N2+9xoIAoYNIFVRYq0uMG6KwVmdBgMRZEvX/IImziFwHXa8+OR+0G9erT87PkqiCjEBEifoMMgIfQywIYEEACwJYEMCCABYEiNyL5R/n3E7ZpfzjHO/FwvBeDOibezFr/e3nWeezhtt+npU4SHIKEjqI4LcaO42UxMR/2mmkhE6RkILkTiH7vdhuc0Zo7p92mzNyRxD/ZnWvOS26nb3mtOj8Gt/N77emhLaz35qSHl7p1x0HrUnn2zloTSpMrvf7oMP2hMPtHLYndMbW+32QNf5Re9zJdo7a42oza9+LHb+MGWOuFt56ebvmzNFcB528jBpjLhfe//sW/WmjvJs/fR0J/riY/4CviWrOWFxJn70Od3oq8vES9f8gCbEoKM5YEMCCABYEsCCABQEsCGBBAAsCWBDAggAWBLAggAUBLAhgQQALAlgQwIIAFgSwIIAFASwIYEEACwK+ALTiKwLH0xBuAAAAAElFTkSuQmCC', 'base64');
 
 // ── La base : les RÈGLES de la 025 et de la 046, en JS ───────────────────────
 let B;
@@ -312,8 +312,8 @@ const secretsDans = (s, autre) => [autre, USERS[autre].email, USERS[autre].login
         dit(await attr(pg, '[data-cm-accomp-regle-entree]', 'data-cm-accomp-regle-entree') === 'demande' && /Tu acceptes chaque personne/.test(await texte(pg)), 'étape 2 : sur invitation, il accepte chaque personne (la règle de la 025, dite)');
         dit(await attr(pg, '[data-cm-accomp-regle-partage]', 'data-cm-accomp-regle-partage') === 'rien' && /Rien, par défaut/.test(await texte(pg)), 'étape 2 : les membres partagent RIEN par défaut (dit)');
         dit(!(await pg.$('[data-cm-accomp-etape="2"] input[type=radio], [data-cm-accomp-etape="2"] select, [data-cm-accomp-etape="2"] [data-cm-accomp-niveau]')), 'et le créateur ne peut PAS changer ce défaut (c’est le membre qui choisit)');
-        await capture(pg, 'groupes-creer-2-' + nomTheme);
         await pg.fill('[data-cm-accomp-createur]', 'Coach Alice');
+        await capture(pg, 'groupes-creer-2-' + nomTheme);
         await pg.click('[data-cm-accomp-valider]');
         await pg.waitForSelector('[data-cm-accomp-etape="3"]', { timeout: 8000 });
         code = B.groupes[0] && B.groupes[0].code; gid = B.groupes[0] && B.groupes[0].id;
