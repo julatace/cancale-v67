@@ -88,4 +88,14 @@ export default {
   "glisser.choisiCible": "Item selected",
   "glisser.changer": "Change",
   "achats.relierA": "Link to a sale / listing",
+  // (17 nov., lot relier-taille) La ligne « ce qu’on sait » d’un achat à relier (src/FaitsAchat.jsx).
+  "faits.taille": "Size {taille}",
+  "faits.tailleTitre": "Size {taille} (title)",
+  "faits.diff": "≠ {visee}",
+  "faits.memeAria": "Size {taille}, same as the item",
+  "faits.diffAria": "Size {taille}, different from the item ({visee})",
+  "faits.vendeur": "from {vendeur}",
+  "faits.sansTailleLue": {"one": "{n} purchase with no size read from Vinted: it is read when you open the order on vinted.fr (extension connected). Meanwhile, the size written in the title is shown, “(title)”.", "other": "{n} purchases with no size read from Vinted: it is read when you open the order on vinted.fr (extension connected). Meanwhile, the size written in the title is shown, “(title)”."},
+  "faits.memeCible": "✓ same size as the purchase",
+  "faits.diffCible": "size ≠ purchase ({taille})",
 };

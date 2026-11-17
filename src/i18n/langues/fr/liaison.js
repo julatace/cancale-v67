@@ -88,4 +88,14 @@ export default {
   "glisser.choisiCible": "Article choisi",
   "glisser.changer": "Changer",
   "achats.relierA": "Relier à une vente / annonce",
+  // (17 nov., lot relier-taille) La ligne « ce qu’on sait » d’un achat à relier (src/FaitsAchat.jsx).
+  "faits.taille": "Taille {taille}",
+  "faits.tailleTitre": "Taille {taille} (titre)",
+  "faits.diff": "≠ {visee}",
+  "faits.memeAria": "Taille {taille}, la même que l’article",
+  "faits.diffAria": "Taille {taille}, différente de l’article ({visee})",
+  "faits.vendeur": "de {vendeur}",
+  "faits.sansTailleLue": {"one": "{n} achat sans taille lue chez Vinted : elle se lit quand tu ouvres la commande sur vinted.fr (extension connectée). En attendant, la taille écrite dans le titre est montrée, « (titre) ».", "other": "{n} achats sans taille lue chez Vinted : elle se lit quand tu ouvres la commande sur vinted.fr (extension connectée). En attendant, la taille écrite dans le titre est montrée, « (titre) »."},
+  "faits.memeCible": "✓ même taille que l’achat",
+  "faits.diffCible": "taille ≠ achat ({taille})",
 };
