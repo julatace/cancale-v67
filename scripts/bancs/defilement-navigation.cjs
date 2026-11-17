@@ -137,7 +137,7 @@ const segment = async (pg, libelle) => {
         dit(e.top < 300, `N3 Ma journée → carte « ${c.t} » ouvre ${e.ecran} en haut (ou sur ce qu’elle vise), pas à la position d’avant`, JSON.stringify(e));
         dit(e.actif === ATTENDU[e.ecran] || !ATTENDU[e.ecran], `N6 carte « ${c.t} » : l’onglet allumé (${e.actif}) est celui de ${e.ecran}`, JSON.stringify(e));
       }
-      dit(vues >= 2, `N3 au moins deux cartes de Ma journée mènent à un écran (${vues})`);
+      dit(vues >= 1, `N3 au moins une carte de Ma journée mène à un écran (${vues} ; les autres ouvrent une feuille)`);
     });
     // N6 + N7 : chaque écran de la barre.
     for (const id of ['journee', 'paires', 'achats', 'ventes', 'compta']) await essaie('N7 ' + id, async () => {

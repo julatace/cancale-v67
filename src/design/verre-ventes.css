@@ -178,11 +178,11 @@
   }
   :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > .vrm-ledger-gestes [data-cout-vente-saisir] { padding: 0 8px 0 0 !important; justify-content: flex-start !important; }
   :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme]:not(:has(> .vrm-rangee-bord > .vrm-fu-imprimer-ligne:only-child)) :is(.vrm-fu-vente-l2, .vrm-ledger-sale-frise) { padding-right: 0 !important; }
-  :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] .vrm-fu-vente-l2 { flex-wrap: wrap !important; white-space: normal !important; overflow: visible !important; row-gap: 2px !important; }
-  :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] .vrm-fu-vente-l2 > .vrm-fu-vente-compte,
-  :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] .vrm-fu-vente-l2 > .vrm-fu-vente-compte * { overflow: visible !important; text-overflow: clip !important; white-space: nowrap !important; min-width: auto !important; }
-  :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] .vrm-ledger-sale-frise .vrm-fu-legende { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; min-width: 6ch !important; }
-  :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] .vrm-ledger-sale-frise .vrm-fu-frise { flex-wrap: wrap !important; }
+  :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row[data-fu-forme] .vrm-fu-vente-l2 { flex-wrap: wrap !important; white-space: normal !important; overflow: visible !important; row-gap: 2px !important; }
+  :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row[data-fu-forme] .vrm-fu-vente-l2 > .vrm-fu-vente-compte,
+  :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row[data-fu-forme] .vrm-fu-vente-l2 > .vrm-fu-vente-compte * { overflow: visible !important; text-overflow: clip !important; white-space: nowrap !important; min-width: auto !important; }
+  :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row[data-fu-forme] .vrm-ledger-sale-frise .vrm-fu-legende { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; min-width: 6ch !important; }
+  :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row[data-fu-forme] .vrm-ledger-sale-frise .vrm-fu-frise { flex-wrap: wrap !important; }
   :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row[data-fu-forme] .vrm-fp-ligne-bouton {
     min-height: 44px !important; height: auto !important; padding: 0 8px 0 0 !important; background: transparent !important; border: 0 !important; box-shadow: none !important;
     border-radius: 0 !important; font: 600 13px/1.2 Inter, system-ui, sans-serif !important; color: var(--sv-lien, #0b5bd3) !important; width: auto !important; justify-content: flex-start !important;
