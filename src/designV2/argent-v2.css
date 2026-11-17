@@ -299,3 +299,10 @@ html[data-grand-texte] .v2-tete-argent .v2-titre-ligne h1 { flex: 1 0 100%; padd
 .v2-stats-periode svg { position: absolute; right: 4px; transform: rotate(90deg); pointer-events: none; }
 .v2-stats-ligne .v2b-texte { color: var(--v2-page-texte) !important; :root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body .vrm-argent .vrm-compta-carte { padding-inline: 24px !important; }
 }
+
+/* Paramètres : la rangée trouvée par la recherche, surlignée (un fond teinté qui s'éteint) ; mouvement réduit : sans fondu. */
+html[data-design="v2"] .v2-pm-surligne { background: var(--v2-teinte-fond) !important; box-shadow: inset 3px 0 0 var(--v2-lien) !important; transition: background-color 600ms ease; }
+@media (min-width: 1024px) { html[data-design="v2"] .vrm-pm-bureau [data-v2-pm-section] .vrm-pm-cat { margin-top: 0; } }
+@layer vrm-verre {
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-surligne { background: var(--v2-teinte-fond) !important; box-shadow: inset 3px 0 0 var(--v2-lien) !important; }
+}

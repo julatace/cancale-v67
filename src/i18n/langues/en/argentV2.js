@@ -44,5 +44,12 @@ export default {
   "v2.reg.exporter": "Export: {nom}",
   "v2.reg.pdf": "PDF",
   "v2.st.prix": "Prices that sell ›",
-  "v2.st.mesVentes": "‹ My sales"
+  "v2.st.mesVentes": "‹ My sales",
+  "v2.pm.cat.plateformes": "Platforms and accounts",
+  "v2.pm.cat.argent": "Money and accounting",
+  "v2.pm.cat.securite": "Security and data",
+  "v2.pm.cat.aide": "Help",
+  "parametres.cat.securite-donnees.desc": "Accounts, backup, your data",
+  "parametres.cat.securite-donnees": "Security and data",
+  "v2.pm.trouve": "in {section}"
 };

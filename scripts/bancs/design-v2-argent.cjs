@@ -175,6 +175,20 @@ async function air(pg, nom, racineSel) {
   return r;
 }
 
+// Paramètres : toutes les rangées de réglage (`data-reglage-id`) atteintes en DEUX touchers au plus (une section, puis la
+// rangée) depuis le premier écran du téléphone. Rend l'ensemble des ids rencontrés.
+async function parcourirParametres(pg) {
+  const ids = new Set();
+  const sections = await pg.evaluate(() => [...document.querySelectorAll('.vrm-pm [data-categorie-ouvrir]')].filter((e) => e.getClientRects().length).map((e) => e.getAttribute('data-categorie-ouvrir')));
+  for (const sec of sections) {
+    const b = await pg.$(`.vrm-pm [data-categorie-ouvrir="${sec}"]`); if (!b) continue;
+    await b.click(); await pg.waitForTimeout(500);
+    for (const id of await pg.evaluate(() => [...document.querySelectorAll('.vrm-pm [data-categorie-ecran] [data-reglage-id], .vrm-pm [data-categorie-ecran] [data-sous-ouvrir]')].map((e) => e.getAttribute('data-reglage-id') || e.getAttribute('data-sous-ouvrir')))) ids.add(id);
+    const r = await pg.$('[data-categorie-retour]'); if (r) { await r.click(); await pg.waitForTimeout(400); }
+  }
+  return { sections, ids: [...ids].sort() };
+}
+
 const ZONES_ARGENT = '.v2-argent, .v2-argent-nav, .vrm-screen-head:has(.v2-argent-nav)';
 
 (async () => {
@@ -201,6 +215,7 @@ const ZONES_ARGENT = '.v2-argent, .v2-argent-nav, .vrm-screen-head:has(.v2-argen
         sigs.mois = await sigStable(pg);
         await aller(pg, 'argent_declarer', 3000); sigs.declarer = await sigStable(pg);
         await aller(pg, 'settings', 2500); sigs.settings = await sigStable(pg);
+        const pmAvant = tel ? await parcourirParametres(pg) : null;
         releve[T] = sigs;
         if (REF && REF[T]) for (const k of Object.keys(REF[T])) {
           const a = String(REF[T][k] || '').split('\n'), b = String(sigs[k] || '').split('\n');
@@ -341,19 +356,42 @@ const ZONES_ARGENT = '.v2-argent, .v2-argent-nav, .vrm-screen-head:has(.v2-argen
             const sep = rangs.filter((x) => x.previousElementSibling).map((x) => { const b = getComputedStyle(x, '::before'); return parseFloat(b.left); });
             return { hs, n: rangs.length, petits: rangs.filter((x) => x.offsetHeight < 44).length, ic: rangs.filter((x) => x.querySelector('.v2-pm-ic svg, .v2-pm-av')).length, chev: rangs.filter((x) => x.querySelector('.v2-pm-chev svg')).length, val: rangs.filter((x) => x.querySelector('.v2-pm-val')).length, horsComposant: [...r.querySelectorAll('button')].filter((b) => !b.hasAttribute('data-v2-rangee') && !b.hasAttribute('data-v2b')).length, sep };
           });
-          dit(pm && pm.hs.length >= 2 && pm.hs.every((h) => h.fs === 13 && h.fw === 600), `R ${T} : Paramètres en sections, en-têtes 13/600 (${pm ? pm.hs.map((h) => h.t).join(' · ') : '—'})`, pm);
-          dit(pm && pm.n >= 6 && pm.petits === 0 && pm.ic === pm.n && pm.chev === pm.n && pm.horsComposant === 0, `R ${T} : ${pm ? pm.n : 0} rangées ≥ 44 px (composant RangeeTouchable), chacune icône + nom + chevron (${pm ? pm.val : 0} avec leur valeur)`, pm);
+          dit(pm && pm.hs.every((h) => h.fs === 13 && h.fw === 600), `R ${T} : Paramètres, en-têtes de groupe 13/600 s'il y en a (${pm ? pm.hs.map((h) => h.t).join(' · ') || 'une seule liste' : '—'})`, pm);
+          dit(pm && pm.n >= 9 && pm.petits === 0 && pm.ic === pm.n && pm.chev === pm.n && pm.horsComposant === 0, `R ${T} : ${pm ? pm.n : 0} rangées ≥ 44 px (composant RangeeTouchable), chacune icône + nom + chevron (${pm ? pm.val : 0} avec leur valeur)`, pm);
           dit(pm && pm.sep.length && pm.sep.every((x) => x >= 40), `R ${T} : séparateurs indentés (à ${pm && pm.sep[0]} px)`, pm && pm.sep);
           const pt = await pg.evaluate(() => { const vis = (e) => !!e && e.getClientRects().length > 0; const i = document.querySelector('[data-recherche-reglages] input, input[data-recherche-reglages]');
             return { loupe: [...document.querySelectorAll('[data-recherche-loupe]')].filter(vis).length, profil: [...document.querySelectorAll('.vrm-app-header [data-profil-tete], .vrm-app-header .vrm-profil-tete')].filter(vis).length, ph: i ? i.getAttribute('placeholder') : null, phCoupe: i ? i.scrollWidth > i.clientWidth + 1 : null }; });
           dit(pt.loupe === 0 && pt.ph === 'Chercher un réglage', `R ${T} : Paramètres sans la rangée de ronds d’hier, recherche « ${pt.ph} »`, pt);
           await mesurer(pg, `Paramètres ${T}`, '[data-v2-parametres]');
           await air(pg, `Paramètres ${T}`, '.vrm-pm');
+          const top = await pg.evaluate(() => { const l = document.querySelector('[data-v2-pm-sections]'); const r = document.querySelector('[data-v2-parametres]');
+            return { n: l ? l.querySelectorAll('[data-categorie-ouvrir]').length : 0, noms: l ? [...l.querySelectorAll('[data-categorie-ouvrir]')].map((e) => e.getAttribute('data-categorie-ouvrir')) : [],
+              cartes: r ? [...r.children[0].children].filter((e) => e.getClientRects().length && !e.matches('[data-v2-pm-sections]')).length : -1 }; });
+          dit(top.n === 9 && top.noms.join(' ') === 'compte plateformes ventes stock argent apparence notifications securite-donnees aide' && top.cartes === 0, `R ${T} : le premier écran est UNE liste de 9 sections dans l’ordre d’iOS, aucune carte à part (${top.noms.join(' · ')})`, top);
+          const pmApres = await parcourirParametres(pg);
+          const manquent = pmAvant ? pmAvant.ids.filter((id) => !pmApres.ids.includes(id)) : ['(pas de relevé éteint)'];
+          dit(!manquent.length, `R ${T} : chacun des ${pmAvant ? pmAvant.ids.length : 0} réglages d’hier est atteint en deux touchers (une section, la rangée)`, manquent);
+          // La recherche mène AU réglage, surligné.
+          const champ = await pg.$('[data-recherche-reglages] input, input[data-recherche-reglages]');
+          if (champ) { await champ.fill('langue'); await pg.waitForTimeout(500); }
+          const res = await pg.evaluate(() => [...document.querySelectorAll('[data-v2-pm-resultat]')].map((e) => e.getAttribute('data-v2-pm-resultat')));
+          let saut = null;
+          if (res.length) { await pg.click(`[data-v2-pm-resultat="${res[0]}"]`); await pg.waitForTimeout(700);
+            saut = await pg.evaluate((id) => { const e = document.querySelector(`[data-reglage-id="${id}"]`); if (!e) return { id, trouve: false }; const q = e.getBoundingClientRect(); return { id, trouve: true, surligne: e.classList.contains('v2-pm-surligne'), visible: q.top >= 0 && q.bottom <= innerHeight }; }, res[0]); }
+          dit(res.length > 0 && saut && saut.trouve && saut.surligne && saut.visible, `R ${T} : « langue » trouvée (${res.length}) ; le toucher ouvre sa section, la rangée au centre, surlignée`, { res, saut });
+          await capture(pg, `parametres-section-${W}-${th}`);
+          await aller(pg, 'settings', 2000);
           await capture(pg, `parametres-${W}-${th}`);
           // L'interrupteur « Nouveau design (essai) » : Apparence et langue → Apparence.
           const inter = await pg.evaluate(() => !!document.querySelector('[data-design-v2-bouton]'));
           dit(inter, `R ${T} : l’interrupteur « Nouveau design (essai) » est monté dans Paramètres`);
-        } else await capture(pg, `parametres-${W}-${th}`);
+        } else {
+          const d = await pg.evaluate(() => ({ sommaire: document.querySelectorAll('.vrm-pm-sommaire [data-categorie-ouvrir]').length, sections: document.querySelectorAll('.vrm-pm-contenu [data-v2-pm-section]').length, id: (document.querySelector('.vrm-pm-contenu [data-v2-pm-section]') || { getAttribute: () => '' }).getAttribute('data-v2-pm-section') }));
+          const b2 = await pg.$('.vrm-pm-sommaire [data-categorie-ouvrir="apparence"]'); if (b2) { await b2.click(); await pg.waitForTimeout(500); }
+          const d2 = await pg.evaluate(() => (document.querySelector('.vrm-pm-contenu [data-v2-pm-section]') || { getAttribute: () => '' }).getAttribute('data-v2-pm-section'));
+          dit(d.sommaire === 9 && d.sections === 1 && d.id === 'compte' && d2 === 'apparence', `R ${T} : deux colonnes — 9 sections à gauche, UNE section à droite (« ${d.id} » puis « ${d2} »)`, { d, d2 });
+          await capture(pg, `parametres-${W}-${th}`);
+        }
         dit(!o.journal.erreurs.length, `${T} : aucune erreur JS`, o.journal.erreurs);
       } catch (e) { dit(false, `${T} : le banc a planté`, String(e && e.stack || e)); }
       await o.ctx.close();
