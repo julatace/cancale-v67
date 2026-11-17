@@ -618,7 +618,7 @@
   .fl-puce[aria-pressed="true"] { background: var(--vu-teinte); color: var(--vu-teinte-encre); box-shadow: inset 0 0 0 1.5px currentColor; }
   .fl-filtres select:focus-visible, .fl-puce:focus-visible, .fl-case input:focus-visible { outline: none; box-shadow: var(--vu-anneau); }
   .fl-liste { list-style: none; margin: 0 0 8px; padding: 0 2px; border-radius: 16px; background: var(--vu-plaque-2); overflow-y: auto; overscroll-behavior: contain;
-    max-height: min(420px, calc(100vh - 440px)); min-height: 140px; }
+    max-height: min(420px, calc(100vh - 560px)); min-height: 160px; }
   .fl-liste > li + li { border-top: 1px solid var(--vu-filet); }
   .fl-l { display: grid; grid-template-columns: 44px 56px minmax(0, 1fr) auto; align-items: center; gap: 0 10px; min-height: 76px; padding: 8px 10px 8px 2px; cursor: pointer;
     content-visibility: auto; contain-intrinsic-size: auto 76px; -webkit-tap-highlight-color: transparent; }
@@ -650,8 +650,8 @@
   .fl-lbl { margin: 0 2px 4px; font: 600 12.5px/1.35 var(--vu-police); color: var(--vu-muet); }
   .fl-duree { margin: 10px 2px 2px; font: 600 14px/1.4 var(--vu-police); color: var(--vu-encre); font-variant-numeric: tabular-nums; }
   .fl-recap .vu-plein { margin-top: 10px; }
-  /* « Envoyer à N favoris » reste en vue au bas de la carte quand elle défile (jamais caché sous la liste). */
-  .fl-pied { position: sticky; bottom: 0; z-index: 1; margin: 0 -2px; padding: 8px 2px 2px; background: var(--vu-plaque); }
+  /* « Envoyer à N favoris » en vue dès l'ouverture : la liste prend la hauteur qui reste (elle défile seule). */
+  .fl-pied { padding-top: 2px; }
   .fl-pied .fl-note { margin-top: 0; }
   .fl-recap .fl-retour { display: flex; justify-content: center; margin-top: 2px; }
 </style>
@@ -1273,7 +1273,7 @@
       const fn = carte.querySelector('[data-fav-nouveaux]');
       if (fn) fn.addEventListener('click', () => { filtreNouveaux = !filtreNouveaux; rendre(); });
       const env = carte.querySelector('[data-fav-envoyer]');
-      if (env) env.addEventListener('click', () => { const p = piedFl(apercuFav); if (!p.n || p.trop) return; vueFav = 'recap'; favErreur = ''; rendre(); });
+      if (env) env.addEventListener('click', () => { const p = piedFl(apercuFav); if (!p.n || p.trop) return; vueFav = 'recap'; favErreur = ''; rendre(); const rc = carte.querySelector('.fl-recap'); if (rc) { try { carte.scrollTop = Math.max(0, rc.getBoundingClientRect().top - carte.getBoundingClientRect().top + carte.scrollTop - 8); } catch (_) {} } });
       const ret = carte.querySelector('[data-fav-retour]');
       if (ret) ret.addEventListener('click', () => { vueFav = null; favErreur = ''; rendre(); });
     } else carte.querySelectorAll('[data-fav-coche]').forEach((el) => el.addEventListener('change', () => { const id = el.getAttribute('data-fav-coche'); if (el.checked) selFav.add(id); else selFav.delete(id); rendre(); }));
