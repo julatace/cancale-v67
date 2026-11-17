@@ -4,6 +4,8 @@ import { DEMANDE_OUVRIR_ACHAT } from '../pasEnLigne.js';   // (11 nov., lot pas-
 import { prixAchatSaisi } from '../prixAuNumerotage.js';
 import { tousAchatsLibres, tousAchatsLibresDetail, filtresAchats, etiquetteLot } from '../suggestionsAchat.js';
 import { propositionsArticle, pistesArticle } from '../liaisonAchat.js';
+import { FaitsAchat, NoteTailleAchats } from '../FaitsAchat.jsx';   // (17 nov., lot relier-taille)
+import { sansTailleLue } from '../faitsAchat.js';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { tr } from '../i18n/index.js';
 import { createPortal } from 'react-dom';
@@ -719,7 +721,8 @@ const COULEUR_PLATEFORME = { vinted: '#007782', leboncoin: '#EC5A13', ebay: '#00
 // directement sur la recherche (aucune suggestion). `pris` : les achats déjà reliés ailleurs passent les
 // mêmes filtres et viennent APRÈS les libres, « Déjà relié à N°… » (`dejaRelie`), « Déplacer ici » ; `actuel`
 // + `onDelier` : l'achat relié à CET article, « Délier ». Toujours SON clic, sur UNE ligne (son n°).
-function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, receptionDe = null, receptionEtat = 'lu', onFiltres = null, onRelier, C, autre = false, actuel = null, onDelier = null, dejaRelie = null }) {
+function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, receptionDe = null, receptionEtat = 'lu', onFiltres = null, onRelier, C, autre = false, actuel = null, onDelier = null, dejaRelie = null,
+  details = undefined, marqueDe = null, couleursDe = null }) {
   const [tous, setTous] = useState(!!autre);
   const [voirPris, setVoirPris] = useState(false);
   const [q, setQ] = useState('');
@@ -753,7 +756,12 @@ function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, recep
   const liste = detail.liste;
   const filtres = useMemo(() => (voirTous && Array.isArray(achats) ? filtresAchats(tousAchatsLibres({ achats, liens, curTx }), compteDe, extractBrand) : { mois: [], comptes: [], marques: [], tailles: [] }), [voirTous, achats, liens, curTx]);
   const nFiltres = [prixMin, prixMax, recuDu, recuAu, marque, taille].filter((x) => String(x || '').trim()).length;
+  // (17 nov., lot relier-taille) Combien des achats LIBRES (ceux qu'on peut relier) n'ont pas de taille lue chez Vinted.
+  const nSansTaille = useMemo(() => (details && Array.isArray(achats) ? sansTailleLue(tousAchatsLibres({ achats, liens, curTx }), details) : 0), [details, achats, liens, curTx]);
   if (!Array.isArray(achats)) return <div data-relier-chargement style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '20px 0' }}>…</div>;
+  // (17 nov., lot relier-taille) Sous le titre, `FaitsAchat` : la taille d'abord (lue chez Vinted, sinon écrite dans le
+  // titre), « ✓ » si c'est celle de l'article visé, « ≠ 42 » sinon ; puis l'état, la date, le vendeur, les couleurs, la
+  // marque, le compte. La ligne passe à la ligne : rien n'est coupé.
   const ligne = (a, attrs, pris = '') => {
     const ph = orderPhoto(a), lot = etiquetteLot(a, liens), px = prixDe(a);
     const d = a.date ? new Date(a.date) : null;
@@ -762,7 +770,8 @@ function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, recep
         <div style={{ width: 44, height: 44, borderRadius: 12, background: C.border, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{ph ? <PhotoVinted src={ph} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <Icon name="image" size={18} style={{ color: C.muted, opacity: .55 }}/>}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.title || '—'}</div>
-          <div style={{ fontSize: 12, color: C.muted, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{[lot, d && !isNaN(d) ? d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : '', compteDe(a) ? `Vinted · ${compteDe(a)}` : 'Vinted', a.seller || a.user_login ? `de ${a.seller || a.user_login}` : ''].filter(Boolean).join(' · ')}</div>
+          <FaitsAchat achat={a} details={details || null} cible={cible} marqueDe={marqueDe} couleursDe={couleursDe} avant={lot || null}
+            date={d && !isNaN(d) ? d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : ''} compte={compteDe(a) ? `Vinted · ${compteDe(a)}` : 'Vinted'}/>
           {pris ? <div data-relier-deja={pris} style={{ fontSize: 12, fontWeight: 600, color: C.text, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pris}</div> : null}
         </div>
         <div data-relier-prix style={{ fontSize: 15, fontWeight: 700, color: C.text, flexShrink: 0 }}>{px != null ? prixCourt(px) : '—'}</div>
@@ -784,6 +793,7 @@ function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, recep
           {onDelier ? <Bouton variante="discret" data-relier-delier={String(actuel.transaction_id || '')} onClick={onDelier} style={{ flexShrink: 0, minHeight: 44 }}>{tr('achats.delier')}</Bouton> : null}
         </div>
       ) : null}
+      {details ? <NoteTailleAchats n={nSansTaille}/> : null}
       {!autre && sugg.length > 0 && <div data-suggestions-achat={sugg.length}>{sugg.map((x) => ligne(x.achat, { 'data-suggestion-achat': String(x.achat.transaction_id), 'data-rang': x.rang, 'data-niveau': x.niveau }))}</div>}
       {pistes.length > 0 && (
         <div data-pistes-achat={pistes.length} data-pistes-ouvertes={pistesOuvertes ? '1' : '0'} style={{ marginTop: 6 }}>
