@@ -75,7 +75,8 @@ const juge = (m, r) => {
   const ctx = await b.newContext({ serviceWorkers: 'block', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
   await ctx.addInitScript(() => {
     localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_visite_vue', '1'); localStorage.setItem('vrm_visite_bulles_vue', '1');
-    window.__ev = []; window.__lt = []; window.__loaf = [];
+    window.__ev = []; window.__lt = []; window.__loaf = []; window.__saves = [];
+    window.addEventListener('vrm:save', (e) => { const d = e && e.detail; if (d && d.k) window.__saves.push((d.distant ? '~' : '') + d.k); });
     try { new PerformanceObserver((l) => { for (const e of l.getEntries()) if (e.interactionId) window.__ev.push({ n: e.name, s: e.startTime, d: e.duration, id: e.interactionId, p: e.processingEnd - e.processingStart }); }).observe({ type: 'event', durationThreshold: 16, buffered: true }); } catch (_) {}
     try { new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__lt.push([e.startTime, e.duration]); }).observe({ type: 'longtask', buffered: true }); } catch (_) {}
     try { new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__loaf.push([e.startTime, e.duration, e.blockingDuration || 0]); }).observe({ type: 'long-animation-frame', buffered: true }); } catch (_) {}
@@ -119,7 +120,9 @@ const juge = (m, r) => {
 
   // Un geste : `agir` touche ; `utileSel` (fonction évaluée dans la page) dit quand le contenu utile est là.
   async function geste(etiquette, agir, utile, fenetre = 2500) {
-    await pg.evaluate(() => { window.__g0 = performance.now(); window.__ev = []; window.__utile = null; });
+    await pg.evaluate(() => { window.__g0 = performance.now(); window.__ev = []; window.__utile = null; window.__saves = [];
+      window.__ecransAvant = new Map([...document.querySelectorAll('.vrm-ecran-vivant [data-attente-ecran]')].map((x) => [x.getAttribute('data-attente-ecran'), x]));
+      window.__gardesAvant = (document.querySelector('[data-ecrans-gardes]') || { getAttribute: () => '' }).getAttribute('data-ecrans-gardes'); });
     await pg.evaluate((src) => { const f = new Function('return (' + src + ')()'); const z = () => { if (window.__utile != null) return; let v = false; try { v = f(); } catch (_) {} if (v) { window.__utile = performance.now() - window.__g0; return; } requestAnimationFrame(z); }; requestAnimationFrame(z); }, utile.toString());
     const tracer = process.env.TRACE_GESTE && new RegExp(process.env.TRACE_GESTE).test(etiquette);
     if (tracer) await b.startTracing(pg, { path: path.join(SHOTS, 'trace-' + etiquette.replace(/\W+/g, '-') + '.json'), categories: ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'blink', 'v8.execute', 'blink.user_timing', 'disabled-by-default-devtools.timeline.frame', 'disabled-by-default-devtools.timeline.invalidationTracking'] });
@@ -135,7 +138,10 @@ const juge = (m, r) => {
       const reponse = parId.size ? Math.round(Math.max(...parId.values())) : (window.__utile != null ? 16 : null);   // < 16 ms : pas d'entrée (seuil de l'API)
       const lt = window.__lt.filter((x) => x[0] >= g0 - 5);
       const mises = (window.__mises || []).filter((m) => m.t >= g0 - 5);
-      return { mises_n: mises.length, mises_ms: Math.round(mises.reduce((a, m) => a + m.ms, 0)), mises: mises.sort((a, b) => b.ms - a.ms).slice(0, 8), geste: etq, reponse, utile: window.__utile == null ? null : Math.round(window.__utile), longues: Math.round(lt.reduce((a, x) => a + x[1], 0)), plusLongue: Math.round(Math.max(0, ...lt.map((x) => x[1]))), traitement: Math.round(Math.max(0, ...ev.map((e) => e.p))) };
+      const ici = [...document.querySelectorAll('.vrm-ecran-vivant [data-attente-ecran]')].find((x) => x.getClientRects().length);
+      const garde = ici ? { ecran: ici.getAttribute('data-attente-ecran'), meme: [...(window.__ecransGardesVus || new Set())].includes(ici) } : null;
+      (window.__ecransGardesVus = window.__ecransGardesVus || new Set()); if (ici) window.__ecransGardesVus.add(ici);
+      return { garde, saves: [...new Set(window.__saves)].join(' ').slice(0, 400), mises_n: mises.length, mises_ms: Math.round(mises.reduce((a, m) => a + m.ms, 0)), mises: mises.sort((a, b) => b.ms - a.ms).slice(0, 8), geste: etq, reponse, utile: window.__utile == null ? null : Math.round(window.__utile), longues: Math.round(lt.reduce((a, x) => a + x[1], 0)), plusLongue: Math.round(Math.max(0, ...lt.map((x) => x[1]))), traitement: Math.round(Math.max(0, ...ev.map((e) => e.p))) };
     }, etiquette);
   }
   const res = [];
@@ -148,6 +154,7 @@ const juge = (m, r) => {
       const r = await geste(`T${tour} ${tab}`, () => pg.locator(`.vrm-tabbar .vrm-tab[data-nav-entree="${tab}"]`).first().tap(),
         new Function(`return () => { const e = [...document.querySelectorAll('[data-attente-ecran="${tab}"]')].find((x) => x.getClientRects().length); return !!e && /pret|plafond/.test(e.getAttribute('data-attente') || ''); }`)(), tour === 1 ? 6000 : 2500);
       if (process.env.MISES) console.log(JSON.stringify({ n: r.mises_n, ms: r.mises_ms, top: r.mises }));
+      if (process.env.SAVES) console.log('      gardé : ' + JSON.stringify(r.garde) + ' · sauvegardes : ' + r.saves);
       res.push(r); juge(`T onglet ${tab} (${tour === 1 ? 'première fois' : 'revu'})`, r);
       if (tour === 1) await calme(15000);
     }
