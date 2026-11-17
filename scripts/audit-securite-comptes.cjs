@@ -176,6 +176,7 @@ const paris = (s) => Date.parse(s + ':00+01:00');
 
   console.log('\n── E. le vrai background.js (vm)');
   const { faireFond } = require('./_fond-vm.cjs');
+const { filCapte } = require('./_fil-capte-vm.cjs');   // (5.398) le fil relu avant le geste
   const UID = '111';
   const conv = (oid, price) => ({ capturedAt: new Date().toISOString(), payload: { conversation: { id: 'c' + oid, description: 'Paire', opposite_user: { id: 500 }, transaction: { item_id: '9' + oid },
     messages: [{ entity_type: 'offer_request_message', entity: { user_id: 500, current: true, status: 10, status_title: '', price: { amount: String(price) }, transaction_id: 7000 + oid, offer_request_id: oid } }] } } });
@@ -185,7 +186,7 @@ const paris = (s) => Date.parse(s + ':00+01:00');
     if (presence) store.vrmSecu = Object.assign({ presence: { vinted: presence } }, store.vrmSecu || {});
     // L'offre a déjà été vue (délai aléatoire passé) : elle est due.
     store.vrmOffresPrevues = { '1': { at: Date.now() - 1000, uid: UID, quoi: 'accept' } };
-    return faireFond({ src: SRC_BG, lignes, store, vinted: vinted || ((r) => ({ status: 200, body: {} })) });
+    return faireFond({ src: SRC_BG, lignes, store, vinted: filCapte(lignes, vinted || ((r) => ({ status: 200, body: {} }))) });
   };
   const accepts = (f) => f.j.vinted.filter((x) => /offer_requests\/1\/accept$/.test(x.chemin)).length;
   // Repos toute la journée (début = fin - 1 min : 24 h de repos moins 1 min, décalage 0).

@@ -107,11 +107,14 @@ const vgJson = (evs) => JSON.stringify({ tracking_events: evs.map((e, i) => ({ i
     const it = fn(D, 'departsAInterroger')({ sortants: [
       { cle: 'vc:1', suivi: 'XW000000810TS', transporteur: 'Chronopost', venteMs: NOW - 48 * H },
       { cle: 'vc:2', suivi: '87654321', transporteur: 'Mondial Relay', venteMs: NOW - 48 * H },
+      { cle: 'vt:9100000009', suivi: '87654322', transporteur: 'mondialrelay', venteMs: NOW - 48 * H },
       { cle: 'vc:3', suivi: 'XW000000811TS', transporteur: 'Chronopost', venteMs: NOW - 48 * H },
       { cle: 'vc:4', suivi: '6A12345678901', transporteur: 'Colissimo', venteMs: NOW - 48 * H },
       { cle: 'vc:5', suivi: 'XW000000812TS', transporteur: 'Chronopost', venteMs: NOW - 40 * 24 * H },
     ], departs: new Map(), entrants: new Set(['XW000000811TS']), maintenant: NOW, max: 10, parTransporteur: 10 });
-    dit(it.length === 1 && it[0].suivi === 'XW000000810TS' && it[0].carrier === 'chronopost', 'lus comme départ : Chronopost seulement ; ni Mondial Relay (code postal de l’acheteur), ni Colissimo, ni un n° d’achat, ni une vente de plus de 21 jours', JSON.stringify(it));
+    // (16 nov., lot transporteurs-suivi) Mondial Relay NOMMÉ est lu comme départ (le code postal vient de SON
+    // étiquette, prouvé par l'écho : audit-suivi-ventes-mr) ; Colissimo jamais (16 nov. : aucun suivi par clé).
+    dit(it.length === 2 && it.some((x) => x.suivi === 'XW000000810TS' && x.carrier === 'chronopost') && it.some((x) => x.suivi === '87654322' && x.carrier === 'mondialrelay'), 'lus comme départ : Chronopost, et Mondial Relay nommé avec SON étiquette à lire ; ni Mondial Relay sans étiquette (Vestiaire), ni Colissimo (jamais lu chez le transporteur), ni un n° d’achat, ni une vente de plus de 21 jours', JSON.stringify(it));
     const fin = fn(D, 'departsAInterroger')({ sortants: [{ cle: 'vc:1', suivi: 'XW000000810TS', transporteur: 'Chronopost' }], departs: carte(ligne('XW000000810TS', NOW - 20 * H)), maintenant: NOW });
     dit(fin.length === 0, 'pris en charge ⇒ plus jamais relu');
     const tot = fn(D, 'departsAInterroger')({ sortants: Array.from({ length: 20 }, (_, i) => ({ cle: 'vc:' + i, suivi: `XW${String(900000000 + i)}TS`, transporteur: 'Chronopost', venteMs: NOW - 48 * H })), maintenant: NOW, max: 3, parTransporteur: 3 });

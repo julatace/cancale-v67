@@ -20,8 +20,13 @@
 //   · un client = une commission par MOIS au plus (mois de Paris du paiement) ;
 //   · datée du PAIEMENT ; DUE 14 jours après (le délai de rétractation) ;
 //   · rien avant le rattachement (rien de rétroactif) ;
-//   · remboursement, litige ou avoir sur la facture ⇒ la commission est ANNULÉE
-//     (gardée, marquée, dite — jamais effacée) ;
+//   · litige, ou remboursement / avoir de TOUTE la facture ⇒ la commission est
+//     ANNULÉE (gardée, marquée, dite — jamais effacée) ;
+//   · (16 nov., lot compta-donnees) remboursement / avoir PARTIEL ⇒ la commission
+//     est RÉDUITE au prorata de ce qui reste payé : 3 € × (payé − remboursé) / payé,
+//     arrondi au centime INFÉRIEUR (jamais plus que ce que le client a payé) —
+//     1 € rendu sur 16,99 € ⇒ 2,82 €. Un montant de remboursement pas lu ⇒
+//     annulée (pas su ne vaut pas « partiel »). `commissionNette` est la seule règle ;
 //   · client parti ⇒ plus aucune facture, donc plus aucune commission ; ce qui
 //     est déjà gagné reste (rien de rétroactif dans l'autre sens non plus) ;
 //   · partenaire en pause : son code n'attache plus personne ; les clients déjà
@@ -102,7 +107,7 @@ export function factureReelle(f) {
 //   existantes     les commissions DÉJÀ rangées de ce filleul : [{ facture, mois, annulee_le }] ;
 //   annulee        une annulation déjà reçue pour cette facture ou son paiement (raison) ou null.
 // Rend { creer: ligne } ou { rien: raison }.
-export function decisionCommission({ facture, rattachement, partenaire, existantes = [], annulee = null }) {
+export function decisionCommission({ facture, rattachement, partenaire, existantes = [], annulee = null, signaux = [] }) {
   const r = factureReelle(facture);
   if (!r.ok) return { rien: r.raison };
   if (!rattachement || !rattachement.filleul) return { rien: 'pas-rattache' };
@@ -124,15 +129,23 @@ export function decisionCommission({ facture, rattachement, partenaire, existant
     mois,
     due_le: new Date(paye + DELAI_DUE_JOURS * 86400000).toISOString(),
     charge: p.charge, payment_intent: p.payment_intent,
-    annulee_le: null, annulee_raison: null,
+    annulee_le: null, annulee_raison: null, rembourse_centimes: 0,
   };
-  if (annulee && RAISONS_ANNULATION.includes(annulee.raison)) { ligne.annulee_le = annulee.le || new Date(paye).toISOString(); ligne.annulee_raison = annulee.raison; }
+  // (16 nov.) Ce qui est arrivé AVANT la facture payée (désordre) : `signaux` (lignes de
+  // `partenaire_annulations`) ; `annulee` (une annulation sans montant) vaut « toute ».
+  const tous = [...(annulee && RAISONS_ANNULATION.includes(annulee.raison) ? [{ raison: annulee.raison, signal: annulee.signal || 'total', centimes: annulee.centimes == null ? null : annulee.centimes, le: annulee.le }] : []), ...(Array.isArray(signaux) ? signaux : [])];
+  const rb = remboursementDe(tous, ligne.facture_centimes);
+  if (rb.total) { ligne.annulee_le = rb.le || new Date(paye).toISOString(); ligne.annulee_raison = rb.raison; }
+  else if (rb.centimes > 0) ligne.rembourse_centimes = rb.centimes;
   return { creer: ligne };
 }
 
-// Un événement Stripe d'annulation ⇒ { raison, cles: { facture, charge, payment_intent } } ou null.
+// Un événement Stripe d'annulation ⇒ { raison, signal, centimes, cles: { facture, charge, payment_intent } } ou null.
 //   charge.refunded / refund.created / charge.refund.updated ⇒ remboursement ;
 //   charge.dispute.created ⇒ litige ; credit_note.created ⇒ avoir.
+// (16 nov.) `signal` nomme CE geste de Stripe (un remboursement « re_… », un avoir « cn_… »,
+// le cumul d'un paiement « cumul:N », un litige « litige ») : le même rejoué ne compte qu'une
+// fois ; `centimes` = son montant (null = pas lu ⇒ toute la facture).
 export function annulationDeLEvenement(type, obj) {
   if (!obj || typeof obj !== 'object') return null;
   const id = (v) => (typeof v === 'string' ? v : (v && v.id) || '');
@@ -150,7 +163,50 @@ export function annulationDeLEvenement(type, obj) {
   const pi = id(obj.payment_intent);
   if (/^pi_/.test(pi)) cles.payment_intent = pi;
   if (!cles.facture && !cles.charge && !cles.payment_intent) return null;
-  return { raison, cles };
+  const n = (v) => (Number.isInteger(Number(v)) && Number(v) > 0 ? Number(v) : null);
+  let signal = 'total', centimes = null;
+  if (type === 'charge.refunded') { centimes = n(obj.amount_refunded); signal = centimes ? 'cumul:' + centimes : 'total'; }
+  else if (type === 'refund.created' || type === 'charge.refund.updated') { const rid = id(obj.id); centimes = n(obj.amount); signal = /^(re|pyr)_[A-Za-z0-9]+$/.test(rid) && centimes ? rid : 'total'; if (signal === 'total') centimes = null; }
+  else if (type === 'credit_note.created') { const cid = id(obj.id); centimes = n(obj.amount); signal = /^cn_[A-Za-z0-9]+$/.test(cid) && centimes ? cid : 'total'; if (signal === 'total') centimes = null; }
+  else signal = 'litige';
+  return { raison, signal, centimes, cles };
+}
+
+// (16 nov.) CE QUI A ÉTÉ RENDU sur une facture, d'après tous les signaux reçus pour elle
+// (facture, paiement). Rend { total, raison, centimes, le } :
+//   · un litige, ou un signal au montant pas lu ⇒ total (la commission est annulée) ;
+//   · sinon : le plus grand de (cumul du paiement, Σ des remboursements distincts, Σ des
+//     avoirs distincts) — un avoir qui rembourse donne aussi un remboursement : on ne les
+//     additionne pas entre familles (jamais deux fois le même euro) ;
+//   · rendu ≥ payé ⇒ total.
+export function remboursementDe(signaux, factureCentimes) {
+  const liste = (Array.isArray(signaux) ? signaux : []).filter((x) => x && RAISONS_ANNULATION.includes(x.raison));
+  if (!liste.length) return { total: false, raison: null, centimes: 0, le: null };
+  const plusTot = (xs) => xs.map((x) => x.le).filter(Boolean).sort()[0] || null;
+  const tot = liste.filter((x) => x.raison === 'litige' || x.signal === 'total' || x.signal === 'litige' || !(Number(x.centimes) > 0));
+  if (tot.length) { const l = tot.find((x) => x.raison === 'litige') || tot[0]; return { total: true, raison: l.raison, centimes: null, le: plusTot(tot) }; }
+  const vus = new Set(); let cumul = 0, re = 0, cn = 0;
+  for (const x of liste) {
+    const sig = String(x.signal || ''), c = Number(x.centimes);
+    if (sig.startsWith('cumul:')) { cumul = Math.max(cumul, c); continue; }
+    if (vus.has(sig)) continue; vus.add(sig);
+    if (sig.startsWith('cn_')) cn += c; else re += c;
+  }
+  const r = Math.max(cumul, re, cn);
+  const raison = cn > Math.max(cumul, re) ? 'avoir' : 'remboursement';
+  const f = Number(factureCentimes);
+  if (!(f > 0) || r >= f) return { total: true, raison, centimes: r, le: plusTot(liste) };
+  return { total: false, raison, centimes: r, le: plusTot(liste) };
+}
+
+// (16 nov.) LA COMMISSION QUI COMPTE : 0 si annulée ; réduite au prorata d'un remboursement
+// partiel, arrondie au centime inférieur ; sinon le montant rangé (3,00 €).
+export function commissionNette(c) {
+  if (!c || c.annulee_le) return 0;
+  const m = Number(c.montant_centimes) || 0, f = Number(c.facture_centimes), r = Number(c.rembourse_centimes) || 0;
+  if (!(r > 0)) return m;
+  if (!(f > 0) || r >= f) return 0;
+  return Math.floor((m * (f - r)) / f);
 }
 
 // L'état d'une commission à un instant : 'annulee' · 'attente' (pas encore due) · 'due'.
@@ -172,12 +228,13 @@ export function etatCommission(c, maintenant = Date.now()) {
 // est à reprendre — dit, jamais caché).
 export function chiffresPartenaire({ commissions = [], versements = [], inscrits = 0, actifs = null, maintenant = Date.now() }) {
   const mois = new Map();
-  const m = (k) => { if (!mois.has(k)) mois.set(k, { mois: k, clients: new Set(), nDues: 0, nAttente: 0, nAnnulees: 0, dueCentimes: 0, attenteCentimes: 0, verseCentimes: 0, versements: [] }); return mois.get(k); };
+  const m = (k) => { if (!mois.has(k)) mois.set(k, { mois: k, clients: new Set(), nDues: 0, nAttente: 0, nAnnulees: 0, nReduites: 0, dueCentimes: 0, attenteCentimes: 0, verseCentimes: 0, versements: [] }); return mois.get(k); };
   const payeurs = new Set();
   for (const c of commissions) {
     if (!c || !RE_MOIS.test(String(c.mois || ''))) continue;
-    const x = m(c.mois), e = etatCommission(c, maintenant), v = Number(c.montant_centimes) || 0;
+    const x = m(c.mois), e = etatCommission(c, maintenant), v = commissionNette(c);
     if (e === 'annulee') { x.nAnnulees++; continue; }
+    if (Number(c.rembourse_centimes) > 0) x.nReduites++;
     if (c.filleul) { x.clients.add(String(c.filleul)); payeurs.add(String(c.filleul)); }
     if (e === 'due') { x.nDues++; x.dueCentimes += v; } else { x.nAttente++; x.attenteCentimes += v; }
   }
@@ -187,7 +244,7 @@ export function chiffresPartenaire({ commissions = [], versements = [], inscrits
     x.verseCentimes += n; x.versements.push({ le: String(v.verse_le || '').slice(0, 10), centimes: n });
   }
   const liste = [...mois.values()].sort((a, b) => b.mois.localeCompare(a.mois)).map((x) => ({
-    mois: x.mois, clientsPayants: x.clients.size, nDues: x.nDues, nAttente: x.nAttente, nAnnulees: x.nAnnulees,
+    mois: x.mois, clientsPayants: x.clients.size, nDues: x.nDues, nAttente: x.nAttente, nAnnulees: x.nAnnulees, nReduites: x.nReduites,
     dueCentimes: x.dueCentimes, attenteCentimes: x.attenteCentimes, verseCentimes: x.verseCentimes,
     resteCentimes: x.dueCentimes - x.verseCentimes, versements: x.versements,
   }));
@@ -215,7 +272,7 @@ export function csvPartenaire({ partenaire, commissions = [], versements = [], m
   const nom = partenaire ? partenaire.nom : '', code = partenaire ? partenaire.code : '';
   for (const c of [...commissions].sort((a, b) => String(a.paye_le).localeCompare(String(b.paye_le)))) {
     lignes.push(['commission', nom, code, c.mois, String(c.paye_le || '').slice(0, 10), String(c.due_le || '').slice(0, 10),
-      c.filleul ? 'Client ' + rang.get(String(c.filleul)) : 'Client (compte supprimé)', euros(c.montant_centimes), etatCommission(c, maintenant), c.annulee_raison || ''].map(champ).join(';'));
+      c.filleul ? 'Client ' + rang.get(String(c.filleul)) : 'Client (compte supprimé)', euros(commissionNette(c)), etatCommission(c, maintenant), c.annulee_raison || (Number(c.rembourse_centimes) > 0 ? `remboursement partiel ${euros(c.rembourse_centimes)}` : '')].map(champ).join(';'));
   }
   for (const v of [...versements].sort((a, b) => String(a.verse_le).localeCompare(String(b.verse_le)))) {
     lignes.push(['versement', nom, code, v.mois, String(v.verse_le || '').slice(0, 10), '', '', euros(v.montant_centimes), 'verse', ''].map(champ).join(';'));

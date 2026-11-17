@@ -57,4 +57,5 @@ export default {
   "etag.site.aconfirmer": "à confirmer",
   "etag.site.masquee": "masquée par Vinted",
   "etag.site.depuis": "depuis le {date}",
+  "etag.glisser": "Glisser « {nom} » vers le haut ou le bas",
 };

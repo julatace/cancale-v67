@@ -1,4 +1,5 @@
 // ENGLISH — translation of fr.js (the source). Same keys, same {variables}.
+import ecran_suivi_vente from './en/suiviVente.js';   // (16 nov.) le suivi des colis vendus
 import ecran_perso from './en/perso.js';   // (16 nov.) « Modifier ma journée » simple
 import ecran_ventesVerre from './en/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
 import ecran_journee from './en/journee.js';
@@ -8,7 +9,8 @@ import ecran_correspondances from './en/correspondances.js';   // (15 nov.) Publ
 import ecran_capte from './en/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_avenir from './en/avenir.js';
 import ecran_verre2 from './en/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
-import ecran_fiched from './en/fiched.js';   // (15 nov.) la fiche d'un article, direction D
+import ecran_fiched from './en/fiched.js';
+import ecran_ecrans_restes from './en/ecransRestes.js';   // (16 nov.) lot ecrans-restes : stock importé, date limite, loupe   // (15 nov.) la fiche d'un article, direction D
 import ecran_vcventes from './en/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
 import ecran_transporteur_connu from './en/transporteurConnu.js';   // (15 nov.) « À expédier » : transporteur connu
 import ecran_vendre from './en/vendre.js';   // (15 nov., vendre plus) baisses conseillées, relance des favoris, loupe
@@ -822,6 +824,7 @@ export default {
   "favoris.sousTitreCompte": "Account {compte} · write to people who like your listings.",
   "favoris.actualiser": "Refresh",
   "favoris.outils": "More tools",
+  "versions.uneSeule": "One version: if it was just sent, only the greeting changes (Bonjour, Salut, Hello).",   // (16 nov.) une seule version : la salutation varie
   "favoris.duree.secondes": { one: "{n} s", other: "{n} s" },
   "favoris.duree.minutes": { one: "{n} min", other: "{n} min" },
   "favoris.duree.heures": { one: "{n} h", other: "{n} h" },
@@ -1203,6 +1206,7 @@ export default {
   "sante.i.fraicheur": "Last read",
   "sante.v.note": {one: "{note}/5 · {n} review", other: "{note}/5 · {n} reviews"},
   "sante.v.avisBas": "{n} of the last {sur}",
+  "sante.v.avisArrives": {one: "{n} arrived {quand}", other: "{n} arrived in the last 14 days, the latest {quand}"},
   "sante.v.delai": {one: "{duree} · over {n} parcel", other: "{duree} · over {n} parcels"},
   "sante.v.retards": "{n} of {sur} parcels",
   "sante.v.enRetard": {one: "{n} still to post", other: "{n} still to post"},
@@ -1221,6 +1225,7 @@ export default {
   "sante.r.enRetard": {one: "{n} parcel to post past its deadline", other: "{n} parcels to post past their deadline"},
   "sante.r.annulees": {one: "{n} cancelled sale (30 d)", other: "{n} cancelled sales (30 d)"},
   "sante.r.avisBas": {one: "{n} review of 3★ or less in the last 10", other: "{n} reviews of 3★ or less in the last 10"},
+  "sante.r.avisArrives": {one: "{n} review of 3★ or less in the last 14 days", other: "{n} reviews of 3★ or less in the last 14 days"},
   "sante.r.note": "Vinted rating {note}/5",
   "sante.r.delai": "Shipped in {duree} (median, 30 d)",
   "sante.journee.un": "Watch {nom}",
@@ -2156,6 +2161,7 @@ export default {
   "creerVinted.photo.retirer": "Remove photo {n}",
   "creerVinted.photo.lecture": "Reading…",
   "creerVinted.photo.ajouter": "Add photos",
+  "creerVinted.photo.studio": {one: "{n} photo from your studio added: remove it or add more.", other: "{n} photos from your studio added: remove them or add more."},
   "creerVinted.fait": "Draft ready on Vinted ✓",
   "creerVinted.ouvrir": "Open on Vinted",
   "creerVinted.aFinir": "To choose on Vinted: {liste}",
@@ -2303,6 +2309,7 @@ export default {
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_liaison,
+  ...ecran_suivi_vente,
   ...ecran_transporteur_connu,
   ...ecran_vendre,
   ...ecran_ebaytableau,
@@ -2313,6 +2320,7 @@ export default {
   ...ecran_avenir,
   ...ecran_verre2,
   ...ecran_fiched,
+  ...ecran_ecrans_restes,
   ...ecran_numeros_nouvelles,
   ...ecran_republie_telephone,
   ...ecran_securite_ventes,
