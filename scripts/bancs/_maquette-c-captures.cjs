@@ -30,9 +30,17 @@ const PLEIN = process.env.PLEIN === '1';
       for (let k = 0; k < 10; k++) { const t = o.pg.locator('.vrm-toasts :is([data-acc-fermer], .vrm-acc-x, .vrm-toast), .vrm-toasts button[aria-label*="ermer"]').first(); if (!(await t.count())) break; await t.click({ timeout: 1500 }).catch(() => {}); await o.pg.waitForTimeout(350); }
       await o.pg.waitForTimeout(1200);
       for (let k = 0; k < 6; k++) { const t = o.pg.locator('.vrm-toasts [data-acc-fermer]').first(); if (!(await t.count())) break; await t.click({ timeout: 1500, force: true }).catch(() => {}); await o.pg.waitForTimeout(300); }
+
+      // (C2) un message passager peut arriver tard (« 36 nouvelles paires numérotées ») : fermé encore une fois, comme Julien le ferait.
+      for (let k = 0; k < 6; k++) { await o.pg.waitForTimeout(400); const t = o.pg.locator('.vrm-toasts :is([data-acc-fermer], .vrm-acc-x), .vrm-toasts button[aria-label*="ermer"]').first(); if (!(await t.count())) break; await t.click({ timeout: 1500, force: true }).catch(() => {}); }
+      // Un message passager encore là (il revient parfois après la fermeture) : masqué pour la PHOTO seulement — il part seul.
+      await o.pg.addStyleTag({ content: '.vrm-toasts .vrm-acc-hote{display:none!important}' }).catch(() => {});
+      await o.pg.waitForTimeout(500);
+      // (C2) mesurée APRÈS l'attente : la page a fini de se poser.
       const mesure = await o.pg.evaluate(() => {
         const r = document.querySelector('.vrm-main');
-        const l = document.querySelector('.sb-rangee, [data-ligne-vente], [data-annonce-ligne], [data-achat-ligne], .vrm-liste-ligne');
+        // (C2) la 1re LIGNE de la liste de chaque écran : Ventes `[data-envoyer-rang]`, Annonces `[data-carte-annonce]`, Achats le 1er enfant de `.vrm-buy-list`.
+        const l = document.querySelector('[data-envoyer-rang], [data-carte-annonce], .vrm-buy-list > *, .sb-rangee, [data-ligne-vente], [data-annonce-ligne], [data-achat-ligne], .vrm-liste-ligne');
         return { premiere: l ? Math.round(l.getBoundingClientRect().top) : null, haut: innerHeight, maquette: document.documentElement.getAttribute('data-maquette') || '', main: !!r };
       }).catch(() => ({}));
       const f = path.join(OUT, `${e}-${W}-${t}.png`);

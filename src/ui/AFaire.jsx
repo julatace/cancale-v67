@@ -14,6 +14,7 @@
 // `seulement` : 'telephone' ou 'ordinateur' — deux places dans l'écran, une par appareil.
 // `capsule` : la ligne prend la forme d'une capsule de filtre (posée en tête de la rangée des vues : aucune ligne de plus).
 import React, { createContext, useContext, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { MAQUETTE_C2 } from '../design/maquette.js';
 import { createPortal } from 'react-dom';
 import { tr } from '../i18n/index.js';
 import { Feuille } from './Feuille.jsx';
@@ -21,7 +22,8 @@ import './ui.css';
 
 const Ctx = createContext(null);
 const Chevron = () => <svg width="8" height="14" viewBox="0 0 8 14" aria-hidden="true"><path d="m1.5 1.5 5 5.5-5 5.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>;
-const telephone = () => { try { return window.matchMedia('(max-width: 767px)').matches; } catch (_) { return false; } };
+// (17 nov., maquette C2, réglage de BANC seulement — src/design/maquette.js) : « À faire · N » partout, l'ordinateur compris.
+const telephone = () => { if (MAQUETTE_C2) return true; try { return window.matchMedia('(max-width: 767px)').matches; } catch (_) { return false; } };
 
 export function AFaireHote({ children }) {
   const conteneur = useMemo(() => { if (typeof document === 'undefined') return null; const d = document.createElement('div'); d.className = 'vrm-ui-afaire-corps'; d.setAttribute('data-ui-afaire-corps', ''); return d; }, []);

@@ -1044,6 +1044,8 @@ import "./design/verre-journee.css";   // (15 nov., refonte-journee) Ma journée
 import "./design/verre-annonces.css";   // (15 nov., refonte-journee) Annonces comme la maquette validée : la rangée de 72 px, la recherche et les vues
 import "./design/verre-restes.css";   // (16 nov., lot design-restes) les restes du verre : la carte qui monte sur Leboncoin, eBay, Vestiaire… — `@layer vrm-verre` : docs/passation/2026-11-16-design-restes.md
 import "./design/maquette-c.css";   // (17 nov.) MAQUETTE C « Studio » — visée par `html[data-maquette="c"]` seulement, un réglage de BANC (src/design/maquette.js) : rien ne change pour un vendeur — `@layer vrm-maquette`, la PREMIÈRE couche (index.html)
+import "./design/maquette-c2.css";   // (17 nov.) MAQUETTE C2 « Studio compact » — visée par `html[data-maquette-c2]` seulement (réglage de BANC `vrm_maquette=c2`, src/design/maquette.js) : rien ne change pour un vendeur
+import { MAQUETTE_C2 } from "./design/maquette.js";
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
@@ -11759,6 +11761,15 @@ function LignePasLus({ resume }) {
     const geste = r.comptes.length ? tr('tc.geste.ouvrirVinted', { comptes: r.comptes.join(', ') }) : tr('tc.geste.ouvrirVintedSans');
     return `${raison} — ${geste}`;
   };
+  // (17 nov., maquette C2, réglage de banc seulement) la phrase devient UNE ligne repliable : touchée ⇒ dépliée, rien de retiré.
+  if (MAQUETTE_C2) return (
+    <details className="vrm-c2-pas-lus-repli" data-c2-repli="pas-lus">
+      <summary><LignePasLusTexte R={R} n={n} morceau={morceau}/></summary>
+    </details>
+  );
+  return <LignePasLusTexte R={R} n={n} morceau={morceau}/>;
+}
+function LignePasLusTexte({ R, n, morceau }) {
   return (
     <p className="vrm-colis-pas-lus" data-envoyer-pas-lus={n} role="note" style={{ margin: '0 0 8px', fontSize: 12, color: C.muted, lineHeight: 1.45, overflowWrap: 'anywhere' }}>
       {R.map((r, i) => <React.Fragment key={r.cle}>{i ? ' · ' : ''}<span data-pas-lu-raison={r.cle} data-pas-lu-n={r.n} data-pas-lu-comptes={r.comptes.join(',')}>{morceau(r)}</span></React.Fragment>)}
