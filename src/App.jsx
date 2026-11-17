@@ -5,7 +5,8 @@ import { FileReseauExt } from './RapportExtension.jsx';   // (12 nov., ext. 5.37
 import { signalDelai } from './compatSafari.js';
 import ChampSaisie from './composants/ChampSaisie.jsx';
 import ChoixPlateformes from './ChoixPlateformes.jsx';
-import ConfigurationDepart from './ConfigurationDepart.jsx';
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : ConfigurationDepart (était importé en statique)
+const ConfigurationDepart = aLaDemandeFeuille(() => import('./ConfigurationDepart.jsx'));
 import { CLE_CONFIGURATION, lireConfiguration, configurationAOuvrir, questionVendsAOuvrir, ecritureVendsVu } from './configurationDepart.js';
 import { CLE_SOCIETE_TVA, cotisationsUrssaf, profilFiscal, rappelDac7Journee } from './profilFiscal.js';
 import { dac7ParPlateforme } from './seuilsAnnee.js';
@@ -33,10 +34,13 @@ import { articlesVendusAilleurs } from './bilanSynchronisation.js';
 import { gardeOffres, avisAcceptationManuelle } from './offresGarde.js';
 import { noterPause, montantSeuil } from './offresSures.js';   // (11 nov., lot DJ8) offres auto sûres
 import { jugerBrouillon, lectureBrouillons } from './brouillonsProposables.js';
-import {ComparaisonComptesVinted,HistoriqueArticle} from './OutilsArticlesVinted.jsx';
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : {ComparaisonComptesVinted,HistoriqueArticle} (était importé en statique)
+const ComparaisonComptesVinted = aLaDemandeDiscret(() => import('./OutilsArticlesVinted.jsx').then((m) => ({ default: m.ComparaisonComptesVinted })));
+const HistoriqueArticle = aLaDemandeDiscret(() => import('./OutilsArticlesVinted.jsx').then((m) => ({ default: m.HistoriqueArticle })));
 import {comparerComptes,diagnosticConnexion} from './outilsArticlesVinted.js';
 import {correspondRechercheMessage} from './rechercheMessagesVinted.js';
-import SynchronisationVinted from './SynchronisationVinted.jsx';
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : SynchronisationVinted (était importé en statique)
+const SynchronisationVinted = aLaDemandeDiscret(() => import('./SynchronisationVinted.jsx'));
 import { prendrePlaceRelais } from './freinRelaisVinted.js';
 import {auteurDernierConfirme,suiviNegociationVinted,reponseAttendueVinted,instantVinted} from './suiviMessagerieVinted.js';
 import {retourReponseVinted,cleReponseVinted,creerBrouillonsReponses,etatActionVinted,cleActionOffreVinted} from './reponseVinted.js';
@@ -90,7 +94,8 @@ import {suivreReceptionLeboncoin,lireReceptionLeboncoin} from './rafraichissemen
 import { STYLE_FLOU, compteLbcOuvert, lbcFloute, compteVcOuvert, vcFloute } from './flouCompte.js';
 import { grouperParCompte, entreesGroupees } from './regroupeComptes.js'; // (11 nov., agent2-regroupe-comptes) lignes floutées regroupées par compte
 import { TeteGroupeCompte, useDepliesComptes, ListeParCompte } from './GroupesComptes.jsx';
-import DiagnosticLeboncoin from './DiagnosticLeboncoin.jsx';
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : DiagnosticLeboncoin (était importé en statique)
+const DiagnosticLeboncoin = aLaDemandeDiscret(() => import('./DiagnosticLeboncoin.jsx'));
 import { BandeChiffres } from './ui/index.js';   // (14 nov., refonte des sites) la bande de chiffres des listes
 import './plateformes/plateformes.css';   // (14 nov., refonte visible) Leboncoin, eBay, Vestiaire, Paramètres, connexion
 import './design/studio-reste.css';   // (14 nov., Studio bleu clair) Argent, Messages, Paramètres, Communauté, E-mails, connexion, feuilles
@@ -134,7 +139,8 @@ import {sourcesDuColis,codeLuDeLigne,verdictCode,codesDesLignes,NOMS_SOURCES,tex
 import { dateLocale } from './formatsDate.js';
 import {achatParConversation, regrouperArrivees, temoinsDe, texteDuBrut} from '../api/_lib/achat-arrive-relais.js';
 import { transporteurRelu, ligneRelueDe, ID_BORD_TRANSPORTEURS } from '../api/_lib/transporteur-anciens.js';
-import InfosSms from './InfosSms.jsx';
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : InfosSms (était importé en statique)
+const InfosSms = aLaDemandeDiscret(() => import('./InfosSms.jsx'));
 import {indexCodesSuivis, finParIdentite, fusionnerParCode, suivisLiesDuColis} from './retraitPreuves.js';
 import {etatRepliRetirer, choixApresBascule} from './repliRetirer.js';
 import { finDatee, texteSortie, sortiRecent, pourquoiPasLu, SORTIS_JOURS, jourCourt as jourCourtParis } from './retraitSuivi.js';
@@ -157,7 +163,8 @@ import './espace-emails.css'; // (8 nov.) style de ./EspaceEmails.jsx, gardé à
 import './emails-apercu.css'; // (8 nov.) style de ./EspaceEmails.jsx, gardé à sa place (son écran est chargé à la demande)
 // (6 nov., vitesse 2) JournalEmails (Réglages → E-mails) : à la demande ; sa feuille de style reste ICI.
 import './journal-emails.css';
-import RecusEmail from "./RecusEmail.jsx";
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : RecusEmail (était importé en statique)
+const RecusEmail = aLaDemandeDiscret(() => import('./RecusEmail.jsx'));
 import VuesVentes from "./VuesVentes.jsx";
 import BordereauxAuto from "./BordereauxAuto.jsx";
 import {resumerStockJournee} from './stockJournee.js';
@@ -178,9 +185,12 @@ import { CLE_A_TRANCHER, publierSource as publierSourceTrancher, lirePublication
 import { CLE_SANTE, publierSante } from "./santeDonnees.js";   // (11 nov., lot sante-donnees)
 import ATrancher, { QuestionChezToi } from "./ATrancher.jsx";
 // (10 nov., lot BC) « Ma semaine » : l'écran du bilan de la semaine (src/maSemaine.js, aucune règle à lui).
-import MaSemaine from "./MaSemaine.jsx";
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : MaSemaine (était importé en statique)
+const MaSemaine = aLaDemande(() => import('./MaSemaine.jsx'));
 import { maSemaine } from "./maSemaine.js";
-import LitigesEnCours, { EntreeLitiges } from "./LitigesEnCours.jsx";
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : LitigesEnCours, { EntreeLitiges } (était importé en statique)
+const LitigesEnCours = aLaDemande(() => import('./LitigesEnCours.jsx'));
+const EntreeLitiges = aLaDemandeDiscret(() => import('./LitigesEnCours.jsx').then((m) => ({ default: m.EntreeLitiges })));
 import { RetoursAchatBloc, RetoursAImprimer, RetoursLot, PasAPasRetour, ARenvoyerJournee, RetoursLitigesJournee, RetoursAVerifier } from "./RetoursLitiges.jsx";
 import { retoursAchat, avecRemboursementsProuves, remboursementsParTx, ACHAT_A_RENVOYER, bordereauDuGarde, quandLimite as quandRetour, classerRetoursAchat } from "./retoursAchat.js";
 import { lireBordereauRetour, lireDemandeRetourAchat, estBordereauRetour, PREFIXE_DEMANDE_RETOUR } from '../api/_lib/retour-email.js';   // (15 nov., lot retours) LA règle du serveur, relue ici
@@ -211,7 +221,8 @@ import {semainePassee} from '../api/_lib/bilan-semaine.js';
 import CoutsVente from "./CoutsVente.jsx";
 // ⟦→ ecrans/Reglages.jsx #9⟧
 import { poserLienVc, defaireLienVc, numerosABarrer, marquerBarre, lienDe, produitDeVinted, vcReliable, suggestionsLienVc } from "./lienVestiaire.js";
-import FeuilleLienVc from "./LienVestiaire.jsx";
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : FeuilleLienVc (était importé en statique)
+const FeuilleLienVc = aLaDemandeFeuille(() => import('./LienVestiaire.jsx'));
 // ⟦→ ecrans/Vestiaire.jsx #1⟧
 import { suggestionsAchat, tousAchatsLibres, tousAchatsLibresDetail, filtresAchats, etiquetteLot, liensParAchat, lotDe, prixIndicatifLot, ecritureLot, suggestionsSaisieSerie, tailleDuTitre } from "./suggestionsAchat.js";
 // (15 nov.) La liaison achat ⇄ article : l'affectation pondérée et globale (src/liaisonAchat.js).
@@ -254,7 +265,8 @@ import { plus30De } from './controleNuit.js';
 import { brancherVeille, noterReleveVeille } from './veilleLigne.js';
 import { prochainGesteAnnonces } from './prochainGesteAnnonces.js';
 import AnnoncesMasquees from "./AnnoncesMasquees.jsx";
-import VueACompleter from "./AnnoncesACompleter.jsx";
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : VueACompleter (était importé en statique)
+const VueACompleter = aLaDemande(() => import('./AnnoncesACompleter.jsx'));
 import AvisVente from "./AvisVente.jsx";
 import { annoncesACompleter } from "./annoncesACompleter.js";
 import { BoutonCentreNotifs, FeuilleCentreNotifs } from "./CentreNotifs.jsx";
@@ -301,6 +313,16 @@ function aLaDemande(charger, feuille = false) {
   const Paresseux = lazySur(charger);
   return function MorceauALaDemande(props) {
     return <Suspense fallback={<MorceauAttente feuille={feuille}/>}><Paresseux {...props}/></Suspense>;
+  };
+}
+// (17 nov., fiabilité-vitesse) Une feuille (pastille « Ouverture… ») ; un petit bloc posé DANS un écran
+// (rien pendant le chargement : jamais un squelette au milieu d'une liste). Récit et mesures :
+// docs/passation/2026-11-17-fiabilite-vitesse.md.
+function aLaDemandeFeuille(charger) { return aLaDemande(charger, true); }
+function aLaDemandeDiscret(charger) {
+  const Paresseux = lazySur(charger);
+  return function BlocALaDemande(props) {
+    return <Suspense fallback={null}><Paresseux {...props}/></Suspense>;
   };
 }
 const FavorisVinted = aLaDemande(() => import('./FavorisVinted.jsx'));
@@ -548,7 +570,8 @@ import { EtatPanne } from "./composants/EtatPanne.jsx";
 // (6 nov., filet 2) Un garde-fou par écran et par feuille : un écran qui tombe ne tombe que lui.
 import { GardeEcran, Differe } from "./composants/GardeEcran.jsx";
 import { L, Lbas, VERBES, PAS_SU } from "./libelles.js";
-import Bienvenue from "./Bienvenue.jsx";
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : Bienvenue (était importé en statique)
+const Bienvenue = aLaDemandeFeuille(() => import('./Bienvenue.jsx'));
 import VisiteBulles from "./VisiteBulles.jsx";
 // (14 nov., accueil des nouveaux, le reste : idées 133 134 136 139 140 145 147) — src/accueilReste/.
 import { poserOutilsAccueil } from "./accueilReste/deps.js";
@@ -608,7 +631,8 @@ import { fusionnerConversation } from "./conversations.js";
 import {etatCommandeEbay} from '../api/_lib/ebay-etat-commande.js';
 import {colisEbay} from '../api/_lib/ebay-a-expedier.js';
 import {annoncesVcEnLigne,stockVestiaire,retraitsVestiaire,VC_VENTE_ETAPES,VC_ANNONCE_ETATS,etapeMotVc,vcVenteAnnulee,vcVentePartie,numVcVente,numVcAnnonce,numerosVcAvecLiens,montantRecuVc,dateVersementVc,dateVenteVc,tempsVc,ventesVcDe,colisVcAPoster,colisVcPartisLus,departsVc,resumeColisVc,etatAnnonceVcBrut,aExpedierVc,expeditionVc,fraisVc} from '../api/_lib/vestiaire-regle.js';
-import OuVendre from './OuVendre.jsx';   // (15 nov., lot securite-ventes) « Où vendre cet article ? » sur la fiche
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : OuVendre (était importé en statique)   // (15 nov., lot securite-ventes) « Où vendre cet article ? » sur la fiche
+const OuVendre = aLaDemandeDiscret(() => import('./OuVendre.jsx'));
 import { fraisVintedSelon, statutVinted, tauxEbay, tauxVestiaire } from './ouVendre.js';
 import { etatVenteVc } from './etatVenteVc.js';   // (15 nov.) l'état d'une vente Vestiaire en mots (jamais « IN_PROGRESS »)
 import { texteEtatVc } from './etatVenteVcTexte.js';
@@ -626,8 +650,11 @@ import { TAMPONS as TAMPONS_IMPR } from './impression/thermique.js';
 import { CLE_TAMPONS, TAILLES_TAMPON, avecChoix, reglageTampons, aEcrire, resoudreTampon, placesDeForme, avecPlace, familleDe, texteDuCartouche, contenuDuMode, repousserHorsInterdits, CIBLES as CIBLES_TAMPON } from './impression/tampons.js';   // (16 nov., lot tampons-parametres) LE réglage des tampons   // (14 nov.) le tampon par bordereau
 import { pagesDe, formatRetenu, signatureLot, voieOuverture, absentsDuLot } from './impression/lotSimple.js';   // (14 nov.) « Imprimer » en un toucher
 import { lignesRetoursLot, motsTamponRetour, estRetour } from './impression/retoursLot.js';   // (16 nov.) les retours dans « Imprimer »
-import { ChoixPapier, FeuilleImpression } from './ImpressionSimple.jsx';
-import ApercuAvantImpression from './impression/ApercuAvantImpression.jsx';
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : { ChoixPapier, FeuilleImpression } (était importé en statique)
+const ChoixPapier = aLaDemandeFeuille(() => import('./ImpressionSimple.jsx').then((m) => ({ default: m.ChoixPapier })));
+const FeuilleImpression = aLaDemandeFeuille(() => import('./ImpressionSimple.jsx').then((m) => ({ default: m.FeuilleImpression })));
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : ApercuAvantImpression (était importé en statique)
+const ApercuAvantImpression = aLaDemandeFeuille(() => import('./impression/ApercuAvantImpression.jsx'));
 import BordereauPret from './impression/BordereauPret.jsx';
 import { occuperPendant, figerBouton, libererBoutonsImprime } from './impression/occuper.js';   // (16 nov.) un bouton d'impression garde sa taille   // (16 nov.) « Bordereau prêt » refait   // (16 nov., lot tampons-parametres) l'aperçu avant impression   // (14 nov., impression-simple) les deux feuilles
 import { CLE_IMPRESSION, reglageImpression, papierThermique, placementEtiquette, carteEncre, boiteEncre, decouperFeuille, fusionnerProches, moduleDuCode, moduleImprimeMm, codeAssezGros, seuillerNoir, tramerNoir, zonesAdresse, CONTRASTES, MODULE_MIN_MM, BANDE_CONTINU_MM } from './impression/thermique.js';
@@ -828,11 +855,15 @@ import { CLE_PRIX_LUS, noterPrixLus } from "./historiquePrix.js";
 import { conseilBaisse, derniereBaisseLue, baisseProportion, noterConseils, fusionConseils, CLE_CONSEIL_PRIX } from "./conseilPrix.js";
 // (15 nov., vendre plus) La baisse intelligente (règle pure), sa feuille, la relance des favoris au bon moment.
 import { baisseConseillee, indexComparables, comparablesDe, ventesComparablesDuReleve, commeConseil, classerConseils } from "./baisseConseillee.js";
-import BaissesConseillees, { EntreeBaissesConseillees } from "./BaissesConseillees.jsx";
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : BaissesConseillees, { EntreeBaissesConseillees } (était importé en statique)
+const BaissesConseillees = aLaDemandeFeuille(() => import('./BaissesConseillees.jsx'));
+const EntreeBaissesConseillees = aLaDemandeDiscret(() => import('./BaissesConseillees.jsx').then((m) => ({ default: m.EntreeBaissesConseillees })));
 import { cartesRelance, datesFavorisParAnnonce } from "./relanceFavoris.js";
 import RelanceFavorisCarte from "./RelanceFavorisCarte.jsx";   // (12 nov.) le conseil de baisse, mesuré   // (10 nov., lot L) les prix lus dans le dressing
-import CalculetteAchat from "./CalculetteAchat.jsx";   // (10 nov., lot L) la calculette d'achat (Achats, ⌘K)
-import { ChoixEmballageColis } from "./EmballagesCarte.jsx";   // (10 nov., lot L) l'emballage d'un colis (facultatif)
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : CalculetteAchat (était importé en statique)   // (10 nov., lot L) la calculette d'achat (Achats, ⌘K)
+const CalculetteAchat = aLaDemandeFeuille(() => import('./CalculetteAchat.jsx'));
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : { ChoixEmballageColis } (était importé en statique)   // (10 nov., lot L) l'emballage d'un colis (facultatif)
+const ChoixEmballageColis = aLaDemandeDiscret(() => import('./EmballagesCarte.jsx').then((m) => ({ default: m.ChoixEmballageColis })));
 import { CLE_EMBALLAGES, colisFaits as colisFaitsEmb } from "./emballages.js";
 // (14 nov., lot colis-plus 99, 101) La douchette (un code lu ⇒ LA vente, par identité) et le bénéfice par colis.
 import { DouchetteGlobale } from "./Douchette.jsx";
@@ -872,11 +903,13 @@ import { achatsPourAtelier, CLE_ACHATS_ATELIER, resumeAtelier, ligneAtelierJourn
 import { produitsANumeroter, attribuerNumerosVc, carteNumerosVc } from "./numerosVestiaire.js";
 import { CLE_STOCK_IMPORTE, CLE_VENTES_IMPORTEES, CLE_IMPORTS, annulerImport, refVente } from "./importStock.js";
 import { importeesPourRecherche, importeeDuNumero } from "./stockImporteVue.js";   // (16 nov., lot ecrans-restes) le stock importé, montré
-import { ImportStockReglage } from "./composants/ImportStock.jsx";
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : { ImportStockReglage } (était importé en statique)
+const ImportStockReglage = aLaDemande(() => import('./composants/ImportStock.jsx').then((m) => ({ default: m.ImportStockReglage })));
 import { sitesDuNumero, appliquerPrix, noterJournalPrix, envoisPrix, prixParSite } from "./prixPartout.js";
 import { champsSource, dupliquerFiche, fichesAPublier, texteAColler } from "./dupliquerFiche.js";
 import { repartirGrosLot, numerosDuLot, verifierNumerosTapes, planGrosLot, morceauxGrosLot, centimesTapes as centimesLotTapes, PREFIXE_PHOTO_LOT } from "./grosLot.js";
-import CreerSurVinted from './CreerSurVinted.jsx';   // (11 nov., lot annonce-vinted) « Créer sur Vinted » depuis une fiche (extension 5.367)
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : CreerSurVinted (était importé en statique)   // (11 nov., lot annonce-vinted) « Créer sur Vinted » depuis une fiche (extension 5.367)
+const CreerSurVinted = aLaDemandeFeuille(() => import('./CreerSurVinted.jsx'));
 import { etatFicheVinted } from './annonceVinted.js';
 import { evenementsDesLignes } from './moderationVinted.js';   // (15 nov.) l'historique complet : masquée / disparue, par annonce
 import { histoireArticle, offresDeConversation, colisDesVentes } from "./histoireArticle.js";
@@ -897,7 +930,8 @@ import { lireLectureHl as lireStockHl, oublierPhotosHl } from "./stockHorsLigne.
 import { CACHE_PDF, garderPdf, lirePdfGarde, lignesPdfPhoto, estLigneBordereau } from "./bordereauxHorsLigne.js";
 import { enLigneDeuxFois, texteCarte as texteEnLigneDeuxFois, raisonPasSu as raisonPasSuEnLigne } from "./enLigneDeuxFois.js";
 import { useAvisBas, AvisBasDetail, titreAvisBas, detailAvisBas } from "./AvisNegatifJournee.jsx";   // (11 nov., lot avis-negatif) la carte « Avis 2★ reçu »
-import { LIGNE_AVIS_BAS, LIGNE_AVIS_BAS_VUS } from "./avisNegatif.js";
+import { LIGNE_AVIS_BAS_VUS } from "./avisNegatif.js";
+import { lireAlertesAvisBas } from "./lectureAvisBas.js";
 // (11 nov., lot photos-comptes) La même PHOTO sur deux de ses comptes Vinted (empreintes de l'extension 5.358).
 import { annoncesPourPhotos, calculerPhotosComptes, publierPhotosComptes, cibleRepublier } from "./photosComptes.js";
 import { empreinteImageLocale } from "./photosComptes.js";   // (16 nov.) rétabli : la fusion de retour-parfait l’avait perdu (empreintes eBay)
@@ -915,7 +949,8 @@ import { DeuxComptesDetail, DeuxComptesAlerte, texteEtDe } from "./DeuxComptes.j
 import { CLE_JOURNAL_NUMEROS, evenementsNumeroFiches, ajouterAuJournal, historiqueNumero } from "./historiqueNumero.js";
 import { carteArgentJournee } from "./journeeArgent.js";
 import { CLE_MODELES, lireModeles } from "./modelesDescription.js";
-import { MesModeles, InsererModele } from "./ModelesDescription.jsx";
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : { MesModeles, InsererModele } (était importé en statique)
+const InsererModele = aLaDemandeDiscret(() => import('./ModelesDescription.jsx').then((m) => ({ default: m.InsererModele })));
 import { suggestionsRemiseEnLigne, PHRASE_FORCE as PHRASE_REMISE } from "./remiseEnLigne.js";
 import { CLE_NUMERO_ECRIT, lireReglageNumeroEcrit, lireNumeroTexte, lireNumeroEcrit as lireNumeroEcritRegle, lectureRecue, apercuNumeroEcrit, decisionEcrite, PHRASE_ETAT as PHRASE_NUMERO_ECRIT, NOM_SOURCE as NOM_SOURCE_NUMERO } from "./numeroEcrit.js";
 import { CLE_REGLAGE_ETIQUETTE, PLACES as PLACES_ETIQUETTE, FORMES as FORMES_ETIQUETTE, QUESTIONS as QUESTIONS_ETIQUETTE, ANNONCE_EXEMPLE, lireReglageEtiquette, etiquetteDe, poserEtiquette, retirerEtiquette, proposition as propositionEtiquette } from "./etiquetteNumero.js";
@@ -962,9 +997,11 @@ import { lienNotif as lienNotifRappel } from '../api/_lib/lien-notif.js';
 import { FeuilleRappel, CarteRappelsJour, ListeRappels, BandeauRappel, BoutonRappelVue } from './Rappels.jsx';
 import { NotePaireVue } from './NotePaire.jsx';
 import { CLE_HORS_MASQUES, achatsEnDouble, opsGarder, horsVisibles } from './achatsDoubles.js';
-import { AchatsEnDouble } from './AchatsEnDouble.jsx';
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : { AchatsEnDouble } (était importé en statique)
+const AchatsEnDouble = aLaDemandeDiscret(() => import('./AchatsEnDouble.jsx').then((m) => ({ default: m.AchatsEnDouble })));
 import {DejaEnStock} from "./DejaEnStock.jsx";
-import {ReventeModele} from "./ReventeModele.jsx";
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : {ReventeModele} (était importé en statique)
+const ReventeModele = aLaDemandeDiscret(() => import('./ReventeModele.jsx').then((m) => ({ default: m.ReventeModele })));
 import {pairesDuModele} from "./dejaEnStock.js";
 import {plancherVente,offreFacePlancher} from "./plancherOffre.js";
 import {prixAnnoncePourOffre} from "./actionsClaires.js";
@@ -979,7 +1016,9 @@ import { datesVersementEbay } from "./ebay/tableau.js";   // (15 nov., eBay comp
 import { chargerSuivi } from "./suiviBranchement.js";
 import { optionsSelecteur, nomCompteVente, identiteCompteVente, annuaireLbc, ongletSansDonnee, nomPlateforme, logoPlateforme } from "./plateformes.js";
 import { MR_SELECT, lireColisMondialRelay, suivisAvecMondialRelay, accordCodes, codeDuCompteMr, ouTrouverQr, ilYa as ilYaLecture, compteDuRetrait, indexAchatsAutresSites } from "./retraitQr.js";
-import ExpliqueMondialRelay, { LecturesMondialRelay } from "./ExpliqueMondialRelay.jsx";
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : ExpliqueMondialRelay, { LecturesMondialRelay } (était importé en statique)
+const ExpliqueMondialRelay = aLaDemandeDiscret(() => import('./ExpliqueMondialRelay.jsx'));
+const LecturesMondialRelay = aLaDemandeDiscret(() => import('./ExpliqueMondialRelay.jsx').then((m) => ({ default: m.LecturesMondialRelay })));
 import { CLE_QR_POSES, jugerQrCapture, dessinerQrCapture, avecQrPoses, titreQrAbsent, qrParCapture, messageQrCapture, cleSuiviQr } from "./qrCapture.js";
 import { lireFile, noterSaisie, instantane, acquitter, compterEnAttente, nuagePlusRecent, fusionAuChargement, oublierCle, CLE_FILE, HORS_FILE } from "./fileEnvoi.js";
 import { fetchBorne, raisonStatut, DELAI_ECRITURE_MS, DELAI_LECTURE_MS, NOM_DELAI } from "./reseauBorne.js";
@@ -1074,14 +1113,16 @@ import { motifDeLApercu } from "./antiArnaque.js";
 const messagesPourArnaque = (l) => (Array.isArray(l) ? l.filter((m) => m && m.kind === 'message').map((m) => ({ t: m.body || '', deMoi: m.mine === true ? true : m.autre === true ? false : null })) : []);
 import { noterLienDemande, oublierLienDemande, lienDemandeIci, adopterJetonsDuLien, MSG_LIEN_PAS_DEMANDE, MSG_LIEN_AUTRE_COMPTE } from "./lienEmail.js";
 import { variantesLues } from "./variantesMessage.js";
-import AutresVersions from "./AutresVersions.jsx";
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : AutresVersions (était importé en statique)
+const AutresVersions = aLaDemandeDiscret(() => import('./AutresVersions.jsx'));
 import { jourParis } from "./dateParis.js";   // (11 nov.) jour/mois métier à l'heure de Paris
 import { sommeConnue, texteSomme, medianeSue, valeurSue } from "./sommeConnue.js";   // (11 nov.) « pas su » ≠ 0
 import { lireLocal, lireJSON, stockageDispo } from "./stockageSur.js";   // (11 nov.) stockage protégé (Safari privé, quota)
 import { creerMagasinPartage } from "./magasinPartage.js";
 import { fusionnerVersements, garderDatesConnues } from "./versementsConnus.js";   // (13 nov.) une date de versement connue ne redevient jamais « pas lue »   // (13 nov., source unique) une copie des données lues pour tous les moteurs
 import { trj, useLangue } from './i18n/react.js';
-import { CollerPrixAchatFeuille } from "./composants/CollerPrixAchat.jsx";   // (14 nov., lot argent-choix — proposition 75)
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : { CollerPrixAchatFeuille } (était importé en statique)   // (14 nov., lot argent-choix — proposition 75)
+const CollerPrixAchatFeuille = aLaDemandeFeuille(() => import('./composants/CollerPrixAchat.jsx').then((m) => ({ default: m.CollerPrixAchatFeuille })));
 import { verifierAvantEcriture } from "./collerPrixAchat.js";
 // (15 nov., parcours nouveau) Le parcours d'un nouveau en huit étapes, un écran plein (src/parcoursNouveau/).
 import { CLE_PARCOURS_NOUVEAU, parcoursNouveauAOuvrir, lireParcoursNouveau, positionApres as positionParcoursNouveau, etatsEtapes as etatsParcoursNouveau, appareilIci as appareilParcoursNouveau, dansOrionIci, reglageNumerotation, reglagePlateformes, ETAPES_NOUVEAU } from "./parcoursNouveau/regle.js";
@@ -61609,7 +61650,7 @@ export { useQuoiDeNeuf };
 async function lireAvisBas() {
   // Comme les autres lectures de l'app : la base (RLS) ne rend que les lignes du vendeur de la session.
   const get = async (q) => { try { const r = await fetch(`${SUPABASE_URL}/rest/v1/${q}`, { headers: sbAuth(), cache: 'no-store' }); if (!r.ok) return null; const j = await r.json(); return Array.isArray(j) ? j : null; } catch (_) { return null; } };
-  const [m, v] = await Promise.all([get(`app_data?id=eq.${LIGNE_AVIS_BAS}&select=a:data->alertes`), get(`app_data?id=eq.${LIGNE_AVIS_BAS_VUS}&select=data`)]);
+  const [m, v] = await Promise.all([lireAlertesAvisBas(get), get(`app_data?id=eq.${LIGNE_AVIS_BAS_VUS}&select=data`)]);   // (17 nov.) partagée avec la santé des comptes
   if (m === null || v === null) return undefined;
   const alertes = m[0] && Array.isArray(m[0].a) ? m[0].a : [];
   const vus = v[0] && v[0].data && typeof v[0].data === 'object' ? v[0].data : {};
