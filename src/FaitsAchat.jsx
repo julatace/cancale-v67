@@ -16,7 +16,9 @@ const COULEURS_DITES = new Set(['noir', 'blanc', 'gris', 'bleu', 'vert', 'rouge'
 export function FaitsAchat({ achat, details = null, cible = null, marqueDe = null, couleursDe = null, date = '', compte = '', avant = null, className = '' }) {
   const f = faitsAchat(achat, { details, cible, marqueDe, couleursDe });
   const couleurs = f.couleurs.filter((c) => COULEURS_DITES.has(c)).map((c) => tr(`liaison.couleur.${c}`)).filter(Boolean);
-  const reste = [f.etat, couleurs.join(' / '), f.marque, date, compte, f.vendeur ? tr('faits.vendeur', { vendeur: f.vendeur }) : ''].filter(Boolean);
+  // L'ordre de lecture : ce qui distingue deux paires au même titre d'abord (taille, état, date, vendeur), puis ce
+  // que le titre dit déjà (couleurs, marque), puis le compte.
+  const reste = [f.etat, date, f.vendeur ? tr('faits.vendeur', { vendeur: f.vendeur }) : '', couleurs.join(' / '), f.marque, compte].filter(Boolean);
   const tx = String((achat && achat.transaction_id) || '');
   return (
     <span className={`vrm-faits ${className}`.trim()} data-faits-achat={tx} data-faits-lu={f.lu ? '1' : '0'}>
