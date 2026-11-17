@@ -638,6 +638,11 @@
   .fl-me { font: 400 12.5px/1.35 var(--vu-police); color: var(--vu-muet); overflow-wrap: anywhere; }
   .fl-etat { font: 600 12.5px/1.35 var(--vu-police); color: var(--vu-muet); overflow-wrap: anywhere; }
   .fl-px { font: 600 14px/1.3 var(--vu-police); color: var(--vu-encre); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .fl-mini { display: block; margin-top: 2px; font: 500 12px/1.3 var(--vu-police); color: var(--vu-muet); }
+  .fl-sans-mini { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 0; }
+  .fl-etat.ambre { color: var(--vu-ambre); }
+  .fl-alerte { margin: 0 2px 10px; padding: 10px 12px; border-radius: 14px; background: var(--vu-plaque-2); font: 600 13.5px/1.4 var(--vu-police); color: var(--vu-ambre); }
+  .fl-alerte-g { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
   .fl-px s { display: block; font-weight: 400; font-size: 12px; color: var(--vu-muet); }
   .fl-note { margin: 2px 2px 8px; font: 500 13px/1.4 var(--vu-police); color: var(--vu-muet); }
   .fl-note.ambre { color: var(--vu-ambre); font-weight: 600; }
@@ -991,8 +996,9 @@
         <div class="p-t fav-l" role="status"><span class="p-nom">${esc(TU('f_titre'))}</span><b class="p-n">${esc(TU('f_sur', { n: faits, total }))}</b></div>
         ${U.barre(total ? 100 * faits / total : 0, ' aria-label="' + esc(TU('f_titre')) + '"')}
         <div class="p-l2">${etat.replace('· ', '')}${pas ? `<span class="p-dans"> · ${esc(TU('f_pas', { n: pas }))}</span>` : ''}</div>
-        ${att ? `<div class="p-pour ambre" data-fav-attente-texte>${esc(att)}</div>` : `<div class="p-pour" data-fav-pour>${esc(pour || TU('f_garde'))}</div>`}
-        <button class="vu-btn vu-plein" data-fav-arreter>${esc(TU('c_tout_arreter'))}</button>
+        ${st.robot ? `<div class="p-pour ambre" data-fav-robot>${esc(TU('a_verif_robot'))}</div><div class="p-pour">${esc(TU('a_doucement'))}</div>${favErreur ? `<div class="p-pour ambre" role="alert">${esc(favErreur)}</div>` : ''}<button class="vu-btn vu-plein" data-fav-reprendre>${esc(TU('a_reprendre'))}</button><button class="vu-btn vu-sec" data-fav-arreter>${esc(TU('c_tout_arreter'))}</button>`
+          : `${att ? `<div class="p-pour ambre" data-fav-attente-texte>${esc(att)}</div>` : `<div class="p-pour" data-fav-pour>${esc(pour || TU('f_garde'))}</div>`}
+        <button class="vu-btn vu-plein" data-fav-arreter>${esc(TU('c_tout_arreter'))}</button>`}
       </section>`;
     }
     if (st && !st.actif && st.fin && Date.now() - Number(st.fin.at || 0) < 6 * 3600000) {
@@ -1103,8 +1109,10 @@
       + `<label class="fl-case"><input type="checkbox" data-fav-coche="${esc(x.id)}"${coche ? ' checked' : ''}${on ? '' : ' disabled'} aria-label="${esc(TU('fl_cocher', { qui }))}${etat ? ' — ' + esc(etat) : ''}"></label>`
       + `<span class="fl-photo">${photoFav(x.photo)}${x.num ? U.etiquette(x.num) : ''}</span>`
       + `<span class="fl-mil"><span class="fl-ti">${esc(x.titre || TU('fl_article'))}</span><span class="fl-me">${esc(qui)}${quand ? ' · ' + esc(quand) : ''}</span>${etat ? `<span class="fl-etat" data-fav-raison-l="${esc(x.raison || x.envoi || '')}">${esc(etat)}</span>` : ''}</span>`
-      + `<span class="fl-px">${px}</span></li>`;
+      + `<span class="fl-px">${px}${'mini' in x ? `<span class="fl-mini" data-fav-mini="${x.mini == null ? '' : esc(x.mini)}">${esc(x.mini == null ? TU('fl_mini_rien') : TU('fl_mini', { p: eurosFav(x.mini) }))}</span>` : ''}</span></li>`;
   }
+  const FIXER_MINI_URL = 'https://vrm.center/?tab=annonces';
+  const fixerMini = (n) => `<div class="fl-note fl-sans-mini" data-fav-sans-mini="${n}"><span>${esc(TU('fl_sans_mini', { n }))}</span><a class="vu-lien" data-fav-fixer href="${FIXER_MINI_URL}" target="_blank" rel="noopener">${esc(TU('fl_fixer'))}</a></div>`;
   // Le compteur, le bouton et la phrase du bas — remis à jour sur place (aucun redessin de la liste).
   // 15 PAR HEURE (sécurité des comptes, 12 nov.) : un envoi part avec les 15 plus récents cochés ; les
   // autres RESTENT cochés pour l'heure suivante. Après un envoi complet (15), le bouton dit l'heure où
@@ -1138,6 +1146,7 @@
       <div class="fl-filtres"><select data-fav-annonce aria-label="${esc(TU('fl_annonce'))}"><option value="">${esc(TU('fl_toutes'))}</option>${options}</select><button class="fl-puce" data-fav-nouveaux aria-pressed="${filtreNouveaux ? 'true' : 'false'}">${esc(TU('fl_nouveaux'))}</button></div>
       <ul class="fl-liste" data-fav-liste="${vis.length}" data-fav-montres="${montres.length}" data-defil="fav">${vis.length ? montres.map(ligneFl).join('') : `<li class="fl-vide" data-fav-vide>${esc(TU('fl_vide'))}</li>`}${suite > 0 ? `<li class="fl-suite"><button class="vu-lien" data-fav-suite="${suite}">${esc(TU('fl_voir', { n: suite }))}</button></li>` : ''}</ul>
       ${total > tous.length ? `<div class="fl-note" data-fav-reste="${total - tous.length}">${esc(TU('fl_plus', { n: tous.length, total: total.toLocaleString('fr-FR') }))}</div>` : ''}
+      ${(() => { const n = favCochables(a).filter((x) => 'mini' in x && x.mini == null).length; return n ? fixerMini(n) : ''; })()}
       ${Number(a.retires) > 0 ? `<div class="fl-note" data-fav-caches="${Number(a.retires)}">${esc(TU('fl_caches', { n: Number(a.retires) }))}</div>` : ''}
       ${a.ventesAilleurs === 'pas_su' ? '<div class="val alerte" data-fav-ailleurs>Tes ventes sur les autres sites n’ont pas été revérifiées récemment : assure-toi que ces articles ne sont pas vendus ailleurs.</div>' : ''}
       ${favErreur ? `<div class="err" role="alert">${esc(favErreur)}</div>` : ''}
@@ -1164,9 +1173,13 @@
     for (const x of choisis) { const k = String(x.itemId); const o = parAnnonce.get(k) || { x, n: 0 }; o.n++; parAnnonce.set(k, o); }
     const offreTxt = m.offre ? (m.offre.mode === 'pct' ? `−${m.offre.valeur} %` : m.offre.mode === 'euros' ? `−${eurosFav(m.offre.valeur)}` : `${eurosFav(m.offre.valeur)}`) + (m.offre.arrondi ? ', ' + TU('fr_arrondi') : '') : '';
     const premier = choisis.find((x) => x.texte) || favCochables(a).find((x) => x.texte) || null, n = choisis.length;
+    // Une offre SOUS le prix mini posé pour l'article : dit, avant « Confirmer » (il décoche, ou il fixe le mini).
+    const sous = (x) => m.offre && x.offre != null && x.mini != null && Number(x.offre) < Number(x.mini);
+    const nSous = choisis.filter(sous).length;
     return `<section class="fav fl-recap" data-fav="pret" data-fav-vue="recap" data-fav-n="${n}">
       <div class="fl-r-t">${esc(n === 1 ? TU('fl_envoyer1') : TU('fl_envoyer', { n }))}</div>
-      <ul class="fl-r-l" data-fav-recap-annonces="${parAnnonce.size}">${[...parAnnonce.values()].map(({ x, n: k }) => `<li data-fav-recap-item="${esc(x.itemId)}">${photoFav(x.photo)}<span class="fl-mil"><span class="fl-ti">${x.num ? U.etiquette(x.num) + ' ' : ''}${esc(x.titre || TU('fl_article'))}</span><span class="fl-me">${esc(k === 1 ? TU('fr_par1') : TU('fr_par', { n: k }))}${m.offre && x.offre != null ? ' · ' + esc(TU('fr_offre', { p: eurosFav(x.offre) })) : ''}</span></span><span class="fl-px">${m.offre && x.offre != null ? `<s>${esc(eurosFav(x.prix))}</s>${esc(eurosFav(x.offre))}` : esc(eurosFav(x.prix))}</span></li>`).join('')}</ul>
+      <ul class="fl-r-l" data-fav-recap-annonces="${parAnnonce.size}">${[...parAnnonce.values()].map(({ x, n: k }) => `<li data-fav-recap-item="${esc(x.itemId)}">${photoFav(x.photo)}<span class="fl-mil"><span class="fl-ti">${x.num ? U.etiquette(x.num) + ' ' : ''}${esc(x.titre || TU('fl_article'))}</span><span class="fl-me">${esc(k === 1 ? TU('fr_par1') : TU('fr_par', { n: k }))}${m.offre && x.offre != null ? ' · ' + esc(TU('fr_offre', { p: eurosFav(x.offre) })) : ''}${'mini' in x ? ' · ' + esc(x.mini == null ? TU('fl_mini_rien') : TU('fl_mini', { p: eurosFav(x.mini) })) : ''}</span>${sous(x) ? `<span class="fl-etat ambre" data-fav-sous-mini="${esc(x.itemId)}">${esc(TU('fr_sous_mini', { o: eurosFav(x.offre), m: eurosFav(x.mini) }))}</span>` : ''}</span><span class="fl-px">${m.offre && x.offre != null ? `<s>${esc(eurosFav(x.prix))}</s>${esc(eurosFav(x.offre))}` : esc(eurosFav(x.prix))}</span></li>`).join('')}</ul>
+      ${nSous ? `<div class="fl-alerte" data-fav-sous="${nSous}"><div>${esc(TU('fr_sous_n', { n: nSous }))}</div><div class="fl-alerte-g"><button class="vu-btn vu-sec" data-fav-decocher-sous>${esc(TU('fr_decocher'))}</button><a class="vu-lien" href="${FIXER_MINI_URL}" target="_blank" rel="noopener">${esc(TU('fl_fixer'))}</a></div></div>` : ''}
       <div class="fl-lbl" data-fav-offre="${m.offre ? esc(m.offre.mode) : 'aucune'}">${esc(m.offre ? TU('fr_offre_mode', { o: offreTxt }) : TU('fr_sans_offre'))}</div>
       <div class="fl-lbl">${esc(TU('fr_message'))}${Number(m.versions) > 1 ? ' · ' + esc(TU('fr_versions', { n: Number(m.versions) })) : ''}</div>
       ${premier ? `<div class="bulle" data-fav-message>${esc(premier.texte)}</div>` : ''}
@@ -1304,12 +1317,20 @@
       const suiteB = carte.querySelector('[data-fav-suite]');
       if (suiteB) suiteB.addEventListener('click', () => { vusFl += PAGE_FL; rendre(); });
       if (env) env.addEventListener('click', () => { const p = piedFl(apercuFav); if (!p.k || p.attente) return; vueFav = 'recap'; favErreur = ''; rendre(); const rc = carte.querySelector('.fl-recap'); if (rc) { try { carte.scrollTop = Math.max(0, rc.getBoundingClientRect().top - carte.getBoundingClientRect().top + carte.scrollTop - 8); } catch (_) {} } });
+      const dsous = carte.querySelector('[data-fav-decocher-sous]');
+      if (dsous) dsous.addEventListener('click', () => { const m = apercuFav.message || {}; for (const x of envoiFl(apercuFav).envoi) if (m.offre && x.offre != null && x.mini != null && Number(x.offre) < Number(x.mini)) selFav.delete(x.id); garderSelection(uid); if (!envoiFl(apercuFav).envoi.length) vueFav = null; rendre(); });
       const ret = carte.querySelector('[data-fav-retour]');
       if (ret) ret.addEventListener('click', () => { vueFav = null; favErreur = ''; rendre(); });
     } else carte.querySelectorAll('[data-fav-coche]').forEach((el) => el.addEventListener('change', () => { const id = el.getAttribute('data-fav-coche'); if (el.checked) selFav.add(id); else selFav.delete(id); rendre(); }));
     carte.querySelectorAll('li.coche-l').forEach((li) => li.addEventListener('click', (ev) => { if (ev.target && ev.target.matches && ev.target.matches('input')) return; const c = li.querySelector('[data-fav-coche]'); if (c) { c.checked = !c.checked; c.dispatchEvent(new Event('change')); } }));
     const tout = avecListe(apercuFav) ? null : carte.querySelector('[data-fav-tout]');
     if (tout) tout.addEventListener('click', () => { selFav = tout.getAttribute('data-fav-tout') === 'tous' ? new Set(listeFavTriee(apercuFav).map((x) => x.id)) : new Set(); rendre(); });
+    const repr = carte.querySelector('[data-fav-reprendre]');
+    if (repr) repr.addEventListener('click', () => {
+      repr.disabled = true;
+      let capte = false; try { capte = !!document.querySelector('iframe[src*="captcha-delivery"], iframe[src*="datadome"], #datadome-captcha, iframe[src*="recaptcha"], iframe[src*="hcaptcha"], iframe[src*="challenges.cloudflare"]'); } catch (_) {}
+      demander('reprendre', { captcha: capte }, (r) => { favErreur = r && r.ok ? '' : ((r && r.raison) || 'Rien n’a repris : l’extension n’a pas répondu.'); rafraichir(); });
+    });
     const arreter = carte.querySelector('[data-fav-arreter]');
     if (arreter) arreter.addEventListener('click', () => { arreter.disabled = true; arreter.textContent = 'Arrêt…'; demander('arreter', null, () => rafraichir()); });
     const okB = carte.querySelector('[data-fav-ok]');

@@ -337,8 +337,12 @@ async function principal() {
     await carte(f, 'lancer', { selection: a.selection, reglages: a.reglages, confirme: true });
     await f.ctx.tickFavorisCarte();
     const st = await etatCarte(f);
-    dit(st && st.actif === false && st.fin && st.fin.raison === 'robot', 'un captcha : la carte s’arrête et le dit (« Vinted demande une vérification »)', JSON.stringify(st && st.fin));
-    dit(f.b.file()?.groupes?.[U]?.active === false, 'et la file est ARRÊTÉE chez VRM (aucun message ne repart)', JSON.stringify(f.b.file()?.groupes?.[U]?.active));
+    // 5.407 : la file est EN PAUSE (plus arrêtée) : elle attend SON « Reprendre » après la vérification faite.
+    dit(st && st.actif === true && st.attente === 'verification' && st.robot && !st.fin, 'un captcha : la carte se met en PAUSE et le dit (« Vinted demande une vérification »)', JSON.stringify(st && { a: st.actif, att: st.attente, robot: st.robot, fin: st.fin }));
+    dit(f.b.file()?.groupes?.[U]?.active === false, 'et rien ne repart chez VRM (le lot est inactif tant qu’il n’a pas repris)', JSON.stringify(f.b.file()?.groupes?.[U]?.active));
+    const nV = f.j.vinted.length;
+    await f.ctx.tickFavorisCarte(); await f.ctx.tickFavorisCarte();
+    dit(f.j.vinted.length === nV, 'les tours suivants n’envoient rien (aucune reprise toute seule)', `${nV} → ${f.j.vinted.length}`);
   });
   await essai('C8', async () => {
     const f = monter();

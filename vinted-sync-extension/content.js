@@ -5,6 +5,21 @@
 // content.js ne fait AUCUN appel a Vinted.
 (function () {
   'use strict';
+  // 5.407 (Julien : « l'affichage qui bloque de l'extension disparaît 1 s ») : la page rechargée
+  // PENDANT une action de VRM (écran plein de vrm-action.js) ne redevient pas utilisable le temps
+  // que l'écran revienne — un voile bloquant est posé ICI, avant le premier dessin (document_start),
+  // si l'écran plein était là il y a moins de 3 min (`vrm_action_gel`, posé par vrm-action.js) ;
+  // vrm-action.js le retire dès qu'il a pris la place (ou si l'action est finie), 8 s au plus.
+  try {
+    const g = Number(sessionStorage.getItem('vrm_action_gel'));
+    if (g && Date.now() - g < 180000 && !document.getElementById('vrm-action-gel')) {
+      const st = document.createElement('style');
+      st.id = 'vrm-action-gel';
+      st.textContent = 'html{overflow:hidden!important}html::after{content:"";position:fixed;inset:0;z-index:2147483647;background:rgb(8 20 38/.6);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}';
+      (document.head || document.documentElement).appendChild(st);
+      setTimeout(() => { try { st.remove(); } catch (_) {} }, 8000);
+    }
+  } catch (_) {}
   const TAG = 'CANCALE_VINTED';
   // 5.361 (revue, 110-115 — famille « minuteries et écouteurs orphelins ») :
   // une minuterie permanente de la page s'ARRÊTE quand l'extension a été mise à

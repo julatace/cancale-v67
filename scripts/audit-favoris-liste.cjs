@@ -119,6 +119,7 @@ async function serveur(apercu) {
       else if (c.action === 'verifier') r = F.verifierReservation(d, { owner: OWNER, jeton: c.jeton, maintenant: now });
       else if (c.action === 'terminer') { const t = P.traduireResultatFavori(c.brut); r = F.terminerFile(d, { owner: OWNER, jeton: c.jeton, resultat: t.resultat, raison: t.raison, maintenant: now, ecrits: Number.isInteger(t.ecrits) ? t.ecrits : null, apresMs: Number.isSafeInteger(t.apresMs) ? t.apresMs : null }); }
       else if (c.action === 'arreter') r = F.arreterFile(d, OWNER);
+      else if (c.action === 'reprendre') r = F.reprendreFile(d, { owner: OWNER, maintenant: now });
       else return { status: 400, body: { message: 'inconnu' } };
       if (r.data) d = r.data;
       const v = ['suivant', 'consommer', 'verifier'].includes(c.action) ? r.valeur.vue : r.valeur;
@@ -133,7 +134,7 @@ async function monde(apercu, o = {}) {
   const sv = await serveur(apercu);
   const vinted = [];
   const f = faireFond({ src: SRC, connecte: o.connecte || UID, store: Object.assign({}, o.store || {}), vrm: sv.vrm,
-    vinted: (req) => { vinted.push(req); return { status: 500, body: {} }; } });
+    vinted: (req) => { vinted.push(req); return o.vinted ? o.vinted(req) : { status: 500, body: {} }; } });
   return { f, sv, vinted };
 }
 const badge = (quoi, extra) => Object.assign({ from: 'vrm-badge', action: 'favorisCarte', quoi, uid: UID }, extra || {});
@@ -256,6 +257,34 @@ const badge = (quoi, extra) => Object.assign({ from: 'vrm-badge', action: 'favor
     await f.ctx.poserToutArrete(true);
     const r = await f.envoyer(badge('lancer', { selection: [cochables[0]], reglages: PREFS, confirme: true, items: [] }), ONGLET);
     dit(r && r.ok === false && sv.lancers.length === 0, '« Tout arrêter » posé ⇒ rien ne part', JSON.stringify(r).slice(0, 160));
+  }
+  // ── B5 : Julien, 17 nov. : « Arrêté : Vinted demande une vérification » — la MÊME file reprend sur SON toucher ──
+  console.log('\nB5. Vérification de Vinted : pause, puis « Reprendre » seulement vérification faite');
+  {
+    let captcha = true;
+    const { f, sv, vinted } = await monde(a, { vinted: (q) => (captcha && q.methode === 'POST' && /\/api\/v2\/conversations$/.test(q.chemin) ? { status: 403, body: { message: 'Please complete the captcha', code: 106 } } : { status: 500, body: {} }) });
+    await f.envoyer(badge('apercu'), ONGLET);
+    const choisis = cochables.slice(0, 3);
+    await f.envoyer(badge('lancer', { selection: choisis, reglages: PREFS, confirme: true, items: [] }), ONGLET);
+    await f.ctx.tickFavorisCarte();
+    const st = f.store.vrmFavorisCarte || {}, act = f.store.vrmActionEnCours || {};
+    dit(st.actif === true && st.attente === 'verification' && !!st.robot && act.verification === true && act.robot === true, 'captcha : la file est EN PAUSE (pas arrêtée), l’écran se met de côté avec la carte « vérification »', JSON.stringify({ a: st.actif, att: st.attente, r: !!st.robot, v: act.verification, ar: act.robot }));
+    const nV = vinted.length, prud = JSON.stringify(f.store.vrmPrudence || null);
+    await f.ctx.tickFavorisCarte(); await f.ctx.tickFavorisCarte();
+    dit(vinted.length === nV, 'aucune reprise toute seule : les tours suivants n’envoient rien', `${nV} → ${vinted.length}`);
+    const r1 = await f.envoyer(badge('reprendre', { captcha: true }), ONGLET);
+    dit(r1 && r1.ok === false && r1.code === 'captcha', '« Reprendre » refusé tant que la vérification est affichée', JSON.stringify(r1));
+    const r2 = await f.envoyer(badge('reprendre', { captcha: false }), ONGLET);
+    dit(r2 && r2.ok === false && r2.code === 'pas-lu', '« Reprendre » refusé tant que Vinted n’a pas répondu normalement depuis', JSON.stringify(r2));
+    captcha = false;
+    f.store.vrmFlux = Object.assign({}, f.store.vrmFlux || {}, { vinted: { okAt: Date.now() + 5 } });
+    await new Promise((res) => setTimeout(res, 10));
+    const r3 = await f.envoyer(badge('reprendre', { captcha: false }), ONGLET);
+    const g = sv.F.vueFile(sv.F.initialiserFile(sv.d()), OWNER);
+    const st3 = f.store.vrmFavorisCarte || {};
+    dit(r3 && r3.ok === true && g.active === true && !st3.robot && st3.actif === true, 'vérification faite + SON toucher : la MÊME file reprend chez VRM', JSON.stringify({ r3, active: g.active, robot: st3.robot }));
+    dit(g.jobs.filter((j) => j.etat === 'attente').length >= 1 && g.jobs.every((j) => choisis.includes(j.notificationId)), 'seuls les favoris de CE lot restent à envoyer', JSON.stringify(g.jobs.map((j) => [j.notificationId, j.etat])));
+    dit(JSON.stringify(f.store.vrmPrudence || null) === prud, 'la prudence de 24 h n’est pas touchée par la reprise', prud);
   }
   console.log(`\n${ko ? '❌' : '✅'} ${ok} vert(s), ${ko} rouge(s)`);
   nettoyer();

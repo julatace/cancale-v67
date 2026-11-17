@@ -3811,11 +3811,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   // 5.406 : l'écran « action en cours » (vrm-action.js) — l'état, seulement pour l'onglet Vinted
   // connecté sur le compte qui agit (jamais l'action d'un autre compte) ; « Tout arrêter » depuis l'écran.
-  if (msg && msg.from === 'vrm-action' && (msg.action === 'etat' || msg.action === 'arreter')) {
+  if (msg && msg.from === 'vrm-action' && (msg.action === 'etat' || msg.action === 'arreter' || msg.action === 'reprendre')) {
     (async () => {
       let hote = ''; try { hote = new URL((sender && sender.tab && sender.tab.url) || '').hostname; } catch (_) {}
       if (!/(^|\.)vinted\.(fr|com|it|de)$/i.test(hote)) return { ok: false };
       if (msg.action === 'arreter') return arreterDepuisEcran(sender);
+      if (msg.action === 'reprendre') return reprendreApresVerification(sender, msg.captcha === true);
       const a = await lireActionEnCours();
       if (!a) return { ok: true, action: null };
       const uid = await compteConnecte(hote);
@@ -18405,6 +18406,11 @@ async function favorisCarte(msg, sender) {
       const d = await donneesInfosPage(o.uid).catch(() => null);
       const inf = d ? infosDuCompte(d, o.uid, [...new Set(ap.tous.map((x) => String(x && x.itemId || '')))]) : {};
       for (const x of ap.tous) { const n = x && inf[String(x.itemId)] && inf[String(x.itemId)].numero; if (n) x.num = String(n).slice(0, 12); }
+      // 5.407 (Julien : « les articles [doivent avoir] leur numéro avec le prix minimum où ça accepte à côté ») :
+      // le prix mini d'acceptation posé à côté du N° (`vinted_annonce_numeros[id].min`, la règle des offres
+      // auto, `offreAutoReglages`) ; pas posé ⇒ `mini: null` (« mini — »), jamais deviné ; pas lu ⇒ rien.
+      const reg = await offreAutoReglages().catch(() => null);
+      if (reg && reg.mins) for (const x of ap.tous) { const m = x ? reg.mins[String(x.itemId)] : null; x.mini = Number.isFinite(m) && m > 0 ? m : null; }
     }
     return { ok: true, uid: o.uid, apercu: ap };
   }
@@ -18449,6 +18455,7 @@ async function favorisCarte(msg, sender) {
     await finirActionEnCours('arret');
     return { ok: !!r.ok, etat: st, raison: r.ok ? '' : ((r.json && r.json.message) || 'VRM n’a pas confirmé l’arrêt. Réessaie.') };
   }
+  if (quoi === 'reprendre') return reprendreApresVerification(sender, msg.captcha === true);
   if (quoi === 'oublier') {
     const st = await lireEtatFavorisCarte();
     if (st && st.uid === o.uid && !st.actif) { try { await chrome.storage.local.remove(FAVORIS_CARTE_CLE); } catch (_) {} }
@@ -18514,9 +18521,45 @@ async function poserActionEnCours(st) {
   await poserAction({ actif: true, sorte: 'favoris', uid: String(st.uid), debut: Number(st.debut) || Date.now(),
     fait: Number(fi.envoyes) || 0, total: Number(fi.total) || Number(st.total) || 0, pas: (Number(fi.refuses) || 0) + (Number(fi.ignores) || 0) + (Number(fi.incertains) || 0),
     enCours: !!st.enCours, prochain: Number(st.prochain) || null, quoi: String(st.quoi || ''), attente: String(st.attente || ''),
-    verification: st.attente === 'verification', item,
+    verification: st.attente === 'verification', robot: !!st.robot, robotAt: st.robot ? Number(st.robot.at) || null : null, item,
     // Les 3 suivants (photo, titre), dans l'ordre de la file : ni passés ni en cours.
     suivants: (Array.isArray(st.items) ? st.items : []).filter((x) => !(Array.isArray(st.passes) && st.passes.includes(x.id)) && !(item && item.id === x.id)).slice(0, 3) });
+}
+// 5.407 (Julien, 17 nov. : « quand Vinted est bloqué […] l'affichage qui bloque de l'extension disparaît
+// 1 s ») : pendant une attente qui ne change rien (pause de Vinted, vérification, autre compte…), la file
+// ne réécrivait PAS l'état ⇒ au bout de 3 min il passait pour « éteint » (fond mort) et l'écran tombait,
+// puis revenait au geste suivant. Le battement : chaque tour d'une file ACTIVE rafraîchit `maj` (au plus
+// une écriture par 20 s), rien d'autre ne change.
+// « Reprendre » après une vérification de Vinted (SON toucher, carte ou écran de vinted.fr) :
+// seulement quand la vérification est FAITE — l'onglet ne montre plus de captcha (`captcha: false`,
+// dit par la page) ET Vinted a répondu normalement depuis (`vrmFlux.vinted.okAt` après l'arrêt).
+// Alors : l'arrêt « captcha » de CE compte est levé (son geste), la MÊME file reprend chez VRM
+// (`reprendre`), au rythme de la prudence de 24 h (inchangée). Jamais tout seul.
+async function reprendreApresVerification(sender, captchaVu) {
+  const o = await compteVintedDeLOnglet(sender);
+  if (!o) return { ok: false, code: 'site', raison: 'Ouvre Vinted, connecté sur ton compte.' };
+  const st = await lireEtatFavorisCarte();
+  if (!st || !st.actif || st.uid !== o.uid || !st.robot) return { ok: false, code: 'rien', raison: 'Rien à reprendre sur ce compte.' };
+  if (captchaVu === true) return { ok: false, code: 'captcha', raison: 'La vérification est encore affichée : fais-la sur la page d’abord.' };
+  const cap = (await lireLocal('vrmCaptcha'))[o.uid];
+  const depuis = Math.max(Number(st.robot.at) || 0, cap && Number(cap.depuis) > 0 ? Number(cap.depuis) : 0);
+  const flux = (await lireLocal('vrmFlux')).vinted || {};
+  if (!(Number(flux.okAt) > depuis)) return { ok: false, code: 'pas-lu', raison: 'Vinted n’a pas encore répondu normalement depuis la vérification : ouvre une page de Vinted (ton dressing), puis « Reprendre ».' };
+  const r = await apiFavorisCarte(o.uid, 'reprendre');
+  if (!r.ok) return { ok: false, code: 'serveur', raison: (r.json && r.json.message) || 'VRM n’a pas confirmé la reprise : rien ne part.' };
+  await surDiscretion(async () => { const m = await lireLocal('vrmCaptcha'); if (m[o.uid] && m[o.uid].quoi === 'captcha') { delete m[o.uid]; try { await chrome.storage.local.set({ vrmCaptcha: m }); } catch (_) {} } });
+  try { noterCarnet(o.uid, 'reprise'); } catch (_) {}
+  Promise.resolve().then(() => publierJaugeMaintenant(String(o.uid))).catch(() => {});
+  const st2 = (await lireEtatFavorisCarte()) || st;
+  st2.robot = null; st2.attente = null; st2.prochain = null; if (r.json && r.json.carte) st2.file = r.json.carte;
+  await poserEtatFavorisCarte(st2);
+  logActivity('▶️ Messages aux favoris (carte) repris après la vérification (plus doucement pendant 24 h).');
+  planifierFavorisCarte(0);
+  return { ok: true };
+}
+async function battreActionEnCours(uid) {
+  const a = await lireActionEnCours();
+  if (a && a.actif === true && a.uid === String(uid) && Date.now() - Number(a.maj || 0) > 20000) await poserAction(a);
 }
 async function finirActionEnCours(raison, st) {
   const a = await lireActionEnCours();
@@ -18567,7 +18610,10 @@ async function tickFavorisCarte() {
     for (let tour = 0; tour < 6; tour++) {
       const st = await lireEtatFavorisCarte();
       if (!st || !st.actif) return;
+      if (tour === 0) await battreActionEnCours(st.uid);
       const attendre = async (code) => { if (st.attente !== code) { st.attente = code; st.attenteAt = Date.now(); await poserEtatFavorisCarte(st); } };
+      // En pause après une vérification de Vinted : rien ne se demande à VRM ni à Vinted tant qu'il n'a pas repris.
+      if (st.robot) return attendre('verification');
       if ((await toutArreteDepuis(null)) > 0) return attendre('tout_arrete');
       if (horsLigne()) return attendre('reseau');
       if (await pauseVinted()) return attendre('pause');
@@ -18619,11 +18665,13 @@ async function tickFavorisCarte() {
       if (f.json && f.json.carte) st2.file = f.json.carte;
       const raison = r && r.data && r.data.raison;
       if (raison === 'vinted_robot' || (r && r.code === 'verification')) {
-        const a = await apiFavorisCarte(st.uid, 'arreter');
-        st2.actif = false; st2.attente = null; st2.fin = { at: Date.now(), raison: 'robot' };
-        if (a.json && a.json.carte) st2.file = a.json.carte;
+        // 5.407 : la file n'est plus ARRÊTÉE chez VRM — elle est EN PAUSE, et ne reprend que sur SON
+        // toucher « Reprendre » (après la vérification faite, `reprendreApresVerification`). Rien ne
+        // part d'ici là : l'arrêt « captcha » de l'extension tient (porteDiscretion) ; la prudence
+        // de 24 h (20/h, délais doublés) reste après la reprise.
+        st2.attente = 'verification'; st2.robot = { at: Date.now() }; st2.prochain = null; st2.quoi = '';
         await poserEtatFavorisCarte(st2);
-        logActivity('⛔ Messages aux favoris (carte) arrêtés : Vinted demande une vérification');
+        logActivity('⏸ Messages aux favoris (carte) en pause : Vinted demande une vérification. Fais-la sur vinted.fr, puis « Reprendre ».');
         return;
       }
       await poserEtatFavorisCarte(st2);
