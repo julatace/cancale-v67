@@ -108,10 +108,10 @@ import { AttenteEcran, useEssentiel, useAttenteComplete } from './AttenteEcran.j
 import { JourneeInstantanee } from './JourneeInstantanee.jsx';
 import { capturerJournee, ecrireInstantane, effacerInstantanes, lireInstantane } from './journeeInstantanee.js';
 // (9 nov., soir) Colis et Ventes tout de suite : la même règle d'instantané (src/instantaneEcran.js).
-import { ColisInstantane, VentesInstantanee } from './ColisVentesInstantanes.jsx';
+import { VentesInstantanee } from './ColisVentesInstantanes.jsx';
 import { AnnoncesInstantanee } from './AnnoncesInstantanee.jsx';   // (11 nov., ouverture-legere-2)
 import { capturerAnnonces, ecrireInstantaneAnnonces, lireInstantaneAnnonces } from './annoncesInstantanee.js';
-import { capturerColis, capturerVentes, ecrireInstantaneColis, ecrireInstantaneVentes, lireInstantaneColis, lireInstantaneVentes } from './colisVentesInstantanes.js';
+import { capturerVentes, ecrireInstantaneVentes, lireInstantaneVentes } from './colisVentesInstantanes.js';
 import { SqLignes, SqBarre } from './Squelette.jsx';
 import { usePreparation, useEnPreparation } from './preparations.js';
 import { souvenir, retenir } from './memoireEcrans.js';
@@ -142,7 +142,7 @@ import {arriveesRelues} from './arriveesRelues.js';
 import { preuveDeLigne } from '../api/_lib/etat-colis.js';
 import { urlQrDuColis } from '../api/_lib/qr-retrait.js';
 import {avecSuiviDuSujet,finsDesLignes,sortiParSuivis,sortiParSuivi,suiviDeLigne,lienSuivi,codePostalLu,nouvelleVinted,transporteurDeForme,colisInternational,suiviValide,TRANSPORTEURS_SAISIE,normaliserCodePostal,idSuiviManuel,relireLigneSuivi,finDeCommandeAchat,txAchatsEnRetour,achatEnRetour,fusionTransporteur,ligneDuTransporteur,ligneDeSuiviTransporteur,leverGarde,SELECT_TRANSP_META,ligneTranspDeMeta,sensDeLigne,incidentDeSuivis,incidentDeLigne,repartiAffichable,nomTransporteurSuivi} from '../api/_lib/suivi-colis.js';
-import {ligneTransporteur,texteCodePostalMr,carrierLisible,carrierNonLu,nomTransporteur,LECTURE_SERVEUR_TRANSP,heureParis,indexTranspParSuivi,carrierLuDeLigne,noterLecturesServeur,lecturesCle} from '../api/_lib/transporteurs.js';
+import {ligneTransporteur,texteCodePostalMr,carrierLisible,carrierNonLu,nomTransporteur,LECTURE_SERVEUR_TRANSP,heureParis,indexTranspParSuivi,carrierLuDeLigne} from '../api/_lib/transporteurs.js';
 // ⟦→ ecrans/Reglages.jsx #6⟧
 import PorteConfidentialite from './PorteConfidentialite.jsx';
 import { AlerteDejaRelie } from './AlerteDejaRelie.jsx';
@@ -181,7 +181,7 @@ import ATrancher, { QuestionChezToi } from "./ATrancher.jsx";
 import MaSemaine from "./MaSemaine.jsx";
 import { maSemaine } from "./maSemaine.js";
 import LitigesEnCours, { EntreeLitiges } from "./LitigesEnCours.jsx";
-import { RetoursAchatBloc, RetoursAImprimer, PasAPasRetour, ARenvoyerJournee, RetoursLitigesJournee, RetoursAVerifier } from "./RetoursLitiges.jsx";
+import { RetoursAchatBloc, RetoursAImprimer, RetoursLot, PasAPasRetour, ARenvoyerJournee, RetoursLitigesJournee, RetoursAVerifier } from "./RetoursLitiges.jsx";
 import { retoursAchat, avecRemboursementsProuves, remboursementsParTx, ACHAT_A_RENVOYER, bordereauDuGarde, quandLimite as quandRetour, classerRetoursAchat } from "./retoursAchat.js";
 import { lireBordereauRetour, lireDemandeRetourAchat, estBordereauRetour, PREFIXE_DEMANDE_RETOUR } from '../api/_lib/retour-email.js';   // (15 nov., lot retours) LA règle du serveur, relue ici
 import { pasAPasVente } from "./retourPasAPas.js";
@@ -612,7 +612,7 @@ import OuVendre from './OuVendre.jsx';   // (15 nov., lot securite-ventes) « O�
 import { fraisVintedSelon, statutVinted, tauxEbay, tauxVestiaire } from './ouVendre.js';
 import { etatVenteVc } from './etatVenteVc.js';   // (15 nov.) l'état d'une vente Vestiaire en mots (jamais « IN_PROGRESS »)
 import { texteEtatVc } from './etatVenteVcTexte.js';
-import {SELECT_DEPART_META,departsParSuivi,txVintedParties} from '../api/_lib/depart-colis.js';
+import {SELECT_DEPART_META,departsParSuivi,txVintedParties,mrSansCodePostal} from '../api/_lib/depart-colis.js';
 import {ventesPartiesParPreuve, suiviDuBord} from '../api/_lib/depart-vente.js';
 import { partiParPreuve } from './etiquettesDepart.js';
 import {publierDepartsVinted,raisonDepartPubliee} from './departVente.js';
@@ -622,10 +622,15 @@ import {PLATEFORMES_COMPTES,etatCompteLie,ageLecture,comptesLbcLies,comptesVcLie
 import { lignesFraicheur, quandRelu } from './fraicheurComptes.js';
 import { FRAICHEUR_ACHATS_J, fraicheurPubliee, suivreFraicheur } from './fraicheur.js';   // (9 nov., lot AG) le seuil des achats vit avec la ligne de fraîcheur unique
 import { ventesEmailFraiches, avecVentesEmail, requeteVentesEmail, gesteVenteEmail, STATUT_VENTE_EMAIL, groupesVentesEmailEnTete, statutVentesEmail } from './venteEmailFraiche.js';
-import { TAMPONS as TAMPONS_IMPR } from './impression/thermique.js';   // (14 nov.) le tampon par bordereau
+import { TAMPONS as TAMPONS_IMPR } from './impression/thermique.js';
+import { CLE_TAMPONS, TAILLES_TAMPON, avecChoix, reglageTampons, aEcrire, resoudreTampon, placesDeForme, avecPlace, familleDe, texteDuCartouche, contenuDuMode, repousserHorsInterdits, CIBLES as CIBLES_TAMPON } from './impression/tampons.js';   // (16 nov., lot tampons-parametres) LE réglage des tampons   // (14 nov.) le tampon par bordereau
 import { pagesDe, formatRetenu, signatureLot, voieOuverture, absentsDuLot } from './impression/lotSimple.js';   // (14 nov.) « Imprimer » en un toucher
-import { ChoixPapier, FeuilleImpression } from './ImpressionSimple.jsx';   // (14 nov., impression-simple) les deux feuilles
-import { CLE_IMPRESSION, reglageImpression, papierThermique, placementEtiquette, contenuTampon, carteEncre, boiteEncre, decouperFeuille, fusionnerProches, moduleDuCode, moduleImprimeMm, codeAssezGros, seuillerNoir, tramerNoir, zonesAdresse, CONTRASTES, MODULE_MIN_MM, BANDE_CONTINU_MM } from './impression/thermique.js';
+import { lignesRetoursLot, motsTamponRetour, estRetour } from './impression/retoursLot.js';   // (16 nov.) les retours dans « Imprimer »
+import { ChoixPapier, FeuilleImpression } from './ImpressionSimple.jsx';
+import ApercuAvantImpression from './impression/ApercuAvantImpression.jsx';
+import BordereauPret from './impression/BordereauPret.jsx';
+import { occuperPendant, figerBouton, libererBoutonsImprime } from './impression/occuper.js';   // (16 nov.) un bouton d'impression garde sa taille   // (16 nov.) « Bordereau prêt » refait   // (16 nov., lot tampons-parametres) l'aperçu avant impression   // (14 nov., impression-simple) les deux feuilles
+import { CLE_IMPRESSION, reglageImpression, papierThermique, placementEtiquette, carteEncre, boiteEncre, decouperFeuille, fusionnerProches, moduleDuCode, moduleImprimeMm, codeAssezGros, seuillerNoir, tramerNoir, zonesAdresse, CONTRASTES, MODULE_MIN_MM, BANDE_CONTINU_MM } from './impression/thermique.js';
 import { decisionNumeroVenteEmail, numeroEcritDansArticle, colisVentesEmail, MENTION_SANS_NUM, CLE_IMPRIMES_SANS_NUM, phraseImprimeSansNumero } from './bordereauVenteEmail.js';
 // (15 nov., Julien : « on range une ANNONCE, pas un achat ») La feuille « Ranger cet achat » n'est plus montée : la règle
 // des cases d'un gros lot, le rattrapage du pool et le N° de l'atelier d'arrivée (sans case : la case vient APRÈS, sur l'article).
@@ -721,7 +726,8 @@ import { etatAbonnement, rappelEssai, publierAbonnement, abonnementPublie, suivr
 // (13 nov., lot 54) Le parrainage clair et visible : « Offert par … » à l'inscription, la ligne du menu « Plus ».
 import { lireApercuParrain, lireParrainageOuvert, parrainageOuvertConnu, suivreParrainageOuvert, demanderParrainage } from "./parrainage/parrainage.js";
 // (15 nov.) Le lien d'un PARTENAIRE (`/p/LEO`) : gardé, présenté une fois (src/partenaires/lien.js).
-import { garderCodePartenaire, codePartenaireGarde, presenterCodePartenaire } from "./partenaires/lien.js";
+import { garderCodePartenaire, codePartenaireGarde } from "./partenaires/lien.js";
+import { presenterCodePartenaire } from "./partenaires/presenter.js";
 import { marquerApercu, effacerApercu, bloquerGestes } from "./abonnement/apercu.js";
 // (9 nov.) Solo / Pro : la règle des ventes par offre (api/_lib/plan-regle.js) et son état (src/abonnement/planVentes.js).
 import { venteHorsPlanUid, demarrerPlan, signaturePlan, suivrePlan, reglePlanCourante } from "./abonnement/planVentes.js";
@@ -829,7 +835,7 @@ import { ChoixEmballageColis } from "./EmballagesCarte.jsx";   // (10 nov., lot 
 import { CLE_EMBALLAGES, colisFaits as colisFaitsEmb } from "./emballages.js";
 // (14 nov., lot colis-plus 99, 101) La douchette (un code lu ⇒ LA vente, par identité) et le bénéfice par colis.
 import { DouchetteGlobale } from "./Douchette.jsx";
-import { venteDuCode, enregistrerResolveur, prendreDemande as prendreDemandeDouchette, codeCourt, DEMANDE_DOUCHETTE } from "./douchette.js";
+import { venteDuCode, enregistrerResolveur, prendreDemande as prendreDemandeDouchette, codeCourt, DEMANDE_DOUCHETTE, lignesAutresSites } from "./douchette.js";
 import { beneficesParColis } from "./tempsColis.js";
 import { listeInventaire, publierInventaireAnnuel } from "./inventaireAnnuel.js";   // (10 nov., lot W) l'inventaire de fin d'année
 import { BarreCoutVente, PointCout, SaisieEmballage } from "./CascadeVente.jsx";
@@ -864,6 +870,7 @@ import { achatsPourAtelier, CLE_ACHATS_ATELIER, resumeAtelier, ligneAtelierJourn
 // ⟦→ ecrans/Compta.jsx #8⟧
 import { produitsANumeroter, attribuerNumerosVc, carteNumerosVc } from "./numerosVestiaire.js";
 import { CLE_STOCK_IMPORTE, CLE_VENTES_IMPORTEES, CLE_IMPORTS, annulerImport, refVente } from "./importStock.js";
+import { importeesPourRecherche, importeeDuNumero } from "./stockImporteVue.js";   // (16 nov., lot ecrans-restes) le stock importé, montré
 import { ImportStockReglage } from "./composants/ImportStock.jsx";
 import { sitesDuNumero, appliquerPrix, noterJournalPrix, envoisPrix, prixParSite } from "./prixPartout.js";
 import { champsSource, dupliquerFiche, fichesAPublier, texteAColler } from "./dupliquerFiche.js";
@@ -979,6 +986,7 @@ import { noterGestes, noterLigne, lireGestes, rejouer as rejouerRegistre, tranch
 import { deconnecterSansPerte, TEXTES_DECONNEXION } from "./deconnexionSure.js";
 import { sessionAAdopter, sousVerrou, VERROU_RENOUVELLEMENT, rangerSessionOnglets, lireSessionOnglets } from "./sessionOnglets.js";
 import { modifierLigneCas, ecrireDifference } from "./ligneCas.js";
+import { fabriquerModifierCle } from "./modifierCle.js";
 import { creerGestes, creerEcrivainLocal, ecrireOps, clesDe, vueDesOps } from "./gesteAnnulable.js";
 import { CLE_CORBEILLE, appliquerMorceaux, clesDesMorceaux, ecrireMorceaux, creerEntree, morceauxSupprimer, morceauxRestaurer, planRestauration, aPurger, annexesAVider, lireCorbeille, listeCorbeille, joursRestants, nomType, TEXTE_MIS } from "./corbeille.js";   // (10 nov., lot Y) la corbeille 30 jours
 import { combiner as combinerIssues } from "./gesteAnnulable.js";
@@ -1038,6 +1046,8 @@ import "./design/verre-ventes.css";   // (16 nov., lot ventes-clair) Ventes plus
 import "./design/verre-ecrans.css";   // (15 nov., maquettes validées : « tout est parfait sauf étagères ») Argent, à venir, Messages, Paramètres, la fiche — des classes `vg-*` neuves, `@layer vrm-verre` : docs/passation/2026-11-15-ecrans-verre-2.md
 import "./design/verre-journee.css";   // (15 nov., refonte-journee) Ma journée comme la maquette validée, « La paire à sortir en premier » — docs/passation/2026-11-15-refonte-journee.md
 import "./design/verre-annonces.css";   // (15 nov., refonte-journee) Annonces comme la maquette validée : la rangée de 72 px, la recherche et les vues
+import "./design/verre-restes.css";   // (16 nov., lot design-restes) les restes du verre : la carte qui monte sur Leboncoin, eBay, Vestiaire… — `@layer vrm-verre` : docs/passation/2026-11-16-design-restes.md
+import "./design/verre-argent.css";   // (16 nov., lot argent-mieux) Argent lisible partout : cartes de verre, encre du verre, « Copier » plein, ventes non comptées groupées — `@layer vrm-verre` : docs/passation/2026-11-16-argent-mieux.md
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
@@ -1049,11 +1059,13 @@ import { langueNavigateur, poserLangueUneFois, alignerLangueCompte } from "./lan
 // `t` est pris partout dans ce fichier comme nom de variable, d'où l'alias `tr`.
 import ChoixLangue from "./i18n/ChoixLangue.jsx";
 import { tr, aCle as aCleTr, LANGUES, NOMS_LANGUES, choisirLangue, langueCourante, localeCourante, monnaie as monnaieI18n, ajouterSourceApp, abonnerLangue } from "./i18n/index.js";
+const trT = tr;   // (16 nov.) le même `tr`, pour les fonctions dont un paramètre s'appelle déjà `tr` (le transporteur)
 import { offresVestiaire, offresJourneeVc, euros as eurosOffre, resteAvant as resteAvantOffre } from './offresVestiaire.js';
 // La partie « app » du dictionnaire français arrive AVEC l'app (le fichier d'entrée reste léger).
 import frApp from "./i18n/langues/fr.js";
 ajouterSourceApp(frApp);
 import { detenteursAchat, texteDejaRelie, patchDelier, ecrituresDeplacer } from "./relierAutreAchat.js";
+import { achatsAutresPourRelier, siteDeAchat } from "./achatsAutresRelier.js";   // (16 nov.) achats Leboncoin et Vestiaire dans « Relier »
 import { appliquerPrixPro, relevesParTx as relevesProParTx, SELECT_TXN_PRO } from "./vintedPro.js";   // (11 nov., lot vinted-pro)
 import { AlerteArnaque, CompteurArnaque, PastilleArnaque } from "./AlerteArnaque.jsx";
 import { motifDeLApercu } from "./antiArnaque.js";
@@ -1108,7 +1120,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.393.0';
+const EXT_ATTENDUE = '5.400.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -1540,7 +1552,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { photovrm: '5.393.0', vcaimes: '5.393.0', versementsauto: '5.393.0', memephotosure: '5.393.0', memephoto: '5.384.0', numerotes: '5.382.0', lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
+const EXT_CAPACITES = { fichepublier: '5.400.0', empreinteebay: '5.400.0', vccategorie: '5.399.0', relueoffre: '5.398.0', salutation: '5.398.0', photovrm: '5.393.0', vcaimes: '5.393.0', versementsauto: '5.393.0', memephotosure: '5.393.0', memephoto: '5.384.0', numerotes: '5.382.0', lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -3201,7 +3213,7 @@ const SYNC_KEYS = [
   // (15 nov., lot argent-plus) Les alertes de seuils déjà dites (« Compris », src/alertesSeuils.js) : une fois chacune, sur tous ses appareils.
   'vrm_seuils_vus',
   // (3 nov.) La place du tampon choisie à la main, par FORME de bordereau (« Toujours ici »).
-  'vrm_tampon_positions','vinted_bords_printed',
+  'vrm_tampon_positions','vrm_tampons','vinted_bords_printed',
   // (8 nov.) Les bordereaux imprimés SANS N° (src/bordereauVenteEmail.js) : la carte le redit.
   'vrm_bords_sans_num',
   // (5 nov.) Le PROGRAMME du mode stream (ce qu'il cache quand il filme) : le même sur
@@ -3361,6 +3373,9 @@ const SYNC_KEYS = [
   'vrm_retours_deposes',
   // (15 nov., refonte-journee) « C'est réglé » sur un retour sans nouvelles (Achats → À vérifier, src/retoursAchat.js).
   'vrm_retours_regles',
+  // (16 nov., lot ecrans-restes) « Plus tard » de la carte « Protège ton compte VRM » (Paramètres → Compte) :
+  // posé sur SON clic, vu sur tous ses appareils (il ne la revoyait sur chaque appareil).
+  'vrm_carte_mfa_rangee',
   // (9 nov., lot AF) LE JOURNAL DES N° (src/historiqueNumero.js) : APPEND-ONLY, une ligne par
   // changement de N° d'une fiche, écrite au moment du changement (`noterJournalNumeros`) ;
   // lu par la fiche d'une paire (« L'histoire du N° »). Ne change jamais un N°.
@@ -4662,7 +4677,7 @@ function FeuilleCreerVinted({ fiches, onFermer, onFait = null, saisie = false })
   const rx = raisonExtGlobale(false, { cap: 'creervinted', role: 'prépare tes annonces sur Vinted' });
   return <CreerSurVinted fiches={fiches} compteOnglet={vc === undefined ? undefined : (vc ? { uid: String(vc.uid || ''), login: String(vc.login || '') } : null)}
     extRaison={rx ? rx.texte : ''} reglages={{ etiquette: load('vrm_num_vinted', null), numeroEcrit: load('vrm_numero_ecrit', null) }}
-    envoyer={(p) => vmrCmdSuivi(p, 480000)} saisie={saisie}
+    envoyer={(p) => vmrCmdSuivi(p, 480000)} saisie={saisie} lireStudio={(num) => import('./studioPhoto.js').then((m) => m.lireStudio(STUDIO_BASE, cleNum(num)))}
     onSaisie={(f, t) => { noterFicheVinted(f, null, t); if (onFait) onFait(); }}
     onCree={(f, r, uid, photos) => { noterFicheVinted(f, { draftId: String(r.draftId), uid: String(uid), at: new Date().toISOString() }, f); enregistrerPhotosProduites(photos, f.numero, r.draftId, uid); if (onFait) onFait(); }}
     onFermer={onFermer} Retour={FermeAuRetour}/>;
@@ -5106,6 +5121,9 @@ const save = (k,v,quand) => {
   _saveEnAttente[k] = v;
   _saveTimers[k] = setTimeout(executer, 500);
 };
+// (16 nov., lot compta-donnees) LA FILE PAR CLÉ (src/modifierCle.js) : un geste part de la valeur
+// EN ATTENTE de sa clé (500 ms), jamais de la carte d'avant le geste précédent.
+const modifierCle = fabriquerModifierCle({ lire: chargerPublie, save });
 // (11 nov., reprise-ecrans) La sauvegarde EN ATTENTE d'une clé, faite tout de suite (même
 // chemin : fusion, file d'envoi, nuage). Au passage en arrière-plan seulement : iOS peut
 // tuer l'app avant les 500 ms (l'écran et la recherche de la reprise se perdaient).
@@ -8891,103 +8909,8 @@ function CarrierBadge({ carrier, size = 22 }) {
   return <span title={c.name} data-carrier-badge={cle || k} style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>{cle ? <LogoTransporteur cle={cle} taille={size} repli={repli}/> : repli}</span>;
 }
 
-// Le fond vectoriel de la mini-carte (MapLibre chargé à la demande).
-function FondMiniCarte({ lat, lon, zoom, sombre }) {
-  const boite = React.useRef(null);
-  const [etat, setEtat] = React.useState('charge');
-  React.useEffect(() => {
-    let vivant = true, carte = null;
-    import('./fondCarte.js').then((f) => {
-      if (!f.webglDispo()) throw new Error('webgl');
-      return f.chargerMaplibre().then((ml) => {
-        if (!vivant || !boite.current) return;
-        // Fond uni d'abord, puis le style OpenFreeMap (poserFond). L'attribution
-        // exigée vient de la TileJSON, repliée en « i » (mini-carte).
-        carte = new ml.Map({ container: boite.current, style: { version: 8, sources: {}, layers: [] }, center: [lon, lat], zoom, interactive: false, attributionControl: { compact: true } });
-        carte.once('load', () => {
-          f.poserFond(carte, { sombre, annule: () => !vivant }).then(() => { if (vivant) setEtat('pret'); }).catch(() => { if (vivant) setEtat('ko'); });
-        });
-      });
-    }).catch(() => { if (vivant) setEtat('ko'); });
-    return () => { vivant = false; if (carte) carte.remove(); };
-  }, [lat, lon, zoom, sombre]);
-  return <div ref={boite} data-mini-fond={etat} aria-hidden="true" style={{ position: 'absolute', inset: 0 }} />;
-}
-
-function OsmMap({ points, height = 230, selected, onSelect }) {
-  const pts = (points || []).filter(p => p && p.lat && p.lon);
-  if (!pts.length) return null;
-  const proj = (lat, lon, zz) => { const n = 2 ** zz; const x = (lon + 180) / 360 * n; const latr = lat * Math.PI / 180; const y = (1 - Math.log(Math.tan(latr) + 1 / Math.cos(latr)) / Math.PI) / 2 * n; return { x, y }; };
-  // Zoom : le plus serré qui contient toutes les épingles… puis on DÉZOOME d'un
-  // cran pour laisser de la marge et voir la ville autour (comme demandé).
-  let z = 16;
-  while (z > 11) {
-    const ts = pts.map(p => proj(p.lat, p.lon, z));
-    const spanX = Math.max(...ts.map(t => t.x)) - Math.min(...ts.map(t => t.x));
-    const spanY = Math.max(...ts.map(t => t.y)) - Math.min(...ts.map(t => t.y));
-    if (spanX < 1.5 && spanY < (height / 256) * 0.72) break;
-    z--;
-  }
-  if (pts.length > 1 && z > 12) z -= 1; // marge : on voit tout d'un coup
-  const clat = (Math.min(...pts.map(p => p.lat)) + Math.max(...pts.map(p => p.lat))) / 2;
-  const clon = (Math.min(...pts.map(p => p.lon)) + Math.max(...pts.map(p => p.lon))) / 2;
-  const c = proj(clat, clon, z);
-  // Fond : OpenFreeMap (sans clé, src/fondCarte.js), MapLibre,
-  // immobile, centré sur le même point et à la même échelle que les épingles
-  // (une tuile MapLibre fait 512 px : zoom MapLibre = z − 1). CARTO retiré (clé
-  // exigée). Injoignable ⇒ un fond uni et les épingles restent, jamais rien.
-  // (29 oct.) La carte garde ses couleurs claires en mode sombre (décision de Julien, comme la communauté).
-  const sombreCarte = false;
-  return (
-    <div data-mini-carte style={{ position: 'relative', width: '100%', height, overflow: 'hidden', background: sombreCarte ? '#1D1D1F' : '#F2F2F7' }}>
-      <FondMiniCarte lat={clat} lon={clon} zoom={z - 1} sombre={sombreCarte} />
-      {(() => {
-        // Anti-chevauchement : on écarte les épingles trop proches en spirale.
-        const placed = [];
-        const R = 30; // distance mini entre 2 épingles (px)
-        const prio = [...pts].sort((a, b) => (b.count || 0) - (a.count || 0)); // colis d'abord, jamais bougés
-        prio.forEach(p => {
-          const t = proj(p.lat, p.lon, z);
-          let ox = (t.x - c.x) * 256, oy = (t.y - c.y) * 256;
-          let tries = 0;
-          while (placed.some(q => Math.hypot(q.ox - ox, q.oy - oy) < R) && tries < 40) {
-            const ang = tries * 2.399, rad = R * (1 + tries * 0.14);
-            ox = (t.x - c.x) * 256 + Math.cos(ang) * rad;
-            oy = (t.y - c.y) * 256 + Math.sin(ang) * rad;
-            tries++;
-          }
-          placed.push({ p, ox, oy });
-        });
-        return placed;
-      })().map(({ p, ox, oy }) => {
-        const isSel = selected === p.key;
-        const car = CARRIERS[carrierKey(p.carrier)];
-        const col = car ? car.bg : (p.picked ? '#2e9e5b' : p.count > 0 ? '#e5484d' : '#8E8E93');
-        const inner = car ? car.short : (p.count > 0 ? String(p.count) : p.picked ? '✓' : '');
-        const innerFg = car ? car.fg : '#fff';
-        const dim = !car && !p.picked && !(p.count > 0);
-        return (
-          <div key={p.key} onClick={() => onSelect && onSelect(p.key)}
-            style={{ position: 'absolute', left: `calc(50% + ${ox}px)`, top: `calc(50% + ${oy}px)`, transform: `translate(-50%, -100%) scale(${isSel ? 1.18 : 1})`, cursor: 'pointer', transition: 'transform .15s', zIndex: isSel ? 4 : car || p.count > 0 ? 3 : 1, opacity: dim ? 0.8 : 1, filter: 'drop-shadow(0 3px 4px rgba(0,0,0,0.28))' }}>
-            {/* Épingle « teardrop » colorée à la marque */}
-            <svg width="34" height="44" viewBox="0 0 34 44" style={{ display: 'block' }}>
-              <path d="M17 0C7.6 0 0 7.5 0 16.8 0 29 17 44 17 44s17-15 17-27.2C34 7.5 26.4 0 17 0z" fill={col} />
-              <circle cx="17" cy="16.5" r="12" fill="#fff" />
-            </svg>
-            <span style={{ position: 'absolute', left: '50%', top: 16.5, transform: 'translate(-50%,-50%)', color: col, fontSize: inner.length > 2 ? 11 : 12, fontWeight: 700, letterSpacing: 0.2 }}>{inner}</span>
-            {/* Pastille « nombre de colis » en coin si c'est une marque */}
-            {car && p.count > 0 && <span style={{ position: 'absolute', top: -5, right: -8, minWidth: 18, height: 18, borderRadius: 999, background: '#e5484d', color: '#fff', fontSize: 11, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px', boxShadow: '0 1px 3px rgba(0,0,0,0.3)', border: '1.5px solid #fff' }}>{p.count}</span>}
-            {/* Étiquette NOM du point (rend chaque relais distinct d'un coup d'œil) */}
-            {(() => { const lbl = p.label || p.key; return (pts.length <= 14 || isSel || p.count > 0) && lbl && (
-              <span style={{ position: 'absolute', left: '50%', top: '100%', transform: 'translate(-50%, 1px)', whiteSpace: 'nowrap', maxWidth: 110, overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 11, fontWeight: 700, color: p.count > 0 ? '#b3261e' : '#2C2C2E', background: 'rgba(255,255,255,0.92)', borderRadius: 6, padding: '1px 5px', boxShadow: '0 1px 2px rgba(0,0,0,0.18)', border: isSel ? `1.5px solid ${col}` : '1px solid rgba(0,0,0,0.06)' }}>{String(lbl).length > 20 ? String(lbl).slice(0, 19) + '…' : lbl}</span>
-            ); })()}
-          </div>
-        );
-      })}
-      <span data-mini-carte-attribution style={{ position: 'absolute', right: 5, bottom: 3, fontSize: 8, color: '#6E6E73', background: 'rgba(255,255,255,0.8)', padding: '1px 5px', borderRadius: 4 }}>OpenFreeMap · © OpenMapTiles · © OpenStreetMap</span>
-    </div>
-  );
-}
+// (16 nov., lot ecrans-restes) `OsmMap` et son fond `FondMiniCarte` ne servaient qu'à la recherche manuelle de point
+// relais (`relayPicker`, jamais ouverte) : retirés avec elle. La carte des relais est src/CarteRelais.jsx.
 // Décode une chaîne base64 en Uint8Array (pour donner le PDF à pdf-lib).
 const b64ToBytes = (b64) => {
   try { const bin = atob(String(b64 || '')); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; }
@@ -10250,7 +10173,9 @@ const ventesDeclarables = ({ vinted, lbc, ebay, vestiaire, masquee, exclu, exclu
     if (!t) { if (!vus.has(id)) { vus.add(id); aDaterOuDeclaree({ id, plateforme: 'Vinted', eur, titre: o.title || '', masquee: masq, o, dateVente: o.date }); } continue; }
     // (11 nov., lot vinted-pro) Compte Vinted PRO : un prix que Vinted contredit (liste ≠ article,
     // relevé muet) n'est pas su ⇒ mise à part et NOMMÉE — sauf une vente déjà déclarée, qui garde son mois.
-    if (o._prixPro && o._prixPro.compter === false && !(idx && idx.get(id))) { if (!vus.has(id)) { vus.add(id); ecartees.push({ id, plateforme: 'Vinted', raison: o._prixPro.raison || 'prix pas lu', titre: o.title || '', manque: true, ts: t || null, tsVente: tsCommande(o) || null }); } continue; }
+    // (16 nov., lot argent-mieux) Les deux prix LUS sont gardés à côté (`deux`, centimes) : la liste groupée
+    // dit « au moins » la somme du plus bas (jamais un des deux choisi pour le total, qui reste sans elles).
+    if (o._prixPro && o._prixPro.compter === false && !(idx && idx.get(id))) { if (!vus.has(id)) { vus.add(id); const pp = o._prixPro; const deux = Number.isSafeInteger(pp.listeC) && Number.isSafeInteger(pp.artC) ? { listeC: pp.listeC, artC: pp.artC, releveC: Number.isSafeInteger(pp.releveC) ? pp.releveC : null } : null; ecartees.push({ id, plateforme: 'Vinted', raison: pp.raison || 'prix pas lu', code: pp.code || '', ...(deux ? { deux, auMoinsC: Math.min(deux.listeC, deux.artC) } : {}), titre: o.title || '', manque: true, ts: t || null, tsVente: tsCommande(o) || null, itemId: o.item_id != null ? String(o.item_id) : '' }); } continue; }
     const l = { id, plateforme: 'Vinted', ts: t, ym: ymDeTs(t), eur, titre: o.title || '', masquee: masq, o, dateVente: o.date };
     if (garde(l)) lignes.push(place(l));
   }
@@ -12011,6 +11936,19 @@ const __vmrPontSeul = new Set();
 //    (`adresse`), et il reste ADRESSÉ : seul le pont de l'extension NOMMÉE le
 //    relaie, et le service worker applique les mêmes règles (origine, nonce,
 //    compte annoncé). Chrome garde son canal adressé, inchangé.
+// (16 nov., ext. 5.395) « Publier cette fiche » : SUR SON CLIC (« Ouvrir Vinted » d'une fiche « À publier »),
+// l'extension de CE navigateur réserve LE N° DE LA FICHE à côté de « Publier » sur la page de dépôt qui
+// s'ouvre ensuite, et le relie à l'annonce que Vinted crée (son identifiant). Rend { ok, code } ; extension
+// absente / pas à jour / muette ⇒ { ok: false } (la feuille dit alors le N° à poser elle-même, comme avant).
+async function annoncerFicheAPublier(f) {
+  try {
+    if (extSait('fichepublier') !== 'ok') return { ok: false, code: 'version' };
+    const ext = String((__vmrEtat && __vmrEtat.ok && __vmrEtat.ext) || '');
+    if (!ext || !f || !f.id || !String(f.numero == null ? '' : f.numero).trim()) return { ok: false, code: 'absent' };
+    const r = await versExtension(ext, { type: 'ficheAPublier', fiche: String(f.id), numero: String(f.numero).trim() }, 4000).catch(() => null);
+    return r && typeof r === 'object' ? r : { ok: false, code: 'muette' };
+  } catch (_) { return { ok: false, code: 'muette' }; }
+}
 function versExtension(id, msg, timeoutMs = 5000) {
   if (__vmrPontSeul.has(String(id || '')) && __vmrExtReady) return vmrDemandeUn('adresse', { ext: String(id), msg }, timeoutMs);
   const rt0 = canalExt();
@@ -13756,9 +13694,24 @@ const couperLignes = (font, taille, s, l, n) => {
 // Le cartouche (N° en gras, titre sur deux lignes) d'une variante : sa taille
 // et ses lignes, en points, origine en haut à gauche. `null` si le N° ne tient
 // pas dans la largeur (on essaie alors la variante suivante).
-const cartoucheTampon = (bold, reg, numero, titre, v) => {
+// (16 nov., lot impression-retours) `retour` : le cartouche d'un bordereau de RETOUR (un achat qu'il renvoie).
+// Julien : « bien préciser que c'est un retour et pas une vente ». Le mot RETOUR d'abord, EN GRAND (plus grand
+// que le N° d'une vente), cerné d'un cadre noir ; le N° dessous ; le titre ; « Achat renvoyé · pas une vente ».
+// Jamais le cartouche d'une vente (le N° seul en tête) sur un retour. Mots : `motsTamponRetour` (src/impression/retoursLot.js).
+const cartoucheTampon = (bold, reg, numero, titre, v, retour = false) => {
   const pad = 3, n = texteEcrivable(bold, numero), t = texteEcrivable(reg, titre);
   const lignes = []; let h = pad, w = 0;
+  if (retour) {
+    const m = motsTamponRetour({ num: n }, tr), tr0 = texteEcrivable(bold, m.haut) || 'RETOUR', P = 5;
+    const tg = v.tn * 1.35, lw = bold.widthOfTextAtSize(tr0, tg);
+    if (lw > v.l - 2 * P) return null;
+    h = P; h += tg * 0.78; lignes.push({ texte: tr0, font: bold, taille: tg, y: h }); h += tg * 0.3; w = Math.max(w, lw);
+    if (m.num) { const tn = v.tn * 0.8, txt = texteEcrivable(bold, m.num), l2 = bold.widthOfTextAtSize(txt, tn); if (l2 > v.l - 2 * P) return null; h += tn * 0.85; lignes.push({ texte: txt, font: bold, taille: tn, y: h }); h += tn * 0.25; w = Math.max(w, l2); }
+    if (t) for (const l of couperLignes(reg, v.tt, t, v.l - 2 * P, 2)) { h += v.tt * 1.05; lignes.push({ texte: l, font: reg, taille: v.tt, y: h }); w = Math.max(w, reg.widthOfTextAtSize(l, v.tt)); }
+    const bas = texteEcrivable(bold, m.bas);
+    if (bas) for (const l of couperLignes(bold, v.tt, bas, v.l - 2 * P, 1)) { h += v.tt * 1.15; lignes.push({ texte: l, font: bold, taille: v.tt, y: h }); w = Math.max(w, bold.widthOfTextAtSize(l, v.tt)); }
+    return { w: Math.ceil(w + 2 * P), h: Math.ceil(h + P + 1), pad: P, lignes, cadre: true, retour: true };
+  }
   if (n) {
     const txt = `N° ${n}`, lw = bold.widthOfTextAtSize(txt, v.tn);
     if (lw > v.l - 2 * pad) return null;
@@ -13793,6 +13746,8 @@ const ecrireCartouche = (PL, page, c, x, y, k = 1, fond = false) => {
   page.resetPosition();
   const a = versPdfAffiche(b, r, x, y), z = versPdfAffiche(b, r, x + c.w * k, y + c.h * k);
   if (fond) page.drawRectangle({ x: Math.min(a.x, z.x), y: Math.min(a.y, z.y), width: Math.abs(z.x - a.x), height: Math.abs(z.y - a.y), color: PL.rgb(1, 1, 1) });
+  // (16 nov.) Le cartouche d'un RETOUR est cerné de noir : il ne se confond pas avec le tampon d'une vente.
+  if (c.cadre) page.drawRectangle({ x: Math.min(a.x, z.x), y: Math.min(a.y, z.y), width: Math.abs(z.x - a.x), height: Math.abs(z.y - a.y), borderColor: PL.rgb(0, 0, 0), borderWidth: 2 * k });
   for (const l of c.lignes) {
     const p = versPdfAffiche(b, r, x + c.pad * k, y + l.y * k);
     const g = l.gris || 0;
@@ -13822,12 +13777,18 @@ const trouverZoneBlanche = (pixels, width, height, boxW, boxH, marge, opts = {})
   for (let y = 0; y < ch; y++) { let row = 0; for (let x = 0; x < cw; x++) { row += encre[y * cw + x] >= 2 ? 1 : 0; sums[(y + 1) * stride + x + 1] = sums[y * stride + x + 1] + row; } }
   const w = Math.ceil((boxW + 2 * mx) / k), h = Math.ceil((boxH + 2 * my) / k);
   const bas = !!opts.depuisBas;
+  // (16 nov., lot tampons-parametres) `opts.vers` { x, y } (pixels) : parmi les fenêtres libres, celle dont le
+  // centre est le PLUS PROCHE de ce point (une place rapide : coin, haut, bas) — jamais une fenêtre qui touche l'encre.
+  const vers = opts.vers; let best = null;
   for (let j = 0; j + h <= ch; j++) for (let i = 0; i + w <= cw; i++) {
     const y = bas ? ch - h - j : j, x = bas ? cw - w - i : i;
     const n = sums[(y + h) * stride + x + w] - sums[y * stride + x + w] - sums[(y + h) * stride + x] + sums[y * stride + x];
-    if (n === 0) return { x: x * k + mx, y: y * k + my };
+    if (n !== 0) continue;
+    if (!vers) return { x: x * k + mx, y: y * k + my };
+    const d = ((x + w / 2) * k - vers.x) ** 2 + ((y + h / 2) * k - vers.y) ** 2;
+    if (!best || d < best.d) best = { x: x * k + mx, y: y * k + my, d };
   }
-  return null;
+  return best ? { x: best.x, y: best.y } : null;
 };
 // Rend la page 1 de `pdf` (pdf-lib) avec pdf.js : { pixels, w, h, s } dans le
 // sens AFFICHÉ, `s` pixels par point. Lève si pdf.js manque (hors ligne…).
@@ -13848,15 +13809,21 @@ const rendrePremierePage = async (pdf, echelle = TAMPON.echelle) => {
 // ① Où poser le cartouche sur la page affichée (recherche automatique) ?
 // `rendu` : la page déjà rendue (l'aperçu la réutilise). Rend { x, y, c, v }
 // (points, page affichée ; `v` = l'indice de la variante) ou null.
-const chercherPlaceTampon = async (pdf, bold, reg, numero, titre, rendu = null, bloques = []) => {
+// (16 nov., lot tampons-parametres) `o.k` : la taille du texte choisie (S 0,8 · M 1 · L 1,25, `vrm_tampons`) ;
+// `o.place` : une place rapide (`hg`, `hd`, `bg`, `bd`, `haut`, `bas`) — la zone blanche la plus proche de ce
+// coin ; 'auto' (ou rien) : la première zone blanche, comme toujours. Les zones `bloques` restent interdites.
+const varianteTampon = (v, k) => (k && k !== 1 ? { tn: v.tn * k, tt: v.tt * k, l: v.l * k } : v);
+const chercherPlaceTampon = async (pdf, bold, reg, numero, titre, rendu = null, bloques = [], o = {}) => {
   rendu = rendu || await rendrePremierePage(pdf); const s = rendu.s;
   const marge = { mx: Math.round(TAMPON.mx * s), my: Math.round(TAMPON.my * s) };
   // (11 nov., lot thermique) Les codes et les adresses de l'étiquette posée, comptés comme de l'encre.
   const bl = (bloques || []).map((z) => ({ x: z.x * s, y: z.y * s, w: z.w * s, h: z.h * s }));
+  const cible = CIBLES_TAMPON[o.place];
   for (let v = 0; v < CARTOUCHES.length; v++) {
-    const c = cartoucheTampon(bold, reg, numero, titre, CARTOUCHES[v]); if (!c) continue;
+    const c = cartoucheTampon(bold, reg, numero, titre, varianteTampon(CARTOUCHES[v], o.k), !!o.retour); if (!c) continue;
     const bw = Math.ceil(c.w * s), bh = Math.ceil(c.h * s);
-    const p = trouverZoneBlanche(rendu.pixels, rendu.w, rendu.h, bw, bh, marge, { bloques: bl });
+    const vers = cible ? { x: cible[0] * rendu.w, y: cible[1] * rendu.h } : null;
+    const p = trouverZoneBlanche(rendu.pixels, rendu.w, rendu.h, bw, bh, marge, { bloques: bl, vers });
     if (p) return { x: p.x / s, y: p.y / s, c, v };
   }
   return null;
@@ -13888,45 +13855,168 @@ const placeMentionVrm = (rendu, bw, bh, interdits) => {
   const p = trouverZoneBlanche(rendu.pixels, rendu.w, rendu.h, Math.ceil(bw * s), Math.ceil(bh * s), marge, { depuisBas: true, bloques });
   return p ? { x: p.x / s, y: p.y / s } : null;
 };
-// Pose la mention sur la page 1 si une place sûre existe. `rendu` : la page
-// AVANT le tampon ; `tampon` : la boîte du cartouche (points, page affichée).
-// Rend true si posée. Ne lève jamais (le bordereau s'imprime toujours).
-// (11 nov., lot thermique) `th` : la page EST le papier thermique ({ boite, bloques, marge } en
-// points, page affichée) — la mention ne va que dans le blanc AUTOUR de l'étiquette posée, en
-// NOIR fin (une tête thermique trame le gris en pointillés), jamais sur un code ni le N°.
-const poserMentionVrm = (PL, pdf, reg, rendu, tampon, th = null) => {
+// ── (16 nov., lot tampons-parametres) LA MENTION À SA PLACE : AU-DESSUS DU QR CODE ─────────────
+// Julien, mot pour mot : « le Créé par vrm.center, c'est mal placé » ; « mets-le en dessous de l'adresse de
+// livraison, au milieu sur le bordereau » ; « là où est le QR code » ; puis, DÉCISION FINALE : « ou au-dessus du
+// QR code, comme ça même si on met du scotch on le voit ». Donc, par défaut :
+//   ① juste AU-DESSUS du QR code, centrée sur SON axe, hors de sa zone de silence (sinon il ne se scanne plus) —
+//      le scotch couvre d'abord le bas et les bords de l'étiquette, le dessus du QR reste lisible ;
+//   ② seulement si cet espace est pris (texte, trait, cadre, code, adresse) : juste EN DESSOUS du QR ;
+//   ③ sans QR (ou sans place autour) : centrée sur le bordereau, dans la première bande blanche SOUS l'adresse du
+//      destinataire ; adresse introuvable : la première bande blanche sous la moitié haute ;
+//   ④ aucune place sûre : RIEN (jamais forcée sur un code, l'adresse, un cadre ou du texte).
+// Petite (6,5 pt en A4, 5,5 pt en thermique, × S/M/L), gris foncé en A4, noir en thermique (une tête thermique
+// tramerait le gris). Le réglage `vrm_tampons` peut la déplacer (coins, bas, place à la main) ou l'ôter.
+const MM_M = 72 / 25.4;   // (MM_PT est déclaré plus bas : une constante lue à l'initialisation ne peut pas s'en servir)
+const MENTION2 = { gris: 0.42, tailleTh: 5.5, marge: 1.2 * MM_M, gardeQrMin: 3 * MM_M, glisse: 8 * MM_M, pas: 0.5 * MM_M };
+// Une boîte (points) de `rendu` touche-t-elle l'encre ? (luminance < 200, comme la recherche du tampon)
+// Comme la recherche du tampon (`trouverZoneBlanche`) : par cases de 3 px, une case est de l'encre si au moins 2 de ses
+// pixels le sont — un point isolé (le grain d'un scan) n'en est pas, un trait l'est. Rend le nombre de cases d'encre.
+const encreDans = (rendu, b) => {
+  const { pixels: d, w, h, s } = rendu; let n = 0; const k = TAMPON.cellule;
+  const x0 = Math.max(0, Math.floor(b.x * s)), y0 = Math.max(0, Math.floor(b.y * s)), x1 = Math.min(w, Math.ceil((b.x + b.w) * s)), y1 = Math.min(h, Math.ceil((b.y + b.h) * s));
+  if (x1 <= x0 || y1 <= y0) return 1e9;
+  for (let cy = y0; cy < y1; cy += k) for (let cx = x0; cx < x1; cx += k) {
+    let m = 0;
+    for (let y = cy; y < Math.min(y1, cy + k) && m < 2; y++) for (let x = cx; x < Math.min(x1, cx + k) && m < 2; x++) { const i = (y * w + x) * 4; if (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2] < 200) m++; }
+    if (m >= 2) n++;
+  }
+  return n;
+};
+// Un QR (ou un DataMatrix) : un code à peu près carré. Sa boîte est AFFINÉE sur ses vrais pixels noirs : la carte
+// des codes est faite de cases de 6 pt, un bord du QR peut en dépasser.
+const estCarreCode = (q) => q.w / q.h >= 0.7 && q.w / q.h <= 1.43 && Math.min(q.w, q.h) >= 8 * MM_M;
+// Un QR alterne noir/blanc dans les DEUX sens ; un code-barres (même trapu, agrandi sur un papier thermique) seulement
+// de gauche à droite : ses colonnes sont pleines. Mesuré sur 5 lignes et 5 colonnes de la boîte.
+const alterneDeuxSens = (rendu, q) => {
+  const { pixels: d, w, h, s } = rendu;
+  const x0 = Math.max(0, Math.round(q.x * s)), y0 = Math.max(0, Math.round(q.y * s)), x1 = Math.min(w - 1, Math.round((q.x + q.w) * s)), y1 = Math.min(h - 1, Math.round((q.y + q.h) * s));
+  const noir = (x, y) => { const i = (y * w + x) * 4; return 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2] < 128; };
+  let th = 0, tv = 0;
+  for (let t = 1; t <= 5; t++) {
+    const y = y0 + Math.floor(((y1 - y0) * t) / 6), x = x0 + Math.floor(((x1 - x0) * t) / 6);
+    for (let i = x0 + 1; i <= x1; i++) if (noir(i, y) !== noir(i - 1, y)) th++;
+    for (let j = y0 + 1; j <= y1; j++) if (noir(x, j) !== noir(x, j - 1)) tv++;
+  }
+  return th >= 20 && tv >= 20 && tv >= th * 0.25;
+};
+const affinerCode = (rendu, q, autour = 8) => {
+  const { pixels: d, w, h, s } = rendu;
+  const x0 = Math.max(0, Math.floor((q.x - autour) * s)), y0 = Math.max(0, Math.floor((q.y - autour) * s)), x1 = Math.min(w, Math.ceil((q.x + q.w + autour) * s)), y1 = Math.min(h, Math.ceil((q.y + q.h + autour) * s));
+  const qx0 = q.x * s, qy0 = q.y * s, qx1 = (q.x + q.w) * s, qy1 = (q.y + q.h) * s;
+  let X0 = qx0, Y0 = qy0, X1 = qx1, Y1 = qy1;
+  // Une ligne/colonne noire collée au code en fait partie (on s'arrête au premier blanc de 2 pt).
+  const noirLigne = (y, a, b2) => { for (let x = a; x < b2; x++) { const i = (y * w + x) * 4; if (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2] < 128) return true; } return false; };
+  const noirCol = (x, a, b2) => { for (let y = a; y < b2; y++) { const i = (y * w + x) * 4; if (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2] < 128) return true; } return false; };
+  const vide = Math.max(2, Math.round(2 * s));
+  let k = 0; for (let y = Math.floor(qy0) - 1; y >= y0 && k < vide; y--) { if (noirLigne(y, Math.floor(X0), Math.ceil(X1))) { Y0 = y; k = 0; } else k++; }
+  k = 0; for (let y = Math.ceil(qy1); y < y1 && k < vide; y++) { if (noirLigne(y, Math.floor(X0), Math.ceil(X1))) { Y1 = y + 1; k = 0; } else k++; }
+  k = 0; for (let x = Math.floor(qx0) - 1; x >= x0 && k < vide; x--) { if (noirCol(x, Math.floor(Y0), Math.ceil(Y1))) { X0 = x; k = 0; } else k++; }
+  k = 0; for (let x = Math.ceil(qx1); x < x1 && k < vide; x++) { if (noirCol(x, Math.floor(Y0), Math.ceil(Y1))) { X1 = x + 1; k = 0; } else k++; }
+  return { x: X0 / s, y: Y0 / s, w: (X1 - X0) / s, h: (Y1 - Y0) / s };
+};
+// La zone de silence d'un QR : 4 modules (la norme), 3 mm au moins.
+const gardeQr = (rendu, q) => {
+  let mod = null; try { const s = rendu.s; const m = moduleDuCode(rendu.pixels, rendu.w, rendu.h, { x: q.x * s, y: q.y * s, w: q.w * s, h: q.h * s }); mod = m != null ? m / s : null; } catch (_) { mod = null; }
+  return Math.max(MENTION2.gardeQrMin, mod != null ? 4.5 * mod : q.w * 0.16);
+};
+// LES ZONES INTERDITES d'une page rendue (points, page affichée) : chaque code-barres + 5 mm, chaque QR + sa zone
+// de silence, chaque adresse donnée. `codes` affinés rendus à part (l'éditeur les hachure, le banc les juge).
+// (16 nov.) DU TEXTE N'EST PAS UN CODE. `zonesCodesTampon` prend aussi une ligne de titre gras (« Comment utiliser votre
+// étiquette ») ou un gros « 24R » : mesuré sur les bordereaux d'exemple, ces faux codes refusaient un tampon posé à la
+// main SUR DU TEXTE (que Julien permet). Un CODE-BARRES est fait de barres PLEINES : presque chaque colonne encrée l'est
+// sur toute sa hauteur (≥ 60 %, chiffres dessous compris) ; un QR / un code 2D alterne dans les deux sens sans ligne ni
+// colonne vide. Une ligne de texte n'a que quelques jambages pleins. Ce qui n'est ni l'un ni l'autre n'est pas protégé
+// comme un code (le tampon automatique, lui, évite toute encre).
+const estUnCode = (rendu, q) => {
+  const { pixels: d, w, h, s } = rendu;
+  const X0 = Math.max(0, Math.floor(q.x * s)), Y0 = Math.max(0, Math.floor(q.y * s)), X1 = Math.min(w, Math.ceil((q.x + q.w) * s)), Y1 = Math.min(h, Math.ceil((q.y + q.h) * s));
+  const noir = (x, y) => { const i = (y * w + x) * 4; return 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2] < 128; };
+  let a = 1e9, b = -1, c = 1e9, e = -1;
+  for (let y = Y0; y < Y1; y++) for (let x = X0; x < X1; x++) if (noir(x, y)) { if (y < a) a = y; if (y > b) b = y; if (x < c) c = x; if (x > e) e = x; }
+  if (b < 0 || b - a < 4 || e - c < 4) return true;
+  const H = b - a + 1;
+  let encrees = 0, pleines = 0, cv = 0;
+  for (let x = c; x <= e; x++) { let run = 0, best = 0, vu = false; for (let y = a; y <= b; y++) { if (noir(x, y)) { run++; vu = true; if (run > best) best = run; } else run = 0; } if (!vu) { cv++; continue; } encrees++; if (best >= 0.6 * H) pleines++; }
+  if (encrees && pleines / encrees >= 0.7) return true;                         // code-barres
+  // Le même code-barres sur une page TOURNÉE (Vestiaire, /Rotate 270) : ses barres sont des rangées pleines.
+  const L = e - c + 1; let encR = 0, pleinesR = 0, rv = 0;
+  for (let y = a; y <= b; y++) { let run = 0, best = 0, vu = false; for (let x = c; x <= e; x++) { if (noir(x, y)) { run++; vu = true; if (run > best) best = run; } else run = 0; } if (!vu) { rv++; continue; } encR++; if (best >= 0.6 * L) pleinesR++; }
+  if (encR && pleinesR / encR >= 0.7) return true;
+  return rv / H < 0.05 && cv / (e - c + 1) < 0.05 && alterneDeuxSens(rendu, { x: c / s, y: a / s, w: (e - c + 1) / s, h: H / s });   // QR, code 2D
+};
+const zonesInterditesTampon = (rendu, adresses = []) => {
+  // (17 nov.) Une « zone de code » de plus de 75 mm dans les DEUX sens n'est pas un code (un QR d'étiquette fait 20 à 50 mm,
+  // un code-barres est long mais bas) : c'est une page de texte serré qu'un rendu de police a vue comme des barres (vu en CI :
+  // toute l'étiquette interdite, le N° posé à la main renvoyé sur une fiche).
+  const codes = zonesCodesTampon(rendu).filter((q) => !(q.w > 75 * MM_M && q.h > 75 * MM_M) && estUnCode(rendu, q)).map((q) => (estCarreCode(q) && alterneDeuxSens(rendu, q) ? { ...affinerCode(rendu, q), qr: true } : { ...q, qr: false }));
+  // Le cartouche garde 5 mm autour de TOUT code (la règle de toujours) ; la mention, collée au QR par la décision de
+  // Julien, garde sa zone de silence mesurée (`interditsMention`).
+  const gardes = codes.map((q) => (q.qr ? gardeQr(rendu, q) : MENTION.codes));
+  const interdits = codes.map((q, i) => ({ ...elargir(q, Math.max(gardes[i], MENTION.codes)), quoi: q.qr ? 'qr' : 'code' }));
+  const interditsMention = codes.map((q, i) => ({ ...elargir(q, gardes[i]), quoi: q.qr ? 'qr' : 'code' }));
+  for (const a of adresses || []) { interdits.push({ ...a, quoi: 'adresse' }); interditsMention.push({ ...a, quoi: 'adresse' }); }
+  return { codes, interdits, interditsMention };
+};
+// Pur (la page déjà rendue) : où poser une boîte bw × bh de mention, par la règle par défaut ①②③.
+// `o` : { codes, interdits, cadre, adresses, bord }. Rend { x, y, via, qr } (points) ou null.
+const placerMentionDefaut = (rendu, bw, bh, o = {}) => {
+  const s = rendu.s, W = rendu.w / s, H = rendu.h / s, B = o.bord != null ? o.bord : MENTION.bord, M = MENTION2.marge;
+  const interdits = o.interdits || [];
+  const libre = (x, y) => x >= B && y >= B && x + bw <= W - B && y + bh <= H - B
+    && !interdits.some((z) => x < z.x + z.w && x + bw > z.x && y < z.y + z.h && y + bh > z.y)
+    && encreDans(rendu, { x: x - M, y: y - M, w: bw + 2 * M, h: bh + 2 * M }) === 0;
+  const qrs = (o.codes || []).filter((q) => q.qr).sort((a, b) => (b.w * b.h - a.w * a.h) || (a.y - b.y) || (a.x - b.x));
+  const q = qrs[0];
+  if (q) {
+    const garde = gardeQr(rendu, q), x = q.x + q.w / 2 - bw / 2;
+    // La boîte ne doit pas toucher la zone de silence de SON QR : on part de son bord, pas de la zone interdite.
+    for (let d = 0; d <= MENTION2.glisse; d += MENTION2.pas) { const y = q.y - garde - bh - d; if (libre(x, y)) return { x, y, via: 'qr-dessus', qr: q }; }
+    for (let d = 0; d <= MENTION2.glisse; d += MENTION2.pas) { const y = q.y + q.h + garde + d; if (libre(x, y)) return { x, y, via: 'qr-dessous', qr: q }; }
+  }
+  // ③ Centrée sur l'étiquette, sous l'adresse (sinon sous la moitié haute) ; on DESCEND jusqu'à la première bande blanche
+  // suffisante (Julien : « descends jusqu'à la première bande blanche suffisante, toujours centré »), avec 3 mm de blanc
+  // autour (jamais collée à un texte qu'on ne sait pas lire : un scan n'a pas de texte).
+  const C = o.cadre || { x: 0, y: 0, w: W, h: H }, x = C.x + C.w / 2 - bw / 2, M2 = 3 * MM_M;
+  const libre2 = (xx, y) => libre(xx, y) && encreDans(rendu, { x: xx - M2, y: y - M2, w: bw + 2 * M2, h: bh + 2 * M2 }) === 0;
+  const ad = (o.adresses || []).filter((z) => z.x < C.x + C.w && z.x + z.w > C.x && z.y < C.y + C.h && z.y + z.h > C.y);
+  const y0 = ad.length ? Math.max(...ad.map((z) => z.y + z.h)) + M2 : C.y + C.h / 2;
+  for (let y = y0; y + bh <= H - B; y += MENTION2.pas) if (libre2(x, y)) return { x, y, via: ad.length ? 'adresse' : 'milieu', qr: null };
+  return null;
+};
+// Pose la mention sur la page 1 (après ou avant le cartouche, voir `tamponnerBordereau`). `rendu` : la page AVANT
+// tout tampon ; `o` : { th (thermique), k (S/M/L), place ('qr' · 'bas' · coins), libre ({ vx, vy } posée à la main),
+// codes, interdits, cadre, adresses, evite (la boîte du cartouche, s'il est déjà posé) }. Rend la boîte posée
+// { x, y, w, h, via, repousse } ou null. Ne lève jamais (le bordereau s'imprime toujours).
+const poserMentionVrm = (PL, pdf, reg, rendu, o = {}) => {
   try {
-    if (!rendu) return false;
-    if (th) {
-      const page = pdf.getPages()[0], interdits = [elargir(th.boite, 2 * MM_PT), ...(th.bloques || [])];
-      if (tampon) interdits.push(elargir(tampon, 6 * MM_PT));
-      for (const q of zonesCodesTampon(rendu)) interdits.push(elargir(q, MENTION.codes));
-      const txt = texteEcrivable(reg, MENTION.texte), T = 5.5; if (!txt) return false;
-      const c = { w: Math.ceil(reg.widthOfTextAtSize(txt, T) + 2), h: Math.ceil(T * 1.1 + 2), pad: 1, lignes: [{ texte: txt, font: reg, taille: T, y: 1 + T * 0.8, gris: 0 }] };
-      const s = rendu.s, W = rendu.w / s, H = rendu.h / s, B = Math.max(1.5 * MM_PT, th.marge || 0);
+    if (!rendu) return null;
+    const page = pdf.getPages()[0], s = rendu.s, W = rendu.w / s, H = rendu.h / s;
+    const T = (o.th ? MENTION2.tailleTh : MENTION.taille) * (o.k || 1), gris = o.th ? 0 : MENTION2.gris;
+    const txt = texteEcrivable(reg, MENTION.texte); if (!txt) return null;
+    const c = { w: Math.ceil(reg.widthOfTextAtSize(txt, T) + 2), h: Math.ceil(T * 1.1 + 2), pad: 1, lignes: [{ texte: txt, font: reg, taille: T, y: 1 + T * 0.8, gris }] };
+    const B = o.th ? Math.max(1.5 * MM_M, o.marge || 0) : MENTION.bord;
+    const interdits = [...(o.interdits || [])]; if (o.evite) interdits.push(elargir(o.evite, 3 * MM_M));
+    if (o.libre && Number.isFinite(o.libre.vx) && Number.isFinite(o.libre.vy)) {
+      // Posée à la main : à sa place, fond blanc dessous — repoussée hors des codes, des QR et de l'adresse.
+      const p = repousserHorsInterdits({ x: o.libre.vx * W, y: o.libre.vy * H, w: c.w, h: c.h }, interdits, W, H);
+      if (!p) return null;
+      ecrireCartouche(PL, page, c, p.x, p.y, 1, true);
+      return { x: p.x, y: p.y, w: c.w, h: c.h, via: 'libre', repousse: p.repousse };
+    }
+    let p = null;
+    if (!o.place || o.place === 'qr') p = placerMentionDefaut(rendu, c.w, c.h, { codes: o.codes, interdits, cadre: o.cadre, adresses: o.adresses, bord: B });
+    else {
+      const cible = CIBLES_TAMPON[o.place];
       const zones = [...interdits, { x: 0, y: 0, w: W, h: B }, { x: 0, y: H - B, w: W, h: B }, { x: 0, y: 0, w: B, h: H }, { x: W - B, y: 0, w: B, h: H }];
       const bloques = zones.map((z) => ({ x: z.x * s, y: z.y * s, w: z.w * s, h: z.h * s }));
-      const p = trouverZoneBlanche(rendu.pixels, rendu.w, rendu.h, Math.ceil(c.w * s), Math.ceil(c.h * s), { mx: Math.round(1 * MM_PT * s), my: Math.round(1 * MM_PT * s) }, { depuisBas: true, bloques });
-      if (!p) return false;
-      ecrireCartouche(PL, page, c, p.x / s, p.y / s);
-      return true;
+      const q = trouverZoneBlanche(rendu.pixels, rendu.w, rendu.h, Math.ceil(c.w * s), Math.ceil(c.h * s), { mx: Math.round(MENTION2.marge * s), my: Math.round(MENTION2.marge * s) }, { bloques, vers: cible ? { x: cible[0] * rendu.w, y: cible[1] * rendu.h } : null });
+      if (q) p = { x: q.x / s, y: q.y / s, via: o.place };
     }
-    if (typeof zoneEtiquette !== 'function') return false;
-    const page = pdf.getPages()[0], b = page.getCropBox(), r = rotationPage(page);
-    const z = zoneEtiquette(PL, page); if (!z || !z.ok) return false;
-    const interdits = [];
-    for (const e of (z.etiquettes && z.etiquettes.length ? z.etiquettes : [z])) {
-      const a = versAffiche(b, r, e.x, e.y), c = versAffiche(b, r, e.x + e.w, e.y + e.h);
-      interdits.push(elargir({ x: Math.min(a.x, c.x), y: Math.min(a.y, c.y), w: Math.abs(c.x - a.x), h: Math.abs(c.y - a.y) }, MENTION.etiquette));
-    }
-    if (tampon) interdits.push(elargir(tampon, MENTION.ecart));
-    for (const q of zonesCodesTampon(rendu)) interdits.push(elargir(q, MENTION.codes));
-    const txt = texteEcrivable(reg, MENTION.texte), T = MENTION.taille; if (!txt) return false;
-    const c = { w: Math.ceil(reg.widthOfTextAtSize(txt, T) + 2), h: Math.ceil(T * 1.1 + 2), pad: 1, lignes: [{ texte: txt, font: reg, taille: T, y: 1 + T * 0.8, gris: MENTION.gris }] };
-    const p = placeMentionVrm(rendu, c.w, c.h, interdits); if (!p) return false;
+    if (!p) return null;
     ecrireCartouche(PL, page, c, p.x, p.y);
-    return true;
-  } catch (_) { return false; }
+    return { x: p.x, y: p.y, w: c.w, h: c.h, via: p.via, repousse: false };
+  } catch (_) { return null; }
 };
 // ── LE TAMPON LIBRE (3 nov., 18 h 59) ────────────────────────────────────────
 // Julien : « on doit pouvoir être LIBRE de le mettre où on veut, MÊME SUR DU
@@ -13941,14 +14031,14 @@ const choixTamponValide = (c) => !!c && [c.vx, c.vy, c.vw].every((x) => Number.i
 const echelleMiniTampon = (v) => Math.max(TAMPON_MIN.n / v.tn, TAMPON_MIN.t / v.tt);
 // Le cartouche de la variante `vi` (si le N° ne tient pas dans sa largeur, la
 // largeur est élargie : à la main, la taille se règle ensuite au doigt).
-const cartoucheLibre = (bold, reg, n, t, vi) => {
+const cartoucheLibre = (bold, reg, n, t, vi, retour = false) => {
   const v = CARTOUCHES[Math.max(0, Math.min(CARTOUCHES.length - 1, vi | 0))];
-  return cartoucheTampon(bold, reg, n, t, v) || cartoucheTampon(bold, reg, n, t, { ...v, l: 600 });
+  return cartoucheTampon(bold, reg, n, t, v, retour) || cartoucheTampon(bold, reg, n, t, { ...v, l: 600 }, retour);
 };
 // Rend { x, y, k, c } (points, page affichée), le cartouche borné à la page.
-const placeLibreTampon = (page, bold, reg, n, t, choix) => {
+const placeLibreTampon = (page, bold, reg, n, t, choix, retour = false) => {
   const { w: W, h: H } = tailleAffichee(page), vi = Math.max(0, Math.min(CARTOUCHES.length - 1, choix.v | 0));
-  const c = cartoucheLibre(bold, reg, n, t, vi); if (!c) return null;
+  const c = cartoucheLibre(bold, reg, n, t, vi, retour); if (!c) return null;
   const kMax = Math.min(W / c.w, H / c.h), kMin = Math.min(echelleMiniTampon(CARTOUCHES[vi]), kMax);
   const k = Math.max(kMin, Math.min(kMax, (choix.vw * W) / c.w));
   const x = Math.max(0, Math.min(W - c.w * k, choix.vx * W)), y = Math.max(0, Math.min(H - c.h * k, choix.vy * H));
@@ -13963,19 +14053,28 @@ const formeTampon = (type, page, isole = false) => {
   const format = pres(595.28, 841.89, 8) ? 'A4' : pres(283.46, 425.2, 10) ? '10x15' : pres(419.53, 595.28, 8) ? 'A5' : `${Math.round(a / MM_PT)}x${Math.round(b / MM_PT)}mm`;
   const sens = w > h ? 'paysage' : 'portrait';
   const t = String(type || 'autre');
-  const nomT = { mondialrelay: 'Mondial Relay', international: 'Mondial Relay international', chronopost: 'Chronopost', colissimo: 'Colissimo', vintedgo: 'Vinted Go', relaiscolis: 'Relais Colis', ups: 'UPS', dpd: 'DPD' }[t] || 'Bordereau';
+  const nomT = { mondialrelay: 'Mondial Relay', international: 'Mondial Relay international', chronopost: 'Chronopost', colissimo: 'Colissimo', vintedgo: 'Vinted Go', relaiscolis: 'Relais Colis', ups: 'UPS', dpd: 'DPD', leboncoin: 'Leboncoin', vestiaire: 'Vestiaire Collective', retour: 'Retour' }[t] || 'Bordereau';
   return {
     cle: `${t}·${format}·${sens}${r ? '·r' + r : ''}${isole ? '·th' : ''}`,
     nom: `${nomT} ${format.replace('x', '×')}${isole ? ' thermique' : ''}${sens === 'paysage' ? ' paysage' : ''}${r ? ' tourné' : ''}`,
   };
 };
 // La préférence SYNCHRONISÉE (SYNC_KEYS) : { [forme]: { vx, vy, vw, v, at } }.
-const TAMPON_POSITIONS = 'vrm_tampon_positions';
-const positionsTampon = () => { try { const m = typeof load === 'function' ? load(TAMPON_POSITIONS, {}) : {}; return m && typeof m === 'object' ? m : {}; } catch (_) { return {}; } };
+// (16 nov., lot tampons-parametres) LE réglage des tampons : `vrm_tampons` (src/impression/tampons.js, SYNC_KEYS),
+// lu à CHAQUE impression (Tout imprimer, une vente, Leboncoin, Vestiaire, l'équipe, les retours) et écrit par
+// Paramètres → Imprimante → « Tampons des bordereaux ». Tant qu'il n'a jamais été écrit, ses choix d'avant
+// (`vrm_impression.tamponA4/Th`, `vrm_tampon_positions`) sont repris TELS QUELS (migration à la lecture).
+const TAMPON_POSITIONS = 'vrm_tampon_positions';   // l'ancienne clé : lue par la migration seulement
+// (17 nov.) `save` n'écrit l'appareil qu'une demi-seconde après (file d'envoi) : le réglage qu'on VIENT d'écrire est relu
+// tel quel pendant 2 s — sinon le PDF composé juste après un geste (« tous de ce type ») prenait l'ancienne place.
+let _tamponsEcrits = null;
+const brutTampons = () => (_tamponsEcrits && Date.now() - _tamponsEcrits.t < 2000 ? _tamponsEcrits.x : load(CLE_TAMPONS, null));
+const reglageTamponsChoisi = () => { try { return reglageTampons(brutTampons(), { impression: load(CLE_IMPRESSION, null), positions: load(TAMPON_POSITIONS, null) }); } catch (_) { return reglageTampons(null); } };
+const ecrireReglageTampons = (r) => { const x = aEcrire(r); _tamponsEcrits = { x, t: Date.now() }; if (typeof save === 'function') save(CLE_TAMPONS, x); try { window.dispatchEvent(new CustomEvent('vrm:tampons', { detail: x })); } catch (_) {} return x; };
 // La position mémorisée d'une forme (ou null : le choix automatique). C'est
 // aussi ce que « Tout imprimer » appelle pour chaque bordereau du lot.
-const positionTampon = (forme) => { const p = positionsTampon()[forme && forme.cle != null ? forme.cle : forme]; return choixTamponValide(p) ? { vx: p.vx, vy: p.vy, vw: p.vw, v: p.v | 0 } : null; };
-const memoriserPositionTampon = (cle, choix) => { if (typeof save !== 'function') return; const m = { ...positionsTampon() }; if (choix && choixTamponValide(choix)) m[cle] = { vx: +choix.vx.toFixed(5), vy: +choix.vy.toFixed(5), vw: +choix.vw.toFixed(5), v: choix.v | 0, at: new Date().toISOString() }; else delete m[cle]; save(TAMPON_POSITIONS, m); };
+const positionTampon = (forme) => { const p = placesDeForme(reglageTamponsChoisi(), forme && forme.cle != null ? forme.cle : forme).n; return choixTamponValide(p) ? { vx: p.vx, vy: p.vy, vw: p.vw, v: p.v | 0 } : null; };
+const memoriserPositionTampon = (cle, choix) => { ecrireReglageTampons(avecPlace(reglageTamponsChoisi(), cle, 'n', choix && choixTamponValide(choix) ? choix : null)); };
 // Les codes-barres et QR de la page RENDUE (pour une puce, jamais un refus) :
 // cases de 6 pt où l'encre couvre 28 à 80 % avec des alternances serrées
 // (barres ou modules : ≥ 0,25 par point, lignes et colonnes ensemble), regroupées ; un groupe de moins de 24×12 pt est écarté
@@ -14030,11 +14129,23 @@ const pageAvecBande = async (PL, pdf, bold, reg, numero, titre) => {
   return false;
 };
 // ③ La fiche colis : une page 10×15 cm juste après la page 1.
-const ajouterFicheColis = (PL, pdf, bold, reg, numero, titre) => {
+const ajouterFicheColis = (PL, pdf, bold, reg, numero, titre, retour = false) => {
   const W = 100 * MM_PT, H = 150 * MM_PT, m = 8 * MM_PT;
   const p = pdf.insertPage(1, [W, H]);
   const n = texteEcrivable(bold, numero), t = texteEcrivable(reg, titre);
   let y = H - m;
+  if (retour) {
+    // (16 nov.) La fiche d'un RETOUR : « RETOUR » en très grand, cerné, puis le N°, le titre, « pas une vente ».
+    const mr = motsTamponRetour({ num: n }, tr), haut = texteEcrivable(bold, mr.haut) || 'RETOUR';
+    let tg = 72; while (tg > 16 && bold.widthOfTextAtSize(haut, tg) > W - 2 * m - 12) tg--;
+    p.drawRectangle({ x: m, y: y - tg - 8, width: W - 2 * m, height: tg + 8, borderColor: PL.rgb(0, 0, 0), borderWidth: 3 });
+    y -= tg * 0.8 + 4; p.drawText(haut, { x: m + 6, y, size: tg, font: bold, color: PL.rgb(0, 0, 0) }); y -= tg * 0.3 + 10;
+    if (mr.num) { const txt = texteEcrivable(bold, mr.num); let tn = 40; while (tn > 12 && bold.widthOfTextAtSize(txt, tn) > W - 2 * m) tn--; y -= tn * 0.8; p.drawText(txt, { x: m, y, size: tn, font: bold, color: PL.rgb(0, 0, 0) }); y -= tn * 0.45; }
+    for (const l of couperLignes(reg, 14, t, W - 2 * m, 4)) { y -= 17; p.drawText(l, { x: m, y, size: 14, font: reg, color: PL.rgb(0, 0, 0) }); }
+    for (const l of couperLignes(bold, 12, texteEcrivable(bold, mr.bas), W - 2 * m, 2)) { y -= 16; p.drawText(l, { x: m, y, size: 12, font: bold, color: PL.rgb(0, 0, 0) }); }
+    p.drawText(texteEcrivable(reg, mr.pied), { x: m, y: m, size: 7.5, font: reg, color: PL.rgb(0.35, 0.35, 0.35) });
+    return;
+  }
   if (n) {
     const txt = `N° ${n}`; let tn = 64;
     while (tn > 12 && bold.widthOfTextAtSize(txt, tn) > W - 2 * m) tn--;
@@ -14047,11 +14158,19 @@ const ajouterFicheColis = (PL, pdf, bold, reg, numero, titre) => {
 // sûre n'existe sur l'étiquette (hors codes, hors adresses), une 2ᵉ étiquette du MÊME papier
 // suit : N°, titre, taille, photo en noir (tramée), emplacement. Elle va DANS le colis, pas
 // dessus — le titre n'y est vu de personne. Tout en noir (pas de gris en thermique).
-const ajouterFichePreparation = async (PL, pdf, bold, reg, { numero = '', titre = '', taille = '', photo = null, emplacement = '', W, H }) => {
+const ajouterFichePreparation = async (PL, pdf, bold, reg, { numero = '', titre = '', taille = '', photo = null, emplacement = '', W, H, retour = false }) => {
   const p = pdf.insertPage(1, [W, H]), m = Math.max(3 * MM_PT, Math.min(W, H) * 0.04), noir = PL.rgb(0, 0, 0), L = W - 2 * m;
   let y = H - m;
   const ligne = (t, f, taille) => { y -= taille * 1.05; if (y < m) return false; p.drawText(t, { x: m, y, size: taille, font: f, color: noir }); y -= taille * 0.25; return true; };
   const tt = Math.max(6, Math.min(9, W / 32));
+  if (retour) {
+    // (16 nov.) La fiche d'un RETOUR dit RETOUR en premier, en très grand, cerné : jamais la fiche d'une vente.
+    const mr = motsTamponRetour({ num: numero }, tr), haut = texteEcrivable(bold, mr.haut) || 'RETOUR';
+    let tg = Math.min(64, H * 0.16); while (tg > 10 && bold.widthOfTextAtSize(haut, tg) > L - 8) tg--;
+    p.drawRectangle({ x: m, y: y - tg - 6, width: L, height: tg + 6, borderColor: noir, borderWidth: 2.5 });
+    ligne(haut, bold, tg); y -= 4;
+    for (const l of couperLignes(bold, tt, texteEcrivable(bold, mr.bas), L, 2)) ligne(l, bold, tt);
+  } else
   for (const l of couperLignes(bold, tt, texteEcrivable(bold, 'Fiche de préparation · à mettre DANS le colis, pas dessus'), L, 2)) ligne(l, bold, tt);
   p.drawLine({ start: { x: m, y: y - 1 }, end: { x: W - m, y: y - 1 }, thickness: 0.8, color: noir }); y -= 3;
   const n = texteEcrivable(bold, numero);
@@ -14079,42 +14198,77 @@ const ajouterFichePreparation = async (PL, pdf, bold, reg, { numero = '', titre 
 // affichée), jamais sous le tampon ; `fiche` : en thermique, { actif, W, H, … } — sans place sûre,
 // la fiche de préparation (actif) ou RIEN de tamponné (mode 'aucun', dit), jamais la fiche
 // 10×15 d'une A4 ; `th` : la mention en noir fin autour de l'étiquette (`poserMentionVrm`).
-const tamponnerBordereau = async (PL, pdf, { numero, titre, thermique = false, choix = null, bloques = [], fiche = null, th = null } = {}) => {
+// (16 nov., lot impression-retours) `retour` : un bordereau de RETOUR (achat renvoyé) — le cartouche RETOUR
+// (`cartoucheTampon(…, true)`), TOUJOURS posé (même sans N° ni titre : le mot RETOUR suffit à le distinguer),
+// et en thermique la fiche de préparation RETOUR même si le réglage l'a éteinte (jamais « rien de tamponné »).
+// (16 nov., lot tampons-parametres) `tampon` : ce que `vrm_tampons` dit pour CE bordereau (`resoudreTampon`) —
+// { k (taille S/M/L du cartouche), place ('auto' ou une place rapide), mention (bool), kMention, placeMention
+// ('qr' par défaut : au-dessus du QR), libreMention ({ vx, vy } posée à la main), adresses / cadre (page A4) }.
+// GARDE-FOU INVIOLABLE : ni le cartouche ni la mention ne recouvrent un code-barres, un QR (zone de silence
+// comprise) ou une adresse repérée — une place posée à la main qui chevauche est REPOUSSÉE à la place libre la
+// plus proche (`repousse: true`, l'écran le dit). Rend aussi `mentionBoite`, `interdits`, `codes` (l'éditeur
+// de Paramètres les dessine, le banc les juge).
+const tamponnerBordereau = async (PL, pdf, { numero, titre, thermique = false, choix = null, bloques = [], fiche = null, th = null, tampon = null, retour = false } = {}) => {
   const n = String(numero == null ? '' : numero).trim(), t = String(titre == null ? '' : titre).trim();
-  if (!n && !t) return { mode: 'rien', raison: '' };
+  const T = tampon || {}, veutMention = T.mention !== false;
+  if (!n && !t && !veutMention && !retour) return { mode: 'rien', raison: '' };
   const bold = await pdf.embedFont(PL.StandardFonts.HelveticaBold), reg = await pdf.embedFont(PL.StandardFonts.Helvetica);
-  if (choixTamponValide(choix)) {
-    const page = pdf.getPages()[0], pl = placeLibreTampon(page, bold, reg, n, t, choix);
+  const page = pdf.getPages()[0], { w: W0, h: H0 } = tailleAffichee(page);
+  let rendu = null, renduErr = null; try { rendu = await rendrePremierePage(pdf); } catch (e) { renduErr = e; }
+  const adresses = [...((th && th.adresses) || []), ...(T.adresses || [])];
+  const zi = rendu ? zonesInterditesTampon(rendu, adresses) : { codes: [], interdits: adresses.map((a) => ({ ...a, quoi: 'adresse' })), interditsMention: adresses.map((a) => ({ ...a, quoi: 'adresse' })) };
+  // Les « codes » de l'étiquette posée (thermique) repassent le même tri : un pavé de texte serré n'est pas un code.
+  // (jugé sur la boîte du code elle-même : les bloques sont élargis de leur garde de 5 mm)
+  const bloquesVrais = (bloques || []).filter((z) => z.quoi !== 'code' || !rendu || estUnCode(rendu, { x: z.x + MENTION.codes, y: z.y + MENTION.codes, w: Math.max(1, z.w - 2 * MENTION.codes), h: Math.max(1, z.h - 2 * MENTION.codes) }));
+  const interdits = [...zi.interdits, ...bloquesVrais.map((z) => ({ ...z, quoi: z.quoi || 'bloque' }))];
+  const cadre = (th && th.boite) || T.cadre || null;
+  // (La mention garde la zone de silence MESURÉE de chaque QR, pas les 5 mm forfaitaires du cartouche.)
+  const interditsM = [...zi.interditsMention, ...bloquesVrais.filter((z) => z.quoi !== 'code')];
+  // (Sur une imprimante thermique, même la page entière : la mention en noir fin — une tête thermique tramerait le gris.)
+  const mentionO = { th: !!th || !!thermique, marge: th && th.marge, k: T.kMention, place: T.placeMention, libre: T.libreMention, codes: zi.codes, interdits: interditsM, cadre, adresses };
+  const fin = (r, mb) => ({ ...r, mention: !!mb, mentionBoite: mb || null, interdits, interditsMention: interditsM, codes: zi.codes });
+  // ① Le cartouche posé À LA MAIN : à sa place (fond blanc dessous, même sur du texte — son choix), repoussé hors
+  // des codes, des QR et de l'adresse ; la mention vient ensuite, à côté de lui.
+  if ((n || t || retour) && choixTamponValide(choix)) {
+    const pl = placeLibreTampon(page, bold, reg, n, t, choix, retour);
     if (pl) {
-      let rendu = null; try { rendu = await rendrePremierePage(pdf); } catch (_) {}
-      const place = { x: pl.x, y: pl.y, w: pl.c.w * pl.k, h: pl.c.h * pl.k };
-      ecrireCartouche(PL, page, pl.c, pl.x, pl.y, pl.k, true);
-      return { mode: 'libre', raison: '', place, mention: poserMentionVrm(PL, pdf, reg, rendu, place, th) };
+      const w = pl.c.w * pl.k, h = pl.c.h * pl.k, p = repousserHorsInterdits({ x: pl.x, y: pl.y, w, h }, interdits, W0, H0);
+      if (p) {
+        const place = { x: p.x, y: p.y, w, h };
+        ecrireCartouche(PL, page, pl.c, p.x, p.y, pl.k, true);
+        const mb = veutMention ? poserMentionVrm(PL, pdf, reg, rendu, { ...mentionO, evite: place }) : null;
+        return fin({ mode: 'libre', raison: '', place, repousse: p.repousse }, mb);
+      }
     }
   }
+  // ② La mention d'abord (sa place est la décision de Julien : au-dessus du QR), puis le cartouche dans une zone
+  // blanche hors d'elle, hors des codes et de l'adresse.
+  const mb = veutMention ? poserMentionVrm(PL, pdf, reg, rendu, mentionO) : null;
+  if (!n && !t && !retour) return fin({ mode: 'rien', raison: '' }, mb);
   let raison = '';
   try {
-    const rendu = await rendrePremierePage(pdf);
-    const place = await chercherPlaceTampon(pdf, bold, reg, n, t, rendu, bloques);
-    if (place) { const boite = { x: place.x, y: place.y, w: place.c.w, h: place.c.h }; ecrireCartouche(PL, pdf.getPages()[0], place.c, place.x, place.y); return { mode: 'blanc', raison: '', place: boite, mention: poserMentionVrm(PL, pdf, reg, rendu, boite, th) }; }
+    if (!rendu) throw renduErr || Error('rendu');
+    const bl = [...interdits, ...(mb ? [elargir(mb, 4 * MM_M)] : [])];
+    const place = await chercherPlaceTampon(pdf, bold, reg, n, t, rendu, bl, { k: T.k, place: T.place, retour });
+    if (place) { const boite = { x: place.x, y: place.y, w: place.c.w, h: place.c.h }; ecrireCartouche(PL, page, place.c, place.x, place.y); return fin({ mode: 'blanc', raison: '', place: boite }, mb); }
     raison = (bloques || []).length ? 'aucune place sûre (hors codes et adresses)' : 'aucun espace libre sur la page';
   } catch (e) {
     raison = 'aperçu du PDF indisponible (' + String((e && e.message) || e).slice(0, 60) + ')';
   }
-  const { w, h } = tailleAffichee(pdf.getPages()[0]);
+  const { w, h } = { w: W0, h: H0 };
   const BANDE_PERMISE = false;
   const tientA4 = (a, b) => (a <= A4_PT.w + 1 && b <= A4_PT.h + 1) || (a <= A4_PT.h + 1 && b <= A4_PT.w + 1);
   // (3 nov.) BANDE COUPÉE : le 28 oct. Julien a « explicitement refusé une bande ajoutée » (passation 2026-10-28). Sans zone libre, c'est la fiche colis qui suit l'étiquette. Rallumer seulement sur sa demande.
-  if (BANDE_PERMISE && !thermique && tientA4(w, h + TAMPON.bande)) {
-    try { if (await pageAvecBande(PL, pdf, bold, reg, n, t)) return { mode: 'bande', raison }; } catch (_) {}
+  if (BANDE_PERMISE && !retour && !thermique && tientA4(w, h + TAMPON.bande)) {
+    try { if (await pageAvecBande(PL, pdf, bold, reg, n, t)) return fin({ mode: 'bande', raison }, mb); } catch (_) {}
   }
   if (thermique && fiche) {
-    if (!fiche.actif) return { mode: 'aucun', raison };
-    await ajouterFichePreparation(PL, pdf, bold, reg, { numero: n, titre: fiche.titre != null ? fiche.titre : t, taille: fiche.taille, photo: fiche.photo, emplacement: fiche.emplacement, W: fiche.W, H: fiche.H });
-    return { mode: 'fiche', raison };
+    if (!fiche.actif && !retour) return fin({ mode: 'aucun', raison }, mb);
+    await ajouterFichePreparation(PL, pdf, bold, reg, { numero: n, titre: fiche.titre != null ? fiche.titre : t, taille: fiche.taille, photo: fiche.photo, emplacement: fiche.emplacement, W: fiche.W, H: fiche.H, retour });
+    return fin({ mode: 'fiche', raison }, mb);
   }
-  ajouterFicheColis(PL, pdf, bold, reg, n, t);
-  return { mode: 'fiche', raison };
+  ajouterFicheColis(PL, pdf, bold, reg, n, t, retour);
+  return fin({ mode: 'fiche', raison }, mb);
 };
 // ── IMPRIMANTE NORMALE OU THERMIQUE ─────────────────────────────────────────
 // Demande de Julien, 15 septembre : « il y a des personnes qui font simplement
@@ -14604,10 +14758,14 @@ const poserEtiquettesThermiques = async (PL, out, page, z, numero, bold, titre =
     if (!a) { etiquettes.push({ x: r.x, y: r.y, w: r.w, h: r.h, sens: r.sens, codes: null }); continue; }
     for (const e of a.etiquettes) etiquettes.push({ ...e, sens: a.coupe ? avecSens({ ok: true, ...e }, textes).sens : r.sens });
   }
-  let k = 0;
+  let k = 0; const poses = [];
+  // (16 nov., lot tampons-parametres) Ce que le tampon écrit : les cases de `vrm_tampons` (N° seul par défaut en
+  // thermique), ou le tampon choisi pour CE bordereau dans la feuille d'après (`imp.tampon`).
+  const ts = (imp && imp.ts) || resoudreTampon(reglageTamponsChoisi(), { famille: (imp && imp.famille) || 'autre', thermique: true });
   for (const e of etiquettes) {
-    const contenu = contenuTampon(reg.tamponTh, { numero: n, titre, taille: imp && imp.taille });
-    const bande = papier.continu && (contenu.numero || contenu.titre) ? BANDE_CONTINU_MM * MM_PT : 0;
+    // (16 nov.) Un RETOUR : son N° et son titre tels quels (le réglage du tampon de VENTE ne s'y applique pas).
+    const contenu = imp && imp.retour ? { numero: n, titre } : texteDuCartouche(ts.contenu, { numero: n, titre, taille: imp && imp.taille });
+    const bande = papier.continu && (contenu.numero || contenu.titre || (imp && imp.retour)) ? BANDE_CONTINU_MM * MM_PT : 0;
     let { d, pl } = await composerEtiquette(PL, page, e, e.sens, papier, bande);
     let rendu = null, noir = false;
     if (reg.encre === 'noir') { try { const nn = await noircirPage(PL, d, pl.W, pl.H, CONTRASTES[reg.contraste]); d = nn.d; rendu = nn.rendu; noir = true; } catch (_) { rendu = null; } }
@@ -14619,66 +14777,54 @@ const poserEtiquettesThermiques = async (PL, out, page, z, numero, bold, titre =
     const dansE = (o) => { const cx = (o.x + o.X) / 2, cy = (o.y + o.Y) / 2; return cx > e.x && cx < e.x + e.w && cy > e.y && cy < e.y + e.h; };
     const clip = (q) => { const x = Math.max(e.x, q.x), y = Math.max(e.y, q.y), X = Math.min(e.x + e.w, q.x + q.w), Y = Math.min(e.y + e.h, q.y + q.h); return X > x && Y > y ? { x, y, w: X - x, h: Y - y } : null; };
     const adresses = zonesAdresse(textes.filter(dansE)).map(clip).filter(Boolean).map((q) => versPapier(e, pl, q));
-    const bloques = [...codes.map((c) => elargir(c.boite, MENTION.codes)), ...adresses];
+    const bloques = [...codes.map((c) => ({ ...elargir(c.boite, MENTION.codes), quoi: 'code' })), ...adresses.map((a) => ({ ...a, quoi: 'adresse' }))];
     const boiteAff = { x: pl.boite.x, y: pl.H - pl.boite.y - pl.boite.h, w: pl.boite.w, h: pl.boite.h };
-    const choix = choisir ? await choisir(d, { isole: true, k }) : null;
+    const td = tamponDePage({ ...(imp || {}), ts }, d.getPages()[0], true);
+    // (16 nov.) Une place posée dans l'aperçu avant impression pour CE bordereau prime sur la place gardée de la forme.
+    const choix = imp && imp.places && imp.places.n !== undefined ? td.libreN : choisir ? await choisir(d, { isole: true, k }) : td.libreN;
     const fiche = { actif: reg.fiche, W: pl.W, H: papier.continu ? Math.max(pl.W * 1.45, 60 * MM_PT) : pl.H, titre, taille: imp && imp.taille, photo: imp && imp.photo, emplacement: imp && imp.emplacement };
-    const t = await tamponnerBordereau(PL, d, { numero: contenu.numero, titre: contenu.titre, thermique: true, choix, bloques, fiche, th: { boite: boiteAff, bloques, marge: papier.marge * MM_PT } });
+    const t = await tamponnerBordereau(PL, d, { numero: contenu.numero, titre: contenu.titre, thermique: true, choix, bloques, fiche, th: { boite: boiteAff, bloques, adresses, marge: papier.marge * MM_PT }, tampon: td.tampon, retour: !!(imp && imp.retour) });
     modes.push(t.mode);
     const mms = codes.map((c) => c.mm).filter((x) => x != null);
     details.push({ mode: t.mode, raison: t.raison || '', echelle: pl.s, tourne: pl.tourne, noir, W: pl.W, H: pl.H, codes: codes.length, retrouves,
       moduleMm: mms.length ? Math.min(...mms) : null, fins: codes.filter((c) => !codeAssezGros(c.mm)).length, mention: !!t.mention, place: t.place || null, boite: boiteAff, bloques });
+    poses.push({ page: out.getPageCount(), cle: td.cle, W: pl.W, H: pl.H, mode: t.mode, place: t.place || null, mentionBoite: t.mentionBoite, interdits: t.interdits, interditsMention: t.interditsMention, codes: t.codes, repousse: !!t.repousse, libre: !!choix });
     (await out.copyPages(d, d.getPageIndices())).forEach((p) => out.addPage(p));
     k++;
   }
-  return { k, modes, details };
+  return { k, modes, details, poses };
 };
-// LE réglage d'imprimante, lu au moment d'imprimer (§11 : un seul réglage
-// `vrm_imprimante`, que Colis et Réglages écrivent tous les deux).
-const imprimanteChoisie = () => imprMode(load('vrm_imprimante', 'normale'));
-// UN bordereau posé dans `out`, la même règle pour les trois chemins
-// d'impression (une vente, un lot, Leboncoin) :
-//   thermique + étiquette reconnue ⇒ une page du papier choisi par étiquette (et
-//   les pages suivantes du PDF, une déclaration en douane par exemple, telles
-//   quelles) ; (11 nov.) une A4 à 2 ou 4 étiquettes que `zoneEtiquette` ne sait
-//   pas lire est découpée d'après l'encre et les codes (`analyserZone`) ;
-//   sinon ⇒ page originale, tamponnée par `tamponnerBordereau` (zone libre,
-//   sinon fiche colis — jamais un refus).
-// Rend `{ isole, etiquettes, raison, tampons, details }` — l'écran dit ce qui a vraiment été fait.
-// `choisir(doc, { isole, k })` (facultatif) : rend la place choisie à la main
-// pour la page 1 de `doc` (aperçu ou position mémorisée de sa forme), sinon null.
-// `impression` (facultatif) : { reg, taille, photo, emplacement } — sans `reg`, le réglage
-// synchronisé (`vrm_impression`) ; c'est lui qui dit ce que le tampon écrit (A4 et thermique).
-const poserBordereau = async (PL, out, src, { numero, title, pos, thermique, choisir = null, impression = null }) => {
-  const { StandardFonts } = PL;
-  const reg = (impression && impression.reg) || reglageImpressionChoisi(), imp = { ...(impression || {}), reg };
-  const first = src.getPages()[0];
-  let z = thermique ? zoneEtiquette(PL, first) : { ok: false };
-  // Pas su, ou une zone qui ne fait qu'un QUART de la feuille (le cadre d'UNE des étiquettes
-  // d'une A4 à 2 ou 4) : la feuille entière est découpée d'après l'encre et les codes.
-  if (thermique && (!z.ok || (z.via !== 'page' && z.part != null && z.part < 0.4 && !(z.etiquettes && z.etiquettes.length > 1)))) {
-    try {
-      const { width: W, height: H } = first.getSize();
-      const a = await analyserZone(PL, first, { x: 0, y: 0, w: W, h: H }, { decouper: true });
-      if (a && a.coupe) { const tx = textesDePage(PL, first); z = { ok: true, x: 0, y: 0, w: W, h: H, via: 'encre', etiquettes: a.etiquettes.map((e) => ({ ...e, sens: avecSens({ ok: true, ...e }, tx).sens })) }; }
-    } catch (_) {}
-  }
-  if (thermique && z.ok) {
-    if (!out.__vrmGras) out.__vrmGras = await out.embedFont(StandardFonts.HelveticaBold);
-    const { k: n, modes, details } = await poserEtiquettesThermiques(PL, out, first, z, numero, out.__vrmGras, title, choisir, imp);
-    const reste = src.getPageIndices().slice(1);
-    if (reste.length) (await out.copyPages(src, reste)).forEach((p) => out.addPage(p));
-    return { isole: true, etiquettes: n, raison: '', tampons: modes, details };
-  }
-  // Page entière (A4 normale, ou thermique sans étiquette repérée) : le même
-  // tampon ; ce qu'il écrit est SON choix (`tamponA4`, ou `tamponTh` en thermique).
-  const contenu = contenuTampon(thermique ? reg.tamponTh : reg.tamponA4, { numero, titre: title, taille: imp.taille });
-  const choix = pos || (choisir ? await choisir(src, { isole: false, k: 0 }) : null);
-  const t = await tamponnerBordereau(PL, src, { numero: contenu.numero, titre: contenu.titre, thermique, choix });
-  (await out.copyPages(src, src.getPageIndices())).forEach((p) => out.addPage(p));
-  return { isole: false, etiquettes: 0, raison: thermique ? (z.raison || 'mise en page inconnue') : '', tampons: [t.mode], details: [] };
+// (16 nov., lot tampons-parametres) Ce que `vrm_tampons` dit pour UNE page tamponnée : la clé de SA forme (type ·
+// format · sens [· tourné] [· thermique]), le cartouche posé à la main pour elle (ou null : la place auto), et le
+// tampon à passer à `tamponnerBordereau` (taille, place rapide, mention et sa place). `imp.ts` : `resoudreTampon`.
+const tamponDePage = (imp, page, isole) => {
+  // (16 nov.) `imp.places` : les places posées dans l'aperçu AVANT impression pour CE bordereau (elles priment).
+  const ts = imp.ts, cle = formeTampon(ts.famille, page, isole).cle, pf = placesDeForme(imp.tampons || reglageTamponsChoisi(), cle);
+  const pi = imp.places || {}, pl = { n: pi.n !== undefined ? pi.n : pf.n, m: pi.m !== undefined ? pi.m : pf.m };
+  return { cle, libreN: choixTamponValide(pl.n) ? pl.n : null,
+    tampon: { k: ts.k, place: ts.place, mention: !!(ts.contenu && ts.contenu.mention), kMention: ts.kMention, placeMention: ts.placeMention, libreMention: pl.m || null } };
 };
-// ⟦→ ecrans/Reglages.jsx #25⟧
+// Le tampon d'une page tamponnée HORS de `poserBordereau` (retour d'achat, l'aide de l'équipe) : la même règle.
+const tamponPourPage = (PL, pdf, { famille = '', thermique = false } = {}) => {
+  let f = famille; if (!f) { let ty = 'autre'; try { ty = typeBordereau(PL, pdf).type; } catch (_) {} f = familleDe({ type: ty }); }
+  const imp = { tampons: reglageTamponsChoisi() }; imp.ts = resoudreTampon(imp.tampons, { famille: f, thermique });
+  const page = pdf.getPages()[0], td = tamponDePage(imp, page, false), geo = geoPageA4(PL, page);
+  return { famille: f, contenu: imp.ts.contenu, choix: td.libreN, tampon: { ...td.tampon, adresses: geo.adresses, cadre: geo.cadre } };
+};
+// L'étiquette et les adresses d'une page A4, sur la page AFFICHÉE (rotation comprise) : la mention se centre sur
+// l'étiquette, sous l'adresse ; le cartouche et la mention n'y vont jamais.
+const geoPageA4 = (PL, page) => {
+  const b = page.getCropBox(), r = rotationPage(page);
+  const aff = (q) => { const a = versAffiche(b, r, q.x, q.y), c = versAffiche(b, r, q.x + q.w, q.y + q.h); return { x: Math.min(a.x, c.x), y: Math.min(a.y, c.y), w: Math.abs(c.x - a.x), h: Math.abs(c.y - a.y) }; };
+  let adresses = [], cadre = null;
+  try { adresses = zonesAdresse(textesDePage(PL, page)).map(aff); } catch (_) { adresses = []; }
+  try { const z = zoneEtiquette(PL, page); if (z && z.ok && z.via !== 'page') cadre = aff(z); } catch (_) { cadre = null; }
+  // Étiquette repérée : seules ses adresses comptent (« Fiche destinataire : à glisser… » de la notice n'est pas une adresse).
+  if (cadre) adresses = adresses.filter((a) => a.x < cadre.x + cadre.w && a.x + a.w > cadre.x && a.y < cadre.y + cadre.h && a.y + a.h > cadre.y);
+  return { adresses, cadre };
+};
+// Le TYPE d'un bordereau (le transporteur lu sur la page), pour l'aperçu de Réglages ET (16 nov.) pour le
+// réglage des tampons : une exception « seulement Mondial Relay » se pose sur ce type.
 const typeBordereau = (PL, doc) => {
   try {
     const page = doc.getPages()[0], ctx = doc.context, out = [];
@@ -14707,6 +14853,63 @@ const typeBordereau = (PL, doc) => {
     return { type: t || 'autre', cle: `${t || 'autre'}·${sens}`, sens, W, H };
   } catch (_) { return { type: 'autre', cle: 'autre·?', sens: '?', W: 0, H: 0 }; }
 };
+// LE réglage d'imprimante, lu au moment d'imprimer (§11 : un seul réglage
+// `vrm_imprimante`, que Colis et Réglages écrivent tous les deux).
+const imprimanteChoisie = () => imprMode(load('vrm_imprimante', 'normale'));
+// UN bordereau posé dans `out`, la même règle pour les trois chemins
+// d'impression (une vente, un lot, Leboncoin) :
+//   thermique + étiquette reconnue ⇒ une page du papier choisi par étiquette (et
+//   les pages suivantes du PDF, une déclaration en douane par exemple, telles
+//   quelles) ; (11 nov.) une A4 à 2 ou 4 étiquettes que `zoneEtiquette` ne sait
+//   pas lire est découpée d'après l'encre et les codes (`analyserZone`) ;
+//   sinon ⇒ page originale, tamponnée par `tamponnerBordereau` (zone libre,
+//   sinon fiche colis — jamais un refus).
+// Rend `{ isole, etiquettes, raison, tampons, details }` — l'écran dit ce qui a vraiment été fait.
+// `choisir(doc, { isole, k })` (facultatif) : rend la place choisie à la main
+// pour la page 1 de `doc` (aperçu ou position mémorisée de sa forme), sinon null.
+// `impression` (facultatif) : { reg, taille, photo, emplacement } — sans `reg`, le réglage
+// synchronisé (`vrm_impression`) ; c'est lui qui dit ce que le tampon écrit (A4 et thermique).
+const poserBordereau = async (PL, out, src, { numero, title, pos, thermique, choisir = null, impression = null }) => {
+  const { StandardFonts } = PL;
+  const reg = (impression && impression.reg) || reglageImpressionChoisi(), imp = { ...(impression || {}), reg };
+  const first = src.getPages()[0];
+  // (16 nov., lot tampons-parametres) LE réglage des tampons, pour CE bordereau : son type (retour · Leboncoin ·
+  // Vestiaire · le transporteur lu sur la page), le réglage « pour tous » ou l'exception de son type.
+  imp.tampons = (impression && impression.tampons) || reglageTamponsChoisi();
+  if (!imp.famille) { let ty = 'autre'; try { ty = typeBordereau(PL, src).type; } catch (_) {} imp.famille = familleDe({ retour: !!imp.retour, site: imp.site, type: ty }); }
+  imp.ts = resoudreTampon(imp.tampons, { famille: imp.famille, thermique: !!thermique });
+  { const c = imp.tampon ? contenuDuMode(imp.tampon) : null; if (c) imp.ts = { ...imp.ts, contenu: c }; }
+  // Un RETOUR : le cartouche RETOUR (lot impression-retours), son N° et son titre écrits, quel que soit le réglage des ventes.
+  if (imp.retour) imp.ts = { ...imp.ts, contenu: { ...imp.ts.contenu, num: true, titre: true } };
+  let z = thermique ? zoneEtiquette(PL, first) : { ok: false };
+  // Pas su, ou une zone qui ne fait qu'un QUART de la feuille (le cadre d'UNE des étiquettes
+  // d'une A4 à 2 ou 4) : la feuille entière est découpée d'après l'encre et les codes.
+  if (thermique && (!z.ok || (z.via !== 'page' && z.part != null && z.part < 0.4 && !(z.etiquettes && z.etiquettes.length > 1)))) {
+    try {
+      const { width: W, height: H } = first.getSize();
+      const a = await analyserZone(PL, first, { x: 0, y: 0, w: W, h: H }, { decouper: true });
+      if (a && a.coupe) { const tx = textesDePage(PL, first); z = { ok: true, x: 0, y: 0, w: W, h: H, via: 'encre', etiquettes: a.etiquettes.map((e) => ({ ...e, sens: avecSens({ ok: true, ...e }, tx).sens })) }; }
+    } catch (_) {}
+  }
+  if (thermique && z.ok) {
+    if (!out.__vrmGras) out.__vrmGras = await out.embedFont(StandardFonts.HelveticaBold);
+    const { k: n, modes, details, poses } = await poserEtiquettesThermiques(PL, out, first, z, numero, out.__vrmGras, title, choisir, imp);
+    const reste = src.getPageIndices().slice(1);
+    if (reste.length) (await out.copyPages(src, reste)).forEach((p) => out.addPage(p));
+    return { isole: true, etiquettes: n, raison: '', tampons: modes, details, poses, famille: imp.famille };
+  }
+  // Page entière (A4 normale, ou thermique sans étiquette repérée) : le même
+  // tampon ; ce qu'il écrit est SON choix (`tamponA4`, ou `tamponTh` en thermique).
+  const contenu = texteDuCartouche(imp.ts.contenu, { numero, titre: title, taille: imp.taille });
+  const td = tamponDePage(imp, first, false), geo = geoPageA4(PL, first);
+  const choix = pos || (imp.places && imp.places.n !== undefined ? td.libreN : choisir ? await choisir(src, { isole: false, k: 0 }) : td.libreN);
+  const t = await tamponnerBordereau(PL, src, { numero: contenu.numero, titre: contenu.titre, thermique, choix, tampon: { ...td.tampon, adresses: geo.adresses, cadre: geo.cadre }, retour: !!imp.retour });
+  const { w: Wa, h: Ha } = tailleAffichee(src.getPages()[0]);
+  const pose = { page: out.getPageCount(), cle: td.cle, W: Wa, H: Ha, mode: t.mode, place: t.place || null, mentionBoite: t.mentionBoite || null, interdits: t.interdits || [], interditsMention: t.interditsMention || t.interdits || [], codes: t.codes || [], repousse: !!t.repousse, libre: !!choix };
+  (await out.copyPages(src, src.getPageIndices())).forEach((p) => out.addPage(p));
+  return { isole: false, etiquettes: 0, raison: thermique ? (z.raison || 'mise en page inconnue') : '', tampons: [t.mode], details: [], poses: [pose], famille: imp.famille };
+};
+// ⟦→ ecrans/Reglages.jsx #25⟧
 // ⟦→ ecrans/Reglages.jsx #26⟧
 
 // ── OÙ POSER LE TAMPON DE CETTE IMPRESSION (3 nov., soir) ───────────────────
@@ -14722,13 +14925,16 @@ const demanderPlacementTampon = (o) => new Promise((resolve) => { if (!_placeurT
 // bordereaux suivants de la même forme (le premier de chaque forme est celui qu'on montre).
 // (11 nov., lot thermique) `thermique` : l'aperçu de placement montre ce que le tampon ÉCRIRA
 // (`contenuTampon` du réglage : N° seul par défaut en thermique, rien ⇒ aucun aperçu).
-const choisirTampon = ({ PL, src, numero, titre, apercu = true, deja = {}, thermique = false }) => {
+// (16 nov., lot tampons-parametres) `site` / `retour` : le type du réglage des tampons (Leboncoin, Vestiaire, un
+// retour) ; ce que le tampon écrit et la place gardée viennent de `vrm_tampons` (`reglageTamponsChoisi`).
+const choisirTampon = ({ PL, src, numero, titre, apercu = true, deja = {}, thermique = false, site = '', retour = false }) => {
   let type = 'autre'; try { type = typeBordereau(PL, src).type; } catch (_) {}
+  const famille = familleDe({ retour, site, type });
   return async (doc, info = {}) => {
-    const forme = formeTampon(type, doc.getPages()[0], !!info.isole);
+    const forme = formeTampon(famille, doc.getPages()[0], !!info.isole);
     if (forme.cle in deja) return deja[forme.cle];
     let choix = positionTampon(forme.cle);
-    const rg = reglageImpressionChoisi(), ct = contenuTampon(thermique ? rg.tamponTh : rg.tamponA4, { numero, titre });
+    const ts = resoudreTampon(reglageTamponsChoisi(), { famille, thermique }), ct = texteDuCartouche(ts.contenu, { numero, titre });
     const n = String(ct.numero == null ? '' : ct.numero).trim(), t = String(ct.titre == null ? '' : ct.titre).trim();
     if ((n || t) && (apercu === 'force' || (apercu && !choix)) && _placeurTampon) {
       libererOngletPdf();
@@ -14808,13 +15014,13 @@ const estIOS = () => /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.pl
 // aucun bloqueur de fenêtres, la confirmation passe au-dessus (z 20000), et
 // « Imprimer » / « Ouvrir dans un onglet » sont de vrais clics.
 let _visionneuse = null; const _ecoutesVisionneuse = new Set();
-const _poserVisionneuse = (v) => { _visionneuse = v; for (const f of _ecoutesVisionneuse) { try { f(v); } catch (_) {} } };
+const _poserVisionneuse = (v) => { if (!v || !v.prep) libererBoutonsImprime(); _visionneuse = v; for (const f of _ecoutesVisionneuse) { try { f(v); } catch (_) {} } };
 // Au clic : la visionneuse s'ouvre tout de suite, « préparation… ».
 const reserverOngletPdf = () => { try { if (estIOS()) return; const at = Date.now(); _poserVisionneuse({ prep: true, at }); setTimeout(() => { if (_visionneuse && _visionneuse.prep && _visionneuse.at === at) _poserVisionneuse(null); }, 25000); } catch (_) {} };
 const libererOngletPdf = () => { if (_visionneuse && _visionneuse.prep) _poserVisionneuse(null); };
 if (typeof document !== 'undefined') {
   document.addEventListener('click', (e) => {
-    try { const b = e.target && e.target.closest && e.target.closest('[data-imprime]'); if (b && !b.disabled) reserverOngletPdf(); } catch (_) {}
+    try { const b = e.target && e.target.closest && e.target.closest('[data-imprime]'); if (b && !b.disabled) { reserverOngletPdf(); if (!b.closest('[data-impr-apercu],[data-bord-pret],[data-placeur-tampon]')) figerBouton(b); } } catch (_) {}
   }, true);
 }
 const ouvrirPdfOnglet = (url, nom, titre) => {
@@ -15013,8 +15219,19 @@ const annotateAndDownloadBordereauBrut = async (numero, title, pdfArrayBuffer, p
   const thermique = imprMode(opts.imprimante || imprimanteChoisie()) === 'thermique';
   const src = await PDFDocument.load(pdfArrayBuffer);
   const pdf = await PDFDocument.create();
-  const choisir = choisirTampon({ PL, src, numero, titre: title, apercu: opts.apercu === undefined ? true : opts.apercu, thermique });
-  const r0 = await poserBordereau(PL, pdf, src, { numero, title, pos, thermique, choisir, impression: extrasImpression(numero, title, opts.extra || {}) });
+  // (16 nov., lot tampons-parametres — Julien : « je sélectionne […] ça m'ouvre une vignette […] le N° je peux le régler
+  // là où je veux ; quand je touche Imprimer, les réglages sont appliqués ») UN bordereau imprimé seul passe AUSSI par
+  // l'aperçu avant impression (sa vignette, le même éditeur) ; « Annuler » ⇒ rien. Sans l'aperçu monté (ou `apercu:
+  // false`) : la place gardée de sa forme, sinon la place de VRM.
+  const apercuVoulu = opts.apercu === undefined ? true : opts.apercu;
+  let places = null, choisir = null;
+  if (apercuVoulu && _apercuUn) {
+    libererOngletPdf();   // la visionneuse « préparation… » ouverte au clic : l'aperçu passe d'abord
+    const rep = await demanderApercuUn({ octets: pdfArrayBuffer, numero, title, imprimante: thermique ? 'thermique' : 'normale', site: opts.site || '', extra: opts.extra || {} });
+    if (rep === null) throw Object.assign(Error(TAMPON_ANNULE), { tamponAnnule: true });
+    places = rep && rep.places ? rep.places : null;
+  } else choisir = choisirTampon({ PL, src, numero, titre: title, apercu: apercuVoulu, thermique, site: opts.site || '' });
+  const r0 = await poserBordereau(PL, pdf, src, { numero, title, pos, thermique, choisir, impression: { ...extrasImpression(numero, title, opts.extra || {}), site: opts.site || '', ...(places ? { places } : {}) } });
   const hasNum = numero != null && String(numero).trim() !== '';
   posePrefsImpression(PL, pdf);
   const bytes = await pdf.save();
@@ -15027,7 +15244,7 @@ const annotateAndDownloadBordereauBrut = async (numero, title, pdfArrayBuffer, p
   const ouvert = ouvrirPdfOnglet(url, filename);
   signalerBordereauImprime(false, avantColis);
   const tp = r0.tampons || [];
-  return { url, filename, printed: ouvert, ouvert, thermique, isoles: r0.isole ? 1 : 0, etiquettes: r0.etiquettes,
+  return { url, bytes, filename, printed: ouvert, ouvert, thermique, isoles: r0.isole ? 1 : 0, etiquettes: r0.etiquettes,
            fiches: tp.filter((m) => m === 'fiche').length, bandes: tp.filter((m) => m === 'bande').length,
            entiers: thermique && !r0.isole ? [{ titre: title || '', raison: r0.raison }] : [], ...bilanThermique(r0.details) };
 };
@@ -15073,8 +15290,12 @@ const composerBordereaux = async (items, resolvePos, opts = {}) => {
       // (14 nov., Julien : « modifier un par un chaque bordereau avec le tamponnage ») le tampon choisi pour CE
       // bordereau dans l'aperçu (`it.tampon` : N° seul, N° + titre, + taille, rien) remplace le réglage, pour lui seul.
       const impIt = extrasImpression(it.numero, it.title, { photo: it.photo || (it.ligne && it.ligne.photo) || null });
-      if (it.tampon && TAMPONS_IMPR.includes(it.tampon)) { const rg0 = reglageImpressionChoisi(); impIt.reg = { ...rg0, tamponA4: it.tampon, tamponTh: it.tampon }; }
-      const r1 = await poserBordereau(PL, out, src, { numero: it.numero, title: it.title, pos, thermique, impression: impIt, choisir: it.tampon === 'rien' ? null : choisirTampon({ PL, src, numero: it.numero, titre: it.title, apercu: opts.apercu === undefined ? false : opts.apercu, deja: dejaLot, thermique }) });
+      // (16 nov., lot impression-retours) Un bordereau de RETOUR : le tampon RETOUR, toujours (jamais « N° seul » ni « Rien »).
+      if (it.retour) { impIt.retour = true; impIt.emplacement = ''; }   // la paire part : aucune case de rangement
+      else if (it.tampon && TAMPONS_IMPR.includes(it.tampon)) impIt.tampon = it.tampon;
+      impIt.site = it.site || '';
+      if (it.places) impIt.places = it.places;   // (16 nov.) les places posées dans l'aperçu avant impression
+      const r1 = await poserBordereau(PL, out, src, { numero: it.numero, title: it.title, pos, thermique, impression: impIt, choisir: it.retour ? null : it.tampon === 'rien' ? null : choisirTampon({ PL, src, numero: it.numero, titre: it.title, apercu: opts.apercu === undefined ? false : opts.apercu, deja: dejaLot, thermique, site: it.site || '' }) });
       for (const t of r1.tampons || []) { if (t === 'fiche') fiches++; else if (t === 'bande') bandes++; }
       details.push(...(r1.details || []));
       if (r1.isole) { isoles++; nEtiquettes += r1.etiquettes; }
@@ -15084,7 +15305,7 @@ const composerBordereaux = async (items, resolvePos, opts = {}) => {
       if (it.invBytes) {
         try { const isrc = await PDFDocument.load(it.invBytes); (await out.copyPages(isrc, isrc.getPageIndices())).forEach(p => out.addPage(p)); nInv++; } catch (_) {}
       }
-      plages.push({ index, cle: it.cle != null ? String(it.cle) : String(index), debut, n: out.getPageCount() - debut });
+      plages.push({ index, cle: it.cle != null ? String(it.cle) : String(index), debut, n: out.getPageCount() - debut, poses: r1.poses || [], famille: r1.famille || '', ...(it.retour ? { retour: true } : {}) });
     } catch (e) {
       if (estTamponAnnule(e)) throw e;
       // Un bordereau qui casse en route ne laisse aucune page à moitié posée dans le lot.
@@ -15141,8 +15362,8 @@ const mergeAndDownloadBordereauxBrut = async (items, resolvePos, opts = {}) => {
   // Ouvert dans un onglet (ordinateur) ; sinon la modale propose « Ouvrir ».
   const printed = ouvrirPdfOnglet(url, r.filename);
   signalerBordereauImprime(true, null);
-  const { bytes: _b, unitBytes: _u, plages: _p, mode: _m, ...reste } = r;
-  return { ...reste, url, printed, ouvert: printed };
+  const { unitBytes: _u, plages: _p, mode: _m, ...reste } = r;
+  return { ...reste, url, printed, ouvert: printed };   // (16 nov.) `bytes` gardés : « Imprimer » de « Bordereau prêt » les partage
 };
 // Un échec (annulé, PDF illisible) referme la visionneuse « préparation… ».
 const mergeAndDownloadBordereaux = async (...a) => { try { return await mergeAndDownloadBordereauxBrut(...a); } catch (e) { libererOngletPdf(); throw e; } };
@@ -18403,8 +18624,11 @@ function rechercheParNumero(q, numData, comptes) {
     // n'est pas lue.
     plan: ((load('vrm_meubles', []) || []).length ? (lu(nd.plan) || {}) : lu(nd.plan)),
     archive: archiveNumeros(),
+    // (16 nov., lot ecrans-restes) Le stock importé d'un autre outil (synchronisé) : lu dès que le nuage l'est.
+    importes: (() => { const imp = load(CLE_STOCK_IMPORTE, null); return Array.isArray(imp) ? imp : (cloud ? [] : null); })(),
   }, {
     cleNum, conflits: (p) => conflitsDeNumeros(p, GROUPES_DEUX_FOIS),
+    importeeDuNumero: (liste, k) => importeeDuNumero(liste, k, { cleNum }),
     ouStock: ouStockNumero,
     numEbayLigne: numLigneEbay,
     numEbayAnnonce: (a) => numEbayLu(a && a.sku, a && a.itemId, null, a && a.depuis),
@@ -19162,6 +19386,7 @@ const dismissToast = (id) => { _toasts = _toasts.filter(t => t.id !== id); _emit
 // type : 'ok' | 'err' | 'info'. Le ton est déduit du texte quand il n'est pas
 // précisé, pour que les appels existants restent courts.
 const toast = (msg, type) => {
+  try { libererBoutonsImprime(); } catch (_) {}   // (16 nov.) un message dit la suite : le bouton d'impression figé est rendu
   const text = String(msg == null ? '' : msg);
   if (!text.trim()) return;
   const t = type || (/^(⚠|❌|erreur|échec|impossible|invalide)/i.test(text.trim()) ? 'err'
@@ -22246,7 +22471,7 @@ function BoutonBordereau({ uid, tx, conv, login, aGenerer, pdf, onImprimer, onFa
   const base = { display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 12, fontFamily: 'inherit', fontWeight: 700,
     fontSize: grand ? 15 : 13, padding: grand ? '11px 14px' : '7px 11px', cursor: 'pointer', whiteSpace: 'nowrap' };
   if (pdf) {
-    return <button type="button" data-bouton-bord="pdf" data-imprime="1" data-tx={tx} onClick={onImprimer} title={tr('ventes.bordereauTamponneTitre')}
+    return <button type="button" data-bouton-bord="pdf" data-imprime="1" data-tx={tx} onClick={(ev) => occuperPendant(ev.currentTarget, () => onImprimer && onImprimer())} title={tr('ventes.bordereauTamponneTitre')}
       style={{ ...base, border: 'none', background: C.accent, color: C.onAccent || '#fff' }}><Icon name="printer" size={grand ? 16 : 14}/>{grand ? <><span className="vrm-lib-long">{tr('ventes.imprimerBordereau')}</span><span className="vrm-lib-court">{tr('ventes.imprimer')}</span></> : tr('journee.bordereau')}</button>;
   }
   if (!aGenerer || !uid || !tx) return null;
@@ -25602,24 +25827,38 @@ const lienItemEbay = (itemId, ref) => lienAnnonceMarche(marcheEbayDeRef(ref), it
 // Le registre, lu une fois par ouverture (et relu après une connexion ou une
 // déconnexion : `vrm:ebay-comptes`). TROIS états : `undefined` en cours ·
 // `null` pas su (la base n'a pas répondu) · la liste des comptes actifs.
-let _comptesEbay = null;
-function lireComptesEbay(force) {
-  if (force || !_comptesEbay) {
+// (16 nov., vitesse-lectures) La ligne BRUTE du registre (`[{comptes}]`, ou `null` pas su) est lue UNE
+// fois pour tous ses lecteurs : la liste des comptes actifs (ici) ET les comptes reliés des autres sites
+// (`useComptesAutresSites`). Mesuré au banc budget-vitesse : Messages et Ma journée la lisaient 3 fois
+// (les deux lecteurs, à plus de 2 s d'écart : hors du partage de `lecturesPartagees`). Même vie que
+// la liste : jusqu'à une connexion / déconnexion (`signalerComptesEbay`) ; une lecture RATÉE n'est
+// pas gardée (la suivante réessaie, « pas su » n'est jamais figé).
+let _registreEbay = null;
+function lireRegistreEbayBrut(force) {
+  if (force || !_registreEbay) {
     const p = (async () => {
       try {
         const r = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.ebay_comptes&select=comptes:data->comptes`, { headers: sbAuth() });
         if (!r.ok) return null;
         const rows = await r.json();
-        if (!Array.isArray(rows)) return null;
-        return comptesEbayActifs(rows[0] ? { comptes: rows[0].comptes } : null);
+        return Array.isArray(rows) ? rows : null;
       } catch (_) { return null; }
     })();
+    _registreEbay = p;
+    p.then((v) => { if (v === null && _registreEbay === p) _registreEbay = null; });
+  }
+  return _registreEbay;
+}
+let _comptesEbay = null;
+function lireComptesEbay(force) {
+  if (force || !_comptesEbay) {
+    const p = lireRegistreEbayBrut(force).then((rows) => (Array.isArray(rows) ? comptesEbayActifs(rows[0] ? { comptes: rows[0].comptes } : null) : null)).catch(() => null);
     _comptesEbay = p;
     p.then((v) => { if (v === null && _comptesEbay === p) _comptesEbay = null; });
   }
   return _comptesEbay;
 }
-const signalerComptesEbay = () => { _comptesEbay = null; try { window.dispatchEvent(new Event('vrm:ebay-comptes')); } catch (_) {} };
+const signalerComptesEbay = () => { _comptesEbay = null; _registreEbay = null; try { window.dispatchEvent(new Event('vrm:ebay-comptes')); } catch (_) {} };
 function useComptesEbay() {
   const [c, setC] = React.useState(undefined);
   React.useEffect(() => {
@@ -25753,9 +25992,6 @@ function useRelectureEbay() {
 //     recule (10 min, 6 h) ; rien n'est vidé ;
 //   · un état CHANGÉ ⇒ `vrm:transp-maj` (les écrans relisent `transp_*`).
 const RELECTURE_TRANSP_MS = 5 * 60 * 1000;
-// (13 nov., lot 89) Ce que le serveur a dit de Colissimo / UPS (lu ou non), retenu sur l'appareil
-// (une commodité : la réponse du passage suivant le remplace) — avant toute réponse : « pas su ».
-try { const x = lireLocalJson('vrm_transp_lecture'); if (x && Object.keys(x).length) noterLecturesServeur(x); } catch (_) {}
 // (9 nov., retraits frais) La dernière lecture RÉUSSIE chez un transporteur (ms) parmi les lignes `transp_`
 // lues, ou null (rien lu, ou pas su). Et l'âge en mots, une règle pour la ligne « Suivi vérifié … ».
 function derniereLectureTransp(lignes) {
@@ -25802,9 +26038,6 @@ function relireTransporteursSiVieux({ force = false } = {}) {
         ecrireLocalJson('vrm_transp_vol', { at: maintenant, prochain: maintenant + attente });
         return { fait: false, raison: st ? `http-${st}` : 'reseau' };
       }
-      // (13 nov., lot 89) Colissimo / UPS lus par le serveur (leur clé est posée sur Vercel) : la règle
-      // partagée le sait (`carrierLisible`, `pourquoiPasLu`) — sinon « suivi lu par e-mail seulement ».
-      if (j.lecture && typeof j.lecture === 'object') { const avant = JSON.stringify(lecturesCle()); noterLecturesServeur(j.lecture); ecrireLocalJson('vrm_transp_lecture', lecturesCle()); if (JSON.stringify(lecturesCle()) !== avant) { try { window.dispatchEvent(new Event('vrm:transp-lu')); } catch (_) {} } }
       const change = Array.isArray(j.lus) && j.lus.some((x) => x && x.change);
       // (8 nov.) Un colis VENDU pris en charge chez le transporteur : Colis, Ma
       // journée et la cloche relisent les départs (jamais « à retirer »).
@@ -26177,6 +26410,14 @@ const prixAchatDe = (fiche, buyByNum) => {
   if (brut == null || String(brut).trim() === '') return null;
   const n = parseFloat(String(brut).replace(',', '.'));
   return Number.isFinite(n) ? n : null;
+};
+// (16 nov., lot design-restes) Le prix d'achat SAISI d'un N° (la carte qui monte sur Leboncoin, eBay, Vestiaire) :
+// la fiche UNIQUE de ce N° (deux fiches au même N° ⇒ aucune n'est choisie), sinon la table par N° — la même
+// lecture `prixAchatDe` que partout ; rien de saisi ⇒ null (« — »), jamais 0.
+const achatDuNumeroLu = (num) => {
+  const k = num != null && String(num).trim() ? cleNum(num) : ''; if (!k) return null;
+  const f = ficheUniqueDuNumero(load('vinted_annonce_numeros', {}) || {}, k);
+  return prixAchatDe(f || { numero: String(num).trim() }, load('vinted_buyprice_by_num', {}) || {});
 };
 // ⟦→ ecrans/Ebay.jsx #20⟧
 
@@ -26671,12 +26912,26 @@ function empreintesEbayPage(autres, deja) {
   if (!aFaire.length) return Promise.resolve(0);
   _ebayEmpEnCours = (async () => {
     const calc = {};
+    const refusees = [];
     for (const a of aFaire) {
       if (!AUTH.user?.id) break;
       const h = await empreinteImageLocale(a.photo);
       _ebayEmpFaites++;
       if (h) calc[a.id] = { ...(calc[a.id] || {}), [clePhotoEmpreinte(a.photo)]: h };
+      else if (/^https:\/\/i\.ebayimg\.com\//i.test(a.photo)) refusees.push(a);
       await new Promise((ok) => setTimeout(ok, 1500));
+    }
+    // (16 nov., extension 5.395) Une photo `i.ebayimg.com` que la page ne peut pas lire (CORS) : l'extension
+    // de CE navigateur (droit d'hôte `i.ebayimg.com`) rend son EMPREINTE seule, 5 par demande. Pas d'extension
+    // à jour ⇒ la photo reste « pas vérifiée » (jamais devinée).
+    const extE = extSait('empreinteebay') === 'ok' ? String((__vmrEtat && __vmrEtat.ok && __vmrEtat.ext) || '') : '';
+    for (let i = 0; extE && i < refusees.length; i += 5) {
+      if (!AUTH.user?.id) break;
+      const lot = refusees.slice(i, i + 5);
+      const rep = await versExtension(extE, { type: 'empreinteImage', urls: lot.map((a) => a.photo) }, 120000).catch(() => null);
+      if (!rep || !rep.ok || !rep.h || typeof rep.h !== 'object') break;
+      for (const a of lot) { const h = rep.h[a.photo]; if (typeof h === 'string' && /^[0-9a-f]{96}$/.test(h)) calc[a.id] = { ...(calc[a.id] || {}), [clePhotoEmpreinte(a.photo)]: h }; }
+      if (rep.plein) break;
     }
     if (!Object.keys(calc).length) return 0;
     const owner = AUTH.user?.id;
@@ -27056,6 +27311,9 @@ function HotePublierPartout({ comptes, nums, numData, onFermer }) {
   const [memoire, setMemoire] = React.useState(() => lireCorrespondances(load(CLE_CORRESPONDANCES, null)));
   // Une extension qui porte catégorie et critères (5.381) — sinon Leboncoin les devinerait : la feuille le dit.
   const lbcCriteres = (relaisVivant() ? 'ok' : extSait('lbccriteres')) === 'ok';
+  // (16 nov., lot plateformes-restes) Vestiaire : l'extension reçoit la catégorie choisie (`vcPreparer`, 5.399) et ne
+  // la pose que si elle existe telle quelle dans le catalogue de dépôt capté ; sinon « à finir sur Vestiaire ».
+  const vcCategorie = extSait('vccategorie') === 'ok';
   // Les listes Leboncoin et Vestiaire (pour « déjà en ligne ») : trois états.
   const [autres, setAutres] = React.useState(undefined);
   const relire = React.useCallback(async () => {
@@ -27093,7 +27351,7 @@ function HotePublierPartout({ comptes, nums, numData, onFermer }) {
     // Ce que la règle d'avant (la même dans l'extension) poserait d'elle-même, d'après le chemin Vinted connu.
     const t = p.catalogId != null ? TABLE_VINTED[String(p.catalogId)] : null;
     let categorieVoie = ''; try { categorieVoie = categorieLbcDe(p.title, p.desc, p.taille, t ? t.chemin : '', p.marque); } catch (_) { categorieVoie = ''; }
-    return lignePartout(p, { enLigne: enLigneDe(p), ext, reglage, params, saisie: saisies[String(p.id)], regles, achat, memoire, lbcCriteres, categorieVoie,
+    return lignePartout(p, { enLigne: enLigneDe(p), ext, reglage, params, saisie: saisies[String(p.id)], regles, achat, memoire, lbcCriteres, vcCategorie, categorieVoie,
       famille: familleArticle({ titre: p.title, taille: p.taille, marque: p.marque }).famille, mpLbc: mpChoisi(fiche, 'lbc'), facultatifs: champsFacultatifs(vendActuel()) });
   });
   const vus = {};
@@ -27121,7 +27379,12 @@ function HotePublierPartout({ comptes, nums, numData, onFermer }) {
       // Un champ à finir sur Vestiaire (son choix que la voie ne porte pas, ou un requis introuvable) :
       // le dépôt s'ouvre SANS publier tout seul — il le finit là-bas (jamais publié avec un autre choix).
       const finir = Array.isArray(e.finir) && e.finir.length > 0;
-      let r = null; try { r = await vmrCmd({ cmd: 'vcPreparer', id: String(e.id), publier: !finir && extSait('vcauto') === 'ok' }, 30000); } catch (_) { r = null; }
+      // (16 nov.) La catégorie Vestiaire de la correspondance (univers › catégorie › sous-catégorie), entière seulement.
+      const cv = e.corr && e.corr.valeurs ? e.corr.valeurs : {};
+      const categorie = vcCategorie && cv.univers && cv.categorie && cv.sous ? { univers: cv.univers, categorie: cv.categorie, sous: cv.sous } : null;
+      let r = null; try { r = await vmrCmd({ cmd: 'vcPreparer', id: String(e.id), publier: !finir && extSait('vcauto') === 'ok', ...(categorie ? { categorie } : {}) }, 30000); } catch (_) { r = null; }
+      // Introuvable telle quelle sur Vestiaire : le dépôt est ouvert SANS publier — à finir là-bas (jamais une autre).
+      if (r && r.accepte && r.categorie === 'introuvable') r = { ...r, finir: [...new Set([...(Array.isArray(e.finir) ? e.finir : []), 'Catégorie']) ] };
       if (r && r.accepte && r.jobId) { __vmrJobs[r.jobId] = { etape: r.etape, at: Date.now() }; __vmrNotifier(); }
       return r;
     },
@@ -27239,7 +27502,7 @@ async function imprimerBordereauVc({ bordId, num, titre, venteId, original = fal
       const r={url,filename:'bordereau-vestiaire-original.pdf',ouvert:ouvrirPdfOnglet(url,'bordereau-vestiaire-original.pdf','Bordereau Vestiaire · original sans tampon')};
       return{etat:'ok',r};
     }
-    const r=await annotateAndDownloadBordereau(num||'',titre||'',bytes,null,{avantOuverture:verifier});
+    const r=await annotateAndDownloadBordereau(num||'',titre||'',bytes,null,{avantOuverture:verifier,site:'vestiaire'});
     verifier();if(venteId)marquerVc('vrm_vc_imprimes',venteId,true);
     return{etat:'ok',r};
   }catch(e){libererOngletPdf();if(estTamponAnnule(e))return{etat:'annule'};return{etat:'refus',texte:String(e?.message||e)};}
@@ -27263,12 +27526,13 @@ function BoutonImprimerVc({ v, grand = false, carte = false, lectureSeule = fals
     }catch(e){if(AUTH.user?.id===owner){setEtat('refus');setErreur(String(e?.message||e));}libererOngletPdf();}
     finally{enCours.current=false;if(AUTH.user?.id===owner)setEtat(e=>e==='lecture'?'':e);}
   };
-  const libelle = etat === 'lecture' ? 'Lecture du bordereau…' : 'Imprimer';
+  // (16 nov.) Le libellé ne change plus pendant la lecture (la ligne bougeait) : la roue tourne DANS le bouton.
+  const libelle = 'Imprimer';
   return <>
     {!lectureSeule&&(carte
-      ? <button type="button" data-imprime="1" data-vc-imprimer={v.id} disabled={etat === 'lecture'} onClick={()=>go(false)} title="Bordereau tamponné (titre + N°), puis impression"
+      ? <button type="button" data-imprime="1" data-vc-imprimer={v.id} disabled={etat === 'lecture'} onClick={(ev)=>occuperPendant(ev.currentTarget, ()=>go(false))} title="Bordereau tamponné (titre + N°), puis impression"
           className="vrm-colis-primaire" style={{flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:C.onAccent,borderRadius:12,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}><Icon name="printer" size={16}/>{etat === 'lecture' ? libelle : <><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></>}</button>
-      : <Bouton variante={grand ? 'primaire' : 'secondaire'} icone="printer" data-imprime="1" data-vc-imprimer={v.id} disabled={etat === 'lecture'} onClick={()=>go(false)} title="Bordereau tamponné (titre + N°), puis impression">{etat === 'lecture' ? libelle : grand ? <><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></> : 'Imprimer le bordereau'}</Bouton>)}
+      : <Bouton variante={grand ? 'primaire' : 'secondaire'} icone="printer" data-imprime="1" data-vc-imprimer={v.id} disabled={etat === 'lecture'} onClick={(ev)=>occuperPendant(ev.currentTarget, ()=>go(false))} title="Bordereau tamponné (titre + N°), puis impression">{etat === 'lecture' ? libelle : grand ? <><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></> : 'Imprimer le bordereau'}</Bouton>)}
     {!carte&&<button type="button" data-imprime="1" data-vc-original={v.id} disabled={etat==='lecture'} onClick={()=>go(true)} className="vrm-lien-action" style={{minHeight:44,color:C.accentTexte,background:'transparent',border:0,font:'inherit',fontSize:13,cursor:'pointer'}}>Ouvrir le PDF d’origine</button>}
     {erreur&&<span role="alert" data-vc-bordereau-erreur="" style={{flexBasis:'100%',fontSize:12,color:C.warn}}>{erreur}</span>}
     {lien ? <a href={lien.url} target="_blank" rel="noreferrer" data-vc-bordereau-lien="" style={{ color: C.accentTexte, fontWeight: 600, fontSize: 13 }}>Ouvrir le bordereau</a> : null}
@@ -30788,23 +31052,52 @@ async function lireCapturesDetail() {
 }
 // `actif` (5 nov.) : le panneau de l'indicateur ne lit ces lignes qu'OUVERT —
 // il vit dans l'en-tête de chaque écran, il ne doit rien lire au démarrage.
+// (16 nov., vitesse-lectures) Les SEPT lectures de ce crochet partent UNE fois pour tous ses lecteurs
+// montés (la feuille « compte relié » de la coque, Solo, l'indicateur, Comptes liés, « Tout va bien ? ») :
+// mesuré au banc budget-vitesse, Messages et Ma journée relisaient `ebay_orders*` et le registre eBay une
+// 2e fois, plus de 2 s après (hors du partage de `lecturesPartagees`). La réponse sert `AUTRES_SITES_MS` ;
+// un signal qui dit que ces lignes ont changé (`vrm:ext` Leboncoin/Vestiaire, `vrm:ebay-comptes`) ou un
+// « relire » explicite l'oublie AVANT que les crochets relisent ; une lecture dont une ligne est RATÉE n'est
+// pas gardée (chacun réessaie, « pas su » n'est jamais figé).
+const AUTRES_SITES_MS = 30000;
+let _autresSites = null;   // { at, uid, p }
+const oublierAutresSites = () => { _autresSites = null; };
+let _autresSitesEcoute = false;
+function lireAutresSitesLignes(force) {
+  if (!_autresSitesEcoute && typeof window !== 'undefined') {
+    _autresSitesEcoute = true;
+    // Posé AVANT les écoutes des crochets (premier appel) : elles relisent ensuite une réponse neuve.
+    window.addEventListener('vrm:ext', (e) => { const d = e && e.detail; if (d && d.type === 'maj' && /lbc|vestiaire|vc|ebay/.test(String(d.quoi || ''))) oublierAutresSites(); });
+    window.addEventListener('vrm:ebay-comptes', oublierAutresSites);
+  }
+  const uid = (AUTH.user && AUTH.user.id) || '';
+  const m = _autresSites;
+  if (!force && m && m.uid === uid && Date.now() - m.at < AUTRES_SITES_MS) return m.p;
+  const B = `${SUPABASE_URL}/rest/v1/app_data?`;
+  const p = Promise.all([
+    lireBaseRelue(`${B}id=eq.lbc_accounts&select=a:data->accounts`),
+    lireBaseRelue(`${B}id=eq.lbc_listings&select=l:data->lectures`),
+    lireBaseRelue(`${B}id=eq.vc_session&select=id:data->>id,at:data->>at,comptes:data->comptes`),
+    lireBaseRelue(`${B}id=eq.vc_listings&select=cap:data->>capturedAt`),
+    lireBaseRelue(`${B}id=eq.vc_ventes&select=cap:data->>capturedAt,ventes:data->ventes`),
+    lireRegistreEbayBrut(force),
+    lireBaseRelue(`${B}id=like.ebay_orders*&select=id,cap:data->>capturedAt`),
+  ]);
+  const ent = { at: Date.now(), uid, p };
+  _autresSites = ent;
+  p.then((r) => { if (r.some((x) => !Array.isArray(x)) && _autresSites === ent) _autresSites = null; }, () => { if (_autresSites === ent) _autresSites = null; });
+  return p;
+}
 function useComptesAutresSites(actif = true) {
   const [lu, setLu] = React.useState({ leboncoin: undefined, vestiaire: undefined, ebay: undefined });
   const [tour, setTour] = React.useState(0);
+  const force = React.useRef(false);
   React.useEffect(() => {
     if (!actif) return undefined;
     let mort = false;
-    const B = `${SUPABASE_URL}/rest/v1/app_data?`;
+    const f = force.current; force.current = false;
     (async () => {
-      const [acc, lec, ses, vcl, vcv, reg, cap] = await Promise.all([
-        lireBaseRelue(`${B}id=eq.lbc_accounts&select=a:data->accounts`),
-        lireBaseRelue(`${B}id=eq.lbc_listings&select=l:data->lectures`),
-        lireBaseRelue(`${B}id=eq.vc_session&select=id:data->>id,at:data->>at,comptes:data->comptes`),
-        lireBaseRelue(`${B}id=eq.vc_listings&select=cap:data->>capturedAt`),
-        lireBaseRelue(`${B}id=eq.vc_ventes&select=cap:data->>capturedAt,ventes:data->ventes`),
-        lireBaseRelue(`${B}id=eq.ebay_comptes&select=comptes:data->comptes`),
-        lireBaseRelue(`${B}id=like.ebay_orders*&select=id,cap:data->>capturedAt`),
-      ]);
+      const [acc, lec, ses, vcl, vcv, reg, cap] = await lireAutresSitesLignes(f).catch(() => [null, null, null, null, null, null, null]);
       if (mort) return;
       const ouvLbc = Array.isArray(acc) && acc[0] ? compteLbcOuvert(acc[0].a || {}) : '';
       const leboncoin = (!Array.isArray(acc) || !Array.isArray(lec)) ? null : comptesLbcLies((acc[0] && acc[0].a) || {}, (lec[0] && lec[0].l) || {}, ouvLbc);
@@ -30830,7 +31123,8 @@ function useComptesAutresSites(actif = true) {
     window.addEventListener('vrm:ext', f); window.addEventListener('vrm:ebay-comptes', g);
     return () => { window.removeEventListener('vrm:ext', f); window.removeEventListener('vrm:ebay-comptes', g); };
   }, []);
-  return [lu, () => setTour((t) => t + 1)];
+  // « Relire » demandé par l'écran : une lecture NEUVE (jamais la réponse gardée).
+  return [lu, () => { force.current = true; oublierAutresSites(); setTour((t) => t + 1); }];
 }
 // ⟦→ ecrans/Reglages.jsx #32⟧
 // (6 nov., onglets B) EN TÊTE DE COLIS : les comptes qui n'envoient AUCUN e-mail à VRM (la MÊME règle,
@@ -33564,6 +33858,51 @@ function TamponPose({ r }) {
 // « Toujours ici » (coché) mémorise la place pour la FORME du bordereau
 // (`vrm_tampon_positions`) ; « Revenir au choix de VRM » l'oublie. Aucune phrase
 // d'explication (sa demande). Ouverte par `demanderPlacementTampon`.
+// ── (16 nov., lot tampons-parametres) L'APERÇU AVANT IMPRESSION D'UN BORDEREAU SEUL ─────────────────
+// La même feuille que celle d'« Imprimer (N) » (`ApercuAvantImpression`), pour UN bordereau : sa vignette composée par le
+// vrai code (`composerBordereaux`), le N° et la mention qu'on déplace (refusés sur un code, un QR, l'adresse), « tous de
+// ce type » (la place gardée pour sa forme, `vrm_tampons`). « Imprimer » rend les places ; fermer rend null (rien).
+let _apercuUn = null;
+const demanderApercuUn = (o) => new Promise((resolve) => { if (!_apercuUn) return resolve(undefined); libererBoutonsImprime(); _apercuUn({ ...o, resolve }); });
+function ApercuUnCoque() {
+  const [q, setQ] = React.useState(null);
+  React.useEffect(() => { _apercuUn = (o) => setQ(o); return () => { _apercuUn = null; }; }, []);
+  if (!q) return null;
+  const fin = (r) => { const res = q.resolve; setQ(null); res(r); };
+  return <ApercuUnFeuille q={q} fin={fin}/>;
+}
+function ApercuUnFeuille({ q, fin }) {
+  const [etat, setEtat] = React.useState({ choisies: [{ cle: 'un' }], places: {}, tous: true });
+  const [entree, setEntree] = React.useState({ etat: 'encours', res: null });
+  const n0 = React.useRef(0);
+  const composer = React.useCallback(async (places) => {
+    const k = ++n0.current; setEntree((e) => ({ ...e, etat: 'encours' }));
+    try {
+      const it = { numero: q.numero || '', title: q.title || '', pdfBuf: q.octets, cle: 'un', site: q.site || '', places: places && places.un ? places.un : null };
+      const r = await composerBordereaux([it], null, { imprimante: q.imprimante, apercu: false });
+      if (k === n0.current) setEntree({ etat: 'pret', res: { ...r, items: [{ cle: 'un', numero: q.numero || '', title: q.title || '' }] } });
+    } catch (e) { if (k === n0.current) setEntree({ etat: 'echec', res: null, err: e }); }
+  }, [q]);
+  React.useEffect(() => { composer({}); }, [composer]);
+  const poser = (cle, quoi, b, pose, facteur = 1) => {
+    const v = (pose.place && pose.place.v) || 0;
+    const place = quoi === 'n' ? { vx: b.x / pose.W, vy: b.y / pose.H, vw: Math.min(1, b.w / pose.W), v } : { vx: b.x / pose.W, vy: b.y / pose.H, vw: Math.min(1, b.w / pose.W) };
+    if (etat.tous) {
+      let r = reglageTamponsChoisi();
+      if (quoi === 'm' && facteur !== 1) { const rs = resoudreTampon(r, { famille: 'autre', thermique: q.imprimante !== 'normale' }); const k = TAILLES_TAMPON[rs.texteMention] * facteur; r = avecChoix(r, 'tous', { texteMention: Object.keys(TAILLES_TAMPON).reduce((x, c) => (Math.abs(TAILLES_TAMPON[c] - k) < Math.abs(TAILLES_TAMPON[x] - k) ? c : x), 'M') }); }
+      ecrireReglageTampons(avecPlace(r, pose.cle, quoi, place));
+    }
+    const places = { ...etat.places, [cle]: { ...(etat.places[cle] || {}), [quoi]: place } };
+    setEtat((x) => ({ ...x, places })); composer(places);
+  };
+  const origine = (cle, quoi, pose) => {
+    if (etat.tous) ecrireReglageTampons(avecPlace(reglageTamponsChoisi(), pose.cle, quoi, null));
+    const places = { ...etat.places, [cle]: { ...(etat.places[cle] || {}), [quoi]: null } };
+    setEtat((x) => ({ ...x, places })); composer(places);
+  };
+  return <ApercuAvantImpression Feuille={SheetShell} Bouton={Bouton} etat={etat} entree={entree} dessiner={dessinerPdf} occupe={false}
+    onPoser={poser} onOrigine={origine} onTous={(v) => setEtat((x) => ({ ...x, tous: v }))} onImprimer={() => fin({ places: etat.places.un ? { ...etat.places.un } : null })} onFermer={() => fin(null)}/>;
+}
 function PlaceurTampon() {
   const [q, setQ] = React.useState(null);
   React.useEffect(() => { _placeurTampon = (o) => setQ(o); return () => { _placeurTampon = null; }; }, []);
@@ -35089,7 +35428,6 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Points relais HABITUELS, pré-enregistrés : la carte s'affiche en permanence,
   // les badges apparaissent à l'arrivée des colis. Synchronisé.
   const [savedPoints, setSavedPoints] = useStateCle('vrm_points_relais', () => load('vrm_points_relais', []));
-  const persistPoints = (u) => { setSavedPoints(u); save('vrm_points_relais', u); };
   // Points relais OFFICIELS de Vinted, captés par l'extension (source complète,
   // pas OpenStreetMap). S'affichent d'office sur la carte, sans taper de ville.
   const [vintedPoints, setVintedPoints] = useState(null);
@@ -35107,8 +35445,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Achats — et son résultat (`villeCache`) n'était rendu NULLE PART : un appel
   // réseau jeté à chaque ouverture, et un commentaire qui promettait une carte
   // qui n'existe plus. État (`ville`, `villeCache`, `villeInput`, `villeLoading`),
-  // fonction et réveils `onCloudReady` associés supprimés. `relayPicker` et
-  // `savedPoints` (la recherche/ajout manuel) restent, eux sont bien rendus.
+  // fonction et réveils `onCloudReady` associés supprimés. (16 nov.) La recherche
+  // manuelle (`relayPicker`) n'était plus rendue non plus : retirée (voir plus bas).
   const [carriersOnly, setCarriersOnly] = useState(() => load('vrm_relais_carriers_only', true)); // casiers/transporteurs seulement
   // Géocode une adresse précise via l'API Adresse du gouvernement français
   // (data.gouv, gratuite, fiable) ; repli Nominatim. Renvoie {lat,lon} ou null.
@@ -35126,49 +35464,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     } catch (_) {}
     return null;
   };
-  // Ajout MANUEL d'un point relais par son adresse exacte (fiable, pas de
-  // « magasins au hasard »). On géocode l'adresse précise donnée.
-  const addPointByAddress = async () => {
-    const input = await askText({ desc: 'Point relais — nom et adresse exacte :\nex : Maison de la Presse, 12 rue de la Gare, 75010 Paris' });
-    if (!input || !input.trim()) return;
-    const parts = input.split(',');
-    const nom = parts[0].trim();
-    const adresse = parts.slice(1).join(',').trim() || input.trim();
-    const hit = await geocode(adresse) || await geocode(input.trim());
-    if (!hit) { toast('Adresse introuvable. Donne la rue + le code postal + la ville (ex : 12 rue de la Gare, 75010 Paris).'); return; }
-    const byName = new Map(savedPoints.map(s => [s.nom.toLowerCase(), s]));
-    byName.set(nom.toLowerCase(), { nom, full: input.trim(), lat: hit.lat, lon: hit.lon });
-    persistPoints([...byName.values()]);
-  };
-  const removeSavedPoint = (nom) => { persistPoints(savedPoints.filter(sp => sp.nom !== nom)); setOpenPoint(null); };
-  // Recherche d'un point relais par son NOM (+ ville) : fiable, c'est toi qui
-  // nommes le vrai lieu (« Super U Cancale »…). Résultats sur carte, tu confirmes.
-  const [relayPicker, setRelayPicker] = useState(null); // {query, loading, results:[], error, carrier}
-  const openRelayPicker = () => setRelayPicker({ query: '', loading: false, results: [], error: null, carrier: '' });
-  const searchPlaces = async (query) => {
-    if (!query || !query.trim()) return;
-    setRelayPicker(p => p ? { ...p, loading: true, error: null, results: [] } : p);
-    try {
-      const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=6&countrycodes=fr&addressdetails=1&q=${encodeURIComponent(query.trim())}`);
-      const js = await r.json();
-      const results = (js || []).map((x, i) => {
-        const a = x.address || {};
-        const nom = a.shop || a.amenity || (x.display_name || '').split(',')[0].trim();
-        const ville = a.village || a.town || a.city || a.municipality || '';
-        const rue = [a.house_number, a.road].filter(Boolean).join(' ');
-        return { id: String(x.place_id || i), nom, adresse: [rue, a.postcode, ville].filter(Boolean).join(', '), lat: +x.lat, lon: +x.lon, full: x.display_name };
-      });
-      setRelayPicker(p => p ? { ...p, loading: false, results, error: results.length ? null : 'Aucun lieu trouvé. Ajoute le nom de la ville (ex : « Super U Lyon »).' } : p);
-    } catch (_) { setRelayPicker(p => p ? { ...p, loading: false, error: 'Recherche indisponible, réessaie.' } : p); }
-  };
-  const addFoundPlace = (f) => {
-    const carrier = relayPicker && relayPicker.carrier;
-    const nom = carrier ? `${f.nom} (${carrier})` : f.nom;
-    const byName = new Map(savedPoints.map(s => [s.nom.toLowerCase(), s]));
-    byName.set(nom.toLowerCase(), { nom, full: f.adresse ? `${f.nom}, ${f.adresse}` : f.nom, lat: f.lat, lon: f.lon, carrier: carrier || undefined });
-    persistPoints([...byName.values()]);
-    setRelayPicker(null);
-  };
+  // (16 nov., lot ecrans-restes) LA RECHERCHE MANUELLE DE POINT RELAIS EST RETIRÉE (§4.11) : `openRelayPicker`
+  // n'avait plus aucun bouton (constaté le 16 nov. : `grep -c 'openRelayPicker'` = 1, sa définition), et `addPointByAddress` / `removeSavedPoint`
+  // aucun appelant. Tranché : ne PAS la rebrancher sur « point inconnu » (Achats → À retirer). Un point inconnu,
+  // c'est un colis dont AUCUN message ne dit le relais : chercher un magasin par son nom (Nominatim, « Super U
+  // Lyon ») ne dit pas où est CE colis — il faudrait relier le colis au lieu choisi, une identité devinée
+  // (§5 : jamais par ressemblance) ; et le 9 nov. la carte a été rendue « parfaite » en ne rangeant plus
+  // aucun point sans code postal LU. Les points restent ceux LUS dans ses e-mails et chez les transporteurs
+  // (`ensureSavedPoint`, plus bas) ; la carte de Colis dit pourquoi un point n'y est pas (`raisonPasSurCarte`).
   // AUTO : chaque point relais réel qui apparaît dans un email de colis est
   // géocodé (adresse exacte) et ENREGISTRÉ en permanence. La carte se construit
   // ainsi toute seule à partir de tes vrais points, même après retrait du colis.
@@ -35549,7 +35852,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, []);
   const [pickerFor, setPickerFor] = useState(null);
   // (16 nov., lot relier-glisser) Le mode « Relier en glissant » (src/RelierGlisser.jsx).
-  const [glisserOuvert, setGlisserOuvert] = useState(false);
+  const [glisserOuvert, setGlisserOuvert] = useState(false);   // false · { achat?, cible? } (le choix posé à l'ouverture)
   // Recherche dans le sélecteur d'achat : avec ~700 achats, si la suggestion
   // n'est pas la bonne il n'y avait que le défilement.
   const [pickerQ, setPickerQ] = useState('');
@@ -35654,7 +35957,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // ⚠️ On NE MUTE PAS la liste partagée : elle sert aussi à la saisie en série.
     // Un `sort` en place réordonnerait la source sous l'autre écran.
     const ref = refAchat(item);
-    const liste = out.map(o => ({ ...o, _score: scoreAchat(ref, o) }))
+    // (16 nov., lot plateformes-restes) + ses achats Leboncoin et Vestiaire, sous leur identité
+    // (`lbc:{n°}`, `vc:{n°}` — src/achatsAutresRelier.js). Seulement à la feuille (jamais à la saisie en série).
+    let autresSites = [];
+    try { autresSites = achatsAutresPourRelier({ lbcAchats: (lbcVentes && lbcVentes.achats) || null, vcAchats: ((vcEtat || vcBrut) && (vcEtat || vcBrut).achats) || null, annulee: lbcAnnulee }); } catch (_) { autresSites = []; }
+    const liste = [...out, ...autresSites].map(o => ({ ...o, _score: scoreAchat(ref, o) }))
       .sort((a,b) => (b._score - a._score) || (new Date(b.date||0) - new Date(a.date||0)));
     setPurchasesPick({loading:false,items:liste});
   };
@@ -38088,8 +38395,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // disent « au moins » et NOMMENT le manque, des MÊMES lignes (§5).
       const sources = { Vinted: 'lu', Leboncoin: lbcLu ? 'lu' : 'pasSu', eBay: ebayCmd ? 'lu' : 'pasSu', Vestiaire: ventesVc === null ? 'pasSu' : 'lu' };
       const ncP = {};
-      for (const x of recuNonComptees) { const k = `${x.plateforme}|${x.raison}`; ncP[k] = (ncP[k] || 0) + 1; }
-      const nonComptees = { n: recuNonComptees.length, par: ncP };
+      // (16 nov., lot argent-mieux) + `parC` : par raison, la somme « au moins » (centimes) quand CHAQUE vente du
+      // groupe la porte (les deux prix lus d'une vente Pro) ; sinon `null` (pas su, jamais 0).
+      const ncC = {};
+      for (const x of recuNonComptees) { const k = `${x.plateforme}|${x.raison}`; ncP[k] = (ncP[k] || 0) + 1; ncC[k] = ncC[k] === null || !Number.isSafeInteger(x.auMoinsC) ? null : (ncC[k] || 0) + x.auMoinsC; }
+      // + `det` : le détail des ventes aux deux prix (identité, date, les deux prix en centimes, l'annonce pour son N°),
+      // 300 au plus — la liste repliée de Déclarer (jamais de titre ni de pseudo dans cette ligne).
+      const det = recuNonComptees.filter((x) => x && x.deux).slice(0, 300).map((x) => ({ k: `${x.plateforme}|${x.raison}`, id: x.id, t: x.tsVente || x.ts || null, l: x.deux.listeC, a: x.deux.artC, r: x.deux.releveC, it: x.itemId || '' }));
+      const nonComptees = { n: recuNonComptees.length, par: ncP, parC: ncC, ...(det.length ? { det } : {}) };
       // L'argent REÇU par mois (date de VERSEMENT), par `recuDuMois` — la règle
       // même de « Reçu en {mois} » sur Ma journée. Le widget de l'iPhone le LIT
       // (api/widget.js) au lieu de le recalculer sur les emails (§11, 17 oct.).
@@ -41606,6 +41919,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       for (const u of bouges) _rowCache.delete(`o:${u}`);
       const deja = new Set();
       for (const q of d.quoi) {
+        // (16 nov., vitesse-lectures) La boîte Vinted d'un compte a changé : Messages (et Ma journée, qui
+        // compte les non-lus) relit CE compte — sa ligne vient d'être oubliée (`viderMemoLignes`), les
+        // autres boîtes restent servies par leur mémoire ; aucune requête Vinted (moisson seulement).
+        if (q.quoi === 'messages') {
+          if (q.uid) _rowCache.delete(`h:${q.uid}:inbox`);
+          try { delete _acctCache.convs; _persistAcctCache(); } catch (_) {}
+          if ((curSub === 'messages' || curSub === 'journee') && !deja.has('messages')) { deja.add('messages'); loadConvs(); }
+          continue;
+        }
         if (!['ventes', 'achats', 'annonces', 'suivi', 'transp'].includes(q.quoi)) continue;
         // Une relecture des ventes couvre tous les comptes touchés (leurs lignes viennent d'être oubliées).
         if ((q.quoi === 'ventes' || q.quoi === 'achats') && deja.has(q.quoi)) continue;
@@ -41621,6 +41943,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     window.addEventListener('vrm:transp-lu', transpMaj);
     if (ecrans.includes(curSub) && ventesPerimees.current) relire();
     const vus = vusSonde.current;
+    // ⚠️ (16 nov., lot vitesse-lectures — TRANCHÉ : la sonde RESTE) Elle double la veille (src/tempsReel.js)
+    //    seulement quand tout va bien ; elle seule couvre encore quatre cas, mesurés dans le code :
+    //    1. une installation sans comptes séparés (`MULTI_USER` faux) : la veille n'est pas montée ;
+    //    2. une ligne écrite par un appareil dont l'horloge retarde de plus de 10 min (la fenêtre de la
+    //       veille part de l'heure de CET appareil) — la sonde compare la date de capture, sans fenêtre ;
+    //    3. un signal de la veille arrivé pendant que cet écran était GARDÉ caché (`cache()` ⇒ jeté) : la
+    //       sonde repart au retour de l'écran (`vivant.surRetour`) et voit la capture changée ;
+    //    4. une veille en panne plus de 10 min (une lecture ratée ⇒ rien) : à la reprise, une ligne écrite
+    //       avant la fenêtre n'est plus vue par elle, la sonde la voit.
+    //    Son coût : une lecture scalaire (< 1 Ko) par minute, onglet visible, partagée avec l'âge des
+    //    ventes de la coque. Récit : docs/passation/2026-11-16-vitesse-lectures.md.
     const sonde = async () => {
       if (document.hidden || !ecrans.includes(curSub) || cache()) return;
       try {
@@ -42807,7 +43140,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         } else {
           const a = autresParIdRapport.get(id);
           if (a) { achatC = a.achat != null ? c(a.achat) : null; num = a.num || ''; }
-          if (id.startsWith('ebay:')) { const r = so.venteAutre('ebay', ebayParId.get(id.slice(5))); prixC = r && r.ok ? r.centimes : null; }
+          if (id.startsWith('ebay:')) { const r = so.venteAutre('ebay', ebayParId.get(id.slice(5))); prixC = r && r.ok && !(Array.isArray(r.lignes) && r.lignes.length > 1) ? r.centimes : null; }   // (16 nov.) une commande à plusieurs articles : la marge d'UNE paire n'est pas su
           else if (id.startsWith('vestiaire:')) { const r = so.venteAutre('vestiaire', vcParId.get(id.slice(10))); prixC = r && r.ok ? r.centimes : null; }
           else if (!l.sansPrix) prixC = c(l.eur);           // Leboncoin, ventes importées : le prix de la vente
         }
@@ -43133,7 +43466,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (!lu || !lu.octets) return null;
       const PL = await import('pdf-lib');
       const pdf = await PL.PDFDocument.load(lu.octets);
-      const t = await tamponnerBordereau(PL, pdf, { numero: c.num || '', titre: `RETOUR · ${String(c.titre || '').replace(/\s+/g, ' ').trim()}`.slice(0, 90) });
+      // (16 nov., lot tampons-parametres) Le cartouche RETOUR (lot impression-retours : mot en grand, cadre) reste toujours posé ; sa taille, sa place et la mention
+      // suivent `vrm_tampons` (type « retour »), comme toute impression.
+      const tp = tamponPourPage(PL, pdf, { famille: 'retour' });
+      const t = await tamponnerBordereau(PL, pdf, { numero: c.num || '', titre: String(c.titre || '').replace(/\s+/g, ' ').trim().slice(0, 90), choix: tp.choix, tampon: tp.tampon, retour: true });
       posePrefsImpression(PL, pdf);
       const bytes = await pdf.save();
       const filename = `retour-${c.num ? 'N' + c.num + '-' : ''}${c.tx || 'vinted'}.pdf`;
@@ -43637,16 +43973,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         enRetard: toShip.filter(t => t.retard).length + (eb ? eb.filter(x => x.jours != null && x.jours < 0).length : 0) + (vc ? vc.filter(x => x.jours != null && x.jours < 0).length : 0),
         vinted: toShip.length, ebay: eb ? eb.length : null, leboncoin: lb ? lb.length : null, vestiaire: vc ? vc.length : null,
         nePasPoster: colisEb ? colisEb.nePasPoster.length : null, at: Date.now() };
+      // (16 nov., lot ecrans-restes) + LA LISTE des colis Vinted à expédier et leur date limite (la règle de Colis,
+      // `limiteExpedition` : l'e-mail du bordereau, sinon estimée) — la loupe la lit (« colis à expédier demain »).
+      // Sur CET appareil seulement (clé non synchronisée) ; le N° d'un lot est celui de son tampon (`lotDeVente`).
+      // Ni acheteur, ni adresse, ni n° de suivi : le titre court, le N°, le jour.
+      try {
+        v.liste = toShip.slice(0, 100).map((t) => { const o = t.o || {}; const l = lotDeVente(o); const e = effEntry(o) || {};
+          return { nom: String(o.title || '').slice(0, 60), num: String((l && l.lu ? l.tampon : e.numero) || ''), jour: t.jour || '', heure: t.heure || '', estimee: t.limite === 'estimee', retard: !!t.retard }; });
+      } catch (_) { v.liste = null; }
+      v.sigListe = Array.isArray(v.liste) ? v.liste.map((x) => `${x.num}|${x.jour}|${x.heure}|${x.nom}`).join(';') : '';
       const avant = load('vrm_colis_aposter', null);
       // (6 nov., onglets A) Et une fois l'heure même sans changement : le badge et la carte ne croient
       // qu'une publication de moins de 12 h (`publicationColisFraiche`) — un nombre stable restait
       // daté de la veille alors que l'écran qui le compte était ouvert.
-      if (!avant || avant.total !== v.total || avant.enRetard !== v.enRetard || avant.ebay !== v.ebay || avant.leboncoin !== v.leboncoin || avant.vestiaire !== v.vestiaire || avant.nePasPoster !== v.nePasPoster || !(Date.now() - (Number(avant.at) || 0) < 3600000)) {
+      if (!avant || avant.total !== v.total || avant.enRetard !== v.enRetard || avant.ebay !== v.ebay || avant.leboncoin !== v.leboncoin || avant.vestiaire !== v.vestiaire || avant.nePasPoster !== v.nePasPoster || avant.sigListe !== v.sigListe || !(Date.now() - (Number(avant.at) || 0) < 3600000)) {
         save('vrm_colis_aposter', v);
         try { window.dispatchEvent(new CustomEvent('vrm:colis')); } catch (_) {}
       }
     } catch (_) {}
-  }, [toShip, sales.items, emailBords, colisEb, colisAutres]);
+  }, [toShip, sales.items, emailBords, colisEb, colisAutres, lotsTx]);
   // ── MA JOURNÉE HORS LIGNE : LA PHOTO, APRÈS UNE LECTURE COMPLÈTE (21 oct.) ──
   // Ce que Ma journée montre — colis à expédier, colis à retirer avec leurs
   // codes et QR — rangé SUR L'APPAREIL, au nom de CE vendeur
@@ -44367,7 +44712,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // `fileVendus`) — une ligne déjà reliée n'en est jamais une. L'écriture : celle de « Relier » (`ecritureRelierAchat`,
   // un lot DEMANDE le prix de cet article), posée par l'identité de la ligne (src/relierGlisser.js `opsRelierGlisse`),
   // en un geste annulable 5 s. Rien n'est relié sans SON glisser PUIS son « Oui ».
-  const ouvrirGlisser = () => { setPickerFor(null); setGlisserOuvert(true); if (accounts.length && !fillBuyAchats.items) chargerAchats(); };
+  const ouvrirGlisser = (init = null) => { const c = pickerFor ? (pickerFor._saleTx ? cleArticleVente(pickerFor._saleTx) : (pickerFor.id != null && !String(pickerFor.id).startsWith('_') ? cleArticleAnnonce(pickerFor.id) : '')) : ''; setPickerFor(null);
+    setGlisserOuvert({ achat: init && init.achat ? String(init.achat) : '', cible: init && init.cible ? String(init.cible) : c }); if (accounts.length && !fillBuyAchats.items) chargerAchats(); };
   const ciblesGlisser = useMemo(() => {
     if (!glisserOuvert) return [];
     const jour = (t) => { const d = typeof t === 'number' ? t : Date.parse(t || ''); return Number.isFinite(d) ? new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : ''; };
@@ -45806,7 +46152,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       // Sur ordinateur : le PDF s'ouvre dans un onglet (bouton imprimer de
       // Chrome). Sur iPhone : la modale « Ouvrir → Partager → Imprimer ».
       const printed = ouvrirPdfOnglet(url);
-      setBordResult({ url, filename, numero, title, pdfBuf: buf, key: bordereauFormatKey(width, height), w:width, h:height, withInvoice: joined, printed,
+      setBordResult({ url, bytes, filename, numero, title, pdfBuf: buf, key: bordereauFormatKey(width, height), w:width, h:height, withInvoice: joined, printed,
                       thermique: imprMode(imprimante) === 'thermique', isoles: thermiqueOK ? 1 : 0, ...bilanThermique(r1.details), entiers: thermiqueOK ? [] : (thermiqueRaison ? [{ titre: title || '', raison: thermiqueRaison }] : []) });
     } catch(err){ libererOngletPdf(); if (!estTamponAnnule(err)) toast('Erreur impression : '+String(err)); }
   };
@@ -45916,15 +46262,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // existe (lu par l'extension, `lbcpdf`). eBay n'a pas de PDF chez VRM (l'étiquette se prend dans
   // eBay, §2.8) : jamais dans le lot. L'ordre est celui des GROUPES de l'écran (`colisAEnvoyerRanges`,
   // `ordonnerLot`) : tous les colis d'un transporteur, puis le suivant.
-  const sigLigneLot = (l) => l.site === 'vinted' ? signatureColis(l.e) : empreinteColis({ owner: AUTH.user?.id || '', compte: l.site, transaction: l.cle, numero: l.num || '' });
+  // (16 nov., lot ecrans-restes) Les N° qu'une ligne du lot tamponne : ceux de SES articles pour une vente en lot
+  // (chacun passe la garde du §5, `confirmerNumerosAVerifier`), sinon le sien.
+  const numerosDeLigne = (l) => (Array.isArray(l && l.nums) ? l.nums.filter(Boolean) : [l && l.num]);
+  // (16 nov.) Une vente en lot signe AUSSI son tampon (un article relié change le PDF à préparer).
+  const sigLigneLot = (l) => l.site === 'vinted' ? signatureColis(l.e) + (Array.isArray(l.nums) ? '#lot:' + (l.num || '') : '') : empreinteColis({ owner: AUTH.user?.id || '', compte: l.site, transaction: l.cle, numero: l.num || '' });
   const lignesLotTous = () => {
     let ranges = []; try { ranges = colisAEnvoyerRanges(); } catch (_) { ranges = []; }
     const ordre = ordreDesGroupes(ranges, trNomColis);
     const rangDe = new Map(ranges.map((x, i) => [x.__autre ? x.key : String(x.txn || x.key), i]));
     const L = [];
     if (voitSite('vinted')) for (const l of lignesLot()) { const o = l.e.o, b = l.e.b;
+      // (16 nov., lot ecrans-restes) Une vente EN LOT : le tampon liste les N° de SES articles (« 124 · 131 · 140 »,
+      // `lotDeVente`, la règle d'`imprimerBordereauVente`) et la garde du §5 vérifie CHACUN (`nums`) — avant, « Tout
+      // imprimer » tamponnait le N° d'un seul article (récit 2026-11-11-ventes-lot.md, « ce qui reste »).
+      const lotV = o ? lotDeVente(o) : null; const enLotV = !!(lotV && lotV.lu);
       L.push({ ...l, site: 'vinted', pdf: true, cochable: true, trNom: trNomColis(l.e), rang: rangDe.get(String(l.cle)),
-        num: (b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : ''), titre: (o && o.title) || (b && (b.modele || b.article)) || 'Bordereau',
+        ...(enLotV ? { nums: lotV.nums.slice() } : {}),
+        num: enLotV ? lotV.tampon : ((b ? numForBord(b) : '') || (o ? (effEntry(o)?.numero || '') : '')), titre: (o && o.title) || (b && (b.modele || b.article)) || 'Bordereau',
         photo: o ? orderPhoto(o) : bordPhoto(b), sous: `Vinted · ${o && o._acc ? accNameOf(o._acc) : 'compte inconnu'}` }); }
     // (4 nov., Julien : « je n'ai pas la possibilité de sélectionner la vente de Vestiaire Co et de
     // Leboncoin ») Chaque colis des autres sites a SA ligne (`ligneLotAutre`, src/lotSelection.js) :
@@ -45941,6 +46296,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     });
     return ordonnerLot(L, ordre, (l) => l.trNom);
   };
+  // (16 nov., lot impression-retours) LES BORDEREAUX DE RETOUR (achats qu'il renvoie) partent dans le MÊME PDF,
+  // mais ne sont JAMAIS des lignes de `lignesLotTous` (les ventes : le nombre du bouton, « à envoyer », le disque
+  // de la barre, `vrm_colis_prets`). Ils ont LEURS lignes (`lignesRetoursLot`, clé `r:{n°}`, identité par le n°),
+  // LEUR case (cochée d'office tant qu'il n'est pas imprimé sur cet appareil) et LEUR compteur (« + N retours »).
+  const vendeurAchatRetour = (o) => String((o && (o.seller || o.user_login || (o.opposite_user && o.opposite_user.login))) || '').trim();
+  const lignesRetoursImpr = () => {
+    if (colisDans === 'achats' || !voitSite('vinted')) return [];
+    let imp = {}; try { imp = load('vrm_retours_imprimes', {}) || {}; } catch (_) { imp = {}; }
+    try { return lignesRetoursLot(retoursAchatRes, { imprimes: imp, vendeurDe: vendeurAchatRetour }); } catch (_) { return []; }
+  };
+  const retoursChoisis = (R = lignesRetoursImpr(), voulus = null) => selectionImprimable(R, voulus instanceof Set ? voulus : cochesEffectives(R, cochesRetours));
+  const lignesLotImpression = () => [...lignesLotTous(), ...lignesRetoursImpr()];
+  // « + N retours » à côté du bouton (le mot RETOUR ne se mêle jamais au nombre des ventes).
+  const pastilleRetours = (n, seul) => n > 0 ? <span className="vrm-impr-retours" data-impr-retours={n} title={tr('impr.retour.titreBouton', { n })}>{tr(seul ? 'impr.retour.seul' : 'impr.retour.plus', { n })}</span> : null;
   const [progressionLot,setProgressionLot]=useState(null);
   const lotActuel=React.useRef(null);lotActuel.current={lignes:lignesLotTous,sig:sigLigneLot};
   // ── (31 oct.) LES CARTES DES QUATRE COLONNES DE COLIS ──────────────────
@@ -46239,6 +46608,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (15 nov., Ventes « Verre dépoli ») Les colis COCHÉS pour l'impression en lot : null = rien touché (la règle du lot,
   // « tous cochés » — `cochesParDefaut`), sinon SON jeu de clés (src/ventesVerre.js `cochesEffectives`).
   const [cochesVentes, setCochesVentes] = useState(null);
+  const [cochesRetours, setCochesRetours] = useState(null);   // (16 nov.) les retours cochés (null = d'office)
   // Le lot lu par la TÊTE d'« À expédier » (même rendu) : la liste et son pied le relisent sans le recalculer.
   const vvLotRef = React.useRef({ Ltous: [], resLot: { total: 0, partent: 0, autres: 0 }, nLot: 0, sigDefaut: '', lignesImpr: [] });
   // (10 nov., lot L) Le stock d'emballages (src/emballages.js) : le choix d'emballage d'un colis dans « Préparer ».
@@ -46246,7 +46616,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // « Déposé » : LE geste existant (`marquerColisFait` pour Vinted, « Colis fait » Vestiaire),
   // différé de 5 s avec « Annuler » (`useDeposeDiffere`, celui de Ventes) ; écran quitté ⇒ écrit.
   // (5 nov.) Leboncoin aussi (la tournée) : sa coche « Colis fait » de toujours (`vrm_lbc_colis_done`).
-  const deposerLbc = (txId) => { if (txId == null) return; const u = { ...(load('vrm_lbc_colis_done', {}) || {}) }; if (!u[txId]) { u[txId] = Date.now(); save('vrm_lbc_colis_done', u); } majLbcFait(); };
+  // (16 nov.) Par la file de la clé : deux colis déposés dans la demi-seconde restent deux.
+  const deposerLbc = (txId) => { if (txId == null) return; modifierCle('vrm_lbc_colis_done', {}, (u) => (u[txId] ? undefined : { ...u, [txId]: Date.now() })); majLbcFait(); };
   const deposeScan = useDeposeDiffere(
     (x) => { if (!x) return; if (x.site === 'vinted') marquerColisFait(x.o, x.b); else if (x.site === 'vestiaire') marquerVc('vrm_vc_colis_done', x.v.id, true); else if (x.site === 'leboncoin') deposerLbc(x.txId); },
     undefined,
@@ -46279,6 +46650,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       if (c.site === 'vestiaire') L.push({ cle: c.cle, site: 'vestiaire', suivis: c.suivis, num: c.num, titre: c.titre, vc: c.v && c.v.id });
       else if (c.site === 'vinted' && !c.o) L.push({ cle: c.cle, site: 'vinted', suivis: c.suivis, num: c.num, titre: c.titre, sansVente: true });
     }
+    // (16 nov., lot plateformes-restes) eBay (n° de commande, SKU « VRM-{N°} ») et Leboncoin (n° de
+    // transaction, n° du bordereau Mondial Relay) — PAR IDENTITÉ (src/douchette.js `lignesAutresSites`).
+    try {
+      const liensLbcD = load('vrm_lbc_liens', {}) || {};
+      L.push(...lignesAutresSites({
+        // Tous les sites, quel que soit le filtre affiché : un colis scanné se trouve même hors du filtre.
+        ebay: Array.isArray(ebayCmd) ? ebayCmd : null,
+        lbc: lbcLu === true ? ((lbcVentes && lbcVentes.ventes) || []) : null,
+        numEbay: numLigneEbay, engagee: commandeEbayEngagee,
+        numLbc: (v) => { const n = numeroLbcIdentite(v, lbcItemsBenef || {}, liensLbcD); return n == null ? '' : String(n); },
+      }));
+    } catch (_) {}
     return L;
   };
   const douchettePrete = colisDans === 'ventes' && curSub === 'bordereaux' && Array.isArray(sales.items) && emailBords !== null;
@@ -46290,7 +46673,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (r.etat === 'trouve' && !r.ligne.sansVente) {
       const l = r.ligne;
       toast(tr('cp.douchette.trouve', { qui: [l.num ? `N°${l.num}` : '', l.titre].filter(Boolean).join(' · ') || tr('cp.douchette.sansNum') }), 'ok');
-      const q = l.site === 'vestiaire' ? `?tab=ventes&site=vestiaire&cible=vcvente&vc=${encodeURIComponent(l.vc || '')}` : `?tab=ventes&site=vinted&cible=vente&tx=${encodeURIComponent(l.tx)}`;
+      // eBay : SA commande dans eBay → Ventes (`DEMANDE_EBAY_CIBLE`, le chemin de « Gérer sur eBay ») ;
+      // Leboncoin : SA carte dans Ventes · Leboncoin (`cible=lbcvente`, par SON n° de transaction).
+      if (l.site === 'ebay') { DEMANDE_EBAY_CIBLE.compte = l.compte || null; DEMANDE_EBAY_CIBLE.id = l.orderId; DEMANDE_EBAY_CIBLE.at = Date.now(); if (onNav) onNav('ebay_ventes'); return; }
+      const q = l.site === 'vestiaire' ? `?tab=ventes&site=vestiaire&cible=vcvente&vc=${encodeURIComponent(l.vc || '')}` : l.site === 'leboncoin' ? `?tab=ventes&site=leboncoin&cible=lbcvente&tx=${encodeURIComponent(l.tx)}` : `?tab=ventes&site=vinted&cible=vente&tx=${encodeURIComponent(l.tx)}`;
       try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: q })); } catch (_) {}
       return;
     }
@@ -46536,21 +46922,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (10 nov., lot L) « Calculette » : ouvre la calculette d'achat (elle n'écrit rien).
   const boutonCalculette = <Bouton variante="secondaire" icone="euro" data-achats-calculette="" onClick={() => { try { window.dispatchEvent(new Event('vrm:calculette')); } catch (_) {} }}>Calculette</Bouton>;
   // (16 nov., lot relier-glisser) « Relier en glissant » depuis Achats.
-  const boutonGlisser = <Bouton variante="secondaire" icone="link" data-glisser-ouvrir="achats" onClick={ouvrirGlisser}>{tr('glisser.entree')}</Bouton>;
+  const boutonGlisser = <Bouton variante="secondaire" icone="link" data-glisser-ouvrir="achats" onClick={()=>ouvrirGlisser()}>{tr('glisser.entree')}</Bouton>;
   const gestesRetraitAchats = pickupUnion.total > 0
     ? <div className="vrm-achats-gestes" data-achats-gestes="" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>{boutonScanRetrait}
         <Bouton variante="secondaire" icone="qr" data-relais-ouvrir={pickupUnion.total} data-achats-relais="" aria-label="Mode relais : les codes de retrait en très grand" onClick={() => setRelaisOuvert(true)}>Mode relais</Bouton></div>
     : boutonScanRetrait;
   const ouvrirLot = () => {
-    const L = lignesLotTous();
+    const L = lignesLotImpression();
     if (!L.length) { toast('Aucun bordereau prêt à imprimer pour l\'instant.'); return; }
-    setProgressionLot(null);setLot({ lignes:L,verifications:{},coches:cochesParDefaut(L),echecs:[] });
+    // (16 nov.) Les retours entrent dans « Choisir » avec LEUR coche (celle de l'écran), dans leur section.
+    const R = L.filter(estRetour), cR = new Set(retoursChoisis(R).map((l) => l.cle));
+    setProgressionLot(null);setLot({ lignes:L,verifications:{},coches:new Set([...cochesParDefaut(L.filter((l) => !estRetour(l)))].concat([...cR])),echecs:[] });
   };
   // (14 nov., impression-simple) L'ancien moteur « Tout imprimer » (feuille en trois temps, « Place du tampon » qui
   // s'ouvrait seule, panneau de suivi par-dessus) est remplacé par `imprimerLot` (plus bas) : le PDF préparé
   // d'avance, ouvert DANS le toucher. Les appelants d'avant (« Imprimer » des actions en série) passent par lui ;
   // il dit lui-même ce qui manque (feuille d'après), la garde des N° (§5) comprise.
-  const batchBordereaux = async (cles) => { imprimerLotRef.current && imprimerLotRef.current(cles instanceof Set ? cles : null); };
+  // (16 nov.) Une sélection de VENTES (actions en série) n'emporte aucun retour.
+  const batchBordereaux = async (cles) => { imprimerLotRef.current && imprimerLotRef.current(cles instanceof Set ? cles : null, cles instanceof Set ? { retours: new Set() } : {}); };
   const imprimerLotRef = React.useRef(null);
   // Deep-link « Tout imprimer » depuis l'extension (?print=bord) : dès que les
   // bordereaux sont chargés, on lance l'impression groupée une seule fois.
@@ -46601,6 +46990,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // La garde du §5 reste : un N° « à vérifier » ou porté par deux fiches DEMANDE d'abord (`numerosDemandent`,
   // la même règle que `confirmerNumerosAVerifier`) — le PDF s'ouvre alors après sa réponse. Rien n'est caché :
   // un bordereau qui manque au PDF est NOMMÉ dans la feuille d'après, avec sa raison.
+  const [apercuImpr, setApercuImpr] = useState(null);   // (16 nov.) l'aperçu avant impression : { choisies, format, tampons, places, tous, sig }
+  const apercuRef = React.useRef(null); apercuRef.current = apercuImpr;
   const [imprEtat, setImprEtat] = useState(null);       // la feuille d'après : { res, sig, voie, etape, manque, corrige, absents, tamponCorrige }
   const [choixPapier, setChoixPapier] = useState(null); // { puis: null | [cles] } — la question du papier
   const imprAccRef = React.useRef(null);   // la pilule « pendant » de l'impression en cours (accompagner)
@@ -46631,6 +47022,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const b64 = Array.isArray(j) && j[0] && j[0].b64;
       if (!Array.isArray(j)) raison = 'pasLu'; else if (!b64) raison = 'sansPdf';
       if (b64) { try { buf = b64ToBytes(b64); } catch (_) { buf = null; raison = 'illisible'; } }
+    } else if (l.site === 'retour') {
+      // (16 nov.) Un bordereau de RETOUR : SON PDF, par SON n° (`email_bordretour_{tx}`), ou le corps gardé.
+      if (l.pdfGarde) { try { buf = b64ToBytes(l.pdfGarde); } catch (_) { buf = null; raison = 'retourIllisible'; } }
+      else { const lu = await lirePdfLigne(`email_bordretour_${l.tx}`); if (lu === null) raison = 'pasLu'; else if (!lu.octets) raison = 'retourSansPdf'; else buf = lu.octets; }
     } else if (l.site === 'leboncoin' && !l.pdf) {
       raison = 'sansPdf';
     } else if (l.site === 'leboncoin') {
@@ -46643,24 +47038,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   // Composer UN lot : lire les octets, tamponner (jamais la feuille « Place du tampon » toute seule : la place
   // gardée, sinon la place automatique), mettre à la suite. Rien n'est ouvert ici.
-  const composerLot = async (lignes, format, tampons, { apercu = false, pas = null } = {}) => {
+  // (16 nov., lot tampons-parametres) `places` : { [cle]: { n, m } } posées dans l'aperçu avant impression.
+  const composerLot = async (lignes, format, tampons, { apercu = false, pas = null, places = null } = {}) => {
     const items = [], raisons = {};
     for (const [i, l] of lignes.entries()) {
       const o = await lireOctetsLigne(l);
       if (pas) pas(i + 1);
       if (!o.buf) { raisons[l.cle] = o.raison; continue; }
-      items.push({ numero: l.num || '', title: l.titre || '', pdfBuf: o.buf, invBytes: o.invBytes, cle: l.cle, site: l.site, ligne: l, tampon: TAMPONS_IMPR.includes((tampons || {})[l.cle]) ? tampons[l.cle] : null });
+      items.push({ numero: l.num || '', title: l.titre || '', pdfBuf: o.buf, invBytes: o.invBytes, cle: l.cle, site: l.site, ligne: l, retour: estRetour(l), tampon: !estRetour(l) && TAMPONS_IMPR.includes((tampons || {})[l.cle]) ? tampons[l.cle] : null, places: places && places[l.cle] ? places[l.cle] : null });
     }
     if (!items.length) return { vide: true, raisons, lignes };
     const r = await composerBordereaux(items, (w, h) => posForFormat(w, h, false), { imprimante: format, apercu });
-    (r.rates || []).forEach((i) => { raisons[items[i].cle] = 'illisible'; });
+    (r.rates || []).forEach((i) => { raisons[items[i].cle] = items[i].retour ? 'retourIllisible' : 'illisible'; });
     const reussies = (r.reussis || []).map((i) => items[i].cle);
     const url = URL.createObjectURL(new Blob([r.bytes], { type: 'application/pdf' }));
     return { ...r, url, items: items.map((it) => ({ ...it, pdfBuf: null, invBytes: null })), raisons, lignes, reussies, owner: AUTH.user?.id || null };
   };
   // La signature compte AUSSI ce qui change le PDF hors des lignes : les places de tampon gardées (« Toujours ici ») et le
   // réglage d'impression (papier thermique, contenu du tampon) — un PDF préparé avant un de ces changements n'est plus le bon.
-  const empreinteReglagesImpr = () => { let h = 5381; const t = (() => { try { return JSON.stringify([positionsTampon(), reglageImpressionChoisi()]); } catch (_) { return ''; } })(); for (let i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0; return h.toString(36); };
+  const empreinteReglagesImpr = () => { let h = 5381; const t = (() => { try { return JSON.stringify([aEcrire(reglageTamponsChoisi()), reglageImpressionChoisi()]); } catch (_) { return ''; } })(); for (let i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0; return h.toString(36); };
   const sigImpr = (lignes, format, tampons) => `${AUTH.user?.id || ''}#${empreinteReglagesImpr()}#` + signatureLot({ lignes, sig: sigLigneLot, format, tampons });
   const preparer = (sig, fabrique) => {
     const m = prepsRef.current;
@@ -46721,6 +47117,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (vinted.length) setBordsPrinted((prev) => { const u = { ...prev }; const at = new Date().toISOString(); vinted.forEach((k) => { u[k] = at; }); save('vinted_bords_printed', u); return u; });
     noterImprimeSansNum(its.filter((it) => it.site === 'vinted' && !String(it.numero || '').trim()).map((it) => it.ligne && it.ligne.e && it.ligne.e.txn));
     its.filter((it) => it.site === 'vestiaire').forEach((it) => { try { marquerVc('vrm_vc_imprimes', it.ligne.v.id, true); } catch (_) {} });
+    // (16 nov.) Un retour imprimé n'est plus coché d'office (sur cet appareil) ; il reste choisissable pour réimprimer.
+    const rets = its.filter((it) => it.retour).map((it) => String(it.cle));
+    if (rets.length) { try { const u = { ...(load('vrm_retours_imprimes', {}) || {}) }; const at = new Date().toISOString(); rets.forEach((k) => { u[k] = at; }); save('vrm_retours_imprimes', u); } catch (_) {} }
     signalerBordereauImprime(true, null);
   };
   const montrerApres = (res, voie, sig, garder = {}) => {
@@ -46728,28 +47127,98 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     setImprEtat({ res, sig, voie, etape: 'question', manque: new Set(), corrige: null, tamponCorrige: '', absents: absentsDuLot(res.lignes, res.reussies, res.raisons), ...garder });
   };
   // LE TOUCHER. `cles` : une sélection (feuille « Choisir »), sinon ce qui part d'office.
-  const imprimerLot = (cles = null) => {
+  // (16 nov., lot impression-retours) `opts.retours` : les retours choisis (un Set de clés `r:…`) ; absent ⇒ ceux
+  // cochés à l'écran (d'office : tous ceux à déposer pas encore imprimés). Ils suivent les ventes dans le PDF.
+  const imprimerLot = (cles = null, opts = {}) => {
     if (imprBusy) return;
     // Le papier, UNE fois : jamais choisi (ni ici, ni dans Réglages, ni sur un autre appareil) ⇒ la question ; le
     // toucher sur un papier imprime aussitôt (2 touchers la première fois, 1 ensuite).
-    if (isCloudReady() && !imprTouchee.current && formatRetenu(load('vrm_imprimante', null)) == null) { setChoixPapier({ puis: cles ? [...cles] : [] }); return; }
-    lancerImpression(cles, formatLot);
+    if (isCloudReady() && !imprTouchee.current && formatRetenu(load('vrm_imprimante', null)) == null) { setChoixPapier({ puis: cles ? [...cles] : [], retours: opts.retours instanceof Set ? [...opts.retours] : null }); return; }
+    lancerImpression(cles, formatLot, tamponsPerso, opts);
   };
-  const lancerImpression = (cles, format, tampons = tamponsPerso) => {
+  // (16 nov., lot tampons-parametres — Julien : « je sélectionne ce que je veux imprimer, et après ça m'ouvre une
+  // vignette […] le N° / le tamponnage je peux le régler là où je veux ; et quand je touche Imprimer, les réglages sont
+  // appliqués aux bordereaux ») LA SÉLECTION OUVRE L'APERÇU AVANT IMPRESSION : chaque bordereau choisi en vignette,
+  // tamponné par le vrai code ; il y déplace le N° ou la mention ; RIEN ne part avant « Imprimer » (`imprimerApercu`).
+  // Le PDF de l'aperçu est celui qui s'ouvre : sa signature compte les places posées (`sigAvecPlaces`).
+  const sigAvecPlaces = (sig, places) => (places && Object.keys(places).length ? `${sig}#places:${JSON.stringify(places)}` : sig);
+  const lancerImpression = (cles, format, tampons = tamponsPerso, { retours = null } = {}) => {
     const L = lignesLotTous();
-    const voulues = cles ? (cles instanceof Set ? cles : new Set(cles)) : null;
-    const choisies = selectionImprimable(L, voulues || cochesParDefaut(L));
+    const voulues0 = cles ? (cles instanceof Set ? cles : new Set(cles)) : null;
+    const voulues = voulues0 ? new Set([...voulues0].filter((c) => !String(c).startsWith('r:'))) : null;
+    const choisiesV = selectionImprimable(L, voulues || cochesParDefaut(L));
+    const choisies = [...choisiesV, ...retoursChoisis(lignesRetoursImpr(), retours instanceof Set ? retours : Array.isArray(retours) ? new Set(retours) : null)];
     if (!choisies.length) { toast(tr('impr.rien')); return; }
-    if (voulues) { const dispo = new Set(choisies.map((l) => l.cle)); const partis = [...voulues].filter((c) => !dispo.has(c)); if (partis.length) { toast(tr('impr.disparus', { n: partis.length })); return; } }
+    if (voulues) { const dispo = new Set(choisiesV.map((l) => l.cle)); const partis = [...voulues].filter((c) => !dispo.has(c)); if (partis.length) { toast(tr('impr.disparus', { n: partis.length })); return; } }
     const sig = sigImpr(choisies, format, tampons);
-    const numeros = choisies.map((l) => l.num);
+    // La lecture des PDF se voit (« Préparation… 1/3 », `imprBusy`) ; une panne est DITE avec « Réessayer » (la même
+    // sélection, l'aperçu rouvert) ; rien choisi n'est lisible : dit ; le compte change pendant la lecture : rien.
+    const proprio = AUTH.user?.id || null, total = choisies.length;
+    const acc = accompagner('colis.imprimer', { total, arretable: false }).pendant(0);
+    imprAccRef.current = acc;
+    setImprBusy({ fait: 0, total });
+    const e = preparer(sig, () => composerLot(choisies, format, tampons, { pas: (f) => setImprBusy({ fait: f, total }) }));
+    setApercuImpr({ choisies, format, tampons, places: {}, tous: true, sig, proprio });
+    const reessayer = () => lancerImpression(cles, format, tampons, { retours });
+    Promise.resolve(e.promesse).then(() => {
+      const ouvert = apercuRef.current && apercuRef.current.sig === sig;
+      if ((AUTH.user?.id || null) !== proprio) { setApercuImpr(null); acc.echec({ message: tr('impr.change') }); return; }
+      if (e.etat === 'echec') { setApercuImpr(null); acc.echec(e.err || new Error('PDF'), { reessayer }); return; }
+      if (e.etat === 'vide') {
+        setApercuImpr(null);
+        const toutPasLu = e.res && e.res.raisons && Object.values(e.res.raisons).every((r) => r === 'pasLu');
+        if (toutPasLu && prepsRef.current.get(sig) === e) prepsRef.current.delete(sig);
+        acc.echec(toutPasLu ? { acc: 'serveur' } : { message: tr('impr.vide') }, { reessayer: toutPasLu ? reessayer : null });
+        return;
+      }
+      if (ouvert || !apercuRef.current) acc.oublier();
+    }).finally(() => { setImprBusy(null); if (imprAccRef.current === acc) imprAccRef.current = null; });
+  };
+  // « Imprimer » DE L'APERÇU : le PDF fait avec EXACTEMENT ces placements (prêt ⇒ ouvert dans le geste, §5 tenu).
+  const imprimerApercu = () => {
+    const a = apercuRef.current; if (!a || imprBusy) return;
+    const { choisies, format, tampons, places } = a;
+    // LE PDF que l'aperçu montre (sa signature, posée au dernier geste) : pas une signature recalculée — un réglage écrit
+    // un instant après (`save`) la changerait, et le PDF prêt ne serait plus reconnu (au téléphone, plus rien ne s'ouvrirait
+    // dans le geste).
+    const sig = a.sig || sigAvecPlaces(sigImpr(choisies, format, tampons), places);
+    const numeros = choisies.flatMap(numerosDeLigne);
     const pret = pretPour(sig);
+    setApercuImpr(null);
+    // Le compte VRM ou un bordereau a changé depuis l'aperçu : rien ne s'ouvre (comme le chemin d'attente).
+    const maintenant = new Map(lignesLotImpression().map((l) => [l.cle, sigLigneLot(l)]));
+    if ((a.proprio !== undefined && (AUTH.user?.id || null) !== a.proprio) || choisies.some((l) => maintenant.get(l.cle) !== sigLigneLot(l))) { toast(tr('impr.change')); return; }
     // Le chemin du geste : prêt, aucune question due (§5), version des N° relue il y a moins d'une minute.
     if (pret && !numerosDemandent(numeros) && (!numeros.some(Boolean) || versionFraiche())) {
       montrerApres(pret, ouvrirPdfLot(pret, { titre: tr('impr.titrePdf') }), sig);
       return;
     }
-    attendrePuisOuvrir(sig, choisies, numeros, () => composerLot(choisies, format, tampons, { pas: (f) => setImprBusy({ fait: f, total: choisies.length }) }));
+    attendrePuisOuvrir(sig, choisies, numeros, () => composerLot(choisies, format, tampons, { places, pas: (f) => setImprBusy({ fait: f, total: choisies.length }) }));
+  };
+  // Un tampon posé sur une vignette : pour CE bordereau (cette fois) et, « tous de ce type » coché, gardé pour la forme.
+  const poserApercu = (cle, quoi, b, pose, facteur = 1) => {
+    const a = apercuRef.current; if (!a) return;
+    const v = (pose.place && pose.place.v) || 0;
+    const place = quoi === 'n' ? { vx: b.x / pose.W, vy: b.y / pose.H, vw: Math.min(1, b.w / pose.W), v } : { vx: b.x / pose.W, vy: b.y / pose.H, vw: Math.min(1, b.w / pose.W) };
+    let tampons = a.tampons;
+    if (a.tous) {
+      let r = reglageTamponsChoisi();
+      if (quoi === 'm' && facteur !== 1) { const rs = resoudreTampon(r, { famille: (a.familles || {})[cle] || 'autre', thermique: imprMode(a.format) !== 'normale' }); const k = TAILLES_TAMPON[rs.texteMention] * facteur; r = avecChoix(r, 'tous', { texteMention: Object.keys(TAILLES_TAMPON).reduce((x, c) => (Math.abs(TAILLES_TAMPON[c] - k) < Math.abs(TAILLES_TAMPON[x] - k) ? c : x), 'M') }); }
+      ecrireReglageTampons(avecPlace(r, pose.cle, quoi, place));
+    }
+    const places = { ...a.places, [cle]: { ...(a.places[cle] || {}), [quoi]: place } };
+    const sig = sigAvecPlaces(sigImpr(a.choisies, a.format, tampons), places);
+    preparer(sig, () => composerLot(a.choisies, a.format, tampons, { places }));
+    setApercuImpr({ ...a, places, sig });
+  };
+  // « Revenir à la place d'origine » : la place de VRM pour ce tampon (et, « tous » coché, pour sa forme).
+  const origineApercu = (cle, quoi, pose) => {
+    const a = apercuRef.current; if (!a) return;
+    if (a.tous) ecrireReglageTampons(avecPlace(reglageTamponsChoisi(), pose.cle, quoi, null));
+    const places = { ...a.places, [cle]: { ...(a.places[cle] || {}), [quoi]: null } };
+    const sig = sigAvecPlaces(sigImpr(a.choisies, a.format, a.tampons), places);
+    preparer(sig, () => composerLot(a.choisies, a.format, a.tampons, { places }));
+    setApercuImpr({ ...a, places, sig });
   };
   // Le chemin d'attente (pas prêt, ou une question due) : la question d'abord, puis le PDF — la visionneuse sur
   // ordinateur (l'impression part seule), « Ouvrir le PDF » sur téléphone (SON toucher ouvre).
@@ -46776,7 +47245,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         if (e.etat === 'vide') { libererOngletPdf(); const toutPasLu = e.res && e.res.raisons && Object.values(e.res.raisons).every((r) => r === 'pasLu'); if (toutPasLu && prepsRef.current.get(sig) === e) prepsRef.current.delete(sig); acc.echec(toutPasLu ? { acc: 'serveur' } : { message: tr('impr.vide') }, { reessayer: toutPasLu ? reessayer : null }); return; }
         if (e.etat !== 'pret') throw (e.err || new Error('PDF'));
         // Rien n'a bougé pendant l'attente (le N°, l'état, le compte de chaque bordereau) : sinon rien ne s'ouvre.
-        const maintenant = new Map(lignesLotTous().map((l) => [l.cle, sigLigneLot(l)]));
+        const maintenant = new Map(lignesLotImpression().map((l) => [l.cle, sigLigneLot(l)]));
         if (choisies.some((l) => maintenant.get(l.cle) !== sigLigneLot(l))) throw new Error(tr('impr.change'));
         acc.oublier();
         montrerApres(e.res, mobile ? 'bouton' : ouvrirPdfLot(e.res, { geste: false, titre: tr('impr.titrePdf') }), sig, garder);
@@ -46826,15 +47295,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const reimprimerUn = (cle) => {
     const s = imprEtatRef.current; const l = s && ligneDe(s, cle); if (!l) return;
     const t = s.tamponCorrige, sg = sigUn(s, cle, t), pret = pretPour(sg);
-    if (pret && !numerosDemandent([l.num]) && (!l.num || versionFraiche())) { montrerApres(pret, ouvrirPdfLot(pret, { titre: tr('impr.titrePdf') }), sg); return; }
+    if (pret && !numerosDemandent(numerosDeLigne(l)) && (!l.num || versionFraiche())) { montrerApres(pret, ouvrirPdfLot(pret, { titre: tr('impr.titrePdf') }), sg); return; }
     const format = s.res.mode || formatLot;
-    attendrePuisOuvrir(sg, [l], [l.num], () => composerLot([l], format, { [cle]: t }));
+    attendrePuisOuvrir(sg, [l], numerosDeLigne(l), () => composerLot([l], format, { [cle]: t }));
   };
   // « Déplacer le tampon » : la feuille « Place du tampon » pour CE bordereau seulement (sur sa demande).
   const deplacerTamponUn = (cle) => {
     const s = imprEtatRef.current; const l = s && ligneDe(s, cle); if (!l) return;
     const format = s.res.mode || formatLot, t = s.tamponCorrige || (tamponsPerso[cle] || '');
-    attendrePuisOuvrir(`${sigImpr([l], format, { [cle]: t })}#place:${Date.now()}`, [l], [l.num], () => composerLot([l], format, t ? { [cle]: t } : {}, { apercu: 'force' }));
+    attendrePuisOuvrir(`${sigImpr([l], format, { [cle]: t })}#place:${Date.now()}`, [l], numerosDeLigne(l), () => composerLot([l], format, t ? { [cle]: t } : {}, { apercu: 'force' }));
   };
   const corrigerUn = (cle) => setImprEtat((x) => x ? { ...x, corrige: x.corrige === cle ? null : cle, tamponCorrige: x.corrige === cle ? '' : (tamponsPerso[cle] || '') } : x);
   const fermerApres = (dire = true) => {
@@ -46845,7 +47314,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const choisirPapier = (f) => {
     const c = choixPapier; setChoixPapier(null);
     choisirImprimante(f);
-    if (c && c.puis) lancerImpression(c.puis.length ? new Set(c.puis) : null, imprMode(f));
+    if (c && c.puis) lancerImpression(c.puis.length ? new Set(c.puis) : null, imprMode(f), tamponsPerso, { retours: Array.isArray(c.retours) ? new Set(c.retours) : null });
   };
   imprimerLotRef.current = imprimerLot;
   // « Déplacer le tampon » (depuis « Bordereau prêt ») : l'aperçu s'ouvre toujours.
@@ -47198,11 +47667,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // `su` date la TRANSACTION (paiement, finalisation), pas le colis : jamais l'heure du statut d'expédition.
     return { texte: e.ss || '', at: null, cap, luAt: cap, finalisee, retour: e.s === 440 };
   };
-  const raisonPasLuVente = (carrier, tr) => {
+  // (16 nov., lot transporteurs-suivi) Mondial Relay se lit aussi pour un colis VENDU : le code postal du point est
+  // LU sur SON étiquette et prouvé par l'écho de Mondial Relay (api/_lib/depart-colis.js `cpDepartMr`). Ne le dit
+  // « pas lisible » que la ligne `depart_` qui l'a constaté (étiquette lue, chaque code postal refusé ou aucun écrit).
+  const raisonPasLuVente = (carrier, tr, dep) => {
     const nom = (tr && tr.nom) || (carrier ? nomTransporteur(carrier) : '');
-    if (carrier === 'mondialrelay' || /mondial|inpost/i.test(String((tr && (tr.cle || tr.nom)) || ''))) return 'Mondial Relay ne se lit pas pour un colis vendu. Vinted et les e-mails font foi.';
-    if (carrier === 'chronopost' || carrier === 'vinted') return `Pas encore lu chez ${nomTransporteur(carrier)}.`;
-    return nom ? `${nom} ne se lit pas ici. Vinted et les e-mails font foi.` : 'Transporteur pas encore connu.';
+    const estMr = carrier === 'mondialrelay' || /mondial|inpost/i.test(String((tr && (tr.cle || tr.nom)) || ''));
+    if (estMr && dep && dep.carrier === 'mondialrelay' && mrSansCodePostal(dep)) return trT('suiviVente.mrSansCp');
+    if (estMr) return trT('suiviVente.pasEncoreLu', { nom: 'Mondial Relay' });
+    if (carrier === 'chronopost' || carrier === 'vinted') return trT('suiviVente.pasEncoreLu', { nom: nomTransporteur(carrier) });
+    const nl = carrierNonLu((tr && (tr.cle || tr.nom)) || carrier || '');
+    return nom ? trT('suiviVente.nonLu', { nom }) : trT('suiviVente.inconnu');
   };
   const suiviVente = (x) => {
     const su = normaliserSuivi((x && x.b && x.b.suivi) || (x && x.v && x.v.suivi) || '');
@@ -47221,7 +47696,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const enCours = estEnCours({ transporteur: dep, finalisee: !!(vt && vt.finalisee) });
     const carrier = (dep && dep.carrier) || carrierLisible((x.tr && (x.tr.cle || x.tr.nom)) || '', su) || '';
     const lien = lienPublic(lienSuivi, (x.tr && (x.tr.cle || x.tr.nom)) || carrier, su);
-    return { su, dep, statut, inc, enCours, lien, raison: statut ? '' : raisonPasLuVente(carrier, x.tr) };
+    return { su, dep, statut, inc, enCours, lien, raison: statut ? '' : raisonPasLuVente(carrier, x.tr, dep) };
   };
   const suiviAchat = (o, su, carrier) => {
     const k = normaliserSuivi(su); if (!k) return null;
@@ -50799,7 +51274,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {/* (8 nov.) Le bordereau reçu par e-mail porte le MÊME n° de transaction : il s'imprime
                       tout de suite, avec le N° seulement s'il est sûr (src/bordereauVenteEmail.js). */}
                   {toShipEmailTx.has(txL) ? <div className="vrm-rangee-bord" data-rangee-bord="" data-sans-glisse="" data-vente-email-bord={txL}>
-                    <button type="button" className="vrm-fu-imprimer-ligne" data-fu-geste="" data-fu-imprimer={txL} data-fu-imprimer-num={num || ''} aria-label={`Imprimer le bordereau${num ? ' du N°' + num : ''}`} title={tr('ventes.imprimerBordereau')} onClick={()=>imprimerBordereauVente(o)}><Icon name="printer" size={16}/><span>{tr('ventes.imprimer')}</span></button>
+                    <button type="button" className="vrm-fu-imprimer-ligne" data-fu-geste="" data-fu-imprimer={txL} data-fu-imprimer-num={num || ''} aria-label={`Imprimer le bordereau${num ? ' du N°' + num : ''}`} title={tr('ventes.imprimerBordereau')} onClick={(ev)=>occuperPendant(ev.currentTarget, ()=>imprimerBordereauVente(o))}><Icon name="printer" size={16}/><span>{tr('ventes.imprimer')}</span></button>
                   </div> : null}
                   {toShipEmailTx.has(txL) && (!num || bordsSansNum[txL]) ? <div data-vente-sans-num={num ? 'avec' : 'sans'} data-sans-glisse="" style={{fontSize:12,fontWeight:600,color:C.warn,overflowWrap:'anywhere'}}>{phraseImprimeSansNumero(bordsSansNum, txL, num) || MENTION_SANS_NUM}</div> : null}
                 </> : peutDeposer ? <>
@@ -50808,7 +51283,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       « Générer le bordereau », l'extension) ; « Déposé » vient après. */}
                   <div className="vrm-rangee-bord" data-rangee-bord="" data-sans-glisse="">
                     {fuPdf
-                      ? <button type="button" className="vrm-fu-imprimer-ligne" data-fu-geste="" data-fu-imprimer={txL} aria-label={`Imprimer le bordereau${num ? ' du N°' + num : ''}`} title={tr('ventes.imprimerBordereau')} onClick={()=>imprimerBordereauVente(o)}><Icon name="printer" size={16}/><span>{tr('ventes.imprimer')}</span></button>
+                      ? <button type="button" className="vrm-fu-imprimer-ligne" data-fu-geste="" data-fu-imprimer={txL} aria-label={`Imprimer le bordereau${num ? ' du N°' + num : ''}`} title={tr('ventes.imprimerBordereau')} onClick={(ev)=>occuperPendant(ev.currentTarget, ()=>imprimerBordereauVente(o))}><Icon name="printer" size={16}/><span>{tr('ventes.imprimer')}</span></button>
                       : <BoutonBordereau grand uid={o._acc && o._acc.vinted_user_id} tx={txL} conv={o.conversation_id} login={accNameOf(o._acc)} aGenerer pdf={false} onFait={(u)=>actionsVentesProxy.rechargerLabels(u)}/>}
                   </div>
                   {gesteDepose ? <div className="vrm-fu-apres" data-sans-glisse="">{gesteDepose}</div> : null}
@@ -52509,6 +52984,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const item = { display:'flex',alignItems:'center',gap:10,width:'100%',textAlign:'left',border:'none',background:'transparent',color:C.text,fontSize:15,fontWeight:600,padding:'0 14px',minHeight:44,cursor:'pointer',fontFamily:'inherit',textDecoration:'none',boxSizing:'border-box' };
                 const close = () => setAchatMenu(null);
                 const itemsMenu = (<>
+                    {/* (17 nov., Julien : « quand je fais les trois petits points, ça ne me propose pas de relier ») Un achat LIBRE
+                        (pas annulé, ni en retour / litige, ni relié) : « Relier à une vente / annonce » ouvre le mode Relier, cet achat
+                        déjà choisi (bandeau fixe) — un toucher sur la vente ou l'annonce, puis « Oui ». */}
+                    {!cancelled && (numA == null || numA === '') && !linkedBuyIds.has(String(o.transaction_id)) && !achatHorsRelier(o, achatsHorsRelierRes) ? <button type="button" role="menuitem" data-achat-relier={tid} style={item} onClick={()=>{ close(); ouvrirGlisser({ achat: String(o.transaction_id) }); }}><Icon name="link" size={15} style={{color:C.muted}}/>{tr('achats.relierA')}</button> : null}
                     {peutCode && <button type="button" role="menuitem" className="vrm-buy-menu-tel" style={item} onClick={()=>{ close(); openQrView(tk); }}><Icon name="key" size={15} style={{color:C.muted}}/>{tr('achats.codeRetrait')}</button>}
                     {peutSuivre && <a role="menuitem" className="vrm-buy-menu-tel" href={trackUrl(tk.carrier||'', suivi)} target="_blank" rel="noreferrer" style={item} onClick={close}><Icon name="truck" size={15} style={{color:C.muted}}/>{tr('achats.suivreColis2')}</a>}
                     {arrive && <button type="button" role="menuitem" data-copier-prix={prixPaye} style={item} onClick={async ()=>{ close(); try { await navigator.clipboard.writeText(prixPaye); toast(tr('achats.prixPayeCopie', { prixPaye: String(prixPaye) })); } catch(_) { toast(tr('suivi.journal.pasCopie'),'error'); } }}><Icon name="cash" size={15} style={{color:C.muted}}/>{tr('achats.copierPrixPaye')}</button>}
@@ -53107,7 +53586,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         ) : annSort==='sansachat' ? (
           <AchatsARelier file={fileAchat} achats={fillBuyAchats.loading && !fillBuyAchats.items ? undefined : (fillBuyAchats.items || (accounts.length ? undefined : []))} liens={liensAchats}
             vendus={fileVendus} liaison={liaison} onRelierVente={relierAchatVente} onRelierSerie={relierAchatAnnonceSerie} onChoisirVente={choisirAchatVente} onRefus={refuserLiaison}
-            propositionDe={propositionSuggestion} onRelier={relierAchatAnnonce} onSaisir={saisirPrixAnnonce} onPlusTard={poserAchatPlusTard} onSerie={()=>setFillBuyOpen(true)} onGlisser={ouvrirGlisser}
+            propositionDe={propositionSuggestion} onRelier={relierAchatAnnonce} onSaisir={saisirPrixAnnonce} onPlusTard={poserAchatPlusTard} onSerie={()=>setFillBuyOpen(true)} onGlisser={()=>ouvrirGlisser()}
             onChoisir={(it, propose)=>openPicker({ ...it, _autre: propose ? String(propose.transaction_id || '1') : undefined, _dateRef: (()=>{ const t=Number(it.createdTs); return Number.isFinite(t)&&t>0 ? new Date(t<1e12?t*1000:t).toISOString() : null; })() })} compteDe={(a)=>a&&a._acc?accNameOf(a._acc):''}/>
         ) : annSort==='acompleter' ? (
           <VueACompleter Photo={PhotoVinted} res={annACompleter} onBrouillon={(id)=>setAtelier(String(id))} onPrixAchat={(id)=>{ const it=(listings.items||[]).find(x=>x&&String(x.id)===String(id)); if (it) saisirPrixAnnonce(it); }}/>
@@ -53892,7 +54371,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           part Vinted des fils est VIDE (rien à lire), pas « Lecture… » à l'infini. */}
       {curSub==='messages' && filTous && <NoAcc/>}
       {curSub==='messages' && filTous && <FilsTous
-        vinted={noAcc ? [] : convs.items==null ? (convs.error ? null : undefined) : (convs.items||[]).filter(c=>{ const u=String((c._acc&&c._acc.vinted_user_id)||''); return accountUids.has(u)&&!acctOffOf(c)&&!conversationRetiree(convRetirees,u,c); }).map(c=>{ const u=String(c._acc.vinted_user_id); const o=offresConv instanceof Map ? (offresConv.get(`${u}_${c.id}`) || null) : null; const oo=o&&offresConfirmees.current.has(cleOffreVinted(u,o))?null:offreOuverte(o,u,lectureOffres); return { c, paire: paireDeConv(u, c.id, null), compte: accName(c._acc), offre: oo }; })}
+        vinted={noAcc ? [] : convs.items==null ? (convs.error ? null : undefined) : (convs.items||[]).filter(c=>{ const u=String((c._acc&&c._acc.vinted_user_id)||''); return accountUids.has(u)&&!acctOffOf(c)&&!conversationRetiree(convRetirees,u,c); }).map(c=>{ const u=String(c._acc.vinted_user_id); const o=offresConv instanceof Map ? (offresConv.get(`${u}_${c.id}`) || null) : null; const oo=o&&offresConfirmees.current.has(cleOffreVinted(u,o))?null:offreOuverte(o,u,lectureOffres); const paire=paireDeConv(u, c.id, null); /* (16 nov., anti-arnaque) le dernier message du FIL capté, auteur PROUVÉ — la même règle que la liste Vinted (motifConv) */ const ex=extraitConversation(c, paire&&paire.r, paire&&paire.titre, normTitle); const dernier = ex.kind==='message' && ex.source==='fil' && !ex.vinted && (ex.de==='eux'||ex.de==='toi') ? { texte: ex.texte, deMoi: ex.de==='toi' } : null; return { c, paire, compte: accName(c._acc), offre: oo, dernier }; })}
         compteOnglet={compteConnecte}
         vintedOuvert={openConv ? String(openConv.acc?.vinted_user_id||'')+':'+String(openConv.convId) : ''}
         ouvrirVinted={(c)=>openConversation(c)} fermerVinted={()=>setOpenConv(null)} rendreVinted={()=>rendreConversation()}
@@ -54263,10 +54742,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // (`resumeLot`). Avant : toutes les lignes du lot ⇒ « Tout imprimer (15) » ouvrait « Imprimer (6) ».
           const Ltous = lignesLotTous(), resLot = resumeLot(Ltous), nLot = resLot.partent;
           // (14 nov., impression-simple) Le lot d'office et sa signature, pour la préparation d'avance (`lotDefautRef`).
-          const lotD = colisDans !== 'achats' ? selectionImprimable(Ltous, cochesParDefaut(Ltous)) : [];
+          // (16 nov., lot impression-retours) Les retours cochés suivent les ventes dans le PDF d'office ; ils ne
+          // changent NI `nLot` (ventes) NI « à envoyer » : leur compteur à part, `nRetLot` (« + N retours »).
+          const Lret = colisDans !== 'achats' ? lignesRetoursImpr() : [];
+          const retDef = retoursChoisis(Lret), nRetLot = retDef.length, nImpr = nLot + nRetLot;
+          const lotD = colisDans !== 'achats' ? [...selectionImprimable(Ltous, cochesParDefaut(Ltous)), ...retDef] : [];
           const sigDefaut = lotD.length ? sigImpr(lotD, formatLot, tamponsPerso) : '';
           lotDefautRef.current = { lignes: lotD, sig: sigDefaut };
-          vvLotRef.current = { Ltous, resLot, nLot, sigDefaut, lignesImpr };
+          vvLotRef.current = { Ltous, resLot, nLot, sigDefaut, lignesImpr, Lret, nRetLot };
           // (1er nov., capture de Julien : « Vestiaire » absent de Colis alors
           // qu'il y a un compte) Même règle que les filtres d'Annonces, Ventes,
           // Messages et que la rangée de Colis · Leboncoin : un site où il a un
@@ -54555,10 +55038,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {colisDans === 'achats' ? null : <>
                   {/* (14 nov., impression-simple) « Imprimer (N) » IMPRIME : le PDF du lot (préparé d'avance) s'ouvre dans
                       CE toucher. Plus rien de neuf ⇒ il ouvre « Choisir » (réimprimer, voir pourquoi). */}
-                  <Bouton variante={nLot > 0 ? 'primaire' : 'secondaire'} icone="printer" className={imprBusy ? 'vrm-impr-enfonce' : undefined} data-colis-barre-btn="imprimer" data-impr-lot={nLot} data-impr-pret={nLot > 0 && sigDefaut && pretPour(sigDefaut) ? '1' : '0'} data-imprimer-prets={nLot}
-                    aria-pressed={imprBusy ? 'true' : undefined}
-                    title={nLot > 0 ? tr('impr.boutonTitre', { n: nLot, format: tr(`impr.format.${formatLot}`) }) : resLot.total > 0 ? tr('impr.rienDeNeuf') : tr('impr.rien')}
-                    onClick={() => { if (nLot > 0) imprimerLot(); else ouvrirLot(); }} disabled={batchBusy || !!imprBusy || resLot.total === 0}>{imprBusy ? tr('impr.enCours', { fait: imprBusy.fait || 0, total: imprBusy.total || 0 }) : nLot > 0 ? tr('impr.bouton', { n: nLot }) : tr('impr.boutonSeul')}</Bouton>
+                  <Bouton variante={nImpr > 0 ? 'primaire' : 'secondaire'} icone="printer" className={imprBusy ? 'vrm-impr-enfonce' : undefined} data-colis-barre-btn="imprimer" data-impr-lot={nLot} data-impr-pret={nImpr > 0 && sigDefaut && pretPour(sigDefaut) ? '1' : '0'} data-imprimer-prets={nLot}
+                    aria-pressed={imprBusy ? 'true' : undefined} data-occupe={imprBusy ? '' : undefined} aria-busy={imprBusy ? 'true' : undefined}
+                    // (16 nov., Julien : « toute la ligne bouge ») le libellé ne change plus pendant la lecture : la roue tourne DANS le bouton.
+                    title={imprBusy ? tr('impr.enCours', { fait: imprBusy.fait || 0, total: imprBusy.total || 0 }) : (nLot > 0 ? tr('impr.boutonTitre', { n: nLot, format: tr(`impr.format.${formatLot}`) }) : resLot.total > 0 ? tr('impr.rienDeNeuf') : tr('impr.rien')) + (nRetLot ? ' ' + tr('impr.retour.titreBouton', { n: nRetLot }) : '')}
+                    onClick={() => { if (nImpr > 0) imprimerLot(); else ouvrirLot(); }} disabled={batchBusy || !!imprBusy || (resLot.total === 0 && !Lret.length)}>{nLot > 0 ? tr('impr.bouton', { n: nLot }) : tr('impr.boutonSeul')}</Bouton>
+                  {pastilleRetours(nRetLot, nLot === 0)}
                   {/* (6 nov.) Pour le conseil « Un envoi presse » (src/accompagnement.js) : le compte du bouton,
                       et la règle de « Prochain geste » (`gesteEnvoi`) — un bordereau pour aujourd'hui ou demain. */}
                   <ChiffreConseil cle="colis.imprimer" valeur={baseKO ? null : { nLot, presse: !!gesteEnvoi({ aImprimer: bordereauxAImprimer(lignesImpr).map((l) => ({ jours: l.e && Number.isFinite(l.e.dl) ? l.e.dl : null })) }, { urgentSeul: true }) }}/>
@@ -54589,10 +55074,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {/* (14 nov., version studio) Le plein IMPRIME en un toucher (impression-simple) : le même geste que le
                       bouton « Imprimer (N) » de la barre — le PDF du lot préparé d'avance s'ouvre DANS ce toucher ; plus rien
                       de neuf ⇒ « Choisir » (`ouvrirLot`). Les data-* des deux chantiers sont portés ensemble. */}
-                  <BoutonPlein icone="printer" enCours={!!batchBusy || !!imprBusy} disabled={batchBusy || !!imprBusy || resLot.total === 0} onClick={() => { if (nLot > 0) imprimerLot(); else ouvrirLot(); }}
+                  <BoutonPlein icone="printer" enCours={!!batchBusy || !!imprBusy} disabled={batchBusy || !!imprBusy || (resLot.total === 0 && !Lret.length)} onClick={() => { if (nImpr > 0) imprimerLot(); else ouvrirLot(); }}
                     libelle={batchBusy || imprBusy ? tr('sv.imprimer.enCours') : nLot > 0 ? tr('sv.imprimer.n', { n: nLot }) : tr('sv.imprimer.court')}
-                    titre={nLot > 0 ? tr('sv.imprimer.titre', { n: nLot }) : resLot.total > 0 ? tr('sv.imprimer.rienDeNeuf') : tr('sv.imprimer.aucun')}
-                    attrs={{ 'data-colis-barre-btn': 'imprimer', 'data-imprimer-prets': nLot, 'data-impr-lot': nLot, 'data-impr-pret': nLot > 0 && sigDefaut && pretPour(sigDefaut) ? '1' : '0', 'aria-pressed': imprBusy ? 'true' : undefined }}/>
+                    titre={(nLot > 0 ? tr('sv.imprimer.titre', { n: nLot }) : resLot.total > 0 ? tr('sv.imprimer.rienDeNeuf') : tr('sv.imprimer.aucun')) + (nRetLot ? ' ' + tr('impr.retour.titreBouton', { n: nRetLot }) : '')}
+                    attrs={{ 'data-colis-barre-btn': 'imprimer', 'data-imprimer-prets': nLot, 'data-impr-lot': nLot, 'data-impr-pret': nImpr > 0 && sigDefaut && pretPour(sigDefaut) ? '1' : '0', 'aria-pressed': imprBusy ? 'true' : undefined }}/>
+                  {batchBusy || imprBusy ? null : pastilleRetours(nRetLot, nLot === 0)}
                   {/* (6 nov.) Le conseil « Un envoi presse » (src/accompagnement.js) : le compte du bouton, inchangé. */}
                   <ChiffreConseil cle="colis.imprimer" valeur={baseKO ? null : { nLot, presse: !!gesteEnvoi({ aImprimer: bordereauxAImprimer(lignesImpr).map((l) => ({ jours: l.e && Number.isFinite(l.e.dl) ? l.e.dl : null })) }, { urgentSeul: true }) }}/>
                 </>);
@@ -54661,6 +55147,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <button type="button" className="vrm-impr-lien" data-lot-ouvrir="1" data-impr-autres={resLot.autres} disabled={!!imprBusy || batchBusy} onClick={ouvrirLot}>{resLot.autres > 0 ? tr('impr.choisirAutres', { n: resLot.autres }) : tr('impr.choisir')}</button>
             </div> : null}
             {choixPapier ? <ChoixPapier Feuille={SheetShell} valeur={formatRetenu(load('vrm_imprimante', null)) ? formatLot : null} puisImprimer={!!choixPapier.puis} onChoisir={choisirPapier} onFermer={() => setChoixPapier(null)}/> : null}
+            {apercuImpr ? <ApercuAvantImpression onMonte={libererBoutonsImprime} Feuille={SheetShell} Bouton={Bouton} etat={apercuImpr} entree={prepsRef.current.get(apercuImpr.sig) || null} dessiner={dessinerPdf} occupe={!!imprBusy}
+              onPoser={poserApercu} onOrigine={origineApercu} onTous={(v) => setApercuImpr((x) => (x ? { ...x, tous: v } : x))} onImprimer={imprimerApercu} onFermer={() => setApercuImpr(null)}/> : null}
             {imprEtat ? <FeuilleImpression Feuille={SheetShell} Bouton={Bouton} etat={imprEtat} dessiner={dessinerPdf} occupe={!!imprBusy}
               pretManque={!!(imprEtat.manque && imprEtat.manque.size && pretPour(sigManque(imprEtat, imprEtat.manque)))}
               pretUn={!!(imprEtat.corrige && imprEtat.tamponCorrige && pretPour(sigUn(imprEtat, imprEtat.corrige, imprEtat.tamponCorrige)))}
@@ -54993,11 +55481,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   // Imprimer, « Oui ») et « Je dépose » dans la même feuille.
                   const L = lot.lignes || lignesLotTous();
                   // (12 nov.) La même source que le bouton (`resumeLot`) : ce qui part, et POURQUOI les autres n'y sont pas.
-                  const resL = resumeLot(L, lot.coches), nb = resL.partent, nSansBord = resL.sansBordereau + aGenItems.length;
+                  // (16 nov., lot impression-retours) Les RETOURS ont leur section (plus bas) : ni dans « Ce qui part », ni dans
+                  // le compte des ventes ; « Imprimer (N) » = les ventes, « + N retours » à côté.
+                  const Lr = L.filter(estRetour), nbR = Lr.filter((l) => lot.coches.has(l.cle)).length;
+                  const resL = resumeLot(L.filter((l) => !estRetour(l)), lot.coches), nb = resL.partent, nSansBord = resL.sansBordereau + aGenItems.length;
                   const basculer = (cle) => setLot(x => { const c = new Set(x.coches); if (c.has(cle)) c.delete(cle); else c.add(cle); return { ...x, coches: c }; });
                   const aVerif = (l) => l.cochable !== false && (l.ancienne || l.imprime || l.depotAVerifier || l.pdf === false);
-                  const partent = L.filter((l) => l.cochable !== false && !aVerif(l));
-                  const verifier = L.filter(aVerif);
+                  const partent = L.filter((l) => !estRetour(l) && l.cochable !== false && !aVerif(l));
+                  const verifier = L.filter((l) => !estRetour(l) && aVerif(l));
                   const ebayL = L.filter((l) => l.cochable === false);
                   const limite = (l) => { const lim = l.e && l.e.lim; const j = lim && lim.daysLeft; if (j == null || !Number.isFinite(j)) return null;
                     return j < 0 ? { t: 'en retard', urgent: true } : j === 0 ? { t: lim.heure ? `avant ${lim.heure}` : 'aujourd’hui', urgent: true } : j === 1 ? { t: 'demain', urgent: false } : { t: `dans ${j} j`, urgent: false }; };
@@ -55032,7 +55523,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   // pourquoi les autres n'y sont pas). Le papier, l'aperçu, « Placer le tampon » et « Tout est sorti ? » n'y
                   // sont plus : le papier est retenu (un toucher à côté d'« Imprimer »), le tampon se corrige APRÈS, sur la
                   // vignette du bordereau, et la question vient dans la feuille d'après (`FeuilleImpression`).
-                  const imprimerChoisis = () => { const c = new Set(lot.coches); setLot(null); imprimerLot(c); };
+                  const imprimerChoisis = () => { const c = new Set(lot.coches); setLot(null); imprimerLot(new Set([...c].filter((k) => !String(k).startsWith('r:'))), { retours: new Set([...c].filter((k) => String(k).startsWith('r:'))) }); };
                   return (
                     <SheetShell onClose={()=>setLot(null)} maxWidth={620} z={9000} className="vrm-lot vrm-tip" data-noswipe="1" data-lot={L.length} data-lot-etape="choix" aria-label={tr('impr.choisir')}
                       titre={tr('impr.choisirTitre')}>
@@ -55062,13 +55553,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           {ebayL.map((l) => <div key={l.cle} className="vrm-tip-ligne is-off" data-lot-ligne={l.cle} data-lot-site={l.site} data-lot-cochable="0" data-coche="0"><input type="checkbox" className="vrm-tip-case" disabled checked={false} readOnly aria-label={`${l.titre||'Commande'} : eBay`}/><PhotoVente src={l.photo||null} size={44} portrait/><span className="vrm-tip-corps"><span className="vrm-titre-entier vrm-tip-titre">{l.titre}</span><span className="vrm-tip-sous"><span data-lot-ebay="1">eBay</span></span></span></div>)}
                         </section>}
                         {/* (11 nov., lot retours-litiges) Les bordereaux de RETOUR d'achat : imprimés un par un, tamponnés « RETOUR · N°… ». */}
-                        <RetoursAImprimer r={retoursAchatRes} onImprimer={imprimerRetourAchat} onPreparer={preparerRetourPdf} Bouton={Bouton}/>
+                        <RetoursAImprimer r={retoursAchatRes} lignes={Lr} coches={lot.coches} onBascule={basculer}/>
                         {nb > 0 ? <AccAvant geste="colis.imprimer" vars={{ n: nb }}/> : null}
                         <div className="vrm-lot-pied vrm-tip-pied">
                           <span className="vrm-impr-sous" data-lot-papier-dit={formatLot}>{tr(`impr.format.${formatLot}`)}</span>
-                          <Bouton variante="primaire" icone="printer" data-lot-imprimer={nb} disabled={!nb || !!imprBusy} onClick={imprimerChoisis}>
-                            {tr('impr.bouton', { n: nb })}
+                          <Bouton variante="primaire" icone="printer" data-lot-imprimer={nb} data-lot-imprimer-retours={nbR} disabled={!(nb + nbR) || !!imprBusy} onClick={imprimerChoisis}>
+                            {nb > 0 ? tr('impr.bouton', { n: nb }) : tr('impr.boutonSeul')}
                           </Bouton>
+                          {pastilleRetours(nbR, nb === 0)}
                         </div>
                       </div>
                     </SheetShell>
@@ -55503,7 +55995,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     primaire={o.label && o.label.voucherUrl
                       ? <button type="button" data-imprime="1" data-imprime-lbc={x.txId} className="vrm-colis-primaire" onClick={() => onColisLeboncoin && onColisLeboncoin()} title="Bordereau Leboncoin tamponné (titre + N°)" style={primaireBleu}><Icon name="printer" size={16}/><span className="vrm-lib-long">Imprimer le bordereau</span><span className="vrm-lib-court">Imprimer</span></button>
                       : <a data-generer-lbc={x.txId} href={`https://www.leboncoin.fr/compte/part/transaction/${encodeURIComponent(x.txId)}`} target="_blank" rel="noreferrer" className="vrm-colis-primaire" title="Le bordereau se génère sur Leboncoin" style={{...primaireBleu,background:C.card2||C.bg,color:C.text}}><Icon name="printer" size={16}/><span className="vrm-lib-long">Générer sur Leboncoin</span><span className="vrm-lib-court">Générer</span></a>}
-                    gestes={<button type="button" data-geste="fait" data-lbc-fait={x.txId} className="vrm-colis-sec vrm-colis-ter" onClick={() => { const u = { ...fait }; if (u[x.txId]) delete u[x.txId]; else u[x.txId] = Date.now(); save('vrm_lbc_colis_done', u); majLbcFait(); }}
+                    gestes={<button type="button" data-geste="fait" data-lbc-fait={x.txId} className="vrm-colis-sec vrm-colis-ter" onClick={() => { modifierCle('vrm_lbc_colis_done', {}, (u) => { if (u[x.txId]) delete u[x.txId]; else u[x.txId] = Date.now(); return u; }); majLbcFait(); }}
                       style={{...sec,border:`1px solid ${C.border}`,background:'transparent',color:C.muted}}>Déposé</button>}/>;
                 };
                 // (7 nov., vitesse) Les 24 plus pressées d'abord, TOUTES les autres juste après (sans clic : aucun colis caché).
@@ -55511,7 +56003,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // « Tout imprimer » : n° de transaction, sinon la clé du site), cochée d'office par la règle du lot, décochée
                 // sur SON toucher. Sans ligne de lot (pas de bordereau, eBay) : la case est grisée, jamais cochée.
                 const enVentes = colisDans === 'ventes';
-                const { Ltous, resLot, nLot, sigDefaut, lignesImpr } = vvLotRef.current;
+                const { Ltous, resLot, nLot, sigDefaut, lignesImpr, Lret = [], nRetLot = 0 } = vvLotRef.current;
                 const lotPar = new Map((Ltous || []).map((l) => [String(l.cle), l]));
                 const cochesVues = enVentes ? cochesEffectives(Ltous, cochesVentes) : null;
                 const caseDe = (cle, titreC) => { if (!enVentes) return null; const l = lotPar.get(String(cle)); const ok = !!(l && l.cochable !== false && l.pdf !== false);
@@ -55712,7 +56204,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         onClick={(ev)=>{ const c = ev.currentTarget.closest('[data-bord-card]'); const o = !c.hasAttribute('data-plus-ouvert'); c.toggleAttribute('data-plus-ouvert', o); ev.currentTarget.setAttribute('aria-expanded', o ? 'true' : 'false'); }}><Icon name="more" size={18}/></button>
                       <PastilleTransporteur t={trV} C={C} data-colis-transporteur={e.txn||e.key}/>
                       {pdf ? (
-                        <button type="button" data-imprime="1" onClick={async ()=>{
+                        <button type="button" data-imprime="1" onClick={(ev)=>occuperPendant(ev.currentTarget, async ()=>{
                           if (b && b.hasPdf && inv) { await printBordAndInvoice(b); return; }
                           // Le PDF vient de l'email s'il y en a un, sinon de la
                           // capture faite par l'extension au moment de générer.
@@ -55725,7 +56217,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           const lu = await octetsBordereau(capte && capte.row, b && b.hasPdf ? b._row : null);
                           if (!lu || !lu.octets) { libererOngletPdf(); toast(messagePdfManquant(lu)); return; }
                           if (await processBordereau(num, titre, lu.octets) && !String(num || '').trim() && e.txn) noterImprimeSansNum([e.txn]);
-                        }} title={inv?'Bordereau tamponné + facture pro, puis impression':'Bordereau tamponné, puis impression'} aria-label={inv?'Imprimer le bordereau et la facture':'Imprimer le bordereau'}
+                        })} title={inv?'Bordereau tamponné + facture pro, puis impression':'Bordereau tamponné, puis impression'} aria-label={inv?'Imprimer le bordereau et la facture':'Imprimer le bordereau'}
                         className="vrm-colis-primaire" style={{flex:'1 1 160px',maxWidth:340,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,border:'none',background:C.accent,color:C.onAccent,borderRadius:12,padding:'0 16px',minHeight:44,cursor:'pointer',fontSize:15,fontWeight:600,fontFamily:'inherit'}}><Icon name="printer" size={16}/><span className="vrm-lib-long">{inv ? 'Imprimer + facture' : 'Imprimer le bordereau'}</span><span className="vrm-lib-court">Imprimer</span></button>
                       ) : (<>
                         {/* ⚠️ PLUS DE BOUTON « Générer sur Vinted ». C'est l'EXTENSION
@@ -55812,7 +56304,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               })}
               {/* (15 nov., Ventes « Verre dépoli ») LA RANGÉE « FORMAT » au pied du verre (le papier retenu ; son toucher ouvre
                   le choix du papier, jamais une étape) — la même fonction et les mêmes data-* que la ligne d'avant. */}
-              {enVentes && resLot.total > 0 ? <button type="button" className="vrm-impr-lien vv-format" data-impr-format={formatLot} disabled={!!imprBusy} onClick={() => setChoixPapier({ puis: null })}>
+              {/* (16 nov., lot impression-retours) LES RETOURS À IMPRIMER, sous les ventes et à part : « RETOUR · tu renvoies
+                  un achat », N°, vendeur, « À déposer … » ; leur case (cochée d'office) les met dans le même PDF. */}
+              {enVentes && Lret.length ? <RetoursLot lignes={Lret} coches={cochesEffectives(Lret, cochesRetours)} onBascule={(cle) => setCochesRetours((c) => basculerCoche(Lret, c, cle))} Case={CaseCoche}/> : null}
+              {enVentes && (resLot.total > 0 || Lret.length > 0) ? <button type="button" className="vrm-impr-lien vv-format" data-impr-format={formatLot} disabled={!!imprBusy} onClick={() => setChoixPapier({ puis: null })}>
                 <span className="vv-format-l"><IconeV nom="printer" taille={18} trait={1.9}/>{tr('vv.format')}</span>
                 <b className="vv-format-v">{tr(`impr.format.${formatLot}`)}<IconeV nom="chevron" taille={14} trait={2.2}/></b>
               </button> : null}
@@ -55820,15 +56315,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {/* LE PLEIN de l'écran, sous la liste (maquette) : « Imprimer les N bordereaux » = les colis COCHÉS. Le même geste
                   qu'avant (`imprimerLot`) : rien touché ⇒ le lot d'office (le PDF préparé d'avance part dans CE toucher) ;
                   une case décochée ⇒ SA sélection. Les data-* d'avant (`data-imprimer-prets`, `data-impr-lot`…) suivent le compte. */}
-              {enVentes && resLot.total > 0 ? (() => {
+              {enVentes && (resLot.total > 0 || Lret.length > 0) ? (() => {
                 const choix = cochesEffectives(Ltous, cochesVentes); const defaut = memeQueDefaut(Ltous, cochesVentes == null ? null : choix);
                 const nC = resumeLot(Ltous, choix).partent;
+                // (16 nov.) Les retours cochés partent avec (compteur à part) ; leur choix suit leurs cases.
+                const choixR = cochesEffectives(Lret, cochesRetours), nR = selectionImprimable(Lret, choixR).length, defautR = memeQueDefaut(Lret, cochesRetours == null ? null : choixR);
                 return (<div className="vv-pied" data-vv-pied="">
-                  <PleinLarge icone="printer" enCours={!!batchBusy || !!imprBusy} disabled={batchBusy || !!imprBusy || nC === 0}
-                    onClick={() => { if (nC <= 0) return; if (defaut) { if (nLot > 0) imprimerLot(); else ouvrirLot(); } else imprimerLot(choix); }}
-                    libelle={batchBusy || imprBusy ? tr('sv.imprimer.enCours') : nC > 0 ? tr('vv.imprimer.n', { n: nC }) : tr('vv.imprimer.aucun')}
-                    titre={nC > 0 ? tr('vv.imprimer.titre', { n: nC }) : tr('vv.imprimer.aucun')}
-                    attrs={{ 'data-colis-barre-btn': 'imprimer', 'data-imprimer-prets': nC, 'data-impr-lot': nC, 'data-vv-coches': nC, 'data-impr-pret': defaut && nLot > 0 && sigDefaut && pretPour(sigDefaut) ? '1' : '0', 'aria-pressed': imprBusy ? 'true' : undefined }}/>
+                  <PleinLarge icone="printer" enCours={!!batchBusy || !!imprBusy} disabled={batchBusy || !!imprBusy || nC + nR === 0}
+                    onClick={() => { if (nC + nR <= 0) return; if (defaut && defautR) { if (nLot + nRetLot > 0) imprimerLot(); else ouvrirLot(); } else imprimerLot(choix, { retours: choixR }); }}
+                    libelle={nC > 0 ? tr('vv.imprimer.n', { n: nC }) : tr('vv.imprimer.aucun')}
+                    titre={batchBusy || imprBusy ? tr('sv.imprimer.enCours') : nC > 0 ? tr('vv.imprimer.titre', { n: nC }) : tr('vv.imprimer.aucun')}
+                    attrs={{ 'data-colis-barre-btn': 'imprimer', 'data-imprimer-prets': nC, 'data-impr-lot': nC, 'data-vv-coches': nC, 'data-impr-retours-coches': nR, 'data-impr-pret': defaut && defautR && nLot + nRetLot > 0 && sigDefaut && pretPour(sigDefaut) ? '1' : '0', 'aria-pressed': imprBusy ? 'true' : undefined }}/>
+                  {pastilleRetours(nR, nC === 0)}
                   <ChiffreConseil cle="colis.imprimer" valeur={baseKO ? null : { nLot, presse: !!gesteEnvoi({ aImprimer: bordereauxAImprimer(lignesImpr).map((l) => ({ jours: l.e && Number.isFinite(l.e.dl) ? l.e.dl : null })) }, { urgentSeul: true }) }}/>
                   <button type="button" className="vrm-impr-lien vv-choisir" data-lot-ouvrir="1" data-impr-autres={resLot.autres} disabled={!!imprBusy || batchBusy} onClick={ouvrirLot}>{resLot.autres > 0 ? tr('impr.choisirAutres', { n: resLot.autres }) : tr('vv.choisir')}</button>
                 </div>);
@@ -56048,7 +56546,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           tresProbables={liaison && liaison.parAchat ? liaison.parAchat : null} cibles={ciblesGlisser} prixDe={prixPayeAchat} compteDe={(a)=>accNameOf(a && a._acc)||''}
           photoDe={(a)=>orderPhoto(a)||''} tailleDe={(a)=>{ const t=tailleDuTitre(String((a&&a.title)||'')); return t ? t.replace('.', ',') : ''; }}
           Photo={PhotoVinted} Icon={Icon} Retour={FermeAuRetour}
-          onRelier={relierGlisse} onFermer={()=>setGlisserOuvert(false)} zIndex={1400}/> : null}
+          onRelier={relierGlisse} onFermer={()=>setGlisserOuvert(false)} zIndex={1400} achatInitial={glisserOuvert.achat || ''} cibleInitiale={glisserOuvert.cible || ''}/> : null}
       {/* Modale : relier un achat (depuis Annonces) */}
       {pickerFor && createPortal(
         <div data-relier-feuille data-relier-autre={pickerFor._autre ? String(pickerFor._autre) : undefined} onClick={()=>setPickerFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1300,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
@@ -56074,13 +56572,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {[pickerFor.brand, pickerFor.size && `taille ${pickerFor.size}`, pickerFor.price!=null && `en vente ${eur(pickerFor.price).toFixed(2).replace('.',',')}\u00a0€`].filter(Boolean).join(' · ')}
                 </div>
               </div>
-              <button type="button" data-glisser-ouvrir="feuille" onClick={ouvrirGlisser} style={{flexShrink:0,border:'none',background:'transparent',color:C.accent,fontSize:13,fontWeight:600,cursor:'pointer',minHeight:44,padding:'0 6px',fontFamily:'inherit'}}>{tr('glisser.entree')}</button>
+              <button type="button" data-glisser-ouvrir="feuille" onClick={()=>ouvrirGlisser()} style={{flexShrink:0,border:'none',background:'transparent',color:C.accent,fontSize:13,fontWeight:600,cursor:'pointer',minHeight:44,padding:'0 6px',fontFamily:'inherit'}}>{tr('glisser.entree')}</button>
               <button type="button" onClick={()=>setPickerFor(null)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer'}}>×</button>
             </div>
             <div data-relier-achat-corps style={{flex:1,overflow:'auto',padding:'4px 14px 14px'}}>
               <AccAvant geste="achat.relier"/>
               <RelierAchatCorps C={C} cible={cibleRelier} achats={purchasesPick.loading ? null : purchasesPick.items} liens={liensAchats}
-                curTx={(entreePicker(pickerFor) || {}).buyFromId || ''} compteDe={(a)=>accNameOf(a._acc)||''} prixDe={prixPayeAchat} onRelier={relierAchat}
+                curTx={(entreePicker(pickerFor) || {}).buyFromId || ''} compteDe={(a)=>{ const st = siteDeAchat(a); return st === 'vinted' ? (accNameOf(a._acc)||'') : [st === 'leboncoin' ? 'Leboncoin' : 'Vestiaire', a.compteSite || ''].filter(Boolean).join(' · '); }} prixDe={prixPayeAchat} onRelier={relierAchat}
                 autre={!!pickerFor._autre} actuel={achatRelie(entreePicker(pickerFor))} onDelier={delierAchatPicker}
                 dejaRelie={(a)=>texteDejaRelie(detenteursAchat(a && a.transaction_id, { numeros, saleOv }))}
                 receptionDe={receptionAchatMs} receptionEtat={receptionsRelierEtat} onFiltres={()=>setBesoinInfosRelier(true)}/>
@@ -56090,83 +56588,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
 
       {/* Modale conversation */}
 
-      {/* Recherche d'un point relais par son nom → carte → confirmer */}
-      {relayPicker && (
-        <div onClick={()=>setRelayPicker(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1200,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
-          <FermeAuRetour fermer={()=>setRelayPicker(null)}/>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:560,height:'88vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
-            <div style={{display:'flex',gap:10,alignItems:'center',padding:'12px 16px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:700,color:C.text}}>📍 Ajouter un point relais</div>
-                <div style={{fontSize:11,color:C.muted}}>Tape le nom du lieu + la ville, puis choisis-le sur la carte</div>
-              </div>
-              <button type="button" onClick={()=>setRelayPicker(null)} aria-label="Fermer" style={{border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer'}}>×</button>
-            </div>
-            <div style={{padding:'12px 14px',borderBottom:`1px solid ${C.border}`,flexShrink:0}}>
-              <div style={{display:'flex',gap:6}}>
-                <input autoFocus value={relayPicker.query} onChange={e=>setRelayPicker(p=>({...p,query:e.target.value}))}
-                  onKeyDown={e=>{ if(e.key==='Enter') searchPlaces(relayPicker.query); }}
-                  placeholder="ex : Super U Lyon, Tabac de la Place…"
-                  style={{flex:1,border:`1px solid ${C.border}`,borderRadius:12,padding:'10px 12px',fontSize:13,fontFamily:'inherit',background:C.card,color:C.text,outline:'none'}}/>
-                <button type="button" onClick={()=>searchPlaces(relayPicker.query)} style={{border:'none',borderRadius:12,background:C.accent,color:C.onAccent,fontSize:13,fontWeight:600,padding:'0 16px',cursor:'pointer',fontFamily:'inherit'}}>Chercher</button>
-              </div>
-              <div style={{display:'flex',gap:6,marginTop:8,flexWrap:'wrap',alignItems:'center'}}>
-                <span style={{fontSize:11,color:C.muted}}>Transporteur :</span>
-                {Object.entries(CARRIERS).map(([k,c])=>{ const on=relayPicker.carrier===c.name; return (
-                  <button type="button" key={k} onClick={()=>setRelayPicker(p=>({...p,carrier:on?'':c.name}))} style={{display:'inline-flex',alignItems:'center',gap:5,padding:'3px 9px 3px 4px',borderRadius:12,fontSize:11,fontWeight:600,cursor:'pointer',fontFamily:'inherit',background:on?`${c.bg}18`:'transparent',color:on?c.bg:C.muted,border:`1.5px solid ${on?c.bg:C.border}`}}>
-                    <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',minWidth:18,height:18,padding:'0 4px',borderRadius:6,background:c.bg,color:c.fg,fontSize:11,fontWeight:700}}>{c.short}</span>
-                    {c.name}
-                  </button>
-                ); })}
-              </div>
-            </div>
-            {relayPicker.loading && <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted,fontSize:13}}>⏳ Recherche…</div>}
-            {!relayPicker.loading && relayPicker.error && <div style={{flex:1,display:'flex',alignItems:'flex-start',justifyContent:'center',color:C.muted,fontSize:13,textAlign:'center',padding:'28px 20px',lineHeight:1.5}}>{relayPicker.error}</div>}
-            {!relayPicker.loading && !relayPicker.error && relayPicker.results.length>0 && (<>
-              <OsmMap points={relayPicker.results.map(f=>({key:f.id,lat:f.lat,lon:f.lon}))} selected={null} onSelect={id=>{ const f=relayPicker.results.find(x=>x.id===id); if(f) addFoundPlace(f); }}/>
-              <div style={{flex:1,overflow:'auto',padding:'8px 12px'}}>
-                {relayPicker.results.map(f=>(
-                  <button type="button" key={f.id} onClick={()=>addFoundPlace(f)} style={{width:'100%',display:'flex',alignItems:'center',gap:10,padding:'10px',border:`1px solid ${C.border}`,background:C.card,borderRadius:12,marginBottom:6,cursor:'pointer',fontFamily:'inherit',textAlign:'left'}}>
-                    <span style={{fontSize:20,flexShrink:0}}>📍</span>
-                    <span style={{flex:1,minWidth:0}}>
-                      <span style={{display:'block',fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{f.nom}</span>
-                      <span style={{display:'block',fontSize:11,color:C.muted,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{f.adresse||f.full}</span>
-                    </span>
-                    <span style={{fontSize:12,fontWeight:600,color:C.accentTexte,flexShrink:0}}>Ajouter</span>
-                  </button>
-                ))}
-              </div>
-            </>)}
-            {!relayPicker.loading && !relayPicker.error && relayPicker.results.length===0 && (
-              <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center',color:C.muted,fontSize:13,textAlign:'center',padding:'0 24px',lineHeight:1.6}}>
-                Tes points relais lus dans tes e-mails y sont déjà.<br/>Ajoute un autre : tape son nom + la ville.
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {bordResult && (
-        <div onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1250,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
-          <FermeAuRetour fermer={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }}/>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,borderRadius:12,maxWidth:360,width:'100%',padding:20,textAlign:'center'}}>
-            <div style={{fontSize:34,marginBottom:6}}>✅</div>
-            <div style={{fontSize:17,fontWeight:700,color:C.text,marginBottom:4}}>{bordResult.batch?`${bordResult.count} bordereaux prêts`:bordResult.withInvoice?'Bordereau + facture prêts':'Bordereau prêt'}</div>
-            <div style={{fontSize:13,color:C.muted,lineHeight:1.45,marginBottom:16}}>{bordResult.batch?<>Tous les bordereaux{bordResult.nInv>0?<> et <b>{bordResult.nInv} facture{bordResult.nInv>1?'s':''}</b> (comptes pro)</>:null} sont <b>à la suite dans un seul PDF</b> (le N° au même endroit sur chacun). {bordResult.printed?<>Ils sont <b>ouverts dans un nouvel onglet</b> : clique sur l'imprimante en haut à droite. Onglet pas ouvert ? Utilise le bouton ci-dessous.</>:<>Ouvre-le puis <b>Imprimer</b> — tu peux tout imprimer d'un coup.</>}</>:bordResult.printed?<>Le bordereau{bordResult.withInvoice?<> (avec <b>la facture</b>)</>:null} est <b>ouvert dans un nouvel onglet</b> : clique sur l'imprimante en haut à droite. Onglet pas ouvert ? Utilise le bouton ci-dessous.</>:<>{bordResult.withInvoice?<>Le PDF contient le <b>bordereau + la facture</b>. </>:null}Ouvre-le puis <b>Partager → Imprimer</b> (ou enregistre-le). Sur iPhone c'est le bouton de partage en bas.</>}</div>
-            <a href={bordResult.url} target="_blank" rel="noreferrer"
-              style={{display:'block',background:C.accent,color:C.onAccent,borderRadius:12,padding:'13px 16px',fontSize:15,fontWeight:600,textDecoration:'none',marginBottom:8}}>📄 {bordResult.batch?'Ouvrir les bordereaux':bordResult.withInvoice?'Ouvrir bordereau + facture':'Ouvrir le bordereau'}</a>
-            {/* (3 nov.) « Déplacer le tampon » : l'aperçu s'ouvre, la place choisie s'imprime (et se mémorise pour la forme). */}
-            {bordResult.pdfBuf && !bordResult.batch && <button type="button" data-imprime="1" data-tampon-deplacer="1" onClick={adjustBordPlacement} style={{width:'100%',border:`1px solid ${C.border}`,borderRadius:12,background:'transparent',color:C.text,cursor:'pointer',fontSize:13,fontWeight:400,padding:'11px',marginBottom:8}}>Déplacer le tampon</button>}
-            {bordResult.batch && !bordResult.thermique && !bordResult.planche && <div className="vrm-aide" style={{fontSize:11,color:C.muted,marginBottom:8,lineHeight:1.4}}>Ton N° est tamponné sur chaque PDF, sinon sur une fiche juste après.</div>}
-            {/* (14 nov., lot colis-plus 98) 4 par page A4 : ce qui a VRAIMENT été posé (étiquettes, feuilles, échelle, pages entières). */}
+      {/* (16 nov., lot tampons-parametres — Julien : « faite à l'arrache ») « BORDEREAU PRÊT » refait : l'aperçu réel du
+          PDF tamponné, « Imprimer » (le partage au téléphone, sinon le PDF), « Enregistrer », « Déplacer le tampon ».
+          Ce que l'impression a VRAIMENT fait (planche, thermique, fiches) reste dit, en dessous de l'aperçu. */}
+      {bordResult && <BordereauPret onMonte={libererBoutonsImprime} r={bordResult} Feuille={SheetShell} Bouton={Bouton} Pourquoi={Pourquoi} dessiner={dessinerPdf}
+          onImprimer={() => { const v = ouvrirPdfLot({ url: bordResult.url, bytes: bordResult.bytes, filename: bordResult.filename }, { titre: bordResult.filename || '' }); if (v === 'bouton') { try { window.open(bordResult.url, '_blank'); } catch (_) {} } }}
+          onDeplacer={adjustBordPlacement} onFermer={() => { URL.revokeObjectURL(bordResult.url); setBordResult(null); }}>
+            {bordResult.batch && !bordResult.thermique && !bordResult.planche && <div className="vrm-aide" style={{fontSize:12,color:C.muted,marginBottom:8,lineHeight:1.4}}>Ton N° est tamponné sur chaque PDF, sinon sur une fiche juste après.</div>}
             {bordResult.batch && bordResult.planche ? <div className="vrm-aide" data-planche-resultat={`${bordResult.planche.etiquettes}/${bordResult.planche.feuilles}/${bordResult.planche.echelle}`} style={{fontSize:13,color:C.text,marginBottom:8,lineHeight:1.4}}>
               {tr('cp.planche.resultat', { etiquettes: bordResult.planche.etiquettes, feuilles: bordResult.planche.feuilles, echelle: bordResult.planche.echelle })}
               {bordResult.planche.entieres ? <> {tr('cp.planche.entieres', { n: bordResult.planche.entieres })}</> : null}</div> : null}
-            {/* ── CE QUE L'IMPRESSION THERMIQUE A VRAIMENT FAIT ────────────────
-                LE CHIFFRE, JAMAIS LA PROMESSE. « Ton étiquette est prête » sur
-                un bordereau qu'on n'a pas su découper, c'est le défaut le plus
-                coûteux du projet. On écrit combien ont été réduits à
-                l'étiquette, combien sont partis entiers, et POURQUOI. */}
             <TamponPose r={bordResult}/>
             {bordResult.thermique && (()=>{ const ent=bordResult.entiers||[]; const iso=bordResult.isoles||0;
               return (
@@ -56184,10 +56615,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {(bordResult.sansTampon||0)>0 && <div data-bord-sans-tampon={bordResult.sansTampon} style={{color:C.warn,marginTop:4}}>{bordResult.sansTampon===1?'1 étiquette part':`${bordResult.sansTampon} étiquettes partent`} sans N° (aucune place sûre, fiche de préparation coupée) : écris-le à la main.</div>}
                 </div>
               ); })()}
-            <button type="button" data-bord-fermer="1" onClick={()=>{ URL.revokeObjectURL(bordResult.url); setBordResult(null); }} style={{width:'100%',border:'none',background:'transparent',color:C.muted,cursor:'pointer',fontSize:13,fontWeight:400,padding:'8px'}}>Fermer</button>
-          </div>
-        </div>
-      )}
+      </BordereauPret>}
 
       {showAnnual && (
         <div onClick={()=>setShowAnnual(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
@@ -59566,15 +59994,25 @@ const applyZoom = (z) => {
 // ⟦→ ecrans/Reglages.jsx #38⟧
 const enTeteSession = () => (AUTH.session && AUTH.session.access_token ? { Authorization: `Bearer ${AUTH.session.access_token}` } : {});
 // ── LA FACTURE PRO (2 nov.) : les outils de l'app que src/FacturePro.jsx emprunte.
-const ecrireReglage = async (id, data) => {
+// ⚠️ (16 nov., lot compta-donnees, reste de 2026-11-12-donnees-suite.md) COMPARER-ET-ÉCHANGER
+//    sur `data.rev` : l'appelant relit la fiche (`frais`), y pose sa saisie, et passe les
+//    DEUX — seul ce qu'il a changé (de `avant` à `data`) est posé sur la ligne RELUE à
+//    l'instant de l'écriture, gardée par `data.rev` (`ecrireDifference`, src/ligneCas.js).
+//    Avant : un POST « fusion » qui réécrivait la fiche ENTIÈRE lue juste avant — un SIRET
+//    ou un régime de TVA posé sur un autre appareil dans cet intervalle était effacé.
+//    Sans `avant` : tout `data` est posé comme changé (les autres champs relus restent).
+//    Une relecture ratée n'écrit RIEN (rend false).
+const ecrireReglage = async (id, data, avant) => {
   oublierReglageMontage(id);
   try {
     // (11 nov., réseau instable) Bornée : « enregistrement… » ne reste jamais affiché
-    // sur une réponse qui ne vient pas. L'écriture est une fusion idempotente : la
-    // rejouer pose la même valeur.
-    const r = await fetchBorne(fetch, `${SUPABASE_URL}/rest/v1/app_data?on_conflict=${SB_CONFLICT}`, { method: 'POST', headers: { ...sbAuth(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify([withOwner({ id, data })]) }, DELAI_ECRITURE_MS);
-    if (r.ok) { try { window.dispatchEvent(new CustomEvent('vrm:profil-fiscal', { detail: data })); } catch (_) {} }
-    return r.ok;
+    // sur une réponse qui ne vient pas.
+    const res = await ecrireDifference({ base: SUPABASE_URL, id, entetes: (x) => ({ ...sbAuth(), ...(x || {}) }), estampille: withOwner,
+      fetch: (u, o) => fetchBorne(fetch, u, o, DELAI_ECRITURE_MS),
+      avant: avant && typeof avant === 'object' && !Array.isArray(avant) ? avant : {}, apres: data && typeof data === 'object' ? data : {} });
+    const ok = !!(res && res.ok);
+    if (ok) { try { window.dispatchEvent(new CustomEvent('vrm:profil-fiscal', { detail: (res && res.data) || data })); } catch (_) {} }
+    return ok;
   } catch (_) { return false; }
 };
 // (14 nov.) L'ACCUEIL DES NOUVEAUX (src/accueilNouveaux/AccueilNouveaux.jsx) : ce qu'il lit et écrit
@@ -60139,7 +60577,9 @@ async function imprimerBordereauEquipe(vendeur, row, numero, titre) {
   try {
     const PL = await import('pdf-lib');
     const pdf = await PL.PDFDocument.load(lu.octets);
-    await tamponnerBordereau(PL, pdf, { numero: numero || '', titre: titre || '' });
+    // (16 nov.) Le réglage des tampons (`vrm_tampons`) vaut aussi pour l'aide : contenu, taille, places.
+    const tp = tamponPourPage(PL, pdf, {}), ct = texteDuCartouche(tp.contenu, { numero: numero || '', titre: titre || '' });
+    await tamponnerBordereau(PL, pdf, { numero: ct.numero, titre: ct.titre, choix: tp.choix, tampon: tp.tampon });
     posePrefsImpression(PL, pdf);
     const url = URL.createObjectURL(new Blob([await pdf.save()], { type: 'application/pdf' }));
     return { ok: true, url, ouvert: ouvrirPdfOnglet(url) };
@@ -60601,7 +61041,7 @@ export default function App() {
   // vendeur que la base vérifie). Sans invitation acceptée, rien ne change.
   return <>{(MULTI_USER && authState.user)
     ? <PorteConfidentialite key={authState.user.id} session={authState.session} theme={C} onDeconnexion={authSignOut} onRafraichir={()=>authRefresh()} onVerifier={uid=>{_confidentialiteUid=uid;}}><PorteEquipe key={authState.user.id} uid={authState.user.id}><PorteAbonnement uid={authState.user.id}>{coeur}</PorteAbonnement></PorteEquipe></PorteConfidentialite>
-    : coeur}<VisionneusePdf/><PlaceurTampon/>{authState.user && authState.user.id ? <ConfortCoque uid={authState.user.id} entetes={enTeteSession} onDeconnexion={authSignOut} ticketQr={QR_A_APPROUVER}/> : null}{authState.user && authState.user.id ? <CapteNotif feuilleOuverte={uneFeuilleOuverte} abonnerFeuilles={abonnerFeuilles}/> : null}</>;
+    : coeur}<VisionneusePdf/><PlaceurTampon/><ApercuUnCoque/>{authState.user && authState.user.id ? <ConfortCoque uid={authState.user.id} entetes={enTeteSession} onDeconnexion={authSignOut} ticketQr={QR_A_APPROUVER}/> : null}{authState.user && authState.user.id ? <CapteNotif feuilleOuverte={uneFeuilleOuverte} abonnerFeuilles={abonnerFeuilles}/> : null}</>;
 }
 
 // ── Le code Discord (revue de sécurité du 21 octobre) ─────────────────────────
@@ -61029,7 +61469,9 @@ function useQuoiDeNeuf() {
   React.useEffect(() => onCloudReady(() => setVues(load(CLE_NOUVEAUTES_VUES, null))), []);
   React.useEffect(() => { const f = (e) => { const k = e && e.detail && e.detail.k; if (!k || k === CLE_NOUVEAUTES_VUES) setVues(load(CLE_NOUVEAUTES_VUES, null)); }; window.addEventListener('vrm:save', f); return () => window.removeEventListener('vrm:save', f); }, []);
   const reg = regimeFiscal();
-  const ctx = { inscritLe: AUTH.user?.created_at || '', mode: p.mode === 'simple' ? 'simple' : 'complet',
+  // (16 nov.) Une nouveauté « pour le propriétaire » (Partenaires) : Julien seul ; pas su ⇒ false (cachée).
+  const estProprio = useEstProprietaire();
+  const ctx = { inscritLe: AUTH.user?.created_at || '', mode: p.mode === 'simple' ? 'simple' : 'complet', proprietaire: estProprio === true,
     // Ce qu'il vend : lu du réglage lui-même (le profil peut avoir été posé avant la lecture du nuage).
     vend: jeVendsEffectif(load(CLE_JE_VENDS, null), { proprietaire: proprioTri() }).vend, categories: lireReglageJeVends(load(CLE_JE_VENDS, null)).categories,
     pro: reg == null ? null : ['micro', 'societe', 'marge'].includes(reg) };
@@ -61136,9 +61578,6 @@ function CaptureInstantane({ uid, ecran, racine: trouver, capturer, ecrire }) {
 const racineEcranPret = (attente, sel) => [...document.querySelectorAll(`[data-attente-ecran="${attente}"][data-attente="pret"] ${sel}`)].find((e) => !e.closest('.vrm-ji') && !e.closest('.vrm-attente-cache')) || null;
 function CaptureJournee({ uid }) {
   return <CaptureInstantane uid={uid} ecran="journee" racine={() => racineEcranPret('journee', '.vrm-fu-journee')} capturer={capturerJournee} ecrire={ecrireInstantane}/>;
-}
-function CaptureColis({ uid }) {
-  return <CaptureInstantane uid={uid} ecran="colis" racine={() => { const c = racineEcranPret('cat_bord', '[data-carte-stats="colis"]'); return c ? c.closest('.vrm-attente-pret') : null; }} capturer={capturerColis} ecrire={ecrireInstantaneColis}/>;
 }
 function CaptureVentes({ uid }) {
   return <CaptureInstantane uid={uid} ecran="ventes" racine={() => racineEcranPret('ventes', 'section.vrm-tache[data-tache="ventes"]')} capturer={capturerVentes} ecrire={ecrireInstantaneVentes}/>;
@@ -61949,7 +62388,8 @@ function AppCoeur() {
         // (1er nov.) La date de versement (transaction finalisée, 450) — la règle
         // de `fetchVersementsVinted`, lue dans la MÊME réponse (aucune requête de plus).
         const ver={}; for(const r of rows){ if(r&&r.tx&&String(r.s)==='450'&&r.su&&!isNaN(Date.parse(r.su))) ver[String(r.tx)]=r.su; } versementsLus=ver; return m; }catch(_){ return null; } })(),
-      lireTout('id=like.email_bord_*&select=id,tx:meta->>transaction,pdf:meta->>_pdf',{strict:true}).catch(()=>null),
+      // (16 nov.) + la date limite lue dans l'e-mail (scalaire de `meta`, §4.4 : jamais le PDF) — la fiche la dit.
+      lireTout('id=like.email_bord_*&select=id,tx:meta->>transaction,pdf:meta->>_pdf,dateLimite:meta->>dateLimite',{strict:true}).catch(()=>null),
       lireTout('id=like.harvest_*_label_*&select=id,tx:meta->>tx,pdf:meta->>_pdf',{strict:true}).catch(()=>null),
       sb('app_data?id=eq.lbc_ventes&select=ventes:data->ventes'),
       lireComptesEbay().catch(()=>null),
@@ -61971,7 +62411,7 @@ function AppCoeur() {
         for(const it of masqueesPresentes(masqueesDuCompte(res.fermees, supp===null?null:(supp.get(k[1])||{}), dateLectureDressing(r)), fichesM, perduesM)) masquees.add(String(it.id)); }
     }catch(_){ enLigne=null; aConfirmer=null; masquees=null; crees=null; } }
     let ventes=null; if(soldRows){ ventes=[]; const vus=new Set(); for(const r of soldRows){ const p={ my_orders: Array.isArray(r&&r.mo)?r.mo:[] }; const uid=(/^harvest_(\d+)_orders_sold$/.exec(String((r&&r.id)||''))||[])[1]||null; for(const o of (p.my_orders||[])){ const t=String(o.transaction_id||''); if(t&&!vus.has(t)){ vus.add(t); ventes.push(uid?{...o,_uid:uid}:o); } } } }
-    const bordereaux=(bE&&bL)?[...bE,...bL].filter(b=>b&&b.tx).map(b=>({tx:String(b.tx),pdf:!!b.pdf&&String(b.pdf)!=='false'})):null;
+    const bordereaux=(bE&&bL)?[...bE,...bL].filter(b=>b&&b.tx).map(b=>({tx:String(b.tx),pdf:!!b.pdf&&String(b.pdf)!=='false',dateLimite:b.dateLimite||''})):null;
     let lbcVentes=null, lbcItems=null;
     if(lbcRows){ const v=(lbcRows[0]&&lbcRows[0].ventes)||{}; lbcVentes=Object.entries(v).map(([id,x])=>({...(x||{}),_id:id})).filter(x=>x.isSeller===true);
       const liens=load('vrm_lbc_liens',{})||{}; if(lbcVentes.some(x=>x.itemId!=null&&!liens[String(x.itemId)])) lbcItems=await lbcAnnoncesSession(); }
@@ -64118,8 +64558,8 @@ function AppCoeur() {
   // doit être celui que l'écran va montrer. Ventes : seulement sur « Tous ».
   const uidInstantane = (authState.user && authState.user.id) || '';
   const snapJournee = React.useMemo(() => (tab === 'journee' && uidInstantane ? lireInstantane(uidInstantane) : null), [tab, uidInstantane]);
-  const vueColisOuverture = tab === 'cat_bord' && platSub !== 'leboncoin' && !(typeof platSub === 'string' && platSub.startsWith('site:'));
-  const snapColis = React.useMemo(() => (vueColisOuverture && uidInstantane ? lireInstantaneColis(uidInstantane) : null), [vueColisOuverture, uidInstantane]);
+  // (16 nov., lot ecrans-restes) Plus d'instantané de Colis (Colis vit dans Ventes « À expédier » depuis le 11 nov. :
+  // rien ne le rangeait plus, `ColisInstantane` n'était plus montré — code mort retiré, §4.11).
   const vueVentesTous = tab === 'ventes' && siteDeTache('ventes', platSub) === 'toutes';
   const snapVentes = React.useMemo(() => (vueVentesTous && uidInstantane ? lireInstantaneVentes(uidInstantane) : null), [vueVentesTous, uidInstantane]);
   // (11 nov.) Annonces : sur sa vue d'ouverture (Vinted · Annonces) et le compte « Tous » (rien de choisi d'autre).
@@ -64134,8 +64574,6 @@ function AppCoeur() {
     ? <JourneeInstantanee snap={snapJournee} ScreenHead={ScreenHead} Icon={Icon} fmt={REGLES_CARTE.fmt} etat={horsLigne ? 'hors-ligne' : 'panne'}/> : null;
   const instantaneEcranIci = !instantanePermis ? null
     : tab === 'journee' && snapJournee ? <JourneeInstantanee snap={snapJournee} ScreenHead={ScreenHead} Icon={Icon} fmt={REGLES_CARTE.fmt}/>
-    : vueColisOuverture && snapColis && (!ongletColis || ongletColis === snapColis.onglet) && (platSub !== 'retirer' || snapColis.onglet === 'retirer')
-      ? <ColisInstantane snap={snapColis} Icon={Icon} fmt={REGLES_CARTE.fmt} ordi={ordi} dateTete={dateJourFr(new Date())}/>
     : vueVentesTous && snapVentes ? <VentesInstantanee snap={snapVentes} fmt={REGLES_CARTE.fmt} ordi={ordi} dateTete={dateJourFr(new Date())}/>
     : vueAnnoncesOuverture && snapAnnonces ? <AnnoncesInstantanee snap={snapAnnonces} fmt={REGLES_CARTE.fmt}/>
     : null;
@@ -64602,7 +65040,7 @@ function AppCoeur() {
           }}</EbayActionCompte>)}
           {sec==='ventes'&&<EbayVentes baseKO={baseKO} vue={ebayVueEff} comptesEbay={comptesEbay} cible={ebayCible?.section==='ventes'?ebayCible:null} onClearCible={()=>setEbayCible(null)}/>}
           {sec==='messages'&&<div style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayMessagesVolets key={ref} comptesEbay={comptesEbay} owner={AUTH.user?.id || 'installation'} cible={ebayCible?.compte===ref && ebayCible.section==='messages'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/>}</EbayActionCompte></div>}
-          {sec==='agent'&&<div className="vrm-ebay-panneau" style={{padding:16}}><GuidesEbay ids={['vente','retour']}/><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayRetours key={'rt-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onSection={(section,t)=>{setEbayVue(ref);setEbayCible(cibleEbay(ref,{...t,section}));allerSec(section);}}/><EbayEvaluations key={'ev-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/></>}</EbayActionCompte></div>}
+          {sec==='agent'&&<div className="vrm-ebay-panneau" style={{padding:16}}><GuidesEbay ids={['vente','retour']}/><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayRetours key={'rt-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onReconnecter={allerComptesEbay}/><EbayAgent key={ref} headers={enTeteSession} theme={C} compte={ref} onReconnecter={allerComptesEbay} onSection={(section,t)=>{setEbayVue(ref);setEbayCible(cibleEbay(ref,{...t,section}));allerSec(section);}}/><EbayEvaluations key={'ev-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/></>}</EbayActionCompte></div>}
           {sec==='promo'&&<div className="vrm-ebay-panneau" style={{padding:16}}><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><><EbayPromotion key={'pr-'+ref} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref}/><EbayRemises key={'rm-'+ref} compte={ref}/></>}</EbayActionCompte></div>}
           {sec==='achats'&&<EbayAchatsOnglet headers={enTeteSession} panelOff={panelOffCoque} vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue} contexte={ctxCalculette}/>}
           {sec==='offres'&&<div className="vrm-ebay-panneau" style={{padding:16}}><GuidesEbay ids={['offre']}/><EbayActionCompte vue={ebayVueEff} comptes={comptesEbay} onCompte={setEbayVue}>{ref=><EbayOffres key={ref} cible={ebayCible?.compte===ref && ebayCible.section==='offres'?ebayCible:null} onClearCible={()=>setEbayCible(null)} headers={enTeteSession} confirm={askConfirm} theme={C} compte={ref} onAnnonces={()=>allerSec('annonces')}/>}</EbayActionCompte></div>}
@@ -64692,7 +65130,9 @@ function AppCoeur() {
           { numEbay: (c, li) => numLigneEbay(c, li) || '', numLbc: (v) => numeroLbcIdentite(v, (numData && numData.lbcItems) || null, load('vrm_lbc_liens', {}) || {}) }));
         // (15 nov., vendre plus) LE STOCK : chaque N° rangé (le plan, par `cleNum`) et son lieu ; le garage aussi.
         let brutPlan = null; try { brutPlan = localStorage.getItem('vrm_room_plan'); } catch (_) {}
-        const stockGs = memoSur('gs-stock', [brutPlan, garageGrid], () => stockPourRecherche(brutPlan, garageGrid));
+        // (16 nov., lot ecrans-restes) + les paires IMPORTÉES d'un autre outil (`vrm_stock_importe`), par leur N°.
+        let brutImp = null; try { brutImp = localStorage.getItem(CLE_STOCK_IMPORTE); } catch (_) {}
+        const stockGs = memoSur('gs-stock', [brutPlan, garageGrid, brutImp], () => [...stockPourRecherche(brutPlan, garageGrid), ...importeesPourRecherche(lireStockImporte(), { cleNum })]);
         const idx = indexRechercheMemo({ ventes: soldCache, achats: buyCache, pseudos: gsData ? gsData.pseudos : null, bordereaux: gsData ? gsData.bordereaux : null, colis: gsData ? gsData.colis : null, fiches, annonces: gsData ? gsData.annonces : null, factures, numerosTx, autres, messages: gsData ? gsData.messages : null,
           stock: stockGs, retours: gsData ? (gsData.retours === undefined ? null : gsData.retours) : null });
         const kNumQ = lireNumeroCherche(qBrut, { cleNum }, [prefixeNumeros(), archiveNumeros()]);
@@ -64781,8 +65221,8 @@ function AppCoeur() {
             info = [etat, nomCompteGs(e.compte), e.date ? jourCourt(e.date) : ''].filter(Boolean).join(' · ');
           } else if (type === 'stock') {
             vignette = <>{numBadge(e.numero)}{thumb(null, <Icon name="box" size={18} style={{color:C.muted}}/>)}</>;
-            titre = tr('vp.loupe.stockSeul'); etat = tr('vp.loupe.stockSeul');
-            info = (e.lieuxAff || []).slice(0, 2).join(' · ');
+            titre = e.importe && e.titre ? e.titre : tr('vp.loupe.stockSeul'); etat = e.importe ? tr('er.loupe.importee') : tr('vp.loupe.stockSeul');
+            info = [e.importe ? etat : '', ...(e.lieuxAff || []).slice(0, 2)].filter(Boolean).join(' · ');
           } else if (type === 'retour') {
             vignette = <>{e.numero ? numBadge(e.numero) : null}{thumb(e.photo, <Icon name="box" size={18} style={{color:C.muted}}/>)}</>;
             titre = e.titre || tr('vp.loupe.retourInfo'); etat = tr('vp.loupe.retourInfo');
@@ -64893,8 +65333,21 @@ function AppCoeur() {
           const lusColis = pubR ? retirerPubliePhrase(pubR, Date.now()) : null;
           const colisP = veut('colis') && lusColis ? passe(lusColis.liste.map((c, i) => ({ ...c, _i: i })), { quoi: 'colis', etats: ['a-retirer'], acces: {
             titre: (c) => c.nom || '', transporteur: (c) => c.transporteur || null, etat: () => 'a-retirer', jour: (c) => c.limite || null } }) : [];
+          // (16 nov., lot ecrans-restes) Les colis À EXPÉDIER et leur date limite : la liste publiée par Ventes « À expédier »
+          // (`vrm_colis_aposter.liste`, la règle de Colis `limiteExpedition`), crue si elle a moins de 12 h — sinon « pas su ».
+          const pubE = load('vrm_colis_aposter', null);
+          const lusEnv = pubE && Array.isArray(pubE.liste) && publicationColisFraiche(pubE) ? pubE.liste : null;
+          const colisE = veut('colis') && lusEnv ? passe(lusEnv.map((c, i) => ({ ...c, _i: i })), { quoi: 'colis', etats: ['a-expedier'], acces: {
+            titre: (c) => c.nom || '', numero: (c) => c.num || '', etat: () => 'a-expedier', jour: (c) => c.jour || null } }) : [];
           const MAXP = 8;
-          nPhrase = paires.length + ventesP.length + achatsP.length + colisP.length;
+          nPhrase = paires.length + ventesP.length + achatsP.length + colisP.length + colisE.length;
+          const lignesEnvoyer = colisE.slice(0, MAXP).map((c) => (
+            <button key={'phrase-env-' + c._i} type="button" className="vrm-recherche-ligne" data-recherche-resultat="phrase-colis-envoyer" data-phrase-limite={c.jour || ''} data-phrase-num={c.num || undefined}
+              onClick={() => ouvrir({ e: { type: 'colis', c: { sens: 'aenvoyer' } }, par: 'phrase' }, 'colis')} style={styleLigne}>
+              {thumb(null, <Icon name="box" size={18} style={{color:C.muted}}/>)}
+              {ligneTexte((c.num ? `N°${c.num} · ` : '') + (c.nom || tr('er.phrase.colisSansTitre')), c.jour ? tr(c.estimee ? 'er.phrase.limiteEstimee' : 'er.phrase.limite', { d: jourCourt(c.jour + 'T12:00:00') }) : '')}
+              <span style={{fontSize:17,color:C.muted}}>›</span>
+            </button>));
           const lignesColis = colisP.slice(0, MAXP).map((c) => (
             <button key={'phrase-colis-' + c._i} type="button" className="vrm-recherche-ligne" data-recherche-resultat="phrase-colis" data-phrase-colis={c.transporteur || ''} data-phrase-limite={c.limite || ''}
               onClick={() => ouvrir({ e: { type: 'colis', c: { sens: 'entrant' } }, par: 'phrase' }, 'colis')} style={styleLigne}>
@@ -64912,6 +65365,8 @@ function AppCoeur() {
               {sous(tr('listes.phrase.quoi.achat'), achatsP, 'achat')}
               {veut('colis') && (phraseGs.filtres.some((f) => f.k === 'transporteur' || (f.k === 'etat' && f.v === 'a-retirer')) || quoiF) && !lusColis ? <div data-phrase-colis-pas-su="" style={{fontSize:12,color:C.muted,padding:'4px 2px'}}>{tr('listes.phrase.colisPasSu')}</div> : null}
               {colisP.length ? <div data-recherche-phrase-type="colis" data-recherche-n={colisP.length}>{entete(tr('listes.phrase.loupeColis'), colisP.length, 'phrase-colis')}{lignesColis}</div> : null}
+              {veut('colis') && phraseGs.filtres.some((f) => f.k === 'etat' && f.v === 'a-expedier') && !lusEnv ? <div data-phrase-envoyer-pas-su="" style={{fontSize:12,color:C.muted,padding:'4px 2px'}}>{tr('er.phrase.envoyerPasSu')}</div> : null}
+              {colisE.length ? <div data-recherche-phrase-type="colis-envoyer" data-recherche-n={colisE.length}>{entete(tr('er.phrase.aEnvoyer'), colisE.length, 'phrase-colis-envoyer')}{lignesEnvoyer}</div> : null}
             </div>);
         }
         return (
@@ -65091,6 +65546,10 @@ function AppCoeur() {
       etapeVente: (o) => etapeVente(o, { poste: (x) => !!shipDone[String(x.transaction_id)] }),
       venteAnnulee: (o) => classifyOrderStatus(o && o.status) === 'cancelled' || (o && o.transaction_id != null && txnAnnuleeAvantEnvoi(o.transaction_id)),
       montantRecuEbay, commandeEbayEngagee, lbcAnnulee, lbcFinalisee,
+      // (16 nov., lot ecrans-restes) La date limite d'envoi d'une vente à poster : LA règle de Colis
+      // (`limiteExpedition` : l'e-mail du bordereau, sinon vente + 7 j estimée) et SA phrase (`texteLimiteEnvoi`).
+      limiteEnvoi: (v, b) => { const l = limiteExpedition(v, b && b.dateLimite ? { dateLimite: b.dateLimite } : null); if (!l || !l.jour) return null;
+        const t = texteLimiteEnvoi(l); return t ? { texte: t, estimee: l.limite === 'estimee', retard: !!l.retard, ambre: !!l.retard || (Number.isFinite(l.daysLeft) && l.daysLeft <= 1), jour: l.jour } : null; },
     });
     // (5 nov.) « Voir l'état » : ce qui se calcule (`etatArticle`), depuis
     // l'histoire ci-dessus et deux lectures en plus (dates Vinted, réception).
@@ -65869,4 +66328,5 @@ export { InfoPop, PuceProposition };
 export { fetchTranspLignes, relireTransporteursSiVieux };
 export { oublierReglageMontage };   // (11 nov., intégration) la lecture gardée au montage, oubliée par une écriture directe
 export { fetchTxnItemIds };   // (11 nov., robustesse) la synchro de l'inventaire relie par identité
-export { sortieCaseStock, texteAvecDescentes, pushNotif, NotePaireCoque, ACTIONS_REPUB, ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, Badge, BlocBarrerVc, BlocComptesMuets, Bouton, BoutonBordereau, BoutonImprimerVc, BrandMark, Btn, BulleConv, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CarteStatsApp, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, CompteVente, CoutAchatVente, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DEMANDE_VC_PAIRE, DEPS_FACTURE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, ENTREPRISE_VIDE, EQUIPE_NON_INSTALLE_TXT, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, EbayCommande, FermeAuRetour, FicheConvVolet, FiltresVentes, FraicheurAnnonces, GuideReglage, IMPR_MODES, INV_STATUS, Icon, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneConv, LignePanne, LigneRelais, LigneVente, LigneVenteCompacte, ListeComptes, LiveStatsCarte, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, MULTI_USER, MicDictee, NAV, NOM_PLAT_STOCK, NOM_RECU_ACHAT, NUM_OK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PeriodePicker, PhraseEcran, PhotoVc, PhotoVente, PhotoVinted, PiedSansEnvoi, Pourquoi, QrColis, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, REGLES_CARTE, RapidesConv, RecapFrise, RepartitionsVentes, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SERIE_DECLARATION, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, Skeleton, StatBox, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, TamponPose, TeteFil, URL_ITEM_EBAY, VENTES_MASQUEES_AUCUNE, ZOOM_KEY, __vmrEtat, __vmrJobs, __vmrNotifier, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _fichesEbayMemo, _persistAcctCache, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aExpedier, aLaDemande, aPayerUrssaf, aRetirerDeLbcEbay, aRetirerDeLbcVinted, achatsMasques, actionEquipe, ageCourtVc, allerComptesEbay, annonceDeclareePartie, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, applyZoom, archiveNumeros, askChoix, askConfirm, askText, authSetPassword, authSignOut, avecDatesLbc, avecNumerosVc, avecRetour, b64ToBytes, beneficeDesJours, beneficeDuMoisPub, bilanLignes, bordereauFormatKey, brouillonsParametres, buildFacturXBytes, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, chargerPhotoBoite, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, classifyOrderStatus, clavierNum, cleDeclarationPartie, cleNum, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, codePerime, commandeEbayEngagee, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesLbcProuves, comptesLbcSession, comptesStockEcartes, connexionExtensionVrm, contexteSignalement, EcrireSupportFeuille, corpsCompteEbay, couvertureBenefice, dansVueEbay, dateCourteVc, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, debutPeriode, decalerPeriode, defaireVc, delaiDemandeEmail, deleteVintedAccount, demanderDeclaration, demanderQuestionRepub, demanderVue, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, dessinerPdf, doublesVenteEbay, doublesVenteLbc, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireJournalRepub, ecrireLigneAccompagnement, emettreClesRelues, enTeteSession, entForInvoice, estIOS, estOctetsPdf, estRelaisApple, estTamponAnnule, etapeVente, etatEnClair, etatRegleOffre, eurEbay, extEnRetard, extSait, extractBrand, extractColors, extractModel, extractSize, familleArticle, fetchEmailAchats, fetchHarvest, fetchHarvestOrders, fetchProInvoices, fetchVersementsVinted, fetchVintedAccounts, fetchVintedListings, fetchVintedOrders, ficheUniqueDuNumero, fichesPourEbay, filtreInventaire, fmt, fmtDate, gesteVrm, harvestTs, ilYaBr, ilYaCourt, imprMode, imprimanteChoisie, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, libelleRegime, libelleRelais, libelleSourceAchat, libererOngletPdf, lienEbay, lienItemEbay, lignesRecu, limiteVcTexte, lireAbonnement, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDatesLbc, lireDeclarations, lireDressings, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEquipe, lireExtrasRepartition, lireFichesPage, lireLbcEnVente, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireMisDeCote, lireModelesRanges, lireMontantSaisi, lireObjet, lirePdfLigne, lirePreuvesVenteVinted, lireReglage, lireReglageMontage, lireReglesEbay, lireReleveVentes, lireTout, lireVentesVestiaire, load, loadRoomPlan, logoFacture, makeChallenge, makeVerifier, mapMailError, marcheEbayDeRef, marquerEbay, masqueesPresentes, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisDeclare, moisPeriodeUrssaf, montantCommande, montantRecuEbay, montantPeriodeUrssaf, mpChoisi, netApresUrssafDe, nextUrssafDeadline, nomAppareil, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, numDeSkuEbay, numEbayLu, numLigneEbay, numeroLbcIdentite, numeroReprenable, numerosDejaVendus, numerosLbcSortis, numerosVcEffectifs, numerosVendusEbay, numerosVendusVc, onCloudReady, onSyncChange, onVmrExt, orderPhoto, ouDansMeubles, ouEstNumero, ouVenduesTexte, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirRecherchePhoto, ouvrirStripe, payeDe, pctFr, photoKey, phraseNonComptees, phrasePersonne, placeDansMeubles, poserBordereau, poserCible, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLisible, providerEnabled, questionRepubOk, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, readZoom, rechercheParNumero, recuAvecADater, recusAchatDe, refLbcPresente, regimeFiscal, regleEngage, reglesEngagees, relaisVivant, relierBoiteDe, repondreSansDepenses, reponsesRapidesPartagees, resultatReviseEbay, retraitsEbayAutoPermis, save, saveTout, sbAuth, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, texteCentimesRecu, textePerime, texteReglesQuiRestent, toast, tod, triNum, tsCommande, txRecuAchat, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, urlPhotoVc, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useEstProprietaire, useEtatEmailsComptes, useExcluAutre, useExtVivante, useLigneSynchro, useLigneUrssaf, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useRegimeFiscal, useReglesStream, useSansSouris, useSecondesRestantes, useSourcesCarte, useStateCle, useStream, useVcLocal, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, useVoixExt, useVueSession, useProfilVendeur, useMotsArticle, exemplesActuels, useExemplesVendeur, vendActuel, PROFIL_VENDEUR, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcCarte, vcSetter, ventesDeclarables, ventesFaites, ventilationRecuAchat, verifierAvantPublication, vintedDeChrome, vmrAuthEtat, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, withOwner, writeSession, xmlEsc, ymCompta, ymCourant, ymDeTs, zoneEtiquette, AideEcran, masquerPourEnvoi, oauthStart, dejaEnLigneEbay, dejaEnLigneLbc, optsNumeroVerif, DEMANDE_RETOUR_EBAY, seDeconnecter, ecrireCopieLocale, ventesAilleursDe, verifierMessageAvantEnvoi };
+export { reglageTamponsChoisi, ecrireReglageTampons, Z_CONFIRMATION };   // (16 nov., lot tampons-parametres)
+export { achatDuNumeroLu, annoncerFicheAPublier, modifierCle, sortieCaseStock, texteAvecDescentes, pushNotif, NotePaireCoque, ACTIONS_REPUB, ANNONCES_RETIREES, AUTH, AUTH_REDIRECT, RECHERCHE_OUVERTURE, Avancement, BUILD_ID, Badge, BlocBarrerVc, BlocComptesMuets, Bouton, BoutonBordereau, BoutonImprimerVc, BrandMark, Btn, BulleConv, C, CE_QUE_VOIT_UN_MEMBRE, CLOISONNE, COL_H, COMPTA_DEFAUT, CadreFil, Card, CarteStatsApp, CaseCgv, ChipsModeles, ChoixDepenses, ChoixPlanches, ComposeConv, CompteVente, CoutAchatVente, DATE_LBC_OK, DEMANDE_ADRESSES, DEMANDE_DEPENSE, DEMANDE_EBAY_PAIRE, DEMANDE_LBC_CIBLE, DEMANDE_LBC_FICHE, DEMANDE_REGLAGE_SOUS, DEMANDE_SAISIE_PRIX, DEMANDE_SIGNALEMENTS, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DEMANDE_VC_PAIRE, DEPS_FACTURE, DICTEE_OK, DOCS_LEGAUX, EBAY_SKIN, ENTREPRISE_VIDE, EQUIPE_NON_INSTALLE_TXT, ETAPES_REPUB, EXT_ATTENDUE, EXT_CAPACITES, EbayCommande, FermeAuRetour, FicheConvVolet, FiltresVentes, FraicheurAnnonces, GuideReglage, IMPR_MODES, INV_STATUS, Icon, IconeReglage, KpiVentes, LAYOUT, LBC_DESC_MAX, LBC_ETATS, LBC_PHOTOS_MAX, LBC_TITRE_MAX, LIENS_EBAY, LISTE_VENTES_FRAICHE_MS, LigneConv, LignePanne, LigneRelais, LigneVente, LigneVenteCompacte, ListeComptes, LiveStatsCarte, MESSAGES_RETIRES, MFA_TROP, MM_PT, MOIS_COMPTA, MOIS_COURTS, MULTI_USER, MicDictee, NAV, NOM_PLAT_STOCK, NOM_RECU_ACHAT, NUM_OK, OAUTH_PROVIDERS, PRIX_CGV_LISIBLE, PeriodePicker, PhraseEcran, PhotoVc, PhotoVente, PhotoVinted, PiedSansEnvoi, Pourquoi, QrColis, RAISON_NON_COMPTEE, REGIMES_FISCAUX, REGLAGE_PAS_LU, REGLES_CARTE, RapidesConv, RecapFrise, RepartitionsVentes, SB_CONFLICT, SEL_EBAY_ANNONCES, SEL_EBAY_COMMANDES, SERIE_DECLARATION, SUPABASE_KEY, SUPABASE_URL, ScreenHead, Segmente, SheetShell, Skeleton, StatBox, TAUX_URSSAF_DEFAUT, TEXTE_DELAI_EMAIL_BOUTON, TamponPose, TeteFil, URL_ITEM_EBAY, VENTES_MASQUEES_AUCUNE, ZOOM_KEY, __vmrEtat, __vmrJobs, __vmrNotifier, _acctCache, _apercuEcrit, _ecoutesApercuEcrit, _failedLocalSaves, _fichesEbayMemo, _persistAcctCache, _reglagesEcoute, _reglagesRates, _saveTimers, _settingsConfirmed, _settingsRevision, _startOfDay, _syncInfo, aExpedier, aLaDemande, aPayerUrssaf, aRetirerDeLbcEbay, aRetirerDeLbcVinted, achatsMasques, actionEquipe, ageCourtVc, allerComptesEbay, annonceDeclareePartie, annonceLbcALui, annonceLbcEnVente, annoncesLbcVendues, annotateAndDownloadBordereau, appelEbay, applyZoom, archiveNumeros, askChoix, askConfirm, askText, authSetPassword, authSignOut, avecDatesLbc, avecNumerosVc, avecRetour, b64ToBytes, beneficeDesJours, beneficeDuMoisPub, bilanLignes, bordereauFormatKey, brouillonsParametres, buildFacturXBytes, caEbayPayees, casesCgvCochees, categorieLbcDe, centimesRecu, centsR, chargeAbonnement, chargerPhotoBoite, cheminCatalogueVinted, chercherEntreprise, choisirVueEquipe, classifyOrderStatus, clavierNum, cleDeclarationPartie, cleNum, clePhotoLbc, clesAnnonceLbc, clesVenteStats, cloudPush, codePerime, commandeEbayEngagee, compressImage, comptaChargesAnnee, comptaChargesMois, compteEcarte, compteEcarteChoix, compteVenteEbay, compterReglesEbay, comptesBloquesVinted, comptesLbcProuves, comptesLbcSession, comptesStockEcartes, connexionExtensionVrm, contexteSignalement, EcrireSupportFeuille, corpsCompteEbay, couvertureBenefice, dansVueEbay, dateCourteVc, dateFr, dateJourFr, dateLocaleISO, dateMiseEnLigneMs, debutPeriode, decalerPeriode, defaireVc, delaiDemandeEmail, deleteVintedAccount, demanderDeclaration, demanderQuestionRepub, demanderVue, descriptionDeFaits, descriptionEbayPropre, descriptionLbcDe, dessinerPdf, doublesVenteEbay, doublesVenteLbc, ebayTitre, echeancesAbonnement, ecouterFenetreCsp, ecrireAchatsMasques, ecrireJournalRepub, ecrireLigneAccompagnement, emettreClesRelues, enTeteSession, entForInvoice, estIOS, estOctetsPdf, estRelaisApple, estTamponAnnule, etapeVente, etatEnClair, etatRegleOffre, eurEbay, extEnRetard, extSait, extractBrand, extractColors, extractModel, extractSize, familleArticle, fetchEmailAchats, fetchHarvest, fetchHarvestOrders, fetchProInvoices, fetchVersementsVinted, fetchVintedAccounts, fetchVintedListings, fetchVintedOrders, ficheUniqueDuNumero, fichesPourEbay, filtreInventaire, fmt, fmtDate, gesteVrm, harvestTs, ilYaBr, ilYaCourt, imprMode, imprimanteChoisie, isCloudReady, jumellesParPhoto, lbcAnnoncesSession, lbcAnnulee, lbcDescription, lbcEuro, lbcExpediee, lbcFinalisee, lbcListingsSession, lbcSortieDe, lbcTitre, lectureEcriteLbc, libellePeriodeCa, libelleRegime, libelleRelais, libelleSourceAchat, libererOngletPdf, lienEbay, lienItemEbay, lignesRecu, limiteVcTexte, lireAbonnement, lireAchatsLies, lireBaseRelue, lireBeneficeJours, lireCapturesDetail, lireComptaSynchro, lireComptesEbay, lireDatesLbc, lireDeclarations, lireDressings, lireEbayEnLigne, lireEbayParCompte, lireEbayTous, lireEquipe, lireExtrasRepartition, lireFichesPage, lireLbcEnVente, lireLigneAccompagnement, lireLignesDuCompte, lireLignesEnLigne, lireMisDeCote, lireModelesRanges, lireMontantSaisi, lireObjet, lirePdfLigne, lirePreuvesVenteVinted, lireReglage, lireReglageMontage, lireReglesEbay, lireReleveVentes, lireTout, lireVentesVestiaire, load, loadRoomPlan, logoFacture, makeChallenge, makeVerifier, mapMailError, marcheEbayDeRef, marquerEbay, masqueesPresentes, mfaAppel, mfaInjoignable, mfaLireFacteurs, mfaVerifierCode, mfaVerifierCodeParmi, moisDeclare, moisPeriodeUrssaf, montantCommande, montantRecuEbay, montantPeriodeUrssaf, mpChoisi, netApresUrssafDe, nextUrssafDeadline, nomAppareil, nomCompteEbay, nonCompteesDe, nonLusVestiaire, normTitle, normalizePlan, numDeSkuEbay, numEbayLu, numLigneEbay, numeroLbcIdentite, numeroReprenable, numerosDejaVendus, numerosLbcSortis, numerosVcEffectifs, numerosVendusEbay, numerosVendusVc, onCloudReady, onSyncChange, onVmrExt, orderPhoto, ouDansMeubles, ouEstNumero, ouVenduesTexte, ouvrirEmailsRelier, ouvrirPdfOnglet, ouvrirRecherchePhoto, ouvrirStripe, payeDe, pctFr, photoKey, phraseNonComptees, phrasePersonne, placeDansMeubles, poserBordereau, poserCible, poserReglesStreamEnAttente, poserRepubVivant, poserStream, prefixeNumeros, prixAchatDe, prixAchatHorsNombre, prixCompatibleRegle, prixCourt, prixLisible, providerEnabled, questionRepubOk, raisonExtGlobale, rangementDuNum, readPdfFirstPageSize, readZoom, rechercheParNumero, recuAvecADater, recusAchatDe, refLbcPresente, regimeFiscal, regleEngage, reglesEngagees, relaisVivant, relierBoiteDe, repondreSansDepenses, reponsesRapidesPartagees, resultatReviseEbay, retraitsEbayAutoPermis, save, saveTout, sbAuth, seuilTropBas, signalerComptesEbay, signalerVc, siteCompteEbayTexte, skuEbayDe, sondeLectureSansCompte, tauxUrssaf, telechargerFichier, texteCentimesRecu, textePerime, texteReglesQuiRestent, toast, tod, triNum, tsCommande, txRecuAchat, typeBordereau, typeCompteEbayTexte, typeCompteVinted, uid, uidsLies, urlPhotoVc, useBeneficeCalcul, useCompteLbcOuvert, useCompteVcOuvert, useComptesAutresSites, useComptesExclus, useEbayPaires, useEstProprietaire, useEtatEmailsComptes, useExcluAutre, useExtVivante, useLigneSynchro, useLigneUrssaf, useMisDeCote, useNumerotationVestiaire, useObjectifMois, useRegimeFiscal, useReglesStream, useSansSouris, useSecondesRestantes, useSourcesCarte, useStateCle, useStream, useVcLocal, useVentesCoque, useVentesEmailFraiches, useVentesVestiaire, useVoixExt, useVueSession, useProfilVendeur, useMotsArticle, exemplesActuels, useExemplesVendeur, vendActuel, PROFIL_VENDEUR, poserProfilVendeur, proprioTri, valideAnnonceLbc, vcCarte, vcSetter, ventesDeclarables, ventesFaites, ventilationRecuAchat, verifierAvantPublication, vintedDeChrome, vmrAuthEtat, vmrCmd, vmrExtPresent, vmrExtVersion, vmrPdfLbc, withOwner, writeSession, xmlEsc, ymCompta, ymCourant, ymDeTs, zoneEtiquette, AideEcran, masquerPourEnvoi, oauthStart, dejaEnLigneEbay, dejaEnLigneLbc, optsNumeroVerif, DEMANDE_RETOUR_EBAY, seDeconnecter, ecrireCopieLocale, ventesAilleursDe, verifierMessageAvantEnvoi };

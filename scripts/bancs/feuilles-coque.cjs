@@ -476,6 +476,8 @@ const attendre = async (pg, fn, arg, ms = 8000) => { const t0 = Date.now(); whil
         if (!num) { dit(false, `[${tag}] Tout imprimer · ${cas.nom} : une ligne porte un N°`, 'aucune'); await ctx.close(); continue; }
         await pg.evaluate(cas.poser, num);
         await clic(pg, '[data-lot-imprimer]', 300);
+        // (16 nov., lot tampons-parametres) L'aperçu avant impression d'abord : son « Imprimer » pose la question.
+        await pg.waitForSelector('[data-impr-apercu="pret"] [data-impr-apercu-imprimer]:not([disabled])', { timeout: 60000 }).then(() => clic(pg, '[data-impr-apercu-imprimer]', 300)).catch(() => {});
         const vu = await attendre(pg, (t) => [...document.querySelectorAll('button')].some((x) => (x.innerText || '').trim() === t), cas.ok);
         if (!vu) { dit(false, `[${tag}] Tout imprimer · ${cas.nom} : la confirmation est posée`, 'aucune confirmation en 8 s'); await ctx.close(); continue; }
         await pg.waitForTimeout(500);

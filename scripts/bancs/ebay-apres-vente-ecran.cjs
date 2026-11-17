@@ -27,7 +27,7 @@ const rows = [
 const RETOUR = { returnId: '5000123', orderId: '12-11111-22222', acheteur: 'acheteur_a', etat: 'RETURN_REQUESTED', itemId: '3001', titre: 'Salomon XT-6 noir taille 43', motif: 'DOES_NOT_FIT', commentaire: 'Trop petit', remboursementPrevu: { value: '80.00', currency: 'EUR' }, rembourse: null };
 const RETOUR_RECU = { ...RETOUR, returnId: '5000999', etat: 'ITEM_DELIVERED', titre: 'Asics Gel 1130 argent', commentaire: '' };
 const ANNUL = { cancelId: '7000456', orderId: '12-33333-44444', acheteur: 'acheteur_b', etat: 'CANCEL_REQUESTED', montant: { value: '55.00', currency: 'EUR' }, date: '2026-10-16T09:00:00.000Z' };
-let envois = [], mode = 'normal', ko = 0;
+let envois = [], recus = [], mode = 'normal', ko = 0;
 const dit = (c, m, d) => { if (!c) ko++; console.log((c ? 'OK  ' : 'KO  ') + m + (d ? ' — ' + d : '')); };
 const essaie = async (quoi, fn) => { try { return await fn(); } catch (e) { dit(false, quoi, 'a levé : ' + String((e && e.message) || e).split('\n')[0].slice(0, 160)); return null; } };
 const types = { '.js': 'text/javascript', '.css': 'text/css', '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/json', '.woff2': 'font/woff2' };
@@ -78,13 +78,17 @@ async function ouvrir(b, vp) {
     if (req.method() !== 'POST') return j({ ok: true, ready: true, canConsent: true });
     let body = {}; try { body = JSON.parse(req.postData() || '{}'); } catch (_) {}
     const a = body.action;
+    recus.push(body);
     if (['deciderretour', 'rembourserretour', 'decannulation', 'promouvoir', 'changertaux', 'arreterpromo'].includes(a)) { envois.push(body); return j(a === 'decannulation' ? { ok: true, decision: body.decision, orderId: ANNUL.orderId, commandeRangee: true } : { ok: true }); }
     if (a === 'status') return j({ ok: true, connected: true, comptes: [{ cle: 'aaaaaaaaaaaaaaa1', pseudo: 'paire_perso', principal: true, relie: true }] });
     if (a === 'retours') return mode === 'scope' ? j({ ok: false, reason: 'scope', error: 'eBay n’a pas autorisé VRM à lire tes demandes de retour. Reconnecte ton compte eBay (Compte → Connecter) pour donner ce droit.' }) : j({ ok: true, retours: [RETOUR, RETOUR_RECU] });
     if (a === 'annulations') return mode === 'scope' ? j({ ok: false, reason: 'pas-su', error: 'eBay n’a pas rendu tes demandes d’annulation.' }, 502) : j({ ok: true, annulations: [ANNUL] });
     if (a === 'promotion') return j({ ok: true, campagnes: [{ id: 'C1', nom: 'VRM', taux: 5 }], promues: [{ listingId: '3001', taux: 5, campagne: 'C1' }], annonces: [{ itemId: '3001', titre: 'Salomon XT-6 noir taille 43' }, { itemId: '3002', titre: 'Nike Dunk Low panda taille 42' }] });
     if (a === 'achats') return j({ ok: true, achats: [{ itemId: '4001', titre: 'Achat test Converse', vendeur: 'vendeur_x', prix: '42.00', devise: 'EUR', date: '2026-10-01T10:00:00.000Z', expedieLe: '2026-10-02T10:00:00.000Z', suivi: { numero: 'LA123456789FR', transporteur: 'Colissimo' } }, { itemId: '4002', titre: 'Achat pas payé', vendeur: 'vendeur_y', prix: '10.00', devise: 'EUR', statut: 'Incomplete' }] });
-    if (a === 'agent') return j({ ok: true, tasks: [], sources: [], journal: [], journalLisible: true });
+    if (a === 'agent') return j({ ok: false, reason: 'agent-arrete', error: 'L\'agent eBay est arrêté.' }, 410);
+    // (16 nov., ebay-a-traiter) « Tâches à traiter » lit `taches` ; en mode « scope », la route
+    // refuse comme la vraie le ferait d'un compte à reconnecter.
+    if (a === 'taches') return mode === 'scope' ? j({ ok: false, reason: 'reconnecter', error: 'eBay a refusé la connexion de ce compte. Reconnecte-le.' }, 401) : j({ ok: true, tasks: [{ id: 'order:12-55555-66666', section: 'ventes', label: 'Préparer l’expédition', ref: '12-55555-66666', title: 'Paire à expédier test' }], sources: [{ nom: 'Commandes', ok: true, partiel: true }], journal: [], journalLisible: true });
     if (a === 'evaluations') return j({ ok: true, evaluations: [] });
     if (a === 'offreinfo') return j({ ok: true, eligibles: [], complet: true });
     return j({ ok: true });
@@ -92,7 +96,10 @@ async function ouvrir(b, vp) {
   return { ctx, pg, errs };
 }
 const feuille = (pg) => pg.locator('div[style*="z-index: 2000"]');
-const sousOnglet = async (pg, nom) => { await pg.getByRole('button', { name: nom, exact: true }).first().click({ timeout: 8000 }); await pg.waitForTimeout(900); };
+// (16 nov.) Les sous-onglets eBay ont changé de forme (refonte) : on ouvre la section par son
+// lien (`?tab=plat_ebay&section=…`, celui que l'app pose elle-même), pas par un libellé.
+const SECTION = { 'À traiter': 'agent', 'Promotion': 'promo', 'Achats': 'achats' };
+const sousOnglet = async (pg, nom) => { const u = new URL(pg.url()); await pg.goto(`${u.origin}/?tab=plat_ebay&section=${SECTION[nom]}`, { waitUntil: 'domcontentloaded' }); await pg.waitForTimeout(1500); };
 const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 (async () => {
   let b;
@@ -108,6 +115,13 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         await pg.waitForSelector('[data-ebay-annulation="7000456"]', { timeout: 12000 });
         const etat = await pg.$eval('[data-ebay-retours]', (e) => [e.getAttribute('data-ebay-retours'), e.getAttribute('data-ebay-annulations')]);
         dit(etat[0] === '2' && etat[1] === '1', 'les demandes s’affichent : 2 retours ouverts, 1 annulation à décider', JSON.stringify(etat));
+        // (16 nov., ebay-a-traiter) « Tâches à traiter » : l'action `taches`, le principal désigné
+        // comme partout (aucun `compte`), jamais `agent` (410) ni « mal désigné ».
+        await pg.waitForSelector('.vrm-ebay-task-row', { timeout: 10000 });
+        const t = recus.filter((x) => x.action === 'taches');
+        dit(t.length >= 1 && t.every((x) => !('compte' in x)) && !recus.some((x) => x.action === 'agent'), 'Tâches à traiter : `taches` part sans `compte` pour le principal, jamais `agent`', JSON.stringify(recus.filter((x) => /taches|agent/.test(x.action))));
+        const tt = await pg.$eval('.vrm-ebay-tasks', (e) => e.innerText);
+        dit(/Paire à expédier test/.test(tt) && !/mal désigné|agent eBay est arrêté/i.test(tt), 'Tâches à traiter : la tâche lue s’affiche, aucun refus', tt.replace(/\s+/g, ' ').slice(0, 160));
         if (process.env.SHOT) await pg.screenshot({ path: path.join(process.env.SHOT, 'traiter-' + vp.width + '.png'), fullPage: true });
         const ret = await pg.$eval('[data-ebay-retour="5000123"]', (e) => e.innerText);
         dit(/acheteur_a/.test(ret) && /80,00\s*€/.test(ret) && /taille/.test(ret), 'le retour nomme l’acheteur, le motif et le montant à rembourser', ret.replace(/\s+/g, ' ').slice(0, 160));
@@ -140,9 +154,11 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         await pg.waitForSelector('[data-ebay-promo="3002"]', { timeout: 10000 });
         const p = await pg.$$eval('[data-ebay-promo]', (l) => l.map((e) => [e.getAttribute('data-ebay-promo'), e.getAttribute('data-promue')]));
         dit(JSON.stringify(p) === JSON.stringify([['3001', 'oui'], ['3002', 'non']]), 'promue / pas promue, annonce par annonce', JSON.stringify(p));
-        dit(/UNIQUEMENT si la paire se vend/.test(await pg.$eval('[data-ebay-promotion]', (e) => e.innerText)), 'les frais de promotion sont dits');
+        dit(/UNIQUEMENT si .{1,30} se vend/.test(await pg.$eval('[data-ebay-promotion]', (e) => e.innerText)), 'les frais de promotion sont dits');
         const avant = envois.length;
         await pg.click('[data-ebay-promo="3002"] [data-geste="promouvoir"]');
+        await pg.waitForTimeout(600);
+        if (process.env.SHOT) await pg.screenshot({ path: path.join(process.env.SHOT, 'promo-' + vp.width + '.png') });
         await feuille(pg).getByRole('button', { name: 'Promouvoir' }).click({ timeout: 5000 }); await pg.waitForTimeout(700);
         const e3 = envois[avant] || {};
         dit(e3.action === 'promouvoir' && e3.listingId === '3002' && e3.taux === '5' && e3.confirme === true, 'promouvoir : l’annonce choisie, au taux affiché, sur confirmation', JSON.stringify(e3));
@@ -166,6 +182,14 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         await pg.waitForSelector('[data-pas-su="retours"]', { timeout: 10000 });
         const t = await pg.$eval('[data-ebay-retours]', (e) => e.innerText);
         dit(/Reconnecte/.test(t) && !/Aucune demande/.test(t), 'droit refusé ⇒ « reconnecte », jamais « aucune demande »', t.replace(/\s+/g, ' ').slice(0, 200));
+        dit(await pg.$eval('[data-ebay-retours]', (e) => !!e.querySelector('[data-ebay-reconnecter]')), 'droit refusé ⇒ un bouton mène à la reconnexion du compte eBay');
+        await pg.waitForSelector('[data-ebay-taches-erreur="reconnecter"] [data-ebay-reconnecter]', { timeout: 10000 });
+        dit(true, 'Tâches à traiter refusées (compte à reconnecter) ⇒ le bouton « Reconnecter » est là');
+        if (process.env.SHOT) await pg.screenshot({ path: path.join(process.env.SHOT, 'traiter-scope-' + vp.width + '.png'), fullPage: true });
+        await pg.click('[data-ebay-taches-erreur] [data-ebay-reconnecter]'); await pg.waitForTimeout(900);
+        const vuCompte = await pg.waitForSelector('[data-ebay-compte-section]', { timeout: 8000 }).then(() => true, () => false);
+        if (process.env.SHOT && !vuCompte) await pg.screenshot({ path: path.join(process.env.SHOT, 'apres-reconnecter-' + vp.width + '.png') });
+        dit(vuCompte, 'le bouton ouvre eBay → Compte (la section de connexion du compte)', pg.url());
       });
       dit(errs.length === 0, 'aucune erreur de page', errs.join(' | ').slice(0, 200));
       await ctx.close();

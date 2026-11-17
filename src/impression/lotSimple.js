@@ -47,7 +47,8 @@ export const pagesDe = (plages = [], cles = []) => {
 
 // Ce que la feuille dit après l'impression : chaque bordereau absent est NOMMÉ
 // (jamais sauté en silence) avec SA raison.
-export const RAISONS_ABSENT = Object.freeze(['pasLu', 'sansPdf', 'illisible']);
+// (16 nov., lot impression-retours) + les raisons d'un bordereau de RETOUR absent (jamais « génère-le sur la vente »).
+export const RAISONS_ABSENT = Object.freeze(['pasLu', 'sansPdf', 'illisible', 'retourSansPdf', 'retourIllisible']);
 export const absentsDuLot = (lignes = [], reussies = [], raisons = {}) => {
   const ok = new Set((reussies || []).map(String));
   return (lignes || []).filter((l) => l && !ok.has(String(l.cle))).map((l) => ({ cle: l.cle, num: l.num || '', titre: l.titre || '', raison: RAISONS_ABSENT.includes(raisons[l.cle]) ? raisons[l.cle] : 'pasLu' }));

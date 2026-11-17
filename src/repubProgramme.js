@@ -193,9 +193,18 @@ export async function lireProgrammes(ctx) {
   return programmesDe(lu.data);
 }
 // `f(data)` rend la donnée à écrire ou undefined. Rend { ok, progs } · null (pas su).
+// (16 nov., lot extension-restes) L'INDEX que lit le serveur (`api/_lib/repub-programme-notif.js`, le passage de
+// 15 min) pour prévenir quand AUCUN appareil n'a lancé à l'heure : les programmations EN ATTENTE en bref (jamais
+// les réglages ni les paires) et la fin de la plus proche fenêtre (`prochaineFin`, ISO : un filtre de la base).
+export function indexAttentes(data) {
+  const progs = Object.values(programmesDe(data)).filter((p) => p.etat === 'attente');
+  const attentes = progs.map((p) => ({ uid: p.uid, id: p.id, at: new Date(p.at).toISOString(), compte: p.compte.slice(0, 40), n: p.ids.length }));
+  const fin = progs.length ? Math.min(...progs.map((p) => p.at + FENETRE_DEPART_MS)) : null;
+  return { attentes, prochaineFin: fin == null ? null : new Date(fin).toISOString() };
+}
 export async function modifierProgrammes(f, ctx) {
   let refus = null;
-  const r = await modifierLigne(LIGNE_PROGRAMME, (d) => { const x = f(d); if (x && x.refus) { refus = x; return undefined; } return x && x.data ? x.data : x; }, ctx);
+  const r = await modifierLigne(LIGNE_PROGRAMME, (d) => { const x = f(d); if (x && x.refus) { refus = x; return undefined; } const out = x && x.data ? x.data : x; return out && typeof out === 'object' ? { ...out, ...indexAttentes(out) } : out; }, ctx);
   if (!r) return null;
   return { ok: r.ok, refus, progs: programmesDe(r.data) };
 }

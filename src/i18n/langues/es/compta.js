@@ -717,6 +717,10 @@ export default {
   "compta.environHeuresVinted": { one: "Unas {n} h con vinted.fr abierto en esta cuenta.", other: "Unas {n} h con vinted.fr abierto en esta cuenta." },
   "compta.releveAVerifier": { one: "{n} venta en el extracto del monedero: fechas del extracto aún no verificadas ({accords} de {min} coincidencias con el detalle de las ventas). Mientras tanto no se fecha nada con él.", other: "{n} ventas en el extracto del monedero: fechas del extracto aún no verificadas ({accords} de {min} coincidencias con el detalle de las ventas). Mientras tanto no se fecha nada con él." },
   "compta.releveDesaccord": { one: "{n} venta en el extracto del monedero: su fecha no cae el mismo día que el detalle de la venta ({desaccords} desacuerdo). El extracto de esta cuenta no fecha nada.", other: "{n} ventas en el extracto del monedero: sus fechas no caen el mismo día que el detalle de las ventas ({desaccords} desacuerdo(s)). El extracto de esta cuenta no fecha nada." },
+  "facturePro.serieVrmTitre": {"one": "¿Enviar {n} factura con VRM?", "other": "¿Enviar {n} facturas con VRM?"},
+  "facturePro.serieVrmDesc": "Tu buzón no está conectado: VRM las envía por ti, cada una a SU comprador comprobado, contigo en copia. Tu ajuste «desde mi buzón» no cambia.",
+  "facturePro.envoyerAvecVrm": "Enviar con VRM",
+  "facturePro.toutEnvoyerVrm": "Enviar todo con VRM ({n})",
   // (15 nov., extension 5.390) La ligne discrète : l’extension récupère les dates de versement, aucun geste.
   "versement.ligne": { one: "Fechas de pago: la extensión las recupera (≈ {n} restante · unas {h} h con vinted.fr abierto).", other: "Fechas de pago: la extensión las recupera (≈ {n} restantes · unas {h} h con vinted.fr abierto)." },
   "versement.ligneSans": { one: "Fechas de pago: la extensión las recupera (≈ {n} restante).", other: "Fechas de pago: la extensión las recupera (≈ {n} restantes)." },

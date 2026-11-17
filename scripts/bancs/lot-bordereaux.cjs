@@ -133,6 +133,12 @@ const projette = (row, sel) => {
       const papier = await pg.waitForSelector('[data-impr-papier-feuille="premiere"]', { timeout: 15000 }).then(() => true).catch(() => false);
       if (papier) await pg.click('[data-impr-papier-choix="normale"]');
       dit(!(await pg.getByRole('button',{name:'Préparer quand même les PDF',exact:true}).count()), 'aucune question « contrôlé » entre « Imprimer » et le PDF');
+      // (16 nov., lot tampons-parametres) La sélection ouvre l'APERÇU AVANT IMPRESSION (une feuille, chaque bordereau en
+      // vignette, le tampon réglable) ; son « Imprimer » lance le PDF.
+      const feuilleAp = await pg.waitForSelector('[data-impr-apercu="pret"] [data-impr-apercu-imprimer]:not([disabled])', { timeout: 60000 }).then(() => true).catch(() => false);
+      const nFeuilles = await pg.evaluate(() => document.querySelectorAll('[data-impr-apercu]').length);
+      dit(feuilleAp && nFeuilles === 1, 'l’aperçu avant impression s’ouvre, une fois', String(nFeuilles));
+      if (feuilleAp) await pg.click('[data-impr-apercu-imprimer]');
       const vis = await pg.waitForSelector('[data-visionneuse-pdf="pret"]', { timeout: 30000 }).then(() => true).catch(() => false);
       dit(vis, 'le PDF des bordereaux lisibles s’ouvre (visionneuse de l’ordinateur)');
       if (vis) await pg.click('[data-visionneuse-fermer]');

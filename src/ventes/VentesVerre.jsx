@@ -105,8 +105,10 @@ export function Emplacement({ e, attrs = {} }) {
 // LE PLEIN de l'écran, en barre (maquette : 52 px, rayon 16, toute la largeur).
 export function PleinLarge({ icone = 'printer', libelle, onClick, disabled = false, enCours = false, titre, attrs = {} }) {
   return (
+    // (16 nov., Julien : « toute la ligne bouge ») pendant la préparation, le bouton garde son mot et sa taille : la roue
+    // tourne DEDANS (`[data-occupe]`, styles-tampons.css).
     <button type="button" className={'sb-btn-plein vv-plein' + (enCours ? ' is-en-cours' : '')} onClick={onClick} disabled={disabled}
-      aria-pressed={enCours ? 'true' : undefined} title={titre} {...attrs}>
+      aria-pressed={enCours ? 'true' : undefined} aria-busy={enCours ? 'true' : undefined} data-occupe={enCours ? '' : undefined} title={titre} {...attrs}>
       <IconeV nom={icone} taille={20} trait={1.9}/><span className="sb-btn-plein-mot">{libelle}</span>
     </button>
   );
