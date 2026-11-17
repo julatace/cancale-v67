@@ -37769,7 +37769,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // ce qui est enregistré dans VRM et ne touche jamais l'annonce d'origine.
   const refaireBrouillon = async (b) => {
     if (!b || !b.uid || !b.id) return { etape:'echec', raison:'annonce incomplète' };
-    const r=await avecCouleurBrouillon((couleur,reponses)=>vmrCmdSuivi({ cmd:'refaireBrouillon', uid:String(b.uid), id:String(b.id), num:b.numero?String(b.numero):undefined, confirme:true, couleur, reponses }, 480000), b.titre||b.title||'');
+    // (17 nov., 5.408) « Reprendre » (`reprendreRepub`) contient « Refaire » : il relit d'abord chez Vinted
+    // ce qui n'est pas prouvé (ancienne partie ? brouillon en ligne ?), puis refait ou met en ligne.
+    const cmdR = extSait('repubreprise')==='ok' ? 'reprendreRepub' : 'refaireBrouillon';
+    const r=await avecCouleurBrouillon((couleur,reponses)=>vmrCmdSuivi({ cmd:cmdR, uid:String(b.uid), id:String(b.id), num:b.numero?String(b.numero):undefined, confirme:true, couleur, reponses }, 480000), b.titre||b.title||'');
     brRefaire.relire(); brVinted.relire();
     if (r.sansReponse) return { etape:'incertain', raison:TEXTE_SANS_REPONSE+' (dans tes brouillons aussi)' };
     if (r && r.accepte) return { etape:r.etape, raison: r.etape==='fait' ? (r.raison || (r.nouvelId ? 'Remise en ligne.' : 'Le brouillon est rangé sur Vinted.')) : (r.raison||''), nouvelId:r.nouvelId, refaire:!!r.refaire };

@@ -18732,6 +18732,7 @@ async function avecActionPlein(sorte, msg, fn) {
   finally {
     const ok = !!(r && (r.accepte === true || r.ok === true));
     const stop = r && (r.code === 'verification' || r.code === 'secu-robot' || r.code === 'vinted-pause' || r.code === 'tout-arrete');
+    try { await _chaineEtapeAction; } catch (_) {}   // 5.408 : la dernière étape annoncée est écrite AVANT (sinon effacée)
     const a = (await lireActionEnCours()) || {};
     if (a.fin && a.fin.raison === 'arret') { /* « Tout arrêter » touché pendant : l'écran est déjà éteint */ }
     else await poserAction(Object.assign({}, a, { actif: !stop, enCours: false, fait: fait + (ok ? 1 : 0), dernier: { ok, at: Date.now() },

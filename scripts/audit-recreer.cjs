@@ -732,8 +732,11 @@ const zero = (j) => gestes(j).length === 0;   // 5.266 : lire la liste des coule
     const att = f.store.vrmRepubAttente || {};
     dit(r.etape === 'attente' && de(f.j, /drafts\/88001\/completion$/).length === 1 && att['9202'] && !att['9101'], "réveil et planification en même temps : A mise en ligne UNE fois, B toujours planifiée", JSON.stringify({ m: de(f.j, /drafts\/88001\/completion$/).length, cles: Object.keys(att) })); }
   { // 2. Un job resté « en cours » (service worker tué) : jamais rejoué, il est DIT.
+    //    (17 nov., 5.408) Après l'envoi (ou sans phase connue), il est relu 2 min plus tard ; une relecture
+    //    qui ne dit pas `is_draft` (ce faux Vinted) laisse « incertain » — jamais une seconde mise en ligne.
+    //    Les reprises sûres (rien d'envoyé, brouillon relu) : scripts/audit-republication-parfaite.cjs §B.
     const { f } = await run({ differer: true });
-    if (f.store.vrmRepubAttente && f.store.vrmRepubAttente['9101']) { f.store.vrmRepubAttente['9101'].du = 0; f.store.vrmRepubAttente['9101'].enCoursLe = Date.now() - 60000; }
+    if (f.store.vrmRepubAttente && f.store.vrmRepubAttente['9101']) { f.store.vrmRepubAttente['9101'].du = 0; f.store.vrmRepubAttente['9101'].enCoursLe = Date.now() - 3 * 60000; }
     try { await f.ctx.miseEnLigneTick(); } catch (_) {}
     const fin = f.j.evts.find((e) => e && e.quoi === 'repub' && e.id === '9101' && e.etape === 'fin');
     dit(de(f.j, /completion$/).length === 0 && fin && fin.fin && fin.fin.etape === 'incertain' && !Object.keys(f.store.vrmRepubAttente || {}).length, "mise en ligne interrompue par Chrome : rien n'est renvoyé, l'app apprend que c'est incertain", JSON.stringify({ m: de(f.j, /completion$/).length, fin: fin && fin.fin && fin.fin.etape })); }
