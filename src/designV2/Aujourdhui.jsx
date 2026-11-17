@@ -39,10 +39,25 @@ function RienAFaire({ Icon }) {
   );
 }
 
-export default function Aujourdhui({ affiche, colis = [], retraits = null, groupes = [], plein = null, Photo, Plaque, Icon, onColis, onRetraits, onScanner = null, titre }) {
+// `pret` : les lectures dont dépend l'écran sont arrivées (à envoyer ET à retirer). Avant : le titre et le chiffre en
+// attente, RIEN d'autre — puis tout arrive d'un coup, sous le chiffre, à sa place (17 nov., Julien : « quand ça charge
+// tout bouge bizarrement » : aucun bloc qui apparaît puis s'en va, aucun ordre qui change, chaque boîte à sa taille).
+export default function Aujourdhui({ affiche, colis = [], retraits = null, groupes = [], plein = null, Photo, Plaque, Icon, onColis, onRetraits, onScanner = null, titre, pret: pretLu = true }) {
+  // Prêt une fois, prêt pour de bon (une relecture ne remet pas l'écran en attente) ; une lecture qui ne répond pas
+  // n'enferme pas l'écran : au bout de 6 s, il se montre tel qu'il est (« — » là où ce n'est pas su).
+  const dejaPret = React.useRef(false);
+  const [delai, setDelai] = React.useState(false);
+  React.useEffect(() => { if (pretLu) return undefined; const t = setTimeout(() => setDelai(true), 6000); return () => clearTimeout(t); }, [pretLu]);
+  if (pretLu || delai) dejaPret.current = true;
+  const pret = dejaPret.current;
+  // L'ORDRE DES GROUPES est celui de leur première apparition : un groupe lu plus tard se range à la fin, jamais
+  // au-dessus des autres (rien ne glisse sous le doigt pendant la lecture).
+  const ordre = React.useRef([]);
+  for (const g of groupes) if (!ordre.current.includes(g.id)) ordre.current.push(g.id);
+  groupes = [...groupes].sort((a, b) => ordre.current.indexOf(a.id) - ordre.current.indexOf(b.id));
   const n = affiche && !affiche.pasSu ? affiche.n : null;
   const nRet = retraits && !retraits.pasSu ? retraits.n : null;
-  const rien = n === 0 && nRet === 0 && groupes.length === 0;
+  const rien = pret && n === 0 && nRet === 0 && groupes.length === 0;
   const premierPoint = retraits && Array.isArray(retraits.points) ? retraits.points[0] : null;
   return (
     <div className="v2-ecran v2-aujourdhui" data-v2-ecran="aujourdhui" data-espace="journee" data-v2-plein={plein ? '1' : '0'}>
@@ -52,14 +67,16 @@ export default function Aujourdhui({ affiche, colis = [], retraits = null, group
         {onScanner ? <BoutonIconeV2 icone={<Icon name="scan" size={24}/>} label={tr('v2.scanner')} onClick={onScanner} attrs={{ 'data-v2-scanner': '' }}/> : null}
       </header>
 
-      {rien ? <RienAFaire Icon={Icon}/> : (<>
+      {rien ? <div data-v2-bloc="rien"><RienAFaire Icon={Icon}/></div> : !pret ? (
+        <ChiffreAffiche attente n={null} mot={tr('v2.aEnvoyer.mot', { n: 2 })} attrs={{ 'data-v2-bloc': 'affiche', 'aria-label': tr('v2.chargement') }}/>
+      ) : (<>
         {/* 1. LE CHIFFRE DE L'ÉCRAN (la signature : 56/700, son mot sur la même ligne de base, l'écart nommé dessous). */}
         <ChiffreAffiche n={n} mot={tr('v2.aEnvoyer.mot', { n: n == null ? 2 : n })} sous={affiche && affiche.sous} ambre={!!(affiche && affiche.ambre)}
-          attrs={{ 'aria-label': tr('v2.aEnvoyer.aria', { n: n == null ? '—' : String(n) }) }}/>
+          attrs={{ 'data-v2-bloc': 'affiche', 'aria-label': tr('v2.aEnvoyer.aria', { n: n == null ? '—' : String(n) }) }}/>
 
         {/* 2. LA BANDE DES PAIRES À ENVOYER — une carte par colis, par identité (le N° de SA vente). */}
-        {colis.length ? (
-          <div className="v2-bande" role="list" aria-label={tr('v2.bande.aria')} data-v2-bande={String(colis.length)}>
+        {n > 0 ? (
+          <div className="v2-bande" role="list" aria-label={tr('v2.bande.aria')} data-v2-bande={String(colis.length)} data-v2-bloc="bande">
             {colis.slice(0, 12).map((c) => (
               <RangeeTouchable key={c.cle} className="v2-bande-carte" onClick={() => onColis && onColis(c)} label={[c.num ? 'N° ' + c.num : '', c.titre, c.prix, c.e && c.e.txt].filter(Boolean).join(' · ')}
                 attrs={{ role: 'listitem', 'data-v2-colis': c.cle }}>
@@ -69,12 +86,16 @@ export default function Aujourdhui({ affiche, colis = [], retraits = null, group
                 <span className={'v2-bande-quand' + (c.e && c.e.ambre ? ' is-ambre' : '')}>{c.e && c.e.ambre ? <i className="v2-point" aria-hidden="true"/> : null}{(c.e && c.e.txt) || ' '}</span>
               </RangeeTouchable>
             ))}
+            {/* Les colis comptés mais pas encore décrits : la même carte, vide, à la même taille (jamais un saut). */}
+            {Array.from({ length: Math.max(0, Math.min(n, 12) - Math.min(colis.length, 12)) }, (_, k) => (
+              <span key={'a' + k} className="v2-bande-carte v2-bande-attente" aria-hidden="true"><span className="v2-bande-photo"/><span className="v2-bande-prix">{'\u00a0'}</span><span className="v2-bande-quand">{'\u00a0'}</span></span>
+            ))}
           </div>
         ) : null}
 
         {/* 3. À RETIRER — la passe du premier point ; le reste dans Achats. */}
         {nRet ? (
-          <section className="v2-groupe" data-v2-groupe="retirer" aria-label={tr('v2.retirer.titre')}>
+          <section className="v2-groupe" data-v2-groupe="retirer" data-v2-bloc="retirer" aria-label={tr('v2.retirer.titre')}>
             <h2 className="v2-groupe-titre"><span>{tr('v2.retirer.titre')}</span><span className="v2-groupe-n" data-v2-n={String(nRet)}>{nRet}</span></h2>
             <RangeeTouchable className="v2-passe-mini" onClick={onRetraits} label={tr('v2.retirer.voir')} attrs={{ 'data-v2-passe-mini': '' }}>
               <span className="v2-passe-mini-haut">
@@ -92,7 +113,7 @@ export default function Aujourdhui({ affiche, colis = [], retraits = null, group
 
         {/* 4. À FAIRE — un groupe par chose, son nombre, UN geste. */}
         {groupes.length ? (
-          <section className="v2-afaire" aria-label={tr('v2.afaire.titre')} data-v2-afaire={String(groupes.length)}>
+          <section className="v2-afaire" aria-label={tr('v2.afaire.titre')} data-v2-afaire={String(groupes.length)} data-v2-bloc="afaire">
             <h2 className="v2-groupe-titre"><span>{tr('v2.afaire.titre')}</span></h2>
             <div className="v2-liste">
               {groupes.map((g) => (

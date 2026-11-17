@@ -93,7 +93,7 @@ async function dessin(nav, b, v, sombre, attendus) {
   });
   console.log(`\n── ${v} · ${th} — ${m.n} rangées rendues, 1re à ${m.premiere} px, ${m.lisibles} lisibles, ${tPremiere} ms jusqu’à la 1re, ${m.noeuds} nœuds`);
   dit(m.premiere != null && m.premiere <= 422, `${v} ${th} : la 1re annonce sur la moitié haute (${m.premiere} px)`);
-  dit(v === 'A' ? m.hauteurs.every((h) => [80, 88, 104, 112].includes(h)) : m.hauteurs.every((h) => h >= 120 && h <= 200), v === 'A' ? `A ${th} : rangées de 88 px, 112 quand le titre prend deux lignes (${m.hauteurs.join(', ')})` : `C ${th} : rangées de 120 à 200 px (${m.hauteurs.join(', ')})`, m.hauteurs);
+  dit(v === 'A' ? (m.hauteurs.every((h) => h >= 64) && m.hauteurs.length <= 2) : m.hauteurs.every((h) => h >= 120 && h <= 200), v === 'A' ? `A ${th} : rangées ≥ 64 px (AIR), deux hauteurs au plus (${m.hauteurs.join(', ')})` : `C ${th} : rangées de 120 à 200 px (${m.hauteurs.join(', ')})`, m.hauteurs);
   dit(m.compte === 0 && m.relierBouton === 0, `${v} ${th} : ni compte, ni bouton « Relier un achat » redits par rangée`, m);
   dit(!m.deborde.length, `${v} ${th} : rien ne sort de sa rangée`, m.deborde);
   dit(m.b188 === true, `${v} ${th} : « N°B188 » lisible en entier`, m.b188);

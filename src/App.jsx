@@ -1108,7 +1108,7 @@ import MenuPlateformeV2 from "./designV2/MenuPlateforme.jsx";
 import { BoutonV2, SegmentV2 } from "./designV2/BoutonV2.jsx";
 import { nombre as nombreV2 } from "./i18n/index.js";
 import LigneAnnonceV2 from "./designV2/LigneAnnonce.jsx";
-import { SqueletteRangees as SqueletteRangeesV2 } from "./designV2/Signature.jsx";
+import { SqueletteRangees as SqueletteRangeesV2, QuandLu as QuandLuV2 } from "./designV2/Signature.jsx";
 import "./design/accessibilite.css";   // (17 nov.) audit WCAG 2.1 AA : focus double, encre claire sur le bleu, 44 px — `@layer vrm-a11y`, nommée AVANT vrm-verre (index.html)
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
@@ -50653,6 +50653,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           }
           return (
             <AujourdhuiV2 titre={tr('nav.journee.court')} Photo={PhotoVinted} Plaque={PlaqueJ} Icon={Icon}
+              pret={baseKO || (!!xE && !xE.pasSu && !!xR && !xR.pasSu)}
               affiche={{ n: nE, pasSu: nE == null, sous: ecart, ambre: colisJournee.some((c) => c.e && c.e.ambre) }}
               colis={nE ? colisJournee : []}
               retraits={{ n: nR, pasSu: nR == null, points: pointsJ, nPoints: Math.max(1, pointsJ.length), premier: premierJ }}
@@ -53454,7 +53455,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {designV2 ? null : <AFaireLigne capsule seulement="telephone" className="vrm-ann-afaire"/>}
         {/* (17 nov., nouveau design) UN contrôle segmenté sous le menu : En ligne · Qui dorment · À publier (les MÊMES vues
             qu'avant, `annSort`) ; les autres vues, le tri, la grille et Stock sont dans « ⋯ ». Le plein au pouce : publier. */}
-        {designV2 && listings.items?.length>0 ? <div className="v2-ann-segment" data-v2-ann-segment="">
+        {/* Posé dès le chargement (au-dessus du squelette), pour que rien ne glisse quand les annonces arrivent. */}
+        {designV2 && (listings.items == null ? !baseKO : listings.items.length>0) ? <div className="v2-ann-segment" data-v2-ann-segment="" data-v2-bloc="segment">
           <SegmentV2 label={tr('v2.ann.vues')} value={annSearch.trim() ? '' : (annSort==='oldest' ? 'oldest' : annSort)} onChange={(v)=>{ if (v==='oldest') { setAnnSort('oldest'); setAnnSearch(''); } else { if (v==='sleeping' && !(annStats.sleeping>0)) setModeDort('favoris'); setAnnSort(v); } }}
             options={[{ v: 'oldest', l: tr('v2.ann.enLigne') }, { v: 'sleeping', l: tr('v2.ann.dorment'), n: annStats.sleeping>0 ? nombreV2(annStats.sleeping) : undefined }, { v: 'brouillons', l: tr('v2.ann.aPublier'), n: (brVinted.liste||[]).length ? nombreV2((brVinted.liste||[]).length) : undefined }]}/>
         </div> : null}
@@ -54321,8 +54323,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         </CacheSiV2>
         {false && designV2 && annSort !== 'sansachat' && fileAchat && fileAchat.length > 0 ? <button type="button" className="v2-rangee v2-ann-arelier" data-v2-rangee="" data-v2-ann-arelier={fileAchat.length} onClick={() => setAnnSort('sansachat')}>
           <Icon name="link" size={18}/><span className="v2-ann-arelier-txt">{trj('v2.ann.sansAchat', { n: fileAchat.length })}</span><span className="v2-ann-arelier-geste">{tr('v2.ann.voir')}</span><Icon name="chevron" size={14}/></button> : null}
-        {designV2 && !baseKO && listings.items == null ? <SqueletteRangeesV2 variante={ligneV2} n={8} label={tr('v2.chargement')}/> : null}
-        {designV2 ? <div className="v2-liste-annonces" data-v2-ligne={ligneV2} role="list" onClick={clicAvant}>{lignesV2}</div> : null}
+        {/* Le squelette et la liste sont LE MÊME bloc (`data-v2-bloc="liste"`) : mêmes rangées, mêmes hauteurs. */}
+        {designV2 && !baseKO && listings.items == null ? <div data-v2-bloc="liste"><SqueletteRangeesV2 variante={ligneV2} n={8} label={tr('v2.chargement')}/></div> : null}
+        {designV2 && !(!baseKO && listings.items == null) ? <div className="v2-liste-annonces" data-v2-ligne={ligneV2} role="list" onClick={clicAvant} data-v2-bloc="liste">{lignesV2}</div> : null}
         <PaireAvantHote rendre={rendreAvantAnnonce}/>
         <SuitePaquets montres={Math.min(annMax, annShown.length)} total={annShown.length} onPlus={annPlus}/>
         </>)}
@@ -55738,7 +55741,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     const v = o.price && typeof o.price === 'object' ? o.price.amount : o.price; const pn = Number(String(v == null ? '' : v).replace(',', '.'));
                     return { id: String(o.transaction_id), titre: o.title || '', photo: orderPhoto(o), compte: plusieursComptesRet && o._acc ? accName(o._acc) : '',
                       prix: Number.isFinite(pn) && pn > 0 && !(o.price && o.price.currency_code && o.price.currency_code !== 'EUR') ? montant(pn) : '', point: (e && e.relais && e.relais.nom) || '' }; }) : [];
-                  return <div className="v2-achats-retirer" data-v2-achats-retirer="">
+                  // Rien avant que les codes ET les achats soient lus, puis tout d'un coup (aucun bloc qui pousse l'autre).
+                  return <QuandLuV2 pret={baseKO || (toutLuRet && buys.items != null)}><div className="v2-achats-retirer" data-v2-achats-retirer="">
                     <PassesRetraitV2 points={parPoint.points || []} Icon={Icon} Plaque={PlaqueJ} Photo={photoCarte}
                       aides={{ echeance: echeanceRetrait, titre: titreRetrait, retirer: retirerColis, relier: relierRetrait,
                         nomTransporteur: (k) => (CARRIERS[k] && CARRIERS[k].name) || '',
@@ -55751,7 +55755,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         plateforme, la même que son bouton : `vrm:v2-ajouter-achat`, src/ecrans/Achats.jsx). */}
 
                     {ancienne ? <details className="vrm-repli" data-v2-detail-retraits=""><summary>{tr('v2.passe.detail')}</summary>{ancienne}</details> : null}
-                  </div>; })()}
+                  </div></QuandLuV2>; })()}
                 {/* (8 nov., retraits) LES COLIS SORTIS DE « À RETIRER », AVEC LA RAISON LUE ET SA DATE (§5 : un colis
                     caché est un colis perdu). Le transporteur, l'e-mail ou la commande Vinted ont dit retiré, livré ou
                     reparti — la décision de `pickupUnion`, inchangée ; ici elle se DIT, quelques jours, hors du compte. */}

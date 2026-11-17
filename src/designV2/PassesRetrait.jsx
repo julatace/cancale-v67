@@ -87,7 +87,7 @@ export function PassesRetrait({ points = [], Icon, Photo, Plaque, aides }) {
   const avecColis = points.map((p) => ({ ...p, arrives: (p.arrives || []).filter(aPresenter) })).filter((p) => p.arrives.length > 0);
   if (!avecColis.length) return null;
   return (
-    <div className="v2-passes" data-v2-passes={String(avecColis.length)}>
+    <div className="v2-passes" data-v2-bloc="passes" data-v2-passes={String(avecColis.length)}>
       {avecColis.map((p, k) => <Passe key={(p.numero || 'x') + ':' + k} p={p} Icon={Icon} Photo={Photo} Plaque={Plaque} aides={aides}/>)}
     </div>
   );
@@ -98,7 +98,7 @@ export function PassesRetrait({ points = [], Icon, Photo, Plaque, aides }) {
 export function EnRouteListe({ lignes = [], Icon, Photo, onOuvrir = null, max = 40, touteSansPoint = false }) {
   if (!lignes.length) return null;
   return (
-    <section className="v2-groupe" data-v2-en-route={String(lignes.length)} aria-label={tr('v2.enRoute.titre')}>
+    <section className="v2-groupe" data-v2-bloc="enroute" data-v2-en-route={String(lignes.length)} aria-label={tr('v2.enRoute.titre')}>
       <h2 className="v2-groupe-titre"><span>{tr('v2.enRoute.titre')}</span><span className="v2-groupe-n">{lignes.length}{touteSansPoint ? ' · ' + tr('v2.enRoute.pointPasDit') : ''}</span></h2>
       <div className="v2-liste">
         {lignes.slice(0, max).map((l, k) => {
