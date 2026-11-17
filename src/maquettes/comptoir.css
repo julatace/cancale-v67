@@ -211,3 +211,9 @@ html:has(.cp-racine) body { overflow: hidden; }
 /* Hors du comptoir (un « écran complet ») : un rond flottant y ramène — plus de barre d'onglets. */
 .cp-retour-coque { position: fixed; z-index: 900; left: 14px; bottom: calc(env(safe-area-inset-bottom, 0px) + 18px); width: 56px; height: 56px; border-radius: 50%;
   display: grid; place-items: center; background: var(--sb-verre, var(--sb-porcelaine)); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); box-shadow: var(--sb-ombre-avant); }
+
+/* Rien ne s'écrit directement sur le fond bleu (il fonce vers le bas) : chaque texte est posé sur sa porcelaine. */
+.cp-scene-corps .sj-deplie-affiche { background: linear-gradient(180deg, var(--sb-porcelaine), var(--sb-porcelaine-2, var(--sb-porcelaine))); border-radius: var(--sb-r-tuile, 22px); box-shadow: var(--sb-ombre-pose); padding: 18px 18px 18px 20px; margin: 8px 0 14px; }
+.cp-scene-corps .sj-pied { background: color-mix(in oklab, var(--sb-porcelaine) 86%, transparent); border-radius: 18px; padding: 6px 8px 6px 14px; margin-top: 12px; }
+.cp-pied .sb-lien, .cp-lien-ecran { background: color-mix(in oklab, var(--sb-porcelaine) 86%, transparent); border-radius: 22px; padding: 0 18px; min-height: 44px; display: inline-flex; align-items: center; }
+.cp-lien-ecran { display: flex; width: max-content; margin: 8px auto 0; }
