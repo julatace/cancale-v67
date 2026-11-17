@@ -47978,7 +47978,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (e && Number.isFinite(e.dl)) return { cle: 'limite', icone: 'calendar', texte: e.dl < 0 ? tr('sv.ech.retard', { n: Math.max(1, -e.dl) }) : e.dl === 0 ? tr('sv.ech.aujourdhui') : e.dl === 1 ? tr('sv.ech.demain') : tr('vv.ech.dans', { n: e.dl }), ambre: e.dl <= 2 };
     return null;
   };
-  const vendueV2 = (att) => (att == null || !Number.isFinite(att) ? null : { cle: 'vendue', icone: 'clock', texte: tr('v2v.vendue', { n: att }) });
+  const vendueV2 = (att) => (att == null || !Number.isFinite(att) ? null : { cle: 'vendue', icone: 'clock', texte: att <= 0 ? tr('v2v.vendueAujourdhui') : att === 1 ? tr('v2v.vendueHier') : tr('v2v.vendue', { n: att }) });
   // Plusieurs plateformes dans la liste : le logo de la plateforme sur chaque rangée (le nom écrit n'est plus redit).
   const avecLogosV2 = (rows) => { if (new Set(rows.map((r) => r.site)).size < 2) return rows;
     return rows.map((r) => ({ ...r, logo: <MarquePlateforme p={r.site} taille={13}/>, sous: (r.sous || []).filter((x) => x !== nomPlateforme(r.site)) })); };
