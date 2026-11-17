@@ -170,6 +170,8 @@ async function allume(nav, b, sombre, W, ref) {
     dit(String(m.n) === String(ref.chiffre), `N ${th} : ${m.n} rangées « À envoyer » = ce nombre (${ref.chiffre}) — aucun colis caché`, { n: m.n, avant: ref.chiffre });
     dit(m.tete.pleinN != null && m.tete.pleinN === ref.lot, `N ${th} : le plein (${m.tete.pleinN}) = le plein d'avant (${ref.lot})`, { v2: m.tete.pleinN, avant: ref.lot });
   }
+  // Les vignettes du haut chargées avant la capture (une capture sans photos ne montre pas l'écran).
+  await attendre(pg, () => [...document.querySelectorAll('[data-v2v-liste] img')].slice(0, 6).every((i) => i.complete && i.naturalWidth > 0), 8000);
   await pg.screenshot({ path: path.join(SHOTS, `ventes-${th}.png`) });
   if (tel) {
     // G : la recherche par N° trouve la rangée.
