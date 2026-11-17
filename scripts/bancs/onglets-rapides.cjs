@@ -104,7 +104,9 @@ const juge = (m, r) => {
   const SUIVIES = { avis_bas: /id=eq\.vrm_avis_bas&/, reserves: /id=eq\.panel_num_reserves&/ };
   const compter = (depuisI) => { const o = {}; for (const [k, re] of Object.entries(SUIVIES)) o[k] = reqs.slice(depuisI).filter((r) => r.m === 'GET' && re.test(r.u)).length; return o; };
   console.log('    lectures au démarrage : ' + JSON.stringify(compter(0)));
-  if (JUGER) { const c = compter(0); dit(c.avis_bas <= 1 && c.reserves <= 1, 'démarrage : `vrm_avis_bas` et `panel_num_reserves` lues au plus une fois chacune', JSON.stringify(c)); }
+  // Au démarrage, `panel_num_reserves` est lue deux fois à des moments DIFFÉRENTS (la numérotation, puis Ma journée) : la
+  // lecture en vol ne partage que des lectures simultanées (rien n'est gardé au-delà : un N° réservé n'est jamais masqué).
+  if (JUGER) { const c = compter(0); dit(c.avis_bas <= 1 && c.reserves <= 2, 'démarrage : `vrm_avis_bas` lue au plus une fois, `panel_num_reserves` au plus deux', JSON.stringify(c)); }
   const toucher = async (id, fenetre) => {
     const depuis = (await ecranIci()).e; const i0 = reqs.length;
     await pg.evaluate((depuis) => { window.__g0 = performance.now(); window.__ev = []; window.__utile = null;

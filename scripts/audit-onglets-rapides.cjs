@@ -25,7 +25,7 @@ const MUTS = {
   'lecteur-fige': ['src/App.jsx', "if (k === CLE_A_TRANCHER) setPubs(lirePubs());", "if (false) setPubs(lirePubs());"],
   'en-vol-oublie': ['src/lectureEnVol.js', '  enVol.set(k, p);\n', ''],
   'en-vol-garde': ['src/lectureEnVol.js', 'const fin = () => { if (enVol.get(k) === p) enVol.delete(k); };', 'const fin = () => {};'],
-  'reserves-en-direct': ['src/App.jsx', '        lireReservesNum(),', '        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`),'],
+  'reserves-en-direct': ['src/App.jsx', "        lireEnVol('panel_num_reserves', () => lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`)),", '        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`),'],
   'autre-lecteur-fige': ['src/SanteDonnees.jsx', "if (k === CLE_A_TRANCHER || k === CLE_SANTE) relire();", "if (k === CLE_SANTE) relire();"],
 };
 const muter = (k) => { const [f, a, b] = MUTS[k]; const t = fs.readFileSync(path.join(R, f), 'utf8'); if (!t.includes(a)) throw new Error('mutation introuvable : ' + k); return [f, t.replace(a, b)]; };
@@ -123,7 +123,8 @@ const sansCommentaires = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   }
   const appL = lire('src/App.jsx'); const aL = appL ? sansCommentaires(appL) : '';
   const directes = (aL.match(/id=eq\.panel_num_reserves&select=data/g) || []).length;
-  dit(directes === 1 && /function lireReservesNum\(\) \{ return lireEnVol\('panel_num_reserves'/.test(aL), 'L5 App.jsx : `panel_num_reserves` lue par un seul chemin, en vol partagé', `${directes} adresse(s)`);
+  const enVolL = (aL.match(/lireEnVol\('panel_num_reserves', \(\) => lireBaseRelue\(`\$\{SUPABASE_URL\}\/rest\/v1\/app_data\?id=eq\.panel_num_reserves&select=data`\)\)/g) || []).length;
+  dit(directes >= 1 && enVolL === directes, 'L5 App.jsx : chaque lecture de `panel_num_reserves` passe par la lecture en vol partagée', `${enVolL}/${directes}`);
   fs.rmSync(tmp, { recursive: true, force: true });
   console.log(`\naudit-onglets-rapides : ${ok} vert(s), ${ko} rouge(s)`);
   process.exit(ko ? 1 : 0);
