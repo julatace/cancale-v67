@@ -158,6 +158,10 @@ const ligneSuivi = (pg, label) => pg.evaluate((lb) => { const c = document.query
         const ms = await attrs(pg, '[data-micro-seuils]', 'data-micro-');
         dit(!!ms && ms.seuils === 'lu' && ms.tva === 'ok' && ms.plafond === 'ok' && Number(ms.ca) > 0, `M ${T} : jauge des seuils lue (TVA et plafond)`, JSON.stringify(ms));
         if (process.env.SHOTS) { const el = await pg.$('[data-micro-entreprise]'); if (el) await el.screenshot({ path: `${process.env.SHOTS}/micro-${vp.width}.png` }); }
+        // (16 nov., confiance-clients) Le calendrier fiscal de l'année : SON rythme (mensuel ⇒ 12 URSSAF), la CFE, l'impôt.
+        const cf = await pg.evaluate(() => { const r = document.querySelector('[data-calendrier-fiscal]'); return r ? { etat: r.getAttribute('data-calendrier-fiscal'), types: [...r.querySelectorAll('[data-cf-echeance]')].map((x) => x.getAttribute('data-cf-echeance')) } : null; });
+        dit(!!cf && cf.etat === 'ok' && cf.types.filter((x) => x === 'urssaf').length === 12 && cf.types.includes('cfe') && cf.types.includes('impot'), `F ${T} : le calendrier fiscal de l'année (12 URSSAF, CFE, impôt)`, JSON.stringify(cf));
+        if (process.env.SHOTS) { const el = await pg.$('[data-calendrier-fiscal]'); if (el) await el.screenshot({ path: `${process.env.SHOTS}/calendrier-fiscal-${vp.width}.png` }); }
         const mi0 = await attrs(pg, '[data-micro-impots]', 'data-micro-impots-');
         dit(!!mi0 && mi0.cases === '5KO,5TA' && Number(mi0.ca) > 0, `I ${T} : déclaration de revenus — versement libératoire pas répondu ⇒ les deux cases`, JSON.stringify(mi0));
         await touche(pg, '[data-micro-vl-choix="non"]', vp);

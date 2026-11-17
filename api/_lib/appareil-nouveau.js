@@ -28,6 +28,7 @@
 import { resumerAppareil } from './securite-compte.js';
 import { DESTINATIONS } from './lien-notif.js';
 import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
+import { gabaritMail, SITE } from './mail-gabarit.js';
 
 export const LIGNE_APPAREILS_VUS = 'vrm_appareils_vus';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -41,6 +42,31 @@ export function nomEnClair(signature) {
 }
 export function texteAlerte(signature) {
   return { title: 'Nouvel appareil', body: `${nomEnClair(signature)}. Ce n'est pas toi ?` };
+}
+
+// (16 nov., confiance-clients, point 5) L'E-MAIL au titulaire, par la voie e-mail existante (celle des relances,
+// RELANCES_SMTP_* : la route passe `envoyerMail` seulement si elle est configurée ; sinon notification seule, dit
+// dans Paramètres → Appareils connectés). À l'adresse de SA SESSION (jamais du corps). Rien d'autre que la signature
+// résumée (« Mac · Chrome ») et l'heure de Paris : jamais d'IP, jamais de lieu.
+export const LIEN_APPAREILS = `${SITE}/?tab=settings&reglage=appareils`;
+export function quandParis(t) {
+  const p = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', hour: 'numeric', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(t));
+  const g = (k) => (p.find((x) => x.type === k) || {}).value || '';
+  return `le ${g('day')}/${g('month')} à ${Number(g('hour'))} h ${g('minute')}`;
+}
+export function mailNouvelAppareil({ signature, maintenant = Date.now() }) {
+  const sig = String(signature || 'Appareil inconnu').replace(/[\r\n<>]/g, ' ').slice(0, 60);
+  const quand = quandParis(maintenant);
+  const sujet = `Nouvelle connexion à VRM — ${sig} — ${quand}`;
+  const { texte, html } = gabaritMail({
+    titre: 'Nouvelle connexion à VRM',
+    preentete: `${sig}, ${quand}.`,
+    paras: [`Ton compte VRM vient d’être ouvert sur un appareil jamais vu : ${sig}, ${quand} (heure de Paris).`, 'C’est toi ? Tu n’as rien à faire.'],
+    bouton: { mot: 'Voir mes appareils', url: LIEN_APPAREILS },
+    suite: ['Ce n’est pas toi ? Change ton mot de passe (Paramètres → Mon compte → Mot de passe), puis « Déconnecter » cet appareil dans Paramètres → Appareils connectés.'],
+    pied: { texte: 'Tu reçois ce message parce qu’une nouvelle connexion à ton compte VRM a eu lieu. Jamais au premier appareil d’un compte.' },
+  });
+  return { sujet, texte, html };
 }
 
 // PURE. `sessions` : lignes de `vrm_sessions_de` ; `registre` : data de
@@ -128,5 +154,16 @@ export async function verifierNouvelAppareil(deps) {
       if (res && res.sent > 0) envoyes++;
     } catch (_) {}
   }
-  return { status: 200, body: { ok: true, nouveaux: calc.nouveaux.length, envoyes } };
+  // L'e-mail : seulement si la voie est configurée (`envoyerMail`) et que SA session porte une adresse.
+  let email = deps.envoyerMail ? null : 'non-configure';
+  const adresse = String(user.email || '').trim();
+  if (deps.envoyerMail && /^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+$/.test(adresse)) {
+    const issues = [];
+    for (const n of calc.nouveaux) {
+      const m = mailNouvelAppareil({ signature: n.signature, maintenant: deps.maintenant || Date.now() });
+      try { const v = await deps.envoyerMail({ a: adresse, ...m }); issues.push(v && v.issue); } catch (_) { issues.push('incertain'); }
+    }
+    email = issues.every((x) => x === 'envoye') ? 'envoye' : issues.includes('envoye') ? 'partiel' : (issues[0] === 'refuse' ? 'refuse' : 'incertain');
+  } else if (deps.envoyerMail) email = 'sans-adresse';
+  return { status: 200, body: { ok: true, nouveaux: calc.nouveaux.length, envoyes, email } };
 }

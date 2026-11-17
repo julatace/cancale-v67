@@ -24,6 +24,7 @@ import { livreDesRecettes, registreDesAchats } from '../registres.js';
 // (11 nov., lot livre-registre) Les registres CONFORMES : mentions obligatoires, sources, exports horodatés.
 import { completerRecettes, completerAchats, facturesParVente, SELECT_FACTURES_REGISTRE, idsTxLignes, lirePseudosTx, csvConforme, pdfConforme, feuillesConformes, nomFichierConforme } from '../registresConformes.js';
 import RegistresVue from '../RegistresVue.jsx';
+import CalendrierFiscalCarte from '../composants/CalendrierFiscal.jsx';   // (16 nov., confiance-clients) les échéances de l'année
 import { xlsxClasseur } from '../xlsxSimple.js';
 import { tr, localeCourante } from '../i18n/index.js';
 import { aVenirPour } from '../argentAVenir.js';   // (15 nov., verre 2) la part « à venir », la règle de la coque
@@ -2963,6 +2964,9 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux, activite
   // temps en temps : repliées sous une ligne qui dit ce qu'il y a dedans. Elles
   // s'ouvrent d'elles-mêmes quand quelque chose demande son attention (le
   // versement libératoire pas encore répondu, un seuil proche ou dépassé).
+  // (16 nov., confiance-clients, point 8) Le calendrier fiscal de l'année : SON rythme tel qu'enregistré (absent ⇒
+  // « rythme à choisir », jamais le défaut), SON registre « déclaré », la ligne publiée (TVA seulement si dépassée).
+  const calendrierAn = <CalendrierFiscalCarte regime="micro" freq={load('vinted_urssaf_freq', null)} declare={regPret ? regLu : null} ligne={ligne || null} activite={activite} debut={load('vrm_debut_activite', null)} now={now} Carte={Card} style={sCarte} titreStyle={sTitre}/>;
   const aConfirmer = optsPret && vl == null;
   const seuilAlerte = besoin && !aConfirmer;
   const prochaine = (cal || []).find((c) => !(regPret && c.ym.every((m) => moisDeclare(regLu, m))));
@@ -2973,7 +2977,7 @@ function MicroEntreprise({ taux, poserTaux, officiel, vlTaux, acreTaux, activite
         <span style={{ fontSize: 13, color: besoin ? (C.warn || '#B25000') : C.muted, fontWeight: 400, lineHeight: 1.4 }}>{aConfirmer ? tr('compta.1QuestionConfirmer') : ''}{seuilAlerte ? tr('compta.seuilApproche') : ''}{tr('compta.taux2')} {String(taux).replace('.', ',')}&nbsp;%{prochaine ? ` · ${prochaine.periode} à déclarer avant le ${prochaine.limite.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''} {tr('compta.seuilsImpots')}</span>
       </span>
     </summary>
-    <div data-micro-entreprise="" className="vrm-micro-grille" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 440px), 1fr))', gap: 12, alignItems: 'stretch', marginTop: 8 }}>{calendrier}{seuils}{profil}{impots}</div>
+    <div data-micro-entreprise="" className="vrm-micro-grille" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 440px), 1fr))', gap: 12, alignItems: 'stretch', marginTop: 8 }}>{calendrier}{seuils}{profil}{impots}{calendrierAn}</div>
   </details>);
 }
 // (14 nov., lot argent-choix — proposition 82) « Ta déclaration de revenus » PRÊTE, en tête de Déclarer :
