@@ -43,6 +43,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 require('./_meta.cjs');
 const H = require('./_base-ecritures.cjs');
+const { choisirApparence, basculerSombre } = require('./_choisir-apparence.cjs');   // (16 nov.) l'interrupteur « Mode sombre » est retiré : le geste vit dans « Apparence »
 const fs = require('node:fs'), path = require('node:path');
 const CAPT = process.env.BANC_CAPTURES || path.join(require('node:os').tmpdir(), 'vrm-bancs', 'deux-appareils');
 fs.mkdirSync(CAPT, { recursive: true });
@@ -129,9 +130,8 @@ const prixFiche = (d, id) => String(((d && d.vinted_annonce_numeros) || {})[id]?
     await H.attendre(() => (H.dataMain(base) || {}).vrm_prenom === 'Julien', 6000);
     dit((H.dataMain(base) || {}).vrm_prenom === 'Julien', 'A : son prénom est en base', JSON.stringify((H.dataMain(base) || {}).vrm_prenom));
     const t0 = Date.now();
-    const sw = pB.pg.locator('[data-reglage-sombre]');
-    dit((await sw.count()) > 0, 'B : l\'interrupteur du mode sombre est là');
-    await sw.first().click();
+    // (16 nov.) Le mode sombre se choisit dans « Apparence » (l'interrupteur en doublon est retiré).
+    dit(await choisirApparence(pB.pg, 'sombre'), 'B : « Apparence → Sombre » est là, touché');
     await H.attendre(() => (H.dataMain(base) || {}).vinted_dark === true, 6000);
     await pB.pg.waitForTimeout(1200);
     const d = H.dataMain(base) || {};
@@ -202,8 +202,7 @@ const prixFiche = (d, id) => String(((d && d.vinted_annonce_numeros) || {})[id]?
     m.data = { ...m.data, vrm_ville: 'Saint-Malo', rev: (Number.isSafeInteger(m.data.rev) ? m.data.rev : 0) + 1 }; m.updated_at = new Date().toISOString();
     B.etat.faute = (u, meth) => (meth === 'GET' && /id=eq\.main/.test(u) && /select=(owner,)?data/.test(u) ? { status: 500 } : null);
     const t0 = Date.now();
-    const sw = pB.pg.locator('[data-reglage-sombre]');
-    await sw.first().click();
+    await choisirApparence(pB.pg, 'clair');   // (16 nov.) l'ancien interrupteur ramenait au clair : « Apparence → Clair »
     await pB.pg.waitForTimeout(3500);
     const passees = H.ecrituresMain(base, t0).filter((e) => e.page === 'B' && (e.resultat === 201 || (typeof e.resultat === 'number' && e.resultat > 0)));
     const d = H.dataMain(base) || {};
@@ -226,7 +225,7 @@ const prixFiche = (d, id) => String(((d && d.vinted_annonce_numeros) || {})[id]?
     const perdue = IDS[4];
     await pC.pg.evaluate((id) => { const f = JSON.parse(localStorage.getItem('vinted_annonce_numeros') || '{}'); delete f[id]; localStorage.setItem('vinted_annonce_numeros', JSON.stringify(f)); }, perdue);
     const t0 = Date.now();
-    await pC.pg.locator('[data-reglage-sombre]').first().click().catch(() => {});
+    await basculerSombre(pC.pg);
     await pC.pg.waitForTimeout(4000);
     const refusI = base.ecritures.filter((e) => e.at >= t0 && e.page === 'C' && /vrm_/.test(String(e.resultat)));
     dit(refusI.length === 0, 'I : un appareil qui a perdu une fiche numérotée : la base ne refuse rien', refusI.map((e) => e.resultat).join(', '));
@@ -261,7 +260,7 @@ const prixFiche = (d, id) => String(((d && d.vinted_annonce_numeros) || {})[id]?
       const p = JSON.parse(localStorage.getItem('vinted_used_numeros') || '[]'); p.push(N); localStorage.setItem('vinted_used_numeros', JSON.stringify(p));
     }, N);
     const t0 = Date.now();
-    await pB.pg.locator('[data-reglage-sombre]').first().click();
+    await basculerSombre(pB.pg);
     await pB.pg.waitForTimeout(4000);
     const d = H.dataMain(base) || {};
     const porteurs = Object.entries(d.vinted_annonce_numeros || {}).filter(([, e]) => e && H.cleNum(e.numero) === N).map(([id]) => id);
@@ -283,7 +282,7 @@ const prixFiche = (d, id) => String(((d && d.vinted_annonce_numeros) || {})[id]?
     base.lignes.set('main', cache);
     await pA.pg.waitForTimeout(5000);
     base.lignes.delete('main');
-    await pA.pg.locator('[data-reglage-sombre]').first().click().catch(() => {});
+    await basculerSombre(pA.pg);
     await pA.pg.waitForTimeout(3500);
     await pA.pg.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
     await pA.pg.waitForTimeout(2500);

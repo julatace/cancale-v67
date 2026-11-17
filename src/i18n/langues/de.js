@@ -616,8 +616,6 @@ export default {
   "reglages.sms.aActiver": "Einschalten",
   "reglages.sms.actif": "Aktiv",
   "reglages.sms.coupe": "Aus",
-  "reglages.sombre.desc": "Dunkler Hintergrund, abends angenehmer.",
-  "reglages.sombre.lib": "Dunkelmodus",
   "reglages.statut.desc": "Laufen Datenbank, E-Mails und Mitteilungen?",
   "reglages.statut.lib": "VRM-Status",
   "reglages.stream-on.desc": "Verbirgt Beträge, Nutzernamen und Adressen, wenn du deinen Bildschirm filmst.",

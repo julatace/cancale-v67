@@ -24,6 +24,8 @@ export default {
   "parametres.g.equipe": "Equipo",
   "parametres.g.onglets": "Lo que muestra VRM",
   "parametres.g.colis": "Paquetes",
+  "parametres.g.apparence": "Apariencia",
+  "parametres.g.langue": "Idioma",
   "parametres.g.ecrans": "Pantallas",
   "parametres.g.stream": "Cuando grabas",
   "parametres.g.raccourcis": "Atajos",

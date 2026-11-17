@@ -621,8 +621,6 @@ export default {
   "reglages.sms.aActiver": "À activer",
   "reglages.sms.actif": "Activé",
   "reglages.sms.coupe": "Coupé",
-  "reglages.sombre.desc": "Fond sombre, plus doux le soir.",
-  "reglages.sombre.lib": "Mode sombre",
   "reglages.statut.desc": "La base, les e-mails et les notifications fonctionnent-ils ?",
   "reglages.statut.lib": "État de VRM",
   "reglages.stream-on.desc": "Cache tes montants, pseudos et adresses quand tu filmes ton écran.",

@@ -24,6 +24,8 @@ export default {
   "parametres.g.equipe": "Squadra",
   "parametres.g.onglets": "Cosa mostra VRM",
   "parametres.g.colis": "Pacchi",
+  "parametres.g.apparence": "Aspetto",
+  "parametres.g.langue": "Lingua",
   "parametres.g.ecrans": "Schermate",
   "parametres.g.stream": "Quando registri",
   "parametres.g.raccourcis": "Scorciatoie",

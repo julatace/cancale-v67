@@ -616,8 +616,6 @@ export default {
   "reglages.sms.aActiver": "Da attivare",
   "reglages.sms.actif": "Attivo",
   "reglages.sms.coupe": "Spento",
-  "reglages.sombre.desc": "Sfondo scuro, più riposante la sera.",
-  "reglages.sombre.lib": "Modalità scura",
   "reglages.statut.desc": "Il database, le e-mail e le notifiche funzionano?",
   "reglages.statut.lib": "Stato di VRM",
   "reglages.stream-on.desc": "Nasconde importi, nomi utente e indirizzi quando registri lo schermo.",

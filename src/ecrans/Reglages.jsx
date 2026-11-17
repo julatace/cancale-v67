@@ -2192,9 +2192,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       // (11 nov., lot traduction) La langue de VRM (src/i18n/) : Français · English · Español · Italiano · Deutsch.
       { id:'langue', type:'panneau', nu:true, ic:'langue', lib:tr('reglages.langue.lib'), desc:tr('reglages.langue.desc'), val: NOMS_LANGUES[langueCourante()] || '', data:{ 'data-reglage-langue': langueCourante() }, el:<LangueSetting/> },
       { id:'je-vends', type:'panneau', nu:true, ic:'bag', lib:tr('reglages.je-vends.lib'), desc:tr('reglages.je-vends.desc'), val: (() => { const n = nomsCategories(profilV.categories || [], lireReglageJeVends(load(CLE_JE_VENDS, null)).autre); return n.length ? (n.length > 2 ? `${n.slice(0, 2).join(', ')}…` : n.join(', ')) : (profilV.vend === 'sneakers' ? 'Sneakers' : 'Autre'); })(), data:{ 'data-reglage-vends': profilV.vend || 'autre' }, el:<JeVendsSetting/> },
-      { id:'sombre', type:'switch', ic:'moon', lib:tr('reglages.sombre.lib'), desc: apparence === 'auto' || apparence === 'soir' ? `${tr('reglages.apparence.' + apparence + '.lib')} : ${tr('reglages.apparence.' + apparence + '.phrase').replace(/\.$/, '').toLowerCase()}.` : tr('reglages.sombre.desc'), on:!!dark, onClick:toggleDark, data:{ 'data-reglage-sombre': dark ? 'on' : 'off' } },
-      // (8 nov., « beauté ») L'apparence : Clair · Sombre · Automatique (le système) · Le soir (19 h–7 h).
-      // L'interrupteur ci-dessus reste le choix explicite (il quitte Automatique / Le soir).
+      // (16 nov., lot apparence-rangee — décidé par Julien) Plus d'interrupteur « Mode sombre » : il doublait
+      // « Apparence » (Automatique · Clair · Sombre · Le soir), où le choix vit seul (`vinted_dark` y est écrit
+      // pour Clair et Sombre, src/apparence.js). (8 nov., « beauté ») L'apparence : Automatique (le système) d'abord.
       onApparence && { id:'apparence', type:'panneau', nu:true, ic:'contraste', lib:tr('reglages.apparence.lib'), desc:tr('reglages.apparence.desc'), val: APPARENCES.includes(apparence) ? tr('reglages.apparence.' + apparence + '.lib') : '', data:{ 'data-reglage-apparence': apparence || '' }, el:<ApparenceSetting valeur={apparence} onChoisir={onApparence}/> },
       // (15 nov.) LA TAILLE DU TEXTE (src/tailleTexte.js) : quatre tailles, toute l'app grandit avec (le mécanisme du
       // texte en grand de l'appareil, src/grandTexte.js) — rien ne déborde. Propre à CET appareil.

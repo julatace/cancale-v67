@@ -616,8 +616,6 @@ export default {
   "reglages.sms.aActiver": "To turn on",
   "reglages.sms.actif": "On",
   "reglages.sms.coupe": "Off",
-  "reglages.sombre.desc": "Dark background, easier in the evening.",
-  "reglages.sombre.lib": "Dark mode",
   "reglages.statut.desc": "Are the database, emails and notifications working?",
   "reglages.statut.lib": "VRM status",
   "reglages.stream-on.desc": "Hides your amounts, usernames and addresses when you record your screen.",

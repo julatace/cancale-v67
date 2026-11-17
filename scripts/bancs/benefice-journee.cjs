@@ -162,8 +162,9 @@ const toucheForce=async(pg,sel,T)=>{ const l=pg.locator(sel).first(); await l.ev
         const txtA=await pg.evaluate(()=>{ const e=document.querySelector('[data-journee-benef]'); return e?e.innerText:''; });
         dit(!!j && j.etat==='passu' && !j.brut && !j.net && /—/.test(txtA) && !/\d+\s*€/.test(txtA),'sans bénéfice publié : la case dit « — », aucun montant (jamais 0 €)',JSON.stringify(j)+' '+txtA.replace(/\n/g,' | '));
         dit(await pg.locator('[data-journee-benef-activer]').count()===0,'aucun bouton « afficher »');
-        await aller(pg,'settings','[data-reglage-sombre]',1500);
-        dit(await pg.locator('[data-reglage-sombre]').count()>0 && await pg.locator('[data-reglage-benef-journee]').count()===0,'Réglages n’a plus d’interrupteur « Bénéfice dans Ma journée »');
+        // (16 nov.) Repère « Paramètres chargé » : ses catégories (l'interrupteur « Mode sombre » qui servait de repère est retiré).
+        await aller(pg,'settings','[data-categorie-ouvrir]',1500);
+        dit(await pg.locator('[data-categorie-ouvrir]').count()>0 && await pg.locator('[data-reglage-benef-journee]').count()===0,'Réglages n’a plus d’interrupteur « Bénéfice dans Ma journée »');
         dit(errs.length===0,'aucune erreur d’app',errs.join(' | ').slice(0,160));
         await ctx.close();
       });

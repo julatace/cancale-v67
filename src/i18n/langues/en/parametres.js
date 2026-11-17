@@ -24,6 +24,8 @@ export default {
   "parametres.g.equipe": "Team",
   "parametres.g.onglets": "What VRM shows",
   "parametres.g.colis": "Parcels",
+  "parametres.g.apparence": "Appearance",
+  "parametres.g.langue": "Language",
   "parametres.g.ecrans": "Screens",
   "parametres.g.stream": "When you film",
   "parametres.g.raccourcis": "Shortcuts",
