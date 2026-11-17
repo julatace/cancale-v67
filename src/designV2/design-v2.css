@@ -484,7 +484,8 @@ html[data-grand-texte] body button.v2b-principal { height: auto; min-height: var
 }
 /* Constat 10. Sur ordinateur, « Extension à installer » (la pastille d'état de l'île du haut) n'est plus un plein : teintée, comme un secondaire. */
 @media (min-width: 1024px) {
-  html[data-design="v2"]:root body .vrm-app-header .vrm-etat-pastille[data-etat-code] { background: var(--v2-teinte-fond) !important; color: var(--v2-teinte-texte) !important; border-color: transparent !important; box-shadow: none !important; }
+  html[data-design="v2"]:root body .vrm-app-header .vrm-etat-pastille[data-etat-code] { background: var(--v2-carte, #FFFFFF) !important; color: var(--v2-teinte-texte) !important; border-color: transparent !important; box-shadow: 0 0 0 1px rgb(255 255 255 / .6) !important; }
+  /* (sur le bleu de la coque, une teinte à 10 % se perdait : le fond porcelaine d'un secondaire, l'encre d'accent — jamais un plein) */
 }
 
 /* ══ 14. L'AIR (17 nov. soir, Julien : « c'est trop compacté, ça doit être moins compact ») ═════════════════════
