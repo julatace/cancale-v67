@@ -759,3 +759,7 @@ html body .v2-squelette-A .v2-squelette-rangee { min-height: 120px; }
 .v2-piste > i.is-fait { background: var(--v2-lien); }
 .v2-piste.is-ambre > i.is-fait:last-of-type { background: var(--v2-ambre-point); }
 :root[data-theme="dark"] .v2-piste > i:not(.is-fait) { background: rgb(255 255 255 / .18); }
+/* La facture envoyée : la boîte visible = l'icône (24 px), la cible au doigt (44) est une zone invisible autour — elle ne
+   recouvre plus le prix ni le pseudo (banc : aucune boîte ne se chevauche dans une rangée). */
+html body button.v2-facture-ok { width: 24px; height: 24px; margin: 0 4px 0 0; border-radius: 8px; overflow: visible; }
+html body button.v2-facture-ok::before { content: ""; position: absolute; inset: -10px; }
