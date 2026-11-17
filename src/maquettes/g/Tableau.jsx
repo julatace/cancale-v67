@@ -72,29 +72,18 @@ function Carte({ c, compact }) {
       aria-label={[c.numero ? 'N° ' + c.numero : '', c.titre, c.sous, c.geste ? 'geste : ' + c.geste.mot : ''].filter(Boolean).join(', ')}>
       <span className="g-vignette">{c.photo ? <img src={c.photo} alt="" loading="lazy" decoding="async" width="52" height="52" /> : <span className="g-vignette-vide" />}</span>
       <span className="g-corps">
-        <span className="g-ligne1"><Plaque c={c} />{c.compte && !compact ? <span className="g-compte">{c.compte}</span> : null}</span>
+        <span className="g-ligne1"><Plaque c={c} /></span>
         <span className="g-titre">{c.titre || '—'}</span>
         <span className="g-sous">{c.ambre ? <i className="g-point" aria-hidden="true" /> : null}{c.sous}</span>
       </span>
       <span className="g-droite">
         <span className="g-prix">{c.groupe ? '' : euros(c.prix)}</span>
-        {c.geste && !compact ? <span className="g-mot-geste" aria-hidden="true">{c.geste.mot}<svg width="12" height="12" viewBox="0 0 24 24"><path d="M9.3 5.3 8.2 6.4 13.8 12l-5.6 5.6 1.1 1.1L16 12z" fill="currentColor" /></svg></span> : null}
-        {c.geste && compact ? <span className="g-mot-geste" aria-hidden="true">{c.geste.mot}</span> : null}
       </span>
     </div>
   );
 }
 
 const motSerie = (s) => (s ? (s.n != null ? `${s.mot} ${s.n}${s.suite ? ' ' + s.suite : ''}` : s.mot) : '');
-function Entete({ col, modele }) {
-  if (col.cle === 'payees') return <p className="g-contexte">30 derniers jours · <b>{euros(modele.montantPayees.s)}</b>{modele.montantPayees.k < modele.montantPayees.sur ? ` sur ${modele.montantPayees.k}/${modele.montantPayees.sur}` : ''}{modele.payeesAvant ? ` · ${modele.payeesAvant} plus anciennes dans Argent` : ''}</p>;
-  if (col.cle === 'envoyer' && col.cartes[0]) return <p className="g-contexte">La première {col.cartes[0].sous.toLowerCase()}</p>;
-  if (col.cle === 'enligne') { const n = col.cartes.filter((c) => c.ambre).length; return <p className="g-contexte">{n ? `${n} dorment depuis plus de 60 j` : 'Lu il y a moins de 24 h'}</p>; }
-  if (col.cle === 'verifier') return <p className="g-contexte">VRM ne sait pas les placer : à toi de regarder</p>;
-  if (col.cle === 'ranger') return <p className="g-contexte">Arrivées chez toi, pas encore en ligne</p>;
-  return col.attente ? <p className="g-contexte">{col.attente}</p> : null;
-}
-
 function Telephone({ modele }) {
   const [cle, setCle] = React.useState(lireCol);
   const idx = modele.colonnes.findIndex((c) => c.cle === cle);
@@ -117,8 +106,7 @@ function Telephone({ modele }) {
       <header className="g-tete">
         <div className="g-tete-l">
           <h1 className="g-titre-ecran">Tableau</h1>
-          <span className="g-tete-sous">{modele.nPaires} paires · 3 comptes</span>
-          <button type="button" className="sb-rond g-plus" aria-label="Plus : messages, notifications, réglages"><Ico n="plus" /></button>
+          <button type="button" className="sb-rond g-plus" aria-label="Comment marche le tableau ?">?</button>
         </div>
         <nav className="g-rail" ref={rail} aria-label="Étapes">
           {modele.colonnes.map((c) => {
@@ -132,18 +120,15 @@ function Telephone({ modele }) {
         </nav>
       </header>
       <main className="g-colonne" onTouchStart={surDebut} onTouchEnd={surFin}>
-        <div className="g-col-tete"><h2>{col.nom}</h2><span className="g-col-n">{col.n}</span></div>
-        <Entete col={col} modele={modele} />
         <div className="g-liste" role="list">
           {col.cartes.length ? col.cartes.map((c) => <Carte key={c.cle} c={c} />) : <p className="g-vide">Aucune paire à cette étape.</p>}
         </div>
-        <p className="g-pied">L’étape vient de Vinted, jamais d’un glisser.</p>
       </main>
       <div className="g-pouce" role="toolbar" aria-label="Gestes">
         <button type="button" className="sb-rond g-pouce-rond" aria-label="Chercher un N°, un pseudo, un suivi"><Ico n="loupe" /></button>
         {s && !s.lien
           ? <button type="button" className="sb-btn-plein sb-btn-plein--barre g-pouce-plein" data-plein="" data-g-serie={col.cle}>{col.cle === 'envoyer' ? <Ico n="imprimer" t={20} /> : null}{motSerie(s)}</button>
-          : <span className="g-pouce-attente">{s && s.lien ? 'Tout est versé' : (col.attente || 'Rien à faire ici')}</span>}
+          : <span className="g-pouce-attente" aria-hidden="true" />}
         <button type="button" className="sb-rond g-pouce-rond" aria-label="Argent"><Ico n="euro" /></button>
       </div>
     </div>
@@ -156,10 +141,9 @@ function Ordinateur({ modele }) {
       <header className="g-ord-tete">
         <span className="g-marque">VRM</span>
         <h1 className="g-titre-ecran">Tableau</h1>
-        <span className="g-tete-sous">{modele.nPaires} paires · 3 comptes · lu il y a 2 min</span>
         <label className="g-cherche"><Ico n="loupe" t={18} /><input placeholder="N°, pseudo, n° de suivi, code…" aria-label="Chercher" /><kbd>⌘K</kbd></label>
         <button type="button" className="sb-touche"><Ico n="euro" t={18} />Argent</button>
-        <button type="button" className="sb-rond" aria-label="Plus : messages, notifications, réglages"><Ico n="plus" /></button>
+        <button type="button" className="sb-rond" aria-label="Comment marche le tableau ?">?</button>
       </header>
       <div className="g-tableau" role="list">
         {modele.colonnes.map((col) => {
@@ -169,11 +153,7 @@ function Ordinateur({ modele }) {
               <div className="g-ord-col-tete">
                 <h2>{col.nom}</h2><span className="g-col-n">{col.n}</span>
               </div>
-              <div className="g-ord-serie">
-                {plein ? <button type="button" className="sb-btn-plein sb-btn-plein--barre g-ord-plein" data-plein=""><Ico n="imprimer" t={18} />{motSerie(s)}</button>
-                  : s ? <button type="button" className={s.lien ? 'sb-lien' : 'sb-touche'}>{motSerie(s)}</button>
-                    : <span className="g-ord-attente">{col.attente || ''}</span>}
-              </div>
+              {plein ? <div className="g-ord-serie"><button type="button" className="sb-btn-plein sb-btn-plein--barre g-ord-plein" data-plein=""><Ico n="imprimer" t={18} />{motSerie(s)}</button></div> : null}
               <div className="g-ord-liste" role="list">
                 {col.cartes.slice(0, 40).map((c) => <Carte key={c.cle} c={c} compact />)}
                 {col.cartes.length > 40 ? <button type="button" className="sb-lien g-encore">Voir les {col.cartes.length - 40} autres</button> : null}
