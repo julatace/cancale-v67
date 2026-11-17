@@ -48,8 +48,9 @@ de retrait) et « Ouvrir l'achat ». La feuille « Achat pas encore relié · Re
   + Relier ⇒ feuille ⇒ rien écrit avant son toucher ⇒ son toucher écrit le n° (tx de CET achat) ⇒ douchette ⇒ la
   fiche ; « Ranger » ⇒ atelier ; 44 px ; rien ne déborde ; aucune erreur. Captures regardées (fiche, lot, inconnu,
   feuille de choix).
-- Code d'avant (`origin/main`) : voir l'ÉTAT ci-dessous ; mutations (détails lus dans une AUTRE transaction ; la
-  demande « Relier » jamais prise) ⇒ rouges.
+- Code d'avant (`origin/main`, banc copié dans l'arbre d'avant) : **10 rouges** (aucun détail, aucun « Ranger »,
+  aucun lot, aucun « Relier »). Mutations (détails lus dans une AUTRE transaction ; la demande « Relier » jamais
+  prise), un build : **8 rouges**. Après fusion de `main` : rebâti, **34/34 verts**.
 - Audits : scan-colis 52/52, studio, relier-colis 22/22, traduction, tdz, identite, icones, variables, quoi-de-neuf.
 
 ## ÉTAT À LA REPRISE
