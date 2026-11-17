@@ -75,11 +75,11 @@ des REQUÊTES, rouge par mutation si deux étapes sont permutées (requêtes, ap
 ## 4. Preuves
 
 - `scripts/audit-republication-parfaite.cjs` (neuf, vrai background.js sur `_fond-vm.cjs`, faux Vinted
-  À ÉTAT de la forme de Vinted) : **38 verts** — A suite dans l'ordre et datée, B reprise après un worker
+  À ÉTAT de la forme de Vinted) : **40 verts** — A suite dans l'ordre et datée, B reprise après un worker
   tué à chaque étape (B1–B10), C aucun second brouillon, D recréer depuis le coffre, E N° reporté, F gardes
   (45/h, jour, REPUB_PAR_JOUR 50, frein, 429, onglet sur un autre compte, confirmation), G retirés restent
   retirés, H règle de l'app, I écran plein. `--prouve` : **rouge sur origin/claude/extension-carte-v2** et
-  **19/19 mutations rouges** (20/20).
+  **22/22 mutations rouges** (23/23 avec la branche de départ ; 4 permutations d'ordre).
 - `audit-recreer` 169 verts (R2 adapté : le job « en cours » est relu 2 min après, la règle « jamais deux
   mises en ligne » inchangée) ; `audit-republier`, `-programme`, `-question`, `-plusieurs-chrome`,
   `brouillons-proposables`, `quoi-republier`, `extension-feuille`, `repub-programme-notif` verts ;
@@ -90,7 +90,7 @@ des REQUÊTES, rouge par mutation si deux étapes sont permutées (requêtes, ap
 ## 5. Bancs
 
 `scripts/bancs/republication-parfaite.cjs` (vrai build, vrais vrm-ui.js / vrm-action.js, données inventées) :
-390 tactile, 1280, 1512 × clair, sombre — **72 OK, 0 KO** : A plan avant de lancer, B écran plein (chaîne,
+390 tactile, 1280, 1512 × clair, sombre — **90 OK, 0 KO** : A plan avant de lancer, B écran plein (chaîne,
 44 px, « photo 2 sur 3 »), C bilan (1 en ligne · 2 à finir, un geste chacun, « Choisir la taille » repart pour
 CETTE paire avec SA réponse). Captures regardées ; corrigé après les avoir vues : la phrase « rien n'a changé sur
 Vinted » sous « Fini » était fausse pour un brouillon à refaire (retirée quand le bilan est là) ; le geste est
