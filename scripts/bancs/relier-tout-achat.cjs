@@ -151,6 +151,10 @@ async function passe(b, nom, ctxOpts, sombre) {
   await pg.locator('[data-relier-feuille] [data-achat-libre], [data-relier-feuille] [data-suggestion-achat], [data-relier-feuille] [data-voir-tous-achats]').first().waitFor({ timeout: 20000 }).catch(() => {});
   await pg.waitForTimeout(600);
 
+  // « Rien d'écrit » = ni dans la base, ni sur l'appareil (les liens d'achat de chaque fiche et vente, relus).
+  const liensLocaux = () => pg.evaluate(() => { const out = {}; for (const k of ['vinted_annonce_numeros', 'vinted_sale_overrides']) { let m = null; try { m = JSON.parse(localStorage.getItem(k) || 'null'); } catch (_) { m = null; } for (const [c, e] of Object.entries(m || {})) if (e && e.buyFromId != null) out[k + ':' + c] = String(e.buyFromId); } return JSON.stringify(Object.entries(out).sort()); });
+  const liensAvant = await liensLocaux();
+  const rienEcrit = async () => !ecritures.length && (await liensLocaux()) === liensAvant;
   // 1 · Les deux parties, sans rien toucher : « Suggestions » (ou la phrase) puis « Tous mes achats ».
   const S = await pg.evaluate(() => {
     const f = document.querySelector('[data-relier-feuille]'); if (!f) return null;
@@ -170,7 +174,7 @@ async function passe(b, nom, ctxOpts, sombre) {
   dit(!(s.sugTx || []).some((t) => prisTx.includes(t)), `${nom} · un achat déjà relié (la seule « Adidas Spezial noir 42 », N°8) n'est JAMAIS suggéré`, JSON.stringify(s.sugTx));
   dit(s.nMasques === exclusTx.length && /5 achats/.test(s.masques) && /masqu/.test(s.masques), `${nom} · « 5 achats retournés, en litige, remboursés ou annulés masqués » est dit`, s.masques);
   dit(s.recherche && s.filtres.length === 3, `${nom} · une recherche (ce qu'elle lit est écrit dessous, visible) et les filtres rapides compte, mois, taille`, JSON.stringify(s.filtres));
-  dit(!ecritures.length, `${nom} · rien n'est écrit en ouvrant la feuille`, ecritures.slice(0, 2).join(' | '));
+  dit(await rienEcrit(), `${nom} · rien n'est écrit en ouvrant la feuille`, ecritures.slice(0, 2).join(' | '));
   await pg.screenshot({ path: path.join(SHOTS, `relier-tout-${nom}-ouverte.png`) });
 
   // 2 · La présentation : cibles ≥ 44 px, rien de coupé, pas de débord, la feuille dans l'écran.
@@ -252,7 +256,7 @@ async function passe(b, nom, ctxOpts, sombre) {
   await pg.screenshot({ path: path.join(SHOTS, `relier-tout-${nom}-confirmation.png`) });
   await pg.evaluate(() => { const c = document.querySelector('.vrm-confirmation'); const b = c && [...c.querySelectorAll('button')].find((x) => /Annuler/.test(x.textContent)); if (b) b.click(); });
   await pg.waitForTimeout(600);
-  dit(!ecritures.length, `${nom} · « Annuler » : rien n'est relié ni détaché`, ecritures.slice(0, 2).join(' | '));
+  dit(await rienEcrit(), `${nom} · « Annuler » : rien n'est relié ni détaché`, ecritures.slice(0, 2).join(' | '));
   // Le lot complet : il demande QUEL article détacher (un seul), puis confirme ; « Annuler » n'écrit rien.
   await pg.locator(`[data-relier-deplacer="${LOT2}"]`).click().catch(() => {});
   await pg.locator('.vrm-confirmation [data-ask-choix]').first().waitFor({ timeout: 5000 }).catch(() => {});
@@ -260,7 +264,7 @@ async function passe(b, nom, ctxOpts, sombre) {
   dit(CH.length === 2 && CH.some((t) => /N°11/.test(t)) && CH.some((t) => /N°12/.test(t)), `${nom} · un lot complet : « quel article détacher ? » N°11 ou N°12 (jamais les deux)`, JSON.stringify(CH));
   await pg.evaluate(() => { const c = document.querySelector('.vrm-confirmation'); const b = c && [...c.querySelectorAll('button')].find((x) => /Annuler/.test(x.textContent)); if (b) b.click(); });
   await pg.waitForTimeout(500);
-  dit(!ecritures.length, `${nom} · « Annuler » : le lot n'est pas touché`, ecritures.slice(0, 2).join(' | '));
+  dit(await rienEcrit(), `${nom} · « Annuler » : le lot n'est pas touché`, ecritures.slice(0, 2).join(' | '));
   await pg.locator('[data-relier-feuille] [data-relier-vue="tous"]').click().catch(() => {});
   await pg.waitForTimeout(300);
 
@@ -284,7 +288,7 @@ async function passe(b, nom, ctxOpts, sombre) {
   const rc = await cherche(`boutique_sud ${txDe(2997)}`);
   dit(rc.length === 1 && rc[0] === txDe(2997), `${nom} · chercher le compte (« boutique_sud ») avec le n°`, rc.join(','));
   // Une taille : celle écrite dans un titre, et celle LUE chez Vinted d'un achat dont le titre n'en dit rien.
-  const t43Titre = tous.find((x) => / taille 43$/.test(x.titre) && !EXCLUS.has(x.i));
+  const t43Titre = tous.find((x) => / taille 43$/.test(x.titre) && !EXCLUS.has(x.i) && !RELIES.has(x.i));
   const t43Lue = tous.find((x) => AVEC_DETAIL.has(x.i) && x.i % 4 === 0 && 38 + (x.i % 9) === 43);
   // (le modèle et la couleur avec : moins de 60 réponses, toutes rendues d'un coup)
   const mc = (x) => x.titre.replace(/ taille \d+$/, '');
@@ -312,7 +316,7 @@ async function passe(b, nom, ctxOpts, sombre) {
   await champ.fill('Salomon');
   await pg.waitForTimeout(250);
   await pg.screenshot({ path: path.join(SHOTS, `relier-tout-${nom}-recherche.png`) });
-  dit(!ecritures.length, `${nom} · toujours rien d'écrit sans son toucher « Relier »`, ecritures.slice(0, 2).join(' | '));
+  dit(await rienEcrit(), `${nom} · toujours rien d'écrit sans son toucher « Relier »`, ecritures.slice(0, 2).join(' | '));
   // 6 · Relier le 2e article du lot : aucune confirmation de détachement, le prix DEMANDÉ vide (jamais partagé), laissé vide
   //     ⇒ relié, coût « à saisir » ; N°10 garde son lien.
   await champ.fill(LOT1);
@@ -326,11 +330,12 @@ async function passe(b, nom, ctxOpts, sombre) {
   await pg.screenshot({ path: path.join(SHOTS, `relier-tout-${nom}-lot-prix.png`) });
   await pg.evaluate(() => { const c = document.querySelector('.vrm-confirmation'); const b = c && c.querySelector('button[type="submit"]'); if (b) b.click(); });
   await pg.waitForTimeout(7500);
-  const dernier = (id) => { for (let k = corps.length - 1; k >= 0; k--) if (corps[k].id === id) return corps[k].data; return null; };
-  const mainW = dernier('main'), ficW = dernier('vinted_annonce_numeros') || (mainW && mainW.vinted_annonce_numeros), venW = dernier('vinted_sale_overrides') || (mainW && mainW.vinted_sale_overrides);
+  // Ce que l'app a écrit : sur l'appareil (localStorage, écrit tout de suite) — la base suit.
+  const LOC = await pg.evaluate(() => { const l = (k) => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (_) { return null; } }; return { fic: l('vinted_annonce_numeros'), ven: l('vinted_sale_overrides') }; });
+  const ficW = LOC.fic, venW = LOC.ven;
   const tousW = { ...(ficW || {}), ...(venW || {}) };
   const ici = Object.entries(tousW).filter(([k, e]) => e && String(e.buyFromId) === LOT1 && k !== 'f10');
-  dit(ici.length === 1 && ici[0][1].buyPrice === '', `${nom} · le 2e article du lot est relié, son prix laissé « à saisir » (rien de partagé)`, JSON.stringify(ici).slice(0, 200) + ' · ' + ecritures.slice(-3).join(' | '));
+  dit(ici.length === 1 && !String(ici[0][1].buyPrice == null ? '' : ici[0][1].buyPrice).trim(), `${nom} · le 2e article du lot est relié, son prix laissé « à saisir » (rien de partagé)`, JSON.stringify(ici).slice(0, 200) + ' · ' + Object.keys(venW || {}).join(',') + ' / ' + Object.keys(ficW || {}).join(','));
   dit(!ficW || !ficW.f10 || String(ficW.f10.buyFromId) === LOT1, `${nom} · N°10 garde son article du lot (relier un article n'en délie jamais un autre)`, JSON.stringify(ficW && ficW.f10));
   dit(!errs.length, `${nom} · aucune erreur de page`, errs.slice(0, 2).join(' | '));
   await ctx.close();
