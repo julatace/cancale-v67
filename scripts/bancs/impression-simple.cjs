@@ -17,6 +17,11 @@
 //    étiquette, sans son N°.
 //  C (390 tactile, iPhone) — §5 : un N° « à vérifier » DEMANDE avant tout PDF ; « Annuler » ⇒ rien n'est ouvert ;
 //    « J'ai vérifié » ⇒ « Ouvrir le PDF » (SON toucher ouvre le partage, dans le geste).
+//  D (1512, clair ET sombre — 16 nov., lot impression-directe) — « impression sans réfléchir » : VRM ouvert sur Ma
+//    journée, des bordereaux prêts (le nombre PUBLIÉ par Ventes, `vrm_colis_prets.lot`) ⇒ la bannière « Imprimer les 5 » ;
+//    UN clic ⇒ la visionneuse avec le PDF (papier déjà choisi, chaque bordereau SON N°), l'impression part seule, AUCUNE
+//    feuille « Choisir » ni « Tout est sorti ? » ; « 4 imprimés · Annuler » ; les 4 marqués imprimés, « Annuler » les
+//    retire. D1 (papier jamais choisi) : UNE question la première fois, puis le PDF. « Plus tard » range la bannière.
 //  PARTOUT : aucune erreur d'app, rien ne déborde, cibles ≥ 44 px dans les feuilles (tactile), un seul bouton plein
 //  par feuille. Captures (SHOTS=dossier).
 // Lancer : construire dist/, puis BANC_PORT=… node scripts/bancs/impression-simple.cjs   (IS_VUES=A,A-sombre,B,B-sombre,C)
@@ -32,7 +37,7 @@ const PDFJS = fs.existsSync(path.join(NM, 'pdfjs-dist')) ? path.join(NM, 'pdfjs-
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT || 4611);
 const SHOTS = process.env.SHOTS || '';
-const VUES = process.env.IS_VUES ? process.env.IS_VUES.split(',') : ['A', 'A-sombre', 'B', 'B-sombre', 'C'];
+const VUES = process.env.IS_VUES ? process.env.IS_VUES.split(',') : ['A', 'A-sombre', 'B', 'B-sombre', 'C', 'D', 'D-sombre', 'D1'];
 const MAINTENANT = Date.now(), H = 3600000, J = 24 * H;
 const ilYaH = (h) => new Date(MAINTENANT - h * H).toISOString();
 const dansJ = (j) => new Date(MAINTENANT + j * J).toISOString();
@@ -106,20 +111,21 @@ async function donnees({ aVerifier = null } = {}) {
   ];
 }
 
-async function ouvrir(b, { tactile, sombre = false, imprimante = null, LIGNES }) {
+async function ouvrir(b, { tactile, sombre = false, imprimante = null, LIGNES, tab = 'cat_bord', local = {} }) {
   const vue = tactile ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2, userAgent: IPHONE } : { viewport: { width: 1512, height: 950 } };
   const ctx = await b.newContext({ ...vue, colorScheme: sombre ? 'dark' : 'light' });
   const pg = await ctx.newPage();
   const errs = []; pg.on('pageerror', (e) => errs.push(e.message));
   const compte = { pdf: 0 };   // les lectures de PDF dans la base (la ligne lourde, §4.4)
   const mainData = LIGNES.find((r) => r.id === 'main').data;
-  await pg.addInitScript(({ m, sombre: s, impr }) => {
+  await pg.addInitScript(({ m, sombre: s, impr, loc }) => {
     try {
       localStorage.setItem('vrm_acces_direct', '1'); localStorage.setItem('vrm_visite_vue', 'true'); localStorage.setItem('vinted_dark', JSON.stringify(s));
       if (!sessionStorage.getItem('banc_init')) {
         sessionStorage.setItem('banc_init', '1');
         localStorage.setItem('vinted_annonce_numeros', JSON.stringify(m.vinted_annonce_numeros)); localStorage.setItem('vinted_used_numeros', JSON.stringify(m.vinted_used_numeros));
         if (impr) localStorage.setItem('vrm_imprimante', JSON.stringify(impr)); else localStorage.removeItem('vrm_imprimante');
+        for (const [k, v] of Object.entries(loc || {})) localStorage.setItem(k, v);
       }
     } catch (_) {}
     // Ce que le navigateur ouvre, et SI c'est dans le geste : `window.event` est le toucher en cours, ou rien (après
@@ -132,7 +138,7 @@ async function ouvrir(b, { tactile, sombre = false, imprimante = null, LIGNES })
     try { Object.defineProperty(navigator, 'share', { configurable: true, value: (d) => { window.__ouvertures.push({ voie: 'partage', geste: geste(), at: Date.now(), blob: d && d.files && d.files[0] }); return Promise.resolve(); } }); } catch (_) {}
     window.open = (u) => { window.__ouvertures.push({ voie: 'onglet', geste: geste(), at: Date.now(), url: String(u) }); return null; };
     window.print = () => {};
-  }, { m: mainData, sombre, impr: imprimante });
+  }, { m: mainData, sombre, impr: imprimante, loc: local });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, (r) => (['image', 'media', 'font'].includes(r.request().resourceType()) || /^https?:\/\/[^/]*vinted\.net\//i.test(r.request().url()) ? r.abort() : r.continue()));
   await pg.route('**://cdn.jsdelivr.net/npm/pdfjs-dist@*/**', (r) => {
     const n = path.basename(new URL(r.request().url()).pathname);
@@ -164,8 +170,8 @@ async function ouvrir(b, { tactile, sombre = false, imprimante = null, LIGNES })
   await pg.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"pret":true}' }));
   ctx.on('page', (p) => { if (p !== pg) p.close().catch(() => {}); });
   await srvPret;
-  await pg.goto(`http://localhost:${PORT}/?tab=cat_bord`, { waitUntil: 'domcontentloaded' });
-  await pg.waitForFunction((n) => { const t = document.body.innerText; return n.every((x) => t.includes('N°' + x)); }, V.map((v) => v.num), { timeout: 45000 }).catch(() => {});
+  await pg.goto(`http://localhost:${PORT}/?tab=${tab}`, { waitUntil: 'domcontentloaded' });
+  if (tab === 'cat_bord') await pg.waitForFunction((n) => { const t = document.body.innerText; return n.every((x) => t.includes('N°' + x)); }, V.map((v) => v.num), { timeout: 45000 }).catch(() => {});
   return { ctx, pg, errs, compte };
 }
 let nShot = 0;
@@ -336,6 +342,65 @@ async function scenarioC(b, nom) {
   await o.ctx.close();
 }
 
+// ── D · « Imprimer les N » sur ordinateur, à l'ouverture (16 nov., lot impression-directe) ─────────────────
+const PUBLIE = JSON.stringify({ prets: 5, aImprimer: 5, total: 5, lot: 5, at: Date.now() });
+async function scenarioD(b, nom, sombre, { papier = 'normale' } = {}) {
+  const LIGNES = await donnees();
+  const o = { ...(await ouvrir(b, { tactile: false, sombre, imprimante: papier, LIGNES, tab: 'journee', local: { vrm_colis_prets: PUBLIE } })), tactile: false, touchers: 0 };
+  const { pg } = o;
+  try {
+    const vu = await attendre(pg, () => !!document.querySelector('[data-impression-directe-imprimer="5"]'), null, 45000);
+    const t = await pg.evaluate(() => { const e = document.querySelector('[data-impression-directe-imprimer]'); return e ? { txt: e.innerText.trim(), h: Math.round(e.getBoundingClientRect().height), plein: getComputedStyle(e).backgroundColor } : null; });
+    dit(vu && t && t.txt === 'Imprimer les 5' && t.h >= 44, `${nom} : D0 à l'ouverture (Ma journée), la bannière « Imprimer les 5 » (le nombre publié par Ventes), ≥ 44 px`, JSON.stringify(t));
+    await shot(pg, `${nom}-banniere`);
+    await toucher(o, '[data-impression-directe-imprimer]');
+    if (!papier) {
+      const q = await attendre(pg, () => !!document.querySelector('[data-impr-papier-feuille]'), null, 30000);
+      dit(q, `${nom} : D1 papier jamais choisi : UNE question (le papier), la première fois`);
+      await shot(pg, `${nom}-papier`);
+      await toucher(o, '[data-impr-papier-feuille] [data-impr-papier-choix="normale"]');
+    }
+    const vis = await attendre(pg, () => !!document.querySelector('[data-visionneuse-pdf="pret"]'), null, 45000);
+    const choisir = !!(await pg.$('[data-lot-etape="choix"]'));
+    dit(vis && !choisir && o.touchers === (papier ? 1 : 2), `${nom} : D2 ${papier ? 'UN clic' : 'deux clics (la question la 1re fois)'} ⇒ la visionneuse avec le PDF, sans la feuille « Choisir »`, JSON.stringify({ vis, choisir, touchers: o.touchers }));
+    const auto = await attendre(pg, () => { const v = document.querySelector('[data-visionneuse-pdf]'); return v && v.getAttribute('data-visionneuse-auto') === 'lancee'; }, null, 8000);
+    dit(auto, `${nom} : D3 l'impression part SEULE`);
+    const b64 = await b64DeVisionneuse(pg);
+    const pages = b64 ? await lirePdf(b64) : [];
+    const cn = codesEtNums(pages);
+    const attendu = Object.fromEntries(V.map((v) => [String(v.tx), v.num]));
+    dit(cn.length === 4 && cn.every((x) => x.nums.length === 1 && x.nums[0] === attendu[x.code]), `${nom} : D4 le PDF : 4 bordereaux, chacun SON N° tamponné (papier ${papier || 'choisi à la question'})`, JSON.stringify(cn));
+    await shot(pg, `${nom}-visionneuse`);
+    await toucher(o, '[data-visionneuse-fermer]');
+    const fait = await attendre(pg, () => !!document.querySelector('[data-impression-faite="4"]'), null, 8000);
+    const feuille = !!(await pg.$('[data-impr-feuille]'));
+    const marques = await pg.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('vinted_bords_printed') || '{}')));
+    dit(fait && !feuille && marques.length === 4, `${nom} : D5 « 4 imprimés · Annuler », aucune feuille d'après, les 4 marqués imprimés`, JSON.stringify({ fait, feuille, marques }));
+    await shot(pg, `${nom}-imprimes`);
+    await toucher(o, '[data-impression-annuler]');
+    const vides = await attendre(pg, () => Object.keys(JSON.parse(localStorage.getItem('vinted_bords_printed') || '{}')).length === 0, null, 8000);
+    dit(vides, `${nom} : D6 « Annuler » retire CES marques (plus aucun marqué imprimé)`);
+    dit((await deborde(pg)) <= 1, `${nom} : rien ne déborde`);
+    dit(o.errs.length === 0, `${nom} : aucune erreur d'app`, o.errs.join(' | ').slice(0, 200));
+  } catch (e) { dit(false, `${nom} : le scénario D s'exécute`, String(e.message).slice(0, 200)); await shot(pg, `${nom}-erreur`); }
+  await o.ctx.close();
+}
+// « Plus tard » range la bannière ; rien ne s'imprime sans son clic.
+async function scenarioDPlusTard(b, nom) {
+  const LIGNES = await donnees();
+  const o = { ...(await ouvrir(b, { tactile: false, sombre: false, imprimante: 'normale', LIGNES, tab: 'journee', local: { vrm_colis_prets: PUBLIE } })), tactile: false, touchers: 0 };
+  const { pg } = o;
+  try {
+    await attendre(pg, () => !!document.querySelector('[data-impression-directe-imprimer]'), null, 45000);
+    await pg.waitForTimeout(3000);
+    dit(o.compte.pdf === 0 && !(await pg.$('[data-visionneuse-pdf]')), `${nom} : D7 rien ne s'imprime (ni ne se lit) sans son clic`, JSON.stringify({ pdf: o.compte.pdf }));
+    await toucher(o, '[data-impression-directe-plus-tard]');
+    await pg.waitForTimeout(400);
+    dit(!(await pg.$('[data-impression-directe]')), `${nom} : D8 « Plus tard » range la bannière`);
+  } catch (e) { dit(false, `${nom} : le scénario D « Plus tard » s'exécute`, String(e.message).slice(0, 200)); }
+  await o.ctx.close();
+}
+
 let srvPret;
 (async () => {
   let b;
@@ -349,6 +414,9 @@ let srvPret;
       else if (v === 'B') await scenarioB(b, '1512', false);
       else if (v === 'B-sombre') await scenarioB(b, '1512-sombre', true);
       else if (v === 'C') await scenarioC(b, '390-verifier');
+      else if (v === 'D') { await scenarioD(b, '1512-direct', false); await scenarioDPlusTard(b, '1512-plus-tard'); }
+      else if (v === 'D-sombre') await scenarioD(b, '1512-direct-sombre', true);
+      else if (v === 'D1') await scenarioD(b, '1512-direct-premiere', false, { papier: null });
     }
   } catch (e) { dit(false, 'le banc s’exécute', String(e.stack || e.message || e).slice(0, 300)); }
   finally {

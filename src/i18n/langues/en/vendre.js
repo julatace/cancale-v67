@@ -61,4 +61,11 @@ export default {
   "vp.loupe.stockSeul": "Stored, no listing",
   "vp.loupe.retourInfo": "Return to send back",
   "vp.loupe.parRangement": "storage",
+  // (16 nov., lot impression-directe) « Imprimer les N » sur ordinateur
+  "impdir.prets": {"one": "{n} label ready", "other": "{n} labels ready"},
+  "impdir.imprimer": {"one": "Print {n}", "other": "Print all {n}"},
+  "impdir.plusTard": "Later",
+  "impdir.faits": {"one": "{n} printed", "other": "{n} printed"},
+  "impdir.annuler": "Undo",
+  "impdir.annule": "Undone: no longer marked printed",
 };
