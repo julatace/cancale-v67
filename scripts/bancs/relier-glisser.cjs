@@ -53,7 +53,7 @@ const projette = (row, sel) => {
 const recouvre = (pg) => pg.evaluate(() => {
   const p = document.querySelector('[data-pilule]'); if (!p) return { pilule: false };
   const a = p.getBoundingClientRect(); const lignes = [...document.querySelectorAll('[data-glisser-cible], [data-glisser-achat]')];
-  const sous = lignes.filter((l) => { const b = l.getBoundingClientRect(); const ul = l.closest('.vrm-rg-liste').getBoundingClientRect(); const vis = b.bottom > ul.top && b.top < ul.bottom; return vis && b.left < a.right && b.right > a.left && Math.min(b.bottom, ul.bottom) > a.top && Math.max(b.top, ul.top) < a.bottom; });
+  const sous = lignes.filter((l) => { const b = l.getBoundingClientRect(); const ul0 = l.closest('.vrm-rg-liste').getBoundingClientRect(); const fe = document.querySelector('[data-glisser-defile]'); const fr = fe && getComputedStyle(fe).overflowY !== 'visible' ? fe.getBoundingClientRect() : ul0; const ul = { top: Math.max(ul0.top, fr.top), bottom: Math.min(ul0.bottom, fr.bottom, window.innerHeight) }; const vis = b.bottom > ul.top && b.top < ul.bottom; return vis && b.left < a.right && b.right > a.left && Math.min(b.bottom, ul.bottom) > a.top && Math.max(b.top, ul.top) < a.bottom; });
   return { pilule: true, n: sous.length, quoi: sous.map((l) => l.getAttribute('data-glisser-cible') || l.getAttribute('data-glisser-achat')).slice(0, 3) };
 });
 // (16 nov., reprise) Ce que la pilule MONTRE : titre + ligne du dessous, et si l'un des deux est coupé (« … » ou
@@ -189,16 +189,18 @@ async function tactile(b) {
   await pg.screenshot({ path: path.join(SHOTS, `relier-glisser-${nom}-ouvert.png`) });
   // ── défile : un doigt qui file vers le haut sur la liste des achats ──
   const a3 = await centre(pg, '[data-glisser-achat="7100003"]');
-  const sc0 = await pg.evaluate(() => document.querySelector('[data-glisser-achats]').scrollTop);
+  // (17 nov., relier-tout-achat) Au téléphone c'est la FEUILLE qui défile (un seul défilement), plus la liste.
+  const defile = () => pg.evaluate(() => { const f = document.querySelector('[data-glisser-defile]'); return (f ? f.scrollTop : 0) + document.querySelector('[data-glisser-achats]').scrollTop; });
+  const sc0 = await defile();
   let leveVu = false;
   await t('touchStart', a3.x, a3.y + 60);
   for (let i = 1; i <= 6; i++) { await t('touchMove', a3.x, a3.y + 60 - i * 30); await pause(16); if (await pg.locator('[data-glisser-flotte]').count()) leveVu = true; }
   await t('touchEnd'); await pause(500);
-  const sc1 = await pg.evaluate(() => document.querySelector('[data-glisser-achats]').scrollTop);
+  const sc1 = await defile();
   dit(!leveVu && !(await pg.locator('[data-glisser-flotte]').count()), `${nom} · défilement rapide : aucun achat ne se lève`);
   dit(sc1 > sc0 + 20, `${nom} · …et la liste des achats DÉFILE normalement`, `${sc0} → ${sc1}`);
   dit(!(await pg.locator('[data-glisser-question]').count()), `${nom} · …aucune question posée`);
-  await pg.evaluate(() => { document.querySelector('[data-glisser-achats]').scrollTop = 0; }); await pause(200);
+  await pg.evaluate(() => { const f = document.querySelector('[data-glisser-defile]'); if (f) f.scrollTop = 0; document.querySelector('[data-glisser-achats]').scrollTop = 0; }); await pause(200);
   // ── vide : appui long, lâché dans le vide ──
   let a1 = await centre(pg, `[data-glisser-achat="${T1}"]`);
   await t('touchStart', a1.x, a1.y); await pause(650);
@@ -210,24 +212,25 @@ async function tactile(b) {
   await t('touchEnd'); await pause(400);
   dit(!(await pg.locator('[data-glisser-question]').count()) && !(await pg.locator('[data-glisser-flotte]').count()), `${nom} · lâché dans le vide : rien (aucune question, l'achat retombe)`);
   dit(JSON.stringify(await liensTous(pg)) === '[]', `${nom} · …rien n'est écrit`, JSON.stringify(await liensTous(pg)));
-  // ── bord : levé près du bas de la liste cible ⇒ elle défile seule ──
+  // ── bord : levé près du bas de la liste cible ⇒ elle défile seule (au téléphone : la feuille, où la liste d'en face
+  //    apparaît dès que l'achat se soulève) ──
   a1 = await centre(pg, `[data-glisser-achat="${T1}"]`);
-  const lc = await pg.evaluate(() => { const r = document.querySelector('[data-glisser-cibles]').getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; });
-  const scC0 = await pg.evaluate(() => document.querySelector('[data-glisser-cibles]').scrollTop);
   await t('touchStart', a1.x, a1.y); await pause(650);
+  const zone = () => pg.evaluate(() => { const f = document.querySelector('[data-glisser-defile]'); const l = document.querySelector('[data-glisser-cibles]'); const e = f && getComputedStyle(f).overflowY !== 'visible' && f.scrollHeight > f.clientHeight + 1 ? f : l; const r = e.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, sc: e.scrollTop }; });
+  const lc = await zone(); const scC0 = lc.sc;
   for (let i = 1; i <= 8; i++) { await t('touchMove', a1.x, a1.y + (lc.bottom - 12 - a1.y) * i / 8); await pause(16); }
   await pause(700);
-  const scC1 = await pg.evaluate(() => document.querySelector('[data-glisser-cibles]').scrollTop);
+  const scC1 = (await zone()).sc;
   dit(scC1 > scC0 + 40, `${nom} · près du bord bas de la liste cible : elle défile toute seule`, `${scC0} → ${scC1}`);
   for (let i = 1; i <= 6; i++) { await t('touchMove', a1.x, lc.bottom - 12 - (lc.bottom - 12 - lc.top - 10) * i / 6); await pause(16); }
   await pause(900);   // remonte (bord haut) jusqu'en haut
   await t('touchMove', 20, 30); await t('touchEnd'); await pause(300);
-  await pg.evaluate(() => { document.querySelector('[data-glisser-cibles]').scrollTop = 0; }); await pause(200);
-  // ── relier : glisser sur l'annonce N°2 ──
-  await pg.evaluate(() => document.querySelector('[data-glisser-cible="a:pa1"]').scrollIntoView({ block: 'center' })); await pause(300);
+  await pg.evaluate(() => { const f = document.querySelector('[data-glisser-defile]'); if (f) f.scrollTop = 0; document.querySelector('[data-glisser-cibles]').scrollTop = 0; }); await pause(200);
+  // ── relier : glisser sur l'annonce N°2 (repérée une fois l'achat soulevé : c'est là qu'elle est à l'écran) ──
   a1 = await centre(pg, `[data-glisser-achat="${T1}"]`);
-  const c2 = await centre(pg, '[data-glisser-cible="a:pa1"]');
   await t('touchStart', a1.x, a1.y); await pause(650);
+  await pause(200);
+  const c2 = await centre(pg, '[data-glisser-cible="a:pa1"]');
   for (let i = 1; i <= 12; i++) { await t('touchMove', a1.x + (c2.x - a1.x) * i / 12, a1.y + (c2.y - a1.y) * i / 12); await pause(20); }
   await pause(150);
   const eclaire = await pg.locator('[data-glisser-cible="a:pa1"][data-glisser-survol="1"]').count();

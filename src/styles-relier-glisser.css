@@ -75,6 +75,9 @@ body:has(.vrm-rg) .vrm-pil-zone { top: auto !important; bottom: calc(12px + env(
   .vrm-rg[data-glisser-vue="cibles"] .vrm-rg-achats, .vrm-rg[data-glisser-vue="achats"] .vrm-rg-cibles {
     position: absolute; left: -300vw; top: 0; width: 1px; height: 1px; overflow: hidden; visibility: hidden; }
   .vrm-rg-col > .vrm-rg-h3 { display: none; }
+  /* La pilule « Achat relié · Bénéfice … » (5 s) : la feuille s'arrête au-dessus d'elle, jamais une ligne dessous ;
+     sans pilule, aucune bande vide. */
+  body:has([data-pilule]) .vrm-rg-corps { margin-bottom: calc(116px + env(safe-area-inset-bottom, 0px)); }
 }
 @media (min-width: 900px) { .vrm-rg-onglets, .vrm-rg-poignee { display: none; } .vrm-rg-corps { padding-bottom: 16px; } .vrm-rg-liste { padding-bottom: calc(116px + env(safe-area-inset-bottom, 0px)); } }
 .vrm-rg-cible { touch-action: pan-y; -webkit-touch-callout: none; }
