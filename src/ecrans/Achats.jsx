@@ -750,6 +750,9 @@ function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, recep
   // (17 nov., lot relier-taille) Combien des achats LIBRES (ceux qu'on peut relier) n'ont pas de taille lue chez Vinted.
   const nSansTaille = useMemo(() => (details && Array.isArray(achats) ? sansTailleLue(tousAchatsLibres({ achats, liens, curTx }), details) : 0), [details, achats, liens, curTx]);
   if (!Array.isArray(achats)) return <div data-relier-chargement style={{ fontSize: 13, color: C.muted, textAlign: 'center', padding: '20px 0' }}>…</div>;
+  // (17 nov., lot relier-taille) Sous le titre, `FaitsAchat` : la taille d'abord (lue chez Vinted, sinon écrite dans le
+  // titre), « ✓ » si c'est celle de l'article visé, « ≠ 42 » sinon ; puis l'état, la date, le vendeur, les couleurs, la
+  // marque, le compte. La ligne passe à la ligne : rien n'est coupé.
   const ligne = (a, attrs, pris = '') => {
     const ph = orderPhoto(a), lot = etiquetteLot(a, liens), px = prixDe(a);
     const d = a.date ? new Date(a.date) : null;
@@ -758,9 +761,6 @@ function RelierAchatCorps({ cible, achats, liens, curTx, compteDe, prixDe, recep
         <div style={{ width: 44, height: 44, borderRadius: 12, background: C.border, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{ph ? <PhotoVinted src={ph} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : <Icon name="image" size={18} style={{ color: C.muted, opacity: .55 }}/>}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.title || '—'}</div>
-          {/* (17 nov., lot relier-taille) La taille d'abord (lue chez Vinted, sinon écrite dans le titre), « ✓ » si c'est
-              celle de l'article visé, « ≠ 42 » sinon ; puis l'état, les couleurs, la marque, la date, le compte, le vendeur.
-              La ligne passe à la ligne : rien n'est coupé. */}
           <FaitsAchat achat={a} details={details || null} cible={cible} marqueDe={marqueDe} couleursDe={couleursDe} avant={lot || null}
             date={d && !isNaN(d) ? d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : ''} compte={compteDe(a) ? `Vinted · ${compteDe(a)}` : 'Vinted'}/>
           {pris ? <div data-relier-deja={pris} style={{ fontSize: 12, fontWeight: 600, color: C.text, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pris}</div> : null}
