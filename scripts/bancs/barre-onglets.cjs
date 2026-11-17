@@ -105,7 +105,7 @@ async function unStyle(nav, b, style, cas) {
       // L'ordinateur (1512) : la colonne de gauche, mêmes icônes, mêmes pastilles, même onglet allumé — capture.
       { const { ctx, pg } = await ouvrir(nav, { W: 1512, sombre: false, b, url: '/?tab=journee' }); await pret(pg);
         await pg.evaluate(() => localStorage.setItem('vrm_design_v2', '1')).catch(() => {}); await pg.reload({ waitUntil: 'domcontentloaded' }); await pret(pg);
-        const r = await pg.evaluate(() => { const a = document.querySelector('.vrm-sidebar [aria-current="page"], .vrm-rail [aria-current="page"]'); return a ? a.getAttribute('data-nav-entree') : null; });
+        const r = await pg.evaluate(() => { const a = document.querySelector('button.vrm-rail-button[aria-current="page"]'); return a ? a.getAttribute('data-nav-entree') : null; });
         dit(r === 'journee', `O8 1512 : la colonne de gauche allume l’écran ouvert (${r})`);
         await pg.screenshot({ path: path.join(SHOTS, 'colonne-1512.png') }); await ctx.close(); }
       // O7 : Paramètres → Apparence → « Barre d'onglets » : tout de suite, puis après un rechargement.
