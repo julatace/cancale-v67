@@ -17,6 +17,7 @@
 //  Libellé : un verbe + un objet + le bon nombre (« Imprimer 5 bordereaux ») — jamais « OK » seul.
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
+import './design-v2.css';
 
 const ROLES = new Set(['principal', 'secondaire', 'texte', 'destructif']);
 

@@ -12,9 +12,14 @@
   --v2-cible: 44px;
   --v2-glyphe: 24px;
   --v2-trait: 1.75;
-  --v2-plein-fond: #0C1D30;          /* l'encre du Studio : le plein est noir d'encre, jamais l'accent (le bleu reste rare) */
-  --v2-plein-fond-appui: #06111F;
-  --v2-plein-texte: #FFFFFF;
+  /* Le plein : la porcelaine sur le bleu de la coque (le geste du jour se voit d'abord), l'encre dessus. */
+  --v2-plein-fond: #FFFFFF;
+  --v2-plein-fond-appui: #DCE6F1;
+  --v2-plein-texte: #0C1D30;
+  /* Le texte posé SUR LA COQUE (le bleu du verre, src/design/studio-verre.css) : blanc ; dans une carte : l'encre. */
+  --v2-page-texte: var(--sv-clair, #FFFFFF);
+  --v2-page-muet: rgb(255 255 255 / .88);
+  --v2-page-ambre: var(--sv-clair-ambre, #FFF1C0);
   --v2-teinte-fond: rgb(0 96 204 / .10);
   --v2-teinte-fond-appui: rgb(0 96 204 / .18);
   --v2-teinte-texte: #0050A8;        /* 6,9:1 sur la teinte posée sur le blanc */
@@ -32,6 +37,9 @@
   --v2-e-retour: 200ms cubic-bezier(.32, 1.25, .5, 1);   /* un ressort court, à peine (aucun rebond visible) */
 }
 :root[data-theme="dark"] {
+  --v2-page-texte: #F2F7FD;
+  --v2-page-muet: #B9C8D8;
+  --v2-page-ambre: #F2B65E;
   --v2-plein-fond: #EAF2FB;
   --v2-plein-fond-appui: #C9D9EA;
   --v2-plein-texte: #06111F;
@@ -81,7 +89,7 @@ html body button.v2b-texte { background: transparent; color: var(--v2-lien); pad
 /* destructif — rouge, derrière une confirmation (le composant la refuse sinon) */
 html body button.v2b-destructif { background: transparent; color: var(--v2-rouge); padding: 0 8px; }
 /* icône — 44 × 44, glyphe 24 */
-html body button.v2b-icone { width: var(--v2-cible); height: var(--v2-cible); min-width: var(--v2-cible); padding: 0; border-radius: 50%; background: transparent; color: var(--sb-encre, #0C1D30); }
+html body button.v2b-icone { width: var(--v2-cible); height: var(--v2-cible); min-width: var(--v2-cible); padding: 0; border-radius: 50%; background: transparent; color: inherit; }
 html body button.v2b-icone .v2b-ic { width: var(--v2-glyphe); height: var(--v2-glyphe); }
 html body button.v2b-icone:active { background: var(--v2-teinte-fond); }
 @media (hover: hover) and (pointer: fine) {
@@ -106,7 +114,7 @@ html body .v2b-roue > span { width: 18px; height: 18px; border-radius: 50%; bord
 html body button.v2-rangee {
   appearance: none; -webkit-appearance: none; margin: 0; border: 0; box-sizing: border-box; width: 100%;
   display: flex; align-items: center; gap: 12px; min-height: var(--v2-cible); padding: 0; text-align: left;
-  background: transparent; color: var(--sb-encre, #0C1D30); font: inherit; cursor: pointer;
+  background: transparent; color: inherit; font: inherit; cursor: pointer;
   touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
   transition: transform var(--v2-e-retour), background-color 160ms ease;
 }
@@ -115,8 +123,8 @@ html body button.v2-rangee:focus-visible { outline: none; box-shadow: var(--v2-a
 @media (prefers-reduced-motion: reduce) { html body button.v2-rangee:active { transform: none; } }
 
 /* ══ 3. L'ÉCRAN ═══════════════════════════════════════════════════════════════ */
-.v2-ecran { padding: 4px 16px 24px; color: var(--sb-encre, #0C1D30); font-family: var(--sb-police-texte, -apple-system, system-ui, sans-serif); font-feature-settings: "tnum" 1, "lnum" 1; position: relative; }
-.v2-ecran[data-v2-plein="1"] { padding-bottom: calc(var(--vrm-barre-bas, 84px) + var(--v2-bouton-h) + 40px); }
+.v2-ecran { padding: 4px 16px 24px; color: var(--v2-page-texte); font-family: var(--sb-police-texte, -apple-system, system-ui, sans-serif); font-feature-settings: "tnum" 1, "lnum" 1; position: relative; }
+.v2-ecran[data-v2-plein="1"] { padding-bottom: calc(var(--vrm-barre-bas, 84px) + var(--v2-bouton-h) + 56px); }
 .v2-tete { padding: 6px 0 2px; }
 .v2-titre { margin: 0; font-size: 34px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
 .v2-muet { color: var(--v2-muet); }
@@ -129,8 +137,8 @@ html body button.v2-rangee:focus-visible { outline: none; box-shadow: var(--v2-a
 .v2-affiche-n { font-size: 56px; line-height: 1; font-weight: 700; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
 .v2-affiche-mots { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .v2-affiche-mot { font-size: 17px; font-weight: 600; line-height: 1.2; }
-.v2-affiche-sous { font-size: 13px; line-height: 1.3; color: var(--v2-muet); }
-.v2-affiche-sous.is-ambre { color: var(--v2-ambre); }
+.v2-affiche-sous { font-size: 13px; line-height: 1.3; color: var(--v2-page-muet); }
+.v2-affiche-sous.is-ambre { color: var(--v2-page-ambre); }
 
 /* La bande des paires (défile de côté, en gardant la marge de l'écran). */
 .v2-bande { display: grid; grid-auto-flow: column; grid-auto-columns: 112px; gap: 10px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity;
@@ -141,17 +149,17 @@ html body button.v2-rangee.v2-bande-carte { flex-direction: column; align-items:
 .v2-bande-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .v2-bande-plaque { position: absolute; left: 6px; bottom: 6px; }
 .v2-bande-prix { font-size: 15px; font-weight: 600; padding: 0 2px; }
-.v2-bande-quand { font-size: 13px; color: var(--v2-muet); padding: 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.v2-bande-quand.is-ambre { color: var(--v2-ambre); }
+.v2-bande-quand { font-size: 13px; color: var(--v2-page-muet); padding: 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2-bande-quand.is-ambre { color: var(--v2-page-ambre); }
 
 /* Les groupes (titre court + nombre, style Réglages). */
 .v2-groupe, .v2-afaire { margin: 0 0 22px; }
 .v2-groupe-titre { display: flex; align-items: baseline; gap: 8px; margin: 0 4px 8px; font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
-.v2-groupe-n { font-size: 15px; font-weight: 600; color: var(--v2-muet); font-variant-numeric: tabular-nums; }
-.v2-liste { background: var(--v2-carte); border-radius: 16px; box-shadow: var(--v2-carte-ombre); overflow: hidden; }
+.v2-groupe-n { font-size: 15px; font-weight: 600; color: var(--v2-page-muet); font-variant-numeric: tabular-nums; }
+.v2-liste { color: var(--sv-encre, #0C1D30); background: var(--v2-carte); border-radius: 16px; box-shadow: var(--v2-carte-ombre); overflow: hidden; }
 .v2-afaire-ligne { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 8px 12px 8px 14px; position: relative; }
 .v2-afaire-ligne + .v2-afaire-ligne::before, .v2-liste > .v2-ligne + .v2-ligne::before { content: ""; position: absolute; left: 66px; right: 0; top: 0; height: .5px; background: var(--v2-filet); }
-.v2-afaire-ic { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 11px; background: var(--v2-socle); color: var(--sb-encre, #0C1D30); flex: none; }
+.v2-afaire-ic { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 11px; background: var(--v2-socle); color: var(--sv-encre, #0C1D30); flex: none; }
 .v2-afaire-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .v2-afaire-titre { font-size: 15px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
 .v2-afaire-detail { font-size: 13px; line-height: 1.35; color: var(--v2-muet); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -170,7 +178,7 @@ html body button.v2-rangee.v2-ligne { position: relative; min-height: 76px; padd
 .v2-chevron { color: var(--v2-muet); display: grid; place-items: center; flex: none; }
 
 /* La passe miniature (Aujourd'hui). */
-html body button.v2-rangee.v2-passe-mini { flex-direction: column; align-items: stretch; gap: 8px; padding: 14px 16px; background: var(--v2-carte); border-radius: 18px; box-shadow: var(--v2-carte-ombre); }
+html body button.v2-rangee.v2-passe-mini { flex-direction: column; align-items: stretch; gap: 8px; padding: 14px 16px; background: var(--v2-carte); color: var(--sv-encre, #0C1D30); border-radius: 18px; box-shadow: var(--v2-carte-ombre); }
 .v2-passe-mini-haut { display: flex; align-items: center; gap: 8px; }
 .v2-passe-mini-lieu { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .v2-passe-mini-code { font-size: 22px; font-weight: 700; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
@@ -178,13 +186,13 @@ html body button.v2-rangee.v2-passe-mini { flex-direction: column; align-items: 
 .v2-passe-mini-bas .is-ambre { color: var(--v2-ambre); }
 
 /* « Rien à faire » : calme. */
-.v2-rien { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 56px 24px 40px; color: var(--sb-encre, #0C1D30); }
-.v2-rien-dessin { color: var(--v2-muet); margin-bottom: 18px; }
+.v2-rien { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 56px 24px 40px; color: var(--v2-page-texte); }
+.v2-rien-dessin { color: var(--v2-page-muet); margin-bottom: 18px; }
 .v2-rien-titre { margin: 0 0 6px; font-size: 22px; font-weight: 700; }
-.v2-rien-sous { margin: 0; font-size: 15px; line-height: 1.4; color: var(--v2-muet); max-width: 30ch; }
+.v2-rien-sous { margin: 0; font-size: 15px; line-height: 1.4; color: var(--v2-page-muet); max-width: 30ch; }
 
 /* Le geste plein AU POUCE : collé au-dessus de la barre du bas (téléphone). */
-.v2-pouce { position: fixed; left: 16px; right: 16px; bottom: calc(var(--vrm-barre-bas, 84px) + 12px); z-index: 30; }
+.v2-pouce { position: fixed; left: 16px; right: 16px; bottom: calc(var(--vrm-barre-bas, 84px) + 24px); z-index: 30; }
 @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
   .v2-ecran { padding: 12px 32px 32px; max-width: 1080px; }
   .v2-ecran[data-v2-plein="1"] { padding-bottom: 32px; }
@@ -200,8 +208,8 @@ html body button.v2-rangee.v2-passe-mini { flex-direction: column; align-items: 
 /* ══ 4. LES PASSES « WALLET » (Achats) ════════════════════════════════════════ */
 .v2-passes { display: grid; gap: 14px; margin: 4px 0 22px; }
 @media (min-width: 1024px) { .v2-passes { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); } }
-.v2-passe { background: var(--v2-carte); border-radius: 22px; box-shadow: var(--v2-carte-ombre); overflow: hidden; color: var(--sb-encre, #0C1D30); }
-.v2-passe-tete { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--sb-encre, #0C1D30); color: var(--sb-porcelaine, #fff); font-size: 13px; font-weight: 600; }
+.v2-passe { background: var(--v2-carte); border-radius: 22px; box-shadow: var(--v2-carte-ombre); overflow: hidden; color: var(--sv-encre, #0C1D30); }
+.v2-passe-tete { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #0C1D30; color: #FFFFFF; font-size: 13px; font-weight: 600; }
 :root[data-theme="dark"] .v2-passe-tete { background: #23395A; color: #EAF2FB; }
 .v2-passe-lieu { display: flex; gap: 10px; align-items: flex-start; padding: 12px 16px 4px; }
 .v2-passe-lieu b { display: block; font-size: 17px; font-weight: 600; }
@@ -220,10 +228,10 @@ html body button.v2-rangee.v2-passe-mini { flex-direction: column; align-items: 
 .v2-passe-pages { text-align: center; font-size: 13px; color: var(--v2-muet); padding: 0 0 12px; font-variant-numeric: tabular-nums; }
 
 /* ══ 5. LE MENU PLATEFORME · COMPTE et sa feuille ═════════════════════════════ */
-html body button.v2-rangee.v2-menu { width: auto; max-width: 100%; gap: 6px; padding: 0 6px; margin: 2px 0 6px -6px; border-radius: 12px; font-size: 15px; font-weight: 600; color: var(--sb-encre, #0C1D30); }
+html body button.v2-rangee.v2-menu { width: auto; max-width: 100%; gap: 6px; padding: 0 6px; margin: 2px 0 6px -6px; border-radius: 12px; font-size: 15px; font-weight: 600; color: var(--v2-page-texte); }
 .v2-menu-logo { display: inline-grid; place-items: center; }
-.v2-menu-sous { font-weight: 400; color: var(--v2-muet); }
-.v2-menu-fleche { display: inline-grid; place-items: center; transform: rotate(90deg); color: var(--v2-muet); }
+.v2-menu-sous { font-weight: 400; color: var(--v2-page-muet); }
+.v2-menu-fleche { display: inline-grid; place-items: center; transform: rotate(90deg); color: var(--v2-page-muet); }
 .v2-feuille-hote { position: fixed; inset: 0; z-index: 2400; }
 .v2-feuille-hote[hidden] { display: none; }
 .v2-voile { position: absolute; inset: 0; background: rgb(6 17 31 / .38); animation: v2-voile 200ms ease-out both; }
@@ -247,5 +255,10 @@ html[data-design="v2"] body .vrm-barre-haut-droite:empty { display: none; }
 /* Sous la barre flottante du bas, rien ne doit rester caché : la page garde une marge de la hauteur de la barre. */
 html[data-design="v2"] body .vrm-main > :last-child { scroll-margin-bottom: calc(var(--vrm-barre-bas, 84px) + 16px); }
 /* Une ligne qui ne s'ouvre pas (achat en route : rien à toucher) : la même forme, sans chevron. */
-div.v2-ligne { position: relative; display: flex; align-items: center; gap: 12px; min-height: 76px; padding: 10px 12px; color: var(--sb-encre, #0C1D30); }
-.v2-liste-reste { margin: 8px 4px 0; font-size: 13px; color: var(--v2-muet); }
+div.v2-ligne { position: relative; display: flex; align-items: center; gap: 12px; min-height: 76px; padding: 10px 12px; color: var(--sv-encre, #0C1D30); }
+.v2-liste-reste { margin: 8px 4px 0; font-size: 13px; color: var(--v2-page-muet); }
+/* La planche des boutons (banc design-v2) force « enfoncé » et « focus » pour les capturer : les MÊMES déclarations. */
+html body button.v2b[data-v2b-force="appui"] { transform: scale(.97); filter: brightness(.94); }
+html body button.v2b-principal[data-v2b-force="appui"] { background: var(--v2-plein-fond-appui); }
+html body button.v2b-secondaire[data-v2b-force="appui"] { background: var(--v2-teinte-fond-appui); }
+html body button.v2b[data-v2b-force="focus"] { box-shadow: var(--v2-anneau); }

@@ -65,8 +65,11 @@ function Passe({ p, Icon, Photo, Plaque, aides }) {
   );
 }
 
+// Une passe ne porte QUE les colis COMPTÉS « à retirer » (la règle `pickupUnion`) : un colis « à vérifier » ou hors du
+// compte n'est pas un code à présenter au comptoir — il reste dans « Tout le détail des retraits », avec sa raison.
+const aPresenter = (x) => x && !x.aVerifier && !x.horsCompte && !x.redirige;
 export function PassesRetrait({ points = [], Icon, Photo, Plaque, aides }) {
-  const avecColis = points.filter((p) => (p.arrives || []).length > 0);
+  const avecColis = points.map((p) => ({ ...p, arrives: (p.arrives || []).filter(aPresenter) })).filter((p) => p.arrives.length > 0);
   if (!avecColis.length) return null;
   return (
     <div className="v2-passes" data-v2-passes={String(avecColis.length)}>
