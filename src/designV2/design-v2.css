@@ -617,11 +617,10 @@ html body button.v2-facture-ok { position: relative; appearance: none; display: 
 :root[data-theme="dark"] .v2-facture-bulle { background: #EAF2FB; color: #06111F; }
 /* Les rangées de la liste d'hier (cachées) ne laissent aucune trace ; la liste garde la place de la barre de sélection. */
 html[data-design="v2"][data-serie-ouverte] .v2t-liste { margin-bottom: calc(var(--vrm-serie-h, 64px) + 24px); }
-/* À l'ordinateur, la tête de la coque est opaque (verre dépoli plein) : jamais une demi-rangée sous la recherche. */
+/* À l'ordinateur, la barre du haut collante (recherche, plateformes) est un verre PLEIN : jamais une demi-rangée dessous. */
 @media (min-width: 1024px) {
-  html[data-design="v2"] body .vrm-app-header::before { content: ""; position: fixed; z-index: -1; top: 0; right: 0; left: var(--vrm-rail-l, 272px); height: 104px; pointer-events: none;
-    background: linear-gradient(180deg, var(--sv-haut, #1F5FA8) 0%, color-mix(in srgb, var(--sv-haut, #1F5FA8) 92%, transparent) 100%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); }
+  html[data-design="v2"] body .vrm-main > .vrm-barre-haut { background: color-mix(in srgb, var(--sv-haut, #1F5FA8) 90%, transparent) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important; backdrop-filter: blur(20px) saturate(180%) !important; box-shadow: 0 .5px 0 rgb(255 255 255 / .14) !important; }
 }
 /* La barre de sélection tient sur UNE ligne au téléphone (le plein prend la largeur de son libellé). */
 @media (max-width: 1023px) {
