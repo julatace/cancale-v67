@@ -85,5 +85,17 @@ export default {
   "v2.menu.comptes": {
     "one": "{n} account",
     "other": "{n} accounts"
-  }
+  },
+  "v2.menu.tousComptes": "All accounts",
+  "v2.ann.vues": "Listing views",
+  "v2.ann.enLigne": "Online",
+  "v2.ann.dorment": "Sleeping",
+  "v2.ann.aPublier": "To publish",
+  "v2.ann.publier": "Publish on another site",
+  "v2.ann.stock": "Stock (storage)",
+  "v2.l.taille": "S{t}",
+  "v2.l.jours": "{n} d",
+  "v2.l.relier": "Link",
+  "v2.l.plus": "More",
+  "v2.l.aRelier": "to link"
 };

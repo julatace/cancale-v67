@@ -210,6 +210,43 @@ async function telephone(nav, sombre, b, sigs) {
   dit(await pg.evaluate(() => !document.querySelector('[data-v2-feuille]:not([hidden])')), 'M la feuille se referme');
   dit(await pg.evaluate(() => document.documentElement.scrollWidth - innerWidth <= 1), 'X Ventes (écran d’hier dans la coque neuve) : rien ne déborde');
   dit(!erreurs.length, 'aucune erreur JS (Ventes)', erreurs);
+  // ANNONCES (17 nov., la capture de Julien : « les boutons sont dégueulasses, c'est mal proportionné »).
+  await pg.goto(`http://localhost:${PORT}/?tab=annonces`, { waitUntil: 'domcontentloaded' }); await pret(pg); await pg.waitForTimeout(1500);
+  const an = await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); const vis = (e) => e && e.getClientRects().length && getComputedStyle(e).display !== 'none';
+    const q = (e) => e.getBoundingClientRect();
+    const rows = [...m.querySelectorAll('.vrm-ann-card')].filter(vis);
+    const premiere = rows[0] ? Math.round(q(rows[0]).top) : null;
+    const hauteurs = rows.slice(0, 6).map((r) => Math.round(q(r).height));
+    const visibles = rows.filter((r) => q(r).top >= 0 && q(r).bottom <= innerHeight - 70).length;
+    const barre = m.querySelector('[data-ann-barre]'); const champ = barre && barre.querySelector('.vrm-annbar-recherche'); const plus = barre && barre.querySelector('.vrm-ann-outils > button');
+    const alignes = champ && plus ? { champ: [Math.round(q(champ).top), Math.round(q(champ).height)], plus: [Math.round(q(plus).top), Math.round(q(plus).height)] } : null;
+    const cpt = rows.filter((r) => vis(r.querySelector('.vrm-ann-l2-cpt'))).length;
+    const relierPuce = [...m.querySelectorAll('.vrm-ann-card .vrm-ann-relier')].filter(vis).filter((b) => !b.classList.contains('v2-ann-relier')).length;
+    const relierTexte = [...m.querySelectorAll('.v2-ann-relier')].filter(vis).length;
+    const puces = vis(m.querySelector('.vrm-stock-views')); const selPaires = vis(m.querySelector('.vrm-paires-selecteur')); const stats = vis(m.querySelector('.vrm-carte-stats'));
+    const seg = m.querySelector('[data-v2-ann-segment]'); const segN = seg ? seg.querySelectorAll('button').length : 0;
+    const tete = m.querySelector('.vrm-ann-compte-tete'); const ct = tete && getComputedStyle(tete);
+    const coupes = [...m.querySelectorAll('[data-v2-ann-segment] button, [data-ann-barre] button')].filter(vis).filter((b) => b.scrollWidth > b.clientWidth + 1).map((b) => b.textContent.trim());
+    return { premiere, hauteurs, visibles, alignes, cpt, relierPuce, relierTexte, puces, selPaires, stats, segN, teteFond: ct ? ct.backgroundColor + '|' + ct.backgroundImage : '', teteTaille: ct ? ct.fontSize : '', coupes,
+      disque: !!document.querySelector('[data-sb-disque]'), pleins: [...document.querySelectorAll('[data-v2b="principal"], .sb-btn-plein')].filter(vis).length, plein: (document.querySelector('[data-v2-principal]') || {}).textContent || '' }; });
+  dit(an.premiere != null && an.premiere <= 422, `N la 1re annonce est sur la moitié haute (${an.premiere} px ≤ 422)`, an);
+  dit(!an.puces && !an.selPaires && !an.stats && an.segN === 3, 'N ni puces, ni « Annonces | Stock », ni chiffres : UN segmenté (En ligne · Qui dorment · À publier)', an);
+  dit(an.alignes && an.alignes.champ[1] === 44 && an.alignes.plus[1] === 44 && Math.abs(an.alignes.champ[0] - an.alignes.plus[0]) <= 1, 'N recherche et « ⋯ » : même hauteur (44), même ligne', an.alignes);
+  dit(an.hauteurs.length >= 3 && an.hauteurs.every((h) => h <= 84), `N rangées de ~76 px (${an.hauteurs.join(', ')})`, an.hauteurs);
+  dit(an.visibles >= 6, `N ${an.visibles} annonces lisibles sur le premier écran`, an.visibles);
+  dit(an.cpt === 0, 'N le compte n’est plus redit sur chaque rangée (il est dans l’en-tête du groupe)', an.cpt);
+  dit(an.relierPuce === 0, `N « Relier un achat » : plus de grosse puce sous la rangée (${an.relierTexte} en texte ambre)`, an);
+  dit(/rgba\(0, 0, 0, 0\)|transparent/.test(an.teteFond) && an.teteTaille === '13px', 'N l’en-tête du groupe est un en-tête simple (13 px, sans bande)', an.teteFond);
+  dit(!an.coupes.length, 'N aucun libellé coupé (segmenté, barre)', an.coupes);
+  dit(!an.disque && an.pleins === 1 && /\S/.test(an.plein), `N pas de « + » flottant ; UN plein : « ${an.plein.trim()} »`, an);
+  await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `annonces-v2-390-${th}.png`) });
+  {
+    await pg.locator('[data-ann-barre] .vrm-ann-outils > button').first().tap({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(500);
+    const me = await pg.evaluate(() => [...document.querySelectorAll('[data-v2-ann-vue]')].map((b) => b.getAttribute('data-v2-ann-vue')));
+    dit(['grille', 'selection', 'republier', 'stock'].every((k) => me.includes(k)), `N « ⋯ » porte les vues, le tri, la grille et Stock (${me.join(', ')})`, me);
+    await pg.screenshot({ path: path.join(SHOTS, `annonces-v2-menu-390-${th}.png`) });
+    await pg.keyboard.press('Escape').catch(() => {}); await pg.mouse.click(10, 300).catch(() => {}); await pg.waitForTimeout(300);
+  }
   for (const [id, url] of [['annonces', '/?tab=annonces'], ['argent', '/?tab=compta']]) {
     await pg.goto(`http://localhost:${PORT}${url}`, { waitUntil: 'domcontentloaded' }); await pret(pg);
     dit(await pg.evaluate(() => document.documentElement.scrollWidth - innerWidth <= 1 && (document.querySelector('.vrm-main').innerText || '').trim().length > 40), `X ${id} (écran d’hier) se rend dans la coque neuve, sans débordement`);

@@ -1056,6 +1056,8 @@ import { useDesignV2, designV2Actif } from "./designV2/reglage.js";
 import AujourdhuiV2 from "./designV2/Aujourdhui.jsx";
 import { PassesRetrait as PassesRetraitV2, EnRouteListe as EnRouteListeV2 } from "./designV2/PassesRetrait.jsx";
 import MenuPlateformeV2 from "./designV2/MenuPlateforme.jsx";
+import { BoutonV2 } from "./designV2/BoutonV2.jsx";
+import LigneAnnonceV2, { varianteLigne as varianteLigneV2 } from "./designV2/LigneAnnonce.jsx";
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
@@ -17604,6 +17606,8 @@ const ICON_PATHS = {
   // et 🧭, deux emojis au milieu de logos de transporteurs au trait.
   pin:  <><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Z"/><circle cx="12" cy="9.5" r="2.2"/></>,
   // (17 nov., nouveau design) Une paire SANS photo : un cintre au trait sur un fond uni (jamais une photo inventée).
+  // (17 nov., nouveau design) « Publier » : une croix au trait.
+  plus: <><path d="M12 5v14M5 12h14"/></>,
   cintre: <><path d="M12 7.2a2.1 2.1 0 1 1 2.1-2.1"/><path d="M12 7.2v1.6L3.6 15a1.2 1.2 0 0 0 .8 2.1h15.2a1.2 1.2 0 0 0 .8-2.1L12 8.8"/></>,
   nav:  <><path d="M3 11 21 3l-8 18-2-7-8-3Z"/></>,
   // ── Icônes ajoutées pour remplacer les emojis utilisés COMME icônes ───────
@@ -20189,6 +20193,11 @@ function SelecteurPaires({ tab, setTab, badges, sites }) {
   </div>;
 }
 const lireColisPretsBarre = () => { try { const v = load('vrm_colis_prets', null); return v && typeof v === 'object' ? v : null; } catch (_) { return null; } };
+// (17 nov., nouveau design) Allumé : ce qui est rangé ailleurs (puces de vues d'Annonces…) reste MONTÉ — ses effets, ses
+// nombres publiés — mais caché par une enveloppe neutre (aucune règle de style ne la vise). Éteint : AUCUNE enveloppe.
+function CacheSiV2({ si, children }) {
+  return si ? <div className="v2-cache" hidden style={{ display: 'none' }}>{children}</div> : children;
+}
 function BottomBar({tab,setTab,sites,badges,gestes:gestesDisque=null}) {
   // (17 nov., nouveau design) Allumé : pas de disque « + » (les gestes globaux sont dans l'écran, au pouce).
   const designV2=useDesignV2();
@@ -48552,6 +48561,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // (11 nov., lot journee-perso) SA Ma journée : l'ordre et les cartes cachées (src/journeePerso.js),
   // et la feuille « Modifier ma journée ».
   const [persoJ] = useJourneePerso();
+  const ligneV2 = varianteLigneV2();
+  const lignesV2 = [];   // (17 nov.) les rangées neuves d'Annonces, remplies par la boucle de la grille d'hier (mêmes sources)   // (17 nov.) le dessin de la rangée d'Annonces à l'essai : A · B · C (`vrm_design_v2_ligne`)
   // (17 nov.) Le nouveau design (essai, `vrm_design_v2`) : Ma journée devient « Aujourd'hui », Achats montre ses passes.
   const designV2 = useDesignV2();
   const [feuillePerso, setFeuillePerso] = useState(false);
@@ -53272,6 +53283,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {!dansPlateforme && <ScreenHead icon="vitrine" title={tr('annonces.annoncesLigne')} />}
         {/* (14 nov., « Studio bleu clair ») « • À faire · N › » : un LIEN sur la ligne du titre (téléphone), plus en tête des vues. */}
         <AFaireLigne capsule seulement="telephone" className="vrm-ann-afaire"/>
+        {/* (17 nov., nouveau design) UN contrôle segmenté sous le menu : En ligne · Qui dorment · À publier (les MÊMES vues
+            qu'avant, `annSort`) ; les autres vues, le tri, la grille et Stock sont dans « ⋯ ». Le plein au pouce : publier. */}
+        {designV2 && listings.items?.length>0 ? <div className="v2-ann-segment" data-v2-ann-segment="">
+          <Segmente label={tr('v2.ann.vues')} plein value={annSearch.trim() ? '' : (annSort==='oldest' ? 'oldest' : annSort)} onChange={(v)=>{ if (v==='oldest') { setAnnSort('oldest'); setAnnSearch(''); } else { if (v==='sleeping' && !(annStats.sleeping>0)) setModeDort('favoris'); setAnnSort(v); } }}
+            options={[{ v: 'oldest', l: tr('v2.ann.enLigne') }, { v: 'sleeping', l: tr('v2.ann.dorment'), n: annStats.sleeping>0 ? annStats.sleeping : undefined }, { v: 'brouillons', l: tr('v2.ann.aPublier'), n: (brVinted.liste||[]).length || undefined }]}/>
+        </div> : null}
+        {designV2 && !baseKO ? <div className="v2-pouce" data-v2-pouce=""><BoutonV2 role="principal" plein icone={<Icon name="plus" size={22}/>} attrs={{ 'data-v2-principal': 'publier' }}
+          onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:publier-ailleurs', { detail: {} })); } catch (_) {} }}>{tr('v2.ann.publier')}</BoutonV2></div> : null}
         <NoAcc/>
         {/* (2 nov.) Sans compte Vinted, rien à compléter : « 0 à relire sur Vinted » n'était qu'un zéro de plus. */}
         {/* (3 nov., critique #7) « Annonces à compléter » et « Offres automatiques » vivent dans « Outils » (…). */}
@@ -53299,7 +53318,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {listings.items?.length>0 && <div className="vrm-ann-toolbar vrm-annbar" data-ann-barre="">
             <ChampRecherche className="vrm-annbar-recherche" valeur={annSearch} onChange={setAnnSearch} placeholder={tr('annonces.rechercher')} label={tr('annonces.rechercherAnnonceTitre')} micro data-ann-recherche=""/>
             <div className="vrm-annbar-gestes">
-            <label className="vrm-annbar-bouton vrm-annbar-tri" data-ann-tri={annSort} title={tr('annonces.trierAnnonces')}>
+            {designV2 ? null : <label className="vrm-annbar-bouton vrm-annbar-tri" data-ann-tri={annSort} title={tr('annonces.trierAnnonces')}>
               <Icon name="filter" size={17}/>
               <span className="vrm-annbar-mot">{({oldest:'Les plus anciennes',recent:'Ordre Vinted',price_desc:'Prix décroissant',price_asc:'Prix croissant',favs:'Plus de favoris',views:'Plus de vues',boost:'Vues sans favoris',sleeping:'En ligne depuis longtemps',nonum:'Sans numéro'})[annSort] || tr('annonces.trier')}</span>
             <select className="vrm-ann-tri" aria-label={tr('annonces.trierAnnonces')} value={['oldest','recent','price_desc','price_asc','favs','views','boost','sleeping','nonum'].includes(annSort)?annSort:''} onChange={e=>setAnnSort(e.target.value)}>
@@ -53314,7 +53333,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {(annStats.sleeping>0 || annSort==='sleeping') && <option value="sleeping">{tr('annonces.ligneDepuisLongtemps')}</option>}
               <option value="nonum">{tr('annonces.sansNumero')}</option>
             </select>
-            </label>
+            </label>}
             {/* (5 nov., chantier C — revue 2.5) « Republier… » mène à la vue « Sélectionner » :
                 on coche, puis UNE feuille « Actions » (Republier · Modifier prix ou titre ·
                 Mettre en brouillon · Mettre en ligne). L'ancienne feuille « Republier et
@@ -53324,8 +53343,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {/* (14 nov., « Studio bleu clair » — « aucun geste en double ») « Republier » n'est plus ICI : la vue « Republier »,
                 juste dessous, est le même geste (elle porte désormais `data-actions-ouvrir`). À sa place, le choix LISTE / GRILLE
                 (la grille de vignettes d'hier reste au choix, retenue sur cet appareil). */}
-            <button type="button" className="vrm-annbar-bouton sb-rond" data-sb-vue-bascule={vuePaires} aria-pressed={vuePaires==='grille'} aria-label={vuePaires==='grille' ? tr('studio.paires.voirListe') : tr('studio.paires.voirGrille')} title={vuePaires==='grille' ? tr('studio.paires.voirListe') : tr('studio.paires.voirGrille')}
-              onClick={()=>changerVuePaires(vuePaires==='grille' ? 'liste' : 'grille')}><Icon name={vuePaires==='grille' ? 'menu' : 'grid'} size={17}/><span className="vrm-annbar-mot">{vuePaires==='grille' ? tr('studio.paires.liste') : tr('studio.paires.grille')}</span></button>
+            {designV2 ? null : <button type="button" className="vrm-annbar-bouton sb-rond" data-sb-vue-bascule={vuePaires} aria-pressed={vuePaires==='grille'} aria-label={vuePaires==='grille' ? tr('studio.paires.voirListe') : tr('studio.paires.voirGrille')} title={vuePaires==='grille' ? tr('studio.paires.voirListe') : tr('studio.paires.voirGrille')}
+              onClick={()=>changerVuePaires(vuePaires==='grille' ? 'liste' : 'grille')}><Icon name={vuePaires==='grille' ? 'menu' : 'grid'} size={17}/><span className="vrm-annbar-mot">{vuePaires==='grille' ? tr('studio.paires.liste') : tr('studio.paires.grille')}</span></button>}
             <div className="vrm-ann-outils">
               <button type="button" className="vrm-annbar-bouton" aria-label={tr('annonces.outilsAnnonces')} onClick={(e)=>{ try { const r=e.currentTarget.getBoundingClientRect(); setAnnToolsCote(r.right>=246?'droite':'gauche'); } catch(_){} setAnnToolsOpen(v=>!v); }} aria-expanded={annToolsOpen} title={tr('annonces.outilsOffresAutomatiques')}>
                 <Icon name="more" size={17}/><span className="vrm-annbar-mot vrm-ann-outils-mot">{tr('ventes.outils')}</span></button>
@@ -53337,6 +53356,32 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     Il s'ancre à droite comme le menu de l'écran Ventes — sauf si le bouton,
                     passé à la ligne, est trop près du bord gauche pour cela. */}
                 <div className="vrm-menu-flottant" data-outils-annonces="" style={{position:'absolute',...(annToolsCote==='gauche'?{left:0}:{right:0}),top:'calc(100% + 6px)',zIndex:71,minWidth:230,maxWidth:'calc(var(--vrm-vw100, 100vw) - 32px)',background:C.card,border:`1px solid ${C.border}`,borderRadius:12,boxShadow:C.shadowLg||'0 8px 24px rgba(0,0,0,.2)',padding:6,display:'flex',flexDirection:'column',gap:2}}>
+                  {designV2 ? <div className="v2-ann-menu" data-v2-ann-menu="">
+                    <label className="v2-ann-menu-tri"><span>{tr('annonces.trierAnnonces')}</span>
+                      <select aria-label={tr('annonces.trierAnnonces')} value={['oldest','recent','price_desc','price_asc','favs','views','boost','sleeping','nonum'].includes(annSort)?annSort:''} onChange={e=>{ setAnnSort(e.target.value); setAnnToolsOpen(false); }}>
+                        {!['oldest','recent','price_desc','price_asc','favs','views','boost','sleeping','nonum'].includes(annSort) && <option value="" disabled>{tr('annonces.trier')}</option>}
+                        <option value="oldest">{tr('annonces.plusAnciennes')}</option><option value="recent">{tr('annonces.ordreVinted')}</option>
+                        <option value="price_desc">{tr('annonces.prixDecroissant')}</option><option value="price_asc">{tr('annonces.prixCroissant')}</option>
+                        {(annStats.hasFav || annSort==='favs') && <option value="favs">{tr('annonces.plusFavoris')}</option>}
+                        {(annStats.hasView || annSort==='views') && <option value="views">{tr('annonces.plusVues')}</option>}
+                        <option value="nonum">{tr('annonces.sansNumero')}</option>
+                      </select></label>
+                    {[
+                      { k: 'grille', icon: vuePaires==='grille' ? 'menu' : 'grid', lab: vuePaires==='grille' ? tr('studio.paires.voirListe') : tr('studio.paires.voirGrille'), on: () => changerVuePaires(vuePaires==='grille' ? 'liste' : 'grille') },
+                      { k: 'selection', icon: 'check', lab: tr('annonces.selectionner'), n: selAnn.length, on: () => setAnnSort('selection') },
+                      { k: 'republier', icon: 'sync', lab: tr('annonces.republier2'), on: () => setAnnSort('republier') },
+                      annMasquees.length>0 ? { k: 'masquees', icon: 'eyeOff', lab: tr('annonces.masquees'), n: annMasquees.length, on: () => setAnnSort('masquees') } : null,
+                      { k: 'nonum', icon: 'tag', lab: tr('annonces.sansNumero'), n: annStats.sansNum, on: () => setAnnSort('nonum') },
+                      fileAchat && fileAchat.length>0 ? { k: 'sansachat', icon: 'link', lab: tr('annonces.sansAchatRelie'), n: fileAchat.length, on: () => setAnnSort('sansachat') } : null,
+                      annACompleter && annACompleter.n>0 ? { k: 'acompleter', icon: 'pencil', lab: tr('annonces.completer'), n: annACompleter.n, on: () => setAnnSort('acompleter') } : null,
+                      { k: 'stock', icon: 'home', lab: tr('v2.ann.stock'), on: () => { if (onNav) onNav('garage'); } },
+                    ].filter(Boolean).map((t) => (
+                      <button key={t.k} type="button" className="vrm-annbar-outil" data-v2-ann-vue={t.k} onClick={() => { setAnnToolsOpen(false); t.on(); }}>
+                        <span aria-hidden="true" className="vrm-annbar-outil-icone"><Icon name={t.icon} size={18}/></span>
+                        <span className="vrm-annbar-outil-mot">{t.lab}</span>
+                        {t.n ? <span className="vrm-annbar-outil-n" style={{marginLeft:'auto',fontVariantNumeric:'tabular-nums'}}>{t.n}</span> : null}
+                      </button>))}
+                  </div> : null}
                   <div className="vrm-outils-annonces-haut" data-outils-haut="">
         {listings.items?.length>0 && (() => {
           const nbMini = nbAccepterDes(annBase, numeros);
@@ -53434,7 +53479,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             {!repubAction && <ProgrammesRepubCarte progs={progsRepub} onModifier={(p)=>ouvrirProgramme(p, 'modifier')} />}
           </div>}
 
-        {(listings.items?.length>0 || annMasquees.length>0 || (brVinted.liste||[]).length>0) && <div className="vrm-stock-views vrm-filtres" role="group" aria-label={tr('annonces.vuesRapidesAnnonces')}>
+        {(listings.items?.length>0 || annMasquees.length>0 || (brVinted.liste||[]).length>0) && <CacheSiV2 si={designV2}><div className="vrm-stock-views vrm-filtres" role="group" aria-label={tr('annonces.vuesRapidesAnnonces')}>
           {/* (14 nov., refonte des listes) « • À faire · N » en tête des vues : au téléphone, la feuille des alertes (src/ui/AFaire.jsx) ;
               à l'ordinateur, les alertes restent posées ensemble sous les vues (place « ordinateur » ci-dessous). */}
           {/* (14 nov., « Studio bleu clair ») « • À faire · N › » est monté sur la ligne du titre (ci-dessus, hors de la barre). */}
@@ -53461,7 +53506,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               seulement (liste pas chargée ou en erreur ⇒ rien). */}
           <ChiffreConseil cle="annonces.dorment" valeur={Array.isArray(listings.items) && !listings.error ? annStats.sleeping : undefined}/>
           <ChiffreConseil cle="annonces.prixMini" valeur={Array.isArray(listings.items) && !listings.error ? { offresAuto: offresAuto === true, nbMini: nbAccepterDes(annBase, numeros), total: (annBase || []).length } : undefined}/>
-        </div>}
+        </div></CacheSiV2>}
         {/* (14 nov., refonte des listes) « • À faire · N › » : au téléphone, UNE ligne qui ouvre la feuille des alertes ;
             à l'ordinateur, les mêmes alertes posées ici, ensemble. */}
         {/* À l'ordinateur, les alertes posées ensemble HORS de la barre (une carte dans une carte, sinon). */}
@@ -53782,10 +53827,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* (14 nov., « Studio bleu clair ») LA LISTE D'ABORD : des rangées de 64 px posées sur un plan de verre (plaque N° ·
             vignette · titre et méta · prix), la grille de vignettes d'hier restant au choix (« Grille », retenu sur cet
             appareil). Toucher une rangée la fait monter au premier plan, à sa place (src/paires/PaireAvant.jsx). */}
+        {/* (17 nov., nouveau design) Allumé : la grille d'hier reste MONTÉE mais cachée (ses gestes vivent dans la fiche) ;
+            la liste neuve (`lignesV2`, remplie par la même boucle) est posée juste après. */}
+        <div className="v2-cache-ancienne" hidden={designV2 || undefined} style={designV2 ? { display: 'none' } : undefined}>
         <div className="vrm-ann-grid vrm-fiches vrm-ann-vignettes sb-liste" data-sb-liste="" data-sb-vue={vuePaires} onClick={clicAvant} data-ann-grille="vignettes" data-ann-grille-comptes={annGroupes.length} style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 180px), 1fr))',gap:16}}>
           {/* (15 nov., la maquette ORDINATEUR « Annonces en tableau ») L'en-tête des colonnes (ordinateur, vue Liste). */}
           {vuePaires === 'liste' ? <div className="vrm-ann-th" data-ann-th="" aria-hidden="true"><span>{tr('annonces.th.article')}</span><span>{tr('annonces.th.taille')}</span><span>{tr('annonces.th.sites')}</span><span>{tr('annonces.th.comptes')}</span><span className="is-r">{tr('annonces.th.prix')}</span><span className="is-r">{tr('annonces.th.enLigne')}</span><span>{tr('annonces.th.place')}</span></div> : null}
-          {annGroupesVus.map(g=>{ const acc0 = g.items[0] && g.items[0]._acc; const nomG = acc0 ? accNameOf(acc0) : ''; return [
+          {annGroupesVus.map(g=>{ const acc0 = g.items[0] && g.items[0]._acc; const nomG = acc0 ? accNameOf(acc0) : '';
+            // (17 nov., nouveau design) Un en-tête de section simple : le compte UNE fois, avec son nombre.
+            if (designV2) lignesV2.push(<h3 key={'v2h:' + g.uid} className="v2-ann-groupe" data-v2-ann-compte={g.uid}><span>{nomG || tr('annonces.compteVinted')}</span><span className="v2-ann-groupe-n">{trj('annonces.annonces', { n: g.tous })}</span></h3>);
+            return [
           <div key={'compte-'+g.uid} className="vrm-ann-compte-tete" data-ann-compte={g.uid} data-ann-compte-n={g.tous} role="heading" aria-level={3}>
             <span className="vrm-ann-compte-avatar" aria-hidden="true">{initialeCompte(nomG)}</span>
             <span className="vrm-ann-compte-nom" title={nomG || undefined}>{nomG || tr('annonces.compteVinted')}</span>
@@ -53863,7 +53914,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // (14 nov., proposition 62) Toucher l'annonce (ou « Détails et gestes ») ouvre LA fiche de la paire, par
             // l'identifiant de CETTE annonce et son N° ; ses gestes (« Plus d'actions ») y sont rendus (`DansFiche`).
             const flAnn = attrsFicheLigne({ contexte: 'annonce', site: 'vinted', cle: 'a' + cleCarte, nums: num ? [num] : [], item: String(it.id || ''), photo: typeof it.photo === 'string' ? it.photo : ((it.photo && it.photo.url) || ''), titre: it.title || '', prix: prix(it.price, it.currency) || '' });
-            return (
+            const carteAncienne = (
               <div className={'vrm-ann-card vrm-fiche vrm-vignette' + (vuePaires === 'liste' ? ' sb-rangee' : '')} key={cleCarte} data-sb-avant-cle={cleCarte} data-sb-alerte={soldBord ? 'vendue' : undefined} data-carte-annonce={it.id} data-fiche="29oct" data-fiche-ouverte={ouverte?'1':'0'} data-vignette-cle={cleCarte} data-vignette-double={enDouble?'1':undefined}
                 {...flAnn}
                 style={{borderRadius:12,background:C.card,border:`1px solid ${soldBord?C.warn:C.border}`,boxShadow:C.shadow||'none',display:'flex',flexDirection:'column',overflow:'hidden',...(estFloute(it)?STYLE_FLOU:null)}}>
@@ -53902,7 +53953,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         (`updatePair`) — le lien suit la vente et la republication (identité, src/repriseNumero.js). Reliée :
                         « Achetée 24,63 € », discret ; « Délier » et « Reçu » sont dans sa fiche. */}
                     {/* La MÊME règle que le compte de « Sans achat relié » (`sansAchatRelie`, src/achatsARelier.js) : chaque puce est comptée. */}
-                    {(e.buyFromId != null && String(e.buyFromId) !== '')
+                    {designV2 && vuePaires === 'liste' && !(e.buyFromId != null && String(e.buyFromId) !== '') ? null : (e.buyFromId != null && String(e.buyFromId) !== '')
                       ? <span className="vrm-ann-lien vrm-ann-achetee" data-ann-achetee={String(e.buyFromId)}>{tr('liaison.ann.achetee', { prix: achatConnu ? prixCourt(achat) : '—' })}</span>
                       : sansAchatRelie(e, () => (achatConnu ? achat : null)) ? <button type="button" className="vrm-ann-lien vrm-ann-relier" data-ann-relier={String(it.id)} onClick={(ev) => { ev.stopPropagation(); openPicker(item); }}><Icon name="link" size={14}/><span>{tr('liaison.ann.relier')}</span></button> : null}
                     {/* (14 nov., « Studio bleu clair ») L'état, le prix d'achat et les chiffres de l'annonce (accepter dès, refuser
@@ -53970,7 +54021,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       return <>
                         <span className="vrm-ann-l2" data-ann-l2="" aria-hidden="true">
                           <span className="vrm-ann-l2-sites" data-ann-sites={sitesL.join(',')}>{sitesL.map((x) => <MarqueSite key={x} site={x} taille={12.5}/>)}</span>
-                          {it._acc ? <span className="vrm-ann-l2-cpt">{accNameOf(it._acc)}</span> : null}
+                          {designV2
+                            /* (17 nov., nouveau design) Le compte est dit UNE fois, dans l'en-tête du groupe ; à sa place, « Relier un achat »
+                               en texte ambre (la MÊME règle `sansAchatRelie`, le même `openPicker`) : la rangée garde ~76 px. */
+                            ? (!(e.buyFromId != null && String(e.buyFromId) !== '') && sansAchatRelie(e, () => (achatConnu ? achat : null))
+                              ? <button type="button" className="vrm-ann-relier v2-ann-relier" data-ann-relier={String(it.id)} onClick={(ev) => { ev.stopPropagation(); openPicker(item); }}>{tr('liaison.ann.relier')}</button> : null)
+                            : (it._acc ? <span className="vrm-ann-l2-cpt">{accNameOf(it._acc)}</span> : null)}
                         </span>
                         <span className={'vrm-ann-fin' + (conseil ? ' is-ambre' : '')} data-ann-fin={conseil ? 'baisser' : ''} aria-hidden="true">
                           {conseil && age != null ? tr('annonces.v.aBaisser', { n: age }) : [tl ? tr('annonces.v.taille', { t: tl }) : '', age != null ? tr('annonces.v.jours', { n: age }) : ''].filter(Boolean).join(' · ')}
@@ -54078,8 +54134,21 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 <div className="sb-avant-place" data-sb-avant-place=""/>
               </div>
             );
+            if (!designV2) return carteAncienne;
+            // (17 nov., nouveau design) LA RANGÉE NEUVE (src/designV2/LigneAnnonce.jsx, dessin A · B · C) : les MÊMES sources que la
+            // carte d'hier, qui reste montée et cachée (ses gestes vivent dans la fiche, `DansFiche`) ; même identité (`flAnn`).
+            const tfV2 = tailleEnFin(it.title);
+            const aRelierV2 = !(e.buyFromId != null && String(e.buyFromId) !== '') && sansAchatRelie(e, () => (achatConnu ? achat : null));
+            lignesV2.push(<LigneAnnonceV2 key={'v2:' + cleCarte} cle={'v2:' + cleCarte} variante={ligneV2} attrs={flAnn} photo={it.photo || null} Photo={PhotoVinted} Icon={Icon} Plaque={PlaqueJ}
+              titre={it.title || it.brand || ''} num={num} taille={tfV2 ? tfV2.taille : (it.size || '')} jours={age} prix={prix(it.price, it.currency) || ''}
+              favoris={Number.isFinite(it.favourites) ? it.favourites : null} vues={Number.isFinite(it.views) ? it.views : null} aRelier={aRelierV2}
+              onRelier={() => openPicker(item)} LigneGlissable={LigneGlissable}
+              onPlus={() => { try { const el = document.querySelector(`[data-v2l][data-fiche-ligne="${CSS.escape(flAnn['data-fiche-ligne'])}"]`); const l = el ? lireLigne(el) : null; if (l) ouvrirLigne(l); } catch (_) {} }}/>);
+            return carteAncienne;
           })]; })}
         </div>
+        </div>
+        {designV2 ? <div className="v2-liste-annonces" data-v2-ligne={ligneV2} role="list" onClick={clicAvant}>{lignesV2}</div> : null}
         <PaireAvantHote rendre={rendreAvantAnnonce}/>
         <SuitePaquets montres={Math.min(annMax, annShown.length)} total={annShown.length} onPlus={annPlus}/>
         </>)}
@@ -65044,21 +65113,22 @@ function AppCoeur() {
               (FiltreSites, SelecteurCompte), dans sa feuille. Éteint : rien de ceci n'est rendu. */}
           {designV2App ? (() => { const cpt = site === 'vinted' && compteSel ? (comptesChoisissables || []).find((a) => String(a.vinted_user_id) === String(compteSel)) : null;
             const nCpt = site === 'vinted' ? (comptesChoisissables || []).length : 0;
-            return <MenuPlateformeV2 id={t} Icon={Icon} Retour={FermeAuRetour} logo={site !== 'toutes' ? <LogoSite site={site}/> : null}
+            return <div className="v2-sous-titre"><MenuPlateformeV2 id={t} Icon={Icon} Retour={FermeAuRetour} logo={site !== 'toutes' ? <LogoSite site={site}/> : null}
               libelle={site === 'toutes' ? tr('v2.menu.toutes') : nomPlateforme(site)}
-              sous={cpt ? ((load('vinted_account_labels', {}) || {})[String(cpt.vinted_user_id)] || cpt.login || '') : nCpt > 1 ? tr('v2.menu.comptes', { n: nCpt }) : ''}>
+              sous={cpt ? ((load('vinted_account_labels', {}) || {})[String(cpt.vinted_user_id)] || cpt.login || '') : nCpt > 1 ? tr('v2.menu.tousComptes') : ''}>
               <FiltreSites tache={t} site={site} sites={sitesPresents} enLigneVinted={t==='annonces' && liveStatsVus ? liveStatsVus.online : undefined} onSite={(s)=>setPlatSub(s)} onChoix={(s)=>{ retenirFiltre(t,s,true); noterReprise({ sites:{ [t]:{ valeur:s, at:Date.now() } } }); }}/>
               {site==='vinted' && !baseKO && nCpt > 1 ? <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} messages={t==='messages'}/> : null}
-            </MenuPlateformeV2>; })() : null}
-          <PhraseEcran cle={t}/>
+            </MenuPlateformeV2><PhraseEcran cle={t}/></div>; })() : null}
+          {designV2App ? null : <PhraseEcran cle={t}/>}
           {/* (15 nov., refonte-journee — la maquette « Annonces ») Annonces | Stock | Achats SOUS le titre d'Annonces (le même
               sélecteur que la coque, qui ne le pose plus au-dessus pour cet écran). */}
-          {t==='annonces' && !ordi && estPaires(tab) && tab==='annonces' ? <SelecteurPaires tab={tab} setTab={setTab} badges={badgesNav} sites={sitesPresents}/> : null}
+          {t==='annonces' && !ordi && estPaires(tab) && tab==='annonces' && !designV2App ? <SelecteurPaires tab={tab} setTab={setTab} badges={badgesNav} sites={sitesPresents}/> : null}
           {/* (15 nov.) Scanner pour retrouver : le code-barres d'un colis ⇒ SA vente, SON achat (src/ScannerRetrouver.jsx). */}
           {(t === 'ventes' || t === 'achats') && !baseKO ? <span className="vrm-tache-retrouver" data-scan-retrouver-hote={t}>
             <Rond icone="retrouver" label={tr('scan.r.bouton')} titre={tr('scan.r.boutonTitre')} onClick={() => ouvrirRetrouver(t)} attrs={{ 'data-scan-retrouver-bouton': t }}/>
           </span> : null}
         </header>
+        <CacheSiV2 si={designV2App && !sous}>
         <div className="vrm-tache-filtres" style={{padding:'0 16px'}}>
           {designV2App ? null : <DansBarreHaut><FiltreSites tache={t} site={site} sites={sitesPresents} enLigneVinted={t==='annonces' && liveStatsVus ? liveStatsVus.online : undefined} onSite={(s)=>setPlatSub(s)} onChoix={(s)=>{ retenirFiltre(t,s,true); noterReprise({ sites:{ [t]:{ valeur:s, at:Date.now() } } }); }}/></DansBarreHaut>}
           {/* (14 nov., « Studio bleu clair ») Annonces Vinted : le choix du compte sur la MÊME ligne que les sites (une ligne de
@@ -65068,6 +65138,7 @@ function AppCoeur() {
               même forme que les rubriques de l'app (`PlatSubNav`). */}
           {sous && <div className="vrm-tache-sous" data-tache-sous={t+'.'+site}><PlatSubNav sub={sec} setSub={(x)=>{ setEbayCible(null); setPlatSub(subDeTache(site,x)); }} sections={sous.map(([id,l,p])=>[id, aCleTr('nav.sous.'+site+'.'+id) ? tr('nav.sous.'+site+'.'+id) : l, p])}/></div>}
         </div>
+        </CacheSiV2>
         {/* (11 nov., lot DJ3) En tête : les colis à expédier (Ventes, section principale du site) ou à retirer (Achats). */}
         {/* (14 nov., refonte des listes) LA carte héros de Ventes EN HAUT (« une chose principale par écran ») : elle
             était posée sous les 30 colis à expédier, à 5 500 px du haut. Mêmes chiffres, même carte, seulement montée.
@@ -65116,6 +65187,7 @@ function AppCoeur() {
           {!baseKO && (sec==='annonces'||achats) && (() => {
             const uid = compteEffectif(compteSel, compteConnecte, (u) => (comptesChoisissables || []).some((a) => String(a.vinted_user_id) === u));
             if (achats) return null; // (3 nov.) la carte d'Achats vit dans l'écran Achats (ses chiffres d'achat)
+            if (designV2App && tab === 'annonces') return null;   // (17 nov., nouveau design) les chiffres vivent dans Argent ; la liste d'abord
             return <div style={{ padding: '12px 16px 0' }}><CarteStatsApp page="annonces" bande className="vrm-fu-ecran" ici="annonces" onNav={setTab}
               sel={{ site: 'vinted', compte: compteCarte(uid, vintedAccounts), periode: null }}/></div>;
           })()}

@@ -271,3 +271,103 @@ html body button.v2b[data-v2b-force="focus"] { box-shadow: var(--v2-anneau); }
 /* Un message passager (« toast ») ne couvre jamais le geste du jour : posé au-dessus du plein quand il y en a un. */
 html[data-design="v2"] body:has(.v2-pouce) .vrm-toasts[data-toasts-place="bas"] { bottom: calc(var(--vrm-barre-bas, 84px) + var(--v2-bouton-h) + 40px) !important; }
 @media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) { html[data-design="v2"] body:has(.v2-pouce) .vrm-toasts[data-toasts-place="bas"] { bottom: 24px !important; } }
+
+/* ══ 7. ANNONCES (nouveau design, 17 nov. — la capture de Julien : « les boutons sont dégueulasses, mal proportionné ») ══
+   Ordre : grand titre · « Vinted · Tous les comptes ⌄ » · UN segmenté · la recherche et « ⋯ » à la même hauteur · la liste. */
+html[data-design="v2"] body .v2-ann-segment { margin: 4px 0 12px; }
+html[data-design="v2"] body .v2-ann-segment .vrm-seg, html[data-design="v2"] body .v2-ann-segment [role="tablist"], html[data-design="v2"] body .v2-ann-segment > * { width: 100%; }
+/* La rangée recherche + « ⋯ » : une hauteur (44), une ligne de base. */
+html[data-design="v2"] body .vrm-annbar { display: flex !important; align-items: center !important; gap: 8px !important; flex-wrap: nowrap !important; }
+html[data-design="v2"] body .vrm-annbar .vrm-annbar-recherche { flex: 1 1 auto !important; min-width: 0 !important; }
+html[data-design="v2"] body .vrm-annbar .vrm-annbar-recherche :is(input, .vrm-champ, [role="search"]) { min-height: 44px !important; }
+html[data-design="v2"] body .vrm-annbar .vrm-annbar-gestes { display: flex !important; align-items: center !important; gap: 0 !important; flex: none !important; }
+html[data-design="v2"] body .vrm-annbar .vrm-ann-outils > button.vrm-annbar-bouton { width: 44px !important; height: 44px !important; min-height: 44px !important; padding: 0 !important; border-radius: 50% !important; display: grid !important; place-items: center !important; }
+html[data-design="v2"] body .vrm-annbar .vrm-ann-outils .vrm-annbar-mot { display: none !important; }
+/* Les vues d'hier (puces) : rangées dans « ⋯ » et le segmenté ; la rangée reste MONTÉE (ses nombres publiés). */
+html[data-design="v2"] body .vrm-stock-views.vrm-filtres { display: none !important; }
+/* Le menu « ⋯ » : les vues, le tri, la grille, Stock, puis les outils d'hier. */
+.v2-ann-menu { display: flex; flex-direction: column; gap: 2px; padding-bottom: 6px; margin-bottom: 6px; border-bottom: .5px solid var(--v2-filet); }
+.v2-ann-menu-tri { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; padding: 0 8px; font-size: 15px; font-weight: 600; }
+.v2-ann-menu-tri select { min-height: 36px; font: inherit; font-weight: 400; max-width: 60%; }
+/* L'en-tête d'un groupe (le compte) : un en-tête de section simple, 13/600 gris, avec son nombre — plus de bande. */
+html[data-design="v2"] body .vrm-ann-compte-tete { background: transparent !important; box-shadow: none !important; border: 0 !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+  font-size: 13px !important; font-weight: 600 !important; color: var(--v2-muet) !important; padding: 14px 16px 6px !important; min-height: 0 !important; }
+html[data-design="v2"] body .vrm-ann-compte-tete :is(.vrm-ann-compte-nom, .vrm-ann-compte-n) { font-size: 13px !important; font-weight: 600 !important; color: var(--v2-muet) !important; }
+html[data-design="v2"] body .vrm-ann-compte-tete .vrm-ann-compte-avatar { display: none !important; }
+/* « Relier un achat » : un texte ambre dans la rangée (cible 44 sans grandir la rangée). */
+html[data-design="v2"] body button.v2-ann-relier { appearance: none; border: 0 !important; background: transparent !important; box-shadow: none !important; padding: 0 4px !important; margin: -12px 0 !important;
+  min-height: 44px !important; height: auto !important; font: 600 13px/1.2 var(--sb-police-texte, system-ui) !important; color: var(--v2-ambre) !important; cursor: pointer; white-space: nowrap;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent; display: flex !important; align-items: center; }
+html[data-design="v2"] body button.v2-ann-relier:active { opacity: .6; }
+/* La place du plein au pouce, sous la dernière annonce. */
+@media (max-width: 1023px) { html[data-design="v2"] body .vrm-main:has(.v2-ann-segment) .sb-liste { margin-bottom: calc(var(--vrm-barre-bas, 84px) + var(--v2-bouton-h) + 40px) !important; } }
+
+/* ══ 8. LA RANGÉE D'ANNONCE (src/designV2/LigneAnnonce.jsx) — dessins A · B · C ════════════════════════════════
+   Grille de 8 px, gouttières 16 ; une hauteur par dessin ; chiffres tabulaires ; photo recadrée pareil partout. */
+html[data-design="v2"] body .sb-liste[data-v2-ligne] { display: block !important; padding: 0 !important; gap: 0 !important; }
+html[data-design="v2"] body .sb-liste[data-v2-ligne] > .vrm-ann-card[hidden], html[data-design="v2"] body .sb-liste[data-v2-ligne] > .vrm-ann-th { display: none !important; }
+html[data-design="v2"] body .sb-liste[data-v2-ligne="B"] { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 16px 8px !important; padding: 0 16px 16px !important; background: transparent !important; box-shadow: none !important; }
+@media (min-width: 1024px) { html[data-design="v2"] body .sb-liste[data-v2-ligne="B"] { grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)) !important; } }
+html[data-design="v2"] body .sb-liste[data-v2-ligne="B"] > .vrm-ann-compte-tete { grid-column: 1 / -1; padding-left: 0 !important; color: var(--v2-page-muet) !important; }
+html[data-design="v2"] body .sb-liste[data-v2-ligne="B"] > .vrm-ann-compte-tete :is(.vrm-ann-compte-nom, .vrm-ann-compte-n) { color: var(--v2-page-muet) !important; }
+.v2l { position: relative; box-sizing: border-box; color: var(--sv-encre, #0C1D30); font-feature-settings: "tnum" 1, "lnum" 1; font-variant-numeric: tabular-nums; cursor: pointer;
+  touch-action: pan-y; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; transition: background-color 160ms ease; }
+.v2l:active { background-color: rgb(18 52 96 / .06); }
+:root[data-theme="dark"] .v2l:active { background-color: rgb(255 255 255 / .06); }
+.v2l-photo { display: grid; place-items: center; overflow: hidden; background: var(--v2-socle); color: var(--v2-muet); flex: none; }
+.v2l-photo img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 50%; display: block; }
+.v2l-sans { display: grid; place-items: center; width: 100%; height: 100%; }
+.v2l .sb-plaque { font-size: 12px; }
+.v2l-geste { display: inline-flex; align-items: center; color: var(--v2-ambre); font-size: 13px; font-weight: 600; white-space: nowrap; }
+
+/* A « Liste nette » : 80 px (8 + 64 + 8), séparateurs en retrait (16 + 64 + 16 = 96). */
+.v2l-a { display: flex; align-items: center; gap: 16px; height: 80px; padding: 8px 16px; }
+.v2l-a + .v2l-a::before, .vrm-ann-card[hidden] + .v2l-a::before { content: ""; position: absolute; left: 96px; right: 0; top: 0; height: .5px; background: var(--v2-filet); }
+.v2l-photo-a { width: 64px; height: 64px; border-radius: 12px; }
+.v2l-a-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.v2l-a-l1 { display: flex; align-items: baseline; gap: 8px; }
+.v2l-a-titre { flex: 1; min-width: 0; font-size: 17px; font-weight: 600; line-height: 24px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2l-a-prix { flex: none; font-size: 17px; font-weight: 600; line-height: 24px; }
+.v2l-a-l2 { display: flex; align-items: center; gap: 8px; min-width: 0; height: 24px; font-size: 15px; color: var(--v2-muet); white-space: nowrap; overflow: hidden; }
+.v2l-faits-txt { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.v2l-a-l2 .v2l-geste { margin-left: auto; }
+
+/* B « Carte photo » : 4:5, N° en haut à gauche, prix en pastille en bas ; titre 2 lignes (hauteur réservée), faits gris. */
+.v2l-b { display: flex; flex-direction: column; gap: 8px; border-radius: 16px; }
+.v2l-b-cadre { position: relative; display: block; aspect-ratio: 4 / 5; border-radius: 16px; overflow: hidden; box-shadow: var(--v2-carte-ombre); }
+.v2l-photo-b { width: 100%; height: 100%; }
+.v2l-b-num { position: absolute; left: 8px; top: 8px; }
+.v2l-b-prix { position: absolute; left: 8px; bottom: 8px; padding: 4px 8px; border-radius: 999px; background: rgb(255 255 255 / .94); color: #0C1D30; font-size: 15px; font-weight: 700; line-height: 16px; box-shadow: 0 1px 2px rgb(0 0 0 / .12); }
+.v2l-b-point { position: absolute; right: 8px; top: 8px; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: rgb(255 255 255 / .94); }
+.v2l-b-point .v2-point { margin: 0; }
+.v2l-b-titre { font-size: 15px; font-weight: 600; line-height: 20px; height: 40px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: var(--v2-page-texte); padding: 0 4px; overflow-wrap: anywhere; }
+.v2l-b-faits { font-size: 13px; line-height: 16px; color: var(--v2-page-muet); padding: 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* C « Fiche compacte » : 120 px (16 + 88 + 16) ; titre 2 lignes, grand prix, trois faits en icône + texte. */
+.v2l-c { display: flex; align-items: flex-start; gap: 16px; height: 120px; padding: 16px; }
+.v2l-c + .v2l-c::before, .vrm-ann-card[hidden] + .v2l-c::before { content: ""; position: absolute; left: 120px; right: 0; top: 0; height: .5px; background: var(--v2-filet); }
+.v2l-photo-c { width: 88px; height: 88px; border-radius: 12px; }
+.v2l-c-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; height: 88px; }
+.v2l-c-titre { font-size: 15px; font-weight: 600; line-height: 20px; height: 40px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.v2l-c-prix { font-size: 20px; font-weight: 700; line-height: 24px; }
+.v2l-c-faits { display: flex; align-items: center; gap: 12px; margin-top: 4px; height: 16px; font-size: 13px; color: var(--v2-muet); white-space: nowrap; overflow: hidden; }
+.v2l-fait { display: flex; align-items: center; gap: 4px; flex: none; }
+.v2l-fait .sb-plaque { transform: scale(.9); transform-origin: left center; }
+.v2l-c-l2 { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 24px; }
+.v2l-c-stats { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--v2-muet); }
+
+/* ══ 9. ANNONCES — la liste neuve (hors des règles d'hier) ═══════════════════════════════════════════════ */
+.v2-sous-titre { display: flex; align-items: center; gap: 4px; min-width: 0; width: 100%; flex-basis: 100%; grid-column: 1 / -1; margin: 0 0 4px; }
+.v2-menu-lib, .v2-menu-sous { white-space: nowrap; }
+.v2-menu-sous { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.v2-sous-titre .vrm-phrase-ecran { margin: 0 !important; }
+html body button.v2-rangee.v2-menu { white-space: nowrap; flex: 0 1 auto; min-width: 0; overflow: hidden; }
+.v2-liste-annonces { margin: 0 0 16px; color: var(--sv-encre, #0C1D30); }
+.v2-liste-annonces[data-v2-ligne="A"], .v2-liste-annonces[data-v2-ligne="C"] { background: var(--v2-carte); border-radius: 16px; box-shadow: var(--v2-carte-ombre); overflow: hidden; }
+.v2-liste-annonces[data-v2-ligne="B"] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 8px; }
+@media (min-width: 1024px) { .v2-liste-annonces[data-v2-ligne="B"] { grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); } }
+.v2-ann-groupe { display: flex; align-items: baseline; gap: 8px; margin: 0; padding: 16px 16px 8px; font-size: 13px; font-weight: 600; line-height: 16px; color: var(--v2-muet); }
+.v2-ann-groupe-n { font-weight: 400; }
+.v2-liste-annonces[data-v2-ligne="B"] .v2-ann-groupe { grid-column: 1 / -1; padding: 8px 4px 0; color: var(--v2-page-muet); }
+.v2-ann-groupe + .v2l-a::before, .v2-ann-groupe + .v2l-c::before { display: none; }
+@media (max-width: 1023px) { .v2-liste-annonces { margin-bottom: calc(var(--vrm-barre-bas, 84px) + var(--v2-bouton-h) + 40px); } }
