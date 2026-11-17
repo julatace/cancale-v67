@@ -35,6 +35,7 @@ export default {
   "achats.chercher": "Cerca ↗",
   "achats.sansCodeVinted": "Codice non letto: apri la conversazione Vinted (il pacco conta «da ritirare» solo con il suo codice)",
   "achats.sansCodeEmail": "Codice non letto nell’e-mail del corriere: aprila (il pacco conta «da ritirare» solo con il suo codice)",
+  "achats.statutCodePasLu": "Codice non ancora letto",
   "achats.transporteurEncoreConnu": "Corriere non ancora noto: stato non ancora letto",
   "achats.confirmeChez": "Confermato da",
   "achats.texte": "{ageCourtMs} fa",

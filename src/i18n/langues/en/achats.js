@@ -35,6 +35,7 @@ export default {
   "achats.chercher": "Search ↗",
   "achats.sansCodeVinted": "Code not read: open the Vinted conversation (the parcel only counts as “to collect” with its code)",
   "achats.sansCodeEmail": "Code not read in the carrier’s e-mail: open it (the parcel only counts as “to collect” with its code)",
+  "achats.statutCodePasLu": "Code not read yet",
   "achats.transporteurEncoreConnu": "Carrier not known yet: its status hasn’t been read",
   "achats.confirmeChez": "Confirmed by",
   "achats.texte": "{ageCourtMs} ago",

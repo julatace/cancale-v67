@@ -35,6 +35,7 @@ export default {
   "achats.chercher": "Buscar ↗",
   "achats.sansCodeVinted": "Código no leído: abre la conversación de Vinted (el paquete solo cuenta «por recoger» con su código)",
   "achats.sansCodeEmail": "Código no leído en el e-mail del transportista: ábrelo (el paquete solo cuenta «por recoger» con su código)",
+  "achats.statutCodePasLu": "Código aún no leído",
   "achats.transporteurEncoreConnu": "Transportista aún desconocido: su estado no se ha leído",
   "achats.confirmeChez": "Confirmado por",
   "achats.texte": "hace {ageCourtMs}",

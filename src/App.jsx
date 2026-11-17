@@ -144,6 +144,7 @@ import { transporteurRelu, ligneRelueDe, ID_BORD_TRANSPORTEURS } from '../api/_l
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : InfosSms (était importé en statique)
 const InfosSms = aLaDemandeDiscret(() => import('./InfosSms.jsx'));
 import {indexCodesSuivis, finParIdentite, fusionnerParCode, suivisLiesDuColis} from './retraitPreuves.js';
+import { statutAVerifier } from './statutAVerifier.js';
 import {etatRepliRetirer, choixApresBascule} from './repliRetirer.js';
 import { finDatee, texteSortie, sortiRecent, pourquoiPasLu, SORTIS_JOURS, jourCourt as jourCourtParis } from './retraitSuivi.js';
 import {arriveesRelues} from './arriveesRelues.js';
@@ -55247,17 +55248,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             if (vers) return delaiRetrait({ arriveeMs: arr.ms, limite: String(vers).slice(0, 10), estimee: true }, Date.now());
             const est = limiteEstimee({ arriveeMs: arr.ms, transporteur: carrierKey(t ? t.carrier : ((ev && ev.carrier) || '')) || '' });
             return est ? delaiRetrait({ arriveeMs: arr.ms, limite: est.jour, estimee: true }, Date.now()) : null; };
-          const statutAVerifier = (x) => { const r = String(x.raisonVerif || '') + ' ' + String(x.raisonCode || '');
-            // (6 nov.) Deux sources datées qui se contredisent (api/_lib/etat-colis.js) : ni « incident » ni « retour ».
-            if (/rien ne l[’']explique/i.test(r)) return 'Contradiction';
-            if (/instance|non r[ée]clam|retour|exp[ée]diteur|renvoy/i.test(r)) return 'Retour à l’expéditeur ?';
-            // (9 nov., 17 h 24) Une moitié Vinted comptée avec le colis du transporteur : l'état, tranché.
-            if (/^compt[ée] avec/i.test(String(x.raisonVerif || ''))) return String(x.raisonVerif).replace(/^c/, 'C');
-            if (/m[eê]me colis|m[eê]me relais|doute|pas encore relu|\brelier\b|\breli[ée]s?\b/i.test(r)) return 'À relier';
-            if (/incident|probl|transporteur/i.test(r)) return 'Incident';
-            if (/d[ée]lai|depasse/i.test(r)) return 'Délai dépassé';
-            if (/depuis plus de/i.test(r)) return 'Au relais depuis longtemps';
-            return 'À vérifier'; };
+          // (17 nov., chasse-bugs) La puce d'un « à vérifier » : src/statutAVerifier.js (l'état machine d'abord).
           // (3 nov.) Le titre d'une ligne : l'achat RELIÉ par identité (sa commande, ou celle du même n° de suivi /
           // code — `cmdParColis`), sinon le titre que l'e-mail porte (`artTitle`, dont les « Ton achat t'attend… »
           // `source:'vinted-commande'`), sinon le n° court (« n°…8456 ») — le transporteur est déjà en tête du point.
