@@ -342,9 +342,13 @@
    liste prenait la hauteur de ses conversations, le panneau la sienne, et la zone de travail (fond blanc)
    laissait un BLOC BLANC sous le panneau (73 à 83 px mesurés). La même règle, sur toute la coque à deux
    colonnes (banc scripts/bancs/ecrans-restes.cjs, C2). */
-@media (min-width: 768px) and (max-width: 999px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (max-width: 999px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (max-width: 999px) and (min-height: 600px) and (pointer: coarse) {
+/* (16 nov., train) La coque à deux colonnes = la règle de coque recopiée MOT POUR MOT (src/coque.js, MQ_ORDINATEUR, audit-coque-tablette),
+   puis « jusqu'à 999 px » dedans. */
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
+@media (max-width: 999px) {
  .vrm-message-workspace{--vrm-msg-h:max(360px,min(740px,calc(100dvh - 200px)));align-items:stretch;}
  .vrm-message-workspace .vrm-inbox-column{height:var(--vrm-msg-h);max-height:none!important;overflow-y:auto;box-sizing:border-box;}
  .vrm-message-workspace .vrm-chat-empty{height:var(--vrm-msg-h)!important;min-height:0!important;box-sizing:border-box;}
  .vrm-message-workspace .vrm-chat-panel{height:var(--vrm-msg-h)!important;min-height:0!important;max-height:none!important;}
+}
 }
