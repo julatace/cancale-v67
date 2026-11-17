@@ -410,6 +410,8 @@ async function allume(nav, b, sombre, W, ref) {
   const b = base();
   const sigs = {};
   try {
+    // SEUL=chargement : le chargement lent et le mouvement réduit seulement (une retouche du banc).
+    if (process.env.SEUL === 'chargement') { await chargementEtMouvement(nav, b); throw null; }
     console.log('\n── éteint (l\'écran d\'avant, la référence des nombres)');
     const refC = await avant(nav, b, false);
     sigs.ventes = refC.sig;
@@ -435,8 +437,8 @@ async function allume(nav, b, sombre, W, ref) {
       await etroit(nav, b, false);
       await etroit(nav, b, true);
     }
-  } catch (e) { ko++; console.log('  ❌ le banc s’est arrêté : ' + String(e && e.stack || e).slice(0, 1500)); }
-  fs.writeFileSync(path.join(SHOTS, 'signature-eteint.json'), JSON.stringify(sigs));
+  } catch (e) { if (e !== null) { ko++; console.log('  ❌ le banc s’est arrêté : ' + String(e && e.stack || e).slice(0, 1500)); } }
+  if (!process.env.SEUL) fs.writeFileSync(path.join(SHOTS, 'signature-eteint.json'), JSON.stringify(sigs));
   await nav.close(); srv.close();
   console.log(`\n${ko ? '❌' : '✅'} design-v2-ventes : ${ok} verts, ${ko} rouges — captures : ${SHOTS}`);
   process.exit(ko ? 1 : 0);
