@@ -209,13 +209,14 @@ async function qualite(pg, th) {
 // Q (suite) : pendant la lecture, le squelette de la forme des rangées, jamais un écran blanc ; mouvement réduit respecté.
 async function chargementEtMouvement(nav, b) {
   console.log('\n── chargement lent et mouvement réduit (390 clair)');
-  const { ctx, pg } = await ouvrir(nav, { W: 390, sombre: false, b, url: '/?tab=ventes' });
+  // Ouvert sur une page SANS l'app (aucune lecture, aucun cache), puis la lecture des ventes retenue, puis Ventes.
+  const { ctx, pg } = await ouvrir(nav, { W: 390, sombre: false, b, url: '/vide-banc.txt' });
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_design_v2', '1'); } catch (_) {} });
   // La lecture des ventes retenue 5 s (page ET contexte : le service worker de l'app passe par le contexte).
   const lent = async (r) => { await new Promise((ok) => setTimeout(ok, 5000)); return r.fallback(); };
   const ventesLues = (u) => /\/rest\/v1\//.test(String(u)) && /orders_sold/.test(decodeURIComponent(String(u)));
   await pg.route(ventesLues, lent); await ctx.route(ventesLues, lent);
-  await pg.reload({ waitUntil: 'domcontentloaded' });
+  await pg.goto(`http://localhost:${PORT}/?tab=ventes`, { waitUntil: 'domcontentloaded' });
   const vu = { squelette: false, blanc: 0, ligne: false };
   for (let k = 0; k < 40; k++) {
     const x = await pg.evaluate(() => ({ sq: !!document.querySelector('[data-v2v-corps] [data-v2-squelette]'), ligne: !!document.querySelector('[data-v2v-liste="envoyer"] [data-v2v-ligne]'),
