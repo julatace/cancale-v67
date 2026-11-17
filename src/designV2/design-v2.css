@@ -554,3 +554,10 @@ html[data-design="v2"] body .v2v-tete .v2-affiche-sig-sous { margin: 0; }
 .v2v-sq-ligne.is-l3 { width: 56%; }
 @keyframes v2v-respire { from { opacity: .55; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .v2v-sq-bloc, .v2v-sq-ligne { animation: none; } }
+/* « Mis à jour à hh:mm » (2 s) : sur Ventes et Annonces du nouveau design, la tête n'a plus de bande — la pastille se posait
+   SUR le grand titre. Elle passe au-dessus de la barre du bas, centrée (dans la couche de sa règle d'hier). */
+@layer vrm-verre {
+  @media (max-width: 760px) {
+    :root:root:root:root:root body:has(.v2-entete-cloche) .vrm-neuf-hote { top: auto !important; bottom: calc(var(--vrm-barre-bas, 84px) + 16px) !important; left: 50% !important; transform: translateX(-50%) !important; height: auto !important; }
+  }
+}
