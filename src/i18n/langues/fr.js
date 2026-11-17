@@ -5,6 +5,7 @@
 // sans `other`. Clés : `<écran>.<élément>[.<précision>]`, jamais le texte lui-même.
 // Pluriel : { one: '…', other: '…' } choisi par `n` (Intl.PluralRules).
 import ecran_suivi_vente from './fr/suiviVente.js';   // (16 nov.) le suivi des colis vendus
+import ecran_perso from './fr/perso.js';   // (16 nov.) « Modifier ma journée » simple
 import ecran_ventesVerre from './fr/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
 import ecran_journee from './fr/journee.js';
 import ecran_confort from './fr/confort.js';   // (14 nov., lots 117–130) confort et sécurité
@@ -18,6 +19,7 @@ import ecran_vcventes from './fr/vcventes.js';   // (15 nov.) ventes Vestiaire :
 import ecran_transporteur_connu from './fr/transporteurConnu.js';   // (15 nov.) « À expédier » : transporteur connu
 import ecran_vendre from './fr/vendre.js';   // (15 nov., vendre plus) baisses conseillées, relance des favoris, loupe
 import ecran_ebaytableau from './fr/ebaytableau.js';   // (15 nov., eBay complet 2) Tableau, Argent, Trafic, Santé
+import ecran_serie_selection from './fr/serieSelection.js';   // (16 nov.) la barre de sélection en série
 import ecran_scan_retrouver from './fr/scanRetrouver.js';   // (15 nov.) Scanner pour retrouver un colis
 import ecran_renvoyer from './fr/renvoyer.js';   // (15 nov., lot retours) « À renvoyer »   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_liaison from './fr/liaison.js';   // (15 nov.) La liaison achat ⇄ article
@@ -69,6 +71,7 @@ import ecran_etageres from './fr/etageres.js';   // (15 nov.) le Stock en étag�
 import ecran_journee_verre from './fr/journee-verre.js';   // (15 nov.) Ma journée verre, la paire à sortir
 import ecran_arrivee from './fr/arrivee.js';   // (15 nov.) atelier d'arrivée, historique, taille du texte
 export default {
+  ...ecran_perso,
   ...ecran_ventesVerre,
   ...ecran_studio_paires,
   ...ecran_republier_guide,
@@ -824,6 +827,7 @@ export default {
   "favoris.sousTitreCompte": "Compte {compte} · écris à ceux qui aiment tes annonces.",
   "favoris.actualiser": "Actualiser",
   "favoris.outils": "Plus d’outils",
+  "versions.uneSeule": "Une version : si elle vient de partir, seule la salutation change (Bonjour, Salut, Hello).",   // (16 nov.) une seule version : la salutation varie
   "favoris.duree.secondes": { one: "{n} s", other: "{n} s" },
   "favoris.duree.minutes": { one: "{n} min", other: "{n} min" },
   "favoris.duree.heures": { one: "{n} h", other: "{n} h" },
@@ -2310,6 +2314,7 @@ export default {
   ...ecran_vendre,
   ...ecran_ebaytableau,
   ...ecran_scan_retrouver,
+  ...ecran_serie_selection,
   ...ecran_finition,
   ...ecran_parametres,
   ...ecran_avenir,

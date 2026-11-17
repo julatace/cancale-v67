@@ -238,15 +238,18 @@ const communs = (m, vp, errs) => {
         const lu = await pg.evaluate(() => {
           const r = document.querySelector('[data-colis-recap]');
           const n = (g) => document.querySelectorAll(`[data-bord-card][data-groupe-carte="${g}"]`).length;
-          const lot = document.querySelector('[data-lot-ouvrir]');
-          return { recap: r ? r.getAttribute('data-colis-recap') : null, cartes: document.querySelectorAll('[data-bord-card]').length, pret: n('pret'), attente: n('attente'), lot: !!lot && lot.getAttribute('data-lot-ouvrir') === '1' && !lot.disabled, lotN: lot ? lot.getAttribute('data-imprimer-prets') : null, lotTxt: lot ? `${lot.innerText} · ${lot.getAttribute('title') || ''}` : '' };
+          // (16 nov.) Depuis « Imprimer en un toucher » (14 nov., docs/passation/2026-11-14-impression-simple.md), le
+          // plein qui annonce N et imprime est `data-colis-barre-btn="imprimer"` (`data-impr-lot`) ; `data-lot-ouvrir`
+          // est devenu « Choisir, réimprimer » (la feuille), sans nombre.
+          const lot = [...document.querySelectorAll('[data-colis-barre-btn="imprimer"]')].find((e) => e.getBoundingClientRect().width > 0);
+          return { recap: r ? r.getAttribute('data-colis-recap') : null, cartes: document.querySelectorAll('[data-bord-card]').length, pret: n('pret'), attente: n('attente'), lot: !!lot && !lot.disabled, lotN: lot ? lot.getAttribute('data-impr-lot') : null, lotTxt: lot ? `${lot.innerText} · ${lot.getAttribute('title') || ''}` : '' };
         });
         dit(lu.recap === String(ATTENDU.colis), `le récapitulatif compte ${ATTENDU.colis} colis à envoyer`, lu.recap);
         dit(lu.cartes === ATTENDU.colis, `${ATTENDU.colis} cartes de colis`, `${lu.cartes}`);
         dit(lu.pret === ATTENDU.prets && lu.attente === ATTENDU.attente, `${ATTENDU.prets} prêts à imprimer, ${ATTENDU.attente} en attente`, `${lu.pret} · ${lu.attente}`);
         // (9 nov.) Depuis le 5 nov. (« la barre du haut ne saute plus »), le bouton garde le même
         // libellé ; le NOMBRE est porté par `data-imprimer-prets` et dit par son titre.
-        dit(lu.lot && lu.lotN === String(ATTENDU.prets) && new RegExp(`\\b${ATTENDU.prets}\\b`).test(lu.lotTxt), `« Tout imprimer » annonce ${ATTENDU.prets} bordereaux`, `${lu.lotN} · ${lu.lotTxt.replace(/\s+/g, ' ')}`);
+        dit(lu.lot && lu.lotN === String(ATTENDU.prets) && new RegExp(`\\b${ATTENDU.prets}\\b`).test(lu.lotTxt), `« Imprimer » annonce ${ATTENDU.prets} bordereaux`, `${lu.lotN} · ${lu.lotTxt.replace(/\s+/g, ' ')}`);
         communs(await mesurer(pg), vp, errs);
         await capture(pg, vp, 'colis');
         await ctx.close();

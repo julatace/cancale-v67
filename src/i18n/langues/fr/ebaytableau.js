@@ -250,4 +250,5 @@ export default {
   "ebt.journal.corrigeraspects": "Caractéristiques ajoutées",
   "ebt.journal.lierproduit": "Reliée au catalogue eBay",
   "ebt.journal.ajouterphotos": "Photos ajoutées",
+  "ebt.reconnecter": "Reconnecter mon compte eBay",
 };

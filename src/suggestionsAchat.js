@@ -41,7 +41,7 @@
 // `scripts/audit-suggestions-achat.cjs` exécutent CES fonctions. La marque et
 // les couleurs viennent des règles de l'app (`extractBrand`, `extractColors`),
 // passées en paramètre : une seule définition (§11).
-import { ACHAT_SANS_COUT } from './prixAchatPropose.js';
+import { achatHorsRelier } from './achatsHorsRelier.js';
 import { moisParis } from './dateParis.js';
 
 const txDe = (a) => (a && a.transaction_id != null ? String(a.transaction_id) : '');
@@ -60,8 +60,12 @@ export function lotDe(achat) {
 
 // ── La taille, normalisée d'écriture ───────────────────────────────────────
 // « 42,5 » / « 42.5 » / « 42½ » ⇒ « 42.5 » ; « 42 2/3 » ⇒ « 42 2/3 » ; « 42 » ⇒ « 42 ».
+// (16 nov., relier-fiable) « 42⅔ », « 42,66 », « 42,67 » ⇒ « 42 2/3 » ; « 42⅓ », « 42,33 » ⇒ « 42 1/3 » ;
+// « 42,0 » ⇒ « 42 » (la même pointure écrite autrement ne doit ni écarter ni confirmer à tort).
+const tiers = (s) => String(s == null ? '' : s).replace(/⅔/g, ' 2/3').replace(/⅓/g, ' 1/3')
+  .replace(/(\d)\s*[.,]\s*6[67]?(?![0-9])/g, '$1 2/3').replace(/(\d)\s*[.,]\s*33?(?![0-9])/g, '$1 1/3').replace(/(\d)\s*[.,]\s*0+(?![0-9])/g, '$1');
 export function tailleNorm(s) {
-  const t = String(s == null ? '' : s).toLowerCase().replace(/\s+/g, ' ').trim();
+  const t = tiers(s).toLowerCase().replace(/\s+/g, ' ').trim();
   const m = /(?:^|[^0-9])(3[0-9]|4[0-9]|5[0-2])(?:\s*([12])\s*\/\s*3|\s*[.,]\s*5|\s*½)?(?![0-9])/.exec(t);
   if (!m) return '';
   const reste = m[0].slice(m[0].indexOf(m[1]) + m[1].length);
@@ -73,7 +77,7 @@ export function tailleNorm(s) {
 // n. / size » d'abord, sinon un nombre isolé 34-52 (les modèles 90/95/97/270
 // sont hors plage).
 export function tailleDuTitre(titre) {
-  const t = String(titre || '').toLowerCase();
+  const t = tiers(titre || '').toLowerCase();
   const apres = /(?:taille|pointure|size|maat|eu|fr|\bt|\bn)\s*[.:]?\s*((?:3[4-9]|4[0-9]|5[0-2])(?:\s*[12]\s*\/\s*3|\s*[.,]\s*5|\s*½)?)(?![0-9])/.exec(t);
   if (apres) return tailleNorm(apres[1]);
   const seul = /(?:^|[^0-9.,/])((?:3[4-9]|4[0-9]|5[0-2])(?:\s+[12]\s*\/\s*3|[.,]5|½)?)(?![0-9/])/.exec(t);
@@ -102,7 +106,10 @@ export function achatDisponible(achat, liens, curTx = '') {
   const l = lotDe(achat);
   return l.lot && (l.n == null || n < l.n);
 }
-export const achatAnnule = (achat) => ACHAT_SANS_COUT.test(String((achat && achat.status) || ''));
+// (16 nov., lot achats-retour) Hors relier : annulé, remboursé, en retour, en litige — le statut, et les
+// PREUVES publiées par l'écran qui les lit (bordereau de retour, remboursement, litige ouvert, par SON n°) :
+// src/achatsHorsRelier.js. Un litige clos sans retour (commande finalisée) redevient proposable.
+export const achatAnnule = (achat) => achatHorsRelier(achat);
 // « lot · 2/5 reliés » (ou « lot · 2 reliés » sans nombre écrit). '' hors lot.
 export function etiquetteLot(achat, liens) {
   const l = lotDe(achat); if (!l.lot) return '';

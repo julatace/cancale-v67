@@ -178,7 +178,14 @@ const charger = async (src, nom) => {
     const memo = dMemo >= 0 ? app.slice(dMemo, app.indexOf('}, [listings, numeros', dMemo)) : '';
     dit(/enLigne: listings\.items\.filter\(/.test(memo) && !/aConfirmer/.test(memo), 'la règle ne reçoit que les annonces EN LIGNE (jamais « à confirmer »)');
     dit(/dateDe: \(it\) => dateMiseEnLigneMs\(it, listingDates\)/.test(memo), 'depuis quand : la date de mise en ligne de l’écran Annonces (`dateMiseEnLigneMs`)');
-    dit(/<EnLigneDeuxFoisAlerte groupes=\{enLigneDeux\.vinted\}/.test(app), 'l’écran Annonces montre l’alerte des MÊMES groupes que Ma journée (`enLigneDeux.vinted`)');
+    // (16 nov., audits-vert-main) Depuis le 15 nov. (lot deux-comptes), un groupe déjà dit par « Deux comptes, une paire »
+    // sort des DEUX écrans par le MÊME filtre (`idsDeuxComptes`) : Annonces et Ma journée gardent les mêmes groupes.
+    const filtreDe = (t) => { const m = /enLigneDeux\.vinted(?:\.length\?enLigneDeux\.vinted:\[\]\))?\.filter\(\(?(\w+)\)?=>(!\(\1\.comptes&&\1\.comptes\.length>=2&&\1\.annonces\.filter\(\(a\)=>a\.plat==='vinted'\)\.every\(\(a\)=>idsDeuxComptes\.has\(String\(a\.id\)\)\)\))\)/.exec(t.replace(/\s+/g, '')); return m ? m[2].split(m[1] + '.').join('g.') : null; };
+    const iAnn = app.indexOf('<EnLigneDeuxFoisAlerte groupes=');
+    const fAnn = iAnn >= 0 ? filtreDe(app.slice(Math.max(0, iAnn - 400), iAnn)) : null;
+    const iJour = app.indexOf('const deuxFois = (enLigneDeux');
+    const fJour = iJour >= 0 ? filtreDe(app.slice(iJour, iJour + 400)) : null;
+    dit((/<EnLigneDeuxFoisAlerte groupes=\{enLigneDeux\.vinted\}/.test(app)) || (fAnn && fJour && fAnn === fJour && /<EnLigneDeuxFoisAlerte groupes=\{g\}/.test(app)), 'l’écran Annonces montre l’alerte des MÊMES groupes que Ma journée (`enLigneDeux.vinted`, même filtre « deux comptes »)', JSON.stringify({ fAnn, fJour }));
     const f = S.feuille ? sans(S.feuille) : '';
     const al = f.slice(f.indexOf('export function EnLigneDeuxFoisAlerte'));
     dit(!!S.feuille && al.length > 50 && /data-deux-fois-ouvrir/.test(al) && !/onClick=\{[^}]*(supprim|delete|vmrCmd)/i.test(al) && !/fetch\(/.test(al), 'l’alerte ouvre l’annonce sur Vinted et ne supprime rien (aucun envoi)');
