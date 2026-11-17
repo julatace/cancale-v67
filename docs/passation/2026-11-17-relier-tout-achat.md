@@ -94,6 +94,31 @@ M2 reliés mêlés à la liste par défaut : 7 · M3 pas d'onglet « Déjà reli
 8 (lot absent, « Lot · 2 articles » absent) · M5 prix du lot pré-rempli à la moitié : 2 · M6 détacher sans demander : 4 ·
 M7 relier un article du lot délie l'autre : 3. Build d'`origin/main` : rouge (200 achats vus sur 2 995, aucune section).
 
+## « Relier achats et ventes » sur iPhone (urgence du soir)
+
+Julien (capture iPhone) : « Ici ça bug de ouf quand je swipe ». Ce qu'on voyait : deux petites boîtes qui défilaient
+chacune dans la page (« Tes achats libres 2002 », « Sans achat relié 1362 »), coupées au milieu d'une ligne ; un grand
+vide en bas (la bande de 116 px réservée à la pilule était HORS des listes) ; titres coupés « … » ; 3 364 cartes rendues
+d'un coup ; et l'appui long qui se disputait le doigt avec deux défilements imbriqués.
+
+Ce qui change (`src/RelierGlisser.jsx`, `src/styles-relier-glisser.css`), au téléphone (< 900 px) :
+- **un seul défilement** : la feuille (`.vrm-rg-corps`, `data-glisser-defile`) défile ; les listes ne défilent plus ;
+- **une liste à la fois** : onglets « Tes achats libres · N » / « Sans achat relié · N » ; toucher un achat ⇒ la liste
+  d'en face prend la place (relier en deux touchers = le geste principal) ; appui long (400 ms, inchangé) ⇒ l'achat se
+  soulève et la liste d'en face apparaît sous le doigt (la liste quittée reste RENDUE hors écran, jamais
+  `display: none`, pour que la carte garde son doigt) ; le défilement n'est bloqué QUE pendant un glisser
+  (`touchmove` non passif seulement achat levé) ; `touch-action: pan-y` sur les lignes ;
+- **tranches de 60** (la suite arrive en défilant) ;
+- la bande du bas est la marge de FIN de la feuille (plus de vide à l'écran) ; titres et lignes passent à la ligne ;
+- **poignée** en haut : tirer vers le bas depuis la poignée ou l'en-tête ferme ; jamais depuis une liste.
+Ordinateur (≥ 900 px) : deux colonnes côte à côte, chacune défile (pas imbriquées), inchangé.
+
+Banc `scripts/bancs/relier-glisser-iphone.cjs` (390 tactile, 200 achats, 150 annonces, titres longs ; Chromium par
+`Input.dispatchTouchEvent`, WebKit par `NAVIGATEUR=webkit` — WebKit ne se télécharge pas dans les conteneurs de session,
+il tourne dans `.github/workflows/iphone-webkit.yml`, à la demande) : un seul conteneur défilant, aucune bande vide,
+aucun titre coupé, un doigt qui file (achats, puis « Sans achat relié ») DÉFILE sans rien soulever ni relier, appui long
++ glisser ⇒ question ⇒ relié, deux touchers ⇒ relié, tirer depuis la poignée ferme, depuis la liste non.
+
 ## Reste
 
 1. « Relier achats et ventes » (`RelierGlisser`) et « Relier ce colis à un achat » n'ont pas encore la recherche large
