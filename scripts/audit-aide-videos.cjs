@@ -136,9 +136,20 @@ function juger(x) {
   const ailleurs = [];
   const fouille = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) { if (p !== DOSSIER) fouille(p); } else if (/\.(mp4|webm|mov|m4v)$/i.test(e.name)) ailleurs.push(path.relative(RAC, p)); } };
   fouille(path.join(RAC, 'public'));
+  // (16 nov., audits-vert-main) UNE exception écrite : le film de la page d'accueil PUBLIQUE (lot 146, 15 nov.,
+  // décision de Julien : 39 s tournées dans la vraie app, données inventées, muette, sous-titres 5 langues),
+  // borné au même poids qu'une vidéo d'aide, et chargé par la seule page d'accueil (jamais par l'app).
+  const FILM_ACCUEIL = path.join('public', 'accueil', 'film-45s.mp4');
+  const filmOk = (f) => f === FILM_ACCUEIL && fs.statSync(path.join(RAC, f)).size <= POIDS_MAX;
+  dit(!ailleurs.some((f) => f === FILM_ACCUEIL && !filmOk(f)), `le film de l'accueil public pèse 1,5 Mo au plus`);
+  for (let i = ailleurs.length - 1; i >= 0; i--) if (filmOk(ailleurs[i])) ailleurs.splice(i, 1);
   dit(!ailleurs.length, `aucune autre vidéo dans public/ (poids du dépôt)${ailleurs.length ? ' — ' + ailleurs.join(', ') : ''}`);
   // 3. Rien au démarrage.
-  const ecrivent = Object.entries(x.sources).filter(([f, s]) => f !== path.join('src', 'aideVideos.js') && /\/aide\/videos|\.mp4['"`]/.test(s)).map(([f]) => f);
+  // (16 nov.) Le lecteur du film de l'accueil public (src/accueil/AccueilVideo.jsx) : son seul fichier, jamais /aide/videos,
+  // jamais préchargé en entier (`preload="metadata"`), et monté par la seule page d'accueil (src/Accueil.jsx).
+  const LECTEUR_ACCUEIL = path.join('src', 'accueil', 'AccueilVideo.jsx');
+  const lecteurOk = (f, t) => f === LECTEUR_ACCUEIL && !/\/aide\/videos/.test(t) && (t.match(/\.mp4['"`]/g) || []).length === 1 && /src="\/accueil\/film-45s\.mp4"/.test(t) && /preload="metadata"/.test(t) && !/preload="auto"/.test(t);
+  const ecrivent = Object.entries(x.sources).filter(([f, s]) => f !== path.join('src', 'aideVideos.js') && /\/aide\/videos|\.mp4['"`]/.test(s) && !lecteurOk(f, s)).map(([f]) => f);
   dit(!ecrivent.length, `/aide/videos n'est écrit que dans src/aideVideos.js${ecrivent.length ? ' — aussi : ' + ecrivent.join(', ') : ''}`);
   const importent = Object.entries(x.sources).filter(([, s]) => /from ['"][./]*aideVideos\.js['"]/.test(s)).map(([f]) => f);
   dit(importent.length === 1 && importent[0] === path.join('src', 'composants', 'AideVideo.jsx'), `seul AideVideo.jsx importe la table (${importent.join(', ')})`);

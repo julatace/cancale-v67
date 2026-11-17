@@ -11,7 +11,7 @@ export default {
   "impr.format.planche4": "4 per pagina A4",
   "impr.formatAria": "Carta: {format}. Cambia",
   "impr.choisir": "Scegli",
-  "impr.choisirAutres": { one: "{n} altra · Scegli", other: "{n} altre · Scegli" },
+  "impr.choisirAutres": { one: "{n} pacco non incluso · Scegli", other: "{n} pacchi non inclusi · Scegli" },
   "impr.choisirTitre": "Scegli cosa parte",
   "impr.papier.titre": "La tua stampante",
   "impr.papier.phrase": "Salvato per le prossime volte.",

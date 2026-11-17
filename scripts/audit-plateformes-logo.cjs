@@ -40,25 +40,27 @@ const MUTS = {
   'sans-numero': ['src/publierAilleurs.js', "if (!ap.num) out.push({ code: 'numero'", "if (false) out.push({ code: 'numero'"],
   'ref-sans-numero': ['src/publierAilleurs.js', "export const refVrm = (num) => (str(num) ? 'VRM-' + str(num) : '');", "export const refVrm = (num) => 'VRM-' + str(num);"],
   'titre-avant-numero': ['src/publierAilleurs.js', "  if (exact.length) return exact;\n", ''],
-  'reception-passu-gardee': ['src/suggestionsAchat.js', "if (r == null || !Number.isFinite(Number(r))) { sansReception++; continue; }", "if (r == null || !Number.isFinite(Number(r))) { out.push({ a, d: Number.isFinite(d) ? d : -Infinity }); continue; }"],
+  // (16 nov., bancs-rouges-a) sept motifs avaient bougé (écrans découpés en src/ecrans/, compteur `libre`, montant Leboncoin
+  // par `montant()`, Vestiaire sans identifiant du 15 nov.) : chacun visé à sa place d'aujourd'hui, même défaut réintroduit.
+  'reception-passu-gardee': ['src/suggestionsAchat.js', "if (r == null || !Number.isFinite(Number(r))) { if (libre) sansReception++; continue; }", "if (r == null || !Number.isFinite(Number(r))) { out.push({ a, d: Number.isFinite(d) ? d : -Infinity }); continue; }"],
   'prix-ignore': ['src/suggestionsAchat.js', "if ((pMin != null && px < pMin) || (pMax != null && px > pMax)) continue;", ''],
   'taille-ignoree': ['src/suggestionsAchat.js', "if (tq && tailleDuTitre(String(a.title || '')) !== tq) continue;", ''],
   'rangee-a-la-main': ['src/App.jsx', "return <SelecteurSites id={tache}", "return <div className=\"vrm-rangee vrm-filtres vrm-filtre-site\" data-filtre-site={tache}/>; <SelecteurSites id={tache}"],
-  'compte-lbc-oublie': ['src/App.jsx', 'titre={titre} sous={sous} compte={compte} ton={ton} montant={lbcEuro(o.price)}', 'titre={titre} sous={sous} ton={ton} montant={lbcEuro(o.price)}'],
-  'compte-vc-oublie': ['src/App.jsx', "<LigneVenteCompacte compte={nomCompteVente('vestiaire', v, {}) || undefined} className=\"vrm-sale-row\"", '<LigneVenteCompacte className="vrm-sale-row"'],
+  'compte-lbc-oublie': ['src/App.jsx', 'titre={titre} sous={sous} compte={compte} ton={ton} montant={montant(o.price', 'titre={titre} sous={sous} ton={ton} montant={montant(o.price'],
+  'compte-vc-oublie': ['src/ecrans/Vestiaire.jsx', "<LigneVenteCompacte compte={nomCompteVente('vestiaire', v, {}) || undefined} className=\"vrm-sale-row\"", '<LigneVenteCompacte className="vrm-sale-row"'],
   // (intégration lot 1) UNE règle : `compteVenteLbc`/`compteVenteEbay` passent par l'identité de src/plateformes.js,
   // « non fourni » ('' de l'ancienne convention) n'écrit rien, le compte n'est jamais recopié dans `sous`.
   'vide-dit-non-releve': ['src/App.jsx', "const compteFourni = (compte) => compte !== undefined && compte !== '';", "const compteFourni = (compte) => compte !== undefined;"],
   'compte-voisin-lbc': ['src/App.jsx', "if (ann && ann.accountName && idAnn === id) return", "if (ann && ann.accountName) return"],
   'ebay-sans-identite': ['src/App.jsx', "  const ref = identiteCompteVente('ebay', o);\n  if (!ref) return null;", "  const ref = (o && o._compte) || (Array.isArray(comptes) && comptes[0] && comptes[0].ref);\n  if (!ref) return null;"],
-  'compte-dans-sous': ['src/App.jsx', "compte={compteVenteEbay(o, comptesEbay)} sous={o.creationDate", "compte={compteVenteEbay(o, comptesEbay)} sous={(o._pseudo ? o._pseudo + ' · ' : '') + o.creationDate"],
+  'compte-dans-sous': ['src/ecrans/Ebay.jsx', "compte={compteVenteEbay(o, comptesEbay)} sous={o.creationDate", "compte={compteVenteEbay(o, comptesEbay)} sous={(o._pseudo ? o._pseudo + ' · ' : '') + o.creationDate"],
   'ebay-publie-prepare': ['src/publierAilleurs.js', "const marquee = site === 'ebay' ? !!(publiesEbay && typeof publiesEbay.has === 'function' && publiesEbay.has(id))", "const marquee = site === 'ebay' ? false"],
   'hors-vinted-ignore': ['src/publierAilleurs.js', "if (site === 'leboncoin' && horsVinted === true) out.push(", "if (false) out.push("],
-  'hors-vinted-pas-passe': ['src/App.jsx', ", horsVinted: paire.chezMoi === true }", " }"],
+  'hors-vinted-pas-passe': ['src/App.jsx', ", horsVinted: paire.chezMoi === true,", ","],
   'reception-pas-lue-ici': ['src/App.jsx', "if (!besoinInfosRelier || !pickerFor", "if (true || !besoinInfosRelier || !pickerFor"],
-  'date-filtre-pendant-lecture': ['src/App.jsx', "recuDu: dateEnAttente ? '' : recuDu, recuAu: dateEnAttente ? '' : recuAu", "recuDu, recuAu"],
-  'lbc-demande-muette': ['src/App.jsx', "    else toast('Cet article n’est pas dans ta file « À publier » Leboncoin", "    else void ('Cet article n’est pas dans ta file « À publier » Leboncoin"],
-  'vc-id-tronque': ['src/plateformes.js', "return id === '-' ? '' : `n° ${id}`;", "return id === '-' ? '' : `n° ${id.slice(0, 8)}`;"],
+  'date-filtre-pendant-lecture': ['src/ecrans/Achats.jsx', "recuDu: dateEnAttente ? '' : recuDu, recuAu: dateEnAttente ? '' : recuAu", "recuDu, recuAu"],
+  'lbc-demande-muette': ['src/ecrans/Leboncoin.jsx', "    else toast('Cet article n’est pas dans ta file « À publier » Leboncoin", "    else void ('Cet article n’est pas dans ta file « À publier » Leboncoin"],
+  'vc-id-ecrit': ['src/plateformes.js', "if (site === 'vestiaire') return '';", "if (site === 'vestiaire') return `n° ${id}`;"],
   'vc-texte-brut': ['src/publierAilleurs.js', "const description = typeof r.descriptionLbc === 'function' ? str(r.descriptionLbc({ ref, texte: x.desc, marque: x.marque, taille: x.taille, etat: x.etat, couleur: x.couleur })) : str(x.desc);\n    return { ...base, titre, description, identite: ref ? { quoi: 'Référence'", "const description = str(x.desc);\n    return { ...base, titre, description, identite: ref ? { quoi: 'Référence'"],
   'ebay-titre-brut': ['src/publierAilleurs.js', "const titre = typeof r.titreEbay === 'function' ? str(r.titreEbay(x.title, x.taille)) : str(x.title);", "const titre = str(x.title);"],
   // (15 nov.) D10 sur la règle d'aujourd'hui : l'entrée « + » de la barre doit ouvrir Publier ailleurs SUR SON site.
@@ -79,6 +81,8 @@ let SRC = path.join(R, 'src');
 const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').split('=')[1];
 if (MUT) {
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'plat-'));
+  // (16 nov., bancs-rouges-a) La copie de src/ (≈ 25 Mo) restait dans /tmp à chaque mutation : 72 copies, 1,8 Go, disque plein.
+  process.on('exit', () => { try { fs.rmSync(d, { recursive: true, force: true }); } catch (_) {} });
   fs.cpSync(path.join(R, 'src'), path.join(d, 'src'), { recursive: true, filter: (s) => !/node_modules/.test(s) });
   const [fic, de, vers] = MUTS[MUT];
   const f = path.join(d, fic); const s = fs.readFileSync(f, 'utf8');

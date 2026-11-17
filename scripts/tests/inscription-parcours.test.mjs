@@ -1,13 +1,17 @@
 import test from 'node:test';import assert from 'node:assert/strict';import vm from 'node:vm';import fs from 'node:fs';
 import { createRequire as creerRequireSourceApp } from 'node:module';
-import * as lienEmail from '../../src/lienEmail.js'; // (11 nov., securite-revue) le lien est noté comme demandé ici
+import * as lienEmail from '../../src/lienEmail.js';
+// (16 nov., parcours-vert) Depuis le lot 54 (13 nov.) et le programme partenaire (15 nov.), l'inscription lit le code
+// de parrainage et le code partenaire GARDÉS : le banc exécute la vraie lecture (`codeParrainGarde`, ses règles importées).
+import { CLE_PARRAIN, CODE_PARRAIN_RE } from '../../src/abonnement/etatAbonnement.js';
+import { codePartenaireGarde } from '../../src/partenaires/lien.js'; // (11 nov., securite-revue) le lien est noté comme demandé ici
 creerRequireSourceApp(import.meta.url)('../_source-app.cjs').brancher(); // (8 nov.) App.jsx découpé : sa lecture texte rend aussi src/ecrans/*.jsx
 const source=fs.readFileSync(new URL('../../src/App.jsx',import.meta.url),'utf8');
-function banc(reponse,{captcha=false}={}){let session=null,appels=0,delai;
- const c=vm.createContext({...lienEmail,codeParrainGarde:()=>'',codePartenaireGarde:()=>'',/* (16 nov.) aucun code de parrainage ni de partenaire gardé, comme connexion-actions */localStorage:{getItem:()=>null,setItem:()=>{},removeItem:()=>{}},langueNavigateur:()=>'fr',SUPABASE_URL:'https://projet.supabase.co',SUPABASE_KEY:'publique',captchaActif:()=>captcha,routeProtegee:()=>true,jetonCaptcha:()=>false,etatCaptcha:()=>({statut:'attente'}),MSG_CAPTCHA_ATTENTE:'Vérification en cours',corpsAvecCaptcha:(_,b)=>b,consommerCaptcha:()=>{},AbortController,setTimeout:(f)=>{delai=f;return 1},clearTimeout:()=>{},fetch:async(...args)=>{appels++;return reponse(...args)},avecRetour:p=>p,MAIL_QUOTA:'Limite temporaire',writeSession:s=>{session=s},sessionFrom:j=>j});
+function banc(reponse,{captcha=false,stock={}}={}){let session=null,appels=0,delai,corps=null;
+ const c=vm.createContext({...lienEmail,CLE_PARRAIN,CODE_PARRAIN_RE,codePartenaireGarde,localStorage:{getItem:(k)=>stock[k]??null,setItem:()=>{},removeItem:()=>{}},langueNavigateur:()=>'fr',SUPABASE_URL:'https://projet.supabase.co',SUPABASE_KEY:'publique',captchaActif:()=>captcha,routeProtegee:()=>true,jetonCaptcha:()=>false,etatCaptcha:()=>({statut:'attente'}),MSG_CAPTCHA_ATTENTE:'Vérification en cours',corpsAvecCaptcha:(_,b)=>b,consommerCaptcha:()=>{},AbortController,setTimeout:(f)=>{delai=f;return 1},clearTimeout:()=>{},fetch:async(...args)=>{appels++;try{corps=JSON.parse(args[1]&&args[1].body||'null')}catch(_){corps=null}return reponse(...args)},avecRetour:p=>p,MAIL_QUOTA:'Limite temporaire',writeSession:s=>{session=s},sessionFrom:j=>j});
  const extrait=(a,b)=>source.slice(source.indexOf(a),source.indexOf(b,source.indexOf(a)));
- vm.runInContext(extrait('const delaiDemandeEmail =','// Les secondes qui restent')+extrait('const authCall = async','// ── OÙ RAMÈNENT')+extrait('const authSignUp  =','const authReset')+';globalThis.inscrire=authSignUp;',c);
- return{inscrire:()=>c.inscrire(' Client@exemple.test ','Secret123'),get appels(){return appels},get session(){return session},expirer:()=>delai()};}
+ vm.runInContext(extrait('const codeParrainGarde =','\n')+'\n'+extrait('const delaiDemandeEmail =','// Les secondes qui restent')+extrait('const authCall = async','// ── OÙ RAMÈNENT')+extrait('const authSignUp  =','const authReset')+';globalThis.inscrire=authSignUp;',c);
+ return{inscrire:()=>c.inscrire(' Client@exemple.test ','Secret123'),get appels(){return appels},get session(){return session},get corps(){return corps},expirer:()=>delai()};}
 const retour=(json,status=200)=>async()=>({ok:status<400,status,json:async()=>json});
 test('inscription : confirmation attendue et session directe sont distinguées',async()=>{const a=banc(retour({id:'nouveau'}));assert.equal((await a.inscrire()).needsConfirm,true);assert.equal(a.session,null);const b=banc(retour({access_token:'jeton',user:{id:'nouveau'}}));assert.equal((await b.inscrire()).ok,true);assert.equal(b.session.access_token,'jeton');});
 test('inscription : réponse incomplète et panne ne deviennent pas une fausse réussite',async()=>{for(const r of [retour({}),retour({message:'panne'},503),async()=>{throw Error('réseau')}]){const b=banc(r),v=await b.inscrire();assert.equal(v.ok,false);assert.equal(v.incertain,true);assert.equal(b.session,null);}});
@@ -17,3 +21,5 @@ test('inscription : une requête bloquée est interrompue et le résultat reste 
 test('inscription : le délai réel du serveur est traduit et conservé',async()=>{const b=banc(retour({msg:'For security purposes, you can only request this after 57 seconds'},429));const r=await b.inscrire();assert.equal(r.ok,false);assert.equal(r.attente,57);assert.match(r.error,/57 secondes/);assert.equal(b.session,null);});
 
 test('inscription : jeton sans utilisateur et identité mal formée ne créent pas de session',async()=>{for(const json of [{access_token:'jeton'},{access_token:'jeton',user:{}},{id:42},{id:' '},{access_token:42,user:{id:'nouveau'}}]){const b=banc(retour(json)),r=await b.inscrire();assert.equal(r.ok,false);assert.equal(r.incertain,true);assert.equal(b.session,null);}});
+
+test('inscription : le code de parrainage gardé suit le compte, un code mal formé jamais',async()=>{const b=banc(retour({id:'nouveau'}),{stock:{[CLE_PARRAIN]:'ABCDEFGH'}});await b.inscrire();assert.equal(b.corps.data.parrain,'ABCDEFGH');const c=banc(retour({id:'nouveau'}),{stock:{[CLE_PARRAIN]:'abc'}});await c.inscrire();assert.equal('parrain' in c.corps.data,false);assert.equal(c.corps.email,'client@exemple.test');});

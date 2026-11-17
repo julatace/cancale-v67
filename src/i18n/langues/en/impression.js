@@ -11,7 +11,7 @@ export default {
   "impr.format.planche4": "4 per A4 page",
   "impr.formatAria": "Paper: {format}. Change",
   "impr.choisir": "Choose",
-  "impr.choisirAutres": { one: "{n} other · Choose", other: "{n} others · Choose" },
+  "impr.choisirAutres": { one: "{n} parcel not included · Choose", other: "{n} parcels not included · Choose" },
   "impr.choisirTitre": "Choose what ships",
   "impr.papier.titre": "Your printer",
   "impr.papier.phrase": "Kept for next time.",

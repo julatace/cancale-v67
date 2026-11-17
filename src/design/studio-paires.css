@@ -403,7 +403,7 @@
 :root:root:root:root:root body [data-espace="paires"] .sb-avant-c.is-prix .sb-eur { font-size: .44em !important; font-weight: 500 !important; transform: translateY(-.92em) !important; margin-left: .04em !important; }
 /* Ce que la rangée ne montre pas (dans la carte ouverte ou la fiche : rien n'est retiré du DOM). */
 :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) :is([data-fiche-duo], [data-chiffres], .vrm-note-ajout, [data-note-paire], .vrm-fiche-plus-bouton, [data-fiche-plus], [data-fiche-infos]) { display: none !important; }
-:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-ann-ledger-info > :not([data-titre], .vrm-ann-price-line, [data-etat-ligne], .vrm-fiche-plus-bouton, .vrm-remise-carte.is-vignette) { display: none !important; }
+:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-ann-ledger-info > :not([data-titre], .vrm-ann-price-line, [data-etat-ligne], .vrm-fiche-plus-bouton, .vrm-remise-carte.is-vignette, .vrm-ann-lien) { display: none !important; }
 /* « Même paire que N°7 ? Oui » : la proposition reste SUR la rangée (son geste, jamais deviné : son clic), dessous. */
 :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]):has(.vrm-remise-carte.is-vignette) { height: auto !important; grid-template-rows: 20px 18px auto !important; padding-top: 10px !important; padding-bottom: 10px !important; content-visibility: visible !important; }
 :root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-remise-carte.is-vignette { grid-column: 3 / -1 !important; grid-row: 3 !important; margin: 6px 0 0 !important; }
@@ -825,3 +825,24 @@
 /* (15 nov., rouges-connus) design-passe C : le « N° » de la plaque passe de 9,5 à 11 px (aucun texte sous 11 px).
    (Les touches de 38–40 px du sélecteur Annonces · Stock · Achats et des sites ne grandissent PAS : leur cible au doigt
    couvre déjà tout le puits de 44–48 px — studio-finition.css §2, pseudo-élément ; design-passe mesure la boîte dessinée.) */
+
+@layer vrm-verre {
+/* (16 nov., relier-fiable) « Relier un achat » / « Achetée 24,63 € » sur chaque annonce : une puce d'une ligne, discrète.
+   Téléphone (liste) : une 3e ligne sous la rangée, à gauche, 44 px au doigt. Ordinateur (liste) : sous le nom de la paire.
+   Vignettes : dans le flux de la carte. */
+:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-lien { display: inline-flex !important; align-items: center !important; gap: 6px !important; align-self: flex-start !important;
+  min-height: 44px !important; padding: 0 12px !important; border-radius: 22px !important; font: 600 13px/1.2 Inter, system-ui, sans-serif !important; white-space: nowrap !important; }
+:root:root:root:root:root:root body [data-espace="paires"] button.vrm-ann-relier { border: 1px solid rgb(12 29 48 / .14) !important; background: rgb(255 255 255 / .55) !important; color: var(--sv-encre, #0c1d30) !important; cursor: pointer !important; }
+:root:root:root:root:root:root body [data-espace="paires"] .vrm-ann-achetee { padding: 0 !important; color: var(--sv-encre-2, #4a5868) !important; font-weight: 550 !important; }
+@media (max-width: 767px) {
+  :root:root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]):has(.vrm-ann-lien) { height: auto !important; grid-template-rows: 20px 19px auto !important; padding-top: 10px !important; padding-bottom: 8px !important; content-visibility: visible !important; }
+  :root:root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-ann-lien { grid-column: 2 / -1 !important; grid-row: 3 !important; margin: 6px 0 0 12px !important; justify-self: start !important; }
+  :root:root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]):has(.vrm-ann-lien) a.vrm-fiche-photo { grid-row: 1 / 3 !important; }
+  :root:root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]):has(.vrm-ann-lien):has(.vrm-remise-carte.is-vignette) { grid-template-rows: 20px 19px auto auto !important; }
+  :root:root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]):has(.vrm-remise-carte.is-vignette) .vrm-ann-lien { grid-row: 4 !important; }
+}
+@media (min-width: 768px) {
+  :root:root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]):has(.vrm-ann-lien) { height: auto !important; grid-template-rows: auto auto !important; padding-top: 8px !important; padding-bottom: 6px !important; content-visibility: visible !important; }
+  :root:root:root:root:root:root:root:root body [data-espace="paires"] [data-sb-vue="liste"] > .sb-rangee:not([data-sb-avant]) .vrm-ann-lien { grid-column: 3 !important; grid-row: 2 !important; justify-self: start !important; min-height: 36px !important; }
+}
+}

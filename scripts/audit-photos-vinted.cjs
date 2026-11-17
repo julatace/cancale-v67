@@ -225,30 +225,20 @@ if (MUTATION && !MUTER_MODULE[MUTATION] && !MUTER_APP[MUTATION]) { console.log('
       'Accueil :: "/logo-vrm-96.png"': 'logo de l’app (page d’accueil)',
       'Plateau :: "/logo-vrm-192.png"': 'logo de l’app (scène du film d’accueil, src/AccueilFilm.jsx)',
       'CarteJourEcran :: "/logo-vrm-96.png"': 'logo de l’app (carte « Ma journée » de l’accueil, src/accueil-carte.jsx)',
-      // (16 nov., lot impression-retours) Sources relevées une fois l'audit capable de lire chaque module (avant : il
-      // levait sur deux constantes homonymes et ne voyait plus rien). Chacune vérifiée dans son fichier :
-      'AuthScreen :: "/accueil/journee-clair.webp"': 'image fixe de l’app (écran de connexion, public/accueil/)',
-      'PhotoStockHl :: a': 'photo du Stock gardée hors ligne : adresse MÊME ORIGINE `/hl-photo?u=…` servie par le service worker (`adressePhotoHl`, src/stockHorsLigne.js), jamais l’adresse Vinted',
-      'EtapePhotos :: p.detoure || p.img': 'photos du studio prises sur l’appareil (data:/blob: de l’atelier d’arrivée, src/AtelierArrivee.jsx), jamais une photo Vinted',
-      'PhotosPaire :: p.detoure || p.img': 'photos du studio prises sur l’appareil (data:/blob:, src/AtelierPaire.jsx), jamais une photo Vinted',
-      'RangeeJ :: photo': 'repli seulement quand l’appelant ne donne pas `Photo` ; les trois appelants (App.jsx, Ma journée) passent `Photo={PhotoVinted}`',
-      'RechercheCouleur :: e.src': 'rendu seulement si `e.src` commence par `data:image/` (garde dans la même ligne) ; sinon `Photo(e.src)` (PhotoVinted)',
+      // (16 nov., parcours-vert) cinq <img> arrivés après la liste (14–15 nov.), lus un à un ; deux autres (FilsTous,
+      // RangeeJ) affichaient une photo d'annonce Vinted en <img> nu : passés par PhotoVinted, pas ajoutés ici.
+      'AuthScreen :: "/accueil/journee-clair.webp"': 'capture de l’app en MODE EXEMPLE (public/accueil/, scripts/accueil-captures.cjs) sur l’écran de connexion, fichier du site — jamais une photo Vinted',
+      'PhotoStockHl :: a': 'adressePhotoHl (src/stockHorsLigne.js) : /hl-photo?u=… de l’origine de l’app seulement, servi par le service worker (public/sw.js, fetch no-referrer, credentials omit) ; adresse hors liste ⇒ null, repli pictogramme',
+      'PhotosPaire :: p.detoure || p.img': 'photos du STUDIO de la paire (studio_photos_{N°}, src/studioPhoto.js) : la même source que StudioPhoto :: ph.img / ph.detoure — data:image fabriquée par le canvas, jamais une adresse Vinted',
+      'EtapePhotos :: p.detoure || p.img': 'photos du STUDIO sous CE N° (coque.lireStudio → studio_photos_{N°}) : la même source que StudioPhoto — data:image du canvas, jamais une adresse Vinted',
+      'RechercheCouleur :: e.src': '<img> rendu SEULEMENT si e.src est une data:image (test /^data:image\// juste avant) ; toute autre adresse passe par Photo (PhotoVinted)',
     };
     const fichiers = fs.readdirSync(path.join(R, 'src')).filter((f) => /\.jsx?$/.test(f));
     const trouves = [], inconnus = [];
     let nPhotoVinted = 0;
-    // (16 nov., lot impression-retours) App.jsx et ses écrans découpés (src/ecrans/*.jsx) se lisent CHACUN comme le
-    // module qu'il est : collés en un seul texte, deux constantes de module homonymes (`partageFichiersPossible`,
-    // `joursAvant`…) faisaient lever l'analyseur et rendaient l'audit rouge sans qu'aucune photo ne soit en cause.
-    const { fichiersApp } = require('./_source-app.cjs');
-    const unites = [];
     for (const f of fichiers) {
-      if (f !== 'App.jsx') { unites.push([f, fs.readFileSync(path.join(R, 'src', f), 'utf8')]); continue; }
-      for (const p of fichiersApp(R)) unites.push([path.relative(path.join(R, 'src'), p), fs.readFileSync(p).toString('utf8')]);   // en octets : jamais la lecture collée
-    }
-    for (const [f, src0] of unites) {
-      let src = src0;
-      if ((f === 'App.jsx' || f.startsWith('ecrans')) && MUTER_APP[MUTATION]) src = MUTER_APP[MUTATION](src);
+      let src = fs.readFileSync(path.join(R, 'src', f), 'utf8');
+      if (f === 'App.jsx' && MUTER_APP[MUTATION]) src = MUTER_APP[MUTATION](src);
       let ast;
       try { ast = parser.parse(src, { sourceType: 'module', plugins: ['jsx'] }); }
       catch (e) { nok(`src/${f} se lit`, e.message); continue; }

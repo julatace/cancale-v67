@@ -30,6 +30,23 @@ const cleDefaut = (n) => {
   return m ? m[1] + m[2] : s;
 };
 
+// (16 nov., lot retirer-case-compact — Julien : « dans le Stock, quand une paire est vendue ET expédiée, elle est
+// d'office supprimée du Stock ; il faut bien tout articuler ») LA RÈGLE UNIQUE de la sortie à l'expédition :
+//   · une vente annulée, un retour, une non réclamée (`annulee`, PAS_UNE_VENTE) ⇒ JAMAIS ;
+//   · le statut de la plateforme dit le colis parti (`statutParti` : `venteSortieDuStock`, lbc/eBay/Vestiaire) ⇒ OUI ;
+//   · sinon, une preuve de DÉPART du TRANSPORTEUR pour le n° de suivi EXACT du bordereau de CETTE transaction
+//     (`ventesPartiesParPreuve`, api/_lib/depart-vente.js : `email` de dépôt/en route/livré, ou `transporteur`, la prise
+//     en charge lue) ⇒ OUI, même si la liste Vinted dit encore « à expédier » ;
+//   · « Colis fait » coché, « expédié » à la main, « traité » au panneau ne suffisent PAS (décision du 27 oct. : un
+//     colis coché peut ne jamais être parti) — la case reste allumée, son toucher la sort ;
+//   · rien lu (raison absente, lecture ratée ⇒ `null`) ⇒ NON : une absence ne sort jamais une paire.
+export const PREUVES_DEPART_STOCK = Object.freeze(['email', 'transporteur']);
+export function partieDuStock({ statutParti = false, annulee = false, raison = null } = {}) {
+  if (annulee) return false;
+  if (statutParti === true) return true;
+  return !!(raison && typeof raison === 'object' && PREUVES_DEPART_STOCK.includes(raison.type));
+}
+
 // La case d'un meuble, en mots (rangée en partant du haut, colonne depuis la gauche).
 export function placeCase(i, meuble) {
   const cols = Math.max(1, Number(meuble && meuble.cols) || 1);

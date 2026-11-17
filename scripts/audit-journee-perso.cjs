@@ -114,7 +114,9 @@ async function controles(T, ok) {
   // (14 nov., Studio) Les alertes urgentes montent au-dessus de la grille (`alertesHaut`, rendu en tête) ; la liste
   // « À faire » = les cartes revenues car urgentes, puis les siennes (`resteAF`).
   ok(/^\s*\.\.\.alertesArgent\.map\(\(j, i\) => \(\{ el: tache\(j, i\), alerte: true \}\)\),\s*\.\.\.forcesAF, \.\.\.montresAF,\s*$/.test(liste)
-    || (/const alertesAF = alertesArgent\.map\(\(j, i\) => tache\(j, i\)\)/.test(app) && /const resteAF = \[\.\.\.forcesAF, \.\.\.montresAF\]/.test(app) && /\{AF\.alertes \|\| null\}/.test(app)),
+    // (16 nov.) Refonte du 15 nov. (récit 2026-11-15-refonte-journee.md §5) : les retours et litiges ont leur bloc à eux, « Tout
+    // va bien ? » sa feuille (`HORS_JOURNEE_JOBS`) — hors de la règle aussi, jamais cachés ; le reste des alertes en premier.
+    || (/const alertesAF = alertesArgent(?:\.filter\(\(j\) => !HORS_JOURNEE_JOBS\.has\(j\.id\)\))?\.map\(\(j, i\) => tache\(j, i\)\)/.test(app) && /const resteAF = \[\.\.\.forcesAF, \.\.\.montresAF\]/.test(app) && /\{AF\.alertes \|\| null\}/.test(app)),
     'S3 les alertes urgentes en premier, puis les cartes revenues car urgentes, puis les siennes');
   ok(!/visJ\([^)]*alerte/.test(app) && /let alertesArgent = jobs\.filter\(j => j\.urgent\);/.test(app), 'S3 les alertes ne passent pas par la règle (jamais cachées)');
   ok(/for \(const id of ordreJournee(?:Heure)?\('afaire', persoJ\)\) \{\s*const v = visJ\(id\); if \(!v\.montree\) continue;\s*for \(const el of \(blocsAF\[id\] \|\| \[\]\)\) \(v\.force \? forcesAF : montresAF\)\.push/.test(app), 'S4 « À faire » suit SON ordre, une carte cachée ne s’affiche pas (sauf urgente)');
@@ -124,7 +126,8 @@ async function controles(T, ok) {
   const catAF = P ? P.CARTES_JOURNEE.filter((c) => c.zone === 'afaire' && !c.fixe).map((c) => c.id) : [];
   // Une carte FIXE de « À faire » (« À trancher », toujours en tête) n'est pas rangée : elle passe par la règle là où elle est rendue.
   const fixesAF = P ? P.CARTES_JOURNEE.filter((c) => c.zone === 'afaire' && c.fixe).map((c) => c.id) : [];
-  ok(fixesAF.every((id) => new RegExp(`visJ\\('${id}'\\)\\.montree \\? carte`).test(app) || new RegExp(`const ${id}Vu = !!\\(job\\w+ && visJ\\('${id}'\\)\\.montree\\);`).test(app)), 'S4 une carte fixe de « À faire » passe aussi par la règle (cachable)', fixesAF.join(','));
+  // (16 nov.) « À trancher » vit dans la feuille « Tout va bien ? » (15 nov.) : `visJ('trancher').montree ? [carteTrancher(…)]`.
+  ok(fixesAF.every((id) => new RegExp(`visJ\\('${id}'\\)\\.montree \\? \\[?carte`).test(app) || new RegExp(`const ${id}Vu = !!\\(job\\w+ && visJ\\('${id}'\\)\\.montree\\);`).test(app)), 'S4 une carte fixe de « À faire » passe aussi par la règle (cachable)', fixesAF.join(','));
   ok(catAF.length && catAF.every((id) => clesBlocs.includes(id)) && clesBlocs.every((id) => catAF.includes(id)), 'S4 chaque carte « À faire » du catalogue a son bloc, et chaque bloc est au catalogue', `blocs: ${clesBlocs.join(',')} · catalogue: ${catAF.join(',')}`);
   const nPar = (app.split('const nParCarteAF = {')[1] || '').split('};')[0];
   const clesN = [...nPar.matchAll(/(?:'([\w-]+)'|(\w+)):/g)].map((m) => m[1] || m[2]);
@@ -133,7 +136,9 @@ async function controles(T, ok) {
   // (14 nov., Studio) La tête rend la phrase et l'affiche dans SON ordre ; les chiffres du mois sont une tuile : cachés, ils
   // restent rendus dans un bloc caché (`data-jp-cachee="chiffres"`), comme l'affiche (`data-jp-cachee="frise"`).
   ok((/ordreJournee(?:Heure)?\('tete', persoJ\)\.map\(\(id\) => \{/.test(app) && /return id === 'phrase' \? null : <div key=\{id\} hidden data-jp-cachee=\{id\}>\{blocsTete\[id\]\}<\/div>;/.test(app))
-    || (/ordreJourneeHeure\('tete', persoJ\)\.filter\(\(id\) => id === 'phrase' \|\| id === 'frise'\)\.map\(/.test(app) && /<div key=\{id\} hidden data-jp-cachee="frise">\{blocsTete\.frise\}<\/div>/.test(app)
+    // (16 nov.) Depuis le 15 nov. l'affiche vit dans la 1re colonne à l'ordinateur (`ordiJournee`), cachée elle reste rendue (même règle).
+    || (/ordreJourneeHeure\('tete', persoJ\)\.filter\(\(id\) => id === 'phrase' \|\| (?:id === 'frise'|\(id === 'frise' && !\(ordiJournee && !baseKO && !premierJour\)\))\)\.map\(/.test(app) && /<div key=\{id\} hidden data-jp-cachee="frise">\{blocsTete\.frise\}<\/div>/.test(app)
+      && (!/ordiJournee && !baseKO && !premierJour/.test(app) || /visibiliteCarte\('frise', \{ reglage: persoJ, mode: PROFIL_VENDEUR\.mode \}\)\.montree \? <div className="sj-affiche" data-sj-affiche="">\{friseJ\}<\/div> : <div hidden data-jp-cachee="frise">\{friseJ\}<\/div>/.test(app))
       && /if \(visT\('chiffres'\)\.montree\) out\.mois = /.test(app) && /\{!out\.mois \? <div hidden data-jp-cachee="chiffres">\{chiffresMois\}<\/div> : null\}/.test(app)), 'S5 la tête suit SON ordre ; frise et chiffres cachés restent rendus, cachés');
   ok(/const premierAF = !visibiliteCarte\('prochain', \{ reglage: persoJ, mode: PROFIL_VENDEUR\.mode \}\)\.montree \? null :/.test(app)
     || /const iP = !visibiliteCarte\('prochain', \{ reglage: persoJ, mode: PROFIL_VENDEUR\.mode \}\)\.montree \? -1 :/.test(app), 'S5 « La prochaine chose » cachée : rien ne monte en tête');

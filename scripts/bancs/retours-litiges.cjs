@@ -202,7 +202,9 @@ const deborde = (pg) => pg.evaluate(() => document.documentElement.scrollWidth -
         });
         dit(p && p.etape === 'recevoir' && p.preuve === 'transaction', `${nom} : la feuille dit l’étape (le colis revient) et la PREUVE (la transaction Vinted)`, JSON.stringify(p && [p.etape, p.preuve]));
         dit(p && p.delais.join('|') === 'repondre:non-ecrite|verifier:regle-vinted' && /2 jours après réception/.test(p.txt), `${nom} : chaque délai porte SA source (date non écrite ; 2 jours = règle écrite par Vinted)`, JSON.stringify(p && p.delais));
-        dit(p && p.revenue === '21' && p.revH >= 44, `${nom} : « Paire revenue · N°21 » (SON N°), 44 px et plus`, JSON.stringify(p && [p.revenue, p.revH]));
+        // (16 nov.) §7 : 44 px AU DOIGT. Sur ordinateur (souris) le plein du Studio est plus bas (36 px mesurés) : une
+        // vraie touche (≥ 32 px) y suffit — comme « Imprimer le bordereau » plus haut (44 au doigt, moins à la souris).
+        dit(p && p.revenue === '21' && p.revH >= (vp.width < 600 ? 44 : 32), `${nom} : « Paire revenue · N°21 » (SON N°), 44 px et plus au doigt`, JSON.stringify(p && [p.revenue, p.revH]));
         dit(p && /vinted\.fr\/inbox\/24618679401$/.test(p.contester), `${nom} : « Pas la bonne paire / abîmée » ouvre SA conversation`, p && p.contester);
         dit((await rougeIci(pg, '[data-pap="v:9401"]')) === false, `${nom} : aucun rouge dans la feuille`);
         await pg.screenshot({ path: path.join(SHOTS, `retours-pas-a-pas-${vp.width}-${sombre ? 'sombre' : 'clair'}.png`), fullPage: false }).catch(() => {});
