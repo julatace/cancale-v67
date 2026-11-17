@@ -279,3 +279,11 @@ html[data-design="v2"] body .vrm-app-header.v2-entete-cloche :is(button, a, [rol
    gris du nouveau design ≥ 4,5:1), trois graisses seulement. */
 .sr-ecran .vrm-sx-etape > b { font-size: 13px !important; font-weight: 600 !important; color: var(--v2-muet, #4A5B6D) !important; }
 .sr-ecran .vrm-sx-etape > span { font-size: 15px; font-weight: 400; }
+
+/* Téléphone : collée, la recherche passe SOUS la cloche (qui reste en haut à droite) ; le titre de la coque ne se
+   redessine pas par-dessus (le grand titre de l'écran le dit déjà). */
+@media (max-width: 1023px) { .sr-cherche-ligne { top: 58px; } }
+html[data-design="v2"] body .vrm-app-header.v2-entete-cloche .vrm-hdr-titre { display: none !important; }
+/* Grand texte (« Très grand », 375 px) : le titre ne se casse jamais en lettres ; le geste plein se resserre. */
+.sr-titre { white-space: nowrap; flex: 0 0 auto; }
+.sr-titre-ligne { flex-wrap: wrap; row-gap: 8px; }

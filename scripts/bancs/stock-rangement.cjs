@@ -193,9 +193,11 @@ async function parcours(b, port, { tel, sombre, v2, nom, petit = false }) {
       if (tel) await el.tap(); else await el.click();
       await r.pg.evaluate(() => new Promise((ok) => setTimeout(() => { const b = document.querySelector('[data-sr-ranger-ici]'); if (b) b.click(); ok(); }, 60)));
       await r.pg.waitForTimeout(120);
+      const courant2 = await r.pg.evaluate(() => { const e = document.querySelector('[data-sr-courant]'); return e && e.getAttribute('data-sr-courant'); });
+      await r.attendreSlots(['201']); await r.pg.waitForTimeout(800);   // `vrm_slots` part 500 ms après : 202 ne doit pas y être
       const apres = await r.pg.evaluate(() => ({ courant: document.querySelector('[data-sr-courant]') && document.querySelector('[data-sr-courant]').getAttribute('data-sr-courant'), rep: window.__reponses.slice(), cls: window.__cls, slots: JSON.parse(localStorage.getItem('vrm_slots') || 'null') }));
       dit(apres.rep.length && Math.max(...apres.rep) < 100, `${t} : Q — la coche « fait » arrive < 100 ms après le toucher`, apres.rep.join(',') + ' ms');
-      dit(apres.courant === '202' && apres.slots['201'] && apres.slots['201'].m === 'mA' && apres.slots['201'].i === 6 && !apres.slots['202'], `${t} : Q — un 2e toucher pendant le mouvement : la suivante arrive, rien n'est reposé`, JSON.stringify({ c: apres.courant, s201: apres.slots['201'], s202: apres.slots['202'] }));
+      dit(courant2 === '202' && apres.courant === '202' && apres.slots['201'] && apres.slots['201'].m === 'mA' && apres.slots['201'].i === 6 && !apres.slots['202'], `${t} : Q — un 2e toucher pendant le mouvement : la suivante arrive, rien n'est reposé`, JSON.stringify({ c: apres.courant, s201: apres.slots['201'], s202: apres.slots['202'] }));
       dit(apres.cls < 0.05, `${t} : Q — aucun saut de mise en page (CLS hors geste)`, apres.cls.toFixed(4));
       await r.ctx.close(); }
     { const r = await rendre(b, port, { tel, sombre, v2, petit, reduit: true });
