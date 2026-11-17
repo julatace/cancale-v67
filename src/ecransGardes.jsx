@@ -50,7 +50,12 @@ export const AGE_MAX_CACHE_MS = 10 * 60 * 1000;
 // d'UN écran (repliée / dépliée), réécrites à chaque montage de Comptabilite.
 // (11 nov., reprise-ecrans) + `vrm_reprise_ecrans` : l'écran ouvert et les filtres retenus,
 // réécrits à CHAQUE changement d'écran — sans elle, aucun écran ne resterait jamais gardé.
-export const CLES_NEUTRES = ['vinted_analyse_open', 'vinted_tips_open', 'vinted_off_open', 'vrm_reprise_ecrans'];
+// (17 nov., onglets rapides — Julien : « beaucoup trop long entre les onglets, c'est catastrophique ») + `vrm_a_trancher` :
+// les publications « À trancher » (src/aTrancher.js) que CHAQUE écran réécrit en passant (Ma journée et la coque publient
+// la même source) faisaient remonter Achats et Ventes à CHAQUE retour — mesuré (banc onglets-rapides, 390 ×4) : 7 à 11 s
+// de calcul au lieu de l'écran gardé. Son seul lecteur (`useATrancher`) l'écoute en direct (`vrm:save`) : un écran gardé
+// qui le montre se met à jour à son retour, rien n'y est périmé.
+export const CLES_NEUTRES = ['vinted_analyse_open', 'vinted_tips_open', 'vinted_off_open', 'vrm_reprise_ecrans', 'vrm_a_trancher'];
 // Signaux de données (même sans sauvegarde) : l'écran caché ne les a pas suivis.
 const SIGNAUX = ['vrm:transp-maj', 'vrm:ebay-maj', 'vrm:suivis-relire', 'vrm:suivis-manuels', 'vrm:nuage-relu', 'vrm-prefixe', 'vrm-numero-ecrit'];
 

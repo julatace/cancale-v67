@@ -619,7 +619,7 @@
   .fl-puce[aria-pressed="true"] { background: var(--vu-teinte); color: var(--vu-teinte-encre); box-shadow: inset 0 0 0 1.5px currentColor; }
   .fl-filtres select:focus-visible, .fl-puce:focus-visible, .fl-case input:focus-visible { outline: none; box-shadow: var(--vu-anneau); }
   .fl-liste { list-style: none; margin: 0 0 8px; padding: 0 2px; border-radius: 16px; background: var(--vu-plaque-2); overflow-y: auto; overscroll-behavior: contain;
-    max-height: min(420px, calc(100vh - 560px)); min-height: 160px; }
+    max-height: min(420px, calc(100vh - 620px)); min-height: 150px; }
   .fl-liste > li + li { border-top: 1px solid var(--vu-filet); }
   .fl-l { display: grid; grid-template-columns: 44px 56px minmax(0, 1fr) auto; align-items: center; gap: 0 10px; min-height: 76px; padding: 8px 10px 8px 2px; cursor: pointer;
     content-visibility: auto; contain-intrinsic-size: auto 76px; -webkit-tap-highlight-color: transparent; }
