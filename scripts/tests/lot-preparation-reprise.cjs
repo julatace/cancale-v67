@@ -14,7 +14,9 @@ assert(a>0&&b>a,'le bloc du lot (batchBordereaux … imprimerLotRef.current = im
 const bloc=src.slice(a,b);
 assert(/imprimerLotRef\.current = imprimerLot;/.test(bloc)&&/const attendrePuisOuvrir =/.test(bloc),'le bloc ne porte plus imprimerLot / attendrePuisOuvrir');
 // useState nommé par son setter : le banc lit chaque état posé.
-const code=bloc.replace(/const \[(\w*), (set\w+)\] = useState\(/g,(_,v,s)=>`const [${v||'_'+s}, ${s}] = __etat('${s}', `)+'\nglobalThis.executer = batchBordereaux;\n';
+// (16 nov., train : ecrans-restes) le bloc lit `numerosDeLigne`, déclaré juste avant lui dans App.jsx : la MÊME ligne, recopiée de la source.
+const numerosDeLigneSrc=(src.match(/  const numerosDeLigne = .*\n/)||[''])[0];
+const code=numerosDeLigneSrc+bloc.replace(/const \[(\w*), (set\w+)\] = useState\(/g,(_,v,s)=>`const [${v||'_'+s}, ${s}] = __etat('${s}', `)+'\nglobalThis.executer = batchBordereaux;\n';
 let regles=null;
 // Les objets nés dans le contexte vm n'ont pas le même prototype : on compare leur forme JSON.
 const eg=(x,y,m)=>assert.equal(JSON.stringify(x),JSON.stringify(y),m);
