@@ -79,8 +79,10 @@ html[data-maquette="g"] body::before { content: ''; position: fixed; inset: 0; z
 .g-point { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--sb-ambre-point, #E89B00); }
 .g-droite { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .g-prix { font: 400 17px/1 var(--sb-police-affiche); color: var(--sv-encre); white-space: nowrap; }
-.g-geste { min-height: 36px !important; padding: 0 12px !important; font-size: 13.5px !important; }
-@media (pointer: coarse) { .g-tel .g-geste { min-height: 44px !important; } }
+.g-mot-geste { display: inline-flex; align-items: center; gap: 2px; font-size: 13px; font-weight: 600; color: var(--sv-encre-2); white-space: nowrap; }
+.g-carte.is-ambre .g-mot-geste { color: var(--sv-ambre); }
+.g-carte { cursor: pointer; }
+.g-carte:active { background: rgb(12 29 48 / .05); }
 
 /* ── LE POUCE : tous les gestes de l'écran en bas, à portée du pouce ── */
 .g-pouce { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 6; display: flex; align-items: center; gap: 10px;
@@ -112,16 +114,18 @@ html[data-maquette="g"] body::before { content: ''; position: fixed; inset: 0; z
 .g-ord-plein { width: 100%; min-width: 0 !important; height: 40px !important; padding: 0 10px !important; border-radius: 13px !important; font-size: 13.5px !important; }
 .g-ord-attente { font-size: 12px; color: var(--sv-encre-2); line-height: 1.3; }
 .g-ord-liste { flex: 1; min-height: 0; overflow-y: auto; padding: 0 8px 10px; display: flex; flex-direction: column; gap: 6px; scrollbar-width: thin; }
-.g-ord .g-carte { flex-wrap: wrap; align-items: flex-start; gap: 8px; min-height: 0; padding: 9px; border-radius: 12px; background: var(--sv-porcelaine); box-shadow: 0 1px 2px rgb(8 26 50 / .12); contain-intrinsic-size: auto 96px; }
+.g-ord .g-carte { flex: none; content-visibility: visible; flex-wrap: wrap; align-items: flex-start; gap: 8px; min-height: 0; padding: 9px; border-radius: 12px; background: var(--sv-porcelaine); box-shadow: 0 1px 2px rgb(8 26 50 / .12); contain-intrinsic-size: auto 96px; }
 .g-ord .g-carte + .g-carte::before { display: none; }
 .g-ord .g-carte:hover { box-shadow: 0 1px 2px rgb(8 26 50 / .12), 0 0 0 1.5px color-mix(in oklab, var(--sb-diode) 45%, transparent); }
 .g-ord .g-vignette { width: 36px; height: 36px; border-radius: 9px; }
 .g-ord .g-corps { flex: 1 1 calc(100% - 44px); }
+.g-ord .g-sous { align-items: flex-start; }
+.g-ord .g-point { margin-top: 4px; }
 .g-ord .g-titre { font-size: 13px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .g-ord .g-sous { font-size: 11.5px; }
 .g-ord .g-droite { flex: 1 1 100%; flex-direction: row; justify-content: space-between; align-items: center; padding-left: 44px; }
 .g-ord .g-prix { font-size: 15px; }
-.g-ord .g-geste { min-height: 28px !important; padding: 0 10px !important; font-size: 12.5px !important; }
+.g-ord .g-mot-geste { font-size: 12px; }
 .g-ord .g-vide { padding: 8px 4px; font-size: 12.5px; }
 .g-encore { align-self: center; min-height: 36px; font-size: 13px; }
 

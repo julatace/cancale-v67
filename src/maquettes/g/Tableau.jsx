@@ -63,11 +63,13 @@ const ICO = {
   scan: 'M4 4h5v1.5H5.5V9H4zm11 0h5v5h-1.5V5.5H15zM4 15h1.5v3.5H9V20H4zm14.5 0H20v5h-5v-1.5h3.5zM7 11.25h10v1.5H7z',
 };
 const Ico = ({ n, t = 22 }) => <svg width={t} height={t} viewBox="0 0 24 24" aria-hidden="true"><path d={ICO[n]} fill="currentColor" /></svg>;
-const Plaque = ({ c }) => (c.numero ? <span className={'sb-plaque g-plaque' + (c.doublon ? ' is-double' : '')} data-numero={c.numero}>N°&thinsp;{c.numero}</span> : <span className="g-plaque-vide">{c.achat ? 'achat' : 'sans N°'}</span>);
+const Plaque = ({ c }) => (c.groupe ? null : c.numero ? <span className={'sb-plaque g-plaque' + (c.doublon ? ' is-double' : '')} data-numero={c.numero}>N°&thinsp;{c.numero}</span> : <span className="g-plaque-vide">{c.achat ? 'achat' : 'sans N°'}</span>);
 
 function Carte({ c, compact }) {
   return (
-    <div className={'g-carte' + (c.ambre ? ' is-ambre' : '') + (c.doublon ? ' is-double' : '')} data-g-carte={c.cle} role="listitem" tabIndex={0}>
+    // La carte ENTIÈRE se touche (jamais un bouton dedans) : elle ouvre la paire, dont le geste vient en bas, au pouce.
+    <div className={'g-carte' + (c.ambre ? ' is-ambre' : '') + (c.doublon ? ' is-double' : '')} data-g-carte={c.cle} data-g-geste={c.geste ? c.geste.mot : undefined} role="listitem" tabIndex={0}
+      aria-label={[c.numero ? 'N° ' + c.numero : '', c.titre, c.sous, c.geste ? 'geste : ' + c.geste.mot : ''].filter(Boolean).join(', ')}>
       <span className="g-vignette">{c.photo ? <img src={c.photo} alt="" loading="lazy" decoding="async" width="52" height="52" /> : <span className="g-vignette-vide" />}</span>
       <span className="g-corps">
         <span className="g-ligne1"><Plaque c={c} />{c.compte && !compact ? <span className="g-compte">{c.compte}</span> : null}</span>
@@ -76,7 +78,8 @@ function Carte({ c, compact }) {
       </span>
       <span className="g-droite">
         <span className="g-prix">{c.groupe ? '' : euros(c.prix)}</span>
-        {c.geste ? <button type="button" className="sb-touche g-geste" data-g-geste={c.geste.mot}>{c.geste.mot}</button> : null}
+        {c.geste && !compact ? <span className="g-mot-geste" aria-hidden="true">{c.geste.mot}<svg width="12" height="12" viewBox="0 0 24 24"><path d="M9.3 5.3 8.2 6.4 13.8 12l-5.6 5.6 1.1 1.1L16 12z" fill="currentColor" /></svg></span> : null}
+        {c.geste && compact ? <span className="g-mot-geste" aria-hidden="true">{c.geste.mot}</span> : null}
       </span>
     </div>
   );
@@ -98,7 +101,7 @@ function Telephone({ modele }) {
   const col = modele.colonnes[Math.max(0, idx)];
   const rail = React.useRef(null);
   React.useEffect(() => { const f = () => setCle(lireCol()); window.addEventListener('hashchange', f); return () => window.removeEventListener('hashchange', f); }, []);
-  React.useLayoutEffect(() => { const b = rail.current && rail.current.querySelector('[aria-current="page"]'); if (b) rail.current.scrollLeft = Math.max(0, b.offsetLeft - 16 - (rail.current.clientWidth - b.offsetWidth) / 2); }, [cle]);
+  React.useLayoutEffect(() => { const b = rail.current && rail.current.querySelector('[aria-current="page"]'); const prec = b && b.previousElementSibling; if (b) rail.current.scrollLeft = Math.max(0, (prec || b).offsetLeft - 16); }, [cle]);
   const aller = (k) => { window.location.hash = 'col=' + k; };
   // On GLISSE d'une étape à la voisine (le doigt), comme on tourne une page.
   const depart = React.useRef(null);
@@ -134,7 +137,7 @@ function Telephone({ modele }) {
         <div className="g-liste" role="list">
           {col.cartes.length ? col.cartes.map((c) => <Carte key={c.cle} c={c} />) : <p className="g-vide">Aucune paire à cette étape.</p>}
         </div>
-        <p className="g-pied">Une paire change d’étape quand Vinted le dit — jamais à la main.</p>
+        <p className="g-pied">L’étape vient de Vinted, jamais d’un glisser.</p>
       </main>
       <div className="g-pouce" role="toolbar" aria-label="Gestes">
         <button type="button" className="sb-rond g-pouce-rond" aria-label="Chercher un N°, un pseudo, un suivi"><Ico n="loupe" /></button>
