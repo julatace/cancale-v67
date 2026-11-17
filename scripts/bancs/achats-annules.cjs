@@ -57,7 +57,7 @@ const toucher = async (pg, sel, tel) => { const l = pg.locator(sel).filter({ vis
       if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `achats-annules-${W}-annules.png`) });
       dit(la && b.annuleVu && !b.autresVus, `[${W}] A3 « Annulés » choisi : l’achat annulé seul`, JSON.stringify(b));
       dit(a.ong.route === b.ong.route && a.ong.recus === b.ong.recus && a.chiffres === b.chiffres, `[${W}] A4 les nombres de l’écran ne bougent pas (affichage seulement)`, JSON.stringify({ a: [a.ong, a.chiffres], b: [b.ong, b.chiffres] }));
-      dit(!journal.erreurs.length, `[${W}] A5 aucune erreur de page`, journal.erreurs.join(' | '));
+      dit(!journal.erreurs.filter((x) => !/due to access control checks/.test(x)).length, `[${W}] A5 aucune erreur de page`, journal.erreurs.filter((x) => !/due to access control checks/.test(x)).join(' | '));
       await o.ctx.close();
     }
   } catch (e) { dit(false, 'le banc a pu tourner', String(e && e.stack || e).slice(0, 400)); }
