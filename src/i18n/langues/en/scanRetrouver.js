@@ -11,6 +11,7 @@ export default {
   "scan.r.sansCamera": "No camera here: type the tracking number.",
   "scan.r.indice": "This code isn’t a tracking number: aim at the other barcode.",
   "scan.r.lampe": "Torch",
+  "scan.r.zoom": "Zoom: aim from further away",
   "scan.r.taper": "Type the number",
   "scan.r.saisie": "Tracking number",
   "scan.r.ok": "OK",
