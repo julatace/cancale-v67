@@ -25,9 +25,12 @@ De haut en bas, au téléphone :
 6. **Les groupes par échéance, chacun dit UNE fois avec son nombre** : Avant demain soir (ambre ; `avantDemainColis`,
    la règle de l'ambre d'hier) · Cette semaine (limite LUE ≤ 7 j) · Plus tard · Date estimée (limite estimée : jamais « en
    retard », §5) · Sans date limite · Imprimés, à déposer (`bordsPrinted`).
-7. **Les rangées A** (la rangée d'Annonces, `LigneAnnonce`, sans fourche) : photo, titre, « N° (étiquette kraft) · T. 42 ·
-   acheteur », prix à droite. Rien de redit : ni le compte, ni « Choisir la vente », ni la date (le groupe la dit). « en
-   retard » (limite LUE dépassée) et « sans bordereau » se disent sur la rangée seulement quand c'est vrai.
+7. **Les rangées A** (la rangée d'Annonces, `LigneAnnonce`, sans fourche ; Julien : « il doit y avoir plusieurs infos ») :
+   ligne 1 le titre (2 lignes au plus, la taille SORTIE du titre — `tailleEnFin`, plus de « taille / 40 » orphelin) + le prix ;
+   ligne 2 l'étiquette N° · T40 · le logo de la plateforme quand plusieurs sont montrées ; ligne 3, petite et grise, chaque
+   fait avec son icône et seulement s'il est LU : l'acheteur · « vendue il y a 2 j » · l'état du bordereau (prêt / pas encore
+   reçu / imprimé) · l'échéance (`echeanceCourteColis`, ambre à 2 jours ou moins d'une limite LUE ; une limite ESTIMÉE dit
+   « vers le 20 nov. », jamais « en retard »). Rien de redit : ni le compte, ni « Choisir la vente ».
    - **Glisser à gauche : Imprimer · Plus.** « Imprimer » touche LE bouton de la carte d'hier (montée, cachée : le même
      PDF tamponné, la même facture Pro) ; sans bordereau et N° en désaccord e-mail/vente : « Choisir la vente » · Plus.
    - **Toucher : la fiche de la paire** (les mêmes `data-fl-*` que la carte d'hier ; ses gestes y sont, `DansFiche`).
@@ -39,7 +42,8 @@ De haut en bas, au téléphone :
 9. **En route** : les mêmes envoyés (`listeEnvoyes`), en rangées A, groupés par état : Retours · Déposés, pas encore vus
    partir · Au relais de l'acheteur · En route · Livrés. Les cartes d'hier restent montées, cachées (« Pas encore posté »
    reste dans leur fiche).
-10. **Toutes** : la tête reste ; la liste des ventes d'hier dessous (pas encore en rangées A — à faire).
+10. **Toutes** : la tête reste ; la liste des ventes d'hier dessous (pas encore en rangées A — à faire). La bande des chiffres
+    d'hier (« 1 911 € vendu · 33 · 30 ») n'est plus à l'écran : montée, cachée (Argent porte les chiffres de synthèse).
 
 « Colis » (l'ancien écran) n'existe plus comme onglet (lot DJ3 : `?tab=colis` ouvre Ventes) : son squelette « prêts · en
 attente · partis » est celui-ci — prêts / sans bordereau dans « À envoyer » (l'écart nommé, « sans bordereau » sur la
