@@ -71,7 +71,11 @@ async function controler(racine) {
   const items = [o('1', '40.00'), o('2', '29.73'), o('3', '15.48'), o('4', '50.48'), o('5', '12.00')];
   const pr = V.appliquerPrixPro(items, { pro: true, txns, releve });
   ok('P1 prix égaux ⇒ compté', pr[0]._prixPro.compter === true && pr[0].price.amount === '40.00');
-  ok('P2 deux prix, pas de relevé ⇒ mis à part et nommé', pr[1]._prixPro.compter === false && /deux prix/.test(pr[1]._prixPro.raison) && /29,73/.test(pr[1]._prixPro.raison));
+  // (16 nov., lot argent-mieux) La raison est UNE phrase pour toutes ces ventes (sinon chaque vente fait son groupe :
+  // le « mur ») ; les deux prix lus sont portés À CÔTÉ, en centimes.
+  ok('P2 deux prix, pas de relevé ⇒ mis à part, nommé, les deux prix gardés', pr[1]._prixPro.compter === false && /deux prix/.test(pr[1]._prixPro.raison) && pr[1]._prixPro.listeC === 2973 && pr[1]._prixPro.artC === 2900);
+  { const a = V.appliquerPrixPro([o('6', '29.73')], { pro: true, txns: new Map([['6', { tx: '6', side: 'seller', prix: '28.0', devise: 'EUR' }]]), releve: null });
+    ok('P8 la raison des « deux prix » ne dépend pas des montants (une seule par cas : les ventes se groupent)', a[0]._prixPro.raison === pr[1]._prixPro.raison && !/\d/.test(pr[1]._prixPro.raison)); }
   ok('P3 relevé = article ⇒ prix de l\'article, liste gardée', pr[2]._prixPro.compter === true && pr[2].price.amount === '15.00' && pr[2]._prixListe.amount === '15.48');
   ok('P4 relevé = liste ⇒ compté tel quel', pr[3]._prixPro.compter === true && pr[3].price.amount === '50.48');
   ok('P5 transaction pas lue ⇒ mis à part', pr[4]._prixPro.compter === false && /pas lu/.test(pr[4]._prixPro.raison));
