@@ -110,6 +110,10 @@ Captures (hors dépôt, données inventées) : `A-*.png` (piste A) et `sm-*.png`
 
 ## ÉTAT À LA REPRISE
 
-Fini, à intégrer (PR de `claude/stock-mieux`). Contient #1197 (`claude/retirer-case-compact`) fusionnée : intégrer
-#1197 d'abord est le plus propre, mais cette PR la porte entière. Possible plus tard : dire « glisse → » en mots au-dessus
-d'un meuble qui défile (aujourd'hui le fondu et la colonne coupée le montrent).
+17 nov. (reprise après pause) : `main` refusionnée (#1197 et #1205 y sont), conflits réglés (imports de `main` dans
+`Stock.jsx`, ids en double de Quoi de neuf retirés, §9 sous 60 Ko). Local, sur le build fusionné : banc `stock-mieux`
+64 OK / 0 KO aux 4 variantes (« + » au repos 0 contre 20 et 50 avant ; N° 18 px mini contre 11-12 px ; contraste du N°
+≥ 5,92:1 ; tête ≥ 5,49:1 contre 1,12:1) ; mutations `num` et `plus` ⇒ rouges ; `stock-etageres`, `stock-planches`,
+`design-restes`, `stock-case-a-sortir`, `stock-retrouver` : 0 KO. CI de la PR #1221 comparée à `main` (rouges déjà
+présents sur `main` : vocabulaire-article, vendeur-generaliste, banc nouveau-vendeur). Possible plus tard : dire
+« glisse → » en mots au-dessus d'un meuble qui défile.
