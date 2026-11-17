@@ -147,3 +147,6 @@ html body .vrm-pmm .vrm-pmm-champ input:focus, html body .vrm-pmm .vrm-pmm-champ
 }
 /* Rien de tapé : le pied reste à sa place (pas de barre flottante pour rien). */
 .vrm-pmm-pied[data-pmm-pied="0"] { position: static; box-shadow: none; margin: 4px 0 0; padding: 6px 0 0; border-radius: 0; background: transparent; border-top: .5px solid var(--w-filet, var(--vrm-line)); }
+/* (16 nov., lot aide-decision) L'option « contre-offre au prix mini », sous la règle. */
+.vrm-oa-contre { border-top: .5px solid var(--w-filet, var(--vrm-line)); padding-top: 4px; }
+.vrm-oa-puce-contrer { color: var(--w-encre, var(--vrm-ink)); background: color-mix(in srgb, var(--w-encre, #1d1d1f) 8%, transparent); }

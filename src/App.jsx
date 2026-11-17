@@ -822,7 +822,8 @@ import { fusionEntreeVente, parcoursPaire } from "./fichePaire.js";
 import { abonner as abonnerFicheLigne, ligneOuverte, ouvrirLigne, fermerLigne, lireLigne, toucheLeCorps, numeroDeLigne, attrsFicheLigne } from './ficheLigne.js';
 import { PaireAvantHote, clicAvant, ouvrirFicheDe } from './paires/PaireAvant.jsx';   // (14 nov., Studio bleu clair) la paire qui monte au premier plan
 import DansFiche from './DansFiche.jsx';
-import { cascadeVente, valeurStock, publierValeurStock } from "./coutVente.js";   // (10 nov., lots BA et BF)
+import { cascadeVente, valeurStock, publierValeurStock } from "./coutVente.js";
+import { lignesArgentDort, publierArgentDort } from "./argentDort.js";   // (16 nov., lot aide-decision) l'argent qui dort, par meuble   // (10 nov., lots BA et BF)
 import { CLE_PRIX_LUS, noterPrixLus } from "./historiquePrix.js";
 import { conseilBaisse, derniereBaisseLue, baisseProportion, noterConseils, fusionConseils, CLE_CONSEIL_PRIX } from "./conseilPrix.js";
 // (15 nov., vendre plus) La baisse intelligente (règle pure), sa feuille, la relance des favoris au bon moment.
@@ -1120,7 +1121,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.400.0';
+const EXT_ATTENDUE = '5.402.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -1552,7 +1553,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { fichepublier: '5.400.0', empreinteebay: '5.400.0', vccategorie: '5.399.0', relueoffre: '5.398.0', salutation: '5.398.0', photovrm: '5.393.0', vcaimes: '5.393.0', versementsauto: '5.393.0', memephotosure: '5.393.0', memephoto: '5.384.0', numerotes: '5.382.0', lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
+const EXT_CAPACITES = { contreauto: '5.402.0', fichepublier: '5.400.0', empreinteebay: '5.400.0', vccategorie: '5.399.0', relueoffre: '5.398.0', salutation: '5.398.0', photovrm: '5.393.0', vcaimes: '5.393.0', versementsauto: '5.393.0', memephotosure: '5.393.0', memephoto: '5.384.0', numerotes: '5.382.0', lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -3328,7 +3329,7 @@ const SYNC_KEYS = [
   // navigateur envoie). Synchronisé pour être LU : série d'archive, version.
   // (11 nov., lot securite-vinted) SES réglages de sécurité des comptes + « Tout arrêter » (src/securiteComptes.js), écrits sur SON geste, lus par l'extension.
   'vrm_securite_comptes',
-  'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vinted_discretion','vinted_offre_refus_msg','vinted_offre_refus_variantes','vinted_offres_garde','vrm_photo_presets','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
+  'vrm_numerotation', 'vinted_repond_auto','vinted_offres_auto','vinted_offres_contre','vinted_discretion','vinted_offre_refus_msg','vinted_offre_refus_variantes','vinted_offres_garde','vrm_photo_presets','vrm_points_relais','vrm_ville','vrm_colis_collected','vrm_colis_collected_at',
   // (5 nov.) Les QR Mondial Relay qu'il a posés sur un colis depuis une capture de l'app
   // (src/qrCapture.js) : clé = n° de suivi, écrits sur SON clic seulement.
   'vrm_colis_qr_poses',
@@ -35770,6 +35771,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // une confirmation qui dit le risque (un programme qui accepte sur Vinted).
   const [offresAuto, setOffresAuto] = useStateCle('vinted_offres_auto', () => load('vinted_offres_auto', false) === true);
   React.useEffect(() => onCloudReady(() => setOffresAuto(load('vinted_offres_auto', false) === true)), []);
+  // (16 nov., lot aide-decision — validé par Julien, ext. 5.402) La CONTRE-OFFRE automatique au prix
+  // mini : une option À PART, éteinte par défaut, synchronisée (`vinted_offres_contre`) ; l'extension
+  // ne la lit que moteur allumé. Allumer demande une confirmation qui dit le risque (elle VEND si
+  // l'acheteur la prend) ; éteindre, jamais.
+  const [offresContre, setOffresContre] = useStateCle('vinted_offres_contre', () => load('vinted_offres_contre', false) === true);
+  React.useEffect(() => onCloudReady(() => setOffresContre(load('vinted_offres_contre', false) === true)), []);
+  const basculerOffresContre = async () => {
+    if (offresContre) { setOffresContre(false); save('vinted_offres_contre', false); return; }
+    const ok = await askConfirm({ title: tr('ad.contre.confirmeTitre'), desc: tr('ad.contre.confirmeDesc'), ok: tr('ad.contre.confirmeOk'), cancel: tr('oa.annuler') });
+    if (!ok) return;
+    setOffresContre(true); save('vinted_offres_contre', true);
+  };
   // (27 oct., refus auto) Le message envoyé à l'acheteur quand VRM refuse une offre
   // trop basse — SON texte, vide par défaut (refus sans message). Synchronisé ;
   // rattrapé au nuage et SEULEMENT s'il est resté vide (§5.49 : jamais par-dessus
@@ -40599,6 +40612,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     } catch (_) {}
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stockDort, listings, listingDatesLu, annBase]);
+  // (16 nov., lot aide-decision) « L'ARGENT QUI DORT, PAR MEUBLE » : les MÊMES paires que « Valeur du
+  // stock » (`annoncesPresentes`), le MÊME prix d'achat (règle du bénéfice) et le MÊME âge (`listedAgeDays`),
+  // par N° (`cleNum`). Cet écran publie `vrm_argent_dort` ; Statistiques le lit avec les meubles du Stock.
+  // Annonces pas lues (ou en erreur) ⇒ rien publié (pas su ≠ 0).
+  const argentDortLignes = useMemo(() => {
+    if (!Array.isArray(listings.items) || listings.error) return null;
+    return lignesArgentDort(annoncesPresentes.map((it) => { const f = numeros[it.id]; const k = f && f.numero ? cleNum(f.numero) : '';
+      return { cle: k, achat: k ? beneficePaire(null, fusionEntreeVente(f || {}, null, buyByNum)).achat : null, age: listingDatesLu === true ? listedAgeDays(it) : null }; }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [annoncesPresentes, listings.items, listings.error, numeros, buyByNum, listingDates, listingDatesLu]);
+  useEffect(() => {
+    if (!argentDortLignes || !AUTH.user?.id) return;
+    publierArgentDort(argentDortLignes, { owner: AUTH.user.id, partiel: !!listings.incomplet || listingDatesLu !== true });
+  }, [argentDortLignes, listings.incomplet, listingDatesLu]);
   // ── RENUMÉROTER À LA SUITE ────────────────────────────────────────────────
   // Le numéro sert à retrouver un carton sur l'étagère : avec 116 paires en ligne
   // il ne devrait pas monter à 172. Au fil des ventes, la séquence se troue et
@@ -54390,7 +54417,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <div hidden={zoneMessages!=='favoris'} style={{display:zoneMessages==='favoris'?undefined:'none'}}>
         {/* (11 nov., lot DJ8) « Offres auto » : l'interrupteur, ce que le moteur ferait, les seuils par paire, l'historique. */}
         <div className="vrm-fav-zones"><Segmente label="Favoris ou offres automatiques" value={zoneFav} onChange={setZoneFav} options={[{ v: 'favoris', l: 'Favoris' }, { v: 'offres', l: 'Offres auto' }]}/></div>
-        {zoneMessages==='favoris' && zoneFav==='offres' && <OffresAuto actif={offresAuto} virguleLue={extSait('offrespage')==='ok'} basculer={basculerOffresAuto} eteindreOffres={()=>{ setOffresAuto(false); save('vinted_offres_auto', false); }}
+        {zoneMessages==='favoris' && zoneFav==='offres' && <OffresAuto actif={offresAuto} virguleLue={extSait('offrespage')==='ok'} basculer={basculerOffresAuto} eteindreOffres={()=>{ setOffresAuto(false); save('vinted_offres_auto', false); setOffresContre(false); save('vinted_offres_contre', false); }}
+          contre={offresContre} basculerContre={basculerOffresContre} contreExt={extSait('contreauto')}
           refusMsg={refusMsg} setRefusMsg={ecrireRefusMsg}
           refusVariantes={refusVariantes} setRefusVariantes={changerRefusVariantes} variantesOk={extSait('variantes')==='ok'}
           annonces={Array.isArray(listings.items) && !listings.error ? annSelectionnables.filter(a=>a.etat==='en-ligne') : null} numeros={numeros}

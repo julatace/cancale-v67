@@ -6,7 +6,8 @@
 //  `LigneVitesse` : la même lecture en une ligne (Ma semaine).
 // ════════════════════════════════════════════════════════════════════════════
 import React, { useEffect, useMemo, useState } from 'react';
-import { vitesseParCompte, texteDuree, texteCouvertureVitesse, lireVitesse, CLE_VITESSE, EVT_VITESSE, JOURS_VITESSE } from './vitesseEnvoi.js';
+import { vitesseParCompte, ralentissements, texteDuree, texteCouvertureVitesse, lireVitesse, CLE_VITESSE, EVT_VITESSE, JOURS_VITESSE } from './vitesseEnvoi.js';
+import { tr } from './i18n/index.js';
 import './styles-vitesse-avis.css';
 
 export function useVitesse(owner) {
@@ -25,6 +26,8 @@ export function useVitesse(owner) {
 export default function VitesseEnvoi({ owner = '', maintenant = null }) {
   const pub = useVitesse(owner);
   const V = useMemo(() => (pub ? vitesseParCompte(pub.lignes, { maintenant: maintenant || Date.now() }) : null), [pub, maintenant]);
+  // (16 nov., lot aide-decision) Un compte qui ralentit NETTEMENT (30 j contre les 30 d'avant) : dit doucement.
+  const Rl = useMemo(() => (pub ? ralentissements(pub.lignes, { maintenant: maintenant || Date.now() }) : null), [pub, maintenant]);
   const tete = <div className="vrm-sv-carte-tete"><h2 className="vrm-display vrm-sv-carte-titre">Vitesse d’envoi</h2><span className="vrm-sv-note">vente → dépôt · {JOURS_VITESSE} jours</span></div>;
   let corps;
   if (!V) corps = <p className="vrm-ve-vide" data-ve-etat="passu">— · ouvre Colis ou Ventes pour la calculer</p>;
@@ -43,10 +46,15 @@ export default function VitesseEnvoi({ owner = '', maintenant = null }) {
               <span className="vrm-ve-nom">{c.nom || 'Compte'}</span>
               <span className="vrm-ve-val">{texteDuree(c.mediane)}</span>
               <span className="vrm-ve-piste" aria-hidden="true"><span style={{ width: `${c.mediane != null && max > 0 ? Math.max(3, (c.mediane / max) * 100) : 0}%` }}/></span>
-              <span className="vrm-ve-sur">{texteCouvertureVitesse(c)}</span>
+              <span className="vrm-ve-sur">{texteCouvertureVitesse(c)}{c.moyenne != null ? <> · <span data-ve-moyenne={c.moyenne}>{tr('ad.envoi.moyenne', { duree: texteDuree(c.moyenne) })}</span></> : null}</span>
             </li>
           ))}
         </ol>
+        {Rl && Rl.length ? Rl.map((r) => (
+          <p key={r.cle || '?'} className="vrm-ve-ralenti" role="status" data-ve-ralenti={r.cle} data-ve-avant={r.avant} data-ve-maintenant={r.maintenant}>
+            {tr('ad.envoi.ralenti', { nom: r.nom || tr('ad.envoi.compte'), maintenant: texteDuree(r.maintenant), avant: texteDuree(r.avant) })}
+          </p>
+        )) : null}
         {pub.partiel ? <p className="vrm-ve-note" data-ve-manque="emails">E-mails des transporteurs pas lus : certains dépôts n’ont pas de date.</p> : null}
       </div>
     );

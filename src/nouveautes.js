@@ -29,6 +29,10 @@ export const PHRASE_MOTS_MAX = 12;
 export const NOUVEAUTES = Object.freeze([
   // (17 nov., Julien : « je dois rester appuyé sur l'achat […] on ne voit pas ce que j'ai sélectionné ») docs/passation/2026-11-17-relier-toucher.md
   { id: 'relier-toucher', date: '2026-11-17', titre: 'Relier un achat en deux touchers', phrase: 'Touche l’achat, puis la vente : le choix reste affiché en haut.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  // (16 nov., lot aide-decision) docs/passation/2026-11-16-aide-decision.md
+  { id: 'argent-dort-meuble', date: '2026-11-16', titre: 'L’argent qui dort, meuble par meuble', phrase: 'Statistiques : ce que tes prix d’achat immobilisent, par meuble.', tab: 'dashboard', pour: 'tous', mode: 'tous' },
+  { id: 'reste-par-modele', date: '2026-11-16', titre: 'Ce qui reste vraiment, par modèle', phrase: 'Après achat et frais, avec les jours en ligne.', tab: 'dashboard', pour: 'tous', mode: 'tous' },
+  { id: 'contre-offre-auto', date: '2026-11-16', titre: 'Contre-offre automatique au prix mini', phrase: 'Offres auto : une option, éteinte tant que tu ne l’allumes pas.', tab: 'messages', pour: 'tous', mode: 'tous' },
   // (16 nov., lot tampons-parametres) docs/passation/2026-11-16-tampons-parametres.md
   { id: 'tampons-apercu', date: '2026-11-16', titre: 'Place ton N° avant d’imprimer', phrase: 'Chaque bordereau en vignette : glisse le tampon, puis Imprimer.', tab: 'cat_bord', pour: 'tous', mode: 'tous' },
   { id: 'tampons-mention-qr', date: '2026-11-16', titre: '« Créé par vrm.center » au-dessus du QR', phrase: 'Visible même sous le scotch ; réglable dans Paramètres → Imprimante.', tab: 'settings', pour: 'tous', mode: 'tous' },
