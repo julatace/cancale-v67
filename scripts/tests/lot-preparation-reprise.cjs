@@ -14,7 +14,9 @@ assert(a>0&&b>a,'le bloc du lot (batchBordereaux … imprimerLotRef.current = im
 const bloc=src.slice(a,b);
 assert(/imprimerLotRef\.current = imprimerLot;/.test(bloc)&&/const attendrePuisOuvrir =/.test(bloc),'le bloc ne porte plus imprimerLot / attendrePuisOuvrir');
 // useState nommé par son setter : le banc lit chaque état posé.
-const code=bloc.replace(/const \[(\w*), (set\w+)\] = useState\(/g,(_,v,s)=>`const [${v||'_'+s}, ${s}] = __etat('${s}', `)+'\nglobalThis.executer = batchBordereaux;\n';
+// (16 nov., train : ecrans-restes) le bloc lit `numerosDeLigne`, déclaré juste avant lui dans App.jsx : la MÊME ligne, recopiée de la source.
+const numerosDeLigneSrc=(src.match(/  const numerosDeLigne = .*\n/)||[''])[0];
+const code=numerosDeLigneSrc+bloc.replace(/const \[(\w*), (set\w+)\] = useState\(/g,(_,v,s)=>`const [${v||'_'+s}, ${s}] = __etat('${s}', `)+'\nglobalThis.executer = batchBordereaux;\n';
 let regles=null;
 // Les objets nés dans le contexte vm n'ont pas le même prototype : on compare leur forme JSON.
 const eg=(x,y,m)=>assert.equal(JSON.stringify(x),JSON.stringify(y),m);
@@ -27,10 +29,10 @@ function banc(){
   React:{useRef:(v)=>({current:v}),useEffect:()=>{}},
   __etat:(nom,init)=>[init,(v)=>{(poses[nom]=poses[nom]||[]).push(v);if(nom==='setImprBusy'&&v===null&&fini)fini();}],
   AUTH:{user:{id:'A'}},SUPABASE_URL:'https://base.example.test',imprimante:null,imprMode:(f)=>f||'normale',
-  _octetsLot:new Map(),_verNum:{etat:'attente',at:0},_visionneuse:null,_pendingBordPrint:false,emailBords:[],only:'bordereaux',colisDans:'',labelsPrets:true,sales:{items:[]},
+  /* (16 nov., train : impression-retours) aucun retour dans ce jeu : la sélection des retours est vide */retoursChoisis:()=>[],lignesRetoursImpr:()=>[],_octetsLot:new Map(),_verNum:{etat:'attente',at:0},_visionneuse:null,_pendingBordPrint:false,emailBords:[],only:'bordereaux',colisDans:'',labelsPrets:true,sales:{items:[]},
   tr:(k)=>k,toast:(m)=>{if(/^Erreur/.test(String(m)))erreurs.push(m);},
   imprTouchee:{current:false},choisirImprimante:()=>{},ouvrirLot:()=>{},isCloudReady:()=>true,load:()=>'normale',save:()=>{},
-  lignesLotTous:()=>rows,sigLigneLot:(l)=>l.cle,
+  lignesLotTous:()=>rows,lignesLotImpression:()=>rows,/* (16 nov.) = ventes + retours ; aucun retour ici */sigLigneLot:(l)=>l.cle,
   positionsTampon:()=>({}),reglageImpressionChoisi:()=>({}),
   numerosDemandent:()=>false,assurerVersionNumerotation:async()=>true,confirmerNumerosAVerifier:async()=>true,
   NUMEROS_PERIMES_IMPRESSION:'N° périmés',NUM_A_VERIFIER_ANNULE:'annulé',
@@ -48,8 +50,8 @@ function banc(){
 }
 (async()=>{
  const imp=async(f)=>(await import(url.pathToFileURL(path.join(racine,f)).href));
- const ls=await imp('src/impression/lotSimple.js'),sel=await imp('src/lotSelection.js'),th=await imp('src/impression/thermique.js');
- regles={formatRetenu:ls.formatRetenu,signatureLot:ls.signatureLot,absentsDuLot:ls.absentsDuLot,cochesParDefaut:sel.cochesParDefaut,selectionImprimable:sel.selectionImprimable,TAMPONS_IMPR:th.TAMPONS};
+ const ls=await imp('src/impression/lotSimple.js'),sel=await imp('src/lotSelection.js'),th=await imp('src/impression/thermique.js'),rl=await imp('src/impression/retoursLot.js');   // (16 nov.) les retours du lot : les VRAIES règles
+ regles={formatRetenu:ls.formatRetenu,signatureLot:ls.signatureLot,absentsDuLot:ls.absentsDuLot,cochesParDefaut:sel.cochesParDefaut,selectionImprimable:sel.selectionImprimable,TAMPONS_IMPR:th.TAMPONS,estRetour:rl.estRetour,motsTamponRetour:rl.motsTamponRetour};
  // 1 + 2 : progression après lecture ; le 2e bordereau illisible est nommé, seul le 1er est marqué.
  {
   const f=banc();let liberer;let n=0;f.c.lireBaseRelue=()=>new Promise(r=>{liberer=r;n++;});

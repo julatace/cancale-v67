@@ -96,7 +96,11 @@ export function PaireAvantHote({ rendre }) {
   // Changer d'écran ferme la carte (la clé ne survit pas à la liste).
   React.useEffect(() => () => fermerAvant(), []);
   if (!cle || !place) return null;
+  // (16 nov.) Un hôte qui ne connaît pas cette rangée (Leboncoin, eBay, Vestiaire, Stock ont le leur) ne pose rien :
+  // jamais une seconde carte, ni un corps vide, dans la place d'une rangée qui n'est pas la sienne.
+  const contenu = rendre(cle, fermerAvant);
+  if (contenu == null) return null;
   return createPortal(<div className="sb-avant-corps" data-sb-avant-corps={cle}>
-    {rendre(cle, fermerAvant)}
+    {contenu}
   </div>, place);
 }

@@ -23,7 +23,9 @@ import { suivreDemarrage, etapeDemarrage } from './demarrage.js';
 // `undefined … default` (src/chargementSur.js).
 import { lazySur, verifierMorceauPerime, rechargerVersNouvelle, estErreurMorceau, relancerFeuilles } from './chargementSur.js';
 import MettreAJourVRM from './composants/MettreAJourVRM.jsx';
-import { ecouterPlantages, ecouterViolationsCsp, noterPlantage, compterMorceauPerime } from './plantages.js';
+// (16 nov., lot vitesse-lectures) Le journal lui-même (src/plantages.js) arrive après l'accueil ; un tampon
+// minuscule écoute dès maintenant et lui rend tout (src/plantagesTampon.js).
+import { poserTamponPlantages } from './plantagesTampon.js';
 // Le journal des plantages écoute dès le démarrage : une erreur AVANT que l'app
 // soit montée est justement celle qu'aucun écran ne montre (src/plantages.js).
 // ⚠️ (22 oct., revue) L'ÉCRAN SE LIT DANS L'HISTORIQUE : l'app retire `?tab=` de
@@ -34,12 +36,16 @@ const ecranCourant = () => {
   try { const st = window.history.state; if (st && st.vrmTab) return String(st.vrmTab) + (st.vrmSub ? ':' + st.vrmSub : ''); } catch (_) {}
   try { return new URLSearchParams(location.search).get('tab') || ''; } catch (_) { return ''; }
 };
-ecouterPlantages(() => ({ ecran: ecranCourant(),
-  version: typeof __BUILD__ !== 'undefined' ? String(__BUILD__) : '' }));
-// Et les violations de la politique de sécurité du contenu (Report-Only) : le
+// Les erreurs de la page ET les violations de la politique de sécurité du contenu (Report-Only) : le
 // même journal, pour savoir sur SES appareils si elle peut passer en vigueur.
-ecouterViolationsCsp(() => ({ ecran: ecranCourant(),
-  version: typeof __BUILD__ !== 'undefined' ? String(__BUILD__) : '' }));
+const plantages = poserTamponPlantages({ contexte: () => ({ ecran: ecranCourant(),
+  version: typeof __BUILD__ !== 'undefined' ? String(__BUILD__) : '' }) });
+const compterMorceauPerime = (p) => plantages.compterMorceauPerime(p);
+// Le vrai journal : à la première inactivité après le chargement (au plus 4 s), ou au premier plantage.
+if (typeof window !== 'undefined') {
+  const plusTard = () => { try { (window.requestIdleCallback || ((f) => setTimeout(f, 1500)))(() => plantages.charger(), { timeout: 4000 }); } catch (_) { plantages.charger(); } };
+  if (document.readyState === 'complete') plusTard(); else window.addEventListener('load', plusTard, { once: true });
+}
 // ⚠️ APRÈS UN DÉPLOIEMENT, UN ONGLET RESTÉ OUVERT DEMANDE DES MORCEAUX QUI
 // N'EXISTENT PLUS (mesuré le 15 octobre dans le journal des plantages : « Unable
 // to preload CSS for /assets/App-….css »). Les fichiers sont nommés par leur
@@ -78,7 +84,11 @@ if (typeof window !== 'undefined') {
 // L'app n'est téléchargée que par ceux qui y entrent : un visiteur qui lit la
 // page d'accueil ne charge pas 340 Ko compressés pour rien (§ montée en charge).
 // (11 nov., lot app-installable) « Mettre à jour » discret et l'aide d'installation.
-import { PiluleMiseAJour, AideInstallation } from './AppInstallable.jsx';
+// (16 nov., lot vitesse-lectures) « Mettre à jour » et l'aide d'installation ne se montrent que DANS l'app
+// (jamais sur la page d'accueil) : un morceau à part, chargé avec l'app — le fichier d'entrée de la page
+// d'accueil (budget du banc `accueil`) n'emporte plus ces deux composants, leurs règles et leur style.
+const PiluleMiseAJour = lazySur(() => import('./AppInstallable.jsx').then((m) => ({ default: m.PiluleMiseAJour })));
+const AideInstallation = lazySur(() => import('./AppInstallable.jsx').then((m) => ({ default: m.AideInstallation })));
 import { decisionMaj, estSaisie, CLE_MAJ_REFUSEE } from './miseAJour.js';
 // Android (Chrome, Edge, Samsung) offre l'installation : gardée pour l'aide,
 // qui la propose UNE fois (src/aideInstallation.js). Plus de mini-bandeau surprise.
@@ -115,7 +125,7 @@ if (typeof document !== 'undefined') { if (document.body) suivreRangeesDefilante
 class DernierFilet extends React.Component {
   constructor(p) { super(p); this.state = { err: null }; }
   static getDerivedStateFromError(err) { return { err }; }
-  componentDidCatch(err, info) { try { console.error('[VRM] application en erreur', err, info && info.componentStack); } catch (_) {} noterPlantage(err, { origine: 'demarrage', version: typeof __BUILD__ !== 'undefined' ? String(__BUILD__) : '' }); }
+  componentDidCatch(err, info) { try { console.error('[VRM] application en erreur', err, info && info.componentStack); } catch (_) {} plantages.noter(err, { origine: 'demarrage', version: typeof __BUILD__ !== 'undefined' ? String(__BUILD__) : '' }); }
   render() {
     if (!this.state.err) return this.props.children;
     // (15 nov.) Un morceau introuvable : « Mettre à jour VRM », un bouton — pas « l'application n'a pas pu démarrer ».
@@ -240,8 +250,7 @@ function Racine() {
   }
   return <>
     <React.Suspense fallback={<FondApp />}><App /></React.Suspense>
-    <PiluleMiseAJour />
-    <AideInstallation actif={aUneSession()} />
+    <React.Suspense fallback={null}><PiluleMiseAJour /><AideInstallation actif={aUneSession()} /></React.Suspense>
   </>;
 }
 

@@ -235,6 +235,7 @@ export const PHRASES_ARTICLE = {
   'Frais de chaque site compris, et la même paire à deux prix.': 'Frais de chaque site compris, et le même article à deux prix.',
   'Épingle tes paires en haut': 'Épingle tes articles en haut',
   'Comparer deux paires côte à côte': 'Comparer deux articles côte à côte',
+  'Leboncoin, eBay, Vestiaire : la paire monte': 'Leboncoin, eBay, Vestiaire : l’article monte',
 };
 export const phraseVendeur = (t, vend = vendCourant()) => (vend === 'sneakers' || typeof t !== 'string' ? t : (PHRASES_ARTICLE[t] || t));
 // « 3 paires » / « 1 article », pour le vendeur connecté (ou `vend` donné).

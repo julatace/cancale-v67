@@ -1,4 +1,5 @@
 // DEUTSCH — Übersetzung von fr.js (der Quelle). Gleiche Schlüssel, gleiche {Variablen}.
+import ecran_suivi_vente from './de/suiviVente.js';   // (16 nov.) le suivi des colis vendus
 import ecran_perso from './de/perso.js';   // (16 nov.) « Modifier ma journée » simple
 import ecran_ventesVerre from './de/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
 import ecran_journee from './de/journee.js';
@@ -8,7 +9,8 @@ import ecran_correspondances from './de/correspondances.js';   // (15 nov.) Publ
 import ecran_capte from './de/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_avenir from './de/avenir.js';
 import ecran_verre2 from './de/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
-import ecran_fiched from './de/fiched.js';   // (15 nov.) la fiche d'un article, direction D
+import ecran_fiched from './de/fiched.js';
+import ecran_ecrans_restes from './de/ecransRestes.js';   // (16 nov.) lot ecrans-restes : stock importé, date limite, loupe   // (15 nov.) la fiche d'un article, direction D
 import ecran_vcventes from './de/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
 import ecran_transporteur_connu from './de/transporteurConnu.js';   // (15 nov.) « À expédier » : transporteur connu
 import ecran_vendre from './de/vendre.js';   // (15 nov., vendre plus) baisses conseillées, relance des favoris, loupe
@@ -822,6 +824,7 @@ export default {
   "favoris.sousTitreCompte": "Konto {compte} · schreib denen, die deine Anzeigen mögen.",
   "favoris.actualiser": "Aktualisieren",
   "favoris.outils": "Weitere Werkzeuge",
+  "versions.uneSeule": "Eine Version: Wurde sie gerade gesendet, ändert sich nur die Begrüßung (Bonjour, Salut, Hello).",   // (16 nov.) une seule version : la salutation varie
   "favoris.duree.secondes": { one: "{n} s", other: "{n} s" },
   "favoris.duree.minutes": { one: "{n} Min.", other: "{n} Min." },
   "favoris.duree.heures": { one: "{n} Std.", other: "{n} Std." },
@@ -1203,6 +1206,7 @@ export default {
   "sante.i.fraicheur": "Letzte Lesung",
   "sante.v.note": {one: "{note}/5 · {n} Bewertung", other: "{note}/5 · {n} Bewertungen"},
   "sante.v.avisBas": "{n} der letzten {sur}",
+  "sante.v.avisArrives": {one: "{n} kam {quand}", other: "{n} kamen in den letzten 14 Tagen, die letzte {quand}"},
   "sante.v.delai": {one: "{duree} · bei {n} Paket", other: "{duree} · bei {n} Paketen"},
   "sante.v.retards": "{n} von {sur} Paketen",
   "sante.v.enRetard": {one: "{n} noch zu versenden", other: "{n} noch zu versenden"},
@@ -1221,6 +1225,7 @@ export default {
   "sante.r.enRetard": {one: "{n} Paket nach Fristablauf noch zu versenden", other: "{n} Pakete nach Fristablauf noch zu versenden"},
   "sante.r.annulees": {one: "{n} stornierter Verkauf (30 T)", other: "{n} stornierte Verkäufe (30 T)"},
   "sante.r.avisBas": {one: "{n} Bewertung mit 3★ oder weniger unter den letzten 10", other: "{n} Bewertungen mit 3★ oder weniger unter den letzten 10"},
+  "sante.r.avisArrives": {one: "{n} Bewertung mit 3★ oder weniger in den letzten 14 Tagen", other: "{n} Bewertungen mit 3★ oder weniger in den letzten 14 Tagen"},
   "sante.r.note": "Vinted-Bewertung {note}/5",
   "sante.r.delai": "Versand in {duree} (Median, 30 T)",
   "sante.journee.un": "{nom} im Blick behalten",
@@ -2156,6 +2161,7 @@ export default {
   "creerVinted.photo.retirer": "Foto {n} entfernen",
   "creerVinted.photo.lecture": "Wird gelesen…",
   "creerVinted.photo.ajouter": "Fotos hinzufügen",
+  "creerVinted.photo.studio": {one: "{n} Foto aus deinem Studio übernommen: entferne es oder füge weitere hinzu.", other: "{n} Fotos aus deinem Studio übernommen: entferne sie oder füge weitere hinzu."},
   "creerVinted.fait": "Entwurf auf Vinted bereit ✓",
   "creerVinted.ouvrir": "Auf Vinted öffnen",
   "creerVinted.aFinir": "Auf Vinted zu wählen: {liste}",
@@ -2304,6 +2310,7 @@ export default {
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_liaison,
+  ...ecran_suivi_vente,
   ...ecran_transporteur_connu,
   ...ecran_vendre,
   ...ecran_ebaytableau,
@@ -2314,6 +2321,7 @@ export default {
   ...ecran_avenir,
   ...ecran_verre2,
   ...ecran_fiched,
+  ...ecran_ecrans_restes,
   ...ecran_numeros_nouvelles,
   ...ecran_republie_telephone,
   ...ecran_securite_ventes,

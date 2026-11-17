@@ -382,7 +382,7 @@ function SiretConfiguration({ entreprise, statut, poser }) {
     const frais = await entreprise.lireReglage(ID_FICHE);
     if (frais === null || frais === undefined) return false;          // lecture ratée : rien n'est écrit
     const fusion = { ...(frais || {}), ...patch };
-    const ok = await entreprise.ecrireReglage(ID_FICHE, fusion);
+    const ok = await entreprise.ecrireReglage(ID_FICHE, fusion, frais || {});   // (16 nov.) seul `patch` est posé, gardé par data.rev
     if (ok) { setFiche(fusion); try { window.dispatchEvent(new CustomEvent('vrm:fiche-facturation', { detail: fusion })); } catch (_) {} }
     return !!ok;
   };

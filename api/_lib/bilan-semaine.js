@@ -183,7 +183,12 @@ export function calculerBilan(e) {
   // (11 nov., saisie rapide) Les ventes « vendu ailleurs » (main propre…) : `decisions` = `vrm_cycle_decisions`,
   // `txItem` = transaction → annonce lue (une paire vendue AUSSI sur Vinted n'entre qu'une fois). Absent ⇒ aucune.
   const main = e.decisions ? ventesAilleursPour(e.decisions, vinted, e.txItem || {}, classifyOrderStatus) : [];
-  const vf = ventesFaites({ vinted, lbc, ebay, vestiaire, cachee, excluAutre, main });
+  // (16 nov., lot ecrans-restes) Les ventes IMPORTÉES d'un autre outil (`vrm_ventes_importees`) : la même règle que
+  // l'app (`importees` — une importée dont le n° est celui d'une vente lue ne compte pas deux fois ; sans date de
+  // versement, « à dater »). `null` = ligne `main` illisible : nommé ; absent (un appelant d'avant) : aucune.
+  if (e.importees === null) manque.push('ventes importées (illisibles)');
+  const importees = Array.isArray(e.importees) ? e.importees : [];
+  const vf = ventesFaites({ vinted, lbc, ebay, vestiaire, cachee, excluAutre, importees, main });
   let n = 0, eur = 0, meilleure = null;
   // (8 nov.) La plus haute vente de la fenêtre (le bilan du MOIS la cite : son
   // montant, son site, son n° de transaction — jamais dans la réponse du cron).
@@ -197,7 +202,7 @@ export function calculerBilan(e) {
   if (e.versements == null && vintedLisible) {
     out.recu = { etat: 'pas-su', eur: 0, manque: ['dates de versement illisibles'] };
   } else {
-    const vd = ventesDeclarables({ vinted, lbc, ebay, vestiaire, exclu: vintedLisible ? (o) => compteEcarte(o && o._acc && o._acc.vinted_user_id, e.masquesComptes, e.panneau, e.regle) : undefined, excluAutre, versements: e.versements || {}, main });
+    const vd = ventesDeclarables({ vinted, lbc, ebay, vestiaire, exclu: vintedLisible ? (o) => compteEcarte(o && o._acc && o._acc.vinted_user_id, e.masquesComptes, e.panneau, e.regle) : undefined, excluAutre, versements: e.versements || {}, importees, main });
     let r = 0;
     for (const l of vd.lignes) if (dansSemaine(l.ts, debut, fin)) r += l.eur;
     const manqueRecu = [...manque];

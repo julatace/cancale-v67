@@ -114,6 +114,13 @@ const lireVariantes = () => { try { return JSON.parse(localStorage.getItem('vint
           dit(deb.page <= 0 && !deb.trop.length, `F ${tag} : aucun débordement`, deb);
           await zone.scrollIntoViewIfNeeded().catch(() => {});
           await attendre(300); await pg.screenshot({ path: path.join(SHOTS, `variantes-refus-${tag}-2-quatre.png`) });
+          // (16 nov., ext. 5.398) Une seule version : la note dit que seule la salutation change.
+          while (await zone.locator('[data-version-retirer]').count()) { await zone.locator('[data-version-retirer]').first().click(); await attendre(200); }
+          await attendre(700);
+          const note = await zone.locator('[data-versions-salutation]').count() ? (await zone.locator('[data-versions-salutation]').innerText()).trim() : '';
+          dit(/salutation/.test(note) && /Bonjour, Salut, Hello/.test(note), `V ${tag} : une seule version : « seule la salutation change » dit sous le champ`, note);
+          await zone.scrollIntoViewIfNeeded().catch(() => {});
+          await attendre(300); await pg.screenshot({ path: path.join(SHOTS, `variantes-refus-${tag}-3-une.png`) });
         }
         // H : l'historique dit la version notée.
         await pg.waitForFunction(() => { const g = document.querySelector('[data-oa-historique]'); return g && !/lecture/.test(g.getAttribute('data-oa-historique')); }, null, { timeout: 8000 }).catch(() => {});

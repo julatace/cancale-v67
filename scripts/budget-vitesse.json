@@ -11,7 +11,6 @@
     "entieres": 0,
     "js": 2250,
     "doublonsParAdresse": {
-     "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
      "app_data?id=eq.lbc_listings&select=l:data->lectures|": 2,
      "app_data?id=eq.panel_accounts_off&select=data|": 2,
@@ -28,8 +27,6 @@
      "app_data?id=eq.vrm_veille_chiffres&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b&select=data|": 3,
      "app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_session,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id|": 2,
      "app_data?id=in.(vc_ventes,vc_listings)&select=id,ventes:data->ventes,liens:data->liens|": 2,
-     "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
-     "app_data?id=like.email_reception_*&select=id&limit=1|": 2,
      "app_data?id=like.harvest_*_listings&select=id,n:data->>nItems|": 2,
      "app_data?id=like.harvest_*_orders_*&select=id,n:data->>nItems|": 2,
      "vinted_accounts?select=id,owner,vinted_user_id,login,domain,created_at,updated_at&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
@@ -49,7 +46,6 @@
     "entieres": 0,
     "js": 1725,
     "doublonsParAdresse": {
-     "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
      "app_data?id=eq.lbc_listings&select=l:data->lectures|": 2,
      "app_data?id=eq.lbc_ventes&select=data|": 2,
@@ -66,8 +62,6 @@
      "app_data?id=eq.vrm_controle_nuit&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b&select=data|": 2,
      "app_data?id=eq.vrm_veille_chiffres&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b&select=data|": 3,
      "app_data?id=in.(lbc_listings,lbc_ventes,lbc_accounts,vc_session,vc_listings,vc_ventes,ebay_orders,ebay_listings)&select=id|": 2,
-     "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
-     "app_data?id=like.email_reception_*&select=id&limit=1|": 2,
      "app_data?id=like.harvest_*_listings&select=id,n:data->>nItems|": 2,
      "app_data?id=like.harvest_*_orders_*&select=id,n:data->>nItems|": 2,
      "vinted_accounts?select=id,owner,vinted_user_id,login,domain,created_at,updated_at&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
@@ -411,7 +405,6 @@
     "entieres": 0,
     "js": 2250,
     "doublonsParAdresse": {
-     "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
      "app_data?id=eq.lbc_listings&select=items:data->items,lectures:data->lectures|": 2,
      "app_data?id=eq.lbc_listings&select=l:data->lectures|": 2,
@@ -428,7 +421,6 @@
      "app_data?id=in.(vc_ventes,vc_listings)&select=id,ventes:data->ventes,liens:data->liens|": 2,
      "app_data?id=in.(vinted_listing_dates,vinted_lbc_posted,panel_accounts_off,panel_colis_collected,panel_colis_relais,panel_a_confirmer,panel_bords_done,panel_buyprices)&select=id,data|": 2,
      "app_data?id=like.coffre_*&meta->>recreeDe=not.is.null&select=id,r:meta->>recreeDe|": 2,
-     "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
      "app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId|": 2,
      "vinted_accounts?select=id,owner,vinted_user_id,login,domain,created_at,updated_at&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
     }
@@ -447,7 +439,6 @@
     "entieres": 0,
     "js": 1757,
     "doublonsParAdresse": {
-     "app_data?id=eq.ebay_comptes&select=comptes:data->comptes|": 3,
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
      "app_data?id=eq.lbc_listings&select=items:data->items,lectures:data->lectures|": 2,
      "app_data?id=eq.lbc_listings&select=l:data->lectures|": 2,
@@ -464,7 +455,6 @@
      "app_data?id=in.(vc_ventes,vc_listings)&select=id,ventes:data->ventes,liens:data->liens|": 2,
      "app_data?id=in.(vinted_listing_dates,vinted_lbc_posted,panel_accounts_off,panel_colis_collected,panel_colis_relais,panel_a_confirmer,panel_bords_done,panel_buyprices)&select=id,data|": 2,
      "app_data?id=like.coffre_*&meta->>recreeDe=not.is.null&select=id,r:meta->>recreeDe|": 2,
-     "app_data?id=like.ebay_orders*&select=id,cap:data->>capturedAt|": 2,
      "app_data?id=like.vinted_brouillon_*&select=id,anc:data->>ancienId,item:data->>itemId|": 2,
      "vinted_accounts?select=id,owner,vinted_user_id,login,domain,created_at,updated_at&owner=eq.0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b|": 2
     }

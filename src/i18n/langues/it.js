@@ -1,4 +1,5 @@
 // ITALIANO — traduzione di fr.js (la fonte). Stesse chiavi, stesse {variabili}.
+import ecran_suivi_vente from './it/suiviVente.js';   // (16 nov.) le suivi des colis vendus
 import ecran_perso from './it/perso.js';   // (16 nov.) « Modifier ma journée » simple
 import ecran_ventesVerre from './it/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
 import ecran_journee from './it/journee.js';
@@ -8,7 +9,8 @@ import ecran_correspondances from './it/correspondances.js';   // (15 nov.) Publ
 import ecran_capte from './it/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_avenir from './it/avenir.js';
 import ecran_verre2 from './it/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
-import ecran_fiched from './it/fiched.js';   // (15 nov.) la fiche d'un article, direction D
+import ecran_fiched from './it/fiched.js';
+import ecran_ecrans_restes from './it/ecransRestes.js';   // (16 nov.) lot ecrans-restes : stock importé, date limite, loupe   // (15 nov.) la fiche d'un article, direction D
 import ecran_vcventes from './it/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
 import ecran_transporteur_connu from './it/transporteurConnu.js';   // (15 nov.) « À expédier » : transporteur connu
 import ecran_vendre from './it/vendre.js';   // (15 nov., vendre plus) baisses conseillées, relance des favoris, loupe
@@ -822,6 +824,7 @@ export default {
   "favoris.sousTitreCompte": "Account {compte} · scrivi a chi ama i tuoi annunci.",
   "favoris.actualiser": "Aggiorna",
   "favoris.outils": "Altri strumenti",
+  "versions.uneSeule": "Una versione: se è appena partita, cambia solo il saluto (Bonjour, Salut, Hello).",   // (16 nov.) une seule version : la salutation varie
   "favoris.duree.secondes": { one: "{n} s", other: "{n} s" },
   "favoris.duree.minutes": { one: "{n} min", other: "{n} min" },
   "favoris.duree.heures": { one: "{n} h", other: "{n} h" },
@@ -1203,6 +1206,7 @@ export default {
   "sante.i.fraicheur": "Ultima lettura",
   "sante.v.note": {one: "{note}/5 · {n} recensione", other: "{note}/5 · {n} recensioni"},
   "sante.v.avisBas": "{n} delle ultime {sur}",
+  "sante.v.avisArrives": {one: "{n} arrivata {quand}", other: "{n} arrivate negli ultimi 14 giorni, l’ultima {quand}"},
   "sante.v.delai": {one: "{duree} · su {n} pacco", other: "{duree} · su {n} pacchi"},
   "sante.v.retards": "{n} su {sur} pacchi",
   "sante.v.enRetard": {one: "{n} ancora da spedire", other: "{n} ancora da spedire"},
@@ -1221,6 +1225,7 @@ export default {
   "sante.r.enRetard": {one: "{n} pacco da spedire oltre la scadenza", other: "{n} pacchi da spedire oltre la scadenza"},
   "sante.r.annulees": {one: "{n} vendita annullata (30 g)", other: "{n} vendite annullate (30 g)"},
   "sante.r.avisBas": {one: "{n} recensione da 3★ o meno tra le ultime 10", other: "{n} recensioni da 3★ o meno tra le ultime 10"},
+  "sante.r.avisArrives": {one: "{n} recensione da 3★ o meno negli ultimi 14 giorni", other: "{n} recensioni da 3★ o meno negli ultimi 14 giorni"},
   "sante.r.note": "Valutazione Vinted {note}/5",
   "sante.r.delai": "Spedizione in {duree} (mediana, 30 g)",
   "sante.journee.un": "{nom} da tenere d’occhio",
@@ -2156,6 +2161,7 @@ export default {
   "creerVinted.photo.retirer": "Rimuovi la foto {n}",
   "creerVinted.photo.lecture": "Lettura…",
   "creerVinted.photo.ajouter": "Aggiungi foto",
+  "creerVinted.photo.studio": {one: "{n} foto del tuo studio ripresa: toglila o aggiungine altre.", other: "{n} foto del tuo studio riprese: toglile o aggiungine altre."},
   "creerVinted.fait": "Bozza pronta su Vinted ✓",
   "creerVinted.ouvrir": "Apri su Vinted",
   "creerVinted.aFinir": "Da scegliere su Vinted: {liste}",
@@ -2304,6 +2310,7 @@ export default {
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_liaison,
+  ...ecran_suivi_vente,
   ...ecran_transporteur_connu,
   ...ecran_vendre,
   ...ecran_ebaytableau,
@@ -2314,6 +2321,7 @@ export default {
   ...ecran_avenir,
   ...ecran_verre2,
   ...ecran_fiched,
+  ...ecran_ecrans_restes,
   ...ecran_numeros_nouvelles,
   ...ecran_republie_telephone,
   ...ecran_securite_ventes,
