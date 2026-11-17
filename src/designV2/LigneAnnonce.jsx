@@ -29,8 +29,11 @@ function Vignette({ photo, Photo, Icon, cls }) {
 
 function Faits({ num, taille, jours, Plaque, sep = ' · ' }) {
   const bouts = [taille ? tr('v2.l.taille', { t: taille }) : '', jours != null ? tr('v2.l.jours', { n: jours }) : ''].filter(Boolean);
-  return <>{num ? <Plaque num={num}/> : null}{bouts.length ? <span className="v2l-faits-txt">{(num ? sep : '') + bouts.join(sep)}</span> : null}</>;
+  return <>{num ? <PlaqueV2 num={num}/> : null}{bouts.length ? <span className="v2l-faits-txt">{(num ? sep : '') + bouts.join(sep)}</span> : null}</>;
 }
+
+// La plaque N° d'une rangée, À SOI (les règles d'hier allumaient `.sb-plaque` en blanc la nuit) : gravée dans la surface.
+function PlaqueV2({ num }) { return <span className="v2-plaque" data-v2-plaque={num}><small>N°</small>{num}</span>; }
 
 export default function LigneAnnonce({ variante = 'A', attrs = {}, cle, photo, Photo, Icon, Plaque, titre, num, taille, jours, prix, favoris = null, vues = null,
   aRelier = false, relierMot = false, onRelier, onPlus, LigneGlissable }) {
@@ -58,7 +61,7 @@ export default function LigneAnnonce({ variante = 'A', attrs = {}, cle, photo, P
           </span>}
         </span>
         <span className="v2l-c-faits">
-          {num ? <span className="v2l-fait"><Plaque num={num}/></span> : null}
+          {num ? <span className="v2l-fait"><PlaqueV2 num={num}/></span> : null}
           {taille ? <span className="v2l-fait"><Icon name="tag" size={16}/>{tr('v2.l.taille', { t: taille })}</span> : null}
           {jours != null ? <span className="v2l-fait"><Icon name="clock" size={16}/>{tr('v2.l.jours', { n: jours })}</span> : null}
         </span>

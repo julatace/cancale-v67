@@ -56,7 +56,7 @@ async function dessin(nav, b, v, sombre) {
     const bas = innerHeight - (document.querySelector('.vrm-tabbar') ? document.querySelector('.vrm-tabbar').getBoundingClientRect().height + 16 : 0) - 74;
     const lisibles = rows.filter((r) => q(r).top >= 0 && q(r).bottom <= bas).length;
     const deborde = rows.slice(0, 40).flatMap((r) => [...r.querySelectorAll('*')].filter((e) => !e.closest('[data-lg-tiroir]')).filter((e) => { const a = q(e), z = q(r); return vis(e) && e.children.length === 0 && (a.right > z.right + 1 || a.left < z.left - 1); }).map((e) => e.textContent.trim().slice(0, 20)));
-    const b188 = [...document.querySelectorAll('[data-v2l] .sb-plaque')].find((p) => /B188/.test(p.textContent));
+    const b188 = [...document.querySelectorAll('[data-v2l] .v2-plaque')].find((p) => /B188/.test(p.textContent));
     const menu = document.querySelector('.v2-menu'); const menuCoupe = menu ? [...menu.querySelectorAll('span')].some((e) => e.scrollWidth > e.clientWidth + 1) : null;
     const ambre = rows.filter((r) => r.querySelector('[data-v2l-relier="mot"]')).length;
     const afaire = !!document.querySelector('.vrm-main .vrm-ann-afaire') && [...document.querySelectorAll('.vrm-main .vrm-ann-afaire')].some(vis);

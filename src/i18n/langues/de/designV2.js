@@ -107,5 +107,9 @@ export default {
   "v2.ann.voir": "Ansehen",
   "v2.ann.affichage": "Ansicht",
   "v2.ann.affListe": "Liste",
-  "v2.ann.affDetaille": "Detailliert"
+  "v2.ann.affDetaille": "Detailliert",
+  "v2.ann.nAnnonces": {
+    "one": "{n} Anzeige",
+    "other": "{n} Anzeigen"
+  }
 };

@@ -1057,6 +1057,7 @@ import AujourdhuiV2 from "./designV2/Aujourdhui.jsx";
 import { PassesRetrait as PassesRetraitV2, EnRouteListe as EnRouteListeV2 } from "./designV2/PassesRetrait.jsx";
 import MenuPlateformeV2 from "./designV2/MenuPlateforme.jsx";
 import { BoutonV2 } from "./designV2/BoutonV2.jsx";
+import { nombre as nombreV2 } from "./i18n/index.js";
 import LigneAnnonceV2 from "./designV2/LigneAnnonce.jsx";
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
@@ -53298,7 +53299,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             qu'avant, `annSort`) ; les autres vues, le tri, la grille et Stock sont dans « ⋯ ». Le plein au pouce : publier. */}
         {designV2 && listings.items?.length>0 ? <div className="v2-ann-segment" data-v2-ann-segment="">
           <Segmente label={tr('v2.ann.vues')} plein value={annSearch.trim() ? '' : (annSort==='oldest' ? 'oldest' : annSort)} onChange={(v)=>{ if (v==='oldest') { setAnnSort('oldest'); setAnnSearch(''); } else { if (v==='sleeping' && !(annStats.sleeping>0)) setModeDort('favoris'); setAnnSort(v); } }}
-            options={[{ v: 'oldest', l: tr('v2.ann.enLigne') }, { v: 'sleeping', l: tr('v2.ann.dorment'), n: annStats.sleeping>0 ? annStats.sleeping : undefined }, { v: 'brouillons', l: tr('v2.ann.aPublier'), n: (brVinted.liste||[]).length || undefined }]}/>
+            options={[{ v: 'oldest', l: tr('v2.ann.enLigne') }, { v: 'sleeping', l: tr('v2.ann.dorment'), n: annStats.sleeping>0 ? nombreV2(annStats.sleeping) : undefined }, { v: 'brouillons', l: tr('v2.ann.aPublier'), n: (brVinted.liste||[]).length ? nombreV2((brVinted.liste||[]).length) : undefined }]}/>
         </div> : null}
         <NoAcc/>
         {/* (2 nov.) Sans compte Vinted, rien à compléter : « 0 à relire sur Vinted » n'était qu'un zéro de plus. */}
@@ -53391,7 +53392,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       <button key={t.k} type="button" className="vrm-annbar-outil" data-v2-ann-vue={t.k} onClick={() => { setAnnToolsOpen(false); t.on(); }}>
                         <span aria-hidden="true" className="vrm-annbar-outil-icone"><Icon name={t.icon} size={18}/></span>
                         <span className="vrm-annbar-outil-mot">{t.lab}</span>
-                        {t.n ? <span className="vrm-annbar-outil-n" style={{marginLeft:'auto',fontVariantNumeric:'tabular-nums'}}>{t.n}</span> : null}
+                        {t.n ? <span className="vrm-annbar-outil-n" style={{marginLeft:'auto',fontVariantNumeric:'tabular-nums'}}>{nombreV2(t.n)}</span> : null}
                       </button>))}
                   </div> : null}
                   <div className="vrm-outils-annonces-haut" data-outils-haut="">
@@ -53847,7 +53848,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           {vuePaires === 'liste' ? <div className="vrm-ann-th" data-ann-th="" aria-hidden="true"><span>{tr('annonces.th.article')}</span><span>{tr('annonces.th.taille')}</span><span>{tr('annonces.th.sites')}</span><span>{tr('annonces.th.comptes')}</span><span className="is-r">{tr('annonces.th.prix')}</span><span className="is-r">{tr('annonces.th.enLigne')}</span><span>{tr('annonces.th.place')}</span></div> : null}
           {annGroupesVus.map(g=>{ const acc0 = g.items[0] && g.items[0]._acc; const nomG = acc0 ? accNameOf(acc0) : '';
             // (17 nov., nouveau design) Un en-tête de section simple : le compte UNE fois, avec son nombre.
-            if (designV2) lignesV2.push(<h3 key={'v2h:' + g.uid} className="v2-ann-groupe" data-v2-ann-compte={g.uid}><span>{nomG || tr('annonces.compteVinted')}</span><span className="v2-ann-groupe-n">{trj('annonces.annonces', { n: g.tous })}</span></h3>);
+            if (designV2) lignesV2.push(<h3 key={'v2h:' + g.uid} className="v2-ann-groupe" data-v2-ann-compte={g.uid}><span>{nomG || tr('annonces.compteVinted')}</span><span className="v2-ann-groupe-n">{tr('v2.ann.nAnnonces', { n: g.tous })}</span></h3>);
             return [
           <div key={'compte-'+g.uid} className="vrm-ann-compte-tete" data-ann-compte={g.uid} data-ann-compte-n={g.tous} role="heading" aria-level={3}>
             <span className="vrm-ann-compte-avatar" aria-hidden="true">{initialeCompte(nomG)}</span>
@@ -54160,7 +54161,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           })]; })}
         </div>
         </div>
-        {designV2 && annSort !== 'sansachat' && fileAchat && fileAchat.length > 0 ? <button type="button" className="v2-rangee v2-ann-arelier" data-v2-rangee="" data-v2-ann-arelier={fileAchat.length} onClick={() => setAnnSort('sansachat')}>
+        {false && designV2 && annSort !== 'sansachat' && fileAchat && fileAchat.length > 0 ? <button type="button" className="v2-rangee v2-ann-arelier" data-v2-rangee="" data-v2-ann-arelier={fileAchat.length} onClick={() => setAnnSort('sansachat')}>
           <Icon name="link" size={18}/><span className="v2-ann-arelier-txt">{trj('v2.ann.sansAchat', { n: fileAchat.length })}</span><span className="v2-ann-arelier-geste">{tr('v2.ann.voir')}</span><Icon name="chevron" size={14}/></button> : null}
         {designV2 ? <div className="v2-liste-annonces" data-v2-ligne={ligneV2} role="list" onClick={clicAvant}>{lignesV2}</div> : null}
         <PaireAvantHote rendre={rendreAvantAnnonce}/>
@@ -61969,6 +61970,9 @@ function AppCoeur() {
   const [reprise0]=useState(()=>{ try{ const owner=AUTH.user?.id||readSession()?.user?.id||''; const st=stockageParcours(); return ecranAOuvrir({ carte:carteReprise(), locale:st?repriseLocale(st,owner):null, ongletsOk:ONGLETS_LIENS, search:search0 }); }catch(_){ return null; } });
   // (11 nov., lot DJ3) Une reprise sur l'ancien onglet Colis rouvre sa moitié : Ventes ou Achats.
   const [tab,setTabBrut]=useState(()=>{ if(!reprise0) return 'journee'; const pl=placeDesColis({ tab:reprise0.tab, sub:reprise0.sub, onglet:reprise0.colis }); if(pl&&pl.onglet==='retirer') demanderRetirer(); return pl?pl.tab:reprise0.tab; });
+  // (17 nov., nouveau design) Annonces au téléphone : la tête de la coque ne prend plus de bande (la cloche seule, sur la ligne du
+  // titre ; la recherche est le champ de l'écran ; le profil est ailleurs — Paramètres par le menu ☰ et les autres écrans).
+  const v2Ann = designV2App && !ordi && tab === 'annonces';
   // (6 nov.) L'écran ouvert et celui d'avant, pour « Signaler un problème ».
   noterEcranVu(tab);
   // (6 nov., v36) Et pour les temps réels : une visite d'écran par onglet ouvert.
@@ -65139,7 +65143,7 @@ function AppCoeur() {
               sous={cpt ? ((load('vinted_account_labels', {}) || {})[String(cpt.vinted_user_id)] || cpt.login || '') : nCpt > 1 ? tr('v2.menu.tous') : ''}>
               <FiltreSites tache={t} site={site} sites={sitesPresents} enLigneVinted={t==='annonces' && liveStatsVus ? liveStatsVus.online : undefined} onSite={(s)=>setPlatSub(s)} onChoix={(s)=>{ retenirFiltre(t,s,true); noterReprise({ sites:{ [t]:{ valeur:s, at:Date.now() } } }); }}/>
               {site==='vinted' && !baseKO && nCpt > 1 ? <SelecteurCompte accounts={comptesChoisissables} sel={compteSel} setSel={setCompteSel} connecte={compteConnecte} messages={t==='messages'}/> : null}
-            </MenuPlateformeV2><PhraseEcran cle={t}/></div>; })() : null}
+            </MenuPlateformeV2><span className="v2-aide"><PhraseEcran cle={t}/></span></div>; })() : null}
           {designV2App ? null : <PhraseEcran cle={t}/>}
           {/* (15 nov., refonte-journee — la maquette « Annonces ») Annonces | Stock | Achats SOUS le titre d'Annonces (le même
               sélecteur que la coque, qui ne le pose plus au-dessus pour cet écran). */}
@@ -66026,7 +66030,7 @@ function AppCoeur() {
           (styles-coque.css) : téléphone = barre transparente qui prend son verre
           et son filet au défilement (`is-defile`) ; ordinateur = île discrète en
           haut à droite. Ici seulement la structure et la position. */}
-      <header className={`vrm-app-header${defile ? ' is-defile' : ''}`} ref={ileRef} data-defile-tete={defile ? '1' : '0'} style={{position: ordi ? 'fixed' : 'sticky',top: ordi ? 12 : 0,right: ordi ? 24 : undefined,zIndex:50}}>
+      <header className={`vrm-app-header${defile ? ' is-defile' : ''}${v2Ann ? ' v2-entete-cloche' : ''}`} ref={ileRef} data-defile-tete={defile ? '1' : '0'} style={{position: ordi ? 'fixed' : v2Ann ? 'absolute' : 'sticky',top: ordi ? 12 : v2Ann ? 6 : 0,right: ordi ? 24 : v2Ann ? 12 : undefined,...(v2Ann ? { left: 'auto', width: 'auto', background: 'transparent' } : null),zIndex:50}}>
         {/* ⚠️ `display:none` sur ordinateur, pas `visibility:hidden` : un bloc
             invisible occupe quand même sa largeur, et l'île ferait 400 px. */}
         <div className="vrm-header-brand" style={{display: ordi ? 'none' : undefined}}>
@@ -66070,7 +66074,7 @@ function AppCoeur() {
             {((!reglesStream.bouton && !streamOn) || montantsCaches) && (ordi || montantsCaches) ? <BoutonMontants/> : null}
             {/* (5 nov.) La cloche : ce que VRM a envoyé (src/CentreNotifs.jsx). */}
             {AUTH.user && <CentreNotifsCoque onReglages={()=>setTab('settings')} enTete={(fermer)=>!baseKO && !horsLigne ? <Suspense fallback={null}><LigneFraicheurParesseuse baseKO={baseKO} comptes={vintedAccounts} publier={false} onNav={(t)=>{ fermer(); setTab(t); }}/></Suspense> : null}/>}
-            {!ordi && <button className="vrm-hbtn" type="button" data-recherche-zone="" data-recherche-loupe="" data-recherche-loupe-voix={DICTEE_OK && !VOIX.refus ? '1' : '0'}
+            {!ordi && !v2Ann && <button className="vrm-hbtn" type="button" data-recherche-zone="" data-recherche-loupe="" data-recherche-loupe-voix={DICTEE_OK && !VOIX.refus ? '1' : '0'}
               onPointerDown={(e)=>{ if(!DICTEE_OK || VOIX.refus || (e.button!=null && e.button!==0)) return; clearTimeout(appuiLoupe.current.t); appuiLoupe.current.long=false;
                 appuiLoupe.current.t=setTimeout(()=>{ appuiLoupe.current.long=true; flushSync(()=>setGsOpen(true)); if(!ecouteEnCours('loupe')) dicterLoupe(); }, 550); }}
               onPointerUp={()=>clearTimeout(appuiLoupe.current.t)} onPointerCancel={()=>clearTimeout(appuiLoupe.current.t)} onPointerLeave={()=>clearTimeout(appuiLoupe.current.t)}
@@ -66079,7 +66083,7 @@ function AppCoeur() {
               <Icon name="search" size={21}/>
             </button>}
             {/* (11 nov., lot DJ6) Au téléphone, la photo du profil ferme l'en-tête : elle ouvre le menu du profil (Paramètres…). */}
-            {!ordi && MULTI_USER && <BoutonProfilTete/>}
+            {!ordi && MULTI_USER && !v2Ann && <BoutonProfilTete/>}
             {/* Messages et Paramètres retirés de l'en-tête (Julien, 16 oct.) : ils sont
                 dans la navigation (rail, menu « Ton espace ») — deux portes de trop. */}
             </>); })()}
