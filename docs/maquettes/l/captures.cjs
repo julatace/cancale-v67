@@ -31,19 +31,19 @@ const ECRANS = [['afaire', ''], ['enligne', 'f=enligne'], ['achats', 'f=achats']
       // La clé du 1er achat à retirer et d'une paire du N° en double (lues dans la page).
       let h = h0;
       if (h === 'p=a') h = 'p=' + await pg.evaluate(() => document.querySelector('[data-etat="retirer"]')?.getAttribute('href').match(/p=([^&]+)/)[1]);
-      if (h === 'p=d') h = 'p=' + await pg.evaluate(() => document.querySelector('.n.rouge')?.closest('a').getAttribute('href').match(/p=([^&]+)/)[1]);
+      if (h === 'p=d') h = 'p=' + await pg.evaluate(() => document.querySelector('.tag.rouge')?.closest('a').getAttribute('href').match(/p=([^&]+)/)[1]);
       if (h) await pg.evaluate((x) => { location.hash = x; }, h);
-      await pg.evaluate(() => document.fonts.ready); await pg.waitForTimeout(700);
+      await pg.evaluate(() => document.fonts.ready); await pg.waitForTimeout(900);
       const f = path.join(OUT, `${nom}-${W}-${theme}.png`);
       await pg.screenshot({ path: f });
       const m = await pg.evaluate((tel) => {
         const vis = (el) => { const r = el.getBoundingClientRect(); return r.width > 1 && r.height > 1 && r.bottom > 0 && r.top < innerHeight && !el.closest('[inert]'); };
         const tous = [...document.querySelectorAll('#app *')].filter(vis);
-        const coupes = tous.filter((x) => x.children.length === 0 && x.textContent.trim() && !x.classList.contains('nom') && x.scrollWidth > x.clientWidth + 1).map((x) => x.textContent.slice(0, 30));
-        const nomsCoupes = tous.filter((x) => x.classList.contains('nom') && x.scrollHeight > x.clientHeight + 1).map((x) => x.textContent.slice(0, 30));
+        const coupes = tous.filter((x) => x.children.length === 0 && x.textContent.trim() && !x.classList.contains('carte-nom') && x.scrollWidth > x.clientWidth + 1).map((x) => x.textContent.slice(0, 30));
+        const nomsCoupes = tous.filter((x) => x.classList.contains('carte-nom') && x.scrollHeight > x.clientHeight + 1).map((x) => x.textContent.slice(0, 30));
         const tailles = {}; for (const x of tous) if ([...x.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) { const s = getComputedStyle(x).fontSize; tailles[s] = (tailles[s] || 0) + 1; }
-        const petites = tel ? tous.filter((x) => x.matches('a.filtre, a.onglet, button, .action, .fermer')).filter((x) => x.getBoundingClientRect().height < 43.5).map((x) => x.textContent.trim().slice(0, 20) || x.getAttribute('aria-label')) : [];
-        return { coupes, nomsCoupes, tailles, petites, actions: tous.filter((x) => x.matches('.action')).length, polices: [...document.fonts].filter((x) => x.status === 'loaded').map((x) => x.family) };
+        const petites = tel ? tous.filter((x) => x.matches('a.segment, a.onglet, button, .bouton, .lien-action')).filter((x) => x.getBoundingClientRect().height < 43.5).map((x) => x.textContent.trim().slice(0, 20) || x.getAttribute('aria-label')) : [];
+        return { coupes, nomsCoupes, tailles, petites, actions: tous.filter((x) => x.matches('.bouton')).length, polices: [...document.fonts].filter((x) => x.status === 'loaded').map((x) => x.family) };
       }, tel);
       console.log(path.basename(f), JSON.stringify(m), err.length ? 'ERREURS ' + err.join(' | ') : '');
       await ctx.close();
