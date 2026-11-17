@@ -37,19 +37,19 @@ html body button.v2-ar-barre:focus-visible { outline: none; box-shadow: var(--v2
 .v2-ar-barre[aria-pressed="true"] .v2-ar-barre-l { color: var(--v2-page-texte); }
 
 /* ══ 2. LES FAITS : UNE carte, 2 × 2 au téléphone, 4 côte à côte à l'ordinateur ═════════════════════════════ */
-.v2-ar-faits { margin: 24px 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; background: var(--v2-carte); border-radius: 20px; box-shadow: var(--v2-carte-ombre); overflow: hidden; color: var(--sv-encre, #0C1D30); }
+.v2-ar-faits { margin: 32px 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; background: var(--v2-carte); border-radius: 20px; box-shadow: var(--v2-carte-ombre); overflow: hidden; color: var(--sv-encre, #0C1D30); }
 html body .v2-ar-faits.is-impair > :last-child { grid-column: 1 / -1; }
 @media (min-width: 1024px) { .v2-ar-faits { grid-template-columns: repeat(var(--v2-ar-n, 4), minmax(0, 1fr)); } html body .v2-ar-faits.is-impair > :last-child { grid-column: auto; } }
 /* Très grand texte : un fait par rangée (un nombre n'est jamais coupé). */
 html[data-grand-texte="tres"] .v2-ar-faits { grid-template-columns: minmax(0, 1fr); }
 html[data-grand-texte="tres"] body button.v2-rangee.v2-ar-fait::after { display: none; }
 html[data-grand-texte="tres"] body button.v2-rangee.v2-ar-fait:nth-child(n+2)::before { content: ""; position: absolute; left: 16px; right: 0; top: 0; height: .5px; background: var(--v2-filet); display: block; }
-.v2-ar-passu { margin: 8px 16px 0; font-size: 13px; line-height: 16px; color: var(--v2-page-muet); }
-html body button.v2-rangee.v2-ar-fait { position: relative; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 4px; min-height: 88px; height: 100%; padding: 16px; margin: 0; border-radius: 0; text-align: left; }
+.v2-ar-passu { margin: 12px 20px 0; font-size: 13px; line-height: 1.4; color: var(--v2-page-muet); }
+html body button.v2-rangee.v2-ar-fait { position: relative; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 4px; min-height: 96px; height: 100%; padding: 20px; margin: 0; border-radius: 0; text-align: left; }
 html body button.v2-rangee.v2-ar-fait:active { background: rgb(18 52 96 / .06); transform: none; transition: none; }
 :root[data-theme="dark"] body button.v2-rangee.v2-ar-fait:active { background: rgb(255 255 255 / .06); }
 html body button.v2-rangee.v2-ar-fait:nth-child(odd)::after { content: ""; position: absolute; right: 0; top: 16px; bottom: 16px; width: .5px; background: var(--v2-filet); }
-html body button.v2-rangee.v2-ar-fait:nth-child(n+3)::before { content: ""; position: absolute; left: 16px; right: 0; top: 0; height: .5px; background: var(--v2-filet); }
+html body button.v2-rangee.v2-ar-fait:nth-child(n+3)::before { content: ""; position: absolute; left: 20px; right: 0; top: 0; height: .5px; background: var(--v2-filet); }
 @media (min-width: 1024px) {
   html body button.v2-rangee.v2-ar-fait:not(:last-child)::after { content: ""; position: absolute; right: 0; top: 16px; bottom: 16px; width: .5px; background: var(--v2-filet); }
   html body button.v2-rangee.v2-ar-fait:nth-child(n+3)::before { display: none; }
@@ -65,13 +65,13 @@ html body button.v2-rangee.v2-ar-fait:nth-child(n+3)::before { content: ""; posi
 @media (min-width: 1024px) { .v2-ar-geste { max-width: 360px; } }
 
 /* ══ 4. LES VERSEMENTS : titre (2 lignes), étiquette N° · jour · plateforme, montant, acheté → marge ═════════ */
-.v2-ar-h { margin: 32px 16px 8px; font-size: 13px; line-height: 16px; font-weight: 600; letter-spacing: 0; color: var(--v2-page-muet); }
+.v2-ar-h { margin: 32px 20px 12px; font-size: 13px; line-height: 16px; font-weight: 600; letter-spacing: 0; color: var(--v2-page-muet); }
 .v2-ar-liste { background: var(--v2-carte); border-radius: 20px; box-shadow: var(--v2-carte-ombre); overflow: hidden; color: var(--sv-encre, #0C1D30); }
-.v2-ar-v, html body button.v2-rangee.v2-ar-v { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; min-height: 72px; padding: 12px 16px; margin: 0; border: 0; border-radius: 0; background: transparent; box-sizing: border-box; text-align: left; color: inherit; box-shadow: none;
+.v2-ar-v, html body button.v2-rangee.v2-ar-v { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; min-height: 72px; padding: 16px 20px; margin: 0; border: 0; border-radius: 0; background: transparent; box-sizing: border-box; text-align: left; color: inherit; box-shadow: none;
   content-visibility: auto; contain-intrinsic-size: auto 80px; }
 html body button.v2-rangee.v2-ar-v:active { background: rgb(18 52 96 / .06); transform: none; transition: none; }
 :root[data-theme="dark"] body button.v2-rangee.v2-ar-v:active { background: rgb(255 255 255 / .06); }
-.v2-ar-v + .v2-ar-v::before { content: ""; position: absolute; left: 16px; right: 0; top: 0; height: .5px; background: var(--v2-filet); }
+.v2-ar-v + .v2-ar-v::before { content: ""; position: absolute; left: 20px; right: 0; top: 0; height: .5px; background: var(--v2-filet); }
 .v2-ar-v-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .v2-ar-v-titre { font-size: 17px; line-height: 22px; font-weight: 600; overflow-wrap: break-word; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .v2-ar-v-sous { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; min-width: 0; font-size: 13px; line-height: 16px; color: var(--v2-muet); }
@@ -83,9 +83,9 @@ html body button.v2-rangee.v2-ar-v:active { background: rgb(18 52 96 / .06); tra
 .v2-ar-v-marge b { font-weight: 600; color: var(--sv-encre, #0C1D30); }
 :root[data-theme="dark"] .v2-ar-v-marge b { color: #F2F7FD; }
 /* État vide et « pas su » : une carte calme, une phrase. */
-.v2-ar-vide { display: flex; align-items: center; justify-content: center; min-height: 88px; padding: 16px; background: var(--v2-carte); border-radius: 20px; box-shadow: var(--v2-carte-ombre); text-align: center; color: var(--v2-muet); font-size: 15px; line-height: 20px; }
+.v2-ar-vide { display: flex; align-items: center; justify-content: center; min-height: 88px; padding: 20px; background: var(--v2-carte); border-radius: 20px; box-shadow: var(--v2-carte-ombre); text-align: center; color: var(--v2-muet); font-size: 15px; line-height: 20px; }
 .v2-ar-vide b { font-weight: 600; }
-.v2-ar-reste { margin: 8px 16px 0; font-size: 13px; line-height: 16px; color: var(--v2-page-muet); }
+.v2-ar-reste { margin: 12px 20px 0; font-size: 13px; line-height: 1.4; color: var(--v2-page-muet); }
 /* Le squelette : la forme exacte d'une rangée, un reflet lent (aucun chiffre) ; mouvement réduit : immobile. */
 .v2-sq { display: block; border-radius: 12px; background: rgb(18 52 96 / .08); }
 :root[data-theme="dark"] .v2-sq { background: rgb(255 255 255 / .08); }
@@ -103,7 +103,7 @@ html body button.v2-rangee.v2-ar-v:active { background: rgb(18 52 96 / .06); tra
 
 /* ══ 5. FACTURES : tête à soi, une recherche, un segmenté, un état vide ══════════════════════════════════════ */
 .v2-fac { display: flex; flex-direction: column; gap: 16px; }
-.v2-fac-vide { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 160px; padding: 24px 16px; background: var(--v2-carte); border-radius: 20px; box-shadow: var(--v2-carte-ombre); text-align: center; color: var(--v2-muet); font-size: 15px; line-height: 20px; }
+.v2-fac-vide { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 160px; padding: 24px 20px; background: var(--v2-carte); border-radius: 20px; box-shadow: var(--v2-carte-ombre); text-align: center; color: var(--v2-muet); font-size: 15px; line-height: 20px; }
 .v2-fac-vide b { color: var(--sv-encre, #0C1D30); font-size: 17px; line-height: 22px; font-weight: 600; }
 :root[data-theme="dark"] .v2-fac-vide b { color: #F2F7FD; }
 .v2-tete-tache.v2-tete-argent { padding: 8px 0 0; gap: 12px; }
@@ -192,10 +192,10 @@ html body button.v2-rangee.v2-ar-v:active { background: rgb(18 52 96 / .06); tra
 
 /* ── Paramètres : les rangées du nouveau design (RangeeTouchable) — icône teintée, nom 17/400, valeur, chevron ── */
 .v2-pm-liste { background: var(--v2-carte); border-radius: 20px; box-shadow: var(--v2-carte-ombre); overflow: hidden; color: var(--sv-encre, #0C1D30); }
-html body button.v2-rangee.v2-pm-rangee { position: relative; gap: 12px; min-height: 52px; padding: 8px 16px; border-radius: 0; color: inherit; }
+html body button.v2-rangee.v2-pm-rangee { position: relative; gap: 12px; min-height: 64px; padding: 12px 20px; border-radius: 0; color: inherit; }
 html body button.v2-rangee.v2-pm-rangee:active { background: rgb(18 52 96 / .06); transform: none; transition: none; }
 :root[data-theme="dark"] body button.v2-rangee.v2-pm-rangee:active { background: rgb(255 255 255 / .06); }
-.v2-pm-rangee + .v2-pm-rangee::before { content: ""; position: absolute; left: 60px; right: 0; top: 0; height: .5px; background: var(--v2-filet); }
+.v2-pm-rangee + .v2-pm-rangee::before { content: ""; position: absolute; left: 64px; right: 0; top: 0; height: .5px; background: var(--v2-filet); }
 .v2-pm-ic { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 12px; background: var(--v2-teinte-fond); color: var(--v2-teinte-texte); }
 .v2-pm-lib { flex: 1 1 auto; min-width: 0; font-size: 17px; line-height: 22px; font-weight: 400; overflow-wrap: break-word; }
 .v2-pm-val { flex: 0 1 auto; max-width: 50%; font-size: 17px; line-height: 22px; text-align: right; color: var(--v2-muet); }
@@ -222,3 +222,47 @@ html[data-grand-texte] .v2-pm-moi .v2-pm-val { padding-left: 60px; }
 html[data-grand-texte] .v2-tete-argent .v2-titre-ligne { flex-wrap: wrap; row-gap: 8px; padding-right: 0; }
 html[data-grand-texte] .v2-tete-argent .v2-titre-ligne h1 { flex: 1 0 100%; padding-right: 56px; box-sizing: border-box; }
 .v2-pm-moi .v2-pm-av { background: var(--v2-teinte-fond); color: var(--v2-teinte-texte); font-weight: 600; }
+
+/* ══ 7. AIR (17 nov. soir, Julien : « c'est trop compacté ») — l'échelle d'espacement OBLIGATOIRE, mesurée par le banc :
+   marge intérieure d'une carte ≥ 20 px, 16 px entre deux cartes, 32 px entre deux sections, titre → contenu 12 px,
+   ≥ 12 px entre deux boutons, rangée de liste ≥ 64 px, interligne 1,4 ; les replis voisins forment UNE liste groupée. ══ */
+.v2-registre-gestes { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
+@layer vrm-verre {
+/* Argent (Mois, Déclarer, Factures) : les cartes d'hier respirent. */
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) :is(.vrm-surface, .vrm-urssaf-geste, .vrm-mb, .vrm-compta-carte, .vrm-ac-carte, .vrm-d7-carte, .vrm-fu-declaration, .vrm-at-carte, [data-prevision-urssaf]) { padding: 20px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) .vrm-surface:has(> [data-compta-resultat]) { padding: 0 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) [data-compta-resultat] { padding: 20px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) .vrm-d7-rapport { padding: 16px 20px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) :is(.vrm-surface, .vrm-urssaf-geste, .vrm-mb, .vrm-compta-carte, .vrm-ac-carte, .vrm-d7-carte, .vrm-repli, .vrm-set-liste) { border-radius: 20px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-argent-partie { gap: 16px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-argent-partie > .vrm-compta-q { display: flex !important; flex-direction: column !important; gap: 16px !important; margin: 16px 0 0 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-argent-partie > .vrm-compta-q:first-child { margin-top: 0 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-compta-q-tete { margin: 0 20px -4px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-compta-question { font-size: 13px !important; line-height: 18px !important; font-weight: 600 !important; letter-spacing: 0 !important; text-transform: none !important; color: var(--v2-page-muet) !important; margin: 0 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) :is(p, small, .vrm-set-desc, .vrm-compta-repli-resume) { line-height: 1.4 !important; }
+/* Les boutons voisins : 12 px au moins. */
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures], .vrm-pm) :is(.vrm-urssaf-gestes, .vrm-registre > span, .vrm-micro-gestes, [data-fac-actions]) { gap: 12px !important; }
+/* Les replis (Tes déclarations URSSAF, Ta micro-entreprise, DAC7, le détail du Mois…) : des RANGÉES de liste groupée —
+   64 px, 20 px de marge, le résumé (la valeur) dessous, le chevron ; des replis voisins se collent en UNE carte. */
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent :is(.vrm-repli.vrm-compta-repli, .vrm-repli.vrm-micro-repli) { margin: 0 !important; padding: 0 !important; background: var(--v2-carte) !important; border: 0 !important; box-shadow: var(--v2-carte-ombre) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; color: var(--sv-encre, #0C1D30) !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent :is(.vrm-repli.vrm-compta-repli, .vrm-repli.vrm-micro-repli) > summary { display: flex !important; align-items: center !important; gap: 12px !important; min-height: 64px !important; padding: 12px 20px !important; box-sizing: border-box !important; margin: 0 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent :is(.vrm-repli.vrm-compta-repli, .vrm-repli.vrm-micro-repli)[open] > :not(summary) { padding: 0 20px 20px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent :is(.vrm-compta-repli-titre) { font-size: 17px !important; line-height: 22px !important; font-weight: 400 !important; color: inherit !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-compta-repli-tete { display: flex !important; flex-direction: column !important; gap: 2px !important; min-width: 0 !important; flex: 1 1 auto !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-compta-repli-resume { font-size: 13px !important; color: var(--v2-muet) !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-theme="dark"] body .vrm-argent :is(.vrm-repli.vrm-compta-repli, .vrm-repli.vrm-micro-repli) { color: #F2F7FD !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent :is(.vrm-compta-repli, .vrm-micro-repli):has(+ :is(.vrm-compta-repli, .vrm-micro-repli)) { border-bottom-left-radius: 0 !important; border-bottom-right-radius: 0 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent :is(.vrm-compta-repli, .vrm-micro-repli) + :is(.vrm-compta-repli, .vrm-micro-repli) { margin-top: -16px !important; border-top-left-radius: 0 !important; border-top-right-radius: 0 !important; position: relative !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent :is(.vrm-compta-repli, .vrm-micro-repli) + :is(.vrm-compta-repli, .vrm-micro-repli)::before { content: "" !important; position: absolute !important; left: 20px !important; right: 0 !important; top: 0 !important; height: .5px !important; background: var(--v2-filet) !important; z-index: 1 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-compta-replis { display: flex !important; flex-direction: column !important; gap: 0 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-compta-replis > .vrm-compta-repli + .vrm-compta-repli { margin-top: 0 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-compta-replis > .vrm-compta-repli:not(:first-child) { border-top-left-radius: 0 !important; border-top-right-radius: 0 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-compta-replis > .vrm-compta-repli:not(:last-child) { border-bottom-left-radius: 0 !important; border-bottom-right-radius: 0 !important; }
+/* Paramètres (les catégories et leurs réglages) : listes groupées aérées. */
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-set-liste { border-radius: 20px !important; overflow: hidden !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-set-liste > .vrm-set-ligne, :root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-set-liste > * > .vrm-set-ligne { min-height: 64px !important; padding: 12px 20px !important; box-sizing: border-box !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm :is(.vrm-set-carte, .vrm-set-panneau > .vrm-surface) { padding: 20px !important; border-radius: 20px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-set-groupe { margin: 0 0 32px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-set-titre { margin: 0 20px 12px !important; font-size: 13px !important; font-weight: 600 !important; text-transform: none !important; letter-spacing: 0 !important; color: var(--v2-page-muet) !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-set-desc { line-height: 1.4 !important; }
+}

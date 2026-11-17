@@ -1978,6 +1978,8 @@ const recettesDe = ({ calc, periode, versements, lbcVentes, ebayCommandes, vente
   return livreDesRecettes({ decl: calc.decl, periode, numDe, compteDe, manque: [...calc.manque, ...(versements === null ? ['dates de versement Vinted'] : [])] });
 };
 function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
+  const designV2 = useDesignV2();   // (17 nov., AIR) « Voir » + « ⋯ » au lieu de trois boutons serrés
+  const [menuReg, setMenuReg] = React.useState(null);
   const { calc, versements } = useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts });
   const ventesVcER = useVentesVestiaire();
   const an = new Date().getFullYear();
@@ -2069,11 +2071,19 @@ function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accoun
           {R && R.type === 'achats' && R.aVerifier ? <span data-registre-a-verifier-txt="" style={{ color: C.warn }}>{trj('compta.verifierAussiDans', { aVerifier: R.aVerifier })}</span> : null}
         </span>
       </span>
+      {designV2 ? (
+        // (17 nov., nouveau design · AIR) Trois boutons serrés ⇒ UN geste « Voir » + « ⋯ » (PDF, Tableur) : les mêmes exports.
+        <span className="v2-registre-gestes">
+          <Bouton variante="secondaire" data-registre-voir={type} disabled={R === undefined} onClick={() => setVue(type)}>{tr('registres.voir')}</Bouton>
+          <BoutonIconeV2 icone={<Icon name="more" size={22}/>} label={tr('v2.reg.exporter', { nom: String(nom) })} onClick={() => setMenuReg(type)} attrs={{ 'data-registre-plus': type, 'aria-haspopup': 'dialog' }}/>
+        </span>
+      ) : (
       <span style={{ display: 'flex', gap: 8, flex: '0 0 auto' }}>
         <Bouton variante="secondaire" icone="doc" data-registre-pdf={type} aria-label={tr('compta.telechargerPdf', { nom: String(nom) })} title={tr('compta.telechargerPdf', { nom: String(nom) })} disabled={!R || !!enCours} onClick={() => exporter(type, 'pdf')}>{enCours === type + 'pdf' ? '…' : 'PDF'}</Bouton>
         <Bouton variante="secondaire" icone="save" data-registre-csv={type} aria-label={tr('compta.telechargerTableur', { nom: String(nom) })} title={tr('compta.telechargerTableurExcel', { nom: String(nom) })} disabled={!R || !!enCours} onClick={() => exporter(type, 'csv')}>{enCours === type + 'csv' ? '…' : tr('compta.tableur')}</Bouton>
         <Bouton variante="secondaire" data-registre-voir={type} disabled={R === undefined} onClick={() => setVue(type)}>{tr('registres.voir')}</Bouton>
       </span>
+      )}
     </div>
   );
   return (
@@ -2086,6 +2096,12 @@ function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accoun
       </div>
       {ligne('recettes', tr('compta.livreRecettes'), recettes)}
       {ligne('achats', tr('compta.registreAchats'), registreAchats)}
+      {designV2 && menuReg ? <SheetShell onClose={() => setMenuReg(null)} maxWidth={420} titre={menuReg === 'recettes' ? tr('compta.livreRecettes') : tr('compta.registreAchats')} data-registre-menu={menuReg}>
+        <div className="vrm-fiche-menu" onClickCapture={(ev) => { const b = ev.target && ev.target.closest && ev.target.closest('button'); if (b) setTimeout(() => setMenuReg(null), 0); }}>
+          <button type="button" data-registre-pdf={menuReg} disabled={!(menuReg === 'recettes' ? recettes : registreAchats) || !!enCours} onClick={() => exporter(menuReg, 'pdf')}><Icon name="doc" size={16}/>{tr('v2.reg.pdf')}</button>
+          <button type="button" data-registre-csv={menuReg} disabled={!(menuReg === 'recettes' ? recettes : registreAchats) || !!enCours} onClick={() => exporter(menuReg, 'csv')}><Icon name="save" size={16}/>{tr('compta.tableur')}</button>
+        </div>
+      </SheetShell> : null}
       {vue && <RegistresVue type={vue} setType={setVue} periode={periode} setPeriode={setPeriode} periodes={periodes} registres={complets}
         onClose={() => setVue(null)} exporter={(R, forme) => exporter(R.type, forme)} enCours={enCours} />}
     </div></Card>

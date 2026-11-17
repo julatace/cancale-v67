@@ -40,5 +40,7 @@ export default {
   "v2.ar.lecture": "Auszahlungen werden gelesen…",
   "v2.pm.chercher": "Einstellung suchen",
   "v2.ar.pasEncoreLu": "Noch nicht gelesen: {quoi}",
-  "v2.fac.chercher": "Rechnung suchen"
+  "v2.fac.chercher": "Rechnung suchen",
+  "v2.reg.exporter": "Exportieren: {nom}",
+  "v2.reg.pdf": "PDF"
 };

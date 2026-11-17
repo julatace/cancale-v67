@@ -40,5 +40,7 @@ export default {
   "v2.ar.lecture": "Reading payouts…",
   "v2.pm.chercher": "Search settings",
   "v2.ar.pasEncoreLu": "Not read yet: {quoi}",
-  "v2.fac.chercher": "Search invoices"
+  "v2.fac.chercher": "Search invoices",
+  "v2.reg.exporter": "Export: {nom}",
+  "v2.reg.pdf": "PDF"
 };

@@ -134,6 +134,46 @@ async function mesurer(pg, nom, zonesSel) {
   return r;
 }
 
+
+// ── AIR (17 nov. soir, Julien : « c'est trop compacté ») : l'échelle d'espacement, mesurée sur ce qui est RENDU. ──
+//   texte ≥ 20 px du bord de SA carte ; 16 px entre deux cartes voisines (0 = une liste groupée collée) ;
+//   ≥ 12 px entre deux boutons voisins, jamais 3 boutons ou plus sur une rangée ; rangée de liste ≥ 64 px ; interligne ≥ 1,35.
+async function air(pg, nom, racineSel) {
+  const r = await pg.evaluate((racineSel) => {
+    const racines = [...document.querySelectorAll(racineSel)].filter((e) => e.getClientRects().length);
+    const vis = (e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden' && !e.closest('[hidden]');
+    const EXCLU = 'button, a, input, select, textarea, .v2-seg, .vrm-seg, .v2-etiquette, .v2-ar-barre, .vrm-tabbar, .v2-sq, svg, img, [role="progressbar"], .vrm-av-barre, .vrm-jauge, [data-jauge]';
+    const estCarte = (e) => { if (e.matches(EXCLU) || e.closest('button, a, .vrm-tabbar')) return false; const cs = getComputedStyle(e); if (!(parseFloat(cs.borderTopLeftRadius) >= 12 || parseFloat(cs.borderBottomLeftRadius) >= 12)) return false;
+      const bg = cs.backgroundColor; const fond = !/rgba\(0, 0, 0, 0\)|transparent/.test(bg) || cs.backgroundImage !== 'none' || (cs.backdropFilter && cs.backdropFilter !== 'none'); if (!fond) return false;
+      const q = e.getBoundingClientRect(); return q.width >= 200 && q.height >= 40; };
+    const cartes = racines.flatMap((z) => [...z.querySelectorAll('*')]).filter(vis).filter(estCarte);
+    const set = new Set(cartes);
+    const carteDe = (n) => { for (let p = n.parentElement; p; p = p.parentElement) if (set.has(p)) return p; return null; };
+    const serres = [];
+    const marcher = (z) => { const w = document.createTreeWalker(z, NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) { if (!n.textContent.trim()) continue; const el = n.parentElement; if (!el || !vis(el) || el.closest('.vg-sr, .vrm-sr-seul, button, .v2-seg, .vrm-seg, select, input')) continue;
+      const c = carteDe(n); if (!c) continue; const r0 = document.createRange(); r0.selectNodeContents(n); const rs = [...r0.getClientRects()].filter((q) => q.width > 1 && q.height > 1); if (!rs.length) continue;
+      const C = c.getBoundingClientRect(); for (const q of rs) { const d = Math.min(q.left - C.left, C.right - q.right, q.top - C.top, C.bottom - q.bottom); if (d < 19.5 && d > -400) { serres.push({ t: n.textContent.trim().slice(0, 24), d: Math.round(d), c: String(c.className || c.tagName).slice(0, 40) }); break; } } } };
+    racines.forEach(marcher);
+    const ecarts = [];
+    for (const c of cartes) { const s = c.nextElementSibling; if (!s || !set.has(s)) continue; const g = s.getBoundingClientRect().top - c.getBoundingClientRect().bottom; if (g > 0.5 && g < 15.5) ecarts.push({ g: Math.round(g), c: String(c.className).slice(0, 30) }); }
+    const boutons = racines.flatMap((z) => [...z.querySelectorAll('button, a.vrm-b')]).filter(vis).filter((b) => !b.closest('.v2-seg, .vrm-seg, .v2-ar-barres, [role="radiogroup"], .vrm-tabbar, .v2-ar-faits, .v2-ar-liste, .v2-pm-liste, summary') && b.getBoundingClientRect().width > 0);
+    const boites = boutons.map((b) => ({ b, q: b.getBoundingClientRect() }));
+    const pres = [], rangees = [];
+    for (const x of boites) { const memes = boites.filter((y) => y !== x && Math.min(x.q.bottom, y.q.bottom) - Math.max(x.q.top, y.q.top) > Math.min(x.q.height, y.q.height) * 0.5 && x.b.parentElement && (x.b.closest('div,span,section') === y.b.closest('div,span,section')));
+      for (const y of memes) { const g = y.q.left - x.q.right; if (g >= -1 && g < 11.5) pres.push((x.b.textContent || x.b.getAttribute('aria-label') || '').trim().slice(0, 16) + '|' + (y.b.textContent || y.b.getAttribute('aria-label') || '').trim().slice(0, 16) + ':' + Math.round(g)); }
+      if (memes.length >= 2) rangees.push((x.b.textContent || '').trim().slice(0, 16)); }
+    const lignes = racines.flatMap((z) => [...z.querySelectorAll('.v2-ar-v, .v2-pm-rangee, .vrm-set-ligne, details.vrm-compta-repli > summary, details.vrm-micro-repli > summary')]).filter(vis).map((e) => ({ t: (e.textContent || '').trim().slice(0, 20), h: Math.round(e.getBoundingClientRect().height) })).filter((x) => x.h > 0 && x.h < 63.5);
+    const interligne = racines.flatMap((z) => [...z.querySelectorAll('p')]).filter(vis).map((e) => { const cs = getComputedStyle(e); const lh = parseFloat(cs.lineHeight), fs = parseFloat(cs.fontSize); return { t: e.textContent.trim().slice(0, 20), r: lh && fs ? Math.round(lh / fs * 100) / 100 : 1.5 }; }).filter((x) => x.r < 1.35);
+    return { n: cartes.length, serres, ecarts, pres: [...new Set(pres)], rangees: [...new Set(rangees)], lignes, interligne };
+  }, racineSel);
+  dit(r.n > 0 && !r.serres.length, `A ${nom} : ${r.n} cartes, aucun texte à moins de 20 px de leur bord`, r.serres.slice(0, 8));
+  dit(!r.ecarts.length, `A ${nom} : 16 px entre deux cartes voisines (ou collées en liste groupée)`, r.ecarts.slice(0, 6));
+  dit(!r.pres.length && !r.rangees.length, `A ${nom} : ≥ 12 px entre deux boutons, aucune rangée de 3 boutons ou plus`, { pres: r.pres.slice(0, 6), rangees: r.rangees.slice(0, 6) });
+  dit(!r.lignes.length, `A ${nom} : rangées de liste ≥ 64 px`, r.lignes.slice(0, 6));
+  dit(!r.interligne.length, `A ${nom} : interligne du texte ≥ 1,35`, r.interligne.slice(0, 6));
+  return r;
+}
+
 const ZONES_ARGENT = '.v2-argent, .v2-argent-nav, .vrm-screen-head:has(.v2-argent-nav)';
 
 (async () => {
@@ -209,6 +249,7 @@ const ZONES_ARGENT = '.v2-argent, .v2-argent-nav, .vrm-screen-head:has(.v2-argen
         dit(!s.encaisse && !s.auMoins0 && !s.nan, `S ${T} : jamais « encaissé », jamais « au moins 0 », ni NaN`, s);
         const mm = await mesurer(pg, `Mois ${T}`, ZONES_ARGENT);
         dit(apres.geste != null ? mm.pleins.length === 1 : mm.pleins.length === 0, `P Mois ${T} : ${apres.geste != null ? 'exactement UN' : 'aucun'} bouton plein (${mm.pleins.join(' | ') || 'aucun'})`, mm.pleins);
+        await air(pg, `Mois ${T}`, '.vrm-argent [data-argent-vue="resume"]');
         await capture(pg, `argent-mois-${W}-${th}`);
         // ── Q · QUALITÉ ET FLUIDITÉ ──
         // Q1 la réponse au toucher : un fait enfoncé change de fond en moins de 100 ms (sans déclencher le geste).
@@ -258,7 +299,9 @@ const ZONES_ARGENT = '.v2-argent, .v2-argent-nav, .vrm-screen-head:has(.v2-argen
         dit(segD === 'declarer', `S ${T} : sur Déclarer, « Déclarer » allumé`, segD);
         const md = await mesurer(pg, `Déclarer ${T}`, ZONES_ARGENT);
         dit(md.pleins.length <= 1, `P Déclarer ${T} : au plus un bouton plein (${md.pleins.join(' | ') || 'aucun'})`, md.pleins);
+        await air(pg, `Déclarer ${T}`, '.vrm-argent [data-argent-vue="declarer"]');
         await capture(pg, `argent-declarer-${W}-${th}`);
+        if (tel) { await pg.evaluate(() => { const e = document.querySelector('[data-micro-repli]') || document.querySelector('[data-registres]'); if (e) e.scrollIntoView({ block: 'start' }); window.scrollBy(0, -80); }); await pg.waitForTimeout(500); await pg.screenshot({ path: path.join(SHOTS, `argent-registres-${W}-${th}.png`) }); }
         // Factures
         await aller(pg, 'invoices', 3000);
         const segF = await pg.evaluate(() => { const b = document.querySelector('.v2-argent-nav [aria-selected="true"]'); return b ? b.getAttribute('data-section') : null; });
@@ -269,6 +312,7 @@ const ZONES_ARGENT = '.v2-argent, .v2-argent-nav, .vrm-screen-head:has(.v2-argen
         dit(fa.plein != null && fa.plein < 200 && fa.champs === 1 && fa.chercher === 0 && fa.zones === 2 && fa.vide && !fa.ancienne, `S ${T} : Factures — « Nouvelle facture » sur la ligne du titre, UNE recherche, UN segmenté En attente · Comptabilisées, un état vide dessiné`, fa);
         const mfa = await mesurer(pg, `Factures ${T}`, ZONES_ARGENT + ', .v2-fac > header, .v2-fac-outils, [data-fac-zones], .v2-fac-vide');
         dit(mfa.pleins.length === 1, `P Factures ${T} : exactement UN plein (${mfa.pleins.join(' | ')})`, mfa.pleins);
+        await air(pg, `Factures ${T}`, '[data-argent-factures]');
         await capture(pg, `argent-factures-${W}-${th}`);
         // Statistiques
         await aller(pg, 'dashboard', 3600);
@@ -295,6 +339,7 @@ const ZONES_ARGENT = '.v2-argent, .v2-argent-nav, .vrm-screen-head:has(.v2-argen
             return { loupe: [...document.querySelectorAll('[data-recherche-loupe]')].filter(vis).length, profil: [...document.querySelectorAll('.vrm-app-header [data-profil-tete], .vrm-app-header .vrm-profil-tete')].filter(vis).length, ph: i ? i.getAttribute('placeholder') : null, phCoupe: i ? i.scrollWidth > i.clientWidth + 1 : null }; });
           dit(pt.loupe === 0 && pt.ph === 'Chercher un réglage', `R ${T} : Paramètres sans la rangée de ronds d’hier, recherche « ${pt.ph} »`, pt);
           await mesurer(pg, `Paramètres ${T}`, '[data-v2-parametres]');
+          await air(pg, `Paramètres ${T}`, '.vrm-pm');
           await capture(pg, `parametres-${W}-${th}`);
           // L'interrupteur « Nouveau design (essai) » : Apparence et langue → Apparence.
           const inter = await pg.evaluate(() => !!document.querySelector('[data-design-v2-bouton]'));

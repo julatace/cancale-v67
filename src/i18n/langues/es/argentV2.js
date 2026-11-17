@@ -40,5 +40,7 @@ export default {
   "v2.ar.lecture": "Leyendo los pagos…",
   "v2.pm.chercher": "Buscar un ajuste",
   "v2.ar.pasEncoreLu": "Aún no leído: {quoi}",
-  "v2.fac.chercher": "Buscar una factura"
+  "v2.fac.chercher": "Buscar una factura",
+  "v2.reg.exporter": "Exportar: {nom}",
+  "v2.reg.pdf": "PDF"
 };
