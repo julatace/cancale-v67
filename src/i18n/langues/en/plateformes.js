@@ -14,6 +14,8 @@ export default {
   "plateformes.reglages.avances": "Advanced settings",
   "plateformes.reglagesEbay": "eBay settings",
   "plateformes.rien": "Nothing matches this search.",
+  "plateformes.ebay.chercher": "No., title, SKU…",
+  "plateformes.lbc.chercher": "No., title, account…",
   "plateformes.vc.chercher": "No., title…",
   "plateformes.vc.chercherLabel": "Search a Vestiaire listing (no., title)",
   "plateformes.vendreEbay": "Sell on eBay",

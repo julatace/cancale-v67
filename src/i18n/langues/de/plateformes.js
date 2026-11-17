@@ -14,6 +14,8 @@ export default {
   "plateformes.reglages.avances": "Erweiterte Einstellungen",
   "plateformes.reglagesEbay": "eBay-Einstellungen",
   "plateformes.rien": "Nichts passt zu dieser Suche.",
+  "plateformes.ebay.chercher": "Nr., Titel, SKU…",
+  "plateformes.lbc.chercher": "Nr., Titel, Konto…",
   "plateformes.vc.chercher": "Nr., Titel…",
   "plateformes.vc.chercherLabel": "Vestiaire-Anzeige suchen (Nr., Titel)",
   "plateformes.vendreEbay": "Auf eBay verkaufen",
