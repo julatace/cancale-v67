@@ -1982,3 +1982,5 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Lignes déplacées de CLAUDE.md §9 (17 nov., lot accessibilite)
 
 - **16 nov. · Tampons des bordereaux (lot tampons-parametres)** : UN réglage `vrm_tampons` (SYNC_KEYS, migration des choix d'avant) lu par TOUTES les impressions ; « Créé par vrm.center » juste AU-DESSUS du QR, centrée (sinon dessous, sinon sous l'adresse) ; la sélection ouvre l'APERÇU AVANT IMPRESSION (vignettes, tampon déplacé au doigt, codes/QR/adresse refusés, « tous de ce type ») ; Paramètres → Imprimante : galerie de tous les types × papiers, même éditeur. `docs/passation/2026-11-16-tampons-parametres.md`. Geste : aucun.
+
+- **17 nov. · Relier en touchant (lot relier-toucher)** : plus jamais d'appui long obligatoire — un toucher choisit l'achat (ou la vente/annonce), bandeau fixe « Achat choisi · Changer », la liste d'en face prend la place, un toucher ⇒ « Relier N°… ? » ⇒ bénéfice + Reçu, Annuler 5 s ; « ⋯ » d'un achat (et sa fiche) : « Relier à une vente / annonce ». `docs/passation/2026-11-17-relier-toucher.md`. Geste : aucun.
