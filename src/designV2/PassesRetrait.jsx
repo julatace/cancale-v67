@@ -110,12 +110,9 @@ export function EnRouteListe({ lignes = [], Icon, Photo, onOuvrir = null, max = 
             </span>
             <span className="v2-ligne-txt">
               <span className="v2-ligne-titre">{l.titre || tr('v2.enRoute.sansTitre')}</span>
-              <span className="v2-ligne-meta">{[l.num ? 'N° ' + l.num : '', l.compte].filter(Boolean).join(' · ') || ' '}</span>
+              <span className="v2-ligne-meta">{[l.num ? 'N° ' + l.num : '', l.compte, l.point].filter(Boolean).join(' · ') || '\u00a0'}</span>
             </span>
-            <span className="v2-ligne-droite">
-              <span className="v2-ligne-valeur">{l.prix || ''}</span>
-              <span className="v2-ligne-meta">{l.point || tr('v2.enRoute.pointPasDit')}</span>
-            </span>
+            {l.prix ? <span className="v2-ligne-droite"><span className="v2-ligne-valeur">{l.prix}</span></span> : null}
             {onOuvrir ? <span className="v2-chevron" aria-hidden="true"><Icon name="chevron" size={16}/></span> : null}
           </Corps>); })}
       </div>

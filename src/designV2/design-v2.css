@@ -482,3 +482,7 @@ html[data-grand-texte] body button.v2b-principal { height: auto; min-height: var
   html[data-design="v2"] body .vrm-neuf-hote { top: auto; bottom: calc(var(--vrm-barre-bas, 84px) + 16px + env(safe-area-inset-bottom, 0px)); }
   html[data-design="v2"] body:has(.v2-pouce) .vrm-neuf-hote { bottom: var(--v2-pile-bas); }
 }
+/* Constat 10. Sur ordinateur, « Extension à installer » (la pastille d'état de l'île du haut) n'est plus un plein : teintée, comme un secondaire. */
+@media (min-width: 1024px) {
+  html[data-design="v2"]:root body .vrm-app-header .vrm-etat-pastille[data-etat-code] { background: var(--v2-teinte-fond) !important; color: var(--v2-teinte-texte) !important; border-color: transparent !important; box-shadow: none !important; }
+}
