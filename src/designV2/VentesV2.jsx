@@ -20,7 +20,7 @@
 import React from 'react';
 import { tr, nombre } from '../i18n/index.js';
 import LigneAnnonce from './LigneAnnonce.jsx';
-import { ChiffreAffiche, RangeeFaite } from './Signature.jsx';
+import { ChiffreAffiche, RangeeFaite, SqueletteRangees } from './Signature.jsx';
 import './design-v2.css';
 
 // L'ordre des groupes d'« À envoyer » (le plus pressé d'abord ; ce qui est imprimé, à la fin).
@@ -117,21 +117,6 @@ export function filtrerLignes(lignes, q) {
   return lignes.filter((l) => sansAccents([l.num ? 'n°' + l.num + ' ' + l.num : '', l.titreComplet || l.titre, ...(l.sous || []), ...((l.l3 || []).map((x) => x.texte)), l.prix].join(' ')).includes(r));
 }
 
-// Le SQUELETTE de la liste, de la forme EXACTE des rangées A (photo 64, titre, étiquette, 3e ligne) : jamais un écran blanc
-// ni une phrase seule pendant la lecture. Aucune donnée : des formes grises, `aria-busy`, un nom accessible.
-export function SqueletteListe({ n = 6, label }) {
-  return (
-    <div className="v2v-liste v2v-squelette" data-v2v-squelette="" aria-busy="true" aria-label={label} role="status">
-      <span className="v2v-sq-groupe"/>
-      {Array.from({ length: n }, (_, i) => (
-        <div key={i} className="v2l v2l-a v2v-sq" aria-hidden="true">
-          <span className="v2l-photo v2l-photo-a v2v-sq-bloc"/>
-          <span className="v2l-a-txt"><span className="v2v-sq-ligne is-titre"/><span className="v2v-sq-ligne is-n"/><span className="v2v-sq-ligne is-l3"/></span>
-        </div>))}
-    </div>
-  );
-}
-
 function Vide({ texte, calme = false, Icon }) {
   return <div className={'v2v-vide' + (calme ? ' is-calme' : '')} data-v2v-vide="">{calme && Icon ? <span className="v2v-vide-ic" aria-hidden="true"><Icon name="check" size={22}/></span> : null}<p>{texte}</p></div>;
 }
@@ -146,8 +131,8 @@ export function ListeEnvoyer({ lignes, q = '', lu = true, erreur = '', pasLus = 
     estimee: { nom: tr('v2v.g.estimee') }, sansDate: { nom: tr('v2v.g.sansDate') }, imprimes: { nom: tr('v2v.g.imprimes') },
   };
   if (erreur && !lignes.length) return <div className="v2v-corps" data-v2v-corps="envoyer" data-v2v-n="0"><Vide texte={erreur}/></div>;
-  if (!lu && !lignes.length) return <div className="v2v-corps" data-v2v-corps="envoyer" data-v2v-n="0"><SqueletteListe label={tr('v2v.vide.lecture')}/></div>;
-  const vide = !lu ? <SqueletteListe label={tr('v2v.vide.lecture')}/> : q.trim() ? <Vide texte={tr('v2v.vide.recherche', { q: q.trim() })}/> : <Vide texte={tr('v2v.vide.envoyer')} calme Icon={Icon}/>;
+  if (!lu && !lignes.length) return <div className="v2v-corps" data-v2v-corps="envoyer" data-v2v-n="0"><SqueletteRangees variante="A" n={6} label={tr('v2v.vide.lecture')}/></div>;
+  const vide = !lu ? <SqueletteRangees variante="A" n={6} label={tr('v2v.vide.lecture')}/> : q.trim() ? <Vide texte={tr('v2v.vide.recherche', { q: q.trim() })}/> : <Vide texte={tr('v2v.vide.envoyer')} calme Icon={Icon}/>;
   return (
     <div className="v2v-corps" data-v2v-corps="envoyer" data-v2v-n={lignes.length}>
       <ListeColis lignes={vues} ordre={GROUPES_ENVOYER} noms={noms} Photo={Photo} Icon={Icon} LigneGlissable={LigneGlissable} vide={vide} id="envoyer" partants={partants}/>

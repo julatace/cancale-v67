@@ -178,7 +178,7 @@ async function qualite(pg, th) {
   dit(q.appui.rangee != null && q.appui.rangee <= 100 && q.appui.plein != null && q.appui.plein <= 100, `Q ${th} : réponse au toucher < 100 ms (rangée ${q.appui.rangee} ms, plein ${q.appui.plein} ms)`, q.appui);
   dit(q.repos === 0, `Q ${th} : au repos, rien ne saute (CLS hors geste = ${q.repos})`, q.repos);
   dit(q.cv === 'auto', `Q ${th} : 1 000 rangées sans à-coup (content-visibility: ${q.cv})`, q.cv);
-  dit(q.fondu === 'v2v-fondu' && q.boite && q.boite[0] === 64 && q.boite[1] === 64, `Q ${th} : la photo arrive en fondu dans sa boîte de 64 × 64 (le texte ne bouge pas)`, { f: q.fondu, b: q.boite });
+  dit(/fondu/.test(q.fondu || '') && q.boite && q.boite[0] === 64 && q.boite[1] === 64, `Q ${th} : la photo arrive en fondu dans sa boîte de 64 × 64 (le texte ne bouge pas)`, { f: q.fondu, b: q.boite });
   dit(q.tailles.every((t) => [13, 15, 17, 34, 56].includes(t)), `Q ${th} : trois tailles de texte + chiffres d'affiche (${q.tailles.join(', ')})`, q.tailles);
   dit(!q.rayons.length, `Q ${th} : rayons 12 / 14 / 20 seulement (ou rond)`, q.rayons);
   dit(!q.nGrille, `Q ${th} : grille de 4 (marges, retraits, espaces)`, q.grille);
@@ -195,7 +195,7 @@ async function chargementEtMouvement(nav, b) {
   await pg.reload({ waitUntil: 'domcontentloaded' });
   const vu = { squelette: false, blanc: 0, ligne: false };
   for (let k = 0; k < 40; k++) {
-    const x = await pg.evaluate(() => ({ sq: !!document.querySelector('[data-v2v-squelette]'), ligne: !!document.querySelector('[data-v2v-liste="envoyer"] [data-v2v-ligne]'),
+    const x = await pg.evaluate(() => ({ sq: !!document.querySelector('[data-v2v-corps] [data-v2-squelette]'), ligne: !!document.querySelector('[data-v2v-liste="envoyer"] [data-v2v-ligne]'),
       blanc: !((document.querySelector('.vrm-main') || { innerText: '' }).innerText || '').trim() })).catch(() => ({}));
     if (x.sq) vu.squelette = true; if (x.blanc) vu.blanc++; if (x.ligne) { vu.ligne = true; break; }
     await pg.waitForTimeout(250);
@@ -203,11 +203,13 @@ async function chargementEtMouvement(nav, b) {
   if (vu.squelette) await pg.screenshot({ path: path.join(SHOTS, 'ventes-squelette-390-clair.png') }).catch(() => {});
   dit(vu.squelette && vu.blanc <= 4, `Q pendant la lecture : le squelette des rangées (vu : ${vu.squelette}), pas d'écran blanc (${vu.blanc} relevés vides au tout début)`, vu);
   await ctx.close();
-  const c2 = await nav.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
-  const p2 = await c2.newPage(); await p2.goto(`http://localhost:${PORT}/?tab=journee`).catch(() => {});
+  const { ctx: c2, pg: p2 } = await ouvrir(nav, { W: 390, sombre: false, b, url: '/?tab=ventes' });
+  await p2.emulateMedia({ reducedMotion: 'reduce' });
+  await p2.evaluate(() => localStorage.setItem('vrm_design_v2', '1')); await p2.reload({ waitUntil: 'domcontentloaded' });
+  await attendre(p2, () => document.querySelectorAll('[data-v2v-liste="envoyer"] [data-v2v-ligne]').length > 0, 30000);
   const r = await p2.evaluate(() => { const h = document.createElement('div'); h.className = 'v2-faite is-faite'; h.innerHTML = '<div class="v2-faite-dedans"></div>'; document.body.appendChild(h);
-    const l = document.createElement('div'); l.className = 'v2v-liste'; l.innerHTML = '<div class="v2l"><span class="v2l-photo"><img alt=""></span></div><div class="v2v-sq-ligne"></div>'; document.body.appendChild(l);
-    return { faite: getComputedStyle(h.firstChild).transform, img: getComputedStyle(l.querySelector('img')).animationName, sq: getComputedStyle(l.querySelector('.v2v-sq-ligne')).animationName }; });
+    const l = document.createElement('div'); l.className = 'v2v-liste'; l.innerHTML = '<div class="v2l"><span class="v2l-photo"><img alt=""></span></div><div class="v2-squelette"><span class="v2-squelette-l1"></span></div>'; document.body.appendChild(l);
+    return { faite: getComputedStyle(h.firstChild).transform, img: getComputedStyle(l.querySelector('img')).animationName, sq: getComputedStyle(l.querySelector('.v2-squelette-l1')).animationName }; });
   dit(r.faite === 'none' && r.img === 'none' && r.sq === 'none', 'Q mouvement réduit : la rangée faite ne glisse pas (fondu), photos et squelette immobiles', r);
   await c2.close();
 }
