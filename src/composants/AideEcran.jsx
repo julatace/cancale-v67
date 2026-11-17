@@ -19,7 +19,7 @@ import { fichesPour, fichesEcran, chercherAide, pourVendeur, emmener, faqAide, F
 // (lot vocabulaire-article) d'abord la phrase « article » écrite en entier (PHRASES_ARTICLE), sinon pourVendeur.
 import { phraseVendeur } from '../profilVendeur.js';
 import { AideAnimation } from './AideAnimation.jsx';
-import { AideVideo } from './AideVideo.jsx';
+import { AideVideo, texteVideo, chercherVideos } from './AideVideo.jsx';
 import './aide-ecran.css';
 // (14 nov., idées 136 et 139) « Revoir la visite de cet écran » et « Les mots de VRM ».
 import { RevoirVisite, GlossaireListe } from '../accueilReste/AccueilReste.jsx';
@@ -75,7 +75,8 @@ export function AideEcranFeuille({ cle, onClose, onSignaler, Feuille = SheetShel
   return (
     <Feuille onClose={onClose} titre={NOMS_ECRANS_AIDE[cle] || 'Aide'} sousTitre={etapes.length ? 'En quelques gestes' : 'Questions fréquentes'} z={10400} maxWidth={520} data-aide-feuille={cle}>
       {/* (13 nov., lot 49) LA vidéo de l'écran (30 s, la vraie app) : demandée seulement au toucher de « Regarder ». */}
-      <AideVideo cle={cle}/>
+      {/* (17 nov., lot aide-videos) Une recherche montre les vidéos qui répondent à ses mots (de tous les écrans). */}
+      <AideVideo cle={cle} ids={q.trim() ? chercherVideos(q, texteVideo) : null}/>
       {/* (11 nov.) L'animation de l'écran : une scène par geste, le geste en cours s'allume dessous. */}
       <AideAnimation cle={cle} onEtape={setEtape}/>
       {/* (10 nov., lot J) EN TÊTE : les 3 à 5 gestes de cet écran (sans vidéo), texte de scripts/aide-contenu.cjs. */}
