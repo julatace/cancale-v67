@@ -349,7 +349,8 @@ async function scenarioD(b, nom, sombre, { papier = 'normale' } = {}) {
   const o = { ...(await ouvrir(b, { tactile: false, sombre, imprimante: papier, LIGNES, tab: 'journee', local: { vrm_colis_prets: PUBLIE } })), tactile: false, touchers: 0 };
   const { pg } = o;
   try {
-    const vu = await attendre(pg, () => !!document.querySelector('[data-impression-directe-imprimer="5"]'), null, 45000);
+    // VISIBLE pour de vrai : le point au centre du bouton est le bouton (pas l'écran d'ouverture par-dessus).
+    const vu = await attendre(pg, () => { const e = document.querySelector('[data-impression-directe-imprimer="5"]'); if (!e) return false; const r = e.getBoundingClientRect(); const x = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!(x && e.contains(x)); }, null, 45000);
     const t = await pg.evaluate(() => { const e = document.querySelector('[data-impression-directe-imprimer]'); return e ? { txt: e.innerText.trim(), h: Math.round(e.getBoundingClientRect().height), plein: getComputedStyle(e).backgroundColor } : null; });
     dit(vu && t && t.txt === 'Imprimer les 5' && t.h >= 44, `${nom} : D0 à l'ouverture (Ma journée), la bannière « Imprimer les 5 » (le nombre publié par Ventes), ≥ 44 px`, JSON.stringify(t));
     await shot(pg, `${nom}-banniere`);
