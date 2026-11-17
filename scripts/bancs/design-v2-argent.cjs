@@ -68,7 +68,7 @@ const CONTRASTE = `(() => {
 
 // La signature d'un écran : balises, classes triées et NOMS des data-* (jamais les valeurs ni le texte : l'heure bouge).
 const SIGNATURE = () => { const m = document.querySelector('.vrm-main'); if (!m) return null; const out = [];
-  const pas = (e, d) => { if (d > 60 || e.matches('.vrm-fraicheur-hote, [data-temps-reel-neuf], [data-fraicheur-unique], [data-geste-disque], .vrm-toast')) return; const cl = [...e.classList].sort().join('.'); const da = [...e.attributes].map((a) => a.name).filter((n) => n.startsWith('data-') && !/^data-(sb-|vu$)/.test(n)).sort().join(',');
+  const pas = (e, d) => { if (d > 60 || e.matches('.vrm-fraicheur-hote, [data-temps-reel-neuf], [data-fraicheur-unique], [data-geste-disque], .vrm-toast, .vrm-settings-status')) return; const cl = [...e.classList].sort().join('.'); const da = [...e.attributes].map((a) => a.name).filter((n) => n.startsWith('data-') && !/^data-(sb-|vu$)/.test(n)).sort().join(',');
     out.push(d + ':' + e.tagName + (cl ? '.' + cl : '') + (da ? '[' + da + ']' : '')); for (const c of e.children) pas(c, d + 1); };
   pas(m, 0); return out.join('\n'); };
 
@@ -302,7 +302,7 @@ const ZONES_ARGENT = '.v2-argent, .v2-argent-nav, .vrm-screen-head:has(.v2-argen
         dit(md.pleins.length <= 1, `P Déclarer ${T} : au plus un bouton plein (${md.pleins.join(' | ') || 'aucun'})`, md.pleins);
         await air(pg, `Déclarer ${T}`, '.vrm-argent [data-argent-vue="declarer"]');
         await capture(pg, `argent-declarer-${W}-${th}`);
-        if (tel) { await pg.evaluate(() => { const e = document.querySelector('[data-micro-repli]') || document.querySelector('[data-registres]'); if (e) e.scrollIntoView({ block: 'start' }); window.scrollBy(0, -80); }); await pg.waitForTimeout(500); await pg.screenshot({ path: path.join(SHOTS, `argent-registres-${W}-${th}.png`) }); }
+        if (tel) { await pg.evaluate(() => { const e = document.querySelector('[data-registres]') || document.querySelector('[data-micro-repli]'); if (e) e.scrollIntoView({ block: 'start' }); window.scrollBy(0, -80); }); await pg.waitForTimeout(500); await pg.screenshot({ path: path.join(SHOTS, `argent-registres-${W}-${th}.png`) }); }
         // Factures
         await aller(pg, 'invoices', 3000);
         const segF = await pg.evaluate(() => { const b = document.querySelector('.v2-argent-nav [aria-selected="true"]'); return b ? b.getAttribute('data-section') : null; });
