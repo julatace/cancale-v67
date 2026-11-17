@@ -698,7 +698,11 @@ function BrouillonsVinted({ br, publier, brouillonOk, onClose, onFile }) {
     </SheetShell>
   );
 }
-const REPUB_ESP_DEFAUT = 30;   // secondes entre deux annonces (borné par fileClamp)
+const REPUB_ESP_DEFAUT = 30;
+// (17 nov., 5.408) Le plus court entre deux paires dans l'atelier : 8 s, le bas du rythme « Rapide » (comme Vintex).
+// 0 s n'est plus possible ici (l'essai à blanc d'AtelierFile garde sa borne à 0) ; une saisie plus courte remonte à 8 s, et c'est dit.
+const REPUB_ESP_MIN = 8;
+const repubClamp = (s) => Math.max(REPUB_ESP_MIN, fileClamp(s));   // secondes entre deux annonces (borné par fileClamp)
 // (29 oct., « approche-toi le plus possible de Vintex ») MESURÉ : Vintex enchaîne
 // les paires à ~12 s d'écart. Le rythme « Comme Vintex » tire 8 à 16 s au hasard ;
 // c'est le choix par défaut tant qu'il n'en a pas retenu un autre.
@@ -1632,7 +1636,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, reprendre 
   const setPCommun = (v) => poserR((c) => ({ prix: { ...c.prix, commun: v } }));
   const setPArr = (v) => poserR((c) => ({ prix: { ...c.prix, arrondi: v } }));
   const setPFin = (v) => poserR((c) => ({ prix: { ...c.prix, fin: v } }));
-  const [esp, setEsp] = useState(() => (PR && PR.esp && PR.esp.fixe !== '' && PR.esp.fixe != null && Number.isFinite(Number(PR.esp.fixe)) && Number(PR.esp.fixe) >= 0 ? Number(PR.esp.fixe) : REPUB_ESP_DEFAUT));
+  const [esp, setEsp] = useState(() => (PR && PR.esp && PR.esp.fixe !== '' && PR.esp.fixe != null && Number.isFinite(Number(PR.esp.fixe)) && Number(PR.esp.fixe) >= 0 ? repubClamp(PR.esp.fixe) : REPUB_ESP_DEFAUT));
   // (28 oct., sa demande) Temps ALÉATOIRE entre deux paires, entre SON minimum et
   // SON maximum (en minutes) — c'est lui qui le choisit et qui lance (§3, l'atelier).
   const espMem = (() => { const v = load('vrm_republier_esp', null); return v && typeof v === 'object' ? v : {}; })();
@@ -1814,7 +1818,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, reprendre 
   // (11 nov., lot republier-programme) Les temps tirés d'une programmation sont CEUX qu'il a vus : gardés
   // paire par paire tant que l'espacement n'a pas changé (une paire partie entre-temps ne décale rien).
   const espFige = !!(PR && PR.esp && PR.plan && espMode === PR.esp.mode && String(espMin) === String(PR.esp.min) && String(espMax) === String(PR.esp.max) && String(esp) === String(PR.esp.fixe));
-  const refaitPlan = () => { const r = planParGroupes(aFaire.map((a) => a.id), { espace: () => (espMode !== 'fixe' ? tirerTemps() : fileClamp(esp)), groupes }); const o = { ...r.plan }; if (espFige) aFaire.forEach((a, i) => { const g = Number(PR.plan[a.id]); if (i > 0 && Number.isFinite(g) && g > 0) o[a.id] = g; }); setPlan(o); setPauses(r.pauses); };
+  const refaitPlan = () => { const r = planParGroupes(aFaire.map((a) => a.id), { espace: () => (espMode !== 'fixe' ? tirerTemps() : repubClamp(esp)), groupes }); const o = { ...r.plan }; if (espFige) aFaire.forEach((a, i) => { const g = Number(PR.plan[a.id]); if (i > 0 && Number.isFinite(g) && g > 0) o[a.id] = g; }); setPlan(o); setPauses(r.pauses); };
   React.useEffect(() => { if (mode === 'idle') refaitPlan(); }, [clePlan]);   // eslint-disable-line react-hooks/exhaustive-deps
   const duree = (sec) => sec >= 60 ? `${Math.floor(sec / 60)} min ${String(sec % 60).padStart(2, '0')} s` : `${sec} s`;
   const autresComptes = compteChrome ? aFaire.filter((a) => a.uid && String(a.uid) !== String(compteChrome)).length : 0;
@@ -1834,7 +1838,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, reprendre 
     const premier = !Object.keys(st).length;
     let annule = false;
     let delai = 0;
-    if (!premier) { const pv = plan[suiv.id]; delai = Number.isFinite(pv) && pv > 0 ? pv : (espMode !== 'fixe' ? tirerTemps() : fileClamp(esp)); }
+    if (!premier) { const pv = plan[suiv.id]; delai = Number.isFinite(pv) && pv > 0 ? pv : (espMode !== 'fixe' ? tirerTemps() : repubClamp(esp)); }
     if (reportRef.current && reportRef.current.id === suiv.id) delai = Math.max(premier ? 0 : delai, Math.ceil((reportRef.current.at - Date.now()) / 1000));
     setProchaine(delai > 0 ? { at: Date.now() + delai * 1000, s: delai } : null);
     const t = setTimeout(async () => {
@@ -2207,7 +2211,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, reprendre 
               <div data-republier-esp={espMode} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <span style={maj}>Temps entre deux articles</span>
                 <Segmente plein label="Temps entre deux articles" value={espMode} onChange={setEspMode} options={[{ v: 'vintex', l: 'Rapide (8–16 s)', data: { 'data-republier-esp-choix': 'vintex' } }, { v: 'aleatoire', l: `Lent (${minutesOk(espMin)}–${minutesOk(espMax)} min)`, data: { 'data-republier-esp-choix': 'aleatoire' } }, { v: 'fixe', l: 'Fixe', data: { 'data-republier-esp-choix': 'fixe' } }]} />
-                {(() => { const n = aFaire.length; if (n < 2) return null; const moy = espMode === 'vintex' ? 12 : espMode === 'fixe' ? fileClamp(esp) : (bornesAlea()[0] + bornesAlea()[1]) / 2; const tousPlan = aFaire.every((a, i) => i === 0 || Number.isFinite(plan[a.id])); const sec = tousPlan ? Math.round(aFaire.reduce((t, a, i) => t + (i === 0 ? 0 : Number(plan[a.id]) || 0), 0)) : Math.round(moy * (n - 1)); const txt = sec < 60 ? `${sec} s` : sec < 3600 ? `${Math.round(sec / 60)} min` : `${Math.floor(sec / 3600)} h ${String(Math.round((sec % 3600) / 60)).padStart(2, '0')}`; return <div data-republier-esp-vintex={espMode === 'vintex' ? '' : undefined} data-republier-duree={sec} style={{ fontSize: 13, color: C.muted }}>Attente entre les {n} {motsVendeur().noms} : environ {txt} en tout.</div>; })()}
+                {(() => { const n = aFaire.length; if (n < 2) return null; const moy = espMode === 'vintex' ? 12 : espMode === 'fixe' ? repubClamp(esp) : (bornesAlea()[0] + bornesAlea()[1]) / 2; const tousPlan = aFaire.every((a, i) => i === 0 || Number.isFinite(plan[a.id])); const sec = tousPlan ? Math.round(aFaire.reduce((t, a, i) => t + (i === 0 ? 0 : Number(plan[a.id]) || 0), 0)) : Math.round(moy * (n - 1)); const txt = sec < 60 ? `${sec} s` : sec < 3600 ? `${Math.round(sec / 60)} min` : `${Math.floor(sec / 3600)} h ${String(Math.round((sec % 3600) / 60)).padStart(2, '0')}`; return <div data-republier-esp-vintex={espMode === 'vintex' ? '' : undefined} data-republier-duree={sec} style={{ fontSize: 13, color: C.muted }}>Attente entre les {n} {motsVendeur().noms} : environ {txt} en tout.</div>; })()}
                 {aFaire.length > GROUPE_MAX && <div data-republier-groupes={groupes ? 'on' : 'off'} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 13, color: C.text }}>
                   <label style={{ display: 'flex', gap: 10, alignItems: 'center', minHeight: 44, cursor: 'pointer', flex: '1 1 220px' }}>
                     <input type="checkbox" data-republier-groupes-case checked={groupes} onChange={(ev) => setGroupes(ev.target.checked)} style={{ width: 20, height: 20, accentColor: C.accent, flexShrink: 0 }} />
@@ -2215,7 +2219,8 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, reprendre 
                   </label>
                   {groupes && <Bouton variante="discret" data-republier-groupes-retirer onClick={refaitPlan}>Autres groupes</Bouton>}
                 </div>}
-                {espMode === 'fixe' && <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.text }}>Une annonce toutes les <input data-republier-esp-fixe value={esp} onChange={(ev) => setEsp(fileClamp(ev.target.value))} inputMode="numeric" style={{ ...champ, width: 70 }} /> secondes</label>}
+                {espMode === 'fixe' && <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.text }}>Une annonce toutes les <input data-republier-esp-fixe value={esp} onChange={(ev) => setEsp(ev.target.value === '' ? '' : Math.max(0, Math.min(FILE_ESP_MAX, Math.round(Number(ev.target.value) || 0))))} onBlur={() => setEsp(repubClamp(esp))} inputMode="numeric" style={{ ...champ, width: 70 }} /> secondes</label>}
+                {espMode === 'fixe' && <div data-republier-esp-min={REPUB_ESP_MIN} style={{ fontSize: 12, color: C.muted }}>{tr('rep.esp.min', { s: REPUB_ESP_MIN })}</div>}
                 {espMode === 'aleatoire' && <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.text, flexWrap: 'wrap' }}>
                     <span>Entre</span><input data-republier-esp-min value={espMin} onChange={(ev) => setEspMin(ev.target.value)} onBlur={() => setEspMin(minutesOk(espMin))} inputMode="decimal" aria-label="Minimum en minutes" style={{ ...champ, width: 64 }} />
@@ -2255,7 +2260,7 @@ function RepublierVinted({ annonces: toutes, publier, refaire = null, reprendre 
                 <div key={a.id} data-republier-ligne={a.id} data-republier-statut={s.etat || 'attente'} style={{ padding: '6px 10px', borderBottom: `1px solid ${C.border}`, fontSize: 13 }}>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', minHeight: 32 }}>
                     <span style={{ flexShrink: 0, width: 18, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{i + 1}.</span>
-                    <span style={{ flex: 1, minWidth: 0, color: C.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre}</span>
+                    <span data-republier-titre style={{ flex: 1, minWidth: 0, color: C.text, overflowWrap: 'anywhere', lineHeight: 1.35, padding: '4px 0' }}>{a.numero ? <b>N°{a.numero} · </b> : null}{a.titre}</span>
                     {!s.etat && a.id !== idAnnoncee && <span data-republier-attente={i === 0 ? 0 : (plan[a.id] || '')} style={{ flexShrink: 0, fontSize: 12, color: C.muted, fontVariantNumeric: 'tabular-nums' }}>{i === 0 ? 'tout de suite' : pauses[a.id] ? <span data-republier-pause-groupe={pauses[a.id]}>Pause {Math.round(pauses[a.id] / 60)} min</span> : Number.isFinite(plan[a.id]) && plan[a.id] > 0 ? `+${duree(plan[a.id])}` : ''}</span>}
                     {mode === 'idle' && aFaire.length > 1 && <span style={{ display: 'flex', flexShrink: 0 }}>
                       <button type="button" aria-label="Monter" data-republier-monter={a.id} disabled={i === 0} onClick={() => bouger(a.id, -1)} style={{ border: 'none', background: 'transparent', color: i === 0 ? C.border : C.text, minWidth: 44, minHeight: 44, fontSize: 17, cursor: i === 0 ? 'default' : 'pointer' }}>↑</button>

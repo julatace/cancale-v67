@@ -9,8 +9,8 @@ export default {
   "rep.chaine.fait": "hecho",
   "rep.chaine.encours": "en curso",
   "rep.chaine.probleme": "detenido aquí",
-  "rep.plan": {"one": "{n} par · unos {duree} · fin hacia las {heure}", "other": "{n} pares · unos {duree} · fin hacia las {heure}"},
-  "rep.plan.pourquoi": "Tu espaciado, más unos 45 s por par en Vinted, más la publicación 1 a 3 min después del último borrador. Una estimación: Vinted puede pedir que esperes.",
+  "rep.plan": {"one": "{n} anuncio · unos {duree} · fin hacia las {heure}", "other": "{n} anuncios · unos {duree} · fin hacia las {heure}"},
+  "rep.plan.pourquoi": "Tu espaciado, más unos 45 s por anuncio en Vinted, más la publicación 1 a 3 min después del último borrador. Una estimación: Vinted puede pedir que esperes.",
   "rep.plan.comment": "Cómo se calcula",
   "rep.duree.s": "{s} s",
   "rep.duree.min": "{min} min",
@@ -35,4 +35,5 @@ export default {
   "rep.reprendre.ok": "Reanudar",
   "rep.reprendre.encours": "Reanudando…",
   "rep.resume.titre": "Resumen",
+  "rep.esp.min": "Al menos {s} s entre dos anuncios: lo mínimo que VRM acepta (el ritmo «Rápido» de Vinted).",
 };

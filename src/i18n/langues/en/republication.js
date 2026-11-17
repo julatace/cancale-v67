@@ -9,8 +9,8 @@ export default {
   "rep.chaine.fait": "done",
   "rep.chaine.encours": "in progress",
   "rep.chaine.probleme": "stopped here",
-  "rep.plan": {"one": "{n} pair · about {duree} · done around {heure}", "other": "{n} pairs · about {duree} · done around {heure}"},
-  "rep.plan.pourquoi": "Your spacing, plus about 45 s per pair on Vinted, plus going online 1 to 3 min after the last draft. An estimate: Vinted may ask you to wait.",
+  "rep.plan": {"one": "{n} listing · about {duree} · done around {heure}", "other": "{n} listings · about {duree} · done around {heure}"},
+  "rep.plan.pourquoi": "Your spacing, plus about 45 s per listing on Vinted, plus going online 1 to 3 min after the last draft. An estimate: Vinted may ask you to wait.",
   "rep.plan.comment": "How it is calculated",
   "rep.duree.s": "{s} s",
   "rep.duree.min": "{min} min",
@@ -35,4 +35,5 @@ export default {
   "rep.reprendre.ok": "Resume",
   "rep.reprendre.encours": "Resuming…",
   "rep.resume.titre": "Summary",
+  "rep.esp.min": "At least {s} s between two listings: the shortest VRM allows (Vinted’s “Fast” pace).",
 };

@@ -93,7 +93,7 @@
     r_enligne: { fr: 'En ligne', en: 'Online', es: 'Publicado', it: 'Online', de: 'Online' },
     r_enligne_dans: { fr: 'En ligne dans {dans}', en: 'Online in {dans}', es: 'Publicado en {dans}', it: 'Online tra {dans}', de: 'Online in {dans}' },
     r_photos: { fr: 'photo {fait} sur {total}', en: 'photo {fait} of {total}', es: 'foto {fait} de {total}', it: 'foto {fait} di {total}', de: 'Foto {fait} von {total}' },
-    r_etapes: { fr: 'Étapes de cette paire', en: 'Steps for this pair', es: 'Pasos de este par', it: 'Passaggi di questo paio', de: 'Schritte für dieses Paar' },
+    r_etapes: { fr: 'Étapes de cette annonce', en: 'Steps for this listing', es: 'Pasos de este anuncio', it: 'Passaggi di questo annuncio', de: 'Schritte für diese Anzeige' },
     a_baisse: { fr: 'Baisse des prix', en: 'Lowering prices', es: 'Bajada de precios', it: 'Ribasso dei prezzi', de: 'Preise senken' },
     a_offres: { fr: 'Réponse aux offres', en: 'Answering offers', es: 'Respuesta a ofertas', it: 'Risposta alle offerte', de: 'Angebote beantworten' },
     a_faites: { fr: '{n} fait(s)', en: '{n} done', es: '{n} hecho(s)', it: '{n} fatto/i', de: '{n} erledigt' },

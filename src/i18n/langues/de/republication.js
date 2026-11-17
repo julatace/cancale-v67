@@ -9,8 +9,8 @@ export default {
   "rep.chaine.fait": "erledigt",
   "rep.chaine.encours": "läuft",
   "rep.chaine.probleme": "hier gestoppt",
-  "rep.plan": {"one": "{n} Paar · etwa {duree} · fertig gegen {heure}", "other": "{n} Paare · etwa {duree} · fertig gegen {heure}"},
-  "rep.plan.pourquoi": "Dein Abstand, plus etwa 45 s pro Paar bei Vinted, plus die Veröffentlichung 1 bis 3 Min. nach dem letzten Entwurf. Eine Schätzung: Vinted kann um Warten bitten.",
+  "rep.plan": {"one": "{n} Anzeige · etwa {duree} · fertig gegen {heure}", "other": "{n} Anzeigen · etwa {duree} · fertig gegen {heure}"},
+  "rep.plan.pourquoi": "Dein Abstand, plus etwa 45 s pro Anzeige bei Vinted, plus die Veröffentlichung 1 bis 3 Min. nach dem letzten Entwurf. Eine Schätzung: Vinted kann um Warten bitten.",
   "rep.plan.comment": "Wie es berechnet wird",
   "rep.duree.s": "{s} s",
   "rep.duree.min": "{min} Min.",
@@ -35,4 +35,5 @@ export default {
   "rep.reprendre.ok": "Fortsetzen",
   "rep.reprendre.encours": "Wird fortgesetzt…",
   "rep.resume.titre": "Bilanz",
+  "rep.esp.min": "Mindestens {s} s zwischen zwei Anzeigen: das Kürzeste, das VRM zulässt (das „Schnell“-Tempo von Vinted).",
 };

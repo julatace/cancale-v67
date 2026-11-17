@@ -1,6 +1,6 @@
 // Banc : REPUBLIER ÉTAPE PAR ÉTAPE (17 nov., extension 5.408 — `repubetapes`, `repubreprise`).
 // Données INVENTÉES. Le vrai build (dist) et les vrais fichiers de l'extension (vrm-ui.js, vrm-action.js).
-//   A. L'atelier AVANT : « 3 paires · environ … · fin vers HH:MM » (data-repub-plan).
+//   A. L'atelier AVANT : « 3 annonces · environ … · fin vers HH:MM » (data-repub-plan).
 //   B. PENDANT : sur vinted.fr, l'écran plein dit la chaîne de LA paire (Coffre ✓ › Brouillon ✓ ›
 //      Supprimée ✓ › En ligne dans 2 min) ; « Tout arrêter » / « Réduire » à 44 px.
 //   C. APRÈS : le bilan « 1 en ligne · 2 à finir » et UN geste par problème (Choisir · Réessayer) ;
@@ -161,7 +161,8 @@ async function ecranPlein(b, vp, theme, tag) {
         const plan = pg.locator('[data-repub-plan]');
         await plan.waitFor({ timeout: 5000 }).catch(() => {});
         const pl = await plan.first().evaluate((e) => ({ n: e.getAttribute('data-repub-plan-n'), sec: Number(e.getAttribute('data-repub-plan')), t: e.textContent })).catch(() => null);
-        dit(pl && pl.n === '3' && pl.sec >= 3 * 45 && /3 paires · environ \d+ min · fin vers \d\d:\d\d/.test(pl.t), `A1 ${tag} le plan avant de lancer : « 3 paires · environ … min · fin vers HH:MM »`, pl && pl.t);
+        dit(pl && pl.n === '3' && pl.sec >= 3 * 45 && /3 annonces · environ \d+ min · fin vers \d\d:\d\d/.test(pl.t), `A1 ${tag} le plan avant de lancer : « 3 annonces · environ … min · fin vers HH:MM »`, pl && pl.t);
+        if (process.env.DIAG) console.log(JSON.stringify(await pg.evaluate(() => { const out = []; for (const sel of ['[data-republier-esp]', '[data-republier-ordre]']) { let e = document.querySelector(sel); for (let i = 0; e && i < 4; i++, e = e.parentElement) { const c = getComputedStyle(e); out.push([sel, i, e.className, c.borderRadius, c.clipPath, c.maskImage || c.webkitMaskImage, c.overflow, c.boxShadow.slice(0, 60)]); } } return out; })));
         await plan.first().scrollIntoViewIfNeeded().catch(() => {});
         await shot(pg, `rp1-atelier-plan-${tag}.png`);
         await pg.locator('[data-republier-confirme]').check();

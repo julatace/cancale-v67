@@ -32,6 +32,8 @@ const argSrc = (() => { const i = process.argv.indexOf('--bg'); return i > 0 ? p
 const argApp = (() => { const i = process.argv.indexOf('--app'); return i > 0 ? process.argv[i + 1] : ''; })();
 const BG = argSrc || path.join(RACINE, 'vinted-sync-extension', 'background.js');
 const APP_ETAPES = argApp || path.join(RACINE, 'src', 'repubEtapes.js');
+const argAction = (() => { const i = process.argv.indexOf('--action'); return i > 0 ? process.argv[i + 1] : ''; })();
+const ACTION_JS = argAction || path.join(RACINE, 'vinted-sync-extension', 'vrm-action.js');
 
 let ok = 0, ko = 0; const rouges = [];
 const dit = (c, msg, det) => { if (c) { ok++; if (!process.env.SILENCE) console.log('✅ ' + msg); } else { ko++; rouges.push(msg); if (!process.env.SILENCE) console.log('❌ ' + msg + (det ? '  → ' + det : '')); } };
@@ -93,6 +95,17 @@ async function auditer() {
     echeance(f); await tick(f);
     const fin = finDe(f), e2 = vb(f).etapes || {};
     dit(seq(f.j) === s1 + 'LM' && fin && fin.etape === 'fait' && vb(f).etat === 'fait' && e2.enLigne && !('cause' in vb(f)), "A3 — à l'heure : lecture du brouillon puis mise en ligne ; « fait », daté « en ligne », sans cause", `seq=${seq(f.j)} fin=${fin && fin.etape} vb=${JSON.stringify({ e: vb(f).etat, c: vb(f).cause, l: e2.enLigne })}`);
+    // A5 — L'ORDRE AFFICHÉ EST L'ORDRE DES REQUÊTES (Julien, 17 nov. : « brouillon puis suppression », jamais inversé).
+    //      L'ordre RÉEL : le coffre écrit (daté) avant la 1re requête-geste, puis l'ordre des POST chez Vinted.
+    { const s = seq(f.j), iB = s.indexOf('B'), iS = s.indexOf('S'), iM = s.indexOf('M');
+      const reel = ['coffre', ...[['brouillon', iB], ['supprimee', iS], ['enligne', iM]].sort((x, y) => x[1] - y[1]).map((x) => x[0])];
+      let appli = null; try { appli = (await import(APP_ETAPES + '?o=' + Date.now())).CHAINE; } catch (_) { appli = null; }
+      let fond = null; try { fond = require('vm').runInContext('ORDRE_ETAPES_REPUB', f.ctx); } catch (_) { fond = null; }
+      const ecran = (/\[('coffre'(?:, '[a-z]+'){3})\]\.map\(\(k, i\)/.exec(fs.readFileSync(ACTION_JS, 'utf8')) || [])[1];
+      const ecranL = ecran ? ecran.split(',').map((x) => x.trim().replace(/'/g, '')) : null;
+      const vu = (l) => JSON.stringify(l);
+      dit(iB > 0 && iB < iS && iS < iM && vu(reel) === vu(['coffre', 'brouillon', 'supprimee', 'enligne']), "A5 — l'ordre RÉEL des requêtes : coffre, puis brouillon, puis suppression, puis mise en ligne (sa décision, jamais inversé)", `seq=${s} reel=${vu(reel)}`);
+      dit(vu(appli) === vu(reel) && vu(fond) === vu(reel) && vu(ecranL) === vu(reel), "A6 — l'ordre AFFICHÉ (app, écran plein, état de l'extension) est celui des requêtes", vu({ appli, fond, ecran: ecranL, reel })); }
     // E — le N° passe sur la nouvelle, PAR IDENTITÉ (la table de l'app relit brouillon et coffre).
     const { tableRecrees, repriseNumerosRecreation } = await import(path.join(RACINE, 'src', 'repriseNumero.js'));
     const br = Object.entries(f.lignes).filter(([k]) => /^vinted_brouillon_/.test(k)).map(([k, d]) => ({ id: k, anc: d.ancienId, item: d.itemId }));
@@ -224,7 +237,7 @@ async function auditer() {
     await new Promise((ok) => setTimeout(ok, 50));
     const a = f.store.vrmActionEnCours || {};
     dit(a.repub && a.repub.id === '9101' && a.repub.fait === 3 && Number(a.repub.du) > Date.now(), "I1 — l'écran plein sur vinted.fr : coffre ✓ brouillon ✓ supprimée ✓, « en ligne dans … » à l'heure planifiée", JSON.stringify(a.repub)); }
-  { const ui = fs.readFileSync(path.join(path.dirname(BG), 'vrm-action.js'), 'utf8');
+  { const ui = fs.readFileSync(ACTION_JS, 'utf8');
     dit(/data-action-chaine/.test(ui) && /r_enligne_dans/.test(ui), "I2 — vrm-action.js dessine la chaîne de la paire (data-action-chaine)"); }
 }
 
@@ -238,7 +251,7 @@ async function prouver() {
   const rb = lance(['--bg', base, '--app', path.join(tmp, 'absent.js')]);
   total++; if (rb) bons++; console.log((rb ? '✅' : '❌') + ' §6.1 — rouge sur origin/claude/extension-carte-v2 (extension 5.406, sans repubEtapes)');
   // 2. Les mutations.
-  const SRC = fs.readFileSync(BG, 'utf8'), APP = fs.readFileSync(APP_ETAPES, 'utf8');
+  const SRC = fs.readFileSync(BG, 'utf8'), APP = fs.readFileSync(APP_ETAPES, 'utf8'), ACT = fs.readFileSync(ACTION_JS, 'utf8');
   const M = [
     ['cause gardée', 'bg', "if (p.etat && p.etat !== v0.etat && !('cause' in p)) delete nv.cause;", ''],
     ['suppression pas datée', 'bg', "if (p.supprime === true && !e.supprimee) e.supprimee = p.supprimeLe || t;", ''],
@@ -258,14 +271,18 @@ async function prouver() {
     ['REPUB_PAR_JOUR 60', 'bg', "const REPUB_PAR_JOUR = 50;", "const REPUB_PAR_JOUR = 60;"],
     ['« pas su » compté en ligne', 'app', "if (s.etat === 'fait') { enLigne++; continue; }", "if (s.etat === 'fait' || s.etat === 'incertain') { enLigne++; continue; }"],
     ['un échec sans étape coche le coffre', 'app', "faites = annoncees || 0;\n    probleme", "faites = annoncees || 1;\n    probleme"],
+    ['suppression AVANT le brouillon (requêtes permutées)', 'bg', "    etapeRepub(id, 'brouillon');\n    await pauseRepub('brouillon', uid);\n    const rbV = await vintedPage(acc, 'POST', '/api/v2/item_upload/drafts', corpsBV, { timeoutMs: 60000 });", "    await vintedPage(acc, 'POST', `/api/v2/items/${id}/delete`, null, { timeoutMs: 60000 });\n    etapeRepub(id, 'brouillon');\n    await pauseRepub('brouillon', uid);\n    const rbV = await vintedPage(acc, 'POST', '/api/v2/item_upload/drafts', corpsBV, { timeoutMs: 60000 });"],
+    ['app : supprimée affichée avant brouillon', 'app', "export const CHAINE = ['coffre', 'brouillon', 'supprimee', 'enligne'];", "export const CHAINE = ['coffre', 'supprimee', 'brouillon', 'enligne'];"],
+    ['extension : supprimée annoncée avant brouillon', 'bg', "const ORDRE_ETAPES_REPUB = ['coffre', 'brouillon', 'supprimee', 'enligne'];", "const ORDRE_ETAPES_REPUB = ['coffre', 'supprimee', 'brouillon', 'enligne'];"],
+    ['écran plein : supprimée dessinée avant brouillon', 'action', "['coffre', 'brouillon', 'supprimee', 'enligne'].map((k, i)", "['coffre', 'supprimee', 'brouillon', 'enligne'].map((k, i)"],
     ['sans brouillon : reprendre au lieu de recréer', 'app', "if (x.etat === 'a-refaire' && !x.draftId)", "if (false)"],
   ];
   for (const [nom, cible, de, vers] of M) {
-    const s = cible === 'bg' ? SRC : APP;
+    const s = cible === 'bg' ? SRC : cible === 'action' ? ACT : APP;
     if (!s.includes(de)) { total++; console.log(`❌ mutation « ${nom} » : ancre absente`); continue; }
-    const fichier = path.join(tmp, cible === 'bg' ? `bg-${total}.js` : `app-${total}.mjs`);
+    const fichier = path.join(tmp, cible === 'bg' ? `bg-${total}.js` : cible === 'action' ? `action-${total}.js` : `app-${total}.mjs`);
     fs.writeFileSync(fichier, s.replace(de, vers));
-    const r = lance(cible === 'bg' ? ['--bg', fichier] : ['--app', fichier]);
+    const r = lance(cible === 'bg' ? ['--bg', fichier] : cible === 'action' ? ['--action', fichier] : ['--app', fichier]);
     total++; if (r) bons++; console.log((r ? '✅' : '❌') + ` mutation « ${nom} » ⇒ ${r ? 'rouge' : 'VERT (le contrôle ne la voit pas)'}`);
   }
   fs.rmSync(tmp, { recursive: true, force: true });
