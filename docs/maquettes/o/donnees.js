@@ -34,7 +34,7 @@
     const semelle = forme === 1 ? `<path d="M52 256 L348 256 Q358 256 358 268 L358 286 Q358 296 346 296 L64 296 Q50 296 50 284 Z" fill="${so}" stroke="${trait}" stroke-width="2.5"/><path d="M56 276 L354 276" stroke="${trait}" stroke-width="2" opacity=".35"/>`
       : `<path d="M56 262 L344 262 Q352 262 352 272 L352 280 Q352 290 340 290 L66 290 Q54 290 54 278 Z" fill="${so}" stroke="${trait}" stroke-width="2.5"/>`;
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 400 400"><rect width="400" height="400" fill="${fond}"/>
-<g transform="translate(-34 ${tf - 40}) scale(1.17)"><ellipse cx="204" cy="${base + 34}" rx="160" ry="9" fill="#000" opacity=".08"/>
+<g transform="translate(10 ${tf - 6}) scale(0.95)"><ellipse cx="204" cy="${base + 34}" rx="160" ry="9" fill="#000" opacity=".08"/>
 <path d="M60 ${base} C58 230 82 216 114 208 L168 192 ${haut} C310 196 334 204 342 226 C348 240 348 252 344 ${base} Z" fill="${up}" stroke="${trait}" stroke-width="2.5" stroke-linejoin="round"/>
 <path d="M60 ${base} C59 242 70 230 92 224 L118 ${base} Z" fill="${ac}" opacity=".9"/>
 <path d="M150 ${base - 8} C184 220 246 206 306 220 L312 238 C252 230 198 238 168 ${base - 4} Z" fill="${ac}"/>

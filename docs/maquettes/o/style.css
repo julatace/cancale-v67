@@ -91,7 +91,8 @@ dd { margin: 0; }
 .g-ligne:active .g-photo img { transform: scale(0.97); }
 .g-photo--liste { width: 96px; height: 96px; flex: none; }
 .g-ligne-textes { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; padding-top: 2px; }
-.g-ligne-titre { font-size: 15px; line-height: 20px; font-weight: 500; overflow-wrap: anywhere; }
+.g-ligne-titre { font-size: 15px; line-height: 20px; font-weight: 500; overflow-wrap: anywhere; text-wrap: pretty; }
+.g-bloc { display: block; }
 .g-ligne-meta { font-size: 12px; line-height: 16px; }
 .g-ligne-prix { flex: none; font-size: 15px; line-height: 20px; font-weight: 500; padding-top: 2px; }
 .g-ligne--colis { align-items: center; }
@@ -111,7 +112,7 @@ dd { margin: 0; }
 .g-nav[aria-current="page"] { color: var(--encre); box-shadow: inset 0 2px 0 var(--encre); }
 .g-nav-long { display: none; }
 .g-point--nav { position: absolute; top: 14px; margin: 0; right: calc(50% - 32px); }
-.g-dock-ordi { display: none; }
+.g-dock-ordi, .g-ordi-seul { display: none; }
 .g-touche { min-height: 56px; padding: 0 20px; background: var(--doux); font-size: 15px; font-weight: 600; text-align: center; }
 
 /* ── La fiche : plein écran, la photo d'abord ── */
@@ -129,11 +130,12 @@ dd { margin: 0; }
 .g-fiche-titre { font: 600 28px/32px var(--affiche); letter-spacing: -0.03em; text-wrap: balance; }
 .g-fiche-titre.g-code { font: 300 40px/44px var(--affiche); letter-spacing: 0.01em; }
 .g-fiche-meta { font-size: 15px; line-height: 20px; margin-top: 8px; text-wrap: pretty; }
-.g-fiche-chiffres { display: flex; gap: 32px; margin-top: 28px; }
+.g-fiche-chiffres { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px 24px; margin-top: 28px; }
 .g-fiche-chiffres > div, .g-fiche-faits > div { display: flex; flex-direction: column-reverse; gap: 2px; }
 .g-fiche-chiffres dd { font-size: 15px; line-height: 20px; font-weight: 600; }
 .g-fiche-chiffres dt, .g-fiche-faits dt { font-size: 12px; line-height: 16px; color: var(--gris); }
-.g-fiche-faits { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 32px; margin-top: 28px; }
+.g-fiche-faits { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px 24px; margin-top: 28px; }
+.g-fiche-faits .g-long { grid-column: span 2; }
 .g-fiche-faits dd { font-size: 15px; line-height: 20px; overflow-wrap: anywhere; }
 .g-gestes { display: flex; padding-bottom: env(safe-area-inset-bottom, 0px); background: var(--fond); }
 .g-gestes > button { flex: 1 1 0; white-space: nowrap; }
@@ -158,6 +160,8 @@ dd { margin: 0; }
   .g-chiffres--argent { flex-wrap: nowrap; }
   .g-chiffre-seul { flex-basis: auto; }
   .g-grille { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 24px 2px; }
+  .g-ordi-seul { display: block; margin-top: 48px; }
+  .g-retraits { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px 48px; }
   .g-outils { position: static; display: flex; align-items: center; gap: 32px; margin: 0 0 20px; padding: 0; }
   .g-champ { width: 360px; }
   .g-outils .g-onglets { margin: 0; }
@@ -170,7 +174,7 @@ dd { margin: 0; }
   .a-fiche .g-main { visibility: visible; margin-right: 440px; }
   .a-fiche .g-grille { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .a-fiche .g-liste { grid-template-columns: minmax(0, 1fr); }
-  .a-fiche .g-dock-ordi { display: none; }
+  .a-fiche .g-dock-ordi, .g-ordi-seul { display: none; }
   .g-fiche { inset: 64px 0 0 auto; width: 440px; background: var(--doux-2); animation: g-glisse 260ms var(--ease); }
   @keyframes g-glisse { from { transform: translateX(24px); opacity: 0; } }
   .g-fiche-corps { padding: 28px 32px; }

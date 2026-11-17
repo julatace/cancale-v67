@@ -59,7 +59,9 @@
         <div><dt>Vendu en ${mois}</dt><dd>${euros(vendu)}</dd></div>
       </dl>
       <div class="g-rubrique"><h2>À poster</h2><button type="button" class="g-lien" data-aller="ventes">Toutes les ventes</button></div>
-      <ul class="g-grille">${aEnvoyer.map((v) => `<li><button type="button" class="g-case" data-f="v:${v.tx}" aria-label="${esc(v.titre)}">${photo(v.photo, v.numero)}<span class="g-legende"><span class="${presse(v) ? 'g-ambre' : ''}">${quand(v)}</span></span></button></li>`).join('')}</ul>` };
+      <ul class="g-grille g-grille--journee">${aEnvoyer.map((v) => `<li><button type="button" class="g-case" data-f="v:${v.tx}" aria-label="${esc(v.titre)}">${photo(v.photo, v.numero)}<span class="g-legende"><span class="${presse(v) ? 'g-ambre' : ''}">${quand(v)}</span></span></button></li>`).join('')}</ul>
+      <section class="g-ordi-seul"><div class="g-rubrique"><h2>À retirer</h2><button type="button" class="g-lien" data-aller="achats">Tous les achats</button></div>
+        <ul class="g-retraits">${D.colis.map((c) => `<li><button type="button" class="g-ligne g-ligne--colis" data-f="c:${c.id}"><span class="g-qr" aria-hidden="true">${qr(c.code)}</span><span class="g-ligne-textes"><span class="g-code">${c.code}</span><span class="g-ligne-meta g-gris">${esc(c.point)} · jusqu’à ${jour(c.limite)}</span></span></button></li>`).join('')}</ul></section>` };
   }
   function annonces(r) {
     const vue = r.s || 'toutes';
@@ -80,7 +82,7 @@
     return { dock: s === 'envoyer' && aImprimer ? `Imprimer ${aImprimer} bordereaux` : '', html: `
       ${tete('Ventes')}
       ${onglets([['envoyer', 'À envoyer', aEnvoyer.length], ['route', 'En route', enRoute.length], ['toutes', 'Toutes', null]], s, 'Ventes')}
-      <ul class="g-liste">${liste.map((v) => ligne(v, `${v.etat === 'envoyer' ? `<span class="${presse(v) ? 'g-ambre' : 'g-encre'}">${quand(v)}</span>` : `<span class="g-encre">${v.etat === 'finie' ? 'Livrée' : 'En route'}</span>`}<span class="g-gris"> · ${esc(v.pseudo)}</span>`, euros(v.prix), 'v:' + v.tx)).join('')}</ul>` };
+      <ul class="g-liste">${liste.map((v) => ligne(v, `${v.etat === 'envoyer' ? `<span class="${presse(v) ? 'g-ambre' : 'g-encre'}">${quand(v)}</span>` : `<span class="g-encre">${v.etat === 'finie' ? 'Livrée' : 'En route'}</span>`}<span class="g-gris g-bloc">${esc(v.pseudo)}</span>`, euros(v.prix), 'v:' + v.tx)).join('')}</ul>` };
   }
   function achats(r) {
     const s = r.s || 'retirer';
@@ -129,7 +131,7 @@
         <h2 class="g-fiche-titre${f.code ? ' g-code' : ''}">${esc(f.titre)}</h2>
         <p class="g-gris g-fiche-meta">${f.meta.map(esc).join(' · ')}</p>
         <dl class="g-fiche-chiffres">${f.chiffres.map(([l, v]) => `<div><dt>${l}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
-        ${f.faits.length ? `<dl class="g-fiche-faits">${f.faits.map(([l, v]) => `<div><dt>${l}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>` : ''}
+        ${f.faits.length ? `<dl class="g-fiche-faits">${f.faits.map(([l, v]) => `<div${String(v).length > 11 ? ' class="g-long"' : ''}><dt>${l}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>` : ''}
       </div>
     </div>
     ${f.plein || f.touche ? `<div class="g-gestes">${f.touche ? `<button type="button" class="g-touche">${f.touche}</button>` : ''}${f.plein ? `<button type="button" class="g-plein" data-plein>${f.plein}</button>` : ''}</div>` : ''}
