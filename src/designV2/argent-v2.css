@@ -316,8 +316,9 @@ html[data-design="v2"] .v2-pm-surligne { background: var(--v2-teinte-fond) !impo
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-set-liste .vrm-set-lib b { overflow-wrap: break-word !important; word-break: normal !important; hyphens: manual !important; }
 }
 html[data-design="v2"] body .v2-pm-val { white-space: nowrap; max-width: none; }
-/* Très grand texte : dans « Prochaine déclaration », une rangée « libellé · montant » passe à la ligne plutôt que de
-   déborder de sa carte (le montant reste entier, jamais coupé). */
+/* Très grand texte : dans « Prochaine déclaration », les rangées en ligne (date · « dans N jours », libellé · montant)
+   passent à la ligne au lieu de déborder de leur carte ; un montant reste entier. */
 @layer vrm-verre {
-:root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body .vrm-argent .vrm-compta-carte :is(div, span) { flex-wrap: wrap !important; min-width: 0 !important; max-width: 100% !important; box-sizing: border-box !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body .vrm-argent .vrm-compta-carte [style*="display: flex"] { flex-wrap: wrap !important; min-width: 0 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body .vrm-argent .vrm-compta-carte [style*="display: flex"] > * { min-width: 0 !important; }
 }
