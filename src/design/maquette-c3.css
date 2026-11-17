@@ -256,7 +256,7 @@
    le « ? » (désormais dans « Plus ») ; un seul geste principal visible ; de l'air. Rien n'est retiré de la page :
    ces phrases restent lues à voix haute (masquées à l'œil seulement). */
 @media (max-width: 767px) {
-  :root[data-maquette="c"][data-maquette-c3] .vrm-main :is(.vrm-colis-pas-lus, .vv-hero p, .vrm-ledger-heading, .vrm-phrase-ecran:not(:has(h1)) > p) {
+  :root[data-maquette="c"][data-maquette-c3] .vrm-main :is(.vrm-colis-pas-lus, .vv-hero .vv-hero-sous, .vrm-ledger-heading, .vrm-phrase-ecran:not(:has(h1)) > p) {
     position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip-path: inset(50%) !important; white-space: nowrap !important; margin: 0 !important; padding: 0 !important;
   }
 }
