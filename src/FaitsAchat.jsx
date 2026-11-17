@@ -32,7 +32,7 @@ export function FaitsAchat({ achat, details = null, cible = null, marqueDe = nul
           {f.accord === 'diff' ? <span className="vrm-faits-diff" aria-hidden="true">{tr('faits.diff', { visee: f.tailleVisee })}</span> : null}
         </span>
       ) : null}
-      {reste.map((x, i) => <span key={i} className="vrm-faits-morceau">{x}</span>)}
+      {reste.map((x) => <span key={x} className="vrm-faits-morceau">{x}</span>)}
     </span>
   );
 }
