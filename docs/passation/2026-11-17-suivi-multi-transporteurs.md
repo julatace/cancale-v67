@@ -81,6 +81,10 @@ clic). Liste pas lue ⇒ rien n'est contredit (pas su).
 - `audit-coherence`, `audit-extension-zip`, `audit-traduction`, `audit-relier-colis`, `audit-quoi-de-neuf`,
   `audit-icones`, `audit-fonctions-api` : verts.
 
+- Non-régression : `retirer-ligne-unique`, `colis-relier-carte`, `retirer-scene-julien` ont exactement les
+  MÊMES rouges sur le build de `main` (déjà rouges avant ce lot : dépli/fiche, « Relier » de la carte, QR) —
+  aucun rouge nouveau.
+
 ## Gestes de Julien
 Installer l'extension **5.403.0** (remplacer le dossier, ⟳ dans chaque Chrome ; Orion : `VRM-Orion-dossier.zip`),
 puis ouvrir vinted.fr sur le compte de l'achat : la ligne de suivi reçoit son 2e n° à la visite suivante et
