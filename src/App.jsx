@@ -53834,7 +53834,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {deuxComptesTexte && <VersAFaire><DeuxComptesAlerte res={deuxComptes} texte={deuxComptesTexte} onOuvrir={()=>setFeuilleDeuxComptes(true)}/></VersAFaire>}
         {(()=>{ const g = enLigneDeux ? enLigneDeux.vinted.filter((x)=>!(x.comptes && x.comptes.length >= 2 && x.annonces.filter((a)=>a.plat==='vinted').every((a)=>idsDeuxComptes.has(String(a.id))))) : [];
           return g.length > 0 ? <VersAFaire><EnLigneDeuxFoisAlerte groupes={g} manque={enLigneDeux.manque} PhotoVinted={PhotoVinted} Feuille={SheetShell}/></VersAFaire> : null; })()}
-        {listings.loading && !listings.items && <Skeleton variant="card" count={6}/>}
+        {listings.loading && !listings.items && !designV2 && <Skeleton variant="card" count={6}/>}
         {listings.error && <EtatPanne quoi="Tes annonces Vinted" data-ann-panne="" onReessayer={()=>loadListings(true)}/>}
         {/* Aucune annonce en ligne MAIS des annonces à confirmer : la ligne du
             dessus le dit déjà, avec le geste (§7 — une cause, une phrase). */}
@@ -53844,7 +53844,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             action={<Bouton variante="primaire" href="https://www.vinted.fr/member/general/settings" target="_blank" rel="noreferrer">{tr('annonces.ouvrirVinted')}</Bouton>}/>
         )}
         {listings.items && !listings.error && listings.items.length===0 && blocMasquees()}
-          {numAttente ? (designV2 ? null : <Skeleton variant="card" count={6}/>) : (<>
+          {/* Allumé : pendant la numérotation, LE squelette du nouveau design, au même endroit que la liste (même bloc). */}
+          {numAttente ? (designV2 ? <div data-v2-bloc="liste"><SqueletteRangeesV2 variante={ligneV2} n={8} entete label={tr('v2.chargement')}/></div> : <Skeleton variant="card" count={6}/>) : (<>
           {blocAEcrire()}
           <BlocBarrerVc/>
           {/* (5 nov., chantier C — revue 2.7) UNE ligne d'avis en tête de la liste :
@@ -55748,7 +55749,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     return { id: String(o.transaction_id), titre: o.title || '', photo: orderPhoto(o), compte: plusieursComptesRet && o._acc ? accName(o._acc) : '',
                       prix: Number.isFinite(pn) && pn > 0 && !(o.price && o.price.currency_code && o.price.currency_code !== 'EUR') ? montant(pn) : '', point: (e && e.relais && e.relais.nom) || '' }; }) : [];
                   // Rien avant que les codes ET les achats soient lus, puis tout d'un coup (aucun bloc qui pousse l'autre).
-                  return <QuandLuV2 pret={baseKO || (toutLuRet && buys.items != null)} attente={<span data-v2-attente-retirer="" hidden/>}><div className="v2-achats-retirer" data-v2-achats-retirer="">
+                  // Prêt quand les codes ET les achats sont lus ET que les passes sont là (ou qu'il n'y a rien à retirer) : une passe
+                  // qui arrive après « En route » le pousserait.
+                  return <QuandLuV2 pret={baseKO || (toutLuRet && buys.items != null && (avecColis || !(pickupUnion.total > 0)))} attente={<span data-v2-attente-retirer="" hidden/>}><div className="v2-achats-retirer" data-v2-achats-retirer="">
                     <PassesRetraitV2 points={parPoint.points || []} Icon={Icon} Plaque={PlaqueJ} Photo={photoCarte}
                       aides={{ echeance: echeanceRetrait, titre: titreRetrait, retirer: retirerColis, relier: relierRetrait,
                         nomTransporteur: (k) => (CARRIERS[k] && CARRIERS[k].name) || '',

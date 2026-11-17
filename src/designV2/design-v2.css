@@ -552,3 +552,7 @@ html body .v2l-a { min-height: 120px; contain-intrinsic-size: auto 120px; }
 html body .v2-squelette-A .v2-squelette-rangee { min-height: 120px; }
 /* L'en-tête de compte que la liste posera : le squelette le réserve déjà (même hauteur), rien ne glisse. */
 .v2-squelette-tete { display: block; height: 44px; }
+/* (couche `vrm-v2`, la première nommée : passe devant les `!important` des couches d'hier) */
+@layer vrm-v2 {
+  html[data-design="v2"] body .vrm-annbar, html[data-design="v2"] body .vrm-annbar .vrm-annbar-gestes { gap: var(--v2-air-boutons, 12px) !important; }
+}
