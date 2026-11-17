@@ -134,7 +134,11 @@ async function mesurer(pg) {
       scanDansChamp: !!document.querySelector('[data-v2v-champ] [data-v2v-scanner]'),
       redits: lignes.filter((r) => /Choisir la vente|vendeur_\d/.test(r.textContent)).length,
       sansPrix: lignes.filter((r) => r.querySelector('[data-v2l]') ? false : !r.querySelector('.v2l-a-prix')).length,
-      sansTitre: lignes.filter((r) => !(r.querySelector('.v2l-a-titre') || {}).textContent).length };
+      sansTitre: lignes.filter((r) => !(r.querySelector('.v2l-a-titre') || {}).textContent).length,
+      // Plusieurs infos par rangée (Julien) : la 3e ligne, ses faits ; la taille sortie du titre ; l'ambre seulement sur une limite.
+      faits: lignes.map((r) => r.querySelectorAll('.v2l-l3').length), orphelins: lignes.filter((r) => /\btaille\s*\d{2}(?:[.,]5)?\s*$/i.test(((r.querySelector('.v2l-a-titre') || {}).textContent || '').trim())).length,
+      ambresHorsLimite: [...document.querySelectorAll('[data-v2v-liste] .v2l-l3.is-ambre')].filter((x) => x.getAttribute('data-v2l-l3') !== 'limite').length,
+      bande: [...document.querySelectorAll('[data-heros-hote="ventes"]')].filter(vis).length };
   }, CONTRASTE);
 }
 
@@ -161,6 +165,8 @@ async function allume(nav, b, sombre, W, ref) {
     `L ${th} : ${m.tetes.length} groupes, chacun dit une fois avec son nombre (somme ${somme} = ${m.n} rangées)`, { tetes: m.tetes, par: m.parGroupe });
   dit(m.redits === 0 && m.sansTitre === 0, `R ${th} : rien redit par rangée (ni « Choisir la vente », ni compte), chaque rangée a son titre`, m);
   dit(m.pleins === 1, `P ${th} : exactement UN bouton plein visible (${m.pleins})`, m.pleins);
+  dit(m.faits.length && m.faits.every((n) => n >= 2) && m.orphelins === 0 && m.ambresHorsLimite === 0, `I ${th} : plusieurs infos par rangée (${Math.min(...m.faits)} à ${Math.max(...m.faits)} faits en 3e ligne), taille sortie du titre, ambre seulement sur une limite`, { faits: m.faits.slice(0, 8), orphelins: m.orphelins, ambres: m.ambresHorsLimite });
+  dit(m.bande === 0, `I ${th} : la bande des chiffres d'hier n'est pas à l'écran`, m.bande);
   dit(!m.petits.length, `T ${th} : ${m.nB} boutons, tous ≥ 44 × 44`, m.petits);
   dit(!m.tronques.length, `X ${th} : aucun texte tronqué sans « … »`, m.tronques);
   dit(m.deb <= 1 && !m.hors.length, `X ${th} : rien ne déborde`, { deb: m.deb, hors: m.hors });
