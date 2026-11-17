@@ -27,6 +27,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (17 nov., lot tampon-qr) docs/passation/2026-11-17-tampon-qr.md
+  { id: 'mention-juste-au-dessus', date: '2026-11-17', titre: '« Créé par vrm.center » collé au QR', phrase: 'Juste au-dessus du code, dans le sens de l’étiquette, chaque transporteur.', tab: 'cat_bord', pour: 'tous', mode: 'tous' },
   // (17 nov., audit d'accessibilité WCAG 2.1 AA) docs/passation/2026-11-17-accessibilite.md
   { id: 'accessibilite-clavier', date: '2026-11-17', titre: 'Plus lisible, et tout au clavier', phrase: 'Focus visible partout, textes sur le bleu éclaircis, « Aller au contenu ».', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (17 nov., Julien : un colis arrivé, deux lignes — envoi à deux transporteurs) docs/passation/2026-11-17-suivi-multi-transporteurs.md

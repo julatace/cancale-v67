@@ -14043,7 +14043,7 @@ const zonesInterditesTampon = (rendu, adresses = []) => {
 //     police RAPETISSE par demi-point jusqu'à 4,5 pt (lisible imprimé) ; toujours rien ⇒ AUCUNE mention (`via:
 //     'aucune-place'`) — jamais dessous, jamais à côté ;
 //   · jamais hors du cadre de l'étiquette (découpé, il emporterait la mention), ni dans la marge non imprimable.
-const MENTION3 = { ecarts: [3, 3.5, 2.5, 4, 2.25].map((x) => x * MM_M), tailleMin: 4.5, pas: 0.5, haut: 0.8, bas: 0.22, marge: 0.4 * MM_M, decoratif: 0.12, autour: 45 * MM_M };
+const MENTION3 = { ecarts: [3, 3.5, 2.5, 4, 2.25].map((x) => x * MM_M), tailleMin: 4.5, pas: 0.5, haut: 0.8, bas: 0.22, marge: 0.5 * MM_M, decoratif: 0.12, autour: 45 * MM_M };
 // Le sens de lecture (0 · 90 · 180 · 270 degrés, sens horaire sur la page affichée) des lignes de texte dans `z`
 // (points ; null = toute la page), pondéré par leur longueur. null : aucun texte.
 const sensDuTexte = (textes, z) => {

@@ -101,11 +101,12 @@ const __fx = (() => {
     c.dm = (x, y, cote, n = 26, col = vise) => { let s = 11; const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647); const m = cote / n * MMp;
       for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) { const on = k === 0 || r === n - 1 ? true : r === 0 ? k % 2 === 0 : k === n - 1 ? r % 2 === 1 : rnd() < 0.5;
         if (on) p.drawRectangle({ x: x * MMp + k * m, y: y * MMp + (n - 1 - r) * m, width: m, height: m, color: col }); } };
-    // MaxiCode INVENTÉ : alvéoles en quinconce et l'œil de bœuf (trois anneaux) au milieu.
+    // MaxiCode INVENTÉ : alvéoles en quinconce (elles s'emboîtent d'une rangée à l'autre, comme des hexagones) et l'œil de
+    // bœuf (trois anneaux) au milieu.
     c.maxi = (x, y, cote, col = vise) => { let s = 5; const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
       const nx = 30, ny = 33, dx = cote / (nx + 0.5), dy = cote / ny, cx = x + cote / 2, cy = y + cote / 2;
       for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const px = x + (i + (j % 2 ? 0.5 : 0) + 0.5) * dx, py = y + (j + 0.5) * dy;
-        if (Math.hypot(px - cx, py - cy) < cote * 0.2) continue; if (rnd() < 0.5) p.drawRectangle({ x: (px - dx * 0.4) * MMp, y: (py - dy * 0.4) * MMp, width: dx * 0.8 * MMp, height: dy * 0.8 * MMp, color: col }); }
+        if (Math.hypot(px - cx, py - cy) < cote * 0.2) continue; if (rnd() < 0.5) p.drawRectangle({ x: (px - dx * 0.4) * MMp, y: (py - dy * 0.52) * MMp, width: dx * 0.8 * MMp, height: dy * 1.04 * MMp, color: col }); }
       for (const r of [0.17, 0.11, 0.05]) p.drawCircle({ x: cx * MMp, y: cy * MMp, size: r * cote * MMp, borderColor: col, borderWidth: cote * 0.022 * MMp }); };
     // Code-barres ITF (vraie forme, 'elementsITF' de bordereauExemple), barre fine X (mm), hauteur h (mm), centré sur xc.
     c.barres = (chiffres, xc, y, X, h, col = noir) => { const el = elementsITF(chiffres); let w = 20 * X; for (const e of el) w += e.large ? 2.5 * X : X;
@@ -132,7 +133,7 @@ const __fx = (() => {
       c.barres('12345678901234', 50, 78, 0.38, 18); c.TC('XY 1234 5678 9FR', 50, 73, 9); c.adresse(6, 64, 10); c.expediteur(6, 26); } },
     colissimo: { w: 100, h: 150, entete: 'COLISSIMO', d: (c) => {
       c.cadre(2, 2, 96, 146); c.T('COLISSIMO', 6, 138, 15, true); c.TD('Point retrait', 94, 139, 8, true); c.trait(4, 132, 96, 132);
-      c.T('Expédition', 6, 114, 8, true); c.dm(6, 84, 25); c.adresse(38, 106); c.expediteur(38, 80);
+      c.T('Expédition', 6, 115, 8, true); c.dm(6, 84, 25); c.adresse(38, 106); c.expediteur(38, 80);
       c.barres('12345678901234', 50, 22, 0.45, 26); c.TC('6A 1234 5678 901', 50, 16, 10); } },
     relaiscolis: { w: 150, h: 100, entete: 'Relais Colis', d: (c) => {
       c.cadre(2, 2, 146, 96); c.T('Relais Colis', 6, 88, 14, true); c.TD('Relais · R12', 144, 89, 8, true); c.trait(4, 83, 146, 83);
