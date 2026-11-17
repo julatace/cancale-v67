@@ -72,6 +72,7 @@ Défaut d'affichage trouvé en route : une règle globale de `src/design/studio-
 
 ## Preuves
 
+- Bancs voisins sur le build final : `relier-taille` 92 / 0, `relier-glisser` 63 / 0.
 - Banc `scripts/bancs/relier-tout-achat.cjs` (390 tactile clair et sombre, 1512 clair et sombre ; 3 002 achats sur deux
   comptes, 5 hors relier, 3 déjà reliés à N°7/8/9, 2 lots, 40 détails de transaction servis en PROJECTION) : **40 contrôles
   par passe** (voir l'en-tête du banc) — deux parties sans rien toucher ; 2 995 comptés ; « 5 … masqués » ; recherche visible + 3 filtres ; page
@@ -87,8 +88,11 @@ Défaut d'affichage trouvé en route : une règle globale de `src/design/studio-
 
 ## Mutations (banc à 390, une par règle — chacune doit rougir)
 
-Voir le rapport de PR (M1 suggestion d'un relié, M2 reliés dans la liste par défaut, M3 pas de « Déjà reliés », M4 lot pas
-lu dans le détail, M5 prix du lot partagé, M6 détacher sans demander, M7 un article du lot délie l'autre).
+Chaque build muté, banc à 390 (`scratchpad/relier-tout/mutations.py`) — toutes rouges :
+M1 un achat relié redevient disponible (`achatDisponible` ⇒ vrai) : 8 rouges (N°8 suggéré, reliés dans la liste) ·
+M2 reliés mêlés à la liste par défaut : 7 · M3 pas d'onglet « Déjà reliés » : 5 · M4 nombre d'articles du détail ignoré :
+8 (lot absent, « Lot · 2 articles » absent) · M5 prix du lot pré-rempli à la moitié : 2 · M6 détacher sans demander : 4 ·
+M7 relier un article du lot délie l'autre : 3. Build d'`origin/main` : rouge (200 achats vus sur 2 995, aucune section).
 
 ## Reste
 
@@ -102,4 +106,4 @@ lu dans le détail, M5 prix du lot partagé, M6 détacher sans demander, M7 un a
 
 ## ÉTAT À LA REPRISE
 
-Branche `claude/relier-tout-achat` poussée, PR ouverte (« Fini, à intégrer »). Aucun geste de Julien.
+Branche `claude/relier-tout-achat`, PR #1255, fusionnée par ce lot (accord du coordinateur). Aucun geste de Julien.
