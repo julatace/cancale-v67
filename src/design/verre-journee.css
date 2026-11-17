@@ -443,6 +443,6 @@
    SUR « Bénéfice · mois » (banc journee-coherence E6, capture 390). La dernière case lui laisse sa place ; rien d'autre
    ne bouge (mêmes colonnes, même crayon, mêmes 44 px). */
 @media (max-width: 743px) {
-  :root:root:root:root:root:root body .sj-journee .sj-t-mois .vrm-fu-cases > .vrm-fu-case:last-child { margin-right: 40px !important; }
+  :root:root:root:root:root:root body .sj-journee .sj-t-mois .vrm-fu-cases { margin-right: 40px !important; }   /* la grille entière (la case de droite dépend de `order`) */
 }
 }
