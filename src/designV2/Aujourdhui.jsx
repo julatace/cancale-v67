@@ -15,6 +15,7 @@ import React from 'react';
 import { tr } from '../i18n/index.js';
 import { BoutonV2, BoutonIconeV2, RangeeTouchable } from './BoutonV2.jsx';
 import './design-v2.css';
+import { ChiffreAffiche, Etiquette } from './Signature.jsx';
 
 function Vignette({ photo, Photo, Icon, taille = 56 }) {
   return (
@@ -52,16 +53,9 @@ export default function Aujourdhui({ affiche, colis = [], retraits = null, group
       </header>
 
       {rien ? <RienAFaire Icon={Icon}/> : (<>
-        {/* 1. LE CHIFFRE DE L'ÉCRAN */}
-        <section className="v2-affiche" aria-label={tr('v2.aEnvoyer.aria', { n: n == null ? '—' : String(n) })} data-v2-affiche={n == null ? '' : String(n)}>
-          <div className="v2-affiche-ligne">
-            <b className="v2-affiche-n">{n == null ? '—' : n}</b>
-            <span className="v2-affiche-mots">
-              <span className="v2-affiche-mot">{tr('v2.aEnvoyer.mot', { n: n == null ? 2 : n })}</span>
-              {affiche && affiche.sous ? <span className={'v2-affiche-sous' + (affiche.ambre ? ' is-ambre' : '')} data-v2-ecart="">{affiche.sous}</span> : null}
-            </span>
-          </div>
-        </section>
+        {/* 1. LE CHIFFRE DE L'ÉCRAN (la signature : 56/700, son mot sur la même ligne de base, l'écart nommé dessous). */}
+        <ChiffreAffiche n={n} mot={tr('v2.aEnvoyer.mot', { n: n == null ? 2 : n })} sous={affiche && affiche.sous} ambre={!!(affiche && affiche.ambre)}
+          attrs={{ 'aria-label': tr('v2.aEnvoyer.aria', { n: n == null ? '—' : String(n) }) }}/>
 
         {/* 2. LA BANDE DES PAIRES À ENVOYER — une carte par colis, par identité (le N° de SA vente). */}
         {colis.length ? (
@@ -70,7 +64,7 @@ export default function Aujourdhui({ affiche, colis = [], retraits = null, group
               <RangeeTouchable key={c.cle} className="v2-bande-carte" onClick={() => onColis && onColis(c)} label={[c.num ? 'N° ' + c.num : '', c.titre, c.prix, c.e && c.e.txt].filter(Boolean).join(' · ')}
                 attrs={{ role: 'listitem', 'data-v2-colis': c.cle }}>
                 <span className="v2-bande-photo">{c.photo && Photo ? <Photo src={c.photo} alt="" loading="lazy" decoding="async" width={104} height={104}/> : <Icon name="cintre" size={26}/>}
-                  {c.num ? <span className="v2-bande-plaque"><Plaque num={c.num}/></span> : null}</span>
+                  {c.num ? <span className="v2-bande-plaque"><Etiquette num={c.num} taille="moyen"/></span> : null}</span>
                 <span className="v2-bande-prix">{c.prix || ' '}</span>
                 <span className={'v2-bande-quand' + (c.e && c.e.ambre ? ' is-ambre' : '')}>{c.e && c.e.ambre ? <i className="v2-point" aria-hidden="true"/> : null}{(c.e && c.e.txt) || ' '}</span>
               </RangeeTouchable>

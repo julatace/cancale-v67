@@ -261,7 +261,9 @@ const ECRANS = [
         // A10 · (17 nov.) plus de disque « + » : rien entre Achats et Ventes, cinq onglets de même largeur.
         const sansDisque = await pg.evaluate(() => { const n = document.querySelector('.vrm-tabbar'); const t = [...n.querySelectorAll(':scope > .vrm-tab')].map((b) => Math.round(b.getBoundingClientRect().width));
           return { disque: !!document.querySelector('[data-sb-disque], .sb-disque'), largeurs: t }; });
-        dit(!sansDisque.disque && sansDisque.largeurs.length === 5 && Math.max(...sansDisque.largeurs) - Math.min(...sansDisque.largeurs) <= 2, `A10 ${qui} : aucun disque « + », cinq onglets également espacés`, JSON.stringify(sansDisque));
+        // « Aujourd'hui » garde sa part ×1,25 (son libellé, studio.css) ; les quatre autres sont égaux, sans trou.
+        const [l0, ...lr] = sansDisque.largeurs;
+        dit(!sansDisque.disque && sansDisque.largeurs.length === 5 && Math.max(...lr) - Math.min(...lr) <= 2 && l0 <= Math.round(lr[0] * 1.3) + 1, `A10 ${qui} : aucun disque « + », cinq onglets sans trou (${sansDisque.largeurs.join(' · ')})`, JSON.stringify(sansDisque));
         // A4 · l'onglet allumé = l'écran, pour chaque écran (au toucher de la barre).
         const vus = [];
         for (const id of ['paires', 'achats', 'ventes', 'compta', 'journee']) {

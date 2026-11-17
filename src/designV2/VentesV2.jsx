@@ -20,6 +20,7 @@
 import React from 'react';
 import { tr, nombre } from '../i18n/index.js';
 import LigneAnnonce from './LigneAnnonce.jsx';
+import { ChiffreAffiche, RangeeFaite } from './Signature.jsx';
 import './design-v2.css';
 
 // L'ordre des groupes d'« À envoyer » (le plus pressé d'abord ; ce qui est imprimé, à la fin).
@@ -27,18 +28,9 @@ export const GROUPES_ENVOYER = ['presse', 'semaine', 'plusTard', 'estimee', 'san
 // L'ordre des groupes d'« En route » (ce qui peut demander un geste d'abord).
 export const GROUPES_ROUTE = ['retour', 'coche', 'relais', 'route', 'livre'];
 
-// Le chiffre d'affiche : le nombre en 56/700 tabulaire, son mot sur la même ligne de base ; « — » quand il n'est pas lu.
+// Le chiffre d'affiche : celui de la signature (src/designV2/Signature.jsx), « N colis à envoyer », l'écart nommé dessous.
 export function AfficheVentes({ n, mot, ecart = '', auMoins = '', attrs = {} }) {
-  return (
-    <div className="v2v-affiche" {...attrs}>
-      <p className="v2v-affiche-l1" aria-label={n == null ? mot : `${auMoins ? auMoins + ' ' : ''}${nombre(n)} ${mot}`}>
-        {auMoins ? <span className="v2v-affiche-borne" aria-hidden="true">{auMoins}</span> : null}
-        <span className="v2v-affiche-n" aria-hidden="true">{n == null ? '—' : nombre(n)}</span>
-        <span className="v2v-affiche-mot" aria-hidden="true">{mot}</span>
-      </p>
-      {ecart ? <p className="v2v-ecart" data-v2v-ecart="">{ecart}</p> : null}
-    </div>
-  );
+  return <ChiffreAffiche n={n} mot={auMoins && n != null ? auMoins + ' · ' + mot : mot} sous={ecart} attrs={attrs}/>;
 }
 
 // La rangée recherche : le champ (le scanner dedans, passé par l'écran) et « ⋯ ».
@@ -65,6 +57,14 @@ export function usePartants(lignes) {
   return partants;
 }
 
+// La rangée qui vient d'être faite : montée « pas faite », elle passe « faite » à l'image suivante (le mouvement de la
+// signature, `RangeeFaite` : coche, glisse, se replie en 220 ms) ; ensuite la liste la range dans « Imprimés, à déposer ».
+function Partante({ children }) {
+  const [f, setF] = React.useState(false);
+  React.useEffect(() => { const r = requestAnimationFrame(() => setF(true)); return () => cancelAnimationFrame(r); }, []);
+  return <RangeeFaite fait={f}>{children}</RangeeFaite>;
+}
+
 // Une rangée de colis : la rangée A de la liste (LigneAnnonce), ses gestes de glisser à soi.
 function LigneColis({ l, Photo, Icon, LigneGlissable, partant = false }) {
   const gestes = [
@@ -72,11 +72,12 @@ function LigneColis({ l, Photo, Icon, LigneGlissable, partant = false }) {
     l.choisir ? { cle: 'choisir', libelle: tr('v2v.choisir'), icone: <Icon name="link" size={20}/>, faire: l.choisir, data: { 'data-v2l-glisse': 'choisir' } } : null,
     l.plus ? { cle: 'plus', libelle: tr('v2.l.plus'), icone: <Icon name="more" size={20}/>, faire: l.plus, data: { 'data-v2l-glisse': 'plus' } } : null,
   ].filter(Boolean);
-  return (
+  const ligne = (
     <LigneAnnonce variante="A" cle={'v2v:' + l.cle} attrs={{ ...l.attrs, 'data-v2v-ligne': l.cle, 'data-v2v-groupe': l.groupe, 'data-v2v-fait': partant ? 'part' : undefined }}
       photo={l.photo || null} Photo={Photo} Icon={Icon} titre={l.titre} num={l.num} double={!!l.double} prix={l.prix}
-      sous={l.sous} sousAmbre={l.sousAmbre} gestes={gestes} LigneGlissable={partant ? null : LigneGlissable} fait={partant}/>
+      sous={l.sous} sousAmbre={l.sousAmbre} gestes={gestes} LigneGlissable={partant ? null : LigneGlissable}/>
   );
+  return partant ? <Partante>{ligne}</Partante> : ligne;
 }
 
 // La liste groupée : un en-tête par groupe (son nom et son nombre, UNE fois), les rangées dessous, sur une carte.

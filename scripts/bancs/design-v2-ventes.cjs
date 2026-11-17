@@ -120,7 +120,7 @@ async function mesurer(pg) {
       tete: { h1: cy(h1), plein: cy(pl), cloche: cy(cl), pleinTxt: pl ? pl.textContent.trim() : '', pleinN: pl ? pl.getAttribute('data-impr-lot') : null, pleinAria: pl ? pl.getAttribute('aria-label') : '', h1Bas: h1 ? Math.round(q(h1).bottom) : null, menuHaut: menu ? Math.round(q(menu).top) : null },
       premiere: lignes[0] ? Math.round(q(lignes[0]).top) : null, n: lignes.length, tetes, parGroupe, segN,
       affiche: (document.querySelector('[data-v2v-affiche]') || { getAttribute: () => null }).getAttribute('data-v2v-affiche'),
-      ecart: (document.querySelector('[data-v2v-ecart]') || {}).textContent || '',
+      ecart: (document.querySelector('.v2v-tete [data-v2-ecart]') || {}).textContent || '',
       scanDansChamp: !!document.querySelector('[data-v2v-champ] [data-v2v-scanner]'),
       redits: lignes.filter((r) => /Choisir la vente|vendeur_\d/.test(r.textContent)).length,
       sansPrix: lignes.filter((r) => r.querySelector('[data-v2l]') ? false : !r.querySelector('.v2l-a-prix')).length,
@@ -163,9 +163,9 @@ async function allume(nav, b, sombre, W, ref) {
   await pg.screenshot({ path: path.join(SHOTS, `ventes-${th}.png`) });
   if (tel) {
     // G : la recherche par N° trouve la rangée.
-    const num = await pg.evaluate(() => { const p = document.querySelector('[data-v2v-liste] [data-v2v-ligne] .v2-plaque'); return p ? p.getAttribute('data-v2-plaque') : ''; });
+    const num = await pg.evaluate(() => { const p = document.querySelector('[data-v2v-liste] [data-v2v-ligne] .v2-etiquette'); return p ? p.getAttribute('data-v2-etiquette') : ''; });
     await pg.locator('[data-v2v-champ] input').fill(num); await pg.waitForTimeout(500);
-    const tr = await pg.evaluate((n) => [...document.querySelectorAll('[data-v2v-liste] [data-v2v-ligne] .v2-plaque')].map((p) => p.getAttribute('data-v2-plaque')), num);
+    const tr = await pg.evaluate((n) => [...document.querySelectorAll('[data-v2v-liste] [data-v2v-ligne] .v2-etiquette')].map((p) => p.getAttribute('data-v2-etiquette')), num);
     dit(num && tr.length >= 1 && tr.includes(num) && tr.length < 5, `G ${th} : « ${num} » tapé ⇒ ${tr.length} rangée(s), dont N°${num}`, tr);
     await pg.screenshot({ path: path.join(SHOTS, `ventes-recherche-${th}.png`) });
     await pg.locator('[data-v2v-champ] input').fill(''); await pg.waitForTimeout(400);
