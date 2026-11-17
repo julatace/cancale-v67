@@ -115,5 +115,6 @@ export default {
   "v2.scanner": "Scansiona un pacco",
   "v2.achats.ajouter": "Aggiungi un acquisto",
   "v2.l.achete": "comprato {p}",
-  "v2.l.acheteMarge": "Comprato {p} · margine {m}"
+  "v2.l.acheteMarge": "Comprato {p} · margine {m}",
+  "v2.chargement": "Lettura dei tuoi annunci…"
 };

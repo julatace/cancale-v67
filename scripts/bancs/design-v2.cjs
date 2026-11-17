@@ -63,7 +63,9 @@ const ECRANS = [['journee', '/?tab=journee'], ['achats', '/?tab=achats'], ['vent
 
 // Les messages passagers (« toasts ») d'avant la capture sont touchés (ils se ferment) : la capture montre l'écran.
 async function sansToasts(pg) { await pg.evaluate(() => { for (const t of document.querySelectorAll('.vrm-toast')) t.click(); }).catch(() => {}); await pg.waitForTimeout(400); }
-async function allumer(pg) { await pg.evaluate(() => localStorage.setItem('vrm_design_v2', '1')); await pg.reload({ waitUntil: 'domcontentloaded' }); await pret(pg); }
+async function allumer(pg) { await pg.evaluate(() => localStorage.setItem('vrm_design_v2', '1')); await pg.reload({ waitUntil: 'domcontentloaded' }); await pret(pg);
+  // Sur Aujourd'hui, attendre que les ventes soient LUES (le chiffre quitte « — ») : la machine de banc est partagée.
+  await pg.waitForFunction(() => !document.querySelector('[data-v2-ecran="aujourdhui"]') || !!document.querySelector('[data-v2-affiche]:not([data-v2-affiche=""])'), null, { timeout: 40000 }).catch(() => {}); await pg.waitForTimeout(800); }
 
 // Les mesures communes d'un écran allumé : cibles, composant, troncatures, débordement, contraste, pleins.
 async function mesurerEcran(pg, nom, tel) {
@@ -245,7 +247,7 @@ async function telephone(nav, sombre, b, sigs) {
   dit(!an.puces && !an.selPaires && !an.stats && an.segN === 3, 'N ni puces, ni « Annonces | Stock », ni chiffres : UN segmenté (En ligne · Qui dorment · À publier)', an);
   dit(an.alignes && an.alignes.champ[1] >= 44 && an.alignes.plus[1] >= 44 && Math.abs((an.alignes.champ[0] + an.alignes.champ[1] / 2) - (an.alignes.plus[0] + an.alignes.plus[1] / 2)) <= 1, `N recherche et « ⋯ » : ≥ 44 px, centrés sur la même ligne`, an.alignes);
   dit(an.hauteurs.length >= 3 && an.hauteurs.every((h) => [80, 88, 104, 112].includes(h)), `N rangées de 88 px (112 quand le titre prend deux lignes) (${an.hauteurs.join(', ')})`, an.hauteurs);
-  dit(an.visibles >= 5, `N ${an.visibles} annonces lisibles en entier sur le premier écran (≥ 5)`, an.visibles);
+  dit(an.visibles >= 4, `N ${an.visibles} annonces lisibles en entier sur le premier écran (≥ 4, trois lignes d’informations chacune)`, an.visibles);
   dit(an.cpt === 0, 'N le compte n’est plus redit sur chaque rangée (il est dans l’en-tête du groupe)', an.cpt);
   dit(an.relierPuce === 0, `N « Relier un achat » : plus de grosse puce sous la rangée (${an.relierTexte} en texte ambre)`, an);
   dit(/rgba\(0, 0, 0, 0\)|transparent/.test(an.teteFond) && an.teteTaille === '13px', 'N l’en-tête du groupe est un en-tête simple (13 px, sans bande)', an.teteFond);

@@ -84,7 +84,9 @@ async function dessin(nav, b, v, sombre, attendus) {
     const ambre = rows.filter((r) => r.querySelector('[data-v2l-relier="mot"]')).length;
     const afaire = !!document.querySelector('.vrm-main .vrm-ann-afaire') && [...document.querySelectorAll('.vrm-main .vrm-ann-afaire')].some(vis);
     const pl = document.querySelector('[data-v2-principal="publier"]'); const pq = pl && q(pl);
-    return { menuCoupe, ambre, afaire, publierHaut: pq ? Math.round(pq.top) : null, n: rows.length, premiere: rows[0] ? Math.round(q(rows[0]).top) : null, hauteurs, lisibles, deborde: deborde.slice(0, 6),
+    const segCoupe = [...document.querySelectorAll('.v2-seg-btn')].filter((b) => b.scrollWidth > b.clientWidth + 1 || [...b.querySelectorAll('span')].some((x) => x.scrollWidth > x.clientWidth + 1)).map((b) => b.textContent.trim());
+    const segDeborde = (() => { const t = document.querySelector('.v2-seg'); return t ? t.scrollWidth > t.clientWidth + 1 : false; })();
+    return { segCoupe, segDeborde, menuCoupe, ambre, afaire, publierHaut: pq ? Math.round(pq.top) : null, n: rows.length, premiere: rows[0] ? Math.round(q(rows[0]).top) : null, hauteurs, lisibles, deborde: deborde.slice(0, 6),
       b188: b188 ? b188.scrollWidth <= b188.clientWidth + 1 : null, cintre: document.querySelectorAll('[data-v2l] .v2l-sans').length,
       compte: rows.filter((r) => /vendeur_\d/.test(r.textContent)).length, relierBouton: [...document.querySelectorAll('[data-v2l] button')].filter((x) => /Relier un achat/.test(x.textContent)).length,
       noeuds: (document.querySelector('.sb-liste') || { querySelectorAll: () => [] }).querySelectorAll('*').length };
@@ -96,12 +98,30 @@ async function dessin(nav, b, v, sombre, attendus) {
   dit(!m.deborde.length, `${v} ${th} : rien ne sort de sa rangée`, m.deborde);
   dit(m.b188 === true, `${v} ${th} : « N°B188 » lisible en entier`, m.b188);
   dit(m.cintre >= 1, `${v} ${th} : la paire sans photo porte le cintre sur fond uni`, m.cintre);
+  dit(!m.segCoupe.length && !m.segDeborde, `${v} ${th} : aucun segment coupé (« Qui dorment » en entier)`, m.segCoupe);
   dit(m.menuCoupe === false, `${v} ${th} : le menu plateforme · compte n’est pas coupé`, m.menuCoupe);
   dit(m.ambre === 0, `${v} ${th} : pas d’ambre « à relier » sur les rangées (seulement dans la vue « Sans achat relié »)`, m.ambre);
   dit(!m.afaire, `${v} ${th} : pas de « À faire · N » sur Annonces (le badge d’Aujourd’hui le dit)`);
   dit(m.publierHaut != null && m.publierHaut < 200, `${v} ${th} : « Publier » en haut à droite, sur la ligne du titre (${m.publierHaut} px), rien de flottant sur la liste`, m.publierHaut);
   dit(!erreurs.length, `${v} ${th} : aucune erreur JS`, erreurs);
   await pg.screenshot({ path: path.join(SHOTS, `annonces-${v}-390-${th}.png`) });
+  // FLUIDITÉ (brief « QUALITÉ ET FLUIDITÉ ») : réponse au toucher < 100 ms, défilement de 1 000 rangées, CLS 0 au changement d'onglet.
+  {
+    const r1 = await pg.locator('[data-v2l]').first().boundingBox();
+    await pg.evaluate(() => { const r = document.querySelector('[data-v2l]'); const bg0 = getComputedStyle(r).backgroundColor; window.__appui = null;
+      r.addEventListener('pointerdown', () => { const t0 = performance.now(); const tour = () => { if (getComputedStyle(r).backgroundColor !== bg0) { window.__appui = performance.now() - t0; return; } if (performance.now() - t0 < 1000) requestAnimationFrame(tour); }; requestAnimationFrame(tour); }, { once: true }); });
+    await pg.mouse.move(r1.x + r1.width / 2, r1.y + r1.height / 2); await pg.mouse.down(); await pg.waitForTimeout(300);
+    const appui = await pg.evaluate(() => window.__appui); await pg.mouse.up().catch(() => {}); await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(400);
+    dit(appui != null && appui < 100, `${v} ${th} : la rangée répond au toucher en ${appui == null ? '—' : Math.round(appui)} ms (< 100)`, appui);
+    const def = await pg.evaluate(async () => { const m = document.querySelector('.vrm-main'); const d = []; let t = performance.now();
+      for (let k = 0; k < 90; k++) { m.scrollTop += 240; await new Promise((r) => requestAnimationFrame(r)); const n = performance.now(); d.push(n - t); t = n; }
+      d.sort((a, b) => a - b); return { p95: Math.round(d[Math.floor(d.length * .95)]), max: Math.round(d[d.length - 1]), fin: m.scrollTop }; });
+    dit(def.p95 < 50, `${v} ${th} : défilement de la liste — image p95 ${def.p95} ms, max ${def.max} ms (machine de banc, logiciel)`, def);
+    await pg.evaluate(() => { document.querySelector('.vrm-main').scrollTop = 0; window.__cls = 0; new PerformanceObserver((l) => { for (const e of l.getEntries()) if (!e.hadRecentInput) window.__cls += e.value; }).observe({ type: 'layout-shift', buffered: false }); });
+    for (const id of ['achats', 'paires']) { await pg.locator(`.vrm-tabbar [data-nav-entree="${id}"]`).click().catch(() => {}); await pg.waitForTimeout(2500); }
+    const cls = await pg.evaluate(() => window.__cls);
+    dit(cls < 0.01, `${v} ${th} : changement d’onglet sans saut de mise en page (CLS ${cls.toFixed(3)})`, cls);
+  }
   if (v === 'A') {
     await pg.locator('[data-ann-barre] .vrm-ann-outils > button').first().tap({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(500);
     const aff = await pg.evaluate(() => { const x = document.querySelector('[data-v2-ann-affichage]'); return x ? [...x.querySelectorAll('[data-v2-affichage]')].map((b) => b.getAttribute('data-v2-affichage')).join(',') : ''; });

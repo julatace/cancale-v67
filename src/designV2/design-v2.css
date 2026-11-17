@@ -242,7 +242,7 @@ html body button.v2-rangee.v2-menu { width: auto; max-width: 100%; gap: 6px; pad
 .v2-feuille-hote { position: fixed; inset: 0; z-index: 2400; }
 .v2-feuille-hote[hidden] { display: none; }
 .v2-voile { position: absolute; inset: 0; background: rgb(6 17 31 / .38); animation: v2-voile 200ms ease-out both; }
-.v2-feuille { position: absolute; left: 0; right: 0; bottom: 0; max-height: 82vh; overflow: auto; background: var(--v2-feuille-fond); color: var(--sv-encre, #0C1D30); border-radius: 22px 22px 0 0; padding: 6px 16px calc(16px + env(safe-area-inset-bottom)); box-shadow: 0 -10px 40px rgb(0 0 0 / .2); animation: v2-monte 320ms cubic-bezier(.32, .72, 0, 1) both; }
+.v2-feuille { position: absolute; left: 0; right: 0; bottom: 0; max-height: 82vh; overflow: auto; background: var(--v2-feuille-fond); color: var(--sv-encre, #0C1D30); border-radius: 22px 22px 0 0; padding: 6px 16px calc(16px + env(safe-area-inset-bottom)); box-shadow: 0 -10px 40px rgb(0 0 0 / .2); animation: v2-monte var(--v2-ressort-feuille, 380ms cubic-bezier(.32, .72, 0, 1)) both; }
 @media (min-width: 1024px) { .v2-feuille { left: 50%; right: auto; bottom: auto; top: 12vh; width: 520px; transform: translateX(-50%); border-radius: 22px; animation: v2-voile 200ms ease-out both; } }
 .v2-feuille-tete { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 14px 0 8px; }
 .v2-feuille-poignee { position: absolute; left: 50%; top: 4px; width: 36px; height: 5px; border-radius: 3px; background: var(--v2-filet); transform: translateX(-50%); }
@@ -428,13 +428,13 @@ html[data-design="v2"] body .vrm-app-header .vrm-header-actions { gap: 8px !impo
 @media (max-width: 1023px) { .v2-titre-ligne { padding-right: 64px; } }
 /* Le segmenté du nouveau design (SegmentV2) : piste translucide, segment choisi en porcelaine claire, encre. */
 .v2-seg { display: flex; gap: 2px; padding: 2px; border-radius: 14px; background: rgb(255 255 255 / .14); box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .18); }
-html body button.v2-seg-btn { appearance: none; flex: 1 1 0; min-width: 0; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 8px; border: 0; border-radius: 12px;
+html body button.v2-seg-btn { appearance: none; flex: 1 1 auto; min-width: max-content; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 0 8px; border: 0; border-radius: 12px;
   background: transparent; color: var(--v2-page-texte, #FFFFFF); font: 600 15px/1.2 var(--sb-police-texte, system-ui); font-variant-numeric: tabular-nums; cursor: pointer; white-space: nowrap;
   touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; transition: background-color 160ms ease, color 160ms ease; }
 html body button.v2-seg-btn.is-on { background: #F4F8FC; color: #0C1D30; box-shadow: 0 1px 2px rgb(0 0 0 / .18); }
 html body button.v2-seg-btn:focus-visible { outline: none; box-shadow: var(--v2-anneau); }
 .v2-seg-n { font-weight: 400; opacity: .8; }
-.v2-seg-l { overflow: hidden; text-overflow: ellipsis; }
+.v2-seg-l { white-space: nowrap; }   /* jamais coupé : la piste se partage selon les mots */
 /* ══ 12. Plus d'informations par rangée (Julien : « il doit y avoir plusieurs infos ») — gris, jamais ambre ══ */
 .v2l-fait { display: inline-flex; align-items: center; gap: 4px; flex: none; white-space: nowrap; }
 .v2l-marge { font-weight: 600; margin-left: 4px; color: inherit; }

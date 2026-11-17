@@ -115,5 +115,6 @@ export default {
   "v2.scanner": "Scan a parcel",
   "v2.achats.ajouter": "Add a purchase",
   "v2.l.achete": "bought {p}",
-  "v2.l.acheteMarge": "Bought {p} · margin {m}"
+  "v2.l.acheteMarge": "Bought {p} · margin {m}",
+  "v2.chargement": "Reading your listings…"
 };
