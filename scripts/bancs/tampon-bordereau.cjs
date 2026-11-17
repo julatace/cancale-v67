@@ -82,6 +82,8 @@ if (MUT === 'seuilStrict') tampon = muter(tampon, 'encre: 200, cellule: 3,', 'en
 // aucune zone gardée) ou sans masquer l'étiquette à découper ⇒ rouge.
 // (16 nov., lot tampons-parametres) La mention au-dessus du QR : sans regarder l'encre ⇒ rouge ; sans s'écarter du cartouche ⇒ rouge.
 if (MUT === 'mentionAveugle') tampon = muter(tampon, '    && encreDans(rendu, { x: x - M, y: y - M, w: bw + 2 * M, h: bh + 2 * M }) === 0;', '    && true;', MUT);
+// (17 nov., lot tampon-qr) la place au-dessus du code (`placerMentionSurCode`) regarde l'encre elle aussi.
+if (MUT === 'mentionAveugle') tampon = muter(tampon, '      if (encreDans(rendu, garde) !== 0) continue;', '', MUT);
 if (MUT === 'mentionCollee') tampon = muter(tampon, 'if (o.evite) interdits.push(elargir(o.evite, 3 * MM_M));', '', MUT);
 // (3 nov., soir) LE TAMPON LIBRE : la place choisie à la main, la forme, la
 // mémoire par forme (`choisirTampon`). Absent du code d'avant ⇒ rouge, pas un plantage.

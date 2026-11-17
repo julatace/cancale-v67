@@ -105,7 +105,7 @@ const __fx = (() => {
     c.maxi = (x, y, cote, col = vise) => { let s = 5; const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
       const nx = 30, ny = 33, dx = cote / (nx + 0.5), dy = cote / ny, cx = x + cote / 2, cy = y + cote / 2;
       for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const px = x + (i + (j % 2 ? 0.5 : 0) + 0.5) * dx, py = y + (j + 0.5) * dy;
-        if (Math.hypot(px - cx, py - cy) < cote * 0.2) continue; if (rnd() < 0.5) p.drawRectangle({ x: (px - dx * 0.34) * MMp, y: (py - dy * 0.36) * MMp, width: dx * 0.68 * MMp, height: dy * 0.72 * MMp, color: col }); }
+        if (Math.hypot(px - cx, py - cy) < cote * 0.2) continue; if (rnd() < 0.5) p.drawRectangle({ x: (px - dx * 0.4) * MMp, y: (py - dy * 0.4) * MMp, width: dx * 0.8 * MMp, height: dy * 0.8 * MMp, color: col }); }
       for (const r of [0.17, 0.11, 0.05]) p.drawCircle({ x: cx * MMp, y: cy * MMp, size: r * cote * MMp, borderColor: col, borderWidth: cote * 0.022 * MMp }); };
     // Code-barres ITF (vraie forme, 'elementsITF' de bordereauExemple), barre fine X (mm), hauteur h (mm), centré sur xc.
     c.barres = (chiffres, xc, y, X, h, col = noir) => { const el = elementsITF(chiffres); let w = 20 * X; for (const e of el) w += e.large ? 2.5 * X : X;

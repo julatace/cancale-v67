@@ -15,7 +15,7 @@
 //   B. aucun pixel n'a changé dans le QR + sa zone de silence (4 modules) ni sur le code-barres (+ 10 modules) —
 //      comparaison avec le même bordereau imprimé SANS tampon ;
 //   C. « Créé par vrm.center » est écrite (texte du PDF), CENTRÉE sur l'axe du QR (écart ≤ 2 % de la largeur), juste
-//      AU-DESSUS du QR (ou juste dessous si le dessus est pris : le récit le compte), jamais dans sa zone de silence ;
+//      AU-DESSUS du QR (17 nov. : jamais dessous — Julien), 2 à 4 mm ;
 //   D. le N° est écrit, hors des codes ;
 // puis les RÉGLAGES (`vrm_tampons`) : contenu (cases), taille L, place rapide, place posée à la main (et REPOUSSÉE
 // hors du QR si elle le touche), exception « seulement Mondial Relay », migration des choix d'avant, place posée
@@ -42,7 +42,8 @@ const DEBUT = '// ── LE TAMPON DU BORDEREAU', FIN = '// ── IMPRIMANTE NO
 let tampon = APP.slice(APP.indexOf(DEBUT), APP.indexOf(FIN));
 if (!imp || !/const CLE_TAMPONS/.test(regles)) { console.log('❌ code d’impression ou réglage des tampons introuvable (arbre d’avant ?)'); if (!imp) process.exit(1); }
 const muter = (s, a, b) => { if (!s.includes(a)) { dit(false, `mutation « ${MUT} » applicable`, 'motif absent'); return s; } return s.split(a).join(b); };
-if (MUT === 'mentionSurQr') tampon = muter(tampon, "  if (q) {\n    const garde = gardeQr(rendu, q), x = q.x + q.w / 2 - bw / 2;", "  if (q) { return { x: q.x + q.w / 2 - bw / 2, y: q.y + q.h / 2 - bh / 2, via: 'qr-dessus', qr: q }; }\n  if (q) {\n    const garde = gardeQr(rendu, q), x = q.x + q.w / 2 - bw / 2;");
+// (17 nov., lot tampon-qr) La mention posée SUR le QR (au milieu de sa boîte, repère de l'étiquette) ⇒ rouge.
+if (MUT === 'mentionSurQr') tampon = muter(tampon, '/*MUTATION-MENTION*/', 'vb = qf.y + qf.h / 2;');
 if (MUT === 'ignoreReglage') imp = muter(imp, "imp.tampons = (impression && impression.tampons) || reglageTamponsChoisi();", "imp.tampons = reglageTampons(null);");
 if (MUT === 'retourSansRetour') imp = muter(imp, "if (imp.retour) imp.ts = { ...imp.ts, contenu: { ...imp.ts.contenu, num: true, titre: true } };", "");
 if (MUT === 'retourPrendVente') regles = muter(regles, "  if (retour) return 'retour';\n", "");
@@ -193,8 +194,10 @@ async function typeSupport(pg, id, support, vignettes) {
     const via = a.pose && a.pose.mentionBoite && a.pose.mentionBoite.via;
     if (via === 'qr-dessus') stats.dessus++; else if (via === 'qr-dessous') stats.dessous++; else stats.autre++;
     dit(ecart <= 0.02, `${t} : C. mention centrée sur l'axe du QR (écart ${(ecart * 100).toFixed(2)} % ≤ 2 %)`);
-    dit((dessus || dessous) && gap >= 2.5 * MM && gap <= 16 * MM, `${t} : C. mention juste ${dessus ? 'AU-DESSUS' : 'EN DESSOUS'} du QR, hors de sa zone de silence (${(gap / MM).toFixed(1)} mm)`, `via=${via}`);
-    dit(m.t <= 7.5 && m.t >= 4.5, `${t} : C. mention petite (${m.t.toFixed(1)} pt)`);
+    // (17 nov., lot tampon-qr) Julien : « vraiment juste au-dessus du qrcode, pas en dessous ou sur les côtés » ⇒ AU-DESSUS
+    // seulement, 2 à 4 mm (mesuré ici du jambage estimé au bord jsQR : 1,5 à 4,5 mm) ; la mesure fine est `tampon-qr.cjs`.
+    dit(dessus && gap >= 1.5 * MM && gap <= 4.5 * MM, `${t} : C. mention juste AU-DESSUS du QR (${(gap / MM).toFixed(1)} mm)`, `via=${via}`);
+    dit(m.t <= 7.5 && m.t >= 4.2, `${t} : C. mention petite (${m.t.toFixed(1)} pt)`);
   }
   // D. le N° — sur l'étiquette, ou sur la fiche (colis / préparation) qui la suit quand il n'y a aucune place sûre
   const num = L.items.find((i) => /^N° 124/.test(i.s));
