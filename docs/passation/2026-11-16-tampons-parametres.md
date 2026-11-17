@@ -224,3 +224,20 @@ pleines, ou QR sans ligne ni colonne vide, page tournée comprise).
   tampons n'y existe pas).
 - Non comparé à `main` faute de temps (machine à charge 20) : `imprimante` (instable, 4 à 12 rouges selon la charge ; `main`
   9) et `feuilles-coque` (20 rouges, écrans Annonces/Ventes qui n'ouvrent pas en 6 s : charge).
+
+### Reprise du 17 nov. (matin) — `main` refusionné avec #1194 (impression-retours) et #1202 (ventes-clair)
+- Fusion réelle : `tamponnerBordereau` prend `tampon` ET `retour` (cartouche RETOUR de #1194 : mot en grand, cadre) ;
+  le retour d'achat passe `tamponPourPage(…, { famille: 'retour' })` + `retour: true` ; `composerBordereaux` : `it.retour`
+  ⇒ `impIt.retour`, jamais le tampon d'une vente ; la recherche manuelle de relais (code mort retiré par main) reste retirée.
+- Corrigé en route : (1) « Imprimer » de l'aperçu refusait un lot contenant un retour (« un bordereau a changé ») — la
+  vérification relit `lignesLotImpression()` (ventes + retours) ; banc impression-retours R3 rouge avant, vert après.
+  (2) Au téléphone, « tous de ce type » ne s'appliquait qu'au bordereau glissé : `save` écrit l'appareil 500 ms après,
+  le PDF composé aussitôt lisait l'ancien réglage ⇒ le réglage qu'on vient d'écrire est relu tel quel 2 s
+  (`brutTampons`) ; P5 390 rouge avant, vert après. (3) Lâché SUR le QR, l'aimant « au-dessus du QR » pouvait tirer le
+  N° hors du QR et l'accepter : le centre lâché sur une zone interdite est refusé (`SceneTampons.lacher`).
+- Bancs : `_code-impression.cjs` charge aussi `retoursLot.js` (le cartouche RETOUR) ; un retour 10×15 dont le grand
+  cartouche ne tient pas va sur la fiche RETOUR qui suit (jamais « rien ») : le banc lit la page posée OU sa fiche.
+- Verts (17 nov.) : tampons-reglages 700, tampons-apercu 56 (390 + 1512, S « rien ne bouge », B « Bordereau prêt »),
+  tampon-bordereau 208, impression-retours 42 ; audits tampons 20, impression-retours, colis-plus 72, colis-trois,
+  impression, selection-bordereaux, impression-carton, lot-preparation-reprise. QR décodé après tampons sur chaque type.
+- Planches regardées (A4 : mention au-dessus du QR sur Colissimo/UPS/DPD, RETOUR cerné sur le retour ; 10×15).

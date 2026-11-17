@@ -85,12 +85,17 @@ export default function SceneTampons({ octets, pose, page, largeur, dessiner, on
       n = borner({ ...b, w: G.w0 * f, h: G.h0 * f });
     } else {
       const pt = enPoints(e);
-      n = borner(aimanter({ ...b, x: pt.x - G.dx, y: pt.y - G.dy }, axes(), 8 / ppt));
+      const brut = borner({ ...b, x: pt.x - G.dx, y: pt.y - G.dy });
+      // (17 nov.) Lâché SUR un code : refusé — l'aimant ne le tire pas hors du QR à la place du doigt (`lacher`).
+      G.brut = brut;
+      n = borner(aimanter(brut, axes(), 8 / ppt));
     }
     setBoites((x) => ({ ...x, [G.quoi]: n }));
   };
-  const lacher = (quoi, b, avant, facteur) => {
-    const z = surInterdit(b, quoi);
+  const lacher = (quoi, b, avant, facteur, brut = null) => {
+    // Le centre lâché SUR une zone interdite : refusé, même si l'aimant l'en a tiré (un bord qui déborde, lui, s'aimante).
+    const cx = brut ? brut.x + brut.w / 2 : 0, cy = brut ? brut.y + brut.h / 2 : 0;
+    const z = surInterdit(b, quoi) || (brut ? zonesDe(quoi).find((q) => cx > q.x && cx < q.x + q.w && cy > q.y && cy < q.y + q.h) : null);
     if (z) { setBoites((x) => ({ ...x, [quoi]: avant })); if (onRefus) onRefus(z.quoi || 'code'); return; }
     if (onPoser) onPoser(quoi, b, facteur);
   };
@@ -100,7 +105,7 @@ export default function SceneTampons({ octets, pose, page, largeur, dessiner, on
     geste.current = null; setActif(null);
     const b = ref.current.boites[G.quoi]; if (!b || !p) return;
     if (Math.abs(b.x - G.avant.x) < 0.5 && Math.abs(b.y - G.avant.y) < 0.5 && Math.abs(b.w - G.avant.w) < 0.5) return;
-    lacher(G.quoi, b, G.avant, G.type !== 'glisse' ? b.w / G.avant.w : 1);
+    lacher(G.quoi, b, G.avant, G.type !== 'glisse' ? b.w / G.avant.w : 1, G.brut);
   };
   const clavier = (quoi) => (e) => {
     const b = ref.current.boites[quoi]; if (!b) return;
