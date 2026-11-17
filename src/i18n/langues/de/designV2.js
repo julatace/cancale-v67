@@ -125,5 +125,6 @@ export default {
   "v2.tousPrets": "alle druckbereit",
   "v2.achats.ajouterCourt": "Hinzufügen",
   "v2.reessayer": "Erneut versuchen",
-  "v2.achats.annules": "Storniert"
+  "v2.achats.annules": "Storniert",
+  "v2.passe.qrKo": "QR hier nicht lesbar — der Code darunter genügt"
 };

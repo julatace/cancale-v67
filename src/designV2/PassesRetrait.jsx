@@ -17,7 +17,8 @@ import { Etiquette, Ticket, RangeeFaite } from './Signature.jsx';
 // Le QR lu (e-mail ou capture). Une image qui ne se charge pas ne se montre pas (jamais une image cassée au comptoir).
 function QrPasse({ src }) {
   const [ko, setKo] = React.useState(false);
-  if (ko) return null;
+  // Une image qui ne vient pas garde SA place (168 × 168) : la passe ne se replie pas sous le doigt ; le code, dessous, suffit.
+  if (ko) return <span className="v2-passe-qr v2-passe-qr-ko" role="img" aria-label={tr('v2.passe.qrKo')} data-v2-qr="ko">{tr('v2.passe.qrKo')}</span>;
   return <img className="v2-passe-qr" src={src} alt={tr('v2.passe.qr')} width={168} height={168} decoding="async" data-v2-qr="" onError={() => setKo(true)}/>;
 }
 

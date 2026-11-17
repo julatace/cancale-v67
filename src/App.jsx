@@ -53978,7 +53978,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {deuxComptesTexte && <VersAFaire><DeuxComptesAlerte res={deuxComptes} texte={deuxComptesTexte} onOuvrir={()=>setFeuilleDeuxComptes(true)}/></VersAFaire>}
         {(()=>{ const g = enLigneDeux ? enLigneDeux.vinted.filter((x)=>!(x.comptes && x.comptes.length >= 2 && x.annonces.filter((a)=>a.plat==='vinted').every((a)=>idsDeuxComptes.has(String(a.id))))) : [];
           return g.length > 0 ? <VersAFaire><EnLigneDeuxFoisAlerte groupes={g} manque={enLigneDeux.manque} PhotoVinted={PhotoVinted} Feuille={SheetShell}/></VersAFaire> : null; })()}
-        {listings.loading && !listings.items && <Skeleton variant="card" count={6}/>}
+        {listings.loading && !listings.items && !designV2 && <Skeleton variant="card" count={6}/>}
         {listings.error && <EtatPanne quoi="Tes annonces Vinted" data-ann-panne="" onReessayer={()=>loadListings(true)}/>}
         {/* Aucune annonce en ligne MAIS des annonces à confirmer : la ligne du
             dessus le dit déjà, avec le geste (§7 — une cause, une phrase). */}
@@ -53988,7 +53988,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             action={<Bouton variante="primaire" href="https://www.vinted.fr/member/general/settings" target="_blank" rel="noreferrer">{tr('annonces.ouvrirVinted')}</Bouton>}/>
         )}
         {listings.items && !listings.error && listings.items.length===0 && blocMasquees()}
-          {numAttente ? (designV2 ? null : <Skeleton variant="card" count={6}/>) : (<>
+          {/* Allumé : pendant la numérotation, LE squelette du nouveau design, au même endroit que la liste (même bloc). */}
+          {numAttente ? (designV2 ? <div data-v2-bloc="liste"><SqueletteRangeesV2 variante={ligneV2} n={8} entete label={tr('v2.chargement')}/></div> : <Skeleton variant="card" count={6}/>) : (<>
           {blocAEcrire()}
           <BlocBarrerVc/>
           {/* (5 nov., chantier C — revue 2.7) UNE ligne d'avis en tête de la liste :
@@ -54474,7 +54475,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <Icon name="link" size={18}/><span className="v2-ann-arelier-txt">{trj('v2.ann.sansAchat', { n: fileAchat.length })}</span><span className="v2-ann-arelier-geste">{tr('v2.ann.voir')}</span><Icon name="chevron" size={14}/></button> : null}
         {/* Le squelette et la liste sont LE MÊME bloc (`data-v2-bloc="liste"`) : mêmes rangées, mêmes hauteurs. */}
         {/* Allumé, le squelette tient AUSSI pendant la numérotation (`numAttente`) : une seule attente, une seule forme. */}
-        {designV2 && !baseKO && (listings.items == null || numAttente) ? <div data-v2-bloc="liste"><SqueletteRangeesV2 variante={ligneV2} n={8} label={tr('v2.chargement')}/></div> : null}
+        {designV2 && !baseKO && (listings.items == null || numAttente) ? <div data-v2-bloc="liste"><SqueletteRangeesV2 variante={ligneV2} n={8} entete label={tr('v2.chargement')}/></div> : null}
         {designV2 && !(!baseKO && (listings.items == null || numAttente)) ? <div className="v2-liste-annonces" data-v2-ligne={ligneV2} role="list" onClick={clicAvant} data-v2-bloc="liste">{lignesV2}</div> : null}
         <PaireAvantHote rendre={rendreAvantAnnonce}/>
         <SuitePaquets montres={Math.min(annMax, annShown.length)} total={annShown.length} onPlus={annPlus}/>
@@ -55956,14 +55957,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     return { id: String(o.transaction_id), titre: o.title || '', photo: orderPhoto(o), compte: plusieursComptesRet && o._acc ? accName(o._acc) : '',
                       prix: Number.isFinite(pn) && pn > 0 && !(o.price && o.price.currency_code && o.price.currency_code !== 'EUR') ? montant(pn) : '', point: (e && e.relais && e.relais.nom) || '' }; }) : [];
                   // Rien avant que les codes ET les achats soient lus, puis tout d'un coup (aucun bloc qui pousse l'autre).
-                  return <QuandLuV2 pret={baseKO || (toutLuRet && buys.items != null)} attente={<span data-v2-attente-retirer="" hidden/>}><div className="v2-achats-retirer" data-v2-achats-retirer="">
+                  // Prêt quand les codes ET les achats sont lus ET que les passes sont là (ou qu'il n'y a rien à retirer) : une passe
+                  // qui arrive après « En route » le pousserait.
+                  return <QuandLuV2 pret={baseKO || (toutLuRet && buys.items != null && (avecColis || !(pickupUnion.total > 0)))} attente={<span data-v2-attente-retirer="" hidden/>}><div className="v2-achats-retirer" data-v2-achats-retirer="">
                     <PassesRetraitV2 points={parPoint.points || []} Icon={Icon} Plaque={PlaqueJ} Photo={photoCarte}
                       aides={{ echeance: echeanceRetrait, titre: titreRetrait, retirer: retirerColis, relier: relierRetrait,
                         nomTransporteur: (k) => (CARRIERS[k] && CARRIERS[k].name) || '',
                         qrSrc: (x) => { const t = (x.src && x.src.t) || null; return t ? qrVivant(t) : ''; },
                         enGrand: (x) => { const f = qrRetrait(x); if (f) return f; const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null;
                           if (!x.code) return null; return () => openQrView(t ? (codeRetrait(t.code) !== x.code ? { ...t, code: x.code } : t) : ligneRetraitVinted(o)); } }}/>
-                    {!avecColis && toutLuRet ? <p className="vrm-colis-vide" data-retraits-vide="">{tr('v2.passe.aucun')}</p> : null}
+                    {/* (17 nov.) Plus de « Aucun colis à aller chercher » ici : « À retirer · 0 » le dit déjà en tête, et cette ligne
+                        posée après « En route » le poussait (banc design-v2-chargement). */}
                     <EnRouteListeV2 lignes={enRouteV2} Icon={Icon} Photo={photoCarte} touteSansPoint={enRouteV2.length > 0 && enRouteV2.every((l) => !l.point)}/>
                     {/* Rien n'attend au relais : le geste plein d'Achats est « Ajouter un achat » (la saisie d'un achat hors
                         plateforme, la même que son bouton : `vrm:v2-ajouter-achat`, src/ecrans/Achats.jsx). */}

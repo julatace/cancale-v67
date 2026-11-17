@@ -56,7 +56,14 @@ const CONTRASTE = `(() => {
 // La signature d'un écran : balises, classes triées et NOMS des data-* (jamais les valeurs ni le texte : l'heure bouge).
 const SIGNATURE = () => { const m = document.querySelector('.vrm-main'); if (!m) return null; const out = [];
   const pas = (e, d) => { if (d > 60 || e.matches('.vrm-fraicheur-hote, [data-temps-reel-neuf], [data-fraicheur-unique], [data-geste-disque]')) return; const cl = [...e.classList].sort().join('.'); const da = [...e.attributes].map((a) => a.name).filter((n) => n.startsWith('data-') && !/^data-(sb-|v2|vu$)/.test(n)).sort().join(',');
-    out.push(d + ':' + e.tagName + (cl ? '.' + cl : '') + (da ? '[' + da + ']' : '')); for (const c of e.children) pas(c, d + 1); };
+    out.push(d + ':' + e.tagName + (cl ? '.' + cl : '') + (da ? '[' + da + ']' : ''));
+    // Les lignes de l'hôte « À faire » (`VersAFaire`, un portail) s'y posent dans l'ORDRE OÙ ELLES ARRIVENT (src/ui/AFaire.jsx) :
+    // un ensemble, pas une suite — comparées triées (même DOM, autre minute d'arrivée, n'est pas un écart du design).
+    const kids = [...e.children], items = kids.filter((c) => c.hasAttribute('data-ui-afaire-item'));
+    if (items.length > 1) { for (const c of kids) if (!c.hasAttribute('data-ui-afaire-item')) pas(c, d + 1);
+      const sous = items.map((c) => { const avant = out.length; pas(c, d + 1); return out.splice(avant); }).sort((x, y) => x.join('|') < y.join('|') ? -1 : 1);
+      for (const t of sous) out.push(...t); return; }
+    for (const c of kids) pas(c, d + 1); };
   pas(m, 0); return out; };
 
 const ECRANS = [['journee', '/?tab=journee'], ['achats', '/?tab=achats'], ['ventes', '/?tab=ventes'], ['annonces', '/?tab=annonces'], ['compta', '/?tab=compta']];
