@@ -14,8 +14,8 @@
 //   E  appui long (650 ms) puis glisser sur une annonce ⇒ la question ⇒ « Oui » ⇒ relié ;
 //   F  toucher un achat puis une annonce ⇒ la question ⇒ « Oui » ⇒ relié ;
 //   G  tirer vers le bas depuis la poignée ferme ; tirer vers le bas sur une liste ne ferme pas.
-// Chromium : `Input.dispatchTouchEvent` (touch + pointer, défilement natif). WebKit (pas de CDP) : défilement par la
-// molette, gestes par évènements de pointeur de type « touch ». `BANC_DIST=` le build ; `SHOTS=` les captures.
+// Chromium : `Input.dispatchTouchEvent` (touch + pointer, défilement natif). WebKit (pas de CDP, ni molette ni toucher natif
+// en mobile) : défilement demandé à la feuille (`scrollBy`), gestes par évènements de pointeur de type « touch ». `BANC_DIST=` le build ; `SHOTS=` les captures.
 // Un banc ne meurt pas, il rapporte.
 'use strict';
 require('./_porte-banc.cjs');
@@ -123,7 +123,9 @@ const POS = () => { const f = document.querySelector('[data-glisser-defile]'); c
     } else {
       await doigt('touchStart', a.x, a.y + 120);
       for (let i = 1; i <= 8; i++) { await doigt('touchMove', a.x, a.y + 120 - i * 40); await pause(16); if (await pg.locator('[data-glisser-flotte]').count()) leve = true; }
-      await doigt('touchEnd'); await pg.mouse.move(a.x, a.y); await pg.mouse.wheel(0, 400); await pause(600);
+      // WebKit mobile n'a ni molette ni toucher natif dans Playwright : le défilement est demandé à la feuille elle-même
+      // (`scrollBy`) — on vérifie qu'ELLE défile (et pas une liste dedans), après un doigt synthétique qui n'a rien soulevé.
+      await doigt('touchEnd'); await pg.evaluate(() => { const f = document.querySelector('[data-glisser-defile]'); if (f && getComputedStyle(f).overflowY !== 'visible') f.scrollBy(0, 400); }); await pause(600);
     }
     const p1 = await pg.evaluate(POS);
     dit(!leve && !(await pg.locator('[data-glisser-flotte]').count()), `${nom} · D ${quoi} : un doigt qui file ne soulève rien`);

@@ -136,7 +136,7 @@ async function toucher(b) {
   await pg.screenshot({ path: path.join(SHOTS, `relier-${nom}-menu.png`) });
   if (await it.count()) await it.tap();
   await pg.locator(`[data-glisser-choisi="${T1}"]`).waitFor({ timeout: 20000 }).catch(() => {});
-  const vis = (sel) => pg.evaluate((q) => { const e = document.querySelector(q); if (!e) return false; const r = e.getBoundingClientRect(); return r.height > 0 && r.bottom > 0 && r.top < innerHeight && getComputedStyle(e).display !== 'none'; }, sel);
+  const vis = (sel) => pg.evaluate((q) => { const e = document.querySelector(q); if (!e) return false; const r = e.getBoundingClientRect(); const cs = getComputedStyle(e); return r.height > 1 && r.right > 0 && r.bottom > 0 && r.top < innerHeight && cs.display !== 'none' && cs.visibility !== 'hidden'; }, sel);
   dit(await vis(`[data-glisser-choisi="${T1}"]`), `${nom} · le mode s'ouvre, l'achat CHOISI dans un bandeau fixe en haut`);
   dit(!(await vis('.vrm-rg-achats')) && await vis('.vrm-rg-cibles'), `${nom} · au téléphone, la liste des ventes / annonces prend la place`);
   await pg.screenshot({ path: path.join(SHOTS, `relier-${nom}-choisi.png`) });
@@ -160,12 +160,16 @@ async function toucher(b) {
   if (await pg.locator(`[data-glisser-achat="${T1}"]`).count()) { await pg.locator(`[data-glisser-achat="${T1}"]`).tap(); n++; }
   await pg.waitForTimeout(250);
   dit(await vis(`[data-glisser-choisi="${T1}"]`) && await pg.locator(`[data-glisser-achat="${T1}"][aria-pressed="true"]`).count() === 1, `${nom} · un toucher simple sur l'achat le choisit (bandeau + ligne surlignée)`);
+  // (17 nov.) Au téléphone, une liste à la fois : l'onglet « Sans achat relié » d'abord.
+  if (await pg.locator('[data-glisser-onglet="cibles"]').count()) { await pg.locator('[data-glisser-onglet="cibles"]').tap(); await pg.waitForTimeout(250); }
   await pg.evaluate(() => document.querySelector('[data-glisser-cible="a:pa1"]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(200);
   await pg.locator('[data-glisser-cible="a:pa1"]').tap(); n++; await pg.waitForTimeout(300);
   if (await pg.locator('[data-glisser-oui]').count()) { await pg.locator('[data-glisser-oui]').tap(); n++; } await pg.waitForTimeout(900);
   dit(n === 3 && await lien(pg, 'pa1') === T1, `${nom} · relié en 3 touchers (achat, annonce, Oui)`, `${n} touchers, lien ${await lien(pg, 'pa1')}`);
   const an2 = pg.locator('[data-pilule-annuler]').first(); if (await an2.count()) { await an2.tap(); await pg.waitForTimeout(900); }
   // dans l'autre sens : l'annonce d'abord, puis l'achat
+  // (17 nov.) Au téléphone, une liste à la fois : l'onglet « Sans achat relié » d'abord.
+  if (await pg.locator('[data-glisser-onglet="cibles"]').count()) { await pg.locator('[data-glisser-onglet="cibles"]').tap(); await pg.waitForTimeout(250); }
   await pg.evaluate(() => document.querySelector('[data-glisser-cible="a:pa1"]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(200);
   await pg.locator('[data-glisser-cible="a:pa1"]').tap(); await pg.waitForTimeout(250);
   dit(await vis('[data-glisser-choisi="a:pa1"]') && !(await vis('.vrm-rg-cibles')), `${nom} · dans l'autre sens : l'annonce choisie (bandeau), la liste des achats prend la place`);
