@@ -1,0 +1,188 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   MAQUETTE I « L'ÉPURE » — feuille autonome (rien de src/).
+   Trois tailles : 40 fin (titre, ou le chiffre d'Argent) · 17 (ce qui se lit) · 13 (ce qui précise).
+   Grille de 8 ; marge 24 ; pas de rangée 8. Aucune carte, aucune bordure, aucune capsule.
+   Une seule couleur d'accent, une fois par écran : la bande d'action. Ambre = un geste t'attend.
+   ════════════════════════════════════════════════════════════════════════════ */
+:root {
+  --fond: #FBFBF9;            /* papier : blanc presque pur, à peine chaud — on QUITTE le bleu dégradé */
+  --encre: #1C1C1E;
+  --gris: #6C6C70;
+  --pale: #C4C4C8;
+  --remplir: rgba(120, 120, 128, 0.09);
+  --trait: rgba(28, 28, 30, 0.14);
+  --accent: #0066D6;
+  --sur-accent: #FFFFFF;
+  --ambre: #F59E0B;
+  --ambre-texte: #A84B00;
+  --feuille: #FFFFFF;
+  --scrim: rgba(20, 20, 22, 0.32);
+  --police: 'Inter', -apple-system, 'SF Pro Text', system-ui, sans-serif;
+  --courbe: cubic-bezier(0.32, 0.72, 0, 1);
+  color-scheme: light;
+}
+:root[data-fond='bleu'] { --fond: #EEF4FB; }
+:root[data-theme='dark'] {
+  --fond: #0E0E10;
+  --encre: #F2F2F4;
+  --gris: #9A9AA0;
+  --pale: #4A4A4E;
+  --remplir: rgba(120, 120, 128, 0.18);
+  --trait: rgba(242, 242, 244, 0.16);
+  --accent: #2F8CFF;
+  --ambre: #FF9F0A;
+  --ambre-texte: #FFB547;
+  --feuille: #1A1A1D;
+  --scrim: rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+:root[data-theme='dark'][data-fond='bleu'] { --fond: #0B0F16; }
+
+html { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; overscroll-behavior: none; background: var(--fond); }
+body { margin: 0; background: var(--fond); color: var(--encre); font: 400 17px/1.35 var(--police);
+  font-feature-settings: 'tnum' 1, 'cv11' 1, 'ss01' 1; letter-spacing: -0.011em; -webkit-font-smoothing: antialiased; }
+::selection { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+p, h1, h2 { margin: 0; }
+button { font: inherit; color: inherit; letter-spacing: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-align: left;
+  touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ico { display: block; flex: none; }
+
+/* ── La tête : un titre fin et grand ; la loupe ; rien d'autre ── */
+.main { padding: calc(env(safe-area-inset-top, 0px) + 24px) 0 calc(176px + env(safe-area-inset-bottom, 0px)); }
+.tete { display: flex; align-items: flex-end; justify-content: space-between; padding: 16px 24px 0; }
+.h1 { font-size: 40px; line-height: 44px; font-weight: 300; letter-spacing: -0.035em; }
+.tete-ronds { display: flex; margin: 0 -10px -2px 0; }
+.rond { width: 44px; height: 44px; display: grid; place-items: center; transition: opacity 120ms ease; }
+.rond:active { opacity: 0.5; }
+.sous { display: flex; align-items: center; gap: 4px; padding: 4px 24px 0; font-size: 13px; line-height: 18px; color: var(--gris); }
+.sous::first-letter { text-transform: uppercase; }
+.filtre { min-height: 44px; padding-top: 0; }
+
+/* ── Les vues : des mots. L'actif à l'encre et souligné d'un trait d'encre, pas de capsule. ── */
+.vues { display: flex; gap: 24px; padding: 0 24px; overflow-x: auto; scrollbar-width: none; }
+.vues::-webkit-scrollbar { display: none; }
+.vue { position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; white-space: nowrap; color: var(--gris); transition: color 160ms ease; }
+.vue[aria-pressed='true'] { color: var(--encre); font-weight: 600; }
+.vue-n { font-weight: 400; color: var(--gris); }
+
+/* ── Les groupes : un en-tête 13 gris ; des rangées que l'espace seul sépare ── */
+.page { padding-top: 0; }
+.groupe { padding-top: 24px; }
+.entete { display: flex; justify-content: space-between; padding: 0 24px 4px; font-size: 13px; line-height: 18px; font-weight: 400; color: var(--gris); }
+.liste { display: flex; flex-direction: column; }
+.rangee { display: grid; grid-template-columns: 14px 44px minmax(0, 1fr) auto; column-gap: 12px; align-items: start;
+  width: 100%; min-height: 48px; padding: 9px 24px; box-sizing: border-box; transition: background-color 160ms ease; }
+.rangee.sans-num { grid-template-columns: 14px minmax(0, 1fr) auto; }
+.rangee:active { background: var(--remplir); transition-duration: 0ms; }
+.rangee.is-choisi { background: var(--remplir); }
+@media (hover: hover) and (pointer: fine) { .rangee:hover { background: color-mix(in srgb, var(--remplir) 60%, transparent); } }
+.puce { width: 6px; height: 6px; border-radius: 50%; margin: 9px 4px 0; box-sizing: border-box; }
+.puce.is-geste { background: var(--ambre); }
+.puce.is-attente { border: 1.25px solid var(--pale); }
+.puce.is-rien { visibility: hidden; }
+.num { color: var(--gris); font-variant-numeric: tabular-nums; text-align: right; }
+.num.is-vide { color: var(--pale); }
+.corps { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.titre { text-wrap: pretty; overflow-wrap: anywhere; }
+.detail { display: block; font-size: 13px; line-height: 18px; color: var(--gris); text-wrap: pretty; }
+.valeur { display: flex; flex-direction: column; align-items: flex-end; text-align: right; white-space: nowrap; padding-left: 8px; }
+.ambre { color: var(--ambre-texte); }
+
+/* Achats · à retirer : un point = un groupe ; le code en registre et son vrai QR. */
+.point { padding-top: 32px; }
+.point + .point { padding-top: 24px; }
+.point-nom { padding: 0 24px; font-size: 17px; line-height: 22px; font-weight: 600; }
+.point-ou { padding: 2px 24px 4px; font-size: 13px; line-height: 18px; color: var(--gris); }
+.colis { align-items: center; }
+.colis .puce { align-self: start; }
+.code { letter-spacing: 0.05em; }
+.qr { display: block; color: var(--encre); }
+
+/* Annonces : la recherche est une ligne d'écriture, pas une boîte. */
+.cherche { display: flex; align-items: center; gap: 8px; margin: 8px 24px 0; height: 44px; color: var(--gris); box-shadow: inset 0 -1px 0 var(--trait); }
+.cherche input { flex: 1; min-width: 0; height: 100%; border: 0; background: none; outline: none; color: var(--encre); font: 400 17px var(--police); letter-spacing: inherit; padding: 0; }
+.cherche input::placeholder { color: var(--gris); }
+
+/* Argent : le chiffre est au corps du titre, sans carte. */
+.affiche { padding: 16px 24px 0; }
+.affiche-n { font-size: 40px; line-height: 44px; font-weight: 300; letter-spacing: -0.035em; font-variant-numeric: tabular-nums; }
+
+/* ── La BANDE d'action : un rectangle plein bord à bord, au pouce. Le seul bleu de l'écran. ── */
+.pied { position: fixed; left: 0; right: 0; bottom: calc(56px + env(safe-area-inset-bottom, 0px)); z-index: 20; padding-top: 24px;
+  background: linear-gradient(to bottom, transparent, var(--fond) 24px); pointer-events: none; }
+.plein { pointer-events: auto; display: flex; align-items: center; justify-content: space-between; width: 100%; height: 56px; padding: 0 24px; box-sizing: border-box;
+  background: var(--accent); color: var(--sur-accent); font-weight: 600; transition: filter 120ms ease; }
+.plein .ico { transition: transform 200ms var(--courbe); }
+.plein:active { filter: brightness(0.9); }
+.plein:active .ico { transform: translateX(4px); }
+
+/* ── La barre : des MOTS, pas d'icônes ni de pastilles. L'actif à l'encre. ── */
+.barre { position: fixed; left: 0; right: 0; bottom: 0; z-index: 21; display: flex; justify-content: space-between;
+  padding: 0 12px env(safe-area-inset-bottom, 0px); height: calc(56px + env(safe-area-inset-bottom, 0px)); box-sizing: border-box; background: var(--fond); }
+.onglet { flex: 1 1 auto; height: 56px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 13px; color: var(--gris); white-space: nowrap; transition: color 160ms ease; }
+.onglet[aria-current='page'] { color: var(--encre); font-weight: 600; }
+.onglet:active { opacity: 0.55; }
+
+/* ── La feuille : un plan qui monte du bas, le fond s'assombrit ── */
+.voile { position: fixed; inset: 0; z-index: 50; background: var(--scrim); display: flex; align-items: flex-end; animation: fondu 220ms ease-out both; }
+.feuille { width: 100%; box-sizing: border-box; background: var(--feuille); border-radius: 16px 16px 0 0; padding: 8px 0 calc(24px + env(safe-area-inset-bottom, 0px));
+  animation: monte 360ms var(--courbe) both; overscroll-behavior: contain; }
+.poignee { display: block; width: 36px; height: 5px; border-radius: 3px; background: var(--pale); margin: 0 auto 16px; }
+.f-tete { display: flex; gap: 16px; align-items: center; padding: 0 24px 16px; }
+.f-photo { width: 64px; height: 64px; flex: none; display: grid; place-items: center; background: hsl(var(--t) 30% 92%); color: hsl(var(--t) 40% 50%); }
+:root[data-theme='dark'] .f-photo { background: hsl(var(--t) 18% 20%); color: hsl(var(--t) 40% 60%); }
+.f-photo svg { width: 52px; }
+.f-ligne { padding: 0 24px 8px; }
+.f-gestes { display: flex; flex-direction: column; }
+.f-geste { min-height: 52px; padding: 0 24px; display: flex; align-items: center; }
+.f-geste:active { background: var(--remplir); }
+.f-geste[aria-pressed='true'] { font-weight: 600; }
+.f-geste:disabled { color: var(--pale); cursor: default; }
+.f-code { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; padding: 8px 24px; }
+.qr-fond { display: block; padding: 12px; margin-bottom: 16px; background: #FFFFFF; color: #000000; }
+.f-code .affiche-n { letter-spacing: 0.04em; }
+.f-pas { display: flex; align-items: center; justify-content: space-between; padding-top: 8px; }
+@keyframes fondu { from { opacity: 0; } }
+@keyframes monte { from { transform: translateY(100%); } }
+
+/* L'apparition : les 12 premières rangées seulement, 24 ms d'écart. */
+@media (prefers-reduced-motion: no-preference) {
+  .page .rangee { animation: entre 280ms var(--courbe) both; }
+  .page .liste > .rangee:nth-child(2) { animation-delay: 24ms; } .page .liste > .rangee:nth-child(3) { animation-delay: 48ms; }
+  .page .liste > .rangee:nth-child(4) { animation-delay: 72ms; } .page .liste > .rangee:nth-child(n+5) { animation-delay: 96ms; }
+  .page .liste > .rangee:nth-child(n+13) { animation: none; }
+}
+@keyframes entre { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .feuille { animation: fondu 200ms ease both; } }
+
+/* ── L'ordinateur : une colonne de mots, la liste, le volet des gestes ── */
+.racine.is-large { display: grid; grid-template-columns: 232px minmax(0, 760px); min-height: 100dvh; }
+.racine.is-large.a-volet { grid-template-columns: 232px minmax(0, 760px) minmax(0, 1fr); }
+.cote { position: sticky; top: 0; height: 100dvh; display: flex; flex-direction: column; padding: 40px 24px 24px; box-sizing: border-box; }
+.marque { font-size: 17px; font-weight: 600; letter-spacing: 0.06em; padding-bottom: 24px; }
+.cherche-cote { margin: 0 0 24px; height: 36px; }
+.cherche-cote input { font-size: 13px; }
+.cote-nav { display: flex; flex-direction: column; }
+.cote-lien { display: flex; align-items: center; justify-content: space-between; min-height: 36px; color: var(--gris); }
+.cote-lien .puce { margin: 0; }
+.cote-lien[aria-current='page'] { color: var(--encre); font-weight: 600; }
+@media (hover: hover) and (pointer: fine) { .cote-lien:hover { color: var(--encre); } }
+.cote-pied { margin-top: auto; }
+.racine.is-large .main { padding: 40px 24px 120px; }
+.racine.is-large .tete { padding-top: 0; }
+.racine.is-large .rangee { min-height: 44px; padding-top: 8px; padding-bottom: 8px; }
+.racine.is-large .pied { position: sticky; bottom: 0; left: auto; right: auto; margin-top: 24px; padding-top: 24px; }
+.racine.is-large .plein { height: 48px; }
+.volet { position: sticky; top: 0; height: 100dvh; overflow: auto; box-sizing: border-box; padding: 128px 40px 40px 24px; max-width: 440px; }
+.volet .f-tete, .volet .f-ligne { padding-left: 0; padding-right: 0; }
+.volet .f-geste { min-height: 40px; padding: 0; }
+.volet .f-code { padding: 0; align-items: flex-start; text-align: left; }
+.volet .f-pas { padding-top: 16px; gap: 24px; justify-content: flex-start; }
+.qr-fond .qr { color: #000000; }
+/* L’ordinateur : la bande d’action tient le bas de la colonne de la liste, toujours au même endroit. */
+.racine.is-large .pied { position: fixed; bottom: 0; left: 232px; width: min(760px, calc(100vw - 232px)); margin: 0; padding: 24px; box-sizing: border-box; }
+.v-offre { display: flex; flex-direction: column; gap: 2px; padding: 12px 0 8px; }
+.v-gestes { display: flex; gap: 24px; }
+.v-gestes .f-geste:first-child { font-weight: 600; }
+.v-compte { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; }
