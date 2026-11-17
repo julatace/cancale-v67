@@ -71,7 +71,7 @@
   const poser = (html) => { const d = new DOMParser().parseFromString('<body>' + html + '</body>', 'text/html'); racine.replaceChildren(...Array.from(d.body.childNodes)); };
   (document.documentElement || document.body).appendChild(hote);
 
-  let action = null, reduit = false, num = '', numPour = '', minuteur = null, finA = 0, arretDemande = false, vintedParle = '';
+  let arretA = 0, action = null, reduit = false, num = '', numPour = '', minuteur = null, finA = 0, arretDemande = false, vintedParle = '';
   // ── Vinted parle (vérification, captcha, alerte) : l'écran se met de côté ───────────────
   // On regarde seulement la PRÉSENCE de ces éléments (jamais leur texte).
   const SEL_VERIF = 'iframe[src*="captcha-delivery"], iframe[src*="datadome"], #datadome-captcha, iframe[src*="recaptcha"], iframe[src*="hcaptcha"], iframe[src*="challenges.cloudflare"]';
@@ -142,7 +142,7 @@
   function brancher() {
     racine.querySelectorAll('[data-arreter]').forEach((b) => b.addEventListener('click', () => {
       if (arretDemande) return;
-      arretDemande = true; b.disabled = true; b.textContent = T('c_arret_en_cours');
+      arretDemande = true; arretA = Date.now(); b.disabled = true; b.textContent = T('c_arret_en_cours');
       try {
         chrome.runtime.sendMessage({ from: 'vrm-action', action: 'arreter' }, () => {
           void chrome.runtime.lastError;
@@ -168,6 +168,8 @@
         void chrome.runtime.lastError;
         const a = r && r.ok && r.action ? r.action : null;
         const avant = action;
+        // « Tout arrêter » vient d'être touché : un état lu AVANT l'arrêt ne rallume pas l'écran.
+        if (a && a.actif && Date.now() - arretA < 5000) return;
         if (a && a.actif) { action = a; finA = 0; }
         else if (a && !a.actif && avant && avant.actif) { action = a; finA = Date.now(); }   // la fin, une fois
         else if (finA && Date.now() - finA < 1600) { /* le ✓ reste un instant */ }

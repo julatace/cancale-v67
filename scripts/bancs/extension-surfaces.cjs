@@ -70,11 +70,11 @@ const baseVinted = (o = {}) => Object.assign({ ok: true, plateforme: 'vinted', c
 const ETATS = {
   favorisEnCours: () => { const e = baseVinted(); e.site.favoris.file = { actif: true, total: 15, file: { total: 15, envoyes: 3 }, prochain: T0 + 3 * MIN, quoi: 'ouverture', attente: null }; return e; },
   favorisPret: () => baseVinted({ maj: null }),
-  leboncoin: () => ({ ok: true, plateforme: 'leboncoin', capte: true, version: VERSION, vrm: { ok: true, connecte: true, email: 'banc@exemple.fr' }, site: { id: 'lbc-banc', nom: 'lbc_banc' }, flux: { okAt: T0 - 2 * MIN },
+  leboncoin: () => ({ ok: true, plateforme: 'leboncoin', capte: true, version: VERSION, code: VERSION, vrm: { ok: true, connecte: true, email: 'banc@exemple.fr' }, site: { id: 'lbc-banc', nom: 'lbc_banc' }, flux: { okAt: T0 - 2 * MIN },
     lbc: { compte: { ok: true, texte: 'Compte Leboncoin : lbc_banc' }, annonces: { ok: true, texte: '24 annonces lues en entier {quand}', at: T0 - 3 * MIN }, ventes: { ok: null, texte: 'Ventes : ouvre « Mes transactions » une fois' } }, secu: { niveau: 'ok', texte: 'Calme', arrete: false } }),
-  vestiaire: () => ({ ok: true, plateforme: 'vestiaire', capte: true, version: VERSION, vrm: { ok: true, connecte: true, email: 'banc@exemple.fr' }, site: { id: '777', nom: 'vc_banc' }, flux: { okAt: T0 - 5 * MIN },
+  vestiaire: () => ({ ok: true, plateforme: 'vestiaire', capte: true, version: VERSION, code: VERSION, vrm: { ok: true, connecte: true, email: 'banc@exemple.fr' }, site: { id: '777', nom: 'vc_banc' }, flux: { okAt: T0 - 5 * MIN },
     vcCapte: { annonces: { n: 12, at: T0 - 5 * MIN }, ventes: { n: 3, at: T0 - 5 * MIN } }, secu: { niveau: 'ok', texte: 'Calme', arrete: false } }),
-  aConnecter: () => ({ ok: true, plateforme: 'vinted', capte: true, version: VERSION, vrm: { ok: true, connecte: false }, site: { id: '424242', nom: 'compte_banc', choix: 'oui' }, flux: {} }),
+  aConnecter: () => ({ ok: true, plateforme: 'vinted', capte: true, version: VERSION, code: VERSION, vrm: { ok: true, connecte: false }, site: { id: '424242', nom: 'compte_banc', choix: 'oui' }, flux: {} }),
 };
 const APERCU = { etat: 'pret', total: 3, message: { intervalleMinutes: 0, versions: 1 }, reglages: { v: 1 }, nonProuves: 0,
   liste: [0, 1, 2].map((i) => ({ id: 'n' + i, itemId: String(9000 + i), pseudo: 'acheteur_' + (i + 1), titre: ['Baskets cuir blanc 42', 'Running bleu 43', 'Sneakers montantes 41'][i], prix: 40 + i * 5, date: new Date(T0 - (i + 1) * 3600000).toISOString(), photo: PHOTO, texte: 'Bonjour acheteur_' + (i + 1) + ', merci pour le favori !' })) };
@@ -330,7 +330,7 @@ const CIBLES = ({ hoteId, sel }) => {
         if (/popup\.js/.test(u)) return r.fulfill({ status: 200, contentType: 'text/javascript', body: lire('popup.js') });
         if (/\.png/.test(u)) return r.fulfill({ status: 200, contentType: 'image/png', body: fs.readFileSync(path.join(ICI, 'vinted-sync-extension', 'logo-vrm-96.png')) });
         if (/vrm-badge\.js/.test(u)) return r.fulfill({ status: 200, contentType: 'text/javascript', body: '' });
-        return r.fulfill({ status: 200, contentType: 'text/html', body: html.replace('<head>', `<head><script>window.chrome={runtime:{id:'x',lastError:null,getManifest:()=>({version:'${VERSION}'}),getURL:(p)=>p,sendMessage:(m,cb)=>{const r=m.action==='authEtat'?{connecte:true,email:'banc@exemple.fr',user_id:'u1'}:m.action==='codeVersion'?{ok:true,code:'${VERSION}'}:m.action==='freshness'?{ok:true,fresh:[]}:{ok:true};setTimeout(()=>cb&&cb(r),0)}},i18n:{getUILanguage:()=>'fr',getMessage:()=>''},storage:{local:{get:(k,cb)=>{cb&&setTimeout(()=>cb({}),0);return Promise.resolve({})},set:(o,cb)=>{cb&&cb();return Promise.resolve()}},onChanged:{addListener(){}}},tabs:{query:(q,cb)=>{cb&&cb([]);return Promise.resolve([])},create(){}}};</script>`) }); });
+        return r.fulfill({ status: 200, contentType: 'text/html', body: html.replace('<head>', `<head><script>window.chrome={runtime:{id:'x',lastError:null,getManifest:()=>({version:'${VERSION}'}),getURL:(p)=>p,sendMessage:(m,cb)=>{const r=m.action==='authEtat'?{connecte:false}:m.action==='codeVersion'?{ok:true,code:'${VERSION}'}:m.action==='freshness'?{ok:true,fresh:[]}:{ok:true};setTimeout(()=>cb&&cb(r),0)}},i18n:{getUILanguage:()=>'fr',getMessage:()=>''},storage:{local:{get:(k,cb)=>{cb&&setTimeout(()=>cb({}),0);return Promise.resolve({})},set:(o,cb)=>{cb&&cb();return Promise.resolve()}},onChanged:{addListener(){}}},tabs:{query:(q,cb)=>{cb&&cb([]);return Promise.resolve([])},create(){}}};</script>`) }); });
       await pg.goto('https://ext.test/popup.html');
       await pg.waitForTimeout(600);
       await cap(pg, `popup-${nuit ? 'sombre' : 'clair'}`);

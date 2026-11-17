@@ -557,7 +557,12 @@
   .principal .p-item { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
   .principal .p-item img, .principal .p-item .vig { width: 40px; height: 40px; border-radius: 10px; object-fit: cover; }
   .principal .outils { margin-top: 4px; }
-  .listes5 { padding: 10px !important; }
+  .contenu > .gestes { padding: 10px !important; }
+  .lbc5 > .ligne { padding: 8px 0; }
+  .lbc5 > .ligne:first-child { padding-top: 0; border-top: 0; }
+  .lbc5 .q4 { margin-top: 8px; }
+  .contenu > .gestes > .listes5 { margin-top: 0; }
+  .maj5 details:not([open]) > summary { margin-bottom: -4px; }
   .listes5 .vu-seg + .vu-seg { margin-top: 8px; }
   .listes5 .panneau { margin-top: 10px; }
   .listes5 .seg-portee button { font-size: 13px; }
@@ -1521,7 +1526,7 @@
     const tete5 = k5 >= 0 ? q5.slice(0, k5) : q5, sous5 = k5 >= 0 ? q5.slice(k5) : '';
     const principal = connecte && e.plateforme === 'vinted' ? favorisFileHtml(e) : '';
     poserHtml(contenu, `<button class="fermer" data-fermer-carte title="${esc(TU('c_fermer'))}" aria-label="${esc(TU('c_fermer'))}">×</button>${lbcVisible ? `<div class="t5"><b class="nom">VRM</b></div>` : tete5}
-      ${lbcVisible ? `<div class="ligne lbc-tete"><div class="lib">Compte ${esc(nomSite)}</div>${compteSite}</div>${lbcLignes}${ligneCapture(e)}` : ''}
+      ${lbcVisible ? `<div class="lbc5"><div class="ligne lbc-tete"><div class="lib">Compte ${esc(nomSite)}</div>${compteSite}</div>${lbcLignes}${ligneCapture(e)}</div>` : ''}
       ${principal}
       ${sous5}
       ${majHtml(e.maj)}
