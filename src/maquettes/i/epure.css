@@ -22,7 +22,7 @@
   --e-dur: cubic-bezier(0.32, 0.72, 0, 1);
   color-scheme: light;
 }
-:root[data-maquette='i'][data-fond='bleu'] { --e-fond: #F4F8FD; --e-voile-fond: rgba(244, 248, 253, 0.92); }
+:root[data-maquette='i'][data-fond='bleu'] { --e-fond: #EFF5FC; --e-voile-fond: rgba(239, 245, 252, 0.92); }
 :root[data-maquette='i'][data-theme='dark'] {
   --e-fond: #0D0D0F;
   --e-voile-fond: rgba(13, 13, 15, 0.92);
@@ -212,3 +212,16 @@
 .e-racine.is-large .e-rangee { min-height: 48px; padding: 8px 24px !important; }
 .e-racine.is-large .e-pied { left: 248px; right: auto; width: min(760px, calc(100vw - 248px)); bottom: 0; padding: 24px 72px 32px; }
 .e-racine.is-large .e-plein { width: auto; padding: 0 32px !important; margin-left: auto; height: 44px; border-radius: 22px; }
+
+/* Le volet de droite (ordinateur) : ce que l'appui long ouvre au téléphone, toujours là, sans cadre. */
+.e-racine.is-large.a-volet { grid-template-columns: 248px minmax(0, 1fr) 400px; }
+.e-volet { position: sticky; top: 0; height: 100dvh; overflow: auto; box-sizing: border-box; padding: 112px 32px 32px 8px; }
+.e-volet .e-f-tete { padding-left: 16px; padding-right: 16px; }
+.e-volet .e-f-gestes { padding: 0; }
+.e-racine.is-large .e-f-geste { min-height: 40px; }
+.e-volet .e-f-code { padding-top: 0; }
+.e-f-ligne { padding: 0 24px 16px; }
+.e-volet .e-f-ligne { padding: 0 16px 16px; }
+.e-racine.is-large:not(.a-volet) .e-main { justify-self: center; }
+.e-racine.is-large:not(.a-volet) .e-pied { left: calc(248px + max(0px, (100vw - 248px - 760px) / 2)); }
+.e-racine.is-large.a-volet .e-pied { width: min(760px, calc(100vw - 248px - 400px)); }

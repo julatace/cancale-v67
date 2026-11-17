@@ -283,7 +283,9 @@ function Argent({ M }) {
 }
 
 // ════════════════════════════ LES FEUILLES ════════════════════════════
-function Feuille({ titre, fermer, children, large }) {
+function Feuille({ titre, fermer, children, large, volet }) {
+  // Sur l'ordinateur, les gestes secondaires ne se cachent pas : ils tiennent dans le VOLET de droite.
+  if (volet) return <aside className="e-volet" aria-label={titre}>{children}</aside>;
   React.useEffect(() => { const f = (e) => { if (e.key === 'Escape') fermer(); }; window.addEventListener('keydown', f); return () => window.removeEventListener('keydown', f); }, [fermer]);
   return (
     <div className={'e-voile' + (large ? ' is-large' : '')} onClick={fermer}>
@@ -294,12 +296,12 @@ function Feuille({ titre, fermer, children, large }) {
     </div>
   );
 }
-function FeuilleAnnonce({ M, id, fermer, large }) {
+function FeuilleAnnonce({ M, id, fermer, large, volet }) {
   const a = M.items.get(id); if (!a) return null;
   const k = M.numParItem.get(id); const p = k ? M.paires.get(k) : null;
   const GESTES = ['Baisser le prix', 'Republier', 'Mettre en pause', 'Ouvrir sur Vinted', 'Copier le lien'];
   return (
-    <Feuille titre={a.title} fermer={fermer} large={large}>
+    <Feuille titre={a.title} fermer={fermer} large={large} volet={volet}>
       <div className="e-f-tete">
         {a.photo ? <img className="e-f-photo" src={a.photo} alt="" width="64" height="64" /> : <span className="e-f-photo" />}
         <span className="e-corps"><span className="e-titre">{a.title}</span><span className="e-detail">{[p ? `N° ${p.numero}` : 'sans N°', p && p.cases.length ? `case ${p.cases[0]}` : null, euros(centimes(a.price))].filter(Boolean).join(' · ')}</span></span>
@@ -311,13 +313,28 @@ function FeuilleAnnonce({ M, id, fermer, large }) {
     </Feuille>
   );
 }
-function FeuilleCodes({ M, id, fermer, large }) {
+function FeuilleVente({ M, tx, fermer, large, volet }) {
+  const l = (M.postes.poster.envoyer || []).find((x) => x.v._tx === tx); if (!l) return null;
+  const p = l.paire;
+  const GESTES = [l.bord ? 'Imprimer le bordereau' : null, 'Écrire à ' + (l.pseudo || 'l’acheteur'), 'Ouvrir sur Vinted', `Tout sur le N° ${p ? p.numero : '—'}`].filter(Boolean);
+  return (
+    <Feuille titre={l.v.title} fermer={fermer} large={large} volet={volet}>
+      <div className="e-f-tete">
+        {p && p.photo ? <img className="e-f-photo" src={p.photo} alt="" width="64" height="64" /> : <span className="e-f-photo" />}
+        <span className="e-corps"><span className="e-titre">{l.v.title}</span><span className="e-detail">{[p ? `N° ${p.numero}` : 'sans N°', p && p.cases.length ? `case ${p.cases[0]}` : null, euros(centimes(l.v.price))].filter(Boolean).join(' · ')}</span></span>
+      </div>
+      <p className="e-detail e-f-ligne">{l.limite ? <span className="e-ambre">À envoyer {avant(l.limite, M)}</span> : `Date limite pas lue · vers ${jourCourt(new Date(l.estimee).toISOString(), M.maintenant)}`}{l.bord && l.bord.suivi ? ` · suivi ${l.bord.suivi}` : ''}</p>
+      <div className="e-liste e-f-gestes">{GESTES.map((g) => <button key={g} type="button" className="e-f-geste">{g}</button>)}</div>
+    </Feuille>
+  );
+}
+function FeuilleCodes({ M, id, fermer, large, volet }) {
   const tous = M.postes.recevoir.aRetirer || [];
   const [i, setI] = React.useState(Math.max(0, tous.findIndex((c) => c.id === id)));
   const c = tous[i]; if (!c) return null;
   const lieu = (c.lieu || '').split('\n');
   return (
-    <Feuille titre="Codes de retrait" fermer={fermer} large={large}>
+    <Feuille titre="Codes de retrait" fermer={fermer} large={large} volet={volet}>
       <div className="e-f-code">
         <Qr texte={c.code} t={216} />
         <p className="e-affiche-n e-code-grand">{c.code.replace(/(\d{3})(?=\d)/g, '$1 ')}</p>
@@ -373,8 +390,15 @@ export default function Epure() {
   const Corps = { jour: Aujourdhui, ventes: Ventes, achats: Achats, annonces: Annonces, argent: Argent }[ecran.cle];
   const date = new Date(M.maintenant).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Paris' });
   const [fT, fId] = route.feuille.split(/:(.*)/s);
+  let volet = null;
+  if (large) {
+    const P = M.postes;
+    if (ecran.cle === 'ventes') { const l = (P.poster.aImprimer || [])[0]; const tx = fT === 'vente' ? fId : l && l.v._tx; if (tx) volet = <FeuilleVente M={M} tx={tx} volet />; }
+    if (ecran.cle === 'achats') { const c = (P.recevoir.aRetirer || [])[0]; volet = <FeuilleCodes key={fId || ''} M={M} id={fT === 'codes' ? fId : c && c.id} volet />; }
+    if (ecran.cle === 'annonces') { const a = (P.publier.enLigne || []).find((x) => M.numParItem.has(x.id)); const id = fT === 'annonce' ? fId : a && a.id; if (id) volet = <FeuilleAnnonce M={M} id={id} volet />; }
+  }
   return (
-    <div className={'e-racine' + (large ? ' is-large' : '')} data-ecran={ecran.cle}>
+    <div className={'e-racine' + (large ? ' is-large' : '') + (large && volet ? ' a-volet' : '')} data-ecran={ecran.cle}>
       {large ? (
         <aside className="e-cote">
           <p className="e-marque">VRM</p>
@@ -405,6 +429,7 @@ export default function Epure() {
         <div className="e-page"><Corps {...props} /></div>
         {geste ? <div className="e-pied"><button type="button" className="e-plein" data-plein="" onClick={() => (ecran.cle === 'achats' ? ouvrir('codes:') : null)}>{geste}</button></div> : null}
       </main>
+      {large && volet ? volet : null}
       {large ? null : (
         <nav className="e-barre" aria-label="Écrans">
           {ECRANS.map((e) => (
@@ -414,8 +439,9 @@ export default function Epure() {
           ))}
         </nav>
       )}
-      {fT === 'annonce' ? <FeuilleAnnonce M={M} id={fId} fermer={fermer} large={large} /> : null}
-      {fT === 'codes' ? <FeuilleCodes M={M} id={fId} fermer={fermer} large={large} /> : null}
+      {fT === 'annonce' && !large ? <FeuilleAnnonce M={M} id={fId} fermer={fermer} large={large} /> : null}
+      {fT === 'codes' && !large ? <FeuilleCodes M={M} id={fId} fermer={fermer} large={large} /> : null}
+      {fT === 'vente' && !large ? <FeuilleVente M={M} tx={fId} fermer={fermer} large={large} /> : null}
       {fT === 'comptes' ? (
         <Feuille titre="Comptes" fermer={fermer} large={large}>
           <p className="e-titre e-f-titre">Montrer</p>
