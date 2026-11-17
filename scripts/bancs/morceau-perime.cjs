@@ -30,12 +30,13 @@ let ko = 0;
 const dit = (bon, quoi, det) => { if (!bon) ko++; console.log(`${bon ? 'OK  ' : 'KO  '}${quoi}${!bon && det ? ' — ' + String(det).slice(0, 500) : ''}`); };
 const base = () => ({ lignes: JSON.parse(JSON.stringify(NV.JEU_LIGNES)), comptes: NV.JEU_COMPTES, ecritures: 0 });
 
-// E-mails : dans la barre latérale à l'ordinateur ; au téléphone, sous « Plus » (les tuiles).
+// E-mails : dans la barre latérale à l'ordinateur ; au téléphone, dans le menu de l'avatar (choix n° 61 du 14 nov. :
+// plus de « Plus » dans la barre — le menu du haut porte Messages, Stock, E-mails…).
 async function versEmails(pg, tel) {
   if (!tel) { await pg.locator('.vrm-sidebar [data-nav-entree="emails"]').first().click(); return; }
-  const plus = pg.locator('.vrm-tabbar button[aria-label^="Plus"]').first();
-  if (await plus.count()) { await plus.click(); await pg.waitForTimeout(500); }
-  const tuile = pg.locator('[data-nav-entree="emails"]:visible').first();
+  const tete = pg.locator('[data-profil-tete]').filter({ visible: true }).first();
+  if (await tete.count()) { await tete.click(); await pg.waitForTimeout(500); }
+  const tuile = pg.locator('[data-menu-profil] [data-nav-entree="emails"], [data-nav-entree="emails"]:visible').first();
   if (await tuile.count()) await tuile.click();
 }
 async function scenario(nav, { W, panne, jsSeul = false }) {
@@ -47,8 +48,19 @@ async function scenario(nav, { W, panne, jsSeul = false }) {
   const nc = nav.newContext.bind(nav);
   nav.newContext = async (...a) => {
     const ctx = await nc(...a);
+    // (17 nov., chasse-bugs) RÈGLE DU 15 NOV. (chantier « ouverture », src/chargementSur.js `verifierMorceauPerime`) : la page
+    // ne se recharge QUE si le serveur sert une AUTRE version (son index.html nomme un autre `index-….js`). Une vraie
+    // mise en ligne change ce nom : après « le déploiement », le serveur du banc sert la page sous un nouveau nom de
+    // script principal (un alias du même fichier) ; en « panne », il sert la même version (aucun rechargement voulu).
+    await ctx.route((u) => { const x = new URL(u); return /^localhost$|^127\./.test(x.hostname) && (x.pathname === '/' || x.pathname === '/index.html' || !/\.\w+$/.test(x.pathname)); }, async (route) => {
+      if (!etat.deploye || panne || route.request().method() !== 'GET') return route.fallback();
+      const r = await route.fetch(); const html = await r.text();
+      return route.fulfill({ response: r, body: html.replace(/\/assets\/index-([A-Za-z0-9_-]+)\.js/g, '/assets/index-NEUF$1.js') });
+    });
+    await ctx.route(/\/assets\/index-NEUF/, (route) => route.fulfill({ status: 200, contentType: 'text/javascript', body: require('fs').readFileSync(require('path').join(process.env.BANC_DIST || require('path').join(__dirname, '..', '..', 'dist'), new URL(route.request().url()).pathname.replace('index-NEUF', 'index-'))) }));
     await ctx.route(/\/assets\//, (route) => {
       const p = new URL(route.request().url()).pathname;
+      if (/index-NEUF/.test(p)) return route.fallback();
       // `jsSeul` (14 nov.) : la feuille de style est déjà là (gardée, ou un morceau sans CSS) — seul le JS manque.
       if (etat.deploye && !etat.charges.has(p) && !(jsSeul && /\.css$/.test(p))) { etat.refus.push(p); return route.fulfill({ status: 404, contentType: 'text/plain', body: 'Not Found' }); }
       etat.charges.add(p);
@@ -103,7 +115,10 @@ async function scenario(nav, { W, panne, jsSeul = false }) {
   const enBase = bv.lignes.filter((l) => /^plantage_/.test(l.id)).map((l) => l.data && l.data.message);
   const morceaux = vu.file.concat(enBase).filter((m) => /preload CSS|dynamically imported module|module script failed/i.test(m || ''));
   dit(etat.refus.length > 0, `${T} (contrôle du banc) des fichiers d'avant ont bien été refusés`, JSON.stringify(etat.refus));
-  dit(chargements === 1, `${T} la page s'est rechargée UNE fois (jamais une boucle)`, `${chargements} rechargement(s)`);
+  // Règle du 15 nov. : déploiement (autre version en ligne) ⇒ UN rechargement ; panne (même version) ⇒ AUCUN (l'écran relance
+  // son morceau puis dit « Mettre à jour VRM ») — jamais une boucle.
+  if (!panne) dit(chargements === 1, `${T} une autre version en ligne : la page s'est rechargée UNE fois (jamais une boucle)`, `${chargements} rechargement(s)`);
+  else dit(chargements === 0, `${T} même version (panne) : aucun rechargement (jamais une boucle)`, `${chargements} rechargement(s)`);
   dit(!morceaux.length, `${T} aucun plantage noté pour un morceau d'un ancien déploiement`, JSON.stringify(morceaux));
   // (14 nov.) Ni « undefined is not an object » ni « reading 'default' » : l'import ne rend jamais `undefined`.
   const indefinis = vu.file.concat(enBase).filter((m) => /undefined|is not an object|reading 'default'/i.test(m || ''));
