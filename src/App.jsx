@@ -33976,6 +33976,13 @@ function Skeleton({ variant='row', count=6 }) {
 
 // État d'erreur de chargement, avec un bouton « Réessayer ».
 function LoadError({ onRetry }) {
+  // (17 nov., audit visuel A5) Allumé : une carte lisible (encre sur porcelaine, rayon 16) et « Réessayer » du système.
+  const designV2 = useDesignV2();
+  if (designV2) return <div className="v2-erreur" role="alert" data-v2-erreur="">
+    <span className="v2-erreur-ic" aria-hidden="true"><Icon name="cloudOff" size={22}/></span>
+    <b>{tr('commun.impossibleChargerCes')}</b>
+    <BoutonV2 role="secondaire" onClick={onRetry} attrs={{ 'data-v2-reessayer': '' }}>{tr('v2.reessayer')}</BoutonV2>
+  </div>;
   return <div className="vrm-erreur-chargement" style={{textAlign:'center',padding:'28px 16px'}}>
     <div aria-hidden="true" style={{width:44,height:44,margin:'0 auto 10px',borderRadius:12,display:'flex',alignItems:'center',justifyContent:'center',background:C.card2,color:C.muted}}><Icon name="cloudOff" size={20}/></div>
     <div style={{fontSize:15,fontWeight:600,color:C.text,marginBottom:4}}>{tr('commun.impossibleChargerCes')}</div>
@@ -50613,8 +50620,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const em = lu(xE) && xE.t.emballer ? xE.t.emballer : null;
           const nPrets = em && em.n > 0 ? em.n : 0;
           const ecart = nE == null ? ((xE && xE.titrePasSu) || tr('v2.pasLu')) : nE === 0 ? tr('v2.rienAEnvoyer')
-            : nPrets && nE > nPrets ? tr('v2.ecart', { p: nPrets, r: nE - nPrets })
-            : nPrets ? tr(em.exact === false ? 'v2.pretsAuMoins' : 'v2.prets', { n: nPrets }) : tr('v2.aucunPret');
+            : nPrets && nE > nPrets ? tr('v2.ecartCourt', { r: nE - nPrets })
+            : nPrets ? (em.exact === false ? tr('v2.pretsAuMoins', { n: nPrets }) : tr('v2.tousPrets')) : tr('v2.aucunPret');
           const nR = lu(xR) ? (Number(xR.t.n) || 0) : null;
           // Les codes COMPTÉS (dans « à retirer »), groupés par point ; la plus proche date limite, de la publication.
           let pointsJ = [], premierJ = null;
@@ -50649,7 +50656,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               colis={nE ? colisJournee : []}
               retraits={{ n: nR, pasSu: nR == null, points: pointsJ, nPoints: Math.max(1, pointsJ.length), premier: premierJ }}
               groupes={groupesJ}
-              plein={nPrets > 0 ? { n: nPrets, txt: tr('v2.imprimer', { n: nPrets }), faire: () => { _pendingBordPrint = true; if (onNav) onNav(xE.tab); } } : null}
+              plein={nPrets > 0 ? { n: nPrets, txt: tr('v2.imprimerCourt'), faire: () => { _pendingBordPrint = true; if (onNav) onNav(xE.tab); } } : null}
               onScanner={() => ouvrirRetrouver('journee')}
               onColis={() => { if (onNav && xE) onNav(xE.tab); }}
               onRetraits={() => { if (onNav) onNav('retraits'); }}/>
@@ -55738,11 +55745,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         enGrand: (x) => { const f = qrRetrait(x); if (f) return f; const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null;
                           if (!x.code) return null; return () => openQrView(t ? (codeRetrait(t.code) !== x.code ? { ...t, code: x.code } : t) : ligneRetraitVinted(o)); } }}/>
                     {!avecColis && toutLuRet ? <p className="vrm-colis-vide" data-retraits-vide="">{tr('v2.passe.aucun')}</p> : null}
-                    <EnRouteListeV2 lignes={enRouteV2} Icon={Icon} Photo={photoCarte}/>
+                    <EnRouteListeV2 lignes={enRouteV2} Icon={Icon} Photo={photoCarte} touteSansPoint={enRouteV2.length > 0 && enRouteV2.every((l) => !l.point)}/>
                     {/* Rien n'attend au relais : le geste plein d'Achats est « Ajouter un achat » (la saisie d'un achat hors
                         plateforme, la même que son bouton : `vrm:v2-ajouter-achat`, src/ecrans/Achats.jsx). */}
-                    {!avecColis ? <div className="v2-pouce" data-v2-pouce=""><BoutonV2 role="principal" plein icone={<Icon name="plus" size={22}/>} attrs={{ 'data-v2-principal': 'ajouter-achat' }}
-                      onClick={() => { try { window.dispatchEvent(new Event('vrm:v2-ajouter-achat')); } catch (_) {} }}>{tr('v2.achats.ajouter')}</BoutonV2></div> : null}
+
                     {ancienne ? <details className="vrm-repli" data-v2-detail-retraits=""><summary>{tr('v2.passe.detail')}</summary>{ancienne}</details> : null}
                   </div>; })()}
                 {/* (8 nov., retraits) LES COLIS SORTIS DE « À RETIRER », AVEC LA RAISON LUE ET SA DATE (§5 : un colis
@@ -65294,7 +65300,11 @@ function AppCoeur() {
             pour « À faire » et coupaient le titre ; éteint, la tête d'hier, inchangée. */}
         <header className={designV2App ? 'v2-tete-tache' : 'vrm-market-heading vrm-tache-tete'} data-tache-tete={t}>
           {t === 'ventes' ? <span className="vrm-fu-date-tete" data-date-tete="">{dateJourFr(new Date())}</span> : null}
-          {designV2App && t === 'annonces' && !baseKO
+          {designV2App && t === 'achats' && !baseKO
+            /* (17 nov., audit visuel A3) « Ajouter un achat » : plein COMPACT sur la ligne du titre (jamais posé sur la liste). */
+            ? <div className="v2-titre-ligne"><h1>{TITRES_TACHE[t]}</h1><BoutonV2 role="principal" compact icone={<Icon name="plus" size={20}/>} attrs={{ 'data-v2-principal': 'ajouter-achat' }}
+                onClick={() => { try { window.dispatchEvent(new Event('vrm:v2-ajouter-achat')); } catch (_) {} }}>{tr('v2.achats.ajouterCourt')}</BoutonV2></div>
+            : designV2App && t === 'annonces' && !baseKO
             /* (17 nov., nouveau design) Annonces : la liste d'abord — le geste plein est COMPACT, en haut à droite de la ligne du
                titre (« Publier » : le geste du disque d'hier, `vrm:publier-ailleurs`), jamais posé sur la liste. */
             ? <div className="v2-titre-ligne"><h1>{TITRES_TACHE[t]}</h1><BoutonV2 role="principal" compact icone={<Icon name="plus" size={20}/>} attrs={{ 'data-v2-principal': 'publier' }}

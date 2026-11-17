@@ -448,3 +448,37 @@ html body button.v2-seg-btn:focus-visible { outline: none; box-shadow: var(--v2-
 .v2l-c-puces { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-size: 13px; color: var(--v2-muet); }
 .v2l-puce { display: inline-flex; align-items: center; min-height: 24px; }
 .v2l-puce > .v2l-fait { padding: 0 8px; height: 24px; border-radius: 999px; background: var(--v2-socle); }
+/* ⚠️ (17 nov.) La tête de la coque posée sur la ligne du titre (Annonces, la cloche) est TRANSPARENTE aux touchers : elle
+   couvrait « Publier » (elementFromPoint ⇒ <header>, le toucher tombait dans le vide). Seuls ses boutons se touchent. */
+html body .vrm-app-header.v2-entete-cloche { pointer-events: none !important; }
+html body .vrm-app-header.v2-entete-cloche :is(button, a, input, select, [role="button"], [tabindex]) { pointer-events: auto !important; }
+
+/* ══ 13. Audit visuel du 17 nov. — les six « absolument » (A1–A6) ═══════════════════════════════════════════ */
+/* A1. Le grand titre ne se casse jamais lettre par lettre : il garde ses mots, le geste passe dessous s'il manque de place. */
+.v2-titre-ligne { flex-wrap: wrap; row-gap: 8px; }
+.v2-titre-ligne h1, .v2-tete-tache h1, .v2-tete h1 { overflow-wrap: normal; word-break: normal; hyphens: manual; min-width: min-content; }
+.v2-tete-tache h1 { font-size: clamp(28px, 8.6vw, 34px); }
+html[data-grand-texte] .v2-titre-ligne { padding-right: 0; }
+html[data-grand-texte] .v2-titre-ligne h1 { flex: 1 0 100%; padding-right: 64px; }
+/* A2. Le libellé d'un bouton passe à la ligne en très grand texte ; le nombre (`.v2b-n`) n'est jamais coupé. */
+html body .v2b-n { flex: none; white-space: nowrap; }
+html[data-grand-texte] body .v2b-lib { white-space: normal; overflow: visible; text-overflow: clip; text-align: center; }
+html[data-grand-texte] body button.v2b-principal { height: auto; min-height: var(--v2-bouton-h); padding-block: 8px; }
+/* A3. La pile du bas : UN jeton (barre + plein + marge) ; messages et accompagnements au-dessus, la liste dégagée. */
+:root { --v2-pile-bas: calc(var(--vrm-barre-bas, 84px) + 24px + var(--v2-bouton-h, 50px) + 16px); }
+@media (max-width: 1023px) {
+  html[data-design="v2"] body:has(.v2-pouce) .vrm-toasts { bottom: var(--v2-pile-bas) !important; top: auto !important; }
+  .v2-ecran[data-v2-plein="1"] { padding-bottom: var(--v2-pile-bas); }
+}
+/* A4. En route : le titre sur toute la largeur (2 lignes au plus), le prix seul à droite. */
+[data-v2-en-route] .v2-ligne-titre { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+[data-v2-en-route] .v2-ligne-droite { flex: none; align-self: flex-start; padding-top: 2px; }
+/* A5. L'erreur de lecture, allumé : une carte lisible, « Réessayer » du système (jamais un plein). */
+.v2-erreur { display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 16px; padding: 24px 16px; border-radius: 16px; text-align: center;
+  background: var(--v2-carte, #FFFFFF); color: var(--sv-encre, var(--v2-encre, #0C1D30)); font-size: 17px; line-height: 22px; }
+.v2-erreur-ic { color: var(--v2-muet, #4A5B6D); }
+/* A6. « Mis à jour à … » ne se pose plus sur le grand titre : allumé au téléphone, elle descend au-dessus de la barre. */
+@media (max-width: 1023px) {
+  html[data-design="v2"] body .vrm-neuf-hote { top: auto; bottom: calc(var(--vrm-barre-bas, 84px) + 16px + env(safe-area-inset-bottom, 0px)); }
+  html[data-design="v2"] body:has(.v2-pouce) .vrm-neuf-hote { bottom: var(--v2-pile-bas); }
+}

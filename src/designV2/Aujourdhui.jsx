@@ -113,7 +113,7 @@ export default function Aujourdhui({ affiche, colis = [], retraits = null, group
       {/* 5. LE GESTE PLEIN, au pouce (en haut à droite sur l'ordinateur, design-v2.css). */}
       {plein ? (
         <div className="v2-pouce" data-v2-pouce="">
-          <BoutonV2 role="principal" plein icone={<Icon name="printer" size={22}/>} onClick={plein.faire} attrs={{ 'data-v2-principal': String(plein.n) }}>{plein.txt}</BoutonV2>
+          <BoutonV2 role="principal" plein n={plein.n} icone={<Icon name="printer" size={22}/>} onClick={plein.faire} attrs={{ 'data-v2-principal': String(plein.n) }}>{plein.txt}</BoutonV2>
         </div>
       ) : null}
     </div>
