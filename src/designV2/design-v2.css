@@ -24,7 +24,8 @@
   --v2-teinte-fond-appui: rgb(0 96 204 / .18);
   --v2-teinte-texte: #0050A8;        /* 6,9:1 sur la teinte posée sur le blanc */
   --v2-lien: #0050A8;
-  --v2-rouge: #B3261E;               /* destructif, derrière une confirmation seulement */
+  /* Destructif : l'AMBRE (§7 — le rouge n'est QUE pour deux paires sous un même N° ; le « danger » de l'app est ambre). */
+  --v2-danger: #8A4B00;
   --v2-anneau: 0 0 0 3px rgb(0 96 204 / .45);
   --v2-muet: #4A5B6D;                /* gris lisible (≥ 4,5:1 sur la porcelaine ET sur l'aplat) */
   --v2-carte: #FFFFFF;
@@ -48,7 +49,7 @@
   --v2-teinte-fond-appui: rgb(74 163 255 / .26);
   --v2-teinte-texte: #8CC4FF;
   --v2-lien: #8CC4FF;
-  --v2-rouge: #FF8A80;
+  --v2-danger: #F2B65E;
   --v2-anneau: 0 0 0 3px rgb(140 196 255 / .55);
   --v2-muet: #A7B8CB;
   --v2-carte: #16273C;
@@ -88,8 +89,8 @@ html body button.v2b-secondaire { background: var(--v2-teinte-fond); color: var(
 html body button.v2b-secondaire:active:not([aria-disabled="true"]) { background: var(--v2-teinte-fond-appui); }
 /* texte — un lien, la cible garde 44 px */
 html body button.v2b-texte { background: transparent; color: var(--v2-lien); padding: 0 8px; }
-/* destructif — rouge, derrière une confirmation (le composant la refuse sinon) */
-html body button.v2b-destructif { background: transparent; color: var(--v2-rouge); padding: 0 8px; }
+/* destructif — ambre (§7), derrière une confirmation (le composant la refuse sinon) */
+html body button.v2b-destructif { background: transparent; color: var(--v2-danger); padding: 0 8px; }
 /* icône — 44 × 44, glyphe 24 */
 html body button.v2b-icone { width: var(--v2-cible); height: var(--v2-cible); min-width: var(--v2-cible); padding: 0; border-radius: 50%; background: transparent; color: inherit; }
 html body button.v2b-icone .v2b-ic { width: var(--v2-glyphe); height: var(--v2-glyphe); }
@@ -425,3 +426,25 @@ html[data-design="v2"] body .vrm-app-header .vrm-header-actions { gap: 8px !impo
 .v2l-c-txt { gap: 0; }
 .v2l-c-faits { height: 24px; margin-top: 0; }
 @media (max-width: 1023px) { .v2-titre-ligne { padding-right: 64px; } }
+/* Le segmenté du nouveau design (SegmentV2) : piste translucide, segment choisi en porcelaine claire, encre. */
+.v2-seg { display: flex; gap: 2px; padding: 2px; border-radius: 14px; background: rgb(255 255 255 / .14); box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .18); }
+html body button.v2-seg-btn { appearance: none; flex: 1 1 0; min-width: 0; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 8px; border: 0; border-radius: 12px;
+  background: transparent; color: var(--v2-page-texte, #FFFFFF); font: 600 15px/1.2 var(--sb-police-texte, system-ui); font-variant-numeric: tabular-nums; cursor: pointer; white-space: nowrap;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; transition: background-color 160ms ease, color 160ms ease; }
+html body button.v2-seg-btn.is-on { background: #F4F8FC; color: #0C1D30; box-shadow: 0 1px 2px rgb(0 0 0 / .18); }
+html body button.v2-seg-btn:focus-visible { outline: none; box-shadow: var(--v2-anneau); }
+.v2-seg-n { font-weight: 400; opacity: .8; }
+.v2-seg-l { overflow: hidden; text-overflow: ellipsis; }
+/* ══ 12. Plus d'informations par rangée (Julien : « il doit y avoir plusieurs infos ») — gris, jamais ambre ══ */
+.v2l-fait { display: inline-flex; align-items: center; gap: 4px; flex: none; white-space: nowrap; }
+.v2l-marge { font-weight: 600; margin-left: 4px; color: inherit; }
+/* A : ligne 3, 13 px gris, icônes 14 : ♡ · vues · jours · acheté → marge. */
+.v2l-a-l3 { display: flex; align-items: center; gap: 12px; height: 16px; font-size: 13px; line-height: 16px; color: var(--v2-muet); overflow: hidden; white-space: nowrap; }
+.v2l-a-txt { gap: 4px !important; }
+/* C : grand prix, « Acheté · marge », puis des puces icône + valeur (elles passent à la ligne au besoin). */
+.v2l-c { height: auto !important; min-height: 120px; align-items: flex-start; }
+.v2l-c-txt { height: auto !important; gap: 4px !important; }
+.v2l-c-achat { font-size: 13px; line-height: 16px; color: var(--v2-muet); }
+.v2l-c-puces { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-size: 13px; color: var(--v2-muet); }
+.v2l-puce { display: inline-flex; align-items: center; min-height: 24px; }
+.v2l-puce > .v2l-fait { padding: 0 8px; height: 24px; border-radius: 999px; background: var(--v2-socle); }
