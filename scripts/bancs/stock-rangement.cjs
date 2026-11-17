@@ -207,7 +207,9 @@ async function parcours(b, port, { tel, sombre, v2, nom, petit = false }) {
       await r.ctx.close(); }
     { const r = await rendre(b, port, { tel, sombre, v2, petit, reduit: true });
       await r.toucher('[data-sr-lancer]'); await r.toucher('[data-sr-ranger-ici]');
-      const q = await r.pg.evaluate(() => ({ anims: document.getAnimations().filter((a) => a.playState === 'running' && a.effect && a.effect.target && a.effect.target.closest && a.effect.target.closest('.sr-feuille, .sr-ecran')).length,
+      // Mouvement réduit : aucun DÉPLACEMENT (un fondu d'opacité reste permis, il ne bouge rien).
+      const q = await r.pg.evaluate(() => ({ anims: document.getAnimations().filter((a) => a.playState === 'running' && a.effect && a.effect.target && a.effect.target.closest && a.effect.target.closest('.sr-feuille, .sr-ecran')
+          && (() => { try { return a.effect.getKeyframes().some((k) => (k.transform && k.transform !== 'none') || k.translate || k.scale); } catch (_) { return true; } })()).length,
         courant: document.querySelector('[data-sr-courant]') && document.querySelector('[data-sr-courant]').getAttribute('data-sr-courant') }));
       dit(q.anims === 0 && q.courant === '202', `${t} : Q — mouvement réduit : aucune animation, la suivante est là`, JSON.stringify(q));
       await r.ctx.close(); }
