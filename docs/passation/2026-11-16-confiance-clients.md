@@ -54,7 +54,9 @@ Mission : `docs/passation/file-attente-16nov/12-confiance-clients.md` (validée 
   TVA toujours, veille sans mémo, aide vers /etat) ; sur l'arbre de `main` : 5/15, rouge.
 - Audits voisins verts : agenda-appareil, confiance, confiance-publique, statut-auto, aide-signalement,
   parcours-nouveau, traduction, urssaf. Build vert.
-- Banc `suivi-urssaf` : contrôle F (le calendrier : 12 URSSAF en mensuel, CFE, impôt) ajouté — voir l'état à la reprise.
+- Banc `suivi-urssaf` : contrôle F (12 URSSAF en mensuel, CFE, impôt) VERT à 390 et 1512. Ses rouges A, R, D, S
+  (« scrollIntoView » 30 s dans les sections suivi/récap/déclarer/stockage, avant ou hors de la carte) n'ont pas été
+  comparés à `main` (machine saturée) : à relire dans la CI de la PR.
 
 ## ÉTAT À LA REPRISE
 
