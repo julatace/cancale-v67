@@ -34,7 +34,7 @@
     const points = new Map();
     for (const c of F.colis) { if (!points.has(c.point)) points.set(c.point, []); points.get(c.point).push(c); }
     for (const [p, l] of points) t.push({ cle: 'retirer-' + p, sorte: 'À retirer', quand: l.reduce((m, c) => (c.limite < m ? c.limite : m), l[0].limite), titre: p, adresse: l[0].adresse, colis: l, geste: l.length === 1 ? 'Colis retiré' : `Les ${l.length} colis retirés` });
-    for (const o of F.offres) { const a = annonceDe.get(o.annonce); t.push({ cle: 'offre-' + o.conv, sorte: 'Offre', quand: null, date: o.date, titre: `${eur(o.montant)} pour la ${a.titre}`, offre: o, annonce: a, geste: 'Répondre' }); }
+    for (const o of F.offres) { const a = annonceDe.get(o.annonce); t.push({ cle: 'offre-' + o.conv, sorte: 'Offre', sorteLigne: `Offre · ${eur(o.montant)}`, quand: null, date: o.date, titre: a.titre, offre: o, annonce: a, geste: 'Accepter l’offre' }); }
     const sansCout = F.ventes.filter((v) => v.cout == null);
     if (sansCout.length) t.push({ cle: 'prix', sorte: "Prix d'achat", quand: null, titre: `${sansCout.length} ventes sans prix d’achat`, paires: sansCout, geste: `Saisir les ${sansCout.length} prix` });
     const rang = (x) => (x.quand ? Date.parse(x.quand) : x.sorte === 'Offre' ? NOW + 5 * J - (NOW - Date.parse(x.date)) : 9e15);
@@ -71,7 +71,7 @@
     }
     if (x.offre) {
       const a = x.annonce;
-      return `<div class="offre">${basket(a.teinte, 96)}<dl class="offre-dl"><div><dt>Annonce</dt><dd>${eur(a.prix)}</dd></div><div><dt>Offre</dt><dd>${eur(x.offre.montant)}</dd></div><div><dt>De</dt><dd>${esc(x.offre.pseudo)}</dd></div><div><dt>N°</dt><dd>${esc(a.numero)}</dd></div></dl></div>`;
+      return `<div class="offre">${basket(a.teinte, 96)}<dl class="offre-dl"><div class="offre-grand"><dt>Offre de ${esc(x.offre.pseudo)}</dt><dd>${eur(x.offre.montant)}</dd></div><div><dt>Annonce</dt><dd>${eur(a.prix)}</dd></div><div><dt>N°</dt><dd>${esc(a.numero)}</dd></div></dl></div>`;
     }
     return '';
   }
@@ -92,7 +92,7 @@
   function ligneTache(x, actif) {
     const urg = x.quand && presse(x.quand);
     return `<a href="#ecran=afaire&focus=${encodeURIComponent(x.cle)}" class="tache${actif ? ' is-actif' : ''}" data-tache="${esc(x.cle)}">
-      <span class="tache-sorte">${esc(x.sorte)}</span><span class="tache-titre">${esc(x.titre)}</span>
+      <span class="tache-sorte">${esc(x.sorteLigne || x.sorte)}</span><span class="tache-titre">${esc(x.titre)}</span>
       <span class="tache-quand${urg ? ' ambre' : ''}">${x.quand ? (urg ? '<i class="pt"></i>' : '') + avant(x.quand).replace(/^avant /, '') : ''}</span></a>`;
   }
   function chiffreJour() {
@@ -150,7 +150,7 @@
         + `<div data-liste>${registre(grouper(l, (x) => Maj(nomJour(x.v.date))), '<span>N°</span><span>Article</span><span>État</span><span>Prix</span>')}</div>`;
     }
     const auPoint = F.colis.filter((c) => correspond(c.code, c.point, c.suivi));
-    const pts = auPoint.map((c) => `<div class="ligne ligne--code" data-colis="${c.suivi}"><span class="l-code">${esc(c.code)}</span><span class="l-corps"><span class="l-titre">${esc(F.achats.find((a) => a.tx === c.achat).titre)}</span><span class="l-sous">${esc(c.point)} · ${c.qr ? 'QR du transporteur' : 'sans QR'}</span></span><span class="l-etat${presse(c.limite) ? ' ambre' : ''}">${avant(c.limite)}</span><span class="l-val"></span></div>`);
+    const pts = auPoint.map((c) => `<div class="ligne ligne--code" data-colis="${c.suivi}"><span class="l-code">${esc(c.code)}</span><span class="l-corps"><span class="l-titre">${esc(F.achats.find((a) => a.tx === c.achat).titre)}</span><span class="l-sous">${esc(c.point)} · <span class="${presse(c.limite) ? 'ambre' : ''}">${avant(c.limite)}</span></span></span><span class="l-etat"></span><span class="l-val l-qr">${c.qr ? 'QR' : ''}</span></div>`);
     const ETAT_A = { point: 'au point relais', route: 'en route', recu: 'reçu' };
     const l = F.achats.filter((a) => a.etat !== 'point' && correspond(a.titre, a.compte, a.tx)).sort((a, b) => b.date.localeCompare(a.date))
       .map((a) => ({ a, html: ligne({ n: null, titre: a.titre, sous: `${esc(a.compte)} · ${a.taille}`, val: eur(a.prix), etat: ETAT_A[a.etat], attrs: `data-achat="${a.tx}"` }) }));
