@@ -165,7 +165,8 @@ import './emails-apercu.css'; // (8 nov.) style de ./EspaceEmails.jsx, gardé à
 import './journal-emails.css';
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : RecusEmail (était importé en statique)
 const RecusEmail = aLaDemandeDiscret(() => import('./RecusEmail.jsx'));
-import VuesVentes from "./VuesVentes.jsx";
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : VuesVentes (était importé en statique)
+const VuesVentes = aLaDemandeDiscret(() => import('./VuesVentes.jsx'));
 import BordereauxAuto from "./BordereauxAuto.jsx";
 import {resumerStockJournee} from './stockJournee.js';
 import { venduesParEmail } from './venduesParEmail.js';   // (11 nov., robustesse) retrait d'« En ligne » par identité
@@ -249,9 +250,11 @@ import { lireDemandeAchat, lireRechercheLien, poserDemandeAchat } from "./raccou
 import RaccourcisClavier from "./RaccourcisClavier.jsx";
 import { MQ_ORDINATEUR, MQ_TABLETTE_LARGE, MQ_TABLETTE_ETROITE, dispositionTablette } from "./coque.js";
 import { articlesQuiDorment, seuilValide } from "./quiDorment.js";
-import QuiDorment from "./design/QuiDorment.jsx";
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : QuiDorment (était importé en statique)
+const QuiDorment = aLaDemandeDiscret(() => import('./design/QuiDorment.jsx'));
 // (11 nov., lot quoi-republier) « Quelles annonces republier ? » : la règle (sur `articlesQuiDorment`) et sa carte.
-import QuoiRepublier from "./design/QuoiRepublier.jsx";
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : QuoiRepublier (était importé en statique)
+const QuoiRepublier = aLaDemandeDiscret(() => import('./design/QuoiRepublier.jsx'));
 import { quoiRepublier, lireReglage as lireReglageQR, CLE_REGLAGE as CLE_REGLAGE_QR, ligneJourneeRepublier } from "./quoiRepublier.js";
 import { favorisSansVente, seuilFavorisValide, gestesDormeuse, cartePairesQuiDorment } from "./vendrePlus.js";
 import { beneficeSiVendue, gesteDormante, classerDormantes } from "./dormantes.js";   // (13 nov., points 14-15) « si vendue » et UN geste par paire qui dort
@@ -597,7 +600,9 @@ import { exempleActif, exempleSansCompte, entrerModeExemple, sortirModeExemple }
 import { demarrerMesures, mesuresEcran } from "./mesuresCollecte.js";
 // ⟦→ ecrans/Reglages.jsx #11⟧
 import { GuideDemarrage, BandeauExemple, CadreExemple, ChoixNumerotation, VerificationInstallation } from "./GuideDemarrage.jsx";
-import { ParcoursArrivee, CarteParcours } from "./ParcoursArrivee.jsx";
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : { ParcoursArrivee, CarteParcours } (était importé en statique)
+const ParcoursArrivee = aLaDemandeFeuille(() => import('./ParcoursArrivee.jsx').then((m) => ({ default: m.ParcoursArrivee })));
+const CarteParcours = aLaDemandeDiscret(() => import('./ParcoursArrivee.jsx').then((m) => ({ default: m.CarteParcours })));
 // (14 nov.) L'accueil des nouveaux : bilan, premier colis, « Nouveau », langue, notifications (src/accueilNouveaux/).
 import { AccueilNouveauxCoque, LangueDetecteeCarte } from "./accueilNouveaux/AccueilNouveaux.jsx";
 import { CLE_ECRANS_VUS, poserStockageEcransVus, ecranNouveau, badgeAvecNouveau, abonnerEcransVus } from "./ecransVus.js";
@@ -800,7 +805,9 @@ installerFonduPhotos();
 import "./design/scanner.css";
 import "./styles-photo-carton.css";   // (10 nov., lot AZ) « Photo du carton » (scanner, Préparer, fiche de la vente)
 import { brancherPhotoCarton, venteDuColis, aPhotoCarton, photoCartonDe } from "./photoCarton.js";
-import { BoutonPhotoCarton, PhotoCartonVente } from "./PhotoCarton.jsx";
+// (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : { BoutonPhotoCarton, PhotoCartonVente } (était importé en statique)
+const BoutonPhotoCarton = aLaDemandeDiscret(() => import('./PhotoCarton.jsx').then((m) => ({ default: m.BoutonPhotoCarton })));
+const PhotoCartonVente = aLaDemandeDiscret(() => import('./PhotoCarton.jsx').then((m) => ({ default: m.PhotoCartonVente })));
 import { beneficeLigneVente, texteBenefice, euros as eurosLigne } from "./beneficeLigne.js";
 import { friseVente, phraseVente, eurosRecap, ETATS_HORS_PARCOURS } from "./recapVente.js";
 import { auCentreDeVerification } from "./verificationArticle.js";
