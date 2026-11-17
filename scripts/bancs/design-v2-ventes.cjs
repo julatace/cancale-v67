@@ -144,7 +144,7 @@ async function allume(nav, b, sombre, W, ref) {
   const { ctx, pg, erreurs } = await ouvrir(nav, { W, sombre, b, url: '/?tab=ventes', dsf: W < 600 ? 2 : 1 });
   await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {});
   await pg.evaluate(() => localStorage.setItem('vrm_design_v2', '1')); await pg.reload({ waitUntil: 'domcontentloaded' });
-  await attendre(pg, () => document.querySelectorAll('[data-v2v-liste="envoyer"] [data-v2v-ligne]').length > 0 && (document.querySelector('[data-v2v-affiche]') || { getAttribute: () => '' }).getAttribute('data-v2v-affiche') !== '', 45000);
+  await attendre(pg, () => document.querySelectorAll('[data-v2v-liste="envoyer"] [data-v2v-ligne]').length > 0 && (document.querySelector('[data-v2v-affiche]') || { getAttribute: () => '' }).getAttribute('data-v2v-affiche') !== '', process.env.BANC_DIST ? 15000 : 45000);
   await pg.waitForTimeout(2500); await sansToasts(pg);
   const m = await mesurer(pg);
   console.log(`   1re rangée à ${m.premiere} px · ${m.n} rangées · groupes ${m.tetes.map((t) => t.g + ':' + t.n).join(' ')} · plein « ${m.tete.pleinTxt} »`);
@@ -174,17 +174,17 @@ async function allume(nav, b, sombre, W, ref) {
   if (tel) {
     // G : la recherche par N° trouve la rangée.
     const num = await pg.evaluate(() => { const p = document.querySelector('[data-v2v-liste] [data-v2v-ligne] .v2-etiquette'); return p ? p.getAttribute('data-v2-etiquette') : ''; });
-    await pg.locator('[data-v2v-champ] input').fill(num); await pg.waitForTimeout(500);
+    await pg.locator('[data-v2v-champ] input').fill(num, { timeout: 3000 }).catch(() => {}); await pg.waitForTimeout(500);
     const tr = await pg.evaluate((n) => [...document.querySelectorAll('[data-v2v-liste] [data-v2v-ligne] .v2-etiquette')].map((p) => p.getAttribute('data-v2-etiquette')), num);
     dit(num && tr.length >= 1 && tr.includes(num) && tr.length < 5, `G ${th} : « ${num} » tapé ⇒ ${tr.length} rangée(s), dont N°${num}`, tr);
     await pg.screenshot({ path: path.join(SHOTS, `ventes-recherche-${th}.png`) });
-    await pg.locator('[data-v2v-champ] input').fill(''); await pg.waitForTimeout(400);
+    await pg.locator('[data-v2v-champ] input').fill('', { timeout: 3000 }).catch(() => {}); await pg.waitForTimeout(400);
     // G : glisser à gauche ⇒ Imprimer · Plus (le tiroir de la rangée).
     const gl = await pg.evaluate(() => { const r = document.querySelector('[data-v2v-liste] [data-v2v-ligne][data-v2v-pret="1"]') || document.querySelector('[data-v2v-liste] [data-v2v-ligne]');
       return r ? [...r.querySelectorAll('[data-v2l-glisse]')].map((b) => b.getAttribute('data-v2l-glisse')) : []; });
     dit(gl.length === 2 && gl.includes('imprimer') && gl.includes('plus'), `G ${th} : glisser à gauche ⇒ Imprimer · Plus (${gl.join(', ')})`, gl);
     // G : toucher ⇒ la fiche.
-    await pg.locator('[data-v2v-liste] [data-v2v-ligne] .v2l-a-titre').first().tap({ timeout: 8000 }).catch(() => {});
+    await pg.locator('[data-v2v-liste] [data-v2v-ligne] .v2l-a-titre').first().tap({ timeout: 4000 }).catch(() => {});
     const fiche = await attendre(pg, () => !!document.querySelector('.vrm-fp, [data-fiche-paire], [data-fp]'), 8000);
     dit(fiche, `G ${th} : toucher la rangée ouvre la fiche de la paire`);
     await pg.screenshot({ path: path.join(SHOTS, `ventes-fiche-${th}.png`) });
