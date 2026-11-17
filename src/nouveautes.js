@@ -30,6 +30,10 @@ export const NOUVEAUTES = Object.freeze([
   // (16 nov., lot compta-donnees) docs/passation/2026-11-16-compta-donnees.md
   { id: 'partenaires-prorata', date: '2026-11-16', titre: 'Partenaires : remboursement partiel, commission au prorata', phrase: '1 € rendu sur 16,99 € : il reste 2,82 € dus.', tab: 'settings', pour: 'proprietaire', mode: 'tous' },
   { id: 'serie-facture-vrm', date: '2026-11-16', titre: 'Factures en série : envoyer avec VRM', phrase: 'Ta boîte pas connectée ? VRM les envoie, toi en copie.', tab: 'compta', pour: 'pro', mode: 'tous' },
+  // (16 nov., lot transporteurs-suivi) docs/passation/2026-11-16-transporteurs-suivi.md
+  { id: 'mondial-relay-ventes', date: '2026-11-16', titre: 'Tes colis Mondial Relay vendus sont suivis', phrase: 'Le code postal du point est lu sur ton étiquette.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (16 nov., lot impression-retours) docs/passation/2026-11-16-impression-retours.md
+  { id: 'impression-retours', date: '2026-11-16', titre: 'Tes retours s’impriment avec tes envois', phrase: 'Tamponnés RETOUR en grand, comptés à part des ventes.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (16 nov., lot vitesse-lectures) docs/passation/2026-11-16-vitesse-lectures.md
   { id: 'veille-sites', date: '2026-11-16', titre: 'Leboncoin, Vestiaire, messages : à jour tout seuls', phrase: 'Ce que l’extension lit arrive sans recharger, même sur iPhone.', tab: 'messages', pour: 'tous', mode: 'tous' },
   // (16 nov., lot ecrans-restes) docs/passation/2026-11-16-ecrans-restes.md

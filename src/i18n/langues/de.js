@@ -1,4 +1,5 @@
 // DEUTSCH — Übersetzung von fr.js (der Quelle). Gleiche Schlüssel, gleiche {Variablen}.
+import ecran_suivi_vente from './de/suiviVente.js';   // (16 nov.) le suivi des colis vendus
 import ecran_perso from './de/perso.js';   // (16 nov.) « Modifier ma journée » simple
 import ecran_ventesVerre from './de/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
 import ecran_journee from './de/journee.js';
@@ -2304,6 +2305,7 @@ export default {
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_liaison,
+  ...ecran_suivi_vente,
   ...ecran_transporteur_connu,
   ...ecran_vendre,
   ...ecran_ebaytableau,

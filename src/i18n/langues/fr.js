@@ -4,6 +4,7 @@
 // absente d'une langue, une variable `{x}` qui n'est pas la même partout, ou un pluriel
 // sans `other`. Clés : `<écran>.<élément>[.<précision>]`, jamais le texte lui-même.
 // Pluriel : { one: '…', other: '…' } choisi par `n` (Intl.PluralRules).
+import ecran_suivi_vente from './fr/suiviVente.js';   // (16 nov.) le suivi des colis vendus
 import ecran_perso from './fr/perso.js';   // (16 nov.) « Modifier ma journée » simple
 import ecran_ventesVerre from './fr/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
 import ecran_journee from './fr/journee.js';
@@ -2309,6 +2310,7 @@ export default {
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_liaison,
+  ...ecran_suivi_vente,
   ...ecran_transporteur_connu,
   ...ecran_vendre,
   ...ecran_ebaytableau,
