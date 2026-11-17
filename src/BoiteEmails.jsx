@@ -613,7 +613,10 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
     window.addEventListener('vrm:neuf', f);
     return () => window.removeEventListener('vrm:neuf', f);
   }, []);
-  const [adresses, setAdresses] = useState(null);
+  const [adressesLues, setAdresses] = useState(null);
+  // (17 nov., nouveau design) Allumé : les adresses de la page lue tout de suite (la ligne du compte arrivait un rendu
+  // plus tard et poussait la liste de 50 px — un saut mesuré au chargement).
+  const adresses = adressesLues || (v2 && pages && Array.isArray(pages.adresses) ? pages.adresses : null);
   useEffect(() => { if (pages && Array.isArray(pages.adresses)) setAdresses(pages.adresses); }, [pages]);
   const c = pages && pages.compteurs;
   const parR = c && c.parRubrique && typeof c.parRubrique === 'object' ? c.parRubrique : null;
@@ -799,7 +802,7 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
               <button type="button" className="v2-rangee v2m-choix" data-v2-rangee="" data-v2-mail-choix="relier" onClick={() => { setFeuilleV2(false); onRelier && onRelier(); }}><span>{tr('v2.mail.relier')}</span></button>
             </div>
           </SheetShell>}
-          <div ref={rangee} className="vrm-boite-rubriques vrm-rangee" role="group" aria-label={tr('emails.trierEMails')} hidden={v2 || undefined} style={v2 ? { display: 'none' } : undefined}>
+          <div ref={rangee} className="vrm-boite-rubriques vrm-rangee" role="group" aria-label={tr('emails.trierEMails')} hidden={v2 || undefined} style={v2 ? { display: 'none' } : undefined} data-v2-cache={v2 ? '' : undefined}>
             <button type="button" aria-pressed={!rubrique && !nonLus && !aVerif} data-boite-rubrique="tout" onClick={(ev) => { setNonLus(false); setAVerif(false); choisir('', ev.currentTarget); }}>
               <span>{tr('emails.tout')}</span>{!filtre && c && parR && !c.plus ? <span className="vrm-boite-n" data-boite-n={c.sur}>{c.sur}</span> : null}
             </button>
@@ -926,9 +929,9 @@ export default function BoiteEmails({ headers, delies: deliesRecus = {}, onAller
     <PhotoBoite.Provider value={Photo}>
     <section className="vrm-boite" data-boite-emails="" data-vue={vue}>
       {v2 && vue === 'relier' ? <div className="v2e-retour"><BoutonV2 role="texte" attrs={{ 'data-v2-mail-retour': '' }} onClick={() => setVue('boite')}>{'‹ ' + tr('v2.mail.boite')}</BoutonV2></div> : null}
-      <div className="vrm-boite-vues" role="tablist" aria-label={tr('nav.emails')} hidden={v2 || undefined} style={v2 ? { display: 'none' } : undefined}>
+      {!v2 && <div className="vrm-boite-vues" role="tablist" aria-label={tr('nav.emails')}>
         {VUES.map(([k, mot]) => <button key={k} type="button" role="tab" aria-selected={vue === k} data-boite-vue={k} onClick={() => setVue(k)}>{mot}</button>)}
-      </div>
+      </div>}
       {vue === 'boite' && <Boite headers={headers} delies={delies} onAller={onAller} onNum={onNum} FermeAuRetour={FermeAuRetour} onRelier={() => setVue('relier')} ecrireLus={ecrireLus} photoDe={photoDe} ranges={ranges} onRanger={onRanger} quarantaine={quarantaine}
         tete={<ARelier comptes={bandeau} onRelier={relierCompte}/>}/>}
       {vue === 'relier' && <div className="vrm-boite-relier" data-boite-relier="">

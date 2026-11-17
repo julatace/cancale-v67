@@ -66,7 +66,10 @@ function attendu(b) {
 }
 
 const SIGNATURE = () => { const m = document.querySelector('.vrm-main'); if (!m) return null; const out = [];
-  const pas = (e, d) => { if (d > 60 || e.matches('.vrm-fraicheur-hote, [data-temps-reel-neuf], [data-fraicheur-unique], [data-geste-disque]')) return; const cl = [...e.classList].sort().join('.'); const da = [...e.attributes].map((a) => a.name).filter((n) => n.startsWith('data-') && !/^data-(sb-|v2|vu$|appui)/.test(n)).sort().join(',');
+  const pas = (e, d) => { if (d > 60 || e.matches('.vrm-fraicheur-hote, [data-temps-reel-neuf], [data-fraicheur-unique], [data-geste-disque]')) return;
+    // Les jours de la boîte suivent l'HEURE du passage (« Aujourd'hui » / « Hier »), pas le code : les rangées sont relevées
+    // à plat, sans leur coupure par jour.
+    if (e.matches('.vrm-boite-jour')) { for (const li of e.querySelectorAll(':scope > ul > *')) pas(li, d); return; } const cl = [...e.classList].sort().join('.'); const da = [...e.attributes].map((a) => a.name).filter((n) => n.startsWith('data-') && !/^data-(sb-|v2|vu$|appui)/.test(n)).sort().join(',');
     out.push(d + ':' + e.tagName + (cl ? '.' + cl : '') + (da ? '[' + da + ']' : '')); for (const c of e.children) pas(c, d + 1); };
   pas(m, 0); return out; };
 async function signatureStable(pg) {
@@ -120,7 +123,10 @@ async function ouvrirEcran(nav, { W, sombre, url, grand = false, v2 = true }) {
   await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {}); await pg.waitForTimeout(1200);
   if (W === 375) await pg.setViewportSize({ width: 375, height: 667 });
   // Le CLS du chargement : observé dès le premier octet du rechargement.
-  await pg.addInitScript(() => { window.__cls = 0; try { new PerformanceObserver((l) => { for (const e of l.getEntries()) if (!e.hadRecentInput) window.__cls += e.value; }).observe({ type: 'layout-shift', buffered: true }); } catch (_) {} });
+  // L'écran de démarrage de la coque (`.vrm-boot*`, avant React) n'est pas l'écran jugé : ses sauts sont écartés.
+  await pg.addInitScript(() => { window.__cls = 0; try { new PerformanceObserver((l) => { for (const e of l.getEntries()) { if (e.hadRecentInput) continue;
+    const src = (e.sources || []).map((x) => x.node).filter((n) => n && n.nodeType === 1);
+    if (src.length && src.every((n) => n.closest('[class*="vrm-boot"]'))) continue; window.__cls += e.value; } }).observe({ type: 'layout-shift', buffered: true }); } catch (_) {} });
   await pg.evaluate(([v2, grand]) => { if (v2) localStorage.setItem('vrm_design_v2', '1'); else localStorage.removeItem('vrm_design_v2'); if (grand) localStorage.setItem('vrm_taille_texte', 'tresGrand'); }, [v2, grand]);
   await pg.reload({ waitUntil: 'domcontentloaded' });
   await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {});
@@ -196,20 +202,20 @@ async function emails(nav, { W, sombre, grand = false, nom, ancien = null }) {
   // E2 : chaque segment montre SA rubrique ; « À traiter » = les 3 « à vérifier ».
   if (W === 390 && !sombre && !grand) {
     for (const [seg, test] of [['colis', (t) => t === 'colis' || t === 'codes'], ['ventes', (t) => t === 'ventes'], ['achats', (t) => t === 'achats']]) {
-      await pg.click(`[data-boite-rubrique-v2="${seg}"]`); await pg.waitForTimeout(1800);
+      await pg.click(`[data-boite-rubrique-v2="${seg}"]`, { timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(1800);
       const rs = await pg.evaluate(() => [...document.querySelectorAll('[data-boite-email]')].map((b) => b.getAttribute('data-rubrique')));
       dit(rs.length > 0 && rs.every(test), `${nom} E2 : « ${seg} » ne montre que sa rubrique (${rs.length})`, [...new Set(rs)]);
     }
-    await pg.click('[data-boite-rubrique-v2="atraiter"]'); await pg.waitForTimeout(1800);
+    await pg.click('[data-boite-rubrique-v2="atraiter"]', { timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(1800);
     const av = await pg.evaluate(() => [...document.querySelectorAll('[data-boite-email]')].map((b) => b.getAttribute('data-etat')));
     dit(av.length === 3 && av.every((x) => x === 'a-verifier'), `${nom} E2 : « À traiter » = les 3 « à vérifier », visibles`, av);
     await pg.screenshot({ path: path.join(SHOTS, `emails-atraiter-${nom}.png`) });
-    await pg.click('[data-boite-rubrique-v2="tout"]'); await pg.waitForTimeout(1800);
+    await pg.click('[data-boite-rubrique-v2="tout"]', { timeout: 5000 }).catch(() => {}); await pg.waitForTimeout(1800);
     // E4 : glisser à gauche range ; l'e-mail reste (replié dans « Rangés »), les nombres ne bougent pas.
     const avant = await pg.evaluate(() => ({ n: document.querySelectorAll('[data-boite-email]').length, segs: [...document.querySelectorAll('[data-boite-rubrique-v2]')].map((b) => b.getAttribute('data-boite-n')).join(',') }));
-    const cible = await pg.evaluate(() => { const b = document.querySelector('.vrm-boite-liste [data-boite-email]'); const r = b.getBoundingClientRect(); return { id: b.getAttribute('data-boite-email'), x: r.left + r.width * 0.7, y: r.top + r.height / 2 }; });
+    const cible = await pg.evaluate(() => { const b = document.querySelector('.vrm-boite-liste [data-boite-email]'); if (!b) return { id: '', x: 0, y: 0 }; const r = b.getBoundingClientRect(); return { id: b.getAttribute('data-boite-email'), x: r.left + r.width * 0.7, y: r.top + r.height / 2 }; });
     // Le glisser au doigt : des PointerEvent « touch » (ceux qu'écoute la rangée), vers la gauche.
-    await pg.evaluate(async (c) => { const b = document.querySelector(`[data-boite-email="${c.id}"]`); const ev = (t, x) => b.dispatchEvent(new PointerEvent(t, { bubbles: true, cancelable: true, pointerType: 'touch', pointerId: 7, isPrimary: true, clientX: x, clientY: c.y, button: 0 }));
+    await pg.evaluate(async (c) => { const b = document.querySelector(`[data-boite-email="${c.id}"]`); if (!b) return; const ev = (t, x) => b.dispatchEvent(new PointerEvent(t, { bubbles: true, cancelable: true, pointerType: 'touch', pointerId: 7, isPrimary: true, clientX: x, clientY: c.y, button: 0 }));
       ev('pointerdown', c.x); for (let k = 1; k <= 8; k++) { ev('pointermove', c.x - k * 18); await new Promise((r) => setTimeout(r, 16)); } ev('pointerup', c.x - 144); }, cible);
     await pg.waitForTimeout(900);
     const apres = await pg.evaluate((id) => ({ n: document.querySelectorAll('[data-boite-email]').length, range: !!document.querySelector(`[data-v2-mail-ranges] [data-boite-email="${id}"]`), segs: [...document.querySelectorAll('[data-boite-rubrique-v2]')].map((b) => b.getAttribute('data-boite-n')).join(','), stocke: (() => { try { return !!JSON.parse(localStorage.getItem('vrm_emails_ranges') || '{}')[id]; } catch (_) { return false; } })() }), cible.id);
@@ -255,7 +261,7 @@ async function eteint(nav, sigs) {
 
 // A8 : « Se déconnecter partout » en très grand texte, 375 px — le plein se lit en entier, au-dessus d'« Annuler ».
 async function confirmation(nav, v2) {
-  const { ctx, pg } = await ouvrirEcran(nav, { W: 375, sombre: false, url: '/?tab=settings', grand: true, v2 });
+  const { ctx, pg } = await ouvrirEcran(nav, { W: 375, sombre: false, url: '/?tab=settings', grand: true, v2 }); void ctx;
   await pg.waitForTimeout(3500); await sansToasts(pg);
   const ouvert = await pg.evaluate(async () => { const b = [...document.querySelectorAll('button')].find((x) => /déconnecter partout/i.test(x.textContent || '')); if (!b) return false; b.scrollIntoView({ block: 'center' }); b.click(); return true; });
   await pg.waitForTimeout(1200);
@@ -282,6 +288,7 @@ async function reglePure() {
   const nav = await P.chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox'] });
   const sigs = {};
   try {
+    if (process.env.SEULEMENT === 'eteint') { await eteint(nav, sigs); throw new Error('seulement éteint'); }
     await reglePure().catch((e) => dit(false, 'règle pure : ' + String(e && e.message || e).slice(0, 200)));
     const hier = await pastillesHier(nav);
     await messages(nav, { W: 390, sombre: false, nom: '390-clair' });
