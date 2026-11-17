@@ -54,5 +54,6 @@ export default {
   "v2v.outils.tournee": "Drop-off round",
   "v2v.outils.emballer": "Pack",
   "v2v.outils.tous": "All parcel tools",
-  "v2v.outils.masquer": "Hide parcel tools"
+  "v2v.outils.masquer": "Hide parcel tools",
+  "v2v.litiges": {"one": "{n} parcel: the email and the sale give different numbers — VRM keeps the sale’s.", "other": "{n} parcels: the email and the sale give different numbers — VRM keeps the sale’s."}
 };

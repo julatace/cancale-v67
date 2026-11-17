@@ -64,9 +64,19 @@ const CONTRASTE = `(() => {
   const sur = (h, b) => ({ r: h.r * h.a + b.r * (1 - h.a), g: h.g * h.a + b.g * (1 - h.a), b: h.b * h.a + b.b * (1 - h.a), a: 1 });
   const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
   const jeton = (v) => { const d = document.createElement('i'); d.style.color = 'var(' + v + ')'; document.body.appendChild(d); const c = rgba(getComputedStyle(d).color); d.remove(); return c; };
-  const fond = (el) => { const couches = []; for (let e = el; e && e.nodeType === 1; e = e.parentElement) { const c = rgba(getComputedStyle(e).backgroundColor); if (c && c.a > 0) { couches.push(c); if (c.a >= 0.99) break; } }
-    const lum0 = (() => { const v = jeton('--sv-haut'); return v && v.a > 0 ? v : jeton('--sb-bas'); })(); let f = couches.length && couches[couches.length - 1].a >= 0.99 ? couches.pop() : lum0; for (let i = couches.length - 1; i >= 0; i--) f = sur(couches[i], f); return f; };
-  return { rgba, sur, ratio, fond };
+  // Un fond en DÉGRADÉ (le plateau du segmenté, la porcelaine) compte : chacune de ses couleurs est un fond possible, le pire gagne.
+  const stops = (img) => (String(img || '').match(/rgba?\([^)]+\)|#[0-9a-fA-F]{3,8}/g) || []).map(rgba).filter(Boolean);
+  const fonds = (el) => { const couches = []; for (let e = el; e && e.nodeType === 1; e = e.parentElement) { const cs = getComputedStyle(e); const c = rgba(cs.backgroundColor);
+      const g = /gradient/.test(cs.backgroundImage) ? stops(cs.backgroundImage) : [];
+      if (g.length) { couches.push(g); if (g.every((x) => x.a >= 0.99)) break; continue; }
+      if (c && c.a > 0) { couches.push([c]); if (c.a >= 0.99) break; } }
+    const lum0 = (() => { const v = jeton('--sv-haut'); return v && v.a > 0 ? v : jeton('--sb-bas'); })();
+    let fs = couches.length && couches[couches.length - 1].every((x) => x.a >= 0.99) ? couches.pop() : [lum0];
+    for (let i = couches.length - 1; i >= 0; i--) fs = fs.flatMap((f) => couches[i].map((h) => sur(h, f)));
+    return fs; };
+  const fond = (el) => fonds(el)[0];
+  const pire = (texte, el) => Math.min(...fonds(el).map((f) => ratio(sur(texte, f), f)));
+  return { rgba, sur, ratio, fond, pire };
 })()`;
 const SIGNATURE = () => { const m = document.querySelector('.vrm-main'); if (!m) return null; const out = [];
   const pas = (e, d) => { if (d > 60 || e.matches('.vrm-fraicheur-hote, [data-temps-reel-neuf], [data-fraicheur-unique]')) return; const cl = [...e.classList].sort().join('.'); const da = [...e.attributes].map((a) => a.name).filter((n) => n.startsWith('data-') && !/^data-(sb-|v2|vu$)/.test(n)).sort().join(',');
@@ -96,7 +106,7 @@ async function avant(nav, b, sombre) {
 
 async function mesurer(pg) {
   return pg.evaluate((src) => { const K = eval(src);
-    const vis = (e) => e && e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden' && !e.closest('[hidden], .v2-cache');
+    const vis = (e) => e && e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden' && !e.closest('[hidden], .v2-cache, .vrm-sr-seul') && e.getBoundingClientRect().width > 1;
     const q = (e) => e.getBoundingClientRect();
     const zones = [...document.querySelectorAll('.v2v-titre-ligne, .v2v-tete, .v2v-corps, .v2-sous-titre')].filter(vis);
     const boutons = zones.flatMap((z) => [...z.querySelectorAll('button')]).filter(vis).filter((b) => !b.closest('[data-lg-tiroir], .vrm-retours-lot'));
@@ -105,8 +115,8 @@ async function mesurer(pg) {
     const tronques = textes.filter((e) => { const cs = getComputedStyle(e); return e.scrollWidth > e.clientWidth + 1 && cs.textOverflow !== 'ellipsis' && /hidden|clip/.test(cs.overflowX) && e.clientWidth > 0 && !/-webkit-box/.test(cs.display); }).map((e) => e.className + ':' + e.textContent.trim().slice(0, 30));
     const W = innerWidth; const deb = document.documentElement.scrollWidth - W;
     const hors = textes.filter((e) => { const r = q(e); return r.width && (r.right > W + 1 || r.left < -1); }).map((e) => e.textContent.trim().slice(0, 30));
-    const contrastes = textes.filter((e) => q(e).bottom > 0 && q(e).top < innerHeight).map((e) => { const cs = getComputedStyle(e); const c = K.rgba(cs.color); if (!c) return null; const f = K.fond(e); const big = parseFloat(cs.fontSize) >= 24 || (parseFloat(cs.fontSize) >= 18.66 && Number(cs.fontWeight) >= 700);
-      if (Number(cs.opacity) === 0) return null; return { t: e.textContent.trim().slice(0, 24), r: Math.round(K.ratio(K.sur(c, f), f) * 100) / 100, min: big ? 3 : 4.5 }; }).filter(Boolean);
+    const contrastes = textes.filter((e) => q(e).bottom > 0 && q(e).top < innerHeight).map((e) => { const cs = getComputedStyle(e); const c = K.rgba(cs.color); if (!c) return null; const big = parseFloat(cs.fontSize) >= 24 || (parseFloat(cs.fontSize) >= 18.66 && Number(cs.fontWeight) >= 700);
+      if (Number(cs.opacity) === 0) return null; return { t: e.textContent.trim().slice(0, 24), r: Math.round(K.pire(c, e) * 100) / 100, min: big ? 3 : 4.5 }; }).filter(Boolean);
     const faibles = contrastes.filter((x) => x.r < x.min);
     const pleins = [...document.querySelectorAll('[data-v2b="principal"], .sb-btn-plein, .vv-pied [data-colis-barre-btn="imprimer"]')].filter(vis);
     const h1 = document.querySelector('.v2v-titre-ligne h1'); const pl = document.querySelector('[data-v2-principal="imprimer"]'); const cl = document.querySelector('.vrm-app-header .vrm-header-actions');
@@ -178,9 +188,10 @@ async function allume(nav, b, sombre, W, ref) {
     const fiche = await attendre(pg, () => !!document.querySelector('.vrm-fp, [data-fiche-paire], [data-fp]'), 8000);
     dit(fiche, `G ${th} : toucher la rangée ouvre la fiche de la paire`);
     await pg.screenshot({ path: path.join(SHOTS, `ventes-fiche-${th}.png`) });
-    await pg.keyboard.press('Escape').catch(() => {}); await pg.goBack().catch(() => {}); await pg.waitForTimeout(600);
+    // La fiche se referme par la page rechargée (le réglage reste allumé), puis la liste revient.
+    await pg.reload({ waitUntil: 'domcontentloaded' });
+    await attendre(pg, () => document.querySelectorAll('[data-v2v-liste="envoyer"] [data-v2v-ligne]').length > 0, 45000); await pg.waitForTimeout(1500); await sansToasts(pg);
     // O : « ⋯ » ⇒ la feuille des gestes d'hier.
-    await pg.evaluate(() => { const f = document.querySelector('.vrm-fp [data-fp-fermer], [aria-label="Fermer"]'); if (f) f.click(); }); await pg.waitForTimeout(400);
     await pg.locator('[data-v2v-plus]').first().tap({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(600);
     const outils = await pg.evaluate(() => [...document.querySelectorAll('[data-v2-feuille="ventes-outils"] [data-v2v-outil]')].map((b) => b.getAttribute('data-v2v-outil')));
     dit(['choisir', 'papier', 'preparer', 'deposer', 'scanner', 'tous'].every((k) => outils.includes(k)), `O ${th} : « ⋯ » ⇒ ${outils.join(', ')}`, outils);
@@ -194,7 +205,7 @@ async function allume(nav, b, sombre, W, ref) {
     if (ref) dit(String(nRoute) === String(ref.envoyes), `N ${th} : ${nRoute} rangées « En route » = les envoyés d'avant (${ref.envoyes})`, { v2: nRoute, avant: ref.envoyes });
     dit(r.tetes.length > 0 && r.tetes.every((t) => t.n === (r.parGroupe[t.g] || 0)), `L ${th} : En route groupé par état (${r.tetes.map((t) => t.t).join(' · ')})`, r.tetes);
     dit(r.pleins === 1 && !r.petits.length && !r.tronques.length && r.deb <= 1 && !r.faibles.length, `P/T/X/C ${th} : En route propre`, { p: r.pleins, petits: r.petits, t: r.tronques, f: r.faibles });
-    await pg.evaluate(() => document.querySelector('.vrm-main').scrollTo(0, 0)); await sansToasts(pg);
+    await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) m.scrollTo(0, 0); }); await sansToasts(pg);
     await pg.screenshot({ path: path.join(SHOTS, `ventes-route-${th}.png`) });
     await pg.locator('[data-v2v-seg="toutes"]').first().tap({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(1500); await sansToasts(pg);
     dit(await pg.evaluate(() => document.documentElement.scrollWidth - innerWidth <= 1), `X ${th} : « Toutes » se rend sans débordement`);

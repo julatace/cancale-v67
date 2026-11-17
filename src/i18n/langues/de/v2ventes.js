@@ -54,5 +54,6 @@ export default {
   "v2v.outils.tournee": "Abgaberunde",
   "v2v.outils.emballer": "Verpacken",
   "v2v.outils.tous": "Alle Paket-Werkzeuge",
-  "v2v.outils.masquer": "Paket-Werkzeuge ausblenden"
+  "v2v.outils.masquer": "Paket-Werkzeuge ausblenden",
+  "v2v.litiges": {"one": "{n} Paket: E-Mail und Verkauf nennen nicht dieselbe Nr. — VRM behält die des Verkaufs.", "other": "{n} Pakete: E-Mail und Verkauf nennen nicht dieselbe Nr. — VRM behält die des Verkaufs."}
 };

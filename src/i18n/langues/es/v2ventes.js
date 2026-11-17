@@ -54,5 +54,6 @@ export default {
   "v2v.outils.tournee": "Ruta de entrega",
   "v2v.outils.emballer": "Embalar",
   "v2v.outils.tous": "Todas las herramientas",
-  "v2v.outils.masquer": "Ocultar herramientas"
+  "v2v.outils.masquer": "Ocultar herramientas",
+  "v2v.litiges": {"one": "{n} paquete: el correo y la venta no dan el mismo N.º — VRM guarda el de la venta.", "other": "{n} paquetes: el correo y la venta no dan el mismo N.º — VRM guarda el de la venta."}
 };

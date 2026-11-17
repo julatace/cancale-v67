@@ -462,3 +462,14 @@ html body .v2v-champ button.v2v-scan:active { opacity: .6; }
 .v2v-vide p { margin: 0; }
 .v2v-vide.is-calme { color: var(--v2-page-texte); font-size: 17px; font-weight: 600; }
 .v2v-vide-ic { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: rgb(255 255 255 / .16); }
+/* La tête de Ventes, serrée : la 1re rangée utile vers 300 px au téléphone (le haut de la section d'hier perd ses 16 px). */
+html[data-design="v2"] body div[data-colis-dans="ventes"] { padding: 4px 16px 12px !important; }
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig { margin: 0 0 12px; }
+/* Le chiffre d'affiche de Ventes : « 30 » à gauche ; à sa droite, son mot (sur la ligne de base du chiffre) et l'écart dessous. */
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 44px auto; column-gap: 12px; }
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig-ligne { display: contents; }
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig-n { grid-column: 1; grid-row: 1 / span 2; }
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig-mot { grid-column: 2; grid-row: 1; align-self: end; line-height: 20px; margin-bottom: -1px; }
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig-sous { grid-column: 2; grid-row: 2; align-self: start; margin: 2px 0 0; font-size: 13px; line-height: 16px; }
+html[data-design="v2"] body .v2v-tete .v2v-segment { margin: 0 0 12px !important; }
+html[data-design="v2"] body .v2v-tete .v2v-recherche { margin-bottom: 8px; }

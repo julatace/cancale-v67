@@ -54,5 +54,6 @@ export default {
   "v2v.outils.tournee": "Tournée de dépôt",
   "v2v.outils.emballer": "Emballer",
   "v2v.outils.tous": "Tous les outils des colis",
-  "v2v.outils.masquer": "Masquer les outils des colis"
+  "v2v.outils.masquer": "Masquer les outils des colis",
+  "v2v.litiges": {"one": "{n} colis : l’e-mail et la vente ne disent pas le même N° — VRM garde celui de la vente.", "other": "{n} colis : l’e-mail et la vente ne disent pas le même N° — VRM garde celui de la vente."}
 };

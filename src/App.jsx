@@ -47862,7 +47862,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         attrs: { 'data-colis-ident': ident, 'data-tx-colis': e.txn || '', 'data-v2v-pret': pdf ? '1' : '0', 'data-v2v-imprime': imprime ? '1' : '0',
           ...attrsFicheLigne({ contexte: 'colis', site: 'vinted', cle: 'c' + (e.txn || e.key), nums: num ? [num] : [], tx: e.txn || '', photo: typeof photo === 'string' ? photo : '', titre, sous: '' }) },
         imprimer: pdf ? () => imprimerCarteV2(ident) : null,
-        choisir: lit && b ? () => { setLinkPickFor(b); setLinkSearch(''); } : null,
+        // Glisser : Imprimer · Plus (deux gestes au plus) ; sans bordereau et N° en désaccord e-mail / vente : Choisir la vente · Plus.
+        choisir: !pdf && lit && b ? () => { setLinkPickFor(b); setLinkSearch(''); } : null, litige: !!lit,
         plus: () => ouvrirFicheV2(ident) };
     });
   };

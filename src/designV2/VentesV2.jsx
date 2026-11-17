@@ -121,6 +121,7 @@ function Vide({ texte, calme = false, Icon }) {
 export function ListeEnvoyer({ lignes, q = '', lu = true, pasLus = null, retours = null, Photo, Icon, LigneGlissable }) {
   const partants = usePartants(lignes);
   const vues = filtrerLignes(lignes, q);
+  const nLitiges = lignes.filter((l) => l.litige).length;
   const noms = {
     presse: { nom: tr('v2v.g.presse'), ambre: true }, semaine: { nom: tr('v2v.g.semaine') }, plusTard: { nom: tr('v2v.g.plusTard') },
     estimee: { nom: tr('v2v.g.estimee') }, sansDate: { nom: tr('v2v.g.sansDate') }, imprimes: { nom: tr('v2v.g.imprimes') },
@@ -130,6 +131,7 @@ export function ListeEnvoyer({ lignes, q = '', lu = true, pasLus = null, retours
     <div className="v2v-corps" data-v2v-corps="envoyer" data-v2v-n={lignes.length}>
       <ListeColis lignes={vues} ordre={GROUPES_ENVOYER} noms={noms} Photo={Photo} Icon={Icon} LigneGlissable={LigneGlissable} vide={vide} id="envoyer" partants={partants}/>
       {retours}
+      {nLitiges ? <p className="v2v-note" data-v2v-litiges={nLitiges}>{tr('v2v.litiges', { n: nLitiges })}</p> : null}
       {pasLus ? <div className="v2v-note">{pasLus}</div> : null}
     </div>
   );
