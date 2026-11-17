@@ -18,29 +18,59 @@
   ];
   const ETATS = ['Très bon état', 'Neuf avec étiquette', 'Bon état', 'Très bon état'];
 
-  // ── Le dessin d'une basket, d'après une graine stable ──
-  const UPPERS = ['#F4F3EF', '#1F2024', '#EAE0CB', '#B8BCC2', '#25324E', '#2E4A3A', '#6A2331', '#D8C29E', '#A8C5E2', '#C9372F', '#F1F1EE', '#3A3B40'];
-  const ACCENTS = ['#1F2024', '#C9372F', '#2B5DAA', '#2E6B47', '#E0A43A', '#F4F3EF', '#7A4B2A', '#8FA9C9'];
-  const SOLES = ['#F6F5F1', '#F6F5F1', '#C69256', '#F6F5F1', '#2A2B2F'];
+  // ── LE DESSIN D'UNE BASKET (une fois, proprement) : un modèle bas de profil, détouré sur un fond
+  //    de studio uni, mêmes proportions partout ; seuls les coloris changent (12, tirés d'une graine stable).
+  const COLORIS = [
+    // tige, empiècement, talon/pointe, intérieur du col, semelle intermédiaire, semelle
+    ['#F7F6F2', '#1D1E21', '#1D1E21', '#2A2B2F', '#FBFAF7', '#F1EFEA'],
+    ['#F7F6F2', '#C8322B', '#B9BCC2', '#C8322B', '#FBFAF7', '#E8E4DC'],
+    ['#EFE6D2', '#2F5B43', '#2F5B43', '#2F5B43', '#F6F1E6', '#B98552'],
+    ['#25262A', '#3A3B40', '#16171A', '#111214', '#2E2F33', '#1A1B1E'],
+    ['#26324F', '#E9E3D5', '#26324F', '#E9E3D5', '#F3EFE6', '#B98552'],
+    ['#C9CCD1', '#8E939B', '#F4F3F0', '#5F646C', '#F7F6F2', '#E4E1DA'],
+    ['#F4F3EF', '#9CC3E4', '#F4F3EF', '#5E86AE', '#FBFAF7', '#E9E6DF'],
+    ['#6B2232', '#F2EDE3', '#6B2232', '#F2EDE3', '#F4EFE5', '#B98552'],
+    ['#E7D8BC', '#8B6A45', '#E7D8BC', '#8B6A45', '#F5EFE2', '#E9DFC9'],
+    ['#F4F3EF', '#E3A23A', '#F4F3EF', '#2B2C30', '#FBFAF7', '#2B2C30'],
+    ['#DCE3DB', '#4E6B57', '#F4F3EF', '#4E6B57', '#F7F6F2', '#E6E3DC'],
+    ['#F4F3EF', '#B9BCC2', '#8E939B', '#5F646C', '#FBFAF7', '#E8E5DE'],
+  ];
   function basket(graine) {
     let h = 2166136261; for (const c of String(graine)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; }
-    const r = (n) => { h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0; return h % n; };
-    const up = UPPERS[r(UPPERS.length)]; let ac = ACCENTS[r(ACCENTS.length)]; if (ac === up) ac = ACCENTS[(ACCENTS.indexOf(ac) + 1) % ACCENTS.length];
-    const so = SOLES[r(SOLES.length)]; const forme = r(3); const tf = 30 + r(12);
-    const fond = ['#F1F0EE', '#EEF0F2', '#F2F0EC', '#EFEFEF'][r(4)];
-    const trait = ['#1F2024', '#3A3B40', '#25324E'].includes(up) ? '#0E0F12' : '#3B3B3E';
-    const haut = forme === 2 ? 'C206 150 214 96 244 92 L300 92 C306 120 316 170 330 196' : forme === 1 ? 'C200 168 214 150 236 152 C256 154 264 172 284 182' : 'C196 168 212 150 234 150 C252 150 260 168 278 178';
-    const base = forme === 1 ? 256 : 262;
-    const semelle = forme === 1 ? `<path d="M52 256 L348 256 Q358 256 358 268 L358 286 Q358 296 346 296 L64 296 Q50 296 50 284 Z" fill="${so}" stroke="${trait}" stroke-width="2.5"/><path d="M56 276 L354 276" stroke="${trait}" stroke-width="2" opacity=".35"/>`
-      : `<path d="M56 262 L344 262 Q352 262 352 272 L352 280 Q352 290 340 290 L66 290 Q54 290 54 278 Z" fill="${so}" stroke="${trait}" stroke-width="2.5"/>`;
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 400 400"><rect width="400" height="400" fill="${fond}"/>
-<g transform="translate(10 ${tf - 6}) scale(0.95)"><ellipse cx="204" cy="${base + 34}" rx="160" ry="9" fill="#000" opacity=".08"/>
-<path d="M60 ${base} C58 230 82 216 114 208 L168 192 ${haut} C310 196 334 204 342 226 C348 240 348 252 344 ${base} Z" fill="${up}" stroke="${trait}" stroke-width="2.5" stroke-linejoin="round"/>
-<path d="M60 ${base} C59 242 70 230 92 224 L118 ${base} Z" fill="${ac}" opacity=".9"/>
-<path d="M150 ${base - 8} C184 220 246 206 306 220 L312 238 C252 230 198 238 168 ${base - 4} Z" fill="${ac}"/>
-<path d="M314 ${forme === 2 ? 120 : 200} C334 ${forme === 2 ? 150 : 210} 344 222 344 242 L330 244 C328 226 322 214 308 ${forme === 2 ? 132 : 206} Z" fill="${ac}"/>
-<g stroke="${trait}" stroke-width="3" stroke-linecap="round" opacity=".8"><path d="M182 ${forme === 2 ? 178 : 186} l12 -8 M198 ${forme === 2 ? 166 : 176} l12 -8 M214 ${forme === 2 ? 152 : 166} l12 -8 ${forme === 2 ? 'M230 136 l12 -8 M244 118 l12 -6' : ''}"/></g>
-${semelle}</g></svg>`;
+    const [tige, emp, talon, col, mid, sem] = COLORIS[h % COLORIS.length];
+    const sombre = ['#25262A', '#26324F', '#6B2232'].includes(tige);
+    const trait = sombre ? '#0C0D10' : '#2C2D31';
+    const ligne = sombre ? 'rgba(255,255,255,.35)' : 'rgba(0,0,0,.28)';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 400 400">
+<defs>
+<linearGradient id="v" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".38"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".14"/></linearGradient>
+<linearGradient id="m" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".5"/><stop offset="1" stop-color="#000" stop-opacity=".08"/></linearGradient>
+<filter id="o" x="-20%" y="-200%" width="140%" height="500%"><feGaussianBlur stdDeviation="7"/></filter>
+</defs>
+<rect width="400" height="400" fill="#F3F2EF"/>
+<g transform="translate(200 208) scale(1.1) translate(-202 -211)">
+<ellipse cx="204" cy="288" rx="150" ry="9" fill="#000" opacity=".22" filter="url(#o)"/>
+<g stroke="${trait}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">
+<path d="M196 168 C198 146 210 132 226 132 C238 132 243 140 241 152 L232 170 Z" fill="${tige}"/>
+<path d="M52 252 C46 232 58 216 86 208 L150 192 C172 186 190 172 204 157 C215 146 229 142 245 144 L287 150 C301 152 307 162 313 172 C323 188 339 198 351 212 C361 224 361 240 357 252 Z" fill="${tige}"/>
+<path d="M204 157 C215 146 229 142 245 144 L287 150 C301 152 307 162 313 172 C297 167 269 163 241 163 C227 163 214 162 204 157 Z" fill="${col}"/>
+<path d="M52 252 C47 236 58 221 84 213 L106 208 C97 222 96 238 104 252 Z" fill="${talon}"/>
+<path d="M313 172 C323 188 339 198 351 212 C361 224 361 240 357 252 L323 252 C326 228 320 202 302 184 Z" fill="${talon}"/>
+<path d="M150 192 C172 186 190 172 204 157 L223 164 C207 182 187 197 163 205 Z" fill="${emp}"/>
+<path d="M120 252 C142 222 200 205 268 207 C298 208 318 216 333 228 L329 241 C300 231 251 228 212 235 C183 241 163 247 153 252 Z" fill="${emp}"/>
+</g>
+<path d="M52 252 C46 232 58 216 86 208 L150 192 C172 186 190 172 204 157 C215 146 229 142 245 144 L287 150 C301 152 307 162 313 172 C323 188 339 198 351 212 C361 224 361 240 357 252 Z" fill="url(#v)"/>
+<g fill="none" stroke="${ligne}" stroke-width="1.4" stroke-dasharray="3 3"><path d="M108 248 C102 234 104 222 112 212"/><path d="M160 248 C186 230 236 216 300 222"/><path d="M318 248 C320 226 314 204 300 190"/></g>
+<g stroke="${trait}" stroke-width="2.6" stroke-linecap="round"><path d="M168 194 l14 -10"/><path d="M181 185 l14 -11"/><path d="M193 175 l13 -11"/><path d="M204 164 l12 -9"/></g>
+<g fill="${sombre ? '#E8E6E1' : '#2C2D31'}"><circle cx="166" cy="200" r="2.2"/><circle cx="180" cy="191" r="2.2"/><circle cx="192" cy="181" r="2.2"/><circle cx="203" cy="171" r="2.2"/></g>
+<g stroke="${trait}" stroke-width="2.2" stroke-linejoin="round">
+<path d="M44 252 H358 Q364 252 364 260 V268 Q364 274 358 274 H46 Q40 274 40 266 V260 Q40 252 44 252 Z" fill="${mid}"/>
+<path d="M44 274 H360 Q364 274 364 280 Q364 290 352 290 H58 Q40 290 40 278 Q40 274 44 274 Z" fill="${sem}"/>
+</g>
+<path d="M44 254 H358 V266 H44 Z" fill="url(#m)" opacity=".7"/>
+<path d="M60 282 H344" stroke="${trait}" stroke-width="1.2" opacity=".25" stroke-dasharray="6 5"/>
+</g>
+</svg>`;
     return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   }
 

@@ -27,14 +27,14 @@ async function capture(nav, { W, sombre, hash, nom, apres }) {
   const f = path.join(OUT, `${nom}-${W}-${sombre ? 'sombre' : 'clair'}.png`);
   await pg.screenshot({ path: f });
   const m = await pg.evaluate((tel) => {
-    const vis = (el) => { const r = el.getBoundingClientRect(); const s = getComputedStyle(el); return r.width > 1 && r.height > 1 && r.bottom > 0 && r.top < innerHeight && s.visibility !== 'hidden' && s.display !== 'none'; };
+    const vis = (el) => { if (el.closest('[data-sous-feuille]') && innerWidth < 600) return false; const r = el.getBoundingClientRect(); const s = getComputedStyle(el); return r.width > 1 && r.height > 1 && r.bottom > 0 && r.top < innerHeight && s.visibility !== 'hidden' && s.display !== 'none'; };
     const pleins = [...document.querySelectorAll('[data-plein]')].filter(vis).length;
-    const petites = tel ? [...document.querySelectorAll('button, input')].filter(vis).filter((b) => b.getBoundingClientRect().height < 43.5 || b.getBoundingClientRect().width < 43.5).map((b) => (b.innerText || b.getAttribute('aria-label') || '').slice(0, 24)) : [];
-    const l1 = [...document.querySelectorAll('.g-grille li, .g-liste li')].find(vis);
+    const petites = tel ? [...document.querySelectorAll('button:not(.ga), input')].filter(vis).filter((b) => b.getBoundingClientRect().height < 43.5 || b.getBoundingClientRect().width < 43.5).map((b) => (b.innerText || b.getAttribute('aria-label') || '').slice(0, 24)) : [];
+    const l1 = [...document.querySelectorAll('.grille li, .ecran .carte li, .passe')].find(vis);
     const feuilles = [...document.querySelectorAll('body *')].filter((el) => vis(el) && [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()));
     const tronques = feuilles.filter((el) => el.scrollWidth > el.clientWidth + 1 && getComputedStyle(el).overflow !== 'visible').map((el) => el.textContent.trim().slice(0, 30));
-    const debordent = feuilles.filter((el) => { const r = el.getBoundingClientRect(); return r.right > innerWidth + 0.5 || r.left < -0.5; }).map((el) => el.textContent.trim().slice(0, 30));
-    const tailles = [...new Set(feuilles.filter((el) => !el.closest('.g-bas, .g-entete, .g-gestes')).map((el) => getComputedStyle(el).fontSize))];
+    const debordent = feuilles.filter((el) => !el.closest('.bande, .passes, .rg.is-glisse')).filter((el) => { const r = el.getBoundingClientRect(); return r.right > innerWidth + 0.5 || r.left < -0.5; }).map((el) => el.textContent.trim().slice(0, 30));
+    const tailles = [...new Set(feuilles.filter((el) => !el.closest('.onglets, .lateral, .tag, .pastille, .feuille-gestes')).map((el) => getComputedStyle(el).fontSize))];
     return { pleins, petites, premier: l1 ? Math.round(l1.getBoundingClientRect().top) : null, tronques, debordent, tailles, sansPhoto: document.querySelectorAll('[data-sans-photo]').length, mauvais: /undefined|NaN|\[object/.test(document.body.innerText) };
   }, tel);
   console.log(path.basename(f), JSON.stringify(m), erreurs.length ? 'ERREURS ' + erreurs.join(' | ') : '');
@@ -50,9 +50,10 @@ async function capture(nav, { W, sombre, hash, nom, apres }) {
     for (const t of THEMES) {
       const sombre = t === 'sombre';
       for (const e of ['journee', 'annonces', 'ventes', 'achats', 'argent']) await capture(nav, { W: 390, sombre, hash: 'e=' + e, nom: e });
-      await capture(nav, { W: 390, sombre, hash: 'e=annonces', nom: 'fiche-annonce', apres: (pg) => pg.click('.g-grille li:nth-child(5) .g-case') });
-      await capture(nav, { W: 390, sombre, hash: 'e=ventes&f=v:23999000001', nom: 'fiche-vente' });
-      await capture(nav, { W: 390, sombre, hash: 'e=achats&f=c:XR700000100FR', nom: 'fiche-colis' });
+      await capture(nav, { W: 390, sombre, hash: 'e=annonces', nom: 'fiche-annonce', apres: (pg) => pg.click('.grille li:nth-child(5) .case') });
+      await capture(nav, { W: 390, sombre, hash: 'e=ventes&f=v:23999000001&d=grande', nom: 'fiche-vente' });
+      await capture(nav, { W: 390, sombre, hash: 'e=achats&f=c:XR700000100FR&d=grande', nom: 'fiche-colis' });
+      await capture(nav, { W: 390, sombre, hash: 'e=ventes&g=v:23999000002', nom: 'ventes-glisse' });
     }
     if (!process.env.SANS_ORDI) {
       for (const e of ['journee', 'annonces', 'ventes', 'achats', 'argent']) await capture(nav, { W: 1512, sombre: false, hash: 'e=' + e, nom: 'o-' + e });

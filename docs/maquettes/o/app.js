@@ -1,12 +1,13 @@
 // ════════════════════════════════════════════════════════════════════════════
-//  MAQUETTE O « GALERIE » — page autonome (n'importe rien de src/).
-//  Ce sont des chaussures : la PHOTO est l'identité. Fond blanc de galerie (noir la nuit),
-//  photos carrées bord à bord, étiquettes de musée, navigation en mots, un seul geste plein :
-//  une barre noire pleine largeur au pouce. Trois tailles de texte par écran.
+//  MAQUETTE O « GALERIE » — page autonome (n'importe rien de src/), données inventées.
+//  Ce sont des chaussures : la PHOTO est l'identité. Une app iOS native de bout en bout
+//  (grand titre, recherche intégrée, contrôle segmenté, listes groupées inset, barre d'onglets
+//  icône + libellé, feuille à détentes, glissement de ligne, cartes de retrait à faire défiler),
+//  et UNE signature : l'ÉTIQUETTE du N° — une petite étiquette de vêtement, encoche et œillet,
+//  accrochée à chaque photo (rouge seulement quand deux paires portent le même N°).
 // ════════════════════════════════════════════════════════════════════════════
 (function () {
   const D = window.VRM_O, J = 86400000, M = D.MAINTENANT;
-  const ECRANS = [['journee', 'Journée', 'Ma journée'], ['annonces', 'Annonces', 'Annonces'], ['ventes', 'Ventes', 'Ventes'], ['achats', 'Achats', 'Achats'], ['argent', 'Argent', 'Argent']];
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const euros = (c, signe) => {
     if (c == null) return '—';
@@ -22,7 +23,7 @@
     if (dj > 1 && dj < 7) return d.toLocaleDateString('fr-FR', { weekday: 'long', timeZone: 'Europe/Paris' });
     return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' }).replace('.', '');
   };
-  // La date limite d'envoi est LUE sur l'e-mail du bordereau ; sans elle, on dit le jour de la vente (rien deviné).
+  // La date limite d'envoi est LUE sur l'e-mail du bordereau ; sans elle on dit le jour de la vente : rien n'est deviné.
   const quand = (v) => (v.limite ? 'avant ' + jour(v.limite) : 'vendue ' + jour(v.date));
   const presse = (v) => !!(v.limite && v.limite - M < 36 * 3600e3);
 
@@ -35,137 +36,198 @@
   const duMois = toutes.filter((v) => v.date >= debut);
   const vendu = duMois.reduce((s, v) => s + v.prix, 0);
   const couverts = duMois.filter((v) => v.cout != null);
+  const sansCout = duMois.filter((v) => v.cout == null);
   const benefice = couverts.length ? couverts.reduce((s, v) => s + v.prix - v.cout, 0) : null;
   const mois = new Date(M).toLocaleDateString('fr-FR', { month: 'long', timeZone: 'Europe/Paris' });
   const points = []; for (const c of D.colis) { let p = points.find((x) => x.point === c.point); if (!p) points.push(p = { point: c.point, adresse: c.adresse, limite: c.limite, colis: [] }); p.colis.push(c); }
-
-  // ── Pièces ──
-  const silhouette = '<svg class="g-silhouette" viewBox="0 0 64 40" aria-hidden="true"><path d="M6 30c1-6 6-8 11-10l7-4c2-1.5 4-4 7-4 2.2 0 3.6 2 5.6 3 4.5 2.2 10.4 2.6 14 4.8 2.4 1.4 3 4.4 2.4 7.2v3H6z M12 34h40" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/></svg>';
-  // Sans photo : un aplat et une silhouette au trait — la grille garde son rythme, jamais un trou.
-  const photo = (src, numero, cls = '') => `<span class="g-photo ${cls}"${src ? '' : ' data-sans-photo'}>${src ? `<img src="${src}" alt="" loading="lazy" decoding="async">` : silhouette}${numero ? `<span class="g-num${isDouble(numero) ? ' is-double' : ''}" data-numero="${esc(numero)}">${esc(numero)}</span>` : ''}</span>`;
   const isDouble = (n) => D.annonces.filter((a) => a.numero === n).length > 1;
+
+  // ── Un seul jeu d'icônes (dessin Lucide, trait 1,75, bouts ronds) ──
+  const IC = {
+    journee: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
+    annonces: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/>',
+    ventes: '<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5M12 22V12M7.5 4.27l9 5.15"/>',
+    achats: '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/>',
+    argent: '<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>',
+    chercher: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+    imprimer: '<path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3h12v6"/><rect x="6" y="14" width="12" height="8" rx="1"/>',
+    plus: '<path d="M5 12h14M12 5v14"/>',
+    bas: '<path d="m6 9 6 6 6-6"/>',
+    droite: '<path d="m9 18 6-6-6-6"/>',
+    lieu: '<path d="M20 10c0 5-5.5 10.2-7.4 11.8a1 1 0 0 1-1.2 0C9.5 20.2 4 15 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
+    horloge: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    camion: '<path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2M15 18H9M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/>',
+    baisse: '<path d="M16 17h6v-6"/><path d="m22 17-8.5-8.5-5 5L2 7"/>',
+    republier: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+    coche: '<path d="M20 6 9 17l-5-5"/>',
+    aide: '<circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/>',
+    coeur: '<path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7Z"/>',
+    oeil: '<path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/>',
+    lien: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+    plusRond: '<circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/>',
+  };
+  const ic = (n, t = 22, cls = '') => `<svg class="ic ${cls}" width="${t}" height="${t}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[n]}</svg>`;
+
+  // ── LA SIGNATURE : l'étiquette du N° (encoche + œillet), accrochée à la photo ──
+  const etiquette = (n, cls = '') => (n ? `<span class="tag ${cls}${isDouble(n) ? ' is-double' : ''}" data-numero="${esc(n)}"><span class="tag-n">${esc(n)}</span></span>` : '');
+  const silhouette = '<svg class="sil" viewBox="0 0 64 40" aria-hidden="true"><path d="M6 30c1-6 6-8 11-10l7-4c2-1.5 4-4 7-4 2.2 0 3.6 2 5.6 3 4.5 2.2 10.4 2.6 14 4.8 2.4 1.4 3 4.4 2.4 7.2v3H6z M8 34h48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+  // Sans photo : le fond de studio et la silhouette au trait — la grille garde son rythme, jamais un trou.
+  const photo = (src, n, cls = '', tagCls = '') => `<span class="ph ${cls}"${src ? '' : ' data-sans-photo'}>${src ? `<img src="${src}" alt="" loading="lazy" decoding="async">` : silhouette}${etiquette(n, tagCls)}</span>`;
   const qr = (texte) => { const q = window.qrcode(0, 'M'); q.addData(String(texte)); q.make(); return q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); };
-  const onglets = (vals, actif, nom) => `<div class="g-onglets" role="tablist" aria-label="${nom}">${vals.map(([k, l, n]) => `<button type="button" role="tab" aria-selected="${actif === k}" data-s="${k}">${l}${n != null ? `<span class="g-compte">${nb(n)}</span>` : ''}</button>`).join('')}</div>`;
-  const tete = (titre, sur, droite = '') => `<header class="g-tete"><div>${sur ? `<p class="g-sur">${sur}</p>` : ''}<h1 class="g-titre">${titre}</h1></div>${droite}</header>`;
+  const segment = (vals, actif, nom) => `<div class="seg" role="tablist" aria-label="${nom}">${vals.map(([k, l]) => `<button type="button" role="tab" aria-selected="${actif === k}" data-s="${k}">${l}</button>`).join('')}</div>`;
+  const grandTitre = (titre, { sous = '', boutons = '', recherche = '' } = {}) => `
+    <div class="nav-haut">${boutons}</div>
+    <header class="grand"><h1>${titre}</h1>${sous}</header>
+    ${recherche ? `<label class="recherche">${ic('chercher', 18)}<input type="search" placeholder="${recherche}" enterkeyhint="search" aria-label="${recherche}"></label>` : ''}`;
+  const menuComptes = `<button type="button" class="menu-titre">Tous les comptes${ic('bas', 16)}</button>`;
+  const chevron = ic('droite', 18, 'chev');
+
+  // Une ligne de liste iOS : vignette 60, titre 17, sous-titre 15 gris, valeur à droite, chevron ; séparateur inset.
+  const rangee = (o, sous, valeur, cle, actions = '') => `<li class="rg${actions ? ' a-glisse' : ''}" data-cle="${cle}">${actions ? `<div class="rg-actions">${actions}</div>` : ''}<button type="button" class="rg-btn" data-f="${cle}">${photo(o.photo, o.numero, 'ph--rg', 'tag--mini')}<span class="rg-txt"><span class="rg-titre">${esc(o.titre)}</span><span class="rg-sous">${sous}</span></span><span class="rg-val">${valeur}</span>${chevron}</button></li>`;
 
   // ── Écrans ──
   function journee() {
     const date = new Date(M).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Paris' });
-    return { dock: aImprimer ? `Imprimer ${aImprimer} bordereaux` : '', html: `
-      ${tete('Ma journée', date[0].toUpperCase() + date.slice(1))}
-      <dl class="g-chiffres">
-        <div><dt>${aEnvoyer.length ? '<i class="g-point"></i>' : ''}À envoyer</dt><dd>${nb(aEnvoyer.length)}</dd></div>
-        <div><dt>${D.colis.length ? '<i class="g-point"></i>' : ''}À retirer</dt><dd>${nb(D.colis.length)}</dd></div>
-        <div><dt>Vendu en ${mois}</dt><dd>${euros(vendu)}</dd></div>
-      </dl>
-      <div class="g-rubrique"><h2>À poster</h2><button type="button" class="g-lien" data-aller="ventes">Toutes les ventes</button></div>
-      <ul class="g-grille g-grille--journee">${aEnvoyer.map((v) => `<li><button type="button" class="g-case" data-f="v:${v.tx}" aria-label="${esc(v.titre)}">${photo(v.photo, v.numero)}<span class="g-legende"><span class="${presse(v) ? 'g-ambre' : ''}">${quand(v)}</span></span></button></li>`).join('')}</ul>
-      <section class="g-ordi-seul"><div class="g-rubrique"><h2>À retirer</h2><button type="button" class="g-lien" data-aller="achats">Tous les achats</button></div>
-        <ul class="g-retraits">${D.colis.map((c) => `<li><button type="button" class="g-ligne g-ligne--colis" data-f="c:${c.id}"><span class="g-qr" aria-hidden="true">${qr(c.code)}</span><span class="g-ligne-textes"><span class="g-code">${c.code}</span><span class="g-ligne-meta g-gris">${esc(c.point)} · jusqu’à ${jour(c.limite)}</span></span></button></li>`).join('')}</ul></section>` };
+    const groupe = (icone, titre, n, action, corps) => `<section class="carte groupe"><header class="groupe-tete"><span class="groupe-ic">${ic(icone, 20)}</span><h2>${titre}</h2><span class="groupe-n">${n}</span>${action}</header>${corps}</section>`;
+    return `
+      ${grandTitre('Ma journée', { sous: `<p class="sous">${date[0].toUpperCase() + date.slice(1)}</p>` })}
+      ${groupe('ventes', 'À poster', aEnvoyer.length, aImprimer ? `<button type="button" class="act" data-plein>${ic('imprimer', 18)}Imprimer ${aImprimer}</button>` : '',
+        `<ul class="bande">${aEnvoyer.map((v) => `<li><button type="button" class="bande-case" data-f="v:${v.tx}" aria-label="${esc(v.titre)}">${photo(v.photo, v.numero, 'ph--bande')}<span class="bande-l ${presse(v) ? 'ambre' : ''}">${quand(v)}</span></button></li>`).join('')}</ul>`)}
+      ${groupe('lieu', 'À retirer', D.colis.length, `<button type="button" class="act-lien" data-aller="achats">Codes</button>`,
+        `<ul class="liste-simple">${points.map((p) => `<li><button type="button" class="ls" data-aller="achats"><span class="ls-txt"><span class="ls-titre">${esc(p.point)}</span><span class="ls-sous"><span class="${p.limite - M < 3 * J ? 'ambre' : ''}">jusqu’à ${jour(p.limite)}</span> · ${p.colis.length} colis</span></span>${chevron}</button></li>`).join('')}</ul>`)}
+      ${groupe('argent', 'Prix d’achat à saisir', sansCout.length, `<button type="button" class="act-lien">Saisir</button>`,
+        `<ul class="bande">${sansCout.map((v) => `<li><button type="button" class="bande-case" data-f="v:${v.tx}" aria-label="${esc(v.titre)}">${photo(v.photo, v.numero, 'ph--bande')}<span class="bande-l">${euros(v.prix)}</span></button></li>`).join('')}</ul>`)}`;
   }
   function annonces(r) {
     const vue = r.s || 'toutes';
-    const vieilles = D.annonces.filter((a) => a.jours > 60), sans = D.annonces.filter((a) => !a.photo);
-    const liste = vue === 'dorment' ? vieilles : vue === 'sansphoto' ? sans : D.annonces;
-    return { dock: 'Publier une annonce', html: `
-      ${tete('Annonces', `${nb(D.annonces.length)} en ligne`, '<button type="button" class="g-choix">Tous les comptes<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>')}
-      <div class="g-outils">
-        <label class="g-champ"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.5 5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11zM14.6 14.6 19.5 19.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><input type="search" placeholder="N°, modèle, taille" enterkeyhint="search" aria-label="Chercher une annonce"></label>
-        ${onglets([['toutes', 'Toutes', null], ['dorment', 'Plus de 60 j', vieilles.length], ['sansphoto', 'Sans photo', sans.length]], vue, 'Vue')}
-      </div>
-      <ul class="g-grille" data-grille>${liste.map((a) => `<li><button type="button" class="g-case${r.f === 'a:' + a.id ? ' is-ouverte' : ''}" data-f="a:${a.id}" aria-label="N° ${a.numero}, ${esc(a.titre)}, ${euros(a.prix)}">${photo(a.photo, a.numero)}<span class="g-legende"><span class="g-prix">${euros(a.prix)}</span><span class="g-gris">${a.jours} j</span></span></button></li>`).join('')}</ul>` };
+    const liste = vue === 'dorment' ? D.annonces.filter((a) => a.jours > 60) : vue === 'sansphoto' ? D.annonces.filter((a) => !a.photo) : D.annonces;
+    return `
+      ${grandTitre('Annonces', { sous: menuComptes, boutons: `<button type="button" class="nav-btn" aria-label="Publier une annonce">${ic('plus', 24)}</button>`, recherche: 'N°, modèle, taille' })}
+      ${segment([['toutes', 'Toutes'], ['dorment', 'Plus de 60 j'], ['sansphoto', 'Sans photo']], vue, 'Vue')}
+      <ul class="grille">${liste.map((a) => `<li><button type="button" class="case${r.f === 'a:' + a.id ? ' is-ouverte' : ''}" data-f="a:${a.id}" aria-label="N° ${a.numero}, ${esc(a.titre)}, ${euros(a.prix)}">${photo(a.photo, a.numero)}<span class="case-l"><span class="prix">${euros(a.prix)}</span><span class="gris">${a.jours} j</span></span></button></li>`).join('')}</ul>`;
   }
-  const ligne = (o, meta, droite, cle) => `<li><button type="button" class="g-ligne" data-f="${cle}">${photo(o.photo, o.numero, 'g-photo--liste')}<span class="g-ligne-textes"><span class="g-ligne-titre">${esc(o.titre)}</span><span class="g-ligne-meta">${meta}</span></span><span class="g-ligne-prix">${droite}</span></button></li>`;
   function ventes(r) {
     const s = r.s || 'envoyer';
-    const liste = s === 'envoyer' ? aEnvoyer : s === 'route' ? enRoute : toutes;
-    return { dock: s === 'envoyer' && aImprimer ? `Imprimer ${aImprimer} bordereaux` : '', html: `
-      ${tete('Ventes')}
-      ${onglets([['envoyer', 'À envoyer', aEnvoyer.length], ['route', 'En route', enRoute.length], ['toutes', 'Toutes', null]], s, 'Ventes')}
-      <ul class="g-liste">${liste.map((v) => ligne(v, `${v.etat === 'envoyer' ? `<span class="${presse(v) ? 'g-ambre' : 'g-encre'}">${quand(v)}</span>` : `<span class="g-encre">${v.etat === 'finie' ? 'Livrée' : 'En route'}</span>`}<span class="g-gris g-bloc">${esc(v.pseudo)}</span>`, euros(v.prix), 'v:' + v.tx)).join('')}</ul>` };
+    const actions = () => `<button type="button" class="ga ga--gris">${ic('coche', 20)}Parti</button><button type="button" class="ga ga--accent">${ic('imprimer', 20)}Imprimer</button>`;
+    const sousV = (v) => `<span class="${presse(v) ? 'ambre' : ''}">${quand(v)}</span>`;
+    let corps;
+    if (s === 'envoyer') {
+      const bientot = aEnvoyer.filter((v) => v.limite), sansDate = aEnvoyer.filter((v) => !v.limite);
+      corps = `<h3 class="entete">Bordereau reçu</h3><ul class="carte">${bientot.map((v) => rangee(v, sousV(v), euros(v.prix), 'v:' + v.tx, actions())).join('')}</ul>
+        <h3 class="entete">Date limite pas encore lue</h3><ul class="carte">${sansDate.map((v) => rangee(v, sousV(v), euros(v.prix), 'v:' + v.tx)).join('')}</ul>`;
+    } else {
+      const l = s === 'route' ? enRoute : toutes;
+      corps = `<ul class="carte">${l.map((v) => rangee(v, `${v.etat === 'envoyer' ? 'À envoyer' : v.etat === 'finie' ? 'Livrée' : 'En route'} · ${jour(v.date)}`, euros(v.prix), 'v:' + v.tx)).join('')}</ul>`;
+    }
+    return `${grandTitre('Ventes', { sous: menuComptes, boutons: aImprimer ? `<button type="button" class="nav-txt" data-plein>${ic('imprimer', 20)}Imprimer ${aImprimer}</button>` : '' })}
+      ${segment([['envoyer', 'À envoyer'], ['route', 'En route'], ['toutes', 'Toutes']], s, 'Ventes')}${corps}`;
   }
   function achats(r) {
     const s = r.s || 'retirer';
     const route = D.achats.filter((a) => a.etat === 'route'), recus = D.achats.filter((a) => a.etat === 'recu');
-    const corps = s === 'retirer'
-      ? points.map((p) => `<section class="g-point-relais"><div class="g-rubrique"><h2>${esc(p.point)}</h2><span class="${p.limite - M < 3 * J ? 'g-ambre' : 'g-gris'}">jusqu’à ${jour(p.limite)}</span></div>
-          <ul class="g-liste">${p.colis.map((c) => `<li><button type="button" class="g-ligne g-ligne--colis" data-f="c:${c.id}"><span class="g-qr" aria-hidden="true">${qr(c.code)}</span><span class="g-ligne-textes"><span class="g-code" aria-label="Code ${c.code}">${c.code}</span><span class="g-ligne-meta g-gris">${esc(c.art)}</span></span></button></li>`).join('')}</ul></section>`).join('')
-      : `<ul class="g-liste">${(s === 'route' ? route : recus).map((a) => ligne(a, `<span class="g-encre">${a.etat === 'recu' ? 'Reçu' : 'En route'}</span><span class="g-gris"> · ${jour(a.date)}</span>`, euros(a.prix), 'h:' + a.tx)).join('')}</ul>`;
-    return { dock: '', html: `${tete('Achats')}${onglets([['retirer', 'À retirer', D.colis.length], ['route', 'En route', route.length], ['recus', 'Reçus', null]], s, 'Achats')}<div class="g-points">${corps}</div>` };
+    let corps;
+    if (s === 'retirer') {
+      corps = `<div class="passes" role="list">${D.colis.map((c) => `<article class="passe" role="listitem"><button type="button" class="passe-btn" data-f="c:${c.id}" aria-label="Code ${c.code}, ${esc(c.point)}">
+          <span class="passe-tete"><span class="passe-lieu">${ic('lieu', 18)}<span><b>${esc(c.point)}</b><span>${esc(c.adresse)}</span></span></span><span class="passe-limite ${c.limite - M < 3 * J ? 'ambre' : ''}">${ic('horloge', 16)}${jour(c.limite)}</span></span>
+          <span class="passe-qr">${qr(c.code)}</span>
+          <span class="passe-code">${c.code.replace(/(\d{3})(\d{3})/, '$1 $2')}</span>
+          <span class="passe-pied">${photo('', '', 'ph--passe')}<span><b>${esc(c.art)}</b><span>${ic('camion', 14)}Mondial Relay</span></span></span>
+        </button></article>`).join('')}</div>
+        <div class="points-pages" aria-hidden="true">${D.colis.map((_, i) => `<i${i === 0 ? ' class="on"' : ''}></i>`).join('')}</div>
+        <h3 class="entete">Arrivent bientôt</h3><ul class="carte">${route.slice(0, 3).map((a) => rangee(a, `En route · ${jour(a.date)}`, euros(a.prix), 'h:' + a.tx)).join('')}</ul>`;
+    } else corps = `<ul class="carte">${(s === 'route' ? route : recus).map((a) => rangee(a, `${a.etat === 'recu' ? 'Reçu' : 'En route'} · ${jour(a.date)}`, euros(a.prix), 'h:' + a.tx)).join('')}</ul>`;
+    return `${grandTitre('Achats', { sous: menuComptes })}${segment([['retirer', 'À retirer'], ['route', 'En route'], ['recus', 'Reçus']], s, 'Achats')}${corps}`;
   }
   function argent() {
-    return { dock: '', html: `
-      ${tete('Argent', '', '<button type="button" class="g-aide" aria-label="Comment c’est calculé">?</button>')}
-      <dl class="g-chiffres g-chiffres--argent">
-        <div class="g-chiffre-seul"><dt>Vendu en ${mois} · ${duMois.length} ventes</dt><dd>${euros(vendu)}</dd></div>
-        <div><dt>Bénéfice, au moins</dt><dd>${euros(benefice, true)}</dd></div>
-        <div><dt>Coût saisi</dt><dd>${couverts.length}<span class="g-sur-n">/${duMois.length}</span></dd></div>
-      </dl>
-      <div class="g-rubrique"><h2>Ventes de ${mois}</h2></div>
-      <ul class="g-liste">${duMois.map((v) => ligne(v, `<span class="g-encre">${jour(v.date)}</span><span class="g-gris"> · ${v.cout != null ? 'coût ' + euros(v.cout) : 'coût pas saisi'}</span>`, euros(v.prix), 'v:' + v.tx)).join('')}</ul>` };
+    // L'histogramme du mois : le VENDU par jour (date de vente) — chaque barre est une somme de ventes réelles.
+    const jours = new Date(M).getDate();
+    const parJour = Array.from({ length: jours }, (_, i) => duMois.filter((v) => new Date(v.date).getDate() === i + 1).reduce((s, v) => s + v.prix, 0));
+    const max = Math.max(...parJour, 1);
+    return `${grandTitre('Argent', { sous: `<p class="sous">${mois[0].toUpperCase() + mois.slice(1)} 2026</p>`, boutons: `<button type="button" class="nav-btn" aria-label="Comment c’est calculé">${ic('aide', 22)}</button>` })}
+      <section class="carte resume">
+        <div class="resume-tete"><span class="gris">Vendu en ${mois}</span><span class="resume-grand">${euros(vendu)}</span></div>
+        <div class="barres" role="img" aria-label="Vendu par jour en ${mois}">${parJour.map((x, i) => `<i style="--h:${x ? Math.max(6, Math.round((x / max) * 100)) : 2}%"${i === jours - 1 ? ' class="auj"' : ''}></i>`).join('')}</div>
+        <div class="barres-l gris"><span>1er ${mois}</span><span>aujourd’hui</span></div>
+        <dl class="resume-deux"><div><dt>Bénéfice, au moins</dt><dd>${euros(benefice, true)}</dd></div><div><dt>Coût saisi</dt><dd>${couverts.length} sur ${duMois.length}</dd></div></dl>
+      </section>
+      <h3 class="entete">Ventes de ${mois}</h3>
+      <ul class="carte">${duMois.map((v) => rangee(v, `${jour(v.date)} · ${v.cout != null ? 'coût ' + euros(v.cout) : '<span class="ambre">coût à saisir</span>'}`, euros(v.prix), 'v:' + v.tx)).join('')}</ul>`;
   }
 
-  // ── La fiche : la photo en haut, l'étiquette, les gestes en bas ──
+  // ── La fiche : une feuille à détentes (moyenne, grande), la photo d'abord, les gestes au pouce ──
   function fiche(cle) {
     const t = cle[0], id = cle.slice(2);
     if (t === 'a') { const a = D.annonces.find((x) => x.id === id); if (!a) return null;
-      return { photo: a.photo, numero: a.numero, titre: a.titre, meta: [`Taille ${a.taille}`, a.etat, a.compte], chiffres: [['Achat', euros(a.cout)], ['Prix', euros(a.prix)], ['En ligne', a.jours + ' j']], faits: [['Favoris', nb(a.fav)], ['Vues', nb(a.vues)]], plein: 'Baisser le prix', touche: 'Republier' }; }
+      return { photo: a.photo, numero: a.numero, titre: a.titre, sous: `Taille ${a.taille} · ${a.etat}`, chiffres: [['Achat', euros(a.cout)], ['Prix', euros(a.prix)], ['En ligne', a.jours + ' j']],
+        lignes: [['coeur', 'Favoris', nb(a.fav)], ['oeil', 'Vues', nb(a.vues)], ['annonces', 'Compte', a.compte]], second: ['republier', 'Republier'], premier: ['baisse', 'Baisser le prix'] }; }
     if (t === 'v') { const v = D.ventes.find((x) => x.tx === id); if (!v) return null;
-      return { photo: v.photo, numero: v.numero, titre: v.titre, meta: ['à ' + v.pseudo, 'vendue ' + jour(v.date)], chiffres: [['Achat', euros(v.cout)], ['Vente', euros(v.prix)], ['Marge', v.cout != null ? euros(v.prix - v.cout, true) : '—']],
-        faits: v.etat === 'envoyer' ? [['Date limite', v.limite ? jour(v.limite) : 'pas lue'], ['Bordereau', v.bordereau ? 'reçu' : 'pas encore reçu'], ['Suivi', v.suivi || '—'], ['Compte', v.compte]] : [['État', v.etat === 'finie' ? 'Livrée' : 'En route'], ['Compte', v.compte]],
-        plein: v.etat === 'envoyer' && v.bordereau ? 'Imprimer le bordereau' : '', touche: v.etat === 'envoyer' ? 'Déjà parti' : 'Suivre le colis', presse: v.etat === 'envoyer' && presse(v) }; }
+      return { photo: v.photo, numero: v.numero, titre: v.titre, sous: `à ${v.pseudo} · vendue ${jour(v.date)}`, chiffres: [['Achat', euros(v.cout)], ['Vente', euros(v.prix)], ['Marge', v.cout != null ? euros(v.prix - v.cout, true) : '—']],
+        lignes: v.etat === 'envoyer' ? [['horloge', 'Date limite', v.limite ? jour(v.limite) : 'pas lue', presse(v)], ['imprimer', 'Bordereau', v.bordereau ? 'reçu' : 'pas encore reçu'], ['camion', 'Suivi', v.suivi || '—'], ['achats', 'Compte', v.compte]] : [['camion', 'État', v.etat === 'finie' ? 'Livrée' : 'En route'], ['achats', 'Compte', v.compte]],
+        second: v.etat === 'envoyer' ? ['coche', 'Déjà parti'] : ['camion', 'Suivre le colis'], premier: v.etat === 'envoyer' && v.bordereau ? ['imprimer', 'Imprimer'] : null }; }
     if (t === 'h') { const a = D.achats.find((x) => x.tx === id); if (!a) return null;
-      return { photo: a.photo, titre: a.titre, meta: [a.compte, jour(a.date)], chiffres: [['Payé', euros(a.prix)], ['État', a.etat === 'recu' ? 'Reçu' : 'En route']], faits: [], plein: '', touche: 'Relier à une paire' }; }
+      return { photo: a.photo, titre: a.titre, sous: `${a.etat === 'recu' ? 'Reçu' : 'En route'} · acheté ${jour(a.date)}`, chiffres: [['Payé', euros(a.prix)]], lignes: [['achats', 'Compte', a.compte]], second: null, premier: ['lien', 'Relier à une paire'] }; }
     if (t === 'c') { const c = D.colis.find((x) => x.id === id); if (!c) return null;
-      return { qr: c.code, titre: c.code, code: true, meta: [c.art], chiffres: [['Point relais', c.point], ['Jusqu’à', jour(c.limite)]], faits: [['Adresse', c.adresse], ['Suivi', c.id]], plein: 'Je l’ai retiré', touche: '' }; }
+      return { qr: c.code, titre: c.code.replace(/(\d{3})(\d{3})/, '$1 $2'), code: true, sous: c.art, chiffres: [['Point relais', c.point], ['Jusqu’à', jour(c.limite)]], lignes: [['lieu', 'Adresse', c.adresse], ['camion', 'Suivi', c.id]], second: null, premier: ['coche', 'Je l’ai retiré'] }; }
     return null;
   }
-  const ficheHtml = (f) => `<aside class="g-fiche" role="dialog" aria-label="${esc(f.titre)}" tabindex="-1">
-    <div class="g-fiche-defile">
-      <div class="g-fiche-photo">${f.qr ? `<span class="g-fiche-qr">${qr(f.qr)}</span>` : photo(f.photo, '', 'g-photo--grand')}
-        <button type="button" class="g-carre g-carre--gauche" data-fermer aria-label="Fermer"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
-        <button type="button" class="g-carre g-carre--droite" aria-label="Plus"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="18.5" cy="12" r="1.5" fill="currentColor"/></svg></button>
+  const ficheHtml = (f, grande) => `<div class="voile" data-fermer></div>
+    <aside class="feuille${grande ? ' is-grande' : ''}" role="dialog" aria-modal="true" aria-label="${esc(f.titre)}" tabindex="-1">
+      <div class="poignee" data-detente aria-hidden="true"><i></i></div>
+      <div class="feuille-haut"><button type="button" class="rond" data-fermer aria-label="Fermer"><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg></button><button type="button" class="rond" aria-label="Plus">${ic('plusRond', 20)}</button></div>
+      <div class="feuille-defile">
+        <div class="feuille-photo">${f.qr ? `<span class="feuille-qr">${qr(f.qr)}</span>` : photo(f.photo, f.numero, 'ph--feuille', 'tag--grand')}</div>
+        <h2 class="feuille-titre${f.code ? ' is-code' : ''}">${esc(f.titre)}</h2>
+        <p class="feuille-sous">${esc(f.sous)}</p>
+        <dl class="feuille-chiffres" style="--n:${f.chiffres.length}">${f.chiffres.map(([l, v]) => `<div><dt>${l}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
+        <ul class="carte carte--feuille">${f.lignes.map(([i, l, v, amb]) => `<li class="ls ls--info"><span class="ls-ic">${ic(i, 20)}</span><span class="ls-titre">${l}</span><span class="ls-val${amb ? ' ambre' : ''}">${esc(v)}</span></li>`).join('')}</ul>
       </div>
-      <div class="g-fiche-corps">
-        ${f.numero ? `<span class="g-num g-num--plat${isDouble(f.numero) ? ' is-double' : ''}">N° ${esc(f.numero)}</span>` : ''}
-        <h2 class="g-fiche-titre${f.code ? ' g-code' : ''}">${esc(f.titre)}</h2>
-        <p class="g-gris g-fiche-meta">${f.meta.map(esc).join(' · ')}</p>
-        <dl class="g-fiche-chiffres">${f.chiffres.map(([l, v]) => `<div><dt>${l}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>
-        ${f.faits.length ? `<dl class="g-fiche-faits">${f.faits.map(([l, v]) => `<div${String(v).length > 11 ? ' class="g-long"' : ''}><dt>${l}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl>` : ''}
-      </div>
-    </div>
-    ${f.plein || f.touche ? `<div class="g-gestes">${f.touche ? `<button type="button" class="g-touche">${f.touche}</button>` : ''}${f.plein ? `<button type="button" class="g-plein" data-plein>${f.plein}</button>` : ''}</div>` : ''}
-  </aside>`;
+      ${f.premier || f.second ? `<div class="feuille-gestes">${f.second ? `<button type="button" class="bt bt--teinte">${ic(f.second[0], 20)}${f.second[1]}</button>` : ''}${f.premier ? `<button type="button" class="bt bt--plein" data-plein>${ic(f.premier[0], 20)}${f.premier[1]}</button>` : ''}</div>` : ''}
+    </aside>`;
 
-  // ── La coque et la route (#e=…&s=…&f=…) ──
-  const lire = () => { const p = new URLSearchParams(location.hash.slice(1)); return { e: p.get('e') || 'journee', s: p.get('s') || '', f: p.get('f') || '' }; };
-  const ecrire = (x) => { const r = { ...lire(), ...x }; const p = new URLSearchParams(); for (const k of ['e', 's', 'f']) if (r[k]) p.set(k, r[k]); location.hash = p.toString(); };
+  // ── La coque : barre d'onglets (icône + libellé) au téléphone, barre latérale à l'ordinateur ──
+  const ECRANS = [['journee', 'Ma journée'], ['annonces', 'Annonces'], ['ventes', 'Ventes'], ['achats', 'Achats'], ['argent', 'Argent']];
+  const lire = () => { const p = new URLSearchParams(location.hash.slice(1)); return { e: p.get('e') || 'journee', s: p.get('s') || '', f: p.get('f') || '', d: p.get('d') || '', g: p.get('g') || '' }; };
+  const ecrire = (x) => { const r = { ...lire(), ...x }; const p = new URLSearchParams(); for (const k of ['e', 's', 'f', 'd', 'g']) if (r[k]) p.set(k, r[k]); location.hash = p.toString(); };
   const racine = document.getElementById('g');
   function rendre() {
     const r = lire();
-    const e = { journee, annonces, ventes, achats, argent }[r.e] || journee;
-    const { html, dock } = e(r);
+    const html = ({ journee, annonces, ventes, achats, argent }[r.e] || journee)(r);
     const f = r.f ? fiche(r.f) : null;
-    const nav = ECRANS.map(([k, court, long]) => `<button type="button" class="g-nav" data-aller="${k}" aria-current="${r.e === k ? 'page' : 'false'}"><span class="g-nav-court">${court}</span><span class="g-nav-long">${long}</span>${k === 'ventes' && aEnvoyer.length ? '<i class="g-point g-point--nav"></i>' : ''}${k === 'achats' && D.colis.length ? '<i class="g-point g-point--nav"></i>' : ''}</button>`).join('');
-    racine.className = 'g' + (f ? ' a-fiche' : '') + (dock ? ' a-dock' : '');
+    // Un point ambre (pas un nombre : le compte est déjà écrit sur l'écran) : il y a un geste à faire là.
+    const pastille = (k) => ((k === 'ventes' && aEnvoyer.length) || (k === 'achats' && D.colis.length) ? `<span class="pastille" aria-label="geste à faire"></span>` : '');
+    racine.className = 'app' + (f ? ' a-feuille' : '');
     racine.dataset.ecran = r.e;
     racine.innerHTML = `
-      <header class="g-entete"><span class="g-marque">VRM</span><nav class="g-navs g-navs--haut" aria-label="Écrans">${nav}</nav></header>
-      <main class="g-main"${f ? ' data-sous-fiche' : ''}>${html}${dock ? `<div class="g-dock-ordi"><button type="button" class="g-plein" data-plein>${dock}</button></div>` : ''}</main>
-      <div class="g-bas">${dock ? `<button type="button" class="g-plein g-plein--dock" data-plein>${dock}</button>` : ''}<nav class="g-navs g-navs--bas" aria-label="Écrans">${nav}</nav></div>
-      ${f ? ficheHtml(f) : ''}`;
-    const fi = racine.querySelector('.g-fiche'); if (fi) fi.focus({ preventScroll: true });
+      <nav class="lateral" aria-label="Écrans"><p class="marque"><span class="tag tag--marque"><span class="tag-n">VRM</span></span></p>${ECRANS.map(([k, l]) => `<button type="button" class="lat" data-aller="${k}" aria-current="${r.e === k ? 'page' : 'false'}">${ic(k, 20)}<span>${l}</span>${pastille(k)}</button>`).join('')}</nav>
+      <main class="ecran"${f ? ' data-sous-feuille' : ''}>${html}</main>
+      <nav class="onglets" aria-label="Écrans">${ECRANS.map(([k, l]) => `<button type="button" class="onglet" data-aller="${k}" aria-current="${r.e === k ? 'page' : 'false'}"><span class="onglet-ic">${ic(k, 25)}${pastille(k)}</span><span>${k === 'journee' ? 'Journée' : l}</span></button>`).join('')}</nav>
+      ${f ? ficheHtml(f, r.d === 'grande') : ''}`;
+    if (r.g) { const li = racine.querySelector(`.rg[data-cle="${r.g}"]`); if (li) li.classList.add('is-glisse'); }
+    const fe = racine.querySelector('.feuille'); if (fe) fe.focus({ preventScroll: true });
+    brancherGestes();
+  }
+  // Le glissement d'une ligne (actions à droite) et la poignée de la feuille (moyenne ↔ grande, au geste).
+  function brancherGestes() {
+    racine.querySelectorAll('.rg.a-glisse .rg-btn').forEach((b) => {
+      let x0 = null, dx = 0;
+      b.addEventListener('pointerdown', (e) => { if (e.pointerType === 'mouse') return; x0 = e.clientX; dx = 0; });
+      b.addEventListener('pointermove', (e) => { if (x0 == null) return; dx = Math.min(0, e.clientX - x0); if (dx < -10) b.style.transform = `translateX(${Math.max(dx, -200)}px)`; });
+      b.addEventListener('pointerup', () => { if (x0 == null) return; b.style.transform = ''; b.closest('.rg').classList.toggle('is-glisse', dx < -60); x0 = null; });
+    });
+    const p = racine.querySelector('[data-detente]'); if (!p) return;
+    let y0 = null;
+    p.addEventListener('pointerdown', (e) => { y0 = e.clientY; p.setPointerCapture(e.pointerId); });
+    p.addEventListener('pointerup', (e) => { if (y0 == null) return; const dy = e.clientY - y0; y0 = null; const g = lire().d === 'grande'; if (dy > 80 && !g) ecrire({ f: '', d: '' }); else if (dy > 40) ecrire({ d: '' }); else if (dy < -40) ecrire({ d: 'grande' }); else if (Math.abs(dy) < 6) ecrire({ d: g ? '' : 'grande' }); });
   }
   racine.addEventListener('click', (ev) => {
-    const b = ev.target.closest('button'); if (!b) return;
-    if (b.dataset.aller) { ecrire({ e: b.dataset.aller, s: '', f: '' }); scrollTo(0, 0); }
-    else if (b.dataset.s) ecrire({ s: b.dataset.s, f: '' });
-    else if (b.dataset.f) ecrire({ f: b.dataset.f });
-    else if (b.hasAttribute('data-fermer')) ecrire({ f: '' });
+    const b = ev.target.closest('[data-aller], [data-s], [data-f], [data-fermer]'); if (!b) return;
+    if (b.dataset.aller) { ecrire({ e: b.dataset.aller, s: '', f: '', d: '', g: '' }); scrollTo(0, 0); }
+    else if (b.dataset.s) ecrire({ s: b.dataset.s, f: '', g: '' });
+    else if (b.dataset.f) ecrire({ f: b.dataset.f, d: '', g: '' });
+    else if (b.hasAttribute('data-fermer')) ecrire({ f: '', d: '' });
   });
-  addEventListener('keydown', (e) => { if (e.key === 'Escape' && lire().f) ecrire({ f: '' }); });
+  addEventListener('keydown', (e) => { if (e.key === 'Escape' && lire().f) ecrire({ f: '', d: '' }); });
   addEventListener('hashchange', rendre);
-  // Le thème : celui de l'appareil, ou ?theme=sombre|clair (banc).
   const th = new URLSearchParams(location.search).get('theme'); if (th) document.documentElement.dataset.theme = th;
   rendre();
 })();
