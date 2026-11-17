@@ -117,7 +117,7 @@
   </button>
 </li>`;
   // Un GROUPE : son titre, son compteur, et son geste (un lien) quand il en a un.
-  const groupe = (titre, n, lignes, { cle, action, plus } = {}) => `<section class="gr" data-groupe="${esc(cle || titre || '')}">${titre ? `<h2 class="gr-t"><span class="gr-nom">${esc(titre)}${n != null ? ` <span class="gr-n">${nb(n)}</span>` : ''}</span>${action ? `<button class="gr-a" type="button" data-ouvrir="${esc(action.ouvrir)}">${esc(action.mot)}</button>` : ''}</h2>` : ''}<ul class="carte">${lignes.join('')}${plus ? `<li class="li-plus"><button type="button" data-ouvrir="${esc(plus.ouvrir)}"><span>${esc(plus.mot)}</span>${I('chevron', 16, 2)}</button></li>` : ''}</ul></section>`;
+  const groupe = (titre, n, lignes, { cle, action, plus } = {}) => `<section class="gr" data-groupe="${esc(cle || titre || '')}">${titre ? `<h2 class="gr-t"><span class="gr-nom">${esc(titre)}${n != null ? ` <span class="gr-n">${nb(n)}</span>` : ''}</span>${action ? `<button class="gr-a" type="button" data-ouvrir="${esc(action.ouvrir)}">${esc(action.mot)}</button>` : ''}</h2>` : ''}<ul class="carte">${lignes.length ? lignes.join('') : '<li class="vide">Rien ici pour l’instant.</li>'}${plus ? `<li class="li-plus"><button type="button" data-ouvrir="${esc(plus.ouvrir)}"><span>${esc(plus.mot)}</span>${I('chevron', 16, 2)}</button></li>` : ''}</ul></section>`;
   const venteLigne = (v, etat, ambre, o = {}) => ligne({ cle: v.tx, visuel: paire(v.look), n: v.numero, sous: v.titre, valeur: euros(v.prix), etat, ambre, ouvrir: v.numero, menu: v.numero, ...o });
   const avant = (v) => { const h = (Date.parse(v.bordereau.limite) - NOW) / H; return [`${h < 36 ? '<i class="pt"></i>' : ''}avant ${heure(v.bordereau.limite)}`, h < 36]; };
 
@@ -211,11 +211,13 @@
   const feuilleColis = (id) => {
     const c = F.colis.find((x) => x.id === id); if (!c) return null;
     const qr = c.qr ? `<svg class="qr qr-grand" viewBox="-2 -2 ${c.qr.n + 4} ${c.qr.n + 4}" role="img" aria-label="QR de retrait envoyé par ${esc(c.transporteur)}"><rect x="-2" y="-2" width="${c.qr.n + 4}" height="${c.qr.n + 4}" fill="#fff"/><path d="${c.qr.d}" fill="#111"/></svg>` : '';
-    const corps = `<div class="re"><p class="re-lieu">${esc(c.point)}</p><p class="re-adr">${esc(c.adresse)} · ${esc(c.transporteur)}</p>${qr}<div class="re-code" aria-label="Code de retrait ${esc(c.code)}">${esc(c.code)}</div><p class="re-art"><i class="pt"></i>avant ${esc(jour(c.limite))} · ${esc(c.art)}</p></div>`;
+    const corps = `<div class="re"><p class="re-lieu">${esc(c.point)}</p><p class="re-adr">${esc(c.adresse)} · ${esc(c.transporteur)}</p>${qr}<div class="re-code" aria-label="Code de retrait ${esc(c.code)}">${esc(c.code)}</div><p class="re-art"><span class="re-lim"><i class="pt"></i>avant ${esc(jour(c.limite))}</span><span>${esc(c.art)}</span></p></div>`;
     return { corps, pied: `<button class="plein plein-l" type="button" data-plein="">${I('coche', 20, 2.2)}<span>C’est retiré</span></button>`, label: `Code ${c.code}`, cran: 'ajuste' };
   };
   // LE MENU CONTEXTUEL (appui long sur une ligne) : les gestes de la paire.
-  const menuDe = (numero) => `<div class="voile voile-menu" data-fermer=""><div class="menu" role="menu" aria-label="N° ${esc(numero)}"><div class="menu-t">${tag(numero)}</div><button role="menuitem" type="button"><span>Ouvrir la fiche</span>${I('chevron', 20)}</button><button role="menuitem" type="button"><span>Imprimer le bordereau</span>${I('imprimer', 20)}</button><button role="menuitem" type="button"><span>Republier</span>${I('republier', 20)}</button><button role="menuitem" type="button"><span>Copier le N°</span>${I('copier', 20)}</button></div></div>`;
+  const menuDe = (numero) => { const v = ventes.find((x) => x.numero === numero);
+    const geste = v ? (v.etat === 'a_envoyer' && v.bordereau ? ['Imprimer le bordereau', 'imprimer'] : null) : ['Republier', 'republier'];
+    return `<div class="voile voile-menu" data-fermer=""><div class="menu" role="menu" aria-label="N° ${esc(numero)}"><div class="menu-t">${tag(numero)}</div><button role="menuitem" type="button"><span>Ouvrir la fiche</span>${I('chevron', 20)}</button>${geste ? `<button role="menuitem" type="button"><span>${geste[0]}</span>${I(geste[1], 20)}</button>` : ''}<button role="menuitem" type="button"><span>Copier le N°</span>${I('copier', 20)}</button></div></div>`; };
 
   // ══ LE RENDU ══
   function rendre() {

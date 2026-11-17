@@ -97,6 +97,7 @@ p, h1, h2, ol, ul, dl, dd { margin: 0; }
 .li-chev { color: var(--filet-fort); display: grid; place-items: center; }
 .li-geste { position: absolute; inset: 0 0 0 auto; width: 96px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; background: var(--geste); color: var(--geste-encre); font-size: 15px; font-weight: 600; }
 .li-plus { position: relative; }
+.vide { padding: 24px 16px; font-size: 15px; color: var(--encre-2); text-align: center; }
 .li-plus button { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 52px; padding: 0 12px 0 88px; font-size: 17px; color: var(--accent); font-weight: 600; }
 .li-plus .ico { color: var(--filet-fort); }
 .code { font: 500 22px/1.1 var(--serif); font-variation-settings: 'opsz' 36; font-feature-settings: 'lnum' 1, 'tnum' 1; letter-spacing: .06em; }
@@ -112,7 +113,7 @@ p, h1, h2, ol, ul, dl, dd { margin: 0; }
 .tag-n { font: 600 22px/1 var(--serif); font-variation-settings: 'opsz' 36, 'SOFT' 50; font-feature-settings: 'lnum' 1, 'tnum' 1; letter-spacing: -.01em; }
 .tag-vide { --kraft: var(--carte-2); color: var(--ambre); }
 .tag-vide .tag-n { font: 600 15px var(--sans); }
-.tag-grand { position: absolute; left: 16px; bottom: 16px; height: 52px; padding: 0 16px 0 34px; clip-path: polygon(15px 0, 100% 0, 100% 100%, 15px 100%, 0 50%); }
+.tag-grand { position: absolute; left: 16px; top: 16px; height: 52px; padding: 0 16px 0 34px; clip-path: polygon(15px 0, 100% 0, 100% 100%, 15px 100%, 0 50%); }
 .tag-grand .tag-o { left: 15px; width: 9px; height: 9px; margin-top: -4.5px; background: var(--ph-f2); }
 .tag-grand .tag-n { font-size: 44px; font-weight: 400; }
 
@@ -143,7 +144,7 @@ p, h1, h2, ol, ul, dl, dd { margin: 0; }
 
 /* ── EN BAS, AU POUCE : un segmenté · chercher + LE geste · les onglets (icône + libellé). ── */
 .pouce { position: fixed; z-index: 20; left: 0; right: 0; bottom: 0; background: var(--papier); box-shadow: var(--ombre-pouce); padding: 12px 0 env(safe-area-inset-bottom); }
-.seg { position: relative; display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); margin: 0 var(--g); padding: 2px; height: 44px; border-radius: 11px; background: var(--seg); }
+.seg { position: relative; display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); margin: 0 var(--g); padding: 0; height: 44px; border-radius: 11px; background: var(--seg); }
 .seg-curseur { position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc((100% - 4px) / var(--n)); transform: translateX(calc(var(--i) * 100%)); border-radius: 8px; background: var(--carte);
   box-shadow: 0 0 0 .5px rgb(0 0 0 / .04), 0 3px 8px rgb(0 0 0 / .12), 0 3px 1px rgb(0 0 0 / .04); transition: transform 300ms var(--ease); }
 .seg-b { position: relative; z-index: 1; display: grid; place-items: center; font-size: 15px; font-weight: 500; color: var(--encre); white-space: nowrap; }
@@ -207,7 +208,8 @@ body.is-replie .seg, body.is-replie .onglets { display: none; }
 .re-adr { margin-top: 2px; font-size: 15px; color: var(--encre-2); }
 .qr-grand { width: 232px; height: 232px; margin-top: 24px; padding: 10px; border-radius: 16px; box-shadow: var(--ombre-carte); }
 .re-code { margin-top: 20px; font: 300 72px/1 var(--serif); font-variation-settings: 'opsz' 144, 'SOFT' 100; font-feature-settings: 'lnum' 1, 'tnum' 1; letter-spacing: .02em; -webkit-user-select: all; user-select: all; }
-.re-art { display: inline-flex; align-items: center; margin-top: 16px; font-size: 15px; color: var(--ambre); font-weight: 600; }
+.re-art { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 16px; font-size: 15px; color: var(--encre-2); }
+.re-lim { display: inline-flex; align-items: center; color: var(--ambre); font-weight: 600; }
 
 /* ══ L'ORDINATEUR (≥ 1100) : on lit à gauche (le champ en colonne), la liste au centre, le bas sous la liste. ══ */
 @media (min-width: 1100px) {
@@ -224,6 +226,8 @@ body.is-replie .seg, body.is-replie .onglets { display: none; }
   .pouce { left: calc(420px + (100vw - 420px - 760px) / 2); right: auto; width: 760px; border-radius: 16px 16px 0 0; }
   .feuille { left: auto; right: calc((100vw - 420px - 760px) / 2); width: 760px; }
   .passe { width: 340px; }
+  .stats { grid-template-columns: 1fr; row-gap: 16px; }
+  .stats div + div { padding-left: 0; border-left: 0; padding-top: 16px; border-top: 1px solid rgb(255 255 255 / .14); }
 }
 @media (hover: hover) and (pointer: fine) { .li-corps:hover { background: var(--carte-2); } }
 @media (prefers-reduced-motion: reduce) {
