@@ -1044,6 +1044,7 @@ import "./design/verre-journee.css";   // (15 nov., refonte-journee) Ma journée
 import "./design/verre-annonces.css";   // (15 nov., refonte-journee) Annonces comme la maquette validée : la rangée de 72 px, la recherche et les vues
 import "./design/verre-restes.css";   // (16 nov., lot design-restes) les restes du verre : la carte qui monte sur Leboncoin, eBay, Vestiaire… — `@layer vrm-verre` : docs/passation/2026-11-16-design-restes.md
 import "./design/maquette-c.css";   // (17 nov.) MAQUETTE C « Studio » — visée par `html[data-maquette="c"]` seulement, un réglage de BANC (src/design/maquette.js) : rien ne change pour un vendeur — `@layer vrm-maquette`, la PREMIÈRE couche (index.html)
+import "./design/maquette-c3.css";   // (17 nov.) MAQUETTE C3 « Studio × iOS » — la C + tab bar collée au bord, grands titres qui se replient, glyphes nus, barre latérale macOS ; visée par `html[data-maquette-c3]` seulement (réglage de BANC, src/design/maquette.js)
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";

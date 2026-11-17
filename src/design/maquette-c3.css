@@ -1,0 +1,168 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   MAQUETTE C3 « STUDIO × iOS » (17 nov. 2026) — proposition, PAS une décision.
+   Julien (17 nov.) a vu six maquettes : « j'aime bien le C, propose encore plein d'autres maquettes ».
+   C3 = la base C (src/design/maquette-c.css : rail souligné, une rangée d'outils, la liste qui monte,
+   le « + » qui dit le geste du lieu) + les meilleurs gestes de B « iOS natif » :
+     1. la tab bar COLLÉE AU BORD (verre fin + filet, cinq onglets égaux), le « + » À PLAT dans la rangée,
+        qui garde le mot du geste de C (« Imprimer », « Publier », « Chercher ») ;
+     2. le GRAND TITRE 34/700 sur la ligne des glyphes ; au défilement il se replie en PETIT TITRE CENTRÉ
+        dans une barre de verre (fondu 0,25 s, comme UINavigationBar) ;
+     3. en haut, des GLYPHES NUS (loupe, cloche, profil) : plus de ronds blancs, 44 px au doigt gardés ;
+     4. à l'ordinateur, une BARRE LATÉRALE façon macOS collée au bord (vibrance, rangées 36 px,
+        sélection grise discrète, nombres en chiffres ambre).
+   Fond bleu, une seule couleur d'accent (l'onglet ouvert), Achats dans la barre, aucun glissement entre
+   onglets, toucher une vente = sa fiche : inchangés.
+   Visée par `html[data-maquette="c"][data-maquette-c3]` SEULEMENT — un réglage de BANC
+   (`localStorage.vrm_maquette = "c3"`, src/design/maquette.js) qu'aucun écran ne pose.
+   Aucun texte neuf, aucun data-* changé, aucune règle métier. Couche `vrm-maquette` (index.html).
+   ════════════════════════════════════════════════════════════════════════════ */
+@layer vrm-maquette {
+
+:root[data-maquette="c"][data-maquette-c3] {
+  --m3-teinte: var(--sv-lien, #004A9F);              /* la seule couleur d'accent : l'onglet ouvert */
+  --m3-gris: rgb(60 60 67 / .62);                     /* iOS secondaryLabel sur verre clair */
+  --m3-barre: rgb(249 250 252 / .86);
+  --m3-filet: rgb(0 0 0 / .16);
+  --m3-plus: rgb(118 118 128 / .16);
+  --m3-ambre: #B25E00;
+  --m3-cote: rgb(246 248 251 / .80);
+  --m3-encre: #0C1D30;
+}
+:root[data-maquette="c"][data-maquette-c3][data-theme="dark"] {
+  --m3-teinte: #6FB1FF;
+  --m3-gris: rgb(235 235 245 / .60);
+  --m3-barre: rgb(14 22 36 / .86);
+  --m3-filet: rgb(255 255 255 / .14);
+  --m3-plus: rgb(255 255 255 / .14);
+  --m3-ambre: #F2B65E;
+  --m3-cote: rgb(14 22 36 / .78);
+  --m3-encre: #FFFFFF;
+}
+
+/* ══ 1. LA TAB BAR COLLÉE AU BORD (téléphone) ═══════════════════════════════ */
+@media (max-width: 767px) {
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell .vrm-tabbar.vrm-tabbar {
+    margin: calc(-54px - env(safe-area-inset-bottom, 0px)) 0 0 !important;
+    height: auto !important; min-height: calc(54px + env(safe-area-inset-bottom, 0px)) !important;
+    padding: 0 2px env(safe-area-inset-bottom, 0px) !important; border-radius: 0 !important; align-items: stretch !important;
+    background: var(--m3-barre) !important; -webkit-backdrop-filter: blur(20px) saturate(180%) !important; backdrop-filter: blur(20px) saturate(180%) !important;
+    box-shadow: 0 -.5px 0 var(--m3-filet) !important; border: 0 !important;
+  }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell .vrm-tabbar.vrm-tabbar::before { display: none !important; }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell .vrm-tabbar.vrm-tabbar::after { background: var(--m3-barre) !important; border-radius: 0 !important; }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell > .vrm-main { padding-bottom: calc(54px + env(safe-area-inset-bottom, 0px) + 24px) !important; }
+  /* Cinq onglets ÉGAUX : icône 25 au-dessus, mot 11/500 dessous (le minimum iOS d'une tab bar). */
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell .vrm-tabbar > .vrm-tab {
+    flex: 1 1 0 !important; min-height: 54px !important; height: 54px !important; gap: 2px !important; padding: 6px 0 0 !important; justify-content: flex-start !important;
+  }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-tab-ic { width: 30px !important; height: 26px !important; color: var(--m3-gris) !important; background: transparent !important; box-shadow: none !important; }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-tab-ic svg { width: 25px !important; height: 25px !important; stroke-width: 1.6 !important; }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-nav-label { font: 500 11px/1.1 Inter, system-ui, sans-serif !important; letter-spacing: 0 !important; color: var(--m3-gris) !important; }
+  /* L'ouvert : teinté, MÊME graisse (le mot ne change pas de largeur), plus de capsule ni de diode. */
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] :is(.vrm-tab-ic, .vrm-nav-label) { color: var(--m3-teinte) !important; font-weight: 500 !important; }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] .vrm-tab-ic svg { stroke-width: 2.1 !important; }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell .vrm-tabbar .vrm-tab-pastille { display: none !important; }
+  /* Le « + » À PLAT, dans la rangée, à la forme d'un onglet : une capsule grise 40×26, et sous elle le MOT du geste
+     du lieu (de C) — « Imprimer » sur Ventes, « Publier » sur Annonces, « Chercher » ailleurs. Plus de disque qui déborde. */
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell .vrm-tabbar > .sb-disque {
+    flex: 1 1 0 !important; width: auto !important; height: 54px !important; min-height: 54px !important; margin: 0 !important; padding: 6px 0 0 !important;
+    justify-content: flex-start !important; gap: 2px !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; transform: none !important;
+  }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell .vrm-tabbar > .sb-disque > svg {
+    width: 42px !important; height: 26px !important; padding: 3px 11px !important; border-radius: 9px !important; box-sizing: border-box !important;
+    background: var(--m3-plus) !important; color: var(--m3-encre) !important; box-shadow: none !important; stroke-width: 2.2 !important;
+  }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell .vrm-tabbar > .sb-disque .sb-disque-mot { font: 600 11px/1.1 Inter, system-ui, sans-serif !important; color: var(--m3-encre) !important; letter-spacing: 0 !important; }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell .vrm-tabbar > .sb-disque:is(:active, [aria-expanded="true"]) > svg { background: rgb(118 118 128 / .30) !important; }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell .vrm-tabbar > .sb-disque:is(:active, [aria-expanded="true"]) { background: transparent !important; box-shadow: none !important; }
+  /* Les nombres : petites pastilles AMBRE (un geste à faire), 17 px, sur le coin de l'icône. */
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell .vrm-tabbar .vrm-nav-badge-barre.vrm-nav-badge-n {
+    background: var(--m3-ambre) !important; color: #FFFFFF !important; min-width: 17px !important; height: 17px !important; padding: 0 5px !important; border-radius: 9px !important;
+    font: 600 11px/17px Inter, system-ui, sans-serif !important; top: -2px !important; left: calc(100% - 9px) !important; box-shadow: 0 0 0 1.5px var(--m3-barre) !important;
+  }
+  :root[data-maquette="c"][data-maquette-c3][data-theme="dark"] body .vrm-app-shell .vrm-tabbar .vrm-nav-badge-barre.vrm-nav-badge-n { color: #1A1206 !important; }
+  /* La pastille passagère « Mis à jour » : juste au-dessus de la barre collée. */
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-neuf-hote { bottom: calc(66px + env(safe-area-inset-bottom, 0px)) !important; }
+}
+
+/* ══ 2–3. GLYPHES NUS, GRAND TITRE QUI SE REPLIE EN PETIT TITRE CENTRÉ (téléphone) ═══ */
+@media (max-width: 767px) {
+  /* Des glyphes nus, 44 px au doigt, à l'encre claire sur le fond bleu (plus de ronds blancs). */
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell > .vrm-app-header .vrm-header-actions :is(button.vrm-hbtn, .vrm-cn-cloche > button, button.vrm-cn-cloche) {
+    width: 44px !important; min-width: 44px !important; height: 44px !important; background: transparent !important; box-shadow: none !important; border: 0 !important; color: var(--sv-clair, #FFF) !important;
+  }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell > .vrm-app-header .vrm-header-actions :is(button.vrm-hbtn, .vrm-cn-cloche > button, button.vrm-cn-cloche) svg { color: inherit !important; width: 23px !important; height: 23px !important; }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell > .vrm-app-header .vrm-header-actions,
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell > .vrm-app-header .vrm-header-actions > div { gap: 0 !important; }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell > .vrm-app-header .vrm-header-actions { padding-top: 5px !important; padding-bottom: 5px !important; }
+  /* Le point de fraîcheur : nu lui aussi (un point, 44 px au doigt), à gauche des glyphes. */
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-fraicheur-hote > .vrm-bandeau-abo.vrm-fraicheur { top: calc(5px + env(safe-area-inset-top, 0px)) !important; right: 140px !important; width: 44px !important; min-width: 44px !important; height: 44px !important; background: transparent !important; box-shadow: none !important; }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-fraicheur-hote > .vrm-fraicheur .vrm-bandeau-abo-geste { width: 44px !important; height: 44px !important; min-width: 44px !important; min-height: 44px !important; }
+
+  /* Le GRAND titre : 34/700, serré, le même sur les cinq écrans, sur la ligne des glyphes. */
+  :root[data-maquette="c"][data-maquette-c3] .vrm-main :is(.vrm-tache-tete.vrm-market-heading h1, .vrm-screen-head :is(h1, h2).vrm-display, .sj-journee .sj-tete .sj-titre) {
+    font: 700 34px/1.08 Inter, system-ui, sans-serif !important; letter-spacing: -.028em !important; color: var(--sv-clair, #FFF) !important;
+  }
+  :root[data-maquette="c"][data-maquette-c3] .vrm-main .vrm-tache-tete.vrm-market-heading { min-height: 58px !important; }
+  :root[data-maquette="c"][data-maquette-c3] .vrm-main .vrm-screen-head, :root[data-maquette="c"][data-maquette-c3] .vrm-main .vrm-screen-head .vrm-tete-row { min-height: 58px !important; }
+  :root[data-maquette="c"][data-maquette-c3] .vrm-main .vrm-tache-tete .vrm-tache-retrouver { height: 58px !important; right: 140px !important; }
+
+  /* Défilée : la barre prend toute la largeur, son verre et son filet, et le PETIT titre centré 17/600 paraît
+     (le grand est parti avec la page). Fondu 0,25 s, ease-out — l'effet de UINavigationBar. */
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell > .vrm-app-header {
+    transition: background-color .25s cubic-bezier(.2,.8,.2,1), box-shadow .25s cubic-bezier(.2,.8,.2,1) !important;
+  }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell > .vrm-app-header.is-defile {
+    left: 0 !important; width: 100% !important; justify-content: flex-end !important;
+    background: var(--m3-barre) !important; box-shadow: 0 .5px 0 var(--m3-filet) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important; backdrop-filter: blur(20px) saturate(180%) !important;
+  }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell > .vrm-app-header .vrm-hdr-titre.vrm-hdr-titre {
+    display: block !important; position: absolute !important; left: 0 !important; right: 0 !important; top: env(safe-area-inset-top, 0px) !important; height: 54px !important;
+    padding: 0 !important; margin: 0 auto !important; max-width: 150px !important; pointer-events: none !important;
+    font: 600 17px/54px Inter, system-ui, sans-serif !important; letter-spacing: -.01em !important; text-align: center !important; color: var(--m3-encre) !important;
+    white-space: nowrap !important; overflow: hidden !important; text-overflow: ellipsis !important;
+    opacity: 0 !important; transform: translateY(6px) !important; transition: opacity .25s cubic-bezier(.2,.8,.2,1), transform .25s cubic-bezier(.2,.8,.2,1) !important;
+  }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell > .vrm-app-header.is-defile .vrm-hdr-titre.vrm-hdr-titre { opacity: 1 !important; transform: none !important; }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell > .vrm-app-header.is-defile .vrm-header-actions :is(button.vrm-hbtn, .vrm-cn-cloche > button, button.vrm-cn-cloche) { color: var(--m3-encre) !important; }
+  :root[data-maquette="c"][data-maquette-c3] body:has(.vrm-app-header.is-defile) .vrm-fraicheur-hote > .vrm-bandeau-abo.vrm-fraicheur { opacity: 0 !important; pointer-events: none !important; }
+  @media (prefers-reduced-motion: reduce) {
+    :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell > .vrm-app-header .vrm-hdr-titre.vrm-hdr-titre { transform: none !important; }
+  }
+}
+
+/* ══ 4. L'ORDINATEUR : LA BARRE LATÉRALE FAÇON macOS (de B), le rail souligné de C ══ */
+@media (min-width: 768px) {
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] {
+    top: 0 !important; left: 0 !important; bottom: 0 !important; width: 236px !important; padding: 18px 10px 10px !important; border-radius: 0 !important;
+    background: var(--m3-cote) !important; -webkit-backdrop-filter: blur(30px) saturate(180%) !important; backdrop-filter: blur(30px) saturate(180%) !important;
+    border: 0 !important; box-shadow: .5px 0 0 var(--m3-filet) !important;
+  }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-sidebar-mot { font: 700 15px/1 Inter, system-ui, sans-serif !important; letter-spacing: -.01em !important; }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] > .vrm-sidebar-brand { padding: 4px 10px 10px !important; }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-section-label { font: 700 11px/1.2 Inter, system-ui, sans-serif !important; letter-spacing: .01em !important; color: var(--m3-gris) !important; padding: 16px 10px 4px !important; }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] :is(.vrm-rail-platforms, .vrm-rail-management) { gap: 1px !important; }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-button {
+    min-height: 36px !important; height: 36px !important; padding: 0 10px !important; gap: 9px !important; border-radius: 8px !important;
+    font: 500 14px/1.2 Inter, system-ui, sans-serif !important; color: var(--sv-encre) !important;
+  }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-button > :first-child { color: var(--m3-teinte) !important; flex-basis: 18px !important; width: 18px !important; }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-button > :first-child svg { width: 18px !important; height: 18px !important; }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-button[aria-current="page"] { font-weight: 600 !important; }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] :is(.vrm-nav-indicateur.vrm-nav-indicateur, .vrm-rail-button[aria-current="page"]) { background: rgb(0 0 0 / .08) !important; box-shadow: none !important; border-radius: 8px !important; }
+  :root[data-maquette="c"][data-maquette-c3][data-theme="dark"] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] :is(.vrm-nav-indicateur.vrm-nav-indicateur, .vrm-rail-button[aria-current="page"]) { background: rgb(255 255 255 / .12) !important; }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-indicateur.vrm-nav-indicateur::after { display: none !important; }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-badge-rail.vrm-nav-badge-n {
+    background: transparent !important; color: var(--m3-ambre) !important; font: 600 13px/22px Inter, system-ui, sans-serif !important; padding: 0 !important; min-width: 0 !important; font-variant-numeric: tabular-nums !important;
+  }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] > .vrm-rail-pied { background: transparent !important; border-top: .5px solid var(--m3-filet) !important; }
+  /* Le grand titre à l'ordinateur aussi : 34/700. */
+  :root[data-maquette="c"][data-maquette-c3] .vrm-main :is(.vrm-tache-tete.vrm-market-heading h1, .vrm-screen-head :is(h1, h2).vrm-display, .sj-journee .sj-tete .sj-titre) { font: 700 34px/1.08 Inter, system-ui, sans-serif !important; letter-spacing: -.028em !important; }
+}
+@media (min-width: 768px) and (max-width: 1399px) {
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] { width: 78px !important; padding: 18px 6px 10px !important; }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-button { width: 64px !important; height: 52px !important; min-height: 52px !important; }
+}
+
+} /* fin de @layer vrm-maquette */
