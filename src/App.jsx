@@ -19179,9 +19179,9 @@ async function detailsAchatScan(uid, tx) {
   const rows = await lireTout(`id=eq.harvest_${uid}_txn_${tx}&select=side:data->payload->transaction->>user_side,vendeur:data->payload->transaction->seller->>login,items:data->payload->transaction->order->items`, { strict: true });
   if (!Array.isArray(rows) || !rows[0] || rows[0].side !== 'buyer') return null;
   const r = rows[0];
-  const articles = (Array.isArray(r.items) ? r.items : []).filter((it) => it && typeof it === 'object').slice(0, 20).map((it) => {
+  const articles = (Array.isArray(r.items) ? r.items : []).filter((it) => it && typeof it === 'object').slice(0, 20).map((it, n) => {
     const pr = it.price && typeof it.price === 'object' ? Number(it.price.amount) : Number(it.price);
-    return { titre: String(it.title || '').slice(0, 160), taille: String(it.size_title || '').slice(0, 40), etat: String(it.status || '').slice(0, 60),
+    return { cle: it.id != null && it.id !== '' ? `id${it.id}` : `n${n}`, titre: String(it.title || '').slice(0, 160), taille: String(it.size_title || '').slice(0, 40), etat: String(it.status || '').slice(0, 60),
       prix: Number.isFinite(pr) && pr > 0 ? pr : null, photo: photoArticle({ photo: Array.isArray(it.photos) ? it.photos[0] : null }) || null };
   });
   return { vendeur: r.vendeur ? String(r.vendeur) : '', articles };

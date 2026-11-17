@@ -139,7 +139,7 @@ function FicheAchat({ e, lu, Photo, onOuvrir, onRanger, onPasCa }) {
     <div className="vrm-rtv-fiche vrm-rtv-achat" data-scan-r-fiche={`${e.sorte}:${e.cle}`} data-scan-r-sorte={e.sorte} data-scan-r-num={e.num || ''} data-scan-a-details={det === undefined ? 'lecture' : det === null ? 'pas-su' : String(articles.length)}>
       <span className="vrm-rtv-kicker" data-scan-r-kicker="">{tr('scan.a.dedans')}{lot ? ` · ${tr('scan.a.lot', { n: articles.length })}` : ''}</span>
       {lot ? (
-        <ul className="vrm-rtv-articles" data-scan-a-lot={articles.length}>{articles.map((a, i) => <LigneArticle key={i} a={a} Photo={Photo}/>)}</ul>
+        <ul className="vrm-rtv-articles" data-scan-a-lot={articles.length}>{articles.map((a, n) => <LigneArticle key={a.cle || `n${n}`} a={a} Photo={Photo}/>)}</ul>
       ) : (
         <div className="vrm-rtv-achat-tete">
           <span className="vrm-rtv-photo is-tres-grande" aria-hidden="true">{photo && Photo ? <Photo src={photo} alt="" decoding="async" loading="lazy"/> : <Icone d={I_BOITE} taille={40}/>}</span>
