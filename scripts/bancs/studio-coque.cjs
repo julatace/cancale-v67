@@ -124,8 +124,10 @@ async function telephone(nav, sombre, b) {
     // (l'anneau ne vit que 560 ms, l'entrée 320 ms).
     await pg.evaluate(() => { const v = window.__sbVu = { onde: 0, entree: false }; const main = document.querySelector('.vrm-main');
       if (window.__sbObs) window.__sbObs.disconnect();
-      window.__sbObs = new MutationObserver((ms) => { for (const m of ms) { for (const n of m.addedNodes || []) if (n.nodeType === 1 && n.hasAttribute('data-sb-onde')) v.onde++; if (m.type === 'attributes' && m.target === main && main.hasAttribute('data-sb-entree')) v.entree = true; } });
-      window.__sbObs.observe(document.body, { childList: true }); window.__sbObs.observe(main, { attributes: true, attributeFilter: ['data-sb-entree'] }); });
+      // (17 nov., vitesse-cache) L'anneau est posé une fois puis REJOUÉ (src/design/ondulation.js) : son compteur
+      // `data-sb-onde` qui avance compte comme une ondulation, au même titre qu'un anneau inséré.
+      window.__sbObs = new MutationObserver((ms) => { for (const m of ms) { for (const n of m.addedNodes || []) if (n.nodeType === 1 && n.hasAttribute('data-sb-onde')) v.onde++; if (m.type === 'attributes' && m.attributeName === 'data-sb-onde' && m.target.hasAttribute('data-sb-onde')) v.onde++; if (m.type === 'attributes' && m.target === main && main.hasAttribute('data-sb-entree')) v.entree = true; } });
+      window.__sbObs.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-sb-onde'] }); window.__sbObs.observe(main, { attributes: true, attributeFilter: ['data-sb-entree'] }); });
     await pg.locator(`.vrm-tabbar [data-nav-entree="${id}"]`).click(); await pg.waitForTimeout(120);
     const o = await pg.evaluate(() => ({ ...window.__sbVu }));
     await pg.waitForTimeout(1400);
@@ -139,7 +141,7 @@ async function telephone(nav, sombre, b) {
   {
     const x = await ouvrir(nav, { W: 390, sombre, b, url: '/?tab=journee' }); await pret(x.pg);
     await x.pg.emulateMedia({ reducedMotion: 'reduce' });
-    await x.pg.evaluate(() => { const v = window.__sbVu = { onde: 0 }; new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes || []) if (n.nodeType === 1 && n.hasAttribute('data-sb-onde')) v.onde++; }).observe(document.body, { childList: true }); });
+    await x.pg.evaluate(() => { const v = window.__sbVu = { onde: 0 }; new MutationObserver((ms) => { for (const m of ms) { for (const n of m.addedNodes || []) if (n.nodeType === 1 && n.hasAttribute('data-sb-onde')) v.onde++; if (m.type === 'attributes' && m.attributeName === 'data-sb-onde') v.onde++; } }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-sb-onde'] }); });
     await x.pg.locator('.vrm-tabbar [data-nav-entree="ventes"]').click(); await x.pg.waitForTimeout(400);
     const vu = await x.pg.evaluate(() => ({ onde: window.__sbVu.onde, ecran: document.querySelector('.vrm-main').getAttribute('data-ecran') }));
     dit(vu.onde === 0 && vu.ecran === 'ventes', 'O mouvement réduit : aucun anneau (un fondu seul), l’écran change', vu);

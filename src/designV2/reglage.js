@@ -1,10 +1,10 @@
 // ════════════════════════════════════════════════════════════════════════════
-//  LE NOUVEAU DESIGN « STUDIO PREMIUM » (17 nov.) — le réglage d'essai.
-//  Paramètres → Apparence → « Nouveau design (essai) ». Éteint par défaut : éteint, l'app est
-//  EXACTEMENT celle d'avant (rien de ce module ne rend quoi que ce soit, aucun attribut posé).
+//  LE NOUVEAU DESIGN « STUDIO PREMIUM » (17 nov.) — ALLUMÉ PAR DÉFAUT pour tous (Julien, 17 nov. soir : « publie le
+//  design »). Paramètres → Apparence → « Ancien design » le ramène sur cet appareil (`vrm_design_v2` = '0') : l'app
+//  est alors EXACTEMENT celle d'avant (rien de ce module ne rend quoi que ce soit, aucun attribut posé).
 //  Le choix vit sur CET appareil (`vrm_design_v2`, localStorage) : c'est un essai — Julien l'allume
 //  sur son iPhone, avec ses vraies photos, sans toucher ses autres appareils. Une lecture qui échoue
-//  (navigation privée, stockage bloqué) vaut « éteint ».
+//  (navigation privée, stockage bloqué) vaut le défaut : allumé.
 //  Allumé : `data-design="v2"` sur <html> (toutes les règles de src/designV2/design-v2.css en dépendent)
 //  et les composants de src/designV2/ prennent la place des anciens, avec les MÊMES sources et règles.
 // ════════════════════════════════════════════════════════════════════════════
@@ -14,7 +14,8 @@ export const CLE_DESIGN_V2 = 'vrm_design_v2';
 const EVT = 'vrm:design-v2';
 
 export function designV2Actif() {
-  try { return typeof localStorage !== 'undefined' && localStorage.getItem(CLE_DESIGN_V2) === '1'; } catch (_) { return false; }
+  // Seul un « 0 » posé par SON geste (« Ancien design ») l'éteint ; absent ou illisible ⇒ allumé.
+  try { return typeof localStorage === 'undefined' || localStorage.getItem(CLE_DESIGN_V2) !== '0'; } catch (_) { return true; }
 }
 
 function appliquer(on) {
@@ -25,7 +26,7 @@ function appliquer(on) {
 }
 
 export function poserDesignV2(on) {
-  try { if (on) localStorage.setItem(CLE_DESIGN_V2, '1'); else localStorage.removeItem(CLE_DESIGN_V2); } catch (_) { /* stockage bloqué : l'essai ne tient que le temps de la page */ }
+  try { localStorage.setItem(CLE_DESIGN_V2, on ? '1' : '0'); } catch (_) { /* stockage bloqué : le choix ne tient que le temps de la page */ }
   appliquer(!!on);
   try { window.dispatchEvent(new Event(EVT)); } catch (_) {}
 }
@@ -40,5 +41,5 @@ function abonner(f) {
 }
 
 export function useDesignV2() {
-  return React.useSyncExternalStore(abonner, designV2Actif, () => false);
+  return React.useSyncExternalStore(abonner, designV2Actif, () => true);
 }

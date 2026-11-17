@@ -566,7 +566,7 @@ import { ID_PAIRES, ECRANS_PAIRES, estPaires, dernierePaire, noterPaire, groupeB
 import { entreeHistorique } from "./navHistorique.js";   // (16 nov., barre-achats) passer d'un onglet de la barre à un autre n'empile rien   // (14 nov., n° 61) l'onglet « Paires »
 // (14 nov., Studio bleu clair) L'espace d'un écran, le disque et son éventail, l'ondulation au changement d'espace.
 import { espaceDe } from "./design/espace.js";
-import { onduler } from "./design/ondulation.js";
+import { onduler, preparerOndulation } from "./design/ondulation.js";
 // Importés ICI une fois pour les chantiers C à H (aucun n'a à retoucher cette ligne).
 import { ChampRecherche } from "./composants/ChampRecherche.jsx";
 import { SuitePaquets, groupesBornes, PAQUET_LISTE } from "./composants/SuitePaquets.jsx";   // (11 nov., limites-client) longues listes par paquets
@@ -942,6 +942,7 @@ import { enLigneDeuxFois, texteCarte as texteEnLigneDeuxFois, raisonPasSu as rai
 import { useAvisBas, AvisBasDetail, titreAvisBas, detailAvisBas } from "./AvisNegatifJournee.jsx";   // (11 nov., lot avis-negatif) la carte « Avis 2★ reçu »
 import { LIGNE_AVIS_BAS_VUS } from "./avisNegatif.js";
 import { lireAlertesAvisBas } from "./lectureAvisBas.js";
+import { lireEnVol } from "./lectureEnVol.js";   // (17 nov., onglets rapides) une lecture en vol par ligne
 // (11 nov., lot photos-comptes) La même PHOTO sur deux de ses comptes Vinted (empreintes de l'extension 5.358).
 import { annoncesPourPhotos, calculerPhotosComptes, publierPhotosComptes, cibleRepublier } from "./photosComptes.js";
 import { empreinteImageLocale } from "./photosComptes.js";   // (16 nov.) rétabli : la fusion de retour-parfait l’avait perdu (empreintes eBay)
@@ -1109,6 +1110,7 @@ import { BoutonV2, SegmentV2 } from "./designV2/BoutonV2.jsx";
 import { nombre as nombreV2 } from "./i18n/index.js";
 import LigneAnnonceV2 from "./designV2/LigneAnnonce.jsx";
 import { SqueletteRangees as SqueletteRangeesV2, QuandLu as QuandLuV2 } from "./designV2/Signature.jsx";
+import { reprendreBarre } from "./designV2/barre.jsx";   // (17 nov.) le style de la barre d'onglets, posé sur <html> dès l'import
 import "./design/accessibilite.css";   // (17 nov.) audit WCAG 2.1 AA : focus double, encre claire sur le bleu, 44 px — `@layer vrm-a11y`, nommée AVANT vrm-verre (index.html)
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
@@ -2000,6 +2002,10 @@ const sbAuth = (extra) => {
 // la règle de `lireReceptionLeboncoin` (src/rafraichissementLeboncoin.js). Rend
 // `null` (« pas su ») au bout, jamais `[]`. Leboncoin et Vestiaire la lisent.
 function lireBaseRelue(url) { return lireReceptionLeboncoin(url, sbAuth, { rafraichir: () => authRefresh() }); }
+// (17 nov., onglets rapides) Les N° réservés par l'extension (`panel_num_reserves`) : chaque lecteur passe par UNE
+// lecture en vol partagée (`lireEnVol('panel_num_reserves', …)`, src/lectureEnVol.js — Achats en lançait 5 à
+// l'ouverture) ; rien gardé au-delà du vol. Même règle : `null` = pas su.
+
 // Complète une ligne à écrire avec son propriétaire. La base a un défaut
 // (auth.uid()) mais on l'envoie explicitement : c'est plus lisible, et la règle
 // `with check` de Postgres vérifie qu'on n'écrit pas au nom d'un autre.
@@ -3222,6 +3228,7 @@ const VENTES_MASQUEES_AUCUNE = () => [];
 const SYNC_KEYS = [
   // (17 nov., nouveau design) L'affichage des annonces : « Liste » (A, par défaut) ou « Détaillé » (C) — son choix, sur tous ses appareils.
   'vrm_annonces_affichage',
+  'vrm_barre_style',   // (17 nov.) le style de la barre d'onglets (src/designV2/barre.js)
   // (11 nov., lot visuels-reseaux) Format, modèle, couleur et nom de SA boutique des visuels réseaux
   // (src/visuelsReseaux.js `reglagesValides` ; boutique vide par défaut).
   'vrm_visuels_reglages',
@@ -5737,7 +5744,7 @@ const numeroDImport = (v, ms) => {
 // Les N° déjà servis : cleNum ⇒ la raison dite sur la ligne en conflit. `null` = pas su.
 async function numerosServisImport() {
   if (!isCloudReady()) return null;
-  const jr = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`);
+  const jr = await lireEnVol('panel_num_reserves', () => lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`));
   if (!Array.isArray(jr)) return null;
   const pris = new Map();
   const add = (v, raison) => { const c = cleNum(v); if (c && !pris.has(c)) pris.set(c, raison); };
@@ -13407,7 +13414,7 @@ async function numeroterVestiaire() {
       const [jl, jv, jr] = await Promise.all([
         lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt`),
         lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_ventes&select=ventes:data->ventes`),
-        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`),
+        lireEnVol('panel_num_reserves', () => lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`)),
       ]);
       if (!Array.isArray(jl) || !Array.isArray(jv) || !Array.isArray(jr)) return 0;
       if (!numerotationPermise() || !isCloudReady()) return 0;
@@ -18905,7 +18912,7 @@ async function numerosServisRelus() {
   return numerosServisLus();
 }
 async function numerosServisLus() {
-  let jr = null; try { jr = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`); } catch (_) { jr = null; }
+  let jr = null; try { jr = await lireEnVol('panel_num_reserves', () => lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`)); } catch (_) { jr = null; }
   if (!Array.isArray(jr)) return null;
   const pris = new Set(), prisK = new Set();
   const add = (v) => { const k = cleNum(v); if (!k) return; prisK.add(k); if (/^\d+$/.test(k)) pris.add(Number(k)); };
@@ -20281,6 +20288,8 @@ function BottomBar({tab,setTab,sites,badges,gestes:gestesDisque=null}) {
   // (17 nov., nouveau design) Allumé : pas de disque « + » (les gestes globaux sont dans l'écran, au pouce).
   const designV2=useDesignV2();
   const [plusOuvert,setPlusOuvert]=React.useState(false);
+  // (17 nov.) Le style de la barre : après la lecture du nuage, la valeur rangée ailleurs reprend le défaut (src/designV2/barre.js).
+  React.useEffect(()=>onCloudReady(()=>reprendreBarre()),[]);
   // (14 nov., Studio bleu clair) « Imprimer N » de l'éventail : ce que « Tout imprimer (N) » de Ventes ferait partir, tel que
   // Ventes le publie (`vrm_colis_prets.lot`, §11 : le même nombre que son bouton) ; pas su ⇒ undefined (jamais un 0 deviné).
   const [colisPrets]=useLigneSynchro('vrm_colis_prets', lireColisPretsBarre);
@@ -20299,6 +20308,7 @@ function BottomBar({tab,setTab,sites,badges,gestes:gestesDisque=null}) {
   // (déjà vu, src/ecransGardes.jsx) revient tel quel, sans calcul.
   // (14 nov., Studio bleu clair) Changer d'ESPACE : l'ondulation de lumière part de l'onglet touché (src/design/ondulation.js).
   const allerA=(id,depuis)=>{ if(depuis&&espaceDe(id,BAR_GROUPE)!==espaceDe(tab,BAR_GROUPE)) onduler(depuis); noterNavigationSimple(id); setVise(id); demarrer(()=>setTab(id)); };
+  React.useEffect(()=>{ preparerOndulation(); },[]);   // (17 nov.) l'anneau posé au repos : un toucher ne l'insère plus (ondulation.js)
   const tabMontre=vise||tab;
   const navRef=React.useRef(null);
   // (8 nov.) LA PASTILLE DE L'ONGLET CHOISI GLISSE vers l'onglet touché (Julien : « vraiment
@@ -38385,9 +38395,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [reservesNum, setReservesNum] = useState(undefined);
   const relireReservesNum = async () => {
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`, { headers: sbAuth() });
-      if (!res.ok) { setReservesNum((v) => (v === undefined ? null : v)); return; }
-      const rows = await res.json();
+      const rows = await lireEnVol('panel_num_reserves', () => lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`));
+      if (!Array.isArray(rows)) { setReservesNum((v) => (v === undefined ? null : v)); return; }
       // Relue à chaque arrivée des annonces : la même réponse ne repose pas un
       // objet neuf (un rendu de Ma journée pour rien, banc `vitesse.cjs`, 22 oct.).
       const n = numerosReserves(Array.isArray(rows) && rows[0] ? rows[0].data : null);
@@ -53215,7 +53224,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* (Ancien bloc « Colis en route » retiré : le suivi est maintenant DANS
             chaque ligne d'achat ci-dessous — photo + statut + progression + Suivre.) */}
         {/* (la barre d'outils est remontée sous le titre, comme sur Ventes) */}
-        {buys.loading && !buys.items && <Skeleton variant="row" count={5}/>}
+        {/* (17 nov.) Nouveau design : l'attente d'Achats est celle de son bloc (rien de posé puis retiré, banc design-v2-chargement). */}
+        {buys.loading && !buys.items && !designV2 && <Skeleton variant="row" count={5}/>}
         {buys.error && <LoadError onRetry={()=>loadOrders('purchased',setBuys,true)}/>}
         {!modeRetraits && buys.items && !buys.error && buysBase.length===0 && (buys.items.length>0
           // (5 nov.) Des achats existent, mais tous sur des comptes écartés : « aucun achat » serait faux.
@@ -55785,7 +55795,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         qrSrc: (x) => { const t = (x.src && x.src.t) || null; return t ? qrVivant(t) : ''; },
                         enGrand: (x) => { const f = qrRetrait(x); if (f) return f; const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null;
                           if (!x.code) return null; return () => openQrView(t ? (codeRetrait(t.code) !== x.code ? { ...t, code: x.code } : t) : ligneRetraitVinted(o)); } }}/>
-                    {!avecColis && toutLuRet ? <p className="vrm-colis-vide" data-retraits-vide="">{tr('v2.passe.aucun')}</p> : null}
+                    {/* (17 nov.) Plus de « Aucun colis à aller chercher » ici : « À retirer · 0 » le dit déjà en tête, et cette ligne
+                        posée après « En route » le poussait (banc design-v2-chargement). */}
                     <EnRouteListeV2 lignes={enRouteV2} Icon={Icon} Photo={photoCarte} touteSansPoint={enRouteV2.length > 0 && enRouteV2.every((l) => !l.point)}/>
                     {/* Rien n'attend au relais : le geste plein d'Achats est « Ajouter un achat » (la saisie d'un achat hors
                         plateforme, la même que son bouton : `vrm:v2-ajouter-achat`, src/ecrans/Achats.jsx). */}
@@ -66274,7 +66285,7 @@ function AppCoeur() {
           (styles-coque.css) : téléphone = barre transparente qui prend son verre
           et son filet au défilement (`is-defile`) ; ordinateur = île discrète en
           haut à droite. Ici seulement la structure et la position. */}
-      <header className={`vrm-app-header${defile ? ' is-defile' : ''}${v2Ann ? ' v2-entete-cloche' : ''}`} ref={ileRef} data-defile-tete={defile ? '1' : '0'} style={{position: ordi ? 'fixed' : v2Ann ? 'absolute' : 'sticky',top: ordi ? 12 : v2Ann ? 6 : 0,right: ordi ? 24 : v2Ann ? 12 : undefined,...(v2Ann ? { left: 'auto', width: 'auto', background: 'transparent' } : null),zIndex:50}}>
+      <header className={`vrm-app-header${defile && !(designV2App && !ordi) ? ' is-defile' : ''}${v2Ann ? ' v2-entete-cloche' : ''}`} ref={ileRef} data-defile-tete={defile ? '1' : '0'} style={{position: ordi ? 'fixed' : v2Ann ? 'absolute' : 'sticky',top: ordi ? 12 : v2Ann ? 6 : 0,right: ordi ? 24 : v2Ann ? 12 : undefined,...(v2Ann ? { left: 'auto', width: 'auto', background: 'transparent' } : null),zIndex:50}}>
         {/* ⚠️ `display:none` sur ordinateur, pas `visibility:hidden` : un bloc
             invisible occupe quand même sa largeur, et l'île ferait 400 px. */}
         <div className="vrm-header-brand" style={{display: ordi ? 'none' : undefined}}>
@@ -66287,7 +66298,9 @@ function AppCoeur() {
           {/* (17 oct.) Le nom de l'entreprise, retrouvé par son SIRET. */}
           <NomEntrepriseCoque entreprise={entreprise} className="vrm-hdr-entreprise"/>
         </div>
-        {!ordi && <div className="vrm-hdr-titre" data-titre-ecran="">{titreCourant}</div>}
+        {/* (17 nov.) Nouveau design, au téléphone : le GRAND titre est dans l'écran ; au défilement, ni verre opaque ni petit
+            titre posé sur la recherche (rapport de l'agent Stock, #1249). */}
+        {!ordi && !designV2App && <div className="vrm-hdr-titre" data-titre-ecran="">{titreCourant}</div>}
         {!ordi && gsOpen && champRechercheMobile}
         <div className="vrm-header-actions">
           {/* (5 nov., chantier H — revue 2.28) Au téléphone, l'en-tête ne porte plus que :
