@@ -20,7 +20,10 @@
 // ════════════════════════════════════════════════════════════════════════════
 import { transporteursNommes } from './transporteur-bordereau.js';
 import { transporteurDeForme, FORME_CHRONOPOST_PROPRE } from './suivi-colis.js';
-import { texteDuPdf } from './texte-pdf.js';
+// (16 nov., lot derniers-rouges — budget-vitesse) texte-pdf.js porte pdf-lib (≈ 1,1 Mo, ≈ 300 Ko compressés) : chargé
+// SEULEMENT quand un PDF est lu. Importé en tête, il montait dans le morceau de DÉMARRAGE de l'app (App.jsx importe
+// transporteur-anciens.js ⇒ ce fichier) et chaque appareil neuf le téléchargeait sans jamais lire une étiquette.
+const lecteurPdf = () => import('./texte-pdf.js');
 
 const sansAccents = (s) => String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '');
 
@@ -92,7 +95,7 @@ export function decisionTexteBordereau(texte) {
 
 // Le PDF (base64 ou octets) ⇒ la décision. Ne lève jamais.
 export async function transporteurDuPdf(pdf) {
-  try { return decisionTexteBordereau(await texteDuPdf(pdf)); }
+  try { const { texteDuPdf } = await lecteurPdf(); return decisionTexteBordereau(await texteDuPdf(pdf)); }
   catch (_) { return { etat: 'illisible', t: '', s: '' }; }
 }
 

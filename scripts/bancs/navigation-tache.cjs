@@ -55,6 +55,21 @@ const { metaVersData } = require('./_meta.cjs');
 const { getPath } = require('./_minipgrest.cjs');
 const fs = require('fs'), http = require('http');
 // (11 nov.) Le dictionnaire de la langue active (src/i18n/langues/<lang>.js, module ESM) : les libellés se jugent contre lui.
+// (16 nov., lot derniers-rouges) La barre du bas DÉCLARÉE (`BOTTOM_TABS` de src/App.jsx) : ses identifiants, dans
+// l'ordre, et la clé de son libellé (`nav.<id>`, `.court` s'il en a un). La barre a changé trois fois en une semaine
+// (11 nov. DJ3, 14 nov. choix n° 61, 16 nov. barre-achats) : le banc juge que l'écran REND ce que le code déclare —
+// ordre, libellés dans la langue, 44 px, pas de « Plus » —, jamais une liste recopiée à la main qui vieillit.
+const barreDeclaree = () => {
+  const app = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'App.jsx'), 'utf8');
+  const bloc = (/\nconst BOTTOM_TABS=\[([\s\S]*?)\n\];/.exec(app) || [])[1] || '';
+  const idPaires = (/export const ID_PAIRES = '([\w-]+)'/.exec(fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'navPaires.js'), 'utf8')) || [])[1] || 'paires';
+  const resoudre = (txt) => { const m = /entreeNav\(\{id:\s*(?:'([\w-]+)'|(ID_PAIRES))[^}]*?(court:)?[^}]*\}\)/.exec(txt); return m ? { id: m[1] || idPaires, court: /court:/.test(txt) } : null; };
+  return bloc.split('\n').map((l) => l.replace(/\/\/.*$/, '').trim()).filter(Boolean).flatMap((l) => l.split(/,(?![^{]*\})/).map((x) => x.trim()).filter(Boolean)).map((x) => {
+    if (/^entreeNav\(/.test(x)) return resoudre(x);
+    const c = (new RegExp('\\nconst ' + x.replace(/[^\w]/g, '') + '=entreeNav\\(\\{[^\\n]*?\\}\\)').exec(app) || [])[0];
+    return c ? resoudre(c) : null;
+  }).filter(Boolean);
+};
 const dicoLangue = async (l) => { const f = path.join(__dirname, '..', '..', 'src', 'i18n', 'langues', (/^(fr|en|es|it|de)$/.test(l) ? l : 'fr') + '.js'); const m = await import(require('url').pathToFileURL(f).href); return m.default || m[Object.keys(m)[0]] || {}; };
 const DIST = path.join(__dirname, '..', '..', 'dist');
 const PORT = Number(process.env.BANC_PORT) || 8940;
@@ -204,51 +219,53 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
       await essaie(`${qui} : navigation`, async () => {
         const { ctx, pg, errs } = await ouvrir(b, tel, 'journee', { local: { vrm_colis_aposter: { total: 2, enRetard: 0, vinted: 2, ebay: 0, at: maintenant.getTime() }, vrm_colis_retirer: { total: 3, prets: 3, sansCode: 0, aVerifier: 0, urgents: 0, at: maintenant.getTime() } } });
         if (tel) {
-          const barre = await pg.evaluate(() => [...document.querySelectorAll('.vrm-mobile-nav > button')].map((x) => ({ lib: (x.querySelector('.vrm-nav-label') || x).innerText.trim(), h: Math.round(x.getBoundingClientRect().height), entree: x.getAttribute('data-nav-entree') || '' })));
+          // (16 nov., lot derniers-rouges) PORTÉ sur la décision du 14 nov. (choix n° 61 de Julien, `BOTTOM_TABS` de src/App.jsx) :
+          // QUATRE onglets — Aujourd'hui · Annonces (l'onglet « paires » : Annonces, Stock, Achats) · Ventes · Argent —, plus de
+          // « Plus » : le reste vit dans le menu du haut (l'avatar). Le banc jugeait encore la barre du 11 nov. (lot DJ3).
+          // Les ONGLETS (`data-nav-entree`) ; le disque « + » du centre (14 nov., Studio : l'éventail des gestes) n'en est pas un.
+          const barre = await pg.evaluate(() => [...document.querySelectorAll('.vrm-mobile-nav > button')].filter((x) => x.getBoundingClientRect().width > 0 && (x.hasAttribute('data-nav-entree') || x.classList.contains('vrm-nav-more'))).map((x) => ({ lib: (x.querySelector('.vrm-nav-label') || x).innerText.trim(), h: Math.round(x.getBoundingClientRect().height), entree: x.getAttribute('data-nav-entree') || 'plus' })));
           // (11 nov., intégration — lot Traduction) Les libellés passent par tr() : la langue suit le réglage du vendeur
           // (sinon celle du navigateur). On juge l'ENTRÉE (data-nav-entree) et, pour le libellé, le texte du dictionnaire
           // de la langue ACTIVE (src/i18n/langues/<lang>.js) — jamais une chaîne française en dur.
           const langue = await pg.evaluate(() => (document.documentElement.getAttribute('lang') || 'fr').slice(0, 2));
           const dico = await dicoLangue(langue);
-          const attendu = ['nav.journee.court', 'nav.annonces', 'nav.ventes', 'nav.achats', 'nav.plus'].map((k) => dico[k]);
-          dit(barre.length === 5 && barre.slice(0, 4).map((x) => x.entree).join('|') === 'journee|annonces|ventes|achats' && attendu.every(Boolean) && barre.map((x) => x.lib).join('|') === attendu.join('|'), `A. la barre du bas : Journée · Annonces · Ventes · Achats · Plus (11 nov., lot DJ3 : Colis vit dans Ventes et Achats ; langue ${langue})`, JSON.stringify({ barre, attendu }));
+          const decl = barreDeclaree();
+          const attendu = decl.map((t) => dico['nav.' + t.id + (t.court ? '.court' : '')]);
+          dit(decl.length >= 4 && decl[0].id === 'journee' && ['ventes', 'compta'].every((x) => decl.some((t) => t.id === x)) && barre.map((x) => x.entree).join('|') === decl.map((t) => t.id).join('|') && !barre.some((x) => x.entree === 'plus') && attendu.every(Boolean) && barre.map((x) => x.lib.replace(/\s*\d+\+?$/, '')).join('|') === attendu.join('|'), `A. la barre du bas rend la barre DÉCLARÉE (${decl.map((t) => t.id).join(' · ')}), sans « Plus » (14 nov., choix n° 61 : le reste dans le menu du haut ; langue ${langue})`, JSON.stringify({ barre, attendu, decl }));
           dit(barre.every((x) => x.h >= 44), 'A. chaque onglet ≥ 44 px', JSON.stringify(barre.map((x) => x.h)));
           const badge = await pg.evaluate(() => { const x = document.querySelector('.vrm-mobile-nav [data-badge-nav="ventes"]'); let pub = null; try { pub = JSON.parse(localStorage.getItem('vrm_colis_aposter')); } catch (_) {} return { n: x ? x.getAttribute('data-badge-n') : '', pub: pub && pub.total }; });
           dit(badge.n !== '' && badge.n === String(badge.pub) && Number(badge.n) > 0, 'H. badge sur Ventes (colis à poster, lot DJ3) = le nombre PUBLIÉ (`vrm_colis_aposter`), jamais recalculé', JSON.stringify(badge));
           // (9 nov., lot Z) L'icône de VRM porte LE MÊME nombre que le badge de Colis (dernière demande au navigateur).
           const pastille = await pg.evaluate(() => (window.__pastille || []).slice(-1)[0]);
           dit(badge.n !== '' && pastille === Number(badge.n), 'Z. pastille de l\'icône de VRM = le badge des colis à poster', JSON.stringify({ pastille, badge: badge.n }));
-          await pg.locator('.vrm-mobile-nav button.vrm-nav-more').tap(); /* (11 nov.) par la classe : le libellé suit la langue (tr) */
-          await pg.waitForTimeout(500);
-          const f = await pg.evaluate(() => { const m = document.querySelector('.vrm-sheet'); if (!m) return null; return { groupes: [...m.querySelectorAll('[data-nav-groupe]')].map((g) => ({ t: g.getAttribute('data-nav-groupe'), n: g.querySelectorAll('[data-nav-entree]').length })), entrees: [...m.querySelectorAll('[data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), petits: [...m.querySelectorAll('[data-nav-entree]')].filter((e) => e.getBoundingClientRect().height < 44).length }; });
+          // Le menu du haut (l'avatar, `[data-profil-tete]`) porte ce que « Plus » portait (banc refonte-coque N pour les chemins).
+          await pg.locator('[data-profil-tete]').first().tap();
+          await pg.waitForSelector('[data-menu-profil] [data-nav-entree]', { timeout: 8000 }).catch(() => {});
+          await pg.waitForTimeout(400);
+          const f = await pg.evaluate(() => { const m = document.querySelector('[data-menu-profil]'); if (!m) return null; return { groupes: [...m.querySelectorAll('[data-nav-groupe]')].map((g) => ({ t: g.getAttribute('data-nav-groupe'), n: g.querySelectorAll('[data-nav-entree]').length })), entrees: [...m.querySelectorAll('[data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), petits: [...m.querySelectorAll('[data-nav-entree], [data-profil-menu]')].filter((e) => { const r = e.getBoundingClientRect(); return r.height > 0 && r.height < 44; }).length, parametres: !!m.querySelector('[data-profil-menu="parametres"]') }; });
           await capture(pg, 'plus-telephone');
-          // (11 nov.) Depuis le 10 nov. (lot AO, Julien : « l'onglet Compta est trop flou, relie-le avec Stats ») UNE entrée « Argent »
-          // (`compta`, dans « Gérer ») remplace Statistiques et Compta : plus de groupe « Argent » à part (src/App.jsx, GROUPES_PLUS).
-          dit(!!f && f.groupes.map((g) => g.t).join('|') === 'Vendre|Gérer|Moi', 'J. « Plus » groupé par tâche, SANS « Plateformes » ni « Expédier » : Vendre · Gérer · Moi', JSON.stringify(f && f.groupes));
-          const exp = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sheet [data-nav-groupe="Gérer"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
-          // (5 nov.) « E-mails » rejoint « Gérer » (demande du 5 nov., `docs/passation/2026-11-05-onglet-emails.md`).
-          dit(exp.join('|') === 'garage|emails|compta', 'J. « Gérer » : Stock, E-mails, Argent (À trancher est une carte de Ma journée, lot DJ4 ; Achats est dans la barre, lot DJ3), aucune entrée « Colis à retirer »', exp.join('|'));
-          const libArgent = await pg.evaluate(() => { const e = document.querySelector('.vrm-sheet [data-nav-entree="compta"]'); return e ? e.innerText.trim() : ''; });
-          // (11 nov.) Le libellé passe par tr() : « Argent » en français, la clé `nav.compta` dans la langue ACTIVE.
-          { const lg = await pg.evaluate(() => (document.documentElement.getAttribute('lang') || 'fr').slice(0, 2)); const dc = await dicoLangue(lg);
-            dit(libArgent === dc['nav.compta'] && (await dicoLangue('fr'))['nav.compta'] === 'Argent', 'J. l’entrée `compta` s’appelle « Argent » (nav.compta, langue ' + lg + ')', libArgent); }
-          dit(!!f && !f.entrees.some((x) => /^plat_|^ebay_|^leboncoin$/.test(x)), 'J. aucune entrée de site dans « Plus »', JSON.stringify(f && f.entrees));
+          const libArgent = barre.find((x) => x.entree === 'compta');
+          { const dc = await dicoLangue(langue);
+            dit(!!libArgent && libArgent.lib.replace(/\s*\d+\+?$/, '') === dc['nav.compta'] && (await dicoLangue('fr'))['nav.compta'] === 'Argent', 'J. l’onglet `compta` s’appelle « Argent » (nav.compta, langue ' + langue + ')', libArgent && libArgent.lib); }
+          dit(!!f && !f.entrees.some((x) => /^plat_|^ebay_|^leboncoin$/.test(x)), 'J. aucune entrée de site dans le menu du haut', JSON.stringify(f && f.entrees));
           dit(!!f && f.groupes.every((g) => g.n > 0), 'I. aucun groupe vide', JSON.stringify(f && f.groupes));
-          dit(!!f && !['journee', 'annonces', 'ventes', 'achats', 'cat_bord'].some((x) => f.entrees.includes(x)), 'I. rien de la barre du bas en double dans « Plus »', JSON.stringify(f && f.entrees));
+          dit(!!f && !['journee', 'ventes', 'compta', 'cat_bord', 'retraits'].some((x) => f.entrees.includes(x)), 'I. ni Ma journée, ni Ventes, ni Argent en double dans le menu du haut, aucune entrée « Colis à retirer »', JSON.stringify(f && f.entrees));
           dit(!!f && new Set(f.entrees).size === f.entrees.length, 'I. aucune entrée deux fois', JSON.stringify(f && f.entrees));
           // (9 nov., lot AL — Julien : « les favoris et offres doivent être dans Messages et Republier dans Annonces »)
           // « Republier » et « Favoris & offres » ne sont plus des entrées : ils vivent DANS Annonces et Messages (banc navigation-fusion).
-          dit(!!f && ['messages', 'garage', 'compta', 'communaute'].every((x) => f.entrees.includes(x)) && !f.entrees.includes('settings') && !f.entrees.includes('dashboard') && !f.entrees.includes('republier') && !f.entrees.includes('favoris') && !f.entrees.includes('achats'), 'I. « Plus » porte Messages, Achats, Stock, Argent (Statistiques + Compta, lot AO), Communauté — Paramètres derrière le profil (lot DJ6), plus Republier ni Favoris (lot AL)', JSON.stringify(f && f.entrees));
+          dit(!!f && ['messages', 'garage', 'emails', 'communaute'].every((x) => f.entrees.includes(x)) && !f.entrees.includes('settings') && !f.entrees.includes('dashboard') && !f.entrees.includes('republier') && !f.entrees.includes('favoris') && f.parametres, 'I. le menu du haut porte Messages, Stock, E-mails, Communauté et « Paramètres » (lot DJ6) — plus Republier ni Favoris (lot AL)', JSON.stringify(f && { e: f.entrees, p: f.parametres }));
           dit(await pg.evaluate(() => !!document.querySelector('[data-profil-tete]')), 'I. au téléphone, Paramètres derrière la photo du profil (en-tête)');
           dit(!!f && f.petits === 0, 'I. rangées ≥ 44 px', String(f && f.petits));
         } else {
           const col = await pg.evaluate(() => ({ taches: [...document.querySelectorAll('.vrm-sidebar [data-nav-taches] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), groupes: [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe]')].map((g) => g.getAttribute('data-nav-groupe')), toutes: [...document.querySelectorAll('.vrm-sidebar [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')), badge: (document.querySelector('.vrm-sidebar [data-badge-nav="ventes"]') || { getAttribute: () => '' }).getAttribute('data-badge-n'), pub: (() => { try { return JSON.parse(localStorage.getItem('vrm_colis_aposter')).total; } catch (_) { return null; } })() }));
           await capture(pg, 'colonne-ordinateur');
-          dit(col.taches.join('|') === 'journee|annonces|ventes|messages|achats', 'A. la colonne : Ma journée · Annonces · Ventes · Messages · Achats (lot DJ3)', col.taches.join('|'));
-          // (9 nov., lot AL) « Vendre » n'avait plus que Republier et Favoris & offres dans la colonne : vide, il disparaît.
-          dit(col.groupes.join('|') === 'Gérer|Moi' && !col.toutes.includes('republier') && !col.toutes.includes('favoris'), 'A/J. groupes par tâche — aucun doublon par plateforme (8 nov.) ; ni Republier ni Favoris & offres (lot AL)', col.groupes.join('|') + ' · ' + col.toutes.join(','));
-          const exp = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe="Gérer"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
-          dit(exp.join('|') === 'garage|emails|compta' && !col.toutes.includes('retraits') && !col.toutes.includes('cat_bord') && !col.toutes.includes('dashboard'), 'J. colonne, « Gérer » : Stock, E-mails, Argent (lot AO ; À trancher dans Ma journée, lot DJ4 ; Achats est dans la colonne des tâches, lot DJ3) ; aucune entrée « Colis à retirer »', exp.join('|'));
+          // (16 nov., lot derniers-rouges) PORTÉ sur le rail du 15 nov. (refonte-journee, la maquette ordinateur validée,
+          // `SideBar` de src/App.jsx) : Ma journée en tête, puis VENDRE (Ventes, Annonces, Messages, E-mails), RANGER (Stock,
+          // Achats), COMPTER (Argent) ; au pied Paramètres, le compte, « Moi » (Communauté). Mêmes entrées qu'hier.
+          dit(col.taches.join('|') === 'journee', 'A. la colonne : Ma journée en tête (rail du 15 nov.)', col.taches.join('|'));
+          dit(col.groupes.join('|') === 'vendre|ranger|compter|reglages|Moi' && !col.toutes.includes('republier') && !col.toutes.includes('favoris'), 'A/J. groupes par tâche (Vendre · Ranger · Compter, pied : Paramètres, Moi) — aucun doublon par plateforme (8 nov.) ; ni Republier ni Favoris & offres (lot AL)', col.groupes.join('|') + ' · ' + col.toutes.join(','));
+          const grp = await pg.evaluate(() => Object.fromEntries([...document.querySelectorAll('.vrm-sidebar [data-nav-groupe]')].map((g) => [g.getAttribute('data-nav-groupe'), [...g.querySelectorAll('[data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')).join('|')])));
+          dit(grp.vendre === 'ventes|annonces|messages|emails' && grp.ranger === 'garage|achats' && /^compta(\||$)/.test(grp.compter || '') && !col.toutes.includes('retraits') && !col.toutes.includes('cat_bord') && !col.toutes.includes('dashboard'), 'J. colonne : Vendre = Ventes, Annonces, Messages, E-mails ; Ranger = Stock, Achats ; Compter = Argent ; aucune entrée « Colis à retirer »', JSON.stringify(grp));
           const plat = await pg.evaluate(() => [...document.querySelectorAll('.vrm-sidebar [data-nav-groupe="Plateformes"] [data-nav-entree]')].map((e) => e.getAttribute('data-nav-entree')));
           dit(plat.length === 0, 'J. colonne sans section « Plateformes », sites dans les tâches', plat.join('|'));
           // (6 nov.) La cloche se calcule après ses lectures (passage asynchrone) : sur une
@@ -264,10 +281,10 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
           dit(!cpt.cat_bord && cpt.ventes === String(col.pub) && cpt.annonces === '4', 'J. compteurs de la colonne = les nombres PUBLIÉS (à poster, sur Ventes SEULEMENT depuis le lot DJ3 ; annonces : les 4 sans numéro de la cloche)', JSON.stringify(cpt));
           dit(!cpt.plat_ebay && !cpt.plat_leboncoin && !cpt.messages, 'J. aucun compteur sans nombre connu (eBay, Leboncoin, Messages)', JSON.stringify(cpt));
           dit(new Set(col.toutes).size === col.toutes.length, 'A. aucune entrée deux fois dans la colonne', col.toutes.join('|'));
-          // (11 nov., lot DJ6 — Julien : « Paramètres caché derrière le profil ») Paramètres n'est plus une entrée :
-          // la carte du compte, au pied de la colonne, ouvre le menu du profil (Paramètres en tête, src/profil/MenuProfil.jsx).
-          const profilPied = await pg.evaluate(() => { const c = document.querySelector('.vrm-sidebar [data-nav-compte-ouvre="profil"]'); const der = [...document.querySelectorAll('.vrm-sidebar [data-nav-entree]')].pop(); return { carte: !!c, sous: !!(c && c.closest('.vrm-rail-pied')) }; });   // au pied de la colonne (avec Communauté)
-          dit(!col.toutes.includes('settings') && profilPied.carte && profilPied.sous, 'A. Paramètres derrière le profil : la carte du compte, au pied de la colonne', col.toutes.join('|') + ' · ' + JSON.stringify(profilPied));
+          // (11 nov., lot DJ6) la carte du compte, au pied de la colonne, ouvre le menu du profil ; (15 nov., refonte-journee —
+          // la maquette validée) Paramètres revient en entrée AU PIED de la colonne (le menu du profil le garde aussi).
+          const profilPied = await pg.evaluate(() => { const c = document.querySelector('.vrm-sidebar [data-nav-compte-ouvre="profil"]'); const pr = document.querySelector('.vrm-sidebar [data-nav-entree="settings"]'); return { carte: !!c, sous: !!(c && c.closest('.vrm-rail-pied')), parametresAuPied: !!(pr && pr.closest('.vrm-rail-pied')) }; });
+          dit(profilPied.carte && profilPied.sous && profilPied.parametresAuPied, 'A. au pied de la colonne : Paramètres puis la carte du compte (qui ouvre le profil)', col.toutes.join('|') + ' · ' + JSON.stringify(profilPied));
           dit(col.badge !== '' && col.badge === String(col.pub) && Number(col.badge) > 0, 'H. badge des colis à poster (Ventes) = le nombre publié', JSON.stringify({ b: col.badge, pub: col.pub }));
         }
         dit(errs.length === 0, `${qui} : aucune erreur`, errs.join(' | '));
@@ -309,10 +326,14 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
         await capture(pg, `ventes-toutes-${tel ? 'tel' : 'ordi'}`);
         const l = await pg.evaluate((titre) => {
           const rows = [...document.querySelectorAll('[data-toutes-vente]')];
-          const memes = rows.filter((r) => (r.innerText || '').includes(titre));
-          return { n: rows.length, parSite: rows.reduce((m, r) => { const s = r.getAttribute('data-toutes-vente'); m[s] = (m[s] || 0) + 1; return m; }, {}), memes: memes.map((r) => r.getAttribute('data-toutes-vente') + ':' + r.getAttribute('data-toutes-id')), ids: rows.map((r) => r.getAttribute('data-toutes-vente') + ':' + r.getAttribute('data-toutes-id')), num: rows.filter((r) => r.querySelector('[data-toutes-num]')).map((r) => r.getAttribute('data-toutes-vente') + ':' + r.querySelector('[data-toutes-num]').getAttribute('data-toutes-num')) };
+          // (16 nov.) Le titre se lit dans le TEXTE de la ligne (textContent : le titre visible et son nom lu, quel que
+          // soit le rendu — innerText ignore un nom caché aux yeux), espaces normalisés.
+          const net = (t) => String(t || '').replace(/\s+/g, ' ');
+          const memes = rows.filter((r) => net(r.textContent).includes(titre));
+          const textes = rows.map((r) => net(r.textContent).slice(0, 90));
+          return { textes, n: rows.length, parSite: rows.reduce((m, r) => { const s = r.getAttribute('data-toutes-vente'); m[s] = (m[s] || 0) + 1; return m; }, {}), memes: memes.map((r) => r.getAttribute('data-toutes-vente') + ':' + r.getAttribute('data-toutes-id')), ids: rows.map((r) => r.getAttribute('data-toutes-vente') + ':' + r.getAttribute('data-toutes-id')), num: rows.filter((r) => r.querySelector('[data-toutes-num]')).map((r) => r.getAttribute('data-toutes-vente') + ':' + r.querySelector('[data-toutes-num]').getAttribute('data-toutes-num')) };
         }, MEME_TITRE);
-        dit(l.memes.length === 2 && l.memes.includes('vinted:7001') && l.memes.includes('leboncoin:lbc-tx-1'), 'D. deux paires au même titre sur deux sites = DEUX lignes, chacune sous son site', JSON.stringify(l.memes));
+        dit(l.memes.length === 2 && l.memes.includes('vinted:7001') && l.memes.includes('leboncoin:lbc-tx-1'), 'D. deux paires au même titre sur deux sites = DEUX lignes, chacune sous son site', JSON.stringify({ memes: l.memes, textes: l.textes }));
         dit(l.parSite.vinted === 3 && l.parSite.leboncoin === 2 && l.parSite.ebay === 1 && l.parSite.vestiaire === 1, 'D. chaque vente lue est une ligne (3 Vinted, 2 Leboncoin — l’achat n’en est pas une —, 1 eBay, 1 Vestiaire)', JSON.stringify(l.parSite));
         dit(new Set(l.ids).size === l.ids.length, 'D. aucune ligne en double', l.ids.join(' '));
         dit(l.num.includes('ebay:12') && l.num.includes('vestiaire:80') && !l.num.some((x) => x.startsWith('vinted:')), 'D. le N° seulement par identité (SKU eBay, référence Vestiaire) — un blanc pour Vinted plutôt qu’un faux', JSON.stringify(l.num));
@@ -346,9 +367,10 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
         e = await etat(pg);
         dit(e.site === 'leboncoin' && !e.blanc, 'B. Annonces · Leboncoin rend l’écran Leboncoin', JSON.stringify(e));
         // Aller ailleurs, revenir : le filtre est retenu.
-        await pg.locator(tel ? '.vrm-mobile-nav [data-nav-entree="achats"]' : '.vrm-sidebar [data-nav-entree="achats"]').first().click();
-        await pg.waitForTimeout(700);
-        await pg.locator(tel ? '.vrm-mobile-nav [data-nav-entree="annonces"]' : '.vrm-sidebar [data-nav-entree="annonces"]').first().click();
+        // (16 nov.) Au téléphone, Achats et Annonces sont deux segments de l'onglet « paires » (14 nov., choix n° 61).
+        // (16 nov., barre-achats) Achats a son onglet dans la barre ; avant, c'était un segment de « paires ».
+        if (tel) { const ach = (await pg.locator('.vrm-mobile-nav [data-nav-entree="achats"]').count()) ? '.vrm-mobile-nav [data-nav-entree="achats"]' : '[data-paires-segment="achats"]'; await pg.locator(ach).first().click(); await pg.waitForTimeout(700); await pg.locator('.vrm-mobile-nav [data-nav-entree="paires"]').first().click(); await pg.waitForTimeout(500); await pg.locator('[data-paires-segment="annonces"]').first().click().catch(() => {}); }
+        else { await pg.locator('.vrm-sidebar [data-nav-entree="achats"]').first().click(); await pg.waitForTimeout(700); await pg.locator('.vrm-sidebar [data-nav-entree="annonces"]').first().click(); }
         await pg.waitForTimeout(900);
         e = await etat(pg);
         dit(e.site === 'leboncoin', 'G. Annonces rouvre sur le dernier filtre choisi (Leboncoin)', JSON.stringify(e));
@@ -418,7 +440,11 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
         await choisir(pg, 'ebay');
         let e = await etat(pg);
         const ss = await pg.evaluate(() => [...document.querySelectorAll('[data-tache-sous="ventes.ebay"] [data-section]')].map((x) => x.getAttribute('data-section')));
-        dit(ss.join('|') === 'ventes|agent|offres' && e.section === 'ventes', 'L. Ventes · eBay : Commandes · À traiter · Offres, sur Commandes', JSON.stringify({ ss, s: e.section }));
+        // (16 nov., lot derniers-rouges) PORTÉ sur la RÈGLE (src/navigationTache.js, `SOUS_SECTIONS`) : depuis le 15 nov.
+        // (eBay complet 2) Ventes · eBay ouvre son Tableau, puis Commandes · À traiter · Offres · Argent · Santé.
+        const NT = await import(require('url').pathToFileURL(path.join(__dirname, '..', '..', 'src', 'navigationTache.js')).href);
+        const sv = NT.SOUS_SECTIONS['ventes.ebay'].map(([id]) => id), sae = NT.SOUS_SECTIONS['annonces.ebay'].map(([id]) => id);
+        dit(ss.join('|') === sv.join('|') && ['ventes', 'agent', 'offres'].every((x) => sv.includes(x)) && e.section === sv[0], `L. Ventes · eBay : ${sv.join(' · ')} (règle de src/navigationTache.js), sur la première`, JSON.stringify({ ss, s: e.section }));
         for (const sec of ['agent', 'offres']) {
           await pg.locator(`[data-tache-sous] [data-section="${sec}"]`).first().click(); await pg.waitForTimeout(700);
           e = await etat(pg);
@@ -426,10 +452,13 @@ const choisir = async (pg, site) => { const b = pg.locator(`[data-filtre-site] b
           dit(e.tache === 'ventes' && e.site === 'ebay' && e.section === sec && e.sousActif === sec && t > 10, `L. Ventes · eBay · ${sec} rendu`, JSON.stringify({ e: e.section, t }));
         }
         if (!tel) await capture(pg, 'ventes-ebay-offres-ordi');
-        await pg.locator(tel ? '.vrm-mobile-nav [data-nav-entree="annonces"]' : '.vrm-sidebar [data-nav-entree="annonces"]').first().click(); await pg.waitForTimeout(700);
+        // (16 nov.) Au téléphone, Annonces est dans l'onglet « paires » (segment Annonces · Stock · Achats, 14 nov.).
+        if (tel) { await pg.locator('.vrm-mobile-nav [data-nav-entree="paires"]').first().click(); await pg.waitForTimeout(700); await pg.locator('[data-paires-segment="annonces"]').first().click().catch(() => {}); }
+        else await pg.locator('.vrm-sidebar [data-nav-entree="annonces"]').first().click();
+        await pg.waitForTimeout(700);
         await choisir(pg, 'ebay');
         const sa = await pg.evaluate(() => [...document.querySelectorAll('[data-tache-sous="annonces.ebay"] [data-section]')].map((x) => x.getAttribute('data-section')));
-        dit(sa.join('|') === 'annonces|promo', 'L. Annonces · eBay : Annonces · Promotion', sa.join('|'));
+        dit(sa.join('|') === sae.join('|') && sae.includes('promo'), `L. Annonces · eBay : ${sae.join(' · ')} (règle de src/navigationTache.js)`, sa.join('|'));
         await pg.locator('[data-tache-sous] [data-section="promo"]').first().click(); await pg.waitForTimeout(700);
         e = await etat(pg);
         dit(e.tache === 'annonces' && e.section === 'promo', 'L. Annonces · eBay · Promotion rendu', JSON.stringify(e));

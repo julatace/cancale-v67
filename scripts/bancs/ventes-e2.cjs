@@ -253,6 +253,16 @@ async function tournee(nav, { W, theme, scenario }) {
   // ── Ventes · Vinted ──
   if (scenario !== 'vide') {
     await allerSite(o.pg, 'vinted');
+    // (17 nov., derniers-rouges) Depuis « Ventes plus clair » (#1202, src/ventes/ARegarder.jsx), l'alerte d'annulations est
+    // rangée dans « N choses à regarder », un repli FERMÉ au départ (décision de Julien : la liste tout de suite). On l'ouvre
+    // comme lui avant de lire les alertes ; l'alerte doit y être COMPTÉE (le N du repli la dit).
+    const ouvrirRegarder = async () => {
+      const t = o.pg.locator('details[data-ventes-regarder]:not([open]) > summary[data-ventes-regarder-ouvrir]').first();
+      if (await t.count() && await t.isVisible().catch(() => false)) { await t.click(); await o.pg.waitForTimeout(400); }
+    };
+    const nRegarder = () => o.pg.evaluate(() => { const d = document.querySelector('details[data-ventes-regarder]'); return d && !d.hidden ? Number(d.getAttribute('data-ventes-regarder')) : 0; });
+    const nAvant = await nRegarder();
+    if (scenario !== 'jeu') await ouvrirRegarder();
     const v = await MESURE(o.pg, { tel, sombre });
     await capture(o.pg, `e2-${scenario}-${W}-${theme}-vinted`);
     if (scenario === 'jeu') {
@@ -273,6 +283,7 @@ async function tournee(nav, { W, theme, scenario }) {
     }
     if (scenario === 'annul') {
       dit(v.alertes.length === 1 && v.alertes[0].uid === '222' && v.alertes[0].n === '3' && v.alertes[0].sur === '6', 'A', `${T} un compte à 50 % d’annulations contre 0 % : dit UNE fois (vendeuse_b, 3 sur 6)`, JSON.stringify(v.alertes));
+      dit(nAvant >= 1, 'A', `${T} « N choses à regarder » compte l’alerte (repli fermé, N ≥ 1)`, String(nAvant));
       const s = o.pg.locator('[data-annulations-alerte] summary').first();
       if (await s.count()) { await s.click(); await o.pg.waitForTimeout(400); }
       const v3 = await MESURE(o.pg, { tel, sombre });
@@ -282,7 +293,7 @@ async function tournee(nav, { W, theme, scenario }) {
       if (tel) dit(!v3.petits.length, 'A', `${T} l’alerte ouverte : 44 px au doigt`, v3.petits.slice(0, 6).join(' ¦ '));
       await capture(o.pg, `e2-${scenario}-${W}-${theme}-vinted-alerte`);
       // Le compte choisi : vendeuse_a ⇒ rien ; vendeuse_b ⇒ l'alerte.
-      const choisir = async (login) => { const c = o.pg.locator(`button:has-text("${login}")`).first(); if (await c.count()) { await c.click(); await o.pg.waitForTimeout(1200); return true; } return false; };
+      const choisir = async (login) => { const c = o.pg.locator(`button:has-text("${login}")`).first(); if (await c.count()) { await c.click(); await o.pg.waitForTimeout(1200); await ouvrirRegarder(); return true; } return false; };
       if (await choisir('vendeuse_a')) { const va = await MESURE(o.pg, { tel, sombre }); dit(!va.alertes.length, 'A', `${T} compte vendeuse_a choisi : pas d’alerte (elle n’annule pas)`, JSON.stringify(va.alertes)); }
       if (await choisir('vendeuse_b')) { const vb = await MESURE(o.pg, { tel, sombre }); dit(vb.alertes.length === 1, 'A', `${T} compte vendeuse_b choisi : l’alerte est là`, JSON.stringify(vb.alertes)); }
     }

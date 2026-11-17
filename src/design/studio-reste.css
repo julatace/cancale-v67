@@ -240,7 +240,7 @@
   color: var(--sb-encre-2) !important; font: 600 13px/1.2 var(--sb-police-texte) !important; letter-spacing: 0 !important;
   padding: 0 8px !important; flex: 1 1 auto !important; min-width: 0 !important; white-space: nowrap !important;
 }
-@media (pointer: coarse) { :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-seg .vrm-seg-btn { min-height: 44px !important; } }
+@media (pointer: coarse) { :root:root:root:root:root:root body :is([data-espace="argent"], [data-espace="autres"], [data-tache="messages"], .vrm-chat-panel) .vrm-seg .vrm-seg-btn { min-height: 44px !important; min-width: 44px !important; } }
 /* (16 nov., parcours-vert) « Questions · Tout » (eBay) et la navigation « 1 · 2 » entre les questions d'une annonce :
    44 × 44 px au doigt ET à la souris (styles-parcours-clairs.css, banc offres-objectif) — le segmenté ci-dessus (40 px,
    largeur libre) les réduisait à 22 × 40 px. */

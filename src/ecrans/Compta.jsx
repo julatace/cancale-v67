@@ -3718,7 +3718,7 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
       <button type="button" className="vg-a-vendu" {...attrs(qV)}>
         <span className="vrm-argent-w-l vg-sr">{qV.libelle}</span>
         {chiffre(qV, true)}
-        <span className="vg-a-vendu-sous">{tr('verre2.argent.venduEn', { mois: moisLong })}{nV && nV.valeur != null ? ` · ${tr('avenir.ventes', { n: nV.valeur })}` : ''}{qV.note ? <span className="vrm-argent-w-note"> · {qV.note}</span> : null}</span>
+        <span className="vg-a-vendu-sous">{tr('verre2.argent.venduEn', { mois: moisLong })}{nV && nV.valeur != null ? `\u00a0· ${tr('avenir.ventes', { n: nV.valeur })}` : ''}{qV.note ? <span className="vrm-argent-w-note">{'\u00a0· '}{qV.note}</span> : null}</span>
       </button>
       <div className="vg-a-duo">
         <button type="button" className="vg-carte vg-a-case" {...attrs(qR)}>

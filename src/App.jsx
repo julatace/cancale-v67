@@ -7754,7 +7754,7 @@ const lireRetoursAchat = async (c) => {
 };
 // Bordereaux reçus par EMAIL (pipeline usevrm) : lignes app_data email_bord_*
 // = { numero, modele, taille, transaction, pdfB64, ... }. Le PDF est en base64.
-const fetchEmailBordereaux = async () => {
+const lireEmailBordereaux = async () => {
   try {
     // ⚠️ SURTOUT PAS `select=data` : chaque bordereau embarque son PDF en
     // base64 (deux fois : brut + tamponné). Mesuré, 51 bordereaux = 6 Mo dont
@@ -7803,6 +7803,17 @@ const fetchEmailBordereaux = async () => {
       .sort((a, b) => new Date(b.receivedAt || 0) - new Date(a.receivedAt || 0));
   } catch (_) { return null; }
 };
+// (16 nov., lot derniers-rouges — budget-vitesse : « NOUVELLE lecture en double » de `email_bord_*` sur Annonces,
+// Ventes, Achats) Plusieurs écrans montés ensemble (la liste « Tous » de Ventes, l'écran des bordereaux) demandaient
+// la même liste au même instant : UNE lecture en vol, partagée ; la suivante, après sa réponse, relit (rien de figé).
+let _emailBordsEnVol = null;
+const fetchEmailBordereaux = () => {
+  if (_emailBordsEnVol) return _emailBordsEnVol.then((v) => (Array.isArray(v) ? v.slice() : v));
+  const p = lireEmailBordereaux().finally(() => { if (_emailBordsEnVol === p) _emailBordsEnVol = null; });
+  _emailBordsEnVol = p;
+  return p.then((v) => (Array.isArray(v) ? v.slice() : v));   // chaque appelant reçoit SA liste (jamais un tableau partagé)
+};
+
 // ── LES OCTETS D'UN BORDEREAU : UN SEUL LECTEUR, TROIS ÉTATS (4 octobre) ─────
 // Sept endroits impriment un bordereau (Ventes, carte Colis, lot, Réimprimer,
 // bordereau + facture, tamponnage en 1 clic, reçu du bilan) et chacun relisait
@@ -32087,7 +32098,8 @@ const lireExtrasRepartition = async () => {
     // par dix minutes (§4.4 : jamais `select=data`, on projette le seul champ).
     lireTout('id=like.harvest_%25_txn_%25&select=tx:meta->>id,cc:data->payload->transaction->buyer->>country_code').catch(() => null),
     lireTout('id=like.harvest_%25_listings&select=items:data->payload->items').catch(() => null),
-    fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_listing_dates&select=data`, { headers: sbAuth() })
+    // (16 nov.) Par `fetchMemo`, comme la lecture de l'écran : la même ligne n'est pas relue deux fois (budget-vitesse).
+    fetchMemo(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vinted_listing_dates&select=data`, { headers: sbAuth() })
       .then((r) => (r.ok ? r.json() : null)).then((j) => (Array.isArray(j) ? ((j[0] && j[0].data) || {}) : null)).catch(() => null),
     lireTxnMeta().catch(() => null),
   ]);
@@ -50033,7 +50045,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // (15 nov., refonte-journee) « Imprimer les 3 bordereaux » en barre (la maquette) ; (16 nov.) toujours le plein de
                 // l'écran : « La paire à sortir » n'est plus dans Ma journée (la case allumée du Stock).
                 const plein = em && em.n > 0 ? (
-                  <button type="button" className="sb-btn-plein" data-sj-imprimer={String(em.n)} data-fu-principal="" title={em.phrase}
+                  <button type="button" className="sb-btn-plein" data-sj-imprimer={String(em.n)} data-sj-imprimer-exact={em.exact ? '1' : '0'} data-fu-principal="" title={em.phrase}
                     onClick={imprimer}>{/* (16 nov.) son nom = son texte visible (WCAG 2.5.3, banc accessibilite) */}
                     <Icon name="printer" size={24}/><span>{(em.n > 1 ? tr('sj.imprimerLesN', { n: em.n }) : tr('sj.imprimerLe'))}</span>
                   </button>) : null;

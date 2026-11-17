@@ -25,8 +25,11 @@ export const POUR = Object.freeze(['tous', 'sneakers', 'autre', 'pro', 'propriet
 export const MODES = Object.freeze(['tous', 'complet']);
 export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
+import { phraseVendeur } from './profilVendeur.js';
 
 export const NOUVEAUTES = Object.freeze([
+  // (16 nov., lot derniers-rouges) docs/passation/2026-11-16-derniers-rouges.md
+  { id: 'mot-article', date: '2026-11-16', titre: 'Tes écrans disent « article » partout', phrase: 'Fiches, listes, nouveautés et aide, dans les cinq langues.', tab: 'journee', pour: 'autre', mode: 'tous' },
   // (16 nov.) docs/passation/2026-11-16-design-restes.md
   { id: 'paire-monte-sites', date: '2026-11-16', titre: 'Leboncoin, eBay, Vestiaire : la paire monte', phrase: 'Touche une annonce : prix, jours, favoris et prix d’achat sur place.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (16 nov., lot extension-restes, extension 5.395) docs/passation/2026-11-16-extension-restes.md
@@ -363,7 +366,13 @@ export function pourLui(n, { vend = null, categories = null, pro = null, proprie
 export function nouveautesDuCompte(ctx = {}, liste = NOUVEAUTES) {
   const depuis = jourDe(ctx.inscritLe);
   if (!depuis) return [];
-  return liste.filter((n) => n && n.date > depuis && pourLui(n, ctx));
+  // (16 nov., lot derniers-rouges) Hors Sneakers, une ligne qui dit « paire » se dit « article »
+  // (PHRASES_ARTICLE, src/profilVendeur.js) ; « pas su » ⇒ le mot neutre.
+  const vend = ctx.vend === 'sneakers' ? 'sneakers' : 'autre';
+  return liste.filter((n) => n && n.date > depuis && pourLui(n, ctx)).map((n) => {
+    const titre = phraseVendeur(n.titre, vend), phrase = phraseVendeur(n.phrase, vend);
+    return titre === n.titre && phrase === n.phrase ? n : { ...n, titre, phrase };
+  });
 }
 
 // Celles à montrer sur la carte : pas encore vues.

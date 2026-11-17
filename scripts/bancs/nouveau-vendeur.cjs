@@ -227,6 +227,10 @@ const INSPECTE = (pg, tel) => pg.evaluate((tel) => {
     const r = e.getBoundingClientRect();
     if (r.bottom < 0 || r.top > innerHeight * 3) continue;
     if (e.tagName === 'A' && getComputedStyle(e).display === 'inline') continue; // lien dans une phrase
+    // (16 nov., derniers-rouges) Un élément que le doigt ne peut PAS toucher (`pointer-events: none`) n'est pas une cible :
+    // la plaque N° d'une rangée de la liste d'Annonces (studio-paires.css : « fermée, la rangée est le geste, la plaque ne
+    // se touche pas ») — c'est la rangée entière qui reçoit le toucher. Un bouton touchable de 22 px reste rouge.
+    if (getComputedStyle(e).pointerEvents === 'none') continue;
     if (r.height < 43.5 || r.width < 43.5) petits.push(`${(e.innerText || e.getAttribute('aria-label') || e.tagName).trim().replace(/\s+/g, ' ').slice(0, 30)} ${Math.round(r.width)}×${Math.round(r.height)}` + (window.__bancSonde ? ' <' + e.outerHTML.slice(0, 220) + ' | parent ' + (e.parentElement && e.parentElement.className) + '>' : ''));
   }
   // Une carte « écran vide » collée à ce qui suit (aucun espace entre les deux).
