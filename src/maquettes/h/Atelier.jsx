@@ -101,12 +101,12 @@ const PasLu = ({ quoi }) => <div className="h-plan"><div className="h-vide">— 
 const Vide = ({ texte }) => <div className="h-plan"><div className="h-vide">{texte}</div></div>;
 
 // LE RAIL SOULIGNÉ (repris de C) : les sous-parties du poste ; la DERNIÈRE est toujours l'historique.
-function Rail({ items, actif, choisir }) {
+function Rail({ items, actif, choisir, sansNombre }) {
   return (
     <nav className="h-rail" aria-label="Sous-parties">
       {items.map((it) => (
         <button key={it.cle} type="button" className="h-rail-cran" aria-current={actif === it.cle ? 'true' : undefined} onClick={() => choisir(it.cle)} data-rail={it.cle}>
-          <span className="h-rail-mot">{it.nom}</span>{it.n != null ? <span className={'h-rail-n' + (it.ambre ? ' is-ambre' : '')}>{nb(it.n)}</span> : null}
+          <span className="h-rail-mot">{it.nom}</span>{it.n != null && it.cle !== sansNombre ? <span className={'h-rail-n' + (it.ambre ? ' is-ambre' : '')}>{nb(it.n)}</span> : null}
           {it.histo ? <Ico n="chevron" t={14} /> : null}
         </button>
       ))}
@@ -134,13 +134,13 @@ function railDe(cle, P) {
 // LE geste du poste : le SEUL bouton plein de l'écran, sous le pouce (plateau du bas), sur l'ordinateur à droite du titre.
 function gesteDe(cle, P) {
   const n = {
-    recevoir: P.recevoir.arrives ? ['Numéroter', P.recevoir.arrives.length] : null,
-    ranger: ['Ranger', P.ranger.sansCase.length],
-    publier: ['Publier', P.publier.aPublier.length],
-    poster: P.poster.aImprimer ? ['Imprimer', P.poster.aImprimer.length] : null,
+    recevoir: P.recevoir.arrives ? ['Numéroter', P.recevoir.arrives.length, 'arrives'] : null,
+    ranger: ['Ranger', P.ranger.sansCase.length, 'faire'],
+    publier: ['Publier', P.publier.aPublier.length, 'faire'],
+    poster: P.poster.aImprimer ? ['Imprimer', P.poster.aImprimer.length, 'faire'] : null,
     encaisser: ['Saisir les prix', P.encaisser.sansCout.length],
   }[cle];
-  return n && n[1] > 0 ? { mot: n[0], n: n[1] } : null;
+  return n && n[1] > 0 ? { mot: n[0], n: n[1], rail: n[2] || '' } : null;
 }
 
 // Julien (17 nov.) : « parfait, minimaliste et simple ». UN cran du rail = UNE liste ; aucun nombre écrit deux fois
@@ -209,7 +209,7 @@ function Ranger({ M, P, rail, large }) {
   if (rail === 'doublons') return !g.doublons.length ? <Vide texte="Aucun N° porté par deux paires." /> : <Section cle="doublons"><Plan>{g.doublons.map((p) => <LignePaire key={p.k} p={p} droite="2 annonces" />)}</Plan></Section>;
   if (rail === 'histo') { const l = [...M.paires.values()].filter((p) => !p.vente).sort((a, b) => b.numero.localeCompare(a.numero, 'fr', { numeric: true })); return <Section cle="stock"><Plan max={9} total={l.length}>{l.map((p) => <LignePaire key={p.k} p={p} />)}</Plan></Section>; }
   if (!g.sansCase.length) return <Vide texte="Tout est rangé." />;
-  return <Section cle="aranger"><Plan max={9} total={g.sansCase.length}>{g.sansCase.map((p) => <LignePaire key={p.k} p={p} droite="sans case" ambre />)}</Plan></Section>;
+  return <Section cle="aranger"><Plan max={9} total={g.sansCase.length}>{g.sansCase.map((p) => <LignePaire key={p.k} p={p} />)}</Plan></Section>;
 }
 
 function Publier({ M, P, rail }) {
@@ -218,7 +218,7 @@ function Publier({ M, P, rail }) {
   if (rail === 'sansnum') return !u.sansNumero ? <PasLu quoi="annonces" /> : !u.sansNumero.length ? <Vide texte="Chaque annonce a son N°." /> : <Section cle="sansnum"><Plan max={9} total={u.sansNumero.length}>{u.sansNumero.map((a) => <LigneAnnonce key={a.id} a={a} M={M} t={t} />)}</Plan></Section>;
   if (rail === 'histo') return !u.enLigne ? <PasLu quoi="annonces" /> : <Section cle="annonces"><Plan max={9} total={u.enLigne.length}>{[...u.enLigne].sort((a, b) => Date.parse(b.cree || 0) - Date.parse(a.cree || 0)).map((a) => <LigneAnnonce key={a.id} a={a} M={M} t={t} />)}</Plan></Section>;
   if (!u.aPublier.length) return <Vide texte="Tout ce qui est rangé est en ligne." />;
-  return <Section cle="apublier"><Plan max={9} total={u.aPublier.length}>{u.aPublier.map((p) => <LignePaire key={p.k} p={p} droite={p.cout != null ? euros(p.cout) : '—'} droiteSous="achat" />)}</Plan></Section>;
+  return <Section cle="apublier"><Plan max={9} total={u.aPublier.length}>{u.aPublier.map((p) => <LignePaire key={p.k} p={p} droite={p.cout != null ? euros(p.cout) : '—'} />)}</Plan></Section>;
 }
 
 function Poster({ M, P, rail, large }) {
@@ -264,9 +264,8 @@ function Encaisser({ M, P, rail }) {
       </div>
       <Section cle="afaire">
         <Plan>
-          <Ligne cle="couts" titre="Prix d’achat à saisir" droite={nb(e.sansCout.length)} ambre={e.sansCout.length > 0} />
           <Ligne cle="statut" titre="Statut URSSAF" droite="à choisir" ambre />
-          <Ligne cle="virer" titre="Virer vers ta banque" droite={e.solde ? euros(e.solde.dispo) : '—'} />
+          <Ligne cle="virer" titre="Virer vers ta banque" droite="sur Vinted" />
         </Plan>
       </Section>
     </>
@@ -336,12 +335,12 @@ export default function Atelier() {
       {large ? (
         <aside className="h-cote">
           <div className="h-marque">VRM<span className="h-marque-sous">L’atelier</span></div>
-          <button type="button" className="h-champ h-champ--cote" onClick={() => aller({ ...route, scan: '' })}><Ico n="scan" t={20} /><span>Scanner ou taper un code</span><kbd>/</kbd></button>
+          <button type="button" className="h-champ h-champ--cote" onClick={() => aller({ ...route, scan: '' })}><Ico n="scan" t={20} /><span>Scanner un code</span><kbd>/</kbd></button>
           <nav className="h-postes-cote">
             {POSTES.map((p, i) => (
               <button key={p.cle} type="button" className="h-poste-cote" aria-current={p.cle === poste.cle ? 'page' : undefined} onClick={() => choisirPoste(p.cle)} data-poste-nav={p.cle}>
                 <span className="h-poste-i">{i + 1}</span><Ico n={ICONE_POSTE[p.cle]} t={20} /><span className="h-poste-nom">{p.nom}</span>
-                {aFaire(p.cle) ? <span className="h-poste-n"><span className="h-point" />{nb(aFaire(p.cle))}</span> : null}
+                {aFaire(p.cle) ? <span className="h-poste-n" aria-label={`${aFaire(p.cle)} à faire`}><span className="h-point" /></span> : null}
               </button>
             ))}
           </nav>
@@ -355,7 +354,7 @@ export default function Atelier() {
             <button type="button" className="h-rond-aide" aria-label="Comment marche ce poste"><Ico n="aide" t={20} /></button>
             {large ? <span className="h-tete-geste">{Plein}</span> : null}
           </div>
-          <Rail items={rail} actif={route.rail || 'faire'} choisir={(c) => aller({ poste: poste.cle, rail: c })} />
+          <Rail items={rail} sansNombre={geste ? geste.rail : ''} actif={route.rail || 'faire'} choisir={(c) => aller({ poste: poste.cle, rail: c })} />
         </header>
         <div className="h-corps"><Ecran M={M} P={P} large={large} rail={route.rail || 'faire'} /></div>
       </main>
