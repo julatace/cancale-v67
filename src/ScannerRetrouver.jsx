@@ -24,7 +24,8 @@ import { tr, monnaie, date as dateLangue } from './i18n/index.js';
 import { useLangue } from './i18n/react.js';
 import { lireCodeColis, retrouverParSuivi, normaliserN } from './scanColis.js';
 import { useLectureCamera, raisonCamera, vibrer, creerBip } from './ScannerColis.jsx';
-import { lireSourcesColis, EV_RETROUVER_CODE } from './retrouverColis.js';
+import { lireSourcesColis, EV_RETROUVER_CODE, chercherCodeSources } from './retrouverColis.js';
+import { codeCherchable, normaliserCode } from './etiquettesScan.js';
 import './design/scanner-retrouver.css';
 
 const ATTENTE_SOURCES_MS = 10000;
@@ -194,17 +195,51 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
   const enCours = React.useRef(null);                  // la lecture qui attend les sources
   const resRef = React.useRef(null); resRef.current = res;
 
+  const dejaCherches = React.useRef(new Set());       // (17 nov.) codes déjà cherchés dans les étiquettes, sans résultat
   const resoudre = React.useCallback((brut, { tape = false } = {}) => {
     const lu = lireCodeColis(brut);
-    if (!lu) {
-      if (tape) { n.current += 1; setRes({ etat: 'pasReconnu', brut: String(brut), n: n.current }); vibrer([30, 60, 30]); bip.current(false); }
+    // (17 nov., lot scan-bordereau-vente) Un code qui n'est pas un n° de suivi (le grand code d'une étiquette
+    // Mondial Relay / InPost, un code de dépôt…) est cherché, tel quel, dans le texte des étiquettes de SES ventes
+    // (src/etiquettesScan.js) : une identité exacte. Trop court ⇒ jamais cherché.
+    const cherchable = codeCherchable(brut);
+    const code = normaliserCode(brut);
+    if (!lu && (!cherchable || (!tape && dejaCherches.current.has(code)))) {
+      if (tape) { n.current += 1; setRes({ etat: 'pasReconnu', brut: String(brut), n: n.current, cherche: dejaCherches.current.has(code) }); vibrer([30, 60, 30]); bip.current(false); }
       else setIndice(court(brut));
       return;
     }
     setIndice('');
     const finir = (incomplet) => {
       const S = lireSourcesColis();
-      const r = retrouverParSuivi(lu, S.enregistrements);
+      const r = lu ? retrouverParSuivi(lu, S.enregistrements) : { etat: 'aucun', lu: null };
+      if (r.etat === 'aucun' && cherchable && S.chercheurs && S.chercheurs.length && !dejaCherches.current.has(code)) {
+        setRes({ etat: 'attente', lu, brut: String(brut), n: n.current, etiquettes: true });
+        chercherCodeSources(code, S.chercheurs).then((rc) => {
+          n.current += 1;
+          if (rc.etat === 'un' || rc.etat === 'plusieurs') {
+            vibrer(40); bip.current(true); setChoisi(null);
+            const luE = lu || { suivi: code, nom: null, transporteur: null, forme: 'etiquette' };
+            setRes(rc.etat === 'un' ? { etat: 'un', lu: luE, trouve: rc.trouves[0], brut: String(brut), n: n.current, parEtiquette: true }
+              : { etat: 'plusieurs', lu: luE, trouves: rc.trouves, brut: String(brut), n: n.current, parEtiquette: true });
+            return;
+          }
+          if (rc.etat === 'aucun') dejaCherches.current.add(code);
+          if (!lu) {
+            if (tape) { setRes({ etat: 'pasReconnu', brut: String(brut), n: n.current, cherche: true, pasSu: rc.etat === 'pasSu' }); vibrer([30, 60, 30]); bip.current(false); }
+            else { setRes(null); setIndice(court(brut)); }
+            return;
+          }
+          vibrer([30, 60, 30]); bip.current(false); setChoisi(null);
+          setRes({ ...r, brut: String(brut), n: n.current, manques: S.manques, incomplet: !!incomplet, cherche: true, pasSu: rc.etat === 'pasSu' });
+        });
+        return;
+      }
+      if (!lu) {
+        n.current += 1;
+        if (tape) { setRes({ etat: 'pasReconnu', brut: String(brut), n: n.current }); vibrer([30, 60, 30]); bip.current(false); }
+        else { setRes(null); setIndice(court(brut)); }
+        return;
+      }
       n.current += 1;
       const bon = r.etat === 'un' || r.etat === 'plusieurs';
       vibrer(bon ? 40 : [30, 60, 30]); bip.current(bon);
@@ -307,7 +342,7 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
       </div>
       <div className="vrm-rtv-bas">
         {res && res.etat !== 'attente' ? (
-          <section className="vrm-rtv-feuille" role="status" aria-live="assertive" data-scan-r-resultat={res.etat} data-scan-r-cle={montrer ? `${montrer.sorte}:${montrer.cle}` : ''}>
+          <section className="vrm-rtv-feuille" role="status" aria-live="assertive" data-scan-r-resultat={res.etat} data-scan-r-par={res.parEtiquette ? 'etiquette' : 'suivi'} data-scan-r-cle={montrer ? `${montrer.sorte}:${montrer.cle}` : ''}>
             {montrer ? <>
               {res.etat === 'plusieurs' ? <button type="button" className="vrm-rtv-lien vrm-rtv-retour" data-scan-r-liste-retour="" onClick={() => setChoisi(null)}>{tr('scan.r.plusieursRetour', { n: res.trouves.length })}</button> : null}
               {montrer.sorte === 'achat' ? <FicheAchat e={montrer} lu={res.lu} Photo={Photo} onOuvrir={ouvrir} onRanger={ranger} onPasCa={pasCa}/> : <Fiche e={montrer} lu={res.lu} Photo={Photo} onOuvrir={ouvrir}/>}
@@ -343,14 +378,14 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
             ) : (
               <div className="vrm-rtv-msg" data-acc-echec="colis.retrouver" data-acc-raison="pasReconnu">
                 <p className="vrm-rtv-msg-titre" data-scan-r-message="">{tr('scan.r.pasReconnu')}</p>
-                <p className="vrm-rtv-msg-sous">{tr('acc.colis.retrouver.pasReconnu')}</p>
-                <p className="vrm-rtv-lu vrm-rtv-mono">{court(res.brut)}</p>
+                <dl className="vrm-rtv-lu-detail"><div><dt>{tr('scan.b.codeLu')}</dt><dd className="vrm-rtv-mono" data-scan-b-code-lu={normaliserCode(res.brut)}>{court(res.brut)}</dd></div></dl>
+                <p className="vrm-rtv-msg-sous" data-scan-b-quoi-faire={res.cherche ? (res.pasSu ? 'pas-su' : 'cherche') : 'court'}>{res.cherche ? (res.pasSu ? tr('scan.b.pasSu') : tr('scan.b.pasSurEtiquette')) : tr('acc.colis.retrouver.pasReconnu')}</p>
               </div>
             )}
             <button type="button" className="vrm-rtv-lien" data-scan-r-autre="" onClick={autre}>{tr('scan.r.autre')}</button>
           </section>
         ) : res && res.etat === 'attente' ? (
-          <section className="vrm-rtv-feuille is-attente" role="status" data-scan-r-resultat="attente"><span className="vrm-rtv-roue" aria-hidden="true"/><p className="vrm-rtv-msg-sous">{tr('scan.r.attente')}</p></section>
+          <section className="vrm-rtv-feuille is-attente" role="status" data-scan-r-resultat="attente"><span className="vrm-rtv-roue" aria-hidden="true"/><p className="vrm-rtv-msg-sous">{res.etiquettes ? tr('scan.b.attente') : tr('scan.r.attente')}</p></section>
         ) : (
           <div className="vrm-rtv-outils">
             {lampe != null ? <button type="button" className={'vrm-rtv-rond' + (lampe ? ' is-actif' : '')} data-scan-r-lampe={lampe ? '1' : '0'} aria-pressed={lampe ? 'true' : 'false'} aria-label={tr('scan.r.lampe')} onClick={basculerLampe}><Icone d={I_LAMPE}/></button> : null}

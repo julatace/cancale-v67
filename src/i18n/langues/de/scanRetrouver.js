@@ -76,4 +76,9 @@ export default {
   "scan.a.pasCaIndice": "Ziele auf einen anderen Code des Pakets oder tippe die Nummer ein.",
   "scan.a.inconnu": "Unbekanntes Paket: Nr. {n}, kein Kauf mit dieser Nummer",
   "scan.a.relier": "Mit einem Kauf verknüpfen",
+  // (17 nov., lot scan-bordereau-vente) un code cherché sur les étiquettes de ses ventes.
+  "scan.b.codeLu": "Gelesener Code",
+  "scan.b.attente": "Suche diesen Code auf deinen Etiketten…",
+  "scan.b.pasSurEtiquette": "Dieser Code ist weder eine bekannte Sendungsnummer noch auf einem deiner Verkaufsetiketten gedruckt. Ziele auf den langen Barcode (oft kleiner, am Rand) oder tippe die Sendungsnummer ein.",
+  "scan.b.pasSu": "Einige Etiketten konnten nicht gelesen werden. Versuche es gleich noch einmal oder tippe die Sendungsnummer ein.",
 };

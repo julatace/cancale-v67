@@ -76,4 +76,9 @@ export default {
   "scan.a.pasCaIndice": "Aim at another code on the parcel, or type the number.",
   "scan.a.inconnu": "Unknown parcel: no. {n}, no purchase has this number",
   "scan.a.relier": "Link to a purchase",
+  // (17 nov., lot scan-bordereau-vente) un code cherché sur les étiquettes de ses ventes.
+  "scan.b.codeLu": "Code read",
+  "scan.b.attente": "Looking for this code on your labels…",
+  "scan.b.pasSurEtiquette": "This code is neither a known tracking number nor printed on one of your sale labels. Aim at the long barcode (often smaller, on the edge), or type the tracking number.",
+  "scan.b.pasSu": "Some of your labels couldn’t be read. Try again in a moment, or type the tracking number.",
 };

@@ -22,19 +22,36 @@ export const sourcePrincipalePresente = () => [...SOURCES.keys()].some((k) => k.
 // Toutes les sources, un enregistrement (sorte + clé) une fois. `pret` : la source principale est là
 // ET chaque source a fini de lire ; sinon le scanner attend (« pas lu » n'est jamais « rien »).
 export function lireSourcesColis() {
-  const enregistrements = [], manques = []; let pret = sourcePrincipalePresente();
+  const enregistrements = [], manques = [], chercheurs = []; let pret = sourcePrincipalePresente();
   const vus = new Set();
   for (const fn of SOURCES.values()) {
     let r = null; try { r = fn(); } catch (_) { r = null; }
     if (!r) continue;
     if (!r.pret) pret = false;
+    if (typeof r.chercher === 'function') chercheurs.push(r.chercher);
     for (const m of (Array.isArray(r.manques) ? r.manques : [])) if (m && !manques.includes(m)) manques.push(m);
     for (const e of (Array.isArray(r.enregistrements) ? r.enregistrements : [])) {
       if (!e || e.cle == null) continue;
       const k = `${e.sorte || ''}:${e.cle}`; if (vus.has(k)) continue; vus.add(k); enregistrements.push(e);
     }
   }
-  return { pret, enregistrements, manques };
+  return { pret, enregistrements, manques, chercheurs };
+}
+// (17 nov., lot scan-bordereau-vente) Un code lu qui n'est pas un n° de suivi connu : chaque source qui sait
+// chercher dans ses étiquettes (`chercher(code)` ⇒ { etat, enregistrements, pasLus }) le cherche ; les trouvés
+// sont réunis (sorte + clé une fois). Rend { etat: 'un' | 'plusieurs' | 'aucun' | 'pasSu', trouves }.
+export async function chercherCodeSources(code, chercheurs) {
+  const vus = new Map(); let pasSu = false;
+  for (const f of (Array.isArray(chercheurs) ? chercheurs : [])) {
+    let r = null; try { r = await f(code); } catch (_) { r = null; }
+    if (!r) { pasSu = true; continue; }
+    if (r.etat === 'pasSu') pasSu = true;
+    for (const e of (Array.isArray(r.enregistrements) ? r.enregistrements : [])) if (e && e.cle != null) vus.set(`${e.sorte || ''}:${e.cle}`, e);
+  }
+  const trouves = [...vus.values()];
+  if (trouves.length === 1) return { etat: 'un', trouves };
+  if (trouves.length > 1) return { etat: 'plusieurs', trouves };
+  return { etat: pasSu ? 'pasSu' : 'aucun', trouves: [] };
 }
 
 // L'ouverture : le disque « + » ⇒ Scanner, et les boutons de Ventes et d'Achats.

@@ -49,7 +49,9 @@ export function transporteursDuPdf(texte) {
 // 26 chiffres commençant par « 56 », dont les chiffres 3 à 10 sont le n° Mondial Relay (3 bordereaux sur 3 :
 // le n° de l'e-mail). Une FORME PROPRE, comme XW…TS pour Chronopost : un seul code de cette forme dans le
 // PDF ⇒ Mondial Relay et son n° ; zéro ou plusieurs ⇒ rien (jamais deviné).
-export const RE_CODE_MR = /56\d{24}/g;
+// (17 nov., lot scan-bordereau-vente) MESURÉ : l'étiquette Mondial Relay du 16 nov. imprime « 55… » (26 chiffres,
+// chiffres 3 à 10 = le n° de l'e-mail) — `suiviPdf` restait vide. « 55 » et « 56 » : la même forme.
+export const RE_CODE_MR = /5[56]\d{24}/g;
 export function codeMondialRelay(texte) {
   const colle = String(texte == null ? '' : texte).replace(/\s+/g, '');
   const codes = [...new Set(colle.match(RE_CODE_MR) || [])];

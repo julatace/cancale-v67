@@ -76,4 +76,9 @@ export default {
   "scan.a.pasCaIndice": "Inquadra un altro codice del pacco o digita il n°.",
   "scan.a.inconnu": "Pacco sconosciuto: n° {n}, nessun acquisto con questo n°",
   "scan.a.relier": "Collega a un acquisto",
+  // (17 nov., lot scan-bordereau-vente) un code cherché sur les étiquettes de ses ventes.
+  "scan.b.codeLu": "Codice letto",
+  "scan.b.attente": "Ricerca di questo codice sulle tue etichette…",
+  "scan.b.pasSurEtiquette": "Questo codice non è un n° di tracciamento noto né è stampato su una delle tue etichette di vendita. Inquadra il codice a barre lungo (spesso più piccolo, sul bordo) o digita il n° di tracciamento.",
+  "scan.b.pasSu": "Alcune etichette non sono state lette. Riprova tra poco o digita il n° di tracciamento.",
 };

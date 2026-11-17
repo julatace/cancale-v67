@@ -696,6 +696,7 @@ import VoirEmailColis from "./VoirEmailColis.jsx";
 import { litigesEnCours, litigeDeVente, requeteEmailsLitiges, texteLimite as texteLimiteLitige, LIBELLE_GENRE as LIBELLE_LITIGE } from "./litiges.js";
 import { ordreDesGroupes, ordonnerLot } from "./lotTransporteurs.js";
 import { trouverParScan, candidatsRetrait } from "./scanColis.js";
+import { chercherCodeDansEtiquettes } from "./etiquettesScan.js";
 import { enregistrerSourceColis, ouvrirRetrouver, sourcePrincipalePresente, EV_RETROUVER, EV_RETROUVER_CODE, EV_RELIER_COLIS, demanderRelierColis, scannerRetrouverOuvert } from "./retrouverColis.js";
 import { lireCodeColis } from "./scanColis.js";
 import { ligneLotAutre, cochesParDefaut, selectionImprimable, texteSansBordereau, resumeLot } from "./lotSelection.js";
@@ -18964,6 +18965,30 @@ async function detailsAchatScan(uid, tx) {
 // (15 nov.) L'HÔTE DU SCANNER POUR RETROUVER (monté une fois dans la coque) : ouvert par `ouvrirRetrouver()`
 // (src/retrouverColis.js) ; le scanner (caméra, ZXing) se charge à la demande. `onAttendreSources` : la coque
 // monte Ventes quand aucune source principale n'est là (le scanner attend sa lecture, « pas lu » n'est pas « rien »).
+// (17 nov., lot scan-bordereau-vente) Le TEXTE d'une étiquette (les deux PDF possibles de la vente), lu par le
+// lecteur sans IA du serveur (api/_lib/texte-pdf.js, chargé à la demande), gardé en mémoire pour la séance.
+// `null` = pas su (lecture ratée, PDF illisible) ; jamais rangé nulle part (il porte une adresse).
+const TEXTES_ETIQUETTES = new Map();
+async function texteEtiquetteScan(capteRow, mailRow) {
+  const k = `${capteRow || ''}|${mailRow || ''}`;
+  if (TEXTES_ETIQUETTES.has(k)) return TEXTES_ETIQUETTES.get(k);
+  // Le PDF lu sans effet de bord (pas de copie hors ligne de chaque étiquette parcourue) : capté d'abord, puis e-mail.
+  let octets = null, pasSu = false;
+  for (const row of [capteRow, mailRow]) {
+    if (!row || octets) continue;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(row)}&select=b:data->>pdfB64`, { headers: sbAuth() });
+      if (!res.ok) { pasSu = true; continue; }
+      const j = await res.json(); const v = Array.isArray(j) && j[0] ? j[0].b : null;
+      if (v && v !== 'None') { const o = b64ToBytes(v); if (estOctetsPdf(o)) octets = o; }
+    } catch (_) { pasSu = true; }
+  }
+  if (!octets) return pasSu ? null : '';
+  let t = null;
+  try { t = await import('../api/_lib/texte-pdf.js').then((m) => m.texteDuPdf(octets)); } catch (_) { t = null; }
+  if (typeof t === 'string') TEXTES_ETIQUETTES.set(k, t);
+  return typeof t === 'string' ? t : null;
+}
 function HoteRetrouver({ onAttendreSources, onChercher }) {
   const [ouvert, setOuvert] = useState(false);
   const [code0, setCode0] = useState('');
@@ -46345,6 +46370,36 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // identité (`achatDuColis`) ; retour : SON bordereau de retour ; Vestiaire : `v.suivi`. Jamais un titre (§5).
   // Lu au moment du scan (rien n'est recalculé à chaque rendu). « Pas lu » ⇒ `pret: false`, jamais « rien ».
   const jourCourtScan = (j) => { const t = Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(String(j || '')) ? `${j}T12:00:00` : String(j || '')); if (!Number.isFinite(t)) return ''; try { return new Date(t).toLocaleDateString(localeCourante(), { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' }); } catch (_) { return ''; } };
+  // (17 nov., lot scan-bordereau-vente) L'enregistrement d'une vente pour le scanner : photo, titre, N°, taille.
+  const enregVenteScan = (o) => {
+    const tx = String(o.transaction_id), b = bordsParTxn[tx];
+    const e = effEntry(o) || {};
+    const aFaire = aExpedier(o) && !isShipDone(o);
+    const etat = aExpedier(o) ? (isShipDone(o) ? tr('scan.r.etat.colisFait') : b ? tr('scan.r.etat.aExpedierPret') : tr('scan.r.etat.aExpedier')) : ((venteStage(o) || {}).label || '');
+    return { sorte: 'vente', site: 'vinted', cle: 'v:' + tx, suivis: [b && b.suivi, b && b.suiviPdf].filter(Boolean), titre: o.title || '', num: (b ? numForBord(b) : '') || e.numero || '', photo: orderPhoto(o) || null,
+      taille: (e.taille ? String(e.taille) : '') || String(o.size_title || o.size || ''), compte: compteDe(o), etat, aFaire, lien: `?tab=ventes&site=vinted&cible=vente&tx=${encodeURIComponent(tx)}` };
+  };
+  // Les étiquettes candidates : d'abord les ventes à expédier, puis les plus récentes (21 jours) ; une étiquette
+  // = le PDF capté par l'extension (`harvest_{uid}_label_{tx}`) ou celui de l'e-mail (`email_bord_{tx}`).
+  // Le texte de chaque étiquette lue est gardé en mémoire pour la séance (par ligne) : un second scan ne relit rien.
+  const chercherVenteParEtiquette = async (code) => {
+    const ventes = Array.isArray(sales.items) ? sales.items : [];
+    const recent = Date.now() - 21 * 864e5;
+    const cands = [];
+    for (const o of ventes) {
+      if (!o || o.transaction_id == null) continue;
+      const tx = String(o.transaction_id), b = bordsParTxn[tx], capte = labelsCaptes[tx];
+      const pdfMail = b && b.hasPdf ? b._row : null, pdfCapte = capte && capte.row ? capte.row : null;
+      if (!pdfMail && !pdfCapte) continue;
+      const aFaire = aExpedier(o) && !isShipDone(o);
+      const t = Date.parse(String(o.date || ''));
+      if (!aFaire && !(Number.isFinite(t) && t >= recent)) continue;
+      cands.push({ o, tx, pdfMail, pdfCapte, aFaire, t: Number.isFinite(t) ? t : 0 });
+    }
+    cands.sort((a, b) => (b.aFaire - a.aFaire) || (b.t - a.t));
+    const r = await chercherCodeDansEtiquettes(code, cands, (c) => texteEtiquetteScan(c.pdfCapte, c.pdfMail));
+    return { etat: r.etat, enregistrements: r.trouves.map((c) => enregVenteScan(c.o)), pasLus: r.pasLus };
+  };
   const sourceRetrouver = React.useRef(null);
   sourceRetrouver.current = () => {
     const E = [], manques = [];
@@ -46366,17 +46421,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         ranger: () => { const e = entreeAvecPaye(o, suivis && suivis[0] ? { suivi: suivis[0] } : {}); if (!e) return; noterArrivees([e]); ouvrirAtelierArrivee([e]); } };
     };
     try {
-      // Ventes Vinted (avec bordereau lu : sans n°, aucun scan ne peut les désigner).
+      // Ventes Vinted (avec bordereau lu : sans n°, aucun scan ne peut les désigner — sauf par le code imprimé
+      // sur SON étiquette, `chercher` plus bas).
       for (const o of (ventesLues ? sales.items : [])) {
         if (!o || o.transaction_id == null) continue;
-        const tx = String(o.transaction_id), b = bordsParTxn[tx];
-        const suivis = [b && b.suivi, b && b.suiviPdf].filter(Boolean);
-        if (!suivis.length) continue;
-        const e = effEntry(o) || {};
-        const aFaire = aExpedier(o) && !isShipDone(o);
-        const etat = aExpedier(o) ? (isShipDone(o) ? tr('scan.r.etat.colisFait') : b ? tr('scan.r.etat.aExpedierPret') : tr('scan.r.etat.aExpedier')) : ((venteStage(o) || {}).label || '');
-        E.push({ sorte: 'vente', site: 'vinted', cle: 'v:' + tx, suivis, titre: o.title || '', num: (b ? numForBord(b) : '') || e.numero || '', photo: orderPhoto(o) || null,
-          taille: (e.taille ? String(e.taille) : '') || String(o.size_title || o.size || ''), compte: compteDe(o), etat, aFaire, lien: `?tab=ventes&site=vinted&cible=vente&tx=${encodeURIComponent(tx)}` });
+        const x = enregVenteScan(o);
+        if (!x.suivis.length) continue;
+        E.push(x);
       }
       // Vestiaire (ventes) : son n° de suivi lu.
       for (const c of colisScannables()) {
@@ -46419,7 +46470,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           lien: `?tab=achats&cible=retour&tx=${encodeURIComponent(c.tx)}` });
       }
     } catch (_) {}
-    return { pret: ventesLues && achatsLus && bordsLus && retoursAchatLus !== undefined, enregistrements: E, manques };
+    return { pret: ventesLues && achatsLus && bordsLus && retoursAchatLus !== undefined, enregistrements: E, manques,
+      // (17 nov., lot scan-bordereau-vente) Un code qui n'est pas un n° de suivi connu : cherché dans le texte des
+      // étiquettes de SES ventes (src/etiquettesScan.js) — une identité exacte, l'étiquette de CETTE transaction.
+      chercher: ventesLues ? (code) => chercherVenteParEtiquette(code) : null };
   };
   useEffect(() => {
     if (only !== 'bordereaux') return undefined;

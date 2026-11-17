@@ -76,4 +76,9 @@ export default {
   "scan.a.pasCaIndice": "Vise un autre code du colis, ou tape le n°.",
   "scan.a.inconnu": "Colis inconnu : n° {n}, aucun achat avec ce n°",
   "scan.a.relier": "Relier à un achat",
+  // (17 nov., lot scan-bordereau-vente) un code cherché sur les étiquettes de ses ventes.
+  "scan.b.codeLu": "Code lu",
+  "scan.b.attente": "Recherche de ce code sur tes étiquettes…",
+  "scan.b.pasSurEtiquette": "Ce code n’est ni un n° de suivi connu, ni imprimé sur une de tes étiquettes de vente. Vise le code-barres long (souvent plus petit, sur le bord), ou tape le n° de suivi.",
+  "scan.b.pasSu": "Certaines de tes étiquettes n’ont pas pu être lues. Réessaie dans un instant, ou tape le n° de suivi.",
 };
