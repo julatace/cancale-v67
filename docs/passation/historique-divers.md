@@ -1997,6 +1997,7 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Lignes déplacées de CLAUDE.md §9 (16 nov., train de mise en ligne)
 
+- **15 nov. · « Verre dépoli » partout + Stock en étagères** : Julien a choisi la proposition 9 sur 30 ; couche `studio-verre.css` (contrastes mesurés, banc `verre`) ; Stock en meubles/cases/piles avec sites + compte par identité sur chaque case (`src/stockAnnonces.js`). Maquettes validées de tous les écrans (sauf l'étagère, v3 en cours) ; refonte des dispositions écran par écran en cours. `2026-11-15-verre-depoli.md`, `2026-11-15-stock-etageres.md`. Geste : aucun.
 - **15 nov. · Vestiaire juste, même photo, fiabilité, retours suivis (extension 5.385.0)** : Vestiaire — l'état le plus frais gagne (`expeditionVc`, `api/_lib/vestiaire-regle.js`), état en mots (jamais « IN_PROGRESS »), prix de VENTE en grand, « pour toi » en second (totaux inchangés : `sellerEarning`) ; même photo entre plateformes à relier (`src/memePhoto.js`) ; une lecture publique vide qui contredit un dressing < 24 h vaut « pas su » (19 paires perdues le 15 nov., navigateur en 5.273 inconnu) ; retours d'achat suivis par le n° de LEUR bordereau (`api/_lib/retour-suivi.js`), e-mail d'un n° de retour toujours sortant. `2026-11-15-vestiaire-ventes.md`, `-meme-photo.md`, `-audit-fiabilite.md`, `-retours-suivi.md`. Gestes : installer 5.385.0 ; retrouver le navigateur en 5.273 ; décider purge PDF > 30 j, compte copié du 2 oct., `vc_brut_*` (SQL prêts dans l'audit).
 
 
