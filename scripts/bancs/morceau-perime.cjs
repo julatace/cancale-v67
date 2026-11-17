@@ -53,7 +53,8 @@ async function scenario(nav, { W, panne, jsSeul = false }) {
     // mise en ligne change ce nom : après « le déploiement », le serveur du banc sert la page sous un nouveau nom de
     // script principal (un alias du même fichier) ; en « panne », il sert la même version (aucun rechargement voulu).
     await ctx.route((u) => { const x = new URL(u); return /^localhost$|^127\./.test(x.hostname) && (x.pathname === '/' || x.pathname === '/index.html' || !/\.\w+$/.test(x.pathname)); }, async (route) => {
-      if (!etat.deploye || panne || route.request().method() !== 'GET') return route.fallback();
+      // La nouvelle version reste en ligne après le rechargement (une mise en ligne ne revient pas en arrière).
+      if (!etat.nouvelle || panne || route.request().method() !== 'GET') return route.fallback();
       const r = await route.fetch(); const html = await r.text();
       return route.fulfill({ response: r, body: html.replace(/\/assets\/index-([A-Za-z0-9_-]+)\.js/g, '/assets/index-NEUF$1.js') });
     });
@@ -90,7 +91,7 @@ async function scenario(nav, { W, panne, jsSeul = false }) {
   o.pg.on('load', () => { chargements++; });
   await o.pg.waitForTimeout(3000);
   // La mise en ligne.
-  etat.deploye = true;
+  etat.deploye = true; etat.nouvelle = !panne;
   await versEmails(o.pg, tel);
   await o.pg.waitForTimeout(5000);
   await o.pg.waitForLoadState('domcontentloaded').catch(() => {});

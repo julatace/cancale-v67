@@ -158,7 +158,8 @@ const detail = async (pg, sousCle) => {
   const l = pg.locator(`.vrm-rpf [data-cc-carte*="${sousCle}"]`).first();
   if (!(await l.count())) return null;
   const ouvert = await l.getAttribute('data-ouvert');
-  if (!ouvert) await l.locator('.vrm-rpf-ouvrir').first().click({ timeout: 5000 }).catch(() => {});
+  // (16 nov., lot achats-qr) toucher le code ouvre le comptoir : le TITRE ouvre la fiche.
+  if (!ouvert) await l.locator('[data-rp-titre]').first().click({ timeout: 5000 }).catch(() => {});
   await pg.waitForTimeout(250);
   // (17 nov., chasse-bugs) Proposition 62 (14 nov.) : le détail d'une ligne s'ouvre dans SA FICHE (DansFiche, une feuille),
   // plus sous la ligne — on le lit là où il est montré (le détail visible), jamais la ligne repliée.

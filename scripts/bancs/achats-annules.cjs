@@ -31,7 +31,10 @@ const mesure = (pg) => pg.evaluate((T) => {
   const m = document.querySelector('.vrm-main'); const t = m ? m.innerText : '';
   const ong = Object.fromEntries([...document.querySelectorAll('[data-achats-onglet]')].map((b) => [b.getAttribute('data-achats-onglet'), b.getAttribute('data-n')]));
   const chiffres = [...document.querySelectorAll('.vrm-main [data-montant]')].map((x) => x.getAttribute('data-montant') + ':' + (x.innerText || '').trim()).join('|');
-  return { annuleVu: t.includes(T), autresVus: /taille 4[123]/.test(t), ong, chiffres };
+  // Les LIGNES de la liste des achats (`data-achat-tx`) — pas les autres blocs de l'écran (À retirer, retours…).
+  const vis = (e) => e.getClientRects().length > 0;
+  const tx = [...document.querySelectorAll('[data-achat-tx]')].filter(vis).map((e) => e.getAttribute('data-achat-tx'));
+  return { annuleVu: tx.includes('73999') && t.includes(T), autresVus: tx.some((x) => x !== '73999'), tx, ong, chiffres };
 }, TITRE_ANNULE);
 const toucher = async (pg, sel, tel) => { const l = pg.locator(sel).filter({ visible: true }).first(); if (!(await l.count())) return false; if (tel) await l.tap(); else await l.click(); await pg.waitForTimeout(1500); return true; };
 

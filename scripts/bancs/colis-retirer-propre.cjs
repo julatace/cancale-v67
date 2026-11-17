@@ -293,7 +293,8 @@ const ouvrir = async (b, vp, sombre) => {
           dit(st.filter((x) => x === 'Code pas encore lu').length === 2 && !st.includes('Incident'), 'À vérifier : les 2 colis sans code portent « Code pas encore lu », jamais « Incident »', st.join(' | '));
           // Le détail au toucher.
           // (17 nov.) Proposition 62 (14 nov.) : le détail d'une ligne s'ouvre dans SA FICHE (DansFiche), plus sous la ligne.
-          await pg.locator('[data-cc-carte*="9301"] .vrm-rpf-ouvrir').first().click();
+          // (16 nov., lot achats-qr) toucher le CODE l'ouvre en très grand (comptoir) : on touche le TITRE pour ouvrir la fiche.
+          await pg.locator('[data-cc-carte*="9301"] [data-rp-titre]').first().click();
           await pg.waitForFunction(() => [...document.querySelectorAll('[data-rp-detail]')].some((d) => d.getClientRects().length), null, { timeout: 15000 }).catch(() => {});
           const det = await pg.evaluate(() => { const d = [...document.querySelectorAll('[data-rp-detail]')].find((x) => x.getClientRects().length); return d ? { code: !!d.querySelector('[data-code-retrait="012345"], .vrm-rp-gestes, .vrm-pickup-code'), txt: d.innerText.slice(0, 200) } : null; });
           dit(!!det && det.code, 'toucher la ligne ouvre son détail (code, gestes)', JSON.stringify(det));
@@ -313,7 +314,8 @@ const ouvrir = async (b, vp, sombre) => {
           dit(nl === 13, 'ouvrir « En route » montre les 13 achats', String(nl));
           await pg.locator('[data-rp-section="route"] > summary').first().click();
           await pg.evaluate(() => { const d = document.querySelector('.vrm-rpf-verifier'); if (d) d.open = false; });
-          await pg.locator('[data-cc-carte*="9301"] .vrm-rpf-ouvrir').first().click();
+          // (16 nov., lot achats-qr) toucher le CODE l'ouvre en très grand (comptoir) : on touche le TITRE pour ouvrir la fiche.
+          await pg.locator('[data-cc-carte*="9301"] [data-rp-titre]').first().click();
           await pg.waitForFunction(() => !document.querySelector('[data-cc-carte*="9301"] [data-rp-detail]'), null, { timeout: 15000 }).catch(() => {});
         }
         if (SHOTS) {
