@@ -943,6 +943,7 @@ import { enLigneDeuxFois, texteCarte as texteEnLigneDeuxFois, raisonPasSu as rai
 import { useAvisBas, AvisBasDetail, titreAvisBas, detailAvisBas } from "./AvisNegatifJournee.jsx";   // (11 nov., lot avis-negatif) la carte « Avis 2★ reçu »
 import { LIGNE_AVIS_BAS_VUS } from "./avisNegatif.js";
 import { lireAlertesAvisBas } from "./lectureAvisBas.js";
+import { lireEnVol } from "./lectureEnVol.js";   // (17 nov., onglets rapides) une lecture en vol par ligne
 // (11 nov., lot photos-comptes) La même PHOTO sur deux de ses comptes Vinted (empreintes de l'extension 5.358).
 import { annoncesPourPhotos, calculerPhotosComptes, publierPhotosComptes, cibleRepublier } from "./photosComptes.js";
 import { empreinteImageLocale } from "./photosComptes.js";   // (16 nov.) rétabli : la fusion de retour-parfait l’avait perdu (empreintes eBay)
@@ -1990,6 +1991,9 @@ const sbAuth = (extra) => {
 // la règle de `lireReceptionLeboncoin` (src/rafraichissementLeboncoin.js). Rend
 // `null` (« pas su ») au bout, jamais `[]`. Leboncoin et Vestiaire la lisent.
 function lireBaseRelue(url) { return lireReceptionLeboncoin(url, sbAuth, { rafraichir: () => authRefresh() }); }
+// (17 nov., onglets rapides) Les N° réservés par l'extension (`panel_num_reserves`) : UNE lecture en vol pour tous ses
+// lecteurs (Achats en lançait 5 à l'ouverture) — src/lectureEnVol.js, rien gardé au-delà du vol. Même règle : `null` = pas su.
+function lireReservesNum() { return lireEnVol('panel_num_reserves', () => lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`)); }
 // Complète une ligne à écrire avec son propriétaire. La base a un défaut
 // (auth.uid()) mais on l'envoie explicitement : c'est plus lisible, et la règle
 // `with check` de Postgres vérifie qu'on n'écrit pas au nom d'un autre.
@@ -5725,7 +5729,7 @@ const numeroDImport = (v, ms) => {
 // Les N° déjà servis : cleNum ⇒ la raison dite sur la ligne en conflit. `null` = pas su.
 async function numerosServisImport() {
   if (!isCloudReady()) return null;
-  const jr = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`);
+  const jr = await lireReservesNum();
   if (!Array.isArray(jr)) return null;
   const pris = new Map();
   const add = (v, raison) => { const c = cleNum(v); if (c && !pris.has(c)) pris.set(c, raison); };
@@ -13395,7 +13399,7 @@ async function numeroterVestiaire() {
       const [jl, jv, jr] = await Promise.all([
         lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_listings&select=items:data->items,liens:data->liens,capturedAt:data->>capturedAt`),
         lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.vc_ventes&select=ventes:data->ventes`),
-        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`),
+        lireReservesNum(),
       ]);
       if (!Array.isArray(jl) || !Array.isArray(jv) || !Array.isArray(jr)) return 0;
       if (!numerotationPermise() || !isCloudReady()) return 0;
@@ -18879,7 +18883,7 @@ async function numerosServisRelus() {
   return numerosServisLus();
 }
 async function numerosServisLus() {
-  let jr = null; try { jr = await lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`); } catch (_) { jr = null; }
+  let jr = null; try { jr = await lireReservesNum(); } catch (_) { jr = null; }
   if (!Array.isArray(jr)) return null;
   const pris = new Set(), prisK = new Set();
   const add = (v) => { const k = cleNum(v); if (!k) return; prisK.add(k); if (/^\d+$/.test(k)) pris.add(Number(k)); };
@@ -38311,9 +38315,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [reservesNum, setReservesNum] = useState(undefined);
   const relireReservesNum = async () => {
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`, { headers: sbAuth() });
-      if (!res.ok) { setReservesNum((v) => (v === undefined ? null : v)); return; }
-      const rows = await res.json();
+      const rows = await lireReservesNum();
+      if (!Array.isArray(rows)) { setReservesNum((v) => (v === undefined ? null : v)); return; }
       // Relue à chaque arrivée des annonces : la même réponse ne repose pas un
       // objet neuf (un rendu de Ma journée pour rien, banc `vitesse.cjs`, 22 oct.).
       const n = numerosReserves(Array.isArray(rows) && rows[0] ? rows[0].data : null);
