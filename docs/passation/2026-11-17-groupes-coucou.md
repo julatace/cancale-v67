@@ -114,9 +114,18 @@ texte de la notification en cinq langues).
   corps, compte renvoyé, sonner chez soi, « Fermer mon compte » qui oublie, l'écran qui
   envoie un texte, l'écran qui propose de répondre). Rouge sur `main` (fichiers absents).
 - Banc `scripts/bancs/groupes-coucou.cjs` (BANC_PORT 7991 ; le vrai `api/compte.js`, faux
-  PostgREST aux règles 025 + 046) — voir la fin de ce fichier pour les chiffres et les
-  captures. Banc `communaute-groupes.cjs` suivi (création en trois étapes, « Retirer »
-  dans la fiche du membre).
+  PostgREST aux règles 025 + 046 ; 390 tactile clair/sombre, 1512 clair/sombre) :
+  **112 verts** ; `BANC_MUTATION=sans-sourdine` 2 rouges, `paire-un-sens` 1,
+  `hors-groupe` 1, `sourdine-visible` 1 ; sur `main` les sélecteurs de la création en
+  trois étapes n'existent pas (rouge). Captures regardées (planche
+  `scratchpad/onglets/groupes-coucou.png`) ; une passe corrigée : notes, titres et liens
+  posés sur le bleu (hors des cartes) étaient illisibles en clair ⇒ encre claire du
+  Studio, comme l'en-tête.
+- Banc `communaute-groupes.cjs` suivi (création en trois étapes, « Retirer » dans la
+  fiche du membre) : **46 verts**. Il était rouge sur `main` (10 rouges : le parcours
+  « Tu vends quoi ? » couvrait l'écran) ; il pose désormais un vendeur déjà installé.
+- `audit-cloisonnement` : 1 788 appels de B, **5 364 ✅, 0 ❌** (les actions `accomp-coucou-*`
+  sont lues dans le code et jouées).
 - `audit-accompagnement` 40, `audit-notifications` 31 (douze familles), `audit-traduction`
   (Accompagnement.jsx migré en entier, 192 clés × 5 langues), `audit-quoi-de-neuf`,
   `audit-fonctions-api`, `audit-textes-courts`, `audit-stockage-sur` verts.

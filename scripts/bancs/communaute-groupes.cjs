@@ -188,6 +188,13 @@ async function ouvrir(nav, { qui, largeur = 1512, sombre = false, chemin = '/?ta
   const erreurs = []; pg.on('pageerror', (e) => erreurs.push(e.message));
   await pg.addInitScript(({ s, sombre, local }) => {
     try { localStorage.setItem('vinted_dark', sombre ? 'true' : 'false'); localStorage.setItem('vrm_bascule_mineral_v1', '1'); localStorage.setItem('vrm_session', JSON.stringify(s)); } catch (_) {}
+    // (17 nov.) Un vendeur déjà installé : ni Bienvenue, ni parcours, ni « Tu vends quoi ? » par-dessus l'écran (rouge sur main sans ça).
+    try { const at = '2026-11-01T10:00:00.000Z';
+      localStorage.setItem('vrm_bienvenue_vue', JSON.stringify({ at: 'banc' })); localStorage.setItem('vrm_visite_vue', JSON.stringify({ at: 'banc' }));
+      localStorage.setItem('vrm_configuration', JSON.stringify({ etat: 'fait', at, statut: null, version: 1 }));
+      localStorage.setItem('vrm_parcours_nouveau', JSON.stringify({ etape: 'fin', fini: true, at }));
+      localStorage.setItem('vrm_je_vends', JSON.stringify({ choix: 'sneakers', at, vu: at }));
+      localStorage.setItem('vrm_mfa_plus_tard_' + s.user.id, String(Date.now())); } catch (_) {}
     try { if (!sessionStorage.getItem('banc_seme')) { for (const [k, v] of Object.entries(local)) localStorage.setItem(k, JSON.stringify(v)); sessionStorage.setItem('banc_seme', '1'); } } catch (_) {}
   }, { s: session(qui), sombre, local });
   await pg.route(/^https?:\/\/(?!localhost|127\.0\.0\.1)/i, async (r) => {
