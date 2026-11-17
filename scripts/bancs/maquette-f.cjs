@@ -111,7 +111,9 @@ async function capture(nav, { W, sombre, hash, nom, focus = false, plein = false
     const texte = document.body.innerText;
     return { pleins, petites, ligne1: l1 ? Math.round(l1.getBoundingClientRect().top) : null, mauvais: /\bundefined\b|\bNaN\b|\[object Object\]/.test(texte),
       ressembleExact: [...document.querySelectorAll('.f-resultats .f-titre-section')].some((h) => /Ressemble/.test(h.innerText) && /exact/i.test(h.nextElementSibling ? h.nextElementSibling.innerText : '')),
-      relie124: /reliée par son n° de transaction/.test(texte) };
+      relie124: /reliée par son n° de transaction/.test(texte),
+      // une ligne trouvée par un N° qui ne fait que CONTENIR la saisie ne porte jamais « exact »
+      partielExact: [...document.querySelectorAll('.f-resultats .f-ligne')].some((l) => { const n = (l.querySelector('[data-numero]') || {}).getAttribute ? l.querySelector('[data-numero]').getAttribute('data-numero') : ''; const q = decodeURIComponent((location.hash.match(/q=([^&]*)/) || [])[1] || ''); return n && q && n !== q && /exact/.test(l.innerText); }) };
   }, { tel: W < 600 });
   console.log(path.basename(f), JSON.stringify(mes), o.erreurs.length ? 'ERREURS ' + o.erreurs.join(' | ') : '');
   await o.ctx.close();
@@ -134,7 +136,7 @@ async function capture(nav, { W, sombre, hash, nom, focus = false, plein = false
     }
     if (VUES.includes('ordinateur')) {
       await capture(nav, { W: 1512, sombre: false, hash: 'liste=envoyer&paire=124', nom: '5-ordinateur', b });
-      await capture(nav, { W: 1512, sombre: false, hash: 'q=' + encodeURIComponent(Q) + '&paire=124', nom: '5-ordinateur-recherche', b });
+      await capture(nav, { W: 1512, sombre: false, hash: 'q=' + encodeURIComponent(process.env.Q2 || '124') + '&paire=124', nom: '5-ordinateur-recherche', b });
       await capture(nav, { W: 1512, sombre: true, hash: 'liste=envoyer&paire=124', nom: '5-ordinateur', b });
     }
   } finally { await nav.close(); P.srv.close(); }

@@ -149,6 +149,8 @@ function Accueil({ m, aller, route, large }) {
 
 // ── UNE RECHERCHE EN COURS ───────────────────────────────────────────────────
 const PAR = { numero: 'N° exact', suivi: 'n° de suivi exact', code: 'code de retrait exact', transaction: 'n° de transaction exact', pseudo: 'pseudo', titre: 'titre', rangement: 'case', montant: 'montant exact' };
+// Une correspondance PARTIELLE ne se dit jamais « exacte » (« 1240 » contient « 124 », ce n'est pas lui).
+const CONTIENT = { numero: 'N° qui contient', suivi: 'suivi qui contient', transaction: 'n° qui contient', rangement: 'case' };
 const GENRES = { numero: 'un N°', transaction: 'un n° de transaction', suivi: 'un n° de suivi', code: 'un code de retrait', pseudo: 'un pseudo', mots: 'des mots du titre', montant: 'un montant' };
 function Resultats({ m, route, aller }) {
   const r = React.useMemo(() => chercher(m, route.q), [m, route.q]);
@@ -179,7 +181,7 @@ function Resultats({ m, route, aller }) {
       ) : null}
       {r.exactes.length ? <><h2 className="f-titre-section">C’est elle<span className="f-titre-sous">identité exacte</span></h2><div className="f-plan">{r.exactes.map((x) => ligneDe(x, PAR[x.t.par]))}</div></> : null}
       {r.personnes.length ? <><h2 className="f-titre-section">Personnes</h2><div className="f-plan">{r.personnes.slice(0, 5).map((x) => ligneDe(x, x.t.valeur))}</div></> : null}
-      {r.reste.length ? <><h2 className="f-titre-section">Autres N° et colis</h2><div className="f-plan">{r.reste.slice(0, 6).map((x) => ligneDe(x, PAR[x.t.par]))}</div></> : null}
+      {r.reste.length ? <><h2 className="f-titre-section">Autres N° et colis</h2><div className="f-plan">{r.reste.slice(0, 6).map((x) => ligneDe(x, x.t.exact ? PAR[x.t.par] : CONTIENT[x.t.par] || 'proche'))}</div></> : null}
       {r.ressemble.length ? <><h2 className="f-titre-section">Ressemble<span className="f-titre-sous">par le titre · à toi de choisir, rien n’est relié</span></h2><div className="f-plan">{r.ressemble.slice(0, 8).map((x) => ligneDe(x))}</div></> : null}
       {!r.total && !r.raccourcis.length ? <p className="f-vide">Rien pour « {r.q} ».</p> : null}
     </div>

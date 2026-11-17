@@ -22,14 +22,14 @@ html[data-maquette="f"] body::before { content: ''; position: fixed; inset: 0; z
   --f-c: var(--sv-clair); --f-c2: var(--sv-clair-2); --f-cambre: var(--sv-clair-ambre); --f-clien: var(--sv-clair-lien);
   --f-e: var(--sv-encre); --f-e2: var(--sv-encre-2); --f-eambre: var(--sv-ambre); --f-elien: var(--sv-lien);
   --f-verre: var(--sv-verre); --f-flou: var(--sv-flou); --f-ombre: var(--sv-ombre);
-  min-height: 100dvh; box-sizing: border-box; color: var(--f-c);
+  min-height: 100dvh; box-sizing: border-box; color: var(--f-c); position: relative; isolation: isolate; background: var(--sv-bas);
   font-family: var(--sb-police-texte); font-feature-settings: var(--sb-chiffres); -webkit-font-smoothing: antialiased;
   padding: 0 var(--f-g) calc(120px + env(safe-area-inset-bottom));
   -webkit-tap-highlight-color: transparent;
 }
 .f-racine *, .f-racine *::before, .f-racine *::after { box-sizing: border-box; }
-.f-racine button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: inherit; -webkit-user-select: none; user-select: none; }
-.f-racine button:focus-visible { outline: 2px solid var(--sb-diode); outline-offset: 2px; border-radius: 12px; }
+:where(.f-racine) button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: inherit; -webkit-user-select: none; user-select: none; }
+:where(.f-racine) button:focus-visible { outline: 2px solid var(--sb-diode); outline-offset: 2px; border-radius: 12px; }
 .f-attente { min-height: 100dvh; }
 .f-ico { flex: none; display: block; }
 
@@ -298,3 +298,15 @@ button.f-ligne:active, .f-ligne.is-actif { background: rgb(255 255 255 / .55); }
 :root[data-theme="dark"] .f-droite .f-maintenant .f-plein { background: #F2F7FD; color: #0C1D30 !important; }
 .f-maintenant .f-plein { background: #0C1D30; color: #FFFFFF !important; }
 :root[data-theme="dark"] .f-maintenant .f-plein { background: #F2F7FD; color: #0C1D30 !important; }
+
+/* Le fond peint PAR la racine (rien de la page ne peut le recouvrir : la racine est son propre contexte d'empilement). */
+.f-racine::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(120% 60% at 15% 0%, var(--sv-reflet) 0%, transparent 55%), radial-gradient(70% 45% at 100% 38%, var(--sv-reflet-2) 0%, transparent 70%),
+    linear-gradient(170deg, var(--sv-haut) 0%, var(--sv-milieu) 45%, var(--sv-bas) 100%); }
+.f-tete, .f-fiche-haut { background: color-mix(in oklab, var(--sv-haut) 88%, transparent); }
+.f-vie-v { white-space: nowrap; }
+/* Le grand fil, au téléphone : seul le nom de l'étape du MOMENT (et les deux bouts) ; tous sur l'ordinateur. */
+@media (max-width: 1099px) {
+  .f-fil--grand .f-fil-m:not(:first-child):not(:last-child):not(.is-geste) .f-fil-l { display: none; }
+  .f-fil--grand .f-fil-m:last-child .f-fil-l { left: auto; right: 0; }
+}
