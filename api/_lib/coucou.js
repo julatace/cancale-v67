@@ -57,15 +57,15 @@ const cleService = () => process.env.SUPABASE_SERVICE_KEY || '';
 
 // Sonner chez celui qui reçoit. `false` si rien n'est parti (pas de clé, pas su) :
 // le coucou, lui, est fait — la notification n'est qu'un plus.
-async function sonner(coucou, moi) {
+async function sonner(coucou, moi, fonction = 'vrm_coucou_a_sonner') {
   const cle = cleService();
   if (!cle || !UUID_RE.test(String(moi || ''))) return false;
-  const r = await rpcEquipe('vrm_coucou_a_sonner', { p_coucou: coucou, p_de: moi }, sbCle(cle));
+  const r = await rpcEquipe(fonction, { p_coucou: coucou, p_de: moi }, sbCle(cle));
   const d = r.etat === 'ok' ? objet(r.data) : null;
   if (!d || !UUID_RE.test(String(d.a || '')) || d.a === moi) return false;
   try {
     return await contexteVendeur.run({ owner: d.a }, async () => {
-      const tx = texteCoucou(await langueDuVendeur(), d.de_nom, d.groupe_nom);
+      const tx = texteCoucou(await langueDuVendeur(), d.de_nom, d.groupe_nom || null);
       const e = await sendPushToAll({ cat: 'coucou', ...tx, tag: 'vrm-coucou-' + coucou, cle: 'coucou-' + coucou, url: lienNotif('communaute', { vue: 'groupes' }) });
       return !!(e && (e.sent || e.rangee));
     });
@@ -74,10 +74,10 @@ async function sonner(coucou, moi) {
 
 // Le profil Discord (identifiant signé) de ceux qui m'ont fait coucou :
 // { idCoucou: '1234…' }. Une panne ⇒ {} (le repli : le salon du groupe).
-async function profilsDesAuteurs(moi) {
+async function profilsDesAuteurs(moi, fonction = 'vrm_coucou_auteurs') {
   const cle = cleService();
   if (!cle || !UUID_RE.test(String(moi || ''))) return {};
-  const r = await rpcEquipe('vrm_coucou_auteurs', { p_a: moi }, sbCle(cle));
+  const r = await rpcEquipe(fonction, { p_a: moi }, sbCle(cle));
   const liste = r.etat === 'ok' && Array.isArray(r.data) ? r.data.filter((x) => x && UUID_RE.test(String(x.id)) && UUID_RE.test(String(x.de)) && x.de !== moi) : [];
   const auteurs = [...new Set(liste.map((x) => x.de))].slice(0, 200);
   if (!auteurs.length) return {};
@@ -162,6 +162,70 @@ export async function routeCoucou(req, res, { corps, qui, action, utilisateur = 
 export async function effacerCoucous(owner, SERVICE) {
   if (!UUID_RE.test(String(owner || '')) || !SERVICE) return null;
   const r = await rpcEquipe('vrm_coucou_effacer', { p_owner: owner }, sbCle(SERVICE));
+  if (r.etat === 'absent') return 0;
+  if (r.etat !== 'ok') return null;
+  const n = Number(r.data);
+  return Number.isFinite(n) ? n : null;
+}
+
+// ── LA CARTE (17 nov., migration 047, PAS APPLIQUÉE) : le coucou remplace les messages ──
+// Julien : « que les personnes puissent se faire coucou, mais pas échanger des
+// messages dans mon app, mais sur Discord » — la même règle que les groupes.
+//   POST { action: 'carte-coucou', pid }              (le pid PUBLIC de la carte ; AUCUN texte)
+//   POST { action: 'carte-coucou-lire' }              → { ok, coucou: { envoyes24h, deja, recus, sourdines } }
+//   POST { action: 'carte-coucou-sourdine', coucou, oui }
+// 047 absente ⇒ 503 `non-installe` (« bientôt ») : jamais de repli vers un message.
+export const CARTE_COUCOU_NON_INSTALLE = 'Le coucou de la carte arrive bientôt : il n’est pas encore activé sur ta base.';
+export async function routeCarteCoucou(req, res, { corps, qui, action, utilisateur = null }) {
+  const dire = (code, c) => res.status(code).json(c);
+  const nonInstalle = () => dire(503, { ok: false, erreur: 'non-installe', message: CARTE_COUCOU_NON_INSTALLE });
+  const pasSu = () => dire(503, { ok: false, erreur: 'pas-su', message: PAS_SU });
+  const refus = (raison, code = 400) => dire(raison === 'session' ? 401 : raison === 'abonnement' ? 403 : code,
+    { ok: false, erreur: raison, message: RAISONS_CARTE[raison] || RAISONS_COUCOU[raison] || `La base a refusé (${raison}).` });
+  const c = corps || {};
+  const moi = utilisateur && UUID_RE.test(String(utilisateur.id || '')) ? utilisateur.id : '';
+  if (action === 'carte-coucou-lire') {
+    const r = await rpcEquipe('vrm_carte_coucou_lire', {}, qui);
+    if (r.etat === 'absent') return nonInstalle();
+    if (r.etat !== 'ok') return pasSu();
+    const d = objet(r.data);
+    if (!d) return refus('session');
+    if (d.acces === false) return refus('abonnement');
+    if (!Array.isArray(d.recus) || !Array.isArray(d.deja)) return pasSu();
+    const profils = d.recus.length ? await profilsDesAuteurs(moi, 'vrm_carte_coucou_auteurs') : {};
+    const recus = d.recus.map((x) => ({ id: x.id, de_pid: x.de_pid, de_nom: x.de_nom, le: x.le, profil: profils[x.id] || null }));
+    const sourdines = (Array.isArray(d.sourdines) ? d.sourdines : []).map((s) => ({ coucou: s.coucou, nom: s.nom }));
+    return dire(200, { ok: true, coucou: { envoyes24h: Number(d.envoyes24h) || 0, plafond: Number(d.plafond) || 20, deja: d.deja.filter((p) => UUID_RE.test(String(p))), recus, sourdines } });
+  }
+  let nom, args;
+  if (action === 'carte-coucou') {
+    const pid = String(c.pid || ''); if (!UUID_RE.test(pid)) return refus('cible', 404);
+    nom = 'vrm_carte_coucou'; args = { p_pid: pid };
+  } else if (action === 'carte-coucou-sourdine') {
+    const k = String(c.coucou || ''); if (!UUID_RE.test(k)) return refus('coucou', 404);
+    nom = 'vrm_carte_coucou_sourdine'; args = { p_coucou: k, p_oui: c.oui === true };
+  } else return dire(400, { ok: false, erreur: 'action', message: 'Action inconnue.' });
+  const r = await rpcEquipe(nom, args, qui);
+  if (r.etat === 'absent') return nonInstalle();
+  if (r.etat !== 'ok' || !objet(r.data)) return pasSu();
+  if (r.data.ok !== true) {
+    const raison = String(r.data.raison || 'inconnue');
+    return refus(raison, raison === 'coucou' || raison === 'cible' ? 404 : raison === 'plafond' ? 429 : 409);
+  }
+  if (action === 'carte-coucou') {
+    const sonne = UUID_RE.test(String(r.data.id || '')) ? await sonner(r.data.id, moi, 'vrm_carte_coucou_a_sonner') : false;
+    return dire(200, { ok: true, id: r.data.id, sonne });
+  }
+  const { ok: _ok, ...reste } = r.data;
+  return dire(200, { ok: true, ...reste });
+}
+export const RAISONS_CARTE = {
+  carte: 'Mets-toi d’abord sur la carte : on fait coucou à quelqu’un qui peut te voir.',
+  cible: 'Cette personne n’est plus sur la carte.',
+};
+export async function effacerCoucousCarte(owner, SERVICE) {
+  if (!UUID_RE.test(String(owner || '')) || !SERVICE) return null;
+  const r = await rpcEquipe('vrm_carte_coucou_effacer', { p_owner: owner }, sbCle(SERVICE));
   if (r.etat === 'absent') return 0;
   if (r.etat !== 'ok') return null;
   const n = Number(r.data);

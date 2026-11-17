@@ -192,4 +192,13 @@ export default {
   "grp.coucou.retablir": "Restore",
   "grp.coucou.retabliFait": "You receive {nom}’s waves again.",
   "grp.coucou.bientot": "Waving is coming soon: it is not switched on in your database yet.",
+  "cmc.metsToi": "Put yourself on the map to wave at them.",
+  "cmc.envoye": "You waved at {nom}. To talk, use Discord.",
+  "cmc.videMoi": "As soon as another VRM reseller adds their city, they will appear here — and you can wave at each other.",
+  "cmc.bientotCourt": "Wave: coming soon",
+  "cmc.titre": "Waves",
+  "cmc.bientot": "Waving on the map is coming soon. To talk with a reseller, use Discord.",
+  "cmc.aucun": "No waves yet. Tap a pin to say hello.",
+  "cmc.note": "One wave per person every 24 h. To talk, use Discord: VRM has no chat.",
+  "cmc.sourdineNote": "Their waves will no longer reach you, and earlier ones disappear. They are not told.",
 };

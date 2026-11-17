@@ -35,7 +35,8 @@ const LANGUES = ['fr', 'en', 'es', 'it', 'de'];
 // `*` = tout le fichier. Ajouter ici chaque écran migré (méthode : docs/passation/2026-11-11-traduction.md).
 const MIGRES = [
   ['src/Accueil.jsx', ['*']],
-  ['src/communaute/Accompagnement.jsx', ['*']],   // (17 nov., groupes-coucou) Communauté → Groupes : créer en trois étapes, le coucou
+  ['src/communaute/Accompagnement.jsx', ['*']],
+  ['src/communaute/CoucouCarte.jsx', ['*']],   // (17 nov., carte-coucou) le coucou de la carte   // (17 nov., groupes-coucou) Communauté → Groupes : créer en trois étapes, le coucou
   ['src/JourneeStudio.jsx', ['*']],   // (14 nov., Studio) la grille Bento de Ma journée
   ['src/ARetirerAilleurs.jsx', ['*']],   // (15 nov., retrait-ailleurs) « À retirer ailleurs »
   ['src/parcoursNouveau/ParcoursNouveau.jsx', ['*']],   // (15 nov., parcours nouveau) les huit étapes

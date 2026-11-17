@@ -104,14 +104,15 @@ export function coucousLus(x) {
 // Le texte de la notification, dans la langue de CELUI QUI REÇOIT (aucun emoji :
 // la forme des notifications les retire, api/_lib/notif-belle.js).
 export const TEXTES_COUCOU = {
-  fr: { t: '{nom} t’a fait coucou', b: 'Dans « {groupe} ». Pour lui répondre, écris-lui sur Discord.' },
-  en: { t: '{nom} waved at you', b: 'In “{groupe}”. To reply, message them on Discord.' },
-  es: { t: '{nom} te ha saludado', b: 'En «{groupe}». Para responder, escríbele en Discord.' },
-  it: { t: '{nom} ti ha salutato', b: 'In «{groupe}». Per rispondere, scrivigli su Discord.' },
-  de: { t: '{nom} hat dir zugewinkt', b: 'In „{groupe}“. Antworte ihm auf Discord.' },
+  fr: { t: '{nom} t’a fait coucou', b: 'Dans « {groupe} ». Pour lui répondre, écris-lui sur Discord.', carte: 'Sur la carte de VRM. Pour lui répondre, écris-lui sur Discord.' },
+  en: { t: '{nom} waved at you', b: 'In “{groupe}”. To reply, message them on Discord.', carte: 'On the VRM map. To reply, message them on Discord.' },
+  es: { t: '{nom} te ha saludado', b: 'En «{groupe}». Para responder, escríbele en Discord.', carte: 'En el mapa de VRM. Para responder, escríbele en Discord.' },
+  it: { t: '{nom} ti ha salutato', b: 'In «{groupe}». Per rispondere, scrivigli su Discord.', carte: 'Sulla mappa di VRM. Per rispondere, scrivigli su Discord.' },
+  de: { t: '{nom} hat dir zugewinkt', b: 'In „{groupe}“. Antworte ihm auf Discord.', carte: 'Auf der VRM-Karte. Antworte ihm auf Discord.' },
 };
 export const texteCoucou = (langue, nom, groupe) => {
   const x = TEXTES_COUCOU[langue] || TEXTES_COUCOU.fr;
   const r = (s) => s.replace('{nom}', String(nom || '').slice(0, 40)).replace('{groupe}', String(groupe || '').slice(0, 60));
-  return { title: r(x.t), body: r(x.b) };
+  // Sans groupe : un coucou de la CARTE (047).
+  return { title: r(x.t), body: groupe ? r(x.b) : r(x.carte) };
 };

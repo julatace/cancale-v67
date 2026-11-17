@@ -32,7 +32,9 @@ import Accompagnement from './Accompagnement.jsx';
 import Pourquoi from '../composants/PourquoiReplie.jsx';
 import { lienFormateurLu } from './formateur.js';
 import { codeDuLien } from './accompagnement.js';
-import { cellules, resume, grouperParPixels, COUCOU, quandCourt, distanceKm, RAYON_PRES_KM } from './regles.js';
+import { cellules, resume, grouperParPixels, quandCourt, distanceKm, RAYON_PRES_KM } from './regles.js';
+import { BoutonCoucouCarte, CoucousCarte, FeuilleCoucouCarte, coucousCarteLus } from './CoucouCarte.jsx';
+import { tr } from '../i18n/index.js';
 import './communaute.css';
 // (5 nov., chantier G, revue 1.10) Les pannes de la carte, du classement et d'un fil : `EtatPanne`.
 import { EtatPanne } from '../composants/EtatPanne.jsx';
@@ -291,68 +293,12 @@ function Rejoindre({ api, moi, prenom, discordCompte = '', onFait, onAnnuler, Fe
   </div>;
 }
 
-// ── UN FIL DE CONVERSATION ───────────────────────────────────────────────────
-function Fil({ api, conv, entete, onFerme, onChange, FermeAuRetour }) {
-  const [fil, setFil] = useState(undefined), [texte, setTexte] = useState(''), [msg, setMsg] = useState(''), [occupe, setOccupe] = useState(false);
-  const bas = useRef(null);
-  const lire = useCallback(async () => {
-    const r = await api({ action: 'fil', conv });
-    if (r.ok) { setFil(r.fil); onChange(); } else setFil((f) => (f === undefined ? null : f));
-    if (!r.ok) setMsg(r.message || PAS_SU);
-  }, [api, conv]);
-  useEffect(() => { lire(); const id = setInterval(() => { if (document.visibilityState === 'visible') lire(); }, 15000); return () => clearInterval(id); }, [lire]);
-  useEffect(() => { if (bas.current) bas.current.scrollTop = bas.current.scrollHeight; }, [fil && fil.messages && fil.messages.length]);
-  const autre = fil && fil.autre;
-  const envoyer = async (t) => {
-    const x = String(t || '').trim(); if (!x) return;
-    if (!autre) { setMsg("Cette personne n'est plus sur la carte : la conversation est en lecture seule."); return; }
-    setOccupe(true); setMsg('');
-    const r = await api({ action: 'ecrire', pid: autre.pid, texte: x });
-    setOccupe(false);
-    if (!r.ok) { setMsg(r.message || PAS_SU); return; }
-    setTexte(''); lire();
-  };
-  const bloquer = async (oui) => {
-    if (oui && !window.confirm('Bloquer cette personne ? Tu ne recevras plus ses messages (elle ne le saura pas) et elle disparaîtra de ta carte.')) return;
-    const r = await api({ action: 'bloquer', conv, oui });
-    if (!r.ok) { setMsg(r.message || PAS_SU); return; }
-    lire();
-  };
-  const signaler = async () => {
-    const raison = window.prompt('Pourquoi signales-tu cette personne ? (facultatif — le propriétaire de VRM lira ton signalement et ses derniers messages)', '');
-    if (raison === null) return;
-    const r = await api({ action: 'signaler', conv, raison });
-    setMsg(r.ok ? 'Signalement envoyé. Merci : il sera lu par le propriétaire de VRM.' : (r.message || PAS_SU));
-  };
-  const titre = autre ? autre.pseudo : (entete && entete.pseudo) || 'Ancien membre de la carte';
-  return <div className="vrm-cm-voile" onClick={(e) => { if (e.target === e.currentTarget) onFerme(); }}>
-    <FermeAuRetour fermer={onFerme} />
-    <div className="vrm-cm-feuille vrm-cm-fil" role="dialog" aria-modal="true" aria-label={'Conversation avec ' + titre} data-cm-fil={conv}>
-      <div className="vrm-cm-feuille-tete"><h3>{titre}{autre && autre.ville ? <small> · {autre.ville}</small> : null}</h3><button type="button" className="vrm-cm-x" onClick={onFerme} aria-label="Fermer">×</button></div>
-      {fil === undefined ? <p role="status">Lecture de la conversation…</p> : fil === null ? <EtatPanne compact data-cm-fil-panne="" quoi="Cette conversation" raison={msg || 'Je n’ai pas pu la lire. Rien n’est perdu.'} onReessayer={lire}/> : <>
-        <div className="vrm-cm-bulles" ref={bas} data-cm-messages={fil.messages.length}>
-          {fil.messages.length === 0 && <p className="vrm-cm-note">Aucun message pour l’instant.</p>}
-          {fil.messages.map((m) => <div key={m.id} className={'vrm-cm-bulle' + (m.moi ? ' moi' : '')} data-cm-bulle={m.moi ? 'moi' : 'autre'}>
-            <span className="vrm-cm-bulle-texte">{m.texte}</span><time>{quandCourt(m.le)}</time></div>)}
-        </div>
-        {fil.bloque ? <p className="vrm-cm-note" data-cm-bloque>Tu as bloqué cette personne : ses messages ne t’arrivent plus. <button type="button" className="vrm-cm-lien" onClick={() => bloquer(false)}>Débloquer</button></p>
-          : !autre ? <p className="vrm-cm-note">Cette personne n’est plus sur la carte : la conversation est en lecture seule.</p>
-          : <form className="vrm-cm-saisie" onSubmit={(e) => { e.preventDefault(); envoyer(texte); }}>
-            <textarea value={texte} maxLength={500} rows={2} onChange={(e) => setTexte(e.target.value)} placeholder="Ton message (500 caractères au plus)" aria-label="Ton message" data-cm-texte />
-            <button type="submit" className="vrm-cm-primaire" disabled={occupe || !texte.trim()} data-cm-envoyer>{occupe ? '…' : 'Envoyer'}</button>
-          </form>}
-        {msg && <p className="vrm-cm-msg" role="alert">{msg}</p>}
-        <div className="vrm-cm-moderation">
-          {!fil.bloque && <button type="button" className="vrm-cm-lien" onClick={() => bloquer(true)} data-cm-bloquer>Bloquer</button>}
-          <button type="button" className="vrm-cm-lien" onClick={signaler} data-cm-signaler>Signaler</button>
-        </div>
-      </>}
-    </div>
-  </div>;
-}
+// (17 nov.) Le fil de conversation de la carte est RETIRÉ : plus aucun message dans
+// VRM (Julien : « se faire coucou, mais pas échanger des messages dans mon app, mais
+// sur Discord »). L'historique reste en base (018), l'app ne le montre plus.
 
 // ── LES PERSONNES D'UN ENDROIT ───────────────────────────────────────────────
-function Personnes({ cells, moi, onEcrire, onCoucou, onFerme, envoye, FermeAuRetour }) {
+function Personnes({ cells, moi, cc, onCoucou, onFerme, FermeAuRetour }) {
   const personnes = cells.flatMap((c) => c.personnes);
   const villes = [...new Set(personnes.map((p) => p.ville))];
   return <div className="vrm-cm-voile" onClick={(e) => { if (e.target === e.currentTarget) onFerme(); }}>
@@ -364,10 +310,7 @@ function Personnes({ cells, moi, onEcrire, onCoucou, onFerme, envoye, FermeAuRet
         <div><b>{p.pseudo}</b>{p.moi && <span className="vrm-cm-badge"> toi</span>}{p.premier && <span className="vrm-cm-badge" data-cm-premier> 🥇 premier de {p.ville}</span>}<small>{p.ville}</small>
           {p.discord && <DiscordDe pseudo={p.discord} />}</div>
         {!p.moi && <div className="vrm-cm-ligne-boutons">
-          {moi ? <>
-            <button type="button" onClick={() => onCoucou(p)} disabled={envoye.has(p.pid)} data-cm-coucou={p.pid}>{envoye.has(p.pid) ? 'Coucou envoyé ✓' : '👋 Coucou'}</button>
-            <button type="button" className="vrm-cm-primaire" onClick={() => onEcrire(p)} data-cm-ecrire={p.pid}>Écrire</button>
-          </> : <small className="vrm-cm-note">Mets-toi sur la carte pour lui écrire.</small>}
+          {moi ? <BoutonCoucouCarte p={p} cc={cc} onCoucou={onCoucou} /> : <small className="vrm-cm-note">{tr('cmc.metsToi')}</small>}
         </div>}
       </li>)}</ul>
     </div>
@@ -379,13 +322,15 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
   const api = useApi(headers);
   const [etat, setEtat] = useState('charge');          // charge · pas-su · non-installe · abonnement · lu
   const [msgEtat, setMsgEtat] = useState('');
-  const [carte, setCarte] = useState(null), [convs, setConvs] = useState([]);
+  const [carte, setCarte] = useState(null);
+  // (17 nov.) Le coucou de la carte (047) : undefined en cours · 'non-installe' · 'pas-su' · lu.
+  const [cc, setCc] = useState(undefined), [coucouPlus, setCoucouPlus] = useState(null);
   const [discordPret, setDiscordPret] = useState(false);
   // Le Discord relié au COMPTE (Paramètres → Mon compte), proposé ici : jamais posé tout seul.
   const [discordCompte, setDiscordCompte] = useState('');
   const [rejoindre, setRejoindre] = useState(false), [cellsOuvertes, setCellsOuvertes] = useState(null);
-  const [filOuvert, setFilOuvert] = useState(null), [enListe, setEnListe] = useState(false);
-  const [envoye, setEnvoye] = useState(() => new Set()), [toast, setToast] = useState('');
+  const [enListe, setEnListe] = useState(false);
+  const [toast, setToast] = useState('');
   // (5 nov.) Un lien d'invitation (`?tab=communaute&groupe=CODE`, gardé par l'app
   // avant de nettoyer l'adresse) ouvre l'onglet Groupes, code déjà tapé.
   const [codeLien] = useState(() => { try { const c = sessionStorage.getItem('vrm_accomp_lien') || ''; sessionStorage.removeItem('vrm_accomp_lien'); return codeDuLien('?groupe=' + encodeURIComponent(c)); } catch (_) { return ''; } });
@@ -401,7 +346,7 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
     if (!discret) setEtat((e) => (e === 'lu' ? e : 'charge'));
     const r = await api();
     if (!vivant.current) return;
-    if (r.ok && r.carte && Array.isArray(r.carte.profils)) { setCarte(r.carte); setConvs(Array.isArray(r.conversations) ? r.conversations : []); setDiscordPret(r.discordConnexion === true); setEtat('lu'); return; }
+    if (r.ok && r.carte && Array.isArray(r.carte.profils)) { setCarte(r.carte); setDiscordPret(r.discordConnexion === true); setEtat('lu'); return; }
     const e = r.erreur === 'non-installe' ? 'non-installe' : r.erreur === 'abonnement' ? 'abonnement' : 'pas-su';
     // Une relecture discrète ratée garde ce qu'on montrait (« pas su » ne vaut pas « personne »).
     if (discret && carte) { setMsgEtat(r.message || PAS_SU); return; }
@@ -409,7 +354,14 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
   }, [api, carte]);
   useEffect(() => { vivant.current = true; lire(); return () => { vivant.current = false; }; }, []);
   useEffect(() => { api({ action: 'discord-compte' }).then((r) => { if (vivant.current && r && r.ok && typeof r.discord === 'string') setDiscordCompte(r.discord); }); }, []);
-  useEffect(() => { const id = setInterval(() => { if (document.visibilityState === 'visible' && !filOuvert) lire(true); }, 30000); return () => clearInterval(id); }, [lire, filOuvert]);
+  useEffect(() => { const id = setInterval(() => { if (document.visibilityState === 'visible') lire(true); }, 30000); return () => clearInterval(id); }, [lire]);
+  const lireCoucou = useCallback(async () => {
+    const r = await api({ action: 'carte-coucou-lire' });
+    if (!vivant.current) return;
+    const lu = r.ok ? coucousCarteLus(r.coucou) : null;
+    if (lu) setCc(lu); else setCc((x) => (x && typeof x === 'object' && r.erreur !== 'non-installe' ? x : r.erreur === 'non-installe' ? 'non-installe' : 'pas-su'));
+  }, [api]);
+  useEffect(() => { lireCoucou(); }, []);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(''), 3500); return () => clearTimeout(t); }, [toast]);
   // Retour de « Se connecter avec Discord » : le pseudo et sa preuve arrivent dans le
   // fragment (#) de l'adresse, mis de côté par main.jsx au démarrage (l'adresse est
@@ -439,7 +391,6 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
   const profils = useMemo(() => (groupe ? tousProfils.filter((p) => p.moi || groupe.membres.includes(p.pid)) : tousProfils), [carte, groupe]);
   const cells = useMemo(() => cellules(profils, moi), [profils]);
   const r = useMemo(() => resume(profils, moi), [profils]);
-  const nonLus = convs.reduce((s, c) => s + (Number(c.nonLus) || 0), 0);
   const pres = useMemo(() => (moi ? profils.filter((p) => !p.moi && distanceKm({ lat: +moi.lat, lon: +moi.lon }, { lat: +p.lat, lon: +p.lon }) <= RAYON_PRES_KM) : []), [profils]);
 
   // (1er nov.) Se retirer SUPPRIME sa ligne (et son rang de « premier de ta ville ») :
@@ -450,17 +401,11 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
     if (!x.ok) { setToast(x.message || PAS_SU); return; }
     setToast('Tu n’es plus sur la carte.'); lire(true);
   };
-  const ecrireA = async (p, texte) => {
-    const x = await api({ action: 'ecrire', pid: p.pid, texte });
-    if (!x.ok) { setToast(x.message || PAS_SU); return null; }
-    lire(true); return x.conv;
-  };
-  const coucou = async (p) => { const c = await ecrireA(p, COUCOU(moi && moi.ville)); if (c) { setEnvoye((s) => new Set(s).add(p.pid)); setToast('Coucou envoyé à ' + p.pseudo + ' 👋'); } };
-  const ouvrirEcrire = (p) => {
-    const c = convs.find((x) => x.pid === p.pid);
-    setCellsOuvertes(null);
-    if (c) { setFilOuvert({ conv: c.conv, entete: c }); return; }
-    setFilOuvert({ nouveau: p });
+  // (17 nov.) Un coucou de la carte : un SIGNE, aucun texte (le pid public, rien d'autre).
+  const coucou = async (p) => {
+    const x = await api({ action: 'carte-coucou', pid: p.pid });
+    setToast(x.ok ? tr('cmc.envoye', { nom: p.pseudo }) : (x.message || PAS_SU));
+    lireCoucou();
   };
 
   // Les feuilles et le toast vivent sur <body> : l'écran est dans une coque
@@ -525,7 +470,7 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
       <p>Donne le code <b>{codeLisible(groupe.code)}</b> à ceux que tu accompagnes : ils apparaîtront ici.</p>
     </div> : <div className="vrm-cm-carton vrm-cm-vide" data-cm-vide>
       <b>{moi ? 'Personne d’autre que toi sur la carte pour l’instant.' : 'Personne n’est encore sur la carte.'}</b>
-      <p>{moi ? 'Dès qu’un autre revendeur VRM y mettra sa ville, il apparaîtra ici — et vous pourrez vous écrire.' : 'Sois le premier : mets ta ville, les prochains revendeurs te trouveront.'}</p>
+      <p>{moi ? tr('cmc.videMoi') : 'Sois le premier : mets ta ville, les prochains revendeurs te trouveront.'}</p>
     </div>) : <ul className="vrm-cm-chiffres" aria-label="La communauté en chiffres">
       <li data-cm-chiffre="total"><b>{r.total}</b> {groupe ? `membre${r.total > 1 ? 's' : ''} dans « ${groupe.nom} »` : `revendeur${r.total > 1 ? 's' : ''} sur la carte`}</li>
       <li data-cm-chiffre="villes"><b>{r.villes}</b> ville{r.villes > 1 ? 's' : ''}</li>
@@ -538,43 +483,19 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
       <h3>Près de toi</h3>
       <ul className="vrm-cm-liste">{pres.slice(0, 8).map((p) => <li key={p.pid}><AvatarProfil profil={p}/><div><b>{p.pseudo}</b>{p.premier && <span className="vrm-cm-badge"> 🥇</span>}<small>{p.ville}</small>{p.discord && <DiscordDe pseudo={p.discord} />}</div>
         <div className="vrm-cm-ligne-boutons">
-          <button type="button" onClick={() => coucou(p)} disabled={envoye.has(p.pid)}>{envoye.has(p.pid) ? 'Coucou envoyé ✓' : '👋 Coucou'}</button>
-          <button type="button" onClick={() => ouvrirEcrire(p)}>Écrire</button>
+          {moi ? <BoutonCoucouCarte p={p} cc={cc} onCoucou={coucou} /> : null}
         </div></li>)}</ul>
     </div>}
 
-    <div className="vrm-cm-carton" data-cm-conversations={convs.length}>
-      <h3>Messages{nonLus > 0 ? <span className="vrm-cm-pastille" data-cm-nonlus={nonLus}>{nonLus} non lu{nonLus > 1 ? 's' : ''}</span> : null}</h3>
-      {convs.length === 0 ? <p className="vrm-cm-note">Aucune conversation. Touche une épingle pour dire bonjour.</p>
-        : <ul className="vrm-cm-liste">{convs.map((c) => <li key={c.conv}><button type="button" className="vrm-cm-conv" onClick={() => setFilOuvert({ conv: c.conv, entete: c })} data-cm-conv={c.conv}>
-          <b>{c.pseudo || 'Ancien membre de la carte'}{c.ville ? <small> · {c.ville}</small> : null}</b>
-          <span>{c.deMoi ? 'Toi : ' : ''}{c.dernier}</span>
-          <time>{quandCourt(c.quand)}</time>{c.nonLus > 0 && <span className="vrm-cm-pastille">{c.nonLus}</span>}
-        </button></li>)}</ul>}
-      <p className="vrm-cm-note">20 messages par heure au plus · bloquer ou signaler depuis la conversation.</p>
-    </div>
+    {/* (17 nov.) Plus de « Messages » : les coucous reçus, et UN geste vers Discord. */}
+    <CoucousCarte cc={cc} onPlus={setCoucouPlus} />
 
     {rejoindre && portail(<Rejoindre api={api} moi={moi} prenom={prenom} discordCompte={discordCompte} FermeAuRetour={FermeAuRetour} onAnnuler={() => setRejoindre(false)} onFait={() => { setRejoindre(false); setToast('Te voilà sur la carte !'); lire(true); }} />)}
-    {cellsOuvertes && portail(<Personnes cells={cellsOuvertes} moi={moi} envoye={envoye} FermeAuRetour={FermeAuRetour} onFerme={() => setCellsOuvertes(null)} onCoucou={coucou} onEcrire={ouvrirEcrire} />)}
-    {filOuvert && filOuvert.conv && portail(<Fil api={api} conv={filOuvert.conv} entete={filOuvert.entete} FermeAuRetour={FermeAuRetour} onFerme={() => setFilOuvert(null)} onChange={() => lire(true)} />)}
-    {filOuvert && filOuvert.nouveau && portail(<PremierMessage p={filOuvert.nouveau} FermeAuRetour={FermeAuRetour} onFerme={() => setFilOuvert(null)}
-      onEnvoyer={async (t) => { const c = await ecrireA(filOuvert.nouveau, t); if (c) setFilOuvert({ conv: c, entete: filOuvert.nouveau }); }} />)}
+    {cellsOuvertes && portail(<Personnes cells={cellsOuvertes} moi={moi} cc={cc} FermeAuRetour={FermeAuRetour} onFerme={() => setCellsOuvertes(null)} onCoucou={coucou} />)}
+    {coucouPlus && portail(<FeuilleCoucouCarte r={coucouPlus} FermeAuRetour={FermeAuRetour} onFerme={() => setCoucouPlus(null)}
+      onCouper={async () => { const x = await api({ action: 'carte-coucou-sourdine', coucou: coucouPlus.id, oui: true }); setCoucouPlus(null); setToast(x.ok ? tr('grp.coucou.sourdineFait', { nom: coucouPlus.de }) : (x.message || PAS_SU)); lireCoucou(); }} />)}
     {toast && portail(<div className="vrm-cm-toast" role="status" data-cm-toast>{toast}</div>)}
   </section>;
-}
-
-function PremierMessage({ p, onEnvoyer, onFerme, FermeAuRetour }) {
-  const [t, setT] = useState(''), [occupe, setOccupe] = useState(false);
-  return <div className="vrm-cm-voile" onClick={(e) => { if (e.target === e.currentTarget) onFerme(); }}>
-    <FermeAuRetour fermer={onFerme} />
-    <div className="vrm-cm-feuille" role="dialog" aria-modal="true" aria-label={'Écrire à ' + p.pseudo} data-cm-premier-message>
-      <div className="vrm-cm-feuille-tete"><h3>Écrire à {p.pseudo}<small> · {p.ville}</small></h3><button type="button" className="vrm-cm-x" onClick={onFerme} aria-label="Fermer">×</button></div>
-      <form className="vrm-cm-saisie" onSubmit={async (e) => { e.preventDefault(); if (!t.trim()) return; setOccupe(true); await onEnvoyer(t); setOccupe(false); }}>
-        <textarea value={t} maxLength={500} rows={3} onChange={(e) => setT(e.target.value)} placeholder="Ton message (500 caractères au plus)" aria-label="Ton message" data-cm-texte />
-        <button type="submit" className="vrm-cm-primaire" disabled={occupe || !t.trim()} data-cm-envoyer>{occupe ? '…' : 'Envoyer'}</button>
-      </form>
-    </div>
-  </div>;
 }
 
 // ── LE PSEUDO DISCORD (019) ──────────────────────────────────────────────────

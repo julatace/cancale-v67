@@ -192,4 +192,13 @@ export default {
   "grp.coucou.retablir": "Rétablir",
   "grp.coucou.retabliFait": "Tu reçois de nouveau les coucous de {nom}.",
   "grp.coucou.bientot": "Le coucou arrive bientôt : il n’est pas encore activé sur ta base.",
+  "cmc.metsToi": "Mets-toi sur la carte pour lui faire coucou.",
+  "cmc.envoye": "Coucou envoyé à {nom}. Pour discuter, c’est sur Discord.",
+  "cmc.videMoi": "Dès qu’un autre revendeur VRM y mettra sa ville, il apparaîtra ici — et vous pourrez vous faire coucou.",
+  "cmc.bientotCourt": "Coucou : bientôt",
+  "cmc.titre": "Coucous",
+  "cmc.bientot": "Le coucou de la carte arrive bientôt. Pour discuter avec un revendeur, c’est sur Discord.",
+  "cmc.aucun": "Aucun coucou pour l’instant. Touche une épingle pour dire bonjour.",
+  "cmc.note": "Un coucou par personne et par 24 h. Pour discuter, c’est sur Discord : VRM n’a pas de messagerie.",
+  "cmc.sourdineNote": "Ses coucous ne t’arriveront plus, et ceux d’avant disparaissent. Cette personne n’est pas prévenue.",
 };
