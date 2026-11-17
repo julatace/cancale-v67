@@ -320,6 +320,28 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
       await ctx.close();
     });
 
+    // (16 nov., lot abonnement-clair) Le rappel 3 jours avant chaque prélèvement : dit tel que le SERVEUR le fait
+    // (`rappelPrelevement` de la route), jamais promis quand il ne le dit pas.
+    console.log('\n── Le rappel avant prélèvement');
+    await essaie('rappel', async () => {
+      const CAPTURES = process.env.BANC_CAPTURES || '';
+      const lire = (pg) => pg.evaluate(() => { const e = document.querySelector('[data-rappel-prelevement]'); return e ? { etat: e.getAttribute('data-rappel-prelevement'), t: e.innerText } : null; });
+      const cas = [
+        ['notif-email', { ...ETATS.actif, rappelPrelevement: { actif: true, email: true, joursAvant: 3 } }, (r) => r && r.etat === 'notif-email' && /3 jours avant chaque prélèvement/.test(r.t) && /e-mail/.test(r.t)],
+        ['notif', { ...ETATS.actif, rappelPrelevement: { actif: true, email: false, joursAvant: 3 } }, (r) => r && r.etat === 'notif' && /3 jours avant/.test(r.t) && !/e-mail/.test(r.t)],
+        ['eteint', { ...ETATS.nonBranche, rappelPrelevement: { actif: false, email: false, joursAvant: 3 } }, (r) => r && r.etat === 'eteint' && /rien n’est envoyé/.test(r.t)],
+        ['pas su', { ...ETATS.actif }, (r) => r === null],
+      ];
+      for (const [nom, abo, juge] of cas) {
+        const { ctx, pg } = await ouvrir(nav, { abo, largeur: 390 });
+        await pg.waitForTimeout(800);
+        const r = await lire(pg);
+        if (CAPTURES) await pg.screenshot({ path: path.join(CAPTURES, `rappel-${nom.replace(' ', '-')}-390.png`), fullPage: false }).catch(() => {});
+        dit(juge(r), `  rappel « ${nom} » : ${nom === 'pas su' ? 'la route ne dit rien ⇒ rien n’est promis' : 'dit tel que le serveur le fait'}`, JSON.stringify(r));
+        await ctx.close();
+      }
+    });
+
     console.log('\n── Les factures');
     await essaie('liste', async () => {
       const { ctx, pg, appels } = await ouvrir(nav, { abo: ETATS.actif });

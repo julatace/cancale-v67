@@ -27,6 +27,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (16 nov., lot abonnement-clair) docs/passation/2026-11-16-abonnement-clair.md
+  { id: 'abonnement-rappel', date: '2026-11-16', titre: 'Un rappel 3 jours avant chaque prélèvement', phrase: 'Date et montant lus chez Stripe ; Gérer ou Résilier en un toucher.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (16 nov.) docs/passation/2026-11-16-design-restes.md
   { id: 'paire-monte-sites', date: '2026-11-16', titre: 'Leboncoin, eBay, Vestiaire : la paire monte', phrase: 'Touche une annonce : prix, jours, favoris et prix d’achat sur place.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (16 nov., lot extension-restes, extension 5.395) docs/passation/2026-11-16-extension-restes.md
