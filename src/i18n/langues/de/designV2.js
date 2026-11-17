@@ -113,5 +113,7 @@ export default {
     "other": "{n} Anzeigen"
   },
   "v2.scanner": "Paket scannen",
-  "v2.achats.ajouter": "Kauf hinzufügen"
+  "v2.achats.ajouter": "Kauf hinzufügen",
+  "v2.l.achete": "gekauft {p}",
+  "v2.l.acheteMarge": "Gekauft {p} · Marge {m}"
 };
