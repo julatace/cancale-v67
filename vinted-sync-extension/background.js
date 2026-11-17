@@ -18337,7 +18337,7 @@ const FAVORIS_CARTE_CLE = 'vrmFavorisCarte';
 const FAVORIS_CARTE_APERCU = 'vrmFavorisApercu';
 const FAVORIS_CARTE_MAX = 15;               // = api/_lib/favoris-carte.js (une heure de favoris)
 const FAVORIS_CARTE_APERCU_MS = 5 * 60000;
-const FAVORIS_CARTE_TOUS = 300;             // = api/_lib/favoris-carte.js (la liste à cocher, 5.407)
+const FAVORIS_CARTE_TOUS = 1000;             // = api/_lib/favoris-carte.js (la liste à cocher, 5.407)
 const FAVORIS_CARTE_CHOIX_MS = 30 * 60000;  // un choix fait sur un aperçu de plus de 30 min ⇒ relire d'abord
 let _favorisCarteEnVol = false, _favorisCarteMinuteur = null, _favorisCarteApercuEnVol = false;
 async function apiFavorisCarte(uid, action, donnees) {

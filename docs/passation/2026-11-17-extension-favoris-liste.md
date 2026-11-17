@@ -14,8 +14,9 @@ aléatoires entre l'offre et le message.
 
 Carte du logo sur vinted.fr → segment **Favoris** :
 
-- **La liste** de TOUS les favoris du compte de l'onglet dont l'article est encore en vente (300 au plus,
-  les plus récents), du plus récent au plus ancien. Chaque rangée : une case (cible 44 × 44 px), la photo
+- **La liste** de TOUS les favoris du compte de l'onglet dont l'article est encore en vente (jusqu'à 1 000,
+  les plus récents), du plus récent au plus ancien, par pages de 100 : « Voir les 100 suivants » jusqu'au
+  dernier — aucun favori hors d'atteinte (revue du coordinateur). Chaque rangée : une case (cible 44 × 44 px), la photo
   avec son étiquette N° en kraft (par identité d'annonce, `infosDuCompte`, compte de l'onglet seulement),
   le titre (2 lignes), « acheteur · il y a 2 h », le prix (barré + prix de l'offre quand il y en a une).
   Une rangée se touche entière.
@@ -23,16 +24,19 @@ Carte du logo sur vinted.fr → segment **Favoris** :
   écrite : « offre déjà envoyée », « message déjà envoyé », « message en cours », « à vérifier sur
   Vinted », « pas envoyé, pas reproposé », « destinataire pas encore sûr : ouvre ce favori depuis la
   cloche de Vinted », « prix de l'offre pas calculable ».
-- **En haut** : « 12 cochés · 15 au plus par envoi », « Tout cocher » (les 15 plus récents visibles qu'on
-  peut contacter) / « Rien » ; les filtres « Toutes les annonces (N) » (une annonce, avec son N°) et
+- **En haut** : « 20 cochés · 15 par heure maximum » (la raison du plafond, à côté), « Tout cocher » (tous
+  les favoris visibles qu'on peut contacter) / « Rien » ; les filtres « Toutes les annonces (N) » (une annonce, avec son N°) et
   « Pas encore contactés ». « N favoris d'articles vendus ou retirés : cachés ».
 - **Un seul plein** : « Envoyer à 12 favoris » ⇒ un **récapitulatif** : par annonce (photo, N°, combien de
   favoris, prix → offre), « Avec une offre −10 % », le message (une de ses N versions, au hasard), la
   durée au vrai rythme (« Environ 25 min · 15 par heure maximum ») ; « Confirmer l'envoi » lance, « Retour
   à la liste » revient. Puis l'écran « action en cours » de la 5.406 (Tout arrêter, Réduire) tel quel.
+- **15 par heure** (garde gardée) : un envoi part avec les 15 plus récents cochés ; « Les 5 autres restent
+  cochés : ils partiront à l'envoi suivant ». Après un envoi de 15, le bouton dit « Envoyer les 15 suivants
+  à 20:45 » et attend l'heure (`vrmFavLot[uid]`, heure du dernier lot, chrome.storage.local).
 - **Le choix survit** à un rechargement : `chrome.storage.local.vrmFavSelection[uid]` (par compte, 30 j),
   réduit aux favoris encore cochables ; sans choix gardé, les 15 plus récents.
-- 300 rangées restent fluides : cocher ne redessine rien (le compteur et le bouton suivent sur place, deux
+- Les longues listes restent fluides : cocher ne redessine rien (le compteur et le bouton suivent sur place, deux
   cases < 50 ms mesuré), `content-visibility: auto` sur les rangées, images paresseuses ; le défilement
   est gardé à chaque redessin (`data-defil`).
 - Textes neufs en 5 langues dans `vrm-ui.js` (`fl_*`, `fr_*`).
@@ -61,12 +65,12 @@ après un lancement l'aperçu gardé est vidé (un second envoi exige une liste 
 ## Preuves
 
 - `scripts/audit-favoris-liste.cjs` (vraie règle du serveur + vrai `background.js` + vraie file) :
-  33/33 ; rouge sur `claude/extension-carte-v2` (15 rouges puis lève) ; `--prouve` 7/7 (cochables, déjà
+  35/35 (dont S2 : 400 favoris, tous dans la liste, réponse bornée) ; rouge sur `claude/extension-carte-v2` (15 rouges puis lève) ; `--prouve` 7/7 (cochables, déjà
   contactés, fraîcheur, confirmation, plafond 15, vendus, contactés côté serveur).
 - `scripts/bancs/extension-favoris-liste.cjs` : 390 tactile, 1280, 1512, clair et sombre — 120 favoris ;
   contraste ≥ 4,5:1, cibles ≥ 44 px, rien de coupé, rien ne déborde ; gestes au doigt et à la souris
   (Rien, trois rangées touchées, déjà contacté non cochable, filtres, Tout cocher ≤ 15, rechargement,
-  récapitulatif, rien avant « Confirmer », puis exactement les 3 cochés avec `confirme: true`).
+  récapitulatif, rien avant « Confirmer », puis exactement les 3 cochés avec `confirme: true` ; F5 : 250 favoris, « Voir les suivants » jusqu'au dernier ; F6 : tout cocher ⇒ 15 envoyés, les autres restent cochés, « Envoyer les 15 suivants à HH:MM »).
   Captures regardées ; planche : scratchpad `onglets/extension-favoris.png`.
 - `audit-coherence` (capacité `favorisliste2`), `audit-extension-zip`, `audit-traduction`, build.
 

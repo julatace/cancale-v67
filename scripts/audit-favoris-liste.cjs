@@ -161,6 +161,17 @@ const badge = (quoi, extra) => Object.assign({ from: 'vrm-badge', action: 'favor
     dit(JSON.stringify((a.liste || []).map((x) => x.id).sort()) === JSON.stringify(tous.filter((x) => x.cochable).map((x) => x.id).slice(0, 15).sort()),
       'les cochables sont EXACTEMENT ceux que l’envoi d’avant retenait (`liste`, une seule règle)');
   }
+  // ── S2 : aucun favori hors d'atteinte (coordinateur, 17 nov. : « 12 ne pourront jamais être cochés ») ──
+  console.log('\nS2. 400 favoris : tous dans la liste (la carte les montre par pages de 100)');
+  {
+    const K = 400, nn = Array.from({ length: K }, (_, i) => ({ id: 'g' + i, user_id: 20000 + i, body: `acheteur_${i} a ajouté ton article à ses favoris.`, link: `/items/${7000 + (i % 40)}/conversation/new?from_notification=true`, created_at: iso(T0 - (i + 1) * MIN) }));
+    const it = Array.from({ length: 40 }, (_, i) => ({ id: 7000 + i, title: 'Running ' + i, price: { amount: '30.0', currency_code: 'EUR' } }));
+    const g = M.apercuCarte({ prefs: PREFS, capture: { payload: { notifications: nn }, domain: 'www.vinted.fr' }, vue: { jobs: [], active: false }, dressing: { cap: iso(T0 - H / 2), pg: { total_entries: 40 }, items: it }, prouve: () => true, maintenant: T0 });
+    const tt = Array.isArray(g.tous) ? g.tous : [];
+    dit(tt.length === K && tt.every((x) => x.cochable), `les ${K} favoris sont dans la liste, tous cochables`, `${tt.length}`);
+    const avecTexte = tt.filter((x) => 'texte' in x).length;
+    dit(avecTexte > 0 && avecTexte <= 60 && JSON.stringify(g).length < 400000, 'réponse bornée : message rendu pour les 60 premiers seulement', `${avecTexte} · ${JSON.stringify(g).length} o`);
+  }
   const cochables = tous.filter((x) => x.cochable).map((x) => x.id);
   if (!cochables.length) cochables.push('n0', 'n6', 'n7', 'n8', 'n9');   // (code d'avant : aucune liste ⇒ les contrôles suivants jugent quand même)
   // ── B1 : `lancer` n'accepte que les cochables ────────────────────────────────

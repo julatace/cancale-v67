@@ -165,7 +165,7 @@ const CIBLES = ({ hoteId, sel }) => {
 // ── L'aperçu inventé : 120 favoris sur 8 annonces ─────────────────────────────
 const TITRES = ['Baskets cuir blanc 42', 'Running bleu nuit 43', 'Sneakers montantes 41', 'Air rétro gris 44', 'Mocassins daim 40', 'Basket toile écrue 38', 'Trail noir 45', 'Tennis vintage 39'];
 const NUMS = ['124', 'B230', '87', '', '9', '1032', '56', ''];
-const TOUS = Array.from({ length: 120 }, (_, i) => {
+const TOUS = Array.from({ length: 250 }, (_, i) => {
   const k = i % 8, envoi = i % 11 === 3 ? 'envoye' : i % 17 === 5 ? 'en_cours' : 'a_envoyer';
   const raison = envoi === 'a_envoyer' && i % 13 === 7 ? 'non_prouve' : '';
   const cochable = envoi === 'a_envoyer' && !raison;
@@ -173,7 +173,7 @@ const TOUS = Array.from({ length: 120 }, (_, i) => {
     num: NUMS[k] || undefined, envoi, ...(envoi === 'envoye' && i % 2 ? { offreFaite: true } : {}), ...(raison ? { raison } : {}), cochable,
     ...(cochable ? { offre: Math.round((40 + k * 5) * 0.9), texte: 'Bonjour acheteur_' + (i + 1) + ', ça te plaît toujours ? Je te fais une petite offre.' } : {}) };
 });
-const APERCU = { etat: 'pret', total: TOUS.filter((x) => x.cochable).length, max: 15, totalTous: 132, retires: 4,
+const APERCU = { etat: 'pret', total: TOUS.filter((x) => x.cochable).length, max: 15, totalTous: 250, retires: 4,
   message: { intervalleMinutes: 2, intervalleMaxMinutes: 4, versions: 3, offre: { mode: 'pct', valeur: 10, arrondi: true } }, reglages: { version: 1 },
   liste: TOUS.filter((x) => x.cochable).slice(0, 15), selection: TOUS.filter((x) => x.cochable).slice(0, 15).map((x) => x.id), tous: TOUS };
 const LIGNE = (r, id) => r.querySelector(`.fl-l[data-fav-qui="${id}"]`);
@@ -214,7 +214,8 @@ const LIGNE = (r, id) => r.querySelector(`.fl-l[data-fav-qui="${id}"]`);
         const sel = q('[data-fav-annonce]'), cs = sel ? getComputedStyle(sel) : null;
         const cv = document.createElement('canvas').getContext('2d'); if (cs) cv.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
         const selTient = !!sel && cv.measureText(sel.options[sel.selectedIndex].text).width <= sel.clientWidth - parseFloat(cs.paddingLeft) - 26;
-        return { enVue, selTient, n: lignes.length, vue: q('[data-fav-vue]') && q('[data-fav-vue]').getAttribute('data-fav-vue'), trie: dates.every((d, i) => isFinite(d) && (i === 0 || dates[i - 1] >= d)),
+        const sb = q('[data-fav-suite]');
+        return { enVue, selTient, suite: sb ? Number(sb.getAttribute('data-fav-suite')) : 0, maxTxt: /15 par heure maximum/.test((q('[data-fav-max]') || {}).textContent || ''), n: lignes.length, vue: q('[data-fav-vue]') && q('[data-fav-vue]').getAttribute('data-fav-vue'), trie: dates.every((d, i) => isFinite(d) && (i === 0 || dates[i - 1] >= d)),
           offOk: off.length > 0 && off.every((l) => l.querySelector('input').disabled && (l.querySelector('.fl-etat') || {}).textContent),
           offreTxt: !!lignes.find((l) => l.getAttribute('data-fav-envoi') === 'envoye' && /offre/.test((l.querySelector('.fl-etat') || {}).textContent || '')),
           msgTxt: !!lignes.find((l) => l.getAttribute('data-fav-envoi') === 'envoye' && /message/.test((l.querySelector('.fl-etat') || {}).textContent || '')),
@@ -224,7 +225,8 @@ const LIGNE = (r, id) => r.querySelector(`.fl-l[data-fav-qui="${id}"]`);
           pleins: Array.from(r.querySelectorAll('.carte .vu-plein, .carte .b:not(.sec)')).filter((el) => el.getClientRects().length).length };
       });
       console.log(`     mesuré : ${m.n} rangées · ${m.coches} cochés · « ${m.bouton} » · ${m.kraft} étiquettes N° · cases ${JSON.stringify(m.cases.slice(0, 2))}`);
-      dit(m.vue === 'liste' && m.n === 120, 'F1 · la liste : 120 favoris, une rangée chacun', `${m.vue} ${m.n}`);
+      dit(m.vue === 'liste' && m.n === 100 && m.suite === 100, 'F1 · la liste : les 100 plus récents, puis « Voir les 100 suivants »', `${m.vue} ${m.n} ${m.suite}`);
+      dit(m.maxTxt, 'F2 · la raison du plafond à côté du compteur : « 15 par heure maximum »');
       dit(m.trie, 'F1 · du plus récent au plus ancien');
       dit(m.photos >= 100 && m.kraft > 0 && m.quand, 'F1 · photo, étiquette N° en kraft, « il y a … »', `${m.photos} ${m.kraft} ${m.quand}`);
       dit(m.offOk && m.offreTxt && m.msgTxt, 'F1 · déjà contactés : case inactive, raison écrite (« offre déjà envoyée » / « message déjà envoyé »)');
@@ -260,16 +262,18 @@ const LIGNE = (r, id) => r.querySelector(`.fl-l[data-fav-qui="${id}"]`);
         // Filtres.
         await touche(pg, mobile, '[data-fav-nouveaux]');
         const nouv = await pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const l = Array.from(r.querySelectorAll('.fl-l')); return { n: l.length, tous: l.every((x) => x.getAttribute('data-fav-envoi') === 'a_envoyer'), coches: r.querySelector('[data-fav-coches]').getAttribute('data-fav-coches') }; });
-        dit(nouv.n > 0 && nouv.n < 120 && nouv.tous && nouv.coches === '3', '« Pas encore contactés » : seulement eux, le choix gardé', JSON.stringify(nouv));
+        dit(nouv.n > 0 && nouv.n <= 100 && nouv.tous && nouv.coches === '3', '« Pas encore contactés » : seulement eux, le choix gardé', JSON.stringify(nouv));
         await touche(pg, mobile, '[data-fav-nouveaux]');
         await pg.evaluate(() => { const s = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-fav-annonce]'); s.value = '9002'; s.dispatchEvent(new Event('change')); });
         await pg.waitForTimeout(150);
         const ann = await pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const l = Array.from(r.querySelectorAll('.fl-l')); return { n: l.length, une: l.every((x) => x.getAttribute('data-fav-item') === '9002') }; });
-        dit(ann.n === 15 && ann.une, 'F2 · filtre « une annonce » : ses 15 favoris seulement', JSON.stringify(ann));
+        dit(ann.n === TOUS.filter((x) => x.itemId === '9002').length && ann.une, 'F2 · filtre « une annonce » : ses favoris seulement', JSON.stringify(ann));
         if (!mobile) await cap(pg, `filtre-${tag}`);
+        await touche(pg, mobile, '[data-fav-tout="aucun"]');
         await touche(pg, mobile, '[data-fav-tout="tous"]');
         const tt = await pg.evaluate(() => document.getElementById('vrm-badge').shadowRoot.querySelector('[data-fav-coches]').getAttribute('data-fav-coches'));
-        dit(Number(tt) <= 15 && Number(tt) > 3, `F2 · « Tout cocher » sur le filtre : au plus 15 (${tt})`, tt);
+        const nAnn = TOUS.filter((x) => x.itemId === '9002' && x.cochable).length;
+        dit(Number(tt) === nAnn, `F2 · « Tout cocher » sur le filtre : chacun de ses favoris qu’on peut contacter (${tt})`, `${tt}/${nAnn}`);
         await touche(pg, mobile, '[data-fav-tout="aucun"]');
         await pg.evaluate(() => { const s = document.getElementById('vrm-badge').shadowRoot.querySelector('[data-fav-annonce]'); s.value = ''; s.dispatchEvent(new Event('change')); });
         await pg.waitForTimeout(150);
@@ -310,6 +314,30 @@ const LIGNE = (r, id) => r.querySelector(`.fl-l[data-fav-qui="${id}"]`);
         const l = await pg.evaluate(() => window.__envoyes.filter((m) => m.quoi === 'lancer'));
         dit(l.length === 1 && l[0].confirme === true && JSON.stringify(l[0].selection.slice().sort()) === JSON.stringify(choix.slice().sort()) && l[0].items.length === 3,
           'F4 · « Confirmer l’envoi » : l’extension reçoit EXACTEMENT les 3 favoris cochés, confirmés', JSON.stringify(l).slice(0, 300));
+        // F5 : rien hors d'atteinte — « Voir les 100 suivants » jusqu'au dernier.
+        {
+          const p3 = await page(nav, { nuit, largeur, hauteur, mobile });
+          await p3.pg.evaluate(OUVRIR_OMBRES);
+          await monter(p3.pg, { etat: ETATS.favorisPret(), apercu: APERCU });
+          await ouvrirCarte(p3.pg, mobile); await p3.pg.waitForTimeout(400);
+          await touche(p3.pg, mobile, '[data-fav-suite]'); await p3.pg.waitForTimeout(200);
+          await touche(p3.pg, mobile, '[data-fav-suite]'); await p3.pg.waitForTimeout(200);
+          const tout = await p3.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; return { n: r.querySelectorAll('.fl-l').length, suite: !!r.querySelector('[data-fav-suite]'), dernier: !!r.querySelector('.fl-l[data-fav-qui="n249"]') }; });
+          dit(tout.n === 250 && !tout.suite && tout.dernier, 'F5 · « Voir les suivants » : les 250 favoris atteignables, le plus ancien compris', JSON.stringify(tout));
+          // F6 : 15 par heure — « Tout cocher » (plus de 15) ⇒ « Envoyer à 15 favoris », les autres restent cochés ;
+          // après l'envoi, « Envoyer les 15 suivants à HH:MM » (attend l'heure).
+          await touche(p3.pg, mobile, '[data-fav-tout="tous"]');
+          const avant = await p3.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; return { n: Number(r.querySelector('[data-fav-coches]').getAttribute('data-fav-coches')), b: r.querySelector('[data-fav-envoyer]').textContent, dis: r.querySelector('[data-fav-envoyer]').disabled, note: r.querySelector('[data-fav-note]').textContent }; });
+          const nCoch = TOUS.filter((x) => x.cochable).length;
+          dit(avant.n === nCoch && /Envoyer à 15 favoris/.test(avant.b) && !avant.dis && new RegExp(`Les ${nCoch - 15} autres restent cochés`).test(avant.note), `F6 · ${nCoch} cochés ⇒ « Envoyer à 15 favoris », les ${nCoch - 15} autres restent cochés (dit)`, JSON.stringify(avant));
+          await touche(p3.pg, mobile, '[data-fav-envoyer]'); await p3.pg.waitForTimeout(250);
+          await touche(p3.pg, mobile, '[data-fav-lancer]'); await p3.pg.waitForTimeout(700);
+          const apres = await p3.pg.evaluate(() => { const r = document.getElementById('vrm-badge').shadowRoot; const l = window.__envoyes.filter((m) => m.quoi === 'lancer'); const b = r.querySelector('[data-fav-envoyer]'); return { lances: l.map((x) => x.selection.length), n: Number((r.querySelector('[data-fav-coches]') || {}).getAttribute && r.querySelector('[data-fav-coches]').getAttribute('data-fav-coches')), b: b ? b.textContent : '', dis: b ? b.disabled : null, a: b ? Number(b.getAttribute('data-fav-a')) : 0 }; });
+          dit(apres.lances.length === 1 && apres.lances[0] === 15, 'F6 · l’envoi part avec 15 favoris (le plafond, gardé)', JSON.stringify(apres.lances));
+          dit(apres.n === nCoch - 15 && /Envoyer les 15 suivants à \d{2}:\d{2}/.test(apres.b) && apres.dis === true && apres.a > Date.now() + 55 * MIN, 'F6 · les autres restent cochés ; « Envoyer les 15 suivants à HH:MM » attend l’heure', JSON.stringify(apres));
+          await cap(p3.pg, `suivants-${tag}`);
+          await p3.ctx.close();
+        }
       }
       dit(!erreurs.length, 'aucune erreur de page', erreurs.join(' | '));
       await ctx.close();

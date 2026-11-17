@@ -605,10 +605,11 @@
      pour pouvoir les sélectionner ») : case 44 px · photo + étiquette N° kraft · titre (2 lignes) /
      qui · quand / état · prix. Une rangée se touche entière ; un favori déjà contacté est grisé
      (la case seulement), sa raison écrite en clair. 300 rangées : content-visibility les saute. */
-  .fl-tete { display: flex; align-items: center; gap: 4px 8px; flex-wrap: wrap; margin: 2px 2px 6px; }
+  .fl-tete { display: flex; align-items: center; gap: 0 8px; flex-wrap: wrap; margin: 2px 2px 6px; }
+  .fl-tete .fl-outils { display: flex; gap: 4px; margin-left: auto; }
   .fl-n { font: 600 14px/1.3 var(--vu-police); color: var(--vu-encre); font-variant-numeric: tabular-nums; }
-  .fl-n.trop { color: var(--vu-ambre); }
-  .fl-max { font: 500 13px/1.3 var(--vu-police); color: var(--vu-muet); flex: 1; min-width: 0; white-space: nowrap; }
+  .fl-suite { display: flex; justify-content: center; padding: 6px 0; content-visibility: visible; }
+  .fl-max { font: 500 13px/1.3 var(--vu-police); color: var(--vu-muet); flex: 1 1 auto; min-width: 0; }
   .fl-tete .vu-lien { padding: 0 6px; }
   .fl-filtres { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; }
   .fl-filtres select { flex: 1 1 190px; min-width: 0; min-height: 44px; padding: 0 10px; border: 0; border-radius: 12px; background: var(--vu-plaque-2); color: var(--vu-encre);
@@ -1077,7 +1078,8 @@
   // pourquoi. Au plus `max` (15) par envoi. Le choix survit à un rechargement (chrome.storage.local,
   // PAR COMPTE). « Envoyer à N favoris » ouvre un récapitulatif ; seul « Confirmer l'envoi » lance.
   const SEL_CLE = 'vrmFavSelection';
-  let filtreAnnonce = '', filtreNouveaux = false, selTimer = null;
+  const LOT_CLE = 'vrmFavLot', PAGE_FL = 100;
+  let filtreAnnonce = '', filtreNouveaux = false, selTimer = null, lotFav = null, vusFl = PAGE_FL;
   const favTous = (a) => (a && Array.isArray(a.tous) ? triFav(a.tous) : []);
   const favMax = (a) => (Number(a && a.max) > 0 ? Math.min(50, Number(a.max)) : 15);
   const favCochables = (a) => favTous(a).filter((x) => x.cochable === true);
@@ -1104,16 +1106,25 @@
       + `<span class="fl-px">${px}</span></li>`;
   }
   // Le compteur, le bouton et la phrase du bas — remis à jour sur place (aucun redessin de la liste).
+  // 15 PAR HEURE (sécurité des comptes, 12 nov.) : un envoi part avec les 15 plus récents cochés ; les
+  // autres RESTENT cochés pour l'heure suivante. Après un envoi complet (15), le bouton dit l'heure où
+  // les suivants peuvent partir (« Envoyer les 15 suivants à 20:45 ») et attend jusque-là.
+  const heureFl = (t) => { try { return new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
+  function envoiFl(a) {
+    const choisis = favCochables(a).filter((x) => selFav.has(x.id)), max = favMax(a);
+    return { choisis, envoi: choisis.slice(0, max), max };
+  }
   function piedFl(a) {
-    const n = favCochables(a).filter((x) => selFav.has(x.id)).length, max = favMax(a);
-    const trop = n > max;
-    return { n, max, trop,
+    const { choisis, envoi, max } = envoiFl(a), n = choisis.length, k = envoi.length, reste = n - k;
+    const l = lotFav && Number(lotFav.n) >= max ? Number(lotFav.at) + 3600000 : 0;
+    const attente = l > Date.now() ? l : 0;
+    return { n, k, max, reste, attente,
       compte: n === 1 ? TU('fl_coche1') : TU('fl_coches', { n }),
-      bouton: n === 1 ? TU('fl_envoyer1') : TU('fl_envoyer', { n }),
-      note: !n ? TU('fl_aucun') : trop ? TU('fl_trop', { n: n - max, max }) : '' };
+      bouton: attente ? TU('fl_suivants', { n: k, h: heureFl(attente) }) : k === 1 ? TU('fl_envoyer1') : TU('fl_envoyer', { n: k }),
+      note: !n ? TU('fl_aucun') : reste > 0 ? TU('fl_reste', { n: reste, max }) : '' };
   }
   function listeFavHtml(a) {
-    const tous = favTous(a), vis = tous.filter(visibleFl), p = piedFl(a);
+    const tous = favTous(a), vis = tous.filter(visibleFl), p = piedFl(a), montres = vis.slice(0, Math.max(PAGE_FL, vusFl)), suite = Math.min(PAGE_FL, vis.length - montres.length);
     const total = Number(a.totalTous) || tous.length;
     const parAnnonce = new Map();
     for (const x of tous) { const k = String(x.itemId || ''); if (!k) continue; const o = parAnnonce.get(k) || { titre: x.titre || TU('fl_article'), n: 0, num: x.num || '' }; o.n++; parAnnonce.set(k, o); }
@@ -1123,15 +1134,15 @@
     const pret = a.etat === 'pret' && favCochables(a).length > 0;
     return `<section class="fav fl" data-fav="${esc(a.etat)}" data-fav-vue="liste" data-fav-n="${tous.length}">
       <div class="lu" data-fav-ordre>${esc(TU('fl_lu', { n: total.toLocaleString('fr-FR') }))}</div>
-      ${pret ? `<div class="fl-tete"><span class="fl-n${p.trop ? ' trop' : ''}" data-fav-coches="${p.n}" aria-live="polite">${esc(p.compte)}</span><span class="fl-max">· ${esc(TU('fl_max', { max: p.max }))}</span><button class="vu-lien" data-fav-tout="tous">${esc(TU('fl_tout'))}</button><button class="vu-lien" data-fav-tout="aucun">${esc(TU('fl_rien'))}</button></div>` : `<div class="fl-note" data-fav-rien>${esc(TU('fl_personne'))}</div>`}
+      ${pret ? `<div class="fl-tete"><span class="fl-n" data-fav-coches="${p.n}" aria-live="polite">${esc(p.compte)}</span><span class="fl-max" data-fav-max="${p.max}">· ${esc(TU('fl_max', { max: p.max }))}</span><span class="fl-outils"><button class="vu-lien" data-fav-tout="tous">${esc(TU('fl_tout'))}</button><button class="vu-lien" data-fav-tout="aucun">${esc(TU('fl_rien'))}</button></span></div>` : `<div class="fl-note" data-fav-rien>${esc(TU('fl_personne'))}</div>`}
       <div class="fl-filtres"><select data-fav-annonce aria-label="${esc(TU('fl_annonce'))}"><option value="">${esc(TU('fl_toutes'))}</option>${options}</select><button class="fl-puce" data-fav-nouveaux aria-pressed="${filtreNouveaux ? 'true' : 'false'}">${esc(TU('fl_nouveaux'))}</button></div>
-      <ul class="fl-liste" data-fav-liste="${vis.length}" data-defil="fav">${vis.length ? vis.map(ligneFl).join('') : `<li class="fl-vide" data-fav-vide>${esc(TU('fl_vide'))}</li>`}</ul>
+      <ul class="fl-liste" data-fav-liste="${vis.length}" data-fav-montres="${montres.length}" data-defil="fav">${vis.length ? montres.map(ligneFl).join('') : `<li class="fl-vide" data-fav-vide>${esc(TU('fl_vide'))}</li>`}${suite > 0 ? `<li class="fl-suite"><button class="vu-lien" data-fav-suite="${suite}">${esc(TU('fl_voir', { n: suite }))}</button></li>` : ''}</ul>
       ${total > tous.length ? `<div class="fl-note" data-fav-reste="${total - tous.length}">${esc(TU('fl_plus', { n: tous.length, total: total.toLocaleString('fr-FR') }))}</div>` : ''}
       ${Number(a.retires) > 0 ? `<div class="fl-note" data-fav-caches="${Number(a.retires)}">${esc(TU('fl_caches', { n: Number(a.retires) }))}</div>` : ''}
       ${a.ventesAilleurs === 'pas_su' ? '<div class="val alerte" data-fav-ailleurs>Tes ventes sur les autres sites n’ont pas été revérifiées récemment : assure-toi que ces articles ne sont pas vendus ailleurs.</div>' : ''}
       ${favErreur ? `<div class="err" role="alert">${esc(favErreur)}</div>` : ''}
-      ${pret ? `<div class="fl-pied"><div class="fl-note${p.trop ? ' ambre' : ''}" data-fav-note${p.note ? '' : ' hidden'}>${esc(p.note)}</div>
-      <button class="vu-btn vu-plein" data-fav-envoyer${!p.n || p.trop ? ' disabled' : ''}>${esc(p.bouton)}</button></div>` : ''}
+      ${pret ? `<div class="fl-pied"><div class="fl-note" data-fav-note${p.note ? '' : ' hidden'}>${esc(p.note)}</div>
+      <button class="vu-btn vu-plein" data-fav-envoyer${p.attente ? ` data-fav-a="${p.attente}"` : ''}${!p.k || p.attente ? ' disabled' : ''}>${esc(p.bouton)}</button></div>` : ''}
     </section>`;
   }
   // La durée attendue AU VRAI RYTHME : chaque message (ouvrir, l'offre, 8–20 s, le temps de l'écrire)
@@ -1148,11 +1159,11 @@
     return Math.max(60000, Math.round(min * 60000));
   }
   function recapFavHtml(a) {
-    const m = a.message || {}, choisis = favCochables(a).filter((x) => selFav.has(x.id));
+    const m = a.message || {}, choisis = envoiFl(a).envoi;
     const parAnnonce = new Map();
     for (const x of choisis) { const k = String(x.itemId); const o = parAnnonce.get(k) || { x, n: 0 }; o.n++; parAnnonce.set(k, o); }
     const offreTxt = m.offre ? (m.offre.mode === 'pct' ? `−${m.offre.valeur} %` : m.offre.mode === 'euros' ? `−${eurosFav(m.offre.valeur)}` : `${eurosFav(m.offre.valeur)}`) + (m.offre.arrondi ? ', ' + TU('fr_arrondi') : '') : '';
-    const premier = choisis.find((x) => x.texte) || null, n = choisis.length;
+    const premier = choisis.find((x) => x.texte) || favCochables(a).find((x) => x.texte) || null, n = choisis.length;
     return `<section class="fav fl-recap" data-fav="pret" data-fav-vue="recap" data-fav-n="${n}">
       <div class="fl-r-t">${esc(n === 1 ? TU('fl_envoyer1') : TU('fl_envoyer', { n }))}</div>
       <ul class="fl-r-l" data-fav-recap-annonces="${parAnnonce.size}">${[...parAnnonce.values()].map(({ x, n: k }) => `<li data-fav-recap-item="${esc(x.itemId)}">${photoFav(x.photo)}<span class="fl-mil"><span class="fl-ti">${x.num ? U.etiquette(x.num) + ' ' : ''}${esc(x.titre || TU('fl_article'))}</span><span class="fl-me">${esc(k === 1 ? TU('fr_par1') : TU('fr_par', { n: k }))}${m.offre && x.offre != null ? ' · ' + esc(TU('fr_offre', { p: eurosFav(x.offre) })) : ''}</span></span><span class="fl-px">${m.offre && x.offre != null ? `<s>${esc(eurosFav(x.prix))}</s>${esc(eurosFav(x.offre))}` : esc(eurosFav(x.prix))}</span></li>`).join('')}</ul>
@@ -1162,7 +1173,7 @@
       <div class="fl-duree" data-fav-duree="${dureeFavMs(n, m)}">${esc(TU('fr_duree', { d: U.duree(dureeFavMs(n, m)), h: 15 }))}</div>
       <p class="fl-note">${esc(TU('fr_rien_avant'))}</p>
       ${favErreur ? `<div class="err" role="alert">${esc(favErreur)}</div>` : ''}
-      <button class="vu-btn vu-plein" data-fav-lancer${favOccupe || !n || n > favMax(a) ? ' disabled' : ''}>${esc(favOccupe ? TU('fr_envoi') : TU('fr_confirmer'))}</button>
+      <button class="vu-btn vu-plein" data-fav-lancer${favOccupe || !n || n > favMax(a) || piedFl(a).attente ? ' disabled' : ''}>${esc(favOccupe ? TU('fr_envoi') : TU('fr_confirmer'))}</button>
       <div class="fl-retour"><button class="vu-lien" data-fav-retour>${esc(TU('fr_retour'))}</button></div>
     </section>`;
   }
@@ -1174,7 +1185,7 @@
         chrome.storage.local.get(SEL_CLE, (g) => {
           try { void chrome.runtime.lastError; } catch (_) {}
           const m = (g && g[SEL_CLE] && typeof g[SEL_CLE] === 'object') ? g[SEL_CLE] : {};
-          m[String(uid)] = { ids: [...selFav].slice(0, 300), at: Date.now() };
+          m[String(uid)] = { ids: [...selFav].slice(0, 1000), at: Date.now() };
           for (const k of Object.keys(m)) if (!/^[1-9]\d{0,19}$/.test(k) || Date.now() - Number(m[k] && m[k].at || 0) > 30 * 86400000) delete m[k];
           try { chrome.storage.local.set({ [SEL_CLE]: m }); } catch (_) {}
         });
@@ -1182,14 +1193,14 @@
     }, 150);
   }
   function lireSelection(uid, fin) {
-    try { chrome.storage.local.get(SEL_CLE, (g) => { try { void chrome.runtime.lastError; } catch (_) {} const v = g && g[SEL_CLE] && g[SEL_CLE][String(uid)]; fin(v && Array.isArray(v.ids) ? v.ids.map(String) : null); }); } catch (_) { fin(null); }
+    try { chrome.storage.local.get([SEL_CLE, LOT_CLE], (g) => { try { void chrome.runtime.lastError; } catch (_) {} const v = g && g[SEL_CLE] && g[SEL_CLE][String(uid)]; const l = g && g[LOT_CLE] && g[LOT_CLE][String(uid)]; lotFav = l && Number(l.at) > Date.now() - 3600000 ? l : null; fin(v && Array.isArray(v.ids) ? v.ids.map(String) : null); }); } catch (_) { fin(null); }
   }
   function majPiedFl() {
     const a = apercuFav; if (!avecListe(a)) return;
     const p = piedFl(a);
-    const c = carte.querySelector('[data-fav-coches]'); if (c) { c.textContent = p.compte; c.setAttribute('data-fav-coches', String(p.n)); c.classList.toggle('trop', p.trop); }
-    const b = carte.querySelector('[data-fav-envoyer]'); if (b) { b.textContent = p.bouton; b.disabled = !p.n || p.trop; }
-    const no = carte.querySelector('[data-fav-note]'); if (no) { no.textContent = p.note; no.hidden = !p.note; no.classList.toggle('ambre', p.trop); }
+    const c = carte.querySelector('[data-fav-coches]'); if (c) { c.textContent = p.compte; c.setAttribute('data-fav-coches', String(p.n)); }
+    const b = carte.querySelector('[data-fav-envoyer]'); if (b) { b.textContent = p.bouton; b.disabled = !p.k || !!p.attente; }
+    const no = carte.querySelector('[data-fav-note]'); if (no) { no.textContent = p.note; no.hidden = !p.note; }
   }
 
   // L'aperçu est demandé à VRM (jamais à Vinted : aucune action, aucune lecture Vinted),
@@ -1211,7 +1222,7 @@
           lireSelection(uid, (gardes) => {
             apercuFav = a; favErreur = '';
             const ids = favTous(a).map((x) => x.id + ':' + (x.cochable ? 1 : 0)).join(',');
-            if (ids !== selFavIds || !gardes) { selFavIds = ids; selFav = new Set((gardes || (Array.isArray(a.selection) ? a.selection : [])).filter((id) => ok.has(id)).slice(0, gardes ? 300 : favMax(a))); }
+            if (ids !== selFavIds || !gardes) { selFavIds = ids; selFav = new Set((gardes || (Array.isArray(a.selection) ? a.selection : [])).filter((id) => ok.has(id)).slice(0, gardes ? 1000 : favMax(a))); }
             if (vueFav === 'recap' && !favCochables(a).some((x) => selFav.has(x.id))) vueFav = null;
             if (carte.classList.contains('on')) rendre();
           });
@@ -1242,7 +1253,7 @@
       // SON clic : ce qu'IL a coché dans la liste montrée (du plus récent au plus ancien), `confirme` posé ici seulement.
       // 5.407 : avec la liste, seulement depuis le RÉCAPITULATIF (« Confirmer l'envoi »), et
       // seulement les favoris COCHABLES qu'il a cochés (jamais un favori déjà contacté).
-      const src = avecListe(a) ? (vueFav === 'recap' ? favCochables(a) : []) : listeFavTriee(a);
+      const src = avecListe(a) ? (vueFav === 'recap' && !piedFl(a).attente ? envoiFl(a).envoi : []) : listeFavTriee(a);
       const selection = src.map((x) => x.id).filter((id) => selFav.has(id));
       if (!selection.length) return;
       favOccupe = true; favErreur = ''; rendre();
@@ -1250,7 +1261,24 @@
       const items = src.filter((x) => selFav.has(x.id)).map((x) => ({ itemId: String(x.itemId || ''), photo: x.photo || '', titre: x.titre || '' }));
       demander('lancer', { selection, reglages: a.reglages, confirme: true, items }, (r) => {
         favOccupe = false;
-        if (r && r.ok) { if (avecListe(a)) { selFav = new Set(); garderSelection(uid); } vueFav = null; apercuFav = null; apercuFavAt = 0; rafraichir(); return; }
+        if (r && r.ok) {
+          const suite = () => { vueFav = null; apercuFav = null; apercuFavAt = 0; rafraichir(); };
+          if (!avecListe(a)) return suite();
+          // Les envoyés quittent le choix ; les AUTRES restent cochés pour l'heure suivante, et l'heure du lot est gardée
+          // (rangés AVANT de relire la liste : la relecture lit ce choix-là).
+          for (const id of selection) selFav.delete(id);
+          lotFav = { at: Date.now(), n: selection.length };
+          clearTimeout(selTimer);
+          try {
+            chrome.storage.local.get([SEL_CLE, LOT_CLE], (g) => {
+              try { void chrome.runtime.lastError; } catch (_) {}
+              const ms = (g && g[SEL_CLE]) || {}, ml = (g && g[LOT_CLE]) || {};
+              ms[uid] = { ids: [...selFav].slice(0, 1000), at: Date.now() }; ml[uid] = lotFav;
+              try { chrome.storage.local.set({ [SEL_CLE]: ms, [LOT_CLE]: ml }, () => { try { void chrome.runtime.lastError; } catch (_) {} suite(); }); } catch (_) { suite(); }
+            });
+          } catch (_) { suite(); }
+          return;
+        }
         favErreur = (r && r.raison) || 'Rien n’est parti : l’extension n’a pas répondu.';
         rendre();
       });
@@ -1264,16 +1292,18 @@
       }
       carte.querySelectorAll('[data-fav-tout]').forEach((b) => b.addEventListener('click', () => {
         if (b.getAttribute('data-fav-tout') === 'aucun') selFav = new Set();
-        else { const vis = favCochables(apercuFav).filter(visibleFl).map((x) => x.id); selFav = new Set(vis.slice(0, favMax(apercuFav))); }
+        else { for (const x of favCochables(apercuFav).filter(visibleFl)) selFav.add(x.id); }
         carte.querySelectorAll('.fl-liste [data-fav-coche]').forEach((c) => { c.checked = selFav.has(c.getAttribute('data-fav-coche')); });
         majPiedFl(); garderSelection(uid);
       }));
       const fa = carte.querySelector('[data-fav-annonce]');
-      if (fa) fa.addEventListener('change', () => { filtreAnnonce = String(fa.value || ''); rendre(); });
+      if (fa) fa.addEventListener('change', () => { filtreAnnonce = String(fa.value || ''); vusFl = PAGE_FL; rendre(); });
       const fn = carte.querySelector('[data-fav-nouveaux]');
-      if (fn) fn.addEventListener('click', () => { filtreNouveaux = !filtreNouveaux; rendre(); });
+      if (fn) fn.addEventListener('click', () => { filtreNouveaux = !filtreNouveaux; vusFl = PAGE_FL; rendre(); });
       const env = carte.querySelector('[data-fav-envoyer]');
-      if (env) env.addEventListener('click', () => { const p = piedFl(apercuFav); if (!p.n || p.trop) return; vueFav = 'recap'; favErreur = ''; rendre(); const rc = carte.querySelector('.fl-recap'); if (rc) { try { carte.scrollTop = Math.max(0, rc.getBoundingClientRect().top - carte.getBoundingClientRect().top + carte.scrollTop - 8); } catch (_) {} } });
+      const suiteB = carte.querySelector('[data-fav-suite]');
+      if (suiteB) suiteB.addEventListener('click', () => { vusFl += PAGE_FL; rendre(); });
+      if (env) env.addEventListener('click', () => { const p = piedFl(apercuFav); if (!p.k || p.attente) return; vueFav = 'recap'; favErreur = ''; rendre(); const rc = carte.querySelector('.fl-recap'); if (rc) { try { carte.scrollTop = Math.max(0, rc.getBoundingClientRect().top - carte.getBoundingClientRect().top + carte.scrollTop - 8); } catch (_) {} } });
       const ret = carte.querySelector('[data-fav-retour]');
       if (ret) ret.addEventListener('click', () => { vueFav = null; favErreur = ''; rendre(); });
     } else carte.querySelectorAll('[data-fav-coche]').forEach((el) => el.addEventListener('change', () => { const id = el.getAttribute('data-fav-coche'); if (el.checked) selFav.add(id); else selFav.delete(id); rendre(); }));
