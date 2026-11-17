@@ -909,6 +909,8 @@ import { MemePhotoHote, LigneMemePhoto, LigneMemePhotoNumero, texteMemePhoto, us
 import { clePhotoEmpreinte, SEUIL_PHOTO } from "./photoEmpreinte.js";
 import { groupesParCompte, initialeCompte, remisesSurVignettes } from "./annoncesGrille.js";   // (10 nov., lot AM) Annonces en grille, par compte
 import { EnLigneDeuxFoisDetail, EnLigneDeuxFoisAlerte } from "./EnLigneDeuxFois.jsx";
+import { ImpressionDirecte } from "./ImpressionDirecte.jsx";   // (16 nov.) « Imprimer les N » sur ordinateur
+import { marquesDe as marquesImpression, retirerMarques as retirerMarquesImpression } from "./impressionDirecte.js";
 import { groupesDeuxComptes, memesPairesFiches, CLE_REFUS_DEUX_COMPTES, CLE_RETRAITS_DEUX_COMPTES, marquesUtiles, reglees as retraitsRegles, texteDeuxComptes } from "./deuxComptes.js";
 import { DeuxComptesDetail, DeuxComptesAlerte, texteEtDe } from "./DeuxComptes.jsx";
 import { CLE_JOURNAL_NUMEROS, evenementsNumeroFiches, ajouterAuJournal, historiqueNumero } from "./historiqueNumero.js";
@@ -20132,6 +20134,12 @@ function SelecteurPaires({ tab, setTab, badges, sites }) {
   return <div className="vrm-paires-selecteur" data-paires-selecteur="">
     <Segmente label={tr('nav.paires')} options={options} value={tab} plein onChange={(id) => { if (id === tab) { remonterEnHaut(); return; } noterNavigationSimple(id); setTab(id); }}/>
   </div>;
+}
+// (16 nov., lot impression-directe) La bannière « Imprimer les N » de l'ordinateur : le nombre PUBLIÉ par Ventes
+// (`vrm_colis_prets.lot`, le même que « Imprimer (N) », §11) ; pas su ⇒ rien (src/impressionDirecte.js).
+function ImpressionDirecteCoque({ onImprimer }) {
+  const [publie] = useLigneSynchro('vrm_colis_prets', lireColisPretsBarre);
+  return <ImpressionDirecte ordi publie={publie} onImprimer={onImprimer}/>;
 }
 const lireColisPretsBarre = () => { try { const v = load('vrm_colis_prets', null); return v && typeof v === 'object' ? v : null; } catch (_) { return null; } };
 function BottomBar({tab,setTab,sites,badges,gestes=null}) {
@@ -46958,16 +46966,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // relues…) annulait le minuteur APRÈS avoir effacé la demande — la feuille ne s'ouvrait jamais.
   React.useEffect(()=>{
     if(!prendImpression() || !_pendingBordPrint || !lotLu()) return;
-    const t=setTimeout(()=>{ if(!_pendingBordPrint || !prendImpression()) return; _pendingBordPrint=false; try{ ouvrirLotRef.current && ouvrirLotRef.current(); }catch(_){} }, 400);
+    const t=setTimeout(()=>{ if(!_pendingBordPrint || !prendImpression()) return; prendreDemandeImpression(); }, 400);
     return ()=>clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   },[emailBords, only, labelsPrets, sales.items]);
   // (9 nov., lot B) ⌘K « Imprimer les bordereaux du jour » quand Colis est DÉJÀ ouvert : la même
   // feuille « Tout imprimer » (rien n'est imprimé avant son clic).
   const ouvrirLotRef = React.useRef(null); ouvrirLotRef.current = ouvrirLot;
+  // (16 nov., lot impression-directe) « Imprimer les N » (la bannière de l'ordinateur) pose `_pendingBordPrint = 'direct'` :
+  // le MOTEUR d'« Imprimer (N) » part tout de suite (papier et tampons déjà choisis ; la question du papier la 1re fois,
+  // celle des N° à vérifier §5 — rien n'est court-circuité), sans la feuille « Choisir ». Sinon : la feuille d'avant.
+  const directImprRef = React.useRef(false);
+  const prendreDemandeImpression = () => {
+    const direct = _pendingBordPrint === 'direct'; _pendingBordPrint = false;
+    try { if (direct) { directImprRef.current = true; imprimerLotRef.current && imprimerLotRef.current(); } else if (ouvrirLotRef.current) ouvrirLotRef.current(); } catch (_) { directImprRef.current = false; }
+  };
   React.useEffect(()=>{
     if(only!=='bordereaux' || colisDans==='achats') return undefined;
-    const f=()=>{ if(!prendImpression() || !_pendingBordPrint || !lotLu()) return; _pendingBordPrint=false; try{ ouvrirLotRef.current && ouvrirLotRef.current(); }catch(_){} };
+    const f=()=>{ if(!prendImpression() || !_pendingBordPrint || !lotLu()) return; prendreDemandeImpression(); };
     window.addEventListener('vrm:tout-imprimer', f); return ()=>window.removeEventListener('vrm:tout-imprimer', f);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[emailBords, only, labelsPrets, sales.items]);
@@ -47124,6 +47140,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   };
   const montrerApres = (res, voie, sig, garder = {}) => {
     if (voie !== 'bouton') marquerImprimes(res);
+    // (16 nov., lot impression-directe) Lancée par « Imprimer les N » (ordinateur) : pas de feuille d'après — la bannière
+    // dit « N imprimés · Annuler » (ce que l'impression a marqué, pour pouvoir le retirer).
+    if (directImprRef.current) {
+      directImprRef.current = false;
+      if (voie !== 'bouton') { try { window.dispatchEvent(new CustomEvent('vrm:impression-faite', { detail: marquesImpression(res.items, res.reussies) })); } catch (_) {} return; }
+    }
     setImprEtat({ res, sig, voie, etape: 'question', manque: new Set(), corrige: null, tamponCorrige: '', absents: absentsDuLot(res.lignes, res.reussies, res.raisons), ...garder });
   };
   // LE TOUCHER. `cles` : une sélection (feuille « Choisir »), sinon ce qui part d'office.
@@ -47151,6 +47173,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!choisies.length) { toast(tr('impr.rien')); return; }
     if (voulues) { const dispo = new Set(choisiesV.map((l) => l.cle)); const partis = [...voulues].filter((c) => !dispo.has(c)); if (partis.length) { toast(tr('impr.disparus', { n: partis.length })); return; } }
     const sig = sigImpr(choisies, format, tampons);
+    // (16 nov., lot impression-directe — Julien : « impression sans réfléchir ») Lancée par « Imprimer les N » de
+    // l'ordinateur : PAS d'aperçu — le papier et les tampons DÉJÀ choisis (places gardées) ; le chemin d'attente
+    // garde la question des N° à vérifier (§5) et ouvre la visionneuse, qui imprime seule.
+    if (directImprRef.current) {
+      attendrePuisOuvrir(sig, choisies, choisies.flatMap(numerosDeLigne), () => composerLot(choisies, format, tampons, { pas: (f) => setImprBusy({ fait: f, total: choisies.length }) }));
+      return;
+    }
     // La lecture des PDF se voit (« Préparation… 1/3 », `imprBusy`) ; une panne est DITE avec « Réessayer » (la même
     // sélection, l'aperçu rouvert) ; rien choisi n'est lisible : dit ; le compte change pendant la lecture : rien.
     const proprio = AUTH.user?.id || null, total = choisies.length;
@@ -47251,6 +47280,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         montrerApres(e.res, mobile ? 'bouton' : ouvrirPdfLot(e.res, { geste: false, titre: tr('impr.titrePdf') }), sig, garder);
       } catch (err) {
         libererOngletPdf();
+        directImprRef.current = false;
         const annule = estTamponAnnule(err) || (err && err.message === NUM_A_VERIFIER_ANNULE);
         if (annule) acc.oublier();
         else if (err && (err.message === NUMEROS_PERIMES_IMPRESSION || err.message === tr('impr.change'))) acc.echec({ message: err.message });
@@ -47317,6 +47347,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (c && c.puis) lancerImpression(c.puis.length ? new Set(c.puis) : null, imprMode(f), tamponsPerso, { retours: Array.isArray(c.retours) ? new Set(c.retours) : null });
   };
   imprimerLotRef.current = imprimerLot;
+  // (16 nov., lot impression-directe) « Annuler » après « Imprimer les N » : retire les SEULES marques posées par CETTE impression.
+  React.useEffect(() => {
+    if (only !== 'bordereaux' || colisDans === 'achats') return undefined;
+    const f = (e) => {
+      if (!prendImpression()) return;
+      const d = (e && e.detail) || {};
+      setBordsPrinted((prev) => { const r = retirerMarquesImpression(prev, d.vinted); if (r.change) save('vinted_bords_printed', r.carte); return r.change ? r.carte : prev; });
+      try { const r = retirerMarquesImpression(load('vrm_retours_imprimes', {}) || {}, d.retours); if (r.change) save('vrm_retours_imprimes', r.carte); } catch (_) {}
+      for (const id of Array.isArray(d.vc) ? d.vc : []) { try { marquerVc('vrm_vc_imprimes', id, false); } catch (_) {} }
+      toast(tr('impdir.annule'));
+    };
+    window.addEventListener('vrm:impression-annuler', f); return () => window.removeEventListener('vrm:impression-annuler', f);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [only, colisDans]);
   // « Déplacer le tampon » (depuis « Bordereau prêt ») : l'aperçu s'ouvre toujours.
   const adjustBordPlacement = async () => {
     const r = bordResult; if (!r?.pdfBuf) return;
@@ -66292,6 +66336,7 @@ function AppCoeur() {
       {/* Une seule navigation à la fois : latérale sur ordinateur, en bas sur
           téléphone. Jamais les deux — c'est la même liste d'écrans. */}
       {ordi ? <SideBar tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesRail}/> : <BottomBar tab={tab} setTab={setTab} sites={sitesPresents} badges={badgesNav} gestes={gestesDisque}/>}
+      {ordi ? <ImpressionDirecteCoque onImprimer={() => { setPlatSub(null); choisirOngletColis('envoyer'); _pendingBordPrint = 'direct'; setTab('cat_bord'); setTimeout(() => { try { window.dispatchEvent(new Event('vrm:tout-imprimer')); } catch (_) {} }, 0); }}/> : null}
       {showBackup&&<GardeEcran nom="sauvegarde" feuille onFermer={()=>setShowBackup(false)}><BackupModal
         catalog={catalog} sales={sales} garageGrid={garageGrid} blockedCells={blockedCells}
         onClose={()=>setShowBackup(false)}

@@ -27,6 +27,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (16 nov., lot impression-directe) docs/passation/2026-11-16-impression-directe.md
+  { id: 'impression-directe', date: '2026-11-17', titre: 'Sur ordinateur : « Imprimer les N » en un clic', phrase: 'À l’ouverture, si des bordereaux sont prêts ; « Annuler » ensuite.', tab: 'cat_bord', pour: 'tous', mode: 'tous' },
   // (17 nov., Julien : « je dois rester appuyé sur l'achat […] on ne voit pas ce que j'ai sélectionné ») docs/passation/2026-11-17-relier-toucher.md
   { id: 'relier-toucher', date: '2026-11-17', titre: 'Relier un achat en deux touchers', phrase: 'Touche l’achat, puis la vente : le choix reste affiché en haut.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (16 nov., lot tampons-parametres) docs/passation/2026-11-16-tampons-parametres.md

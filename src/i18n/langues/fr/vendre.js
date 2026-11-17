@@ -62,4 +62,11 @@ export default {
   "vp.loupe.stockSeul": "Rangé, sans annonce",
   "vp.loupe.retourInfo": "Retour à renvoyer",
   "vp.loupe.parRangement": "rangement",
+  // (16 nov., lot impression-directe) « Imprimer les N » sur ordinateur
+  "impdir.prets": {"one": "{n} bordereau prêt", "other": "{n} bordereaux prêts"},
+  "impdir.imprimer": {"one": "Imprimer le {n}", "other": "Imprimer les {n}"},
+  "impdir.plusTard": "Plus tard",
+  "impdir.faits": {"one": "{n} imprimé", "other": "{n} imprimés"},
+  "impdir.annuler": "Annuler",
+  "impdir.annule": "Annulé : plus marqués imprimés",
 };

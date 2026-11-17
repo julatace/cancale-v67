@@ -1,0 +1,16 @@
+/* (16 nov., lot impression-directe) « Imprimer les N » sur ordinateur : une île flottante en bas à droite,
+   un seul bouton plein (l'accent), « Plus tard » / « Annuler » en liens. Jetons de couleur de l'app. */
+.vrm-impdir {
+  position: fixed; right: 24px; bottom: 96px; z-index: 900;   /* au-dessus du pied des écrans (« Format », « Imprimer ») */
+  display: flex; align-items: center; gap: 12px; max-width: min(560px, calc(100vw - 48px));
+  padding: 10px 12px 10px 18px; border-radius: 16px;
+  background: var(--vrm-surface, #fff); color: var(--vrm-ink, #1d1d1f);
+  border: 1px solid var(--vrm-line, rgba(0, 0, 0, .1)); box-shadow: var(--vrm-ombre-flottante, 0 10px 30px rgba(0, 0, 0, .18));
+  font-size: 15px;
+}
+.vrm-impdir-texte { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.vrm-impdir-plein, .vrm-impdir-lien { min-height: 44px; font: inherit; font-weight: 600; cursor: pointer; border-radius: 12px; white-space: nowrap; }
+.vrm-impdir-plein { padding: 0 18px; border: 0; background: var(--vrm-accent, #0071E3); color: var(--vrm-on-accent, #fff); }
+.vrm-impdir-lien { padding: 0 10px; border: 0; background: transparent; color: var(--vrm-b-lien, #0066CC); }
+.vrm-impdir-plein:focus-visible, .vrm-impdir-lien:focus-visible { outline: 2px solid var(--vrm-accent, #0071E3); outline-offset: 2px; }
+@media print { .vrm-impdir { display: none; } }

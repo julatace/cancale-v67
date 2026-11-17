@@ -61,4 +61,11 @@ export default {
   "vp.loupe.stockSeul": "Gelagert, ohne Anzeige",
   "vp.loupe.retourInfo": "Rücksendung zu verschicken",
   "vp.loupe.parRangement": "Lagerplatz",
+  // (16 nov., lot impression-directe) « Imprimer les N » sur ordinateur
+  "impdir.prets": {"one": "{n} Etikett bereit", "other": "{n} Etiketten bereit"},
+  "impdir.imprimer": {"one": "{n} drucken", "other": "Alle {n} drucken"},
+  "impdir.plusTard": "Später",
+  "impdir.faits": {"one": "{n} gedruckt", "other": "{n} gedruckt"},
+  "impdir.annuler": "Rückgängig",
+  "impdir.annule": "Rückgängig: nicht mehr als gedruckt markiert",
 };
