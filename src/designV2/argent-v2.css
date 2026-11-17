@@ -265,4 +265,16 @@ html[data-grand-texte] .v2-tete-argent .v2-titre-ligne h1 { flex: 1 0 100%; padd
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-set-groupe { margin: 0 0 32px !important; }
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-set-titre { margin: 0 20px 12px !important; font-size: 13px !important; font-weight: 600 !important; text-transform: none !important; letter-spacing: 0 !important; color: var(--v2-page-muet) !important; }
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-set-desc { line-height: 1.4 !important; }
+
+/* AIR, deuxième passe (le banc a mesuré les restes) */
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) :is(.vrm-fu-case, .vrm-stva, .vrm-fp-section, .vrm-tva-marge, .vrm-fu-panneau) { padding: 20px !important; border-radius: 20px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) details.vrm-ac-repli > summary { display: flex !important; align-items: center !important; padding: 12px 20px !important; min-height: 64px !important; box-sizing: border-box !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) details.vrm-ac-repli[open] > :not(summary) { padding: 0 20px 16px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-compta-replis { background: transparent !important; box-shadow: none !important; padding: 0 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures], .vrm-pm) .vrm-set-liste > .vrm-set-ligne, :root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures], .vrm-pm) .vrm-set-liste > * > .vrm-set-ligne { min-height: 64px !important; padding: 12px 20px !important; box-sizing: border-box !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) :is(.vrm-micro-grille, .vrm-d7-liste, .vrm-compta-grille) { gap: 16px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) :has(> .vrm-b + .vrm-b) { column-gap: 12px !important; row-gap: 12px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) :has(> :is(.vrm-b, button) + :is(.vrm-b, button) + :is(.vrm-b, button)):not(.v2-seg, .vrm-seg, .v2-ar-barres, .v2-ar-faits, .v2-ar-liste, [role="radiogroup"], [role="group"]) { display: flex !important; flex-direction: column !important; align-items: stretch !important; gap: 12px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-liste > button.v2-rangee.v2-pm-rangee { min-height: 64px !important; padding: 12px 20px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-liste > button.v2-rangee.v2-pm-rangee.v2-pm-moi { min-height: 80px !important; }
 }

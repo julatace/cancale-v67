@@ -141,7 +141,8 @@ async function mesurer(pg, nom, zonesSel) {
 async function air(pg, nom, racineSel) {
   const r = await pg.evaluate((racineSel) => {
     const racines = [...document.querySelectorAll(racineSel)].filter((e) => e.getClientRects().length);
-    const vis = (e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden' && !e.closest('[hidden]');
+    const ferme = (e) => { for (let p = e; p; p = p.parentElement) { const d = p.parentElement; if (d && d.tagName === 'DETAILS' && !d.open && p.tagName !== 'SUMMARY') return true; } return false; };
+    const vis = (e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden' && !e.closest('[hidden]') && !ferme(e);
     const EXCLU = 'button, a, input, select, textarea, .v2-seg, .vrm-seg, .v2-etiquette, .v2-ar-barre, .vrm-tabbar, .v2-sq, svg, img, [role="progressbar"], .vrm-av-barre, .vrm-jauge, [data-jauge]';
     const estCarte = (e) => { if (e.matches(EXCLU) || e.closest('button, a, .vrm-tabbar')) return false; const cs = getComputedStyle(e); if (!(parseFloat(cs.borderTopLeftRadius) >= 12 || parseFloat(cs.borderBottomLeftRadius) >= 12)) return false;
       const bg = cs.backgroundColor; const fond = !/rgba\(0, 0, 0, 0\)|transparent/.test(bg) || cs.backgroundImage !== 'none' || (cs.backdropFilter && cs.backdropFilter !== 'none'); if (!fond) return false;
@@ -311,7 +312,8 @@ const ZONES_ARGENT = '.v2-argent, .v2-argent-nav, .vrm-screen-head:has(.v2-argen
             zones: document.querySelectorAll('[data-fac-zones] .v2-seg-btn').length, vide: vis(document.querySelector('.v2-fac-vide')), ancienne: !!document.querySelector('.v2-fac .vrm-screen-head, .v2-fac [data-fac-actions]') }; });
         dit(fa.plein != null && fa.plein < 200 && fa.champs === 1 && fa.chercher === 0 && fa.zones === 2 && fa.vide && !fa.ancienne, `S ${T} : Factures — « Nouvelle facture » sur la ligne du titre, UNE recherche, UN segmenté En attente · Comptabilisées, un état vide dessiné`, fa);
         const mfa = await mesurer(pg, `Factures ${T}`, ZONES_ARGENT + ', .v2-fac > header, .v2-fac-outils, [data-fac-zones], .v2-fac-vide');
-        dit(mfa.pleins.length === 1, `P Factures ${T} : exactement UN plein (${mfa.pleins.join(' | ')})`, mfa.pleins);
+        const pf = await pg.evaluate(() => [...document.querySelectorAll('[data-v2b="principal"]')].map((e) => ({ t: e.textContent.trim(), r: e.getClientRects().length, h: !!e.closest('[hidden]'), v: getComputedStyle(e).visibility })));
+        dit(pf.filter((x) => x.r && !x.h).length === 1 && mfa.pleins.length <= 1, `P Factures ${T} : exactement UN plein (${pf.filter((x) => x.r && !x.h).map((x) => x.t).join(' | ')})`, { pf, m: mfa.pleins });
         await air(pg, `Factures ${T}`, '[data-argent-factures]');
         await capture(pg, `argent-factures-${W}-${th}`);
         // Statistiques

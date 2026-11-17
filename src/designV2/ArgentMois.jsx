@@ -82,12 +82,12 @@ function LigneVersement({ l, montant }) {
     <span className="v2-ar-v-txt">
       <span className="v2-ar-v-titre">{l.titre || tr('v2.ar.venteSans', { plateforme: l.plateforme || '' })}</span>
       <span className="v2-ar-v-sous">{l.num ? <Etiquette num={l.num}/> : null}<span className="v2-ar-v-date">{sous}</span></span>
-    </span>
-    <span className="v2-ar-v-droite">
-      <b className="v2-ar-v-eur" data-v2-pas-su={l.montant == null ? '' : undefined}>{l.montant == null ? '—' : montant(l.montant)}</b>
       {l.achat != null ? <span className="v2-ar-v-marge" data-v2-argent-achat={cents(l.achat)} data-v2-argent-marge={cents(l.marge)}>
         {tr('v2.ar.achete', { p: montant(l.achat) })}{l.marge != null ? <> → <b>{(l.marge > 0 ? '+' : l.marge < 0 ? '−' : '') + montant(Math.abs(l.marge))}</b></> : null}
       </span> : null}
+    </span>
+    <span className="v2-ar-v-droite">
+      <b className="v2-ar-v-eur" data-v2-pas-su={l.montant == null ? '' : undefined}>{l.montant == null ? '—' : montant(l.montant)}</b>
     </span>
   </>);
   const attrs = { 'data-v2-argent-versement': l.id, 'data-eur': cents(l.montant) };

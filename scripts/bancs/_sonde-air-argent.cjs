@@ -24,6 +24,7 @@ const tab = process.env.TAB || 'argent_declarer';
       const txt = (e.innerText || '').trim().split('\n')[0].slice(0, 30); out.push({ txt, cls: (e.className || e.tagName).toString().slice(0, 60) + ' < ' + String((e.parentElement && e.parentElement.className) || '').slice(0, 40), data: [...e.attributes].map((a) => a.name).filter((n) => n.startsWith('data-')).slice(0, 3).join(','), pad: cs.padding, y: Math.round(q.top), h: Math.round(q.height) });
     }
     return out; });
+  if (process.env.TEXTE) { const t = await o.pg.evaluate((q) => { const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) if (n.textContent.includes(q)) { const out = []; for (let p = n.parentElement; p && out.length < 8; p = p.parentElement) { const cs = getComputedStyle(p); const r = p.getBoundingClientRect(); out.push(`${p.tagName}.${String(p.className).slice(0, 40)} pad=${cs.padding} pos=${cs.position} x=${Math.round(r.left)} w=${Math.round(r.width)} open=${p.open}`); } return out; } return null; }, process.env.TEXTE); console.log(t && t.join('\n')); }
   for (const x of r) console.log(x.y, x.h, x.pad, '|', x.txt, '|', x.cls, '|', x.data);
   await nav.close(); NV.srv.close(); process.exit(0);
 })();
