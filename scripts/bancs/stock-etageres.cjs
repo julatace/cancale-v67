@@ -197,7 +197,7 @@ async function retirerCase(pg, n) {
         dit(!!K.n20 && /vinted:enligne/.test(K.n20.sites || '') && /leboncoin:enligne/.test(K.n20.sites || '') && K.n20.compte === 'compte_invente', `${t} · K1 : N°20 montre Vinted ET Leboncoin (sa référence VRM-20) et son compte « compte_invente »`, K.n20);
         dit(!!K.n21 && K.n21.sites === 'vinted:enligne', `${t} · K2 : N°21 — une annonce Leboncoin au MÊME titre (autre paire, VRM-999) ne lui donne aucun logo`, K.n21);
         dit(!!K.n23 && K.n23.sites === 'vinted:enligne' && !K.n23.compte && K.n23.texte === '', `${t} · K3 : N°23, compte sans pseudo connu ⇒ aucun nom (jamais l'identifiant « 333 »)`, K.n23);
-        dit(!!K.n20 && K.n20.logos.length === 2 && K.n20.logos.every((h) => h >= 13 && h <= 16) && K.n20.police >= 10 && K.n20.dedans, `${t} · K4 : logos 14 px, compte ≥ 10 px, tenus dans la case`, K.n20);
+        dit(!!K.n20 && K.n20.logos.length === 2 && K.n20.logos.every((h) => h >= 13 && h <= 16) && (K.n20.texte === '' || (K.n20.police >= 10 && !K.n20.coupe)) && K.n20.dedans, `${t} · K4 : logos 14 px, tenus dans la case ; le pseudo jamais coupé (de loin il n'est pas écrit — fiche et aide vocale le disent, lot stock-mieux)`, K.n20);
         if (CAPT) { await pg.evaluate(() => document.querySelector('[data-case-num="20"]').scrollIntoView({ block: 'center' })); await pg.waitForTimeout(300); await pg.screenshot({ path: path.join(CAPT, `etag-${v}-0-sites.png`) }); }
         if (complet) {
           await toucher(pg, '[data-case-num="20"]');
@@ -230,7 +230,7 @@ async function retirerCase(pg, n) {
         const vig = await pg.evaluate(() => { const cs = [...document.querySelectorAll('[data-meuble="mA"] .vrm-s2d-case[data-case-num]')].filter((c) => { const q = c.getBoundingClientRect(); return q.top >= 0 && q.bottom <= innerHeight; }); const im = cs.filter((c) => { const i = c.querySelector('img'); return i && i.complete && i.naturalWidth > 0; }).length; const lettres = cs.filter((c) => { const t = [...c.childNodes].filter((n) => !(n.classList && (n.classList.contains('vrm-s2d-num') || n.classList.contains('vrm-etag-sites')))).map((n) => n.textContent || '').join('').trim(); return t.length > 0; }).length; const pl = cs[0] && cs[0].querySelector('.vrm-s2d-num'); return { n: cs.length, im, lettres, plaque: pl ? parseFloat(getComputedStyle(pl).fontSize) : 0 }; });
         dit(vig.n > 0 && vig.im === vig.n && vig.lettres === 0 && vig.plaque >= 11, `${t} · V2 : chaque case montre la PHOTO de sa paire, aucune lettre, le N° en plaque (≥ 11 px)`, vig);
         const pied = await pg.evaluate(() => { const a = document.querySelector('[data-creer-meuble]'), b = document.querySelector('[data-stock-explication-ouvrir]'); if (!a || !b) return null; const p = a.getBoundingClientRect(), q = b.getBoundingClientRect(); const recouvre = !(p.right <= q.left || q.right <= p.left || p.bottom <= q.top || q.bottom <= p.top); return { recouvre, ligne: Math.abs((p.top + p.bottom) / 2 - (q.top + q.bottom) / 2) < 4, h: [Math.round(p.height), Math.round(q.height)] }; });
-        dit(!!pied && !pied.recouvre && pied.ligne && pied.h[0] >= (tel ? 44 : 40), `${t} · V3 : « Ajouter un meuble » et « Comment ça marche ? » sur une ligne, sans se chevaucher`, pied);
+        dit(!!pied && !pied.recouvre && pied.h[0] >= (tel ? 44 : 40) && pied.h[1] >= (tel ? 44 : 40), `${t} · V3 : « Ajouter un meuble » et « Comment ça marche ? » (dans la barre du plan depuis le lot stock-mieux) sans se chevaucher, 44 px`, pied);
         const pq = await pg.evaluate(() => { const s = document.querySelector('[data-meuble="mQ"]'); if (!s) return null; const c = s.querySelector('.vrm-s2d-case').getBoundingClientRect(); const coupees = [...s.querySelectorAll('.vrm-s2d-num')].filter((x) => x.scrollWidth > x.clientWidth + 1).length; return { w: Math.round(s.querySelector('.vrm-s2d-etagere').getBoundingClientRect().width), ch: Math.round(c.height), cw: Math.round(c.width), coupees }; });
         dit(!!pq && pq.w <= 200 && pq.ch <= 56 && pq.cw <= 64 && pq.coupees === 0, `${t} · V4 : une pile est compacte (colonne de cartons ≤ 200 px, cartons ≤ 64 × 56), ses N° entiers (« N°9999 » pas coupé)`, pq);
         if (CAPT) await pg.screenshot({ path: path.join(CAPT, `etag-${v}-1b-piece.png`) });
@@ -303,12 +303,16 @@ async function retirerCase(pg, n) {
         dit(allume === true, `${t} · G : chercher « 12 » allume la case du N°12`, allume);
         if (CAPT) await pg.screenshot({ path: path.join(CAPT, `etag-${v}-6-recherche.png`) });
         await pg.waitForTimeout(4200);
+        // (16 nov., lot stock-mieux) Monter / Descendre sont dans le menu « Modifier » du meuble (un mot, plus une flèche seule).
+        await toucher(pg, '[data-meuble-menu="mA"]');
+        const menuMots = await pg.evaluate(() => [...document.querySelectorAll('[data-meuble-menu-liste="mA"] [role="menuitem"]')].map((x) => x.innerText.trim()).join('|'));
+        dit(/Modifier/.test(menuMots) && /Monter/.test(menuMots) && /Descendre/.test(menuMots), `${t} · G : le menu du meuble dit Modifier / Monter / Descendre en mots`, menuMots);
         await toucher(pg, '[data-meuble-descendre="mA"]');
         await pg.waitForTimeout(500);
         const ordre2 = await pg.evaluate(() => [...document.querySelectorAll('[data-meuble]')].map((x) => x.getAttribute('data-meuble')).slice(0, 2).join(','));
         dit(ordre2 === 'mB,mA', `${t} · G : « Descendre » le Garage le met après le Bureau`, ordre2);
-        const rondPetit = await pg.evaluate((mini) => [...document.querySelectorAll('[data-meuble-monter],[data-meuble-descendre],[data-meuble-modifier]')].map((x) => x.getBoundingClientRect()).filter((q) => q.width < mini || q.height < mini).length, tel ? 43.5 : 39.5);
-        dit(rondPetit === 0, `${t} · H : monter / descendre / modifier font ${tel ? 44 : 40} px au moins`, rondPetit);
+        const rondPetit = await pg.evaluate((mini) => [...document.querySelectorAll('[data-meuble-menu],[data-meuble-glisser],[data-meuble-monter],[data-meuble-descendre],[data-meuble-modifier]')].filter((x) => x.getClientRects().length).map((x) => x.getBoundingClientRect()).filter((q) => q.width < mini || q.height < mini).length, tel ? 43.5 : 39.5);
+        dit(rondPetit === 0, `${t} · H : les gestes du meuble (menu, poignée) font ${tel ? 44 : 40} px au moins`, rondPetit);
         // ── H ──
         await pg.waitForTimeout(1500);
         const garde = await pg.evaluate(() => { try { const l = JSON.parse(localStorage.getItem('vrm_meubles')); const b = l.find((m) => m.id === 'mB'); return b && b.gravite === false && Array.isArray(b.planches) && b.cols === 7 && b.rows === 10 && b.name === 'Bureau' && l.length === 5; } catch (_) { return false; } });
