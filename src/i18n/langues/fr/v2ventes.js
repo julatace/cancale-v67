@@ -16,16 +16,12 @@ export default {
     "other": "colis à envoyer"
   },
   "v2v.rechercher": "N°, modèle, acheteur…",
-  "v2v.ecart.prets": {"one": "{n} prêt", "other": "{n} prêts"} prêt à imprimer",
-    "other": "{n} prêts à imprimer"
-  },
+  "v2v.ecart.prets": {"one": "{n} prêt", "other": "{n} prêts"},
   "v2v.ecart.sans": {
     "one": "{n} sans bordereau",
     "other": "{n} sans bordereau"
   },
-  "v2v.ecart.imprimes": {"one": "{n} à déposer", "other": "{n} à déposer"} imprimé, à déposer",
-    "other": "{n} imprimés, à déposer"
-  },
+  "v2v.ecart.imprimes": {"one": "{n} à déposer", "other": "{n} à déposer"},
   "v2v.enRetard": "en retard",
   "v2v.avantDemain": "avant demain soir",
   "v2v.taille": "T. {t}",

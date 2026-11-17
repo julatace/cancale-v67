@@ -16,16 +16,12 @@ export default {
     "other": "pacchi da spedire"
   },
   "v2v.rechercher": "N°, modello, acquirente…",
-  "v2v.ecart.prets": {"one": "{n} pronta", "other": "{n} pronte"} pronta da stampare",
-    "other": "{n} pronte da stampare"
-  },
+  "v2v.ecart.prets": {"one": "{n} pronta", "other": "{n} pronte"},
   "v2v.ecart.sans": {
     "one": "{n} senza etichetta",
     "other": "{n} senza etichetta"
   },
-  "v2v.ecart.imprimes": {"one": "{n} da consegnare", "other": "{n} da consegnare"} stampata, da consegnare",
-    "other": "{n} stampate, da consegnare"
-  },
+  "v2v.ecart.imprimes": {"one": "{n} da consegnare", "other": "{n} da consegnare"},
   "v2v.enRetard": "in ritardo",
   "v2v.avantDemain": "entro domani sera",
   "v2v.taille": "Tg. {t}",
