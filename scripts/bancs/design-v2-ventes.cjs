@@ -149,6 +149,22 @@ async function mesurer(pg) {
 
 // LA GRILLE « QUALITÉ ET FLUIDITÉ » (Julien : « ça doit être beaucoup plus quali et fluide »), mesurée sur l'écran rendu.
 async function qualite(pg, th) {
+  // L'appui RÉEL : `:active` forcé par le protocole du navigateur sur la rangée et le plein (la transition de l'appui, pas
+  // celle du retour au repos, qui est un ressort plus lent).
+  const appuiForce = {};
+  try {
+    const cdp = await pg.context().newCDPSession(pg); await cdp.send('DOM.enable'); await cdp.send('CSS.enable');
+    const { root } = await cdp.send('DOM.getDocument', { depth: -1 });
+    for (const [k, sel] of [['rangee', '.v2v-liste .v2l'], ['plein', '[data-v2-principal="imprimer"]']]) {
+      const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: sel }); if (!nodeId) continue;
+      await cdp.send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: ['active'] });
+      appuiForce[k] = await pg.evaluate((sel) => { const e = document.querySelector(sel); const cs = getComputedStyle(e); const ms = (x) => (x.trim().endsWith('ms') ? parseFloat(x) : parseFloat(x) * 1000);
+        const props = cs.transitionProperty.split(',').map((x) => x.trim()); const durs = cs.transitionDuration.split(',').map(ms);
+        const v = props.map((p, i) => (/^(all|transform|background-color|background|scale|filter)$/.test(p) ? durs[i % durs.length] : null)).filter((x) => x != null); return v.length ? Math.max(...v) : 0; }, sel);
+      await cdp.send('CSS.forcePseudoState', { nodeId, forcedPseudoClasses: [] });
+    }
+    await cdp.detach();
+  } catch (e) { appuiForce.erreur = String(e.message || e).slice(0, 120); }
   const t0 = await pg.evaluate(() => performance.now());
   await pg.waitForTimeout(2500);   // l'écran au repos : plus rien ne doit bouger tout seul
   const q = await pg.evaluate((t0) => {
@@ -176,8 +192,9 @@ async function qualite(pg, th) {
     const segs = [...document.querySelectorAll('[data-v2v-segment] button')].map((b) => b.offsetHeight);
     const hauteurs = { champ: champ ? champ.offsetHeight : null, plus: plus ? plus.offsetHeight : null, segs };
     const restes = [...document.querySelectorAll('.vrm-main :is(.vv-hero, .vv-seg, .vv-pied, .vv-filtres, .vrm-colis-grille, [data-bord-card], .vrm-colis-resume, .vrm-colis-afaire, [data-heros-hote])')].filter(vis).map((e) => String(e.className).slice(0, 30));
-    return { appui, repos: Math.round(repos * 1000) / 1000, cv, fondu, boite, tailles, rayons: rayons.slice(0, 5), grille: grille.slice(0, 6), nGrille: grille.length, hauteurs, restes };
+    return { appuiRepos: appui, repos: Math.round(repos * 1000) / 1000, cv, fondu, boite, tailles, rayons: rayons.slice(0, 5), grille: grille.slice(0, 6), nGrille: grille.length, hauteurs, restes };
   }, t0);
+  q.appui = { rangee: appuiForce.rangee != null ? appuiForce.rangee : null, plein: appuiForce.plein != null ? appuiForce.plein : null, ...(appuiForce.erreur ? { erreur: appuiForce.erreur } : {}) };
   dit(q.appui.rangee != null && q.appui.rangee <= 100 && q.appui.plein != null && q.appui.plein <= 100, `Q ${th} : réponse au toucher ≤ 100 ms (rangée ${q.appui.rangee} ms, plein ${q.appui.plein} ms)`, q.appui);
   dit(q.repos === 0, `Q ${th} : au repos, rien ne saute (CLS hors geste = ${q.repos})`, q.repos);
   dit(q.cv === 'auto', `Q ${th} : 1 000 rangées sans à-coup (content-visibility: ${q.cv})`, q.cv);
