@@ -132,7 +132,9 @@ const segment = async (pg, libelle) => {
         const e = await etat(pg);
         if (e.ecran === avant.ecran) { console.log(`   (N3 « ${c.t} » : reste sur ${e.ecran})`); continue; }
         vues++;
-        dit(e.top === 0, `N3 Ma journée → carte « ${c.t} » ouvre ${e.ecran} EN HAUT`, JSON.stringify(e));
+        // En haut — ou sur l'élément que la carte vise (« À envoyer » mène à la section des colis, près du haut) ; jamais la
+        // position d'une visite d'avant (800 px posés plus haut).
+        dit(e.top < 300, `N3 Ma journée → carte « ${c.t} » ouvre ${e.ecran} en haut (ou sur ce qu’elle vise), pas à la position d’avant`, JSON.stringify(e));
         dit(e.actif === ATTENDU[e.ecran] || !ATTENDU[e.ecran], `N6 carte « ${c.t} » : l’onglet allumé (${e.actif}) est celui de ${e.ecran}`, JSON.stringify(e));
       }
       dit(vues >= 2, `N3 au moins deux cartes de Ma journée mènent à un écran (${vues})`);
@@ -143,7 +145,7 @@ const segment = async (pg, libelle) => {
       const e = await etat(pg);
       dit(e.actif === ATTENDU[e.ecran], `N6 ${id} : l’onglet allumé (${e.actif}) est celui de l’écran montré (${e.ecran})`, JSON.stringify(e));
       // Tout en bas, une fois le contenu arrivé (la hauteur ne bouge plus).
-      for (let k = 0, h0 = -1; k < 8; k++) { await defiler(pg, 1e7); await attendre(pg, 700); const h = await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); return m.scrollHeight; }); if (h === h0) break; h0 = h; }
+      for (let k = 0, h0 = -1; k < 10; k++) { await defiler(pg, 1e7); await attendre(pg, 800); const h = await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); return { h: m.scrollHeight, auBout: Math.abs(m.scrollTop - (m.scrollHeight - m.clientHeight)) < 2 }; }); if (h.h === h0 && h.auBout) break; h0 = h.h; }
       const b = await pg.evaluate(() => {
         const bar = document.querySelector('.vrm-tabbar'); const m = document.querySelector('.vrm-main'); if (!bar || !m) return null;
         const haut = bar.getBoundingClientRect().top;

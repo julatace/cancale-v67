@@ -66,13 +66,16 @@ const mesure = (pg) => pg.evaluate(() => {
       await pg.setViewportSize({ width: W, height: W === 375 ? 667 : 844 });
       await pg.evaluate((t) => { try { if (t === 'normal') localStorage.removeItem('vrm_taille_texte'); else localStorage.setItem('vrm_taille_texte', t); } catch (_) {} }, taille);
       await pg.reload({ waitUntil: 'domcontentloaded' });
+      await pg.waitForSelector('.vrm-main .vrm-sale-row', { timeout: 30000 }).catch(() => {});
       await pg.waitForTimeout(3000);
-      // La liste « Toutes » (la capture de Julien) : le segment de Ventes · Vinted.
+      // « À envoyer » (l'ouverture) PUIS « Toutes » (la capture de Julien) : les lignes des deux listes.
+      const m1 = await mesure(pg);
       const toutes = pg.locator('.vrm-main').getByRole('button', { name: /^Toutes/ }).first();
       if (await toutes.count()) { await toutes.tap().catch(() => {}); }
       await pg.waitForSelector('.vrm-main .vrm-sale-row', { timeout: 30000 }).catch(() => {});
       await pg.waitForTimeout(2500);
-      const m = await mesure(pg);
+      const m2 = await mesure(pg);
+      const m = { n: m2.n, chevauche: [...m1.chevauche, ...m2.chevauche], rognes: [...m1.rognes, ...m2.rognes] };
       if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `ventes-ligne-${W}-${taille}.png`) });
       dit(m.n >= 3, `${T} des lignes de vente sont là (${m.n})`);
       dit(!m.chevauche.length, `${T} L1 aucun texte n’en recouvre un autre dans une ligne`, m.chevauche.join(' ¦ '));
