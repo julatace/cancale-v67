@@ -183,7 +183,7 @@ const ZONES_ARGENT = '.v2-argent, .v2-argent-nav, .vrm-screen-head:has(.v2-argen
   const releve = {};
   try {
     for (const { W, sombre, tres } of TAILLES) {
-      const T = `${W} ${sombre ? 'sombre' : 'clair'}${tres ? ' très grand' : ''}`, tel = W < 600, th = sombre ? 'sombre' : 'clair';
+      const T = `${W} ${sombre ? 'sombre' : 'clair'}${tres ? ' très grand' : ''}`, tel = W < 600, th = (sombre ? 'sombre' : 'clair') + (tres ? '-tres' : '');
       console.log(`\n── ${T}`);
       const o = await NV.ouvrir(nav, { W, sombre, base: jeu(), tab: 'journee' });
       const pg = o.pg;

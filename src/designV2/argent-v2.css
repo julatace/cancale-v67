@@ -287,4 +287,5 @@ html[data-grand-texte] .v2-tete-argent .v2-titre-ligne h1 { flex: 1 0 100%; padd
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-micro-grille .vrm-surface { padding-inline: 24px !important; }
 :root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body .vrm-argent .vrm-surface div { flex-wrap: wrap !important; }
 :root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body .vrm-argent .vrm-surface :is(div, span, label, input, select, p) { min-width: 0 !important; max-width: 100% !important; overflow-wrap: break-word !important; box-sizing: border-box !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) :has(> :is(.vrm-b, button) + :is(.vrm-b, button) + :is(.vrm-b, button)):not(.v2-seg, .vrm-seg, .v2-ar-barres, .v2-ar-faits, .v2-ar-liste, [role="radiogroup"], [role="group"]) > * { flex: 0 0 auto !important; width: 100% !important; }
 }
