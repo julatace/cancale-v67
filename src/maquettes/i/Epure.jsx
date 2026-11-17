@@ -172,16 +172,18 @@ function Ventes({ M, vue, aller, feuille }) {
   const vues = <Vues actif={v} choisir={(c) => aller({ ecran: 'ventes', vue: c })} vues={[{ cle: 'envoyer', nom: 'À envoyer', n: env.length }, { cle: 'route', nom: 'En route' }, { cle: 'toutes', nom: 'Toutes' }]} />;
   let corps;
   if (v === 'envoyer') {
-    const g = grouper(env, (l) => (l.limite ? 'l' + jourDe(l.limite) : 'estimee'));
-    corps = g.map(([k, ls]) => (
-      <Groupe key={k} nom={k === 'estimee' ? 'Date limite pas encore lue' : avant(ls[0].limite, M).replace(/^a/, 'A')} a={nb(ls.length)}>
-        {ls.map((l) => (
-          <Rangee key={l.cle} etat={l.bord ? 'geste' : 'attente'} num={l.paire && l.paire.numero} titre={l.v.title}
-            detail={[l.bord ? null : 'bordereau pas reçu', l.pseudo, l.compte].filter(Boolean).join(' · ')}
-            valeur={euros(centimes(l.v.price))} appuiLong={() => feuille('vente:' + l.v._tx)} onTouche={() => {}} />
-        ))}
-      </Groupe>
-    ));
+    // Deux groupes : ce qui peut partir (bordereau reçu) et ce qui attend Vinted. La date limite, à droite.
+    const prets = env.filter((l) => l.bord), attente = env.filter((l) => !l.bord);
+    const rangee = (l) => (
+      <Rangee key={l.cle} etat={l.bord ? 'geste' : 'attente'} num={l.paire && l.paire.numero} titre={l.v.title}
+        detail={[l.pseudo, l.compte].filter(Boolean).join(' · ')}
+        valeur={euros(centimes(l.v.price))} valeurDetail={l.limite ? jourCourt(new Date(l.limite).toISOString(), M.maintenant) : 'vers ' + jourCourt(new Date(l.estimee).toISOString(), M.maintenant)}
+        appuiLong={() => feuille('vente:' + l.v._tx)} onTouche={() => {}} />
+    );
+    corps = <>
+      {prets.length ? <Groupe nom="Prêts à imprimer">{prets.map(rangee)}</Groupe> : null}
+      {attente.length ? <Groupe nom="Bordereau pas encore reçu" a={nb(attente.length)}>{attente.map(rangee)}</Groupe> : null}
+    </>;
   } else {
     const ls = v === 'route' ? route : toutes;
     corps = (
@@ -238,17 +240,20 @@ function Annonces({ M, vue, aller, feuille }) {
     <>
       {vues}
       <label className="e-cherche"><Ico n="loupe" t={18} /><input type="search" placeholder="N°, titre, taille" aria-label="Chercher une annonce" enterKeyHint="search" /></label>
-      <Groupe>
-        {ls.slice(0, 40).map((a) => {
-          const j = jours(a);
-          return (
-            <Rangee key={a.id} etat={!numDe(a) || (j != null && j > 60) ? 'geste' : 'rien'} num={numDe(a)} titre={a.title}
-              detail={[j == null ? null : j === 0 ? 'en ligne aujourd’hui' : `${j} j en ligne`, a.fav ? `${a.fav} favoris` : null, M.loginDe(a.uid)].filter(Boolean).join(' · ')}
-              valeur={euros(centimes(a.price))} appuiLong={() => feuille('annonce:' + a.id)} onTouche={() => {}} />
-          );
-        })}
-        <Plus n={ls.length - 40} />
-      </Groupe>
+      {grouper(ls.slice(0, 40), (a) => a.uid).map(([uid, g]) => (
+        // Le compte, une fois, dans l'en-tête du groupe — jamais répété sur chaque rangée.
+        <Groupe key={uid} nom={M.loginDe(uid) || 'Compte pas lu'}>
+          {g.map((a) => {
+            const j = jours(a);
+            return (
+              <Rangee key={a.id} etat={!numDe(a) || (j != null && j > 60) ? 'geste' : 'rien'} num={numDe(a)} titre={a.title}
+                detail={[j == null ? null : j === 0 ? 'en ligne aujourd’hui' : `${j} j en ligne`, a.fav ? `${a.fav} favoris` : null].filter(Boolean).join(' · ')}
+                valeur={euros(centimes(a.price))} appuiLong={() => feuille('annonce:' + a.id)} onTouche={() => {}} />
+            );
+          })}
+        </Groupe>
+      ))}
+      <Plus n={ls.length - 40} />
     </>
   );
 }
@@ -404,7 +409,7 @@ export default function Epure() {
         <nav className="e-barre" aria-label="Écrans">
           {ECRANS.map((e) => (
             <button key={e.cle} type="button" className="e-onglet" aria-current={e.cle === ecran.cle ? 'page' : undefined} onClick={() => aller({ ecran: e.cle })}>
-              {e.nom}{aFaire(M, e.cle) ? <Puce e="geste" /> : null}
+              {e.nom}
             </button>
           ))}
         </nav>

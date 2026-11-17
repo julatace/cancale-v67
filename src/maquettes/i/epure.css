@@ -67,18 +67,18 @@
 
 /* ── La tête : un titre fin, rien d'autre que la loupe ─────────────────────── */
 .e-main { padding: calc(env(safe-area-inset-top, 0px) + 16px) 0 calc(184px + env(safe-area-inset-bottom, 0px)); }
-.e-tete { display: flex; align-items: flex-end; justify-content: space-between; padding: 24px 24px 0; min-height: 56px; }
-.e-h1 { font-size: 34px; line-height: 1.1; font-weight: 300; letter-spacing: -0.025em; }
+.e-tete { display: flex; align-items: flex-end; justify-content: space-between; padding: 16px 24px 0; min-height: 48px; }
+.e-racine .e-h1 { font-family: var(--e-police) !important; font-size: 34px !important; line-height: 1.1 !important; font-weight: 300 !important; letter-spacing: -0.025em !important; color: var(--e-encre) !important; }
 .e-tete-ronds { display: flex; gap: 0; margin-right: -10px; margin-bottom: -4px; }
 .e-rond { width: 44px; height: 44px; display: grid !important; place-items: center; color: var(--e-encre) !important; border-radius: 22px; transition: background-color 120ms ease, transform 120ms var(--e-dur); }
 .e-rond:active { background: var(--e-remplir) !important; transform: scale(0.94); }
-.e-sous { display: flex; align-items: center; gap: 4px; margin: 4px 24px 0; font-size: 13px; line-height: 18px; color: var(--e-gris) !important; }
-.e-filtre { min-height: 44px; margin-top: -4px !important; margin-bottom: -8px !important; }
+.e-racine .e-sous { display: flex; align-items: center; gap: 4px; padding: 4px 24px 0 !important; font-size: 13px !important; line-height: 18px; color: var(--e-gris) !important; }
+.e-racine .e-filtre { min-height: 44px; padding-top: 0 !important; }
 .e-filtre .e-ico { opacity: 0.8; }
 .e-sous::first-letter { text-transform: uppercase; }
 
 /* ── Les vues : des mots. L'actif à l'encre, les autres au gris. ─────────── */
-.e-vues { display: flex; gap: 24px; padding: 16px 24px 0; overflow-x: auto; scrollbar-width: none; }
+.e-vues { display: flex; gap: 24px; padding: 4px 24px 0; overflow-x: auto; scrollbar-width: none; }
 .e-vues::-webkit-scrollbar { display: none; }
 .e-vue { display: inline-flex !important; align-items: baseline; gap: 6px; min-height: 44px; align-items: center; white-space: nowrap; color: var(--e-gris) !important; transition: color 160ms ease; }
 .e-vue[aria-pressed='true'] { color: var(--e-encre) !important; font-weight: 600; }
@@ -92,7 +92,7 @@
 .e-liste { display: flex; flex-direction: column; }
 .e-rangee {
   display: grid !important; grid-template-columns: 14px auto 1fr auto; align-items: start; column-gap: 12px;
-  width: 100%; min-height: 56px; padding: 10px 24px !important; box-sizing: border-box;
+  width: 100%; min-height: 48px; padding: 9px 24px !important; box-sizing: border-box;
   transition: background-color 160ms ease;
   content-visibility: auto; contain-intrinsic-size: auto 64px;
 }
@@ -105,7 +105,7 @@
 .e-puce.is-geste { background: var(--e-ambre); }
 .e-puce.is-attente { border: 1.25px solid var(--e-pale); }
 .e-puce.is-rien { visibility: hidden; }
-.e-num { min-width: 40px; color: var(--e-gris); font-variant-numeric: tabular-nums; }
+.e-num { min-width: 36px; color: var(--e-gris); font-variant-numeric: tabular-nums; }
 .e-num.is-vide { color: var(--e-pale); }
 .e-corps { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .e-titre { text-wrap: pretty; overflow-wrap: anywhere; }
@@ -132,7 +132,7 @@
 
 /* Argent : le chiffre est le titre de la page, au même corps que le titre. */
 .e-affiche { padding: 16px 24px 0; }
-.e-affiche-n { font-size: 34px; line-height: 1.1; font-weight: 300; letter-spacing: -0.025em; font-variant-numeric: tabular-nums; }
+.e-racine .e-affiche-n { font-size: 34px; line-height: 1.1; font-weight: 300 !important; letter-spacing: -0.025em; font-variant-numeric: tabular-nums; }
 
 /* ── Le pied : UN bouton plein, au pouce, sur un voile qui laisse la liste se fondre ── */
 .e-pied {
