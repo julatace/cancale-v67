@@ -271,7 +271,10 @@ async function typeSupport(pg, id, support, vignettes) {
     x = await un(pg, 'retour', 'a4', { tampons: R({ a4: { num: true, titre: false, taille: false, mention: true } }), sansTemoin: true });
     dit(x && x.L.items.some((i) => /RETOUR/.test(i.s)), 'retour : « RETOUR » écrit même titre décoché');
     x = await un(pg, 'retour', '10x15', { tampons: R({ th: { num: false, titre: false, taille: false, mention: false } }), sansTemoin: true });
-    dit(x && x.L.items.some((i) => /RETOUR/.test(i.s)), 'retour thermique : « RETOUR » écrit même tout décoché');
+    // (17 nov., cartouche RETOUR de #1194 : le mot en grand) sans place sûre sur l'étiquette, le RETOUR va sur la fiche de
+    // préparation qui la suit (jamais « rien de tamponné ») : la page posée OU sa fiche.
+    { const fr = x && x.a.pose && /fiche/.test(x.a.pose.mode) ? await pg.evaluate(([b, k]) => __lire(b, k, 4, false), [x.a.b64, x.a.pose.page + 1]).catch(() => null) : null;
+      dit(x && (x.L.items.some((i) => /RETOUR/.test(i.s)) || !!(fr && fr.items.some((i) => /RETOUR/.test(i.s)))), 'retour thermique : « RETOUR » écrit même tout décoché', x ? JSON.stringify({ mode: x.a.pose && x.a.pose.mode, page: x.L.items.map((i) => i.s).slice(0, 6), fiche: fr ? fr.items.map((i) => i.s).slice(0, 6) : null }) : '—'); }
     // (16 nov., Julien : « les retours imprimables avec les ventes mais jamais confondus avec une vente ») Le retour est un
     // Mondial Relay A4 comme une vente : la place posée à la main pour la forme d'une VENTE Mondial Relay et l'exception
     // « seulement Mondial Relay » ne s'appliquent JAMAIS à lui (sa famille est « retour », sa forme « retour·… »).

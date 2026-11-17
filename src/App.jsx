@@ -47169,7 +47169,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const pret = pretPour(sig);
     setApercuImpr(null);
     // Le compte VRM ou un bordereau a changé depuis l'aperçu : rien ne s'ouvre (comme le chemin d'attente).
-    const maintenant = new Map(lignesLotTous().map((l) => [l.cle, sigLigneLot(l)]));
+    const maintenant = new Map(lignesLotImpression().map((l) => [l.cle, sigLigneLot(l)]));
     if ((a.proprio !== undefined && (AUTH.user?.id || null) !== a.proprio) || choisies.some((l) => maintenant.get(l.cle) !== sigLigneLot(l))) { toast(tr('impr.change')); return; }
     // Le chemin du geste : prêt, aucune question due (§5), version des N° relue il y a moins d'une minute.
     if (pret && !numerosDemandent(numeros) && (!numeros.some(Boolean) || versionFraiche())) {
