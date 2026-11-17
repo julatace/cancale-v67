@@ -41442,7 +41442,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // (17 nov., Julien : « ça met livré il y a deux jours mais […] la barre de progression avance pas ») LE TRANSPORTEUR
     // TRANCHE : la ligne lue chez lui (et l'e-mail) du n° de suivi de SON bordereau — la MÊME que la phrase sous la frise
     // (`suiviVente` → `dernierStatut`). Une preuve n'est jamais retirée ; « Validé » reste à Vinted (src/friseTransporteur.js).
-    const suF = normaliserSuivi((bordE && bordE.suivi) || '');
+    const bordS = (bordsParTxn && bordsParTxn[txL]) || bordE; const suF = normaliserSuivi((bordS && bordS.suivi) || '');
     const depF = suF && vcLoc0.departs instanceof Map ? (vcLoc0.departs.get(suF) || null) : null;
     const emF = suF ? emailDuSuivi(suF) : null;
     const prT = preuvesTransporteur({ transporteur: depF, email: emF ? { status: emF.status, receivedAt: emF.receivedAt } : null });
