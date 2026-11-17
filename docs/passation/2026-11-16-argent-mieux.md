@@ -93,3 +93,23 @@ règle) ; l'écran dit « au moins » la somme des plus bas, qui EST cette somme
 - `audit-vinted-pro` : P2 porté sur la RÈGLE (les deux prix en champs, plus dans le texte) + P8 (la raison ne dépend
   pas des montants) ; 31 verts.
 - Captures regardées : Déclarer 390 clair et sombre, 1512 clair, Résumé, Factures.
+
+## Reprise du 16 nov. (soir) — aucun chiffre n'a changé (prouvé)
+
+- `git merge origin/main` (vrai merge ; conflit CLAUDE.md §9 réglé en gardant les deux lignes ; deux lignes du 15 nov.
+  déplacées telles quelles dans `historique-divers.md`, CLAUDE.md < 59 000 octets).
+- Le banc relève maintenant CHAQUE montant rendu (`MONTANTS=<fichier>` : segment fermé, replis ouverts, et le détail
+  replié par vente). Lancé sur l'arbre d'`origin/main` (avant) et sur la branche (après), 390 et 1512, clair et
+  sombre, Résumé · Déclarer · Factures. Comparaison (montants « 30 € » et « 30,00 € » confondus) :
+  - hors prix par vente : **tous les montants sont identiques** avant/après sur les 24 vues ; le SEUL montant neuf est
+    « au moins 3 090 € » de la ligne groupée (= la somme des prix les plus bas, déjà vérifiée par G) ;
+  - les 120 prix par vente (2 × 60) qui faisaient le mur sont **tous** dans le détail replié (aucun manquant).
+  - Factures : identiques (11 montants).
+- Banc : après 64 ✅ · 0 ❌ ; avant 18 ✅ · 46 ❌.
+
+### La question à poser à Julien (une phrase, deux choix)
+
+« Sur tes comptes Pro, Vinted affiche pour 66 ventes un prix dans la liste un peu plus haut (+0,47 € à +1,45 €) que le
+prix de l'article sur la vente — ce n'est PAS la protection acheteurs : veux-tu (A) qu'on les compte au prix de
+l'article (2 864,98 € en plus dans ton CA, l'écart de 44,37 € nommé à côté) ou (B) qu'elles restent à part tant que
+ton relevé Vinted ne tranche pas (comme aujourd'hui) ? »
