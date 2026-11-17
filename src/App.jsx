@@ -46377,7 +46377,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const aFaire = aExpedier(o) && !isShipDone(o);
     const etat = aExpedier(o) ? (isShipDone(o) ? tr('scan.r.etat.colisFait') : b ? tr('scan.r.etat.aExpedierPret') : tr('scan.r.etat.aExpedier')) : ((venteStage(o) || {}).label || '');
     return { sorte: 'vente', site: 'vinted', cle: 'v:' + tx, suivis: [b && b.suivi, b && b.suiviPdf].filter(Boolean), titre: o.title || '', num: (b ? numForBord(b) : '') || e.numero || '', photo: orderPhoto(o) || null,
-      taille: (e.taille ? String(e.taille) : '') || String(o.size_title || o.size || ''), compte: compteDe(o), etat, aFaire, lien: `?tab=ventes&site=vinted&cible=vente&tx=${encodeURIComponent(tx)}` };
+      taille: (e.taille ? String(e.taille) : '') || String(o.size_title || o.size || ''), compte: o && o._acc && typeof o._acc === 'object' ? accName(o._acc) : '', etat, aFaire, lien: `?tab=ventes&site=vinted&cible=vente&tx=${encodeURIComponent(tx)}` };
   };
   // Les étiquettes candidates : d'abord les ventes à expédier, puis les plus récentes (21 jours) ; une étiquette
   // = le PDF capté par l'extension (`harvest_{uid}_label_{tx}`) ou celui de l'e-mail (`email_bord_{tx}`).
