@@ -150,6 +150,17 @@ Reprise du 16 nov. (soir, session youthful-wozniak) sur la branche existante :
   la refonte de Ventes, pas par ce lot ; la feuille du reçu généré n'a pas de capture d'app dédiée
   (le PDF de même mise en page est regardé).
 
+Reprise du 17 nov. (après pause) :
+- `git merge origin/main` (après #1202 ventes-clair, #1209 tampons, #1216 argent) : la pastille reste
+  dans la frise (`{friseEtat}{fusion.facture}`), hors des rangées refaites par #1202 ; la fusion avait
+  doublé l'import de `tr` dans FacturePro.jsx (tdz rouge ⇒ corrigé) ; trois lignes anciennes du §9
+  déplacées telles quelles dans `historique-divers.md` (CLAUDE.md < 60 000 octets).
+- Verts après fusion : audit-factures-mieux, facture-en-tva, facture-pro, facture-mobile,
+  emails-verre, justificatif, achats-relier, chiffres, urssaf, traduction, coherence, variables, tdz.
+- Rouges des bancs hors CI DÉJÀ sur main (mesuré le 16 nov. sur l'arbre de main) : facture-pro 28,
+  rapport 12, achats-relier 2 (navigation « Outils », bouton d'émission de la feuille, fiche 7004).
+- Jugement : la CI de la PR #1218 contre celle du dernier commit de main.
+
 ## Geste de Julien
 
 Aucun.
