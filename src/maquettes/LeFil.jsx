@@ -109,7 +109,7 @@ function CarteFil({ c, ouverte, onOuvrir, onFait, onTard, Icon, Photo, ordi, cho
           <span className="fil-dessous-d">{tr('fil.plusTard')}{Icon ? <Icon name="clock" size={22}/> : null}</span>
         </div>
       ) : null}
-      <div className="fil-face" style={dx ? { transform: `translate3d(${dx}px,0,0) rotate(${dx / 60}deg)`, transition: 'none' } : undefined} {...handlers}>
+      <div className={'fil-face' + (dx ? ' is-glisse' : '')} style={dx ? { transform: `translate3d(${dx}px,0,0) rotate(${dx / 60}deg)` } : undefined} {...handlers}>
         {c.el ? (
           <div className="fil-el">
             <div className="fil-tete"><span className="fil-kicker">{c.urgent ? <span className="fil-point" aria-hidden="true"/> : null}{c.kicker}</span></div>
