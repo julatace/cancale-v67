@@ -59,6 +59,8 @@ import { valeurChiffre, raisonCourte, sansCompteSur } from '../design/carteChiff
 import { questionsArgent } from '../argent.js';
 import { useDesignV2 } from '../designV2/reglage.js';   // (17 nov.) le nouveau design, en essai
 import ArgentMoisV2Vue from '../designV2/ArgentMois.jsx';   // (17 nov., phase 2) Argent · Mois
+import { BoutonV2, BoutonIconeV2, SegmentV2 } from '../designV2/BoutonV2.jsx';
+import { ChampRecherche } from '../composants/ChampRecherche.jsx';
 import { tauxMicro, detailTaux, AIDE_NEUTRE, SOURCES_OFFICIELLES, TAUX_ACTIVITE } from '../profilFiscal.js';
 // (10 nov., lot T) La jauge et l'alerte du seuil de TVA, à côté des factures (src/seuilTvaFacture.js).
 const SeuilTvaFactures = aLaDemande(() => import('../SeuilTvaFactures.jsx'));
@@ -1052,85 +1054,9 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
     URL.revokeObjectURL(url);
   };
   
-  return (
-    <div data-espace="argent" data-argent-factures="" style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
-      {/* ⚠️ LES BOUTONS PASSENT DANS LE `right` DE `ScreenHead`. Posés à côté
-          dans une rangée à part, ils sortaient de la zone protégée et
-          glissaient SOUS l'île d'actions flottante : « ⚙ Réglages » était
-          invisible (vu en capture). Le slot `right` existe pour ça. */}
-      <div>
-        <ScreenHead icon={argentNav?"euro":"receipt"} title={argentNav?L.argent:tr('compta.factures')} sous={designV2 && argentNav ? argentNav : undefined} desc="Les justificatifs de tes ventes, importés depuis tes e-mails Vinted."
-          right={<>
-          {/* (11 nov., décision C4 — Julien : « tranche ») Au téléphone, les cinq boutons tassaient la
-              ligne du titre : le geste principal reste visible, les quatre autres passent dans « … »
-              (une feuille en portail, des lignes de 44 px). Sur ordinateur, rien ne change. */}
-          <div className="vrm-fac-actions" data-fac-actions="large" style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
-          <Btn small primaire onClick={()=>setShowForm(true)}>{tr('compta.nouvelleFacture')}</Btn>
-          {/* ⚠️ « Récupérer Vinted » appelait l'Apps Script mort : le bouton ne
-              pouvait QUE échouer. Il relit maintenant les reçus arrivés par
-              email — la source qui remplit vraiment cet écran. */}
-          <Btn small outline color={C.muted} disabled={fetching} onClick={relireFacturesClic} style={{display:'inline-flex',alignItems:'center',gap:5}}>
-            <Icon name="sync" size={13}/>{fetching?tr('reglages.langue.chargement'):tr('compta.relireFactures')}
-          </Btn>
-          <Btn small outline color={C.muted} onClick={exportExcel} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="save" size={13}/>{tr('compta.exporterExcel')}</Btn>
-          <Btn small outline color={C.muted} onClick={()=>setShowPro(v=>!v)} aria-expanded={showPro} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="receipt" size={13}/>{tr('compta.maFacture')}</Btn>
-          <Btn small outline color={C.muted} onClick={()=>setShowSettings(true)} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="gear" size={13}/>{tr('compta.reglagesFactures')}</Btn>
-          </div>
-          <div className="vrm-fac-actions-tel" data-fac-actions="tel">
-            <Btn small primaire onClick={()=>setShowForm(true)} data-fac-principal="">{tr('compta.nouvelleFacture')}</Btn>
-            <button type="button" className="vrm-icon-control vrm-fac-plus" data-fac-plus="" aria-haspopup="dialog" aria-expanded={menuFac} aria-label={tr('compta.autresActionsFactures')} onClick={()=>setMenuFac(true)}><Icon name="more" size={20}/></button>
-          </div>
-        </>}/>
-        {menuFac && <SheetShell onClose={()=>setMenuFac(false)} maxWidth={420} titre={tr('compta.factures')} data-fac-menu="">
-          <div className="vrm-fiche-menu" onClickCapture={(ev)=>{ const b = ev.target && ev.target.closest && ev.target.closest('button'); if (b) setTimeout(()=>setMenuFac(false), 0); }}>
-            <button type="button" data-fac-menu-geste="relire" disabled={fetching} onClick={relireFacturesClic}><Icon name="sync" size={16}/>{fetching?tr('reglages.langue.chargement'):tr('compta.relireFactures')}</button>
-            <button type="button" data-fac-menu-geste="excel" onClick={exportExcel}><Icon name="save" size={16}/>{tr('compta.exporterExcel')}</button>
-            <button type="button" data-fac-menu-geste="fiche" onClick={()=>setShowPro(v=>!v)}><Icon name="receipt" size={16}/>{tr('compta.maFacture')}</button>
-            <button type="button" data-fac-menu-geste="reglages" onClick={()=>setShowSettings(true)}><Icon name="gear" size={16}/>{tr('compta.reglagesFactures')}</button>
-          </div>
-        </SheetShell>}
-        {/* (10 nov., Argent) Les segments SOUS la ligne du titre, pas dedans : cinq actions y
-            tassaient la piste (« Statistiqu… », vu en capture à 1512 px). */}
-        {designV2 ? null : argentNav}
-      </div>
-      <SeuilTvaFactures deps={DEPS_FACTURE}/>
-      <TvaMargeCarte deps={DEPS_FACTURE}/>
-      {showPro && <FicheFacturation deps={DEPS_FACTURE}/>}
-      <FacturesAEnvoyer deps={DEPS_FACTURE}/>
-      <ListeFacturesPro deps={DEPS_FACTURE}/>
-
-      {/* Barre de recherche : par n° de paire ou date de vente (cherche dans toutes les zones) */}
-      <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
-        <input
-          value={searchInput}
-          onChange={e=>setSearchInput(e.target.value)}
-          onKeyDown={e=>{if(e.key==='Enter')triggerSearch();}}
-          placeholder={tr('compta.articleDateVente')}
-          style={{flex:1,minWidth:200,padding:'9px 12px',background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,
-            color:C.text,fontSize:13,fontFamily:'inherit',outline:'none'}}
-        />
-        <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?tr('compta.tapeAbordDate'):undefined} style={{flexShrink:0,whiteSpace:'nowrap'}}>{tr('compta.chercher')}</Btn>
-        {search&&<Btn small onClick={clearSearch} color={C.border}>{tr('compta.effacer')}</Btn>}
-      </div>
-      {search&&<div style={{fontSize:12,color:C.muted}}>{trj('compta.resultatsDansToutes', { n: fullList.length, search: search })}</div>}
-      
-      {/* Sous-onglets zones — (14 nov., Studio) un segmenté (creusé, le choisi posé + diode), plus un soulignement bleu. */}
-      <div className="vrm-seg" role="group" aria-label={tr('compta.factures')} data-fac-zones="" style={{display:'inline-flex',alignSelf:'flex-start',maxWidth:'100%',gap:0,borderBottom:`1px solid ${C.border}`,overflowX:'auto',opacity:search?0.4:1,pointerEvents:search?'none':'auto'}}>
-        {[
-          {id:'attente',icon:'clock',label:tr('compta.attente'),count:counters.attente},
-          {id:'comptabilisees',icon:'check',label:tr('compta.comptabilisees'),count:counters.comptabilisees},
-        ].map(z=>(
-          <button key={z.id} type="button" className="vrm-seg-btn" aria-pressed={zone===z.id} onClick={()=>{setZone(z.id);setPage(null);}}
-            style={{background:'transparent',border:'none',borderBottom:zone===z.id?`3px solid ${C.accent}`:'3px solid transparent',
-              color:zone===z.id?C.accentTexte:C.muted,padding:'8px 14px',cursor:'pointer',fontSize:13,fontWeight:400,fontFamily:'inherit',whiteSpace:'nowrap'}}>
-            <span style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name={z.icon} size={13}/>{z.label} ({z.count})</span>
-          </button>
-        ))}
-      </div>
-      {/* (Une seule barre de recherche, au-dessus des onglets — la deuxième,
-          identique, faisait doublon.) */}
-      {search.trim()&&<div style={{fontSize:11,color:C.muted,marginTop:6}}>{tr('compta.rechercheActiveDans')}</div>}
-      
+  // (17 nov., nouveau design · phase 2) Le tableau et sa pagination : UNE écriture, posée par l'écran d'hier (éteint) et par
+  // celui du nouveau design (allumé, sous la recherche et le segmenté).
+  const tableauFactures = (<>
       {/* Tableau factures */}
       <Card style={{padding:0,overflowX:'auto'}}>
         {/* (12 nov., finitions) Le vide se dit HORS du tableau : dans un tableau de 700 px, sur
@@ -1208,6 +1134,128 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
         <Btn small onClick={()=>setShowAll(false)} color={C.border}>{tr('compta.revenirPagination')}</Btn>
       </div>}
       
+  </>);
+  // (17 nov., nouveau design · phase 2, revue du coordinateur) FACTURES ALLUMÉ : la tête du design (« Argent » + le plein
+  // « Nouvelle facture » sur la ligne du titre, la cloche à droite), la ligne comptes et le segmenté d'Argent, puis UNE
+  // recherche (+ « ⋯ » : relire, Excel, ma facture, réglages — les mêmes gestes, la même feuille), UN segmenté
+  // En attente · Comptabilisées, la liste (le même tableau) ou un état vide dessiné ; les cartes d'hier dessous.
+  if (designV2 && argentNav) return (
+    <div data-espace="argent" data-argent-factures="" className="v2-fac" style={{padding:16}}>
+      <header className="v2-tete-tache v2-tete-argent" data-v2-factures-tete="">
+        <div className="v2-titre-ligne"><h1>{L.argent}</h1>
+          <BoutonV2 role="principal" compact icone={<Icon name="plus" size={20}/>} titre={tr('compta.nouvelleFacture')} attrs={{ 'data-v2-principal': 'facture', 'data-fac-principal': '' }} onClick={()=>setShowForm(true)}>{tr('v2.fac.nouvelle')}</BoutonV2></div>
+        {argentNav}
+      </header>
+      <div className="v2-fac-outils" data-v2-fac-outils="">
+        <div className="v2-fac-champ"><ChampRecherche valeur={searchInput} onChange={(v)=>{ setSearchInput(v); setSearch(v); setPage(null); }} placeholder={tr('v2.fac.chercher')} label={tr('v2.fac.chercher')} data-v2-fac-recherche=""/></div>
+        <BoutonIconeV2 icone={<Icon name="more" size={22}/>} label={tr('compta.autresActionsFactures')} onClick={()=>setMenuFac(true)} attrs={{ 'data-fac-plus': '', 'aria-haspopup': 'dialog', 'aria-expanded': menuFac }}/>
+      </div>
+      {menuFac && <SheetShell onClose={()=>setMenuFac(false)} maxWidth={420} titre={tr('compta.factures')} data-fac-menu="">
+        <div className="vrm-fiche-menu" onClickCapture={(ev)=>{ const b = ev.target && ev.target.closest && ev.target.closest('button'); if (b) setTimeout(()=>setMenuFac(false), 0); }}>
+          <button type="button" data-fac-menu-geste="relire" disabled={fetching} onClick={relireFacturesClic}><Icon name="sync" size={16}/>{fetching?tr('reglages.langue.chargement'):tr('compta.relireFactures')}</button>
+          <button type="button" data-fac-menu-geste="excel" onClick={exportExcel}><Icon name="save" size={16}/>{tr('compta.exporterExcel')}</button>
+          <button type="button" data-fac-menu-geste="fiche" onClick={()=>setShowPro(v=>!v)}><Icon name="receipt" size={16}/>{tr('compta.maFacture')}</button>
+          <button type="button" data-fac-menu-geste="reglages" onClick={()=>setShowSettings(true)}><Icon name="gear" size={16}/>{tr('compta.reglagesFactures')}</button>
+        </div>
+      </SheetShell>}
+      <SegmentV2 label={tr('compta.factures')} value={zone} onChange={(z)=>{ setZone(z); setPage(null); }} attrs={{ 'data-fac-zones': '' }}
+        options={[{ v: 'attente', l: tr('compta.attente'), n: counters.attente }, { v: 'comptabilisees', l: tr('compta.comptabilisees'), n: counters.comptabilisees }]}/>
+      {search.trim() ? <p className="v2-ar-reste" style={{margin:0}}>{trj('compta.resultatsDansToutes', { n: fullList.length, search: search })}</p> : null}
+      {list.length === 0
+        ? <div className="v2-fac-vide" data-factures-vide={zone}><span className="v2-fac-vide-ic" aria-hidden="true"><Icon name="receipt" size={24}/></span>
+            <b>{search.trim() ? <>{tr('compta.aucuneFactureTrouvee')} {search} ».</> : zone === 'attente' ? tr('compta.aucuneFactureAttente') : tr('compta.aucuneFactureComptabilisee')}</b>
+            {!search.trim() && zone !== 'attente' ? <span>{tr('compta.factureArriveIci')}</span> : null}</div>
+        : tableauFactures}
+      {showPro && <FicheFacturation deps={DEPS_FACTURE}/>}
+      <FacturesAEnvoyer deps={DEPS_FACTURE}/>
+      <ListeFacturesPro deps={DEPS_FACTURE}/>
+      <SeuilTvaFactures deps={DEPS_FACTURE}/>
+      <TvaMargeCarte deps={DEPS_FACTURE}/>
+      {showForm&&<InvoiceForm onClose={()=>setShowForm(false)} onSave={addInvoice} nextNumber={nextInvoiceNumber} catalog={catalog}/>}
+      {showSettings&&<InvoiceSettings settings={invoiceSettings} setSettings={(s)=>{setInvoiceSettings(s);save('vinted_invoice_settings',s);}} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt} onClose={()=>setShowSettings(false)}/>}
+    </div>
+  );
+  return (
+    <div data-espace="argent" data-argent-factures="" style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
+      {/* ⚠️ LES BOUTONS PASSENT DANS LE `right` DE `ScreenHead`. Posés à côté
+          dans une rangée à part, ils sortaient de la zone protégée et
+          glissaient SOUS l'île d'actions flottante : « ⚙ Réglages » était
+          invisible (vu en capture). Le slot `right` existe pour ça. */}
+      <div>
+        <ScreenHead icon={argentNav?"euro":"receipt"} title={argentNav?L.argent:tr('compta.factures')} desc="Les justificatifs de tes ventes, importés depuis tes e-mails Vinted."
+          right={<>
+          {/* (11 nov., décision C4 — Julien : « tranche ») Au téléphone, les cinq boutons tassaient la
+              ligne du titre : le geste principal reste visible, les quatre autres passent dans « … »
+              (une feuille en portail, des lignes de 44 px). Sur ordinateur, rien ne change. */}
+          <div className="vrm-fac-actions" data-fac-actions="large" style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center'}}>
+          <Btn small primaire onClick={()=>setShowForm(true)}>{tr('compta.nouvelleFacture')}</Btn>
+          {/* ⚠️ « Récupérer Vinted » appelait l'Apps Script mort : le bouton ne
+              pouvait QUE échouer. Il relit maintenant les reçus arrivés par
+              email — la source qui remplit vraiment cet écran. */}
+          <Btn small outline color={C.muted} disabled={fetching} onClick={relireFacturesClic} style={{display:'inline-flex',alignItems:'center',gap:5}}>
+            <Icon name="sync" size={13}/>{fetching?tr('reglages.langue.chargement'):tr('compta.relireFactures')}
+          </Btn>
+          <Btn small outline color={C.muted} onClick={exportExcel} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="save" size={13}/>{tr('compta.exporterExcel')}</Btn>
+          <Btn small outline color={C.muted} onClick={()=>setShowPro(v=>!v)} aria-expanded={showPro} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="receipt" size={13}/>{tr('compta.maFacture')}</Btn>
+          <Btn small outline color={C.muted} onClick={()=>setShowSettings(true)} style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name="gear" size={13}/>{tr('compta.reglagesFactures')}</Btn>
+          </div>
+          <div className="vrm-fac-actions-tel" data-fac-actions="tel">
+            <Btn small primaire onClick={()=>setShowForm(true)} data-fac-principal="">{tr('compta.nouvelleFacture')}</Btn>
+            <button type="button" className="vrm-icon-control vrm-fac-plus" data-fac-plus="" aria-haspopup="dialog" aria-expanded={menuFac} aria-label={tr('compta.autresActionsFactures')} onClick={()=>setMenuFac(true)}><Icon name="more" size={20}/></button>
+          </div>
+        </>}/>
+        {menuFac && <SheetShell onClose={()=>setMenuFac(false)} maxWidth={420} titre={tr('compta.factures')} data-fac-menu="">
+          <div className="vrm-fiche-menu" onClickCapture={(ev)=>{ const b = ev.target && ev.target.closest && ev.target.closest('button'); if (b) setTimeout(()=>setMenuFac(false), 0); }}>
+            <button type="button" data-fac-menu-geste="relire" disabled={fetching} onClick={relireFacturesClic}><Icon name="sync" size={16}/>{fetching?tr('reglages.langue.chargement'):tr('compta.relireFactures')}</button>
+            <button type="button" data-fac-menu-geste="excel" onClick={exportExcel}><Icon name="save" size={16}/>{tr('compta.exporterExcel')}</button>
+            <button type="button" data-fac-menu-geste="fiche" onClick={()=>setShowPro(v=>!v)}><Icon name="receipt" size={16}/>{tr('compta.maFacture')}</button>
+            <button type="button" data-fac-menu-geste="reglages" onClick={()=>setShowSettings(true)}><Icon name="gear" size={16}/>{tr('compta.reglagesFactures')}</button>
+          </div>
+        </SheetShell>}
+        {/* (10 nov., Argent) Les segments SOUS la ligne du titre, pas dedans : cinq actions y
+            tassaient la piste (« Statistiqu… », vu en capture à 1512 px). */}
+        {argentNav}
+      </div>
+      <SeuilTvaFactures deps={DEPS_FACTURE}/>
+      <TvaMargeCarte deps={DEPS_FACTURE}/>
+      {showPro && <FicheFacturation deps={DEPS_FACTURE}/>}
+      <FacturesAEnvoyer deps={DEPS_FACTURE}/>
+      <ListeFacturesPro deps={DEPS_FACTURE}/>
+
+      {/* Barre de recherche : par n° de paire ou date de vente (cherche dans toutes les zones) */}
+      <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
+        <input
+          value={searchInput}
+          onChange={e=>setSearchInput(e.target.value)}
+          onKeyDown={e=>{if(e.key==='Enter')triggerSearch();}}
+          placeholder={tr('compta.articleDateVente')}
+          style={{flex:1,minWidth:200,padding:'9px 12px',background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,
+            color:C.text,fontSize:13,fontFamily:'inherit',outline:'none'}}
+        />
+        <Btn small onClick={triggerSearch} color={C.accent} disabled={!searchInput.trim()&&!search} title={!searchInput.trim()&&!search?tr('compta.tapeAbordDate'):undefined} style={{flexShrink:0,whiteSpace:'nowrap'}}>{tr('compta.chercher')}</Btn>
+        {search&&<Btn small onClick={clearSearch} color={C.border}>{tr('compta.effacer')}</Btn>}
+      </div>
+      {search&&<div style={{fontSize:12,color:C.muted}}>{trj('compta.resultatsDansToutes', { n: fullList.length, search: search })}</div>}
+      
+      {/* Sous-onglets zones — (14 nov., Studio) un segmenté (creusé, le choisi posé + diode), plus un soulignement bleu. */}
+      <div className="vrm-seg" role="group" aria-label={tr('compta.factures')} data-fac-zones="" style={{display:'inline-flex',alignSelf:'flex-start',maxWidth:'100%',gap:0,borderBottom:`1px solid ${C.border}`,overflowX:'auto',opacity:search?0.4:1,pointerEvents:search?'none':'auto'}}>
+        {[
+          {id:'attente',icon:'clock',label:tr('compta.attente'),count:counters.attente},
+          {id:'comptabilisees',icon:'check',label:tr('compta.comptabilisees'),count:counters.comptabilisees},
+        ].map(z=>(
+          <button key={z.id} type="button" className="vrm-seg-btn" aria-pressed={zone===z.id} onClick={()=>{setZone(z.id);setPage(null);}}
+            style={{background:'transparent',border:'none',borderBottom:zone===z.id?`3px solid ${C.accent}`:'3px solid transparent',
+              color:zone===z.id?C.accentTexte:C.muted,padding:'8px 14px',cursor:'pointer',fontSize:13,fontWeight:400,fontFamily:'inherit',whiteSpace:'nowrap'}}>
+            <span style={{display:'inline-flex',alignItems:'center',gap:5}}><Icon name={z.icon} size={13}/>{z.label} ({z.count})</span>
+          </button>
+        ))}
+      </div>
+      {/* (Une seule barre de recherche, au-dessus des onglets — la deuxième,
+          identique, faisait doublon.) */}
+      {search.trim()&&<div style={{fontSize:11,color:C.muted,marginTop:6}}>{tr('compta.rechercheActiveDans')}</div>}
+      
+      {tableauFactures}
+
       {/* Modale création facture */}
       {showForm&&<InvoiceForm onClose={()=>setShowForm(false)} onSave={addInvoice} nextNumber={nextInvoiceNumber} catalog={catalog}/>}
       
@@ -3819,9 +3867,22 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
   const MAX = 30;
   const lignesV = livre ? [...livre.lignes].sort((a, b) => (b.ts || 0) - (a.ts || 0)) : [];
   const jour = (t) => (t == null ? '' : new Date(t).toLocaleDateString(localeCourante(), { weekday: 'short', day: 'numeric', month: 'short' }));
+  // Le prix d'achat et la marge d'une vente : le relevé de Ventes (`vrm_stats_ventes` : [4] vente, [5] achat), la
+  // règle de « Ce qui rapporte » (marge = vente − achat), par l'identité de la ligne (celle de `recettesDe`). Pas su ⇒ rien.
+  const achatDe = React.useMemo(() => {
+    const m = new Map(); const rel = lireReleveVentes();
+    for (const r of ((rel && rel.l) || [])) if (Array.isArray(r)) m.set(r[0] === 'Vinted' ? 'vinted:' + r[2] : String(r[2]), r);
+    return m;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [livre]);
+  const coutDe = (id) => {
+    const r = achatDe.get(String(id)); if (!r || r[5] == null || !Number.isFinite(Number(r[5]))) return { achat: null, marge: null };
+    const a = Math.round(Number(r[5]) * 100), v = r[4] == null || !Number.isFinite(Number(r[4])) ? null : Math.round(Number(r[4]) * 100);
+    return { achat: a / 100, marge: v == null ? null : (v - a) / 100 };
+  };
   const vers = {
     etat: calc.etat === 'encours' ? 'encours' : !livre ? 'passu' : 'lu', n: lignesV.length, reste: Math.max(0, lignesV.length - MAX),
-    lignes: lignesV.slice(0, MAX).map((l) => ({ id: l.id, num: l.num, titre: l.titre, plateforme: l.plateforme, montant: l.montant, date: jour(l.ts),
+    lignes: lignesV.slice(0, MAX).map((l) => ({ id: l.id, num: l.num, titre: l.titre, plateforme: l.plateforme, montant: l.montant, date: jour(l.ts), ...coutDe(l.id),
       onClick: () => { try { window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: String(l.num) })); } catch (_) {} } })),
   };
   return <ArgentMoisV2Vue poster={{ valeur: qR.valeur, partiel: qR.partiel }} phrase={phrase} moisLong={moisLong} barres={barres} faits={faits} geste={geste} versements={vers} montant={somme}/>;

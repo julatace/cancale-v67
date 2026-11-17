@@ -164,7 +164,8 @@ import { useLangue } from '../i18n/react.js';
 import { ReglagesAidesAccueil } from '../accueilReste/AccueilReste.jsx';   // (14 nov., idées 136 139 140 147)
 import MIGRATION_SQL from "../../supabase/migrations/001-multi-utilisateurs.sql?raw";
 import { accompagner } from '../accompagnement.js';   // (14 nov.) pendant, après, échec d'un geste (src/ui/Accompagne.jsx)
-import { useDesignV2, poserDesignV2 } from '../designV2/reglage.js';   // (17 nov.) « Nouveau design (essai) »
+import { useDesignV2, poserDesignV2 } from '../designV2/reglage.js';
+import { RangeeTouchable } from '../designV2/BoutonV2.jsx';   // (17 nov., phase 2) les rangées de Paramètres   // (17 nov.) « Nouveau design (essai) »
 
 // ⟦← App.jsx #10⟧
 const SuiviReceptionEmails = aLaDemande(() => import('../ReceptionEmails.jsx'));
@@ -2455,6 +2456,20 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       </button>
     );
   };
+  // (17 nov., nouveau design · phase 2) La rangée d'une catégorie, en `RangeeTouchable` : icône teintée, nom, la valeur de
+  // `valeurCat` (rien d'inventé), le chevron ; la phrase reste pour les lecteurs d'écran. Le même geste, les mêmes data-*.
+  const rangeeCatV2 = (c) => {
+    const v = valeurCat(c);
+    const ambre = c.id === 'donnees' && derniereSauvegarde.old;
+    return (
+      <RangeeTouchable key={c.id} className="v2-pm-rangee" onClick={() => ouvrirCategorie(c.id)} attrs={{ 'data-categorie-ouvrir': c.id, 'data-categorie-contient': ` ${c.ids.join(' ')} ` }}>
+        <span className="v2-pm-ic" aria-hidden="true"><Icon name={c.ic} size={18}/></span>
+        <span className="v2-pm-lib">{titreCat(c.id)}<span className="vg-sr">{' — ' + tr(`parametres.cat.${c.id}.desc`)}</span></span>
+        {v ? <span className={'v2-pm-val' + (ambre ? ' is-ambre' : '')} data-categorie-valeur={c.id}>{v}</span> : null}
+        <span className="v2-pm-chev" aria-hidden="true">{chevron}</span>
+      </RangeeTouchable>
+    );
+  };
   // « Mon compte » : la carte (l'avatar, le nom de la catégorie, l'adresse de connexion), un toucher l'ouvre.
   const carteCompte = (c) => (
     <button key={c.id} type="button" className="vg-carte vg-pm-moi" data-categorie-ouvrir={c.id} data-vue="compte" data-categorie-contient={` ${c.ids.join(' ')} `} onClick={() => ouvrirCategorie(c.id)}>
@@ -2518,7 +2533,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       ) : (<>
         {/* (14 nov., refonte visible — AJOUT 3.8) Le titre et son « ? ». Puis la RECHERCHE, en haut, comme les Réglages d'iOS. */}
         <div className="vrm-set-tete"><h2 className="vrm-set-h1" style={{color:C.text}}>{tr('ecran.settings')}</h2>{PHRASES_ECRAN.settings ? <span className="vrm-pf-set-aide" data-phrase-ecran="settings" title={PHRASES_ECRAN.settings}><AideEcran cle="settings"/></span> : null}<StatutSauvegardeReglages/></div>
-        <ChampRecherche valeur={rechercheReglage} onChange={setRechercheReglage} placeholder={tr('parametres.recherche.placeholder')} label={tr('reglages.recherche.label')} micro voix="brut" className="vrm-set-recherche" data-recherche-reglages=""/>
+        <ChampRecherche valeur={rechercheReglage} onChange={setRechercheReglage} placeholder={designV2 ? tr('v2.pm.chercher') : tr('parametres.recherche.placeholder')} label={tr('reglages.recherche.label')} micro voix="brut" className="vrm-set-recherche" data-recherche-reglages=""/>
         <ReglagesPasLus/>
       </>)}
 
@@ -2545,11 +2560,17 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
             <section className="vrm-pm-racine v2-pm-racine" data-v2-parametres="">
               <div data-categories-reglages="" data-onglets-reglages="">
                 <h2 className="v2-pm-h">{tr('v2.pm.compte')}</h2>
-                {categories.filter((c) => c.id === 'compte').map((c) => carteCompte(c))}
+                <div className="v2-pm-liste">{categories.filter((c) => c.id === 'compte').map((c) => (
+                  <RangeeTouchable key={c.id} className="v2-pm-rangee v2-pm-moi" onClick={() => ouvrirCategorie(c.id)} attrs={{ 'data-categorie-ouvrir': c.id, 'data-vue': 'compte', 'data-categorie-contient': ` ${c.ids.join(' ')} ` }}>
+                    <span className="v2-pm-av" aria-hidden="true">{AUTH.user ? <AvatarCompte key={AUTH.user.id} owner={AUTH.user.id} headers={enTeteSession} lettre={String(AUTH.user.email || '?').slice(0, 1).toUpperCase()}/> : <Icon name={c.ic} size={20}/>}</span>
+                    <span className="v2-pm-moi-txt"><b>{titreCat(c.id)}</b><span className="vrm-sensible">{AUTH.user ? AUTH.user.email : tr(`parametres.cat.${c.id}.desc`)}</span></span>
+                    {(() => { const pl = (reglePlanCourante() || {}).plan; const o = pl === 'pro' ? 'Pro' : pl === 'solo' ? 'Solo' : ''; return o ? <span className="v2-pm-val" data-moi-offre={pl}>{o}</span> : null; })()}
+                    <span className="v2-pm-chev" aria-hidden="true">{chevron}</span>
+                  </RangeeTouchable>))}</div>
                 <h2 className="v2-pm-h">{tr('v2.pm.reglages')}</h2>
-                <div className="vrm-set-liste v2-pm-liste">{categories.filter((c) => c.id !== 'compte' && !c.expert).map((c) => ligneCategorie(c, { surClic: () => ouvrirCategorie(c.id) }))}</div>
+                <div className="v2-pm-liste">{categories.filter((c) => c.id !== 'compte' && !c.expert).map(rangeeCatV2)}</div>
                 {categories.some((c) => c.expert) ? <><h2 className="v2-pm-h">{tr('v2.pm.avance')}</h2>
-                <div className="vrm-set-liste v2-pm-liste">{categories.filter((c) => c.expert).map((c) => ligneCategorie(c, { surClic: () => ouvrirCategorie(c.id) }))}</div></> : null}
+                <div className="v2-pm-liste">{categories.filter((c) => c.expert).map(rangeeCatV2)}</div></> : null}
               </div>
             </section>
             ) :

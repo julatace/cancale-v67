@@ -27,7 +27,8 @@ const NV = require('./nouveau-vendeur.cjs');
 const { chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'));
 const SHOTS = process.env.SHOTS || path.join(require('os').tmpdir(), 'banc-design-v2-argent');
 fs.mkdirSync(SHOTS, { recursive: true });
-const TAILLES = String(process.env.TAILLES || '390:sombre,390:clair,1512:clair,1512:sombre').split(',').map((x) => { const [w, t] = x.split(':'); return { W: Number(w), sombre: t === 'sombre' }; });
+// `375:clair` : un iPhone plus étroit ; `390:clair:tres` : le réglage « Très grand » de la taille du texte.
+const TAILLES = String(process.env.TAILLES || '390:sombre,390:clair,375:clair,390:sombre:tres,1512:clair,1512:sombre').split(',').map((x) => { const [w, t, g] = x.split(':'); return { W: Number(w), sombre: t === 'sombre', tres: g === 'tres' }; });
 const JSON_OUT = process.env.BANC_JSON || '';
 const REF = process.env.BANC_REFERENCE ? JSON.parse(fs.readFileSync(process.env.BANC_REFERENCE, 'utf8')) : null;
 let ok = 0, ko = 0;
@@ -47,6 +48,8 @@ const jeu = () => {
     { transaction_id: 62012, title: 'Nike Air Max 1 ’86 OG Big Bubble Sport Red édition anniversaire taille 43', price: { amount: '129', currency_code: 'EUR' }, status: 'Commande finalisée', transaction_user_status: 'completed', date: iso(4), photo: null });
   L.push(txn(222, 62005, 6), txn(111, 62002, 4), txn(222, 62010, 33), txn(222, 62011, 61), txn(222, 62012, 1));
   const main = L.find((r) => r.id === 'main');
+  // Un prix d'achat saisi sur la fiche de la vente 62012 (par identité : son annonce 562012) ⇒ « acheté 60 € → +69 € ».
+  main.data.vinted_annonce_numeros = { ...(main.data.vinted_annonce_numeros || {}), 562012: { numero: '21', buyPrice: '60' } };
   main.data.vinted_regime = 'micro'; main.data.vinted_urssaf_freq = 'mensuel'; main.data.vrm_urssaf_declare = {};
   return { lignes: L, comptes: NV.JEU_COMPTES, ecritures: 0 };
 };
@@ -107,6 +110,10 @@ async function mesurer(pg, nom, zonesSel) {
     const textes = zones.flatMap((z) => [z, ...z.querySelectorAll('*')]).filter(vis).filter((e) => !rogne(e)).filter((e) => [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()));
     const tronques = textes.filter((e) => { const cs = getComputedStyle(e); return e.scrollWidth > e.clientWidth + 1 && cs.textOverflow !== 'ellipsis' && /hidden|clip/.test(cs.overflowX) && e.clientWidth > 0; }).map((e) => e.className + ':' + e.textContent.trim().slice(0, 30));
     const coupes = textes.filter((e) => { const cs = getComputedStyle(e); return cs.textOverflow === 'ellipsis' && e.scrollWidth > e.clientWidth + 1 && !e.closest('.v2-ar-v-titre, .v2-ar-v-date'); }).map((e) => e.textContent.trim().slice(0, 30));
+    // Un mot coupé en deux (titre, montant) : une ligne qui commence au milieu d'un mot (Range par caractère).
+    const coupesMot = textes.filter((e) => !e.closest('.vg-sr')).flatMap((e) => [...e.childNodes].filter((n) => n.nodeType === 3 && n.textContent.trim().length > 3).map((n) => { const t = n.textContent; const r = document.createRange(); let y0 = null, cut = null;
+      for (let i = 0; i < t.length; i++) { r.setStart(n, i); r.setEnd(n, i + 1); const q = r.getClientRects()[0]; if (!q) continue; if (y0 != null && q.top > y0 + 4 && i > 0 && /\S/.test(t[i - 1]) && /\S/.test(t[i]) && !/[-–—\/·]/.test(t[i - 1])) { cut = t.slice(Math.max(0, i - 8), i) + '|' + t.slice(i, i + 8); break; } y0 = q.top; }
+      return cut; }).filter(Boolean));
     const W = innerWidth; const deb = document.documentElement.scrollWidth - W;
     const hors = textes.filter((e) => { const q = e.getBoundingClientRect(); return q.right > W + 1 || q.left < -1; }).map((e) => e.textContent.trim().slice(0, 30));
     const contrastes = textes.map((e) => { const cs = getComputedStyle(e); const c = K.rgba(cs.color); if (!c) return null; const f = K.fond(e); const big = parseFloat(cs.fontSize) >= 24 || (parseFloat(cs.fontSize) >= 18.66 && Number(cs.fontWeight) >= 700);
@@ -114,11 +121,11 @@ async function mesurer(pg, nom, zonesSel) {
     const faibles = contrastes.filter((x) => x.r < x.min);
     const pleinFond = K.jeton('--v2-plein-fond'); const memeFond = (e) => { const c = K.rgba(getComputedStyle(e).backgroundColor); return c && pleinFond && c.a > .9 && Math.abs(c.r - pleinFond.r) + Math.abs(c.g - pleinFond.g) + Math.abs(c.b - pleinFond.b) < 12; };
     const pleins = [...document.querySelectorAll('[data-v2b="principal"], .sb-btn-plein, .vrm-main .vrm-b-primaire')].filter(vis).filter((e) => e.matches('[data-v2b="principal"], .sb-btn-plein') || memeFond(e)).filter((e) => { const r = e.getBoundingClientRect(); return r.bottom > 0 && r.width > 0; }).map((e) => e.textContent.trim().slice(0, 30));
-    return { nZones: zones.length, n: boutons.length, petits, tronques, coupes, deb, hors, nTextes: contrastes.length, faibles, pleins, minC: contrastes.length ? Math.min(...contrastes.map((x) => x.r)) : null };
+    return { nZones: zones.length, n: boutons.length, petits, tronques, coupes, coupesMot, deb, hors, nTextes: contrastes.length, faibles, pleins, minC: contrastes.length ? Math.min(...contrastes.map((x) => x.r)) : null };
   }, [CONTRASTE, zonesSel]);
   dit(r.nZones > 0, `${nom} : le nouveau design est rendu (${r.nZones} zones)`);
   dit(!r.petits.length, `T ${nom} : ${r.n} boutons, tous ≥ 44 × 44`, r.petits);
-  dit(!r.tronques.length && !r.coupes.length, `X ${nom} : aucun texte tronqué`, { t: r.tronques, c: r.coupes });
+  dit(!r.tronques.length && !r.coupes.length && !r.coupesMot.length, `X ${nom} : aucun texte tronqué, aucun mot coupé en deux`, { t: r.tronques, c: r.coupes, m: r.coupesMot });
   dit(r.deb <= 1 && !r.hors.length, `X ${nom} : rien ne déborde de l’écran`, { deb: r.deb, hors: r.hors });
   dit(r.nTextes > 0 && !r.faibles.length, `C ${nom} : ${r.nTextes} textes au contraste suffisant (min ${r.minC})`, r.faibles);
   return r;
@@ -131,11 +138,13 @@ const ZONES_ARGENT = '.v2-argent, .v2-argent-nav, .vrm-screen-head:has(.v2-argen
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--use-angle=swiftshader', '--no-proxy-server'] });
   const releve = {};
   try {
-    for (const { W, sombre } of TAILLES) {
-      const T = `${W} ${sombre ? 'sombre' : 'clair'}`, tel = W < 600, th = sombre ? 'sombre' : 'clair';
+    for (const { W, sombre, tres } of TAILLES) {
+      const T = `${W} ${sombre ? 'sombre' : 'clair'}${tres ? ' très grand' : ''}`, tel = W < 600, th = sombre ? 'sombre' : 'clair';
       console.log(`\n── ${T}`);
       const o = await NV.ouvrir(nav, { W, sombre, base: jeu(), tab: 'journee' });
       const pg = o.pg;
+      if (tel && W !== 390) await pg.setViewportSize({ width: W, height: 812 });
+      if (tres) await pg.evaluate(() => localStorage.setItem('vrm_taille_texte', 'tresGrand'));
       try {
         // ── ÉTEINT : les chiffres d'hier et les signatures ──
         await allumer(pg, false);
@@ -167,49 +176,102 @@ const ZONES_ARGENT = '.v2-argent, .v2-argent-nav, .vrm-screen-head:has(.v2-argen
           const vis = (e) => !!e && e.getClientRects().length > 0 && !e.closest('[hidden]');
           const h = [...document.querySelectorAll('.vrm-main h1, .vrm-main h2.vrm-display')].find(vis);
           const navs = [...document.querySelectorAll('.v2-argent-nav')].filter(vis);
-          const segs = navs[0] ? [...navs[0].querySelectorAll('.vrm-seg-btn')].map((b) => ({ id: b.getAttribute('data-section'), on: b.getAttribute('aria-pressed') === 'true', l: b.textContent.trim() })) : [];
+          const segs = navs[0] ? [...navs[0].querySelectorAll('[data-section]')].map((b) => ({ id: b.getAttribute('data-section'), on: b.getAttribute('aria-selected') === 'true', l: b.textContent.trim(), w: Math.round(b.getBoundingClientRect().width) })) : [];
+          const segBox = navs[0] && navs[0].querySelector('.v2-seg'); const segL = segBox ? Math.round(segBox.getBoundingClientRect().width) : 0; const mainL = Math.round(document.querySelector('.v2-ar-faits') ? document.querySelector('.v2-ar-faits').getBoundingClientRect().width : 0);
+          const vMarge = [...document.querySelectorAll('[data-v2-argent-achat]')].map((e) => ({ a: e.getAttribute('data-v2-argent-achat'), m: e.getAttribute('data-v2-argent-marge'), t: e.textContent.trim() }));
+          const etiq = [...document.querySelectorAll('[data-v2-argent-versement] .v2-etiquette')].length;
+          const barV = [...document.querySelectorAll('[data-v2-argent-barre-v]')].map((e) => e.textContent.trim());
+          const faitsH = [...document.querySelectorAll('[data-v2-argent-fait]')].map((e) => ({ h: Math.round(e.getBoundingClientRect().height), y: Math.round(e.getBoundingClientRect().top) }));
           const fig = document.querySelector('.v2-ar-barres'); const af = document.querySelector('.v2-ar-affiche');
           const vers = [...document.querySelectorAll('[data-v2-argent-versement]')].filter(vis);
           const txt = document.querySelector('.vrm-main').innerText;
           return { titre: h ? h.textContent.trim() : '', nNav: navs.length, comptes: navs[0] ? !!navs[0].querySelector('[data-v2-argent-comptes]') : false, segs, affiche: af ? af.textContent.replace(/\s+/g, ' ').trim() : '',
-            afficheTaille: af ? parseFloat(getComputedStyle(af.querySelector('.v2-ar-nb')).fontSize) : 0, graphe: fig ? Math.round(fig.getBoundingClientRect().height) : null,
-            faits: document.querySelectorAll('[data-v2-argent-fait]').length, vers: vers.length, versN: vers.filter((v) => v.querySelector('.v2-etiquette')).length,
+            afficheTaille: af ? parseFloat(getComputedStyle(af.querySelector('.v2-affiche-sig-n')).fontSize) : 0, graphe: fig ? Math.round(fig.getBoundingClientRect().height) : null,
+            faits: document.querySelectorAll('[data-v2-argent-fait]').length + ((document.querySelector('[data-v2-argent-passu]') || { getAttribute: () => '' }).getAttribute('data-v2-argent-passu') || '').split(' ').filter(Boolean).length, faitsTiret: [...document.querySelectorAll('[data-v2-argent-fait] [data-v2-pas-su]')].length, vers: vers.length, versN: vers.filter((v) => v.querySelector('.v2-etiquette')).length, segL, mainL, vMarge, etiq, barV, faitsH,
             versNum: vers.filter((v) => v.tagName === 'BUTTON').length, ancienVisible: [...document.querySelectorAll('[data-argent-questions]')].some(vis),
             encaisse: /encaiss/i.test(txt), auMoins0: /au moins 0[,\s]*0?0?\s*€/i.test(txt), nan: /\bNaN\b|undefined|Invalid Date/.test(txt) };
         });
         console.log('     structure', JSON.stringify(s));
         dit(s.titre === 'Argent' && s.nNav === 1 && s.comptes, `S ${T} : « Argent », puis UNE ligne comptes`, s);
         dit(s.segs.length === 4 && s.segs.map((x) => x.l).join('·') === 'Mois·Statistiques·Déclarer·Factures' && s.segs.filter((x) => x.on).map((x) => x.id).join() === 'resume', `S ${T} : UN segmenté Mois · Statistiques · Déclarer · Factures, « Mois » allumé`, s.segs);
+        dit(tres ? Math.abs(s.segL - s.mainL) <= 1 : tel ? Math.abs(s.segL - s.mainL) <= 1 && new Set(s.segs.map((x) => x.w)).size === 1 : s.segL >= 520 && new Set(s.segs.map((x) => x.w)).size === 1, `S ${T} : le segmenté prend toute la largeur (${s.segL} px / contenu ${s.mainL}), segments égaux (${s.segs.map((x) => x.w).join('/')})`, s);
+        dit(s.barV.length === 1 && /€/.test(s.barV[0]), `S ${T} : le montant écrit au-dessus d’UNE barre seulement (« ${s.barV.join(' | ')} »)`, s.barV);
+        dit(s.vMarge.length >= 1 && s.vMarge.some((x) => x.a === '6000' && x.m === '6900' && /acheté 60/.test(x.t) && /\+69/.test(x.t)), `S ${T} : « acheté 60 € → +69 € » sur la vente au prix d’achat connu, rien sur les autres (${s.vMarge.length})`, s.vMarge);
+        dit([...new Set(s.faitsH.map((f) => f.y))].every((y) => new Set(s.faitsH.filter((f) => f.y === y).map((f) => f.h)).size === 1), `F ${T} : les faits d’une même rangée ont la même hauteur (${s.faitsH.map((f) => f.h).join('/')})`, s.faitsH);
         dit(/reçus en/.test(s.affiche) && s.afficheTaille >= 56, `S ${T} : l’affiche « ${s.affiche} » en ${s.afficheTaille} px`, s.affiche);
         dit(s.graphe != null && s.graphe <= 80, `S ${T} : le graphe tient en ${s.graphe} px (≤ 80)`, s.graphe);
-        dit(s.faits === 4, `S ${T} : 4 faits (disponible, en attente, bénéfice, coûts saisis)`, s.faits);
+        dit(s.faits === 4 && s.faitsTiret === 0, `S ${T} : 4 faits (disponible, en attente, bénéfice, coûts saisis) — aucune carte « — » (un fait pas su est nommé sur une ligne)`, s);
         dit(s.vers > 0 && s.versN === s.versNum, `S ${T} : ${s.vers} versements en rangées, l’étiquette N° sur les ${s.versN} qui ont un N°`, s);
         dit(!s.ancienVisible, `S ${T} : l’écran d’hier (les quatre réponses) n’est pas montré en double`);
         dit(!s.encaisse && !s.auMoins0 && !s.nan, `S ${T} : jamais « encaissé », jamais « au moins 0 », ni NaN`, s);
         const mm = await mesurer(pg, `Mois ${T}`, ZONES_ARGENT);
         dit(apres.geste != null ? mm.pleins.length === 1 : mm.pleins.length === 0, `P Mois ${T} : ${apres.geste != null ? 'exactement UN' : 'aucun'} bouton plein (${mm.pleins.join(' | ') || 'aucun'})`, mm.pleins);
         await capture(pg, `argent-mois-${W}-${th}`);
-        if (tel) { await pg.evaluate(() => { const l = document.querySelector('.v2-ar-liste'); if (l) l.scrollIntoView({ block: 'end' }); }); await pg.waitForTimeout(300); await pg.screenshot({ path: path.join(SHOTS, `argent-mois-bas-${W}-${th}.png`) }); }
+        // ── Q · QUALITÉ ET FLUIDITÉ ──
+        // Q1 la réponse au toucher : un fait enfoncé change de fond en moins de 100 ms (sans déclencher le geste).
+        const bF = await pg.$('[data-v2-argent-fait]'); const rF = bF && await bF.boundingBox();
+        const fondDe = () => pg.evaluate(() => getComputedStyle(document.querySelector('[data-v2-argent-fait]')).backgroundColor);
+        let q1 = null;
+        if (rF) { const a = await fondDe(); await pg.mouse.move(rF.x + 20, rF.y + 20); await pg.mouse.down(); await pg.waitForTimeout(60); const p = await fondDe(); await pg.mouse.move(2, 2); await pg.mouse.up(); q1 = { a, p }; }
+        dit(q1 && q1.a !== q1.p, `Q ${T} : un fait répond au toucher en < 100 ms (fond ${q1 && q1.a} → ${q1 && q1.p})`, q1);
+        // Q2 finition : tailles de texte et rayons du nouvel écran.
+        const fin = await pg.evaluate(() => {
+          const z = [...document.querySelectorAll('.v2-argent, .v2-argent-nav')]; const vis = (e) => e.getClientRects().length;
+          const tailles = new Set(), rayons = new Set();
+          for (const e of z.flatMap((x) => [x, ...x.querySelectorAll('*')]).filter(vis)) { if ([...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) tailles.add(parseFloat(getComputedStyle(e).fontSize)); }
+          for (const e of document.querySelectorAll('.v2-ar-faits, .v2-ar-liste, .v2-ar-vide, .v2-argent-nav .v2-seg, .v2-ar-geste button')) rayons.add(parseFloat(getComputedStyle(e).borderTopLeftRadius));
+          return { tailles: [...tailles].sort((a, b) => a - b), rayons: [...rayons].sort((a, b) => a - b) };
+        });
+        dit(fin.tailles.every((t) => [10, 13, 14, 15, 17, 22, 32, 34, 56].includes(t)), `Q ${T} : texte en 13 · 15 · 17 (+ chiffres 22 · 56, étiquette 10/14) — ${fin.tailles.join(', ')}`, fin.tailles);
+        dit(fin.rayons.every((r) => [12, 14, 20].includes(r)), `Q ${T} : rayons des cartes et contrôles ∈ {12, 14, 20} — ${fin.rayons.join(', ')}`, fin.rayons);
+        // Q3 mouvement réduit : ni fondu d'arrivée, ni reflet du squelette.
+        await pg.emulateMedia({ reducedMotion: 'reduce' });
+        const rm = await pg.evaluate(() => getComputedStyle(document.querySelector('.v2-ar-mois')).animationName);
+        await pg.emulateMedia({ reducedMotion: 'no-preference' });
+        dit(rm === 'none', `Q ${T} : mouvement réduit respecté (animation « ${rm} »)`, rm);
+        // Q4 la tête défilée : une barre de verre PLEINE LARGEUR, jamais un bloc posé sur le contenu.
+        if (tel) {
+          await pg.evaluate(() => { const l = document.querySelector('.v2-ar-liste') || document.querySelector('.v2-ar-vide'); if (l) l.scrollIntoView({ block: 'end' }); }); await pg.waitForTimeout(500);
+          const td = await pg.evaluate(() => { const h = document.querySelector('.vrm-app-header'); if (!h) return null; const r = h.getBoundingClientRect(); const cs = getComputedStyle(h); const m = cs.backgroundColor.match(/[\d.]+/g) || []; return { defile: h.classList.contains('is-defile'), l: Math.round(r.left), w: Math.round(r.width), W: innerWidth, a: m.length > 3 ? Number(m[3]) : 1, flou: cs.backdropFilter || cs.webkitBackdropFilter || '' }; });
+          dit(td && td.defile && td.l === 0 && td.w === td.W && td.a >= 0.7 && /blur/.test(td.flou), `Q ${T} : défilée, la tête est une barre de verre pleine largeur (${td && td.w}/${td && td.W} px, opacité ${td && td.a})`, td);
+          await pg.screenshot({ path: path.join(SHOTS, `argent-mois-bas-${W}-${th}.png`) });
+        }
+        // Q5 changer de segment : jamais d'écran blanc, aucun saut de mise en page (CLS hors geste = 0).
+        await pg.evaluate(() => { window.scrollTo(0, 0); for (const e of document.querySelectorAll('.vrm-main, .vrm-main *')) if (e.scrollTop) e.scrollTop = 0; }); await pg.waitForTimeout(700);
+        await pg.evaluate(() => { window.__cls = 0; try { new PerformanceObserver((l) => { for (const e of l.getEntries()) if (!e.hadRecentInput) { window.__cls += e.value; (window.__clsSrc = window.__clsSrc || []).push(Math.round(e.startTime) + ' ' + e.value.toFixed(4) + ' ' + (e.sources || []).map((x) => x.node ? (x.node.className || x.node.nodeName) + '' : '?').map((t) => String(t).slice(0, 50)).join(' + ')); } }).observe({ type: 'layout-shift' }); } catch (_) { window.__cls = null; } window.scrollTo(0, 0); for (const e of document.querySelectorAll('.vrm-main, .vrm-main *')) if (e.scrollTop) e.scrollTop = 0; });
+        await pg.waitForTimeout(300);
+        await pg.click('.v2-argent-nav [data-section="declarer"]');
+        await pg.waitForTimeout(120);
+        const blanc = await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); return !m || (m.innerText || '').trim().length < 20 || !document.querySelector('.v2-argent-nav'); });
+        await pg.waitForTimeout(2800);
+        const cls = await pg.evaluate(() => window.__cls); const clsSrc = await pg.evaluate(() => window.__clsSrc || []);
+        dit(!blanc, `Q ${T} : Mois → Déclarer sans écran blanc (120 ms après le toucher)`);
+        dit(cls != null && cls < 0.01, `Q ${T} : Mois → Déclarer, CLS hors geste ${cls == null ? '—' : cls.toFixed(4)}`, clsSrc);
         // Déclarer
         await aller(pg, 'argent_declarer', 3400);
         const dcl = await lireApres(pg);
         dit(avant.apayer != null && dcl.apayer === avant.apayer && dcl.ca === avant.ca, `F ${T} : URSSAF — à payer ${dcl.apayer} et chiffre d’affaires ${dcl.ca}, ceux d’hier`, { avant: [avant.apayer, avant.ca], apres: [dcl.apayer, dcl.ca] });
-        const segD = await pg.evaluate(() => { const b = document.querySelector('.v2-argent-nav [aria-pressed="true"]'); return b ? b.getAttribute('data-section') : null; });
+        const segD = await pg.evaluate(() => { const b = document.querySelector('.v2-argent-nav [aria-selected="true"]'); return b ? b.getAttribute('data-section') : null; });
         dit(segD === 'declarer', `S ${T} : sur Déclarer, « Déclarer » allumé`, segD);
         const md = await mesurer(pg, `Déclarer ${T}`, ZONES_ARGENT);
         dit(md.pleins.length <= 1, `P Déclarer ${T} : au plus un bouton plein (${md.pleins.join(' | ') || 'aucun'})`, md.pleins);
         await capture(pg, `argent-declarer-${W}-${th}`);
         // Factures
         await aller(pg, 'invoices', 3000);
-        const segF = await pg.evaluate(() => { const b = document.querySelector('.v2-argent-nav [aria-pressed="true"]'); return b ? b.getAttribute('data-section') : null; });
+        const segF = await pg.evaluate(() => { const b = document.querySelector('.v2-argent-nav [aria-selected="true"]'); return b ? b.getAttribute('data-section') : null; });
         dit(segF === 'factures', `S ${T} : sur Factures, « Factures » allumé`, segF);
-        await mesurer(pg, `Factures ${T}`, ZONES_ARGENT);
+        const fa = await pg.evaluate(() => { const vis = (e) => !!e && e.getClientRects().length > 0; const p = document.querySelector('[data-v2-principal="facture"]');
+          return { plein: vis(p) ? Math.round(p.getBoundingClientRect().top) : null, champs: [...document.querySelectorAll('.v2-fac-outils input')].filter(vis).length, chercher: [...document.querySelectorAll('.v2-fac button')].filter((b) => /^Chercher$/.test(b.textContent.trim())).length,
+            zones: document.querySelectorAll('[data-fac-zones] .v2-seg-btn').length, vide: vis(document.querySelector('.v2-fac-vide')), ancienne: !!document.querySelector('.v2-fac .vrm-screen-head, .v2-fac [data-fac-actions]') }; });
+        dit(fa.plein != null && fa.plein < 200 && fa.champs === 1 && fa.chercher === 0 && fa.zones === 2 && fa.vide && !fa.ancienne, `S ${T} : Factures — « Nouvelle facture » sur la ligne du titre, UNE recherche, UN segmenté En attente · Comptabilisées, un état vide dessiné`, fa);
+        const mfa = await mesurer(pg, `Factures ${T}`, ZONES_ARGENT + ', .v2-fac > header, .v2-fac-outils, [data-fac-zones], .v2-fac-vide');
+        dit(mfa.pleins.length === 1, `P Factures ${T} : exactement UN plein (${mfa.pleins.join(' | ')})`, mfa.pleins);
         await capture(pg, `argent-factures-${W}-${th}`);
         // Statistiques
         await aller(pg, 'dashboard', 3600);
         const venduApres = await lireVendu(pg);
         dit(venduAvant != null && venduApres === venduAvant, `F ${T} : VENDU — « Comparer » de Statistiques identique (${venduAvant})`, { venduAvant, venduApres });
-        const segS = await pg.evaluate(() => { const b = document.querySelector('.v2-argent-nav [aria-pressed="true"]'); return b ? b.getAttribute('data-section') : null; });
+        const segS = await pg.evaluate(() => { const b = document.querySelector('.v2-argent-nav [aria-selected="true"]'); return b ? b.getAttribute('data-section') : null; });
         dit(segS === 'stats', `S ${T} : sur Statistiques, « Statistiques » allumé`, segS);
         await mesurer(pg, `Statistiques ${T}`, ZONES_ARGENT);
         await capture(pg, `argent-stats-${W}-${th}`);
@@ -219,13 +281,16 @@ const ZONES_ARGENT = '.v2-argent, .v2-argent-nav, .vrm-screen-head:has(.v2-argen
           const pm = await pg.evaluate(() => {
             const r = document.querySelector('[data-v2-parametres]'); if (!r) return null;
             const hs = [...r.querySelectorAll('.v2-pm-h')].map((h) => ({ t: h.textContent.trim(), fs: parseFloat(getComputedStyle(h).fontSize), fw: Number(getComputedStyle(h).fontWeight) }));
-            const rangs = [...r.querySelectorAll('.v2-pm-liste .vrm-set-ligne')];
+            const rangs = [...r.querySelectorAll('.v2-pm-liste .v2-pm-rangee')];
             const sep = rangs.filter((x) => x.previousElementSibling).map((x) => { const b = getComputedStyle(x, '::before'); return parseFloat(b.left); });
-            return { hs, n: rangs.length, petits: rangs.filter((x) => x.offsetHeight < 44).length, ic: rangs.filter((x) => x.querySelector('.vrm-pm-cat-ic svg')).length, chev: rangs.filter((x) => x.querySelector('.vrm-set-chev')).length, val: rangs.filter((x) => x.querySelector('.vrm-set-val')).length, sep };
+            return { hs, n: rangs.length, petits: rangs.filter((x) => x.offsetHeight < 44).length, ic: rangs.filter((x) => x.querySelector('.v2-pm-ic svg, .v2-pm-av')).length, chev: rangs.filter((x) => x.querySelector('.v2-pm-chev svg')).length, val: rangs.filter((x) => x.querySelector('.v2-pm-val')).length, horsComposant: [...r.querySelectorAll('button')].filter((b) => !b.hasAttribute('data-v2-rangee') && !b.hasAttribute('data-v2b')).length, sep };
           });
           dit(pm && pm.hs.length >= 2 && pm.hs.every((h) => h.fs === 13 && h.fw === 600), `R ${T} : Paramètres en sections, en-têtes 13/600 (${pm ? pm.hs.map((h) => h.t).join(' · ') : '—'})`, pm);
-          dit(pm && pm.n >= 6 && pm.petits === 0 && pm.ic === pm.n && pm.chev === pm.n, `R ${T} : ${pm ? pm.n : 0} rangées ≥ 44 px, chacune icône + nom + chevron (${pm ? pm.val : 0} avec leur valeur)`, pm);
+          dit(pm && pm.n >= 6 && pm.petits === 0 && pm.ic === pm.n && pm.chev === pm.n && pm.horsComposant === 0, `R ${T} : ${pm ? pm.n : 0} rangées ≥ 44 px (composant RangeeTouchable), chacune icône + nom + chevron (${pm ? pm.val : 0} avec leur valeur)`, pm);
           dit(pm && pm.sep.length && pm.sep.every((x) => x >= 40), `R ${T} : séparateurs indentés (à ${pm && pm.sep[0]} px)`, pm && pm.sep);
+          const pt = await pg.evaluate(() => { const vis = (e) => !!e && e.getClientRects().length > 0; const i = document.querySelector('[data-recherche-reglages] input, input[data-recherche-reglages]');
+            return { loupe: [...document.querySelectorAll('[data-recherche-loupe]')].filter(vis).length, profil: [...document.querySelectorAll('.vrm-app-header [data-profil-tete], .vrm-app-header .vrm-profil-tete')].filter(vis).length, ph: i ? i.getAttribute('placeholder') : null, phCoupe: i ? i.scrollWidth > i.clientWidth + 1 : null }; });
+          dit(pt.loupe === 0 && pt.ph === 'Chercher un réglage', `R ${T} : Paramètres sans la rangée de ronds d’hier, recherche « ${pt.ph} »`, pt);
           await mesurer(pg, `Paramètres ${T}`, '[data-v2-parametres]');
           await capture(pg, `parametres-${W}-${th}`);
           // L'interrupteur « Nouveau design (essai) » : Apparence et langue → Apparence.

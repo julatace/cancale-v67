@@ -24322,7 +24322,7 @@ function ArgentNav({ seg, setTab, comptes = null, panelOff = null }) {
           {sous ? <span className="v2-menu-sous">{sous}</span> : null}
           <span className="v2-menu-fleche" aria-hidden="true"><Icon name="chevron" size={14}/></span>
         </button>
-        <Segmente label={tr('v2.ar.segments')} plein className="v2-argent-seg" value={seg} onChange={(id) => { if (id !== seg) setTab(ONGLET_SEGMENT[id] || 'argent'); }}
+        <SegmentV2 label={tr('v2.ar.segments')} value={seg} onChange={(id) => { if (id !== seg) setTab(ONGLET_SEGMENT[id] || 'argent'); }} attrs={{ 'data-v2-argent-seg': seg }}
           options={SEGMENTS_ARGENT.map((x) => ({ v: x.id, l: tr('v2.ar.seg.' + x.id), data: { 'data-section': x.id, 'aria-current': x.id === seg ? 'page' : undefined } }))}/>
       </div>
     );
@@ -62106,7 +62106,7 @@ function AppCoeur() {
   // (17 nov., nouveau design) Annonces au téléphone : la tête de la coque ne prend plus de bande (la cloche seule, sur la ligne du
   // titre ; la recherche est le champ de l'écran ; le profil est ailleurs — Paramètres par le menu ☰ et les autres écrans).
   // (17 nov., phase 2) Argent aussi : la cloche se pose sur la ligne du grand titre, la tête ne prend plus de bande.
-  const v2Ann = designV2App && !ordi && (tab === 'annonces' || tab === 'compta' || tab === 'dashboard');
+  const v2Ann = designV2App && !ordi && (tab === 'annonces' || tab === 'compta' || tab === 'dashboard' || tab === 'settings');
   // (6 nov.) L'écran ouvert et celui d'avant, pour « Signaler un problème ».
   noterEcranVu(tab);
   // (6 nov., v36) Et pour les temps réels : une visite d'écran par onglet ouvert.

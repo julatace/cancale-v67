@@ -34,5 +34,11 @@ export default {
   },
   "v2.pm.compte": "Account",
   "v2.pm.reglages": "Impostazioni",
-  "v2.pm.avance": "Avanzate"
+  "v2.pm.avance": "Avanzate",
+  "v2.fac.nouvelle": "Fattura",
+  "v2.ar.achete": "acquistato {p}",
+  "v2.ar.lecture": "Lettura dei versamenti…",
+  "v2.pm.chercher": "Cerca un’impostazione",
+  "v2.ar.pasEncoreLu": "Non ancora letto: {quoi}",
+  "v2.fac.chercher": "N. articolo o data di vendita"
 };

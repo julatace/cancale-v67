@@ -34,5 +34,11 @@ export default {
   },
   "v2.pm.compte": "Konto",
   "v2.pm.reglages": "Einstellungen",
-  "v2.pm.avance": "Erweitert"
+  "v2.pm.avance": "Erweitert",
+  "v2.fac.nouvelle": "Rechnung",
+  "v2.ar.achete": "gekauft {p}",
+  "v2.ar.lecture": "Auszahlungen werden gelesen…",
+  "v2.pm.chercher": "Einstellung suchen",
+  "v2.ar.pasEncoreLu": "Noch nicht gelesen: {quoi}",
+  "v2.fac.chercher": "Artikel-Nr. oder Verkaufsdatum"
 };

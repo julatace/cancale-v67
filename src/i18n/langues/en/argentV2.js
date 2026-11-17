@@ -34,5 +34,11 @@ export default {
   },
   "v2.pm.compte": "Account",
   "v2.pm.reglages": "Settings",
-  "v2.pm.avance": "Advanced"
+  "v2.pm.avance": "Advanced",
+  "v2.fac.nouvelle": "Invoice",
+  "v2.ar.achete": "bought {p}",
+  "v2.ar.lecture": "Reading payouts…",
+  "v2.pm.chercher": "Search settings",
+  "v2.ar.pasEncoreLu": "Not read yet: {quoi}",
+  "v2.fac.chercher": "Item no. or sale date"
 };
