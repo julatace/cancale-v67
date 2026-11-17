@@ -23,7 +23,8 @@
 //  V. VIDE : une étiquette sans code pendant 4 s : images analysées par seconde et fil de l'écran bloqué.
 //  PARTOUT : la fiche est celle de l'identité EXACTE (jamais une voisine), aucune erreur, aucune image envoyée.
 // SEUILS (rouges sur main, voir docs/passation/2026-11-17-scan-instantane.md) : SCAN_SEUILS=0 pour mesurer seulement.
-// Le temps se juge sur une machine qui respire (charge par cœur ≤ 1,5), sinon il est DIT (⚠️), pas jugé.
+// Un TEMPS se juge sur une machine qui respire (charge par cœur ≤ 1,5), sinon il est DIT (⚠️), pas jugé ; une capacité
+// (taille lue, fiche rouverte, écran bloqué par seconde) est jugée toujours.
 // Modules : bwip-js et @zxing/library@0.20.0 (le lecteur d'avant, servi à l'adresse que la CSP autorise) :
 //   npm i --prefix <dossier> bwip-js @zxing/library@0.20.0, puis BANC_MODULES=<dossier>/node_modules
 // Lancer : construire dist/, puis node scripts/bancs/scan-instantane.cjs   (BANC_PORT, SHOTS, BANC_DIST, SCAN_SCENES=NODV)
@@ -65,6 +66,8 @@ const juge = (c, m, d) => {
   if (!c && ch > 1.5) { console.log(`  ⚠️  ${m} — non jugé : machine chargée (${ch.toFixed(1)} par cœur)`); return; }
   dit(c, m, d);
 };
+// Une CAPACITÉ (la taille lue, la fiche rouverte, l'écran figé) ne dépend pas de la charge : jugée toujours.
+const jugeToujours = (c, m, d) => { console.log(`     ${m} : ${d}`); if (JUGER) dit(c, m, d); };
 const essaie = async (nom, f) => { try { await f(); } catch (e) { dit(false, nom, String(e.message || e).slice(0, 240)); } };
 
 // ── Les modules du banc ──────────────────────────────────────────────────────
@@ -398,7 +401,7 @@ const shot = async (pg, q) => { if (SHOTS) await pg.screenshot({ path: path.join
       mesures.ouvrir = { ...o, t0: undefined, bloque: bl, longues: L.filter(([st, du]) => st + du > o.t0 && st < o.t0 + 1500).map(([st, du]) => [Math.round(st - o.t0), du]) };
       dit(o.fiche != null && o.remplie != null && o.marque != null && o.encore, 'O : « Ouvrir la vente » ⇒ LA fiche de CETTE vente (N° 31), remplie par sa ligne, la ligne marquée dessous', JSON.stringify(o));
       juge(o.fiche != null && o.fiche <= SEUIL.ouvrirMs, `O : la fiche de la vente à l’écran ≤ ${SEUIL.ouvrirMs} ms`, `${o.fiche} ms (remplie : ${o.remplie} ms ; ligne marquée : ${o.marque} ms)`);
-      juge(o.ouvertures <= SEUIL.ouvertures, 'O : la fiche ne se rouvre pas (au plus : ouverte, puis devenue celle de la ligne)', `${o.ouvertures} ouverture(s) en 3,6 s`);
+      jugeToujours(o.ouvertures <= SEUIL.ouvertures, 'O : la fiche ne se rouvre pas (au plus : ouverte, puis devenue celle de la ligne)', `${o.ouvertures} ouverture(s) en 3,6 s`);
       // Dit, pas jugé : la première image de la fiche (son rendu React) domine, et varie avec la charge de la machine.
       console.log(`     O : le plus long blocage de l’écran pendant l’ouverture : ${bl.max} ms (${bl.n} tâches longues, ${bl.total} ms au-delà de 50 ms)`);
       dit(lourdes.length === n0, 'O : aucune lecture lourde (select=data sur ventes ou bordereaux) en ouvrant', lourdes.slice(n0, n0 + 2).join(' '));
@@ -413,7 +416,7 @@ const shot = async (pg, q) => { if (SHOTS) await pg.screenshot({ path: path.join
         const px = i >= 0 ? TAILLES[i] : null;
         mesures['distance' + cle] = { px, ms: m.lecture, suivi: e.suivi };
         dit(e.resultat === 'aucun' && i >= 0, `D ${cle} : un n° de la vidéo lu, jamais une vente (aucun de ces n° n’est dans VRM)`, JSON.stringify({ e, m }));
-        juge(px != null && px <= seuil, `D ${cle} : lu dès ${seuil} px par module (de plus loin)`, `${px} px par module (caméra active ⇒ lu : ${m.lecture} ms)`);
+        jugeToujours(px != null && px <= seuil, `D ${cle} : lu dès ${seuil} px par module (de plus loin)`, `${px} px par module (caméra active ⇒ lu : ${m.lecture} ms)`);
         if (cle === '128') await shot(pg, '3-distance');
       });
     }
@@ -428,7 +431,7 @@ const shot = async (pg, q) => { if (SHOTS) await pg.screenshot({ path: path.join
       const ips = Math.round((r.n / s) * 10) / 10, bps = Math.round(bl.total / s);
       mesures.vide = { ips, bloqueParSec: bps, max: bl.max };
       juge(ips >= SEUIL.imagesSec, `V : images analysées par seconde ≥ ${SEUIL.imagesSec}`, `${ips} /s`);
-      juge(bps <= SEUIL.bloqueParSec, `V : fil de l’écran bloqué ≤ ${SEUIL.bloqueParSec} ms par seconde`, `${bps} ms/s (plus longue tâche ${bl.max} ms)`);
+      jugeToujours(bps <= SEUIL.bloqueParSec, `V : fil de l’écran bloqué ≤ ${SEUIL.bloqueParSec} ms par seconde`, `${bps} ms/s (plus longue tâche ${bl.max} ms)`);
       const e = await etat(pg);
       dit(!e.resultat && e.camera === 'active', 'V : sans code, aucune fiche, la caméra continue', JSON.stringify(e));
       await shot(pg, '4-vise');
