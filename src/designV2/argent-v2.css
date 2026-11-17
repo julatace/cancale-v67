@@ -166,7 +166,7 @@ html body button.v2-rangee.v2-ar-v:active { background: rgb(18 52 96 / .06); tra
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, .vrm-finance-page) .vrm-b-primaire:not([data-urssaf-cest-declare]),
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent button.vrm-urssaf-copier { background: var(--v2-teinte-fond) !important; background-image: none !important; color: var(--v2-teinte-texte) !important; box-shadow: none !important; border-color: transparent !important; }
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent button.vrm-urssaf-copier { min-height: 44px !important; border-radius: 12px !important; }
-:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-argent-nav .v2-seg-btn { padding: 0 4px !important; font-size: 13px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-argent-nav .v2-seg-btn { flex: 1 1 0 !important; min-width: 0 !important; padding: 0 4px !important; font-size: 13px !important; }
 /* Grand texte : le segmenté passe en 2 × 2 (Argent) ou en colonne (Factures) — jamais un segment rogné. */
 :root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body .v2-argent-nav .v2-seg { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
 :root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body [data-fac-zones].v2-seg { display: grid !important; grid-template-columns: minmax(0, 1fr) !important; }
