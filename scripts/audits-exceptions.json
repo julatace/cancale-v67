@@ -19,9 +19,9 @@
     {
       "banc": "ventes-e2",
       "navigateur": "webkit",
-      "raison": "rouge sur main sous WebKit (CI du 16 nov., PR #1222) — la plupart aussi rouges sous Chromium ; réparés par #1203 (bancs-rouges-b), #1204 (bancs-rouges-a), #1215 (derniers-rouges). Retirer dès « exception à retirer ».",
+      "raison": "rouge sur main sous WebKit (CI du 16 nov., PR #1222) — la plupart aussi rouges sous Chromium ; réparés par #1203 (bancs-rouges-b), #1204 (bancs-rouges-a), #1215 (derniers-rouges). Retirer dès « exception à retirer ». Depuis la fusion de main du 16 nov. au soir (#1202 « Ventes plus clair » : les cartes d’info repliées sous « N choses à regarder ») : le scénario « annul » ne trouve plus la ligne « 50 % d’annulations » — à porter par le lot qui répare ventes-e2.",
       "depuis": "2026-11-16",
-      "rouges": "^(G \\[gros 390px clair\\] Tous : titre très long à la ligne, prix « 249,50 € » entier|G \\[gros 390px sombre\\] Tous : titre très long à la ligne, prix « 249,50 € » entier|V7 \\[jeu 390px sombre\\] Vinted : chaque N° est `Numero` \\(8\\), jamais blanc en sombre)( — |$)"
+      "rouges": "^(A \\[annul 390px clair\\] un compte à 50 % d’annulations contre 0 % : dit UNE fois \\(vendeuse_b, 3 sur 6\\)|A \\[annul 390px sombre\\] un compte à 50 % d’annulations contre 0 % : dit UNE fois \\(vendeuse_b, 3 sur 6\\)|G \\[gros 390px clair\\] Tous : titre très long à la ligne, prix « 249,50 € » entier|G \\[gros 390px sombre\\] Tous : titre très long à la ligne, prix « 249,50 € » entier|V0 \\[annul 390px clair\\] le passage a pu aller au bout|V0 \\[annul 390px sombre\\] le passage a pu aller au bout|V7 \\[jeu 390px sombre\\] Vinted : chaque N° est `Numero` \\(8\\), jamais blanc en sombre)( — |$)"
     },
     {
       "banc": "colis-retirer-propre",
