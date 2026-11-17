@@ -146,6 +146,7 @@ const InfosSms = aLaDemandeDiscret(() => import('./InfosSms.jsx'));
 import {indexCodesSuivis, finParIdentite, fusionnerParCode, suivisLiesDuColis} from './retraitPreuves.js';
 import { revenirSurOnglet, prendreRetourOnglet, positionAOuvrir, cleDefilement } from './defilementNavigation.js';
 import { statutAVerifier } from './statutAVerifier.js';
+import { garderSelonAnnules, nombreAnnules, FILTRE_ANNULES } from './achatsAnnules.js';
 import {etatRepliRetirer, choixApresBascule} from './repliRetirer.js';
 import { finDatee, texteSortie, sortiRecent, pourquoiPasLu, SORTIS_JOURS, jourCourt as jourCourtParis } from './retraitSuivi.js';
 import {arriveesRelues} from './arriveesRelues.js';
@@ -10905,7 +10906,7 @@ function etapeAchat(o, tk, { fini = false, retour = false } = {}) {
   //    Motif précis (comme venteStage) pour ne pas attraper « Retournée à
   //    l'expéditeur », qui est autre chose.
   if (ACHAT_A_RENVOYER.test(s)) return { label: 'À renvoyer', step: 1, color: C.warn, retour: true };
-  if (/annul|rembours|refus/i.test(s)) return { label: 'Annulé', step: 0, color: C.danger };
+  if (achatAnnule(o)) return { label: 'Annulé', step: 0, color: C.danger };   // (17 nov.) la règle de src/registres.js, la même que le filtre « Annulés »
   // (5 nov.) Mots retenus (revue du 5 nov.) : « Arrivé » (« Reçu » est réservé à l'argent),
   // « En route ». Et « à retirer » SEULEMENT si la règle des colis à retirer le compte
   // (`pickupUnion`) : un achat que Vinted dit encore « déposé » mais dont le transporteur
@@ -42324,6 +42325,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     let arr = buysBase
     .filter(o => { const p = phaseReception(o);
       if (aFilter === 'attente') return false;
+      // (17 nov., chasse-bugs — Julien : « je veux pas voir les achats annulés sauf si je les sélectionne ») : affichage seul.
+      if (!garderSelonAnnules(o, aFilter)) return false;
+      if (aFilter === FILTRE_ANNULES) return true;
       if (aFilter === 'route') return p === 'route';
       if (aFilter === 'recus') return p === 'recu';
       return true; })
@@ -51966,7 +51970,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // `data-n` reste (le nombre de l'onglet, pour qui le lit).
             const surCarte = (dansPlateforme && !baseKO) ? idsCarteAchats() : null;
             const dejaDit = (id) => !!surCarte && surCarte.has(id === 'route' ? 'enroute' : id);
-            return [...(modeListeAchats?[]:[['attente','À retirer',tracking===null?'—':pickupUnion.total]]),['route','En route',n.route],['recus','Arrivés',n.recu],['all','Tous',null]].map(([id,label,cnt])=>(
+            return [...(modeListeAchats?[]:[['attente','À retirer',tracking===null?'—':pickupUnion.total]]),['route','En route',n.route],['recus','Arrivés',n.recu],['all','Tous',null],[FILTRE_ANNULES,tr('achats.filtreAnnules'),nombreAnnules(buysBase)]].map(([id,label,cnt])=>(
             <button type="button" key={id} className="vrm-seg-btn" data-achats-onglet={id} data-n={cnt==null?undefined:String(cnt)} onClick={()=>setAFilter(id)} aria-pressed={aFilter===id} aria-label={cnt?`${label} ${cnt}`:undefined} style={{whiteSpace:'nowrap'}}>{label}{cnt&&!dejaDit(id)?<span className="vrm-seg-n" title={String(cnt)}> {cnt>=1000?`${(Math.floor(cnt/100)/10).toLocaleString('fr-FR')} k`:cnt}</span>:null}</button>
           )); })()}
         </div>

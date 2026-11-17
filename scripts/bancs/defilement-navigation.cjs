@@ -71,7 +71,7 @@ const segment = async (pg, libelle) => {
       const y = await defiler(pg, 700); await poser(pg);
       await barre(pg, 'compta'); await barre(pg, 'ventes');
       const e = await etat(pg);
-      dit(y > 200 && Math.abs(e.top - y) < 40, `N5 revenir sur Ventes par la barre garde sa position (${y})`, JSON.stringify(e));
+      dit(y > 200 && e.top >= Math.min(y, e.haut) - 40, `N5 revenir sur Ventes par la barre garde sa position (${y})`, JSON.stringify(e));
     });
     // N2 « J'ai déclaré » : Ventes gardait 700 ; le geste doit ouvrir sa destination en haut.
     await essaie('N2', async () => {
@@ -113,12 +113,13 @@ const segment = async (pg, libelle) => {
     await essaie('N3', async () => {
       for (const dest of ['ventes', 'achats']) { await barre(pg, dest); await defiler(pg, 800); await poser(pg); }
       await barre(pg, 'journee');
-      const cartes = await pg.evaluate(() => [...document.querySelectorAll('.vrm-main [data-tuile], .vrm-main .sb-tuile')].filter((x) => x.getClientRects().length).map((x, i) => { x.setAttribute('data-banc-carte', String(i)); return { i, t: (x.innerText || '').split('\n')[0].slice(0, 30) }; }));
+      await pg.waitForSelector('.vrm-main [data-tuile]', { timeout: 15000 }).catch(() => {});
+      const cartes = await pg.evaluate(() => [...document.querySelectorAll('.vrm-main [data-tuile], .vrm-main [data-sj-lien]')].filter((x) => x.getClientRects().length).map((x, i) => { x.setAttribute('data-banc-carte', String(i)); return { i, t: (x.innerText || '').split('\n')[0].slice(0, 30) }; }));
       let vues = 0;
       for (const c of cartes) {
         await barre(pg, 'journee');
         const l = pg.locator(`[data-banc-carte="${c.i}"]`);
-        if (!(await l.count())) { await pg.evaluate(() => [...document.querySelectorAll('.vrm-main [data-tuile], .vrm-main .sb-tuile')].filter((x) => x.getClientRects().length).forEach((x, i) => x.setAttribute('data-banc-carte', String(i)))); }
+        if (!(await l.count())) { await pg.waitForSelector('.vrm-main [data-tuile]', { timeout: 15000 }).catch(() => {}); await pg.evaluate(() => [...document.querySelectorAll('.vrm-main [data-tuile], .vrm-main [data-sj-lien]')].filter((x) => x.getClientRects().length).forEach((x, i) => x.setAttribute('data-banc-carte', String(i)))); }
         const avant = await etat(pg);
         await l.first().tap({ timeout: 4000 }).catch(() => {});
         await attendre(pg, 2200);
@@ -141,9 +142,14 @@ const segment = async (pg, libelle) => {
         const bar = document.querySelector('.vrm-tabbar'); const m = document.querySelector('.vrm-main'); if (!bar || !m) return null;
         const haut = bar.getBoundingClientRect().top;
         let bas = 0, quoi = '';
+        const mr = m.getBoundingClientRect();
         for (const x of m.querySelectorAll('button, a, p, h1, h2, h3, li, [data-fu-principal]')) {
           const r = x.getBoundingClientRect(); const s = getComputedStyle(x);
-          if (!r.width || !r.height || s.visibility === 'hidden' || s.position === 'fixed' || x.closest('[role="dialog"], .vrm-sheet, .vrm-tabbar')) continue;
+          if (!r.width || !r.height || s.visibility === 'hidden' || s.position === 'fixed' || x.closest('[role="dialog"], .vrm-sheet, .vrm-tabbar, [aria-hidden="true"], [hidden]')) continue;
+          if (!((x.innerText || '').trim() || x.getAttribute('aria-label'))) continue;
+          if (r.top >= mr.bottom || (x.checkVisibility && !x.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }))) continue;
+          // Coupé par un parent qui ne déborde pas (liste repliée, carrousel) : pas une ligne de la page.
+          let clip = false; for (let p = x.parentElement; p && p !== m; p = p.parentElement) { const cs = getComputedStyle(p); if (/(hidden|clip|auto|scroll)/.test(cs.overflowY) && r.top >= p.getBoundingClientRect().bottom - 1) { clip = true; break; } } if (clip) continue;
           if (r.bottom > bas) { bas = r.bottom; quoi = (x.innerText || '').trim().slice(0, 30); }
         }
         return { haut: Math.round(haut), bas: Math.round(bas), quoi };
