@@ -218,6 +218,8 @@ import FeuilleLienVc from "./LienVestiaire.jsx";
 import { suggestionsAchat, tousAchatsLibres, tousAchatsLibresDetail, filtresAchats, etiquetteLot, liensParAchat, lotDe, prixIndicatifLot, ecritureLot, suggestionsSaisieSerie, tailleDuTitre } from "./suggestionsAchat.js";
 // (15 nov.) La liaison achat ⇄ article : l'affectation pondérée et globale (src/liaisonAchat.js).
 import { affecterPropositions, propositionsArticle, pistesArticle, publierAffectation, seriePropositions, aValider, morceauxPourquoi, couleursTexte, lectureAchat, cleArticleAnnonce, cleArticleVente, cleRefusLiaison } from "./liaisonAchat.js";
+import { SELECT_DETAILS_ACHATS, detailsDeLignes, sansTailleLue } from "./faitsAchat.js";   // (17 nov., lot relier-taille)
+import { FaitsAchat, NoteTailleAchats } from "./FaitsAchat.jsx";
 import { cibleVente, venteDeLaPaire } from "./ficheProduit.js";   // (15 nov.) la fiche d'un article, direction D : la cible de l'achat proposé
 // (6 nov., vitesse 2) AchatsOutils : à la demande ; ses feuilles de style restent ICI, à la même place (même ordre).
 import './styles-annonces-outils.css';
@@ -44474,6 +44476,25 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const receptionAchatMs = React.useCallback((a) => { const r = dateReception(a, { infosTx: infosReception, recuClic: pickupDone }); return r ? r.ms : null; }, [infosReception, pickupDone]);
   // « lecture » tant que les transactions des achats de la feuille ne sont pas lues.
   const receptionsRelierEtat = infosRelier === undefined ? 'lecture' : infosRelier === null ? 'pas-su' : 'lu';
+  // (17 nov., lot relier-taille — Julien : « pour relier les achats je veux qu'il y ait la taille ou une description à
+  //    côté des articles achetés ») CE QU'ON SAIT D'UN ACHAT : la taille et l'état LUS dans le détail de sa transaction
+  //    (`order.items[].size_title` / `.status`), son vendeur (`seller.login`) — src/faitsAchat.js. Lus UNE fois à
+  //    l'ouverture d'une feuille de liaison (« Relier un achat », Relier achats et ventes, colis à relier), projetés en
+  //    scalaires (§4.4 : jamais `select=data`), paginés (§4.5), seulement les détails côté ACHETEUR. Trois états :
+  //    undefined pas encore lu · null pas su · { tx: … }. Une lecture ratée ne montre rien (jamais « pas de taille »).
+  const [detailsAchats, setDetailsAchats] = useState(undefined);
+  const besoinDetailsAchats = !!(pickerFor || glisserOuvert || relierColis);
+  useEffect(() => {
+    if (!besoinDetailsAchats || detailsAchats !== undefined) return undefined;
+    let stop = false;
+    (async () => {
+      const rows = await lireTout(SELECT_DETAILS_ACHATS, { strict: true }).catch(() => null);
+      if (!stop) setDetailsAchats(detailsDeLignes(rows));
+    })();
+    return () => { stop = true; };
+  }, [besoinDetailsAchats, detailsAchats]);
+  // Relue à chaque nouvelle ouverture (une commande ouverte entre-temps sur vinted.fr a pu ranger sa taille).
+  useEffect(() => { if (!besoinDetailsAchats) setDetailsAchats(undefined); }, [besoinDetailsAchats]);
   const nArticlesTx = useMemo(() => { const m = {}; for (const [tx, i] of Object.entries(infosAchatsLues || {})) if (i && i.nb != null) m[tx] = i.nb; return m; }, [infosAchatsLues]);
   const estLotApp = (a) => estLotAchat(a, { nArticlesTx, declares: lotsDeclares });
   const estLotPropose = (a) => estLotApp(a) || !!(a && a.lot === true);
@@ -44837,9 +44858,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const out = [];
     for (const x of (fileAchat || [])) { const f = x.fiche || numeros[x.id] || {};
       out.push({ key: cleArticleAnnonce(x.id), genre: 'annonce', id: String(x.id), titre: (x.item && x.item.title) || '', photo: (x.item && x.item.photo) || '', num: f.numero ? String(f.numero) : '',
+        taille: String((x.item && (x.item.size || x.item.size_title)) || f.size || ''),   // (17 nov., lot relier-taille) « ✓ même taille »
         sous: [prixTxt(x.item && x.item.price), x.ts ? tr('liaison.enLigneLe', { date: jour(x.ts) }) : ''].filter(Boolean).join(' · ') }); }
     for (const x of (fileVendus || [])) {
       out.push({ key: x.key, genre: 'vente', tx: String(x.o.transaction_id), idf: x.idf || null, titre: x.o.title || '', photo: (x.cible && x.cible.photo) || '', num: x.fiche && x.fiche.numero ? String(x.fiche.numero) : '',
+        taille: String((x.cible && x.cible.taille) || (typeof x.o.size_title === 'string' ? x.o.size_title : '') || ''),
         sous: [prixTxt(x.o.price), x.o.date ? tr('liaison.venduLe', { date: jour(x.o.date) }) : ''].filter(Boolean).join(' · ') }); }
     return out;
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -56709,7 +56732,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {glisserOuvert ? <RelierGlisser C={C} achats={fillBuyAchats.loading && !fillBuyAchats.items ? undefined : (fillBuyAchats.items || (accounts.length ? undefined : []))} liens={liensAchats}
           tresProbables={liaison && liaison.parAchat ? liaison.parAchat : null} cibles={ciblesGlisser} prixDe={prixPayeAchat} compteDe={(a)=>accNameOf(a && a._acc)||''}
           photoDe={(a)=>orderPhoto(a)||''} tailleDe={(a)=>{ const t=tailleDuTitre(String((a&&a.title)||'')); return t ? t.replace('.', ',') : ''; }}
-          Photo={PhotoVinted} Icon={Icon} Retour={FermeAuRetour}
+          Photo={PhotoVinted} Icon={Icon} Retour={FermeAuRetour} details={detailsAchats} marqueDe={extractBrand} couleursDe={extractColors}
           onRelier={relierGlisse} onFermer={()=>setGlisserOuvert(false)} zIndex={1400} achatInitial={glisserOuvert.achat || ''} cibleInitiale={glisserOuvert.cible || ''}/> : null}
       {/* Modale : relier un achat (depuis Annonces) */}
       {pickerFor && createPortal(
@@ -56745,7 +56768,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 curTx={(entreePicker(pickerFor) || {}).buyFromId || ''} compteDe={(a)=>{ const st = siteDeAchat(a); return st === 'vinted' ? (accNameOf(a._acc)||'') : [st === 'leboncoin' ? 'Leboncoin' : 'Vestiaire', a.compteSite || ''].filter(Boolean).join(' · '); }} prixDe={prixPayeAchat} onRelier={relierAchat}
                 autre={!!pickerFor._autre} actuel={achatRelie(entreePicker(pickerFor))} onDelier={delierAchatPicker}
                 dejaRelie={(a)=>texteDejaRelie(detenteursAchat(a && a.transaction_id, { numeros, saleOv }))}
-                receptionDe={receptionAchatMs} receptionEtat={receptionsRelierEtat} onFiltres={()=>setBesoinInfosRelier(true)}/>
+                receptionDe={receptionAchatMs} receptionEtat={receptionsRelierEtat} onFiltres={()=>setBesoinInfosRelier(true)}
+                details={detailsAchats} marqueDe={extractBrand} couleursDe={extractColors}/>
             </div>
           </div>
         </div>, document.body)}
@@ -58552,6 +58576,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         <SheetShell onClose={() => setRelierColis(null)} titre={tr('achats.relier.titre')} sousTitre={[relierColis.nom, `n° ${relierColis.suivi}`].filter(Boolean).join(' · ')} maxWidth={520} z={Z_CONFIRMATION - 3}
           aria-label={tr('achats.relier.titre')} data-relier-colis={relierColis.suivi} data-relier-colis-n={vus ? vus.length : 'pas-su'}>
           <p className="vrm-aide" style={{ fontSize: 13, color: C.muted, margin: '0 0 10px', lineHeight: 1.45 }}>{tr('achats.relier.aide')}</p>
+          {detailsAchats && liste ? <NoteTailleAchats n={sansTailleLue(liste, detailsAchats)}/> : null}
           {liste === null ? <p data-relier-colis-pas-su="" style={{ fontSize: 13, color: C.warn }}>{tr('achats.relier.pasSu')}</p> : <>
             <input type="search" aria-label={tr('achats.relier.chercher')} placeholder={tr('achats.relier.chercher')} value={relierEtat.q} onChange={(e) => setRelierEtat((x) => ({ ...x, q: e.target.value }))} data-relier-colis-recherche=""
               style={{ width: '100%', minHeight: 44, boxSizing: 'border-box', border: `1px solid ${C.border}`, borderRadius: 12, padding: '0 12px', fontSize: 17, background: C.card, color: C.text, fontFamily: 'inherit', marginBottom: 8 }}/>
@@ -58563,7 +58588,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   {ph && !imgMortes.has(ph) ? <PhotoVinted src={ph} alt="" loading="lazy" onError={() => noterImgMorte(ph)} style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }}/> : <span style={{ width: 44, height: 44, borderRadius: 10, flexShrink: 0, background: C.card2 || C.bg, display: 'grid', placeItems: 'center', color: C.muted }}><Icon name="bag" size={18}/></span>}
                   <span style={{ minWidth: 0, flex: 1 }}>
                     <span style={{ display: 'block', fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{relierEtat.envoi === tx ? tr('achats.relier.enCours') : (o.title || 'Achat')}</span>
-                    <span style={{ display: 'block', fontSize: 12, color: C.muted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{[o._acc ? accName(o._acc) : '', o.date ? dateFr(o.date) : '', m > 0 ? m.toFixed(2).replace('.', ',') + '\u00a0€' : '', String(o.status || '').replace(/\s+-\s+.*/, '').slice(0, 60)].filter(Boolean).join(' · ')}</span>
+                    {/* (17 nov., lot relier-taille) La taille (lue chez Vinted, sinon celle du titre), l'état, le vendeur… */}
+                    <FaitsAchat achat={o} details={detailsAchats || null} marqueDe={extractBrand} couleursDe={extractColors}
+                      date={[o.date ? dateFr(o.date) : '', m > 0 ? m.toFixed(2).replace('.', ',') + '\u00a0€' : ''].filter(Boolean).join(' · ')}
+                      compte={[o._acc ? accName(o._acc) : '', String(o.status || '').replace(/\s+-\s+.*/, '').slice(0, 60)].filter(Boolean).join(' · ')}/>
                   </span>
                 </button>; })}
             </div>
