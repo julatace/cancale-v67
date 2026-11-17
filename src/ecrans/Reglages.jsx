@@ -165,7 +165,7 @@ import { ReglagesAidesAccueil } from '../accueilReste/AccueilReste.jsx';   // (1
 import MIGRATION_SQL from "../../supabase/migrations/001-multi-utilisateurs.sql?raw";
 import { accompagner } from '../accompagnement.js';   // (14 nov.) pendant, après, échec d'un geste (src/ui/Accompagne.jsx)
 import { useDesignV2, poserDesignV2 } from '../designV2/reglage.js';   // (17 nov.) « Nouveau design (essai) »
-import { useBarre, poserBarre, STYLES_BARRE, ApercuBarre } from '../designV2/barre.js';   // (17 nov.) « Barre d'onglets » : cinq styles
+import { useBarre, poserBarre, STYLES_BARRE, ApercuBarre } from '../designV2/barre.jsx';   // (17 nov.) « Barre d'onglets » : cinq styles
 
 // ⟦← App.jsx #10⟧
 const SuiviReceptionEmails = aLaDemande(() => import('../ReceptionEmails.jsx'));

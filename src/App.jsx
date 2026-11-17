@@ -1109,7 +1109,7 @@ import { BoutonV2, SegmentV2 } from "./designV2/BoutonV2.jsx";
 import { nombre as nombreV2 } from "./i18n/index.js";
 import LigneAnnonceV2 from "./designV2/LigneAnnonce.jsx";
 import { SqueletteRangees as SqueletteRangeesV2, QuandLu as QuandLuV2 } from "./designV2/Signature.jsx";
-import { reprendreBarre } from "./designV2/barre.js";   // (17 nov.) le style de la barre d'onglets, posé sur <html> dès l'import
+import { reprendreBarre } from "./designV2/barre.jsx";   // (17 nov.) le style de la barre d'onglets, posé sur <html> dès l'import
 import "./design/accessibilite.css";   // (17 nov.) audit WCAG 2.1 AA : focus double, encre claire sur le bleu, 44 px — `@layer vrm-a11y`, nommée AVANT vrm-verre (index.html)
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
