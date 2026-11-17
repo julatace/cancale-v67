@@ -1,4 +1,5 @@
 // ESPAÑOL — traducción de fr.js (la fuente). Mismas claves, mismas {variables}.
+import ecran_accessibilite from './es/accessibilite.js';   // (17 nov.) audit d'accessibilité
 import ecran_suivi_vente from './es/suiviVente.js';   // (16 nov.) le suivi des colis vendus
 import ecran_perso from './es/perso.js';   // (16 nov.) « Modifier ma journée » simple
 import ecran_ventesVerre from './es/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
@@ -71,6 +72,7 @@ import ecran_journee_verre from './es/journee-verre.js';   // (15 nov.) Ma journ
 import ecran_arrivee from './es/arrivee.js';   // (15 nov.) atelier d'arrivée, historique, taille du texte
 import ecran_stock_rangement from './es/stockRangement.js';   // (17 nov.) le Stock « Ranger » en séance (nouveau design)
 export default {
+  ...ecran_accessibilite,
   ...ecran_perso,
   ...ecran_ventesVerre,
   ...ecran_studio_paires,
