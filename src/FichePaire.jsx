@@ -365,7 +365,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
     const modale = () => el.getAttribute('aria-modal') === 'true';
     const avant = document.activeElement;
     const SEL = 'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),summary,[tabindex]:not([tabindex="-1"])';
-    const focusables = () => [...el.querySelectorAll(SEL)].filter((x) => x.getClientRects().length && !x.closest('[inert],[aria-hidden="true"]') && x.closest('[role="dialog"]') === el);
+    const focusables = () => [...el.querySelectorAll(SEL)].filter((x) => x.tabIndex >= 0 && x.getClientRects().length && !x.closest('[inert],[aria-hidden="true"]') && x.closest('[role="dialog"]') === el);
     if (modale() && !el.contains(document.activeElement)) { el.setAttribute('tabindex', '-1'); try { el.focus({ preventScroll: true }); } catch (_) {} }
     const k = (e) => {
       if (e.key !== 'Tab' || !modale()) return;

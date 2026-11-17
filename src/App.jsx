@@ -65562,9 +65562,9 @@ function AppCoeur() {
     const barre = e.currentTarget.querySelector('[data-barre-recherche]'); const p = document.getElementById('vrm-recherche-resultats');
     if (!barre || !barre.contains(e.target) || !p || !e.currentTarget.contains(p)) return;
     const SEL = 'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),summary,[tabindex]:not([tabindex="-1"])';
-    const dansBarre = [...barre.querySelectorAll(SEL)].filter((x) => x.getClientRects().length);
+    const dansBarre = [...barre.querySelectorAll(SEL)].filter((x) => x.tabIndex >= 0 && x.getClientRects().length);
     if (dansBarre[dansBarre.length - 1] !== e.target) return;
-    const tous = [...document.querySelectorAll(SEL)].filter((x) => x.getClientRects().length && !x.closest('[inert],[aria-hidden="true"]'));
+    const tous = [...document.querySelectorAll(SEL)].filter((x) => x.tabIndex >= 0 && x.getClientRects().length && !x.closest('[inert],[aria-hidden="true"]'));
     const suivant = tous.find((x) => !p.contains(x) && !barre.contains(x) && (e.target.compareDocumentPosition(x) & Node.DOCUMENT_POSITION_FOLLOWING));
     if (!suivant) return;
     e.preventDefault(); flushSync(() => setGsOpen(false)); try { suivant.focus(); } catch (_) {}

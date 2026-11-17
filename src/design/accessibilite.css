@@ -34,7 +34,7 @@
      Achats → Meilleures sources : « 3 ventes sans achat relié » (1,57:1) et « Comment c'est
      calculé » (1,43:1) sont posés sur le fond, sous la carte ; Annonces : la ligne « 4 en ligne
      sur Vinted · 222 € de valeur » (1,45:1). L'encre CLAIRE du verre, celle des titres d'écran. */
-  .vrm-achats-sources :is(.vrm-ms-hors, .vrm-ms-calcul > ul, .vrm-ms-calcul > ul li),
+  .vrm-achats-sources :is(.vrm-ms-hors, .vrm-ms-calcul > ul, .vrm-ms-calcul > ul *),
   .vrm-main [data-ann-resume], .vrm-main [data-ann-resume] :is(span, small) {
     color: var(--sv-clair-2, #EDF4FC) !important;
   }

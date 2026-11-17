@@ -157,8 +157,8 @@ async function main() {
             const seq = await M.sequenceTab(pg, 45);
             const vus = seq.filter((x) => !x.body);
             dit(vus.length && vus[0].evitement, `${T} E4 ${nom} · le premier Tab est « Aller au contenu »`, JSON.stringify(vus[0] || null));
-            const iNav = vus.findIndex((x) => x.nav), iMain = vus.findIndex((x) => x.main && !x.evitement);
-            dit(iNav >= 0 && (iMain < 0 || iNav < iMain), `${T} E4 ${nom} · la navigation passe avant l'écran`, `nav au ${iNav}e arrêt, écran au ${iMain}e`);
+            const iNav = vus.findIndex((x) => x.rail), iMain = vus.findIndex((x) => x.main && !x.evitement);
+            dit(iNav >= 0 && (iMain < 0 || iNav < iMain), `${T} E4 ${nom} · la colonne de navigation passe avant l'écran`, `nav au ${iNav}e arrêt, écran au ${iMain}e`);
             const sugg = vus.filter((x) => x.suggestion);
             dit(sugg.length === 0, `${T} E4 ${nom} · Tab ne traverse pas les suggestions de la recherche`, `${sugg.length} arrêts : ` + sugg.slice(0, 3).map((x) => x.nom).join(' | '));
             const inv = vus.filter((x) => !x.evitement && (x.w < 2 || x.h < 2));

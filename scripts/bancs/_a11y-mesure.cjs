@@ -32,6 +32,7 @@ async function contrastePixels(pg, racine) {
       const t = tw.currentNode; if (!t.textContent.trim()) continue;
       const el = t.parentElement; if (!el || vu.has(el)) continue; vu.add(el);
       if (el.closest('[aria-hidden="true"],[inert],script,style,noscript,svg,[data-marque],#vrm-demarrage')) continue;
+      { const dt = el.closest('details:not([open])'); if (dt && !el.closest('summary')) continue; }   // le corps d'un repli fermé ne se peint pas
       if (racine) { const d = [...document.querySelectorAll(racine)].filter((e) => e.getClientRects().length).pop(); if (!d || !d.contains(el)) continue; }
       const r = el.getBoundingClientRect(); if (r.width < 2 || r.height < 2 || r.bottom < 0 || r.top > innerHeight - 4 || r.left > innerWidth || r.right < 0) continue;
       if (!racine && r.bottom > fondu && !(barre && barre.contains(el))) continue;
@@ -102,7 +103,8 @@ async function nomsVides(pg) {
 }
 
 async function sequenceTab(pg, n = 45) {
-  await pg.evaluate(() => { try { document.activeElement && document.activeElement.blur(); } catch (_) {} });
+  // Le point de départ de la tabulation : le haut du document (un élément éphémère focalisé puis retiré).
+  await pg.evaluate(() => { const a = document.createElement('div'); a.tabIndex = -1; document.body.prepend(a); a.focus(); a.remove(); });
   const seq = [];
   for (let i = 0; i < n; i++) {
     await pg.keyboard.press('Tab'); await pg.waitForTimeout(50);
@@ -112,7 +114,7 @@ async function sequenceTab(pg, n = 45) {
       const contour = (cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) >= 1) || (cs.boxShadow && cs.boxShadow !== 'none')
         || !!(e.closest('label') && getComputedStyle(e.closest('label')).outlineStyle !== 'none');
       return { tag: e.tagName.toLowerCase(), cls: typeof e.className === 'string' ? e.className : '', nom: (e.getAttribute('aria-label') || e.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 30),
-        w: Math.round(r.width), h: Math.round(r.height), contour, nav: !!e.closest('nav'), main: !!e.closest('main'), suggestion: !!e.closest('#vrm-recherche-resultats'), evitement: e.hasAttribute('data-aller-contenu') };
+        w: Math.round(r.width), h: Math.round(r.height), contour, rail: !!e.closest('.vrm-atelier-rail, .vrm-sidebar'), main: !!e.closest('main'), suggestion: !!e.closest('#vrm-recherche-resultats'), evitement: e.hasAttribute('data-aller-contenu') };
     }));
   }
   return seq;
