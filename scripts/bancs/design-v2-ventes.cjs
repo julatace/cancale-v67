@@ -274,7 +274,7 @@ async function etroit(nav, b, grand) {
       while ((t = w.nextNode())) { if (!vis(t.parentElement)) continue; const re = /[^\s\-–/·]+/g; let m;
         while ((m = re.exec(t.textContent))) { if (m[0].length < 3) continue; const r = document.createRange(); r.setStart(t, m.index); r.setEnd(t, m.index + m[0].length);
           const tops = [...new Set([...r.getClientRects()].filter((x) => x.width > 0).map((x) => Math.round(x.top)))]; if (tops.length > 1) coupes.push(m[0]); } } }
-    const rognes = [...document.querySelectorAll('[data-v2v-segment] button, [data-v2v-segment] .v2-seg-l, .v2v-titre-ligne button, .v2v-titre-ligne .v2b-lib')].filter(vis).filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent.trim());
+    const rognes = [...document.querySelectorAll('[data-v2v-segment] .v2-seg, [data-v2v-segment] button, [data-v2v-segment] .v2-seg-l, .v2v-titre-ligne button, .v2v-titre-ligne .v2b-lib')].filter(vis).filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent.trim());
     const l = [...document.querySelectorAll('[data-v2v-liste] [data-v2v-ligne]')].filter(vis)[0];
     const pl = document.querySelector('[data-v2-principal="imprimer"]'); const pq = pl && pl.getBoundingClientRect();
     return { coupes: [...new Set(coupes)].slice(0, 8), rognes, premiere: l ? Math.round(l.getBoundingClientRect().top) : null, deb: document.documentElement.scrollWidth - innerWidth,

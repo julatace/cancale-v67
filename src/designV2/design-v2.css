@@ -558,3 +558,9 @@ html body .v2v-segment button.v2-seg-btn { flex: 1 0 auto; padding: 0 12px; }
 html body .v2v-segment .v2-seg-l { overflow: visible; text-overflow: clip; }
 /* Le champ de Ventes sur la grille de 4 (le champ partagé posait 10 px à gauche). */
 :root:root:root body .v2v-recherche .vrm-champ-recherche.v2v-champ { padding-left: 12px; }
+/* Très grand texte : les trois segments tiennent toujours dans la largeur (un mot peut passer à la ligne, jamais coupé, jamais
+   caché derrière un défilement) ; le texte d'aide du champ finit par « … ». */
+html body .v2v-segment .v2-seg { overflow-x: visible; }
+html body .v2v-segment button.v2-seg-btn { flex: 1 1 0; min-width: 0; padding: 4px 8px; }
+html body .v2v-segment .v2-seg-l { white-space: normal; text-align: center; line-height: 1.15; overflow-wrap: normal; }
+:root:root:root body .v2v-recherche .v2v-champ input { text-overflow: ellipsis; }
