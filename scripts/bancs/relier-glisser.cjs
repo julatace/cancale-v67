@@ -149,8 +149,8 @@ async function toucher(b) {
   await pg.screenshot({ path: path.join(SHOTS, `relier-${nom}-question.png`) });
   if (await pg.locator('[data-glisser-oui]').count()) await pg.locator('[data-glisser-oui]').tap(); await pg.waitForTimeout(900);
   dit(await lien(pg, 'pa1') === T1, `${nom} · « Oui » : N°2 relié à ${T1} (menu, choix, cible, Oui — aucun appui long)`, String(await lien(pg, 'pa1')));
-  const pt = (await pg.locator('[data-pilule] .vrm-pil-titre').innerText().catch(() => '')).replace(/ | /g, ' ');
-  dit(/^Achat relié · Bénéfice /.test(pt) && await pg.locator(`[data-pilule-autre="${T1}"]`).count() === 1, `${nom} · le bénéfice et « Reçu » s'affichent`, JSON.stringify(pt));
+  const pt = await piluleLue(pg);
+  dit(pt.titre === 'Achat relié' && pt.sous === 'Bénéfice au plus +31 € au prix affiché' && await pg.locator(`[data-pilule-autre="${T1}"]`).count() === 1, `${nom} · le bénéfice (la règle) et « Reçu » s'affichent`, JSON.stringify(pt));
   await pg.screenshot({ path: path.join(SHOTS, `relier-${nom}-relie.png`) });
   const an = pg.locator('[data-pilule-annuler]').first(); if (await an.count()) { await an.tap(); await pg.waitForTimeout(900); }
   dit(!(await lien(pg, 'pa1')), `${nom} · « Annuler » retire le lien`);

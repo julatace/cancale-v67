@@ -69,3 +69,5 @@ body:has(.vrm-rg) .vrm-pil-zone { top: auto !important; bottom: calc(12px + env(
   .vrm-rg[data-glisser-mode="achat"] .vrm-rg-achats, .vrm-rg[data-glisser-mode="cible"] .vrm-rg-cibles { display: none; }
 }
 @media (min-width: 900px) { .vrm-rg-choisi { max-width: 1152px; width: calc(100% - 48px); margin: 0 auto 8px; box-sizing: border-box; } }
+.vrm-rg-ici { display: inline-flex; align-items: center; justify-content: center; }
+@media (max-width: 520px) { .vrm-rg-question-texte { flex-basis: 100%; } .vrm-rg-oui, .vrm-rg-non { flex: 1 1 0; } }
