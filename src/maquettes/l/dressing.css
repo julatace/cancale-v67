@@ -27,7 +27,7 @@ html[data-maquette="l"] body::before { content: ''; position: fixed; inset: 0; z
   background: radial-gradient(120% 60% at 15% 0%, var(--sv-reflet) 0%, transparent 55%), linear-gradient(170deg, var(--sv-haut) 0%, var(--sv-milieu) 45%, var(--sv-bas) 100%); }
 html[data-maquette="l"] ::selection { background: rgb(255 255 255 / .85); color: #0C1D30; }
 
-.l-racine { min-height: 100dvh; box-sizing: border-box; color: var(--sv-clair); font-family: var(--sb-police-texte); font-feature-settings: var(--sb-chiffres);
+.l-racine { min-height: 100dvh; box-sizing: border-box; color: var(--sv-clair); font-family: var(--sb-police-texte); font-feature-settings: normal;
   -webkit-font-smoothing: antialiased; isolation: isolate; }
 .l-racine *, .l-racine *::before, .l-racine *::after { box-sizing: border-box; }
 :where(.l-racine) :where(h1, h2, p, dl, dd) { margin: 0; }
@@ -177,6 +177,9 @@ html[data-maquette="l"] ::selection { background: rgb(255 255 255 / .85); color:
 .l-fiche.is-panneau .l-fiche-texte { padding: 24px 24px; }
 .l-fiche.is-panneau .l-fiche-geste { padding: 16px 24px 24px; }
 
+/* Chiffres alignés sur les CHIFFRES seulement (sur un titre, « Gel-1130 » prenait un tiret à chasse fixe). */
+.l-prix, .l-plaque, .l-filtre-n, .l-faits dd, .l-rang-val, .l-code-val, .l-plein-n { font-variant-numeric: tabular-nums; }
+.l-ordi.a-fiche .l-tete-ordi .l-plein { visibility: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .l-tuile, .l-fiche, .l-fiche.is-panneau .l-fiche-corps { animation: l-fondu 160ms ease both !important; }
   .l-filtre::after, .l-photo img { transition: none; }

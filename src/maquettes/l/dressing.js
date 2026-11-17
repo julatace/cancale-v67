@@ -158,7 +158,7 @@ export function construire(src, maintenant = Date.now()) {
         paires.push(p({ ...base, etat: 'retirer', retrait: r, limite: lim, detail: lim ? 'avant ' + jour(new Date(lim).toISOString(), maintenant) : 'au point relais', geste: 'J’ai retiré le colis' }));
       } else paires.push(p({ ...base, etat: 'enroute', detail: s.toLowerCase().includes('transit') ? 'en transit' : 'envoyé', geste: 'Voir le suivi' }));
     } else if (maintenant - (Date.parse(o.date) || 0) < 30 * J) {
-      paires.push(p({ ...base, etat: 'numeroter', detail: jour(o.date, maintenant), geste: 'Donner un N°' }));
+      paires.push(p({ ...base, etat: 'numeroter', detail: 'arrivée ' + jour(o.date, maintenant), geste: 'Donner un N°' }));
     }
   }
 

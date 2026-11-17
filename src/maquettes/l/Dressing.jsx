@@ -146,7 +146,7 @@ function Fiche({ x, fermer, large }) {
       : [['Acheté', euros(x.cout)], ['Vendu', euros(x.prix)], ['Marge', marge == null ? '—' : (marge > 0 ? '+' : '') + euros(marge)]];
   const ligneEtat = x.etat === 'envoyer' ? `À envoyer ${x.detail}` : x.etat === 'retirer' ? `À retirer ${x.limite ? x.detail : ''}`.trim()
     : x.etat === 'enligne' ? `En ligne depuis ${x.jours} jours` : x.etat === 'vendue' ? (x.detail === 'en route' ? 'Vendue · en route' : 'Vendue · bordereau attendu')
-      : x.etat === 'enroute' ? 'Achat en route vers toi' : x.etat === 'numeroter' ? `Arrivée ${x.detail.replace('arrivée ', '')} · sans N°` : x.etat === 'publier' ? 'Brouillon · pas en ligne' : e.mot;
+      : x.etat === 'enroute' ? 'Achat en route vers toi' : x.etat === 'numeroter' ? `Arrivée ${x.detail.replace('arrivée ', '')}, sans N°` : x.etat === 'publier' ? 'Brouillon · pas en ligne' : e.mot;
   const TR = { mondialrelay: 'Mondial Relay', vintedgo: 'Vinted Go', chronopost: 'Chronopost' };
   const infos = [
     ['Compte', x.compte || '—'],
