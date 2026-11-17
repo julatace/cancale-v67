@@ -2114,7 +2114,7 @@ async function titreAchatDuColis(track) {
     const suivi = String((track && track.suivi) || ''), code = codeColisNorm(track && track.code);
     if (!suivi && !code) return '';
     const [sv, sm, rel] = await Promise.all([
-      suivi ? lireLignes('id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi') : [],
+      suivi ? lireLignes('id=like.harvest_*_suivi_*&select=id,tx:meta->>tx,suivi:meta->>suivi,sv:meta->>suivisVinted,sl:meta->>suivisLusAt') : [],
       suivi ? lireLignes('id=like.colis_suivi_*&select=id,suivi:meta->>suivi,tx:meta->>tx,uid:meta->>uid') : [],
       code ? supabaseLireRow('panel_colis_relais') : { lu: true, data: {} },
     ]);

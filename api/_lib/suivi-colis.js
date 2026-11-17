@@ -26,6 +26,7 @@
 //     Il ne vaut jamais « retiré » (api/_lib/etat-colis-email.js).
 // ─────────────────────────────────────────────────────────────────────────────
 import { normaliserSuivi, etatColisDepuisTexte, changementDeRelais, colisPerdu } from './etat-colis-email.js';
+import { listeDeLigne, listesParAchat, lienContredit } from './suivis-multiples.js';
 import { arriveeColisEmail } from './arrivee-colis.js';
 import { etatRetrait, lieuDepuisExtrait, lieuLisibleDepuisExtrait, limiteRetraitDepuisTexte, LIEU_AU_FUTUR, joursAvantLimite, jourParis } from './retrait-colis.js';
 import { codeRetraitTournure, codeImpossible } from './code-retrait-email.js';
@@ -615,15 +616,18 @@ export function txDuColis({ suivi = '', code = '' } = {}, relais, liens) {
 // Les liens « n° de suivi ↔ transaction » lus en scalaires : une ligne de suivi
 // Vinted dont la transaction contredit son identifiant ne relie rien (la règle
 // de l'app) ; un n° ajouté à la main ne relie que s'il porte une transaction.
+// (17 nov., 5.403) + TOUS les n° du trajet d'un achat (`sv` = meta->>suivisVinted : un envoi à deux
+// transporteurs a deux n° pour le même colis), et un lien manuel que la liste LUE (`sl`) contredit ne relie
+// plus rien (api/_lib/suivis-multiples.js, la règle de l'app).
 export function liensDesLignes(suivisVinted, suivisManuels) {
   if (!Array.isArray(suivisVinted) || !Array.isArray(suivisManuels)) return null;
   const out = [];
   for (const r of suivisVinted) {
-    const m = /^harvest_(\w+?)_suivi_(\w+)$/.exec(String((r && r.id) || '')); if (!m) continue;
-    if (r.tx && String(r.tx) !== m[2]) continue;
-    if (normaliserSuivi(r.suivi)) out.push({ uid: m[1], tx: m[2], suivi: normaliserSuivi(r.suivi) });
+    const l = listeDeLigne(r); if (!l) continue;
+    for (const su of l.numeros) out.push({ uid: l.uid, tx: l.tx, suivi: su });
   }
-  for (const r of suivisManuels) if (r && r.tx && normaliserSuivi(r.suivi)) out.push({ uid: r.uid ? String(r.uid) : '', tx: String(r.tx), suivi: normaliserSuivi(r.suivi) });
+  const listes = listesParAchat(suivisVinted);
+  for (const r of suivisManuels) if (r && r.tx && normaliserSuivi(r.suivi) && !lienContredit(r, listes)) out.push({ uid: r.uid ? String(r.uid) : '', tx: String(r.tx), suivi: normaliserSuivi(r.suivi) });
   return out;
 }
 // Ce que les commandes disent de ces transactions : 'retire' · 'reparti' · null
