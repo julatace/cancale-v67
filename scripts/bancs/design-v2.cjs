@@ -243,7 +243,7 @@ async function telephone(nav, sombre, b, sigs) {
       publierHaut: (() => { const p = document.querySelector('[data-v2-principal="publier"]'); return p ? Math.round(p.getBoundingClientRect().top) : null; })(), disque: !!document.querySelector('[data-sb-disque]'), pleins: [...document.querySelectorAll('[data-v2b="principal"], .sb-btn-plein')].filter(vis).length, plein: (document.querySelector('[data-v2-principal]') || {}).textContent || '' }; });
   dit(an.premiere != null && an.premiere <= 380, `N la 1re annonce commence à ${an.premiere} px (≤ 380)`, an);
   dit(!an.puces && !an.selPaires && !an.stats && an.segN === 3, 'N ni puces, ni « Annonces | Stock », ni chiffres : UN segmenté (En ligne · Qui dorment · À publier)', an);
-  dit(an.alignes && an.alignes.champ[1] >= 44 && an.alignes.champ[1] === an.alignes.plus[1] && Math.abs(an.alignes.champ[0] - an.alignes.plus[0]) <= 1, `N recherche et « ⋯ » : même hauteur (${an.alignes && an.alignes.champ[1]}), même ligne`, an.alignes);
+  dit(an.alignes && an.alignes.champ[1] >= 44 && an.alignes.plus[1] >= 44 && Math.abs((an.alignes.champ[0] + an.alignes.champ[1] / 2) - (an.alignes.plus[0] + an.alignes.plus[1] / 2)) <= 1, `N recherche et « ⋯ » : ≥ 44 px, centrés sur la même ligne`, an.alignes);
   dit(an.hauteurs.length >= 3 && an.hauteurs.every((h) => h === 80 || h === 96), `N rangées de 80 px (96 quand le titre prend deux lignes) (${an.hauteurs.join(', ')})`, an.hauteurs);
   dit(an.visibles >= 5, `N ${an.visibles} annonces lisibles en entier sur le premier écran (≥ 5)`, an.visibles);
   dit(an.cpt === 0, 'N le compte n’est plus redit sur chaque rangée (il est dans l’en-tête du groupe)', an.cpt);

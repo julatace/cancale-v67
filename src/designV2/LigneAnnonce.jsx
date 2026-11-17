@@ -17,6 +17,7 @@
 import React from 'react';
 import { tr } from '../i18n/index.js';
 import './design-v2.css';
+import { Etiquette } from './Signature.jsx';
 
 
 function Vignette({ photo, Photo, Icon, cls }) {
@@ -32,8 +33,8 @@ function Faits({ num, taille, jours, Plaque, sep = ' · ' }) {
   return <>{num ? <PlaqueV2 num={num}/> : null}{bouts.length ? <span className="v2l-faits-txt">{(num ? sep : '') + bouts.join(sep)}</span> : null}</>;
 }
 
-// La plaque N° d'une rangée, À SOI (les règles d'hier allumaient `.sb-plaque` en blanc la nuit) : gravée dans la surface.
-function PlaqueV2({ num }) { return <span className="v2-plaque" data-v2-plaque={num}><small>N°</small>{num}</span>; }
+// Le N° d'une rangée : l'ÉTIQUETTE carton de la signature (src/designV2/Signature.jsx), la même partout.
+function PlaqueV2({ num }) { return <Etiquette num={num}/>; }
 
 export default function LigneAnnonce({ variante = 'A', attrs = {}, cle, photo, Photo, Icon, Plaque, titre, num, taille, jours, prix, favoris = null, vues = null,
   aRelier = false, relierMot = false, onRelier, onPlus, LigneGlissable }) {

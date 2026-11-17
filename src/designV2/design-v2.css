@@ -220,7 +220,9 @@ html body button.v2-rangee.v2-passe-mini { flex-direction: column; align-items: 
 .v2-passe-lieu small { display: block; font-size: 13px; color: var(--v2-muet); margin-top: 2px; }
 .v2-passe-piste { display: grid; grid-auto-flow: column; grid-auto-columns: 100%; overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; }
 .v2-passe-piste::-webkit-scrollbar { display: none; }
-.v2-passe-face { scroll-snap-align: start; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 8px 16px 14px; min-width: 0; }
+.v2-passe-face { scroll-snap-align: start; min-width: 0; }
+.v2-passe-face .v2-ticket-corps { padding-top: 4px; }
+.v2-passe-face .v2-passe-limite { padding: 0; }
 .v2-passe-limite { align-self: stretch; text-align: center; font-size: 15px; font-weight: 600; padding: 6px 0 2px; }
 .v2-passe-limite.is-ambre { color: var(--v2-ambre); }
 .v2-passe-qr { width: 168px; height: 168px; image-rendering: pixelated; background: #fff; padding: 8px; border-radius: 12px; box-sizing: content-box; }
