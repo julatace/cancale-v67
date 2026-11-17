@@ -23,7 +23,6 @@
 // Les outils de l'app (lecture de la base, confirmation, notifications) sont
 // passés par `deps` : ce fichier n'importe rien d'App.jsx.
 import { fetchBorne, DELAI_ROUTE_MS, NOM_DELAI } from './reseauBorne.js';
-import { tr } from './i18n/index.js';
 import React from 'react';
 import './facture-pro.css';
 import './facture-tva.css';
