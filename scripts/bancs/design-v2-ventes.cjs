@@ -54,7 +54,11 @@ const SIG_AVANT = process.env.SIGNATURE_AVANT || '';
 let ok = 0, ko = 0;
 const dit = (c, m, d) => { if (c) { ok++; console.log('  ✅ ' + m); } else { ko++; console.log('  ❌ ' + m + (d !== undefined ? ' — ' + (typeof d === 'string' ? d : JSON.stringify(d)).slice(0, 500) : '')); } return c; };
 const attendre = async (pg, f, ms = 30000, arg) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await pg.evaluate(f, arg).catch(() => false)) return true; await pg.waitForTimeout(arg !== undefined ? 50 : 400); } return false; };
-const sansToasts = async (pg) => { await pg.evaluate(() => { for (const t of document.querySelectorAll('.vrm-toast')) t.click(); }).catch(() => {}); await pg.waitForTimeout(400); };
+// Les messages passagers d'avant la capture (toasts, l'alerte locale « N nouvelles paires numérotées ») sont fermés : la
+// capture montre l'écran.
+const sansToasts = async (pg) => { await pg.evaluate(() => { for (const t of document.querySelectorAll('.vrm-toast')) t.click();
+  for (const e of document.querySelectorAll('body *')) { if (getComputedStyle(e).position !== 'fixed' || !/paires? numérotées?/.test(e.textContent || '') || e.closest('.vrm-tabbar')) continue;
+    const f = [...e.querySelectorAll('button')].find((b) => /fermer|close|×/i.test((b.getAttribute('aria-label') || '') + b.textContent)); if (f) { f.click(); break; } } }).catch(() => {}); await pg.waitForTimeout(400); };
 
 // Le contraste au fond EFFECTIF (fonds composés jusqu'au premier opaque, sinon la lumière du Studio) — la règle du banc design-v2.
 const CONTRASTE = `(() => {
