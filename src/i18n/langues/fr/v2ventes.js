@@ -67,5 +67,7 @@ export default {
   "v2s.deposer": {"one": "Marquer déposée ({n})", "other": "Marquer déposées ({n})"},
   "v2s.zero.imprimer": "Aucun bordereau prêt dans la sélection",
   "v2s.zero.deposer": "Aucune vente à déposer dans la sélection",
-  "v2s.facture": "Facture {num} envoyée le {date}"
+  "v2s.facture": "Facture {num} envoyée le {date}",
+  "v2v.etape": "Étape {n} sur {m} : {mot}",
+  "v2v.etapeAucune": "Pas encore déposé"
 };

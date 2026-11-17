@@ -122,6 +122,7 @@ import { usePreparation, useEnPreparation } from './preparations.js';
 import { souvenir, retenir } from './memoireEcrans.js';
 // ⟦→ ecrans/Reglages.jsx #3⟧
 import {etatColisDepuisTexte,normaliserSuivi} from '../api/_lib/etat-colis-email.js';
+import { preuvesTransporteur, fusionnerPreuves } from "./friseTransporteur.js";   // (17 nov.) la frise d'une vente : le transporteur tranche
 // (11 nov., lot suivi-commandes) Le suivi des commandes en cours : dernier statut, incohérences datées.
 import {dernierStatut,incoherencesVente,incoherencesAchat,estEnCours,lienPublic,nbAVerifier,statutCourt} from '../api/_lib/suivi-commandes.js';
 import { LigneSuivi } from './SuiviCommande.jsx';
@@ -1106,7 +1107,7 @@ import AujourdhuiV2 from "./designV2/Aujourdhui.jsx";
 import { PassesRetrait as PassesRetraitV2, EnRouteListe as EnRouteListeV2 } from "./designV2/PassesRetrait.jsx";
 import MenuPlateformeV2 from "./designV2/MenuPlateforme.jsx";
 import { BoutonV2, BoutonIconeV2, SegmentV2 } from "./designV2/BoutonV2.jsx";
-import { AfficheVentes as AfficheVentesV2, RechercheVentes as RechercheVentesV2, ListeEnvoyer as ListeEnvoyerBaseV2, ListeRoute as ListeRouteBaseV2 } from "./designV2/VentesV2.jsx";
+import { AfficheVentes as AfficheVentesV2, RechercheVentes as RechercheVentesV2, ListeEnvoyer as ListeEnvoyerBaseV2, ListeRoute as ListeRouteBaseV2, PisteEtapes as PisteEtapesV2 } from "./designV2/VentesV2.jsx";
 import { nombre as nombreV2 } from "./i18n/index.js";
 import LigneAnnonceV2 from "./designV2/LigneAnnonce.jsx";
 import { SqueletteRangees as SqueletteRangeesV2, QuandLu as QuandLuV2 } from "./designV2/Signature.jsx";
@@ -41438,20 +41439,29 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const posteMain = isShipDone(o);
     const etx = etatTxn(o.transaction_id);
     const finalisee = /finalis/i.test(s) || tus === 'completed' || !!(etx && etx.s === 450);
-    const livreeLue = finalisee || /\blivr[ée]|remis\b|r[ée]ceptionn/i.test(s);
-    const bougeLu = livreeLue || tus === 'waiting' || COLIS_DEJA_BOUGE.test(s) || isAtRelayStatus(s);
+    // (17 nov., Julien : « ça met livré il y a deux jours mais […] la barre de progression avance pas ») LE TRANSPORTEUR
+    // TRANCHE : la ligne lue chez lui (et l'e-mail) du n° de suivi de SON bordereau — la MÊME que la phrase sous la frise
+    // (`suiviVente` → `dernierStatut`). Une preuve n'est jamais retirée ; « Validé » reste à Vinted (src/friseTransporteur.js).
+    const suF = normaliserSuivi((bordE && bordE.suivi) || '');
+    const depF = suF && vcLoc0.departs instanceof Map ? (vcLoc0.departs.get(suF) || null) : null;
+    const emF = suF ? emailDuSuivi(suF) : null;
+    const prT = preuvesTransporteur({ transporteur: depF, email: emF ? { status: emF.status, receivedAt: emF.receivedAt } : null });
+    const livreeVinted = finalisee || /\blivr[ée]|remis\b|r[ée]ceptionn/i.test(s);
+    const fz = fusionnerPreuves({ livre: livreeVinted, bouge: livreeVinted || tus === 'waiting' || COLIS_DEJA_BOUGE.test(s) || isAtRelayStatus(s), valide: finalisee }, prT);
+    const livreeLue = fz.livre;
+    const bougeLu = fz.bouge;
     const versement = versements ? (versements[txL] || null) : null;
     const etapes = horsParcours ? null : friseVente({
       vendue: { lu: true, t: o.date || null },
       bordereau: { lu: !!(bordE || bordC), t: (bordE && bordE.receivedAt) || (bordC && bordC.capturedAt) || null },
       // (8 nov.) + parti par une preuve sûre de la règle unique (api/_lib/depart-vente.js) : déposée, datée.
       deposee: { lu: posteMain || bougeLu || partisVinted.has(txL), t: posteMain ? shipDone[txL] : ((partisVinted.get(txL) || {}).at || null) },
-      livree: { lu: livreeLue, t: null },
+      livree: { lu: livreeLue, t: fz.parTransporteur ? fz.livreAt : null },
       argent: { lu: finalisee, t: versement },
     });
     // (6 nov.) La Vérification de l'article : lue sur l'état de CETTE transaction (src/verificationArticle.js).
     const verification = !horsParcours && auCentreDeVerification(o);
-    return { s, tus, vs, horsParcours, bordE, bordC, posteMain, finalisee, versement, etapes, bougeLu, livreeLue, verification };
+    return { s, tus, vs, horsParcours, bordE, bordC, posteMain, finalisee, versement, etapes, bougeLu, livreeLue, verification, livreParTransporteur: fz.parTransporteur };
   };
   // Suit l'ENSEMBLE des comptes (`cleComptes`), pas leur nombre : un compte lié
   // ou retiré relit (le cache ne sert plus une liste qui ne le couvre pas).
@@ -47906,9 +47916,11 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const b = bordsParTxn[tx] || null;
           if (b && isBordShippedManual(b)) continue;
           const j = o.date ? Math.floor((Date.now() - new Date(o.date).getTime()) / 86400000) : null;
+          // (17 nov.) « Livré » aussi quand le transporteur le dit (la règle de la frise, src/friseTransporteur.js).
+          const pvT = preuvesFriseDe(o);
           out.push({ cle: 'v:' + tx, site: 'vinted', type: 'transp', o, b, j, depart: dp, rang: 1.5,
             photo: orderPhoto(o), titre: o.title || 'Vente', num: (b ? numForBord(b) : '') || (effEntry(o)?.numero || ''), tr: transporteurVente(b, tx),
-            lues: { imprime: !!(b && isBordPrinted(b)), depose: true, enroute: true } });
+            lues: { imprime: !!(b && isBordPrinted(b)), depose: true, enroute: true, livre: !!(pvT && pvT.livreeLue) } });
         }
       }
       if (voitSite('vestiaire')) {
@@ -48044,8 +48056,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       titre: (tailleEnFin(x.titre || '') || { nom: x.titre || '' }).nom, titreComplet: x.titre || '',
       sous: [(() => { const t = (o && typeof o.size_title === 'string' && o.size_title) || ((tailleEnFin(x.titre || '') || {}).taille) || ''; return t ? tr('v2v.taille', { t }) : ''; })(), x.site !== 'vinted' ? nomPlateforme(x.site) : ''].filter(Boolean),
       pseudo: pseudoAcheteur(o),
-      l3: [x.tr && x.tr.nom ? { cle: 'transporteur', icone: 'truck', texte: x.tr.nom } : null,
-        x.j != null && Number.isFinite(x.j) ? vendueV2(x.j) : null].filter(Boolean),
+      // (17 nov.) La PISTE (quatre segments, `etapesRoute` — les preuves de Vinted ET du transporteur, src/friseTransporteur.js)
+      // et, à côté, l'étape en mots avec sa date : la phrase du DERNIER statut lu (`suiviVente` → `dernierStatut`), la MÊME
+      // source que la ligne du transporteur ; pas lu ⇒ le mot de l'étape. Puis le n° de suivi.
+      l3: (() => { const et = etapesRoute(x.lues || {}); let sv = null; try { sv = suiviVente(x); } catch (_) { sv = null; }
+        const ici = et.find((e) => e.ici); const mot = sv && sv.statut && sv.statut.texte ? sv.statut.texte : (ici ? tr('vv.route.' + ici.cle) : '');
+        return [{ cle: 'etape', noeud: <PisteEtapesV2 etapes={et}/>, texte: mot },
+          sv && sv.su ? { cle: 'suivi', icone: 'truck', texte: [x.tr && x.tr.nom ? x.tr.nom : '', sv.su].filter(Boolean).join(' · ') } : (x.tr && x.tr.nom ? { cle: 'transporteur', icone: 'truck', texte: x.tr.nom } : null)].filter(Boolean); })(),
       sousAmbre: false,
       attrs: { 'data-colis-ident': cle, 'data-v2v-parti': x.type === 'parti' ? lab : x.type,
         ...attrsFicheLigne({ contexte: 'colis', site: x.site, cle: 'c' + (tx || cle), nums: x.num ? [x.num] : [], tx, photo: typeof x.photo === 'string' ? x.photo : '', titre: x.titre || '' }) },

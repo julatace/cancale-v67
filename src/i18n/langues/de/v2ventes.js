@@ -67,5 +67,7 @@ export default {
   "v2s.deposer": {"one": "Als abgegeben markieren ({n})", "other": "Als abgegeben markieren ({n})"},
   "v2s.zero.imprimer": "Kein Etikett in der Auswahl bereit",
   "v2s.zero.deposer": "Kein Verkauf zum Abgeben in der Auswahl",
-  "v2s.facture": "Rechnung {num} am {date} gesendet"
+  "v2s.facture": "Rechnung {num} am {date} gesendet",
+  "v2v.etape": "Schritt {n} von {m}: {mot}",
+  "v2v.etapeAucune": "Noch nicht abgegeben"
 };

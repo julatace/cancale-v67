@@ -67,5 +67,7 @@ export default {
   "v2s.deposer": {"one": "Segna consegnata ({n})", "other": "Segna consegnate ({n})"},
   "v2s.zero.imprimer": "Nessuna etichetta pronta nella selezione",
   "v2s.zero.deposer": "Nessuna vendita da consegnare nella selezione",
-  "v2s.facture": "Fattura {num} inviata il {date}"
+  "v2s.facture": "Fattura {num} inviata il {date}",
+  "v2v.etape": "Passo {n} di {m}: {mot}",
+  "v2v.etapeAucune": "Non ancora consegnato"
 };

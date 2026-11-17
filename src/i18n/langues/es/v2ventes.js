@@ -67,5 +67,7 @@ export default {
   "v2s.deposer": {"one": "Marcar entregada ({n})", "other": "Marcar entregadas ({n})"},
   "v2s.zero.imprimer": "Ninguna etiqueta lista en la selección",
   "v2s.zero.deposer": "Ninguna venta por entregar en la selección",
-  "v2s.facture": "Factura {num} enviada el {date}"
+  "v2s.facture": "Factura {num} enviada el {date}",
+  "v2v.etape": "Paso {n} de {m}: {mot}",
+  "v2v.etapeAucune": "Aún no entregado"
 };

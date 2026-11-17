@@ -67,5 +67,7 @@ export default {
   "v2s.deposer": {"one": "Mark dropped off ({n})", "other": "Mark dropped off ({n})"},
   "v2s.zero.imprimer": "No label ready in the selection",
   "v2s.zero.deposer": "No sale to drop off in the selection",
-  "v2s.facture": "Invoice {num} sent on {date}"
+  "v2s.facture": "Invoice {num} sent on {date}",
+  "v2v.etape": "Step {n} of {m}: {mot}",
+  "v2v.etapeAucune": "Not dropped off yet"
 };

@@ -23,6 +23,21 @@ import LigneAnnonce from './LigneAnnonce.jsx';
 import { ChiffreAffiche, RangeeFaite, SqueletteRangees } from './Signature.jsx';
 import './design-v2.css';
 
+// LA PISTE D'UN COLIS PARTI (Julien : « je veux […] que tu en fasses une plus belle ») : quatre segments courts (Déposé ·
+// En transit · Livré · Validé) remplis jusqu'à l'étape PROUVÉE ; l'accent pour ce qui est fait, l'ambre seulement s'il a un
+// geste à faire ; même taille partout (rien ne saute quand elle avance) ; un nom accessible (« Étape 3 sur 4 : livré »).
+export function PisteEtapes({ etapes, ambre = false }) {
+  if (!Array.isArray(etapes) || !etapes.length) return null;
+  const i = etapes.findIndex((e) => e.ici);
+  const n = i + 1, m = etapes.length;
+  const label = n > 0 ? tr('v2v.etape', { n, m, mot: tr('vv.route.' + etapes[i].cle) }) : tr('v2v.etapeAucune');
+  return (
+    <span className={'v2-piste' + (ambre ? ' is-ambre' : '')} role="img" aria-label={label} data-v2-piste={n} data-v2-piste-m={m}>
+      {etapes.map((e) => <i key={e.cle} className={e.fait ? 'is-fait' : ''} data-etape={e.cle}/>)}
+    </span>
+  );
+}
+
 // L'ordre des groupes d'« À envoyer » (le plus pressé d'abord ; ce qui est imprimé, à la fin).
 export const GROUPES_ENVOYER = ['presse', 'semaine', 'plusTard', 'estimee', 'sansDate', 'imprimes'];
 // L'ordre des groupes d'« En route » (ce qui peut demander un geste d'abord).
