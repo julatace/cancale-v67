@@ -18,6 +18,8 @@
 // Trois états (§5) : rien publié / meubles pas lus ⇒ null (« — ») ; lu ⇒ valeur.
 // Module PUR hors publier/lire. Exécuté par scripts/audit-aide-decision.cjs.
 
+import { lireLocal, ecrireLocal, lireJSON } from './stockageSur.js';
+
 const str = (v) => String(v == null ? '' : v);
 const entier = (v) => (v != null && Number.isFinite(Number(v)) ? Math.round(Number(v)) : null);
 
@@ -87,19 +89,16 @@ export const EVT_ARGENT_DORT = 'vrm:argent-dort';
 export function publierArgentDort(lignes, { owner = '', partiel = false } = {}) {
   if (!Array.isArray(lignes)) return;
   const p = { v: 1, owner: str(owner), partiel: !!partiel, l: lignes };
-  try {
-    const avant = localStorage.getItem(CLE_ARGENT_DORT);
-    const neuf = JSON.stringify(p);
-    if (avant && avant.replace(/,"at":\d+}$/, '}') === neuf) return;
-    localStorage.setItem(CLE_ARGENT_DORT, JSON.stringify({ ...p, at: Date.now() }));
-  } catch (_) { /* stockage refusé : Statistiques dit « — » */ }
+  // (stockage protégé, src/stockageSur.js) : refusé ⇒ rien écrit, Statistiques dit « — ».
+  const avant = lireLocal(CLE_ARGENT_DORT, null);
+  const neuf = JSON.stringify(p);
+  if (avant && avant.replace(/,"at":\d+}$/, '}') === neuf) return;
+  ecrireLocal(CLE_ARGENT_DORT, JSON.stringify({ ...p, at: Date.now() }));
   try { window.dispatchEvent(new CustomEvent(EVT_ARGENT_DORT)); } catch (_) {}
 }
 // null = jamais publiée pour CE compte VRM (pas su ⇒ « — »).
 export function lireArgentDort(owner = '') {
-  try {
-    const p = JSON.parse(localStorage.getItem(CLE_ARGENT_DORT) || 'null');
-    if (!p || p.v !== 1 || str(p.owner) !== str(owner) || !Array.isArray(p.l)) return null;
-    return { partiel: !!p.partiel, at: p.at || null, lignes: p.l.filter((x) => Array.isArray(x) && x.length === 3) };
-  } catch (_) { return null; }
+  const p = lireJSON(lireLocal(CLE_ARGENT_DORT, null), null);
+  if (!p || p.v !== 1 || str(p.owner) !== str(owner) || !Array.isArray(p.l)) return null;
+  return { partiel: !!p.partiel, at: p.at || null, lignes: p.l.filter((x) => Array.isArray(x) && x.length === 3) };
 }
