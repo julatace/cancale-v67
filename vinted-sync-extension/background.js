@@ -18402,11 +18402,12 @@ async function favorisCarte(msg, sender) {
     if (!r.ok || !r.json || !r.json.vue) return { ok: false, code: 'serveur', raison: (r.json && r.json.message) || 'VRM n’a pas confirmé le lancement : rien n’est parti.' };
     // (5.406) La photo et le titre de chaque favori choisi, tels que l'aperçu les montrait (photo
     // Vinted seulement) : l'écran « action en cours » montre l'article qui part.
-    const items = {};
+    // Un TABLEAU, dans l'ordre de la sélection (l'ordre de la file) : l'écran montre les suivants.
+    const items = [];
     for (const x of (Array.isArray(msg.items) ? msg.items.slice(0, FAVORIS_CARTE_MAX) : [])) {
       const id = x && /^\d{1,20}$/.test(String(x.itemId || '')) ? String(x.itemId) : '';
-      if (!id) continue;
-      items[id] = { photo: /^https:\/\/[\w.-]*vinted\.net\//.test(String(x.photo || '')) ? String(x.photo).slice(0, 500) : '', titre: String(x.titre || '').slice(0, 120) };
+      if (!id || items.some((y) => y.id === id)) continue;
+      items.push({ id, photo: /^https:\/\/[\w.-]*vinted\.net\//.test(String(x.photo || '')) ? String(x.photo).slice(0, 500) : '', titre: String(x.titre || '').slice(0, 120) });
     }
     const st = { v: 1, uid: o.uid, dom: o.dom, actif: true, debut: Date.now(), total: sel.length, file: r.json.carte || null, attente: null, prochain: null, fin: null, items };
     await poserEtatFavorisCarte(st);
@@ -18487,7 +18488,9 @@ async function poserActionEnCours(st) {
   await poserAction({ actif: true, sorte: 'favoris', uid: String(st.uid), debut: Number(st.debut) || Date.now(),
     fait: Number(fi.envoyes) || 0, total: Number(fi.total) || Number(st.total) || 0, pas: (Number(fi.refuses) || 0) + (Number(fi.ignores) || 0) + (Number(fi.incertains) || 0),
     enCours: !!st.enCours, prochain: Number(st.prochain) || null, quoi: String(st.quoi || ''), attente: String(st.attente || ''),
-    verification: st.attente === 'verification', item });
+    verification: st.attente === 'verification', item,
+    // Les 3 suivants (photo, titre), dans l'ordre de la file : ni passés ni en cours.
+    suivants: (Array.isArray(st.items) ? st.items : []).filter((x) => !(Array.isArray(st.passes) && st.passes.includes(x.id)) && !(item && item.id === x.id)).slice(0, 3) });
 }
 async function finirActionEnCours(raison, st) {
   const a = await lireActionEnCours();
@@ -18579,7 +18582,7 @@ async function tickFavorisCarte() {
       const t = s.json.travail;
       if (!t || typeof t.jeton !== 'string') { st.attente = null; await poserEtatFavorisCarte(st); return; }
       st.attente = null; st.prochain = null; st.quoi = ''; st.enCours = Date.now();
-      { const it = st.items && st.items[String(t.itemId || '')]; st.item = { id: String(t.itemId || ''), photo: it ? it.photo : '', titre: it ? it.titre : '' }; }
+      { const id = String(t.itemId || ''), it = Array.isArray(st.items) ? st.items.find((x) => x.id === id) : null; st.item = { id, photo: it ? it.photo : '', titre: it ? it.titre : '' }; st.passes = [...new Set([...(Array.isArray(st.passes) ? st.passes : []), id])].slice(-FAVORIS_CARTE_MAX); }
       await poserEtatFavorisCarte(st);
       let r = null;
       try { r = await executerPourAppCoeur({ uid: st.uid, method: 'POST', endpoint: '/vrm/favoris', body: t, __carte: true }); } catch (_) { r = null; }

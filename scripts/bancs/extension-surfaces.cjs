@@ -198,7 +198,8 @@ const CIBLES = ({ hoteId, sel }) => {
             tete: !!q('.t5 [data-q4="compte"]') && !!q('.t5 .vu-point') && !!q('.t5 [data-q4="etat"]'),
             principal: !!q('.principal[data-fav="encours"] .vu-barre'), pleins: Array.from(r.querySelectorAll('.carte .vu-plein, .carte .b:not(.sec)')).filter(vis).length,
             sous: !!q('.vu-sous [data-q4="jauge"]'), majH: maj ? Math.round(maj.querySelector('.vu-bandeau').getBoundingClientRect().height) : 0, etapes: q('[data-maj-comment]') ? q('[data-maj-comment]').open : null,
-            seg: !!q('.vu-seg[role="tablist"]') && r.querySelectorAll('.vu-seg[role="tablist"] [role="tab"]').length === 3,
+            seg: !!q('.vu-seg[role="tablist"]') && r.querySelectorAll('.vu-seg[role="tablist"] [role="tab"]').length === 3 && r.querySelectorAll('.carte .vu-seg').length === 1 && !!q('.t5 [data-compte-menu]'),
+            sousPx: q('.vu-sous') ? parseFloat(getComputedStyle(q('.vu-sous')).fontSize) : 0,
             dans: q('[data-fav-dans]') ? Number(q('[data-fav-dans]').getAttribute('data-fav-dans')) - Date.now() : null, quoi: q('[data-fav-quoi]') ? q('[data-fav-quoi]').getAttribute('data-fav-quoi') : '',
             dedans: cr.left >= 0 && cr.top >= 0 && cr.right <= innerWidth + 0.5 && cr.bottom <= innerHeight + 0.5, debord: document.documentElement.scrollWidth > innerWidth,
           };
@@ -208,7 +209,8 @@ const CIBLES = ({ hoteId, sel }) => {
         dit(m.pleins === 1, 'K · un seul plein dans la carte', m.pleins);
         dit(m.sous, 'K · la jauge dans la ligne secondaire');
         dit(m.majH > 0 && m.majH <= 60 && m.etapes === false, 'K · bandeau de version fin, étapes repliées', `${m.majH} px, ouvert=${m.etapes}`);
-        dit(m.seg, 'K · Favoris · Annonces · Ventes en UN contrôle segmenté');
+        dit(m.seg, 'K · UN seul contrôle segmenté (Favoris · Annonces · Ventes) ; le choix du compte est dans la tête (« compte ⌄ »)');
+        dit(m.sousPx >= 13, 'K · la ligne d’état secondaire à 13 px au moins', m.sousPx);
         dit(m.dans != null && m.dans <= 6 * MIN && m.quoi === 'ouverture', 'K · « prochain dans » ≤ 6 min, avec sa raison', `${m.dans} ${m.quoi}`);
         dit(m.dedans && !m.debord, 'L · la carte tient dans la fenêtre, rien ne déborde');
         const c = await pg.evaluate(CONTRASTE, 'vrm-badge');
@@ -261,7 +263,7 @@ const CIBLES = ({ hoteId, sel }) => {
       await monter(pg, { etat: ETATS.favorisEnCours(), action: null, fichiers: ['ui', 'mots', 'badge', 'action'] });
       const vide = await pg.evaluate(() => { const h = document.getElementById('vrm-action'); return h && getComputedStyle(h).display; });
       dit(vide === 'none', 'O · sans action : rien n’est dessiné', vide);
-      const ACT = { v: 1, actif: true, sorte: 'favoris', uid: '424242', fait: 3, total: 15, enCours: false, prochain: Date.now() + 3 * MIN, quoi: 'ouverture', item: { id: '9001', photo: PHOTO, titre: 'Baskets cuir blanc 42' }, maj: Date.now() };
+      const ACT = { v: 1, actif: true, sorte: 'favoris', uid: '424242', fait: 3, total: 15, enCours: false, prochain: Date.now() + 3 * MIN, quoi: 'ouverture', item: { id: '9001', photo: PHOTO, titre: 'Baskets cuir blanc 42' }, suivants: [{ id: '9002', photo: PHOTO, titre: 'Running bleu 43' }, { id: '9003', photo: PHOTO, titre: 'Sneakers montantes 41' }, { id: '9004', photo: PHOTO, titre: 'Mocassins daim 40' }], maj: Date.now() };
       await pg.evaluate((a) => window.__poserAction(a), ACT);
       await pg.waitForTimeout(500);
       await cap(pg, `action-plein-${tag}`);
@@ -275,6 +277,8 @@ const CIBLES = ({ hoteId, sel }) => {
       dit(m && m.couvre && m.attrape, 'O · l’écran couvre la fenêtre et attrape le clic', JSON.stringify(m));
       dit(m && /blur/.test(m.flou), 'O · Vinted flouté derrière', m && m.flou);
       dit(m && m.num, 'O · l’article en cours porte son étiquette N°');
+      const g2 = await pg.evaluate(() => { const r = document.getElementById('vrm-action').shadowRoot, b = r.querySelector('.boite').getBoundingClientRect(), p = r.querySelector('.photo img').getBoundingClientRect(); return { w: Math.round(b.width), photo: Math.round(p.width), suiv: r.querySelectorAll('.suiv .mini').length, compteur: parseFloat(getComputedStyle(r.querySelector('.compteur')).fontSize) }; });
+      dit(g2.w >= (mobile ? 380 : 560) && g2.photo >= 150 && g2.suiv === 3 && g2.compteur >= 36, 'O · un vrai écran plein : panneau large (feuille au téléphone), photo 160 px, grand compteur, 3 suivants', JSON.stringify(g2));
       const clics0 = await pg.evaluate(() => window.__clicPage || 0);
       const cb = await pg.evaluate(() => { const b = document.getElementById('cible').getBoundingClientRect(); return { x: b.left + 10, y: b.top + 10 }; });
       if (mobile) await pg.touchscreen.tap(cb.x, cb.y); else await pg.mouse.click(cb.x, cb.y);

@@ -527,11 +527,24 @@
   .contenu > .t5, .contenu > .vu-sous, .contenu > .maj5, .contenu > .fermer { background: transparent !important; box-shadow: none !important; padding: 0; border-radius: 0; color: var(--vu-sur) !important; }
   .contenu > .principal { padding: 14px; }
   .t5 { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 44px 0 6px !important; margin: 0 !important; }
-  .t5 .nom { font: 700 18px/1.2 var(--vu-police); letter-spacing: -.02em; color: var(--vu-sur); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .t5 .et { flex: none; font: 600 13px/1.2 var(--vu-police); color: var(--vu-sur-2); white-space: nowrap; }
+  .t5 .nom { flex: 0 1 auto; max-width: 62%; font: 700 18px/1.2 var(--vu-police); letter-spacing: -.02em; color: var(--vu-sur); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .t5 .et { flex: 1 1 0; min-width: 0; font: 600 13px/1.25 var(--vu-police); color: var(--vu-sur-2); }
   .t5 [data-q4-etat="geste"] { color: #FFE2A8; }
+  .t5 .nom-b { appearance: none; border: 0; background: transparent; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 6px; margin-left: -6px; border-radius: 10px; -webkit-tap-highlight-color: transparent; }
+  .t5 .nom-b:hover { background: rgb(255 255 255/.10); }
+  .t5 .nom-b:focus-visible { outline: none; box-shadow: var(--vu-anneau); }
+  .t5 .nom-b i { width: 7px; height: 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg) translate(-2px, -2px); flex: none; opacity: .85; }
+  .t5 .nom-b[aria-expanded="true"] i { transform: rotate(-135deg) translate(-2px, -2px); }
+  .contenu > .menu5 { padding: 4px !important; display: grid; gap: 2px; }
+  .contenu > .menu5[hidden] { display: none; }
+  .menu5 button { appearance: none; border: 0; background: transparent; display: flex; align-items: baseline; gap: 8px; min-height: 44px; padding: 0 12px; border-radius: 12px; color: var(--vu-encre); font: 600 15px/1.2 var(--vu-police); text-align: left; cursor: pointer; }
+  .menu5 button small { font-size: 13px; font-weight: 500; color: var(--vu-muet); }
+  .menu5 button[data-actif] { background: var(--vu-teinte); color: var(--vu-teinte-encre); }
+  .menu5 button[data-actif]::after { content: '✓'; margin-left: auto; }
+  .menu5 button:focus-visible { outline: none; box-shadow: var(--vu-anneau); }
   .t5 .vu-point { color: var(--vu-sur-2); }
-  .contenu > .vu-sous { padding: 2px 6px 0 !important; margin: 6px 0 0 !important; }
+  .contenu > .vu-sous { padding: 2px 6px 0 !important; margin: 6px 0 0 !important; font-size: 13px; }
+  .lu, .fav-t, .lib, .ligne.secu .val { font-size: 13px; }
   .vu-sous .sep { opacity: .7; padding: 0 2px; }
   .vu-sous [data-capture] a { color: var(--vu-sur); }
   .maj5 { margin: 8px 0 0 !important; }
@@ -551,7 +564,7 @@
   .principal .p-t b { font-weight: 700; }
   .principal .p-t .p-dans { color: var(--vu-muet); font-weight: 500; }
   .principal .vu-barre { margin-top: 10px; }
-  .principal .p-pour { margin-top: 6px; font: 500 12.5px/1.4 var(--vu-police); color: var(--vu-muet); }
+  .principal .p-pour { margin-top: 6px; font: 500 13px/1.4 var(--vu-police); color: var(--vu-muet); }
   .principal .p-pour.ambre { color: var(--vu-ambre); font-weight: 600; }
   .principal .vu-btn { margin-top: 12px; }
   .principal .p-item { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
@@ -568,8 +581,8 @@
   .listes5 .seg-portee button { font-size: 13px; }
   .fav-t, .lib, .lu, .me, .val.gris, .ap-lbl, .refus, .pied, .detail > summary { color: var(--vu-muet); }
   .val.alerte, .me .ambre, .err { color: var(--vu-ambre); }
-  .contenu .b { min-height: 50px; border-radius: 14px; background: var(--vu-plein-sur-plaque); color: var(--vu-plein-sur-plaque-encre); box-shadow: 0 1px 2px rgb(0 0 0/.18); font: 600 16px/1.2 var(--vu-police); }
-  .contenu .b.sec, .contenu .touche { background: var(--vu-teinte); color: var(--vu-teinte-encre); box-shadow: none; border-radius: 14px; }
+  .contenu .b, .connexion .b { min-height: 50px; border-radius: 14px; background: var(--vu-plein-sur-plaque); color: var(--vu-plein-sur-plaque-encre); box-shadow: 0 1px 2px rgb(0 0 0/.18); font: 600 16px/1.2 var(--vu-police); }
+  .contenu .b.sec, .contenu .touche, .connexion .b.sec { background: var(--vu-teinte); color: var(--vu-teinte-encre); box-shadow: none; border-radius: 14px; }
   .contenu > .b:not(.sec) { background: var(--vu-plein); color: var(--vu-plein-encre); }
   .contenu > .b.sec { background: rgb(255 255 255/.16); color: var(--vu-sur); border: 0; }
   .outils .lien, .ap-tout .lien, .cx .lien, .cx .oubli, .fav-go, .lien-site.lien-vrm { color: var(--vu-lien); }
@@ -1040,7 +1053,9 @@
       const selection = listeFavTriee(a).map((x) => x.id).filter((id) => selFav.has(id));
       if (!selection.length) return;
       favOccupe = true; favErreur = ''; rendre();
-      demander('lancer', { selection, reglages: a.reglages, confirme: true }, (r) => {
+      // 5.406 : la photo et le titre de chaque favori choisi (ce que l'aperçu montre), pour l'écran « action en cours ».
+      const items = listeFavTriee(a).filter((x) => selFav.has(x.id)).map((x) => ({ itemId: String(x.itemId || ''), photo: x.photo || '', titre: x.titre || '' }));
+      demander('lancer', { selection, reglages: a.reglages, confirme: true, items }, (r) => {
         favOccupe = false;
         if (r && r.ok) { apercuFav = null; apercuFavAt = 0; rafraichir(); return; }
         favErreur = (r && r.raison) || 'Rien n’est parti : l’extension n’a pas répondu.';
@@ -1074,7 +1089,7 @@
   //   · une rangée n'a pas de bouton : une annonce s'ouvre en la touchant (sa page sur le
   //     site), une vente est une ligne ; les liens du site restent ceux de la carte.
   // Tout vient du service worker (`carteListes`, lecture seule) ; pas su ⇒ « — », dit.
-  let ongletListe = 'favoris', porteeTous = false, listes = null, listesAt = 0, listesEnVol = false, listesErreur = '';
+  let menuCompteOuvert = false, ongletListe = 'favoris', porteeTous = false, listes = null, listesAt = 0, listesEnVol = false, listesErreur = '';
   try { chrome.storage.local.get(['vrmCarteOnglet', 'vrmCartePortee'], (g) => { try { void chrome.runtime.lastError; } catch (_) {} g = g || {}; if (['favoris', 'annonces', 'ventes'].includes(g.vrmCarteOnglet)) ongletListe = g.vrmCarteOnglet; if (g.vrmCartePortee === 'tous') porteeTous = true; }); } catch (_) {}
   const eurosL = (n) => { const x = Number(n); if (!(x > 0)) return '—'; const c = Math.round(x * 100); return (c % 100 ? (c / 100).toFixed(2).replace('.', ',') : String(c / 100)) + ' €'; };
   const ETAT_VENTE = { a_expedier: 'à expédier', en_route: 'en route', finalisee: 'finalisée', annulee: 'annulée — pas une vente', pas_su: 'état pas encore lu' };
@@ -1151,7 +1166,7 @@
     const tab = (k, t) => `<button role="tab" data-onglet-b="${k}" aria-selected="${ongletListe === k ? 'true' : 'false'}"${ongletListe === k ? ' data-actif' : ''}>${t}</button>`;
     const nom = listes && listes.compte && listes.compte.nom ? listes.compte.nom : (e && e.site && e.site.nom) || '';
     return `<section class="listes listes5" data-listes data-onglet="${ongletListe}" data-portee="${porteeTous ? 'tous' : 'ce'}">
-      ${vinted ? `<div class="vu-seg seg-portee portee" role="group" aria-label="${esc(TU('c_tous'))}"><button data-portee-b="ce" aria-pressed="${porteeTous ? 'false' : 'true'}"${porteeTous ? '' : ' data-actif'}>${nom ? esc(nom) : esc(TU('c_ce_compte'))}</button><button data-portee-b="tous" aria-pressed="${porteeTous ? 'true' : 'false'}"${porteeTous ? ' data-actif' : ''}>${esc(TU('c_tous'))}</button></div>` : ''}
+      ${vinted && LISTES ? `<div class="vu-seg seg-portee portee" role="group" aria-label="${esc(TU('c_tous'))}"><button data-portee-b="ce" aria-pressed="${porteeTous ? 'false' : 'true'}"${porteeTous ? '' : ' data-actif'}>${nom ? esc(nom) : esc(TU('c_ce_compte'))}</button><button data-portee-b="tous" aria-pressed="${porteeTous ? 'true' : 'false'}"${porteeTous ? ' data-actif' : ''}>${esc(TU('c_tous'))}</button></div>` : ''}
       <div class="vu-seg" role="tablist" aria-label="${esc(TU('c_ce_compte'))}">${tab('favoris', esc(TU('c_favoris')))}${tab('annonces', esc(TU('c_annonces')))}${tab('ventes', esc(TU('c_ventes')))}</div>
       <div class="panneau" role="tabpanel" data-panneau="${ongletListe}">${panneau}</div>
       ${vinted && ongletListe !== 'favoris' ? autresHtml() : ''}
@@ -1163,7 +1178,10 @@
       if (ongletListe !== 'favoris') chargerListes(false);
       if (LISTES) rendreListesSeules(); else rendre();
     }));
+    const mc = racine.querySelector('[data-compte-menu]');
+    if (mc) mc.addEventListener('click', () => { menuCompteOuvert = !menuCompteOuvert; rendre(); });
     racine.querySelectorAll('[data-portee-b]').forEach((b) => b.addEventListener('click', () => {
+      menuCompteOuvert = false;
       porteeTous = b.getAttribute('data-portee-b') === 'tous'; ranger({ vrmCartePortee: porteeTous ? 'tous' : 'ce' });
       if (porteeTous && ongletListe === 'favoris') ongletListe = 'annonces';
       chargerListes(porteeTous);
@@ -1219,21 +1237,29 @@
     const j = e.plateforme === 'vinted' ? site.jauge : null;
     const et = etatQuatre(e, r);
     const pointK = et.k === 'normal' ? 'ok' : et.k;
+    // 5.406 (revue) : le choix « ce compte / tous les comptes » vit dans la TÊTE (« compte_banc ⌄ »),
+    // plus un second contrôle segmenté. Seulement sur Vinted, connecté, compte de l'onglet nommé.
+    const menuCompte = e.plateforme === 'vinted' && !!compte && !!site.id && site.choix !== 'non' && !!(e.vrm && e.vrm.connecte);
     const etTexte = et.k === 'normal' ? TU('c_normal') : et.t;
     const tete = `<div class="t5 q4 resume" data-resume="${esc(r.etat)}" data-q4-bloc role="status">`
       + `<span class="vu-point" data-k="${esc(pointK)}" aria-hidden="true"></span>`
-      + `<b class="nom" data-q4="compte">${compte ? esc(compte) : esc(e.plateforme === 'vinted' ? TU('c_aucun_compte') : '—')}</b>`
-      + `<span class="et" data-q4="etat" data-q4-etat="${esc(et.k)}">${esc(etTexte)}</span></div>`;
+      + (menuCompte
+        ? `<button class="nom nom-b" data-q4="compte" data-compte-menu aria-haspopup="true" aria-expanded="${menuCompteOuvert ? 'true' : 'false'}">${esc(porteeTous ? TU('c_tous') : compte)}<i aria-hidden="true"></i></button>`
+        : `<b class="nom" data-q4="compte">${compte ? esc(compte) : esc(e.plateforme === 'vinted' ? TU('c_aucun_compte') : '—')}</b>`)
+      + `<span class="et" data-q4="etat" data-q4-etat="${esc(et.k)}">${esc(etTexte)}</span></div>`
+      + (menuCompte ? `<div class="menu5" data-menu-compte role="group" aria-label="${esc(TU('c_tous'))}"${menuCompteOuvert ? '' : ' hidden'}>`
+        + `<button data-portee-b="ce" aria-pressed="${porteeTous ? 'false' : 'true'}"${porteeTous ? '' : ' data-actif'}><span>${esc(compte)}</span><small>${esc(TU('c_ce_compte'))}</small></button>`
+        + `<button data-portee-b="tous" aria-pressed="${porteeTous ? 'true' : 'false'}"${porteeTous ? ' data-actif' : ''}><span>${esc(TU('c_tous'))}</span></button></div>` : '');
     const morceaux = [];
     if (j) morceaux.push(`<span data-q4="jauge" data-q4-h="${Number(j.h) || 0}" data-q4-maxh="${Number(j.maxH) || 0}" data-q4-j="${Number(j.j) || 0}" data-q4-maxj="${Number(j.maxJ) || ''}" data-q4-complet="${j.complet ? '1' : '0'}"><b>${esc(TU(j.complet ? 'c_heure' : 'c_heure_min', { n: nbFr(j.h), max: nbFr(j.maxH) }))}</b> · ${esc(TU('c_jour', { n: nbFr(j.j), max: j.maxJ ? nbFr(j.maxJ) : '—' }))}</span>`);
-    morceaux.push(`<span data-q4="lu" data-q4-at="${lu || ''}">${lu ? esc(TU('c_lu', { quand: depuis(lu) })) : '—'}</span>`);
+    if (lu || morceaux.length) morceaux.push(`<span data-q4="lu" data-q4-at="${lu || ''}">${lu ? esc(TU('c_lu', { quand: depuis(lu) })) : '—'}</span>`);
     const c = e && e.capture;
     if (c && c.phrase) {
       const lien = c.lien && /^https:\/\/www\.vinted\.fr\//.test(String(c.lien)) ? String(c.lien) : '';
       const geste = c.geste ? (lien ? ` · <a href="${esc(lien)}" target="_blank" rel="noopener" data-capture-geste>${esc(c.geste)}</a>` : ` · <span data-capture-geste>${esc(c.geste)}</span>`) : '';
       morceaux.push(`<span data-capture="${esc(c.k || '')}" data-capture-n="${Number(c.n) || 0}">${esc(c.phrase)}${c.k === 'ok' ? ' ✓' : ''}${geste}</span>`);
     }
-    return tete + `<div class="vu-sous" data-sous>${morceaux.join('<span class="sep" aria-hidden="true"> · </span>')}</div>`;
+    return tete + (morceaux.length ? `<div class="vu-sous" data-sous>${morceaux.join('<span class="sep" aria-hidden="true"> · </span>')}</div>` : '');
   }
   // « Nouvelle version disponible » : seulement installée À LA MAIN (zip, fichier
   // Orion) et plus ancienne que celle servie. Boutique ⇒ rien (elle se met à jour).

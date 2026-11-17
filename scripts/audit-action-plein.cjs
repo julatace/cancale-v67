@@ -42,7 +42,7 @@ const MUTATIONS = {
   apres: ['if(arretPlafond){const at=attenteDeRefus(arretPlafond);if(at>0)apresMs=at;}', ''],
   essai: ['if (essai) return { ok: true, n: tous.length, essai: true };', ''],
   etat: ["await poserActionEnCours(st);", ''],
-  arret: ["await finirActionEnCours('arret');", ''],
+  arret: ['let tout = null; try { tout = await poserToutArrete(true); } catch (_) { tout = null; }', 'let tout = null;'],
 };
 if (args.includes('--prouve')) {
   let rates = 0;
@@ -110,7 +110,7 @@ async function monde(o = {}) {
   sv.lancer(3, 0);
   const store = Object.assign({ vrmFavorisCarte: etatFile() }, o.store || {});
   const vinted = [];
-  const f = faireFond({ src: SRC, connecte: UID, store, vrm: sv.vrm, vinted: (req) => { vinted.push(req); return o.vinted ? o.vinted(req) : { status: 500, body: {} }; } });
+  const f = faireFond({ src: SRC, connecte: UID, store, lignes: o.lignes || {}, vrm: sv.vrm, vinted: (req) => { vinted.push(req); return o.vinted ? o.vinted(req) : { status: 500, body: {} }; } });
   // La base : rien d'autre (les autres Chrome n'ont rien fait), réglages par défaut.
   return { f, sv, vinted };
 }
@@ -168,6 +168,27 @@ const lireSt = (f) => f.store.vrmFavorisCarte || {};
     console.log(`     mesuré : réservations ${sv.reservations} · attente annoncée ${mn(lireSt(f).prochain ? lireSt(f).prochain - Date.now() : null)}`);
     dit(sv.reservations >= 1, 'le premier message part tout de suite (aucune attente ajoutée)', sv.reservations);
   }
+  // ── W6 : un refus d'attente APRÈS la réservation (sécurité du compte) ─────────
+  console.log('\nW6. Sécurité du compte (1 favori par heure, son réglage) : refus après réservation');
+  {
+    const t = Date.now();
+    const { f, sv, vinted } = await monde({ lignes: { main: { vrm_securite_comptes: { plateformes: { vinted: { parType: { favori: 1 } } } } } },
+      store: { vrmSecu: { presence: { vinted: t }, comptes: { ['vinted:' + UID]: { gestes: [{ t: t - 40 * MIN, s: 'favori', m: 'serie' }], dernier: t - 40 * MIN, jours: {} } } } } });
+    await f.ctx.tickFavorisCarte();
+    const p = sv.prochain(), v = sv.F.vueFile(sv.F.initialiserFile(sv.d()), OWNER);
+    console.log(`     mesuré : réservations ${sv.reservations} · suite chez VRM dans ${mn(p)} · file active ${v.active} · requêtes Vinted ${vinted.length}`);
+    dit(sv.reservations === 1 && vinted.length === 0, 'la réservation est faite, la garde de l’extension refuse avant toute écriture', `${sv.reservations}/${vinted.length}`);
+    dit(p != null && Math.abs(p - 20 * MIN) < 30000, 'le serveur reprend au VRAI temps dit par l’extension (≈ 20 min), plus 10 min fixes', mn(p));
+    dit(v.active === true, 'la file attend (elle n’est plus coupée par ce refus)');
+  }
+  // ── W7 : la question aux gardes ne prend rien ───────────────────────────────
+  console.log('\nW7. « Une place est-elle libre ? » ne prend aucune place');
+  {
+    const { f } = await monde();
+    const r = await f.ctx.attenteAvantFavori(UID, 3);
+    const n = ((f.store.vrmActions || {})[UID] || []).length;
+    dit(r === null && n === 0, 'place libre ⇒ null, et aucune action comptée', `${JSON.stringify(r)} · ${n}`);
+  }
   // ── W5 : le serveur et `apresMs` ─────────────────────────────────────────────
   console.log('\nW5. Refus d’attente après réservation : le serveur reprend au vrai temps');
   {
@@ -191,10 +212,11 @@ const lireSt = (f) => f.store.vrmFavorisCarte || {};
     const a = f.store.vrmActionEnCours || {};
     dit(a.actif === true && a.sorte === 'favoris' && a.uid === UID && Number(a.total) === 3, 'pendant la file : actif, favoris, ce compte, sur 3', JSON.stringify(a).slice(0, 200));
     dit(Number(a.prochain) > Date.now() && a.quoi === 'ouverture', 'le prochain pas et sa raison sont dans l’état', `${a.prochain} ${a.quoi}`);
-    const r = await f.envoyer({ from: 'vrm-badge', action: 'favorisCarte', quoi: 'arreter', uid: UID }, { tab: { id: 7, url: 'https://www.vinted.fr/' } });
+    const r = await f.envoyer({ from: 'vrm-action', action: 'arreter' }, { tab: { id: 7, url: 'https://www.vinted.fr/' } });
     const b = f.store.vrmActionEnCours || {};
     dit(b.actif === false && b.fin && b.fin.raison === 'arret', '« Tout arrêter » : l’état s’éteint aussitôt, fin « arrêté » dite', JSON.stringify(b.fin));
-    dit(r && r.etat && r.etat.actif === false, 'la file est arrêtée');
+    dit(r && r.ok === true && lireSt(f).actif === false, '« Tout arrêter » de l’écran : la file des favoris est arrêtée', JSON.stringify(r));
+    dit((await f.ctx.toutArreteDepuis(null)) > 0, '« Tout arrêter » de l’écran : la porte commune est posée (plus rien d’automatique, jusqu’à « Reprendre »)');
   }
   console.log('\nO2. Vinted demande une vérification : l’écran s’écarte');
   {
