@@ -335,12 +335,14 @@ async function verifier(racine, { muet = false, avant = null } = {}) {
   dit(/const GROUPES = GROUPES_LOUPE\.map\(\(\[t, l\]\) => \[t, t === 'paire' \? motsVendeur\(\)\.Noms : l\]\);/.test(app) || (/const libGroupe = \(t, l\) => \(t === 'paire' \? motsVendeur\(\)\.Noms : /.test(app) && /\.map\(\(\[t, l\]\) => \[t, libGroupe\(t, l\)\]\);/.test(app)), 'B9 la recherche : le groupe « Paires » s’appelle « Articles » hors Sneakers');
   dit(/const rv = retraitsVestiaire\(\{.*, mots: motsVendeur\(\) \}\);/.test(app), 'B10 Ma journée (Vestiaire) passe le mot du vendeur à `retraitsVestiaire`');
   // (16 nov., lot derniers-rouges) B11 : vidéos d'aide, cartes de Ma journée, « Quoi de neuf » passent par phraseVendeur.
+  // (16 nov. soir, personnalisation-simple) « Modifier ma journée » ne montre plus la description d'une carte (le nom seul,
+  // par tr) : la règle tient tant qu'aucune description n'est rendue SANS phraseVendeur.
   try {
     const AV = await imp(racine, 'src/aideVideos.js'), JP = await imp(racine, 'src/journeePerso.js'), NV = await imp(racine, 'src/nouveautes.js');
     const phrases = [...Object.values(AV.VIDEOS_AIDE).flatMap((v) => [v.titre, v.geste]), ...JP.CARTES_JOURNEE.map((c) => c.desc), ...NV.NOUVEAUTES.flatMap((n) => [n.titre, n.phrase])].filter((t) => typeof t === 'string' && MOT.test(t));
     const manque = phrases.filter((t) => !PV.PHRASES_ARTICLE[t]);
     const av = lire(racine, 'src/composants/AideVideo.jsx'), jp = lire(racine, 'src/JourneePerso.jsx');
-    dit(phrases.length > 0 && !manque.length && /phraseVendeur\(v\.titre\)/.test(av) && !/\{[vx]\.(?:titre|geste)\}/.test(av) && /\{phraseVendeur\(c\.desc\)\}/.test(jp) && !/\{c\.desc\}/.test(jp), `B11 vidéos d’aide, cartes de Ma journée, Quoi de neuf : chaque phrase qui dit « paire » (${phrases.length}) a sa version « article », et l’écran la prend`, manque);
+    dit(phrases.length > 0 && !manque.length && /phraseVendeur\(v\.titre\)/.test(av) && !/\{[vx]\.(?:titre|geste)\}/.test(av) && (!/\bc\.desc\b/.test(jp) || /\{phraseVendeur\(c\.desc\)\}/.test(jp)) && !/\{c\.desc\}/.test(jp), `B11 vidéos d’aide, cartes de Ma journée, Quoi de neuf : chaque phrase qui dit « paire » (${phrases.length}) a sa version « article », et l’écran la prend`, manque);
     const ctx = { inscritLe: '2026-11-01', vend: 'autre', mode: 'complet' };
     const vus = NV.nouveautesDuCompte(ctx).filter((n) => MOT.test(n.titre + ' ' + n.phrase));
     const sn = NV.nouveautesDuCompte({ ...ctx, vend: 'sneakers' });
