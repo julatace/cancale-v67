@@ -280,8 +280,11 @@ html[data-grand-texte] .v2-tete-argent .v2-titre-ligne h1 { flex: 1 0 100%; padd
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) .vrm-ac-sites { padding: var(--v2-air-carte, 20px) !important; border-radius: 20px !important; }
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) .vrm-compta-carte { padding: 24px 20px 20px !important; }
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) .vrm-set-liste .vrm-set-ligne { min-height: 64px !important; padding: 12px var(--v2-air-carte, 20px) !important; box-sizing: border-box !important; }
-:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures], .vrm-pm) .vrm-set-liste { padding-block: 4px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures], .vrm-pm) .vrm-set-liste { padding-block: 8px !important; }
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures], .vrm-pm) .vrm-set-liste .vrm-set-ligne { padding: 16px var(--v2-air-carte, 20px) !important; }
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-micro-grille .vrm-surface div:has(> * + *) { flex-wrap: wrap !important; column-gap: 12px !important; }
 :root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body .vrm-argent :is(.vrm-compta-carte, .vrm-surface) div:has(> * + *) { flex-wrap: wrap !important; column-gap: 12px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-micro-grille .vrm-surface { padding-inline: 24px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body .vrm-argent .vrm-surface div { flex-wrap: wrap !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body .vrm-argent .vrm-surface :is(div, span, label, input, select, p) { min-width: 0 !important; max-width: 100% !important; overflow-wrap: break-word !important; box-sizing: border-box !important; }
 }
