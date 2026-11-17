@@ -30,7 +30,7 @@ const DEFILE = process.env.DEFILE === '1';
       await P.pret(o.pg);
       // Le message « N nouvelles paires numérotées » de la base inventée : fermé par SON ×, comme Julien le ferait.
       const fermerMessages = () => o.pg.evaluate(() => { for (const b of document.querySelectorAll('button.vrm-toast, .vrm-acc-x')) b.click(); }).catch(() => {});
-      await fermerMessages(); await o.pg.waitForTimeout(1500); await fermerMessages(); await o.pg.waitForTimeout(700);
+      for (let k = 0; k < 6; k++) { await fermerMessages(); await o.pg.waitForTimeout(700); }
       const f = path.join(OUT, `${e}-${W}-${t}.png`);
       await o.pg.screenshot({ path: f });
       // Mesures (lues dans la page, jamais un libellé).
