@@ -61845,6 +61845,9 @@ function LigneSansDate({ n }) {
   return <div role="presentation" data-sans-date={n} style={{ fontSize: 12, color: C.muted, padding: '12px 2px 4px', lineHeight: 1.4 }}>{PHRASE_SANS_DATE(n)}</div>;
 }
 function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVentes, lbcLu, ebayTous, onOuvrir, onPro }) {
+  // (17 nov., nouveau design) Allumé : les ventes de toutes les plateformes en rangées A (le logo de la plateforme sur chaque
+  // rangée, le titre sur 2 lignes, la taille en « T. », l'état et la date en 3e ligne) ; éteint, la liste d'hier.
+  const designV2T = useDesignV2();
   // (8 nov.) Les départs prouvés chez le transporteur : la ligne d'une vente Vestiaire partie se redessine.
   const vcLocDep = useVcLocal();
   const voit = (s) => !sites || sites.has(s);
@@ -62035,6 +62038,15 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
               : <><p className="vrm-toutes-vide-titre">Aucune vente pour l’instant</p><p data-acc-vide-pourquoi="">Dès qu’un article part, il apparaît ici, sur tous tes sites.</p><AccVide cle="ventes" lien="?tab=settings&reglage=verifier" sansPourquoi/></>}
           </div>
         : (
+          designV2T ? <div className="vrm-toutes-liste v2v-liste v2t-liste" role="list" data-v2-toutes="">
+            {lignes.slice(0, n).map((l) => { const tf = tailleEnFin(l.titre || '');
+              return <LigneAnnonceV2 key={l.cle} variante="A" cle={'v2tt:' + l.cle} Photo={PhotoVinted} Icon={Icon} photo={l.photo || null} titre={(tf ? tf.nom : l.titre) || ''} num={l.num || ''}
+                prix={l.prix != null ? prix(l) : ''} sous={[tf ? tr('v2v.taille', { t: tf.taille }) : ''].filter(Boolean)} logo={<LogoSite site={l.site}/>}
+                l3={[l.etat ? { cle: 'etat', icone: 'truck', texte: motEtatVente(l.etat) } : null, l.t != null ? { cle: 'date', icone: 'clock', texte: jour(l.t) } : null,
+                  l.tr && l.tr.nom ? { cle: 'transporteur', icone: 'box', texte: l.tr.nom } : null].filter(Boolean)}
+                attrs={{ 'data-toutes-vente': l.site, 'data-toutes-id': l.id, 'data-v2t-ligne': l.cle, role: 'button', tabIndex: 0, onClick: () => onOuvrir(l), onKeyDown: (e) => { if (e.key === 'Enter') onOuvrir(l); } }}/>; })}
+            {lignes.length > n && <Bouton variante="secondaire" plein data-toutes-plus="" onClick={() => React.startTransition(()=>setN((x) => x + 60))} style={{ marginTop: 12 }}>Afficher {Math.min(60,lignes.length-n) > 1 ? `les ${Math.min(60,lignes.length-n)} suivantes` : 'la suivante'}</Bouton>}
+          </div> :
           <div className="vrm-toutes-liste">
             {/* (11 nov., lot accessibilité) Plus de role="list"/"listitem" : un <button role="listitem"> n'était plus
                 annoncé comme un bouton (rôle ARIA faux) ; la liste reste une suite de boutons. */}
@@ -65569,7 +65581,7 @@ function AppCoeur() {
         {site==='toutes' && t==='ventes' && !baseKO && <CacheSiV2 si={designV2App}><div className="vrm-heros-hote" data-heros-hote="ventes" style={{padding:'12px 16px 0'}}><CarteStatsApp page="ventes-toutes" aide bande className="vrm-fu-ecran" ici="cat_ventes" onNav={setTab} sel={{ site: 'toutes', compte: null, periode: null }}/></div></CacheSiV2>}
         {/* (10 nov., lot BB) L'entrée de « Litiges en cours » : sur Ventes, quel que soit le site. */}
         {t==='ventes' && !baseKO && <div className="vrm-entree-litiges-hote" style={{padding:'12px 16px 0'}}><EntreeLitiges ligne={aTrancherEtat && Array.isArray(aTrancherEtat.lignes) ? aTrancherEtat.lignes.find((l)=>l.cle==='litiges-en-cours') : null} onOuvrir={()=>setTab('litiges')}/></div>}
-        {site==='toutes' && t==='ventes' && !baseKO && <div className="vrm-a-venir-hote" style={{padding:'12px 16px 0'}}><ArgentAVenirCarte A={liveStatsVus && liveStatsVus.aVenir} reserve/></div>}
+        {site==='toutes' && t==='ventes' && !baseKO && <CacheSiV2 si={designV2App}><div className="vrm-a-venir-hote" style={{padding:'12px 16px 0'}}><ArgentAVenirCarte A={liveStatsVus && liveStatsVus.aVenir} reserve/></div></CacheSiV2>}
         {/* (6 nov., filet 2) La section d'un site tombe seule : le titre et le filtre des sites restent, on change de site. */}
         <GardeEcran nom={t+':'+site} resetKey={platSub}>
         {/* (10 nov., lot AB) Messages · Tous : un fil par acheteur et par paire (src/filUnique.js). */}

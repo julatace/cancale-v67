@@ -303,14 +303,22 @@ async function toutes(nav, b0, W) {
   const { ctx, pg, erreurs } = await ouvrir(nav, { W, sombre: false, b, url: '/?tab=ventes', dsf: tel ? 2 : 1 });
   await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {});
   await pg.evaluate(() => localStorage.setItem('vrm_design_v2', '1')); await pg.reload({ waitUntil: 'domcontentloaded' });
-  await attendre(pg, () => !!document.querySelector('[data-v2-menu]'), 30000);
+  await attendre(pg, () => !!document.querySelector('[data-v2v-seg="toutes"]'), 30000);
+  // Toutes les plateformes d'abord : les ventes de chaque site en rangées A, le logo de la plateforme sur chaque rangée.
+  await pg.locator('[data-v2v-seg="toutes"]').first().click({ timeout: 8000 }).catch(() => {});
+  await attendre(pg, () => document.querySelectorAll('[data-v2-toutes] [data-v2t-ligne]').length > 2, 30000); await pg.waitForTimeout(1200); await sansToasts(pg);
+  const tp = await pg.evaluate(() => { const l = [...document.querySelectorAll('[data-v2-toutes] [data-v2t-ligne]')]; return { n: l.length, logos: l.filter((x) => x.querySelector('.v2l-logo')).length, vieilles: document.querySelectorAll('.vrm-toutes-ligne').length,
+    aVenir: [...document.querySelectorAll('.vrm-a-venir-hote')].filter((e) => e.getClientRects().length && !e.closest('.v2-cache')).length }; });
+  dit(tp.n > 2 && tp.logos === tp.n && tp.vieilles === 0 && tp.aVenir === 0, `T ${th} : toutes plateformes, ${tp.n} ventes en rangées A avec le logo de leur plateforme ; ni lignes ni carte « À venir » d'hier`, tp);
+  await pg.screenshot({ path: path.join(SHOTS, `toutes-plateformes-${th}.png`) });
+  // Puis Vinted (la liste qui porte la sélection, la facture, les gestes).
   await pg.locator('[data-v2-menu]').first().click({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(500);
-  await pg.locator('[data-v2-feuille] [data-filtre-site="vinted"]').first().click({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(800);
+  await pg.locator('[data-v2-feuille]:not([hidden]) [data-site="vinted"]').first().click({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(800);
   await pg.evaluate(() => { const v = document.querySelector('[data-v2-feuille]:not([hidden]) .v2-voile'); if (v) v.click(); }); await pg.waitForTimeout(300);
   await pg.locator('[data-v2v-seg="toutes"]').first().click({ timeout: 8000 }).catch(() => {});
-  await attendre(pg, () => document.querySelectorAll('[data-v2t-ligne]').length > 2, 30000); await pg.waitForTimeout(2000); await sansToasts(pg);
+  await attendre(pg, () => document.querySelectorAll('.v2t-liste:not([data-v2-toutes]) [data-v2t-ligne]').length > 2, 30000); await pg.waitForTimeout(2000); await sansToasts(pg);
   const r = await pg.evaluate(() => { const vis = (e) => e.getClientRects().length && !e.closest('[hidden], .v2-cache');
-    const lignes = [...document.querySelectorAll('[data-v2t-ligne]')].filter(vis);
+    const lignes = [...document.querySelectorAll('.v2t-liste:not([data-v2-toutes]) [data-v2t-ligne]')].filter(vis);
     const ok = [...document.querySelectorAll('[data-v2-facture-ok]')].filter(vis);
     const vert = ok[0] ? getComputedStyle(ok[0]).color : '';
     return { n: lignes.length, prixAchat: lignes.filter((l) => /Prix d.achat \?/.test(l.textContent)).length,
@@ -323,7 +331,7 @@ async function toutes(nav, b0, W) {
   await pg.screenshot({ path: path.join(SHOTS, `toutes-${th}.png`) });
   // La sélection : « Sélectionner », puis 3 rangées.
   await pg.locator('[data-serie-ouvrir]').first().click({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(400);
-  const lignes = pg.locator('[data-v2t-ligne]');
+  const lignes = pg.locator('.v2t-liste:not([data-v2-toutes]) [data-v2t-ligne]');
   for (let k = 0; k < 3; k++) { await lignes.nth(k).locator('.v2l-a-titre').click({ timeout: 4000 }).catch(() => {}); await pg.waitForTimeout(200); }
   await pg.waitForTimeout(600);
   const s3 = await pg.evaluate(() => { const vis = (e) => e && e.getClientRects().length; const q = (e) => e.getBoundingClientRect();
@@ -348,7 +356,7 @@ async function toutes(nav, b0, W) {
   // Une seule vente, PAS imprimable (déjà partie) : le plein n'est pas « Imprimer » ; « ⋯ » dit pourquoi.
   await pg.locator('[data-v2-serie] [data-serie-annuler]').first().click({ timeout: 4000 }).catch(() => {}); await pg.waitForTimeout(500);
   await pg.locator('[data-serie-ouvrir]').first().click({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(300);
-  const idx = await pg.evaluate(() => [...document.querySelectorAll('[data-v2t-ligne]')].filter((e) => !e.closest('.v2-cache')).findIndex((l) => /En route|Livr|Postée|Au relais/.test(l.textContent)));
+  const idx = await pg.evaluate(() => [...document.querySelectorAll('.v2t-liste:not([data-v2-toutes]) [data-v2t-ligne]')].filter((e) => !e.closest('.v2-cache')).findIndex((l) => /En route|Livr|Postée|Au relais/.test(l.textContent)));
   if (idx >= 0) await lignes.nth(idx).locator('.v2l-a-titre').click({ timeout: 4000 }).catch(() => {});
   await pg.waitForTimeout(600);
   await pg.screenshot({ path: path.join(SHOTS, `toutes-selection1-${th}.png`) });
