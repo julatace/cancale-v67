@@ -237,3 +237,7 @@ html[data-defile] .n-collant { background-color: color-mix(in srgb, var(--sv-mil
   .n-rangee:hover { background: rgb(255 255 255 / .04); }
   .n-carte:hover { box-shadow: 0 1px 1px rgb(8 26 50 / .06), 0 16px 36px -14px rgb(8 26 50 / .55); }
 }
+
+/* (2e passe) La plaque sur une carte de nuit garde son creux ; les morceaux d'une sous-ligne se séparent par « · ». */
+[data-theme="dark"] .n-carte .n-plaque { background: rgb(255 255 255 / .07); box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .18); }
+.n-rangee-sous > span:not(.n-plaque) + span::before { content: '·'; margin-right: 8px; color: var(--c2); font-weight: 400; }
