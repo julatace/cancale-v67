@@ -14059,8 +14059,12 @@ const formeTampon = (type, page, isole = false) => {
 // Paramètres → Imprimante → « Tampons des bordereaux ». Tant qu'il n'a jamais été écrit, ses choix d'avant
 // (`vrm_impression.tamponA4/Th`, `vrm_tampon_positions`) sont repris TELS QUELS (migration à la lecture).
 const TAMPON_POSITIONS = 'vrm_tampon_positions';   // l'ancienne clé : lue par la migration seulement
-const reglageTamponsChoisi = () => { try { return reglageTampons(load(CLE_TAMPONS, null), { impression: load(CLE_IMPRESSION, null), positions: load(TAMPON_POSITIONS, null) }); } catch (_) { return reglageTampons(null); } };
-const ecrireReglageTampons = (r) => { const x = aEcrire(r); if (typeof save === 'function') save(CLE_TAMPONS, x); try { window.dispatchEvent(new CustomEvent('vrm:tampons', { detail: x })); } catch (_) {} return x; };
+// (17 nov.) `save` n'écrit l'appareil qu'une demi-seconde après (file d'envoi) : le réglage qu'on VIENT d'écrire est relu
+// tel quel pendant 2 s — sinon le PDF composé juste après un geste (« tous de ce type ») prenait l'ancienne place.
+let _tamponsEcrits = null;
+const brutTampons = () => (_tamponsEcrits && Date.now() - _tamponsEcrits.t < 2000 ? _tamponsEcrits.x : load(CLE_TAMPONS, null));
+const reglageTamponsChoisi = () => { try { return reglageTampons(brutTampons(), { impression: load(CLE_IMPRESSION, null), positions: load(TAMPON_POSITIONS, null) }); } catch (_) { return reglageTampons(null); } };
+const ecrireReglageTampons = (r) => { const x = aEcrire(r); _tamponsEcrits = { x, t: Date.now() }; if (typeof save === 'function') save(CLE_TAMPONS, x); try { window.dispatchEvent(new CustomEvent('vrm:tampons', { detail: x })); } catch (_) {} return x; };
 // La position mémorisée d'une forme (ou null : le choix automatique). C'est
 // aussi ce que « Tout imprimer » appelle pour chaque bordereau du lot.
 const positionTampon = (forme) => { const p = placesDeForme(reglageTamponsChoisi(), forme && forme.cle != null ? forme.cle : forme).n; return choixTamponValide(p) ? { vx: p.vx, vy: p.vy, vw: p.vw, v: p.v | 0 } : null; };
