@@ -1,0 +1,196 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   MAQUETTE B « iOS natif » (17 nov., demande de Julien : « améliore la disposition des onglets et le design »)
+   ⚠️ N'EXISTE QUE DERRIÈRE LE RÉGLAGE DE BANC `localStorage.vrm_banc_maquette = "b"` (src/maquetteB.js pose
+   `data-maquette="b"` sur la racine) : Julien ne la voit pas tant qu'il ne l'a pas choisie.
+   Couche `vrm-maquette`, déclarée la PREMIÈRE dans index.html : ses `!important` passent devant ceux du verre.
+   Ce qu'elle change, rien d'autre (aucune règle métier, aucun chiffre, aucune donnée, aucun texte) :
+   1. la barre du bas = une tab bar Apple : posée au bord, pleine largeur, verre fin + filet, 5 onglets égaux et le
+      « + » à plat au milieu, l'onglet ouvert TEINTÉ (icône + mot), pastilles ambre (geste) ;
+   2. les grands titres 34/700 partout, qui laissent la place au petit titre centré de la barre du haut au défilement ;
+   3. UN seul dessin de segment système pour TOUS les onglets internes (sites, états, comptes, Résumé/…, vues) ;
+   4. la barre du haut : des glyphes nus (plus de ronds), « Mis à jour » n'est plus une pastille posée sur la liste ;
+   5. à l'ordinateur : une barre latérale façon macOS (collée au bord, vibrance, rangées 36 px, sélection discrète).
+   Le fond bleu dégradé du verre reste tel quel.
+   ════════════════════════════════════════════════════════════════════════════ */
+@layer vrm-maquette {
+
+:root[data-maquette="b"] {
+  --mb-teinte: var(--sv-lien, #004A9F);              /* la seule couleur d'accent : l'onglet ouvert, rien d'autre ici */
+  --mb-gris: rgb(60 60 67 / .62);                     /* iOS « secondaryLabel » sur verre clair */
+  --mb-barre: rgb(249 250 252 / .84);
+  --mb-filet: rgb(0 0 0 / .16);
+  --mb-piste: rgb(255 255 255 / .17);                 /* la piste du segment, posée sur le fond bleu */
+  --mb-piste-t: #FFFFFF;
+  --mb-choisi: #FFFFFF;
+  --mb-choisi-t: #0C1D30;
+  --mb-ambre: #B25E00;
+  --mb-cote: rgb(246 248 251 / .80);                  /* la barre latérale (ordinateur) */
+}
+:root[data-maquette="b"][data-theme="dark"] {
+  --mb-gris: rgb(235 235 245 / .60);
+  --mb-barre: rgb(14 22 36 / .84);
+  --mb-filet: rgb(255 255 255 / .14);
+  --mb-piste: rgb(255 255 255 / .10);
+  --mb-choisi: rgb(255 255 255 / .24);
+  --mb-choisi-t: #FFFFFF;
+  --mb-ambre: #F2B65E;
+  --mb-cote: rgb(14 22 36 / .78);
+}
+
+/* ══ 1. LA TAB BAR (téléphone) ══════════════════════════════════════════════ */
+@media (max-width: 743px) {
+  :root[data-maquette="b"] body .vrm-app-shell .vrm-tabbar.vrm-tabbar {
+    margin: calc(-50px - env(safe-area-inset-bottom, 0px)) 0 0 !important;
+    height: auto !important; min-height: calc(50px + env(safe-area-inset-bottom, 0px)) !important;
+    padding: 0 4px env(safe-area-inset-bottom, 0px) !important; border-radius: 0 !important; align-items: stretch !important;
+    background: var(--mb-barre) !important; -webkit-backdrop-filter: blur(20px) saturate(180%) !important; backdrop-filter: blur(20px) saturate(180%) !important;
+    box-shadow: 0 -.5px 0 var(--mb-filet) !important; border: 0 !important;
+  }
+  :root[data-maquette="b"] body .vrm-app-shell .vrm-tabbar.vrm-tabbar::before { display: none !important; }
+  :root[data-maquette="b"] body .vrm-app-shell .vrm-tabbar.vrm-tabbar::after { background: var(--mb-barre) !important; border-radius: 0 !important; }
+  :root[data-maquette="b"] body .vrm-app-shell > .vrm-main { padding-bottom: calc(50px + env(safe-area-inset-bottom, 0px) + 24px) !important; }
+  /* Cinq onglets ÉGAUX (« Aujourd'hui » ne prend plus plus de place) : icône 24 au-dessus, mot 11/500 dessous. */
+  :root[data-maquette="b"] body .vrm-app-shell .vrm-tabbar > .vrm-tab {
+    flex: 1 1 0 !important; min-height: 50px !important; height: 50px !important; gap: 2px !important; padding: 5px 0 0 !important; justify-content: flex-start !important;
+  }
+  :root[data-maquette="b"] body .vrm-app-shell .vrm-tabbar > .vrm-tab[data-nav-entree="journee"] { flex-grow: 1 !important; }
+  :root[data-maquette="b"] body .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-tab-ic { width: 30px !important; height: 26px !important; color: var(--mb-gris) !important; }
+  :root[data-maquette="b"] body .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-tab-ic svg { width: 25px !important; height: 25px !important; stroke-width: 1.6 !important; }
+  :root[data-maquette="b"] body .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-nav-label { font: 500 11px/1.1 Inter, system-ui, sans-serif !important; letter-spacing: 0 !important; color: var(--mb-gris) !important; }
+  /* L'ouvert : teinté, MÊME graisse (le mot ne change pas de largeur au toucher). Plus de capsule ni de diode. */
+  :root[data-maquette="b"] body .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] :is(.vrm-tab-ic, .vrm-nav-label) { color: var(--mb-teinte) !important; font-weight: 500 !important; }
+  :root[data-maquette="b"] body .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] .vrm-tab-ic svg { stroke-width: 2.1 !important; }
+  :root[data-maquette="b"] body .vrm-app-shell .vrm-tabbar .vrm-tab-pastille { display: none !important; }
+  /* Le « + » : à plat, dans la rangée (plus de disque qui déborde sur la liste), un rond gris 40. */
+  :root[data-maquette="b"] body .vrm-app-shell .vrm-tabbar > .sb-disque {
+    flex: 0 0 52px !important; width: 52px !important; height: 50px !important; min-height: 50px !important; margin: 0 !important; align-self: flex-start !important;
+    background: transparent !important; box-shadow: none !important; transform: none !important; position: relative !important; color: var(--mb-choisi-t) !important;
+  }
+  :root[data-maquette="b"] body .vrm-app-shell .vrm-tabbar > .sb-disque::before {
+    content: "" !important; position: absolute !important; left: 6px !important; top: 5px !important; width: 40px !important; height: 40px !important; border-radius: 50% !important;
+    background: rgb(118 118 128 / .16) !important; z-index: -1 !important; display: block !important;
+  }
+  :root[data-maquette="b"][data-theme="dark"] body .vrm-app-shell .vrm-tabbar > .sb-disque::before { background: rgb(255 255 255 / .14) !important; }
+  :root[data-maquette="b"] body .vrm-app-shell .vrm-tabbar > .sb-disque > svg { width: 22px !important; height: 22px !important; margin-top: -2px !important; }
+  :root[data-maquette="b"] body .vrm-app-shell .vrm-tabbar > .sb-disque::after { display: none !important; }
+  /* Les nombres : petites pastilles AMBRE (un geste à faire), 17 px, posées sur le coin de l'icône. */
+  :root[data-maquette="b"] body .vrm-app-shell .vrm-tabbar .vrm-nav-badge-barre.vrm-nav-badge-n {
+    background: var(--mb-ambre) !important; color: #FFFFFF !important; min-width: 17px !important; height: 17px !important; padding: 0 5px !important; border-radius: 9px !important;
+    font: 600 11px/17px Inter, system-ui, sans-serif !important; top: -2px !important; left: calc(100% - 9px) !important; box-shadow: 0 0 0 1.5px var(--mb-barre) !important;
+  }
+  :root[data-maquette="b"][data-theme="dark"] body .vrm-app-shell .vrm-tabbar .vrm-nav-badge-barre.vrm-nav-badge-n { color: #1A1206 !important; }
+}
+
+/* ══ 2. LA BARRE DU HAUT ET LES GRANDS TITRES ═══════════════════════════════ */
+@media (max-width: 743px) {
+  /* Des glyphes nus 44 px (zone de toucher gardée), à l'encre claire sur le fond ; plus de ronds blancs. */
+  :root[data-maquette="b"] body .vrm-app-shell > .vrm-app-header .vrm-header-actions :is(button.vrm-hbtn, .vrm-cn-cloche > button, button.vrm-cn-cloche) {
+    background: transparent !important; box-shadow: none !important; border: 0 !important; color: var(--sv-clair, #FFF) !important;
+  }
+  :root[data-maquette="b"] body .vrm-app-shell > .vrm-app-header.is-defile .vrm-header-actions :is(button.vrm-hbtn, .vrm-cn-cloche > button, button.vrm-cn-cloche) { color: var(--sv-encre) !important; }
+  :root[data-maquette="b"] body .vrm-app-shell > .vrm-app-header .vrm-header-actions :is(button.vrm-hbtn, .vrm-cn-cloche > button, button.vrm-cn-cloche) svg { color: inherit !important; width: 23px !important; height: 23px !important; }
+  /* Défilée : le verre de la tab bar, un filet, le PETIT titre centré 17/600 (le grand est parti avec la page). */
+  :root[data-maquette="b"] body .vrm-app-shell > .vrm-app-header.vrm-app-header.is-defile {
+    background: var(--mb-barre) !important; box-shadow: 0 .5px 0 var(--mb-filet) !important; -webkit-backdrop-filter: blur(20px) saturate(180%) !important; backdrop-filter: blur(20px) saturate(180%) !important;
+  }
+  :root[data-maquette="b"] body .vrm-app-shell > .vrm-app-header .vrm-hdr-titre.vrm-hdr-titre {
+    font: 600 17px/1.2 Inter, system-ui, sans-serif !important; letter-spacing: -.01em !important; color: var(--sv-encre) !important; opacity: 0 !important;
+  }
+  :root[data-maquette="b"] body .vrm-app-shell > .vrm-app-header.is-defile .vrm-hdr-titre.vrm-hdr-titre { opacity: 1 !important; }
+}
+/* LE grand titre : 34/700, serré, le même sur les cinq écrans (avant : 26/750, 34/600, 34/400, 28/600…). */
+:root[data-maquette="b"] body .vrm-main :is(.vrm-tache-tete > h1, .vrm-screen-head-titre h1, h1.sj-titre, .vrm-market-heading > h1) {
+  font: 700 34px/1.12 Inter, system-ui, sans-serif !important; letter-spacing: -.025em !important; color: var(--sv-clair, #FFF) !important; margin: 0 !important;
+}
+:root[data-maquette="b"] body .vrm-main .vrm-tache-tete { padding-top: 4px !important; min-height: 0 !important; }
+/* « Mis à jour à 08:55 » n'est plus une pastille posée sur l'écran : une ligne grise sous le grand titre (Ma journée la dit). */
+:root[data-maquette="b"] .vrm-neuf-hote { display: none !important; }
+
+/* ══ 3. UN SEGMENT SYSTÈME POUR TOUS LES ONGLETS INTERNES ═══════════════════
+   Sites (Tous · Vinted · Leboncoin · eBay), états de Ventes et d'Achats, Annonces · Stock, Résumé · Statistiques ·
+   Déclarer · Factures, comptes d'Achats, vues d'Annonces : UNE piste de verre, 44 px, le choisi en porcelaine. */
+:root[data-maquette="b"] body .vrm-main :is(.vrm-seg, .vv-seg, .vrm-sel-sites, .vrm-compte-puces, .vrm-stock-views),
+:root[data-maquette="b"] body .vrm-app-shell .vrm-barre-haut-droite .vrm-sel-sites {
+  display: flex !important; flex-wrap: nowrap !important; gap: 0 !important; align-items: stretch !important;
+  min-height: 44px !important; height: auto !important; padding: 0 !important; border: 0 !important; border-radius: 12px !important;
+  background: var(--mb-piste) !important; background-image: none !important; box-shadow: none !important;
+  -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+  overflow-x: auto !important; overflow-y: hidden !important; scrollbar-width: none !important; width: auto !important; max-width: 100% !important;
+}
+:root[data-maquette="b"] body .vrm-main :is(.vrm-seg, .vv-seg, .vrm-sel-sites, .vrm-compte-puces, .vrm-stock-views)::-webkit-scrollbar { display: none !important; }
+:root[data-maquette="b"] body .vrm-main :is(.vrm-seg, .vv-seg, .vrm-sel-sites, .vrm-compte-puces, .vrm-stock-views)::before,
+:root[data-maquette="b"] body .vrm-main :is(.vrm-seg, .vv-seg, .vrm-sel-sites, .vrm-compte-puces, .vrm-stock-views)::after { display: none !important; }
+/* Les segments d'écran prennent la largeur ; les rangées longues (comptes, vues) défilent. */
+:root[data-maquette="b"] body .vrm-main :is(.vrm-seg-plein, .vv-seg, .vrm-platform-tabs, .vrm-paires-selecteur .vrm-seg, .vrm-tache-filtres .vrm-sel-sites) { width: 100% !important; }
+:root[data-maquette="b"] body .vrm-main :is(.vrm-seg, .vv-seg, .vrm-sel-sites, .vrm-compte-puces, .vrm-stock-views) > :is(button, a, [role="tab"], label) {
+  flex: 1 0 auto !important; min-width: 0 !important; min-height: 44px !important; height: 44px !important; margin: 0 !important; padding: 0 14px !important;
+  display: inline-flex !important; align-items: center !important; justify-content: center !important; gap: 6px !important;
+  position: relative !important; isolation: isolate !important; border: 0 !important; border-radius: 12px !important;
+  background: transparent !important; background-image: none !important; box-shadow: none !important; outline-offset: -2px;
+  font: 600 14px/1 Inter, system-ui, sans-serif !important; letter-spacing: -.005em !important; color: var(--mb-piste-t) !important; white-space: nowrap !important; transform: none !important;
+}
+:root[data-maquette="b"] body .vrm-main :is(.vrm-seg-plein, .vv-seg, .vrm-platform-tabs, .vrm-paires-selecteur .vrm-seg, .vrm-tache-filtres .vrm-sel-sites) > :is(button, a, [role="tab"]) { flex: 1 1 0 !important; padding: 0 8px !important; }
+/* Le choisi : une porcelaine posée DANS la piste (2 px de marge), une ombre fine — ni diode, ni teinte. */
+:root[data-maquette="b"] body .vrm-main :is(.vrm-seg, .vv-seg, .vrm-sel-sites, .vrm-compte-puces, .vrm-stock-views) > :is(button, a, [role="tab"])::after { display: none !important; }
+:root[data-maquette="b"] body .vrm-main :is(.vrm-seg, .vv-seg, .vrm-sel-sites, .vrm-compte-puces, .vrm-stock-views) > :is(button, a, [role="tab"])::before { display: none !important; }
+:root[data-maquette="b"] body .vrm-main :is(.vrm-seg, .vv-seg, .vrm-sel-sites, .vrm-compte-puces, .vrm-stock-views) > :is([aria-pressed="true"], [aria-current="page"], [aria-selected="true"], [aria-checked="true"], .is-on, .is-actif)::before {
+  content: "" !important; display: block !important; position: absolute !important; inset: 2px !important; z-index: -1 !important; border-radius: 10px !important;
+  background: var(--mb-choisi) !important; box-shadow: 0 3px 8px rgb(0 0 0 / .12), 0 1px 1px rgb(0 0 0 / .06) !important;
+}
+:root[data-maquette="b"] body .vrm-main :is(.vrm-seg, .vv-seg, .vrm-sel-sites, .vrm-compte-puces, .vrm-stock-views) > :is([aria-pressed="true"], [aria-current="page"], [aria-selected="true"], [aria-checked="true"], .is-on, .is-actif) {
+  color: var(--mb-choisi-t) !important;
+}
+:root[data-maquette="b"] body .vrm-main :is(.vrm-seg, .vv-seg, .vrm-sel-sites, .vrm-compte-puces, .vrm-stock-views) > * * { color: inherit !important; }
+:root[data-maquette="b"] body .vrm-main :is(.vrm-seg, .vv-seg, .vrm-sel-sites, .vrm-compte-puces, .vrm-stock-views) > * :is(img, svg) { opacity: 1 !important; }
+/* Les compteurs d'un segment : le même mot, en plus léger (plus de capsule grise). */
+:root[data-maquette="b"] body .vrm-main :is(.vrm-seg-n, .vv-seg-n) {
+  background: transparent !important; box-shadow: none !important; padding: 0 !important; min-width: 0 !important; height: auto !important;
+  font: 500 14px/1 Inter, system-ui, sans-serif !important; opacity: .62 !important; font-variant-numeric: tabular-nums !important; margin: 0 !important;
+}
+:root[data-maquette="b"] body .vrm-main .vv-seg-n.is-ambre { color: var(--sv-clair-ambre, #FFE0A8) !important; opacity: 1 !important; }
+:root[data-maquette="b"] body .vrm-main .vv-seg-b.is-on .vv-seg-n.is-ambre { color: var(--mb-ambre) !important; }
+/* L'ordinateur pose aussi les sites dans l'île du haut : même dessin, sur le verre clair de l'île. */
+:root[data-maquette="b"] body .vrm-app-shell .vrm-barre-haut-droite .vrm-sel-sites { background: rgb(118 118 128 / .14) !important; }
+:root[data-maquette="b"] body .vrm-app-shell .vrm-barre-haut-droite .vrm-sel-sites > :is(button, a) { min-height: 36px !important; height: 36px !important; border-radius: 10px !important; background: transparent !important; box-shadow: none !important; color: var(--sv-encre) !important; position: relative !important; isolation: isolate !important; }
+:root[data-maquette="b"] body .vrm-app-shell .vrm-barre-haut-droite .vrm-sel-sites > :is(button, a)::after { display: none !important; }
+:root[data-maquette="b"] body .vrm-app-shell .vrm-barre-haut-droite .vrm-sel-sites > :is([aria-pressed="true"], [aria-current="page"], .is-on)::before {
+  content: "" !important; position: absolute !important; inset: 2px !important; z-index: -1 !important; border-radius: 8px !important; background: #FFFFFF !important; box-shadow: 0 2px 6px rgb(0 0 0 / .12) !important; display: block !important;
+}
+/* Deux segments empilés (sites puis états) : 8 px entre eux, pas 12 + 16. */
+:root[data-maquette="b"] body .vrm-main .vrm-tache-filtres { margin-bottom: 8px !important; }
+:root[data-maquette="b"] body .vrm-main :is(.vrm-colis-onglets, .vv-onglets) { margin-top: 0 !important; }
+
+/* ══ 4. L'ORDINATEUR : LA BARRE LATÉRALE FAÇON macOS ═══════════════════════ */
+@media (min-width: 768px) {
+  :root[data-maquette="b"] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] {
+    top: 0 !important; left: 0 !important; bottom: 0 !important; width: 236px !important; padding: 18px 10px 10px !important; border-radius: 0 !important;
+    background: var(--mb-cote) !important; -webkit-backdrop-filter: blur(30px) saturate(180%) !important; backdrop-filter: blur(30px) saturate(180%) !important;
+    border: 0 !important; box-shadow: .5px 0 0 var(--mb-filet) !important;
+  }
+  :root[data-maquette="b"] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-sidebar-mot { font: 700 15px/1 Inter, system-ui, sans-serif !important; letter-spacing: -.01em !important; }
+  :root[data-maquette="b"] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] > .vrm-sidebar-brand { padding: 4px 10px 10px !important; }
+  :root[data-maquette="b"] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-section-label { font: 700 11px/1.2 Inter, system-ui, sans-serif !important; letter-spacing: .01em !important; color: var(--mb-gris) !important; padding: 16px 10px 4px !important; }
+  :root[data-maquette="b"] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] :is(.vrm-rail-platforms, .vrm-rail-management) { gap: 1px !important; }
+  :root[data-maquette="b"] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-button {
+    min-height: 36px !important; height: 36px !important; padding: 0 10px !important; gap: 9px !important; border-radius: 8px !important;
+    font: 500 14px/1.2 Inter, system-ui, sans-serif !important; color: var(--sv-encre) !important;
+  }
+  :root[data-maquette="b"] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-button > :first-child { color: var(--mb-teinte) !important; flex-basis: 18px !important; width: 18px !important; }
+  :root[data-maquette="b"] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-button > :first-child svg { width: 18px !important; height: 18px !important; }
+  :root[data-maquette="b"] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-button[aria-current="page"] { font-weight: 600 !important; }
+  /* La sélection : un aplat gris discret (fenêtre active de macOS sans couleur), plus de porcelaine qui bombe ni de diode. */
+  :root[data-maquette="b"] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] :is(.vrm-nav-indicateur.vrm-nav-indicateur, .vrm-rail-button[aria-current="page"]) { background: rgb(0 0 0 / .08) !important; box-shadow: none !important; border-radius: 8px !important; }
+  :root[data-maquette="b"][data-theme="dark"] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] :is(.vrm-nav-indicateur.vrm-nav-indicateur, .vrm-rail-button[aria-current="page"]) { background: rgb(255 255 255 / .12) !important; }
+  :root[data-maquette="b"] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-indicateur.vrm-nav-indicateur::after { display: none !important; }
+  /* Les nombres : le chiffre seul, à droite, gris — ambre quand c'est un geste (comme Mail). */
+  :root[data-maquette="b"] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-nav-badge-rail.vrm-nav-badge-n {
+    background: transparent !important; color: var(--mb-ambre) !important; font: 600 13px/22px Inter, system-ui, sans-serif !important; padding: 0 !important; min-width: 0 !important; font-variant-numeric: tabular-nums !important;
+  }
+  :root[data-maquette="b"] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] > .vrm-rail-pied { background: transparent !important; border-top: .5px solid var(--mb-filet) !important; }
+}
+@media (min-width: 768px) and (max-width: 1399px) {
+  :root[data-maquette="b"] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] { width: 78px !important; padding: 18px 6px 10px !important; }
+  :root[data-maquette="b"] body .vrm-app-shell nav.vrm-sidebar[data-rail-verre] .vrm-rail-button { width: 64px !important; height: 52px !important; min-height: 52px !important; }
+}
+
+} /* fin de @layer vrm-maquette */
