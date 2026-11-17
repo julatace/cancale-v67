@@ -834,7 +834,7 @@ export function FactureVente({ vente, deps, ligne = false, groupe = null, pastil
       <span className="vrm-fp-pastille" role="button" tabIndex={0} data-fp-pastille={cle} data-fp-vente={emise ? (e ? e.etat : 'emise') : 'a-faire'} data-fp-ligne-etat={emise ? k : undefined} title={emise ? f.numero : undefined}
         onClick={() => setOuverte(true)} onKeyDown={(ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); setOuverte(true); } }}>
         <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>
-        {tr(`fm.pastille.${cle}`)}
+        <span className="vrm-fp-pastille-long">{tr(`fm.pastille.${cle}`)}</span><span className="vrm-fp-pastille-court" aria-hidden="true">{tr(`fm.pastille.court.${cle}`)}</span>
       </span>
       {ouverte ? <FeuilleFactureVente vente={vente} preuve={preuve} facture={f} avoir={av} deps={deps} fermer={() => setOuverte(false)}/> : null}
     </span>;

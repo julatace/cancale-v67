@@ -53,4 +53,9 @@ export default {
   "fm.pastille.encours": "Invoice sending",
   "fm.pastille.averifier": "Check invoice",
   "fm.pastille.annulee": "Invoice cancelled",
+  "fm.pastille.court.facturee": "Invoiced",
+  "fm.pastille.court.aenvoyer": "To invoice",
+  "fm.pastille.court.encours": "Sending…",
+  "fm.pastille.court.averifier": "Check",
+  "fm.pastille.court.annulee": "Cancelled",
 };

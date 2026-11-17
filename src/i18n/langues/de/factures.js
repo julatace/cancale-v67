@@ -53,4 +53,9 @@ export default {
   "fm.pastille.encours": "Rechnung wird gesendet",
   "fm.pastille.averifier": "Rechnung prüfen",
   "fm.pastille.annulee": "Rechnung storniert",
+  "fm.pastille.court.facturee": "Abgerechnet",
+  "fm.pastille.court.aenvoyer": "Abrechnen",
+  "fm.pastille.court.encours": "Senden…",
+  "fm.pastille.court.averifier": "Prüfen",
+  "fm.pastille.court.annulee": "Storniert",
 };

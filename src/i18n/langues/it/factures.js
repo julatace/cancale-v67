@@ -53,4 +53,9 @@ export default {
   "fm.pastille.encours": "Fattura in invio",
   "fm.pastille.averifier": "Fattura da verificare",
   "fm.pastille.annulee": "Fattura annullata",
+  "fm.pastille.court.facturee": "Fatturata",
+  "fm.pastille.court.aenvoyer": "Da fatturare",
+  "fm.pastille.court.encours": "Invio…",
+  "fm.pastille.court.averifier": "Verificare",
+  "fm.pastille.court.annulee": "Annullata",
 };
