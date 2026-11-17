@@ -26,6 +26,8 @@
     "https://vrm.center/*",
     "https://*.ebay.fr/*",
     "https://*.ebay.com/*",
+    "https://i.ebayimg.com/*",
+    "https://*.vestiairecollective.com/*",
     "https://www.mondialrelay.be/*",
     "https://www.mondialrelay.fr/*",
     "https://ws.chronopost.fr/*",

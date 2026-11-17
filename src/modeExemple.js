@@ -27,8 +27,14 @@
 // Le banc `scripts/bancs/mode-exemple.cjs` compte les requêtes qui atteignent la
 // base pendant l'exemple (attendu : 0) et vérifie qu'aucune trace de l'exemple
 // ne reste dans la base ni dans le stockage réel après la sortie.
-import { servirTable } from './exempleBase.js';
-import { jeuExemple, UID_EXEMPLE, EMAIL_EXEMPLE } from './exempleDonnees.js';
+// (16 nov., lot vitesse-lectures) Les données inventées et la petite base qui les sert sont un
+// morceau À PART (≈ 23 Ko de source) : chargées seulement quand l'exemple est vraiment demandé, au
+// moment où il s'installe — la page d'accueil de tous les visiteurs ne les télécharge plus (budget
+// du fichier d'entrée, banc `accueil`). Toute lecture de la base de l'exemple ATTEND ces données
+// (la réponse arrive un instant plus tard, rien ne sort pour autant : le réseau est déjà coupé).
+import { UID_EXEMPLE, EMAIL_EXEMPLE } from './exempleIdentite.js';
+let _donneesExemple = null;
+const chargerDonneesExemple = () => _donneesExemple || (_donneesExemple = Promise.all([import('./exempleBase.js'), import('./exempleDonnees.js')]));
 
 export const CLE_EXEMPLE = 'vrm_mode_exemple';
 export { UID_EXEMPLE };
@@ -143,10 +149,13 @@ function repondreBase(chemin, url, methode, entetes, corps) {
   if (chemin.startsWith('/rest/v1/')) {
     const table = chemin.slice('/rest/v1/'.length).split('/')[0];
     if (table === 'rpc') return reponse(200, 'null');
-    const t = table === 'app_data' ? ETAT.base : table === 'vinted_accounts' ? ETAT.comptes : (ETAT.autres[table] || (ETAT.autres[table] = { lignes: [] }));
     if (methode !== 'GET' && methode !== 'HEAD') ETAT.ecritures++;
-    const r = servirTable(t, { methode, url, entetes, corps, owner: ETAT.uid });
-    return reponse(r.status, r.status === 204 ? null : r.body, r.headers);
+    const etat = ETAT;
+    return etat.pret.then(() => {
+      const t = table === 'app_data' ? etat.base : table === 'vinted_accounts' ? etat.comptes : (etat.autres[table] || (etat.autres[table] = { lignes: [] }));
+      const r = etat.servirTable(t, { methode, url, entetes, corps, owner: etat.uid });
+      return reponse(r.status, r.status === 204 ? null : r.body, r.headers);
+    }, () => reponse(503, { message: 'exemple : données indisponibles' }));
   }
   // storage, functions, realtime en HTTP : rien d'utile dans l'exemple.
   if (methode !== 'GET' && methode !== 'HEAD') ETAT.ecritures++;
@@ -185,8 +194,19 @@ export function installerModeExemple(win = typeof window !== 'undefined' ? windo
   // (14 nov.) `origine` : les photos d'exemple sont servies par `public/exemple/` (même origine, CSP).
   let origine = ''; try { origine = String(win.location.origin || ''); } catch (_) {}
   // (15 nov.) Le bac à sable : une base VIDE, celle d'un compte qui vient d'être créé.
-  const jeu = bac ? { lignes: [], comptes: [] } : jeuExemple(Date.now(), { catalogue: win.__vrmExempleCatalogue, origine });
-  ETAT = { actif: true, ssReel, sansCompte, bac, uid: bac ? UID_BAC : UID_EXEMPLE, email: bac ? EMAIL_BAC : EMAIL_EXEMPLE, base: { lignes: jeu.lignes }, comptes: { lignes: jeu.comptes }, autres: {}, surPlace: 0, ecritures: 0, refusees: 0, coupes: 0 };
+  const t0 = Date.now(), catalogue = win.__vrmExempleCatalogue;
+  ETAT = { actif: true, ssReel, sansCompte, bac, uid: bac ? UID_BAC : UID_EXEMPLE, email: bac ? EMAIL_BAC : EMAIL_EXEMPLE, base: { lignes: [] }, comptes: { lignes: [] }, autres: {}, surPlace: 0, ecritures: 0, refusees: 0, coupes: 0, servirTable: null, pret: null };
+  {
+    const etat = ETAT;
+    etat.pret = chargerDonneesExemple().then(([b, d]) => {
+      const jeu = bac ? { lignes: [], comptes: [] } : d.jeuExemple(t0, { catalogue, origine });
+      // Lectures ET écritures de la base de l'exemple attendent `pret` : rien n'est servi avant le jeu.
+      etat.base.lignes = jeu.lignes;
+      etat.comptes.lignes = jeu.comptes;
+      etat.servirTable = b.servirTable;
+    });
+    etat.pret.catch(() => {});
+  }
 
   // 1. LE STOCKAGE : en mémoire. La session de l'exemple n'existe que là.
   const depart = {};

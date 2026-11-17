@@ -40,8 +40,9 @@ test('arrêt avant consommation interdit l’envoi ; arrêt après départ n’i
 test('plus de plafond de dix par heure (29 oct.) : la onzième réservation part après son délai',()=>{
   let d=lancer(null,Array.from({length:10},(_,i)=>cible(i))).data;
   d=lancer(d,[cible(20),cible(21)],autre).data;
-  for(let i=0;i<10;i++){const r=claim(d,T+i*60000,owner,'t'+i);assert.ok(r.valeur.travail);d=regler(r.data,T+i*60000,owner,'t'+i);}
-  const r=claim(d,T+10*60000,autre);assert.ok(r.valeur.travail);
+  // (16 nov.) Un temps fixe d'1 min dure 61 à 89 s (jamais une minute ronde) : une réservation toutes les 90 s.
+  for(let i=0;i<10;i++){const r=claim(d,T+i*90000,owner,'t'+i);assert.ok(r.valeur.travail);d=regler(r.data,T+i*90000,owner,'t'+i);}
+  const r=claim(d,T+10*90000,autre);assert.ok(r.valeur.travail);
   d=terminerFile(r.data,{owner:autre,jeton:'jeton-unique',resultat:'refuse'}).data;
   assert.equal(d.tentatives.length,11);assert.equal(d.groupes[autre].active,false);
 });
@@ -56,7 +57,7 @@ test('le quota et la cadence repartent de l’accusé reçu, pas d’une réserv
   let d=claim(lancer(null,[cible(1),cible(2)]).data).data;
   d=consommerFile(d,{owner,jeton:'jeton-unique',maintenant:T}).data;
   d=terminerFile(d,{owner,jeton:'jeton-unique',resultat:'envoye',maintenant:T+50000}).data;
-  assert.deepEqual(d.tentatives,[T+50000]);assert.equal(claim(d,T+60000).valeur.travail,undefined);assert.ok(claim(d,T+110000).valeur.travail);
+  assert.deepEqual(d.tentatives,[T+50000]);assert.equal(claim(d,T+60000).valeur.travail,undefined);assert.equal(claim(d,T+50000+60000).valeur.travail,undefined,'1 min fixe : jamais pile 60 s');assert.ok(claim(d,T+50000+89000).valeur.travail);
 });
 test('dédoublonnage après envoi ; refus relançable seulement par une nouvelle sélection explicite',()=>{
   let d=lancer(null,[cible(1),{...cible(1),notificationId:'autre-notif'}]).data;assert.equal(d.groupes[owner].jobs.length,1);

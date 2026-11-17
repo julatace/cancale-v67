@@ -19,6 +19,7 @@
 require('./_source-app.cjs').brancher();
 const fs = require('fs'), path = require('path'), os = require('os'), url = require('url');
 const { faireFond } = require('./_fond-vm.cjs');
+const { filCapte } = require('./_fil-capte-vm.cjs');   // (5.398) le fil relu avant le geste
 
 const iSrc = process.argv.indexOf('--src');
 const RAC = iSrc > 0 ? path.resolve(process.argv[iSrc + 1]) : path.join(__dirname, '..');
@@ -89,7 +90,7 @@ async function moteur({ prix, min, refuse, garde, onglets, frein, deux, refusVin
   lignes.main.vinted_offres_garde = garde === undefined ? GARDE_OK() : garde;
   const store = frein ? { vrmFreinRepub: { [UID]: { jusqua: Date.now() + 3600000, restreint: false, status: 422, at: Date.now() } } } : {};
   const f = faireFond({ src: BG_SRC || undefined, lignes, store, connecte: UID, ...(onglets ? { onglets } : {}),
-    vinted: (e) => (refusVinted && /\/offer_requests\//.test(e.chemin) ? { status: 422, body: { message: 'expired' } } : { status: 200, body: {} }) });
+    vinted: filCapte(lignes, (e) => (refusVinted && /\/offer_requests\//.test(e.chemin) ? { status: 422, body: { message: 'expired' } } : { status: 200, body: {} })) });
   try { await f.ctx.autoAccepterOffres(UID); } catch (_) {}
   const pv = f.store.vrmOffresPrevues || {}; for (const k in pv) if (pv[k]) pv[k].at = Date.now() - 1000;
   try { await f.ctx.autoAccepterOffres(UID); } catch (_) {}

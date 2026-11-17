@@ -15,4 +15,7 @@ export default {
   "studio.paires.grille": "Grille",
   "studio.paires.dansStock": "au Stock",
   "studio.paires.ranger": "à ranger",
+  "studio.paires.observateurs": "observateurs",
+  "studio.paires.voirSur": "Voir sur {site}",
+  "studio.paires.ouvrirFiche": "Ouvrir la fiche",
 };

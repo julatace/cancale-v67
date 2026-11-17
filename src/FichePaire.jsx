@@ -102,14 +102,20 @@ const Evenement = ({ ev }) => (
 const LIB_SOURCE = { relie: 'achat relié', gros: 'achat en gros', saisi: 'saisi à la main' };
 function EtatArticle({ etat }) {
   const r = etat.republications;
+  // (16 nov., captures de Julien) « achat pas relié à cette paire » sous deux chiffres : une même phrase sur plusieurs
+  // lignes est UNE phrase, dite une fois sous le titre (§7) ; les lignes gardent leur « — ».
+  const nbRaison = new Map();
+  for (const l of etat.lignes) if (l.jours == null && l.raison) nbRaison.set(l.raison, (nbRaison.get(l.raison) || 0) + 1);
+  const communes = [...nbRaison].filter(([, n]) => n > 1).map(([t]) => t);
   return (
     <section className="vrm-fp-etat" aria-label="L’état de cet article" data-fiche-etat-article="">
       <h3 className="vrm-fp-etat-titre">L’état</h3>
+      {communes.map((t) => <p key={t} className="vrm-fp-etat-commune" data-etat-raison-commune="">— {t}</p>)}
       <dl className="vrm-fp-etat-grille">
         {etat.lignes.map((l) => (
           <div key={l.cle} className="vrm-fp-etat-l" data-etat-ligne={l.cle} data-etat-val={l.jours == null ? '' : l.jours} data-etat-borne={l.borne || ''}>
             <dt>{l.titre}</dt>
-            <dd><b>{texteDuree(l)}</b>{l.jours == null && l.raison ? <small>{l.raison}</small> : /^depuis/.test(l.borne || '') ? <small>pas encore vendue</small> : l.borne === 'au-plus' || l.borne === 'au-moins' ? <small>la 1re annonce n’a pas de date lue</small> : null}</dd>
+            <dd><b>{texteDuree(l)}</b>{l.jours == null && l.raison ? (communes.includes(l.raison) ? null : <small>{l.raison}</small>) : /^depuis/.test(l.borne || '') ? <small>pas encore vendue</small> : l.borne === 'au-plus' || l.borne === 'au-moins' ? <small>la 1re annonce n’a pas de date lue</small> : null}</dd>
           </div>
         ))}
         <div className="vrm-fp-etat-l" data-etat-ligne="republications" data-etat-val={r.n == null ? '' : r.n}>
@@ -214,6 +220,8 @@ function CarteAction({ a, I, Photo, relier, onBordereau, onPrix, onSaisir, num }
     <section className="fd-act" data-fd-action="bordereau" aria-label={tr('fd.bord.titre')}>
       <b className="fd-act-t">{tr('fd.bord.titre')}</b>
       {a.pret ? <span className="fd-act-s">{tr('fd.bord.pret')}</span> : null}
+      {/* (16 nov., lot ecrans-restes) La date limite d'envoi, par la règle de Colis (l'e-mail du bordereau, sinon estimée). */}
+      {a.limite ? <span className={'fd-act-s' + (a.limite.ambre ? ' is-am' : '')} data-fd-limite={a.limite.jour || ''} data-fd-limite-estimee={a.limite.estimee ? '1' : '0'}>{a.limite.texte}</span> : null}
       <button type="button" className="fd-plein sb-btn-plein" data-fiche-bordereau={a.tx || ''} onClick={() => onBordereau && onBordereau(a.tx)}>{I('printer', 19)}{tr('fd.bord.plein')}</button>
     </section>
   );
@@ -369,7 +377,10 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
   const vueOuverte = vue || (p ? vueInitiale(p, lignesSites) : 'argent');
   const cases = p ? argentFiche(p, lignesSites) : [];
   const hist = p ? histoireFiche(p, { sites: lignesSites }) : [];
-  const dispo = { neuve, note: !!((plus && plus.note) || note), atelier: !!(plus && plus.atelier), rappel: !!(plus && plus.rappel), onPrix, onPublierAilleurs, onDupliquer, outilsIdees, onBordereau, onEmballer, histoNum };
+  // (16 nov., captures de Julien) Ouverte depuis une ligne de COLIS, la feuille porte déjà SON geste du bordereau
+  // (« Imprimer le bordereau » / « Générer le bordereau », la place des actions de la ligne) : la tuile « Bordereau »
+  // le redisait sous une autre forme. Une fonction, une forme (§7).
+  const dispo = { neuve, note: !!((plus && plus.note) || note), atelier: !!(plus && plus.atelier), rappel: !!(plus && plus.rappel), onPrix, onPublierAilleurs, onDupliquer, outilsIdees, onBordereau: ctx === 'colis' ? null : onBordereau, onEmballer, histoNum };
   const tuiles = p ? tuilesFiche(p, dispo) : [];
   const fermerPlus = () => { setPlusOuvert(false); setTuile(null); };
   // Une tuile : un geste direct (il ferme la feuille), ou ce qu'elle montre (la note, l'atelier, le rappel, l'histoire du N°).
@@ -486,7 +497,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
           {(p || depuis) ? <div className="fd-t" aria-label={tr('fiche.heros')}>
             {ctxHeros ? <span className="fd-ctx" data-fiche-heros-ctx="">{codeHeros ? <>{`${ctxHeros} · `}<span className="vrm-sensible" data-stream-type="code" data-fiche-heros-code="">{codeHeros}</span></> : [ctxHeros, depuis && depuis.sous].filter(Boolean).join(' · ')}</span> : null}
             <h1 className="fd-nom">{motsInsecables(titre)}{taille ? ` · ${taille}` : ''}</h1>
-            {lEtat ? <span className={'fd-etat' + (lEtat.ambre ? ' is-am' : '') + (lEtat.rouge ? ' is-rouge' : '')} data-fd-etat={lEtat.cle} data-fd-ambre={lEtat.ambre ? '1' : '0'}>{tr(lEtat.cle, { ...lEtat.vars, prix: lEtat.vars.prix != null ? eur(lEtat.vars.prix) : '' })}</span>
+            {lEtat ? <span className={'fd-etat' + (lEtat.ambre ? ' is-am' : '') + (lEtat.rouge ? ' is-rouge' : '')} data-fd-etat={lEtat.cle} data-fd-ambre={lEtat.ambre ? '1' : '0'} data-fd-limite={lEtat.limite ? (lEtat.limite.jour || '') : undefined}>{tr(lEtat.cle, { ...lEtat.vars, prix: lEtat.vars.prix != null ? eur(lEtat.vars.prix) : '' })}</span>
               : depuis && depuis.prix ? <span className="fd-etat" data-fiche-heros-prix={depuis.prix}>{depuis.prix}</span> : null}
             {neuve ? <span className="fd-etat" data-fiche-neuve="">Photos à prendre</span> : null}
             {p && p.ancienNumero ? <span className="fd-etat">Ancien numéro (d’avant la remise à zéro)</span> : null}

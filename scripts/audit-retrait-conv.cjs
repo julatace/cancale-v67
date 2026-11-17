@@ -188,6 +188,13 @@ const dit = (ok, nom, det) => { if (!ok) ko++; console.log(`${ok ? '✅' : '❌'
   const deux = ctx.retraitDeConversation(conv([act('Ton colis est arrivé !',
     'Rends-toi au relais Mondial Relay. Un casier Vinted Go est aussi proche, 35260 Cancale.')]));
   dit(!deux || deux.transporteur === '', 'deux transporteurs nommés → on ne choisit pas', deux ? `«${deux.transporteur}»` : 'null');
+  // 5.395 — « Mondial Relay by InPost » (signature mesurée de ses e-mails) = UN réseau : Mondial Relay.
+  const by = ctx.retraitDeConversation(conv([act('Ton colis est arrivé !',
+    'Rends-toi au Point Relais Phone Cash, 12 rue du Port, 35260 Cancale. L’équipe Mondial Relay by InPost.')]));
+  dit(!!by && by.transporteur === 'mondialrelay', '« Mondial Relay by InPost » → mondialrelay (un seul réseau)', by ? `«${by.transporteur}»` : 'null');
+  const ip = ctx.retraitDeConversation(conv([act('Ton colis est arrivé !',
+    'Ton colis t’attend au casier InPost Carrefour, 35260 Cancale.')]));
+  dit(!!ip && ip.transporteur === 'mondialrelay', '« InPost » seul → mondialrelay (jamais une clé inpost)', ip ? `«${ip.transporteur}»` : 'null');
 }
 console.log(ko ? `\n${ko} contrôle(s) en échec` : '\nTous les contrôles passent');
 process.exit(ko ? 1 : 0);

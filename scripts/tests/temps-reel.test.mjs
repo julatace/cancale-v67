@@ -131,3 +131,38 @@ test('canal refusé (migration pas posée) ⇒ ne réessaie plus', () => {
   p.recevoir({ topic: j.topic, event: 'phx_reply', ref: j.ref, payload: { status: 'error', response: { reason: 'Unauthorized' } } });
   assert.equal(relances, 0); assert.equal(prises.length, 1);
 });
+
+// (16 nov., lot vitesse-lectures) Les familles ajoutées et la passerelle Leboncoin/Vestiaire.
+import { famillesARejouer, installerPasserelleVeille, DEJA_MS } from '../../src/passerelleVeille.js';
+test('quoiDe : Messages (par compte), Leboncoin, Vestiaire, e-mails ; le reste de leurs lignes n\'est pas signalé', () => {
+  assert.deepEqual(quoiDe('harvest_42_inbox'), { quoi: 'messages', uid: '42' });
+  assert.deepEqual(quoiDe('lbc_ventes'), { quoi: 'lbc', uid: null });
+  assert.deepEqual(quoiDe('lbc_listings'), { quoi: 'lbc', uid: null });
+  assert.deepEqual(quoiDe('vc_offres'), { quoi: 'vestiaire', uid: null });
+  assert.deepEqual(quoiDe('email_reception_0123456789abcdef'), { quoi: 'emails', uid: null });
+  for (const bruit of ['lbc_a_retirer', 'lbc_recon', 'lbc_catalogue', 'vc_recon', 'vc_brut_x', 'vc_envoi', 'email_journal', 'email_reception_zz', 'harvest_42_conv_9', 'harvest_42_inbox_x']) assert.equal(quoiDe(bruit), null, bruit);
+});
+test('passerelle : une famille rejouée une fois, jamais juste après un vrai signal de l\'extension', () => {
+  const t = 1e6;
+  assert.deepEqual(famillesARejouer([{ quoi: 'lbc' }, { quoi: 'lbc' }, { quoi: 'vestiaire' }, { quoi: 'ventes' }], {}, t), ['lbc', 'vestiaire']);
+  assert.deepEqual(famillesARejouer([{ quoi: 'lbc' }], { lbc: t - 1000 }, t), []);
+  assert.deepEqual(famillesARejouer([{ quoi: 'lbc' }], { lbc: t - DEJA_MS }, t), ['lbc']);
+  assert.deepEqual(famillesARejouer([{ quoi: 'messages' }, { quoi: 'emails' }], {}, t), []);
+  // La vraie fenêtre (EventTarget) : le signal rejoué porte `source:'veille'` ; un vrai signal juste avant l'empêche.
+  const ecoutes = new Map(); const envoyes = [];
+  const win = { CustomEvent: class { constructor(n, o) { this.type = n; this.detail = o && o.detail; } },
+    addEventListener: (n, f) => { ecoutes.set(n, [...(ecoutes.get(n) || []), f]); }, removeEventListener: (n, f) => ecoutes.set(n, (ecoutes.get(n) || []).filter((g) => g !== f)),
+    dispatchEvent: (e) => { if (e.type === 'vrm:ext') envoyes.push(e.detail); for (const f of ecoutes.get(e.type) || []) f(e); return true; } };
+  let maintenant = t;
+  const off = installerPasserelleVeille(win, () => maintenant);
+  win.dispatchEvent(new win.CustomEvent('vrm:neuf', { detail: { quoi: [{ quoi: 'lbc' }] } }));
+  assert.deepEqual(envoyes, [{ type: 'maj', quoi: 'lbc', source: 'veille' }]);
+  maintenant += 1000; win.dispatchEvent(new win.CustomEvent('vrm:neuf', { detail: { quoi: [{ quoi: 'lbc' }] } }));
+  assert.equal(envoyes.length, 1);
+  win.dispatchEvent(new win.CustomEvent('vrm:ext', { detail: { type: 'maj', quoi: 'vestiaire' } }));   // vrai signal de l'extension
+  maintenant += 1000; win.dispatchEvent(new win.CustomEvent('vrm:neuf', { detail: { quoi: [{ quoi: 'vestiaire' }] } }));
+  assert.equal(envoyes.filter((x) => x.source === 'veille' && x.quoi === 'vestiaire').length, 0);
+  off();
+  maintenant += DEJA_MS * 2; win.dispatchEvent(new win.CustomEvent('vrm:neuf', { detail: { quoi: [{ quoi: 'lbc' }] } }));
+  assert.equal(envoyes.filter((x) => x.source === 'veille').length, 1);
+});

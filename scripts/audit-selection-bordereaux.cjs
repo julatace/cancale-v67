@@ -70,7 +70,8 @@ const dit = (c, m, d) => { n++; if (!c) ko++; console.log(`${c ? '✅' : '❌'} 
   dit(S.texteSansBordereau([]) === '', '4b rien à nommer ⇒ rien');
   const lotBloc = app.slice(app.indexOf('const lignesLotTous = () =>'), app.indexOf('const [progressionLot,setProgressionLot]'));
   dit(/ligneLotAutre\(/.test(lotBloc) && !/__autre === 'vc' && x\.v && x\.v\.bordereau/.test(lotBloc) && !/lbcPdf && x\.o && x\.o\.label/.test(lotBloc), '5a App : le lot prend les lignes de `ligneLotAutre` (plus de filtre « PDF déjà là »)');
-  dit(/coches:cochesParDefaut\(L\)/.test(app) && /const choisies = selectionImprimable\(L, voulues \|\| cochesParDefaut\(L\)\);/.test(app), '5b App : cochées d’office et sélection imprimable par la règle');
+  // (16 nov., lot impression-retours) Les ventes gardent LEUR règle ; les retours (lignes `r:…`) ont leur case à part.
+  dit(/coches:(?:new Set\(\[\.\.\.)?cochesParDefaut\(L(?:\.filter\(\(l\) => !estRetour\(l\)\))?\)/.test(app) && /const choisiesV? = selectionImprimable\(L, voulues \|\| cochesParDefaut\(L\)\);/.test(app), '5b App : cochées d’office et sélection imprimable par la règle');
   // (14 nov., impression-simple) la fusion vit dans `composerBordereaux`.
   const merge = app.slice(app.indexOf('const composerBordereaux = async'), app.indexOf('const mergeAndDownloadBordereaux = '));
   dit(/const dejaLot = \{\};/.test(merge) && /deja: dejaLot\s*[,}]/.test(merge), '5c la place choisie vaut pour TOUS les bordereaux de la même forme du lot (une question par forme)');
@@ -78,8 +79,8 @@ const dit = (c, m, d) => { n++; if (!c) ko++; console.log(`${c ? '✅' : '❌'} 
   // (14 nov., impression-simple) La feuille « Place du tampon » ne s'ouvre plus seule pendant le lot (elle bloquait
   // l'impression, une fois par transporteur) : la place gardée, sinon l'automatique ; « Déplacer le tampon » l'ouvre
   // pour UN bordereau, APRÈS, sur sa demande.
-  dit(/composerLot\(\[l\], format, t \? \{ \[cle\]: t \} : \{\}, \{ apercu: 'force' \}\)/.test(app) && /data-impr-deplacer=\{corrige\.cle\}/.test(fs.readFileSync(path.join(__dirname, '..', 'src', 'ImpressionSimple.jsx'), 'utf8')) && /\{ apercu = false, pas = null \} = \{\}/.test(app), '5e « Déplacer le tampon » rouvre la feuille pour CE bordereau, sur sa demande ; jamais d’office pendant le lot');
-  dit(/const choisirTampon = \(\{ PL, src, numero, titre, apercu = true, deja = \{\}(?:, [\w ={}]+)? \}\)/.test(app), '5f `choisirTampon` accepte une mémoire partagée (`deja`)');
+  dit(/composerLot\(\[l\], format, t \? \{ \[cle\]: t \} : \{\}, \{ apercu: 'force' \}\)/.test(app) && /data-impr-deplacer=\{corrige\.cle\}/.test(fs.readFileSync(path.join(__dirname, '..', 'src', 'ImpressionSimple.jsx'), 'utf8')) && /\{ apercu = false, pas = null(?:, places = null)? \} = \{\}/.test(app), '5e « Déplacer le tampon » rouvre la feuille pour CE bordereau, sur sa demande ; jamais d’office pendant le lot');
+  dit(/const choisirTampon = \(\{ PL, src, numero, titre, apercu = true, deja = \{\}(?:, [\w ={}'']+)* \}\)/.test(app), '5f `choisirTampon` accepte une mémoire partagée (`deja`)');
   console.log(`\n${ko ? '❌' : '✅'} audit-selection-bordereaux : ${n - ko}/${n}`);
   fs.rmSync(tmp, { recursive: true, force: true });
   process.exit(ko ? 1 : 0);

@@ -8,6 +8,7 @@
 // est src/variantesMessage.js (l'extension en porte la copie).
 import React from 'react';
 import { VARIANTES_MAX } from './variantesMessage.js';
+import { tr } from './i18n/index.js';
 import './autres-versions.css';
 
 // `variantes` : textes des versions 2 à 5 (le 1er champ reste celui de l'écran).
@@ -66,7 +67,7 @@ export default function AutresVersions({ nom, premier = '', variantes = [], onCh
       )}
       {remplies >= 2
         ? <small className="vrm-versions-note" data-versions-note="">{remplies} versions : une au hasard, jamais la même deux fois de suite.</small>
-        : <small className="vrm-versions-note" data-versions-note="">Écris plusieurs versions : chacun reçoit une phrase différente du précédent.</small>}
+        : <small className="vrm-versions-note" data-versions-note="" data-versions-salutation="">{tr('versions.uneSeule')}</small>}{/* (16 nov., ext. 5.398) texteJamaisRepete */}
       {remplies >= 2 && !extOk && (
         <small className="vrm-versions-maj" data-versions-maj="">Extension 5.369 requise pour varier. Sinon, la version 1 part.</small>
       )}

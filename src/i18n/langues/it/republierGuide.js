@@ -165,6 +165,8 @@ export default {
   "rg.publier.sous": "Pubblichi tu, da qui non parte nulla",
   "rg.publier.refus": "Testo non pronto: {raison}.",
   "rg.publier.num": "Il N. {num} è quello della scheda: lo stesso sulla scatola.",
+  "rg.publier.reserve": "Il N°{num} della scheda appare accanto a «Carica» su Vinted: l’annuncio lo prenderà.",
+  "rg.publier.pris": "Il N°{num} è già su un annuncio Vinted: niente riservato, guarda Annunci.",
   // (15 nov., « je veux TOUTES les photos », « les barres beaucoup mieux »)
   "rg.photos.choix": "{n} di {m} foto scelte · tocca una foto per toglierla o rimetterla",
   "rg.photos.aucuneChoisie": "Nessuna foto scelta: tocca una foto per rimetterla.",

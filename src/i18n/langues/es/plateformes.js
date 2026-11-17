@@ -14,6 +14,8 @@ export default {
   "plateformes.reglages.avances": "Ajustes avanzados",
   "plateformes.reglagesEbay": "Ajustes de eBay",
   "plateformes.rien": "Nada coincide con esta búsqueda.",
+  "plateformes.ebay.chercher": "N.º, título, SKU…",
+  "plateformes.lbc.chercher": "N.º, título, cuenta…",
   "plateformes.vc.chercher": "N.º, título…",
   "plateformes.vc.chercherLabel": "Buscar un anuncio de Vestiaire (n.º, título)",
   "plateformes.vendreEbay": "Vender en eBay",

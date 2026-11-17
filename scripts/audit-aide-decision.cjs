@@ -48,7 +48,8 @@ const MUTATIONS = {
   // A — le moteur
   ext_contre_allumee_par_defaut: { f: 'bg', m: (s) => s.replace("const contre = actif && m.vinted_offres_contre === true;", "const contre = actif && m.vinted_offres_contre !== false;") },
   ext_contre_option_ignoree: { f: 'bg', m: (s) => s.replace("else if (reg.contre === true && isFinite(min) && min > 0 && o.prix < min) quoi = 'contre';", "else if (isFinite(min) && min > 0 && o.prix < min) quoi = 'contre';") },
-  ext_contre_sans_garde: { f: 'bg', m: (s) => s.replace("if (quoi === 'accept' || quoi === 'contre') {", "if (quoi === 'accept') {") },
+  ext_contre_sans_garde: { f: 'bg', m: (s) => s.replace("      if (quoi === 'accept' || quoi === 'contre') {\n        const raison", "      if (quoi === 'accept') {\n        const raison") },
+  ext_contre_annonce_vendue: { f: 'bg', m: (s) => s.replace("      if (quoi === 'accept' || quoi === 'contre') {\n        const ind", "      if (quoi === 'accept') {\n        const ind") },
   ext_contre_sous_le_mini: { f: 'bg', m: (s) => s.replace("prixContre = contreOffreMini(o.prix, await prixAnnonceContre(uid, o.item), min);", "prixContre = Math.floor(min) - 1;") },
   ext_contre_prix_devine: { f: 'bg', m: (s) => s.replace("prixContre = contreOffreMini(o.prix, await prixAnnonceContre(uid, o.item), min);", "prixContre = contreOffreMini(o.prix, (await prixAnnonceContre(uid, o.item)) || 999, min);") },
   ext_contre_dressing_perime: { f: 'bg', m: (s) => s.replace("Date.now() - cap > CONTRE_DRESSING_MAX_MS ||", "") },
@@ -103,14 +104,15 @@ function conv({ item, tx, oid, price, user = 500 }) {
 }
 let BG_SRC = null;
 const ITEM = 444, TX = 9001, OID = 7001;
-function monter({ prix = 30, min = '40', refuse = '20', actif = true, contre = true, garde, listing = { amount: '50.00', currency_code: 'EUR' }, capListing = 0, connecte = UID, store = {}, sansListing = false }) {
+function monter({ prix = 30, min = '40', refuse = '20', actif = true, contre = true, garde, listing = { amount: '50.00', currency_code: 'EUR' }, listingEtat = {}, capListing = 0, connecte = UID, store = {}, sansListing = false }) {
   const lignes = { [`harvest_${UID}_conv_${OID}`]: conv({ item: ITEM, tx: TX, oid: OID, price: prix }) };
   const fiche = { num: '7' }; if (min != null) fiche.min = min; if (refuse != null) fiche.refuse = refuse;   // null = absent
   lignes.main = { capturedAt: new Date().toISOString(), vinted_offres_auto: actif, vinted_annonce_numeros: { [String(ITEM)]: fiche }, vinted_offre_refus_msg: '', vrm_securite_comptes: { plateformes: { vinted: { repos: { actif: false } } } } };
   if (contre != null) lignes.main.vinted_offres_contre = contre;   // null = réglage absent
   lignes.main.vinted_offres_garde = garde === undefined ? GARDE_OK() : garde;
-  if (!sansListing) lignes[`harvest_${UID}_listings`] = { capturedAt: new Date(Date.now() - capListing).toISOString(), payload: { items: [{ id: ITEM, title: 'Paire', price: listing }, { id: 555, price: { amount: '10.00', currency_code: 'EUR' } }] } };
-  return faireFond({ src: BG_SRC || undefined, lignes, store, connecte, vinted: () => ({ status: 200, body: {} }) });
+  if (!sansListing) lignes[`harvest_${UID}_listings`] = { capturedAt: new Date(Date.now() - capListing).toISOString(), payload: { items: [{ id: ITEM, title: 'Paire', price: listing, ...listingEtat }, { id: 555, price: { amount: '10.00', currency_code: 'EUR' } }] } };
+  // (5.398) Le faux Vinted rend aussi le FIL tel qu'il est (le moteur le relit juste avant le geste).
+  return faireFond({ src: BG_SRC || undefined, lignes, store, connecte, vinted: (e) => { const m = /^\/api\/v2\/conversations\/(c\d+)$/.exec(e.chemin); const l = m && e.methode === 'GET' ? lignes[`harvest_${UID}_conv_${m[1].slice(1)}`] : null; return l ? { status: 200, body: { conversation: l.payload.conversation } } : { status: 200, body: {} }; } });
 }
 async function moteur(o = {}) {
   const f = monter(o);
@@ -156,6 +158,8 @@ async function partieA(S) {
     dit(r.contres.length === 0, 'A13 annonce absente de la lecture : prix pas su ⇒ rien ne part', `contres=${r.contres.length}`); }
   { const r = await moteur({ listing: { amount: '35.00', currency_code: 'EUR' } });
     dit(r.contres.length === 0, 'A14 mini (40) au-dessus du prix de l’annonce (35) : rien ne part', `contres=${r.contres.length}`); }
+  { const r = await moteur({ listingEtat: { is_closed: true } });
+    dit(r.contres.length === 0, 'A14b annonce fermée/vendue à la dernière lecture du dressing : pas de contre-offre (prise, elle VENDRAIT)', `contres=${r.contres.length}`); }
   { const r = await moteur({ listing: { amount: '50.00', currency_code: 'GBP' } });
     dit(r.contres.length === 0, 'A15 annonce dans une autre devise : rien ne part (jamais convertie)', `contres=${r.contres.length}`); }
   { const r = await moteur({ min: '44,2' });
