@@ -241,12 +241,12 @@ li[data-fp-a-envoyer-etat="a-annuler"] .vrm-fp-rangee-txt > span { color: var(--
 :root:root body .vrm-fp-pastille { min-height: 0 !important; min-width: 0 !important; height: auto !important; position: relative; }
 .vrm-fp-pastille::after { content: ''; position: absolute; inset: -12px -6px; }
 
-/* (17 nov., après #1202 ventes-clair) Au téléphone, la ligne montre l'état (« Payée ») sous le compte : la
-   pastille s'y met, juste après (l3, une ligne qui ne s'agrandit jamais). À l'ordinateur (≥ 1024 px, là où
-   la ligne passe en colonnes) : sous la frise de la colonne « État ». Une seule des deux est montrée. */
-.vrm-fu-vente-l3 > .vrm-fp-pastille-hote { margin-left: 8px; }
-:root:root body .vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-frise > .vrm-fp-pastille-hote[data-ou="tel"] { display: none !important; }
-@media (min-width: 1024px) {
-  :root:root body .vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-frise > .vrm-fp-pastille-hote[data-ou="tel"] { display: inline !important; }
-  .vrm-fu-vente-l3 > .vrm-fp-pastille-hote { display: none !important; }
+/* (17 nov., après #1202 ventes-clair) Au téléphone, la rangée de la frise est « Payée ···· » sur UNE ligne : la
+   pastille s'y range entre la légende (qui se coupe proprement s'il le faut) et les quatre traits — la hauteur
+   reste celle de la rangée. À l'ordinateur (≥ 1024 px, colonnes) : sous la frise, en position absolue (plus haut). */
+@media (max-width: 1023.98px) {
+  :root:root body .vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-frise:has(> .vrm-fp-pastille-hote) { display: flex !important; align-items: center; gap: 6px; }
+  :root:root body .vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-frise:has(> .vrm-fp-pastille-hote) > :not(.vrm-fp-pastille-hote) { flex: 1 1 auto; min-width: 0; }
+  :root:root body .vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-frise > .vrm-fp-pastille-hote[data-ou="tel"] { position: static !important; flex: 0 0 auto; order: 0; display: inline-flex !important; }
+  :root:root body .vrm-app-shell .vrm-main .vrm-sale-row .vrm-ledger-sale-frise:has(> .vrm-fp-pastille-hote) > :not(.vrm-fp-pastille-hote) { order: -1; }
 }

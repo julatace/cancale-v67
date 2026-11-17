@@ -92,7 +92,7 @@ async function verifier(racine, { dire = true } = {}) {
   dit(!/action: 'emettre'[^}]*langue/.test(jsx.slice(jsx.indexOf('export async function envoyerFacturesSerie'))) && !/langue/.test(auto), 'M2 la série et l’envoi automatique ne forcent aucune langue (la règle du serveur s’applique)');
 
   // (16 nov.) La facture en PASTILLE dans la rangée N° · compte · taille, plus sous la ligne.
-  dit(/facture: \(o\._fromEmail \? o\._txMail : o\.transaction_id != null\) \? <FactureVenteLigne pastille /.test(lire('src/App.jsx')) && /\{friseEtat\}\{fusion && fusion\.facture \? fusion\.facture : null\}<\/span>/.test(lire('src/App.jsx')) && /\{fusion\.factureL3 \|\| null\}<\/span>/.test(lire('src/App.jsx')) && !/frise=\{<>\{\(o\._fromEmail \? o\._txMail : o\.transaction_id != null\) \? <FactureVenteLigne/.test(lire('src/App.jsx')), 'M3 sur la ligne de vente : une pastille DANS la ligne (à droite de l’état, sous la frise), plus de gros boutons dessous');
+  dit(/facture: \(o\._fromEmail \? o\._txMail : o\.transaction_id != null\) \? <FactureVenteLigne pastille /.test(lire('src/App.jsx')) && /\{friseEtat\}\{fusion && fusion\.facture \? fusion\.facture : null\}<\/span>/.test(lire('src/App.jsx')) && !/frise=\{<>\{\(o\._fromEmail \? o\._txMail : o\.transaction_id != null\) \? <FactureVenteLigne/.test(lire('src/App.jsx')), 'M3 sur la ligne de vente : une pastille DANS la ligne (à droite de l’état, sous la frise), plus de gros boutons dessous');
   dit(/fm\.pastille\.\$\{cle\}/.test(jsx) && /<BonRetour vente=\{vente\} preuve=\{preuve\} facture=\{facture\} deps=\{deps\} ligne=\{false\}\/>/.test(jsx), 'M3 la pastille ouvre la feuille de la facture, qui porte le bon de retour');
 
   // ── R · le reçu d'achat généré ──
