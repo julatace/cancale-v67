@@ -69,5 +69,11 @@ export default {
   "v2s.zero.deposer": "No sale to drop off in the selection",
   "v2s.facture": "Invoice {num} sent on {date}",
   "v2v.etape": "Step {n} of {m}: {mot}",
-  "v2v.etapeAucune": "Not dropped off yet"
+  "v2v.etapeAucune": "Not dropped off yet",
+  "v2v.etat.transit": "In transit",
+  "v2v.etat.relais": "At the pick-up point",
+  "v2v.etat.retire": "Picked up",
+  "v2v.etat.livre": "Delivered",
+  "v2v.etat.retour": "Returning",
+  "v2v.etat.incident": "Issue"
 };

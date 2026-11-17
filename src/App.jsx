@@ -48062,7 +48062,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       l3: (() => { const et = etapesRoute(x.lues || {}); let sv = null; try { sv = suiviVente(x); } catch (_) { sv = null; }
         // Le mot COURT du dernier statut et son âge (« Livré au relais · il y a 2 j », `statutCourt`, la même source) : une ligne.
         const ici = et.find((e) => e.ici); const sc = sv && sv.statut ? statutCourt(sv.statut) : null;
-        const mot = sc && sc.court ? [sc.court, sc.quand].filter(Boolean).join(' · ') : (ici ? tr('vv.route.' + ici.cle) : '');
+        const MOTS_ETAT = { en_route: 'v2v.etat.transit', disponible: 'v2v.etat.relais', retire: 'v2v.etat.retire', livre: 'v2v.etat.livre', retour_expediteur: 'v2v.etat.retour', incident: 'v2v.etat.incident' };
+        const motEtat = sv && sv.statut && MOTS_ETAT[sv.statut.etat] ? tr(MOTS_ETAT[sv.statut.etat]) : (sc && sc.court) || '';
+        const mot = motEtat ? [motEtat, sc && sc.quand].filter(Boolean).join(' · ') : (ici ? tr('vv.route.' + ici.cle) : '');
         return [{ cle: 'etape', noeud: <PisteEtapesV2 etapes={et}/>, texte: mot },
           sv && sv.su ? { cle: 'suivi', icone: 'truck', texte: [x.tr && x.tr.nom ? x.tr.nom : '', sv.su].filter(Boolean).join(' · ') } : (x.tr && x.tr.nom ? { cle: 'transporteur', icone: 'truck', texte: x.tr.nom } : null)].filter(Boolean); })(),
       sousAmbre: false,

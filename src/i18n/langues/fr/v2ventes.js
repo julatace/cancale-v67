@@ -69,5 +69,11 @@ export default {
   "v2s.zero.deposer": "Aucune vente à déposer dans la sélection",
   "v2s.facture": "Facture {num} envoyée le {date}",
   "v2v.etape": "Étape {n} sur {m} : {mot}",
-  "v2v.etapeAucune": "Pas encore déposé"
+  "v2v.etapeAucune": "Pas encore déposé",
+  "v2v.etat.transit": "En transit",
+  "v2v.etat.relais": "Livré au relais",
+  "v2v.etat.retire": "Retiré",
+  "v2v.etat.livre": "Livré",
+  "v2v.etat.retour": "En retour",
+  "v2v.etat.incident": "Incident"
 };

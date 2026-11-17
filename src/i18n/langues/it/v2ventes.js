@@ -69,5 +69,11 @@ export default {
   "v2s.zero.deposer": "Nessuna vendita da consegnare nella selezione",
   "v2s.facture": "Fattura {num} inviata il {date}",
   "v2v.etape": "Passo {n} di {m}: {mot}",
-  "v2v.etapeAucune": "Non ancora consegnato"
+  "v2v.etapeAucune": "Non ancora consegnato",
+  "v2v.etat.transit": "In transito",
+  "v2v.etat.relais": "Al punto di ritiro",
+  "v2v.etat.retire": "Ritirato",
+  "v2v.etat.livre": "Consegnato",
+  "v2v.etat.retour": "In reso",
+  "v2v.etat.incident": "Problema"
 };

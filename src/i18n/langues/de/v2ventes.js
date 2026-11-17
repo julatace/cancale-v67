@@ -69,5 +69,11 @@ export default {
   "v2s.zero.deposer": "Kein Verkauf zum Abgeben in der Auswahl",
   "v2s.facture": "Rechnung {num} am {date} gesendet",
   "v2v.etape": "Schritt {n} von {m}: {mot}",
-  "v2v.etapeAucune": "Noch nicht abgegeben"
+  "v2v.etapeAucune": "Noch nicht abgegeben",
+  "v2v.etat.transit": "Unterwegs",
+  "v2v.etat.relais": "Im Abholpunkt",
+  "v2v.etat.retire": "Abgeholt",
+  "v2v.etat.livre": "Zugestellt",
+  "v2v.etat.retour": "Rücksendung",
+  "v2v.etat.incident": "Problem"
 };
