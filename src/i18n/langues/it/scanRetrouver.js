@@ -11,6 +11,7 @@ export default {
   "scan.r.sansCamera": "Nessuna fotocamera qui: scrivi il numero di tracciamento.",
   "scan.r.indice": "Questo codice non è un numero di tracciamento: inquadra l’altro codice a barre.",
   "scan.r.lampe": "Torcia",
+  "scan.r.zoom": "Zoom: inquadra da più lontano",
   "scan.r.taper": "Scrivi il numero",
   "scan.r.saisie": "Numero di tracciamento",
   "scan.r.ok": "OK",
