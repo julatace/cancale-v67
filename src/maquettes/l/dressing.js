@@ -118,7 +118,7 @@ export function construire(src, maintenant = Date.now()) {
         const b = bordParTx.get(str(v.transaction_id));
         if (b) {
           const lim = Date.parse(b.limite || '') || null;
-          paires.push(p({ ...base, etat: 'envoyer', prix, limite: lim, detail: lim ? 'avant ' + jour(new Date(lim).toISOString(), maintenant) : 'date pas lue', geste: 'Imprimer le bordereau', vendueLe: v.date }));
+          paires.push(p({ ...base, etat: 'envoyer', prix, limite: lim, suivi: str(b.suivi) || null, detail: lim ? 'avant ' + jour(new Date(lim).toISOString(), maintenant) : 'date pas lue', geste: 'Imprimer le bordereau', vendueLe: v.date }));
         } else paires.push(p({ ...base, etat: 'vendue', prix, date: v.date, detail: 'bordereau attendu', vendueLe: v.date }));
       } else paires.push(p({ ...base, etat: 'vendue', prix, date: v.date, detail: 'en route', geste: 'Voir le suivi', vendueLe: v.date }));
     } else if (!a) {
@@ -158,7 +158,7 @@ export function construire(src, maintenant = Date.now()) {
         paires.push(p({ ...base, etat: 'retirer', retrait: r, limite: lim, detail: lim ? 'avant ' + jour(new Date(lim).toISOString(), maintenant) : 'au point relais', geste: 'J’ai retiré le colis' }));
       } else paires.push(p({ ...base, etat: 'enroute', detail: s.toLowerCase().includes('transit') ? 'en transit' : 'envoyé', geste: 'Voir le suivi' }));
     } else if (maintenant - (Date.parse(o.date) || 0) < 30 * J) {
-      paires.push(p({ ...base, etat: 'numeroter', detail: 'arrivée ' + jour(o.date, maintenant), geste: 'Donner un N°' }));
+      paires.push(p({ ...base, etat: 'numeroter', detail: jour(o.date, maintenant), geste: 'Donner un N°' }));
     }
   }
 
@@ -209,7 +209,7 @@ export function jour(iso, maintenant = Date.now()) {
   const dj = Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() - j0) / J);
   if (dj === 0) return 'aujourd’hui'; if (dj === -1) return 'hier'; if (dj === 1) return 'demain';
   if (dj > 1 && dj < 7) return d.toLocaleDateString('fr-FR', { weekday: 'long', timeZone: 'Europe/Paris' });
-  if (dj < -1 && dj > -7) return d.toLocaleDateString('fr-FR', { weekday: 'long', timeZone: 'Europe/Paris' }) + ' dernier';
+  if (dj < -1 && dj > -7) return `il y a ${-dj} j`;
   return 'le ' + d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' });
 }
 export const euros = (c) => (c == null ? '—' : (c / 100).toLocaleString('fr-FR', { minimumFractionDigits: c % 100 ? 2 : 0, maximumFractionDigits: 2 }).replace(/ | /g, ' ') + ' €');

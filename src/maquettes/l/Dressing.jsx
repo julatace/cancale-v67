@@ -41,7 +41,7 @@ async function lireDonnees() {
     lireTout('app_data?select=id,items:data->payload->items,lu:data->>capturedAt&id=like.harvest_*_listings'),
     lireTout('app_data?select=id,o:data->payload->my_orders&id=like.harvest_*_orders_sold'),
     lireTout('app_data?select=id,o:data->payload->my_orders&id=like.harvest_*_orders_purchased'),
-    lireTout('app_data?select=id,tx:data->>transaction,limite:data->>dateLimite&id=like.email_bord_*'),
+    lireTout('app_data?select=id,tx:data->>transaction,limite:data->>dateLimite,suivi:data->>suivi&id=like.email_bord_*'),
     lireTout('app_data?select=id,tx:data->payload->transaction->>id,st:data->payload->transaction->>status,at:data->payload->transaction->>status_updated_at&id=like.harvest_*_txn_*'),
     lireTout('app_data?select=id,colis:data->colis&id=eq.vrm_colis_retirer'),
   ]);
@@ -147,6 +147,16 @@ function Fiche({ x, fermer, large }) {
   const ligneEtat = x.etat === 'envoyer' ? `À envoyer ${x.detail}` : x.etat === 'retirer' ? `À retirer ${x.limite ? x.detail : ''}`.trim()
     : x.etat === 'enligne' ? `En ligne depuis ${x.jours} jours` : x.etat === 'vendue' ? (x.detail === 'en route' ? 'Vendue · en route' : 'Vendue · bordereau attendu')
       : x.etat === 'enroute' ? 'Achat en route vers toi' : x.etat === 'numeroter' ? `Arrivée ${x.detail.replace('arrivée ', '')} · sans N°` : x.etat === 'publier' ? 'Brouillon · pas en ligne' : e.mot;
+  const TR = { mondialrelay: 'Mondial Relay', vintedgo: 'Vinted Go', chronopost: 'Chronopost' };
+  const infos = [
+    ['Compte', x.compte || '—'],
+    x.vendueLe ? ['Vendue', jour(x.vendueLe)] : null,
+    x.etat === 'envoyer' ? ['Suivi', x.suivi || '—'] : null,
+    x.etat === 'enligne' ? ['Vues', String(x.vues)] : null,
+    x.etat === 'retirer' && r ? ['Transporteur', TR[r.transporteur] || r.transporteur || '—'] : null,
+    x.etat === 'retirer' && r ? ['Suivi', r.suivi || '—'] : null,
+    x.achat && x.etat !== 'retirer' ? ['Acheté', jour(x.date)] : null,
+  ].filter(Boolean);
   return (
     <div className={'l-fiche' + (large ? ' is-panneau' : '')} role="dialog" aria-modal={!large} aria-label={x.titre} data-l-fiche={x.cle} data-etat={x.etat}>
       {large ? <div className="l-fiche-voile" onClick={fermer} aria-hidden="true" /> : null}
@@ -157,7 +167,7 @@ function Fiche({ x, fermer, large }) {
           <button type="button" className="l-rond l-fiche-plus" aria-label="Plus de gestes"><Ico n="plus" /></button>
         </div>
         <div className="l-fiche-texte">
-          <div className="l-fiche-id"><Plaque x={x} /><span className="l-fiche-compte">{x.compte}</span></div>
+          {x.numero ? <div className="l-fiche-id"><Plaque x={x} /></div> : null}
           <h2 className="l-fiche-titre">{x.titre}</h2>
           <p className={'l-fiche-etat' + (e.geste ? ' is-geste' : '')}>{ligneEtat}</p>
           {x.raison ? <p className="l-fiche-raison">{x.raison}</p> : null}
@@ -175,6 +185,7 @@ function Fiche({ x, fermer, large }) {
               {faits.filter((f) => f[1] != null).map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}
             </dl>
           )}
+          <dl className="l-infos">{infos.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
         </div>
         {x.geste ? (
           <div className="l-fiche-geste">

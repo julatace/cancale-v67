@@ -30,8 +30,8 @@ html[data-maquette="l"] ::selection { background: rgb(255 255 255 / .85); color:
 .l-racine { min-height: 100dvh; box-sizing: border-box; color: var(--sv-clair); font-family: var(--sb-police-texte); font-feature-settings: var(--sb-chiffres);
   -webkit-font-smoothing: antialiased; isolation: isolate; }
 .l-racine *, .l-racine *::before, .l-racine *::after { box-sizing: border-box; }
-.l-racine h1, .l-racine h2, .l-racine p, .l-racine dl, .l-racine dd { margin: 0; }
-.l-racine button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+:where(.l-racine) :where(h1, h2, p, dl, dd) { margin: 0; }
+:where(.l-racine) button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .l-racine :focus-visible { outline: 2px solid var(--sv-clair); outline-offset: 3px; border-radius: 6px; }
 .l-vide { padding: 48px 16px; font-size: 15px; color: var(--sv-clair-2); }
 .l-ico { flex: none; display: block; }
@@ -90,8 +90,8 @@ html[data-maquette="l"] ::selection { background: rgb(255 255 255 / .85); color:
 .l-plein-tel { position: fixed; left: 0; right: 0; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 6; display: flex; justify-content: center; pointer-events: none; }
 .l-plein-tel .l-plein { pointer-events: auto; }
 .l-barre { position: fixed; left: 0; right: 0; bottom: 0; z-index: 7; display: flex; padding: 6px 8px calc(env(safe-area-inset-bottom) + 6px);
-  background: var(--sv-verre-barre); -webkit-backdrop-filter: var(--sv-flou); backdrop-filter: var(--sv-flou); box-shadow: 0 -.5px 0 rgb(8 26 50 / .12); }
-.l-onglet { flex: 1; min-width: 0; height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--sv-encre-2); font-size: 13px; font-weight: 500; }
+  background: var(--sv-feuille); -webkit-backdrop-filter: var(--sv-flou); backdrop-filter: var(--sv-flou); box-shadow: 0 -.5px 0 rgb(8 26 50 / .14); }
+.l-onglet { flex: 1; min-width: 0; height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: color-mix(in oklab, var(--sv-encre-2) 88%, var(--sv-encre)); font-size: 13px; font-weight: 500; }
 .l-onglet[aria-current="page"] { color: var(--sv-encre); font-weight: 600; }
 .l-onglet:active { opacity: .6; }
 
@@ -99,7 +99,8 @@ html[data-maquette="l"] ::selection { background: rgb(255 255 255 / .85); color:
 .l-fiche { position: fixed; inset: 0; z-index: 50; overflow-y: auto; overscroll-behavior: contain;
   background: linear-gradient(170deg, var(--sv-haut) 0%, var(--sv-milieu) 45%, var(--sv-bas) 100%); animation: l-fiche 280ms var(--l-ease) both; }
 @keyframes l-fiche { from { opacity: 0; transform: translateY(24px); } }
-.l-fiche-corps { min-height: 100%; display: flex; flex-direction: column; outline: none; }
+.l-fiche-corps { min-height: 100%; display: flex; flex-direction: column; }
+.l-racine .l-fiche-corps:focus, .l-racine .l-fiche-corps:focus-visible { outline: none; }
 .l-fiche-photo { position: relative; aspect-ratio: 1; background: var(--l-photo-fond); flex: none; border-radius: 0 0 24px 24px; overflow: hidden; }
 .l-fiche-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .l-fiche-photo .l-rond { position: absolute; top: calc(env(safe-area-inset-top) + 12px); background: rgb(255 255 255 / .82); color: #0C1D30;
@@ -115,6 +116,10 @@ html[data-maquette="l"] ::selection { background: rgb(255 255 255 / .85); color:
 .l-faits { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 24px; padding-top: 16px; box-shadow: inset 0 1px 0 var(--l-filet); }
 .l-faits dt { font-size: 13px; color: var(--sv-clair-2); }
 .l-faits dd { margin-top: 4px; font-size: 22px; font-weight: 500; letter-spacing: -.015em; color: var(--sv-clair); white-space: nowrap; }
+.l-infos { margin-top: 24px; }
+.l-infos > div { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 48px; box-shadow: inset 0 1px 0 var(--l-filet); font-size: 15px; }
+.l-infos dt { color: var(--sv-clair-2); }
+.l-infos dd { color: var(--sv-clair); text-align: right; min-width: 0; overflow-wrap: anywhere; }
 .l-fiche-geste { position: sticky; bottom: 0; padding: 16px 16px calc(env(safe-area-inset-bottom) + 16px);
   background: linear-gradient(180deg, transparent, color-mix(in oklab, var(--sv-bas) 85%, transparent) 40%); }
 /* À retirer : le code est le héros, le titre se range. */
@@ -141,7 +146,7 @@ html[data-maquette="l"] ::selection { background: rgb(255 255 255 / .85); color:
 .l-rang-val { font-size: 15px; font-weight: 600; color: var(--sv-encre); white-space: nowrap; }
 .l-rang-vignette { width: 40px; height: 40px; border-radius: 8px; overflow: hidden; background: var(--l-photo-fond); flex: none; }
 .l-rang-vignette img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.l-rang.is-photo .l-rang-mot { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 
 /* ════ ORDINATEUR ════ */
 .l-barre-haut { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 40px; height: 64px; padding: 0 48px;

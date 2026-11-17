@@ -86,22 +86,23 @@ const FONDS = ['#ECE9E4', '#E6EAEE', '#EEE8E1', '#E4E9E6', '#EAE6EC', '#E9ECEF']
 function basket(u) {
   let h = 0; for (const c of String(u)) h = (h * 31 + c.charCodeAt(0)) >>> 0;
   const [corps, bande, semelle, detail] = COLORIS[h % COLORIS.length];
-  const fond = FONDS[(h >> 4) % FONDS.length];
-  const inv = (h >> 8) % 2 ? '' : ' transform="translate(800 0) scale(-1 1)"';
+  const fond = FONDS[(h >>> 4) % FONDS.length];
+  const inv = (h >>> 8) % 2 ? '' : ' transform="translate(800 0) scale(-1 1)"';
   return `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800">
 <defs><linearGradient id="f" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity=".55"/><stop offset=".6" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
 <linearGradient id="c" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity=".22"/><stop offset="1" stop-color="#000000" stop-opacity=".10"/></linearGradient></defs>
 <rect width="800" height="800" fill="${fond}"/><rect width="800" height="800" fill="url(#f)"/>
 <ellipse cx="410" cy="572" rx="300" ry="20" fill="#000" opacity=".13"/>
 <g${inv}>
-<path d="M118 500 C122 446 168 418 228 402 L318 366 C350 352 372 316 412 312 C446 309 468 334 500 350 C562 380 640 386 688 414 C716 431 724 468 716 506 L118 506 Z" fill="${corps}" stroke="#1F2328" stroke-opacity=".55" stroke-width="3"/>
-<path d="M118 500 C122 446 168 418 228 402 L318 366 C350 352 372 316 412 312 C446 309 468 334 500 350 C562 380 640 386 688 414 C716 431 724 468 716 506 L118 506 Z" fill="url(#c)"/>
-<path d="M140 470 C190 440 250 430 300 438 C330 444 330 470 300 476 L150 488 Z" fill="${detail}" opacity=".9"/>
-<path d="M300 470 C380 420 470 410 560 430 C600 440 610 462 570 466 C480 470 400 478 318 492 Z" fill="${bande}" opacity=".95"/>
-<path d="M600 404 C640 410 680 420 700 440 L704 470 C680 452 640 444 606 440 Z" fill="${detail}" opacity=".85"/>
-<path d="M372 340 L392 372 M398 330 L418 362 M424 324 L444 356 M450 330 L468 362" stroke="#1F2328" stroke-opacity=".6" stroke-width="5" stroke-linecap="round"/>
-<path d="M112 506 L722 506 L718 534 C600 548 300 550 140 540 C120 539 110 526 112 506 Z" fill="${semelle}" stroke="#1F2328" stroke-opacity=".45" stroke-width="3"/>
-<path d="M130 522 C300 530 560 530 712 520" stroke="#1F2328" stroke-opacity=".18" stroke-width="3" fill="none"/>
+<path d="M120 505 C118 470 140 450 182 440 C240 426 290 410 330 386 L430 332 C452 320 472 314 496 318 C520 304 546 304 562 320 C600 332 640 322 668 332 C700 346 712 400 712 450 L716 505 Z" fill="${corps}" stroke="#1F2328" stroke-opacity=".5" stroke-width="3" stroke-linejoin="round"/>
+<path d="M120 505 C118 470 140 450 182 440 C240 426 290 410 330 386 L430 332 C452 320 472 314 496 318 C520 304 546 304 562 320 C600 332 640 322 668 332 C700 346 712 400 712 450 L716 505 Z" fill="url(#c)"/>
+<path d="M120 505 C118 470 140 450 182 440 C214 433 244 444 252 476 L256 505 Z" fill="${detail}" opacity=".9"/>
+<path d="M622 338 C664 330 702 360 708 420 L712 505 L634 505 C646 452 644 392 622 338 Z" fill="${detail}" opacity=".9"/>
+<path d="M300 486 C380 440 470 410 596 402 C618 401 624 418 604 424 C500 440 420 466 342 505 L300 505 Z" fill="${bande}" opacity=".95"/>
+<path d="M496 318 C520 311 546 312 562 322 C542 331 516 330 496 318 Z" fill="#1F2328" opacity=".55"/>
+<path d="M352 384 L366 402 M376 370 L390 388 M400 357 L414 375 M424 345 L438 363 M448 334 L462 352" stroke="#1F2328" stroke-opacity=".55" stroke-width="5" stroke-linecap="round"/>
+<path d="M110 505 L722 505 L720 540 C600 552 260 552 132 544 C114 542 106 526 110 505 Z" fill="${semelle}" stroke="#1F2328" stroke-opacity=".4" stroke-width="3" stroke-linejoin="round"/>
+<path d="M128 522 C300 530 560 530 714 521" stroke="#1F2328" stroke-opacity=".16" stroke-width="3" fill="none"/>
 </g></svg>`;
 }
 // Un QR INVENTÉ (motif de démonstration, ne se lit pas) : l'app n'en fabrique jamais, elle montre l'image reçue.
@@ -124,7 +125,7 @@ async function capture(nav, { W, sombre, hash, nom, b, plein = false }) {
   await o.pg.screenshot({ path: f, fullPage: plein });
   const mes = await o.pg.evaluate(({ tel }) => {
     const vis = (el) => { const r = el.getBoundingClientRect(); return r.width > 1 && r.height > 1 && r.bottom > 0 && r.top < innerHeight; };
-    const pleins = [...document.querySelectorAll('[data-plein]')].filter(vis).length;
+    const pleins = [...document.querySelectorAll('[data-plein]')].filter(vis).filter((x) => !x.closest('[inert]')).length;
     const petites = tel ? [...document.querySelectorAll('.l-racine button')].filter(vis).filter((x) => !x.closest('[inert]')).filter((x) => x.getBoundingClientRect().height < 43.5 && !x.classList.contains('l-tuile')).map((x) => (x.innerText || x.getAttribute('aria-label') || '').slice(0, 24)) : [];
     const coupes = [...document.querySelectorAll('.l-racine *')].filter(vis).filter((x) => !x.closest('[inert]') && x.children.length === 0 && x.innerText && !x.classList.contains('l-nom') && x.scrollWidth > x.clientWidth + 1).map((x) => x.innerText.slice(0, 30));
     const tailles = {}; for (const x of document.querySelectorAll('.l-racine *')) { if (!vis(x) || x.closest('[inert]') || !x.childNodes.length || ![...x.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) continue; const t = getComputedStyle(x).fontSize; tailles[t] = (tailles[t] || 0) + 1; }
