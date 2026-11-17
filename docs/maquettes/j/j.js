@@ -52,7 +52,8 @@
     fleche: '<path d="M5 12h13.5M13 6.5l5.5 5.5-5.5 5.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>',
     coeur: '<path d="M12 19.2s-7-4.3-7-9.2A3.8 3.8 0 0 1 12 8a3.8 3.8 0 0 1 7 2c0 4.9-7 9.2-7 9.2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>',
   };
-  const ico = (n, t = 24) => `<svg class="j-ico" width="${t}" height="${t}" viewBox="0 0 24 24" aria-hidden="true">${ICO[n]}</svg>`;
+  const ICO_V = { chercher: 'chercher', aide: 'aide', grille: 'grille', liste: 'liste', coeur: 'coeur' };
+  const ico = (n, t = 24) => (window.VRM_J_VISUELS && (ICO_V[n] || ['aujourdhui','annonces','achats','ventes','argent','imprimer','plus','agrandir','crayon','horloge','epingle','chevron','bas'].includes(n)) ? window.VRM_J_VISUELS.ico(ICO_V[n] || n, t) : `<svg class="j-ico" width="${t}" height="${t}" viewBox="0 0 24 24" aria-hidden="true">${ICO[n] || ''}</svg>`);
 
   // ── Calculs (sur la fixture, une seule fois) ──
   const aEnvoyer = D.ventes.filter((v) => v.etat === 'envoyer').sort((a, b) => (a.limite || a.estimee) - (b.limite || b.estimee));
@@ -83,12 +84,12 @@
     const a = achatDe(c.achat);
     return `<article class="j-pass is-devant" data-point="${esc(p.nom)}" data-devant>
       <header class="j-pass-tete"><h3>${esc(p.nom)}</h3><p>${esc(p.adresse)}</p></header>
+      <p class="j-pass-avant">${c.limite - NOW < 2 * J ? ambre('à retirer avant ' + quand(c.limite)) : 'à retirer avant ' + quand(c.limite)}&nbsp;· ${esc(c.transporteur)}</p>
       <div class="j-pass-qr" data-code="${esc(c.code)}">${qr(c.code)}</div>
       <p class="j-pass-code" data-chiffre>${esc(c.code)}</p>
       <dl class="j-pass-pied">
         <div><dt>Colis</dt><dd>${esc(a ? titreDe(a) : '—')}</dd></div>
-        <div><dt>Avant</dt><dd>${c.limite - NOW < 2 * J ? ambre(quand(c.limite)) : quand(c.limite)}</dd></div>
-        <div><dt>${esc(c.transporteur)}</dt><dd class="j-pass-suivi">${esc(c.suivi)}</dd></div>
+        <div><dt>Suivi</dt><dd class="j-pass-suivi">${esc(c.suivi)}</dd></div>
       </dl>
       ${p.colis.length > 1 ? `<p class="j-pass-pages"><b>1</b> sur ${p.colis.length} colis à ce point</p>` : ''}
     </article>`;
@@ -109,8 +110,8 @@
     const n = new Date(NOW).getDate(); const t = new Array(n).fill(0);
     for (const v of ceMois) { const j = new Date(v.versee).getDate() - 1; t[j] += v.prix; }
     let c = 0; const cum = t.map((v) => (c += v));
-    const W = 1000, H = 240, max = Math.max(1, ...cum);
-    const pts = cum.map((v, i) => [(i / (n - 1)) * W, H - 12 - (v / max) * (H - 36)]);
+    const W = 1000, H = 120, max = Math.max(1, ...cum);
+    const pts = cum.map((v, i) => [(i / (n - 1)) * (W - 24), H - 8 - (v / max) * (H - 24)]);
     // En marches (un versement = une marche) : la forme dit la vérité de la donnée.
     let d = `M0 ${pts[0][1].toFixed(1)}`; for (let i = 1; i < pts.length; i++) d += ` H${pts[i][0].toFixed(1)} V${pts[i][1].toFixed(1)}`;
     const [lx, ly] = pts[pts.length - 1];
@@ -122,9 +123,8 @@
     journee() {
       const v = aEnvoyer[0];
       return `<div class="j-ecran j-e-journee">
-        <div class="j-col-a">${heros(nb(aEnvoyer.length), 'colis à envoyer', urgents.length ? ambre(`${nb(urgents.length)} avant demain soir`) : '')}
-        <a class="j-vedette" href="#ecran=ventes" data-vedette><span class="j-vedette-photo">${img(v, 'is-grand')}${numero(v.numero)}</span>
-          <span class="j-vedette-texte"><span class="j-vedette-titre">${esc(titreDe(v))}</span><span class="j-vedette-sous"><span>${limiteTexte(v)} · ${esc(v.acheteur)}</span><b>${euros(v.prix)}</b></span></span></a></div>
+        <div class="j-col-a">${heros(nb(aEnvoyer.length), 'colis à envoyer', `${nb(prets.length)} bordereaux prêts · ${nb(aEnvoyer.length - prets.length)} sans bordereau`)}
+        <div class="j-bande" data-bande>${aEnvoyer.map((v) => `<a class="j-bande-paire" href="#ecran=ventes" data-ligne="v${v.tx}"><span class="j-bande-photo">${img(v)}${numero(v.numero)}</span><span class="j-bande-prix">${euros(v.prix)}</span><span class="j-bande-quand">${v.limite ? (v.limite - NOW < 2 * J ? ambre(quand(v.limite)) : quand(v.limite)) : 'estimée'}</span></a>`).join('')}</div></div>
         <div class="j-col-b">
         <section class="j-groupe"><h2 class="j-entete">À retirer<span>${nb(D.colis.length)}</span></h2>${pile(true)}</section>
         <section class="j-groupe"><h2 class="j-entete">Novembre</h2><div class="j-paire-chiffres"><a href="#ecran=argent"><b>${euros(recuMois)}</b><span>reçus</span></a><a href="#ecran=ventes&vue=toutes"><b>${nb(D.ventes.length)}</b><span>ventes</span></a></div></section>
@@ -135,7 +135,7 @@
       const tabs = onglets([['envoyer', 'À envoyer'], ['route', 'En route'], ['toutes', 'Toutes']], vue, 'ventes');
       if (vue === 'envoyer') {
         const g = [['Avant demain soir', aEnvoyer.filter((v) => v.limite && v.limite - NOW < 2 * J)], ['Cette semaine', aEnvoyer.filter((v) => v.limite && v.limite - NOW >= 2 * J)], ['Date estimée', aEnvoyer.filter((v) => !v.limite)]].filter(([, l]) => l.length);
-        return `<div class="j-ecran">${heros(nb(aEnvoyer.length), 'colis à envoyer', `${nb(prets.length)} bordereaux prêts`)}${tabs}
+        return `<div class="j-ecran">${heros(nb(aEnvoyer.length), 'colis à envoyer', `${nb(prets.length)} bordereaux prêts · ${nb(aEnvoyer.length - prets.length)} sans bordereau`)}${tabs}
           ${g.map(([t, l]) => groupe(t, l.length, `<div class="j-liste">${l.map((v) => rangee(v, `<b>${euros(v.prix)}</b>`, `${numero(v.numero)}<span>${limiteTexte(v)}</span>`, 'v' + v.tx)).join('')}</div>`)).join('')}</div>`;
       }
       const l = vue === 'route' ? D.ventes.filter((v) => v.etat === 'route') : D.ventes;
@@ -178,14 +178,14 @@
     },
   };
   const GESTES = {
-    journee: prets.length ? ['Imprimer les bordereaux', prets.length] : null,
-    ventes: prets.length ? ['Imprimer les bordereaux', prets.length] : null,
-    achats: points.length ? ['Afficher le code en grand', null] : null,
-    annonces: D.aPublier.length ? ['Publier les paires rangées', D.aPublier.length] : null,
-    argent: sansCout ? ['Saisir les prix d’achat', sansCout] : null,
+    journee: prets.length ? [`Imprimer ${prets.length} bordereaux`, null, 'imprimer'] : null,
+    ventes: prets.length ? [`Imprimer ${prets.length} bordereaux`, null, 'imprimer'] : null,
+    achats: points.length ? ['Afficher le code en grand', null, 'agrandir'] : null,
+    annonces: D.aPublier.length ? [`Publier ${D.aPublier.length} paires rangées`, null, 'plus'] : null,
+    argent: sansCout ? [`Saisir ${sansCout} prix d’achat`, null, 'crayon'] : null,
   };
   const NOMS = [['journee', 'Aujourd’hui'], ['annonces', 'Annonces'], ['achats', 'Achats'], ['ventes', 'Ventes'], ['argent', 'Argent']];
-  const AFAIRE = { ventes: urgents.length > 0, achats: points.some((p) => p.limite - NOW < 2 * J) };
+  const AFAIRE = { ventes: aEnvoyer.length ? [aEnvoyer.length, `${aEnvoyer.length} colis à envoyer`] : null, achats: D.colis.length ? [D.colis.length, `${D.colis.length} colis à retirer`] : null };
 
   function rendre() {
     const p = new URLSearchParams(location.hash.replace(/^#/, ''));
@@ -193,12 +193,12 @@
     const nom = NOMS.find(([c]) => c === ecran)[1];
     const g = GESTES[ecran];
     const date = new Date(NOW).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
-    const nav = NOMS.map(([c, n]) => `<a class="j-nav-item" href="#ecran=${c}" ${c === ecran ? 'aria-current="page"' : ''} data-nav="${c}">${n}${AFAIRE[c] ? '<i class="j-point" aria-label="à faire"></i>' : ''}</a>`).join('');
-    const geste = g ? `<button type="button" class="j-geste" data-plein><span>${g[0]}</span>${g[1] != null ? `<b>${g[1]}</b>` : ico('fleche', 22)}</button>` : '';
+    const nav = NOMS.map(([c, n]) => `<a class="j-nav-item" href="#ecran=${c}" ${c === ecran ? 'aria-current="page"' : ''} data-nav="${c}" aria-label="${n}${AFAIRE[c] ? ', ' + AFAIRE[c][1] : ''}"><span class="j-nav-i">${ico(c === 'journee' ? 'aujourdhui' : c, 24)}${AFAIRE[c] ? `<b class="j-badge" aria-hidden="true">${AFAIRE[c][0]}</b>` : ''}</span><span class="j-nav-mot">${n}</span></a>`).join('');
+    const geste = g ? `<button type="button" class="j-geste" data-plein>${ico(g[2], 22)}<span>${g[0]}</span></button>` : '';
     $('#app').innerHTML = `
       <aside class="j-cote"><p class="j-marque">VRM</p><nav class="j-cote-nav">${nav}</nav><p class="j-cote-pied">${esc(D.COMPTES.length)} comptes Vinted</p></aside>
       <div class="j-page">
-        <header class="j-tete"><h1>${nom}</h1>${ecran === 'journee' ? `<p class="j-tete-date">${date}</p>` : ''}<span class="j-tete-actions"><button type="button" class="j-bouton-icone" aria-label="Chercher un N°, un code, un pseudo">${ico('chercher', 22)}</button><button type="button" class="j-bouton-icone" aria-label="Comment marche cet écran">${ico('aide', 22)}</button></span></header>
+        <header class="j-tete"><h1>${nom}</h1><button type="button" class="j-compte" aria-haspopup="menu" data-compte><span class="j-logo-v" aria-hidden="true">V</span><span>Vinted · ${D.COMPTES.length} comptes</span>${ico('bas', 16)}</button><span class="j-tete-actions"><button type="button" class="j-bouton-icone" aria-label="Chercher un N°, un code, un pseudo">${ico('chercher', 22)}</button><button type="button" class="j-bouton-icone" aria-label="Comment marche cet écran">${ico('aide', 22)}</button></span></header>
         <main class="j-main">${ECRANS[ecran](p.get('vue'), p.get('mode'))}</main>
         ${geste ? `<div class="j-geste-zone">${geste}</div>` : ''}
       </div>
