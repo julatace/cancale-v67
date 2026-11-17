@@ -53,8 +53,9 @@
 
   /* ── B · Pilule flottante ── */
   html[data-barre="B"] body .vrm-app-shell .vrm-tabbar.vrm-tabbar { border-radius: 31px !important; padding: 0 4px !important; align-items: center !important; }
-  html[data-barre="B"] body .vrm-app-shell .vrm-tabbar > .vrm-tab { flex: 1 1 0 !important; flex-direction: column !important; gap: 2px !important; padding: 0 !important; min-height: 52px !important; border-radius: 26px !important; }
-  html[data-barre="B"] body .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] { background: #0060C7 !important; color: #FFFFFF !important; }
+  /* L'actif : une PILULE à la taille de son contenu (icône + nom), 48 de haut — jamais un rond d'où le nom déborde. */
+  html[data-barre="B"] body .vrm-app-shell .vrm-tabbar > .vrm-tab { flex: 1 1 auto !important; flex-direction: column !important; gap: 2px !important; padding: 0 4px !important; min-height: 48px !important; height: 48px !important; border-radius: 24px !important; }
+  html[data-barre="B"] body .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] { flex: 0 0 auto !important; padding: 0 14px !important; background: #0060C7 !important; color: #FFFFFF !important; }
 
   /* ── C · Épurée (défaut) : icônes seules, l'actif « icône + nom » dans une capsule teintée (14 % jour, 22 % nuit). ── */
   html[data-barre="C"] body .vrm-app-shell .vrm-tabbar.vrm-tabbar { border-radius: 22px !important; padding: 0 8px !important; align-items: center !important; justify-content: space-between !important; }
