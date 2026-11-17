@@ -17,6 +17,7 @@
   --kraft: #D6BC94; --kraft-ombre: #C4A67A; --kraft-rabat: #E2CCA8; --kraft-trait: #8E6F45; --kraft-encre: #3A2A16; --oeil: var(--page);
   --ombre: 0 .5px 1px rgb(0 0 0 / .04), 0 2px 6px rgb(0 0 0 / .04), 0 12px 28px -12px rgb(0 0 0 / .10);
   --ombre-haute: 0 1px 2px rgb(0 0 0 / .06), 0 8px 20px rgb(0 0 0 / .08), 0 28px 56px -16px rgb(0 0 0 / .18);
+  --seg-sel: #FFFFFF;
   --g: 16px; --sortie: cubic-bezier(.32, .72, 0, 1);
   color-scheme: light;
 }
@@ -24,7 +25,7 @@
   --page: #000000; --plaque: #1C1C1E; --encre: #F5F5F7; --gris: #98989F; --gris-2: #636366; --filet: rgb(84 84 88 / .5); --remplir: rgb(118 118 128 / .24);
   --vign: #2A2A2D; --ambre: #FFB340; --rouge: #FF453A;
   --kraft: #C9AD84; --kraft-ombre: #A88B62; --kraft-rabat: #D6BE98; --kraft-trait: #6E5432; --kraft-encre: #2B1E0E;
-  --ombre: 0 0 0 .5px rgb(255 255 255 / .06); --ombre-haute: 0 0 0 .5px rgb(255 255 255 / .08), 0 24px 48px -12px rgb(0 0 0 / .8); color-scheme: dark; } }
+  --seg-sel: #636366; --ombre: 0 0 0 .5px rgb(255 255 255 / .06); --ombre-haute: 0 0 0 .5px rgb(255 255 255 / .08), 0 24px 48px -12px rgb(0 0 0 / .8); color-scheme: dark; } }
 
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; overscroll-behavior: none; background: var(--page); }
@@ -58,8 +59,7 @@ html[data-defile] .nb-titre { opacity: 1; }
 /* Un seul contrôle segmenté (2 à 3 valeurs) */
 .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; margin-top: 12px; padding: 2px; border-radius: 11px; background: var(--remplir); }
 .seg-o { display: grid; place-items: center; min-height: 44px; border-radius: 9px; font-size: 15px; font-weight: 500; white-space: nowrap; }
-.seg-o[aria-selected] { background: var(--plaque); font-weight: 600; box-shadow: 0 3px 8px rgb(0 0 0 / .12), 0 3px 1px rgb(0 0 0 / .04); }
-[data-theme="dark"] .seg-o[aria-selected] { background: #636366; }
+.seg-o[aria-selected] { background: var(--seg-sel); font-weight: 600; box-shadow: 0 3px 8px rgb(0 0 0 / .12), 0 3px 1px rgb(0 0 0 / .04); }
 .seg-o b { font-weight: 600; color: var(--gris); margin-left: 3px; font-variant-numeric: tabular-nums; }
 
 /* ── GROUPES ET PLAQUES (liste groupée inset) ── */
@@ -68,6 +68,8 @@ html[data-defile] .nb-titre { opacity: 1; }
 .grp-t h2 { font: 600 22px/28px 'Fraunces N', Georgia, serif; letter-spacing: -.015em; }
 .grp-n { font: 500 15px 'Texte N', system-ui, sans-serif; color: var(--gris); margin-left: 4px; font-variant-numeric: tabular-nums; letter-spacing: 0; }
 .grp-a { font-size: 15px; color: var(--gris); }
+.sous-grp { display: flex; align-items: center; padding: 4px 4px 8px; font-size: 15px; }
+.plaque + .sous-grp { margin-top: 16px; }
 .plaque { background: var(--plaque); border-radius: 14px; box-shadow: var(--ombre); overflow: hidden; }
 
 /* La rangée : vignette 52, titre 17, sous-titre 15, valeur à droite, chevron, séparateur inset */
@@ -81,6 +83,7 @@ html[data-defile] .nb-titre { opacity: 1; }
 .rang-d { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; text-align: right; }
 .rang-v { font-size: 17px; font-weight: 500; font-variant-numeric: tabular-nums; }
 .rang-ds { font-size: 13px; color: var(--gris); }
+.rang-ds.ambre { color: var(--ambre); font-weight: 600; }
 .chev { color: var(--gris-2); margin-left: -2px; }
 /* Glissement (swipe actions) : l'action de la ligne vit sous la ligne, pas dessus */
 .rang-actions { position: absolute; inset: 0 0 0 auto; display: flex; }
@@ -90,7 +93,7 @@ html[data-defile] .nb-titre { opacity: 1; }
 
 /* La vignette : la basket détourée, mêmes proportions partout, sur fond uni */
 .vign { flex: none; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 12px; background: var(--vign); overflow: hidden; }
-.vign .basket { width: 92%; height: auto; display: block; transform: translateY(2px); }
+.vign .basket { width: 100%; height: auto; display: block; transform: translateY(3px) scale(1.06); }
 .vign--s { width: 44px; height: 44px; border-radius: 10px; box-shadow: 0 0 0 2px var(--plaque); }
 .vign--xs { width: 28px; height: 28px; border-radius: 7px; background: rgb(255 255 255 / .55); }
 
@@ -141,7 +144,7 @@ html[data-defile] .nb-titre { opacity: 1; }
 .jour--carte { margin-top: 40px; width: 100%; padding: 24px 16px; border-radius: 18px; background: var(--plaque); box-shadow: var(--ombre); }
 .jour--cote { display: none; }
 .jour-pile { display: flex; }
-.jour-pile .vign + .vign { margin-left: -10px; }
+.jour-pile { gap: 6px; }
 .jour-v { margin-top: 12px; font: 600 64px/1 'Fraunces N', Georgia, serif; letter-spacing: -.03em; font-variant-numeric: lining-nums; }
 .eur { font-size: .42em; vertical-align: .9em; margin-left: .06em; letter-spacing: 0; }
 .jour-l { margin-top: 6px; font-size: 15px; color: var(--gris); }
@@ -215,11 +218,13 @@ html[data-defile] .nb-titre { opacity: 1; }
   .cote { position: sticky; top: 0; height: 100dvh; padding: 28px 16px; background: var(--plaque); box-shadow: inset -.5px 0 0 var(--filet); }
   .marque { padding: 0 12px 28px; font: 600 24px 'Fraunces N', Georgia, serif; letter-spacing: -.01em; }
   .cote .barre { position: static; display: flex; flex-direction: column; height: auto; padding: 0; gap: 2px; background: none; backdrop-filter: none; -webkit-backdrop-filter: none; box-shadow: none; }
-  .cote .onglet { flex-direction: row; gap: 12px; height: 40px; padding: 0 12px; border-radius: 10px; color: var(--gris); }
+  .cote .onglet { flex-direction: row; justify-content: flex-start; gap: 12px; min-height: 40px; height: 40px; padding: 0 12px; border-radius: 10px; color: var(--gris); }
+  .cote .onglet-i { position: static; }
   .cote .onglet[aria-current] { background: var(--remplir); color: var(--encre); }
   .cote .onglet-n { font-size: 15px; font-weight: 500; }
   .cote .onglet-i .ico { width: 20px; height: 20px; }
-  .cote .onglet-b { left: auto; right: -170px; top: 1px; }
+  .cote .onglet-b { position: static; order: 3; margin-left: auto; box-shadow: none; }
+  .cote .onglet { display: flex; }
   .main { padding-bottom: 64px; max-width: 1180px; width: 100%; }
   .nb { margin: 0 calc(-1 * var(--g)); padding-top: 12px; height: 60px; }
   .gt { font-size: 40px; line-height: 46px; }

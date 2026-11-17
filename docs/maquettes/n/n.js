@@ -63,14 +63,14 @@
   document.addEventListener('click', (e) => { const a = e.target.closest('a[href="#"]'); if (a) e.preventDefault(); });
 
   const ONGLETS = [['afaire', 'À faire', 'boite'], ['commandes', 'Commandes', 'commandes'], ['annonces', 'Annonces', 'annonces'], ['argent', 'Argent', 'argent']];
-  const nav = (actif, n) => `<nav class="barre" aria-label="Onglets">${ONGLETS.map(([k, nom, i]) => `<a href="#ecran=${k}" class="onglet" ${actif === k ? 'aria-current="page"' : ''} data-onglet="${k}"><span class="onglet-i">${ico(i, 25)}${k === 'afaire' && n ? `<span class="onglet-b">${n}</span>` : ''}</span><span class="onglet-n">${nom}</span></a>`).join('')}</nav>`;
+  const nav = (actif, n) => `<nav class="barre" aria-label="Onglets">${ONGLETS.map(([k, nom, i]) => `<a href="#ecran=${k}" class="onglet" ${actif === k ? 'aria-current="page"' : ''} data-onglet="${k}"><span class="onglet-i">${ico(i, 25)}${k === 'afaire' && n && !large() ? `<span class="onglet-b">${n}</span>` : ''}</span><span class="onglet-n">${nom}</span>${k === 'afaire' && n && large() ? `<span class="onglet-b">${n}</span>` : ''}</a>`).join('')}</nav>`;
 
   // L'en-tête iOS : une barre (actions à droite), le grand titre, la recherche intégrée.
   const entete = ({ titre, droite = '', cherche = true, sous = '' }) => `
     <div class="nb"><span class="nb-titre">${titre}</span><span class="nb-d">${droite}<button class="nb-b" aria-label="Aide">${ico('aide', 22)}</button></span></div>
     <h1 class="gt">${titre}</h1>${sous}
     ${cherche ? `<label class="recherche">${ico('chercher', 17)}<input type="search" placeholder="N°, titre, pseudo, code" enterkeyhint="search"></label>` : ''}`;
-  const segmente = (items, actif) => `<div class="seg" role="tablist">${items.map(([k, nom, h]) => `<a href="${h}" role="tab" class="seg-o" ${actif === k ? 'aria-selected="true"' : ''} data-seg="${k}">${nom}</a>`).join('')}</div>`;
+  const segmente = (items, actif) => `<div class="seg" role="tablist">${items.map(([k, nom, h]) => `<a href="${h}" role="tab" class="seg-o" ${actif === k ? 'aria-selected="true"' : ''} data-seg="${k}"><span>${nom}</span></a>`).join('')}</div>`;
 
   // ══ À FAIRE ═══════════════════════════════════════════════════════════════
   function chiffreJour(cls = '') {
@@ -91,8 +91,9 @@
         </section>`;
     }
     const lot = premierLot.length;
-    const poster = groupe({ cle: 'poster', titre: 'À poster', n: aPoster.length, action: `<button class="b-plein" data-plein="">${ico('imprimer', 17)}Imprimer ${lot}</button>`,
-      contenu: aPoster.map((v) => rangee({ g: vign(v), titre: esc(v.titre), sous: `${tag(v.numero)}${urg(v.limite)}`, attrs: `data-vente="${v.tx}"` })).join('') });
+    const lots = []; for (const v of aPoster) { const k = jourParis(v.limite); let L = lots.find((x) => x.k === k); if (!L) { L = { k, t: v.limite, l: [] }; lots.push(L); } L.l.push(v); }
+    const poster = groupe({ cle: 'poster', titre: 'À poster', n: aPoster.length, action: `<button class="b-plein" data-plein="">${ico('imprimer', 17)}Imprimer ${lot}</button>`, nu: true,
+      contenu: lots.map((L) => `<p class="sous-grp">${urg(L.t)}<span class="gris">&nbsp;· ${L.l.length}</span></p><div class="plaque">${L.l.map((v) => rangee({ g: vign(v), titre: esc(v.titre), sous: `${tag(v.numero)}<span>${esc(v.compte)}</span>`, attrs: `data-vente="${v.tx}"` })).join('')}</div>`).join('') });
     const retirer = groupe({ cle: 'retirer', titre: 'À retirer', n: F.colis.length, contenu: tickets(F.colis), nu: true });
     const offres = groupe({ cle: 'offres', titre: 'Offres', n: F.offres.length, contenu: F.offres.map((o) => { const a = annonceDe.get(o.annonce); return rangee({ g: vign(a), titre: `${eur(o.montant)} <span class="gris">· ${esc(o.pseudo)}</span>`, sous: `${tag(a.numero)}<span>annonce ${eur(a.prix)}</span>`, attrs: `data-offre="${o.conv}"` }); }).join('') });
     const prix = groupe({ cle: 'prix', titre: 'Prix d’achat à saisir', n: sansCout.length, action: '<button class="b-texte">Saisir</button>',
@@ -115,7 +116,7 @@
     const l = F.achats.filter((a) => a.etat !== 'point').sort((a, b) => b.date.localeCompare(a.date));
     const ETAT_A = { route: 'en route', recu: 'reçu' };
     return haut + groupe({ titre: 'Au point relais', n: F.colis.length, contenu: tickets(F.colis), nu: true })
-      + parJour(l, (a) => a.date).map((g) => groupe({ titre: g.k, n: g.l.length, contenu: g.l.map((a) => rangee({ g: vign(a), titre: esc(a.titre), sous: `<span>${esc(a.compte)} · ${a.taille}</span>`, droite: eur(a.prix), droiteSous: ETAT_A[a.etat], attrs: `data-achat="${a.tx}"` })).join('') })).join('');
+      + parJour(l, (a) => a.date).map((g) => groupe({ titre: g.k, n: g.l.length, contenu: g.l.map((a) => rangee({ g: vign(a), titre: esc(a.titre), sous: `<span>${esc(a.compte)}</span>`, droite: eur(a.prix), droiteSous: ETAT_A[a.etat], attrs: `data-achat="${a.tx}"` })).join('') })).join('');
   }
 
   // ══ ANNONCES (une grille de paires) ═══════════════════════════════════════
