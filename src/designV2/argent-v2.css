@@ -14,6 +14,8 @@ html[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) .vrm-phrase-ecr
 html[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) .vrm-phrase-ecran :is(button, a, svg) { color: var(--v2-page-texte) !important; }
 html[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) .vrm-screen-head-sous { flex: 1 0 100%; margin: 0 !important; }
 html[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) .vrm-screen-actions { width: 100%; justify-content: flex-start !important; }
+/* Téléphone : la cloche de la coque est posée sur la ligne du titre (comme Annonces) — sa place est gardée à droite. */
+@media (max-width: 1023px) { html[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) .vrm-screen-head-titre { padding-right: 60px; } }
 @media (min-width: 1024px) {
   html[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) .vrm-screen-actions { position: absolute; top: 8px; right: 0; width: auto; }
   html[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) { position: relative; }
@@ -46,7 +48,7 @@ html[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) .vrm-screen-act
 /* ══ 3. LES FAITS : UNE carte, 2 × 2 au téléphone, 4 côte à côte à l'ordinateur ═════════════════════════════ */
 .v2-ar-faits { margin: 20px 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); background: var(--v2-carte); border-radius: 16px; box-shadow: var(--v2-carte-ombre); overflow: hidden; color: var(--sv-encre, #0C1D30); }
 @media (min-width: 1024px) { .v2-ar-faits { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
-html body button.v2-rangee.v2-ar-fait { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; min-height: 76px; padding: 12px 16px; margin: 0; border: 0; border-radius: 0; background: transparent; text-align: left; color: inherit; box-shadow: none; position: relative; }
+html body button.v2-rangee.v2-ar-fait { display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 2px; min-height: 76px; padding: 12px 16px; margin: 0; border: 0; border-radius: 0; background: transparent; text-align: left; color: inherit; box-shadow: none; position: relative; }
 html body button.v2-rangee.v2-ar-fait:nth-child(odd)::after { content: ""; position: absolute; right: 0; top: 14px; bottom: 14px; width: .5px; background: var(--v2-filet); }
 html body button.v2-rangee.v2-ar-fait:nth-child(n+3)::before { content: ""; position: absolute; left: 16px; right: 0; top: 0; height: .5px; background: var(--v2-filet); }
 @media (min-width: 1024px) {
@@ -93,18 +95,33 @@ html[data-design="v2"] body .vrm-argent [data-argent-vue="resume"] #compta-detai
 html[data-design="v2"] body .vrm-argent [data-argent-vue="resume"] #compta-detail .vrm-compta-question { font-size: 13px !important; line-height: 18px !important; font-weight: 600 !important; letter-spacing: 0 !important; text-transform: none !important; color: var(--v2-page-muet) !important; margin: 0 4px 8px !important; }
 
 /* ══ 7. PARAMÈTRES : la liste groupée d'iOS (téléphone, premier écran) ══════════════════════════════════════════ */
-.v2-pm-racine { display: flex; flex-direction: column; gap: 0; }
-.v2-pm-h { margin: 24px 16px 8px; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--v2-page-muet); }
-.v2-pm-h:first-child { margin-top: 8px; }
-.v2-pm-liste { background: var(--v2-carte); border-radius: 16px; box-shadow: var(--v2-carte-ombre); overflow: hidden; color: var(--sv-encre, #0C1D30); }
-html[data-design="v2"] body .v2-pm-liste .vrm-set-ligne { position: relative; display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 8px 16px; margin: 0; border: 0 !important; border-radius: 0; background: transparent; box-shadow: none; width: 100%; box-sizing: border-box; text-align: left; color: inherit; }
-html[data-design="v2"] body .v2-pm-liste .vrm-set-ligne + .vrm-set-ligne::before { content: ""; position: absolute; left: 60px; right: 0; top: 0; height: .5px; background: var(--v2-filet); }
-html[data-design="v2"] body .v2-pm-liste .vrm-pm-cat-ic { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 8px; background: var(--v2-teinte-fond); color: var(--v2-teinte-texte); }
-html[data-design="v2"] body .v2-pm-liste .vrm-set-lib { flex: 1; min-width: 0; }
-html[data-design="v2"] body .v2-pm-liste .vrm-set-lib b { display: block; font-size: 17px; line-height: 22px; font-weight: 400; color: var(--sv-encre, #0C1D30) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-html[data-design="v2"] body .v2-pm-liste .vrm-set-desc { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-html[data-design="v2"] body .v2-pm-liste .vrm-set-val { flex: none; max-width: 40%; font-size: 17px; line-height: 22px; color: var(--v2-muet) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-html[data-design="v2"] body .v2-pm-liste .vrm-set-chev { flex: none; stroke: var(--v2-muet); opacity: .7; }
-:root[data-theme="dark"] .v2-pm-liste .vrm-set-lib b { color: #F2F7FD !important; }
-html[data-design="v2"] body .v2-pm-liste .vrm-set-ligne:active { background: rgb(18 52 96 / .06); }
-:root[data-theme="dark"] .v2-pm-liste .vrm-set-ligne:active { background: rgb(255 255 255 / .06); }
+/* Dans `@layer vrm-verre` : la PREMIÈRE couche nommée (index.html) — pour un `!important`, c'est elle qui gagne sur les
+   règles d'hier (`vrm-premium`, `vrm-studio`…). Seulement allumé (`[data-design="v2"]`). */
+@layer vrm-verre {
+.v2-pm-racine { display: flex !important; flex-direction: column !important; gap: 0 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-h { margin: 24px 16px 8px !important; font-size: 13px !important; line-height: 18px !important; font-weight: 600 !important; letter-spacing: 0 !important; text-transform: none !important; color: var(--v2-page-muet) !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-h:first-child { margin-top: 8px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-liste, :root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-racine .vg-pm-moi { background: var(--v2-carte) !important; border-radius: 16px !important; box-shadow: var(--v2-carte-ombre) !important; overflow: hidden !important; color: var(--sv-encre, #0C1D30) !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-liste .vrm-set-ligne { position: relative !important; display: flex !important; align-items: center !important; gap: 12px !important; min-height: 52px !important; padding: 8px 16px !important; margin: 0 !important; border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; width: 100% !important; box-sizing: border-box !important; text-align: left !important; color: inherit !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-liste .vrm-set-ligne + .vrm-set-ligne::before { content: "" !important; position: absolute !important; left: 60px !important; right: 0 !important; top: 0 !important; height: .5px !important; background: var(--v2-filet) !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-liste .vrm-pm-cat-ic { display: grid !important; place-items: center !important; flex: none !important; width: 32px !important; height: 32px !important; border-radius: 8px !important; background: var(--v2-teinte-fond) !important; color: var(--v2-teinte-texte) !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-liste .vrm-set-lib { flex: 1 !important; min-width: 0 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-liste .vrm-set-lib b { display: block !important; font-size: 17px !important; line-height: 22px !important; font-weight: 400 !important; color: var(--sv-encre, #0C1D30) !important; white-space: normal !important; overflow-wrap: anywhere !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-liste .vrm-set-desc { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; white-space: nowrap !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-liste .vrm-set-val { flex: 0 1 auto !important; max-width: 50% !important; font-size: 17px !important; line-height: 22px !important; text-align: right !important; color: var(--v2-muet) !important; white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-liste .vrm-set-chev { flex: none !important; stroke: var(--v2-muet) !important; opacity: .7 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-theme="dark"] body .v2-pm-liste .vrm-set-lib b { color: #F2F7FD !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-liste .vrm-set-ligne:active { background: rgb(18 52 96 / .06) !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-theme="dark"] body .v2-pm-liste .vrm-set-ligne:active { background: rgb(255 255 255 / .06) !important; }
+
+/* Les autres boutons pleins d'hier, sur Argent allumé : teintés (UN seul plein par écran — le geste du jour : « Saisir N
+   prix d'achat » sur Mois, « J'ai déclaré » sur Déclarer). Rien n'est retiré : le même bouton, le même geste. */
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-b-primaire:not([data-urssaf-cest-declare]),
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-finance-page .vrm-b-primaire:not([data-urssaf-cest-declare]) { background: var(--v2-teinte-fond) !important; color: var(--v2-teinte-texte) !important; box-shadow: none !important; border-color: transparent !important; }
+/* « Copier » (Déclarer) : un geste secondaire, teinté — le plein de l'écran est « J'ai déclaré ». */
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent button.vrm-urssaf-copier { background: var(--v2-teinte-fond) !important; color: var(--v2-teinte-texte) !important; box-shadow: none !important; border-color: transparent !important; }
+/* Le segmenté d'Argent : toute la largeur, quatre parts égales. */
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-argent-nav .v2-argent-seg { display: flex !important; width: 100% !important; max-width: none !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-argent-nav .v2-argent-seg > .vrm-seg-btn { flex: 1 1 0 !important; min-width: 0 !important; justify-content: center !important; }
+@media (min-width: 1024px) { :root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-argent-nav .v2-argent-seg { max-width: 560px !important; } }
+} /* fin @layer vrm-verre */

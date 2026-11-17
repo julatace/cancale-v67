@@ -59,7 +59,6 @@ import { valeurChiffre, raisonCourte, sansCompteSur } from '../design/carteChiff
 import { questionsArgent } from '../argent.js';
 import { useDesignV2 } from '../designV2/reglage.js';   // (17 nov.) le nouveau design, en essai
 import ArgentMoisV2Vue from '../designV2/ArgentMois.jsx';   // (17 nov., phase 2) Argent · Mois
-import { recuPublie } from '../design/carteChiffres.js';
 import { tauxMicro, detailTaux, AIDE_NEUTRE, SOURCES_OFFICIELLES, TAUX_ACTIVITE } from '../profilFiscal.js';
 // (10 nov., lot T) La jauge et l'alerte du seuil de TVA, à côté des factures (src/seuilTvaFacture.js).
 const SeuilTvaFactures = aLaDemande(() => import('../SeuilTvaFactures.jsx'));
@@ -3760,8 +3759,8 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
 // ── (17 nov., nouveau design, phase 2) ARGENT · MOIS ─────────────────────────
 // Allumé seulement. Les MÊMES sources et règles qu'`ArgentQuestions` (au caractère près : `valeurChiffre`,
 // `questionsArgent`, le brut et sa couverture, `DEMANDE_SAISIE_PRIX`), plus :
-//   · le reçu des cinq mois d'avant : `recuPublie` sur la ligne publiée `vinted_urssaf_mois` (celle du chiffre du
-//     mois en cours — le mois en cours EST l'affiche, la même valeur) ;
+//   · le reçu des cinq mois d'avant : `recuPublieEntre` (mois entier) sur la ligne publiée `vinted_urssaf_mois` — la
+//     lecture de « Comparer deux mois » ; le mois en cours EST l'affiche, la même valeur ;
 //   · disponible et en attente : `valeurChiffre('dispo' | 'attente')` (le porte-monnaie lu, l'argent à venir) ;
 //   · les versements du mois : le livre des recettes (`recettesDe`, la lecture de « Registres »), daté au versement.
 // Rien n'est recalculé ; aucun chiffre n'est écrit deux fois sur l'écran.
@@ -3785,7 +3784,7 @@ function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, 
     for (let k = 5; k >= 0; k--) {
       const de = new Date(d.getFullYear(), d.getMonth() - k, 1);
       const ym = `${de.getFullYear()}-${String(de.getMonth() + 1).padStart(2, '0')}`;
-      const R = k === 0 ? { valeur: qR.valeur, partiel: qR.partiel } : recuPublie(S.ligneUrssaf, ym);
+      const R = k === 0 ? { valeur: qR.valeur, partiel: qR.partiel } : recuPublieEntre(S.ligneUrssaf, { ym, complet: true });
       out.push({ cle: ym, l: de.toLocaleDateString(localeCourante(), { month: 'narrow' }), long: de.toLocaleDateString(localeCourante(), { month: 'long', year: 'numeric' }), v: R.valeur == null ? null : R.valeur, partiel: !!R.partiel, courant: k === 0 });
     }
     return out;

@@ -40,7 +40,12 @@ const jeu = () => {
   const L = JSON.parse(JSON.stringify(NV.JEU_LIGNES));
   const v2 = L.find((r) => r.id === 'harvest_222_orders_sold');
   v2.data.payload.my_orders.push({ transaction_id: 62006, title: 'Asics Gel-1130 argent taille 42', price: { amount: '70', currency_code: 'EUR' }, status: 'Commande finalisée', transaction_user_status: 'completed', date: iso(12), photo: null });
-  L.push(txn(222, 62005, 6), txn(111, 62002, 4));
+  // + des versements d'octobre et de septembre (la déclaration d'octobre a un chiffre d'affaires), et un titre très long.
+  v2.data.payload.my_orders.push(
+    { transaction_id: 62010, title: 'Adidas Gazelle bleue taille 40', price: { amount: '64', currency_code: 'EUR' }, status: 'Commande finalisée', transaction_user_status: 'completed', date: iso(38), photo: null },
+    { transaction_id: 62011, title: 'New Balance 550 blanche taille 43', price: { amount: '88', currency_code: 'EUR' }, status: 'Commande finalisée', transaction_user_status: 'completed', date: iso(66), photo: null },
+    { transaction_id: 62012, title: 'Nike Air Max 1 ’86 OG Big Bubble Sport Red édition anniversaire taille 43', price: { amount: '129', currency_code: 'EUR' }, status: 'Commande finalisée', transaction_user_status: 'completed', date: iso(4), photo: null });
+  L.push(txn(222, 62005, 6), txn(111, 62002, 4), txn(222, 62010, 33), txn(222, 62011, 61), txn(222, 62012, 1));
   const main = L.find((r) => r.id === 'main');
   main.data.vinted_regime = 'micro'; main.data.vinted_urssaf_freq = 'mensuel'; main.data.vrm_urssaf_declare = {};
   return { lignes: L, comptes: NV.JEU_COMPTES, ecritures: 0 };
@@ -98,7 +103,8 @@ async function mesurer(pg, nom, zonesSel) {
     const vis = (e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden' && !e.closest('[hidden]');
     const boutons = zones.flatMap((z) => z.matches('button') ? [z] : [...z.querySelectorAll('button')]).filter(vis);
     const petits = boutons.filter((b) => b.offsetHeight < 44 || b.offsetWidth < 44).map((b) => (b.textContent || b.getAttribute('aria-label') || '').trim().slice(0, 30) + ':' + b.offsetWidth + 'x' + b.offsetHeight);
-    const textes = zones.flatMap((z) => [z, ...z.querySelectorAll('*')]).filter(vis).filter((e) => [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()));
+    const rogne = (e) => { for (let p = e; p && p !== document.body; p = p.parentElement) { const st = getComputedStyle(p); if (st.clipPath === 'inset(50%)' || /rect\(0(px)?,? 0(px)?,? 0(px)?,? 0(px)?\)/.test(st.clip)) return true; } return false; };
+    const textes = zones.flatMap((z) => [z, ...z.querySelectorAll('*')]).filter(vis).filter((e) => !rogne(e)).filter((e) => [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()));
     const tronques = textes.filter((e) => { const cs = getComputedStyle(e); return e.scrollWidth > e.clientWidth + 1 && cs.textOverflow !== 'ellipsis' && /hidden|clip/.test(cs.overflowX) && e.clientWidth > 0; }).map((e) => e.className + ':' + e.textContent.trim().slice(0, 30));
     const coupes = textes.filter((e) => { const cs = getComputedStyle(e); return cs.textOverflow === 'ellipsis' && e.scrollWidth > e.clientWidth + 1 && !e.closest('.v2-ar-v-titre, .v2-ar-v-date'); }).map((e) => e.textContent.trim().slice(0, 30));
     const W = innerWidth; const deb = document.documentElement.scrollWidth - W;
@@ -106,7 +112,8 @@ async function mesurer(pg, nom, zonesSel) {
     const contrastes = textes.map((e) => { const cs = getComputedStyle(e); const c = K.rgba(cs.color); if (!c) return null; const f = K.fond(e); const big = parseFloat(cs.fontSize) >= 24 || (parseFloat(cs.fontSize) >= 18.66 && Number(cs.fontWeight) >= 700);
       if (Number(cs.opacity) === 0) return null; return { t: e.textContent.trim().slice(0, 24), r: Math.round(K.ratio(K.sur(c, f), f) * 100) / 100, min: big ? 3 : 4.5 }; }).filter(Boolean);
     const faibles = contrastes.filter((x) => x.r < x.min);
-    const pleins = [...document.querySelectorAll('[data-v2b="principal"], .sb-btn-plein, .vrm-main .vrm-btn-primaire, .vrm-main [data-variante="primaire"]')].filter(vis).filter((e) => { const r = e.getBoundingClientRect(); return r.bottom > 0 && r.width > 0; }).map((e) => e.textContent.trim().slice(0, 30));
+    const pleinFond = K.jeton('--v2-plein-fond'); const memeFond = (e) => { const c = K.rgba(getComputedStyle(e).backgroundColor); return c && pleinFond && c.a > .9 && Math.abs(c.r - pleinFond.r) + Math.abs(c.g - pleinFond.g) + Math.abs(c.b - pleinFond.b) < 12; };
+    const pleins = [...document.querySelectorAll('[data-v2b="principal"], .sb-btn-plein, .vrm-main .vrm-b-primaire')].filter(vis).filter((e) => e.matches('[data-v2b="principal"], .sb-btn-plein') || memeFond(e)).filter((e) => { const r = e.getBoundingClientRect(); return r.bottom > 0 && r.width > 0; }).map((e) => e.textContent.trim().slice(0, 30));
     return { nZones: zones.length, n: boutons.length, petits, tronques, coupes, deb, hors, nTextes: contrastes.length, faibles, pleins, minC: contrastes.length ? Math.min(...contrastes.map((x) => x.r)) : null };
   }, [CONTRASTE, zonesSel]);
   dit(r.nZones > 0, `${nom} : le nouveau design est rendu (${r.nZones} zones)`);
@@ -182,7 +189,7 @@ const ZONES_ARGENT = '.v2-argent, .v2-argent-nav, .vrm-screen-head:has(.v2-argen
         const mm = await mesurer(pg, `Mois ${T}`, ZONES_ARGENT);
         dit(apres.geste != null ? mm.pleins.length === 1 : mm.pleins.length === 0, `P Mois ${T} : ${apres.geste != null ? 'exactement UN' : 'aucun'} bouton plein (${mm.pleins.join(' | ') || 'aucun'})`, mm.pleins);
         await capture(pg, `argent-mois-${W}-${th}`);
-        if (tel) { await pg.evaluate(() => window.scrollTo(0, 560)); await pg.waitForTimeout(300); await pg.screenshot({ path: path.join(SHOTS, `argent-mois-bas-${W}-${th}.png`) }); }
+        if (tel) { await pg.evaluate(() => { const l = document.querySelector('.v2-ar-liste'); if (l) l.scrollIntoView({ block: 'end' }); }); await pg.waitForTimeout(300); await pg.screenshot({ path: path.join(SHOTS, `argent-mois-bas-${W}-${th}.png`) }); }
         // Déclarer
         await aller(pg, 'argent_declarer', 3400);
         const dcl = await lireApres(pg);
@@ -213,7 +220,7 @@ const ZONES_ARGENT = '.v2-argent, .v2-argent-nav, .vrm-screen-head:has(.v2-argen
             const r = document.querySelector('[data-v2-parametres]'); if (!r) return null;
             const hs = [...r.querySelectorAll('.v2-pm-h')].map((h) => ({ t: h.textContent.trim(), fs: parseFloat(getComputedStyle(h).fontSize), fw: Number(getComputedStyle(h).fontWeight) }));
             const rangs = [...r.querySelectorAll('.v2-pm-liste .vrm-set-ligne')];
-            const sep = rangs.slice(1).map((x) => { const b = getComputedStyle(x, '::before'); return parseFloat(b.left); });
+            const sep = rangs.filter((x) => x.previousElementSibling).map((x) => { const b = getComputedStyle(x, '::before'); return parseFloat(b.left); });
             return { hs, n: rangs.length, petits: rangs.filter((x) => x.offsetHeight < 44).length, ic: rangs.filter((x) => x.querySelector('.vrm-pm-cat-ic svg')).length, chev: rangs.filter((x) => x.querySelector('.vrm-set-chev')).length, val: rangs.filter((x) => x.querySelector('.vrm-set-val')).length, sep };
           });
           dit(pm && pm.hs.length >= 2 && pm.hs.every((h) => h.fs === 13 && h.fw === 600), `R ${T} : Paramètres en sections, en-têtes 13/600 (${pm ? pm.hs.map((h) => h.t).join(' · ') : '—'})`, pm);

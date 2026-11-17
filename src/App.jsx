@@ -62037,7 +62037,8 @@ function AppCoeur() {
   const [tab,setTabBrut]=useState(()=>{ if(!reprise0) return 'journee'; const pl=placeDesColis({ tab:reprise0.tab, sub:reprise0.sub, onglet:reprise0.colis }); if(pl&&pl.onglet==='retirer') demanderRetirer(); return pl?pl.tab:reprise0.tab; });
   // (17 nov., nouveau design) Annonces au téléphone : la tête de la coque ne prend plus de bande (la cloche seule, sur la ligne du
   // titre ; la recherche est le champ de l'écran ; le profil est ailleurs — Paramètres par le menu ☰ et les autres écrans).
-  const v2Ann = designV2App && !ordi && tab === 'annonces';
+  // (17 nov., phase 2) Argent aussi : la cloche se pose sur la ligne du grand titre, la tête ne prend plus de bande.
+  const v2Ann = designV2App && !ordi && (tab === 'annonces' || tab === 'compta' || tab === 'dashboard');
   // (6 nov.) L'écran ouvert et celui d'avant, pour « Signaler un problème ».
   noterEcranVu(tab);
   // (6 nov., v36) Et pour les temps réels : une visite d'écran par onglet ouvert.
