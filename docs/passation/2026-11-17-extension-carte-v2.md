@@ -60,14 +60,18 @@ formulaire de dépôt, pastille N° sur les photos, messages brefs et bandeaux, 
 La carte : UNE ligne de tête (compte · point · « Normal »), UNE ligne principale (« Messages aux favoris ·
 3 sur 15 », trait, « Prochain dans 3 min », la raison), UN plein (« Tout arrêter » pendant un envoi), la
 ligne secondaire (jauge de l'heure et du jour · lu · capté), le bandeau « Version 5.406 disponible ·
-Mettre à jour » (étapes repliées sous « Comment ? »), Favoris · Annonces · Ventes en contrôle segmenté.
+Mettre à jour » (étapes repliées sous « Comment ? »), Favoris · Annonces · Ventes en UN contrôle segmenté ;
+le choix « ce compte / tous les comptes » est dans la tête (« compte_banc ⌄ », un petit menu) ; ligne d'état à 13 px.
 Les marques `data-q4*`, `data-fav*`, `data-maj*`, `data-onglet-b` restent (bancs).
 
 ## 3. L'écran « action en cours » : `vinted-sync-extension/vrm-action.js`
 
 État `vrmActionEnCours` (chrome.storage.local) posé par le fond : la file des favoris de la carte
 (`poserActionEnCours`, à chaque pas), les commandes de l'app Republier / Recréer / Baisser le prix
-(`avecActionPlein`). L'écran : Vinted flouté (repli : voile opaque), le clic et le clavier n'atteignent pas
+(`avecActionPlein`). L'écran (revu après la première planche : « trop timide ») : un panneau d'environ 600 px (feuille plein
+écran au téléphone), grande photo 160 px et son étiquette N° kraft, grand titre, grand compteur « 3 sur 15 »,
+barre large, la suite et son compte à rebours, les 3 suivants en vignettes, entrée calme (fondu + 0,98→1,
+200 ms ; rien avec « réduire les animations »). Vinted flouté (repli : voile opaque), le clic et le clavier n'atteignent pas
 Vinted, ce qui se passe, l'article (photo, étiquette N° du compte de l'onglet), la suite et son compte à
 rebours, « Tout arrêter » (porte `toutArreter` + file des favoris arrêtée ; dit « Arrêté »), « Réduire »
 (pastille, la page redevient utilisable). Captcha ou alerte de Vinted (présence seulement, jamais le texte)
@@ -76,11 +80,12 @@ animations suivi, état périmé (> 3 min) ⇒ éteint. Capacités `actionplein`
 
 ## Preuves
 
-- `scripts/audit-action-plein.cjs` : 27/27 ; rouge sur main (20 rouges) ; `--prouve`.
+- `scripts/audit-action-plein.cjs` : 32/32 ; rouge sur main (20 rouges) ; `--prouve` 5/5 (W6 : refus de la sécurité
+  du compte APRÈS réservation ⇒ le serveur reprend au vrai temps, 20 min, et la file n'est plus coupée).
 - `scripts/audit-extension-feuille.cjs` : 17/17 ; `--prouve` 6/6.
 - `scripts/bancs/extension-surfaces.cjs` : carte (390, 1280, 1512, clair et sombre), aperçu, Leboncoin,
   Vestiaire, à connecter, écran plein (plein, réduit, captcha, arrêt, réduire les animations), fenêtre,
-  message bref ; contraste ≥ 4,5:1 mesuré, cibles ≥ 44 px, débordement ; `BANC_RACINE=<avant>` = captures
+  message bref ; 141 verts ; contraste ≥ 4,5:1 mesuré, cibles ≥ 44 px, débordement ; `BANC_RACINE=<avant>` = captures
   « avant ». Planche : scratchpad `onglets/extension-carte.png`.
 - `audit-carte-extension` : les deux contrôles « le plafond a refusé » attendent désormais « rien réservé,
   vraie attente et raison rangées ».
