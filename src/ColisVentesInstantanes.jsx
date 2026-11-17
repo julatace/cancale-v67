@@ -12,9 +12,8 @@
 //  `data-toutes-prix`, `data-colis-dates`, `data-colis-limite-texte`, `data-colis-lignes`).
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
-import { colisMontrable, ventesMontrable } from './colisVentesInstantanes.js';
-import { useInerte, useMaintenant, MentionInstantane, CarteInstantanee, GesteVerification } from './InstantaneCommun.jsx';
-import { SqLignes } from './Squelette.jsx';
+import { ventesMontrable } from './colisVentesInstantanes.js';
+import { useInerte, useMaintenant, MentionInstantane, CarteInstantanee } from './InstantaneCommun.jsx';
 import './styles-colis-ventes-instantanes.css';
 import MarquePlateforme from './plateformes/Marque.jsx';
 import { LogoSite } from './SelecteurSites.jsx';
@@ -44,95 +43,9 @@ function FiltreInstantane({ sites, ordi = false, cle }) {
   return rangee;
 }
 
-// ── COLIS ───────────────────────────────────────────────────────────────────
-export function ColisInstantane({ snap, maintenant = null, fmt = null, Icon = null, ordi = false, dateTete = '' }) {
-  const ref = React.useRef(null);
-  const now = useMaintenant(maintenant);
-  useInerte(ref);
-  const M = colisMontrable(snap, now);
-  if (!M) return null;
-  const largeurOk = typeof window !== 'undefined' && M.largeur && Math.abs((window.innerWidth || 0) - M.largeur) < 2;
-  return (
-    // Le cadre de l'écran vrai (la racine de `Comptabilite` : 16 px en haut).
-    <div ref={ref} className="vrm-ji vrm-inst" style={{ padding: '16px 14px 40px', position: 'relative' }} data-inst-ecran="colis" data-inst-t={String(M.t)} data-inst-age={String(Math.floor(M.age / 60000))} data-inst-onglet={M.onglet} aria-busy="true">
-      <div className="vrm-screen-head vrm-screen-head-doublon">
-        <div className="vrm-tete-row">
-          <div className="vrm-screen-head-titre a-repere">
-            {Icon ? <span className="vrm-screen-repere" aria-hidden="true" style={{ display: 'flex', flexShrink: 0 }}><Icon name="box" size={20}/></span> : null}
-            {dateTete ? <span className="vrm-fu-date-tete">{dateTete}</span> : null}
-            <h1 className="vrm-display">Colis</h1>
-            {M.phrase ? <p className="vrm-phrase-ecran">{M.phrase}</p> : null}
-          </div>
-          <div className="vrm-screen-actions" style={{ flexShrink: 0, maxWidth: '100%', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
-            {/* Scanner, Tout imprimer, Outils : des gestes — gardés jusqu'à la relecture. */}
-            <div className="vrm-colis-barre"><GesteVerification/></div>
-          </div>
-        </div>
-      </div>
-      {M.carte ? null : <MentionInstantane age={M.age} className="vrm-ji-age vrm-ji-age-seule" prefixe="data-inst"/>}
-      {M.prochain ? (
-        <div className="vrm-colis-prochain" data-inst-prochain={M.prochain.cle}>
-          <span className="vrm-colis-prochain-txt">{M.prochain.texte}{M.prochain.sous ? <span className="vrm-colis-prochain-sous"> · {M.prochain.sous}</span> : null}</span>
-          <GesteVerification/>
-        </div>
-      ) : null}
-      <CarteInstantanee carte={M.carte} age={M.age} fmt={fmt} maintenant={now}/>
-      <FiltreInstantane sites={M.sites} ordi={ordi} cle="colis"/>
-      {M.onglets ? (
-        <div className="vrm-colis-onglets" data-inst-onglets={M.onglet}>
-          <div role="group" aria-label="Colis à envoyer, envoyés ou à retirer" className="vrm-seg vrm-seg-plein">
-            {M.onglets.map((o) => (
-              <button key={o.cle} type="button" tabIndex={-1} className="vrm-seg-btn" aria-pressed={o.cle === M.onglet ? 'true' : 'false'} data-inst-onglet-choix={o.cle} data-inst-onglet-n={o.n == null ? '' : String(o.n)}>
-                {o.l}{o.n != null ? <span className="vrm-seg-n"> {o.n}</span> : null}
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : null}
-      {M.liste ? (
-        <>
-          {largeurOk && M.ecart ? <div aria-hidden="true" style={{ height: M.ecart }}/> : null}
-          <div className="vrm-colis-grille" data-colis-lignes="1" data-inst-liste={String(M.liste.filter((l) => l.g == null).length)} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {M.liste.map((l, i) => (l.g != null ? (
-              <div key={'g' + i} className="vrm-fu-groupe-transp" data-inst-groupe="">
-                <span className="vrm-fu-groupe-tuile" aria-hidden="true">{Icon ? <Icon name="box" size={16}/> : null}</span><h3>{l.g}</h3><span>{l.n}</span>
-              </div>
-            ) : (
-              <div key={'c' + i} className="vrm-colis-carte vrm-inst-carte" data-inst-colis={l.num || ''} style={{ padding: 14, borderRadius: 12 }}>
-                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                  <div className="vrm-colis-photo vrm-inst-photo" aria-hidden="true" style={{ width: 64, height: 80, borderRadius: 12, boxSizing: 'border-box', flexShrink: 0 }}/>
-                  <div style={{ flex: '1 1 150px', minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                      <span className="vrm-colis-titre" style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', overflowWrap: 'anywhere' }}>
-                        {l.num ? <><span className="vrm-num vrm-num-petit vrm-colis-titre-num" role="img" aria-label={'Numéro ' + l.num}><span className="vrm-num-prefixe" aria-hidden="true">N°</span><span aria-hidden="true">{l.num}</span></span>{' '}</> : null}{l.titre}
-                      </span>
-                      <span className="vrm-display vrm-colis-prix" style={{ flexShrink: 0, fontSize: 17, fontWeight: 700, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{l.prix}</span>
-                    </div>
-                    {l.limite || l.attente ? (
-                      <div style={{ fontSize: 12, marginTop: 6, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                        <span data-colis-dates="" style={{ flex: '0 1 auto', minWidth: 0 }}>{l.limite ? <span data-colis-limite-texte="" style={{ overflowWrap: 'anywhere', fontWeight: 400 }}>{l.limite}</span> : null}{l.attente ? <span>{l.attente}</span> : null}</span>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-                <div className="vrm-colis-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, flexWrap: 'wrap' }}>
-                  <div className="vrm-rangee-bord">
-                    {l.transp ? <span className="vrm-transporteur vrm-puce-transp"><span>{l.transp}</span></span> : null}
-                    {/* Imprimer, Générer, Déposé, Suivre : gardés jusqu'à la relecture. */}
-                    <GesteVerification/>
-                  </div>
-                </div>
-              </div>
-            )))}
-          </div>
-        </>
-      ) : (
-        // « Envoyés » et « À retirer » ne rangent aucune liste (suivis, points relais, codes) : leur place, en attente.
-        <div className="vrm-inst-attente-liste" aria-hidden="true"><SqLignes n={Math.min(3, Math.max(1, (M.onglets && (M.onglets.find((o) => o.cle === M.onglet) || {}).n) || 1))} montant={false}/></div>
-      )}
-    </div>
-  );
-}
+// (16 nov., lot ecrans-restes) L'instantané de COLIS est retiré : Colis vit dans Ventes « À expédier » depuis le
+// lot DJ3 (11 nov.), plus rien ne le rangeait (`CaptureColis` retiré) et `ColisInstantane` n'était plus jamais
+// montré — un instantané rangé avant le 11 nov. aurait pu l'être (§4.11 : code mort, retiré).
 
 // ── VENTES ──────────────────────────────────────────────────────────────────
 export function VentesInstantanee({ snap, maintenant = null, fmt = null, ordi = false, dateTete = '' }) {

@@ -220,6 +220,8 @@ function CarteAction({ a, I, Photo, relier, onBordereau, onPrix, onSaisir, num }
     <section className="fd-act" data-fd-action="bordereau" aria-label={tr('fd.bord.titre')}>
       <b className="fd-act-t">{tr('fd.bord.titre')}</b>
       {a.pret ? <span className="fd-act-s">{tr('fd.bord.pret')}</span> : null}
+      {/* (16 nov., lot ecrans-restes) La date limite d'envoi, par la règle de Colis (l'e-mail du bordereau, sinon estimée). */}
+      {a.limite ? <span className={'fd-act-s' + (a.limite.ambre ? ' is-am' : '')} data-fd-limite={a.limite.jour || ''} data-fd-limite-estimee={a.limite.estimee ? '1' : '0'}>{a.limite.texte}</span> : null}
       <button type="button" className="fd-plein sb-btn-plein" data-fiche-bordereau={a.tx || ''} onClick={() => onBordereau && onBordereau(a.tx)}>{I('printer', 19)}{tr('fd.bord.plein')}</button>
     </section>
   );
@@ -495,7 +497,7 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
           {(p || depuis) ? <div className="fd-t" aria-label={tr('fiche.heros')}>
             {ctxHeros ? <span className="fd-ctx" data-fiche-heros-ctx="">{codeHeros ? <>{`${ctxHeros} · `}<span className="vrm-sensible" data-stream-type="code" data-fiche-heros-code="">{codeHeros}</span></> : [ctxHeros, depuis && depuis.sous].filter(Boolean).join(' · ')}</span> : null}
             <h1 className="fd-nom">{motsInsecables(titre)}{taille ? ` · ${taille}` : ''}</h1>
-            {lEtat ? <span className={'fd-etat' + (lEtat.ambre ? ' is-am' : '') + (lEtat.rouge ? ' is-rouge' : '')} data-fd-etat={lEtat.cle} data-fd-ambre={lEtat.ambre ? '1' : '0'}>{tr(lEtat.cle, { ...lEtat.vars, prix: lEtat.vars.prix != null ? eur(lEtat.vars.prix) : '' })}</span>
+            {lEtat ? <span className={'fd-etat' + (lEtat.ambre ? ' is-am' : '') + (lEtat.rouge ? ' is-rouge' : '')} data-fd-etat={lEtat.cle} data-fd-ambre={lEtat.ambre ? '1' : '0'} data-fd-limite={lEtat.limite ? (lEtat.limite.jour || '') : undefined}>{tr(lEtat.cle, { ...lEtat.vars, prix: lEtat.vars.prix != null ? eur(lEtat.vars.prix) : '' })}</span>
               : depuis && depuis.prix ? <span className="fd-etat" data-fiche-heros-prix={depuis.prix}>{depuis.prix}</span> : null}
             {neuve ? <span className="fd-etat" data-fiche-neuve="">Photos à prendre</span> : null}
             {p && p.ancienNumero ? <span className="fd-etat">Ancien numéro (d’avant la remise à zéro)</span> : null}
