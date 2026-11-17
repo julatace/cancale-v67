@@ -561,3 +561,11 @@ html[data-design="v2"] body .v2v-tete .v2-affiche-sig-sous { margin: 0; }
     :root:root:root:root:root body:has(.v2-entete-cloche) .vrm-neuf-hote { top: auto !important; bottom: calc(var(--vrm-barre-bas, 84px) + 16px) !important; left: 50% !important; transform: translateX(-50%) !important; height: auto !important; }
   }
 }
+/* Grand texte (Paramètres → Taille du texte, jusqu'à ×1,36) et 375 px : rien de rogné, aucun mot coupé.
+   · la ligne du titre passe à la ligne s'il le faut (le plein sous le titre, entier) ;
+   · le segmenté prend la largeur de ses mots (jamais rogné) et défile au doigt s'ils ne tiennent pas. */
+.v2v-titre-ligne { flex-wrap: wrap; row-gap: 8px; }
+html body .v2v-segment .v2-seg { overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
+html body .v2v-segment .v2-seg::-webkit-scrollbar { display: none; }
+html body .v2v-segment button.v2-seg-btn { flex: 1 0 auto; padding: 0 12px; }
+html body .v2v-segment .v2-seg-l { overflow: visible; text-overflow: clip; }
