@@ -20275,12 +20275,12 @@ function ListeRouteV2(props) { return <ListeRouteBaseV2 {...props} Photo={PhotoV
 // (17 nov., nouveau design — Ventes · Toutes) Une vente en rangée A. Toucher : la fiche de la ligne d'hier (montée, cachée :
 // son récapitulatif, la facture, le bon de retour y sont) ; en sélection, la case dans sa colonne et le toucher coche.
 const FactureEnvoyeeIconeParesseuse = lazySur(() => import('./FacturePro.jsx').then((m) => ({ default: m.FactureEnvoyeeIcone })));
-function LigneVenteV2({ tx, o, photo, titre, num, prix, sous, l3, serie, gestes = [], attenue = false }) {
+function LigneVenteV2({ tx, o, photo, titre, num, prix, sous, l3, serie, gestes = [], attenue = false, pseudo = '' }) {
   const ouvrir = () => { try { const el = document.querySelector(`.v2-cache [data-tx="${CSS.escape(tx)}"][data-fiche-ligne], .v2-cache [data-tx="${CSS.escape(tx)}"] [data-fiche-ligne]`); const l = el ? lireLigne(el) : null; if (l) ouvrirLigne(l); } catch (_) {} };
   const sel = serie ? serie.ligne(tx) : {};
   const actions = [...gestes, { cle: 'plus', libelle: tr('v2.l.plus'), icone: <Icon name="more" size={20}/>, faire: ouvrir, data: { 'data-v2l-glisse': 'plus' } }];
   const facture = o && o.transaction_id != null && !o._fromEmail ? <Suspense fallback={null}><FactureEnvoyeeIconeParesseuse tx={String(o.transaction_id)} deps={DEPS_FACTURE}/></Suspense> : null;
-  return <LigneAnnonceV2 variante="A" cle={'v2t:' + tx} Photo={PhotoVinted} Icon={Icon} photo={photo} titre={titre} num={num} prix={prix} sous={sous} l3={l3} gestes={actions}
+  return <LigneAnnonceV2 variante="A" cle={'v2t:' + tx} Photo={PhotoVinted} Icon={Icon} photo={photo} titre={titre} num={num} prix={prix} sous={sous} l3={l3} gestes={actions} apresLogo={pseudo || null}
     LigneGlissable={serie && serie.actif ? null : LigneGlissable} apresPrix={facture}
     avant={serie && serie.actif ? <CaseSerie serie={serie} cle={tx} etiquette={titre}/> : null}
     attrs={{ ...sel, 'data-v2t-ligne': tx, 'data-v2t-attenue': attenue ? '1' : undefined, onClick: (ev) => { if (serie && serie.actif) return; if (ev.target && ev.target.closest && ev.target.closest('button, a, [data-lg-tiroir]')) return; ouvrir(); } }}/>;
@@ -48022,7 +48022,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         double: !!(num && conflitsNum.some((x) => String(x.numero) === String(num))),
         prix: o && o.price ? montant(o.price, { etrangere: 'ecarter' }) : '',
         sous: [taille ? tr('v2v.taille', { t: taille }) : ''].filter(Boolean),
-        l3: [pseudo ? { cle: 'acheteur', icone: 'users', texte: pseudo } : null, vendueV2(attenteColis(e)),
+        pseudo,
+        l3: [vendueV2(attenteColis(e)),
           { cle: 'bordereau', icone: imprime ? 'printer' : 'doc', texte: imprime ? tr('v2v.bord.imprime') : pdf ? tr('v2v.bord.pret') : tr('v2v.bord.attente') },
           echeanceV2(e)].filter(Boolean),
         attrs: { 'data-colis-ident': ident, 'data-tx-colis': e.txn || '', 'data-v2v-pret': pdf ? '1' : '0', 'data-v2v-imprime': imprime ? '1' : '0',
@@ -48042,7 +48043,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       prix: o && o.price ? montant(o.price, { etrangere: 'ecarter' }) : '',
       titre: (tailleEnFin(x.titre || '') || { nom: x.titre || '' }).nom, titreComplet: x.titre || '',
       sous: [(() => { const t = (o && typeof o.size_title === 'string' && o.size_title) || ((tailleEnFin(x.titre || '') || {}).taille) || ''; return t ? tr('v2v.taille', { t }) : ''; })(), x.site !== 'vinted' ? nomPlateforme(x.site) : ''].filter(Boolean),
-      l3: [pseudoAcheteur(o) ? { cle: 'acheteur', icone: 'users', texte: pseudoAcheteur(o) } : null, x.tr && x.tr.nom ? { cle: 'transporteur', icone: 'truck', texte: x.tr.nom } : null,
+      pseudo: pseudoAcheteur(o),
+      l3: [x.tr && x.tr.nom ? { cle: 'transporteur', icone: 'truck', texte: x.tr.nom } : null,
         x.j != null && Number.isFinite(x.j) ? vendueV2(x.j) : null].filter(Boolean),
       sousAmbre: false,
       attrs: { 'data-colis-ident': cle, 'data-v2v-parti': x.type === 'parti' ? lab : x.type,
@@ -51779,9 +51781,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <CacheSiV2 si>{ancienne}</CacheSiV2>
               <LigneVenteV2 tx={txL} o={o} photo={typeof photo === 'string' ? photo : null} titre={(tfV ? tfV.nom : o.title) || ''} num={num || ''} prix={montant(sell, { devise: o.price?.currency_code || 'EUR' })}
                 sous={[tailleV ? tr('v2v.taille', { t: tailleV }) : ''].filter(Boolean)}
-                l3={[acheteurV ? { cle: 'acheteur', icone: 'users', texte: acheteurV } : null, { cle: 'etat', icone: 'truck', texte: motEtatVente(venteStage(o).label) },
-                  o.date ? { cle: 'date', icone: 'clock', texte: dateFr(o.date, { day: 'numeric', month: 'short' }) } : null,
-                  lb.benefice != null && st !== 'cancelled' ? { cle: 'benefice', icone: 'euro', texte: texteBenefice(lb) } : null].filter(Boolean)}
+                pseudo={acheteurV}
+                l3={[{ cle: 'etat', icone: 'truck', texte: motEtatVente(venteStage(o).label) },
+                  o.date ? { cle: 'date', icone: 'clock', texte: dateFr(o.date, { day: 'numeric', month: 'short' }) } : null].filter(Boolean)}
                 serie={serieVentes} attenue={hidden || st === 'cancelled'}
                 gestes={[peutDeposer && fuPdf ? { cle: 'imprimer', libelle: tr('ventes.imprimer'), icone: <Icon name="printer" size={20}/>, faire: () => imprimerBordereauVente(o), data: { 'data-v2l-glisse': 'imprimer' } }
                   : peutDeposer && !deposeIci ? { cle: 'depose', libelle: tr('ventes.depose'), icone: <Icon name="check" size={20}/>, faire: () => demanderDepose(txL, o, libDepose), data: { 'data-v2l-glisse': 'depose' } } : null].filter(Boolean)}/>

@@ -746,3 +746,9 @@ html body .v2-squelette-A .v2-squelette-rangee { min-height: 120px; }
   html[data-design="v2"] body .vrm-annbar, html[data-design="v2"] body .vrm-annbar .vrm-annbar-gestes { gap: var(--v2-air-boutons, 12px) !important; }
 }
 .v2-passe-qr-ko { display: grid; place-items: center; text-align: center; font-size: 13px; line-height: 1.4; color: var(--v2-muet, #4A5B6D); background: var(--v2-socle, #EEF3F8); image-rendering: auto; }
+/* Une rangée de Ventes reste CALME, même avec un long pseudo et tous les gestes (Julien : « c'est moche ») : la 2e ligne
+   « N° · T42 · logo · pseudo » passe à la ligne plutôt que de couper ou de chevaucher ; aucun bouton dans la rangée (gestes au
+   glisser et dans la fiche), la facture envoyée seule à côté du prix. */
+:is(.v2v-liste, .v2t-liste) .v2l-a-l2 { flex-wrap: wrap; height: auto; min-height: 24px; white-space: normal; row-gap: 4px; overflow: visible; }
+:is(.v2v-liste, .v2t-liste) .v2l-a-l2 .v2l-faits-txt { overflow: visible; text-overflow: clip; white-space: nowrap; }
+.v2l-apres-logo { min-width: 0; overflow-wrap: anywhere; color: var(--v2-muet); }

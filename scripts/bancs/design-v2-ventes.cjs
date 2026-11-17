@@ -296,10 +296,36 @@ async function etroit(nav, b, grand) {
 
 // TOUTES (Vinted), la capture de Julien : rangées sans bouton ni ambre, la facture envoyée en icône verte, la sélection
 // (case dans sa colonne, rangée teintée), la barre de sélection neuve (UN plein, « ⋯ » avec nombre ou raison).
+// Dans une rangée, AUCUNE boîte de texte n'en chevauche une autre (la capture de Julien : « Prix d'achat ? » sur la taille),
+// au plus UN petit geste au bout de la rangée, aucun texte coupé ; relevé sur les rangées à l'écran.
+async function chevauchements(pg, sel) {
+  return pg.evaluate((sel) => {
+    const vis = (e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden' && !e.closest('[hidden], .v2-cache, [data-lg-tiroir], .v2-facture-bulle');
+    const rows = [...document.querySelectorAll(sel)].filter(vis).filter((r) => { const q = r.getBoundingClientRect(); return q.bottom > 0 && q.top < innerHeight; }).slice(0, 12);
+    const out = [], coupes = [], gestes = [];
+    for (const r of rows) {
+      const boites = [...r.querySelectorAll('*')].filter(vis).filter((e) => e.matches('.v2-etiquette, button') || [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()))
+        .filter((e) => !e.closest('.v2-etiquette') || e.matches('.v2-etiquette'));
+      // Une boîte de texte = les rectangles de SES lignes (un texte qui passe à la ligne n'est pas un rectangle plein).
+      const rects = boites.map((e) => { const rg = document.createRange(); rg.selectNodeContents(e); const rs = e.matches('.v2-etiquette, button') ? [e.getBoundingClientRect()] : [...rg.getClientRects()].filter((x) => x.width > 1);
+        return { e, rs, t: (e.textContent || e.getAttribute('aria-label') || '').trim().slice(0, 18) }; });
+      for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) {
+        const a = rects[i], b = rects[j]; if (a.e.contains(b.e) || b.e.contains(a.e)) continue;
+        if (a.rs.some((x) => b.rs.some((y) => Math.min(x.right, y.right) - Math.max(x.left, y.left) > 1 && Math.min(x.bottom, y.bottom) - Math.max(x.top, y.top) > 1))) out.push(a.t + ' ⟂ ' + b.t);
+      }
+      for (const e of boites) { const cs = getComputedStyle(e); if (e.scrollWidth > e.clientWidth + 1 && /hidden|clip/.test(cs.overflowX) && cs.textOverflow === 'ellipsis' && !/-webkit-box/.test(cs.display)) coupes.push(e.textContent.trim().slice(0, 20)); }
+      gestes.push([...r.querySelectorAll('button')].filter(vis).filter((b) => !b.closest('.v2l-avant')).length);
+    }
+    return { n: rows.length, chevauche: [...new Set(out)].slice(0, 6), coupes: coupes.slice(0, 6), gestesMax: gestes.length ? Math.max(...gestes) : 0 };
+  }, sel);
+}
+
 async function toutes(nav, b0, W) {
   const tel = W < 600, th = (tel ? '390' : '1512') + '-clair';
   console.log(`\n── allumé · Toutes (Vinted) · ${th}`);
   const b = JSON.parse(JSON.stringify(b0));
+  // Les pires cas de sa capture : des pseudos LONGS sur toutes les ventes (inventés).
+  for (const r of b.rows.filter((x) => /_orders_sold$/.test(x.id))) for (const [i, o] of (r.data.payload.my_orders || []).entries()) if (o) o.user_login = i % 2 ? 'jujuf38_vend_ses_sneakers' : 'arthuror2';
   // Une facture Pro ENVOYÉE sur une vente (inventée : FA-2026-0006), pour voir son icône.
   const sold = b.rows.find((r) => /_orders_sold$/.test(r.id)); const v0 = sold && sold.data.payload.my_orders.find((o) => o && !/expédi|envoyer/i.test(String(o.status || '')));
   if (v0) b.rows.push({ id: 'email_invoice_tx_' + v0.transaction_id, data: { number: 'FA-2026-0006', status: 'emise', transaction: String(v0.transaction_id), emiseLe: new Date(Date.now() - 86400e3).toISOString(), type: 'facture_pro',
@@ -308,6 +334,11 @@ async function toutes(nav, b0, W) {
   await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {});
   await pg.evaluate(() => localStorage.setItem('vrm_design_v2', '1')); await pg.reload({ waitUntil: 'domcontentloaded' });
   await attendre(pg, () => !!document.querySelector('[data-v2v-seg="toutes"]'), 30000);
+  // « À envoyer » avec ces pseudos longs : les mêmes rangées calmes.
+  await attendre(pg, () => document.querySelectorAll('[data-v2v-liste="envoyer"] [data-v2v-ligne]').length > 2, 30000); await pg.waitForTimeout(1200); await sansToasts(pg);
+  { const c = await chevauchements(pg, '[data-v2v-liste="envoyer"] [data-v2v-ligne]');
+    dit(c.n > 3 && !c.chevauche.length && !c.coupes.length && c.gestesMax <= 1, `R ${th} : À envoyer, pseudos longs : aucune boîte de texte n'en chevauche une autre, rien de coupé, au plus UN petit geste par rangée (${c.gestesMax})`, c);
+    await pg.screenshot({ path: path.join(SHOTS, `envoyer-pseudos-${th}.png`) }); }
   // Toutes les plateformes d'abord : les ventes de chaque site en rangées A, le logo de la plateforme sur chaque rangée.
   await pg.locator('[data-v2v-seg="toutes"]').first().click({ timeout: 8000 }).catch(() => {});
   await attendre(pg, () => document.querySelectorAll('[data-v2-toutes] [data-v2t-ligne]').length > 2, 30000); await pg.waitForTimeout(1200); await sansToasts(pg);
@@ -332,6 +363,8 @@ async function toutes(nav, b0, W) {
   dit(r.n > 2 && r.prixAchat === 0 && r.boutonsRangee === 0, `T ${th} : ${r.n} ventes en rangées A, ni « Prix d'achat ? » ni bouton répété par rangée`, r);
   dit(r.icones === 1 && r.factureTexte === 0 && /rgb\(30, 122, 69\)/.test(r.vert), `T ${th} : la facture envoyée = UNE icône verte à côté du prix (plus de texte « Facture envoyée le … »)`, r);
   dit(r.orphelins === 0, `T ${th} : la taille sortie du titre (« T. »), aucun « taille 40 » seul`, r.orphelins);
+  { const c = await chevauchements(pg, '.v2t-liste:not([data-v2-toutes]) [data-v2t-ligne]');
+    dit(c.n > 3 && !c.chevauche.length && !c.coupes.length && c.gestesMax <= 1, `R ${th} : Toutes, pseudos longs : aucune boîte de texte n'en chevauche une autre, rien de coupé, au plus UN petit geste par rangée (${c.gestesMax})`, c); }
   await pg.screenshot({ path: path.join(SHOTS, `toutes-${th}.png`) });
   if (!tel) {
     // La barre du haut collante (recherche, plateformes) : un verre plein — jamais une demi-rangée lisible dessous.

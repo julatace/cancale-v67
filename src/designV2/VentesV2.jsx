@@ -79,7 +79,7 @@ function LigneColis({ l, Photo, Icon, LigneGlissable, partant = false }) {
   const ligne = (
     <LigneAnnonce variante="A" cle={'v2v:' + l.cle} attrs={{ ...l.attrs, 'data-v2v-ligne': l.cle, 'data-v2v-groupe': l.groupe, 'data-v2v-fait': partant ? 'part' : undefined }}
       photo={l.photo || null} Photo={Photo} Icon={Icon} titre={l.titre} num={l.num} double={!!l.double} prix={l.prix}
-      sous={l.sous} sousAmbre={l.sousAmbre} l3={l.l3} logo={l.logo} gestes={gestes} LigneGlissable={partant ? null : LigneGlissable}/>
+      sous={l.sous} sousAmbre={l.sousAmbre} l3={l.l3} logo={l.logo} apresLogo={l.pseudo || null} gestes={gestes} LigneGlissable={partant ? null : LigneGlissable}/>
   );
   return partant ? <Partante>{ligne}</Partante> : ligne;
 }
@@ -114,7 +114,7 @@ const sansAccents = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, 
 export function filtrerLignes(lignes, q) {
   const r = sansAccents(q).replace(/^n°\s*/, '').trim();
   if (!r) return lignes;
-  return lignes.filter((l) => sansAccents([l.num ? 'n°' + l.num + ' ' + l.num : '', l.titreComplet || l.titre, ...(l.sous || []), ...((l.l3 || []).map((x) => x.texte)), l.prix].join(' ')).includes(r));
+  return lignes.filter((l) => sansAccents([l.num ? 'n°' + l.num + ' ' + l.num : '', l.titreComplet || l.titre, l.pseudo || '', ...(l.sous || []), ...((l.l3 || []).map((x) => x.texte)), l.prix].join(' ')).includes(r));
 }
 
 function Vide({ texte, calme = false, Icon }) {
