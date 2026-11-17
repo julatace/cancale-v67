@@ -1,7 +1,11 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve as resoudreChemin } from 'node:path';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+const exiger = createRequire(import.meta.url);
+const RACINE = fileURLToPath(new URL('.', import.meta.url));
 // __BUILD__ = horodatage du build, injecté à la compilation. Sert de « version »
 // visible dans l'app pour diagnostiquer les problèmes de cache/mise à jour.
 // ⚠️ ON INJECTE L'ISO COMPLET, PAS UNE CHAÎNE DÉJÀ MISE EN FORME. La version
@@ -62,6 +66,63 @@ const listeHorsLigne = () => ({
     writeFileSync(join(dir, 'hors-ligne-assets.json'), JSON.stringify({ v: 1, fichiers }));
   },
 });
+
+// (17 nov., lot vitesse-poids) LE FRANÇAIS DES ÉCRANS À LA DEMANDE, CHARGÉ AVEC EUX.
+// Le fr.js qu'importe src/App.jsx devient, au build, la part que le démarrage peut lire ;
+// le reste remplit src/i18n/langues/fr-reste.js, importé EN PREMIER par chaque module chargé
+// à la demande qui peut en lire une clé. Règle et prudences : scripts/_francais-differe.cjs ;
+// garde : scripts/audit-francais-differe.cjs. Le dépôt garde fr.js complet.
+const francaisDiffere = () => {
+  const FR = resoudreChemin(RACINE, 'src/i18n/langues/fr.js');
+  const RESTE = resoudreChemin(RACINE, 'src/i18n/langues/fr-reste.js');
+  const APP = resoudreChemin(RACINE, 'src/App.jsx');
+  const INDEX = resoudreChemin(RACINE, 'src/i18n/index.js');
+  const BASE = '\0vrm-fr-demarrage';
+  let a = null;
+  return {
+    name: 'vrm-francais-differe',
+    apply: 'build',
+    enforce: 'pre',
+    async buildStart() {
+      const F = exiger('./scripts/_francais-differe.cjs');
+      a = F.analyser(RACINE, await F.dictionnaire(RACINE));
+    },
+    async resolveId(source, importer) {
+      if (!a || !importer || resoudreChemin(importer.split('?')[0]) !== APP) return null;
+      const r = await this.resolve(source, importer, { skipSelf: true });
+      return r && r.id === FR ? BASE : null;
+    },
+    load(id) {
+      if (!a) return null;
+      if (id === BASE) return 'export default ' + JSON.stringify(a.base) + ';\n';
+      if (id === RESTE) return 'import { ajouterSourceDifferee } from ' + JSON.stringify(INDEX) + ';\najouterSourceDifferee(' + JSON.stringify(a.reste) + ');\nexport default true;\n';
+      return null;
+    },
+    transform(code, id) {
+      if (!a || !a.injecter.has(id.split('?')[0])) return null;
+      return { code: 'import ' + JSON.stringify(RESTE) + ';\n' + code, map: null };
+    },
+  };
+};
+// (17 nov., lot vitesse-poids) LES NOMS COURTS, DONNÉS PAR FRÉQUENCE. esbuild minifie bien
+// mais nomme les variables locales sans regarder leur usage ; terser (`mangle` SEUL : aucune
+// réécriture du code, seulement les noms locaux) les nomme par fréquence, ce que gzip compresse
+// mieux. Mesuré sur le morceau App : 1 640 → 1 589 Ko compressés (−3 %). Seuls les morceaux de
+// l'app (src/) ; les bibliothèques déjà minifiées (maplibre, three…) ne sont pas touchées.
+const nomsCourts = () => ({
+  name: 'vrm-noms-courts',
+  apply: 'build',
+  async generateBundle(o, bundle) {
+    const { minify } = exiger('terser');
+    for (const c of Object.values(bundle)) {
+      if (c.type !== 'chunk' || c.code.length < 20000) continue;
+      const ids = c.moduleIds || Object.keys(c.modules || {});
+      if (!ids.some((m) => /[\\/]src[\\/]/.test(m) && !/node_modules/.test(m))) continue;
+      const r = await minify(c.code, { module: c.fileName.endsWith('.js') && o.format === 'es', ecma: 2020, compress: false, mangle: true });
+      if (r && typeof r.code === 'string' && r.code.length) c.code = r.code;
+    }
+  },
+});
 const prechargerApp = () => ({
   name: 'vrm-precharger-app',
   apply: 'build',
@@ -98,7 +159,7 @@ const prechargerApp = () => ({
   },
 });
 export default defineConfig({
-  plugins: [react(), allegerIndex(), versionEtat(), prechargerApp(), listeHorsLigne()],
+  plugins: [francaisDiffere(), react(), allegerIndex(), versionEtat(), prechargerApp(), listeHorsLigne(), nomsCourts()],
   define: { __BUILD__: JSON.stringify(BUILD) },
   build: {
     // Cible moderne : moins de transformations/polyfills → bundle plus léger et
