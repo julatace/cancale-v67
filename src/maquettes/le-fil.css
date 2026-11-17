@@ -126,8 +126,11 @@
 :root:root:root:root:root:root:root[data-fil] .fil-barre-biblios { margin-left: auto !important; display: flex !important; gap: 4px !important; }
 :root:root:root:root:root:root:root[data-fil] .fil-barre-lien { min-height: 44px !important; padding: 0 7px !important; color: var(--sv-encre-2) !important; font-weight: 500 !important; }
 :root:root:root:root:root:root:root[data-fil] .fil-barre-lien[aria-current="page"] { color: var(--sv-encre) !important; font-weight: 700 !important; }
-:root:root:root:root:root:root:root[data-fil] .fil-champ-ordi { flex: 0 1 320px !important; min-width: 0 !important; }
+:root:root:root:root:root:root:root[data-fil] .fil-champ-ordi { flex: 0 0 300px !important; min-width: 0 !important; }
 :root:root:root:root:root:root:root[data-fil] .fil-slot:empty { display: none !important; }
+:root:root:root:root:root:root:root[data-fil] .fil-barre-ordi { flex-wrap: wrap !important; }
+:root:root:root:root:root:root:root[data-fil] .fil-barre-biblios { flex: none !important; }
+:root:root:root:root:root:root:root[data-fil] .fil-slot:not(:empty) { flex-basis: 100% !important; display: flex !important; justify-content: flex-start !important; padding-top: 4px !important; }
 
 :root:root:root:root:root:root:root[data-fil] .fil-ordi { display: grid !important; grid-template-columns: minmax(380px, 460px) minmax(0, 1fr) !important; gap: 24px !important; align-items: start !important; }
 :root:root:root:root:root:root:root[data-fil] .fil-ordi .fil-col { min-width: 0 !important; }

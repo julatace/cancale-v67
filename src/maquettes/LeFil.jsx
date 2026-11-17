@@ -316,7 +316,7 @@ export function FilDock({ tab, setTab, onChercher, Icon, FermeAuRetour }) {
     <nav className="fil-dock" aria-label={tr('fil.biblios')} data-fil-dock="">
       <button type="button" className="sb-rond fil-dock-fil" aria-current={surFil ? 'page' : undefined} aria-label={tr('fil.retourFil')} data-fil-dock-fil="" onClick={() => setTab('journee')}>
         {Icon ? <Icon name="home" size={21}/> : null}
-        {n ? <span className="fil-dock-n">{n > 9 ? '9+' : n}</span> : null}
+        {n && surFil ? <span className="fil-dock-n">{n > 9 ? '9+' : n}</span> : null}
       </button>
       <button type="button" className="sb-touche fil-cherche" data-fil-chercher="" onClick={onChercher}>
         {Icon ? <Icon name="search" size={18}/> : null}<span>{tr('fil.chercher')}</span>
@@ -352,7 +352,7 @@ export function FilBarreOrdi({ tab, setTab, onChercher, Icon, champ = null, pose
     <nav className="fil-barre-ordi" aria-label={tr('fil.biblios')} data-fil-barre="">
       <span className="fil-marque" aria-hidden="true"><img src="/logo-vrm-96.png" alt="" width="26" height="26" decoding="async"/></span>
       <button type="button" className="sb-touche" aria-pressed={tab === 'journee'} onClick={() => setTab('journee')} data-fil-barre-fil="">
-        {tr('fil.retourFil')}{n ? <span className="fil-barre-n">{n}</span> : null}
+        {tr('fil.retourFil')}{n && tab === 'journee' ? <span className="fil-barre-n">{n}</span> : null}
       </button>
       {/* La VRAIE recherche de la coque (touche « / ») quand elle est passée ; sinon une touche qui l'ouvre. */}
       {champ ? <span className="fil-champ-ordi">{champ}</span> : (
