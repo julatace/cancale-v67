@@ -13,6 +13,7 @@ const JOBS = [
   { W: 390, t: 'light', h: 'ecran=ventes&glisse=1', n: 'ventes-glisse' },
   { W: 390, t: 'light', h: 'ecran=ventes&fiche=124', n: 'ventes-fiche' },
   { W: 390, t: 'light', h: 'ecran=achats&colis=c1', n: 'achats-code' },
+  { W: 390, t: 'light', h: 'ecran=ventes&menu=124', n: 'ventes-menu' },
   ...ECR.map((e) => ({ W: 390, t: 'dark', h: 'ecran=' + e, n: e })),
   { W: 390, t: 'dark', h: 'ecran=achats&colis=c1', n: 'achats-code' },
   ...ECR.map((e) => ({ W: 1512, t: 'light', h: 'ecran=' + e, n: e })),
@@ -31,7 +32,7 @@ const JOBS = [
       const pleins = [...document.querySelectorAll('[data-plein]')].filter(vis).length;
       const petites = tel ? [...document.querySelectorAll('button')].filter(vis).filter((b) => { const r = b.getBoundingClientRect(); return Math.min(r.width, r.height) < 43.5 && !b.matches('.li-geste'); }).map((b) => b.innerText.slice(0, 20) || b.getAttribute('aria-label')) : [];
       const l1 = document.querySelector('.liste .li'); const hauts = tel ? [...document.querySelectorAll('button,input')].filter(vis).filter((b) => !b.closest('.liste,.feuille,.voile') && !b.matches('.aide') && b.getBoundingClientRect().bottom < innerHeight / 2).map((b) => b.innerText.slice(0, 20)) : [];
-      const coupes = [...document.querySelectorAll('.li-n,.li-mot,.li-sous,.li-val,.li-etat,.filtre,.plein,.onglet,.legende,.sur,.chiffre,.gr-t span,.lieu-t span,.trio dd,.vie-d')].filter(vis).filter((x) => x.scrollWidth > x.clientWidth + 1).map((x) => x.innerText.slice(0, 30));
+      const coupes = [...document.querySelectorAll('.tag-n,.li-mot,.li-sous,.li-val,.li-etat,.seg-b,.plein,.onglet span,.legende,.titre,.chiffre,.gr-nom,.passe-v,.passe-lieu,.trio dd,.stats dd,.vie-d')].filter(vis).filter((x) => x.scrollWidth > x.clientWidth + 1).map((x) => x.innerText.slice(0, 30));
       const tailles = new Set(); for (const x of document.querySelectorAll('body *')) { if ([...x.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()) && vis(x)) tailles.add(getComputedStyle(x).fontSize); }
       const lignes = [...document.querySelectorAll('.liste .li')].filter((x) => { const r = x.getBoundingClientRect(); const p = document.querySelector('.pouce').getBoundingClientRect(); return r.top >= 0 && r.bottom <= p.top; }).length;
       return { pleins, petites, ligne1: l1 ? Math.round(l1.getBoundingClientRect().top) : null, lignesEntieres: lignes, hauts, coupes, tailles: [...tailles], mauvais: /undefined|NaN|\[object/.test(document.body.innerText) };

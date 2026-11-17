@@ -24,6 +24,22 @@ const MODELES = [
   ['New Balance', '9060 sel de mer', 160], ['Nike', 'Cortez blanche et rouge', 0], ['Salomon', 'Speedcross 6 kaki', 95], ['Adidas', 'Campus 00s vert', 140],
   ['Nike', 'Air Max 1 ’86 Big Bubble', 5], ['Puma', 'Palermo bordeaux', 345], ['Onitsuka Tiger', 'Mexico 66 jaune', 48], ['Converse', 'Chuck 70 Hi noire', 220],
 ];
+
+// L'ALLURE de chaque modèle (inventée, sans logo de marque) : forme (basse, course, montante) et ses couleurs.
+const LOOKS = {
+  'Samba OG blanche': ['basse', '#F3F1EC', '#1C1C1C', '#B98552', '#1C1C1C'], 'Dunk Low Panda': ['basse', '#F5F5F3', '#151515', '#F5F5F3', '#151515'],
+  '550 crème': ['basse', '#EFE7D6', '#2F5D3A', '#F1ECE1', '#2F5D3A'], 'XT-6 noire': ['course', '#232425', '#55585C', '#1A1A1A', '#8B9096'],
+  'Gel-1130 argent': ['course', '#E9EAEC', '#A9AEB5', '#F4F4F2', '#1F3E73'], 'Gazelle bleu marine': ['basse', '#25365C', '#F2EFE8', '#B98552', '#F2EFE8'],
+  '2002R gris': ['course', '#B9BBBD', '#8E9195', '#F0EEE9', '#5E6166'], 'Air Force 1 blanche': ['basse', '#F7F7F5', '#ECECEA', '#F7F7F5', '#DADAD6'],
+  'Old Skool noire': ['basse', '#1E1E1E', '#F2F0EA', '#F2F0EA', '#F2F0EA'], 'Spezial Handball beige': ['basse', '#D8C3A0', '#7E2E2A', '#B98552', '#7E2E2A'],
+  'Air Max 90 Infrared': ['course', '#EDEDEA', '#9C9EA1', '#F3F2EE', '#E8473B'], 'Gel-Kayano 14 crème': ['course', '#EDE6D3', '#B9A27A', '#F3EFE6', '#4F6B8A'],
+  '9060 sel de mer': ['course', '#E7E2D8', '#C9C1B1', '#EFEBE3', '#9C9384'], 'Cortez blanche et rouge': ['basse', '#F5F3EE', '#C7322B', '#EDE9E0', '#1F3E73'],
+  'Speedcross 6 kaki': ['course', '#5E6145', '#3B3D2C', '#2A2A26', '#C9B98A'], 'Campus 00s vert': ['basse', '#2F6A49', '#F2EFE8', '#F2EFE8', '#F2EFE8'],
+  'Air Max 1 ’86': ['course', '#F1F0EC', '#C7322B', '#F3F2EE', '#C7322B'], 'Palermo bordeaux': ['basse', '#6A2430', '#E9DFCF', '#B98552', '#E9DFCF'],
+  'Mexico 66 jaune': ['basse', '#E3B53A', '#1C1C1C', '#F1ECE1', '#1C1C1C'], 'Chuck 70 Hi noire': ['montante', '#1E1E1E', '#F2EEE4', '#F2EEE4', '#F2EEE4'],
+  'Air Max 90 blanche': ['course', '#F4F4F2', '#D7D8DA', '#F3F2EE', '#BFC2C6'], 'Samba OG noire': ['basse', '#1C1C1C', '#F3F1EC', '#B98552', '#F3F1EC'],
+};
+const lookDe = (titre) => { const k = Object.keys(LOOKS).sort((a, b) => b.length - a.length).find((m) => titre.includes(m)); if (!k) throw new Error('allure inconnue : ' + titre); const [forme, haut, deco, semelle, detail] = LOOKS[k]; return { forme, haut, deco, semelle, detail }; };
 let graine = 7; const rnd = () => (graine = (graine * 16807) % 2147483647) / 2147483647;
 const pick = (a) => a[Math.floor(rnd() * a.length)];
 
@@ -82,6 +98,8 @@ const portemonnaie = [{ compte: COMPTES[0], dispo: 8450, attente: 21400 }, { com
 const sansCase = annonces.filter((a) => a.numero && !a.cas).map((a) => a.numero);
 const aPublier = [{ numero: '141', titre: 'Nike Air Max 90 blanche 41', teinte: 0, cas: 'D-2' }, { numero: '142', titre: 'Adidas Samba OG noire 40', teinte: 220, cas: 'D-2' }, { numero: '143', titre: 'New Balance 550 crème 39', teinte: 38, cas: 'D-3' }];
 
+for (const x of [...annonces, ...ventes, ...achats, ...aPublier]) x.look = lookDe(x.titre);
+for (const c of colis) c.look = lookDe(c.art);
 const fixture = { maintenant: iso(MAINTENANT), comptes: COMPTES, annonces, ventes, achats, colis, portemonnaie, sansCase, aPublier };
 fs.writeFileSync(path.join(__dirname, 'fixture.js'), '// Généré par fabriquer-fixture.cjs — données INVENTÉES.\nwindow.FIXTURE = ' + JSON.stringify(fixture) + ';\n');
 console.log('fixture.js :', annonces.length, 'annonces,', ventes.length, 'ventes,', achats.length, 'achats,', colis.length, 'colis');
