@@ -194,6 +194,10 @@ const VueComptable = lazySur(() => import('./VueComptable.jsx'));
 // (15 nov.) LA PAGE D'UN PARTENAIRE (`/pa/<jeton>` → `?espace-partenaire=`) : lecture seule, sans l'app ni session (src/VuePartenaire.jsx).
 const partenaireDemande = /[?&]espace-partenaire=/.test(window.location.search || '');
 const VuePartenaire = lazySur(() => import('./VuePartenaire.jsx'));
+// (17 nov.) MAQUETTE O « Galerie » : un PROTOTYPE de banc (src/maquettes/o/), monté seulement quand le banc
+// pose `vrm_banc_maquette` = 'o' sur l'appareil (scripts/bancs/maquette-o.cjs). Aucun geste de l'app ne le pose : invisible pour Julien.
+const maquetteO = (() => { try { return window.localStorage.getItem('vrm_banc_maquette') === 'o'; } catch (_) { return false; } })();
+const MaquetteO = lazySur(() => import('./maquettes/o/Galerie.jsx'));
 // (14 nov., ouverture instantanée) LES DERNIERS CHIFFRES DE MA JOURNÉE, PEINTS AVANT L'APP.
 // src/ouvertureInstantanee.js décide (rien que ce que la porte hors ligne laisserait voir, pour CE
 // compte, sur CET appareil) ; src/OuvertureInstantanee.jsx peint l'instantané dans l'écran de
@@ -235,6 +239,7 @@ function Racine() {
     window.addEventListener('popstate', f);
     return () => window.removeEventListener('popstate', f);
   }, []);
+  if (maquetteO) return <React.Suspense fallback={null}><MaquetteO /></React.Suspense>;
   if (comptableDemande) return <React.Suspense fallback={null}><VueComptable /></React.Suspense>;
   if (partenaireDemande) return <React.Suspense fallback={null}><VuePartenaire /></React.Suspense>;
   if (filmDemande) return <React.Suspense fallback={<FondApp />}><Film /></React.Suspense>;
