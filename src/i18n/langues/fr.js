@@ -53,13 +53,15 @@ import ecran_plus from './fr/plus.js';
 import ecran_plateformes from './fr/plateformes.js';
 import ecran_colisplus from './fr/colisplus.js';   // (14 nov., lot colis-plus)
 import ecran_studioventes from './fr/studioventes.js';   // (14 nov., Studio bleu clair) Ventes et Achats
-import ecran_impression from './fr/impression.js';   // (14 nov., impression-simple)
+import ecran_impression from './fr/impression.js';
+import ecran_tampons from './fr/tampons.js';   // (16 nov., lot tampons-parametres)   // (14 nov., impression-simple)
 import ecran_accueilReste from './fr/accueilReste.js';
 import ecran_fraiscarte from './fr/fraiscarte.js';   // (14 nov., frais-carte)
 import ecran_atelier from './fr/atelier.js';
 import ecran_accompagnement from './fr/accompagnement.js';   // (14 nov.) les quatre moments d'un geste
 import ecran_partenaires from './fr/partenaires.js';   // (15 nov.) programme partenaire
 import ecran_argentprix from './fr/argentprix.js';   // (14 nov., argent-prix)
+import ecran_argentMieux from './fr/argentMieux.js';   // (16 nov., argent-mieux)
 import ecran_argentPlus from './fr/argentPlus.js';   // (15 nov., lot argent-plus)
 import ecran_rechliste from './fr/rechliste.js';
 import ecran_studio_paires from './fr/studio-paires.js';   // (14 nov., Studio bleu clair : Paires)
@@ -93,6 +95,7 @@ export default {
   ...ecran_accompagnement,
   ...ecran_plus,
   ...ecran_argentprix,
+  ...ecran_argentMieux,
   ...ecran_argentPlus,
   ...ecran_partenaires,
   ...ecran_plateformes,
@@ -102,6 +105,7 @@ export default {
   ...ecran_colisplus,
   ...ecran_studioventes,
   ...ecran_impression,
+  ...ecran_tampons,
   ...ecran_stats,
   ...ecran_emails,
   ...ecran_messages,

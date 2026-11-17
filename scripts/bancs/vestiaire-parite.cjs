@@ -283,7 +283,7 @@ const compte = (t, mot) => (String(t).match(new RegExp(mot, 'g')) || []).length;
         // (3 nov.) Forme jamais vue : l'aperçu du tampon s'ouvre d'abord ; on garde le choix de VRM.
         // (15 nov.) L'aperçu se rend avec pdf.js : mesuré 1,8 s à 390 px et 22 s à 1512 px sous une charge de 25 —
         // on attend son ÉTAT (prêt / ko), jamais une durée fixe trop courte.
-        if (await pg.waitForSelector('[data-placeur-tampon="pret"],[data-placeur-tampon="ko"]', { timeout: 60000 }).then(() => true, () => false)) await pg.click('[data-tampon-imprimer]').catch(() => {});
+        if (await pg.waitForSelector('[data-placeur-tampon="pret"],[data-placeur-tampon="ko"],[data-impr-apercu="pret"]', { timeout: 60000 }).then(() => true, () => false)) await pg.click('[data-tampon-imprimer],[data-impr-apercu="pret"] [data-impr-apercu-imprimer]').catch(() => {});
         await pg.waitForFunction(() => window.__pdfs && window.__pdfs.length > 0, null, { timeout: 15000 }).catch(async (e) => { if (process.env.BANC_DEBUG) console.log(await pg.evaluate(() => window.__vus.slice(-15).join(' | '))); throw e; });
         const b64 = await pg.evaluate(async () => { const bl = window.__pdfs[window.__pdfs.length - 1]; const u = new Uint8Array(await bl.arrayBuffer()); let s = ''; for (let i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s); });
         const t = await texteDuPdf(b64);
