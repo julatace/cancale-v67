@@ -889,6 +889,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
 
 /* ── Factures ───────────────────────────────────────── */
 function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoiceSettings,entreprises,setEntreprises,activeEnt,setActiveEnt,argentNav=null}) {
+  const designV2 = useDesignV2();   // (17 nov., phase 2) allumé : les segments SOUS le titre, dans l'en-tête (avant les actions)
   const [searchInput,setSearchInput]=useState('');
   const [search,setSearch]=useState('');
   const [zone,setZone]=useState('attente'); // 'attente' | 'comptabilisees'
@@ -1058,7 +1059,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
           glissaient SOUS l'île d'actions flottante : « ⚙ Réglages » était
           invisible (vu en capture). Le slot `right` existe pour ça. */}
       <div>
-        <ScreenHead icon={argentNav?"euro":"receipt"} title={argentNav?L.argent:tr('compta.factures')} desc="Les justificatifs de tes ventes, importés depuis tes e-mails Vinted."
+        <ScreenHead icon={argentNav?"euro":"receipt"} title={argentNav?L.argent:tr('compta.factures')} sous={designV2 && argentNav ? argentNav : undefined} desc="Les justificatifs de tes ventes, importés depuis tes e-mails Vinted."
           right={<>
           {/* (11 nov., décision C4 — Julien : « tranche ») Au téléphone, les cinq boutons tassaient la
               ligne du titre : le geste principal reste visible, les quatre autres passent dans « … »
@@ -1090,7 +1091,7 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
         </SheetShell>}
         {/* (10 nov., Argent) Les segments SOUS la ligne du titre, pas dedans : cinq actions y
             tassaient la piste (« Statistiqu… », vu en capture à 1512 px). */}
-        {argentNav}
+        {designV2 ? null : argentNav}
       </div>
       <SeuilTvaFactures deps={DEPS_FACTURE}/>
       <TvaMargeCarte deps={DEPS_FACTURE}/>

@@ -124,4 +124,5 @@ html[data-design="v2"] body .vrm-argent [data-argent-vue="resume"] #compta-detai
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-argent-nav .v2-argent-seg { display: flex !important; width: 100% !important; max-width: none !important; }
 :root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-argent-nav .v2-argent-seg > .vrm-seg-btn { flex: 1 1 0 !important; min-width: 0 !important; justify-content: center !important; }
 @media (min-width: 1024px) { :root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-argent-nav .v2-argent-seg { max-width: 560px !important; } }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) .vrm-seg-btn, :root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-argent-nav .vrm-seg-btn { min-height: 44px !important; }
 } /* fin @layer vrm-verre */
