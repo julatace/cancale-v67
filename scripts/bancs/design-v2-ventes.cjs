@@ -100,7 +100,8 @@ async function avant(nav, b, sombre) {
     chiffre: (document.querySelector('[data-sb-chiffre]') || { getAttribute: () => null }).getAttribute('data-sb-chiffre'),
     lot: (document.querySelector('.vv-pied [data-impr-lot]') || { getAttribute: () => null }).getAttribute('data-impr-lot'),
     nRoute: (document.querySelector('[data-colis-onglet-choix="envoyes"]') || { getAttribute: () => null }).getAttribute('data-colis-onglet-n') }));
-  await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `eteint-ventes-390-${sombre ? 'sombre' : 'clair'}.png`) });
+  await sansToasts(pg); x.palette = await palette(pg);
+  await pg.screenshot({ path: path.join(SHOTS, `eteint-ventes-390-${sombre ? 'sombre' : 'clair'}.png`) });
   await pg.locator('[data-ventes-seg-choix="envoyes"]').first().tap({ timeout: 8000 }).catch(() => {});
   await attendre(pg, () => !!document.querySelector('[data-colis-envoyes]'), 15000);
   x.envoyes = await pg.evaluate(() => (document.querySelector('section[data-colis-envoyes]') || { getAttribute: () => null }).getAttribute('data-colis-envoyes'));
@@ -211,6 +212,58 @@ async function chargementEtMouvement(nav, b) {
   await c2.close();
 }
 
+// LA PALETTE RENDUE d'un écran (l'audit visuel du 17 nov. : l'écran d'hier comptait 20 tailles, 6 graisses, 13 rayons,
+// 572 espacements sur 1 281 hors de la grille de 4/8) : relevée sur ce qui est À L'ÉCRAN dans la zone de Ventes.
+async function palette(pg) {
+  return pg.evaluate(() => {
+    const vis = (e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden' && !e.closest('[hidden], .v2-cache, .vrm-sr-seul, svg');
+    const zone = document.querySelector('.vrm-tache[data-tache="ventes"]') || document.querySelector('.vrm-main');
+    const els = [...zone.querySelectorAll('*')].filter(vis).filter((e) => { const r = e.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight * 3; }).slice(0, 4000);
+    const textes = els.filter((e) => [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()));
+    const tailles = new Set(textes.map((e) => Math.round(parseFloat(getComputedStyle(e).fontSize))));
+    const graisses = new Set(textes.map((e) => getComputedStyle(e).fontWeight));
+    const rayons = new Set(els.map((e) => { const r = parseFloat(getComputedStyle(e).borderTopLeftRadius) || 0; const q = e.getBoundingClientRect(); return r > 0 && r < Math.min(q.width, q.height) / 2 - 1 ? Math.round(r) : null; }).filter((x) => x != null));
+    let n = 0, hors = 0;
+    for (const e of els) { const cs = getComputedStyle(e); for (const k of ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'marginTop', 'marginRight', 'marginBottom', 'marginLeft', 'rowGap', 'columnGap']) { const v = parseFloat(cs[k]); if (!Number.isFinite(v) || v === 0) continue; n++; if (Math.abs(v) % 4 !== 0) hors++; } }
+    const choisir = [...document.querySelectorAll('.vrm-main *')].filter(vis).filter((e) => e.children.length === 0 && /Choisir la vente/.test(e.textContent)).length;
+    return { tailles: tailles.size, graisses: graisses.size, rayons: rayons.size, espacements: n, hors, part: n ? Math.round(hors / n * 100) : 0, choisir };
+  });
+}
+
+// À 375 (normal et « Très grand », ×1,36) : aucun mot coupé, aucun segment rogné, la 1re vente sur le premier écran.
+async function etroit(nav, b, grand) {
+  const th = '375x667-' + (grand ? 'tres-grand' : 'normal');
+  console.log(`\n── allumé · ${th}`);
+  const { ctx, pg, erreurs } = await ouvrir(nav, { W: 390, sombre: false, b, url: '/?tab=ventes', dsf: 2 });
+  await pg.setViewportSize({ width: 375, height: 667 });
+  await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {});
+  await pg.evaluate((g) => { localStorage.setItem('vrm_design_v2', '1'); if (g) localStorage.setItem('vrm_taille_texte', 'tresGrand'); }, grand);
+  await pg.reload({ waitUntil: 'domcontentloaded' });
+  await attendre(pg, () => document.querySelectorAll('[data-v2v-liste="envoyer"] [data-v2v-ligne]').length > 0, process.env.BANC_DIST ? 15000 : 45000);
+  await pg.waitForTimeout(2500); await sansToasts(pg);
+  const m = await pg.evaluate(() => {
+    const vis = (e) => e && e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden' && !e.closest('[hidden], .v2-cache, .vrm-sr-seul');
+    const zones = [...document.querySelectorAll('.v2v-titre-ligne, .v2-sous-titre, .v2v-tete, .v2v-corps')].filter(vis);
+    const coupes = [];
+    for (const z of zones) { const w = document.createTreeWalker(z, NodeFilter.SHOW_TEXT); let t;
+      while ((t = w.nextNode())) { if (!vis(t.parentElement)) continue; const re = /[^\s\-–/·]+/g; let m;
+        while ((m = re.exec(t.textContent))) { if (m[0].length < 3) continue; const r = document.createRange(); r.setStart(t, m.index); r.setEnd(t, m.index + m[0].length);
+          const tops = [...new Set([...r.getClientRects()].filter((x) => x.width > 0).map((x) => Math.round(x.top)))]; if (tops.length > 1) coupes.push(m[0]); } } }
+    const rognes = [...document.querySelectorAll('[data-v2v-segment] button, [data-v2v-segment] .v2-seg-l, .v2v-titre-ligne button, .v2v-titre-ligne .v2b-lib')].filter(vis).filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent.trim());
+    const l = [...document.querySelectorAll('[data-v2v-liste] [data-v2v-ligne]')].filter(vis)[0];
+    const pl = document.querySelector('[data-v2-principal="imprimer"]'); const pq = pl && pl.getBoundingClientRect();
+    return { coupes: [...new Set(coupes)].slice(0, 8), rognes, premiere: l ? Math.round(l.getBoundingClientRect().top) : null, deb: document.documentElement.scrollWidth - innerWidth,
+      plein: pq ? pq.right <= innerWidth + 1 && pq.left >= -1 : null, h: innerHeight };
+  });
+  dit(!m.coupes.length, `W ${th} : aucun mot coupé au milieu`, m.coupes);
+  dit(!m.rognes.length, `W ${th} : aucun segment ni libellé du plein rogné`, m.rognes);
+  dit(m.premiere != null && m.premiere < m.h - 80, `W ${th} : la 1re vente sur le premier écran (${m.premiere} px sur ${m.h})`, m.premiere);
+  dit(m.deb <= 1 && m.plein === true, `W ${th} : rien ne déborde, le plein est entier à l'écran`, m);
+  dit(!erreurs.length, `${th} : aucune erreur JS`, erreurs);
+  await pg.screenshot({ path: path.join(SHOTS, `ventes-${th}.png`) });
+  await ctx.close();
+}
+
 async function allume(nav, b, sombre, W, ref) {
   const th = (W < 600 ? '390-' : '1512-') + (sombre ? 'sombre' : 'clair');
   console.log(`\n── allumé · ${th}`);
@@ -250,6 +303,12 @@ async function allume(nav, b, sombre, W, ref) {
   await attendre(pg, () => [...document.querySelectorAll('[data-v2v-liste] img')].slice(0, 6).every((i) => i.complete && i.naturalWidth > 0), 8000);
   await pg.screenshot({ path: path.join(SHOTS, `ventes-${th}.png`) });
   await qualite(pg, th);
+  if (ref && ref.palette && tel) {
+    const p = await palette(pg), o = ref.palette;
+    console.log(`   palette : avant ${o.tailles} tailles · ${o.graisses} graisses · ${o.rayons} rayons · ${o.hors}/${o.espacements} hors grille (${o.part} %) · « Choisir la vente » ×${o.choisir} — ici ${p.tailles} · ${p.graisses} · ${p.rayons} · ${p.hors}/${p.espacements} (${p.part} %) · ×${p.choisir}`);
+    dit(p.tailles < o.tailles && p.graisses <= o.graisses && p.rayons < o.rayons && p.part < o.part && p.choisir === 0,
+      `Q ${th} : moins de tailles (${p.tailles} < ${o.tailles}), de graisses (${p.graisses} ≤ ${o.graisses}), de rayons (${p.rayons} < ${o.rayons}), d'espacements hors grille (${p.part} % < ${o.part} %) ; « Choisir la vente » jamais redit`, { avant: o, ici: p });
+  }
   if (tel) {
     // G : la recherche par N° trouve la rangée.
     const num = await pg.evaluate(() => { const p = document.querySelector('[data-v2v-liste] [data-v2v-ligne] .v2-etiquette'); return p ? p.getAttribute('data-v2-etiquette') : ''; });
@@ -347,6 +406,8 @@ async function allume(nav, b, sombre, W, ref) {
       await allume(nav, b, true, 390, refC);
       await allume(nav, b, false, 1512, refC);
       await chargementEtMouvement(nav, b);
+      await etroit(nav, b, false);
+      await etroit(nav, b, true);
     }
   } catch (e) { ko++; console.log('  ❌ le banc s’est arrêté : ' + String(e && e.stack || e).slice(0, 1500)); }
   fs.writeFileSync(path.join(SHOTS, 'signature-eteint.json'), JSON.stringify(sigs));
