@@ -1,7 +1,7 @@
 require('./_porte-banc.cjs');
 // ════════════════════════════════════════════════════════════════════════════
-//  ANNONCES, NOUVEAU DESIGN : LES TROIS DESSINS DE LA RANGÉE (17 nov.) — A « Liste nette » · B « Carte photo » ·
-//  C « Fiche compacte » (src/designV2/LigneAnnonce.jsx), choisis par la clé d'essai `vrm_design_v2_ligne`.
+//  ANNONCES, NOUVEAU DESIGN : LES DEUX DESSINS DE LA RANGÉE (17 nov., Julien : « J'aime bien A et C ») — A « Liste »
+//  et C « Détaillé » (src/designV2/LigneAnnonce.jsx), le réglage RÉEL `vrm_annonces_affichage` (« ⋯ » → Affichage).
 //  Base INVENTÉE de 1 000 annonces en ligne (3 comptes, `_base-volume` `annonces: 2500`, 40 % en ligne) et les PIRES
 //  CAS réels, posés sur les plus anciennes (le haut de la liste) : un titre très long, un N° « B188 », pas de taille,
 //  pas de photo, un article qui n'est pas une chaussure. 390 tactile, clair et sombre. Mesure, par dessin :
@@ -42,7 +42,7 @@ async function dessin(nav, b, v, sombre) {
   const th = sombre ? 'sombre' : 'clair';
   const { ctx, pg, erreurs } = await P.ouvrir(nav, { W: 390, sombre, b, url: '/?tab=annonces', dsf: 2 });
   await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {}); await pg.waitForTimeout(1500);
-  await pg.evaluate((x) => { localStorage.setItem('vrm_design_v2', '1'); localStorage.setItem('vrm_design_v2_ligne', x); }, v);
+  await pg.evaluate((x) => { localStorage.setItem('vrm_design_v2', '1'); localStorage.setItem('vrm_annonces_affichage', JSON.stringify(x)); }, v);
   const t0 = Date.now();
   await pg.reload({ waitUntil: 'domcontentloaded' });
   await pg.waitForSelector('[data-v2l]', { timeout: 60000 }).catch(() => {});
@@ -57,20 +57,34 @@ async function dessin(nav, b, v, sombre) {
     const lisibles = rows.filter((r) => q(r).top >= 0 && q(r).bottom <= bas).length;
     const deborde = rows.slice(0, 40).flatMap((r) => [...r.querySelectorAll('*')].filter((e) => !e.closest('[data-lg-tiroir]')).filter((e) => { const a = q(e), z = q(r); return vis(e) && e.children.length === 0 && (a.right > z.right + 1 || a.left < z.left - 1); }).map((e) => e.textContent.trim().slice(0, 20)));
     const b188 = [...document.querySelectorAll('[data-v2l] .sb-plaque')].find((p) => /B188/.test(p.textContent));
-    return { n: rows.length, premiere: rows[0] ? Math.round(q(rows[0]).top) : null, hauteurs, lisibles, deborde: deborde.slice(0, 6),
+    const menu = document.querySelector('.v2-menu'); const menuCoupe = menu ? [...menu.querySelectorAll('span')].some((e) => e.scrollWidth > e.clientWidth + 1) : null;
+    const ambre = rows.filter((r) => r.querySelector('[data-v2l-relier="mot"]')).length;
+    const afaire = !!document.querySelector('.vrm-main .vrm-ann-afaire') && [...document.querySelectorAll('.vrm-main .vrm-ann-afaire')].some(vis);
+    const pl = document.querySelector('[data-v2-principal="publier"]'); const pq = pl && q(pl);
+    return { menuCoupe, ambre, afaire, publierHaut: pq ? Math.round(pq.top) : null, n: rows.length, premiere: rows[0] ? Math.round(q(rows[0]).top) : null, hauteurs, lisibles, deborde: deborde.slice(0, 6),
       b188: b188 ? b188.scrollWidth <= b188.clientWidth + 1 : null, cintre: document.querySelectorAll('[data-v2l] .v2l-sans').length,
       compte: rows.filter((r) => /vendeur_\d/.test(r.textContent)).length, relierBouton: [...document.querySelectorAll('[data-v2l] button')].filter((x) => /Relier un achat/.test(x.textContent)).length,
       noeuds: (document.querySelector('.sb-liste') || { querySelectorAll: () => [] }).querySelectorAll('*').length };
   });
   console.log(`\n── ${v} · ${th} — ${m.n} rangées rendues, 1re à ${m.premiere} px, ${m.lisibles} lisibles, ${tPremiere} ms jusqu’à la 1re, ${m.noeuds} nœuds`);
   dit(m.premiere != null && m.premiere <= 422, `${v} ${th} : la 1re annonce sur la moitié haute (${m.premiere} px)`);
-  dit(m.hauteurs.length === 1, `${v} ${th} : toutes les rangées de la même hauteur (${m.hauteurs.join(', ')} px)`, m.hauteurs);
+  dit(v === 'A' ? m.hauteurs.every((h) => h === 80 || h === 96) : m.hauteurs.length === 1, v === 'A' ? `A ${th} : rangées de 80 px, 96 px quand le titre prend deux lignes (${m.hauteurs.join(', ')})` : `${v} ${th} : toutes les rangées de la même hauteur (${m.hauteurs.join(', ')} px)`, m.hauteurs);
   dit(m.compte === 0 && m.relierBouton === 0, `${v} ${th} : ni compte, ni bouton « Relier un achat » redits par rangée`, m);
   dit(!m.deborde.length, `${v} ${th} : rien ne sort de sa rangée`, m.deborde);
   dit(m.b188 === true, `${v} ${th} : « N°B188 » lisible en entier`, m.b188);
   dit(m.cintre >= 1, `${v} ${th} : la paire sans photo porte le cintre sur fond uni`, m.cintre);
+  dit(m.menuCoupe === false, `${v} ${th} : le menu plateforme · compte n’est pas coupé`, m.menuCoupe);
+  dit(m.ambre === 0, `${v} ${th} : pas d’ambre « à relier » sur les rangées (seulement dans la vue « Sans achat relié »)`, m.ambre);
+  dit(!m.afaire, `${v} ${th} : pas de « À faire · N » sur Annonces (le badge d’Aujourd’hui le dit)`);
+  dit(m.publierHaut != null && m.publierHaut < 200, `${v} ${th} : « Publier » en haut à droite, sur la ligne du titre (${m.publierHaut} px), rien de flottant sur la liste`, m.publierHaut);
   dit(!erreurs.length, `${v} ${th} : aucune erreur JS`, erreurs);
   await pg.screenshot({ path: path.join(SHOTS, `annonces-${v}-390-${th}.png`) });
+  if (v === 'A') {
+    await pg.locator('[data-ann-barre] .vrm-ann-outils > button').first().tap({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(500);
+    const aff = await pg.evaluate(() => { const x = document.querySelector('[data-v2-ann-affichage]'); return x ? [...x.querySelectorAll('[data-v2-affichage]')].map((b) => b.getAttribute('data-v2-affichage')).join(',') : ''; });
+    dit(aff === 'A,C', `« ⋯ » → Affichage : Liste · Détaillé (${aff})`, aff);
+    await pg.screenshot({ path: path.join(SHOTS, `annonces-menu-390-${th}.png`) });
+  }
   await ctx.close();
   return { v, th, ...m, tPremiere };
 }
@@ -82,7 +96,7 @@ async function dessin(nav, b, v, sombre) {
   console.log(`base : ${enLigne} annonces en ligne`);
   dit(enLigne >= 1000, `1 000 annonces en ligne dans la base (${enLigne})`);
   const res = [];
-  try { for (const v of (process.env.DESSINS || 'A,B,C').split(',')) for (const s of [false, true]) res.push(await dessin(nav, b, v, s)); }
+  try { for (const v of (process.env.DESSINS || 'A,C').split(',')) for (const s of [false, true]) res.push(await dessin(nav, b, v, s)); }
   catch (e) { ko++; console.log('  ❌ le banc s’est arrêté : ' + String(e && e.stack || e).slice(0, 1200)); }
   fs.writeFileSync(path.join(SHOTS, 'mesures.json'), JSON.stringify(res, null, 1));
   await nav.close(); P.srv.close();

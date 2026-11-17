@@ -3,7 +3,7 @@
 import sys, os
 from PIL import Image, ImageDraw, ImageFont
 src, out = sys.argv[1], sys.argv[2]
-NOMS = {'A': 'A « Liste nette »', 'B': 'B « Carte photo »', 'C': 'C « Fiche compacte »'}
+NOMS = {'A': 'A · Liste', 'C': 'C · Détaillé'}
 W, H = 390, 844
 def police(t):
     for p in ['/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf']:
@@ -11,13 +11,13 @@ def police(t):
     return ImageFont.load_default()
 f1, f2 = police(30), police(20)
 marge, tete, col = 32, 150, 24
-board = Image.new('RGB', (marge * 2 + 6 * W + 5 * col, tete + H + 60), (238, 243, 248))
+board = Image.new('RGB', (marge * 2 + 4 * W + 3 * col, tete + H + 60), (238, 243, 248))
 d = ImageDraw.Draw(board)
-d.text((marge, 28), 'Annonces · trois dessins de la rangée (nouveau design) — 390 px, 1 000 annonces, pires cas en tête', font=f1, fill=(12, 29, 48))
-d.text((marge, 76), 'Pires cas : titre très long, N°B188, pas de photo (cintre), manteau et manuels (pas de taille). Glisser à gauche : Relier · Plus. B : appui long = fiche.', font=f2, fill=(74, 91, 109))
+d.text((marge, 28), 'Annonces · A « Liste » et C « Détaillé » (⋯ → Affichage) — 390 px, 1 000 annonces', font=f1, fill=(12, 29, 48))
+d.text((marge, 76), 'Pires cas en tête : titre long, N°B188, sans photo (cintre), manteau et manuels sans taille. Glisser à gauche : Relier · Plus.', font=f2, fill=(74, 91, 109))
 x = marge
-for v in 'ABC':
-    for th in ('clair', 'sombre'):
+for v in 'AC':
+    for th in ('sombre', 'clair'):
         p = os.path.join(src, f'annonces-{v}-390-{th}.png')
         if os.path.exists(p):
             im = Image.open(p).convert('RGB').resize((W, H), Image.LANCZOS)

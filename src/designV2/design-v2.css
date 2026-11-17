@@ -321,12 +321,13 @@ html[data-design="v2"] body .sb-liste[data-v2-ligne="B"] > .vrm-ann-compte-tete 
 .v2l-geste { display: inline-flex; align-items: center; color: var(--v2-ambre); font-size: 13px; font-weight: 600; white-space: nowrap; }
 
 /* A « Liste nette » : 80 px (8 + 64 + 8), séparateurs en retrait (16 + 64 + 16 = 96). */
-.v2l-a { display: flex; align-items: center; gap: 16px; height: 80px; padding: 8px 16px; }
+.v2l-a { display: flex; align-items: center; gap: 16px; min-height: 80px; padding: 8px 16px; }
 .v2l-a + .v2l-a::before, .vrm-ann-card[hidden] + .v2l-a::before { content: ""; position: absolute; left: 96px; right: 0; top: 0; height: .5px; background: var(--v2-filet); }
 .v2l-photo-a { width: 64px; height: 64px; border-radius: 12px; }
 .v2l-a-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-.v2l-a-l1 { display: flex; align-items: baseline; gap: 8px; }
-.v2l-a-titre { flex: 1; min-width: 0; font-size: 17px; font-weight: 600; line-height: 24px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2l-a-l1 { display: flex; align-items: flex-start; gap: 8px; }
+/* Le titre sur DEUX lignes au besoin (jamais coupé au milieu d'un modèle) : la rangée passe de 80 à 96 px. */
+.v2l-a-titre { flex: 1; min-width: 0; font-size: 17px; font-weight: 600; line-height: 24px; max-height: 48px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
 .v2l-a-prix { flex: none; font-size: 17px; font-weight: 600; line-height: 24px; }
 .v2l-a-l2 { display: flex; align-items: center; gap: 8px; min-width: 0; height: 24px; font-size: 15px; color: var(--v2-muet); white-space: nowrap; overflow: hidden; }
 .v2l-faits-txt { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
@@ -370,4 +371,35 @@ html body button.v2-rangee.v2-menu { white-space: nowrap; flex: 0 1 auto; min-wi
 .v2-ann-groupe-n { font-weight: 400; }
 .v2-liste-annonces[data-v2-ligne="B"] .v2-ann-groupe { grid-column: 1 / -1; padding: 8px 4px 0; color: var(--v2-page-muet); }
 .v2-ann-groupe + .v2l-a::before, .v2-ann-groupe + .v2l-c::before { display: none; }
-@media (max-width: 1023px) { .v2-liste-annonces { margin-bottom: calc(var(--vrm-barre-bas, 84px) + var(--v2-bouton-h) + 40px); } }
+@media (max-width: 1023px) { .v2-liste-annonces { margin-bottom: calc(var(--vrm-barre-bas, 84px) + 24px); } }
+
+/* ══ 10. Retouches après la planche A·B·C (17 nov.) ═══════════════════════════════════════════════════════ */
+/* Le plein COMPACT (en haut à droite d'Annonces) : 44 px, 15/600 — le même rôle, la même couleur. */
+html body button.v2b-principal.v2b-compact { min-height: 44px; padding: 0 16px; font-size: 15px; }
+.v2-titre-ligne { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; flex-basis: 100%; grid-column: 1 / -1; }
+.v2-titre-ligne h1 { margin: 0; min-width: 0; }
+/* « N annonces sans achat relié · Voir » : UNE ligne au-dessus de la liste (plus d'ambre sur chaque rangée). */
+html body button.v2-rangee.v2-ann-arelier { gap: 8px; min-height: 44px; margin: 0 0 8px; padding: 0 4px; color: var(--v2-page-texte); font-size: 15px; }
+.v2-ann-arelier-txt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2-ann-arelier-geste { font-weight: 600; }
+.v2l-lien { display: inline-flex; align-items: center; color: var(--v2-muet); margin-left: auto; flex: none; }
+.v2l-b-point.is-neutre { color: #4A5B6D; }
+/* L'en-tête de la coque : les trois ronds respirent et le dernier ne touche plus le bord. */
+html[data-design="v2"] body .vrm-app-header .vrm-header-actions { gap: 8px !important; padding-inline-end: 8px !important; }
+/* La tête d'une tâche, allumé : grand titre, « Plateforme · compte ⌄ » et « ? » dessous ; les ronds d'hier (Scanner) à droite. */
+.v2-tete-tache { position: relative; display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 8px 16px 0; color: var(--v2-page-texte); }
+.v2-tete-tache h1 { margin: 0; font-size: 34px; font-weight: 700; line-height: 40px; letter-spacing: -.02em; color: var(--v2-page-texte); }
+.v2-tete-tache .vrm-fu-date-tete { font-size: 13px; color: var(--v2-page-muet); }
+.v2-tete-tache .vrm-tache-retrouver { position: absolute; right: 16px; top: 8px; }
+.v2-tete-tache:has(.vrm-tache-retrouver) h1 { padding-right: 56px; }
+/* Le « ? » de l'écran, sur la coque : à l'encre de la coque (il était gris foncé sur le bleu). */
+.v2-sous-titre .vrm-phrase-ecran, .v2-sous-titre .vrm-phrase-ecran :is(button, a, svg) { color: var(--v2-page-texte) !important; }
+.v2-ann-menu-affichage { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 0 8px; font-size: 15px; font-weight: 600; }
+/* « ⋯ » d'Annonces, allumé : une feuille pleine (plus un panneau translucide posé sur la liste). */
+.v2-outils-feuille { display: flex; flex-direction: column; gap: 2px; }
+.v2-outils-feuille .v2-ann-menu-affichage > span { background: none !important; box-shadow: none !important; padding: 0 !important; }
+.v2-outils-feuille button.vrm-annbar-outil { display: flex; align-items: center; gap: 12px; min-height: 48px; width: 100%; padding: 0 8px; border: 0; background: transparent; color: inherit; font: 600 15px/1.2 var(--sb-police-texte, system-ui); text-align: left; cursor: pointer; border-radius: 12px; }
+.v2-outils-feuille button.vrm-annbar-outil:active { background: rgb(18 52 96 / .06); }
+/* La nuit, la plaque N° d'une rangée ne s'allume plus en blanc : gravée dans la surface, lisible (≥ 4,5:1). */
+:root[data-theme="dark"] .v2l .sb-plaque:not(.is-double) { background: #22385A !important; color: #EAF2FB !important; box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .22) !important; text-shadow: none !important; }
+:root[data-theme="dark"] .v2l .sb-plaque:not(.is-double) small { color: #B9C8D8 !important; }

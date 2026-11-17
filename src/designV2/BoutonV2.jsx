@@ -27,7 +27,7 @@ function Roue() {
 
 // `onClick` peut rendre une promesse : tant qu'elle court, le bouton est « en cours » (et refuse un second toucher).
 export function BoutonV2({ role = 'secondaire', icone = null, n = null, children, onClick, raison = '', indisponible = false,
-  chargement = false, confirmer = null, plein = false, className = '', attrs = {}, type = 'button', titre = '' }) {
+  chargement = false, confirmer = null, plein = false, compact = false, className = '', attrs = {}, type = 'button', titre = '' }) {
   const r = ROLES.has(role) ? role : 'secondaire';
   const [enCours, setEnCours] = React.useState(false);
   const occupe = chargement || enCours;
@@ -40,7 +40,7 @@ export function BoutonV2({ role = 'secondaire', icone = null, n = null, children
     const res = onClick(e);
     if (res && typeof res.then === 'function') { setEnCours(true); try { await res; } finally { setEnCours(false); } }
   };
-  const cls = ['v2b', 'v2b-' + r, plein ? 'v2b-plein-largeur' : '', className].filter(Boolean).join(' ');
+  const cls = ['v2b', 'v2b-' + r, plein ? 'v2b-plein-largeur' : '', compact ? 'v2b-compact' : '', className].filter(Boolean).join(' ');
   return (
     <span className={'v2b-hote' + (plein ? ' v2b-hote-plein' : '')} data-v2b-hote="">
       <button type={type} className={cls} data-v2b={r} data-v2b-etat={indisponible ? 'indisponible' : occupe ? 'chargement' : 'repos'}

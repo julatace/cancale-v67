@@ -196,7 +196,7 @@ async function telephone(nav, sombre, b, sigs) {
 
   // Ventes : le menu plateforme · compte ; l'écran d'hier dans la coque neuve.
   ({ ctx, pg, erreurs } = await ouvrir(nav, { W: 390, sombre, b, url: '/?tab=ventes' })); await allumer(pg);
-  const m = await pg.evaluate(() => { const h = document.querySelector('.vrm-tache-tete h1'); const me = document.querySelector('[data-v2-menu]');
+  const m = await pg.evaluate(() => { const h = document.querySelector('.v2-tete-tache h1, .vrm-tache-tete h1'); const me = document.querySelector('[data-v2-menu]');
     const pastilles = [...document.querySelectorAll('.vrm-main [data-selecteur-sites], .vrm-main .vrm-selecteur-sites')].filter((e) => e.getClientRects().length && !e.closest('[data-v2-feuille]')).length;
     return { menu: !!me, sous: me && h ? Math.round(me.getBoundingClientRect().top - h.getBoundingClientRect().bottom) : null, texte: me ? me.textContent.trim() : '', pastilles }; });
   dit(m.menu && m.sous != null && m.sous >= -2 && m.sous <= 24, `M UN menu sous le grand titre : « ${m.texte} »`, m);

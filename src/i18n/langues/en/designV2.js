@@ -97,5 +97,15 @@ export default {
   "v2.l.jours": "{n} d",
   "v2.l.relier": "Link",
   "v2.l.plus": "More",
-  "v2.l.aRelier": "to link"
+  "v2.l.aRelier": "to link",
+  "v2.menu.tous": "All",
+  "v2.ann.publierCourt": "Publish",
+  "v2.ann.sansAchat": {
+    "one": "{n} listing with no linked purchase",
+    "other": "{n} listings with no linked purchase"
+  },
+  "v2.ann.voir": "View",
+  "v2.ann.affichage": "Display",
+  "v2.ann.affListe": "List",
+  "v2.ann.affDetaille": "Detailed"
 };

@@ -97,5 +97,15 @@ export default {
   "v2.l.jours": "{n} j",
   "v2.l.relier": "Relier",
   "v2.l.plus": "Plus",
-  "v2.l.aRelier": "à relier"
+  "v2.l.aRelier": "à relier",
+  "v2.menu.tous": "Tous",
+  "v2.ann.publierCourt": "Publier",
+  "v2.ann.sansAchat": {
+    "one": "{n} annonce sans achat relié",
+    "other": "{n} annonces sans achat relié"
+  },
+  "v2.ann.voir": "Voir",
+  "v2.ann.affichage": "Affichage",
+  "v2.ann.affListe": "Liste",
+  "v2.ann.affDetaille": "Détaillé"
 };
