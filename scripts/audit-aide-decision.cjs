@@ -158,8 +158,8 @@ async function partieA(S) {
     dit(r.contres.length === 0, 'A13 annonce absente de la lecture : prix pas su ⇒ rien ne part', `contres=${r.contres.length}`); }
   { const r = await moteur({ listing: { amount: '35.00', currency_code: 'EUR' } });
     dit(r.contres.length === 0, 'A14 mini (40) au-dessus du prix de l’annonce (35) : rien ne part', `contres=${r.contres.length}`); }
-  { const r = await moteur({ listingEtat: { is_closed: true } });
-    dit(r.contres.length === 0, 'A14b annonce fermée/vendue à la dernière lecture du dressing : pas de contre-offre (prise, elle VENDRAIT)', `contres=${r.contres.length}`); }
+  { const r = await moteur({ listingEtat: { is_reserved: true } });
+    dit(r.contres.length === 0, 'A14b annonce réservée (ou vendue, fermée) à la dernière lecture du dressing : pas de contre-offre (prise, elle VENDRAIT)', `contres=${r.contres.length}`); }
   { const r = await moteur({ listing: { amount: '50.00', currency_code: 'GBP' } });
     dit(r.contres.length === 0, 'A15 annonce dans une autre devise : rien ne part (jamais convertie)', `contres=${r.contres.length}`); }
   { const r = await moteur({ min: '44,2' });
