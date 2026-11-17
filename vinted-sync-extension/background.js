@@ -10291,7 +10291,65 @@ function nettoyerRelaisSuivi(r) {
 }
 // </suivi-regle>
 
-const SUIVI_QUOI = ['journey', 'escrow', 'code', 'transaction'];   // 5.372 : le détail de la transaction (n° de suivi)
+// ══ 5.403 (17 nov.) — TOUS LES N° DE SUIVI D'UN ACHAT, PAS SEULEMENT LE PREMIER ═══════════
+// Julien (17 nov., captures) : UN colis arrivé au point, DEUX lignes dans VRM — « Colis Chronopost
+// Pickup » (n° Chronopost, code) et l'achat Vinted « Code sur Vinted · Incident ». Mesuré en lecture
+// seule : un envoi international à DEUX transporteurs (« Shop2Shop by Chronopost » puis Chronopost),
+// deux n° pour LE MÊME colis ; la ligne de suivi rangée ne gardait que celui de la première étape
+// (`suivi`), alors que la réponse les porte tous : `journey_summary.carriers[].tracking_code` (avec
+// `code` et `is_current`), `current_carrier.tracking_code`, `details[].carrier.tracking_code`. Aucune
+// identité commune ⇒ deux lignes.
+// `numerosDuTrajet` lit, sous tout objet dont la CLÉ dit un transporteur (`carriers[]`,
+// `current_carrier`, `carrier`), son n° (`tracking_code` / `tracking_number`, la forme de
+// `suiviNumero`), son code transporteur (forme machine) et `is_current` — jamais une autre valeur.
+// `vu` : la réponse a une liste de transporteurs (`carriers` ou `current_carrier`). Une réponse du SUIVI
+// (`journey_summary`) reconnue est la liste LUE (`suivisLusAt`), même sans transporteur nommé : ce que
+// Vinted montre de ce colis est rangé, l'app ne propose plus rien « en attendant » (le détail de la
+// transaction, lui, ne porte pas la liste : il ne pose jamais `suivisLusAt`).
+// Lecture seule, sur une réponse déjà reçue : aucune requête de plus. Rangés dans la ligne de suivi en
+// SCALAIRES (la base les recopie dans `meta`) : `suivisVinted` (« N1,N2 »), `transporteursVinted`
+// (« CODE1,CODE2 »), `suiviCourant`, `suivisLusAt` — `suivi` reste (compatibilité, §8).
+const SUIVI_PARENT_CARRIER = /^(?:carriers?|current_carrier|courier|transporteur)$/i;
+function numerosDuTrajet(racine) {
+  const vus = new Map();
+  let vu = false;
+  const poser = (o, courant) => {
+    if (!o || typeof o !== 'object' || Array.isArray(o)) return;
+    const n = suiviNumero(o.tracking_code != null ? o.tracking_code : o.tracking_number);
+    if (!n) return;
+    const code = typeof o.code === 'string' && /^[A-Za-z][A-Za-z0-9_.:-]{1,39}$/.test(o.code.trim()) ? o.code.trim().toUpperCase() : '';
+    const p = vus.get(n) || { n, code: '', courant: false };
+    if (!p.code && code) p.code = code;
+    if (courant || o.is_current === true) p.courant = true;
+    vus.set(n, p);
+  };
+  const marche = (v, prof) => {
+    if (prof > 8 || !v || typeof v !== 'object') return;
+    if (Array.isArray(v)) { for (const x of v.slice(0, 40)) marche(x, prof + 1); return; }
+    for (const k of Object.keys(v).slice(0, 80)) {
+      const x = v[k];
+      if (!x || typeof x !== 'object') continue;
+      if (SUIVI_PARENT_CARRIER.test(k)) {
+        if (/^(?:carriers|current_carrier)$/i.test(k)) vu = true;
+        if (Array.isArray(x)) { for (const y of x.slice(0, 20)) poser(y, false); }
+        else poser(x, /^current_carrier$/i.test(k));
+      }
+      marche(x, prof + 1);
+    }
+  };
+  marche(racine, 0);
+  const liste = [...vus.values()].slice(0, 8);
+  const courants = liste.filter((e) => e.courant);
+  return { liste, courant: courants.length === 1 ? courants[0].n : '', vu };
+}
+// Les n° déjà rangés (« N1,N2 ») et les nouveaux : l'UNION (un n° lu n'est jamais perdu), 8 au plus.
+function unionNumerosSuivi(avant, neufs) {
+  const out = [];
+  for (const x of String(avant || '').split(',').concat(neufs || [])) { const n = suiviNumero(x); if (n && !out.includes(n)) out.push(n); }
+  return out.slice(0, 8);
+}
+
+const SUIVI_QUOI =['journey', 'escrow', 'code', 'transaction'];   // 5.372 : le détail de la transaction (n° de suivi)
 const FORMES_SUIVI = 'panel_formes_suivi';
 const FORMES_SUIVI_MEMO = 'vrmFormesSuivi';
 const FORMES_SUIVI_MAX = 300;
@@ -10451,7 +10509,7 @@ async function rangerSuiviUn(uid, tx, contrat, source, forme) {
   try {
     if (!uid || !/^\d{4,20}$/.test(String(tx || '')) || !contrat) return false;
     const id = `harvest_${uid}_suivi_${tx}`;
-    const rows = await sbGet(`app_data?id=eq.${id}&select=d:data->dernier,e:data->etapes,s:data->>source,tr:data->>transporteur,nu:data->>suivi,cap:data->>capturedAt,rn:data->>relaisNom,rr:data->>relaisRue,rc:data->>relaisCp,rv:data->>relaisVille,ae:data->>arriveeEstimee`);
+    const rows = await sbGet(`app_data?id=eq.${id}&select=d:data->dernier,e:data->etapes,s:data->>source,tr:data->>transporteur,nu:data->>suivi,cap:data->>capturedAt,rn:data->>relaisNom,rr:data->>relaisRue,rc:data->>relaisCp,rv:data->>relaisVille,ae:data->>arriveeEstimee,sv:data->>suivisVinted,tv:data->>transporteursVinted,sc:data->>suiviCourant,sl:data->>suivisLusAt`);
     if (rows === null) { noterDiag('suivi_lecture_ratee'); return null; }       // pas su : on n'écrase rien
     const r0 = rows[0];
     const avant = r0 ? { dernier: (r0.d && typeof r0.d === 'object') ? r0.d : null, etapes: Array.isArray(r0.e) ? r0.e : [], source: r0.s || '' } : null;
@@ -10476,7 +10534,14 @@ async function rangerSuiviUn(uid, tx, contrat, source, forme) {
     // 5.372 : un n° de suivi (ou un transporteur) NOUVEAU suffit à réécrire la ligne — avant, un n°
     //    lu sur des étapes inchangées était jeté (achats « en route » sans n°, mesuré le 12 nov.).
     //    Un n° lu AVANT toute étape (vendeur qui vient de télécharger le bordereau) ouvre la ligne.
-    const numeroNeuf = !!((contrat.suivi && (!r0 || contrat.suivi !== r0.nu)) || (r0 && contrat.transporteur && !r0.tr));
+    // 5.403 : TOUS les n° du trajet (`numerosDuTrajet`) — un n° de plus, ou la liste lue pour la
+    //    première fois, suffit à réécrire la ligne (les lignes rangées avant la 5.403 la reçoivent).
+    const nt = contrat.numeros && typeof contrat.numeros === 'object' ? contrat.numeros : null;
+    const svAvant = unionNumerosSuivi(r0 && r0.sv, []);
+    const sv = unionNumerosSuivi(r0 && r0.sv, nt ? nt.liste.map((e) => e.n) : []);
+    const tv = [...new Set(String((r0 && r0.tv) || '').split(',').filter((c) => /^[A-Z][A-Z0-9_.:-]{1,39}$/.test(c)).concat(nt ? nt.liste.map((e) => e.code).filter(Boolean) : []))].slice(0, 8);
+    const listeNeuve = !!(nt && !(r0 && r0.sl)) || sv.length > svAvant.length;
+    const numeroNeuf = !!((contrat.suivi && (!r0 || contrat.suivi !== r0.nu)) || (r0 && contrat.transporteur && !r0.tr)) || listeNeuve;
     if (!dec.ecrire && !(numeroNeuf || (lieuChange && avant && (avant.etapes.length || avant.dernier)))) { noterDiag(`suivi_${dec.raison}`); return false; }
     const garde = !dec.ecrire;
     const etapesE = garde ? (avant ? avant.etapes : []) : dec.etapes, dernierE = garde ? (avant ? avant.dernier : null) : dec.dernier;
@@ -10484,8 +10549,11 @@ async function rangerSuiviUn(uid, tx, contrat, source, forme) {
       etapes: etapesE, dernier: dernierE, n: etapesE.length,
       transporteur: contrat.transporteur || (r0 && r0.tr) || null, suivi: contrat.suivi || (r0 && r0.nu) || null,
       ...lieu, lieuLuAt: rel || est ? new Date().toISOString() : undefined,
+      suivisVinted: sv.length ? sv.join(',') : undefined, transporteursVinted: tv.length ? tv.join(',') : undefined,
+      suiviCourant: (nt && nt.courant) || (r0 && r0.sc) || undefined,
+      suivisLusAt: nt ? new Date().toISOString() : ((r0 && r0.sl) || undefined),
       forme: nettoyerFormeSuivi(forme) };
-    if (data.lieuLuAt === undefined) delete data.lieuLuAt;
+    for (const k of ['lieuLuAt', 'suivisVinted', 'transporteursVinted', 'suiviCourant', 'suivisLusAt']) if (data[k] === undefined) delete data[k];
     const ok = await supabaseUpsert('app_data', [{ id, data }], 'id');
     if (ok === false) { noterDiag('suivi_ecriture_ratee'); return null; }
     noterDiag(`suivi_ecrit_${source}`);
@@ -10527,7 +10595,7 @@ async function noterSuiviPage(domain, msg) {
     // (31 oct., 5.295) le point relais de destination (relu par la règle, rien
     // d'autre ne passe) et l'arrivée estimée (sur le contenu allégé : ses dates
     // gardent leur nom de clé).
-    if (contrat) { contrat.relais = nettoyerRelaisSuivi(msg.relais); contrat.estimee = arriveeEstimeeSuivi(allegerSuivi(msg.allege)); }
+    if (contrat) { contrat.relais = nettoyerRelaisSuivi(msg.relais); contrat.estimee = arriveeEstimeeSuivi(allegerSuivi(msg.allege)); if (quoi === 'journey') contrat.numeros = numerosDuTrajet(allegerSuivi(msg.allege)); }
     await rangerFormeSuivi(quoi, forme, contrat ? 'reconnue' : 'inconnue');
     if (!contrat) { noterDiag(`suivi_forme_inattendue_${quoi}`); return false; }
     const achats = await achatsDuCompte(uid);
@@ -21607,9 +21675,19 @@ function achatASuivre(o, derniers, maintenant) {
   if (Number.isFinite(d) && d < maintenant - SUIVI_ACHAT_MAX_J * 86400000) return false;
   const da = derniers.get(String(o.transaction_id));
   const aSonNumero = !!(da && da.nu);
+  // 5.403 : une ligne rangée AVANT la liste de tous les n° (`suivisLusAt` absent) est relue une fois,
+  //    même arrivée : son 2e n° (trajet à deux transporteurs) relie le colis du transporteur à l'achat.
+  if (listeARelire(o, da)) return true;
   if (/livr[ée]e/i.test(st) && !/pas\s+encore/i.test(st) && aSonNumero) return false;
   if (da && SUIVI_ARRIVE.test(da.t || '') && aSonNumero) return false;
   return true;
+}
+// 5.403 — LES ACHATS QUI ATTENDENT LEUR LISTE DE N° : une ligne de suivi existe (déjà lue avant la 5.403),
+// sans `suivisLusAt`, et l'achat est EXPÉDIÉ (au point relais, en route, arrivé) — ceux que VRM montre « à
+// vérifier » faute d'identité commune. Relus EN PREMIER à la visite suivante, dans le même budget de lecture.
+function listeARelire(o, da) {
+  const st = String((o && o.status) || '');
+  return !!(da && !da.sl && achatExpedie(o) && !(/livr[ée]e/i.test(st) && !/pas\s+encore/i.test(st)));
 }
 function achatExpedie(o) {
   const st = String(o.status || '');
@@ -21630,7 +21708,10 @@ function rangSuivi(o, derniers) {
   const da = derniers.get(String(o.transaction_id));
   const sansNumero = !(da && da.nu);
   const relais = String(o.transaction_user_status || '') === 'needs_action' || AT_RELAY(String(o.status || ''));
+  // 5.403 : au point relais sans sa liste de n° (une ligne d'avant la 5.403) : au même rang que « au point sans n° ».
+  if (relais && listeARelire(o, da)) return 0;
   if (sansNumero && achatExpedie(o)) return relais ? 0 : 1;
+  if (listeARelire(o, da)) return 1;
   return sansNumero ? 2 : 3;
 }
 function ordreSuivi(a, b, derniers) {
@@ -21711,12 +21792,12 @@ async function capterSuivisAchats(uid) {
     if (!acc) return 0;
     const achats = await achatsDuCompte(uid);
     if (achats === null) return 0;                                         // pas su
-    const suivis = await sbGetTout(`app_data?id=like.harvest_${uid}_suivi_*&select=id,da:data->dernier->>at,dt:data->dernier->>t,nu:data->>suivi,lu:data->>capturedAt`);
+    const suivis = await sbGetTout(`app_data?id=like.harvest_${uid}_suivi_*&select=id,da:data->dernier->>at,dt:data->dernier->>t,nu:data->>suivi,lu:data->>capturedAt,sl:data->>suivisLusAt`);
     if (suivis === null) return 0;                                         // pas su
     const derniers = new Map();
     for (const r of suivis) {
       const tx = (/_suivi_(\d+)$/.exec(String((r && r.id) || '')) || [])[1];
-      if (tx) derniers.set(tx, { ms: Date.parse((r && (r.lu || r.da)) || ''), t: String((r && r.dt) || ''), nu: (r && r.nu) || null });
+      if (tx) derniers.set(tx, { ms: Date.parse((r && (r.lu || r.da)) || ''), t: String((r && r.dt) || ''), nu: (r && r.nu) || null, sl: !!(r && r.sl) });
     }
     const maintenant = Date.now();
     const cibles = [...achats.values()].filter((o) => achatASuivre(o, derniers, maintenant))
@@ -21768,7 +21849,7 @@ async function capterSuivisAchats(uid) {
       const forme = formeSuivi(rep.json);
       const contrat = contratSuivi(allegerSuivi(rep.json));
       // (31 oct., 5.295) le point relais où il arrive et l'arrivée estimée, sur la réponse brute.
-      if (contrat) { contrat.relais = relaisDestination(rep.json); contrat.estimee = arriveeEstimeeSuivi(rep.json); }
+      if (contrat) { contrat.relais = relaisDestination(rep.json); contrat.estimee = arriveeEstimeeSuivi(rep.json); contrat.numeros = numerosDuTrajet(rep.json); }
       await rangerFormeSuivi('journey', forme, contrat ? 'reconnue' : 'inconnue');
       // 5.372 : le suivi ne porte pas le n° ⇒ le détail de la transaction (une lecture de
       // plus, dans les MÊMES bornes : 6/h pour le suivi, sous la réserve de l'argent et des colis).
