@@ -539,7 +539,6 @@ import { ID_PAIRES, ECRANS_PAIRES, estPaires, dernierePaire, noterPaire, groupeB
 import { entreeHistorique } from "./navHistorique.js";   // (16 nov., barre-achats) passer d'un onglet de la barre à un autre n'empile rien   // (14 nov., n° 61) l'onglet « Paires »
 // (14 nov., Studio bleu clair) L'espace d'un écran, le disque et son éventail, l'ondulation au changement d'espace.
 import { espaceDe } from "./design/espace.js";
-import { DisqueEventail } from "./design/DisqueEventail.jsx";
 import { onduler } from "./design/ondulation.js";
 // Importés ICI une fois pour les chantiers C à H (aucun n'a à retoucher cette ligne).
 import { ChampRecherche } from "./composants/ChampRecherche.jsx";
@@ -17758,6 +17757,16 @@ const DICTEE_OK = typeof window !== 'undefined' && typeof (window.SpeechRecognit
 // (11 nov.) Plus « sans un mot » : la phrase dit quoi faire (toast, et la loupe la garde).
 // (6 nov.) L'appareil photo de la recherche : ouvre « Chercher par photo »
 // (src/RecherchePhoto.jsx, chargé à ce moment-là seulement).
+// (17 nov.) Le « Scanner » du disque d'hier : dans le champ de recherche, sur tous les écrans — un code-barres de colis
+// ⇒ SA vente ou SON achat (`ouvrirRetrouver`, src/retrouverColis.js : le même scanner).
+function BoutonScanRecherche() {
+  return (
+    <button className="vrm-micro" type="button" data-recherche-scanner="" data-geste-disque="scanner" onClick={(e) => { e.preventDefault(); ouvrirRetrouver('loupe'); }}
+      aria-label={tr('v2.scanner')} title={tr('v2.scanner')}>
+      <Icon name="scan" size={19}/>
+    </button>
+  );
+}
 function BoutonPhotoRecherche() {
   return (
     <button className="vrm-micro" type="button" data-recherche-photo-ouvrir="" onClick={(e) => { e.preventDefault(); ouvrirRecherchePhoto(); }}
@@ -20210,7 +20219,6 @@ function CacheSiV2({ si, children }) {
 function BottomBar({tab,setTab,sites,badges,gestes:gestesDisque=null}) {
   // (17 nov., nouveau design) Allumé : pas de disque « + » (les gestes globaux sont dans l'écran, au pouce).
   const designV2=useDesignV2();
-  const gestes=designV2?null:gestesDisque;
   const [plusOuvert,setPlusOuvert]=React.useState(false);
   // (14 nov., Studio bleu clair) « Imprimer N » de l'éventail : ce que « Tout imprimer (N) » de Ventes ferait partir, tel que
   // Ventes le publie (`vrm_colis_prets.lot`, §11 : le même nombre que son bouton) ; pas su ⇒ undefined (jamais un 0 deviné).
@@ -20309,9 +20317,11 @@ function BottomBar({tab,setTab,sites,badges,gestes:gestesDisque=null}) {
       <span className="vrm-tab-pastille-ancre" aria-hidden="true"><span ref={pastilleRef} className="vrm-tab-pastille" style={{opacity:0}}/></span>
       {BOTTOM_TABS.map((t,i)=>{ const on=groupeBarre(tabMontre,BAR_GROUPE)===t.id; const lib=t.court||t.label; const n=badgesBarre&&typeof badgesBarre[t.id]==='number'&&badgesBarre[t.id]>0?badgesBarre[t.id]:0; return (
         <React.Fragment key={t.id}>
-        {/* (14 nov., Studio bleu clair) Le DISQUE « + » au centre de la barre : l'éventail des gestes globaux
-            (Chercher · Scanner · Publier · Imprimer N), chacun branché sur un geste qui existait déjà. */}
-        {i===POS_DISQUE&&gestes ? <DisqueEventail gestes={gestes} nImprimer={nImprimer} Retour={FermeAuRetour} ecran={tab}/> : null}
+        {/* ⚠️ (17 nov., Julien, trois fois : « Le + dégueulasse ») PLUS DE DISQUE « + » DANS LA BARRE, réglage allumé ou
+            éteint. Ses gestes ont chacun leur place, à un toucher : Chercher = la loupe ; Scanner = l'icône dans le champ
+            de recherche (et le rond « Scanner » de Ventes, d'Achats, d'Aujourd'hui) ; Publier = la ligne du titre
+            d'Annonces ; Imprimer N = Ma journée / Aujourd'hui et « Tout imprimer » de Ventes ; Ajouter un achat = Achats.
+            Ne pas le remettre. */}
         <button type="button" className="vrm-tab" data-nav-entree={t.id} onClick={(e)=>{ setPlusOuvert(false);
           const ic=e.currentTarget.querySelector('.vrm-tab-ic')||e.currentTarget;
           // (14 nov., n° 61) « Paires » ouvre le dernier de ses trois écrans ; retouché sur l'un d'eux, il remonte en haut.
@@ -53866,7 +53876,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             appareil). Toucher une rangée la fait monter au premier plan, à sa place (src/paires/PaireAvant.jsx). */}
         {/* (17 nov., nouveau design) Allumé : la grille d'hier reste MONTÉE mais cachée (ses gestes vivent dans la fiche) ;
             la liste neuve (`lignesV2`, remplie par la même boucle) est posée juste après. */}
-        <div className="v2-cache-ancienne" hidden={designV2 || undefined} style={designV2 ? { display: 'none' } : undefined}>
+        <CacheSiV2 si={designV2}>
         <div className="vrm-ann-grid vrm-fiches vrm-ann-vignettes sb-liste" data-sb-liste="" data-sb-vue={vuePaires} onClick={clicAvant} data-ann-grille="vignettes" data-ann-grille-comptes={annGroupes.length} style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(min(100%, 180px), 1fr))',gap:16}}>
           {/* (15 nov., la maquette ORDINATEUR « Annonces en tableau ») L'en-tête des colonnes (ordinateur, vue Liste). */}
           {vuePaires === 'liste' ? <div className="vrm-ann-th" data-ann-th="" aria-hidden="true"><span>{tr('annonces.th.article')}</span><span>{tr('annonces.th.taille')}</span><span>{tr('annonces.th.sites')}</span><span>{tr('annonces.th.comptes')}</span><span className="is-r">{tr('annonces.th.prix')}</span><span className="is-r">{tr('annonces.th.enLigne')}</span><span>{tr('annonces.th.place')}</span></div> : null}
@@ -54184,7 +54194,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             return carteAncienne;
           })]; })}
         </div>
-        </div>
+        </CacheSiV2>
         {false && designV2 && annSort !== 'sansachat' && fileAchat && fileAchat.length > 0 ? <button type="button" className="v2-rangee v2-ann-arelier" data-v2-rangee="" data-v2-ann-arelier={fileAchat.length} onClick={() => setAnnSort('sansachat')}>
           <Icon name="link" size={18}/><span className="v2-ann-arelier-txt">{trj('v2.ann.sansAchat', { n: fileAchat.length })}</span><span className="v2-ann-arelier-geste">{tr('v2.ann.voir')}</span><Icon name="chevron" size={14}/></button> : null}
         {designV2 ? <div className="v2-liste-annonces" data-v2-ligne={ligneV2} role="list" onClick={clicAvant}>{lignesV2}</div> : null}
@@ -65181,6 +65191,10 @@ function AppCoeur() {
           {/* (15 nov., refonte-journee — la maquette « Annonces ») Annonces | Stock | Achats SOUS le titre d'Annonces (le même
               sélecteur que la coque, qui ne le pose plus au-dessus pour cet écran). */}
           {t==='annonces' && !ordi && estPaires(tab) && tab==='annonces' && !designV2App ? <SelecteurPaires tab={tab} setTab={setTab} badges={badgesNav} sites={sitesPresents}/> : null}
+          {/* (17 nov.) « Publier » (le geste du disque d'hier, `vrm:publier-ailleurs`) sur la ligne du titre d'Annonces, éteint. */}
+          {t === 'annonces' && !designV2App && !baseKO ? <span className="vrm-tache-retrouver" data-geste-disque="publier">
+            <Rond icone="plus" label={tr('v2.ann.publierCourt')} titre={tr('v2.ann.publier')} onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:publier-ailleurs', { detail: {} })); } catch (_) {} }} attrs={{ 'data-v2-principal': 'publier' }}/>
+          </span> : null}
           {/* (15 nov.) Scanner pour retrouver : le code-barres d'un colis ⇒ SA vente, SON achat (src/ScannerRetrouver.jsx). */}
           {(t === 'ventes' || t === 'achats') && !baseKO ? <span className="vrm-tache-retrouver" data-scan-retrouver-hote={t}>
             <Rond icone="retrouver" label={tr('scan.r.bouton')} titre={tr('scan.r.boutonTitre')} onClick={() => ouvrirRetrouver(t)} attrs={{ 'data-scan-retrouver-bouton': t }}/>
@@ -65789,6 +65803,7 @@ function AppCoeur() {
         <Icon name="search" size={18}/>
         {champRecherche(false)}
         {micLoupe}
+        <BoutonScanRecherche/>
         <BoutonPhotoRecherche/>
         <RechercheVivante rendre={(fil)=> fil.q ? <button type="button" className="vrm-recherche-effacer" aria-label="Effacer la recherche" onClick={()=>{ setGsQ(''); try{ gsChampRef.current&&gsChampRef.current.focus(); }catch(_){} }}><Icon name="close" size={14}/></button>
           : <kbd className="vrm-barre-kbd">/</kbd>}/>
@@ -65801,6 +65816,7 @@ function AppCoeur() {
       <Icon name="search" size={18} style={{color:C.muted,flexShrink:0}}/>
       {champRecherche(true)}
       {micLoupe}
+      <BoutonScanRecherche/>
       <BoutonPhotoRecherche/>
       <button type="button" className="vrm-hdr-recherche-fermer" aria-label="Fermer la recherche" onClick={fermerRecherche} style={{color:C.text}}>Fermer</button>
     </div>

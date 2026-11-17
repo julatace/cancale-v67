@@ -201,7 +201,8 @@ const mesureBarre = (pg) => pg.evaluate(() => {
   return { entrees, gauche: r.left, droite: r.right, vw: innerWidth, docW: document.documentElement.scrollWidth, badges };
 });
 
-const ATTENDU_BARRE = ['journee', 'paires', 'achats', 'disque', 'ventes', 'compta'];
+// (17 nov., Julien : « Le + dégueulasse ») Plus de disque : cinq onglets, également espacés.
+const ATTENDU_BARRE = ['journee', 'paires', 'achats', 'ventes', 'compta'];
 // Chaque écran et l'onglet qui DOIT s'allumer (barre ; à l'ordinateur, l'entrée de la colonne).
 const ECRANS = [
   { lien: 'journee', barre: 'journee', rail: 'journee' },
@@ -257,15 +258,10 @@ const ECRANS = [
         dit(!!m && m.entrees.some((e) => e.id === 'achats') && nJuste, `A3 ${qui} : l'onglet Achats porte le nombre « À retirer » publié (${pub}), une fois`, JSON.stringify({ pub, badges: m && m.badges }));
         const nombres = m ? m.badges.map(([, n]) => n).filter((n) => /^\d+$/.test(n)) : [];
         dit(new Set(m ? m.badges.map(([k]) => k) : []).size === (m ? m.badges.length : 0), `A3 ${qui} : une pastille par onglet au plus`, JSON.stringify(m && m.badges));
-        // A10 · le disque « + » n'est plus au milieu (3 onglets à gauche, 2 à droite) : son éventail reste DANS l'écran.
-        await toucher(pg, '.vrm-tabbar > .sb-disque');
-        await pg.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => {})))).catch(() => {});
-        const lames = await pg.evaluate(() => [...document.querySelectorAll('[data-sb-lame]')].map((b) => { const r = b.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.right)]; }));
-        const vw = await pg.evaluate(() => innerWidth);
-        await capture(pg, `eventail-${mode}-${sombre ? 'sombre' : 'clair'}`);
-        dit(lames.length >= 3 && lames.every(([g, d]) => g >= 0 && d <= vw), `A10 ${qui} : l'éventail du « + » s'ouvre, toutes ses lames dans l'écran`, JSON.stringify({ vw, lames }));
-        await pg.keyboard.press('Escape').catch(() => {}); await pg.waitForTimeout(400);
-        if (await pg.locator('[data-sb-lame]').count()) { await toucher(pg, '.vrm-tabbar > .sb-disque'); }
+        // A10 · (17 nov.) plus de disque « + » : rien entre Achats et Ventes, cinq onglets de même largeur.
+        const sansDisque = await pg.evaluate(() => { const n = document.querySelector('.vrm-tabbar'); const t = [...n.querySelectorAll(':scope > .vrm-tab')].map((b) => Math.round(b.getBoundingClientRect().width));
+          return { disque: !!document.querySelector('[data-sb-disque], .sb-disque'), largeurs: t }; });
+        dit(!sansDisque.disque && sansDisque.largeurs.length === 5 && Math.max(...sansDisque.largeurs) - Math.min(...sansDisque.largeurs) <= 2, `A10 ${qui} : aucun disque « + », cinq onglets également espacés`, JSON.stringify(sansDisque));
         // A4 · l'onglet allumé = l'écran, pour chaque écran (au toucher de la barre).
         const vus = [];
         for (const id of ['paires', 'achats', 'ventes', 'compta', 'journee']) {
