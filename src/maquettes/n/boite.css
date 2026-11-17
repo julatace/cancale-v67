@@ -1,0 +1,240 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   MAQUETTE N — « ZÉRO À FAIRE » (17 nov.) — prototype de banc, pas livré.
+   Le fond bleu du Studio (C) ; deux matières seulement :
+     · la PORCELAINE pour les cartes de la boîte (une carte = une chose à faire, un geste) ;
+     · le FOND lui-même pour les listes de consultation (aucune carte : rangées fines, densité Linear).
+   Trois tailles de texte par écran : 32 (titre, affiche à part), 17 (la chose), 13 (le reste).
+   Accent rare : le seul plein (encre) est le geste de la carte du dessus ; ambre = une échéance qui
+   presse ou un geste à faire ; rouge = deux paires sous un N°, rien d'autre. Cibles 44 px.
+   Ce qu'on prend : Superhuman (la boîte à vider, glisser = fait) · Linear (listes serrées, en-têtes
+   collants) · Wise (un seul chiffre d'affiche pour l'argent).
+   ════════════════════════════════════════════════════════════════════════════ */
+@import '../../design/studio.css';
+@import '../../design/studio-verre.css';
+
+html[data-maquette="n"] { background: var(--sv-bas) !important; -webkit-text-size-adjust: 100%; }
+html[data-maquette="n"] body { margin: 0; background: transparent !important; overscroll-behavior: none; }
+.n-racine {
+  --g: 20px;
+  --c: var(--sv-clair); --c2: var(--sv-clair-2); --cambre: var(--sv-clair-ambre);
+  --e: var(--sv-encre); --e2: var(--sv-encre-2); --eambre: var(--sv-ambre); --elien: var(--sv-lien);
+  --filet: rgb(255 255 255 / .13);
+  --filet-e: rgb(12 29 48 / .09);
+  --sortie: cubic-bezier(.23, 1, .32, 1);
+  min-height: 100dvh; box-sizing: border-box; color: var(--c); position: relative; isolation: isolate;
+  font-family: var(--sb-police-texte); font-feature-settings: var(--sb-chiffres); -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+[data-theme="dark"] .n-racine { --filet: rgb(255 255 255 / .09); --filet-e: rgb(255 255 255 / .08); }
+.n-racine::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background: radial-gradient(120% 60% at 15% 0%, var(--sv-reflet) 0%, transparent 55%), radial-gradient(70% 45% at 100% 38%, var(--sv-reflet-2) 0%, transparent 70%),
+    linear-gradient(170deg, var(--sv-haut) 0%, var(--sv-milieu) 45%, var(--sv-bas) 100%); }
+.n-racine *, .n-racine *::before, .n-racine *::after { box-sizing: border-box; }
+:where(.n-racine) button { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-align: inherit; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+:where(.n-racine) :is(button, input, [role="button"]):focus-visible { outline: 2px solid var(--c); outline-offset: 2px; border-radius: 14px; }
+.n-racine ::selection { background: rgb(255 255 255 / .28); }
+.n-ico { flex: none; display: block; }
+.n-attente { min-height: 100dvh; }
+.n-main { padding: 0 var(--g) calc(112px + env(safe-area-inset-bottom)); max-width: 640px; margin: 0 auto; }
+
+/* ── LA TÊTE : la date, le titre ; un seul rond (profil ou « ? ») ── */
+.n-tete { position: relative; padding: calc(env(safe-area-inset-top) + 24px) 56px 0 0; }
+.n-tete-date { display: block; font-size: 13px; line-height: 18px; color: var(--c2); }
+.n-tete-date::first-letter { text-transform: uppercase; }
+.n-titre { margin: 2px 0 0; font: 400 32px/40px var(--sb-police-affiche); letter-spacing: -.02em; color: var(--c); display: flex; align-items: baseline; gap: 10px; }
+.n-titre-n { font-weight: 200; color: var(--c2); font-variant-numeric: tabular-nums; }
+.n-rond { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 22px; color: var(--c2); }
+.n-tete .n-rond { position: absolute; right: -6px; bottom: -2px; }
+.n-avatar { width: 32px; height: 32px; border-radius: 16px; display: grid; place-items: center; font: 600 13px/1 var(--sb-police-texte); color: var(--c); background: rgb(255 255 255 / .14); box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .3); }
+.n-pas-lu { margin: 8px 0 0; font-size: 13px; color: var(--c2); }
+@media (hover: hover) and (pointer: fine) { .n-rond:hover { background: rgb(255 255 255 / .08); } }
+
+/* ── LA BOÎTE : une pile de cartes de porcelaine ── */
+.n-cartes { list-style: none; margin: 24px 0 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.n-carte-li { display: block; }
+.n-carte { display: flex; flex-direction: column; width: 100%; padding: 16px 16px 0; border-radius: 22px; background: var(--sv-porcelaine); color: var(--e);
+  box-shadow: 0 1px 1px rgb(8 26 50 / .06), 0 12px 32px -14px rgb(8 26 50 / .45); cursor: pointer; touch-action: pan-y; -webkit-user-select: none; user-select: none;
+  transition: transform 360ms var(--sortie), opacity 220ms ease; will-change: transform; }
+[data-theme="dark"] .n-carte { box-shadow: inset 0 .5px 0 rgb(255 255 255 / .08), 0 12px 32px -14px rgb(0 0 0 / .7); }
+.n-carte:active { transform: scale(.985); transition-duration: 90ms; }
+.n-carte.is-double { box-shadow: inset 0 0 0 1.5px var(--sb-rouge, #C8102E), 0 12px 32px -14px rgb(8 26 50 / .45); }
+.n-carte-tete { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 13px; line-height: 18px; }
+.n-carte-sorte { font-weight: 600; color: var(--e2); }
+.n-carte-quand { display: inline-flex; align-items: center; gap: 6px; color: var(--e2); text-align: right; }
+.n-carte-quand.is-ambre { color: var(--eambre); font-weight: 600; }
+.n-point { width: 7px; height: 7px; border-radius: 4px; background: currentColor; flex: none; transform: translateY(-1px); }
+.n-carte-corps { display: flex; align-items: center; gap: 14px; margin-top: 12px; min-height: 52px; }
+.n-carte-textes { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.n-carte-titre { font-size: 17px; line-height: 22px; font-weight: 600; letter-spacing: -.01em; text-wrap: pretty; }
+.n-carte-titre-n { font-weight: 400; color: var(--e2); }
+.n-carte-de { font-weight: 400; color: var(--e2); }
+.n-montant { font-variant-numeric: tabular-nums; }
+.n-carte-sous { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; font-size: 13px; line-height: 18px; color: var(--e2); font-variant-numeric: tabular-nums; }
+/* Le geste : le pied de la carte. Sur la carte du DESSUS seulement, il est plein (le seul de l'écran). */
+.n-carte-geste { display: flex; align-items: center; justify-content: space-between; min-height: 52px; margin: 14px -16px 0; padding: 0 12px 0 16px;
+  border-top: .5px solid var(--filet-e); font-size: 17px; font-weight: 600; color: var(--elien); }
+.n-carte-geste.is-plein { justify-content: center; margin: 16px 0 16px; padding: 0 20px; min-height: 50px; border: 0; border-radius: 25px; background: var(--e); color: var(--sv-porcelaine); }
+
+/* La pile des photos (de C), la vignette, la plaque gravée du N° */
+.n-pile { position: relative; height: 52px; flex: none; }
+.n-pile-v { position: absolute; top: 0; width: 52px; height: 52px; border-radius: 14px; overflow: hidden; background: var(--sv-porcelaine-2); box-shadow: 0 0 0 2px var(--sv-porcelaine); }
+.n-pile-v img, .n-vignette img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.n-vignette { flex: none; display: block; border-radius: 10px; overflow: hidden; background: rgb(255 255 255 / .10); }
+.n-carte .n-vignette { border-radius: 14px; background: var(--sv-porcelaine-2); }
+.n-plaque { display: inline-flex; align-items: baseline; gap: 2px; padding: 1px 6px; border-radius: 6px; font-size: 12px; line-height: 16px; font-weight: 600; font-variant-numeric: tabular-nums;
+  color: var(--e); background: rgb(12 29 48 / .06); box-shadow: inset 0 0 0 .5px rgb(12 29 48 / .14); }
+.n-plaque-n { font-size: 10px; font-weight: 500; opacity: .7; }
+.n-rangee .n-plaque { color: var(--c); background: rgb(255 255 255 / .08); box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .22); }
+
+/* Les codes de retrait sur la carte : le code d'abord, à la taille de la chose (17), en chiffres alignés */
+.n-carte-corps--retirer { flex-direction: column; align-items: stretch; gap: 10px; }
+.n-codes { display: flex; flex-direction: column; }
+.n-code { display: grid; grid-template-columns: 76px 1fr auto; align-items: center; gap: 12px; min-height: 40px; padding: 4px 0; }
+.n-code + .n-code { border-top: .5px solid var(--filet-e); }
+.n-code-v { font-size: 17px; font-weight: 600; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
+.n-code-art { font-size: 13px; line-height: 18px; color: var(--e2); }
+.n-code-qr { width: 28px; height: 28px; display: block; }
+.n-code-qr img { display: block; width: 28px; height: 28px; image-rendering: pixelated; }
+
+/* ── RIEN À FAIRE : l'écran apaisé ── */
+.n-rien { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 18vh 0 0; }
+.n-rien-dessin { width: 128px; height: 64px; color: rgb(255 255 255 / .55); }
+.n-rien-titre { margin: 20px 0 0; font: 300 32px/40px var(--sb-police-affiche); letter-spacing: -.02em; }
+.n-rien-chiffre { display: flex; flex-direction: column; align-items: center; margin-top: 40px; }
+.n-affiche { font: 200 60px/1 var(--sb-police-affiche); letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+.n-affiche .sb-eur { font-size: .44em; }
+.n-rien-l { margin-top: 8px; font-size: 13px; color: var(--c2); }
+.n-aside { display: none; }
+
+/* ══ LES LISTES DE CONSULTATION ══════════════════════════════════════════════ */
+.n-tete--liste { padding-right: 52px; }
+.n-tete-liste .n-tete { padding-top: calc(env(safe-area-inset-top) + 24px); }
+.n-titre-bascule { gap: 18px; }
+.n-titre-mot { font: inherit; letter-spacing: inherit; color: var(--c); opacity: .42; transition: opacity 160ms ease; min-height: 44px; }
+.n-titre-mot[aria-pressed="true"] { opacity: 1; }
+/* La recherche et les filtres restent sous le pouce en défilant (verre FONCÉ, une seule couche) */
+.n-collant { position: sticky; top: 0; z-index: 5; margin: 0 calc(-1 * var(--g)); padding: 12px var(--g) 0;
+  background: color-mix(in srgb, var(--sv-milieu) 80%, transparent); -webkit-backdrop-filter: blur(20px) saturate(140%); backdrop-filter: blur(20px) saturate(140%); }
+.n-champ { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 14px; border-radius: 14px; background: rgb(255 255 255 / .10); color: var(--c2); box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .14); }
+.n-champ input { flex: 1; min-width: 0; height: 100%; border: 0; background: none; outline: none; color: var(--c); font: 400 16px/1 var(--sb-police-texte); }
+.n-champ input::placeholder { color: var(--c2); opacity: .8; }
+.n-champ input::-webkit-search-cancel-button { filter: invert(1); }
+.n-filtres { display: flex; gap: 4px; margin: 4px -8px 0; overflow-x: auto; scrollbar-width: none; }
+.n-filtres::-webkit-scrollbar { display: none; }
+.n-filtre { position: relative; flex: none; display: inline-flex; align-items: center; gap: 6px; height: 44px; padding: 0 8px; font-size: 15px; font-weight: 500; color: var(--c2); white-space: nowrap; }
+.n-filtre[aria-pressed="true"] { color: var(--c); font-weight: 600; }
+.n-filtre[aria-pressed="true"]::after { content: ''; position: absolute; left: 8px; right: 8px; bottom: 6px; height: 2px; border-radius: 1px; background: var(--c); }
+.n-filtre-n { font-weight: 400; color: var(--c2); font-variant-numeric: tabular-nums; }
+.n-collant:not(:has(.n-filtres)) { padding-bottom: 12px; }
+
+.n-liste { margin-top: 0; }
+.n-groupe-tete { position: sticky; top: var(--haut-collant, 112px); z-index: 2; display: flex; justify-content: space-between; margin: 0 calc(-1 * var(--g)); padding: 18px var(--g) 6px; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--c2);
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--sv-milieu) 70%, transparent) 70%, transparent); }
+.n-main--argent .n-groupe-tete, .n-collant:not(:has(.n-filtres)) ~ .n-liste .n-groupe-tete { --haut-collant: 68px; }
+.n-groupe-n { font-weight: 400; font-variant-numeric: tabular-nums; }
+.n-rangee { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 60px; padding: 10px 0; position: relative; content-visibility: auto; contain-intrinsic-size: auto 60px; }
+.n-rangee + .n-rangee::before { content: ''; position: absolute; top: 0; left: 52px; right: 0; height: .5px; background: var(--filet); }
+.n-rangee:active { background: rgb(255 255 255 / .05); }
+.n-rangee-corps { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.n-rangee-titre { font-size: 15px; line-height: 20px; font-weight: 500; color: var(--c); text-wrap: pretty; }
+.n-rangee-sous { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 8px; font-size: 13px; line-height: 18px; color: var(--c2); }
+.n-rangee-droite { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; text-align: right; }
+.n-rangee-val { font-size: 15px; line-height: 20px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.n-rangee-etat { font-size: 13px; line-height: 18px; color: var(--c2); }
+.n-rangee-etat.is-ambre { color: var(--cambre); font-weight: 600; }
+.n-rangee--code { align-items: center; }
+.n-rangee-code { flex: none; width: 76px; font-size: 17px; font-weight: 600; letter-spacing: .04em; font-variant-numeric: tabular-nums; color: var(--c); }
+.n-rangee--code + .n-rangee--code::before { left: 88px; }
+.n-encore, .n-vide { margin: 20px 0 0; font-size: 13px; color: var(--c2); }
+
+/* ── ARGENT : un seul chiffre d'affiche, deux chiffres calmes, puis la liste ── */
+.n-argent { padding: 20px 0 4px; }
+.n-argent-affiche { display: flex; flex-direction: column; }
+.n-argent-l { margin-top: 8px; font-size: 13px; color: var(--c2); }
+.n-argent-deux { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0 0; }
+.n-argent-deux div { display: flex; flex-direction: column-reverse; gap: 2px; }
+.n-argent-deux dt { font-size: 13px; color: var(--c2); }
+.n-argent-deux dd { margin: 0; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ══ LA BARRE : quatre onglets, collée au bas (pas flottante), verre ══════════ */
+.n-barre { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; display: grid; grid-template-columns: repeat(4, 1fr);
+  padding: 6px 8px max(env(safe-area-inset-bottom), 22px); background: linear-gradient(180deg, var(--sv-verre), var(--sv-verre-2)); color: var(--e);
+  -webkit-backdrop-filter: var(--sv-flou); backdrop-filter: var(--sv-flou); box-shadow: inset 0 .5px 0 var(--sv-bord), 0 -10px 30px -20px rgb(8 26 50 / .5); }
+.n-onglet { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; min-height: 52px; padding-top: 4px; color: var(--sv-onglet); }
+.n-onglet-ico { position: relative; }
+.n-onglet-nom { font-size: 11px; line-height: 13px; font-weight: 600; letter-spacing: .01em; }
+.n-onglet[aria-current] { color: var(--e); }
+.n-onglet-point { position: absolute; top: -1px; right: -5px; width: 9px; height: 9px; border-radius: 5px; background: var(--eambre); box-shadow: 0 0 0 2px var(--sv-verre); }
+.n-onglet:active .n-onglet-ico { transform: scale(.9); transition: transform 90ms ease; }
+
+/* ══ LA FEUILLE ════════════════════════════════════════════════════════════ */
+.n-feuille-fond { position: fixed; inset: 0; z-index: 40; background: rgb(4 14 28 / .45); display: flex; align-items: flex-end; justify-content: center; animation: n-fondu 200ms ease both; }
+.n-feuille { width: 100%; max-width: 560px; max-height: 92dvh; overflow-y: auto; overscroll-behavior: contain; padding: 8px 20px max(env(safe-area-inset-bottom), 24px); border-radius: 28px 28px 0 0;
+  background: var(--sv-porcelaine); color: var(--e); animation: n-monte 360ms var(--sortie) both; }
+.n-feuille-poignee { display: block; width: 36px; height: 5px; border-radius: 3px; margin: 0 auto 8px; background: var(--filet-e); background: rgb(12 29 48 / .16); }
+.n-feuille-tete { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.n-feuille-titre { margin: 0; font: 400 24px/30px var(--sb-police-affiche); letter-spacing: -.015em; }
+.n-feuille .n-rond { color: var(--e2); margin-right: -10px; }
+.n-feuille-sous { margin: 2px 0 0; font-size: 13px; line-height: 18px; color: var(--e2); white-space: pre-line; }
+.n-feuille-codes { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.n-grand-code { display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; column-gap: 16px; align-items: center; padding: 16px; border-radius: 18px; background: var(--sv-porcelaine-2); box-shadow: inset 0 0 0 .5px var(--filet-e); }
+.n-grand-code-v { font: 600 40px/1.05 var(--sb-police-texte); letter-spacing: .06em; font-variant-numeric: tabular-nums; }
+.n-grand-code-art { grid-row: 2; font-size: 13px; line-height: 18px; color: var(--e2); margin-top: 4px; }
+.n-grand-qr { grid-column: 2; grid-row: 1 / 3; width: 104px; height: 104px; border-radius: 8px; background: #fff; padding: 6px; image-rendering: pixelated; }
+.n-grand-sans-qr { grid-column: 2; grid-row: 1 / 3; max-width: 96px; font-size: 13px; line-height: 18px; color: var(--e2); text-align: right; }
+.n-feuille-offre { display: flex; align-items: center; gap: 16px; margin-top: 16px; }
+.n-feuille-montant { margin: 0; font: 200 44px/1 var(--sb-police-affiche); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.n-feuille-gestes { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+.n-feuille-deux { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.n-touche { height: 50px; border-radius: 25px; font-size: 17px; font-weight: 600; text-align: center; color: var(--e); background: rgb(12 29 48 / .06); }
+[data-theme="dark"] .n-touche { background: rgb(255 255 255 / .08); }
+.n-plein { height: 52px; border-radius: 26px; font-size: 17px; font-weight: 600; text-align: center; color: var(--sv-porcelaine); background: var(--e); }
+.n-plein:active, .n-touche:active { transform: scale(.97); transition: transform 90ms ease; }
+@keyframes n-fondu { from { opacity: 0; } }
+@keyframes n-monte { from { transform: translateY(100%); } }
+
+/* Mouvement : les cartes arrivent une à une (les 8 premières seulement) */
+@keyframes n-carte-entre { from { opacity: 0; transform: translateY(10px); } }
+.n-carte-li { animation: n-carte-entre 320ms var(--sortie) both; }
+.n-carte-li:nth-child(2) { animation-delay: 40ms; } .n-carte-li:nth-child(3) { animation-delay: 80ms; } .n-carte-li:nth-child(4) { animation-delay: 120ms; }
+.n-carte-li:nth-child(5) { animation-delay: 160ms; } .n-carte-li:nth-child(n+6) { animation-delay: 200ms; }
+@media (prefers-reduced-motion: reduce) {
+  .n-carte-li, .n-feuille { animation: n-fondu 200ms ease both; }
+  .n-carte, .n-carte:active { transition: opacity 200ms ease; transform: none; }
+}
+@media (prefers-reduced-transparency: reduce) { .n-barre, .n-collant { backdrop-filter: none; -webkit-backdrop-filter: none; background: var(--sv-milieu); } .n-barre { background: var(--sv-porcelaine); } }
+
+/* ══ L'ORDINATEUR (≥ 1100) : la colonne à gauche, la boîte au centre, le jour à droite ══ */
+.n-racine.is-large { display: grid; grid-template-columns: 232px minmax(0, 1fr); }
+.n-colonne { position: sticky; top: 0; height: 100dvh; display: flex; flex-direction: column; gap: 2px; padding: 24px 12px; color: var(--c2);
+  background: rgb(4 14 28 / .18); box-shadow: inset -.5px 0 0 var(--filet); }
+.n-marque { font: 600 15px/1 var(--sb-police-affiche); letter-spacing: .08em; color: var(--c); padding: 8px 12px 24px; }
+.n-colonne .n-onglet { flex-direction: row; justify-content: flex-start; gap: 12px; min-height: 44px; padding: 0 12px; border-radius: 12px; color: var(--c2); }
+.n-colonne .n-onglet-nom { font-size: 15px; line-height: 20px; font-weight: 500; letter-spacing: 0; }
+.n-colonne .n-onglet[aria-current] { color: var(--c); background: rgb(255 255 255 / .10); }
+.n-colonne .n-onglet[aria-current] .n-onglet-nom { font-weight: 600; }
+.n-colonne .n-onglet-point { display: none; }
+.n-onglet-n { margin-left: auto; font-size: 13px; font-weight: 600; color: var(--cambre); font-variant-numeric: tabular-nums; }
+.is-large .n-main { max-width: none; width: 100%; padding: 0 48px 64px; margin: 0; }
+.is-large .n-main--afaire { display: grid; grid-template-columns: minmax(0, 560px) minmax(0, 1fr); column-gap: 64px; align-content: start; }
+.is-large .n-main--afaire > .n-tete, .is-large .n-main--afaire > .n-pas-lu { grid-column: 1; }
+.is-large .n-main--afaire > .n-cartes { grid-column: 1; }
+.is-large .n-main--afaire > .n-rien { grid-column: 1 / -1; }
+.is-large .n-aside { display: block; grid-column: 2; grid-row: 1 / span 3; }
+.is-large .n-aside .n-rien { position: sticky; top: 0; padding-top: 30vh; }
+.is-large .n-aside .n-rien-titre { display: none; }
+.is-large .n-aside .n-rien-dessin { display: none; }
+.is-large .n-aside .n-rien-chiffre { margin-top: 0; }
+.is-large .n-tete { padding-top: 40px; }
+.is-large .n-tete-liste, .is-large .n-liste, .is-large .n-argent, .is-large .n-groupe { max-width: 960px; }
+.is-large .n-collant { margin: 0; padding-left: 0; padding-right: 0; background: color-mix(in srgb, var(--sv-haut) 70%, transparent); }
+.is-large .n-groupe-tete { margin: 0; padding-left: 0; padding-right: 0; }
+.is-large .n-feuille-fond { align-items: stretch; justify-content: flex-end; }
+.is-large .n-feuille { max-width: 440px; max-height: none; height: 100dvh; border-radius: 28px 0 0 28px; padding-top: 24px; animation-name: n-glisse; }
+.is-large .n-feuille-poignee { display: none; }
+@keyframes n-glisse { from { transform: translateX(100%); } }
+@media (hover: hover) and (pointer: fine) {
+  .n-colonne .n-onglet:hover { color: var(--c); background: rgb(255 255 255 / .06); }
+  .n-rangee:hover { background: rgb(255 255 255 / .04); }
+  .n-carte:hover { box-shadow: 0 1px 1px rgb(8 26 50 / .06), 0 16px 36px -14px rgb(8 26 50 / .55); }
+}
