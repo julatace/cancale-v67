@@ -40,6 +40,7 @@ const ZONE = [CENTRE, LOIN, { x: 0.04, y: 0.18, l: 0.92, h: 0.64 }];
 // Le zoom posé à l'ouverture quand la caméra en a un (Safari 17+, Chrome Android) : on vise de deux fois plus loin.
 const ZOOM_LOIN = 2;
 const SORTES = ['vente', 'achat', 'retour', 'colis'];
+const SCANNERS_OUVERTS = { n: 0 };
 
 // La phrase quand la caméra manque : un refus dit OÙ l'autoriser (la raison gardée par la caméra du scanner).
 const phraseCamera = () => {
@@ -298,7 +299,13 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
     window.addEventListener(EV_RETROUVER_CODE, f); return () => window.removeEventListener(EV_RETROUVER_CODE, f);
   }, [resoudre]);
   // L'app dessous n'est plus dessinée tant que le scanner la couvre (scanner-retrouver.css), rendue à la fermeture.
-  React.useEffect(() => { const h = document.documentElement; h.setAttribute('data-scan-retrouver', ''); return () => h.removeAttribute('data-scan-retrouver'); }, []);
+  // (17 nov., lot scan-instantane) Rendue APRÈS la première image qui suit la fermeture : redessiner toute l'app
+  // (le style de chaque élément) dans la même tâche que la fiche ouverte retardait la fiche (banc scan-instantane).
+  React.useEffect(() => {
+    const h = document.documentElement; SCANNERS_OUVERTS.n += 1; h.setAttribute('data-scan-retrouver', '');
+    return () => { SCANNERS_OUVERTS.n -= 1; const rendre = () => { if (SCANNERS_OUVERTS.n <= 0) h.removeAttribute('data-scan-retrouver'); };
+      if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => setTimeout(rendre, 0)); else rendre(); };
+  }, []);
   React.useEffect(() => {
     const f = (e) => { if (e.key === 'Escape') { if (resRef.current) { setRes(null); setChoisi(null); } else if (onFermer) onFermer(); } };
     window.addEventListener('keydown', f); return () => window.removeEventListener('keydown', f);
@@ -340,7 +347,9 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
       } catch (_) {}
     }
     if (onFermer) onFermer();
-    try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: lien })); } catch (_) {}
+    // L'écran dessous (Ventes, la ligne) se place APRÈS la première image de la fiche : la fiche ne l'attend pas.
+    const aller = () => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: lien })); } catch (_) {} };
+    if (tx && typeof requestAnimationFrame === 'function') requestAnimationFrame(() => setTimeout(aller, 0)); else aller();
   };
   const chercher = (lu) => { if (onChercher && lu) onChercher(lu.suivi); if (onFermer) onFermer(); };
   // (16 nov., lot scan-achat) « Ranger » : l'atelier d'arrivée s'ouvre une fois le scanner fermé (il le couvrirait).
@@ -349,6 +358,9 @@ export default function ScannerRetrouver({ Photo = null, onFermer, onChercher = 
   const relier = (lu) => { if (!lu || !onRelier) return; if (onFermer) onFermer(); setTimeout(() => { try { onRelier({ suivi: lu.suivi, transporteur: lu.transporteur || '', nom: lu.nom || '' }); } catch (_) {} }, 60); };
   const pasCa = () => { setRes(null); setChoisi(null); setIndice(tr('scan.a.pasCaIndice')); };
   const montrer = res && res.etat === 'un' ? res.trouve : res && res.etat === 'plusieurs' && choisi ? choisi : null;
+  // (17 nov.) Une vente trouvée : le morceau de la fiche se charge PENDANT qu'il lit la feuille (« Ouvrir » n'attend pas le réseau).
+  const venteMontree = !!(montrer && montrer.sorte === 'vente');
+  React.useEffect(() => { if (venteMontree) import('./FichePaire.jsx').catch(() => {}); }, [venteMontree]);
   const sansCam = camera === 'sans';
 
   return createPortal(

@@ -360,7 +360,15 @@ const shot = async (pg, q) => { if (SHOTS) await pg.screenshot({ path: path.join
       juge(m.total != null && m.total <= SEUIL.netMs, `N : toucher « Scanner » ⇒ fiche ≤ ${SEUIL.netMs} ms`, `${m.total} ms (caméra active ⇒ fiche : ${m.lecture} ms ; vidéo ${m.video})`);
       await pg.waitForTimeout(300); await shot(pg, '1-fiche');
       if (!SCENES.includes('O')) return;
+      // Le code pas lu (le lecteur d'avant) : le n° est TAPÉ, pour mesurer quand même l'ouverture de la vente.
+      if (e.fiche !== 'vente:v:9201') {
+        await pg.click('[data-scan-r-clavier]').catch(() => {});
+        await pg.fill('[data-scan-r-saisie]', MR_A); await pg.click('[data-scan-r-ok]');
+        await pg.waitForSelector('[data-scan-r-ouvrir="vente:v:9201"]', { timeout: 15000 });
+        await pg.waitForTimeout(800);
+      }
       const n0 = lourdes.length;
+      if (process.env.SCAN_TRACE) await pg.context().browser().startTracing(pg, { path: process.env.SCAN_TRACE, categories: ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'v8.execute'] });
       const o = await pg.evaluate(async () => {
         let ouvertures = 0; const f = () => { ouvertures++; }; window.addEventListener('vrm:fiche-ligne', f);
         const t0 = performance.now();
@@ -384,6 +392,7 @@ const shot = async (pg, q) => { if (SHOTS) await pg.screenshot({ path: path.join
         const fp = document.querySelector('[data-fiche-paire]');
         return { t0, fiche: d(fiche), remplie: d(remplie), marque: d(marque), parti: d(parti), ouvertures, encore: !!(fp && fp.getClientRects().length && fp.getAttribute('data-fiche-paire') === '31' && fp.querySelector('[data-fiche-depuis-ligne]')) };
       });
+      if (process.env.SCAN_TRACE) await pg.context().browser().stopTracing();
       const L = await pg.evaluate(() => window.__longues);
       const bl = bloque(L, o.t0, o.t0 + 1500);
       mesures.ouvrir = { ...o, t0: undefined, bloque: bl, longues: L.filter(([st, du]) => st + du > o.t0 && st < o.t0 + 1500).map(([st, du]) => [Math.round(st - o.t0), du]) };
