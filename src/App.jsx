@@ -65926,7 +65926,7 @@ function AppCoeur() {
           (au-dessus des feuilles, par un portail) : l'exemple ne se confond plus avec ses vraies données. */}
       {exempleActif() && <BandeauExemple sansCompte={exempleSansCompte()} style={ordi ? { marginLeft: NAV_LARGEUR + 36 } : undefined} onBrancher={() => (exempleSansCompte() ? sortirModeExemple(window, '/?inscription') : sortirModeExemple())} onConnexion={() => sortirModeExemple(window, '/?connexion')}/>}
       {exempleActif() && createPortal(<CadreExemple/>, document.body)}
-      <main id="vrm-contenu" className="vrm-main" data-ecran={tab} data-espace={espaceDe(tab, BAR_GROUPE)} data-defile="1" style={{
+      <main className="vrm-main" id="vrm-contenu" data-ecran={tab} data-espace={espaceDe(tab, BAR_GROUPE)} data-defile="1" style={{
         // ⚠️ COQUE APP-SHELL : c'est `<main>` qui défile, pas le document. La
         // barre du bas est un frère HORS de ce conteneur → elle ne bouge plus
         // jamais pendant le scroll (bug iOS « barre au milieu de l'écran »).

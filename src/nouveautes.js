@@ -27,6 +27,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (17 nov., audit d'accessibilité WCAG 2.1 AA) docs/passation/2026-11-17-accessibilite.md
+  { id: 'accessibilite-clavier', date: '2026-11-17', titre: 'Plus lisible, et tout au clavier', phrase: 'Focus visible partout, textes sur le bleu éclaircis, « Aller au contenu ».', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (17 nov., lot scan-bordereau-vente) docs/passation/2026-11-17-scan-bordereau-vente.md
   { id: 'scan-bordereau-vente', date: '2026-11-17', titre: 'Scanne n’importe quel code du bordereau', phrase: 'Le grand code aussi : VRM ouvre la vente de cette étiquette.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (17 nov., Julien : « je dois rester appuyé sur l'achat […] on ne voit pas ce que j'ai sélectionné ») docs/passation/2026-11-17-relier-toucher.md
