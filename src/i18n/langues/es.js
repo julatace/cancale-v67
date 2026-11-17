@@ -1,4 +1,5 @@
 // ESPAÑOL — traducción de fr.js (la fuente). Mismas claves, mismas {variables}.
+import ecran_suivi_vente from './es/suiviVente.js';   // (16 nov.) le suivi des colis vendus
 import ecran_perso from './es/perso.js';   // (16 nov.) « Modifier ma journée » simple
 import ecran_ventesVerre from './es/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
 import ecran_journee from './es/journee.js';
@@ -2304,6 +2305,7 @@ export default {
   ...ecran_correspondances,
   ...ecran_renvoyer,
   ...ecran_liaison,
+  ...ecran_suivi_vente,
   ...ecran_transporteur_connu,
   ...ecran_vendre,
   ...ecran_ebaytableau,

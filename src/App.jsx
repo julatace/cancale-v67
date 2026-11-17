@@ -142,7 +142,7 @@ import {arriveesRelues} from './arriveesRelues.js';
 import { preuveDeLigne } from '../api/_lib/etat-colis.js';
 import { urlQrDuColis } from '../api/_lib/qr-retrait.js';
 import {avecSuiviDuSujet,finsDesLignes,sortiParSuivis,sortiParSuivi,suiviDeLigne,lienSuivi,codePostalLu,nouvelleVinted,transporteurDeForme,colisInternational,suiviValide,TRANSPORTEURS_SAISIE,normaliserCodePostal,idSuiviManuel,relireLigneSuivi,finDeCommandeAchat,txAchatsEnRetour,achatEnRetour,fusionTransporteur,ligneDuTransporteur,ligneDeSuiviTransporteur,leverGarde,SELECT_TRANSP_META,ligneTranspDeMeta,sensDeLigne,incidentDeSuivis,incidentDeLigne,repartiAffichable,nomTransporteurSuivi} from '../api/_lib/suivi-colis.js';
-import {ligneTransporteur,texteCodePostalMr,carrierLisible,carrierNonLu,nomTransporteur,LECTURE_SERVEUR_TRANSP,heureParis,indexTranspParSuivi,carrierLuDeLigne,noterLecturesServeur,lecturesCle} from '../api/_lib/transporteurs.js';
+import {ligneTransporteur,texteCodePostalMr,carrierLisible,carrierNonLu,nomTransporteur,LECTURE_SERVEUR_TRANSP,heureParis,indexTranspParSuivi,carrierLuDeLigne} from '../api/_lib/transporteurs.js';
 // ⟦→ ecrans/Reglages.jsx #6⟧
 import PorteConfidentialite from './PorteConfidentialite.jsx';
 import { AlerteDejaRelie } from './AlerteDejaRelie.jsx';
@@ -612,7 +612,7 @@ import OuVendre from './OuVendre.jsx';   // (15 nov., lot securite-ventes) « O�
 import { fraisVintedSelon, statutVinted, tauxEbay, tauxVestiaire } from './ouVendre.js';
 import { etatVenteVc } from './etatVenteVc.js';   // (15 nov.) l'état d'une vente Vestiaire en mots (jamais « IN_PROGRESS »)
 import { texteEtatVc } from './etatVenteVcTexte.js';
-import {SELECT_DEPART_META,departsParSuivi,txVintedParties} from '../api/_lib/depart-colis.js';
+import {SELECT_DEPART_META,departsParSuivi,txVintedParties,mrSansCodePostal} from '../api/_lib/depart-colis.js';
 import {ventesPartiesParPreuve, suiviDuBord} from '../api/_lib/depart-vente.js';
 import { partiParPreuve } from './etiquettesDepart.js';
 import {publierDepartsVinted,raisonDepartPubliee} from './departVente.js';
@@ -1052,6 +1052,7 @@ import { langueNavigateur, poserLangueUneFois, alignerLangueCompte } from "./lan
 // `t` est pris partout dans ce fichier comme nom de variable, d'où l'alias `tr`.
 import ChoixLangue from "./i18n/ChoixLangue.jsx";
 import { tr, aCle as aCleTr, LANGUES, NOMS_LANGUES, choisirLangue, langueCourante, localeCourante, monnaie as monnaieI18n, ajouterSourceApp, abonnerLangue } from "./i18n/index.js";
+const trT = tr;   // (16 nov.) le même `tr`, pour les fonctions dont un paramètre s'appelle déjà `tr` (le transporteur)
 import { offresVestiaire, offresJourneeVc, euros as eurosOffre, resteAvant as resteAvantOffre } from './offresVestiaire.js';
 // La partie « app » du dictionnaire français arrive AVEC l'app (le fichier d'entrée reste léger).
 import frApp from "./i18n/langues/fr.js";
@@ -25725,9 +25726,6 @@ function useRelectureEbay() {
 //     recule (10 min, 6 h) ; rien n'est vidé ;
 //   · un état CHANGÉ ⇒ `vrm:transp-maj` (les écrans relisent `transp_*`).
 const RELECTURE_TRANSP_MS = 5 * 60 * 1000;
-// (13 nov., lot 89) Ce que le serveur a dit de Colissimo / UPS (lu ou non), retenu sur l'appareil
-// (une commodité : la réponse du passage suivant le remplace) — avant toute réponse : « pas su ».
-try { const x = lireLocalJson('vrm_transp_lecture'); if (x && Object.keys(x).length) noterLecturesServeur(x); } catch (_) {}
 // (9 nov., retraits frais) La dernière lecture RÉUSSIE chez un transporteur (ms) parmi les lignes `transp_`
 // lues, ou null (rien lu, ou pas su). Et l'âge en mots, une règle pour la ligne « Suivi vérifié … ».
 function derniereLectureTransp(lignes) {
@@ -25774,9 +25772,6 @@ function relireTransporteursSiVieux({ force = false } = {}) {
         ecrireLocalJson('vrm_transp_vol', { at: maintenant, prochain: maintenant + attente });
         return { fait: false, raison: st ? `http-${st}` : 'reseau' };
       }
-      // (13 nov., lot 89) Colissimo / UPS lus par le serveur (leur clé est posée sur Vercel) : la règle
-      // partagée le sait (`carrierLisible`, `pourquoiPasLu`) — sinon « suivi lu par e-mail seulement ».
-      if (j.lecture && typeof j.lecture === 'object') { const avant = JSON.stringify(lecturesCle()); noterLecturesServeur(j.lecture); ecrireLocalJson('vrm_transp_lecture', lecturesCle()); if (JSON.stringify(lecturesCle()) !== avant) { try { window.dispatchEvent(new Event('vrm:transp-lu')); } catch (_) {} } }
       const change = Array.isArray(j.lus) && j.lus.some((x) => x && x.change);
       // (8 nov.) Un colis VENDU pris en charge chez le transporteur : Colis, Ma
       // journée et la cloche relisent les départs (jamais « à retirer »).
@@ -47232,11 +47227,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // `su` date la TRANSACTION (paiement, finalisation), pas le colis : jamais l'heure du statut d'expédition.
     return { texte: e.ss || '', at: null, cap, luAt: cap, finalisee, retour: e.s === 440 };
   };
-  const raisonPasLuVente = (carrier, tr) => {
+  // (16 nov., lot transporteurs-suivi) Mondial Relay se lit aussi pour un colis VENDU : le code postal du point est
+  // LU sur SON étiquette et prouvé par l'écho de Mondial Relay (api/_lib/depart-colis.js `cpDepartMr`). Ne le dit
+  // « pas lisible » que la ligne `depart_` qui l'a constaté (étiquette lue, chaque code postal refusé ou aucun écrit).
+  const raisonPasLuVente = (carrier, tr, dep) => {
     const nom = (tr && tr.nom) || (carrier ? nomTransporteur(carrier) : '');
-    if (carrier === 'mondialrelay' || /mondial|inpost/i.test(String((tr && (tr.cle || tr.nom)) || ''))) return 'Mondial Relay ne se lit pas pour un colis vendu. Vinted et les e-mails font foi.';
-    if (carrier === 'chronopost' || carrier === 'vinted') return `Pas encore lu chez ${nomTransporteur(carrier)}.`;
-    return nom ? `${nom} ne se lit pas ici. Vinted et les e-mails font foi.` : 'Transporteur pas encore connu.';
+    const estMr = carrier === 'mondialrelay' || /mondial|inpost/i.test(String((tr && (tr.cle || tr.nom)) || ''));
+    if (estMr && dep && dep.carrier === 'mondialrelay' && mrSansCodePostal(dep)) return trT('suiviVente.mrSansCp');
+    if (estMr) return trT('suiviVente.pasEncoreLu', { nom: 'Mondial Relay' });
+    if (carrier === 'chronopost' || carrier === 'vinted') return trT('suiviVente.pasEncoreLu', { nom: nomTransporteur(carrier) });
+    const nl = carrierNonLu((tr && (tr.cle || tr.nom)) || carrier || '');
+    return nom ? trT('suiviVente.nonLu', { nom }) : trT('suiviVente.inconnu');
   };
   const suiviVente = (x) => {
     const su = normaliserSuivi((x && x.b && x.b.suivi) || (x && x.v && x.v.suivi) || '');
@@ -47255,7 +47256,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const enCours = estEnCours({ transporteur: dep, finalisee: !!(vt && vt.finalisee) });
     const carrier = (dep && dep.carrier) || carrierLisible((x.tr && (x.tr.cle || x.tr.nom)) || '', su) || '';
     const lien = lienPublic(lienSuivi, (x.tr && (x.tr.cle || x.tr.nom)) || carrier, su);
-    return { su, dep, statut, inc, enCours, lien, raison: statut ? '' : raisonPasLuVente(carrier, x.tr) };
+    return { su, dep, statut, inc, enCours, lien, raison: statut ? '' : raisonPasLuVente(carrier, x.tr, dep) };
   };
   const suiviAchat = (o, su, carrier) => {
     const k = normaliserSuivi(su); if (!k) return null;
