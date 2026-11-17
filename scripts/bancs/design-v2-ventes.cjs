@@ -142,10 +142,76 @@ async function mesurer(pg) {
   }, CONTRASTE);
 }
 
+// LA GRILLE « QUALITÉ ET FLUIDITÉ » (Julien : « ça doit être beaucoup plus quali et fluide »), mesurée sur l'écran rendu.
+async function qualite(pg, th) {
+  const t0 = await pg.evaluate(() => performance.now());
+  await pg.waitForTimeout(2500);   // l'écran au repos : plus rien ne doit bouger tout seul
+  const q = await pg.evaluate((t0) => {
+    const vis = (e) => e && e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden' && !e.closest('[hidden], .v2-cache, .vrm-sr-seul');
+    const zones = [...document.querySelectorAll('.v2v-titre-ligne, .v2v-tete, .v2v-corps')].filter(vis);
+    const tous = zones.flatMap((z) => [z, ...z.querySelectorAll('*')]).filter(vis).filter((e) => !e.closest('.v2-etiquette, svg, .vrm-retours-lot, .v2v-note, [data-lg-tiroir]'));
+    const px = (v) => String(v || '').split(/\s+/).map(parseFloat).filter((x) => Number.isFinite(x));
+    const ms = (v) => Math.max(...String(v || '0s').split(',').map((x) => (x.trim().endsWith('ms') ? parseFloat(x) : parseFloat(x) * 1000)));
+    const row = document.querySelector('.v2v-liste .v2l'); const plein = document.querySelector('[data-v2-principal="imprimer"]');
+    const appui = { rangee: row ? ms(getComputedStyle(row).transitionDuration) : null, plein: plein ? ms(getComputedStyle(plein).transitionDuration) : null };
+    const repos = (window.__cls || []).filter((x) => x.t > t0 && !x.input).reduce((s, x) => s + x.v, 0);
+    const cv = row ? getComputedStyle(row).contentVisibility : null;
+    const img = document.querySelector('.v2v-liste .v2l-photo img'); const fondu = img ? getComputedStyle(img).animationName : null;
+    const boite = img ? (() => { const r = img.parentElement.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })() : null;
+    const tailles = [...new Set(tous.filter((e) => [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())).map((e) => Math.round(parseFloat(getComputedStyle(e).fontSize))))].sort((a, b) => a - b);
+    const rayons = tous.map((e) => { const r = parseFloat(getComputedStyle(e).borderTopLeftRadius) || 0; const q = e.getBoundingClientRect(); return { r, rond: r >= Math.min(q.width, q.height) / 2 - 1, c: e.className && e.className.baseVal === undefined ? String(e.className).slice(0, 30) : '' }; })
+      .filter((x) => x.r > 0 && !x.rond && ![12, 14, 20].includes(Math.round(x.r)));
+    const mes = (e) => e.matches('[class*="v2v-"], .v2l, .v2l *');
+    const grille = tous.filter(mes).flatMap((e) => { const cs = getComputedStyle(e); return ['padding', 'margin', 'rowGap', 'columnGap'].flatMap((k) => px(cs[k]).map((v) => ({ k, v, c: String(e.className).slice(0, 30) }))); })
+      .filter((x) => Math.abs(x.v) % 4 !== 0);
+    const champ = document.querySelector('.v2v-recherche .v2v-champ'), plus = document.querySelector('[data-v2v-plus]');
+    const segs = [...document.querySelectorAll('[data-v2v-segment] button')].map((b) => b.offsetHeight);
+    const hauteurs = { champ: champ ? champ.offsetHeight : null, plus: plus ? plus.offsetHeight : null, segs };
+    const restes = [...document.querySelectorAll('.vrm-main :is(.vv-hero, .vv-seg, .vv-pied, .vv-filtres, .vrm-colis-grille, [data-bord-card], .vrm-colis-resume, .vrm-colis-afaire, [data-heros-hote])')].filter(vis).map((e) => String(e.className).slice(0, 30));
+    return { appui, repos: Math.round(repos * 1000) / 1000, cv, fondu, boite, tailles, rayons: rayons.slice(0, 5), grille: grille.slice(0, 6), nGrille: grille.length, hauteurs, restes };
+  }, t0);
+  dit(q.appui.rangee != null && q.appui.rangee <= 100 && q.appui.plein != null && q.appui.plein <= 100, `Q ${th} : réponse au toucher < 100 ms (rangée ${q.appui.rangee} ms, plein ${q.appui.plein} ms)`, q.appui);
+  dit(q.repos === 0, `Q ${th} : au repos, rien ne saute (CLS hors geste = ${q.repos})`, q.repos);
+  dit(q.cv === 'auto', `Q ${th} : 1 000 rangées sans à-coup (content-visibility: ${q.cv})`, q.cv);
+  dit(q.fondu === 'v2v-fondu' && q.boite && q.boite[0] === 64 && q.boite[1] === 64, `Q ${th} : la photo arrive en fondu dans sa boîte de 64 × 64 (le texte ne bouge pas)`, { f: q.fondu, b: q.boite });
+  dit(q.tailles.every((t) => [13, 15, 17, 34, 56].includes(t)), `Q ${th} : trois tailles de texte + chiffres d'affiche (${q.tailles.join(', ')})`, q.tailles);
+  dit(!q.rayons.length, `Q ${th} : rayons 12 / 14 / 20 seulement (ou rond)`, q.rayons);
+  dit(!q.nGrille, `Q ${th} : grille de 4 (marges, retraits, espaces)`, q.grille);
+  dit(q.hauteurs.champ === 44 && q.hauteurs.plus === 44 && q.hauteurs.segs.length === 3 && new Set(q.hauteurs.segs).size === 1, `Q ${th} : même hauteur dans une rangée (champ ${q.hauteurs.champ}, ⋯ ${q.hauteurs.plus}, segments ${q.hauteurs.segs.join('/')})`, q.hauteurs);
+  dit(!q.restes.length, `Q ${th} : aucun reste de l'écran d'hier à l'écran`, q.restes);
+}
+
+// Q (suite) : pendant la lecture, le squelette de la forme des rangées, jamais un écran blanc ; mouvement réduit respecté.
+async function chargementEtMouvement(nav, b) {
+  console.log('\n── chargement lent et mouvement réduit (390 clair)');
+  const { ctx, pg } = await ouvrir(nav, { W: 390, sombre: false, b, url: '/?tab=ventes' });
+  await pg.addInitScript(() => { try { localStorage.setItem('vrm_design_v2', '1'); } catch (_) {} });
+  await pg.route(/\/rest\/v1\/.*orders_sold/, async (r) => { await new Promise((ok) => setTimeout(ok, 5000)); return r.fallback(); });
+  await pg.reload({ waitUntil: 'domcontentloaded' });
+  const vu = { squelette: false, blanc: 0, ligne: false };
+  for (let k = 0; k < 40; k++) {
+    const x = await pg.evaluate(() => ({ sq: !!document.querySelector('[data-v2v-squelette]'), ligne: !!document.querySelector('[data-v2v-liste="envoyer"] [data-v2v-ligne]'),
+      blanc: !((document.querySelector('.vrm-main') || { innerText: '' }).innerText || '').trim() })).catch(() => ({}));
+    if (x.sq) vu.squelette = true; if (x.blanc) vu.blanc++; if (x.ligne) { vu.ligne = true; break; }
+    await pg.waitForTimeout(250);
+  }
+  if (vu.squelette) await pg.screenshot({ path: path.join(SHOTS, 'ventes-squelette-390-clair.png') }).catch(() => {});
+  dit(vu.squelette && vu.blanc <= 4, `Q pendant la lecture : le squelette des rangées (vu : ${vu.squelette}), pas d'écran blanc (${vu.blanc} relevés vides au tout début)`, vu);
+  await ctx.close();
+  const c2 = await nav.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
+  const p2 = await c2.newPage(); await p2.goto(`http://localhost:${PORT}/?tab=journee`).catch(() => {});
+  const r = await p2.evaluate(() => { const h = document.createElement('div'); h.className = 'v2-faite is-faite'; h.innerHTML = '<div class="v2-faite-dedans"></div>'; document.body.appendChild(h);
+    const l = document.createElement('div'); l.className = 'v2v-liste'; l.innerHTML = '<div class="v2l"><span class="v2l-photo"><img alt=""></span></div><div class="v2v-sq-ligne"></div>'; document.body.appendChild(l);
+    return { faite: getComputedStyle(h.firstChild).transform, img: getComputedStyle(l.querySelector('img')).animationName, sq: getComputedStyle(l.querySelector('.v2v-sq-ligne')).animationName }; });
+  dit(r.faite === 'none' && r.img === 'none' && r.sq === 'none', 'Q mouvement réduit : la rangée faite ne glisse pas (fondu), photos et squelette immobiles', r);
+  await c2.close();
+}
+
 async function allume(nav, b, sombre, W, ref) {
   const th = (W < 600 ? '390-' : '1512-') + (sombre ? 'sombre' : 'clair');
   console.log(`\n── allumé · ${th}`);
   const { ctx, pg, erreurs } = await ouvrir(nav, { W, sombre, b, url: '/?tab=ventes', dsf: W < 600 ? 2 : 1 });
+  await pg.addInitScript(() => { window.__cls = []; try { new PerformanceObserver((l) => { for (const e of l.getEntries()) window.__cls.push({ t: e.startTime, v: e.value, input: e.hadRecentInput }); }).observe({ type: 'layout-shift', buffered: true }); } catch (_) {} });
   await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {});
   await pg.evaluate(() => localStorage.setItem('vrm_design_v2', '1')); await pg.reload({ waitUntil: 'domcontentloaded' });
   await attendre(pg, () => document.querySelectorAll('[data-v2v-liste="envoyer"] [data-v2v-ligne]').length > 0 && (document.querySelector('[data-v2v-affiche]') || { getAttribute: () => '' }).getAttribute('data-v2v-affiche') !== '', process.env.BANC_DIST ? 15000 : 45000);
@@ -179,6 +245,7 @@ async function allume(nav, b, sombre, W, ref) {
   // Les vignettes du haut chargées avant la capture (une capture sans photos ne montre pas l'écran).
   await attendre(pg, () => [...document.querySelectorAll('[data-v2v-liste] img')].slice(0, 6).every((i) => i.complete && i.naturalWidth > 0), 8000);
   await pg.screenshot({ path: path.join(SHOTS, `ventes-${th}.png`) });
+  await qualite(pg, th);
   if (tel) {
     // G : la recherche par N° trouve la rangée.
     const num = await pg.evaluate(() => { const p = document.querySelector('[data-v2v-liste] [data-v2v-ligne] .v2-etiquette'); return p ? p.getAttribute('data-v2-etiquette') : ''; });
@@ -273,6 +340,7 @@ async function allume(nav, b, sombre, W, ref) {
     await allume(nav, b, false, 390, refC);
     await allume(nav, b, true, 390, refC);
     await allume(nav, b, false, 1512, refC);
+    await chargementEtMouvement(nav, b);
   } catch (e) { ko++; console.log('  ❌ le banc s’est arrêté : ' + String(e && e.stack || e).slice(0, 1500)); }
   fs.writeFileSync(path.join(SHOTS, 'signature-eteint.json'), JSON.stringify(sigs));
   await nav.close(); srv.close();
