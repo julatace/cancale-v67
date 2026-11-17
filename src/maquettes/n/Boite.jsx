@@ -58,6 +58,7 @@ const D = {
   chevron: 'M9.3 5.3 8.2 6.4 13.8 12l-5.6 5.6 1.1 1.1L16 12z',
   croix: 'M6.4 5.3 5.3 6.4 10.9 12l-5.6 5.6 1.1 1.1 5.6-5.6 5.6 5.6 1.1-1.1-5.6-5.6 5.6-5.6-1.1-1.1-5.6 5.6z',
   coche: 'M9.5 16.2 5.3 12l-1.1 1.1 5.3 5.3L20 7.9l-1.1-1.1z',
+  qr: 'M4 4h6v6H4zm1.5 1.5v3h3v-3zM14 4h6v6h-6zm1.5 1.5v3h3v-3zM4 14h6v6H4zm1.5 1.5v3h3v-3zM14 14h2v2h-2zm2 2h2v2h-2zm2-2h2v2h-2zm0 4h2v2h-2zm-4 0h2v2h-2z',
   aide: 'M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18zm0 1.5a7.5 7.5 0 1 0 0 15 7.5 7.5 0 0 0 0-15zm-.1 10.6a1 1 0 1 1 0 2 1 1 0 0 1 0-2zM12 7c1.8 0 3.1 1.1 3.1 2.6 0 1.2-.7 1.9-1.6 2.5-.6.4-.8.7-.8 1.3v.3h-1.5v-.4c0-1 .4-1.6 1.3-2.2.7-.5 1.1-.8 1.1-1.5 0-.7-.7-1.2-1.6-1.2-.9 0-1.6.5-1.7 1.4H8.8C8.9 8.2 10.2 7 12 7z',
 };
 const Ico = ({ n, t = 22 }) => <svg className="n-ico" width={t} height={t} viewBox="0 0 24 24" aria-hidden="true"><path d={D[n]} fill="currentColor" fillRule="evenodd" /></svg>;
@@ -68,13 +69,17 @@ const Plaque = ({ n }) => (n ? <span className="n-plaque" data-numero={n}><span 
 const Vignette = ({ src, t = 40 }) => (
   <span className="n-vignette" style={{ width: t, height: t }}>{src ? <img src={src} alt="" loading="lazy" decoding="async" width={t} height={t} /> : null}</span>
 );
-const Pile = ({ photos }) => (
-  <span className="n-pile" style={{ width: 52 + (Math.max(1, photos.length) - 1) * 22 }}>
-    {photos.map((p, i) => <span key={i} className="n-pile-v" style={{ left: i * 22, zIndex: 10 - i }}><img src={p} alt="" loading="lazy" decoding="async" width={52} height={52} /></span>)}
-  </span>
-);
+// La pile (de C) : trois photos au plus, posées l'une sur l'autre comme des cartons, décalées de 8 px.
+const Pile = ({ photos }) => {
+  const l = photos.slice(0, 3);
+  return (
+    <span className="n-pile" style={{ width: 52 + (l.length - 1) * 8, height: 52 + (l.length - 1) * 4 }}>
+      {l.map((p, i) => <span key={i} className="n-pile-v" style={{ left: (l.length - 1 - i) * 8, top: (l.length - 1 - i) * 4, zIndex: 10 - i, opacity: 1 - i * 0.12 }}><img src={p} alt="" loading="lazy" decoding="async" width={52} height={52} /></span>)}
+    </span>
+  );
+};
 // « N° 124, 309 et 13 autres » : on nomme ce qui tient, on compte le reste — rien n'est coupé.
-const listeNumeros = (nums, max = 3) => {
+const listeNumeros = (nums, max = 2) => {
   const n = nums.filter(Boolean);
   if (!n.length) return '';
   const vus = n.slice(0, max).join(', ');
@@ -132,7 +137,7 @@ function CorpsCarte({ c }) {
             <span key={x.id} className="n-code">
               <span className="n-code-v" data-code={x.code}>{x.code || '—'}</span>
               <span className="n-code-art">{x.art}</span>
-              {x.qr ? <span className="n-code-qr" title="QR du transporteur"><img src={x.qr} alt="" width={28} height={28} /></span> : null}
+              {x.qr ? <span className="n-code-qr" aria-label="QR du transporteur"><Ico n="qr" t={18} /></span> : <span className="n-code-qr" />}
             </span>
           ))}
         </span>
@@ -182,7 +187,7 @@ function RienAFaire({ jour, cote }) {
   );
 }
 
-function EcranAFaire({ B, faits, faire, ouvrir, maintenant, large }) {
+function EcranAFaire({ B, faits, faire, ouvrir, maintenant, large, feuille }) {
   const reste = B.cartes.filter((c) => !faits.has(c.cle));
   const date = new Date(maintenant).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Paris' });
   return (
@@ -194,7 +199,7 @@ function EcranAFaire({ B, faits, faire, ouvrir, maintenant, large }) {
       </header>
       {B.pasLu.length ? <p className="n-pas-lu">— · {B.pasLu.length === 1 ? 'une source pas lue' : `${B.pasLu.length} sources pas lues`} : la liste peut être incomplète</p> : null}
       {reste.length ? (
-        <ol className="n-cartes">{reste.map((c, i) => <Carte key={c.cle} c={c} premier={i === 0} ouvrir={ouvrir} faire={faire} maintenant={maintenant} />)}</ol>
+        <ol className="n-cartes">{reste.map((c, i) => <Carte key={c.cle} c={c} premier={i === 0 && !feuille} ouvrir={ouvrir} faire={faire} maintenant={maintenant} />)}</ol>
       ) : <RienAFaire jour={B.jour} />}
       {large && reste.length ? <aside className="n-aside"><RienAFaire jour={B.jour} cote /></aside> : null}
     </>
@@ -215,14 +220,15 @@ const Rangee = ({ photo, titre, sous, valeur, etat, ambre, attrs }) => (
 function Liste({ lignes, rendre, cleJour, vide }) {
   if (lignes == null) return <p className="n-vide">— · pas lu</p>;
   if (!lignes.length) return <p className="n-vide">{vide}</p>;
-  const MAX = 120; const vues = lignes.slice(0, MAX);
-  const groupes = []; let cur = null;
-  for (const l of vues) { const j = cleJour(l); if (!cur || cur.j !== j) { cur = { j, l: [] }; groupes.push(cur); } cur.l.push(l); }
+  // Le compte d'un groupe est celui de TOUTE la liste (jamais celui des rangées montrées).
+  const MAX = 120;
+  const groupes = []; let cur = null; let vus = 0;
+  for (const l of lignes) { const j = cleJour(l); if (!cur || cur.j !== j) { cur = { j, l: [], n: 0 }; groupes.push(cur); } cur.n++; if (vus < MAX) { cur.l.push(l); vus++; } }
   return (
     <div className="n-liste">
-      {groupes.map((g) => (
+      {groupes.filter((g) => g.l.length).map((g) => (
         <section key={g.j} className="n-groupe">
-          <h2 className="n-groupe-tete"><span>{g.j}</span><span className="n-groupe-n">{g.l.length}</span></h2>
+          <h2 className="n-groupe-tete"><span>{g.j}</span><span className="n-groupe-n">{nb(g.n)}</span></h2>
           {g.l.map(rendre)}
         </section>
       ))}
@@ -233,13 +239,13 @@ function Liste({ lignes, rendre, cleJour, vide }) {
 function Filtres({ items, actif, choisir }) {
   return (
     <nav className="n-filtres" aria-label="Filtrer">
-      {items.map(([cle, nom, n]) => (
+      {items.filter(([cle, , n]) => n !== 0 || cle === actif).map(([cle, nom, n]) => (
         <button key={cle} type="button" className="n-filtre" aria-pressed={actif === cle} onClick={() => choisir(cle)} data-filtre={cle}>{nom}{n != null ? <span className="n-filtre-n">{nb(n)}</span> : null}</button>
       ))}
     </nav>
   );
 }
-function TeteListe({ titres, actif, choisir, q, setQ, filtres, aide }) {
+function TeteListe({ titres, actif, choisir, q, setQ, filtres, aide, avant }) {
   return (
     <div className="n-tete-liste">
       <header className="n-tete n-tete--liste">
@@ -250,6 +256,7 @@ function TeteListe({ titres, actif, choisir, q, setQ, filtres, aide }) {
         ) : <h1 className="n-titre">{titres[0][1]}</h1>}
         <button type="button" className="n-rond n-tete-aide" aria-label={'Aide : ' + aide}><Ico n="aide" /></button>
       </header>
+      {avant}
       <div className="n-collant">
         <label className="n-champ"><Ico n="loupe" t={18} /><input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="N°, titre, pseudo, code" enterKeyHint="search" /></label>
         {filtres}
@@ -324,7 +331,7 @@ function EcranAnnonces({ M, route, aller, maintenant }) {
         filtres={<Filtres items={[['enligne', 'En ligne', P.publier.enLigne ? P.publier.enLigne.length : null], ['dorment', 'Qui dorment', P.publier.dorment ? P.publier.dorment.length : null], ['sansnum', 'Sans N°', P.publier.sansNumero ? P.publier.sansNumero.length : null]]} actif={filtre} choisir={(f) => aller({ ecran: 'annonces', filtre: f })} />} />
       <Liste lignes={lignes} vide={filtre === 'sansnum' ? 'Toutes ont leur N°' : 'Aucune annonce'} cleJour={tranche} rendre={(a) => {
         const j = age(a);
-        return <Rangee key={a.id} photo={a.photo} titre={a.title} sous={<>{numDe(a) ? <Plaque n={numDe(a)} /> : null}<span>{[j != null ? `${j} j` : null, a.fav ? `${a.fav} favori${a.fav > 1 ? 's' : ''}` : null].filter(Boolean).join(' · ')}</span></>} valeur={euros(centimes(a.price))} attrs={{ 'data-annonce': a.id }} />;
+        return <Rangee key={a.id} photo={a.photo} titre={a.title} sous={<>{numDe(a) ? <Plaque n={numDe(a)} /> : null}<span>{[j == null ? null : j < 1 ? 'aujourd’hui' : `${j} j`, a.fav ? `${a.fav} favori${a.fav > 1 ? 's' : ''}` : null].filter(Boolean).join(' · ')}</span></>} valeur={euros(centimes(a.price))} attrs={{ 'data-annonce': a.id }} />;
       }} />
     </>
   );
@@ -337,17 +344,18 @@ function EcranArgent({ M, maintenant }) {
   const vues = E.versees ? E.versees.filter((x) => correspond(q, x.v.title, x.paire && x.paire.numero, x.v._tx)) : null;
   return (
     <>
-      <TeteListe titres={[['a', 'Argent']]} q={q} setQ={setQ} aide="Argent" filtres={null} />
-      <div className="n-argent">
-        <div className="n-argent-affiche">
-          <Affiche data-recu-mois="" v={E.recuMois == null ? '—' : euros(E.recuMois)} />
-          <span className="n-argent-l">reçus en {mois}{E.ceMois ? ` · ${E.ceMois.length} versement${E.ceMois.length > 1 ? 's' : ''}` : ''}</span>
+      <TeteListe titres={[['a', 'Argent']]} q={q} setQ={setQ} aide="Argent" filtres={null} avant={(
+        <div className="n-argent">
+          <div className="n-argent-affiche">
+            <Affiche data-recu-mois="" v={E.recuMois == null ? '—' : euros(E.recuMois)} />
+            <span className="n-argent-l">reçus en {mois}{E.ceMois ? ` · ${E.ceMois.length} versement${E.ceMois.length > 1 ? 's' : ''}` : ''}</span>
+          </div>
+          <dl className="n-argent-deux">
+            <div><dt>Disponible sur Vinted</dt><dd>{E.solde ? euros(E.solde.dispo) : '—'}</dd></div>
+            <div><dt>En attente</dt><dd>{E.solde ? euros(E.solde.attente) : '—'}</dd></div>
+          </dl>
         </div>
-        <dl className="n-argent-deux">
-          <div><dt>Sur Vinted, disponible</dt><dd>{E.solde ? euros(E.solde.dispo) : '—'}</dd></div>
-          <div><dt>En attente</dt><dd>{E.solde ? euros(E.solde.attente) : '—'}</dd></div>
-        </dl>
-      </div>
+      )} />
       <Liste lignes={vues} vide="Aucun versement lu" cleJour={(x) => jourDe(x.le, maintenant)} rendre={(x) => (
         <Rangee key={x.v._tx} photo={photoDe(x.v.photo)} titre={x.v.title} sous={<>{x.paire ? <Plaque n={x.paire.numero} /> : null}<span>{M.loginDe(x.v._uid)}</span></>} valeur={euros(centimes(x.v.price), { signe: true })} attrs={{ 'data-versement': x.v._tx }} />
       )} />
@@ -446,7 +454,7 @@ export default function Boite() {
     <div className={'n-racine' + (large ? ' is-large' : '')} data-ecran={ecran}>
       {large ? <Barre actif={ecran} aller={aller} nAFaire={nAFaire} large /> : null}
       <main className={'n-main n-main--' + ecran}>
-        {ecran === 'afaire' ? <EcranAFaire B={B} faits={tousFaits} faire={faire} ouvrir={ouvrir} maintenant={maintenant} large={large} /> : null}
+        {ecran === 'afaire' ? <EcranAFaire B={B} faits={tousFaits} faire={faire} ouvrir={ouvrir} maintenant={maintenant} large={large} feuille={!!route.feuille} /> : null}
         {ecran === 'commandes' ? <EcranCommandes M={M} route={route} aller={aller} maintenant={maintenant} /> : null}
         {ecran === 'annonces' ? <EcranAnnonces M={M} route={route} aller={aller} maintenant={maintenant} /> : null}
         {ecran === 'argent' ? <EcranArgent M={M} maintenant={maintenant} /> : null}

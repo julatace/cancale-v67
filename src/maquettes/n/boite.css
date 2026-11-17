@@ -22,7 +22,7 @@ html[data-maquette="n"] body { margin: 0; background: transparent !important; ov
   --filet-e: rgb(12 29 48 / .09);
   --sortie: cubic-bezier(.23, 1, .32, 1);
   min-height: 100dvh; box-sizing: border-box; color: var(--c); position: relative; isolation: isolate;
-  font-family: var(--sb-police-texte); font-feature-settings: var(--sb-chiffres); -webkit-font-smoothing: antialiased;
+  font-family: var(--sb-police-texte); font-feature-settings: "cv11" 1, "kern" 1;   /* chiffres tabulaires seulement sur les nombres : sinon les tirets s'élargissent (« xt - 6 ») */ -webkit-font-smoothing: antialiased;
   -webkit-tap-highlight-color: transparent;
 }
 [data-theme="dark"] .n-racine { --filet: rgb(255 255 255 / .09); --filet-e: rgb(255 255 255 / .08); }
@@ -77,7 +77,7 @@ html[data-maquette="n"] body { margin: 0; background: transparent !important; ov
 
 /* La pile des photos (de C), la vignette, la plaque gravée du N° */
 .n-pile { position: relative; height: 52px; flex: none; }
-.n-pile-v { position: absolute; top: 0; width: 52px; height: 52px; border-radius: 14px; overflow: hidden; background: var(--sv-porcelaine-2); box-shadow: 0 0 0 2px var(--sv-porcelaine); }
+.n-pile-v { position: absolute; width: 52px; height: 52px; border-radius: 14px; overflow: hidden; background: var(--sv-porcelaine-2); box-shadow: 0 0 0 2px var(--sv-porcelaine), 0 2px 6px rgb(8 26 50 / .12); }
 .n-pile-v img, .n-vignette img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .n-vignette { flex: none; display: block; border-radius: 10px; overflow: hidden; background: rgb(255 255 255 / .10); }
 .n-carte .n-vignette { border-radius: 14px; background: var(--sv-porcelaine-2); }
@@ -89,12 +89,11 @@ html[data-maquette="n"] body { margin: 0; background: transparent !important; ov
 /* Les codes de retrait sur la carte : le code d'abord, à la taille de la chose (17), en chiffres alignés */
 .n-carte-corps--retirer { flex-direction: column; align-items: stretch; gap: 10px; }
 .n-codes { display: flex; flex-direction: column; }
-.n-code { display: grid; grid-template-columns: 76px 1fr auto; align-items: center; gap: 12px; min-height: 40px; padding: 4px 0; }
+.n-code { display: grid; grid-template-columns: 76px 1fr 18px; align-items: center; gap: 12px; min-height: 40px; padding: 4px 0; }
 .n-code + .n-code { border-top: .5px solid var(--filet-e); }
 .n-code-v { font-size: 17px; font-weight: 600; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
 .n-code-art { font-size: 13px; line-height: 18px; color: var(--e2); }
-.n-code-qr { width: 28px; height: 28px; display: block; }
-.n-code-qr img { display: block; width: 28px; height: 28px; image-rendering: pixelated; }
+.n-code-qr { width: 18px; height: 18px; display: block; color: var(--e2); }
 
 /* ── RIEN À FAIRE : l'écran apaisé ── */
 .n-rien { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 18vh 0 0; }
@@ -148,7 +147,7 @@ html[data-defile] .n-collant { background-color: color-mix(in srgb, var(--sv-mil
 .n-encore, .n-vide { margin: 20px 0 0; font-size: 13px; color: var(--c2); }
 
 /* ── ARGENT : un seul chiffre d'affiche, deux chiffres calmes, puis la liste ── */
-.n-argent { padding: 20px 0 4px; }
+.n-argent { padding: 20px 0 8px; }
 .n-argent-affiche { display: flex; flex-direction: column; }
 .n-argent-l { margin-top: 8px; font-size: 13px; color: var(--c2); }
 .n-argent-deux { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0 0; }
@@ -224,7 +223,10 @@ html[data-defile] .n-collant { background-color: color-mix(in srgb, var(--sv-mil
 .is-large .n-aside .n-jour { position: sticky; top: 0; padding-top: 124px; }
 .is-large .n-tete { padding-top: 40px; }
 .is-large .n-tete-liste, .is-large .n-liste, .is-large .n-argent, .is-large .n-groupe { max-width: 960px; }
-.is-large .n-collant { margin: 0; padding-left: 0; padding-right: 0; background: color-mix(in srgb, var(--sv-haut) 70%, transparent); }
+.is-large .n-collant { margin: 0; padding-left: 0; padding-right: 0; }
+.is-large .n-rangee-droite { flex-direction: row-reverse; align-items: center; gap: 0; }
+.is-large .n-rangee-val { width: 96px; }
+.is-large .n-rangee-etat { width: 140px; text-align: left; }
 .is-large .n-groupe-tete { margin: 0; padding-left: 0; padding-right: 0; }
 .is-large .n-feuille-fond { align-items: stretch; justify-content: flex-end; }
 .is-large .n-feuille { max-width: 440px; max-height: none; height: 100dvh; border-radius: 28px 0 0 28px; padding-top: 24px; animation-name: n-glisse; }
