@@ -168,6 +168,7 @@ const groupeDe = (l, g) => (l.groupes || []).find((x) => x.groupe === g);
 const PHOTO = 'data:image/jpeg;base64,' + 'A'.repeat(400) + '==';
 
 (async () => {
+  if (!fs.existsSync(MIG) || !fs.existsSync(path.join(RACINE, 'src/communaute/coucou.js'))) { console.log('❌ la migration 046 (ou src/communaute/coucou.js) est absente : aucun coucou dans la base'); process.exit(1); }
   R = await import('file://' + path.join(RACINE, 'src/communaute/coucou.js'));
   console.log(`(Postgres jetable dans ${DIR}${MUTATION ? ' · MUTATION « ' + MUTATION + ' »' : ''})\n`);
   let SQL = fs.readFileSync(MIG, 'utf8');
