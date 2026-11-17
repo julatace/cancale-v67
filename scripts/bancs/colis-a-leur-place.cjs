@@ -228,6 +228,13 @@ const attendre = async (pg, q) => { await pg.waitForSelector(q, { timeout: 30000
           dit(avantPapier === 0, 'I la PREMIÈRE fois : la question du papier, aucun PDF avant', String(avantPapier));
           if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `imprimer-1-papier-${nom}.png`) });
           await pg.click('[data-impr-papier-choix="normale"]');
+          // (16 nov., lot tampons-parametres — Julien : « ça m'ouvre une vignette […] et quand je touche Imprimer, les
+          // réglages sont appliqués ») L'APERÇU AVANT IMPRESSION : rien ne part avant son « Imprimer ».
+          await pg.waitForSelector('[data-impr-apercu="pret"] [data-impr-apercu-imprimer]:not([disabled])', { timeout: 60000 });
+          const avantAp = await pg.evaluate(() => ({ vis: !!document.querySelector('[data-visionneuse-pdf]'), imprimes: Object.keys(JSON.parse(localStorage.getItem('vinted_bords_printed') || '{}')).length }));
+          dit(!avantAp.vis && avantAp.imprimes === 0, 'I l’aperçu avant impression d’abord : aucun PDF ouvert ni rien noté imprimé avant son « Imprimer »', JSON.stringify(avantAp));
+          if (SHOTS) await pg.screenshot({ path: path.join(SHOTS, `imprimer-1b-apercu-${nom}.png`) });
+          await pg.click('[data-impr-apercu-imprimer]');
           await pg.waitForSelector('[data-visionneuse-pdf="pret"]', { timeout: 30000 });
           // Noté imprimé quand le PDF est OUVERT (impression-simple) : on attend l'écriture (file du geste), sans délai fixe.
           await pg.waitForFunction(() => Object.keys(JSON.parse(localStorage.getItem('vinted_bords_printed') || '{}')).length >= 2, null, { timeout: 10000 }).catch(() => {});

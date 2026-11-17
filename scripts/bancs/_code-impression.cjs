@@ -10,7 +10,10 @@ const path = require('path'), fs = require('fs');
 const RACINE = path.join(__dirname, '..', '..');
 const sansExport = (s) => s.replace(/^export\s+(?=(const|function|async|let|class)\b)/gm, '');
 const lireRegle = (f) => { const p = path.join(RACINE, 'src', 'impression', f); return fs.existsSync(p) ? sansExport(fs.readFileSync(p, 'utf8')) : ''; };
-const regles = () => [lireRegle('thermique.js'), lireRegle('bordereauExemple.js')].join('\n');
+// (16 nov., lot tampons-parametres) + src/impression/tampons.js (LE réglage des tampons) et les noms sous lesquels
+// App.jsx l'importe (`CIBLES as CIBLES_TAMPON`).
+// (17 nov.) + src/impression/retoursLot.js : le cartouche RETOUR (lot impression-retours) lit `motsTamponRetour`.
+const regles = () => { const t = lireRegle('tampons.js'); return [lireRegle('thermique.js'), lireRegle('bordereauExemple.js'), lireRegle('retoursLot.js'), 'if (typeof globalThis.tr === "undefined") globalThis.tr = null;   // les mots du RETOUR en français (`motsTamponRetour`, sans `tr`)', t, t ? 'const CIBLES_TAMPON = CIBLES;' : ''].join('\n'); };
 function impression(APP) {
   // (La fin : le bloc `poserBordereau` entier — le repère `⟦→ ecrans/…⟧` qui le suit est
   // remplacé par l'écran lui-même quand `_source-app.cjs` recolle App.jsx.)

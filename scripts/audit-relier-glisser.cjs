@@ -43,6 +43,9 @@ const MUTS = {
   'app-feuille-bulle': ['src/App.jsx', "    const ok = confirmerLiaison(a, cible._saleTx ?", "    const ok = false && confirmerLiaison(a, cible._saleTx ?"],
   'benefice-sans-frais': ['src/relierGlisser.js', "  const r = typeof ligne === 'function' ? ligne(prix, entree || {}) : null;", "  const r = typeof ligne === 'function' ? ligne(prix, { buyPrice: (entree || {}).buyPrice, fraisComplets: true }) : null;"],
   'ligne-sans-benef': ['src/App.jsx', "benefSu: lb.benefice!=null && st!=='cancelled' ? texteBenefice(lb) : '',", "benefSu: '',"],
+  'toucher-cible-rien': ['src/RelierGlisser.jsx', "if (choisi) relierIci(c); else setCibleChoisie(", "if (false) relierIci(c); else setCibleChoisie("],
+  'toucher-sans-bandeau': ['src/RelierGlisser.jsx', "      {mode ? (\n        <div className=\"vrm-rg-choisi\"", "      {false ? (\n        <div className=\"vrm-rg-choisi\""],
+  'menu-sans-relier': ['src/App.jsx', "onClick={()=>{ close(); ouvrirGlisser({ achat: String(o.transaction_id) }); }}", "onClick={()=>{ close(); }}"],
   'pilule-sans-action': ['src/PiluleAnnuler.jsx', "{v && v.action ? <button", "{false && v.action ? <button"],
   'ecran-defile-pendant': ['src/RelierGlisser.jsx', "if (appui.current && appui.current.phase === 'leve' && e.cancelable) e.preventDefault();", 'void e;'],
   'ecran-bloque-toujours': ['src/RelierGlisser.jsx', "if (appui.current && appui.current.phase === 'leve' && e.cancelable) e.preventDefault();", 'if (e.cancelable) e.preventDefault();'],
@@ -195,8 +198,14 @@ const sans = (s) => s.replace(/\/\/[^\n]*/g, '');
   }
   dit(/benefSu: lb\.benefice!=null && st!=='cancelled' \? texteBenefice\(lb\) : ''/.test(app), 'R9 la LIGNE de la vente reliée montre son bénéfice, discret à côté du prix (la règle de la ligne)');
 
-  // ── S · le branchement ──
   let ecran = ''; try { ecran = sans(fs.readFileSync(path.join(SRC, 'RelierGlisser.jsx'), 'utf8')); } catch (_) {}
+  // ── T · relier en TOUCHANT (17 nov., Julien : « je dois rester appuyé sur l'achat ») ──
+  dit(/onClick=\{\(\) => toucherAchat\(x\)\}/.test(ecran) && /onClick=\{\(\) => toucherCible\(c\)\}/.test(ecran) && /const toucherCible = \(c\) => \{[^\n]*if \(choisi\) relierIci\(c\);/.test(ecran), 'T1 un toucher choisit l’achat, un toucher sur la vente / l’annonce pose la question (aucun appui long)');
+  dit(/\{mode \? \(\s*<div className="vrm-rg-choisi" data-glisser-choisi=/.test(ecran) && /data-glisser-changer=""/.test(ecran), 'T2 le choix reste visible tout du long (bandeau fixe « Achat choisi … · Changer »)');
+  dit(/const toucherAchat = \(x\) => \{[^\n]*const c = cibleChoisie \? parCle\.get\(cibleChoisie\) : null; if \(c\) \{ setConfirme/.test(ecran), 'T3 dans l’autre sens : la vente / l’annonce choisie d’abord, puis l’achat');
+  dit(/data-achat-relier=\{tid\}[^\n]*onClick=\{\(\)=>\{ close\(\); ouvrirGlisser\(\{ achat: String\(o\.transaction_id\) \}\); \}\}/.test(app), 'T4 le menu « ⋯ » d’un achat (et sa fiche) propose « Relier à une vente / annonce »');
+
+  // ── S · le branchement ──
   dit(/const ciblesGlisser = useMemo\(\(\) => \{[\s\S]{0,700}?for \(const x of \(fileAchat \|\| \[\]\)\)[\s\S]{0,900}?for \(const x of \(fileVendus \|\| \[\]\)\)/.test(app), 'S1 les cibles : les annonces et les ventes SANS achat relié (fileAchat, fileVendus)');
   dit(/const relierGlisse = async[\s\S]{0,200}?ecritureRelierAchat\(a\)[\s\S]{0,700}?confirmerLiaison\(/.test(app) && /const confirmerLiaison = [\s\S]{0,1500}?opsRelierGlisse\([\s\S]{0,1800}?gesteVrm\(res\.texte, ops,/.test(app), 'S2 l’écriture de « Relier » (un lot demande son prix), par identité, en geste annulable 5 s');
   dit(['feuille', 'annonces', 'achats'].every((k) => app.includes(`data-glisser-ouvrir="${k}"`)), 'S3 trois entrées : la feuille « Relier », Annonces → Sans achat relié, Achats');

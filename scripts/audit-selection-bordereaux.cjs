@@ -79,8 +79,8 @@ const dit = (c, m, d) => { n++; if (!c) ko++; console.log(`${c ? '✅' : '❌'} 
   // (14 nov., impression-simple) La feuille « Place du tampon » ne s'ouvre plus seule pendant le lot (elle bloquait
   // l'impression, une fois par transporteur) : la place gardée, sinon l'automatique ; « Déplacer le tampon » l'ouvre
   // pour UN bordereau, APRÈS, sur sa demande.
-  dit(/composerLot\(\[l\], format, t \? \{ \[cle\]: t \} : \{\}, \{ apercu: 'force' \}\)/.test(app) && /data-impr-deplacer=\{corrige\.cle\}/.test(fs.readFileSync(path.join(__dirname, '..', 'src', 'ImpressionSimple.jsx'), 'utf8')) && /\{ apercu = false, pas = null \} = \{\}/.test(app), '5e « Déplacer le tampon » rouvre la feuille pour CE bordereau, sur sa demande ; jamais d’office pendant le lot');
-  dit(/const choisirTampon = \(\{ PL, src, numero, titre, apercu = true, deja = \{\}(?:, [\w ={}]+)? \}\)/.test(app), '5f `choisirTampon` accepte une mémoire partagée (`deja`)');
+  dit(/composerLot\(\[l\], format, t \? \{ \[cle\]: t \} : \{\}, \{ apercu: 'force' \}\)/.test(app) && /data-impr-deplacer=\{corrige\.cle\}/.test(fs.readFileSync(path.join(__dirname, '..', 'src', 'ImpressionSimple.jsx'), 'utf8')) && /\{ apercu = false, pas = null(?:, places = null)? \} = \{\}/.test(app), '5e « Déplacer le tampon » rouvre la feuille pour CE bordereau, sur sa demande ; jamais d’office pendant le lot');
+  dit(/const choisirTampon = \(\{ PL, src, numero, titre, apercu = true, deja = \{\}(?:, [\w ={}'']+)* \}\)/.test(app), '5f `choisirTampon` accepte une mémoire partagée (`deja`)');
   console.log(`\n${ko ? '❌' : '✅'} audit-selection-bordereaux : ${n - ko}/${n}`);
   fs.rmSync(tmp, { recursive: true, force: true });
   process.exit(ko ? 1 : 0);

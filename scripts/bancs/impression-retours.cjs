@@ -216,6 +216,11 @@ const shot = async (pg, nom) => { if (SHOTS) { try { await pg.screenshot({ path:
         const bt = pg.locator('[data-vv-pied] [data-colis-barre-btn="imprimer"]').first();
         await bt.scrollIntoViewIfNeeded().catch(() => {});
         await bt.click();
+        // (17 nov., lot tampons-parametres) la sélection ouvre d'abord l'APERÇU AVANT IMPRESSION (la vente et le retour en
+        // vignettes) ; rien ne part avant son « Imprimer ».
+        const ap = await pg.waitForSelector('[data-impr-apercu="pret"] [data-impr-apercu-imprimer]:not([disabled])', { timeout: 60000 }).then(() => true).catch(() => false);
+        dit(ap, `${nom} : R3 l’aperçu avant impression s’ouvre d’abord`);
+        if (ap) await pg.click('[data-impr-apercu-imprimer]');
         await pg.waitForSelector('[data-visionneuse-pdf="pret"]', { timeout: 30000 }).catch(() => {});
         const b64 = await pg.evaluate(async () => { const f = document.querySelector('[data-visionneuse-cadre]'); if (!f) return null; const r = await fetch(f.src); const u = new Uint8Array(await r.arrayBuffer()); let s = ''; for (let j = 0; j < u.length; j++) s += String.fromCharCode(u[j]); return btoa(s); });
         dit(!!b64, `${nom} : R3 le PDF du lot s’ouvre dans la visionneuse`);
