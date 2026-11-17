@@ -51,8 +51,14 @@
   /* Plus de diode bleue sur un segment allumé : l'accent redevient rare. */
   :root[data-onglets="a"] body :is(.vrm-seg, .vrm-sel-sites, .vv-seg, .vrm-platform-tabs, .vrm-messages-sections, .vrm-boite-vues, .vrm-compte-puces, .vrm-stock-views, .vrm-filtres) > button::after,
   :root[data-onglets="a"] body :is(.vrm-seg-point, .vrm-compte-puce)::after { display: none !important; content: none !important; }
-  /* Le sélecteur de sites garde ses logos ; le libellé de l'actif suffit. */
-  :root[data-onglets="a"] body .vrm-sel-sites > button :is(img, svg) { opacity: .9 !important; }
+  /* Le sélecteur de sites garde ses logos ; il prend la largeur de son contenu (jamais « V.. »), touches 36 dessinées. */
+  :root[data-onglets="a"] body .vrm-sel-sites { display: inline-flex !important; width: fit-content !important; max-width: 100% !important; flex: 0 0 auto !important; }
+  :root[data-onglets="a"] body .vrm-sel-sites > button { flex: 0 0 auto !important; height: 36px !important; min-height: 36px !important; padding: 0 12px !important; overflow: visible !important; }
+  :root[data-onglets="a"] body .vrm-sel-sites > button * { overflow: visible !important; text-overflow: clip !important; max-width: none !important; }
+  @media (pointer: coarse) {
+    :root[data-onglets="a"] body .vrm-sel-sites > button { position: relative !important; }
+    :root[data-onglets="a"] body .vrm-sel-sites > button::before { content: "" !important; position: absolute !important; inset: -4px 0 !important; }
+  }
 
   /* ── 2. Compteurs discrets ────────────────────────────────────────────── */
   :root[data-onglets="a"] body :is(.vv-seg-n, .vrm-seg-n, .vrm-of-n) {
@@ -80,7 +86,6 @@
   :root[data-onglets="a"] body :is(.vrm-compte-puces .vrm-compte-puce, .vrm-stock-views.vrm-filtres > button):is([aria-pressed="true"], .is-actif, [aria-current="page"]) {
     background: var(--oa-on) !important; color: var(--oa-on-encre) !important;
   }
-  :root[data-onglets="a"] body .vrm-stock-views.vrm-filtres > button:not([aria-pressed="true"]):not(.is-actif) { border-color: var(--oa-piste-bord) !important; }
 
   /* ── 3. La barre du bas ───────────────────────────────────────────────── */
   :root[data-onglets="a"] body .vrm-app-shell .vrm-tabbar > .vrm-tab .vrm-nav-label { font: 600 11px/1 Inter, system-ui, sans-serif !important; letter-spacing: -.01em !important; }
