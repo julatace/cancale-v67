@@ -213,18 +213,20 @@ async function chargementEtMouvement(nav, b) {
   const { ctx, pg } = await ouvrir(nav, { W: 390, sombre: false, b, url: '/apple-touch-icon.png' });
   await pg.addInitScript(() => { try { localStorage.setItem('vrm_design_v2', '1'); } catch (_) {} });
   // Les lectures retenues 5 s (page ET contexte : le service worker de l'app passe par le contexte).
-  const lent = async (r) => { await new Promise((ok) => setTimeout(ok, 5000)); return r.fallback(); };
-  // Toutes les lectures de la base (ventes, bordereaux, e-mails…) sauf la ligne `main` : rien n'est su pendant 5 s.
-  const ventesLues = (u) => /\/rest\/v1\/app_data/.test(String(u)) && !/id=eq\.main\b/.test(decodeURIComponent(String(u)));
+  let nLent = 0; const lent = async (r) => { nLent++; await new Promise((ok) => setTimeout(ok, 5000)); return r.fallback(); };
+  // Les lectures d'où viennent les colis (ventes, bordereaux, e-mails) : rien de ces colis n'est su pendant 5 s.
+  const ventesLues = (u) => /\/rest\/v1\/app_data/.test(String(u)) && /orders_sold|email_|label_|bordereau/.test(decodeURIComponent(String(u)));
   await pg.route(ventesLues, lent); await ctx.route(ventesLues, lent);
   await pg.goto(`http://localhost:${PORT}/?tab=ventes`, { waitUntil: 'domcontentloaded' });
   const vu = { squelette: false, blanc: 0, ligne: false };
   for (let k = 0; k < 40; k++) {
-    const x = await pg.evaluate(() => ({ sq: !!document.querySelector('[data-v2v-corps] [data-v2-squelette]'), ligne: !!document.querySelector('[data-v2v-liste="envoyer"] [data-v2v-ligne]'),
+    const x = await pg.evaluate(() => ({ sq: !!document.querySelector('.vrm-colis-section [data-v2-squelette]'), ligne: !!document.querySelector('[data-v2v-liste="envoyer"] [data-v2v-ligne]'),
       blanc: !((document.querySelector('.vrm-main') || { innerText: '' }).innerText || '').trim() })).catch(() => ({}));
+    if (k === 10) await pg.screenshot({ path: path.join(SHOTS, 'ventes-pendant-lecture-390-clair.png') }).catch(() => {});
     if (x.sq) vu.squelette = true; if (x.blanc) vu.blanc++; if (x.ligne) { vu.ligne = true; break; }
     await pg.waitForTimeout(250);
   }
+  console.log('   lectures retenues : ' + nLent);
   if (vu.squelette) await pg.screenshot({ path: path.join(SHOTS, 'ventes-squelette-390-clair.png') }).catch(() => {});
   dit(vu.squelette && vu.blanc <= 4, `Q pendant la lecture : le squelette des rangées (vu : ${vu.squelette}), pas d'écran blanc (${vu.blanc} relevés vides au tout début)`, vu);
   await ctx.close();
