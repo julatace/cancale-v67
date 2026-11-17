@@ -67,7 +67,8 @@ function juger(regleSrc, sources) {
   const A = sansCommentaires(sources.app), R = sansCommentaires(sources.relais), Q = sansCommentaires(sources.dorment);
   const memeQue = (src, action, bouton) => src.includes(action) && src.includes(bouton);
   dit(memeQue(A, "faire: ()=>demanderDepose(txL, o, libDepose)", "onClick={()=>demanderDepose(txL, o, libDepose)}>Déposé</Bouton>"), 'Ventes : « Déposé » au glisser = le bouton « Déposé » (sa barre « Annuler » 5 s)');
-  dit(memeQue(A, "faire: ()=>imprimerBordereauVente(o)", "onClick={()=>imprimerBordereauVente(o)}"), 'Ventes : « Imprimer » au glisser = le bouton « Imprimer le bordereau »');
+  // (17 nov., lot tampons-parametres) le bouton garde sa taille pendant la préparation : `occuperPendant(ev.currentTarget, …)` enveloppe le MÊME geste.
+  dit(memeQue(A, "faire: ()=>imprimerBordereauVente(o)", "onClick={()=>imprimerBordereauVente(o)}") || memeQue(A, "faire: ()=>imprimerBordereauVente(o)", "onClick={(ev)=>occuperPendant(ev.currentTarget, ()=>imprimerBordereauVente(o))}"), 'Ventes : « Imprimer » au glisser = le bouton « Imprimer le bordereau »');
   dit(/fuPdf \? \{ cle: 'imprimer'/.test(A), 'Ventes : « Imprimer » seulement quand le PDF est là (comme le bouton)');
   dit(/<LigneGlissable actif=\{peutDeposer && !deposeIci\}/.test(A), 'Ventes : seule une vente à expédier, pas déjà en attente, se glisse');
   dit(memeQue(R, "faire: () => retirer(x)", "onClick={(ev) => { ev.stopPropagation(); retirer(x); }}>J’ai retiré</button>"), 'À retirer : « Retiré » au glisser = « J’ai retiré » (le geste annulable)');
