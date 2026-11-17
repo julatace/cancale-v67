@@ -61663,6 +61663,11 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
                   {l.num ? <span data-toutes-num={l.num} style={{ display: 'block', marginTop: 4 }}><Numero n={l.num} taille="petit"/></span> : null}
                 </span>
               </button>
+              {/* (17 nov., vitesse-cache) Dans SA fiche : les gestes de la vente (bordereau, suivi, prix d'achat…) restent à
+                  un toucher, sur l'écran Vinted où ils vivent — comme le toucher d'avant, mais seulement quand on les veut. */}
+              {ficheToutes(l)['data-fiche-ligne'] ? <DansFiche cle={ficheToutes(l)['data-fiche-ligne']} place="actions" seulementFiche>
+                <Bouton variante="secondaire" data-toutes-gestes={l.id} onClick={() => { fermerLigne(); onOuvrir(l); }}>{tr('ventes.gestesVinted')}</Bouton>
+              </DansFiche> : null}
               </React.Fragment>
             ))}
             {lignes.length > n && <Bouton variante="secondaire" plein data-toutes-plus="" onClick={() => React.startTransition(()=>setN((x) => x + 60))} style={{ marginTop: 12 }}>Afficher {Math.min(60,lignes.length-n) > 1 ? `les ${Math.min(60,lignes.length-n)} suivantes` : 'la suivante'}</Bouton>}
