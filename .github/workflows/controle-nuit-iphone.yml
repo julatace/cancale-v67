@@ -1,0 +1,67 @@
+name: Contrôle de nuit iPhone
+# (16 nov., satisfaction-clients, point 1 — Julien : « zéro bug visible sur iPhone, en permanence »)
+# Chaque nuit, le build de `main` servi avec la base INVENTÉE des bancs (jamais la production, aucune donnée réelle,
+# aucun secret) : le banc scripts/bancs/stabilite-iphone.cjs parcourt TOUS les écrans principaux, leurs sous-onglets
+# et leurs feuilles, clair et sombre, sous WebKit « iPhone 15 » (le moteur de Safari) ET sous Chromium à 390 px :
+# erreurs JS, écran sur le garde-fou, éléments qui se recouvrent, contenu sous la barre du bas, contraste < 4,5:1,
+# débordement horizontal, longues tâches. Un rouge ⇒ le job échoue (notification GitHub au propriétaire du dépôt) ;
+# le résumé en mots simples est sur la page du workflow (scripts/bancs/_resume-nuit.cjs), les captures en pièce jointe.
+# Récit : docs/passation/2026-11-16-satisfaction-clients.md.
+on:
+  schedule:
+    - cron: '37 1 * * *'   # 2 h 37 / 3 h 37 à Paris : la nuit, loin des crons de la journée
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: controle-nuit-iphone
+  cancel-in-progress: false
+jobs:
+  nuit:
+    name: Nuit · ${{ matrix.moteur }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - moteur: webkit
+            largeur: ''
+          - moteur: chromium
+            largeur: '390'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Installer le navigateur
+        run: |
+          echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-vrm-retries >/dev/null
+          for essai in 1 2 3 4; do npx playwright install --with-deps ${{ matrix.moteur }} && break; [ "$essai" = 4 ] && exit 1; sleep $((essai * 20)); sudo apt-get update || true; done
+          if [ "${{ matrix.moteur }}" = chromium ]; then
+            sudo mkdir -p /opt/pw-browsers
+            sudo ln -sf "$(node -e 'console.log(require("playwright").chromium.executablePath())')" /opt/pw-browsers/chromium
+          fi
+      # La garde réseau : un banc qui joindrait un vrai serveur (la production, Internet) est ROUGE.
+      - name: Poser la garde réseau
+        run: echo "NODE_OPTIONS=--require=$GITHUB_WORKSPACE/scripts/bancs/_garde-reseau.cjs" >> "$GITHUB_ENV"
+      - name: Tous les écrans
+        env:
+          NAVIGATEUR: ${{ matrix.moteur }}
+          LARGEUR: ${{ matrix.largeur }}
+          SHOTS: nuit-${{ matrix.moteur }}
+        run: node scripts/bancs/stabilite-iphone.cjs
+      - name: Résumé lisible
+        if: always()
+        run: node scripts/bancs/_resume-nuit.cjs nuit-${{ matrix.moteur }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nuit-${{ matrix.moteur }}
+          path: nuit-${{ matrix.moteur }}
+          retention-days: 7

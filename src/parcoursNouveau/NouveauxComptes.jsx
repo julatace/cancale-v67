@@ -150,8 +150,36 @@ function Tableau({ entetes, fetcher }) {
           </ul>
         </>
       ) : null}
+      <Demarrage d={x.demarrage}/>
       {manques.map((m) => <p key={m} className="nc-note" data-nc-manque="">{tr('nc.manque', { quoi: m })}</p>)}
     </div>
+  );
+}
+
+// (16 nov., satisfaction-clients, point 4) LES 10 PREMIÈRES MINUTES — regroupées par étape côté serveur
+// (src/mesureDemarrage.js, `agregerDemarrage`) : rien sous 5 vendeurs mesurés, un temps médian seulement si
+// 5 au moins ont atteint l'étape. Aucun compte, aucune date : des nombres par étape.
+const duree = (s) => (s == null ? '—' : s < 60 ? tr('satisf.duree.s', { s }) : tr('satisf.duree.min', { m: Math.floor(s / 60), s: String(s % 60).padStart(2, '0') }));
+function Demarrage({ d }) {
+  if (!d) return null;
+  return (
+    <section data-nc-demarrage={d.ok === false ? 'pas-su' : d.assez ? String(d.n) : 'trop-peu'}>
+      <h4 className="nc-sous">{tr('satisf.demarrage.titre')}</h4>
+      {d.ok === false ? <p className="nc-note">{tr('nc.pasSu', { raison: raisonTexte('base') })}</p>
+        : !d.assez ? <p className="nc-note">{tr('satisf.demarrage.tropPeu', { n: d.seuil })}</p>
+        : <>
+          <p className="nc-note">{tr('satisf.demarrage.sur', { n: d.n })}</p>
+          <ul className="nc-liste" data-nc-demarrage-etapes="">
+            {d.etapes.map((e, j) => (
+              <li key={e.etape} data-nc-demarrage-etape={e.etape} data-atteinte={e.atteinte}>
+                <span>{e.etape === 'fini' ? tr('nc.parcoursFini') : `${j + 1} · ${tr('pn.court.' + e.etape)}`}</span>
+                <b>{tr('satisf.demarrage.ligne', { n: e.atteinte, pc: Math.round((e.atteinte / d.n) * 100), t: duree(e.mediane) })}</b>
+              </li>
+            ))}
+          </ul>
+          {d.perte ? <p className="nc-note" data-nc-demarrage-perte={d.perte.apres}>{tr('satisf.demarrage.perte', { etape: tr('pn.court.' + d.perte.apres), n: d.perte.perdus })}</p> : null}
+        </>}
+    </section>
   );
 }
 

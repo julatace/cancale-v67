@@ -284,7 +284,7 @@ const resumeValide = (r) => {
   return { plantages: n(o.plantages), lectures: n(o.lectures), echecs: n(o.echecs), plan: n(o.plan), gardeFou: o.gardeFou === true };
 };
 // Ce que la liste projette : des scalaires et le résumé, jamais `data` entier.
-const SELECT_LISTE = ['id', 'texte:data->>texte', 'ecran:data->>ecran', 'ecranAvant:data->>ecranAvant', 'version:data->>version', 'extension:data->>extension', 'navigateur:data->>navigateur', 'appareil:data->>appareil', 'systeme:data->>systeme', 'largeur:data->ecranTaille->>largeur', 'hauteur:data->ecranTaille->>hauteur', 'de:data->>de', 'at:data->>at', 'traite:data->>traite', 'traiteLe:data->>traiteLe', 'resume:data->resume', 'repondre:data->>repondre', 'reponse:data->>reponse', 'reponduLe:data->>reponduLe'].join(',');
+const SELECT_LISTE = ['id', 'texte:data->>texte', 'ecran:data->>ecran', 'ecranAvant:data->>ecranAvant', 'version:data->>version', 'extension:data->>extension', 'navigateur:data->>navigateur', 'appareil:data->>appareil', 'systeme:data->>systeme', 'largeur:data->ecranTaille->>largeur', 'hauteur:data->ecranTaille->>hauteur', 'de:data->>de', 'at:data->>at', 'traite:data->>traite', 'traiteLe:data->>traiteLe', 'resume:data->resume', 'repondre:data->>repondre', 'reponse:data->>reponse', 'reponduLe:data->>reponduLe', 'etat:data->>etat', 'mot:data->>mot', 'etatLe:data->>etatLe'].join(',');
 // (12 nov., « J'ai un problème ») « Réponds-moi par e-mail » : SEULEMENT si la personne
 // l'a coché (`repondreA: true`), et l'adresse vient de SA SESSION (jamais du corps).
 // Sans la case, rien ne change : ni e-mail, ni pseudo (audit-aide-client).
@@ -346,9 +346,9 @@ export async function listerSignalements({ utilisateur, unId = null, env = proce
     const s = normaliserSignalement({ texte: x.texte, ecran: x.ecran, ecranAvant: x.ecranAvant, version: x.version, extension: x.extension, navigateur: x.navigateur, appareil: x.appareil, systeme: x.systeme, ecranTaille: { largeur: x.largeur, hauteur: x.hauteur } })
       || { texte: '', ecran: '', ecranAvant: '', version: '', extension: null, navigateur: 'inconnu', ecranTaille: null, appareil: null, systeme: null };
     const { plantages, lectures, plan, etatEcran, enLigne, theme, ...leger } = s;   // eslint-disable-line no-unused-vars
-    return { id: x.id, ...leger, resume: resumeValide(x.resume), de: UUID.test(String(x.de)) ? String(x.de) : null, repondre: reponseLue(x.repondre), at: dateIso(x.at), traite: String(x.traite) === 'true', traiteLe: dateIso(x.traiteLe), reponse: reponseTexte(x.reponse), reponduLe: dateIso(x.reponduLe) };
+    return { id: x.id, ...leger, resume: resumeValide(x.resume), de: UUID.test(String(x.de)) ? String(x.de) : null, repondre: reponseLue(x.repondre), at: dateIso(x.at), traite: String(x.traite) === 'true', traiteLe: dateIso(x.traiteLe), reponse: reponseTexte(x.reponse), reponduLe: dateIso(x.reponduLe), etat: etatDe(x), mot: motTexte(x.mot), etatLe: dateIso(x.etatLe) };
   });
-  return { code: 200, corps: { ok: true, signalements, nonTraites: signalements.filter((x) => !x.traite).length } };
+  return { code: 200, corps: { ok: true, signalements, nonTraites: signalements.filter((x) => x.etat !== 'corrige').length } };
 }
 
 // POST {action:'traite', id, traite} (PROPRIÉTAIRE seulement) : lire, puis
@@ -364,7 +364,7 @@ export async function marquerTraite({ utilisateur, corps, env = process.env, fet
   const rows = await lire(env, fetcher, `app_data?owner=eq.${proprio}&id=eq.${id}&select=data&limit=1`);
   if (!rows) return { code: 503, corps: { ok: false, raison: 'base' } };
   if (!rows[0] || !rows[0].data) return { code: 404, corps: { ok: false, raison: 'absent' } };
-  const data = { ...rows[0].data, traite, traiteLe: traite ? new Date(maintenant).toISOString() : null };
+  const data = { ...rows[0].data, traite, traiteLe: traite ? new Date(maintenant).toISOString() : null, etat: traite ? 'corrige' : 'recu', etatLe: new Date(maintenant).toISOString() };
   const { url, service } = cfg(env);
   try {
     const r = await fetcher(`${url}/rest/v1/app_data?owner=eq.${proprio}&id=eq.${id}`, {
@@ -413,7 +413,10 @@ export async function repondreSignalement({ utilisateur, corps, env = process.en
   if (!rows) return { code: 503, corps: { ok: false, raison: 'base' } };
   if (!rows[0] || !rows[0].data) return { code: 404, corps: { ok: false, raison: 'absent' } };
   const at = new Date(maintenant).toISOString();
-  const data = { ...rows[0].data, reponse, reponduLe: at, traite: true, traiteLe: rows[0].data.traiteLe || at };
+  // (16 nov., satisfaction-clients) Une réponse veut dire « on regarde » : l'état passe « en cours », sauf s'il est
+  // déjà « corrigé » (seul le geste « Corrigé » du propriétaire le pose, et c'est lui qui prévient).
+  const avant = etatDe(rows[0].data);
+  const data = { ...rows[0].data, reponse, reponduLe: at, traite: true, traiteLe: rows[0].data.traiteLe || at, etat: avant === 'corrige' ? 'corrige' : 'en_cours', etatLe: avant === 'corrige' ? (rows[0].data.etatLe || at) : at };
   const { url, service } = cfg(env);
   try {
     const r = await fetcher(`${url}/rest/v1/app_data?owner=eq.${proprio}&id=eq.${id}`, {
@@ -431,7 +434,7 @@ export async function repondreSignalement({ utilisateur, corps, env = process.en
 
 // GET ?quoi=suivi — TOUTE session : SES signalements (texte, écran, date, réponse), lus
 // chez le propriétaire et filtrés sur SA session. Projetés champ par champ (§4.4).
-const SELECT_SUIVI = ['id', 'texte:data->>texte', 'ecran:data->>ecran', 'at:data->>at', 'traite:data->>traite', 'reponse:data->>reponse', 'reponduLe:data->>reponduLe'].join(',');
+const SELECT_SUIVI = ['id', 'texte:data->>texte', 'ecran:data->>ecran', 'at:data->>at', 'traite:data->>traite', 'reponse:data->>reponse', 'reponduLe:data->>reponduLe', 'etat:data->>etat', 'mot:data->>mot', 'etatLe:data->>etatLe'].join(',');
 export async function suiviSignalements({ utilisateur, env = process.env, fetcher = fetchAvecDelai }) {
   if (!utilisateur || !UUID.test(String(utilisateur.id || ''))) return { code: 401, corps: { ok: false, raison: 'session' } };
   if (!cfg(env).service) return { code: 503, corps: { ok: false, raison: 'non-configure' } };
@@ -443,8 +446,64 @@ export async function suiviSignalements({ utilisateur, env = process.env, fetche
   const signalements = rows.filter((x) => ID_SIG.test(String(x.id || ''))).map((x) => ({
     id: x.id, texte: String(x.texte || '').slice(0, 300), ecran: ecranValide(x.ecran), at: dateIso(x.at),
     traite: String(x.traite) === 'true', reponse: reponseTexte(x.reponse), reponduLe: dateIso(x.reponduLe),
+    etat: etatDe(x), mot: motTexte(x.mot), etatLe: dateIso(x.etatLe),
   }));
   return { code: 200, corps: { ok: true, signalements } };
+}
+
+// ── (16 nov., satisfaction-clients, point 3) TROIS ÉTATS : REÇU · EN COURS · CORRIGÉ ──────
+// Julien : le vendeur voit l'état de CHACUN de ses signalements, et reçoit une notification quand le
+// propriétaire le marque corrigé. UNE source : la ligne du signalement chez le propriétaire (`etat`,
+// `etatLe`, `mot`), écrite par le serveur seul (clé de service) — le vendeur la LIT filtrée sur SA session
+// (`suiviSignalements`), il ne peut ni l'écrire ni lire celle d'un autre.
+// Une ligne d'avant les états : `traite` ⇒ « corrigé », sinon « reçu » (`etatDe`, la même règle partout).
+export const ETATS_SIGNALEMENT = ['recu', 'en_cours', 'corrige'];
+export const MOT_MAX = 280;
+export function etatDe(d) {
+  const e = d && d.etat;
+  if (ETATS_SIGNALEMENT.includes(e)) return e;
+  return d && (d.traite === true || String(d.traite) === 'true') ? 'corrige' : 'recu';
+}
+// Le « mot » du propriétaire (ce qui a été corrigé) : court, sans caractère de contrôle ; vide ⇒ null.
+export const motTexte = (v) => { const t = String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, MOT_MAX); return t.length >= 2 ? t : null; };
+export function notifCorrige({ mot }) {
+  const corps = mot ? (mot.length > 90 ? mot.slice(0, 89) + '…' : mot) : 'Le problème que tu as signalé est réglé. Merci de l’avoir dit.';
+  return { cat: 'signalement', title: '✅ Ton signalement est corrigé', body: corps, tag: 'vrm-signalement-corrige', url: '/?tab=settings&reglage=mes-signalements' };
+}
+
+// POST {action:'etat', id, etat, mot?} — le PROPRIÉTAIRE seul. Lire la ligne, puis la réécrire (une lecture
+// ratée n'écrit rien). Rend `de` et `prevenir` : la route prévient celui qui a signalé SEULEMENT au passage à
+// « corrigé » (une fois : déjà corrigé ⇒ pas de seconde notification).
+export async function changerEtatSignalement({ utilisateur, corps, env = process.env, fetcher = fetchAvecDelai, maintenant = Date.now() }) {
+  if (!cfg(env).service) return { code: 503, corps: { ok: false, raison: 'non-configure' } };
+  const proprio = await proprietaireInstallation({ env, fetcher });
+  if (!proprio) return { code: 503, corps: { ok: false, raison: 'destinataire-inconnu' } };
+  if (String(utilisateur.id).toLowerCase() !== proprio) return { code: 403, corps: { ok: false, raison: 'proprietaire' } };
+  const id = String((corps && corps.id) || '');
+  if (!ID_SIG.test(id)) return { code: 400, corps: { ok: false, raison: 'id' } };
+  const etat = corps && corps.etat;
+  if (!ETATS_SIGNALEMENT.includes(etat)) return { code: 400, corps: { ok: false, raison: 'etat' } };
+  const mot = motTexte(corps && corps.mot);
+  const rows = await lire(env, fetcher, `app_data?owner=eq.${proprio}&id=eq.${id}&select=data&limit=1`);
+  if (!rows) return { code: 503, corps: { ok: false, raison: 'base' } };
+  if (!rows[0] || !rows[0].data) return { code: 404, corps: { ok: false, raison: 'absent' } };
+  const avant = etatDe(rows[0].data);
+  const at = new Date(maintenant).toISOString();
+  const data = { ...rows[0].data, etat, etatLe: at, traite: etat === 'corrige', traiteLe: etat === 'corrige' ? (rows[0].data.traiteLe || at) : null };
+  if (mot) data.mot = mot; else if (etat !== 'corrige') delete data.mot;
+  const { url, service } = cfg(env);
+  try {
+    const r = await fetcher(`${url}/rest/v1/app_data?owner=eq.${proprio}&id=eq.${id}`, {
+      method: 'PATCH',
+      headers: { ...sbCle(service), 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({ data, updated_at: at }),
+    });
+    if (!r.ok) return { code: 503, corps: { ok: false, raison: 'base' } };
+    const j = await r.json().catch(() => null);
+    if (!Array.isArray(j) || j.length !== 1) return { code: 503, corps: { ok: false, raison: 'base' } };
+  } catch (_) { return { code: 503, corps: { ok: false, raison: 'base' } }; }
+  const de = UUID.test(String(rows[0].data.de || '')) ? String(rows[0].data.de).toLowerCase() : null;
+  return { code: 200, corps: { ok: true, id, etat, etatLe: at, mot: data.mot || null }, de, prevenir: etat === 'corrige' && avant !== 'corrige' && !!de, mot: data.mot || null };
 }
 
 // ── CÔTÉ APP : l'envoi, et ce qu'il dit ─────────────────────────────────────

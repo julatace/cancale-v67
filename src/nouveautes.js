@@ -58,6 +58,9 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'stock-case-allumee', date: '2026-11-16', titre: 'Stock : la case vendue reste allumée', phrase: 'Touche-la quand l’article est sorti ; « Annuler » la remet.', tab: 'garage', pour: 'tous', mode: 'tous' },
   // (16 nov., bancs-rouges-a) docs/passation/2026-11-16-bancs-rouges-a.md
   // (16 nov., Julien : « la liaison pour relier l'achat beaucoup plus fiable ») docs/passation/2026-11-16-relier-fiable.md
+  // (16 nov., satisfaction-clients) docs/passation/2026-11-16-satisfaction-clients.md
+  { id: 'signalement-etats', date: '2026-11-16', titre: 'Tes signalements : reçu, en cours, corrigé', phrase: 'Une notification quand ton problème est corrigé.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  { id: 'semaine-temps', date: '2026-11-16', titre: 'Ma semaine : argent à venir et temps gagné', phrase: 'Le temps gagné est une estimation sur tes ventes.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'fiche-delier-recu', date: '2026-11-16', titre: 'Fiche : délier un achat, ouvrir son reçu', phrase: 'À côté de « Achetée » : « Reçu » et « Délier », confirmé.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   { id: 'relier-fiable', date: '2026-11-16', titre: 'Relier un achat : seulement les propositions sûres', phrase: 'Même taille, même couleur, un seul achat ; le reste dans « Autres pistes ».', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (16 nov., lot vente-email-absente) docs/passation/2026-11-16-vente-email-absente.md
