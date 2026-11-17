@@ -59,7 +59,7 @@ function monter(o = {}) {
       if (e.methode === 'GET' && /\/api\/v2\/item_upload\/items\/9101$/.test(e.chemin)) return v.ancienne === 'en-ligne' ? { status: 200, body: { item: { id: 9101, is_draft: false } } } : v.ancienne === '5xx' ? { status: 503, body: {} } : { status: 404, body: {} };
       if (e.methode === 'GET' && /\/api\/v2\/item_upload\/items\/88001$/.test(e.chemin)) {
         if (o.lectureBrouillon) return st(o.lectureBrouillon);
-        return v.brouillon === 'parti' ? { status: 404, body: {} } : { status: 200, body: { item: { id: 88001, is_draft: v.brouillon !== 'en-ligne' } } };
+        return v.brouillon === 'parti' ? { status: 404, body: {} } : { status: 200, body: { item: { id: 88001, is_draft: v.brouillon !== 'en-ligne', photos: [{ id: 701, orientation: 0 }, { id: 702, orientation: 0 }] } } };
       }
       if (e.methode === 'GET' && /\/api\/v2\/item_upload\/items\/\d+$/.test(e.chemin)) return { status: 200, body: { item: { id: Number(e.chemin.split('/').pop()) } } };
       if (e.methode === 'POST' && /\/api\/v2\/photos$/.test(e.chemin)) return { status: 200, body: { id: ++v.nPhotos } };
@@ -186,7 +186,8 @@ async function auditer() {
       extra: { harvest_111_listings: { capturedAt: t, payload: { items: [], pagination: { total_entries: 0 } } } } });
     f.lignes.coffre_111_9101.versBrouillon.majAt = new Date(Date.now() - 30 * 60000).toISOString();
     const r = await reprendre(f);
-    dit(r && r.etape === 'fait' && n(f.j, 'S') === 0 && n(f.j, 'B') === 1 && n(f.j, 'P') >= 1 && n(f.j, 'M') === 1, "D1 — brouillon disparu : « Recréer depuis le coffre » refait UN brouillon avec les photos du coffre et le met en ligne (l'ancienne déjà partie)", JSON.stringify({ r: r && (r.etape || r.code || r.absent), raison: r && r.raison, seq: seq(f.j) })); }
+    const sD = seq(f.j), iBD = sD.indexOf('B'), iMD = sD.indexOf('M'), iLD = sD.indexOf('L', iBD);
+    dit(r && r.etape === 'fait' && n(f.j, 'S') === 0 && n(f.j, 'B') === 1 && n(f.j, 'P') >= 1 && n(f.j, 'M') === 1 && iLD > iBD && iLD < iMD && (() => { try { const m = gestes(f.j).find((x) => /completion$/.test(x.chemin)); return JSON.parse(m.corps).draft.assigned_photos.map((p) => p.id).join(',') === '701,702'; } catch (_) { return false; } })(), "D1 — brouillon disparu : « Recréer depuis le coffre » refait UN brouillon avec les photos du coffre, le RELIT chez Vinted, puis le met en ligne (l'ancienne déjà partie)", JSON.stringify({ r: r && (r.etape || r.code || r.absent), raison: r && r.raison, seq: seq(f.j) })); }
 
   // ── P — « Publier » / « Brouillons → en ligne » d'un brouillon de republication règle l'ancienne.
   { const f = monter({ ancienne: 'partie', vb: VB({ etat: 'a-publier', draftId: '88001', supprime: true }), brouillonLigne: true });
@@ -287,7 +288,7 @@ async function prouver() {
     ['extension : supprimée annoncée avant brouillon', 'bg', "const ORDRE_ETAPES_REPUB = ['coffre', 'brouillon', 'supprimee', 'enligne'];", "const ORDRE_ETAPES_REPUB = ['coffre', 'supprimee', 'brouillon', 'enligne'];"],
     ['écran plein : supprimée dessinée avant brouillon', 'action', "['coffre', 'brouillon', 'supprimee', 'enligne'].map((k, i)", "['coffre', 'supprimee', 'brouillon', 'enligne'].map((k, i)"],
     ['trace coupée', 'bg', "try { sansRejet(tracerRepub(acc, String(method || 'POST').toUpperCase(), endpoint, body, o), 'trace_repub'); } catch (_) {}", ''],
-    ['trace sans masque', 'bg', ".replace(/\\d{3,}/g, '#')", ''],
+    ['trace sans masque', 'bg', "'«…»').replace(/\\d{3,}/g, '#')", "'«…»')"],
     ['sans relecture du brouillon dans Refaire', 'bg', "const luR = appliquerBrouillonLu(corpsC.draft, rlR, draftId);", "const luR = { photos: null };"],
     ['sans brouillon : reprendre au lieu de recréer', 'app', "if (x.etat === 'a-refaire' && !x.draftId)", "if (false)"],
   ];
