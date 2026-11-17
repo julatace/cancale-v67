@@ -15,7 +15,7 @@
 
 // La version écrite DANS CE FICHIER (voir `viderTampon`) — égale au manifeste
 // dans le zip livré (`audit-extension-zip.cjs`). À monter avec lui.
-const CODE_VERSION = '5.406.0';
+const CODE_VERSION = '5.407.0';
 
 // ══════════════════════════════════════════════════════════════════════════
 // LE CODE QUI TOURNE N'ÉTAIT PAS CELUI QUE LE MANIFESTE ANNONCE (11 octobre)
@@ -18337,6 +18337,8 @@ const FAVORIS_CARTE_CLE = 'vrmFavorisCarte';
 const FAVORIS_CARTE_APERCU = 'vrmFavorisApercu';
 const FAVORIS_CARTE_MAX = 15;               // = api/_lib/favoris-carte.js (une heure de favoris)
 const FAVORIS_CARTE_APERCU_MS = 5 * 60000;
+const FAVORIS_CARTE_TOUS = 300;             // = api/_lib/favoris-carte.js (la liste à cocher, 5.407)
+const FAVORIS_CARTE_CHOIX_MS = 30 * 60000;  // un choix fait sur un aperçu de plus de 30 min ⇒ relire d'abord
 let _favorisCarteEnVol = false, _favorisCarteMinuteur = null, _favorisCarteApercuEnVol = false;
 async function apiFavorisCarte(uid, action, donnees) {
   const session = await authToken().catch(() => null);
@@ -18359,10 +18361,18 @@ async function poserEtatFavorisCarte(st) {
   try { await poserActionEnCours(st); } catch (_) {}
   return true;
 }
+// 5.407 : les favoris COCHABLES de l'aperçu montré (ceux que VRM a vérifiés : article encore en
+// vente, jamais contacté, destinataire prouvé) ⇒ `lancer` n'accepte RIEN d'autre (un favori vendu
+// ou déjà contacté ne part jamais, même si une carte d'avant ou un message forgé le demande).
+function cochablesApercu(a) {
+  if (!a || a.etat !== 'pret') return [];
+  const l = Array.isArray(a.tous) ? a.tous.filter((x) => x && x.cochable === true && x.envoi === 'a_envoyer') : (Array.isArray(a.liste) ? a.liste : []);
+  return [...new Set(l.map((x) => String(x && x.id || '')).filter((id) => id && id.length <= 160))].slice(0, FAVORIS_CARTE_TOUS);
+}
 async function noterApercuCarte(uid, a) {
   try {
     const m = (await chrome.storage.local.get(FAVORIS_CARTE_APERCU))[FAVORIS_CARTE_APERCU] || {};
-    m[String(uid)] = { at: Date.now(), etat: String(a && a.etat || ''), total: Number(a && a.total) || 0, raison: String(a && a.raison || '') };
+    m[String(uid)] = { at: Date.now(), etat: String(a && a.etat || ''), total: Number(a && a.total) || 0, raison: String(a && a.raison || ''), cochables: cochablesApercu(a) };
     await chrome.storage.local.set({ [FAVORIS_CARTE_APERCU]: m });
   } catch (_) {}
 }
@@ -18388,12 +18398,28 @@ async function favorisCarte(msg, sender) {
     const r = await apiFavorisCarte(o.uid, 'apercu');
     if (!r.ok || !r.json || !r.json.apercu) return { ok: false, code: 'serveur', raison: (r.json && r.json.message) || 'VRM n’a pas répondu. Réessaie dans un instant.' };
     await noterApercuCarte(o.uid, r.json.apercu);
-    return { ok: true, uid: o.uid, apercu: r.json.apercu };
+    // 5.407 : l'étiquette N° de chaque article, PAR IDENTITÉ d'annonce, du compte de l'onglet
+    // seulement (infosDuCompte, la règle de la ligne sous ses annonces) — lu dans VRM, aucune requête Vinted.
+    const ap = r.json.apercu;
+    if (Array.isArray(ap.tous) && ap.tous.length) {
+      const d = await donneesInfosPage(o.uid).catch(() => null);
+      const inf = d ? infosDuCompte(d, o.uid, [...new Set(ap.tous.map((x) => String(x && x.itemId || '')))]) : {};
+      for (const x of ap.tous) { const n = x && inf[String(x.itemId)] && inf[String(x.itemId)].numero; if (n) x.num = String(n).slice(0, 12); }
+    }
+    return { ok: true, uid: o.uid, apercu: ap };
   }
   if (quoi === 'lancer') {
     if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien ne part sans ton clic sur « Lancer ».' };
     const sel = Array.isArray(msg.selection) ? [...new Set(msg.selection.filter((x) => typeof x === 'string' && x && x.length <= 160))] : [];
     if (!sel.length || sel.length > FAVORIS_CARTE_MAX || !msg.reglages || typeof msg.reglages !== 'object' || Array.isArray(msg.reglages)) return { ok: false, code: 'selection', raison: 'Rouvre l’aperçu : la liste n’est plus à jour. Rien n’est parti.' };
+    // 5.407 : seulement des favoris COCHABLES de l'aperçu montré de CE compte (encore en vente,
+    // jamais contactés, destinataire prouvé), lu il y a moins de 30 min ; sinon rien ne part.
+    {
+      let ap = null; try { ap = ((await chrome.storage.local.get(FAVORIS_CARTE_APERCU))[FAVORIS_CARTE_APERCU] || {})[o.uid] || null; } catch (_) { ap = null; }
+      const ok = ap && Array.isArray(ap.cochables) && Date.now() - Number(ap.at || 0) < FAVORIS_CARTE_CHOIX_MS ? new Set(ap.cochables) : null;
+      if (!ok) return { ok: false, code: 'selection', raison: 'La liste de tes favoris doit être relue avant l’envoi : rouvre l’onglet Favoris. Rien n’est parti.' };
+      if (sel.some((id) => !ok.has(id))) return { ok: false, code: 'selection', raison: 'Un favori choisi n’est plus à contacter (article vendu, ou déjà contacté) : la liste est relue. Rien n’est parti.' };
+    }
     if (horsLigne()) return { ok: false, code: 'hors-ligne', raison: 'Pas de réseau : rien n’est parti.' };
     if ((await toutArreteDepuis(null)) > 0) return { ok: false, code: 'tout-arrete', raison: '« Tout arrêter » est posé : touche « Reprendre » d’abord. Rien n’est parti.' };
     const avant = await lireEtatFavorisCarte();
