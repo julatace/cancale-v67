@@ -386,7 +386,7 @@ export function lignePartout(paire, ctx = {}) {
         for (const d of corr.demandes) corrDemandes.push('corr:' + d.champ);
         // Une catégorie que la voie ne retrouve pas seule (réponse, mémoire, ou table hors de sa règle) : à choisir là-bas.
         const aFaire = [];
-        // (16 nov., lot plateformes-restes) Une extension qui REÇOIT la catégorie (`vccategorie`, 5.397) pose un
+        // (16 nov., lot plateformes-restes) Une extension qui REÇOIT la catégorie (`vccategorie`, 5.399) pose un
         // choix entier (univers + catégorie + sous-catégorie) s'il existe tel quel sur Vestiaire : plus « à finir ».
         const portee = !!ctx.vcCategorie && !corr.demandes.length && !!(corr.valeurs.univers && corr.valeurs.categorie && corr.valeurs.sous);
         if (!corr.posee && !portee) for (const k of ['univers', 'categorie', 'sous']) if (corr.valeurs[k]) aFaire.push(`${k === 'sous' ? 'Sous-catégorie' : NOM_C[k]} « ${corr.valeurs[k]} »`);

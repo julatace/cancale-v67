@@ -95,6 +95,9 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { ko++; n++; con
   // (15 nov., sites sur la case) La règle de Vestiaire importée par stockAnnonces.js : api/_lib copié tel quel.
   fs.mkdirSync(path.join(dir, 'api', '_lib'), { recursive: true });
   for (const f of fs.readdirSync(path.join(R, 'api', '_lib'))) if (f.endsWith('.js')) fs.copyFileSync(path.join(R, 'api', '_lib', f), path.join(dir, 'api', '_lib', f));
+  // (16 nov., lot retirer-case-compact) api/_lib importe aussi des règles de src/ (argent-notif.js → src/alertesSeuils.js) :
+  // les modules purs de src/ (premier niveau) sont copiés tels quels — ceux de FICHIERS sont réécrits plus bas (mutation).
+  for (const f of fs.readdirSync(path.join(R, 'src'))) if (/\.(js|mjs)$/.test(f)) fs.copyFileSync(path.join(R, 'src', f), path.join(dir, 'src', f));
   const texte = {};
   for (const f of FICHIERS) { const p = path.join(R, f); texte[f] = fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : null; }
   if (mut) {
@@ -103,6 +106,7 @@ const essaie = async (nom, f) => { try { await f(); } catch (e) { ko++; n++; con
     texte[m[0]] = texte[m[0]].replace(m[1], m[2]);
   }
   for (const f of FICHIERS) if (texte[f] != null && f.endsWith('.js')) fs.writeFileSync(path.join(dir, f), texte[f]);
+  require('./_copie-imports.cjs').completerImports(R, dir);   // (16 nov.) ce qu'importe api/_lib depuis src/ (argent-notif → alertesSeuils)
   const imp = async (f) => { if (texte[f] == null) return { __absent: true }; try { return await import(pathToFileURL(path.join(dir, f)).href); } catch (e) { return { __erreur: String(e && e.message || e) }; } };
   const E = await imp('src/stockEtageres.js'), S = await imp('src/stockSortie.js'), Y = await imp('src/cycleArticle.js'), G = await imp('src/gesteAnnulable.js');
   const A = await imp('src/stockAnnonces.js');

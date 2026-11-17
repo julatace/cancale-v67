@@ -57,6 +57,39 @@ function tempsEcritureMs(texte, mode, hasard) {
   const base = (n / E.cps) * 1000 * (1 - E.jitter + 2 * E.jitter * h);
   return Math.round(Math.min(E.maxMs, Math.max(E.minMs, base)));
 }
+// (16 nov., lot favoris-offres-irreprochable, ext. 5.398) JAMAIS DEUX FOIS LE MÊME TEXTE À LA
+// CHAÎNE. Une seule version (ou des versions identiques) faisait partir le même texte, à l'octet
+// près, à chaque favori. Si le texte final est celui du DERNIER message parti de ce compte
+// (TEXTES_RECENTS = 1 : ses propres versions ne sont jamais touchées), SEULE la salutation change (Bonjour · Salut · Hello, avec ou sans le
+// pseudo lu dans le fil) : en tête si le message en a une, sinon ajoutée devant (« Bonjour ! »).
+// Aucun autre mot n'est touché, jamais d'IA. On garde des EMPREINTES, jamais le texte.
+// Rend le texte à envoyer, ou null (toutes les salutations déjà parties : rien ne part).
+const TEXTES_RECENTS = 1;
+const SALUTATIONS = ['Bonjour', 'Salut', 'Hello'];
+const SALUT_DEBUT = /^(bonjour|salut|hello|coucou|bonsoir|hey)(?=[\s,!.?;:]|$)/i;
+function empreinteMessage(texte) {
+  let h = 0x811c9dc5;
+  const t = String(texte == null ? '' : texte);
+  for (let i = 0; i < t.length; i++) h = Math.imul(h ^ t.charCodeAt(i), 0x01000193) >>> 0;
+  return h.toString(16).padStart(8, '0') + ':' + t.length;
+}
+function texteJamaisRepete(texte, pseudo, recents, hasard) {
+  const t = String(texte == null ? '' : texte);
+  const deja = new Set(Array.isArray(recents) ? recents.map(String) : []);
+  if (!t.trim() || !deja.has(empreinteMessage(t))) return t;
+  const p = /^[\w.-]{1,40}$/.test(String(pseudo || '')) && !t.includes(String(pseudo)) ? String(pseudo) : '';
+  const cands = [];
+  const m = SALUT_DEBUT.exec(t);
+  for (const sa of SALUTATIONS) {
+    if (m) { const reste = t.slice(m[0].length); cands.push(sa + reste); if (p) cands.push(sa + ' ' + p + reste); }
+    else { cands.push(sa + ' ! ' + t); if (p) cands.push(sa + ' ' + p + ' ! ' + t); }
+  }
+  const libres = cands.filter((c, i) => c !== t && c.length <= 2000 && cands.indexOf(c) === i && !deja.has(empreinteMessage(c)));
+  if (!libres.length) return null;
+  const tirer = typeof hasard === 'function' ? hasard : Math.random;
+  const h = Number(tirer());
+  return libres[Math.min(libres.length - 1, Math.max(0, Math.floor((Number.isFinite(h) ? h : 0) * libres.length)))];
+}
 // </variantes-regle>
 
 // Les versions telles qu'on les RANGE : la 1re à part (le champ d'avant), les
@@ -74,4 +107,4 @@ function variantesLues(v) {
   return v.filter((t) => typeof t === 'string').map((t) => t.slice(0, 2000)).slice(0, VARIANTES_MAX - 1);
 }
 
-export { VARIANTES_MAX, ECRITURE_HUMAINE, versionsMessage, choisirVariante, tempsEcritureMs, variantesARanger, variantesLues };
+export { VARIANTES_MAX, ECRITURE_HUMAINE, versionsMessage, choisirVariante, tempsEcritureMs, variantesARanger, variantesLues, TEXTES_RECENTS, SALUTATIONS, empreinteMessage, texteJamaisRepete };

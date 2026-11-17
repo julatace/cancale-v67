@@ -86,7 +86,7 @@ export default {
   "ia.vm.aucune": "Aucune paire au N°{num} dans tes annonces.",
   "ia.vm.plusieurs": {"one": "Le N°{num} est porté par {n} paire : laquelle ?", "other": "{n} paires portent le N°{num} : laquelle as-tu vendue ?"},
   "ia.vm.propositions": "Proposées par le titre : touche la bonne.",
-  "ia.vm.rienTrouve": "Rien trouvé : essaie le N° écrit sur le carton.",
+  "ia.vm.rienTrouve": "Rien trouvé : essaie le N° écrit sur son rangement.",
   "ia.vm.sansTitre": "Sans titre",
   "ia.vm.autrePaire": "Une autre paire",
   "ia.vm.prixLib": "Vendue à (€)",

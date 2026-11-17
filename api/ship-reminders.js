@@ -273,7 +273,9 @@ async function lireCommandesEbay() {
   });
 }
 // (2 nov., soir) + Vestiaire : « Colis fait » et les N° donnés aux annonces (src/numerosVestiaire.js).
-const MAIN_BILAN = [MAIN_MOTS, 'vinted_accounts_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vrm_paires_dorment', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros', 'vrm_vc_liens', 'vrm_comptes_exclus', 'vrm_cycle_decisions'];
+// (16 nov., lot ecrans-restes) + `vrm_ventes_importees` : les ventes passées importées d'un autre outil (Paramètres →
+// Importer) — comptées par le bilan comme dans l'app (`importees`, la même règle refabriquée, api/_lib/ventes-regle.js).
+const MAIN_BILAN = [MAIN_MOTS, 'vinted_accounts_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vrm_paires_dorment', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros', 'vrm_vc_liens', 'vrm_comptes_exclus', 'vrm_ventes_importees', 'vrm_cycle_decisions'];
 const ensemble = (v) => new Set(Array.isArray(v) ? v.map(String) : []);
 const objet = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 
@@ -347,6 +349,8 @@ async function lireDonneesBilan() {
     // `null` = illisible (le bilan le NOMME) ; ligne absente = aucune vente.
     vestiaire: (vcV === undefined || vcL === undefined) ? null : ventesVcDe({ ventes: (vcV && vcV.ventes) || null, liens: (vcL && vcL.liens) || {}, auto: numerosVcAvecLiens((mm && mm.vrm_vc_numeros) || {}, mm && mm.vrm_vc_liens) }),
     main: mm,
+    // (16 nov.) Ses ventes importées (un tableau ; absent ⇒ aucune). `main` illisible ⇒ `null`, le bilan le NOMME.
+    importees: mm ? (Array.isArray(mm.vrm_ventes_importees) ? mm.vrm_ventes_importees : []) : null,
   };
 }
 
@@ -1176,7 +1180,9 @@ export function texteMatin({ overdue, aVerifier = 0, dueToday, dueTomorrow, ebay
   return {
     title: nePasPoster && !total ? 'Commande eBay : ne poste pas' : overdue ? 'Colis en retard à expédier' : 'Colis à expédier',   // (8 nov.) le retard DANS le titre, sans emoji
     // (15 nov.) « Ouvre l'app… » seulement s'il tient dans les 90 caractères (le toucher l'ouvre de toute façon).
-    body: ((b0, fin) => (b0 + fin).length <= 90 ? b0 + fin : b0)((corps + estime + stop).trim(), ebayDus || vestiaireDus || nePasPoster ? " Ouvre l'app pour les voir." : " Ouvre l'app pour les préparer."),
+    // (16 nov.) « ne poste pas » ne tombe JAMAIS sous la coupe des 90 : s'il ne tient pas avec le détail, le détail part
+    // (il est dans l'app) et la phrase d'annulation reste entière.
+    body: ((b0, fin) => (b0 + fin).length <= 90 ? b0 + fin : b0.length <= 90 || !stop ? b0 : ((total > 0 ? `${quoi}.` : '') + stop).trim())((corps + estime + stop).trim(), ebayDus || vestiaireDus || nePasPoster ? " Ouvre l'app pour les voir." : " Ouvre l'app pour les préparer."),
   };
 }
 

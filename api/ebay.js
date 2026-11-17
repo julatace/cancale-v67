@@ -2076,6 +2076,25 @@ const gestesEbay=creerGestesEbay({accessToken:jetonDe,tradingCall,lireXml:lireXm
 const rechercheEbay = creerRechercheEbay({ jetonApplication, oublierJetonApplication, modifierDonnee });
 // (11 nov., lot alertes-ebay) La liste « Nouvelles annonces pour tes recherches » : lecture projetée, « écarter ».
 const alertesEbay = creerRouteAlertes({ lireProjection: lectureProjetee({ portee: porteeEbay, cle: () => process.env.SUPABASE_SERVICE_KEY || '', sbCle }), modifierDonnee });
+// (16 nov., ebay-a-traiter) « Tâches à traiter » (eBay → À traiter) : la liste
+// des commandes à expédier, messages et offres de CE compte. LECTURE SEULE,
+// rien n'est envoyé à eBay qu'une lecture. Différences avec l'ancienne action
+// `agent` (arrêtée le 11 nov., H27/M87) : `ebay_orders` lue PROJETÉE (les
+// commandes et leur date de capture — la même projection que l'app,
+// `SEL_EBAY_COMMANDES`), jamais `select=data` ; le journal lu en `items` seul ;
+// messages et offres demandés EN MÊME TEMPS (plus en série). Une lecture ratée
+// reste « pas su » (`undefined` ⇒ la source dit « lecture indisponible »).
+const lireProjeteeEbay = lectureProjetee({ portee: porteeEbay, cle: () => process.env.SUPABASE_SERVICE_KEY || '', sbCle });
+async function tachesEbay(ctx) {
+  const vide = (x) => (x === undefined ? undefined : (x || {}));
+  const [o, messages, offres, j] = await Promise.all([
+    lireProjeteeEbay(ligneDe('ebay_orders', ctx), ctx.owner, 'orders:data->orders,capturedAt:data->>capturedAt'),
+    gestionEbay.messages({ page: 1 }, ctx).catch(() => null),
+    gestionEbay.offres({ page: 1 }, ctx).catch(() => null),
+    lireProjeteeEbay(ligneDe('ebay_agent_journal', ctx), ctx.owner, 'items:data->items'),
+  ]);
+  return preparerAgentEbay({ orders: vide(o), messages, offres, journal: vide(j) });
+}
 
 // ── TOUS LES PARAMÈTRES DE PUBLICATION (11 nov., ebay-complet) ──────────────
 // LECTURE SEULE. Ce que la feuille « Tous les réglages eBay » demande à eBay
@@ -2251,6 +2270,9 @@ async function handleApp(req, res) {
       // adresses comprises) puis attendait messages et offres en série. Il répond
       // 410 sans rien lire. `preparerAgentEbay` reste (bancs) si on le rallume.
       agent:async()=>({status:410,body:{ok:false,reason:'agent-arrete',error:'L\'agent eBay est arrêté.'}}),
+      // (16 nov., ebay-a-traiter) « Tâches à traiter » lit ICI (l'app appelait
+      // encore `agent` et lisait 410 ou « mal désigné »). Voir `tachesEbay`.
+      taches:(ctx)=>tachesEbay(ctx),
       commande:(ctx)=>gestionEbay.commande(b,ctx),
       transporteurs:(ctx)=>gestionEbay.transporteurs(b,ctx),
       expedier:(ctx)=>gestionEbay.expedier(b,ctx),

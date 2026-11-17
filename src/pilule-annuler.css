@@ -43,6 +43,10 @@
 .vrm-pil-txt { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; padding: 6px 0; }
 .vrm-pil-titre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vrm-pil-sous { font-size: 13px; color: var(--pil-sous); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* (16 nov., reprise relier-glisser) Le résultat d'un geste (« Bénéfice au plus +31 € au prix affiché ») se lit EN ENTIER :
+   sur autant de lignes qu'il faut, jamais coupé par « … » ; la coche s'efface (« Achat relié » le dit déjà) (Julien : « avoir le bénéfice à portée de main »). */
+.vrm-pil.is-resultat .vrm-pil-sous { white-space: normal; text-overflow: clip; overflow: visible; overflow-wrap: anywhere; color: var(--pil-texte); font-weight: 600; font-size: 14px; line-height: 1.25; }
+.vrm-pil.is-resultat .vrm-pil-ic { display: none; }
 .vrm-pil.is-alerte .vrm-pil-titre { color: var(--pil-alerte); font-weight: 600; }
 
 .vrm-pil .vrm-pil-action {

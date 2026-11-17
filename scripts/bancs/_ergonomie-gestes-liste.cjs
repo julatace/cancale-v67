@@ -25,7 +25,8 @@ module.exports = ({ vu, BARRE }) => {
       but: vu('[data-rp-code-visible="418205"]'),
       chemins: [
         { nom: 'Ma journée → À retirer', pas: [['t', 'button[data-tuile="retirer"]'], ['v', '[data-rp-code-visible="418205"]']] },
-        { nom: 'Paires → Achats → À retirer', pas: [['t', onglet('paires')], ['t', '[data-paires-segment="achats"]'], ['v', '[data-rp-code-visible="418205"]']] },
+        // (16 nov., barre-achats) Achats a son onglet dans la barre : un toucher de moins.
+        { nom: 'Achats → À retirer', pas: [['t', onglet('achats')], ['v', '[data-rp-code-visible="418205"]']] },
       ] },
     { id: 'prixachat', nom: 'Saisir un prix d’achat', plafond: 3,
       // Le champ du prix est OUVERT, le curseur dedans : il tape le prix (une saisie, pas un toucher), puis Entrée.

@@ -557,6 +557,14 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
     document.addEventListener('visibilitychange', voir); window.addEventListener('focus', voir);
     return () => { clearTimeout(t); document.removeEventListener('visibilitychange', voir); window.removeEventListener('focus', voir); };
   }, [luA]);
+  // (16 nov., vitesse-lectures) Un e-mail vient d'être rangé chez le serveur (la veille, src/tempsReel.js,
+  // famille `emails`) : « Actualiser » paraît tout de suite — la liste n'est relue que sur SON geste
+  // (chaque lecture est un appel à la route ; rien ne bouge sous ses yeux pendant qu'il lit).
+  useEffect(() => {
+    const f = (e) => { const d = e && e.detail; if (d && Array.isArray(d.quoi) && d.quoi.some((q) => q && q.quoi === 'emails')) setVieille(true); };
+    window.addEventListener('vrm:neuf', f);
+    return () => window.removeEventListener('vrm:neuf', f);
+  }, []);
   const [adresses, setAdresses] = useState(null);
   useEffect(() => { if (pages && Array.isArray(pages.adresses)) setAdresses(pages.adresses); }, [pages]);
   const c = pages && pages.compteurs;

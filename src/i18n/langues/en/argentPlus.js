@@ -34,7 +34,7 @@ export default {
   "argentPlus.ba.achatManque": "not entered",
   "argentPlus.ba.reste": "After selling costs",
   "argentPlus.ba.auPlus": "at most",
-  "argentPlus.bl.sur": {"one": "on {n} sale of {m}", "other": "on {n} sales of {m}"},
+  "argentPlus.bl.sur": {"one": "counted on {n} sale out of {m} (those whose purchase price you know)", "other": "counted on {n} sales out of {m} (those whose purchase price you know)"},
   "argentPlus.bl.achat": {"one": "{n} purchase price to enter", "other": "{n} purchase prices to enter"},
   "argentPlus.bl.plateforme": {"one": "{n} site fee not read", "other": "{n} site fees not read"},
   "argentPlus.bl.frais": {"one": "{n} sale with costs to confirm", "other": "{n} sales with costs to confirm"},

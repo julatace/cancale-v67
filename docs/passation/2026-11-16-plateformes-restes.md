@@ -126,9 +126,14 @@ une commande à plusieurs articles n'a pas de prix « d'une paire » (prix `null
 
 ## Gestes de Julien
 
-1. Installer l'extension **5.397.0** (remplacer le dossier, puis ⟳ dans chaque Chrome).
+1. Installer l’extension **5.399.0** (remplacer le dossier, puis ⟳ dans chaque Chrome).
 2. Au prochain article vendu sur Leboncoin et sur eBay, et au prochain achat sur Leboncoin, eBay, Vestiaire :
    laisser l'e-mail arriver dans la boîte relevée par VRM (débloque 39 et les e-mails de 40).
 3. Ouvrir « Mes commandes » sur Vestiaire dans Chrome avec l'extension : les achats Vestiaire seront relevés (leur
    prix pourra alors être mesuré).
 4. Déposer UNE annonce Vêtements / Accessoires / Enfants sur leboncoin.fr avec l'extension (le formulaire est capté).
+
+## Fusion par le train (17 nov.)
+L'extension de ce lot sort en **5.399.0** (5.397 sur la branche ; la 5.398 de « favoris-offres-irreprochable » est passée avant) :
+`CODE_VERSION`, manifeste, `EXT_ATTENDUE`, `EXT_CAPACITES.vccategorie = 5.399.0` (les capacités 5.398 gardées), zips refaits
+(un dossier), §8 et « Extension servie » de CLAUDE.md. Geste de Julien : installer **5.399.0** (remplacer le dossier, ⟳ dans chaque Chrome).
