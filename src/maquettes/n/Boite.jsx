@@ -62,6 +62,8 @@ const D = {
 };
 const Ico = ({ n, t = 22 }) => <svg className="n-ico" width={t} height={t} viewBox="0 0 24 24" aria-hidden="true"><path d={D[n]} fill="currentColor" fillRule="evenodd" /></svg>;
 
+// Le chiffre d'affiche : le symbole € plus petit, remonté (Studio).
+const Affiche = ({ v, ...attrs }) => { const t = String(v); const m = /^(.*?)\s?€$/.exec(t); return <span className="n-affiche" {...attrs}>{m ? <>{m[1]}<span className="n-eur">€</span></> : t}</span>; };
 const Plaque = ({ n }) => (n ? <span className="n-plaque" data-numero={n}><span className="n-plaque-n">N°</span>{n}</span> : null);
 const Vignette = ({ src, t = 40 }) => (
   <span className="n-vignette" style={{ width: t, height: t }}>{src ? <img src={src} alt="" loading="lazy" decoding="async" width={t} height={t} /> : null}</span>
@@ -161,15 +163,19 @@ function CorpsCarte({ c }) {
 }
 
 // L'écran apaisé : plus rien à faire. Le chiffre du jour, vrai ou « — ».
-function RienAFaire({ jour }) {
+function RienAFaire({ jour, cote }) {
+  if (cote) return (
+    <div className="n-jour" data-jour=""><span className="n-jour-t">Aujourd’hui</span><Affiche v={jour ? (jour.n ? euros(jour.total) : '0') : '—'} /><span className="n-rien-l">{jour == null ? 'ventes pas lues' : jour.n ? `vendus · ${jour.n} paire${jour.n > 1 ? 's' : ''}` : 'aucune vente'}</span></div>
+  );
   return (
     <div className="n-rien" data-rien-a-faire="">
-      <svg className="n-rien-dessin" viewBox="0 0 160 80" aria-hidden="true">
-        <path d="M8 62c2-14 14-20 27-24l18-10c7-4 11-11 20-11 6 0 9 6 15 9 11 6 22 7 32 13 8 5 12 11 11 23H8z M8 62h123 M30 46l6 7 M42 40l6 7 M54 34l6 7" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <svg className="n-rien-dessin" viewBox="0 0 72 72" aria-hidden="true">
+        <circle cx="36" cy="36" r="34" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M24 37.5l8 8 16-17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
       <h2 className="n-rien-titre">Rien à faire</h2>
       <div className="n-rien-chiffre">
-        <span className="n-affiche" data-chiffre-jour="">{jour ? (jour.n ? euros(jour.total) : '0') : '—'}</span>
+        <Affiche data-chiffre-jour="" v={jour ? (jour.n ? euros(jour.total) : '0') : '—'} />
         <span className="n-rien-l">{jour == null ? 'ventes pas lues' : jour.n ? `vendus aujourd’hui · ${jour.n} paire${jour.n > 1 ? 's' : ''}` : 'vente aujourd’hui'}</span>
       </div>
     </div>
@@ -190,7 +196,7 @@ function EcranAFaire({ B, faits, faire, ouvrir, maintenant, large }) {
       {reste.length ? (
         <ol className="n-cartes">{reste.map((c, i) => <Carte key={c.cle} c={c} premier={i === 0} ouvrir={ouvrir} faire={faire} maintenant={maintenant} />)}</ol>
       ) : <RienAFaire jour={B.jour} />}
-      {large && reste.length ? <aside className="n-aside"><RienAFaire jour={B.jour} /></aside> : null}
+      {large && reste.length ? <aside className="n-aside"><RienAFaire jour={B.jour} cote /></aside> : null}
     </>
   );
 }
@@ -291,8 +297,7 @@ function EcranCommandes({ M, route, aller, maintenant }) {
           {auPoint.filter((c) => correspond(q, c.art, c.code, c.lieu)).map((c) => (
             <button key={c.id} type="button" className="n-rangee n-rangee--code" onClick={() => aller({ ecran: 'commandes', vue: 'achats', feuille: 'retirer-' + c.lieu.split('\n')[0] })}>
               <span className="n-rangee-code" data-code={c.code}>{c.code}</span>
-              <span className="n-rangee-corps"><span className="n-rangee-titre">{c.art}</span><span className="n-rangee-sous"><span>{c.lieu.split('\n')[0]}</span></span></span>
-              <span className="n-rangee-droite"><span className="n-rangee-etat is-ambre">{echeance(Date.parse(c.limite), {}, maintenant)}</span></span>
+              <span className="n-rangee-corps"><span className="n-rangee-titre">{c.art}</span><span className="n-rangee-sous"><span>{c.lieu.split('\n')[0]}</span><span className={presse(Date.parse(c.limite), maintenant) ? 'is-ambre' : ''}>{echeance(Date.parse(c.limite), {}, maintenant)}</span></span></span>
             </button>
           ))}
         </section>
@@ -335,7 +340,7 @@ function EcranArgent({ M, maintenant }) {
       <TeteListe titres={[['a', 'Argent']]} q={q} setQ={setQ} aide="Argent" filtres={null} />
       <div className="n-argent">
         <div className="n-argent-affiche">
-          <span className="n-affiche" data-recu-mois="">{E.recuMois == null ? '—' : euros(E.recuMois)}</span>
+          <Affiche data-recu-mois="" v={E.recuMois == null ? '—' : euros(E.recuMois)} />
           <span className="n-argent-l">reçus en {mois}{E.ceMois ? ` · ${E.ceMois.length} versement${E.ceMois.length > 1 ? 's' : ''}` : ''}</span>
         </div>
         <dl className="n-argent-deux">
@@ -426,6 +431,8 @@ export default function Boite() {
   React.useEffect(() => { lireDonnees().then(setM, () => setM(null)); }, []);
   React.useEffect(() => { if (M !== undefined) finDemarrage('maquette-n'); }, [M]);
   const B = React.useMemo(() => (M && M.postes ? boite(M) : null), [M]);
+  // Le verre de la barre de recherche n'apparaît qu'une fois le contenu passé dessous (bord de défilement).
+  React.useEffect(() => { const d = document.documentElement; const f = () => d.toggleAttribute('data-defile', window.scrollY > 8); f(); window.addEventListener('scroll', f, { passive: true }); return () => window.removeEventListener('scroll', f); }, []);
   if (M === undefined) return <div className="n-racine n-attente" />;
   if (M === null || !B) return <div className="n-racine"><p className="n-vide">— · base pas lue</p></div>;
   const maintenant = M.maintenant;

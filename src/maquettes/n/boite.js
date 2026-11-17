@@ -47,10 +47,11 @@ export function boite(M, maintenant = M.maintenant || Date.now()) {
       geste: n === 1 ? 'Montrer le code' : `Montrer les ${n} codes` });
   }
 
-  // ── OFFRES : chacune avec SA conversation ; le prix de l'annonce par l'id de SON annonce. ──
+  // ── OFFRES : chacune avec SA conversation ; le prix de l'annonce par l'id de SON annonce. Elles passent après
+//    ce qui a une date limite dans les 3 jours (un colis à poster, un colis à retirer), la plus ancienne d'abord. ──
   for (const o of (M.offres || []).filter((x) => maintenant - (Date.parse(x.date) || 0) < 2 * J).sort((a, b) => Date.parse(b.date) - Date.parse(a.date))) {
     const a = M.items.get(o.item) || null; const k = M.numParItem.get(o.item);
-    cartes.push({ cle: 'offre-' + o.conv, sorte: 'offre', echeance: (Date.parse(o.date) || maintenant) + J, n: 1, pseudo: o.pseudo, montant: o.montant,
+    cartes.push({ cle: 'offre-' + o.conv, sorte: 'offre', echeance: maintenant + 3 * J - (maintenant - (Date.parse(o.date) || maintenant)), n: 1, pseudo: o.pseudo, montant: o.montant,
       prix: a ? centimes(a.price) : null, numero: k ? M.paires.get(k).numero : null, photo: (a && a.photo) || o.photo || '', titre: (a && a.title) || o.titre, date: o.date,
       geste: 'Répondre' });
   }

@@ -102,8 +102,9 @@ function baseN() {
   // ══ (N) LA BOÎTE ══
   // Les offres : 3 récentes (2 h, 7 h, 19 h), les autres vieilles de plus de 2 jours (elles restent dans Messages).
   let no = 0;
+  const prixAnnonce = new Map(); b.rows.filter((r) => /_listings$/.test(r.id)).forEach((r) => r.data.payload.items.forEach((it) => prixAnnonce.set(String(it.id), it.price)));
   b.rows.filter((r) => /_conv_/.test(r.id)).forEach((r) => { const c = r.data.payload.conversation; const m = c.messages[c.messages.length - 1];
-    if (m && m.entity_type === 'offer_request_message') { const t = no < 3 ? iso([2, 7, 19][no] * 3600e3) : iso((3 + no) * J); m.created_at_ts = t; r.data.capturedAt = t; if (no < 3) m.entity.price = { amount: ['85.0', '62.0', '110.0'][no], currency_code: 'EUR' }; no++; } });
+    if (m && m.entity_type === 'offer_request_message') { const t = no < 3 ? iso([2, 7, 19][no] * 3600e3) : iso((3 + no) * J); m.created_at_ts = t; r.data.capturedAt = t; if (no < 3) { const it = prixAnnonce.get(String(c.transaction.item_id)); const p = it ? Number(it.amount) : 60; m.entity.price = { amount: String(Math.round(p * [0.85, 0.8, 0.9][no])) + '.0', currency_code: 'EUR' }; } no++; } });
   // 3 ventes aujourd'hui (déjà parties : elles ne s'ajoutent pas aux colis à poster).
   b.accounts.forEach((a, ai) => { const sold = b.rows.find((r) => r.id === `harvest_${a.vinted_user_id}_orders_sold`).data.payload.my_orders;
     const v = sold.find((o) => o.transaction_user_status !== 'needs_action' && o !== sold[0]); if (v) { v.date = iso((1 + ai * 2) * 3600e3); } });
