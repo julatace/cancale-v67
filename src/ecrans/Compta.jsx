@@ -57,6 +57,9 @@ import { bornesPeriode as bornesPeriodeExport, raisonUrssaf } from '../exportCom
 import { CLE_JE_VENDS, lireReglageJeVends } from '../profilVendeur.js';
 import { valeurChiffre, raisonCourte, sansCompteSur } from '../design/carteChiffres.js';
 import { questionsArgent } from '../argent.js';
+import { useDesignV2 } from '../designV2/reglage.js';   // (17 nov.) le nouveau design, en essai
+import ArgentMoisV2Vue from '../designV2/ArgentMois.jsx';   // (17 nov., phase 2) Argent · Mois
+import { recuPublie } from '../design/carteChiffres.js';
 import { tauxMicro, detailTaux, AIDE_NEUTRE, SOURCES_OFFICIELLES, TAUX_ACTIVITE } from '../profilFiscal.js';
 // (10 nov., lot T) La jauge et l'alerte du seuil de TVA, à côté des factures (src/seuilTvaFacture.js).
 const SeuilTvaFactures = aLaDemande(() => import('../SeuilTvaFactures.jsx'));
@@ -3754,6 +3757,75 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
     </section>
   );
 }
+// ── (17 nov., nouveau design, phase 2) ARGENT · MOIS ─────────────────────────
+// Allumé seulement. Les MÊMES sources et règles qu'`ArgentQuestions` (au caractère près : `valeurChiffre`,
+// `questionsArgent`, le brut et sa couverture, `DEMANDE_SAISIE_PRIX`), plus :
+//   · le reçu des cinq mois d'avant : `recuPublie` sur la ligne publiée `vinted_urssaf_mois` (celle du chiffre du
+//     mois en cours — le mois en cours EST l'affiche, la même valeur) ;
+//   · disponible et en attente : `valeurChiffre('dispo' | 'attente')` (le porte-monnaie lu, l'argent à venir) ;
+//   · les versements du mois : le livre des recettes (`recettesDe`, la lecture de « Registres »), daté au versement.
+// Rien n'est recalculé ; aucun chiffre n'est écrit deux fois sur l'écran.
+function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
+  const liveCoque = React.useContext(LiveStatsCarte);
+  const S = useSourcesCarte(liveStats || liveCoque);
+  const { P } = usePrevisionUrssaf();
+  const profil = useProfilFiscal();
+  const sel = { site: 'toutes', compte: null, periode: null };
+  const v = (id) => sansCompteSur(valeurChiffre(id, { id, p: 'mois' }, S, sel, REGLES_CARTE), S);
+  const mois = new Date().toLocaleDateString('fr-FR', { month: 'short' });
+  const moisLong = new Date().toLocaleDateString(localeCourante(), { month: 'long' });
+  const Q = questionsArgent({ vendu: v('vendu'), recu: v('recu'), benefice: v('benefice'), prevision: P, profil, raisonCourte, mois, dateCourte: dateArgentCourte });
+  const qR = Q.find((x) => x.id === 'recu'), qB = Q.find((x) => x.id === 'benefice');
+  const somme = (x) => (Math.abs(Number(x)) < 1000 ? montant(x) : montant(x, { centimes: 'jamais' }));
+  // La phrase de l'affiche : la note de la MÊME règle (le manque, les ventes à dater), sinon « au jour du versement ».
+  const phrase = qR.valeur == null ? (qR.note || tr('v2.ar.pasSu')) : qR.note ? qR.note : tr('v2.ar.auVersement');
+  // Les six mois : le mois en cours = l'affiche (la même valeur) ; avant, la ligne publiée, mois par mois.
+  const barres = (() => {
+    const d = new Date(); const out = [];
+    for (let k = 5; k >= 0; k--) {
+      const de = new Date(d.getFullYear(), d.getMonth() - k, 1);
+      const ym = `${de.getFullYear()}-${String(de.getMonth() + 1).padStart(2, '0')}`;
+      const R = k === 0 ? { valeur: qR.valeur, partiel: qR.partiel } : recuPublie(S.ligneUrssaf, ym);
+      out.push({ cle: ym, l: de.toLocaleDateString(localeCourante(), { month: 'narrow' }), long: de.toLocaleDateString(localeCourante(), { month: 'long', year: 'numeric' }), v: R.valeur == null ? null : R.valeur, partiel: !!R.partiel, courant: k === 0 });
+    }
+    return out;
+  })();
+  // Le bénéfice : la règle de la case d'hier (le net ; sinon le brut des ventes au prix connu, jamais « au moins »).
+  const vb = v('benefice');
+  const Bn = vb && vb.B ? vb.B : null;
+  const manquent = Bn && Bn.n > Bn.nCout ? Bn.n - Bn.nCout : 0;
+  const brut = qB.valeur == null && Bn && Bn.nCout > 0 && manquent > 0 ? chiffreBrut({ n: Bn.n, nCout: Bn.nCout, brut: Bn.brut }) : null;
+  const versSaisiePrix = () => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); };
+  const fait = (id, l, x, onClick) => ({ id, l, onClick, cents: x && x.valeur != null ? String(Math.round(x.valeur * 100)) : '',
+    v: x && x.valeur != null ? somme(x.valeur) : '—', pasSu: !(x && x.valeur != null), auMoins: !!(x && x.valeur != null && x.partiel),
+    sous: x && x.valeur == null ? (raisonCourte(x) || tr('v2.ar.pasSu')) : '' });
+  const faits = [
+    fait('dispo', tr('v2.ar.dispo'), v('dispo'), () => ouvrirRepliCompta('compta-porte-monnaie')),
+    fait('attente', tr('v2.ar.attente'), v('attente'), () => ouvrirArgentAVenir()),
+    brut
+      ? { id: 'benefice', l: NOM_BENEFICE_BRUT, v: somme(brut.valeur), cents: String(Math.round(brut.valeur * 100)), brut: true, onClick: () => ouvrirRepliCompta('compta-benefice'), sous: '' }
+      : { ...fait('benefice', tr('v2.ar.benefice'), { valeur: qB.valeur, partiel: qB.partiel, raison: qB.raison }, () => ouvrirRepliCompta('compta-benefice')), sous: qB.valeur == null ? (qB.note || tr('v2.ar.pasSu')) : '' },
+    { id: 'couts', l: tr('v2.ar.couts'), v: Bn && Bn.n > 0 ? tr('v2.ar.coutsSur', { k: Bn.nCout, n: Bn.n }) : '—', pasSu: !(Bn && Bn.n > 0), cents: Bn && Bn.n > 0 ? `${Bn.nCout}/${Bn.n}` : '',
+      onClick: manquent > 0 ? versSaisiePrix : () => ouvrirRepliCompta('compta-benefice'), sous: '' },
+  ];
+  const geste = manquent > 0 ? { id: 'saisir-prix', n: manquent, libelle: tr('v2.ar.saisirPrix', { n: manquent }), onClick: versSaisiePrix } : null;
+  // Les versements du mois : le livre des recettes (la lecture de « Registres »), du plus récent au plus ancien.
+  const { calc, versements } = useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts });
+  const ventesVcER = useVentesVestiaire();
+  const ym = ymCourant();
+  const livre = React.useMemo(() => (calc.etat === 'lu' ? recettesDe({ calc, periode: ym, versements, lbcVentes, ebayCommandes, ventesVcER }) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [calc, ym, versements, ventesVcER]);
+  const MAX = 30;
+  const lignesV = livre ? [...livre.lignes].sort((a, b) => (b.ts || 0) - (a.ts || 0)) : [];
+  const jour = (t) => (t == null ? '' : new Date(t).toLocaleDateString(localeCourante(), { weekday: 'short', day: 'numeric', month: 'short' }));
+  const vers = {
+    etat: calc.etat === 'encours' ? 'encours' : !livre ? 'passu' : 'lu', n: lignesV.length, reste: Math.max(0, lignesV.length - MAX),
+    lignes: lignesV.slice(0, MAX).map((l) => ({ id: l.id, num: l.num, titre: l.titre, plateforme: l.plateforme, montant: l.montant, date: jour(l.ts),
+      onClick: () => { try { window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: String(l.num) })); } catch (_) {} } })),
+  };
+  return <ArgentMoisV2Vue poster={{ valeur: qR.valeur, partiel: qR.partiel }} phrase={phrase} moisLong={moisLong} barres={barres} faits={faits} geste={geste} versements={vers} montant={somme}/>;
+}
 // (15 nov., extension 5.390) Julien : « Enlève les 1741 ventes à dater, cela n'a aucun sens.
 // Le but est que l'extension récupère ces infos, pas que ça soit à nous de le faire. »
 // La carte « ce qui est daté / pourquoi / le geste » (lot DJ7) est RETIRÉE : plus aucun
@@ -4600,6 +4672,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   // (30 oct.) « Se calcule dans Ventes » était écrit ~9 fois sur cet écran : la cause
   // se dit UNE fois ici, avec le geste ; les cartes ne gardent que « — ».
   const ligneComptaPub = useLigneUrssaf();
+  const designV2 = useDesignV2();
   return (
     <div className="vrm-finance-page vrm-fu-ecran vrm-argent" data-espace="argent" data-argent-ecran={vue} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* (10 nov., Argent) Statistiques et Comptabilité en UN endroit (src/argent.js) : le titre
@@ -4621,12 +4694,17 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
       <div className="vrm-argent-partie" data-argent-vue="resume" hidden={vue !== 'resume'}>
         {/* (15 nov., lot argent-plus) Un seuil de l'année à 80 % ou 100 % : en tête, jusqu'à « Compris » (rien sinon). */}
         <AlertesSeuilsArgent />
+        {/* (17 nov., nouveau design · phase 2) Allumé : « Mois » (src/designV2/ArgentMois.jsx) à la place des réponses, de
+            « À venir » et des six mois — qui restent MONTÉS, cachés (mêmes lectures, mêmes data-*). Éteint : rien ne change. */}
+        {designV2 ? <ArgentMoisV2 liveStats={liveStats} onNav={onNav} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts}/> : null}
+        {(() => { const anciens = (<>
         {/* Les quatre réponses : vendu, reçu, bénéfice, à déclarer. Toucher = le détail. */}
         <ArgentQuestions liveStats={liveStats} onNav={onNav} allerVue={allerVue} />
         {/* (15 nov.) L'argent à venir, en résumé : un toucher ouvre son écran (src/ArgentAVenirEcran.jsx). */}
         <AVenirArgent liveStats={liveStats}/>
       {/* (2 nov., style « Fusion ») L'anneau et les six mois — des parts et des hauteurs, aucun montant redit. */}
       <ComptaFusion compta={data} onNav={onNav}/>
+        </>); return designV2 ? <div className="v2-cache-ancienne" hidden style={{ display: 'none' }}>{anciens}</div> : anciens; })()}
         <section id="compta-detail" className="vrm-compta-q" data-compta-q="detail" style={{ scrollMarginTop: 72 }}>
           <div className="vrm-compta-q-tete">
             <h2 className="vrm-compta-question" data-compta-question="detail">{tr('compta.detail')}</h2>

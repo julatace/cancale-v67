@@ -1058,6 +1058,7 @@ import AujourdhuiV2 from "./designV2/Aujourdhui.jsx";
 import { PassesRetrait as PassesRetraitV2, EnRouteListe as EnRouteListeV2 } from "./designV2/PassesRetrait.jsx";
 import MenuPlateformeV2 from "./designV2/MenuPlateforme.jsx";
 import { BoutonV2 } from "./designV2/BoutonV2.jsx";
+import "./designV2/argent-v2.css";   // (17 nov., phase 2) Argent et Paramètres, nouveau design (tout sous html[data-design="v2"] ou .v2-*)
 import { nombre as nombreV2 } from "./i18n/index.js";
 import LigneAnnonceV2 from "./designV2/LigneAnnonce.jsx";
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
@@ -24299,7 +24300,28 @@ function PlatSubNav({ sub, setSub, sections, dark }) {
 // (10 nov.) LES QUATRE SEGMENTS D'ARGENT (src/argent.js) : le même contrôle segmenté que
 // partout (`PlatSubNav`). Un segment = un nom passé à `setTab`, résolu par `ONGLETS_DEPLACES`
 // (même écran ⇒ seule la section change).
-function ArgentNav({ seg, setTab }) {
+function ArgentNav({ seg, setTab, comptes = null, panelOff = null }) {
+  // (17 nov., nouveau design · Argent) Allumé : UNE ligne « Toutes les plateformes · N comptes › » (les comptes qui entrent
+  // dans les totaux, la même règle `compteEcarte` que Compta ; le toucher mène aux comptes), puis UN contrôle segmenté
+  // Mois · Statistiques · Déclarer · Factures — les MÊMES chemins (`ONGLET_SEGMENT`). Éteint : la navigation d'hier.
+  const designV2 = useDesignV2();
+  if (designV2) {
+    const hAcc = new Set((load('vinted_accounts_hidden', []) || []).map(String));
+    const liste = Array.isArray(comptes) ? comptes.filter((a) => a && a.vinted_user_id != null) : null;
+    const dedans = liste ? liste.filter((a) => !compteEcarte(String(a.vinted_user_id), hAcc, panelOff || {})).length : null;
+    const sous = liste == null || !liste.length ? '' : dedans === liste.length ? tr('v2.ar.comptes', { n: dedans }) : tr('v2.ar.comptesSur', { k: dedans, n: liste.length });
+    return (
+      <div className="v2-argent-nav" data-v2-argent-nav={seg}>
+        <button type="button" className="v2-rangee v2-menu v2-argent-comptes" data-v2-rangee="" data-v2-argent-comptes={dedans == null ? '' : String(dedans)} onClick={() => setTab('vintedaccounts')}>
+          <span className="v2-menu-lib">{tr('v2.ar.toutes')}</span>
+          {sous ? <span className="v2-menu-sous">{sous}</span> : null}
+          <span className="v2-menu-fleche" aria-hidden="true"><Icon name="chevron" size={14}/></span>
+        </button>
+        <Segmente label={tr('v2.ar.segments')} plein className="v2-argent-seg" value={seg} onChange={(id) => { if (id !== seg) setTab(ONGLET_SEGMENT[id] || 'argent'); }}
+          options={SEGMENTS_ARGENT.map((x) => ({ v: x.id, l: tr('v2.ar.seg.' + x.id), data: { 'data-section': x.id, 'aria-current': x.id === seg ? 'page' : undefined } }))}/>
+      </div>
+    );
+  }
   return (
     <div className="vrm-argent-nav" data-argent-nav={seg}>
       <PlatSubNav sub={seg} setSub={(id) => setTab(ONGLET_SEGMENT[id] || 'argent')} sections={SEGMENTS_ARGENT.map((x) => [x.id, x.l])}/>
@@ -66545,9 +66567,9 @@ function AppCoeur() {
         {/* (3 nov., critique #2/#9) Un grand titre sur CHAQUE écran : la barre du haut ne le dit plus. */}
         {(tab==='communaute'||tab==='emails')&&<header className="vrm-market-heading vrm-tache-tete" data-espace="autres" data-titre-ecran-grand=""><h1>{titreCourant}</h1><PhraseEcran cle={tab}/></header>}
         {/* (5 nov., chantier F, revue 2.25) Le choix « Vue d'ensemble · Prix qui marche » vit SOUS le titre de l'écran (il passait au-dessus). */}
-        {tab==='dashboard'&&platSub==='prix'&&<GardeEcran nom="dashboard:prix"><PrixMarche data={pqmData} baseKO={baseKO} sousNav={<><ArgentNav seg="stats" setTab={setTab}/>{!premierJour?<PlatSubNav sub="prix" setSub={setPlatSub} sections={[['stats','Mes ventes'],['prix','Prix qui marche']]}/>:null}</>}/></GardeEcran>}
+        {tab==='dashboard'&&platSub==='prix'&&<GardeEcran nom="dashboard:prix"><PrixMarche data={pqmData} baseKO={baseKO} sousNav={<><ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/>{!premierJour?<PlatSubNav sub="prix" setSub={setPlatSub} sections={[['stats','Mes ventes'],['prix','Prix qui marche']]}/>:null}</>}/></GardeEcran>}
         {tab==='dashboard'&&premierJour&&<GardeEcran nom="dashboard:bienvenue"><Onboarding setTab={setTab}/></GardeEcran>}
-        {tab==='dashboard'&&platSub!=='prix'&&<GardeEcran nom="dashboard"><Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStatsVus} lbcVentes={lbcVentes} lbcLu={lbcCoqueLu} ebayCa={ebayCa} ebayCommandes={ebayCommandes} ventesVc={ventesVcCoque} onGo={setTab} actions={notifItems} baseKO={baseKO} panelOff={panelOffCoque} sousNav={<><ArgentNav seg="stats" setTab={setTab}/>{!premierJour?<PlatSubNav sub="stats" setSub={setPlatSub} sections={[['stats','Mes ventes'],['prix','Prix qui marche']]}/>:null}</>}/></GardeEcran>}
+        {tab==='dashboard'&&platSub!=='prix'&&<GardeEcran nom="dashboard"><Dashboard premierJour={premierJour} catalog={catalog} sales={sales} garageGrid={garageGrid} invoices={invoices} liveStats={liveStatsVus} lbcVentes={lbcVentes} lbcLu={lbcCoqueLu} ebayCa={ebayCa} ebayCommandes={ebayCommandes} ventesVc={ventesVcCoque} onGo={setTab} actions={notifItems} baseKO={baseKO} panelOff={panelOffCoque} sousNav={<><ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/>{!premierJour?<PlatSubNav sub="stats" setSub={setPlatSub} sections={[['stats','Mes ventes'],['prix','Prix qui marche']]}/>:null}</>}/></GardeEcran>}
         {/* ⚠️ UN SEUL ONGLET VINTED QUI CONTIENT TOUT : Aperçu (CA, argent,
             compteurs) + Annonces / Ventes / Achats rendus À L'INTÉRIEUR, via les
             MÊMES composants que les écrans séparés (aucune duplication §11). Les
@@ -66570,7 +66592,7 @@ function AppCoeur() {
         {tab==='masques' &&<GardeEcran nom="masques"><EcranMasques comptes={vintedAccounts} ordi={ordi}/></GardeEcran>}
         {tab==='semaine'&&<GardeEcran nom="semaine"><EcranMaSemaine liveStats={liveStatsVus} onNav={setTab} entete={<ScreenHead icon="chart" title="Ma semaine"/>}/></GardeEcran>}
         {/* (11 nov., lot DJ4) Plus d'écran « À trancher » : `?tab=trancher` ouvre Ma journée, la carte ouverte (VUES_DEPLACEES). */}
-        {tab==='compta'&&platSub==='factures'&&<GardeEcran nom="compta:factures"><Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt} argentNav={<ArgentNav seg="factures" setTab={setTab}/>}/></GardeEcran>}
+        {tab==='compta'&&platSub==='factures'&&<GardeEcran nom="compta:factures"><Invoices  invoices={invoices} setInvoices={setInvoices} catalog={catalog} sales={sales} invoiceSettings={invoiceSettings} setInvoiceSettings={setInvoiceSettings} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt} argentNav={<ArgentNav seg="factures" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/>}/></GardeEcran>}
         {tab==='stockvinted'&&<GardeEcran nom="stockvinted"><StockVinted stockVinted={stockVinted} setStockVinted={setStockVinted} garageGrid={garageGrid} invoices={invoices}/></GardeEcran>}
         {tab==='communaute'&&<div data-espace="autres" style={{display:'contents'}}><GardeEcran nom="communaute"><Suspense fallback={<p role="status" style={{padding:20}}>{PAS_SU.enCours}</p>}><Communaute sombre={C===THEMES.dark} headers={enTeteSession} prenom={String(load('vrm_prenom','')||'').trim()} FermeAuRetour={FermeAuRetour}/></Suspense></GardeEcran></div>}
         {/* (5 nov.) E-mails : les liens « Voir dans VRM » passent par `vrm:aller` (un chemin `?tab=…&cible=…`, src/cibleNotif.js). */}
@@ -66588,7 +66610,7 @@ function AppCoeur() {
         {tab==='garage'   &&<GardeEcran nom="garage"><Garage    catalog={catalog} garageGrid={garageGrid} setGarageGrid={setGarageGrid} blockedCells={blockedCells} setBlockedCells={setBlockedCells} extraCols={extraCols} setExtraCols={setExtraCols} cellColors={cellColors} setCellColors={setCellColors} locate={garageLocate} onLocateConsumed={()=>setGarageLocate(null)} placeNum={garagePlace} onPlaced={()=>setGaragePlace(null)} accounts={vintedAccounts} comptesLus={accountsLoaded&&!baseKO}/></GardeEcran>}
         {tab==='comptabilite'&&<GardeEcran nom="comptabilite"><Comptabilite accounts={vintedAccounts} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}}/></GardeEcran>}
         {/* (10 nov.) « Vue d’ensemble · Factures » est remplacé par les quatre segments d'Argent (`ArgentNav`, dans le titre de chaque segment). */}
-        {tab==='compta'&&<GardeEcran nom="compta"><ComptaPro vue={vueCompta(platSub)} allerVue={(v)=>setTab(ONGLET_SEGMENT[v]||'argent')} argentNav={<ArgentNav seg={segmentArgent('compta',platSub)} setTab={setTab}/>} liveStats={liveStatsVus} onNav={setTab} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOffCoque} accounts={vintedAccounts} comptesLus={accountsLoaded && !baseKO}/></GardeEcran>}
+        {tab==='compta'&&<GardeEcran nom="compta"><ComptaPro vue={vueCompta(platSub)} allerVue={(v)=>setTab(ONGLET_SEGMENT[v]||'argent')} argentNav={<ArgentNav seg={segmentArgent('compta',platSub)} setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/>} liveStats={liveStatsVus} onNav={setTab} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOffCoque} accounts={vintedAccounts} comptesLus={accountsLoaded && !baseKO}/></GardeEcran>}
         {/* (11 nov., lot DJ3) Colis · Leboncoin (`LeboncoinColis`) vit dans Ventes · Leboncoin, section « À expédier » (`rendreColisSection`). */}
         {(()=>{ const map={cat_annonces:'annonces',cat_ventes:'ventes',litiges:'litiges'}; return map[tab] ? <GardeEcran nom={tab} resetKey={platSub}><Comptabilite key={tab} accounts={vintedAccounts} only={map[tab]} liveStats={liveStatsVus} accountsReady={accountsLoaded} baseKO={baseKO} onNav={setTab} garageGrid={garageGrid} onLocate={(n)=>{setGarageLocate(String(n));setTab('garage');}} onStore={(n)=>{setGaragePlace(String(n));setTab('garage');}} onFreeNum={freeGarageNum}
           sitesPresents={tab==='litiges'?sitesPresents:null}/></GardeEcran> : null; })()}

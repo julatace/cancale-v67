@@ -1,0 +1,110 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   ARGENT ET PARAMÈTRES — le nouveau design, phase 2 (17 nov.). Seulement sous `html[data-design="v2"]` (ou des
+   classes `.v2-*` neuves, rendues seulement allumé) : éteint, rien ne s'applique.
+   Texte posé sur la coque bleue : `--v2-page-*` ; dans une carte : l'encre.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ══ 1. L'EN-TÊTE D'ARGENT : grand titre, UNE ligne comptes, UN segmenté ══════════════════════════════════ */
+html[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) { padding: 8px 0 0 !important; margin: 0 0 4px !important; border: 0 !important; }
+html[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) .vrm-tete-row { display: flex; flex-direction: column; align-items: stretch; gap: 12px; padding: 0 !important; }
+html[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) .vrm-screen-repere { display: none !important; }
+html[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) .vrm-screen-head-titre { display: flex; flex-wrap: wrap; align-items: center; column-gap: 8px; row-gap: 0; min-width: 0; }
+html[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) :is(h1, h2).vrm-display { margin: 0; font: 700 34px/40px var(--sb-police-texte, -apple-system, system-ui, sans-serif) !important; letter-spacing: -.02em; color: var(--v2-page-texte) !important; }
+html[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) .vrm-phrase-ecran { color: var(--v2-page-texte) !important; }
+html[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) .vrm-phrase-ecran :is(button, a, svg) { color: var(--v2-page-texte) !important; }
+html[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) .vrm-screen-head-sous { flex: 1 0 100%; margin: 0 !important; }
+html[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) .vrm-screen-actions { width: 100%; justify-content: flex-start !important; }
+@media (min-width: 1024px) {
+  html[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) .vrm-screen-actions { position: absolute; top: 8px; right: 0; width: auto; }
+  html[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) { position: relative; }
+}
+.v2-argent-nav { display: flex; flex-direction: column; align-items: stretch; gap: 12px; }
+.v2-argent-nav .v2-argent-comptes { align-self: flex-start; }
+.v2-argent-nav .v2-argent-seg { width: 100%; }
+@media (min-width: 1024px) { .v2-argent-nav .v2-argent-seg { max-width: 560px; } }
+
+/* ══ 2. MOIS : l'affiche, sa phrase, les six mois ══════════════════════════════════════════════════════════ */
+.v2-ar-mois { display: flex; flex-direction: column; gap: 0; color: var(--v2-page-texte); font-family: var(--sb-police-texte, -apple-system, system-ui, sans-serif); }
+.v2-ar-tete { display: flex; flex-direction: column; gap: 4px; padding: 4px 4px 0; }
+.v2-ar-affiche { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 10px; row-gap: 0; margin: 0; color: var(--v2-page-texte); }
+.v2-ar-nb { font-size: 56px; line-height: 60px; font-weight: 700; letter-spacing: -.035em; font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1, "lnum" 1; white-space: nowrap; }
+.v2-ar-auMoins { flex: 0 0 100%; font-size: 15px; line-height: 20px; font-weight: 600; color: var(--v2-page-muet); }
+.v2-ar-mot { font-size: 20px; line-height: 24px; font-weight: 600; letter-spacing: -.01em; color: var(--v2-page-texte); }
+.v2-ar-phrase { margin: 0; font-size: 15px; line-height: 20px; color: var(--v2-page-muet); }
+/* Le graphe : 6 barres, 56 px de colonne + 16 de libellé = 72 px (≤ 80). Une seule série : le blanc de la coque,
+   le mois en cours plein, les autres voilés ; une barre « pas su » = une amorce en pointillé. */
+.v2-ar-barres { margin: 12px 0 0; padding: 0; }
+.v2-ar-barres-piste { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; height: 72px; }
+.v2-ar-barre { display: flex; flex-direction: column; align-items: stretch; gap: 2px; min-width: 0; }
+.v2-ar-barre-col { flex: 1; display: flex; align-items: flex-end; border-radius: 4px; }
+.v2-ar-barre-col i { display: block; width: 100%; border-radius: 4px 4px 2px 2px; background: rgb(255 255 255 / .42); }
+.v2-ar-barre[data-courant] .v2-ar-barre-col i { background: var(--v2-page-texte); }
+.v2-ar-barre[data-vide] .v2-ar-barre-col i { background: transparent; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .55); }
+.v2-ar-barre-l { height: 14px; font-size: 12px; line-height: 14px; font-weight: 600; text-align: center; color: var(--v2-page-muet); }
+.v2-ar-barre[data-courant] .v2-ar-barre-l { color: var(--v2-page-texte); }
+
+/* ══ 3. LES FAITS : UNE carte, 2 × 2 au téléphone, 4 côte à côte à l'ordinateur ═════════════════════════════ */
+.v2-ar-faits { margin: 20px 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); background: var(--v2-carte); border-radius: 16px; box-shadow: var(--v2-carte-ombre); overflow: hidden; color: var(--sv-encre, #0C1D30); }
+@media (min-width: 1024px) { .v2-ar-faits { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+html body button.v2-rangee.v2-ar-fait { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; min-height: 76px; padding: 12px 16px; margin: 0; border: 0; border-radius: 0; background: transparent; text-align: left; color: inherit; box-shadow: none; position: relative; }
+html body button.v2-rangee.v2-ar-fait:nth-child(odd)::after { content: ""; position: absolute; right: 0; top: 14px; bottom: 14px; width: .5px; background: var(--v2-filet); }
+html body button.v2-rangee.v2-ar-fait:nth-child(n+3)::before { content: ""; position: absolute; left: 16px; right: 0; top: 0; height: .5px; background: var(--v2-filet); }
+@media (min-width: 1024px) {
+  html body button.v2-rangee.v2-ar-fait:not(:last-child)::after { content: ""; position: absolute; right: 0; top: 14px; bottom: 14px; width: .5px; background: var(--v2-filet); }
+  html body button.v2-rangee.v2-ar-fait:nth-child(n+3)::before { display: none; }
+}
+.v2-ar-fait-l { font-size: 13px; line-height: 16px; font-weight: 600; color: var(--v2-muet); }
+.v2-ar-fait-v { font-size: 22px; line-height: 28px; font-weight: 700; letter-spacing: -.01em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.v2-ar-fait-v small { font-size: 13px; font-weight: 600; color: var(--v2-muet); }
+.v2-ar-fait-v[data-v2-pas-su] { color: var(--v2-muet); }
+.v2-ar-fait-s { font-size: 13px; line-height: 16px; color: var(--v2-muet); }
+
+/* ══ 4. LE GESTE (un seul plein, seulement s'il y a un geste) ══════════════════════════════════════════════ */
+.v2-ar-geste { margin: 16px 0 0; }
+@media (min-width: 1024px) { .v2-ar-geste { max-width: 360px; } }
+
+/* ══ 5. LES VERSEMENTS : des rangées A, l'étiquette N°, le montant à droite ═══════════════════════════════════ */
+.v2-ar-h { margin: 28px 4px 8px; font-size: 13px; line-height: 18px; font-weight: 600; letter-spacing: 0; color: var(--v2-page-muet); }
+.v2-ar-liste { background: var(--v2-carte); border-radius: 16px; box-shadow: var(--v2-carte-ombre); overflow: hidden; color: var(--sv-encre, #0C1D30); }
+.v2-ar-v, html body button.v2-rangee.v2-ar-v { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 10px 16px; margin: 0; border: 0; border-radius: 0; background: transparent; box-sizing: border-box; text-align: left; color: inherit; box-shadow: none; }
+.v2-ar-v + .v2-ar-v::before { content: ""; position: absolute; left: 16px; right: 0; top: 0; height: .5px; background: var(--v2-filet); }
+.v2-ar-v-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.v2-ar-v-titre { font-size: 17px; line-height: 22px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2-ar-v-sous { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 13px; line-height: 18px; color: var(--v2-muet); }
+.v2-ar-v-date { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.v2-ar-v-eur { flex: none; font-size: 17px; line-height: 22px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.v2-ar-v-eur[data-v2-pas-su] { color: var(--v2-muet); }
+.v2-ar-vide, .v2-ar-reste { margin: 0 4px; font-size: 15px; line-height: 20px; color: var(--v2-page-muet); }
+.v2-ar-reste { margin-top: 8px; font-size: 13px; }
+
+/* L'étiquette N° (la signature du design : le N° écrit sur le carton) — dessin de REPLI, sous `:where()` (spécificité
+   nulle) : le composant commun `.v2-etiquette` du design le remplace dès qu'il arrive. Kraft clair, encre, coin
+   coupé, œillet percé. Encre #2A2116 sur #E9DCC4 = 12,9:1 ; la nuit #F3E9D6 sur #3A3226 = 10,4:1. */
+:where(.v2-etiquette) { display: inline-flex; align-items: baseline; gap: 2px; flex: none; height: 22px; box-sizing: border-box; padding: 2px 7px 0 12px; position: relative;
+  background: #E9DCC4; color: #2A2116; font-size: 13px; line-height: 18px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap;
+  clip-path: polygon(6px 0, 100% 0, 100% 100%, 6px 100%, 0 50%); border-radius: 3px; }
+:where(.v2-etiquette)::before { content: ""; position: absolute; left: 5px; top: 50%; width: 4px; height: 4px; margin-top: -2px; border-radius: 50%; background: var(--v2-carte); }
+:where(.v2-etiquette) small { font-size: 10px; font-weight: 600; color: #5A4A33; }
+:where(:root[data-theme="dark"]) :where(.v2-etiquette) { background: #3A3226; color: #F3E9D6; }
+:where(:root[data-theme="dark"]) :where(.v2-etiquette) small { color: #D9C7A6; }
+
+/* ══ 6. LE DÉTAIL D'HIER, sous Mois (les replis restent : bénéfice, porte-monnaie, dépenses…) ══════════════════ */
+html[data-design="v2"] body .vrm-argent [data-argent-vue="resume"] #compta-detail { margin-top: 28px; }
+html[data-design="v2"] body .vrm-argent [data-argent-vue="resume"] #compta-detail .vrm-compta-question { font-size: 13px !important; line-height: 18px !important; font-weight: 600 !important; letter-spacing: 0 !important; text-transform: none !important; color: var(--v2-page-muet) !important; margin: 0 4px 8px !important; }
+
+/* ══ 7. PARAMÈTRES : la liste groupée d'iOS (téléphone, premier écran) ══════════════════════════════════════════ */
+.v2-pm-racine { display: flex; flex-direction: column; gap: 0; }
+.v2-pm-h { margin: 24px 16px 8px; font-size: 13px; line-height: 18px; font-weight: 600; color: var(--v2-page-muet); }
+.v2-pm-h:first-child { margin-top: 8px; }
+.v2-pm-liste { background: var(--v2-carte); border-radius: 16px; box-shadow: var(--v2-carte-ombre); overflow: hidden; color: var(--sv-encre, #0C1D30); }
+html[data-design="v2"] body .v2-pm-liste .vrm-set-ligne { position: relative; display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 8px 16px; margin: 0; border: 0 !important; border-radius: 0; background: transparent; box-shadow: none; width: 100%; box-sizing: border-box; text-align: left; color: inherit; }
+html[data-design="v2"] body .v2-pm-liste .vrm-set-ligne + .vrm-set-ligne::before { content: ""; position: absolute; left: 60px; right: 0; top: 0; height: .5px; background: var(--v2-filet); }
+html[data-design="v2"] body .v2-pm-liste .vrm-pm-cat-ic { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 8px; background: var(--v2-teinte-fond); color: var(--v2-teinte-texte); }
+html[data-design="v2"] body .v2-pm-liste .vrm-set-lib { flex: 1; min-width: 0; }
+html[data-design="v2"] body .v2-pm-liste .vrm-set-lib b { display: block; font-size: 17px; line-height: 22px; font-weight: 400; color: var(--sv-encre, #0C1D30) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html[data-design="v2"] body .v2-pm-liste .vrm-set-desc { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+html[data-design="v2"] body .v2-pm-liste .vrm-set-val { flex: none; max-width: 40%; font-size: 17px; line-height: 22px; color: var(--v2-muet) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html[data-design="v2"] body .v2-pm-liste .vrm-set-chev { flex: none; stroke: var(--v2-muet); opacity: .7; }
+:root[data-theme="dark"] .v2-pm-liste .vrm-set-lib b { color: #F2F7FD !important; }
+html[data-design="v2"] body .v2-pm-liste .vrm-set-ligne:active { background: rgb(18 52 96 / .06); }
+:root[data-theme="dark"] .v2-pm-liste .vrm-set-ligne:active { background: rgb(255 255 255 / .06); }

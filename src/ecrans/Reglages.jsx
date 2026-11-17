@@ -1858,6 +1858,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   // (docs/emails/boite-collective.md). Le montrer à un autre, c'était un réglage
   // qui s'enregistre et ne fait rien : il n'est pas proposé.
   const proprioInst = useEstProprietaire();
+  const designV2 = useDesignV2();   // (17 nov., phase 2) le premier écran en liste groupée d'iOS
   // Actions sur le compte : une vraie fenêtre plutôt qu'un prompt du navigateur.
   // Un window.prompt ne se style pas, ne masque pas le mot de passe saisi, et
   // sur iPhone il s'affiche comme une alerte système au milieu de rien — c'est
@@ -2538,6 +2539,20 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
             // (15 nov., maquette « Verre dépoli » validée : « Tuiles plutôt qu'une longue liste : tout tient sur un
             // écran ») « Mon compte » en carte, puis les neuf autres catégories en tuiles (trois par rangée) ; « Sécurité
             // des données » (expert) en dernière tuile. Les mêmes `data-categorie-ouvrir`, le même geste.
+            designV2 ? (
+            // (17 nov., nouveau design · phase 2) La liste groupée d'iOS : « Compte » (la carte), « Réglages » (les catégories en
+            // rangées : icône, nom, valeur, chevron — `ligneCategorie`, le même geste), « Avancé » (Sécurité des données).
+            <section className="vrm-pm-racine v2-pm-racine" data-v2-parametres="">
+              <div data-categories-reglages="" data-onglets-reglages="">
+                <h2 className="v2-pm-h">{tr('v2.pm.compte')}</h2>
+                {categories.filter((c) => c.id === 'compte').map((c) => carteCompte(c))}
+                <h2 className="v2-pm-h">{tr('v2.pm.reglages')}</h2>
+                <div className="vrm-set-liste v2-pm-liste">{categories.filter((c) => c.id !== 'compte' && !c.expert).map((c) => ligneCategorie(c, { surClic: () => ouvrirCategorie(c.id) }))}</div>
+                {categories.some((c) => c.expert) ? <><h2 className="v2-pm-h">{tr('v2.pm.avance')}</h2>
+                <div className="vrm-set-liste v2-pm-liste">{categories.filter((c) => c.expert).map((c) => ligneCategorie(c, { surClic: () => ouvrirCategorie(c.id) }))}</div></> : null}
+              </div>
+            </section>
+            ) :
             <section className="vrm-pm-racine vg-pm-racine">
               <div className="vg-pm-cats" data-categories-reglages="" data-onglets-reglages="">
                 {categories.filter((c) => c.id === 'compte').map((c) => carteCompte(c))}
