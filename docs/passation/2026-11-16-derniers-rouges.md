@@ -121,6 +121,18 @@ CI de la PR sur a1a33f6c1 : statut-colis 81/0 et navigation-tache 162/0 VERTS (b
   (la plaque N° d'une rangée de liste — « la rangée est le geste ») n'est pas une cible ; un bouton touchable petit
   reste rouge. Sonde utilisée : CDP `CSS.getMatchedStylesForNode` (quelle règle donne la hauteur).
 
+## 6. 17 nov. — après les fusions de main
+
+- **ventes-e2 « annul »** (rouge NOUVEAU avec #1202 « Ventes plus clair », sous WebKit ET Chromium — CI de #1222, et
+  ici 8 rouges) : banc PÉRIMÉ, pas un défaut — l'alerte « vendeuse_b annule plus » est rangée, comme voulu, dans
+  « 3 choses à regarder » (src/ventes/ARegarder.jsx, repli fermé : la liste d'abord) ; capture regardée : l'alerte, ses
+  3 ventes annulées, rien de rouge. Le banc ouvre le repli comme lui et exige en plus que N la compte (N ≥ 1, fermé).
+  annul, egal, exclu : verts.
+- audit-vocabulaire-article après fusion : « Délier » (relier-fiable) et « la paire monte » (design-restes) ont leur
+  version « article » ; B11 : « Modifier ma journée » ne montre plus de description (personnalisation-simple), la règle
+  tient tant qu'aucune n'est rendue sans `phraseVendeur`.
+- veilleLigne : vitesse-lectures a fait la même lecture partagée, sa version gardée.
+
 ## ÉTAT À LA REPRISE
 
 - PR #1215 (`claude/derniers-rouges`) ; PR #1210 (`claude/regles-achat-recopie`, recopie de vrm-regles-achat.js) à
