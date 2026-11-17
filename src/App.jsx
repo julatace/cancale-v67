@@ -703,7 +703,8 @@ import VoirEmailColis from "./VoirEmailColis.jsx";
 import { litigesEnCours, litigeDeVente, requeteEmailsLitiges, texteLimite as texteLimiteLitige, LIBELLE_GENRE as LIBELLE_LITIGE } from "./litiges.js";
 import { ordreDesGroupes, ordonnerLot } from "./lotTransporteurs.js";
 import { trouverParScan, candidatsRetrait } from "./scanColis.js";
-import { enregistrerSourceColis, ouvrirRetrouver, sourcePrincipalePresente, EV_RETROUVER } from "./retrouverColis.js";
+import { chercherCodeDansEtiquettes } from "./etiquettesScan.js";
+import { enregistrerSourceColis, ouvrirRetrouver, sourcePrincipalePresente, EV_RETROUVER, EV_RETROUVER_CODE, EV_RELIER_COLIS, demanderRelierColis, scannerRetrouverOuvert } from "./retrouverColis.js";
 import { lireCodeColis } from "./scanColis.js";
 import { ligneLotAutre, cochesParDefaut, selectionImprimable, texteSansBordereau, resumeLot } from "./lotSelection.js";
 // (15 nov., maquettes validées) Ventes « Verre dépoli » : les règles (src/ventesVerre.js) et l'habit (src/ventes/VentesVerre.jsx).
@@ -19173,21 +19174,66 @@ const CIBLE_NOTIF = { c: null, tab: null, at: 0 };
 const DEMANDE_COLIS = { o: null, at: 0 };
 // (14 nov., Studio bleu clair) « Scanner » demandé par le disque de la barre du bas (lu par Ventes → À expédier).
 const DEMANDE_SCAN = { at: 0 };
+// (16 nov., lot scan-achat) « Relier à un achat » demandé par le scanner quand aucun écran ne savait relier (lu par Achats).
+const DEMANDE_RELIER = { d: null, at: 0 };
+// Ce que SA transaction dit de l'achat scanné : le pseudo du vendeur (côté acheteur seulement) et CHAQUE article
+// (photo, titre, taille, état, prix — un lot en a plusieurs). Une ligne, projetée (jamais `select=data`), lue au
+// moment où sa fiche s'affiche. `null` = pas su (la fiche dit « — »), jamais une liste vide inventée.
+async function detailsAchatScan(uid, tx) {
+  if (!uid || !/^\d+$/.test(String(tx || ''))) return null;
+  const rows = await lireTout(`id=eq.harvest_${uid}_txn_${tx}&select=side:data->payload->transaction->>user_side,vendeur:data->payload->transaction->seller->>login,items:data->payload->transaction->order->items`, { strict: true });
+  if (!Array.isArray(rows) || !rows[0] || rows[0].side !== 'buyer') return null;
+  const r = rows[0];
+  const articles = (Array.isArray(r.items) ? r.items : []).filter((it) => it && typeof it === 'object').slice(0, 20).map((it, n) => {
+    const pr = it.price && typeof it.price === 'object' ? Number(it.price.amount) : Number(it.price);
+    return { cle: it.id != null && it.id !== '' ? `id${it.id}` : `n${n}`, titre: String(it.title || '').slice(0, 160), taille: String(it.size_title || '').slice(0, 40), etat: String(it.status || '').slice(0, 60),
+      prix: Number.isFinite(pr) && pr > 0 ? pr : null, photo: photoArticle({ photo: Array.isArray(it.photos) ? it.photos[0] : null }) || null };
+  });
+  return { vendeur: r.vendeur ? String(r.vendeur) : '', articles };
+}
 // (15 nov.) L'HÔTE DU SCANNER POUR RETROUVER (monté une fois dans la coque) : ouvert par `ouvrirRetrouver()`
 // (src/retrouverColis.js) ; le scanner (caméra, ZXing) se charge à la demande. `onAttendreSources` : la coque
 // monte Ventes quand aucune source principale n'est là (le scanner attend sa lecture, « pas lu » n'est pas « rien »).
+// (17 nov., lot scan-bordereau-vente) Le TEXTE d'une étiquette (les deux PDF possibles de la vente), lu par le
+// lecteur sans IA du serveur (api/_lib/texte-pdf.js, chargé à la demande), gardé en mémoire pour la séance.
+// `null` = pas su (lecture ratée, PDF illisible) ; jamais rangé nulle part (il porte une adresse).
+const TEXTES_ETIQUETTES = new Map();
+async function texteEtiquetteScan(capteRow, mailRow) {
+  const k = `${capteRow || ''}|${mailRow || ''}`;
+  if (TEXTES_ETIQUETTES.has(k)) return TEXTES_ETIQUETTES.get(k);
+  // Le PDF lu sans effet de bord (pas de copie hors ligne de chaque étiquette parcourue) : capté d'abord, puis e-mail.
+  let octets = null, pasSu = false;
+  for (const row of [capteRow, mailRow]) {
+    if (!row || octets) continue;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/app_data?id=eq.${encodeURIComponent(row)}&select=b:data->>pdfB64`, { headers: sbAuth() });
+      if (!res.ok) { pasSu = true; continue; }
+      const j = await res.json(); const v = Array.isArray(j) && j[0] ? j[0].b : null;
+      if (v && v !== 'None') { const o = b64ToBytes(v); if (estOctetsPdf(o)) octets = o; }
+    } catch (_) { pasSu = true; }
+  }
+  if (!octets) return pasSu ? null : '';
+  let t = null;
+  try { t = await import('../api/_lib/texte-pdf.js').then((m) => m.texteDuPdf(octets)); } catch (_) { t = null; }
+  if (typeof t === 'string') TEXTES_ETIQUETTES.set(k, t);
+  return typeof t === 'string' ? t : null;
+}
 function HoteRetrouver({ onAttendreSources, onChercher }) {
   const [ouvert, setOuvert] = useState(false);
+  const [code0, setCode0] = useState('');
   const ref = useRef({}); ref.current = { onAttendreSources, onChercher };
   const attendre = React.useCallback(() => { try { if (ref.current.onAttendreSources) ref.current.onAttendreSources(); } catch (_) {} }, []);
   const chercher = React.useCallback((n) => { try { if (ref.current.onChercher) ref.current.onChercher(n); } catch (_) {} }, []);
   useEffect(() => {
-    const o = () => { setOuvert(true); if (!sourcePrincipalePresente()) attendre(); };
+    // (16 nov., lot scan-achat) Un code DÉJÀ lu (la douchette) : le scanner s'ouvre sur son résultat ; déjà ouvert ⇒ il le résout.
+    const o = (ev) => { const c = (ev && ev.detail && ev.detail.code) || ''; if (c && scannerRetrouverOuvert()) { try { window.dispatchEvent(new CustomEvent(EV_RETROUVER_CODE, { detail: { code: c } })); } catch (_) {} return; } setCode0(c); setOuvert(true); if (!sourcePrincipalePresente()) attendre(); };
     window.addEventListener(EV_RETROUVER, o); return () => window.removeEventListener(EV_RETROUVER, o);
   }, [attendre]);
   if (!ouvert) return null;
-  const fermer = () => setOuvert(false);
-  return <ScannerRetrouver Photo={PhotoVinted} onFermer={fermer} onChercher={chercher} onAttendreSources={attendre} zIndex={Z_CONFIRMATION - 2}><FermeAuRetour fermer={fermer}/></ScannerRetrouver>;
+  const fermer = () => { setOuvert(false); setCode0(''); };
+  // « Relier à un achat » : la feuille de choix d'Achats (src/relierColis.js) ; sans écran qui sait relier, Achats s'ouvre et la reprend.
+  const relier = (d) => { if (demanderRelierColis(d)) return; DEMANDE_RELIER.d = d; DEMANDE_RELIER.at = Date.now(); try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=achats' })); } catch (_) {} };
+  return <ScannerRetrouver Photo={PhotoVinted} onFermer={fermer} onChercher={chercher} onAttendreSources={attendre} onRelier={relier} codeInitial={code0} zIndex={Z_CONFIRMATION - 2}><FermeAuRetour fermer={fermer}/></ScannerRetrouver>;
 }
 const poserCible = (c, tab) => {
   // (11 nov., lot DJ3) Une cible de colis À RETIRER vit dans Achats (src/colisPlace.js).
@@ -36104,6 +36150,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [sales, setSales] = useEtatPartage(_magasinCommandes, cleMagasinCommandes('sold'), () => etatOrdersDuCache('sold', accounts));   // (13 nov.) une copie pour tous les moteurs
   const salesCourant = useRef(sales); salesCourant.current = sales;   // (12 nov.) la liste montrée, pour relire UN compte (`relire`)
   const [buys, setBuys] = useEtatPartage(_magasinCommandes, cleMagasinCommandes('purchased'), () => etatOrdersDuCache('purchased', accounts));
+  // (16 nov., lot scan-achat) « Colis inconnu · Relier à un achat » depuis le scanner : la PREMIÈRE instance d'Achats
+  // (Comptabilite des achats) qui a ses achats lus prend la demande — une seule feuille. Rien n'est relié sans SON clic.
+  const relierPeut = (colisDans === 'achats' || curSub === 'achats') && Array.isArray(buys.items);
+  const relierPeutRef = useRef(false); relierPeutRef.current = relierPeut;
+  useEffect(() => {
+    const f = (ev) => { const d = ev && ev.detail; if (!d || d.pris || !relierPeutRef.current || !d.suivi) return; d.pris = true; setRelierEtat({ q: '', envoi: '', msg: '' }); setRelierColis({ suivi: d.suivi, transporteur: d.transporteur || '', nom: d.nom || '', depuis: 'scan' }); };
+    window.addEventListener(EV_RELIER_COLIS, f); return () => window.removeEventListener(EV_RELIER_COLIS, f);
+  }, []);
+  useEffect(() => { if (!relierPeut || !DEMANDE_RELIER.d || Date.now() - DEMANDE_RELIER.at > 60000) return; const d = DEMANDE_RELIER.d; DEMANDE_RELIER.d = null; setRelierEtat({ q: '', envoi: '', msg: '' }); setRelierColis({ suivi: d.suivi, transporteur: d.transporteur || '', nom: d.nom || '', depuis: 'scan' }); }, [relierPeut]);
   // (6 nov.) LES VENTES VUES PAR E-MAIL, PAS ENCORE RELUES SUR VINTED
   // (src/venteEmailFraiche.js) : la liste de l'écran et VENDU les lisent ; tout
   // le reste (Colis, numéros, bordereaux, verrous) lit `sales.items`, la liste
@@ -46745,7 +46800,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (r.etat === 'ambigu') { toast(tr('cp.douchette.ambigu', { n: r.lignes.length, code: codeCourt(code) }), 'err'); return; }
     // Les bordereaux peuvent encore arriver (lecture en cours) : on relit UNE fois 2 s plus tard avant de dire « inconnu ».
     if (!relu) { setTimeout(() => { try { resoudreDouchette.current(code, true); } catch (_) {} }, 2000); return; }
-    toast(tr('cp.douchette.inconnu', { code: codeCourt(code) }), 'err');
+    // (16 nov., lot scan-achat) Pas une vente : peut-être un ACHAT reçu ⇒ le scanner pour retrouver (sa fiche, ou « Colis inconnu · Relier »).
+    ouvrirRetrouver('douchette', code);
   };
   useEffect(() => {
     if (colisDans !== 'ventes' || curSub !== 'bordereaux') return undefined;
@@ -46761,6 +46817,36 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // identité (`achatDuColis`) ; retour : SON bordereau de retour ; Vestiaire : `v.suivi`. Jamais un titre (§5).
   // Lu au moment du scan (rien n'est recalculé à chaque rendu). « Pas lu » ⇒ `pret: false`, jamais « rien ».
   const jourCourtScan = (j) => { const t = Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(String(j || '')) ? `${j}T12:00:00` : String(j || '')); if (!Number.isFinite(t)) return ''; try { return new Date(t).toLocaleDateString(localeCourante(), { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' }); } catch (_) { return ''; } };
+  // (17 nov., lot scan-bordereau-vente) L'enregistrement d'une vente pour le scanner : photo, titre, N°, taille.
+  const enregVenteScan = (o) => {
+    const tx = String(o.transaction_id), b = bordsParTxn[tx];
+    const e = effEntry(o) || {};
+    const aFaire = aExpedier(o) && !isShipDone(o);
+    const etat = aExpedier(o) ? (isShipDone(o) ? tr('scan.r.etat.colisFait') : b ? tr('scan.r.etat.aExpedierPret') : tr('scan.r.etat.aExpedier')) : ((venteStage(o) || {}).label || '');
+    return { sorte: 'vente', site: 'vinted', cle: 'v:' + tx, suivis: [b && b.suivi, b && b.suiviPdf].filter(Boolean), titre: o.title || '', num: (b ? numForBord(b) : '') || e.numero || '', photo: orderPhoto(o) || null,
+      taille: (e.taille ? String(e.taille) : '') || String(o.size_title || o.size || ''), compte: o && o._acc && typeof o._acc === 'object' ? accName(o._acc) : '', etat, aFaire, lien: `?tab=ventes&site=vinted&cible=vente&tx=${encodeURIComponent(tx)}` };
+  };
+  // Les étiquettes candidates : d'abord les ventes à expédier, puis les plus récentes (21 jours) ; une étiquette
+  // = le PDF capté par l'extension (`harvest_{uid}_label_{tx}`) ou celui de l'e-mail (`email_bord_{tx}`).
+  // Le texte de chaque étiquette lue est gardé en mémoire pour la séance (par ligne) : un second scan ne relit rien.
+  const chercherVenteParEtiquette = async (code) => {
+    const ventes = Array.isArray(sales.items) ? sales.items : [];
+    const recent = Date.now() - 21 * 864e5;
+    const cands = [];
+    for (const o of ventes) {
+      if (!o || o.transaction_id == null) continue;
+      const tx = String(o.transaction_id), b = bordsParTxn[tx], capte = labelsCaptes[tx];
+      const pdfMail = b && b.hasPdf ? b._row : null, pdfCapte = capte && capte.row ? capte.row : null;
+      if (!pdfMail && !pdfCapte) continue;
+      const aFaire = aExpedier(o) && !isShipDone(o);
+      const t = Date.parse(String(o.date || ''));
+      if (!aFaire && !(Number.isFinite(t) && t >= recent)) continue;
+      cands.push({ o, tx, pdfMail, pdfCapte, aFaire, t: Number.isFinite(t) ? t : 0 });
+    }
+    cands.sort((a, b) => (b.aFaire - a.aFaire) || (b.t - a.t));
+    const r = await chercherCodeDansEtiquettes(code, cands, (c) => texteEtiquetteScan(c.pdfCapte, c.pdfMail));
+    return { etat: r.etat, enregistrements: r.trouves.map((c) => enregVenteScan(c.o)), pasLus: r.pasLus };
+  };
   const sourceRetrouver = React.useRef(null);
   sourceRetrouver.current = () => {
     const E = [], manques = [];
@@ -46769,18 +46855,26 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!achatsLus) manques.push(tr('scan.r.manque.achats'));
     if (!bordsLus) manques.push(tr('scan.r.manque.bordereaux'));
     const compteDe = (o) => (o && o._acc && typeof o._acc === 'object' ? accName(o._acc) : '');
+    // (16 nov., lot scan-achat) Ce qu'il y a dans le colis d'un achat : ce que VRM a LU (la commande, puis SA transaction
+    // à l'affichage), la marque seulement si le titre la nomme ; et les gestes (Ranger, Signaler un problème sur Vinted).
+    const dansLeColis = (o, tx, suivis) => {
+      const m = montantCommande(o);
+      const uid = String((o && o._acc && o._acc.vinted_user_id) || (o && o._acc) || '');
+      const info = infosTxAchats && infosTxAchats[tx];
+      return { prix: m > 0 ? m : null, devise: (o.price && typeof o.price === 'object' && o.price.currency_code) || 'EUR', date: o.date || '', vendeur: (info && info.vendeur) || '',
+        marque: extractBrand(o.title || '') || '',
+        signaler: o.conversation_id ? `https://www.vinted.fr/inbox/${encodeURIComponent(o.conversation_id)}` : `https://www.vinted.fr/member/transactions/${encodeURIComponent(tx)}`,
+        details: () => detailsAchatScan(uid, tx),
+        ranger: () => { const e = entreeAvecPaye(o, suivis && suivis[0] ? { suivi: suivis[0] } : {}); if (!e) return; noterArrivees([e]); ouvrirAtelierArrivee([e]); } };
+    };
     try {
-      // Ventes Vinted (avec bordereau lu : sans n°, aucun scan ne peut les désigner).
+      // Ventes Vinted (avec bordereau lu : sans n°, aucun scan ne peut les désigner — sauf par le code imprimé
+      // sur SON étiquette, `chercher` plus bas).
       for (const o of (ventesLues ? sales.items : [])) {
         if (!o || o.transaction_id == null) continue;
-        const tx = String(o.transaction_id), b = bordsParTxn[tx];
-        const suivis = [b && b.suivi, b && b.suiviPdf].filter(Boolean);
-        if (!suivis.length) continue;
-        const e = effEntry(o) || {};
-        const aFaire = aExpedier(o) && !isShipDone(o);
-        const etat = aExpedier(o) ? (isShipDone(o) ? tr('scan.r.etat.colisFait') : b ? tr('scan.r.etat.aExpedierPret') : tr('scan.r.etat.aExpedier')) : ((venteStage(o) || {}).label || '');
-        E.push({ sorte: 'vente', site: 'vinted', cle: 'v:' + tx, suivis, titre: o.title || '', num: (b ? numForBord(b) : '') || e.numero || '', photo: orderPhoto(o) || null,
-          taille: (e.taille ? String(e.taille) : '') || String(o.size_title || o.size || ''), compte: compteDe(o), etat, aFaire, lien: `?tab=ventes&site=vinted&cible=vente&tx=${encodeURIComponent(tx)}` });
+        const x = enregVenteScan(o);
+        if (!x.suivis.length) continue;
+        E.push(x);
       }
       // Vestiaire (ventes) : son n° de suivi lu.
       for (const c of colisScannables()) {
@@ -46799,7 +46893,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const lieu = String((t && t.lieu) || (r && r.lieu) || '');
         const limite = jourCourtScan((t && t.limite) || (r && r.limite) || '');
         const tx = o && o.transaction_id != null ? String(o.transaction_id) : '';
-        const x = { sorte: o ? 'achat' : 'colis', site: 'vinted', cle: o ? 'a:' + tx : c.cle, suivis, titre: c.titre || '', num: tx && buyNumByTxn[tx] != null ? String(buyNumByTxn[tx]) : '', photo: c.photo || null,
+        const x = { ...(o ? dansLeColis(o, tx, suivis) : {}), sorte: o ? 'achat' : 'colis', site: 'vinted', cle: o ? 'a:' + tx : c.cle, suivis, titre: c.titre || '', num: tx && buyNumByTxn[tx] != null ? String(buyNumByTxn[tx]) : '', photo: c.photo || null,
           taille: c.taille || '', compte: c.compte || '', etat: c.deja ? tr('scan.r.etat.retire') : tr('scan.r.etat.aRetirer'), aFaire: !c.deja, detail: !c.deja && limite ? tr('scan.r.etat.limite', { date: limite }) : '',
           code: c.deja ? '' : code, lieu: c.deja ? '' : lieu,
           lien: tx ? `?tab=achats&cible=${c.deja ? 'achat' : 'retrait'}&tx=${encodeURIComponent(tx)}` : `?tab=achats&cible=retrait&suivi=${encodeURIComponent(suivis[0])}` };
@@ -46811,7 +46905,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const tx = String(o.transaction_id); if (parTx.has(tx)) continue;
         const suivis = suivisAchat(o, indexSuivisAchats);
         if (!suivis.length) continue;
-        E.push({ sorte: 'achat', site: 'vinted', cle: 'a:' + tx, suivis, titre: o.title || '', num: buyNumByTxn[tx] != null ? String(buyNumByTxn[tx]) : '', photo: orderPhoto(o) || null,
+        E.push({ ...dansLeColis(o, tx, suivis), sorte: 'achat', site: 'vinted', cle: 'a:' + tx, suivis, titre: o.title || '', num: buyNumByTxn[tx] != null ? String(buyNumByTxn[tx]) : '', photo: orderPhoto(o) || null,
           taille: String(o.size_title || o.size || ''), compte: compteDe(o), etat: String(o.status || ''), aFaire: false, lien: `?tab=achats&cible=achat&tx=${encodeURIComponent(tx)}` });
       }
       // Retours d'achat : SON bordereau de retour (n° EXACT), l'étape PROUVÉE de la carte (src/retoursAchat.js).
@@ -46823,7 +46917,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           lien: `?tab=achats&cible=retour&tx=${encodeURIComponent(c.tx)}` });
       }
     } catch (_) {}
-    return { pret: ventesLues && achatsLus && bordsLus && retoursAchatLus !== undefined, enregistrements: E, manques };
+    return { pret: ventesLues && achatsLus && bordsLus && retoursAchatLus !== undefined, enregistrements: E, manques,
+      // (17 nov., lot scan-bordereau-vente) Un code qui n'est pas un n° de suivi connu : cherché dans le texte des
+      // étiquettes de SES ventes (src/etiquettesScan.js) — une identité exacte, l'étiquette de CETTE transaction.
+      chercher: ventesLues ? (code) => chercherVenteParEtiquette(code) : null };
   };
   useEffect(() => {
     if (only !== 'bordereaux') return undefined;

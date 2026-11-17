@@ -73,8 +73,11 @@ clic). Liste pas lue ⇒ rien n'est contredit (pas su).
 - Banc `scripts/bancs/retirer-multi-transporteurs.cjs` : 67 verts (390 tactile et 1512, clair et sombre) —
   avec la liste ⇒ 1 ligne au nom de l'article, code et QR, aucune « Code sur Vinted » ; sans la liste ⇒ 2
   lignes + la proposition, aucune écriture avant le toucher, 1 ligne après ; deux achats ⇒ aucune
-  proposition ; « pas le même » ; lien contredit + « Délier ». Captures regardées. Rouge sur `main` et par
-  mutation : voir le rapport de PR.
+  proposition ; « pas le même » ; lien contredit + « Délier ». Captures regardées.
+  **Rouge sur le build de `main`** : 28 rouges — exactement le cas de Julien (« Colis Chronopost Pickup » +
+  « Baskets… » à vérifier, « Code sur Vinted »). **Mutation « relier sans son toucher »** (la proposition
+  relie au rendu, build à part) : rouge (« rien n'est relié avant SON toucher », deux lignes attendues).
+  « Proposer avec deux candidats » : rouge par mutation de `src/memeColis.js` dans `audit-meme-colis`.
 - `audit-coherence`, `audit-extension-zip`, `audit-traduction`, `audit-relier-colis`, `audit-quoi-de-neuf`,
   `audit-icones`, `audit-fonctions-api` : verts.
 

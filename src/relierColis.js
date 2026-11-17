@@ -63,10 +63,10 @@ export function achatsARelier(achats, index = {}, { maintenant = Date.now(), jou
 }
 
 // L'écriture du lien : la ligne `colis_suivi_*` du n° (son id et ce qu'elle porte). Rien sans n° lisible ni achat.
-export function ecritureRelierColis({ suivi, transporteur }, achat) {
+export function ecritureRelierColis({ suivi, transporteur, depuis }, achat) {
   const su = normaliserSuivi(suivi); const t = tx(achat);
   if (!su || !t) return null;
   const tr = TRANSPORTEURS_SAISIE.includes(transporteur) ? transporteur : 'autre';
   const uid = uidDe(achat);
-  return { id: idSuiviManuel(tr, su), patch: { suivi: su, transporteur: tr, tx: t, uid: uid || null, relieDepuis: 'retrait' } };
+  return { id: idSuiviManuel(tr, su), patch: { suivi: su, transporteur: tr, tx: t, uid: uid || null, relieDepuis: depuis === 'scan' ? 'scan' : 'retrait' } };
 }
