@@ -338,3 +338,5 @@ html[data-design="v2"] body .vrm-app-header.v2-entete-cloche [data-titre-ecran] 
 /* La paire montrée à droite (ordinateur) : sa rangée reste marquée dans la liste. */
 .sr-ligne[data-sr-actif="1"] { background: rgb(0 113 227 / .08); box-shadow: inset 3px 0 0 #0071E3; }
 :root[data-theme="dark"] .sr-ligne[data-sr-actif="1"] { background: rgb(74 163 255 / .12); box-shadow: inset 3px 0 0 #4AA3FF; }
+/* « ⋯ » à côté de la recherche collée : un disque de la même porcelaine que le champ (lisible sur la coque comme sur une carte). */
+html body .sr-cherche-ligne > button.v2b-icone { background: var(--sr-carte); color: var(--sr-encre); box-shadow: var(--sr-ombre); flex: none; }
