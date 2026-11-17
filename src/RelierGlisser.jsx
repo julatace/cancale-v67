@@ -170,7 +170,7 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
     // (17 nov., lot relier-taille) La taille (lue chez Vinted, sinon celle du titre), comparée à la vente / l'annonce
     // CHOISIE (« ✓ » ou « ≠ 42 »), l'état, les couleurs, la marque, la date, le compte, le vendeur — src/FaitsAchat.jsx.
     const sous = <FaitsAchat achat={a} details={details || null} cible={cChoisie || null} marqueDe={marqueDe} couleursDe={couleursDe}
-      date={a.date ? jourCourt(a.date) : ''} compte={compteDe(a)} className="vrm-rg-faits"/>;
+      date={a.date ? jourCourt(a.date) : ''} compte={compteDe(a)} court className="vrm-rg-faits"/>;
     return (
       <>
         <span className="vrm-rg-photo" aria-hidden="true">{ph ? <Photo src={ph} alt="" loading="lazy" decoding="async" draggable={false}/> : <Icon name="bag" size={20}/>}</span>
@@ -210,7 +210,6 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
       <div className="vrm-rg-corps">
         <section className="vrm-rg-col vrm-rg-achats" aria-label={tr('glisser.achats')}>
           <h3 className="vrm-rg-h3">{tr('glisser.achats')}{nA != null ? <span className="vrm-rg-n">{nA}</span> : null}</h3>
-          {details && nSansTaille ? <NoteTailleAchats n={nSansTaille} className="vrm-rg-note"/> : null}
           <ul className="vrm-rg-liste" data-glisser-achats={nA == null ? '' : String(nA)}>
             {L.achats === undefined ? <li className="vrm-rg-vide">…</li>
               : L.achats === null ? <li className="vrm-rg-vide">{tr('glisser.pasSu')}</li>
@@ -224,6 +223,9 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
                     {carteAchat(x)}
                   </button>
                 </li>))}
+            {/* La phrase « N achats sans taille lue », une fois, au BAS de la liste : au téléphone la moitié haute de
+                l'écran reste aux achats eux-mêmes. */}
+            {details && nSansTaille && Array.isArray(L.achats) && L.achats.length ? <li className="vrm-rg-note-li"><NoteTailleAchats n={nSansTaille} className="vrm-rg-note"/></li> : null}
           </ul>
         </section>
         <section className="vrm-rg-col vrm-rg-cibles" aria-label={tr('glisser.cibles')}>

@@ -70,6 +70,12 @@ Textes : `faits.*` dans `src/i18n/langues/{fr,en,es,it,de}/liaison.js`. Quoi de 
   - Build de `origin/main` : **48 rouges** sur 92. Build muté (détails ignorés) : **9 rouges** (390) ; build muté
     (accord par l'entier : 42,5 = 42) : **3 rouges** (1512).
   - Captures regardées (feuille 390 clair / sombre, 1512 ; Relier achats et ventes 390 et 1512 sombre, achat choisi).
+- Bancs voisins : `relier-glisser` **63 / 0** (il a d'abord rougi une fois : la phrase « N achats sans taille lue » en
+  tête de la colonne et des cartes de trois lignes repoussaient le 3e achat sous le bas de la liste, le doigt du banc
+  tombait hors de la liste ⇒ la phrase passe au BAS de la liste et les cartes de « Relier achats et ventes » omettent
+  couleurs et marque, déjà dans le titre — `court`) ; `relier-sans-retour` **18 / 0** ; `relier-achat-suggestions` et
+  `relier-achat-filtres` rouges à l'entrée (« Relier un achat » introuvable) **aussi sur le build d'`origin/main`** :
+  sans rapport avec ce lot.
 - Audits touchés verts : traduction, quoi-de-neuf, relier-glisser, relier-fiable (43, une extraction fragile du code —
   un `image/*` lu comme début de commentaire — m'a fait déplacer un commentaire JSX en commentaire de ligne),
   achats-relier, liaison-achat, achats-a-relier, identite, achats-hors-relier, relier-colis, relier-compte,

@@ -13,12 +13,13 @@ import './styles-faits-achat.css';
 
 const COULEURS_DITES = new Set(['noir', 'blanc', 'gris', 'bleu', 'vert', 'rouge', 'rose', 'jaune', 'orange', 'violet', 'beige', 'marron']);
 
-export function FaitsAchat({ achat, details = null, cible = null, marqueDe = null, couleursDe = null, date = '', compte = '', avant = null, className = '' }) {
+export function FaitsAchat({ achat, details = null, cible = null, marqueDe = null, couleursDe = null, date = '', compte = '', avant = null, court = false, className = '' }) {
   const f = faitsAchat(achat, { details, cible, marqueDe, couleursDe });
   const couleurs = f.couleurs.filter((c) => COULEURS_DITES.has(c)).map((c) => tr(`liaison.couleur.${c}`)).filter(Boolean);
   // L'ordre de lecture : ce qui distingue deux paires au même titre d'abord (taille, état, date, vendeur), puis ce
   // que le titre dit déjà (couleurs, marque), puis le compte.
-  const reste = [f.etat, date, f.vendeur ? tr('faits.vendeur', { vendeur: f.vendeur }) : '', couleurs.join(' / '), f.marque, compte].filter(Boolean);
+  // `court` (Relier achats et ventes, cartes compactes) : sans les couleurs ni la marque, qui viennent du titre affiché juste au-dessus.
+  const reste = [f.etat, date, f.vendeur ? tr('faits.vendeur', { vendeur: f.vendeur }) : '', court ? '' : couleurs.join(' / '), court ? '' : f.marque, compte].filter(Boolean);
   const tx = String((achat && achat.transaction_id) || '');
   return (
     <span className={`vrm-faits ${className}`.trim()} data-faits-achat={tx} data-faits-lu={f.lu ? '1' : '0'}>
