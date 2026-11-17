@@ -16,16 +16,14 @@ export default {
     "other": "paquetes por enviar"
   },
   "v2v.rechercher": "N.º, modelo, comprador…",
-  "v2v.ecart.prets": {
-    "one": "{n} lista para imprimir",
+  "v2v.ecart.prets": {"one": "{n} lista", "other": "{n} listas"} lista para imprimir",
     "other": "{n} listas para imprimir"
   },
   "v2v.ecart.sans": {
     "one": "{n} sin etiqueta",
     "other": "{n} sin etiqueta"
   },
-  "v2v.ecart.imprimes": {
-    "one": "{n} impresa, por entregar",
+  "v2v.ecart.imprimes": {"one": "{n} por entregar", "other": "{n} por entregar"} impresa, por entregar",
     "other": "{n} impresas, por entregar"
   },
   "v2v.enRetard": "con retraso",

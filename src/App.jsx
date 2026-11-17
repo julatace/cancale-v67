@@ -47824,7 +47824,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const imprimerCarteV2 = (ident) => { try { const b = document.querySelector(`.v2-cache [data-colis-ident="${CSS.escape(ident)}"] button[data-imprime="1"]`); if (b) b.click(); } catch (_) {} };
   const lignesEnvoyerV2 = () => {
     const groupeDl = (dl) => (dl == null || !Number.isFinite(dl) ? 'sansDate' : dl <= 1 ? 'presse' : dl <= 7 ? 'semaine' : 'plusTard');
-    return colisAEnvoyerListe().map((e) => {
+    // L'ordre de la liste d'hier (`colisAEnvoyerRanges` : la vente la plus récente en haut — Julien, 9 nov.), dans chaque groupe.
+    return colisAEnvoyerRanges().map((e) => {
       if (e.__autre) {
         const site = { vc: 'vestiaire', eb: 'ebay', lbc: 'leboncoin' }[e.__autre] || e.__autre;
         const x = e.x || {}, v = e.v || {}, o = e.o || {};

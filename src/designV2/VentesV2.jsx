@@ -42,17 +42,20 @@ export function RechercheVentes({ champ, plus }) {
 // `lignes` : [{ cle, fait }] ; rend l'ensemble des clés qui viennent de passer à « fait » (encore à leur place).
 export function usePartants(lignes) {
   const avant = React.useRef(null);
+  const minuteurs = React.useRef(new Set());
   const [partants, setPartants] = React.useState(() => new Map());
+  // Les minuteurs ne sont arrêtés qu'au démontage : un nouveau rendu (il y en a un tout de suite) ne doit pas les annuler.
+  React.useEffect(() => () => { for (const t of minuteurs.current) clearTimeout(t); minuteurs.current.clear(); }, []);
   React.useEffect(() => {
     const maintenant = new Map(lignes.map((l) => [l.cle, { fait: !!l.fait, groupe: l.groupe }]));
     const prec = avant.current; avant.current = maintenant;
-    if (!prec) return undefined;
+    if (!prec) return;
     const neufs = lignes.filter((l) => l.fait && prec.get(l.cle) && prec.get(l.cle).fait === false);
-    if (!neufs.length) return undefined;
+    if (!neufs.length) return;
     setPartants((m) => { const x = new Map(m); for (const l of neufs) x.set(l.cle, { ...l, groupeAvant: prec.get(l.cle).groupe }); return x; });
     const reduit = (() => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } })();
-    const t = setTimeout(() => setPartants((m) => { const x = new Map(m); for (const l of neufs) x.delete(l.cle); return x; }), reduit ? 200 : 520);
-    return () => clearTimeout(t);
+    const t = setTimeout(() => { minuteurs.current.delete(t); setPartants((m) => { const x = new Map(m); for (const l of neufs) x.delete(l.cle); return x; }); }, reduit ? 200 : 520);
+    minuteurs.current.add(t);
   });
   return partants;
 }

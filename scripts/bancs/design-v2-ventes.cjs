@@ -206,7 +206,7 @@ async function allume(nav, b, sombre, W, ref) {
     if (f0) {
       await pg.evaluate((cle) => { const b = document.querySelector(`.v2-cache [data-colis-ident="${CSS.escape(cle)}"] button[data-geste="imprime"]`); if (b) b.click(); }, f0.cle);
       const vu = await attendre(pg, (cle) => !!document.querySelector(`[data-v2v-ligne="${CSS.escape(cle)}"][data-v2v-fait="part"]`), 1500, f0.cle).catch(() => false);
-      const enCours = await pg.evaluate(() => !!document.querySelector('.v2-faite.is-faite .v2v-ligne, .v2-faite.is-faite [data-v2v-ligne]') || !!document.querySelector('.v2-faite.is-faite'));
+      const enCours = await attendre(pg, () => !!document.querySelector('.v2-faite.is-faite [data-v2v-fait="part"]'), 400, 0);
       await pg.screenshot({ path: path.join(SHOTS, `ventes-fait-${th}.png`) });
       await pg.waitForTimeout(1200);
       const f1 = await pg.evaluate((cle) => { const r = [...document.querySelectorAll(`[data-v2v-ligne="${CSS.escape(cle)}"]`)].filter((x) => x.getAttribute('data-v2v-fait') !== 'part');

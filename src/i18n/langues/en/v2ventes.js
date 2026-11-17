@@ -16,16 +16,14 @@ export default {
     "other": "parcels to send"
   },
   "v2v.rechercher": "No., model, buyer…",
-  "v2v.ecart.prets": {
-    "one": "{n} ready to print",
+  "v2v.ecart.prets": {"one": "{n} ready", "other": "{n} ready"} ready to print",
     "other": "{n} ready to print"
   },
   "v2v.ecart.sans": {
     "one": "{n} without a label",
     "other": "{n} without a label"
   },
-  "v2v.ecart.imprimes": {
-    "one": "{n} printed, to drop off",
+  "v2v.ecart.imprimes": {"one": "{n} to drop off", "other": "{n} to drop off"} printed, to drop off",
     "other": "{n} printed, to drop off"
   },
   "v2v.enRetard": "late",

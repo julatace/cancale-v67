@@ -16,16 +16,14 @@ export default {
     "other": "Pakete zu versenden"
   },
   "v2v.rechercher": "Nr., Modell, Käufer…",
-  "v2v.ecart.prets": {
-    "one": "{n} druckbereit",
+  "v2v.ecart.prets": {"one": "{n} bereit", "other": "{n} bereit"} druckbereit",
     "other": "{n} druckbereit"
   },
   "v2v.ecart.sans": {
     "one": "{n} ohne Etikett",
     "other": "{n} ohne Etikett"
   },
-  "v2v.ecart.imprimes": {
-    "one": "{n} gedruckt, abzugeben",
+  "v2v.ecart.imprimes": {"one": "{n} abzugeben", "other": "{n} abzugeben"} gedruckt, abzugeben",
     "other": "{n} gedruckt, abzugeben"
   },
   "v2v.enRetard": "verspätet",
