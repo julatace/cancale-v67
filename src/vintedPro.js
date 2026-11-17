@@ -165,21 +165,27 @@ export const SELECT_TXN_PRO = 'id,tx:data->payload->transaction->>id,side:data->
 //   · transaction pas lue ⇒ mise à part (« prix de l'article pas lu »).
 // Une vente DÉJÀ DÉCLARÉE garde sa place (son mois de déclaration) : on ne retire
 // jamais une vente d'une déclaration faite.
-const eurTxt = (c) => (Number.isSafeInteger(c) ? (c / 100).toFixed(2).replace('.', ',') + ' €' : '—');
+export const RAISON_DEUX_PRIX = 'deux prix chez Vinted';
+export const RAISON_DEUX_PRIX_RELEVE = 'deux prix chez Vinted, le relevé en dit un troisième';
+export const RAISON_PRO_PAS_LU = 'prix de l’article pas lu (compte Pro)';
 export function prixVentePro(o, txn, ligneReleve) {
   const liste = centimesVinted(o && o.price);
-  if (!txn) return { compter: false, raison: 'prix de l’article pas lu (compte Pro)' };
+  if (!txn) return { compter: false, code: 'pro-pas-lu', raison: RAISON_PRO_PAS_LU };
   const dev = txt(txn.devise).toUpperCase();
-  if (dev && dev !== 'EUR') return { compter: false, raison: 'autre devise que l’euro' };
+  if (dev && dev !== 'EUR') return { compter: false, code: 'devise', raison: 'autre devise que l’euro' };
   const art = centimesVinted(txn.prix);
-  if (art == null || liste == null) return { compter: false, raison: 'prix de l’article pas lu (compte Pro)' };
+  if (art == null || liste == null) return { compter: false, code: 'pro-pas-lu', raison: RAISON_PRO_PAS_LU };
   if (art === liste) return { compter: true };
   const cr = ligneReleve ? centimesVinted(ligneReleve.montant) : null;
   if (cr != null && cr === liste) return { compter: true, tranche: 'releve' };
   if (cr != null && cr === art) return { compter: true, tranche: 'releve', prixArticle: art };
-  return { compter: false, raison: cr != null
-    ? `deux prix chez Vinted (${eurTxt(liste)} et ${eurTxt(art)}), le relevé dit ${eurTxt(cr)}`
-    : `deux prix chez Vinted (${eurTxt(liste)} et ${eurTxt(art)}) : ouvre ton porte-monnaie Vinted, le relevé tranchera` };
+  // (16 nov., lot argent-mieux) La raison est UNE phrase, la même pour toutes les ventes de ce cas : les
+  // prix vivent à côté (`listeC`, `artC`, `releveC`, centimes). Avant, chaque vente portait ses deux prix
+  // DANS sa raison : les ventes se groupant par raison, 60 ventes faisaient 60 groupes (« le mur »).
+  // La règle ne change pas : la vente reste mise à part (`compter: false`).
+  return cr != null
+    ? { compter: false, code: 'deux-prix-releve', raison: RAISON_DEUX_PRIX_RELEVE, listeC: liste, artC: art, releveC: cr }
+    : { compter: false, code: 'deux-prix', raison: RAISON_DEUX_PRIX, listeC: liste, artC: art };
 }
 // Pose `_prixPro` sur les ventes d'UN compte. pro : true · false · null ;
 // txns : Map(tx → scalaires) · null (pas lu) ; releve : Map(tx → ligne) · null.

@@ -172,6 +172,10 @@ let nShot = 0;
 const shot = async (pg, nom) => { if (SHOTS) { try { await pg.screenshot({ path: path.join(SHOTS, `impression-simple-${String(++nShot).padStart(2, '0')}-${nom}.png`), timeout: 60000 }); } catch (_) {} } };
 // UN TOUCHER : au doigt (tap) en tactile, au clic sinon — compté.
 const toucher = async (o, sel) => { const l = o.pg.locator(sel).first(); await l.waitFor({ state: 'visible', timeout: 15000 }); if (o.tactile) await l.tap(); else await l.click(); o.touchers++; };
+// (16 nov., lot tampons-parametres — Julien : « je sélectionne ce que je veux imprimer, et après ça m'ouvre une vignette […] et
+// quand je touche Imprimer, les réglages sont appliqués ») La sélection ouvre l'APERÇU AVANT IMPRESSION : un toucher de plus,
+// son « Imprimer » ouvre le PDF (dans le geste : préparé pendant l'aperçu). Banc de l'aperçu lui-même : tampons-apercu.
+const passerApercu = async (o) => { await o.pg.waitForSelector('[data-impr-apercu="pret"] [data-impr-apercu-imprimer]:not([disabled])', { timeout: 60000 }); await toucher(o, '[data-impr-apercu-imprimer]'); };
 const attendre = (pg, f, arg, ms = 20000) => pg.waitForFunction(f, arg, { timeout: ms }).then(() => true).catch(() => false);
 const ouvertures = (pg) => pg.evaluate(() => window.__ouvertures.map((x) => ({ voie: x.voie, geste: x.geste })));
 const b64DePartage = (pg, i) => pg.evaluate(async (k) => { const x = window.__ouvertures[k]; if (!x || !x.blob) return null; const u = new Uint8Array(await x.blob.arrayBuffer()); let s = ''; for (let j = 0; j < u.length; j++) s += String.fromCharCode(u[j]); return btoa(s); }, i);
@@ -197,10 +201,12 @@ async function scenarioA(b, nom, sombre) {
     dit(q && (await ouvertures(pg)).length === 0, `${nom} : A1 la PREMIÈRE fois : la question du papier, rien d'ouvert encore`);
     await shot(pg, `${nom}-papier`);
     await toucher(o, '[data-impr-papier-choix="normale"]');
+    dit((await ouvertures(pg)).length === 0, `${nom} : A1b l'aperçu avant impression d'abord : rien d'ouvert`);
+    await passerApercu(o);
     await attendre(pg, () => window.__ouvertures.length > 0, null, 8000);
     const ouv = await ouvertures(pg);
     dit(ouv.length === 1 && ouv[0].voie === 'partage' && ouv[0].geste === 'click', `${nom} : A2 la feuille de partage s'ouvre DANS le toucher (window.event = ${ouv[0] && ouv[0].geste || '—'})`, JSON.stringify(ouv));
-    dit(o.touchers === 2, `${nom} : A3 2 touchers jusqu'au PDF la première fois`, String(o.touchers));
+    dit(o.touchers === 3, `${nom} : A3 3 touchers jusqu'au PDF la première fois (Imprimer · papier · Imprimer de l'aperçu)`, String(o.touchers));
     const b64 = await b64DePartage(pg, 0);
     const pages = b64 ? await lirePdf(b64) : [];
     const cn = codesEtNums(pages);
@@ -257,9 +263,10 @@ async function scenarioB(b, nom, sombre) {
     dit(pret && luAvant === 0 && pretAvant === '0', `${nom} : B0 sur ordinateur, AUCUN PDF n'est lu avant son toucher`, JSON.stringify({ luAvant, pretAvant }));
     await shot(pg, `${nom}-ecran`);
     await toucher(o, '[data-impr-lot]');
+    await passerApercu(o);
     const vis = await attendre(pg, () => !!document.querySelector('[data-visionneuse-pdf="pret"]'), null, 30000);
     const papier = !!(await pg.$('[data-impr-papier-feuille]'));
-    dit(pret && vis && !papier && o.touchers === 1, `${nom} : B1 papier déjà choisi : UN toucher ⇒ la visionneuse s'ouvre avec le PDF (aucune question de papier)`, JSON.stringify({ pret, vis, papier, touchers: o.touchers }));
+    dit(pret && vis && !papier && o.touchers === 2, `${nom} : B1 papier déjà choisi : Imprimer puis l'aperçu ⇒ la visionneuse s'ouvre avec le PDF (aucune question de papier)`, JSON.stringify({ pret, vis, papier, touchers: o.touchers }));
     const auto = await attendre(pg, () => { const v = document.querySelector('[data-visionneuse-pdf]'); return v && v.getAttribute('data-visionneuse-auto') === 'lancee'; }, null, 8000);
     dit(auto, `${nom} : B2 l'impression part SEULE (la fenêtre d'impression du navigateur)`);
     const b64 = await b64DeVisionneuse(pg);
@@ -313,6 +320,7 @@ async function scenarioC(b, nom) {
   try {
     await attendre(pg, () => { const e = document.querySelector('[data-impr-lot]'); return e && e.getAttribute('data-impr-pret') === '1'; }, null, 45000);
     await toucher(o, '[data-impr-lot]');
+    await passerApercu(o);
     const q = await attendre(pg, () => /N°23 n.est pas encore vérifié/.test(document.body.innerText), null, 8000);
     dit(q && (await ouvertures(pg)).length === 0, `${nom} : C1 le N° « à vérifier » (23) DEMANDE, et rien n'est ouvert avant sa réponse`);
     await shot(pg, `${nom}-question`);
@@ -320,6 +328,7 @@ async function scenarioC(b, nom) {
     await pg.waitForTimeout(1500);
     dit((await ouvertures(pg)).length === 0 && !(await pg.$('[data-impr-feuille]')), `${nom} : C2 « Annuler » ⇒ aucun PDF ouvert, aucune feuille`);
     await toucher(o, '[data-impr-lot]');
+    await passerApercu(o);
     await attendre(pg, () => /N°23 n.est pas encore vérifié/.test(document.body.innerText), null, 8000);
     await pg.evaluate(() => { const bs = [...document.querySelectorAll('button')].filter((x) => /J'ai vérifié, imprimer/.test(x.innerText) && x.offsetParent); bs[bs.length - 1].click(); });
     const f = await attendre(pg, () => !!document.querySelector('[data-impr-feuille] [data-impr-ouvrir]'), null, 15000);

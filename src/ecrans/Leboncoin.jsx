@@ -466,7 +466,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] }, enSection = false }) {
   // « Déplacer le tampon » : l'aperçu s'ouvre toujours, la place choisie s'imprime.
   const adjustBordPlacement = async () => {
     const r = bordResult; if (!r?.pdfBuf) return;
-    try { const r2 = await annotateAndDownloadBordereau(r.numero, r.title, r.pdfBuf, null, { apercu: 'force' }); setBordResult({ ...r2, numero: r.numero, title: r.title, pdfBuf: r.pdfBuf, key: r.key, w: r.w, h: r.h }); }
+    try { const r2 = await annotateAndDownloadBordereau(r.numero, r.title, r.pdfBuf, null, { apercu: 'force', site: 'leboncoin' }); setBordResult({ ...r2, numero: r.numero, title: r.title, pdfBuf: r.pdfBuf, key: r.key, w: r.w, h: r.h }); }
     catch (err) { libererOngletPdf(); if (!estTamponAnnule(err)) toast('Erreur : ' + String(err)); }
   };
   const ventes = lbcVentes.ventes || [];
@@ -503,7 +503,7 @@ function LeboncoinColis({ lbcVentes = { ventes: [] }, enSection = false }) {
       const { width, height } = await readPdfFirstPageSize(bytes);
       const key = bordereauFormatKey(width, height);
       const pos = posForFormat(width, height);   // emplacement APPRIS pour ce format
-      const r = await annotateAndDownloadBordereau(n || '', o.title || '', bytes, pos);
+      const r = await annotateAndDownloadBordereau(n || '', o.title || '', bytes, pos, { site: 'leboncoin' });
       // On garde le PDF SOUS LA MAIN pour permettre de DÉPLACER ensuite (comme Vinted).
       setBordResult({ ...r, numero: n || '', title: o.title || '', pdfBuf: bytes, key, w: width, h: height });
     } catch (e) { libererOngletPdf(); if (!estTamponAnnule(e)) toast('Impossible de tamponner ce bordereau : ' + String(e)); }
