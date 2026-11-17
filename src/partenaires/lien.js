@@ -8,7 +8,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 export const CLE_PARTENAIRE = 'vrm_partenaire_code';
 export const CODE_PARTENAIRE_RE = /^[A-Z0-9]{3,16}$/;
-const canon = (c) => { const t = String(c == null ? '' : c).trim().toUpperCase(); return CODE_PARTENAIRE_RE.test(t) ? t : ''; };
+export const canon = (c) => { const t = String(c == null ? '' : c).trim().toUpperCase(); return CODE_PARTENAIRE_RE.test(t) ? t : ''; };
 
 export function codePartenaireDe(search) {
   try { return canon(new URLSearchParams(search || '').get('partenaire')); } catch (_) { return ''; }
@@ -27,21 +27,5 @@ export function garderCodePartenaire(stock, search, chemin) {
   return c;
 }
 
-// Présenter le code gardé (ou celui posé sur le compte à l'inscription) — une fois.
-// Rend 'ok' · 'refus' · 'garde' (à refaire plus tard) · 'rien'.
-export async function presenterCodePartenaire({ fetcher, enTete, stock, uid, duCompte, dire }) {
-  let code = codePartenaireGarde(stock);
-  const cleTente = uid ? 'vrm_partenaire_tente_' + uid : '';
-  let deja = false; try { deja = !!cleTente && stock.getItem(cleTente) === '1'; } catch (_) {}
-  if (!code && !deja) code = canon(duCompte);
-  if (!code || !enTete || !enTete.Authorization) return 'rien';
-  let r;
-  try { r = await fetcher('/api/compte?mode=partenaire', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTete }, body: JSON.stringify({ action: 'rattacher', code }) }); }
-  catch (_) { return 'garde'; }
-  if (!r || r.status >= 500 || r.status === 401) return 'garde';
-  const j = await r.json().catch(() => null);
-  try { stock.removeItem(CLE_PARTENAIRE); if (cleTente) stock.setItem(cleTente, '1'); } catch (_) {}
-  if (r.ok && j && j.ok) { if (dire) dire('ok', j); return 'ok'; }
-  if (dire && j && j.raison) dire('refus', j);
-  return 'refus';
-}
+// (16 nov., lot vitesse-lectures) Présenter le code au serveur : src/partenaires/presenter.js (l'app seule ;
+// ce fichier-ci est lu dès le démarrage par la page d'accueil, il reste minuscule).

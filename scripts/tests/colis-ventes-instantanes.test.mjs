@@ -4,7 +4,7 @@
 // node --test scripts/tests/colis-ventes-instantanes.test.mjs
 import test from 'node:test'; import assert from 'node:assert/strict';
 import { lireInstantaneEcran, ecrireInstantaneEcran, effacerInstantanes, cleInstantaneEcran, jourLocalIso, AGE_MAX_INSTANTANE_MS } from '../../src/instantaneEcran.js';
-import { colisMontrable, ventesMontrable } from '../../src/colisVentesInstantanes.js';
+import { ventesMontrable } from '../../src/colisVentesInstantanes.js';
 import { lireInstantane, ecrireInstantane, cleInstantane } from '../../src/journeeInstantanee.js';
 
 const faux = () => { const m = new Map(); return { get length() { return m.size; }, key: (i) => [...m.keys()][i] ?? null, getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) }; };
@@ -66,16 +66,13 @@ test('trop vieux, futur, illisible, autre version ⇒ rien', () => {
   ls.setItem(cleInstantaneEcran('colis', 'A'), JSON.stringify({ ...colis('A'), v: 2 }));
   assert.equal(lireInstantaneEcran('colis', 'A', { maintenant: T0, ls }), null);
 });
-test('Colis un autre jour : ni prochaine chose, ni délais, ni carte du jour ; les nombres des onglets restent', () => {
-  const M0 = colisMontrable(colis('A'), T0 + 60000);
-  assert.ok(M0.prochain && M0.carte && M0.liste[1].limite);
-  const lendemain = T0 + 86400000;
-  const M = colisMontrable(colis('A'), lendemain);
-  assert.equal(M.prochain, null);
-  assert.equal(M.carte, null, 'la carte « Aujourd’hui » n’est pas d’aujourd’hui');
-  assert.equal(M.liste[1].limite, ''); assert.equal(M.liste[1].attente, '');
-  assert.equal(M.liste[1].num, '117'); assert.equal(M.onglets[0].n, 3);
-  assert.equal(colisMontrable(ventes('A'), T0), null, 'un instantané de Ventes ne se montre pas dans Colis');
+// (16 nov., lot ecrans-restes) Plus d'instantané de Colis montré (ColisInstantane retiré, Colis vit dans Ventes) :
+// la règle commune ci-dessus reste jugée sur sa clé (purgée à la déconnexion), `colisMontrable` n'existe plus.
+test('Colis : plus aucun rendu ni rangement de l’instantané (code retiré)', async () => {
+  const M = await import('../../src/colisVentesInstantanes.js');
+  assert.equal(typeof M.colisMontrable, 'undefined');
+  assert.equal(typeof M.capturerColis, 'undefined');
+  assert.equal(typeof M.ecrireInstantaneColis, 'undefined');
 });
 test('Ventes un autre jour : la carte du mois reste le même mois, « hier » ne se dit plus', () => {
   const lendemain = T0 + 86400000;

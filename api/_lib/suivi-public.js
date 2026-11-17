@@ -25,7 +25,7 @@ import { normaliserSuivi } from './etat-colis-email.js';
 export const VOIES_A_OUVRIR = Object.freeze({
   // (16 nov.) Colissimo et UPS : la lecture par clé (lot 89 du 13 nov., puis la clé du vendeur) est RETIRÉE sur
   // décision de Julien — aucun appel à La Poste ni à UPS, aucun écran qui propose une clé.
-  colissimo: { nom: 'Colissimo / La Poste', page: 'https://www.laposte.fr/outils/suivre-vos-envois?code={n}', cle: 'aucune', voie: 'aucune voie serveur (16 nov., décision de Julien : « on laisse tomber », aucun suivi par clé) : suivi Vinted et e-mails seulement ; la page publique s’ouvre seulement par le lien « Suivre », sur le clic du vendeur', geste: 'aucun' },
+  colissimo: { nom: 'Colissimo / La Poste', page: 'https://www.laposte.fr/outils/suivre-vos-envois?code={n}', cle: 'aucune', voie: 'aucune voie serveur (aucun suivi par clé) : suivi Vinted et e-mails seulement ; la page publique s’ouvre seulement par le lien « Suivre », sur le clic du vendeur', geste: 'aucun' },
   // (13 nov., lot 89) DPD et GLS : JAMAIS MESURÉS. Le conteneur ne joint pas leurs hôtes, et le bac à sable
   // Vercel (la voie de mesure du 24 oct.) est épuisé jusqu'au 1er déc. (plan Hobby, 402). Aucun lecteur de
   // page inventé : e-mails et SMS seulement. Leur n° ne se reconnaît pas à sa forme (DPD : 14 chiffres comme
@@ -35,7 +35,7 @@ export const VOIES_A_OUVRIR = Object.freeze({
   // expéditeurs sous contrat ; leurs pages publiques ne sont pas une API documentée et n'ont jamais été mesurées. Rien n'est
   // branché (on n'invente pas un lecteur de page) : e-mails et SMS seulement, et la ligne dit « suivi non lu chez ce transporteur ».
   dpd: { nom: 'DPD', page: 'https://tracking.dpd.de/rest/plc/fr_FR/{n}', cle: 'aucune annoncée (service de la page de suivi publique)', voie: 'serveur, réponse jamais mesurée : e-mails et SMS seulement en attendant', geste: 'mesurer la réponse depuis un bac à sable Vercel (dub1, User-Agent honnête) après le 1er déc., vérifier les conditions d’utilisation, puis brancher la lecture' },
-  ups: { nom: 'UPS', page: 'https://www.ups.com/track?loc=fr_FR&tracknum={n}', cle: 'aucune', voie: 'aucune voie serveur (16 nov., décision de Julien : « on laisse tomber », aucun suivi par clé) : suivi Vinted et e-mails seulement ; la page publique s’ouvre seulement par le lien « Suivre », sur le clic du vendeur', geste: 'aucun' },
+  ups: { nom: 'UPS', page: 'https://www.ups.com/track?loc=fr_FR&tracknum={n}', cle: 'aucune', voie: 'aucune voie serveur (aucun suivi par clé) : suivi Vinted et e-mails seulement ; la page publique s’ouvre seulement par le lien « Suivre », sur le clic du vendeur', geste: 'aucun' },
   gls: { nom: 'GLS', page: 'https://gls-group.eu/app/service/open/rest/FR/fr/rstt001?match={n}', cle: 'aucune (service de la page de suivi publique)', voie: 'serveur, réponse jamais mesurée : e-mails et SMS seulement en attendant', geste: 'mesurer la réponse depuis un bac à sable Vercel (dub1, User-Agent honnête) après le 1er déc., vérifier les conditions d’utilisation, puis brancher la lecture' },
   relaiscolis: { nom: 'Relais Colis', page: 'https://www.relaiscolis.com/suivi-de-colis/', cle: 'aucune API publique connue ; formulaire de la page', voie: 'aucune voie serveur sûre connue : e-mails et SMS seulement', geste: 'aucun pour l’instant (raison : pas de service de suivi public documenté)' },
   shop2shop: { nom: 'Shop2Shop', page: 'https://www.chronopost.fr/tracking-no-cms/suivi-page?listeNumerosLT={n}', cle: 'aucune', voie: 'serveur (route Chronopost, déjà lue)', geste: 'aucun' },

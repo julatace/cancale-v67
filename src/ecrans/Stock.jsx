@@ -28,6 +28,8 @@ import { EmballagesCarte } from '../EmballagesCarte.jsx';
 import { useSelectionSerie, CaseSerie, BarreSerie, OuvrirSerie } from '../composants/SelectionSerie.jsx';   // (11 nov., lot actions-serie)
 import { trierSerie, resumeSerie, csvDe } from '../selectionSerie.js';   // (10 nov., lot L) le stock d'emballages
 import { CLE_EMBALLAGES, colisFaits } from '../emballages.js';
+import { CLE_STOCK_IMPORTE } from '../importStock.js';
+import { importeesAuStock } from '../stockImporteVue.js';   // (16 nov., lot ecrans-restes) le stock importé d'un autre outil, montré
 import { useMotsArticle, useExemplesVendeur, NotePaireCoque, gesteVrm, InfoPop, Pourquoi, AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, fetchTxnItemIds, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
@@ -339,6 +341,9 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   const baseSlotsRef = React.useRef(null); if (baseSlotsRef.current === null) baseSlotsRef.current = slots;
 
   const numeros = load('vinted_annonce_numeros', {}) || {};
+  // (16 nov., lot ecrans-restes) Le stock importé d'un autre outil (synchronisé) — relu quand le nuage le rapporte.
+  const [stockImporte] = useStateCle(CLE_STOCK_IMPORTE, () => load(CLE_STOCK_IMPORTE, []));
+  const [maxImp, setMaxImp] = useState(60);
   const horsCompte = comptesStockEcartes();
   const venduSig = load('vrm_stock_vendus', null);
   const vendus = new Set((venduSig && Array.isArray(venduSig.nums) ? venduSig.nums : []).map((x) => cleNum(x)).filter(Boolean));
@@ -1155,6 +1160,32 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       {articlesVus.length > maxListe && <button className="vrm-ms-plus" type="button" data-stock-liste-plus="" onClick={() => setMaxListe((x) => x + 60)}>{trj('stock.voirPlus', { maxListe: maxListe, articlesVusN: articlesVus.length })}</button>}
     </section>) : null;
 
+  // ── (16 nov., lot ecrans-restes) LES PAIRES IMPORTÉES D'UN AUTRE OUTIL (`vrm_stock_importe`) ──────────
+  // Elles ne se voyaient nulle part (récit 2026-11-11-import-autre-outil.md). Montrées ici sous LEUR N°, avec
+  // l'emplacement et le prix d'achat tels que son fichier les disait ; une paire reliée à une annonce (son clic)
+  // ou dont le N° est porté par une fiche est déjà dans la liste au-dessus : pas deux fois (src/stockImporteVue.js).
+  // Toucher une ligne ouvre SA fiche (« Tout sur le N° »). Rien n'est écrit ici.
+  const portesImp = new Set([...Object.values(numeros || {}).map((x) => cleNum((x && x.numero) || '')).filter(Boolean), ...Object.keys(ficheParCle)]);
+  const importees = importeesAuStock(stockImporte, { cleNum, numerosPortes: portesImp });
+  const blocImportees = importees.length ? (
+    <section className="vrm-ms-section" data-stock-importees={importees.length} aria-label={tr('er.stock.titre')}>
+      <h2 className="vrm-ms-h2">{tr('er.stock.titreN', { n: importees.length })}</h2>
+      <div className="vrm-ms-groupe">
+        {importees.slice(0, maxImp).map((x) => (
+          <button key={x.cle} type="button" className="vrm-s2d-liste-ligne vrm-ms-rangee" data-stock-importee={x.cle}
+            onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: x.numero })); } catch (_) {} }}
+            style={{ width: '100%', textAlign: 'left', background: 'transparent', border: 0, font: 'inherit', color: 'inherit', cursor: 'pointer', minHeight: 44 }}>
+            <span className="vrm-s2d-vig">{Vignette({ f: { numero: x.numero, title: x.titre, photo: null }, sold: false, mini: true })}</span>
+            <span className="vrm-s2d-txt">
+              <span className="vrm-s2d-txt-t"><b className="vrm-ms-num">N°{x.numero}</b><span className="vrm-ms-titre">{x.titre || '—'}</span></span>
+              <span className="vrm-s2d-txt-s vrm-ms-sous" data-stock-importee-sous="">{[x.emplacement ? tr('er.stock.emplacement', { lieu: x.emplacement }) : tr('er.stock.sansEmplacement'), x.prix != null ? tr('er.stock.achat', { prix: x.prix }) : ''].filter(Boolean).join(' · ')}</span>
+            </span>
+            <span className="vrm-ms-chevron" aria-hidden="true">›</span>
+          </button>))}
+      </div>
+      {importees.length > maxImp && <button className="vrm-ms-plus" type="button" data-stock-importees-plus="" onClick={() => setMaxImp((v) => v + 60)}>{tr('er.stock.voirPlus', { n: importees.length - maxImp })}</button>}
+    </section>) : null;
+
   // ── (11 nov., lot DJ4) À PART : ce qui n'est pas « en ligne » mais reste chez lui ──────
   // Trois replis fermés : « À confirmer » (lecture de plus de 24 h : la date de lecture dite),
   // « Masquées par Vinted », « Gardées chez toi » (SA réponse « Oui, je la garde » : hors ligne,
@@ -1401,6 +1432,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
       </ul>
     </LigneAFaire>
     {blocListe}
+    {blocImportees}
     {blocAPart}
     {nEcartes > 0 && <div data-stock-ecartes={nEcartes} style={{ fontSize: 12, color: C.muted }}>{nEcartes} {nEcartes > 1 ? motsStock.noms : motsStock.nom} d'un compte retiré ou masqué {nEcartes > 1 ? 'ne sont' : "n'est"} pas montré{motsStock.e}{nEcartes > 1 ? 's' : ''} ici.</div>}
 
