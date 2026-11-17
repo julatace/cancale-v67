@@ -224,7 +224,7 @@ export function BarreSerie({ serie, actions = [], unite = null, rendreIcone }) {
     return createPortal(
       <div ref={barreRef} className="v2-serie" role="toolbar" aria-label={tr('serie.barre')} data-serie-barre={serie.nom} data-serie-n={n} data-serie-total={serie.total} data-v2-serie="">
         <div className="v2-serie-g">
-          <b role="status" data-serie-compte={n}>{tr('v2s.n', { n })}</b>
+          <b role="status" data-serie-compte={n}>{n} {n > 1 ? unite.plusieurs : unite.un}</b>
           <span className="v2-serie-liens">
             {n < serie.total ? <button type="button" className="v2-serie-lien" data-serie-tout={serie.total} onClick={() => serie.tout()}>{tr('v2s.tout', { n: serie.total })}</button> : null}
             <button type="button" className="v2-serie-lien" data-serie-annuler="" onClick={() => serie.vider()} title="Échap">{tr('serie.annuler')}</button>
@@ -240,7 +240,7 @@ export function BarreSerie({ serie, actions = [], unite = null, rendreIcone }) {
         {menuV2 ? createPortal(<div className="v2-feuille-hote is-ouverte" data-v2-feuille="serie">
           <div className="v2-voile" onClick={() => setMenuV2(false)} aria-hidden="true"/>
           <div className="v2-feuille v2-outils-feuille" role="dialog" aria-modal="true" aria-label={tr('v2s.autres')}>
-            <div className="v2-feuille-tete"><span className="v2-feuille-poignee" aria-hidden="true"/><h2 className="v2-feuille-titre">{tr('v2s.n', { n })}</h2>
+            <div className="v2-feuille-tete"><span className="v2-feuille-poignee" aria-hidden="true"/><h2 className="v2-feuille-titre">{n} {n > 1 ? unite.plusieurs : unite.un}</h2>
               <BoutonIconeV2 icone={rendreIcone ? rendreIcone('close', 22) : <span aria-hidden="true">×</span>} label={tr('v2.menu.fermer')} onClick={() => setMenuV2(false)} attrs={{ 'data-v2-feuille-fermer': '' }}/></div>
             <div className="v2-feuille-corps v2-ann-menu">
               {autres.map((x) => x.possible
