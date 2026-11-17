@@ -84,6 +84,8 @@ function faireCtx({ lignes = {}, vinted = () => ({ status: 404, json: null }) } 
   vm.createContext(ctx);
   vm.runInContext(src, ctx, { filename: 'background.js' }); ctx.authToken = async () => ({ user_id: 'owner-banc', access_token: 'jeton_banc', user_id: 'vendeur_banc', expires_at: Date.now() + 3600e3 }); // 5.193 : sa sonde de schéma répond 200 (base cloisonnée) — sans session l'extension n'écrit plus rien (une écriture vouée au 400)
   // `vintedGet` est la porte vers Vinted : on la remplace pour COMPTER.
+  // (16 nov.) 5.362 : une lecture de fond exige le compte CONNECTÉ lisible (cookie) — le banc sert le compte 9, celui lu.
+  ctx.activeAccountId = async () => '9';
   ctx.vintedGet = async (acc, chemin) => { journal.vinted.push(chemin); return vinted(chemin); };
   ctx.__journal = journal; ctx.__store = store;
   return ctx;
@@ -121,9 +123,12 @@ const conv = (cid, oid, prix) => ({
     dit(!r.ok, 'sans URL, la capture échoue honnêtement', r.raison);
     dit(nTxn === 1, 'la transaction n’est demandée QU’UNE FOIS pour toute la série',
       `${nTxn} appels — avant : un par essai`);
-    dit(nChemins === 12, 'les trois chemins sont bien essayés à chaque tentative',
-      `${nChemins} appels`);
-    dit(j.vinted.length === 13, 'total : 13 requêtes Vinted au lieu de 16',
+    // (16 nov.) Depuis 5.376 la série s'arrête au budget de LECTURE du compte (`garde: 'trop-de-lectures'`, la suite au
+    // prochain passage) : chaque tentative faite essaie ses trois chemins, et jamais plus de 13 requêtes.
+    const arreteBudget = r.garde === 'trop-de-lectures';
+    dit(nChemins > 0 && nChemins % 3 === 0 && (nChemins === 12 || arreteBudget), 'les trois chemins sont bien essayés à chaque tentative (jusqu’au budget de lecture)',
+      `${nChemins} appels${arreteBudget ? ' · arrêté au budget de lecture' : ''}`);
+    dit(j.vinted.length === 13 || (arreteBudget && j.vinted.length < 13), 'total : 13 requêtes Vinted au plus au lieu de 16',
       `${j.vinted.length} requêtes`);
   }
 

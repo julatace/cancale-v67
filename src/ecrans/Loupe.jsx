@@ -1,6 +1,7 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
 import { motsVendeur } from '../profilVendeur.js';
+import { tr } from '../i18n/index.js';
 import { C, commandeEbayEngagee, etapeVente, lbcAnnulee, lbcEuro, lbcFinalisee, prixCourt, rechercheParNumero } from '../App.jsx';
 
 
@@ -27,7 +28,7 @@ function ToutSurLeNumero({ q, numData, comptes, onNav, onStock, onChercher, onFi
   const ETAT_BORD = { pret: 'Prêt à imprimer', imprime: 'Imprimé', poste: 'Posté', attente: 'En attente du PDF' };
   const { vinted, lbc, ebay } = rn.ventes;
   const rien = rn.etat === 'rien';
-  const rienDautre = !rn.annonces.length && !vinted.length && !lbc.length && !ebay.length && !rn.annoncesEbay.length && !rn.stock && !rn.reattribues.length;
+  const rienDautre = !rn.annonces.length && !vinted.length && !lbc.length && !ebay.length && !rn.annoncesEbay.length && !rn.stock && !rn.importe && !rn.reattribues.length;
   return (
     <div data-tout-num={k} data-tout-etat={lecture && rn.etat !== 'trouve' ? 'lecture' : rn.etat} data-tout-lecture={lecture ? '1' : '0'} style={{ marginTop: 12, padding: '12px 16px 8px', background: 'var(--d-carte)', border: 0, borderRadius: 'var(--d-r-carte)', boxShadow: 'var(--d-ombre-carte)' }}>
       <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-.012em', color: C.text, marginBottom: 4 }}>Tout sur le N°{k}</div>
@@ -57,10 +58,14 @@ function ToutSurLeNumero({ q, numData, comptes, onNav, onStock, onChercher, onFi
       {rn.annoncesEbay.map((a) => ligne('ea' + a.itemId, { 'data-tout-annonce-ebay': String(a.itemId) }, a.title || 'Annonce eBay', 'En vente sur eBay', () => onNav('ebay_annonces')))}
       {rn.bordereaux.length > 0 && titreSec('Bordereau')}
       {rn.bordereaux.map((b) => ligne('b' + b.tx, { 'data-tout-bord': b.tx, 'data-tout-bord-etat': b.etat }, ETAT_BORD[b.etat], 'Colis de la vente Vinted', () => onNav('cat_bord', b.etat === 'poste' ? null : { type: 'colis', tx: String(b.tx) })))}
-      {(rn.stock || rn.annonces.length > 0) && titreSec('Stock')}
+      {(rn.stock || rn.importe || rn.annonces.length > 0) && titreSec('Stock')}
+      {/* (16 nov., lot ecrans-restes) La paire importée d'un autre outil sous CE N° (par le N°, jamais un titre). */}
+      {rn.importe && ligne('imp', { 'data-tout-importe': rn.importe.numero }, rn.importe.titre || tr('er.loupe.importeeSansTitre'),
+        [tr('er.loupe.importee'), rn.importe.emplacement ? tr('er.loupe.emplacement', { lieu: rn.importe.emplacement }) : '', rn.importe.prix != null ? tr('er.loupe.achat', { prix: prixCourt(String(rn.importe.prix).replace(',', '.')) }) : ''].filter(Boolean).join(' · '),
+        () => (onFiche ? onFiche(k) : onStock(k)))}
       {rn.stock
         ? ligne('s', { 'data-tout-stock': rn.stock.itemName || 'range' }, `Rangé : ${rn.stock.itemName || 'un meuble'}`, [rn.stock.roomName, rn.stock.nom].filter(Boolean).join(' · '), () => onStock(k))
-        : rn.annonces.length > 0 && <div data-tout-stock="" style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>{rn.manques.includes('ton Stock') ? 'Stock pas encore lu.' : 'Pas rangé dans le Stock.'}</div>}
+        : rn.annonces.length > 0 && !rn.importe && <div data-tout-stock="" style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>{rn.manques.includes('ton Stock') ? 'Stock pas encore lu.' : 'Pas rangé dans le Stock.'}</div>}
       {rn.etat === 'trouve' && rienDautre && rn.servi &&
         <div data-tout-servi="1" style={{ fontSize: 13, color: C.text, marginTop: 8 }}>Ce numéro a déjà servi, mais aucune fiche ne le porte aujourd'hui.</div>}
       {rien && <div data-tout-rien="1" style={{ fontSize: 13, color: C.text, marginTop: 8 }}>Le N°{k} n'a jamais servi.</div>}

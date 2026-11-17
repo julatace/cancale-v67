@@ -902,7 +902,7 @@ const trN = (cle, n, vars = {}) => (Number(n) === 1 ? tr(`${cle}.un`, vars) : tr
 const lireNumeroEcritRegl = () => load(CLE_NUMERO_ECRIT, null);
 // iPhone : le menu de partage avec des FICHIERS (« Enregistrer N images ») ; ailleurs, le téléchargement.
 const peutPartagerFichiers = (files) => { try { return !!(typeof navigator !== 'undefined' && navigator.share && navigator.canShare && navigator.canShare({ files })); } catch (_) { return false; } };
-const partageFichiersPossible = () => { try { return !!(typeof navigator !== 'undefined' && navigator.share && navigator.canShare); } catch (_) { return false; } };
+const partageRepublierPossible = () => { try { return !!(typeof navigator !== 'undefined' && navigator.share && navigator.canShare); } catch (_) { return false; } };
 // Les réglages d'Étiquette et de « Je numérote moi-même », relus quand ils changent ailleurs.
 function useReglagesNumero() {
   const [etq, setEtq] = useState(lireEtiquetteVinted);
@@ -1005,7 +1005,7 @@ function SectionPhotos({ photos, choisies = null, onBasculer = null, lecture = n
     {ph && ph.envoi === 'telecharge' && envoyees > 0 ? <AccApres geste="republier.main" ensuite={null} texte={trN('rg.photos.apresTelecharge', envoyees)}/> : null}
     {ph && !ph.encours && ph.rate ? <AccEchec geste="republier.main" lu={{ code: 'pasSu', texte: tr('rg.photos.rate', { n: ph.rate }) }} gesteTexte={tr('rg.photos.rateGeste')}/> : null}
     {ph && ph.erreur ? <AccEchec geste="republier.main" lu={{ code: 'inconnu', texte: tr('rg.photos.refusPartage') }} gesteTexte={tr('rg.photos.refusGeste')}/> : null}
-    {nCh > 0 && pretes ? <p className="vrm-rm-muet" data-main-dl-fait={ph.fait} data-main-dl-rate={ph.rate}>{tr(partageFichiersPossible() ? 'rg.photos.ouUne' : 'rg.photos.noms', { nom: nomPhotoReglee(numero, 0) })}</p> : null}
+    {nCh > 0 && pretes ? <p className="vrm-rm-muet" data-main-dl-fait={ph.fait} data-main-dl-rate={ph.rate}>{tr(partageRepublierPossible() ? 'rg.photos.ouUne' : 'rg.photos.noms', { nom: nomPhotoReglee(numero, 0) })}</p> : null}
     {reglage}
   </>);
 }
@@ -1377,7 +1377,7 @@ function usePhotosReglees(photos, reglage, numero, { auto = false, source = null
     : pretes && ph.envoyees ? trN('rg.photos.encore', nPretes)
     : pretes && peutPartagerFichiers(ph.fichiers) ? trN('rg.photos.enregistrer', nPretes)
     : pretes ? trN('rg.photos.telecharger', nPretes)
-    : partageFichiersPossible() ? trN('rg.photos.preparer', nPh)
+    : partageRepublierPossible() ? trN('rg.photos.preparer', nPh)
     : trN('rg.photos.telecharger', nPh);
   return { ph, pretes, enregistrer, enregistrerUne, libelle };
 }

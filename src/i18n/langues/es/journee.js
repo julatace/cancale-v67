@@ -83,6 +83,8 @@ export default {
   "journee.colisRetirerAujourd": "{hd} paquetes por recoger hoy o mañana",
   "journee.colisVerifier": "{x} paquetes por revisar",
   "journee.colisVerifier2": "Paquetes por revisar",
+  "journee.colisVerifier.suivi": { one: "Mira su seguimiento antes de ir", other: "Mira su seguimiento antes de ir" },
+  "journee.colisVerifier.relier": { one: "Aún sin vincular: abre la compra en Vinted", other: "Aún sin vincular: abre las compras en Vinted" },
   "journee.supprimeVinted": "N°{numero} eliminado de Vinted",
   "journee.annoncesNumeroteesSans": { one: "{n} anuncio numerado sin precio de compra", other: "{n} anuncios numerados sin precio de compra" },
   "journee.saisisPrixRelie": "Escribe el precio o vincula la compra (una sugerencia por anuncio, o en serie)",

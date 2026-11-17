@@ -119,7 +119,8 @@ const SECRETS = {
     const app = fs.readFileSync(path.join(R, 'src', 'App.jsx'), 'utf8');
     dit(/function PhraseEcran[\s\S]{0,400}AIDE_ECRANS\[cle\] \? <AideEcran cle=\{cle\}\/>/.test(app), '`PhraseEcran` pose le « ? » de son écran');
     const reg = fs.readFileSync(path.join(R, 'src', 'ecrans', 'Reglages.jsx'), 'utf8');
-    dit(/data-phrase-ecran="settings">\{PHRASES_ECRAN\.settings\}<AideEcran cle="settings"\/>/.test(reg), 'Réglages pose le sien');
+    // (16 nov.) Paramètres refait le 15 nov. : la phrase de l'écran passe dans l'infobulle (`title`), le « ? » reste posé à côté du titre.
+    dit(/data-phrase-ecran="settings">\{PHRASES_ECRAN\.settings\}<AideEcran cle="settings"\/>/.test(reg) || /data-phrase-ecran="settings" title=\{PHRASES_ECRAN\.settings\}><AideEcran cle="settings"\/>/.test(reg), 'Réglages pose le sien');
     const vj = JSON.parse(fs.readFileSync(path.join(R, 'vercel.json'), 'utf8'));
     dit(vj.rewrites.some((r) => r.source === '/aide' && r.destination === '/aide/index.html') && vj.rewrites.some((r) => r.source === '/aide/([a-z-]+)'), 'vercel.json réécrit /aide et /aide/<article>');
     const sw = fs.readFileSync(path.join(R, 'public', 'sw.js'), 'utf8');

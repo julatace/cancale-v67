@@ -67,3 +67,11 @@ Règle de Julien du 16 nov. : ZÉRO rouge pour fusionner. La PR suit (voir le ra
   `git archive origin/main`) ; bancs rouges (colis-retirer-propre, annonces-actions, iphone-reprise, argent-mois,
   chiffres-coherents, retraits-suivi, accessibilite-clavier, nouveau-vendeur hors « Tes comptes Vinted ») et jobs
   `parcours-critiques` rouges aussi sur main. **PR NON FUSIONNÉE** (règle de Julien du 16 nov. : zéro rouge).
+
+## Fusion par le train (17 nov.)
+Sort en **5.400.0** (5.395 sur la branche ; 5.398 favoris et 5.399 plateformes-restes sont passées avant) : `CODE_VERSION`, manifeste,
+capteurs Leboncoin, `EXT_ATTENDUE`, `EXT_CAPACITES` (fichepublier, empreinteebay = 5.400.0 ; vccategorie 5.399 et 5.398 gardées),
+audit-coherence et audit-extension-restes portés, zips refaits (un dossier), aide régénérée, CLAUDE.md §8 et version servie.
+Embarque la recopie de #1210 (`vrm-regles-achat.js` refabriqué par `regles-achat-extension.cjs --recopie` : audit-infos-vinted vert).
+`api/ship-reminders.js` : le passage de 15 min garde la republication programmée (ce lot) ET « Vendu ! » hors Vinted (#1188).
+Geste de Julien : installer **5.400.0** (remplacer le dossier, ⟳ dans chaque Chrome ; Orion : VRM-Orion-dossier.zip).

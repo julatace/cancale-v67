@@ -12,7 +12,7 @@
 //      requête vers Vinted ni eBay, rien écrit ; le manifeste porte l'hôte ; l'app ne
 //      demande qu'avec une extension à jour (`extSait('empreinteebay')`).
 //   S  « Créer sur Vinted » reprend les photos du studio d'une fiche SANS photo (la photo d'origine).
-//   C  les deux capacités dans EXT_CAPACITES (5.395.0) et la table de l'audit coherence.
+//   C  les deux capacités dans EXT_CAPACITES (5.400.0 : 5.395 sur la branche, servie après 5.399) et la table de l'audit coherence.
 //  `--src chemin` : un autre background.js (preuve sur le code d'avant, §6.1).
 //  `--prouve` : mutations ⇒ rouge.
 // ════════════════════════════════════════════════════════════════════════════
@@ -147,7 +147,7 @@ const attendre = (ms = 30) => new Promise((r) => setTimeout(r, ms));
     const coh = fs.readFileSync(path.join(RACINE, 'scripts', 'audit-coherence.cjs'), 'utf8');
     dit(/msg\.type === 'empreinteImage'\) \{ sendResponse\(await empreintesImagesPourApp\(msg\)\)/.test(bg) && /msg\.type === 'ficheAPublier'\) \{ sendResponse\(await annoncerFicheAPublier\(msg\)\)/.test(bg), 'C1 · les deux messages de l’app (origine vérifiée, `onMessageExternal`)');
     dit((man.host_permissions || []).includes('https://i.ebayimg.com/*'), 'C2 · le manifeste porte l’hôte i.ebayimg.com (et rien de plus large)');
-    dit(/fichepublier: '5\.395\.0'/.test(app) && /empreinteebay: '5\.395\.0'/.test(app) && /fichepublier:'annoncerFicheAPublier'/.test(coh) && /empreinteebay:'empreintesImagesPourApp'/.test(coh), 'C3 · EXT_CAPACITES : fichepublier et empreinteebay à 5.395.0, dans la table de l’audit coherence');
+    dit(/fichepublier: '5\.400\.0'/.test(app) && /empreinteebay: '5\.400\.0'/.test(app) && /fichepublier:'annoncerFicheAPublier'/.test(coh) && /empreinteebay:'empreintesImagesPourApp'/.test(coh), 'C3 · EXT_CAPACITES : fichepublier et empreinteebay à 5.395.0, dans la table de l’audit coherence');
     dit(/extSait\('empreinteebay'\) === 'ok'/.test(app) && /extSait\('fichepublier'\) !== 'ok'/.test(app), 'C4 · l’app ne demande qu’à une extension à jour (« pas su » ≠ « oui »)');
   });
 

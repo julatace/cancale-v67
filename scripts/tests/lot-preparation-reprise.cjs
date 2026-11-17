@@ -1,22 +1,84 @@
 // Exécute le vrai contrôleur de lot ; aucun PDF ou compte réel.
-const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
-const src=fs.readFileSync('src/App.jsx','utf8'),a=src.indexOf('  const batchBordereaux ='),b=src.indexOf('  // Deep-link « Tout imprimer »',a);
-assert(a>0&&b>a);const code=src.slice(a,b).replace('const batchBordereaux =','globalThis.executer =');
-// Le vrai suivi de travail (lot suivi-travail, 11 nov.) : le lot le pilote ; sans lui, ReferenceError.
-let suiviTravail=null;
+// (16 nov., parcours-vert) Le moteur « Tout imprimer » d'avant (`batchBordereaux` seul) est remplacé depuis le
+// 14 nov. (impression-simple) par `imprimerLot` → `lancerImpression` → `attendrePuisOuvrir` ; `batchBordereaux`
+// (l'« Imprimer » des actions en série) passe par lui. Le banc exécute CE bloc-là, d'un morceau, avec les vraies
+// règles pures (`lotSimple.js`, `lotSelection.js`) et juge les mêmes règles qu'avant :
+//   1. la progression avance APRÈS la lecture de chaque bordereau (jamais avant) ;
+//   2. un bordereau raté est NOMMÉ (absent, avec sa raison) et n'est pas marqué « imprimé » ;
+//   3. une panne de lecture n'ouvre rien, ne marque rien, et « Réessayer » reprend la MÊME sélection ;
+//   4. un changement de compte pendant la préparation : rien ouvert, rien marqué.
+const fs=require('fs'),vm=require('vm'),path=require('path'),url=require('url'),assert=require('assert/strict');
+const racine=path.resolve(__dirname,'..','..');
+const src=fs.readFileSync(path.join(racine,'src/App.jsx'),'utf8'),a=src.indexOf('  const batchBordereaux ='),b=src.indexOf('  // « Déplacer le tampon » (depuis « Bordereau prêt »)',a);
+assert(a>0&&b>a,'le bloc du lot (batchBordereaux … imprimerLotRef.current = imprimerLot) est introuvable');
+const bloc=src.slice(a,b);
+assert(/imprimerLotRef\.current = imprimerLot;/.test(bloc)&&/const attendrePuisOuvrir =/.test(bloc),'le bloc ne porte plus imprimerLot / attendrePuisOuvrir');
+// useState nommé par son setter : le banc lit chaque état posé.
+// (16 nov., train : ecrans-restes) le bloc lit `numerosDeLigne`, déclaré juste avant lui dans App.jsx : la MÊME ligne, recopiée de la source.
+const numerosDeLigneSrc=(src.match(/  const numerosDeLigne = .*\n/)||[''])[0];
+const code=numerosDeLigneSrc+bloc.replace(/const \[(\w*), (set\w+)\] = useState\(/g,(_,v,s)=>`const [${v||'_'+s}, ${s}] = __etat('${s}', `)+'\nglobalThis.executer = batchBordereaux;\n';
+let regles=null;
+// Les objets nés dans le contexte vm n'ont pas le même prototype : on compare leur forme JSON.
+const eg=(x,y,m)=>assert.equal(JSON.stringify(x),JSON.stringify(y),m);
 function banc(){
  const rows=['a','b'].map(cle=>({cle,site:'vestiaire',num:cle,titre:cle,v:{id:cle,bordereau:{id:'vc_label_'+cle}}}));
- const etats=[],marques=[],resultats=[],erreurs=[];const c={suiviTravail,Set,Map,Array,Number,String,Date,Error,Math,Uint8Array,AUTH:{user:{id:'A'}},batchBusy:false,imprimante:null,SUPABASE_URL:'https://base.example.test',lot:{coches:new Set(['a','b']),echecs:[],verifications:{a:'preuve'}},lotActuel:{current:{lignes:()=>rows,sig:l=>l.cle}},selectionImprimable:(l,s)=>l.filter(x=>!s||s.has(x.cle)),lignesLotTous:()=>rows,sigLigneLot:l=>l.cle,controlePreparation:()=>({reste:0}),libererOngletPdf:()=>{},toast:m=>{if(/^Erreur/.test(String(m)))erreurs.push(m);},noterImprimeSansNum:()=>{},setProgressionLot:p=>etats.push(p),setBatchBusy:v=>c.batchBusy=v,setLot:f=>c.lot=f(c.lot),setBordResult:r=>resultats.push(r),marquerVc:(_,id)=>marques.push(id),setBordsPrinted:()=>{},estTamponAnnule:()=>false,b64ToBytes:()=>new Uint8Array([1]),posForFormat:()=>null,texteSansBordereau:()=>'',lireBaseRelue:async()=>[{b64:'YQ=='}],mergeAndDownloadBordereaux:async(items,_,opts)=>{opts.avantOuverture();return{count:items.length,reussis:items.map((_,i)=>i),rates:[]};}};
- vm.createContext(c);vm.runInContext(code,c);return{c,etats,marques,resultats,erreurs};
+ const poses={},marques=[],echecs=[],erreurs=[];let fini;const c={};
+ const fin=()=>new Promise(r=>{fini=r;});
+ Object.assign(c,{...regles,Set,Map,Array,Number,String,Date,Error,Math,Object,JSON,Promise,Uint8Array,Blob,
+  URL:{createObjectURL:()=>'blob:banc',revokeObjectURL:()=>{}},
+  React:{useRef:(v)=>({current:v}),useEffect:()=>{}},
+  __etat:(nom,init)=>[init,(v)=>{(poses[nom]=poses[nom]||[]).push(v);if(nom==='setImprBusy'&&v===null&&fini)fini();}],
+  AUTH:{user:{id:'A'}},SUPABASE_URL:'https://base.example.test',imprimante:null,imprMode:(f)=>f||'normale',
+  /* (16 nov., train : impression-retours) aucun retour dans ce jeu : la sélection des retours est vide */retoursChoisis:()=>[],lignesRetoursImpr:()=>[],_octetsLot:new Map(),_verNum:{etat:'attente',at:0},_visionneuse:null,_pendingBordPrint:false,emailBords:[],only:'bordereaux',colisDans:'',labelsPrets:true,sales:{items:[]},
+  tr:(k)=>k,toast:(m)=>{if(/^Erreur/.test(String(m)))erreurs.push(m);},
+  imprTouchee:{current:false},choisirImprimante:()=>{},ouvrirLot:()=>{},isCloudReady:()=>true,load:()=>'normale',save:()=>{},
+  lignesLotTous:()=>rows,lignesLotImpression:()=>rows,/* (16 nov.) = ventes + retours ; aucun retour ici */sigLigneLot:(l)=>l.cle,
+  positionsTampon:()=>({}),reglageImpressionChoisi:()=>({}),
+  numerosDemandent:()=>false,assurerVersionNumerotation:async()=>true,confirmerNumerosAVerifier:async()=>true,
+  NUMEROS_PERIMES_IMPRESSION:'N° périmés',NUM_A_VERIFIER_ANNULE:'annulé',
+  estIOS:()=>false,estAndroid:()=>false,reserverOngletPdf:()=>{},libererOngletPdf:()=>{},estTamponAnnule:()=>false,
+  accompagner:()=>{const acc={pendant:()=>acc,oublier:()=>{},echec:(err,o)=>{echecs.push({err,o:o||{}});}};return acc;},
+  b64ToBytes:()=>new Uint8Array([1]),posForFormat:()=>null,
+  lireBaseRelue:async()=>[{b64:'YQ=='}],
+  composerBordereaux:async(items)=>({bytes:new Uint8Array([1]),count:items.length,reussis:items.map((_,i)=>i),rates:[]}),
+  ouvrirPdfLot:()=>'visionneuse',
+  setBordsPrinted:()=>{},noterImprimeSansNum:()=>{},signalerBordereauImprime:()=>{},
+  marquerVc:(_,id)=>marques.push(id)});
+ vm.createContext(c);vm.runInContext(code,c);
+ const dernier=(nom)=>{const l=poses[nom]||[];return l[l.length-1];};
+ return{c,poses,marques,echecs,erreurs,fin,dernier};
 }
 (async()=>{
- suiviTravail=(await import(require('url').pathToFileURL(require('path').resolve('src/suiviTravail.js')).href)).suivi;assert(suiviTravail&&typeof suiviTravail.demarrer==='function');
- const f=banc();let liberer;let n=0;f.c.lireBaseRelue=()=>new Promise(r=>{liberer=r;n++;});
- const vol=f.c.executer(new Set(['a','b']));assert.equal(f.etats.at(-1).fait,0);liberer([{b64:'YQ=='}]);await new Promise(setImmediate);assert.equal(n,2);assert.equal(f.etats.at(-1).fait,1);
- f.c.mergeAndDownloadBordereaux=async(_,__,opts)=>{opts.avantOuverture();return{count:1,reussis:[0],rates:[1]};};liberer([{b64:'Yg=='}]);await vol;
- assert.deepEqual([...f.c.lot.coches],['b']);assert.deepEqual(f.marques,['a']);assert.equal(f.c.batchBusy,false);assert.deepEqual(f.erreurs,[],'aucune erreur de code avalée par le catch du lot');
- const e=banc();e.c.lireBaseRelue=async()=>{throw Error('Réseau');};await e.c.executer(new Set(['a','b']));assert.deepEqual([...e.c.lot.coches],['a','b']);assert.ok(e.c.lot.erreur);assert.equal(e.resultats.length,0);assert.equal(e.c.batchBusy,false);
- e.c.lireBaseRelue=async()=>[{b64:'YQ=='}];await e.c.executer(new Set(e.c.lot.coches));assert.equal(e.c.lot,null);assert.deepEqual(e.marques,['a','b']);
- const o=banc();o.c.mergeAndDownloadBordereaux=async(_,__,opts)=>{opts.avantOuverture();o.c.AUTH.user.id='B';return{count:2,reussis:[0,1],rates:[]};};await o.c.executer(new Set(['a','b']));assert.equal(o.marques.length,0);assert.equal(o.resultats.length,0);
- console.log('OK : progression après lecture, reprise des seuls échecs, sélection conservée après panne, aucun marquage après changement de compte.');
+ const imp=async(f)=>(await import(url.pathToFileURL(path.join(racine,f)).href));
+ const ls=await imp('src/impression/lotSimple.js'),sel=await imp('src/lotSelection.js'),th=await imp('src/impression/thermique.js'),rl=await imp('src/impression/retoursLot.js');   // (16 nov.) les retours du lot : les VRAIES règles
+ regles={formatRetenu:ls.formatRetenu,signatureLot:ls.signatureLot,absentsDuLot:ls.absentsDuLot,cochesParDefaut:sel.cochesParDefaut,selectionImprimable:sel.selectionImprimable,TAMPONS_IMPR:th.TAMPONS,estRetour:rl.estRetour,motsTamponRetour:rl.motsTamponRetour};
+ // 1 + 2 : progression après lecture ; le 2e bordereau illisible est nommé, seul le 1er est marqué.
+ {
+  const f=banc();let liberer;let n=0;f.c.lireBaseRelue=()=>new Promise(r=>{liberer=r;n++;});
+  f.c.composerBordereaux=async()=>({bytes:new Uint8Array([1]),count:1,reussis:[0],rates:[1]});
+  const fin=f.fin();f.c.executer(new Set(['a','b']));await new Promise(setImmediate);
+  eg(f.dernier('setImprBusy'),{fait:0,total:2},'rien n’est compté avant la lecture');
+  liberer([{b64:'YQ=='}]);await new Promise(setImmediate);
+  assert.equal(n,2);eg(f.dernier('setImprBusy'),{fait:1,total:2},'la progression avance après la 1re lecture');
+  liberer([{b64:'Yg=='}]);await fin;
+  const e=f.dernier('setImprEtat');assert.ok(e&&e.res,'la feuille d’après s’ouvre');
+  eg(e.res.reussies,['a']);eg(e.absents.map(x=>[x.cle,x.raison]),[['b','illisible']],'le raté est NOMMÉ avec sa raison');
+  eg(f.marques,['a'],'seul le bordereau sorti est marqué imprimé');assert.equal(f.echecs.length,0,'aucun échec : '+JSON.stringify(f.echecs.map(x=>String(x.err&&x.err.message||x.err))));eg(f.erreurs,[],'aucune erreur de code avalée');
+ }
+ // 3 : panne de lecture ⇒ rien ouvert, rien marqué, « Réessayer » reprend la même sélection.
+ {
+  const e=banc();e.c.lireBaseRelue=async()=>{throw Error('Réseau');};
+  let fin=e.fin();e.c.executer(new Set(['a','b']));await fin;
+  assert.equal(e.poses.setImprEtat,undefined,'rien ne s’ouvre sur une panne');assert.equal(e.marques.length,0);
+  assert.equal(e.echecs.length,1);assert.equal(e.echecs[0].err.message,'Réseau','la vraie panne est dite (pas une erreur de code)');assert.equal(typeof e.echecs[0].o.reessayer,'function','la panne est dite avec « Réessayer »');
+  e.c.lireBaseRelue=async()=>[{b64:'YQ=='}];fin=e.fin();e.echecs[0].o.reessayer();await fin;
+  eg(e.marques,['a','b'],'Réessayer reprend la même sélection');eg(e.dernier('setImprEtat').absents,[]);
+ }
+ // 4 : le compte change pendant la préparation ⇒ rien ouvert, rien marqué.
+ {
+  const o=banc();o.c.composerBordereaux=async(items)=>{o.c.AUTH.user.id='B';return{bytes:new Uint8Array([1]),count:items.length,reussis:items.map((_,i)=>i),rates:[]};};
+  const fin=o.fin();o.c.executer(new Set(['a','b']));await fin;
+  assert.equal(o.marques.length,0);assert.equal(o.poses.setImprEtat,undefined);assert.equal(o.echecs.length,1);assert.equal(o.echecs[0].err.message,'impr.change');
+ }
+ console.log('OK : progression après lecture, raté nommé et seul le sorti marqué, panne sans rien ouvert puis « Réessayer » sur la même sélection, aucun marquage après changement de compte.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

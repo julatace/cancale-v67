@@ -38,6 +38,7 @@
 //
 //   cible=offre    conv=<id> compte=<uid>               Messages · la conversation ouverte, l'offre en évidence
 //   cible=vcvente  vc=<productId Vestiaire>              Ventes · Vestiaire · la vente
+//   cible=lbcvente tx=<n° de transaction Leboncoin>       Ventes · Leboncoin · la carte du colis (16 nov., douchette)
 //   cible=case     meuble=<id du meuble> i=<n° de case>  Stock · LA case (sélectionnée, défilée,
 //                  éclairée) — « Ranger » (une vente, une fiche, « Où ranger à l'arrivée ») et
 //                  « Voir au stock » (6 nov., vague 3). Identité = la PLACE (meuble + case), jamais
@@ -46,7 +47,7 @@
 import { motsVendeur } from './profilVendeur.js';
 const ID = /^[A-Za-z0-9_-]{1,64}$/;
 const COLONNES = ['prets', 'attente', 'retirer', 'partis'];
-const TYPES = ['conv', 'offre', 'offres', 'vente', 'vcvente', 'colis', 'retrait', 'colonne', 'achat', 'retour', 'urssaf', 'doublon', 'case', 'bilanmois', 'ailleurs', 'seuils'];   // (15 nov., lot argent-plus) + « seuils » : l'alerte d'un seuil de l'année
+const TYPES = ['conv', 'offre', 'offres', 'vente', 'vcvente', 'lbcvente', 'colis', 'retrait', 'colonne', 'achat', 'retour', 'urssaf', 'doublon', 'case', 'bilanmois', 'ailleurs', 'seuils'];   // (15 nov., lot argent-plus) + « seuils » : l'alerte d'un seuil de l'année
 const MOIS = /^\d{4}-(0[1-9]|1[0-2])$/;
 // (13 nov., lot 53) Le mois demandé par l'e-mail du bilan mensuel : la carte « Bilan du
 // mois » (Compta) le lit à son montage pour montrer CE mois (s'il est l'un des deux qu'elle sait).
@@ -72,7 +73,7 @@ export function lireCible(params) {
   if (type === 'case') { c.meuble = propre(g('meuble')); const i = String(g('i') == null ? '' : g('i')).trim(); c.i = /^\d{1,4}$/.test(i) ? String(Number(i)) : ''; if (!c.meuble || !c.i) return null; }
   if ((type === 'conv' || type === 'offre') && !c.conv) return null;
   if (type === 'vcvente' && !c.vc) return null;
-  if ((type === 'vente' || type === 'colis' || type === 'achat' || type === 'retour') && !c.tx) return null;
+  if ((type === 'vente' || type === 'colis' || type === 'achat' || type === 'retour' || type === 'lbcvente') && !c.tx) return null;
   if (type === 'retrait' && !c.tx && !c.suivi) return null;
   if (type === 'colonne' && !c.colonne) return null;
   return c;
@@ -106,6 +107,8 @@ export function jetonsCible(c) {
     case 'offres': return ['offres'];
     case 'vente': return [`vente:${c.tx}`];
     case 'vcvente': return [`vcvente:${c.vc}`];
+    // (16 nov.) Une vente Leboncoin : SA carte dans Ventes · Leboncoin, par SON n° de transaction (la douchette).
+    case 'lbcvente': return [`lbcvente:${c.tx}`];
     case 'colis': return [`colis:${c.tx}`];
     case 'retrait': return [c.tx ? `retrait:tx:${c.tx}` : null, c.suivi ? `retrait:suivi:${c.suivi}` : null].filter(Boolean);
     case 'colonne': return [`colonne:${c.colonne}`];
@@ -149,6 +152,7 @@ function selecteursAnciens(c) {
       essais: [c.compte ? `.vrm-inbox-row[data-conv="${q(c.conv)}"][data-conv-compte="${q(c.compte)}"]` : null, `.vrm-inbox-row[data-conv="${q(c.conv)}"]`].filter(Boolean),
       ouvrir: '', deplier: [], puis: '[data-cible~="offre"]' };
     case 'vcvente': return { essais: [`.vrm-sale-row[data-vc-vente="${q(c.vc)}"]`], ouvrir: '.vrm-ledger-sale-toggle', deplier: [] };
+    case 'lbcvente': return { essais: [`[data-lbc-vente="${q(c.tx)}"]`], ouvrir: null, deplier: [] };
     case 'offres': return { essais: ['[data-offres-au-mini]'], ouvrir: '', deplier: [] };
     case 'vente': return { essais: [`.vrm-sale-row[data-tx="${q(c.tx)}"]`], ouvrir: '.vrm-ledger-sale-toggle', deplier: [] };
     case 'colis': return {
@@ -213,6 +217,7 @@ export function phraseAbsente(c) {
     // ⚠️ (5 nov., Julien) Une offre VINTED n'expire pas : ne jamais écrire « a expiré » ici.
     case 'offre-fil': return "La conversation est ouverte, mais je n'y vois pas d'offre en cours : elle a peut-être été acceptée, refusée ou retirée, ou le fil n'est pas encore relu.";
     case 'colis': return "Ce colis n'est plus à poster : il est peut-être déjà parti.";
+    case 'lbcvente': return "Cette vente Leboncoin n'est pas dans la liste affichée : elle est peut-être déjà postée, ou l'extension ne l'a pas encore relue.";
     case 'retrait': return "Ce colis n'est plus dans « À retirer » : il est peut-être déjà retiré.";
     case 'colonne': return 'Rien dans cette colonne pour l\u2019instant.';
     case 'achat': return "Cet achat n'est pas dans la liste affichée.";

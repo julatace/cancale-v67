@@ -34,7 +34,7 @@ export default {
   "argentPlus.ba.achatManque": "sin anotar",
   "argentPlus.ba.reste": "Tras gastos de venta",
   "argentPlus.ba.auPlus": "como máximo",
-  "argentPlus.bl.sur": {"one": "sobre {n} venta de {m}", "other": "sobre {n} ventas de {m}"},
+  "argentPlus.bl.sur": {"one": "calculado con {n} venta de {m} (las que tienen precio de compra)", "other": "calculado con {n} ventas de {m} (las que tienen precio de compra)"},
   "argentPlus.bl.achat": {"one": "{n} precio de compra por anotar", "other": "{n} precios de compra por anotar"},
   "argentPlus.bl.plateforme": {"one": "{n} comisión no leída", "other": "{n} comisiones no leídas"},
   "argentPlus.bl.frais": {"one": "{n} venta con gastos por confirmar", "other": "{n} ventas con gastos por confirmar"},

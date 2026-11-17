@@ -120,7 +120,8 @@ function mrFragment({ n, cp, k, jours }) {
     dit(sc && sc.court === 'Pris en charge · Lieusaint' && sc.quand === 'il y a 47 min' && /HUB|Lieusaint/.test(sc.detail), 'ligne courte : « Pris en charge · Lieusaint » · « il y a 47 min » (la phrase du transporteur, recopiée en court)', JSON.stringify(sc));
     dit(fn(S, 'lieuDuLibelle')('Colis remis à Mondial Relay') === '' && fn(S, 'lieuDuLibelle')('Envoi en cours d’acheminement') === '', 'aucun lieu lisible dans la phrase ⇒ aucun lieu (jamais deviné)');
     dit(fn(S, 'statutCourt')(null) === null, 'rien de lu ⇒ aucune ligne courte');
-    dit(D.carrierDepart('Mondial Relay', MR) === null && D.carrierDepart('InPost', MR) === null, 'Mondial Relay / InPost VENDU : jamais lu comme départ (code postal de l’acheteur, jamais deviné)');
+    // (16 nov., lot transporteurs-suivi) Le code postal vient de SON étiquette, prouvé par l'écho (audit-suivi-ventes-mr).
+    dit(D.carrierDepart('Mondial Relay', MR) === 'mondialrelay' && D.carrierDepart('InPost', MR) === 'mondialrelay' && D.carrierDepart('', MR) === null, 'Mondial Relay / InPost VENDU : lu comme départ quand le transporteur est NOMMÉ, jamais par la forme du n° (code postal : celui de SON étiquette)');
     const lien = fn(S, 'lienPublic')(SC.lienSuivi, 'InPost', MR);
     dit(lien && /mondialrelay\.fr/.test(lien.url) && lien.site, 'InPost ⇒ la page publique Mondial Relay', lien && lien.url);
     // Les transporteurs que VRM ne lit pas : jamais interrogés, statut par l'e-mail du MÊME n°.

@@ -32,7 +32,11 @@ import { lireJournal, lireLu } from './_lib/journal-notifs.js';
 import { DESTINATIONS, lienNotif } from './_lib/lien-notif.js';
 import { passageFacturesAuto } from './_lib/factures-auto.js';
 // (revue du 5 nov.) Les textes des rappels soir et « offres au mini » : un propriétaire, celui de l'aperçu.
-import { texteSoir, texteOffresMini, texteRetourRappel, texteRetourDepose, texteRetourLivre } from './_lib/notif-apercus.js';
+import { texteSoir, texteOffresMini, texteRetourRappel, texteRetourDepose, texteRetourLivre, texteVendu } from './_lib/notif-apercus.js';
+// (16 nov., lot plateformes-restes) « Vendu ! » pour Leboncoin, eBay et Vestiaire, d'après ce que VRM lit déjà.
+import { MEMO_VENTES_SITES, ventesDesSites, ventesANotifier, donneesVendu } from './_lib/ventes-sites-notif.js';
+import { lbcAnnulee as lbcAnnuleeServeur } from './_lib/ventes-regle.js';
+import { etatCommandeEbay as etatCommandeEbayServeur } from './_lib/ebay-etat-commande.js';
 import { passeNotifsRetours } from './_lib/retour-notifs.js';   // (15 nov., lot retour-parfait)
 import { ID_RETOURS_DEPOSES_CHAMP } from './_lib/retour-suivi.js';
 import { modifierCas } from './_lib/suivi-vinted.js';
@@ -56,7 +60,7 @@ import { colisEbay, resumeColisEbay, lireCommandesEbayServeur } from './_lib/eba
 // (1er nov., audit A4) Les colis Leboncoin et Vestiaire à poster, et les ventes
 // Vestiaire du bilan : les règles de l'app (un propriétaire, importé).
 import { resumeColisSites } from './_lib/colis-sites.js';
-import { ventesVcDe, numerosVcAvecLiens } from './_lib/vestiaire-regle.js';
+import { ventesVcDe, numerosVcAvecLiens, vcVenteAnnulee as vcVenteAnnuleeServeur, dateVenteVc as dateVenteVcServeur } from './_lib/vestiaire-regle.js';
 import { SELECT_DEPART_META, departsParSuivi, txVintedParties } from './_lib/depart-colis.js';
 import { ventesPartiesParPreuve, lirePreuvesDepart } from './_lib/depart-vente.js';
 import { colisVentesEmailServeur, reqVentesEmail, txsDeCommandes } from './_lib/colis-ventes-email.js';
@@ -270,7 +274,9 @@ async function lireCommandesEbay() {
   });
 }
 // (2 nov., soir) + Vestiaire : « Colis fait » et les N° donnés aux annonces (src/numerosVestiaire.js).
-const MAIN_BILAN = [MAIN_MOTS, 'vinted_accounts_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vrm_paires_dorment', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros', 'vrm_vc_liens', 'vrm_comptes_exclus', 'vrm_cycle_decisions'];
+// (16 nov., lot ecrans-restes) + `vrm_ventes_importees` : les ventes passées importées d'un autre outil (Paramètres →
+// Importer) — comptées par le bilan comme dans l'app (`importees`, la même règle refabriquée, api/_lib/ventes-regle.js).
+const MAIN_BILAN = [MAIN_MOTS, 'vinted_accounts_hidden', 'vinted_ship_done', 'vinted_bords_shipped', 'vrm_paires_dorment', 'vrm_lbc_colis_done', 'vrm_vc_colis_done', 'vrm_vc_numeros', 'vrm_vc_liens', 'vrm_comptes_exclus', 'vrm_ventes_importees', 'vrm_cycle_decisions'];
 const ensemble = (v) => new Set(Array.isArray(v) ? v.map(String) : []);
 const objet = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 
@@ -344,6 +350,8 @@ async function lireDonneesBilan() {
     // `null` = illisible (le bilan le NOMME) ; ligne absente = aucune vente.
     vestiaire: (vcV === undefined || vcL === undefined) ? null : ventesVcDe({ ventes: (vcV && vcV.ventes) || null, liens: (vcL && vcL.liens) || {}, auto: numerosVcAvecLiens((mm && mm.vrm_vc_numeros) || {}, mm && mm.vrm_vc_liens) }),
     main: mm,
+    // (16 nov.) Ses ventes importées (un tableau ; absent ⇒ aucune). `main` illisible ⇒ `null`, le bilan le NOMME.
+    importees: mm ? (Array.isArray(mm.vrm_ventes_importees) ? mm.vrm_ventes_importees : []) : null,
   };
 }
 
@@ -1173,7 +1181,9 @@ export function texteMatin({ overdue, aVerifier = 0, dueToday, dueTomorrow, ebay
   return {
     title: nePasPoster && !total ? 'Commande eBay : ne poste pas' : overdue ? 'Colis en retard à expédier' : 'Colis à expédier',   // (8 nov.) le retard DANS le titre, sans emoji
     // (15 nov.) « Ouvre l'app… » seulement s'il tient dans les 90 caractères (le toucher l'ouvre de toute façon).
-    body: ((b0, fin) => (b0 + fin).length <= 90 ? b0 + fin : b0)((corps + estime + stop).trim(), ebayDus || vestiaireDus || nePasPoster ? " Ouvre l'app pour les voir." : " Ouvre l'app pour les préparer."),
+    // (16 nov.) « ne poste pas » ne tombe JAMAIS sous la coupe des 90 : s'il ne tient pas avec le détail, le détail part
+    // (il est dans l'app) et la phrase d'annulation reste entière.
+    body: ((b0, fin) => (b0 + fin).length <= 90 ? b0 + fin : b0.length <= 90 || !stop ? b0 : ((total > 0 ? `${quoi}.` : '') + stop).trim())((corps + estime + stop).trim(), ebayDus || vestiaireDus || nePasPoster ? " Ouvre l'app pour les voir." : " Ouvre l'app pour les préparer."),
   };
 }
 
@@ -1491,6 +1501,51 @@ async function passageGroupe(maintenant = Date.now()) {
     out.forEach((r) => { if (r && r.vidange === 'envoye') envoyes += 1; bilans.push(r && typeof r === 'object' ? r : {}); });
   }
   return { fait: true, fenetres: aVider.length, resumes: envoyes, echecs, budgetAtteint, bilans: bilans.slice(0, 50) };
+}
+// (16 nov., lot plateformes-restes) « VENDU ! » LEBONCOIN, eBAY, VESTIAIRE — api/_lib/ventes-sites-notif.js.
+// Une vente NOUVELLE vue dans ce que VRM lit déjà (lbc_ventes, ebay_orders*, vc_ventes) sonne UNE fois
+// (mémo `vrm_ventes_sites_vues` écrit AVANT l'envoi, puis le tag réservé dans `push_dedup`) ; la 1re
+// lecture d'un compte ne sonne jamais (l'historique). Une lecture ratée ⇒ rien d'écrit, rien d'envoyé.
+async function notifsVentesSites(maintenant = Date.now()) {
+  try {
+    const [memo, lbcL, ebay, vcV, vcL, mm] = await Promise.all([
+      getRow(MEMO_VENTES_SITES), getRowProjete('lbc_ventes', ['ventes']), lireCommandesEbay(),
+      getRowProjete('vc_ventes', ['ventes', 'lectures']), getRowProjete('vc_listings', ['liens']), getRowProjete('main', ['vrm_vc_numeros', 'vrm_vc_liens']),
+    ]);
+    if (memo === undefined) return { etat: 'memo-illisible' };
+    const vcLu = vcV === undefined || vcL === undefined || mm === undefined ? null
+      : vcV && vcV.ventes ? ventesVcDe({ ventes: vcV.ventes, lectures: vcV.lectures || null, liens: (vcL && vcL.liens) || {}, auto: numerosVcAvecLiens((mm && mm.vrm_vc_numeros) || {}, mm && mm.vrm_vc_liens) }) : null;
+    const parSite = ventesDesSites({ lbc: lbcL && lbcL.ventes ? lbcL.ventes : null, ebay, vestiaire: vcLu },
+      { lbcAnnulee: lbcAnnuleeServeur, etatCommandeEbay: etatCommandeEbayServeur, vcVenteAnnulee: vcVenteAnnuleeServeur, dateVenteVc: dateVenteVcServeur });
+    const r = ventesANotifier(memo, parSite, maintenant);
+    const change = JSON.stringify(r.memoApres.vus) !== JSON.stringify((memo && memo.vus) || {}) || JSON.stringify(r.memoApres.comptes) !== JSON.stringify((memo && memo.comptes) || {});
+    if (!change) return { etat: 'rien', n: 0 };
+    if (!(await ecrireDedup(MEMO_VENTES_SITES, r.memoApres))) return { etat: 'memo-non-ecrit', n: r.nouvelles.length };
+    if (!r.nouvelles.length) return { etat: 'rien', premieres: r.premieres, n: 0 };
+    if (!(await pushCategorieActive('vente'))) return { etat: 'coupe', n: r.nouvelles.length };
+    let envoyees = 0;
+    for (const v of r.nouvelles.slice(0, 10)) {
+      const res = await modifierCas('push_dedup', (d) => { const ks = (d && Array.isArray(d.keys)) ? d.keys.filter((x) => typeof x === 'string') : []; if (ks.includes(v.tag)) return undefined; return { ...(d || {}), keys: [v.tag, ...ks].slice(0, 300) }; });
+      if (res !== true) continue;                                  // déjà sonnée (e-mail Vestiaire) ou pas su : rien
+      const url = v.site === 'vestiaire' ? DESTINATIONS.vcVente({ id: v.id }) : v.site === 'leboncoin' ? lienNotif('ventes', { site: 'leboncoin', cible: 'lbcvente', tx: v.id }) : lienNotif('ventes', { site: 'ebay' });
+      await sendPushToAll({ ...texteVendu(donneesVendu(v)), tag: v.tag, url, cat: 'vente' });
+      envoyees++;
+    }
+    return { etat: 'envoye', n: r.nouvelles.length, envoyees };
+  } catch (e) { return { etat: 'echec' }; }
+}
+async function passageVentesSites(maintenant = Date.now()) {
+  const debut = Date.now();
+  const lignes = await fetchPaginated('app_data?or=(id.eq.lbc_ventes,id.eq.vc_ventes,id.like.ebay_orders*)&select=owner');
+  if (!lignes) return { fait: false, raison: 'pas su' };
+  const owners = [...new Set(lignes.map((x) => x && x.owner && String(x.owner)).filter((o) => o && o !== PROPRIETAIRE_NEUTRE))];
+  let envoyees = 0, echecs = 0, budgetAtteint = false;
+  for (let i = 0; i < owners.length; i += VENDEURS_EN_PARALLELE) {
+    if (Date.now() - debut > 90000) { budgetAtteint = true; break; }
+    const out = await Promise.all(owners.slice(i, i + VENDEURS_EN_PARALLELE).map((o) => contexteVendeur.run({ owner: o }, () => notifsVentesSites(maintenant)).catch(() => ({ etat: 'echec' }))));
+    out.forEach((r) => { if (r && r.envoyees) envoyees += r.envoyees; if (r && r.etat === 'echec') echecs += 1; });
+  }
+  return { fait: true, vendeurs: owners.length, envoyees, echecs, budgetAtteint };
 }
 // (11 nov., lot lbc-plus) LES REMISES EN MAIN PROPRE (api/_lib/remises-main-propre.js) :
 // UNE notification une heure avant le rendez-vous qu'IL a posé (jamais proposé par VRM).
@@ -1825,7 +1880,10 @@ async function passageDuCron(req, res, moment, bailEtat) {
     // (16 nov.) Et la republication programmée qu'aucun appareil n'a lancée (un échec n'empêche rien d'autre).
     let repubProg = null;
     try { repubProg = await passageRepubProgramme(instantNotif()); } catch (e) { repubProg = { fait: false, raison: String((e && e.message) || e).slice(0, 120) }; }
-    res.status(r && r.fait ? (r.echecs ? 500 : 200) : 503).json({ ok: !!(r && r.fait) && !r.echecs, moment: 'groupe', ...r, remises, repubProg });
+    // (16 nov., lot plateformes-restes) « Vendu ! » Leboncoin, eBay, Vestiaire : le même passage de 15 min.
+    let ventesSites = null;
+    try { ventesSites = await passageVentesSites(Date.now()); } catch (e) { ventesSites = { fait: false, raison: String((e && e.message) || e).slice(0, 120) }; }
+    res.status(r && r.fait ? (r.echecs ? 500 : 200) : 503).json({ ok: !!(r && r.fait) && !r.echecs, moment: 'groupe', ...r, remises, repubProg, ventesSites });
     return;
   }
   // (11 nov., lot alertes-ebay) `?moment=alertes` : les ALERTES D'ACHAT eBAY, et RIEN d'autre —
