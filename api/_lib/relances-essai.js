@@ -7,7 +7,8 @@
 // (api/ship-reminders.js — aucune fonction de plus, plan Hobby) :
 //   j1  bienvenue et le premier geste            (jour 1 ou 2 de l'essai)
 //   j3  ce qui n'est pas encore relié            (jour 3 à 5)
-//   j6  l'essai se termine demain                (la veille de la fin)
+//   j6  l'essai se termine demain                (la veille de la fin — essai RÉSILIÉ seulement depuis le
+//       16 nov. : un essai qui sera prélevé a son rappel 3 jours avant, api/_lib/rappel-prelevement.js)
 //
 // ⚠️ À QUI — ET SURTOUT À QUI JAMAIS :
 //   · seulement un compte dont l'abonnement est EN ESSAI (`abonnements.statut =
@@ -109,15 +110,19 @@ export const etapeFaite = (envois, e) => {
   const x = envois && envois[e];
   return !!(x && ['envoye', 'incertain', 'en-cours'].includes(x.issue));
 };
-export function etapeDuJour({ fin, maintenant = Date.now(), envois = {} }) {
+// (16 nov., lot abonnement-clair) Un essai qui sera PRÉLEVÉ reçoit, 3 jours avant, le rappel de prélèvement
+// (api/_lib/rappel-prelevement.js : date et montant lus chez Stripe) : plus de « se termine demain » pour lui,
+// et « ce qui n'est pas relié » ne tombe plus le même jour. Un essai RÉSILIÉ (`annule`) garde la veille :
+// « ton accès se ferme demain ».
+export function etapeDuJour({ fin, maintenant = Date.now(), envois = {}, annule = false }) {
   const tFin = Date.parse(fin || '');
   if (!Number.isFinite(tFin) || tFin <= maintenant) return null;
   const aujourdhui = jourParis(maintenant);
   const debut = jourParis(tFin - DUREE_ESSAI_JOURS * 86400e3);
   const jour = ecartJours(debut, aujourdhui) + 1;          // 1 = le jour où il a commencé
   const reste = ecartJours(aujourdhui, jourParis(tFin));   // 1 = l'essai finit demain
-  if (reste === 1) return etapeFaite(envois, 'j6') ? null : 'j6';
-  if (jour >= 3 && jour <= 5 && reste > 1) return etapeFaite(envois, 'j3') ? null : 'j3';
+  if (reste === 1) return annule !== true || etapeFaite(envois, 'j6') ? null : 'j6';
+  if (jour >= 3 && jour <= 5 && reste > (annule === true ? 1 : 3)) return etapeFaite(envois, 'j3') ? null : 'j3';
   if (jour >= 1 && jour <= 2 && reste > 1) return etapeFaite(envois, 'j1') ? null : 'j1';
   return null;
 }
@@ -321,7 +326,7 @@ export async function passageRelances({ maintenant = Date.now(), env = process.e
     const [choix, envois] = lu ? [lu.choix, lu.envois] : await Promise.all([lireChoix(owner), lireEnvois(owner)]);
     if (!choix || !envois) { ign('pas su'); continue; }
     if (choix.desinscrit === true) { ign('desinscrit'); continue; }
-    const etape = etapeDuJour({ fin: a.fin_periode, maintenant, envois: envois.envois || {} });
+    const etape = etapeDuJour({ fin: a.fin_periode, maintenant, envois: envois.envois || {}, annule: a.annule_fin_periode === true });
     if (!etape) { ign('rien aujourd’hui'); continue; }
     const adr = await adresseDuCompte(owner);
     if (adr.etat !== 'ok') { ign(`adresse ${adr.etat}`); continue; }
