@@ -94,12 +94,12 @@ export function SqueletteRangees({ variante = 'A', n = 8, label = '' }) {
 }
 
 // 6. QUAND C'EST LU : rien n'est posé avant que les lectures d'un bloc soient arrivées, puis TOUT d'un coup, à sa place
-//    (17 nov., « quand ça charge tout bouge bizarrement ») ; une lecture qui ne répond pas n'enferme rien : 6 s au plus.
+//    (17 nov., « quand ça charge tout bouge bizarrement ») ; une lecture qui ne répond pas n'enferme rien : 10 s au plus.
 //    Lu une fois, lu pour de bon (une relecture ne rend pas le bloc vide).
 export function QuandLu({ pret, children, attente = null }) {
   const deja = React.useRef(false);
   const [delai, setDelai] = React.useState(false);
-  React.useEffect(() => { if (pret) return undefined; const t = setTimeout(() => setDelai(true), 6000); return () => clearTimeout(t); }, [pret]);
+  React.useEffect(() => { if (pret) return undefined; const t = setTimeout(() => setDelai(true), 10000); return () => clearTimeout(t); }, [pret]);
   if (pret || delai) deja.current = true;
   return deja.current ? children : attente;
 }

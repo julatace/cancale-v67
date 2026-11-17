@@ -35,9 +35,15 @@ function sonde(mutation) {
   window.__cls = 0; window.__sauts = [];
   try {
     new PerformanceObserver((l) => { for (const e of l.getEntries()) { if (e.hadRecentInput) continue; window.__cls += e.value;
-      window.__sauts.push({ v: +e.value.toFixed(4), t: Math.round(e.startTime), q: (e.sources || []).slice(0, 3).map((s) => { const n = s.node; return n && n.nodeType === 1 ? (n.tagName + '.' + String(n.className || '').split(' ').slice(0, 2).join('.') + (n.getAttribute('data-v2-bloc') ? '[' + n.getAttribute('data-v2-bloc') + ']' : '')) : (n ? '#text' : '?'); }) }); } })
+      window.__sauts.push({ v: +e.value.toFixed(4), t: Math.round(e.startTime), q: (e.sources || []).slice(0, 3).map((s) => { const n = s.node; const dy = Math.round(s.currentRect.y - s.previousRect.y); return n && n.nodeType === 1 ? (n.tagName + '.' + String(n.className || '').split(' ').slice(0, 2).join('.') + (n.getAttribute('data-v2-bloc') ? '[' + n.getAttribute('data-v2-bloc') + ']' : '') + ' Δy' + dy) : (n ? '#text' : '?'); }) }); } })
       .observe({ type: 'layout-shift', buffered: true });
   } catch (_) {}
+  // Pour dire QUI pousse : les éléments posés (visibles, ≥ 8 px de haut) pendant le chargement, avec l'heure et la place.
+  window.__ajouts = [];
+  try { new MutationObserver((ms) => { const t = Math.round(performance.now()); for (const m of ms) for (const n of m.addedNodes) { if (n.nodeType !== 1 || window.__ajouts.length > 400) continue;
+    requestAnimationFrame(() => { if (!n.isConnected || !n.getClientRects().length) return; const q = n.getBoundingClientRect(); if (q.height < 8 || q.top > innerHeight) return;
+      window.__ajouts.push({ t, y: Math.round(q.top), h: Math.round(q.height), c: n.tagName + '.' + String(n.className || '').split(' ').slice(0, 2).join('.') }); }); } })
+    .observe(document.documentElement, { childList: true, subtree: true }); } catch (_) {}
   window.__vus = []; // ordre de première apparition
   window.__releve = setInterval(() => {
     for (const e of document.querySelectorAll('[data-v2-bloc]')) { const k = e.getAttribute('data-v2-bloc'); if (e.getClientRects().length && !window.__vus.includes(k)) window.__vus.push(k); }
@@ -74,7 +80,8 @@ async function mesure(pg) {
     // (d) entre deux blocs repérés (sections) qui se suivent : ≥ 32 (le squelette et la liste sont un même bloc).
     const blocs = [...document.querySelectorAll('[data-v2-bloc]')].filter(vis).map((e) => ({ k: e.getAttribute('data-v2-bloc'), q: e.getBoundingClientRect() })).sort((a, b) => a.q.top - b.q.top);
     for (let k = 1; k < blocs.length; k++) { const e = Math.round(blocs[k].q.top - blocs[k - 1].q.bottom); if (e >= 0 && e < 32 && !/segment/.test(blocs[k - 1].k)) air.sections.push(blocs[k - 1].k + ' → ' + blocs[k].k + ' ' + e); }
-    return { cls: +window.__cls.toFixed(4), sauts: window.__sauts.slice(0, 8), vus: window.__vus, fin, nus, air };
+    const avant = (t) => window.__ajouts.filter((a) => a.t <= t + 20 && a.t >= t - 1500);
+    return { ajouts: window.__sauts.slice(0, 3).map((x) => avant(x.t).slice(-6)), cls: +window.__cls.toFixed(4), sauts: window.__sauts.slice(0, 8), vus: window.__vus, fin, nus, air };
   });
 }
 
@@ -106,7 +113,7 @@ async function un(nav, b, tab, sombre, mutation) {
       console.log(`\n${tab} · ${sombre ? 'sombre' : 'clair'}`);
       for (const k of ['froid', 'chaud']) {
         const m = r[k];
-        verifier(m.cls <= SEUIL, `L1 ${k} : CLS ${m.cls} ≤ ${SEUIL}` + (m.cls > SEUIL ? ' — ' + JSON.stringify(m.sauts) : ''));
+        verifier(m.cls <= SEUIL, `L1 ${k} : CLS ${m.cls} ≤ ${SEUIL}` + (m.cls > SEUIL ? ' — ' + JSON.stringify(m.sauts) + '\n      posés juste avant : ' + JSON.stringify(m.ajouts) : ''));
         const partis = m.vus.filter((x) => !m.fin.includes(x));
         verifier(!partis.length, `L2 ${k} : aucun bloc apparu puis parti` + (partis.length ? ' — ' + partis.join(', ') : ''));
         const ordreVu = m.vus.filter((x) => m.fin.includes(x)); const ordreFin = m.fin.filter((x) => ordreVu.includes(x));
