@@ -1100,6 +1100,7 @@ import "./design/verre-journee.css";   // (15 nov., refonte-journee) Ma journée
 import "./design/verre-annonces.css";   // (15 nov., refonte-journee) Annonces comme la maquette validée : la rangée de 72 px, la recherche et les vues
 import "./design/verre-restes.css";   // (16 nov., lot design-restes) les restes du verre : la carte qui monte sur Leboncoin, eBay, Vestiaire… — `@layer vrm-verre` : docs/passation/2026-11-16-design-restes.md
 import "./design/verre-argent.css";   // (16 nov., lot argent-mieux) Argent lisible partout : cartes de verre, encre du verre, « Copier » plein, ventes non comptées groupées — `@layer vrm-verre` : docs/passation/2026-11-16-argent-mieux.md
+import "./design/accessibilite.css";   // (17 nov.) audit WCAG 2.1 AA : focus double, encre claire sur le bleu, 44 px — `@layer vrm-a11y`, nommée AVANT vrm-verre (index.html)
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
 import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
@@ -1174,7 +1175,7 @@ const BUILD_ID = (() => {
 // et RIEN ne le lui disait — l'app affichait juste un numéro, qui ne veut rien
 // dire pour quelqu'un qui n'est pas développeur. Une version en retard ne
 // « bugue » pas : elle ne capte simplement pas ce que l'app attend, en silence.
-const EXT_ATTENDUE = '5.403.0';
+const EXT_ATTENDUE = '5.406.0';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // OÙ VA CETTE ANNONCE, EN PLUS DE VINTED ?
@@ -1606,7 +1607,7 @@ const extEnRetard = (v) => !!v && cmpVersion(v, EXT_ATTENDUE) < 0;
 // ⚠️ (30 oct., intégration) `transp`, `lbcsupprime` et `lbcstats` arrivent tous
 //    en 5.291.0 : 5.288 (Leboncoin) et 5.290 (colis) étaient des numéros de
 //    branche, jamais servis ; aucune version publiée ne porte ces fonctions.
-const EXT_CAPACITES = { suivisliste: '5.403.0', fichepublier: '5.400.0', empreinteebay: '5.400.0', vccategorie: '5.399.0', relueoffre: '5.398.0', salutation: '5.398.0', photovrm: '5.393.0', vcaimes: '5.393.0', versementsauto: '5.393.0', memephotosure: '5.393.0', memephoto: '5.384.0', numerotes: '5.382.0', lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
+const EXT_CAPACITES = { actionplein: '5.406.0', carte5: '5.406.0', suivisliste: '5.403.0', fichepublier: '5.400.0', empreinteebay: '5.400.0', vccategorie: '5.399.0', relueoffre: '5.398.0', salutation: '5.398.0', photovrm: '5.393.0', vcaimes: '5.393.0', versementsauto: '5.393.0', memephotosure: '5.393.0', memephoto: '5.384.0', numerotes: '5.382.0', lbccriteres: '5.381.0', relevemois: '5.378.0', popupcapte: '5.377.0', cartelistes: '5.377.0', favoriscoches: '5.377.0', versementconv: '5.376.0', remiseprix: '5.376.0', rechercheachat: '5.376.0', carteliens: '5.376.0', favoriscarte: '5.376.0', bordrelance: '5.376.0', filecaptures: '5.376.0', capturecarte: '5.376.0', importpasse: '5.375.0', vcventeorion: '5.374.0', vcventedate: '5.374.0', favoriattente: '5.372.0', suivinumero: '5.372.0', majdispo: '5.371.0', carte4: '5.371.0', reparer: '5.371.0', rapportext: '5.371.0', fileReseau: '5.371.0', barresfixes: '5.371.0', ecriturehumaine: '5.372.0', variantes: '5.372.0', formevinted: '5.372.0', prudence: '5.372.0', importsites: '5.365.0', empreintes: '5.358.0', resumemois: '5.354.0', verifdepot: '5.353.0', avisnegatif: '5.352.0', moderation: '5.350.0', importdepart: '5.344.0', offrespage: '5.342.0', versementrapide: '5.341.0', journalvacances: '5.340.0', vcprixvente: '5.340.0', avishisto: '5.340.0', infosvinted: '5.339.0', achatvinted: '5.339.0', vacances: '5.338.0', jauge: '5.337.0', journal: '5.337.0', baisseprix: '5.336.0', lbcclair: '5.335.0', cartecadre: '5.332.0', comptepush: '5.331.0', cartecode: '5.330.0', cartesansonglet: '5.329.0', connexioncarte: '5.328.0', appareil: '5.327.0', secoursenvoi: '5.327.0', ventesleger: '5.326.0', lieroauth: '5.325.0', plafondcompte: '5.312.0', freinrepub: '5.311.0', numeroscompte: '5.311.0', republierquestion: '5.310.0', favorisauto: '5.309.0', offresgarde: '5.308.0', transp: '5.291.0', favorisouvrir: '5.225.0', favorisliste: '5.218.0', suivivinted: '5.217.0', favoris: '5.217.0', liaison: '5.171.0', supprimees: '5.165.0', enligne: '5.170.0', codes: '5.45.0', releve: '5.52.0', places: '5.54.0', ebay: '5.55.0', lbctitre: '5.55.4', photoslbc: '5.58.0', photosebay: '5.59.0', commande: '5.129.0', publication: '5.160.0', lbcdate: '5.131.0', versement: '5.133.0', messagerie: '5.135.0', lbcpdf: '5.136.0', lbcmsg: '5.153.0', vestiaire: '5.154.0', preuves: '5.172.0', etatcompte: '5.181.0', lbcfiche: '5.182.0', relais: '5.183.0', lbcpack: '5.185.0', annulee: '5.185.0', confirmer: '5.206.0', retraitnotif: '5.206.0', offresauto: '5.234.0', vcpublier: '5.235.0', vcauto: '5.236.0', vcventes: '5.237.0', vcmessages: '5.238.0', vcachats: '5.239.0', republier: '5.240.0', republiermodif: '5.247.0', recreer: '5.248.0', lettre: '5.250.0', brouillon: '5.251.0', versbrouillon: '5.253.0', republierbrouillon: '5.254.0', refaire: '5.255.0', republierpage: '5.277.0', republierfile: '5.279.0', favorisperso: '5.281.0', lbcsupprime: '5.291.0', lbcstats: '5.291.0', vcsession: '5.295.0', vcfil: '5.317.0', vcrepondre: '5.295.0', vcfavoris: '5.295.0', relaisdest: '5.295.0', vcfiche: '5.296.0', lbcfil: '5.318.0', lbcrepondre: '5.318.0', vcoffres: '5.319.0', vcoffrerepondre: '5.319.0', avis: '5.319.0', ventesfusion: '5.323.0', releveidentite: '5.323.0', numeroecrit: '5.324.0', numerodescription: '5.334.0', discretion: '5.370.0', repubdepart: '5.368.0', creervinted: '5.367.0', securite: '5.366.0', vcprix: '5.368.0', lbcprix: '5.368.0' };
 // Trois états, jamais un seul : pas d'extension ici · en retard · à jour.
 const extSait = (quoi) => {
   if (!vmrExtPresent()) return 'absente';                    // téléphone, autre navigateur
@@ -16041,7 +16042,7 @@ function EnLigne({ value, onCommit, rendu, placeholder, inputMode, largeur = 64,
     // (revue du 19 oct.) La zone au doigt fait 44 px de LARGE aussi : sur
     // « achat — » elle faisait 10 px (le tiret), 25 px sur « N°2 ». Le
     // pointillé reste sous le texte seul (le span), pas sous la zone.
-    <button type="button" data-edition={data} onClick={() => setEdit(true)} title={titre || tr('annonces.cliquerModifier')}
+    <button type="button" className="vrm-cible-44" data-edition={data} onClick={() => setEdit(true)} title={titre || tr('annonces.cliquerModifier')}
       style={{border:'none',background:'transparent',padding:0,minHeight:0,minWidth:44,margin:0,color:'inherit',font:'inherit',cursor:'text',lineHeight:'inherit',textAlign:'inherit'}}><span style={{borderBottom:`1px dashed ${C.border}`}}>{rendu}</span></button>
   );
 }
@@ -16464,7 +16465,7 @@ const MARQUES_PLAT = {
 };
 function MarquePlateforme({ p, taille = 18 }) {
   const m = MARQUES_PLAT[p]; if (!m) return null;
-  return <span data-marque={p} title={`En ligne sur ${m.nom}`} aria-label={`En ligne sur ${m.nom}`}
+  return <span data-marque={p} title={tr('a11y.enLigneSur', { site: m.nom })} aria-label={tr('a11y.enLigneSur', { site: m.nom })}
     style={{display:'inline-flex',alignItems:'center',justifyContent:'center',minWidth:taille,height:taille,padding:'0 4px',borderRadius:6,
       background:m.bg,color:m.fg,border:`1px solid ${m.bord||m.bg}`,fontSize:Math.round(taille*0.5),fontWeight:700,letterSpacing:-0.2,lineHeight:1,flexShrink:0}}>{m.court}</span>;
 }
@@ -61667,9 +61668,11 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
               <React.Fragment key={l.cle}>
               {il === sansDateT.i ? <LigneSansDate n={sansDateT.n}/> : null}
               <button type="button" className="vrm-toutes-ligne" data-toutes-vente={l.site} data-toutes-id={l.id} data-toutes-compte={l.compte || ''} data-ordre-t={l.t != null ? String(l.t) : ''} onClick={() => onOuvrir(l)}
+                aria-label={`${l.titre} — ${NOM[l.site]}${l.compte ? ', ' + l.compte : ''}, ${jour(l.t)}${l.etat ? ', ' + motEtatVente(l.etat) : ''}${l.prix != null ? ', ' + prix(l) : ''}${l.num ? ', N°' + l.num : ''}`}
                 style={{ width: '100%', minHeight: 56, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 2px', background: 'transparent', border: 0, borderBottom: `1px solid ${C.border}`, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: C.text }}>
                 {/* (11 nov., lot accessibilité) Le nom de la ligne est LU ici (tout ce qu'elle montre, N° compris) ;
-                    le dessin est caché au lecteur. Plus d'aria-label qui ne contenait pas le texte affiché. */}
+                    le dessin est caché au lecteur. (17 nov.) Le MÊME texte en aria-label : `content-visibility:auto`
+                    (styles-listes.css) vidait ce texte des lignes hors écran pour le lecteur (nom vide mesuré). */}
                 <span className="vrm-sr-seul">{`${l.titre} — ${NOM[l.site]}${l.compte ? ', ' + l.compte : ''}, ${jour(l.t)}${l.etat ? ', ' + motEtatVente(l.etat) : ''}${l.prix != null ? ', ' + prix(l) : ''}${l.num ? ', N°' + l.num : ''}`}</span>
                 {/* (31 oct., Julien : « pas de photos partout ») La photo de la vente, comme sur l'écran de son site. */}
                 <span className="vrm-toutes-photo" data-toutes-photo={l.photo ? '1' : '0'} aria-hidden="true" style={{ width: 64, height: 80, flexShrink: 0, borderRadius: 12, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -65732,8 +65735,23 @@ function AppCoeur() {
       value={fil.q} onChange={e=>{ setGsQ(e.target.value); if(!gsOpen) setGsOpen(true); }} onFocus={()=>{ if(!gsOpen) setGsOpen(true); }}
       onKeyDown={e=>{ if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); fermerRecherche(); return; } clavierChamp(e); }}/>
   )}/>;
+  // (17 nov., accessibilité WCAG 2.4.3) Au clavier, Tab depuis la barre de recherche ne traverse plus les 7 suggestions
+  // ouvertes au focus (8 arrêts de plus sur chaque écran, mesuré) : il va au contrôle qui SUIT la recherche et referme le
+  // panneau. Les suggestions restent atteignables par ↓ (le clavier de la loupe, ci-dessus).
+  const tabHorsSuggestions = (e) => {
+    if (e.key !== 'Tab' || e.shiftKey || e.altKey || e.metaKey || e.ctrlKey) return;
+    const barre = e.currentTarget.querySelector('[data-barre-recherche]'); const p = document.getElementById('vrm-recherche-resultats');
+    if (!barre || !barre.contains(e.target) || !p || !e.currentTarget.contains(p)) return;
+    const SEL = 'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),summary,[tabindex]:not([tabindex="-1"])';
+    const dansBarre = [...barre.querySelectorAll(SEL)].filter((x) => x.tabIndex >= 0 && x.getClientRects().length);
+    if (dansBarre[dansBarre.length - 1] !== e.target) return;
+    const tous = [...document.querySelectorAll(SEL)].filter((x) => x.tabIndex >= 0 && x.getClientRects().length && !x.closest('[inert],[aria-hidden="true"]'));
+    const suivant = tous.find((x) => !p.contains(x) && !barre.contains(x) && (e.target.compareDocumentPosition(x) & Node.DOCUMENT_POSITION_FOLLOWING));
+    if (!suivant) return;
+    e.preventDefault(); flushSync(() => setGsOpen(false)); try { suivant.focus(); } catch (_) {}
+  };
   const champRechercheOrdi = (
-    <div className="vrm-recherche" data-recherche-zone="" data-recherche-ouverte={gsOpen?'1':'0'}>
+    <div className="vrm-recherche" data-recherche-zone="" data-recherche-ouverte={gsOpen?'1':'0'} onKeyDown={tabHorsSuggestions}>
       <label className="vrm-barre-recherche" data-barre-recherche="">
         <Icon name="search" size={18}/>
         {champRecherche(false)}
@@ -65962,6 +65980,9 @@ function AppCoeur() {
       // doigts ou que je glisse ») PLUS AUCUN CHANGEMENT D'ONGLET AU DOIGT. On change d'écran par la
       // barre du bas (ou les flèches ← → du clavier sur ordinateur). Ne pas remettre de balayage.
 >
+      {/* (17 nov., accessibilité WCAG 2.4.1) Le lien d'évitement : invisible tant qu'on ne tabule pas, il mène au contenu. */}
+      <a href="#vrm-contenu" className="vrm-aller-contenu" data-aller-contenu="" onClick={(e)=>{ e.preventDefault(); const m=document.getElementById('vrm-contenu'); if(m){ m.setAttribute('tabindex','-1'); try{ m.focus({preventScroll:true}); }catch(_){} } }}>{tr('a11y.allerContenu')}</a>
+      {ordi ? <SideBar tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesRail}/> : null}
       {/* Barre de chargement globale : visible dès qu'une donnée est en cours de
           chargement, sur n'importe quel écran. */}
       <TopProgress/>
@@ -66086,7 +66107,7 @@ function AppCoeur() {
           (au-dessus des feuilles, par un portail) : l'exemple ne se confond plus avec ses vraies données. */}
       {exempleActif() && <BandeauExemple sansCompte={exempleSansCompte()} style={ordi ? { marginLeft: NAV_LARGEUR + 36 } : undefined} onBrancher={() => (exempleSansCompte() ? sortirModeExemple(window, '/?inscription') : sortirModeExemple())} onConnexion={() => sortirModeExemple(window, '/?connexion')}/>}
       {exempleActif() && createPortal(<CadreExemple/>, document.body)}
-      <main className="vrm-main" data-ecran={tab} data-espace={espaceDe(tab, BAR_GROUPE)} data-defile="1" style={{
+      <main className="vrm-main" id="vrm-contenu" data-ecran={tab} data-espace={espaceDe(tab, BAR_GROUPE)} data-defile="1" style={{
         // ⚠️ COQUE APP-SHELL : c'est `<main>` qui défile, pas le document. La
         // barre du bas est un frère HORS de ce conteneur → elle ne bouge plus
         // jamais pendant le scroll (bug iOS « barre au milieu de l'écran »).
@@ -66248,7 +66269,7 @@ function AppCoeur() {
             ou la source en retard NOMMÉE avec son geste (src/fraicheur.js). Base injoignable ⇒ elle se tait
             (le bloc ci-dessus parle) ; hors ligne ⇒ cette branche n'est pas rendue (JourneeHorsLigne). La place
             est tenue dès le premier rendu (repli de même hauteur) : rien ne saute à l'arrivée de la réponse. */}
-        {!baseKO && !horsLigne && <Suspense fallback={<div className="vrm-fraicheur-hote" aria-hidden="true"><div className="vrm-bandeau-abo vrm-fraicheur" data-fraicheur-unique="charge" style={{background:'transparent',boxShadow:'none'}}/></div>}><LigneFraicheurParesseuse baseKO={baseKO} comptes={vintedAccounts} onNav={setTab}/></Suspense>}
+        {!baseKO && !horsLigne && <Suspense fallback={<div className="vrm-fraicheur-hote" aria-hidden="true"><div className="vrm-bandeau-abo vrm-fraicheur" data-fraicheur-unique="charge" style={{background:'transparent',boxShadow:'none'}}/></div>}><LigneFraicheurParesseuse baseKO={baseKO} comptes={vintedAccounts} onNav={setTab} horsTab/></Suspense>}
         <BandeauAbonnement setTab={setTab}/>
         {MULTI_USER && authState.user && <BandeauSuppressionPrevue tab={tab}/>}
         <BandeauCompteVendeur enTete={enTeteSession} ventes={ventesCoque} autres={autresSolo}
@@ -66569,7 +66590,9 @@ function AppCoeur() {
       <MemoireDefilement ecran={`${tab}:${(tab.startsWith('plat_')||estTacheSite(tab))?platSub:''}`}/>
       {/* Une seule navigation à la fois : latérale sur ordinateur, en bas sur
           téléphone. Jamais les deux — c'est la même liste d'écrans. */}
-      {ordi ? <SideBar tab={tab} setTab={setTab} entreprise={entreprise} sites={sitesPresents} badges={badgesRail}/> : <BottomBar tab={tab} setTab={setTab} sites={sitesPresents} badges={badgesNav} gestes={gestesDisque}/>}
+      {/* (17 nov., accessibilité WCAG 2.4.3) Sur ordinateur, la colonne de navigation est rendue EN TÊTE de la coque
+          (elle est fixe : rien ne bouge à l'écran) — au clavier, Tab la parcourt avant l'écran, comme on la lit. */}
+      {ordi ? null : <BottomBar tab={tab} setTab={setTab} sites={sitesPresents} badges={badgesNav} gestes={gestesDisque}/>}
       {showBackup&&<GardeEcran nom="sauvegarde" feuille onFermer={()=>setShowBackup(false)}><BackupModal
         catalog={catalog} sales={sales} garageGrid={garageGrid} blockedCells={blockedCells}
         onClose={()=>setShowBackup(false)}

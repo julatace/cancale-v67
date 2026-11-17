@@ -357,6 +357,31 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
   const [tuile, setTuile] = React.useState(null);
   const numCle = p ? p.num : '';
   React.useEffect(() => { setVue(null); setPlusOuvert(false); setTuile(null); }, [numCle]);
+  // (17 nov., accessibilité WCAG 2.4.3) Feuille modale : le focus ENTRE à l'ouverture, Tab et Maj+Tab
+  // tournent DEDANS (une feuille posée par-dessus, ex. « Plus », garde son propre tour), et le focus
+  // REVIENT à ce qui l'avait ouverte. En plan (ordinateur, à côté de la liste, aria-modal="false") : rien.
+  React.useEffect(() => {
+    const el = racine.current; if (!el) return undefined;
+    const modale = () => el.getAttribute('aria-modal') === 'true';
+    const avant = document.activeElement;
+    const SEL = 'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),summary,[tabindex]:not([tabindex="-1"])';
+    const focusables = () => [...el.querySelectorAll(SEL)].filter((x) => x.tabIndex >= 0 && x.getClientRects().length && !x.closest('[inert],[aria-hidden="true"]') && x.closest('[role="dialog"]') === el);
+    if (modale() && !el.contains(document.activeElement)) { el.setAttribute('tabindex', '-1'); try { el.focus({ preventScroll: true }); } catch (_) {} }
+    const k = (e) => {
+      if (e.key !== 'Tab' || !modale()) return;
+      const dessus = e.target && e.target.closest ? e.target.closest('[role="dialog"]') : null;
+      if (dessus && dessus !== el && el.contains(dessus)) return;
+      const f = focusables(); if (!f.length) { e.preventDefault(); return; }
+      const i = f.indexOf(document.activeElement);
+      if (e.shiftKey) { if (i <= 0) { e.preventDefault(); f[f.length - 1].focus(); } }
+      else if (i === -1 || i === f.length - 1) { e.preventDefault(); f[0].focus(); }
+    };
+    document.addEventListener('keydown', k, true);
+    return () => {
+      document.removeEventListener('keydown', k, true);
+      try { if (modale() && avant && avant !== document.body && document.contains(avant) && typeof avant.focus === 'function') avant.focus({ preventScroll: true }); } catch (_) {}
+    };
+  }, []);
   if (typeof document === 'undefined') return null;
   const I = (n, s = 18) => (Icon ? <Icon name={n} size={s}/> : null);
   const r = p && p.resume;
@@ -476,8 +501,8 @@ export default function FichePaire({ owner = '', p, etat = null, histoNum = null
   ) : null;
   // Ordinateur : un voile derrière le panneau (hors de lui : il couvre la page, un clic ferme la fiche) — sauf en plan.
   return createPortal(<>
-    {!enPlan && ordi ? <button type="button" className="fd-fond" data-fd-fond="" aria-label="Fermer la fiche" tabIndex={-1} onClick={onFermer}/> : null}
-    <div ref={racine} className={'vrm-fp fd' + (depuis ? ' is-depuis-ligne' : '') + (enPlan ? ' sb-plan fd-plan' : '') + (ordi ? ' fd-ordi' : '')} role="dialog" aria-modal={enPlan ? 'false' : 'true'} data-sb-plan={enPlan ? '1' : undefined} aria-label={nomFiche ? `Tout sur le N°${nomFiche}` : tr('fiche.heros')} data-fiche-paire={nomFiche} data-fiche-contexte-ouvert={ctx || undefined}
+    {!enPlan && ordi ? <button type="button" className="fd-fond" data-fd-fond="" aria-label={tr('a11y.fiche.fermer')} tabIndex={-1} onClick={onFermer}/> : null}
+    <div ref={racine} className={'vrm-fp fd' + (depuis ? ' is-depuis-ligne' : '') + (enPlan ? ' sb-plan fd-plan' : '') + (ordi ? ' fd-ordi' : '')} role="dialog" aria-modal={enPlan ? 'false' : 'true'} data-sb-plan={enPlan ? '1' : undefined} aria-label={nomFiche ? tr('a11y.fiche.nom', { n: String(nomFiche) }) : tr('fiche.heros')} data-fiche-paire={nomFiche} data-fiche-contexte-ouvert={ctx || undefined}
       data-fiche-ligne-cle={depuis ? depuis.cle : undefined} data-fiche-identite={depuis ? (ligneRes ? ligneRes.etat + ':' + (ligneRes.par || '') : '') : 'numero'} data-fiche-lecture-en-cours={lecture ? '1' : '0'} data-fd-vue={p ? vueOuverte : undefined} data-noswipe="1">
       {Retour ? <Retour fermer={onFermer}/> : null}
       <div className="fd-cadre" ref={cadre}>
