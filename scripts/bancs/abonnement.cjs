@@ -182,7 +182,10 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
 (async () => {
   await new Promise((res, rej) => { srv.once('error', (e) => rej(e)); srv.listen(PORT, res); }).catch((e) => { console.log('❌ le port ' + PORT + ' est pris (' + e.code + ') — relance le banc seul'); process.exit(1); });
   const nav = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--no-sandbox', '--no-proxy-server'] });
+  // (16 nov.) `BANC_SEUL=rappel` : la section « Le rappel avant prélèvement » seule.
+  const SEUL = process.env.BANC_SEUL || '';
   try {
+    if (SEUL !== 'rappel') {
     console.log('\n── La carte suit ce que le serveur sait');
     const attendus = { sans: 'sans', actif: 'actif', resilie: 'actif', impaye: 'impaye', proprietaire: 'proprietaire', nonBranche: 'non-branche', prixDifferent: 'non-branche', proprietairePrixDifferent: 'proprietaire',
       ancienPrixDifferent: 'non-branche', actifPrixDifferent: 'actif', actifAncienPrix: 'actif', proprietaireUsd: 'proprietaire', proprietairePaliers: 'proprietaire',
@@ -320,6 +323,7 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
       await ctx.close();
     });
 
+    }
     // (16 nov., lot abonnement-clair) Le rappel 3 jours avant chaque prélèvement : dit tel que le SERVEUR le fait
     // (`rappelPrelevement` de la route), jamais promis quand il ne le dit pas.
     console.log('\n── Le rappel avant prélèvement');
@@ -333,7 +337,11 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
         ['pas su', { ...ETATS.actif }, (r) => r === null],
       ];
       for (const [nom, abo, juge] of cas) {
-        const { ctx, pg } = await ouvrir(nav, { abo, largeur: 390 });
+        const { ctx, pg } = await ouvrir(nav, { abo, largeur: 390, compte: false, extra: '&vue=abonnement' });
+        await pg.waitForSelector('[data-abonnement]', { timeout: 15000 }).catch(() => {});
+        // La configuration de départ (premier lancement) se pose par-dessus : « Plus tard », comme le vendeur.
+        const tard = pg.getByRole('button', { name: /^Plus tard$/ });
+        if (await tard.count()) { await tard.first().click().catch(() => {}); await pg.waitForTimeout(600); }
         await pg.waitForTimeout(800);
         const r = await lire(pg);
         if (CAPTURES) await pg.screenshot({ path: path.join(CAPTURES, `rappel-${nom.replace(' ', '-')}-390.png`), fullPage: false }).catch(() => {});
@@ -341,6 +349,7 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
         await ctx.close();
       }
     });
+    if (SEUL !== 'rappel') {
 
     console.log('\n── Les factures');
     await essaie('liste', async () => {
@@ -543,6 +552,7 @@ const boutons = (pg) => pg.evaluate(() => { const e = document.querySelector('[d
       dit((await etatFermer(pg)) === 'pas-su' && !b, 'inventaire illisible : aucun bouton tant qu’on ne sait pas ce qui serait effacé ni s’il est le propriétaire');
       await ctx.close();
     });
+    }
   } catch (e) { dit(false, 'le banc s’exécute', String(e && e.message || e).slice(0, 160)); }
   finally {
     await nav.close(); srv.close();

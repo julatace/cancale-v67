@@ -40,7 +40,7 @@ surprise sur l'abonnement »).
 - `audit-fonctions-api`, `audit-traduction`, `audit-familles-serveur`, `audit-abonnement`, `audit-abonnement-propre`,
   `audit-notifications`, `audit-notifs-centre`, `audit-notifs-groupees`, `audit-push`, `audit-cibles-notif`,
   `audit-notifs-belles` : verts. `audit-notifs-redaction` : 5 rouges (offres groupées), **les mêmes sur main**.
-- Banc `abonnement` : section « Le rappel avant prélèvement » (390 tactile) — voir la PR.
+- Banc `abonnement` (`BANC_SEUL=rappel`, 390 tactile) : **4/4** — notification et e-mail · notification · éteint · « pas su » ⇒ rien promis ; capture regardée. (Le reste de ce banc est rouge depuis le 15 nov. : il cherche les anciens onglets de Paramètres — inchangé ici.)
 
 ## Gestes de Julien
 Aucun de plus : le rappel s'allume avec `STRIPE_SECRET_KEY` (déjà dans sa liste) ; l'e-mail avec `RELANCES_SMTP_*`.
