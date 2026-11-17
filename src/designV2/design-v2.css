@@ -599,7 +599,7 @@ html body button.v2-serie-lien { position: relative; }
    La liste des ventes en rangées A ; la case de sélection dans SA colonne de 44 px à gauche de la photo, seulement en
    sélection ; une rangée choisie se teinte (jamais un cadre gris) ; la facture envoyée = une petite icône verte. */
 html[data-design="v2"] body .v2t-liste { background: var(--v2-carte) !important; border: 0 !important; border-radius: 20px !important; box-shadow: var(--v2-carte-ombre) !important; overflow: hidden; }
-html[data-design="v2"] body .v2t-liste > .v2l + .v2l::before { content: ""; position: absolute; left: 96px; right: 0; top: 0; height: .5px; background: var(--v2-filet); }
+html[data-design="v2"] body .v2t-liste > .v2l + .v2l::before { content: ""; position: absolute; left: calc(var(--v2-air-carte, 16px) + 80px); right: 0; top: 0; height: .5px; background: var(--v2-filet); }
 .v2t-liste .v2l { align-items: flex-start; }
 .v2t-liste .v2l-a-l3 { height: auto; flex-wrap: wrap; white-space: normal; overflow: visible; gap: 4px 12px; line-height: 18px; }
 .v2l-avant { display: grid; place-items: center; flex: none; width: 44px; min-height: 64px; margin: 0 -8px 0 -8px; }
@@ -618,9 +618,11 @@ html body button.v2-facture-ok { position: relative; appearance: none; display: 
 /* Les rangées de la liste d'hier (cachées) ne laissent aucune trace ; la liste garde la place de la barre de sélection. */
 html[data-design="v2"][data-serie-ouverte] .v2t-liste { margin-bottom: calc(var(--vrm-serie-h, 64px) + 24px); }
 /* À l'ordinateur, la barre du haut collante (recherche, plateformes) est un verre PLEIN : jamais une demi-rangée dessous. */
-@media (min-width: 1024px) {
-  html[data-design="v2"] body .vrm-main > .vrm-barre-haut { background: color-mix(in srgb, var(--sv-haut, #1F5FA8) 90%, transparent) !important;
-    -webkit-backdrop-filter: blur(20px) saturate(180%) !important; backdrop-filter: blur(20px) saturate(180%) !important; box-shadow: 0 .5px 0 rgb(255 255 255 / .14) !important; }
+@layer vrm-finition {
+  @media (min-width: 1024px) {
+    html[data-design="v2"]:root:root:root body .vrm-app-shell .vrm-main > .vrm-barre-haut { background: var(--sv-haut, #1F5FA8) !important;
+      -webkit-backdrop-filter: blur(20px) saturate(180%) !important; backdrop-filter: blur(20px) saturate(180%) !important; box-shadow: 0 .5px 0 rgb(255 255 255 / .14) !important; }
+  }
 }
 /* La barre de sélection tient sur UNE ligne au téléphone (le plein prend la largeur de son libellé). */
 @media (max-width: 1023px) {

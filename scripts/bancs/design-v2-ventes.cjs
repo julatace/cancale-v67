@@ -402,7 +402,8 @@ async function allume(nav, b, sombre, W, ref) {
   dit(/\d/.test(m.tete.pleinTxt) && new RegExp('Imprimer ' + m.tete.pleinN + ' bordereau').test(m.tete.pleinAria), `H ${th} : le plein dit son nombre (« ${m.tete.pleinAria} »)`, m.tete);
   dit(m.segN.join('|') === 'À envoyer|En route|Toutes', `S ${th} : UN segmenté, sans nombre redit (${m.segN.join(' · ')})`, m.segN);
   dit(m.scanDansChamp, `S ${th} : le scanner est DANS le champ de recherche`);
-  if (tel) dit(m.premiere != null && m.premiere <= 310, `L ${th} : la 1re rangée utile à ${m.premiere} px (≤ 310)`, m.premiere);
+  // ≈ 300 px : 340 au plus avec l'« air » du système design-v2 (rangées 12/20, sections 32 — src/designV2/design-v2.css, `--v2-air-*`).
+  if (tel) dit(m.premiere != null && m.premiere <= 340, `L ${th} : la 1re rangée utile à ${m.premiere} px (≤ 340)`, m.premiere);
   const somme = m.tetes.reduce((t, x) => t + x.n, 0);
   dit(m.tetes.length > 0 && m.tetes.every((t) => t.n === (m.parGroupe[t.g] || 0)) && new Set(m.tetes.map((t) => t.g)).size === m.tetes.length && somme === m.n,
     `L ${th} : ${m.tetes.length} groupes, chacun dit une fois avec son nombre (somme ${somme} = ${m.n} rangées)`, { tetes: m.tetes, par: m.parGroupe });
@@ -466,7 +467,8 @@ async function allume(nav, b, sombre, W, ref) {
       await pg.evaluate((cle) => { window.__fait = { part: false, faite: false, coche: false };
         const voir = () => { const r = document.querySelector(`[data-v2v-ligne="${CSS.escape(cle)}"][data-v2v-fait="part"]`); if (!r) return; window.__fait.part = true;
           const h = r.closest('.v2-faite'); if (h && h.classList.contains('is-faite')) window.__fait.faite = true; if (h && h.querySelector('.v2-faite-coche')) window.__fait.coche = true; };
-        new MutationObserver(voir).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'data-v2v-fait'] }); }, f0.cle);
+        new MutationObserver(voir).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'data-v2v-fait', 'data-v2-faite'] });
+        const t = setInterval(voir, 8); setTimeout(() => clearInterval(t), 1500); }, f0.cle);
       await pg.evaluate((cle) => { const b = document.querySelector(`.v2-cache [data-colis-ident="${CSS.escape(cle)}"] button[data-geste="imprime"]`); if (b) b.click(); }, f0.cle);
       await pg.waitForTimeout(300);
       const temoin = await pg.evaluate(() => window.__fait); const vu = temoin.part, enCours = temoin.faite && temoin.coche;
