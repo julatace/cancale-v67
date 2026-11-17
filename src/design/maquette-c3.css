@@ -95,6 +95,7 @@
   :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell > .vrm-app-header .vrm-header-actions,
   :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell > .vrm-app-header .vrm-header-actions > div { gap: 0 !important; }
   :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell > .vrm-app-header .vrm-header-actions { padding-top: 5px !important; padding-bottom: 5px !important; }
+  :root[data-maquette="c"][data-maquette-c3] body .vrm-app-shell > .vrm-app-header .vrm-header-actions button:not(.vrm-etat-pastille) { background: transparent !important; box-shadow: none !important; border-color: transparent !important; }
   /* Le point de fraîcheur : nu lui aussi (un point, 44 px au doigt), à gauche des glyphes. */
   :root[data-maquette="c"][data-maquette-c3] body .vrm-fraicheur-hote > .vrm-bandeau-abo.vrm-fraicheur { top: calc(5px + env(safe-area-inset-top, 0px)) !important; right: 140px !important; width: 44px !important; min-width: 44px !important; height: 44px !important; background: transparent !important; box-shadow: none !important; }
   :root[data-maquette="c"][data-maquette-c3] body .vrm-fraicheur-hote > .vrm-fraicheur .vrm-bandeau-abo-geste { width: 44px !important; height: 44px !important; min-width: 44px !important; min-height: 44px !important; }
@@ -328,6 +329,44 @@
   /* Les chiffres (36 en ligne · 30 ventes · 1 680 €) : une ligne serrée. */
   :root[data-maquette="c"][data-maquette-c3] .vrm-main .vrm-ann-workbar { padding-left: 16px !important; padding-right: 16px !important; }
   :root[data-maquette="c"][data-maquette-c3] .vrm-main .vrm-fu-bande.vrm-carte-stats { min-height: 0 !important; padding-top: 2px !important; padding-bottom: 2px !important; }
+}
+
+/* ══ 7. LA REVUE « VIBE CODÉ » (impeccable + design-critique sur les captures, 17 nov.) ═══════════════════
+   1. le même nombre écrit trois fois (rail « À envoyer 30 » + « 30 colis à envoyer » + pastille ; « Annonces 36 »
+      + « 36 en ligne ») ⇒ le chiffre-héros et la bande de chiffres quittent Ventes, Annonces, Achats (Argent les a) ;
+   2. le sur-titre « Bon après-midi · date » au-dessus du titre (un « eyebrow ») ⇒ retiré à l'œil ;
+   3. les N° dans des boîtes à filet 1 px ⇒ une plaque teintée sans filet, chiffres tabulaires ;
+   4. trois pistes de verre empilées (plateformes, comptes, vues) ⇒ une seule (les plateformes) ; comptes et vues
+      deviennent des mots, le choisi en porcelaine ;
+   5. la liste qui file sous la barre au pouce sans rien ⇒ un bord de défilement (fondu du fond) derrière la barre. */
+@media (max-width: 767px) {
+  :root[data-maquette="c"][data-maquette-c3] .vrm-main:is([data-ecran="ventes"], [data-ecran="cat_expedition"]) .vv-hero.sb-tete,
+  :root[data-maquette="c"][data-maquette-c3] .vrm-main:is([data-ecran="annonces"], [data-ecran="paires"], [data-ecran="achats"]) .vrm-carte-stats {
+    position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip-path: inset(50%) !important; white-space: nowrap !important; margin: 0 !important; padding: 0 !important; min-height: 0 !important;
+  }
+  :root[data-maquette="c"][data-maquette-c3] .vrm-main .sj-journee .sj-tete .sj-bonjour { visibility: hidden !important; height: 0 !important; min-height: 0 !important; overflow: hidden !important; margin: 0 !important; padding: 0 !important; }
+  /* 3. Le N° : une plaque teintée, sans filet. */
+  :root[data-maquette="c"][data-maquette-c3] .vrm-main .vrm-ann-card .vrm-num {
+    border: 0 !important; box-shadow: none !important; background: rgb(118 118 128 / .13) !important; border-radius: 6px !important;
+    padding: 2px 6px !important; font: 600 12.5px/1.2 Inter, system-ui, sans-serif !important; font-variant-numeric: tabular-nums !important; color: inherit !important;
+  }
+  :root[data-maquette="c"][data-maquette-c3][data-theme="dark"] .vrm-main .vrm-ann-card .vrm-num { background: rgb(255 255 255 / .12) !important; }
+  /* 4. Vues d'Annonces et comptes d'Achats : des mots sur le fond, le choisi en porcelaine — plus de piste de verre. */
+  :root[data-maquette="c"][data-maquette-c3] .vrm-main :is(.vrm-stock-views.vrm-filtres, .vrm-compte-puces) {
+    background: transparent !important; box-shadow: none !important; padding: 0 !important; gap: 4px !important; margin: 8px -4px 4px !important; height: 44px !important;
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent) !important; mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent) !important;
+  }
+  :root[data-maquette="c"][data-maquette-c3] .vrm-main :is(.vrm-stock-views.vrm-filtres > button, .vrm-compte-puce) { height: 34px !important; min-height: 34px !important; margin: 5px 0 !important; padding: 0 12px !important; border-radius: 17px !important; }
+  :root[data-maquette="c"][data-maquette-c3] .vrm-main :is(.vrm-stock-views.vrm-filtres > button[aria-pressed="true"], .vrm-compte-puce.is-actif) { background: var(--sv-porcelaine, #FFF) !important; color: var(--sv-encre, #0C1D30) !important; box-shadow: none !important; }
+  :root[data-maquette="c"][data-maquette-c3] .vrm-main .vrm-stock-views.vrm-filtres .vrm-of-n { display: none !important; }
+  /* 5. Le bord de défilement derrière la barre au pouce : le fond de l'app qui monte en fondu, comme le bord d'iOS. */
+  :root[data-maquette="c"][data-maquette-c3] .m3-pouce::before {
+    content: ""; position: absolute; left: -12px; right: -12px; top: -24px; bottom: -70px; z-index: -1; pointer-events: none;
+    background: linear-gradient(to bottom, transparent, var(--sv-bas, #0E3C78) 46%);
+  }
+  :root[data-maquette="c"][data-maquette-c3][data-theme="dark"] .m3-pouce::before { background: linear-gradient(to bottom, transparent, var(--sv-bas, #07111F) 46%); }
+  /* Le rail retrouve son air quand le chiffre-héros est parti. */
+  :root[data-maquette="c"][data-maquette-c3] .vrm-main :is(.vv-seg, .vrm-seg) { margin-bottom: 12px !important; }
 }
 
 } /* fin de @layer vrm-maquette */
