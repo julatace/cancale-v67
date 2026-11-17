@@ -1,0 +1,153 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   MAQUETTE L « Le dressing » — page blanche, aucune feuille de src/.
+   Le papier, l'encre, la photo. Une app de mode (SSENSE, Grailed, Vestiaire) pour le VENDEUR.
+   · Deux polices auto-hébergées (OFL) : Instrument Serif (les titres), Geist (tout le reste).
+   · Trois tailles par écran : 40 (titre ; 64 à l'ordinateur) · 15 · 13.
+   · Coins droits partout ; photos bord à bord, 2 px entre elles ; aucun dégradé, aucun verre, aucune pastille.
+   · L'action est une barre d'encre pleine largeur, une par écran. Ambre = un geste à faire (un carré) ;
+     rouge = deux paires sous un N°, rien d'autre.
+   ════════════════════════════════════════════════════════════════════════════ */
+@font-face { font-family: 'Instrument Serif L'; src: url('polices/instrument-serif-latin-400-normal.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Geist L'; src: url('polices/geist-latin-wght-normal.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
+
+:root {
+  color-scheme: light;
+  --papier: #F3F1EC; --carte: #FFFFFF; --encre: #151514; --gris: #64615B; --filet: rgb(21 21 20 / .12); --filet-fort: rgb(21 21 20 / .32);
+  --ambre: #E08A00; --ambre-texte: #8A4B00; --rouge: #C2261B;
+  --affiche: 'Instrument Serif L', 'Times New Roman', serif; --texte: 'Geist L', system-ui, sans-serif;
+  --sortie: cubic-bezier(.23, 1, .32, 1);
+  --barre: 56px; --action: 56px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; --papier: #121211; --carte: #1D1D1B; --encre: #EDEBE6; --gris: #A19E96; --filet: rgb(237 235 230 / .12); --filet-fort: rgb(237 235 230 / .34); --ambre: #F0A43A; --ambre-texte: #F2B65E; --rouge: #FF6A5C; } }
+:root[data-theme="dark"] { color-scheme: dark; --papier: #121211; --carte: #1D1D1B; --encre: #EDEBE6; --gris: #A19E96; --filet: rgb(237 235 230 / .12); --filet-fort: rgb(237 235 230 / .34); --ambre: #F0A43A; --ambre-texte: #F2B65E; --rouge: #FF6A5C; }
+
+*, *::before, *::after { box-sizing: border-box; }
+html { background: var(--papier); -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; overscroll-behavior-y: none; }
+html.verrou { overflow: hidden; }
+body { margin: 0; background: var(--papier); color: var(--encre); font: 400 15px/1.4 var(--texte); -webkit-font-smoothing: antialiased; }
+h1, h2, p, dl, dd { margin: 0; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+a, button { touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+::selection { background: var(--encre); color: var(--papier); }
+:focus-visible { outline: 2px solid var(--encre); outline-offset: 2px; }
+svg { display: block; flex: none; }
+.prix, .compte, .n, .code, .rang-val, .spec dd, .suivi { font-variant-numeric: tabular-nums; }
+
+/* ── Titre, filtres ── */
+h1 { font: 400 40px/1 var(--affiche); letter-spacing: -.01em; }
+.filtre { position: relative; display: inline-flex; align-items: center; gap: 4px; height: 48px; color: var(--gris); white-space: nowrap; transition: color 160ms ease; }
+.filtre[aria-current] { color: var(--encre); font-weight: 600; }
+.filtre[aria-current]::before { content: ''; width: 6px; height: 6px; background: var(--encre); margin-right: 4px; }
+.compte { font-size: 13px; font-weight: 400; color: var(--gris); }
+.filtre:active, .onglet:active { opacity: .55; }
+
+/* ── La grille et la tuile ── */
+.grille { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 2px; }
+.tuile { display: flex; flex-direction: column; min-width: 0; content-visibility: auto; contain-intrinsic-size: auto 300px; animation: entre 420ms var(--sortie) both; animation-delay: calc(var(--i) * 30ms); }
+@keyframes entre { from { opacity: 0; transform: translateY(8px); } }
+.photo { position: relative; display: block; aspect-ratio: 4 / 5; overflow: hidden; background: #E7E4DE; }
+.photo img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 500ms var(--sortie), opacity 160ms ease; }
+.tuile:active .photo img { opacity: .82; }
+.n { display: inline-flex; align-items: center; height: 22px; padding: 0 7px; background: #151514; color: #F3F1EC; font-size: 13px; font-weight: 500; letter-spacing: .01em; white-space: nowrap; }
+.n.rouge { background: var(--rouge); color: #FFFFFF; }
+.n.vide { background: transparent; color: var(--gris); padding: 0; font-weight: 400; }
+.photo .n { position: absolute; top: 0; left: 0; }
+.etat { position: absolute; left: 0; bottom: 0; display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; background: #FFFFFF; color: #151514; font-size: 13px; font-weight: 500; white-space: nowrap; }
+.etat.geste::before, .quand.geste::before, .fiche-etat.geste::before { content: ''; width: 7px; height: 7px; background: var(--ambre); flex: none; }
+.nom { padding: 10px 12px 0; font-size: 13px; line-height: 18px; color: var(--encre); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 46px; }
+.bas { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 2px 12px 0; font-size: 13px; }
+.prix { font-weight: 600; white-space: nowrap; }
+.quand { display: inline-flex; align-items: center; gap: 6px; color: var(--gris); white-space: nowrap; }
+.quand.geste { color: var(--ambre-texte); }
+
+/* ── L'action : une barre d'encre ── */
+.action { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: var(--action); padding: 0 20px; background: var(--encre); color: var(--papier); font-size: 15px; font-weight: 600; white-space: nowrap; transition: opacity 120ms ease; }
+.action:active { opacity: .8; }
+
+/* ════ TÉLÉPHONE ════ */
+.tel .tete { display: flex; align-items: flex-end; justify-content: space-between; padding: calc(env(safe-area-inset-top) + 20px) 8px 4px 16px; }
+.loupe { width: 44px; height: 44px; display: grid; place-items: center; }
+.tel .filtres { position: sticky; top: 0; z-index: 3; display: flex; justify-content: space-between; padding: 0 16px; margin-bottom: 8px; background: var(--papier); }
+.tel main { padding-bottom: calc(var(--barre) + var(--action) + 32px + env(safe-area-inset-bottom)); }
+.tel .ecran > .action { position: fixed; left: 0; right: 0; bottom: calc(var(--barre) + env(safe-area-inset-bottom)); z-index: 4; }
+.barre { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; display: flex; height: calc(var(--barre) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); background: var(--papier); box-shadow: inset 0 1px 0 var(--filet); }
+.onglet { flex: 1; display: grid; place-items: center; font-size: 13px; color: var(--gris); }
+.onglet[aria-current] { color: var(--encre); font-weight: 600; }
+
+/* ── La fiche ── */
+.fiche { position: fixed; inset: 0; z-index: 20; }
+.voile { display: none; }
+.fiche-corps { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; background: var(--papier); display: flex; flex-direction: column; animation: monte 300ms var(--sortie) both; }
+@keyframes monte { from { opacity: 0; transform: translateY(24px); } }
+.fiche-photo { position: relative; aspect-ratio: 4 / 5; flex: none; background: #E7E4DE; }
+.fiche-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.fermer, .plus { position: absolute; top: calc(env(safe-area-inset-top) + 4px); width: 44px; height: 44px; display: grid; place-items: center; color: #151514; }
+.fermer { left: 4px; } .plus { right: 4px; }
+.fiche-texte { padding: 20px 16px 32px; flex: 1; }
+.fiche-tags { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--gris); }
+.fiche-titre { margin-top: 16px; font: 400 40px/1 var(--affiche); letter-spacing: -.01em; text-wrap: balance; }
+.fiche-etat { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 15px; font-weight: 500; }
+.fiche-etat.geste { color: var(--ambre-texte); }
+.raison { margin-top: 8px; font-size: 13px; line-height: 18px; color: var(--gris); max-width: 44ch; }
+.specs { margin-top: 24px; }
+.spec { display: flex; justify-content: space-between; align-items: center; gap: 16px; min-height: 48px; box-shadow: inset 0 1px 0 var(--filet); font-size: 15px; }
+.spec:last-child { box-shadow: inset 0 1px 0 var(--filet), inset 0 -1px 0 var(--filet); }
+.spec dt { color: var(--gris); }
+.spec dd { text-align: right; min-width: 0; overflow-wrap: anywhere; }
+.fiche-corps > .action { position: sticky; bottom: 0; flex: none; height: calc(var(--action) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); }
+/* À retirer : la photo se réduit, le ticket prend la place. */
+.fiche[data-etat="retirer"] .fiche-photo { aspect-ratio: auto; height: calc(env(safe-area-inset-top) + 52px); background: none; }
+.fiche[data-etat="retirer"] .fermer, .fiche[data-etat="retirer"] .plus { color: var(--encre); }
+.fiche[data-etat="retirer"] .fiche-texte { padding-top: 8px; }
+.ticket-photo { position: absolute; top: 16px; right: 20px; width: 64px; height: 80px; object-fit: cover; }
+.ticket { position: relative; margin-top: 24px; padding: 16px 20px 20px; background: var(--carte); color: var(--encre); box-shadow: 0 1px 0 var(--filet), 0 12px 28px -18px rgb(0 0 0 / .35); }
+.ticket-haut { display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: var(--gris); padding-right: 80px; }
+.ticket-haut span:last-child { color: var(--ambre-texte); }
+.code { margin-top: 20px; font: 600 40px/1 var(--texte); letter-spacing: .04em; white-space: nowrap; }
+.lieu { margin-top: 8px; font-size: 15px; }
+.ticket-qr { position: relative; margin: 20px -20px 0; padding: 20px 20px 0; border-top: 1.5px dashed var(--filet-fort); display: flex; justify-content: center; }
+.ticket-qr::before, .ticket-qr::after { content: ''; position: absolute; top: -9px; width: 16px; height: 16px; border-radius: 50%; background: var(--papier); }
+.ticket-qr::before { left: -8px; } .ticket-qr::after { right: -8px; }
+.ticket-qr img { width: 168px; height: 168px; background: #fff; padding: 8px; image-rendering: pixelated; }
+.sans-qr { font-size: 13px; color: var(--gris); text-align: center; padding: 4px 0 2px; }
+.suivi { margin-top: 12px; font-size: 13px; color: var(--gris); text-align: center; }
+
+/* ── Argent : une liste chiffrée sobre ── */
+.argent { display: flex; flex-direction: column; gap: 40px; padding: 8px 16px 0; }
+.argent h2 { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+.rang { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 0; box-shadow: inset 0 1px 0 var(--filet); }
+.rang-g { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.rang-mot { font-size: 15px; }
+.rang-sous { font-size: 13px; color: var(--gris); }
+.rang-val { font-size: 15px; font-weight: 600; white-space: nowrap; }
+.photo-rang img { width: 40px; height: 50px; object-fit: cover; flex: none; }
+
+/* ════ ORDINATEUR ════ */
+.ordi .haut { position: sticky; top: 0; z-index: 6; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; height: 72px; padding: 0 40px; background: var(--papier); box-shadow: inset 0 -1px 0 var(--filet); }
+.marque { font: 400 28px/1 var(--affiche); }
+.nav { display: flex; gap: 32px; }
+.ordi .onglet { height: 44px; font-size: 15px; }
+@media (hover: hover) and (pointer: fine) { .onglet:hover, .filtre:hover { color: var(--encre); } .tuile:hover .photo img { transform: scale(1.03); } .action:hover { opacity: .88; } }
+.cherche { justify-self: end; display: flex; align-items: center; gap: 10px; width: 340px; height: 40px; color: var(--gris); box-shadow: inset 0 -1px 0 var(--filet-fort); }
+.cherche input { flex: 1; min-width: 0; background: none; border: 0; outline: none; font: inherit; font-size: 15px; color: var(--encre); }
+.cherche input::placeholder { color: var(--gris); }
+.ordi .tete { display: flex; align-items: flex-end; gap: 48px; padding: 40px 40px 24px; }
+.ordi h1 { font-size: 64px; line-height: .9; }
+.ordi .filtres { display: flex; gap: 28px; }
+.ordi .tete .action { margin-left: auto; height: 48px; padding: 0 20px; gap: 24px; }
+.ordi .grille { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 40px 2px; padding-bottom: 80px; }
+.ordi .argent { max-width: 760px; padding: 8px 40px 80px; }
+.ordi .fiche .voile { display: block; position: absolute; inset: 0; background: rgb(10 10 9 / .32); animation: fondu 240ms ease both; }
+@keyframes fondu { from { opacity: 0; } }
+.ordi .fiche-corps { left: auto; width: 520px; box-shadow: -1px 0 0 var(--filet); animation: glisse 300ms var(--sortie) both; }
+@keyframes glisse { from { opacity: 0; transform: translateX(24px); } }
+.ordi .fiche-photo { aspect-ratio: 1; }
+.ordi .fiche-texte { padding: 24px 32px 32px; }
+.ordi .fiche-corps > .action { padding: 0 32px; }
+.ordi.a-fiche .tete .action { visibility: hidden; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tuile, .fiche-corps, .ordi .fiche-corps { animation: fondu 160ms ease both !important; }
+  .photo img { transition: none; }
+}
