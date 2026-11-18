@@ -37,3 +37,10 @@ Preuves : `audit-magasin-groupe` 7 verts, rouge sur main (3), `--prouve` 3/3 ; c
 Déclarer) 26/26 identiques ; source-unique 24 verts ; versements-course 26 verts ; temps-reel 38 verts.
 ⚠️ Ces bancs d'écran NE voient PAS une prévenance perdue (mutant « prévenance oubliée » : chiffres-volume et temps-reel verts —
 un autre rendu relit la valeur) : seul l'audit exécuté le voit. À savoir pour l'étape suivante.
+
+## 5. « Deux Comptabilite montées » : vérifié, ce n'est PAS le cas sur Ma journée
+Ma journée monte UNE `Comptabilite` (`key="journee"`, App.jsx). Les entrées en double du crochet `POURQUOI` (même liste
+d'états à 1 ms d'écart) sont un artefact : une 2e validation React où `Comptabilite` n'a pas été rendue (sa fibre et son
+`alternate` sont ceux de la validation d'avant ; le compteur `RENDUS` les écarte déjà). Ventes (2 moteurs : « À expédier » et
+la liste) et Achats (3 : colis, retraits, liste) montent plusieurs moteurs EXPRÈS ; ils partagent déjà les commandes par le
+magasin (source unique du 13 nov.). Diviser le calcul par deux en « montant une seule fois » ne s'applique donc pas à Ma journée.
