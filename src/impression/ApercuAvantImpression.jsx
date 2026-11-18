@@ -60,12 +60,11 @@ export default function ApercuAvantImpression({ onMonte, Feuille, Bouton, etat, 
                 {it.numero ? <b>N°{it.numero}</b> : null} <span>{it.title || ''}</span>
               </div>
               {pose ? <SceneTampons octets={res.unitBytes || res.bytes} pose={pose} largeur={largeur} dessiner={dessiner} occupe={occupe || enCours}
-                libres={{ n: !!perso.n || (pose.libre && !('n' in perso)), m: !!perso.m }} libelles={{ n: tr('tampons.el.n'), m: tr('tampons.el.m') }} compact
+                libres={{ n: !!perso.n || (pose.libre && !('n' in perso)), m: !!perso.m }} libelles={{ n: tr('tampons.el.n'), m: tr('tampons.el.m'), mVerrou: tr('tampons.el.mVerrou') }} compact
                 onPoser={(quoi, b, f) => { setRefus(null); onPoser(pg.cle, quoi, b, pose, f); }} onRefus={(q) => setRefus(q)}/>
                 : <p className="vrm-impr-sous">{tr('tampons.apercu.sansPose')}</p>}
               {pose ? <div className="vrm-tampons-apercu-actions">
                 <Bouton variante="discret" taille="petit" data-impr-apercu-origine={`${pg.cle}:n`} disabled={occupe} onClick={() => onOrigine(pg.cle, 'n', pose)}>{tr('tampons.apercu.origine.n')}</Bouton>
-                <Bouton variante="discret" taille="petit" data-impr-apercu-origine={`${pg.cle}:m`} disabled={occupe} onClick={() => onOrigine(pg.cle, 'm', pose)}>{tr('tampons.apercu.origine.m')}</Bouton>
               </div> : null}
             </div>
           );
