@@ -57,6 +57,10 @@ import { bornesPeriode as bornesPeriodeExport, raisonUrssaf } from '../exportCom
 import { CLE_JE_VENDS, lireReglageJeVends } from '../profilVendeur.js';
 import { valeurChiffre, raisonCourte, sansCompteSur } from '../design/carteChiffres.js';
 import { questionsArgent } from '../argent.js';
+import { useDesignV2 } from '../designV2/reglage.js';   // (17 nov.) le nouveau design, en essai
+import ArgentMoisV2Vue from '../designV2/ArgentMois.jsx';   // (17 nov., phase 2) Argent · Mois
+import { BoutonV2, BoutonIconeV2, SegmentV2 } from '../designV2/BoutonV2.jsx';
+import { ChampRecherche } from '../composants/ChampRecherche.jsx';
 import { tauxMicro, detailTaux, AIDE_NEUTRE, SOURCES_OFFICIELLES, TAUX_ACTIVITE } from '../profilFiscal.js';
 // (10 nov., lot T) La jauge et l'alerte du seuil de TVA, à côté des factures (src/seuilTvaFacture.js).
 const SeuilTvaFactures = aLaDemande(() => import('../SeuilTvaFactures.jsx'));
@@ -887,6 +891,7 @@ function Sales({catalog,setCatalog,sales,setSales,invoices,invoiceSettings,entre
 
 /* ── Factures ───────────────────────────────────────── */
 function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoiceSettings,entreprises,setEntreprises,activeEnt,setActiveEnt,argentNav=null}) {
+  const designV2 = useDesignV2();   // (17 nov., phase 2) allumé : les segments SOUS le titre, dans l'en-tête (avant les actions)
   const [searchInput,setSearchInput]=useState('');
   const [search,setSearch]=useState('');
   const [zone,setZone]=useState('attente'); // 'attente' | 'comptabilisees'
@@ -1049,6 +1054,127 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
     URL.revokeObjectURL(url);
   };
   
+  // (17 nov., nouveau design · phase 2) Le tableau et sa pagination : UNE écriture, posée par l'écran d'hier (éteint) et par
+  // celui du nouveau design (allumé, sous la recherche et le segmenté).
+  const tableauFactures = (<>
+      {/* Tableau factures */}
+      <Card style={{padding:0,overflowX:'auto'}}>
+        {/* (12 nov., finitions) Le vide se dit HORS du tableau : dans un tableau de 700 px, sur
+            téléphone, la phrase et « + Nouvelle facture » étaient coupés au bord de la carte. */}
+        {list.length===0 ? <div data-factures-vide={zone} style={{padding:'28px 20px',textAlign:'center',color:C.muted,fontSize:13,lineHeight:1.5}}>
+              {search.trim()
+                ? <>{tr('compta.aucuneFactureTrouvee')} {search} ».</>
+                : zone==='attente'
+                  ? <>{tr('compta.aucuneFactureAttente')}<br/>
+                      {/* ⚠️ Cette phrase parlait d'une « feuille Google » : le
+                          pipeline Apps Script est mort (404, mesuré). Il aurait
+                          attendu des factures qui ne pouvaient pas arriver. Ce
+                          qui remplit vraiment cet écran, ce sont les reçus
+                          Vinted reçus par email, et sa propre saisie. */}
+                      
+                      {/* (14 nov., Studio) « + Nouvelle facture » était écrit deux fois sur l'écran : le geste
+                          reste UNE fois, le plein de l'écran (en tête, `data-fac-principal` au téléphone). */}
+                    </>
+                  : <>{tr('compta.aucuneFactureComptabilisee')}<br/>
+                      <span style={{fontSize:12}}>{tr('compta.factureArriveIci')}</span>
+                    </>}
+
+        </div> :
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:12,minWidth:700}}>
+          <thead>
+            <tr style={{background:C.surface,borderBottom:`1px solid ${C.border}`}}>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('compta.article')}</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('compta.facture')}</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('compta.dateVente')}</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('compta.designation')}</th>
+              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('partout.part.prix')}</th>
+              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('ventes.acheteur')}</th>
+              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('ventes.actions')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {/* ⚠️ UN ÉCRAN VIDE DOIT DIRE QUOI FAIRE (§7 : il n'est pas
+                développeur — « Aucune facture en attente » ne se rattrape
+                nulle part). D'où l'origine des lignes, et la porte : le même
+                « Récupérer Vinted » que le haut de l'écran, à l'endroit où il
+                constate le vide. */}
+            {list.map(inv=>{
+              const isAccounted=accountedSet.has(String(inv.productId).trim());
+              return (
+                <tr key={inv.id} style={{borderBottom:`1px solid ${C.border}`}}>
+                  <td style={{padding:'8px',color:C.text,fontWeight:600,fontFamily:'monospace',fontSize:15}}>#{inv.productId||'?'}</td>
+                  <td style={{padding:'8px',color:C.accentTexte,fontWeight:400,fontFamily:'monospace',fontSize:11}}>{inv.number||'—'}{(entreprises&&entreprises.length>1)&&(()=>{const e=entForInvoice(inv,entreprises,activeEnt,invoiceSettings);return e&&e.companyName?<div style={{marginTop:2,fontFamily:'inherit',fontSize:11,color:C.muted,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:110}}>🏢 {e.companyName}</div>:null;})()}</td>
+                  <td style={{padding:'8px',color:C.text,fontFamily:'monospace',fontSize:11}}>{fmtDate(inv.saleDate)}</td>
+                  <td style={{padding:'8px',color:C.text}}>{String(inv.itemName||'—').replace(/\bimages?\s*:\s*/gi,'').replace(/\bimages?\b/gi,'').replace(/\s+/g,' ').trim()||'—'}</td>
+                  <td style={{padding:'8px',textAlign:'right',color:C.accentTexte,fontWeight:400}}>{fmt(valeurSue(inv.sellPrice))}</td>
+                  <td style={{padding:'8px',color:C.muted,fontSize:11}}>{inv.buyerName||'—'}</td>
+                  <td style={{padding:'8px',textAlign:'right',whiteSpace:'nowrap'}}>
+                    <Btn small onClick={()=>generatePDF(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.blue} style={{marginRight:4}} aria-label={tr('compta.imprimerFacture')} title={tr('compta.imprimerFacture')}><Icon name="printer" size={15}/></Btn>
+                    <Btn small onClick={()=>generateFacturXPdf(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.muted} style={{marginRight:4}} title={tr('compta.factureElectroniqueFactur')}>🧾</Btn>
+                    <Btn small onClick={()=>deleteInvoice(inv.id)} color={C.danger}>🗑</Btn>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>}
+      </Card>
+      
+      {/* Pagination */}
+      {!showAll&&totalPages>1&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0',flexWrap:'wrap'}}>
+        <Btn small onClick={()=>setPage(p=>Math.max(0,(p===null?0:p)-1))} color={C.border} style={{opacity:currentPage===0?0.4:1}}>{tr('compta.precedent')}</Btn>
+        <span style={{color:C.muted,minWidth:120,textAlign:'center'}}>
+          {tr('compta.page')} <b style={{color:C.text}}>{currentPage+1}</b> / {totalPages} <span style={{color:C.muted,fontSize:11}}>{trj('compta.resultats', { fullListN: fullList.length })}</span>
+        </span>
+        <Btn small onClick={()=>setPage(p=>Math.min(totalPages-1,(p===null?0:p)+1))} color={C.border} style={{opacity:currentPage>=totalPages-1?0.4:1}}>{tr('compta.suivant')}</Btn>
+        <Btn small onClick={()=>setShowAll(true)} color={C.border} style={{marginLeft:8}}>{tr('compta.voirTout')}</Btn>
+      </div>}
+      {showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0'}}>
+        <span style={{color:C.muted}}>{trj('compta.affichageCompletFactures', { fullListN: fullList.length })}</span>
+        <Btn small onClick={()=>setShowAll(false)} color={C.border}>{tr('compta.revenirPagination')}</Btn>
+      </div>}
+      
+  </>);
+  // (17 nov., nouveau design · phase 2, revue du coordinateur) FACTURES ALLUMÉ : la tête du design (« Argent » + le plein
+  // « Nouvelle facture » sur la ligne du titre, la cloche à droite), la ligne comptes et le segmenté d'Argent, puis UNE
+  // recherche (+ « ⋯ » : relire, Excel, ma facture, réglages — les mêmes gestes, la même feuille), UN segmenté
+  // En attente · Comptabilisées, la liste (le même tableau) ou un état vide dessiné ; les cartes d'hier dessous.
+  if (designV2 && argentNav) return (
+    <div data-espace="argent" data-argent-factures="" className="v2-fac" style={{padding:16}}>
+      <header className="v2-tete-tache v2-tete-argent" data-v2-factures-tete="">
+        <div className="v2-titre-ligne"><h1>{L.argent}</h1>
+          <BoutonV2 role="principal" compact icone={<Icon name="plus" size={20}/>} titre={tr('compta.nouvelleFacture')} attrs={{ 'data-v2-principal': 'facture', 'data-fac-principal': '' }} onClick={()=>setShowForm(true)}>{tr('v2.fac.nouvelle')}</BoutonV2></div>
+        {argentNav}
+      </header>
+      <div className="v2-fac-outils" data-v2-fac-outils="">
+        <div className="v2-fac-champ"><ChampRecherche valeur={searchInput} onChange={(v)=>{ setSearchInput(v); setSearch(v); setPage(null); }} placeholder={tr('v2.fac.chercher')} label={tr('v2.fac.chercher')} data-v2-fac-recherche=""/></div>
+        <BoutonIconeV2 icone={<Icon name="more" size={22}/>} label={tr('compta.autresActionsFactures')} onClick={()=>setMenuFac(true)} attrs={{ 'data-fac-plus': '', 'aria-haspopup': 'dialog', 'aria-expanded': menuFac }}/>
+      </div>
+      {menuFac && <SheetShell onClose={()=>setMenuFac(false)} maxWidth={420} titre={tr('compta.factures')} data-fac-menu="">
+        <div className="vrm-fiche-menu" onClickCapture={(ev)=>{ const b = ev.target && ev.target.closest && ev.target.closest('button'); if (b) setTimeout(()=>setMenuFac(false), 0); }}>
+          <button type="button" data-fac-menu-geste="relire" disabled={fetching} onClick={relireFacturesClic}><Icon name="sync" size={16}/>{fetching?tr('reglages.langue.chargement'):tr('compta.relireFactures')}</button>
+          <button type="button" data-fac-menu-geste="excel" onClick={exportExcel}><Icon name="save" size={16}/>{tr('compta.exporterExcel')}</button>
+          <button type="button" data-fac-menu-geste="fiche" onClick={()=>setShowPro(v=>!v)}><Icon name="receipt" size={16}/>{tr('compta.maFacture')}</button>
+          <button type="button" data-fac-menu-geste="reglages" onClick={()=>setShowSettings(true)}><Icon name="gear" size={16}/>{tr('compta.reglagesFactures')}</button>
+        </div>
+      </SheetShell>}
+      <SegmentV2 label={tr('compta.factures')} value={zone} onChange={(z)=>{ setZone(z); setPage(null); }} attrs={{ 'data-fac-zones': '' }}
+        options={[{ v: 'attente', l: tr('compta.attente'), n: counters.attente }, { v: 'comptabilisees', l: tr('compta.comptabilisees'), n: counters.comptabilisees }]}/>
+      {search.trim() ? <p className="v2-ar-reste" style={{margin:0}}>{trj('compta.resultatsDansToutes', { n: fullList.length, search: search })}</p> : null}
+      {list.length === 0
+        ? <div className="v2-fac-vide" data-factures-vide={zone}><span className="v2-fac-vide-ic" aria-hidden="true"><Icon name="receipt" size={24}/></span>
+            <b>{search.trim() ? <>{tr('compta.aucuneFactureTrouvee')} {search} ».</> : zone === 'attente' ? tr('compta.aucuneFactureAttente') : tr('compta.aucuneFactureComptabilisee')}</b>
+            {!search.trim() && zone !== 'attente' ? <span>{tr('compta.factureArriveIci')}</span> : null}</div>
+        : tableauFactures}
+      {showPro && <FicheFacturation deps={DEPS_FACTURE}/>}
+      <FacturesAEnvoyer deps={DEPS_FACTURE}/>
+      <ListeFacturesPro deps={DEPS_FACTURE}/>
+      <SeuilTvaFactures deps={DEPS_FACTURE}/>
+      <TvaMargeCarte deps={DEPS_FACTURE}/>
+      {showForm&&<InvoiceForm onClose={()=>setShowForm(false)} onSave={addInvoice} nextNumber={nextInvoiceNumber} catalog={catalog}/>}
+      {showSettings&&<InvoiceSettings settings={invoiceSettings} setSettings={(s)=>{setInvoiceSettings(s);save('vinted_invoice_settings',s);}} entreprises={entreprises} setEntreprises={setEntreprises} activeEnt={activeEnt} setActiveEnt={setActiveEnt} onClose={()=>setShowSettings(false)}/>}
+    </div>
+  );
   return (
     <div data-espace="argent" data-argent-factures="" style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
       {/* ⚠️ LES BOUTONS PASSENT DANS LE `right` DE `ScreenHead`. Posés à côté
@@ -1128,83 +1254,8 @@ function Invoices({invoices,setInvoices,catalog,sales,invoiceSettings,setInvoice
           identique, faisait doublon.) */}
       {search.trim()&&<div style={{fontSize:11,color:C.muted,marginTop:6}}>{tr('compta.rechercheActiveDans')}</div>}
       
-      {/* Tableau factures */}
-      <Card style={{padding:0,overflowX:'auto'}}>
-        {/* (12 nov., finitions) Le vide se dit HORS du tableau : dans un tableau de 700 px, sur
-            téléphone, la phrase et « + Nouvelle facture » étaient coupés au bord de la carte. */}
-        {list.length===0 ? <div data-factures-vide={zone} style={{padding:'28px 20px',textAlign:'center',color:C.muted,fontSize:13,lineHeight:1.5}}>
-              {search.trim()
-                ? <>{tr('compta.aucuneFactureTrouvee')} {search} ».</>
-                : zone==='attente'
-                  ? <>{tr('compta.aucuneFactureAttente')}<br/>
-                      {/* ⚠️ Cette phrase parlait d'une « feuille Google » : le
-                          pipeline Apps Script est mort (404, mesuré). Il aurait
-                          attendu des factures qui ne pouvaient pas arriver. Ce
-                          qui remplit vraiment cet écran, ce sont les reçus
-                          Vinted reçus par email, et sa propre saisie. */}
-                      
-                      {/* (14 nov., Studio) « + Nouvelle facture » était écrit deux fois sur l'écran : le geste
-                          reste UNE fois, le plein de l'écran (en tête, `data-fac-principal` au téléphone). */}
-                    </>
-                  : <>{tr('compta.aucuneFactureComptabilisee')}<br/>
-                      <span style={{fontSize:12}}>{tr('compta.factureArriveIci')}</span>
-                    </>}
+      {tableauFactures}
 
-        </div> :
-        <table style={{width:'100%',borderCollapse:'collapse',fontSize:12,minWidth:700}}>
-          <thead>
-            <tr style={{background:C.surface,borderBottom:`1px solid ${C.border}`}}>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('compta.article')}</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('compta.facture')}</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('compta.dateVente')}</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('compta.designation')}</th>
-              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('partout.part.prix')}</th>
-              <th style={{padding:'10px 8px',textAlign:'left',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('ventes.acheteur')}</th>
-              <th style={{padding:'10px 8px',textAlign:'right',color:C.muted,fontWeight:400,fontSize:11,letterSpacing:0.5,textTransform:'uppercase'}}>{tr('ventes.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {/* ⚠️ UN ÉCRAN VIDE DOIT DIRE QUOI FAIRE (§7 : il n'est pas
-                développeur — « Aucune facture en attente » ne se rattrape
-                nulle part). D'où l'origine des lignes, et la porte : le même
-                « Récupérer Vinted » que le haut de l'écran, à l'endroit où il
-                constate le vide. */}
-            {list.map(inv=>{
-              const isAccounted=accountedSet.has(String(inv.productId).trim());
-              return (
-                <tr key={inv.id} style={{borderBottom:`1px solid ${C.border}`}}>
-                  <td style={{padding:'8px',color:C.text,fontWeight:600,fontFamily:'monospace',fontSize:15}}>#{inv.productId||'?'}</td>
-                  <td style={{padding:'8px',color:C.accentTexte,fontWeight:400,fontFamily:'monospace',fontSize:11}}>{inv.number||'—'}{(entreprises&&entreprises.length>1)&&(()=>{const e=entForInvoice(inv,entreprises,activeEnt,invoiceSettings);return e&&e.companyName?<div style={{marginTop:2,fontFamily:'inherit',fontSize:11,color:C.muted,fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:110}}>🏢 {e.companyName}</div>:null;})()}</td>
-                  <td style={{padding:'8px',color:C.text,fontFamily:'monospace',fontSize:11}}>{fmtDate(inv.saleDate)}</td>
-                  <td style={{padding:'8px',color:C.text}}>{String(inv.itemName||'—').replace(/\bimages?\s*:\s*/gi,'').replace(/\bimages?\b/gi,'').replace(/\s+/g,' ').trim()||'—'}</td>
-                  <td style={{padding:'8px',textAlign:'right',color:C.accentTexte,fontWeight:400}}>{fmt(valeurSue(inv.sellPrice))}</td>
-                  <td style={{padding:'8px',color:C.muted,fontSize:11}}>{inv.buyerName||'—'}</td>
-                  <td style={{padding:'8px',textAlign:'right',whiteSpace:'nowrap'}}>
-                    <Btn small onClick={()=>generatePDF(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.blue} style={{marginRight:4}} aria-label={tr('compta.imprimerFacture')} title={tr('compta.imprimerFacture')}><Icon name="printer" size={15}/></Btn>
-                    <Btn small onClick={()=>generateFacturXPdf(inv,entForInvoice(inv,entreprises,activeEnt,invoiceSettings))} color={C.muted} style={{marginRight:4}} title={tr('compta.factureElectroniqueFactur')}>🧾</Btn>
-                    <Btn small onClick={()=>deleteInvoice(inv.id)} color={C.danger}>🗑</Btn>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>}
-      </Card>
-      
-      {/* Pagination */}
-      {!showAll&&totalPages>1&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0',flexWrap:'wrap'}}>
-        <Btn small onClick={()=>setPage(p=>Math.max(0,(p===null?0:p)-1))} color={C.border} style={{opacity:currentPage===0?0.4:1}}>{tr('compta.precedent')}</Btn>
-        <span style={{color:C.muted,minWidth:120,textAlign:'center'}}>
-          {tr('compta.page')} <b style={{color:C.text}}>{currentPage+1}</b> / {totalPages} <span style={{color:C.muted,fontSize:11}}>{trj('compta.resultats', { fullListN: fullList.length })}</span>
-        </span>
-        <Btn small onClick={()=>setPage(p=>Math.min(totalPages-1,(p===null?0:p)+1))} color={C.border} style={{opacity:currentPage>=totalPages-1?0.4:1}}>{tr('compta.suivant')}</Btn>
-        <Btn small onClick={()=>setShowAll(true)} color={C.border} style={{marginLeft:8}}>{tr('compta.voirTout')}</Btn>
-      </div>}
-      {showAll&&<div style={{display:'flex',justifyContent:'center',alignItems:'center',gap:8,fontSize:12,padding:'4px 0'}}>
-        <span style={{color:C.muted}}>{trj('compta.affichageCompletFactures', { fullListN: fullList.length })}</span>
-        <Btn small onClick={()=>setShowAll(false)} color={C.border}>{tr('compta.revenirPagination')}</Btn>
-      </div>}
-      
       {/* Modale création facture */}
       {showForm&&<InvoiceForm onClose={()=>setShowForm(false)} onSave={addInvoice} nextNumber={nextInvoiceNumber} catalog={catalog}/>}
       
@@ -1927,6 +1978,8 @@ const recettesDe = ({ calc, periode, versements, lbcVentes, ebayCommandes, vente
   return livreDesRecettes({ decl: calc.decl, periode, numDe, compteDe, manque: [...calc.manque, ...(versements === null ? ['dates de versement Vinted'] : [])] });
 };
 function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
+  const designV2 = useDesignV2();   // (17 nov., AIR) « Voir » + « ⋯ » au lieu de trois boutons serrés
+  const [menuReg, setMenuReg] = React.useState(null);
   const { calc, versements } = useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts });
   const ventesVcER = useVentesVestiaire();
   const an = new Date().getFullYear();
@@ -2018,11 +2071,19 @@ function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accoun
           {R && R.type === 'achats' && R.aVerifier ? <span data-registre-a-verifier-txt="" style={{ color: C.warn }}>{trj('compta.verifierAussiDans', { aVerifier: R.aVerifier })}</span> : null}
         </span>
       </span>
+      {designV2 ? (
+        // (17 nov., nouveau design · AIR) Trois boutons serrés ⇒ UN geste « Voir » + « ⋯ » (PDF, Tableur) : les mêmes exports.
+        <span className="v2-registre-gestes">
+          <Bouton variante="secondaire" data-registre-voir={type} disabled={R === undefined} onClick={() => setVue(type)}>{tr('registres.voir')}</Bouton>
+          <BoutonIconeV2 icone={<Icon name="more" size={22}/>} label={tr('v2.reg.exporter', { nom: String(nom) })} onClick={() => setMenuReg(type)} attrs={{ 'data-registre-plus': type, 'aria-haspopup': 'dialog' }}/>
+        </span>
+      ) : (
       <span style={{ display: 'flex', gap: 8, flex: '0 0 auto' }}>
         <Bouton variante="secondaire" icone="doc" data-registre-pdf={type} aria-label={tr('compta.telechargerPdf', { nom: String(nom) })} title={tr('compta.telechargerPdf', { nom: String(nom) })} disabled={!R || !!enCours} onClick={() => exporter(type, 'pdf')}>{enCours === type + 'pdf' ? '…' : 'PDF'}</Bouton>
         <Bouton variante="secondaire" icone="save" data-registre-csv={type} aria-label={tr('compta.telechargerTableur', { nom: String(nom) })} title={tr('compta.telechargerTableurExcel', { nom: String(nom) })} disabled={!R || !!enCours} onClick={() => exporter(type, 'csv')}>{enCours === type + 'csv' ? '…' : tr('compta.tableur')}</Bouton>
         <Bouton variante="secondaire" data-registre-voir={type} disabled={R === undefined} onClick={() => setVue(type)}>{tr('registres.voir')}</Bouton>
       </span>
+      )}
     </div>
   );
   return (
@@ -2035,6 +2096,12 @@ function RegistresCarte({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accoun
       </div>
       {ligne('recettes', tr('compta.livreRecettes'), recettes)}
       {ligne('achats', tr('compta.registreAchats'), registreAchats)}
+      {designV2 && menuReg ? <SheetShell onClose={() => setMenuReg(null)} maxWidth={420} titre={menuReg === 'recettes' ? tr('compta.livreRecettes') : tr('compta.registreAchats')} data-registre-menu={menuReg}>
+        <div className="vrm-fiche-menu" onClickCapture={(ev) => { const b = ev.target && ev.target.closest && ev.target.closest('button'); if (b) setTimeout(() => setMenuReg(null), 0); }}>
+          <button type="button" data-registre-pdf={menuReg} disabled={!(menuReg === 'recettes' ? recettes : registreAchats) || !!enCours} onClick={() => exporter(menuReg, 'pdf')}><Icon name="doc" size={16}/>{tr('v2.reg.pdf')}</button>
+          <button type="button" data-registre-csv={menuReg} disabled={!(menuReg === 'recettes' ? recettes : registreAchats) || !!enCours} onClick={() => exporter(menuReg, 'csv')}><Icon name="save" size={16}/>{tr('compta.tableur')}</button>
+        </div>
+      </SheetShell> : null}
       {vue && <RegistresVue type={vue} setType={setVue} periode={periode} setPeriode={setPeriode} periodes={periodes} registres={complets}
         onClose={() => setVue(null)} exporter={(R, forme) => exporter(R.type, forme)} enCours={enCours} />}
     </div></Card>
@@ -3754,6 +3821,88 @@ function ArgentQuestions({ liveStats, onNav, allerVue }) {
     </section>
   );
 }
+// ── (17 nov., nouveau design, phase 2) ARGENT · MOIS ─────────────────────────
+// Allumé seulement. Les MÊMES sources et règles qu'`ArgentQuestions` (au caractère près : `valeurChiffre`,
+// `questionsArgent`, le brut et sa couverture, `DEMANDE_SAISIE_PRIX`), plus :
+//   · le reçu des cinq mois d'avant : `recuPublieEntre` (mois entier) sur la ligne publiée `vinted_urssaf_mois` — la
+//     lecture de « Comparer deux mois » ; le mois en cours EST l'affiche, la même valeur ;
+//   · disponible et en attente : `valeurChiffre('dispo' | 'attente')` (le porte-monnaie lu, l'argent à venir) ;
+//   · les versements du mois : le livre des recettes (`recettesDe`, la lecture de « Registres »), daté au versement.
+// Rien n'est recalculé ; aucun chiffre n'est écrit deux fois sur l'écran.
+function ArgentMoisV2({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts }) {
+  const liveCoque = React.useContext(LiveStatsCarte);
+  const S = useSourcesCarte(liveStats || liveCoque);
+  const { P } = usePrevisionUrssaf();
+  const profil = useProfilFiscal();
+  const sel = { site: 'toutes', compte: null, periode: null };
+  const v = (id) => sansCompteSur(valeurChiffre(id, { id, p: 'mois' }, S, sel, REGLES_CARTE), S);
+  const mois = new Date().toLocaleDateString('fr-FR', { month: 'short' });
+  const moisLong = new Date().toLocaleDateString(localeCourante(), { month: 'long' });
+  const Q = questionsArgent({ vendu: v('vendu'), recu: v('recu'), benefice: v('benefice'), prevision: P, profil, raisonCourte, mois, dateCourte: dateArgentCourte });
+  const qR = Q.find((x) => x.id === 'recu'), qB = Q.find((x) => x.id === 'benefice');
+  const somme = (x) => (Math.abs(Number(x)) < 1000 ? montant(x) : montant(x, { centimes: 'jamais' }));
+  // La phrase de l'affiche : la note de la MÊME règle (le manque, les ventes à dater), sinon « au jour du versement ».
+  const phrase = qR.valeur == null ? (qR.note || tr('v2.ar.pasSu')) : qR.note ? qR.note : tr('v2.ar.auVersement');
+  // Les six mois : le mois en cours = l'affiche (la même valeur) ; avant, la ligne publiée, mois par mois.
+  const barres = (() => {
+    const d = new Date(); const out = [];
+    for (let k = 5; k >= 0; k--) {
+      const de = new Date(d.getFullYear(), d.getMonth() - k, 1);
+      const ym = `${de.getFullYear()}-${String(de.getMonth() + 1).padStart(2, '0')}`;
+      const R = k === 0 ? { valeur: qR.valeur, partiel: qR.partiel } : recuPublieEntre(S.ligneUrssaf, { ym, complet: true });
+      out.push({ cle: ym, l: de.toLocaleDateString(localeCourante(), { month: 'narrow' }), long: de.toLocaleDateString(localeCourante(), { month: 'long', year: 'numeric' }), v: R.valeur == null ? null : R.valeur, partiel: !!R.partiel, courant: k === 0 });
+    }
+    return out;
+  })();
+  // Le bénéfice : la règle de la case d'hier (le net ; sinon le brut des ventes au prix connu, jamais « au moins »).
+  const vb = v('benefice');
+  const Bn = vb && vb.B ? vb.B : null;
+  const manquent = Bn && Bn.n > Bn.nCout ? Bn.n - Bn.nCout : 0;
+  const brut = qB.valeur == null && Bn && Bn.nCout > 0 && manquent > 0 ? chiffreBrut({ n: Bn.n, nCout: Bn.nCout, brut: Bn.brut }) : null;
+  const versSaisiePrix = () => { DEMANDE_SAISIE_PRIX.on = true; if (onNav) onNav('vinted_annonces'); };
+  const fait = (id, l, x, onClick) => ({ id, l, onClick, cents: x && x.valeur != null ? String(Math.round(x.valeur * 100)) : '',
+    v: x && x.valeur != null ? somme(x.valeur) : '—', pasSu: !(x && x.valeur != null), auMoins: !!(x && x.valeur != null && x.partiel),
+    sous: x && x.valeur == null ? (raisonCourte(x) || tr('v2.ar.pasSu')) : '' });
+  const faits = [
+    fait('dispo', tr('v2.ar.dispo'), v('dispo'), () => ouvrirRepliCompta('compta-porte-monnaie')),
+    fait('attente', tr('v2.ar.attente'), v('attente'), () => ouvrirArgentAVenir()),
+    brut
+      ? { id: 'benefice', l: NOM_BENEFICE_BRUT, v: somme(brut.valeur), cents: String(Math.round(brut.valeur * 100)), brut: true, onClick: () => ouvrirRepliCompta('compta-benefice'), sous: '' }
+      : { ...fait('benefice', tr('v2.ar.benefice'), { valeur: qB.valeur, partiel: qB.partiel, raison: qB.raison }, () => ouvrirRepliCompta('compta-benefice')), sous: qB.valeur == null ? (qB.note || tr('v2.ar.pasSu')) : '' },
+    { id: 'couts', l: tr('v2.ar.couts'), v: Bn && Bn.n > 0 ? tr('v2.ar.coutsSur', { k: Bn.nCout, n: Bn.n }) : '—', pasSu: !(Bn && Bn.n > 0), cents: Bn && Bn.n > 0 ? `${Bn.nCout}/${Bn.n}` : '',
+      onClick: manquent > 0 ? versSaisiePrix : () => ouvrirRepliCompta('compta-benefice'), sous: '' },
+  ];
+  const geste = manquent > 0 ? { id: 'saisir-prix', n: manquent, libelle: tr('v2.ar.saisirPrix', { n: manquent }), onClick: versSaisiePrix } : null;
+  // Les versements du mois : le livre des recettes (la lecture de « Registres »), du plus récent au plus ancien.
+  const { calc, versements } = useDeclarablesCompta({ lbcVentes, lbcCoqueLu, ebayCommandes, panelOff, accounts });
+  const ventesVcER = useVentesVestiaire();
+  const ym = ymCourant();
+  const livre = React.useMemo(() => (calc.etat === 'lu' ? recettesDe({ calc, periode: ym, versements, lbcVentes, ebayCommandes, ventesVcER }) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [calc, ym, versements, ventesVcER]);
+  const MAX = 30;
+  const lignesV = livre ? [...livre.lignes].sort((a, b) => (b.ts || 0) - (a.ts || 0)) : [];
+  const jour = (t) => (t == null ? '' : new Date(t).toLocaleDateString(localeCourante(), { weekday: 'short', day: 'numeric', month: 'short' }));
+  // Le prix d'achat et la marge d'une vente : le relevé de Ventes (`vrm_stats_ventes` : [4] vente, [5] achat), la
+  // règle de « Ce qui rapporte » (marge = vente − achat), par l'identité de la ligne (celle de `recettesDe`). Pas su ⇒ rien.
+  const achatDe = React.useMemo(() => {
+    const m = new Map(); const rel = lireReleveVentes();
+    for (const r of ((rel && rel.l) || [])) if (Array.isArray(r)) m.set(r[0] === 'Vinted' ? 'vinted:' + r[2] : String(r[2]), r);
+    return m;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [livre]);
+  const coutDe = (id) => {
+    const r = achatDe.get(String(id)); if (!r || r[5] == null || !Number.isFinite(Number(r[5]))) return { achat: null, marge: null };
+    const a = Math.round(Number(r[5]) * 100), v = r[4] == null || !Number.isFinite(Number(r[4])) ? null : Math.round(Number(r[4]) * 100);
+    return { achat: a / 100, marge: v == null ? null : (v - a) / 100 };
+  };
+  const vers = {
+    etat: calc.etat === 'encours' ? 'encours' : !livre ? 'passu' : 'lu', n: lignesV.length, reste: Math.max(0, lignesV.length - MAX),
+    lignes: lignesV.slice(0, MAX).map((l) => ({ id: l.id, num: l.num, titre: l.titre, plateforme: l.plateforme, montant: l.montant, date: jour(l.ts), ...coutDe(l.id),
+      onClick: () => { try { window.dispatchEvent(new CustomEvent('vrm:fiche-article', { detail: String(l.num) })); } catch (_) {} } })),
+  };
+  return <ArgentMoisV2Vue poster={{ valeur: qR.valeur, partiel: qR.partiel }} phrase={phrase} moisLong={moisLong} barres={barres} faits={faits} geste={geste} versements={vers} montant={somme}/>;
+}
 // (15 nov., extension 5.390) Julien : « Enlève les 1741 ventes à dater, cela n'a aucun sens.
 // Le but est que l'extension récupère ces infos, pas que ça soit à nous de le faire. »
 // La carte « ce qui est daté / pourquoi / le geste » (lot DJ7) est RETIRÉE : plus aucun
@@ -4600,6 +4749,7 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
   // (30 oct.) « Se calcule dans Ventes » était écrit ~9 fois sur cet écran : la cause
   // se dit UNE fois ici, avec le geste ; les cartes ne gardent que « — ».
   const ligneComptaPub = useLigneUrssaf();
+  const designV2 = useDesignV2();
   return (
     <div className="vrm-finance-page vrm-fu-ecran vrm-argent" data-espace="argent" data-argent-ecran={vue} style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* (10 nov., Argent) Statistiques et Comptabilité en UN endroit (src/argent.js) : le titre
@@ -4621,12 +4771,17 @@ function ComptaPro({ liveStats, onNav, lbcVentes, lbcCoqueLu, ebayCommandes, pan
       <div className="vrm-argent-partie" data-argent-vue="resume" hidden={vue !== 'resume'}>
         {/* (15 nov., lot argent-plus) Un seuil de l'année à 80 % ou 100 % : en tête, jusqu'à « Compris » (rien sinon). */}
         <AlertesSeuilsArgent />
+        {/* (17 nov., nouveau design · phase 2) Allumé : « Mois » (src/designV2/ArgentMois.jsx) à la place des réponses, de
+            « À venir » et des six mois — qui restent MONTÉS, cachés (mêmes lectures, mêmes data-*). Éteint : rien ne change. */}
+        {designV2 ? <ArgentMoisV2 liveStats={liveStats} onNav={onNav} lbcVentes={lbcVentes} lbcCoqueLu={lbcCoqueLu} ebayCommandes={ebayCommandes} panelOff={panelOff} accounts={accounts}/> : null}
+        {(() => { const anciens = (<>
         {/* Les quatre réponses : vendu, reçu, bénéfice, à déclarer. Toucher = le détail. */}
         <ArgentQuestions liveStats={liveStats} onNav={onNav} allerVue={allerVue} />
         {/* (15 nov.) L'argent à venir, en résumé : un toucher ouvre son écran (src/ArgentAVenirEcran.jsx). */}
         <AVenirArgent liveStats={liveStats}/>
       {/* (2 nov., style « Fusion ») L'anneau et les six mois — des parts et des hauteurs, aucun montant redit. */}
       <ComptaFusion compta={data} onNav={onNav}/>
+        </>); return designV2 ? <div className="v2-cache-ancienne" hidden style={{ display: 'none' }}>{anciens}</div> : anciens; })()}
         <section id="compta-detail" className="vrm-compta-q" data-compta-q="detail" style={{ scrollMarginTop: 72 }}>
           <div className="vrm-compta-q-tete">
             <h2 className="vrm-compta-question" data-compta-question="detail">{tr('compta.detail')}</h2>

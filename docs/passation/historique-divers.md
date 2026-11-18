@@ -1994,13 +1994,15 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne du §9 de CLAUDE.md déplacée le 17 nov. (lot extension-carte-v2, après fusion de main), telle quelle
 
 
+## Lignes déplacées telles quelles de CLAUDE.md §9 (17 nov., fusion de main dans design-v2-argent, pour rester sous 59 000 octets)
+
+- **17 nov. · La taille à côté de chaque achat à relier (lot relier-taille)** : Relier un achat, Relier achats et ventes, colis à relier : taille LUE chez Vinted (détail de transaction, par n°) sinon « (titre) », « ✓ Taille 42 » / « ≠ 42 » face à l'article (encre neutre, jamais un lien auto), état, vendeur ; « N achats sans taille lue » une fois. Description : rangée nulle part (reste, extension). `docs/passation/2026-11-17-relier-taille.md`. Geste : aucun.
+
 ## Ligne du §9 de CLAUDE.md déplacée le 17 nov. (PR #1250, après fusion de main), telle quelle
 - **17 nov. · Scanner un bordereau de vente (lot scan-bordereau-vente, URGENT)** : mesuré sur son étiquette Mondial Relay : 3 grands codes « lettre + 19 chiffres » SANS le n° de suivi (le téléphone lit celui-là) + un « 55… » de 26 chiffres sur le bord ; les étiquettes captées n'ont aucun n°. Un code inconnu est cherché, lettres et chiffres, dans le texte des étiquettes de SES ventes (`src/etiquettesScan.js`, identité exacte) ⇒ sa vente ; caméra, douchette ; inconnu ⇒ « Code lu » + quoi faire ; « 55… » = Mondial Relay. `2026-11-17-scan-bordereau-vente.md`. Geste : aucun.
 
-<!-- déplacé tel quel de CLAUDE.md §9 le 17 nov. (taille) -->
-- **17 nov. · Relier en touchant (lot relier-toucher)** : plus jamais d'appui long obligatoire — un toucher choisit l'achat (ou la vente/annonce), bandeau fixe « Achat choisi · Changer », la liste d'en face prend la place, un toucher ⇒ « Relier N°… ? » ⇒ bénéfice + Reçu, Annuler 5 s ; « ⋯ » d'un achat (et sa fiche) : « Relier à une vente / annonce ». `docs/passation/2026-11-17-relier-toucher.md`. Geste : aucun.
+## Ligne déplacée telle quelle de CLAUDE.md §9 (17 nov., fusion de design-v2 dans design-v2-argent, sous 59 000 octets)
 
-<!-- déplacé tel quel de CLAUDE.md §9 le 18 nov. (taille, lot design-v2-ventes) -->
 - **17 nov. · Un colis, deux transporteurs (lot suivi-multi-transporteurs, ext. 5.403.0)** : un envoi international (Shop2Shop puis Chronopost) a DEUX n° pour le même colis ; l'extension range tous les n° du trajet, l'app ET le serveur relient le colis du transporteur à l'achat par n'importe lequel (`api/_lib/suivis-multiples.js`) ⇒ UNE ligne au nom de l'article, avec code et QR, plus d'« incident » d'un autre n° du trajet. En attendant la liste (lignes d'avant) : « C'est sans doute le même colis — Relier » seulement si un colis + un achat au même point, même groupe de transporteur, arrivé après l'achat, aucun autre achat en route (`src/memeColis.js`) — SON toucher relie ; « Ce n'est pas le même » gardé (`vrm_colis_pas_meme`) ; une liste LUE qui contredit un lien manuel ⇒ « délier ? ». `2026-11-17-suivi-multi-transporteurs.md`. Geste : installer 5.403.0, ouvrir vinted.fr.
 
 ## Ligne du §9 de CLAUDE.md déplacée le 17 nov. (lot emails-beaux, 2e fusion de main), telle quelle
@@ -2033,3 +2035,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée le 18 nov. (lot vitesse-cache, fusion de main), telle quelle
 - **17 nov. · Nouveau design « Studio Premium » ALLUMÉ PAR DÉFAUT (lot design-v2, #1246) + plus de disque « + » + barre d'onglets en 5 styles** : Aujourd'hui, Annonces (A/C), Achats (passes, liste propre, « Annulés · N »), chargement immobile, l'AIR ; « Ancien design » (Paramètres → Apparence) ramène l'apparence d'avant, identique à main ; « Barre d'onglets » C par défaut (A, B, D, E au choix, synchronisé). Les bancs d'hier voient l'ancien design (`_garde-reseau.cjs`). Détail : `docs/passation/2026-11-17-design-v2.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée le 18 nov. (lot design-v2-argent, fusion de main), telle quelle
+- **17 nov. · Vitesse : le poids du démarrage (lot vitesse-poids)** : Ma journée 2 087 → 1 945 Ko de JS+CSS (budget-vitesse VERT) — le français des écrans à la demande part avec eux (`fr-reste`, au build : `scripts/_francais-differe.cjs`, fr.js reste complet), noms courts par terser (mangle seul), QR à la demande. CSS morte : 0,3 Ko prouvable, rien retiré. `2026-11-17-vitesse-poids.md`. Geste : aucun.

@@ -39,6 +39,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'groupes-coucou', date: '2026-11-17', titre: 'Groupes en trois étapes, et le coucou', phrase: 'Photo, QR code, Discord ; un coucou, puis on s’écrit sur Discord.', tab: 'communaute', pour: 'tous', mode: 'tous' },
   // (17 nov., lot design-v2 — Julien : « Le + dégueulasse ») plus de disque dans la barre ; ses gestes à leur place
   { id: 'plus-de-disque', date: '2026-11-17', titre: 'Plus de « + » dans la barre', phrase: 'Scanner dans la recherche, Publier sur Annonces, Imprimer sur ta journée.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (17 nov., lot design-v2-argent) docs/passation/2026-11-17-design-v2-argent.md — dans l'essai du nouveau design
+  { id: 'design-v2-argent', date: '2026-11-17', titre: 'Argent revu dans le nouveau design', phrase: 'Le reçu du mois en grand, six mois, chaque versement numéroté.', tab: 'compta', pour: 'tous', mode: 'tous' },
   // (17 nov., lot design-v2-ventes) docs/passation/2026-11-17-design-v2-ventes.md — Ventes dans le nouveau design (essai)
   { id: 'design-v2-ventes', date: '2026-11-17', titre: 'Ventes revue dans le nouveau design', phrase: 'Imprimer en haut, colis rangés par date limite, recherche avec scanner.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (17 nov., lot design-v2) docs/passation/2026-11-17-design-v2.md — l'essai, éteint par défaut

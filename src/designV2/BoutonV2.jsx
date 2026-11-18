@@ -19,6 +19,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import './design-v2.css';
+import './argent-v2.css';   // (17 nov., phase 2) Argent, Paramètres et la tête de la coque (allumé seulement) — ici et pas dans App.jsx : audit-studio S3
 
 const ROLES = new Set(['principal', 'secondaire', 'texte', 'destructif']);
 
