@@ -1149,6 +1149,7 @@ import { jourParis } from "./dateParis.js";   // (11 nov.) jour/mois métier à 
 import { sommeConnue, texteSomme, medianeSue, valeurSue } from "./sommeConnue.js";   // (11 nov.) « pas su » ≠ 0
 import { lireLocal, lireJSON, stockageDispo } from "./stockageSur.js";   // (11 nov.) stockage protégé (Safari privé, quota)
 import { creerMagasinPartage } from "./magasinPartage.js";
+import { versionMemoire, toucherMemoire, suivreStockage, stockageInchange } from "./versionDonnees.js";
 import { fusionnerVersements, garderDatesConnues } from "./versementsConnus.js";   // (13 nov.) une date de versement connue ne redevient jamais « pas lue »   // (13 nov., source unique) une copie des données lues pour tous les moteurs
 import { trj, useLangue } from './i18n/react.js';
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : { CollerPrixAchatFeuille } (était importé en statique)   // (14 nov., lot argent-choix — proposition 75)
@@ -9187,7 +9188,7 @@ let TXN_ETATS_LU;
 const RETOURS_EBAY_CACHE = { v: undefined, at: 0 };
 // (3 nov.) Les e-mails de litige (src/litiges.js) : une lecture par 10 min, partagée par les écrans.
 const EMAILS_LITIGES_CACHE = { v: undefined, at: 0 };
-const noterEtatsTxn = (rows) => { for (const r of (rows || [])) if (r && r.tx && r.s != null && isFinite(Number(r.s))) TXN_ETATS.set(String(r.tx), { s: Number(r.s), ss: String(r.ss || ''), su: r.su || null, cap: r.cap || null }); };
+const noterEtatsTxn = (rows) => { for (const r of (rows || [])) if (r && r.tx && r.s != null && isFinite(Number(r.s))) TXN_ETATS.set(String(r.tx), { s: Number(r.s), ss: String(r.ss || ''), su: r.su || null, cap: r.cap || null }); toucherMemoire(); };   // (18 nov.) table remplie en place : les calculs mémorisés qui la lisent sont refaits (src/versionDonnees.js)
 const lireEtatsTxn = async () => { try { const rows = await lireTxnMeta(); if (rows === null) return false; noterEtatsTxn(rows); return true; } catch (_) { return false; } };
 const etatTxn = (tx) => (tx == null ? null : TXN_ETATS.get(String(tx)) || null);
 const txnBloqueEnvoi = (tx) => { const e = etatTxn(tx); return !!(e && (e.s === 220 || e.s >= 430)); };
@@ -13350,7 +13351,7 @@ onVersionNumerotation((e) => { if (e.etat === 'ok') _verNum.okAt = e.at; });
 const _vcMem = {};
 const vcCarte = (k) => { if (_vcMem[k] !== undefined) return _vcMem[k]; const v = load(k, {}); return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; };
 const _ecoutesVc = new Set();
-const signalerVc = () => { for (const f of _ecoutesVc) { try { f(); } catch (_) {} } };
+const signalerVc = () => { toucherMemoire(); for (const f of _ecoutesVc) { try { f(); } catch (_) {} } };   // (18 nov.) `_vcMem` change en place : version (src/versionDonnees.js)
 // Une clé Vestiaire posée par un geste : visible tout de suite, synchronisée par `save`.
 const vcPoser = (k, v) => { _vcMem[k] = v; save(k, v); signalerVc(); };
 // (6 nov., v36) L'écran d'un geste annulable sur une clé Vestiaire : la copie en mémoire, sans écrire
@@ -48368,7 +48369,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   // Les commandes EN COURS qui ont une incohérence prouvée (Ma journée : « N à vérifier »). Les MÊMES
   // règles que les cartes (`suiviVente`, `suiviAchat`) : Ventes · Envoyés, et les achats en route
   // (pas encore au relais, pas annulés, pas en retour — ceux-là ont leur place).
+  // (18 nov., moteur-rapide) « N commandes à vérifier » de Ma journée coûtait 1,1 à 1,5 s par ouverture (×4) : refait à
+  // CHAQUE rendu montré (35 par ouverture), alors que la plupart ne changent aucune de ses entrées. Il n'est plus refait
+  // que si UNE de ses entrées a changé : la clé ci-dessous porte TOUT ce que le calcul lit (états et props de cet écran,
+  // tables de module, version de la mémoire — src/versionDonnees.js) et une tranche de 10 s pour l'heure ; les clés du
+  // stockage qu'il a LUES sont notées pendant le calcul : une écriture de l'une d'elles le refait (`stockageInchange`)
+  // (« en retard », « depuis… »). La liste est GÉNÉRÉE et vérifiée : `node scripts/audit-cle-verifier.cjs` refait
+  // l'analyse du code (tout nom lu par `commandesAVerifierCalc`, directement ou par les fonctions qu'il appelle) et
+  // rougit si un nom manque (`--ecrire` réécrit la liste). Même règle, même résultat : seulement moins souvent calculé.
+  const cleVerifier = useRef(null);
   const commandesAVerifier = () => {
+    const cle = /* ⟦cle-verifier⟧ */ [bordLinks, bordParTx, bordsHidden, bordsParTxn, bordsPrinted, bordsShipped, bordsVenteEmailParTx, buyByNum, buysBase, cochesNonPartis, colisParTx, emailBords, hiddenSales, indexSuivisAchats, labelsCaptes, lbcLu, lbcVentes, numeros, numerosByPhoto, numerosByPhotoDir, onlineAnnonceIds, ordSearchDiff, panelBordsDone, partisVinted, periode, pickupUnion, saleOv, sales, shipDone, shippedSuivis, siteColis, soldByTxn, tracking, transpMap, txRetourAchat, txnItem, txnLink, vcEtat, ventesEmail, ventesEmailParTx, versements, C, _pdfEtiquettes, vcLoc0.departs, versionMemoire(), Math.floor(Date.now() / 10000)] /* ⟦/cle-verifier⟧ */;
+    const m = cleVerifier.current;
+    if (m && m.cle.length === cle.length && m.cle.every((x, i) => Object.is(x, cle[i])) && stockageInchange(m.lu)) return m.r;
+    const { r, lu } = suivreStockage(commandesAVerifierCalc);
+    cleVerifier.current = { cle, r, lu };
+    return r;
+  };
+  const commandesAVerifierCalc = () => {
     const ventes = [], achats = [];
     try { for (const x of listeEnvoyes()) { const sv = suiviVente(x); if (sv && sv.inc.length) ventes.push({ cle: x.cle, photo: x.photo, incoherences: sv.inc }); } } catch (_) {}
     try {

@@ -7,9 +7,11 @@
 // Pas encore calculé ⇒ `null` (pas su) : rien n'est déduit, l'écran garde ce
 // qu'il savait (« Colis fait » seul).
 export { phraseRaison, raisonDepartVente, ventesPartiesParPreuve, attendEnvoi } from '../api/_lib/depart-vente.js';
+import { toucherMemoire } from './versionDonnees.js';
 
 let _partis = null;
-export function publierDepartsVinted(m) { _partis = m instanceof Map ? m : null; }
+// (18 nov.) Publiée : les calculs mémorisés qui la lisent (`raisonDepartPubliee`) sont refaits (src/versionDonnees.js).
+export function publierDepartsVinted(m) { const v = m instanceof Map ? m : null; if (v !== _partis) { _partis = v; toucherMemoire(); } }
 export function raisonDepartPubliee(tx) {
   if (!_partis || tx == null) return null;
   return _partis.get(String(tx)) || null;
