@@ -192,4 +192,13 @@ export default {
   "grp.coucou.retablir": "Restablecer",
   "grp.coucou.retabliFait": "Vuelves a recibir los saludos de {nom}.",
   "grp.coucou.bientot": "El saludo llega pronto: aún no está activado en tu base de datos.",
+  "cmc.metsToi": "Ponte en el mapa para saludarle.",
+  "cmc.envoye": "Has saludado a {nom}. Para hablar, usa Discord.",
+  "cmc.videMoi": "En cuanto otro revendedor de VRM ponga su ciudad, aparecerá aquí, y podréis saludaros.",
+  "cmc.bientotCourt": "Saludo: próximamente",
+  "cmc.titre": "Saludos",
+  "cmc.bientot": "El saludo en el mapa llega pronto. Para hablar con un revendedor, usa Discord.",
+  "cmc.aucun": "Aún no hay saludos. Toca un pin para decir hola.",
+  "cmc.note": "Un saludo por persona cada 24 h. Para hablar, Discord: VRM no tiene chat.",
+  "cmc.sourdineNote": "Sus saludos ya no te llegarán y los anteriores desaparecen. Esta persona no recibe aviso.",
 };

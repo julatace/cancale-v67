@@ -192,4 +192,13 @@ export default {
   "grp.coucou.retablir": "Wiederherstellen",
   "grp.coucou.retabliFait": "Du erhältst wieder Winker von {nom}.",
   "grp.coucou.bientot": "Das Winken kommt bald: Es ist in deiner Datenbank noch nicht aktiviert.",
+  "cmc.metsToi": "Trag dich auf der Karte ein, um zu winken.",
+  "cmc.envoye": "Du hast {nom} zugewinkt. Zum Reden gibt es Discord.",
+  "cmc.videMoi": "Sobald ein anderer VRM-Wiederverkäufer seine Stadt einträgt, erscheint er hier – und ihr könnt euch zuwinken.",
+  "cmc.bientotCourt": "Winken: bald",
+  "cmc.titre": "Winker",
+  "cmc.bientot": "Winken auf der Karte kommt bald. Zum Reden mit einem Wiederverkäufer gibt es Discord.",
+  "cmc.aucun": "Noch keine Winker. Tippe auf eine Stecknadel, um Hallo zu sagen.",
+  "cmc.note": "Ein Winker pro Person alle 24 h. Zum Reden gibt es Discord: VRM hat keinen Chat.",
+  "cmc.sourdineNote": "Ihre Winker erreichen dich nicht mehr, frühere verschwinden. Die Person wird nicht benachrichtigt.",
 };

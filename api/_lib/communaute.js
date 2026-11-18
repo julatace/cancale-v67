@@ -44,7 +44,9 @@ import { jetonDe } from './session.js';
 import { sbCle } from './cle.js';
 import { rpcEquipe } from './equipe.js';
 import { routeAccompagnement, effacerAccompagnement } from './accompagnement.js';
-import { effacerCoucous } from './coucou.js';
+import { effacerCoucous, routeCarteCoucou, effacerCoucousCarte } from './coucou.js';
+export const MESSAGES_RETIRES = new Set(['ecrire', 'fil', 'bloquer', 'signaler']);
+export const MESSAGES_RETIRES_TEXTE = 'Les messages se font sur Discord : VRM n’a plus de messagerie. Fais-lui coucou sur la carte.';
 import { routeFormateur, effacerFormateur } from './formateur.js';
 import { discordConfigure, lirePreuve } from './discord.js';
 import {lireIdentiteDiscord,signerAvatarPublic,avatarPublicVerifie,ajouterAvatars,urlAvatarDiscord,signerIdDiscord} from './avatar-discord.js';
@@ -224,20 +226,23 @@ export async function routeCommunaute(req, res, { utilisateur, corps }) {
   const qui = commeAppelant(jeton);
 
   if (req.method === 'GET') {
-    const [c, l] = await Promise.all([rpcEquipe('vrm_communaute_carte', {}, qui), rpcEquipe('vrm_communaute_conversations', {}, qui)]);
-    if (c.etat === 'absent' || l.etat === 'absent') return nonInstalle();
-    if (c.etat !== 'ok' || l.etat !== 'ok') return pasSu();
+    // (17 nov., Julien : « pas échanger des messages dans mon app, mais sur Discord »)
+    // Les conversations de la carte ne sont plus lues : plus de « non lus », plus de
+    // fil. Elles restent en base (018), intactes ; l'app ne les montre plus.
+    const c = await rpcEquipe('vrm_communaute_carte', {}, qui);
+    if (c.etat === 'absent') return nonInstalle();
+    if (c.etat !== 'ok') return pasSu();
     const carte = objet(c.data);
     if (!carte) return refus('session');
     if (carte.acces === false) return refus('abonnement');
-    if (!Array.isArray(carte.profils) || !Array.isArray(l.data)) return pasSu();
+    if (!Array.isArray(carte.profils)) return pasSu();
     await lierAvatarAuProfil(utilisateur.id,qui,objet(carte.moi));
     await lierPhotoAuProfil(utilisateur.id,objet(carte.moi)?.pid).catch(()=>{});
     const profils=await ajouterPhotosPersonnelles(await ajouterAvatars(carte.profils));
     const moi=objet(carte.moi);
     const c2 = { moi: moi?{...moi,avatar:profils.find(p=>p.pid===moi.pid)?.avatar||''}:null, profils };
     if (Array.isArray(carte.groupes)) c2.groupes = carte.groupes;   // 020 installée
-    return dire(200, { ok: true, carte: c2, conversations: l.data, discordConnexion: discordConfigure() });
+    return dire(200, { ok: true, carte: c2, discordConnexion: discordConfigure() });
   }
 
   const action = String((corps && corps.action) || '');
@@ -271,6 +276,10 @@ export async function routeCommunaute(req, res, { utilisateur, corps }) {
     if(d)await retirerPhotoDeCarte(utilisateur.id).catch(()=>{});
     return dire(200, { ok: true, retire: d });
   }
+  // (17 nov.) Le coucou de la carte (047) ; et PLUS AUCUN message : écrire, lire un
+  // fil, bloquer ou signaler depuis un fil sont retirés (410), l'historique reste en base.
+  if (action.startsWith('carte-coucou')) return routeCarteCoucou(req, res, { corps, qui, action, utilisateur });
+  if (MESSAGES_RETIRES.has(action)) return dire(410, { ok: false, erreur: 'retire', message: MESSAGES_RETIRES_TEXTE });
   if (action === 'ecrire') {
     const pid = String(corps.pid || '');
     if (!UUID_RE.test(pid)) return refus('introuvable');
@@ -416,6 +425,8 @@ export async function effacerCommunaute(owner, SERVICE) {
   // (17 nov.) + les coucous (046) : AVANT la 025, ses coucous et sourdines détachés.
   const k = await effacerCoucous(owner, SERVICE);
   if (k === null) return null;
+  const kc = await effacerCoucousCarte(owner, SERVICE);
+  if (kc === null) return null;
   const a = await effacerAccompagnement(owner, SERVICE);
-  return a === null ? null : n + f + k + a;
+  return a === null ? null : n + f + k + kc + a;
 }

@@ -2041,3 +2041,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée le 18 nov. (lot relier-tout-achat, fusion de main), telle quelle
 - **17 nov. · Groupes : créer en 3 étapes, et le coucou (lot groupes-coucou)** : feuille guidée (photo · règles dites, RIEN partagé par défaut · inviter : QR, Partager, lien Discord) ; page du groupe ; coucou 👋 sans aucun texte, UN geste « Lui écrire sur Discord » (profil signé, sinon salon du groupe, sinon « Pas de Discord lié »), 1/paire/24 h, 20/jour, sourdine, même groupe seulement ; migration **046 PAS APPLIQUÉE** (« bientôt » d'ici là). `2026-11-17-groupes-coucou.md`. Geste : appliquer la 046, coller le lien Discord du groupe.
+
+## Ligne du §9 de CLAUDE.md déplacée le 18 nov. (lot carte-coucou, fusion de main), telle quelle
+- **17 nov. · Stock « Ranger » naturel (lot stock-rangement, nouveau design, `vrm_design_v2`, allumé par défaut depuis #1246)** : la liste d'abord (rangée A, glisser = Ranger), « Ranger N » = séance une paire à la fois (la case proposée suit la dernière place, mouvement « fait »), « Où est N° » = l'étiquette kraft de sa place, Paires · Places ; règles inchangées, éteint = identique. `2026-11-17-stock-rangement.md`. Geste : l'essayer.

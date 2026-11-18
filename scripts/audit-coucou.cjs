@@ -31,6 +31,8 @@ const MOD = path.join(RACINE, 'src/communaute/coucou.js');
 const ROUTE = path.join(RACINE, 'api/_lib/coucou.js');
 const AVATAR = path.join(RACINE, 'api/_lib/avatar-discord.js');
 const ECRAN = path.join(RACINE, 'src/communaute/Accompagnement.jsx');
+const CARTE = path.join(RACINE, 'src/communaute/Communaute.jsx');
+const COMMU = path.join(RACINE, 'api/_lib/communaute.js');
 const MUTATION = (process.argv.find((a) => a.startsWith('--mutation=')) || '').slice(11);
 
 const remplace = (s, a, b, nom) => { if (s.split(a).length !== 2) throw new Error('mutation ' + nom + ' : ancre introuvable'); return s.split(a).join(b); };
@@ -49,7 +51,7 @@ const MUTATIONS = {
   // L'identifiant Discord cru sans signature.
   'id-non-signe': { f: AVATAR, m: (s) => remplace(s, "if(/^\\d{15,25}$/.test(did)&&typeof d.signatureId==='string'&&egal(signerIdDiscord(owner,d.discord,did),d.signatureId))return did;", "if(/^\\d{15,25}$/.test(did))return did;", 'ins') },
   // L'auteur pris dans le corps de la requête (usurpable).
-  'sonner-de-corps': { f: ROUTE, m: (s) => remplace(s, "  const moi = utilisateur && UUID_RE.test(String(utilisateur.id || '')) ? utilisateur.id : '';", "  const moi = String((corps || {}).de || (utilisateur && utilisateur.id) || '');", 'sdc') },
+  'sonner-de-corps': { f: ROUTE, m: (s) => { const [a, b] = ["  const moi = utilisateur && UUID_RE.test(String(utilisateur.id || '')) ? utilisateur.id : '';", "  const moi = String((corps || {}).de || (utilisateur && utilisateur.id) || '');"]; if (!s.includes(a)) throw new Error('mutation sdc : ancre introuvable'); return s.split(a).join(b); } },
   // Le compte de l'auteur renvoyé au navigateur.
   'owner-renvoye': { f: ROUTE, m: (s) => remplace(s, "le: x.le, discord_groupe: x.discord_groupe || null, profil: profils[x.id] || null }));", "le: x.le, discord_groupe: x.discord_groupe || null, profil: profils[x.id] || null, de: x.de }));", 'or') },
   // La notification part chez l'auteur au lieu de celui qui reçoit.
@@ -60,6 +62,14 @@ const MUTATIONS = {
   'ecran-texte': { f: ECRAN, m: (s) => remplace(s, "    const r = await api({ action: 'accomp-coucou', groupe, membre: cible.cible });", "    const r = await api({ action: 'accomp-coucou', groupe, membre: cible.cible, texte: 'Coucou !' });", 'et') },
   // L'écran propose de répondre dans l'app.
   'ecran-repondre': { f: ECRAN, m: (s) => remplace(s, "        <button type=\"button\" className=\"vrm-gc-plus\" onClick={() => onPlus(r)}", "        <textarea data-cm-coucou-reponse /><button type=\"button\" className=\"vrm-gc-plus\" onClick={() => onPlus(r)}", 'er') },
+  // (17 nov., carte) La carte retrouve un champ de message.
+  'carte-texte': { f: CARTE, m: (s) => remplace(s, "    <CoucousCarte cc={cc} onPlus={setCoucouPlus} />", "    <CoucousCarte cc={cc} onPlus={setCoucouPlus} /><textarea data-cm-texte />", 'ct') },
+  // La route laisse encore écrire un message sur la carte.
+  'carte-ecrire': { f: COMMU, m: (s) => remplace(s, "export const MESSAGES_RETIRES = new Set(['ecrire', 'fil', 'bloquer', 'signaler']);", "export const MESSAGES_RETIRES = new Set(['bloquer', 'signaler']);", 'ce') },
+  // Le coucou de la carte relaie un texte.
+  'carte-texte-relaye': { f: ROUTE, m: (s) => remplace(s, "    nom = 'vrm_carte_coucou'; args = { p_pid: pid };", "    nom = 'vrm_carte_coucou'; args = { p_pid: pid, p_texte: c.texte };", 'ctr') },
+  // La 047 absente ⇒ repli vers un message.
+  'carte-repli-message': { f: ROUTE, m: (s) => remplace(s, "    const r = await rpcEquipe('vrm_carte_coucou_lire', {}, qui);\n    if (r.etat === 'absent') return nonInstalle();", "    const r = await rpcEquipe('vrm_carte_coucou_lire', {}, qui);\n    if (r.etat === 'absent') return dire(200, { ok: true, coucou: { envoyes24h: 0, deja: [], recus: [], sourdines: [] } });", 'crm') },
 };
 
 if (process.argv.includes('--prouve')) {
@@ -123,7 +133,7 @@ global.fetch = async (url, o = {}) => {
   BASE.appels.push({ fn, args, auth, corps: o.body || '' });
   if (fn === 'vrm_communaute_effacer') return rep(2);
   if (fn === 'vrm_acces_pour') return rep(true);
-  if (!/^vrm_(coucou_|accomp_habiller)/.test(fn)) return rep({ code: 'PGRST202' }, 404);
+  if (!/^vrm_(coucou_|accomp_habiller|carte_coucou)/.test(fn)) return rep({ code: 'PGRST202' }, 404);
   if (!BASE.installe) return rep({ code: 'PGRST202', message: 'Could not find the function' }, 404);
   if (BASE.panne) return new Response('<html>522</html>', { status: 522 });
   if (fn === 'vrm_coucou_lire') return rep({ acces: true, envoyes24h: 3, plafond: 20,
@@ -135,6 +145,11 @@ global.fetch = async (url, o = {}) => {
   if (fn === 'vrm_coucou_envoyer') return rep(BASE.raison ? { ok: false, raison: BASE.raison } : { ok: true, id: C1 });
   if (fn === 'vrm_coucou_a_sonner') return rep(args.p_de === MOI ? { a: LEA, de_nom: 'Moi', groupe_nom: 'Groupe inventé' } : null);
   if (fn === 'vrm_coucou_effacer') return rep(4);
+  if (fn === 'vrm_carte_coucou_effacer') return rep(1);
+  if (fn === 'vrm_carte_coucou_lire') return rep({ acces: true, envoyes24h: 1, plafond: 20, deja: [M], recus: [{ id: C1, de: LEA, de_pid: M, de_nom: 'lea_carte', le: new Date().toISOString() }, { id: C2, de_pid: G, de_nom: 'bob_carte', le: new Date().toISOString() }], sourdines: [] });
+  if (fn === 'vrm_carte_coucou_auteurs') return rep([{ id: C1, de: LEA }, { id: C2, de: AUTRE }]);
+  if (fn === 'vrm_carte_coucou') return rep(BASE.raison ? { ok: false, raison: BASE.raison } : { ok: true, id: C1 });
+  if (fn === 'vrm_carte_coucou_a_sonner') return rep(args.p_de === MOI ? { a: LEA, de_nom: 'moi_carte' } : null);
   return rep({ ok: true });
 };
 const appeler = async (route, corps, uid = MOI) => {
@@ -260,6 +275,32 @@ const appeler = async (route, corps, uid = MOI) => {
     r = await appeler(routeCommunaute, { action: 'accomp-coucou-ouvrir', adhesion: M, oui: 1 });
     const ou = BASE.appels.find((a) => a.fn === 'vrm_coucou_ouvrir');
     dit(ou && ou.args.p_oui === false, 'ouvrir aux autres membres : seul un `true` explicite ouvre (non par défaut)');
+  });
+
+
+  await essaie('la carte : le coucou remplace les messages', async () => {
+    reset({ installe: false });
+    let r = await appeler(routeCommunaute, { action: 'carte-coucou-lire' });
+    dit(r.code === 503 && r.corps.erreur === 'non-installe' && /bientôt/.test(r.corps.message), 'carte, 047 absente ⇒ « bientôt », jamais une liste vide ni un message', JSON.stringify(r.corps));
+    reset();
+    for (const action of ['ecrire', 'fil', 'bloquer', 'signaler']) {
+      const x = await appeler(routeCommunaute, { action, pid: M, conv: G, texte: 'Salut' });
+      dit(x.code === 410 && x.corps.erreur === 'retire' && /Discord/.test(x.corps.message) && !BASE.appels.some((a) => /vrm_communaute_(ecrire|fil)/.test(a.fn)), `« ${action} » : retiré (410), rien ne part à la base`, JSON.stringify(x.corps));
+    }
+    r = await appeler(routeCommunaute, { action: 'carte-coucou', pid: M, texte: 'Coucou, on échange ?' });
+    const env = BASE.appels.find((a) => a.fn === 'vrm_carte_coucou');
+    dit(r.code === 200 && env && Object.keys(env.args).join() === 'p_pid' && env.auth === 'Bearer ' + JETON, 'coucou de la carte : seul le pid public part, avec le jeton de l’appelant', env && env.corps);
+    const s = BASE.appels.find((a) => a.fn === 'vrm_carte_coucou_a_sonner');
+    dit(s && s.args.p_de === MOI && s.auth === 'Bearer ' + SERVICE, 'sonner : clé de service, identité vérifiée');
+    dit(BASE.lectures.some((l) => /push_(subs|prefs|journal)/.test(l.u) && l.u.includes('owner=eq.' + LEA)), 'la notification part chez celui qui reçoit');
+    reset();
+    BASE.lignesDiscord = [{ owner: LEA, discord: 'lea_invente', did: DID, signatureId: AV.signerIdDiscord(LEA, 'lea_invente', DID) }];
+    r = await appeler(routeCommunaute, { action: 'carte-coucou-lire' });
+    const recus = (r.corps.coucou || {}).recus || [];
+    dit(r.code === 200 && recus[0] && recus[0].profil === DID && recus[1] && recus[1].profil === null && !JSON.stringify(r.corps).includes(LEA), 'coucous reçus : le profil Discord signé, sinon rien ; aucun compte renvoyé', JSON.stringify(r.corps).slice(0, 200));
+    const src = fs.readFileSync(path.join(TMP, 'src/communaute/Communaute.jsx'), 'utf8').replace(/\/\/[^\n]*/g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
+    dit(!/<textarea\b/.test(src) && !/data-cm-texte|data-cm-envoyer|action: 'ecrire'|'fil'/.test(src), 'l’écran de la carte : aucun champ de message, aucune action « écrire » ni « fil »');
+    dit(!/data-cm-conv\b|data-cm-nonlus/.test(src), 'plus de liste de conversations ni de « non lus »');
   });
 
   await essaie('fermer mon compte', async () => {
