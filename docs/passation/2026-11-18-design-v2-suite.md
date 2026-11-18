@@ -71,3 +71,11 @@ Chiffres dans « ÉTAT » ci-dessous.
 - La fluidité à prouver sur un vrai appareil.
 
 ## ÉTAT
+- Build de la branche : audit-visuel-v2 **318 ✅ · 0 ❌** (≈ 7 min) ; sur le build de main 9814b67c9 : **229 ✅ · 88 ❌**.
+- Mutations : `MUTATION=titre` ⇒ rouge (règle 4, mot coupé à 375) ; `pile` ⇒ rouge (14, le plein sous la barre) ;
+  `bouton` ⇒ rouge (5 et 12, un bouton par rangée d'« À faire »).
+- Un reste de JSX (« ))} ») rendu sous « À faire » au 1er jet : vu sur la capture, retiré ; la règle 18 l'attrape désormais.
+- Bancs voisins : design-v2 0 rouge, design-v2-chargement 0 rouge, barre-achats 12 rouges IDENTIQUES à main (libellés de la
+  barre C) ; audits traduction, quoi-de-neuf, variables, icônes, barre-achats, fonctions-api verts ; audit-studio : les
+  2 rouges de main (S3, ordre des feuilles), inchangés.
+- Planche avant → après : scratchpad `onglets/v2-suite.png` (hors dépôt).
