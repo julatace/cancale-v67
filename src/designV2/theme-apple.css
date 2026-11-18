@@ -130,6 +130,17 @@ html[data-theme-style="apple"][data-theme="dark"]:root {
   --v2-kraft: #34302A !important; --v2-kraft-encre: #EFE6D6 !important; --v2-kraft-doux: #C4B69E !important;
   --v2-kraft-bord: rgb(239 230 214 / .18) !important;
 }
+/* Les familles posées sur un CONTENEUR (pas la racine) : les Paires (studio-paires.css) et Ma journée (studio-journee.css). */
+html[data-theme-style="apple"] :is([data-espace="paires"], .vrm-paires-selecteur, .vrm-fp, .vrm-main[data-ecran="annonces"], .vrm-main[data-ecran="garage"], .vrm-main[data-ecran="inventory"], .sj-journee) {
+  --sbp-haut: var(--ap-fond) !important; --sbp-bas: var(--ap-fond) !important; --sbp-aplat: var(--ap-fond) !important;
+  --sbp-feuille: var(--ap-carte) !important; --sbp-feuille2: var(--ap-carte) !important; --sbp-creux: var(--ap-remplir) !important;
+  --sbp-socle: var(--sb-socle) !important; --sbp-plan: var(--ap-carte) !important; --sbp-puits: var(--ap-remplir) !important; --sbp-puits-sh: none !important;
+  --sbp-k-bg: var(--ap-carte) !important; --sbp-k-sh: none !important; --sbp-k-in: none !important; --sbp-pl-sh: none !important; --sbp-pl-ts: none !important;
+  --sbp-om-pose: none !important; --sbp-om-tuile: none !important; --sbp-halo: transparent !important;
+  --sbp-affiche: var(--ap-police) !important; --sbp-texte: var(--ap-police) !important;
+  --sj-k-bg: var(--ap-carte) !important; --sj-k-sh: none !important; --sj-k-in: none !important; --sj-pl-sh: none !important;
+  --sj-puits: var(--ap-remplir) !important; --sj-puits-sh: none !important; --sj-socle: var(--sb-socle) !important; --sj-fond: none !important;
+}
 /* Les conteneurs du verre qui RE-déclarent leurs jetons (sv-ecrans, encre claire, porcelaine des feuilles) les relisent
    sur --sv-* : rien à refaire. La nuit, une carte DANS une feuille monte d'un cran (#2C2C2E sur #1C1C1E, comme iOS). */
 html[data-theme-style="apple"][data-theme="dark"] :is(.vrm-fs, .sb-feuille, .vrm-fs-cadre, [role="dialog"], [role="alertdialog"], .vrm-confirm, .v2-feuille) {
@@ -192,8 +203,8 @@ html[data-theme-style="apple"] body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-se
 /* ══ 7. LE CONTRÔLE SEGMENTÉ d'iOS : piste grise, pouce blanc et son ombre ════ */
 html[data-theme-style="apple"] body .v2-seg, html[data-theme-style="apple"] body .vrm-seg { background: var(--ap-remplir) !important; box-shadow: none !important; border-radius: 9px !important; padding: 2px !important; }
 html[data-theme-style="apple"] body button.v2-seg-btn, html[data-theme-style="apple"] body .vrm-seg .vrm-seg-btn { color: var(--ap-encre) !important; border-radius: 7px !important; font-weight: 500 !important; background: transparent !important; }
-html[data-theme-style="apple"] body button.v2-seg-btn.is-on, html[data-theme-style="apple"] body .vrm-seg .vrm-seg-btn[aria-current="page"] { background: #FFFFFF !important; color: #000000 !important; font-weight: 600 !important; box-shadow: 0 3px 8px rgb(0 0 0 / .12), 0 3px 1px rgb(0 0 0 / .04), 0 0 0 .5px rgb(0 0 0 / .04) !important; }
-html[data-theme-style="apple"][data-theme="dark"] body button.v2-seg-btn.is-on, html[data-theme-style="apple"][data-theme="dark"] body .vrm-seg .vrm-seg-btn[aria-current="page"] { background: #636366 !important; color: #FFFFFF !important; }
+html[data-theme-style="apple"] body button.v2-seg-btn.is-on, html[data-theme-style="apple"] body .vrm-seg .vrm-seg-btn:is([aria-current="page"], [aria-pressed="true"]), html[data-theme-style="apple"] body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button[aria-pressed="true"] { background: #FFFFFF !important; color: #000000 !important; font-weight: 600 !important; box-shadow: 0 3px 8px rgb(0 0 0 / .12), 0 3px 1px rgb(0 0 0 / .04), 0 0 0 .5px rgb(0 0 0 / .04) !important; }
+html[data-theme-style="apple"][data-theme="dark"] body button.v2-seg-btn.is-on, html[data-theme-style="apple"][data-theme="dark"] body .vrm-seg .vrm-seg-btn:is([aria-current="page"], [aria-pressed="true"]), html[data-theme-style="apple"][data-theme="dark"] body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button[aria-pressed="true"] { background: #636366 !important; color: #FFFFFF !important; }
 
 /* ══ 8. LES INTERRUPTEURS d'iOS (51 × 31) — le bleu, le seul accent ═══════════ */
 html[data-theme-style="apple"] body .vrm-ios-switch[aria-checked="true"]::before { background: var(--ap-bleu-vif) !important; }
@@ -244,5 +255,74 @@ html[data-theme-style="apple"] body .v2-etiquette.is-double { box-shadow: inset 
 
 /* ══ 13. Le reste du verre : tout ce qui gardait un dégradé ou un bord blanc ═══ */
 html[data-theme-style="apple"] body .vrm-main .vrm-colis-section [data-bords-faits] { background: var(--ap-carte) !important; box-shadow: none !important; }
-html[data-theme-style="apple"] body :is(.vrm-acc:is(.vrm-acc-pendant, .vrm-acc-apres, .vrm-acc-echec), .vrm-toasts .vrm-toast) { box-shadow: 0 8px 30px -8px rgb(0 0 0 / .3) !important; }
+html[data-theme-style="apple"] body :is(.vrm-acc:is(.vrm-acc-pendant, .vrm-acc-apres, .vrm-acc-echec), .vrm-toasts .vrm-toast) { box-shadow: 0 8px 30px -8px rgb(0 0 0 / .3) !important; 
+/* ══ 14. LES PASTILLES « FUMÉES » du verre (posées sur le bleu, texte blanc) : le remplissage gris d'iOS, l'encre.
+   Liste tirée des feuilles de src/design/ (fond rgb(10 38 76) ou rgb(8 28 56)) ; une pastille oubliée sortirait blanche
+   sur gris : le banc (contraste) la nomme. ══ */
+html[data-theme-style="apple"] body .vrm-app-shell > .vrm-app-header:not(.is-defile) .vrm-header-actions :is(button.vrm-hbtn, .vrm-cn-cloche > button, button.vrm-cn-cloche),
+html[data-theme-style="apple"] body .vv-seg,
+html[data-theme-style="apple"] body .vv-hero-ronds .sb-rond,
+html[data-theme-style="apple"] body .sb-tete[data-sb-tete="achats"] .sb-rond,
+html[data-theme-style="apple"] body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button,
+html[data-theme-style="apple"] body .vrm-paires-selecteur .vrm-seg.vrm-seg-plein,
+html[data-theme-style="apple"] body .vrm-fs.vg-av .vrm-fs-croix-rond,
+html[data-theme-style="apple"] body .vrm-pm .vg-pm-retour,
+html[data-theme-style="apple"] body .vg-ms-vues,
+html[data-theme-style="apple"] body .vg-ms-onglet,
+html[data-theme-style="apple"] body .vrm-chat-panel > .vrm-chat-head :is(.vrm-chat-back, .vrm-chat-sync, .vrm-chat-retirer),
+html[data-theme-style="apple"] body .vrm-chat-panel .vrm-chat-jour,
+html[data-theme-style="apple"] body .vrm-fp:not(.sb-plan) .vrm-fp-tete :is(.vrm-fp-retour, .vrm-fp-fermer),
+html[data-theme-style="apple"] body .vrm-fp:not(.sb-plan) .vrm-fp-raccourcis button,
+html[data-theme-style="apple"] body .vrm-pm .vrm-pm-cat-h .vrm-pm-cat-ic,
+html[data-theme-style="apple"] body .vrm-fp .vg-fp-plus > summary {
+  background: var(--ap-remplir) !important; background-image: none !important; border-color: transparent !important; box-shadow: none !important; color: var(--ap-encre) !important;
+  -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+html[data-theme-style="apple"] body .vrm-app-shell > .vrm-app-header:not(.is-defile) .vrm-header-actions :is(button.vrm-hbtn, .vrm-cn-cloche > button, button.vrm-cn-cloche) *,
+html[data-theme-style="apple"] body .vv-seg *,
+html[data-theme-style="apple"] body .vv-hero-ronds .sb-rond *,
+html[data-theme-style="apple"] body .sb-tete[data-sb-tete="achats"] .sb-rond *,
+html[data-theme-style="apple"] body [data-espace="paires"] .vrm-ann-workbar > .vrm-stock-views.vrm-filtres > button *,
+html[data-theme-style="apple"] body .vrm-paires-selecteur .vrm-seg.vrm-seg-plein *,
+html[data-theme-style="apple"] body .vrm-fs.vg-av .vrm-fs-croix-rond *,
+html[data-theme-style="apple"] body .vrm-pm .vg-pm-retour *,
+html[data-theme-style="apple"] body .vg-ms-vues *,
+html[data-theme-style="apple"] body .vg-ms-onglet *,
+html[data-theme-style="apple"] body .vrm-chat-panel > .vrm-chat-head :is(.vrm-chat-back, .vrm-chat-sync, .vrm-chat-retirer) *,
+html[data-theme-style="apple"] body .vrm-chat-panel .vrm-chat-jour *,
+html[data-theme-style="apple"] body .vrm-fp:not(.sb-plan) .vrm-fp-tete :is(.vrm-fp-retour, .vrm-fp-fermer) *,
+html[data-theme-style="apple"] body .vrm-fp:not(.sb-plan) .vrm-fp-raccourcis button *,
+html[data-theme-style="apple"] body .vrm-pm .vrm-pm-cat-h .vrm-pm-cat-ic *,
+html[data-theme-style="apple"] body .vrm-fp .vg-fp-plus > summary * { color: inherit !important; }
+
+/* ══ 15. LES CONTRÔLES SEGMENTÉS écrits à la main par écran (Ventes, Paires, Messages) : piste grise, pouce blanc ══ */
+html[data-theme-style="apple"] body :is(.vv-seg-b, .vrm-paires-selecteur .vrm-seg.vrm-seg-plein > .vrm-seg-btn, .vg-ms-vues > button) { color: var(--ap-encre) !important; background: transparent !important; box-shadow: none !important; border-radius: 7px !important; font-weight: 500 !important; }
+html[data-theme-style="apple"] body :is(.vv-seg, .vrm-paires-selecteur .vrm-seg.vrm-seg-plein, .vg-ms-vues) { border-radius: 9px !important; padding: 2px !important; }
+html[data-theme-style="apple"] body :is(.vv-seg-b.is-on, .vrm-paires-selecteur .vrm-seg.vrm-seg-plein > .vrm-seg-btn[aria-pressed="true"], .vg-ms-vues > button:is([aria-pressed="true"], [aria-current="page"], .is-on)) {
+  background: #FFFFFF !important; color: #000000 !important; font-weight: 600 !important; border-color: transparent !important;
+  box-shadow: 0 3px 8px rgb(0 0 0 / .12), 0 3px 1px rgb(0 0 0 / .04), 0 0 0 .5px rgb(0 0 0 / .04) !important; }
+html[data-theme-style="apple"][data-theme="dark"] body :is(.vv-seg-b.is-on, .vrm-paires-selecteur .vrm-seg.vrm-seg-plein > .vrm-seg-btn[aria-pressed="true"], .vg-ms-vues > button:is([aria-pressed="true"], [aria-current="page"], .is-on)) { background: #636366 !important; color: #FFFFFF !important; }
+html[data-theme-style="apple"] body .vv-seg-n:not(.is-ambre) { background: var(--ap-remplir) !important; color: inherit !important; }
+html[data-theme-style="apple"] body .vv-seg-b.is-on .vv-seg-n:not(.is-ambre) { background: rgb(118 118 128 / .12) !important; }
+html[data-theme-style="apple"][data-theme="dark"] body .vv-seg-b.is-on .vv-seg-n:not(.is-ambre) { background: rgb(255 255 255 / .16) !important; }
+
+/* ══ 16. Ventes (ventes-verre.css) : la coche et la touche prennent le bleu et la carte ══ */
+html[data-theme-style="apple"] body { --vv-plein: var(--ap-bleu) !important; --vv-plein-t: #FFFFFF !important; --vv-touche: var(--ap-carte) !important; --vv-touche-b: transparent !important;
+  --vv-seg-on: #FFFFFF !important; --vv-ligne: var(--ap-filet) !important; --vv-stp-vide: var(--ap-carte) !important; }
+html[data-theme-style="apple"][data-theme="dark"] body { --vv-seg-on: #636366 !important; }
+
+/* ══ 17. Les titres que le verre écrivait en blanc à la main, et le bleu teinté ══ */
+html[data-theme-style="apple"] body .vrm-tache > .vrm-tache-tete h1 { color: var(--ap-encre) !important; font-family: var(--ap-police) !important; font-weight: 700 !important; letter-spacing: .011em !important; }
+html[data-theme-style="apple"] { --ap-bleu-teinte: #0058B8; }
+html[data-theme-style="apple"][data-theme="dark"] { --ap-bleu-teinte: #5AA9FF; }
+html[data-theme-style="apple"] body :is(button.v2b-secondaire, .vrm-app-shell .vrm-b.vrm-b-secondaire, .vrm-fs .vrm-b.vrm-b-secondaire) { color: var(--ap-bleu-teinte) !important; }
+
+/* ══ 18. Ma journée (verre-journee.css) : le plein bleu, les touches grises, la semaine en barres grises (le jour choisi en bleu) ══ */
+html[data-theme-style="apple"] body { --vj-plein: var(--ap-bleu) !important; --vj-plein-t: #FFFFFF !important; --vj-plein-ombre: none !important;
+  --vj-touche: var(--ap-remplir) !important; --vj-touche-bord: transparent !important; --vj-libre: transparent !important; --vj-libre-bord: var(--ap-filet) !important;
+  --vj-ac: var(--ap-bleu-vif) !important; --vj-pastille: var(--ap-remplir) !important; --vj-site: var(--ap-carte) !important; }
+html[data-theme-style="apple"] body .sj-journee .vrm-jv2-barre { background: #D1D1D6 !important; }
+html[data-theme-style="apple"][data-theme="dark"] body .sj-journee .vrm-jv2-barre { background: #48484A !important; }
+html[data-theme-style="apple"] body .sj-journee :is(.vrm-fu-jour[data-choisi] .vrm-jv2-barre, .vrm-jv2-jour[aria-pressed="true"] .vrm-jv2-barre) { background: var(--ap-bleu-vif) !important; }
+/* Les rayons d'hier (cartes 20–22 px) : 12, comme une liste groupée d'iOS. */
+html[data-theme-style="apple"]:root { --d-r-carte: 12px !important; --d-r-tuile: 12px !important; }
 }
