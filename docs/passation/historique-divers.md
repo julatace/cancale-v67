@@ -2002,3 +2002,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée le 18 nov. (lot vitesse-poids, 3e fusion de main), telle quelle
 - **17 nov. · Fiabilité et vitesse** : démarrage 2 344 → 2 087 Ko de JS+CSS (pdf-lib hors du morceau App, 30 blocs rares à la demande) ; `vrm_avis_bas` lue une fois ; QR plus jamais lus hors CSP ; audits `morceau-app`, `avis-bas-partage`, `qr-csp`. `2026-11-17-fiabilite-vitesse.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée le 18 nov. (lot groupes-coucou, après fusion de main), telle quelle
+- **17 nov. · Accessibilité WCAG 2.1 AA (lot accessibilite)** : focus double encre+blanc partout (`src/design/accessibilite.css`, couche `vrm-a11y` nommée AVANT `vrm-verre`), fiche « Tout sur le N° » qui garde et rend le focus, encre claire sur le bleu (Meilleures sources, résumé d'Annonces), « Aller au contenu » + colonne avant l'écran, 44 px, noms lus ; banc `accessibilite.cjs` partie E (49 rouges sur main, 0 après). `2026-11-17-accessibilite.md`. Geste : aucun.
