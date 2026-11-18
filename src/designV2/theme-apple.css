@@ -28,6 +28,7 @@ html[data-theme-style="apple"] {
   --ap-bleu: #0068D6;          /* texte, bouton plein : 5,31:1 sur le blanc, 4,76:1 sur #F2F2F7 */
   --ap-bleu-vif: #007AFF;      /* ce qui n'est pas du texte : interrupteur, coche, onglet choisi */
   --ap-bleu-appui: #0058B8;
+  --ap-plein: #0068D6;         /* le fond d'un bouton plein, jour ET nuit : le blanc dessus tient 5,3:1 (#0A84FF : 3,6) */
   --ap-teinte: rgb(0 122 255 / .12);
   --ap-ambre: #8A4B00;
   --ap-ambre-point: #FF9500;
@@ -47,7 +48,7 @@ html[data-theme-style="apple"][data-theme="dark"] {
   --ap-gris: #98989F;          /* EBEBF5 à 60 % rendu lisible : 5,94:1 sur #1C1C1E */
   --ap-bleu: #409CFF;          /* 6,01:1 sur #1C1C1E, 4,92:1 sur #2C2C2E */
   --ap-bleu-vif: #0A84FF;
-  --ap-bleu-appui: #2F8BEF;
+  --ap-bleu-appui: #0058B8;
   --ap-teinte: rgb(10 132 255 / .20);
   --ap-ambre: #FF9F0A;
   --ap-ambre-point: #FF9F0A;
@@ -92,7 +93,7 @@ html[data-theme-style="apple"]:root {
   --sb-verre-bord: none !important;
   --sb-touche-fond: var(--ap-carte) !important; --sb-touche-ombre: none !important;
   --sb-enfonce: none !important; --sb-grave: none !important; --sb-grave-texte: none !important;
-  --sb-plein-fond: var(--ap-bleu) !important; --sb-plein-encre: #FFFFFF !important; --sb-plein-ombre: none !important;
+  --sb-plein-fond: var(--ap-plein) !important; --sb-plein-encre: #FFFFFF !important; --sb-plein-ombre: none !important;
   --sb-r-tuile: 12px !important; --sb-r-plan: 12px !important; --sb-r-plateau: 10px !important;
   --sb-r-champ: 10px !important; --sb-r-touche: 10px !important; --sb-r-vignette: 10px !important;
   --sb-police-affiche: var(--ap-police) !important; --sb-police-texte: var(--ap-police) !important;
@@ -108,7 +109,7 @@ html[data-theme-style="apple"]:root {
 
   /* La v2 (src/designV2/design-v2.css) : le bouton plein devient le bleu (texte blanc), la coque claire. */
   --v2-bouton-r: 12px !important;
-  --v2-plein-fond: var(--ap-bleu) !important; --v2-plein-fond-appui: var(--ap-bleu-appui) !important; --v2-plein-texte: #FFFFFF !important;
+  --v2-plein-fond: var(--ap-plein) !important; --v2-plein-fond-appui: var(--ap-bleu-appui) !important; --v2-plein-texte: #FFFFFF !important;
   --v2-page-texte: var(--ap-encre) !important; --v2-page-muet: var(--ap-gris) !important; --v2-page-ambre: var(--ap-ambre) !important;
   --v2-teinte-fond: var(--ap-teinte) !important; --v2-teinte-fond-appui: color-mix(in srgb, var(--ap-bleu-vif) 22%, transparent) !important;
   --v2-teinte-texte: var(--ap-bleu) !important; --v2-lien: var(--ap-bleu) !important;
@@ -192,12 +193,12 @@ html[data-theme-style="apple"] body :is(.v2l:active, button.v2-rangee:active) { 
 html[data-theme-style="apple"] body .v2l-photo-a, html[data-theme-style="apple"] body .v2l-photo-c, html[data-theme-style="apple"] body .v2-vignette { border-radius: 10px !important; }
 
 /* ══ 6. LES BOUTONS d'iOS : plein bleu (UN par écran), teinté, simple ══════════ */
-html[data-theme-style="apple"] body button.v2b-principal { background: var(--ap-bleu) !important; color: #FFFFFF !important; box-shadow: none !important; border-radius: 12px !important; }
+html[data-theme-style="apple"] body button.v2b-principal { background: var(--ap-plein) !important; color: #FFFFFF !important; box-shadow: none !important; border-radius: 12px !important; }
 html[data-theme-style="apple"] body button.v2b-principal:active:not([aria-disabled="true"]) { background: var(--ap-bleu-appui) !important; filter: none !important; }
 html[data-theme-style="apple"] body button.v2b-secondaire { background: var(--ap-teinte) !important; color: var(--ap-bleu) !important; }
 html[data-theme-style="apple"] body button.v2b-texte { color: var(--ap-bleu) !important; }
 html[data-theme-style="apple"] body .v2b-hote-plein .v2b-raison { color: var(--ap-gris) !important; }
-html[data-theme-style="apple"] body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-primaire { background: var(--ap-bleu) !important; background-image: none !important; color: #FFFFFF !important; box-shadow: none !important; border-radius: 12px !important; }
+html[data-theme-style="apple"] body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-primaire { background: var(--ap-plein) !important; background-image: none !important; color: #FFFFFF !important; box-shadow: none !important; border-radius: 12px !important; }
 html[data-theme-style="apple"] body :is(.vrm-app-shell, .vrm-fs) .vrm-b.vrm-b-secondaire { background: var(--ap-teinte) !important; background-image: none !important; color: var(--ap-bleu) !important; box-shadow: none !important; border: 0 !important; border-radius: 12px !important; }
 
 /* ══ 7. LE CONTRÔLE SEGMENTÉ d'iOS : piste grise, pouce blanc et son ombre ════ */
@@ -220,13 +221,13 @@ html[data-theme-style="apple"] body .vrm-fs .vrm-fs-croix-rond { background: var
 
 /* ══ 10. LA BARRE D'ONGLETS : la seule matière translucide (systemChromeMaterial) ══ */
 html[data-theme-style="apple"] body .vrm-app-shell .vrm-tabbar.vrm-tabbar {
-  --b-actif: var(--ap-bleu) !important; --b-gris: var(--ap-gris) !important; --b-fond: var(--ap-matiere) !important;
+  --b-actif: var(--ap-bleu-teinte) !important; --b-gris: var(--ap-gris) !important; --b-fond: var(--ap-matiere) !important;
   background: var(--ap-matiere) !important; background-image: none !important;
   -webkit-backdrop-filter: var(--ap-flou) !important; backdrop-filter: var(--ap-flou) !important;
   box-shadow: inset 0 .5px 0 var(--ap-filet) !important; border-color: transparent !important; }
 html[data-theme-style="apple"] body .vrm-app-shell .vrm-tabbar.vrm-tabbar::before { display: none !important; }
 html[data-theme-style="apple"] body .vrm-app-shell .vrm-tabbar > .vrm-tab { color: var(--ap-gris) !important; }
-html[data-theme-style="apple"] body .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] { color: var(--ap-bleu) !important; }
+html[data-theme-style="apple"] body .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] { color: var(--ap-bleu-teinte) !important; }
 html[data-theme-style="apple"] body .vrm-app-shell .vrm-tabbar > .vrm-tab::before, html[data-theme-style="apple"] body .vrm-app-shell .vrm-tabbar > .vrm-tab::after { background: transparent !important; }
 /* La pastille rouge d'iOS est réservée par §7 à deux paires sous un N° : celle de la barre reste ambre (le geste à faire). */
 html[data-theme-style="apple"] body .vrm-app-shell .vrm-tabbar .vrm-nav-badge-barre.vrm-nav-badge-n { background: #FF9500 !important; color: #1A1100 !important; box-shadow: none !important; }
@@ -306,7 +307,7 @@ html[data-theme-style="apple"] body .vv-seg-b.is-on .vv-seg-n:not(.is-ambre) { b
 html[data-theme-style="apple"][data-theme="dark"] body .vv-seg-b.is-on .vv-seg-n:not(.is-ambre) { background: rgb(255 255 255 / .16) !important; }
 
 /* ══ 16. Ventes (ventes-verre.css) : la coche et la touche prennent le bleu et la carte ══ */
-html[data-theme-style="apple"] body { --vv-plein: var(--ap-bleu) !important; --vv-plein-t: #FFFFFF !important; --vv-touche: var(--ap-carte) !important; --vv-touche-b: transparent !important;
+html[data-theme-style="apple"] body { --vv-plein: var(--ap-plein) !important; --vv-plein-t: #FFFFFF !important; --vv-touche: var(--ap-carte) !important; --vv-touche-b: transparent !important;
   --vv-seg-on: #FFFFFF !important; --vv-ligne: var(--ap-filet) !important; --vv-stp-vide: var(--ap-carte) !important; }
 html[data-theme-style="apple"][data-theme="dark"] body { --vv-seg-on: #636366 !important; }
 
@@ -317,7 +318,7 @@ html[data-theme-style="apple"][data-theme="dark"] { --ap-bleu-teinte: #5AA9FF; }
 html[data-theme-style="apple"] body :is(button.v2b-secondaire, .vrm-app-shell .vrm-b.vrm-b-secondaire, .vrm-fs .vrm-b.vrm-b-secondaire) { color: var(--ap-bleu-teinte) !important; }
 
 /* ══ 18. Ma journée (verre-journee.css) : le plein bleu, les touches grises, la semaine en barres grises (le jour choisi en bleu) ══ */
-html[data-theme-style="apple"] body { --vj-plein: var(--ap-bleu) !important; --vj-plein-t: #FFFFFF !important; --vj-plein-ombre: none !important;
+html[data-theme-style="apple"] body { --vj-plein: var(--ap-plein) !important; --vj-plein-t: #FFFFFF !important; --vj-plein-ombre: none !important;
   --vj-touche: var(--ap-remplir) !important; --vj-touche-bord: transparent !important; --vj-libre: transparent !important; --vj-libre-bord: var(--ap-filet) !important;
   --vj-ac: var(--ap-bleu-vif) !important; --vj-pastille: var(--ap-remplir) !important; --vj-site: var(--ap-carte) !important; }
 html[data-theme-style="apple"] body .sj-journee .vrm-jv2-barre { background: #D1D1D6 !important; }

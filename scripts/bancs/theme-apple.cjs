@@ -85,7 +85,8 @@ async function ouvrir(nav, W, sombre, url, avecStyle) {
   await pg.waitForTimeout(4500);
   await pg.evaluate(() => { for (const t of document.querySelectorAll('.vrm-toast')) t.click(); }).catch(() => {});
   if (MUT === 'gris') await pg.addStyleTag({ content: 'html[data-theme-style="apple"]{--ap-gris:#AEAEB2 !important}' });
-  if (MUT === 'degrade') await pg.addStyleTag({ content: 'html[data-theme-style="apple"] body .vrm-app-shell[data-espace]::before{background:linear-gradient(170deg,#2563A8,#0E2C52) !important}' });
+  // (dans la couche vrm-apple : hors couche, la mutation perdrait contre ses !important et ne prouverait rien)
+  if (MUT === 'degrade') await pg.addStyleTag({ content: '@layer vrm-apple { html[data-theme-style="apple"] body .vrm-app-shell[data-espace].vrm-app-shell::before { background: linear-gradient(170deg, #2563A8, #0E2C52) !important } }' });
   if (MUT === 'deux') await pg.evaluate(() => { const m = document.querySelector('.vrm-main'); if (m) { for (let i = 0; i < 2; i++) { const b = document.createElement('button'); b.className = 'v2b v2b-principal'; b.textContent = 'Essai'; m.prepend(b); } } });
   await pg.waitForTimeout(300);
   return { ctx, pg, erreurs };
@@ -118,8 +119,10 @@ async function ouvrir(nav, W, sombre, url, avecStyle) {
       const avant = await pg.evaluate(() => document.documentElement.getAttribute('data-theme-style'));
       dit(avant === null, 'éteint par défaut : aucun data-theme-style', avant);
       // Le réglage est dans la page Apparence de Paramètres : on la cherche comme lui (le bouton « Apple »).
-      let b = pg.locator('[data-style="apple"]').first();
-      if (!(await b.count())) { await pg.locator('text=Apparence et langue').first().click({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(1500); b = pg.locator('[data-style="apple"]').first(); }
+      const ap = pg.locator('[data-sous-ouvrir="apparence"]').first();
+      await ap.waitFor({ timeout: 30000 }).catch(() => {});
+      if (await ap.count()) { await ap.click().catch(() => {}); await pg.waitForTimeout(900); }
+      const b = pg.locator('[data-style="apple"]').first();
       await b.scrollIntoViewIfNeeded({ timeout: 8000 }).catch(() => {});
       if (MUT === 'persiste') await pg.evaluate(() => { Storage.prototype.setItem = function () {}; });
       await b.click({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(800);
