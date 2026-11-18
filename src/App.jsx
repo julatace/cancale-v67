@@ -54855,7 +54855,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           <BoutonIconeV2 icone={<Icon name="more" size={22}/>} label={tr('v2.msg.plus')} actif={messageFilter!=='all'} onClick={()=>setFeuilleMsgV2(true)} attrs={{'data-v2-msg-plus':''}}/>
         </div> : <ChampRecherche className="vrm-msg-recherche" valeur={messageSearch} onChange={(v)=>setMessageSearch(String(v||'').slice(0,200))} label="Rechercher une conversation" placeholder="Pseudo, article, N°…" micro data-msg-recherche=""/>}
         {!!messageSearch.trim()&&<p className="vrm-msg-recherche-portee" role="status">Sur tous tes comptes.{messageFilter!=='all'&&<> Le filtre reste appliqué. <button type="button" className="vrm-pied-lien" data-pied-lien="tout" onClick={()=>{setMessageFilter('all');setConvMax(40);}}>Afficher tous les résultats</button></>}</p>}
-        {convs.loading && !convs.items && !(designV2 && (dernieresConvs.current.items||[]).length) && <Skeleton variant="row" count={2}/>}
+        {convs.loading && !convs.items && !designV2 && <Skeleton variant="row" count={2}/>}
+        {/* (17 nov., nouveau design) La première lecture : une place de la hauteur d'un écran (ce qui est dessous ne saute pas
+            dans l'écran quand la liste arrive). */}
+        {convs.loading && !convs.items && designV2 && !(dernieresConvs.current.items||[]).length && <div className="v2m-chargement" data-v2-msg-chargement="" aria-busy="true"><SqueletteRangeesV2 n={6}/></div>}
         {/* (5 nov., chantier G, revue 1.10) La panne dite par `EtatPanne` : une phrase, la raison, UN geste. */}
         {convs.error && <EtatPanne quoi="Tes conversations Vinted" raison="Aucune boîte n’a pu être lue. Rien n’est perdu : c’est la lecture qui a échoué." onReessayer={()=>loadConvs(true)} data-msg-panne=""/>}
         {/* ── LA MESSAGERIE INTÉGRÉE (3 octobre) ─────────────────────────────
