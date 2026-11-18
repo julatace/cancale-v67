@@ -773,11 +773,13 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
       <div className="vrm-boite-liste-col" data-boite-liste-col="">
         {tete}
         <div className="vrm-boite-filtres">
-          {v2 && choixCompte ? <label className="v2e-compte" data-v2-mail-compte="">{/* (17 nov.) le compte, sous le titre, comme Messages */}
+          {/* (17 nov.) Le compte, sous le titre, comme Messages — posé dès le premier rendu (sa place ne saute pas quand les
+              adresses arrivent) ; une seule adresse : le menu est inactif, il dit seulement « Tous les comptes ». */}
+          {v2 ? <label className="v2e-compte" data-v2-mail-compte="" data-actif={choixCompte ? '1' : '0'}>
             <span className="vrm-boite-sr">{tr('ventes.compte4')}</span>
-            <select value={adresse} onChange={(ev) => { setAdresse(ev.target.value); setOuvert(''); }} data-boite-adresse="" aria-label={tr('ventes.compte4')}>
+            <select value={adresse} disabled={!choixCompte} onChange={(ev) => { setAdresse(ev.target.value); setOuvert(''); }} data-boite-adresse="" aria-label={tr('ventes.compte4')}>
               <option value="">{tr('achats.tousComptes')}</option>
-              {adresses.map((a) => <option key={a.adresse} value={a.adresse}>{libelleCompte(a)}</option>)}
+              {(adresses || []).map((a) => <option key={a.adresse} value={a.adresse}>{libelleCompte(a)}</option>)}
             </select>
             <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="m3 4.5 3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </label> : null}

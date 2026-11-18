@@ -185,3 +185,5 @@ html[data-grand-texte] .v2m-extrait { -webkit-line-clamp: 3; }
 html[data-grand-texte] .v2m-av { width: 40px; height: 40px; border-radius: 10px; }
 html[data-grand-texte] html body button.v2-rangee.v2m-ligne, html[data-grand-texte] body button.v2-rangee.v2m-ligne { padding-left: 20px; gap: 12px; }
 html[data-grand-texte] .v2m-point { left: 6px; }
+.v2e-compte[data-actif="0"] svg { visibility: hidden; }
+html body .v2e-compte select:disabled { opacity: 1; cursor: default; color: inherit; }
