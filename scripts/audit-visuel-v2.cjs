@@ -31,7 +31,7 @@
 //  16  états vide / erreur / chargement : une phrase qui dit quoi faire, un geste, jamais « — » en affiche,
 //      aucun plein posé sur un texte
 //  17  traits des icônes : au plus 2 épaisseurs rendues par écran
-//  18  anti-générique : aucun emoji, verre seulement sur la coque, aucun dégradé dans .v2-*, aucune ombre de rangée
+//  18  anti-générique : aucun reste de code rendu (« ))} », « undefined »), aucun emoji, verre seulement sur la coque, aucun dégradé dans .v2-*, aucune ombre de rangée
 //  19  preuve : rouge sur le build d'avant (`BANC_DIST=<dist de main>`) et par mutation (`MUTATION=titre|pile|bouton`)
 //  +   CLS : changer d'onglet ne fait rien sauter (somme des décalages ≤ 0,02) ;
 //  +   fluidité : Annonces à ~1 000 annonces en ligne montées, processeur ralenti × 4 : 95e centile du temps d'image < 50 ms
@@ -217,7 +217,7 @@ async function jugerEcran(nav, decodeur, b, fk, f, id, url, juge, g) {
     if (id !== 'feuille') J(![...surTitre].length, `15 ${nom} · rien ne se pose sur le titre (0–3 s)`, [...surTitre]);
     const nTraits = Object.keys(m.traits).length;
     J(nTraits <= 2, `17 ${nom} · traits d'icône : ${nTraits} épaisseurs (${Object.keys(m.traits).join(' · ')})`, m.traitsOu);
-    J(!m.ia.emoji.length && !m.ia.verreHors.length && !m.ia.degV2.length && !m.ia.ombreRangee, `18 ${nom} · aucun emoji, verre seulement sur la coque, aucun dégradé dans .v2-*, aucune ombre de rangée`, m.ia);
+    J(!m.ia.restesCode.length && !m.ia.emoji.length && !m.ia.verreHors.length && !m.ia.degV2.length && !m.ia.ombreRangee, `18 ${nom} · aucun reste de code à l'écran, aucun emoji, verre seulement sur la coque, aucun dégradé dans .v2-*, aucune ombre de rangée`, m.ia);
     J(m.debord <= 1, `${nom} · rien ne déborde de l'écran (${m.debord})`);
     J(!erreurs.length, `${nom} · aucune erreur de page`, erreurs);
     // 14 (suite) : la dernière rangée défile au-dessus du plein au pouce.

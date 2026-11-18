@@ -181,12 +181,14 @@
 
   // ── 18. ANTI-GÉNÉRIQUE : emoji, verre hors coque, dégradés dans .v2-*, ombre sur une rangée ──
   const emo = []; let verreHors = [], degV2 = [], ombreRangee = [];
+  // Un RESTE DE CODE rendu en texte (« ))} », « {x} », « undefined », « [object Object] ») : 18 aussi.
+  const restes = avecTexte.filter((e) => { const t = [...e.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join('').trim(); return /^[)}\]({[]{2,}$/.test(t) || /\{[a-zA-Z_]+\}|\bundefined\b|\bNaN\b|\[object Object\]/.test(t); }).map((e) => e.textContent.trim().slice(0, 30));
   for (const e of avecTexte) { const m = e.textContent.match(/\p{Extended_Pictographic}/u); if (m && !/[©®™↗→←↑↓›‹✓✕×]/.test(m[0])) emo.push(m[0] + ' ' + e.textContent.trim().slice(0, 20)); }
   for (const e of visibles) { if (!dansEcran(e.getBoundingClientRect())) continue; const cs = getComputedStyle(e);
     if (cs.backdropFilter && cs.backdropFilter !== 'none' && !e.closest('.vrm-tabbar, .vrm-app-header, .sb-plan, .v2-feuille, .v2-voile, .vrm-barre-haut, .v2-pouce, .vrm-acc, .vrm-toasts, .v2-barre, nav')) verreHors.push(String(e.className).slice(0, 30));
     if (estV2(e) && /linear-gradient/.test(cs.backgroundImage) && !e.closest('.v2-ticket, .v2-pouce, .v2-squelette, [class*="squelette"], .vrm-app-header')) degV2.push(String(e.className).slice(0, 30));
     if (e.matches('[data-v2l], .v2-ligne, .v2-afaire-ligne, .vrm-buy-row') && cs.boxShadow && cs.boxShadow !== 'none') ombreRangee.push(String(e.className).slice(0, 30)); }
-  out.ia = { emoji: [...new Set(emo)].slice(0, 6), verreHors: [...new Set(verreHors)].slice(0, 6), degV2: [...new Set(degV2)].slice(0, 6), ombreRangee: ombreRangee.length };
+  out.ia = { restesCode: [...new Set(restes)].slice(0, 6), emoji: [...new Set(emo)].slice(0, 6), verreHors: [...new Set(verreHors)].slice(0, 6), degV2: [...new Set(degV2)].slice(0, 6), ombreRangee: ombreRangee.length };
   out.debord = document.documentElement.scrollWidth - W;
   return out;
 }

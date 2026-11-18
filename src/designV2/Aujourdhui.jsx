@@ -142,7 +142,6 @@ export default function Aujourdhui({ affiche, colis = [], retraits = null, group
                   <div key={g.id} className="v2-afaire-ligne" data-v2-job={g.id} data-n={g.n == null ? '' : String(g.n)}>{contenu}</div>
                 );
               })}
-              ))}
             </div>
           </section>
         ) : null),
