@@ -179,5 +179,6 @@ export default {
   "v2.barre.ann": "Listings",
   "v2.barre.ach": "Purchases",
   "v2.barre.ven": "Sales",
-  "v2.barre.arg": "Money"
+  "v2.barre.arg": "Money",
+  "v2.mail.selectionner": "Select"
 };

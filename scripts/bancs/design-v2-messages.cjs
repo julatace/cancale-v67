@@ -77,6 +77,9 @@ async function signatureStable(pg) {
   for (let k = 0; k < 16; k++) { const s = await pg.evaluate((f) => eval('(' + f + ')')(), SIGNATURE.toString()); if (avant && JSON.stringify(s) === JSON.stringify(avant)) { if (++egaux >= 2) return s; } else egaux = 0; avant = s; await pg.waitForTimeout(1200); }
   return avant;
 }
+// La pastille « Mis à jour à … » (coque) ne se pose jamais sur le grand titre.
+const PASTILLE = () => { const p = document.querySelector('.vrm-neuf'), h = document.querySelector('.vrm-main h1'); if (!p || !h || !p.getClientRects().length) return { vue: false };
+  const a = p.getBoundingClientRect(), b = h.getBoundingClientRect(); return { vue: true, sur: !(a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom) }; };
 const sansToasts = async (pg) => { await pg.evaluate(() => { for (const t of document.querySelectorAll('.vrm-toast')) t.click(); }).catch(() => {}); await pg.waitForTimeout(300); };
 
 // Les mesures communes d'une zone allumée (cibles, tronqués, pleins, AIR des cartes).
@@ -171,12 +174,18 @@ async function messages(nav, { W, sombre, grand = false, nom }) {
       premiere: (() => { const x = document.querySelector('[data-v2-conv]'); return x ? Math.round(x.getBoundingClientRect().top) : null; })() }; });
   if (W !== 1512) dit(tete.titre && tete.cloche && tete.memeLigne, `${nom} : le grand titre et la cloche sur une ligne`, tete);
   dit(tete.segs === 1 && tete.anciens === 0, `${nom} : UN segmenté (Conversations · Offres · Favoris), plus les rangées d’hier`, tete);
+  const pa = await pg.evaluate((f) => eval('(' + f + ')')(), PASTILLE.toString());
+  dit(!pa.sur, `${nom} : la pastille « Mis à jour » ne couvre pas le titre${pa.vue ? '' : ' (pas montrée)'}`, pa);
+  if (grand) { const noms = await pg.evaluate(() => [...document.querySelectorAll('.v2m-nom')].slice(0, 12).filter((n) => n.scrollWidth > n.clientWidth + 1 || n.scrollHeight > n.clientHeight + 1).map((n) => n.textContent));
+    dit(!noms.length, `${nom} : en très grand texte, chaque pseudo se lit en entier (2 lignes au plus)`, noms); }
   if (W === 390) dit(tete.premiere != null && tete.premiere <= 422, `${nom} : la 1re conversation sur la moitié haute (y ${tete.premiere})`);
   await pg.screenshot({ path: path.join(SHOTS, `messages-${nom}.png`) });
   // Le fil : des bulles, les gestes d'hier (le champ, les réponses rapides).
   if (W === 390 && !grand) {
     await pg.click('[data-v2-conv]').catch(() => {}); await pg.waitForTimeout(2500);
     const fil = await pg.evaluate(() => ({ bulles: document.querySelectorAll('.vrm-bulle').length, moi: (() => { const x = document.querySelector('.vrm-bulle-moi .vrm-bulle'); return x ? getComputedStyle(x).backgroundColor : ''; })(), champ: !!document.querySelector('.vrm-chat-panel textarea, .vrm-chat-panel input[type="text"]') || [...document.querySelectorAll('.vrm-chat-panel a, .vrm-chat-panel button')].some((x) => /Répondre sur Vinted/.test(x.textContent || '')) }));
+    const tf = await pg.evaluate(() => { const e = document.querySelector('.vrm-chat-head-s'); if (!e) return null; const cs = getComputedStyle(e); return { coupe: e.scrollHeight > e.clientHeight + 1, ellipse: [...e.querySelectorAll('*'), e].some((x) => getComputedStyle(x).textOverflow === 'ellipsis' && x.scrollWidth > x.clientWidth + 1), lignes: Math.round(e.clientHeight / parseFloat(cs.lineHeight)) }; });
+    dit(tf && !tf.coupe && !tf.ellipse, `${nom} : la tête du fil (paire · compte) n’est pas coupée`, tf);
     dit(fil.bulles >= 2 && /0, 113, 227|10, 132, 255/.test(fil.moi) && fil.champ, `${nom} : le fil en bulles (les miennes en bleu), le champ de réponse (ou « Répondre sur Vinted ») gardé`, fil);
     await pg.screenshot({ path: path.join(SHOTS, `fil-${nom}.png`) });
   }
@@ -194,6 +203,11 @@ async function emails(nav, { W, sombre, grand = false, nom, ancien = null }) {
   dit(m.zones >= 2 && m.pleins <= 1, `${nom} E : au plus 1 bouton plein (${m.pleins})`);
   dit(m.zones >= 2 && !m.petites.length, `${nom} E : cibles ≥ 44 px`, m.petites.slice(0, 6));
   dit(m.zones >= 2 && !m.tronques.length && !m.coupes.length, `${nom} E : rien de tronqué sans « … », aucun mot coupé`, { tronques: m.tronques.slice(0, 6), coupes: m.coupes });
+  const seg = await pg.evaluate(() => { const g = document.querySelector('[data-v2-mail-seg]'); if (!g) return null; const cs = getComputedStyle(g); return { deborde: g.scrollWidth > g.clientWidth + 1, fondu: /gradient/.test(cs.maskImage || cs.webkitMaskImage || ''),
+    compteSousTitre: !!document.querySelector('[data-v2-mail-compte]') && !document.querySelector('.vrm-boite-ligne-outils select'), selectionnerSeul: !!document.querySelector('.vrm-serie-entree') }; });
+  dit(seg && (!seg.deborde || seg.fondu) && seg.compteSousTitre && !seg.selectionnerSeul, `${nom} E : filtres en puces (fondu s’ils débordent), compte sous le titre, « Sélectionner » dans « ⋯ »`, seg);
+  const paE = await pg.evaluate((f) => eval('(' + f + ')')(), PASTILLE.toString());
+  dit(!paE.sur, `${nom} E : la pastille « Mis à jour » ne couvre pas le titre${paE.vue ? '' : ' (pas montrée)'}`, paE);
   const cls = await pg.evaluate(() => window.__cls || 0);
   dit(cls <= 0.001, `${nom} E : CLS du chargement = ${cls.toFixed(4)}`, await pg.evaluate(() => window.__clsSrc || []));
   // E3 : l'étiquette N° = le N° LU (bordereau, vente), le code se copie, un geste par rangée sans code.

@@ -773,6 +773,14 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
       <div className="vrm-boite-liste-col" data-boite-liste-col="">
         {tete}
         <div className="vrm-boite-filtres">
+          {v2 && choixCompte ? <label className="v2e-compte" data-v2-mail-compte="">{/* (17 nov.) le compte, sous le titre, comme Messages */}
+            <span className="vrm-boite-sr">{tr('ventes.compte4')}</span>
+            <select value={adresse} onChange={(ev) => { setAdresse(ev.target.value); setOuvert(''); }} data-boite-adresse="" aria-label={tr('ventes.compte4')}>
+              <option value="">{tr('achats.tousComptes')}</option>
+              {adresses.map((a) => <option key={a.adresse} value={a.adresse}>{libelleCompte(a)}</option>)}
+            </select>
+            <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="m3 4.5 3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </label> : null}
           {v2 ? <div className="v2m-outils" data-v2-mail-outils="">{/* (17 nov.) la recherche + « ⋯ » (non lus, codes, offres) */}<label className="vrm-boite-cherche" data-boite-cherche={cherche ? '1' : '0'}>
             <span className="vrm-boite-sr">{tr('emails.chercherEMail')}</span>
             <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.6"/><path d="m13 13 4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>
@@ -800,6 +808,7 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
                 <button key={k} type="button" className="v2-rangee v2m-choix" data-v2-rangee="" role="radio" aria-checked={(k === 'nonlus' ? nonLus : rubrique === k) ? 'true' : 'false'} data-v2-mail-choix={k}
                   onClick={() => { if (k === 'nonlus') { setNonLus((v) => !v); } else { setNonLus(false); setAVerif(false); setRubrique(rubrique === k ? '' : k); } setOuvert(''); setFeuilleV2(false); }}>
                   <span>{l}</span>{n != null && n > 0 ? <span className="v2m-choix-n">{n}</span> : null}</button>))}
+              {!serie.actif && serie.total && ordreSerie.length > 1 ? <button type="button" className="v2-rangee v2m-choix" data-v2-rangee="" data-v2-mail-choix="selectionner" onClick={() => { setFeuilleV2(false); serie.ouvrir(); }}><span>{tr('v2.mail.selectionner')}</span></button> : null}
               <button type="button" className="v2-rangee v2m-choix" data-v2-rangee="" data-v2-mail-choix="relier" onClick={() => { setFeuilleV2(false); onRelier && onRelier(); }}><span>{tr('v2.mail.relier')}</span></button>
             </div>
           </SheetShell>}
@@ -821,8 +830,8 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
               <span>{tr('journee.verifier')}</span>{!filtre && c && c.aVerifier > 0 ? <span className="vrm-boite-n" data-boite-n={c.aVerifier}>{c.aVerifier}{c.plus ? '+' : ''}</span> : null}
             </button>}
           </div>
-          {(choixCompte || (vieille && pages !== null) || (lusSus && nNonLus > 0)) && <div className="vrm-boite-ligne-outils">
-            {choixCompte && <label className="vrm-boite-compte">
+          {((choixCompte && !v2) || (vieille && pages !== null) || (lusSus && nNonLus > 0)) && <div className="vrm-boite-ligne-outils">
+            {choixCompte && !v2 && <label className="vrm-boite-compte">
               <span className="vrm-boite-sr">{tr('ventes.compte4')}</span>
               <select value={adresse} onChange={(ev) => { setAdresse(ev.target.value); setOuvert(''); }} data-boite-adresse="" aria-label={tr('ventes.compte4')}>
                 <option value="">{tr('achats.tousComptes')}</option>
@@ -850,7 +859,7 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
           gestes={[rubrique ? { k: 'tout', mot: 'Voir toutes les rubriques', f: () => setRubrique('') } : { k: 'relier', mot: 'Relier ma boîte', f: onRelier }, { k: 'comptes', mot: 'Tous les comptes', f: () => setAdresse('') }]}/>}
         {vide && !filtre && !adresse && rubrique && <Etat k="rubrique-vide" titre={tr('emails.aucunEMail2', { motRubrique: String(motRubrique) })} texte="Ils arriveront ici dès que tes e-mails en parleront." gestes={[{ k: 'tout', mot: 'Voir tout', f: () => setRubrique('') }]}/>}
         {vide && !filtre && !adresse && !rubrique && <Etat k="vide" dessin="relier" titre={tr('emails.boiteVrmVide')} texte="Relie ta boîte : chaque e-mail de Vinted, des transporteurs ou des autres sites que tu transfères à VRM arrivera ici, déjà rangé." gestes={[{ k: 'relier', mot: 'Relier ma boîte', f: onRelier }]}/>}
-        {groupes.length > 0 && ordreSerie.length > 1 && <div className="vrm-serie-entree" style={{ display: 'flex', justifyContent: 'flex-end' }}><OuvrirSerie serie={serie}/></div>}
+        {groupes.length > 0 && ordreSerie.length > 1 && !v2 && <div className="vrm-serie-entree" style={{ display: 'flex', justifyContent: 'flex-end' }}><OuvrirSerie serie={serie}/></div>}
         <BarreSerie serie={serie} actions={actionsSerie} unite={{ un: 'e-mail sélectionné', plusieurs: 'e-mails sélectionnés' }}/>
         {groupes.length > 0 && <div className="vrm-boite-liste" data-boite-liste="">
           {groupesV2.map((g) => (g.items.length ? <section key={g.cle} className="vrm-boite-jour" data-boite-jour={g.mot} aria-label={g.mot}>
