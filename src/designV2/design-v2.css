@@ -508,8 +508,8 @@ html[data-design="v2"] body .v2v-tete .v2-affiche-sig { margin: 0 0 8px; }
 html[data-design="v2"] body .v2v-tete .v2-affiche-sig { grid-template-rows: 40px auto; margin: 0 0 6px; }
 html[data-design="v2"] body .v2v-tete .v2v-recherche { margin-bottom: 0; }
 .v2v-liste .v2v-groupe:first-child { padding-top: 6px; }
-/* L'écart nommé tient sur UNE ligne (points de suspension s'il déborde ; le texte entier reste lu). */
-html[data-design="v2"] body .v2v-tete .v2-affiche-sig-sous { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+/* L'écart nommé : une ligne à la taille normale ; en « Très grand » il passe à la ligne entre deux mots, jamais coupé. */
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig-sous { white-space: normal; overflow-wrap: normal; min-width: 0; }
 /* Les règles d'hier du plateau sont dans `@layer vrm-premium` avec !important : un !important EN COUCHE l'emporte sur un
    !important hors couche, quelle que soit la spécificité. La retouche de Ventes se pose donc DANS la même couche. */
 @layer vrm-premium {
