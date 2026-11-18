@@ -13879,7 +13879,15 @@ const rendrePremierePage = async (pdf, echelle = TAMPON.echelle) => {
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
     await page.render({ canvasContext: ctx, viewport: v }).promise;
-    return { pixels: ctx.getImageData(0, 0, w, h).data, w, h, s };
+    // (17 nov., lot tampon-qr) Les lignes de texte, page AFFICHÉE (points) : origine, sens (dx, dy), nombre de signes —
+    // le SENS de lecture d'une étiquette posée de travers (la mention s'écrit au-dessus du code dans son sens à elle).
+    let textes = [];
+    try {
+      const m0 = v.transform, mul = (b) => [m0[0] * b[0] + m0[2] * b[1], m0[1] * b[0] + m0[3] * b[1], m0[0] * b[4] + m0[2] * b[5] + m0[4], m0[1] * b[4] + m0[3] * b[5] + m0[5]];
+      textes = (await page.getTextContent()).items.filter((it) => it && it.str && it.str.trim() && it.transform)
+        .map((it) => { const m = mul(it.transform), n = Math.hypot(m[0], m[1]) || 1; return { x: m[2] / s, y: m[3] / s, dx: m[0] / n, dy: m[1] / n, n: it.str.trim().length }; });
+    } catch (_) { textes = []; }
+    return { pixels: ctx.getImageData(0, 0, w, h).data, w, h, s, textes };
   } finally { try { await d.destroy(); } catch (_) {} }
 };
 // ① Où poser le cartouche sur la page affichée (recherche automatique) ?
@@ -14034,22 +14042,165 @@ const zonesInterditesTampon = (rendu, adresses = []) => {
   for (const a of adresses || []) { interdits.push({ ...a, quoi: 'adresse' }); interditsMention.push({ ...a, quoi: 'adresse' }); }
   return { codes, interdits, interditsMention };
 };
-// Pur (la page déjà rendue) : où poser une boîte bw × bh de mention, par la règle par défaut ①②③.
-// `o` : { codes, interdits, cadre, adresses, bord }. Rend { x, y, via, qr } (points) ou null.
+// ── (17 nov., lot tampon-qr) LA MENTION VRAIMENT JUSTE AU-DESSUS DU CODE, POUR CHAQUE TRANSPORTEUR ─────────────────
+// Julien, 17 nov. : « pour l'impression c'est très bien, seulement je veux que le créé par vrm.center soit vraiment
+// juste au-dessus du qrcode, pas en dessous ou sur les côtés là où on met le scotch ». MESURÉ sur la règle du 16 nov.
+// (banc scripts/bancs/tampon-qr.cjs, 11 bordereaux inventés à la forme de chaque transporteur × A4 · 10×15 · 4 par page :
+// 0 juste sur 33) : la mention allait 8 à 12 mm au-dessus (la zone de silence de 4,5 modules PLUS le glissement), EN
+// DESSOUS quand un texte occupait le dessus, rien sur l'étiquette Chronopost / Relais Colis / Hermes en thermique, et
+// sur une étiquette DE TRAVERS (page Vestiaire /Rotate 270, Relais Colis couchée dans une A4) elle était écrite dans le
+// sens de la PAGE : « au-dessus » de la page = SUR LE CÔTÉ de l'étiquette, là où va le scotch. Donc, par défaut :
+//   · LE CODE VISÉ : le plus grand code 2D (QR, DataMatrix, MaxiCode) de l'étiquette (dans son cadre s'il est connu) ;
+//     un petit code décoratif (côté < 12 % du petit côté de l'étiquette : « télécharge l'appli ») n'en est pas un ;
+//     SANS code 2D, le code-barres principal (le plus grand) — le repli est voulu, pas un défaut ; sans aucun code, la
+//     règle d'avant (centrée sous l'adresse, plus bas) ;
+//   · LE SENS DE L'ÉTIQUETTE : celui de ses lignes de texte autour du code (pdf.js, `rendu.textes`), sinon `o.sens`
+//     (le sens où VRM l'a tournée sur le rouleau) ; « au-dessus » est le haut de l'ÉTIQUETTE, et la mention s'écrit
+//     dans son sens de lecture ;
+//   · CENTRÉE sur l'axe du code ; le bas de ses lettres (le jambage du « p ») à 3 mm du bord du code (2 à 4 mm) ;
+//   · JAMAIS SUR L'ENCRE (texte, cadre, trait, autre code, adresse) : la bande est lue sur le rendu ; trop étroite, la
+//     police RAPETISSE par demi-point jusqu'à 4,5 pt (lisible imprimé) ; toujours rien ⇒ AUCUNE mention (`via:
+//     'aucune-place'`) — jamais dessous, jamais à côté ;
+//   · jamais hors du cadre de l'étiquette (découpé, il emporterait la mention), ni dans la marge non imprimable.
+const MENTION3 = { ecarts: [3, 3.5, 2.5, 4, 2.25].map((x) => x * MM_M), tailleMin: 4.5, pas: 0.5, haut: 0.8, bas: 0.22, marge: 0.5 * MM_M, decoratif: 0.12, autour: 45 * MM_M };
+// Le sens de lecture (0 · 90 · 180 · 270 degrés, sens horaire sur la page affichée) des lignes de texte dans `z`
+// (points ; null = toute la page), pondéré par leur longueur. null : aucun texte.
+const sensDuTexte = (textes, z) => {
+  const score = [0, 0, 0, 0];
+  for (const t of textes || []) {
+    if (z && (t.x < z.x || t.x > z.x + z.w || t.y < z.y || t.y > z.y + z.h)) continue;
+    const k = ((Math.round(Math.atan2(t.dy, t.dx) * 2 / Math.PI) % 4) + 4) % 4; score[k] += t.n || 1;
+  }
+  let k = 0; for (let i = 1; i < 4; i++) if (score[i] > score[k]) k = i;
+  return score[k] > 0 ? k * 90 : null;
+};
+// Le repère de l'étiquette sur une page affichée W × H (points) : (x, y) → (u le long du texte, v vers le BAS de
+// l'étiquette), et l'inverse. Pour a = 90 le texte descend : le haut de l'étiquette est à DROITE ; pour 270, à gauche.
+const repereEtiquette = (a, W, H) => {
+  if (a === 90) return { vers: (x, y) => [y, W - x], depuis: (u, v) => [W - v, u] };
+  if (a === 180) return { vers: (x, y) => [W - x, H - y], depuis: (u, v) => [W - u, H - v] };
+  if (a === 270) return { vers: (x, y) => [H - y, x], depuis: (u, v) => [v, H - u] };
+  return { vers: (x, y) => [x, y], depuis: (u, v) => [u, v] };
+};
+// La boîte ENTIÈRE du code dont `q` (points) est un morceau : l'encre (luminance < 128) reliée à lui, les blancs de
+// moins de 1,6 mm en largeur et 0,8 mm en hauteur franchis (l'espace large d'un code-barres, les modules blancs d'un
+// QR) — jamais la zone de silence (2 mm au moins). Un résultat démesuré (collé à un bloc de texte) rend `q` tel quel.
+const boiteEntiereCode = (rendu, q) => {
+  const { pixels: d, w, h, s } = rendu, k = Math.max(1, Math.round(0.25 * MM_M * s));
+  const lim = elargir(q, 60 * MM_M), X0 = Math.max(0, Math.floor(lim.x * s)), Y0 = Math.max(0, Math.floor(lim.y * s));
+  const X1 = Math.min(w, Math.ceil((lim.x + lim.w) * s)), Y1 = Math.min(h, Math.ceil((lim.y + lim.h) * s));
+  const cw = Math.ceil((X1 - X0) / k), ch = Math.ceil((Y1 - Y0) / k); if (cw < 1 || ch < 1) return q;
+  const encre = new Uint8Array(cw * ch);
+  for (let y = Y0; y < Y1; y++) for (let x = X0; x < X1; x++) { const i = (y * w + x) * 4; if (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2] < 128) encre[(((y - Y0) / k) | 0) * cw + (((x - X0) / k) | 0)] = 1; }
+  const rx = Math.max(1, Math.round(0.8 * MM_M * s / k)), ry = Math.max(1, Math.round(0.4 * MM_M * s / k));
+  const st = cw + 1, sm = new Uint32Array(st * (ch + 1));
+  for (let y = 0; y < ch; y++) { let r = 0; for (let x = 0; x < cw; x++) { r += encre[y * cw + x]; sm[(y + 1) * st + x + 1] = sm[y * st + x + 1] + r; } }
+  const plein = (x, y) => { const a = Math.max(0, x - rx), b = Math.max(0, y - ry), c = Math.min(cw, x + rx + 1), e = Math.min(ch, y + ry + 1); return sm[e * st + c] - sm[b * st + c] - sm[e * st + a] + sm[b * st + a] > 0; };
+  const vu = new Uint8Array(cw * ch), pile = [];
+  const qx0 = Math.max(0, Math.floor((q.x * s - X0) / k)), qy0 = Math.max(0, Math.floor((q.y * s - Y0) / k)), qx1 = Math.min(cw - 1, Math.floor(((q.x + q.w) * s - X0) / k)), qy1 = Math.min(ch - 1, Math.floor(((q.y + q.h) * s - Y0) / k));
+  for (let y = qy0; y <= qy1; y++) for (let x = qx0; x <= qx1; x++) if (encre[y * cw + x]) { vu[y * cw + x] = 1; pile.push(y * cw + x); }
+  let a0 = 1e9, b0 = 1e9, a1 = -1, b1 = -1;
+  while (pile.length) {
+    const j = pile.pop(), x = j % cw, y = (j / cw) | 0;
+    if (encre[j]) { if (x < a0) a0 = x; if (x > a1) a1 = x; if (y < b0) b0 = y; if (y > b1) b1 = y; }
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const X = x + dx, Y = y + dy; if (X < 0 || Y < 0 || X >= cw || Y >= ch) continue; const m = Y * cw + X; if (!vu[m] && plein(X, Y)) { vu[m] = 1; pile.push(m); } }
+  }
+  if (a1 < 0) return q;
+  const b = { x: (X0 + a0 * k) / s, y: (Y0 + b0 * k) / s, w: ((a1 - a0 + 1) * k) / s, h: ((b1 - b0 + 1) * k) / s };
+  return b.w > 90 * MM_M || b.h > 90 * MM_M || b.w * b.h > Math.max(4 * q.w * q.h, 60 * 60 * MM_M * MM_M) ? q : b;
+};
+const codes2DEpars = (rendu, connus) => {
+  const { pixels: d, w, h, s } = rendu, t = Math.max(4, Math.round(6 * s)), cw = Math.floor(w / t), ch = Math.floor(h / t);
+  const noir = (x, y) => { const i = (y * w + x) * 4; return 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2] < 128; };
+  const c = new Uint8Array(cw * ch);
+  for (let cy = 0; cy < ch; cy++) for (let cx = 0; cx < cw; cx++) {
+    let n = 0, th = 0, tv = 0;
+    for (let y = cy * t; y < cy * t + t; y++) for (let x = cx * t; x < cx * t + t; x++) { const a = noir(x, y); if (a) n++; if (x > cx * t && a !== noir(x - 1, y)) th++; if (y > cy * t && a !== noir(x, y - 1)) tv++; }
+    const part = n / (t * t), f = t * (t / s);
+    if (part >= 0.12 && part <= 0.85 && th / f >= 0.1 && tv / f >= 0.1) c[cy * cw + cx] = 1;
+  }
+  const vu = new Uint8Array(cw * ch), out = [];
+  for (let i = 0; i < c.length; i++) {
+    if (!c[i] || vu[i]) continue;
+    const pile = [i]; vu[i] = 1; let x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1;
+    while (pile.length) { const j = pile.pop(), x = j % cw, y = (j / cw) | 0; x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const X = x + dx, Y = y + dy, k = Y * cw + X; if (X >= 0 && Y >= 0 && X < cw && Y < ch && c[k] && !vu[k]) { vu[k] = 1; pile.push(k); } } }
+    const q = { x: x0 * t / s, y: y0 * t / s, w: (x1 - x0 + 1) * t / s, h: (y1 - y0 + 1) * t / s };
+    if (!estCarreCode(q) || Math.max(q.w, q.h) > 75 * MM_M) continue;
+    if ((connus || []).some((k) => q.x < k.x + k.w && q.x + q.w > k.x && q.y < k.y + k.h && q.y + q.h > k.y)) continue;
+    try { if (estUnCode(rendu, q) && alterneDeuxSens(rendu, q)) out.push({ ...q, qr: true }); } catch (_) {}
+  }
+  return out;
+};
+const boiteRepere = (f, b) => { const p = f(b.x, b.y), q = f(b.x + b.w, b.y + b.h); return { x: Math.min(p[0], q[0]), y: Math.min(p[1], q[1]), w: Math.abs(q[0] - p[0]), h: Math.abs(q[1] - p[1]) }; };
+const seCroisent = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+// Pur (la page déjà rendue) : le code visé, le sens de l'étiquette et la place de la mention. `largeur(T)` : la
+// longueur du texte à la taille T ; `o` : { codes, interdits, cadre, bord, T (taille voulue), sens (indice) }.
+// Rend null (aucun code : la règle d'avant), { via: 'aucune-place', code } ou
+// { via: 'qr-dessus' | 'code-dessus', code, a, T, debut: [x, y] (début de la ligne de base, page affichée), boite }.
+const placerMentionSurCode = (rendu, largeur, o = {}) => {
+  const s = rendu.s, W = rendu.w / s, H = rendu.h / s, B = o.bord != null ? o.bord : MENTION.bord;
+  const page = { x: B, y: B, w: W - 2 * B, h: H - 2 * B };
+  const C = o.cadre ? { x: Math.max(page.x, o.cadre.x), y: Math.max(page.y, o.cadre.y), w: 0, h: 0 } : { ...page };
+  if (o.cadre) { C.w = Math.min(page.x + page.w, o.cadre.x + o.cadre.w) - C.x; C.h = Math.min(page.y + page.h, o.cadre.y + o.cadre.h) - C.y; }
+  if (!(C.w > 0 && C.h > 0)) return null;
+  const centreDans = (q, z) => q.x + q.w / 2 > z.x && q.x + q.w / 2 < z.x + z.w && q.y + q.h / 2 > z.y && q.y + q.h / 2 < z.y + z.h;
+  // Les morceaux d'un même code d'abord RÉUNIS : la carte des codes est faite de cases de 6 pt, et un grand QR (ses
+  // repères pleins) ou un code-barres à barres larges y sort en plusieurs morceaux (mesuré : Vinted Go, DPD) — centrer
+  // sur un morceau décentrait la mention de 10 mm. Puis la boîte est affinée sur les vrais pixels du code.
+  // + les codes 2D ÉPARS que la carte des codes ne voit pas (un MaxiCode UPS : alvéoles espacées, moins de 28 % d'encre
+  // par case) — gardés seulement s'ils passent le même tri qu'un code (`estUnCode`, carré, alterne dans les deux sens).
+  const bruts = [...(o.codes || []), ...codes2DEpars(rendu, o.codes || [])].filter((q) => !o.cadre || centreDans(q, o.cadre));
+  const codes = fusionnerProches(bruts.map((q) => boiteEntiereCode(rendu, q)), 1 * MM_M).map((g) => {
+    const qr = bruts.some((q) => q.qr && centreDans(q, g)) || (estCarreCode(g) && alterneDeuxSens(rendu, g));
+    return { x: g.x, y: g.y, w: g.w, h: g.h, qr };
+  });
+  const ref = Math.min(C.w, C.h), aire = (q) => q.w * q.h;
+  const deuxD = codes.filter((q) => q.qr && Math.min(q.w, q.h) >= MENTION3.decoratif * ref).sort((a, b) => aire(b) - aire(a));
+  const barres = codes.filter((q) => !q.qr).sort((a, b) => aire(b) - aire(a));
+  // Plusieurs étiquettes sur la feuille (2 ou 4 par A4) : chaque grand code d'étiquette (au moins 60 % du plus grand) est
+  // essayé ; le premier qui a sa place au-dessus la prend.
+  const cands = deuxD.length ? deuxD.filter((c) => aire(c) >= 0.6 * aire(deuxD[0])) : barres.slice(0, 1);
+  if (!cands.length) return null;
+  let premier = null;
+  for (const q of cands) { const r = placerAuDessusDe(rendu, largeur, o, q, C, centreDans); if (r.via !== 'aucune-place') return r; premier = premier || r; }
+  return premier;
+};
+const placerAuDessusDe = (rendu, largeur, o, q, C, centreDans) => {
+  const s = rendu.s, W = rendu.w / s, H = rendu.h / s;
+  // Le sens : les lignes de texte autour du code (dans le cadre), sinon toute la page, sinon l'indice.
+  const autour = elargir(q, MENTION3.autour);
+  let a = sensDuTexte(rendu.textes, o.cadre ? { x: Math.max(autour.x, o.cadre.x), y: Math.max(autour.y, o.cadre.y), w: Math.min(autour.x + autour.w, o.cadre.x + o.cadre.w) - Math.max(autour.x, o.cadre.x), h: Math.min(autour.y + autour.h, o.cadre.y + o.cadre.h) - Math.max(autour.y, o.cadre.y) } : autour);
+  if (a == null) a = sensDuTexte(rendu.textes, o.cadre || null);
+  if (a == null) a = [0, 90, 180, 270].includes(o.sens) ? o.sens : 0;
+  const R = repereEtiquette(a, W, H), versR = (b) => boiteRepere(R.vers, b), depuisR = (b) => boiteRepere(R.depuis, b);
+  const qf = versR(q), Cf = versR(C);
+  // Les zones interdites, sauf celle du code visé lui-même (sa zone de silence est blanche : on la mesure à l'encre).
+  const interdits = (o.interdits || []).filter((z) => !((z.quoi === 'qr' || z.quoi === 'code') && (centreDans(q, z) || centreDans(z, elargir(q, MM_M)))));
+  const T0 = o.T || MENTION.taille, Tmin = Math.min(T0, MENTION3.tailleMin), M = MENTION3.marge;
+  for (let T = T0; T >= Tmin - 1e-6; T -= MENTION3.pas) {
+    const l = largeur(T); if (!(l > 0)) return { via: 'aucune-place', code: q, a };
+    for (const g of MENTION3.ecarts) {
+      let u0 = qf.x + qf.w / 2 - l / 2, vb = qf.y - g - MENTION3.bas * T;
+      /*MUTATION-MENTION*/
+      const lf = { x: u0, y: vb - MENTION3.haut * T, w: l, h: (MENTION3.haut + MENTION3.bas) * T };   // les lettres, repère étiquette
+      if (lf.x < Cf.x || lf.y < Cf.y || lf.x + lf.w > Cf.x + Cf.w || lf.y + lf.h > Cf.y + Cf.h) continue;
+      const lettres = depuisR(lf), garde = depuisR({ x: lf.x - M, y: lf.y - M, w: lf.w + 2 * M, h: lf.h + 2 * M });
+      if (interdits.some((z) => seCroisent(lettres, z))) continue;
+      if (encreDans(rendu, garde) !== 0) continue;
+      return { via: q.qr ? 'qr-dessus' : 'code-dessus', code: q, a, T, debut: R.depuis(u0, vb), boite: lettres };
+    }
+  }
+  return { via: 'aucune-place', code: q, a };
+};
+// Pur (la page déjà rendue) : sans aucun code sur l'étiquette, où poser une boîte bw × bh de mention (règle ③).
+// `o` : { interdits, cadre, adresses, bord }. Rend { x, y, via, qr } (points) ou null.
 const placerMentionDefaut = (rendu, bw, bh, o = {}) => {
   const s = rendu.s, W = rendu.w / s, H = rendu.h / s, B = o.bord != null ? o.bord : MENTION.bord, M = MENTION2.marge;
   const interdits = o.interdits || [];
   const libre = (x, y) => x >= B && y >= B && x + bw <= W - B && y + bh <= H - B
     && !interdits.some((z) => x < z.x + z.w && x + bw > z.x && y < z.y + z.h && y + bh > z.y)
     && encreDans(rendu, { x: x - M, y: y - M, w: bw + 2 * M, h: bh + 2 * M }) === 0;
-  const qrs = (o.codes || []).filter((q) => q.qr).sort((a, b) => (b.w * b.h - a.w * a.h) || (a.y - b.y) || (a.x - b.x));
-  const q = qrs[0];
-  if (q) {
-    const garde = gardeQr(rendu, q), x = q.x + q.w / 2 - bw / 2;
-    // La boîte ne doit pas toucher la zone de silence de SON QR : on part de son bord, pas de la zone interdite.
-    for (let d = 0; d <= MENTION2.glisse; d += MENTION2.pas) { const y = q.y - garde - bh - d; if (libre(x, y)) return { x, y, via: 'qr-dessus', qr: q }; }
-    for (let d = 0; d <= MENTION2.glisse; d += MENTION2.pas) { const y = q.y + q.h + garde + d; if (libre(x, y)) return { x, y, via: 'qr-dessous', qr: q }; }
-  }
   // ③ Centrée sur l'étiquette, sous l'adresse (sinon sous la moitié haute) ; on DESCEND jusqu'à la première bande blanche
   // suffisante (Julien : « descends jusqu'à la première bande blanche suffisante, toujours centré »), avec 3 mm de blanc
   // autour (jamais collée à un texte qu'on ne sait pas lire : un scan n'a pas de texte).
@@ -14081,8 +14232,18 @@ const poserMentionVrm = (PL, pdf, reg, rendu, o = {}) => {
       return { x: p.x, y: p.y, w: c.w, h: c.h, via: 'libre', repousse: p.repousse };
     }
     let p = null;
-    if (!o.place || o.place === 'qr') p = placerMentionDefaut(rendu, c.w, c.h, { codes: o.codes, interdits, cadre: o.cadre, adresses: o.adresses, bord: B });
-    else {
+    if (!o.place || o.place === 'qr') {
+      // (17 nov., lot tampon-qr) Juste AU-DESSUS du code, dans le sens de l'étiquette ; sans code, la règle ③.
+      const sur = placerMentionSurCode(rendu, (t) => reg.widthOfTextAtSize(txt, t), { codes: o.codes, interdits, cadre: o.cadre, bord: B, T, sens: o.sens });
+      if (sur && sur.via === 'aucune-place') return null;
+      if (sur) {
+        const b = page.getCropBox(), r = rotationPage(page), d0 = versPdfAffiche(b, r, sur.debut[0], sur.debut[1]);
+        page.resetPosition();
+        page.drawText(txt, { x: d0.x, y: d0.y, size: sur.T, font: reg, color: PL.rgb(gris, gris, gris), rotate: PL.degrees(r - sur.a) });
+        return { ...sur.boite, via: sur.via, repousse: false, a: sur.a, taille: sur.T };
+      }
+      p = placerMentionDefaut(rendu, c.w, c.h, { interdits, cadre: o.cadre, adresses: o.adresses, bord: B });
+    } else {
       const cible = CIBLES_TAMPON[o.place];
       const zones = [...interdits, { x: 0, y: 0, w: W, h: B }, { x: 0, y: H - B, w: W, h: B }, { x: 0, y: 0, w: B, h: H }, { x: W - B, y: 0, w: B, h: H }];
       const bloques = zones.map((z) => ({ x: z.x * s, y: z.y * s, w: z.w * s, h: z.h * s }));
@@ -14286,11 +14447,16 @@ const ajouterFichePreparation = async (PL, pdf, bold, reg, { numero = '', titre 
 // de Paramètres les dessine, le banc les juge).
 const tamponnerBordereau = async (PL, pdf, { numero, titre, thermique = false, choix = null, bloques = [], fiche = null, th = null, tampon = null, retour = false } = {}) => {
   const n = String(numero == null ? '' : numero).trim(), t = String(titre == null ? '' : titre).trim();
-  const T = tampon || {}, veutMention = T.mention !== false;
+  // (17 nov., lot tampon-qr) « Créé par vrm.center » ne s'enlève plus (Julien) : posé à CHAQUE impression, quel que soit
+  // le réglage rangé, à sa place de toujours (au-dessus du code) — jamais à la main, jamais une autre place rapide.
+  const T = tampon || {}, veutMention = true;
   if (!n && !t && !veutMention && !retour) return { mode: 'rien', raison: '' };
   const bold = await pdf.embedFont(PL.StandardFonts.HelveticaBold), reg = await pdf.embedFont(PL.StandardFonts.Helvetica);
   const page = pdf.getPages()[0], { w: W0, h: H0 } = tailleAffichee(page);
   let rendu = null, renduErr = null; try { rendu = await rendrePremierePage(pdf); } catch (e) { renduErr = e; }
+  // (17 nov., lot tampon-qr) Une étiquette passée au noir pur est une IMAGE : ses lignes de texte (le sens de lecture)
+  // sont celles de la page vectorielle d'avant, lues par l'appelant.
+  if (rendu && !(rendu.textes || []).length && th && th.textes) rendu.textes = th.textes;
   const adresses = [...((th && th.adresses) || []), ...(T.adresses || [])];
   const zi = rendu ? zonesInterditesTampon(rendu, adresses) : { codes: [], interdits: adresses.map((a) => ({ ...a, quoi: 'adresse' })), interditsMention: adresses.map((a) => ({ ...a, quoi: 'adresse' })) };
   // Les « codes » de l'étiquette posée (thermique) repassent le même tri : un pavé de texte serré n'est pas un code.
@@ -14301,7 +14467,7 @@ const tamponnerBordereau = async (PL, pdf, { numero, titre, thermique = false, c
   // (La mention garde la zone de silence MESURÉE de chaque QR, pas les 5 mm forfaitaires du cartouche.)
   const interditsM = [...zi.interditsMention, ...bloquesVrais.filter((z) => z.quoi !== 'code')];
   // (Sur une imprimante thermique, même la page entière : la mention en noir fin — une tête thermique tramerait le gris.)
-  const mentionO = { th: !!th || !!thermique, marge: th && th.marge, k: T.kMention, place: T.placeMention, libre: T.libreMention, codes: zi.codes, interdits: interditsM, cadre, adresses };
+  const mentionO = { th: !!th || !!thermique, marge: th && th.marge, sens: th ? th.sens : null, k: 1, place: 'qr', libre: null, codes: zi.codes, interdits: interditsM, cadre, adresses };
   const fin = (r, mb) => ({ ...r, mention: !!mb, mentionBoite: mb || null, interdits, interditsMention: interditsM, codes: zi.codes });
   // ① Le cartouche posé À LA MAIN : à sa place (fond blanc dessous, même sur du texte — son choix), repoussé hors
   // des codes, des QR et de l'adresse ; la mention vient ensuite, à côté de lui.
@@ -14859,7 +15025,11 @@ const poserEtiquettesThermiques = async (PL, out, page, z, numero, bold, titre =
     // (16 nov.) Une place posée dans l'aperçu avant impression pour CE bordereau prime sur la place gardée de la forme.
     const choix = imp && imp.places && imp.places.n !== undefined ? td.libreN : choisir ? await choisir(d, { isole: true, k }) : td.libreN;
     const fiche = { actif: reg.fiche, W: pl.W, H: papier.continu ? Math.max(pl.W * 1.45, 60 * MM_PT) : pl.H, titre, taille: imp && imp.taille, photo: imp && imp.photo, emplacement: imp && imp.emplacement };
-    const t = await tamponnerBordereau(PL, d, { numero: contenu.numero, titre: contenu.titre, thermique: true, choix, bloques, fiche, th: { boite: boiteAff, bloques, adresses, marge: papier.marge * MM_PT }, tampon: td.tampon, retour: !!(imp && imp.retour) });
+    // (17 nov., lot tampon-qr) Le sens de l'étiquette sur le papier : ses lignes de texte (la page vectorielle), sinon le
+    // quart de tour que VRM lui a donné (pdf-lib tourne dans le sens trigonométrique : +90 ⇒ le texte MONTE, 270°).
+    const sensPose = pl.angle === 90 ? 270 : pl.angle === -90 ? 90 : 0;
+    const textesV = rendu && rendu.textes && rendu.textes.length ? rendu.textes : null;
+    const t = await tamponnerBordereau(PL, d, { numero: contenu.numero, titre: contenu.titre, thermique: true, choix, bloques, fiche, th: { boite: boiteAff, bloques, adresses, marge: papier.marge * MM_PT, sens: sensPose, textes: textesV }, tampon: td.tampon, retour: !!(imp && imp.retour) });
     modes.push(t.mode);
     const mms = codes.map((c) => c.mm).filter((x) => x != null);
     details.push({ mode: t.mode, raison: t.raison || '', echelle: pl.s, tourne: pl.tourne, noir, W: pl.W, H: pl.H, codes: codes.length, retrouves,
@@ -14878,7 +15048,7 @@ const tamponDePage = (imp, page, isole) => {
   const ts = imp.ts, cle = formeTampon(ts.famille, page, isole).cle, pf = placesDeForme(imp.tampons || reglageTamponsChoisi(), cle);
   const pi = imp.places || {}, pl = { n: pi.n !== undefined ? pi.n : pf.n, m: pi.m !== undefined ? pi.m : pf.m };
   return { cle, libreN: choixTamponValide(pl.n) ? pl.n : null,
-    tampon: { k: ts.k, place: ts.place, mention: !!(ts.contenu && ts.contenu.mention), kMention: ts.kMention, placeMention: ts.placeMention, libreMention: pl.m || null } };
+    tampon: { k: ts.k, place: ts.place, mention: true, kMention: 1, placeMention: 'qr', libreMention: null } };
 };
 // Le tampon d'une page tamponnée HORS de `poserBordereau` (retour d'achat, l'aide de l'équipe) : la même règle.
 const tamponPourPage = (PL, pdf, { famille = '', thermique = false } = {}) => {

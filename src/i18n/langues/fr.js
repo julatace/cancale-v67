@@ -1655,7 +1655,7 @@ export default {
   "impression.tampon.num": "N° seul",
   "impression.tampon.num_titre": "N° + titre",
   "impression.tampon.num_titre_taille": "N° + titre + taille",
-  "impression.tampon.rien": "Rien",
+  "impression.tampon.rien": "Sans N° (la mention reste)",
   "impression.tampon.pourquoi": "Le titre est caché par défaut : l’étiquette se colle sur le colis, il serait visible par le transporteur.",
   "impression.tampon.jamais": "Jamais sur un code-barres, un QR ou une adresse.",
   "impression.fiche": "Fiche de préparation",
