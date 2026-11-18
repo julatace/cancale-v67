@@ -91,10 +91,15 @@ function LigneColis({ l, Photo, Icon, LigneGlissable, partant = false }) {
     l.choisir ? { cle: 'choisir', libelle: tr('v2v.choisir'), icone: <Icon name="link" size={20}/>, faire: l.choisir, data: { 'data-v2l-glisse': 'choisir' } } : null,
     l.plus ? { cle: 'plus', libelle: tr('v2.l.plus'), icone: <Icon name="more" size={20}/>, faire: l.plus, data: { 'data-v2l-glisse': 'plus' } } : null,
   ].filter(Boolean);
+  // (18 nov.) La ligne grise « qui » : le logo (plusieurs plateformes) · l'acheteur · depuis quand elle est vendue — chaque
+  // fait seulement s'il est LU. La 3e ligne garde le reste (bordereau, échéance, étape, suivi).
+  const vendue = (l.l3 || []).filter((x) => x && x.cle === 'vendue');
+  const l3 = (l.l3 || []).filter((x) => x && x.cle !== 'vendue');
+  const qui = { logo: l.logo || null, textes: [l.pseudo || '', ...vendue.map((x) => x.texte)].filter(Boolean) };
   const ligne = (
     <LigneAnnonce variante="A" cle={'v2v:' + l.cle} attrs={{ ...l.attrs, 'data-v2v-ligne': l.cle, 'data-v2v-groupe': l.groupe, 'data-v2v-fait': partant ? 'part' : undefined }}
       photo={l.photo || null} Photo={Photo} Icon={Icon} titre={l.titre} num={l.num} double={!!l.double} prix={l.prix}
-      sous={l.sous} sousAmbre={l.sousAmbre} l3={l.l3} logo={l.logo} apresLogo={l.pseudo || null} gestes={gestes} LigneGlissable={partant ? null : LigneGlissable}/>
+      sous={l.sous} sousAmbre={l.sousAmbre} l3={l3} qui={qui} gestes={gestes} LigneGlissable={partant ? null : LigneGlissable}/>
   );
   return partant ? <Partante>{ligne}</Partante> : ligne;
 }

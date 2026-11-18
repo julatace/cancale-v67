@@ -62,13 +62,16 @@ export default function LigneAnnonce({ variante = 'A', attrs = {}, cle, photo, P
   // seulement) ; `apresPrix` : un signe à côté du prix (la facture envoyée, verte).
   avant = null, apresPrix = null,
   // (17 nov., Ventes) ce qui suit le logo sur la 2e ligne (le pseudo de l'acheteur) : « N° · T42 · logo · pseudo ».
-  apresLogo = null }) {
+  apresLogo = null,
+  // (18 nov., Ventes — « plusieurs infos ») une ligne grise de plus, entre la 2e et la 3e : `qui` = { logo, textes }
+  // (le logo de la plateforme quand plusieurs sont montrées, puis « pseudo · vendue il y a 6 j ») ; rien d'inconnu.
+  qui = null }) {
   const plus = () => onPlus && onPlus();
   const actions = gestes || [
     aRelier ? { cle: 'relier', libelle: tr('v2.l.relier'), icone: <Icon name="link" size={20}/>, faire: () => onRelier && onRelier(), data: { 'data-v2l-glisse': 'relier' } } : null,
     { cle: 'plus', libelle: tr('v2.l.plus'), icone: <Icon name="more" size={20}/>, faire: plus, data: { 'data-v2l-glisse': 'plus' } },
   ].filter(Boolean);
-  const aria = [num ? 'N° ' + num : '', titre, prix, ...(sous || []), apresLogo && typeof apresLogo === 'string' ? apresLogo : '', ...((l3 || []).map((x) => [x.aria, x.texte].filter(Boolean).join(' '))), aRelier ? tr('v2.l.aRelier') : ''].filter(Boolean).join(' · ');
+  const aria = [num ? 'N° ' + num : '', titre, prix, ...(sous || []), apresLogo && typeof apresLogo === 'string' ? apresLogo : '', ...((qui && qui.textes) || []), ...((l3 || []).map((x) => [x.aria, x.texte].filter(Boolean).join(' '))), aRelier ? tr('v2.l.aRelier') : ''].filter(Boolean).join(' · ');
   // « à relier » : sur un vrai compte, la plupart des paires n'ont pas d'achat relié — l'ambre partout ne dirait plus rien.
   // Le mot ambre seulement dans la vue « Sans achat relié » (`relierMot`) ; ailleurs, une petite icône de lien, neutre.
   const relier = !aRelier ? null : relierMot ? <span className="v2l-geste" data-v2l-relier="mot"><i className="v2-point" aria-hidden="true"/>{tr('v2.l.aRelier')}</span>
@@ -105,6 +108,7 @@ export default function LigneAnnonce({ variante = 'A', attrs = {}, cle, photo, P
         <span className="v2l-a-l1"><span className="v2l-a-titre">{titre}</span>{apresPrix ? <span className="v2l-apres-prix">{apresPrix}</span> : null}<span className="v2l-a-prix">{prix || '—'}</span></span>
         {sous ? <span className="v2l-a-l2">{num ? <PlaqueV2 num={num} double={double}/> : null}{sous.length ? <span className={'v2l-faits-txt' + (sousAmbre ? ' is-ambre' : '')}>{(num ? ' · ' : '') + sous.join(' · ')}</span> : null}{logo ? <span className="v2l-logo" aria-hidden="true">{logo}</span> : null}{apresLogo ? <span className="v2l-apres-logo">{(sous && sous.length) || num || logo ? <span aria-hidden="true">{logo ? ' ' : ' · '}</span> : null}{apresLogo}</span> : null}</span>
           : <span className="v2l-a-l2"><Faits num={num} taille={taille} jours={null} Plaque={Plaque}/>{relier}</span>}
+        {qui && ((qui.textes && qui.textes.length) || qui.logo) ? <span className="v2l-a-qui" aria-hidden="true">{qui.logo ? <span className="v2l-logo">{qui.logo}</span> : null}{(qui.textes || []).length ? <span className="v2l-qui-txt">{qui.textes.join(' · ')}</span> : null}</span> : null}
         {l3 && l3.length ? <span className="v2l-a-l3" aria-hidden="true">{l3.map((x, i) => <span key={i} className={'v2l-l3' + (x.ambre ? ' is-ambre' : '')} data-v2l-l3={x.cle || undefined}>{x.noeud || null}{x.icone ? <Icon name={x.icone} size={13}/> : null}{x.texte}</span>)}</span>
           : (fav || vu || jr || ach ? <span className="v2l-a-l3">{fav}{vu}{jr}{ach}</span> : null)}
       </span>

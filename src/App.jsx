@@ -48071,6 +48071,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       titre: (tailleEnFin(x.titre || '') || { nom: x.titre || '' }).nom, titreComplet: x.titre || '',
       sous: [(() => { const t = (o && typeof o.size_title === 'string' && o.size_title) || ((tailleEnFin(x.titre || '') || {}).taille) || ''; return t ? tr('v2v.taille', { t }) : ''; })(), x.site !== 'vinted' ? nomPlateforme(x.site) : ''].filter(Boolean),
       pseudo: pseudoAcheteur(o),
+      // (18 nov.) depuis quand elle est vendue (date de vente LUE de la commande ou de la vente Vestiaire ; rien sinon).
       // (17 nov.) La PISTE (quatre segments, `etapesRoute` — les preuves de Vinted ET du transporteur, src/friseTransporteur.js)
       // et, à côté, l'étape en mots avec sa date : la phrase du DERNIER statut lu (`suiviVente` → `dernierStatut`), la MÊME
       // source que la ligne du transporteur ; pas lu ⇒ le mot de l'étape. Puis le n° de suivi.
@@ -48080,7 +48081,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const MOTS_ETAT = { en_route: 'v2v.etat.transit', disponible: 'v2v.etat.relais', retire: 'v2v.etat.retire', livre: 'v2v.etat.livre', retour_expediteur: 'v2v.etat.retour', incident: 'v2v.etat.incident' };
         const motEtat = sv && sv.statut && MOTS_ETAT[sv.statut.etat] ? tr(MOTS_ETAT[sv.statut.etat]) : (sc && sc.court) || '';
         const mot = motEtat ? [motEtat, sc && sc.quand].filter(Boolean).join(' · ') : (ici ? tr('vv.route.' + ici.cle) : '');
-        return [{ cle: 'etape', noeud: <PisteEtapesV2 etapes={et}/>, texte: mot },
+        return [vendueV2(joursAttente((o && o.date) || (x.v && x.v.date) || null)), { cle: 'etape', noeud: <PisteEtapesV2 etapes={et}/>, texte: mot },
           sv && sv.su ? { cle: 'suivi', icone: 'truck', texte: [x.tr && x.tr.nom ? x.tr.nom : '', sv.su].filter(Boolean).join(' · ') } : (x.tr && x.tr.nom ? { cle: 'transporteur', icone: 'truck', texte: x.tr.nom } : null)].filter(Boolean); })(),
       sousAmbre: false,
       attrs: { 'data-colis-ident': cle, 'data-v2v-parti': x.type === 'parti' ? lab : x.type,

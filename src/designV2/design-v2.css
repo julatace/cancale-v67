@@ -774,3 +774,8 @@ html body button.v2-facture-ok { width: 24px; height: 24px; margin: 0 4px 0 0; b
 html body button.v2-facture-ok::before { content: ""; position: absolute; inset: -10px; }
 /* La place gardée sous la liste de Ventes, sur la grille de 4 (la barre du bas a sa hauteur à elle). */
 @media (max-width: 1023px) { .v2v-corps { margin-bottom: round(up, calc(var(--vrm-barre-bas, 84px) + 24px), 4px); } }
+/* (18 nov.) La ligne grise « qui » d'une rangée de Ventes : logo (plusieurs plateformes) · acheteur · vendue il y a N j.
+   Petite, grise, elle passe à la ligne entre deux mots (un long pseudo se coupe n'importe où plutôt que de déborder). */
+.v2l-a-qui { display: flex; flex-wrap: wrap; align-items: center; gap: 0 4px; font-size: 13px; line-height: 18px; color: var(--v2-muet); min-width: 0; }
+.v2l-a-qui .v2l-logo { display: inline-flex; align-items: center; }
+.v2l-qui-txt { min-width: 0; overflow-wrap: anywhere; }

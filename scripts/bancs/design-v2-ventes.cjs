@@ -144,7 +144,7 @@ async function mesurer(pg) {
       sansPrix: lignes.filter((r) => r.querySelector('[data-v2l]') ? false : !r.querySelector('.v2l-a-prix')).length,
       sansTitre: lignes.filter((r) => !(r.querySelector('.v2l-a-titre') || {}).textContent).length,
       // Plusieurs infos par rangée (Julien) : la 3e ligne, ses faits ; la taille sortie du titre ; l'ambre seulement sur une limite.
-      faits: lignes.map((r) => r.querySelectorAll('.v2l-l3').length), orphelins: lignes.filter((r) => /\btaille\s*\d{2}(?:[.,]5)?\s*$/i.test(((r.querySelector('.v2l-a-titre') || {}).textContent || '').trim())).length,
+      faits: lignes.map((r) => r.querySelectorAll('.v2l-l3').length + (((r.querySelector('.v2l-qui-txt') || {}).textContent || '').split(' · ').filter(Boolean).length)), orphelins: lignes.filter((r) => /\btaille\s*\d{2}(?:[.,]5)?\s*$/i.test(((r.querySelector('.v2l-a-titre') || {}).textContent || '').trim())).length,
       ambresHorsLimite: [...document.querySelectorAll('[data-v2v-liste] .v2l-l3.is-ambre')].filter((x) => x.getAttribute('data-v2l-l3') !== 'limite').length,
       bande: [...document.querySelectorAll('[data-heros-hote="ventes"]')].filter(vis).length };
   }, CONTRASTE);
@@ -525,6 +525,14 @@ async function allume(nav, b, sombre, W, ref) {
     await attendre(pg, () => document.querySelectorAll('[data-v2v-liste="route"] [data-v2v-ligne]').length > 0, 15000); await pg.waitForTimeout(800);
     const r = await mesurer(pg);
     const nRoute = await pg.evaluate(() => document.querySelectorAll('[data-v2v-liste="route"] [data-v2v-ligne]').length);
+    // (18 nov., « plusieurs infos ») la ligne grise de chaque rangée : l'acheteur · « vendue il y a N j » (date de vente LUE), sur
+    // la rangée elle-même.
+    const qui = await pg.evaluate(() => { const L = [...document.querySelectorAll('[data-v2v-liste] [data-v2v-ligne]')].filter((x) => !x.closest('.v2-cache'));
+      return { n: L.length, avecVendue: L.filter((r) => /vendue|hier|aujourd/i.test((r.querySelector('.v2l-qui-txt') || {}).textContent || '')).length,
+        avecPseudo: L.filter((r) => /arthur|jujuf|[a-z]+\d/i.test((r.querySelector('.v2l-qui-txt') || {}).textContent || '')).length,
+        quiVide: L.filter((r) => { const q = r.querySelector('.v2l-a-qui'); return q && !q.textContent.trim() && !q.querySelector('.v2l-logo'); }).length };
+    });
+    dit(qui.n > 0 && qui.avecVendue === qui.n && qui.quiVide === 0, `I ${th} : En route, chaque rangée dit l'acheteur et « vendue il y a … » sur sa ligne grise (${qui.avecVendue}/${qui.n}, pseudo ${qui.avecPseudo})`, qui);
     if (ref) dit(String(nRoute) === String(ref.envoyes), `N ${th} : ${nRoute} rangées « En route » = les envoyés d'avant (${ref.envoyes})`, { v2: nRoute, avant: ref.envoyes });
     dit(r.tetes.length > 0 && r.tetes.every((t) => t.n === (r.parGroupe[t.g] || 0)), `L ${th} : En route groupé par état (${r.tetes.map((t) => t.t).join(' · ')})`, r.tetes);
     dit(r.pleins === 1 && !r.petits.length && !r.tronques.length && r.deb <= 1 && !r.faibles.length, `P/T/X/C ${th} : En route propre`, { p: r.pleins, petits: r.petits, t: r.tronques, f: r.faibles });
