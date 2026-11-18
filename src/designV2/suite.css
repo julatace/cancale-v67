@@ -42,12 +42,33 @@ html body .v2-bande-quand:not(.is-ambre) { color: var(--v2-page-muet); }
 
 /* ── ANNONCES · B8 : aucun mot coupé au milieu dans un titre (2 lignes puis « … ») ── */
 html body :is(.v2l-a-titre, .v2l-c-titre) { overflow-wrap: normal; word-break: normal; }
+/* « À vérifier » : une carte-rangée (le même dessin que « À faire »). */
+html[data-design="v2"] body .v2-achats-verifier { margin: 0 0 var(--v2-air-sections, 32px); background: var(--v2-carte); color: var(--sv-encre, #0C1D30); border-radius: var(--v2-r-grand); box-shadow: var(--v2-carte-ombre); overflow: hidden; }
+
+/* ── COQUE · B10 : UN trait pour toutes les icônes (1,5 px rendus, quelle que soit la taille du glyphe) ── */
+html[data-design="v2"] body svg[stroke]:not([stroke="none"]):not(.vrm-tab-ic svg), html[data-design="v2"] body :is(.fd-rond, .vrm-aide-bouton, .v2b, .vrm-hbtn) svg { stroke-width: 1.5px; }
+html[data-design="v2"] body svg[stroke]:not([stroke="none"]):not(.vrm-tab-ic svg) :is(path, circle, rect, line, polyline, polygon, ellipse),
+html[data-design="v2"] body :is(.fd-rond, .vrm-aide-bouton, .v2b, .vrm-hbtn) svg :is(path, circle, rect, line, polyline, polygon, ellipse) { vector-effect: non-scaling-stroke; stroke-width: 1.5px; }
+
+/* ── LA BARRE · contraste : le libellé de l'onglet choisi ≥ 4,5:1 sur sa capsule (mesuré sur les pixels : 3,9) ── */
+html[data-design="v2"]:not([data-theme="dark"])[data-barre="C"] body .vrm-app-shell .vrm-tabbar.vrm-tabbar { --b-actif: #004A96; }
+html body .v2-bande-commune { margin: 0 4px var(--v2-air-titre, 12px); font-size: 13px; line-height: 1.4; color: var(--v2-page-muet); }
+/* Achats, l'historique d'hier sous la liste : le « ⋯ » de chaque rangée se montre au survol ou au focus (la rangée
+   entière ouvre déjà la fiche) — à l'ordinateur seulement ; au doigt il reste. */
+@media (hover: hover) and (pointer: fine) {
+  html[data-design="v2"] body .vrm-tache[data-tache="achats"] .vrm-buy-row .vrm-buy-more { opacity: 0; transition: opacity 120ms ease; }
+  html[data-design="v2"] body .vrm-tache[data-tache="achats"] .vrm-buy-row:is(:hover, :focus-within) .vrm-buy-more,
+  html[data-design="v2"] body .vrm-tache[data-tache="achats"] .vrm-buy-row .vrm-buy-more[aria-expanded="true"] { opacity: 1; }
+}
+
+/* ── Les règles qui doivent passer devant les `!important` des couches d'hier (vrm-verre, sj-studio…) : dans la
+   couche `vrm-v2`, la PREMIÈRE nommée (index.html) — pour un `!important`, la première couche gagne. ── */
+@layer vrm-v2 {
+
 
 /* ── ACHATS · B4 B5 C5 ───────────────────────────────────────────────────── */
 /* « À retirer · 0 » (et son scanner) ne se dit pas quand il n'y a rien à retirer : le titre de la tâche et la liste suffisent. */
 html[data-design="v2"] body .vrm-achats-retirer-repli[data-retirer-n="0"] .sb-tete-hote { display: none !important; }
-/* « À vérifier » : une carte-rangée (le même dessin que « À faire »). */
-html[data-design="v2"] body .v2-achats-verifier { margin: 0 0 var(--v2-air-sections, 32px); background: var(--v2-carte); color: var(--sv-encre, #0C1D30); border-radius: var(--v2-r-grand); box-shadow: var(--v2-carte-ombre); overflow: hidden; }
 /* La carte de chiffres d'hier (Dépensé · En route · À retirer · Arrivés) redisait les nombres de l'écran : Argent les porte. */
 html[data-design="v2"] body .vrm-tache[data-tache="achats"] [data-achats-hero] { display: none !important; }
 /* C5 · l'historique d'hier sous la liste : sans ombre ni dégradé par rangée (1 000 achats). */
@@ -60,10 +81,34 @@ html[data-design="v2"] body .vrm-tache[data-tache="achats"] .vrm-buy-row { box-s
   html[data-design="v2"] body .v2-tete-tache:has(.vrm-tache-retrouver) .v2-titre-ligne { padding-right: 60px; }
 }
 
-/* ── COQUE · B10 : UN trait pour toutes les icônes (1,5 px rendus, quelle que soit la taille du glyphe) ── */
-html[data-design="v2"] body svg[viewBox="0 0 24 24"][stroke="currentColor"] { stroke-width: 1.5px; }
-html[data-design="v2"] body svg[viewBox="0 0 24 24"][stroke="currentColor"] :is(path, circle, rect, line, polyline, polygon, ellipse) { vector-effect: non-scaling-stroke; }
-
 /* ── COQUE · B7 : « Extension à installer » n'est pas un bouton plein (un seul plein par écran) — une pastille de verre ── */
-html[data-design="v2"] body .vrm-app-header .vrm-etat-pastille { background: rgb(255 255 255 / .14) !important; border: 1px solid rgb(255 255 255 / .28) !important; box-shadow: none !important; color: #FFFFFF !important; }
-html[data-design="v2"] body .vrm-app-header .vrm-etat-pastille * { color: inherit !important; }
+html[data-design="v2"]:root:root body .vrm-app-header .vrm-etat-pastille[data-etat-code], html[data-design="v2"]:root:root body .vrm-app-header .vrm-etat-pastille { background: rgb(255 255 255 / .14) !important; border: 1px solid rgb(255 255 255 / .28) !important; box-shadow: none !important; color: #FFFFFF !important; }
+html[data-design="v2"]:root:root body .vrm-app-header .vrm-etat-pastille :is(span, b, strong, small) { color: inherit !important; }
+/* Les ronds de la tête passent par le composant (v2b-icone) : sans dégradé hérité d'hier. */
+html[data-design="v2"]:root:root body .vrm-hbtn.v2b { background-image: none !important; }
+
+/* ── LA FICHE · C6 / règle 18 : les ronds posés sur la photo sans verre flouté (le verre est réservé à la coque) ── */
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-fp.fd .fd-rond:not(.is-clair) { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; background: rgb(8 24 46 / .68) !important; }
+/* Les cartes de la bande sans échéance propre gardent leur hauteur (une ligne vide), rien ne saute. */
+
+/* Achats : « À retirer » ne se dit que s'il y a une passe à montrer (rien à retirer ⇒ ni titre ni scanner). */
+html[data-design="v2"] body .vrm-achats-retirer-repli:not(:has(.v2-passe)) .sb-tete-hote { display: none !important; }
+/* L'île de l'ordinateur : la pastille de verre plus sombre (le blanc y tient ≥ 4,5:1 sur le haut clair du dégradé). */
+@media (min-width: 1024px) { html[data-design="v2"]:root:root body .vrm-app-header .vrm-etat-pastille[data-etat-code] { background: rgb(4 32 72 / .34) !important; } }
+}
+/* Fluidité : les achats en route hors de l'écran ne coûtent ni mise en page ni peinture (60 rangées et plus). */
+html body .v2-groupe[data-v2-en-route] .v2-ligne { content-visibility: auto; contain-intrinsic-size: auto 88px; }
+
+/* ── GRAND TEXTE · règle 1 (≤ 4 bandes avant la liste) : le plein COMPACT de la ligne du titre (Publier, Ajouter) devient
+   un rond « + » de 44 (son nom reste lu : libellé masqué visuellement, jamais retiré) et reprend sa place à côté du titre ;
+   si le titre ne tient pas, il passe dessous (retour à la ligne, jamais un mot coupé — A1). ── */
+html[data-design="v2"][data-grand-texte] body .v2-tete-tache:has(.v2-titre-ligne .v2b-compact) { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; align-items: center; }
+html[data-design="v2"][data-grand-texte] body .v2-tete-tache:has(.v2-titre-ligne .v2b-compact) > * { grid-column: 1 / -1; }
+html[data-design="v2"][data-grand-texte] body .v2-tete-tache .v2-titre-ligne:has(.v2b-compact) { display: contents; }
+html[data-design="v2"][data-grand-texte] body .v2-tete-tache .v2-titre-ligne:has(.v2b-compact) > h1 { grid-column: 1 / -1; grid-row: 1; }
+html[data-design="v2"][data-grand-texte] body .v2-tete-tache .v2-titre-ligne:has(.v2b-compact) > .v2b-hote { grid-column: 2; grid-row: 2; }
+html[data-design="v2"][data-grand-texte] body .v2-tete-tache:has(.v2-titre-ligne .v2b-compact) > .v2-sous-titre { grid-column: 1; grid-row: 2; min-width: 0; }
+html[data-design="v2"][data-grand-texte] body .v2-tete-tache .v2-titre-ligne button.v2b-principal.v2b-compact { width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 0; border-radius: 50%; gap: 0; justify-content: center; }
+html[data-design="v2"][data-grand-texte] body .v2-tete-tache .v2-titre-ligne button.v2b-compact .v2b-lib { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+/* La fiche ouverte (modale) : le plein de la page derrière elle se tait — un seul plein à l'écran (règle 2). */
+html[data-design="v2"] body:has(.vrm-fp.fd) .v2-tete-tache [data-v2b="principal"] { visibility: hidden; }

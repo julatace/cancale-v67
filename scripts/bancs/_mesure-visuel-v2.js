@@ -6,6 +6,8 @@
 (opts) => {
   const tactile = !!opts.tactile, W = innerWidth, H = innerHeight, echelle = Number(opts.echelle) || 1;
   const vis = (e) => { if (!e || !e.getClientRects().length) return false; const cs = getComputedStyle(e); if (cs.visibility === 'hidden' || Number(cs.opacity) === 0) return false; const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+  // Rogné entièrement par un ancêtre qui coupe (une boîte de 1 px, overflow:hidden) : rien ne se voit.
+  const rogneTout = (e) => { const r = e.getBoundingClientRect(); for (let p = e.parentElement; p && p !== document.body; p = p.parentElement) { const cs = getComputedStyle(p); if (/hidden|clip/.test(cs.overflowX + cs.overflowY)) { const q = p.getBoundingClientRect(); const ix = Math.min(r.right, q.right) - Math.max(r.left, q.left), iy = Math.min(r.bottom, q.bottom) - Math.max(r.top, q.top); if (ix < 2 || iy < 2) return true; } } return false; };
   const dansEcran = (r) => r.bottom > 0 && r.top < H && r.right > 0 && r.left < W;
   const R = (r) => ({ x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) });
   const txt = (e) => ((e.getAttribute && e.getAttribute('aria-label')) || e.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 50);
@@ -25,7 +27,7 @@
   const ownText = (e) => [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
   const avecTexte = visibles.filter((e) => { const r = e.getBoundingClientRect(); return r.width > 2 && r.height > 2 && !/sr-seul|vg-sr|sr-only|visually-hidden/.test(String(e.className)) && ownText(e); });
   const CLIQ = 'button, a[href], [role="button"], [role="tab"], [role="switch"], input:not([type="hidden"]), select, textarea, summary';
-  const cliquables = visibles.filter((e) => e.matches(CLIQ) && !e.closest('[inert]'));
+  const cliquables = visibles.filter((e) => e.matches(CLIQ) && !e.closest('[inert]') && !rogneTout(e));
   const couvert = (e) => { const r = e.getBoundingClientRect(); const x = Math.max(1, Math.min(W - 2, r.left + Math.min(r.width, 40) / 2)), y = Math.max(1, Math.min(H - 2, r.top + r.height / 2)); const t = document.elementFromPoint(x, y); return !t || !(t === e || e.contains(t) || t.contains(e)); };
   const out = { W, H, design: document.documentElement.getAttribute('data-design'), grand: document.documentElement.hasAttribute('data-grand-texte') };
 
@@ -58,7 +60,7 @@
   // ── 3. LE PLEIN DIT SON NOMBRE EN ENTIER ──
   out.pleinsCoupes = [...document.querySelectorAll('[data-v2b="principal"]')].filter(vis).filter((b) => dansEcran(b.getBoundingClientRect())).flatMap((b) => {
     const l = b.querySelector('.v2b-lib'), n = b.querySelector('.v2b-n'); const ko = [];
-    if (l && l.scrollWidth > l.clientWidth + 1) ko.push({ t: txt(b), k: 'libelle' });
+    if (l && l.clientWidth > 2 && l.scrollWidth > l.clientWidth + 1) ko.push({ t: txt(b), k: 'libelle' });   // un libellé masqué visuellement (rond « + ») n'est pas tronqué
     if (n && (!vis(n) || n.scrollWidth > n.clientWidth + 1)) ko.push({ t: txt(b), k: 'nombre' });
     if (b.getAttribute('data-v2-principal') && /^\d+$/.test(b.getAttribute('data-v2-principal')) && !(b.textContent || '').includes(b.getAttribute('data-v2-principal'))) ko.push({ t: txt(b), k: 'absent' });
     return ko; });
@@ -114,20 +116,24 @@
     for (const L of lignes) { if (L.m.length < 2) continue; const hs = L.m.map((x) => Math.round(x.r.height)); if (Math.max(...hs) - Math.min(...hs) > 2) out.hauteurs.push({ cls: String(p.className).slice(0, 40), hs, t: L.m.map((x) => txt(x.e).slice(0, 12)) }); } }
   out.listesInegales = [];
   for (const [sel, rangee] of [['.v2-liste-annonces', ':scope > [data-v2l]'], ['.v2-groupe[data-v2-en-route] .v2-liste', ':scope > .v2-ligne']]) {
-    for (const l of document.querySelectorAll(sel)) { const hs = [...l.querySelectorAll(rangee)].filter(vis).map((e) => e.getBoundingClientRect()).filter((r) => r.bottom > -H && r.top < 2 * H).map((r) => Math.round(r.height));
+    for (const l of document.querySelectorAll(sel)) { const hs = [...l.querySelectorAll(rangee)].filter(vis).map((e) => e.getBoundingClientRect()).filter((r) => r.bottom > 0 && r.top < H).map((r) => Math.round(r.height));
       if (hs.length >= 2 && Math.max(...hs) - Math.min(...hs) > 1) out.listesInegales.push({ sel, hs: [...new Set(hs)].slice(0, 6) }); } }
 
   // ── 10. CONTRASTE : les rectangles de texte à juger sur les PIXELS (le calcul est fait hors de la page) ──
-  out.textes = avecTexte.map((e) => { const r = e.getBoundingClientRect(); if (!dansEcran(r) || r.width < 4 || r.height < 6) return null; const cs = getComputedStyle(e); if (Number(cs.opacity) < .99 || e.closest('[aria-disabled="true"], [disabled], .v2-bande-attente, [aria-hidden="true"]')) return null;
+  const barre = document.querySelector('.vrm-tabbar'); const basVisible = barre && vis(barre) ? barre.getBoundingClientRect().top - 40 : H;
+  const dialogue = [...document.querySelectorAll('[role="dialog"], .vrm-fp, .v2-feuille')].filter(vis).pop() || null;
+  out.textes = avecTexte.filter((e) => !dialogue || dialogue.contains(e)).map((e) => { const r = e.getBoundingClientRect(); if (!dansEcran(r) || r.width < 4 || r.height < 6) return null; const cs = getComputedStyle(e); if (Number(cs.opacity) < .99 || e.closest('[aria-disabled="true"], [disabled], .v2-bande-attente, [aria-hidden="true"]')) return null;
     let verre = 0; for (let p = e; p; p = p.parentElement) { const s = getComputedStyle(p); if (/gradient/.test(s.backgroundImage) || s.backgroundImage.includes('url(')) { verre = 1; break; } }
-    let tr = null; try { const rg = document.createRange(); rg.selectNodeContents(e); const rs = [...rg.getClientRects()].filter((q) => q.width > 1 && q.height > 4); if (rs.length) tr = rs[0]; } catch (_) {}
+    let tr = null; try { const tn = [...e.childNodes].find((n) => n.nodeType === 3 && n.textContent.trim()); const rg = document.createRange(); rg.selectNodeContents(tn); const rs = [...rg.getClientRects()].filter((q) => q.width > 1 && q.height > 4); if (rs.length) tr = rs[0]; } catch (_) {}
     if (!tr) return null; const fs = parseFloat(cs.fontSize), fw = Number(cs.fontWeight);
-    return { t: e.textContent.replace(/\s+/g, ' ').trim().slice(0, 30), grand: fs >= 24 || (fs >= 18.66 && fw >= 700), verre, couvert: couvert(e), rect: { x: Math.round(tr.left), y: Math.round(tr.top), w: Math.round(Math.min(tr.width, W - tr.left)), h: Math.round(tr.height) } }; }).filter(Boolean).filter((x) => !x.couvert && x.rect.w > 2 && x.rect.y >= 0 && x.rect.y + x.rect.h <= H).slice(0, 260);
+    return { dansBarre: !!e.closest('.vrm-tabbar, .v2-pouce'), t: e.textContent.replace(/\s+/g, ' ').trim().slice(0, 30), grand: fs >= 24 || (fs >= 18.66 && fw >= 700), verre, couvert: couvert(e), rect: { x: Math.round(tr.left), y: Math.round(tr.top), w: Math.round(Math.min(tr.width, W - tr.left)), h: Math.round(tr.height) } }; }).filter(Boolean).filter((x) => !x.couvert && x.rect.w > 2 && x.rect.y >= 0 && x.rect.y + x.rect.h <= Math.min(H, basVisible) || (x.rect.y >= basVisible && x.rect.y + x.rect.h <= H && x.dansBarre)).slice(0, 260);
 
   // ── 11. AUCUN NOMBRE DOUBLÉ sur le premier écran (deux contextes différents) ──
   const nombres = {};
   for (const e of avecTexte) { if (!main.contains(e)) continue; const r = e.getBoundingClientRect(); if (!dansEcran(r)) continue; const s = [...e.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join(' ');
     if (e.closest('.v2-etiquette, [data-v2-etiquette], .vrm-num-plaque')) continue;   // un N° de carton est une identité, pas un compte
+    if (e.closest('[data-v2b="principal"]')) continue;
+    if (/^\s*·?\s*T\.?\s?\d{2}([,.]5)?\s*$/.test(s) || /\btaille\s+\d{2}\b/i.test(s) && e.closest('[data-v2l]')) continue;   // une TAILLE (T36) est un attribut de la paire, pas un compte   // le nombre du plein EST son geste (« Imprimer 15 ») ; l'écart nommé à côté est une autre chose
     for (const m of s.matchAll(/(\d[\d   ]{0,8}\d|\d)(?:[,.]\d+)?\s?(€|%)?/g)) { const brut = m[0].replace(/[\s  ]/g, ''); const dig = brut.replace(/\D/g, ''); if (dig.length < 2 && !m[2]) continue; if (/^(19|20)\d\d$/.test(dig)) continue; if (/\d{1,2}:\d{2}/.test(s)) continue;
       const ctx = String(e.className).split(/\s+/)[0] || e.parentElement.className; (nombres[brut] = nombres[brut] || []).push({ ctx, t: s.trim().slice(0, 30) }); } }
   out.doubles = Object.entries(nombres).map(([n, v]) => ({ n, ctxs: [...new Set(v.map((x) => x.ctx))], t: v.map((x) => x.t).slice(0, 3) })).filter((x) => x.ctxs.length >= 2);
@@ -146,7 +152,8 @@
   out.ambres = []; out.rouges = [];
   for (const e of visibles) { if (!main.contains(e)) continue; const r = e.getBoundingClientRect(); if (!dansEcran(r)) continue; const cs = getComputedStyle(e);
     const amb = (ownText(e) && estAmbre(rgba(cs.color))) || estAmbre(rgba(cs.backgroundColor)) || (e.tagName === 'svg' && (estAmbre(rgba(cs.color)) || estAmbre(rgba(cs.stroke))));
-    if (amb) out.ambres.push({ t: txt(e).slice(0, 30), rect: R(r), geste: !!e.closest('[data-geste], [data-a-faire]'), rangee: (e.closest('[data-v2l], .v2-ligne, .v2-afaire-ligne, .v2-bande-carte, [data-fiche-ligne]') || {}).outerHTML ? 1 : 0, cle: e.closest('[data-v2l], .v2-ligne, .v2-afaire-ligne, .v2-bande-carte, [data-fiche-ligne]') });
+    if (amb && (r.width < 4 || r.height < 4 || rogneTout(e))) continue;   // une boîte vide, repliée (rien ne se voit)
+    if (amb) out.ambres.push({ t: txt(e).slice(0, 30) || (e.tagName.toLowerCase() + '.' + String(e.className).split(/\s+/)[0]), rect: R(r), geste: !!e.closest('[data-geste], [data-a-faire]'), rangee: (e.closest('[data-v2l], .v2-ligne, .v2-afaire-ligne, .v2-bande-carte, [data-fiche-ligne]') || {}).outerHTML ? 1 : 0, cle: e.closest('[data-v2l], .v2-ligne, .v2-afaire-ligne, .v2-bande-carte, [data-fiche-ligne]') });
     const rou = (ownText(e) && estRouge(rgba(cs.color))) || estRouge(rgba(cs.backgroundColor)) || estRouge(rgba(cs.borderTopColor)) && parseFloat(cs.borderTopWidth) > 0;
     if (rou && !e.closest('.is-double, [data-double], [data-v2-double]')) out.rouges.push({ t: txt(e).slice(0, 30), rect: R(r) }); }
   out.ambres = out.ambres.filter((a, i, A) => !A.some((b, j) => j !== i && b.rect.x <= a.rect.x && b.rect.y <= a.rect.y && b.rect.x + b.rect.w >= a.rect.x + a.rect.w && b.rect.y + b.rect.h >= a.rect.y + a.rect.h && b.rect.w * b.rect.h > a.rect.w * a.rect.h));
@@ -169,7 +176,7 @@
   // ── 17. TRAITS DES ICÔNES (épaisseur rendue) ──
   const traits = {};
   for (const s of document.querySelectorAll('svg')) { if (!vis(s) || !dansPerimetre(s)) continue; const r = s.getBoundingClientRect(); if (!dansEcran(r) || r.width > 64 || r.width < 8) continue; const el = s.querySelector('path, circle, rect, line, polyline'); if (!el) continue; const cs = getComputedStyle(el); if (!cs.stroke || cs.stroke === 'none') continue; const sw = parseFloat(cs.strokeWidth); if (!sw) continue;
-    const vb = (s.viewBox && s.viewBox.baseVal && s.viewBox.baseVal.width) || r.width; const eff = cs.vectorEffect === 'non-scaling-stroke' ? sw : sw * r.width / vb; const k = Math.round(eff * 4) / 4; traits[k] = (traits[k] || 0) + 1; }
+    const vb = (s.viewBox && s.viewBox.baseVal && s.viewBox.baseVal.width) || r.width; const eff = cs.vectorEffect === 'non-scaling-stroke' ? sw : sw * r.width / vb; const k = Math.round(eff * 4) / 4; traits[k] = (traits[k] || 0) + 1; (out.traitsOu = out.traitsOu || {})[k] = out.traitsOu[k] || String((s.parentElement || {}).className || '').slice(0, 30); }
   out.traits = traits;
 
   // ── 18. ANTI-GÉNÉRIQUE : emoji, verre hors coque, dégradés dans .v2-*, ombre sur une rangée ──
@@ -177,7 +184,7 @@
   for (const e of avecTexte) { const m = e.textContent.match(/\p{Extended_Pictographic}/u); if (m && !/[©®™↗→←↑↓›‹✓✕×]/.test(m[0])) emo.push(m[0] + ' ' + e.textContent.trim().slice(0, 20)); }
   for (const e of visibles) { if (!dansEcran(e.getBoundingClientRect())) continue; const cs = getComputedStyle(e);
     if (cs.backdropFilter && cs.backdropFilter !== 'none' && !e.closest('.vrm-tabbar, .vrm-app-header, .sb-plan, .v2-feuille, .v2-voile, .vrm-barre-haut, .v2-pouce, .vrm-acc, .vrm-toasts, .v2-barre, nav')) verreHors.push(String(e.className).slice(0, 30));
-    if (estV2(e) && /linear-gradient/.test(cs.backgroundImage) && !e.closest('.v2-ticket, .v2-pouce, .v2-squelette, [class*="squelette"]')) degV2.push(String(e.className).slice(0, 30));
+    if (estV2(e) && /linear-gradient/.test(cs.backgroundImage) && !e.closest('.v2-ticket, .v2-pouce, .v2-squelette, [class*="squelette"], .vrm-app-header')) degV2.push(String(e.className).slice(0, 30));
     if (e.matches('[data-v2l], .v2-ligne, .v2-afaire-ligne, .vrm-buy-row') && cs.boxShadow && cs.boxShadow !== 'none') ombreRangee.push(String(e.className).slice(0, 30)); }
   out.ia = { emoji: [...new Set(emo)].slice(0, 6), verreHors: [...new Set(verreHors)].slice(0, 6), degV2: [...new Set(degV2)].slice(0, 6), ombreRangee: ombreRangee.length };
   out.debord = document.documentElement.scrollWidth - W;

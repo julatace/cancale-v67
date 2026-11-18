@@ -50851,6 +50851,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               groupes={groupesJ}
               plein={nPrets > 0 ? { n: nPrets, txt: tr('v2.imprimerCourt'), faire: () => { _pendingBordPrint = true; if (onNav) onNav(xE.tab); } } : null}
               onScanner={() => ouvrirRetrouver('journee')}
+              horsLigne={!!baseKO}
               onOuvrirVinted={() => { try { window.open('https://www.vinted.fr/', '_blank', 'noopener'); } catch (_) {} }}
               onColis={() => { if (onNav && xE) onNav(xE.tab); }}
               onRetraits={() => { if (onNav) onNav('retraits'); }}/>
