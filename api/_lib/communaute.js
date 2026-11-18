@@ -44,9 +44,10 @@ import { jetonDe } from './session.js';
 import { sbCle } from './cle.js';
 import { rpcEquipe } from './equipe.js';
 import { routeAccompagnement, effacerAccompagnement } from './accompagnement.js';
+import { effacerCoucous } from './coucou.js';
 import { routeFormateur, effacerFormateur } from './formateur.js';
 import { discordConfigure, lirePreuve } from './discord.js';
-import {lireIdentiteDiscord,signerAvatarPublic,avatarPublicVerifie,ajouterAvatars,urlAvatarDiscord} from './avatar-discord.js';
+import {lireIdentiteDiscord,signerAvatarPublic,avatarPublicVerifie,ajouterAvatars,urlAvatarDiscord,signerIdDiscord} from './avatar-discord.js';
 import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -185,6 +186,9 @@ async function lireDiscordCompte(owner, qui) {
 async function rangerDiscordCompte(owner, qui, d, preuve = null) {
   const identite=lireIdentiteDiscord(preuve,owner,d),avatar=urlAvatarDiscord(identite);
   const photo=avatar?{avatar,pid:"",signatureAvatar:signerAvatarPublic(owner,d,"",avatar)}:{};
+  // (17 nov., coucou) L'identifiant Discord, signé : « Lui écrire sur Discord » ouvre son profil.
+  const sid=identite?signerIdDiscord(owner,d,identite.id):'';
+  if(sid){photo.did=identite.id;photo.signatureId=sid;}
   try {
     const r = await fetchAvecDelai(`${SB_URL}/rest/v1/app_data?on_conflict=owner,id`, {
       method: 'POST', headers: { ...qui, 'content-type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
@@ -238,7 +242,7 @@ export async function routeCommunaute(req, res, { utilisateur, corps }) {
 
   const action = String((corps && corps.action) || '');
   // (5 nov.) Les groupes d'accompagnement (025) : leur propre fichier, la même session.
-  if (action.startsWith('accomp-')) return routeAccompagnement(req, res, { corps, qui, action });
+  if (action.startsWith('accomp-')) return routeAccompagnement(req, res, { corps, qui, action, utilisateur });
   // (10 nov., lot AR) L'espace formateur (032) : son propre fichier, la même session.
   if (action.startsWith('form-')) return routeFormateur(req, res, { corps, qui, action });
   if (action === 'ville') {
@@ -409,6 +413,9 @@ export async function effacerCommunaute(owner, SERVICE) {
   const f = await effacerFormateur(owner, SERVICE);
   if (f === null) return null;
   // (5 nov.) + les groupes d'accompagnement (025) : partages vidés, adhésions et groupes détachés.
+  // (17 nov.) + les coucous (046) : AVANT la 025, ses coucous et sourdines détachés.
+  const k = await effacerCoucous(owner, SERVICE);
+  if (k === null) return null;
   const a = await effacerAccompagnement(owner, SERVICE);
-  return a === null ? null : n + f + a;
+  return a === null ? null : n + f + k + a;
 }
