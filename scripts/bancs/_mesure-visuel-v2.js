@@ -162,7 +162,7 @@
   out.ambres = out.ambres.map(({ cle, ...x }) => x);
 
   // ── 14. LA PILE DU BAS : les éléments fixes du bas ne se recouvrent pas ──
-  const fixesBas = [...document.querySelectorAll('.vrm-tabbar, .v2-pouce, .vrm-acc, .vrm-acc-apres, .vrm-toasts > *, .v2-barre')].filter(vis).map((e) => ({ e, r: e.getBoundingClientRect(), pos: getComputedStyle(e).position })).filter((x) => /fixed|sticky/.test(x.pos) || x.e.closest('.vrm-toasts') || x.e.matches('.v2-pouce'));
+  const fixesBas = [...document.querySelectorAll('.vrm-tabbar, .v2-pouce, .vrm-acc, .vrm-acc-apres, .vrm-toasts > *, .v2-barre')].filter(vis).map((e) => ({ e, r: e.getBoundingClientRect(), pos: getComputedStyle(e).position })).filter((x) => /fixed|sticky/.test(x.pos) || x.e.closest('.vrm-toasts') || x.e.matches('.v2-pouce, .vrm-tabbar'));   /* la barre est « relative » dans un hôte fixe */
   out.pileChevauche = [];
   for (let i = 0; i < fixesBas.length; i++) for (let j = i + 1; j < fixesBas.length; j++) { const a = fixesBas[i], b = fixesBas[j]; if (a.e.contains(b.e) || b.e.contains(a.e)) continue; const ix = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left), iy = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top); if (ix > 1 && iy > 1) out.pileChevauche.push([String(a.e.className).slice(0, 24), String(b.e.className).slice(0, 24), Math.round(iy)]); }
   const pouce = document.querySelector('.v2-pouce'); out.pouceHaut = pouce && vis(pouce) && getComputedStyle(pouce).position === 'fixed' ? Math.round(pouce.getBoundingClientRect().top) : null;

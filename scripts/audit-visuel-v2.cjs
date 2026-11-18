@@ -89,7 +89,7 @@ const cliquetsNeufs = JSON.parse(JSON.stringify(cliquets));
 // Les MUTATIONS de la règle 19 : réaffaiblir ce que l'audit garde ⇒ il doit rougir.
 const MUTATIONS = {
   titre: `.v2-titre-ligne{flex-wrap:nowrap!important}.v2-titre-ligne h1,.v2-titre,h1.v2-titre{overflow-wrap:anywhere!important;word-break:break-all!important;flex:0 1 auto!important;min-width:0!important}`,
-  pile: `.v2-pouce{bottom:calc(var(--vrm-barre-bas,84px) - 40px)!important}`,
+  pile: `@layer vrm-v2{html body .v2-pouce.v2-pouce.v2-pouce{bottom:calc(var(--vrm-barre-bas,84px) - 40px)!important}} html body .v2-pouce.v2-pouce.v2-pouce{bottom:calc(var(--vrm-barre-bas,84px) - 40px)!important}`,
   bouton: null,
 };
 async function preparer(pg, f, regle) {
