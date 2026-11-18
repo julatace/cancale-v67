@@ -1,0 +1,36 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   ACHATS, LA LISTE — nouveau design (17 nov., capture de Julien : « Reçu d'achat » et un gros « ⋯ » sur CHAQUE
+   rangée, le compte coupé à une lettre (« k.. »), des rangées de hauteurs folles). Couche `vrm-v2`, nommée la
+   PREMIÈRE dans index.html : ses `!important` passent devant ceux des couches d'hier. Tout est sous
+   `html[data-design="v2"]` : éteint, rien ne change.
+   Une forme de rangée, comme la rangée A d'Annonces : photo 64 · titre (2 lignes au plus) · la sous-ligne grise
+   (compte, date, N°) ENTIÈRE sur sa ligne · l'état et, s'il existe, le reçu en PETITE icône · le prix à droite ·
+   le suivi sur UNE ligne · « ⋯ » discret (une icône, pas un rond).
+   ════════════════════════════════════════════════════════════════════════════ */
+@layer vrm-v2 {
+  html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-list > .vrm-buy-row {
+    display: grid !important; grid-template-columns: 64px minmax(0, 1fr) auto 32px !important;
+    grid-template-areas: "ph titre titre act" "ph meta meta act" "ph etat prix act" "ph plus plus act" !important;
+    grid-template-rows: auto auto auto auto !important; align-content: center !important; align-items: center !important;
+    column-gap: 16px !important; row-gap: 4px !important; padding: 12px 8px 12px var(--v2-air-carte, 20px) !important; min-height: 88px !important;
+  }
+  html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-list > .vrm-buy-row + .vrm-buy-row::before { left: calc(var(--v2-air-carte, 20px) + 80px) !important; }
+  html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-ph { width: 64px !important; height: 64px !important; margin: 0 !important; align-self: start !important; border-radius: 12px !important; }
+  html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-title {
+    font-size: 17px !important; line-height: 22px !important; font-weight: 600 !important; white-space: normal !important;
+    display: -webkit-box !important; -webkit-box-orient: vertical !important; -webkit-line-clamp: 2 !important; overflow: hidden !important; padding: 0 !important; }
+  /* La sous-ligne grise sur SA ligne, entière : le compte n'est plus coupé à une lettre. */
+  html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-meta { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; font-size: 15px !important; line-height: 21px !important; }
+  html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-meta > .vrm-acct-tag { max-width: none !important; overflow: visible !important; }
+  html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-pastilles { flex-wrap: nowrap !important; gap: 0 12px !important; }
+  /* Le reçu : une petite icône (seulement quand il existe), plus une pilule « Reçu d'achat » sur chaque rangée. */
+  html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-chip { font-size: 0 !important; gap: 0 !important; padding: 0 !important; margin: -10px 0 !important;
+    min-width: 44px !important; min-height: 44px !important; justify-content: center !important; color: var(--v2-muet, #4A5B6D) !important; }
+  html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-chip::before { display: none !important; }
+  html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-chip svg { width: 18px !important; height: 18px !important; }
+  html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-price { font-size: 17px !important; font-weight: 600 !important; line-height: 22px !important; }
+  /* Le suivi : UNE ligne, toujours la même place (plus de second bloc qui double la rangée). */
+  html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row :is(.vrm-buy-transp, .vrm-buy-retour) { max-height: 22px !important; overflow: hidden !important; margin: 0 !important; font-size: 13px !important; line-height: 22px !important; }
+  /* « ⋯ » : une icône discrète dans une cible de 44, plus un grand rond blanc sur chaque rangée. */
+  html[data-design="v2"] body .vrm-main .vrm-achats .vrm-buy-row .vrm-buy-more { width: 32px !important; min-width: 32px !important; height: 44px !important; background: transparent !important; box-shadow: none !important; border: 0 !important; color: var(--v2-muet, #4A5B6D) !important; }
+}
