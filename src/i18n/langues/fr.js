@@ -11,6 +11,7 @@ import ecran_ventesVerre from './fr/ventesVerre.js';   // (15 nov.) Ventes et Ac
 import ecran_journee from './fr/journee.js';
 import ecran_confort from './fr/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_studio from './fr/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
+import ecran_design_v2 from './fr/designV2.js';   // (17 nov.) le nouveau design, en essai
 import ecran_correspondances from './fr/correspondances.js';   // (15 nov.) Publier partout : catégories qui correspondent
 import ecran_capte from './fr/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_avenir from './fr/avenir.js';
@@ -2309,6 +2310,7 @@ export default {
   "instantane.arret.panne": "Pas relu : la base ne répond pas. Ces chiffres sont ceux de ta dernière visite.",
   ...ecran_confort,
   ...ecran_studio,
+  ...ecran_design_v2,
   ...ecran_capte,
   ...ecran_retrait_ailleurs,
   ...ecran_vcventes,
