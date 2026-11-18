@@ -164,7 +164,8 @@ import { useLangue } from '../i18n/react.js';
 import { ReglagesAidesAccueil } from '../accueilReste/AccueilReste.jsx';   // (14 nov., idées 136 139 140 147)
 import MIGRATION_SQL from "../../supabase/migrations/001-multi-utilisateurs.sql?raw";
 import { accompagner } from '../accompagnement.js';   // (14 nov.) pendant, après, échec d'un geste (src/ui/Accompagne.jsx)
-import { useDesignV2, poserDesignV2 } from '../designV2/reglage.js';   // (17 nov.) « Nouveau design (essai) »
+import { useDesignV2, poserDesignV2 } from '../designV2/reglage.js';
+import { useStyle, poserStyle, STYLES } from '../designV2/style.js';   // (18 nov.) « Style » : Apple · Studio bleu   // (17 nov.) « Nouveau design (essai) »
 import { useBarre, poserBarre, STYLES_BARRE, ApercuBarre } from '../designV2/barre.jsx';   // (17 nov.) « Barre d'onglets » : cinq styles
 
 // ⟦← App.jsx #10⟧
@@ -1759,6 +1760,7 @@ const GROUPES_NOTIF = [
   { id: 'echanges', titre: 'Échanges avec les acheteurs', ids: ['offres', 'messages'] },
   { id: 'comptes', titre: 'Comptes et avis', ids: ['comptes', 'avis'] },
   { id: 'achats', titre: 'Achats', ids: ['alertesebay'] },
+  { id: 'communaute', titre: 'Communauté', ids: ['communaute'] },
 ];
 function groupesFamillesNotif(familles) {
   const vus = new Set();
@@ -4730,6 +4732,7 @@ function ReglagesStream() {
 // Le choix est le sien, jamais posé tout seul ; « Le soir » suit l'heure de l'appareil.
 function ApparenceSetting({ valeur, onChoisir }) {
   const designV2 = useDesignV2();
+  const style = useStyle();
   const barre = useBarre();
   return (<>
     <div className="vrm-apparence" role="radiogroup" aria-label="Apparence" data-apparence-choix={valeur || ''}>
@@ -4741,6 +4744,20 @@ function ApparenceSetting({ valeur, onChoisir }) {
           <svg className="vrm-apparence-coche" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3.2L13 4.8"/></svg>
         </button>
       ))}
+    </div>
+    {/* (18 nov., Julien : « Apple — Wallet, Réglages ») LE STYLE : deux choix en liste d'iOS, sur CET appareil (src/designV2/style.js).
+        « Studio bleu » est celui d'hier (le défaut) ; « Apple » ne change que la matière (src/designV2/theme-apple.css). */}
+    <div className="vrm-apparence-style" style={{display:'flex',flexDirection:'column',gap:8,padding:'12px 4px 4px',marginTop:8,borderTop:`1px solid ${C.border}`}}>
+      <b style={{fontSize:15,fontWeight:600,color:C.text}}>{tr('v2.style.lib')}</b>
+      <div className="vrm-apparence" role="radiogroup" aria-label={tr('v2.style.lib')} data-style-choix={style}>
+        {STYLES.map((k) => (
+          <button key={k} type="button" role="radio" aria-checked={style === k} className={'vrm-apparence-ligne' + (style === k ? ' is-choisi' : '')}
+            data-style={k} onClick={() => poserStyle(k)}>
+            <span className="vrm-apparence-txt"><b>{tr('v2.style.' + k)}</b><small>{tr('v2.style.' + k + '.desc')}</small></span>
+            <svg className="vrm-apparence-coche" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3.2L13 4.8"/></svg>
+          </button>
+        ))}
+      </div>
     </div>
     {/* (17 nov.) LE NOUVEAU DESIGN est allumé par défaut ; « Ancien design » le ramène sur CET appareil (src/designV2/reglage.js) : rien d autre ne change. */}
     <div className="vrm-apparence-v2" data-reglage-design-v2={designV2 ? '1' : '0'} style={{display:'flex',alignItems:'center',gap:12,minHeight:56,padding:'8px 4px',marginTop:8,borderTop:`1px solid ${C.border}`}}>

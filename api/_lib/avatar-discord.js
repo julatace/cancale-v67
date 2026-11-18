@@ -22,6 +22,22 @@ export function signerAvatarPublic(owner,discord,pid,avatar){
 export function avatarPublicVerifie(owner,d){
  return !!(secret()&&d&&avatarDiscordPermis(d.avatar)&&typeof d.signatureAvatar==='string'&&egal(signerAvatarPublic(owner,d.discord,d.pid,d.avatar),d.signatureAvatar));
 }
+// (17 nov., coucou) L'IDENTIFIANT Discord d'un compte relié, pour ouvrir SON
+// profil (discord.com/users/<id>) quand il fait coucou. Signé par le serveur au
+// moment où il relie Discord (preuve OAuth), comme l'avatar : une ligne écrite
+// par un navigateur n'en est jamais une preuve. Ancienne ligne sans `did` : on
+// le lit dans l'adresse de l'avatar SIGNÉ (photo personnelle seulement).
+export function signerIdDiscord(owner,discord,did){
+ if(!secret()||!/^\d{15,25}$/.test(String(did||'')))return '';
+ return mac('id',String(owner).toLowerCase(),discord,did);
+}
+export function idDiscordVerifie(owner,d){
+ if(!d||!secret())return '';
+ const did=String(d.did||'');
+ if(/^\d{15,25}$/.test(did)&&typeof d.signatureId==='string'&&egal(signerIdDiscord(owner,d.discord,did),d.signatureId))return did;
+ if(avatarPublicVerifie(owner,d)){const m=/\/avatars\/(\d{15,25})\//.exec(String(d.avatar||''));if(m)return m[1];}
+ return '';
+}
 // Données projetées seulement, bornées par les PID déjà autorisés par la RPC.
 // Une ligne écrite par un client ne devient jamais une preuve d'identité.
 export async function ajouterAvatars(profils,f=fetchAvecDelai){
