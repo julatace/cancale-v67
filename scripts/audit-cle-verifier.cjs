@@ -47,6 +47,8 @@ const MODULES_ADMIS = {
   '../api/_lib/transporteurs.js:VG_RETOUR_GROUPES': 'ensemble constant', '../api/_lib/transporteurs.js:VG_GROUPES_DE_ROUTE': 'ensemble constant',
   '../api/_lib/transporteurs.js:ETATS_A_RELIRE': 'ensemble constant', '../api/_lib/transporteurs.js:AMBRE': 'ensemble constant',
   '../api/_lib/depart-colis.js:CP_PAS_DEPART': 'ensemble constant', '../api/_lib/depart-colis.js:VG_PAS_DEPART': 'ensemble constant',
+  // (18 nov., train — #1258 design-v2-ventes ajoute src/friseTransporteur.js) deux `new Set([...])` jamais modifiés.
+  'friseTransporteur.js:LIVRE_T': 'ensemble constant', 'friseTransporteur.js:LIVRE_E': 'ensemble constant',
 };
 const EN_PLUS = ['vcLoc0.departs', 'versionMemoire()', 'Math.floor(Date.now() / 10000)'];
 
