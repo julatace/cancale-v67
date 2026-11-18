@@ -1651,7 +1651,7 @@ export default {
   "impression.tampon.num": "No. only",
   "impression.tampon.num_titre": "No. + title",
   "impression.tampon.num_titre_taille": "No. + title + size",
-  "impression.tampon.rien": "Nothing",
+  "impression.tampon.rien": "No number (the credit stays)",
   "impression.tampon.pourquoi": "The title is hidden by default: the label goes on the parcel, the carrier would see it.",
   "impression.tampon.jamais": "Never on a barcode, a QR code or an address.",
   "impression.fiche": "Packing slip",
