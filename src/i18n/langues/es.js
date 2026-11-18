@@ -71,7 +71,6 @@ import ecran_favorisSites from './es/favorisSites.js';   // (15 nov., lot favori
 import ecran_etageres from './es/etageres.js';   // (15 nov.) le Stock en étagères
 import ecran_journee_verre from './es/journee-verre.js';   // (15 nov.) Ma journée verre, la paire à sortir
 import ecran_arrivee from './es/arrivee.js';   // (15 nov.) atelier d'arrivée, historique, taille du texte
-import ecran_stock_rangement from './es/stockRangement.js';   // (17 nov.) le Stock « Ranger » en séance (nouveau design)
 export default {
   ...ecran_accessibilite,
   ...ecran_perso,
@@ -2335,5 +2334,4 @@ export default {
   ...ecran_republie_telephone,
   ...ecran_securite_ventes,
   ...ecran_parcours_nouveau,
-  ...ecran_stock_rangement,
 };

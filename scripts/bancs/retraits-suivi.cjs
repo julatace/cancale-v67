@@ -158,22 +158,13 @@ const detail = async (pg, sousCle) => {
   const l = pg.locator(`.vrm-rpf [data-cc-carte*="${sousCle}"]`).first();
   if (!(await l.count())) return null;
   const ouvert = await l.getAttribute('data-ouvert');
-  // (16 nov., lot achats-qr) toucher le code ouvre le comptoir : le TITRE ouvre la fiche.
-  if (!ouvert) await l.locator('[data-rp-titre]').first().click({ timeout: 5000 }).catch(() => {});
+  if (!ouvert) await l.locator('.vrm-rpf-ouvrir').first().click({ timeout: 5000 }).catch(() => {});
   await pg.waitForTimeout(250);
-  // (17 nov., chasse-bugs) Proposition 62 (14 nov.) : le détail d'une ligne s'ouvre dans SA FICHE (DansFiche, une feuille),
-  // plus sous la ligne — on le lit là où il est montré (le détail visible), jamais la ligne repliée.
-  await pg.waitForFunction(() => [...document.querySelectorAll('[data-rp-detail]')].some((x) => x.getClientRects().length), null, { timeout: 8000 }).catch(() => {});
-  const r = await l.evaluate((e) => { const d = [...document.querySelectorAll('[data-rp-detail]')].find((x) => x.getClientRects().length) || e.querySelector('[data-rp-detail]') || e;
-    const q = (sel) => d.querySelector(sel) || e.querySelector(sel);
-    const tr = q('[data-transp]'); const lim = q('[data-colis-limite]');
+  return l.evaluate((e) => { const d = e.querySelector('[data-rp-detail]') || e;
+    const tr = d.querySelector('[data-transp]'); const lim = d.querySelector('[data-colis-limite]');
     return { transp: tr ? tr.getAttribute('data-transp') : null, transpEtat: tr ? tr.getAttribute('data-transp-etat') : null, transpTexte: tr ? tr.textContent : '', limite: lim ? lim.getAttribute('data-colis-limite') : null, estimee: lim ? lim.getAttribute('data-colis-limite-estimee') : null, limTexte: lim ? lim.textContent : '',
-      pasLu: (q('[data-transp-pas-lu]') || { getAttribute: () => null }).getAttribute('data-transp-pas-lu'), pasLuTexte: ((q('[data-transp-pas-lu]') || {}).textContent || ''),
-      codeSms: (q('[data-colis-code-sms]') || { getAttribute: () => null }).getAttribute('data-colis-code-sms'), texte: d.innerText.replace(/\s+/g, ' ').slice(0, 600) }; });
-  // Refermer la fiche avant la ligne suivante.
-  await pg.keyboard.press('Escape').catch(() => {}); const f = pg.locator('[role="dialog"] [aria-label^="Fermer"]').filter({ visible: true }).last(); if (await f.count()) await f.click().catch(() => {});
-  await pg.waitForTimeout(250);
-  return r;
+      pasLu: (d.querySelector('[data-transp-pas-lu]') || { getAttribute: () => null }).getAttribute('data-transp-pas-lu'), pasLuTexte: ((d.querySelector('[data-transp-pas-lu]') || {}).textContent || ''),
+      codeSms: (d.querySelector('[data-colis-code-sms]') || { getAttribute: () => null }).getAttribute('data-colis-code-sms'), texte: d.innerText.replace(/\s+/g, ' ').slice(0, 600) }; });
 };
 
 (async () => {

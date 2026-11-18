@@ -60,39 +60,15 @@ export function texteSansBordereau(lignes) {
 export function resumeLot(L, coches) {
   const lignes = (L || []).filter(Boolean);
   const c = coches || cochesParDefaut(lignes);
-  const r = { total: lignes.length, partent: 0, ebay: 0, sansBordereau: 0, dejaImprimes: 0, anciennes: 0, decoches: 0, exclus: [] };
-  // (17 nov., chasse-bugs) Chaque ligne qui ne part pas, NOMMÉE avec sa raison (« N°193 attend son bordereau ») :
-  // Julien ne savait pas quels étaient « 2 colis n'y sont pas ».
-  const exclu = (l, raison) => r.exclus.push({ cle: l.cle, num: l.num ? String(l.num) : '', titre: l.titre || '', raison });
+  const r = { total: lignes.length, partent: 0, ebay: 0, sansBordereau: 0, dejaImprimes: 0, anciennes: 0, decoches: 0 };
   for (const l of lignes) {
-    if (l.cochable === false) { r.ebay++; exclu(l, 'ebay'); continue; }
+    if (l.cochable === false) { r.ebay++; continue; }
     if (c.has(l.cle)) { r.partent++; continue; }
-    if (l.pdf === false) { r.sansBordereau++; exclu(l, 'sansBordereau'); }
-    else if (l.imprime || l.depotAVerifier) { r.dejaImprimes++; exclu(l, 'dejaImprime'); }
-    else if (l.ancienne) { r.anciennes++; exclu(l, 'ancienne'); }
-    else { r.decoches++; exclu(l, 'decoche'); }   // décochée par lui
+    if (l.pdf === false) r.sansBordereau++;
+    else if (l.imprime || l.depotAVerifier) r.dejaImprimes++;
+    else if (l.ancienne) r.anciennes++;
+    else r.decoches++;   // décochée par lui
   }
   r.autres = r.total - r.partent;
   return r;
-}
-
-// ── (17 nov., chasse-bugs — Julien : « regarde ici il y a 4 bordereaux de sélectionné ») ─────────────
-// Le bouton disait « Imprimer les 3 bordereaux » à côté d'une pastille « + 1 retour » alors que QUATRE cases
-// étaient cochées et que les quatre partaient dans le même PDF (`imprimerLot(choix, { retours })`). UNE règle :
-// le nombre du bouton = les ventes cochées imprimables + les retours cochés imprimables, le mot « retour » dit
-// à côté (« Imprimer les 4 bordereaux · dont 1 retour »), jamais un second nombre à additionner de tête.
-export const nombreAImprimer = (nVentes, nRetours) => (Number(nVentes) || 0) + (Number(nRetours) || 0);
-export function libelleImprimer(t, cle, nVentes, nRetours, vars = {}) {
-  const n = nombreAImprimer(nVentes, nRetours), nR = Number(nRetours) || 0;
-  const base = t(cle, { ...vars, n });
-  return nR > 0 ? `${base} · ${t('impr.retour.dont', { n: nR })}` : base;
-}
-// « N°193 attend son bordereau · N°88 : étiquette dans eBay · + 2 autres » — au plus deux nommées.
-export function texteExclus(t, exclus, max = 2) {
-  const X = (exclus || []).filter(Boolean);
-  if (!X.length) return '';
-  const nom = (x) => (x.num ? `N°${x.num}` : String(x.titre || '').slice(0, 28) || t('impr.exclu.sansNom'));
-  const parts = X.slice(0, max).map((x) => t(`impr.exclu.${x.raison}`, { nom: nom(x) }));
-  if (X.length > max) parts.push(t('impr.exclu.plus', { n: X.length - max }));
-  return parts.join(' · ');
 }
