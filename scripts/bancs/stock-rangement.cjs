@@ -83,7 +83,7 @@ async function rendre(b, port, { tel, sombre = false, v2, reduit = false, petit 
     addEventListener('pointerdown', (e) => { if (e.target && e.target.closest && e.target.closest('[data-sr-ranger-ici]')) t0 = performance.now(); }, true);
     new MutationObserver(() => { if (t0 && document.querySelector('.sr-coche')) { window.__reponses.push(Math.round(performance.now() - t0)); t0 = 0; } }).observe(document, { childList: true, subtree: true });
   });
-  await pg.addInitScript(({ m, sombre, v2, petit }) => { try { localStorage.setItem('vrm_acces_direct', '1'); for (const k in m) localStorage.setItem(k, JSON.stringify(m[k])); localStorage.setItem('vinted_dark', JSON.stringify(!!sombre)); localStorage.setItem('vrm_meubles_zoom', 'normal'); localStorage.setItem('vrm_design_v2', v2 ? '1' : '0');   // (18 nov.) allumé par défaut : « 0 » = l'ancien design if (petit) localStorage.setItem('vrm_taille_texte', 'tresGrand'); } catch (_) {} }, { m: MAIN, sombre, v2, petit });
+  await pg.addInitScript(({ m, sombre, v2, petit }) => { try { localStorage.setItem('vrm_acces_direct', '1'); for (const k in m) localStorage.setItem(k, JSON.stringify(m[k])); localStorage.setItem('vinted_dark', JSON.stringify(!!sombre)); localStorage.setItem('vrm_meubles_zoom', 'normal'); localStorage.setItem('vrm_design_v2', v2 ? '1' : '0'); /* (18 nov.) allumé par défaut : « 0 » = l'ancien design */ if (petit) localStorage.setItem('vrm_taille_texte', 'tresGrand'); } catch (_) {} }, { m: MAIN, sombre, v2, petit });
   await pg.goto(`http://localhost:${port}/?tab=garage`, { waitUntil: 'domcontentloaded' });
   await pg.waitForSelector(v2 ? '[data-sr-ecran] [data-sr-lancer]' : '[data-case-ici="mA:0"]', { timeout: 40000 }).catch(() => {});
   await pg.waitForTimeout(1200);
