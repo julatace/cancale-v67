@@ -676,7 +676,7 @@
    "ecrans": [
     "journee"
    ],
-   "raison": "train du 18 nov. : Messages et E-mails du nouveau design (lot design-v2-messages, #1263 : LigneConversation, messagesV2 dans le morceau App) — +1 Ko de JS+CSS au démarrage (1 967 mesuré par audit-poids-demarrage)"
+   "raison": "train du 18 nov. : Messages et E-mails du nouveau design (lot design-v2-messages, #1263 : LigneConversation, messagesV2 dans le morceau App) — +1 Ko de JS+CSS au démarrage (1 967 arrondi, un peu plus de 1 967 × 1 024 octets mesuré en CI : budget 1 968)"
   },
   {
    "date": "2026-11-18",
