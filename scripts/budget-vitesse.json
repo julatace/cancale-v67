@@ -683,7 +683,14 @@
    "ecrans": [
     "journee"
    ],
-   "raison": "train du 18 nov. : la suite du nouveau design (lot design-v2-suite, #1268 : suite.css, rangées touchables d'Aujourd'hui, Achats) — +5 Ko de JS+CSS au démarrage (1 972 mesuré par audit-poids-demarrage)"
+   "raison": "train du 18 nov. : Relier tous ses achats (lot relier-tout-achat, #1255) — +0,4 Ko au démarrage (1 968,38 mesuré) ; la suite de la file reste sous 1 969 (carte-coucou 1 968,40 · favoris-liste 1 968,47 · republication 1 968,98)"
+  },
+  {
+   "date": "2026-11-18",
+   "ecrans": [
+    "journee"
+   ],
+   "raison": "train du 18 nov. : la suite du nouveau design (lot design-v2-suite, #1268 : suite.css, rangées touchables d'Aujourd'hui, Achats) — +2,5 Ko au démarrage (1 971,49 mesuré par audit-poids-demarrage ; accord du coordinateur)"
   }
  ]
 }
