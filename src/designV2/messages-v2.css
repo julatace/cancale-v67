@@ -138,9 +138,8 @@ html[data-design="v2"] .vrm-boite .v2e-quarantaine-titre { color: var(--sv-encre
 html[data-design="v2"] .vrm-boite .v2e-quarantaine-phrase { color: var(--v2-muet); }
 :root[data-theme="dark"][data-design="v2"] .vrm-boite .v2e-quarantaine-titre { color: #EAF2FB; }
 
-/* E-mails, allumé : « Sélectionner » à la couleur des liens (il était blanc sur la surface claire) ; le code copiable,
-   posé à droite de la rangée, ne recouvre plus l'heure. */
+/* E-mails, allumé : « Sélectionner » à la couleur des liens (il était blanc sur la surface claire) ; le code copiable reste
+   posé à droite de la rangée (comme hier). */
 @layer vrm-v2 {
   html[data-design="v2"] body .vrm-boite .vrm-serie-entree button { color: var(--v2-lien) !important; min-height: 44px !important; }
-  html[data-design="v2"] body .vrm-boite .vrm-boite-item:has(> .vrm-boite-puce-code) .vrm-boite-ligne-txt { padding-right: 132px !important; }
 }

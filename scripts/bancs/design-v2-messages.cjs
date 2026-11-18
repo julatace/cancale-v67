@@ -100,6 +100,12 @@ const MESURE = (sel) => {
         out.tronques.push({ quoi: e.textContent.trim().slice(0, 40), cl: String(e.className).slice(0, 40), de: e.scrollWidth, dans: e.clientWidth });
     }
   }
+  // Un MOT coupé au milieu (une colonne écrasée écrit « C / o / l ») : chaque mot de ≥ 3 lettres tient sur une ligne.
+  out.coupes = [];
+  for (const z of zones) { const w = document.createTreeWalker(z, NodeFilter.SHOW_TEXT); let n;
+    while ((n = w.nextNode()) && out.coupes.length < 8) { const el = n.parentElement; if (!el || !vis(el) || el.closest('.vrm-sr, .vrm-sr-seul, .vrm-boite-sr')) continue; const r0 = el.getBoundingClientRect(); if (r0.top > innerHeight * 2) continue;
+      const re = /[\p{L}\p{N}]{3,20}/gu; let m; while ((m = re.exec(n.data))) { const rg = document.createRange(); rg.setStart(n, m.index); rg.setEnd(n, m.index + m[0].length);
+        const tops = [...rg.getClientRects()].filter((x) => x.width > .5).map((x) => Math.round(x.top)); if (tops.length > 1 && Math.max(...tops) - Math.min(...tops) > 3) { out.coupes.push(m[0]); break; } } } }
   // AIR : chaque rangée ≥ 64, son texte à ≥ 20 px des bords de SA carte.
   for (const l of document.querySelectorAll('.v2m-carte > .v2m-ligne, .v2e-carte > .v2e-q-ligne')) {
     if (!vis(l)) continue; const r = l.getBoundingClientRect(); const carte = l.parentElement.getBoundingClientRect();
@@ -155,7 +161,7 @@ async function messages(nav, { W, sombre, grand = false, nom }) {
   const m = await pg.evaluate((f) => eval('(' + f + ')')('.v2m-tete, .v2m-outils, .v2m-liste, .v2-tete-tache'), MESURE.toString());
   dit(m.zones >= 3 && m.pleins <= 1, `${nom} M2 : au plus 1 bouton plein (${m.pleins})`);
   dit(m.zones >= 3 && !m.petites.length, `${nom} M3 : cibles ≥ 44 px`, m.petites.slice(0, 6));
-  dit(m.zones >= 3 && !m.tronques.length, `${nom} M4 : rien de tronqué sans « … »`, m.tronques.slice(0, 6));
+  dit(m.zones >= 3 && !m.tronques.length && !m.coupes.length, `${nom} M4 : rien de tronqué sans « … », aucun mot coupé`, { tronques: m.tronques.slice(0, 6), coupes: m.coupes });
   dit(m.zones >= 3 && !m.air.length && !m.voisins.length, `${nom} M5 : l’AIR (rangée ≥ 64, 20 px du bord, 32 entre groupes, 12 titre → carte, 12 entre boutons)`, { air: m.air.slice(0, 6), voisins: m.voisins });
   dit(cls <= 0.001, `${nom} M6 : CLS du chargement = ${cls.toFixed(4)}`);
   // La tête : le grand titre et la cloche sur une ligne, UN segmenté, la recherche.
@@ -187,7 +193,7 @@ async function emails(nav, { W, sombre, grand = false, nom, ancien = null }) {
   const m = await pg.evaluate((f) => eval('(' + f + ')')('[data-v2-mail-tete], [data-v2-mail-outils], .vrm-boite-liste'), MESURE.toString());
   dit(m.zones >= 2 && m.pleins <= 1, `${nom} E : au plus 1 bouton plein (${m.pleins})`);
   dit(m.zones >= 2 && !m.petites.length, `${nom} E : cibles ≥ 44 px`, m.petites.slice(0, 6));
-  dit(m.zones >= 2 && !m.tronques.length, `${nom} E : rien de tronqué sans « … »`, m.tronques.slice(0, 6));
+  dit(m.zones >= 2 && !m.tronques.length && !m.coupes.length, `${nom} E : rien de tronqué sans « … », aucun mot coupé`, { tronques: m.tronques.slice(0, 6), coupes: m.coupes });
   const cls = await pg.evaluate(() => window.__cls || 0);
   dit(cls <= 0.001, `${nom} E : CLS du chargement = ${cls.toFixed(4)}`);
   // E3 : l'étiquette N° = le N° LU (bordereau, vente), le code se copie, un geste par rangée sans code.
