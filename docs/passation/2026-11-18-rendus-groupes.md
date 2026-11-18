@@ -26,3 +26,14 @@ rendus venus des props d'`AppCoeur`.
 Une SEULE source des données du démarrage (le magasin `src/magasinPartage.js`) que `Comptabilite` et `AppCoeur` lisent par
 `useSyncExternalStore`, avec une pose groupée DANS le magasin (toutes les lectures parallèles du démarrage posées ensemble,
 « pas su » gardé `null`, « en cours » `undefined`). C'est le chantier « une version des données » : les deux vont ensemble.
+
+## 4. Étape 1 livrée : le magasin partagé prévient ses abonnés ENSEMBLE (`src/magasinPartage.js`)
+`poser` change la valeur tout de suite ; les abonnés de toutes les clés posées dans la même tâche (ventes, achats, versements,
+suivis) sont prévenus en UNE passe à la tâche suivante (avant : un rendu `useSyncExternalStore` par clé posée).
+A/B (5 passes alternées, Ma journée, ×4, 5 000 ventes) : rendus de `Comptabilite` avant « prêt » 18 · 22 (main) → 15 · 16 · 17 ;
+validations React 28 · 37 → 25 · 27 · 27 ; prêt 9,5 · 11,4 s → 9,2 · 9,2 · 9,8 s ; tâches longues 14,4 · 13,9 s → 8,9 · 13,4 · 14,9 s.
+Gain réel mais petit : la plupart des rendus viennent des `useState` propres de `Comptabilite` et des props d'`AppCoeur` (§3).
+Preuves : `audit-magasin-groupe` 7 verts, rouge sur main (3), `--prouve` 3/3 ; chiffres-volume (Ma journée, Ventes, Argent,
+Déclarer) 26/26 identiques ; source-unique 24 verts ; versements-course 26 verts ; temps-reel 38 verts.
+⚠️ Ces bancs d'écran NE voient PAS une prévenance perdue (mutant « prévenance oubliée » : chiffres-volume et temps-reel verts —
+un autre rendu relit la valeur) : seul l'audit exécuté le voit. À savoir pour l'étape suivante.
