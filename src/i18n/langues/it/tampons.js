@@ -95,5 +95,14 @@ export default {
   "tampons.pret.titreLot": {
     "one": "{n} etichetta pronta",
     "other": "{n} etichette pronte"
-  }
+  },
+  // (17 nov., lot tampon-qr)
+  "tampons.statut.auto2": "Posizionamento automatico",
+  "tampons.modifier": "Modifica",
+  "tampons.exemple": "Esempio",
+  "tampons.exemple.phrase": "Esempio: nessuna etichetta di questo corriere ricevuta finora. I dati sono inventati.",
+  "tampons.mention.toujours": "«Créé par vrm.center» si stampa sempre, appena sopra il codice QR: visibile anche sotto il nastro.",
+  "tampons.phrase2": "La tua ultima etichetta di ogni corriere, timbrata come uscirà. Toccala per spostare il N°.",
+  "tampons.editeur.phrase2": "Trascina il N°; tira la maniglia per ingrandirlo. Salvato subito. «Créé par vrm.center» resta sopra il codice QR.",
+  "tampons.el.mVerrou": "«Créé par vrm.center»: fisso, appena sopra il codice QR"
 };

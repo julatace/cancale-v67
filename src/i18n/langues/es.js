@@ -7,6 +7,7 @@ import ecran_ventesVerre from './es/ventesVerre.js';   // (15 nov.) Ventes et Ac
 import ecran_journee from './es/journee.js';
 import ecran_confort from './es/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_studio from './es/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
+import ecran_design_v2 from './es/designV2.js';   // (17 nov.) le nouveau design, en essai
 import ecran_correspondances from './es/correspondances.js';   // (15 nov.) Publier partout : catégories qui correspondent
 import ecran_capte from './es/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_avenir from './es/avenir.js';
@@ -1651,7 +1652,7 @@ export default {
   "impression.tampon.num": "Solo N.º",
   "impression.tampon.num_titre": "N.º + título",
   "impression.tampon.num_titre_taille": "N.º + título + talla",
-  "impression.tampon.rien": "Nada",
+  "impression.tampon.rien": "Sin N.º (la mención queda)",
   "impression.tampon.pourquoi": "El título se oculta por defecto: la etiqueta va pegada al paquete, el transportista lo vería.",
   "impression.tampon.jamais": "Nunca sobre un código de barras, un QR o una dirección.",
   "impression.fiche": "Hoja de preparación",
@@ -2306,6 +2307,7 @@ export default {
   "instantane.arret.panne": "Sin releer: la base no responde. Estas cifras son las de tu última visita.",
   ...ecran_confort,
   ...ecran_studio,
+  ...ecran_design_v2,
   ...ecran_capte,
   ...ecran_retrait_ailleurs,
   ...ecran_vcventes,
