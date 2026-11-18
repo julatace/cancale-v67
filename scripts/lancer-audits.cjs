@@ -84,7 +84,10 @@ function lancer(fichier) {
 
 async function main() {
   const exceptions = lireExceptions();
-  const tous = fs.readdirSync(path.join(RACINE, 'scripts')).filter((f) => /^audit-.*\.cjs$/.test(f)).sort();
+  // (18 nov.) Les audits qui RENDENT l'app à 4 formats (des bancs, plusieurs minutes) passent dans le job des bancs
+  // (verifier.yml, « Bancs principaux » part 1, le plus léger), pas ici : `BANCS_PAS_ICI`.
+  const BANCS_PAS_ICI = ['audit-visuel-v2.cjs'];
+  const tous = fs.readdirSync(path.join(RACINE, 'scripts')).filter((f) => /^audit-.*\.cjs$/.test(f) && !BANCS_PAS_ICI.includes(f)).sort();
   const filtres = FILTRE ? tous.filter((f) => FILTRE.test(f)) : tous;
   const ordonnes = [...LOURDS.filter((f) => filtres.includes(f)), ...filtres.filter((f) => !LOURDS.includes(f))];
   const choisis = PART ? ordonnes.filter((_, i) => i % PART.n === PART.k - 1) : ordonnes;

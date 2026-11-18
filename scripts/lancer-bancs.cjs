@@ -56,7 +56,8 @@ const lignesRouges = (sortie) => sortie.split('\n').map((l) => l.replace(/^\s+/,
 function lancer(nom, port) {
   return new Promise((resolve) => {
     const debut = Date.now();
-    const fichier = path.join(RACINE, 'scripts', 'bancs', nom + '.cjs');
+    // (18 nov.) Un audit qui REND l'app (scripts/audit-visuel-v2.cjs) est un banc : lancé ici, par son nom, s'il n'est pas dans bancs/.
+    const fichier = [path.join(RACINE, 'scripts', 'bancs', nom + '.cjs'), path.join(RACINE, 'scripts', nom + '.cjs')].find((f) => fs.existsSync(f)) || path.join(RACINE, 'scripts', 'bancs', nom + '.cjs');
     if (!fs.existsSync(fichier)) { resolve({ nom, code: 2, ms: 0, sortie: 'banc introuvable : ' + fichier }); return; }
     const enfant = spawn(process.execPath, [fichier], {
       cwd: RACINE, env: avecGarde(Object.assign({}, process.env, { BANC_PORT: String(port), PORT: String(port) })), stdio: ['ignore', 'pipe', 'pipe'], detached: true,

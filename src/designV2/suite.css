@@ -112,3 +112,6 @@ html[data-design="v2"][data-grand-texte] body .v2-tete-tache .v2-titre-ligne but
 html[data-design="v2"][data-grand-texte] body .v2-tete-tache .v2-titre-ligne button.v2b-compact .v2b-lib { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
 /* La fiche ouverte (modale) : le plein de la page derrière elle se tait — un seul plein à l'écran (règle 2). */
 html[data-design="v2"] body:has(.vrm-fp.fd) .v2-tete-tache [data-v2b="principal"] { visibility: hidden; }
+/* C10 · le message « N nouvelles paires numérotées · N°… » : deux lignes au plus (la liste des N° est dans Aujourd'hui → À faire),
+   jamais un pavé posé sur la liste en très grand texte. */
+html[data-design="v2"] body .vrm-acc-apres .vrm-acc-texte { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }

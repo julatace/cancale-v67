@@ -55821,19 +55821,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               // (18 nov., audit visuel B4) Nouveau design, Achats : « N à vérifier » est UNE rangée qui se touche (elle ouvre
               // le détail des retraits, où chaque colis à vérifier a sa raison et ses gestes) ; « avec code » est déjà dit par
               // les passes. Mêmes nombres, mêmes sources (`pickupUnion`).
-              if (designV2 && colisDans === 'achats') {
-                const nv = (vus.find((x) => x[0] === 'verifier') || [])[1] || 0;
-                if (!nv) return null;
-                return <div className="v2-achats-verifier" data-a-faire="" data-colis-resume={colisDans}><RangeeTouchableV2 className="v2-afaire-ligne v2-verifier-ligne" label={tr('v2s.achats.verifier', { n: nv })}
-                  attrs={{ 'data-colis-resume-case': 'verifier', 'data-n': String(nv), 'data-v2-verifier': String(nv) }}
-                  onClick={() => { try { const d = document.querySelector('details[data-v2-detail-retraits]'); if (d) { d.open = true; d.scrollIntoView({ block: 'start', behavior: 'smooth' }); } } catch (_) {} }}>
-                  <span className="v2-afaire-ic" aria-hidden="true"><Icon name="box" size={20}/></span>
-                  <span className="v2-afaire-txt"><span className="v2-afaire-titre"><i className="v2-point" aria-hidden="true" data-geste=""/>{tr('v2s.achats.verifierTitre')}</span>
-                    <span className="v2-afaire-detail">{tr('v2s.achats.verifierDetail')}</span></span>
-                  <span className="v2-afaire-n">{nv}</span>
-                  <span className="v2-chevron" aria-hidden="true"><Icon name="chevron" size={16}/></span>
-                </RangeeTouchableV2></div>;
-              }
+              // (18 nov., audit visuel B4) Nouveau design, Achats : « N à vérifier » est une rangée posée AVEC les passes (même
+              // arrivée, rien ne glisse : CLS), plus bas (`LigneVerifierAchatsV2`).
+              if (designV2 && colisDans === 'achats') return null;
               return <VersAFaire><p className="vrm-colis-resume" data-colis-resume={colisDans}>{vus.map((x, i) => <span key={x[0]} data-colis-resume-case={x[0]} data-n={String(x[1])}>{i ? ' · ' : ''}{x[1]} {x[2]}</span>)}</p></VersAFaire>; })() : null}
             {!baseKO && !colisDans && onglet !== 'retirer' && (() => { const m0 = new Date(); m0.setHours(0, 0, 0, 0); const deposes = gestesDepuis(shipDone, m0.getTime());
               // (3 nov., carte réglable par page) Défaut = la carte d'avant : « à poster » (la publication
@@ -55959,6 +55949,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   // Prêt quand les codes ET les achats sont lus ET que les passes sont là (ou qu'il n'y a rien à retirer) : une passe
                   // qui arrive après « En route » le pousserait.
                   return <QuandLuV2 pret={baseKO || (toutLuRet && buys.items != null && (avecColis || !(pickupUnion.total > 0)))} attente={<span data-v2-attente-retirer="" hidden/>}><div className="v2-achats-retirer" data-v2-achats-retirer="">
+                    {(() => { const nv = (pickupUnion.aVerifier || []).length + (pickupUnion.aConfirmer || []).length; if (!nv) return null;
+                      return <div className="v2-achats-verifier" data-a-faire="" data-colis-resume="achats"><RangeeTouchableV2 className="v2-afaire-ligne v2-verifier-ligne" label={tr('v2s.achats.verifier', { n: nv })}
+                        attrs={{ 'data-colis-resume-case': 'verifier', 'data-n': String(nv), 'data-v2-verifier': String(nv) }}
+                        onClick={() => { try { const d = document.querySelector('details[data-v2-detail-retraits]'); if (d) { d.open = true; d.scrollIntoView({ block: 'start', behavior: 'smooth' }); } } catch (_) {} }}>
+                        <span className="v2-afaire-ic" aria-hidden="true"><Icon name="box" size={20}/></span>
+                        <span className="v2-afaire-txt"><span className="v2-afaire-titre"><i className="v2-point" aria-hidden="true" data-geste=""/>{tr('v2s.achats.verifierTitre')}</span>
+                          <span className="v2-afaire-detail">{tr('v2s.achats.verifierDetail')}</span></span>
+                        <span className="v2-afaire-n">{nv}</span>
+                        <span className="v2-chevron" aria-hidden="true"><Icon name="chevron" size={16}/></span>
+                      </RangeeTouchableV2></div>; })()}
                     <PassesRetraitV2 points={parPoint.points || []} Icon={Icon} Plaque={PlaqueJ} Photo={photoCarte}
                       aides={{ echeance: echeanceRetrait, titre: titreRetrait, retirer: retirerColis, relier: relierRetrait,
                         nomTransporteur: (k) => (CARRIERS[k] && CARRIERS[k].name) || '',
