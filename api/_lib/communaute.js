@@ -44,9 +44,12 @@ import { jetonDe } from './session.js';
 import { sbCle } from './cle.js';
 import { rpcEquipe } from './equipe.js';
 import { routeAccompagnement, effacerAccompagnement } from './accompagnement.js';
+import { effacerCoucous, routeCarteCoucou, effacerCoucousCarte } from './coucou.js';
+export const MESSAGES_RETIRES = new Set(['ecrire', 'fil', 'bloquer', 'signaler']);
+export const MESSAGES_RETIRES_TEXTE = 'Les messages se font sur Discord : VRM n’a plus de messagerie. Fais-lui coucou sur la carte.';
 import { routeFormateur, effacerFormateur } from './formateur.js';
 import { discordConfigure, lirePreuve } from './discord.js';
-import {lireIdentiteDiscord,signerAvatarPublic,avatarPublicVerifie,ajouterAvatars,urlAvatarDiscord} from './avatar-discord.js';
+import {lireIdentiteDiscord,signerAvatarPublic,avatarPublicVerifie,ajouterAvatars,urlAvatarDiscord,signerIdDiscord} from './avatar-discord.js';
 import { fetchAvecDelai } from './fetch-delai.js';   // (11 nov.) chaque appel sortant a un délai
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -185,6 +188,9 @@ async function lireDiscordCompte(owner, qui) {
 async function rangerDiscordCompte(owner, qui, d, preuve = null) {
   const identite=lireIdentiteDiscord(preuve,owner,d),avatar=urlAvatarDiscord(identite);
   const photo=avatar?{avatar,pid:"",signatureAvatar:signerAvatarPublic(owner,d,"",avatar)}:{};
+  // (17 nov., coucou) L'identifiant Discord, signé : « Lui écrire sur Discord » ouvre son profil.
+  const sid=identite?signerIdDiscord(owner,d,identite.id):'';
+  if(sid){photo.did=identite.id;photo.signatureId=sid;}
   try {
     const r = await fetchAvecDelai(`${SB_URL}/rest/v1/app_data?on_conflict=owner,id`, {
       method: 'POST', headers: { ...qui, 'content-type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
@@ -220,25 +226,28 @@ export async function routeCommunaute(req, res, { utilisateur, corps }) {
   const qui = commeAppelant(jeton);
 
   if (req.method === 'GET') {
-    const [c, l] = await Promise.all([rpcEquipe('vrm_communaute_carte', {}, qui), rpcEquipe('vrm_communaute_conversations', {}, qui)]);
-    if (c.etat === 'absent' || l.etat === 'absent') return nonInstalle();
-    if (c.etat !== 'ok' || l.etat !== 'ok') return pasSu();
+    // (17 nov., Julien : « pas échanger des messages dans mon app, mais sur Discord »)
+    // Les conversations de la carte ne sont plus lues : plus de « non lus », plus de
+    // fil. Elles restent en base (018), intactes ; l'app ne les montre plus.
+    const c = await rpcEquipe('vrm_communaute_carte', {}, qui);
+    if (c.etat === 'absent') return nonInstalle();
+    if (c.etat !== 'ok') return pasSu();
     const carte = objet(c.data);
     if (!carte) return refus('session');
     if (carte.acces === false) return refus('abonnement');
-    if (!Array.isArray(carte.profils) || !Array.isArray(l.data)) return pasSu();
+    if (!Array.isArray(carte.profils)) return pasSu();
     await lierAvatarAuProfil(utilisateur.id,qui,objet(carte.moi));
     await lierPhotoAuProfil(utilisateur.id,objet(carte.moi)?.pid).catch(()=>{});
     const profils=await ajouterPhotosPersonnelles(await ajouterAvatars(carte.profils));
     const moi=objet(carte.moi);
     const c2 = { moi: moi?{...moi,avatar:profils.find(p=>p.pid===moi.pid)?.avatar||''}:null, profils };
     if (Array.isArray(carte.groupes)) c2.groupes = carte.groupes;   // 020 installée
-    return dire(200, { ok: true, carte: c2, conversations: l.data, discordConnexion: discordConfigure() });
+    return dire(200, { ok: true, carte: c2, discordConnexion: discordConfigure() });
   }
 
   const action = String((corps && corps.action) || '');
   // (5 nov.) Les groupes d'accompagnement (025) : leur propre fichier, la même session.
-  if (action.startsWith('accomp-')) return routeAccompagnement(req, res, { corps, qui, action });
+  if (action.startsWith('accomp-')) return routeAccompagnement(req, res, { corps, qui, action, utilisateur });
   // (10 nov., lot AR) L'espace formateur (032) : son propre fichier, la même session.
   if (action.startsWith('form-')) return routeFormateur(req, res, { corps, qui, action });
   if (action === 'ville') {
@@ -267,6 +276,10 @@ export async function routeCommunaute(req, res, { utilisateur, corps }) {
     if(d)await retirerPhotoDeCarte(utilisateur.id).catch(()=>{});
     return dire(200, { ok: true, retire: d });
   }
+  // (17 nov.) Le coucou de la carte (047) ; et PLUS AUCUN message : écrire, lire un
+  // fil, bloquer ou signaler depuis un fil sont retirés (410), l'historique reste en base.
+  if (action.startsWith('carte-coucou')) return routeCarteCoucou(req, res, { corps, qui, action, utilisateur });
+  if (MESSAGES_RETIRES.has(action)) return dire(410, { ok: false, erreur: 'retire', message: MESSAGES_RETIRES_TEXTE });
   if (action === 'ecrire') {
     const pid = String(corps.pid || '');
     if (!UUID_RE.test(pid)) return refus('introuvable');
@@ -409,6 +422,11 @@ export async function effacerCommunaute(owner, SERVICE) {
   const f = await effacerFormateur(owner, SERVICE);
   if (f === null) return null;
   // (5 nov.) + les groupes d'accompagnement (025) : partages vidés, adhésions et groupes détachés.
+  // (17 nov.) + les coucous (046) : AVANT la 025, ses coucous et sourdines détachés.
+  const k = await effacerCoucous(owner, SERVICE);
+  if (k === null) return null;
+  const kc = await effacerCoucousCarte(owner, SERVICE);
+  if (kc === null) return null;
   const a = await effacerAccompagnement(owner, SERVICE);
-  return a === null ? null : n + f + a;
+  return a === null ? null : n + f + k + kc + a;
 }

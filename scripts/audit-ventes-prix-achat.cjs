@@ -77,7 +77,8 @@ const sansCommentaires = (t) => t.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/
   const bloc = i >= 0 ? APP.slice(i, i + 1600) : '';
   dit(/achatConnu: \(o\) => beneficeLigneVente\(o\.price\?\.amount, effEntry\(o\), \{ annulee: false \}\)\.achat != null/.test(bloc), 'S1 N = la règle de la ligne (`beneficeLigneVente`), jamais un second calcul');
   dit(/data-ventes-achats=\{`\$\{n\}\/\$\{m\}`\}/.test(bloc) && /data-ventes-achats-completer="" [^>]*onClick=\{\(\)=>setFillBuyOpen\(true\)\}/.test(bloc), 'S2 « Prix d’achat N/M · Compléter » ouvre la saisie en série');
-  const iListe = APP.indexOf('<div className="vrm-ventes-liste" data-fu-liste=""');
+  // (18 nov., nouveau design) la liste porte aussi ses classes du nouveau design (`className={'vrm-ventes-liste' + …}`).
+  const iListe = APP.search(/<div className=(?:"vrm-ventes-liste"|\{'vrm-ventes-liste'[^}]*\}) data-fu-liste=""/);
   dit(i > 0 && iListe > i, 'S3 le bandeau est en tête, au-dessus de la liste Vinted');
   dit(/if \(!bd\) return null;\s*const \{ n, m \} = bd;\s*return \(\s*<div className="vrm-ann-avis vrm-ventes-avis" data-ventes-avis="">/.test(bloc), 'S4 il est rendu dès qu’un prix manque (et seulement alors), dans la forme du bandeau d’Annonces');
 
