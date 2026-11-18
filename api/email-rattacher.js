@@ -433,7 +433,8 @@ async function preuveDemander(req, res) {
   const garder = d && d.etat === 'attente' && d.nonce && Date.parse(d.expire || '') > maintenant + 3600e3;
   const nonce = garder ? d.nonce : crypto.randomBytes(18).toString('base64url');
   const expire = garder ? d.expire : new Date(maintenant + DUREE_LIEN_MS).toISOString();
-  const data = { owner: u.id, adresse: a, etat: 'attente', nonce, expire, demandeLe: iso, demandes: [...demandes, iso].slice(-MAX_ENVOIS_ADRESSE_JOUR) };
+  // (17 nov.) + la langue du compte : celle de l'e-mail du lien (api/_lib/mail-textes.js).
+  const data = { owner: u.id, adresse: a, etat: 'attente', nonce, expire, demandeLe: iso, demandes: [...demandes, iso].slice(-MAX_ENVOIS_ADRESSE_JOUR), ...(u.langue && u.langue !== 'fr' ? { langue: u.langue } : {}) };
   if (!await ecrireNeutre(id, data)) { indispo(res); return; }
   res.status(200).json({ ok: true, etat: 'envoi', expire });
 }

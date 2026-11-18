@@ -29,8 +29,8 @@ func donnees(cas string) map[string]interface{} {
 	switch cas {
 	case "fr":
 		d["Data"] = map[string]interface{}{"langue": "fr"}
-	case "en":
-		d["Data"] = map[string]interface{}{"langue": "en"}
+	case "en", "es", "it", "de":
+		d["Data"] = map[string]interface{}{"langue": cas}
 	case "sans-langue":
 		d["Data"] = map[string]interface{}{"prenom": "Julien"}
 	case "sans-donnees":
@@ -66,7 +66,7 @@ func main() {
 	src, out := os.Args[1], os.Args[2]
 	os.MkdirAll(out, 0o755)
 	fichiers, _ := filepath.Glob(filepath.Join(src, "*.html"))
-	cas := []string{"fr", "en", "sans-langue", "sans-donnees", "sans-cle"}
+	cas := []string{"fr", "en", "es", "it", "de", "sans-langue", "sans-donnees", "sans-cle"}
 	for _, f := range fichiers {
 		b, err := os.ReadFile(f)
 		if err != nil {
