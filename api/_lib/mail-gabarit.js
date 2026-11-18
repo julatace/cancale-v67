@@ -26,7 +26,8 @@
 //    titre d'article ne peut jamais écrire du HTML. Une URL qui n'est pas
 //    http(s) n'est jamais posée dans un lien (rendu : rien).
 // ⚠️ Aucune donnée inventée : le gabarit ne porte que ce qu'on lui donne.
-// ⚠️ Français seulement : VRM reste sur la France (§3, 28 oct.).
+// ⚠️ (17 nov.) Cinq langues : celle du compte qui reçoit (api/_lib/mail-textes.js) ;
+//    le français reste la référence (§3 « International », 11 nov.).
 // (11 nov., lot emails-envoyes — « les e-mails que VRM envoie au nom du vendeur
 // sont beaux et lisibles sur téléphone ») La forme est reprise ainsi :
 //   · largeur 600 au plus (une table « fantôme » fixe la largeur sous Outlook,
@@ -57,6 +58,7 @@
 // 
 
 import { VERRE, teteVerre, boutonVerre, enveloppeVerre } from './mail-verre.js';
+import { tm, langueMail } from './mail-textes.js';
 
 export const SITE = 'https://vrm.center';
 // Réglages → Notifications (là où vivent le bilan du mois et les e-mails de l'essai).
@@ -98,25 +100,33 @@ export function lignesEditeur(E = globalThis.VRM_EDITEUR) {
 // marque    : (facultatif) { nom } — l'e-mail est celui d'un VENDEUR (sa facture) :
 //             le NOM DE SA BOUTIQUE en tête au lieu du mot « VRM », et rien de VRM
 //             (ni mot, ni mentions de l'éditeur, ni « via VRM » : Julien, 11 nov.)
-// langue    : (facultatif) l'attribut `lang` du document (défaut « fr »)
+// langue    : (facultatif) la langue du destinataire (fr, en, es, it, de — défaut « fr ») :
+//             l'attribut `lang` ET les mots du gabarit lui-même (secours du bouton,
+//             « Gérer mes e-mails », signature) — api/_lib/mail-textes.js
+// (17 nov., « Améliore les emails aussi ») Le pied dit QUI envoie : « Envoyé par VRM, ton
+// outil de revente · vrm.center » (jamais sur la facture d'un vendeur : `marque`), puis
+// pourquoi on le reçoit. Le bouton est « à toute épreuve » sous Outlook (VML, mail-verre.js).
 // editeur   : (facultatif) l'objet VRM_EDITEUR (défaut : globalThis)
 export function gabaritMail({ titre, preentete = '', paras = [], liste = [], chiffres = [], suite = [], bouton = null, apres = '', pied = null, facultatif = false, marque = null, editeur, langue = 'fr' } = {}) {
   const urlBouton = bouton ? urlSure(bouton.url) : '';
   const lienPied = pied ? urlSure(pied.lien) : '';
   const mentions = marque ? [] : lignesEditeur(editeur === undefined ? globalThis.VRM_EDITEUR : editeur);
   const apercu = String(preentete || paras[0] || titre || '').replace(/\s+/g, ' ').trim().slice(0, 140);
-  const lang = /^[a-z]{2}$/.test(String(langue)) ? langue : 'fr';
+  const lang = langueMail(langue);
+  const signature = marque ? '' : tm(lang, 'g.signature');
 
   // ── Le texte brut : le même contenu, dans le même ordre ───────────────────
   const lignes = [titre, '', ...paras.flatMap((p) => [p, ''])];
   if (liste.length) lignes.push(...liste.map((x) => `· ${x}`), '');
-  if (chiffres.length) lignes.push(...chiffres.map(([l, v, n]) => `${l} : ${v}${n ? ` (${n})` : ''}`), '');
+  if (chiffres.length) lignes.push(...chiffres.map(([l, v, n]) => `${l}${lang === 'fr' ? ' :' : ':'} ${v}${n ? ` (${n})` : ''}`), '');
   lignes.push(...suite.flatMap((x) => [x, '']));
-  if (bouton && urlBouton) lignes.push(`${bouton.mot} : ${urlBouton}`, '');
+  if (bouton && urlBouton) lignes.push(`${bouton.mot}${lang === 'fr' ? ' :' : ':'} ${urlBouton}`, '');
   if (apres) lignes.push(apres, '');
   const piedTxt = [];
-  if (pied) piedTxt.push(lienPied ? `${pied.texte} ${pied.motLien ? pied.motLien[0].toUpperCase() + pied.motLien.slice(1) : 'Lien'} : ${lienPied}` : pied.texte);
-  if (facultatif) piedTxt.push(`Gérer mes e-mails : ${LIEN_GERER}`);
+  const deuxPoints = lang === 'fr' ? ' :' : ':';
+  if (pied) piedTxt.push(lienPied ? `${pied.texte} ${pied.motLien ? pied.motLien[0].toUpperCase() + pied.motLien.slice(1) : tm(lang, 'g.lien')}${deuxPoints} ${lienPied}` : pied.texte);
+  if (facultatif) piedTxt.push(`${tm(lang, 'g.gerer')}${deuxPoints} ${LIEN_GERER}`);
+  if (signature) piedTxt.push(signature);
   if (mentions.length) piedTxt.push(mentions.join(' · '));
   if (piedTxt.length) lignes.push('—', ...piedTxt);
   const texte = lignes.join('\n').replace(/\n{3,}/g, '\n\n').trim();
@@ -148,9 +158,10 @@ export function gabaritMail({ titre, preentete = '', paras = [], liste = [], chi
   const petit = (t) => `<p class="vv-pied" style="margin:0 0 10px;font-family:${P};font-size:13px;line-height:1.55;color:${V.surBleu2}">${t}</p>`;
   const lienDoux = (url, mot) => `<a href="${echapperHtml(url)}" style="color:${V.surBleu};text-decoration:underline">${echapperHtml(mot)}</a>`;
   const blocsPied = [];
-  if (bouton && urlBouton) blocsPied.push(petit(`Le bouton ne marche pas ? Copie cette adresse dans ton navigateur :<br><span style="word-break:break-all;color:${V.surBleu}">${echapperHtml(urlBouton)}</span>`));
+  if (bouton && urlBouton) blocsPied.push(petit(`${echapperHtml(tm(lang, 'g.secours'))}<br><span style="word-break:break-all;color:${V.surBleu}">${echapperHtml(urlBouton)}</span>`));
   if (pied) blocsPied.push(petit(`${echapperHtml(pied.texte)}${lienPied ? ` ${lienDoux(lienPied, majuscule(pied.motLien || 'lien'))}.` : ''}`));
-  if (facultatif) blocsPied.push(petit(lienDoux(LIEN_GERER, 'Gérer mes e-mails')));
+  if (facultatif) blocsPied.push(petit(lienDoux(LIEN_GERER, tm(lang, 'g.gerer'))));
+  if (signature) blocsPied.push(petit(`${echapperHtml(signature.replace(/ · vrm\.center$/, ''))} · ${lienDoux(SITE, 'vrm.center')}`));
   if (mentions.length) blocsPied.push(petit(mentions.map(echapperHtml).join('<br>')));
 
   const corps = paras.map((t) => p(t)).join('')
