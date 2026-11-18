@@ -228,7 +228,8 @@ function mrFragment({ n, cp, k, jours }) {
   dit(/\{!cancelled && \(\(\)=>\{ const su = suivi \|\| suivisAchat\(o, indexSuivisAchats\)\[0\]; if \(!su\) return null;[\s\S]{0,900}<LigneSuivi /.test(app), 'Achats : la ligne de suivi sur CHAQUE achat qui a un n° prouvé (pas seulement en route)');
   dit(!/<PastilleTransporteur t=\{trA\}/.test(app), 'Achats : plus de puce grise pleine largeur au logo centré (capture de Julien)');
   dit(/const aVerifier = commandesAVerifier\(\);/.test(app) && /data-journee-suivi-verifier=/.test(app) && /\(aVerifier\.n \? 1 : 0\)/.test(app), 'Ma journée : « N commandes à vérifier », compté dans les gestes');
-  dit(/const commandesAVerifier = \(\) => \{[\s\S]{0,300}suiviVente\(x\)[\s\S]{0,700}suiviAchat\(o, su/.test(app), 'Ma journée compte avec les MÊMES fonctions que les cartes');
+  // (18 nov., moteur rapide 1b) le calcul vit dans `commandesAVerifierCalc` ; `commandesAVerifier` n'en garde que la clé.
+  dit(/const commandesAVerifier(?:Calc)? = \(\) => \{[\s\S]{0,300}suiviVente\(x\)[\s\S]{0,700}suiviAchat\(o, su/.test(app), 'Ma journée compte avec les MÊMES fonctions que les cartes');
   dit(/cap:meta->>capturedAt'/.test(app) && /cap: r\.cap \|\| null/.test(app), 'l’état Vinted porte l’heure de SA lecture (une incohérence se fonde sur une lecture datée)');
   dit(/data-suivi-copier=/.test(comp) && /navigator\.clipboard\.writeText\(suivi\)/.test(comp) && /data-suivi-lien=/.test(comp) && /data-suivi-deplier=/.test(comp), 'la ligne : n° copiable d’un tap, lien public, détail en dépliant');
   const sl = (() => { try { return fs.readFileSync(path.join(RACINE, 'src/design/suivi-ligne.css'), 'utf8'); } catch (_) { return ''; } })();
