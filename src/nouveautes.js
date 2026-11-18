@@ -27,6 +27,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (18 nov., lot design-v2-suite) docs/passation/2026-11-18-design-v2-suite.md — les finitions de l'audit visuel
+  { id: 'design-v2-finitions', date: '2026-11-18', titre: 'Aujourd’hui plus calme et plus clair', phrase: 'Une rangée par chose à faire, l’ambre seulement quand il faut agir.', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (17 nov., lot design-v2 — Julien : « Le + dégueulasse ») plus de disque dans la barre ; ses gestes à leur place
   { id: 'plus-de-disque', date: '2026-11-17', titre: 'Plus de « + » dans la barre', phrase: 'Scanner dans la recherche, Publier sur Annonces, Imprimer sur ta journée.', tab: 'annonces', pour: 'tous', mode: 'tous' },
   // (17 nov., lot design-v2) docs/passation/2026-11-17-design-v2.md — l'essai, éteint par défaut

@@ -102,8 +102,8 @@
   for (const e of visibles) { if (!estV2(e) || !dansEcran(e.getBoundingClientRect())) continue; const cs = getComputedStyle(e);
     if (ownText(e)) { const f = parseFloat(cs.fontSize) / echelle; if (!TAILLES.some((t) => Math.abs(t - f) <= 0.6)) note('tailles', Math.round(f * 2) / 2, e); if (!GRAISSES.includes(cs.fontWeight)) note('graisses', cs.fontWeight, e); }
     const rad = parseFloat(cs.borderTopLeftRadius); const bg = rgba(cs.backgroundColor);
-    if (rad > 0 && !String(cs.borderTopLeftRadius).includes('%') && rad < 900 && ((bg && bg.a > .02) || parseFloat(cs.borderTopWidth) > 0 || e.tagName === 'IMG') && !RAYONS.includes(Math.round(rad)) && !(rad >= e.getBoundingClientRect().height / 2 - 1)) note('rayons', Math.round(rad), e);
-    for (const p of ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'marginTop', 'marginBottom', 'rowGap', 'columnGap']) { const v = parseFloat(cs[p]); if (!v || isNaN(v) || v <= 2) continue; const vv = Math.round(v * 2) / 2; if (vv % 4 !== 0) note('espaces', vv, e); } }
+    if (rad > 0 && !String(cs.borderTopLeftRadius).includes('%') && rad < 900 && ((bg && bg.a > .02) || parseFloat(cs.borderTopWidth) > 0 || e.tagName === 'IMG') && !RAYONS.includes(Math.round(rad)) && !(rad >= e.getBoundingClientRect().height / 2 - 1) && !e.closest('.v2-etiquette')) note('rayons', Math.round(rad), e);   /* l'étiquette carton (signature) : coin coupé et rayon de 3, dessinés */
+    for (const p of ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'marginTop', 'marginBottom', 'rowGap', 'columnGap']) { const v = parseFloat(cs[p]); if (!v || isNaN(v) || v <= 2 || v > 64) continue;   /* > 64 : une réserve calculée (la pile du bas), pas un espacement */ const vv = Math.round(v * 2) / 2; if (vv % 4 !== 0) note('espaces', vv, e); } }
   out.horsEchelle = horsEchelle;
   out.nHorsEchelle = Object.values(horsEchelle).reduce((t, o) => t + Object.keys(o).length, 0);
 

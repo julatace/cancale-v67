@@ -115,3 +115,13 @@ html[data-design="v2"] body:has(.vrm-fp.fd) .v2-tete-tache [data-v2b="principal"
 /* C10 · le message « N nouvelles paires numérotées · N°… » : deux lignes au plus (la liste des N° est dans Aujourd'hui → À faire),
    jamais un pavé posé sur la liste en très grand texte. */
 html[data-design="v2"] body .vrm-acc-apres .vrm-acc-texte { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* ── B9 · l'échelle 4/8 tenue dans .v2-* (audit visuel v2, règle 8) ── */
+html body .v2-etiquette { padding: 4px 8px 0 16px; line-height: 16px; }
+html body .v2-etiquette.is-moyen { padding: 4px 12px 0 16px; }
+html body .v2-etiquette.is-grand { padding: 8px 16px 0 24px; }
+html body button.v2-rangee.v2-menu { gap: 8px; padding: 0 8px; margin: 0 0 8px -8px; }
+html body .v2-ligne-txt, html body .v2-ligne-droite { gap: 4px; }
+html body .v2b-n { padding: 0 8px; }
+html body .v2-tete { padding: 8px 0 4px; }
+html body .v2-bande { padding-top: 0; padding-bottom: 8px; }
