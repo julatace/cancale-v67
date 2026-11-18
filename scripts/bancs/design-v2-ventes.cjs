@@ -35,7 +35,8 @@ if (process.env.MUTER) {
     // un groupe oublié : les colis à date estimée ne sont plus rangés (des colis cachés)
     groupe: [/"plusTard","estimee","sansDate"/g, '"plusTard","sansDate"'],
     // le compte redit sur chaque rangée (ce qui était interdit)
-    compte: [/cle:"vendue",icone:"clock",texte:/g, 'cle:"vendue",icone:"clock",texte:"vendeur_1 · "+'],
+    // (le texte entier entre parenthèses : le minifieur écrit le ternaire sans elles, `"x"+a<=0?…` ne préfixerait rien)
+    compte: [/cle:"vendue",icone:"clock",texte:([^{}]*\{n:\w+\}\))\}/g, 'cle:"vendue",icone:"clock",texte:"vendeur_1 · "+($1)}'],
   };
   const m = muts[process.env.MUTER]; let n = 0;
   for (const f of fs.readdirSync(path.join(dst, 'assets'))) {
