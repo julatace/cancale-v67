@@ -290,6 +290,19 @@ const badge = (quoi, extra) => Object.assign({ from: 'vrm-badge', action: 'favor
     dit(g.jobs.filter((j) => j.etat === 'attente').length >= 1 && g.jobs.every((j) => choisis.includes(j.notificationId)), 'seuls les favoris de CE lot restent à envoyer', JSON.stringify(g.jobs.map((j) => [j.notificationId, j.etat])));
     dit(JSON.stringify(f.store.vrmPrudence || null) === prud, 'la prudence de 24 h n’est pas touchée par la reprise', prud);
   }
+  // ── B6 : un refus de Vinted se dit PRÉCISÉMENT (jamais « Vinted ou l'extension a interrompu la file ») ──
+  console.log('\nB6. Un refus de Vinted : la raison exacte et le geste');
+  {
+    const sv = await serveur(a);
+    for (const [raison, motif] of [['offre_refusee', /offre de réduction/], ['conversation_deja_contactee', /Conversation avec des messages/], ['vinted_robot', /vérification \(anti-robot\).*Reprendre/]]) {
+      const F = sv.F; let d = null;
+      d = F.lancerFile(d, { owner: OWNER, targets: [{ itemId: '5000', recipientId: '900', notificationId: 'n0', initiator: 'favourite' }, { itemId: '5006', recipientId: '906', notificationId: 'n6', initiator: 'favourite' }], message: 'x', intervalleMinutes: 0, maintenant: Date.now(), lot: 'l' }).data;
+      const rs = F.reserverFile(d, { owner: OWNER, maintenant: Date.now(), jeton: '00000000-0000-4000-8000-000000000001', suivi: 's' }); d = rs.data;
+      const t = F.terminerFile(d, { owner: OWNER, jeton: '00000000-0000-4000-8000-000000000001', resultat: raison === 'conversation_deja_contactee' ? 'refuse' : 'refuse', raison, maintenant: Date.now(), ecrits: 0 });
+      const txt = String(t.valeur.raison || '');
+      dit(motif.test(txt) && !/Vinted ou l’extension a interrompu/.test(txt), `refus « ${raison} » : dit précisément`, txt.slice(0, 160));
+    }
+  }
   console.log(`\n${ko ? '❌' : '✅'} ${ok} vert(s), ${ko} rouge(s)`);
   nettoyer();
   process.exit(ko ? 1 : 0);
