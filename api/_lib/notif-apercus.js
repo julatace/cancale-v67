@@ -34,6 +34,7 @@ import { texteNotifModeration } from '../../src/moderationVinted.js';
 import { texteAvisBas } from '../../src/avisNegatif.js';
 import { notifAlertes } from './ebay-alertes-texte.js';
 import { rediger } from './notif-redaction.js';
+import { texteCoucou } from '../../src/communaute/coucou.js';
 
 const court = (t, n) => { const x = String(t || ''); return x.length > n ? x.slice(0, n - 1).trimEnd() + '…' : x; };
 
@@ -222,6 +223,13 @@ export const APERCUS_NOTIF = {
     quoi: 'Une nouvelle annonce eBay pour une recherche dont tu as allumé l’alerte. VRM n’achète rien.',
     exemples: [
       (() => { const n = notifAlertes([{ itemId: 'v1|1|0', recherche: 'Samba 42', titre: 'Adidas Samba OG 42', prix: 6500, port: 500, total: 7000 }]); return { title: n.title, body: n.body, mene: 'eBay · Achats' }; })(),
+    ],
+  },
+  // (17 nov.) Un coucou reçu dans un groupe : le vrai texte (api/_lib/coucou.js), sans contenu.
+  communaute: {
+    quoi: 'Quelqu’un d’un de tes groupes d’accompagnement t’a fait coucou. Pour lui répondre, c’est sur Discord.',
+    exemples: [
+      { ...texteCoucou('fr', 'Léa', 'Accompagnement novembre'), mene: 'Communauté · Groupes' },
     ],
   },
 };
