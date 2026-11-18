@@ -336,14 +336,15 @@ async function vue(nom, vp, sombre) {
     const p = await pg.evaluate(() => window.__pistes.map((t) => t.readyState));
     dit(p.length >= 1 && p.every((x) => x === 'ended'), `${nom} A : la caméra coupée en partant`, JSON.stringify(p));
   });
-  // B — DataMatrix (S10) ⇒ SA vente ; au téléphone par le disque « + » depuis Ma journée.
+  // B — DataMatrix (S10) ⇒ SA vente ; au téléphone par l'icône Scanner du champ de recherche, depuis Ma journée.
   await scene(nom, vp, sombre, 'B', async ({ pg }, shot) => {
     if (tel) {
-      await pg.waitForSelector('[data-sb-disque]', { timeout: 30000 });
+      // (17 nov.) Plus de disque « + » : le Scanner est l'icône DANS le champ de recherche (loupe ⇒ champ ⇒ scanner).
+      await pg.waitForSelector('button[data-recherche-loupe]', { timeout: 30000 });
       await pg.waitForTimeout(1200);
-      const m = await ouvrirEtLire(pg, ['[data-sb-disque]', '[data-sb-lame="scanner"]']);
+      const m = await ouvrirEtLire(pg, ['button[data-recherche-loupe]', '[data-recherche-scanner]']);
       const e = await etat(pg);
-      dit(e && e.resultat === 'un' && e.fiche === 'vente:v:9203', `${nom} B : disque « + » ⇒ Scanner, depuis Ma journée : DataMatrix (S10) ⇒ SA vente (pas la voisine)`, JSON.stringify(e && { r: e.resultat, f: e.fiche, m }));
+      dit(e && e.resultat === 'un' && e.fiche === 'vente:v:9203', `${nom} B : loupe ⇒ Scanner (dans le champ), depuis Ma journée : DataMatrix (S10) ⇒ SA vente (pas la voisine)`, JSON.stringify(e && { r: e.resultat, f: e.fiche, m }));
       await shot(pg, '3-disque');
     } else {
       await pret(pg, 'ventes');

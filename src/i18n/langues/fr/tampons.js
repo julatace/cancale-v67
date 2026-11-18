@@ -95,5 +95,14 @@ export default {
   "tampons.pret.titreLot": {
     "one": "{n} bordereau prêt",
     "other": "{n} bordereaux prêts"
-  }
+  },
+  // (17 nov., lot tampon-qr)
+  "tampons.statut.auto2": "Placement automatique",
+  "tampons.modifier": "Modifier",
+  "tampons.exemple": "Exemple",
+  "tampons.exemple.phrase": "Exemple : aucun bordereau de ce transporteur reçu pour l’instant. Les données sont inventées.",
+  "tampons.mention.toujours": "« Créé par vrm.center » s’imprime toujours, juste au-dessus du QR code : visible même sous le scotch.",
+  "tampons.phrase2": "Ton dernier bordereau de chaque transporteur, tamponné comme il sortira. Touche-le pour déplacer le N°.",
+  "tampons.editeur.phrase2": "Glisse le N° ; tire la poignée pour l’agrandir. Enregistré tout de suite. « Créé par vrm.center » reste au-dessus du QR code.",
+  "tampons.el.mVerrou": "« Créé par vrm.center » : fixe, juste au-dessus du QR code"
 };
