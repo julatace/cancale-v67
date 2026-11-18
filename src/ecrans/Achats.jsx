@@ -366,6 +366,15 @@ function AchatsHorsPlateforme({ achats, ouvert, onBasculer, onAjouter, onModifie
     return () => { vivant = false; };
   }, [ouvert, avecPhoto]);
   const ouvrirAjout = () => { setEditId(null); setErreur(''); setForm(BROUILLON0()); };
+  // (17 nov., nouveau design) Le plein d'Achats « Ajouter un achat » (quand rien n'attend au relais) ouvre CETTE saisie :
+  // la section se déplie, le formulaire s'ouvre, on y descend. Le même geste que son bouton ; rien n'est écrit sans « Ajouter ».
+  const ajoutRef = useRef(null);
+  useEffect(() => {
+    const f = () => { if (!ouvert && onBasculer) onBasculer(true); ouvrirAjout(); setTimeout(() => { try { ajoutRef.current && ajoutRef.current.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {} }, 120); };
+    window.addEventListener('vrm:v2-ajouter-achat', f);
+    return () => window.removeEventListener('vrm:v2-ajouter-achat', f);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ouvert]);
   // (10 nov., lot AH) Le raccourci Siri « Ajouter un achat » (src/raccourcisSiri.js) : le formulaire s'ouvre,
   // pré-rempli de ce qu'il a dit — rien n'est écrit sans « Ajouter l'achat ». Consommé une fois.
   useEffect(() => {
