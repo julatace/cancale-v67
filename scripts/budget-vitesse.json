@@ -690,6 +690,13 @@
    "ecrans": [
     "journee"
    ],
+   "raison": "train du 18 nov. : republication parfaite (ext. 5.408, #1257 : l'étape de chaque paire dans l'app) — 1 968,98 Ko mesuré ici, un peu plus de 1 969 en CI : budget 1 970"
+  },
+  {
+   "date": "2026-11-18",
+   "ecrans": [
+    "journee"
+   ],
    "raison": "train du 18 nov. : la suite du nouveau design (lot design-v2-suite, #1268 : suite.css, rangées touchables d'Aujourd'hui, Achats) — +2,5 Ko au démarrage (1 971,49 mesuré par audit-poids-demarrage ; accord du coordinateur)"
   }
  ]
