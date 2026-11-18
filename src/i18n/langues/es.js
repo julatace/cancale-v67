@@ -7,6 +7,7 @@ import ecran_journee from './es/journee.js';
 import ecran_confort from './es/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_studio from './es/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
 import ecran_design_v2 from './es/designV2.js';   // (17 nov.) le nouveau design, en essai
+import ecran_v2_suite from './es/v2suite.js';   // (18 nov.) la suite du nouveau design
 import ecran_correspondances from './es/correspondances.js';   // (15 nov.) Publier partout : catégories qui correspondent
 import ecran_capte from './es/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_avenir from './es/avenir.js';
@@ -2306,6 +2307,7 @@ export default {
   ...ecran_confort,
   ...ecran_studio,
   ...ecran_design_v2,
+  ...ecran_v2_suite,
   ...ecran_capte,
   ...ecran_retrait_ailleurs,
   ...ecran_vcventes,

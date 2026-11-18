@@ -13,6 +13,7 @@ import { TYPES_CENTRE, ETAT_CENTRE, entreesDuJournal, estLue, marquerLues, toutL
 import { ICONE_FAMILLE, GESTE_FAMILLE } from '../api/_lib/notif-belle.js';
 import { SheetShell } from './composants/SheetShell.jsx';
 import { EtatPanne } from './composants/EtatPanne.jsx';
+import { designV2Actif } from './designV2/reglage.js';   // (18 nov.) la cloche passe par le composant du nouveau design
 
 const nomType = (f) => (TYPES_CENTRE.find((t) => t.id === f) || {}).titre || (f === 'test' ? 'Essai' : 'Autre');
 // (8 nov.) Une ligne de la cloche : l'icône de la famille, le fait, le texte, le
@@ -66,7 +67,7 @@ export function BoutonCentreNotifs({ nonLues, onOuvrir, Icon, alerte = false, al
   const n = Number.isSafeInteger(nonLues) && nonLues > 0 ? nonLues : 0;
   const lib = (n ? `Notifications : ${n} non lue${n > 1 ? 's' : ''}` : 'Notifications') + (alerte && alerteNom ? ` · ${alerteNom}` : '');
   return (
-    <button className="vrm-hbtn vrm-cn-cloche" type="button" data-centre-notifs-cloche="" data-non-lues={Number.isSafeInteger(nonLues) ? String(nonLues) : ''}
+    <button className={"vrm-hbtn vrm-cn-cloche" + (designV2Actif() ? " v2b v2b-icone" : "")} data-v2b={designV2Actif() ? "icone" : undefined} type="button" data-centre-notifs-cloche="" data-non-lues={Number.isSafeInteger(nonLues) ? String(nonLues) : ''}
       aria-label={lib} title={lib} onClick={onOuvrir} data-cn-alerte={alerte ? '1' : undefined}>
       <Icon name="bell2" size={21}/>
       {/* (14 nov., refonte de la coque) « 9+ » au plus : au-delà, le nombre exact est dans la feuille (et lu dans `aria-label`). */}

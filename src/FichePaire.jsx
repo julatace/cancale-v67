@@ -4,6 +4,7 @@
 // pleine. Pas su : « — » et la raison. Pas (encore) arrivée : grisée — jamais
 // inventée. Aucune couleur (§7) sauf le rouge de deux paires sous ce N° (§5).
 import React from 'react';
+import { designV2Actif } from './designV2/reglage.js';
 import { motsVendeur } from './profilVendeur.js';
 import {HistoriqueModifications} from './OutilsParcours.jsx';
 import { createPortal } from 'react-dom';
@@ -184,7 +185,9 @@ const NOM_SITE_FD = { vinted: 'Vinted', ebay: 'eBay', leboncoin: 'Leboncoin', ve
 const dateFd = (t) => { const d = new Date(t); if (!Number.isFinite(d.getTime())) return ''; return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', ...(d.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {}) }); };
 const prixFd = (c) => (c == null ? '' : eur(c));
 // Un rond sur la photo (‹ et ⋯) : 44 px, verre sombre (maquette `.rd3`).
-const Rond = ({ children, className = '', ...p }) => <button type="button" className={'fd-rond ' + className} {...p}>{children}</button>;
+// (18 nov., audit visuel C6) Nouveau design : le rond passe par le contrat du composant (`data-v2b="icone"` : états d'appui et
+// d'anneau de src/designV2), son dessin (le verre sur la photo) reste le sien.
+const Rond = ({ children, className = '', ...p }) => <button type="button" className={'fd-rond ' + className} data-v2b={designV2Actif() ? 'icone' : undefined} {...p}>{children}</button>;
 const ICONE_TUILE = { note: 'pencil', photos: 'camera', certificat: 'doc', rappel: 'clock', prix: 'tag', publier: 'shop', dupliquer: 'copy', taille: 'grid', bordereau: 'printer', emballer: 'box', numero: 'journal' };
 const MarqueSite = (site, I) => (['vinted', 'ebay', 'leboncoin', 'vestiaire'].includes(site) ? <MarquePlateforme site={site} taille={site === 'ebay' ? 11 : 18}/> : I('tag', 17));
 

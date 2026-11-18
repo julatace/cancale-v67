@@ -1,0 +1,69 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   LA SUITE DU NOUVEAU DESIGN (18 nov.) — les « à corriger » et « finitions » de l'audit visuel du 17 nov.
+   (coque, Aujourd'hui, Annonces, Achats, barre). Importée EN DERNIER (src/App.jsx), tout sous le design v2 :
+   éteint, rien ne s'applique. Échelle fermée (audit visuel v2, règle 8) : tailles 11 · 13 · 15 · 17 · 20 · 28 · 34 · 56,
+   graisses 400 · 600 · 700, rayons 8 · 12 · 16 · pilule, espacements multiples de 4.
+   Banc : scripts/audit-visuel-v2.cjs. Récit : docs/passation/2026-11-18-design-v2-suite.md.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── B9 · les jetons de l'échelle ─────────────────────────────────────────── */
+:root {
+  --v2-r-petit: 8px; --v2-r-moyen: 12px; --v2-r-grand: 16px; --v2-r-pilule: 999px;
+  --v2-e-1: 4px; --v2-e-2: 8px; --v2-e-3: 12px; --v2-e-4: 16px; --v2-e-6: 24px; --v2-e-8: 32px;
+  /* C2 · le plein mesure 50 partout (le jeton dit vrai) ; le compact de la ligne du titre, 44. */
+  --v2-bouton-h: 50px;
+}
+
+/* ── AUJOURD'HUI · B1 C1 C3 : la rangée « À faire » se touche entière ────────── */
+html body button.v2-rangee.v2-afaire-ligne { position: relative; min-height: var(--v2-air-rangee, 64px); padding: 12px var(--v2-air-carte, 20px); gap: 16px; border-radius: 0; }
+html body .v2-afaire-ligne + .v2-afaire-ligne::before { content: ""; position: absolute; left: calc(var(--v2-air-carte, 20px) + 56px); right: 0; top: 0; height: .5px; background: var(--v2-filet); }
+html body .v2-afaire-titre { font-size: 15px; font-weight: 600; line-height: 1.4; overflow-wrap: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+html body .v2-afaire-detail { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; -webkit-line-clamp: none; }
+html body .v2-afaire-n { flex: none; min-width: 28px; text-align: right; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--sv-encre, #0C1D30); }
+html body .v2-afaire-ic { border-radius: var(--v2-r-moyen); }
+html body .v2-afaire .v2-chevron, html body .v2-paslu .v2-chevron { color: var(--v2-muet); }
+/* B3 · pas encore lu : une carte-rangée calme, son geste dit en clair. */
+html body button.v2-rangee.v2-paslu { margin: 16px 0 var(--v2-air-sections, 32px); padding: 16px var(--v2-air-carte, 20px); gap: 16px; min-height: 72px;
+  background: var(--v2-carte); color: var(--sv-encre, #0C1D30); border-radius: var(--v2-r-grand); box-shadow: var(--v2-carte-ombre); }
+html body .v2-paslu-geste { flex: none; font-size: 15px; font-weight: 600; color: var(--v2-lien); }
+/* B2 · la date estimée n'est pas ambre : gris de la page. */
+html body .v2-bande-quand:not(.is-ambre) { color: var(--v2-page-muet); }
+
+/* ── AUJOURD'HUI À L'ORDINATEUR · B6 : deux colonnes, la bande sans coupe ────── */
+@media (min-width: 1100px) {
+  html body .v2-aujourdhui:not(:has([data-v2-rien])) { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 440px); column-gap: 32px; align-items: start; max-width: 1180px; }
+  html body .v2-aujourdhui > :is(header, .v2-affiche-sig, [data-v2-bloc="affiche"], .v2-pouce) { grid-column: 1 / -1; }
+  html body .v2-aujourdhui > [data-v2-bloc="bande"], html body .v2-aujourdhui > [data-v2-bloc="retirer"] { grid-column: 1; }
+  html body .v2-aujourdhui > [data-v2-bloc="afaire"] { grid-column: 2; grid-row: 3 / span 4; max-width: none; }
+  html body .v2-aujourdhui .v2-bande { grid-auto-flow: row; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); grid-auto-columns: auto; overflow: visible; }
+  html body .v2-aujourdhui .v2-bande-photo { width: 100%; height: auto; aspect-ratio: 1; }
+  html body .v2-aujourdhui .v2-afaire, html body .v2-aujourdhui .v2-groupe { max-width: none; }
+}
+
+/* ── ANNONCES · B8 : aucun mot coupé au milieu dans un titre (2 lignes puis « … ») ── */
+html body :is(.v2l-a-titre, .v2l-c-titre) { overflow-wrap: normal; word-break: normal; }
+
+/* ── ACHATS · B4 B5 C5 ───────────────────────────────────────────────────── */
+/* « À retirer · 0 » (et son scanner) ne se dit pas quand il n'y a rien à retirer : le titre de la tâche et la liste suffisent. */
+html[data-design="v2"] body .vrm-achats-retirer-repli[data-retirer-n="0"] .sb-tete-hote { display: none !important; }
+/* « À vérifier » : une carte-rangée (le même dessin que « À faire »). */
+html[data-design="v2"] body .v2-achats-verifier { margin: 0 0 var(--v2-air-sections, 32px); background: var(--v2-carte); color: var(--sv-encre, #0C1D30); border-radius: var(--v2-r-grand); box-shadow: var(--v2-carte-ombre); overflow: hidden; }
+/* La carte de chiffres d'hier (Dépensé · En route · À retirer · Arrivés) redisait les nombres de l'écran : Argent les porte. */
+html[data-design="v2"] body .vrm-tache[data-tache="achats"] [data-achats-hero] { display: none !important; }
+/* C5 · l'historique d'hier sous la liste : sans ombre ni dégradé par rangée (1 000 achats). */
+html[data-design="v2"] body .vrm-tache[data-tache="achats"] .vrm-buy-row { box-shadow: none !important; background-image: none !important; }
+/* B5 · à l'ordinateur, la même composition qu'au téléphone : UNE colonne de 760, les passes puis la liste. */
+@media (min-width: 1024px) {
+  :root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-tache[data-tache="achats"] { display: block !important; max-width: 760px !important; }
+  :root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-tache[data-tache="achats"] > * { max-width: 760px !important; }
+  /* Le plein compact et le scanner de la ligne du titre ne se recouvrent plus (« Ajo… » sous la loupe). */
+  html[data-design="v2"] body .v2-tete-tache:has(.vrm-tache-retrouver) .v2-titre-ligne { padding-right: 60px; }
+}
+
+/* ── COQUE · B10 : UN trait pour toutes les icônes (1,5 px rendus, quelle que soit la taille du glyphe) ── */
+html[data-design="v2"] body svg[viewBox="0 0 24 24"][stroke="currentColor"] { stroke-width: 1.5px; }
+html[data-design="v2"] body svg[viewBox="0 0 24 24"][stroke="currentColor"] :is(path, circle, rect, line, polyline, polygon, ellipse) { vector-effect: non-scaling-stroke; }
+
+/* ── COQUE · B7 : « Extension à installer » n'est pas un bouton plein (un seul plein par écran) — une pastille de verre ── */
+html[data-design="v2"] body .vrm-app-header .vrm-etat-pastille { background: rgb(255 255 255 / .14) !important; border: 1px solid rgb(255 255 255 / .28) !important; box-shadow: none !important; color: #FFFFFF !important; }
+html[data-design="v2"] body .vrm-app-header .vrm-etat-pastille * { color: inherit !important; }

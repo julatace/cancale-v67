@@ -1106,11 +1106,12 @@ import { useDesignV2, designV2Actif } from "./designV2/reglage.js";
 import AujourdhuiV2 from "./designV2/Aujourdhui.jsx";
 import { PassesRetrait as PassesRetraitV2, EnRouteListe as EnRouteListeV2 } from "./designV2/PassesRetrait.jsx";
 import MenuPlateformeV2 from "./designV2/MenuPlateforme.jsx";
-import { BoutonV2, SegmentV2 } from "./designV2/BoutonV2.jsx";
+import { BoutonV2, SegmentV2, RangeeTouchable as RangeeTouchableV2 } from "./designV2/BoutonV2.jsx";
 import { nombre as nombreV2 } from "./i18n/index.js";
 import LigneAnnonceV2 from "./designV2/LigneAnnonce.jsx";
 import { SqueletteRangees as SqueletteRangeesV2, QuandLu as QuandLuV2 } from "./designV2/Signature.jsx";
 import { reprendreBarre } from "./designV2/barre.jsx";   // (17 nov.) le style de la barre d'onglets, posé sur <html> dès l'import
+import "./designV2/suite.css";   // (18 nov.) la suite du nouveau design (audit visuel), EN DERNIER
 import "./design/accessibilite.css";   // (17 nov.) audit WCAG 2.1 AA : focus double, encre claire sur le bleu, 44 px — `@layer vrm-a11y`, nommée AVANT vrm-verre (index.html)
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
@@ -20071,7 +20072,7 @@ function BoutonProfilTete() {
   const etat = useEtatActionsVu();
   if (!uid) return null;
   const lib = etat && etat.nom ? `${tr('coque.monProfil')} · ${etat.nom}` : tr('coque.monProfil');
-  return <button type="button" className="vrm-hbtn vrm-hdr-profil" data-profil-tete="" data-etat-ton={etat ? etat.ton : undefined} aria-haspopup="dialog" aria-label={lib} onClick={ouvrirMenuProfil}>
+  return <button type="button" className={"vrm-hbtn vrm-hdr-profil" + (designV2Actif() ? " v2b v2b-icone" : "")} data-v2b={designV2Actif() ? "icone" : undefined} data-profil-tete="" data-etat-ton={etat ? etat.ton : undefined} aria-haspopup="dialog" aria-label={lib} onClick={ouvrirMenuProfil}>
     <PastilleProfil owner={uid} headers={enTeteSession} nom="" email={String(AUTH.user.email || '')} taille={30} className="vrm-sensible"/>
     {etat ? <span className="vrm-hdr-profil-etat" data-etat-point={etat.ton} aria-hidden="true" style={{ '--etat-point': etat.point }}/> : null}
   </button>;
@@ -50712,7 +50713,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         const echeanceJ = (t) => {
           if (!t || t.daysLeft == null) return { txt: '', ambre: false, date: false };
           const H = t.heure ? heureCourteJ(t.heure) : '';
-          if (t.depasse && !t.retard) return { txt: tr('sj.ech.aVerifier'), ambre: true, date: false };
+          if (t.depasse && !t.retard) return { txt: tr('sj.ech.aVerifier'), ambre: true, date: false, estim: true };
           if (t.depasse) return { txt: tr('sj.ech.retard'), ambre: true, date: false };
           if (t.daysLeft === 0) return { txt: H ? tr('sj.ech.aujH', { h: H }) : tr('sj.ech.auj'), ambre: true, date: false };
           if (t.daysLeft === 1) return { txt: H ? tr('sj.ech.demainH', { h: H }) : tr('sj.ech.demain'), ambre: true, date: false };
@@ -50842,12 +50843,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           return (
             <AujourdhuiV2 titre={tr('nav.journee.court')} Photo={PhotoVinted} Plaque={PlaqueJ} Icon={Icon}
               pret={baseKO || [xE, xR, xM, xP].every((x) => !!x && !x.pasSu)}
-              affiche={{ n: nE, pasSu: nE == null, sous: ecart, ambre: colisJournee.some((c) => c.e && c.e.ambre) }}
-              colis={nE ? colisJournee : []}
+              /* (18 nov., audit visuel B2) Une date ESTIMÉE dépassée (vente + 7 j, §5 : un plancher, jamais un retard) est dite
+                 en gris, pas en ambre : l'ambre reste aux dates lues qui pressent. Affichage seulement. */
+              affiche={{ n: nE, pasSu: nE == null, sous: ecart, ambre: colisJournee.some((c) => c.e && c.e.ambre && !c.e.estim) }}
+              colis={nE ? colisJournee.map((c) => (c.e && c.e.estim ? { ...c, e: { ...c.e, ambre: false } } : c)) : []}
               retraits={{ n: nR, pasSu: nR == null, points: pointsJ, nPoints: Math.max(1, pointsJ.length), premier: premierJ }}
               groupes={groupesJ}
               plein={nPrets > 0 ? { n: nPrets, txt: tr('v2.imprimerCourt'), faire: () => { _pendingBordPrint = true; if (onNav) onNav(xE.tab); } } : null}
               onScanner={() => ouvrirRetrouver('journee')}
+              onOuvrirVinted={() => { try { window.open('https://www.vinted.fr/', '_blank', 'noopener'); } catch (_) {} }}
               onColis={() => { if (onNav && xE) onNav(xE.tab); }}
               onRetraits={() => { if (onNav) onNav('retraits'); }}/>
           );
@@ -54504,7 +54508,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             const tfV2 = tailleEnFin(it.title);
             const aRelierV2 = !(e.buyFromId != null && String(e.buyFromId) !== '') && sansAchatRelie(e, () => (achatConnu ? achat : null));
             lignesV2.push(<LigneAnnonceV2 key={'v2:' + cleCarte} cle={'v2:' + cleCarte} variante={ligneV2} attrs={flAnn} photo={it.photo || null} Photo={PhotoVinted} Icon={Icon} Plaque={PlaqueJ}
-              titre={it.title || it.brand || ''} num={num} taille={tfV2 ? tfV2.taille : (it.size || '')} jours={age} prix={prix(it.price, it.currency) || ''}
+              titre={(tfV2 && tfV2.nom) || it.title || it.brand || ''} titreEntier={it.title || it.brand || ''} num={num} taille={tfV2 ? tfV2.taille : (it.size || '')} jours={age} prix={prix(it.price, it.currency) || ''}
               favoris={Number.isFinite(it.favourites) ? it.favourites : null} vues={Number.isFinite(it.views) ? it.views : null} aRelier={aRelierV2}
               etat={it.condition ? String(it.condition) : ''} achat={achatConnu ? prixCourt(achat) : ''} marge={achatConnu && marge != null ? (marge > 0 ? '+' : marge < 0 ? '−' : '') + prixCourt(Math.abs(marge)) : ''} relierMot={annSort === 'sansachat'}
               onRelier={() => openPicker(item)} LigneGlissable={LigneGlissable}
@@ -55813,6 +55817,22 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 : [['imprimer', nPrets === nLot ? 0 : nPrets, 'à imprimer'], (() => { const d = gestesDepuis(shipDone, m0.getTime()); return ['deposes', d, d > 1 ? 'déposés aujourd’hui' : 'déposé aujourd’hui']; })()];
               const vus = parts.filter((x) => x[1] > 0);
               if (!vus.length) return null;
+              // (18 nov., audit visuel B4) Nouveau design, Achats : « N à vérifier » est UNE rangée qui se touche (elle ouvre
+              // le détail des retraits, où chaque colis à vérifier a sa raison et ses gestes) ; « avec code » est déjà dit par
+              // les passes. Mêmes nombres, mêmes sources (`pickupUnion`).
+              if (designV2 && colisDans === 'achats') {
+                const nv = (vus.find((x) => x[0] === 'verifier') || [])[1] || 0;
+                if (!nv) return null;
+                return <div className="v2-achats-verifier" data-a-faire="" data-colis-resume={colisDans}><RangeeTouchableV2 className="v2-afaire-ligne v2-verifier-ligne" label={tr('v2s.achats.verifier', { n: nv })}
+                  attrs={{ 'data-colis-resume-case': 'verifier', 'data-n': String(nv), 'data-v2-verifier': String(nv) }}
+                  onClick={() => { try { const d = document.querySelector('details[data-v2-detail-retraits]'); if (d) { d.open = true; d.scrollIntoView({ block: 'start', behavior: 'smooth' }); } } catch (_) {} }}>
+                  <span className="v2-afaire-ic" aria-hidden="true"><Icon name="box" size={20}/></span>
+                  <span className="v2-afaire-txt"><span className="v2-afaire-titre"><i className="v2-point" aria-hidden="true" data-geste=""/>{tr('v2s.achats.verifierTitre')}</span>
+                    <span className="v2-afaire-detail">{tr('v2s.achats.verifierDetail')}</span></span>
+                  <span className="v2-afaire-n">{nv}</span>
+                  <span className="v2-chevron" aria-hidden="true"><Icon name="chevron" size={16}/></span>
+                </RangeeTouchableV2></div>;
+              }
               return <VersAFaire><p className="vrm-colis-resume" data-colis-resume={colisDans}>{vus.map((x, i) => <span key={x[0]} data-colis-resume-case={x[0]} data-n={String(x[1])}>{i ? ' · ' : ''}{x[1]} {x[2]}</span>)}</p></VersAFaire>; })() : null}
             {!baseKO && !colisDans && onglet !== 'retirer' && (() => { const m0 = new Date(); m0.setHours(0, 0, 0, 0); const deposes = gestesDepuis(shipDone, m0.getTime());
               // (3 nov., carte réglable par page) Défaut = la carte d'avant : « à poster » (la publication
@@ -55946,7 +55966,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                           if (!x.code) return null; return () => openQrView(t ? (codeRetrait(t.code) !== x.code ? { ...t, code: x.code } : t) : ligneRetraitVinted(o)); } }}/>
                     {/* (17 nov.) Plus de « Aucun colis à aller chercher » ici : « À retirer · 0 » le dit déjà en tête, et cette ligne
                         posée après « En route » le poussait (banc design-v2-chargement). */}
-                    <EnRouteListeV2 lignes={enRouteV2} Icon={Icon} Photo={photoCarte} touteSansPoint={enRouteV2.length > 0 && enRouteV2.every((l) => !l.point)}/>
+                    <EnRouteListeV2 lignes={enRouteV2} Icon={Icon} Photo={photoCarte} touteSansPoint={enRouteV2.length > 0 && enRouteV2.every((l) => !l.point)}
+                      sansN={enRouteV2.length === ((pickupUnion.aVerifier || []).length + (pickupUnion.aConfirmer || []).length)}/>
                     {/* Rien n'attend au relais : le geste plein d'Achats est « Ajouter un achat » (la saisie d'un achat hors
                         plateforme, la même que son bouton : `vrm:v2-ajouter-achat`, src/ecrans/Achats.jsx). */}
 
@@ -61395,7 +61416,7 @@ function BoutonMontants() {
   const cache = useMontantsCaches();
   const lib = cache ? 'Montrer les montants' : 'Cacher les montants';
   return (
-    <button className="vrm-hbtn" type="button" data-bouton-montants="" data-montants-caches={cache ? '1' : '0'} data-stream-libre=""
+    <button className={"vrm-hbtn" + (designV2Actif() ? " v2b v2b-icone" : "")} data-v2b={designV2Actif() ? "icone" : undefined} type="button" data-bouton-montants="" data-montants-caches={cache ? '1' : '0'} data-stream-libre=""
       aria-pressed={cache} aria-label={lib} title={lib} onClick={() => poserMontants(!cache)}>
       <Icon name={cache ? 'eyeOff' : 'eye'} size={21}/>
     </button>
@@ -66479,7 +66500,7 @@ function AppCoeur() {
             {((!reglesStream.bouton && !streamOn) || montantsCaches) && (ordi || montantsCaches) ? <BoutonMontants/> : null}
             {/* (5 nov.) La cloche : ce que VRM a envoyé (src/CentreNotifs.jsx). */}
             {AUTH.user && <CentreNotifsCoque onReglages={()=>setTab('settings')} enTete={(fermer)=>!baseKO && !horsLigne ? <Suspense fallback={null}><LigneFraicheurParesseuse baseKO={baseKO} comptes={vintedAccounts} publier={false} onNav={(t)=>{ fermer(); setTab(t); }}/></Suspense> : null}/>}
-            {!ordi && !v2Ann && <button className="vrm-hbtn" type="button" data-recherche-zone="" data-recherche-loupe="" data-recherche-loupe-voix={DICTEE_OK && !VOIX.refus ? '1' : '0'}
+            {!ordi && !v2Ann && <button className={"vrm-hbtn" + (designV2App ? " v2b v2b-icone" : "")} data-v2b={designV2App ? "icone" : undefined} type="button" data-recherche-zone="" data-recherche-loupe="" data-recherche-loupe-voix={DICTEE_OK && !VOIX.refus ? '1' : '0'}
               onPointerDown={(e)=>{ if(!DICTEE_OK || VOIX.refus || (e.button!=null && e.button!==0)) return; clearTimeout(appuiLoupe.current.t); appuiLoupe.current.long=false;
                 appuiLoupe.current.t=setTimeout(()=>{ appuiLoupe.current.long=true; flushSync(()=>setGsOpen(true)); if(!ecouteEnCours('loupe')) dicterLoupe(); }, 550); }}
               onPointerUp={()=>clearTimeout(appuiLoupe.current.t)} onPointerCancel={()=>clearTimeout(appuiLoupe.current.t)} onPointerLeave={()=>clearTimeout(appuiLoupe.current.t)}
