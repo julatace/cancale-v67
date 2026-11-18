@@ -23,7 +23,7 @@
 // Les outils de l'app (lecture de la base, confirmation, notifications) sont
 // passés par `deps` : ce fichier n'importe rien d'App.jsx.
 import { fetchBorne, DELAI_ROUTE_MS, NOM_DELAI } from './reseauBorne.js';
-import { tr } from './i18n/index.js';
+import { tr, localeCourante } from './i18n/index.js';
 import React from 'react';
 import './facture-pro.css';
 import './facture-tva.css';
@@ -825,6 +825,28 @@ export function FactureVente({ vente, deps, ligne = false, groupe = null }) {
     <BonRetour vente={vente} preuve={preuve} facture={f} deps={deps} ligne={ligne}/>
     {ouverte ? <FeuilleFactureVente vente={vente} preuve={preuve} facture={f} avoir={av} deps={deps} fermer={() => setOuverte(false)}/> : null}
   </div>;
+}
+
+// ── (17 nov., nouveau design — Julien : « quand la facture est envoyée ça doit être un logo avec un valide, vert,
+// minimaliste ») LA FACTURE ENVOYÉE, sur la rangée : une petite icône (document + coche) verte à côté du prix — le SEUL vert
+// de l'app, pour ce seul état. Toucher, appui long ou survol : « Facture FA-2026-0006 envoyée le 16 nov. ». Rien d'autre :
+// pas encore envoyée ⇒ rien sur la rangée (le geste est dans la fiche et « ⋯ »). La règle : celle de `FactureVente`.
+export function FactureEnvoyeeIcone({ tx, deps }) {
+  const d = useFactures(deps);
+  const [vu, setVu] = React.useState(false);
+  if (!d || !tx) return null;
+  const f = d.factures.get(String(tx)) || null; const e = f && f.envoi;
+  if (!(f && f.emiseLe && e && e.etat === 'envoyee')) return null;
+  let quand = ''; try { quand = new Date(e.at).toLocaleDateString(localeCourante(), { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' }); } catch (_) { quand = jourParis(e.at); }
+  const texte = tr('v2s.facture', { num: f.numero, date: quand });
+  return (
+    <button type="button" className="v2-facture-ok" data-v2-facture-ok={f.numero} aria-label={texte} title={texte} data-fiche-ligne-ignore="" data-sans-glisse=""
+      onClick={(ev) => { ev.stopPropagation(); setVu((v) => !v); }} onContextMenu={(ev) => { ev.preventDefault(); setVu(true); }} onBlur={() => setVu(false)}>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="m9 14.5 2 2 4-4.5"/></svg>
+      {vu ? <span className="v2-facture-bulle" role="status">{texte}</span> : null}
+    </button>
+  );
 }
 
 // ── LE BON DE RETOUR (11 nov., lot DJ1) ─────────────────────────────────────

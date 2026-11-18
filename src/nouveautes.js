@@ -27,8 +27,32 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (18 nov., Julien : « Apple — Wallet, Réglages ») src/designV2/theme-apple.css — éteint par défaut, sur cet appareil
+  { id: 'style-apple', date: '2026-11-18', titre: 'Essaie le style Apple', phrase: 'Paramètres → Apparence → Style : fond gris clair, cartes blanches.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (17 nov., Julien : « il faut une liste avec les favoris pour pouvoir les sélectionner etc ») docs/passation/2026-11-17-extension-favoris-liste.md
   { id: 'extension-favoris-liste', date: '2026-11-17', titre: 'Tes favoris en liste, à cocher, sur Vinted', phrase: 'Installe la 5.407 : coche, relis le récapitulatif, puis confirme.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (17 nov., Julien : « pas échanger des messages dans mon app, mais sur Discord ») docs/passation/2026-11-17-carte-coucou.md
+  { id: 'carte-coucou', date: '2026-11-17', titre: 'Sur la carte aussi, un coucou', phrase: 'Plus de messages dans VRM : on s’écrit sur Discord.', tab: 'communaute', pour: 'tous', mode: 'tous' },
+  // (17 nov., chasse-bugs — Julien : « il y a 4 bordereaux de sélectionné ») docs/passation/2026-11-17-chasse-bugs.md
+  { id: 'ventes-ligne-propre', date: '2026-11-17', titre: 'Les lignes de ventes ne se chevauchent plus', phrase: '« Prix d’achat ? » sur sa ligne, pseudo et état entiers.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  { id: 'imprimer-compte-exact', date: '2026-11-17', titre: 'Imprimer compte ce qui est coché', phrase: 'Les retours cochés comptent ; les colis absents sont nommés.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  { id: 'ecrans-en-haut', date: '2026-11-17', titre: 'Chaque écran s’ouvre en haut', phrase: 'Après « J’ai déclaré » ou un segment d’Argent, plus au milieu.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  // (17 nov., lot stock-rangement) docs/passation/2026-11-17-stock-rangement.md — dans le nouveau design (essai)
+  { id: 'stock-ranger-seance', date: '2026-11-17', titre: 'Ranger le stock, une paire à la fois', phrase: 'Nouveau design : la case proposée, un toucher, la suivante arrive.', tab: 'garage', pour: 'sneakers', mode: 'tous' },
+  // (17 nov., Julien : « que les personnes puissent se faire coucou […] sur Discord ») docs/passation/2026-11-17-groupes-coucou.md
+  { id: 'groupes-coucou', date: '2026-11-17', titre: 'Groupes en trois étapes, et le coucou', phrase: 'Photo, QR code, Discord ; un coucou, puis on s’écrit sur Discord.', tab: 'communaute', pour: 'tous', mode: 'tous' },
+  // (17 nov., lot design-v2 — Julien : « Le + dégueulasse ») plus de disque dans la barre ; ses gestes à leur place
+  { id: 'plus-de-disque', date: '2026-11-17', titre: 'Plus de « + » dans la barre', phrase: 'Scanner dans la recherche, Publier sur Annonces, Imprimer sur ta journée.', tab: 'annonces', pour: 'tous', mode: 'tous' },
+  // (17 nov., lot design-v2-argent) docs/passation/2026-11-17-design-v2-argent.md — dans l'essai du nouveau design
+  { id: 'design-v2-argent', date: '2026-11-17', titre: 'Argent revu dans le nouveau design', phrase: 'Le reçu du mois en grand, six mois, chaque versement numéroté.', tab: 'compta', pour: 'tous', mode: 'tous' },
+  // (17 nov., lot design-v2-ventes) docs/passation/2026-11-17-design-v2-ventes.md — Ventes dans le nouveau design (essai)
+  { id: 'design-v2-ventes', date: '2026-11-17', titre: 'Ventes revue dans le nouveau design', phrase: 'Imprimer en haut, colis rangés par date limite, recherche avec scanner.', tab: 'ventes', pour: 'tous', mode: 'tous' },
+  // (17 nov., lot design-v2) docs/passation/2026-11-17-design-v2.md — l'essai, éteint par défaut
+  { id: 'design-v2-essai', date: '2026-11-17', titre: 'Essaie le nouveau design', phrase: 'Paramètres → Apparence : Aujourd’hui, passes de retrait, un menu par plateforme.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (17 nov., lot design-v2-messages) docs/passation/2026-11-17-design-v2-messages.md — le nouveau design
+  { id: 'design-v2-messages', date: '2026-11-17', titre: 'Messages et e-mails, nouveau design', phrase: 'Un compte par groupe, À traiter · Colis · Ventes · Achats, « C’est à moi ».', tab: 'messages', pour: 'tous', mode: 'tous' },
+  // (17 nov., lot tampon-qr) docs/passation/2026-11-17-tampon-qr.md
+  { id: 'mention-juste-au-dessus', date: '2026-11-17', titre: '« Créé par vrm.center » collé au QR', phrase: 'Juste au-dessus du code, dans le sens de l’étiquette, chaque transporteur.', tab: 'cat_bord', pour: 'tous', mode: 'tous' },
   // (17 nov., Julien : « Améliore les emails aussi ») docs/passation/2026-11-17-emails-beaux.md
   { id: 'emails-cinq-langues', date: '2026-11-17', titre: 'Les e-mails de VRM dans ta langue', phrase: 'Bilan, essai, sécurité : dans la langue choisie, partout lisibles.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (17 nov., Julien : « il faut être très très proche… je veux que ce soit instantané ») docs/passation/2026-11-17-scan-instantane.md
@@ -39,6 +63,9 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'accessibilite-clavier', date: '2026-11-17', titre: 'Plus lisible, et tout au clavier', phrase: 'Focus visible partout, textes sur le bleu éclaircis, « Aller au contenu ».', tab: 'journee', pour: 'tous', mode: 'tous' },
   // (17 nov., Julien : un colis arrivé, deux lignes — envoi à deux transporteurs) docs/passation/2026-11-17-suivi-multi-transporteurs.md
   { id: 'colis-deux-transporteurs', date: '2026-11-17', titre: 'Un colis à deux transporteurs, une ligne', phrase: 'Les deux n° de suivi relient le colis à ton achat.', tab: 'retraits', pour: 'tous', mode: 'tous' },
+  // (17 nov., Julien : « on me laisse choisir autre chose que les articles achetés choisis par VRM ») docs/passation/2026-11-17-relier-tout-achat.md
+  { id: 'relier-glisser-iphone', date: '2026-11-17', titre: 'Relier achats et ventes : défilement réparé', phrase: 'Une liste à la fois ; touche l’achat, puis la vente.', tab: 'achats', pour: 'tous', mode: 'tous' },
+  { id: 'relier-tout-achat', date: '2026-11-17', titre: 'Relier : choisis parmi tous tes achats', phrase: 'Un achat relié n’est plus proposé ; un lot, article par article.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (17 nov., Julien : « je veux qu'il y ait la taille […] à côté des articles achetés pour pouvoir relier ») docs/passation/2026-11-17-relier-taille.md
   { id: 'relier-taille', date: '2026-11-17', titre: 'La taille à côté de chaque achat', phrase: 'Pour relier : taille, état, vendeur ; « ✓ » si c’est la même.', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (17 nov., lot scan-bordereau-vente) docs/passation/2026-11-17-scan-bordereau-vente.md

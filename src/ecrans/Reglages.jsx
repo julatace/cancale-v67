@@ -164,6 +164,10 @@ import { useLangue } from '../i18n/react.js';
 import { ReglagesAidesAccueil } from '../accueilReste/AccueilReste.jsx';   // (14 nov., idées 136 139 140 147)
 import MIGRATION_SQL from "../../supabase/migrations/001-multi-utilisateurs.sql?raw";
 import { accompagner } from '../accompagnement.js';   // (14 nov.) pendant, après, échec d'un geste (src/ui/Accompagne.jsx)
+import { useDesignV2, poserDesignV2 } from '../designV2/reglage.js';   // (17 nov.) « Nouveau design (essai) »
+import { RangeeTouchable } from '../designV2/BoutonV2.jsx';   // (17 nov., phase 2) les rangées de Paramètres
+import { useStyle, poserStyle, STYLES } from '../designV2/style.js';   // (18 nov.) « Style » : Apple · Studio bleu
+import { useBarre, poserBarre, STYLES_BARRE, ApercuBarre } from '../designV2/barre.jsx';   // (17 nov.) « Barre d'onglets » : cinq styles
 
 // ⟦← App.jsx #10⟧
 const SuiviReceptionEmails = aLaDemande(() => import('../ReceptionEmails.jsx'));
@@ -372,7 +376,7 @@ const ImpressionBordereaux = ({ mode, reg, changer }) => {
   React.useEffect(() => { const f = () => setTps(reglageTamponsChoisi()); window.addEventListener('vrm:tampons', f); const d = onCloudReady(f); return () => { window.removeEventListener('vrm:tampons', f); if (typeof d === 'function') d(); }; }, []);
   const contenuVu = th ? tps.th : tps.a4;
   const tampon = modeDuContenu(contenuVu) || 'perso';
-  const choisirTamponCourt = (v) => { const c = contenuDuMode(v); if (!c) return; const n = avecChoixTampons(tps, 'tous', { contenu: v === 'rien' ? c : { ...c, mention: contenuVu.mention } }, { support: th ? 'th' : 'a4' }); ecrireReglageTampons(n); setTps(reglageTamponsChoisi()); };
+  const choisirTamponCourt = (v) => { const c = contenuDuMode(v); if (!c) return; const n = avecChoixTampons(tps, 'tous', { contenu: c }, { support: th ? 'th' : 'a4' }); ecrireReglageTampons(n); setTps(reglageTamponsChoisi()); };
   const papier = papierThermique(reg);
   const fmt = FORMATS_THERMIQUES.find((f) => f.id === reg.format) || FORMATS_THERMIQUES[0];
   const [ap, setAp] = React.useState(null);   // null · {etat:'charge'} · {etat:'ko'} · {etat:'lu', octets, pages, r1}
@@ -1757,6 +1761,7 @@ const GROUPES_NOTIF = [
   { id: 'echanges', titre: 'Échanges avec les acheteurs', ids: ['offres', 'messages'] },
   { id: 'comptes', titre: 'Comptes et avis', ids: ['comptes', 'avis'] },
   { id: 'achats', titre: 'Achats', ids: ['alertesebay'] },
+  { id: 'communaute', titre: 'Communauté', ids: ['communaute'] },
 ];
 function groupesFamillesNotif(familles) {
   const vus = new Set();
@@ -1857,6 +1862,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   // (docs/emails/boite-collective.md). Le montrer à un autre, c'était un réglage
   // qui s'enregistre et ne fait rien : il n'est pas proposé.
   const proprioInst = useEstProprietaire();
+  const designV2 = useDesignV2();   // (17 nov., phase 2) le premier écran en liste groupée d'iOS
   // Actions sur le compte : une vraie fenêtre plutôt qu'un prompt du navigateur.
   // Un window.prompt ne se style pas, ne masque pas le mot de passe saisi, et
   // sur iPhone il s'affiche comme une alerte système au milieu de rien — c'est
@@ -1934,7 +1940,15 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   const ongletsCompte = MULTI_USER && !!AUTH.user;
   // La catégorie ouverte (téléphone) : null = le premier écran. Le retour de Stripe ouvre l'abonnement.
   const [cat, setCat] = React.useState(() => (RETOUR_ABONNEMENT || RETOUR_VUE === 'abonnement' || RETOUR_VUE === 'compte') ? 'compte' : null);
-  const [catActive, setCatActive] = React.useState(null);   // la catégorie surlignée dans le sommaire (ordinateur)
+  const [catActive, setCatActive] = React.useState(null);
+  const [surligne, setSurligne] = React.useState(null);   // (17 nov., nouveau design) la rangée trouvée par la recherche, surlignée 2,4 s
+  React.useEffect(() => {
+    if (!surligne) return undefined;
+    let el = null;
+    const t1 = setTimeout(() => { try { el = document.querySelector(`[data-reglage-id="${surligne}"]`); if (el) { el.scrollIntoView({ block: 'center' }); el.classList.add('v2-pm-surligne'); } } catch (_) {} }, 80);
+    const t2 = setTimeout(() => { try { if (el) el.classList.remove('v2-pm-surligne'); } catch (_) {} setSurligne(null); }, 2600);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [surligne]);   // la catégorie surlignée dans le sommaire (ordinateur)
 
   // ── LA DISPOSITION (16 octobre : « trop vibe-codé, surtout sur téléphone ») ─
   // Modèle : les Réglages d'iOS. Des groupes en listes à lignes ; un panneau
@@ -2374,7 +2388,31 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
     .map((g) => ({ ...g, items: g.items.filter(Boolean) }));
   const categories = rangerParCategorie(groupes);
   rangementRef.current = categories;
-  const titreCat = (id) => tr(`parametres.cat.${id}`);
+  // (17 nov., nouveau design — Julien : « c'est beau mais les cases sont dispersées partout ») NEUF SECTIONS, dans l'ordre des
+  // Réglages d'iOS : Compte · Plateformes et comptes · Ventes et colis · Stock et numéros · Argent et compta · Apparence et
+  // langue · Notifications · Sécurité et données · Aide. « Sécurité des comptes » et « Sécurité des données » (le panneau
+  // technique, tel quel) deviennent UNE section ; les mêmes rangées, les mêmes panneaux — rien n'est retiré.
+  const ORDRE_V2 = ['compte', 'plateformes', 'ventes', 'stock', 'argent', 'apparence', 'notifications', 'securite-donnees', 'aide'];
+  const catsV2 = (() => {
+    const par = new Map(categories.map((c) => [c.id, c]));
+    const sc = par.get('securite-comptes'), dn = par.get('donnees');
+    const fus = sc || dn ? { id: 'securite-donnees', ic: 'shield', expert: false, groupes: [...((sc && sc.groupes) || []), ...((dn && dn.groupes) || [])], ids: [...((sc && sc.ids) || []), ...((dn && dn.ids) || [])] } : null;
+    if (fus) par.set('securite-donnees', fus);
+    // (17 nov., revue) Apparence et langue sans doublons : l'interrupteur « Mode sombre » fait la même chose que « Apparence »
+    // (Clair / Sombre / comme l'appareil) — il n'est pas montré ici (le lot apparence-rangee, PR #1235, le retire pour tous) ;
+    // « Taille de l'affichage » et « Taille du texte » sont deux réglages différents : leurs noms et leur phrase le disent.
+    const NOMS_V2 = { zoom: ['v2.pm.zoom', 'v2.pm.zoom.desc'], 'taille-texte': ['v2.pm.texte', 'v2.pm.texte.desc'] };
+    for (const [k, c] of [...par]) par.set(k, { ...c, groupes: c.groupes.map((g) => ({ ...g, items: g.items.filter((it) => it && it.id !== 'sombre').map((it) => (NOMS_V2[it.id] ? { ...it, lib: tr(NOMS_V2[it.id][0]), desc: tr(NOMS_V2[it.id][1]) } : it)) })) });
+    const connus = ORDRE_V2.map((id) => par.get(id)).filter(Boolean);
+    const restes = categories.filter((c) => !ORDRE_V2.includes(c.id) && c.id !== 'securite-comptes' && c.id !== 'donnees');
+    return [...connus, ...restes];
+  })();
+  const idV2 = (id) => (id === 'securite-comptes' || id === 'donnees' ? 'securite-donnees' : id);
+  const sectionDeRangee = (id) => { const c = catsV2.find((x) => Array.isArray(x.ids) && x.ids.includes(id)); return c ? c.id : null; };
+  // La recherche mène AU réglage : sa section s'ouvre, la rangée vient au centre, surlignée.
+  const allerARangee = (id) => { const sec = sectionDeRangee(id); setRechercheReglage(''); if (etroit) ouvrirCategorie(sec); else setCatActive(sec); setSurligne(id); };
+  const TITRES_V2 = { plateformes: 'v2.pm.cat.plateformes', argent: 'v2.pm.cat.argent', 'securite-donnees': 'v2.pm.cat.securite', aide: 'v2.pm.cat.aide' };
+  const titreCat = (id) => (designV2 && TITRES_V2[id] ? tr(TITRES_V2[id]) : tr(`parametres.cat.${id}`));
   const panneaux = groupes.flatMap((g) => g.items.filter((it) => it.type === 'panneau'));
   const ouvert = sous ? panneaux.find((it) => it.id === sous) : null;
   // Le retour d'un panneau : sa catégorie (téléphone), ou « Paramètres » (ordinateur : tout est sur une page).
@@ -2453,6 +2491,21 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       </button>
     );
   };
+  // (17 nov., nouveau design · phase 2) La rangée d'une catégorie, en `RangeeTouchable` : icône teintée, nom, la valeur de
+  // `valeurCat` (rien d'inventé), le chevron ; la phrase reste pour les lecteurs d'écran. Le même geste, les mêmes data-*.
+  const rangeeCatV2 = (c) => {
+    const pl = c.id === 'compte' ? (reglePlanCourante() || {}).plan : null;
+    const v = c.id === 'compte' ? (pl === 'pro' ? 'Pro' : pl === 'solo' ? 'Solo' : null) : c.id === 'securite-donnees' ? valeurCat({ ...c, id: 'donnees' }) : valeurCat(c);
+    const ambre = (c.id === 'donnees' || c.id === 'securite-donnees') && derniereSauvegarde.old;
+    return (
+      <RangeeTouchable key={c.id} className="v2-pm-rangee" onClick={() => ouvrirCategorie(c.id)} attrs={{ 'data-categorie-ouvrir': c.id, 'data-categorie-contient': ` ${c.ids.join(' ')} ` }}>
+        <span className="v2-pm-ic" aria-hidden="true"><Icon name={c.ic} size={18}/></span>
+        <span className="v2-pm-lib">{titreCat(c.id)}<span className="vg-sr">{' — ' + tr(`parametres.cat.${c.id}.desc`)}</span></span>
+        {v ? <span className={'v2-pm-val' + (ambre ? ' is-ambre' : '')} data-categorie-valeur={c.id}>{v}</span> : null}
+        <span className="v2-pm-chev" aria-hidden="true">{chevron}</span>
+      </RangeeTouchable>
+    );
+  };
   // « Mon compte » : la carte (l'avatar, le nom de la catégorie, l'adresse de connexion), un toucher l'ouvre.
   const carteCompte = (c) => (
     <button key={c.id} type="button" className="vg-carte vg-pm-moi" data-categorie-ouvrir={c.id} data-vue="compte" data-categorie-contient={` ${c.ids.join(' ')} `} onClick={() => ouvrirCategorie(c.id)}>
@@ -2481,9 +2534,9 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
   const q = rechercheReglage.trim();
   // La recherche : dans TOUTES les catégories (avant : l'onglet « Réglages » seul) ; le nom de la
   // catégorie et celui du groupe comptent (« argent » trouve le statut, l'URSSAF, les prix d'achat).
-  const resultats = q ? filtrerReglages(categories.flatMap((c) => c.groupes.map((g) => ({ id: g.id, titre: [titreCat(c.id), g.titreCle ? tr(g.titreCle) : (g.titre || '')].filter(Boolean).join(' · '), items: g.items }))), q) : null;
+  const resultats = q ? filtrerReglages((designV2 ? catsV2 : categories).flatMap((c) => c.groupes.map((g) => ({ id: g.id, titre: [titreCat(c.id), g.titreCle ? tr(g.titreCle) : (g.titre || '')].filter(Boolean).join(' · '), items: g.items }))), q) : null;
   const nTrouves = resultats ? resultats.reduce((n, g) => n + g.items.length, 0) : 0;
-  const catOuverte = etroit && cat ? categories.find((c) => c.id === cat) || null : null;
+  const catOuverte = etroit && cat ? (designV2 ? catsV2.find((c) => c.id === idV2(cat)) : categories.find((c) => c.id === cat)) || null : null;
 
   return (
     <div ref={racine} className="vrm-set vrm-pm" data-espace="autres" data-reglages-disposition={etroit ? 'telephone' : 'ordinateur'} data-sous-ecran-ouvert={ouvert ? ouvert.id : ''}
@@ -2518,7 +2571,7 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
       ) : (<>
         {/* (14 nov., refonte visible — AJOUT 3.8) Le titre et son « ? ». Puis la RECHERCHE, en haut, comme les Réglages d'iOS. */}
         <div className="vrm-set-tete"><h2 className="vrm-set-h1" style={{color:C.text}}>{tr('ecran.settings')}</h2>{PHRASES_ECRAN.settings ? <span className="vrm-pf-set-aide" data-phrase-ecran="settings" title={PHRASES_ECRAN.settings}><AideEcran cle="settings"/></span> : null}<StatutSauvegardeReglages/></div>
-        <ChampRecherche valeur={rechercheReglage} onChange={setRechercheReglage} placeholder={tr('parametres.recherche.placeholder')} label={tr('reglages.recherche.label')} micro voix="brut" className="vrm-set-recherche" data-recherche-reglages=""/>
+        <ChampRecherche valeur={rechercheReglage} onChange={setRechercheReglage} placeholder={designV2 ? tr('v2.pm.chercher') : tr('parametres.recherche.placeholder')} label={tr('reglages.recherche.label')} micro voix="brut" className="vrm-set-recherche" data-recherche-reglages=""/>
         <ReglagesPasLus/>
       </>)}
 
@@ -2531,7 +2584,12 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
         {q ? (
           resultats.length ? <>
             <p className="vrm-settings-search-info" role="status" data-recherche-trouves={nTrouves} style={{color:C.muted}}>{tr('reglages.recherche.trouves', { n: nTrouves })}</p>
-            {resultats.map(groupe)}
+            {designV2 ? <div className="v2-pm-liste" data-v2-pm-resultats="">{resultats.flatMap((g) => g.items).filter((it) => it && it.lib).map((it) => (
+              <RangeeTouchable key={it.id} className="v2-pm-rangee" onClick={() => allerARangee(it.id)} attrs={{ 'data-v2-pm-resultat': it.id }}>
+                <span className="v2-pm-lib">{it.lib}</span>
+                {sectionDeRangee(it.id) ? <span className="v2-pm-val">{tr('v2.pm.trouve', { section: titreCat(sectionDeRangee(it.id)) })}</span> : null}
+                <span className="v2-pm-chev" aria-hidden="true">{chevron}</span>
+              </RangeeTouchable>))}</div> : resultats.map(groupe)}
           </> : <div role="status" className="vrm-set-rien" data-recherche-trouves="0" style={{color:C.muted,fontSize:13}}><p style={{margin:'0 0 4px'}}>{tr('reglages.recherche.rien', { q })}</p><Bouton variante="discret" onClick={()=>setRechercheReglage('')}>{tr('reglages.recherche.effacer')}</Bouton></div>
         ) : etroit ? (
           catOuverte ? ecranCategorie(catOuverte, { avecTitre: false }) : (
@@ -2539,6 +2597,15 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
             // (15 nov., maquette « Verre dépoli » validée : « Tuiles plutôt qu'une longue liste : tout tient sur un
             // écran ») « Mon compte » en carte, puis les neuf autres catégories en tuiles (trois par rangée) ; « Sécurité
             // des données » (expert) en dernière tuile. Les mêmes `data-categorie-ouvrir`, le même geste.
+            designV2 ? (
+            // (17 nov., nouveau design · phase 2) La liste groupée d'iOS : « Compte » (la carte), « Réglages » (les catégories en
+            // rangées : icône, nom, valeur, chevron — `ligneCategorie`, le même geste), « Avancé » (Sécurité des données).
+            <section className="vrm-pm-racine v2-pm-racine" data-v2-parametres="">
+              <div data-categories-reglages="" data-onglets-reglages="">
+                <div className="v2-pm-liste" data-v2-pm-sections={catsV2.length}>{catsV2.map(rangeeCatV2)}</div>
+              </div>
+            </section>
+            ) :
             <section className="vrm-pm-racine vg-pm-racine">
               <div className="vg-pm-cats" data-categories-reglages="" data-onglets-reglages="">
                 {categories.filter((c) => c.id === 'compte').map((c) => carteCompte(c))}
@@ -2553,10 +2620,12 @@ function SettingsScreen({ setTab, onPlateforme, comptes, onExport, onImport, dar
           <div className="vrm-pm-bureau">
             <nav className="vrm-pm-sommaire" aria-label={tr('ecran.settings')}>
               <div className="vrm-set-liste" data-categories-reglages="" data-onglets-reglages="">
-                {categories.map((c) => ligneCategorie(c, { actif: catActive === c.id, surClic: () => { setCatActive(c.id); try { const el = document.getElementById(`parametres-${c.id}`); if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {} } }))}
+                {(designV2 ? catsV2 : categories).map((c) => ligneCategorie(c, { actif: designV2 ? idV2(catActive || cat || 'compte') === c.id : catActive === c.id, surClic: () => { setCatActive(c.id); try { const el = document.getElementById(`parametres-${c.id}`); if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {} } }))}
               </div>
             </nav>
-            <div className="vrm-pm-contenu">{categories.map((c) => ecranCategorie(c, { avecTitre: true }))}</div>
+            <div className="vrm-pm-contenu">{designV2
+              ? (() => { const c = catsV2.find((x) => x.id === idV2(catActive || cat || 'compte')) || catsV2[0]; return c ? <div data-v2-pm-section={c.id}>{ecranCategorie(c, { avecTitre: true })}</div> : null; })()
+              : categories.map((c) => ecranCategorie(c, { avecTitre: true }))}</div>
           </div>
         )}
       </>}
@@ -4727,7 +4796,10 @@ function ReglagesStream() {
 // (8 nov., « beauté ») L'APPARENCE : quatre choix en liste d'iOS (une coche sur le choisi).
 // Le choix est le sien, jamais posé tout seul ; « Le soir » suit l'heure de l'appareil.
 function ApparenceSetting({ valeur, onChoisir }) {
-  return (
+  const designV2 = useDesignV2();
+  const style = useStyle();
+  const barre = useBarre();
+  return (<>
     <div className="vrm-apparence" role="radiogroup" aria-label="Apparence" data-apparence-choix={valeur || ''}>
       {APPARENCES.map((m) => (
         <button key={m} type="button" role="radio" aria-checked={valeur === m} className={'vrm-apparence-ligne' + (valeur === m ? ' is-choisi' : '')}
@@ -4738,7 +4810,40 @@ function ApparenceSetting({ valeur, onChoisir }) {
         </button>
       ))}
     </div>
-  );
+    {/* (18 nov., Julien : « Apple — Wallet, Réglages ») LE STYLE : deux choix en liste d'iOS, sur CET appareil (src/designV2/style.js).
+        « Studio bleu » est celui d'hier (le défaut) ; « Apple » ne change que la matière (src/designV2/theme-apple.css). */}
+    <div className="vrm-apparence-style" style={{display:'flex',flexDirection:'column',gap:8,padding:'12px 4px 4px',marginTop:8,borderTop:`1px solid ${C.border}`}}>
+      <b style={{fontSize:15,fontWeight:600,color:C.text}}>{tr('v2.style.lib')}</b>
+      <div className="vrm-apparence" role="radiogroup" aria-label={tr('v2.style.lib')} data-style-choix={style}>
+        {STYLES.map((k) => (
+          <button key={k} type="button" role="radio" aria-checked={style === k} className={'vrm-apparence-ligne' + (style === k ? ' is-choisi' : '')}
+            data-style={k} onClick={() => poserStyle(k)}>
+            <span className="vrm-apparence-txt"><b>{tr('v2.style.' + k)}</b><small>{tr('v2.style.' + k + '.desc')}</small></span>
+            <svg className="vrm-apparence-coche" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3.2L13 4.8"/></svg>
+          </button>
+        ))}
+      </div>
+    </div>
+    {/* (17 nov.) LE NOUVEAU DESIGN est allumé par défaut ; « Ancien design » le ramène sur CET appareil (src/designV2/reglage.js) : rien d autre ne change. */}
+    <div className="vrm-apparence-v2" data-reglage-design-v2={designV2 ? '1' : '0'} style={{display:'flex',alignItems:'center',gap:12,minHeight:56,padding:'8px 4px',marginTop:8,borderTop:`1px solid ${C.border}`}}>
+      <span style={{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:2}}>
+        <b style={{fontSize:15,fontWeight:600,color:C.text}}>{tr('v2.reglage.lib')}</b>
+        <small style={{fontSize:13,lineHeight:1.35,color:C.muted}}>{tr('v2.reglage.desc')}</small>
+      </span>
+      <Interrupteur on={!designV2} onClick={() => poserDesignV2(!designV2)} label={tr('v2.reglage.lib')} data-design-v2-bouton="" data-ancien-design={designV2 ? '0' : '1'}/>
+    </div>
+    {/* (17 nov., Julien : « prends la C et propose un menu déroulant, je choisirai le mieux ») LA BARRE D'ONGLETS : cinq
+        dessins de la même barre, un menu natif et un aperçu vivant ; appliqué tout de suite, synchronisé (src/designV2/barre.js). */}
+    <div className="vrm-apparence-barre" data-reglage-barre={barre} style={{display:'flex',flexDirection:'column',gap:8,padding:'12px 4px 4px',borderTop:`1px solid ${C.border}`}}>
+      <label style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,minHeight:44}}>
+        <b style={{fontSize:15,fontWeight:600,color:C.text}}>{tr('v2.barre.lib')}</b>
+        <select value={barre} onChange={(e) => poserBarre(e.target.value, save)} data-barre-choix="" style={{minHeight:44,fontSize:15,borderRadius:12,padding:'0 12px',border:`1px solid ${C.border}`,background:C.card,color:C.text}}>
+          {STYLES_BARRE.map((k) => <option key={k} value={k}>{tr('v2.barre.' + k)}</option>)}
+        </select>
+      </label>
+      <ApercuBarre style={barre} Icon={Icon} onglets={[{ id: 'journee', icon: 'soleilLevant', label: tr('nav.journee.court') }, { id: 'annonces', icon: 'vitrine', label: tr('v2.barre.ann') }, { id: 'achats', icon: 'cart', label: tr('v2.barre.ach'), n: 8 }, { id: 'ventes', icon: 'bag', label: tr('v2.barre.ven'), n: 4 }, { id: 'argent', icon: 'euro', label: tr('v2.barre.arg') }]}/>
+    </div>
+  </>);
 }
 // (11 nov., lot traduction) LA LANGUE : la même liste d'iOS que l'Apparence. Chaque langue
 // est écrite DANS sa langue (on la retrouve sans comprendre la langue courante) ; le choix

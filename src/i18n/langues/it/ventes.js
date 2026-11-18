@@ -247,4 +247,5 @@ export default {
   "ventes.pourquoiBord": "Perché questa etichetta aspetta?",
   "ventes.puceAchat": "Prezzo d’acquisto?",
   "ventes.puceRelier": "Collega un acquisto",
+  "ventes.gestesVinted": "Le sue azioni in Vendite · Vinted",
 };

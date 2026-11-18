@@ -1,0 +1,330 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   ARGENT ET PARAMÈTRES — le nouveau design, phase 2 (17 nov.). Seulement sous `html[data-design="v2"]` (ou des
+   classes `.v2-*` neuves, rendues seulement allumé) : éteint, rien ne s'applique.
+   Texte posé sur la coque bleue : `--v2-page-*` ; dans une carte : l'encre.
+   Grille : multiples de 4/8, gouttières 16. Texte : 13 · 15 · 17 (+ les chiffres : 22 des faits, 56 de l'affiche).
+   Rayons : 12 · 14 · 20 (les marques du graphe exceptées). Un seul trait d'icône (celui de l'app).
+   Tout ce qui doit battre les `!important` d'hier vit dans `@layer vrm-verre` (la PREMIÈRE couche nommée, index.html :
+   pour un `!important`, la couche nommée d'abord gagne) avec un préfixe fort, seulement allumé.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ══ 1. MOIS : l'affiche (la signature), les six mois ═══════════════════════════════════════════════════════ */
+.v2-ar-mois { display: flex; flex-direction: column; color: var(--v2-page-texte); font-family: var(--sb-police-texte, -apple-system, system-ui, sans-serif); }
+.v2-ar-col { display: flex; flex-direction: column; min-width: 0; }
+/* Ordinateur : deux colonnes — à gauche le mois (affiche, six mois, faits, geste), à droite les versements. */
+@media (min-width: 1024px) {
+  .v2-ar-mois { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); column-gap: 40px; align-items: start; max-width: 1120px; }
+  .v2-ar-col-versements .v2-ar-h:first-child { margin-top: 8px; }
+}
+.v2-ar-affiche { margin: 8px 0 0; }
+.v2-ar-auMoins { display: block; font-size: 15px; line-height: 20px; font-weight: 600; color: var(--v2-page-muet); }
+.v2-ar-affiche .v2-affiche-sig-sous { font-size: 15px; line-height: 20px; }
+/* Le graphe : 6 barres-boutons de 80 px (colonne + libellé de 16) — ≤ 80. Une seule série : le blanc de la coque, la
+   barre choisie pleine, les autres voilées ; « pas su » = un contour. Le montant au-dessus de la barre choisie seulement. */
+.v2-ar-barres { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; height: 80px; margin: 16px 0 0; }
+html body button.v2-ar-barre { appearance: none; margin: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; cursor: pointer;
+  display: flex; flex-direction: column; align-items: stretch; gap: 4px; min-width: 0; min-height: 44px; touch-action: manipulation; -webkit-tap-highlight-color: transparent; border-radius: 12px; }
+html body button.v2-ar-barre:focus-visible { outline: none; box-shadow: var(--v2-anneau); }
+.v2-ar-barre-col { flex: 1; display: flex; flex-direction: column; padding-top: 20px; min-height: 0; }
+.v2-ar-barre-piste { position: relative; flex: 1; display: flex; align-items: flex-end; min-height: 0; }
+.v2-ar-barre-piste i { display: block; width: 100%; border-radius: 4px 4px 2px 2px; background: rgb(255 255 255 / .38); transition: background-color 80ms ease; }
+.v2-ar-barre[aria-pressed="true"] .v2-ar-barre-piste i { background: var(--v2-page-texte); }
+.v2-ar-barre[data-vide] .v2-ar-barre-piste i { background: transparent; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .5); height: 8px !important; }
+.v2-ar-barre-v { position: absolute; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 13px; line-height: 16px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--v2-page-texte); pointer-events: none; }
+.v2-ar-barre:first-child .v2-ar-barre-v { left: 0; transform: none; }
+.v2-ar-barre:last-child .v2-ar-barre-v { left: auto; right: 0; transform: none; }
+.v2-ar-barre-l { height: 16px; font-size: 13px; line-height: 16px; font-weight: 600; text-align: center; color: var(--v2-page-muet); }
+.v2-ar-barre[aria-pressed="true"] .v2-ar-barre-l { color: var(--v2-page-texte); }
+
+/* ══ 2. LES FAITS : UNE carte, 2 × 2 au téléphone, 4 côte à côte à l'ordinateur ═════════════════════════════ */
+.v2-ar-faits { margin: 32px 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; background: var(--v2-carte); border-radius: 20px; box-shadow: var(--v2-carte-ombre); overflow: hidden; color: var(--sv-encre, #0C1D30); }
+html body .v2-ar-faits.is-impair > :last-child { grid-column: 1 / -1; }
+@media (min-width: 1024px) { .v2-ar-faits { grid-template-columns: repeat(var(--v2-ar-n, 4), minmax(0, 1fr)); } html body .v2-ar-faits.is-impair > :last-child { grid-column: auto; } }
+/* Très grand texte : un fait par rangée (un nombre n'est jamais coupé). */
+html[data-grand-texte="tres"] .v2-ar-faits { grid-template-columns: minmax(0, 1fr); }
+html[data-grand-texte="tres"] body button.v2-rangee.v2-ar-fait::after { display: none; }
+html[data-grand-texte="tres"] body button.v2-rangee.v2-ar-fait:nth-child(n+2)::before { content: ""; position: absolute; left: 16px; right: 0; top: 0; height: .5px; background: var(--v2-filet); display: block; }
+.v2-ar-passu { margin: 12px 20px 0; font-size: 13px; line-height: 1.4; color: var(--v2-page-muet); }
+html body button.v2-rangee.v2-ar-fait { position: relative; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 4px; min-height: 96px; height: 100%; padding: 20px; margin: 0; border-radius: 0; text-align: left; }
+html body button.v2-rangee.v2-ar-fait:active { background: rgb(18 52 96 / .06); transform: none; transition: none; }
+:root[data-theme="dark"] body button.v2-rangee.v2-ar-fait:active { background: rgb(255 255 255 / .06); }
+html body button.v2-rangee.v2-ar-fait:nth-child(odd)::after { content: ""; position: absolute; right: 0; top: 16px; bottom: 16px; width: .5px; background: var(--v2-filet); }
+html body button.v2-rangee.v2-ar-fait:nth-child(n+3)::before { content: ""; position: absolute; left: 20px; right: 0; top: 0; height: .5px; background: var(--v2-filet); }
+@media (min-width: 1024px) {
+  html body button.v2-rangee.v2-ar-fait:not(:last-child)::after { content: ""; position: absolute; right: 0; top: 16px; bottom: 16px; width: .5px; background: var(--v2-filet); }
+  html body button.v2-rangee.v2-ar-fait:nth-child(n+3)::before { display: none; }
+}
+.v2-ar-fait-l { font-size: 13px; line-height: 16px; font-weight: 600; color: var(--v2-muet); }
+.v2-ar-fait-v { font-size: 22px; line-height: 28px; font-weight: 700; letter-spacing: -.01em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.v2-ar-fait-v small { font-size: 13px; font-weight: 600; color: var(--v2-muet); }
+.v2-ar-fait-v[data-v2-pas-su] { color: var(--v2-muet); }
+.v2-ar-fait-s { font-size: 13px; line-height: 16px; color: var(--v2-muet); }
+
+/* ══ 3. LE GESTE (un seul plein, seulement s'il y a un geste) ══════════════════════════════════════════════ */
+.v2-ar-geste { margin: 16px 0 0; }
+@media (min-width: 1024px) { .v2-ar-geste { max-width: 360px; } }
+
+/* ══ 4. LES VERSEMENTS : titre (2 lignes), étiquette N° · jour · plateforme, montant, acheté → marge ═════════ */
+.v2-ar-h { margin: 32px 20px 12px; font-size: 13px; line-height: 16px; font-weight: 600; letter-spacing: 0; color: var(--v2-page-muet); }
+.v2-ar-liste { background: var(--v2-carte); border-radius: 20px; box-shadow: var(--v2-carte-ombre); overflow: hidden; color: var(--sv-encre, #0C1D30); }
+.v2-ar-v, html body button.v2-rangee.v2-ar-v { position: relative; display: flex; align-items: center; gap: 12px; width: 100%; min-height: 72px; padding: 16px 20px; margin: 0; border: 0; border-radius: 0; background: transparent; box-sizing: border-box; text-align: left; color: inherit; box-shadow: none;
+  content-visibility: auto; contain-intrinsic-size: auto 80px; }
+html body button.v2-rangee.v2-ar-v:active { background: rgb(18 52 96 / .06); transform: none; transition: none; }
+:root[data-theme="dark"] body button.v2-rangee.v2-ar-v:active { background: rgb(255 255 255 / .06); }
+.v2-ar-v + .v2-ar-v::before { content: ""; position: absolute; left: 20px; right: 0; top: 0; height: .5px; background: var(--v2-filet); }
+.v2-ar-v-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.v2-ar-v-titre { font-size: 17px; line-height: 22px; font-weight: 600; overflow-wrap: break-word; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.v2-ar-v-sous { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; min-width: 0; font-size: 13px; line-height: 16px; color: var(--v2-muet); }
+.v2-ar-v-date { min-width: 0; }
+.v2-ar-v-droite { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; align-self: flex-start; }
+.v2-ar-v-eur { font-size: 17px; line-height: 22px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.v2-ar-v-eur[data-v2-pas-su] { color: var(--v2-muet); }
+.v2-ar-v-marge { font-size: 13px; line-height: 16px; color: var(--v2-muet); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.v2-ar-v-marge b { font-weight: 600; color: var(--sv-encre, #0C1D30); }
+:root[data-theme="dark"] .v2-ar-v-marge b { color: #F2F7FD; }
+/* État vide et « pas su » : une carte calme, une phrase. */
+.v2-ar-vide { display: flex; align-items: center; justify-content: center; min-height: 88px; padding: 20px; background: var(--v2-carte); border-radius: 20px; box-shadow: var(--v2-carte-ombre); text-align: center; color: var(--v2-muet); font-size: 15px; line-height: 20px; }
+.v2-ar-vide b { font-weight: 600; }
+.v2-ar-reste { margin: 12px 20px 0; font-size: 13px; line-height: 1.4; color: var(--v2-page-muet); }
+/* Le squelette : la forme exacte d'une rangée, un reflet lent (aucun chiffre) ; mouvement réduit : immobile. */
+.v2-sq { display: block; border-radius: 12px; background: rgb(18 52 96 / .08); }
+:root[data-theme="dark"] .v2-sq { background: rgb(255 255 255 / .08); }
+.v2-sq-titre { width: 70%; height: 16px; margin: 3px 0; }
+.v2-sq-etiq { width: 56px; height: 24px; }
+.v2-sq-date { width: 96px; height: 12px; }
+.v2-sq-eur { flex: none; width: 56px; height: 16px; align-self: flex-start; margin-top: 3px; }
+@media (prefers-reduced-motion: no-preference) {
+  .v2-sq { animation: v2-sq-reflet 1.4s ease-in-out infinite; }
+  @keyframes v2-sq-reflet { 50% { opacity: .5; } }
+  /* L'arrivée de Mois : un fondu court (ni saut, ni décalage). */
+  .v2-ar-mois { animation: v2-ar-fondu 180ms ease-out both; }
+  @keyframes v2-ar-fondu { from { opacity: 0; } }
+}
+
+/* ══ 5. FACTURES : tête à soi, une recherche, un segmenté, un état vide ══════════════════════════════════════ */
+.v2-fac { display: flex; flex-direction: column; gap: 16px; }
+.v2-fac-vide { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 160px; padding: 24px 20px; background: var(--v2-carte); border-radius: 20px; box-shadow: var(--v2-carte-ombre); text-align: center; color: var(--v2-muet); font-size: 15px; line-height: 20px; }
+.v2-fac-vide b { color: var(--sv-encre, #0C1D30); font-size: 17px; line-height: 22px; font-weight: 600; }
+:root[data-theme="dark"] .v2-fac-vide b { color: #F2F7FD; }
+.v2-tete-tache.v2-tete-argent { padding: 8px 0 0; gap: 12px; }
+.v2-tete-argent .v2-titre-ligne h1 { flex: none; white-space: nowrap; }
+.v2-fac-outils { display: flex; align-items: center; gap: 8px; }
+.v2-fac-champ { flex: 1 1 auto; min-width: 0; }
+.v2-fac-champ > * { width: 100%; margin: 0 !important; }
+.v2-fac-vide-ic { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px; background: var(--v2-teinte-fond); color: var(--v2-teinte-texte); }
+
+/* ══ 6. PARAMÈTRES : la liste groupée d'iOS (téléphone, premier écran) ══════════════════════════════════════ */
+.v2-pm-racine { display: flex; flex-direction: column; gap: 0; }
+
+@layer vrm-verre {
+/* ── L'en-tête d'Argent : grand titre (la cloche sur sa ligne), UNE ligne comptes, UN segmenté pleine largeur ── */
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) { padding: 8px 0 0 !important; margin: 0 0 8px !important; border: 0 !important; position: relative !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) .vrm-tete-row { display: flex !important; flex-direction: column !important; align-items: stretch !important; gap: 12px !important; padding: 0 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) .vrm-screen-repere { display: none !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) .vrm-screen-head-titre { display: flex !important; flex-wrap: wrap !important; align-items: center !important; gap: 0 8px !important; width: 100% !important; max-width: none !important; min-width: 0 !important; padding: 0 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) :is(h1, h2).vrm-display { margin: 0 !important; font: 700 34px/40px var(--sb-police-texte, -apple-system, system-ui, sans-serif) !important; letter-spacing: -.02em !important; color: var(--v2-page-texte) !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) :is(.vrm-phrase-ecran, .vrm-phrase-ecran button, .vrm-phrase-ecran a, .vrm-phrase-ecran svg) { color: var(--v2-page-texte) !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) .vrm-screen-head-sous { flex: 1 0 100% !important; width: 100% !important; max-width: none !important; margin: 8px 0 0 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) .vrm-screen-actions { width: 100% !important; justify-content: flex-start !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) .vrm-seg-btn { min-height: 44px !important; }
+@media (min-width: 1024px) { :root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-screen-head:has(.v2-argent-nav) .vrm-screen-actions { position: absolute !important; top: 8px !important; right: 0 !important; width: auto !important; } }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-argent-nav { display: flex !important; flex-direction: column !important; align-items: stretch !important; gap: 12px !important; width: 100% !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-argent-nav .v2-argent-comptes { align-self: flex-start !important; width: auto !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-argent-nav .v2-seg { width: 100% !important; box-sizing: border-box !important; }
+@media (min-width: 1024px) { :root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-argent-nav .v2-seg { max-width: 560px !important; } }
+
+/* ── La tête de la coque au téléphone (Annonces, Argent, Paramètres) : TOUJOURS une barre fixe pleine largeur de 56 px
+   (la cloche à droite, à la même place qu'en haut de page : rien ne saute quand on défile) ; transparente en haut de
+   page (les touchers passent au travers, sauf sur ses boutons), en verre une fois défilée, le titre centré. ── */
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-app-header.v2-entete-cloche { position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; width: auto !important;
+  display: flex !important; align-items: center !important; justify-content: flex-end !important; box-sizing: border-box !important; min-height: calc(56px + env(safe-area-inset-top)) !important; padding: env(safe-area-inset-top) 12px 0 !important; margin: 0 !important;
+  background: transparent !important; box-shadow: none !important; border-radius: 0 !important; pointer-events: none !important; transition: background-color 160ms ease, box-shadow 160ms ease !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-app-header.v2-entete-cloche :is(button, a, [role="button"]) { pointer-events: auto !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-app-header.v2-entete-cloche[data-defile-tete="1"] { background: rgb(22 72 132 / .82) !important; -webkit-backdrop-filter: saturate(180%) blur(20px) !important; backdrop-filter: saturate(180%) blur(20px) !important; box-shadow: 0 .5px 0 rgb(255 255 255 / .18) !important; pointer-events: auto !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-theme="dark"] body .vrm-app-header.v2-entete-cloche[data-defile-tete="1"] { background: rgb(8 20 36 / .82) !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-app-header.v2-entete-cloche .vrm-hdr-titre { position: absolute !important; left: 64px !important; right: 64px !important; top: env(safe-area-inset-top) !important; height: 56px !important; display: flex !important; align-items: center !important; justify-content: center !important;
+  margin: 0 !important; padding: 0 !important; background: transparent !important; box-shadow: none !important; border: 0 !important; color: var(--v2-page-texte) !important; font: 600 17px/22px var(--sb-police-texte, -apple-system, system-ui, sans-serif) !important; transform: none !important; white-space: nowrap !important; opacity: 0 !important; transition: opacity 160ms ease !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-app-header.v2-entete-cloche[data-defile-tete="1"] .vrm-hdr-titre { opacity: 1 !important; }
+@media (prefers-reduced-motion: reduce) { :root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-app-header.v2-entete-cloche, :root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-app-header.v2-entete-cloche .vrm-hdr-titre { transition: none !important; } }
+
+/* ── Paramètres : liste groupée d'iOS ── */
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-h { margin: 24px 16px 8px !important; font-size: 13px !important; line-height: 16px !important; font-weight: 600 !important; letter-spacing: 0 !important; text-transform: none !important; color: var(--v2-page-muet) !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-h:first-child { margin-top: 8px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-racine .vg-pm-moi { background: var(--v2-carte) !important; border-radius: 20px !important; box-shadow: var(--v2-carte-ombre) !important; overflow: hidden !important; color: var(--sv-encre, #0C1D30) !important; border: 0 !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-liste .vrm-set-ligne { position: relative !important; display: flex !important; align-items: center !important; gap: 12px !important; min-height: 52px !important; padding: 8px 16px !important; margin: 0 !important; border: 0 !important; border-radius: 0 !important; background: transparent !important; box-shadow: none !important; width: 100% !important; box-sizing: border-box !important; text-align: left !important; color: inherit !important; transition: background-color 80ms ease !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-liste .vrm-set-ligne + .vrm-set-ligne::before { content: "" !important; position: absolute !important; left: 60px !important; right: 0 !important; top: 0 !important; height: .5px !important; background: var(--v2-filet) !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-liste .vrm-pm-cat-ic { display: grid !important; place-items: center !important; flex: none !important; width: 32px !important; height: 32px !important; border-radius: 12px !important; background: var(--v2-teinte-fond) !important; color: var(--v2-teinte-texte) !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-liste .vrm-set-lib { flex: 1 1 auto !important; min-width: 0 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-liste .vrm-set-lib b { display: block !important; font-size: 17px !important; line-height: 22px !important; font-weight: 400 !important; color: var(--sv-encre, #0C1D30) !important; white-space: normal !important; overflow-wrap: break-word !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-liste .vrm-set-desc { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0 0 0 0) !important; white-space: nowrap !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-liste .vrm-set-val { flex: 0 1 auto !important; max-width: 50% !important; font-size: 17px !important; line-height: 22px !important; text-align: right !important; color: var(--v2-muet) !important; white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-liste .vrm-set-chev { flex: none !important; stroke: var(--v2-muet) !important; opacity: .7 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-theme="dark"] body .v2-pm-liste .vrm-set-lib b { color: #F2F7FD !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-liste .vrm-set-ligne:active { background: rgb(18 52 96 / .06) !important; transition: none !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-theme="dark"] body .v2-pm-liste .vrm-set-ligne:active { background: rgb(255 255 255 / .06) !important; }
+/* La tête de Paramètres au téléphone : la cloche de la coque sur sa ligne (la rangée de ronds d'hier n'est plus là). */
+@media (max-width: 1023px) {
+  :root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-set-tete { padding-right: 56px !important; margin-top: 8px !important; }
+  :root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-set-h1 { font-size: 34px !important; line-height: 40px !important; letter-spacing: -.02em !important; color: var(--v2-page-texte) !important; }
+}
+
+/* ── Un seul plein par écran : les autres boutons pleins d'hier sur Argent deviennent teintés (rien n'est retiré). ── */
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, .vrm-finance-page) .vrm-b-primaire:not([data-urssaf-cest-declare]),
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent button.vrm-urssaf-copier { background: var(--v2-teinte-fond) !important; background-image: none !important; color: var(--v2-teinte-texte) !important; box-shadow: none !important; border-color: transparent !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent button.vrm-urssaf-copier { min-height: 44px !important; border-radius: 12px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-argent-nav .v2-seg-btn { flex: 1 1 0 !important; min-width: 0 !important; padding: 0 4px !important; font-size: 13px !important; }
+/* Grand texte : le segmenté passe en 2 × 2 (Argent) ou en colonne (Factures) — jamais un segment rogné. */
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body .v2-argent-nav .v2-seg { display: flex !important; flex-wrap: nowrap !important; overflow-x: auto !important; scrollbar-width: none !important; -webkit-overflow-scrolling: auto !important; scroll-snap-type: x proximity !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body .v2-argent-nav .v2-seg-btn { flex: 0 0 auto !important; padding: 0 16px !important; scroll-snap-align: start !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body [data-fac-zones].v2-seg { display: grid !important; grid-template-columns: minmax(0, 1fr) !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body :is(.v2-argent-nav, [data-fac-zones]) .v2-seg-btn { padding: 0 8px !important; }
+/* « Tout va bien ? » en tête de Paramètres : une rangée blanche, un POINT ambre (plus un aplat ambre). */
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-pm-alerte-liste { background: var(--v2-carte) !important; border: 0 !important; border-radius: 20px !important; box-shadow: var(--v2-carte-ombre) !important; overflow: hidden !important; margin: 0 0 8px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-pm-alerte { background: transparent !important; color: var(--sv-encre, #0C1D30) !important; min-height: 52px !important; padding: 8px 16px !important; gap: 12px !important; border: 0 !important; box-shadow: none !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-theme="dark"] body .vrm-pm .vrm-pm-alerte { color: #F2F7FD !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-pm-alerte .vrm-pm-alerte-point { width: 32px !important; height: 32px !important; display: grid !important; place-items: center !important; background: transparent !important; color: transparent !important; position: relative !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-pm-alerte .vrm-pm-alerte-point svg { display: none !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-pm-alerte .vrm-pm-alerte-point::after { content: "" !important; width: 10px !important; height: 10px !important; border-radius: 50% !important; background: var(--v2-ambre-point) !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-pm-alerte :is(b, small) { color: inherit !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-pm-alerte small { color: var(--v2-muet) !important; font-size: 13px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-pm-alerte b { font-size: 17px !important; font-weight: 400 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent-partie > .v2-ar-mois { width: 100% !important; max-width: 1120px !important; align-self: stretch !important; margin: 0 !important; }
+} /* fin @layer vrm-verre */
+
+/* ── Paramètres : les rangées du nouveau design (RangeeTouchable) — icône teintée, nom 17/400, valeur, chevron ── */
+.v2-pm-liste { background: var(--v2-carte); border-radius: 20px; box-shadow: var(--v2-carte-ombre); overflow: hidden; color: var(--sv-encre, #0C1D30); }
+html body button.v2-rangee.v2-pm-rangee { position: relative; gap: 12px; min-height: 64px; padding: 12px 20px; border-radius: 0; color: inherit; }
+html body button.v2-rangee.v2-pm-rangee:active { background: rgb(18 52 96 / .06); transform: none; transition: none; }
+:root[data-theme="dark"] body button.v2-rangee.v2-pm-rangee:active { background: rgb(255 255 255 / .06); }
+.v2-pm-rangee + .v2-pm-rangee::before { content: ""; position: absolute; left: 64px; right: 0; top: 0; height: .5px; background: var(--v2-filet); }
+.v2-pm-ic { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border-radius: 12px; background: var(--v2-teinte-fond); color: var(--v2-teinte-texte); }
+.v2-pm-lib { flex: 1 1 auto; min-width: 0; font-size: 17px; line-height: 22px; font-weight: 400; overflow-wrap: break-word; }
+.v2-pm-val { flex: 0 1 auto; max-width: 50%; font-size: 17px; line-height: 22px; text-align: right; color: var(--v2-muet); }
+.v2-pm-val.is-ambre { color: var(--v2-ambre); }
+.v2-pm-chev { flex: none; display: flex; color: var(--v2-muet); }
+.v2-pm-chev svg { stroke: currentColor; opacity: .7; }
+.v2-pm-moi .v2-pm-av { flex: none; width: 48px; height: 48px; border-radius: 50%; overflow: hidden; display: grid; place-items: center; }
+.v2-pm-moi-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.v2-pm-moi-txt b { font-size: 17px; line-height: 22px; font-weight: 600; }
+.v2-pm-moi-txt span { font-size: 13px; line-height: 16px; color: var(--v2-muet); overflow-wrap: anywhere; }
+html body button.v2-rangee.v2-pm-rangee.v2-pm-moi { min-height: 72px; }
+:root[data-theme="dark"] .v2-pm-liste { color: #F2F7FD; }
+
+/* ── Grand texte (réglage « Grand » à « Très grand », ou l'appareil) : rien ne se serre jusqu'à couper un mot ── */
+html[data-grand-texte] .v2-ar-v { flex-wrap: wrap; }
+html[data-grand-texte] .v2-ar-v-droite { flex: 1 0 100%; flex-direction: row; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; }
+html[data-grand-texte] body button.v2-rangee.v2-pm-rangee { flex-wrap: wrap; }
+html[data-grand-texte] .v2-pm-lib { flex: 1 1 0; min-width: 0; }
+html[data-grand-texte] .v2-pm-chev { order: 2; }
+html[data-grand-texte] .v2-pm-val { order: 3; flex: 1 0 100%; max-width: none; padding-left: 44px; text-align: left; }
+html[data-grand-texte] .v2-pm-moi .v2-pm-val { padding-left: 60px; }
+.v2-argent-comptes { flex-wrap: wrap; }
+.v2-argent-comptes .v2-menu-sous, .v2-argent-comptes .v2-menu-lib { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; min-width: 0; }
+html[data-grand-texte] .v2-tete-argent .v2-titre-ligne { flex-wrap: wrap; row-gap: 8px; padding-right: 0; }
+html[data-grand-texte] .v2-tete-argent .v2-titre-ligne h1 { flex: 1 0 100%; padding-right: 56px; box-sizing: border-box; }
+.v2-pm-moi .v2-pm-av { background: var(--v2-teinte-fond); color: var(--v2-teinte-texte); font-weight: 600; }
+
+/* ══ 7. AIR (17 nov. soir, Julien : « c'est trop compacté ») — l'échelle d'espacement OBLIGATOIRE, mesurée par le banc :
+   marge intérieure d'une carte ≥ 20 px, 16 px entre deux cartes, 32 px entre deux sections, titre → contenu 12 px,
+   ≥ 12 px entre deux boutons, rangée de liste ≥ 64 px, interligne 1,4 ; les replis voisins forment UNE liste groupée. ══ */
+.v2-registre-gestes { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
+@layer vrm-verre {
+/* Argent (Mois, Déclarer, Factures) : les cartes d'hier respirent. */
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) :is(.vrm-surface, .vrm-urssaf-geste, .vrm-mb, .vrm-compta-carte, .vrm-ac-carte, .vrm-d7-carte, .vrm-fu-declaration, .vrm-at-carte, [data-prevision-urssaf]) { padding: var(--v2-air-carte, 20px) !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) .vrm-surface:has(> [data-compta-resultat]) { padding: 0 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) [data-compta-resultat] { padding: var(--v2-air-carte, 20px) !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) .vrm-d7-rapport { padding: 16px var(--v2-air-carte, 20px) !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) :is(.vrm-surface, .vrm-urssaf-geste, .vrm-mb, .vrm-compta-carte, .vrm-ac-carte, .vrm-d7-carte, .vrm-repli, .vrm-set-liste) { border-radius: 20px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-argent-partie { gap: 16px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-argent-partie > .vrm-compta-q { display: flex !important; flex-direction: column !important; gap: 16px !important; margin: 16px 0 0 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-argent-partie > .vrm-compta-q:first-child { margin-top: 0 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-compta-q-tete { margin: 0 20px -4px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-compta-question { font-size: 13px !important; line-height: 18px !important; font-weight: 600 !important; letter-spacing: 0 !important; text-transform: none !important; color: var(--v2-page-muet) !important; margin: 0 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) :is(p, small, .vrm-set-desc, .vrm-compta-repli-resume) { line-height: 1.4 !important; }
+/* Les boutons voisins : 12 px au moins. */
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures], .vrm-pm) :is(.vrm-urssaf-gestes, .vrm-registre > span, .vrm-micro-gestes, [data-fac-actions]) { gap: 12px !important; }
+/* Les replis (Tes déclarations URSSAF, Ta micro-entreprise, DAC7, le détail du Mois…) : des RANGÉES de liste groupée —
+   64 px, 20 px de marge, le résumé (la valeur) dessous, le chevron ; des replis voisins se collent en UNE carte. */
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent :is(.vrm-repli.vrm-compta-repli, .vrm-repli.vrm-micro-repli) { margin: 0 !important; padding: 0 !important; background: var(--v2-carte) !important; border: 0 !important; box-shadow: var(--v2-carte-ombre) !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; color: var(--sv-encre, #0C1D30) !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent :is(.vrm-repli.vrm-compta-repli, .vrm-repli.vrm-micro-repli) > summary { display: flex !important; align-items: center !important; gap: 12px !important; min-height: 64px !important; padding: 12px var(--v2-air-carte, 20px) !important; box-sizing: border-box !important; margin: 0 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent :is(.vrm-repli.vrm-compta-repli, .vrm-repli.vrm-micro-repli)[open] > :not(summary) { padding: 0 20px 20px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent :is(.vrm-compta-repli-titre) { font-size: 17px !important; line-height: 22px !important; font-weight: 400 !important; color: inherit !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-compta-repli-tete { display: flex !important; flex-direction: column !important; gap: 2px !important; min-width: 0 !important; flex: 1 1 auto !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-compta-repli-resume { font-size: 13px !important; color: var(--v2-muet) !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-theme="dark"] body .vrm-argent :is(.vrm-repli.vrm-compta-repli, .vrm-repli.vrm-micro-repli) { color: #F2F7FD !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent :is(.vrm-compta-repli, .vrm-micro-repli):has(+ :is(.vrm-compta-repli, .vrm-micro-repli)) { border-bottom-left-radius: 0 !important; border-bottom-right-radius: 0 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent :is(.vrm-compta-repli, .vrm-micro-repli) + :is(.vrm-compta-repli, .vrm-micro-repli) { margin-top: -16px !important; border-top-left-radius: 0 !important; border-top-right-radius: 0 !important; position: relative !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent :is(.vrm-compta-repli, .vrm-micro-repli) + :is(.vrm-compta-repli, .vrm-micro-repli)::before { content: "" !important; position: absolute !important; left: 20px !important; right: 0 !important; top: 0 !important; height: .5px !important; background: var(--v2-filet) !important; z-index: 1 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-compta-replis { display: flex !important; flex-direction: column !important; gap: 0 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-compta-replis > .vrm-compta-repli + .vrm-compta-repli { margin-top: 0 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-compta-replis > .vrm-compta-repli:not(:first-child) { border-top-left-radius: 0 !important; border-top-right-radius: 0 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-compta-replis > .vrm-compta-repli:not(:last-child) { border-bottom-left-radius: 0 !important; border-bottom-right-radius: 0 !important; }
+/* Paramètres (les catégories et leurs réglages) : listes groupées aérées. */
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-set-liste { border-radius: 20px !important; overflow: hidden !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-set-liste > .vrm-set-ligne, :root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-set-liste > * > .vrm-set-ligne { min-height: 64px !important; padding: 12px var(--v2-air-carte, 20px) !important; box-sizing: border-box !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm :is(.vrm-set-carte, .vrm-set-panneau > .vrm-surface) { padding: var(--v2-air-carte, 20px) !important; border-radius: 20px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-set-groupe { margin: 0 0 32px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-set-titre { margin: 0 20px 12px !important; font-size: 13px !important; font-weight: 600 !important; text-transform: none !important; letter-spacing: 0 !important; color: var(--v2-page-muet) !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-set-desc { line-height: 1.4 !important; }
+
+/* AIR, deuxième passe (le banc a mesuré les restes) */
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) :is(.vrm-fu-case, .vrm-stva, .vrm-fp-section, .vrm-tva-marge, .vrm-fu-panneau) { padding: var(--v2-air-carte, 20px) !important; border-radius: 20px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) details.vrm-ac-repli > summary { display: flex !important; align-items: center !important; padding: 12px var(--v2-air-carte, 20px) !important; min-height: 64px !important; box-sizing: border-box !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) details.vrm-ac-repli[open] > :not(summary) { padding: 0 20px 16px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-compta-replis { background: transparent !important; box-shadow: none !important; padding: 0 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures], .vrm-pm) .vrm-set-liste > .vrm-set-ligne, :root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures], .vrm-pm) .vrm-set-liste > * > .vrm-set-ligne { min-height: 64px !important; padding: 12px var(--v2-air-carte, 20px) !important; box-sizing: border-box !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) :is(.vrm-micro-grille, .vrm-d7-liste, .vrm-compta-grille) { gap: 16px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) :has(> .vrm-b + .vrm-b) { column-gap: 12px !important; row-gap: 12px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) :has(> :is(.vrm-b, button) + :is(.vrm-b, button) + :is(.vrm-b, button)):not(.v2-seg, .vrm-seg, .v2-ar-barres, .v2-ar-faits, .v2-ar-liste, [role="radiogroup"], [role="group"]) { display: flex !important; flex-direction: column !important; align-items: stretch !important; gap: 12px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-liste > button.v2-rangee.v2-pm-rangee { min-height: 64px !important; padding: 12px var(--v2-air-carte, 20px) !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-liste > button.v2-rangee.v2-pm-rangee.v2-pm-moi { min-height: 80px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) .vrm-ac-sites { padding: var(--v2-air-carte, 20px) !important; border-radius: 20px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) .vrm-compta-carte { padding: 24px 20px 20px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) .vrm-set-liste .vrm-set-ligne { min-height: 64px !important; padding: 12px var(--v2-air-carte, 20px) !important; box-sizing: border-box !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures], .vrm-pm) .vrm-set-liste { padding-block: 8px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures], .vrm-pm) .vrm-set-liste .vrm-set-ligne { padding: 16px var(--v2-air-carte, 20px) !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-micro-grille .vrm-surface div:has(> * + *) { flex-wrap: wrap !important; column-gap: 12px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body .vrm-argent :is(.vrm-compta-carte, .vrm-surface) div:has(> * + *) { flex-wrap: wrap !important; column-gap: 12px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-argent .vrm-micro-grille .vrm-surface { padding-inline: 24px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body .vrm-argent .vrm-surface div { flex-wrap: wrap !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body .vrm-argent .vrm-surface :is(div, span, label, input, select, p) { min-width: 0 !important; max-width: 100% !important; overflow-wrap: break-word !important; box-sizing: border-box !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body :is(.vrm-argent, [data-argent-factures]) :has(> :is(.vrm-b, button) + :is(.vrm-b, button) + :is(.vrm-b, button)):not(.v2-seg, .vrm-seg, .v2-ar-barres, .v2-ar-faits, .v2-ar-liste, [role="radiogroup"], [role="group"]) > * { flex: 0 0 auto !important; width: 100% !important; }
+}
+
+/* Statistiques : UN segmenté (celui d'Argent) ; la période en menu compact « Mois ⌄ », « Prix qui marche › » en lien. */
+.v2-stats-ligne { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; margin: 0 0 8px; color: var(--v2-page-texte); }
+.v2-stats-periode { position: relative; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 4px; font-size: 17px; font-weight: 600; color: var(--v2-page-texte); cursor: pointer; }
+.v2-stats-periode select { appearance: none; -webkit-appearance: none; border: 0; background: transparent; color: inherit; font: inherit; padding: 0 20px 0 0; min-height: 44px; cursor: pointer; }
+.v2-stats-periode select option { color: #0C1D30; }
+.v2-stats-periode svg { position: absolute; right: 4px; transform: rotate(90deg); pointer-events: none; }
+.v2-stats-ligne .v2b-texte { color: var(--v2-page-texte) !important; }
+@layer vrm-verre {
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body .vrm-argent .vrm-compta-carte { padding: 24px !important; }
+}
+
+/* Paramètres : la rangée trouvée par la recherche, surlignée (un fond teinté qui s'éteint) ; mouvement réduit : sans fondu. */
+html[data-design="v2"] .v2-pm-surligne { background: var(--v2-teinte-fond) !important; box-shadow: inset 3px 0 0 var(--v2-lien) !important; transition: background-color 600ms ease; }
+@media (min-width: 1024px) { html[data-design="v2"] .vrm-pm-bureau [data-v2-pm-section] .vrm-pm-cat { margin-top: 0; } }
+@layer vrm-verre {
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .v2-pm-surligne { background: var(--v2-teinte-fond) !important; box-shadow: inset 3px 0 0 var(--v2-lien) !important; }
+}
+/* Paramètres à l'ordinateur (nouveau design) : la section choisie en UNE colonne de listes groupées (plus de grille à deux
+   colonnes qui coupait « Taille de l'affichage »), 680 px au plus ; les valeurs des rangées ne se coupent pas. */
+@layer vrm-verre {
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-pm-contenu [data-v2-pm-section] .vrm-pm-cat { display: flex !important; flex-direction: column !important; gap: 0 !important; max-width: 680px !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-pm-contenu [data-v2-pm-section] .vrm-pm-cat > * { grid-column: auto !important; width: 100% !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"] body .vrm-pm .vrm-set-liste .vrm-set-lib b { overflow-wrap: break-word !important; word-break: normal !important; hyphens: manual !important; }
+}
+html[data-design="v2"] body .v2-pm-val { white-space: nowrap; max-width: none; }
+/* Très grand texte : dans « Prochaine déclaration », les rangées en ligne (date · « dans N jours », libellé · montant)
+   passent à la ligne au lieu de déborder de leur carte ; un montant reste entier. */
+@layer vrm-verre {
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body .vrm-argent .vrm-compta-carte [style*="display: flex"] { flex-wrap: wrap !important; min-width: 0 !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body .vrm-argent .vrm-compta-carte [style*="display: flex"] > * { min-width: 0 !important; }
+}
+/* Très grand texte, « Prochaine déclaration » (mesuré) : la date d'échéance passe à la ligne entre ses mots (jamais au milieu
+   d'un mot), et le grand montant de la carte prend une taille qui tient dans sa carte (il n'est jamais coupé). */
+@layer vrm-verre {
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body .vrm-argent :is([data-compta-echeance], [data-prevision-urssaf]) span[style*="nowrap"] { white-space: normal !important; }
+:root:root:root:root:root:root:root:root:root[data-design="v2"][data-grand-texte] body .vrm-argent .vrm-compta-carte .vrm-compta-hero { font-size: 28px !important; line-height: 1.15 !important; }
+}
