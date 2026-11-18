@@ -136,5 +136,10 @@ export default {
   "v2.barre.ann": "Anzeigen",
   "v2.barre.ach": "Käufe",
   "v2.barre.ven": "Verkäufe",
-  "v2.barre.arg": "Geld"
+  "v2.barre.arg": "Geld",
+  "v2.style.lib": "Stil",
+  "v2.style.apple": "Apple",
+  "v2.style.apple.desc": "Hellgrauer Hintergrund, weiße Karten, Schrift und Schalter wie auf dem iPhone.",
+  "v2.style.studio": "Studio Blau",
+  "v2.style.studio.desc": "Der bisherige blaue Hintergrund mit Glas."
 };
