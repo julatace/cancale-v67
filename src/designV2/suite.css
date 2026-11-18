@@ -102,14 +102,15 @@ html body .v2-groupe[data-v2-en-route] .v2-ligne { content-visibility: auto; con
 /* ── GRAND TEXTE · règle 1 (≤ 4 bandes avant la liste) : le plein COMPACT de la ligne du titre (Publier, Ajouter) devient
    un rond « + » de 44 (son nom reste lu : libellé masqué visuellement, jamais retiré) et reprend sa place à côté du titre ;
    si le titre ne tient pas, il passe dessous (retour à la ligne, jamais un mot coupé — A1). ── */
-html[data-design="v2"][data-grand-texte] body .v2-tete-tache:has(.v2-titre-ligne .v2b-compact) { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; align-items: center; }
-html[data-design="v2"][data-grand-texte] body .v2-tete-tache:has(.v2-titre-ligne .v2b-compact) > * { grid-column: 1 / -1; }
-html[data-design="v2"][data-grand-texte] body .v2-tete-tache .v2-titre-ligne:has(.v2b-compact) { display: contents; }
-html[data-design="v2"][data-grand-texte] body .v2-tete-tache .v2-titre-ligne:has(.v2b-compact) > h1 { grid-column: 1 / -1; grid-row: 1; }
-html[data-design="v2"][data-grand-texte] body .v2-tete-tache .v2-titre-ligne:has(.v2b-compact) > .v2b-hote { grid-column: 2; grid-row: 2; }
-html[data-design="v2"][data-grand-texte] body .v2-tete-tache:has(.v2-titre-ligne .v2b-compact) > .v2-sous-titre { grid-column: 1; grid-row: 2; min-width: 0; }
-html[data-design="v2"][data-grand-texte] body .v2-tete-tache .v2-titre-ligne button.v2b-principal.v2b-compact { width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 0; border-radius: 50%; gap: 0; justify-content: center; }
-html[data-design="v2"][data-grand-texte] body .v2-tete-tache .v2-titre-ligne button.v2b-compact .v2b-lib { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+/* (18 nov., train) Ventes garde SON plein « Imprimer N » (libellé court en très grand texte, banc design-v2-ventes W) : `.v2v-titre-ligne` exclu. */
+html[data-design="v2"][data-grand-texte] body .v2-tete-tache:has(.v2-titre-ligne:not(.v2v-titre-ligne) .v2b-compact) { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; align-items: center; }
+html[data-design="v2"][data-grand-texte] body .v2-tete-tache:has(.v2-titre-ligne:not(.v2v-titre-ligne) .v2b-compact) > * { grid-column: 1 / -1; }
+html[data-design="v2"][data-grand-texte] body .v2-tete-tache .v2-titre-ligne:not(.v2v-titre-ligne):has(.v2b-compact) { display: contents; }
+html[data-design="v2"][data-grand-texte] body .v2-tete-tache .v2-titre-ligne:not(.v2v-titre-ligne):has(.v2b-compact) > h1 { grid-column: 1 / -1; grid-row: 1; }
+html[data-design="v2"][data-grand-texte] body .v2-tete-tache .v2-titre-ligne:not(.v2v-titre-ligne):has(.v2b-compact) > .v2b-hote { grid-column: 2; grid-row: 2; }
+html[data-design="v2"][data-grand-texte] body .v2-tete-tache:has(.v2-titre-ligne:not(.v2v-titre-ligne) .v2b-compact) > .v2-sous-titre { grid-column: 1; grid-row: 2; min-width: 0; }
+html[data-design="v2"][data-grand-texte] body .v2-tete-tache .v2-titre-ligne:not(.v2v-titre-ligne) button.v2b-principal.v2b-compact { width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 0; border-radius: 50%; gap: 0; justify-content: center; }
+html[data-design="v2"][data-grand-texte] body .v2-tete-tache .v2-titre-ligne:not(.v2v-titre-ligne) button.v2b-compact .v2b-lib { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
 /* La fiche ouverte (modale) : le plein de la page derrière elle se tait — un seul plein à l'écran (règle 2). */
 html[data-design="v2"] body:has(.vrm-fp.fd) .v2-tete-tache [data-v2b="principal"] { visibility: hidden; }
 /* C10 · le message « N nouvelles paires numérotées · N°… » : deux lignes au plus (la liste des N° est dans Aujourd'hui → À faire),
