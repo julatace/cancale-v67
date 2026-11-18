@@ -779,3 +779,6 @@ html body button.v2-facture-ok::before { content: ""; position: absolute; inset:
 .v2l-a-qui { display: flex; flex-wrap: wrap; align-items: center; gap: 0 4px; font-size: 13px; line-height: 18px; color: var(--v2-muet); min-width: 0; }
 .v2l-a-qui .v2l-logo { display: inline-flex; align-items: center; }
 .v2l-qui-txt { min-width: 0; overflow-wrap: anywhere; }
+/* Chaque fait de la ligne « qui » reste entier (« vendue il y a 6 j » ne se coupe pas) ; seul un pseudo trop long se coupe. */
+.v2l-qui-fait { white-space: nowrap; }
+.v2l-qui-fait:first-child { white-space: normal; overflow-wrap: anywhere; }
