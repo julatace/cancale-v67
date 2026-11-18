@@ -9,7 +9,7 @@
     "octets": 3418418,
     "doublons": 27,
     "entieres": 0,
-    "js": 1972,
+    "js": 1983,
     "doublonsParAdresse": {
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
      "app_data?id=eq.lbc_listings&select=l:data->lectures|": 2,
@@ -698,6 +698,13 @@
     "journee"
    ],
    "raison": "train du 18 nov. : la suite du nouveau design (lot design-v2-suite, #1268 : suite.css, rangées touchables d'Aujourd'hui, Achats) — +2,5 Ko au démarrage (1 971,49 mesuré par audit-poids-demarrage ; accord du coordinateur)"
+  },
+  {
+   "date": "2026-11-18",
+   "ecrans": [
+    "journee"
+   ],
+   "raison": "train du 18 nov. : design-v2-suite (#1268) sur main après #1270 (budget 1 982) — 1 982,49 Ko mesuré : budget 1 983 (dans l'accord du coordinateur pour #1268)"
   }
  ]
 }
