@@ -372,7 +372,7 @@ const ImpressionBordereaux = ({ mode, reg, changer }) => {
   React.useEffect(() => { const f = () => setTps(reglageTamponsChoisi()); window.addEventListener('vrm:tampons', f); const d = onCloudReady(f); return () => { window.removeEventListener('vrm:tampons', f); if (typeof d === 'function') d(); }; }, []);
   const contenuVu = th ? tps.th : tps.a4;
   const tampon = modeDuContenu(contenuVu) || 'perso';
-  const choisirTamponCourt = (v) => { const c = contenuDuMode(v); if (!c) return; const n = avecChoixTampons(tps, 'tous', { contenu: v === 'rien' ? c : { ...c, mention: contenuVu.mention } }, { support: th ? 'th' : 'a4' }); ecrireReglageTampons(n); setTps(reglageTamponsChoisi()); };
+  const choisirTamponCourt = (v) => { const c = contenuDuMode(v); if (!c) return; const n = avecChoixTampons(tps, 'tous', { contenu: c }, { support: th ? 'th' : 'a4' }); ecrireReglageTampons(n); setTps(reglageTamponsChoisi()); };
   const papier = papierThermique(reg);
   const fmt = FORMATS_THERMIQUES.find((f) => f.id === reg.format) || FORMATS_THERMIQUES[0];
   const [ap, setAp] = React.useState(null);   // null · {etat:'charge'} · {etat:'ko'} · {etat:'lu', octets, pages, r1}

@@ -1649,7 +1649,7 @@ export default {
   "impression.tampon.num": "Solo N.º",
   "impression.tampon.num_titre": "N.º + título",
   "impression.tampon.num_titre_taille": "N.º + título + talla",
-  "impression.tampon.rien": "Nada",
+  "impression.tampon.rien": "Sin N.º (la mención queda)",
   "impression.tampon.pourquoi": "El título se oculta por defecto: la etiqueta va pegada al paquete, el transportista lo vería.",
   "impression.tampon.jamais": "Nunca sobre un código de barras, un QR o una dirección.",
   "impression.fiche": "Hoja de preparación",

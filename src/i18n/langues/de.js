@@ -1649,7 +1649,7 @@ export default {
   "impression.tampon.num": "Nur Nr.",
   "impression.tampon.num_titre": "Nr. + Titel",
   "impression.tampon.num_titre_taille": "Nr. + Titel + Größe",
-  "impression.tampon.rien": "Nichts",
+  "impression.tampon.rien": "Ohne Nr. (der Vermerk bleibt)",
   "impression.tampon.pourquoi": "Der Titel ist standardmäßig ausgeblendet: Das Etikett klebt auf dem Paket, der Zusteller würde ihn sehen.",
   "impression.tampon.jamais": "Nie auf einem Barcode, QR-Code oder einer Adresse.",
   "impression.fiche": "Packzettel",
