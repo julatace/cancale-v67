@@ -313,3 +313,4 @@ await secuObserver('vestiaire', compte, { status, defi, retryAfter }); // 'robot
 - 17 nov. · design-v2 : je prends #1246 (nouveau design en essai + plus de disque « + » pour tous).
 
 - 2026-11-18 07:04 UTC · session youthful-wozniak : **GEL DES FUSIONS sur main jusqu’à ce que #1246 (design-v2) soit fusionnée** — chaque fusion la remet en conflit (2 fois cette nuit). Merci de ne rien fusionner avant la ligne « #1246 en ligne ».
+- 2026-11-18 07:11 UTC · youthful-wozniak : je prends #1251 (ext 5.407.0) — fusion après #1246 ; puis #1257 (5.408.0).
