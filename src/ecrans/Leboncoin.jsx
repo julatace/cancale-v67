@@ -841,6 +841,42 @@ function LbcRelier({ ad, numsConnus, onRelie, suggestions, detail, vendue = fals
     </div>
   );
 }
+function ChoixVintedLbc({ annonce, choix, onClose, onChoisir }) {
+  const [recherche, setRecherche] = useState('');
+  const [selection, setSelection] = useState('');
+  const [limite, setLimite] = useState(60);
+  const mots = recherche.trim().toLocaleLowerCase().split(/\s+/);
+  const articles = choix.filter((a) => {
+    const texte = [a.titre, a.taille, a.compte, a.numero, 'n°' + a.numero].join(' ').toLocaleLowerCase();
+    return mots.every((mot) => texte.includes(mot));
+  });
+  const article = choix.find((a) => a.id === selection);
+  return <SheetShell onClose={onClose} maxWidth={560} titre={tr('plateformes.lbc.relierVinted')} sousTitre={annonce.subject || annonce.title}>
+    <div className="vrm-lbc-choix">
+      <p>{tr('plateformes.lbc.achatPartage')}</p>
+      <input type="search" value={recherche} onChange={(e) => { setRecherche(e.target.value); setLimite(60); }}
+        placeholder={tr('plateformes.lbc.chercherVinted')} aria-label={tr('plateformes.lbc.chercherVinted')}/>
+      <div className="vrm-lbc-choix-resultats">
+        {articles.slice(0, limite).map((a) => {
+          const prix = achatDuNumeroLu(a.numero);
+          return <button type="button" key={a.id} className="vrm-lbc-choix-ligne" aria-pressed={selection === a.id} onClick={() => setSelection(a.id)}>
+            <span className="vrm-lbc-choix-photo" aria-hidden="true">{a.photo ? <PhotoVinted src={a.photo} alt="" loading="lazy"/> : <Icon name="image" size={20}/>}</span>
+            <span><strong>{a.titre || tr('plateformes.lbc.annonceSansTitre')}</strong>
+              <small>{['N° ' + a.numero, a.taille, a.compte].filter(Boolean).join(' · ')}</small>
+              <small>{prix == null ? tr('plateformes.lbc.achatNonRenseigne') : tr('plateformes.lbc.prixAchat', { prix: montant(prix) })}</small></span>
+            <span className="vrm-lbc-choix-coche" aria-hidden="true">{selection === a.id ? '✓' : ''}</span>
+          </button>;
+        })}
+        {!articles.length && <p role="status">{tr('plateformes.lbc.aucuneVinted')}</p>}
+        {articles.length > limite && <button type="button" className="vrm-lbc-choix-plus" onClick={() => setLimite(limite + 60)}>{tr('plateformes.lbc.plusVinted')}</button>}
+      </div>
+      <button type="button" className="vrm-b vrm-b-primaire" disabled={!article} onClick={() => article && onChoisir(article)}>
+        {tr('plateformes.lbc.confirmerLien')}
+      </button>
+    </div>
+  </SheetShell>;
+}
+
 const MAIN_LEBONCOIN = ['vinted_annonce_numeros', 'vinted_accounts_hidden', 'vinted_accounts_blocked', 'vinted_pairs_lost', 'vrm_lbc_liens', 'vrm_lbc_pas_de_paire'];
 // La limite d'annonces de son offre Leboncoin (le compteur la compare au nombre
 // en ligne). Elle se réglait dans le panneau sur leboncoin.fr, retiré en 5.130 :
@@ -1260,6 +1296,7 @@ const SousEcranLbc = ({ children }) => <div style={{ fontSize: 13, color: C.mute
 const TitreEcranLbc = ({ children, ...p }) => <div {...p} style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 3, letterSpacing: '-.01em' }}>{children}</div>;
 function LeboncoinScreen() {
   const [data, setData] = useState(null);
+  const [annonceARelier, setAnnonceARelier] = useState(null);
   // (31 oct.) Le compte Leboncoin OUVERT mis en avant, les autres estompés (§11).
   const lbcOuvert = useCompteLbcOuvert();
   const [loading, setLoading] = useState(true);
@@ -1779,7 +1816,10 @@ function LeboncoinScreen() {
     // (15 nov., Annonces propre) La touche Leboncoin du sélecteur d'Annonces : SES annonces en ligne (la règle
     // `bilanEnLigneLbc`, le même nombre que `lbcCount`) ; lecture ratée ⇒ pas su (src/plateformes/nombresAnnonces.js).
     poserNombreAnnonces('leboncoin', lbcRows === null ? null : bilanLbc.enLigne.length);
-    setData({ retirerAConfirmer, catalogueAds: lbcAds.filter(aLui), catalogueVentes: ventesLbc, sortiesLbc: sortiesLbc.map((a) => { const q = lbcSortieDe(a); return { id: String(a.id), plusVueAt: q === 'plusvue' ? a.plusVueAt : null, pauseAt: q === 'pause' ? a.pauseAt : null, compte: String(a.account || a.lbcUser || '') }; }), lecturesLbc, pasRevues: pasRevues.length, pasRevuesJours: pasRevues.length ? Math.floor(Math.min(...pasRevues.map(lbcJoursSansVoir))) : 0, liensPoses, liensMain: liens, preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, postedKO, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked: unlinkedAsk, nonRelieesSansJumelle, ventesSansJumelle, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, repub: (preuveKO || ventesLbcKO || postedRows === null || lbcRows === null) ? null : repub, repubKO, baisse: lbcRows === null ? null : baisse, lbcAccounts, lbcConnecte, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: bilanLbc.enLigne.length, lbcAConfirmer: { n: bilanLbc.aConfirmer.length, ids: bilanLbc.aConfirmer.map((a) => String(a.id)), lu: bilanLbc.comptes.reduce((m, c) => (Number.isFinite(c.lu) && (m == null || c.lu < m) ? c.lu : m), null), jamais: bilanLbc.comptes.some((c) => !Number.isFinite(c.lu)) }, limit: pd.limit, plan: pd.plan, prep });
+    const choixVinted = online.filter((a) => !preuveKO && !vendus.has(a.id) && numeros[a.id]?.numero && !numsSortis.has(cleNum(numeros[a.id].numero)))
+      .map((a) => ({ id: a.id, titre: a.title, taille: a.size, compte: nomCompteDe(a.uid), photo: a.photo, numero: cleNum(numeros[a.id].numero) }))
+      .filter((a) => NUM_OK.test(a.numero));
+    setData({ choixVinted, retirerAConfirmer, catalogueAds: lbcAds.filter(aLui), catalogueVentes: ventesLbc, sortiesLbc: sortiesLbc.map((a) => { const q = lbcSortieDe(a); return { id: String(a.id), plusVueAt: q === 'plusvue' ? a.plusVueAt : null, pauseAt: q === 'pause' ? a.pauseAt : null, compte: String(a.account || a.lbcUser || '') }; }), lecturesLbc, pasRevues: pasRevues.length, pasRevuesJours: pasRevues.length ? Math.floor(Math.min(...pasRevues.map(lbcJoursSansVoir))) : 0, liensPoses, liensMain: liens, preuveKO, aConfirmer: aConfirmerIds.size, echecLecture: echecLecture || listRowsBrut === null, postedKO, lbcJamaisLu: lbcJamaisLu || (lbcRows !== null && liveAds.length === 0), lbcKO: lbcRows === null, vendues, nEnLigne: online.length, nNumerotees, queue, removals, unlinked: unlinkedAsk, nonRelieesSansJumelle, ventesSansJumelle, doublons, aRelierVentes, ventesLbcKO, numsConnus: [...keysKnown], liveAds, autoMatched, retirees, repub: (preuveKO || ventesLbcKO || postedRows === null || lbcRows === null) ? null : repub, repubKO, baisse: lbcRows === null ? null : baisse, lbcAccounts, lbcConnecte, parCompte, postedCount: [...posted].filter((x) => /^\d+$/.test(x)).length, lbcCount: bilanLbc.enLigne.length, lbcAConfirmer: { n: bilanLbc.aConfirmer.length, ids: bilanLbc.aConfirmer.map((a) => String(a.id)), lu: bilanLbc.comptes.reduce((m, c) => (Number.isFinite(c.lu) && (m == null || c.lu < m) ? c.lu : m), null), jamais: bilanLbc.comptes.some((c) => !Number.isFinite(c.lu)) }, limit: pd.limit, plan: pd.plan, prep });
     setLoading(false);
   };
   useEffect(() => {
@@ -1938,6 +1978,10 @@ function LeboncoinScreen() {
     const liens = data.liensMain || null;
     return (ad) => (ad && ad.id != null) ? numeroLbcIdentite({ itemId: ad.id }, parId, liens) : '';
   }, [data]);
+  const retraitParAnnonce = React.useMemo(() => new Map(
+    (data?.removals || []).filter((r) => r.ident && r.id && r.etat === 'vendue')
+      .map((r) => [String(r.id), r.ou || 'Vinted'])
+  ), [data]);
   const nRetirerLbc = (data && data.removals) ? data.removals.filter((r) => r.etat === 'vendue' && r.ou !== 'eBay').length : 0;
   const nRetirerLbcEbay = (data && data.removals) ? data.removals.filter((r) => r.etat === 'vendue' && r.ou === 'eBay').length : 0;
   const conseilsLbc = data ? [
@@ -2073,7 +2117,25 @@ function LeboncoinScreen() {
             : pe === 'retard'
               ? <>Mets l’extension à jour, puis ouvre « Mes annonces », chaque compte.</>
               : <><a href={LIEN_MES_ANNONCES_LBC} target="_blank" rel="noreferrer" data-lbc-ouvrir-mes-annonces="">Ouvrir « Mes annonces » sur leboncoin.fr ↗</a> — sur chacun de tes comptes : l’extension relit la liste en entier.</>}</>;
-      })() : null} annonces={data.catalogueAds} ventes={data.catalogueVentes} lectureKO={data.lbcKO} numeroDe={numeroAnnonceLbc} sortieDe={lbcSortieDe} onSupprimer={supprEtat() === 'ok' ? supprimerSurLbc : null} enVol={pauseEnVol ? String(pauseEnVol) : null} achatDe={achatDuNumeroLu}/>}
+      })() : null} annonces={data.catalogueAds} ventes={data.catalogueVentes} lectureKO={data.lbcKO} numeroDe={numeroAnnonceLbc} sortieDe={lbcSortieDe} onSupprimer={supprEtat() === 'ok' ? supprimerSurLbc : null} enVol={pauseEnVol ? String(pauseEnVol) : null} achatDe={achatDuNumeroLu}
+        lienVintedDe={(ad) => !!data.liensMain?.[String(ad.id)]}
+        retraitDe={(ad) => retraitParAnnonce.get(String(ad.id))}
+        onRelierVinted={data.choixVinted.length ? setAnnonceARelier : null}/>}
+      {annonceARelier && <ChoixVintedLbc key={String(annonceARelier.id)} annonce={annonceARelier} choix={data?.choixVinted || []}
+        onClose={() => setAnnonceARelier(null)} onChoisir={(article) => {
+          const actuelle = data?.catalogueAds.find((ad) => String(ad.id) === String(annonceARelier.id));
+          const disponible = data?.liveAds.some((ad) => String(ad.id) === String(annonceARelier.id));
+          const lien = load('vrm_lbc_liens', {})?.[String(annonceARelier.id)];
+          if (!actuelle || !disponible || lien || numeroAnnonceLbc?.(actuelle) || !data.choixVinted.some((a) => a.id === article.id && a.numero === article.numero)) {
+            toast(tr('plateformes.lbc.lienIndisponible'));
+            setAnnonceARelier(null);
+            return;
+          }
+          relierAnnonceLbc(actuelle.id, article.numero);
+          toast(tr('plateformes.lbc.lienConfirme', { numero: article.numero }));
+          setAnnonceARelier(null);
+          reload();
+        }}/>}
       {/* ⚠️ UNE LECTURE RATÉE SE DIT UNE FOIS (§7). L'écran la disait jusqu'à quatre
           fois (ventes Leboncoin, compteur, preuve de vente, file vide) et, sur une
           lecture ratée de ses annonces Leboncoin, il affirmait « je n'ai pas encore

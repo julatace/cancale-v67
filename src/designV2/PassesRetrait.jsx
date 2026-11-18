@@ -9,7 +9,7 @@
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { tr } from '../i18n/index.js';
-import { BoutonV2 } from './BoutonV2.jsx';
+import { BoutonV2, BoutonIconeV2 } from './BoutonV2.jsx';
 import './design-v2.css';
 import './achats-v2.css';
 import { Etiquette, Ticket, RangeeFaite } from './Signature.jsx';
@@ -30,22 +30,31 @@ function FacePasse({ x, Icon, Photo, aides }) {
   const qr = aides.qrSrc(x);
   const ouvrir = aides.enGrand(x);
   const relier = aides.relier(x);
+  const photo = x.photo && Photo ? Photo(x.photo) : null;
+  const codesEnConflit = x.codesDesaccord?.length > 1;
   const fin = React.useCallback(() => aides.retirer(x), [aides, x]);
   return (
     <RangeeFaite fait={fait} onFin={fin} className="v2-passe-face" attrs={{ 'data-v2-face': x.cle || x.id, 'data-v2-code': x.code || '' }}>
       <Ticket
-        haut={<div className={'v2-passe-limite' + (ech && ech.ambre ? ' is-ambre' : '')} data-v2-limite={ech ? ech.code : ''}>
-          {ech ? <><i className="v2-point" aria-hidden="true" hidden={!ech.ambre}/>{ech.t}</> : <span className="v2-muet">{tr('v2.passe.limiteInconnue')}</span>}</div>}
+        haut={<div className="v2-passe-contenu">
+          <div className="v2-passe-paire">
+            <span className="v2-vignette v2-passe-photo" data-v2-photo-article={photo ? '' : undefined} aria-hidden="true">
+              {photo || <Icon name="box" size={24}/>}
+            </span>
+            <span className="v2-passe-titre">
+              {aides.titre(x)}
+              {x.num ? <small><Etiquette num={x.num}/></small> : null}
+            </span>
+          </div>
+          <div className={'v2-passe-limite' + (ech && ech.ambre ? ' is-ambre' : '')} data-v2-limite={ech ? ech.code : ''}>
+            {ech ? <><i className="v2-point" aria-hidden="true" hidden={!ech.ambre}/>{ech.t}</> : <span className="v2-muet">{tr('v2.passe.limiteInconnue')}</span>}
+          </div>
+        </div>}
         qr={qr ? <QrPasse src={qr}/> : null}
-        code={x.code || x.code2 || ''}
-        codeVide={<span className="v2-passe-sans" data-v2-sans-code="">{tr('v2.passe.codeAVenir')}</span>}>
-        <div className="v2-passe-paire">
-          <span className="v2-vignette" style={{ width: 40, height: 40 }} aria-hidden="true">{x.photo && Photo ? Photo(x.photo) : <Icon name="cintre" size={18}/>}</span>
-          <span className="v2-passe-titre">{aides.titre(x)}</span>
-          {x.num ? <Etiquette num={x.num}/> : null}
-        </div>
+        code={codesEnConflit ? '' : x.code || x.code2 || ''}
+        codeVide={<span className="v2-passe-sans" data-v2-sans-code="">{tr(codesEnConflit ? 'v2.passe.codesEnConflit' : 'v2.passe.codeAVenir')}</span>}>
         <div className="v2-passe-gestes">
-          {ouvrir ? <BoutonV2 role="secondaire" icone={<Icon name="qr" size={20}/>} onClick={() => ouvrir()} attrs={{ 'data-v2-en-grand': '' }}>{tr('v2.passe.enGrand')}</BoutonV2> : null}
+          {ouvrir && (!codesEnConflit || qr) ? <BoutonV2 role="secondaire" icone={<Icon name={qr ? "qr" : "scan"} size={20}/>} onClick={ouvrir} attrs={{ 'data-v2-en-grand': '' }}>{tr(qr ? 'v2.passe.afficherQr' : 'v2.passe.afficherCode')}</BoutonV2> : null}
           {relier ? <BoutonV2 role="texte" onClick={relier} attrs={{ 'data-v2-relier': '' }}>{tr('v2.passe.relier')}</BoutonV2> : null}
           <BoutonV2 role="texte" onClick={() => setFait(true)} attrs={{ 'data-v2-retire': '' }}>{tr('v2.passe.retire')}</BoutonV2>
         </div>
@@ -58,6 +67,13 @@ function Passe({ p, Icon, Photo, Plaque, aides }) {
   const colis = p.arrives || [];
   const [i, setI] = React.useState(0);
   const piste = React.useRef(null);
+  const aller = (index) => {
+    const el = piste.current;
+    if (!el) return;
+    const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+    el.scrollTo({ left: el.clientWidth * index, behavior });
+  };
+  const page = Math.min(i, colis.length - 1);
   const surDefilement = () => {
     const el = piste.current; if (!el || !el.clientWidth) return;
     const k = Math.round(el.scrollLeft / el.clientWidth); if (k !== i) setI(k);
@@ -77,7 +93,11 @@ function Passe({ p, Icon, Photo, Plaque, aides }) {
       <div className="v2-passe-piste" ref={piste} onScroll={surDefilement} data-v2-piste="">
         {colis.map((x) => <FacePasse key={x.cle || x.id} x={x} Icon={Icon} Photo={Photo} aides={aides}/>)}
       </div>
-      {colis.length > 1 ? <div className="v2-passe-pages" data-v2-page={String(i + 1)} aria-live="polite">{tr('v2.passe.page', { i: i + 1, n: colis.length })}</div> : null}
+      {colis.length > 1 ? <div className="v2-passe-pages" data-v2-page={String(page + 1)}>
+        <BoutonIconeV2 label={tr('v2.passe.precedent')} onClick={() => aller(page - 1)} attrs={{ disabled: page === 0 }} icone={<Icon name="chevron" size={16} style={{ transform: 'rotate(180deg)' }}/>}/>
+        <span aria-live="polite">{tr('v2.passe.page', { i: page + 1, n: colis.length })}</span>
+        <BoutonIconeV2 label={tr('v2.passe.suivant')} onClick={() => aller(page + 1)} attrs={{ disabled: page === colis.length - 1 }} icone={<Icon name="chevron" size={16}/>}/>
+      </div> : null}
     </article>
   );
 }

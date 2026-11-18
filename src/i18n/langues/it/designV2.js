@@ -1,5 +1,10 @@
 // it · le nouveau design « Studio Premium » (17 nov.), en essai : src/designV2/.
 export default {
+  "v2.passe.afficherQr": "Mostra il QR",
+  "v2.passe.afficherCode": "Mostra il codice",
+  "v2.passe.codesEnConflit": "Due codici diversi · Vedi i dettagli del ritiro",
+  "v2.passe.precedent": "Pacco precedente",
+  "v2.passe.suivant": "Pacco successivo",
   "v2.reglage.lib": "Design precedente",
   "v2.reglage.desc": "Torna all'aspetto precedente su questo dispositivo. Dati e impostazioni restano uguali.",
   "v2.aEnvoyer.aria": "{n} pacchi da spedire",
