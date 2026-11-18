@@ -144,6 +144,9 @@ import { transporteurRelu, ligneRelueDe, ID_BORD_TRANSPORTEURS } from '../api/_l
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : InfosSms (était importé en statique)
 const InfosSms = aLaDemandeDiscret(() => import('./InfosSms.jsx'));
 import {indexCodesSuivis, finParIdentite, fusionnerParCode, suivisLiesDuColis} from './retraitPreuves.js';
+import { revenirSurOnglet, prendreRetourOnglet, positionAOuvrir, cleDefilement } from './defilementNavigation.js';
+import { statutAVerifier } from './statutAVerifier.js';
+import { garderSelonAnnules, nombreAnnules, FILTRE_ANNULES } from './achatsAnnules.js';
 import {etatRepliRetirer, choixApresBascule} from './repliRetirer.js';
 import { finDatee, texteSortie, sortiRecent, pourquoiPasLu, SORTIS_JOURS, jourCourt as jourCourtParis } from './retraitSuivi.js';
 import {arriveesRelues} from './arriveesRelues.js';
@@ -739,7 +742,7 @@ import { trouverParScan, candidatsRetrait } from "./scanColis.js";
 import { chercherCodeDansEtiquettes } from "./etiquettesScan.js";
 import { enregistrerSourceColis, ouvrirRetrouver, sourcePrincipalePresente, EV_RETROUVER, EV_RETROUVER_CODE, EV_RELIER_COLIS, demanderRelierColis, scannerRetrouverOuvert } from "./retrouverColis.js";
 import { lireCodeColis } from "./scanColis.js";
-import { ligneLotAutre, cochesParDefaut, selectionImprimable, texteSansBordereau, resumeLot } from "./lotSelection.js";
+import { ligneLotAutre, cochesParDefaut, selectionImprimable, texteSansBordereau, resumeLot, nombreAImprimer, libelleImprimer, texteExclus } from "./lotSelection.js";
 // (15 nov., maquettes validées) Ventes « Verre dépoli » : les règles (src/ventesVerre.js) et l'habit (src/ventes/VentesVerre.jsx).
 import { cochesEffectives, basculerCoche, memeQueDefaut, emplacementDe as emplacementVente, etapesRoute, etapesFicheVente } from "./ventesVerre.js";
 import { ARegarder } from "./ventes/ARegarder.jsx";   // (16 nov., lot ventes-clair) « N choses à regarder » : les cartes d'information de Ventes dans UN repli
@@ -10924,7 +10927,7 @@ function etapeAchat(o, tk, { fini = false, retour = false } = {}) {
   //    Motif précis (comme venteStage) pour ne pas attraper « Retournée à
   //    l'expéditeur », qui est autre chose.
   if (ACHAT_A_RENVOYER.test(s)) return { label: 'À renvoyer', step: 1, color: C.warn, retour: true };
-  if (/annul|rembours|refus/i.test(s)) return { label: 'Annulé', step: 0, color: C.danger };
+  if (/annul|rembours|refus/i.test(s)) return { label: 'Annulé', step: 0, color: C.danger };   // (17 nov.) le motif de `achatAnnule` (src/registres.js), celui du filtre « Annulés » (gardé en ligne : les audits exécutent cette fonction seule)
   // (5 nov.) Mots retenus (revue du 5 nov.) : « Arrivé » (« Reçu » est réservé à l'argent),
   // « En route ». Et « à retirer » SEULEMENT si la règle des colis à retirer le compte
   // (`pickupUnion`) : un achat que Vinted dit encore « déposé » mais dont le transporteur
@@ -20087,7 +20090,7 @@ function NomEntrepriseCoque({ entreprise, className }) {
 function SideBar({ tab, setTab, entreprise, sites, badges }) {
   useProfilVendeur();   // (8 nov.) Simple / Complet : la colonne se redessine au changement
   const groupes = groupesVisibles(sites, t => !t.tel, true);
-  const bouton=(t)=>{ const on=entreeActive(t, tab); return <button key={cleEntree(t)} type="button" className="vrm-rail-button" aria-label={t.label + suffixeBadgeNav(t, badges)} title={t.label} data-nav-entree={cleEntree(t)} onClick={()=>ouvrirEntree(t,setTab)} aria-current={on?'page':undefined}><NavigationIcon item={t} size={18}/><span className="vrm-rail-lib" aria-hidden="true">{t.label}</span><BadgeNav t={t} badges={badges} place="rail"/></button>; };
+  const bouton=(t)=>{ const on=entreeActive(t, tab); return <button key={cleEntree(t)} type="button" className="vrm-rail-button" aria-label={t.label + suffixeBadgeNav(t, badges)} title={t.label} data-nav-entree={cleEntree(t)} onClick={()=>{ revenirSurOnglet(); ouvrirEntree(t,setTab); }} aria-current={on?'page':undefined}><NavigationIcon item={t} size={18}/><span className="vrm-rail-lib" aria-hidden="true">{t.label}</span><BadgeNav t={t} badges={badges} place="rail"/></button>; };
   // (30 oct., Edge sous Windows) Une fenêtre basse (1366×768 → 630 px utiles)
   // coupe le bas de la colonne, et la zone défile SANS barre visible : elle dit
   // de quel côté il en reste (`data-rail-suite`, un fondu en CSS), et l'entrée
@@ -20363,7 +20366,14 @@ function MemoireDefilement({ ecran }) {
     // (5 nov., reprise) La position est rangée sur l'APPAREIL (src/repriseEcran.js) :
     // l'app installée qu'iOS ferme puis rouvre retrouve aussi son défilement.
     const owner=AUTH.user?.id||'';const st=stockageParcours();let gardee=0;try{if(st)gardee=Number(lireParcours(st,owner,'position:'+ecran,0))||0;}catch(_){}
-    const cible=positions.current.get(owner+':'+ecran)??Math.max(0,Math.min(1000000,gardee));
+    // (17 nov., chasse-bugs — Julien : « quand j'ai déclaré, ça me met en plein milieu de la page ») La position gardée
+    // ne vaut que pour la REPRISE (premier écran après l'ouverture) et le RETOUR par la barre/la colonne ; toute autre
+    // arrivée (un geste, une carte, un segment, un retour arrière) ouvre EN HAUT — src/defilementNavigation.js.
+    const memorisee=positions.current.get(owner+':'+ecran)??Math.max(0,Math.min(1000000,gardee));
+    const cible=positionAOuvrir({ premier: !MemoireDefilement.dejaRendu, retourOnglet: prendreRetourOnglet(), memorisee });
+    // La même zone gardait le défilement de l'écran d'avant : remise à 0 — sauf si l'écran qui s'ouvre a DÉJÀ fait défiler
+    // lui-même (un lien « aller à cet élément » : la position n'est plus celle laissée en partant).
+    if(cible===0 && main.scrollTop!==0 && (MemoireDefilement.sortie==null || Math.abs(main.scrollTop-MemoireDefilement.sortie)<2)) main.scrollTop=0;
     let position=cible, restauration=cible>0, arrete=false;   // rien à tenir à 0
     // On ne s'arrête pas au premier succès : l'écran peut se raccourcir le temps
     // d'un chargement (le navigateur ramène alors la position à 0). On tient la
@@ -20395,6 +20405,7 @@ function MemoireDefilement({ ecran }) {
     return ()=>{
       arrete=true;clearTimeout(delai);cancelAnimationFrame(image);window.removeEventListener('pagehide',garderPosition);document.removeEventListener('visibilitychange',auMasquage);
       positions.current.set(owner+':'+ecran,position);
+      MemoireDefilement.sortie=main.scrollTop;
       try{if(st&&(AUTH.user?.id||'')===owner)garderParcours(st,owner,'position:'+ecran,position);}catch(_){}
       main.removeEventListener('scroll',lire);main.removeEventListener('wheel',intervenir);main.removeEventListener('touchstart',intervenir);window.removeEventListener('keydown',intervenir);main.removeEventListener('pointerdown',intervenir);
     };
@@ -20480,7 +20491,8 @@ function BottomBar({tab,setTab,sites,badges,gestes:gestesDisque=null}) {
   // (14 nov., Studio bleu clair) Changer d'ESPACE : l'ondulation de lumière part de l'onglet touché (src/design/ondulation.js).
   const allerA=(id,depuis)=>{ if(depuis&&espaceDe(id,BAR_GROUPE)!==espaceDe(tab,BAR_GROUPE)) onduler(depuis); noterNavigationSimple(id); setVise(id); demarrer(()=>setTab(id)); };
   React.useEffect(()=>{ preparerOndulation(); },[]);   // (17 nov.) l'anneau posé au repos : un toucher ne l'insère plus (ondulation.js)
-  const tabMontre=vise||tab;
+  // (17 nov., chasse-bugs) L'onglet allumé suit l'écran MONTRÉ ; le toucher en cours ne l'emporte que pendant sa transition.
+  const tabMontre=(vise&&enCours)?vise:tab;
   const navRef=React.useRef(null);
   // (8 nov.) LA PASTILLE DE L'ONGLET CHOISI GLISSE vers l'onglet touché (Julien : « vraiment
   // fluide, pas robotique »). Les places des onglets sont relevées quand la barre change de
@@ -20567,8 +20579,9 @@ function BottomBar({tab,setTab,sites,badges,gestes:gestesDisque=null}) {
         <button type="button" className="vrm-tab" data-nav-entree={t.id} onClick={(e)=>{ setPlusOuvert(false);
           const ic=e.currentTarget.querySelector('.vrm-tab-ic')||e.currentTarget;
           // (14 nov., n° 61) « Paires » ouvre le dernier de ses trois écrans ; retouché sur l'un d'eux, il remonte en haut.
-          if(t.id===ID_PAIRES){ if(!vise&&estPaires(tab)) remonterEnHaut(); else allerA(dernierePaire(),ic); return; }
-          if(!vise&&(BAR_GROUPE[tab]||tab)===t.id&&t.id===tab) remonterEnHaut(); else allerA(t.id,ic); }} aria-current={on?'page':undefined}>
+          if(t.id===ID_PAIRES){ if(!vise&&estPaires(tab)) remonterEnHaut(); else { revenirSurOnglet(); allerA(dernierePaire(),ic); } return; }
+          // (17 nov., chasse-bugs) L'onglet ALLUMÉ retouché remonte en haut (Argent sur Statistiques ou Déclarer compris).
+          if(!vise&&groupeBarre(tab,BAR_GROUPE)===t.id) remonterEnHaut(); else { revenirSurOnglet(); allerA(t.id,ic); } }} aria-current={on?'page':undefined}>
           <span aria-hidden="true" className="vrm-tab-ic" style={{position:'relative'}}><NavigationIcon item={t} size={22} style={{strokeWidth:on?2:1.6}}/><BadgeNav t={t} badges={badgesBarre} place="barre"/></span>
           <span className="vrm-nav-label">{lib}</span>{n ? <span className="vrm-sr-seul"> · {n} à faire</span> : null}
         </button>
@@ -42547,6 +42560,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     let arr = buysBase
     .filter(o => { const p = phaseReception(o);
       if (aFilter === 'attente') return false;
+      // (17 nov., chasse-bugs — Julien : « je veux pas voir les achats annulés sauf si je les sélectionne ») : affichage seul.
+      // Nouveau design : sa propre règle des annulés, juste en dessous (`designV2Actif`) — les deux ne s'empilent pas.
+      if (!designV2Actif() && !garderSelonAnnules(o, aFilter)) return false;
+      if (aFilter === FILTRE_ANNULES) return true;
       if (aFilter === 'route') return p === 'route';
       if (aFilter === 'recus') return p === 'recu';
       return true; })
@@ -46739,7 +46756,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const retoursChoisis = (R = lignesRetoursImpr(), voulus = null) => selectionImprimable(R, voulus instanceof Set ? voulus : cochesEffectives(R, cochesRetours));
   const lignesLotImpression = () => [...lignesLotTous(), ...lignesRetoursImpr()];
   // « + N retours » à côté du bouton (le mot RETOUR ne se mêle jamais au nombre des ventes).
-  const pastilleRetours = (n, seul) => n > 0 ? <span className="vrm-impr-retours" data-impr-retours={n} title={tr('impr.retour.titreBouton', { n })}>{tr(seul ? 'impr.retour.seul' : 'impr.retour.plus', { n })}</span> : null;
+  // (17 nov., chasse-bugs) Plus de pastille « + N retours » à côté du bouton : le bouton compte les retours cochés (`libelleImprimer`).
   const [progressionLot,setProgressionLot]=useState(null);
   const lotActuel=React.useRef(null);lotActuel.current={lignes:lignesLotTous,sig:sigLigneLot};
   // ── (31 oct.) LES CARTES DES QUATRE COLONNES DE COLIS ──────────────────
@@ -47041,6 +47058,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const [cochesRetours, setCochesRetours] = useState(null);   // (16 nov.) les retours cochés (null = d'office)
   // Le lot lu par la TÊTE d'« À expédier » (même rendu) : la liste et son pied le relisent sans le recalculer.
   const vvLotRef = React.useRef({ Ltous: [], resLot: { total: 0, partent: 0, autres: 0 }, nLot: 0, sigDefaut: '', lignesImpr: [] });
+  // (17 nov., chasse-bugs) Les colis de la liste qui ne sont PAS une ligne du lot (aucun bordereau reçu) : nommés au pied (« N°193 attend son bordereau »).
+  const vvHorsLotRef = React.useRef([]);
   // (10 nov., lot L) Le stock d'emballages (src/emballages.js) : le choix d'emballage d'un colis dans « Préparer ».
   const [emballagesR, setEmballagesR] = useStateCle(CLE_EMBALLAGES, () => load(CLE_EMBALLAGES, null));
   // « Déposé » : LE geste existant (`marquerColisFait` pour Vinted, « Colis fait » Vestiaire),
@@ -49074,7 +49093,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             action:'Emballer', tab:'cat_bord', prio:1, avant:()=>{ DEMANDE_EMBALLAGE.at = Date.now(); } });
           // (1er nov., « très répétitif ») Le même geste porté par la case « À envoyer »
           // quand elle se voit : la ligne d'« À faire » n'est alors plus redite (§7).
-          if (pretsImpr > 0) tuiles.envoyer.emballer = { n: pretsImpr, exact, phrase: `${combien} — un par un : le N°, la photo, où est ${motsVendeur().le}` };
+          if (pretsImpr > 0) tuiles.envoyer.emballer = { n: pretsImpr, nRetours: (() => { try { return retoursChoisis().length; } catch (_) { return 0; } })(), exact, phrase: `${combien} — un par un : le N°, la photo, où est ${motsVendeur().le}` };
         }
         // (19 oct.) LES VENTES eBAY À POSTER comptent dans « À envoyer » — la
         // même règle que Colis (`colisEb`, §11). L'étiquette se prend dans eBay
@@ -50941,9 +50960,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 // (15 nov., refonte-journee) « Imprimer les 3 bordereaux » en barre (la maquette) ; (16 nov.) toujours le plein de
                 // l'écran : « La paire à sortir » n'est plus dans Ma journée (la case allumée du Stock).
                 const plein = em && em.n > 0 ? (
-                  <button type="button" className="sb-btn-plein" data-sj-imprimer={String(em.n)} data-fu-principal="" title={em.phrase}
+                  <button type="button" className="sb-btn-plein" data-sj-imprimer={String(em.n)} data-impr-total={String(nombreAImprimer(em.n, em.nRetours))} data-fu-principal="" title={em.phrase}
                     onClick={imprimer}>{/* (16 nov.) son nom = son texte visible (WCAG 2.5.3, banc accessibilite) */}
-                    <Icon name="printer" size={24}/><span>{(em.n > 1 ? tr('sj.imprimerLesN', { n: em.n }) : tr('sj.imprimerLe'))}</span>
+                    <Icon name="printer" size={24}/><span>{/* (17 nov., chasse-bugs) le même nombre que Ventes : ventes prêtes + retours cochés d'office */}{(nombreAImprimer(em.n, em.nRetours) > 1 ? libelleImprimer(tr, 'sj.imprimerLesN', em.n, em.nRetours) : tr('sj.imprimerLe'))}</span>
                   </button>) : null;
                 const colis = colisJournee;
                 const montres = colis.slice(0, 6);
@@ -52255,9 +52274,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             // `data-n` reste (le nombre de l'onglet, pour qui le lit).
             const surCarte = (dansPlateforme && !baseKO) ? idsCarteAchats() : null;
             const dejaDit = (id) => !!surCarte && surCarte.has(id === 'route' ? 'enroute' : id);
-            // (17 nov.) Nouveau design : « Annulés · N » (les annulés n'apparaissent plus ailleurs), seulement s'il y en a.
+            // (17 nov.) Nouveau design : « Annulés · N » (les annulés n'apparaissent plus ailleurs), seulement s'il y en a. Ancien design : « Annulés · N » toujours là (chasse-bugs, `achatsAnnules.js`).
             const nAnnules = designV2 ? buysBase.filter((o) => achatStage(o, trackForBuy(o)).step === 0).length : 0;
-            return [...(modeListeAchats?[]:[['attente','À retirer',tracking===null?'—':pickupUnion.total]]),['route','En route',n.route],['recus','Arrivés',n.recu],['all','Tous',null],...(nAnnules > 0 || aFilter === 'annules' ? [['annules',tr('v2.achats.annules'),nAnnules]] : [])].map(([id,label,cnt])=>(
+            return (designV2 ? [...(modeListeAchats?[]:[['attente','À retirer',tracking===null?'—':pickupUnion.total]]),['route','En route',n.route],['recus','Arrivés',n.recu],['all','Tous',null],...(nAnnules > 0 || aFilter === 'annules' ? [['annules',tr('v2.achats.annules'),nAnnules]] : [])] : [...(modeListeAchats?[]:[['attente','À retirer',tracking===null?'—':pickupUnion.total]]),['route','En route',n.route],['recus','Arrivés',n.recu],['all','Tous',null],[FILTRE_ANNULES,tr('achats.filtreAnnules'),nombreAnnules(buysBase)]]).map(([id,label,cnt])=>(
             <button type="button" key={id} className="vrm-seg-btn" data-achats-onglet={id} data-n={cnt==null?undefined:String(cnt)} onClick={()=>setAFilter(id)} aria-pressed={aFilter===id} aria-label={cnt?`${label} ${cnt}`:undefined} style={{whiteSpace:'nowrap'}}>{label}{cnt&&!dejaDit(id)?<span className="vrm-seg-n" title={String(cnt)}> {cnt>=1000?`${(Math.floor(cnt/100)/10).toLocaleString('fr-FR')} k`:cnt}</span>:null}</button>
           )); })()}
         </div>
@@ -55620,17 +55639,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             if (vers) return delaiRetrait({ arriveeMs: arr.ms, limite: String(vers).slice(0, 10), estimee: true }, Date.now());
             const est = limiteEstimee({ arriveeMs: arr.ms, transporteur: carrierKey(t ? t.carrier : ((ev && ev.carrier) || '')) || '' });
             return est ? delaiRetrait({ arriveeMs: arr.ms, limite: est.jour, estimee: true }, Date.now()) : null; };
-          const statutAVerifier = (x) => { const r = String(x.raisonVerif || '') + ' ' + String(x.raisonCode || '');
-            // (6 nov.) Deux sources datées qui se contredisent (api/_lib/etat-colis.js) : ni « incident » ni « retour ».
-            if (/rien ne l[’']explique/i.test(r)) return 'Contradiction';
-            if (/instance|non r[ée]clam|retour|exp[ée]diteur|renvoy/i.test(r)) return 'Retour à l’expéditeur ?';
-            // (9 nov., 17 h 24) Une moitié Vinted comptée avec le colis du transporteur : l'état, tranché.
-            if (/^compt[ée] avec/i.test(String(x.raisonVerif || ''))) return String(x.raisonVerif).replace(/^c/, 'C');
-            if (/m[eê]me colis|m[eê]me relais|doute|pas encore relu|\brelier\b|\breli[ée]s?\b/i.test(r)) return 'À relier';
-            if (/incident|probl|transporteur/i.test(r)) return 'Incident';
-            if (/d[ée]lai|depasse/i.test(r)) return 'Délai dépassé';
-            if (/depuis plus de/i.test(r)) return 'Au relais depuis longtemps';
-            return 'À vérifier'; };
+          // (17 nov., chasse-bugs) La puce d'un « à vérifier » : src/statutAVerifier.js (l'état machine d'abord).
           // (3 nov.) Le titre d'une ligne : l'achat RELIÉ par identité (sa commande, ou celle du même n° de suivi /
           // code — `cmdParColis`), sinon le titre que l'e-mail porte (`artTitle`, dont les « Ton achat t'attend… »
           // `source:'vinted-commande'`), sinon le n° court (« n°…8456 ») — le transporteur est déjà en tête du point.
@@ -55655,8 +55664,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     aria-pressed={imprBusy ? 'true' : undefined} data-occupe={imprBusy ? '' : undefined} aria-busy={imprBusy ? 'true' : undefined}
                     // (16 nov., Julien : « toute la ligne bouge ») le libellé ne change plus pendant la lecture : la roue tourne DANS le bouton.
                     title={imprBusy ? tr('impr.enCours', { fait: imprBusy.fait || 0, total: imprBusy.total || 0 }) : (nLot > 0 ? tr('impr.boutonTitre', { n: nLot, format: tr(`impr.format.${formatLot}`) }) : resLot.total > 0 ? tr('impr.rienDeNeuf') : tr('impr.rien')) + (nRetLot ? ' ' + tr('impr.retour.titreBouton', { n: nRetLot }) : '')}
-                    onClick={() => { if (nImpr > 0) imprimerLot(); else ouvrirLot(); }} disabled={batchBusy || !!imprBusy || (resLot.total === 0 && !Lret.length)}>{nLot > 0 ? tr('impr.bouton', { n: nLot }) : tr('impr.boutonSeul')}</Bouton>
-                  {pastilleRetours(nRetLot, nLot === 0)}
+                    onClick={() => { if (nImpr > 0) imprimerLot(); else ouvrirLot(); }} disabled={batchBusy || !!imprBusy || (resLot.total === 0 && !Lret.length)}>{nImpr > 0 ? libelleImprimer(tr, 'impr.bouton', nLot, nRetLot) : tr('impr.boutonSeul')}</Bouton>
                   {/* (6 nov.) Pour le conseil « Un envoi presse » (src/accompagnement.js) : le compte du bouton,
                       et la règle de « Prochain geste » (`gesteEnvoi`) — un bordereau pour aujourd'hui ou demain. */}
                   <ChiffreConseil cle="colis.imprimer" valeur={baseKO ? null : { nLot, presse: !!gesteEnvoi({ aImprimer: bordereauxAImprimer(lignesImpr).map((l) => ({ jours: l.e && Number.isFinite(l.e.dl) ? l.e.dl : null })) }, { urgentSeul: true }) }}/>
@@ -55688,10 +55696,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                       bouton « Imprimer (N) » de la barre — le PDF du lot préparé d'avance s'ouvre DANS ce toucher ; plus rien
                       de neuf ⇒ « Choisir » (`ouvrirLot`). Les data-* des deux chantiers sont portés ensemble. */}
                   <BoutonPlein icone="printer" enCours={!!batchBusy || !!imprBusy} disabled={batchBusy || !!imprBusy || (resLot.total === 0 && !Lret.length)} onClick={() => { if (nImpr > 0) imprimerLot(); else ouvrirLot(); }}
-                    libelle={batchBusy || imprBusy ? tr('sv.imprimer.enCours') : nLot > 0 ? tr('sv.imprimer.n', { n: nLot }) : tr('sv.imprimer.court')}
+                    libelle={batchBusy || imprBusy ? tr('sv.imprimer.enCours') : nImpr > 0 ? libelleImprimer(tr, 'sv.imprimer.n', nLot, nRetLot) : tr('sv.imprimer.court')}
                     titre={(nLot > 0 ? tr('sv.imprimer.titre', { n: nLot }) : resLot.total > 0 ? tr('sv.imprimer.rienDeNeuf') : tr('sv.imprimer.aucun')) + (nRetLot ? ' ' + tr('impr.retour.titreBouton', { n: nRetLot }) : '')}
-                    attrs={{ 'data-colis-barre-btn': 'imprimer', 'data-imprimer-prets': nLot, 'data-impr-lot': nLot, 'data-impr-pret': nImpr > 0 && sigDefaut && pretPour(sigDefaut) ? '1' : '0', 'aria-pressed': imprBusy ? 'true' : undefined }}/>
-                  {batchBusy || imprBusy ? null : pastilleRetours(nRetLot, nLot === 0)}
+                    attrs={{ 'data-colis-barre-btn': 'imprimer', 'data-imprimer-prets': nLot, 'data-impr-lot': nLot, 'data-impr-total': nImpr, 'data-impr-retours-coches': nRetLot, 'data-impr-pret': nImpr > 0 && sigDefaut && pretPour(sigDefaut) ? '1' : '0', 'aria-pressed': imprBusy ? 'true' : undefined }}/>
                   {/* (6 nov.) Le conseil « Un envoi presse » (src/accompagnement.js) : le compte du bouton, inchangé. */}
                   <ChiffreConseil cle="colis.imprimer" valeur={baseKO ? null : { nLot, presse: !!gesteEnvoi({ aImprimer: bordereauxAImprimer(lignesImpr).map((l) => ({ jours: l.e && Number.isFinite(l.e.dl) ? l.e.dl : null })) }, { urgentSeul: true }) }}/>
                 </>);
@@ -56198,9 +56205,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                         <div className="vrm-lot-pied vrm-tip-pied">
                           <span className="vrm-impr-sous" data-lot-papier-dit={formatLot}>{tr(`impr.format.${formatLot}`)}</span>
                           <Bouton variante="primaire" icone="printer" data-lot-imprimer={nb} data-lot-imprimer-retours={nbR} disabled={!(nb + nbR) || !!imprBusy} onClick={imprimerChoisis}>
-                            {nb > 0 ? tr('impr.bouton', { n: nb }) : tr('impr.boutonSeul')}
+                            {nb + nbR > 0 ? libelleImprimer(tr, 'impr.bouton', nb, nbR) : tr('impr.boutonSeul')}
                           </Bouton>
-                          {pastilleRetours(nbR, nb === 0)}
                         </div>
                       </div>
                     </SheetShell>
@@ -56646,11 +56652,14 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 const { Ltous, resLot, nLot, sigDefaut, lignesImpr, Lret = [], nRetLot = 0 } = vvLotRef.current;
                 const lotPar = new Map((Ltous || []).map((l) => [String(l.cle), l]));
                 const cochesVues = enVentes ? cochesEffectives(Ltous, cochesVentes) : null;
+                vvHorsLotRef.current = enVentes ? exT.filter((e) => !e.__autre && !lotPar.has(String(e.txn || e.key))).map((e) => {
+                  const o = e.o, b = e.b; let num = ''; try { num = String((b ? numForBord(b) : '') || (o ? ((effEntry(o) || {}).numero || '') : '') || ''); } catch (_) { num = ''; }
+                  return { cle: String(e.txn || e.key), num, titre: o ? o.title : ((b && (b.modele || b.article)) || ''), raison: 'sansBordereau' }; }) : [];
                 const caseDe = (cle, titreC) => { if (!enVentes) return null; const l = lotPar.get(String(cle)); const ok = !!(l && l.cochable !== false && l.pdf !== false);
                   return <CaseCoche coche={ok && cochesVues.has(l.cle)} desactive={!ok} label={ok ? tr('vv.coche.label', { titre: String(titreC || '') }) : tr('vv.coche.sansBordereau', { titre: String(titreC || '') })}
                     onBascule={() => setCochesVentes((c) => basculerCoche(Ltous, c, l.cle))} attrs={{ 'data-vv-coche': String(cle), 'data-vv-coche-on': ok && cochesVues.has(l.cle) ? '1' : '0' }}/>; };
                 const empl = (num) => { try { return emplacementVente(num ? ouDansMeubles(num) : null); } catch (_) { return null; } };
-                return <>{lignePasLus}<div className={'vrm-colis-grille' + (enVentes ? ' vv-liste' : '')} data-cible="colonne:prets colonne:attente" data-colis-lignes="1" style={{display:'flex',flexDirection:'column',gap:6}}>{enVentes ? <div className="vv-tab-tete" aria-hidden="true"><span/><span/><span>{tr('vv.col.paire')}</span><span>{tr('vv.col.limite')}</span><span>{tr('vv.col.ou')}</span><span>{tr('vv.col.transport')}</span><span>{tr('vv.col.montant')}</span></div> : null}{(colisTous ? exT : exT.slice(0, 24)).map((e,ix)=>{
+                return <>{/* (17 nov., chasse-bugs — capture de Julien) Dans Ventes, la ligne « transporteur pas encore lu » est DANS la liste, sous ses colonnes (au-dessus, elle passait sous la barre du haut). */}{enVentes ? null : lignePasLus}<div className={'vrm-colis-grille' + (enVentes ? ' vv-liste' : '')} data-cible="colonne:prets colonne:attente" data-colis-lignes="1" style={{display:'flex',flexDirection:'column',gap:6}}>{enVentes ? <div className="vv-tab-tete" aria-hidden="true"><span/><span/><span>{tr('vv.col.paire')}</span><span>{tr('vv.col.limite')}</span><span>{tr('vv.col.ou')}</span><span>{tr('vv.col.transport')}</span><span>{tr('vv.col.montant')}</span></div> : null}{enVentes ? <div className="vv-pas-lus" data-vv-pas-lus="">{lignePasLus}</div> : null}{(colisTous ? exT : exT.slice(0, 24)).map((e,ix)=>{
                 const ouvreSansDate = ix === iSansDateEnv ? <LigneSansDate n={nSansDateEnv}/> : null;
                 const quandE = quandColisAEnvoyer(e);
                 if (e.__autre) return (
@@ -56957,18 +56966,17 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   une case décochée ⇒ SA sélection. Les data-* d'avant (`data-imprimer-prets`, `data-impr-lot`…) suivent le compte. */}
               {enVentes && (resLot.total > 0 || Lret.length > 0) ? (() => {
                 const choix = cochesEffectives(Ltous, cochesVentes); const defaut = memeQueDefaut(Ltous, cochesVentes == null ? null : choix);
-                const nC = resumeLot(Ltous, choix).partent;
+                const resChoix = resumeLot(Ltous, choix), nC = resChoix.partent;
                 // (16 nov.) Les retours cochés partent avec (compteur à part) ; leur choix suit leurs cases.
                 const choixR = cochesEffectives(Lret, cochesRetours), nR = selectionImprimable(Lret, choixR).length, defautR = memeQueDefaut(Lret, cochesRetours == null ? null : choixR);
                 return (<div className="vv-pied" data-vv-pied="">
                   <PleinLarge icone="printer" enCours={!!batchBusy || !!imprBusy} disabled={batchBusy || !!imprBusy || nC + nR === 0}
                     onClick={() => { if (nC + nR <= 0) return; if (defaut && defautR) { if (nLot + nRetLot > 0) imprimerLot(); else ouvrirLot(); } else imprimerLot(choix, { retours: choixR }); }}
-                    libelle={nC > 0 ? tr('vv.imprimer.n', { n: nC }) : tr('vv.imprimer.aucun')}
-                    titre={batchBusy || imprBusy ? tr('sv.imprimer.enCours') : nC > 0 ? tr('vv.imprimer.titre', { n: nC }) : tr('vv.imprimer.aucun')}
-                    attrs={{ 'data-colis-barre-btn': 'imprimer', 'data-imprimer-prets': nC, 'data-impr-lot': nC, 'data-vv-coches': nC, 'data-impr-retours-coches': nR, 'data-impr-pret': defaut && defautR && nLot + nRetLot > 0 && sigDefaut && pretPour(sigDefaut) ? '1' : '0', 'aria-pressed': imprBusy ? 'true' : undefined }}/>
-                  {pastilleRetours(nR, nC === 0)}
+                    libelle={nC + nR > 0 ? libelleImprimer(tr, 'vv.imprimer.n', nC, nR) : tr('vv.imprimer.aucun')}
+                    titre={batchBusy || imprBusy ? tr('sv.imprimer.enCours') : nC + nR > 0 ? libelleImprimer(tr, 'vv.imprimer.titre', nC, nR) : tr('vv.imprimer.aucun')}
+                    attrs={{ 'data-colis-barre-btn': 'imprimer', 'data-imprimer-prets': nC, 'data-impr-lot': nC, 'data-vv-coches': nC, 'data-impr-total': nombreAImprimer(nC, nR), 'data-impr-retours-coches': nR, 'data-impr-pret': defaut && defautR && nLot + nRetLot > 0 && sigDefaut && pretPour(sigDefaut) ? '1' : '0', 'aria-pressed': imprBusy ? 'true' : undefined }}/>
                   <ChiffreConseil cle="colis.imprimer" valeur={baseKO ? null : { nLot, presse: !!gesteEnvoi({ aImprimer: bordereauxAImprimer(lignesImpr).map((l) => ({ jours: l.e && Number.isFinite(l.e.dl) ? l.e.dl : null })) }, { urgentSeul: true }) }}/>
-                  <button type="button" className="vrm-impr-lien vv-choisir" data-lot-ouvrir="1" data-impr-autres={resLot.autres} disabled={!!imprBusy || batchBusy} onClick={ouvrirLot}>{resLot.autres > 0 ? tr('impr.choisirAutres', { n: resLot.autres }) : tr('vv.choisir')}</button>
+                  <button type="button" className="vrm-impr-lien vv-choisir" data-lot-ouvrir="1" data-impr-autres={resChoix.autres} disabled={!!imprBusy || batchBusy} onClick={ouvrirLot}>{(() => { const vus = new Set(); const X = [...(vvHorsLotRef.current || []), ...resChoix.exclus].filter((x) => x && !vus.has(x.cle) && vus.add(x.cle)); return X.length ? tr('impr.exclu.choisir', { liste: texteExclus(tr, X) }) : tr('vv.choisir'); })()}</button>
                 </div>);
               })() : null}
               </>; })()}
@@ -62348,7 +62356,7 @@ function AppCoeur() {
   const [tab,setTabBrut]=useState(()=>{ if(!reprise0) return 'journee'; const pl=placeDesColis({ tab:reprise0.tab, sub:reprise0.sub, onglet:reprise0.colis }); if(pl&&pl.onglet==='retirer') demanderRetirer(); return pl?pl.tab:reprise0.tab; });
   // (17 nov., nouveau design) Annonces au téléphone : la tête de la coque ne prend plus de bande (la cloche seule, sur la ligne du
   // titre ; la recherche est le champ de l'écran ; le profil est ailleurs — Paramètres par le menu ☰ et les autres écrans).
-  const v2Ann = designV2App && !ordi && tab === 'annonces';
+  const v2Ann = designV2App && !ordi && (tab === 'annonces' || tab === 'garage');   // (17 nov., lot stock-rangement) Stock aussi : la cloche sur la ligne du titre
   // (6 nov.) L'écran ouvert et celui d'avant, pour « Signaler un problème ».
   noterEcranVu(tab);
   // (6 nov., v36) Et pour les temps réels : une visite d'écran par onglet ouvert.
@@ -66691,7 +66699,8 @@ function AppCoeur() {
         {/* (8 nov.) Ma journée, Colis, Ventes, Annonces déjà vues restent montées, gelées et hors de
             la page, et reviennent telles quelles au toucher de la barre (src/ecransGardes.jsx). */}
         {/* (14 nov., n° 61) « Paires » au téléphone : Annonces | Stock | Achats, en tête des trois écrans. */}
-        {!ordi && estPaires(tab) && tab!=='annonces' && <SelecteurPaires tab={tab} setTab={setTab} badges={badgesNav} sites={sitesPresents}/>}
+        {/* (17 nov., lot stock-rangement) Nouveau design : Stock se joint par Annonces → « ⋯ » (comme Annonces), sans la bande Annonces | Stock. */}
+        {!ordi && estPaires(tab) && tab!=='annonces' && !(designV2App && tab==='garage') && <SelecteurPaires tab={tab} setTab={setTab} badges={badgesNav} sites={sitesPresents}/>}
         <EcransGardes ecran={tab} cle={(authState.user && authState.user.id) || ''} pret={subPose===tab}>
         <AttenteEcran key={tab} ecran={tab} memoire={((authState.user && authState.user.id) || '') + ':' + tab} ordi={ordi} attendus={ESSENTIELS_ECRAN[tab] || []} donnees={essentielsCoque} instantane={instantaneEcranIci}>
         {/* (14 nov., ouverture instantanée) Jamais de capture pendant une panne ou hors ligne : un écran lu à moitié
@@ -66990,7 +66999,7 @@ function AppCoeur() {
         silence={!!(bienvenue || pnOuvert || visite || configOuverte || parcoursOuvert)} onNav={setTab}/></Suspense></GardeEcran>
       {/* Les chiffres que la COQUE publie pour les conseils (la même règle que leurs bandeaux). */}
       {ordi ? <ChiffreConseilExtension/> : <ChiffreConseil cle="coque.iphone" valeur={estIphoneSafari() ? (estInstallee() ? 'installee' : 'a-installer') : 'autre'}/>}
-      <MemoireDefilement ecran={`${tab}:${(tab.startsWith('plat_')||estTacheSite(tab))?platSub:''}`}/>
+      <MemoireDefilement ecran={cleDefilement(tab, platSub, tab.startsWith('plat_')||estTacheSite(tab)||tab==='compta')}/>
       {/* Une seule navigation à la fois : latérale sur ordinateur, en bas sur
           téléphone. Jamais les deux — c'est la même liste d'écrans. */}
       {/* (17 nov., accessibilité WCAG 2.4.3) Sur ordinateur, la colonne de navigation est rendue EN TÊTE de la coque
