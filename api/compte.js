@@ -1918,7 +1918,7 @@ async function supprimerCompte(req, res) {
       if (cfg.pret) {
         try {
           try { await lireMentions(); } catch (_) {}
-          const m = mailDemande({ effaceLe: p.effaceLe, contact: contactEmail() });
+          const m = mailDemande({ effaceLe: p.effaceLe, contact: contactEmail(), langue: u.langue });
           const v = await envoyerSmtp({ hote: process.env.RELANCES_SMTP_HOTE, port: cfg.port, utilisateur: process.env.RELANCES_SMTP_UTILISATEUR, motDePasse: process.env.RELANCES_SMTP_MOT_DE_PASSE,
             de: process.env.RELANCES_EXPEDITEUR, nomDe: 'VRM', a: u.email, sujet: m.sujet, texte: m.texte, html: m.html, entetes: { 'Auto-Submitted': 'auto-generated' } });
           etapes.email = (v && v.issue) || 'incertain';
@@ -1946,7 +1946,7 @@ async function supprimerCompte(req, res) {
     if (cfg.pret) {
       try {
         try { await lireMentions(); } catch (_) {}
-        const m = mailSuppression({ fait, contact: contactEmail() });
+        const m = mailSuppression({ fait, contact: contactEmail(), langue: u.langue, etapes: r.etapes, abonnement: etapes.abonnement });
         const v = await envoyerSmtp({ hote: process.env.RELANCES_SMTP_HOTE, port: cfg.port, utilisateur: process.env.RELANCES_SMTP_UTILISATEUR, motDePasse: process.env.RELANCES_SMTP_MOT_DE_PASSE,
           de: process.env.RELANCES_EXPEDITEUR, nomDe: 'VRM', a: u.email, sujet: m.sujet, texte: m.texte, html: m.html, entetes: { 'Auto-Submitted': 'auto-generated' } });
         etapes.email = (v && v.issue) || 'incertain';

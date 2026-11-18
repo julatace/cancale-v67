@@ -149,7 +149,10 @@ function juger(depot) {
   dit(/v\.lot = r\.partent/.test(app) && /colisPrets\.lot\)\?colisPrets\.lot:undefined/.test(app), 'S7 Imprimer N lit `vrm_colis_prets.lot` (le nombre de « Tout imprimer (N) »), undefined sinon');
   const de = lire('src/design/DisqueEventail.jsx');
   dit(/connu && nImprimer > 0 \? tr\('studio\.imprimerN'/.test(de) && /: tr\('studio\.imprimer'\)/.test(de), 'S7 pas su ⇒ « Imprimer » sans nombre (jamais un 0 deviné)');
-  dit(/<DisqueEventail gestes=\{gestes\}/.test(app) && /gestes=\{gestesDisque\}/.test(app), 'S7 la barre du bas porte le disque');
+  // (17 nov., Julien : « Le + dégueulasse ») Le disque a quitté la barre ; ses gestes ont chacun leur place, à un toucher.
+  dit(!/<DisqueEventail\b/.test(app), 'S7 plus de disque dans la barre du bas');
+  dit(/data-recherche-scanner=""[^\n]*ouvrirRetrouver\('loupe'\)/.test(app) && /<BoutonScanRecherche\/>/.test(app), 'S7 Scanner = une icône DANS le champ de recherche (le même scanner pour retrouver)');
+  dit(/data-geste-disque="publier"/.test(app) && /data-v2-principal': 'publier'/.test(app), 'S7 Publier = la ligne du titre d’Annonces (éteint et allumé)');
   return rouges;
 }
 

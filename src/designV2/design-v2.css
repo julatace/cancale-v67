@@ -1,0 +1,784 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   LE NOUVEAU DESIGN « STUDIO PREMIUM » (17 nov.) — essai derrière `vrm_design_v2`.
+   Toutes les règles qui touchent la coque d'hier sont sous `html[data-design="v2"]` : éteint, rien ne
+   s'applique. Les classes `.v2-*` / `.v2b*` sont neuves (personne d'autre ne les vise).
+   Base : la lumière bleue du Studio (src/design/studio.css, jetons --sb-*), le jour comme la nuit.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ══ 1. LES JETONS DES BOUTONS ET DES LISTES ══════════════════════════════════ */
+:root {
+  --v2-bouton-h: 50px;
+  --v2-bouton-r: 14px;
+  --v2-cible: 44px;
+  --v2-glyphe: 24px;
+  --v2-trait: 1.75;
+  /* Le plein : la porcelaine sur le bleu de la coque (le geste du jour se voit d'abord), l'encre dessus. */
+  --v2-plein-fond: #FFFFFF;
+  --v2-plein-fond-appui: #DCE6F1;
+  --v2-plein-texte: #0C1D30;
+  /* Le texte posé SUR LA COQUE (le bleu du verre, src/design/studio-verre.css) : blanc ; dans une carte : l'encre. */
+  --v2-page-texte: var(--sv-clair, #FFFFFF);
+  --v2-page-muet: rgb(255 255 255 / .88);
+  --v2-page-ambre: var(--sv-clair-ambre, #FFF1C0);
+  --v2-teinte-fond: rgb(0 96 204 / .10);
+  --v2-teinte-fond-appui: rgb(0 96 204 / .18);
+  --v2-teinte-texte: #0050A8;        /* 6,9:1 sur la teinte posée sur le blanc */
+  --v2-lien: #0050A8;
+  /* Destructif : l'AMBRE (§7 — le rouge n'est QUE pour deux paires sous un même N° ; le « danger » de l'app est ambre). */
+  --v2-danger: #8A4B00;
+  --v2-anneau: 0 0 0 3px rgb(0 96 204 / .45);
+  --v2-muet: #4A5B6D;                /* gris lisible (≥ 4,5:1 sur la porcelaine ET sur l'aplat) */
+  --v2-carte: #FFFFFF;
+  --v2-feuille-fond: #F4F8FC;
+  --v2-carte-ombre: 0 .5px 0 rgb(18 52 96 / .06), 0 1px 2px rgb(18 52 96 / .07), 0 10px 24px -14px rgb(18 52 96 / .28);
+  --v2-filet: rgb(18 52 96 / .12);
+  --v2-socle: #EEF3F8;
+  --v2-ambre: #8A4B00;               /* le TEXTE ambre : 5,6:1 sur le blanc */
+  --v2-ambre-point: #E08A12;
+  --v2-e-appui: 100ms cubic-bezier(.2, .9, .25, 1);
+  --v2-e-retour: 200ms cubic-bezier(.32, 1.25, .5, 1);   /* un ressort court, à peine (aucun rebond visible) */
+}
+:root[data-theme="dark"] {
+  --v2-page-texte: #F2F7FD;
+  --v2-page-muet: #B9C8D8;
+  --v2-page-ambre: #F2B65E;
+  --v2-plein-fond: #EAF2FB;
+  --v2-plein-fond-appui: #C9D9EA;
+  --v2-plein-texte: #06111F;
+  --v2-teinte-fond: rgb(74 163 255 / .16);
+  --v2-teinte-fond-appui: rgb(74 163 255 / .26);
+  --v2-teinte-texte: #8CC4FF;
+  --v2-lien: #8CC4FF;
+  --v2-danger: #F2B65E;
+  --v2-anneau: 0 0 0 3px rgb(140 196 255 / .55);
+  --v2-muet: #A7B8CB;
+  --v2-carte: #16273C;
+  --v2-feuille-fond: #101E32;
+  --v2-carte-ombre: 0 0 0 .5px rgb(255 255 255 / .06), 0 12px 26px -14px rgb(0 0 0 / .8);
+  --v2-filet: rgb(255 255 255 / .10);
+  --v2-socle: #1E3149;
+  --v2-ambre: #F2B65E;
+  --v2-ambre-point: #F2A33A;
+}
+
+/* ══ 2. LES BOUTONS (src/designV2/BoutonV2.jsx) ═══════════════════════════════ */
+html body .v2b-hote { display: flex; flex-direction: column; align-items: stretch; gap: 4px; width: max-content; max-width: 100%; min-width: 0; flex: none; }
+html body .v2b-hote-plein { display: flex; width: 100%; }
+html body button.v2b {
+  appearance: none; -webkit-appearance: none; margin: 0; border: 0; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: var(--v2-cible); padding: 0 16px; border-radius: var(--v2-bouton-r);
+  font-family: var(--sb-police-texte, -apple-system, system-ui, sans-serif); font-size: 15px; font-weight: 600; line-height: 1.2;
+  font-feature-settings: "tnum" 1, "lnum" 1; font-variant-numeric: tabular-nums;
+  white-space: nowrap; cursor: pointer; text-decoration: none;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
+  transition: transform var(--v2-e-retour), background-color 160ms ease, filter 160ms ease;
+}
+html body button.v2b:active:not([aria-disabled="true"]) { transform: scale(.97); filter: brightness(.94); transition: transform var(--v2-e-appui), background-color 100ms ease, filter 100ms ease; }
+html body button.v2b:focus-visible { outline: none; box-shadow: var(--v2-anneau); }
+html body .v2b-ic { display: grid; place-items: center; width: 22px; height: 22px; flex: none; }
+html body .v2b-ic svg { stroke-width: var(--v2-trait); }
+html body .v2b-lib { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+html body .v2b-n { min-width: 2ch; padding: 1px 7px; border-radius: 999px; font-size: 13px; background: rgb(255 255 255 / .18); text-align: center; }
+/* principal — plein, 50 px, 17/600 */
+html body button.v2b-principal { min-height: var(--v2-bouton-h); padding: 0 20px; font-size: 17px; background: var(--v2-plein-fond); color: var(--v2-plein-texte); box-shadow: 0 1px 2px rgb(0 0 0 / .18), 0 10px 22px -12px rgb(12 29 48 / .6); }
+html body button.v2b-principal:active:not([aria-disabled="true"]) { background: var(--v2-plein-fond-appui); }
+html body button.v2b-plein-largeur { width: 100%; }
+/* secondaire — teinté */
+html body button.v2b-secondaire { background: var(--v2-teinte-fond); color: var(--v2-teinte-texte); }
+html body button.v2b-secondaire:active:not([aria-disabled="true"]) { background: var(--v2-teinte-fond-appui); }
+/* texte — un lien, la cible garde 44 px */
+html body button.v2b-texte { background: transparent; color: var(--v2-lien); padding: 0 8px; }
+/* destructif — ambre (§7), derrière une confirmation (le composant la refuse sinon) */
+html body button.v2b-destructif { background: transparent; color: var(--v2-danger); padding: 0 8px; }
+/* icône — 44 × 44, glyphe 24 */
+html body button.v2b-icone { width: var(--v2-cible); height: var(--v2-cible); min-width: var(--v2-cible); padding: 0; border-radius: 50%; background: transparent; color: inherit; }
+html body button.v2b-icone .v2b-ic { width: var(--v2-glyphe); height: var(--v2-glyphe); }
+html body button.v2b-icone:active, html body button.v2b-icone[data-v2b-force="appui"] { background: color-mix(in srgb, currentColor 16%, transparent); }
+@media (hover: hover) and (pointer: fine) {
+  html body button.v2b-secondaire:hover:not([aria-disabled="true"]) { background: var(--v2-teinte-fond-appui); }
+  html body button.v2b-texte:hover:not([aria-disabled="true"]), html body button.v2b-destructif:hover:not([aria-disabled="true"]) { text-decoration: underline; text-underline-offset: 3px; }
+  html body button.v2b-icone:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
+}
+/* indisponible — la raison est DITE dessous ; le bouton s'éteint sans disparaître */
+html body button.v2b[aria-disabled="true"][data-v2b-etat="indisponible"] { cursor: not-allowed; opacity: .5; }
+html body .v2b-raison { font-size: 13px; line-height: 1.35; color: var(--v2-muet); white-space: normal; }
+/* Le plein vit sur la coque bleue : sa raison s'écrit à l'encre de la coque. */
+html body .v2b-hote-plein .v2b-raison { color: var(--v2-page-muet); }
+/* chargement — la roue remplace l'icône, la largeur ne saute pas */
+html body button.v2b[data-v2b-etat="chargement"] { cursor: progress; }
+html body .v2b-roue { display: grid; place-items: center; width: 22px; height: 22px; flex: none; }
+html body .v2b-roue > span { width: 18px; height: 18px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: v2b-tour 700ms linear infinite; }
+@keyframes v2b-tour { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  html body button.v2b, html body button.v2b:active { transition: background-color 100ms ease; transform: none !important; }
+  html body .v2b-roue > span { animation-duration: 1600ms; }
+}
+
+/* La rangée touchable (liste iOS) : elle se touche entière, mêmes états qu'un bouton. */
+html body button.v2-rangee {
+  appearance: none; -webkit-appearance: none; margin: 0; border: 0; box-sizing: border-box; width: 100%;
+  display: flex; align-items: center; gap: 12px; min-height: var(--v2-cible); padding: 0; text-align: left;
+  background: transparent; color: inherit; font: inherit; cursor: pointer;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
+  transition: transform var(--v2-e-retour), background-color 160ms ease;
+}
+html body button.v2-rangee:active { transform: scale(.985); transition: transform var(--v2-e-appui); }
+html body button.v2-rangee:focus-visible { outline: none; box-shadow: var(--v2-anneau); border-radius: 14px; }
+@media (prefers-reduced-motion: reduce) { html body button.v2-rangee:active { transform: none; } }
+
+/* ══ 3. L'ÉCRAN ═══════════════════════════════════════════════════════════════ */
+.v2-ecran { padding: 4px 16px 24px; color: var(--v2-page-texte); font-family: var(--sb-police-texte, -apple-system, system-ui, sans-serif); font-feature-settings: "tnum" 1, "lnum" 1; position: relative; }
+.v2-ecran[data-v2-plein="1"] { padding-bottom: calc(var(--vrm-barre-bas, 84px) + var(--v2-bouton-h) + 56px); }
+.v2-tete { padding: 6px 0 2px; }
+.v2-titre { margin: 0; font-size: 34px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
+.v2-muet { color: var(--v2-muet); }
+.v2-point { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--v2-ambre-point); margin-right: 6px; vertical-align: 1px; flex: none; }
+.is-ambre { color: var(--v2-ambre); }
+
+/* L'affiche : le chiffre et son mot sur la même ligne. */
+.v2-affiche { margin: 14px 0 12px; }
+.v2-affiche-ligne { display: flex; align-items: center; gap: 12px; }
+.v2-affiche-n { font-size: 56px; line-height: 1; font-weight: 700; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+.v2-affiche-mots { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.v2-affiche-mot { font-size: 17px; font-weight: 600; line-height: 1.2; }
+.v2-affiche-sous { font-size: 13px; line-height: 1.3; color: var(--v2-page-muet); }
+.v2-affiche-sous.is-ambre { color: var(--v2-page-ambre); }
+
+/* La bande des paires (défile de côté, en gardant la marge de l'écran). */
+.v2-bande { display: grid; grid-auto-flow: column; grid-auto-columns: 112px; gap: 10px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity;
+  margin: 0 -16px 22px; padding: 2px 16px 6px; scrollbar-width: none; }
+.v2-bande::-webkit-scrollbar { display: none; }
+html body button.v2-rangee.v2-bande-carte { flex-direction: column; align-items: stretch; gap: 4px; scroll-snap-align: start; padding: 0; }
+.v2-bande-photo { position: relative; display: grid; place-items: center; width: 112px; height: 112px; border-radius: 16px; overflow: hidden; background: var(--v2-carte); box-shadow: var(--v2-carte-ombre); color: var(--v2-muet); }
+.v2-bande-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.v2-bande-plaque { position: absolute; left: 6px; bottom: 6px; }
+.v2-bande-prix { font-size: 15px; font-weight: 600; padding: 0 2px; }
+.v2-bande-quand { font-size: 13px; color: var(--v2-page-muet); padding: 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2-bande-quand.is-ambre { color: var(--v2-page-ambre); }
+
+/* Les groupes (titre court + nombre, style Réglages). */
+.v2-groupe, .v2-afaire { margin: 0 0 22px; }
+.v2-groupe-titre { display: flex; align-items: baseline; gap: 8px; margin: 0 4px 8px; font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
+.v2-groupe-n { font-size: 15px; font-weight: 600; color: var(--v2-page-muet); font-variant-numeric: tabular-nums; }
+.v2-liste { color: var(--sv-encre, #0C1D30); background: var(--v2-carte); border-radius: 16px; box-shadow: var(--v2-carte-ombre); overflow: hidden; }
+.v2-afaire-ligne { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 8px 12px 8px 14px; position: relative; }
+.v2-afaire-ligne + .v2-afaire-ligne::before, .v2-liste > .v2-ligne + .v2-ligne::before { content: ""; position: absolute; left: 66px; right: 0; top: 0; height: .5px; background: var(--v2-filet); }
+.v2-afaire-ic { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 11px; background: var(--v2-socle); color: var(--sv-encre, #0C1D30); flex: none; }
+.v2-afaire-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.v2-afaire-titre { font-size: 15px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+.v2-afaire-detail { font-size: 13px; line-height: 1.35; color: var(--v2-muet); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* La vignette (photo fixe, recadrée pareil partout ; sans photo : un cintre sur fond uni). */
+.v2-vignette { display: grid; place-items: center; flex: none; border-radius: 12px; overflow: hidden; background: var(--v2-socle); color: var(--v2-muet); }
+.v2-vignette img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* Les lignes iOS (Achats en route) : 56 px, titre sur UNE ligne, méta dessous, valeur à droite, chevron. */
+html body button.v2-rangee.v2-ligne { position: relative; min-height: 76px; padding: 10px 12px 10px 12px; gap: 12px; }
+.v2-ligne-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.v2-ligne-titre { font-size: 17px; font-weight: 400; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2-ligne-meta { font-size: 15px; line-height: 1.25; color: var(--v2-muet); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2-ligne-droite { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; max-width: 40%; min-width: 0; }
+.v2-ligne-valeur { font-size: 17px; font-variant-numeric: tabular-nums; }
+.v2-chevron { color: var(--v2-muet); display: grid; place-items: center; flex: none; }
+
+/* La passe miniature (Aujourd'hui). */
+html body button.v2-rangee.v2-passe-mini { flex-direction: column; align-items: stretch; gap: 8px; padding: 14px 16px; background: var(--v2-carte); color: var(--sv-encre, #0C1D30); border-radius: 18px; box-shadow: var(--v2-carte-ombre); }
+.v2-passe-mini-haut { display: flex; align-items: center; gap: 8px; }
+.v2-passe-mini-lieu { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2-passe-mini-code { font-size: 22px; font-weight: 700; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
+.v2-passe-mini-bas { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; color: var(--v2-muet); }
+.v2-passe-mini-bas .is-ambre { color: var(--v2-ambre); }
+
+/* « Rien à faire » : calme. */
+.v2-rien { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 56px 24px 40px; color: var(--v2-page-texte); }
+.v2-rien-dessin { color: var(--v2-page-muet); margin-bottom: 18px; }
+.v2-rien-titre { margin: 0 0 6px; font-size: 22px; font-weight: 700; }
+.v2-rien-sous { margin: 0; font-size: 15px; line-height: 1.4; color: var(--v2-page-muet); max-width: 30ch; }
+
+/* Le geste plein AU POUCE : collé au-dessus de la barre du bas (téléphone). */
+.v2-pouce { position: fixed; left: 16px; right: 16px; bottom: calc(var(--vrm-barre-bas, 84px) + 24px); z-index: 30; }
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
+  .v2-ecran { padding: 12px 32px 32px; max-width: 1080px; }
+  .v2-ecran[data-v2-plein="1"] { padding-bottom: 32px; }
+  /* L'ordinateur : le plein EN HAUT À DROITE, sur la ligne du titre. */
+  .v2-pouce { position: absolute; left: auto; right: 32px; bottom: auto; top: 14px; z-index: 2; }
+  .v2-pouce .v2b-hote-plein { width: auto; }
+  .v2-pouce button.v2b-principal { width: auto; }
+  .v2-bande { margin: 0 0 24px; padding: 2px 0 6px; grid-auto-columns: 132px; }
+  .v2-bande-photo { width: 132px; height: 132px; }
+  .v2-aujourdhui .v2-afaire, .v2-aujourdhui .v2-groupe { max-width: 720px; }
+}
+
+/* ══ 4. LES PASSES « WALLET » (Achats) ════════════════════════════════════════ */
+.v2-passes { display: grid; gap: 14px; margin: 4px 0 22px; }
+@media (min-width: 1024px) { .v2-passes { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); } }
+.v2-passe { background: var(--v2-carte); border-radius: 22px; box-shadow: var(--v2-carte-ombre); overflow: hidden; color: var(--sv-encre, #0C1D30); }
+.v2-passe-tete { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #0C1D30; color: #FFFFFF; font-size: 13px; font-weight: 600; }
+:root[data-theme="dark"] .v2-passe-tete { background: #23395A; color: #EAF2FB; }
+.v2-passe-lieu { display: flex; gap: 10px; align-items: flex-start; padding: 12px 16px 4px; }
+.v2-passe-lieu b { display: block; font-size: 17px; font-weight: 600; }
+.v2-passe-lieu small { display: block; font-size: 13px; color: var(--v2-muet); margin-top: 2px; }
+.v2-passe-piste { display: grid; grid-auto-flow: column; grid-auto-columns: 100%; overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; }
+.v2-passe-piste::-webkit-scrollbar { display: none; }
+.v2-passe-face { scroll-snap-align: start; min-width: 0; }
+.v2-passe-face .v2-ticket-corps { padding-top: 4px; }
+.v2-passe-face .v2-passe-limite { padding: 0; }
+.v2-passe-limite { align-self: stretch; text-align: center; font-size: 15px; font-weight: 600; padding: 6px 0 2px; }
+.v2-passe-limite.is-ambre { color: var(--v2-ambre); }
+.v2-passe-qr { width: 168px; height: 168px; image-rendering: pixelated; background: #fff; padding: 8px; border-radius: 12px; box-sizing: content-box; }
+.v2-passe-code { font-size: 40px; font-weight: 700; letter-spacing: .06em; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.v2-passe-sans { font-size: 15px; color: var(--v2-muet); padding: 10px 0; }
+.v2-passe-paire { align-self: stretch; display: flex; align-items: center; gap: 10px; padding-top: 10px; border-top: .5px solid var(--v2-filet); }
+.v2-passe-titre { flex: 1; min-width: 0; font-size: 15px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2-passe-gestes { align-self: stretch; display: flex; flex-wrap: wrap; gap: 6px; justify-content: space-between; }
+.v2-passe-pages { text-align: center; font-size: 13px; color: var(--v2-muet); padding: 0 0 12px; font-variant-numeric: tabular-nums; }
+
+/* ══ 5. LE MENU PLATEFORME · COMPTE et sa feuille ═════════════════════════════ */
+html body button.v2-rangee.v2-menu { width: auto; max-width: 100%; gap: 6px; padding: 0 6px; margin: 2px 0 6px -6px; border-radius: 12px; font-size: 15px; font-weight: 600; color: var(--v2-page-texte); }
+.v2-menu-logo { display: inline-grid; place-items: center; }
+.v2-menu-sous { font-weight: 400; color: var(--v2-page-muet); }
+.v2-menu-fleche { display: inline-grid; place-items: center; transform: rotate(90deg); color: var(--v2-page-muet); }
+.v2-feuille-hote { position: fixed; inset: 0; z-index: 2400; }
+.v2-feuille-hote[hidden] { display: none; }
+.v2-voile { position: absolute; inset: 0; background: rgb(6 17 31 / .38); animation: v2-voile 200ms ease-out both; }
+.v2-feuille { position: absolute; left: 0; right: 0; bottom: 0; max-height: 82vh; overflow: auto; background: var(--v2-feuille-fond); color: var(--sv-encre, #0C1D30); border-radius: 22px 22px 0 0; padding: 6px 16px calc(16px + env(safe-area-inset-bottom)); box-shadow: 0 -10px 40px rgb(0 0 0 / .2); animation: v2-monte var(--v2-ressort-feuille, 380ms cubic-bezier(.32, .72, 0, 1)) both; }
+@media (min-width: 1024px) { .v2-feuille { left: 50%; right: auto; bottom: auto; top: 12vh; width: 520px; transform: translateX(-50%); border-radius: 22px; animation: v2-voile 200ms ease-out both; } }
+.v2-feuille-tete { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 14px 0 8px; }
+.v2-feuille-poignee { position: absolute; left: 50%; top: 4px; width: 36px; height: 5px; border-radius: 3px; background: var(--v2-filet); transform: translateX(-50%); }
+.v2-feuille-titre { margin: 0; font-size: 20px; font-weight: 700; }
+.v2-feuille-corps { display: flex; flex-direction: column; gap: 14px; padding-bottom: 8px; }
+.v2-feuille-corps .vrm-tache-filtres { padding: 0 !important; }
+@keyframes v2-monte { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes v2-voile { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .v2-feuille, .v2-voile { animation: v2-voile 160ms ease both; } }
+
+/* ══ 6. LA COQUE (seulement allumé) ════════════════════════════════════════════ */
+/* Le titre de chaque tâche : grand titre iOS, et le menu juste dessous. La rangée de pastilles d'hier n'est plus
+   posée à l'écran (elle vit dans la feuille du menu). */
+html[data-design="v2"] body .vrm-tache-tete h1 { font-size: 34px; letter-spacing: -.02em; flex-basis: 100%; }
+/* Sous le grand titre, sur UNE ligne : le menu plateforme · compte et le « ? » de l'écran. */
+html[data-design="v2"] body .vrm-tache-tete { display: flex; flex-wrap: wrap; align-items: center; column-gap: 4px; }
+html[data-design="v2"] body .vrm-tache-tete > .vrm-fu-date-tete { flex-basis: 100%; }
+html[data-design="v2"] body .vrm-barre-haut-droite:empty { display: none; }
+/* Sous la barre flottante du bas, rien ne doit rester caché : la page garde une marge de la hauteur de la barre. */
+html[data-design="v2"] body .vrm-main > :last-child { scroll-margin-bottom: calc(var(--vrm-barre-bas, 84px) + 16px); }
+/* Une ligne qui ne s'ouvre pas (achat en route : rien à toucher) : la même forme, sans chevron. */
+div.v2-ligne { position: relative; display: flex; align-items: center; gap: 12px; min-height: 76px; padding: 10px 12px; color: var(--sv-encre, #0C1D30); }
+.v2-liste-reste { margin: 8px 4px 0; font-size: 13px; color: var(--v2-page-muet); }
+/* La planche des boutons (banc design-v2) force « enfoncé » et « focus » pour les capturer : les MÊMES déclarations. */
+html body button.v2b[data-v2b-force="appui"] { transform: scale(.97); filter: brightness(.94); }
+html body button.v2b-principal[data-v2b-force="appui"] { background: var(--v2-plein-fond-appui); }
+html body button.v2b-secondaire[data-v2b-force="appui"] { background: var(--v2-teinte-fond-appui); }
+html body button.v2b[data-v2b-force="focus"] { box-shadow: var(--v2-anneau); }
+/* Un message passager (« toast ») ne couvre jamais le geste du jour : posé au-dessus du plein quand il y en a un. */
+html[data-design="v2"] body:has(.v2-pouce) .vrm-toasts[data-toasts-place="bas"] { bottom: calc(var(--vrm-barre-bas, 84px) + var(--v2-bouton-h) + 40px) !important; }
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) { html[data-design="v2"] body:has(.v2-pouce) .vrm-toasts[data-toasts-place="bas"] { bottom: 24px !important; } }
+
+/* ══ 7. ANNONCES (nouveau design, 17 nov. — la capture de Julien : « les boutons sont dégueulasses, mal proportionné ») ══
+   Ordre : grand titre · « Vinted · Tous les comptes ⌄ » · UN segmenté · la recherche et « ⋯ » à la même hauteur · la liste. */
+html[data-design="v2"] body .v2-ann-segment { margin: 4px 0 12px; }
+html[data-design="v2"] body .v2-ann-segment .vrm-seg, html[data-design="v2"] body .v2-ann-segment [role="tablist"], html[data-design="v2"] body .v2-ann-segment > * { width: 100%; }
+/* La rangée recherche + « ⋯ » : une hauteur (44), une ligne de base. */
+html[data-design="v2"] body .vrm-annbar { display: flex !important; align-items: center !important; gap: 8px !important; flex-wrap: nowrap !important; }
+html[data-design="v2"] body .vrm-annbar .vrm-annbar-recherche { flex: 1 1 auto !important; min-width: 0 !important; }
+html[data-design="v2"] body .vrm-annbar .vrm-annbar-recherche :is(input, .vrm-champ, [role="search"]) { min-height: 44px !important; }
+html[data-design="v2"] body .vrm-annbar .vrm-annbar-gestes { display: flex !important; align-items: center !important; gap: 0 !important; flex: none !important; }
+html[data-design="v2"] body .vrm-annbar .vrm-ann-outils > button.vrm-annbar-bouton { width: 48px !important; height: 48px !important; min-height: 48px !important; padding: 0 !important; border-radius: 50% !important; display: grid !important; place-items: center !important; }
+html[data-design="v2"] body .vrm-annbar .vrm-ann-outils .vrm-annbar-mot { display: none !important; }
+/* Les vues d'hier (puces) : rangées dans « ⋯ » et le segmenté ; la rangée reste MONTÉE (ses nombres publiés). */
+html[data-design="v2"] body .vrm-stock-views.vrm-filtres { display: none !important; }
+/* Le menu « ⋯ » : les vues, le tri, la grille, Stock, puis les outils d'hier. */
+.v2-ann-menu { display: flex; flex-direction: column; gap: 2px; padding-bottom: 6px; margin-bottom: 6px; border-bottom: .5px solid var(--v2-filet); }
+.v2-ann-menu-tri { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; padding: 0 8px; font-size: 15px; font-weight: 600; }
+.v2-ann-menu-tri select { min-height: 36px; font: inherit; font-weight: 400; max-width: 60%; }
+/* L'en-tête d'un groupe (le compte) : un en-tête de section simple, 13/600 gris, avec son nombre — plus de bande. */
+html[data-design="v2"] body .vrm-ann-compte-tete { background: transparent !important; box-shadow: none !important; border: 0 !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+  font-size: 13px !important; font-weight: 600 !important; color: var(--v2-muet) !important; padding: 14px 16px 6px !important; min-height: 0 !important; }
+html[data-design="v2"] body .vrm-ann-compte-tete :is(.vrm-ann-compte-nom, .vrm-ann-compte-n) { font-size: 13px !important; font-weight: 600 !important; color: var(--v2-muet) !important; }
+html[data-design="v2"] body .vrm-ann-compte-tete .vrm-ann-compte-avatar { display: none !important; }
+/* « Relier un achat » : un texte ambre dans la rangée (cible 44 sans grandir la rangée). */
+html[data-design="v2"] body button.v2-ann-relier { appearance: none; border: 0 !important; background: transparent !important; box-shadow: none !important; padding: 0 4px !important; margin: -12px 0 !important;
+  min-height: 44px !important; height: auto !important; font: 600 13px/1.2 var(--sb-police-texte, system-ui) !important; color: var(--v2-ambre) !important; cursor: pointer; white-space: nowrap;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent; display: flex !important; align-items: center; }
+html[data-design="v2"] body button.v2-ann-relier:active { opacity: .6; }
+/* La place du plein au pouce, sous la dernière annonce. */
+@media (max-width: 1023px) { html[data-design="v2"] body .vrm-main:has(.v2-ann-segment) .sb-liste { margin-bottom: calc(var(--vrm-barre-bas, 84px) + var(--v2-bouton-h) + 40px) !important; } }
+
+/* ══ 8. LA RANGÉE D'ANNONCE (src/designV2/LigneAnnonce.jsx) — dessins A · B · C ════════════════════════════════
+   Grille de 8 px, gouttières 16 ; une hauteur par dessin ; chiffres tabulaires ; photo recadrée pareil partout. */
+html[data-design="v2"] body .sb-liste[data-v2-ligne] { display: block !important; padding: 0 !important; gap: 0 !important; }
+html[data-design="v2"] body .sb-liste[data-v2-ligne] > .vrm-ann-card[hidden], html[data-design="v2"] body .sb-liste[data-v2-ligne] > .vrm-ann-th { display: none !important; }
+html[data-design="v2"] body .sb-liste[data-v2-ligne="B"] { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 16px 8px !important; padding: 0 16px 16px !important; background: transparent !important; box-shadow: none !important; }
+@media (min-width: 1024px) { html[data-design="v2"] body .sb-liste[data-v2-ligne="B"] { grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)) !important; } }
+html[data-design="v2"] body .sb-liste[data-v2-ligne="B"] > .vrm-ann-compte-tete { grid-column: 1 / -1; padding-left: 0 !important; color: var(--v2-page-muet) !important; }
+html[data-design="v2"] body .sb-liste[data-v2-ligne="B"] > .vrm-ann-compte-tete :is(.vrm-ann-compte-nom, .vrm-ann-compte-n) { color: var(--v2-page-muet) !important; }
+.v2l { position: relative; box-sizing: border-box; color: var(--sv-encre, #0C1D30); font-feature-settings: "tnum" 1, "lnum" 1; font-variant-numeric: tabular-nums; cursor: pointer;
+  touch-action: pan-y; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; transition: background-color 160ms ease; }
+.v2l:active { background-color: rgb(18 52 96 / .06); }
+:root[data-theme="dark"] .v2l:active { background-color: rgb(255 255 255 / .06); }
+.v2l-photo { display: grid; place-items: center; overflow: hidden; background: var(--v2-socle); color: var(--v2-muet); flex: none; }
+.v2l-photo img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 50%; display: block; }
+.v2l-sans { display: grid; place-items: center; width: 100%; height: 100%; }
+.v2l .sb-plaque { font-size: 12px; }
+.v2l-geste { display: inline-flex; align-items: center; color: var(--v2-ambre); font-size: 13px; font-weight: 600; white-space: nowrap; }
+
+/* A « Liste nette » : 80 px (8 + 64 + 8), séparateurs en retrait (16 + 64 + 16 = 96). */
+.v2l-a { display: flex; align-items: center; gap: 16px; min-height: 80px; padding: 8px 16px; }
+.v2l-a + .v2l-a::before, .vrm-ann-card[hidden] + .v2l-a::before { content: ""; position: absolute; left: 96px; right: 0; top: 0; height: .5px; background: var(--v2-filet); }
+.v2l-photo-a { width: 64px; height: 64px; border-radius: 12px; }
+.v2l-a-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.v2l-a-l1 { display: flex; align-items: flex-start; gap: 8px; }
+/* Le titre sur DEUX lignes au besoin (jamais coupé au milieu d'un modèle) : la rangée passe de 80 à 96 px. */
+.v2l-a-titre { flex: 1; min-width: 0; font-size: 17px; font-weight: 600; line-height: 24px; max-height: 48px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.v2l-a-prix { flex: none; font-size: 17px; font-weight: 600; line-height: 24px; }
+.v2l-a-l2 { display: flex; align-items: center; gap: 8px; min-width: 0; height: 24px; font-size: 15px; color: var(--v2-muet); white-space: nowrap; overflow: hidden; }
+.v2l-faits-txt { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.v2l-a-l2 .v2l-geste { margin-left: auto; }
+
+/* B « Carte photo » : 4:5, N° en haut à gauche, prix en pastille en bas ; titre 2 lignes (hauteur réservée), faits gris. */
+.v2l-b { display: flex; flex-direction: column; gap: 8px; border-radius: 16px; }
+.v2l-b-cadre { position: relative; display: block; aspect-ratio: 4 / 5; border-radius: 16px; overflow: hidden; box-shadow: var(--v2-carte-ombre); }
+.v2l-photo-b { width: 100%; height: 100%; }
+.v2l-b-num { position: absolute; left: 8px; top: 8px; }
+.v2l-b-prix { position: absolute; left: 8px; bottom: 8px; padding: 4px 8px; border-radius: 999px; background: rgb(255 255 255 / .94); color: #0C1D30; font-size: 15px; font-weight: 700; line-height: 16px; box-shadow: 0 1px 2px rgb(0 0 0 / .12); }
+.v2l-b-point { position: absolute; right: 8px; top: 8px; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: rgb(255 255 255 / .94); }
+.v2l-b-point .v2-point { margin: 0; }
+.v2l-b-titre { font-size: 15px; font-weight: 600; line-height: 20px; height: 40px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: var(--v2-page-texte); padding: 0 4px; overflow-wrap: anywhere; }
+.v2l-b-faits { font-size: 13px; line-height: 16px; color: var(--v2-page-muet); padding: 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* C « Fiche compacte » : 120 px (16 + 88 + 16) ; titre 2 lignes, grand prix, trois faits en icône + texte. */
+.v2l-c { display: flex; align-items: flex-start; gap: 16px; height: 120px; padding: 16px; }
+.v2l-c + .v2l-c::before, .vrm-ann-card[hidden] + .v2l-c::before { content: ""; position: absolute; left: 120px; right: 0; top: 0; height: .5px; background: var(--v2-filet); }
+.v2l-photo-c { width: 88px; height: 88px; border-radius: 12px; }
+.v2l-c-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; height: 88px; }
+.v2l-c-titre { font-size: 15px; font-weight: 600; line-height: 20px; height: 40px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.v2l-c-prix { font-size: 20px; font-weight: 700; line-height: 24px; }
+.v2l-c-faits { display: flex; align-items: center; gap: 12px; margin-top: 4px; height: 16px; font-size: 13px; color: var(--v2-muet); white-space: nowrap; overflow: hidden; }
+.v2l-fait { display: flex; align-items: center; gap: 4px; flex: none; }
+.v2l-fait .sb-plaque { transform: scale(.9); transform-origin: left center; }
+.v2l-c-l2 { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 24px; }
+.v2l-c-stats { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--v2-muet); }
+
+/* ══ 9. ANNONCES — la liste neuve (hors des règles d'hier) ═══════════════════════════════════════════════ */
+.v2-sous-titre { display: flex; align-items: center; gap: 4px; min-width: 0; width: 100%; flex-basis: 100%; grid-column: 1 / -1; margin: 0 0 4px; }
+.v2-menu-lib, .v2-menu-sous { white-space: nowrap; }
+.v2-menu-sous { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.v2-sous-titre .vrm-phrase-ecran { margin: 0 !important; }
+html body button.v2-rangee.v2-menu { white-space: nowrap; flex: 0 1 auto; min-width: 0; overflow: hidden; }
+.v2-liste-annonces { margin: 0 0 16px; color: var(--sv-encre, #0C1D30); }
+.v2-liste-annonces[data-v2-ligne="A"], .v2-liste-annonces[data-v2-ligne="C"] { background: var(--v2-carte); border-radius: 16px; box-shadow: var(--v2-carte-ombre); overflow: hidden; }
+.v2-liste-annonces[data-v2-ligne="B"] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 8px; }
+@media (min-width: 1024px) { .v2-liste-annonces[data-v2-ligne="B"] { grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); } }
+.v2-ann-groupe { display: flex; align-items: baseline; gap: 8px; margin: 0; padding: 16px 16px 8px; font-size: 13px; font-weight: 600; line-height: 16px; color: var(--v2-muet); }
+.v2-ann-groupe-n { font-weight: 400; }
+.v2-liste-annonces[data-v2-ligne="B"] .v2-ann-groupe { grid-column: 1 / -1; padding: 8px 4px 0; color: var(--v2-page-muet); }
+.v2-ann-groupe + .v2l-a::before, .v2-ann-groupe + .v2l-c::before { display: none; }
+@media (max-width: 1023px) { .v2-liste-annonces { margin-bottom: calc(var(--vrm-barre-bas, 84px) + 24px); } }
+
+/* ══ 10. Retouches après la planche A·B·C (17 nov.) ═══════════════════════════════════════════════════════ */
+/* Le plein COMPACT (en haut à droite d'Annonces) : 44 px, 15/600 — le même rôle, la même couleur. */
+html body button.v2b-principal.v2b-compact { min-height: 44px; padding: 0 16px; font-size: 15px; }
+.v2-titre-ligne { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; flex-basis: 100%; grid-column: 1 / -1; }
+.v2-titre-ligne h1 { margin: 0; min-width: 0; }
+/* « N annonces sans achat relié · Voir » : UNE ligne au-dessus de la liste (plus d'ambre sur chaque rangée). */
+html body button.v2-rangee.v2-ann-arelier { gap: 8px; min-height: 44px; margin: 0 0 8px; padding: 0 4px; color: var(--v2-page-texte); font-size: 15px; }
+.v2-ann-arelier-txt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2-ann-arelier-geste { font-weight: 600; }
+.v2l-lien { display: inline-flex; align-items: center; color: var(--v2-muet); margin-left: auto; flex: none; }
+.v2l-b-point.is-neutre { color: #4A5B6D; }
+/* L'en-tête de la coque : les trois ronds respirent et le dernier ne touche plus le bord. */
+html[data-design="v2"] body .vrm-app-header .vrm-header-actions { gap: 8px !important; padding-inline-end: 8px !important; }
+/* La tête d'une tâche, allumé : grand titre, « Plateforme · compte ⌄ » et « ? » dessous ; les ronds d'hier (Scanner) à droite. */
+.v2-tete-tache { position: relative; display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 8px 16px 0; color: var(--v2-page-texte); }
+.v2-tete-tache h1 { margin: 0; font-size: 34px; font-weight: 700; line-height: 40px; letter-spacing: -.02em; color: var(--v2-page-texte); }
+.v2-tete-tache .vrm-fu-date-tete { font-size: 13px; color: var(--v2-page-muet); }
+.v2-tete-tache .vrm-tache-retrouver { position: absolute; right: 16px; top: 8px; }
+.v2-tete-tache:has(.vrm-tache-retrouver) h1 { padding-right: 56px; }
+/* Le « ? » de l'écran, sur la coque : à l'encre de la coque (il était gris foncé sur le bleu). */
+.v2-sous-titre .vrm-phrase-ecran, .v2-sous-titre .vrm-phrase-ecran :is(button, a, svg) { color: var(--v2-page-texte) !important; }
+.v2-ann-menu-affichage { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 0 8px; font-size: 15px; font-weight: 600; }
+/* « ⋯ » d'Annonces, allumé : une feuille pleine (plus un panneau translucide posé sur la liste). */
+.v2-outils-feuille { display: flex; flex-direction: column; gap: 2px; }
+.v2-outils-feuille .v2-ann-menu-affichage > span { background: none !important; box-shadow: none !important; padding: 0 !important; }
+.v2-outils-feuille button.vrm-annbar-outil { display: flex; align-items: center; gap: 12px; min-height: 48px; width: 100%; padding: 0 8px; border: 0; background: transparent; color: inherit; font: 600 15px/1.2 var(--sb-police-texte, system-ui); text-align: left; cursor: pointer; border-radius: 12px; }
+.v2-outils-feuille button.vrm-annbar-outil:active { background: rgb(18 52 96 / .06); }
+/* La nuit, la plaque N° d'une rangée ne s'allume plus en blanc : gravée dans la surface, lisible (≥ 4,5:1). */
+:root[data-theme="dark"] .v2l .sb-plaque:not(.is-double) { background: #22385A !important; color: #EAF2FB !important; box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .22) !important; text-shadow: none !important; }
+:root[data-theme="dark"] .v2l .sb-plaque:not(.is-double) small { color: #B9C8D8 !important; }
+
+/* ══ 11. Retouches après la planche A·C (17 nov.) ═════════════════════════════════════════════════════════ */
+/* La plaque N° des rangées : gravée dans la surface, jour (encre sur gris clair) et nuit (clair sur bleu nuit). */
+.v2-plaque { display: inline-flex; align-items: baseline; gap: 2px; flex: none; height: 24px; box-sizing: border-box; padding: 3px 6px 0; border-radius: 6px;
+  background: #EEF3F8; color: #0C1D30; box-shadow: inset 0 0 0 .5px rgb(18 52 96 / .22); font-size: 14px; font-weight: 700; line-height: 18px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.v2-plaque small { font-size: 10px; font-weight: 600; color: #4A5B6D; }
+:root[data-theme="dark"] .v2-plaque { background: #22385A; color: #EAF2FB; box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .22); }
+:root[data-theme="dark"] .v2-plaque small { color: #B9C8D8; }
+/* Le « ? » sur la coque bleue, le jour : blanc (la règle d'hier le peignait gris foncé ; sa feuille est un portail, hors du filtre). */
+:root:not([data-theme="dark"]) .v2-aide { filter: brightness(0) invert(1); }
+.v2-aide { display: inline-flex; align-items: center; }
+/* Annonces au téléphone : la cloche posée sur la ligne du titre ⇒ la place à droite de « Publier ». */
+@media (max-width: 1023px) { .v2-titre-ligne { padding-right: 52px; } }
+/* L'en-tête d'un groupe, plus serré (13/600, 8 px au-dessus). */
+.v2-ann-groupe { padding: 8px 16px 4px; }
+.v2-ann-segment { margin-top: 0 !important; }
+/* C : la ligne des faits porte la plaque entière (24 px) ; 40 + 24 + 24 = 88, la hauteur de la photo. */
+.v2l-c-txt { gap: 0; }
+.v2l-c-faits { height: 24px; margin-top: 0; }
+@media (max-width: 1023px) { .v2-titre-ligne { padding-right: 64px; } }
+/* Le segmenté du nouveau design (SegmentV2) : piste translucide, segment choisi en porcelaine claire, encre. */
+.v2-seg { display: flex; gap: 2px; padding: 2px; border-radius: 14px; background: rgb(255 255 255 / .14); box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .18); }
+html body button.v2-seg-btn { appearance: none; flex: 1 1 auto; min-width: max-content; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 0 8px; border: 0; border-radius: 12px;
+  background: transparent; color: var(--v2-page-texte, #FFFFFF); font: 600 15px/1.2 var(--sb-police-texte, system-ui); font-variant-numeric: tabular-nums; cursor: pointer; white-space: nowrap;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; transition: background-color 160ms ease, color 160ms ease; }
+html body button.v2-seg-btn.is-on { background: #F4F8FC; color: #0C1D30; box-shadow: 0 1px 2px rgb(0 0 0 / .18); }
+html body button.v2-seg-btn:focus-visible { outline: none; box-shadow: var(--v2-anneau); }
+.v2-seg-n { font-weight: 400; opacity: .8; }
+.v2-seg-l { white-space: nowrap; }   /* jamais coupé : la piste se partage selon les mots */
+/* ══ 12. Plus d'informations par rangée (Julien : « il doit y avoir plusieurs infos ») — gris, jamais ambre ══ */
+.v2l-fait { display: inline-flex; align-items: center; gap: 4px; flex: none; white-space: nowrap; }
+.v2l-marge { font-weight: 600; margin-left: 4px; color: inherit; }
+/* A : ligne 3, 13 px gris, icônes 14 : ♡ · vues · jours · acheté → marge. */
+.v2l-a-l3 { display: flex; align-items: center; gap: 12px; height: 16px; font-size: 13px; line-height: 16px; color: var(--v2-muet); overflow: hidden; white-space: nowrap; }
+.v2l-a-txt { gap: 4px !important; }
+/* C : grand prix, « Acheté · marge », puis des puces icône + valeur (elles passent à la ligne au besoin). */
+.v2l-c { height: auto !important; min-height: 120px; align-items: flex-start; }
+.v2l-c-txt { height: auto !important; gap: 4px !important; }
+.v2l-c-achat { font-size: 13px; line-height: 16px; color: var(--v2-muet); }
+.v2l-c-puces { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-size: 13px; color: var(--v2-muet); }
+.v2l-puce { display: inline-flex; align-items: center; min-height: 24px; }
+.v2l-puce > .v2l-fait { padding: 0 8px; height: 24px; border-radius: 999px; background: var(--v2-socle); }
+
+/* ══ 12. VENTES (phase 2, 17 nov. — src/designV2/VentesV2.jsx) ════════════════════════════════════════════
+   Grand titre + « Imprimer N » + cloche sur UNE ligne · le menu · UN segmenté · le chiffre d'affiche et l'écart nommé ·
+   la recherche (scanner dedans) et « ⋯ » · les groupes par échéance (dits une fois) · les rangées A. */
+/* Le plein de la ligne du titre : « Imprimer 5 bordereaux » ; au téléphone étroit, « Imprimer 5 » (le nom entier reste son
+   nom accessible). */
+.v2v-plein-court { display: none; }
+@media (max-width: 429px) { .v2v-titre-ligne .v2v-plein-long { display: none; } .v2v-titre-ligne .v2v-plein-court { display: inline; } }
+.v2v-titre-ligne .v2v-tete-plein { display: flex; flex: none; min-width: 0; }
+.v2v-titre-ligne .v2v-tete-plein:empty { display: none; }
+.v2v-titre-ligne h1 { white-space: nowrap; }
+.v2v-tete { display: flex; flex-direction: column; gap: 0; color: var(--v2-page-texte); }
+.v2v-plein-ici { display: flex; justify-content: flex-end; margin: 0 0 8px; }
+html[data-design="v2"] body .v2v-segment { margin: 4px 0 8px !important; }
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig { margin: 4px 0 12px; }
+/* La recherche et « ⋯ » : une hauteur (44), une ligne. Le scanner est DANS le champ, à droite. */
+.v2v-recherche { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; }
+.v2v-recherche .v2v-champ { flex: 1 1 auto; min-width: 0; }
+html[data-design="v2"] body .v2v-recherche .v2v-champ { min-height: 44px; }
+html[data-design="v2"] body .v2v-recherche .v2v-champ input { min-height: 44px; }
+html body .v2v-champ button.v2v-scan { display: grid; place-items: center; flex: none; width: 44px; height: 44px; min-width: 44px; min-height: 44px; margin: 0 -4px 0 0; padding: 0;
+  border: 0; background: transparent; color: var(--v2-muet); cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; border-radius: 12px; }
+html body .v2v-champ button.v2v-scan:active { opacity: .6; }
+/* La liste : UNE carte, les groupes en en-têtes simples, les rangées A. */
+.v2v-liste { background: var(--v2-carte); border-radius: 16px; box-shadow: var(--v2-carte-ombre); overflow: hidden; color: var(--sv-encre, #0C1D30); }
+:root[data-theme="dark"] .v2v-liste { color: var(--v2-page-texte); }
+.v2v-liste .v2v-groupe:not(:first-child) { border-top: .5px solid var(--v2-filet); padding-top: 12px; }
+.v2v-groupe-ambre { color: var(--v2-ambre); }
+.v2l-faits-txt.is-ambre { color: var(--v2-ambre); font-weight: 600; }
+.v2v-corps { display: flex; flex-direction: column; gap: 12px; }
+@media (max-width: 1023px) { .v2v-corps { margin-bottom: calc(var(--vrm-barre-bas, 84px) + 24px); } }
+.v2v-note { font-size: 13px; line-height: 18px; color: var(--v2-page-muet); padding: 0 4px; }
+.v2v-note :is(p, span, div) { color: inherit !important; font-size: inherit !important; }
+.v2v-vide { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 32px 16px; text-align: center; color: var(--v2-page-muet); font-size: 15px; }
+.v2v-vide p { margin: 0; }
+.v2v-vide.is-calme { color: var(--v2-page-texte); font-size: 17px; font-weight: 600; }
+.v2v-vide-ic { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: rgb(255 255 255 / .16); }
+/* La tête de Ventes, serrée : la 1re rangée utile vers 300 px au téléphone (le haut de la section d'hier perd ses 16 px). */
+html[data-design="v2"] body div[data-colis-dans="ventes"] { padding: 4px 16px 12px !important; }
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig { margin: 0 0 12px; }
+/* Le chiffre d'affiche de Ventes : « 30 » à gauche ; à sa droite, son mot (sur la ligne de base du chiffre) et l'écart dessous. */
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 44px auto; column-gap: 12px; }
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig-ligne { display: contents; }
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig-n { grid-column: 1; grid-row: 1 / span 2; }
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig-mot { grid-column: 2; grid-row: 1; align-self: end; line-height: 20px; margin-bottom: -1px; }
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig-sous { grid-column: 2; grid-row: 2; align-self: start; margin: 2px 0 0; font-size: 13px; line-height: 16px; }
+html[data-design="v2"] body .v2v-tete .v2v-segment { margin: 0 0 12px !important; }
+html[data-design="v2"] body .v2v-tete .v2v-recherche { margin-bottom: 8px; }
+/* Passe 1 (captures 390 / 1512) : la loupe et le scanner du champ étaient peints au gris de la page (invisibles sur le champ
+   clair) ; le plateau du segmenté plus serré (2 px) ; 44 px au doigt ET à la souris pour les gestes de Ventes ; la tête resserrée. */
+:root:root:root body .v2v-recherche .v2v-champ :is(.vrm-champ-recherche-loupe, button.v2v-scan) { color: var(--v2-muet) !important; }
+:root:root:root:root body .v2v-recherche .v2v-champ { --cr-h: 44px; min-height: 44px; }
+:root:root:root:root body .v2v-recherche .v2v-champ button.v2v-scan { width: 44px !important; min-width: 44px !important; height: 44px !important; min-height: 44px !important; }
+html[data-design="v2"] body .v2v-tete .v2v-segment { margin: 0 0 8px !important; }
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig { margin: 0 0 8px; }
+/* Passe 2 : la 1re rangée vers 300 px — le plateau du segmenté à 2 px (l'ID de la règle d'hier, `:not(#vrm-seg)`, l'emportait),
+   le chiffre d'affiche un peu plus court, la recherche collée à la liste (l'écart de 8 px vient de la colonne d'hier). */
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig { grid-template-rows: 40px auto; margin: 0 0 6px; }
+html[data-design="v2"] body .v2v-tete .v2v-recherche { margin-bottom: 0; }
+.v2v-liste .v2v-groupe:first-child { padding-top: 6px; }
+/* L'écart nommé : une ligne à la taille normale ; en « Très grand » il passe à la ligne entre deux mots, jamais coupé. */
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig-sous { white-space: normal; overflow-wrap: normal; min-width: 0; }
+/* Les règles d'hier du plateau sont dans `@layer vrm-premium` avec !important : un !important EN COUCHE l'emporte sur un
+   !important hors couche, quelle que soit la spécificité. La retouche de Ventes se pose donc DANS la même couche. */
+@layer vrm-premium {
+    }
+/* La 3e ligne d'une rangée de Ventes (« il doit y avoir plusieurs infos ») : petite, grise, chaque fait avec son icône ;
+   elle passe à la ligne plutôt que de couper (rien de tronqué) ; l'ambre seulement pour une limite LUE à 2 jours ou moins. */
+.v2l-a-l3 { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; margin-top: -2px; font-size: 13px; line-height: 18px; color: var(--v2-muet); }
+.v2l-l3 { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.v2l-l3 svg { flex: none; opacity: .9; }
+.v2l-l3.is-ambre { color: var(--v2-ambre); font-weight: 600; }
+.v2l-logo { display: inline-flex; align-items: center; margin-left: 8px; flex: none; }
+.v2v-liste .v2l-a { align-items: flex-start; }
+.v2v-liste .v2l-a .v2l-a-txt { gap: 6px; }
+/* La 3e ligne de VENTES passe à la ligne (rien de coupé) ; celle d'Annonces reste sur une ligne. */
+.v2v-liste .v2l-a-l3 { height: auto; flex-wrap: wrap; white-space: normal; overflow: visible; gap: 2px 12px; line-height: 18px; }
+
+/* ══ 13. VENTES — QUALITÉ ET FLUIDITÉ (Julien : « ça doit être beaucoup plus quali et fluide ») ═══════════════════
+   Grille de 4/8, rayons 12/14/20, réponse au toucher < 100 ms, 1 000 rangées sans à-coup, images en fondu sans décalage,
+   squelette de la forme exacte des rangées, mouvement réduit respecté. */
+.v2v-liste { border-radius: 20px; }
+.v2v-liste .v2l { transition: background-color var(--v2-appui, 100ms ease); }
+/* 1 000 rangées : le navigateur ne dessine que ce qui est à l'écran ; la place réservée évite tout saut au défilement. */
+.v2v-liste > .v2l { content-visibility: auto; contain-intrinsic-size: auto 104px; }
+/* (Les photos en fondu et le squelette sont ceux de la signature partagée : src/designV2/signature.css §5-6.) */
+/* La grille de 4 : la tête et la 3e ligne sans demi-pixels de rattrapage. */
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig { grid-template-rows: 40px auto; margin: 0 0 8px; }
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig-mot { margin-bottom: 0; }
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig-sous { margin: 0; }
+.v2v-liste .v2l-a-l3 { margin-top: 0; gap: 4px 12px; }
+.v2v-liste .v2v-groupe:first-child { padding-top: 4px; }
+
+/* « Mis à jour à hh:mm » (2 s) : sur Ventes et Annonces du nouveau design, la tête n'a plus de bande — la pastille se posait
+   SUR le grand titre. Elle passe au-dessus de la barre du bas, centrée (dans la couche de sa règle d'hier). */
+@layer vrm-verre {
+  @media (max-width: 760px) {
+    :root:root:root:root:root body:has(.v2-entete-cloche) .vrm-neuf-hote { top: auto !important; bottom: calc(var(--vrm-barre-bas, 84px) + 16px) !important; left: 50% !important; transform: translateX(-50%) !important; height: auto !important; }
+  }
+}
+/* Grand texte (Paramètres → Taille du texte, jusqu'à ×1,36) et 375 px : rien de rogné, aucun mot coupé.
+   · la ligne du titre passe à la ligne s'il le faut (le plein sous le titre, entier) ;
+   · le segmenté prend la largeur de ses mots (jamais rogné) et défile au doigt s'ils ne tiennent pas. */
+.v2v-titre-ligne { flex-wrap: wrap; row-gap: 8px; }
+html body .v2v-segment .v2-seg { overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
+html body .v2v-segment .v2-seg::-webkit-scrollbar { display: none; }
+html body .v2v-segment button.v2-seg-btn { flex: 1 0 auto; padding: 0 12px; }
+html body .v2v-segment .v2-seg-l { overflow: visible; text-overflow: clip; }
+/* Le champ de Ventes sur la grille de 4 (le champ partagé posait 10 px à gauche). */
+:root:root:root body .v2v-recherche .vrm-champ-recherche.v2v-champ { padding-left: 12px; }
+/* Très grand texte : les trois segments tiennent toujours dans la largeur (un mot peut passer à la ligne, jamais coupé, jamais
+   caché derrière un défilement) ; le texte d'aide du champ finit par « … ». */
+html body .v2v-segment .v2-seg { overflow-x: visible; }
+html body .v2v-segment button.v2-seg-btn { flex: 1 1 0; min-width: 0; padding: 4px 8px; }
+html body .v2v-segment .v2-seg-l { white-space: normal; text-align: center; line-height: 1.15; overflow-wrap: normal; }
+:root:root:root body .v2v-recherche .v2v-champ input { text-overflow: ellipsis; }
+
+/* ══ 14. LA BARRE DE SÉLECTION (nouveau design — Julien : « même le imprimer, le je dépose, etc c'est bizarre ») ════════
+   Une barre fine au-dessus de la barre du bas : le compte et deux liens à gauche, UN plein et « ⋯ » à droite ; elle entre et
+   sort en ressort (fondu en mouvement réduit) ; la liste garde sa place. */
+.v2-serie { position: fixed; z-index: 70; left: 12px; right: 12px; bottom: calc(var(--vrm-barre-bas, 84px) + 12px); display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 8px 8px 8px 16px; border-radius: 20px; background: var(--v2-feuille-fond); color: var(--sv-encre, #0C1D30); box-shadow: 0 12px 32px -12px rgb(6 17 31 / .45), 0 0 0 .5px rgb(18 52 96 / .12);
+  animation: v2-serie-entre var(--v2-ressort-feuille, 380ms cubic-bezier(.32, .72, 0, 1)) both; font-variant-numeric: tabular-nums; }
+:root[data-theme="dark"] .v2-serie { color: var(--v2-page-texte); box-shadow: 0 12px 32px -12px rgb(0 0 0 / .8), 0 0 0 .5px rgb(255 255 255 / .1); }
+.v2-serie.is-sortie { animation: v2-serie-sort 220ms cubic-bezier(.32, .72, 0, 1) both; height: 64px; pointer-events: none; }
+@keyframes v2-serie-entre { from { transform: translateY(calc(100% + 24px)); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes v2-serie-sort { from { transform: none; opacity: 1; } to { transform: translateY(calc(100% + 24px)); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .v2-serie { animation: v2-fondu-img 160ms ease-out both; } .v2-serie.is-sortie { animation: none; opacity: 0; } }
+.v2-serie-g { display: flex; flex-direction: column; gap: 0; min-width: 0; flex: 1 1 auto; }
+.v2-serie-g > b { font-size: 15px; font-weight: 600; line-height: 20px; white-space: nowrap; }
+.v2-serie-liens { display: flex; gap: 12px; }
+html body button.v2-serie-lien { appearance: none; border: 0; background: none; padding: 0; min-height: 28px; font: 600 13px/16px var(--sb-police-texte, system-ui); color: var(--v2-lien); cursor: pointer; touch-action: manipulation; }
+html body button.v2-serie-lien::after { content: ""; position: absolute; inset: -8px -6px; }
+html body button.v2-serie-lien { position: relative; }
+.v2-serie-d { display: flex; align-items: center; gap: 4px; flex: none; }
+.v2-serie-d [data-serie-principal] { min-width: 200px; justify-content: center; }
+.v2-serie-rien { font-size: 13px; color: var(--v2-muet); padding: 0 8px; }
+.v2-serie-resume { flex-basis: 100%; margin: 0; font-size: 13px; color: var(--v2-muet); }
+.v2-serie-indispo { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 8px; color: var(--v2-muet); font-size: 15px; }
+.v2-serie-raison { margin-left: auto; font-size: 13px; text-align: right; max-width: 60%; }
+/* La barre du bas RESTE au téléphone (la barre de sélection se pose au-dessus) ; la liste garde la place des deux. */
+@media (max-width: 1023px) {
+  html[data-design="v2"][data-serie-ouverte] .vrm-app-shell .vrm-tabbar { display: flex !important; }
+  html[data-design="v2"][data-serie-ouverte] .vrm-main::after { height: calc(var(--vrm-serie-h, 64px) + var(--vrm-barre-bas, 84px) + 24px); }
+}
+@media (min-width: 1024px) { .v2-serie { left: calc(var(--vrm-rail-l, 272px) + 24px); right: 24px; bottom: 16px; max-width: 880px; margin: 0 auto; } }
+
+/* ══ 15. VENTES · TOUTES (Julien, capture : « le bouton est sur la photo ça rend pas bien du tout ») ═════════════════════
+   La liste des ventes en rangées A ; la case de sélection dans SA colonne de 44 px à gauche de la photo, seulement en
+   sélection ; une rangée choisie se teinte (jamais un cadre gris) ; la facture envoyée = une petite icône verte. */
+html[data-design="v2"] body .v2t-liste { background: var(--v2-carte) !important; border: 0 !important; border-radius: 20px !important; box-shadow: var(--v2-carte-ombre) !important; overflow: hidden; }
+html[data-design="v2"] body .v2t-liste > .v2l + .v2l::before { content: ""; position: absolute; left: calc(var(--v2-air-carte, 16px) + 80px); right: 0; top: 0; height: .5px; background: var(--v2-filet); }
+.v2t-liste .v2l { align-items: flex-start; }
+.v2t-liste .v2l-a-l3 { height: auto; flex-wrap: wrap; white-space: normal; overflow: visible; gap: 4px 12px; line-height: 18px; }
+.v2l-avant { display: grid; place-items: center; flex: none; width: 44px; min-height: 64px; margin: 0 -8px 0 -8px; }
+.v2l-avant .vrm-serie-case { position: static !important; margin: 0 !important; }
+.v2l[data-serie-coche="1"] { background-color: var(--v2-teinte-fond) !important; }
+.v2l[data-v2t-attenue="1"] { opacity: .6; }
+.v2l-apres-prix { display: inline-flex; align-items: center; flex: none; margin: 0 -4px 0 0; }
+/* La facture envoyée : 20 px, vert (le seul vert de l'app), 44 px au doigt ; la phrase apparaît au toucher / appui long. */
+:root { --v2-vert-facture: #1E7A45; }
+:root[data-theme="dark"] { --v2-vert-facture: #5BCB88; }
+html body button.v2-facture-ok { position: relative; appearance: none; display: grid; place-items: center; width: 44px; height: 44px; margin: -10px -6px -10px 0; padding: 0; border: 0; background: none;
+  color: var(--v2-vert-facture); cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; border-radius: 12px; }
+.v2-facture-bulle { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; width: max-content; max-width: 240px; padding: 8px 12px; border-radius: 12px;
+  background: var(--sv-encre, #0C1D30); color: #FFFFFF; font: 600 13px/16px var(--sb-police-texte, system-ui); text-align: left; box-shadow: 0 8px 24px -8px rgb(0 0 0 / .4); }
+:root[data-theme="dark"] .v2-facture-bulle { background: #EAF2FB; color: #06111F; }
+/* Les rangées de la liste d'hier (cachées) ne laissent aucune trace ; la liste garde la place de la barre de sélection. */
+html[data-design="v2"][data-serie-ouverte] .v2t-liste { margin-bottom: calc(var(--vrm-serie-h, 64px) + 24px); }
+/* À l'ordinateur, la barre du haut collante (recherche, plateformes) est un verre PLEIN : jamais une demi-rangée dessous. */
+@layer vrm-finition {
+  @media (min-width: 1024px) {
+    html[data-design="v2"]:root:root:root body .vrm-app-shell .vrm-main > .vrm-barre-haut { background: var(--sv-haut, #1F5FA8) !important;
+      -webkit-backdrop-filter: blur(20px) saturate(180%) !important; backdrop-filter: blur(20px) saturate(180%) !important; box-shadow: 0 .5px 0 rgb(255 255 255 / .14) !important; }
+  }
+}
+/* La barre de sélection tient sur UNE ligne au téléphone (le plein prend la largeur de son libellé). */
+@media (max-width: 1023px) {
+  .v2-serie { flex-wrap: nowrap; }
+  .v2-serie-d [data-serie-principal] { min-width: 0; }
+  .v2-serie-d .v2b-lib { white-space: nowrap; }
+}
+/* La tête de la coque sur Ventes / Annonces (la cloche seule) : au défilement, une barre de verre PLEINE LARGEUR avec le
+   petit titre (iOS), jamais une demi-boîte posée sur la liste. */
+@media (max-width: 1023px) {
+  html[data-design="v2"] body .vrm-app-header.v2-entete-cloche.is-defile { position: fixed !important; left: 0 !important; right: 0 !important; top: 0 !important; width: auto !important;
+    padding: calc(env(safe-area-inset-top, 0px) + 6px) 12px 6px 16px !important; background: var(--sv-verre-barre, rgb(240 246 252 / .82)) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important; backdrop-filter: blur(20px) saturate(180%) !important; box-shadow: 0 .5px 0 rgb(18 52 96 / .12) !important; }
+}
+/* ⚠️ (17 nov.) La tête de la coque posée sur la ligne du titre (Annonces, la cloche) est TRANSPARENTE aux touchers : elle
+   couvrait « Publier » (elementFromPoint ⇒ <header>, le toucher tombait dans le vide). Seuls ses boutons se touchent. */
+html body .vrm-app-header.v2-entete-cloche { pointer-events: none !important; }
+html body .vrm-app-header.v2-entete-cloche :is(button, a, input, select, [role="button"], [tabindex]) { pointer-events: auto !important; }
+
+/* ══ 13. Audit visuel du 17 nov. — les six « absolument » (A1–A6) ═══════════════════════════════════════════ */
+/* A1. Le grand titre ne se casse jamais lettre par lettre : il garde ses mots, le geste passe dessous s'il manque de place. */
+.v2-titre-ligne { flex-wrap: wrap; row-gap: 8px; }
+.v2-titre-ligne h1, .v2-tete-tache h1, .v2-tete h1 { overflow-wrap: normal; word-break: normal; hyphens: manual; min-width: min-content; }
+.v2-tete-tache h1 { font-size: clamp(28px, 8.6vw, 34px); }
+html[data-grand-texte] .v2-titre-ligne { padding-right: 0; }
+html[data-grand-texte] .v2-titre-ligne h1 { flex: 1 0 100%; padding-right: 64px; }
+/* A2. Le libellé d'un bouton passe à la ligne en très grand texte ; le nombre (`.v2b-n`) n'est jamais coupé. */
+html body .v2b-n { flex: none; white-space: nowrap; }
+html[data-grand-texte] body .v2b-lib { white-space: normal; overflow: visible; text-overflow: clip; text-align: center; }
+html[data-grand-texte] body button.v2b-principal { height: auto; min-height: var(--v2-bouton-h); padding-block: 8px; }
+/* A3. La pile du bas : UN jeton (barre + plein + marge) ; messages et accompagnements au-dessus, la liste dégagée. */
+:root { --v2-pile-bas: calc(var(--vrm-barre-bas, 84px) + 24px + var(--v2-bouton-h, 50px) + 16px); }
+@media (max-width: 1023px) {
+  html[data-design="v2"] body:has(.v2-pouce) .vrm-toasts { bottom: var(--v2-pile-bas) !important; top: auto !important; }
+  .v2-ecran[data-v2-plein="1"] { padding-bottom: var(--v2-pile-bas); }
+}
+/* A4. En route : le titre sur toute la largeur (2 lignes au plus), le prix seul à droite. */
+[data-v2-en-route] .v2-ligne-titre { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+[data-v2-en-route] .v2-ligne-droite { flex: none; align-self: flex-start; padding-top: 2px; }
+/* A5. L'erreur de lecture, allumé : une carte lisible, « Réessayer » du système (jamais un plein). */
+.v2-erreur { display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 16px; padding: 24px 16px; border-radius: 16px; text-align: center;
+  background: var(--v2-carte, #FFFFFF); color: var(--sv-encre, var(--v2-encre, #0C1D30)); font-size: 17px; line-height: 22px; }
+.v2-erreur-ic { color: var(--v2-muet, #4A5B6D); }
+/* A6. « Mis à jour à … » ne se pose plus sur le grand titre : allumé au téléphone, elle descend au-dessus de la barre. */
+@media (max-width: 1023px) {
+  html[data-design="v2"] body .vrm-neuf-hote { top: auto; bottom: calc(var(--vrm-barre-bas, 84px) + 16px + env(safe-area-inset-bottom, 0px)); }
+  html[data-design="v2"] body:has(.v2-pouce) .vrm-neuf-hote { bottom: var(--v2-pile-bas); }
+}
+/* Constat 10. Sur ordinateur, « Extension à installer » (la pastille d'état de l'île du haut) n'est plus un plein : teintée, comme un secondaire. */
+@media (min-width: 1024px) {
+  html[data-design="v2"]:root body .vrm-app-header .vrm-etat-pastille[data-etat-code] { background: var(--v2-carte, #FFFFFF) !important; color: var(--v2-teinte-texte) !important; border-color: transparent !important; box-shadow: 0 0 0 1px rgb(255 255 255 / .6) !important; }
+  /* (sur le bleu de la coque, une teinte à 10 % se perdait : le fond porcelaine d'un secondaire, l'encre d'accent — jamais un plein) */
+}
+
+/* ══ 14. L'AIR (17 nov. soir, Julien : « c'est trop compacté, ça doit être moins compact ») ═════════════════════
+   L'échelle d'espacement OBLIGATOIRE du nouveau design, en jetons partagés (les écrans de la phase 2 les reprennent),
+   mesurée par le banc design-v2-chargement (§ AIR) : marge intérieure d'une carte ≥ 20 (24 à l'ordinateur), 16 entre
+   deux cartes, 32 entre deux sections, 12 du titre de section au contenu, ≥ 12 entre deux boutons, rangée ≥ 64,
+   interligne 1,4. Une carte = un groupe de lignes ; jamais une carte vide. */
+:root {
+  --v2-air-carte: 20px;       /* marge intérieure d'une carte (texte jamais à moins du bord) */
+  --v2-air-cartes: 16px;      /* entre deux cartes */
+  --v2-air-sections: 32px;    /* entre deux sections */
+  --v2-air-titre: 12px;       /* titre de section → contenu */
+  --v2-air-boutons: 12px;     /* entre deux boutons voisins */
+  --v2-air-rangee: 64px;      /* hauteur minimale d'une rangée de liste */
+  --v2-air-interligne: 1.4;   /* texte courant */
+}
+@media (min-width: 1024px) { :root { --v2-air-carte: 24px; } }
+/* Sections : 32 entre elles ; le titre de section → contenu : 12. */
+html body .v2-affiche-sig { margin: 16px 0 var(--v2-air-sections); }
+.v2-bande, .v2-groupe, .v2-afaire, .v2-passes, [data-v2-en-route] { margin-bottom: var(--v2-air-sections); }
+.v2-groupe-titre { margin: 0 4px var(--v2-air-titre); }
+/* Cartes : 16 entre elles. */
+.v2-passes { gap: var(--v2-air-cartes); }
+html body .v2-bande { gap: var(--v2-air-cartes); }
+/* Rangées : ≥ 64, le texte à 20 du bord de la carte. */
+.v2-afaire-ligne { min-height: var(--v2-air-rangee); padding: 12px var(--v2-air-carte); gap: 16px; }
+html body button.v2-rangee.v2-ligne, div.v2-ligne { min-height: max(76px, var(--v2-air-rangee)); padding: 12px var(--v2-air-carte); gap: 16px; }
+.v2-afaire-ligne + .v2-afaire-ligne::before, .v2-liste > .v2-ligne + .v2-ligne::before { left: calc(var(--v2-air-carte) + 72px); }
+html body button.v2-rangee.v2-passe-mini { padding: var(--v2-air-carte); gap: 12px; }
+.v2-passe-tete { padding: 12px var(--v2-air-carte); }
+.v2-passe-lieu { padding: 16px var(--v2-air-carte) 4px; }
+.v2-passe .v2-ticket-corps { padding: 12px var(--v2-air-carte) var(--v2-air-carte); gap: 12px; }
+.v2-passe-gestes { gap: var(--v2-air-boutons); }
+.v2-passe-pages { padding: 0 var(--v2-air-carte) 16px; }
+.v2-erreur { padding: 24px var(--v2-air-carte); }
+/* Annonces : la rangée A respire (12 dessus/dessous, 20 sur les côtés), C 20 partout. */
+.v2l-a { padding: 12px var(--v2-air-carte); min-height: 88px; }
+.v2l-a + .v2l-a::before, .vrm-ann-card[hidden] + .v2l-a::before { left: calc(var(--v2-air-carte) + 80px); }
+.v2l-c { padding: var(--v2-air-carte); height: calc(88px + 2 * var(--v2-air-carte)); }
+.v2l-c + .v2l-c::before, .vrm-ann-card[hidden] + .v2l-c::before { left: calc(var(--v2-air-carte) + 104px); }
+html body .v2l-c { contain-intrinsic-size: auto calc(88px + 2 * var(--v2-air-carte)); }
+.v2-ann-groupe { padding: 20px var(--v2-air-carte) 8px; }
+html[data-design="v2"] body .v2-ann-segment { margin: 8px 0 16px; }
+/* Le squelette a la forme EXACTE des rangées (mêmes marges, mêmes hauteurs). */
+html body .v2-squelette-rangee { height: auto; min-height: 88px; padding: 12px var(--v2-air-carte); }
+html body .v2-squelette-C .v2-squelette-rangee { height: calc(88px + 2 * var(--v2-air-carte)); padding: var(--v2-air-carte); }
+/* Texte courant : interligne 1,4. */
+html body :is(.v2-afaire-detail, .v2-ligne-meta, .v2-rien-sous, .v2-affiche-sig-sous, .v2-passe-mini-bas, .v2-ann-arelier) { line-height: var(--v2-air-interligne); }
+/* Boutons voisins : 12 au moins. */
+.v2-titre-ligne { column-gap: var(--v2-air-boutons); }
+/* La carte de la bande en attente : la même boîte que la carte décrite (rien ne bouge quand la photo arrive). */
+.v2-bande-attente { display: flex; flex-direction: column; align-items: stretch; gap: 4px; }
+.v2-bande-attente .v2-bande-photo { background: rgb(255 255 255 / .16); }
+/* AIR · boutons voisins ≥ 12 : le menu plateforme et « ? », la recherche et « ⋯ ». */
+html body .v2-sous-titre { gap: var(--v2-air-boutons); }
+html[data-design="v2"] body .vrm-annbar { gap: var(--v2-air-boutons) !important; }
+/* Achats, allumé : la liste d'hier (sous les passes) attend avec elles ⇒ tout arrive d'un coup, rien n'est poussé. */
+html[data-design="v2"] body:has([data-v2-attente-retirer]) .vrm-main .vrm-market-space { display: none !important; }
+/* L'ordinateur : le plein sur la ligne du titre, À GAUCHE du « Scanner » (44 + 12) — il le couvrait (banc T, 1512). */
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
+  .v2-aujourdhui:has([data-v2-scanner]) .v2-pouce { right: calc(32px + 44px + var(--v2-air-boutons, 12px)); }
+}
+/* A : UNE hauteur pour toutes les rangées (titre sur une ligne ou deux, faits ou pas) — 120, le squelette aussi. */
+html body .v2l-a { min-height: 120px; contain-intrinsic-size: auto 120px; }
+html body .v2-squelette-A .v2-squelette-rangee { min-height: 120px; }
+/* L'en-tête de compte que la liste posera : le squelette le réserve déjà (même hauteur), rien ne glisse. */
+.v2-squelette-tete { display: block; height: 44px; }
+/* (couche `vrm-v2`, la première nommée : passe devant les `!important` des couches d'hier) */
+@layer vrm-v2 {
+  html[data-design="v2"] body .vrm-annbar, html[data-design="v2"] body .vrm-annbar .vrm-annbar-gestes { gap: var(--v2-air-boutons, 12px) !important; }
+}
+.v2-passe-qr-ko { display: grid; place-items: center; text-align: center; font-size: 13px; line-height: 1.4; color: var(--v2-muet, #4A5B6D); background: var(--v2-socle, #EEF3F8); image-rendering: auto; }
+/* Le plein au pouce ne cache rien : la page garde barre + plein (sa VRAIE hauteur, une ou deux lignes) + 16 ; et sous lui,
+   le contenu s'efface dans le fond (un voile du bas de la page) au lieu d'être coupé net derrière le bouton. */
+:root { --v2-pile-bas: calc(var(--vrm-barre-bas, 84px) + 24px + var(--v2-pouce-h, var(--v2-bouton-h, 50px)) + 16px); }
+@media (max-width: 1023px) {
+  html body .v2-ecran[data-v2-plein="1"] { padding-bottom: calc(var(--v2-pile-bas) + 24px); }
+  html body .v2-pouce::before { content: ""; position: absolute; z-index: -1; pointer-events: none; left: -16px; right: -16px; top: -28px; bottom: calc(-24px - var(--vrm-barre-bas, 84px));
+    background: linear-gradient(to bottom, transparent, var(--sv-bas, #0E2C52) 34px); }
+}
+/* Une rangée de Ventes reste CALME, même avec un long pseudo et tous les gestes (Julien : « c'est moche ») : la 2e ligne
+   « N° · T42 · logo · pseudo » passe à la ligne plutôt que de couper ou de chevaucher ; aucun bouton dans la rangée (gestes au
+   glisser et dans la fiche), la facture envoyée seule à côté du prix. */
+:is(.v2v-liste, .v2t-liste) .v2l-a-l2 { flex-wrap: wrap; height: auto; min-height: 24px; white-space: normal; row-gap: 4px; overflow: visible; }
+:is(.v2v-liste, .v2t-liste) .v2l-a-l2 .v2l-faits-txt { overflow: visible; text-overflow: clip; white-space: nowrap; }
+.v2l-apres-logo { min-width: 0; overflow-wrap: anywhere; color: var(--v2-muet); }
+/* LA PISTE d'un colis parti : 4 segments courts (12 × 4 px, 2 px entre eux), l'accent pour ce qui est fait, l'ambre seulement
+   s'il y a un geste ; même boîte partout (aucun saut quand elle avance), sur la ligne de son étape en mots. */
+.v2-piste { display: inline-flex; align-items: center; gap: 2px; flex: none; height: 16px; margin-right: 4px; }
+.v2-piste > i { display: block; width: 12px; height: 4px; border-radius: 2px; background: var(--v2-filet); }
+.v2-piste > i.is-fait { background: var(--v2-lien); }
+.v2-piste.is-ambre > i.is-fait:last-of-type { background: var(--v2-ambre-point); }
+:root[data-theme="dark"] .v2-piste > i:not(.is-fait) { background: rgb(255 255 255 / .18); }
+/* La facture envoyée : la boîte visible = l'icône (24 px), la cible au doigt (44) est une zone invisible autour — elle ne
+   recouvre plus le prix ni le pseudo (banc : aucune boîte ne se chevauche dans une rangée). */
+html body button.v2-facture-ok { width: 24px; height: 24px; margin: 0 4px 0 0; border-radius: 8px; overflow: visible; }
+html body button.v2-facture-ok::before { content: ""; position: absolute; inset: -10px; }
+/* La place gardée sous la liste de Ventes, sur la grille de 4 (la barre du bas a sa hauteur à elle). */
+@media (max-width: 1023px) { .v2v-corps { margin-bottom: round(up, calc(var(--vrm-barre-bas, 84px) + 24px), 4px); } }
+/* (18 nov.) La ligne grise « qui » d'une rangée de Ventes : logo (plusieurs plateformes) · acheteur · vendue il y a N j.
+   Petite, grise, elle passe à la ligne entre deux mots (un long pseudo se coupe n'importe où plutôt que de déborder). */
+.v2l-a-qui { display: flex; flex-wrap: wrap; align-items: center; gap: 0 4px; font-size: 13px; line-height: 18px; color: var(--v2-muet); min-width: 0; }
+.v2l-a-qui .v2l-logo { display: inline-flex; align-items: center; }
+.v2l-qui-txt { min-width: 0; overflow-wrap: anywhere; }
+/* Chaque fait de la ligne « qui » reste entier (« vendue il y a 6 j » ne se coupe pas) ; seul un pseudo trop long se coupe. */
+.v2l-qui-fait { white-space: nowrap; }
+.v2l-qui-fait[data-v2l-pseudo] { white-space: normal; overflow-wrap: anywhere; }

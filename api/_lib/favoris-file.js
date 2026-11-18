@@ -2,6 +2,7 @@
 // recipients from native captures before passing targets here. No network IO
 // inside a CAS decision: a retry must never repeat a Vinted request.
 export class RefusFavoris extends Error { constructor(message,status=409){super(message);this.status=status;} }
+import {RAISONS_FAVORIS} from '../../src/favorisProgression.js';
 import {AUTO_FREINS,AUTO_PAUSE_MS,AUTO_ESSAIS,AUTO_AVANT_ECRITURE,DEMANDES_AUTO,RAISONS_DEMANDE,dansPlageAuto,ecartAutoMs} from '../../src/favorisAuto.js';
 const entier=v=>typeof v==='string'&&/^[1-9]\d{0,19}$/.test(v);
 const clone=v=>structuredClone(v);
@@ -159,7 +160,7 @@ export function terminerFile(d,{owner,jeton,resultat,maintenant,raison,ecrits=nu
   const attendQuota=!j.auto&&resultat==='refuse'&&j.raison==='quota_extension'&&j.ecrits===0&&(Number(j.attentesQuota)||0)<QUOTA_ATTENTES_MAX;
   if(attendQuota){j.etat='attente';delete j.raison;delete j.traiteLe;j.attentesQuota=(Number(j.attentesQuota)||0)+1;const att=Number.isSafeInteger(apresMs)&&apresMs>=5000&&apresMs<=3600000?apresMs:QUOTA_ATTENTE_MS;g.prochain=Math.max(e.prochainAvant||0,fin+att);d.prochainGlobal=g.prochain;g.raison='La limite d’actions de l’heure est atteinte : les messages suivants partent dès qu’une place se libère.';}
   else if(j.auto&&['envoye','ignore'].includes(resultat)){if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;}
-  else if(!['envoye','ignore'].includes(resultat)){g.active=false;g.raison=raison==='article_vendu'?'Article vendu : aucun message envoyé pour cette tentative. Les messages restants ne sont pas envoyés.':raison==='annonce_indisponible'?'Annonce réservée, masquée, fermée ou supprimée : aucun message envoyé pour cette tentative. Les messages restants ne sont pas envoyés.':raison==='ecran_inactif'?'Écran des favoris quitté avant le départ. Les messages restants ne sont pas envoyés.':resultat==='incertain'?'Réponse incertaine : vérifie la conversation sur Vinted. Aucun renvoi automatique.':'Vinted ou l’extension a interrompu la file. Les messages restants ne sont pas envoyés.';}
+  else if(!['envoye','ignore'].includes(resultat)){g.active=false;g.raison=raison==='article_vendu'?'Article vendu : aucun message envoyé pour cette tentative. Les messages restants ne sont pas envoyés.':raison==='annonce_indisponible'?'Annonce réservée, masquée, fermée ou supprimée : aucun message envoyé pour cette tentative. Les messages restants ne sont pas envoyés.':raison==='ecran_inactif'?'Écran des favoris quitté avant le départ. Les messages restants ne sont pas envoyés.':raison==='vinted_robot'&&!j.auto?'Vinted demande une vérification (anti-robot) : la file est en pause, rien ne part. Fais-la sur vinted.fr, puis « Reprendre » sur la carte VRM de vinted.fr (on reprend plus doucement pendant 24 h).':resultat==='incertain'?'Réponse incertaine : vérifie la conversation sur Vinted. Aucun renvoi automatique.':RAISONS_FAVORIS[raison]?`${RAISONS_FAVORIS[raison]} Les messages restants ne sont pas envoyés.`:'Vinted ou l’extension a interrompu la file. Les messages restants ne sont pas envoyés.';}
   else {if(!g.jobs.some(x=>x.etat==='attente'))g.active=false;if(!g.active)g.raison='Sélection traitée ou file arrêtée.';}
   // (28 oct.) La file vient de se TERMINER (finie ou interrompue) : son bilan,
   // une seule fois (la transition active → inactive), pour la notification.
@@ -194,6 +195,15 @@ export function arreterFile(d,owner){
   d=initialiserFile(d);const g=d.groupes[owner];if(!g)return {valeur:vueFile(d,owner)};
   g.active=false;g.raison='File arrêtée. Une tentative déjà partie peut encore aboutir.';
   for(const j of g.jobs)if(j.etat==='attente')j.etat='annule';
+  return {data:d,valeur:vueFile(d,owner)};
+}
+// 5.407 (Julien, 17 nov. : « Arrêté : Vinted demande une vérification ») : après une vérification de
+// Vinted, la MÊME file reprend — seulement sur SON toucher « Reprendre » (carte ou écran de vinted.fr),
+// jamais toute seule. Seuls les favoris encore « en attente » de CE lot repartent ; rien d'autre ne change.
+export function reprendreFile(d,{owner,maintenant}){
+  d=initialiserFile(d);const g=d.groupes[owner];
+  if(!g||g.active===true||!g.jobs.some(x=>x.etat==='attente'&&!x.auto&&(!g.lot||x.lot===g.lot)))throw new RefusFavoris('Il n’y a plus rien à reprendre : relance depuis la liste de tes favoris.',409);
+  g.active=true;g.raison='';g.prochain=maintenant;d.prochainGlobal=maintenant;
   return {data:d,valeur:vueFile(d,owner)};
 }
 export function cloreIncertains(d,{owner,maintenant}){

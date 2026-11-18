@@ -23,7 +23,7 @@ const R = path.join(__dirname, '..');
 const parser = require(path.join(R, 'node_modules', '@babel', 'parser'));
 
 // Ce qui ne doit JAMAIS entrer dans le morceau App (chargé à la demande ailleurs).
-const LOURDS = ['pdf-lib', 'pako', 'three', 'maplibre-gl', 'jsqr'];
+const LOURDS = ['pdf-lib', 'pako', 'three', 'maplibre-gl', 'jsqr', 'qrcode-generator'];   // (17 nov., vitesse-poids) le QR aussi
 // Les modules rendus « à la demande » le 17 nov. (aLaDemande, aLaDemandeFeuille, aLaDemandeDiscret).
 const A_LA_DEMANDE = [
   'src/ConfigurationDepart.jsx', 'src/CreerSurVinted.jsx', 'src/composants/ImportStock.jsx', 'src/LitigesEnCours.jsx',
