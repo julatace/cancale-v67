@@ -28,7 +28,7 @@ let chromium;
 try { ({ chromium } = require(path.join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 catch (_) { ({ chromium } = require(require('path').join(__dirname, '..', '..', 'node_modules', 'playwright'))); }
 const { fabriquer, repondre } = require('./_base-volume.cjs');
-const DIST = path.join(__dirname, '..', '..', 'dist');
+const DIST = process.env.VITESSE_DIST ? path.resolve(process.env.VITESSE_DIST) : path.join(__dirname, '..', '..', 'dist');   // (17 nov.) VITESSE_DIST : un autre build (mutation de francais-differe)
 const PORT = Number(process.env.BANC_PORT || process.env.PORT) || 4871;
 const DETAIL = !!process.env.VITESSE_DETAIL;
 const RTT = 150;            // ms — un aller-retour vers Supabase depuis la France (mesuré : 165–536 ms)
@@ -283,6 +283,7 @@ async function ouvrir(b, vp, tab, attendre, frappe, opts = {}) {
     const lu2 = await pg.evaluate(() => ({ tombe: /pas pu s'afficher|Cannot access|is not defined/.test(document.body.innerText), texte: document.body.innerText })).catch(() => ({ tombe: true, texte: '' }));
     deuxieme = { req: req.slice(), utile: utile2, errs: errs2, lu: lu2, fichiers: servis.slice(), heros: [] };
   }
+  if (opts.capture) await pg.screenshot({ path: opts.capture }).catch(() => {});   // (17 nov.) la capture à regarder (francais-differe CAPTURES=dossier)
   await ctx.close();
   return { req: reqPremier, utile, errs, lu, frappes, heros, rendusSignal, fichiers, coque, deuxieme };
 }

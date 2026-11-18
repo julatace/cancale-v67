@@ -400,14 +400,18 @@ async function editeur(b, vue) {
     const garde = await attendre(pg, (c) => { try { const t = JSON.parse(localStorage.getItem('vrm_tampons') || 'null'); return !!(t && t.formes && t.formes[c] && t.formes[c].n); } catch (_) { return false; } }, cle, 10000);
     dit(garde, `${nom} : E1 le N° glissé ⇒ la place est enregistrée pour la forme (${cle})`);
     await attendre(pg, () => document.querySelector('[data-tampons-editeur]').getAttribute('data-etat') === 'ok', null, 30000);
-    await pg.locator('[data-tampons-editeur] [data-tampon-el="m"]').scrollIntoViewIfNeeded();
+    await pg.locator('[data-tampons-editeur] [data-tampon-el="n"]').scrollIntoViewIfNeeded();
     const zq = await pg.evaluate(() => { const e = document.querySelector('[data-tampons-editeur] [data-tampon-interdit="qr"]'); if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
-    const bm = await pg.locator('[data-tampons-editeur] [data-tampon-el="m"]').boundingBox();
+    const bm = await pg.locator('[data-tampons-editeur] [data-tampon-el="n"]').boundingBox();
     if (zq && bm) {
-      await glisser(o, '[data-tampons-editeur] [data-tampon-el="m"]', zq.x - (bm.x + Math.min(bm.width / 2, 12)), zq.y - (bm.y + bm.height / 2));
-      dit(await attendre(pg, () => !!document.querySelector('[data-tampons-editeur] [data-tampons-refus="qr"]'), null, 5000), `${nom} : E1 la mention glissée sur le QR ⇒ « Refusé : ça recouvrirait le QR code »`);
+      await glisser(o, '[data-tampons-editeur] [data-tampon-el="n"]', zq.x - (bm.x + Math.min(bm.width / 2, 12)), zq.y - (bm.y + bm.height / 2));
+      dit(await attendre(pg, () => !!document.querySelector('[data-tampons-editeur] [data-tampons-refus="qr"]'), null, 5000), `${nom} : E1 le N° glissé sur le QR (17 nov. : la mention est verrouillée) ⇒ « Refusé : ça recouvrirait le QR code »`);
       await shot(pg, `${vue}-editeur-refus`);
     } else dit(false, `${nom} : E1 la zone du QR est dessinée`);
+    // (17 nov., lot tampon-qr) Mesuré, sur main aussi : au doigt (CDP), le PREMIER toucher qui suit un glisser du N° REFUSÉ
+    // ne donne pas de « click » (pointerdown/touchend reçus, pas de click) — le glisser refusé est désormais celui du N°
+    // (la mention est verrouillée). Un toucher neutre sur le titre de la feuille le précède.
+    if (o.tactile) await toucher(o, '[data-tampons-editeur] .vrm-tampon-tete b');
     await toucher(o, '[data-tampons-editeur] [data-tampons-portee="mondialrelay"]');
     await toucher(o, '[data-tampons-editeur] [data-tampons-contenu="titre"]');
     const ex = await attendre(pg, () => { try { const t = JSON.parse(localStorage.getItem('vrm_tampons') || 'null'); return t && t.types && t.types.mondialrelay && t.types.mondialrelay.contenu && t.types.mondialrelay.contenu.titre === false; } catch (_) { return false; } }, null, 8000);

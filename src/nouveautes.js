@@ -33,6 +33,8 @@ export const NOUVEAUTES = Object.freeze([
   { id: 'design-v2-ventes', date: '2026-11-17', titre: 'Ventes revue dans le nouveau design', phrase: 'Imprimer en haut, colis rangés par date limite, recherche avec scanner.', tab: 'ventes', pour: 'tous', mode: 'tous' },
   // (17 nov., lot design-v2) docs/passation/2026-11-17-design-v2.md — l'essai, éteint par défaut
   { id: 'design-v2-essai', date: '2026-11-17', titre: 'Essaie le nouveau design', phrase: 'Paramètres → Apparence : Aujourd’hui, passes de retrait, un menu par plateforme.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (17 nov., lot tampon-qr) docs/passation/2026-11-17-tampon-qr.md
+  { id: 'mention-juste-au-dessus', date: '2026-11-17', titre: '« Créé par vrm.center » collé au QR', phrase: 'Juste au-dessus du code, dans le sens de l’étiquette, chaque transporteur.', tab: 'cat_bord', pour: 'tous', mode: 'tous' },
   // (17 nov., Julien : « Améliore les emails aussi ») docs/passation/2026-11-17-emails-beaux.md
   { id: 'emails-cinq-langues', date: '2026-11-17', titre: 'Les e-mails de VRM dans ta langue', phrase: 'Bilan, essai, sécurité : dans la langue choisie, partout lisibles.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (17 nov., Julien : « il faut être très très proche… je veux que ce soit instantané ») docs/passation/2026-11-17-scan-instantane.md
