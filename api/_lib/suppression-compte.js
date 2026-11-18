@@ -24,6 +24,7 @@
 //    au bout de JOURNAL_ANS ans (purge à chaque nouvelle suppression).
 import crypto from 'crypto';
 import { gabaritMail, SITE } from './mail-gabarit.js';
+import { tm, tmN, langueMail, dateMail } from './mail-textes.js';
 import { sbCle } from './cle.js';
 import { PROPRIETAIRE_NEUTRE } from './proprietaire-email.js';
 import { derniereConnexion, connexionRecente, fournisseursDu, aMotDePasseSelon, nomFournisseur, FOURNISSEURS_RECONNEXION, FENETRE_RECENTE_MS as FENETRE } from './preuve-connexion.js';
@@ -178,24 +179,40 @@ export async function noterJournal({ url, service, owner, ok, nombres, maintenan
 }
 
 // ── L'e-mail de confirmation (gabarit commun ; rien de ses données dedans) ──
-export function mailSuppression({ fait = [], contact = '', motif = 'demande', maintenant = Date.now() } = {}) {
-  const jour = new Date(maintenant).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris', day: 'numeric', month: 'long', year: 'numeric' });
+// (17 nov.) Dans la langue du compte (`langue`). « Ce qui a été fait » : en français, la
+// liste `fait` d'avant, telle quelle ; dans une autre langue, refaite depuis les MÊMES
+// étapes (`etapes` d'effacerCompte, `abonnement` = l'étape Stripe) — sans étapes, `fait`.
+export function faitDansLaLangue({ etapes, abonnement = '', langue = 'fr' } = {}) {
+  if (!etapes || typeof etapes !== 'object') return null;
+  const L = langueMail(langue), out = [];
+  const n = (k, v) => tmN(L, k, Number(v) || 0);
+  if (abonnement === 'resilie' || abonnement === 'deja-resilie') out.push(tm(L, 'fait.abonnementResilie'));
+  if (abonnement === 'arrete') out.push(tm(L, 'fait.abonnementArrete'));
+  if (etapes.donnees != null) out.push(n('fait.donnees', etapes.donnees));
+  if (etapes.comptesVinted != null) out.push(n('fait.comptesVinted', etapes.comptesVinted));
+  if (etapes.preuvesAdresse > 0) out.push(tm(L, 'fait.preuvesAdresse'));
+  if (etapes.indexJetons > 0) out.push(tm(L, 'fait.indexJetons'));
+  if (etapes.signalements > 0) out.push(n('fait.signalements', etapes.signalements));
+  if (etapes.equipe > 0) out.push(n('fait.equipe', etapes.equipe));
+  if (etapes.communaute > 0) out.push(tm(L, 'fait.communaute'));
+  if (etapes.photos > 0) out.push(n('fait.photos', etapes.photos));
+  if (etapes.connexion === 'supprimee') out.push(tm(L, 'fait.connexion'));
+  if (etapes.facturesGardees > 0) out.push(n('fait.facturesGardees', etapes.facturesGardees));
+  return out;
+}
+export function mailSuppression({ fait = [], contact = '', motif = 'demande', maintenant = Date.now(), langue = 'fr', etapes = null, abonnement = '' } = {}) {
+  const L = langueMail(langue);
+  const jour = dateMail(maintenant, L, { day: 'numeric', month: 'long', year: 'numeric' });
+  const T = (k) => tm(L, k, { jour, contact });
+  const refait = L === 'fr' ? null : faitDansLaLangue({ etapes, abonnement, langue: L });
   const { texte, html } = gabaritMail({
-    titre: 'Ton compte VRM est supprimé',
-    preentete: `Ton compte et tes données ont été effacés le ${jour}.`,
-    paras: [
-      motif === 'depart'
-        ? `Ton abonnement VRM s’est terminé il y a 12 mois : comme annoncé, ton compte et tes données ont été effacés le ${jour}. Ce qui a été fait :`
-        : motif === 'differee'
-          ? `Tu as demandé la suppression de ton compte VRM il y a 30 jours : comme annoncé, ton compte et tes données ont été effacés le ${jour}. Ce qui a été fait :`
-          : `Tu as supprimé ton compte VRM le ${jour}. Ce qui a été fait :`,
-    ],
-    liste: fait.slice(0, 12),
-    suite: [
-      'Ce qui reste, et pourquoi : les factures Pro que tu as émises avec VRM sont gardées 10 ans, sans accès, parce que la loi l’exige (art. L123-22 du Code de commerce), puis effacées ; les factures de ton abonnement VRM restent chez Stripe, notre prestataire de paiement (même obligation). VRM garde aussi une ligne sans contenu — la date et des nombres — qui prouve que l’effacement a été fait ; elle part au bout de 3 ans.',
-      `Pense à retirer l’extension VRM de ton navigateur.${contact ? ` Ce n’est pas toi ? Écris à ${contact}.` : ''}`,
-    ],
-    pied: { texte: 'Tu reçois ce message parce que ton compte VRM vient d’être supprimé. C’est le dernier : tu ne recevras plus rien de VRM.' },
+    titre: T('supp.sujet'),
+    preentete: T('supp.apercu'),
+    paras: [motif === 'depart' ? T('supp.depart') : motif === 'differee' ? T('supp.differee') : T('supp.demande')],
+    liste: (refait || fait).slice(0, 12),
+    suite: [T('supp.reste'), `${T('supp.extension')}${contact ? ` ${T('supp.pasToi')}` : ''}`],
+    pied: { texte: T('supp.pied') },
+    langue: L,
   });
-  return { sujet: 'Ton compte VRM est supprimé', texte, html, lien: SITE };
+  return { sujet: T('supp.sujet'), texte, html, lien: SITE };
 }
