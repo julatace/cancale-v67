@@ -18,7 +18,10 @@ import { ouvrirLigne, fermerLigne, attrsFicheLigne } from '../ficheLigne.js';   
 import { attrsAvantSite, clicAvantSite, PaireAvantSiteHote } from '../paires/PaireAvantSite.jsx';   // (16 nov.) la rangée touchée monte à sa place, comme Annonces
 import { montant } from '../format.js';
 import { ChiffreConseil } from '../Conseils.jsx';
-import { casesProposees, caseEnMots } from '../ouRanger.js';
+import { casesProposees, caseEnMots, caseLibreDans, premiereCaseLibre } from '../ouRanger.js';
+// (17 nov., lot stock-rangement) Le nouveau design (essai, `vrm_design_v2`) : le Stock « Ranger » en séance (src/stockV2/).
+import { useDesignV2 } from '../designV2/reglage.js';
+import StockV2 from '../stockV2/StockV2.jsx';
 import { attrCible } from '../cibleNotif.js';
 import { remettreCase, resteAuStock, etatCase } from '../stockSortie.js';
 import { annoncesActuelles, annoncesVcStock, classerRangees, partagerParEtat } from '../stockAnnonces.js';
@@ -32,7 +35,7 @@ import { trierSerie, resumeSerie, csvDe } from '../selectionSerie.js';   // (10 
 import { CLE_EMBALLAGES, colisFaits } from '../emballages.js';
 import { CLE_STOCK_IMPORTE } from '../importStock.js';
 import { importeesAuStock } from '../stockImporteVue.js';   // (16 nov., lot ecrans-restes) le stock importé d'un autre outil, montré
-import { achatDuNumeroLu, useMotsArticle, useExemplesVendeur, NotePaireCoque, gesteVrm, InfoPop, Pourquoi, AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, fetchTxnItemIds, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
+import { achatDuNumeroLu, useMotsArticle, useExemplesVendeur, NotePaireCoque, gesteVrm, InfoPop, Pourquoi, AUTH, Badge, Bouton, C, COL_H, Card, ChoixPlanches, DEMANDE_SAISIE_PRIX, DEMANDE_STOCK_CASE, DEMANDE_STOCK_CHERCHE, DEMANDE_STOCK_INVENTAIRE, INVENTAIRE_FEUILLE, DICTEE_OK, FermeAuRetour, INV_STATUS, Icon, LAYOUT, MicDictee, NAV, NOM_PLAT_STOCK, PhotoVinted, SUPABASE_URL, ScreenHead, Segmente, SheetShell, StatBox, annonceDeclareePartie, fetchTxnItemIds, annotateAndDownloadBordereau, archiveNumeros, askChoix, askConfirm, classifyOrderStatus, cleDeclarationPartie, cleNum, comptesStockEcartes, estTamponAnnule, fetchHarvest, fetchVintedListings, fetchVintedOrders, filtreInventaire, lireBaseRelue, lireEbayEnLigne, lireLbcEnVente, load, loadRoomPlan, masqueesPresentes, normTitle, normalizePlan, onCloudReady, orderPhoto, ouDansMeubles, ouEstNumero, ouvrirRecherchePhoto, extractSize, photoKey, placeDansMeubles, poserCible, save, saveTout, sbAuth, toast, tod, triNum, uid, useStateCle, useVcLocal, withOwner } from '../App.jsx';
 
 // ⟦← App.jsx #1⟧
 import StockExplication from "../StockExplication.jsx";
@@ -216,7 +219,8 @@ function PhotoStockHl({ src, style, initiale }) {
   return <img src={a} alt="" decoding="async" style={style} data-photo-hl="gardee" onError={() => setKo(true)} />;
 }
 function StockMeubles({ locate = null, placeNum = null, onPlaced = null, accounts = null, comptesLus = false } = {}) {
-  const motsStock = useMotsArticle();   // (11 nov., lot DJ2) « paire » seulement pour Sneakers
+  const motsStock = useMotsArticle();
+  const designV2 = useDesignV2();   // (17 nov., lot stock-rangement) éteint : l'écran d'avant, à l'identique   // (11 nov., lot DJ2) « paire » seulement pour Sneakers
   const exemplesStock = useExemplesVendeur();   // (11 nov., lot DJ2) le nom d’emballage proposé
   const [meubles, setMeubles] = React.useState(() => { const m = load('vrm_meubles', []); return Array.isArray(m) ? m : []; });
   const [slots, setSlots] = React.useState(() => { const s = load('vrm_slots', {}); return s && typeof s === 'object' ? s : {}; });
@@ -267,6 +271,8 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   React.useEffect(() => {
     if (placeNum == null || !String(placeNum).trim()) return;
     const k = cleNum(placeNum);
+    // (17 nov.) Nouveau design : la séance « Ranger » s'ouvre sur CE N° (src/stockV2/StockV2.jsx) — pas de « touche une case ».
+    if (designV2 && k) { setPlace(k); setQ(''); if (onPlaced) onPlaced(); return; }
     if (k) {
       setPlace(k); setQ('');
       const libre = caseProposeeDe(k);
@@ -578,7 +584,9 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   // qui porte une paire PRÉSENTE (`ficheParCle`) pose la question : échanger (si la
   // paire qu'on range avait une place), choisir la nouvelle case de l'occupante, ou
   // la remettre « À ranger » — chaque issue DITE ; « Annuler » ne change rien.
-  const poser = async (cle, mid, i) => {
+  // (17 nov.) `opts.muet` : la séance « Ranger » du nouveau design dit elle-même la pose (« ✓ N°201 · … », la case FINALE) ;
+  // un échange avec une occupante (`suite`) se dit toujours ici.
+  const poser = async (cle, mid, i, opts = {}) => {
     const u = { ...slots };
     // occupant éventuel de la case cible
     const occ = Object.keys(u).find((c) => u[c] && u[c].m === mid && u[c].i === i);
@@ -618,7 +626,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     // les mots du meuble (rangée, colonne) — la case qui clignote peut être
     // hors de l'écran sur téléphone. (15 nov.) Dans une pile, la case FINALE (elle a pu tomber), et qui est descendu.
     const fin = r.slots[cle] || { m: mid, i };
-    if (m) toast(tr('stock.rangee', { x: String(f ? f.numero : cle), ici: String(ici(m, fin.i)), x2: String(suite ? ' ' + suite : '') }), 'ok');   // (15 nov.) la descente est dite UNE fois : le bandeau du meuble
+    if (m && !(opts.muet && !suite)) toast(tr('stock.rangee', { x: String(f ? f.numero : cle), ici: String(ici(m, fin.i)), x2: String(suite ? ' ' + suite : '') }), 'ok');   // (15 nov.) la descente est dite UNE fois : le bandeau du meuble
     return true;
   };
   // Rend la phrase des descentes (vide si rien n'a bougé) : l'appelant l'ajoute à SON message.
@@ -1195,7 +1203,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
                   {a.cle ? <NotePaireCoque numero={a.numero} ajout rangee/> : null}
                 </span>
               </span>
-              {a.cle && f && <button className="vrm-ms-geste" type="button" data-stock-annonce-geste={ou ? 'voir' : 'ranger'} onClick={() => { if (ou) montrer(fOu); else { setPlace(a.cle); const c = caseProposeeDe(a.cle); if (c) { viserCase(c.meubleId, c.i); toast(tr('stock.toucheCaseRanges', { placeNum: String(a.numero), caseEnMots: String(caseEnMots(c)) })); } else toast(tr('stock.toucheCaseRanges3', { numero: String(a.numero) })); } }}>{ou ? tr('stock.voir') : tr('stock.ranger2')}</button>}
+              {a.cle && f && <button className="vrm-ms-geste" type="button" data-stock-annonce-geste={ou ? 'voir' : 'ranger'} onClick={() => { if (ou) montrer(fOu); else if (designV2) setPlace(a.cle); else { setPlace(a.cle); const c = caseProposeeDe(a.cle); if (c) { viserCase(c.meubleId, c.i); toast(tr('stock.toucheCaseRanges', { placeNum: String(a.numero), caseEnMots: String(caseEnMots(c)) })); } else toast(tr('stock.toucheCaseRanges3', { numero: String(a.numero) })); } }}>{ou ? tr('stock.voir') : tr('stock.ranger2')}</button>}
               {a.cle ? <span className="sb-avant-place" data-sb-avant-place=""/> : null}
             </div>); })}
       </div>
@@ -1335,7 +1343,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
   const elAnnuel = annuel ? <InventaireAnnuel owner={AUTH.user?.id || ''} cle={cleNum} Feuille={SheetShell} lire={lireLigneInventaire} onFermer={() => { DEMANDE_INVENTAIRE_ANNUEL.at = 0; setAnnuel(false); }} onSaisirPrix={saisirPrixStock}
       onVerifier={() => { retourAnnuel.current = true; setAnnuel(false); setInventaire(true); }}
       onAnnonces={() => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vinted_annonces' })); } catch (_) {} }}/> : null;
-  if (!fiches.length && !meubles.length) return (<>
+  if (!designV2 && !fiches.length && !meubles.length) return (<>
     {elInventaire}
     {elAnnuel}
     {blocHorsLigne}
@@ -1453,6 +1461,83 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
     sortisMeubles.length ? { k: 'sortis', cible: '[data-stock-sortis-meubles]', mot: tr('ms.stock.af.sortis', { n: sortisMeubles.length }) } : null,
     aRanger.length ? { k: 'aranger', cible: '[data-bande-a-ranger]', mot: tr('ms.stock.af.aRanger', { n: aRanger.length }) } : null,
   ].filter(Boolean);
+  const sectionAFaire = aFaire.length && (blocRetours || blocPlusEnLigne || blocPasSu || blocSortis) ? <section className="vrm-ms-section" data-stock-section="afaire" aria-label={tr('listes.afaire')}>
+      <h2 className="vrm-ms-h2">{tr('listes.afaire')}</h2>
+      {blocRetours}
+      {blocPlusEnLigne}
+      {barreSerieStock}
+      {blocPasSu}
+      {blocSortis}
+    </section> : <>{barreSerieStock}</>;
+  const sectionPlus = (
+    <section className="vrm-ms-section" data-stock-section="plus" aria-label={tr('ms.stock.plus')}>
+    <h2 className="vrm-ms-h2">{tr('ms.stock.plus')}</h2>
+    {/* (14 nov., lot 129, de main) L'inventaire tournant : 10 N° par jour à vérifier — dans « Plus », sous la liste. */}
+    {unitesTournant ? <div style={{ marginBottom: 14 }}><InventaireTournant unites={unitesTournant} uid={AUTH.user?.id || ''} lire={() => load(CLE_TOURNANT, {})} ecrire={(v) => save(CLE_TOURNANT, v)}
+      onFiche={(n) => { try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(n) })); } catch (_) {} }}/></div> : null}
+    <ValeurStockCarte v={valeurStk} onSaisir={saisirPrixStock} mots={motsStock}/>
+    {/* (10 nov., lot L) Le stock d'emballages : écrit sur SON clic ; le reste dérive des « Colis fait ». */}
+    <EmballagesCarte reglage={emballagesR} Feuille={SheetShell} exemple={exemplesStock.emballage} ecrire={(r) => { setEmballagesR(r); save(CLE_EMBALLAGES, r); }}
+      lireFaits={() => colisFaits({ vinted: load('vinted_ship_done', {}), leboncoin: load('vrm_lbc_colis_done', {}), vestiaire: load('vrm_vc_colis_done', {}) })}/>
+    <button type="button" className="vrm-ia-entree" data-ia-ouvrir="" onClick={() => setAnnuel(true)}><span>{tr('stock.inventaireFinAnnee')}</span><span aria-hidden="true">›</span></button>
+    </section>);
+  // ── (17 nov., lot stock-rangement) LE NOUVEAU DESIGN (essai) : le même état, les mêmes gestes, rendus par
+  // src/stockV2/StockV2.jsx (séance « Ranger », « Où est… », « Mes places »). Éteint : rien de ceci n'est rendu.
+  const compteMeuble = (m) => {
+    const T = total(m); let pleines = 0, aSortir = 0, ici = 0;
+    for (let i = 0; i < T; i++) { const o = occupant(m.id, i); if (o) { pleines++; if (estVendu(o)) aSortir++; if (cibles.includes(cleDeFiche(o)) || (filtre && correspond(o))) ici++; } else if (noteeIci(m.id, i)) pleines++; }
+    return { total: T, pleines, aSortir, ici };
+  };
+  // Les paires du nouveau design : les annonces actuelles EN LIGNE (la même liste et le même tri que « blocListe »),
+  // chacune avec sa place par identité de N° (son N° ou l'autre N° de la même paire).
+  const lignesV2 = !designV2 || !(aa && aa.su) ? [] : articlesVus.slice().sort((a, b) => (articleRange(a) - articleRange(b)) || triNum(a.numero, b.numero)).map((a) => {
+    const f = a.cle ? ficheParCle[a.cle] : null;
+    const fOu = f ? ((ouEst(f) ? f : null) || (a.aussi || []).map((n) => ficheParCle[cleNum(n)]).filter(Boolean).find((x) => ouEst(x)) || null) : null;
+    return { key: a.ids[0], cle: a.cle && f ? a.cle : '', numero: a.numero, titre: a.titre, photo: a.photo || (f && f.photo) || null, ou: fOu ? ouEst(fOu) : null,
+      taille: motsStock.nom === 'paire' ? extractSize(a.titre) : null, double: !!(a.cle && doublonsStock.has(a.cle)) };
+  });
+  // Ce qui n'est pas compté « en ligne », DIT avec son geste (dans « ⋯ ») — les mêmes nombres que la bande d'avant.
+  const nSansTout = aa ? nSansNum + sansNumAutres + vcSansNum.length : 0;
+  const etatsV2 = !designV2 || !(aa && aa.su) ? [] : [
+    nAConf > 0 ? { k: 'aconfirmer', ambre: true, titre: tr('sr.etat.aConf', { n: nAConf }), geste: tr('sr.etat.aConfGeste', { qui: aConfVoir.map((c) => (c.plateforme === 'vinted' ? c.nom : nomPlateforme(c.plateforme))).filter(Boolean).join(', ') }) } : null,
+    aa.manque.length > 0 ? { k: 'pastoutlu', titre: tr('sr.etat.pasLu'), geste: tr('sr.etat.pasLuGeste', { liste: manqueTxt }) } : null,
+    nSansTout > 0 ? { k: 'sansnum', titre: tr('sr.etat.sansNum', { n: nSansTout }), geste: tr('sr.etat.sansNumGeste'), faire: () => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vinted_annonces' })); } catch (_) {} } } : null,
+    nMasq > 0 ? { k: 'masquees', titre: tr('sr.etat.masquees', { n: nMasq }), geste: tr('sr.etat.masqueesGeste') } : null,
+  ].filter(Boolean);
+  const filtresV2 = designV2 && aa && aa.su && (platsPresents.length > 1 || comptesPresents.length > 1) ? {
+    libelle: filtrePlat ? (NOM_PLAT_FILTRE[filtrePlat] || filtrePlat) : tr('v2.menu.toutes'),
+    sous: filtreCompte ? (comptesNoms.get(filtreCompte) || filtreCompte) : (comptesPresents.length > 1 ? tr('v2.menu.tous') : ''),
+    corps: <div className="vrm-s2d-filtres" data-stock-filtres="">
+      {platsPresents.length > 1 && <Filtres className="vrm-rangee vrm-filtres" label={tr('stock.filtrerPlateforme')} data-stock-filtre-plat={filtrePlat || 'toutes'} valeur={filtrePlat}
+        onChange={(v) => setFiltrePlat(v)} options={['', ...platsPresents].map((x) => ({ v: x, l: x ? (NOM_PLAT_FILTRE[x] || x) : tr('journee.toutes'), attrs: { 'data-plat': x || 'toutes' } }))}/>}
+      {comptesPresents.length > 1 && <MenuCompte court data-stock-filtre-compte={filtreCompte || 'tous'} valeur={filtreCompte} onChange={(v) => setFiltreCompte(v || '')}
+        comptes={comptesPresents.map((u) => ({ id: u, nom: comptesNoms.get(u) || u }))}/>}
+    </div> } : null;
+  const sV2 = designV2 ? {
+    Segmente, Retour: FermeAuRetour, lignes: lignesV2, etats: etatsV2, filtres: filtresV2,
+    versAnnonces: () => { try { window.dispatchEvent(new CustomEvent('vrm:aller', { detail: '?tab=vinted_annonces' })); } catch (_) {} },
+    Icon, Photo: PhotoVinted, Mic: MicDictee, Feuille: SheetShell, dicteeOk: DICTEE_OK, mots: motsStock,
+    nombres: { etat: lecture === undefined ? 'encours' : (aa && aa.su ? nAffiche : 'passu'), attente: lecture === undefined,
+      enLigne: aa && aa.su && !(aa.auMoins && nAffiche === 0) ? nAffiche : null, auMoins: !!(aa && aa.auMoins), rangees: nRangees },
+    aRanger, meubles: meublesVus, ficheDe: (k) => ficheParCle[k] || null, cleDe: cleDeFiche, ouEst, estVendu,
+    peutRanger: (k) => aRanger.some((f) => cleDeFiche(f) === k),
+    occupee: (mid, i) => !!occupant(mid, i) || !!noteeIci(mid, i),
+    occupantNum: (mid, i) => { const o = occupant(mid, i); return o ? String(o.numero) : (noteeIci(mid, i) || null); },
+    placeCase: (i, m) => placeDansMeubles(i, m),
+    placeEnMots: (ou) => tr('stock.rangeeColonne', { name: String(ou.meuble.name), rangee: String(ou.rangee), colonne: String(ou.colonne) }),
+    // La dernière place utilisée d'abord (le même meuble), sinon la première case libre — les règles de src/ouRanger.js.
+    caseProposee: (cle, derniere) => (derniere ? caseLibreDans({ meubles: meublesVus, slots, meubleId: derniere }) : null) || premiereCaseLibre({ meubles: meublesVus, slots }),
+    poser, montrer, place, setPlace,
+    q, setQ: (v) => { setQ(v); setCibles([]); }, resultats, qEstNum, exactNum, cibles, setCibles, cherche: !!(filtre || cibles.length), chercheRef,
+    compteMeuble, rendreMeuble: cadreMeuble, creerMeuble: () => setModal({ type: 'meuble' }),
+    modifierMeuble: (m) => { const coulM = COULEURS.includes(m.couleur) ? m.couleur : undefined; setModal({ type: 'meuble', id: m.id, name: m.name, cols: m.cols, rows: m.rows, planches: planchesDe(m), gravite: !!m.gravite, typeM: typeDe(m), couleur: coulM || null, couleurs: couleursDans(m.couleurs, m.cols, m.rows), piles: [...colonnesEnPile({ ...m, gravite: false, type: undefined })] }); },
+    deplacerMeuble: (id, sens) => deplacer(id, sens),
+    ouvrirPhoto: ouvrirRecherchePhoto, ouvrirInventaire: () => setInventaire(true),
+    blocs: { inventaire: elInventaire, annuel: elAnnuel, horsLigne: blocHorsLigne, explication: <StockExplication sneakers={motsStock.nom === 'paire'} />,
+      aFaire: sectionAFaire, liste: blocListe, importees: blocImportees, aPart: blocAPart, plus: sectionPlus, modale: Modale(),
+      ecartes: nEcartes > 0 ? <div data-stock-ecartes={nEcartes} className="sr-note">{nEcartes} {nEcartes > 1 ? motsStock.noms : motsStock.nom} d'un compte retiré ou masqué {nEcartes > 1 ? 'ne sont' : "n'est"} pas montré{motsStock.e}{nEcartes > 1 ? 's' : ''} ici.</div> : null },
+  } : null;
+  if (designV2) return <StockV2 s={sV2}/>;
   const allerA = (sel) => { setAFaireOuvert(false); setTimeout(() => { try { const el = document.querySelector(sel); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.setAttribute('data-ms-vise', '1'); setTimeout(() => el.removeAttribute('data-ms-vise'), 1600); } } catch (_) {} }, 60); };
   return (<>
     {/* (6 nov.) Pour le conseil « Ton premier inventaire » : les N° des annonces actuelles (lus seulement). */}
@@ -1481,14 +1566,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
 
     {/* (16 nov., lot retirer-case-compact) La section ne se pose que si elle a un bloc : sans « Vendues à sortir », « À
         faire » pouvait ne compter que des cibles ailleurs (« À ranger », les cases allumées) — un titre sur du vide. */}
-    {aFaire.length && (blocRetours || blocPlusEnLigne || blocPasSu || blocSortis) ? <section className="vrm-ms-section" data-stock-section="afaire" aria-label={tr('listes.afaire')}>
-      <h2 className="vrm-ms-h2">{tr('listes.afaire')}</h2>
-      {blocRetours}
-      {blocPlusEnLigne}
-      {barreSerieStock}
-      {blocPasSu}
-      {blocSortis}
-    </section> : <>{barreSerieStock}</>}
+    {sectionAFaire}
 
     <section className="vrm-ms-section" data-stock-section="meubles" aria-label={tr('ms.stock.meubles')}>
     <h2 className="vrm-ms-h2">{tr('ms.stock.meubles')}</h2>
@@ -1550,17 +1628,7 @@ function StockMeubles({ locate = null, placeNum = null, onPlaced = null, account
 
     </section>
 
-    <section className="vrm-ms-section" data-stock-section="plus" aria-label={tr('ms.stock.plus')}>
-    <h2 className="vrm-ms-h2">{tr('ms.stock.plus')}</h2>
-    {/* (14 nov., lot 129, de main) L'inventaire tournant : 10 N° par jour à vérifier — dans « Plus », sous la liste. */}
-    {unitesTournant ? <div style={{ marginBottom: 14 }}><InventaireTournant unites={unitesTournant} uid={AUTH.user?.id || ''} lire={() => load(CLE_TOURNANT, {})} ecrire={(v) => save(CLE_TOURNANT, v)}
-      onFiche={(n) => { try { window.dispatchEvent(new CustomEvent('vrm:fiche-paire', { detail: String(n) })); } catch (_) {} }}/></div> : null}
-    <ValeurStockCarte v={valeurStk} onSaisir={saisirPrixStock} mots={motsStock}/>
-    {/* (10 nov., lot L) Le stock d'emballages : écrit sur SON clic ; le reste dérive des « Colis fait ». */}
-    <EmballagesCarte reglage={emballagesR} Feuille={SheetShell} exemple={exemplesStock.emballage} ecrire={(r) => { setEmballagesR(r); save(CLE_EMBALLAGES, r); }}
-      lireFaits={() => colisFaits({ vinted: load('vinted_ship_done', {}), leboncoin: load('vrm_lbc_colis_done', {}), vestiaire: load('vrm_vc_colis_done', {}) })}/>
-    <button type="button" className="vrm-ia-entree" data-ia-ouvrir="" onClick={() => setAnnuel(true)}><span>{tr('stock.inventaireFinAnnee')}</span><span aria-hidden="true">›</span></button>
-    </section>
+    {sectionPlus}
     {Modale()}
   </>);
 }
@@ -1678,6 +1746,7 @@ function EditeurMeuble({ modal, onSave, onDelete }) {
 
 function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,extraCols,setExtraCols,cellColors,setCellColors,locate,onLocateConsumed,placeNum,onPlaced,accounts=null,comptesLus=false}) {
   const motsStock = useMotsArticle();   // (11 nov., lot DJ2) « paire » seulement pour Sneakers
+  const designV2 = useDesignV2();   // (17 nov., lot stock-rangement)
   const [searchInput,setSearchInput]=useState('');
   const [garageSearch,setGarageSearch]=useState(''); // recherche validée
   // ⚠️ LA 3D EST LA VUE PAR DÉFAUT (Julien : « je veux vraiment que la 3D soit
@@ -1894,6 +1963,12 @@ function Garage({catalog,garageGrid,setGarageGrid,blockedCells,setBlockedCells,e
   };
 
   let colN=0;
+  // (17 nov., lot stock-rangement) Nouveau design (essai) : la tête est celle de src/stockV2/StockV2.jsx (grand titre, deux ronds).
+  if (designV2) return (
+    <div className="vrm-ms-stock sr-hote" data-refonte-ms="stock" data-sr-garage="">
+      <StockMeubles locate={locate} placeNum={placeNum} onPlaced={onPlaced} accounts={accounts} comptesLus={comptesLus}/>
+    </div>
+  );
   return (
     <div className="vrm-ms-stock" data-refonte-ms="stock" style={{padding:16,display:'flex',flexDirection:'column',gap:14}}>
       <ScreenHead icon="home" title={tr('nav.garage')} phrase="garage" desc="Tes étagères en 2D : chaque article dans sa case. Cherche un numéro, il te dit le meuble et la case."

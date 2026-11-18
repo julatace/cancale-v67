@@ -38,6 +38,14 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
   const [confirme, setConfirme] = useState(null);  // { a, cible }
   const [enCours, setEnCours] = useState(false);
   const [large, setLarge] = useState(() => (typeof window !== 'undefined' ? window.innerWidth >= 900 : false));
+  // (17 nov., Julien sur iPhone : « Ici ça bug de ouf quand je swipe ») Au téléphone, UN SEUL défilement : l'écran montre
+  // UNE liste à la fois (onglets « Tes achats libres » / « Sans achat relié »), dans la feuille qui défile elle-même —
+  // plus deux petites boîtes qui défilent chacune dans la page (le doigt s'y coinçait, la page rebondissait, un grand vide
+  // restait en bas). Toucher un achat ⇒ la liste d'en face prend la place ; le glisser (appui long 400 ms) montre la liste
+  // d'en face sous le doigt. Les listes arrivent par tranches de 60 (2 000 achats ne figent plus l'écran).
+  const [ongletTel, setOngletTel] = useState('achats');
+  const [nVusA, setNVusA] = useState(60), [nVusC, setNVusC] = useState(60);
+  const corpsRef = useRef(null), finA = useRef(null), finC = useRef(null), tirer = useRef(null);
   const bordDepuis = useRef(0), vientDeGlisser = useRef(false), appui = useRef(null), minuteur = useRef(0), raf = useRef(0), pos = useRef({ x: 0, y: 0 }), listeCibles = useRef(null), carteSource = useRef(null), survolRef = useRef('');
   const parTx = useMemo(() => new Map((L.achats || []).map((x) => [x.tx, x])), [L.achats]);
   const parCle = useMemo(() => new Map(L.cibles.map((c) => [String(c.key), c])), [L.cibles]);
@@ -61,7 +69,7 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
 
   // Le défilement automatique : tant que l'achat est levé, le doigt près d'un bord de la liste cible la fait défiler.
   const boucle = () => {
-    const l = listeCibles.current;
+    const l = large ? listeCibles.current : corpsRef.current;
     if (l && appui.current && appui.current.phase === 'leve') {
       const r = l.getBoundingClientRect();
       const v = vitesseBord(pos.current.y, r.top, r.bottom);
@@ -152,6 +160,20 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
   const toucherAchat = (x) => { if (leve || vientDeGlisser.current || !x) return; const c = cibleChoisie ? parCle.get(cibleChoisie) : null; if (c) { setConfirme({ a: x.a, cible: c }); return; } setChoisi((v) => (v === x.tx ? '' : x.tx)); };
   const changer = () => { setChoisi(''); setCibleChoisie(''); setConfirme(null); };
   const mode = choisi ? 'achat' : cibleChoisie ? 'cible' : '';
+  // La liste montrée au téléphone : celle d'en face du choix (ou de l'achat levé), sinon l'onglet touché.
+  const vueTel = leve || mode === 'achat' ? 'cibles' : mode === 'cible' ? 'achats' : ongletTel;
+  // Une autre liste à l'écran : elle commence en haut (au téléphone, la feuille entière défile).
+  useEffect(() => { if (!large && corpsRef.current) corpsRef.current.scrollTop = 0; }, [vueTel, large]);
+  // La tranche suivante arrive quand la fin de la liste approche (défilement de la feuille, ou de la liste à l'ordinateur).
+  useEffect(() => {
+    if (typeof IntersectionObserver !== 'function') return undefined;
+    const io = new IntersectionObserver((es) => { for (const e of es) if (e.isIntersecting) { if (e.target === finA.current) setNVusA((n) => n + 60); if (e.target === finC.current) setNVusC((n) => n + 60); } }, { rootMargin: '600px 0px' });
+    if (finA.current) io.observe(finA.current); if (finC.current) io.observe(finC.current);
+    return () => io.disconnect();
+  });
+  // Fermer en tirant vers le bas : seulement depuis la poignée / l'en-tête (jamais depuis une liste qui défile).
+  const tirerDebut = (e) => { if (e.pointerType === 'mouse') return; tirer.current = { y: e.clientY, id: e.pointerId }; };
+  const tirerFin = (e) => { const t = tirer.current; tirer.current = null; if (t && t.id === e.pointerId && e.clientY - t.y > 80) onFermer(); };
   const xChoisi = choisi ? parTx.get(choisi) : null, cChoisie = cibleChoisie ? parCle.get(cibleChoisie) : null;
 
   const achatLeve = leve ? parTx.get(leve.tx) : null;
@@ -185,10 +207,11 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
   };
 
   return createPortal(
-    <div className="vrm-rg" data-relier-glisser="" data-glisser-mode={mode || undefined} data-glisser-large={large ? '1' : '0'} data-glisser-leve={leve ? leve.tx : undefined} role="dialog" aria-modal="true" aria-label={tr('glisser.titre')}
+    <div className="vrm-rg" data-relier-glisser="" data-glisser-mode={mode || undefined} data-glisser-vue={large ? undefined : vueTel} data-glisser-large={large ? '1' : '0'} data-glisser-leve={leve ? leve.tx : undefined} role="dialog" aria-modal="true" aria-label={tr('glisser.titre')}
       style={{ zIndex, '--rg-fond': C.bg, '--rg-carte': C.card, '--rg-encre': C.text, '--rg-gris': C.muted, '--rg-filet': C.border, '--rg-accent': C.accent, '--rg-sur-accent': C.onAccent }}>
       {Retour ? <Retour fermer={onFermer}/> : null}
-      <header className="vrm-rg-tete">
+      <div className="vrm-rg-poignee" data-glisser-poignee="" aria-hidden="true" onPointerDown={tirerDebut} onPointerUp={tirerFin} onPointerCancel={() => { tirer.current = null; }}><span/></div>
+      <header className="vrm-rg-tete" onPointerDown={tirerDebut} onPointerUp={tirerFin} onPointerCancel={() => { tirer.current = null; }}>
         <div className="vrm-rg-tete-texte">
           <h2 className="vrm-rg-h">{tr('glisser.titre')}</h2>
           <p className="vrm-rg-aide" data-glisser-aide="">{choisi ? tr('glisser.aideChoisi') : cibleChoisie ? tr('glisser.aideCible') : tr('glisser.aide')}</p>
@@ -207,14 +230,21 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
           <button type="button" className="vrm-rg-changer" data-glisser-changer="" onClick={changer}>{tr('glisser.changer')}</button>
         </div>
       ) : null}
-      <div className="vrm-rg-corps">
+      {!large && !mode && !leve ? (
+        <div className="vrm-rg-onglets" role="tablist" data-glisser-onglets="">
+          {[['achats', tr('glisser.achats'), nA], ['cibles', tr('glisser.cibles'), L.cibles.length]].map(([k, lib, n]) => (
+            <button key={k} type="button" role="tab" aria-selected={vueTel === k} className="vrm-rg-onglet" data-glisser-onglet={k} onClick={() => setOngletTel(k)}>
+              {lib}{n != null ? <span className="vrm-rg-n">{n}</span> : null}</button>))}
+        </div>
+      ) : null}
+      <div className="vrm-rg-corps" ref={corpsRef} data-glisser-defile="">
         <section className="vrm-rg-col vrm-rg-achats" aria-label={tr('glisser.achats')}>
           <h3 className="vrm-rg-h3">{tr('glisser.achats')}{nA != null ? <span className="vrm-rg-n">{nA}</span> : null}</h3>
           <ul className="vrm-rg-liste" data-glisser-achats={nA == null ? '' : String(nA)}>
             {L.achats === undefined ? <li className="vrm-rg-vide">…</li>
               : L.achats === null ? <li className="vrm-rg-vide">{tr('glisser.pasSu')}</li>
               : !L.achats.length ? <li className="vrm-rg-vide" data-glisser-vide="achats">{tr('glisser.aucunAchat')}</li>
-              : L.achats.map((x) => (
+              : L.achats.slice(0, nVusA).map((x) => (
                 <li key={x.tx}>
                   <button type="button" className="vrm-rg-carte vrm-rg-achat" data-glisser-achat={x.tx} aria-pressed={choisi === x.tx}
                     data-glisser-source={leve && leve.tx === x.tx ? '1' : undefined}
@@ -225,13 +255,14 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
                 </li>))}
             {/* La phrase « N achats sans taille lue », une fois, au BAS de la liste : au téléphone la moitié haute de
                 l'écran reste aux achats eux-mêmes. */}
+            {Array.isArray(L.achats) && L.achats.length > nVusA ? <li ref={finA} className="vrm-rg-plus-li"><button type="button" className="vrm-rg-plus" data-glisser-plus="achats" onClick={() => setNVusA((n) => n + 60)}>{tr('relierTout.plus', { n: String(L.achats.length - nVusA) })}</button></li> : null}
             {details && nSansTaille && Array.isArray(L.achats) && L.achats.length ? <li className="vrm-rg-note-li"><NoteTailleAchats n={nSansTaille} className="vrm-rg-note"/></li> : null}
           </ul>
         </section>
         <section className="vrm-rg-col vrm-rg-cibles" aria-label={tr('glisser.cibles')}>
           <h3 className="vrm-rg-h3">{tr('glisser.cibles')}<span className="vrm-rg-n">{L.cibles.length}</span></h3>
           <ul className="vrm-rg-liste" ref={listeCibles} data-glisser-cibles={String(L.cibles.length)}>
-            {!L.cibles.length ? <li className="vrm-rg-vide" data-glisser-vide="cibles">{tr('glisser.aucuneCible')}</li> : L.cibles.map((c) => {
+            {!L.cibles.length ? <li className="vrm-rg-vide" data-glisser-vide="cibles">{tr('glisser.aucuneCible')}</li> : L.cibles.slice(0, nVusC).map((c) => {
               const actif = survol === String(c.key);
               const propose = achatLeve && achatLeve.propose === String(c.key);
               return (
@@ -249,6 +280,7 @@ export default function RelierGlisser({ achats, liens, tresProbables = null, cib
                 </li>
               );
             })}
+            {L.cibles.length > nVusC ? <li ref={finC} className="vrm-rg-plus-li"><button type="button" className="vrm-rg-plus" data-glisser-plus="cibles" onClick={() => setNVusC((n) => n + 60)}>{tr('relierTout.plus', { n: String(L.cibles.length - nVusC) })}</button></li> : null}
           </ul>
         </section>
       </div>
