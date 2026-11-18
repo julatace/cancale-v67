@@ -255,7 +255,7 @@ html[data-theme-style="apple"] body .v2-etiquette.is-double { box-shadow: inset 
 
 /* ══ 13. Le reste du verre : tout ce qui gardait un dégradé ou un bord blanc ═══ */
 html[data-theme-style="apple"] body .vrm-main .vrm-colis-section [data-bords-faits] { background: var(--ap-carte) !important; box-shadow: none !important; }
-html[data-theme-style="apple"] body :is(.vrm-acc:is(.vrm-acc-pendant, .vrm-acc-apres, .vrm-acc-echec), .vrm-toasts .vrm-toast) { box-shadow: 0 8px 30px -8px rgb(0 0 0 / .3) !important; 
+html[data-theme-style="apple"] body :is(.vrm-acc:is(.vrm-acc-pendant, .vrm-acc-apres, .vrm-acc-echec), .vrm-toasts .vrm-toast) { box-shadow: 0 8px 30px -8px rgb(0 0 0 / .3) !important; }
 /* ══ 14. LES PASTILLES « FUMÉES » du verre (posées sur le bleu, texte blanc) : le remplissage gris d'iOS, l'encre.
    Liste tirée des feuilles de src/design/ (fond rgb(10 38 76) ou rgb(8 28 56)) ; une pastille oubliée sortirait blanche
    sur gris : le banc (contraste) la nomme. ══ */
