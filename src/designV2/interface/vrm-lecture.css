@@ -1,0 +1,249 @@
+@layer vrm-interface {
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) :is(#root, body) :is(.vrm-boite, .vrm-boite-lecture) {
+    --bx-encre: var(--vrm-ui-ink) !important;
+    --bx-gris: var(--vrm-ui-muted) !important;
+    --bx-filet: var(--vrm-ui-border) !important;
+    --bx-sol: var(--vrm-ui-bg) !important;
+    --bx-carte: var(--vrm-ui-panel) !important;
+    --bx-accent: var(--vrm-ui-accent) !important;
+    --bx-accent-texte: var(--vrm-ui-accent) !important;
+    --bx-doux: var(--vrm-ui-soft) !important;
+    color: var(--vrm-ui-ink) !important;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) #root :is(.vrm-boite-vues, .vg-ms-vues) {
+    padding: 3px !important;
+    gap: 3px;
+    border: 1px solid var(--vrm-ui-border) !important;
+    border-radius: var(--vrm-ui-control-radius) !important;
+    background: var(--vrm-ui-soft) !important;
+    box-shadow: none !important;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) #root :is(.vrm-boite-vues > button, button.vg-ms-vue) {
+    min-height: 42px;
+    border: 1px solid transparent !important;
+    border-radius: 7px !important;
+    color: var(--vrm-ui-muted) !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) #root :is(.vrm-boite-vues > button[aria-selected="true"], button.vg-ms-vue[aria-pressed="true"]) {
+    border-color: var(--vrm-ui-border) !important;
+    background: var(--vrm-ui-panel) !important;
+    color: var(--vrm-ui-accent) !important;
+    box-shadow: var(--vrm-ui-shadow) !important;
+    font-weight: 670;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) #root :is(.vrm-boite-liste-col, .vrm-inbox-column) {
+    min-width: 0;
+    background: var(--vrm-ui-panel) !important;
+    border: 1px solid var(--vrm-ui-border) !important;
+    border-radius: var(--vrm-ui-radius) !important;
+    box-shadow: none !important;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) #root .vrm-boite-filtres {
+    display: grid;
+    gap: 8px;
+    padding: 10px 12px 8px !important;
+    border-bottom: 1px solid var(--vrm-ui-border);
+    background: var(--vrm-ui-panel) !important;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) #root .vrm-boite-cherche {
+    min-height: 43px !important;
+    margin: 0 !important;
+    padding-inline: 10px !important;
+    border: 1px solid var(--vrm-ui-border) !important;
+    border-radius: var(--vrm-ui-control-radius) !important;
+    background: var(--vrm-ui-soft) !important;
+    color: var(--vrm-ui-muted) !important;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) #root .vrm-boite-cherche:focus-within {
+    border-color: var(--vrm-ui-focus) !important;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) #root .vrm-boite-cherche input {
+    color: var(--vrm-ui-ink) !important;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) #root .vrm-boite-cherche input::placeholder {
+    color: var(--vrm-ui-muted) !important;
+    opacity: 1;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) #root .vrm-boite-rubriques {
+    gap: 6px !important;
+    margin: 0 !important;
+    padding: 2px !important;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) #root .vrm-boite-rubriques button {
+    min-height: 34px !important;
+    padding-inline: 9px !important;
+    border: 1px solid var(--vrm-ui-border) !important;
+    border-radius: 7px !important;
+    background: var(--vrm-ui-panel) !important;
+    color: var(--vrm-ui-ink) !important;
+    font-weight: 580 !important;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) #root .vrm-boite-rubriques button[aria-pressed="true"] {
+    background: var(--vrm-ui-selected) !important;
+    color: var(--vrm-ui-accent) !important;
+    border-color: color-mix(in srgb, var(--vrm-ui-accent) 34%, var(--vrm-ui-border)) !important;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) #root :is(.vrm-boite-jour-titre, .vg-ms-groupe-h) {
+    color: var(--vrm-ui-muted) !important;
+    font-size: 12px !important;
+    letter-spacing: .015em;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) #root :is(.vrm-boite-ligne, .vg-fil) {
+    min-height: 66px !important;
+    border-color: var(--vrm-ui-border) !important;
+    border-radius: 0 !important;
+    background: var(--vrm-ui-panel) !important;
+    color: var(--vrm-ui-ink) !important;
+    box-shadow: none !important;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) #root :is(.vrm-boite-ligne[aria-current="true"], .vg-fil.is-current) {
+    background: var(--vrm-ui-selected) !important;
+    box-shadow: inset 3px 0 var(--vrm-ui-accent) !important;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) #root .vrm-boite-quoi {
+    color: var(--vrm-ui-ink) !important;
+    font-weight: 610 !important;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) #root .vrm-boite-ligne[data-lu="0"] .vrm-boite-quoi {
+    font-weight: 720 !important;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) #root :is(.vrm-boite-point[data-boite-point="1"], .vrm-boite-nonlus-point, .vg-fil-nl) {
+    background: var(--vrm-ui-accent) !important;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) #root :is(.vrm-boite-essentiel, .vrm-boite-ligne-haut time, .vg-fil-extrait, .vg-fil-quand) {
+    color: var(--vrm-ui-muted) !important;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) #root .vrm-boite-puce-code {
+    border: 1px solid var(--vrm-ui-control-line) !important;
+    border-radius: 7px !important;
+    background: var(--vrm-ui-selected) !important;
+    color: var(--vrm-ui-accent) !important;
+    box-shadow: none !important;
+    font-variant-numeric: tabular-nums;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) :is(#root, body) .vrm-boite-lecture {
+    background: var(--vrm-ui-panel) !important;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) :is(#root, body) .vrm-boite-lecture-barre {
+    background: var(--vrm-ui-panel) !important;
+    border-color: var(--vrm-ui-border) !important;
+    box-shadow: none !important;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) :is(#root, body) .vrm-boite-retour {
+    min-height: 44px !important;
+    border-radius: var(--vrm-ui-control-radius) !important;
+    color: var(--vrm-ui-accent) !important;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) :is(#root, body) .vrm-boite-titre {
+    color: var(--vrm-ui-ink) !important;
+    letter-spacing: -.045em !important;
+    font-weight: 700 !important;
+    line-height: 1.12 !important;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) :is(#root, body) :is(.vrm-boite-haut, .vrm-boite-message, .vrm-boite-heros, .vrm-boite-billet) {
+    border-color: var(--vrm-ui-border) !important;
+    box-shadow: none !important;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) :is(#root, body) :is(.vrm-boite-heros, .vrm-boite-message) {
+    background: var(--vrm-ui-soft) !important;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) :is(#root, body) .vrm-boite-lecture :is(
+    .vrm-boite-haut-de, .vrm-boite-billet-etiq, .vrm-boite-billet-bas :is(dt, dd span),
+    .vrm-boite-fait, .vrm-boite-sous, .vrm-boite-meta, .vrm-boite-doux
+  ),
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) #root .vrm-boite :is(.vrm-boite-fin, .vrm-boite-meta, .vrm-boite-ligne-pied) {
+    color: var(--vrm-ui-muted) !important;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) :is(#root, body) .vrm-boite-billet {
+    border: 1px solid var(--vrm-ui-border) !important;
+    border-radius: var(--vrm-ui-radius) !important;
+    background: var(--vrm-ui-soft) !important;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) :is(#root, body) .vrm-boite-billet-chiffres {
+    color: var(--vrm-ui-ink) !important;
+    font-variant-numeric: tabular-nums;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) #root .vrm-boite-compte select {
+    min-height: 44px !important;
+    border: 1px solid var(--vrm-ui-border) !important;
+    border-radius: 8px !important;
+    background: var(--vrm-ui-panel) !important;
+    color: var(--vrm-ui-ink) !important;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) :is(#root, body) .vrm-boite-principal {
+    min-height: 44px !important;
+    background: var(--vrm-ui-button) !important;
+    color: #fff !important;
+    border-radius: var(--vrm-ui-control-radius) !important;
+    box-shadow: var(--vrm-ui-control-shadow) !important;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) #root :is(.vrm-sv-tuile-lib, .vrm-sv-tuile-sous, .vrm-sp-vr-lib, .vrm-sp-vr-quand) {
+    color: var(--vrm-ui-muted) !important;
+  }
+
+  html:is([data-theme-style="vrm"], :not([data-theme-style])) #root .vrm-sv-tuile-val {
+    font-variant-numeric: tabular-nums;
+    line-height: 1.17;
+  }
+
+  @media (max-width: 520px) {
+    html:is([data-theme-style="vrm"], :not([data-theme-style])) #root :is(.vrm-boite-vues > button, button.vg-ms-vue, .vrm-boite-rubriques button) {
+      min-height: 44px !important;
+    }
+
+    html:is([data-theme-style="vrm"], :not([data-theme-style])) #root .vrm-boite-filtres {
+      padding-inline: 10px !important;
+    }
+
+    html:is([data-theme-style="vrm"], :not([data-theme-style])) #root .vrm-boite .vrm-boite-ligne[data-boite-a-code="1"] {
+      padding-inline-end: 131px !important;
+    }
+
+    html:is([data-theme-style="vrm"], :not([data-theme-style])) #root .vrm-boite .vrm-boite-puce-code:not(.is-grande) {
+      padding-inline: 7px !important;
+      max-width: 122px;
+    }
+
+    html:is([data-theme-style="vrm"], :not([data-theme-style])) :is(#root, body) .vrm-boite-lecture .vrm-boite-titre {
+      font-size: clamp(23px, 6.5vw, 29px) !important;
+    }
+
+    html:is([data-theme-style="vrm"], :not([data-theme-style])) #root .vrm-sv-tuiles {
+      gap: 8px !important;
+    }
+  }
+}
