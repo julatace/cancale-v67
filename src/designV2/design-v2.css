@@ -772,3 +772,5 @@ html body .v2-squelette-A .v2-squelette-rangee { min-height: 120px; }
    recouvre plus le prix ni le pseudo (banc : aucune boîte ne se chevauche dans une rangée). */
 html body button.v2-facture-ok { width: 24px; height: 24px; margin: 0 4px 0 0; border-radius: 8px; overflow: visible; }
 html body button.v2-facture-ok::before { content: ""; position: absolute; inset: -10px; }
+/* La place gardée sous la liste de Ventes, sur la grille de 4 (la barre du bas a sa hauteur à elle). */
+@media (max-width: 1023px) { .v2v-corps { margin-bottom: round(up, calc(var(--vrm-barre-bas, 84px) + 24px), 4px); } }

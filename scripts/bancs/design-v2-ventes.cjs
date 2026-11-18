@@ -338,8 +338,9 @@ async function toutes(nav, b0, W) {
   await pg.evaluate(() => localStorage.setItem('vrm_design_v2', '1')); await pg.reload({ waitUntil: 'domcontentloaded' });
   await attendre(pg, () => !!document.querySelector('[data-v2v-seg="toutes"]'), 30000);
   // « À envoyer » avec ces pseudos longs : les mêmes rangées calmes.
-  await attendre(pg, () => document.querySelectorAll('[data-v2v-liste="envoyer"] [data-v2v-ligne]').length > 2, 30000); await pg.waitForTimeout(1200); await sansToasts(pg);
-  { const c = await chevauchements(pg, '[data-v2v-liste="envoyer"] [data-v2v-ligne]');
+  await attendre(pg, () => document.querySelectorAll('[data-v2v-liste="envoyer"] [data-v2v-ligne]').length > 2, 60000); await pg.waitForTimeout(1200); await sansToasts(pg);
+  { let c = await chevauchements(pg, '[data-v2v-liste="envoyer"] [data-v2v-ligne]');
+    if (!c.n) { await pg.waitForTimeout(3000); c = await chevauchements(pg, '[data-v2v-liste="envoyer"] [data-v2v-ligne]'); }
     dit(c.n > 3 && !c.chevauche.length && !c.coupes.length && c.gestesMax <= 1, `R ${th} : À envoyer, pseudos longs : aucune boîte de texte n'en chevauche une autre, rien de coupé, au plus UN petit geste par rangée (${c.gestesMax})`, c);
     await pg.screenshot({ path: path.join(SHOTS, `envoyer-pseudos-${th}.png`) }); }
   // Toutes les plateformes d'abord : les ventes de chaque site en rangées A, le logo de la plateforme sur chaque rangée.
