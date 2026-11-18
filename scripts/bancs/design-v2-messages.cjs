@@ -173,6 +173,8 @@ async function messages(nav, { W, sombre, grand = false, nom }) {
     return { titre: !!h, cloche: !!c, memeLigne: !!(hr && cr && Math.abs((hr.top + hr.bottom) / 2 - (cr.top + cr.bottom) / 2) < 24), segs: document.querySelectorAll('.vrm-main .v2-seg').length, anciens: document.querySelectorAll('.vrm-main .vrm-messages-sections, .vrm-main .vrm-fav-zones, .vrm-main .vrm-msg-bar').length,
       premiere: (() => { const x = document.querySelector('[data-v2-conv]'); return x ? Math.round(x.getBoundingClientRect().top) : null; })() }; });
   if (W !== 1512) dit(tete.titre && tete.cloche && tete.memeLigne, `${nom} : le grand titre et la cloche sur une ligne`, tete);
+  const segM = await pg.evaluate(() => { const g = document.querySelector('.v2m-tete .v2-seg'); if (!g) return null; const cs = getComputedStyle(g); return { deborde: g.scrollWidth > g.clientWidth + 1, fondu: /gradient/.test(cs.maskImage || cs.webkitMaskImage || '') }; });
+  dit(segM && (!segM.deborde || segM.fondu), `${nom} : le segmenté tient dans la largeur, ou défile avec un fondu`, segM);
   dit(tete.segs === 1 && tete.anciens === 0, `${nom} : UN segmenté (Conversations · Offres · Favoris), plus les rangées d’hier`, tete);
   const pa = await pg.evaluate((f) => eval('(' + f + ')')(), PASTILLE.toString());
   dit(!pa.sur, `${nom} : la pastille « Mis à jour » ne couvre pas le titre${pa.vue ? '' : ' (pas montrée)'}`, pa);

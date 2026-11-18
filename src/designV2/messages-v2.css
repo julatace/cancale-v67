@@ -187,3 +187,11 @@ html[data-grand-texte] html body button.v2-rangee.v2m-ligne, html[data-grand-tex
 html[data-grand-texte] .v2m-point { left: 6px; }
 .v2e-compte[data-actif="0"] svg { visibility: hidden; }
 html body .v2e-compte select:disabled { opacity: 1; cursor: default; color: inherit; }
+/* Le compte d'E-mails ne touche pas le bord du panneau. */
+.v2e-compte { margin-inline-start: 8px; }
+/* Messages en très grand texte : le segmenté défile avec un fondu (jamais « Favor » rogné net). */
+@layer vrm-v2 {
+  html[data-grand-texte][data-design="v2"] body .v2m-tete .v2-seg { overflow-x: auto !important; scrollbar-width: none; padding-right: 32px !important;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); }
+  html[data-grand-texte][data-design="v2"] body .v2m-tete button.v2-seg-btn { flex: 0 0 auto !important; }
+}
