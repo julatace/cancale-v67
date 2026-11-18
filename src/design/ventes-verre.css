@@ -389,3 +389,7 @@
   }
 }
 }
+
+/* (17 nov., chasse-bugs) « N colis : transporteur pas encore lu » dans la liste, sous ses colonnes (rien de nouveau : la même ligne discrète). */
+:root:root:root:root:root:root:root:root body .vv-pas-lus:empty { display: none !important; }
+:root:root:root:root:root:root:root:root body .vv-pas-lus > .vrm-colis-pas-lus { margin: 0 !important; padding: 6px 16px 2px !important; }

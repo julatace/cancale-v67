@@ -164,3 +164,36 @@
 }
 
 } /* fin de @layer vrm-verre */
+
+/* (17 nov., chasse-bugs) Dans la couche `vrm-verre`, comme le reste du fichier : hors couche, un `!important` perd contre la couche. */
+@layer vrm-verre {
+/* ── (17 nov., chasse-bugs — capture iPhone de Julien : « Regarde c'est moche ») LA LIGNE DE VENTE AU TÉLÉPHONE ──
+   1. « Prix d'achat ? » était posé EN ABSOLU sur la 2e ligne (place réservée : 128 px) : avec un pseudo et une taille
+      longs, ou le texte agrandi, il se peignait SUR « · T37,5 ». Il prend SA ligne sous la vente (jamais par-dessus).
+   2. Le pseudo et l'état (« Vendue · 13 nov. ») se coupaient à 3 lettres à côté des ronds « Imprimer » / « Déposé » :
+      ils passent à la ligne au lieu d'être rognés.
+   3. « Envoyer la facture » / « Bon de retour » : des liens d'une ligne (les mêmes boutons, 44 px au doigt), plus des
+      grosses pilules empilées. Rien d'autre ne bouge (mêmes éléments, mêmes gestes). */
+@media (max-width: 767px) {
+  :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > .vrm-ledger-gestes:not(:has(form)) {
+    position: static !important; margin: 0 0 0 68px !important; padding: 0 !important; inset: auto !important;
+  }
+  :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme] > .vrm-ledger-gestes [data-cout-vente-saisir] { padding: 0 8px 0 0 !important; justify-content: flex-start !important; }
+  :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-ventes-liste .vrm-sale-row[data-fu-forme]:not(:has(> .vrm-rangee-bord > .vrm-fu-imprimer-ligne:only-child)) :is(.vrm-fu-vente-l2, .vrm-ledger-sale-frise) { padding-right: 0 !important; }
+  :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row[data-fu-forme] .vrm-fu-vente-l2 { flex-wrap: wrap !important; white-space: normal !important; overflow: visible !important; row-gap: 2px !important; }
+  :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row[data-fu-forme] .vrm-fu-vente-l2 > .vrm-fu-vente-compte,
+  :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row[data-fu-forme] .vrm-fu-vente-l2 > .vrm-fu-vente-compte * { overflow: visible !important; text-overflow: clip !important; white-space: nowrap !important; min-width: auto !important; }
+  :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row[data-fu-forme] .vrm-ledger-sale-frise .vrm-fu-legende { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; min-width: 6ch !important; }
+  :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row[data-fu-forme] .vrm-ledger-sale-frise .vrm-fu-frise { flex-wrap: wrap !important; }
+  :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row[data-fu-forme] .vrm-fp-ligne-bouton {
+    min-height: 44px !important; height: auto !important; padding: 0 8px 0 0 !important; background: transparent !important; border: 0 !important; box-shadow: none !important;
+    border-radius: 0 !important; font: 600 13px/1.2 Inter, system-ui, sans-serif !important; color: var(--sv-lien, #0b5bd3) !important; width: auto !important; justify-content: flex-start !important;
+  }
+  :root:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row[data-fu-forme] > .vrm-fp-ligne { margin-top: 0 !important; }
+  /* Toutes les lignes de vente (aussi celles de « À envoyer », sans data-fu-forme) : pseudo et état jamais rognés. */
+  :root:root:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row .vrm-fu-vente-l2 { flex-wrap: wrap !important; white-space: normal !important; overflow: visible !important; }
+  :root:root:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row .vrm-fu-vente-l2 .vrm-fu-vente-compte,
+  :root:root:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row .vrm-fu-vente-l2 .vrm-fu-vente-compte * { overflow: visible !important; text-overflow: clip !important; min-width: auto !important; flex-shrink: 0 !important; }
+  :root:root:root:root:root:root:root:root:root:root body .vrm-main .vrm-sale-row .vrm-fu-legende { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; }
+}
+}
