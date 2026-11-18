@@ -81,6 +81,13 @@ function baseFrise() {
             unique: [...new Set(pistes)], uneLigne: q3 ? q3.height <= 20 && q3.right <= l.getBoundingClientRect().right + 1 && t3.scrollWidth <= t3.clientWidth + 1 : null }; }, tx);
         dit(vu && r.groupe === 'livre' && r.n === '3' && /3 sur 4/.test(r.aria || ''), `allumé ${th} : la rangée est dans « Livrés », sa piste à 3 sur 4 (« ${r.aria} »)`, r);
         dit(/Livré au relais/.test(r.mot), `allumé ${th} : à côté de la piste, l'étape en mots et sa date, de la même source que le transporteur (« ${r.mot} »)`, r);
+        // (18 nov.) Aucune rangée ne dit « Livré » à côté d'une piste restée avant « livré » : la phrase et la piste lisent
+        // les mêmes preuves (Vinted : l'état de la commande ET le détail de la transaction ; le transporteur).
+        const contra = await pg.evaluate(() => [...document.querySelectorAll('[data-v2v-liste="route"] [data-v2v-ligne]')].map((l) => {
+          const p = l.querySelector('.v2-piste'); const m = ((l.querySelector('[data-v2l-l3="etape"]') || {}).textContent || '').trim();
+          return { cle: l.getAttribute('data-v2v-ligne'), n: p ? Number(p.getAttribute('data-v2-piste')) : null, m }; })
+          .filter((x) => /\blivr[ée]|retir[ée]/i.test(x.m) && !/non\s+livr/i.test(x.m) && !(x.n >= 3)));
+        dit(!contra.length, `allumé ${th} : aucune rangée ne dit « Livré » à côté d'une piste avant « livré » (${contra.length})`, contra.slice(0, 4));
         dit(r.unique.length === 1 && r.uneLigne === true, `allumé ${th} : la piste a la même boîte sur chaque rangée (${r.unique.join(', ')}) et tient sur une ligne, dans la rangée`, r);
         await pg.waitForTimeout(300); await pg.screenshot({ path: path.join(SHOTS, `frise-allume-${th}.png`) });
         dit(!erreurs.length, `allumé ${th} : aucune erreur JS`, erreurs); await ctx.close(); }

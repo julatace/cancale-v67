@@ -41461,8 +41461,12 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     const depF = suF && vcLoc0.departs instanceof Map ? (vcLoc0.departs.get(suF) || null) : null;
     const emF = suF ? emailDuSuivi(suF) : null;
     const prT = preuvesTransporteur({ transporteur: depF, email: emF ? { status: emF.status, receivedAt: emF.receivedAt } : null });
-    const livreeVinted = finalisee || /\blivr[ée]|remis\b|r[ée]ceptionn/i.test(s);
-    const fz = fusionnerPreuves({ livre: livreeVinted, bouge: livreeVinted || tus === 'waiting' || COLIS_DEJA_BOUGE.test(s) || isAtRelayStatus(s), valide: finalisee }, prT);
+    // (18 nov.) Vinted parle à DEUX endroits : l'état de la commande (`o.status`) et le détail de la transaction lu ensuite
+    // (`etatTxn(tx).ss`) — c'est CE détail que dit la phrase sous la frise (`vintedDeTx` → `dernierStatut`). La piste lit les
+    // deux, pour ne jamais dire « Livré » à côté d'une piste restée à « En route ».
+    const sx = String((etx && etx.ss) || '');
+    const livreeVinted = finalisee || /\blivr[ée]|remis\b|r[ée]ceptionn/i.test(s) || /\blivr[ée]|remis\b|r[ée]ceptionn/i.test(sx);
+    const fz = fusionnerPreuves({ livre: livreeVinted, bouge: livreeVinted || tus === 'waiting' || COLIS_DEJA_BOUGE.test(s) || isAtRelayStatus(s) || (sx && (COLIS_DEJA_BOUGE.test(sx) || isAtRelayStatus(sx))), valide: finalisee }, prT);
     const livreeLue = fz.livre;
     const bougeLu = fz.bouge;
     const versement = versements ? (versements[txL] || null) : null;
