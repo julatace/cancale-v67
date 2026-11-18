@@ -1,0 +1,130 @@
+@layer vrm-apple {
+  html[data-theme-style="vrm"] {
+    --ap-fond: #f1f4f2;
+    --ap-carte: #fff;
+    --ap-carte-2: #f7f9f8;
+    --ap-remplir: #e7eeea;
+    --ap-filet: #d4dfd9;
+    --ap-encre: #172924;
+    --ap-gris: #4d625a;
+    --ap-bleu: #11624e;
+    --ap-bleu-vif: #207d65;
+    --ap-bleu-appui: #0b503f;
+    --ap-bleu-teinte: #11624e;
+    --ap-plein: #11624e;
+    --ap-teinte: #dceee6;
+    --ap-matiere: var(--ap-carte);
+    --ap-flou: none;
+    --ap-ombre-wallet: 0 1px 2px rgb(20 50 40 / .08);
+    --vrm-rail-fond: #132b27;
+    --vrm-rail-encre: #edf7f2;
+    --vrm-rail-muet: #acc4b9;
+    --vrm-rail-actif: #284d42;
+  }
+
+  html[data-theme-style="vrm"][data-theme="dark"] {
+    --ap-fond: #111b20;
+    --ap-carte: #1a292e;
+    --ap-carte-2: #22363a;
+    --ap-remplir: #293e42;
+    --ap-filet: #354b50;
+    --ap-encre: #eaf4ef;
+    --ap-gris: #afc4bc;
+    --ap-bleu: #8ddbc1;
+    --ap-bleu-vif: #72c7aa;
+    --ap-bleu-appui: #0b503f;
+    --ap-bleu-teinte: #a4e9d0;
+    --ap-plein: #11624e;
+    --ap-ambre: #ffd08a;
+    --ap-teinte: #294c43;
+    --ap-matiere: var(--ap-carte);
+    --ap-flou: none;
+    --ap-ombre-wallet: 0 1px 2px rgb(0 0 0 / .3);
+    --vrm-rail-fond: #142522;
+    --vrm-rail-actif: #2b4d43;
+  }
+
+  html[data-theme-style="vrm"] .vrm-app-shell .vrm-rail-verre {
+    --rv-fond: var(--vrm-rail-fond) !important;
+    --rv-bord: transparent !important;
+    --rv-encre: var(--vrm-rail-encre) !important;
+    --rv-libelle: var(--vrm-rail-encre) !important;
+    --rv-gris: var(--vrm-rail-muet) !important;
+    --rv-filet: rgb(237 247 242 / .17) !important;
+    --rv-pastille: #cce8db !important;
+    --rv-pastille-t: #172924 !important;
+    color: var(--vrm-rail-encre) !important;
+    background: var(--vrm-rail-fond) !important;
+    border-right-color: transparent !important;
+    box-shadow: none !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  html[data-theme-style="vrm"] .vrm-rail-verre :is(.vrm-sidebar-mot, .vrm-rail-button) {
+    color: var(--vrm-rail-encre) !important;
+  }
+
+  html[data-theme-style="vrm"] .vrm-rail-verre .vrm-rail-section-label {
+    color: var(--vrm-rail-muet) !important;
+    font-weight: 650 !important;
+  }
+
+  html[data-theme-style="vrm"] .vrm-rail-verre .vrm-rail-button {
+    border-radius: 10px !important;
+  }
+
+  html[data-theme-style="vrm"] .vrm-rail-verre .vrm-rail-button:is([aria-current="page"], :focus-visible) {
+    background: var(--vrm-rail-actif) !important;
+    box-shadow: inset 3px 0 #8ddbc1 !important;
+  }
+
+  html[data-theme-style="vrm"] body .vrm-app-shell .vrm-tabbar > .vrm-tab[aria-current="page"] {
+    background: var(--ap-teinte) !important;
+    border-radius: 12px !important;
+  }
+
+  html[data-theme-style="vrm"] body .vrm-app-shell :is(.v2-tete, .v2-tete-tache, .v2-titre-ligne) h1 {
+    font-weight: 760 !important;
+    letter-spacing: -.045em !important;
+  }
+
+  html[data-theme-style="vrm"] body .vrm-app-shell :is(.v2-liste-annonces, .v2v-liste, .v2-afaire .v2-liste, .v2-passe-mini) {
+    border: 1px solid var(--ap-filet) !important;
+    border-radius: 14px !important;
+  }
+
+  html[data-theme-style="vrm"] body .v2-aujourdhui > .v2-affiche-sig {
+    padding: 14px 18px 10px;
+    border: 1px solid var(--ap-filet);
+    border-radius: 16px;
+    background: var(--ap-carte);
+  }
+
+  html[data-theme-style="vrm"] body .v2-aujourdhui .v2-affiche-sig-n {
+    color: var(--ap-bleu);
+  }
+
+  html[data-theme-style="vrm"] body .v2-groupe-titre {
+    margin-inline: 0 !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    text-transform: none !important;
+    letter-spacing: -.01em !important;
+    color: var(--ap-encre) !important;
+  }
+
+  html[data-theme-style="vrm"] body .vrm-app-shell .v2-bande-photo {
+    border-radius: 13px;
+  }
+
+  html[data-theme-style="vrm"] body .vrm-app-shell .v2-passe-tete {
+    background: var(--vrm-rail-fond) !important;
+  }
+
+  html[data-theme-style="vrm"] body :is(button.v2-seg-btn.is-on, .vrm-seg .vrm-seg-btn:is([aria-current="page"], [aria-pressed="true"])) {
+    background: var(--ap-carte) !important;
+    color: var(--ap-bleu) !important;
+    box-shadow: 0 1px 2px rgb(0 0 0 / .12) !important;
+  }
+}

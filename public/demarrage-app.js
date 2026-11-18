@@ -20,6 +20,7 @@ try {
   var lien = /[?&](connexion|inscription|tab|code|error|error_description|type|lier-extension|confirmer-adresse)(=|&|$)/.test(q) || /(access_token|error|type)=/.test(h);
   var film = /[?&]film(=|&|$)/.test(q);
   if (s && !film && (session || lien)) {
+    document.documentElement.setAttribute('data-vrm-boot-app', '');
     var poser = function (rel, href, as) {
       if (!href) return;
       var l = document.createElement('link');

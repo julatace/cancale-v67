@@ -522,6 +522,27 @@
     #vrm-demarrage .vrm-boot-lent a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 22px;border-radius:999px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.34);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);color:#fff;font-weight:600;font-size:15px;text-decoration:none}
     #vrm-demarrage .vrm-boot-lent a:active{background:rgba(255,255,255,.26)}
     #vrm-demarrage .vrm-boot-lent a:focus-visible{outline:2px solid #fff;outline-offset:2px;box-shadow:0 0 0 5px #0C1D30}
+    html[data-theme-style="vrm"][data-vrm-boot-app] {
+      --vrm-verre-fond:none;--vrm-verre-fond-nuit:none;
+      --vrm-verre-uni:#f1f4f2;--vrm-verre-uni-nuit:#111b20;
+      --vrm-boot-encre:#172924;--vrm-boot-accent:#11624e;
+    }
+    html[data-theme-style="vrm"][data-vrm-boot-app][data-theme="dark"] {
+      --vrm-boot-encre:#eaf4ef;--vrm-boot-accent:#8ddbc1;
+    }
+    html[data-theme-style="vrm"][data-vrm-boot-app] #vrm-demarrage .vrm-boot-rail,
+    html[data-theme-style="vrm"][data-vrm-boot-app] #vrm-demarrage .vrm-boot-lent a {
+      background:color-mix(in srgb,var(--vrm-boot-accent) 18%,transparent);
+    }
+    html[data-theme-style="vrm"][data-vrm-boot-app] #vrm-demarrage .vrm-boot-rail>span {
+      background:var(--vrm-boot-accent);
+    }
+    html[data-theme-style="vrm"][data-vrm-boot-app] #vrm-demarrage .vrm-boot-rail>span::after {
+      content:none;
+    }
+    html[data-theme-style="vrm"][data-vrm-boot-app] #vrm-demarrage .vrm-boot-lent :is(p,a) {
+      color:var(--vrm-boot-encre);
+    }
     /* L'instantané de Ma journée peint dans l'écran de démarrage (src/OuvertureInstantanee.jsx) : il a ses chiffres, la phrase « lente » n'a rien à y faire. */
     #vrm-demarrage[data-apercu] > .vrm-boot-lent{display:none}
     @keyframes vrmBootReflet{from{transform:translateX(-48px)}to{transform:translateX(140px)}}

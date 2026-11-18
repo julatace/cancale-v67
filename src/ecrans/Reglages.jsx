@@ -4810,8 +4810,6 @@ function ApparenceSetting({ valeur, onChoisir }) {
         </button>
       ))}
     </div>
-    {/* (18 nov., Julien : « Apple — Wallet, Réglages ») LE STYLE : deux choix en liste d'iOS, sur CET appareil (src/designV2/style.js).
-        « Studio bleu » est celui d'hier (le défaut) ; « Apple » ne change que la matière (src/designV2/theme-apple.css). */}
     <div className="vrm-apparence-style" style={{display:'flex',flexDirection:'column',gap:8,padding:'12px 4px 4px',marginTop:8,borderTop:`1px solid ${C.border}`}}>
       <b style={{fontSize:15,fontWeight:600,color:C.text}}>{tr('v2.style.lib')}</b>
       <div className="vrm-apparence" role="radiogroup" aria-label={tr('v2.style.lib')} data-style-choix={style}>

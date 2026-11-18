@@ -1107,7 +1107,7 @@ import "./design/verre-argent.css";   // (16 nov., lot argent-mieux) Argent lisi
 // défaut : éteint, rien ne change). Ses règles (src/designV2/design-v2.css, importée par ses composants) sont toutes sous
 // `html[data-design="v2"]` ou des classes `.v2-*` neuves.
 import { useDesignV2, designV2Actif } from "./designV2/reglage.js";
-import "./designV2/style.js";   // (18 nov.) le style « Apple » (Paramètres → Apparence → Style) : `data-theme-style` posé dès l'import, éteint par défaut
+import { couleurStyle, styleActif, useStyle } from "./designV2/style.js";
 import AujourdhuiV2 from "./designV2/Aujourdhui.jsx";
 import { PassesRetrait as PassesRetraitV2, EnRouteListe as EnRouteListeV2 } from "./designV2/PassesRetrait.jsx";
 import MenuPlateformeV2 from "./designV2/MenuPlateforme.jsx";
@@ -20150,6 +20150,7 @@ function SideBar({ tab, setTab, entreprise, sites, badges }) {
   // `prefers-reduced-motion`). Purement décoratif (`aria-hidden`) : l'état reste
   // `aria-current`, et sans mesure (pas d'entrée allumée, entrée hors de la zone
   // visible) la pastille se cache et l'entrée garde son propre fond.
+  const styleNavigation = useStyle();
   const indRef = React.useRef(null), indPose = React.useRef(false);
   React.useLayoutEffect(() => {
     const nav = railRef.current, ind = indRef.current, zone = zoneRef.current; if (!nav || !ind) return undefined;
@@ -20170,8 +20171,13 @@ function SideBar({ tab, setTab, entreprise, sites, badges }) {
     const cibles = [zone, nav].filter(Boolean);
     cibles.forEach((c) => c.addEventListener('scroll', suivre, { passive: true }));
     window.addEventListener('resize', suivre);
-    return () => { cancelAnimationFrame(raf); cibles.forEach((c) => c.removeEventListener('scroll', suivre)); window.removeEventListener('resize', suivre); };
-  }, [tab, nEntrees, badges]);
+    return () => {
+      cancelAnimationFrame(raf);
+      cibles.forEach((c) => c.removeEventListener('scroll', suivre));
+      window.removeEventListener('resize', suivre);
+      nav.removeAttribute('data-indicateur');
+    };
+  }, [tab, nEntrees, badges, styleNavigation]);
   // (9 nov., DA 5) LA CARTE DU COMPTE, au pied : l'initiale, le nom de
   // l'entreprise s'il est connu (sinon l'e-mail du compte VRM), et l'offre
   // SEULEMENT si le serveur l'a dite (`reglePlanCourante`, Solo / Pro) — rien
@@ -20199,7 +20205,7 @@ function SideBar({ tab, setTab, entreprise, sites, badges }) {
     </span>
   </button> : null;
   return <nav ref={railRef} className="vrm-sidebar vrm-atelier-rail vrm-rail-verre" data-nav-v2="" data-rail-verre="" aria-label={tr('coque.navigationPrincipale')} style={{width:NAV_LARGEUR,background:C.sidebar||C.chrome,borderRight:`1px solid ${C.chromeLine}`,color:C.onChrome}}>
-    <span ref={indRef} className="vrm-nav-indicateur" data-nav-indicateur="" aria-hidden="true"/>
+    {styleNavigation !== 'vrm' && <span ref={indRef} className="vrm-nav-indicateur" data-nav-indicateur="" aria-hidden="true"/>}
     <div className="vrm-sidebar-brand"><span className="vrm-nav-tuile" aria-hidden="true"><img src="/logo-vrm-96.png" alt="" width="32" height="32" decoding="async"/></span><span className="vrm-sidebar-mot" role="img" aria-label="VRM">VRM</span></div>
     <div className="vrm-rail-scroll" ref={zoneRef}>
       {/* (15 nov., refonte-journee — le rail de la maquette ordinateur validée) Ma journée, puis VENDRE (Ventes, Annonces,
@@ -63122,7 +63128,7 @@ function AppCoeur() {
       const m = document.querySelector('meta[name="theme-color"]');
       // (15 nov., chantier « ouverture ») Tant que l'écran de démarrage couvre l'app (`data-vrm-boot`), la barre
       // d'état garde le haut de SON dégradé (public/demarrage-theme.js) : elle prend celle de l'app à sa sortie.
-      const poser = () => { if (m) m.setAttribute('content', document.documentElement.getAttribute('data-theme-style') === 'apple' ? (dark ? '#000000' : '#F2F2F7') : (t.haut || t.bg)); };   // (18 nov.) style « Apple » : la barre d'état prend le fond groupé (src/designV2/style.js)   // (14 nov., Studio) la barre d'état prend le HAUT de la lumière
+      const poser = () => { if (m) m.setAttribute('content', couleurStyle(styleActif(), dark, t.haut || t.bg)); };
       if (document.documentElement.hasAttribute('data-vrm-boot')) window.addEventListener('vrm:demarrage-fin', poser, { once: true }); else poser();
     } catch (_) { /* un navigateur sans <head> accessible ne doit rien casser */ }
   }, [dark]);

@@ -138,6 +138,8 @@ export default {
   "v2.barre.ven": "Vendite",
   "v2.barre.arg": "Soldi",
   "v2.style.lib": "Stile",
+  "v2.style.vrm": "VRM",
+  "v2.style.vrm.desc": "Sfondo minerale, navigazione antracite e accenti verdi.",
   "v2.style.apple": "Apple",
   "v2.style.apple.desc": "Sfondo grigio chiaro, schede bianche, carattere e controlli di iPhone.",
   "v2.style.studio": "Studio blu",

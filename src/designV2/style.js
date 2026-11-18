@@ -1,35 +1,37 @@
-// ════════════════════════════════════════════════════════════════════════════
-//  LE STYLE (18 nov., Julien trouve le design « atroce » ; l'app qu'il trouve belle : Apple — Wallet, Réglages).
-//  Paramètres → Apparence → « Style » : « Studio bleu » (celui d'hier, le défaut) ou « Apple » (src/designV2/theme-apple.css).
-//  Le choix vit sur CET appareil (`vrm_style`, localStorage) : un essai — Julien l'allume sur son iPhone, avec ses vraies
-//  données, sans toucher ses autres appareils. Rien d'autre ne change : aucun écran, aucune règle, aucune donnée.
-//  Allumé : `data-theme-style="apple"` sur <html> (toutes les règles de theme-apple.css en dépendent). Éteint (absent,
-//  « studio », illisible, stockage bloqué) : aucun attribut, l'app est exactement celle d'avant.
-//  Posé AVANT le premier rendu par public/demarrage-theme.js (même clé, même valeur) puis ici, à l'import.
-// ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import './theme-apple.css';
+import './theme-vrm.css';
 
 export const CLE_STYLE = 'vrm_style';
-export const STYLES = ['apple', 'studio'];
+export const STYLES = ['vrm', 'apple', 'studio'];
 const EVT = 'vrm:style';
 
 export function styleActif() {
-  try { return typeof localStorage !== 'undefined' && localStorage.getItem(CLE_STYLE) === 'apple' ? 'apple' : 'studio'; } catch (_) { return 'studio'; }
+  try {
+    const choix = localStorage.getItem(CLE_STYLE);
+    return STYLES.includes(choix) ? choix : 'vrm';
+  } catch (_) { return 'vrm'; }
+}
+
+export function couleurStyle(s, sombre, studio) {
+  if (s === 'vrm') return sombre ? '#111B20' : '#F1F4F2';
+  if (s === 'apple') return sombre ? '#000000' : '#F2F2F7';
+  return studio;
 }
 
 function appliquer(s) {
   try {
     const r = document.documentElement;
-    if (s === 'apple') r.setAttribute('data-theme-style', 'apple'); else r.removeAttribute('data-theme-style');
+    if (s === 'studio') r.removeAttribute('data-theme-style'); else r.setAttribute('data-theme-style', s);
     // La barre d'état d'iOS prend le fond de la page (plus le bleu du verre).
     const m = document.querySelector('meta[name="theme-color"]');
-    if (m && s === 'apple') m.setAttribute('content', r.getAttribute('data-theme') === 'dark' ? '#000000' : '#F2F2F7');
+    const sombre = r.getAttribute('data-theme') === 'dark';
+    if (m) m.setAttribute('content', couleurStyle(s, sombre, sombre ? '#133460' : '#2563A8'));
   } catch (_) { /* sans document : rien */ }
 }
 
 export function poserStyle(s) {
-  const v = s === 'apple' ? 'apple' : 'studio';
+  const v = STYLES.includes(s) ? s : 'vrm';
   try { localStorage.setItem(CLE_STYLE, v); } catch (_) { /* stockage bloqué : le choix ne tient que le temps de la page */ }
   appliquer(v);
   try { window.dispatchEvent(new Event(EVT)); } catch (_) {}
@@ -44,5 +46,5 @@ function abonner(f) {
 }
 
 export function useStyle() {
-  return React.useSyncExternalStore(abonner, styleActif, () => 'studio');
+  return React.useSyncExternalStore(abonner, styleActif, () => 'vrm');
 }
