@@ -8,7 +8,9 @@
 //     `?connexion-qr=…`) : « Connecter “Mac de …” ? » — rien ne se passe sans son clic.
 import React from 'react';
 import { createPortal } from 'react-dom';
-import qrcode from 'qrcode-generator';
+// (17 nov., lot vitesse-poids) le générateur de QR (≈ 50 Ko) chargé au clic « Montrer le QR », plus au démarrage.
+let qrcode = null;
+const chargerQr = () => (qrcode ? Promise.resolve(qrcode) : import('qrcode-generator').then((m) => { qrcode = m.default || m; return qrcode; }));
 import { tr } from './i18n/index.js';
 import { useLangue } from './i18n/react.js';
 import './styles-confort.css';
@@ -30,7 +32,7 @@ export function nomParDefaut(ua = (typeof navigator !== 'undefined' ? navigator.
   if (/Linux/.test(ua)) return 'Ordinateur Linux';
   return 'Ordinateur';
 }
-const qrDe = (texte) => { try { const q = qrcode(0, 'M'); q.addData(texte, 'Byte'); q.make(); return q.createDataURL(6, 2); } catch (_) { return ''; } };
+const qrDe = (texte) => { try { if (!qrcode) return ''; const q = qrcode(0, 'M'); q.addData(texte, 'Byte'); q.make(); return q.createDataURL(6, 2); } catch (_) { return ''; } };
 
 export function QrOrdinateur({ onSession, origine = (typeof location !== 'undefined' ? location.origin : '') }) {
   useLangue();
@@ -41,6 +43,7 @@ export function QrOrdinateur({ onSession, origine = (typeof location !== 'undefi
   const secret = React.useRef('');
   const lancer = async () => {
     setEtat('attente');
+    try { await chargerQr(); } catch (_) { setEtat('erreur'); return; }
     const r = await poster({ action: 'creer', appareil: nom });
     if (r.status !== 200 || !r.j.ticket) { setEtat('erreur'); return; }
     secret.current = r.j.secret;                      // en mémoire seulement

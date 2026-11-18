@@ -2000,8 +2000,11 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 ## Ligne du §9 de CLAUDE.md déplacée le 18 nov. (lot tampon-qr, fusion de main), telle quelle
 - **17 nov. · Un colis, deux transporteurs (lot suivi-multi-transporteurs, ext. 5.403.0)** : un envoi international (Shop2Shop puis Chronopost) a DEUX n° pour le même colis ; l'extension range tous les n° du trajet, l'app ET le serveur relient le colis du transporteur à l'achat par n'importe lequel (`api/_lib/suivis-multiples.js`) ⇒ UNE ligne au nom de l'article, avec code et QR, plus d'« incident » d'un autre n° du trajet. En attendant la liste (lignes d'avant) : « C'est sans doute le même colis — Relier » seulement si un colis + un achat au même point, même groupe de transporteur, arrivé après l'achat, aucun autre achat en route (`src/memeColis.js`) — SON toucher relie ; « Ce n'est pas le même » gardé (`vrm_colis_pas_meme`) ; une liste LUE qui contredit un lien manuel ⇒ « délier ? ». `2026-11-17-suivi-multi-transporteurs.md`. Geste : installer 5.403.0, ouvrir vinted.fr.
 
-## Ligne du §9 de CLAUDE.md déplacée le 18 nov. (lot groupes-coucou, après fusion de #1246), telle quelle
+## Ligne du §9 de CLAUDE.md déplacée le 18 nov. (lot vitesse-poids, 3e fusion de main), telle quelle
 - **17 nov. · Fiabilité et vitesse** : démarrage 2 344 → 2 087 Ko de JS+CSS (pdf-lib hors du morceau App, 30 blocs rares à la demande) ; `vrm_avis_bas` lue une fois ; QR plus jamais lus hors CSP ; audits `morceau-app`, `avis-bas-partage`, `qr-csp`. `2026-11-17-fiabilite-vitesse.md`. Geste : aucun.
 
-## Ligne du §9 de CLAUDE.md déplacée le 18 nov. (lot carte-coucou, après fusion de #1246), telle quelle
+## Ligne du §9 de CLAUDE.md déplacée le 18 nov. (lot groupes-coucou, après fusion de main), telle quelle
 - **17 nov. · Accessibilité WCAG 2.1 AA (lot accessibilite)** : focus double encre+blanc partout (`src/design/accessibilite.css`, couche `vrm-a11y` nommée AVANT `vrm-verre`), fiche « Tout sur le N° » qui garde et rend le focus, encre claire sur le bleu (Meilleures sources, résumé d'Annonces), « Aller au contenu » + colonne avant l'écran, 44 px, noms lus ; banc `accessibilite.cjs` partie E (49 rouges sur main, 0 après). `2026-11-17-accessibilite.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée le 18 nov. (lot carte-coucou), telle quelle
+- **17 nov. · Extension 5.406 (lot extension-carte-v2)** : « prochain dans 10 min » = refus d'attente (ouverture de Vinted, 15/h, 50/h) payé 10 min FIXES par le serveur ⇒ la vraie attente et sa raison ; carte design v2, feuille commune `vrm-ui.js`, écran « action en cours » ; aucune garde retirée. `2026-11-17-extension-carte-v2.md`. Geste : installer 5.406.
