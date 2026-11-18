@@ -51,8 +51,8 @@ const sansCommentaires = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[
   const defs = {}; for (const m of app.matchAll(/const (ONGLET_\w+)=entreeNav\(\{id:(?:ID_PAIRES|'(\w+)')/g)) defs[m[1]] = m[2] || 'paires';
   const ids = mB ? mB[1].split('\n').map((l) => { const a = /entreeNav\(\{id:'(\w+)'/.exec(l); if (a) return a[1]; const b = /^\s*(ONGLET_\w+),?\s*$/.exec(l); return b ? defs[b[1]] : null; }).filter(Boolean) : [];
   dit(JSON.stringify(ids) === JSON.stringify(barre), 'B1 la barre = Aujourd\'hui · Annonces · Achats · Ventes · Argent', JSON.stringify(ids));
-  const pos = /const POS_DISQUE=(\d+);/.exec(app);
-  dit(!!pos && Number(pos[1]) === 3 && /i===POS_DISQUE&&gestes \? <DisqueEventail/.test(app), 'B1 le disque « + » après Aujourd\'hui · Annonces · Achats', pos && pos[1]);
+  // (17 nov., Julien, trois fois : « Le + dégueulasse ») PLUS DE DISQUE dans la barre, réglage allumé ou éteint : cinq onglets.
+  dit(!/<DisqueEventail\b/.test(app), 'B1 aucun disque « + » dans la barre (cinq onglets, rien entre eux)');
   // B2
   const tous = ['journee', 'annonces', 'garage', 'achats', 'ventes', 'compta', 'dashboard', 'semaine', 'litiges', 'messages'];
   const allume = tous.map((t) => [t, groupe(t)]);

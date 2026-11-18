@@ -95,5 +95,14 @@ export default {
   "tampons.pret.titreLot": {
     "one": "{n} label ready",
     "other": "{n} labels ready"
-  }
+  },
+  // (17 nov., lot tampon-qr)
+  "tampons.statut.auto2": "Automatic placement",
+  "tampons.modifier": "Edit",
+  "tampons.exemple": "Example",
+  "tampons.exemple.phrase": "Example: no label from this carrier received yet. The data is made up.",
+  "tampons.mention.toujours": "“Créé par vrm.center” is always printed, just above the QR code: still visible under tape.",
+  "tampons.phrase2": "Your latest label from each carrier, stamped as it will print. Tap it to move the number.",
+  "tampons.editeur.phrase2": "Drag the number; pull the handle to enlarge it. Saved right away. “Créé par vrm.center” stays above the QR code.",
+  "tampons.el.mVerrou": "“Créé par vrm.center”: fixed, just above the QR code"
 };
