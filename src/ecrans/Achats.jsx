@@ -809,7 +809,7 @@ function RelierAchatCorps({ cible, achats: achatsBruts, liens, curTx, compteDe, 
             <div data-relier-titre style={{ fontSize: 13, fontWeight: 600, color: C.text, overflowWrap: 'anywhere', lineHeight: 1.3 }}>{a.title || '—'}</div>
             {l.lot ? <div data-relier-lot-etat style={{ fontSize: 12, fontWeight: 600, color: C.text, marginTop: 2 }}>{l.n ? tr('relierTout.lotRelies', { n: String(nLie), total: String(l.n) }) : tr('relierTout.lotReliesSansN', { n: String(nLie) })}</div> : null}
             {arts.length ? <ul data-relier-lot-articles={arts.length} style={{ listStyle: 'none', margin: '4px 0 0', padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
-              {arts.map((x, i) => <li key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12, color: C.text, minWidth: 0 }}>
+              {arts.map((x, i) => <li key={`${x.titre}·${x.photo}·${x.taille}·${i}`} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12, color: C.text, minWidth: 0 }}>
                 <span style={{ width: 28, height: 28, borderRadius: 8, background: C.border, flexShrink: 0, overflow: 'hidden', display: 'inline-flex' }}>{x.photo ? <PhotoVinted src={x.photo} alt="" loading="lazy" onError={(e) => { const t = e.currentTarget; if (t) t.style.visibility = 'hidden'; }} style={{ width: '100%', height: '100%', objectFit: 'cover' }}/> : null}</span>
                 <span style={{ overflowWrap: 'anywhere', minWidth: 0 }}>{[x.titre, x.taille ? tr('faits.taille', { taille: x.taille }) : ''].filter(Boolean).join(' · ')}</span>
               </li>)}
