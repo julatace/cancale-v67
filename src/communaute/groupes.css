@@ -62,8 +62,7 @@
 }
 .vrm-gc-liste > li:has(> .vrm-gc-ligne-bouton) { padding: 10px 16px; }
 .vrm-gc-chevron { color: var(--cm-doux); font-size: 22px; line-height: 1; }
-.vrm-gc-menu .vrm-gc-danger b { color: #C9342B; }
-.vrm-communaute[data-dark="true"] .vrm-gc-menu .vrm-gc-danger b { color: #FF6961; }
+/* « Fermer le groupe » : encre neutre — le rouge est réservé à deux paires sous un N° (§7) ; le geste demande d'abord. */
 .vrm-gc-carte-liste { background: var(--cm-carte); border: 1px solid var(--cm-bord); border-radius: 20px; box-shadow: var(--cm-ombre); }
 .vrm-communaute[data-dark="true"] .vrm-gc-carte-liste { background: var(--cm-carte); }
 .vrm-gc-main { flex: 0 0 auto; font-size: 26px; line-height: 1; }
