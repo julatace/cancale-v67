@@ -171,6 +171,9 @@ async function passe(b, nom, ctxOpts, sombre) {
     let choisi = await pg.evaluate(() => { const e = document.querySelector('[data-glisser-choisi]'); return e ? e.getAttribute('data-glisser-choisi') : ''; });
     if (choisi !== 'v:' + VENTE_TX) {
       await pg.evaluate(() => { const b = document.querySelector('[data-glisser-changer]'); if (b) b.click(); });
+      // (17 nov.) Au téléphone, une liste à la fois : l'onglet « Sans achat relié » d'abord.
+      await pg.evaluate(() => { const b = document.querySelector('[data-glisser-onglet="cibles"]'); if (b) b.click(); });
+      await pg.waitForTimeout(200);
       await pg.locator(`[data-glisser-cible="v:${VENTE_TX}"]`).click().catch(() => {});
       await pg.waitForTimeout(300);
       choisi = await pg.evaluate(() => { const e = document.querySelector('[data-glisser-choisi]'); return e ? e.getAttribute('data-glisser-choisi') : ''; });
@@ -186,6 +189,8 @@ async function passe(b, nom, ctxOpts, sombre) {
     await pg.screenshot({ path: path.join(SHOTS, `relier-taille-${nom}-glisser.png`) });
     // Toucher un achat en 42 : la vente dit « ✓ même taille que l'achat » ; aucun lien sans « Oui ».
     await pg.evaluate(() => { const b = document.querySelector('[data-glisser-changer]'); if (b) b.click(); });
+    await pg.waitForTimeout(200);
+    await pg.evaluate(() => { const b = document.querySelector('[data-glisser-onglet="achats"]'); if (b) b.click(); });
     await pg.waitForTimeout(200);
     await pg.locator(`[data-glisser-achat="${memes[0]}"]`).click().catch(() => {});
     await pg.waitForTimeout(300);

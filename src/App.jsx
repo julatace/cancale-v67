@@ -231,7 +231,7 @@ import { poserLienVc, defaireLienVc, numerosABarrer, marquerBarre, lienDe, produ
 // (17 nov., fiabilité-vitesse) à la demande, hors du morceau App : FeuilleLienVc (était importé en statique)
 const FeuilleLienVc = aLaDemandeFeuille(() => import('./LienVestiaire.jsx'));
 // ⟦→ ecrans/Vestiaire.jsx #1⟧
-import { suggestionsAchat, tousAchatsLibres, tousAchatsLibresDetail, filtresAchats, etiquetteLot, liensParAchat, lotDe, prixIndicatifLot, ecritureLot, suggestionsSaisieSerie, tailleDuTitre } from "./suggestionsAchat.js";
+import { suggestionsAchat, tousAchatsLibres, tousAchatsLibresDetail, filtresAchats, etiquetteLot, liensParAchat, lotDe, ecritureLot, suggestionsSaisieSerie, tailleDuTitre } from "./suggestionsAchat.js";
 // (15 nov.) La liaison achat ⇄ article : l'affectation pondérée et globale (src/liaisonAchat.js).
 import { affecterPropositions, propositionsArticle, pistesArticle, publierAffectation, seriePropositions, aValider, morceauxPourquoi, couleursTexte, lectureAchat, cleArticleAnnonce, cleArticleVente, cleRefusLiaison } from "./liaisonAchat.js";
 import { SELECT_DETAILS_ACHATS, detailsDeLignes, sansTailleLue } from "./faitsAchat.js";   // (17 nov., lot relier-taille)
@@ -242,6 +242,7 @@ import './styles-annonces-outils.css';
 import './styles-baisse-prix.css';
 import './styles-reprise-ecrans.css'; // (11 nov.) le bandeau « Affiché avec … · Effacer » (src/repriseSynchro.js)
 import './styles-achats-outils.css';
+import './styles-relier-tout.css';   // (17 nov., lot relier-tout-achat) la feuille « Relier un achat »
 import { CLE_FOURNISSEURS, lireRegistre, avecFournisseur, sansFournisseur, avecAchatGros, sansAchatGros, avecRepartition, achatGros, reliesDuLot, partsDuLot, planPrixGros, ecrituresPrixGros, ecritureLienGros, ecritureDelierGros, origineDuPrix, horsRattachables, avecHors, sansHors, avecGardes, bilanFournisseurs, eurosC as eurosFo } from "./fournisseurs.js";
 import { articlesParAchat, delaisMiseEnLigne, dateReception, estLot as estLotAchat, nombreLot, totalARepartir, ecrituresRepartition, annulationRepartition, ecritureLienAchat, prixAchatCentimes, achatSansCout } from "./achatsSourcing.js";
 // ⟦→ ecrans/Stats.jsx #3⟧
@@ -1111,7 +1112,9 @@ import "./designV2/style.js";   // (18 nov.) le style « Apple » (Paramètres �
 import AujourdhuiV2 from "./designV2/Aujourdhui.jsx";
 import { PassesRetrait as PassesRetraitV2, EnRouteListe as EnRouteListeV2 } from "./designV2/PassesRetrait.jsx";
 import MenuPlateformeV2 from "./designV2/MenuPlateforme.jsx";
-import { BoutonV2, BoutonIconeV2, SegmentV2 } from "./designV2/BoutonV2.jsx";
+import { BoutonV2, SegmentV2, BoutonIconeV2, RangeeTouchable as RangeeTouchableV2 } from "./designV2/BoutonV2.jsx";
+import { GroupeConversations as GroupeConversationsV2, LigneConversation as LigneConversationV2 } from "./designV2/LigneConversation.jsx";
+import { groupesParCompte as groupesParCompteV2, rangerEmails as rangerEmailsV2 } from "./designV2/messagesV2.js";
 import { AfficheVentes as AfficheVentesV2, RechercheVentes as RechercheVentesV2, ListeEnvoyer as ListeEnvoyerBaseV2, ListeRoute as ListeRouteBaseV2, PisteEtapes as PisteEtapesV2 } from "./designV2/VentesV2.jsx";
 import { nombre as nombreV2 } from "./i18n/index.js";
 import LigneAnnonceV2 from "./designV2/LigneAnnonce.jsx";
@@ -1135,7 +1138,7 @@ import { offresVestiaire, offresJourneeVc, euros as eurosOffre, resteAvant as re
 // La partie « app » du dictionnaire français arrive AVEC l'app (le fichier d'entrée reste léger).
 import frApp from "./i18n/langues/fr.js";
 ajouterSourceApp(frApp);
-import { detenteursAchat, texteDejaRelie, patchDelier, ecrituresDeplacer } from "./relierAutreAchat.js";
+import { detenteursAchat, quiDetient, patchDelier, ecrituresDeplacer } from "./relierAutreAchat.js";
 import { achatsAutresPourRelier, siteDeAchat } from "./achatsAutresRelier.js";   // (16 nov.) achats Leboncoin et Vestiaire dans « Relier »
 import { appliquerPrixPro, relevesParTx as relevesProParTx, SELECT_TXN_PRO } from "./vintedPro.js";   // (11 nov., lot vinted-pro)
 import { AlerteArnaque, CompteurArnaque, PastilleArnaque } from "./AlerteArnaque.jsx";
@@ -3236,6 +3239,7 @@ const VENTES_MASQUEES_AUCUNE = () => [];
 const SYNC_KEYS = [
   // (17 nov., nouveau design) L'affichage des annonces : « Liste » (A, par défaut) ou « Détaillé » (C) — son choix, sur tous ses appareils.
   'vrm_annonces_affichage',
+  'vrm_emails_ranges',   // (17 nov., nouveau design) les e-mails rangés (glisser à gauche), jamais supprimés
   'vrm_barre_style',   // (17 nov.) le style de la barre d'onglets (src/designV2/barre.js)
   // (11 nov., lot visuels-reseaux) Format, modèle, couleur et nom de SA boutique des visuels réseaux
   // (src/visuelsReseaux.js `reglagesValides` ; boutique vide par défaut).
@@ -44715,6 +44719,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fillBuyAchats.items, accounts]);
   useEffect(() => { if (fillBuyOpen) chargerAchats(); }, [fillBuyOpen, chargerAchats]);
+  // (17 nov., lot relier-tout-achat) La feuille « Relier un achat » ouverte : la page derrière ne défile plus (le doigt qui
+  // arrive au bout de la liste ne fait plus glisser l'écran du dessous).
+  const pickerOuvert = !!pickerFor;
+  useEffect(() => {
+    if (!pickerOuvert) return undefined;
+    const h = document.documentElement, avant = h.style.overflow;
+    h.style.overflow = 'hidden';
+    return () => { h.style.overflow = avant; };
+  }, [pickerOuvert]);
   // (6 nov.) « Mise en ligne numérotée par VRM » ouverte : les achats captés sont relus
   // (relecture seule) pour PROPOSER une suggestion à côté du prix d'achat de chaque ligne.
   useEffect(() => { if (neufsOuverts && numerosNeufs.length && accounts.length && !fillBuyAchats.items) chargerAchats(); /* eslint-disable-next-line */ }, [neufsOuverts, numerosNeufs.length, accounts.length]);
@@ -45041,9 +45054,16 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     if (!a) return null;
     const accNom = accNameOf(a._acc) || '';
     if (lotDe(a).lot || estLotApp(a)) {
-      const l = lotDe(a), ind = prixIndicatifLot(a), px = prixPayeAchat(a);
-      const saisi = await askText({ title: "Prix d'achat de cet article", desc: ind != null ? `${prixCourt(px)} ÷ ${l.n} ≈ ${prixCourt(ind)}` : (px != null ? `Lot · ${prixCourt(px)}` : ''), numeric: true, value: '', ok: 'Relier', cancel: 'Annuler' });
+      // (17 nov., lot relier-tout-achat — §2.5 : il saisit ses prix d'achat) Le prix d'un lot n'est JAMAIS partagé tout seul :
+      // « Lot de 2 · 80 € — prix par paire à saisir ». Laissé vide ⇒ l'article est relié, son coût reste « à saisir » (le
+      // chiffre manquant est la porte pour le saisir) ; un montant illisible ⇒ rien n'est relié.
+      const l = lotDe(a), px = prixPayeAchat(a);
+      const saisi = await askText({ title: tr('relierTout.lotPrixTitre'), desc: tr('relierTout.lotPrix', { total: String(l.n || nombreLot(a, { nArticlesTx, declares: lotsDeclares }) || '?'), prix: px != null ? prixCourt(px) : '—' }), numeric: true, value: '', ok: tr('journee.relier'), cancel: tr('relierTout.annuler') });
       if (saisi == null) return null;
+      if (!String(saisi).trim()) {
+        const w0 = ecritureLot(a, '1', { accNom, photo: orderPhoto(a) || '' });
+        return w0 ? { ...w0, buyPrice: '', buyFrom: { ...w0.buyFrom, price: null, aSaisir: true } } : null;
+      }
       const w = ecritureLot(a, saisi, { accNom, photo: orderPhoto(a) || '' });
       if (!w) { toast("Montant illisible : rien n'a été relié"); return null; }
       return w;
@@ -45081,15 +45101,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     return true;
   };
   const iciPicker = (cible) => (cible ? (cible._saleTx ? { ou: 'vente', cle: String(cible._saleTx) } : { ou: 'fiche', cle: String(cible.id) }) : null);
+  // Rend les écritures qui détachent l'achat de ses autres détenteurs (vide : rien à détacher), ou null (il a dit non).
+  const detacherAvantRelier = async (a, cible, opts = {}) => {
+    let autres = ecrituresDeplacer(a, { numeros, saleOv, ici: iciPicker(cible) });
+    // (17 nov., Julien : « s'il y a un achat qui comporte 2 articles on le prend en compte ») Un LOT pas encore complet : relier
+    // un de ses articles ne délie JAMAIS un autre article. Un lot complet choisi dans « Déjà reliés » : il dit QUEL article
+    // il détache (un seul), jamais tous.
+    const lot = lotDe(a), nLie = (liensAchats && liensAchats.get(String(a.transaction_id))) || 0;
+    if (lot.lot && (lot.n == null || nLie < lot.n)) autres = [];
+    else if (lot.lot && autres.length > 1) {
+      const k = await askChoix({ title: tr('relierTout.lotQuel'), options: autres.map((x, i) => [String(i), x.numero ? 'N°' + x.numero : tr('relierTout.uneVente')]), cancel: tr('relierTout.annuler') });
+      if (k == null) return null;
+      autres = [autres[Number(k)]].filter(Boolean);
+    }
+    // (17 nov., lot relier-tout-achat) Un article n'appartient qu'à UNE paire : prendre un achat déjà relié le DÉTACHE de
+    // l'autre — toujours après SA confirmation, même si l'autre détenteur ne se retrouve pas.
+    if (autres.length || (opts.deplacer && !(lot.lot && (lot.n == null || nLie < lot.n)))) {
+      const qui = autres.length ? quiDetient(autres, tr) : tr('relierTout.uneVente');
+      const ok = await askConfirm({ title: tr('relierTout.detacherTitre', { qui }), desc: tr('relierTout.detacherDesc', { qui }), ok: tr('relierTout.detacherOk'), cancel: tr('relierTout.annuler') });
+      if (ok !== true) return null;
+    }
+    return autres;
+  };
   const relierAchat = async (a, opts = {}) => {
     const cible = pickerFor; if (!cible || !a) return;
-    const autres = ecrituresDeplacer(a, { numeros, saleOv, ici: iciPicker(cible) });
-    if (opts.deplacer || autres.length) {
-      if (autres.length) {
-        const ok = await askConfirm({ title: texteDejaRelie(autres), desc: 'Il sera délié de là-bas et relié ici.', ok: 'Déplacer ici', cancel: 'Annuler' });
-        if (!ok) return;
-      }
-    }
+    const autres = await detacherAvantRelier(a, cible, opts); if (autres == null) return;
     const w = await ecritureRelierAchat(a); if (!w) return;
     // (16 nov.) Un geste annulable qui dit le bénéfice et offre le reçu (`confirmerLiaison`) ; « Déplacer ici » dans le même geste.
     const o = cible._saleTx ? (sales.items || []).find((x) => String(x.transaction_id) === String(cible._saleTx)) || null : null;
@@ -48472,6 +48508,8 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   }, [only, listings.items, listings.error, annBase, numeros, nouveauxFav, articlesVendusFavoris, listingDates]);
   const ventesFavorisHisto = useMemo(() => ventesPourHistorique({ ventes: sales.items || [], txnItem, conversations: convs.items || [], uid: favorisUid, annulee: (v) => classifyOrderStatus(v.status) === 'cancelled' }), [sales.items, txnItem, convs.items, favorisUid]);
   const [zoneMessages,setZoneMessages]=React.useState('conversations');
+  const [feuilleMsgV2,setFeuilleMsgV2]=React.useState(false);
+  const [plusGroupeV2,setPlusGroupeV2]=React.useState({});   // (17 nov., nouveau design) la suite de CHAQUE compte   // (17 nov., nouveau design) la feuille « ⋯ » de Messages
   // (11 nov., lot DJ8) Favoris & offres : deux vues, « Favoris » et « Offres auto ».
   const [zoneFav,setZoneFav]=useVueSession('favoris-zone','favoris');
   const lireGardeOffres=React.useCallback(()=>load('vinted_offres_garde', null),[]);
@@ -55238,13 +55276,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         {/* (9 nov., lot AL — Julien : « les favoris et offres doivent être dans Messages ») L'ancienne
             entrée « Favoris & offres » du menu est CETTE section : même écran (`FavorisConnectes` :
             favoris reçus, offre aux favoris, mode auto), son nom d'hier. */}
-        <div className="vrm-messages-sections" role="group" aria-label="Choisir Conversations ou Favoris & offres">
+        {/* (17 nov., nouveau design) UN segmenté : Conversations · Offres · Favoris — les MÊMES zones qu'hier (`zoneMessages`,
+            `zoneFav`) ; la rangée « Conversations / Favoris & offres » et « Favoris / Offres auto » ne sont pas rendues allumé. */}
+        {designV2 && <div className="v2m-tete" data-v2-msg-tete=""><SegmentV2 label={tr('v2.msg.seg')} value={zoneMessages==='conversations'?'conversations':zoneFav==='offres'?'offres':'favoris'}
+          onChange={(v)=>{ if(v==='conversations') setZoneMessages('conversations'); else { setZoneMessages('favoris'); setZoneFav(v==='offres'?'offres':'favoris'); } }}
+          options={[{ v:'conversations', l:tr('v2.msg.conversations') },{ v:'offres', l:tr('v2.msg.offres') },{ v:'favoris', l:tr('v2.msg.favoris') }]} attrs={{'data-v2-msg-seg':''}}/></div>}
+        {!designV2 && <div className="vrm-messages-sections" role="group" aria-label="Choisir Conversations ou Favoris & offres">
           <button type="button" data-messages-zone="conversations" aria-pressed={zoneMessages==='conversations'} onClick={()=>setZoneMessages('conversations')}><Icon name="chat" size={17}/>Conversations</button>
           <button type="button" data-messages-zone="favoris" aria-pressed={zoneMessages==='favoris'} onClick={()=>setZoneMessages('favoris')}><Icon name="heart" size={17}/>Favoris & offres</button>
-        </div>
+        </div>}
         <div hidden={zoneMessages!=='favoris'} style={{display:zoneMessages==='favoris'?undefined:'none'}}>
         {/* (11 nov., lot DJ8) « Offres auto » : l'interrupteur, ce que le moteur ferait, les seuils par paire, l'historique. */}
-        <div className="vrm-fav-zones"><Segmente label="Favoris ou offres automatiques" value={zoneFav} onChange={setZoneFav} options={[{ v: 'favoris', l: 'Favoris' }, { v: 'offres', l: 'Offres auto' }]}/></div>
+        {!designV2 && <div className="vrm-fav-zones"><Segmente label="Favoris ou offres automatiques" value={zoneFav} onChange={setZoneFav} options={[{ v: 'favoris', l: 'Favoris' }, { v: 'offres', l: 'Offres auto' }]}/></div>}
         {zoneMessages==='favoris' && zoneFav==='offres' && <OffresAuto actif={offresAuto} virguleLue={extSait('offrespage')==='ok'} basculer={basculerOffresAuto} eteindreOffres={()=>{ setOffresAuto(false); save('vinted_offres_auto', false); }}
           refusMsg={refusMsg} setRefusMsg={ecrireRefusMsg}
           refusVariantes={refusVariantes} setRefusVariantes={changerRefusVariantes} variantesOk={extSait('variantes')==='ok'}
@@ -55259,9 +55302,15 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         </div>
         <div className="vrm-message-workspace" hidden={zoneMessages!=='conversations'} style={{display:zoneMessages==='conversations'?undefined:'none'}}><div className="vrm-inbox-column">
         {/* (5 nov., chantier G) Le champ de recherche commun (`ChampRecherche`) : plus un champ teinté posé dans un champ bordé. */}
-        <ChampRecherche className="vrm-msg-recherche" valeur={messageSearch} onChange={(v)=>setMessageSearch(String(v||'').slice(0,200))} label="Rechercher une conversation" placeholder="Pseudo, article, N°…" micro data-msg-recherche=""/>
+        {designV2 ? <div className="v2m-outils" data-v2-msg-outils="">{/* (17 nov., nouveau design) la recherche + « ⋯ » (filtres, mise à jour, réponses rapides) : une ligne. */}
+          <ChampRecherche className="vrm-msg-recherche" valeur={messageSearch} onChange={(v)=>setMessageSearch(String(v||'').slice(0,200))} label={tr('v2.msg.chercher')} placeholder={tr('v2.msg.chercherPh')} micro data-msg-recherche=""/>
+          <BoutonIconeV2 icone={<Icon name="more" size={22}/>} label={tr('v2.msg.plus')} actif={messageFilter!=='all'} onClick={()=>setFeuilleMsgV2(true)} attrs={{'data-v2-msg-plus':''}}/>
+        </div> : <ChampRecherche className="vrm-msg-recherche" valeur={messageSearch} onChange={(v)=>setMessageSearch(String(v||'').slice(0,200))} label="Rechercher une conversation" placeholder="Pseudo, article, N°…" micro data-msg-recherche=""/>}
         {!!messageSearch.trim()&&<p className="vrm-msg-recherche-portee" role="status">Sur tous tes comptes.{messageFilter!=='all'&&<> Le filtre reste appliqué. <button type="button" className="vrm-pied-lien" data-pied-lien="tout" onClick={()=>{setMessageFilter('all');setConvMax(40);}}>Afficher tous les résultats</button></>}</p>}
-        {convs.loading && !convs.items && <Skeleton variant="row" count={2}/>}
+        {convs.loading && !convs.items && !designV2 && <Skeleton variant="row" count={2}/>}
+        {/* (17 nov., nouveau design) La première lecture : une place de la hauteur d'un écran (ce qui est dessous ne saute pas
+            dans l'écran quand la liste arrive). */}
+        {convs.loading && !convs.items && designV2 && !(dernieresConvs.current.items||[]).length && <div className="v2m-chargement" data-v2-msg-chargement="" aria-busy="true"><SqueletteRangeesV2 n={6}/></div>}
         {/* (5 nov., chantier G, revue 1.10) La panne dite par `EtatPanne` : une phrase, la raison, UN geste. */}
         {convs.error && <EtatPanne quoi="Tes conversations Vinted" raison="Aucune boîte n’a pu être lue. Rien n’est perdu : c’est la lecture qui a échoué." onReessayer={()=>loadConvs(true)} data-msg-panne=""/>}
         {/* ── LA MESSAGERIE INTÉGRÉE (3 octobre) ─────────────────────────────
@@ -55272,7 +55321,9 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
             Les non lus d'abord, puis les plus récents ; le compte est nommé sur
             chaque ligne (la liste mélange ses comptes). Un clic ouvre le fil :
             répondre et trancher une offre se font là, par l'extension. */}
-        {convs.items && !convs.error && (()=>{
+        {/* (17 nov., nouveau design) Pendant une RELECTURE (items remis à vide le temps de lire), la liste allumée garde la
+            dernière lecture à l'écran au lieu de s'effondrer puis revenir (un saut de 0,23 mesuré, déjà là éteint). */}
+        {(designV2 && convs.loading && !convs.items && Array.isArray(dernieresConvs.current.items) && dernieresConvs.current.items.length ? dernieresConvs.current : convs).items && !convs.error && ((convs)=>{
           // Filtre par compte (sélecteur de l'onglet) : `_acc` d'une conversation
           // est l'OBJET compte. Choisi ⇒ ses conversations seules.
           const uidC = c => String((c._acc&&c._acc.vinted_user_id)||'');
@@ -55406,7 +55457,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {/* (16 oct.) UNE barre : le filtre en contrôle segmenté, le nombre
                   (déjà dans « Toutes N ») lu par les lecteurs d'écran seulement,
                   et l'actualisation en icône — plus deux rangées de commandes. */}
-              <div className="vrm-msg-bar">
+              {designV2 && messageFilter!=='all' && <div className="v2m-filtre-actif" data-v2-msg-filtre={messageFilter}><span><b>{messageFilter==='unread'?tr('v2.msg.f.nonlues'):messageFilter==='offres'?tr('v2.msg.f.offres'):tr('v2.msg.f.repondre')}</b></span>
+                <BoutonV2 role="texte" onClick={()=>{setMessageFilter('all');setConvMax(40);}} attrs={{'data-v2-msg-filtre-effacer':''}}>{tr('v2.msg.f.toutes')}</BoutonV2></div>}
+              {designV2 && feuilleMsgV2 && <SheetShell onClose={()=>setFeuilleMsgV2(false)} titre={tr('v2.msg.plus')} data-v2-msg-feuille="">
+                <div className="v2m-feuille" role="radiogroup" aria-label={tr('v2.msg.filtrer')}>
+                  <p className="v2m-feuille-titre">{tr('v2.msg.filtrer')}</p>
+                  {[['all',tr('v2.msg.f.toutes'),liste.length],['repondre',tr('v2.msg.f.repondre'),aRepondre.length],['unread',tr('v2.msg.f.nonlues'),nonLus],...((nOffres>0||messageFilter==='offres')?[['offres',tr('v2.msg.f.offres'),nOffres]]:[])].map(([v,l,n])=>(
+                    <RangeeTouchableV2 key={v} className="v2m-choix" attrs={{role:'radio','aria-checked':(v==='repondre'?messageFilter.startsWith('repondre'):messageFilter===v)?'true':'false','data-v2-msg-choix':v,'data-n':String(n)}}
+                      onClick={()=>{setMessageFilter(v);setConvMax(40);setFeuilleMsgV2(false);}}><span>{l}</span><span className="v2m-choix-n">{nombreV2(n)}</span></RangeeTouchableV2>))}
+                  <p className="v2m-feuille-titre">{tr('v2.msg.outils')}</p>
+                  {!boitesKO.length && <RangeeTouchableV2 className="v2m-choix" attrs={{'data-v2-msg-maj':''}} onClick={()=>{setFeuilleMsgV2(false);loadConvs(true);}}><span>{tr('v2.msg.maj')}</span><Icon name="sync" size={20}/></RangeeTouchableV2>}
+                  <RangeeTouchableV2 className="v2m-choix" attrs={{'data-v2-msg-rapides':''}} onClick={()=>{setFeuilleMsgV2(false);setFeuilleQR(true);}}><span>{tr('v2.msg.rapides')}</span><Icon name="pencil" size={20}/></RangeeTouchableV2>
+                </div>
+              </SheetShell>}
+              {!designV2 && <div className="vrm-msg-bar">
                 {/* (5 nov., chantier G, revue 2.23) Les filtres au dessin des AUTRES filtres de l'app (`.vrm-filtres`). */}
                 <div className="vrm-inbox-filters vrm-filtres" role="group" aria-label="Filtrer les conversations">
                   <button type="button" aria-pressed={messageFilter==='all'} onClick={()=>{setMessageFilter('all');setConvMax(40);}}>Toutes <span>{liste.length}</span></button>
@@ -55419,7 +55483,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 </div>
                 {/* (5 nov., revue 3.8) Une boîte en panne a SON « Réessayer » : l'icône de relecture se tait à côté. */}
                 {!boitesKO.length && <button type="button" className="vrm-msg-refresh" onClick={()=>loadConvs(true)} aria-label="Mettre à jour les conversations" title="Mettre à jour les conversations"><Icon name="sync" size={17}/></button>}
-              </div>
+              </div>}
               <CompteurArnaque n={nArnaque}/>
               {messageFilter.startsWith('repondre')&&<ChoixReponses mode={messageFilter} total={aRepondre.length} offres={offresARepondre} onChoix={v=>{setMessageFilter(v);setConvMax(40);}}/>}
               {messageFilter.startsWith('repondre')&&<p className="vrm-inbox-feedback">{aRepondre.length?`${offresARepondre} offre${offresARepondre>1?'s':''} · ${aRepondre.length-offresARepondre} conversation${aRepondre.length-offresARepondre>1?'s':''} sans offre en attente`:'Aucune conversation confirmée comme étant à répondre.'} · Dernier auteur vérifié uniquement. Les fils non vérifiés restent dans Toutes.</p>}
@@ -55464,7 +55528,45 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               {tri.length===0 && liste.length>0 && messageFilter!=='all' && <div data-msg-filtre-vide="" className="vrm-vue-vide"><b>Aucune conversation dans ce filtre</b><p>Les conversations sont toujours disponibles dans « Toutes ».</p><Bouton variante="secondaire" onClick={()=>{setMessageFilter('all');setConvMax(40);}}>Voir toutes les conversations</Bouton></div>}
               {/* (5 nov., chantier G) L'état vide dit QUOI FAIRE, en une phrase, et nomme les comptes lus. */}
               {listeBrute.length===0 && !messageSearch.trim() && !boitesKO.length && <div data-msg-vide="" className="vrm-vide-dessin"><Illustration nom="courrier" taille={104}/><p>Aucune conversation pour l’instant</p><p>Ouvre ta messagerie sur vinted.fr {NAV.dans} : elles arrivent ici.</p></div>}
-              <div className="vrm-msg-list" style={{border:liste.length?`1px solid ${C.border}`:'none',background:C.card}}>
+              {designV2 ? (()=>{
+                // (17 nov., nouveau design) LES COMPTES SÉPARÉS (CLAUDE.md §3, 12 nov.) : le compte de l'onglet d'abord, puis
+                // chaque autre compte ; du plus récent au plus ancien DANS chaque groupe (`groupesParCompte`). Les MÊMES
+                // conversations que la liste d'hier (`tri` : mêmes filtres, mêmes retirées), la même pagination (`convMax`).
+                const groupes = groupesParCompteV2(tri, { uidDe: uidC, quand: (c)=>c.updated_at, compteOnglet: prioMsg, nomDe: (c)=>c._acc?accName(c._acc):'' });
+                // Chaque compte a SA suite (15, puis 40 de plus) : une pagination commune ne montrait que le premier compte.
+                const montres = groupes.map((g)=>{ const max = plusGroupeV2[g.uid] || 15; return { ...g, total: g.convs.length, convs: g.convs.slice(0, max) }; }).filter((g)=>g.convs.length);
+                return <div className="v2m-liste" data-v2-msg-liste="" data-v2-msg-groupes={montres.length}>
+                  {montres.map((g)=>(
+                    <GroupeConversationsV2 key={g.uid} titre={g.nom || tr('v2.msg.compte')} sous={prioMsg ? (g.onglet ? tr('v2.msg.ouvert', { nav: NAV.dansNu }) : tr('v2.msg.lectureSeule')) : ''}
+                      attrs={{ 'data-v2-msg-groupe': g.uid, 'data-v2-msg-onglet': g.onglet ? '1' : '0', 'data-v2-msg-groupe-n': String(g.convs.length) }}>
+                      {g.convs.map((c)=>{
+                        const paire = paireDeConv(uidC(c), c.id, null);
+                        const auteur = auteurDernier(c, paire);
+                        const offre = offreDeConv(c);
+                        const tsConv = Date.parse(c.updated_at||'') || null;
+                        const photo = (c.item_photos&&c.item_photos[0]&&c.item_photos[0].url) || (paire&&paire.photo) || (c.opposite_user&&c.opposite_user.photo&&c.opposite_user.photo.url) || null;
+                        const ro = !!prioMsg && uidC(c)!==prioMsg;
+                        const nom = (c.opposite_user&&c.opposite_user.login)||tr('v2.msg.conversation');
+                        const ex = extraitConversation(c, paire&&paire.r, paire&&paire.titre, normTitle);
+                        const offreDer = !offre && ex.kind==='offer' ? ex.offre : null;
+                        const texteEx = offreDer ? `${libelleOffre(offreDer)} ${prix(offreDer.montant,offreDer.devise)}${etatOffreCourt(offreDer.etat,offreDer.etatLibelle)?' · '+etatOffreCourt(offreDer.etat,offreDer.etatLibelle):''}`
+                          : ex.kind==='event' ? tr('v2.msg.vinted',{ t: ex.texte }) : ex.kind==='message' ? (ex.vinted?tr('v2.msg.equipe',{ t: ex.texte }):ex.texte) : '';
+                        const toi = ex.kind==='message'&&ex.source==='fil'&&(ex.de==='toi'||auteur==='toi');
+                        const titrePaire = (paire&&paire.titre)||c.item_title||c.item?.title||'';
+                        return <LigneConversationV2 key={uidC(c)+'_'+c.id} Photo={PhotoVinted} photo={photo} nom={nom} heure={tsConv?heureListe(tsConv):''} quandIso={tsConv?new Date(tsConv).toISOString():''}
+                          extrait={texteEx || titrePaire} toi={toi?tr('messages.toi'):''} num={paire&&paire.num?String(paire.num):''}
+                          offre={offre?tr('v2.msg.offreAttente',{ p: prix(offre.prix) }):''} etat={paire&&paire.etat?paire.etat.t:''}
+                          nonLu={!!c.unread} lectureSeule={ro} actif={openConv?.convId===c.id && String(openConv.acc?.vinted_user_id)===uidC(c)}
+                          label={[c.unread?tr('messages.nonLu'):'', nom, texteEx, paire&&paire.num?'N° '+paire.num:''].filter(Boolean).join(' · ')}
+                          apres={<PastilleArnaque motif={ex.kind==='message'&&ex.source==='fil'&&!ex.vinted?motifDeLApercu(ex.texte, ex.de==='eux'?false:ex.de==='toi'?true:null):null}/>}
+                          onClick={()=>openConversation(c)}
+                          attrs={{'data-conv':c.id,'data-cible':attrCible(['conv',c.id],c._acc?['conv',String(c._acc.vinted_user_id),c.id]:null),'data-conv-acces':prioMsg?(ro?'lecture':'action'):undefined,'data-nonlu':c.unread?'1':undefined,
+                            'data-conv-num':paire&&paire.num?paire.num:undefined,'data-conv-quand':tsConv?new Date(tsConv).toISOString():undefined,'data-conv-compte':c._acc?String(c._acc.vinted_user_id):undefined,'data-conv-offre':offre?String(offre.prix):undefined}}/>;
+                      })}
+                      {g.total > g.convs.length ? <div className="v2m-suite"><BoutonV2 role="texte" attrs={{'data-v2-msg-suite': g.uid}} onClick={()=>React.startTransition(()=>setPlusGroupeV2((m)=>({ ...m, [g.uid]: (m[g.uid] || 15) + 40 })))}>{tr('v2.msg.suite', { n: Math.min(40, g.total - g.convs.length), total: g.total })}</BoutonV2></div> : null}
+                    </GroupeConversationsV2>))}
+                </div>;
+              })() : (<div className="vrm-msg-list" style={{border:liste.length?`1px solid ${C.border}`:'none',background:C.card}}>
                 {affiches.map((c,i)=>{
                   const paire = paireDeConv(uidC(c), c.id, null);
                   const auteur = auteurDernier(c, paire);
@@ -55529,10 +55631,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                     </React.Fragment>
                   );
                 })}
-              </div>
+              </div>)}
               {nSansDate>0 && <p className="vrm-msg-sans-date" data-conv-sans-date={nSansDate} style={{color:C.muted}}>{nSansDate} sans date lue : en bas de la liste.</p>}
               {/* (5 nov., chantier G, revue 2.23) UN style de lien en pied (`vrm-pied-lien`) ; le compte « 40/200 » reste lisible à côté. */}
-              {tri.length>convMax && <button type="button" className="vrm-msg-more vrm-pied-lien" data-pied-lien="suite" onClick={()=>React.startTransition(()=>setConvMax(m=>m+40))}>Afficher les {Math.min(40,tri.length-convMax)} suivantes <span className="vrm-pied-lien-n">{convMax} sur {tri.length}</span></button>}
+              {tri.length>convMax && !designV2 && <button type="button" className="vrm-msg-more vrm-pied-lien" data-pied-lien="suite" onClick={()=>React.startTransition(()=>setConvMax(m=>m+40))}>Afficher les {Math.min(40,tri.length-convMax)} suivantes <span className="vrm-pied-lien-n">{convMax} sur {tri.length}</span></button>}
               {retireesIci.length>0 && (
                 <p className="vrm-msg-retirees" data-conv-retirees={retireesIci.length} style={{color:C.muted}}>
                   {/* (revue) Pendant une recherche, une conversation retirée qui
@@ -55545,7 +55647,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               )}
             </div>
           );
-        })()}
+        })(designV2 && convs.loading && !convs.items && Array.isArray(dernieresConvs.current.items) && dernieresConvs.current.items.length ? dernieresConvs.current : convs)}
         </div><div className="vrm-chat-column" data-conv-ouverte={openConv?.convId!=null?String(openConv.convId):undefined}>{openConv?rendreConversation():<div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>Choisis une conversation</span><small>La plus récente est en haut.</small></div>}</div>{rendreFicheConv()}</div>
         {/* (11 nov.) Les réponses rapides se RÈGLENT dans une feuille, ouverte par le crayon au bout de la
             rangée du fil (une seule entrée : la barre « Réponses rapides » sous la liste faisait doublon). */}
@@ -57502,7 +57604,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       {pickerFor && createPortal(
         <div data-relier-feuille data-relier-autre={pickerFor._autre ? String(pickerFor._autre) : undefined} onClick={()=>setPickerFor(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.5)',zIndex:1300,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
           <FermeAuRetour fermer={()=>setPickerFor(null)}/>
-          <div onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,maxHeight:'85vh',borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+          <div className="vrm-relier-feuille-boite" role="dialog" aria-modal="true" aria-label={tr('relierTout.titreFeuille')} onClick={e=>e.stopPropagation()} style={{background:C.bg,width:'100%',maxWidth:520,borderRadius:'14px 14px 0 0',display:'flex',flexDirection:'column',overflow:'hidden'}}>
             {/* ⚠️ ON MONTRE LA PAIRE QU'ON RELIE. La modale couvrait l'écran et
                 demandait « quel achat correspond à CETTE paire ? » sans jamais
                 dire laquelle : il fallait se souvenir de la carte sur laquelle
@@ -57517,23 +57619,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
               <div style={{flex:1,minWidth:0}}>
                 <div style={{display:'flex',alignItems:'center',gap:6}}>
                   {numeros[pickerFor.id]?.numero && <span style={{fontSize:12,fontWeight:700,color:C.onAccent||'#fff',background:C.accent,borderRadius:12,padding:'2px 7px',flexShrink:0}}>N°{numeros[pickerFor.id].numero}</span>}
-                  <span style={{fontSize:13,fontWeight:600,color:C.text,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{pickerFor.title}</span>
+                  <span data-relier-cible-titre style={{fontSize:13,fontWeight:600,color:C.text,overflowWrap:'anywhere',lineHeight:1.3,minWidth:0}}>{pickerFor.title}</span>
                 </div>
                 <div style={{fontSize:12,color:C.muted,marginTop:2}}>
                   {[pickerFor.brand, pickerFor.size && `taille ${pickerFor.size}`, pickerFor.price!=null && `en vente ${eur(pickerFor.price).toFixed(2).replace('.',',')}\u00a0€`].filter(Boolean).join(' · ')}
                 </div>
               </div>
               <button type="button" data-glisser-ouvrir="feuille" onClick={()=>ouvrirGlisser()} style={{flexShrink:0,border:'none',background:'transparent',color:C.accent,fontSize:13,fontWeight:600,cursor:'pointer',minHeight:44,padding:'0 6px',fontFamily:'inherit'}}>{tr('glisser.entree')}</button>
-              <button type="button" onClick={()=>setPickerFor(null)} aria-label="Fermer" style={{flexShrink:0,border:'none',background:'transparent',fontSize:20,color:C.muted,cursor:'pointer'}}>×</button>
+              <button type="button" data-relier-fermer onClick={()=>setPickerFor(null)} aria-label={tr('relierTout.fermer')} style={{flexShrink:0,border:'none',background:'transparent',fontSize:22,color:C.muted,cursor:'pointer',minWidth:44,minHeight:44,display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>
             </div>
-            <div data-relier-achat-corps style={{flex:1,overflow:'auto',padding:'4px 14px 14px'}}>
+            <div data-relier-achat-corps className="vrm-relier-feuille-corps" style={{flex:1,minHeight:0,overflow:'auto',padding:'4px 14px 14px'}}>
               <AccAvant geste="achat.relier"/>
               <RelierAchatCorps C={C} cible={cibleRelier} achats={purchasesPick.loading ? null : purchasesPick.items} liens={liensAchats}
                 curTx={(entreePicker(pickerFor) || {}).buyFromId || ''} compteDe={(a)=>{ const st = siteDeAchat(a); return st === 'vinted' ? (accNameOf(a._acc)||'') : [st === 'leboncoin' ? 'Leboncoin' : 'Vestiaire', a.compteSite || ''].filter(Boolean).join(' · '); }} prixDe={prixPayeAchat} onRelier={relierAchat}
                 autre={!!pickerFor._autre} actuel={achatRelie(entreePicker(pickerFor))} onDelier={delierAchatPicker}
-                dejaRelie={(a)=>texteDejaRelie(detenteursAchat(a && a.transaction_id, { numeros, saleOv }))}
+                dejaRelie={(a)=>detenteursAchat(a && a.transaction_id, { numeros, saleOv })}
                 receptionDe={receptionAchatMs} receptionEtat={receptionsRelierEtat} onFiltres={()=>setBesoinInfosRelier(true)}
-                details={detailsAchats} marqueDe={extractBrand} couleursDe={extractColors}/>
+                details={detailsAchats} marqueDe={extractBrand} couleursDe={extractColors} declares={lotsDeclares} nArticlesTx={nArticlesTx}/>
             </div>
           </div>
         </div>, document.body)}
@@ -61849,7 +61951,25 @@ function EcranEmails({ comptes, ...props }) {
   //    (chargé à la demande) suspend et React rejoue l'initialiseur — la demande était déjà vidée.
   const [compteInitial] = useState(() => DEMANDE_ADRESSES.compte || '');
   useEffect(() => { DEMANDE_ADRESSES.compte = ''; const f = () => { DEMANDE_ADRESSES.compte = ''; }; window.addEventListener('vrm:relier-compte', f); return () => window.removeEventListener('vrm:relier-compte', f); }, []);
-  return <BoiteEmails {...props} Photo={PhotoVinted} aRelier={liste} boites={boites} compteInitial={compteInitial} lireDernier={lireDernierEmailCompte}/>;
+  // (17 nov., nouveau design) « Ranger » (glisser à gauche) : une marque synchronisée (`vrm_emails_ranges`, { id: date }),
+  // jamais une suppression ; au retour du nuage, seule une valeur vide est remplacée. Et les e-mails à rattacher : la
+  // MÊME lecture que Paramètres (`useMisDeCote`), le MÊME rejeu « C'est à moi » (POST /api/email-rattacher, SA session).
+  const designV2 = useDesignV2();
+  const [ranges, setRanges] = useStateCle('vrm_emails_ranges', () => load('vrm_emails_ranges', {}) || {});
+  useEffect(() => onCloudReady(() => setRanges((v) => (v && Object.keys(v).length ? v : (load('vrm_emails_ranges', {}) || {})))), []);
+  const ranger = React.useCallback((e, oui) => { setRanges((v) => { const n = rangerEmailsV2(v, e && e.id, oui); save('vrm_emails_ranges', n); return n; }); }, []);
+  const misDeCote = useMisDeCote();
+  useEffect(() => { if (designV2 && _misDeCote === undefined) lireMisDeCote(); }, [designV2]);
+  const quarantaine = designV2 ? { emails: misDeCote === undefined ? undefined : misDeCote ? misDeCote.emails : null, relire: () => lireMisDeCote(),
+    rattacher: async (id) => {
+      let ok = false;
+      try { const r = await fetch('/api/email-rattacher', { method: 'POST', headers: { 'Content-Type': 'application/json', ...enTeteSession() }, body: JSON.stringify({ id, silencieux: false }) }); const j = await r.json().catch(() => ({})); ok = !!(j && j.ok); }
+      catch (_) { toast(tr('v2.mail.q.reseau')); return; }
+      toast(ok ? tr('v2.mail.q.ok') : tr('v2.mail.q.ko'));
+      lireMisDeCote();
+    } } : null;
+  return <BoiteEmails {...props} Photo={PhotoVinted} aRelier={liste} boites={boites} compteInitial={compteInitial} lireDernier={lireDernierEmailCompte}
+    ranges={designV2 ? ranges : null} onRanger={designV2 ? ranger : null} quarantaine={quarantaine}/>;
 }
 // (10 nov.) `ComptesARelierColis` (le bandeau « N colis de X : ses e-mails n'arrivent pas ») est retiré :
 // une marque discrète sur la carte du colis (`data-colis-sans-email`), la ligne de fraîcheur dit le reste.
@@ -62681,9 +62801,10 @@ function AppCoeur() {
   const [tab,setTabBrut]=useState(()=>{ if(!reprise0) return 'journee'; const pl=placeDesColis({ tab:reprise0.tab, sub:reprise0.sub, onglet:reprise0.colis }); if(pl&&pl.onglet==='retirer') demanderRetirer(); return pl?pl.tab:reprise0.tab; });
   // (17 nov., nouveau design) Annonces au téléphone : la tête de la coque ne prend plus de bande (la cloche seule, sur la ligne du
   // titre ; la recherche est le champ de l'écran ; le profil est ailleurs — Paramètres par le menu ☰ et les autres écrans).
+  // (17 nov., nouveau design — Messages) La même tête sur Messages : le grand titre et la cloche sur UNE ligne.
   // (17 nov., phase 2) Argent aussi : la cloche se pose sur la ligne du grand titre, la tête ne prend plus de bande.
   // (17 nov., lot stock-rangement) Stock aussi : la cloche sur la ligne du titre
-  const v2Ann = designV2App && !ordi && (tab === 'annonces' || tab === 'compta' || tab === 'dashboard' || tab === 'settings' || tab === 'garage');
+  const v2Ann = designV2App && !ordi && (tab === 'annonces' || tab === 'messages' || tab === 'emails' || tab === 'compta' || tab === 'dashboard' || tab === 'settings' || tab === 'garage');
   // (6 nov.) L'écran ouvert et celui d'avant, pour « Signaler un problème ».
   noterEcranVu(tab);
   // (6 nov., v36) Et pour les temps réels : une visite d'écran par onglet ouvert.
@@ -65865,6 +65986,7 @@ function AppCoeur() {
                titre (« Publier » : le geste du disque d'hier, `vrm:publier-ailleurs`), jamais posé sur la liste. */
             ? <div className="v2-titre-ligne"><h1>{TITRES_TACHE[t]}</h1><BoutonV2 role="principal" compact icone={<Icon name="plus" size={20}/>} attrs={{ 'data-v2-principal': 'publier' }}
                 onClick={() => { try { window.dispatchEvent(new CustomEvent('vrm:publier-ailleurs', { detail: {} })); } catch (_) {} }}>{tr('v2.ann.publierCourt')}</BoutonV2></div>
+            : designV2App && t === 'messages' ? <div className="v2-titre-ligne" data-v2-msg-titre=""><h1>{TITRES_TACHE[t]}</h1></div>
             : designV2App && t === 'ventes' && v2VentesColis && !baseKO
             /* (17 nov., nouveau design — Ventes, phase 2) Le plein « Imprimer N bordereaux » sur la ligne du titre : rendu par l'écran
                des colis (Comptabilite, son compte et son geste) dans cette place, par portail. */
@@ -67263,7 +67385,9 @@ function AppCoeur() {
             ne répondait pas. `baseKO` distingue « aucun compte » de « je n'ai
             pas pu lire », et l'écran le DIT au lieu de repartir de zéro. */}
         {/* (3 nov., critique #2/#9) Un grand titre sur CHAQUE écran : la barre du haut ne le dit plus. */}
-        {(tab==='communaute'||tab==='emails')&&<header className="vrm-market-heading vrm-tache-tete" data-espace="autres" data-titre-ecran-grand=""><h1>{titreCourant}</h1><PhraseEcran cle={tab}/></header>}
+        {(tab==='communaute'||(tab==='emails'&&!designV2App))&&<header className="vrm-market-heading vrm-tache-tete" data-espace="autres" data-titre-ecran-grand=""><h1>{titreCourant}</h1><PhraseEcran cle={tab}/></header>}
+        {/* (17 nov., nouveau design) E-mails : le grand titre et la cloche sur une ligne (la tête de Messages). */}
+        {tab==='emails'&&designV2App&&<header className="v2-tete-tache" data-espace="autres" data-titre-ecran-grand=""><div className="v2-titre-ligne" data-v2-mail-titre=""><h1>{titreCourant}</h1></div><div className="v2-sous-titre"><span className="v2-aide"><PhraseEcran cle={tab}/></span></div></header>}
         {/* (5 nov., chantier F, revue 2.25) Le choix « Vue d'ensemble · Prix qui marche » vit SOUS le titre de l'écran (il passait au-dessus). */}
         {tab==='dashboard'&&platSub==='prix'&&<GardeEcran nom="dashboard:prix"><PrixMarche data={pqmData} baseKO={baseKO} sousNav={designV2App ? <><ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/><div className="v2-stats-ligne"><BoutonV2 role="texte" onClick={()=>setPlatSub('stats')} attrs={{ 'data-v2-stats-ventes': '' }}>{tr('v2.st.mesVentes')}</BoutonV2></div></> : <><ArgentNav seg="stats" setTab={setTab} comptes={vintedAccounts} panelOff={panelOffCoque}/>{!premierJour?<PlatSubNav sub="prix" setSub={setPlatSub} sections={[['stats','Mes ventes'],['prix','Prix qui marche']]}/>:null}</>}/></GardeEcran>}
         {tab==='dashboard'&&premierJour&&<GardeEcran nom="dashboard:bienvenue"><Onboarding setTab={setTab}/></GardeEcran>}

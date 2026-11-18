@@ -9,7 +9,7 @@
     "octets": 3418418,
     "doublons": 27,
     "entieres": 0,
-    "js": 1966,
+    "js": 1969,
     "doublonsParAdresse": {
      "app_data?id=eq.lbc_accounts&select=a:data->accounts|": 2,
      "app_data?id=eq.lbc_listings&select=l:data->lectures|": 2,
@@ -670,6 +670,20 @@
     "achats"
    ],
    "raison": "source unique : suivis lus une fois pour tous les moteurs (lot agent2-source-unique)"
+  },
+  {
+   "date": "2026-11-18",
+   "ecrans": [
+    "journee"
+   ],
+   "raison": "train du 18 nov. : Messages et E-mails du nouveau design (lot design-v2-messages, #1263 : LigneConversation, messagesV2 dans le morceau App) — +1 Ko de JS+CSS au démarrage (1 967 arrondi, un peu plus de 1 967 × 1 024 octets mesuré en CI : budget 1 968)"
+  },
+  {
+   "date": "2026-11-18",
+   "ecrans": [
+    "journee"
+   ],
+   "raison": "train du 18 nov. : Relier tous ses achats (lot relier-tout-achat, #1255) — +0,4 Ko au démarrage (1 968,38 mesuré) ; la suite de la file reste sous 1 969 (carte-coucou 1 968,40 · favoris-liste 1 968,47 · republication 1 968,98)"
   }
  ]
 }

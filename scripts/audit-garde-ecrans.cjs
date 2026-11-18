@@ -25,7 +25,8 @@ const dit = (c, m, d) => { if (!c) ko++; console.log((c ? '✅ ' : '❌ ') + m +
 const lignes = src.split('\n');
 const montages = lignes.map((l, i) => ({ l, i: i + 1 })).filter(({ l }) => /^        \{\(?tab==='[a-z_]+'/.test(l));
 // Les titres seuls (un <header> sans écran) ne sont pas des écrans.
-const ecrans = montages.filter(({ l }) => !/&&<header className="vrm-market-heading/.test(l));
+// (18 nov., design-v2-messages) le titre d'E-mails du nouveau design (`<header className="v2-tete-tache"`) : un titre seul, lui aussi.
+const ecrans = montages.filter(({ l }) => !/&&<header className="(?:vrm-market-heading|v2-tete-tache)/.test(l));
 // Un montage écrit sur deux lignes (`{…&&(` puis `<GardeEcran …>`) : la ligne suivante compte.
 const sansGarde = ecrans.filter(({ l, i }) => !/<GardeEcran nom=/.test(l) && !/^\s*<GardeEcran nom=/.test(lignes[i] || ''));
 console.log(`${ecrans.length} écrans montés par la coque (lignes « {tab==='…'&& »), ${montages.length - ecrans.length} titre(s) seul(s).`);

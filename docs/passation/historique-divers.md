@@ -2038,3 +2038,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée le 18 nov. (lot design-v2-argent, fusion de main), telle quelle
 - **17 nov. · Vitesse : le poids du démarrage (lot vitesse-poids)** : Ma journée 2 087 → 1 945 Ko de JS+CSS (budget-vitesse VERT) — le français des écrans à la demande part avec eux (`fr-reste`, au build : `scripts/_francais-differe.cjs`, fr.js reste complet), noms courts par terser (mangle seul), QR à la demande. CSS morte : 0,3 Ko prouvable, rien retiré. `2026-11-17-vitesse-poids.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée le 18 nov. (lot relier-tout-achat, fusion de main), telle quelle
+- **17 nov. · Groupes : créer en 3 étapes, et le coucou (lot groupes-coucou)** : feuille guidée (photo · règles dites, RIEN partagé par défaut · inviter : QR, Partager, lien Discord) ; page du groupe ; coucou 👋 sans aucun texte, UN geste « Lui écrire sur Discord » (profil signé, sinon salon du groupe, sinon « Pas de Discord lié »), 1/paire/24 h, 20/jour, sourdine, même groupe seulement ; migration **046 PAS APPLIQUÉE** (« bientôt » d'ici là). `2026-11-17-groupes-coucou.md`. Geste : appliquer la 046, coller le lien Discord du groupe.
