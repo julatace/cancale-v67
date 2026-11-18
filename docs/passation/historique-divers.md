@@ -2030,3 +2030,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée le 18 nov. (lot moteur-rapide, fusion de main), telle quelle
 - **17 nov. · « Créé par vrm.center » juste au-dessus du code, et ne s'enlève plus (lot tampon-qr)** : centrée sur le plus grand QR/DataMatrix/MaxiCode (sinon le code-barres), 3 mm au-dessus, dans le SENS de l'étiquette, police réduite jusqu'à 4,5 pt, sinon rien — jamais dessous ni à côté ; aucune case/place/taille, un « sans mention » rangé ignoré ; Paramètres → Tampons montre SON dernier bordereau par transporteur (sinon « Exemple »). Bancs `tampon-qr` 33/33, `tampons-page`. `2026-11-17-tampon-qr.md`. Geste : aucun.
+
+## Ligne du §9 de CLAUDE.md déplacée le 18 nov. (lot vitesse-cache, fusion de main), telle quelle
+- **17 nov. · Nouveau design « Studio Premium » ALLUMÉ PAR DÉFAUT (lot design-v2, #1246) + plus de disque « + » + barre d'onglets en 5 styles** : Aujourd'hui, Annonces (A/C), Achats (passes, liste propre, « Annulés · N »), chargement immobile, l'AIR ; « Ancien design » (Paramètres → Apparence) ramène l'apparence d'avant, identique à main ; « Barre d'onglets » C par défaut (A, B, D, E au choix, synchronisé). Les bancs d'hier voient l'ancien design (`_garde-reseau.cjs`). Détail : `docs/passation/2026-11-17-design-v2.md`. Geste : aucun.

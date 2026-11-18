@@ -1120,7 +1120,8 @@ import { reprendreBarre } from "./designV2/barre.jsx";   // (17 nov.) le style d
 import "./design/accessibilite.css";   // (17 nov.) audit WCAG 2.1 AA : focus double, encre claire sur le bleu, 44 px — `@layer vrm-a11y`, nommée AVANT vrm-verre (index.html)
 import { articleVisuel, CLE_REGLAGES as CLE_VISUELS } from "./visuelsReseaux.js";   // (11 nov., lot visuels-reseaux)
 import { enregistrerGaleries, ouvrirVisionneuse, galerieDe, origineVignette } from "./visionneuse.js";
-import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre } from "./ecransGardes.jsx";
+import { EcransGardes, noterNavigationSimple, useVivant, estCache, useEcranGardeMontre, generationDonnees, AGE_MAX_CACHE_MS } from "./ecransGardes.jsx";
+import { numDataGardable, numDataFrais } from "./histoireGardee.js";   // (17 nov., lot vitesse-cache) l'histoire des N° gardée entre deux fiches
 import { fonduEntree } from "./passageOnglet.js";
 import { echelleTexte, marquerGrandTexte } from "./grandTexte.js";
 import { echelleTotale, lireTailleTexte } from "./tailleTexte.js";   // (15 nov.) Paramètres → Taille du texte
@@ -62296,6 +62297,11 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
   // L'état d'une vente : le mot retenu (« À envoyer », « En route »), et l'ambre
   // seulement quand il y a un geste à faire (un colis à envoyer, §7).
   const geste = (l) => l.etat === L.aEnvoyer || motEtatVente(l.etat) === L.aEnvoyer;
+  // (17 nov., lot vitesse-cache — Julien : « ouvrir une vente ça prend du temps, ça bug ») Toucher une vente VINTED
+  // ouvre SA fiche (HoteFicheLigne, src/ficheLigne.js), désignée par SON n° de transaction — jamais le titre. Avant, le
+  // toucher redessinait tout l'écran Vinted (2 000 ventes : 3 s avant la première image, 15 s de calcul au téléphone)
+  // et ne montrait même pas la vente touchée. Leboncoin, Vestiaire, eBay : leur écran, comme avant.
+  const ficheToutes = (l) => (l.site === 'vinted' && l.id ? attrsFicheLigne({ contexte: 'vente', site: 'vinted', tx: l.id, cle: l.cle, photo: typeof l.photo === 'string' ? l.photo : '', titre: l.titre || '', prix: prix(l), sous: l.etat ? motEtatVente(l.etat) : '' }) : {});
   return (
     <div className="vrm-ventes-toutes" data-ventes-toutes={enCours ? 'lecture' : 'lu'} data-n={String(lignes.length)} style={{ padding: '4px 16px 16px' }}>
       {visibles.length > 0 && (
@@ -62334,7 +62340,7 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
             {lignes.slice(0, n).map((l, il) => (
               <React.Fragment key={l.cle}>
               {il === sansDateT.i ? <LigneSansDate n={sansDateT.n}/> : null}
-              <button type="button" className="vrm-toutes-ligne" data-toutes-vente={l.site} data-toutes-id={l.id} data-toutes-compte={l.compte || ''} data-ordre-t={l.t != null ? String(l.t) : ''} onClick={() => onOuvrir(l)}
+              <button type="button" className="vrm-toutes-ligne" data-toutes-vente={l.site} data-toutes-id={l.id} data-toutes-compte={l.compte || ''} data-ordre-t={l.t != null ? String(l.t) : ''} {...ficheToutes(l)} onClick={() => { if (!ficheToutes(l)['data-fiche-ligne']) onOuvrir(l); }}
                 aria-label={`${l.titre} — ${NOM[l.site]}${l.compte ? ', ' + l.compte : ''}, ${jour(l.t)}${l.etat ? ', ' + motEtatVente(l.etat) : ''}${l.prix != null ? ', ' + prix(l) : ''}${l.num ? ', N°' + l.num : ''}`}
                 style={{ width: '100%', minHeight: 56, display: 'flex', alignItems: 'center', gap: 12, padding: '10px 2px', background: 'transparent', border: 0, borderBottom: `1px solid ${C.border}`, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', color: C.text }}>
                 {/* (11 nov., lot accessibilité) Le nom de la ligne est LU ici (tout ce qu'elle montre, N° compris) ;
@@ -62359,6 +62365,11 @@ function VentesToutes({ sites, ventesVinted, ventesKO, comptes, panelOff, lbcVen
                   {l.num ? <span data-toutes-num={l.num} style={{ display: 'block', marginTop: 4 }}><Numero n={l.num} taille="petit"/></span> : null}
                 </span>
               </button>
+              {/* (17 nov., vitesse-cache) Dans SA fiche : les gestes de la vente (bordereau, suivi, prix d'achat…) restent à
+                  un toucher, sur l'écran Vinted où ils vivent — comme le toucher d'avant, mais seulement quand on les veut. */}
+              {ficheToutes(l)['data-fiche-ligne'] ? <DansFiche cle={ficheToutes(l)['data-fiche-ligne']} place="actions" seulementFiche>
+                <Bouton variante="secondaire" data-toutes-gestes={l.id} onClick={() => { fermerLigne(); onOuvrir(l); }}>{tr('ventes.gestesVinted')}</Bouton>
+              </DansFiche> : null}
               </React.Fragment>
             ))}
             {lignes.length > n && <Bouton variante="secondaire" plein data-toutes-plus="" onClick={() => React.startTransition(()=>setN((x) => x + 60))} style={{ marginTop: 12 }}>Afficher {Math.min(60,lignes.length-n) > 1 ? `les ${Math.min(60,lignes.length-n)} suivantes` : 'la suivante'}</Bouton>}
@@ -63254,6 +63265,7 @@ function AppCoeur() {
   // « jamais servi ». Scalaires seulement pour les bordereaux et les
   // transactions (§4.4), pagination stricte (§4.5).
   const [numData,setNumData]=useState(null);
+  const numDataQuand=React.useRef(null);   // (17 nov.) { gen, at, complet } de l'histoire des N° gardée (voir plus bas)
   const [revisionFiche,relireFiche]=React.useReducer(n=>n+1,0);
   useEffect(()=>{const ouvrir=e=>{if(typeof e.detail!=='string'||!e.detail.trim()||e.detail.length>64)return;setNumData(null);relireFiche();setGsQ(e.detail.trim());setGsOpen(true);setTimeout(()=>{ try{ gsChampRef.current&&gsChampRef.current.focus({preventScroll:true}); }catch(_){} },0);};window.addEventListener('vrm:fiche-article',ouvrir);return()=>window.removeEventListener('vrm:fiche-article',ouvrir);},[]);
   // (1er nov.) LA FICHE COMPLÈTE D'UNE PAIRE (`FichePaire`) : ouverte depuis
@@ -63330,7 +63342,17 @@ function AppCoeur() {
         recuMs:pr.recu?pr.recu.ms:null, recuSource:pr.recu?pr.recu.source:null, centimes:prix?prix.centimes:null, texte:prix&&Number.isSafeInteger(prix.centimes)?`${(prix.centimes/100).toFixed(prix.centimes%100?2:0).replace('.',',')}\u00a0€`:null, proposition:prix } });
     })();
     return ()=>{ vivant=false; }; /* eslint-disable-next-line */ },[numOutil,numData,ficheTick]);
-  useEffect(()=>{ if(!besoinNumData){ setNumData(null); return undefined; } if(numData) return undefined; let vivant=true; (async()=>{
+  // (17 nov., lot vitesse-cache — Julien : « ouvrir une vente ça prend du temps, ça bug ») L'HISTOIRE DES N° n'est plus
+  // jetée à la fermeture de la fiche : chaque ouverture relisait tout (dressings, ventes de tous les comptes, transactions,
+  // bordereaux, Leboncoin, eBay — plusieurs Mo à analyser au téléphone). Elle est GARDÉE tant qu'aucune donnée n'a changé
+  // (`generationDonnees`, la règle des écrans gardés : une sauvegarde qui compte, un signal de l'extension, une relecture
+  // du nuage, un retour au premier plan) et au plus AGE_MAX_CACHE_MS ; sinon elle est oubliée AVANT d'être relue (la fiche
+  // dit « lecture… », jamais l'ancienne histoire présentée comme fraîche). Pas su (une lecture ratée) n'est jamais gardé
+  // plus que la fiche ouverte.
+  useEffect(()=>{ if(!besoinNumData){ if(!numData) return undefined; const t=setTimeout(()=>{ numDataQuand.current=null; setNumData(null); }, numDataGardable(numDataQuand.current) ? AGE_MAX_CACHE_MS : 0); return ()=>clearTimeout(t); }
+    if(numData&&!numDataFrais(numDataQuand.current)){ numDataQuand.current=null; setNumData(null); }
+    else if(numData) return undefined;
+    const genLue=generationDonnees(); let vivant=true; (async()=>{
     const sb=async(q)=>{ try{ const r=await fetch(`${SUPABASE_URL}/rest/v1/${q}`,{headers:sbAuth()}); if(!r.ok) return null; const j=await r.json(); return Array.isArray(j)?j:null; }catch(_){ return null; } };
     let versementsLus=null;
     // Le Stock vit dans SA ligne (`vrm_room`) : la copie de l'appareil peut
@@ -63377,7 +63399,7 @@ function AppCoeur() {
     let ebayCommandes=null, ebayAnnonces=null;
     if(Array.isArray(cE)){ const tous=async(base,sel,champ)=>{ const r=await lireEbayTous(base,sel,champ,cE); return (!r||r.illisibles.length)?null:r.items; };
       [ebayCommandes, ebayAnnonces]=await Promise.all([tous('ebay_orders',SEL_EBAY_COMMANDES,'orders'), tous('ebay_listings',SEL_EBAY_ANNONCES,'items')]); }
-    if(vivant) setNumData({enLigne,aConfirmer,masquees,ventes,txnItem,bordereaux,lbcVentes,lbcItems,ebayCommandes,ebayAnnonces,plan,stats,crees,versements:txnItem==null?null:versementsLus});
+    if(vivant){ numDataQuand.current={ gen: genLue, at: Date.now(), complet: !!(lstRows&&soldRows&&txnItem&&bE&&bL&&lbcRows&&Array.isArray(cE)) }; setNumData({enLigne,aConfirmer,masquees,ventes,txnItem,bordereaux,lbcVentes,lbcItems,ebayCommandes,ebayAnnonces,plan,stats,crees,versements:txnItem==null?null:versementsLus}); }
   })(); return ()=>{ vivant=false; }; /* eslint-disable-next-line */ },[besoinNumData,revisionFiche]);
   // (9 nov.) Plus de balayage entre onglets : voir la coque (onTouchStart retiré).
   // Passer à l'onglet voisin au doigt ou avec les flèches du clavier.
