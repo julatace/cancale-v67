@@ -37,6 +37,17 @@ const EXEMPTS = {
   _departsCarte: 'lu par `departsCarte()` : `vcLoc0.departs` est cette même carte',
 };
 // Ce que la clé porte en plus des noms (vérifié présent).
+// Les fichiers IMPORTÉS que le calcul atteint : un état de module (`let`, table vide remplie en place, `new …`)
+// n'y est admis qu'ici, avec sa raison (sinon il serait lu figé). Clé : « fichier:nom ».
+const MODULES_ADMIS = {
+  'liensColis.js:memo': 'mémoire d\'UN calcul synchrone, vidée à la microtâche suivante',
+  'transporteursVisuels.js:_emailsParSuivi': 'WeakMap rangée par la liste elle-même (une autre liste = une autre entrée)',
+  'departVente.js:_partis': 'publiée par `publierDepartsVinted`, qui appelle toucherMemoire() (versionMemoire est dans la clé)',
+  '../api/_lib/limite-envoi.js:_fmt': 'formateur de date créé une fois',
+  '../api/_lib/transporteurs.js:VG_RETOUR_GROUPES': 'ensemble constant', '../api/_lib/transporteurs.js:VG_GROUPES_DE_ROUTE': 'ensemble constant',
+  '../api/_lib/transporteurs.js:ETATS_A_RELIRE': 'ensemble constant', '../api/_lib/transporteurs.js:AMBRE': 'ensemble constant',
+  '../api/_lib/depart-colis.js:CP_PAS_DEPART': 'ensemble constant', '../api/_lib/depart-colis.js:VG_PAS_DEPART': 'ensemble constant',
+};
 const EN_PLUS = ['vcLoc0.departs', 'versionMemoire()', 'Math.floor(Date.now() / 10000)'];
 
 function analyser(src) {
@@ -54,7 +65,7 @@ function analyser(src) {
   const dansCompta = (s) => { for (let x = s; x; x = x.parent) if (x === cScope) return true; return false; };
   const estHook = (n) => n && n.type === 'CallExpression' && ((n.callee.type === 'Identifier' && /^use[A-Z]/.test(n.callee.name))
     || (n.callee.type === 'MemberExpression' && n.callee.property && /^use[A-Z]/.test(n.callee.property.name || '')));
-  const racines = new Set(), modules = new Set();
+  const racines = new Set(), modules = new Set(), imports = new Set();
   const vus = new Set();
   const pile = [b0.path.isFunctionDeclaration() ? b0.path : b0.path.get('init')];
   while (pile.length) {
@@ -66,7 +77,7 @@ function analyser(src) {
         if (!b || dans(b.path, corps)) return;
         const cle = (b.scope === mScope ? 'm:' : 'c:') + nom;
         if (b.scope === mScope) {
-          if (b.kind === 'module') return;                       // import : une fonction pure d'un autre fichier
+          if (b.kind === 'module') { imports.add(nom); return; }   // import : son fichier est vérifié plus bas
           if (b.kind === 'let' || b.kind === 'var') { modules.add(nom); return; }
           const ini = b.path.node && b.path.node.init;
           if (ini && (ini.type === 'ObjectExpression' || ini.type === 'ArrayExpression' || ini.type === 'NewExpression')) { modules.add(nom); return; }
@@ -89,7 +100,25 @@ function analyser(src) {
       },
     });
   }
-  return { racines: [...racines].sort(), modules: [...modules].sort() };
+  // Les fichiers importés atteints : leurs états de module (hors MODULES_ADMIS).
+  const source = {};
+  for (const n of prog.node.body) if (n.type === 'ImportDeclaration') for (const sp of n.specifiers) source[sp.local.name] = n.source.value;
+  const etatsImportes = [];
+  for (const f of new Set([...imports].map((n) => source[n]).filter((f) => f && f.startsWith('.')))) {
+    let fp = path.resolve(path.dirname(FICHIER), f);
+    if (!fs.existsSync(fp)) continue;
+    let a2; try { a2 = parser.parse(fs.readFileSync(fp, 'utf8'), { sourceType: 'module', plugins: ['jsx'], errorRecovery: true }); } catch (_) { continue; }
+    for (const n of a2.program.body) {
+      const d = n.type === 'ExportNamedDeclaration' ? n.declaration : n;
+      if (!d || d.type !== 'VariableDeclaration') continue;
+      for (const v of d.declarations) {
+        const i = v.init; const nom = v.id && v.id.name; if (!nom) continue;
+        const etat = d.kind !== 'const' || (i && (i.type === 'NewExpression' || (i.type === 'ObjectExpression' && !i.properties.length) || (i.type === 'ArrayExpression' && !i.elements.length)));
+        if (etat) etatsImportes.push(f.replace(/^\.\//, '') + ':' + nom);
+      }
+    }
+  }
+  return { racines: [...racines].sort(), modules: [...modules].sort(), etatsImportes };
 }
 
 function cleAttendue(a) {
@@ -113,6 +142,7 @@ function verifier(src) {
   if (!cle) return { rouges: ['marqueurs ⟦cle-verifier⟧ introuvables'], a, cle };
   const dansCle = new Set(cle);
   for (const n of cleAttendue(a)) if (!dansCle.has(n)) rouges.push(`« ${n} » est lu par ${CIBLE} mais absent de la clé`);
+  for (const e of a.etatsImportes) if (!MODULES_ADMIS[e]) rouges.push(`état de module « ${e} » lu par ${CIBLE} (fichier importé) : ni dans la clé ni admis — le versionner (toucherMemoire) puis l'admettre avec sa raison`);
   for (const n of Object.keys(EXEMPTS)) if (dansCle.has(n)) rouges.push(`« ${n} » est exempté (${EXEMPTS[n]}) mais dans la clé`);
   return { rouges, a, cle };
 }
@@ -131,6 +161,9 @@ if (process.argv.includes('--prouve')) {
     const r = verifier(ecrireCle(src, cle.filter((x) => x !== n)));
     if (r.rouges.length) rougies++; else console.log(`  ✗ retirer « ${n} » ne rougit pas`);
   }
+  // Un état de module importé non admis : rouge.
+  { const sauve = MODULES_ADMIS['departVente.js:_partis']; delete MODULES_ADMIS['departVente.js:_partis']; const rr = verifier(src); MODULES_ADMIS['departVente.js:_partis'] = sauve;
+    console.log(`état importé non admis (departVente.js:_partis) ⇒ ${rr.rouges.length ? 'rouge' : 'VERT (défaut)'}`); if (!rr.rouges.length) rougies = -1e9; }
   // Et un nom lu ajouté au calcul sans la clé : rouge.
   const mutant = src.replace(`const ${CIBLE} = () => {`, `const ${CIBLE} = () => { void cycleRepondus;`);
   const rm = verifier(mutant);
@@ -141,5 +174,5 @@ const r = verifier(src);
 if (!/stockageInchange\(m\.lu\)/.test(src) || !/suivreStockage\(commandesAVerifierCalc\)/.test(src)) r.rouges.push('le stockage lu par le calcul n\'est plus suivi (suivreStockage / stockageInchange)');
 for (const x of EN_PLUS) if (!(r.cle || []).includes(x)) r.rouges.push(`la clé ne porte pas « ${x} »`);
 if (r.rouges.length) { for (const x of r.rouges) console.log('  ❌ ' + x); console.log(`\naudit-cle-verifier : ${r.rouges.length} rouge(s) — \`node scripts/audit-cle-verifier.cjs --ecrire\` refait la liste`); process.exit(1); }
-console.log(`  ✅ la clé de « commandes à vérifier » porte les ${r.a.racines.length} entrées de l'écran et les ${r.a.modules.length} de module lues (${Object.keys(EXEMPTS).length} exemptées, raison dite)`);
+console.log(`  ✅ la clé de « commandes à vérifier » porte les ${r.a.racines.length} entrées de l'écran et les ${r.a.modules.length} de module lues (${Object.keys(EXEMPTS).length} exemptées, raison dite) ; états de module des fichiers importés : ${r.a.etatsImportes.length}, tous admis avec leur raison`);
 console.log('\naudit-cle-verifier : vert');
