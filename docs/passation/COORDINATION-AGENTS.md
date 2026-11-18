@@ -337,3 +337,4 @@ await secuObserver('vestiaire', compte, { status, defi, retryAfter }); // 'robot
 - 2026-11-18 14:26 UTC · train youthful-wozniak : #1266 en ligne (moteur rapide 1b) — main bff6953d5, Vercel production success. Avant fusion : audit-statuts (j) et audit-suivi-commandes portés (86e0ba49f, seuls rouges nouveaux). Suivante : #1253.
 - 2026-11-18 14:33 UTC · train youthful-wozniak : #1253 en ligne (vitesse-cache) — main 6a1d65bae, Vercel production success. CI : rouges = main. Suivante : #1254.
 - 2026-11-18 14:37 UTC · train youthful-wozniak : #1254 en ligne (Argent et Paramètres, nouveau design) — main 87693fcac, Vercel production success. CI : rouges = main. Suivante : #1263.
+- 2026-11-18 17:48 UTC · train youthful-wozniak : #1263 en ligne (Messages et E-mails, nouveau design) — main 41796bca4, Vercel production success. Avant fusion : audit-garde-ecrans (titre seul v2) et budget du démarrage 1 968 (accord du coordinateur). Suivante : #1255.
