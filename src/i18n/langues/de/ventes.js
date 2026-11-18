@@ -247,4 +247,5 @@ export default {
   "ventes.pourquoiBord": "Warum wartet dieses Etikett?",
   "ventes.puceAchat": "Einkaufspreis?",
   "ventes.puceRelier": "Einkauf verknüpfen",
+  "ventes.gestesVinted": "Ihre Aktionen unter Verkäufe · Vinted",
 };

@@ -180,5 +180,10 @@ export default {
   "v2.barre.ach": "Achats",
   "v2.barre.ven": "Ventes",
   "v2.barre.arg": "Argent",
-  "v2.mail.selectionner": "Sélectionner"
+  "v2.mail.selectionner": "Sélectionner",
+  "v2.style.lib": "Style",
+  "v2.style.apple": "Apple",
+  "v2.style.apple.desc": "Fond gris clair, cartes blanches, police et réglages d'iPhone.",
+  "v2.style.studio": "Studio bleu",
+  "v2.style.studio.desc": "Le fond bleu et le verre d'avant."
 };
