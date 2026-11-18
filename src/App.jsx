@@ -62717,6 +62717,8 @@ function AppCoeur() {
       // (5 nov.) Un lien d'invitation à un groupe d'accompagnement : le code est
       // gardé pour l'écran Communauté (chargé ensuite), l'adresse est nettoyée.
       if(tt==='communaute'&&p.get('groupe')){ try{ sessionStorage.setItem('vrm_accomp_lien', String(p.get('groupe')).slice(0,20)); }catch(_){} }
+      // (17 nov.) Une notification de coucou (`?tab=communaute&vue=groupes`) ouvre l'onglet Groupes.
+      if(tt==='communaute'&&p.get('vue')==='groupes'){ try{ sessionStorage.setItem('vrm_cm_vue', 'groupes'); }catch(_){} }
       if(tt==='communaute'&&p.get('formateur')&&p.get('g')){ try{ sessionStorage.setItem('vrm_form_lien', JSON.stringify({ a: String(p.get('formateur')).slice(0,30), g: String(p.get('g')).slice(0,36) })); }catch(_){} }
       setTab(tt); window.history.replaceState(window.history.state,'',window.location.pathname); } }catch(_){}};
     goto(window.location.search);
