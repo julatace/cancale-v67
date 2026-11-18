@@ -1,5 +1,6 @@
 // ITALIANO — traduzione di fr.js (la fonte). Stesse chiavi, stesse {variabili}.
 import ecran_accessibilite from './it/accessibilite.js';   // (17 nov.) audit d'accessibilité
+import ecran_groupes from './it/groupes.js';   // (17 nov.) Communauté → Groupes : créer en trois étapes, le coucou
 import ecran_suivi_vente from './it/suiviVente.js';   // (16 nov.) le suivi des colis vendus
 import ecran_perso from './it/perso.js';   // (16 nov.) « Modifier ma journée » simple
 import ecran_ventesVerre from './it/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
@@ -74,6 +75,7 @@ import ecran_arrivee from './it/arrivee.js';   // (15 nov.) atelier d'arrivée, 
 import ecran_stock_rangement from './it/stockRangement.js';   // (17 nov.) le Stock « Ranger » en séance (nouveau design)
 export default {
   ...ecran_accessibilite,
+  ...ecran_groupes,
   ...ecran_perso,
   ...ecran_ventesVerre,
   ...ecran_studio_paires,

@@ -392,7 +392,9 @@ export default function Communaute({ headers, sombre = false, prenom = '', Ferme
   // (10 nov., lot AR) « Demander à rejoindre » depuis la page publique d'un formateur
   // (`?tab=communaute&formateur=<adresse>&g=<groupe>`, gardé par l'app) : onglet Groupes.
   const [lienFormateur] = useState(() => { try { const c = sessionStorage.getItem('vrm_form_lien'); sessionStorage.removeItem('vrm_form_lien'); return lienFormateurLu(c); } catch (_) { return null; } });
-  const [vue, setVue] = useState(codeLien || lienFormateur ? 'groupes' : 'carte');   // carte · classement · groupes
+  // (17 nov.) Une notification de coucou ouvre Groupes (`vrm_cm_vue`, gardé par l'app).
+  const [vueLien] = useState(() => { try { const v = sessionStorage.getItem('vrm_cm_vue'); sessionStorage.removeItem('vrm_cm_vue'); return v === 'groupes' ? v : ''; } catch (_) { return ''; } });
+  const [vue, setVue] = useState(codeLien || lienFormateur || vueLien ? 'groupes' : 'carte');   // carte · classement · groupes
   const [groupeId, setGroupeId] = useState(null);     // null = tous les membres
   const vivant = useRef(true);
   const lire = useCallback(async (discret) => {

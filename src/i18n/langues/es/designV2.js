@@ -136,5 +136,10 @@ export default {
   "v2.barre.ann": "Anuncios",
   "v2.barre.ach": "Compras",
   "v2.barre.ven": "Ventas",
-  "v2.barre.arg": "Dinero"
+  "v2.barre.arg": "Dinero",
+  "v2.style.lib": "Estilo",
+  "v2.style.apple": "Apple",
+  "v2.style.apple.desc": "Fondo gris claro, tarjetas blancas, letra y controles de iPhone.",
+  "v2.style.studio": "Estudio azul",
+  "v2.style.studio.desc": "El fondo azul y el cristal de antes."
 };

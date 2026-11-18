@@ -31,6 +31,8 @@
     var m = document.querySelector('meta[name="theme-color"]');
     if (m) m.setAttribute('content', d ? BOOT_NUIT : BOOT_CLAIR);
     document.documentElement.setAttribute('data-vrm-boot', '');
+    // (18 nov.) Le style « Apple » (src/designV2/style.js, `vrm_style`) : posé avant le premier rendu, le fond groupé dès l'ouverture.
+    try { if (localStorage.getItem('vrm_style') === 'apple') { document.documentElement.setAttribute('data-theme-style', 'apple'); if (m) m.setAttribute('content', d ? '#000000' : '#F2F2F7'); } } catch (e) {}
   } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
   // « Recharger » de l'écran de démarrage (au-delà de 8 s) : avant tout JavaScript de l'app (c'est quand
   // elle ne vient pas qu'on le touche). Il OUBLIE la coquille gardée par le service worker (la page `/`,

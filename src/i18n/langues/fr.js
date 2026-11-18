@@ -5,6 +5,7 @@
 // sans `other`. Clés : `<écran>.<élément>[.<précision>]`, jamais le texte lui-même.
 // Pluriel : { one: '…', other: '…' } choisi par `n` (Intl.PluralRules).
 import ecran_accessibilite from './fr/accessibilite.js';   // (17 nov.) audit d'accessibilité
+import ecran_groupes from './fr/groupes.js';   // (17 nov.) Communauté → Groupes : créer en trois étapes, le coucou
 import ecran_suivi_vente from './fr/suiviVente.js';   // (16 nov.) le suivi des colis vendus
 import ecran_perso from './fr/perso.js';   // (16 nov.) « Modifier ma journée » simple
 import ecran_ventesVerre from './fr/ventesVerre.js';   // (15 nov.) Ventes et Achats « Verre dépoli »
@@ -79,6 +80,7 @@ import ecran_arrivee from './fr/arrivee.js';   // (15 nov.) atelier d'arrivée, 
 import ecran_stock_rangement from './fr/stockRangement.js';   // (17 nov.) le Stock « Ranger » en séance (nouveau design)
 export default {
   ...ecran_accessibilite,
+  ...ecran_groupes,
   ...ecran_perso,
   ...ecran_ventesVerre,
   ...ecran_studio_paires,
