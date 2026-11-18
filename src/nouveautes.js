@@ -29,6 +29,8 @@ export const PHRASE_MOTS_MAX = 12;
 export const NOUVEAUTES = Object.freeze([
   // (18 nov., Julien : « Apple — Wallet, Réglages ») src/designV2/theme-apple.css — éteint par défaut, sur cet appareil
   { id: 'style-apple', date: '2026-11-18', titre: 'Essaie le style Apple', phrase: 'Paramètres → Apparence → Style : fond gris clair, cartes blanches.', tab: 'settings', pour: 'tous', mode: 'tous' },
+  // (17 nov., Julien : « tout doit être parfait […] de annonce à brouillon et de brouillon à en ligne ») docs/passation/2026-11-17-republication-parfaite.md
+  { id: 'republication-parfaite', date: '2026-11-17', titre: 'Republier : chaque étape visible, tout se reprend', phrase: 'Coffre, brouillon, supprimée, en ligne ; « Reprendre » finit une paire arrêtée.', tab: 'republier', pour: 'tous', mode: 'tous' },
   // (17 nov., Julien : « il faut une liste avec les favoris pour pouvoir les sélectionner etc ») docs/passation/2026-11-17-extension-favoris-liste.md
   { id: 'extension-favoris-liste', date: '2026-11-17', titre: 'Tes favoris en liste, à cocher, sur Vinted', phrase: 'Installe la 5.407 : coche, relis le récapitulatif, puis confirme.', tab: 'settings', pour: 'tous', mode: 'tous' },
   // (17 nov., Julien : « pas échanger des messages dans mon app, mais sur Discord ») docs/passation/2026-11-17-carte-coucou.md

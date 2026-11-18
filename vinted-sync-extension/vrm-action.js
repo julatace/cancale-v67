@@ -94,7 +94,18 @@
   @keyframes vu-in { from { opacity: 0; } to { opacity: 1; } }
   .sort { animation: vu-out .5s ease forwards; }
   @keyframes vu-out { 0%, 60% { opacity: 1; } 100% { opacity: 0; } }
-  @media (prefers-reduced-motion: reduce) { .anim .voile, .anim .boite, .anim .pastille, .sort { animation: none; } }
+  /* 5.408 : la chaîne de la paire en cours (coffre › brouillon › supprimée › en ligne). */
+  .chaine { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; font: 600 14px/1.3 var(--vu-police); color: var(--vu-sur-2); font-feature-settings: "tnum" 1; font-variant-numeric: tabular-nums; }
+  .chaine li { display: inline-flex; align-items: center; gap: 6px; }
+  .chaine li + li::before { content: '›'; margin-right: 8px; opacity: .5; }
+  .chaine .pu { width: 20px; height: 20px; border-radius: 999px; display: inline-grid; place-items: center; font: 800 12px/1 var(--vu-police); box-shadow: inset 0 0 0 2px currentColor; opacity: .55; }
+  .chaine [data-etat="faite"] { color: var(--vu-sur); }
+  .chaine [data-etat="faite"] .pu { opacity: 1; box-shadow: none; background: var(--vu-sur); color: rgb(8 20 38); }
+  .chaine [data-etat="encours"] { color: var(--vu-sur); }
+  .chaine [data-etat="encours"] .pu { opacity: 1; animation: vu-pouls 1.4s ease-in-out infinite; }
+  @keyframes vu-pouls { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+  @media (max-width: 560px) { .chaine { justify-content: center; } }
+  @media (prefers-reduced-motion: reduce) { .anim .voile, .anim .boite, .anim .pastille, .sort, .chaine .pu { animation: none; } }
 </style><div class="vu-racine" data-racine></div>`;
   U.monter(ombre);
   const racine = ombre.querySelector('[data-racine]');
@@ -199,6 +210,18 @@
     const suivants = Array.isArray(a.suivants) ? a.suivants.slice(0, 3) : [];
     return suivants.length ? `<div class="suiv-t">${esc(T('a_suivants'))}</div><div class="suiv-l">${suivants.map((x) => `<span class="mini" title="${esc(x.titre || '')}">${vinted(x.photo) ? `<img src="${esc(x.photo)}" alt="" referrerpolicy="no-referrer" decoding="async">` : '<span class="ph"></span>'}<span class="mt">${esc(x.titre || '')}</span></span>`).join('')}</div>` : '';
   };
+  // 5.408 (`repubetapes`) : l'étape de LA paire en cours, telle que le service worker l'a annoncée
+  // (coffre › brouillon › supprimée › en ligne). Rendue au premier dessin ET tenue à jour sur place (majPlein).
+  const chaineHtml = (a) => {
+    const it = a.item || {};
+    const rp = a.sorte === 'republier' && a.repub && String(a.repub.id || '') === String(it.id || '') ? a.repub : null;
+    if (!rp) return '';
+    const fait = Math.max(0, Math.min(4, Number(rp.fait) || 0)); const du = Number(rp.du) > Date.now() ? Number(rp.du) : 0;
+    return `<ol class="chaine" aria-label="${esc(T('r_etapes'))}" data-action-chaine="${fait}">${['coffre', 'brouillon', 'supprimee', 'enligne'].map((k, i) => {
+      const etat = i < fait ? 'faite' : i === fait ? 'encours' : 'attente';
+      const nom = k === 'enligne' && du ? T('r_enligne_dans', { dans: U.duree(du - Date.now()) }) : k === 'coffre' && i === fait && rp.photos && rp.photos.total > 0 ? `${T('r_coffre')} · ${T('r_photos', { fait: Math.min(rp.photos.fait + 1, rp.photos.total), total: rp.photos.total })}` : T('r_' + k);
+      return `<li data-etape="${k}" data-etat="${etat}"${k === 'enligne' && du ? ` data-action-enligne="${du}"` : ''}><span class="pu" aria-hidden="true">${etat === 'faite' ? '✓' : ''}</span>${esc(nom)}</li>`; }).join('')}</ol>`;
+  };
   const numDe = (it) => (num && numPour === String(it.id || '') ? U.etiquette(num, true) : (it.num ? U.etiquette(it.num, true) : ''));
   function minuter() {
     clearInterval(minuteur); minuteur = null;
@@ -219,6 +242,10 @@
     if (ti) { const t = it.titre || ''; if (ti.textContent !== t) ti.textContent = t; ti.hidden = !t; }
     const su = racine.querySelector('[data-action-suite]');
     if (su) { const h = suiteHtml(a); if (su.getAttribute('data-h') !== h) { const d = new DOMParser().parseFromString('<body>' + h + '</body>', 'text/html'); su.replaceChildren(...Array.from(d.body.childNodes)); su.setAttribute('data-h', h); } }
+    // 5.408 : la chaîne des étapes suit la paire en cours, sur place (remplacée seulement si elle change).
+    { const h = chaineHtml(a), ch = racine.querySelector('.chaine'), cur = ch ? ch.outerHTML : '';
+      if (h !== cur) { if (!h) { if (ch) ch.remove(); } else { const d = new DOMParser().parseFromString('<body>' + h + '</body>', 'text/html'); const el = d.body.firstElementChild;
+        if (ch) ch.replaceWith(el); else if (su) su.after(el); } } }
     const sv = racine.querySelector('[data-action-suiv]');
     if (sv) { const h = suivantsHtml(a); if (sv.getAttribute('data-h') !== h) { const d = new DOMParser().parseFromString('<body>' + h + '</body>', 'text/html'); sv.replaceChildren(...Array.from(d.body.childNodes)); sv.setAttribute('data-h', h); sv.setAttribute('data-action-suivants', String((a.suivants || []).slice(0, 3).length)); sv.hidden = !h; } }
     const ar = racine.querySelector('[data-arreter]');
@@ -297,6 +324,7 @@
             ${a.total > 0 ? U.barre(pc) : ''}
             <div class="ti" data-action-ti${it.titre ? '' : ' hidden'}>${esc(it.titre || '')}</div>
             <div class="suite" role="status" data-action-suite data-h="${esc(sh)}">${sh}</div>
+            ${chaineHtml(a)}
           </div>
         </div>
         <div class="suiv" data-action-suiv data-action-suivants="${(a.suivants || []).slice(0, 3).length}" data-h="${esc(sv)}"${sv ? '' : ' hidden'}>${sv}</div>
