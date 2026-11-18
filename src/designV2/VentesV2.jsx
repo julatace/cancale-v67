@@ -95,7 +95,7 @@ function LigneColis({ l, Photo, Icon, LigneGlissable, partant = false }) {
   // fait seulement s'il est LU. La 3e ligne garde le reste (bordereau, échéance, étape, suivi).
   const vendue = (l.l3 || []).filter((x) => x && x.cle === 'vendue');
   const l3 = (l.l3 || []).filter((x) => x && x.cle !== 'vendue');
-  const qui = { logo: l.logo || null, textes: [l.pseudo || '', ...vendue.map((x) => x.texte)].filter(Boolean) };
+  const qui = { logo: l.logo || null, pseudo: !!l.pseudo, textes: [l.pseudo || '', ...vendue.map((x) => x.texte)].filter(Boolean) };
   const ligne = (
     <LigneAnnonce variante="A" cle={'v2v:' + l.cle} attrs={{ ...l.attrs, 'data-v2v-ligne': l.cle, 'data-v2v-groupe': l.groupe, 'data-v2v-fait': partant ? 'part' : undefined }}
       photo={l.photo || null} Photo={Photo} Icon={Icon} titre={l.titre} num={l.num} double={!!l.double} prix={l.prix}
