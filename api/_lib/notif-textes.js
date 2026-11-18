@@ -45,6 +45,9 @@ export const FAMILLES = [
   // (11 nov., lot alertes-ebay) Une nouvelle annonce eBay pour une recherche dont IL a
   // allumé l'alerte (api/_lib/ebay-alertes.js) : une notification par passage, groupée.
   { id: 'alertesebay', titre: 'Alertes d’achat eBay', def: true },
+  // (17 nov., Julien : « que les personnes puissent se faire coucou ») Quelqu'un d'un de tes
+  // groupes d'accompagnement t'a fait coucou (api/_lib/coucou.js) : une fois par coucou.
+  { id: 'communaute', titre: 'Coucous de la communauté', def: true },
 ];
 
 // Catégorie (le mot que chaque route passe à `pushCategorieActive` et à
@@ -83,6 +86,8 @@ export const FAMILLE_DE = {
   avis: 'avis',
   // (11 nov.) Les alertes d'achat eBay (api/_lib/ebay-alertes.js).
   alerteebay: 'alertesebay',
+  // (17 nov.) Un coucou reçu dans un groupe d'accompagnement (api/_lib/coucou.js).
+  coucou: 'communaute',
 };
 // Un type NEUF hérite du réglage de la famille d'où il sort tant qu'il n'est pas
 // posé lui-même : il avait coupé « Ventes », la double vente reste coupée ; il
