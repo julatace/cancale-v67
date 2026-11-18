@@ -132,7 +132,7 @@ async function ouvrirEcran(nav, { W, sombre, url, grand = false, v2 = true }) {
   // L'écran de démarrage de la coque (`.vrm-boot*`, avant React) n'est pas l'écran jugé : ses sauts sont écartés.
   await pg.addInitScript(() => { window.__cls = 0; try { new PerformanceObserver((l) => { for (const e of l.getEntries()) { if (e.hadRecentInput) continue;
     const src = (e.sources || []).map((x) => x.node).filter((n) => n && n.nodeType === 1);
-    if (src.length && src.every((n) => n.closest('[class*="vrm-boot"]'))) continue; window.__cls += e.value; } }).observe({ type: 'layout-shift', buffered: true }); } catch (_) {} });
+    if (src.length && src.every((n) => n.closest('[class*="vrm-boot"]'))) continue; window.__cls += e.value; (window.__clsSrc = window.__clsSrc || []).push(Math.round(e.startTime) + ' ' + src.map((n) => n.tagName + '.' + String(n.className).slice(0, 40)).join(',')); } }).observe({ type: 'layout-shift', buffered: true }); } catch (_) {} });
   await pg.evaluate(([v2, grand]) => { localStorage.setItem('vrm_design_v2', v2 ? '1' : '0'); if (grand) localStorage.setItem('vrm_taille_texte', 'tresGrand'); }, [v2, grand]);
   await pg.reload({ waitUntil: 'domcontentloaded' });
   await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {});
@@ -163,7 +163,7 @@ async function messages(nav, { W, sombre, grand = false, nom }) {
   dit(m.zones >= 3 && !m.petites.length, `${nom} M3 : cibles ≥ 44 px`, m.petites.slice(0, 6));
   dit(m.zones >= 3 && !m.tronques.length && !m.coupes.length, `${nom} M4 : rien de tronqué sans « … », aucun mot coupé`, { tronques: m.tronques.slice(0, 6), coupes: m.coupes });
   dit(m.zones >= 3 && !m.air.length && !m.voisins.length, `${nom} M5 : l’AIR (rangée ≥ 64, 20 px du bord, 32 entre groupes, 12 titre → carte, 12 entre boutons)`, { air: m.air.slice(0, 6), voisins: m.voisins });
-  dit(cls <= 0.001, `${nom} M6 : CLS du chargement = ${cls.toFixed(4)}`);
+  dit(cls <= 0.001, `${nom} M6 : CLS du chargement = ${cls.toFixed(4)}`, await pg.evaluate(() => window.__clsSrc || []));
   // La tête : le grand titre et la cloche sur une ligne, UN segmenté, la recherche.
   const tete = await pg.evaluate(() => { const h = document.querySelector('[data-v2-msg-titre] h1'), c = document.querySelector('.vrm-app-header [data-cloche], .vrm-app-header .vrm-notifs-cloche, .vrm-app-header button[aria-label*="otification"]');
     const r = (e) => e && e.getBoundingClientRect(); const hr = r(h), cr = r(c);
@@ -195,7 +195,7 @@ async function emails(nav, { W, sombre, grand = false, nom, ancien = null }) {
   dit(m.zones >= 2 && !m.petites.length, `${nom} E : cibles ≥ 44 px`, m.petites.slice(0, 6));
   dit(m.zones >= 2 && !m.tronques.length && !m.coupes.length, `${nom} E : rien de tronqué sans « … », aucun mot coupé`, { tronques: m.tronques.slice(0, 6), coupes: m.coupes });
   const cls = await pg.evaluate(() => window.__cls || 0);
-  dit(cls <= 0.001, `${nom} E : CLS du chargement = ${cls.toFixed(4)}`);
+  dit(cls <= 0.001, `${nom} E : CLS du chargement = ${cls.toFixed(4)}`, await pg.evaluate(() => window.__clsSrc || []));
   // E3 : l'étiquette N° = le N° LU (bordereau, vente), le code se copie, un geste par rangée sans code.
   const e3 = await pg.evaluate(() => { const faux = []; let vus = 0, gestes = 0, codes = 0;
     for (const li of document.querySelectorAll('.vrm-boite-item')) { const b = li.querySelector('[data-boite-email]'); if (!b) continue; const n = b.getAttribute('data-v2-num'); const et = li.querySelector('[data-v2-etiquette]');

@@ -145,7 +145,8 @@ html[data-design="v2"] .vrm-boite .v2e-quarantaine-phrase { color: var(--v2-muet
 }
 /* Le code copiable passe SOUS le texte de la rangée (à droite, il écrasait la colonne en très grand texte : « C / o / l »). */
 @layer vrm-v2 {
-  html[data-design="v2"] body .vrm-boite .vrm-boite-ligne[data-boite-a-code="1"] { padding-right: 20px !important; padding-bottom: 68px !important; }
+  html[data-design="v2"] body .vrm-boite .vrm-boite-ligne[data-boite-a-code="1"] { padding-right: 20px !important; }
+  html[data-design="v2"] body .vrm-boite .vrm-boite-item:has(> .vrm-boite-puce-code) { position: relative !important; padding-bottom: 60px !important; }
   html[data-design="v2"] body .vrm-boite .vrm-boite-item > .vrm-boite-puce-code.vrm-boite-puce-code { right: auto !important; left: 86px !important; top: auto !important; bottom: 12px !important; transform: none !important; max-width: calc(100% - 106px) !important; }
 }
 
