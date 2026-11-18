@@ -676,7 +676,8 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
   // (17 nov., nouveau design) Les nombres des segments : ceux que la boîte d'hier écrivait sur ses pastilles, sans
   // filtre (la même réponse de la route) — gardés quand un segment filtre, pour qu'ils ne disparaissent pas au toucher.
   const nombresV2 = useRef(null);
-  if (!filtre && c) nombresV2.current = { tout: complet ? c.sur : null, colis: complet && Number.isFinite(parR.colis) ? parR.colis : null, ventes: complet && Number.isFinite(parR.ventes) ? parR.ventes : null,
+  // Relevés sur la vue « Tout » (sans rubrique) : ce sont ceux des pastilles d'hier, la boîte entière.
+  if (!filtre && c && (!rubrique || !nombresV2.current)) nombresV2.current = { tout: complet ? c.sur : null, colis: complet && Number.isFinite(parR.colis) ? parR.colis : null, ventes: complet && Number.isFinite(parR.ventes) ? parR.ventes : null,
     achats: complet && Number.isFinite(parR.achats) ? parR.achats : null, atraiter: c.aVerifier > 0 ? c.aVerifier : (Number.isFinite(c.aVerifier) ? 0 : null), plus: !!c.plus };
   const phrase = cherche ? `Recherche « ${cherche} » dans le sujet, l’expéditeur, l’article, le code et le n° de suivi${adresse ? ` de ${nomCompte(adresse)}` : ''}.`
     : complet && !filtre && c.adresse ? `Les nombres sont ceux de ${nomCompte(c.adresse)}.` : '';

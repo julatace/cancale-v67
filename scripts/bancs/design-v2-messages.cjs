@@ -144,7 +144,7 @@ async function messages(nav, { W, sombre, grand = false, nom }) {
   await pg.waitForSelector('[data-v2-msg-groupe] [data-v2-conv]', { timeout: 40000 }).catch(() => {});
   await pg.waitForTimeout(3000); await sansToasts(pg);
   if (MUT === 'melange') await pg.evaluate(() => { const g = [...document.querySelectorAll('.v2m-groupe .v2m-carte')]; if (g.length > 1) g[0].appendChild(g[1].querySelector('.v2m-ligne')); });
-  if (MUT === 'ordre') await pg.evaluate(() => { const c = document.querySelector('.v2m-groupe .v2m-carte'); if (c && c.children.length > 1) c.insertBefore(c.lastElementChild, c.firstElementChild); });
+  if (MUT === 'ordre') await pg.evaluate(() => { const c = document.querySelector('.v2m-groupe .v2m-carte'); const l = c ? c.querySelectorAll(':scope > .v2m-ligne') : []; if (l.length > 1) c.insertBefore(l[l.length - 1], l[0]); });
   if (MUT === 'air') await pg.addStyleTag({ content: 'html body button.v2-rangee.v2m-ligne { min-height: 48px !important; padding: 4px 8px !important; }' });
   const cls = await pg.evaluate(() => window.__cls || 0);
   const lu = await pg.evaluate(() => [...document.querySelectorAll('[data-v2-msg-groupe]')].map((g) => ({ uid: g.getAttribute('data-v2-msg-groupe'), onglet: g.getAttribute('data-v2-msg-onglet'),
