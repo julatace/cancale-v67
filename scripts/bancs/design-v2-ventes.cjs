@@ -94,6 +94,9 @@ async function signatureStable(pg) { let avant = null;
 async function avant(nav, b, sombre) {
   const { ctx, pg } = await ouvrir(nav, { W: 390, sombre, b, url: '/?tab=ventes' });
   await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {});
+  // Le nouveau design est ALLUMÉ par défaut (17 nov. soir) : « l'écran d'avant » = le réglage posé à « Ancien design » ('0').
+  await pg.evaluate(() => localStorage.setItem('vrm_design_v2', '0')); await pg.reload({ waitUntil: 'domcontentloaded' });
+  await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {});
   await attendre(pg, () => !!document.querySelector('[data-sb-chiffre]') && document.querySelector('[data-sb-chiffre]').getAttribute('data-sb-chiffre') !== '');
   const sig = await signatureStable(pg);
   const x = await pg.evaluate(() => ({ attr: document.documentElement.getAttribute('data-design'),

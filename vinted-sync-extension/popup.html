@@ -115,6 +115,23 @@
       input { font-size: 16px; }
       button, input, a { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
     }
+    /* ══ 5.406 — LA FENÊTRE « DESIGN V2 » : la feuille COMMUNE (vrm-ui.js, posée par le script de la fenêtre sur
+       <html class="vu-racine">) ; la coque bleue, la PORCELAINE (plus le verre), un plein, des
+       boutons de 44 px au moins, contraste ≥ 4,5:1 (jetons `--vu-*`). */
+    html.vu-racine { --fond-uni: var(--vu-coque-uni); --fond-bleu: var(--vu-coque); --sur: var(--vu-sur); --sur-2: var(--vu-sur-2);
+      --carte: var(--vu-plaque-2); --texte: var(--vu-encre); --doux: var(--vu-muet); --accent: var(--vu-lien); --ambre: var(--vu-ambre);
+      --bord: var(--vu-filet); --plein: var(--vu-plein-sur-plaque); --plein-t: var(--vu-plein-sur-plaque-encre); }
+    html.vu-racine body { font-family: var(--vu-police); }
+    html.vu-racine #auth, html.vu-racine body > .maj, html.vu-racine #parcours-favoris { background: var(--vu-plaque) !important; border: 0 !important;
+      -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: var(--vu-ombre); color: var(--vu-encre); }
+    html.vu-racine button { border-radius: 14px; min-height: 48px; }
+    html.vu-racine button.sec { background: var(--vu-teinte); color: var(--vu-teinte-encre); border-color: transparent; }
+    html.vu-racine button.lien { min-height: 44px; color: var(--vu-lien); font-size: 13px; }
+    html.vu-racine .who { background: var(--vu-plaque-2); }
+    html.vu-racine .dot { background: #2E9E58; box-shadow: 0 0 0 3px rgb(46 158 88 / .2); }
+    html.vu-racine .dot.warn { background: var(--vu-ambre-point); box-shadow: none; }
+    html.vu-racine input { background: var(--vu-plaque-2); border-color: var(--vu-filet); }
+    html.vu-racine body.carte { background: transparent; }
   </style>
 </head>
 <body class="decide">
@@ -135,6 +152,7 @@
     <button id="parcours-copier" type="button" disabled>Copier le rapport</button>
     <button id="parcours-effacer" type="button" disabled>Effacer le rapport</button>
   </section>
+  <script src="vrm-ui.js"></script>
   <script src="popup.js"></script>
   <script src="parcours-popup.js"></script>
 </body>

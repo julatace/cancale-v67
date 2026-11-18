@@ -1,7 +1,7 @@
 // de · le nouveau design « Studio Premium » (17 nov.), en essai : src/designV2/.
 export default {
-  "v2.reglage.lib": "Neues Design (Test)",
-  "v2.reglage.desc": "Heute, Käufe als Pässe, ein Menü pro Plattform. Nur auf diesem Gerät; ausschalten, um zurückzukehren.",
+  "v2.reglage.lib": "Altes Design",
+  "v2.reglage.desc": "Auf diesem Gerät zum bisherigen Aussehen zurückkehren. Deine Daten und Einstellungen bleiben gleich.",
   "v2.aEnvoyer.aria": "{n} Pakete zu versenden",
   "v2.aEnvoyer.mot": {
     "one": "Paket zu versenden",
@@ -126,5 +126,15 @@ export default {
   "v2.achats.ajouterCourt": "Hinzufügen",
   "v2.reessayer": "Erneut versuchen",
   "v2.achats.annules": "Storniert",
-  "v2.passe.qrKo": "QR hier nicht lesbar — der Code darunter genügt"
+  "v2.passe.qrKo": "QR hier nicht lesbar — der Code darunter genügt",
+  "v2.barre.lib": "Tableiste",
+  "v2.barre.C": "C · Schlicht (Standard)",
+  "v2.barre.A": "A · Klassisches iOS",
+  "v2.barre.B": "B · Schwebende Pille",
+  "v2.barre.D": "D · Linie oben",
+  "v2.barre.E": "E · Kraft",
+  "v2.barre.ann": "Anzeigen",
+  "v2.barre.ach": "Käufe",
+  "v2.barre.ven": "Verkäufe",
+  "v2.barre.arg": "Geld"
 };

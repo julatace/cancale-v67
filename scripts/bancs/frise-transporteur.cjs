@@ -51,6 +51,9 @@ function baseFrise() {
       const th = `${W}-${sombre ? 'sombre' : 'clair'}`;
       // ÉTEINT
       { const { ctx, pg, erreurs } = await P.ouvrir(nav, { W, sombre, b, url: '/?tab=ventes', dsf: W < 600 ? 2 : 1 });
+        // « Ancien design » posé ('0') : le nouveau est allumé par défaut depuis le 17 nov. au soir.
+        await pg.waitForSelector('.vrm-main', { timeout: 30000 }).catch(() => {});
+        await pg.evaluate(() => localStorage.setItem('vrm_design_v2', '0')); await pg.reload({ waitUntil: 'domcontentloaded' });
         await attendre(pg, () => !!document.querySelector('[data-ventes-seg-choix="envoyes"]'));
         await pg.locator('[data-ventes-seg-choix="envoyes"]').first().click({ timeout: 8000 }).catch(() => {});
         const vu = await attendre(pg, (tx) => !!document.querySelector(`[data-vv-etapes="v:${tx}"]`), 30000, tx);

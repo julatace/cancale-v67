@@ -89,6 +89,7 @@ async function ouvrir(nav, chemin, html, taille, f) {
     window.chrome = { runtime: { id: 'x', lastError: null, sendMessage: (m, cb) => { window.__msgs.push(m); window.__fond(m, location.href).then((r) => cb && cb(r)); } } };
   });
   await pg.goto('https://www.vinted.fr' + chemin, { waitUntil: 'domcontentloaded' });
+  { const ui = lire('vrm-ui.js'); if (ui) await pg.addScriptTag({ content: ui }); }   // (5.406) la feuille commune d'abord, comme le manifeste
   for (const fic of ['vinted-capture.js', 'vrm-regles-achat.js', 'vinted-infos.js']) { const c = lire(fic); if (c == null) throw new Error(`${fic} absent de l’extension jugée`); await pg.addScriptTag({ content: c }); }
   await pg.waitForTimeout(3600);
   return { ctx, pg, vinted };

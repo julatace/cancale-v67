@@ -161,7 +161,23 @@ async function telephone(nav, sombre, b, sigs) {
     const vu = await bt.count();
     if (vu) { await bt.scrollIntoViewIfNeeded().catch(() => {}); await bt.tap().catch(() => {}); await pg.waitForTimeout(500); }
     const etat = await pg.evaluate(() => ({ ls: localStorage.getItem('vrm_design_v2'), attr: document.documentElement.getAttribute('data-design') }));
-    dit(vu > 0 && etat.ls === '1' && etat.attr === 'v2', `R Paramètres → Apparence → « Nouveau design (essai) » l’allume (${th})`, { vu, ...etat });
+    dit(vu > 0 && etat.ls === '1' && etat.attr === 'v2', `R Paramètres → Apparence → « Ancien design » décoché : le nouveau design (${th})`, { vu, ...etat });
+    // « Ancien design » coché : retour à l'apparence d'avant, tout de suite, et après un rechargement.
+    if (vu) { await pg.locator('[data-design-v2-bouton]').first().tap().catch(() => {}); await pg.waitForTimeout(500); }
+    const ancien = await pg.evaluate(() => ({ ls: localStorage.getItem('vrm_design_v2'), attr: document.documentElement.getAttribute('data-design') }));
+    await pg.reload({ waitUntil: 'domcontentloaded' }); await pret(pg);
+    const apres = await pg.evaluate(() => document.documentElement.getAttribute('data-design'));
+    dit(ancien.ls === '0' && ancien.attr === null && apres === null, `R « Ancien design » coché : l’apparence d’avant, gardée après rechargement (${th})`, { ...ancien, apres });
+    if (vu) { await pg.locator('[data-design-v2-bouton]').first().tap().catch(() => {}); await pg.waitForTimeout(400); }
+  }
+  await ctx.close();
+  // LE DÉFAUT : sans aucun choix posé, le nouveau design est ALLUMÉ (Julien, 17 nov. soir : « publie le design »).
+  ({ ctx, pg, erreurs } = await ouvrir(nav, { W: 390, sombre, b, url: '/manifest.webmanifest' }));
+  {
+    await pg.evaluate(() => { sessionStorage.setItem('banc_defaut_v2', '1'); localStorage.removeItem('vrm_design_v2'); });
+    await pg.goto(`http://localhost:${P.PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' }); await pret(pg);
+    const d = await pg.evaluate(() => ({ ls: localStorage.getItem('vrm_design_v2'), attr: document.documentElement.getAttribute('data-design'), ecran: !!document.querySelector('[data-v2-ecran="aujourdhui"]') }));
+    dit(d.ls === null && d.attr === 'v2' && d.ecran, `R0 sans choix posé : le nouveau design par défaut (Aujourd’hui) (${th})`, d);
     if (!sombre) await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `reglage-390-${th}.png`) });
   }
   await ctx.close();
