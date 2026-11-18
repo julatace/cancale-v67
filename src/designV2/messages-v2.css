@@ -152,3 +152,5 @@ html[data-design="v2"] .vrm-boite .v2e-quarantaine-phrase { color: var(--v2-muet
 
 /* La première lecture des conversations : la hauteur d'un écran réservée. */
 .v2m-chargement { min-height: 100vh; padding: 16px 16px 0; }
+/* Les nombres des segments arrivent avec la première page : leur place est réservée (aucun segment ne bouge). */
+@layer vrm-v2 { html[data-design="v2"] body .vrm-boite .v2-seg-n { display: inline-block !important; min-width: 4ch !important; text-align: left !important; } }

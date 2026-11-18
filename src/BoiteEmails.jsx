@@ -788,7 +788,7 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
             return <div className="v2e-tete" data-v2-mail-tete="">
               <SegmentV2 label={tr('emails.trierEMails')} value={actif} attrs={{ 'data-v2-mail-seg': '' }}
                 onChange={(v) => { const f = filtresDuSegment(v); setNonLus(false); setAVerif(f.aVerif); setRubrique(f.rubrique); setOuvert(''); }}
-                options={SEGMENTS_EMAILS.map((v) => ({ v, l: mot[v], n: N[v] != null && (v !== 'atraiter' || N[v] > 0) ? String(N[v]) + (v === 'atraiter' && N.plus ? '+' : '') : '', data: { 'data-boite-rubrique-v2': v, 'data-boite-n': N[v] != null ? String(N[v]) : undefined } }))}/>
+                options={SEGMENTS_EMAILS.map((v) => ({ v, l: mot[v], n: N[v] != null && (v !== 'atraiter' || N[v] > 0) ? String(N[v]) + (v === 'atraiter' && N.plus ? '+' : '') : '\u00a0', data: { 'data-boite-rubrique-v2': v, 'data-boite-n': N[v] != null ? String(N[v]) : undefined } }))}/>
               {(rubrique && !['colis', 'ventes', 'achats'].includes(rubrique)) || nonLus || (aVerif && rubrique) ? <div className="v2e-outils" data-v2-mail-filtre="">
                 <span>{[rubrique && !['colis', 'ventes', 'achats'].includes(rubrique) ? motRubrique : '', nonLus ? tr('emails.nonLus') : ''].filter(Boolean).join(' · ') || tr('journee.verifier')}</span>
                 <BoutonV2 role="texte" onClick={() => { setRubrique(''); setNonLus(false); setAVerif(false); setOuvert(''); }}>{tr('v2.mail.tout')}</BoutonV2></div> : null}

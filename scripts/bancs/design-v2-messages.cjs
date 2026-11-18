@@ -295,6 +295,7 @@ async function reglePure() {
   const sigs = {};
   try {
     if (process.env.SEULEMENT === 'eteint') { await eteint(nav, sigs); throw new Error('seulement éteint'); }
+    if (process.env.SEULEMENT === 'messages') { await messages(nav, { W: 390, sombre: false, nom: '390-clair' }); throw new Error('seulement messages (390 clair)'); }
     await reglePure().catch((e) => dit(false, 'règle pure : ' + String(e && e.message || e).slice(0, 200)));
     const hier = await pastillesHier(nav);
     await messages(nav, { W: 390, sombre: false, nom: '390-clair' });
