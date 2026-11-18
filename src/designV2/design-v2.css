@@ -516,7 +516,7 @@ html[data-design="v2"] body .v2v-tete .v2-affiche-sig-sous { white-space: normal
     }
 /* La 3e ligne d'une rangée de Ventes (« il doit y avoir plusieurs infos ») : petite, grise, chaque fait avec son icône ;
    elle passe à la ligne plutôt que de couper (rien de tronqué) ; l'ambre seulement pour une limite LUE à 2 jours ou moins. */
-.v2l-a-l3 { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; margin-top: -2px; font-size: 13px; line-height: 18px; color: var(--v2-muet); }
+.v2l-a-l3 { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; margin-top: -2px; font-size: 13px; line-height: 18px; color: var(--v2-muet); height: auto; }   /* (18 nov., train) height: auto — la règle d'Annonces (16 px, overflow: hidden) rognait ces 18 px en très grand texte (audit visuel v2, règle 5) */
 .v2l-l3 { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .v2l-l3 svg { flex: none; opacity: .9; }
 .v2l-l3.is-ambre { color: var(--v2-ambre); font-weight: 600; }

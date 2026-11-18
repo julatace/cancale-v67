@@ -25,6 +25,16 @@ function Vignette({ photo, Photo, Icon, taille = 56 }) {
   );
 }
 
+// « 9 messages à lire » ⇒ « Messages à lire » (le nombre passe à droite) ; un titre qui ne commence pas par SON nombre
+// reste tel quel (et le nombre n'est pas redit à droite).
+export function titreSansNombre(titre, n) {
+  const t = String(titre || '');
+  if (n == null || n === '' || !(Number(n) > 0)) return t;
+  const m = t.match(new RegExp('^\\s*' + String(n) + '\\s+(.+)$'));
+  if (!m) return t;
+  return m[1].charAt(0).toLocaleUpperCase() + m[1].slice(1);
+}
+
 function RienAFaire({ Icon }) {
   return (
     <section className="v2-rien" data-v2-rien="" aria-label={tr('v2.rien.titre')}>
@@ -42,7 +52,7 @@ function RienAFaire({ Icon }) {
 // `pret` : les lectures dont dépend l'écran sont arrivées (à envoyer ET à retirer). Avant : le titre et le chiffre en
 // attente, RIEN d'autre — puis tout arrive d'un coup, sous le chiffre, à sa place (17 nov., Julien : « quand ça charge
 // tout bouge bizarrement » : aucun bloc qui apparaît puis s'en va, aucun ordre qui change, chaque boîte à sa taille).
-export default function Aujourdhui({ affiche, colis = [], retraits = null, groupes = [], plein = null, Photo, Plaque, Icon, onColis, onRetraits, onScanner = null, titre, pret: pretLu = true }) {
+export default function Aujourdhui({ affiche, colis = [], retraits = null, groupes = [], plein = null, Photo, Plaque, Icon, onColis, onRetraits, onScanner = null, onOuvrirVinted = null, horsLigne = false, titre, pret: pretLu = true }) {
   // Prêt une fois, prêt pour de bon (une relecture ne remet pas l'écran en attente) ; une lecture qui ne répond pas
   // n'enferme pas l'écran : au bout de 10 s, il se montre tel qu'il est (« — » là où ce n'est pas su).
   const dejaPret = React.useRef(false);
@@ -69,8 +79,12 @@ export default function Aujourdhui({ affiche, colis = [], retraits = null, group
   // LES BLOCS SOUS LE CHIFFRE, dans l'ORDRE DE LEUR ARRIVÉE : l'ordre voulu (bande, à retirer, à faire) quand tout est lu
   // ensemble ; un bloc lu plus tard se pose à la fin, jamais au-dessus d'un autre (rien ne pousse ce que l'œil lit).
   const ordreBlocs = React.useRef([]);
+  const vus12 = colis.slice(0, 12);
+  const quandCommun = vus12.length >= 4 && vus12.every((c) => c.e && c.e.txt && !c.e.ambre && c.e.txt === vus12[0].e.txt) ? vus12[0].e.txt : '';
   const BLOCS = {
-    bande: () => (n > 0 ? (
+    bande: () => (n > 0 ? (<>
+          {/* (18 nov., audit visuel règle 12) La même échéance sur CHAQUE carte (« à vérifier » ×12) est dite UNE fois, au-dessus. */}
+          {quandCommun ? <p className="v2-bande-commune" data-v2-bande-commune="">{tr('v2s.bande.commune', { q: quandCommun })}</p> : null}
           <div className="v2-bande" role="list" aria-label={tr('v2.bande.aria')} data-v2-bande={String(colis.length)} data-v2-bloc="bande">
             {colis.slice(0, 12).map((c) => (
               <RangeeTouchable key={c.cle} className="v2-bande-carte" onClick={() => onColis && onColis(c)} label={[c.num ? 'N° ' + c.num : '', c.titre, c.prix, c.e && c.e.txt].filter(Boolean).join(' · ')}
@@ -78,7 +92,7 @@ export default function Aujourdhui({ affiche, colis = [], retraits = null, group
                 <span className="v2-bande-photo">{c.photo && Photo ? <Photo src={c.photo} alt="" loading="lazy" decoding="async" width={104} height={104}/> : <Icon name="cintre" size={26}/>}
                   {c.num ? <span className="v2-bande-plaque"><Etiquette num={c.num} taille="moyen"/></span> : null}</span>
                 <span className="v2-bande-prix">{c.prix || ' '}</span>
-                <span className={'v2-bande-quand' + (c.e && c.e.ambre ? ' is-ambre' : '')}>{c.e && c.e.ambre ? <i className="v2-point" aria-hidden="true"/> : null}{(c.e && c.e.txt) || ' '}</span>
+                <span className={'v2-bande-quand' + (c.e && c.e.ambre ? ' is-ambre' : '')} data-geste={c.e && c.e.ambre ? '' : undefined}>{c.e && c.e.ambre ? <i className="v2-point" aria-hidden="true"/> : null}{(!quandCommun && c.e && c.e.txt) || '\u00a0'}</span>
               </RangeeTouchable>
             ))}
             {/* Les colis comptés mais pas encore décrits : la même carte, vide, à la même taille (jamais un saut). */}
@@ -86,7 +100,7 @@ export default function Aujourdhui({ affiche, colis = [], retraits = null, group
               <span key={'a' + k} className="v2-bande-carte v2-bande-attente" aria-hidden="true"><span className="v2-bande-photo"/><span className="v2-bande-prix">{'\u00a0'}</span><span className="v2-bande-quand">{'\u00a0'}</span></span>
             ))}
           </div>
-        ) : null),
+        </>) : null),
     retirer: () => (nRet ? (
           <section className="v2-groupe" data-v2-groupe="retirer" data-v2-bloc="retirer" aria-label={tr('v2.retirer.titre')}>
             <h2 className="v2-groupe-titre"><span>{tr('v2.retirer.titre')}</span><span className="v2-groupe-n" data-v2-n={String(nRet)}>{nRet}</span></h2>
@@ -104,19 +118,30 @@ export default function Aujourdhui({ affiche, colis = [], retraits = null, group
           </section>
         ) : null),
     afaire: () => (groupes.length ? (
-          <section className="v2-afaire" aria-label={tr('v2.afaire.titre')} data-v2-afaire={String(groupes.length)} data-v2-bloc="afaire">
+          <section className="v2-afaire" data-a-faire="" aria-label={tr('v2.afaire.titre')} data-v2-afaire={String(groupes.length)} data-v2-bloc="afaire">
             <h2 className="v2-groupe-titre"><span>{tr('v2.afaire.titre')}</span></h2>
             <div className="v2-liste">
-              {groupes.map((g) => (
-                <div key={g.id} className="v2-afaire-ligne" data-v2-job={g.id} data-n={g.n == null ? '' : String(g.n)}>
+              {groupes.map((g) => {
+                // (18 nov., audit visuel B1 · C1 · C3) La rangée ENTIÈRE se touche (chevron), jamais un bouton dedans ; son
+                // nombre à droite, dans la colonne des nombres (le même gabarit pour toutes : un nombre n'est pas « redit ») ;
+                // le titre sans ce nombre devant ; le détail sur UNE ligne.
+                const titreSansN = titreSansNombre(g.titre, g.n);
+                const contenu = (<>
                   {g.photo ? <Vignette photo={g.photo} Photo={Photo} Icon={Icon} taille={40}/> : <span className="v2-afaire-ic" aria-hidden="true"><Icon name={g.icone || 'check'} size={20}/></span>}
                   <span className="v2-afaire-txt">
-                    <span className="v2-afaire-titre">{g.ambre ? <i className="v2-point" aria-hidden="true"/> : null}{g.titre}</span>
+                    <span className="v2-afaire-titre">{g.ambre ? <i className="v2-point" aria-hidden="true" data-geste=""/> : null}{titreSansN}</span>
                     {g.detail ? <span className="v2-afaire-detail">{g.detail}</span> : null}
                   </span>
-                  {g.geste ? <BoutonV2 role="secondaire" onClick={g.geste.faire} attrs={{ 'data-v2-geste': g.id }}>{g.geste.txt}</BoutonV2> : null}
-                </div>
-              ))}
+                  {g.n != null && g.n !== '' && Number(g.n) > 0 && titreSansN !== g.titre ? <span className="v2-afaire-n" data-v2-afaire-n="">{g.n}</span> : null}
+                  {g.geste ? <span className="v2-chevron" aria-hidden="true"><Icon name="chevron" size={16}/></span> : null}
+                </>);
+                return g.geste ? (
+                  <RangeeTouchable key={g.id} className="v2-afaire-ligne" onClick={g.geste.faire} label={[g.titre, g.detail, g.geste.txt].filter(Boolean).join(' · ')}
+                    attrs={{ 'data-v2-job': g.id, 'data-n': g.n == null ? '' : String(g.n), 'data-v2-geste': g.id }}>{contenu}</RangeeTouchable>
+                ) : (
+                  <div key={g.id} className="v2-afaire-ligne" data-v2-job={g.id} data-n={g.n == null ? '' : String(g.n)}>{contenu}</div>
+                );
+              })}
             </div>
           </section>
         ) : null),
@@ -136,8 +161,22 @@ export default function Aujourdhui({ affiche, colis = [], retraits = null, group
         <ChiffreAffiche attente n={null} mot={tr('v2.aEnvoyer.mot', { n: 2 })} attrs={{ 'data-v2-bloc': 'affiche', 'aria-label': tr('v2.chargement') }}/>
       ) : (<>
         {/* 1. LE CHIFFRE DE L'ÉCRAN (la signature : 56/700, son mot sur la même ligne de base, l'écart nommé dessous). */}
+        {/* (18 nov., audit visuel B3) PAS LU : jamais un « — » géant en affiche — une rangée qui dit quoi faire. */}
+        {n == null && horsLigne ? null /* base injoignable : la coque le dit une fois (BaseInjoignable) */ : n == null ? (
+          <RangeeTouchable className="v2-paslu" onClick={onOuvrirVinted || undefined} label={tr('v2s.pasLu.titre') + ' · ' + tr('v2s.pasLu.geste')}
+            attrs={{ 'data-v2-bloc': 'affiche', 'data-v2-paslu': '', 'data-a-faire': '' }}>
+            <span className="v2-afaire-ic" aria-hidden="true"><Icon name="box" size={20}/></span>
+            <span className="v2-afaire-txt">
+              <span className="v2-afaire-titre">{tr('v2s.pasLu.titre')}</span>
+              <span className="v2-afaire-detail">{(affiche && affiche.sous) || tr('v2s.pasLu.detail')}</span>
+            </span>
+            <span className="v2-paslu-geste">{tr('v2s.pasLu.geste')}</span>
+            <span className="v2-chevron" aria-hidden="true"><Icon name="chevron" size={16}/></span>
+          </RangeeTouchable>
+        ) : (
         <ChiffreAffiche n={n} mot={tr('v2.aEnvoyer.mot', { n: n == null ? 2 : n })} sous={affiche && affiche.sous} ambre={!!(affiche && affiche.ambre)}
           attrs={{ 'data-v2-bloc': 'affiche', 'aria-label': tr('v2.aEnvoyer.aria', { n: n == null ? '—' : String(n) }) }}/>
+        )}
 
         {blocs}
       </>)}

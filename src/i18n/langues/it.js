@@ -8,6 +8,7 @@ import ecran_journee from './it/journee.js';
 import ecran_confort from './it/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_studio from './it/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
 import ecran_design_v2 from './it/designV2.js';   // (17 nov.) le nouveau design, en essai
+import ecran_v2_suite from './it/v2suite.js';   // (18 nov.) la suite du nouveau design
 import ecran_argent_v2 from './it/argentV2.js';   // (17 nov., phase 2) Argent et Paramètres, nouveau design
 import ecran_v2_ventes from './it/v2ventes.js';   // (17 nov.) Ventes, nouveau design (phase 2)
 import ecran_correspondances from './it/correspondances.js';   // (15 nov.) Publier partout : catégories qui correspondent
@@ -2313,6 +2314,7 @@ export default {
   ...ecran_confort,
   ...ecran_studio,
   ...ecran_design_v2,
+  ...ecran_v2_suite,
   ...ecran_argent_v2,
   ...ecran_v2_ventes,
   ...ecran_capte,

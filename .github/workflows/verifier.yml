@@ -96,8 +96,10 @@ jobs:
       matrix:
         include:
           # nouveau-vendeur seul : le plus long (chaque écran, 2 largeurs, 2 thèmes).
+          # audit-visuel-v2 (18 nov.) : les 19 règles de l'audit visuel du nouveau design, 4 formats (~7 min) — dans la part
+          # la plus légère (5-6 min avant lui, 45 min permises).
           - part: 1
-            lot: nouveau-vendeur garde-ecrans imprimer-compte-exact defilement-navigation achats-annules ventes-ligne-propre
+            lot: nouveau-vendeur garde-ecrans audit-visuel-v2 imprimer-compte-exact defilement-navigation achats-annules ventes-ligne-propre
           # budget-vitesse (11 nov.) : lectures, octets, doublons, lignes entières et JS par
           # écran principal, contre scripts/budget-vitesse.json (~5 min).
           - part: 2

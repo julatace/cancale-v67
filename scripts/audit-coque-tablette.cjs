@@ -124,9 +124,11 @@ function evalue(q, env) {
   const imports = [...app.matchAll(/^import ["']\.\/([^"']+\.css)["'];/gm)].map((m) => m[1]);
   // (16 nov., audits-vert-main) Décision du 14 nov. (Studio bleu clair, écrite dans App.jsx) : les feuilles du studio
   // (`./design/…`) viennent EN DERNIER, après styles-tablette. styles-tablette reste après toutes les AUTRES feuilles.
-  const horsStudio = imports.filter((f) => !/^design\//.test(f));
+  // (18 nov., design-v2-suite) `designV2/suite.css` (couche vrm-v2, tout sous le design v2) suit le studio, comme lui.
+  const deStudio = (f) => /^design\//.test(f) || f === 'designV2/suite.css';
+  const horsStudio = imports.filter((f) => !deStudio(f));
   const iTab = imports.indexOf('styles-tablette.css');
-  dit(imports.length > 10 && horsStudio[horsStudio.length - 1] === 'styles-tablette.css' && imports.slice(iTab + 1).every((f) => /^design\//.test(f)), 'styles-tablette.css est importée après toutes les autres feuilles (le studio `design/` ensuite, décision du 14 nov.)', `dernière hors studio : ${horsStudio[horsStudio.length - 1]}`);
+  dit(imports.length > 10 && horsStudio[horsStudio.length - 1] === 'styles-tablette.css' && imports.slice(iTab + 1).every(deStudio), 'styles-tablette.css est importée après toutes les autres feuilles (le studio `design/` ensuite, décision du 14 nov.)', `dernière hors studio : ${horsStudio[horsStudio.length - 1]}`);
   const po = lire('src/passageOnglet.js') || '';
   dit(/import \{ MQ_ORDINATEUR \} from '\.\/coque\.js'/.test(po) && /matchMedia\(MQ_ORDINATEUR\)/.test(po), 'passageOnglet.js lit la même règle');
 

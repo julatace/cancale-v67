@@ -50,7 +50,7 @@ function fusionner(a, b) {
   return out;
 }
 
-export default function LigneAnnonce({ variante = 'A', attrs = {}, cle, photo, Photo, Icon, Plaque, titre, num, taille, jours, prix, favoris = null, vues = null,
+export default function LigneAnnonce({ variante = 'A', attrs = {}, cle, photo, Photo, Icon, Plaque, titre, titreEntier = '', num, taille, jours, prix, favoris = null, vues = null,
   etat = '', achat = '', marge = '', aRelier = false, relierMot = false, onRelier, onPlus, LigneGlissable,
   // (17 nov., Ventes) La MÊME rangée A pour un colis : `sous` remplace « T · j » (« T. 42 · acheteur »), `gestes` ses
   // actions de glisser, `double` le N° porté par deux paires (le seul rouge).
@@ -71,11 +71,13 @@ export default function LigneAnnonce({ variante = 'A', attrs = {}, cle, photo, P
     aRelier ? { cle: 'relier', libelle: tr('v2.l.relier'), icone: <Icon name="link" size={20}/>, faire: () => onRelier && onRelier(), data: { 'data-v2l-glisse': 'relier' } } : null,
     { cle: 'plus', libelle: tr('v2.l.plus'), icone: <Icon name="more" size={20}/>, faire: plus, data: { 'data-v2l-glisse': 'plus' } },
   ].filter(Boolean);
-  const aria = [num ? 'N° ' + num : '', titre, prix, ...(sous || []), apresLogo && typeof apresLogo === 'string' ? apresLogo : '', ...((qui && qui.textes) || []), ...((l3 || []).map((x) => [x.aria, x.texte].filter(Boolean).join(' '))), aRelier ? tr('v2.l.aRelier') : ''].filter(Boolean).join(' · ');
+  const aria = [num ? 'N° ' + num : '', titreEntier || titre, prix, ...(sous || []), apresLogo && typeof apresLogo === 'string' ? apresLogo : '', ...((qui && qui.textes) || []), ...((l3 || []).map((x) => [x.aria, x.texte].filter(Boolean).join(' '))), aRelier ? tr('v2.l.aRelier') : ''].filter(Boolean).join(' · ');
   // « à relier » : sur un vrai compte, la plupart des paires n'ont pas d'achat relié — l'ambre partout ne dirait plus rien.
   // Le mot ambre seulement dans la vue « Sans achat relié » (`relierMot`) ; ailleurs, une petite icône de lien, neutre.
   const relier = !aRelier ? null : relierMot ? <span className="v2l-geste" data-v2l-relier="mot"><i className="v2-point" aria-hidden="true"/>{tr('v2.l.aRelier')}</span>
-    : <span className="v2l-lien" data-v2l-relier="icone" title={tr('v2.l.aRelier')}><Icon name="link" size={16}/></span>;
+    // (18 nov., audit visuel B8) Ailleurs, RIEN par rangée (la même icône sur chaque ligne n'apprend rien) : « Relier »
+    // reste le geste du glisser et de la fiche ; la vue « Sans achat relié » les montre toutes.
+    : null;
   // Les faits connus de l'annonce (favoris, vues, jours en ligne ; acheté et marge — la règle de marge de la fiche).
   const fav = favoris != null ? <Fait Icon={Icon} icone="heart" data="favoris">{favoris}</Fait> : null;
   const vu = vues != null ? <Fait Icon={Icon} icone="eye" data="vues">{vues}</Fait> : null;
