@@ -220,12 +220,12 @@ async function jugerEcran(nav, decodeur, b, fk, f, id, url, juge, g) {
     J(!m.ia.restesCode.length && !m.ia.emoji.length && !m.ia.verreHors.length && !m.ia.degV2.length && !m.ia.ombreRangee, `18 ${nom} · aucun reste de code à l'écran, aucun emoji, verre seulement sur la coque, aucun dégradé dans .v2-*, aucune ombre de rangée`, m.ia);
     J(m.debord <= 1, `${nom} · rien ne déborde de l'écran (${m.debord})`);
     J(!erreurs.length, `${nom} · aucune erreur de page`, erreurs);
+    await capturer(pg, nom, D);   // la capture annotée, l'écran en haut (avant le défilement de la règle 14)
     // 14 (suite) : la dernière rangée défile au-dessus du plein au pouce.
     if (tel && m.pouceHaut != null && id !== 'feuille') {
       const bas = await pg.evaluate(() => { const sc = [document.querySelector('.vrm-main'), document.scrollingElement].find((e) => e && e.scrollHeight > e.clientHeight + 10); if (sc) sc.scrollTop = sc.scrollHeight; return new Promise((r) => setTimeout(() => { const l = [...document.querySelectorAll('.v2-ecran [data-v2-bloc]:not(.v2-pouce), .v2-ecran .v2-afaire-ligne, .v2-ecran .v2-bande-carte')].filter((e) => e.getClientRects().length).map((e) => e.getBoundingClientRect().bottom); r(l.length ? Math.round(Math.max(...l)) : null); }, 500)); });
       J(bas == null || bas <= m.pouceHaut + 1, `14 ${nom} · défilé jusqu'en bas, le contenu finit au-dessus du plein (${bas} ≤ ${m.pouceHaut})`);
     }
-    await capturer(pg, nom, D);
   } catch (e) { dit(!juge, `${nom} : mesuré`, e.message.slice(0, 200)); }
   await ctx.close();
 }
