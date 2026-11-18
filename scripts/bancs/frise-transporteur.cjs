@@ -36,6 +36,9 @@ function baseFrise() {
   for (const r of b.rows.filter((x) => /_orders_sold$/.test(x.id))) for (const o of r.data.payload.my_orders || []) if (!cible && o && /achemin/i.test(String(o.status || '')) && bords.has(String(o.transaction_id))) cible = o;
   if (!cible) return { b, tx: null };
   const tx = String(cible.transaction_id); const bord = b.rows.find((r) => r.id === 'email_bord_' + tx); const su = String(bord.data.suivi || ('XW' + tx));
+  // Vinted ne dit « livré » NULLE PART pour cette vente (ni la commande, ni le détail de transaction, `shipment.status_title`) :
+  // seul le transporteur le prouve (sinon la mutation ne mesurerait rien).
+  for (const r of b.rows.filter((x) => new RegExp('_txn_' + tx + '$').test(x.id))) { const t = r.data && r.data.payload && r.data.payload.transaction; if (t && t.shipment) t.shipment.status_title = "Colis en cours d'acheminement"; }
   const il2j = new Date(Date.now() - 2 * 86400e3 - 3600e3).toISOString();
   b.rows.push({ id: 'depart_chronopost_' + su, data: { suivi: su, carrier: 'chronopost', etat: 'disponible', etatAt: il2j, derAt: il2j, lu: new Date(Date.now() - 600e3).toISOString(), lieuNom: 'CONSIGNE CARREFOUR', lieuVille: 'SALIES DE BEARN', derLib: 'Livré au relais' } });
   return { b, tx };
