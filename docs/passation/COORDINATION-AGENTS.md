@@ -333,3 +333,4 @@ await secuObserver('vestiaire', compte, { status, defi, retryAfter }); // 'robot
 - 2026-11-18 12:57 UTC · train youthful-wozniak : #1267 en ligne (theme-apple, éteint par défaut) — main 9678c4f47, Vercel production success. CI : rouges = main (WebKit non bloquant encore en cours à la fusion). Suivante : #1258 (Ventes).
 - 2026-11-18 13:06 UTC · train youthful-wozniak : #1258 en ligne (Ventes, nouveau design) — main a22c9ed25, Vercel production success. CI : rouges = main. Suivantes : #1264 → #1265 → #1266 → #1253 (déjà poussées sur la chaîne).
 - 2026-11-18 13:09 UTC · train youthful-wozniak : #1264 en ligne (rendus-groupes) — main e3401505b, Vercel production success. CI : rouges = main.
+- 2026-11-18 13:12 UTC · train youthful-wozniak : #1265 en ligne (moteur rapide 1a) — main df3a73a93, Vercel production success. CI : rouges = main.
