@@ -130,3 +130,6 @@ chiffres exacts dans le rapport de la PR. Il est ROUGE sur la base design-v2 (au
 - « Choisir la vente » pour une rangée AVEC bordereau dont le N° de l'e-mail diffère (le glisser n'a que deux gestes) :
   dit une fois sous la liste ; le geste reste dans la carte d'hier, pas encore dans la fiche.
 - Le mouvement « fait » est joué à l'impression ; « Colis fait » (déposé) le jouera quand la rangée passera dans En route.
+
+## 18 nov. · Une ligne grise de plus (« plusieurs infos »)
+Rangées À envoyer et En route : sous « N° · T. 40 », une ligne grise « logo (si plusieurs plateformes) · acheteur · vendue il y a N j » (`qui` de `LigneAnnonce`). Chaque fait n'apparaît que s'il est LU (pseudo de la commande, date de vente de la commande ou de la vente Vestiaire) ; la ligne passe à la ligne entre deux faits, seul un pseudo trop long se coupe. La 3e ligne garde le bordereau, l'échéance, l'étape et le suivi. Banc : « I … En route, chaque rangée dit l'acheteur et « vendue il y a … » » (18/18 sur la base inventée, qui n'a pas de pseudo pour ces commandes).
