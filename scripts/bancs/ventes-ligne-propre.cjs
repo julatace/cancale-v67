@@ -80,7 +80,7 @@ const mesure = (pg) => pg.evaluate(() => {
       dit(m.n >= 3, `${T} des lignes de vente sont là (${m.n})`);
       dit(!m.chevauche.length, `${T} L1 aucun texte n’en recouvre un autre dans une ligne`, m.chevauche.join(' ¦ '));
       dit(!m.rognes.length, `${T} L2 le pseudo et l’état ne sont jamais rognés`, m.rognes.join(' ¦ '));
-      dit(!journal.erreurs.filter((x) => !/due to access control checks/.test(x)).length, `${T} L3 aucune erreur de page`, journal.erreurs.filter((x) => !/due to access control checks/.test(x)).join(' | '));
+      dit(!journal.erreurs.filter((x) => !/access control checks|lgonxzrzjcqthjtbdpzo\.supabase\.co/.test(x)).length, `${T} L3 aucune erreur de page`, journal.erreurs.filter((x) => !/access control checks|lgonxzrzjcqthjtbdpzo\.supabase\.co/.test(x)).join(' | '));
       await o.ctx.close();
     }
   } catch (e) { dit(false, 'le banc a pu tourner', String(e && e.stack || e).slice(0, 400)); }

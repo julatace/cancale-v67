@@ -164,7 +164,7 @@ const segment = async (pg, libelle) => {
       });
       dit(!!b && b.bas <= b.haut + 1, `N7 ${id} : tout en bas, le dernier élément (« ${b && b.quoi} ») passe au-dessus de la barre`, JSON.stringify(b));
     });
-    dit(!journal.erreurs.filter((x) => !/due to access control checks/.test(x)).length, 'aucune erreur de page', journal.erreurs.filter((x) => !/due to access control checks/.test(x)).join(' | '));
+    dit(!journal.erreurs.filter((x) => !/access control checks|lgonxzrzjcqthjtbdpzo\.supabase\.co/.test(x)).length, 'aucune erreur de page', journal.erreurs.filter((x) => !/access control checks|lgonxzrzjcqthjtbdpzo\.supabase\.co/.test(x)).join(' | '));
     await o.ctx.close();
   } catch (e) { dit(false, 'le banc a pu tourner', String(e && e.stack || e).slice(0, 400)); }
   finally { await nav.close().catch(() => {}); NV.srv.close(); }

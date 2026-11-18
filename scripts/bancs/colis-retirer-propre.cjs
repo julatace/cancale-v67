@@ -303,20 +303,24 @@ const ouvrir = async (b, vp, sombre) => {
           await pg.locator('[data-rp-detail] .vrm-pickup-code').filter({ visible: true }).first().click({ timeout: 8000 });
           await pg.waitForTimeout(150);
           dit(await pg.evaluate(()=>window.__codeCopie)==='012345','Code copie le texte exact en conservant le zéro initial');
+          // (17 nov.) La fiche fermée, la ligne retrouve ses gestes (DansFiche les prête à la fiche le temps qu'elle est ouverte).
+          const fermerFiche = async () => { await pg.keyboard.press('Escape').catch(() => {}); const f = pg.locator('[role="dialog"] [aria-label^="Fermer"]').filter({ visible: true }).last(); if (await f.count()) await f.click({ timeout: 3000 }).catch(() => {}); await pg.waitForFunction(() => ![...document.querySelectorAll('[data-rp-detail]')].some((x) => x.getClientRects().length), null, { timeout: 8000 }).catch(() => {}); };
+          await fermerFiche();
           const gestes=await pg.locator('[data-cc-carte*="9301"] .vrm-rpf-rang button').evaluateAll(es=>es.map(e=>{const r=e.getBoundingClientRect();return r.top+r.height/2;}));
           dit(gestes.every(y=>Math.abs(y-gestes[0])<2),'ouvrir et retrait restent côte à côte');
           await pg.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw Error('refus');}}}));
+          await pg.locator('[data-cc-carte*="9301"] [data-rp-titre]').first().click();
+          await pg.waitForFunction(() => [...document.querySelectorAll('[data-rp-detail]')].some((d) => d.getClientRects().length), null, { timeout: 15000 }).catch(() => {});
           await pg.locator('[data-rp-detail] .vrm-pickup-code').filter({ visible: true }).first().click({ timeout: 8000 });
-          dit(await pg.locator('[data-cc-carte*="9301"] [data-rp-detail]').count()===1,'un presse-papiers refusé garde le détail disponible');
+          dit(await pg.evaluate(() => [...document.querySelectorAll('[data-rp-detail]')].some((x) => x.getClientRects().length)),'un presse-papiers refusé garde le détail disponible');
+          await fermerFiche();
           await pg.locator('[data-rp-section="route"] > summary').first().click();
           await pg.waitForFunction(() => [...document.querySelectorAll('[data-en-route-liste] [data-en-route-achat]')].some((x) => x.getBoundingClientRect().height > 0), null, { timeout: 15000 }).catch(() => {});
           const nl = await pg.evaluate(() => [...document.querySelectorAll('[data-en-route-liste] [data-en-route-achat]')].filter((x) => x.getBoundingClientRect().height > 0).length);
           dit(nl === 13, 'ouvrir « En route » montre les 13 achats', String(nl));
           await pg.locator('[data-rp-section="route"] > summary').first().click();
           await pg.evaluate(() => { const d = document.querySelector('.vrm-rpf-verifier'); if (d) d.open = false; });
-          // (16 nov., lot achats-qr) toucher le CODE l'ouvre en très grand (comptoir) : on touche le TITRE pour ouvrir la fiche.
-          await pg.locator('[data-cc-carte*="9301"] [data-rp-titre]').first().click();
-          await pg.waitForFunction(() => !document.querySelector('[data-cc-carte*="9301"] [data-rp-detail]'), null, { timeout: 15000 }).catch(() => {});
+          await fermerFiche();
         }
         if (SHOTS) {
           const suf = `${nom}${JEU === 'base' ? '' : '-' + JEU}`;
