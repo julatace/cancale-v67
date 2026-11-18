@@ -566,8 +566,12 @@ async function allume(nav, b, sombre, W, ref) {
       const blocs = (l) => { const out = []; let i = 0; while (i < l.length) { const m = /^(\d+):DIV\[data-ui-afaire-item\]$/.exec(l[i]); if (!m) { out.push(l[i]); i++; continue; }
         const d = +m[1]; const g = []; while (i < l.length && /^(\d+):DIV\[data-ui-afaire-item\]$/.test(l[i]) && +RegExp.$1 === d) { const b = [l[i++]]; while (i < l.length && +l[i].split(':')[0] > d) b.push(l[i++]); g.push(b.join('\n')); }
         out.push(...g.sort().join('\n').split('\n')); } return out; };
-      const a = blocs((JSON.parse(fs.readFileSync(SIG_AVANT, 'utf8')).ventes || []).map((x) => x.replace(/,data-vu(?=[,\]])|\[data-vu\]|(?<=\[)data-vu,/g, '')));
-      const c = blocs((refC.sig || []).map((x) => x.replace(/,data-vu(?=[,\]])|\[data-vu\]|(?<=\[)data-vu,/g, '')));
+      // (18 nov.) La frise est changée EXPRÈS dans les deux designs (le transporteur et le détail de transaction Vinted
+      // tranchent, `frise-transporteur.cjs` la mesure) : ses sous-arbres (`.vrm-colis-frise`) sont retirés des deux côtés.
+      const sansFrise = (l) => { const out = []; let i = 0; while (i < l.length) { const m = /^(\d+):OL\.vrm-colis-frise\b/.exec(l[i]); if (!m) { out.push(l[i++]); continue; }
+        const d = +m[1]; i++; while (i < l.length && +l[i].split(':')[0] > d) i++; } return out; };
+      const a = blocs(sansFrise((JSON.parse(fs.readFileSync(SIG_AVANT, 'utf8')).ventes || []).map((x) => x.replace(/,data-vu(?=[,\]])|\[data-vu\]|(?<=\[)data-vu,/g, ''))));
+      const c = blocs(sansFrise((refC.sig || []).map((x) => x.replace(/,data-vu(?=[,\]])|\[data-vu\]|(?<=\[)data-vu,/g, ''))));
       let i = 0; while (i < a.length && i < c.length && a[i] === c[i]) i++;
       dit(a.length > 20 && a.length === c.length && i === a.length, `E éteint : Ventes a le DOM de la base (${c.length} nœuds)`, i < Math.max(a.length, c.length) ? { n: [a.length, c.length], ecart: i, base: a[i], ici: c[i] } : undefined);
     } else console.log('  (pas de SIGNATURE_AVANT : la comparaison au DOM de la base n\'est pas jouée)');
