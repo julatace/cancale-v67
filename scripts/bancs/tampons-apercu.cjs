@@ -408,6 +408,10 @@ async function editeur(b, vue) {
       dit(await attendre(pg, () => !!document.querySelector('[data-tampons-editeur] [data-tampons-refus="qr"]'), null, 5000), `${nom} : E1 le N° glissé sur le QR (17 nov. : la mention est verrouillée) ⇒ « Refusé : ça recouvrirait le QR code »`);
       await shot(pg, `${vue}-editeur-refus`);
     } else dit(false, `${nom} : E1 la zone du QR est dessinée`);
+    // (17 nov., lot tampon-qr) Mesuré, sur main aussi : au doigt (CDP), le PREMIER toucher qui suit un glisser du N° REFUSÉ
+    // ne donne pas de « click » (pointerdown/touchend reçus, pas de click) — le glisser refusé est désormais celui du N°
+    // (la mention est verrouillée). Un toucher neutre sur le titre de la feuille le précède.
+    if (o.tactile) await toucher(o, '[data-tampons-editeur] .vrm-tampon-tete b');
     await toucher(o, '[data-tampons-editeur] [data-tampons-portee="mondialrelay"]');
     await toucher(o, '[data-tampons-editeur] [data-tampons-contenu="titre"]');
     const ex = await attendre(pg, () => { try { const t = JSON.parse(localStorage.getItem('vrm_tampons') || 'null'); return t && t.types && t.types.mondialrelay && t.types.mondialrelay.contenu && t.types.mondialrelay.contenu.titre === false; } catch (_) { return false; } }, null, 8000);
