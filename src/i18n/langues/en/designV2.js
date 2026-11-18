@@ -1,7 +1,7 @@
 // en · le nouveau design « Studio Premium » (17 nov.), en essai : src/designV2/.
 export default {
-  "v2.reglage.lib": "New design (preview)",
-  "v2.reglage.desc": "Today, purchases as passes, one menu per platform. This device only; turn it off to go back.",
+  "v2.reglage.lib": "Previous design",
+  "v2.reglage.desc": "Go back to the previous look on this device. Your data and settings stay the same.",
   "v2.aEnvoyer.aria": "{n} parcels to send",
   "v2.aEnvoyer.mot": {
     "one": "parcel to send",
@@ -113,5 +113,28 @@ export default {
     "other": "{n} listings"
   },
   "v2.scanner": "Scan a parcel",
-  "v2.achats.ajouter": "Add a purchase"
+  "v2.achats.ajouter": "Add a purchase",
+  "v2.l.achete": "bought {p}",
+  "v2.l.acheteMarge": "Bought {p} · margin {m}",
+  "v2.chargement": "Reading your listings…",
+  "v2.imprimerCourt": "Print the labels",
+  "v2.ecartCourt": {
+    "one": "{r} not ready yet",
+    "other": "{r} not ready yet"
+  },
+  "v2.tousPrets": "all ready to print",
+  "v2.achats.ajouterCourt": "Add",
+  "v2.reessayer": "Try again",
+  "v2.achats.annules": "Cancelled",
+  "v2.passe.qrKo": "QR not readable here — the code below is enough",
+  "v2.barre.lib": "Tab bar",
+  "v2.barre.C": "C · Clean (default)",
+  "v2.barre.A": "A · Classic iOS",
+  "v2.barre.B": "B · Floating pill",
+  "v2.barre.D": "D · Line on top",
+  "v2.barre.E": "E · Kraft",
+  "v2.barre.ann": "Listings",
+  "v2.barre.ach": "Purchases",
+  "v2.barre.ven": "Sales",
+  "v2.barre.arg": "Money"
 };

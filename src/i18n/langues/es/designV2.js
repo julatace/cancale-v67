@@ -1,7 +1,7 @@
 // es · le nouveau design « Studio Premium » (17 nov.), en essai : src/designV2/.
 export default {
-  "v2.reglage.lib": "Nuevo diseño (prueba)",
-  "v2.reglage.desc": "Hoy, compras en pases, un menú por plataforma. Solo en este dispositivo; apágalo para volver.",
+  "v2.reglage.lib": "Diseño anterior",
+  "v2.reglage.desc": "Volver al aspecto anterior en este dispositivo. Tus datos y ajustes no cambian.",
   "v2.aEnvoyer.aria": "{n} paquetes por enviar",
   "v2.aEnvoyer.mot": {
     "one": "paquete por enviar",
@@ -113,5 +113,28 @@ export default {
     "other": "{n} anuncios"
   },
   "v2.scanner": "Escanear un paquete",
-  "v2.achats.ajouter": "Añadir una compra"
+  "v2.achats.ajouter": "Añadir una compra",
+  "v2.l.achete": "comprado {p}",
+  "v2.l.acheteMarge": "Comprado {p} · margen {m}",
+  "v2.chargement": "Leyendo tus anuncios…",
+  "v2.imprimerCourt": "Imprimir las etiquetas",
+  "v2.ecartCourt": {
+    "one": "{r} aún no listo",
+    "other": "{r} aún no listos"
+  },
+  "v2.tousPrets": "todos listos para imprimir",
+  "v2.achats.ajouterCourt": "Añadir",
+  "v2.reessayer": "Reintentar",
+  "v2.achats.annules": "Cancelados",
+  "v2.passe.qrKo": "QR no legible aquí — basta con el código de abajo",
+  "v2.barre.lib": "Barra de pestañas",
+  "v2.barre.C": "C · Depurada (por defecto)",
+  "v2.barre.A": "A · iOS clásico",
+  "v2.barre.B": "B · Píldora flotante",
+  "v2.barre.D": "D · Línea arriba",
+  "v2.barre.E": "E · Kraft",
+  "v2.barre.ann": "Anuncios",
+  "v2.barre.ach": "Compras",
+  "v2.barre.ven": "Ventas",
+  "v2.barre.arg": "Dinero"
 };

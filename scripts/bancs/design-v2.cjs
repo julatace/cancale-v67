@@ -56,17 +56,31 @@ const CONTRASTE = `(() => {
 // La signature d'un écran : balises, classes triées et NOMS des data-* (jamais les valeurs ni le texte : l'heure bouge).
 const SIGNATURE = () => { const m = document.querySelector('.vrm-main'); if (!m) return null; const out = [];
   const pas = (e, d) => { if (d > 60 || e.matches('.vrm-fraicheur-hote, [data-temps-reel-neuf], [data-fraicheur-unique], [data-geste-disque]')) return; const cl = [...e.classList].sort().join('.'); const da = [...e.attributes].map((a) => a.name).filter((n) => n.startsWith('data-') && !/^data-(sb-|v2|vu$)/.test(n)).sort().join(',');
-    out.push(d + ':' + e.tagName + (cl ? '.' + cl : '') + (da ? '[' + da + ']' : '')); for (const c of e.children) pas(c, d + 1); };
+    out.push(d + ':' + e.tagName + (cl ? '.' + cl : '') + (da ? '[' + da + ']' : ''));
+    // Les lignes de l'hôte « À faire » (`VersAFaire`, un portail) s'y posent dans l'ORDRE OÙ ELLES ARRIVENT (src/ui/AFaire.jsx) :
+    // un ensemble, pas une suite — comparées triées (même DOM, autre minute d'arrivée, n'est pas un écart du design).
+    const kids = [...e.children], items = kids.filter((c) => c.hasAttribute('data-ui-afaire-item'));
+    if (items.length > 1) { for (const c of kids) if (!c.hasAttribute('data-ui-afaire-item')) pas(c, d + 1);
+      const sous = items.map((c) => { const avant = out.length; pas(c, d + 1); return out.splice(avant); }).sort((x, y) => x.join('|') < y.join('|') ? -1 : 1);
+      for (const t of sous) out.push(...t); return; }
+    for (const c of kids) pas(c, d + 1); };
   pas(m, 0); return out; };
 
 const ECRANS = [['journee', '/?tab=journee'], ['achats', '/?tab=achats'], ['ventes', '/?tab=ventes'], ['annonces', '/?tab=annonces'], ['compta', '/?tab=compta']];
 
 // Les messages passagers (« toasts ») d'avant la capture sont touchés (ils se ferment) : la capture montre l'écran.
 async function sansToasts(pg) { await pg.evaluate(() => { for (const t of document.querySelectorAll('.vrm-toast')) t.click(); }).catch(() => {}); await pg.waitForTimeout(400); }
-async function allumer(pg) { await pg.evaluate(() => localStorage.setItem('vrm_design_v2', '1')); await pg.reload({ waitUntil: 'domcontentloaded' }); await pret(pg); }
+async function allumer(pg) { await pg.evaluate(() => localStorage.setItem('vrm_design_v2', '1')); await pg.reload({ waitUntil: 'domcontentloaded' }); await pret(pg);
+  // Sur Aujourd'hui, attendre que les ventes soient LUES (le chiffre quitte « — ») : la machine de banc est partagée.
+  await pg.waitForFunction(() => !document.querySelector('[data-v2-ecran="aujourdhui"]') || !!document.querySelector('[data-v2-affiche]:not([data-v2-affiche=""])'), null, { timeout: 40000 }).catch(() => {}); await pg.waitForTimeout(800); }
 
 // Les mesures communes d'un écran allumé : cibles, composant, troncatures, débordement, contraste, pleins.
 async function mesurerEcran(pg, nom, tel) {
+  await sansToasts(pg);
+  const atteint = await pg.evaluate(() => { const vis = (e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden';
+    return [...document.querySelectorAll('[data-v2b="principal"], .v2-tete button, .v2-tete-tache button')].filter(vis).map((b) => { const q = b.getBoundingClientRect(); const x = q.left + q.width / 2, y = q.top + q.height / 2;
+      if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return null; const e = document.elementFromPoint(x, y); return { b: (b.textContent || b.getAttribute('aria-label') || '').trim().slice(0, 24), ok: !!e && (e === b || b.contains(e)), sur: e ? e.tagName + '.' + String(e.className).slice(0, 30) : null }; }).filter(Boolean); });
+  dit(atteint.every((c) => c.ok), `T ${nom} : boutons pleins et de tête atteignables (elementFromPoint, ${atteint.length})`, atteint.filter((c) => !c.ok));
   const r = await pg.evaluate((src) => { const K = eval(src);
     const zones = [...document.querySelectorAll('.v2-ecran, .v2-achats-retirer, .v2-menu')];
     const vis = (e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden';
@@ -147,7 +161,23 @@ async function telephone(nav, sombre, b, sigs) {
     const vu = await bt.count();
     if (vu) { await bt.scrollIntoViewIfNeeded().catch(() => {}); await bt.tap().catch(() => {}); await pg.waitForTimeout(500); }
     const etat = await pg.evaluate(() => ({ ls: localStorage.getItem('vrm_design_v2'), attr: document.documentElement.getAttribute('data-design') }));
-    dit(vu > 0 && etat.ls === '1' && etat.attr === 'v2', `R Paramètres → Apparence → « Nouveau design (essai) » l’allume (${th})`, { vu, ...etat });
+    dit(vu > 0 && etat.ls === '1' && etat.attr === 'v2', `R Paramètres → Apparence → « Ancien design » décoché : le nouveau design (${th})`, { vu, ...etat });
+    // « Ancien design » coché : retour à l'apparence d'avant, tout de suite, et après un rechargement.
+    if (vu) { await pg.locator('[data-design-v2-bouton]').first().tap().catch(() => {}); await pg.waitForTimeout(500); }
+    const ancien = await pg.evaluate(() => ({ ls: localStorage.getItem('vrm_design_v2'), attr: document.documentElement.getAttribute('data-design') }));
+    await pg.reload({ waitUntil: 'domcontentloaded' }); await pret(pg);
+    const apres = await pg.evaluate(() => document.documentElement.getAttribute('data-design'));
+    dit(ancien.ls === '0' && ancien.attr === null && apres === null, `R « Ancien design » coché : l’apparence d’avant, gardée après rechargement (${th})`, { ...ancien, apres });
+    if (vu) { await pg.locator('[data-design-v2-bouton]').first().tap().catch(() => {}); await pg.waitForTimeout(400); }
+  }
+  await ctx.close();
+  // LE DÉFAUT : sans aucun choix posé, le nouveau design est ALLUMÉ (Julien, 17 nov. soir : « publie le design »).
+  ({ ctx, pg, erreurs } = await ouvrir(nav, { W: 390, sombre, b, url: '/manifest.webmanifest' }));
+  {
+    await pg.evaluate(() => { sessionStorage.setItem('banc_defaut_v2', '1'); localStorage.removeItem('vrm_design_v2'); });
+    await pg.goto(`http://localhost:${P.PORT}/?tab=journee`, { waitUntil: 'domcontentloaded' }); await pret(pg);
+    const d = await pg.evaluate(() => ({ ls: localStorage.getItem('vrm_design_v2'), attr: document.documentElement.getAttribute('data-design'), ecran: !!document.querySelector('[data-v2-ecran="aujourdhui"]') }));
+    dit(d.ls === null && d.attr === 'v2' && d.ecran, `R0 sans choix posé : le nouveau design par défaut (Aujourd’hui) (${th})`, d);
     if (!sombre) await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `reglage-390-${th}.png`) });
   }
   await ctx.close();
@@ -244,14 +274,26 @@ async function telephone(nav, sombre, b, sigs) {
   dit(an.premiere != null && an.premiere <= 380, `N la 1re annonce commence à ${an.premiere} px (≤ 380)`, an);
   dit(!an.puces && !an.selPaires && !an.stats && an.segN === 3, 'N ni puces, ni « Annonces | Stock », ni chiffres : UN segmenté (En ligne · Qui dorment · À publier)', an);
   dit(an.alignes && an.alignes.champ[1] >= 44 && an.alignes.plus[1] >= 44 && Math.abs((an.alignes.champ[0] + an.alignes.champ[1] / 2) - (an.alignes.plus[0] + an.alignes.plus[1] / 2)) <= 1, `N recherche et « ⋯ » : ≥ 44 px, centrés sur la même ligne`, an.alignes);
-  dit(an.hauteurs.length >= 3 && an.hauteurs.every((h) => h === 80 || h === 96), `N rangées de 80 px (96 quand le titre prend deux lignes) (${an.hauteurs.join(', ')})`, an.hauteurs);
-  dit(an.visibles >= 5, `N ${an.visibles} annonces lisibles en entier sur le premier écran (≥ 5)`, an.visibles);
+  dit(an.hauteurs.length >= 3 && an.hauteurs.every((h) => h >= 64) && new Set(an.hauteurs).size <= 2, `N rangées ≥ 64 px (AIR), deux hauteurs au plus — une ligne de titre ou deux (${an.hauteurs.join(', ')})`, an.hauteurs);
+  dit(an.visibles >= 4, `N ${an.visibles} annonces lisibles en entier sur le premier écran (≥ 4, trois lignes d’informations chacune)`, an.visibles);
   dit(an.cpt === 0, 'N le compte n’est plus redit sur chaque rangée (il est dans l’en-tête du groupe)', an.cpt);
   dit(an.relierPuce === 0, `N « Relier un achat » : plus de grosse puce sous la rangée (${an.relierTexte} en texte ambre)`, an);
   dit(/rgba\(0, 0, 0, 0\)|transparent/.test(an.teteFond) && an.teteTaille === '13px', 'N l’en-tête du groupe est un en-tête simple (13 px, sans bande)', an.teteFond);
   dit(!an.coupes.length, 'N aucun libellé coupé (segmenté, barre)', an.coupes);
   dit(!an.disque && an.pleins === 1 && /\S/.test(an.plein) && an.publierHaut != null && an.publierHaut < 200, `N pas de « + » ; UN plein, compact, en haut : « ${an.plein.trim()} »`, an);
   await sansToasts(pg); await pg.screenshot({ path: path.join(SHOTS, `annonces-v2-390-${th}.png`) });
+  // CIBLES ATTEIGNABLES : au centre de chaque bouton plein et de chaque bouton de tête, `elementFromPoint` rend CE bouton
+  // (ou un de ses enfants) — la tête de la coque posée sur la ligne du titre ne doit rien avaler. Puis un VRAI toucher.
+  if (process.env.MUTATION === 'entete') await pg.addStyleTag({ content: 'html body .vrm-app-header.v2-entete-cloche, html body .vrm-app-header.v2-entete-cloche * { pointer-events: auto !important; } html body .vrm-app-header.v2-entete-cloche { left: 0 !important; right: 0 !important; width: auto !important; }' });
+  const cibles = await pg.evaluate(() => { const vis = (e) => e.getClientRects().length && getComputedStyle(e).visibility !== 'hidden';
+    const bs = [...document.querySelectorAll('[data-v2b="principal"], .v2-tete-tache button, .vrm-app-header button, .v2-sous-titre button')].filter(vis);
+    return bs.map((b) => { const q = b.getBoundingClientRect(); const x = q.left + q.width / 2, y = q.top + q.height / 2; if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return null;
+      const e = document.elementFromPoint(x, y); return { b: (b.getAttribute('aria-label') || b.textContent || '').trim().slice(0, 24), ok: !!e && (e === b || b.contains(e)), sur: e ? e.tagName + '.' + String(e.className).slice(0, 30) : null }; }).filter(Boolean); });
+  dit(cibles.length >= 3 && cibles.every((c) => c.ok), `T Annonces : chaque bouton plein / de tête est atteignable au toucher (${cibles.length})`, cibles.filter((c) => !c.ok));
+  await pg.locator('[data-v2-principal="publier"]').first().tap({ timeout: 6000 }).catch(() => {}); await pg.waitForTimeout(1500);
+  dit(await pg.evaluate(() => !!document.querySelector('[class*="vrm-pa"], [data-pa-site], [data-publier-ailleurs]')), 'T un VRAI toucher sur « Publier » ouvre « Publier ailleurs »');
+  await pg.keyboard.press('Escape').catch(() => {}); await pg.goBack().catch(() => {}); await pg.waitForTimeout(800);
+  await pg.goto(`http://localhost:${PORT}/?tab=annonces`, { waitUntil: 'domcontentloaded' }); await pret(pg);
   {
     await pg.locator('[data-ann-barre] .vrm-ann-outils > button').first().tap({ timeout: 8000 }).catch(() => {}); await pg.waitForTimeout(500);
     const me = await pg.evaluate(() => [...document.querySelectorAll('[data-v2-ann-vue]')].map((b) => b.getAttribute('data-v2-ann-vue')));

@@ -24,7 +24,8 @@
   --v2-teinte-fond-appui: rgb(0 96 204 / .18);
   --v2-teinte-texte: #0050A8;        /* 6,9:1 sur la teinte posée sur le blanc */
   --v2-lien: #0050A8;
-  --v2-rouge: #B3261E;               /* destructif, derrière une confirmation seulement */
+  /* Destructif : l'AMBRE (§7 — le rouge n'est QUE pour deux paires sous un même N° ; le « danger » de l'app est ambre). */
+  --v2-danger: #8A4B00;
   --v2-anneau: 0 0 0 3px rgb(0 96 204 / .45);
   --v2-muet: #4A5B6D;                /* gris lisible (≥ 4,5:1 sur la porcelaine ET sur l'aplat) */
   --v2-carte: #FFFFFF;
@@ -48,7 +49,7 @@
   --v2-teinte-fond-appui: rgb(74 163 255 / .26);
   --v2-teinte-texte: #8CC4FF;
   --v2-lien: #8CC4FF;
-  --v2-rouge: #FF8A80;
+  --v2-danger: #F2B65E;
   --v2-anneau: 0 0 0 3px rgb(140 196 255 / .55);
   --v2-muet: #A7B8CB;
   --v2-carte: #16273C;
@@ -88,8 +89,8 @@ html body button.v2b-secondaire { background: var(--v2-teinte-fond); color: var(
 html body button.v2b-secondaire:active:not([aria-disabled="true"]) { background: var(--v2-teinte-fond-appui); }
 /* texte — un lien, la cible garde 44 px */
 html body button.v2b-texte { background: transparent; color: var(--v2-lien); padding: 0 8px; }
-/* destructif — rouge, derrière une confirmation (le composant la refuse sinon) */
-html body button.v2b-destructif { background: transparent; color: var(--v2-rouge); padding: 0 8px; }
+/* destructif — ambre (§7), derrière une confirmation (le composant la refuse sinon) */
+html body button.v2b-destructif { background: transparent; color: var(--v2-danger); padding: 0 8px; }
 /* icône — 44 × 44, glyphe 24 */
 html body button.v2b-icone { width: var(--v2-cible); height: var(--v2-cible); min-width: var(--v2-cible); padding: 0; border-radius: 50%; background: transparent; color: inherit; }
 html body button.v2b-icone .v2b-ic { width: var(--v2-glyphe); height: var(--v2-glyphe); }
@@ -197,7 +198,7 @@ html body button.v2-rangee.v2-passe-mini { flex-direction: column; align-items: 
 
 /* Le geste plein AU POUCE : collé au-dessus de la barre du bas (téléphone). */
 .v2-pouce { position: fixed; left: 16px; right: 16px; bottom: calc(var(--vrm-barre-bas, 84px) + 24px); z-index: 30; }
-@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) {
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
   .v2-ecran { padding: 12px 32px 32px; max-width: 1080px; }
   .v2-ecran[data-v2-plein="1"] { padding-bottom: 32px; }
   /* L'ordinateur : le plein EN HAUT À DROITE, sur la ligne du titre. */
@@ -241,7 +242,7 @@ html body button.v2-rangee.v2-menu { width: auto; max-width: 100%; gap: 6px; pad
 .v2-feuille-hote { position: fixed; inset: 0; z-index: 2400; }
 .v2-feuille-hote[hidden] { display: none; }
 .v2-voile { position: absolute; inset: 0; background: rgb(6 17 31 / .38); animation: v2-voile 200ms ease-out both; }
-.v2-feuille { position: absolute; left: 0; right: 0; bottom: 0; max-height: 82vh; overflow: auto; background: var(--v2-feuille-fond); color: var(--sv-encre, #0C1D30); border-radius: 22px 22px 0 0; padding: 6px 16px calc(16px + env(safe-area-inset-bottom)); box-shadow: 0 -10px 40px rgb(0 0 0 / .2); animation: v2-monte 320ms cubic-bezier(.32, .72, 0, 1) both; }
+.v2-feuille { position: absolute; left: 0; right: 0; bottom: 0; max-height: 82vh; overflow: auto; background: var(--v2-feuille-fond); color: var(--sv-encre, #0C1D30); border-radius: 22px 22px 0 0; padding: 6px 16px calc(16px + env(safe-area-inset-bottom)); box-shadow: 0 -10px 40px rgb(0 0 0 / .2); animation: v2-monte var(--v2-ressort-feuille, 380ms cubic-bezier(.32, .72, 0, 1)) both; }
 @media (min-width: 1024px) { .v2-feuille { left: 50%; right: auto; bottom: auto; top: 12vh; width: 520px; transform: translateX(-50%); border-radius: 22px; animation: v2-voile 200ms ease-out both; } }
 .v2-feuille-tete { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 14px 0 8px; }
 .v2-feuille-poignee { position: absolute; left: 50%; top: 4px; width: 36px; height: 5px; border-radius: 3px; background: var(--v2-filet); transform: translateX(-50%); }
@@ -272,7 +273,7 @@ html body button.v2b-secondaire[data-v2b-force="appui"] { background: var(--v2-t
 html body button.v2b[data-v2b-force="focus"] { box-shadow: var(--v2-anneau); }
 /* Un message passager (« toast ») ne couvre jamais le geste du jour : posé au-dessus du plein quand il y en a un. */
 html[data-design="v2"] body:has(.v2-pouce) .vrm-toasts[data-toasts-place="bas"] { bottom: calc(var(--vrm-barre-bas, 84px) + var(--v2-bouton-h) + 40px) !important; }
-@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine) { html[data-design="v2"] body:has(.v2-pouce) .vrm-toasts[data-toasts-place="bas"] { bottom: 24px !important; } }
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) { html[data-design="v2"] body:has(.v2-pouce) .vrm-toasts[data-toasts-place="bas"] { bottom: 24px !important; } }
 
 /* ══ 7. ANNONCES (nouveau design, 17 nov. — la capture de Julien : « les boutons sont dégueulasses, mal proportionné ») ══
    Ordre : grand titre · « Vinted · Tous les comptes ⌄ » · UN segmenté · la recherche et « ⋯ » à la même hauteur · la liste. */
@@ -425,3 +426,143 @@ html[data-design="v2"] body .vrm-app-header .vrm-header-actions { gap: 8px !impo
 .v2l-c-txt { gap: 0; }
 .v2l-c-faits { height: 24px; margin-top: 0; }
 @media (max-width: 1023px) { .v2-titre-ligne { padding-right: 64px; } }
+/* Le segmenté du nouveau design (SegmentV2) : piste translucide, segment choisi en porcelaine claire, encre. */
+.v2-seg { display: flex; gap: 2px; padding: 2px; border-radius: 14px; background: rgb(255 255 255 / .14); box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .18); }
+html body button.v2-seg-btn { appearance: none; flex: 1 1 auto; min-width: max-content; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 0 8px; border: 0; border-radius: 12px;
+  background: transparent; color: var(--v2-page-texte, #FFFFFF); font: 600 15px/1.2 var(--sb-police-texte, system-ui); font-variant-numeric: tabular-nums; cursor: pointer; white-space: nowrap;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; transition: background-color 160ms ease, color 160ms ease; }
+html body button.v2-seg-btn.is-on { background: #F4F8FC; color: #0C1D30; box-shadow: 0 1px 2px rgb(0 0 0 / .18); }
+html body button.v2-seg-btn:focus-visible { outline: none; box-shadow: var(--v2-anneau); }
+.v2-seg-n { font-weight: 400; opacity: .8; }
+.v2-seg-l { white-space: nowrap; }   /* jamais coupé : la piste se partage selon les mots */
+/* ══ 12. Plus d'informations par rangée (Julien : « il doit y avoir plusieurs infos ») — gris, jamais ambre ══ */
+.v2l-fait { display: inline-flex; align-items: center; gap: 4px; flex: none; white-space: nowrap; }
+.v2l-marge { font-weight: 600; margin-left: 4px; color: inherit; }
+/* A : ligne 3, 13 px gris, icônes 14 : ♡ · vues · jours · acheté → marge. */
+.v2l-a-l3 { display: flex; align-items: center; gap: 12px; height: 16px; font-size: 13px; line-height: 16px; color: var(--v2-muet); overflow: hidden; white-space: nowrap; }
+.v2l-a-txt { gap: 4px !important; }
+/* C : grand prix, « Acheté · marge », puis des puces icône + valeur (elles passent à la ligne au besoin). */
+.v2l-c { height: auto !important; min-height: 120px; align-items: flex-start; }
+.v2l-c-txt { height: auto !important; gap: 4px !important; }
+.v2l-c-achat { font-size: 13px; line-height: 16px; color: var(--v2-muet); }
+.v2l-c-puces { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-size: 13px; color: var(--v2-muet); }
+.v2l-puce { display: inline-flex; align-items: center; min-height: 24px; }
+.v2l-puce > .v2l-fait { padding: 0 8px; height: 24px; border-radius: 999px; background: var(--v2-socle); }
+/* ⚠️ (17 nov.) La tête de la coque posée sur la ligne du titre (Annonces, la cloche) est TRANSPARENTE aux touchers : elle
+   couvrait « Publier » (elementFromPoint ⇒ <header>, le toucher tombait dans le vide). Seuls ses boutons se touchent. */
+html body .vrm-app-header.v2-entete-cloche { pointer-events: none !important; }
+html body .vrm-app-header.v2-entete-cloche :is(button, a, input, select, [role="button"], [tabindex]) { pointer-events: auto !important; }
+
+/* ══ 13. Audit visuel du 17 nov. — les six « absolument » (A1–A6) ═══════════════════════════════════════════ */
+/* A1. Le grand titre ne se casse jamais lettre par lettre : il garde ses mots, le geste passe dessous s'il manque de place. */
+.v2-titre-ligne { flex-wrap: wrap; row-gap: 8px; }
+.v2-titre-ligne h1, .v2-tete-tache h1, .v2-tete h1 { overflow-wrap: normal; word-break: normal; hyphens: manual; min-width: min-content; }
+.v2-tete-tache h1 { font-size: clamp(28px, 8.6vw, 34px); }
+html[data-grand-texte] .v2-titre-ligne { padding-right: 0; }
+html[data-grand-texte] .v2-titre-ligne h1 { flex: 1 0 100%; padding-right: 64px; }
+/* A2. Le libellé d'un bouton passe à la ligne en très grand texte ; le nombre (`.v2b-n`) n'est jamais coupé. */
+html body .v2b-n { flex: none; white-space: nowrap; }
+html[data-grand-texte] body .v2b-lib { white-space: normal; overflow: visible; text-overflow: clip; text-align: center; }
+html[data-grand-texte] body button.v2b-principal { height: auto; min-height: var(--v2-bouton-h); padding-block: 8px; }
+/* A3. La pile du bas : UN jeton (barre + plein + marge) ; messages et accompagnements au-dessus, la liste dégagée. */
+:root { --v2-pile-bas: calc(var(--vrm-barre-bas, 84px) + 24px + var(--v2-bouton-h, 50px) + 16px); }
+@media (max-width: 1023px) {
+  html[data-design="v2"] body:has(.v2-pouce) .vrm-toasts { bottom: var(--v2-pile-bas) !important; top: auto !important; }
+  .v2-ecran[data-v2-plein="1"] { padding-bottom: var(--v2-pile-bas); }
+}
+/* A4. En route : le titre sur toute la largeur (2 lignes au plus), le prix seul à droite. */
+[data-v2-en-route] .v2-ligne-titre { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+[data-v2-en-route] .v2-ligne-droite { flex: none; align-self: flex-start; padding-top: 2px; }
+/* A5. L'erreur de lecture, allumé : une carte lisible, « Réessayer » du système (jamais un plein). */
+.v2-erreur { display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 16px; padding: 24px 16px; border-radius: 16px; text-align: center;
+  background: var(--v2-carte, #FFFFFF); color: var(--sv-encre, var(--v2-encre, #0C1D30)); font-size: 17px; line-height: 22px; }
+.v2-erreur-ic { color: var(--v2-muet, #4A5B6D); }
+/* A6. « Mis à jour à … » ne se pose plus sur le grand titre : allumé au téléphone, elle descend au-dessus de la barre. */
+@media (max-width: 1023px) {
+  html[data-design="v2"] body .vrm-neuf-hote { top: auto; bottom: calc(var(--vrm-barre-bas, 84px) + 16px + env(safe-area-inset-bottom, 0px)); }
+  html[data-design="v2"] body:has(.v2-pouce) .vrm-neuf-hote { bottom: var(--v2-pile-bas); }
+}
+/* Constat 10. Sur ordinateur, « Extension à installer » (la pastille d'état de l'île du haut) n'est plus un plein : teintée, comme un secondaire. */
+@media (min-width: 1024px) {
+  html[data-design="v2"]:root body .vrm-app-header .vrm-etat-pastille[data-etat-code] { background: var(--v2-carte, #FFFFFF) !important; color: var(--v2-teinte-texte) !important; border-color: transparent !important; box-shadow: 0 0 0 1px rgb(255 255 255 / .6) !important; }
+  /* (sur le bleu de la coque, une teinte à 10 % se perdait : le fond porcelaine d'un secondaire, l'encre d'accent — jamais un plein) */
+}
+
+/* ══ 14. L'AIR (17 nov. soir, Julien : « c'est trop compacté, ça doit être moins compact ») ═════════════════════
+   L'échelle d'espacement OBLIGATOIRE du nouveau design, en jetons partagés (les écrans de la phase 2 les reprennent),
+   mesurée par le banc design-v2-chargement (§ AIR) : marge intérieure d'une carte ≥ 20 (24 à l'ordinateur), 16 entre
+   deux cartes, 32 entre deux sections, 12 du titre de section au contenu, ≥ 12 entre deux boutons, rangée ≥ 64,
+   interligne 1,4. Une carte = un groupe de lignes ; jamais une carte vide. */
+:root {
+  --v2-air-carte: 20px;       /* marge intérieure d'une carte (texte jamais à moins du bord) */
+  --v2-air-cartes: 16px;      /* entre deux cartes */
+  --v2-air-sections: 32px;    /* entre deux sections */
+  --v2-air-titre: 12px;       /* titre de section → contenu */
+  --v2-air-boutons: 12px;     /* entre deux boutons voisins */
+  --v2-air-rangee: 64px;      /* hauteur minimale d'une rangée de liste */
+  --v2-air-interligne: 1.4;   /* texte courant */
+}
+@media (min-width: 1024px) { :root { --v2-air-carte: 24px; } }
+/* Sections : 32 entre elles ; le titre de section → contenu : 12. */
+html body .v2-affiche-sig { margin: 16px 0 var(--v2-air-sections); }
+.v2-bande, .v2-groupe, .v2-afaire, .v2-passes, [data-v2-en-route] { margin-bottom: var(--v2-air-sections); }
+.v2-groupe-titre { margin: 0 4px var(--v2-air-titre); }
+/* Cartes : 16 entre elles. */
+.v2-passes { gap: var(--v2-air-cartes); }
+html body .v2-bande { gap: var(--v2-air-cartes); }
+/* Rangées : ≥ 64, le texte à 20 du bord de la carte. */
+.v2-afaire-ligne { min-height: var(--v2-air-rangee); padding: 12px var(--v2-air-carte); gap: 16px; }
+html body button.v2-rangee.v2-ligne, div.v2-ligne { min-height: max(76px, var(--v2-air-rangee)); padding: 12px var(--v2-air-carte); gap: 16px; }
+.v2-afaire-ligne + .v2-afaire-ligne::before, .v2-liste > .v2-ligne + .v2-ligne::before { left: calc(var(--v2-air-carte) + 72px); }
+html body button.v2-rangee.v2-passe-mini { padding: var(--v2-air-carte); gap: 12px; }
+.v2-passe-tete { padding: 12px var(--v2-air-carte); }
+.v2-passe-lieu { padding: 16px var(--v2-air-carte) 4px; }
+.v2-passe .v2-ticket-corps { padding: 12px var(--v2-air-carte) var(--v2-air-carte); gap: 12px; }
+.v2-passe-gestes { gap: var(--v2-air-boutons); }
+.v2-passe-pages { padding: 0 var(--v2-air-carte) 16px; }
+.v2-erreur { padding: 24px var(--v2-air-carte); }
+/* Annonces : la rangée A respire (12 dessus/dessous, 20 sur les côtés), C 20 partout. */
+.v2l-a { padding: 12px var(--v2-air-carte); min-height: 88px; }
+.v2l-a + .v2l-a::before, .vrm-ann-card[hidden] + .v2l-a::before { left: calc(var(--v2-air-carte) + 80px); }
+.v2l-c { padding: var(--v2-air-carte); height: calc(88px + 2 * var(--v2-air-carte)); }
+.v2l-c + .v2l-c::before, .vrm-ann-card[hidden] + .v2l-c::before { left: calc(var(--v2-air-carte) + 104px); }
+html body .v2l-c { contain-intrinsic-size: auto calc(88px + 2 * var(--v2-air-carte)); }
+.v2-ann-groupe { padding: 20px var(--v2-air-carte) 8px; }
+html[data-design="v2"] body .v2-ann-segment { margin: 8px 0 16px; }
+/* Le squelette a la forme EXACTE des rangées (mêmes marges, mêmes hauteurs). */
+html body .v2-squelette-rangee { height: auto; min-height: 88px; padding: 12px var(--v2-air-carte); }
+html body .v2-squelette-C .v2-squelette-rangee { height: calc(88px + 2 * var(--v2-air-carte)); padding: var(--v2-air-carte); }
+/* Texte courant : interligne 1,4. */
+html body :is(.v2-afaire-detail, .v2-ligne-meta, .v2-rien-sous, .v2-affiche-sig-sous, .v2-passe-mini-bas, .v2-ann-arelier) { line-height: var(--v2-air-interligne); }
+/* Boutons voisins : 12 au moins. */
+.v2-titre-ligne { column-gap: var(--v2-air-boutons); }
+/* La carte de la bande en attente : la même boîte que la carte décrite (rien ne bouge quand la photo arrive). */
+.v2-bande-attente { display: flex; flex-direction: column; align-items: stretch; gap: 4px; }
+.v2-bande-attente .v2-bande-photo { background: rgb(255 255 255 / .16); }
+/* AIR · boutons voisins ≥ 12 : le menu plateforme et « ? », la recherche et « ⋯ ». */
+html body .v2-sous-titre { gap: var(--v2-air-boutons); }
+html[data-design="v2"] body .vrm-annbar { gap: var(--v2-air-boutons) !important; }
+/* Achats, allumé : la liste d'hier (sous les passes) attend avec elles ⇒ tout arrive d'un coup, rien n'est poussé. */
+html[data-design="v2"] body:has([data-v2-attente-retirer]) .vrm-main .vrm-market-space { display: none !important; }
+/* L'ordinateur : le plein sur la ligne du titre, À GAUCHE du « Scanner » (44 + 12) — il le couvrait (banc T, 1512). */
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
+  .v2-aujourdhui:has([data-v2-scanner]) .v2-pouce { right: calc(32px + 44px + var(--v2-air-boutons, 12px)); }
+}
+/* A : UNE hauteur pour toutes les rangées (titre sur une ligne ou deux, faits ou pas) — 120, le squelette aussi. */
+html body .v2l-a { min-height: 120px; contain-intrinsic-size: auto 120px; }
+html body .v2-squelette-A .v2-squelette-rangee { min-height: 120px; }
+/* L'en-tête de compte que la liste posera : le squelette le réserve déjà (même hauteur), rien ne glisse. */
+.v2-squelette-tete { display: block; height: 44px; }
+/* (couche `vrm-v2`, la première nommée : passe devant les `!important` des couches d'hier) */
+@layer vrm-v2 {
+  html[data-design="v2"] body .vrm-annbar, html[data-design="v2"] body .vrm-annbar .vrm-annbar-gestes { gap: var(--v2-air-boutons, 12px) !important; }
+}
+.v2-passe-qr-ko { display: grid; place-items: center; text-align: center; font-size: 13px; line-height: 1.4; color: var(--v2-muet, #4A5B6D); background: var(--v2-socle, #EEF3F8); image-rendering: auto; }
+/* Le plein au pouce ne cache rien : la page garde barre + plein (sa VRAIE hauteur, une ou deux lignes) + 16 ; et sous lui,
+   le contenu s'efface dans le fond (un voile du bas de la page) au lieu d'être coupé net derrière le bouton. */
+:root { --v2-pile-bas: calc(var(--vrm-barre-bas, 84px) + 24px + var(--v2-pouce-h, var(--v2-bouton-h, 50px)) + 16px); }
+@media (max-width: 1023px) {
+  html body .v2-ecran[data-v2-plein="1"] { padding-bottom: calc(var(--v2-pile-bas) + 24px); }
+  html body .v2-pouce::before { content: ""; position: absolute; z-index: -1; pointer-events: none; left: -16px; right: -16px; top: -28px; bottom: calc(-24px - var(--vrm-barre-bas, 84px));
+    background: linear-gradient(to bottom, transparent, var(--sv-bas, #0E2C52) 34px); }
+}
