@@ -448,6 +448,195 @@ html body button.v2-seg-btn:focus-visible { outline: none; box-shadow: var(--v2-
 .v2l-c-puces { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-size: 13px; color: var(--v2-muet); }
 .v2l-puce { display: inline-flex; align-items: center; min-height: 24px; }
 .v2l-puce > .v2l-fait { padding: 0 8px; height: 24px; border-radius: 999px; background: var(--v2-socle); }
+
+/* ══ 12. VENTES (phase 2, 17 nov. — src/designV2/VentesV2.jsx) ════════════════════════════════════════════
+   Grand titre + « Imprimer N » + cloche sur UNE ligne · le menu · UN segmenté · le chiffre d'affiche et l'écart nommé ·
+   la recherche (scanner dedans) et « ⋯ » · les groupes par échéance (dits une fois) · les rangées A. */
+/* Le plein de la ligne du titre : « Imprimer 5 bordereaux » ; au téléphone étroit, « Imprimer 5 » (le nom entier reste son
+   nom accessible). */
+.v2v-plein-court { display: none; }
+@media (max-width: 429px) { .v2v-titre-ligne .v2v-plein-long { display: none; } .v2v-titre-ligne .v2v-plein-court { display: inline; } }
+.v2v-titre-ligne .v2v-tete-plein { display: flex; flex: none; min-width: 0; }
+.v2v-titre-ligne .v2v-tete-plein:empty { display: none; }
+.v2v-titre-ligne h1 { white-space: nowrap; }
+.v2v-tete { display: flex; flex-direction: column; gap: 0; color: var(--v2-page-texte); }
+.v2v-plein-ici { display: flex; justify-content: flex-end; margin: 0 0 8px; }
+html[data-design="v2"] body .v2v-segment { margin: 4px 0 8px !important; }
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig { margin: 4px 0 12px; }
+/* La recherche et « ⋯ » : une hauteur (44), une ligne. Le scanner est DANS le champ, à droite. */
+.v2v-recherche { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; }
+.v2v-recherche .v2v-champ { flex: 1 1 auto; min-width: 0; }
+html[data-design="v2"] body .v2v-recherche .v2v-champ { min-height: 44px; }
+html[data-design="v2"] body .v2v-recherche .v2v-champ input { min-height: 44px; }
+html body .v2v-champ button.v2v-scan { display: grid; place-items: center; flex: none; width: 44px; height: 44px; min-width: 44px; min-height: 44px; margin: 0 -4px 0 0; padding: 0;
+  border: 0; background: transparent; color: var(--v2-muet); cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; border-radius: 12px; }
+html body .v2v-champ button.v2v-scan:active { opacity: .6; }
+/* La liste : UNE carte, les groupes en en-têtes simples, les rangées A. */
+.v2v-liste { background: var(--v2-carte); border-radius: 16px; box-shadow: var(--v2-carte-ombre); overflow: hidden; color: var(--sv-encre, #0C1D30); }
+:root[data-theme="dark"] .v2v-liste { color: var(--v2-page-texte); }
+.v2v-liste .v2v-groupe:not(:first-child) { border-top: .5px solid var(--v2-filet); padding-top: 12px; }
+.v2v-groupe-ambre { color: var(--v2-ambre); }
+.v2l-faits-txt.is-ambre { color: var(--v2-ambre); font-weight: 600; }
+.v2v-corps { display: flex; flex-direction: column; gap: 12px; }
+@media (max-width: 1023px) { .v2v-corps { margin-bottom: calc(var(--vrm-barre-bas, 84px) + 24px); } }
+.v2v-note { font-size: 13px; line-height: 18px; color: var(--v2-page-muet); padding: 0 4px; }
+.v2v-note :is(p, span, div) { color: inherit !important; font-size: inherit !important; }
+.v2v-vide { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 32px 16px; text-align: center; color: var(--v2-page-muet); font-size: 15px; }
+.v2v-vide p { margin: 0; }
+.v2v-vide.is-calme { color: var(--v2-page-texte); font-size: 17px; font-weight: 600; }
+.v2v-vide-ic { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: rgb(255 255 255 / .16); }
+/* La tête de Ventes, serrée : la 1re rangée utile vers 300 px au téléphone (le haut de la section d'hier perd ses 16 px). */
+html[data-design="v2"] body div[data-colis-dans="ventes"] { padding: 4px 16px 12px !important; }
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig { margin: 0 0 12px; }
+/* Le chiffre d'affiche de Ventes : « 30 » à gauche ; à sa droite, son mot (sur la ligne de base du chiffre) et l'écart dessous. */
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: 44px auto; column-gap: 12px; }
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig-ligne { display: contents; }
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig-n { grid-column: 1; grid-row: 1 / span 2; }
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig-mot { grid-column: 2; grid-row: 1; align-self: end; line-height: 20px; margin-bottom: -1px; }
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig-sous { grid-column: 2; grid-row: 2; align-self: start; margin: 2px 0 0; font-size: 13px; line-height: 16px; }
+html[data-design="v2"] body .v2v-tete .v2v-segment { margin: 0 0 12px !important; }
+html[data-design="v2"] body .v2v-tete .v2v-recherche { margin-bottom: 8px; }
+/* Passe 1 (captures 390 / 1512) : la loupe et le scanner du champ étaient peints au gris de la page (invisibles sur le champ
+   clair) ; le plateau du segmenté plus serré (2 px) ; 44 px au doigt ET à la souris pour les gestes de Ventes ; la tête resserrée. */
+:root:root:root body .v2v-recherche .v2v-champ :is(.vrm-champ-recherche-loupe, button.v2v-scan) { color: var(--v2-muet) !important; }
+:root:root:root:root body .v2v-recherche .v2v-champ { --cr-h: 44px; min-height: 44px; }
+:root:root:root:root body .v2v-recherche .v2v-champ button.v2v-scan { width: 44px !important; min-width: 44px !important; height: 44px !important; min-height: 44px !important; }
+html[data-design="v2"] body .v2v-tete .v2v-segment { margin: 0 0 8px !important; }
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig { margin: 0 0 8px; }
+/* Passe 2 : la 1re rangée vers 300 px — le plateau du segmenté à 2 px (l'ID de la règle d'hier, `:not(#vrm-seg)`, l'emportait),
+   le chiffre d'affiche un peu plus court, la recherche collée à la liste (l'écart de 8 px vient de la colonne d'hier). */
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig { grid-template-rows: 40px auto; margin: 0 0 6px; }
+html[data-design="v2"] body .v2v-tete .v2v-recherche { margin-bottom: 0; }
+.v2v-liste .v2v-groupe:first-child { padding-top: 6px; }
+/* L'écart nommé : une ligne à la taille normale ; en « Très grand » il passe à la ligne entre deux mots, jamais coupé. */
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig-sous { white-space: normal; overflow-wrap: normal; min-width: 0; }
+/* Les règles d'hier du plateau sont dans `@layer vrm-premium` avec !important : un !important EN COUCHE l'emporte sur un
+   !important hors couche, quelle que soit la spécificité. La retouche de Ventes se pose donc DANS la même couche. */
+@layer vrm-premium {
+    }
+/* La 3e ligne d'une rangée de Ventes (« il doit y avoir plusieurs infos ») : petite, grise, chaque fait avec son icône ;
+   elle passe à la ligne plutôt que de couper (rien de tronqué) ; l'ambre seulement pour une limite LUE à 2 jours ou moins. */
+.v2l-a-l3 { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; margin-top: -2px; font-size: 13px; line-height: 18px; color: var(--v2-muet); }
+.v2l-l3 { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.v2l-l3 svg { flex: none; opacity: .9; }
+.v2l-l3.is-ambre { color: var(--v2-ambre); font-weight: 600; }
+.v2l-logo { display: inline-flex; align-items: center; margin-left: 8px; flex: none; }
+.v2v-liste .v2l-a { align-items: flex-start; }
+.v2v-liste .v2l-a .v2l-a-txt { gap: 6px; }
+/* La 3e ligne de VENTES passe à la ligne (rien de coupé) ; celle d'Annonces reste sur une ligne. */
+.v2v-liste .v2l-a-l3 { height: auto; flex-wrap: wrap; white-space: normal; overflow: visible; gap: 2px 12px; line-height: 18px; }
+
+/* ══ 13. VENTES — QUALITÉ ET FLUIDITÉ (Julien : « ça doit être beaucoup plus quali et fluide ») ═══════════════════
+   Grille de 4/8, rayons 12/14/20, réponse au toucher < 100 ms, 1 000 rangées sans à-coup, images en fondu sans décalage,
+   squelette de la forme exacte des rangées, mouvement réduit respecté. */
+.v2v-liste { border-radius: 20px; }
+.v2v-liste .v2l { transition: background-color var(--v2-appui, 100ms ease); }
+/* 1 000 rangées : le navigateur ne dessine que ce qui est à l'écran ; la place réservée évite tout saut au défilement. */
+.v2v-liste > .v2l { content-visibility: auto; contain-intrinsic-size: auto 104px; }
+/* (Les photos en fondu et le squelette sont ceux de la signature partagée : src/designV2/signature.css §5-6.) */
+/* La grille de 4 : la tête et la 3e ligne sans demi-pixels de rattrapage. */
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig { grid-template-rows: 40px auto; margin: 0 0 8px; }
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig-mot { margin-bottom: 0; }
+html[data-design="v2"] body .v2v-tete .v2-affiche-sig-sous { margin: 0; }
+.v2v-liste .v2l-a-l3 { margin-top: 0; gap: 4px 12px; }
+.v2v-liste .v2v-groupe:first-child { padding-top: 4px; }
+
+/* « Mis à jour à hh:mm » (2 s) : sur Ventes et Annonces du nouveau design, la tête n'a plus de bande — la pastille se posait
+   SUR le grand titre. Elle passe au-dessus de la barre du bas, centrée (dans la couche de sa règle d'hier). */
+@layer vrm-verre {
+  @media (max-width: 760px) {
+    :root:root:root:root:root body:has(.v2-entete-cloche) .vrm-neuf-hote { top: auto !important; bottom: calc(var(--vrm-barre-bas, 84px) + 16px) !important; left: 50% !important; transform: translateX(-50%) !important; height: auto !important; }
+  }
+}
+/* Grand texte (Paramètres → Taille du texte, jusqu'à ×1,36) et 375 px : rien de rogné, aucun mot coupé.
+   · la ligne du titre passe à la ligne s'il le faut (le plein sous le titre, entier) ;
+   · le segmenté prend la largeur de ses mots (jamais rogné) et défile au doigt s'ils ne tiennent pas. */
+.v2v-titre-ligne { flex-wrap: wrap; row-gap: 8px; }
+html body .v2v-segment .v2-seg { overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
+html body .v2v-segment .v2-seg::-webkit-scrollbar { display: none; }
+html body .v2v-segment button.v2-seg-btn { flex: 1 0 auto; padding: 0 12px; }
+html body .v2v-segment .v2-seg-l { overflow: visible; text-overflow: clip; }
+/* Le champ de Ventes sur la grille de 4 (le champ partagé posait 10 px à gauche). */
+:root:root:root body .v2v-recherche .vrm-champ-recherche.v2v-champ { padding-left: 12px; }
+/* Très grand texte : les trois segments tiennent toujours dans la largeur (un mot peut passer à la ligne, jamais coupé, jamais
+   caché derrière un défilement) ; le texte d'aide du champ finit par « … ». */
+html body .v2v-segment .v2-seg { overflow-x: visible; }
+html body .v2v-segment button.v2-seg-btn { flex: 1 1 0; min-width: 0; padding: 4px 8px; }
+html body .v2v-segment .v2-seg-l { white-space: normal; text-align: center; line-height: 1.15; overflow-wrap: normal; }
+:root:root:root body .v2v-recherche .v2v-champ input { text-overflow: ellipsis; }
+
+/* ══ 14. LA BARRE DE SÉLECTION (nouveau design — Julien : « même le imprimer, le je dépose, etc c'est bizarre ») ════════
+   Une barre fine au-dessus de la barre du bas : le compte et deux liens à gauche, UN plein et « ⋯ » à droite ; elle entre et
+   sort en ressort (fondu en mouvement réduit) ; la liste garde sa place. */
+.v2-serie { position: fixed; z-index: 70; left: 12px; right: 12px; bottom: calc(var(--vrm-barre-bas, 84px) + 12px); display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 8px 8px 8px 16px; border-radius: 20px; background: var(--v2-feuille-fond); color: var(--sv-encre, #0C1D30); box-shadow: 0 12px 32px -12px rgb(6 17 31 / .45), 0 0 0 .5px rgb(18 52 96 / .12);
+  animation: v2-serie-entre var(--v2-ressort-feuille, 380ms cubic-bezier(.32, .72, 0, 1)) both; font-variant-numeric: tabular-nums; }
+:root[data-theme="dark"] .v2-serie { color: var(--v2-page-texte); box-shadow: 0 12px 32px -12px rgb(0 0 0 / .8), 0 0 0 .5px rgb(255 255 255 / .1); }
+.v2-serie.is-sortie { animation: v2-serie-sort 220ms cubic-bezier(.32, .72, 0, 1) both; height: 64px; pointer-events: none; }
+@keyframes v2-serie-entre { from { transform: translateY(calc(100% + 24px)); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes v2-serie-sort { from { transform: none; opacity: 1; } to { transform: translateY(calc(100% + 24px)); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .v2-serie { animation: v2-fondu-img 160ms ease-out both; } .v2-serie.is-sortie { animation: none; opacity: 0; } }
+.v2-serie-g { display: flex; flex-direction: column; gap: 0; min-width: 0; flex: 1 1 auto; }
+.v2-serie-g > b { font-size: 15px; font-weight: 600; line-height: 20px; white-space: nowrap; }
+.v2-serie-liens { display: flex; gap: 12px; }
+html body button.v2-serie-lien { appearance: none; border: 0; background: none; padding: 0; min-height: 28px; font: 600 13px/16px var(--sb-police-texte, system-ui); color: var(--v2-lien); cursor: pointer; touch-action: manipulation; }
+html body button.v2-serie-lien::after { content: ""; position: absolute; inset: -8px -6px; }
+html body button.v2-serie-lien { position: relative; }
+.v2-serie-d { display: flex; align-items: center; gap: 4px; flex: none; }
+.v2-serie-d [data-serie-principal] { min-width: 200px; justify-content: center; }
+.v2-serie-rien { font-size: 13px; color: var(--v2-muet); padding: 0 8px; }
+.v2-serie-resume { flex-basis: 100%; margin: 0; font-size: 13px; color: var(--v2-muet); }
+.v2-serie-indispo { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 8px; color: var(--v2-muet); font-size: 15px; }
+.v2-serie-raison { margin-left: auto; font-size: 13px; text-align: right; max-width: 60%; }
+/* La barre du bas RESTE au téléphone (la barre de sélection se pose au-dessus) ; la liste garde la place des deux. */
+@media (max-width: 1023px) {
+  html[data-design="v2"][data-serie-ouverte] .vrm-app-shell .vrm-tabbar { display: flex !important; }
+  html[data-design="v2"][data-serie-ouverte] .vrm-main::after { height: calc(var(--vrm-serie-h, 64px) + var(--vrm-barre-bas, 84px) + 24px); }
+}
+@media (min-width: 1024px) { .v2-serie { left: calc(var(--vrm-rail-l, 272px) + 24px); right: 24px; bottom: 16px; max-width: 880px; margin: 0 auto; } }
+
+/* ══ 15. VENTES · TOUTES (Julien, capture : « le bouton est sur la photo ça rend pas bien du tout ») ═════════════════════
+   La liste des ventes en rangées A ; la case de sélection dans SA colonne de 44 px à gauche de la photo, seulement en
+   sélection ; une rangée choisie se teinte (jamais un cadre gris) ; la facture envoyée = une petite icône verte. */
+html[data-design="v2"] body .v2t-liste { background: var(--v2-carte) !important; border: 0 !important; border-radius: 20px !important; box-shadow: var(--v2-carte-ombre) !important; overflow: hidden; }
+html[data-design="v2"] body .v2t-liste > .v2l + .v2l::before { content: ""; position: absolute; left: calc(var(--v2-air-carte, 16px) + 80px); right: 0; top: 0; height: .5px; background: var(--v2-filet); }
+.v2t-liste .v2l { align-items: flex-start; }
+.v2t-liste .v2l-a-l3 { height: auto; flex-wrap: wrap; white-space: normal; overflow: visible; gap: 4px 12px; line-height: 18px; }
+.v2l-avant { display: grid; place-items: center; flex: none; width: 44px; min-height: 64px; margin: 0 -8px 0 -8px; }
+.v2l-avant .vrm-serie-case { position: static !important; margin: 0 !important; }
+.v2l[data-serie-coche="1"] { background-color: var(--v2-teinte-fond) !important; }
+.v2l[data-v2t-attenue="1"] { opacity: .6; }
+.v2l-apres-prix { display: inline-flex; align-items: center; flex: none; margin: 0 -4px 0 0; }
+/* La facture envoyée : 20 px, vert (le seul vert de l'app), 44 px au doigt ; la phrase apparaît au toucher / appui long. */
+:root { --v2-vert-facture: #1E7A45; }
+:root[data-theme="dark"] { --v2-vert-facture: #5BCB88; }
+html body button.v2-facture-ok { position: relative; appearance: none; display: grid; place-items: center; width: 44px; height: 44px; margin: -10px -6px -10px 0; padding: 0; border: 0; background: none;
+  color: var(--v2-vert-facture); cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; border-radius: 12px; }
+.v2-facture-bulle { position: absolute; right: 0; top: calc(100% + 4px); z-index: 5; width: max-content; max-width: 240px; padding: 8px 12px; border-radius: 12px;
+  background: var(--sv-encre, #0C1D30); color: #FFFFFF; font: 600 13px/16px var(--sb-police-texte, system-ui); text-align: left; box-shadow: 0 8px 24px -8px rgb(0 0 0 / .4); }
+:root[data-theme="dark"] .v2-facture-bulle { background: #EAF2FB; color: #06111F; }
+/* Les rangées de la liste d'hier (cachées) ne laissent aucune trace ; la liste garde la place de la barre de sélection. */
+html[data-design="v2"][data-serie-ouverte] .v2t-liste { margin-bottom: calc(var(--vrm-serie-h, 64px) + 24px); }
+/* À l'ordinateur, la barre du haut collante (recherche, plateformes) est un verre PLEIN : jamais une demi-rangée dessous. */
+@layer vrm-finition {
+  @media (min-width: 1024px) {
+    html[data-design="v2"]:root:root:root body .vrm-app-shell .vrm-main > .vrm-barre-haut { background: var(--sv-haut, #1F5FA8) !important;
+      -webkit-backdrop-filter: blur(20px) saturate(180%) !important; backdrop-filter: blur(20px) saturate(180%) !important; box-shadow: 0 .5px 0 rgb(255 255 255 / .14) !important; }
+  }
+}
+/* La barre de sélection tient sur UNE ligne au téléphone (le plein prend la largeur de son libellé). */
+@media (max-width: 1023px) {
+  .v2-serie { flex-wrap: nowrap; }
+  .v2-serie-d [data-serie-principal] { min-width: 0; }
+  .v2-serie-d .v2b-lib { white-space: nowrap; }
+}
+/* La tête de la coque sur Ventes / Annonces (la cloche seule) : au défilement, une barre de verre PLEINE LARGEUR avec le
+   petit titre (iOS), jamais une demi-boîte posée sur la liste. */
+@media (max-width: 1023px) {
+  html[data-design="v2"] body .vrm-app-header.v2-entete-cloche.is-defile { position: fixed !important; left: 0 !important; right: 0 !important; top: 0 !important; width: auto !important;
+    padding: calc(env(safe-area-inset-top, 0px) + 6px) 12px 6px 16px !important; background: var(--sv-verre-barre, rgb(240 246 252 / .82)) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important; backdrop-filter: blur(20px) saturate(180%) !important; box-shadow: 0 .5px 0 rgb(18 52 96 / .12) !important; }
+}
 /* ⚠️ (17 nov.) La tête de la coque posée sur la ligne du titre (Annonces, la cloche) est TRANSPARENTE aux touchers : elle
    couvrait « Publier » (elementFromPoint ⇒ <header>, le toucher tombait dans le vide). Seuls ses boutons se touchent. */
 html body .vrm-app-header.v2-entete-cloche { pointer-events: none !important; }
@@ -566,3 +755,30 @@ html body .v2-squelette-A .v2-squelette-rangee { min-height: 120px; }
   html body .v2-pouce::before { content: ""; position: absolute; z-index: -1; pointer-events: none; left: -16px; right: -16px; top: -28px; bottom: calc(-24px - var(--vrm-barre-bas, 84px));
     background: linear-gradient(to bottom, transparent, var(--sv-bas, #0E2C52) 34px); }
 }
+/* Une rangée de Ventes reste CALME, même avec un long pseudo et tous les gestes (Julien : « c'est moche ») : la 2e ligne
+   « N° · T42 · logo · pseudo » passe à la ligne plutôt que de couper ou de chevaucher ; aucun bouton dans la rangée (gestes au
+   glisser et dans la fiche), la facture envoyée seule à côté du prix. */
+:is(.v2v-liste, .v2t-liste) .v2l-a-l2 { flex-wrap: wrap; height: auto; min-height: 24px; white-space: normal; row-gap: 4px; overflow: visible; }
+:is(.v2v-liste, .v2t-liste) .v2l-a-l2 .v2l-faits-txt { overflow: visible; text-overflow: clip; white-space: nowrap; }
+.v2l-apres-logo { min-width: 0; overflow-wrap: anywhere; color: var(--v2-muet); }
+/* LA PISTE d'un colis parti : 4 segments courts (12 × 4 px, 2 px entre eux), l'accent pour ce qui est fait, l'ambre seulement
+   s'il y a un geste ; même boîte partout (aucun saut quand elle avance), sur la ligne de son étape en mots. */
+.v2-piste { display: inline-flex; align-items: center; gap: 2px; flex: none; height: 16px; margin-right: 4px; }
+.v2-piste > i { display: block; width: 12px; height: 4px; border-radius: 2px; background: var(--v2-filet); }
+.v2-piste > i.is-fait { background: var(--v2-lien); }
+.v2-piste.is-ambre > i.is-fait:last-of-type { background: var(--v2-ambre-point); }
+:root[data-theme="dark"] .v2-piste > i:not(.is-fait) { background: rgb(255 255 255 / .18); }
+/* La facture envoyée : la boîte visible = l'icône (24 px), la cible au doigt (44) est une zone invisible autour — elle ne
+   recouvre plus le prix ni le pseudo (banc : aucune boîte ne se chevauche dans une rangée). */
+html body button.v2-facture-ok { width: 24px; height: 24px; margin: 0 4px 0 0; border-radius: 8px; overflow: visible; }
+html body button.v2-facture-ok::before { content: ""; position: absolute; inset: -10px; }
+/* La place gardée sous la liste de Ventes, sur la grille de 4 (la barre du bas a sa hauteur à elle). */
+@media (max-width: 1023px) { .v2v-corps { margin-bottom: round(up, calc(var(--vrm-barre-bas, 84px) + 24px), 4px); } }
+/* (18 nov.) La ligne grise « qui » d'une rangée de Ventes : logo (plusieurs plateformes) · acheteur · vendue il y a N j.
+   Petite, grise, elle passe à la ligne entre deux mots (un long pseudo se coupe n'importe où plutôt que de déborder). */
+.v2l-a-qui { display: flex; flex-wrap: wrap; align-items: center; gap: 0 4px; font-size: 13px; line-height: 18px; color: var(--v2-muet); min-width: 0; }
+.v2l-a-qui .v2l-logo { display: inline-flex; align-items: center; }
+.v2l-qui-txt { min-width: 0; overflow-wrap: anywhere; }
+/* Chaque fait de la ligne « qui » reste entier (« vendue il y a 6 j » ne se coupe pas) ; seul un pseudo trop long se coupe. */
+.v2l-qui-fait { white-space: nowrap; }
+.v2l-qui-fait[data-v2l-pseudo] { white-space: normal; overflow-wrap: anywhere; }

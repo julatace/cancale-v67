@@ -7,6 +7,7 @@ import ecran_journee from './en/journee.js';
 import ecran_confort from './en/confort.js';   // (14 nov., lots 117–130) confort et sécurité
 import ecran_studio from './en/studio.js';   // (14 nov.) Studio bleu clair : le disque et l'éventail
 import ecran_design_v2 from './en/designV2.js';   // (17 nov.) le nouveau design, en essai
+import ecran_v2_ventes from './en/v2ventes.js';   // (17 nov.) Ventes, nouveau design (phase 2)
 import ecran_correspondances from './en/correspondances.js';   // (15 nov.) Publier partout : catégories qui correspondent
 import ecran_capte from './en/capte.js';   // (14 nov., extension 5.377) « L'extension a capté »
 import ecran_avenir from './en/avenir.js';
@@ -70,6 +71,7 @@ import ecran_favorisSites from './en/favorisSites.js';   // (15 nov., lot favori
 import ecran_etageres from './en/etageres.js';   // (15 nov.) le Stock en étagères
 import ecran_journee_verre from './en/journee-verre.js';   // (15 nov.) Ma journée verre, la paire à sortir
 import ecran_arrivee from './en/arrivee.js';   // (15 nov.) atelier d'arrivée, historique, taille du texte
+import ecran_stock_rangement from './en/stockRangement.js';   // (17 nov.) le Stock « Ranger » en séance (nouveau design)
 export default {
   ...ecran_accessibilite,
   ...ecran_perso,
@@ -2306,6 +2308,7 @@ export default {
   ...ecran_confort,
   ...ecran_studio,
   ...ecran_design_v2,
+  ...ecran_v2_ventes,
   ...ecran_capte,
   ...ecran_retrait_ailleurs,
   ...ecran_vcventes,
@@ -2332,4 +2335,5 @@ export default {
   ...ecran_republie_telephone,
   ...ecran_securite_ventes,
   ...ecran_parcours_nouveau,
+  ...ecran_stock_rangement,
 };

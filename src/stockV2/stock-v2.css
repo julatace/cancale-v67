@@ -1,0 +1,342 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   LE STOCK DU NOUVEAU DESIGN (17 nov., lot stock-rangement) — seulement allumé (`vrm_design_v2`) :
+   ces classes `.sr-*` ne sont posées que par src/stockV2/StockV2.jsx. Les jetons sont ceux du nouveau
+   design (src/designV2/design-v2.css, `--v2-*`) quand il est chargé, sinon leurs valeurs ici (les mêmes).
+   ════════════════════════════════════════════════════════════════════════════ */
+.sr-ecran, .sr-feuille {
+  --sr-page: var(--v2-page-texte, #FFFFFF);
+  --sr-page-muet: var(--v2-page-muet, rgb(255 255 255 / .88));
+  --sr-carte: var(--v2-carte, #FFFFFF);
+  --sr-encre: var(--sv-encre, #0C1D30);
+  --sr-muet: var(--v2-muet, #4A5B6D);
+  --sr-filet: var(--v2-filet, rgb(18 52 96 / .12));
+  --sr-socle: var(--v2-socle, #EEF3F8);
+  --sr-ombre: var(--v2-carte-ombre, 0 .5px 0 rgb(18 52 96 / .06), 0 1px 2px rgb(18 52 96 / .07), 0 10px 24px -14px rgb(18 52 96 / .28));
+  --sr-teinte: var(--v2-teinte-fond, rgb(0 96 204 / .10));
+  --sr-teinte-appui: var(--v2-teinte-fond-appui, rgb(0 96 204 / .18));
+  --sr-teinte-texte: var(--v2-teinte-texte, #0050A8);
+  --sr-plein: var(--v2-plein-fond, #FFFFFF);
+  --sr-plein-appui: var(--v2-plein-fond-appui, #DCE6F1);
+  --sr-plein-texte: var(--v2-plein-texte, #0C1D30);
+  --sr-accent: #0071E3;
+  --sr-ambre: var(--v2-ambre, #8A4B00);
+  --sr-page-ambre: var(--v2-page-ambre, #FFF1C0);
+  --sr-anneau: var(--v2-anneau, 0 0 0 3px rgb(0 96 204 / .45));
+  --sr-appui: 100ms cubic-bezier(.2, .9, .25, 1);
+  --sr-retour: 200ms cubic-bezier(.32, 1.25, .5, 1);
+}
+.sr-ecran {
+  display: flex; flex-direction: column; gap: 0;
+  color: var(--sr-page); font-family: var(--sb-police-texte, -apple-system, system-ui, sans-serif);
+  font-feature-settings: "tnum" 1, "lnum" 1; font-variant-numeric: tabular-nums;
+}
+:root[data-theme="dark"] .sr-ecran, :root[data-theme="dark"] .sr-feuille {
+  --sr-page: var(--v2-page-texte, #F2F7FD); --sr-page-muet: var(--v2-page-muet, #B9C8D8);
+  --sr-carte: var(--v2-carte, #16273C); --sr-encre: #EAF2FB; --sr-muet: var(--v2-muet, #A7B8CB);
+  --sr-filet: var(--v2-filet, rgb(255 255 255 / .10)); --sr-socle: var(--v2-socle, #1E3149);
+  --sr-ombre: var(--v2-carte-ombre, 0 0 0 .5px rgb(255 255 255 / .06), 0 12px 26px -14px rgb(0 0 0 / .8));
+  --sr-teinte: var(--v2-teinte-fond, rgb(74 163 255 / .16)); --sr-teinte-appui: var(--v2-teinte-fond-appui, rgb(74 163 255 / .26));
+  --sr-teinte-texte: var(--v2-teinte-texte, #8CC4FF); --sr-plein: var(--v2-plein-fond, #EAF2FB); --sr-plein-appui: var(--v2-plein-fond-appui, #C9D9EA);
+  --sr-plein-texte: var(--v2-plein-texte, #06111F); --sr-accent: #0A84FF; --sr-ambre: var(--v2-ambre, #F2B65E); --sr-page-ambre: var(--v2-page-ambre, #F2B65E);
+  --sr-anneau: var(--v2-anneau, 0 0 0 3px rgb(140 196 255 / .55));
+}
+.vrm-ms-stock.sr-hote { padding: 4px 16px 24px !important; gap: 0 !important; }
+
+/* La tête : le grand titre, le geste compact à droite (src/designV2 : `.v2-titre-ligne`). */
+.sr-titre-ligne { padding: 6px 0 2px; }
+/* Téléphone : la cloche de la coque est posée sur la ligne du titre (comme Annonces) — sa place est gardée à droite. */
+@media (max-width: 743px), (max-width: 767px) and (hover: hover) and (pointer: fine), (max-width: 1023px) and (max-height: 599px) and (hover: none), (max-width: 1023px) and (max-height: 599px) and (pointer: coarse), (max-width: 1023px) and (max-height: 599px) and (pointer: none) { .sr-titre-ligne { padding-right: 60px; min-height: 52px; } }
+.sr-titre { margin: 0; font-size: 34px; font-weight: 700; letter-spacing: -.02em; line-height: 40px; color: var(--sr-page); }
+.sr-sous-titre { margin: 2px 0 2px; }
+.sr-rond { appearance: none; border: 0; margin: 0; padding: 0; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+  background: transparent; color: inherit; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; transition: background-color 160ms ease; }
+.sr-rond:active { background: color-mix(in srgb, currentColor 16%, transparent); }
+.sr-rond:focus-visible { outline: none; box-shadow: var(--sr-anneau); }
+/* « Où est… » : un vrai champ (photo et voix dedans) et « ⋯ », collés en haut. */
+.sr-cherche-ligne { position: sticky; top: 6px; z-index: 25; display: flex; align-items: center; gap: 4px; margin: 8px 0 12px; color: var(--sr-page); }
+.sr-cherche { flex: 1; min-width: 0; display: flex; align-items: center; background: var(--sr-carte); color: var(--sr-encre);
+  border-radius: 14px; box-shadow: var(--sr-ombre); min-height: 50px; }
+.sr-cherche-ic { display: grid; place-items: center; width: 40px; flex: none; color: var(--sr-muet); }
+.sr-champ { flex: 1; min-width: 0; height: 50px; border: 0; outline: none; background: transparent; color: inherit; font: inherit; font-size: 17px; padding: 0; -webkit-appearance: none; appearance: none; }
+:root:root:root:root:root:root:root body .sr-cherche input.sr-champ { background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; border-radius: 0 !important; min-height: 50px !important; color: var(--sr-encre) !important; outline: none !important; }
+.sr-champ::placeholder { color: var(--sr-muet); opacity: 1; }
+.sr-champ::-webkit-search-cancel-button { display: none; }
+.sr-cherche-mic { display: flex; align-items: center; padding-right: 3px; color: var(--sr-muet); }
+.sr-cherche:focus-within { box-shadow: var(--sr-ombre), var(--sr-anneau); }
+.sr-cherche .sr-rond { color: var(--sr-muet); }
+/* Le micro commun (MicDictee) posé DANS le champ : un rond discret de 44, pas un disque blanc. */
+:root:root:root:root:root:root:root body .sr-cherche-mic button { width: 44px !important; height: 44px !important; min-width: 44px !important; padding: 0 !important; background: transparent !important; box-shadow: none !important; border: 0 !important; color: var(--sr-muet) !important; }
+
+/* La réponse « Où est » et la séance partagent la carte « ici ». */
+.sr-resultats { margin: 0 0 22px; }
+.sr-reponse { background: var(--sr-carte); color: var(--sr-encre); border-radius: 20px; box-shadow: var(--sr-ombre); padding: 14px; display: flex; flex-direction: column; gap: 12px;
+  animation: sr-monte 260ms cubic-bezier(.32, .72, 0, 1) both; }
+.sr-reponse-tete, .sr-paire { display: flex; gap: 14px; align-items: center; }
+.sr-paire-txt { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; flex: 1; }
+.sr-paire-titre { font-size: 15px; line-height: 1.3; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sr-paire-ou { font-size: 13px; color: var(--sr-muet); line-height: 1.35; }
+.sr-vendue { font-size: 13px; font-weight: 600; color: var(--sr-ambre); }
+.sr-photo { position: relative; display: grid; place-items: center; flex: none; border-radius: 14px; overflow: hidden; background: var(--sr-socle); color: var(--sr-muet); }
+.sr-plaque { display: inline-flex; align-items: center; height: 26px; padding: 0 9px; border-radius: 8px; background: var(--sr-encre); color: var(--sr-carte);
+  font-size: 15px; font-weight: 700; letter-spacing: .01em; white-space: nowrap; }
+.sr-plaque.is-grand { height: 36px; padding: 0 12px; font-size: 22px; border-radius: 10px; }
+.sr-ici { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "l plan" "m plan" "c plan"; column-gap: 12px; row-gap: 2px; align-items: center;
+  background: var(--sr-socle); border-radius: 14px; padding: 12px 14px; }
+.sr-ici.is-reponse { grid-template-areas: "m plan" "c plan"; }
+.sr-ici-l { grid-area: l; font-size: 13px; font-weight: 600; color: var(--sr-muet); }
+.sr-ici-meuble { grid-area: m; font-size: 22px; font-weight: 700; line-height: 1.2; letter-spacing: -.01em; overflow-wrap: anywhere; }
+.sr-ici-case { grid-area: c; font-size: 17px; font-weight: 600; }
+.sr-plan { grid-area: plan; display: grid; gap: 3px; justify-content: end; align-content: center; }
+.sr-plan-case { display: block; border-radius: 3px; background: color-mix(in srgb, var(--sr-encre) 10%, transparent); }
+.sr-plan-case.is-prise { background: color-mix(in srgb, var(--sr-encre) 34%, transparent); }
+.sr-plan-case.is-vise { background: var(--sr-accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--sr-accent) 35%, transparent); animation: sr-pulse 1600ms ease-in-out 2; }
+.sr-sans { margin: 0; font-size: 15px; line-height: 1.4; color: var(--sr-muet); }
+.sr-segment { margin: 0 0 12px; }
+.sr-sans-num { font-size: 13px; font-weight: 600; color: var(--sr-muet); }
+.sr-ligne { outline: none; }
+.sr-ligne:focus-visible { box-shadow: inset var(--sr-anneau); }
+.sr-liste-paires .v2l-a-l2 { gap: 8px; }
+/* « ⋯ » : ce qui n'est pas compté, avec son geste ; les outils. */
+.sr-plus { display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px; }
+.sr-plus-h { margin: 8px 4px 2px; font-size: 13px; font-weight: 600; color: color-mix(in srgb, currentColor 66%, transparent); }
+.sr-plus-groupe { display: flex; flex-direction: column; border-radius: 14px; overflow: hidden; background: color-mix(in srgb, currentColor 5%, transparent); }
+.sr-plus-ligne { appearance: none; border: 0; margin: 0; width: 100%; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 10px 14px; text-align: left; background: transparent; color: inherit; font: inherit; cursor: pointer; touch-action: manipulation; }
+.sr-plus-ligne + .sr-plus-ligne { box-shadow: inset 0 .5px 0 color-mix(in srgb, currentColor 14%, transparent); }
+.sr-plus-ligne:disabled { cursor: default; }
+.sr-plus-ligne:active:not(:disabled) { background: color-mix(in srgb, currentColor 7%, transparent); }
+.sr-plus-ligne > svg { flex: none; }
+.sr-plus-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sr-plus-txt b { font-size: 15px; font-weight: 600; display: flex; align-items: center; }
+.sr-plus-txt span { font-size: 13px; line-height: 1.4; color: color-mix(in srgb, currentColor 70%, transparent); }
+.sr-vide-l { margin: 0; padding: 14px 4px; font-size: 15px; color: var(--sr-page-muet); }
+
+/* Les boutons : plein (un par écran), teinté, texte. Toujours ≥ 44 px, aucune icône seule sans nom. */
+.sr-btn { appearance: none; -webkit-appearance: none; margin: 0; border: 0; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 44px; padding: 0 16px; border-radius: 14px; font: inherit; font-size: 15px; font-weight: 600; line-height: 1.2; cursor: pointer; white-space: nowrap;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
+  transition: transform var(--sr-retour), background-color 160ms ease, filter 160ms ease; }
+.sr-btn:active:not(:disabled) { transform: scale(.97); filter: brightness(.94); transition: transform var(--sr-appui), background-color 100ms ease; }
+.sr-btn:focus-visible { outline: none; box-shadow: var(--sr-anneau); }
+.sr-btn:disabled { opacity: .55; cursor: progress; }
+.sr-btn-plein { min-height: 50px; font-size: 17px; background: var(--sr-accent); color: #FFFFFF; width: 100%; }
+.sr-btn-plein.is-pouce { background: var(--sr-plein); color: var(--sr-plein-texte); box-shadow: 0 1px 2px rgb(0 0 0 / .18), 0 10px 22px -12px rgb(12 29 48 / .6); }
+.sr-btn-plein.is-pouce:active { background: var(--sr-plein-appui); }
+.sr-btn-teinte { background: var(--sr-teinte); color: var(--sr-teinte-texte); }
+.sr-btn-teinte:active, .sr-btn-teinte[aria-pressed="true"] { background: var(--sr-teinte-appui); }
+.sr-btn-texte { background: transparent; color: var(--sr-teinte-texte); padding: 0 10px; }
+.sr-ecran > section > .sr-btn-texte, .sr-groupe > .sr-btn-texte { color: var(--sr-page); }
+.sr-gestes { display: flex; flex-direction: column; gap: 10px; }
+.sr-gestes-bas { display: flex; flex-wrap: wrap; gap: 8px; }
+.sr-gestes-bas > .sr-btn { flex: 1 1 auto; }
+
+/* Les groupes et les listes iOS. */
+.sr-groupe { margin: 0 0 24px; }
+.sr-h2 { margin: 0 4px 8px; font-size: 20px; font-weight: 700; letter-spacing: -.01em; color: var(--sr-page); }
+.sr-liste { background: var(--sr-carte); color: var(--sr-encre); border-radius: 16px; box-shadow: var(--sr-ombre); overflow: hidden; }
+.sr-rangee { appearance: none; -webkit-appearance: none; margin: 0; border: 0; box-sizing: border-box; width: 100%; position: relative;
+  display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 8px 12px; text-align: left; background: transparent; color: inherit; font: inherit;
+  cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; transition: background-color 160ms ease; }
+.sr-rangee:active { background: color-mix(in srgb, var(--sr-encre) 6%, transparent); }
+.sr-rangee:focus-visible { outline: none; box-shadow: inset var(--sr-anneau); }
+.sr-liste > .sr-rangee + .sr-rangee::before, .sr-liste > .sr-place + .sr-place::before, .sr-liste > .sr-place + .sr-rangee::before {
+  content: ""; position: absolute; left: 68px; right: 0; top: 0; height: .5px; background: var(--sr-filet); }
+.sr-place { position: relative; }
+.sr-rangee-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.sr-rangee-t { font-size: 17px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sr-rangee-t.is-lien { color: var(--sr-teinte-texte); font-weight: 600; }
+.sr-rangee-s { font-size: 15px; line-height: 1.25; color: var(--sr-muet); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sr-a-sortir { color: var(--sr-ambre); font-weight: 600; }
+.sr-chevron { display: grid; place-items: center; color: var(--sr-muet); flex: none; transition: transform 200ms ease; }
+.sr-chevron[data-ouvert="1"] { transform: rotate(90deg); }
+.sr-place-ic { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: var(--sr-socle); color: var(--sr-encre); flex: none; }
+.sr-place-ic.is-ajout { font-size: 26px; font-weight: 400; color: var(--sr-teinte-texte); background: var(--sr-teinte); }
+.sr-place-corps { padding: 0 8px 12px; animation: sr-ouvre 220ms ease-out both; }
+/* Dans « Mes places », le meuble d'avant (ses cases, ses gestes) sans redire son nom : la rangée le dit. */
+.sr-place-corps .vrm-etag-titre-m { display: none; }
+.sr-place-corps .vrm-s2d-meuble { margin: 0; box-shadow: none; background: transparent; }
+.sr-note { font-size: 13px; color: var(--sr-page-muet); margin: 0 4px 16px; }
+.sr-ancien { color: var(--sr-page); }
+
+/* LA SÉANCE (dans la feuille commune). */
+.sr-feuille .sr-seance, .sr-feuille .sr-fin { color: var(--sv-encre, inherit); }
+.sr-seance { display: flex; flex-direction: column; gap: 16px; padding: 4px 0 8px; }
+.sr-seance .sr-ici { --sr-socle: color-mix(in srgb, currentColor 6%, transparent); --sr-encre: currentColor; --sr-muet: color-mix(in srgb, currentColor 66%, transparent); }
+.sr-seance .sr-photo { background: color-mix(in srgb, currentColor 8%, transparent); color: color-mix(in srgb, currentColor 60%, transparent); }
+.sr-seance .sr-plaque { background: #0C1D30; color: #FFFFFF; }
+:root[data-theme="dark"] .sr-seance .sr-plaque { background: #EAF2FB; color: #06111F; }
+.sr-seance .sr-paire-ou, .sr-seance .sr-sans, .sr-seance .sr-aide { color: color-mix(in srgb, currentColor 66%, transparent); }
+.sr-seance .sr-btn-plein { background: #0071E3; }
+:root[data-theme="dark"] .sr-seance .sr-btn-plein { background: #0A84FF; }
+.sr-seance .sr-btn-teinte { background: rgb(0 113 227 / .12); color: #0058B8; }
+:root[data-theme="dark"] .sr-seance .sr-btn-teinte { background: rgb(10 132 255 / .2); color: #8CC4FF; }
+.sr-seance .sr-btn-texte { color: #0058B8; }
+:root[data-theme="dark"] .sr-seance .sr-btn-texte { color: #8CC4FF; }
+.sr-seance .sr-plan-case { background: color-mix(in srgb, currentColor 12%, transparent); }
+.sr-seance .sr-plan-case.is-prise { background: color-mix(in srgb, currentColor 36%, transparent); }
+.sr-seance .sr-plan-case.is-vise { background: #0071E3; }
+:root[data-theme="dark"] .sr-seance .sr-plan-case.is-vise { background: #0A84FF; }
+.sr-fait { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 13px; line-height: 1.35; color: color-mix(in srgb, currentColor 70%, transparent); animation: sr-ouvre 200ms ease both; }
+.sr-fait svg { flex: none; color: #0058B8; }
+:root[data-theme="dark"] .sr-fait svg { color: #8CC4FF; }
+.sr-fait.is-fin { justify-content: center; }
+.sr-choix { display: flex; flex-direction: column; gap: 10px; }
+.sr-meubles { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 0 -2px; padding: 2px; }
+.sr-meuble-onglet { appearance: none; border: 0; margin: 0; flex: none; min-height: 44px; padding: 0 14px; border-radius: 12px; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
+  background: color-mix(in srgb, currentColor 7%, transparent); color: inherit; white-space: nowrap; touch-action: manipulation; }
+.sr-meuble-onglet[aria-selected="true"] { color: var(--sr-onglet-texte, #FFFFFF); background: #0C1D30; }
+:root[data-theme="dark"] .sr-meuble-onglet[aria-selected="true"] { background: #EAF2FB; color: #06111F; }
+.sr-grille-hote { overflow-x: auto; overscroll-behavior-x: contain; margin: 0 -2px; padding: 2px; }
+.sr-grille { display: grid; gap: 6px; width: max-content; }
+.sr-case { appearance: none; margin: 0; min-width: 44px; min-height: 44px; aspect-ratio: 1; border-radius: 12px; font: inherit; cursor: pointer; padding: 0; display: grid; place-items: center;
+  border: 1.5px dashed color-mix(in srgb, currentColor 28%, transparent); background: transparent; color: inherit; touch-action: manipulation; transition: transform var(--sr-retour), background-color 120ms ease; }
+.sr-case:active:not(:disabled) { transform: scale(.94); background: rgb(0 113 227 / .14); transition: transform var(--sr-appui); }
+.sr-case:focus-visible { outline: none; box-shadow: var(--sr-anneau); }
+.sr-case.is-prise { border-style: solid; border-color: transparent; background: color-mix(in srgb, currentColor 9%, transparent); }
+.sr-case.is-ici { border: 2px solid #0071E3; background: rgb(0 113 227 / .1); cursor: default; }
+.sr-case:disabled:not(.is-ici) { cursor: progress; }
+.sr-case-n { font-size: 13px; font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; padding: 0 2px; }
+.sr-aide { margin: 0; font-size: 13px; line-height: 1.4; }
+.sr-fin { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 28px 12px 36px; gap: 12px; animation: sr-monte 280ms cubic-bezier(.32, .72, 0, 1) both; }
+.sr-fin-ic { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: rgb(0 113 227 / .12); color: #0058B8; }
+:root[data-theme="dark"] .sr-fin-ic { background: rgb(10 132 255 / .2); color: #8CC4FF; }
+.sr-fin-titre { margin: 0; font-size: 20px; font-weight: 700; }
+
+@keyframes sr-monte { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes sr-suivant { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+@keyframes sr-ouvre { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sr-pulse { 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--sr-accent) 25%, transparent); } }
+@media (prefers-reduced-motion: reduce) {
+  .sr-reponse, .sr-fin, .sr-place-corps { animation: sr-ouvre 160ms ease both; }
+  .sr-plan-case.is-vise { animation: none; }
+  .sr-btn, .sr-btn:active, .sr-case:active { transform: none !important; }
+}
+
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
+  .vrm-ms-stock.sr-hote { padding: 12px 32px 32px !important; max-width: 824px; }
+  .sr-groupe, .sr-cherche-ligne, .sr-resultats, .sr-liste-paires, .sr-segment { max-width: 760px; }
+  .sr-segment { max-width: 420px; }
+}
+
+/* ══ LA SIGNATURE (17 nov., brief « SIGNATURE ») : l'ÉTIQUETTE KRAFT — une place est une étiquette de carton, en plus grand
+   que celle du N° (kraft clair #E9DCC4 / nuit #3A3226, encre, coin coupé, œillet percé) ; et le MOUVEMENT « fait ». ══ */
+.sr-kraft { --sr-kraft: var(--v2-kraft, #E9DCC4); --sr-kraft-encre: var(--v2-kraft-encre, #2A2116); --sr-kraft-muet: var(--v2-kraft-doux, #6B5A40); background: var(--sr-kraft) !important; color: var(--sr-kraft-encre) !important;
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%); border-radius: 6px; box-shadow: inset 0 0 0 .5px var(--v2-kraft-bord, rgb(42 33 22 / .22)); position: relative; }
+/* L'œillet percé, à gauche (la géométrie de l'étiquette N° partagée, src/designV2/signature.css, en plus grand). */
+.sr-kraft::before { content: ""; position: absolute; left: 10px; top: 50%; width: 8px; height: 8px; margin-top: -4px; border-radius: 50%; background: var(--sr-trou, var(--v2-kraft-trou, #FFFFFF)); box-shadow: inset 0 0 0 .5px var(--v2-kraft-bord, rgb(42 33 22 / .22)); }
+.sr-feuille .sr-kraft { --sr-trou: var(--v2-feuille-fond, #F4F8FC); }
+.sr-ici.sr-kraft { padding: 14px 18px 14px 30px; --sr-muet: var(--sr-kraft-muet); }
+.sr-ici.sr-kraft .sr-ici-l { color: var(--sr-kraft-muet); }
+.sr-ici.sr-kraft .sr-plan-case { background: color-mix(in srgb, var(--sr-kraft-encre) 12%, transparent); }
+.sr-ici.sr-kraft .sr-plan-case.is-prise { background: color-mix(in srgb, var(--sr-kraft-encre) 38%, transparent); }
+.sr-ici.sr-kraft .sr-plan-case.is-vise { background: #0071E3; }
+:root[data-theme="dark"] .sr-ici.sr-kraft .sr-plan-case.is-vise { background: #4AA3FF; }
+.sr-ici.sr-kraft .sr-ici-meuble { font-size: 24px; }
+/* « Où est N°178 » : SA place, l'étiquette en grand et ALLUMÉE — un liseré bleu de 3 px qui suit le coin coupé. */
+.sr-kraft-anneau { padding: 3px; background: #0071E3; clip-path: polygon(0 0, calc(100% - 17px) 0, 100% 17px, 100% 100%, 0 100%); border-radius: 9px; animation: sr-allume 900ms ease-out 1 both; }
+:root[data-theme="dark"] .sr-kraft-anneau { background: #4AA3FF; }
+.sr-kraft-anneau > .sr-ici.sr-kraft { clip-path: polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% 100%, 0 100%); }
+@keyframes sr-allume { from { transform: scale(.97); opacity: .4; } 60% { transform: scale(1.015); opacity: 1; } to { transform: none; } }
+/* Mes places : l'étiquette du meuble, ses lettres au feutre. */
+.sr-place-etiquette { display: grid; place-items: center; width: 56px; height: 44px; padding-left: 8px; box-sizing: border-box; flex: none; font-size: 17px; font-weight: 700; letter-spacing: .02em; clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 0 100%); border-radius: 4px; }
+.sr-place-etiquette.sr-kraft::before { left: 7px; width: 6px; height: 6px; margin-top: -3px; }
+.sr-liste > .sr-place + .sr-place::before, .sr-liste > .sr-place + .sr-rangee::before { left: 76px; }
+/* LE MOUVEMENT « fait » : la paire rangée glisse et se replie (220 ms, un ressort court), une coche sur sa photo ; le
+   compteur « N à ranger » descend d'un cran. Mouvement réduit : rien ne glisse, la suivante est là. */
+.sr-paire-photo { position: relative; display: block; flex: none; }
+.sr-coche { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 14px; background: rgb(0 113 227 / .78); color: #FFFFFF; animation: sr-coche 220ms cubic-bezier(.32, 1.25, .5, 1) both; }
+.sr-seance.is-sortie .sr-paire, .sr-seance.is-sortie .sr-ici { animation: sr-range 220ms cubic-bezier(.32, .72, 0, 1) both; }
+.sr-seance.is-sortie .sr-paire { animation-delay: 0ms; }
+@keyframes sr-range { to { opacity: 0; transform: translateX(-28px) scale(.96); } }
+@keyframes sr-coche { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
+.sr-reste { display: inline-block; font-variant-numeric: tabular-nums; animation: sr-cran 220ms cubic-bezier(.32, 1.25, .5, 1) both; }
+@keyframes sr-cran { from { opacity: .3; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .sr-coche, .sr-reste, .sr-seance.is-sortie .sr-paire, .sr-seance.is-sortie .sr-ici, .sr-kraft-anneau { animation: none !important; }
+}
+
+/* Le segmenté Paires · Places : le contrôle iOS, À SOI (aucune règle d'hier ne le repeint) — un creux translucide sur la
+   coque, l'élu en porcelaine (jour) ou en verre clair (nuit), sans aplat gris lourd ni diode. */
+.sr-seg { display: flex; gap: 2px; padding: 3px; border-radius: 12px; background: rgb(255 255 255 / .16); box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .18); }
+.sr-seg-btn { appearance: none; border: 0; margin: 0; flex: 1 1 0; min-width: 0; min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 6px;
+  border-radius: 10px; background: transparent; color: #FFFFFF; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; white-space: nowrap;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent; transition: background-color 180ms cubic-bezier(.32, .72, 0, 1), color 180ms ease, box-shadow 180ms ease; }
+.sr-seg-btn:active { background: rgb(255 255 255 / .10); }
+.sr-seg-btn:focus-visible { outline: none; box-shadow: var(--sr-anneau); }
+.sr-seg-btn[aria-selected="true"] { background: #FFFFFF; color: #0C1D30; box-shadow: 0 1px 2px rgb(0 0 0 / .14), 0 3px 8px rgb(0 0 0 / .10); }
+.sr-seg-n { font-weight: 400; opacity: .72; font-variant-numeric: tabular-nums; }
+:root[data-theme="dark"] .sr-seg { background: rgb(0 0 0 / .28); box-shadow: inset 0 0 0 .5px rgb(255 255 255 / .10); }
+:root[data-theme="dark"] .sr-seg-btn { color: #EAF2FB; }
+:root[data-theme="dark"] .sr-seg-btn[aria-selected="true"] { background: #3A5072; color: #FFFFFF; box-shadow: 0 1px 3px rgb(0 0 0 / .35); }
+@media (prefers-reduced-motion: reduce) { .sr-seg-btn { transition: none; } }
+
+/* 1 000 paires : une rangée hors de l'écran n'est ni mise en page ni peinte (sa hauteur réservée : aucun saut). */
+.sr-liste-paires > .sr-ligne { content-visibility: auto; contain-intrinsic-size: auto 96px; }
+/* Une photo arrive en fondu, dans SA place (taille fixée : le texte ne bouge pas). */
+.sr-liste-paires .v2l-photo img { animation: sr-ouvre 200ms ease both; }
+@media (prefers-reduced-motion: reduce) { .sr-liste-paires .v2l-photo img { animation: none; } }
+
+/* La coque, allumé, sur Stock (et Annonces) : l'en-tête qui porte la cloche est POSÉ sur la ligne du titre — sa boîte
+   transparente couvrait « Ranger 10 » (mesuré : le toucher tombait sur <header>). Seuls ses boutons prennent le doigt. */
+html[data-design="v2"] body .vrm-app-header.v2-entete-cloche { pointer-events: none; }
+html[data-design="v2"] body .vrm-app-header.v2-entete-cloche :is(button, a, [role="button"], input) { pointer-events: auto; }
+
+/* L'explication du Stock (premier meuble pas encore créé) dans le nouveau design : les numéros d'étapes lisibles (13 px,
+   gris du nouveau design ≥ 4,5:1), trois graisses seulement. */
+.sr-ecran .vrm-sx-etape > b { font-size: 13px !important; font-weight: 600 !important; color: var(--v2-muet, #4A5B6D) !important; }
+.sr-ecran .vrm-sx-etape > span { font-size: 15px; font-weight: 400; }
+
+/* Téléphone : collée, la recherche passe SOUS la cloche (qui reste en haut à droite) ; le titre de la coque ne se
+   redessine pas par-dessus (le grand titre de l'écran le dit déjà). */
+@media (max-width: 743px), (max-width: 767px) and (hover: hover) and (pointer: fine), (max-width: 1023px) and (max-height: 599px) and (hover: none), (max-width: 1023px) and (max-height: 599px) and (pointer: coarse), (max-width: 1023px) and (max-height: 599px) and (pointer: none) { .sr-cherche-ligne { top: 58px; } }
+html[data-design="v2"] body .vrm-app-header.v2-entete-cloche .vrm-hdr-titre { display: none !important; }
+/* Grand texte (« Très grand », 375 px) : le titre ne se casse jamais en lettres ; le geste plein se resserre. */
+.sr-titre { white-space: nowrap; flex: 0 0 auto; }
+.sr-titre-ligne { flex-wrap: wrap; row-gap: 8px; }
+/* Champ étroit (375 px en « Très grand ») : la photo se retire du champ (elle reste dans « ⋯ ») — le texte d'aide n'est pas coupé. */
+.sr-cherche { container-type: inline-size; }
+@container (max-width: 300px) { .sr-cherche [data-sr-photo] { display: none; } }
+
+/* ══ MES PLACES ouvertes : la place sur sa ligne, gestes nommés, l'ancienne tête du meuble (ronds sans nom) retirée. ══ */
+.sr-place-corps { padding: 4px 20px 20px; display: flex; flex-direction: column; gap: 12px; }
+.sr-place-corps .vrm-s2d-tete { display: none !important; }
+.sr-ici.sr-kraft.is-place { grid-template-columns: 1fr; grid-template-areas: "m" "c"; padding: 20px 20px 20px 34px; }
+.sr-ici.sr-kraft.is-place .sr-ici-meuble { font-size: 24px; overflow-wrap: anywhere; }
+.sr-place-gestes { display: flex; flex-wrap: wrap; gap: 12px; }
+.sr-place .sr-rangee-t { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* Le défilement : l'en-tête à la cloche ne redevient pas une barre opaque avec le titre par-dessus la recherche collée. */
+html[data-design="v2"] body .vrm-app-header.v2-entete-cloche, html[data-design="v2"] body .vrm-app-header.v2-entete-cloche.is-defile { background: transparent !important; box-shadow: none !important; border: 0 !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+html[data-design="v2"] body .vrm-app-header.v2-entete-cloche [data-titre-ecran] { display: none !important; }
+
+/* ══ L'AIR (brief « AIR ») : cartes ≥ 20 px de marge intérieure, rangées ≥ 64, 12 entre boutons, 32 entre sections. ══ */
+.sr-reponse { padding: 20px; gap: 16px; }
+.sr-ici, .sr-ici.sr-kraft { padding: 20px 20px 20px 34px; }
+.sr-rangee { padding: 10px 20px; min-height: 64px; }
+.sr-liste > .sr-rangee + .sr-rangee::before, .sr-liste > .sr-place + .sr-place::before, .sr-liste > .sr-place + .sr-rangee::before { left: 84px; }
+.sr-gestes-bas, .sr-gestes { gap: 12px; }
+.sr-groupe { margin: 0 0 32px; }
+.sr-h2 { margin: 0 4px 12px; }
+.sr-plus-ligne { min-height: 64px; padding: 12px 20px; }
+.sr-plus { gap: 12px; }
+.sr-cherche-ligne { margin: 12px 0 16px; }
+.sr-segment { margin: 0 0 16px; }
+.sr-feuille .sr-seance { gap: 20px; }
+
+/* ══ ORDINATEUR : deux colonnes — la liste à gauche, la place (ou les places) à droite. ══ */
+@media (min-width: 1024px), (min-width: 768px) and (hover: hover) and (pointer: fine), (min-width: 744px) and (min-height: 600px) and (hover: none), (min-width: 744px) and (min-height: 600px) and (pointer: coarse), (min-width: 744px) and (min-height: 600px) and (pointer: none) {
+  .vrm-ms-stock.sr-hote { max-width: 1240px; }
+  .sr-deux { display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 440px); gap: 24px; align-items: start; }
+  .sr-deux .sr-liste-paires, .sr-deux .sr-col { max-width: none; }
+  .sr-cote { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow: auto; }
+  .sr-cote .sr-groupe { max-width: none; margin: 0; }
+  .sr-cote-paire { display: flex; flex-direction: column; gap: 12px; color: var(--sr-page); }
+  .sr-cote-paire .sr-reponse { padding: 24px; }
+  .sr-cherche-ligne, .sr-segment { max-width: none; }
+  .sr-segment { max-width: 420px; }
+  .sr-reponse, .sr-plus-ligne { padding: 24px; }
+}
+
+/* La paire montrée à droite (ordinateur) : sa rangée reste marquée dans la liste. */
+.sr-ligne[data-sr-actif="1"] { background: rgb(0 113 227 / .08); box-shadow: inset 3px 0 0 #0071E3; }
+:root[data-theme="dark"] .sr-ligne[data-sr-actif="1"] { background: rgb(74 163 255 / .12); box-shadow: inset 3px 0 0 #4AA3FF; }
+/* « ⋯ » à côté de la recherche collée : un disque de la même porcelaine que le champ (lisible sur la coque comme sur une carte). */
+html body .sr-cherche-ligne > button.v2b-icone { background: var(--sr-carte); color: var(--sr-encre); box-shadow: var(--sr-ombre); flex: none; }
