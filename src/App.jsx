@@ -108,7 +108,7 @@ import PorteSansCompte from './auth/PorteSansCompte.jsx';
 import MenuProfil,{PastilleProfil,useNomCoque} from './profil/MenuProfil.jsx';
 import {poserLecteurFiche} from './profil/AvatarPersonnel.jsx';
 import { SqueletteChargement } from "./Chargement.jsx";
-import { AttenteEcran, useEssentiel, useAttenteComplete } from './AttenteEcran.jsx';
+import { AttenteEcran, useEssentiel, useAttenteComplete, useEcranMontre } from './AttenteEcran.jsx';
 // (9 nov.) Ma journée tout de suite : les derniers chiffres rendus sur CET appareil (src/journeeInstantanee.js).
 import { JourneeInstantanee } from './JourneeInstantanee.jsx';
 import { capturerJournee, ecrireInstantane, effacerInstantanes, lireInstantane } from './journeeInstantanee.js';
@@ -49145,6 +49145,23 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     try { localStorage.setItem('vrm_journee_sorties_vues', JSON.stringify(n)); } catch (_) {}
     setSortiesVues(n);
   };
+  // (18 nov., moteur-rapide) MA JOURNÉE CACHÉE NE SE REDESSINE PAS. Tant que l'écran attend ses données
+  // (src/AttenteEcran.jsx : monté, invisible, le squelette ou l'instantané à sa place), chaque lecture arrivée
+  // rendait `Comptabilite` ET recalculait les 2 200 lignes de Ma journée (tuiles, `commandesAVerifier`…) pour un
+  // écran que personne ne voit : 200 à 600 ms par arrivée, au ×4. Caché, Ma journée garde l'arbre de son
+  // dernier calcul (même élément ⇒ React ne le reparcourt pas) ; ses composants qui lisent eux-mêmes (la carte du
+  // mois et son `useEssentiel`) continuent seuls. La carte dépend de `liveStats` et de `premierJour` : s'ils
+  // changent, l'arbre est recalculé. Dès que l'écran se MONTRE, il est recalculé avec les données du moment —
+  // aucun chiffre ne se montre plus vieux que maintenant ; rien d'autre ne change (lectures, publications, règles).
+  const ecranMontre = useEcranMontre();
+  const gelJournee = useRef(null);
+  const journeeGelee = (calculer) => {
+    const g = gelJournee.current;
+    if (!ecranMontre && g && g.liveStats === liveStats && g.premierJour === premierJourProp) return g.el;
+    const el = calculer();
+    gelJournee.current = ecranMontre ? null : { el, liveStats, premierJour: premierJourProp };
+    return el;
+  };
   const sourcesBilan=[
     {id:'ventes-vinted',libelle:'Ventes Vinted',onglet:'cat_ventes',comptes:accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accNameOf(a)})),items:Array.isArray(sales.items)?sales.items.map(o=>({id:o.transaction_id,compte:String(o._acc?.vinted_user_id||''),titre:o.title,valeurs:[o.status,o.price]})):null,charge:sales.loading,erreur:sales.error,echecs:sales.failedUids||[],partiel:true,revision:accounts.map(a=>_harvestSeen[`${a.vinted_user_id}_orders_sold`])},
     {id:'annonces-vinted',libelle:'Annonces Vinted',onglet:'cat_annonces',comptes:accounts.filter(a=>!acctOff(a.vinted_user_id)).map(a=>({uid:String(a.vinted_user_id),nom:accNameOf(a)})),items:Array.isArray(listings.items)?listings.items.map(it=>({id:it.id,compte:String(it._acc?.vinted_user_id||''),titre:it.title,valeurs:[it.title,it.price,it.photo,it.photoCount,it.condition]})):null,charge:listings.loading,erreur:listings.error,echecs:listings.ko||[],partiel:!!listings.incomplet,revision:listings.lues},
@@ -49174,7 +49191,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           liste priorisée de ce qui te fait gagner de l'argent AUJOURD'HUI, chaque
           ligne = une action d'un tap. L'app pilote ta journée. Tout est calculé
           en local (aucun appel Vinted en plus). */}
-      {curSub==='journee' && (()=>{
+      {curSub==='journee' && journeeGelee(()=>{
         const h = new Date().getHours();
         const hello = h<12?'Bonjour':h<18?'Bon après-midi':'Bonsoir';
         // (2 nov., audit des données G2) « dimanche 1er novembre », jamais « 1 novembre ».
@@ -51428,7 +51445,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                 une carte de « À faire » (comptée dans « N gestes »), seulement s'il y a quelque chose
                 à vérifier — la lecture part au montage (`vendusAilleurs`, plus haut). */}
           </div>
-        );      })()}
+        );      })}
 
       {!only && (
         <div style={{display:'flex',gap:8,marginBottom:16,flexWrap:'wrap'}}>

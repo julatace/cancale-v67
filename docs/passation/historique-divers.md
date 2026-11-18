@@ -2027,3 +2027,6 @@ les outils sont derrière « … » (`data-achats-plus`) ; le banc l'ouvre d'abo
 
 ## Ligne du §9 de CLAUDE.md déplacée le 18 nov. (lot design-v2-ventes, fusion de main), telle quelle
 - **17 nov. · E-mails envoyés (lot emails-beaux)** : 13 e-mails de VRM dans la langue du compte (fr/en/es/it/de, `api/_lib/mail-textes.js`), bouton VML pour Outlook, « Envoyé par VRM · vrm.center » au pied, sujet du bilan avec le vendu ; modèles Supabase en 5 langues (`audit-emails-beaux`, planche `scripts/emails-planche.cjs`). `2026-11-17-emails-beaux.md`. Geste : recoller les 6 modèles `supabase/templates/` dans Supabase.
+
+## Ligne du §9 de CLAUDE.md déplacée le 18 nov. (lot moteur-rapide, fusion de main), telle quelle
+- **17 nov. · « Créé par vrm.center » juste au-dessus du code, et ne s'enlève plus (lot tampon-qr)** : centrée sur le plus grand QR/DataMatrix/MaxiCode (sinon le code-barres), 3 mm au-dessus, dans le SENS de l'étiquette, police réduite jusqu'à 4,5 pt, sinon rien — jamais dessous ni à côté ; aucune case/place/taille, un « sans mention » rangé ignoré ; Paramètres → Tampons montre SON dernier bordereau par transporteur (sinon « Exemple »). Bancs `tampon-qr` 33/33, `tampons-page`. `2026-11-17-tampon-qr.md`. Geste : aucun.
