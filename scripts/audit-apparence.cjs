@@ -55,7 +55,7 @@ async function verifier({ src, dem, app }, bavard = true) {
   }
   dit(ecarts.length === 0, `le script de démarrage et React donnent la MÊME teinte sur ${n} entrées (aucun flash)`, ecarts.slice(0, 3).join(' | '));
   for (const [style, clair, sombre] of [
-    [undefined, '#F1F4F2', '#111B20'],
+    [undefined, '#F3F5F8', '#101A29'],
     ['apple', '#F2F2F7', '#000000'],
     ['studio', '#2563A8', '#133460'],
   ]) {

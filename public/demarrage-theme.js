@@ -37,7 +37,7 @@
     if (style !== 'studio') {
       var apple = style === 'apple';
       document.documentElement.setAttribute('data-theme-style', apple ? 'apple' : 'vrm');
-      if (m && (apple || document.documentElement.hasAttribute('data-vrm-boot-app'))) m.setAttribute('content', apple ? (d ? '#000000' : '#F2F2F7') : (d ? '#111B20' : '#F1F4F2'));
+      if (m && (apple || document.documentElement.hasAttribute('data-vrm-boot-app'))) m.setAttribute('content', apple ? (d ? '#000000' : '#F2F2F7') : (d ? '#101A29' : '#F3F5F8'));
     }
   } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
   // « Recharger » de l'écran de démarrage (au-delà de 8 s) : avant tout JavaScript de l'app (c'est quand

@@ -139,7 +139,7 @@ export default {
   "v2.barre.arg": "Geld",
   "v2.style.lib": "Stil",
   "v2.style.vrm": "VRM",
-  "v2.style.vrm.desc": "Mineralischer Hintergrund, anthrazitfarbene Navigation und grüne Akzente.",
+  "v2.style.vrm.desc": "Heller Hintergrund und dunkelblaue Navigation.",
   "v2.style.apple": "Apple",
   "v2.style.apple.desc": "Hellgrauer Hintergrund, weiße Karten, Schrift und Schalter wie auf dem iPhone.",
   "v2.style.studio": "Studio Blau",

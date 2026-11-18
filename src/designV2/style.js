@@ -14,7 +14,7 @@ export function styleActif() {
 }
 
 export function couleurStyle(s, sombre, studio) {
-  if (s === 'vrm') return sombre ? '#111B20' : '#F1F4F2';
+  if (s === 'vrm') return sombre ? '#101A29' : '#F3F5F8';
   if (s === 'apple') return sombre ? '#000000' : '#F2F2F7';
   return studio;
 }
