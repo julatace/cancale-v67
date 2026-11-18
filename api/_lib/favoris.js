@@ -3,7 +3,7 @@ import {vendeurExige,lireCommeVendeur} from './session.js';
 import {modifierNeutre} from './neutre-cas.js';
 import {resoudreCiblesFavoris} from './favoris-cibles.js';
 import {lirePreuvesConversationsFavoris} from './favoris-preuves.js';
-import {initialiserFile,vueFile,lancerFile,reserverFile,terminerFile,arreterFile,consommerFile,verifierReservation,cloreIncertains,RefusFavoris} from './favoris-file.js';
+import {initialiserFile,vueFile,lancerFile,reserverFile,terminerFile,arreterFile,consommerFile,verifierReservation,cloreIncertains,reprendreFile,RefusFavoris} from './favoris-file.js';
 import {validerReglagesFavoris} from '../../src/reglagesFavoris.js';
 import {sendPushToAll,pushCategorieActive} from './push.js';
 import {contexteVendeur} from './owner.js';
@@ -283,6 +283,8 @@ export async function routeFavoris(req,res){
         const r=await tourAuto(req,{owner,uid,cle,maintenant,extension});
         if(r.nouvelleDemande)await notifierDemandeAuto(owner,r.nouvelleDemande).catch(()=>{});
         return res.status(200).json({ok:true,uid,...r,serveur:maintenant});
+      }else if(c.action==='reprendre'){
+        decision=d=>reprendreFile(d,{owner,maintenant});
       }else if(c.action==='suivant'){
         const jeton=randomUUID(),suivi=randomUUID();decision=d=>reserverFile(d,{owner,maintenant,jeton,suivi});
       }else if(c.action==='terminer'){
