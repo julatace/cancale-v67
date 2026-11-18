@@ -1,5 +1,7 @@
 // Découpé d'App.jsx (démarrage léger, 8 nov.) : chargé à la demande par App.jsx.
 // Déplacement MÉCANIQUE (le code est celui d'App.jsx, inchangé) — voir docs/passation/2026-11-08-demarrage-leger.md.
+import { useDesignV2 } from '../designV2/reglage.js';   // (17 nov., phase 2)
+import { BoutonV2 } from '../designV2/BoutonV2.jsx';
 import { motsVendeur } from '../profilVendeur.js';
 import { GraphiqueSemaines } from '../GraphiqueSemaines.jsx';   // (8 nov., « beauté ») le vendu par semaine façon Santé
 import { annulationsParCompte } from '../annulationsCompte.js';
@@ -321,7 +323,8 @@ function RepliStats({ id, titre, phrase, children, ouvertDefaut = false }) {
     </details>
   );
 }
-function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,baseKO,premierJour,lbcVentes={ventes:[],inconnues:0},lbcLu,ebayCa=null,ebayCommandes,panelOff=null,ventesVc,sousNav=null}) {
+function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,baseKO,premierJour,lbcVentes={ventes:[],inconnues:0},lbcLu,ebayCa=null,ebayCommandes,panelOff=null,ventesVc,sousNav=null,versPrix=null}) {
+  const designV2 = useDesignV2();   // (17 nov., phase 2) un seul segmenté : la période en menu compact, « Prix qui marche » en lien
   // Les N° des annonces « à confirmer » (la liste dépliée sous « Annonces en ligne ») :
   // relus avec les chiffres, jamais un « sans N° » inventé (revue de la 5.167).
   const numerosDash=React.useMemo(()=>load('vinted_annonce_numeros',{}),[liveStats]);
@@ -672,7 +675,13 @@ function Dashboard({catalog,sales,garageGrid,invoices,liveStats,onGo,actions,bas
 
   return (
     <div className="vrm-finance-page vrm-statistiques-premium" data-espace="argent" style={{padding:16,display:'flex',flexDirection:'column',gap:18}}>
-      <ScreenHead icon="euro" title={L.argent} phrase="dashboard" sous={sousNav ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}</div> : null} right={<Segmente label={tr('stats.periode')} className="vrm-sv-periode" value={periodeStats} onChange={setPeriodeStats} options={Object.entries(PERIODES).map(([v,l])=>({v,l,data:{'data-sv-choix':v}}))}/>}/>
+      <ScreenHead icon="euro" title={L.argent} phrase="dashboard" sous={sousNav ? <div className="vrm-stats-sous-nav" data-stats-sous-nav="">{sousNav}{designV2 ? <div className="v2-stats-ligne" data-v2-stats-ligne="">
+        <label className="v2-stats-periode"><span className="vg-sr">{tr('stats.periode')}</span>
+          <select value={periodeStats} onChange={(e) => setPeriodeStats(e.target.value)} data-v2-stats-periode={periodeStats}>{Object.entries(PERIODES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+          <Icon name="chevron" size={14}/></label>
+        {versPrix ? <BoutonV2 role="texte" onClick={versPrix} attrs={{ 'data-v2-stats-prix': '' }}>{tr('v2.st.prix')}</BoutonV2> : null}
+      </div> : null}</div> : null} right={designV2 ? null : <Segmente label={tr('stats.periode')} className="vrm-sv-periode" value={periodeStats} onChange={setPeriodeStats} options={Object.entries(PERIODES).map(([v,l])=>({v,l,data:{'data-sv-choix':v}}))}/>}/>
+
       {/* 🎯 OBJECTIF DU MOIS (4 nov.) — le MÊME réglage et la MÊME règle que la barre de la carte sombre.
           (11 nov., lot objectifs-mois) Sorti du volet replié : c'est LE détail de l'objectif dans Argent.
           (14 nov., lot argent-choix) Remonté sous les tuiles de la vitrine (trouvable sans défiler). */}

@@ -35,6 +35,8 @@ export default {
   "achats.chercher": "Suchen ↗",
   "achats.sansCodeVinted": "Code nicht gelesen: öffne die Vinted-Unterhaltung (das Paket zählt nur mit seinem Code als „abzuholen“)",
   "achats.sansCodeEmail": "Code in der E-Mail des Versanddienstes nicht gelesen: öffne sie (das Paket zählt nur mit seinem Code als „abzuholen“)",
+  "achats.statutCodePasLu": "Code noch nicht gelesen",
+  "achats.filtreAnnules": "Storniert",
   "achats.transporteurEncoreConnu": "Versanddienst noch unbekannt: Status noch nicht gelesen",
   "achats.confirmeChez": "Bestätigt von",
   "achats.texte": "vor {ageCourtMs}",

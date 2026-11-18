@@ -247,4 +247,5 @@ export default {
   "ventes.pourquoiBord": "Pourquoi ce bordereau attend ?",
   "ventes.puceAchat": "Prix d’achat ?",
   "ventes.puceRelier": "Relier un achat",
+  "ventes.gestesVinted": "Ses gestes dans Ventes · Vinted",
 };
