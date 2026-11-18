@@ -98,3 +98,14 @@ toucher). Avant de livrer : n'y mettre que des calculs dont chaque lecture hors 
   mutants rouges : setItem/removeItem/storage ignorés, getItem pas noté, imbriqué perdu, versions pas comparées).
 - Tables de module remplies en place : `noterEtatsTxn` (TXN_ETATS) et `signalerVc` (`_vcMem`) appellent `toucherMemoire()`.
 - Mesuré (build de diagnostic, 1re ouverture) : 24 rendus sur 35 reprennent le résultat (11 calculs au lieu de 35).
+- Profil (non minifié, ×4, 2 passes alternées, temps INCLUSIF de `listeEnvoyes`, le cœur du calcul) : 1re ouverture
+  921 · 1 221 ms → 423 · 321 ms ; 2e ouverture 997 · 1 345 → 135 · 101 ms.
+- A/B minifié (3 passes alternées) : dans le bruit de la machine (charge 6–12 : une même build varie de 8,0 à 10,4 s) —
+  1re ouverture tâches longues 13 126 → 12 893 ms, 2e 9 824 → 10 328 ms. Le gain (~0,5–1 s de calcul) est réel au profil,
+  pas séparable du bruit au chronomètre.
+- Les bancs d'écran ne VOIENT pas une clé incomplète : la base inventée n'a aucune commande à vérifier (n = 0 avant et
+  après). Ce qui le prouve : `audit-cle-verifier` (statique, `--prouve` 43/43 + nom ajouté + état importé non admis) et
+  `audit-version-donnees` (exécuté, 13 cas, `--prouve` 6/6). Les deux sont rouges sur le code d'avant (fichiers absents).
+- chiffres-volume (build 1b contre rendus-groupes) : 34/35, le 35e = le même ordre de deux attributs qu'en 1a ;
+  source-unique 25 ✓, versements-course 27 ✓, temps-reel 38 ✓ ; audits tdz, journee-coherence, journee-court verts ;
+  capture 390 (1re et 2e ouverture) identique.
