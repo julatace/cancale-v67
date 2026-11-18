@@ -139,6 +139,7 @@ async function mesurer(pg, nom, zonesSel) {
 //   texte ≥ 20 px du bord de SA carte ; 16 px entre deux cartes voisines (0 = une liste groupée collée) ;
 //   ≥ 12 px entre deux boutons voisins, jamais 3 boutons ou plus sur une rangée ; rangée de liste ≥ 64 px ; interligne ≥ 1,35.
 async function air(pg, nom, racineSel) {
+  if (process.env.AIR_DEBUG) await pg.evaluate(() => { window.__airDebug = true; });
   const r = await pg.evaluate((racineSel) => {
     const racines = [...document.querySelectorAll(racineSel)].filter((e) => e.getClientRects().length);
     const ferme = (e) => { for (let p = e; p; p = p.parentElement) { const d = p.parentElement; if (d && d.tagName === 'DETAILS' && !d.open && p.tagName !== 'SUMMARY') return true; } return false; };
@@ -153,7 +154,7 @@ async function air(pg, nom, racineSel) {
     const serres = [];
     const marcher = (z) => { const w = document.createTreeWalker(z, NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) { if (!n.textContent.trim()) continue; const el = n.parentElement; if (!el || !vis(el) || el.closest('.vg-sr, .vrm-sr-seul, button, .v2-seg, .vrm-seg, select, input')) continue;
       const c = carteDe(n); if (!c) continue; const r0 = document.createRange(); r0.selectNodeContents(n); const rs = [...r0.getClientRects()].filter((q) => q.width > 1 && q.height > 1); if (!rs.length) continue;
-      const C = c.getBoundingClientRect(); for (const q of rs) { const d = Math.min(q.left - C.left, C.right - q.right, q.top - C.top, C.bottom - q.bottom); if (d < 19.5 && d > -400) { serres.push({ t: n.textContent.trim().slice(0, 24), d: Math.round(d), c: String(c.className || c.tagName).slice(0, 40) }); break; } } } };
+      const C = c.getBoundingClientRect(); for (const q of rs) { const d = Math.min(q.left - C.left, C.right - q.right, q.top - C.top, C.bottom - q.bottom); if (d < 19.5 && d > -400) { serres.push({ t: n.textContent.trim().slice(0, 24), d: Math.round(d), c: String(c.className || c.tagName).slice(0, 40), ...(window.__airDebug ? { chaine: (() => { const o = []; for (let p = n.parentElement; p && p !== c.parentElement && o.length < 7; p = p.parentElement) { const cs = getComputedStyle(p); const r = p.getBoundingClientRect(); o.push(`${p.tagName}.${String(p.className).slice(0, 25)} st=${(p.getAttribute('style') || '').slice(0, 60)} disp=${cs.display} ws=${cs.whiteSpace} x=${Math.round(r.left)}-${Math.round(r.right)} C=${Math.round(C.left)}-${Math.round(C.right)}`); } return o; })(), q: [Math.round(q.left), Math.round(q.right), Math.round(q.top), Math.round(q.bottom)], C: [Math.round(C.left), Math.round(C.right), Math.round(C.top), Math.round(C.bottom)] } : {}) }); break; } } } };
     racines.forEach(marcher);
     const ecarts = [];
     for (const c of cartes) { const s = c.nextElementSibling; if (!s || !set.has(s)) continue; const g = s.getBoundingClientRect().top - c.getBoundingClientRect().bottom; if (g > 0.5 && g < 15.5) ecarts.push({ g: Math.round(g), c: String(c.className).slice(0, 30) }); }
@@ -168,6 +169,7 @@ async function air(pg, nom, racineSel) {
     return { n: cartes.length, serres, ecarts, pres: [...new Set(pres)], rangees: [...new Set(rangees)], lignes, interligne };
   }, racineSel);
   dit(r.n > 0 && !r.serres.length, `A ${nom} : ${r.n} cartes, aucun texte à moins de 20 px de leur bord`, r.serres.slice(0, 8));
+  if (process.env.AIR_DEBUG && r.serres.length) console.log(JSON.stringify(r.serres.slice(0, 3), null, 1));
   dit(!r.ecarts.length, `A ${nom} : 16 px entre deux cartes voisines (ou collées en liste groupée)`, r.ecarts.slice(0, 6));
   dit(!r.pres.length && !r.rangees.length, `A ${nom} : ≥ 12 px entre deux boutons, aucune rangée de 3 boutons ou plus`, { pres: r.pres.slice(0, 6), rangees: r.rangees.slice(0, 6) });
   dit(!r.lignes.length, `A ${nom} : rangées de liste ≥ 64 px`, r.lignes.slice(0, 6));
@@ -292,7 +294,7 @@ const ZONES_ARGENT = '.v2-argent, .v2-argent-nav, .vrm-screen-head:has(.v2-argen
         // Q4 la tête défilée : une barre de verre PLEINE LARGEUR, jamais un bloc posé sur le contenu.
         if (tel) {
           await pg.evaluate(() => { const l = document.querySelector('.v2-ar-liste') || document.querySelector('.v2-ar-vide'); if (l) l.scrollIntoView({ block: 'end' }); }); await pg.waitForTimeout(500);
-          const td = await pg.evaluate(() => { const h = document.querySelector('.vrm-app-header'); if (!h) return null; const r = h.getBoundingClientRect(); const cs = getComputedStyle(h); const m = cs.backgroundColor.match(/[\d.]+/g) || []; return { defile: h.classList.contains('is-defile'), l: Math.round(r.left), w: Math.round(r.width), W: innerWidth, a: m.length > 3 ? Number(m[3]) : 1, flou: cs.backdropFilter || cs.webkitBackdropFilter || '' }; });
+          const td = await pg.evaluate(() => { const h = document.querySelector('.vrm-app-header'); if (!h) return null; const r = h.getBoundingClientRect(); const cs = getComputedStyle(h); const m = cs.backgroundColor.match(/[\d.]+/g) || []; return { defile: h.getAttribute('data-defile-tete') === '1', l: Math.round(r.left), w: Math.round(r.width), W: innerWidth, a: m.length > 3 ? Number(m[3]) : 1, flou: cs.backdropFilter || cs.webkitBackdropFilter || '' }; });
           dit(td && td.defile && td.l === 0 && td.w === td.W && td.a >= 0.7 && /blur/.test(td.flou), `Q ${T} : défilée, la tête est une barre de verre pleine largeur (${td && td.w}/${td && td.W} px, opacité ${td && td.a})`, td);
           await pg.screenshot({ path: path.join(SHOTS, `argent-mois-bas-${W}-${th}.png`) });
         }
