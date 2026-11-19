@@ -10,7 +10,7 @@
    qu'on y pose exprès (`.vrm-hbtn` : synchronisation, œil, Stream) gardent leur dessin.
    Il disparaît le jour où plus aucune règle d'avant n'est sans couche (chantier `claude/lisible-partout`).
    ════════════════════════════════════════════════════════════════════════════ */
-:is(.n-onglets, .n-barre-titre, .n-page-recherche, .n-feuille, .n-laterale, .n-poussee, .n-toast, .n-coque-detail, .n-tt, .n-page-plein, .n-au-volets, .n-msg-outils, .n-fil-article) :is(button, input, select, textarea, a):not(.vrm-hbtn, .vrm-hbtn *, .n-coque-etats *, .n-laterale-outils *) {
+:is(.n-onglets, .n-barre-titre, .n-page-recherche, .n-feuille, .n-laterale, .n-poussee, .n-toast, .n-coque-detail, .n-tt, .n-page-plein, .n-au-volets, .n-msg-outils, .n-fil-article, .n-fil-vignette) :is(button, input, select, textarea, a):not(.vrm-hbtn, .vrm-hbtn *, .n-coque-etats *, .n-laterale-outils *) {
   all: revert-layer;
 }
 /* Une seule exception à « aucune valeur » : le champ de recherche. `.vrm-app-shell .vrm-main input:not(…)` (sans couche,
@@ -18,3 +18,6 @@
    L'identifiant de <main> (#vrm-contenu) suffit à passer devant, sans surenchère ailleurs. */
 #vrm-contenu .n-page-recherche .n-recherche-champ, #vrm-contenu .n-tt-recherche .n-recherche-champ { background: transparent !important; box-shadow: none !important; }
 /* (19 nov. soir) Le tableau de travail (`.n-tt`), le plein collé d'une page native et les volets d'Automatisations : les mêmes. */
+/* (19 nov. soir) Messages · Tous, à l'ordinateur : l'avatar de la personne est ROND (la vignette carrée de l'article est à droite).
+   La règle d'avant (`:root:root:root:root:root body .vg-fil-ph`, sans couche) dessinait un carré : une classe de plus la passe. */
+:root:root:root:root:root body .vg-fil-ph.n-fil-avatar { border-radius: 999px; box-shadow: none; }

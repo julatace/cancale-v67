@@ -27,6 +27,7 @@ import { CLE_FILS_RELIES, convVinted, convLeboncoin, convVestiaire, convEbay, re
 import { trj } from '../i18n/react.js';
 import { heureListe } from '../ordreConversations.js';   // (15 nov., verre 2) la même heure que la liste Vinted
 import { montant } from '../format.js';
+import { useOrdinateur } from '../natif/Coque.jsx';   // (19 nov. soir) la barre d'outils des listes, à l'ordinateur
 const montantCourt = (v) => montant(v);
 import { BarreOutils, LigneAFaire } from '../ui/index.js';   // (14 nov., refonte) les briques communes des écrans de liste
 
@@ -223,6 +224,10 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
   }, [vinted, sigVinted, autres, ebayTous, relies]);
   // (15 nov., maquette « Verre dépoli » validée) « Toutes · Offres · Non lues » : un filtre, rien d'autre (aucune lecture).
   const [vue, setVue] = React.useState('toutes');
+  // (19 nov. soir, NATIF.md §2 bis) À l'ordinateur : « Choisir une action ▾ » et le filtre Site (sur les fils DÉJÀ lus : un fil
+  // est d'un site s'il porte une conversation de ce site) ; l'avatar de la personne et la vignette de l'article sur chaque fil.
+  const ordinateur = useOrdinateur();
+  const [siteF, setSiteF] = React.useState('tous');
   const offreDe = (f) => { const o = f.convs.filter((c) => c.offre).map((c) => c.offre); return o.length ? o[o.length - 1] : null; };
   const nOffres = fils.filter((f) => offreDe(f)).length;
   const nNonLues = fils.filter((f) => f.nonLu === true).length;
@@ -232,7 +237,13 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
     const t = [f.num ? 'n°' + f.num : '', f.num || '', ...f.convs.map((c) => [c.nom, c.titre, c.compteNom].join(' ')), d ? d.apercu : ''].join(' ').toLowerCase();
     return t.includes(motCherche);
   }) : fils;
-  const filsMontres = vue === 'offres' ? filsVus.filter((f) => offreDe(f)) : vue === 'nonlues' ? filsVus.filter((f) => f.nonLu === true) : filsVus;
+  const filsSite = siteF === 'tous' ? filsVus : filsVus.filter((f) => f.plateformes.includes(siteF));
+  const sitesFils = [...new Set(fils.flatMap((f) => f.plateformes))];
+  const filsMontres = vue === 'offres' ? filsSite.filter((f) => offreDe(f)) : vue === 'nonlues' ? filsSite.filter((f) => f.nonLu === true) : filsSite;
+  // Le prix mini d'un fil : celui posé à côté de SON N° (la fiche de ce N°, une seule — sinon rien), jamais deviné.
+  const miniDuNum = (num) => { if (!num) return null; try { const F = load('vinted_annonce_numeros', {}) || {}; const k = cleNum(num);
+    const l = Object.values(F).filter((x) => x && x.numero != null && cleNum(x.numero) === k); if (l.length !== 1) return null;
+    const v = Number(String(l[0].min == null ? '' : l[0].min).replace(',', '.')); return Number.isFinite(v) && v > 0 ? v : null; } catch (_) { return null; } };
   // (12 nov., Julien, CLAUDE.md §3 « Messages, comptes ») LES COMPTES SÉPARÉS : le compte de l'onglet d'abord, puis
   // chaque autre compte (le plus récent d'abord) ; DANS chaque compte, du plus récent au plus ancien. Le compte d'un
   // fil est celui de son DERNIER message (un fil relié de deux sites se range une fois). Rien n'est mélangé.
@@ -277,6 +288,12 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
     if (cleVinted && vintedOuvert === cleVinted) { vuVinted.current = cleVinted; return; }
     if (cleVinted && vuVinted.current === cleVinted && !vintedOuvert) { vuVinted.current = ''; if (via) setVia(''); else setOuvert(''); }
   }, [vintedOuvert, cleVinted]);
+  // L'article EN TÊTE du fil : photo, N°, titre, dernière offre, prix mini (par le N° du fil, une identité).
+  const enTete = (f) => { if (!f || (!f.num && !f.convs.some((c) => c.photo || c.titre))) return null; const ph = (f.convs.find((c) => c.photo) || {}).photo || null;
+    const titre = (f.convs.find((c) => c.titre) || {}).titre || ''; const o = offreDe(f); const mini = miniDuNum(f.num);
+    return <div className="n-fil-article" data-fil-article={f.num || ''}><span className="n-fil-article-photo">{ph ? <PhotoVinted src={ph} alt="" loading="lazy"/> : <Icon name="image" size={20}/>}</span>
+      <span className="n-fil-article-texte"><span className="n-fil-article-titre">{titre}</span>
+        <span className="n-fil-article-sous">{[f.num ? 'N°' + f.num : '', o ? tr('verre2.msg.offreDe', { m: montantCourt(o.prix) }) : '', mini != null ? tr('egalite.mini', { p: montantCourt(mini) }) : tr('tableau.msg.sansMini')].filter(Boolean).join(' · ')}</span></span></div>; };
   const panneau = () => {
     if (!choisi) return <div className="vrm-chat-empty"><Icon name="chat" size={28}/><span>{tr('messages.choisisFil')}</span></div>;
     if (!conv) return <FilFusionne key={choisi.cle} fil={choisi} vintedDe={vintedDe} lireVinted={lireVinted} ebayDe={(e) => (ebayTous && ebayTous.messages ? ebayTous.messages.get(e.compte + ':' + e.conv) : null)} onRepondre={repondre} onFermer={fermer} nomDe={nomDe}
@@ -299,6 +316,20 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
           {/* (14 nov., refonte — AJOUT 3) Les questions « Peut-être la même paire ? » passent dans UNE ligne
               « À faire · N › » : la feuille montre la question du moment avec SES deux gestes (Oui / Non),
               la suivante vient après. Rien n'est relié sans son clic. */}
+          {ordinateur && fils.length ? <div className="n-msg-outils" data-msg-outils-tableau="">
+            <select className="n-au-choix" aria-label={tr('tableau.choisirAction')} value="" data-msg-action="" onChange={(e) => { const v = e.target.value; e.target.value = '';
+                if (v === 'ebay') relireEbay(); else if (v) setVue(v); }}>
+              <option value="">{tr('tableau.choisirAction')}</option>
+              <option value="nonlues">{tr('tableau.msg.nonLues')}</option>
+              <option value="offres">{tr('tableau.msg.offres')}</option>
+              <option value="toutes">{tr('tableau.msg.toutes')}</option>
+              {sitesFils.includes('ebay') ? <option value="ebay">{tr('tableau.msg.relireEbay')}</option> : null}
+            </select>
+            {sitesFils.length > 1 ? <select className="n-au-choix" aria-label={tr('egalite.site.titre')} value={siteF} data-msg-site="" onChange={(e) => setSiteF(e.target.value)}>
+              <option value="tous">{tr('egalite.site.tous')}</option>
+              {sitesFils.map((x) => <option key={x} value={x}>{NOM_SITE[x] || x}</option>)}
+            </select> : null}
+          </div> : null}
           {fils.length ? <BarreOutils className="vrm-ms-msg-outils" valeur={cherche} onChange={setCherche} placeholder={tr('ms.msg.chercher')} label={tr('ms.msg.chercher')}
             data-msg-recherche="" champAttrs={{ 'data-msg-recherche': '', autoComplete: 'off', spellCheck: false, name: 'recherche-messages' }}/> : null}
           <LigneAFaire n={propositions.length} titre={tr('ms.msg.aFaire')} className="vrm-ms-msg-afaire" data-msg-afaire={propositions.length}>
@@ -358,7 +389,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
                             data-fil={f.cle} data-fil-convs={String(f.convs.length)} data-fil-sites={f.plateformes.join(',')} data-fil-num={f.num || undefined} data-nonlu={f.nonLu === true ? '1' : undefined}
                             data-fil-at={f.at != null ? String(f.at) : ''} data-fil-offre={offre ? String(offre.prix) : undefined}
                             onClick={() => ouvrir(f)} aria-label={`Ouvrir le fil ${nomF}`}>
-                            <span className="vg-fil-ph" aria-hidden="true">{photo ? <PhotoVinted src={photo} alt="" loading="lazy" decoding="async" width={44} height={44}/> : <span className={sensible ? 'vrm-sensible' : undefined}>{String(nomF || '').trim().charAt(0).toUpperCase() || '·'}</span>}</span>
+                            {ordinateur ? <span className="vg-fil-ph n-fil-avatar" aria-hidden="true"><span className={sensible ? 'vrm-sensible' : undefined}>{String(nomF || '?').trim().charAt(0).toUpperCase() || '?'}</span></span> : <span className="vg-fil-ph" aria-hidden="true">{photo ? <PhotoVinted src={photo} alt="" loading="lazy" decoding="async" width={44} height={44}/> : <span className={sensible ? 'vrm-sensible' : undefined}>{String(nomF || '').trim().charAt(0).toUpperCase() || '·'}</span>}</span>}
                             <span className="vg-fil-mid">
                               <span className="vg-fil-1">
                                 <b className={sensible ? 'vrm-sensible' : undefined} data-stream-type={sensible ? 'acheteur' : undefined}>{nomF}</b>
@@ -372,6 +403,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
                                 {f.plateformes.length > 1 ? <Marques plateformes={f.plateformes}/> : null}
                               </span>
                             </span>
+                            {ordinateur && photo ? <span className="n-fil-vignette" aria-hidden="true"><PhotoVinted src={photo} alt="" loading="lazy" decoding="async" width={44} height={44}/></span> : null}
                           </button>
                         );
                       })}
@@ -383,7 +415,7 @@ export function FilsTous({ vinted, vintedOuvert, ouvrirVinted, fermerVinted, ren
           {pasLus.length ? <p data-fils-pas-lus={pasLus.join(',')} style={{ ...muted, marginTop: 8 }}>{trj('messages.puLireRien', { x: pasLus.map((p) => NOM_SITE[p]).join(', ') })}</p> : null}
           {ebayTous === undefined ? <p data-fils-ebay="charge" style={{ ...muted, marginTop: 8 }}>{tr('ebay.fil.lecture')}</p> : null}
         </div>
-        <div className="vrm-chat-column">{panneau()}</div>
+        <div className="vrm-chat-column">{ordinateur && choisi ? enTete(choisi) : null}{panneau()}</div>
       </div>
     </div>
   );

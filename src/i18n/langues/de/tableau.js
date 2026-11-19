@@ -141,6 +141,7 @@ export default {
   "auto.nego.plus": "Bald",
   "auto.nego.tranchesBientot": "Marge nach Preisspanne und Bündelbonus: noch nicht in der Engine. Nichts wird gespeichert, bis sie es anwenden kann.",
   "auto.baisse.extLbc": "Leboncoin: Erweiterung {v} oder neuer nötig.",
+  "tableau.msg.relireEbay": "eBay-Nachrichten neu laden",
   "auto.titre": "Automatisierungen",
   "auto.desc": "Nachrichten an Favoriten, Angebote, Senkungen, Neueinstellen",
   "auto.etat.on": "Aktiv",

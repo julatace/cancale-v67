@@ -141,6 +141,7 @@ export default {
   "auto.nego.plus": "Presto",
   "auto.nego.tranchesBientot": "Margine per fascia e bonus lotto: non ancora nel motore. Nulla viene salvato finché non sa applicarli.",
   "auto.baisse.extLbc": "Leboncoin: serve l’estensione {v} o più recente.",
+  "tableau.msg.relireEbay": "Rileggi i messaggi eBay",
   "auto.titre": "Automazioni",
   "auto.desc": "Messaggi ai preferiti, offerte, ribassi, ripubblicazione",
   "auto.etat.on": "Attivo",

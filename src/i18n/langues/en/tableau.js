@@ -141,6 +141,7 @@ export default {
   "auto.nego.plus": "Soon",
   "auto.nego.tranchesBientot": "Margin by price range and bundle bonus: not in the engine yet. Nothing is stored until it can apply them.",
   "auto.baisse.extLbc": "Leboncoin: extension {v} or newer is needed.",
+  "tableau.msg.relireEbay": "Reload eBay messages",
   "auto.titre": "Automations",
   "auto.desc": "Messages to favourites, offers, price drops, reposting",
   "auto.etat.on": "On",

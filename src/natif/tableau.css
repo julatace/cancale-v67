@@ -181,3 +181,8 @@
   .n-fil-article-titre { font: var(--n-t-second-fort); color: var(--n-encre); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .n-fil-article-sous { font: var(--n-t-legende); color: var(--n-encre-2); }
 }
+/* (19 nov. soir) Messages · Tous : l'avatar rond de la personne et la vignette de l'article, à l'ordinateur. */
+@layer vrm-natif {
+  .n-fil-vignette { flex: 0 0 auto; display: inline-flex; width: 44px; height: 44px; border-radius: var(--n-r-vignette); overflow: hidden; background: var(--n-carte-2); align-self: center; }
+  .n-fil-vignette img { width: 100%; height: 100%; object-fit: cover; }
+}

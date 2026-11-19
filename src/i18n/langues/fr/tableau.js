@@ -141,6 +141,7 @@ export default {
   "auto.nego.plus": "Bientôt",
   "auto.nego.tranchesBientot": "Marge par tranche de prix et bonus de lot : pas encore dans le moteur. Rien n’est rangé tant qu’il ne sait pas les appliquer.",
   "auto.baisse.extLbc": "Leboncoin : il faut l’extension {v} ou plus récente.",
+  "tableau.msg.relireEbay": "Relire les messages eBay",
   "auto.titre": "Automatisations",
   "auto.desc": "Messages aux favoris, offres, baisses, republication",
   "auto.etat.on": "Activé",
