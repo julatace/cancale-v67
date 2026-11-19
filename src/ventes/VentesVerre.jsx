@@ -182,3 +182,46 @@ export function RangeeEntree({ icone, ambre = false, titre, sous, sousAmbre = fa
     </button>
   );
 }
+
+// ── (19 nov., Ventes « comme avant ») À L'ORDINATEUR : la liste en tableau ET la fiche de la vente touchée dans un volet à
+// droite (maquette validée « ventes-ordi » : la fiche à droite, la liste reste visible). Le seuil est celui du tableau
+// (src/ventes/ventes-comme-avant.css) : 1 100 px.
+export const MQ_VENTES_GRAND = '(min-width: 1100px)';
+export function useGrandEcran() {
+  const [grand, setGrand] = React.useState(() => { try { return window.matchMedia(MQ_VENTES_GRAND).matches; } catch (_) { return false; } });
+  React.useEffect(() => {
+    let mq; try { mq = window.matchMedia(MQ_VENTES_GRAND); } catch (_) { return undefined; }
+    const on = () => setGrand(mq.matches);
+    try { mq.addEventListener('change', on); } catch (_) { mq.addListener(on); }
+    return () => { try { mq.removeEventListener('change', on); } catch (_) { mq.removeListener(on); } };
+  }, []);
+  return grand;
+}
+
+// LE VOLET : ce que la liste sait de la vente touchée (`v`, bâti par la liste avec SES valeurs — rien n'est recalculé ici) :
+// la photo, la plaque N°, le site, le titre, « T38 · compte », la fiche de la vente (`v.bloc` : la MÊME que la fiche plein
+// écran), ses gestes en touches (jamais un second plein : le plein de l'écran est « Imprimer les N bordereaux ») et
+// « Toute la fiche » (la fiche de la paire, avec tous ses gestes). Aucune vente dans la liste ⇒ une phrase.
+export function VoletVente({ v, Photo = null, numero = null, logo = null, onFiche = null }) {
+  if (!v) return <aside className="vv-volet is-vide" data-vv-volet="" aria-label={tr('vv.volet.label')}><p>{tr('vv.volet.vide')}</p></aside>;
+  const Img = Photo || 'img';
+  return (
+    <aside className="vv-volet" data-vv-volet={v.ident} aria-label={tr('vv.volet.label')}>
+      <div className="vv-volet-photo" data-vv-volet-photo={v.photo ? '1' : '0'}>
+        {v.photo ? <Img src={v.photo} alt="" loading="lazy" decoding="async"/> : <IconeV nom="box" taille={34} trait={1.5}/>}
+      </div>
+      <div className="vv-volet-tete">
+        {numero || logo ? <p className="vv-volet-l1">{numero}{logo}</p> : null}
+        <h2 className="vv-volet-titre">{v.titre}</h2>
+        {v.sous ? <p className="vv-volet-sous">{v.sous}</p> : null}
+      </div>
+      {v.bloc || null}
+      {(v.gestes || []).length ? <div className="vv-volet-gestes">
+        {v.gestes.map((g) => g.href
+          ? <a key={g.cle} className="sb-touche vv-touche" data-vv-volet-geste={g.cle} href={g.href} target="_blank" rel="noreferrer"><IconeV nom={g.icone} taille={17} trait={1.9}/><span>{g.libelle}</span></a>
+          : <button key={g.cle} type="button" className="sb-touche vv-touche" data-vv-volet-geste={g.cle} onClick={g.onClick}><IconeV nom={g.icone} taille={17} trait={1.9}/><span>{g.libelle}</span></button>)}
+      </div> : null}
+      {onFiche ? <button type="button" className="sb-lien vv-volet-fiche" data-vv-volet-fiche="" onClick={onFiche}><span>{tr('vv.volet.fiche')}</span><IconeV nom="chevron" taille={14} trait={2.2}/></button> : null}
+    </aside>
+  );
+}
