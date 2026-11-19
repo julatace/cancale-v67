@@ -127,7 +127,7 @@ const ouvrirPorte = (pg, d) => pg.evaluate((d) => window.dispatchEvent(new Custo
       await pg.addInitScript(() => {
         window.__cp = { touchers: 0, t0: 0, deltas: [] };
         const noter = () => { window.__cp.touchers++; window.__cp.t0 = performance.now(); };
-        window.addEventListener('pointerdown', (e) => { if (e.target && e.target.closest && e.target.closest('[data-completer]')) noter(); }, true);
+        window.addEventListener('pointerdown', (e) => { if (e.target && e.target.closest && e.target.closest('[data-completer], [data-cp-lot], [data-cp-reste]')) noter(); }, true);
         let derniere = '';
         const obs = new MutationObserver(() => { const c = document.querySelector('[data-cp-carte]'); const q = document.querySelector('[data-cp-question]'); const k = (c ? c.getAttribute('data-cp-carte') : '') + '|' + (q ? q.getAttribute('data-cp-question') : '');
           if (k !== derniere) { derniere = k; if (window.__cp.t0) { const t0 = window.__cp.t0; requestAnimationFrame(() => window.__cp.deltas.push(Math.round(performance.now() - t0))); window.__cp.t0 = 0; } } })

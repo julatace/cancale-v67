@@ -100,3 +100,14 @@ body[data-completer-ouvert] .vrm-pil-zone { display: none; }
   .vrm-cp-carte.is-courante { animation: none; }
   .vrm-cp-avance::-webkit-progress-value { transition: none; }
 }
+
+/* La règle en lot sur téléphone : cinq choix (−10 · −15 · −20 · Autre · achat + 10 €) ne tiennent pas sur une ligne
+   de 358 px (« achat + 10 € » coupé, banc completer 19 nov.) ⇒ deux rangées de cases, le choix posé sur la case
+   elle-même (le curseur glissant ne sait faire qu'une rangée). Mêmes jetons, mêmes 44 px. */
+@media (max-width: 599px) {
+  .n-segmente.vrm-cp-regles { grid-template-columns: repeat(3, minmax(0, 1fr)); height: auto; row-gap: 3px; }
+  .n-segmente.vrm-cp-regles > .n-segmente-curseur { display: none; }
+  .n-segmente.vrm-cp-regles > .n-segmente-choix { margin: 0; height: var(--n-cible); }
+  .n-segmente.vrm-cp-regles > .n-segmente-choix[aria-checked="true"] { background: var(--n-curseur); }
+  .n-segmente.vrm-cp-regles > .n-segmente-choix:last-child { grid-column: span 2; }
+}
