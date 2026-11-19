@@ -1,0 +1,36 @@
+/* ── src/ecrans/publierAgent.css — « Publier sur… » (19 nov.) : la barre d'outils, le tableau, les étiquettes, la question.
+   Jetons seulement (src/natif/jetons.css) : aucune couleur ni taille en dur. */
+@layer vrm-natif {
+  .n-pa-outils { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; padding: 0 var(--n-marge) 12px; }
+  .n-pa-outils-d { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-height: var(--n-cible); }
+  .n-pa-compte { margin: 0; padding: 0 var(--n-marge) 8px; font: var(--n-t-legende-fort); color: var(--n-encre-2); }
+
+  .n-pa-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  .n-pa-th { text-align: left; padding: 10px 12px; font: var(--n-t-legende); color: var(--n-encre-2); text-transform: uppercase; letter-spacing: .02em; white-space: nowrap; border-bottom: 1px solid var(--n-trait); }
+  .n-pa-th-n, .n-pa-td-n { text-align: right; }
+  .n-pa-tr { cursor: pointer; outline: none; }
+  .n-pa-tr-fixe { cursor: default; }
+  .n-pa-tr + .n-pa-tr .n-pa-td { border-top: 1px solid var(--n-trait); }
+  .n-pa-tr:not(.n-pa-tr-fixe):hover .n-pa-td, .n-pa-tr:focus-visible .n-pa-td { background: var(--n-appui); }
+  .n-pa-td { padding: 8px 12px; height: 64px; box-sizing: border-box; vertical-align: middle; font: var(--n-t-second); color: var(--n-encre); }
+  .n-pa-td[data-pa-vide="1"] { color: var(--n-encre-2); }
+  .n-pa-td-article { display: flex; align-items: center; gap: 12px; min-width: 0; max-width: 420px; }
+  .n-pa-article { display: flex; flex-direction: column; min-width: 0; }
+  .n-pa-article-titre { display: block; font: var(--n-t-second-fort); color: var(--n-encre); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-pa-article-sous { display: block; font: var(--n-t-legende); color: var(--n-encre-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* L'étiquette douce : neutre ; accent = prêt / sûre ; ambre = un geste à faire. Jamais de rouge ni de vert. */
+  .n-pa-etiquette { display: inline-block; padding: 3px 10px; border-radius: 999px; font: var(--n-t-legende-fort); white-space: nowrap; background: var(--n-carte-2); color: var(--n-encre-2); }
+  .n-pa-etiquette[data-pa-ton="accent"] { background: var(--n-teinte); color: var(--n-accent); }
+  .n-pa-etiquette[data-pa-ton="ambre"] { background: var(--n-ambre-fond); color: var(--n-ambre); }
+
+  .n-pa-qs { display: flex; flex-direction: column; }
+  .n-pa-q { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px; }
+  .n-pa-q + .n-pa-q { border-top: 1px solid var(--n-trait); }
+  .n-pa-q-ligne { flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; min-height: 50px; padding-top: 4px; padding-bottom: 4px; }
+  .n-pa-q-nom { font: var(--n-t-corps); color: var(--n-encre); flex: 0 0 auto; }
+  .n-pa-choix, .n-pa-entree { min-width: 0; flex: 1 1 auto; max-width: 62%; min-height: var(--n-cible); border: 0; border-radius: var(--n-r-plaque); background: var(--n-carte-2); color: var(--n-encre); font: var(--n-t-corps); padding: 0 12px; text-align: right; text-align-last: right; }
+  .n-pa-choix:focus-visible, .n-pa-entree:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 1px; }
+  .n-pa-entree::placeholder { color: var(--n-encre-2); }
+  .n-pa-aide { margin: 0; font: var(--n-t-second); color: var(--n-encre-2); }
+}

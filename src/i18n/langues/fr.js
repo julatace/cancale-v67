@@ -21,6 +21,7 @@ import ecran_avenir from './fr/avenir.js';
 import ecran_verre2 from './fr/verre2.js';   // (15 nov.) écrans en verre, 2   // (15 nov.) « Argent à venir »
 import ecran_fiched from './fr/fiched.js';
 import ecran_egalite from './fr/egalite.js';
+import ecran_publierAgent from './fr/publierAgent.js';
 import ecran_ecrans_restes from './fr/ecransRestes.js';   // (16 nov.) lot ecrans-restes : stock importé, date limite, loupe   // (15 nov.) la fiche d'un article, direction D
 import ecran_vcventes from './fr/vcventes.js';   // (15 nov.) ventes Vestiaire : l'état en mots
 import ecran_transporteur_connu from './fr/transporteurConnu.js';   // (15 nov.) « À expédier » : transporteur connu
@@ -2347,6 +2348,7 @@ export default {
   ...ecran_verre2,
   ...ecran_fiched,
   ...ecran_egalite,
+  ...ecran_publierAgent,
   ...ecran_ecrans_restes,
   ...ecran_numeros_nouvelles,
   ...ecran_republie_telephone,

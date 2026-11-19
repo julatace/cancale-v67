@@ -45,7 +45,7 @@ const cleNumero = (v) => { let s = str(v).toUpperCase().replace(/[\s\-_.]/g, '')
 //     marque: { leboncoin: { [marque lue, normalisée]: libellé du site }, vestiaire: { … } },
 //     envois: { ['site:N°']: { site, numero, voulu, at } } }
 // Une valeur hors de la liste du site n'y entre JAMAIS (relue à chaque lecture).
-const cleArt = (k) => (/^[\w:.-]{1,80}$/.test(str(k)) ? str(k) : '');
+const cleArt = (k) => (/^[\w:#.-]{1,80}$/.test(str(k)) ? str(k) : '');
 export function lireMemoireAgent(brut) {
   const b = obj(brut) || {};
   const out = { v: 1, articles: {}, cat: {}, marque: { leboncoin: {}, vestiaire: {} }, envois: {} };
