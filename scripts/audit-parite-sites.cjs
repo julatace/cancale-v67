@@ -315,11 +315,16 @@ const cleNum = (v) => { let s = String(v == null ? '' : v).trim().toUpperCase().
       const sans = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
       const app = sans(APPSRC);
       dit(/'vrm_articles_sites'/.test(app), 'la clé `vrm_articles_sites` est synchronisée (liste des clés de l’app)');
-      dit(/x\.propre\s*&&[^;]*numero/.test(app) || /propre[^;\n]{0,80}cleNum\(/.test(app), '`numEbayLu` lit le N° PROPRE d’une annonce eBay (`vrm_ebay_liens[id].propre`) avant le SKU');
+      const corpsEbay = (app.match(/const numEbayLu = \([^)]*\) => \{[\s\S]*?\n\};/) || [''])[0];
+      const iLien = corpsEbay.search(/if \(lien\)/), iPropre = corpsEbay.search(/l0\.propre\s*&&\s*l0\.numero/), iSku = corpsEbay.search(/numDeSkuEbay\(sku\)/);
+      dit(iPropre > iLien && iPropre < iSku && iLien >= 0, '`numEbayLu` lit le N° PROPRE d’une annonce eBay (`vrm_ebay_liens[id].propre`) avant le SKU');
       dit(/numeroterSites\(/.test(app), 'la numérotation des annonces Leboncoin / eBay est lancée par l’app (`numeroterSites`)');
       const vue = fs.existsSync(path.join(SRC, 'natif', 'ecrans', 'Annonces.jsx')) ? sans(fs.readFileSync(path.join(SRC, 'natif', 'ecrans', 'Annonces.jsx'), 'utf8')) : '';
       dit(!!vue && !/from ['"][^'"]*App\.jsx['"]/.test(vue), 'la vue src/natif/ecrans/Annonces.jsx existe et ne lit aucune donnée elle-même');
-      dit(!!vue && (vue.match(/variante="plein"/g) || []).length <= 2 && !/relierVinted/.test(vue), '… un seul plein (celui de l’écran, ou celui de la sélection), aucun bouton « Relier à Vinted » par rangée');
+      // Les rangées (téléphone) et le tableau (ordinateur) ne portent AUCUN plein ; l'écran en a un (sélection OU publier).
+      const rangees = (vue.match(/const rangee = \(a\) => \{[\s\S]*?\n  \};/) || [''])[0] + (vue.match(/const tableau = \([\s\S]*?\n  \);/) || [''])[0];
+      const plein = (vue.match(/const plein = [\s\S]*?\n\n/) || [''])[0];
+      dit(!!vue && !!rangees && !/variante="plein"/.test(rangees) && (plein.match(/variante="plein"/g) || []).length <= 2 && !/relierVinted|Relier à Vinted/.test(vue), '… un seul plein (celui de l’écran, ou celui de la sélection), aucun bouton « Relier à Vinted » par rangée');
     });
   }
 

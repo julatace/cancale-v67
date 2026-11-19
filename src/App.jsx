@@ -3267,6 +3267,9 @@ const SYNC_KEYS = [
   // auto } }, src/numerosVestiaire.js — fusionné comme les fiches, §5), « Colis
   // fait » et « Imprimé » posés par lui ({ [id de vente]: ts }).
   'vrm_vc_numeros','vrm_vc_colis_done','vrm_vc_imprimes',
+  // (19 nov., src/articles/modele.js) Les faits d'un article SANS annonce Vinted (prix d'achat, achat relié, prix mini,
+  // N° donné à écrire), sous l'identifiant de l'annonce de SON site (« Leboncoin:123 ») — écrits par `gesteVrm` seulement.
+  'vrm_articles_sites',
   // (3 nov.) La liaison Vinted ↔ Vestiaire posée par SON clic (src/lienVestiaire.js) :
   // { [productId]: { numero, item, de, at, ecrit } } — un seul N° pour l'article.
   'vrm_vc_liens',
@@ -13474,6 +13477,84 @@ async function numeroterVestiaire() {
 }
 // Lancée par les écrans Vestiaire (Annonces, Ventes, Colis) et à chaque lecture
 // rangée par l'extension.
+// (19 nov., Julien : « Les annonces qui n'ont pas de numéro : donne-leur un numéro, c'est à l'application de le faire,
+// pas à moi » — et « ce n'est pas parce que Vinted est ma plateforme principale que c'est celle des autres »)
+// LEBONCOIN ET eBAY NUMÉROTÉS SEULS, comme Vinted et Vestiaire : la règle est src/articles/numerosSites.js
+// (`annoncesSitesANumeroter` : en ligne d'après une lecture fraîche de SON site, sans identité ; un vendeur qui a AUSSI
+// Vinted ⇒ « à relier » d'abord, jamais un 2ᵉ N° pour une paire qui a déjà son carton ; « je numérote moi-même » ⇒ rien),
+// le N° est `prochainLibre` (après le plus haut, jamais un trou, jamais un N° servi, pool append-only).
+// Lecture ratée (annonces, liens, réserves) ⇒ RIEN n'est donné. `aVinted` : true · false · null (pas su).
+let _numSitesEnVol = null, _numSitesRelance = null;
+async function numeroterSites(aVinted = null) {
+  if (_numSitesEnVol) return _numSitesEnVol;
+  _numSitesEnVol = (async () => {
+    try {
+      if (!numerotationPermise()) { if (!_numSitesRelance) _numSitesRelance = setTimeout(() => { _numSitesRelance = null; numeroterSites(aVinted); }, 4000); return 0; }
+      if (numeroEcritActif()) return 0;
+      const [{ annoncesSitesANumeroter, attribuerNumerosSites }, { annoncesLeboncoin, annoncesEbay }] = await Promise.all([import('./articles/numerosSites.js'), import('./articles/sources.js')]);
+      const [ls, vr, eb, jr] = await Promise.all([
+        lbcListingsSession(),
+        lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.lbc_ventes&select=ventes:data->ventes`).catch(() => null),
+        lireEbayTous('ebay_listings', SEL_EBAY_ANNONCES, 'items').catch(() => null),
+        lireEnVol('panel_num_reserves', () => lireBaseRelue(`${SUPABASE_URL}/rest/v1/app_data?id=eq.panel_num_reserves&select=data`)),
+      ]);
+      if (!ls || !ls.items || !Array.isArray(vr) || !eb || !Array.isArray(jr)) return 0;
+      if (!numerotationPermise() || !isCloudReady()) return 0;
+      if (CLES_ECRITURE_NUMEROS.some((k) => _saveTimers[k])) { if (!_numSitesRelance) _numSitesRelance = setTimeout(() => { _numSitesRelance = null; numeroterSites(aVinted); }, 1500); return 0; }
+      const vendues = annoncesLbcVendues((vr[0] && vr[0].ventes) || {});
+      const liensL = { ...(load('vrm_lbc_liens', {}) || {}) };
+      const journal = load('vrm_liaison_sites', {}) || {};
+      const propre = (site, id) => { const e = journal['propre:' + site + ':' + id]; return !!(e && typeof e === 'object' && e.actif !== false); };
+      const lbc = annoncesLeboncoin(ls.items, {
+        etatDe: (ad) => { if (!annonceLbcEnVente(ad, vendues)) return vendues.has && vendues.has(String(ad.id)) ? 'vendue' : 'retiree';
+          const e = etatEnLigneLbc(ad, { enVente: (x) => annonceLbcEnVente(x, vendues), lectures: ls.lectures || {}, maintenant: Date.now() }); return e.etat === 'enligne' ? 'active' : e.etat === 'aconfirmer' ? 'aconfirmer' : 'retiree'; },
+        numeroDe: (ad) => numeroLbcIdentite({ itemId: ad.id }, ls.items, liensL), propreDe: (ad) => propre('Leboncoin', ad.id) });
+      const luDe = new Map((eb.lignes || []).map(({ compte, ligne }) => [compte && compte.ref, ligne && ligne.capturedAt ? Date.parse(ligne.capturedAt) : NaN]));
+      const ebay = annoncesEbay((eb.items || []).map((x) => { const t = luDe.get(x && x._compte); return { ...x, frais: Number.isFinite(t) && Date.now() - t >= 0 && Date.now() - t < 24 * 3600 * 1000 }; }),
+        { numeroDe: (x) => numEbayLu(x && x.sku, x && x.itemId, null, x && x.depuis) || '', vintedDe: (x) => (lienEbay(x && x.itemId) ? String(lienEbay(x.itemId).pairId) : ''), propreDe: (x) => propre('eBay', x && x.itemId) });
+      const { ids } = annoncesSitesANumeroter({ annonces: [...lbc, ...ebay], mode: 'vrm', aVinted, cle: cleNum });
+      if (!ids.length) return 0;
+      const pris = new Set(), prisK = new Set();
+      const add = (v) => { const c = cleNum(v); if (!c) return; prisK.add(c); if (/^\d+$/.test(c)) pris.add(Number(c)); };
+      (load('vinted_used_numeros', []) || []).forEach(add);
+      Object.values(load('vinted_annonce_numeros', {}) || {}).forEach((e) => add(e && e.numero));
+      Object.values(load('vinted_sale_overrides', {}) || {}).forEach((e) => add(e && e.numero));
+      Object.values(liensL).forEach(add);
+      Object.values(load(LIENS_EBAY, {}) || {}).forEach((e) => add(e && typeof e === 'object' ? e.numero : null));
+      Object.values(carteNumerosVc(vcCarte('vrm_vc_numeros'))).forEach(add);
+      numerosReserves(jr[0] ? jr[0].data : null).cles.forEach(add);
+      for (const a of [...lbc, ...ebay]) add(a.numero);
+      const r = attribuerNumerosSites({ ids, pris, prisCles: prisK, pref: prefixeNumeros(), prochainLibre, cle: cleNum,
+        cartes: { lbc: liensL, ebay: { ...(load(LIENS_EBAY, {}) || {}) }, faits: load('vrm_articles_sites', {}) || {} } });
+      if (r.refus || !r.nouveaux.length) return 0;
+      // Le pool d'abord (append-only), puis les identités (chaque opération par le chemin des gestes).
+      const pool = (load('vinted_used_numeros', []) || []).slice();
+      const dejaK = new Set(pool.map(cleNum));
+      for (const x of r.nouveaux) { const ep = entreePool(x.numero); if (ep != null && !dejaK.has(cleNum(ep))) { pool.push(ep); dejaK.add(cleNum(ep)); } }
+      save('vinted_used_numeros', pool.sort(triPool));
+      for (const k of ['vrm_lbc_liens', LIENS_EBAY, 'vrm_articles_sites']) {
+        const ops = r.ops.filter((o) => o.k === k); if (!ops.length) continue;
+        const carte = { ...(load(k, {}) || {}) };
+        for (const o of ops) { if (o.apres === undefined) delete carte[o.id]; else carte[o.id] = o.apres; }
+        save(k, carte);
+      }
+      emettreClesRelues(['vinted_used_numeros', 'vrm_lbc_liens', LIENS_EBAY, 'vrm_articles_sites']);
+      return r.nouveaux.length;
+    } catch (_) { return 0; }
+    finally { setTimeout(() => { _numSitesEnVol = null; }, 0); }
+  })();
+  return _numSitesEnVol;
+}
+function useNumerotationSites(aVinted) {
+  React.useEffect(() => {
+    if (aVinted === null || aVinted === undefined) return undefined;
+    numeroterSites(aVinted);
+    const f = (e) => { const x = e && e.detail; if (x && x.type === 'maj' && (x.quoi === 'leboncoin' || x.quoi === 'ebay' || x.quoi === 'annonces')) numeroterSites(aVinted); };
+    window.addEventListener('vrm:ext', f);
+    const off = onCloudReady ? onCloudReady(() => numeroterSites(aVinted)) : null;
+    return () => { window.removeEventListener('vrm:ext', f); if (typeof off === 'function') off(); };
+  }, [aVinted]);
+}
 function useNumerotationVestiaire() {
   React.useEffect(() => {
     numeroterVestiaire();
@@ -60354,6 +60435,9 @@ const numEbayLu = (sku, itemId, dateMs, depuis) => {
   const fiches = fichesPourEbay();
   const lien = id ? lienEbay(id) : null;
   if (lien) { const f = fiches[lien.pairId]; return f && f.numero != null && String(f.numero).trim() ? cleNum(f.numero) : null; }
+  // (19 nov., src/articles/numerosSites.js) Une annonce eBay qui n'est PAS sur Vinted : SON N°, donné par VRM
+  // (`vrm_ebay_liens[id] = { numero, propre: true }`), par l'identifiant de l'annonce — jamais par son titre.
+  if (id) { let l0 = null; try { l0 = (load(LIENS_EBAY, {}) || {})[id]; } catch (_) {} if (l0 && typeof l0 === 'object' && !l0.pairId && l0.propre && l0.numero != null && String(l0.numero).trim()) return cleNum(l0.numero); }
   // (7 nov.) Il numérote lui-même : un SKU qui est SON numéro (« 123 », « B125 »,
   // « N° 123 ») compte comme « VRM-123 » — avec les mêmes gardes (une seule fiche le
   // porte, déjà avant la publication). Éteint : le SKU strict « VRM-… » seul.
@@ -63814,6 +63898,9 @@ function AppCoeur() {
   // « Comptes liés », ce qui laissait les onglets vides tant qu'on n'y était pas
   // passé. C'est une lecture Supabase légère (pas un appel Vinted, aucun risque).
   const [accountsLoaded,setAccountsLoaded]=useState(false);
+  // (19 nov.) Leboncoin et eBay numérotés seuls (src/articles/numerosSites.js) : « a-t-il AUSSI Vinted ? » se lit sur
+  // ses comptes Vinted une fois chargés (pas encore chargés ⇒ pas su ⇒ rien n'est donné).
+  useNumerotationSites(accountsLoaded ? (Array.isArray(vintedAccounts) && vintedAccounts.length > 0) : null);
   // (6 nov.) Un passage qui ne finit jamais (lecture pendue, erreur) ne bloque rien : au plus 20 s après les
   // comptes, Ma journée montre ce qu'elle sait (comme avant).
   useEffect(()=>{ if(!accountsLoaded||notifsLus) return undefined; const t=setTimeout(()=>setNotifsLus(true),20000); return ()=>clearTimeout(t); },[accountsLoaded,notifsLus]);
