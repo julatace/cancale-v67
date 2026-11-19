@@ -13,6 +13,9 @@
 //   POST { action:'moderation' }             → l'extension a rangé « Vinted a masqué / fait disparaître /
 //                                              limite » (5.350) : la route RELIT les lignes, une fois par
 //                                              événement, regroupé (_lib/moderation-notif.js)
+//   POST { action:'comptebloque' }           → (19 nov., ext. 5.409) le profil d'un compte a changé
+//                                              bloqué ⇔ actif : la route RELIT tout, « Vinted a bloqué … » /
+//                                              « … est débloqué », une fois (_lib/compte-bloque-notif.js)
 //   POST { action:'avis', uid }              → (11 nov.) l'extension vient de lire les avis de CE
 //                                              compte : la route RELIT la ligne et sonne une fois
 //                                              par avis ≤ seuil (_lib/avis-negatif.js)
@@ -33,6 +36,7 @@ import { notifierSuiviVinted } from './_lib/suivi-vinted.js';
 import { corsExtension } from './_lib/cors-extension.js';
 import { notifierComptesRelies } from './_lib/compte-relie.js';
 import { notifierModeration } from './_lib/moderation-notif.js';
+import { notifierComptesBloques } from './_lib/compte-bloque-notif.js';
 import { notifierAvisBas } from './_lib/avis-negatif.js';
 import { notifierVerificationVinted } from './_lib/verification-vinted.js';
 import { notifierAlertesDuVendeur } from './_lib/veille-chiffres.js';
@@ -127,6 +131,13 @@ async function traiter(req, res) {
     // tout est relu ici, au nom de CE vendeur, une fois par événement.
     if (body.action === 'moderation') {
       const r = await notifierModeration();
+      res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, n: r.n, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
+      return;
+    }
+    // (19 nov., lot compte-bloque) LE PROFIL D'UN COMPTE A CHANGÉ (bloqué ⇔ actif) : le corps ne dit
+    // rien, tout est relu ici, au nom de CE vendeur, une fois par blocage / par remise.
+    if (body.action === 'comptebloque') {
+      const r = await notifierComptesBloques();
       res.status(r.status).json(r.status === 200 ? { ok: true, envoye: !!r.envoye, n: r.n, ...(r.raison ? { raison: r.raison } : {}) } : { erreur: r.raison });
       return;
     }
