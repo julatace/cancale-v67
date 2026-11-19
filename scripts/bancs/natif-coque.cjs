@@ -222,10 +222,13 @@ async function k8(pg, t, modele, tactile) {
   // Ce qui est POSÉ là-haut : un attribut, une classe ou un id changé sur html / body / la racine (ScheduleStyleInvalidationTracking).
   // Les autres invalidations de ces nœuds (focus, survol, style en ligne d'une mesure, :has() d'avant) sont comptées, pas jugées.
   const pose = (e) => { const d = e.args.data; return d.changedAttribute || d.changedClass || d.changedId; };
-  const haut = inval.filter((e) => enHaut(e) && !parHas(e) && pose(e));
-  const autres = inval.filter((e) => enHaut(e) && !pose(e)).length;
+  // (19 nov., intégration) Un drapeau de racine `data-vrm-dN` (src/drapeauxRacine.js, lot vite-et-sans-bug) REMPLACE un `:has()`
+  // d'avant : il n'invalide que les descendants que SES règles nomment (banc drapeaux-justes). Compté avec les :has(), pas jugé.
+  const drapeau = (e) => /^data-vrm-d\d+$/.test(String(e.args.data.changedAttribute || ''));
+  const haut = inval.filter((e) => enHaut(e) && !parHas(e) && pose(e) && !drapeau(e));
+  const autres = inval.filter((e) => enHaut(e) && (!pose(e) || drapeau(e))).length;
   const nomsHaut = [...new Set(haut.map((e) => `${e.args.data.nodeName} · ${pose(e)}`))].slice(0, 6);
-  dit(inval.length > 0 && haut.length === 0, `K8a ${t} : la coque ne pose aucun attribut, classe ou id sur <html>, <body> ou sa racine au changement d’onglet (${inval.length} invalidations ; ${haut.length} posées en haut ; ${autres} autres en haut : focus, :has() d’avant, style en ligne)`, nomsHaut);
+  dit(inval.length > 0 && haut.length === 0, `K8a ${t} : la coque ne pose aucun attribut, classe ou id sur <html>, <body> ou sa racine au changement d’onglet (${inval.length} invalidations ; ${haut.length} posées en haut ; ${autres} autres en haut : focus, :has() d’avant et ses drapeaux, style en ligne)`, nomsHaut);
   // K8b — le temps de THREAD des tâches de style. ⚠️ La plus lourde est l'écran gardé qui RE-APPARAÎT (src/ecransGardes.jsx,
   // chantier `claude/vite-et-sans-bug`) : mesuré aussi sur le build d'avant (main ad73a3c7c), voir le récit du 19 nov.
   dit(style.length > 0 && pire <= 50 && maxEl <= 3000,

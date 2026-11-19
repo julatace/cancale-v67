@@ -5660,6 +5660,8 @@ function infosDuCompte(d, uid, ids) {
     if (num) o.numero = num;
     else if (d.ecrit && it && it.numEcrit && it.numEcrit.etat === 'lu' && it.numEcrit.cle) { o.numero = String(it.numEcrit.cle); o.ecrit = true; }
     if (f && f.buyPrice != null && String(f.buyPrice).trim() !== '') o.buyPrice = String(f.buyPrice);
+    // 5.409 (le grand panneau) : le prix mini d'acceptation posé à côté du N° (`vinted_annonce_numeros[id].min`) ; pas posé ⇒ rien.
+    if (f && Number(f.min) > 0 && Number(f.min) < 1e6) o.mini = Math.round(Number(f.min) * 100) / 100;
     if (num && d.buyByNum[num] != null && String(d.buyByNum[num]).trim() !== '') o.buyNum = String(d.buyByNum[num]);
     // La date de mise en ligne, dans l'ordre de l'écran Annonces (`listedAgeDays`) :
     // « Ajouté il y a… » lu sur la page, puis la date Vinted du dressing.
@@ -17962,9 +17964,12 @@ function noterCarnet(uid, sorte) {
       const m = await lireLocal('vrmCarnet');
       const l = (Array.isArray(m[u]) ? m[u] : []).filter((e) => e && t - Number(e.t) < CARNET_JOURS * 864e5);
       // Un même événement noté deux fois dans la minute (deux réponses de la même rafale) : une fois.
-      if (!l.some((e) => e.s === sorte && t - Number(e.t) < 60000)) l.push({ t, s: sorte });
+      const neuf = !l.some((e) => e.s === sorte && t - Number(e.t) < 60000);
+      if (neuf) l.push({ t, s: sorte });
       m[u] = l.slice(-CARNET_MAX);
       await chrome.storage.local.set({ vrmCarnet: m });
+      // 5.409 : un refus ou une pause de Vinted, dit à l'arrivée dans l'app (une fois par heure et par cause).
+      if (neuf && CAPTE_REFUS[sorte]) { const q = CAPTE_REFUS[sorte]; sansRejet(journalCapte('vinted', u, 'refus', [{ id: q + '@' + Math.floor(t / 3600000), q }]), 'capte_journal_refus'); }
       return true;
     } catch (_) { return false; }
   });
@@ -18886,7 +18891,8 @@ async function favorisCarte(msg, sender) {
     if ((await toutArreteDepuis(null)) > 0) return { ok: false, code: 'tout-arrete', raison: '« Tout arrêter » est posé : touche « Reprendre » d’abord. Rien n’est parti.' };
     const avant = await lireEtatFavorisCarte();
     if (avant && avant.actif) return { ok: false, code: 'deja', raison: 'Des messages partent déjà depuis cette carte.' };
-    const r = await apiFavorisCarte(o.uid, 'lancer', { selection: sel, reglages: msg.reglages });
+    // 5.409 : le rythme choisi à l'étape « Rythme » (40–90 s par défaut, « plus prudent » 2–4 min) ; rien d'autre n'est accepté.
+    const r = await apiFavorisCarte(o.uid, 'lancer', { selection: sel, reglages: msg.reglages, ...(msg.rythme === 'prudent' || msg.rythme === 'normal' ? { rythme: msg.rythme } : {}) });
     if (!r.ok || !r.json || !r.json.vue) return { ok: false, code: 'serveur', raison: (r.json && r.json.message) || 'VRM n’a pas confirmé le lancement : rien n’est parti.' };
     // (5.406) La photo et le titre de chaque favori choisi, tels que l'aperçu les montrait (photo
     // Vinted seulement) : l'écran « action en cours » montre l'article qui part.
@@ -20514,10 +20520,64 @@ async function annoncerCapteUn(plateforme, compte, sorte, items) {
     }
     for (const k of Object.keys(lots)) { const v = lots[k]; if (!v || !(now - Number(v.maj || 0) < 3600000)) delete lots[k]; }
     try { await chrome.storage.local.set({ [CAPTE_VU]: memo, [CAPTE_LOTS]: lots, [CAPTE_ETAT]: etat }); } catch (_) { return null; }
+    if (nouveaux.length) sansRejet(journalCapte(plateforme, c, sorte, nouveaux.map((id) => ({ id }))), 'capte_journal');   // 5.409
     if (lot) { noterDiag('capte_lot'); notifierApp({ type: 'capte', lot: await lotCaptePublic(lot) }); }
     return lot ? JSON.parse(JSON.stringify(lot)) : null;
   } catch (_) { return null; }
 }
+// ══ 5.409 (19 nov.) — « CE QUE L'EXTENSION A CAPTÉ DEPUIS TA DERNIÈRE VISITE » ═════════
+// Julien, mot pour mot : « je veux que quand je rentre sur l'app, et que l'extension a capté
+// quelque chose, on est informé avec un pop up ». Le lot de la 5.377 ne vit que 2 min et ne
+// porte que des NOMBRES : VRM fermé, il était perdu. La MÊME source (`annoncerCapteUn` : une
+// écriture RÉUSSIE, nouveau PAR IDENTITÉ, jamais au point de départ) range désormais chaque
+// identité nouvelle dans un journal court, publié dans la ligne DÉDIÉE
+// `capte_journal_{navigateur}` (un seul écrivain par ligne, jamais `main`) : l'app la lit à
+// l'arrivée et dit ce qui est né depuis SA dernière visite (src/capteArrivee/).
+//   · une entrée = { p: site, c: compte, s: sorte, id: identité, t: heure où VRM l'a rangée } —
+//     jamais un titre, un pseudo, un texte ou un montant ;
+//   · 14 jours, 400 entrées au plus ; écriture sérialisée, la ligne porte toujours la liste
+//     ENTIÈRE relue du stockage (une écriture en retard n'efface rien de plus neuf) ;
+//   · le réglage « Dire ce que l'extension capte » coupé : le journal est quand même tenu
+//     (l'app relit le même réglage et se tait) ;
+//   · une écriture ratée ne bloque rien : la lecture est déjà rangée.
+// La sorte `refus` (hors captation) : Vinted a refusé ou mis en pause (`noterCarnet` : 403, 429,
+// pause, vérification, prudence, modération, déconnexion) — dite une fois, la cause en `q`.
+const CAPTE_JOURNAL = 'vrmCapteJournal', CAPTE_JOURNAL_LIGNE = 'capte_journal_';
+const CAPTE_JOURNAL_MAX = 400, CAPTE_JOURNAL_JOURS = 14;
+const CAPTE_JOURNAL_SORTES = [...CAPTE_SORTES, 'refus'];
+let _chaineCapteJournal = Promise.resolve();
+function entreeCapteJournal(x) {
+  if (!x || typeof x !== 'object' || !CAPTE_PLATEFORMES.includes(x.p) || !CAPTE_JOURNAL_SORTES.includes(x.s)) return null;
+  const c = String(x.c == null ? '' : x.c), id = String(x.id == null ? '' : x.id), t = Number(x.t);
+  if (!/^[\w:.-]{1,80}$/.test(c) || !RE_ID_CAPTE.test(id) || !(t > 1.5e12 && t < 4e12)) return null;
+  const e = { p: x.p, c, s: x.s, id, t: Math.round(t) };
+  if (x.s === 'refus' && /^[a-z0-9]{1,12}$/.test(String(x.q || ''))) e.q = String(x.q);
+  return e;
+}
+function journalCapte(plateforme, compte, sorte, items) {
+  const suite = _chaineCapteJournal.then(async () => {
+    try {
+      const t = Date.now();
+      const neufs = (Array.isArray(items) ? items : []).map((x) => entreeCapteJournal({ p: plateforme, c: compte, s: sorte, id: x && x.id, q: x && x.q, t })).filter(Boolean);
+      if (!neufs.length) return false;
+      const cur = (await chrome.storage.local.get(CAPTE_JOURNAL))[CAPTE_JOURNAL];
+      const lim = t - CAPTE_JOURNAL_JOURS * 864e5;
+      const vus = new Set();
+      const l = (Array.isArray(cur) ? cur : []).map(entreeCapteJournal).filter((e) => e && e.t > lim);
+      for (const e of l) vus.add(e.p + '|' + e.c + '|' + e.s + '|' + e.id);
+      for (const e of neufs) { const k = e.p + '|' + e.c + '|' + e.s + '|' + e.id; if (!vus.has(k)) { vus.add(k); l.push(e); } }
+      l.sort((a, b) => a.t - b.t);
+      const garde = l.slice(-CAPTE_JOURNAL_MAX);
+      await chrome.storage.local.set({ [CAPTE_JOURNAL]: garde });
+      const moi = await idNavigateur();
+      if (moi) { try { await supabaseUpsert('app_data', [{ id: CAPTE_JOURNAL_LIGNE + moi, data: { nav: moi, v: CODE_VERSION, at: new Date(t).toISOString(), e: garde } }], 'id'); } catch (_) {} }
+      return true;
+    } catch (_) { return false; }
+  });
+  _chaineCapteJournal = suite.then(() => {}, () => {});
+  return suite;
+}
+const CAPTE_REFUS = { pause: 'pause', captcha: 'captcha', prudence: 'prudence', moderation: 'moderation', deconnecte: 'deconnecte' };
 // Ce qui sort d'un lot (vers la carte et l'app) : des nombres, le compte et son nom.
 async function lotCaptePublic(l) {
   const n = {};
@@ -20733,7 +20793,15 @@ async function carteListes(msg, sender) {
     const liste = (aConfirmer ? r.aConfirmer : r.enLigne).slice();
     const infos = infosDuCompte(d, u, liste.map((it) => String(it.id)));
     const ligne = (it) => { const inf = infos[String(it.id)] || {}; const dep = Number(inf.depuis) || null;
-      return { id: String(it.id), titre: String(it.title || '').slice(0, 120), prix: prixCarte(it.price), photo: photoCarte(it), num: inf.numero || '', jours: dep ? Math.max(0, Math.floor((maintenant - dep) / 86400000)) : null, favoris: Number.isFinite(Number(it.favourite_count)) ? Number(it.favourite_count) : null, depuis: dep }; };
+      // 5.409 (le grand panneau, « dès qu'on clique sur un élément, le grand déroulé ») : ce que le dressing RANGÉ
+      // porte déjà — taille, marque, état, vues, photos (vinted.net seulement), prix mini et achat posés par lui.
+      // Rien n'est lu pour ça ; un champ absent n'est pas envoyé (« pas su » ⇒ la fiche n'écrit rien).
+      const txt = (v, n) => (v == null ? '' : String(typeof v === 'object' ? (v.title || v.name || '') : v).slice(0, n));
+      const photos = (Array.isArray(it.photos) ? it.photos : []).map((p) => String((p && (p.url || (p.thumbnails && p.thumbnails[0] && p.thumbnails[0].url))) || '')).filter((u) => /^https:\/\/[\w.-]*vinted\.net\//.test(u)).slice(0, 8);
+      const achat = Number(String(inf.buyPrice != null ? inf.buyPrice : inf.buyNum != null ? inf.buyNum : '').replace(',', '.'));
+      return { id: String(it.id), titre: String(it.title || '').slice(0, 120), prix: prixCarte(it.price), photo: photoCarte(it), num: inf.numero || '', jours: dep ? Math.max(0, Math.floor((maintenant - dep) / 86400000)) : null, favoris: Number.isFinite(Number(it.favourite_count)) ? Number(it.favourite_count) : null, depuis: dep,
+        taille: txt(it.size_title || it.size, 30), marque: txt(it.brand_title || it.brand, 40), etat: txt(it.status, 40), vues: Number.isFinite(Number(it.view_count)) ? Number(it.view_count) : null,
+        description: txt(it.description, 600), photos, mini: Number(inf.mini) > 0 ? Number(inf.mini) : null, achat: achat > 0 && achat < 1e6 ? achat : null }; };
     const lignes = liste.map(ligne).sort((a, b) => (Number(b.depuis) || 0) - (Number(a.depuis) || 0));
     annonces = { lu: isFinite(capL) ? capL : null, aConfirmer, total: lignes.length, liste: lignes.slice(0, CARTE_LISTE_MAX) };
     // Lue il y a plus d'une heure ⇒ relue, dans le budget de LECTURE, depuis l'onglet.
@@ -20756,6 +20824,16 @@ async function carteListes(msg, sender) {
     }).sort((a, b) => (Number(b.date) || 0) - (Number(a.date) || 0));
     ventes = { lu: r0 ? (Date.parse(r0.cap || '') || null) : null, total: r0 ? Number(r0.n) || lignes.length : 0, liste: lignes };
   }
+  // ── 5.409 : les messages du compte de l'onglet (la boîte RANGÉE `harvest_{uid}_inbox`, ses 40 plus récentes
+  //    conversations ; jamais un autre compte). Pas su ⇒ `null` (« — », dit) ; aucune requête Vinted pour ça.
+  let messages = null;
+  const lm = await sbGet(`app_data?id=eq.harvest_${u}_inbox&select=cap:data->>capturedAt,${idxCarte('c', 'data->payload->conversations', CARTE_LISTE_MAX)}`);
+  if (lm !== null) {
+    const r0 = (lm && lm[0]) || null;
+    const cs = r0 ? Array.from({ length: CARTE_LISTE_MAX }, (_, i) => r0['c' + i]).filter((x) => x && typeof x === 'object' && /^[1-9]\d{0,19}$/.test(String(x.id == null ? '' : x.id))) : [];
+    const ph = (x) => { const v = String((x && Array.isArray(x.item_photos) && x.item_photos[0] && x.item_photos[0].url) || ''); return /^https:\/\/[\w.-]*vinted\.net\//.test(v) ? v : ''; };
+    messages = { lu: r0 ? (Date.parse(r0.cap || '') || null) : null, liste: cs.map((x) => ({ conv: String(x.id), qui: String((x.opposite_user && x.opposite_user.login) || '').slice(0, 40), texte: String(x.description || '').slice(0, 160), at: Date.parse(x.updated_at || '') || null, nonlu: x.unread === true, photo: ph(x) })).sort((a, b) => (Number(b.at) || 0) - (Number(a.at) || 0)) };
+  }
   // ── les autres comptes (lecture seule)
   let autres = null;
   if (msg && msg.tous === true) {
@@ -20772,7 +20850,7 @@ async function carteListes(msg, sender) {
       }
     }
   }
-  return { ok: true, plateforme, compte: { id: u, nom }, annonces, ventes, autres, fenetre: o.fenetre };
+  return { ok: true, plateforme, compte: { id: u, nom }, annonces, ventes, messages, autres, fenetre: o.fenetre };
 }
 // 5.330 : l'onglet revient de Google / Discord (même onglet, Orion) ⇒ la carte
 // s'ouvre UNE fois et dit le résultat. Lu une fois (`vu`), 5 minutes au plus,
@@ -27727,6 +27805,11 @@ async function repondreLeboncoin(msg) {
     if (!o.ok && o.code) return { accepte: false, code: o.code, raison: o.raison };
     if (!o.ok && o.autres && o.autres.length) return { accepte: false, code: 'autre-compte', raison: "Leboncoin est connecté sur un autre compte que celui de cette conversation dans ce Chrome — connecte-toi sur le bon compte, puis réessaie" };
     if (!o.ok) return { accepte: false, code: 'lbc-absent', raison: "ouvre leboncoin.fr dans ce Chrome, connecté sur le compte de cette conversation, puis réessaie — l'envoi part de cet onglet" };
+    // 19 nov. (5.409, audit-actions-gardees) : la réponse Leboncoin passait le plafond (50/h) mais PAS la
+    // sécurité du compte (anti-robot, « Tout arrêter », repos, plafonds du jour) — comme Vestiaire, désormais.
+    { const rbR = await secuRobotDit('leboncoin', compte); if (rbR) return { accepte: false, code: rbR.code, raison: rbR.error }; }
+    const secuR = await secuGeste('leboncoin', compte, 'reponse', 'clic');
+    if (secuR) return { accepte: false, code: secuR.code, raison: secuR.error };
     const cpt = await compterAction('lbc:' + compte, ACTIONS_MAX_HEURE);
     if (!cpt.ok && cpt.code === 'stockage') return { accepte: false, code: 'stockage', raison: RAISON_STOCKAGE };
     if (!cpt.ok) return { accepte: false, code: 'plafond', raison: `déjà ${ACTIONS_MAX_HEURE} actions sur ce compte Leboncoin cette heure-ci — réessaie dans ${Math.max(1, Math.ceil((cpt.resteMs || 0) / 60000))} min` };
@@ -28555,6 +28638,10 @@ async function pauseLbcDepuisApp(msg) {
     //    sur un message, une pause ou une suppression) ⇒ rien ne part ; et l'ordre prend
     //    sa place dans les 50 actions/heure DU COMPTE Leboncoin (avant : compteurs à part,
     //    50 messages + 10 suppressions + 10 pauses par heure).
+    // 19 nov. (5.409, audit-actions-gardees) : la pause Leboncoin passait le plafond mais PAS la sécurité du compte.
+    { const rbP = await secuRobotDit('leboncoin', compte); if (rbP) return { accepte: false, code: rbP.code, raison: rbP.error }; }
+    const secuP = await secuGeste('leboncoin', compte, 'autre', 'clic');
+    if (secuP) return { accepte: false, code: secuP.code, raison: secuP.error };
     const freinLbc = await pauseLbcMsg();
     if (freinLbc) return { accepte: false, code: 'lbc-pause', raison: `Leboncoin a demandé de ralentir — VRM reprend dans ${Math.max(1, Math.ceil((Number(freinLbc.jusqua) - Date.now()) / 60000))} min (rien n'est parti)` };
     const cptLbc = await compterAction('lbc:' + compte, ACTIONS_MAX_HEURE);

@@ -89,10 +89,11 @@
     background: var(--n-appui); color: var(--n-encre);
     font: var(--n-t-legende-fort); font-variant-numeric: tabular-nums; letter-spacing: normal; white-space: nowrap;
   }
-  .n-pastille[data-n-ton="accent"] { background: var(--n-teinte); color: var(--n-sur-teinte); }
-  .n-pastille[data-n-ton="ambre"] { background: var(--n-ambre-fond); color: var(--n-ambre); }
-  .n-pastille[data-n-ton="ambre-plein"] { background: var(--n-ambre); color: var(--n-sur-ambre); }
-  .n-pastille[data-n-ton="doublon"] { background: var(--n-doublon); color: var(--n-sur-doublon); }
+  /* (19 nov., intégration) Le ton d'une pastille ne cède à aucune ancienne feuille : « 27 » blanc sur le fond (1,12:1) à côté de Ventes. */
+  .n-pastille[data-n-ton="accent"] { background: var(--n-teinte) !important; color: var(--n-sur-teinte) !important; }
+  .n-pastille[data-n-ton="ambre"] { background: var(--n-ambre-fond) !important; color: var(--n-ambre) !important; }
+  .n-pastille[data-n-ton="ambre-plein"] { background: var(--n-ambre) !important; color: var(--n-sur-ambre) !important; }
+  .n-pastille[data-n-ton="doublon"] { background: var(--n-doublon) !important; color: var(--n-sur-doublon) !important; }
 
   /* ── Plaque (le N°) ─────────────────────────────────────────────────────── */
   .n-plaque {
@@ -206,6 +207,8 @@
     font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer;
     touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
   }
+  /* (19 nov., intégration) Un repli d'en-tête n'a pas de fond : un ancien fond de bouton (#E3E3E8) y tombait sous l'encre seconde (4,09:1). */
+  .n-groupe-repli, .n-groupe-repli:hover { background: transparent !important; }
   .n-groupe-fleche { color: var(--n-encre-3); transition: transform var(--n-duree) var(--n-courbe); }
   .n-groupe-repli[aria-expanded="true"] .n-groupe-fleche { transform: rotate(90deg); }
   .n-groupe-carte { border-radius: var(--n-r-carte); background: var(--n-surface, var(--n-carte)); overflow: hidden; }
@@ -256,6 +259,19 @@
   .n-rangee-sous[data-n-raison] .n-rangee-sous-texte { white-space: normal; overflow-wrap: anywhere; }
   .n-rangee-sous-texte[data-n-lignes="2"] { white-space: normal; overflow-wrap: anywhere; }
   .n-rangee-detail { grid-column: 2; grid-row: 2; justify-self: end; font: var(--n-t-legende); font-variant-numeric: tabular-nums; color: var(--n-encre-2); white-space: nowrap; }
+  .n-rangee-note { grid-column: 1 / -1; font: var(--n-t-legende); font-variant-numeric: tabular-nums; color: var(--n-encre-2); overflow-wrap: anywhere; }
+  /* La case de sélection (Ventes : cochés pour l'impression) : à côté du corps, 44 de large, le dessin de 24. */
+  .n-rangee[data-n-case] { display: flex; align-items: stretch; }
+  .n-rangee[data-n-case] > .n-rangee-corps { flex: 1 1 auto; width: auto; min-width: 0; padding-inline-start: 4px; }
+  .n-rangee[data-n-case][data-n-tete="vignette-56"] { --n-retrait: 116px; }
+  .n-rangee[data-n-case][data-n-tete="vignette-44"] { --n-retrait: 104px; }
+  .n-rangee-case { position: relative; z-index: 1; flex: 0 0 48px; display: flex; align-items: center; justify-content: center; min-height: var(--n-cible); padding-inline-start: 8px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .n-rangee-case[data-n-indisponible] { cursor: default; }
+  .n-case { appearance: none; -webkit-appearance: none; position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: inherit; }
+  .n-case-dessin { display: flex; align-items: center; justify-content: center; box-sizing: border-box; width: 24px; height: 24px; border-radius: var(--n-r-rond); border: 1.5px solid var(--n-encre-3); color: transparent; transition: background-color var(--n-duree-appui) ease-out; }
+  .n-case:checked + .n-case-dessin { background: var(--n-plein); border-color: var(--n-plein); color: var(--n-sur-plein); }
+  .n-case:disabled + .n-case-dessin { border-style: dashed; opacity: .5; }
+  .n-case:focus-visible + .n-case-dessin { outline: 2px solid var(--n-accent); outline-offset: 2px; }
   .n-rangee-fin { flex: 0 0 auto; display: flex; align-items: center; color: var(--n-encre-3); }
   .n-rangee-fin .n-rangee-chevron { margin-inline-end: -4px; }
   .n-rangee-coche { color: var(--n-accent); }
@@ -281,6 +297,8 @@
   .n-vignette[data-n-taille="44"] { width: 44px; height: 44px; }
   .n-vignette[data-n-taille="48"] { width: 48px; height: 48px; }
   .n-vignette-vide { display: flex; align-items: center; justify-content: center; color: var(--n-encre-3); }
+  .n-vignette-image { position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; color: var(--n-encre-3); }
+  .n-vignette-image > img { display: block; width: 100%; height: 100%; object-fit: cover; }
 
   .n-interrupteur {
     appearance: none; -webkit-appearance: none; position: relative; flex: 0 0 auto; width: 51px; height: 31px; margin: 0; border: 0;

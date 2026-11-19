@@ -110,13 +110,19 @@ export function estimationSecondes({ n = 0, rythme = 'vintex', intervalle = 0, i
   if (!k) return 0;
   let ecart;
   if (rythme === 'vintex') ecart = (RYTHME_VINTEX.min + RYTHME_VINTEX.max) / 2;
+  // (19 nov., 5.409) au hasard : 40–90 s (65 en moyenne), « plus prudent » 2–4 min (180 s) — api/_lib/favoris-file.js.
+  else if (rythme === 'normal') ecart = 65;
+  else if (rythme === 'prudent') ecart = 180;
   else {
     const a = Number(intervalle), b = rythme === 'aleatoire' ? Number(intervalleMax) : a;
     if (!(Number.isFinite(a) && a >= 0 && Number.isFinite(b) && b >= a)) return null;
     ecart = ((a + b) / 2) * 60;
   }
+  // (19 nov., 5.409) 15 favoris par heure au plus (le plafond de l'extension, inchangé) : au-delà, la suite attend l'heure d'après.
+  if (k > FAVORIS_PAR_HEURE) return Math.round(Math.floor((k - 1) / FAVORIS_PAR_HEURE) * 3600 + ((k - 1) % FAVORIS_PAR_HEURE) * ecart);
   return Math.round((k - 1) * ecart);
 }
+export const FAVORIS_PAR_HEURE = 15;
 
 // ── LE RÉCAPITULATIF ───────────────────────────────────────────────────────
 //   jauge : { n, pourApp } (src/jaugeActions.js) ou null (pas lue).

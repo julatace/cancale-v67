@@ -14,6 +14,8 @@
   .n-eg-tr + .n-eg-tr .n-eg-td { border-top: 1px solid var(--n-trait); }
   .n-eg-tr:hover .n-eg-td, .n-eg-tr:focus-visible .n-eg-td { background: var(--n-appui); }
   .n-eg-tr[data-eg-choisie="1"] .n-eg-td { background: var(--n-teinte); }
+  /* (19 nov., intégration) Sur le voile du survol (8 %), l'encre seconde tombait à 4,43:1 : 15 % d'encre en plus, comme les anciens écrans. */
+  .n-eg-tr:is(:hover, :focus-visible, [data-eg-choisie="1"]) :is(.n-eg-article-sous, .n-eg-td[data-eg-vide="1"] .n-eg-valeur) { color: color-mix(in srgb, var(--n-encre-2) 85%, var(--n-encre)); }
   .n-eg-tr[data-eg-grise="1"] { cursor: default; }
   .n-eg-tr[data-eg-grise="1"] .n-eg-article-titre { color: var(--n-encre-2); }
   .n-eg-td { padding: 8px 12px; height: 56px; box-sizing: border-box; vertical-align: middle; font: var(--n-t-second); color: var(--n-encre); white-space: nowrap; }

@@ -290,7 +290,7 @@ action('colis.depose', async (nav) => {
   const o = await ouvrir(nav, { url: '/?tab=cat_bord' });
   try {
     const btn = await o.pg.locator('[data-depot-ouvrir]').count();
-    if (!btn) { for (const s of ['avant', 'pendant', 'apres', 'echec']) noter('colis.depose', s, null, { raisonNonJoue: '« Je dépose » absent (aucun colis à déposer dans cette base)' }); return; }
+    if (!btn) { for (const s of ['avant', 'pendant', 'apres', 'echec']) noter('colis.depose', s, null, { raisonNonJoue: '« Je dépose » absent : retiré de Ventes (décision de Julien du 19 nov., « 4 oui » — le dépôt est constaté par le suivi), ou aucun colis à déposer' }); return; }
     // (14 nov., intégration avec claude/refonte-listes) Au téléphone, « Préparer mes colis · Je dépose » vit dans
     // « • À faire · N » (src/ui/AFaire.jsx) : on ouvre d'abord sa feuille, comme lui.
     // (16 nov., Ventes « Verre dépoli ») « À faire » vit maintenant derrière « … » de la tête (data-colis-barre-btn="outils") :

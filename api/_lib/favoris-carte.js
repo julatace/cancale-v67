@@ -146,9 +146,9 @@ export function apercuCarte({ prefs, capture, vue, dressing, garde = () => null,
   });
   const plus = { tous, totalTous: lignes.length - retires, retires, max: FAVORIS_CARTE_MAX };
   if (!liste.length) return { etat: 'rien', total: 0, nonProuves, ecartes, lus, totalLus: lignes.length, file, ...plus,
-    message: { versions, offre: offre ? { mode: offre.mode, valeur: offre.valeur, arrondi: offre.arrondi } : null, intervalleMinutes: prefs.intervalleMinutes, intervalleMaxMinutes: prefs.intervalleMaxMinutes || null } };
+    message: { versions, offre: offre ? { mode: offre.mode, valeur: offre.valeur, arrondi: offre.arrondi } : null, intervalleMinutes: prefs.intervalleMinutes, intervalleMaxMinutes: prefs.intervalleMaxMinutes || null, rythme: ['normal', 'prudent', 'perso'].includes(prefs.rythme) ? prefs.rythme : 'normal' } };
   return { etat: 'pret', total: prets.length, liste, selection: liste.map((x) => x.id), nonProuves, ecartes, ...plus,
     message: { versions, offre: offre ? { mode: offre.mode, valeur: offre.valeur, arrondi: offre.arrondi } : null,
-      intervalleMinutes: prefs.intervalleMinutes, intervalleMaxMinutes: prefs.intervalleMaxMinutes || null },
+      intervalleMinutes: prefs.intervalleMinutes, intervalleMaxMinutes: prefs.intervalleMaxMinutes || null, rythme: ['normal', 'prudent', 'perso'].includes(prefs.rythme) ? prefs.rythme : 'normal' },
     reglages: prefs, file };
 }

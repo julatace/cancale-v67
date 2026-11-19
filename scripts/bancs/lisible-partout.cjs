@@ -95,13 +95,14 @@ const ECRANS = [
   { id: 'journee-semaine', groupe: 'Aujourd’hui', etapes: [{ aller: '?tab=semaine' }], preuve: '.vrm-main' },
   { id: 'journee-a-trancher', groupe: 'Aujourd’hui', etapes: [{ aller: '?tab=trancher' }], preuve: '.vrm-main' },
   // ── Annonces ──
-  { id: 'annonces', groupe: 'Annonces', etapes: [{ aller: '?tab=annonces&site=vinted' }], preuve: '[data-v2l], .vrm-fiche-photo, [data-fiche-photo]' },
-  { id: 'annonces-detaille', groupe: 'Annonces', si: (c) => c.v2, etapes: [{ ls: ['vrm_annonces_affichage', '"C"'] }, { aller: '?tab=journee' }, { aller: '?tab=annonces&site=vinted' }], preuve: '[data-v2l]', apres: [{ ls: ['vrm_annonces_affichage', '"A"'] }] },
-  { id: 'annonces-dorment', groupe: 'Annonces', si: (c) => c.v2, etapes: [{ aller: '?tab=annonces&site=vinted' }, { clic: '[data-v2-seg="sleeping"]' }], preuve: '[data-v2-seg="sleeping"][aria-selected="true"]' },
-  { id: 'annonces-a-publier', groupe: 'Annonces', si: (c) => c.v2, etapes: [{ aller: '?tab=annonces&site=vinted' }, { clic: '[data-v2-seg="brouillons"]' }], preuve: '[data-v2-seg="brouillons"][aria-selected="true"]' },
-  { id: 'annonces-menu', groupe: 'Annonces', etapes: [{ aller: '?tab=annonces&site=vinted' }, { clic: '.vrm-annbar-bouton[aria-expanded]' }], preuve: '.vrm-annbar-bouton[aria-expanded="true"], [role="dialog"], .vrm-fs' },
-  { id: 'annonces-selection', groupe: 'Annonces', etapes: [{ aller: '?tab=annonces&site=vinted' }, { clic: '[data-vue-selection]', ou: [{ clic: '.vrm-annbar-bouton[aria-expanded]' }, { clic: '[role="dialog"] button:has-text("Sélectionner"), .v2-feuille button:has-text("Sélectionner")' }] }], preuve: '.vrm-sel, [data-sel-consigne], [data-vue-selection][aria-pressed="true"]' },
-  { id: 'annonces-plateformes', groupe: 'Annonces', si: (c) => c.v2, etapes: [{ aller: '?tab=annonces&site=vinted' }, { clic: '[data-v2-menu="annonces"]' }], preuve: '[data-v2-menu="annonces"][aria-expanded="true"], [role="dialog"]' },
+  // (19 nov., intégration) Annonces est l'écran natif « à égalité » (src/natif/ecrans/Annonces.jsx, `data-eg-*`) ; l'ancien reste en repli.
+  { id: 'annonces', groupe: 'Annonces', etapes: [{ aller: '?tab=annonces&site=vinted' }], preuve: '[data-eg-liste], [data-eg-tableau], [data-v2l], .vrm-fiche-photo, [data-fiche-photo]' },
+  { id: 'annonces-detaille', groupe: 'Annonces', si: (c) => c.v2, etapes: [{ ls: ['vrm_annonces_affichage', '"C"'] }, { aller: '?tab=journee' }, { aller: '?tab=annonces&site=vinted' }], preuve: '[data-eg-liste], [data-eg-tableau], [data-v2l], .vrm-fiche-photo, [data-fiche-photo]', apres: [{ ls: ['vrm_annonces_affichage', '"A"'] }] },
+  { id: 'annonces-dorment', groupe: 'Annonces', si: (c) => c.v2, etapes: [{ aller: '?tab=annonces&site=vinted' }, { clic: '[data-eg-tete] .n-segmente-choix:nth-of-type(3), [data-v2-seg="sleeping"]' }], preuve: '[data-eg-etat="dorment"], [data-v2-seg="sleeping"][aria-selected="true"]' },
+  { id: 'annonces-a-publier', groupe: 'Annonces', si: (c) => c.v2, etapes: [{ aller: '?tab=annonces&site=vinted' }, { clic: '[data-eg-tete] .n-segmente-choix:nth-of-type(2), [data-v2-seg="brouillons"]' }], preuve: '[data-eg-etat="apublier"], [data-v2-seg="brouillons"][aria-selected="true"]' },
+  { id: 'annonces-menu', groupe: 'Annonces', etapes: [{ aller: '?tab=annonces&site=vinted' }, { clic: '[data-eg-actions], .vrm-annbar-bouton[aria-expanded]' }], preuve: '[data-eg-menu-actions], .vrm-annbar-bouton[aria-expanded="true"], [role="dialog"], .vrm-fs' },
+  { id: 'annonces-selection', groupe: 'Annonces', etapes: [{ aller: '?tab=annonces&site=vinted' }, { clic: '[data-eg-actions], [data-vue-selection]' }, { clic: '[data-eg-action]', facultatif: true }], preuve: '[data-eg-selection], .vrm-sel, [data-sel-consigne], [data-vue-selection][aria-pressed="true"]' },
+  { id: 'annonces-plateformes', groupe: 'Annonces', si: (c) => c.v2, etapes: [{ aller: '?tab=annonces&site=vinted' }, { clic: '[data-eg-filtre], [data-v2-menu="annonces"]' }], preuve: '[data-eg-menu-sites], [data-v2-menu="annonces"][aria-expanded="true"], [role="dialog"]' },
   { id: 'annonces-republier', groupe: 'Annonces', etapes: [{ aller: '?tab=annonces&vue=republier' }], preuve: '.vrm-main' },
   { id: 'annonces-leboncoin', groupe: 'Annonces', etapes: [{ aller: '?tab=annonces&site=leboncoin' }], preuve: '.vrm-main' },
   { id: 'annonces-ebay', groupe: 'Annonces', etapes: [{ aller: '?tab=annonces&site=ebay' }], preuve: '.vrm-main' },
@@ -148,10 +149,10 @@ const ECRANS = [
   { id: 'communaute', groupe: 'Communauté', etapes: [{ aller: '?tab=communaute' }], preuve: '.vrm-main' },
   { id: 'communaute-parrainage', groupe: 'Communauté', etapes: [{ aller: '?tab=parrainage' }], preuve: '.vrm-main' },
   // ── La coque : cloche, loupe, menus, aide ──
-  { id: 'coque-cloche', groupe: 'Coque', etapes: [{ aller: '?tab=journee' }, { clic: '[data-centre-notifs-cloche]' }], preuve: '[data-centre-notifs], [data-centre-notifs-panneau], .vrm-cn-panneau, [role="dialog"]' },
+  { id: 'coque-cloche', groupe: 'Coque', etapes: [{ aller: '?tab=journee' }, { clic: '[data-centre-notifs-cloche], [data-n-notifs]', ou: [{ clic: '[data-n-coque-plus]' }, { clic: '[data-n-notifs]' }] }], preuve: '[data-centre-notifs], [data-centre-notifs-panneau], .vrm-cn-panneau, [role="dialog"]' },
   { id: 'coque-loupe', groupe: 'Coque', etapes: [{ aller: '?tab=achats' }, { loupe: '5' }], preuve: '[data-recherche-champ], [data-recherche-panneau]' },
   { id: 'coque-loupe-numero', groupe: 'Coque', etapes: [{ aller: '?tab=achats' }, { loupe: '3102' }], preuve: '[data-recherche-champ], [data-recherche-panneau]' },
-  { id: 'coque-profil', groupe: 'Coque', etapes: [{ aller: '?tab=achats' }, { clic: '[data-profil-tete], [data-nav-compte]' }], preuve: '[role="dialog"], [role="menu"], .vrm-profil-menu, [data-profil-menu]' },
+  { id: 'coque-profil', groupe: 'Coque', etapes: [{ aller: '?tab=achats' }, { clic: '[data-profil-tete], [data-nav-compte]', ou: [{ clic: '[data-n-coque-plus]' }, { clic: '[data-profil-tete]' }] }], preuve: '[role="dialog"], [role="menu"], .vrm-profil-menu, [data-profil-menu]' },
   { id: 'coque-etat-extension', groupe: 'Coque', si: (c) => !c.tel, etapes: [{ aller: '?tab=achats' }, { clic: '[data-etat-actions]' }], preuve: '[data-etat-actions][aria-expanded="true"]' },
   { id: 'coque-aide', groupe: 'Coque', etapes: [{ aller: '?tab=achats' }, { clic: '[data-aide-ouvrir]' }], preuve: '[role="dialog"], .vrm-aide-feuille, [data-aide-feuille]' },
   // ── La fiche d'un article (un autre chantier : ouverte, listée à part) ──
@@ -481,7 +482,7 @@ async function jouer(o, etapes) {
     else if (e.ls) { await pg.evaluate(([k, v]) => { try { localStorage.setItem(k, v); window.dispatchEvent(new CustomEvent('vrm:save', { detail: { k } })); } catch (_) {} }, e.ls); }
     else if (e.reglage) { for (let i = 0; i < 6; i++) { const r = await pg.evaluate(pasVersReglage, e.reglage).catch(() => 'rien'); if (r !== 'retour' && r !== 'categorie') break; await pg.waitForTimeout(280); } await calme(pg, 250, 2500); }
     else if (e.loupe) {
-      if (o.tel) { if (!(await toucher(o, 'button[data-recherche-loupe]'))) return false; } else { await pg.mouse.click(700, 500).catch(() => {}); await pg.keyboard.press('Control+K'); }
+      if (o.tel) { if (!(await toucher(o, 'button[data-recherche-loupe], input[data-recherche-loupe]'))) return false; } else { await pg.mouse.click(700, 500).catch(() => {}); await pg.keyboard.press('Control+K'); }
       await pg.waitForSelector('[data-recherche-champ]', { timeout: 5000 }).catch(() => {});
       await pg.evaluate((v) => { const el = document.querySelector('[data-recherche-champ]'); if (!el) return; const poser = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; poser.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true })); }, e.loupe);
       await pg.waitForTimeout(900); await calme(pg, 300, 3000);

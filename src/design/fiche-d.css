@@ -52,7 +52,7 @@
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-top { position: absolute; left: 16px; right: 16px; top: max(14px, calc(env(safe-area-inset-top) + 8px)); display: flex; justify-content: space-between; z-index: 2; }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-rond {
   width: 44px !important; height: 44px !important; min-width: 44px; min-height: 44px; border-radius: 50% !important; display: grid !important; place-items: center; padding: 0 !important; margin: 0 !important;
-  background: rgb(8 24 46 / .5) !important; background-image: none !important; -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); color: #FFFFFF !important;
+  background: rgb(8 24 46 / .62) !important; background-image: none !important; -webkit-backdrop-filter: none; backdrop-filter: none; color: #FFFFFF !important; /* (19 nov., VRM natif) pas de flou hors des deux barres : un rond plus dense à la place */
   border: 1px solid rgb(255 255 255 / .3) !important; box-shadow: none !important; cursor: pointer; transition: transform 120ms ease !important;
 }
 :root:root:root:root:root:root:root:root body .vrm-fp.fd .fd-rond:active { transform: scale(.94); }

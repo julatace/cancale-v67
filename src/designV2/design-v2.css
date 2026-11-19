@@ -401,6 +401,9 @@ html[data-design="v2"] body .vrm-app-header .vrm-header-actions { gap: 8px !impo
 .v2-tete-tache .vrm-fu-date-tete { font-size: 13px; color: var(--v2-page-muet); }
 .v2-tete-tache .vrm-tache-retrouver { position: absolute; right: 16px; top: 8px; }
 .v2-tete-tache:has(.vrm-tache-retrouver) h1 { padding-right: 56px; }
+/* (19 nov., intégration) Le rond « retrouver » ne se pose plus sur « Ajouter » : la ligne du titre lui garde sa place. */
+.v2-tete-tache:has(> .vrm-tache-retrouver) > .v2-titre-ligne { padding-right: 60px; box-sizing: border-box; }
+.v2-tete-tache:has(> .vrm-tache-retrouver) > .v2-titre-ligne h1 { padding-right: 0; }
 /* Le « ? » de l'écran, sur la coque : à l'encre de la coque (il était gris foncé sur le bleu). */
 .v2-sous-titre .vrm-phrase-ecran, .v2-sous-titre .vrm-phrase-ecran :is(button, a, svg) { color: var(--v2-page-texte) !important; }
 .v2-ann-menu-affichage { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 0 8px; font-size: 15px; font-weight: 600; }
