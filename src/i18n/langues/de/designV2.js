@@ -183,26 +183,7 @@ export default {
   "v2.style.studio": "Studio Blau",
   "v2.style.studio.desc": "Der bisherige blaue Hintergrund mit Glas.",
   // (19 nov.) « Aujourd’hui » refait (les chiffres, les dernières ventes) et « À régler » dans chaque onglet.
-  "v2.jour.auj": "heute",
-  "v2.jour.hier": "gestern",
-  "v2.jour.le": "{quand}",
-  "v2.jour.vendus": {
-    "one": "{quand} verkauft",
-    "other": "{quand} verkauft"
-  },
-  "v2.jour.aucune": "kein Verkauf",
-  "v2.jour.ventes": {
-    "one": "{n} Verkauf",
-    "other": "{n} Verkäufe"
-  },
   "v2.jour.pasSu": "Verkäufe noch nicht gelesen",
-  "v2.mois.vendu": "Verkauft",
-  "v2.mois.recu": "Erhalten",
-  "v2.mois.benefice": "Gewinn",
-  "v2.mois.sur": {
-    "one": "{k} Verkauf von {n}",
-    "other": "{k} Verkäufe von {n}"
-  },
   "v2.envoyer.titre": "Zu versenden",
   "v2.bande.plus": {
     "one": "{n} weiteres Paket zu versenden",
@@ -225,5 +206,22 @@ export default {
   "v2.reg.completer": "Meine Anzeigen vervollständigen",
   "v2.reg.completerN": "Meine Anzeigen vervollständigen · {n}",
   "v2.jour.lecture": "wird gelesen…",
+  "v2.stats.periode": "Zeitraum",
+  "v2.stats.jour": "Tag",
+  "v2.stats.semaine": "Woche",
+  "v2.stats.mois": "Monat",
+  "v2.stats.vendus.jour": "heute verkauft",
+  "v2.stats.vendus.semaine": "diese Woche verkauft",
+  "v2.stats.vendus.mois": "im {mois} verkauft",
+  "v2.stats.ecart.jour": "{s} ggü. gestern zur selben Zeit",
+  "v2.stats.ecart.semaine": "{s} ggü. letzter Woche bis heute",
+  "v2.stats.ecart.mois": "{s} ggü. {mois} bis heute",
+  "v2.stats.benefice": "Gewinn",
+  "v2.stats.beneficeBrut": "Bruttogewinn",
+  "v2.stats.ventes": "Verkäufe",
+  "v2.stats.panier": "Ø Verkauf",
+  "v2.stats.auMoinsSur": "mindestens · Einkaufspreise {c}",
+  "v2.stats.aucune": "kein Verkauf",
+  "v2.stats.pasTout": "nicht alles gelesen",
   "v2.alerte.retourTitre": "Rücksendung abzugeben"
 };

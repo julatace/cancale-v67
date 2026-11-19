@@ -6,19 +6,19 @@
 //  ⇒ PAS DE LISTE « À FAIRE » ICI : ses groupes sont PUBLIÉS (src/designV2/aRegler.js) et se lisent en tête de LEUR
 //    onglet (« À régler »). Ne pas la remettre sur cet écran.
 //  De haut en bas — ce qu'il regarde chaque matin, rien qui le gronde :
-//    1. l'affiche : le vendu du jour (« — » si pas su, jamais 0 pour « pas su ») et les 7 jours en barres ;
-//    2. le mois : Vendu · Reçu · Bénéfice (un bénéfice brut dit sa couverture, jamais « au moins ») ;
+//    1+2. LES CHIFFRES (19 nov., « plus de stats […] le CA, le bénéfice ») : Jour · Semaine · Mois — le CA vendu en grand
+//       et son écart nommé avec la période d'avant, puis Bénéfice · Ventes · Panier moyen (« — » si pas su, jamais 0) ;
 //    3. « À envoyer » : le nombre, des vignettes nettes (chacune SA plaque, « +N » pour le reste) ; LE plein
 //       « Imprimer N bordereaux » est celui de la page (collé en bas) ;
 //    4. « À retirer » : le point sur une ligne, le code en grand ;
-//    5. « Dernières ventes » (5) et « Argent à venir » s'il y en a.
+//    5. « Dernières ventes » (5). (« Argent à venir », « Reçu », les 7 barres : dans Argent.)
 //  Au plus UNE alerte (une date limite LUE qui tombe aujourd'hui ou demain), dite DANS le groupe qu'elle concerne.
 //  Écran natif : il COMPOSE les composants de src/natif/ — ni style en ligne, ni classe de mise en page, ni couleur.
 //  AUCUNE règle ici : tout arrive calculé (src/aujourdhui/modele.js, les cartes de Ma journée dans src/App.jsx).
 // ════════════════════════════════════════════════════════════════════════════
 import React from 'react';
 import { tr, nombre, localeCourante } from '../../i18n/index.js';
-import { Page, Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Affiche, Faits, Fait, Vide, Barres, Vignettes, CodeRetrait, Colonnes, Colonne } from '../index.js';
+import { Page, Groupe, Rangee, Vignette, Plaque, Bouton, BoutonIcone, Affiche, Faits, Fait, Vide, Segmente, Vignettes, CodeRetrait, Colonnes, Colonne } from '../index.js';
 import { publierARegler } from '../../designV2/aRegler.js';
 
 const cents = (x) => (x == null || !Number.isFinite(Number(x)) ? '' : String(Math.round(Number(x) * 100)));
@@ -36,44 +36,50 @@ export function ilYaCourt(ts, maintenant = Date.now()) {
   } catch (_) { return ''; }
 }
 
-// L'AFFICHE et LE MOIS. `chiffres` : { etat: 'encours' | 'passu' | 'lu', raison, jours: [{ cle, lettre, long, court, v, n,
-// partiel, auj }], montre (le rang du jour dit par défaut : `jourMontre`), mois: { nom, vendu, recu, benefice }, montant, onArgent }.
-// La boîte a la MÊME forme dans les trois états (« — » et sa raison) : rien ne bouge quand le chiffre arrive.
+// LES CHIFFRES (19 nov., Julien : « je veux peut-être plus de stats dans l'onglet Ma journée, par exemple le CA, le
+// bénéfice etc. »). Un segmenté Jour · Semaine · Mois, puis : le CA vendu en grand (« au moins » si un prix n'est pas lu)
+// et son écart NOMMÉ avec la période d'avant au même moment ; Bénéfice · Ventes · Panier moyen. Tout vient de
+// `chiffres.stats` (src/aujourdhui/modele.js `statsPeriodes` : les mêmes `valeurChiffre` que l'écran Argent) ; un chiffre
+// pas su = « — » et sa raison, jamais 0. Toucher un chiffre ouvre Argent sur la période.
+// `chiffres` : { etat: 'encours' | 'passu' | 'lu', raison, stats: { jour|semaine|mois: { vendu, ventes, panier, benefice,
+// ecart } }, mois: { nom }, moisAvant, montant, ouvrirPeriode(p) }.
+// La boîte a la MÊME forme dans les trois états : rien ne bouge quand le chiffre arrive.
+const PERIODES = ['jour', 'semaine', 'mois'];
+const NOTE = { aucune: 'v2.stats.aucune', partiel: 'v2.stats.pasTout' };
 function Chiffres({ chiffres }) {
-  const { etat = 'encours', raison = '', jours = [], montre = -1, mois = null, montant = (x) => String(x), onArgent = null } = chiffres;
-  const [choix, setChoix] = React.useState(null);
-  const auto = montre >= 0 && montre < jours.length ? montre : jours.length - 1;
-  const i = choix == null || choix >= jours.length ? auto : choix;
-  const j = jours[i] || null, auj = jours.length ? jours[jours.length - 1] : null;
-  const lu = etat === 'lu' && !!j && j.v != null;
-  const [n, u] = lu ? coupe(montant(j.v)) : [null, ''];
-  const quand = !j ? '' : j.auj ? tr('v2.jour.auj') : i === jours.length - 2 ? tr('v2.jour.hier') : tr('v2.jour.le', { quand: j.court });
-  const mot = etat === 'encours' ? tr('v2.jour.lecture') : !lu ? (raison || (j && j.raison) || tr('v2.jour.pasSu'))
-    : (j.partiel ? tr('journee.moins') + ' · ' : '') + tr('v2.jour.vendus', { n: j.v, quand }) + (j.n != null ? ' · ' + (j.n === 0 ? tr('v2.jour.aucune') : tr('v2.jour.ventes', { n: j.n })) : '');
-  const fait = (cle, libelle, x) => {
-    const su = !!x && x.valeur != null;
-    const detail = !x ? '' : !su ? (x.note || '') : x.couverture ? tr('v2.mois.sur', { n: x.couverture.n, k: x.couverture.k }) : x.partiel ? tr('journee.moins') : (x.note || '');
-    return <Fait key={cle} libelle={libelle} valeur={su ? montant(x.valeur) : null} detail={detail} onModifier={onArgent}
-      attrs={{ 'data-v2-mois': cle, 'data-v2-mois-cents': su ? cents(x.valeur) : '', 'data-v2-mois-partiel': su && x.partiel ? '1' : undefined, 'data-v2-mois-brut': x && x.couverture ? '1' : undefined }}/>;
-  };
+  const { etat = 'encours', raison = '', stats = null, mois = null, moisAvant = '', montant = (x) => String(x), ouvrirPeriode = null } = chiffres;
+  const [p, setP] = React.useState('jour');
+  const S = etat === 'lu' && stats ? stats[p] : null;
+  const V = S ? S.vendu : null;
+  const [n, u] = V && V.valeur != null ? coupe(montant(V.valeur)) : [null, ''];
+  const quand = tr('v2.stats.vendus.' + p, { mois: mois && mois.nom ? mois.nom.toLowerCase() : '' });
+  const libelle = etat === 'encours' ? tr('v2.jour.lecture') : !V || V.valeur == null ? (raison || (V && V.note) || tr('v2.jour.pasSu'))
+    : (V.partiel ? tr('journee.moins') + ' · ' : '') + quand;
+  const signe = (x) => (x > 0 ? '+' : x < 0 ? '−' : '±') + Math.abs(x) + ' %';
+  const ecart = S && S.ecart != null ? tr('v2.stats.ecart.' + p, { s: signe(S.ecart), mois: moisAvant }) : '';
+  const ouvrir = ouvrirPeriode ? () => ouvrirPeriode(p) : null;
+  const note = (x) => (!x ? '' : NOTE[x.note] ? tr(NOTE[x.note]) : (x.note || ''));
+  const B = S ? S.benefice : null;
+  const detailB = !B ? '' : B.valeur == null ? note(B) : B.couverture ? tr('v2.stats.auMoinsSur', { c: B.couverture.replace('/', ' / ') }) : '';
+  // Ce que le banc lit (les nombres, jamais un libellé) : chaque période, chaque chiffre, en centimes ; « » = pas su.
+  const resume = !stats || etat !== 'lu' ? '' : JSON.stringify(Object.fromEntries(PERIODES.map((k) => { const x = stats[k]; return [k, {
+    vendu: cents(x.vendu.valeur), vp: x.vendu.partiel ? 1 : 0, ventes: x.ventes.valeur == null ? '' : String(x.ventes.valeur), benefice: cents(x.benefice.valeur),
+    bp: x.benefice.partiel ? 1 : 0, couverture: x.benefice.couverture || '', panier: cents(x.panier.valeur), ecart: x.ecart == null ? '' : String(x.ecart) }]; })));
+  const nul = (x) => (x == null ? null : x);
   return (<>
-    <Groupe attrs={{ 'data-v2-bloc': 'chiffres', 'data-v2-chiffres': etat, 'aria-busy': etat === 'encours' ? 'true' : undefined,
-      'data-v2-jour-vendu': etat === 'lu' && auj && auj.v != null ? cents(auj.v) : '', 'data-v2-jour-ventes': etat === 'lu' && auj && auj.n != null ? String(auj.n) : '', 'data-v2-jour-montre': j ? j.cle : '' }}>
-      <Affiche valeur={n} unite={u} libelle={mot}>
-        <Barres libelle={tr('journee.septDerniersJours')} choisie={i} onChoisir={setChoix}
-          barres={jours.map((x) => ({ cle: x.cle, lettre: x.lettre, libelle: x.long + (etat === 'lu' && x.v != null ? ' · ' + montant(x.v) : ''), valeur: etat === 'lu' ? x.v : null }))}
-          attrs={{ 'data-v2-semaine': jours.map((x) => (etat === 'lu' ? cents(x.v) : '')).join(',') }}/>
-      </Affiche>
+    <Segmente libelle={tr('v2.stats.periode')} valeur={p} onChange={setP} options={PERIODES.map((k) => ({ cle: k, libelle: tr('v2.stats.' + k) }))}/>
+    <Groupe attrs={{ 'data-v2-bloc': 'chiffres', 'data-v2-chiffres': etat, 'data-v2-periode': p, 'data-v2-stats': resume, 'aria-busy': etat === 'encours' ? 'true' : undefined,
+      'data-v2-jour-vendu': etat === 'lu' && stats ? cents(stats.jour.vendu.valeur) : '', 'data-v2-jour-ventes': etat === 'lu' && stats && stats.jour.ventes.valeur != null ? String(stats.jour.ventes.valeur) : '' }}>
+      <Affiche valeur={n} unite={u} libelle={libelle} ecart={ecart}/>
+      <Faits colonnes={3}>
+        <Fait libelle={B && B.brut ? tr('v2.stats.beneficeBrut') : tr('v2.stats.benefice')} valeur={B && B.valeur != null ? montant(B.valeur) : null} detail={detailB} onModifier={ouvrir}
+          attrs={{ 'data-v2-stat': 'benefice' }}/>
+        <Fait libelle={tr('v2.stats.ventes')} valeur={S && S.ventes.valeur != null ? nombre(S.ventes.valeur) : null} detail={S && S.ventes.valeur == null ? note(S.ventes) : (S && S.ventes.partiel ? tr('journee.moins') : '')} onModifier={ouvrir}
+          attrs={{ 'data-v2-stat': 'ventes' }}/>
+        <Fait libelle={tr('v2.stats.panier')} valeur={S && S.panier.valeur != null ? montant(S.panier.valeur) : nul(null)} detail={S && S.panier.valeur == null ? note(S.panier) : ''} onModifier={ouvrir}
+          attrs={{ 'data-v2-stat': 'panier' }}/>
+      </Faits>
     </Groupe>
-    {mois ? (
-      <Groupe titre={mois.nom} attrs={{ 'data-v2-bloc': 'mois' }}>
-        <Faits colonnes={3}>
-          {fait('vendu', tr('v2.mois.vendu'), mois.vendu)}
-          {fait('recu', tr('v2.mois.recu'), mois.recu)}
-          {fait('benefice', mois.benefice && mois.benefice.libelle ? mois.benefice.libelle : tr('v2.mois.benefice'), mois.benefice)}
-        </Faits>
-      </Groupe>
-    ) : null}
   </>);
 }
 

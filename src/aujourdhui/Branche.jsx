@@ -5,9 +5,9 @@
 // valeur (`chiffres`, `aVenir`, `alerte`, `ventes`). Aucune règle ici : on relie, on ne calcule pas.
 import React from 'react';
 import Aujourdhui from '../natif/ecrans/Aujourdhui.jsx';
-import { chiffresAujourdhui, dernieresVentes, alerteDuJour } from './modele.js';
+import { chiffresAujourdhui, statsPeriodes, dernieresVentes, alerteDuJour } from './modele.js';
 
-const Mo = Object.freeze({ chiffresAujourdhui, dernieresVentes, alerteDuJour });
+const Mo = Object.freeze({ chiffresAujourdhui, statsPeriodes, dernieresVentes, alerteDuJour });
 
 export default function AujourdhuiBranche({ calculer = null, alerte = null, ventes = null, ...reste }) {
   let plus = {};

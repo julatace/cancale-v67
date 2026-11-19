@@ -33586,7 +33586,18 @@ function AujourdhuiAvecChiffresV2({ liveStats, onNav, ...reste }) {
   const chiffres = { etat: M.etat, raison: M.raison, jours, montre: M.montre, montant: somme, onArgent: () => { if (onNav) onNav('compta'); },
     mois: { nom: majusculeJ(new Date(maintenant).toLocaleDateString(localeCourante(), { month: 'long' })), vendu: M.mois.vendu, recu: M.mois.recu,
       benefice: M.mois.benefice.brut ? { ...M.mois.benefice, libelle: NOM_BENEFICE_BRUT } : M.mois.benefice } };
-  return { chiffres, aVenir: M.aVenir ? { ...M.aVenir, texte: somme(M.aVenir.valeur), ouvrir: () => ouvrirArgentAVenir() } : null };
+  // (19 nov., Julien : « plus de stats dans l'onglet Ma journée, par exemple le CA, le bénéfice ») Jour · Semaine · Mois :
+  // les mêmes `valeurChiffre` ; la période d'avant coupée au MÊME moment (règles de période de la carte, `REGLES_CARTE`).
+  const precedente = (p) => {
+    const de = p === 'jour' ? new Date(new Date(maintenant).setHours(0, 0, 0, 0)) : REGLES_CARTE.debutPeriode(maintenant, p);
+    const avant = p === 'jour' ? new Date(de.getFullYear(), de.getMonth(), de.getDate() - 1) : REGLES_CARTE.decalerPeriode(de, p, -1);
+    return { de: avant.getTime(), a: Math.min(de.getTime(), avant.getTime() + (maintenant - de.getTime())), label: '' };
+  };
+  const stats = Mo.statsPeriodes({ valeur: (id, p) => sansCompteSur(valeurChiffre(id, { id, p }, S, SEL_TOUT_V2, REGLES_CARTE, maintenant), S), precedente, raisonCourte, beneficeMois: M.mois.benefice });
+  const moisAvant = new Date(new Date(maintenant).getFullYear(), new Date(maintenant).getMonth() - 1, 1).toLocaleDateString(localeCourante(), { month: 'long' });
+  // Toucher un chiffre ouvre Argent sur la période (le graphique du CA retient `vrm_compta_periode` : semaine ou mois).
+  const ouvrirPeriode = (p) => { try { localStorage.setItem('vrm_compta_periode', p === 'mois' ? 'mois' : 'semaine'); } catch (_) {} if (onNav) onNav('compta'); };
+  return { chiffres: { ...chiffres, stats, moisAvant, ouvrirPeriode }, aVenir: null };
   };
   return <AujourdhuiV2 {...reste} calculer={calculer}/>;
 }

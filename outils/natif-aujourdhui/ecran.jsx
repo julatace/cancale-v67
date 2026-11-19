@@ -41,16 +41,20 @@ const VENTES = [
   { cle: 'Leboncoin:4', site: 'Leboncoin', ts: Date.now() - 3 * 86400000, prix: '82,50 €', titre: '', photo: '', num: '' },
   { cle: 'Vinted:5', site: 'Vinted', ts: Date.now() - 4 * 86400000, prix: '36 €', titre: 'Adidas Samba OG blanc vert taille 42', photo: photo(28), num: '13' },
 ];
+// Les chiffres d'une période (la forme de `statsPeriodes`, src/aujourdhui/modele.js).
+const st = (v, n, b, { vp = false, bp = '', ecart = null } = {}) => ({ vendu: { valeur: v, partiel: vp, note: v == null ? 'pas lu' : '' }, ventes: { valeur: n, partiel: false, note: n == null ? 'pas lu' : '' },
+  panier: v != null && n > 0 && !vp ? { valeur: Math.round((v / n) * 100) / 100, note: '' } : { valeur: null, note: n === 0 ? 'aucune' : 'partiel' },
+  benefice: { valeur: b, brut: true, partiel: !!bp, couverture: bp, note: b == null ? 'prix d’achat manquants' : '' }, ecart });
 const CAS = {
   capture: { pret: true, affiche: { n: 8, pasSu: false, sous: '3 pas encore prêts', ambre: true }, colis: colis(8), plein: { n: 5 },
     retraits: { n: 15, pasSu: false, nPoints: 6, points: [{ lieu: 'Relais Pickup Tabac-Presse du Marché Couvert de la Gare Centrale', code: '416362' }], premier: { txt: 'dernier jour', ambre: true } },
     alerte: { id: 'poster', txt: '2 pressés · 1 j de retard', faire: () => {} }, ventes: { etat: 'lu', lignes: VENTES }, aVenir: { valeur: 952, partiel: false, texte: '952 €', ouvrir: () => {} },
-    chiffres: { etat: 'lu', jours: jours([69, 0, 47, 94, 246, 55, 102], [2, 0, 1, 2, 5, 1, 2]), montre: 6, mois: { nom: 'Novembre', vendu: { valeur: 968, partiel: true, note: '' }, recu: { valeur: 372, partiel: false, note: '' }, benefice: { valeur: 187, partiel: false, couverture: { k: 12, n: 30 }, libelle: 'Bénéfice brut' } } } },
+    chiffres: { etat: 'lu', stats: { jour: st(102, 2, 38, { ecart: 85 }), semaine: st(497, 10, 141, { bp: '8/10', ecart: -12 }), mois: st(968, 21, 187, { vp: true, bp: '12/30' }) }, moisAvant: 'octobre', jours: jours([69, 0, 47, 94, 246, 55, 102], [2, 0, 1, 2, 5, 1, 2]), montre: 6, mois: { nom: 'Novembre', vendu: { valeur: 968, partiel: true, note: '' }, recu: { valeur: 372, partiel: false, note: '' }, benefice: { valeur: 187, partiel: false, couverture: { k: 12, n: 30 }, libelle: 'Bénéfice brut' } } } },
   volume: { pret: true, affiche: { n: 30, pasSu: false, sous: '15 pas encore prêts' }, colis: colis(12), plein: { n: 15 },
     retraits: { n: 8, pasSu: false, nPoints: 8, points: [{ lieu: 'Relais 0', code: '100000' }], premier: { txt: 'dans 3 j', ambre: false } }, alerte: null, ventes: { etat: 'lu', lignes: VENTES }, aVenir: { valeur: 13630.5, partiel: true, texte: '13 630 €', ouvrir: () => {} },
-    chiffres: { etat: 'lu', jours: jours([1380, 1270, 1160, 1410, 1080, 750, 0], [12, 11, 9, 13, 8, 3, 0]), montre: 5, mois: { nom: 'Novembre', vendu: { valeur: 22740, partiel: false, note: '' }, recu: { valeur: 15960, partiel: true, note: '' }, benefice: { valeur: null, partiel: false, note: 'prix d’achat manquants' } } } },
+    chiffres: { etat: 'lu', stats: { jour: st(0, 0, 0), semaine: st(7050, 56, 2380.5, { ecart: 4 }), mois: st(22740, 182, null) }, moisAvant: 'octobre', jours: jours([1380, 1270, 1160, 1410, 1080, 750, 0], [12, 11, 9, 13, 8, 3, 0]), montre: 5, mois: { nom: 'Novembre', vendu: { valeur: 22740, partiel: false, note: '' }, recu: { valeur: 15960, partiel: true, note: '' }, benefice: { valeur: null, partiel: false, note: 'prix d’achat manquants' } } } },
   vide: { pret: true, affiche: { n: 0, pasSu: false, sous: '' }, colis: [], plein: null, retraits: { n: 0, pasSu: false, points: [] }, alerte: null, ventes: { etat: 'lu', lignes: [] }, aVenir: null,
-    chiffres: { etat: 'lu', jours: jours([0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0]), montre: 6, mois: { nom: 'Novembre', vendu: { valeur: 0, partiel: false, note: '' }, recu: { valeur: null, partiel: false, note: 'ouvre Ventes' }, benefice: { valeur: null, partiel: false, note: 'rien à compter' } } } },
+    chiffres: { etat: 'lu', stats: { jour: st(0, 0, null), semaine: st(0, 0, null), mois: st(0, 0, null) }, moisAvant: 'octobre', jours: jours([0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0]), montre: 6, mois: { nom: 'Novembre', vendu: { valeur: 0, partiel: false, note: '' }, recu: { valeur: null, partiel: false, note: 'ouvre Ventes' }, benefice: { valeur: null, partiel: false, note: 'rien à compter' } } } },
   attente: { pret: false, affiche: { n: null, pasSu: true, sous: '' }, colis: [], plein: null, retraits: null, alerte: null, ventes: { etat: 'encours', lignes: [] }, aVenir: null,
     chiffres: { etat: 'encours', jours: jours([null, null, null, null, null, null, null], [null, null, null, null, null, null, null]), montre: 6, mois: { nom: 'Novembre', vendu: null, recu: null, benefice: null } } },
 };
@@ -81,7 +85,7 @@ function Ecran() {
     <Coque {...coque} titre="Aujourd’hui">
       <Aujourdhui titre="Aujourd’hui" Icon={Icon} Photo={Photo} pret={c.pret} affiche={c.affiche} colis={c.colis} retraits={c.retraits} groupes={null} alerte={c.alerte} ventes={c.ventes} aVenir={c.aVenir}
         plein={c.plein ? { n: c.plein.n, faire: () => { document.documentElement.setAttribute('data-banc-imprime', String(c.plein.n)); } } : null}
-        chiffres={{ ...c.chiffres, montant: euros, onArgent: () => setActif('compta') }} onScanner={() => {}} onColis={() => setActif('ventes')} onRetraits={() => setActif('achats')} onVentes={() => setActif('ventes')}/>
+        chiffres={{ ...c.chiffres, montant: euros, ouvrirPeriode: (p) => { document.documentElement.setAttribute('data-banc-argent', p); setActif('compta'); } }} onScanner={() => {}} onColis={() => setActif('ventes')} onRetraits={() => setActif('achats')} onVentes={() => setActif('ventes')}/>
     </Coque>
   );
 }

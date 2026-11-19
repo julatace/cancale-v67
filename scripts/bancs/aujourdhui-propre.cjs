@@ -137,6 +137,7 @@ const LIRE = (sel) => { const e = document.querySelector(sel); if (!e) return nu
   return { blocs: [...e.querySelectorAll('[data-v2-bloc]')].map((b) => b.getAttribute('data-v2-bloc')), jobs: e.querySelectorAll('[data-v2-job], [data-v2-afaire], .v2-afaire-ligne, [data-v2-regler], [data-v2-regler-groupe]').length,
     affiche: a(e, 'data-v2-affiche'), ecart: a(q('[data-v2-ecart]'), 'data-v2-ecart') || '', plein: a(q('[data-v2-principal]'), 'data-v2-principal'),
     etat: a(c, 'data-v2-chiffres'), jour: a(c, 'data-v2-jour-vendu'), jourN: a(c, 'data-v2-jour-ventes'), semaine: (a(q('[data-v2-semaine]'), 'data-v2-semaine') || '').split(','),
+    stats: (() => { try { return JSON.parse(a(c, 'data-v2-stats') || 'null'); } catch (_) { return null; } })(),
     mois: Object.fromEntries([...e.querySelectorAll('[data-v2-mois]')].map((m) => [m.getAttribute('data-v2-mois'), { cents: m.getAttribute('data-v2-mois-cents'), partiel: m.getAttribute('data-v2-mois-partiel') === '1', brut: m.getAttribute('data-v2-mois-brut') === '1', texte: m.textContent.trim() }])),
     colis: e.querySelectorAll('[data-v2-colis]').length, plus: Number(a(q('[data-v2-bande] [data-n-plus]'), 'data-n-plus') || 0),
     retirer: a(q('[data-v2-groupe="retirer"] [data-v2-n]'), 'data-v2-n'), lieu: a(q('[data-v2-passe-lieu]'), 'data-v2-passe-lieu') || '', code: a(q('[data-v2-passe-code]'), 'data-v2-passe-code') || '',
@@ -247,7 +248,7 @@ async function muter(pg) {
   if (MUT === 'plein') await pg.evaluate((s) => { const p = document.querySelector(s + ' [data-v2-principal]'); if (p) { const c = p.cloneNode(true); c.removeAttribute('data-v2-principal'); p.parentElement.appendChild(c); } }, ECRAN);
   if (MUT === 'job') await pg.evaluate((s) => { const e = document.querySelector(s); if (e) { const d = document.createElement('div'); d.setAttribute('data-v2-job', 'x'); d.textContent = 'À faire'; e.appendChild(d); } }, ECRAN);
   if (MUT === 'pastille') await pg.evaluate((so) => { const b = document.querySelector(so + '[data-nav-entree="ventes"] [data-badge-n]'); if (b) { b.setAttribute('data-badge-n', String(Number(b.getAttribute('data-badge-n')) + 3)); } }, '');
-  if (MUT === 'chiffre') await pg.evaluate((s) => { const c = document.querySelector(s + ' [data-v2-bloc="chiffres"]'); if (c) c.setAttribute('data-v2-jour-vendu', String(Number(c.getAttribute('data-v2-jour-vendu') || 0) + 100)); const m = document.querySelector(s + ' [data-v2-mois="recu"]'); if (m) m.setAttribute('data-v2-mois-cents', '1'); }, ECRAN);
+  if (MUT === 'chiffre') await pg.evaluate((s) => { const c = document.querySelector(s + ' [data-v2-bloc="chiffres"]'); if (c) c.setAttribute('data-v2-jour-vendu', String(Number(c.getAttribute('data-v2-jour-vendu') || 0) + 100)); try { const S = JSON.parse(c.getAttribute('data-v2-stats')); S.semaine.vendu = String(Number(S.semaine.vendu || 0) + 100); S.mois.benefice = '1'; c.setAttribute('data-v2-stats', JSON.stringify(S)); } catch (_) {} const m = document.querySelector(s + ' [data-v2-mois="recu"]'); if (m) m.setAttribute('data-v2-mois-cents', '1'); }, ECRAN);
   await pg.waitForTimeout(300);
 }
 
@@ -257,7 +258,9 @@ function attenduJours(ventes) {
   const m0 = minuit(); const jours = [6, 5, 4, 3, 2, 1, 0].map((k) => { const d = new Date(m0); d.setDate(d.getDate() - k); const f = new Date(d); f.setDate(f.getDate() + 1); return [d.getTime(), f.getTime()]; });
   const sur = (de, a) => { const l = ventes.filter((v) => !v.annulee && v.ts >= de && v.ts < a); const lus = l.filter((v) => v.eur != null); const cents = Math.round(lus.reduce((t, v) => t + v.eur * 100, 0)); return { cents, partiel: lus.length < l.length, n: l.length }; };
   const d = new Date(); const de = new Date(d.getFullYear(), d.getMonth(), 1).getTime(), a = new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime();
-  return { jours: jours.map(([x, y]) => sur(x, y)), mois: sur(de, a) };
+  // (19 nov.) La semaine du calendrier (lundi 0 h → lundi suivant), comme la carte des chiffres et Argent.
+  const lundi = new Date(m0); lundi.setDate(lundi.getDate() - ((lundi.getDay() + 6) % 7)); const lundiApres = new Date(lundi); lundiApres.setDate(lundiApres.getDate() + 7);
+  return { jours: jours.map(([x, y]) => sur(x, y)), semaine: sur(lundi.getTime(), lundiApres.getTime()), mois: sur(de, a) };
 }
 const DEJA = new Set(['colis-limite', 'poste-sans-depart', 'colis-en-retard', 'ebay-ne-pas-poster', 'vestiaire-envoyer', 'retrait-a-verifier', 'retrait-en-verification', 'retrait-dernier-jour', 'sans-numero', 'numeros-en-double', 'double-vente', 'completer']);
 
@@ -279,16 +282,25 @@ async function unEcran(nav, nomBase, b, W, sombre) {
       const w = await pg.evaluate(LIRE, ECRAN);
       // ── LE FOND ──
       dit(w.jobs === 0 && !/À faire/.test(w.texte), `F1 ${ou} : aucun groupe « À faire » dans Aujourd’hui (décision du 19 nov.)`, { jobs: w.jobs });
-      dit(w.blocs[0] === 'chiffres' && w.blocs[1] === 'mois' && w.blocs.includes('envoyer') && w.blocs.includes('retirer') && w.blocs.includes('ventes'), `F5 ${ou} : les chiffres, À envoyer, À retirer, Dernières ventes — dans cet ordre`, w.blocs);
+      dit(w.blocs[0] === 'chiffres' && !w.blocs.includes('mois') && w.blocs.includes('envoyer') && w.blocs.includes('retirer') && w.blocs.includes('ventes'), `F5 ${ou} : les chiffres, À envoyer, À retirer, Dernières ventes — dans cet ordre`, w.blocs);
       dit(w.alertes <= 1, `F6 ${ou} : au plus UNE alerte (${w.alertes})`, w.alerte);
       if (nomBase === 'capture') {
         const A = b.attendu, X = attenduJours(A.ventes);
         dit(w.affiche === String(A.nEnvoyer) && w.plein === String(A.nPrets) && /3/.test(w.ecart) && /prêts\b/.test(w.ecart), `F5 ${ou} : ${A.nEnvoyer} colis à envoyer, « ${w.ecart} » (accordé), le plein dit ${A.nPrets} bordereaux`, { affiche: w.affiche, plein: w.plein, ecart: w.ecart });
         dit(w.retirer === String(A.nRetirer) && w.lieu === A.point && /^\d{6}$/.test(w.code), `F5 ${ou} : ${A.nRetirer} colis à retirer, la passe du premier point et son code`, { retirer: w.retirer, lieu: w.lieu, code: w.code });
         dit(w.ventes.length === 5 && new Set(w.ventes).size === 5, `F5 ${ou} : les 5 dernières ventes, chacune une fois`, w.ventes);
-        dit(w.etat === 'lu' && w.semaine.length === 7 && w.semaine.every((c, i) => (X.jours[i].cents === 0 && X.jours[i].partiel ? c === '' : c === String(X.jours[i].cents))), `F4 ${ou} : le vendu de chacun des 7 jours = les ventes semées (${X.jours.map((j) => j.cents / 100).join(' · ')} €)`, { vu: w.semaine, attendu: X.jours.map((j) => j.cents) });
+        // (19 nov., Julien : « plus de stats […] le CA, le bénéfice ») Jour · Semaine · Mois : CA vendu, ventes, panier =
+        // les ventes SEMÉES (« au moins » quand un prix n'est pas lu, « — » pour un panier sur une partie des ventes).
+        const S = w.stats || {};
+        for (const [k, x] of [['jour', X.jours[6]], ['semaine', X.semaine], ['mois', X.mois]]) {
+          const v = S[k] || {};
+          const venduAttendu = x.cents === 0 && x.partiel ? '' : String(x.cents);
+          dit(w.etat === 'lu' && v.vendu === venduAttendu && !!v.vp === x.partiel && v.ventes === String(x.n), `F4 ${ou} : ${k} — vendu ${x.cents / 100} € en ${x.n} ventes${x.partiel ? ' (« au moins »)' : ''} = les ventes semées`, { vu: v, attendu: x });
+          const panier = x.partiel || !x.n ? '' : String(Math.round(Math.round((x.cents / 100 / x.n) * 100)));
+          dit(v.panier === panier, `F4 ${ou} : ${k} — panier moyen ${panier ? Number(panier) / 100 + ' €' : '« — » (pas tout lu ou aucune vente)'}`, { vu: v.panier, attendu: panier });
+        }
+        dit(X.mois.partiel === true && !!S.mois && S.mois.vp === 1, `F4 ${ou} : le mois dit « au moins » (${A.illisibles} ventes au prix pas lu — jamais comptées 0 €)`, S.mois);
         dit(w.jour === String(X.jours[6].cents) && w.jourN === String(X.jours[6].n), `F4 ${ou} : vendu aujourd’hui = ${X.jours[6].cents / 100} € en ${X.jours[6].n} ventes`, { jour: w.jour, n: w.jourN });
-        dit(!!w.mois.vendu && w.mois.vendu.cents === String(X.mois.cents) && w.mois.vendu.partiel === X.mois.partiel && X.mois.partiel === true, `F4 ${ou} : vendu du mois = ${X.mois.cents / 100} €, dit « au moins » (${A.illisibles} ventes au prix pas lu — jamais comptées 0 €)`, { vu: w.mois.vendu, attendu: X.mois });
         dit(w.alerte === 'poster', `F6 ${ou} : l’alerte est celle des colis à poster dont la limite est LUE`, w.alerte);
       }
       if (nomBase === 'estimee') dit(w.alerte !== 'poster', `F6 ${ou} : aucune limite lue ⇒ aucune alerte « à poster » (une date estimée ne presse jamais)`, w.alerte);
@@ -382,10 +394,9 @@ async function onglets(nav, b, sombre) {
     await pg.waitForSelector('[data-v2-argent-recu]', { timeout: 30000 }).catch(() => {}); await pg.waitForTimeout(2500);
     const ar = await pg.evaluate(() => { const a = (s, n) => { const e = document.querySelector(s); return e ? e.getAttribute(n) : null; };
       return { recu: a('[data-v2-argent-recu]', 'data-v2-argent-recu'), partiel: a('[data-v2-argent-recu]', 'data-v2-argent-partiel') === '1', benefice: a('[data-v2-argent-fait="benefice"]', 'data-v2-argent-valeur'), attente: a('[data-v2-argent-fait="attente"]', 'data-v2-argent-valeur') }; });
-    const mo = auj.mois || {};
-    dit(ar.recu != null && (mo.recu ? mo.recu.cents : null) === ar.recu && (mo.recu.partiel === ar.partiel || ar.recu === ''), `F4 reçu du mois : Aujourd’hui (${mo.recu && mo.recu.cents}) = Argent (${ar.recu})`, { auj: mo.recu, argent: ar });
-    dit((mo.benefice ? mo.benefice.cents : null) === (ar.benefice || ''), `F4 bénéfice du mois : Aujourd’hui (${mo.benefice && mo.benefice.cents}) = Argent (${ar.benefice})`, { auj: mo.benefice, argent: ar.benefice });
-    dit((auj.avenir || '') === (ar.attente || ''), `F4 argent à venir : Aujourd’hui (${auj.avenir}) = Argent (${ar.attente})`, { auj: auj.avenir, argent: ar.attente });
+    const mo = auj.stats && auj.stats.mois ? auj.stats.mois : {};
+    dit((mo.benefice != null ? mo.benefice : null) === (ar.benefice || ''), `F4 bénéfice du mois : Aujourd’hui (${mo.benefice}) = Argent (${ar.benefice})`, { auj: mo, argent: ar.benefice });
+    dit(!auj.avenir && !auj.mois.recu, 'F4 « Reçu » et « Argent à venir » sont dans Argent, plus sur Aujourd’hui (19 nov.)', { avenir: auj.avenir, recu: auj.mois.recu });
     dit(!erreurs.length, 'les onglets : aucune erreur JS', erreurs);
   } catch (e) { dit(false, 'les onglets : le contrôle est allé au bout', String(e && e.stack || e).slice(0, 600)); }
   await ctx.close();

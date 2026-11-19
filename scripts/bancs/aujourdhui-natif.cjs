@@ -78,13 +78,29 @@ async function unEcran(nav, port, base, W, sombre) {
     const natif = await pg.evaluate((s) => { const e = document.querySelector(s); const tous = [e, ...e.querySelectorAll('*')];
       return { styles: tous.filter((x) => x.getAttribute('style') && !x.closest('.n-vignettes-photo') && !/^--n-/.test(x.getAttribute('style').trim())).map((x) => x.className + ':' + x.getAttribute('style')).slice(0, 5), horsNatif: [...e.querySelectorAll('[class]')].filter((x) => ![...x.classList].every((c) => /^n-/.test(c))).map((x) => String(x.className)).slice(0, 5) }; }, ECRAN);
     dit(w.jobs === 0 && !natif.styles.length && !natif.horsNatif.length, `N ${ou} : aucune liste « À faire », aucun style en ligne, seulement des composants natifs`, { jobs: w.jobs, ...natif });
-    if (base === 'attente') { dit(w.etat === 'encours' && w.blocs.join() === 'chiffres,mois' && !w.plein && w.colis === 0, `V ${ou} : en attente — l’affiche et le mois à leur taille (« — »), rien d’autre`, { blocs: w.blocs, etat: w.etat });
+    if (base === 'attente') { dit(w.etat === 'encours' && w.blocs.join() === 'chiffres' && !w.plein && w.colis === 0, `V ${ou} : en attente — les chiffres à leur taille (« — »), rien d’autre`, { blocs: w.blocs, etat: w.etat });
       const h = await pg.evaluate(() => Math.round(document.querySelector('[data-v2-bloc="chiffres"]').getBoundingClientRect().height));
       const p2 = await ouvrir(nav, port, { W, sombre, base: 'capture' }); const h2 = await p2.pg.evaluate(() => Math.round(document.querySelector('[data-v2-bloc="chiffres"]').getBoundingClientRect().height)); await p2.ctx.close();
       dit(Math.abs(h - h2) <= 1, `V ${ou} : la boîte des chiffres a la MÊME hauteur en attente (${h}) et lue (${h2}) — rien ne saute`, [h, h2]); }
     else if (base === 'vide') dit(!w.plein && w.colis === 0 && w.alertes === 0 && w.blocs.includes('rien') && !/NaN|undefined|null/.test(w.texte) && w.jour === '0', `V ${ou} : rien à envoyer ni à retirer ⇒ ni bande, ni plein, ni alerte ; 0 € lu, « — » pour le pas su`, { blocs: w.blocs, jour: w.jour });
     else {
-      dit(w.blocs.join() === (base === 'capture' ? 'chiffres,mois,envoyer,retirer,ventes' : 'chiffres,mois,envoyer,retirer,ventes') && w.alertes <= 1, `${ou} : l’affiche, le mois, À envoyer, À retirer, Dernières ventes ; au plus une alerte (${w.alertes})`, w.blocs);
+      dit(w.blocs.join() === 'chiffres,envoyer,retirer,ventes' && w.alertes <= 1, `${ou} : les chiffres, À envoyer, À retirer, Dernières ventes — rien d’autre ; au plus une alerte (${w.alertes})`, w.blocs);
+      // (19 nov., « plus de stats […] le CA, le bénéfice ») Jour · Semaine · Mois : un toucher change la période, l'affiche et
+      // les faits suivent ; l'écart est nommé ; un chiffre se touche et ouvre Argent sur SA période.
+      if (base === 'capture' && !MUT) {
+        const lireS = () => pg.evaluate(() => { const c = document.querySelector('[data-v2-bloc="chiffres"]'); const f = (k) => { const x = document.querySelector(`[data-v2-stat="${k}"] .n-fait-valeur`); return x ? x.textContent.trim() : null; };
+          return { p: c.getAttribute('data-v2-periode'), grand: (document.querySelector('.n-affiche-valeur') || {}).textContent, ecart: (document.querySelector('.n-affiche-ecart') || { textContent: '' }).textContent, ben: f('benefice'), ventes: f('ventes'), panier: f('panier'),
+            detB: ((document.querySelector('[data-v2-stat="benefice"] .n-fait-detail') || {}).textContent || ''), seg: document.querySelectorAll('.n-segmente [role="radio"]').length }; });
+        const toucherS = (s2) => (tel ? pg.locator(s2).first().tap({ timeout: 5000 }) : pg.locator(s2).first().click({ timeout: 5000 })).catch(() => {});
+        let s1 = await lireS();
+        dit(s1.seg === 3 && s1.p === 'jour' && s1.grand === '102' && /\+85 %/.test(s1.ecart) && s1.ventes === '2' && /51/.test(s1.panier || ''), `S ${ou} : Jour — 102 € vendus, « +85 % » nommé, 2 ventes, panier 51 €`, s1);
+        await toucherS('.n-segmente [role="radio"]:nth-of-type(2)'); await pg.waitForTimeout(300); s1 = await lireS();
+        dit(s1.p === 'semaine' && s1.grand === '497' && /−12 %/.test(s1.ecart) && /au moins/.test(s1.detB) && /8 \/ 10/.test(s1.detB), `S ${ou} : Semaine — 497 €, « −12 % », bénéfice « au moins · prix d’achat 8 / 10 »`, s1);
+        await pg.screenshot({ path: path.join(SHOTS, `aujourdhui-semaine-${W}-${th}.png`) });
+        await toucherS('[data-v2-stat="benefice"]'); await pg.waitForTimeout(200);
+        dit(await pg.evaluate(() => document.documentElement.getAttribute('data-banc-argent')) === 'semaine', `S ${ou} : toucher le bénéfice ouvre Argent sur la semaine`);
+        await pg.goto(pg.url(), { waitUntil: 'load' }); await pg.waitForSelector(ECRAN, { timeout: 20000 }).catch(() => {}); await pg.waitForTimeout(600);
+      }
       const d = await pg.evaluate(DESSIN, [ECRAN, BARRE, ONGLET]);
       dit(d.bande.cases >= 2 && !d.bande.chev.length && !d.bande.chevTextes.length && d.bande.horsBande === 0, `D1 ${ou} : ${d.bande.cases} vignettes, aucune n’en chevauche une autre, aucun texte superposé`, d.bande);
       dit(d.bande.plaques >= 1 && !d.bande.plaquesKo.length, `D1 ${ou} : ${d.bande.plaques} plaques N°, chacune ENTIÈRE dans sa case`, d.bande.plaquesKo);

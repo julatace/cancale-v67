@@ -183,26 +183,7 @@ export default {
   "v2.style.studio": "Blue studio",
   "v2.style.studio.desc": "The previous blue background and glass.",
   // (19 nov.) « Aujourd’hui » refait (les chiffres, les dernières ventes) et « À régler » dans chaque onglet.
-  "v2.jour.auj": "today",
-  "v2.jour.hier": "yesterday",
-  "v2.jour.le": "{quand}",
-  "v2.jour.vendus": {
-    "one": "sold {quand}",
-    "other": "sold {quand}"
-  },
-  "v2.jour.aucune": "no sale",
-  "v2.jour.ventes": {
-    "one": "{n} sale",
-    "other": "{n} sales"
-  },
   "v2.jour.pasSu": "sales not read yet",
-  "v2.mois.vendu": "Sold",
-  "v2.mois.recu": "Received",
-  "v2.mois.benefice": "Profit",
-  "v2.mois.sur": {
-    "one": "{k} sale out of {n}",
-    "other": "{k} sales out of {n}"
-  },
   "v2.envoyer.titre": "To ship",
   "v2.bande.plus": {
     "one": "{n} more parcel to ship",
@@ -225,5 +206,22 @@ export default {
   "v2.reg.completer": "Complete my listings",
   "v2.reg.completerN": "Complete my listings · {n}",
   "v2.jour.lecture": "reading…",
+  "v2.stats.periode": "Period",
+  "v2.stats.jour": "Day",
+  "v2.stats.semaine": "Week",
+  "v2.stats.mois": "Month",
+  "v2.stats.vendus.jour": "sold today",
+  "v2.stats.vendus.semaine": "sold this week",
+  "v2.stats.vendus.mois": "sold in {mois}",
+  "v2.stats.ecart.jour": "{s} vs yesterday at this time",
+  "v2.stats.ecart.semaine": "{s} vs last week so far",
+  "v2.stats.ecart.mois": "{s} vs {mois} so far",
+  "v2.stats.benefice": "Profit",
+  "v2.stats.beneficeBrut": "Gross profit",
+  "v2.stats.ventes": "Sales",
+  "v2.stats.panier": "Average sale",
+  "v2.stats.auMoinsSur": "at least · purchase prices {c}",
+  "v2.stats.aucune": "no sales",
+  "v2.stats.pasTout": "not all read",
   "v2.alerte.retourTitre": "Return to drop off"
 };

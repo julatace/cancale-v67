@@ -66,6 +66,49 @@ export function chiffresAujourdhui({ valeur, etatVendu = 'encours', sansCompte =
     aVenir: at && at.valeur != null ? { valeur: at.valeur, partiel: !!at.partiel } : null };
 }
 
+// (19 nov., Julien : « je veux peut-être plus de stats dans l'onglet Ma journée, par exemple le CA, le bénéfice etc. »)
+// LES CHIFFRES D'UNE PÉRIODE — Jour · Semaine · Mois : CA vendu, bénéfice, nombre de ventes, panier moyen, et l'écart du
+// vendu avec la période d'avant AU MÊME MOMENT (hier à la même heure, la semaine dernière au même jour…). Aucune règle
+// neuve : chaque valeur est DEMANDÉE à `valeur(id, période)` (= `valeurChiffre`, les mêmes appels que l'écran Argent) :
+//   vendu / ventes  `ventesFaites` (date de vente, toutes plateformes) — « au moins » si un prix n'est pas lu ;
+//   bénéfice        le mois : celui de la case d'Argent (`beneficeMois`, le net, sinon le brut et sa couverture) ;
+//                   le jour, la semaine : `brut` (la publication `vrm_benefice_jours`, sa couverture si des prix
+//                   d'achat manquent) — le bénéfice net ne se calcule qu'au mois (règle de l'URSSAF) ;
+//   panier moyen    le vendu divisé par le nombre de ventes, SEULEMENT si les deux sont lus en entier (une moyenne sur
+//                   une partie des ventes n'est pas un minimum : « — », la règle du panier de la carte) ;
+//   écart           seulement entre deux vendus lus en entier, et une période d'avant qui a vendu (pas de « +∞ % »).
+// `precedente(p)` → { de, a } : la période d'avant, coupée au même moment (fourni par l'app : ses règles de période).
+export const PERIODES_STATS = ['jour', 'semaine', 'mois'];
+export function statsPeriodes({ valeur, precedente = null, raisonCourte = () => '', beneficeMois = null }) {
+  const lu = (x) => !!x && x.valeur != null;
+  const out = {};
+  for (const p of PERIODES_STATS) {
+    const V = valeur('vendu', p) || {}, N = valeur('ventes', p) || {};
+    const vendu = { valeur: lu(V) ? V.valeur : null, partiel: lu(V) && !!V.partiel, note: lu(V) ? '' : (raisonCourte(V) || '') };
+    const ventes = { valeur: lu(N) ? N.valeur : null, partiel: lu(N) && !!N.partiel, note: lu(N) ? '' : (raisonCourte(N) || '') };
+    const entier = (x) => x.valeur != null && !x.partiel;
+    const panier = entier(vendu) && entier(ventes) && ventes.valeur > 0
+      ? { valeur: Math.round((vendu.valeur / ventes.valeur) * 100) / 100, note: '' }
+      : { valeur: null, note: entier(ventes) && ventes.valeur === 0 ? 'aucune' : (vendu.partiel || ventes.partiel) ? 'partiel' : (vendu.note || ventes.note) };
+    let benefice;
+    if (p === 'mois' && beneficeMois) {
+      const c = beneficeMois.couverture;
+      benefice = { valeur: beneficeMois.valeur == null ? null : beneficeMois.valeur, brut: !!beneficeMois.brut, partiel: !!c, couverture: c ? `${c.k}/${c.n}` : '', note: beneficeMois.note || '' };
+    } else {
+      const Bb = valeur('brut', p) || {};
+      const m = /^(\d+) sur (\d+)$/.exec(String(Bb.couverture || ''));
+      benefice = lu(Bb) ? { valeur: Bb.valeur, brut: true, partiel: !!Bb.partiel, couverture: m ? `${m[1]}/${m[2]}` : '', note: '' } : { valeur: null, brut: true, partiel: false, couverture: '', note: raisonCourte(Bb) || '' };
+    }
+    let ecart = null;
+    if (entier(vendu) && typeof precedente === 'function') {
+      const P = valeur('vendu', precedente(p)) || {};
+      if (lu(P) && !P.partiel && P.valeur > 0) ecart = Math.round(((vendu.valeur - P.valeur) / P.valeur) * 100);
+    }
+    out[p] = { vendu, ventes, panier, benefice, ecart };
+  }
+  return out;
+}
+
 // Les N dernières ventes : les lignes de « Vendu » datées et identifiées, la plus récente d'abord. Une ligne sans
 // date ou sans identité n'y est pas (jamais un titre comme identité, §5) ; deux lignes de même identité : une seule.
 export function dernieresVentes(lignes, n = 5) {

@@ -64,6 +64,7 @@
   /* Colonnes : effacées au téléphone (les groupes se suivent), une grille à l'ordinateur (320 au moins par colonne :
      trois à 1280 et 1512, deux à 1024). */
   .n-colonnes, .n-colonne { display: contents; }
+  .n-colonne > .n-segmente { margin: 0 var(--n-marge) 12px; }
   @media (min-width: 1024px) {
     .n-colonnes { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); align-items: start; gap: 0 8px; box-sizing: border-box; width: 100%; max-width: 1120px; padding-inline: 8px; }
     .n-colonne { display: flex; flex-direction: column; min-width: 0; }
