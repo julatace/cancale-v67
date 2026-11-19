@@ -86,6 +86,7 @@ const MUTATIONS = {
   garderVinted: [R, "    if (g === a && vintedDe(paire)) return { ok: false, refus: 'garder-vinted', numero: n, garder: a };\n", ''],
   articleSansVinted: [R, "    if (!a || a.id == null || !SITES_LIAISON.includes(a.plateforme) || a.enVente === false) continue;\n    const brut = String(a.numero || a.numeroSite || '').trim();", "    if (true) continue;\n    const brut = String(a.numero || a.numeroSite || '').trim();"],
   sonNumeroPasUnLien: [R, "    return pr && cle(pr.numero || '') === cle(v) ? null : { numero: String(v) };", '    return null;'],
+  sansArticle: [R, "  const propre = !relie && !reunie && (sansArticle || (!!pr && pr.actif !== false));", "  const propre = !relie && !reunie && (!!pr && pr.actif !== false);"],
   // « Pas sur Vinted ».
   numeroServi: [R, "  if (n && servis && (servis instanceof Set ? servis.has(n) : arr(servis).map((x) => cle(x)).includes(n))) return { refus: 'numero-servi', numero: n };\n", ''],
   // La relecture.
@@ -595,6 +596,14 @@ function pixels(nom, w = 64, h = w) {
         const retour = d.ops ? L.appliquerSurCartes(apres, d.ops) : null;
         dit(d.ops && retour.lbc['6001'] === '53' && retour.journal['lien:Leboncoin:6001'] === undefined, 'J4 · délier lui REND son N°53 (jamais une annonce sans N°, jamais un N° neuf)', retour);
         dit(L.opsPropre({ annonce: lb, numero: '54', cartes, servis: new Set(), cle }).refus === 'identite', 'J4 · elle a déjà SON N° : « que sur ce site » ne lui en donne jamais un deuxième', '');
+      }
+      {
+        // L'ancien écran Leboncoin disait « pas d'article à relier » (reliée, sans N°) : ni « reliée » à un N° fantôme, ni reproposée.
+        const lb = ann('Leboncoin', 6101, { relie: true, numero: '' });
+        const r = L.construireLiaison({ autres: [lb, ann('Leboncoin', 6102)], paires: [P124], journal: {}, cle, marqueDe });
+        const e = r.parCle.get('Leboncoin:6101');
+        dit(e && e.etat === 'propre' && !r.file.some((x) => x.cle === 'Leboncoin:6101') && r.file.some((x) => x.cle === 'Leboncoin:6102'),
+          'J5 · une annonce dite « pas d’article à relier » par l’ancien écran ⇒ « que sur ce site », hors de la file (jamais « reliée » sans N°)', e && { etat: e.etat, file: r.file.map((x) => x.cle) });
       }
 
       // ── I · le câblage ──
