@@ -147,7 +147,7 @@ regarde, et s'il ne trouve pas il demande l'information à l'utilisateur ; 100 %
 Décision : UN geste « Publier sur… » (un article ou une sélection) ; l'agent remplit tout seul chaque champ de chaque
 site depuis la fiche article, dans cet ordre de confiance : (1) tables vérifiées ; (2) ses réponses passées
 (retenues par catégorie et par marque) ; (3) ce qui est LU sur le site cible (listes de valeurs du formulaire,
-suggestion de catégorie eBay) ; (4) en dernier, une IA sur la clé du VENDEUR si elle est posée (CLAUDE.md §2.9 :
-jamais celle de Julien pour les autres) — toujours une PROPOSITION. Doute restant ⇒ UNE question groupée par article
+suggestion de catégorie eBay) ; PAS D'IA (Julien, même jour : « tu n'intègres pas d'IA, mais tu fais un agent 100 % autonome, sans IA ») :
+uniquement des règles, des tables, ce qui est lu et ce qu'il a déjà répondu ; il apprend de chaque réponse. Doute restant ⇒ UNE question groupée par article
 (toutes les inconnues sur un écran, choix du site, réponse retenue). Publie, RELIT, et dit le résultat ; un échec dit
 pourquoi et quoi faire. Garde-fous de l'extension inchangés (son geste, compte de l'onglet, plafonds, une à la fois).
