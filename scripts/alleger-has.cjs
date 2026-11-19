@@ -248,7 +248,9 @@ async function verifier(distA, distB) {
         await pg.goto(`http://localhost:${port}/?tab=${e}`, { waitUntil: 'commit' });
         const fin = Date.now() + 90000; while (Date.now() < fin) { const ok = await pg.evaluate(() => { const d = document.getElementById('vrm-demarrage'); const a = [...document.querySelectorAll('[data-attente-ecran]')].find((x) => x.getClientRects().length); return !d && !!a && /pret|plafond/.test(a.getAttribute('data-attente') || ''); }).catch(() => false); if (ok) break; await attendre(250); }
         await attendre(6000);
-        await pg.addStyleTag({ content: '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}' }).catch(() => {});
+        // Le bandeau « les photos de Vinted ne s'affichent pas » dépend des images que le banc a coupées À CE MOMENT-LÀ (le même
+        // build le montre sur un écran puis sur un autre : compare-chiffres-volume l'écarte aussi) — retiré des deux captures.
+        await pg.addStyleTag({ content: '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}[data-photos-perdues]{display:none!important}' }).catch(() => {});
         await attendre(400);
         const f = path.join(DOSSIER, `${nom}-${taille}-${e}.png`); await pg.screenshot({ path: f, fullPage: false }); out[`${taille}-${e}`] = f;
       }
