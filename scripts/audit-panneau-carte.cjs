@@ -22,6 +22,7 @@ const MUTATIONS = {
   transporteur: ["if (tx && TRANSPORTEURS_CARTE[c] && !parTx.has(tx)) parTx.set(tx, TRANSPORTEURS_CARTE[c]);", "if (tx && !parTx.has(tx)) parTx.set(tx, c || 'inconnu');"],
   boite: ["if (!Object.values(r0).some((v) => String(v) === conv))", 'if (false)'],
   confirme: ["if (msg.confirme !== true) return { ok: false, code: 'confirmation', raison: 'Rien n’est parti : touche « Envoyer ».' };", ''],
+  siteCompte: ["if (c !== moi) continue;\n        const st = STATUT_LBC", "const st = STATUT_LBC"],
   autreCompteNotif: ["if (e.p === 'vinted' && e.c !== u) continue;", ''],
 };
 if (args.includes('--prouve')) {
@@ -100,6 +101,21 @@ function monde() {
     const r5 = await Promise.race([f.ctx.repondreCarte({ conv: '55501', texte: 'Oui, toujours dispo', confirme: true }, ONGLET), new Promise((ok2) => setTimeout(() => ok2({ ok: 'timeout' }), 4000))]);
     const post = f.j.vinted.find((x) => /\/conversations\/55501\/replies$/.test(String(x.chemin || x.url || x.path || '')));
     dit(r5 && r5.ok === true && !!post, 'E. son toucher, sa conversation : la réponse part par le chemin gardé (POST …/replies)', JSON.stringify({ r5, n: f.j.vinted.length, d: f.j.vinted.slice(-2) }));
+    // F. Leboncoin et Vestiaire : le compte de L'ONGLET de ce site, jamais un autre, rien attribué au hasard.
+    const lignesSites = {
+      lbc_listings: { updatedAt: iso(T0 - H), items: { a1: { id: 'a1', subject: 'Paire A', price: 80, status: 'active', account: 'lbc-account:moi' }, a2: { id: 'a2', subject: 'Paire B', price: 60, status: 'inactive', account: 'lbc-account:moi' }, a3: { id: 'a3', subject: 'Autre compte', price: 50, status: 'active', account: 'lbc-account:autre' }, a4: { id: 'a4', subject: 'Sans compte', price: 40, status: 'active' } } },
+      lbc_ventes: { ventes: { v1: { txId: 'T1', title: 'Paire A', price: 80, account: 'lbc-account:moi', stepStatus: 'validation', dateVente: iso(T0 - H) }, v2: { txId: 'T2', title: 'Autre', price: 50, account: 'lbc-account:autre', stepStatus: 'done' } } },
+      vc_listings: { capturedAt: iso(T0 - H), items: { p1: { ref: 'p1', titre: 'Sac', prix: 300, statut: 'published', compte: '42', favoris: 7 } } },
+      vc_ventes: { ventes: { s1: { productId: 'p9', titre: 'Sac vendu', prixVente: 250, compte: '42', etat: 'ACTION_NEEDED', aExpedier: true, transporteur: 'Chronopost', date: iso(T0 - H) }, s2: { productId: 'p8', titre: 'Pas à moi', compte: '43', etat: 'IN_PROGRESS' } } },
+    };
+    const h = faireFond({ src: BG, connecte: '111', lignes: lignesSites });
+    h.ctx.compteOngletCapte = async (url) => (/leboncoin/.test(url) ? { p: 'leboncoin', id: 'lbc-account:moi' } : { p: 'vestiaire', id: '42' });
+    const rl = await h.ctx.carteListes({ action: 'carteListes' }, { tab: { id: 8, url: 'https://www.leboncoin.fr/mes-annonces' } });
+    const ids = (rl && rl.annonces && rl.annonces.toutes || []).map((x) => x.id + ':' + x.statut).join(',');
+    dit(rl && ids === 'a1:en_vente,a2:masque' && rl.annonces.sansCompte === 1 && rl.annonces.statuts.en_vente === 1 && rl.annonces.statuts.masque === 1, 'F. Leboncoin : les annonces du compte de l’onglet seulement (statut lu), celles sans compte comptées et dites, jamais montrées', JSON.stringify(rl && rl.annonces));
+    dit(rl && rl.ventes && rl.ventes.liste.length === 1 && rl.ventes.liste[0].tx === 'T1' && rl.ventes.liste[0].etat === 'a_expedier', 'F. Leboncoin : les ventes du compte de l’onglet seulement', JSON.stringify(rl && rl.ventes));
+    const rv = await h.ctx.carteListes({ action: 'carteListes' }, { tab: { id: 9, url: 'https://www.vestiairecollective.com/' } });
+    dit(rv && rv.annonces && rv.annonces.toutes.length === 1 && rv.annonces.toutes[0].favoris === 7 && rv.ventes && rv.ventes.liste.length === 1 && rv.ventes.liste[0].transporteur === 'Chronopost' && rv.ventes.liste[0].etat === 'a_expedier', 'F. Vestiaire : annonces (favoris lus) et ventes (état, transporteur) du compte de l’onglet seulement', JSON.stringify(rv && { a: rv.annonces, v: rv.ventes }));
   } catch (e) { dit(false, 'exception', e && e.stack); }
   console.log(`\n${ko ? '❌' : '✅'} audit-panneau-carte : ${ok} vert(s), ${ko} rouge(s)`);
   process.exit(ko ? 1 : 0);

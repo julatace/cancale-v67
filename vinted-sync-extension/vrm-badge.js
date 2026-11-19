@@ -1607,7 +1607,7 @@
     const chip = (k, n) => `<button type="button" class="chip5" data-ann-statut="${k}" aria-pressed="${annStatut === k ? 'true' : 'false'}">${esc(TU('s_' + k))} · ${n == null ? '—' : Number(n).toLocaleString('fr-FR')}</button>`;
     const cols = COLS5.filter((c) => annCols.has(c));
     const actions = `<select class="act5" data-ann-action aria-label="${esc(TU('a_choisir'))}"${nSel ? '' : ' disabled'}><option value="">${esc(nSel ? TU('a_choisir_n', { n: nSel }) : TU('a_choisir'))}</option>`
-      + ['republier', 'baisser', 'favoris', 'ouvrir'].map((k) => `<option value="${k}"${k === 'ouvrir' && nSel !== 1 ? ' disabled' : ''}>${esc(TU('ac_' + k))}</option>`).join('') + '</select>';
+      + (e && e.plateforme === 'leboncoin' || e && e.plateforme === 'vestiaire' ? ['baisser', 'ouvrir'] : ['republier', 'baisser', 'favoris', 'ouvrir']).map((k) => `<option value="${k}"${k === 'ouvrir' && nSel !== 1 ? ' disabled' : ''}>${esc(TU('ac_' + k))}</option>`).join('') + '</select>';
     const outils = `<div class="barre5">${actions}<input type="search" class="cherche5" data-ann-cherche placeholder="${esc(TU('a_chercher'))}" aria-label="${esc(TU('a_chercher'))}" value="${esc(annCherche)}">`
       + `<div class="vu-seg vue5" role="group" aria-label="${esc(TU('a_vue'))}"><button type="button" data-ann-vue="liste" aria-pressed="${annVue === 'liste'}">${esc(TU('a_liste'))}</button><button type="button" data-ann-vue="grille" aria-pressed="${annVue === 'grille'}">${esc(TU('a_grille'))}</button></div>`
       + `<details class="cols5" data-ann-cols${annColsOuvert ? ' open' : ''}><summary>${esc(TU('a_colonnes'))}</summary><div class="cols5-l">${COLS5.map((c) => `<label><input type="checkbox" data-ann-col="${c}"${annCols.has(c) ? ' checked' : ''}> ${esc(TU('c5_' + c))}</label>`).join('')}</div></details></div>`
@@ -1639,8 +1639,8 @@
       // Les gestes en série passent par leurs chemins GARDÉS : l'atelier Republier et la baisse de VRM (sur SON
       // clic là-bas), le parcours des favoris de la carte. Jamais de suppression en série.
       if (k === 'republier') { try { window.open('https://vrm.center/?tab=annonces&site=vinted&vue=republier', '_blank', 'noopener'); } catch (_) {} return; }
-      if (k === 'baisser') { try { window.open('https://vrm.center/?tab=annonces&site=vinted', '_blank', 'noopener'); } catch (_) {} return; }
-      if (k === 'ouvrir' && ids.length === 1) { try { window.top.location.href = (ORIGINE_ICI || 'https://www.vinted.fr') + '/items/' + encodeURIComponent(ids[0]); } catch (_) {} return; }
+      if (k === 'baisser') { try { window.open('https://vrm.center/?tab=annonces&site=' + (listes && listes.plateforme ? listes.plateforme : 'vinted'), '_blank', 'noopener'); } catch (_) {} return; }
+      if (k === 'ouvrir' && ids.length === 1) { const x = ((listes && listes.annonces && listes.annonces.toutes) || []).find((y) => y.id === ids[0]); try { window.top.location.href = x && x.url ? x.url : (ORIGINE_ICI || 'https://www.vinted.fr') + '/items/' + encodeURIComponent(ids[0]); } catch (_) {} return; }
       if (k === 'favoris') { ongletListe = 'favoris'; if (ids.length === 1) filtreAnnonce = ids[0]; ranger({ vrmCarteOnglet: ongletListe }); rendre(); }
     });
   }
@@ -1683,7 +1683,7 @@
   const ecart5 = (prix, achat) => (Number(prix) > 0 && Number(achat) > 0 ? eurosL(Number(prix) - Number(achat)).replace(/^(?=\d)/, Number(prix) - Number(achat) >= 0 ? '+' : '') : null);
   function ficheAnnonceHtml(x, ici) {
     const photos = (Array.isArray(x.photos) && x.photos.length ? x.photos : (x.photo ? [x.photo] : [])).slice(0, 8);
-    const lien = ici + '/items/' + encodeURIComponent(x.id);
+    const lien = x.url ? String(x.url) : ici + '/items/' + encodeURIComponent(x.id);
     return `<div class="fiche5" data-fiche="a:${esc(x.id)}" role="region" aria-label="${esc(x.titre || '')}">`
       + (photos.length ? `<div class="ph5" data-photos="${photos.length}">${photos.map((u) => `<img src="${esc(u)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">`).join('')}</div>` : '')
       + `<div class="g5">${fait5('p_num', x.num || null, 'num')}${fait5('p_prix', Number(x.prix) > 0 ? eurosL(x.prix) : null, 'prix')}${fait5('p_mini', Number(x.mini) > 0 ? eurosL(x.mini) : null, 'mini')}${fait5('p_achat', Number(x.achat) > 0 ? eurosL(x.achat) : null, 'achat')}`
@@ -1820,9 +1820,13 @@
     const vinted = !e || e.plateforme === 'vinted';
     const nomSite = (e && NOM_SITE[e.plateforme]) || 'ce site';
     let panneau;
-    if (ongletListe === 'favoris') panneau = !vinted ? `<div class="val gris" data-favoris-site="${esc(e.plateforme)}">${esc(nomSite)} ne dit pas qui a mis tes annonces en favori : il n’y a personne à qui écrire d’ici.</div>`
+    if (ongletListe === 'favoris') panneau = !vinted ? `<div class="val gris" data-favoris-site="${esc(e.plateforme)}">${e.plateforme === 'vestiaire' ? esc(TU('f_vc_aimes')) : `${esc(nomSite)} ne dit pas qui a mis tes annonces en favori : il n’y a personne à qui écrire d’ici.`}</div>`
       : LISTES ? '<div class="val gris" data-favoris-fenetre>Les messages aux favoris partent de l’onglet Vinted : ouvre vinted.fr, puis touche le logo VRM.</div>'
       : (favorisOngletHtml(e) || '<div class="val gris">Pas encore de favoris lus : ouvre la cloche de Vinted une fois.</div>');
+    else if (!vinted && carte.hasAttribute('data-grand') && ongletListe === 'automatisations') panneau = `<div class="par5" data-auto-site="${esc(e.plateforme)}"><p class="note5">${esc(TU(e.plateforme === 'leboncoin' ? 'au_site_lbc' : 'au_site_vc'))}</p></div>`;
+    else if (!vinted && carte.hasAttribute('data-grand') && ongletListe === 'annonces' && listes && listes.plateforme === e.plateforme) panneau = annoncesHtml(e) + (listes.annonces && listes.annonces.sansCompte ? `<div class="val gris" data-sans-compte="${Number(listes.annonces.sansCompte)}">${esc(TU('a_sans_compte', { n: listes.annonces.sansCompte }))}</div>` : '');
+    else if (!vinted && carte.hasAttribute('data-grand') && ongletListe === 'ventes' && listes && listes.plateforme === e.plateforme) panneau = ventesHtml(e);
+    else if (!vinted && carte.hasAttribute('data-grand') && ongletListe === 'notifications') panneau = notificationsHtml();
     else if (!vinted) panneau = `<div class="val gris" data-liste-site="${esc(e.plateforme)}">Sur ${esc(nomSite)}, tes ${ongletListe === 'ventes' ? 'ventes' : 'annonces'} sont dans les pages du site (liens ci-dessous) : la carte ne les recopie pas encore.</div>`;
     else if (ongletListe === 'parametres') panneau = parametres || `<div class="val gris">${esc(TU('r_rien'))}</div>`;
     else if (ongletListe === 'automatisations') panneau = !vinted ? `<div class="val gris">${esc(TU('m_site', { site: nomSite }))}</div>` : automatisationsHtml();
@@ -2236,7 +2240,7 @@
     // 5.409 (le grand panneau) : le technique (compte VRM, envois, version) va dans « Détails », replié, sous
     // Paramètres ; la carte des autres sites garde son « Détails » en bas, comme avant.
     void ligneSecu;   // 5.409 : la ligne « Sécurité du compte » n'est plus montrée (sa décision) ; les garde-fous restent.
-    const grand5 = !!avecListes && e.plateforme === 'vinted' && !LISTES && !CADRE;
+    const grand5 = !!avecListes && ['vinted', 'leboncoin', 'vestiaire'].includes(e.plateforme) && !LISTES && !CADRE;   // 5.409 : Leboncoin et Vestiaire aussi
     const detailsHtml = `
       <details class="detail" data-detail${ouvert ? ' open' : ''}><summary><span>${esc(TU('c_details'))}${e.version ? ' · ' + esc(e.version) : ''}</span></summary>
       <div class="ligne"><div class="lib">Compte VRM utilisé</div>${compteVrm}</div>

@@ -20697,6 +20697,75 @@ async function repondreCarte(msg, sender) {
   if (r && r.ok && (!r.json || r.json.code == null || Number(r.json.code) === 0)) return { ok: true };
   return { ok: false, code: (r && r.code) || 'refus', raison: (r && (r.error || (r.json && r.json.message))) || 'Vinted n’a pas accepté le message : rien n’est confirmé.' };
 }
+// 5.409 — LEBONCOIN ET VESTIAIRE DANS LE GRAND PANNEAU. Le compte est celui de L'ONGLET (`compteOngletCapte` :
+// la session Leboncoin, l'onglet Vestiaire) ; une annonce ou une vente n'est montrée que si elle porte CE compte
+// (jamais attribuée par ressemblance) : celles lues sans compte sont COMPTÉES et dites, pas montrées.
+// Leboncoin : annonces (`lbc_listings`), ventes (`lbc_ventes`) ; pas de favoris nominatifs, pas d'offres. Vestiaire :
+// annonces (`vc_listings`, favoris lus), ventes (`vc_ventes` : état, transporteur, bordereau) ; pas de date de mise en
+// ligne. Messages : les fils restent sur le site (la carte ne les recopie pas encore) — dit une fois.
+const STATUT_LBC = { active: 'en_vente', inactive: 'masque', paused: 'masque', deleted: 'supprime', sold: 'vendu' };
+const STATUT_VC = { published: 'en_vente', on_sale: 'en_vente', draft: 'brouillon', pending: 'a_confirmer', sold: 'vendu', reserved: 'reserve', hidden: 'masque' };
+async function carteListesSite(plateforme, o, sender) {
+  const s = await loadSession().catch(() => null);
+  if (!(s && s.user_id && !s.mort)) return { ok: true, plateforme, connecte: false };
+  const oc = await compteOngletCapte(o.url, sender && sender.tab ? sender.tab.id : null);
+  const moi = oc && oc.id ? cleCompteCapte(oc.id) : '';
+  if (!moi) return { ok: true, plateforme, compte: null };
+  const euro = (v) => { const n = Number(String(v == null ? '' : (typeof v === 'object' ? (v.amount != null ? v.amount : v.value) : v)).replace(',', '.')); return Number.isFinite(n) && n > 0 ? n : null; };
+  const photoSure = (u) => (/^https:\/\/[\w.-]+\//.test(String(u || '')) ? String(u) : '');
+  const statuts = { en_vente: 0, brouillon: 0, masque: 0, reserve: 0, vendu: 0, a_confirmer: 0 };
+  let annonces = null, ventes = null, sansCompte = 0;
+  if (plateforme === 'leboncoin') {
+    const la = await sbGet('app_data?id=eq.lbc_listings&select=it:data->items,at:data->>updatedAt');
+    if (Array.isArray(la)) {
+      const items = Object.values((la[0] && la[0].it) || {});
+      const a = [];
+      for (const x of items) {
+        if (!x || typeof x !== 'object') continue;
+        const c = cleCompteCapte(x.account || x.lbcUser || '');
+        if (!c) { sansCompte++; continue; }
+        if (c !== moi) continue;
+        const st = STATUT_LBC[String(x.status || '')] || 'a_confirmer';
+        if (st === 'supprime') continue;
+        statuts[st]++;
+        const pub = Date.parse(x.publieeLe || '') || null;
+        a.push({ id: String(x.id || x.ref || ''), titre: String(x.subject || '').slice(0, 120), prix: euro(x.price), photo: photoSure(Array.isArray(x.images) ? x.images[0] : ''), photos: (Array.isArray(x.images) ? x.images : []).map(photoSure).filter(Boolean).slice(0, 8), num: x.numEcrit && x.numEcrit.cle ? String(x.numEcrit.cle) : '', jours: pub ? Math.max(0, Math.floor((Date.now() - pub) / 864e5)) : null, description: String(x.body || '').slice(0, 600), statut: st, url: /^https:\/\/www\.leboncoin\.fr\//.test(String(x.url || '')) ? String(x.url) : '' });
+      }
+      annonces = { lu: Date.parse((la[0] && la[0].at) || '') || null, aConfirmer: false, total: a.length, liste: a.filter((x) => x.statut === 'en_vente').slice(0, CARTE_LISTE_MAX), toutes: a.slice(0, CARTE_TOUTES_MAX), nTous: a.length, statuts, sansCompte };
+    }
+    const lv = await sbGet('app_data?id=eq.lbc_ventes&select=v:data->ventes');
+    if (Array.isArray(lv)) {
+      const vs = Object.values((lv[0] && lv[0].v) || {}).filter((x) => x && cleCompteCapte(x.account || '') === moi);
+      const etat = (x) => (x.stepStatus === 'cancelled' ? 'annulee' : x.stepStatus === 'done' ? 'finalisee' : x.stepStatus === 'validation' ? 'a_expedier' : 'pas_su');
+      ventes = { lu: null, total: vs.length, liste: vs.map((x) => ({ tx: String(x.txId || ''), titre: String(x.title || '').slice(0, 120), prix: euro(x.price), date: Date.parse(x.dateVente || x.at || '') || null, etat: etat(x), vendue: etat(x) !== 'annulee', num: '' })).sort((a, b) => (b.date || 0) - (a.date || 0)).slice(0, CARTE_LISTE_MAX) };
+    }
+  } else {
+    const la = await sbGet('app_data?id=eq.vc_listings&select=it:data->items,at:data->>capturedAt');
+    if (Array.isArray(la)) {
+      const a = [];
+      for (const x of Object.values((la[0] && la[0].it) || {})) {
+        if (!x || typeof x !== 'object') continue;
+        const c = String(x.compte || '');
+        if (!c) { sansCompte++; continue; }
+        if (c !== moi) continue;
+        const st = STATUT_VC[String(x.statut || '').toLowerCase()] || 'a_confirmer';
+        statuts[st]++;
+        a.push({ id: String(x.ref || ''), titre: String(x.titre || '').slice(0, 120), prix: euro(x.prix), photo: photoSure(x.photo), photos: x.photo ? [photoSure(x.photo)] : [], num: '', jours: null, favoris: Number.isFinite(Number(x.favoris)) ? Number(x.favoris) : null, statut: st });
+      }
+      annonces = { lu: Date.parse((la[0] && la[0].at) || '') || null, aConfirmer: false, total: a.length, liste: a.filter((x) => x.statut === 'en_vente').slice(0, CARTE_LISTE_MAX), toutes: a.slice(0, CARTE_TOUTES_MAX), nTous: a.length, statuts, sansCompte };
+    }
+    const lv = await sbGet('app_data?id=eq.vc_ventes&select=v:data->ventes');
+    if (Array.isArray(lv)) {
+      const vs = Object.values((lv[0] && lv[0].v) || {}).filter((x) => x && String(x.compte || '') === moi);
+      const etat = (x) => (x.aExpedier === true || x.etat === 'ACTION_NEEDED' ? 'a_expedier' : x.etat === 'IN_PROGRESS' ? 'en_route' : x.etat === 'COMPLETED' || x.etat === 'DONE' ? 'finalisee' : x.etat === 'CANCELLED' ? 'annulee' : 'pas_su');
+      ventes = { lu: null, total: vs.length, liste: vs.map((x) => ({ tx: String(x.productId || x.ref || ''), titre: String(x.titre || '').slice(0, 120), prix: euro(x.prixVente != null ? x.prixVente : x.montant), photo: photoSure(x.photo), date: Date.parse(x.date || x.premiereVue || '') || null, etat: etat(x), vendue: etat(x) !== 'annulee', num: '', bordereau: etat(x) === 'a_expedier' ? !!(x.bordereau || x.etiquette) : null, transporteur: x.transporteur ? String(x.transporteur).slice(0, 30) : undefined })).sort((a, b) => (b.date || 0) - (a.date || 0)).slice(0, CARTE_LISTE_MAX) };
+    }
+  }
+  const nom = await nomCompteCapte(plateforme, moi).catch(() => '');
+  const n = await notificationsCarte(moi).catch(() => null);
+  const notifications = n ? { vu: n.vu, liste: n.liste.filter((e) => e.p === plateforme && e.c === moi) } : null;
+  return { ok: true, plateforme, compte: { id: moi, nom }, annonces, ventes, messages: null, automatisations: null, notifications, autres: null, fenetre: o.fenetre };
+}
 async function automatisationsCarte(u, owner) {
   const of = await offreAutoReglages().catch(() => null);
   const rg = await sbGet(`app_data?id=eq.vrm_favoris_reglages_${u}&select=m:data->>message,v:data->variantes,r:data->>rythme`);
@@ -20767,6 +20836,9 @@ async function carteListes(msg, sender) {
   const o = ongletCarte(sender);
   if (!o) return { ok: false, code: 'origine' };
   const plateforme = plateformeDe(o.url);
+  // 5.409 (Julien : « tout doit marcher aussi pour Leboncoin et Vestiaire Collective ») : le grand panneau sur ces
+  // sites, compte de l'onglet de CE site, avec ce que l'extension a déjà rangé (aucune requête de plus).
+  if (plateforme === 'leboncoin' || plateforme === 'vestiaire') return await carteListesSite(plateforme, o, sender).catch(() => ({ ok: true, plateforme, pasDeListe: true }));
   if (plateforme !== 'vinted') return { ok: true, plateforme, pasDeListe: true };
   const s = await loadSession().catch(() => null);
   if (!(s && s.user_id && !s.mort)) return { ok: true, plateforme, connecte: false };
