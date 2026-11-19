@@ -51,10 +51,6 @@ const MUTS = {
   'hors-relier-propose': [REG, "    if (typeof horsRelier === 'function' && horsRelier(achat)) return;\n", ''],
   'ecriture-qui-ecrase': [REG, "return [{ k, type: 'fusion', id, apres: champs, avant:", "return [{ k, type: 'cle', id, apres: champs, avant_: 0, avant_2:"],
   'sans-ecrit-un-prix': [REG, "return [{ k: CLE_SANS, type: 'cle', id, apres: at, avant: (sans || {})[id] }];", "return [{ k: CLE_SANS, type: 'cle', id, apres: at, avant: (sans || {})[id] }, { k: 'vinted_annonce_numeros', type: 'champs', id: String(article.idf), apres: { buyPrice: '0' }, avant: {} }];"],
-  'certain-lot': [REG, "if (!a || String(a.transaction_id) !== String(e.buyFromId) || lotDe(a).lot) continue;", "if (!a || String(a.transaction_id) !== String(e.buyFromId)) continue;"],
-  'certain-autre-achat': [REG, "if (!a || String(a.transaction_id) !== String(e.buyFromId) || lotDe(a).lot) continue;", "if (!a || lotDe(a).lot) continue;",
-    "|| String(p.tx) !== String(e.buyFromId)) continue;", ") continue;"],
-  'certain-ecrase': [REG, "    if (e.buyPrice != null && String(e.buyPrice).trim() !== '') continue;\n    if (e.buyFrom && e.buyFrom.aSaisir) continue;", "    if (e.buyFrom && e.buyFrom.aSaisir) continue;"],
   'lecture-ratee-ecrit': ['src/gesteAnnulable.js', "    if (v === undefined) return { ok: false, definitif: true, ecrit: false, raison: 'lecture' };", ''],
   'pave-trois-decimales': [REG, 'if (d !== undefined) return d.length >= 2 ? t : t + touche;', 'if (d !== undefined) return t + touche;'],
   'ecran-relie-le-premier': ['src/completer/Completer.jsx', "apresPeinture(async () => { let ok = false; try { ok = await onRelier(a, c.achat); }", "apresPeinture(async () => { let ok = false; try { ok = await onRelier(a, cand.liste[0].achat); }"],
@@ -304,23 +300,17 @@ async function principal() {
   dit(oM.length === 1 && oM[0].apres.min === '45.5' && Off.seuilMoteur(oM[0].apres.min, false) === 45.5 && oM[0].avant.min === undefined, 'E7 le prix mini est écrit « 45.5 » : lisible par le moteur de toutes les versions');
   dit(M.opsPrixFiche({ article: { genre: 'fiche', id: 'fn1' }, prix: 45, fichesNeuves: { fn1: { id: 'fn1', prix: null } } })[0].apres.prix === 45 && M.opsPrixFiche({ article: { genre: 'annonce', id: '9010' }, prix: 45, fichesNeuves: {} }).length === 0,
     'E8 « Son prix ? » n’écrit que sur une fiche « À publier » (rien ne part chez Vinted)');
-  // Ce qui est certain se remplit ; rien d'autre.
+  // Ce qui est certain se remplit ; rien d'autre (19 nov., « 2 oui » : le montant du REÇU, src/prixAchatRecu.js ;
+  // la règle a son audit : scripts/audit-prix-achat-recu.cjs). Ici : l'atelier la consomme telle quelle.
   const simple = { transaction_id: 8200001, title: 'Nike Dunk Low', price: { amount: '41.30', currency_code: 'EUR' } };
-  const propositionDe = (a) => PP.propositionPrixAchat({ identite: { achat: a, par: 'lien' }, estLot: () => false });
-  // Un appelant négligent qui rendrait « un achat qui ressemble » : la règle exige le n° de transaction du lien.
-  const achatDe = (tx) => ({ 8200001: simple, 8100001: lot }[tx] || simple);
-  const entrees = [
-    { ou: 'fiche', cle: 'A', entree: { numero: '1', buyFromId: '8200001', buyPrice: '' } },
-    { ou: 'fiche', cle: 'B', entree: { numero: '2', buyFromId: '8200001', buyPrice: '39' } },
-    { ou: 'fiche', cle: 'C', entree: { numero: '3', buyFromId: '8100001', buyPrice: '' } },
-    { ou: 'fiche', cle: 'D', entree: { numero: '4', title: 'Nike Dunk Low', buyPrice: '' } },
-    { ou: 'vente', cle: 'E', entree: { buyFromId: '8299999' } },
-    { ou: 'fiche', cle: 'F', entree: { numero: '6', buyFromId: '8200001', buyPrice: '', buyFrom: { aSaisir: true } } },
-  ];
-  const cer = M.prixCertains({ entrees, achatDe, propositionDe });
-  dit(cer.length === 1 && cer[0].cle === 'A' && cer[0].centimes === 4130, 'E9 certain = un achat qu’IL a relié, prix resté vide ⇒ ce qu’il a payé ; jamais un lot, jamais un titre qui ressemble, jamais un prix déjà là', cer);
-  const oC = M.opsPrixCertains(cer, { fiches: { A: { numero: '1', buyFromId: '8200001', buyPrice: '' } }, ventes: {}, prixParNum: {} });
-  dit(oC.length === 2 && oC[0].apres.buyPrice === '41,30' && !('buyFromId' in oC[0].apres) && oC[1].id === '1', 'E10 il n’écrit que le prix (le lien, posé par lui, ne change pas)', oC);
+  const recuJuste = { trouve: true, somme: 'juste', paye: 4520, lignes: [] };
+  const achatDe = (tx) => ({ 8200001: simple, 8100001: lot }[tx] || null);
+  const fichesC = { A: { numero: '1', buyFromId: '8200001', buyPrice: '' }, B: { numero: '2', buyFromId: '8100001', buyPrice: '' }, D: { numero: '4', title: 'Nike Dunk Low', buyPrice: '' } };
+  const cer = M.prixCertains({ fiches: fichesC, ventes: {}, achatDe, ventilationDe: () => recuJuste, estLot: (a) => /^lot/i.test(a.title) });
+  dit(cer.length === 1 && cer[0].cle === 'A' && cer[0].centimes === 4520, 'E9 certain = un achat relié, prix vide ⇒ le montant de SON reçu ; jamais un lot, jamais un titre qui ressemble', cer);
+  const oC = M.opsPrixCertains(cer);
+  dit(oC.length === 2 && oC[0].type === 'champsSiVide' && oC[0].apres.buyPrice === '45,20' && !('buyFromId' in oC[0].apres) && oC[1].id === '1', 'E10 il n’écrit que le prix, sous condition (le lien, posé par lui, ne change pas)', oC);
+  dit(M.prixCertains({ fiches: fichesC, ventes: {}, achatDe, ventilationDe: () => null, estLot: () => false }).length === 0, 'E11 sans reçu lu, rien : la question « Payé combien ? » reste');
 
   // ── C. le pavé ──
   console.log('\n── C. le pavé');
@@ -354,7 +344,7 @@ async function principal() {
     'S11 aucune attente : la réponse fait avancer tout de suite, l’écriture part après la carte suivante ; « Annuler » ou un refus ⇒ l’article revient');
   dit(/'vrm_completer_sans',/.test(app) && /sansFeuillePrix\.current = true; try \{ await poserNumero\(it, v, ''\); \} finally \{ sansFeuillePrix\.current = false; \}/.test(app) && /const demanderPrixAchat = async \(item, numeroPose\) => \{\s*if \(sansFeuillePrix\.current\) return;/.test(app),
     'S8 « Je ne sais plus » est synchronisé ; le N° passe par `poserNumero` (ses garde-fous), sans redemander le prix d’achat');
-  dit(/prixCertains\(\{ entrees: liees/.test(ecran) && /par: 'lien'/.test(app), 'S9 le prix certain vient de l’achat qu’il a relié (`par: \'lien\'`), jamais d’une proposition');
+  dit(/prixAPoser\(\{ fiches:/.test(app) && /opsPrixRecu\(aPoser\)/.test(app) && !/prixCertains|propositionDe\(a\)\)/.test(ecran.replace(/\/\/.*$/gm, '')), 'S9 le prix du reçu a UN propriétaire (l’app, `prixAPoser`) ; l’atelier n’en écrit pas de copie');
 
   console.log(`\n${ko ? '❌' : '✅'} audit-completer : ${ok} verts, ${ko} rouges`);
   process.exit(ko ? 1 : 0);

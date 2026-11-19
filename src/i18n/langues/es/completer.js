@@ -62,6 +62,7 @@ export default {
   "cpl.fait.numero": "N.º {num} asignado",
   "cpl.fait.sans": "{qui} · apartado",
   "cpl.fait.lot": {"one": "{n} precio mínimo puesto", "other": "{n} precios mínimos puestos"},
+  "cpl.fait.recu": {"one": "{n} precio de compra tomado del recibo · {quoi}", "other": "{n} precios de compra tomados de los recibos · {quoi}"},
   "cpl.fait.certains": {"one": "{n} precio de compra tomado de su compra vinculada", "other": "{n} precios de compra tomados de sus compras vinculadas"},
   "cpl.fait.revoir": {"one": "{n} pregunta de vuelta en la cola", "other": "{n} preguntas de vuelta en la cola"},
   "cpl.reste.titre": "Lo que queda",

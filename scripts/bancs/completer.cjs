@@ -64,7 +64,11 @@ const etat = (pg) => pg.evaluate(() => {
     bandeau: (document.querySelector('[data-cp-bandeau]') || { getAttribute: () => '' }).getAttribute('data-cp-bandeau') || '' };
 });
 // La forme de l'écran courant : pleins, cibles, débords, textes coupés, contrastes.
-const forme = (pg) => pg.evaluate(() => {
+// Mesurée une fois les mouvements FINIS (page poussée qui entre, feuille qui monte) : mesurer pendant
+// la glissade voyait la page à x = 1 524 et la jugeait « hors de l'écran » (19 nov., 1512 px).
+const immobile = (pg) => pg.waitForFunction(() => !document.getAnimations().some((a) => a.playState === 'running' && a.effect && a.effect.getTiming().iterations !== Infinity), null, { timeout: 4000 }).catch(() => {});
+const forme = async (pg) => { await immobile(pg); return forme0(pg); };
+const forme0 = (pg) => pg.evaluate(() => {
   const P = document.querySelector('[data-completer]'); if (!P) return null;
   const feuille = [...document.querySelectorAll('[data-n-feuille-couche][data-n-etat="ouverte"]')].pop() || null;
   const racines = [feuille || P, ...document.querySelectorAll('.n-toast')];

@@ -62,6 +62,7 @@ export default {
   "cpl.fait.numero": "N°{num} assegnato",
   "cpl.fait.sans": "{qui} · messo da parte",
   "cpl.fait.lot": {"one": "{n} prezzo minimo impostato", "other": "{n} prezzi minimi impostati"},
+  "cpl.fait.recu": {"one": "{n} prezzo d’acquisto ripreso dalla ricevuta · {quoi}", "other": "{n} prezzi d’acquisto ripresi dalle ricevute · {quoi}"},
   "cpl.fait.certains": {"one": "{n} prezzo d’acquisto ripreso dall’acquisto collegato", "other": "{n} prezzi d’acquisto ripresi dagli acquisti collegati"},
   "cpl.fait.revoir": {"one": "{n} domanda rimessa in coda", "other": "{n} domande rimesse in coda"},
   "cpl.reste.titre": "Cosa resta",

@@ -28,6 +28,7 @@ import { lignesManquantes, apercuLigne } from '../prixMiniManquants.js';
 import { sansAchatRelie } from '../achatsARelier.js';
 import { montantSeuil } from '../offresSures.js';
 import { achatDisponible, lotDe } from '../suggestionsAchat.js';
+import { prixAPoser, opsPrixRecu } from '../prixAchatRecu.js';
 
 export const CLE_SANS = 'vrm_completer_sans';          // { 'a:<id>|achat': at } — « Je ne sais plus », synchronisé
 export const CLE_REPRISE = 'vrm_completer_reprise';    // { sujet, cle } — où il s'est arrêté (cet appareil)
@@ -327,42 +328,14 @@ export function opsRevoir(sans = {}) {
   return Object.keys(sans || {}).map((id) => ({ k: CLE_SANS, type: 'cle', id, apres: undefined, avant: sans[id] }));
 }
 
-// ── CE QUI EST CERTAIN SE REMPLIT SANS LUI (19 nov., Julien) ────────────────
-// Un article qu'IL a déjà relié à un achat (`buyFromId`, son toucher) et dont le prix d'achat est resté vide :
-// le prix est celui qu'il a payé pour CET achat (`propositionDe(achat)` : `propositionPrixAchat`, le reçu
-// juste sinon l'article — jamais pour un lot, dont le prix par article ne se devine pas). Rien d'autre n'est
-// rempli seul : une ressemblance, une photo ne relient jamais sans son toucher (§5).
-// entrees : [{ ou: 'fiche' | 'vente', cle, entree }] ; achatDe(tx) → l'achat lu ou null.
-export function prixCertains({ entrees, achatDe, propositionDe } = {}) {
-  const out = [];
-  for (const x of (Array.isArray(entrees) ? entrees : [])) {
-    const e = x && x.entree;
-    if (!e || e.buyFromId == null || String(e.buyFromId).trim() === '') continue;
-    if (e.buyPrice != null && String(e.buyPrice).trim() !== '') continue;
-    if (e.buyFrom && e.buyFrom.aSaisir) continue;                          // un article de lot : son prix est à saisir
-    const a = typeof achatDe === 'function' ? achatDe(String(e.buyFromId)) : null;
-    if (!a || String(a.transaction_id) !== String(e.buyFromId) || lotDe(a).lot) continue;
-    const p = typeof propositionDe === 'function' ? propositionDe(a) : null;
-    if (!p || !Number.isSafeInteger(p.centimes) || p.centimes <= 0 || String(p.tx) !== String(e.buyFromId)) continue;
-    out.push({ ou: x.ou, cle: String(x.cle), numero: String(e.numero || '').trim(), buyPrice: p.valeur, centimes: p.centimes });
-  }
-  return out;
+// ── CE QUI EST CERTAIN SE REMPLIT SANS LUI (19 nov., Julien : « 2 oui ») ────
+// Un article relié à SON achat (`buyFromId`), prix d'achat vide, achat lu, pas un lot, reçu lu et juste ⇒ le
+// montant du REÇU (src/prixAchatRecu.js, LA règle — l'atelier la consomme, il n'en a pas de copie). Le prix de
+// l'article seul n'est plus posé : ce n'est pas ce qu'il a payé. Une ressemblance, une photo ne relient jamais.
+export function prixCertains({ fiches, ventes, achatDe, ventilationDe, estLot } = {}) {
+  return prixAPoser({ fiches, ventes, achatDe, ventilationDe, estLot });
 }
-export function opsPrixCertains(certains, { fiches = {}, ventes = {}, prixParNum = {} } = {}) {
-  const ops = [];
-  for (const c of (Array.isArray(certains) ? certains : [])) {
-    if (c.ou === 'fiche') {
-      const f = (fiches || {})[c.cle]; if (!f || typeof f !== 'object') continue;
-      ops.push({ k: 'vinted_annonce_numeros', type: 'champs', id: c.cle, apres: { buyPrice: c.buyPrice }, avant: { buyPrice: f.buyPrice } });
-      const n = String(f.numero == null ? '' : f.numero).trim();
-      if (n) ops.push({ k: 'vinted_buyprice_by_num', type: 'cle', id: n, apres: String(c.buyPrice), avant: (prixParNum || {})[n] });
-    } else if (c.ou === 'vente') {
-      const v = (ventes || {})[c.cle]; if (!v || typeof v !== 'object') continue;
-      ops.push({ k: 'vinted_sale_overrides', type: 'champs', id: c.cle, apres: { buyPrice: c.buyPrice }, avant: { buyPrice: v.buyPrice } });
-    }
-  }
-  return ops;
-}
+export const opsPrixCertains = (certains) => opsPrixRecu(certains);
 
 // ── LA PROGRESSION ET LA REPRISE ────────────────────────────────────────────
 // « 12 sur 51 » : `fait` (réponses données depuis l'ouverture) sur `fait + reste`. Ce qui reste, par sorte.

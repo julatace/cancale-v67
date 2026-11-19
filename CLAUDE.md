@@ -65,7 +65,7 @@ comptabilité. Il n'est **pas développeur** et pilote tout par des sessions Cla
    production. Les bancs servent des copies.
 4. **« Même avec 50 articles identiques, tu ne dois pas pouvoir te tromper »** —
    aucun rapprochement par ressemblance (titre, marque, taille). Voir §5.
-5. **Il saisit les prix d'achat lui-même.** Ne pas les deviner.
+5. **Les prix d'achat ne se devinent jamais.** Depuis le 19 nov. (sa décision « 2 oui ») le montant du REÇU d'un achat relié par identité se pose seul (`src/prixAchatRecu.js`) ; un lot reste à saisir, une saisie n'est jamais écrasée.
 6. **L'extension se livre en zip qui se dézippe en UN dossier.**
 7. **Il n'est pas développeur** : une alerte qui ne dit pas quoi faire ne sert à
    rien ; un chiffre qu'on ne peut pas vérifier est invendable.
@@ -495,6 +495,7 @@ sans la fonction.
 ---
 
 ## 9. État actuel et décisions récentes
+- **19 nov. · Prix d'achat repris du reçu (décision « 2 oui »)** : achat relié par identité + reçu lu et juste ⇒ son montant posé seul (`src/prixAchatRecu.js`, `champsSiVide` : une saisie gagne toujours), jamais un lot, dit une fois ; l'atelier « Compléter » n'en garde pas de copie. `2026-11-19-completer-infos.md` (fin). Geste : aucun.
 - **17 nov. · Republication parfaite (ext. 5.408)** : mesuré 10 republiées, 0 en ligne du 1er coup (refus 400 photos), 5 supprimées jamais en ligne ⇒ étapes datées, « Reprendre », « Recréer depuis le coffre », chaîne/plan/bilan dans l'atelier. `2026-11-17-republication-parfaite.md`. Geste : 5.408, « Reprendre » les 5.
 - **17 nov. · Favoris en liste à cocher (lot extension-favoris-liste, ext. 5.407)** : « il faut une liste avec les favoris pour pouvoir les sélectionner » ⇒ la carte liste TOUS les favoris encore en vente (`apercu.tous`, règle du serveur = celle de l'app), coche, filtre, récapitulatif (offre, message, durée au vrai rythme), 15 par heure (les autres restent cochés) ; prix mini à côté du N° ; écran plein continu (plus d'« éclair » quand Vinted bloque, rechargement, SPA), défilement verrouillé ; captcha ⇒ file en PAUSE, « Reprendre » sur SON toucher une fois la vérification faite ; l'extension refuse tout favori non cochable ; aucune garde retirée. `2026-11-17-extension-favoris-liste.md`. Geste : installer 5.407.
 - **17 nov. · Carte : le coucou remplace les messages (lot carte-coucou)** : plus d'« Écrire », de fil ni de « non lus » (route 410) ; « 👋 Coucou » sans texte, mêmes bornes que les groupes, « Lui écrire sur Discord » ; historique gardé en base. Migration **047 PAS APPLIQUÉE** (après la 046). `2026-11-17-carte-coucou.md`. Geste : appliquer 046 puis 047.

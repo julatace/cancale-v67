@@ -911,6 +911,7 @@ import { lireCible, selecteursCible, phraseAbsente, attrCible, DEMANDE_BILAN_MOI
 import { fusionnerLigne, fusion3, egal as egalStable, CLE_POOL, CLES_FICHES } from "./fusionNuage.js";
 import { NOM_BENEFICE, NOM_BENEFICE_BRUT, NOM_APRES_FRAIS, chiffreBenefice, chiffreBrut, chiffreApresFrais, finDuMois, moisCouvertParPublication } from "./beneficeNoms.js";
 import { achatParIdentite, propositionPrixAchat, propositionsUniques, listeConfirmation, ecritureProposition, texteProposition } from "./prixAchatPropose.js";
+import { prixAPoser, opsPrixRecu, texteRepris } from "./prixAchatRecu.js";
 // ⟦→ ecrans/Compta.jsx #7⟧
 import { livreDesRecettes, registreDesAchats, csvRegistre, pdfRegistre, nomFichierRegistre, achatAnnule } from "./registres.js";
 import { achatsHorsRelier, publierHorsRelier, achatHorsRelier } from "./achatsHorsRelier.js";
@@ -44863,6 +44864,32 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   const estLotPropose = (a) => estLotApp(a) || !!(a && a.lot === true);
   const achatsIdentite = fillBuyAchats.items || buys.items || null;
   const ventilationDeTx = (tx) => { const r = indexRecusAchat.get(String(tx)); return r ? ventilationRecuAchat(r.texte) : null; };
+  // (19 nov., décision de Julien « 2 oui ») LE PRIX D'ACHAT SE POSE SEUL, DEPUIS LE REÇU — la règle : src/prixAchatRecu.js
+  // (un article relié à SON achat, prix vide, pas un lot, reçu lu et juste). Ne part que sur des lectures COMPLÈTES :
+  // le nuage chargé, les achats lus, les reçus lus, les lots su (`infosAchatsLues`) ; une saisie n'est jamais écrasée
+  // (`champsSiVide`, revérifié sur la valeur relue par `ecrireOps`). Dit une fois, discrètement, par l'appareil qui l'a écrit.
+  const prixRecuEnCours = React.useRef(false);
+  useEffect(() => {
+    if (prixRecuEnCours.current || !isCloudReady() || !Array.isArray(achatsIdentite) || !Array.isArray(recusAchat) || infosAchatsLues === undefined) return;
+    const fiches = _ecrivainVrm.lire('vinted_annonce_numeros'), ventes = _ecrivainVrm.lire('vinted_sale_overrides');
+    if (fiches === undefined || ventes === undefined) return;      // pas su : rien
+    const parTx = new Map(achatsIdentite.filter((a) => a && a.transaction_id != null).map((a) => [String(a.transaction_id), a]));
+    const aPoser = prixAPoser({ fiches: fiches || {}, ventes: ventes || {}, achatDe: (tx) => parTx.get(String(tx)) || null, ventilationDe: ventilationDeTx,
+      estLot: (a) => !!estLotPropose(a) });
+    const ops = opsPrixRecu(aPoser);
+    if (!ops.length) return;
+    prixRecuEnCours.current = true;
+    (async () => {
+      let r = null;
+      try { r = await ecrireOps({ ops, sens: 'apres', lire: _ecrivainVrm.lire, ecrire: _ecrivainVrm.ecrire }); } catch (_) { r = null; }
+      prixRecuEnCours.current = false;
+      if (!r || r.ok === false || !r.ecrit) return;
+      // Dit ce qui porte VRAIMENT ce prix maintenant (une saisie arrivée entre-temps a gagné : elle n'est pas dite).
+      const F = _ecrivainVrm.lire('vinted_annonce_numeros') || {}, V = _ecrivainVrm.lire('vinted_sale_overrides') || {};
+      const poses = aPoser.filter((c) => { const e = (c.ou === 'fiche' ? F : V)[c.cle]; return e && e.buyPriceSource === 'recu' && String(e.buyPriceRecuTx) === c.tx && String(e.buyPrice) === c.buyPrice; });
+      if (poses.length) { try { toast(tr('cpl.fait.recu', { n: poses.length, quoi: texteRepris(poses) })); } catch (_) {} }
+    })();
+  }, [achatsIdentite, recusAchat, indexRecusAchat, infosAchatsLues, nArticlesTx, lotsDeclares]);   // eslint-disable-line react-hooks/exhaustive-deps
   // (12 nov., vitesse-volume) Les propositions de prix d'achat ne servent qu'à la liste des Ventes et à la saisie
   // en série (« Prix d'achat ») : ailleurs (Ma journée, Achats, Colis…) elles ne sont pas calculées — 1,5 s au
   // téléphone à 20 000 ventes. Même règle là où elles s'affichent (chiffres-volume 35/35).

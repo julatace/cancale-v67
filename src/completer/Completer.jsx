@@ -26,7 +26,7 @@ import { portailNatif } from '../natif/outils.js';
 import { tr, monnaie } from '../i18n/index.js';
 import { PagePoussee, Groupe, Rangee, Plaque, Bouton, BoutonIcone, Segmente, Feuille, Faits, Fait, Toast, useOrdinateur, poserIcone, iconePosee } from '../natif/index.js';
 import { fileCompleter, filtrer, parGenre, questionsDe, compteurs, pucesMini, jugerMini, apercuLot, ecrituresLot, candidatsAchat, opsPrixAchat, opsMini, opsPrixFiche, opsSans, opsRevoir,
-  prixCertains, opsPrixCertains, indexReprise, indexNumero, toucheSuivante, montantTape, CLE_REPRISE, LOT_POURCENTS, ACHAT_PLUS, LOT_SEUIL, GENRES } from './regles.js';
+  indexReprise, indexNumero, toucheSuivante, montantTape, CLE_REPRISE, LOT_POURCENTS, ACHAT_PLUS, LOT_SEUIL, GENRES } from './regles.js';
 import { morceauxPourquoi } from '../liaisonAchat.js';
 import { faitsAchat } from '../faitsAchat.js';
 import { ecriturePrixSaisi } from '../prixAuNumerotage.js';
@@ -146,7 +146,7 @@ export default function Completer({ demande = null, entrees, achats, liens = nul
   const [regle, setRegle] = useState(null), [choix, setChoix] = useState({}), [autrePct, setAutrePct] = useState('');
   const [grille, setGrille] = useState({ cles: null, vals: {}, poses: {} });
   const [, forcer] = useState(0);
-  const dernierIdx = useRef(0), pret = useRef(false), vus = useRef(new Set()), certainsFaits = useRef(false), lotJuge = useRef(false);
+  const dernierIdx = useRef(0), pret = useRef(false), vus = useRef(new Set()), lotJuge = useRef(false);
 
   const resTout = useMemo(() => (entrees ? fileCompleter(entrees) : entrees), [entrees]);
   const res = useMemo(() => parGenre(resTout, genre), [resTout, genre]);
@@ -167,7 +167,9 @@ export default function Completer({ demande = null, entrees, achats, liens = nul
     dernierIdx.current = parNum >= 0 ? parNum : indexReprise(liste, lireReprise(), sujet);
   }
   // L'entrée « prix mini » avec beaucoup d'annonces : la règle en lot d'abord (3 touchers : ouvrir, choisir, poser).
-  if (res && !lotJuge.current) {
+  // Jugé UNE fois, mais seulement sur des annonces LUES : une file encore vide (annonces pas encore là) donnait
+  // nMini = 0 et la règle en lot ne s'ouvrait plus jamais (banc completer, 19 nov.).
+  if (res && !lotJuge.current && res.etat && res.etat.annonces === 'lu') {
     lotJuge.current = true;
     const nMini = filtrer(res, 'mini').length;
     if (demande && (demande.lot || (demande.sujet === 'mini' && !demande.num && nMini >= LOT_SEUIL)) && nMini > 0 && !lotOuvert) setLotOuvert(true);
@@ -194,16 +196,10 @@ export default function Completer({ demande = null, entrees, achats, liens = nul
   const puces = useMemo(() => (question === 'mini' && article ? pucesMini(article) : []), [article, question]);
   const enPave = mode === 'pave' || question === 'prix' || question === 'numero' || (question === 'achat' && !cand.liste.length) || (question === 'mini' && !puces.length);
 
-  // ── Ce qui est CERTAIN se remplit sans lui : un achat qu'IL a relié, prix resté vide ⇒ ce qu'il a payé ──
-  useEffect(() => {
-    if (certainsFaits.current || !Array.isArray(achats) || typeof propositionDe !== 'function' || typeof courant !== 'function') return;
-    certainsFaits.current = true;
-    const k = courant(); const parTx = new Map(achats.filter((a) => a && a.transaction_id != null).map((a) => [String(a.transaction_id), a]));
-    const liees = [...Object.entries(k.fiches || {}).map(([cle, entree]) => ({ ou: 'fiche', cle, entree })), ...Object.entries(k.ventes || {}).map(([cle, entree]) => ({ ou: 'vente', cle, entree }))];
-    const c = prixCertains({ entrees: liees, achatDe: (tx) => parTx.get(tx) || null, propositionDe });
-    const ops = opsPrixCertains(c, k);
-    if (ops.length) geste(tr('cpl.fait.certains', { n: c.length }), ops);
-  }, [achats]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // ── Ce qui est CERTAIN se remplit sans lui : le prix d'achat du REÇU d'un achat relié (19 nov., décision « 2 oui ») ──
+  // Un seul propriétaire : l'app (src/App.jsx, `prixAPoser` de src/prixAchatRecu.js) l'écrit dès que les achats, les
+  // reçus et les lots sont lus — ici, la question « Payé combien ? » disparaît d'elle-même quand le prix arrive. Elle
+  // reste pour les lots, les achats sans reçu lu et les articles sans achat relié.
 
   // ── Les réponses : UNE écriture chacune, par le moteur des gestes (annulable 10 s) ──
   const apresPeinture = (f) => setTimeout(f, 40);

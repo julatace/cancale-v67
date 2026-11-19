@@ -62,6 +62,7 @@ export default {
   "cpl.fait.numero": "Nr. {num} vergeben",
   "cpl.fait.sans": "{qui} · zurückgestellt",
   "cpl.fait.lot": {"one": "{n} Mindestpreis gesetzt", "other": "{n} Mindestpreise gesetzt"},
+  "cpl.fait.recu": {"one": "{n} Einkaufspreis aus dem Beleg übernommen · {quoi}", "other": "{n} Einkaufspreise aus den Belegen übernommen · {quoi}"},
   "cpl.fait.certains": {"one": "{n} Einkaufspreis aus dem verknüpften Kauf übernommen", "other": "{n} Einkaufspreise aus den verknüpften Käufen übernommen"},
   "cpl.fait.revoir": {"one": "{n} Frage wieder in der Liste", "other": "{n} Fragen wieder in der Liste"},
   "cpl.reste.titre": "Was noch fehlt",

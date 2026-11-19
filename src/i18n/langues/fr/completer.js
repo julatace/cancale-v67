@@ -62,6 +62,7 @@ export default {
   "cpl.fait.numero": "N°{num} donné",
   "cpl.fait.sans": "{qui} · mis de côté",
   "cpl.fait.lot": {"one": "{n} prix mini posé", "other": "{n} prix mini posés"},
+  "cpl.fait.recu": {"one": "{n} prix d’achat repris du reçu · {quoi}", "other": "{n} prix d’achat repris du reçu · {quoi}"},
   "cpl.fait.certains": {"one": "{n} prix d’achat repris de son achat relié", "other": "{n} prix d’achat repris de leurs achats reliés"},
   "cpl.fait.revoir": {"one": "{n} question remise dans la file", "other": "{n} questions remises dans la file"},
   "cpl.reste.titre": "Ce qui reste",

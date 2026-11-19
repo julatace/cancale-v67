@@ -82,6 +82,17 @@ export function appliquerOp(valeur, op, sens = 'apres') {
     return dedans ? [...a, id] : a;
   }
   const base = estObjet(valeur) ? valeur : {};
+  // (19 nov., prix d'achat repris du reçu, src/prixAchatRecu.js) Écritures SOUS CONDITION, jugée sur la valeur
+  // RELUE : `champsSiVide` ne pose ses champs que si `garde` est encore vide dans la fiche (une saisie posée
+  // entre-temps gagne) ; `cleSiVide` ne pose la sous-clé que si elle est vide. Aucun inverse : rien n'est défait.
+  if (op.type === 'champsSiVide' || op.type === 'cleSiVide') {
+    if (sens !== 'apres') return valeur;
+    const videV = (v) => v == null || String(v).trim() === '';
+    if (op.type === 'cleSiVide') return videV(base[id]) ? { ...base, [id]: cible } : valeur;
+    const f = base[id];
+    if (!estObjet(f) || !videV(f[op.garde || 'buyPrice'])) return valeur;
+    return { ...base, [id]: { ...f, ...(cible || {}) } };
+  }
   if (op.type === 'champs') {
     const f = base[id];
     if (!estObjet(f)) return base;                  // jamais une fiche créée par un « C'est écrit »

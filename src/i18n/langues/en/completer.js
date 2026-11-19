@@ -62,6 +62,7 @@ export default {
   "cpl.fait.numero": "No. {num} given",
   "cpl.fait.sans": "{qui} · set aside",
   "cpl.fait.lot": {"one": "{n} minimum price set", "other": "{n} minimum prices set"},
+  "cpl.fait.recu": {"one": "{n} cost taken from the receipt · {quoi}", "other": "{n} costs taken from their receipts · {quoi}"},
   "cpl.fait.certains": {"one": "{n} cost filled in from its linked purchase", "other": "{n} costs filled in from their linked purchases"},
   "cpl.fait.revoir": {"one": "{n} question back in the queue", "other": "{n} questions back in the queue"},
   "cpl.reste.titre": "What’s left",

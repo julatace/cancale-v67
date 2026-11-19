@@ -91,3 +91,32 @@ le moteur ; `scripts/bancs/completer.cjs` joue dix articles au doigt, mesure les
    l'atelier d'arrivée (lien depuis « Ce qui reste »).
 4. Pas mesuré sur un vrai iPhone ; ses volumes réels (≈ 2 000 achats, ≈ 1 400 articles sans achat) : la file est bornée
    (ventes de 30 jours), l'affectation des achats reste celle de l'app (calculée après le rendu).
+
+## Reprise du 19 nov. (soir) — le prix d'achat repris du reçu, et le banc remis au vert
+
+**Décision de Julien du 19 nov.** (« 2 oui », texte exact en fin de `docs/passation/2026-11-19-demandes-julien.md`,
+branche `claude/project-review-nsk5su`) : le montant du REÇU de CET achat est posé seul quand l'achat est relié à
+l'article par identité ou reçoit son N° ; jamais deviné ; un lot jamais divisé ; une saisie jamais écrasée ; dit une fois.
+
+- **La règle** : `src/prixAchatRecu.js` (pur). Un article (fiche ou vente) dont `buyFromId` désigne un achat LU au même
+  n° de transaction, prix vide, pas un lot (`estLot` vrai, pas su, `aSaisir`, ou deux N° sur le même achat ⇒ rien), reçu
+  lu par SON n° et juste au centime ⇒ `buyPrice` = « Montant payé » du reçu (+ `buyPriceSource: 'recu'`,
+  `buyPriceRecuTx`), et `vinted_buyprice_by_num` du N°. L'article seul (sans port ni frais) n'est PLUS posé : ce n'est
+  pas ce qu'il a payé. Autre devise, remboursé, reçu faux ⇒ rien.
+- **L'écriture** : par `ecrireOps` (relire puis écrire, le chemin des gestes) avec deux types d'opération neufs du moteur
+  (`src/gesteAnnulable.js`) : `champsSiVide` / `cleSiVide`, revérifiés sur la valeur RELUE — une saisie arrivée entre la
+  lecture et l'écriture gagne. Aucun inverse.
+- **Un propriétaire** : l'app (`Comptabilite`, après `ventilationDeTx`), seulement nuage chargé, achats lus, reçus lus,
+  lots su (`infosAchatsLues`). Dit une fois par toast « 1 prix d'achat repris du reçu · N°12 · 47,45 € » (`cpl.fait.recu`,
+  5 langues), seulement pour ce que la valeur relue porte vraiment. L'atelier « Compléter » n'écrit plus sa copie
+  (`prixCertains` délègue à la règle) : la question « Payé combien ? » disparaît quand le prix arrive ; elle reste pour
+  les lots, les achats sans reçu lu et les articles sans achat relié.
+- **Audit** : `scripts/audit-prix-achat-recu.cjs` (23 verts, `--prouve` 16/16) ; `audit-completer` (E9–E11, S9) suit.
+- **Banc `completer` remis au vert** : les `.n-bouton` tombaient à 34 px (règle de base des boutons d'`index.html`, hors
+  couche, gagnait sur `@layer vrm-natif`) ⇒ les composants `n-*` en sont exclus (`:where`, même spécificité pour les
+  autres) ; la croix « Fermer » de `styles-boutons.css` (marge −8 px !important) n'atteint plus la feuille native ;
+  « Annuler » (toast) passe par le portail natif (invisible à 390 px) ; la carte laisse la zone sûre du bas ; la règle en
+  lot du « prix mini » ne se juge que sur des annonces LUES ; le banc juge le PRIX (pas la ligne) pour « Je ne sais plus »
+  et mesure la forme une fois les mouvements finis.
+
+**Geste de Julien** : aucun.

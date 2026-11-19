@@ -27,6 +27,8 @@ export const TITRE_MOTS_MAX = 8;
 export const PHRASE_MOTS_MAX = 12;
 
 export const NOUVEAUTES = Object.freeze([
+  // (19 nov., Julien : « 2 oui ») src/prixAchatRecu.js — le montant du reçu d'un achat relié, jamais un lot, jamais sur une saisie.
+  { id: 'prix-achat-recu', date: '2026-11-19', titre: 'Prix d’achat repris du reçu', phrase: 'Achat relié, reçu lu : le prix se pose seul (pas les lots).', tab: 'achats', pour: 'tous', mode: 'tous' },
   // (19 nov., Julien : « trouve autre chose pour relier les achats, mettre les prix plancher […] pratique, pas chiant ») docs/passation/2026-11-19-completer-infos.md
   { id: 'completer-infos', date: '2026-11-19', titre: 'Compléter : une question à la fois', phrase: 'Prix d’achat, prix mini, N° : un toucher par réponse.', tab: 'journee', pour: 'tous', mode: 'tous' },
   { id: 'interface-vrm-bleu-nuit', date: '2026-11-18', titre: 'VRM adopte le design de l’aperçu', phrase: 'Bleu nuit, nouveaux boutons, photos des colis et factures visibles.', tab: 'achats', pour: 'tous', mode: 'tous' },
