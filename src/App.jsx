@@ -48314,6 +48314,31 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         } });
     });
   };
+  // La phrase d'état d'un colis parti (« En route · vendue il y a 3 j », « Vinted ne l'a pas vu partir · coché il y a 2 j ») :
+  // la fonction d'avant, sortie de son bloc pour que l'écran natif la lise aussi (aucun mot changé).
+  const sousEnvoye = (x, plusieursComptes) => {
+    if (x.type === 'coche') { const np = x.np; const depuis = np ? (np.heures < 48 ? `${np.heures} h` : `${Math.floor(np.heures/24)} j`) : '';
+      return { t: np ? `Vinted ne l’a pas vu partir${depuis ? ` · coché il y a ${depuis}` : ''}${np.limiteDepassee ? ' · date limite dépassée' : ''}` : 'Coché « Colis fait »', ambre: !!np }; }
+    // (5 nov., chantier D) Les mots de l'app (src/libelles.js) : « En route » (plus « En transit »), « Livré »
+    // pour un colis ; l'étiquette brute de Vinted reste dans `data-parti` (les règles la lisent).
+    if (x.type === 'parti') { const retour = /Retour/.test(x.st.label); const mot = { 'En transit': 'En route', 'Livrée': 'Livré', 'Au relais': 'Au relais de l’acheteur' }[x.st.label] || x.st.label; return { t: `${mot}${x.j != null ? ` · ${x.j === 0 ? 'vendue aujourd’hui' : `vendue il y a ${x.j} j`}` : ''}${plusieursComptes && x.o._acc && colisDans !== 'ventes' ? ` · ${accNameOf(x.o._acc)}` : ''}`, ambre: retour, aide: x.st.aide }; }
+    if (x.type === 'vc') return { t: x.depart ? `Vestiaire · ${x.depart.phrase}` : 'Vestiaire · coché « Colis fait »', ambre: false };
+    if (x.type === 'vcenvoyee') return { t: `Vestiaire · envoyée${x.j != null ? ` · ${x.j === 0 ? 'vendue aujourd’hui' : `vendue il y a ${x.j} j`}` : ''}`, ambre: false };
+    // (8 nov.) Parti d'après le transporteur (le site ne l'a pas encore dit) : la raison, de la même ligne que la preuve.
+    if (x.type === 'transp') return { t: `${x.depart.phrase}${x.j != null ? ` · ${x.j === 0 ? 'vendue aujourd’hui' : `vendue il y a ${x.j} j`}` : ''}`, ambre: false };
+    return { t: `Leboncoin · ${lbcExpediee(x.lo) ? (x.lo.stepLabel || 'en livraison') : 'coché « Colis fait »'}`, ambre: false };
+  };
+  // « En route » en entier pour l'écran natif : pas lu ⇒ `lu: false` (jamais une liste vide qui dirait « aucun colis ») ; les
+  // retours suivis sortent de la liste (la règle du bloc d'avant) ; le filtre par transporteur et l'ordre « le plus récent en haut ».
+  const routeNatif = () => {
+    if (voitSite('vinted') && !Array.isArray(sales.items)) return { lu: false, erreur: !!sales.error, rangs: [], total: null };
+    const retoursTx = new Set(((retoursSuivis && retoursSuivis.etat === 'lu') ? [...retoursSuivis.lignes, ...retoursSuivis.remises] : []).filter((l) => l.plateforme === 'vinted').map((l) => String(l.tx)));
+    for (const tx of ((retoursSuivis && retoursSuivis.dejaRepubliees) || [])) retoursTx.add(String(tx));
+    const L = listeEnvoyes().filter((x) => !(x.site === 'vinted' && x.o && retoursTx.has(String(x.o.transaction_id))));
+    const { liste: LF } = filtrerEnvoyes(L, filtreEnvoyes);
+    const plusieurs = (accounts || []).length > 1;
+    return { lu: true, erreur: false, rangs: rangsRouteNatif(rangerEnvoyes(LF), (x) => sousEnvoye(x, plusieurs)), total: L.length };
+  };
   // « En route » : la MÊME liste (`listeEnvoyes`, rangée par `rangerEnvoyes` : le plus récent en haut), ses étapes prouvées.
   const rangsRouteNatif = (LT, sousDe) => (LT || []).map((x) => {
     const o = x.o || null; const cle = String(x.cle); const tx = o && o.transaction_id != null ? String(o.transaction_id) : '';
@@ -49162,6 +49187,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
   });
   // (19 nov.) À l'ordinateur : la vente touchée, montrée dans le volet de droite (la liste reste visible). null ⇒ la première.
   const [voletVente, setVoletVente] = useState(null);
+  const ventesNatifRef = React.useRef(null);   // (19 nov., « VRM natif ») le modèle et les gestes de l'écran Ventes, assemblés au rendu de la tête
   const grandEcranV = useGrandEcran();
   const ouvrirFicheColis = (ident) => { try { const row = document.querySelector(`[data-vv-rang="${CSS.escape(String(ident))}"]`); const fl = row ? (row.matches('[data-fiche-ligne]') ? row : row.querySelector('[data-fiche-ligne]')) : null; const l = fl ? lireLigne(fl) : null; if (l) ouvrirLigne(l); } catch (_) {} };
   // Le toucher d'une rangée à l'ordinateur : SA fiche dans le volet (le toucher délégué de la fiche plein écran se tait : `preventDefault`).
@@ -56055,6 +56081,24 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
                   const sousV = nTete == null ? null : ([nCochesV > 0 ? tr('vv.hero.coches', { n: nCochesV }) : '', ecV.sans ? tr('v2v.ecart.sans', { n: ecV.sans }) : '', ecV.imprimes ? tr('vv.hero.imprimes', { n: ecV.imprimes }) : ''].filter(Boolean).join(' · ') || null);
                   const rondsV = designV2 ? <Rond icone="more" label={tr('sv.outils')} actif={!!outilsV2} onClick={() => setOutilsV2(true)} attrs={{ 'data-colis-barre-btn': 'outils', 'data-vv-plus': '', 'aria-haspopup': 'dialog' }}/> : ronds;
                   const scanV = <button type="button" className="vrm-champ-recherche-bouton vv-scan" data-vv-scanner="" aria-label={tr('scan.r.bouton')} title={tr('scan.r.boutonTitre')} onClick={() => ouvrirRetrouver('ventes')}><Icon name="scan" size={20}/></button>;
+                  // (19 nov., « VRM natif ») LE MODÈLE DE L'ÉCRAN, pour src/natif/ecrans/Ventes.jsx : les nombres de la tête (publication
+                  // `vrm_colis_aposter`, envoyés), les rangées-objets, le lot (cases, plein, papier) et les gestes — les fonctions d'avant.
+                  const choixNV = cochesEffectives(Ltous, cochesVentes), defNV = memeQueDefaut(Ltous, cochesVentes == null ? null : choixNV);
+                  const choixNR = cochesEffectives(Lret, cochesRetours), nNR = selectionImprimable(Lret, choixNR).length, defNR = memeQueDefaut(Lret, cochesRetours == null ? null : choixNR);
+                  const rangsNV = rangsEnvoyerNatif(Ltous, choixNV);
+                  ventesNatifRef.current = {
+                    m: { onglet: toutesSeules ? 'toutes' : onglet, nEnv: nTete, auMoins: !!(envPartiel && nTete != null), nRoute: nEnvoyes, urgent: !!urgentEnv, presses: pressesTete,
+                      envoyer: { lu: !voitSite('vinted') || (Array.isArray(sales.items) && !sales.loading), erreur: !!(voitSite('vinted') && sales.error && !(sales.items || []).length),
+                        rangs: rangsNV, ecart: ecartNomme(rangsNV, nCochesV), plein: pleinImprimer({ nC: nCochesV, nR: nNR, occupe: !!batchBusy || !!imprBusy, total: resLot.total + Lret.length }),
+                        retours: Lret.map((l) => ({ cle: l.cle, tx: l.tx, num: l.num || '', titre: l.titre || '', vendeur: l.vendeur || '', on: choixNR.has(l.cle) })),
+                        format: formatLot, autres: resLot.autres, aPreparer: (nEnv || 0) > 0, aEmballer: nPrets > 0 },
+                      route: onglet === 'envoyes' && !toutesSeules ? routeNatif() : null },
+                    g: { onglet: (v) => onOngletColis && onOngletColis(v),
+                      basculer: (cle) => setCochesVentes((c) => basculerCoche(Ltous, c, cle)), basculerRetour: (cle) => setCochesRetours((c) => basculerCoche(Lret, c, cle)),
+                      // LE PLEIN : rien touché ⇒ le lot d'office (le PDF préparé d'avance part dans CE toucher) ; une case changée ⇒ SA sélection.
+                      imprimer: () => { if (nCochesV + nNR <= 0) return; if (defNV && defNR) { if (nLot + nRetLot > 0) imprimerLot(); else ouvrirLot(); } else imprimerLot(choixNV, { retours: choixNR }); },
+                      format: () => setChoixPapier({ puis: null }), choisir: ouvrirLot, preparer: () => setPreparerOuvert(true), deposer: () => setDepotOuvert(true),
+                      tournee: () => setTourneeDepot(true), emballer: () => setEmballage(true), scanner: () => setScanOuvert('envoi'), retrouver: () => ouvrirRetrouver('ventes') } };
                   const rechV = designV2 && !ordiJournee && !toutesSeules && slotTeteV ? createPortal(<ChampRecherche className="vv-champ" valeur={rechV2} onChange={setRechV2} placeholder={tr('v2v.rechercher')} label={tr('v2v.rechercher')} fin={scanV} data-vv-champ=""/>, slotTeteV) : null;
                   return (
                     <div className="sb-tete-hote vv-tete" id={ID_SECTION_COLIS.ventes} data-colis-section="ventes" data-colis-barre="" data-sb-studio={colisDans} data-sb-tuiles={tuilesTete ? '1' : '0'} data-vv-toutes={toutesSeules ? '1' : '0'}>
@@ -57474,18 +57518,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           const LT = rangerEnvoyes(LF);
           const postes = L.filter((x) => x.type === 'coche');
           const nbAuRelais = L.filter((x) => x.st && x.st.label === 'Au relais').length;
-          const sousDe = (x) => {
-            if (x.type === 'coche') { const np = x.np; const depuis = np ? (np.heures < 48 ? `${np.heures} h` : `${Math.floor(np.heures/24)} j`) : '';
-              return { t: np ? `Vinted ne l’a pas vu partir${depuis ? ` · coché il y a ${depuis}` : ''}${np.limiteDepassee ? ' · date limite dépassée' : ''}` : 'Coché « Colis fait »', ambre: !!np }; }
-            // (5 nov., chantier D) Les mots de l'app (src/libelles.js) : « En route » (plus « En transit »), « Livré »
-            // pour un colis ; l'étiquette brute de Vinted reste dans `data-parti` (les règles la lisent).
-            if (x.type === 'parti') { const retour = /Retour/.test(x.st.label); const mot = { 'En transit': 'En route', 'Livrée': 'Livré', 'Au relais': 'Au relais de l’acheteur' }[x.st.label] || x.st.label; return { t: `${mot}${x.j != null ? ` · ${x.j === 0 ? 'vendue aujourd’hui' : `vendue il y a ${x.j} j`}` : ''}${plusieursComptes && x.o._acc && colisDans !== 'ventes' ? ` · ${accNameOf(x.o._acc)}` : ''}`, ambre: retour, aide: x.st.aide }; }
-            if (x.type === 'vc') return { t: x.depart ? `Vestiaire · ${x.depart.phrase}` : 'Vestiaire · coché « Colis fait »', ambre: false };
-            if (x.type === 'vcenvoyee') return { t: `Vestiaire · envoyée${x.j != null ? ` · ${x.j === 0 ? 'vendue aujourd’hui' : `vendue il y a ${x.j} j`}` : ''}`, ambre: false };
-            // (8 nov.) Parti d'après le transporteur (le site ne l'a pas encore dit) : la raison, de la même ligne que la preuve.
-            if (x.type === 'transp') return { t: `${x.depart.phrase}${x.j != null ? ` · ${x.j === 0 ? 'vendue aujourd’hui' : `vendue il y a ${x.j} j`}` : ''}`, ambre: false };
-            return { t: `Leboncoin · ${lbcExpediee(x.lo) ? (x.lo.stepLabel || 'en livraison') : 'coché « Colis fait »'}`, ambre: false };
-          };
+          const sousDe = (x) => sousEnvoye(x, plusieursComptes);
           // (19 nov., Ventes « comme avant ») « En route » : un bloc par colis avec ses étapes PROUVÉES, pour tout le monde (les
           // rangées A groupées du 17 nov. sont retirées). Gardé de v2 : toucher un colis ouvre SA fiche (`attrsFicheLigne`, par
           // identité) ; la recherche ; à l'ordinateur, la fiche dans le volet de droite.
