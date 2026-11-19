@@ -142,7 +142,7 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
         const th = await pg.evaluate(() => document.documentElement.getAttribute('data-theme'));
         dit(th === (sombre ? 'dark' : 'light'), `${nom} : thème ${sombre ? 'sombre' : 'clair'} posé`, th);
         const lignes = b.locator('[data-boite-email]');
-        dit(await lignes.count() === 20, `${nom} : une page de 20 e-mails`, String(await lignes.count()));
+        dit(await lignes.count() >= 20 && journal(appels)[0] && journal(appels)[0].q.page === '0', `${nom} : la première page (20 e-mails), la suite au défilement`, String(await lignes.count()));
         const l1 = b.locator(`[data-boite-email="${id(1)}"]`);
         dit(await l1.getAttribute('data-rubrique') === 'codes' && /Mondial Relay/.test(await l1.innerText()), `${nom} : ligne — rubrique « codes », expéditeur lisible`, await l1.innerText());
         // La ligne (19 nov.) : expéditeur, sujet d'origine, ce que VRM a compris (une ligne), date.
@@ -151,7 +151,7 @@ const journal = (appels) => appels.filter((a) => a.chemin === '/api/email-rattac
           mot: ((x.querySelector('[data-boite-geste-mot]') || {}).innerText || '').replace(/\s+/g, ' ').trim(), heure: !!x.querySelector('time'), h: Math.round((x.querySelector('[data-boite-compris]') || { getBoundingClientRect: () => ({ height: 99 }) }).getBoundingClientRect().height) })));
         const sujetDe = Object.fromEntries(E.map((e) => [e.id, e.subject]));
         const mauvaises = L.filter((x) => !x.de || x.sujet !== sujetDe[x.id] || !x.quoi || !x.heure || x.h > 24);
-        dit(L.length === 20 && !mauvaises.length, `${nom} : chaque ligne dit l'expéditeur, le SUJET d'origine, ce que VRM a compris sur UNE ligne, la date`, JSON.stringify(mauvaises.slice(0, 2)));
+        dit(L.length >= 20 && !mauvaises.length, `${nom} : chaque ligne dit l'expéditeur, le SUJET d'origine, ce que VRM a compris sur UNE ligne, la date`, JSON.stringify(mauvaises.slice(0, 2)));
         const rid = Object.fromEntries(L.map((x) => [x.id, x]));
         const attendu = {
           [id(1)]: ['Colis à retirer', 'Relais Tabac du Port', 'retrait', 'avant le 9 nov.'],

@@ -1,5 +1,6 @@
 // es · E-mails comme Mail et « Relier ma boîte » accompagné (19 nov., lot emails-mail) : src/BoiteEmails.jsx, src/RelierMaBoite.jsx, src/boiteEmails.js (`enClair`).
 export default {
+  "mail.passu": "{quoi}: por ahora no se sabe",
   "mail.compris": "Lo que VRM ha entendido",
   "mail.colisRetirer": "Paquete por recoger",
   "mail.codeRetrait": "Código de recogida",

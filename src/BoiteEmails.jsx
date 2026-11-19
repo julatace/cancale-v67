@@ -37,7 +37,6 @@ import { cleTransporteur, nomDuTransporteur } from './transporteursVisuels.js';
 import RelierBoite from './RelierBoite.jsx';
 import RelierMaBoite from './RelierMaBoite.jsx';
 import { phraseARelier } from './relierCompte.js';
-import { EtatPanne } from './composants/EtatPanne.jsx';
 import CadreEmail from './CadreEmail.jsx';
 import { streamAllume } from './modeStream.js';
 import { prendreDemande, DEMANDE_RECHERCHE } from './rechercheEcran.js';
@@ -257,7 +256,7 @@ function Lecture({ id, entetes, delies, onFermer, onAller, onNum, plein, FermeAu
         </span>
       </div>
       {m === undefined ? <div className="n-mail-lecture-attente" role="status"><span className="n-mail-sr">{tr('emails.ouvertureEMail')}</span><Attente forme="texte" n={6}/></div> : null}
-      {m === null ? <EtatPanne className="n-mail-panne" role="alert" data-boite-lecture-etat="pas-su" quoi={tr('mail.cetEmail')} raison={tr('mail.lecturePasAboutie')} onReessayer={() => setEssai((n) => n + 1)}/> : null}
+      {m === null ? <div className="n-mail-etat" role="alert" data-boite-lecture-etat="pas-su"><Vide phrase={tr('mail.passu', { quoi: tr('mail.cetEmail') })} detail={tr('mail.lecturePasAboutie')} action={<Bouton onClick={() => setEssai((n) => n + 1)}>{tr('commun.reessayer')}</Bouton>}/></div> : null}
       {m && !e ? <div className="n-mail-etat" data-boite-lecture-etat="absent"><Vide phrase={tr('emails.eMailPlus')}/></div> : null}
       {e ? <>
         <header className="n-mail-entete">
@@ -417,7 +416,7 @@ function Quarantaine({ q }) {
   const [occupe, setOccupe] = useState('');
   const [max, setMax] = useState(5);
   if (q.emails === undefined) return null;
-  if (q.emails === null) return <section className="n-mail-quarantaine" data-v2-mail-quarantaine="pas-su"><EtatPanne compact quoi={tr('v2.mail.q.titre')} raison={tr('v2.mail.q.passu')} onReessayer={q.relire}/></section>;
+  if (q.emails === null) return <section className="n-mail-quarantaine n-mail-etat" data-v2-mail-quarantaine="pas-su"><Vide phrase={tr('mail.passu', { quoi: tr('v2.mail.q.titre') })} detail={tr('v2.mail.q.passu')} action={<Bouton onClick={q.relire}>{tr('commun.reessayer')}</Bouton>}/></section>;
   if (!q.emails.length) return null;
   return (
     <section className="n-mail-quarantaine" data-v2-mail-quarantaine={q.emails.length} aria-label={tr('v2.mail.q.titre')}>
@@ -562,6 +561,20 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
   const photoLigne = useCallback((e) => (photoDe ? photoDe(e) : null), [photoDe]);
   const lectureCol = useRef(null);
   useEffect(() => { if (large && lectureCol.current) lectureCol.current.scrollTop = 0; }, [ouvert, large]);
+  // Deux volets : le volet de lecture tient dans la fenêtre (il défile seul) — sa hauteur = ce qui reste sous son haut,
+  // relue au défilement de la page et au redimensionnement (il est collant : son haut remonte jusqu'à 12 px).
+  useEffect(() => {
+    const n = lectureCol.current;
+    if (!large || !ouvert || !n) return undefined;
+    let defile = null;
+    for (let p = n.parentElement; p && p !== document.body; p = p.parentElement) { const o = getComputedStyle(p).overflowY; if (o === 'auto' || o === 'scroll') { defile = p; break; } }
+    let raf = 0;
+    const maj = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => { const haut = Math.max(12, n.getBoundingClientRect().top); n.style.maxHeight = `${Math.max(320, Math.round(window.innerHeight - haut - 12))}px`; }); };
+    maj();
+    const cible = defile || window;
+    cible.addEventListener('scroll', maj, { passive: true }); window.addEventListener('resize', maj);
+    return () => { cancelAnimationFrame(raf); cible.removeEventListener('scroll', maj); window.removeEventListener('resize', maj); };
+  }, [large, ouvert]);
   // Le clavier, comme Mail (ordinateur) : ↓ / ↑ ouvrent l'e-mail voisin, Échap ferme la lecture.
   const auClavier = (ev) => {
     if (!large || ev.altKey || ev.metaKey || ev.ctrlKey) return;
@@ -604,7 +617,7 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
       {/* LE HAUT, sur toute la largeur : le segmenté, puis la recherche, le compte, « ⋯ ». */}
       <div className="n-mail-haut" data-v2-mail-tete="">
         <Segmente className="n-mail-seg" libelle={tr('emails.trierEMails')} valeur={segActif} onChange={choisirSeg}
-          options={SEGMENTS_EMAILS.map((v) => ({ cle: v, libelle: MOT_SEG[v], n: N[v] != null && (v !== 'atraiter' || N[v] > 0) ? String(N[v]) + (v === 'atraiter' && N.plus ? '+' : '') : undefined, attrs: { 'data-boite-rubrique-v2': v, 'data-boite-n': N[v] != null ? String(N[v]) : undefined } }))}/>
+          options={SEGMENTS_EMAILS.map((v) => ({ cle: v, libelle: MOT_SEG[v], n: N[v] != null && (v !== 'atraiter' || N[v] > 0) ? String(N[v]) + (v === 'atraiter' && N.plus ? '+' : '') : '\u00a0',   /* une place gardée : la ligne ne bouge pas quand les nombres arrivent */ attrs: { 'data-boite-rubrique-v2': v, 'data-boite-n': N[v] != null ? String(N[v]) : undefined } }))}/>
         <div className="n-mail-outils" data-v2-mail-outils="">
           <label className="n-mail-cherche" data-boite-cherche={cherche ? '1' : '0'}>
             <span className="n-mail-sr">{tr('emails.chercherEMail')}</span>
@@ -651,7 +664,7 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
       <div className="n-mail-corps" data-boite-corps-ecran="">
         <div className="n-mail-liste-col" data-boite-liste-col="">
           {pages === undefined ? <div className="n-mail-attente" data-boite-chargement="" role="status" aria-busy="true"><span className="n-mail-sr">{tr('emails.lectureBoite')}</span><Attente forme="rangees" n={7} vignette={44} titre/></div> : null}
-          {pages === null ? <EtatPanne className="n-mail-panne" role="alert" data-boite-etat="panne" data-boite="pas-su" quoi={tr('mail.taBoite')} raison={`${panne || tr('mail.panne.lecture')} ${tr('mail.rienPerdu')}`} onReessayer={() => charger(0)}/> : null}
+          {pages === null ? <div className="n-mail-etat" role="alert" data-boite-etat="panne" data-boite="pas-su"><Vide icone={<Glyphe nom="mail" taille={40}/>} phrase={tr('mail.passu', { quoi: tr('mail.taBoite') })} detail={`${panne || tr('mail.panne.lecture')} ${tr('mail.rienPerdu')}`} action={<Bouton onClick={() => charger(0)} chargement={lecture} attrs={{ 'data-boite-reessayer': '' }}>{tr('commun.reessayer')}</Bouton>}/></div> : null}
           {vide ? <div className="n-mail-etat" data-boite-etat={cherche ? 'recherche-vide' : nonLus ? 'nonlus-vide' : aVerif ? 'rien-a-verifier' : adresse ? 'compte-vide' : rubrique ? 'rubrique-vide' : 'vide'} data-boite={cherche ? undefined : 'vide'}>
             {cherche ? <Vide icone={<Glyphe nom="search" taille={40}/>} phrase={tr('emails.aucunEMail', { cherche: String(cherche) })} detail={tr('mail.vide.rechercheDetail')} action={<Bouton onClick={() => { setSaisie(''); setCherche(''); }} attrs={{ 'data-boite-etat-geste': 'effacer' }}>{tr('mail.vide.effacer')}</Bouton>}/>
               : nonLus ? <Vide icone={Ic.lu} phrase={tr('emails.toutLu')} action={<Bouton onClick={() => setNonLus(false)} attrs={{ 'data-boite-etat-geste': 'tout' }}>{tr('mail.vide.voirTout')}</Bouton>}/>
@@ -676,7 +689,7 @@ function Boite({ headers, delies, onAller, onNum, FermeAuRetour, onRelier, tete 
           </div> : null}
           {quarantaine ? <Quarantaine q={quarantaine}/> : null}
           <div ref={sentinelle} className="n-mail-sentinelle" aria-hidden="true"/>
-          {pages && pages.suiteKO ? <EtatPanne compact className="n-mail-panne" role="alert" data-boite-suite="pas-su" quoi={tr('mail.laSuite')} raison={tr('mail.suiteRestent')} onReessayer={() => charger((pages.page || 0) + 1)}/> : null}
+          {pages && pages.suiteKO ? <div className="n-mail-etat" role="alert" data-boite-suite="pas-su"><Vide phrase={tr('mail.passu', { quoi: tr('mail.laSuite') })} detail={tr('mail.suiteRestent')} action={<Bouton onClick={() => charger((pages.page || 0) + 1)}>{tr('commun.reessayer')}</Bouton>}/></div> : null}
           {pages && pages.suite && !pages.suiteKO ? <div className="n-mail-plus"><Bouton variante="texte" chargement={lecture} onClick={() => charger((pages.page || 0) + 1)} attrs={{ 'data-boite-plus': '' }}>{tr('achats.voirPlus')}</Bouton></div> : null}
           {pages && !pages.suite && pages.emails.length > 0 ? <p className="n-mail-fin" data-boite-fin="">{tr('mail.fin', { n: pages.emails.length })}</p> : null}
         </div>

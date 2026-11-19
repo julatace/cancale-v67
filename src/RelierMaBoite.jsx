@@ -293,7 +293,7 @@ export default function RelierMaBoite({ headers, comptes = [], uid = '', onChois
       {d.actif === false ? <p className="n-relier-note" data-adresse-off="">{tr('relier.adresse.off')}</p> : null}
       {liste.length ? <div className="n-relier-compte" data-bloc="comptes">
         <p className="n-relier-sous">{tr('relier.compte.titre')}</p>
-        <ChoixCompte comptes={liste} uid={c ? c.uid : ''} onChoisir={onChoisir}/>
+        <div className="vrm-pv"><ChoixCompte comptes={liste} uid={c ? c.uid : ''} onChoisir={onChoisir}/></div>
         {c && c.adresse ? <p className="n-relier-note" data-relier-compte-adresse-ligne="">{tr('relier.compte.boite', { login: c.login })} <code className="vrm-sensible" data-relier-compte-adresse="">{c.adresse}</code></p> : null}
       </div> : null}
     </>;
@@ -330,7 +330,7 @@ export default function RelierMaBoite({ headers, comptes = [], uid = '', onChois
         <Bouton variante="texte" chargement={manuel} onClick={() => lire(true)} attrs={{ 'data-essai-verifier': '' }}>{tr('relier.essai.verifier')}</Bouton>
       </div> : null}
       {eEssai.etat === 'trop-long' ? <Bouton variante="texte" onClick={() => recommencer('essai')} attrs={{ 'data-essai-refaire': '' }}>{tr('relier.essai.nouveau')}</Bouton> : null}
-      {c ? <Verification key={c.uid} compte={c} lireDernier={lireDernier} onRelie={noterRelie}/> : null}
+      {c ? <div className="vrm-pv"><Verification key={c.uid} compte={c} lireDernier={lireDernier} onRelie={noterRelie}/></div> : null}
     </>;
     // LE geste : écrire l'e-mail d'essai depuis SA messagerie (mailto) ; VRM guette l'arrivée.
     plein = <a className="n-bouton n-relier-plein-lien" data-n-variante="plein" href={lienEssai(adresse, codeEssai)} data-essai="" onClick={() => lancerEssai(codeEssai)}>
@@ -344,7 +344,7 @@ export default function RelierMaBoite({ headers, comptes = [], uid = '', onChois
         <Bouton variante="texte" onClick={() => recommencer('essai')} attrs={{ 'data-essai-refaire': '' }}>{tr('relier.recu.refaire')}</Bouton>
         <Bouton variante="texte" onClick={() => { setMessagerie(''); recommencer('messagerie'); }} attrs={{ 'data-relier-autre-boite': '' }}>{tr('relier.recu.autre')}</Bouton>
       </div>
-      {c ? <Verification key={c.uid} compte={c} lireDernier={lireDernier} onRelie={noterRelie}/> : null}
+      {c ? <div className="vrm-pv"><Verification key={c.uid} compte={c} lireDernier={lireDernier} onRelie={noterRelie}/></div> : null}
     </div>;
     plein = onBoite ? <Bouton variante="plein" onClick={onBoite} attrs={{ 'data-ouvrir-boite': '' }}>{tr('relier.recu.voir')}</Bouton> : null;
   }

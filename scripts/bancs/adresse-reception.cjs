@@ -217,7 +217,11 @@ async function scenarioC(nav, W, theme) {
   const T = `[C ${W} ${theme}]`, tag = `${W}-${theme}`;
   const o = await ouvrir(nav, { W, theme, tab: 'settings' });
   const { pg } = o;
-  await pg.locator('[data-reglage-adresse-vrm]').first().waitFor({ timeout: 30000 });
+  // (19 nov.) Au téléphone, Paramètres montre des tuiles : la ligne se trouve par la recherche des réglages (son geste).
+  if (!(await pg.locator('[data-reglage-adresse-vrm]').first().waitFor({ timeout: 8000 }).then(() => true).catch(() => false))) {
+    await pg.locator('input[placeholder^="Chercher"]').first().fill('adresse VRM').catch(() => {});
+  }
+  await pg.locator('[data-reglage-adresse-vrm]').first().waitFor({ timeout: 20000 }).catch(async (e) => { await capture(pg, `c-sans-ligne-${tag}`); throw e; });
   dit(o.appels.length === 0, `${T} rien n'est demandé au serveur avant son toucher`, String(o.appels.length));
   await pg.locator('[data-reglage-adresse-vrm]').first().click();
   await pg.waitForSelector('[data-feuille-adresse-reception] [data-parcours-adresse][data-ecran="messagerie"]', { timeout: 15000 }).catch(() => {});
