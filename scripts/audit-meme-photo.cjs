@@ -80,7 +80,7 @@ const MUTATIONS = {
   correlFaible: [['src/photoFine.js', 'vinted-sync-extension/background.js'], 'SEUIL_CORREL_SUR = 0.998;', 'SEUIL_CORREL_SUR = 0.9;'],
   ecartFin: ['src/memePhoto.js', "          if (etatCouple(d, fine) === 'non') { ecartes.add(c.a.id + '|' + q.a.id); continue; }\n", ''],
   ambiguSur: ['src/memePhoto.js', "  const nSurs = propositions.filter((p) => p.etat === 'sur').length;", "  const nSurs = propositions.filter((p) => p.etat === 'sur').length + ambigus.filter((x) => x.paires.some((p) => p.etat === 'sur')).length;"],
-  relierSeul: ['src/App.jsx', '    publierMemePhoto(etat);\n', "    publierMemePhoto(etat);\n    for (const p of res.propositions) if (p.etat === 'sur') relierParPhoto({ annonce: p.annonce, numero: p.numero, vintedId: (p.vinted[0] || {}).id });\n"],
+  relierSeul: ['src/App.jsx', '    publierMemePhoto(etat);\n', "    publierMemePhoto(etat);\n    for (const p of res.propositions) if (p.etat === 'sur') liaisonVrm().then((L) => L.relier({ annonce: p.annonce, paire: { id: (p.vinted[0] || {}).id, numero: p.numero }, preuve: 'photo-sure' }));\n"],
   fineCookie: ['vinted-sync-extension/background.js', "    const res = await fetch(url, { credentials: 'omit', cache: 'no-store' });", "    const res = await fetch(url, { credentials: 'include', cache: 'no-store' });"],
   fineBudget: ['vinted-sync-extension/background.js', "  const lu = await compterLecture(cleImpSite(pf, cible.compte), EMPREINTES_SITES_MAX_HEURE);\n  if (!lu.ok) { noterDiag('verif_fine_budget'); return 0; }", "  const lu = { ok: true };"],
   fineOnglet: ['vinted-sync-extension/background.js', "    if ((await ongletImpSite(SITE_IMPORT[c.site], c.compte)) == null) continue;   // l'onglet de CE compte sur son site\n", ''],
@@ -225,9 +225,11 @@ function pixels(nom, w = 64, h = w) {
     dit(!/\bsave\(|withOwner|fetch\(|localStorage|chrome\.|\btitre\b[^:]*===|normTitle|marque|taille/.test(regle.replace(/titre: /g, '')), 'R7 · la règle n’écrit rien et ne lit ni titre, ni marque, ni taille', '');
     const app = fs.readFileSync(path.join(RACINE, 'src', 'App.jsx'), 'utf8');
     const corps = (debut, n = 5000) => { const i = app.indexOf(debut); return i < 0 ? '' : app.slice(i, i + n); };
-    const rel = corps('async function relierParPhoto(', 3200);
-    dit(/k: 'vrm_lbc_liens', type: 'cle', id, apres: n,/.test(rel) && /pairId: String\(vintedId\), numero: n/.test(rel) && /k: LIENS_EBAY, type: 'cle'/.test(rel) && /await relierVc\(\{ productId: id, item: String\(vintedId\), numVinted: n/.test(rel),
-      'R7 · Relier pose l’identité EXISTANTE de chaque site (vrm_lbc_liens = N°, vrm_ebay_liens = { pairId, numero }, relierVc)', rel.slice(0, 200));
+    // (19 nov., liaison guidée) Relier vit dans le parcours « Relier mes annonces » : la règle src/liaisonSites.js
+    // (`opPorter`, exécutée par audit-liaison-sites C1) pose les MÊMES identités qu'avant.
+    const rel = fs.readFileSync(path.join(RACINE, 'src', 'liaisonSites.js'), 'utf8');
+    dit(/CLES_LIENS = \{ Leboncoin: 'vrm_lbc_liens', eBay: 'vrm_ebay_liens', Vestiaire: 'vrm_vc_liens' \}/.test(rel) && /k: CLES_LIENS\.Leboncoin, type: 'cle', id, apres: String\(numero\)/.test(rel) && /\{ pairId: vinted, numero: String\(numero\), at, par: preuve \}/.test(rel) && /poserLienVc\(\{ liens: C\.vc, productId: id, item: vinted, numeroVinted: String\(numero\)/.test(rel),
+      'R7 · Relier pose l’identité EXISTANTE de chaque site (vrm_lbc_liens = N°, vrm_ebay_liens = { pairId, numero }, poserLienVc)', rel.slice(0, 200));
     dit(/const lien = liens \? liens\[iid\] : null;\s*\n\s*if \(lien != null && String\(lien\)\.trim\(\)\) return cleNum\(lien\);/.test(corps('const numeroLbcIdentite = ', 600)) && /return x && x\.pairId \? x : null/.test(corps('const lienEbay = ', 300)) && /numerosVcAvecLiens\(vcCarte\('vrm_vc_numeros'\), vcCarte\('vrm_vc_liens'\)\)/.test(app),
       'R7 · ce sont les liens que lisent numeroLbcIdentite, lienEbay et numerosVcEffectifs (le retrait ailleurs)', '');
     const aut = corps('async function annoncesAutresMemePhoto(', 2400);
@@ -361,11 +363,12 @@ function pixels(nom, w = 64, h = w) {
     {
       // §5 : « sûr » propose, SON toucher relie — aucun chemin ne relie seul.
       const appSrc = app.replace(/^\s*\/\/.*$/gm, '');
-      const appels = (appSrc.match(/relierParPhoto\s*\(/g) || []).length, refs = (appSrc.match(/\brelierParPhoto\b/g) || []).length;
+      // (19 nov., liaison guidée) La seule porte : `ACTIONS_LIAISON.relier`, passée au parcours (`actions={ACTIONS_LIAISON}`).
+      const appels = (appSrc.match(/\.relier\(/g) || []).length, refs = (appSrc.match(/\bACTIONS_LIAISON\b/g) || []).length;
       const charge = corps('async function chargerMemePhoto(', 4000).split('\nif (typeof window')[0].replace(/^\s*\/\/.*$/gm, '');
       const regles = (fs.readFileSync(path.join(RACINE, 'src', 'photoFine.js'), 'utf8') + fs.readFileSync(path.join(RACINE, 'src', 'memePhoto.js'), 'utf8')).replace(/\/\/.*$/gm, '');
-      dit(appels === 1 && refs === 2 && /onRelier=\{relierParPhoto\}/.test(appSrc) && !/relier|gesteVrm|vrm_lbc_liens|LIENS_EBAY|relierVc/.test(charge) && !/fetch\(|save\(|localStorage|withOwner|gesteVrm/.test(regles),
-        'F6 · §5 : relier n’a lieu que sur SON toucher (`onRelier`), même « sûr » ; le calcul et les règles n’écrivent rien', JSON.stringify({ appels, refs, charge: /relier|gesteVrm/.test(charge) }));
+      dit(appels === 1 && refs === 2 && /actions=\{ACTIONS_LIAISON\}/.test(appSrc) && /relier: \(x\) => liaisonVrm\(\)\.then\(\(L\) => L\.relier\(x\)\)/.test(appSrc) && !/relier|gesteVrm|vrm_lbc_liens|LIENS_EBAY|relierVc/.test(charge) && !/fetch\(|save\(|localStorage|withOwner|gesteVrm/.test(regles),
+        'F6 · §5 : relier n’a lieu que sur SON toucher (les actions du parcours), même « sûr » ; le calcul et les règles n’écrivent rien', JSON.stringify({ appels, refs, charge: /relier|gesteVrm/.test(charge) }));
     }
     {
       // E7 · l'extension : la mesure fine d'un couple candidat, les deux images, sans cookie, budgets.
