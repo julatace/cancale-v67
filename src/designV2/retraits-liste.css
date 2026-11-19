@@ -5,6 +5,8 @@
 .v2r-ligne:first-child { border-top: 0; }
 .v2r-haut { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 10px 16px 0; margin: 0;
   background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+/* Les anciennes couches peignent tout « button » (fond clair, ombre) : la ligne garde la carte. */
+html body .v2-passe button.v2r-haut { background: transparent !important; box-shadow: none !important; border: 0 !important; color: inherit !important; border-radius: 0 !important; min-height: 64px !important; }
 button.v2r-haut:active { opacity: .7; }
 .v2-passe .v2r-ligne .v2r-photo { flex: none; width: 48px; height: 48px; border-radius: 10px; overflow: hidden; display: grid; place-items: center;
   background: rgb(127 127 127 / .14); }
@@ -17,8 +19,8 @@ button.v2r-haut:active { opacity: .7; }
 .v2r-code { flex: none; font-size: 26px; font-weight: 700; letter-spacing: .04em; font-variant-numeric: tabular-nums; line-height: 1; }
 .v2r-sans.v2-passe-sans { flex: none; max-width: 40%; font-size: 13px; padding: 0; text-align: right; }
 .v2r-gestes { display: flex; justify-content: flex-end; padding: 0 8px 4px; }
-.v2r-retire { min-height: 36px; margin: 6px 0 8px; padding: 0 14px; border-radius: 18px; background: rgb(127 127 127 / .16); border: 0;
+.v2r-retire { min-height: 44px; margin: 2px 0 6px; padding: 0 16px; border-radius: 22px; background: rgb(127 127 127 / .16); border: 0;
   font: inherit; font-size: 15px; font-weight: 600; color: inherit; cursor: pointer; position: relative; }
-.v2r-retire::before { content: ""; position: absolute; inset: -4px 0; } /* cible au doigt 44 px */
 @media (max-width: 359px) { .v2r-code { font-size: 22px; } }
 .v2r-dedans { font-size: 13px; line-height: 18px; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html body .v2-passe button.v2r-retire { min-height: 44px !important; }
