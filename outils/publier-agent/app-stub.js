@@ -11,14 +11,17 @@ export const load = (k, d) => (B.store[k] !== undefined ? JSON.parse(JSON.string
 export const save = (k, v) => { B.store[k] = JSON.parse(JSON.stringify(v)); };
 export const isCloudReady = () => true;
 export const relaisVivant = () => false;
+export const vintedDeChrome = () => (B.sansVinted ? null : { uid: '111', login: 'atelier.nord' });
 export const extSait = () => B.ext;
 export async function lireFichesPage(ids) { const out = {}; for (const id of ids) if (B.fiches && B.fiches[id]) out[id] = B.fiches[id]; return out; }
 export async function lireBaseRelue(url) { if (/lbc_listings/.test(url)) return [{ items: B.lbc || {} }]; return []; }
 export async function lireEbayTous() { return { items: B.ebay || [], lignes: [] }; }
 export async function appelEbay() { await new Promise((r) => setTimeout(r, 60)); return { j: { ok: true, categories: [{ id: '15709', nom: 'Baskets', chemin: 'Mode > Homme > Chaussures > Baskets' }, { id: '95672', nom: 'Chaussures de sport', chemin: 'Sport > Chaussures' }] } }; }
 export async function vmrCmd(msg) {
+  if (msg.cmd === 'listesVinted') { B.listes = (B.listes || 0) + 1; return { accepte: false, code: 'pas-lu' }; }   // lecture, pas un envoi
   B.cmds.push(JSON.parse(JSON.stringify(msg))); B.enVol++; B.maxEnVol = Math.max(B.maxEnVol, B.enVol);
   await new Promise((r) => setTimeout(r, 80));
+  if (msg.cmd === 'creerVintedFiche') { B.enVol--; return { accepte: true, etape: 'fait', draftId: '9' + msg.fiche.numero }; }
   const jobId = (msg.site === 'leboncoin' ? 'lbc:' : 'vc:') + 'fiche-' + msg.fiche.numero;
   // Le dépôt « se finit » un peu plus tard, comme dans le navigateur.
   setTimeout(() => { __vmrJobs[jobId] = { etape: 'fait', at: NOW }; B.enVol--; }, 400);

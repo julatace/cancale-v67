@@ -105,11 +105,11 @@ async function juger(nav, mutant = '') {
       dit(r.n === (v === 'volume' ? 60 : 6), `N ${ou} : « ${r.n} articles » au-dessus de la liste`, r.n);
       dit(r.pleinsRangee === 0 && r.pleins <= 1, `B ${ou} : un plein au plus (${r.pleins}), aucun dans une rangée`, r);
       if (nomV === '1512') {
-        dit(JSON.stringify(r.th) === JSON.stringify(['x', 'x', 'leboncoin', 'vestiaire', 'ebay']), `T ${ou} : le tableau (article · catégorie · Leboncoin · Vestiaire · eBay)`, r.th);
-        dit(r.cases.length === r.n && r.cases.every((c) => c.etats.length === 3 && c.etats.every((e) => !/:null$/.test(e))), `T ${ou} : chaque case porte un état`, r.cases.find((c) => c.etats.length !== 3));
+        dit(JSON.stringify(r.th) === JSON.stringify(['x', 'x', 'vinted', 'leboncoin', 'vestiaire', 'ebay']), `T ${ou} : le tableau (article · catégorie · Vinted · Leboncoin · Vestiaire · eBay)`, r.th);
+        dit(r.cases.length === r.n && r.cases.every((c) => c.etats.length === 4 && c.etats.every((e) => !/:null$/.test(e))), `T ${ou} : chaque case porte un état`, r.cases.find((c) => c.etats.length !== 4));
         if (v === 'melange') {
-          dit(etatDe(r, 'vinted#101', 'leboncoin') === 'pret' && etatDe(r, 'vinted#101', 'vestiaire') === 'pret' && etatDe(r, 'vinted#101', 'ebay') === 'question', `S ${ou} : catégorie lue ⇒ Leboncoin et Vestiaire prêts, eBay à préciser (SA catégorie)`, r.cases[0]);
-          dit(['leboncoin', 'vestiaire', 'ebay'].every((s) => etatDe(r, 'vinted#104', s) !== 'pret'), `S ${ou} : catégorie pas lue ⇒ aucun site « Prêt »`, r.cases.find((c) => c.cle === 'vinted#104'));
+          dit(etatDe(r, 'vinted#101', 'vinted') === 'deja' && etatDe(r, 'vinted#101', 'leboncoin') === 'pret' && etatDe(r, 'vinted#101', 'vestiaire') === 'pret' && etatDe(r, 'vinted#101', 'ebay') === 'question', `S ${ou} : catégorie lue ⇒ Leboncoin et Vestiaire prêts, eBay à préciser (SA catégorie)`, r.cases[0]);
+          dit(['vinted', 'leboncoin', 'vestiaire', 'ebay'].every((s) => etatDe(r, 'vinted#104', s) !== 'pret'), `S ${ou} : catégorie pas lue ⇒ aucun site « Prêt »`, r.cases.find((c) => c.cle === 'vinted#104'));
           dit(etatDe(r, 'vinted#105', 'vestiaire') === 'refus' && etatDe(r, 'vinted#102', 'vestiaire') === 'refus', `S ${ou} : livre et « Nike SB » ⇒ Vestiaire « Pas vendable ici »`, [etatDe(r, 'vinted#105', 'vestiaire'), etatDe(r, 'vinted#102', 'vestiaire')]);
         }
       } else {
@@ -141,17 +141,19 @@ async function juger(nav, mutant = '') {
     dit(/chaussures\/baskets\/homme/.test(apres.mem) && /"pointure":"43"/.test(apres.mem), `Q ${nomV} : la réponse est retenue (vrm_agent_publier)`, apres.mem.slice(0, 300));
     if (nomV === '1512') {
       const r = await pg.evaluate(MESURE);
-      dit(etatDe(r, 'leboncoin#9001', 'leboncoin') === 'deja' && etatDe(r, 'leboncoin#9001', 'vestiaire') === 'pret', `Q ${nomV} : après sa réponse, l'article Leboncoin part vers Vestiaire (déjà sur Leboncoin)`, r.cases.find((c) => c.cle === 'leboncoin#9001'));
+      dit(etatDe(r, 'leboncoin#9001', 'leboncoin') === 'deja' && etatDe(r, 'leboncoin#9001', 'vestiaire') === 'pret' && etatDe(r, 'leboncoin#9001', 'vinted') === 'pret', `Q ${nomV} : après sa réponse, l'article Leboncoin part vers Vestiaire (déjà sur Leboncoin)`, r.cases.find((c) => c.cle === 'leboncoin#9001'));
       const n = Number(r.publier);
       await pg.click('[data-pa-publier]');
       await pg.waitForFunction(() => !document.querySelector('[data-pa-arreter]'), null, { timeout: 20000 }).catch(() => {});
       await pg.waitForTimeout(300);
       const b = await pg.evaluate(() => ({ cmds: window.__banc.cmds, max: window.__banc.maxEnVol, brouillons: (window.__banc.brouillons || []).length }));
-      dit(n > 0 && b.cmds.length > 0 && b.cmds.every((c) => c.cmd === 'publierFiche' && c.fiche && c.fiche.categorie && /VRM-\w+/.test(c.fiche.description)), `P ${nomV} : « Publier ${n} » ⇒ ${b.cmds.length} commandes publierFiche, chacune avec SA catégorie et « VRM-n° »`, b.cmds.map((c) => c.site + ':' + c.fiche.numero));
+      const pf = b.cmds.filter((c) => c.cmd === 'publierFiche'), cv = b.cmds.filter((c) => c.cmd === 'creerVintedFiche');
+      dit(n > 0 && pf.length > 0 && pf.every((c) => c.fiche && c.fiche.categorie && /VRM-\w+/.test(c.fiche.description)) && pf.length + cv.length === b.cmds.length, `P ${nomV} : « Publier ${n} » ⇒ ${pf.length} publierFiche avec SA catégorie et « VRM-n° »`, b.cmds.map((c) => c.cmd + ':' + c.fiche.numero));
+      dit(cv.length === 1 && cv[0].fiche.numero === '17' && cv[0].uid === '111' && cv[0].reponses.catalog_id === '1242' && cv[0].confirme === true, `P ${nomV} : l'article Leboncoin part aussi vers Vinted par « Créer sur Vinted » (compte de l'onglet, catalog_id de la table)`, cv);
       dit(b.max === 1, `P ${nomV} : une seule commande en vol à la fois (${b.max})`, b.max);
-      dit(!b.cmds.some((c) => c.fiche.numero === '15' || c.fiche.numero === '16' && c.site === 'vestiaire'), `P ${nomV} : rien n'est parti pour l'article sans catégorie ni pour le livre vers Vestiaire`, b.cmds.map((c) => c.site + ':' + c.fiche.numero));
+      dit(!b.cmds.some((c) => c.fiche.numero === '15' || (c.fiche.numero === '16' && c.site === 'vestiaire')), `P ${nomV} : rien n'est parti pour l'article sans catégorie ni pour le livre vers Vestiaire`, b.cmds.map((c) => c.site + ':' + c.fiche.numero));
       const r2 = await pg.evaluate(MESURE);
-      dit(['parti'].includes(etatDe(r2, 'vinted#101', 'leboncoin')), `P ${nomV} : la case dit « Envoyé »`, r2.cases[0]);
+      dit(['parti'].includes(etatDe(r2, 'vinted#101', 'leboncoin')) && etatDe(r2, 'leboncoin#9001', 'vinted') === 'parti', `P ${nomV} : les cases disent « Envoyé »`, r2.cases.map((c) => c.etats.join('|')));
       if (!PROUVE) await pg.screenshot({ path: path.join(SHOTS, `apres-publier-${nomV}.png`) });
     }
     dit(!erreurs.length, `R ${nomV} : aucune erreur pendant la question et l'envoi`, erreurs);
@@ -173,7 +175,7 @@ async function juger(nav, mutant = '') {
   }
   // E : une extension trop vieille ⇒ rien n'est envoyé vers Leboncoin ou Vestiaire.
   { const { ctx, pg } = await ouvrir(nav, PC, '?v=melange&ext=0'); const r = await pg.evaluate(MESURE);
-    dit(r.cases.every((c) => c.etats.filter((e) => /^(leboncoin|vestiaire):/.test(e)).every((e) => !/:pret$/.test(e))), 'E extension sans `publierfiche` ⇒ aucun Leboncoin / Vestiaire « Prêt »', r.cases.map((c) => c.etats.join('|')));
+    dit(r.cases.every((c) => c.etats.filter((e) => /^(vinted|leboncoin|vestiaire):/.test(e)).every((e) => !/:pret$/.test(e))), 'E extension sans `publierfiche` ⇒ aucun Vinted / Leboncoin / Vestiaire « Prêt »', r.cases.map((c) => c.etats.join('|')));
     await ctx.close(); }
 }
 (async () => {
