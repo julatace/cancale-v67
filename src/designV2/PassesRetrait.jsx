@@ -78,11 +78,11 @@ function Passe({ p, Icon, Photo, Plaque, aides, nouveaux }) {
       </header>
       <div className="v2-passe-lieu">
         <Icon name="pin" size={18}/>
-        <span><b>{lieu}</b>{p.adresseCourte || p.adresse ? <small>{p.adresseCourte || p.adresse}</small> : null}</span>
+        {/* (19 nov., retraits parfaits) Consigne (on TAPE le code sur l'écran du casier) ou comptoir (on le DONNE) : dit
+            une fois par point, sous l'adresse — un casier et le comptoir du même magasin sont deux passes (src/retraitSorte.js). */}
+        <span><b>{lieu}</b>{p.adresseCourte || p.adresse ? <small>{p.adresseCourte || p.adresse}</small> : null}
+          <small className="v2-passe-sorte" data-v2-sorte={p.consigne ? 'consigne' : 'comptoir'}>{tr(p.consigne ? 'v2.passe.consigne' : 'v2.passe.comptoir')}</small></span>
       </div>
-      {/* (19 nov., retraits parfaits) Consigne (on TAPE le code sur l'écran du casier) ou comptoir (on le DONNE) : dit
-          une fois par point — un casier et le comptoir du même magasin sont deux passes (src/retraitSorte.js). */}
-      <p className="v2-passe-sorte" data-v2-sorte={p.consigne ? 'consigne' : 'comptoir'}>{tr(p.consigne ? 'v2.passe.consigne' : 'v2.passe.comptoir')}</p>
       <div className="v2r-liste" data-v2-retraits={String(colis.length)}>
         {colis.map((x) => <LigneRetrait key={x.cle || x.id} x={x} Icon={Icon} Photo={Photo} aides={aides} nouveaux={nouveaux}/>)}
       </div>
