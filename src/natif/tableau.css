@@ -3,7 +3,7 @@
    Jetons seulement : aucune couleur, aucune taille de texte en dur ; ni `!important`, ni `:has()`. */
 @layer vrm-natif {
   /* Le tableau ne pousse jamais la page : sa largeur est celle de l'écran (un tableau plus large défile DANS son cadre). */
-  .n-tt { min-width: 0; contain: inline-size; }
+  .n-tt { min-width: 0; contain: inline-size; container-type: inline-size; container-name: tt; }
   .n-tt .n-page-contenu { padding-top: 0; }
   .n-tt-espace { flex: 1 1 auto; min-width: 0; }
   .n-tt-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -166,7 +166,7 @@
     .n-poussee.n-tt-fiche { left: auto; width: min(520px, 46vw); box-shadow: var(--n-ombre); border-left: .5px solid var(--n-trait); }
   }
 }
-/* (19 nov. soir) Le cadre ne défile qu'en dernier recours : entre 1024 et 1400, le titre d'un article cède la place aux colonnes. */
+/* (19 nov. soir) Le cadre ne défile qu'en dernier recours : dans un tableau étroit (un écran d'avant le tient dans sa colonne), le titre d'un article cède la place aux colonnes. */
 @layer vrm-natif {
-  @media (max-width: 1400px) { .n-tt-article { max-width: 190px; } .n-tt-th-article { min-width: 150px; } .n-tt-th, .n-tt-td { padding-inline: 6px; } .n-tt-td-article .n-vignette { width: 44px; height: 44px; } }
+  @container tt (max-width: 1160px) { .n-tt-article { max-width: 190px; } .n-tt-th-article { min-width: 150px; } .n-tt-th, .n-tt-td { padding-inline: 6px; } .n-tt-td-article .n-vignette { width: 44px; height: 44px; } }
 }

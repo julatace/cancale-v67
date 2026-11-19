@@ -34,7 +34,7 @@ export default function AchatsTableau({ lignes, filtres = [], compte = '', majLe
     { cle: 'date', libelle: tr('tableau.col.date'), num: true, tri: (l) => l.t, rendu: (l) => (l.t != null ? dateCourte(l.t) : null) },
     { cle: 'transporteur', libelle: tr('tableau.col.transporteur'), tri: (l) => (l.transporteur && l.transporteur.nom) || null,
       rendu: (l) => (l.transporteur && l.transporteur.nom ? <span className="n-tt-transporteur">{l.transporteur.logo}<span>{l.transporteur.nom}</span></span> : null) },
-    { cle: 'code', libelle: tr('tableau.col.code'), tri: (l) => l.code || null,
+    { cle: 'code', libelle: tr('tableau.col.code'), titreCourt: tr('tableau.col.codeCourt'), tri: (l) => l.code || null,
       rendu: (l) => (l.code ? (onCode ? <button type="button" className="n-eg-cellule n-tt-code" data-achat-code={l.cle} aria-label={tr('tableau.voirCode', { code: l.code })} onClick={(e) => { e.stopPropagation(); onCode(l); }}>{l.code}</button> : <span className="n-tt-code">{l.code}</span>) : null) },
     { cle: 'statut', libelle: tr('tableau.col.statut'), tri: (l) => CATEGORIES_ACHAT.indexOf(l.statut) },
   ];

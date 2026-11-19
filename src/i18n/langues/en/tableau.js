@@ -110,6 +110,7 @@ export default {
   "ext.lies.ici": "seen by this browser",
   "ext.lies.version": "extension {v}",
   "ext.lies.lie": "Linked",
+  "tableau.col.codeCourt": "Code",
   "auto.titre": "Automations",
   "auto.desc": "Messages to favourites, offers, price drops, reposting",
   "auto.etat.on": "On",

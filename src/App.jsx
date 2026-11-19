@@ -53043,11 +53043,11 @@ function Comptabilite({ filtreNatif = null, accounts, only, garageGrid, onLocate
         {/* (6 nov., v36-visuel-2) La recherche et la période sur UNE ligne (la période sans valeur =
             son icône seule, le libellé reste lu au lecteur d'écran) : la liste remonte d'un cran. */}
         {buysBase.length>0 && aFilter!=='attente' && <div className="vrm-achats-filtres">
-        {buysBase.length>0 && aFilter!=='attente' && (
+        {buysBase.length>0 && aFilter!=='attente' && !ordiAchats && (
           <label className="vrm-msg-search vrm-achats-search" style={{color:C.muted}}><Icon name="search" size={16}/><input type="search" aria-label={tr('achats.rechercherAchat')} value={ordSearch} onChange={e=>setOrdSearch(e.target.value)} placeholder={tr('achats.titreVendeur')}
             style={{color:C.text,background:'transparent',border:0,boxShadow:'none'}}/><MicDictee nu titre={tr('achats.chercherVoixNumero')} onDirect={setOrdSearch} onText={(t)=>setOrdSearch(requeteDeLaVoix(t).requete)}/></label>
         )}
-        <PeriodePicker value={periode} onChange={setPeriode} titre={tr('achats.periodeAchats')} datation="Date d’achat"/>{dansPlateforme && !modeRetraits ? boutonCalculette : null}</div>}
+        {ordiAchats ? null : <PeriodePicker value={periode} onChange={setPeriode} titre={tr('achats.periodeAchats')} datation="Date d’achat"/>}{dansPlateforme && !modeRetraits ? boutonCalculette : null}</div>}
         {/* ── LES CHIFFRES DE L'ACHAT (l'écran n'en avait AUCUN) ─────────────────
             « C'est mon métier, fais ça comme un pro. » L'écran Ventes porte
             quatre chiffres depuis toujours ; Achats, zéro — alors que l'achat,

@@ -110,6 +110,7 @@ export default {
   "ext.lies.ici": "vu par ce navigateur",
   "ext.lies.version": "extension {v}",
   "ext.lies.lie": "Lié",
+  "tableau.col.codeCourt": "Code",
   "auto.titre": "Automatisations",
   "auto.desc": "Messages aux favoris, offres, baisses, republication",
   "auto.etat.on": "Activé",
