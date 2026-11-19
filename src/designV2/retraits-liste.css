@@ -24,3 +24,8 @@ html body .v2-passe[data-v2-passe] .v2r-haut[data-v2-en-grand], html body .v2-pa
 @media (max-width: 359px) { .v2r-code { font-size: 22px; } }
 .v2r-dedans { font-size: 13px; line-height: 18px; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 html body .v2-passe[data-v2-passe] button.v2r-retire[data-v2-retire], html body .v2-passe button.v2r-retire { min-height: 44px !important; }
+/* (19 nov., retraits parfaits) Consigne ou comptoir, une fois par point ; « Nouveau » sur la ligne d'un colis qui vient
+   d'arriver, jusqu'à ce qu'il l'ouvre (ambre : un geste à faire — aller le chercher). */
+.v2-passe-lieu small.v2-passe-sorte { font-weight: 600; }
+.v2r-nouveau { display: inline-block; margin-right: 6px; padding: 1px 7px; border-radius: 9px; font-size: 12px; font-weight: 700; line-height: 18px;
+  vertical-align: 1px; color: inherit; background: rgb(255 179 64 / .28); }

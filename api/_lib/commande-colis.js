@@ -15,9 +15,10 @@
 import { achatDuColis } from '../../src/liensColis.js';
 import { achatParConversation } from './achat-arrive-relais.js';
 import { normaliserSuivi } from './etat-colis-email.js';
+import { estFormeCodeRetrait } from './forme-code-retrait.js';
 
 // Le code de retrait comparable (la forme de `codeRetrait` de l'app : lettres puis chiffres).
-export const codeColisNorm = (c) => { const x = String(c == null ? '' : c).toUpperCase().replace(/\s+/g, ''); return /^[A-Z]{0,2}\d{3,10}$/.test(x) ? x : ''; };
+export const codeColisNorm = (c) => { const x = String(c == null ? '' : c).toUpperCase().replace(/\s+/g, ''); return estFormeCodeRetrait(x) ? x : ''; };   // (19 nov.) api/_lib/forme-code-retrait.js
 
 // Code de retrait → transaction (null si deux transactions portent le même code).
 export function txParCodeDe(relais) {

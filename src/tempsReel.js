@@ -70,8 +70,15 @@ const REGLES = [
   [/^lbc_(?:listings|ventes|accounts|messages)$/, 'lbc'],
   [/^vc_(?:listings|ventes|session|offres|messages|achats)$/, 'vestiaire'],
   [/^email_reception_[0-9a-f]{16,64}$/, 'emails'],
+  // (19 nov., retraits parfaits — Julien : « je dois voir dans l'app quand un nouveau QR code ou colis à retirer a été
+  // détecté ») Un e-mail de colis rangé par le serveur (`email_track_*`) et un code de retrait lu dans une conversation
+  // par l'extension (`panel_colis_relais`) : l'app relit CETTE famille (`lireSuivis`, `relireColisRelais`) ; la liste
+  // « à retirer » se refait et ce qui est nouveau est annoncé (src/retraitsNouveaux.js). L'app n'écrit ni l'une ni l'autre
+  // sur une relecture (aucune boucle).
+  [/^email_track_[a-z0-9]{1,30}_[A-Za-z0-9_.-]{1,120}$/, 'colis'],
+  [/^panel_colis_relais$/, 'retrait'],
 ];
-const SANS_COMPTE = new Set(['transp', 'lbc', 'vestiaire', 'emails']);
+const SANS_COMPTE = new Set(['transp', 'lbc', 'vestiaire', 'emails', 'colis', 'retrait']);
 export function quoiDe(id) {
   const s = String(id == null ? '' : id);
   for (const [re, quoi] of REGLES) { const m = re.exec(s); if (m) return { quoi, uid: SANS_COMPTE.has(quoi) ? null : m[1] }; }
