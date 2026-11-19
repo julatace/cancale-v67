@@ -414,7 +414,7 @@ export function BarreDelai({ d, enTete = false }) {
   );
 }
 function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C = null, avecTransp = false, titreDe = null, delai = null, delaiEnTete = false, suiviDe = null, qrDe = null, memeColisDe = null }) {
-  // (17 nov., suivi multi-transporteurs) Le geste en cours sur la proposition « même colis » ou « délier ».
+  // (17 nov., suivi multi-transporteurs) Le geste en cours sur « délier » (un lien manuel que la liste lue contredit).
   const [mcEtat, setMcEtat] = React.useState('');
   const [ouvert, setOuvert] = React.useState(false);
   // (15 nov., Achats « Verre dépoli ») La feuille « Montre ce code au comptoir » (maquette validée).
@@ -492,11 +492,11 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
   // (19 nov., Julien : « ça doit être automatique […] on ne doit pas avoir le bouton relier un achat ») Plus de
   // « Achat pas encore relié · Relier » : la ligne dit ce qu'il y a DEDANS (`x.contenu`, src/contenuColis.js) — le prix
   // payé et le compte de l'achat relié par identité, ou « Contenu pas encore lu » et le geste connu, sans bouton.
-  // (17 nov., suivi multi-transporteurs — src/memeColis.js) Deux cas, à la place de « pas encore relié » :
-  //  · « C'est sans doute le même colis — Relier » : en attendant la liste des n° de l'achat (jamais lue), UN colis
-  //    et UN achat au même point, du même groupe de transporteur… SON toucher relie ; « Ce n'est pas le même » est gardé ;
-  //  · « Ce lien ne correspond pas au suivi Vinted — délier ? » : un lien posé à la main que la liste LUE contredit.
-  const mc = memeColisDe && titreSansArticle ? memeColisDe(x) : null;
+  // (17 nov., suivi multi-transporteurs — src/memeColis.js) « Ce lien ne correspond pas au suivi Vinted — délier ? » : un
+  // lien posé à la main par le passé que la liste LUE contredit. (19 nov.) La proposition « C'est sans doute le même
+  // colis — Relier » est retirée avec « Relier l'achat » (décision de Julien : automatique, ou rien).
+  const mc0 = memeColisDe && titreSansArticle ? memeColisDe(x) : null;
+  const mc = mc0 && mc0.sorte === 'contredit' ? mc0 : null;
   const contenu = x.contenu || null;
   const contenuTxt = mc ? '' : texteContenu(contenu, trVA);
   const geste = (f, quoi) => async (ev) => { ev.stopPropagation(); if (mcEtat) return; setMcEtat(quoi); let okG = false; try { okG = await f(); } catch (_) { okG = false; } setMcEtat(okG === false ? 'rate' : ''); };
@@ -563,12 +563,6 @@ function LigneRetraitF({ x, Photo, gestes, detail, echeance, statut, retirer, C 
           : x.code && !desaccord ? <button type="button" className="va-rond-code" data-va-code-grand={x.code} aria-label={trVA('va.code.grand')} title={trVA('va.code.grand')} onClick={(ev) => { ev.stopPropagation(); setComptoir(true); }}><IcoAgrandir/></button> : null}
         {retirer ? <button type="button" className="vrm-rpf-retire" data-colis-retire="" aria-label="J’ai retiré ce colis" onClick={(ev) => { ev.stopPropagation(); retirer(x); }}>J’ai retiré</button> : null}
       </div>
-      {mc && mc.sorte === 'proposition' ? <div className="vrm-rpf-relier vrm-rpf-meme" data-rp-meme-colis={x.cle} data-rp-meme-achat={mc.tx || ''}>
-        <span className="vrm-rpf-relier-t">{mc.titre ? trVA('achats.memeColis.proposeTitre', { titre: mc.titre }) : trVA('achats.memeColis.propose')}</span>
-        <button type="button" className="vrm-lien-action vrm-rpf-relier-b" data-rp-meme-relier={x.cle} disabled={!!mcEtat && mcEtat !== 'rate'} onClick={geste(mc.relier, 'relier')}>{mcEtat === 'relier' ? trVA('achats.relier.enCours') : trVA('achats.relier.bouton')}</button>
-        <button type="button" className="vrm-lien-action vrm-rpf-relier-b vrm-rpf-pas-meme" data-rp-pas-meme={x.cle} disabled={!!mcEtat && mcEtat !== 'rate'} onClick={geste(async () => { mc.pasMeme(); return true; }, 'pas')}>{trVA('achats.memeColis.pasMeme')}</button>
-        {mcEtat === 'rate' ? <span role="status" className="vrm-rpf-relier-t" data-rp-meme-rate="">{trVA('achats.relier.rate')}</span> : null}
-      </div> : null}
       {mc && mc.sorte === 'contredit' ? <div className="vrm-rpf-relier vrm-rpf-contredit" data-rp-lien-contredit={x.cle} role="note">
         <span className="vrm-rpf-relier-t">{trVA('achats.memeColis.contredit')}</span>
         <button type="button" className="vrm-lien-action vrm-rpf-relier-b" data-rp-delier={x.cle} disabled={!!mcEtat && mcEtat !== 'rate'} onClick={geste(mc.delier, 'delier')}>{mcEtat === 'delier' ? trVA('achats.memeColis.delierEnCours') : trVA('achats.memeColis.delier')}</button>

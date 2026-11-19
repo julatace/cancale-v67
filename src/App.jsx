@@ -136,7 +136,7 @@ import './design/studio-ventes.css';
 import { TeteStudio, BoutonPlein, Rond, TuilesFiltres } from './design/StudioVentes.jsx';
 import {achatDuColis,suivisAchat,entreeIndexAchat} from './liensColis.js';
 import { achatsARelier, ecritureRelierColis } from './relierColis.js';
-import { achatDuRetrait, contenuDuColis } from './contenuColis.js';
+import { achatDuRetrait, contenuDuColis, limiteDuColis } from './contenuColis.js';
 import { numerosDeListe, codesDeListe, lienContredit } from '../api/_lib/suivis-multiples.js';
 import { listesDesSuivisVinted, liensContredits } from './memeColis.js';
 import {sourcesDuColis,codeLuDeLigne,verdictCode,codesDesLignes,NOMS_SOURCES,texteVerifie} from './sourcesRetrait.js';
@@ -3464,6 +3464,7 @@ const SYNC_KEYS = [
   'vrm_carte_mfa_rangee',
   // (17 nov., suivi multi-transporteurs) « Ce n'est pas le même » sur une proposition « C'est sans doute le même
   // colis » (src/memeColis.js) : { 'n°|compte:transaction': date }, posé sur SON clic, vu sur tous ses appareils.
+  // (19 nov.) Plus lu ni écrit par l'app (la proposition « même colis · Relier » est retirée) ; la clé reste ici pour que rien ne soit effacé.
   'vrm_colis_pas_meme',
   // (9 nov., lot AF) LE JOURNAL DES N° (src/historiqueNumero.js) : APPEND-ONLY, une ligne par
   // changement de N° d'une fiche, écrite au moment du changement (`noterJournalNumeros`) ;
@@ -37539,46 +37540,20 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
     } catch (_) { return null; }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pickupUnion, buysBase, indexSuivisAchats]);
-  // ── (17 nov., suivi multi-transporteurs) « C'EST SANS DOUTE LE MÊME COLIS » ET « CE LIEN NE CORRESPOND PAS » ──
-  // La voie principale est l'identité (tous les n° du trajet, extension 5.403) : rien à proposer quand elle relie.
-  // EN ATTENDANT qu'un achat ait sa liste de n° lue, une PROPOSITION seulement quand rien d'autre n'est possible
-  // (src/memeColis.js : un colis, un achat, même point, même groupe de transporteur, arrivé après l'achat, aucun
-  // autre achat en route vers ce point) — SON toucher relie. Et un lien posé à la main que la liste LUE contredit
-  // ne relie plus rien : la ligne le dit et propose « Délier ».
-  const [colisPasMeme, setColisPasMeme] = useStateCle('vrm_colis_pas_meme', () => load('vrm_colis_pas_meme', {}));
+  // ── (17 nov., suivi multi-transporteurs) « CE LIEN NE CORRESPOND PAS AU SUIVI VINTED » ──
+  // La voie de l'identité : tous les n° du trajet d'un achat (extension 5.403). Un lien posé à la main par le passé que
+  // la liste LUE contredit ne relie plus rien : la ligne le dit et propose « Délier » (src/memeColis.js, `liensContredits`).
+  // (19 nov., décision de Julien : « je ne dois pas relier l'achat au colis qui est au point relais, ça doit être
+  // automatique […] on ne doit pas avoir le bouton relier un achat ») La PROPOSITION « C'est sans doute le même colis —
+  // Relier » (un colis et un achat au même point, SON toucher reliait) n'est plus montrée : c'était encore un « Relier »
+  // sur un colis à retirer, par ressemblance (même point, même transporteur). Le colis dit « Contenu pas encore lu »
+  // (src/contenuColis.js) jusqu'à ce que l'identité relie. `vrm_colis_pas_meme` n'est plus lu ni écrit (rien n'est effacé).
   const memeColis = useMemo(() => {
     try {
-      const lieuDeAchat = (o) => { const r = relaisDe(o); if (r && r.lieu) return String(r.lieu); const e = entreeSuiviAchat(o); return e && e.relais && e.relais.nom ? [e.relais.nom, e.relais.rue, [e.relais.cp, e.relais.ville].filter(Boolean).join(' ')].filter(Boolean).join(', ') : ''; };
-      const transpDeAchat = (o) => { const r = relaisDe(o); const e = entreeSuiviAchat(o); return [r && r.transporteur, e && e.transporteur, ...((e && e.transporteursV) || [])].filter(Boolean); };
-      const cleAchat = (o) => `${String((o && o._acc && o._acc.vinted_user_id) || (o && o._acc) || '')}:${String(o.transaction_id)}`;
-      const lignesT = [...(pickupUnion.emailList || []), ...(pickupUnion.aVerifier || []).filter((x) => x.kind === 'email' && x.t).map((x) => x.t)];
-      const colis = [];
-      for (const t of lignesT) {
-        if (!t || t.source === 'vinted-commande' || !suiviDeLigne(t) || commandeRetrait(t)) continue;
-        const a = arriveeColisEmail({ ...t, status: 'available' });
-        colis.push({ cle: colisKey(t), suivi: suiviDeLigne(t), transporteur: carrierKey(t.carrier) || t.carrier || '', lieu: t.lieu || '', arriveeMs: a && Number.isFinite(a.ms) ? a.ms : NaN });
-      }
-      const vus = new Set(); const achats = [];
-      for (const o of [...(pickupUnion.extra || []), ...(pickupUnion.aVerifier || []).filter((x) => x.kind === 'vinted' && x.o).map((x) => x.o), ...(pickupUnion.aConfirmer || [])]) {
-        if (!o || o.transaction_id == null) continue; const k = cleAchat(o); if (vus.has(k)) continue; vus.add(k);
-        const e = entreeSuiviAchat(o); const r = relaisDe(o);
-        achats.push({ cle: k, o, lieu: lieuDeAchat(o), transporteurs: transpDeAchat(o), listeLue: !!(e && e.listeLue), aCode: !!(r && (codeRetrait(r.code) || r.qr)), dateMs: Date.parse(o.date || '') });
-      }
-      const enRoute = [];
-      for (const o of (buysBase || [])) { if (o && o.transaction_id != null && phaseReception(o) === 'route') { const e = entreeSuiviAchat(o); enRoute.push({ cle: cleAchat(o), lieu: e && e.relais && e.relais.nom ? [e.relais.nom, e.relais.cp].filter(Boolean).join(', ') : '', transporteurs: transpDeAchat(o) }); } }
-      const propositions = propositionsMemeColis({ colis, achats, enRoute, pasMeme: new Set(Object.keys(colisPasMeme || {})) });
       const contredits = new Map(); for (const m of liensContredits(suivisVinted, suivisManuels)) contredits.set(normaliserSuivi(m.suivi), m);
-      return { propositions, contredits };
-    } catch (_) { return { propositions: new Map(), contredits: new Map() }; }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pickupUnion, buysBase, indexSuivisAchats, suivisVinted, suivisManuels, colisPasMeme]);
-  const relierMemeColis = async (t, p) => {
-    const w = ecritureRelierColis({ suivi: p.suivi, transporteur: carrierKey(t.carrier) || '' }, p.achat); if (!w) return false;
-    const r = await ecrireSuiviManuel(w.id, { ...w.patch, relieDepuis: 'proposition' });
-    if (!r.ok) return false;
-    await relireSuivisManuelsPartout(); return true;
-  };
-  const pasMemeColis = (p) => setColisPasMeme((prev) => { const u = { ...(prev || {}), [clePasMeme(p.suivi, p.cleAchat)]: new Date().toISOString() }; save('vrm_colis_pas_meme', u); return u; });
+      return { contredits };
+    } catch (_) { return { contredits: new Map() }; }
+  }, [suivisVinted, suivisManuels]);
   const delierLienContredit = async (m) => { const ok = await retirerSuiviManuel(m.id); if (ok) await relireSuivisManuelsPartout(); return ok; };
   // Les fins par n° de suivi (la règle de `pickupUnion`), pour dire où en est un
   // n° ajouté à la main (`etapeDuSuiviManuel`).
@@ -46915,6 +46890,18 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           prix: p != null && p > 0 ? montant(p) : '', compteAchat: plusieursComptesC && o && o._acc && typeof o._acc === 'object' ? accName(o._acc) : '', compteColis: t ? (compteDuColisEmail(t) || '') : '' });
       } catch (_) { return null; }
     };
+    // (19 nov.) + ce qu'il faut pour écrire le colis en UNE RANGÉE (`rangeeRetrait(x)`, src/contenuColis.js — l'écran
+    // Achats en rangées se construira dessus) : la date limite et si elle est LUE ou ESTIMÉE (la préséance de la barre de
+    // délai : lue, puis « vers le » du transporteur, puis la garde de SON transporteur), et « un QR existe pour ce colis ».
+    const limiteCarte = ({ t = null, o = null } = {}) => {
+      try {
+        const ev = !t && o ? (etatColisVinted(o, maintenant, tpmC) || {}) : null;
+        const arr = t ? arriveeColisEmail(t) : (ev ? ev.arr : null);
+        const est = arr && Number.isFinite(arr.ms) ? limiteEstimee({ arriveeMs: arr.ms, transporteur: carrierKey(t ? t.carrier : ((ev && ev.carrier) || '')) || '' }) : null;
+        return limiteDuColis({ limite: t ? t.limite : (ev && ev.limite), limiteAt: t ? t.limiteAt : (ev && ev.limiteAt), vers: t ? t.limiteVers : (ev && ev.limiteVers), estimation: est });
+      } catch (_) { return limiteDuColis({}); }
+    };
+    const qrCarte = ({ t = null, o = null } = {}) => { try { if (t) return !!qrVivant(t); const r = o ? relaisDe(o) : null; return !!(r && r.qr); } catch (_) { return false; } };
     const tpmC = transpMap;
     const dernierJour = (j) => (Number.isFinite(j) && j <= 1 ? (j <= 0 ? "dernier jour aujourd'hui" : 'dernier jour demain') : '');
     // (1er nov.) Chaque colis à retirer porte SON lieu (nom + adresse, tels que
@@ -47006,7 +46993,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const aa = (a || cmdN) ? null : (achatsAutres.get(suiviDeLigne(t)) || null);
       L.push({ cle: 'r:e:' + (suiviDeLigne(t) || t.id || t.cleLigne || colisKey(t) || ''), groupe: 'retirer', site: aa ? aa.site : 'vinted', achatAutre: aa, nom: nomAvecTaille(cmdN && cmdN.title ? cmdN.title : ((aa && aa.titre) || t.artTitle || (nomTr(t.carrier) ? `Colis ${nomTr(t.carrier)}` : 'Colis à retirer')), cmdN), photo: cmdN ? photoAchat(cmdN) : ((aa && aa.photo) || t.photo || null),
         etat: [lu.lieuNom || nomTr(t.carrier), dernierJour(ej) || (code ? code : (qrImage(t) ? 'QR code' : 'code pas encore lu'))].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
-        ...lu, lieuType: typeCasier(t.lieu), transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code && !(scE && scE.code && scE.code.desaccord), jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), arrivee: arriveeLueRetrait({ t }), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), ...champsSources(scE), contenu: contenuCarte({ t, o: cmdN, autre: aa, site: aa ? aa.site : 'vinted' }), src: { t } });
+        ...lu, lieuType: typeCasier(t.lieu), transporteur: t.carrier || '', transp: transporteurColis(t.carrier, suiviDeLigne(t)), code, code2: codeRetrait(t.code2) || '', qr: !!qrImage(t) && !code && !(scE && scE.code && scE.code.desaccord), jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eE), arrivee: arriveeLueRetrait({ t }), ...(lu.lieuNom ? {} : { sansLieu: sansLieuEmail(t) }), ...champsSources(scE), contenu: contenuCarte({ t, o: cmdN, autre: aa, site: aa ? aa.site : 'vinted' }), limite: limiteCarte({ t }), qrDispo: qrCarte({ t }), src: { t } });
     }
     // (14 nov., Vinted Go réacheminé) LE LIEU D'UN ACHAT VINTED SANS E-MAIL : celui de la conversation de SA commande,
     // confronté au suivi du transporteur du MÊME n° (son achat → son n° de suivi, une identité). Le plus RÉCENT prouvé
@@ -47026,7 +47013,7 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
       const suV = suivisAchat(o, indexSuivisAchats)[0] || ''; const eSV = entreeSuiviAchat(o); const trInconnu = !!suV && !((r && r.transporteur) || (eSV && eSV.transporteur) || transporteurDeForme(suV) || colisInternational(suV));
       L.push({ cle: 'r:v:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), num: '', trInconnu,
         etat: [lu.lieuNom || 'au point relais', dernierJour(ej) || (code || 'code pas encore lu')].filter(Boolean).join(' · '), ambre: Number.isFinite(ej) && ej <= 1, ouvrir: true,
-        ...lu, transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSV && eSV.transporteur) || '', suV), code, qr: !!(r && r.qr) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eV), arrivee: eV.arriveeSure != null ? eV.arriveeSure : null, ...(lu.lieuNom ? {} : { sansLieu: r && r.lieu ? { raison: 'La conversation Vinted ne nomme pas clairement le point.', geste: 'Ouvre la conversation du colis : le point y est écrit.' } : sansLieuVinted(o) }) , ...champsSources(scV), contenu: contenuCarte({ o }), src: { o } });
+        ...lu, transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSV && eSV.transporteur) || '', suV), code, qr: !!(r && r.qr) && !code, jours: Number.isFinite(ej) ? ej : null, tri: urgenceTri(eV), arrivee: eV.arriveeSure != null ? eV.arriveeSure : null, ...(lu.lieuNom ? {} : { sansLieu: r && r.lieu ? { raison: 'La conversation Vinted ne nomme pas clairement le point.', geste: 'Ouvre la conversation du colis : le point y est écrit.' } : sansLieuVinted(o) }) , ...champsSources(scV), contenu: contenuCarte({ o }), limite: limiteCarte({ o }), qrDispo: qrCarte({ o }), src: { o } });
     }
     for (const x of [...(pickupUnion.aVerifier || []), ...(pickupUnion.enDouble || [])]) {
       const o = x.kind === 'email' ? (x.o || achatDuColis(x.t, buysBase, indexSuivisAchats)) : x.o;
@@ -47043,13 +47030,13 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
         // (2 nov.) Présentation seulement : la raison (`raisonAVerifier`, la même que
         // l'ancien bloc « à vérifier ») et la source, pour les gestes de SA carte.
         arrivee: arriveeLueRetrait(x.kind === 'email' ? { t: x.t } : { o: x.o }),
-        raisonVerif: raisonAVerifier(x), raisonCode: (x.e && x.e.etat) || '', encoreCode: aEncoreCode(x), ...champsSources(scX), contenu: contenuCarte(x.kind === 'email' ? { t: x.t, o: x.o || (x.t ? commandeRetrait(x.t) : null) } : { o: x.o }), src: x.kind === 'email' ? { t: x.t, o: x.o || null } : { o: x.o } });
+        raisonVerif: raisonAVerifier(x), raisonCode: (x.e && x.e.etat) || '', encoreCode: aEncoreCode(x), ...champsSources(scX), contenu: contenuCarte(x.kind === 'email' ? { t: x.t, o: x.o || (x.t ? commandeRetrait(x.t) : null) } : { o: x.o }), limite: limiteCarte(x.kind === 'email' ? { t: x.t } : { o: x.o }), qrDispo: qrCarte(x.kind === 'email' ? { t: x.t } : { o: x.o }), src: x.kind === 'email' ? { t: x.t, o: x.o || null } : { o: x.o } });
     }
     for (const o of (pickupUnion.aConfirmer || [])) { const r = relaisDe(o); const lu = completer(lieuDe(r && r.lieu), r && r.transporteur, ''); const suC = suivisAchat(o, indexSuivisAchats)[0] || ''; const eSC = entreeSuiviAchat(o); const trInconnu = !!suC && !((r && r.transporteur) || (eSC && eSC.transporteur) || transporteurDeForme(suC) || colisInternational(suC));
       L.push({ cle: 'r:c:' + o.transaction_id, groupe: 'retirer', site: 'vinted', nom: nomAvecTaille(o.title || 'Achat', o), photo: photoAchat(o), trInconnu, etat: 'au point relais · à vérifier (compte pas relu)', aVerifier: true, horsCompte: true, ouvrir: true,
         ...lu, transporteur: (r && r.transporteur) || '', transp: transporteurColis((r && r.transporteur) || (eSC && eSC.transporteur) || '', suC), code: '', jours: null, ...(lu.lieuNom ? {} : { sansLieu: { raison: 'Peut-être le même colis qu’un e-mail : son compte Vinted n’a pas encore été relu.', geste: `Passe sur Vinted${o._acc ? ` connecté sur ${accName(o._acc)}` : ''} : l’extension relie le colis à son e-mail.` } }),
         arrivee: arriveeLueRetrait({ o }),
-        raisonVerif: `peut-être le même colis qu’un e-mail : compte ${o._acc ? accName(o._acc) + ' ' : ''}pas encore relu sur Vinted`, contenu: contenuCarte({ o }), src: { o } }); }
+        raisonVerif: `peut-être le même colis qu’un e-mail : compte ${o._acc ? accName(o._acc) + ' ' : ''}pas encore relu sur Vinted`, contenu: contenuCarte({ o }), limite: limiteCarte({ o }), qrDispo: qrCarte({ o }), src: { o } }); }
     // Partis : la règle de la section « Partis » plus bas (même filtre, même ordre).
     if (Array.isArray(sales.items)) {
       const ordre = { 'Retournée': 0, 'Retour en cours': 0, 'Au relais': 1, 'En transit': 2, 'Livrée': 3 };
@@ -55970,12 +55957,10 @@ function Comptabilite({ accounts, only, garageGrid, onLocate, onStore, onNav, on
           // (19 nov., Julien : « ça doit être automatique […] on ne doit pas avoir le bouton relier un achat ») Plus de
           // « Relier l'achat » sur un colis à retirer : chaque carte porte `contenu` (posé par `cartesColis`, la règle de
           // src/contenuColis.js) — l'achat relié par identité, ou « pas lu » et sa raison. Aucun geste ici.
-          // (17 nov., suivi multi-transporteurs) La proposition « C'est sans doute le même colis » (en attendant la liste
-          // des n° de l'achat) et le lien posé à la main que la liste LUE contredit (`memeColis`, src/memeColis.js).
+          // (17 nov., suivi multi-transporteurs) Le lien posé à la main que la liste LUE contredit (`memeColis`,
+          // src/memeColis.js) : « Délier ». (19 nov.) Plus de proposition « même colis · Relier » (décision de Julien).
           const memeColisDe = (x) => { const t = (x.src && x.src.t) || null; if (!t || x.horsCompte || x.redirige || (x.site && x.site !== 'vinted')) return null;
-            const c = memeColis.contredits.get(suiviDeLigne(t)); if (c) return { sorte: 'contredit', delier: () => delierLienContredit(c) };
-            const p = memeColis.propositions.get(colisKey(t)); if (!p) return null;
-            return { sorte: 'proposition', titre: (p.achat && p.achat.title) || '', tx: String(p.achat.transaction_id), relier: () => relierMemeColis(t, p), pasMeme: () => pasMemeColis(p) }; };
+            const c = memeColis.contredits.get(suiviDeLigne(t)); return c ? { sorte: 'contredit', delier: () => delierLienContredit(c) } : null; };
           const delaiColisRetrait = (x) => { if (x.horsCompte) return null; const t = (x.src && x.src.t) || null, o = (x.src && x.src.o) || null;
             const ev = !t && o ? (etatColisVinted(o, Date.now(), transpMap) || {}) : null;
             const arr = t ? arriveeColisEmail(t) : (ev ? ev.arr : null);

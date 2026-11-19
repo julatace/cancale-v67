@@ -235,7 +235,7 @@ html body button.v2-rangee.v2-passe-mini { flex-direction: column; align-items: 
    « Contenu pas encore lu · ouvre vinted.fr sur … » — une ligne discrète, jamais un bouton (src/contenuColis.js). */
 .v2-passe-quoi { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; text-align: left; }
 .v2-passe-quoi > .v2-passe-titre { flex: none; }
-.v2-passe-dedans { font-size: 13px; line-height: 1.35; color: var(--v2-muet); overflow-wrap: anywhere; }
+.v2-passe-dedans { font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }   /* la couleur : `.v2-muet` (celle que chaque habillage donne déjà au texte discret d'une passe) */
 .v2-passe-gestes { align-self: stretch; display: flex; flex-wrap: wrap; gap: 6px; justify-content: space-between; }
 .v2-passe-pages { text-align: center; font-size: 13px; color: var(--v2-muet); padding: 0 0 12px; font-variant-numeric: tabular-nums; }
 

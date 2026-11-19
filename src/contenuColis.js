@@ -70,3 +70,63 @@ export function texteContenu(c, tr) {
   }
   return '';
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+//  UN COLIS À RETIRER EN UNE RANGÉE — LE SÉLECTEUR (19 nov.)
+// ════════════════════════════════════════════════════════════════════════════
+// Julien (19 nov., capture de la passe géante) : « je ne comprends pas pourquoi les codes de retrait sont aussi gros,
+// tu peux faire ça beaucoup plus petit : simplement une ligne comme pour les achats ». L'écran Achats en rangées
+// (« VRM natif », docs/design/NATIF.md) se construira sur `rangeeRetrait(x)` : TOUT ce qu'une rangée montre d'un colis,
+// en données, sans une règle de plus — chaque champ vient de la carte « à retirer » (`cartesColis`, App.jsx), elle-même
+// faite des règles de `pickupUnion` (src/retraitPreuves.js) et de `contenuDuColis` ci-dessus.
+
+// LA DATE LIMITE : LUE (écrite dans l'e-mail, par le transporteur ou dans la conversation) ou ESTIMÉE (« vers le » du
+// transporteur, sinon la garde habituelle de SON transporteur — api/_lib/retrait-colis.js, `limiteEstimee`). Les deux ne
+// se confondent jamais : une rangée dit « avant le 24 » pour une date lue, « vers le 24 » pour une estimée.
+// La même préséance que la barre de délai de la ligne (`delaiColisRetrait`, App.jsx) : lue, puis « vers », puis la garde.
+const jourIso = (v) => { const s = String(v == null ? '' : v).slice(0, 10); return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : ''; };
+export function limiteDuColis({ limite = '', limiteAt = '', vers = '', estimation = null } = {}) {
+  if (limite || limiteAt) return { jour: jourIso(limite), at: limiteAt ? String(limiteAt) : '', source: 'lue' };
+  if (jourIso(vers)) return { jour: jourIso(vers), at: '', source: 'estimee' };
+  if (estimation && jourIso(estimation.jour)) return { jour: jourIso(estimation.jour), at: '', source: 'estimee', garde: Number.isFinite(Number(estimation.garde)) ? Number(estimation.garde) : null };
+  return { jour: '', at: '', source: 'inconnue' };
+}
+
+// `x` : une carte « à retirer » (une entrée de `parPoint.points[].arrives`, ou de la colonne). Rend :
+//   cle            l'identité de la carte (n° de suivi `r:e:…`, transaction `r:v:…`) ;
+//   contenu        le sélecteur du contenu ({ etat: 'relie' | 'pas-lu' | 'autre-site', … }) ou null ;
+//   titre, titreDe le nom à écrire et d'où il vient : 'achat' (relié par identité) · 'email' (l'e-mail de CE colis le
+//                  nomme) · '' (rien : l'écran écrit « Colis {transporteur} ») ;
+//   photo          la photo de l'achat relié, ou null (l'écran montre alors le logo du transporteur) ;
+//   point          { nom, adresse } tels que lus ('' = pas su) ;
+//   transporteur   { cle, nom } ('' = pas su, jamais deviné) ;
+//   code, codeEtat le code de retrait en clair et son état : 'lu' · 'desaccord' (deux sources, deux codes : aucun choisi)
+//                  · 'qr-seul' (un QR, pas de code) · 'pas-lu' ;
+//   qr             un QR existe pour CE colis (lu dans l'e-mail, la capture ou la conversation — jamais fabriqué) ;
+//   limite         { jour, at, source: 'lue' | 'estimee' | 'inconnue' } ;
+//   aVerifier      hors du compte « à retirer » (délai dépassé, incident, peut-être en double) : visible, jamais compté.
+export function rangeeRetrait(x) {
+  if (!x || typeof x !== 'object') return null;
+  const c = x.contenu && typeof x.contenu === 'object' ? x.contenu : null;
+  const relie = !!(c && c.etat === 'relie');
+  const t = (x.src && x.src.t) || null;
+  const titreAchat = c && (c.etat === 'relie' || c.etat === 'autre-site') ? String(c.titre || '') : '';
+  const titreEmail = !titreAchat && t && t.artTitle ? String(t.artTitle).trim() : '';
+  const desaccord = Array.isArray(x.codesDesaccord) && x.codesDesaccord.length > 1;
+  const code = desaccord ? '' : String(x.code || x.code2 || '');
+  const tr = x.transp && !x.trInconnu ? x.transp : null;
+  return {
+    cle: String(x.cle || x.id || ''),
+    contenu: c,
+    titre: titreAchat || titreEmail,
+    titreDe: titreAchat ? 'achat' : (titreEmail ? 'email' : ''),
+    photo: relie ? (c.photo || null) : (c && c.etat === 'autre-site' ? (x.photo || null) : null),
+    point: { nom: String(x.lieuNom || ''), adresse: String(x.lieuAdresse || '') },
+    transporteur: { cle: String((tr && tr.cle) || ''), nom: String((tr && tr.nom) || '') },
+    code,
+    codeEtat: desaccord ? 'desaccord' : code ? 'lu' : (x.qrDispo ? 'qr-seul' : 'pas-lu'),
+    qr: !!x.qrDispo,
+    limite: x.limite && typeof x.limite === 'object' ? x.limite : limiteDuColis({}),
+    aVerifier: !!(x.aVerifier || x.horsCompte),
+  };
+}

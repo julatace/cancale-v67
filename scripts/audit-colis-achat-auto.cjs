@@ -26,6 +26,14 @@
 //   G  le branchement : plus AUCUN geste « Relier » sur un colis à retirer (passe, colonne détaillée, clés de
 //      traduction) ; chaque carte « à retirer » porte SON `contenu` (`cartesColis` → `contenuDuColis`), l'écran relie
 //      par `achatDuRetrait` ; la feuille de choix ne s'ouvre plus que depuis le scanner ;
+//      la proposition « même colis — Relier » (par ressemblance : même point, même transporteur) n'est plus montrée ;
+//   M  l'e-mail Vinted « Commande mise à jour pour {titre} — ton achat t'attend » (casier, point relais) : jamais de
+//      n° de suivi, mais la CONVERSATION de sa commande ⇒ rangé avec SON achat, plus « à vérifier · je n'ai pas
+//      trouvé le n° de suivi » (mesuré : 78 e-mails sur 30 jours, tous « à vérifier », tous reliés par la
+//      conversation) ; un e-mail de TRANSPORTEUR sans n° reste « à vérifier » ;
+//   R  UN COLIS EN UNE RANGÉE (`rangeeRetrait`, le sélecteur que l'écran Achats en rangées lira) : achat relié ou
+//      raison, point, transporteur, code en clair et son état, QR disponible ou non, date limite LUE ou ESTIMÉE —
+//      jamais un code choisi entre deux, jamais une photo ni un transporteur devinés ;
 //   T  les phrases existent dans les 5 langues, avec leurs variables.
 // `--prouve` : chaque mutation réaffaiblit UNE règle ⇒ l'audit DOIT rougir (un contrôle qui ne peut pas échouer
 // est pire qu'absent, §6). Sur le code d'avant (`git archive origin/main`, l'audit copié DEDANS) : rouge.
@@ -56,11 +64,25 @@ const MUTS = {
   'app-relier-revenu': ['src/App.jsx', "aides={{ echeance: echeanceRetrait, titre: titreRetrait, retirer: retirerColis,", "aides={{ echeance: echeanceRetrait, titre: titreRetrait, retirer: retirerColis, relier: (x) => () => setRelierColis({ suivi: suiviDeLigne(x.src.t) }),"],
   'app-carte-sans-contenu': ['src/App.jsx', "...champsSources(scE), contenu: contenuCarte({ t, o: cmdN, autre: aa, site: aa ? aa.site : 'vinted' }), src: { t } });", "...champsSources(scE), src: { t } });"],
   'app-prix-brut': ['src/App.jsx', "prix: p != null && p > 0 ? montant(p) : '', compteAchat:", "prix: montant(montantCommande(o)), compteAchat:"],
+  'proposition-revenue': ['src/CarteRelais.jsx', "  const mc = mc0 && mc0.sorte === 'contredit' ? mc0 : null;", "  const mc = mc0;"],
+  'mail-conversation-ignoree': ['api/_lib/resume-email.js', "if (!r.s && !r.cv && ['available', 'delivered', 'retour'].includes(c.status)) r.av = 'sans-suivi';", "if (!r.s && ['available', 'delivered', 'retour'].includes(c.status)) r.av = 'sans-suivi';"],
+  'mail-achat-a-verifier': ['src/journalEmail.js', "  return !!r.cv || SUJET_ACHAT_VINTED.test(String((e && e.subject) || ''));", "  return false;"],
+  'mail-transporteur-range': ['src/journalEmail.js', "if (!r || r.t !== 'suivi' || r.s || r.tr !== 'autre' || r.st !== 'available' || r.sens === 'sortant') return false;", "if (!r || r.t !== 'suivi' || r.s || r.st !== 'available' || r.sens === 'sortant') return false;"],
+  'mail-sujet-seul': ['src/journalEmail.js', "  return !!r.cv || SUJET_ACHAT_VINTED.test(String((e && e.subject) || ''));", "  return true;"],
+  'limite-estimee-dite-lue': ['src/contenuColis.js', "  if (jourIso(vers)) return { jour: jourIso(vers), at: '', source: 'estimee' };", "  if (jourIso(vers)) return { jour: jourIso(vers), at: '', source: 'lue' };"],
+  'limite-garde-avant-lue': ['src/contenuColis.js', "  if (limite || limiteAt) return { jour: jourIso(limite), at: limiteAt ? String(limiteAt) : '', source: 'lue' };\n", ""],
+  'rangee-code-choisi': ['src/contenuColis.js', "  const code = desaccord ? '' : String(x.code || x.code2 || '');", "  const code = String(x.code || x.code2 || (desaccord ? x.codesDesaccord[0].code : '') || '');"],
+  'rangee-photo-devinee': ['src/contenuColis.js', "    photo: relie ? (c.photo || null) : (c && c.etat === 'autre-site' ? (x.photo || null) : null),", "    photo: relie ? (c.photo || null) : (x.photo || null),"],
+  'rangee-transporteur-devine': ['src/contenuColis.js', "  const tr = x.transp && !x.trInconnu ? x.transp : null;", "  const tr = x.transp || null;"],
+  'app-carte-sans-limite': ['src/App.jsx', "limite: limiteCarte({ t }), qrDispo: qrCarte({ t }), src: { t } });", "src: { t } });"],
   'cle-allemande-absente': ['src/i18n/langues/de/achats.js', '  "achats.contenu.pasLuCompte":', '  "achats.contenu.pasLuCompteX":'],
   'cle-relier-revenue': ['src/i18n/langues/fr/designV2.js', '  "v2.passe.retire":', '  "v2.passe.relier": "Relier l’achat",\n  "v2.passe.retire":'],
 };
 if (process.argv.includes('--prouve')) {
   let n = 0;
+  // Le TÉMOIN : la même copie, sans mutation, doit être verte — sinon un rouge ne prouverait rien.
+  { let code = 0; try { execFileSync(process.execPath, [__filename, '--mutation=temoin'], { stdio: 'pipe' }); } catch (e) { code = e.status; }
+    console.log(`${code === 0 ? '✅' : '❌'} témoin (copie sans mutation) ⇒ ${code === 0 ? 'vert' : 'ROUGE (' + code + ') : la preuve ne vaut rien'}`); if (code !== 0) process.exit(1); }
   for (const k of Object.keys(MUTS)) {
     let code = 0, sortie = '';
     try { sortie = String(execFileSync(process.execPath, [__filename, '--mutation=' + k], { stdio: 'pipe' })); } catch (e) { code = e.status; sortie = String(e.stdout || ''); }
@@ -74,15 +96,19 @@ if (process.argv.includes('--prouve')) {
 let RC = R;   // la racine du code jugé (une copie quand une mutation est demandée)
 const MUT = (process.argv.find((a) => a.startsWith('--mutation=')) || '').split('=')[1];
 if (MUT) {
-  if (!MUTS[MUT]) { console.log('mutation inconnue : ' + MUT); process.exit(2); }
+  if (MUT !== 'temoin' && !MUTS[MUT]) { console.log('mutation inconnue : ' + MUT); process.exit(2); }
   const d = fs.mkdtempSync(path.join(os.tmpdir(), 'colis-achat-auto-'));
   fs.cpSync(path.join(R, 'src'), path.join(d, 'src'), { recursive: true });
-  fs.cpSync(path.join(R, 'api', '_lib'), path.join(d, 'api', '_lib'), { recursive: true });
-  const [f, de, vers] = MUTS[MUT];
-  const p = path.join(d, f); const s = fs.readFileSync(p, 'utf8');
-  if (!s.includes(de)) { console.log('motif introuvable : ' + MUT); process.exit(2); }
-  fs.writeFileSync(p, s.replace(de, vers)); RC = d;
-  console.log('⚠️  MUTATION « ' + MUT + ' » — doit rougir');
+  fs.cpSync(path.join(R, 'api'), path.join(d, 'api'), { recursive: true });
+  fs.cpSync(path.join(R, 'scripts', '_source-app.cjs'), path.join(d, 'scripts', '_source-app.cjs'));
+  RC = d;
+  if (MUT !== 'temoin') {
+    const [f, de, vers] = MUTS[MUT];
+    const p = path.join(d, f); const s = fs.readFileSync(p, 'utf8');
+    if (!s.includes(de)) { console.log('motif introuvable : ' + MUT); process.exit(2); }
+    fs.writeFileSync(p, s.replace(de, vers));
+    console.log('⚠️  MUTATION « ' + MUT + ' » — doit rougir');
+  }
   process.on('exit', () => { try { fs.rmSync(d, { recursive: true, force: true }); } catch (_) {} });
 }
 let ok = 0, ko = 0;
@@ -227,6 +253,70 @@ const colis = (suivi, plus = {}) => ({ suivi, carrier: 'mondialrelay', status: '
     dit(ouvertures > 0 && ouvertures === parScan, 'G11 la feuille de choix ne s’ouvre plus que depuis le scanner (un colis qu’il tient en main)', `${parScan}/${ouvertures}`);
     for (const l of ['fr', 'en', 'es', 'it', 'de']) { const d2 = lire(`src/i18n/langues/${l}/designV2.js`) || ''; const a2 = lire(`src/i18n/langues/${l}/achats.js`) || ''; if (/"v2\.passe\.relier"/.test(d2) || /"achats\.relier\.pasRelie"/.test(a2)) { dit(false, 'G12 les phrases « Relier l’achat » / « Achat pas encore relié » sont retirées des 5 langues', l); return; } }
     dit(true, 'G12 les phrases « Relier l’achat » / « Achat pas encore relié » sont retirées des 5 langues');
+    dit(!/data-rp-meme-relier|data-rp-pas-meme|achats\.memeColis\.propose|achats\.relier\.bouton/.test(CR) && /const mc = mc0 && mc0\.sorte === 'contredit' \? mc0 : null;/.test(CR) && !/propositionsMemeColis|relierMemeColis|memeColis\.propositions/.test(APP), 'G13 la proposition « C’est sans doute le même colis — Relier » (un Relier par ressemblance) n’est plus montrée ; « délier » un lien contredit reste');
+  });
+
+  console.log('\n── M. L’e-mail Vinted d’un achat arrivé : rangé avec son achat par la conversation, plus « à vérifier »');
+  await essai('M', async () => {
+    const RM = await importer('api/_lib/resume-email.js'), JE = await importer('src/journalEmail.js'), BE = await importer('src/boiteEmails.js');
+    if (!RM || !JE || !BE) return;
+    const CONV = '01a1aaaa-bbbb-7ccc-8ddd-000000000037', SUJET = 'Commande mise à jour pour Baskets blanches 42';
+    // Ce que la route répond pour cet e-mail (api/email-inbound.js, branche 0a) : type suivi, transporteur « autre », arrivé, la conversation.
+    const neuf = RM.resumeClassement(200, { ok: true, type: 'suivi', carrier: 'autre', status: 'available', arrivee: 'livre', conv: CONV, ligne: `email_track_autre_conv-${CONV}`, lieu: 'Casier Exemple, 1 rue Exemple, 35000 Rennes', code: '' }, { lieu: 'Casier Exemple, 1 rue Exemple, 35000 Rennes', article: 'Baskets blanches 42' });
+    dit(neuf.t === 'suivi' && neuf.cv === CONV && !neuf.av && !neuf.s, 'M1 au classement : la conversation est gardée (`cv`), l’e-mail n’est plus « sans-suivi »', neuf);
+    const sansLien = RM.resumeClassement(200, { ok: true, type: 'suivi', carrier: 'autre', status: 'available', conv: '' }, {});
+    dit(sansLien.av === 'sans-suivi' && !sansLien.cv, 'M2 sans conversation lue (aucune identité) : toujours « à vérifier »', sansLien);
+    const transporteur = RM.resumeClassement(200, { ok: true, type: 'suivi', carrier: 'mondialrelay', status: 'available' }, { code: '123456' });
+    dit(transporteur.av === 'sans-suivi', 'M3 un e-mail de TRANSPORTEUR sans n° de suivi reste « à vérifier »', transporteur);
+    const E = (resume, plus = {}) => ({ id: 'email_reception_' + 'a'.repeat(16), at: '2026-11-19T12:01:00.000Z', etat: resume.av ? 'a-verifier' : 'integre', type: 'suivi', subject: SUJET, from: 'Vinted <no-reply@vinted.fr>', resume: { v: 1, ...resume }, ...plus });
+    const l1 = JE.lectureEmail(E(neuf));
+    dit(l1.etat === 'range' && !l1.raison && !l1.geste && /achat/.test(l1.fait) && /conversation/.test(l1.fait) && l1.cible && l1.cible.k === 'conv' && l1.cible.v === CONV, 'M4 le journal dit « rangé avec ton achat, par la conversation de sa commande » — rien à vérifier', l1);
+    // Les e-mails DÉJÀ classés (avant le 19 nov.) : « sans-suivi », sans `cv`, rangés « a-verifier » en base.
+    const ancien = E({ t: 'suivi', tr: 'autre', st: 'available', lieu: 'Casier Exemple', av: 'sans-suivi' });
+    const l2 = JE.lectureEmail(ancien), g2 = BE.ligneEmail(ancien, {}, Date.parse('2026-11-19T13:00:00Z'));
+    dit(JE.arriveeAchatVinted(ancien) === true && l2.etat === 'range' && !l2.raison && !/aucun colis/.test(l2.fait), 'M5 un e-mail déjà classé « à vérifier » de cette famille se lit rangé (plus « je n’ai pas trouvé le n° de suivi »)', l2);
+    dit(!!g2 && (!g2.geste || g2.geste.k !== 'verifier'), 'M6 sa ligne dans la boîte ne porte plus « à vérifier » (il garde « à retirer »)', g2 && g2.geste);
+    const mr = { ...E({ t: 'suivi', tr: 'mondialrelay', st: 'available', av: 'sans-suivi' }), subject: 'Votre colis est disponible' };
+    const l3 = JE.lectureEmail(mr), g3 = BE.ligneEmail(mr, {}, Date.parse('2026-11-19T13:00:00Z'));
+    dit(JE.arriveeAchatVinted(mr) === false && l3.etat === 'verifier' && /n° de suivi/.test(l3.raison) && g3.geste && g3.geste.k === 'verifier', 'M7 un e-mail de transporteur sans n° : toujours « à vérifier », avec sa raison', { l3: l3.etat, g3: g3.geste });
+    const mrSujet = { ...mr, subject: SUJET };
+    dit(JE.arriveeAchatVinted(mrSujet) === false && JE.arriveeAchatVinted({ ...ancien, subject: 'Votre colis est disponible' }) === false, 'M8 ni le sujet seul, ni « autre » seul ne suffisent (sans conversation gardée : les deux)');
+    dit(JE.arriveeAchatVinted(E({ t: 'suivi', tr: 'autre', st: 'available', s: '81000037' })) === false && JE.arriveeAchatVinted(E({ t: 'suivi', tr: 'autre', st: 'delivered', av: 'sans-suivi' })) === false && JE.arriveeAchatVinted(null) === false, 'M9 un e-mail avec son n° de suivi, un colis livré, rien : pas concernés');
+    const route = sansCommentaires(lire('api/email-inbound.js'));
+    dit(/type: 'suivi', carrier: 'autre', status: retire \? 'delivered' : 'available', arrivee: arr\.forme, conv: arr\.conv \|\| ''/.test(route), 'M10 la route répond bien la conversation de cet e-mail (ce que le résumé lit)');
+  });
+
+  console.log('\n── R. Un colis en une rangée : le sélecteur');
+  await essai('R', async () => {
+    const limiteDuColis = C && C.limiteDuColis, rangeeRetrait = C && C.rangeeRetrait;
+    dit(typeof limiteDuColis === 'function' && typeof rangeeRetrait === 'function', 'R0 le sélecteur existe (`rangeeRetrait`, `limiteDuColis`)');
+    if (typeof limiteDuColis !== 'function' || typeof rangeeRetrait !== 'function') return;
+    const lue = limiteDuColis({ limite: '2026-11-24', vers: '2026-11-26', estimation: { jour: '2026-11-27', garde: 8 } });
+    dit(lue.source === 'lue' && lue.jour === '2026-11-24', 'R1 une date limite LUE prime sur « vers le » et sur la garde du transporteur', lue);
+    const heure = limiteDuColis({ limiteAt: '2026-11-24T19:00:00+01:00' });
+    dit(heure.source === 'lue' && heure.at === '2026-11-24T19:00:00+01:00', 'R2 une heure limite lue (consigne) est une date LUE', heure);
+    const vers = limiteDuColis({ vers: '2026-11-26T00:00:00Z', estimation: { jour: '2026-11-27', garde: 8 } }), garde = limiteDuColis({ estimation: { jour: '2026-11-27', garde: 8 } });
+    dit(vers.source === 'estimee' && vers.jour === '2026-11-26' && garde.source === 'estimee' && garde.jour === '2026-11-27' && garde.garde === 8, 'R3 « vers le » du transporteur, puis sa garde : ESTIMÉE, jamais dite lue', { vers, garde });
+    dit(limiteDuColis({}).source === 'inconnue' && limiteDuColis({}).jour === '' && limiteDuColis({ estimation: { jour: 'bientôt' } }).source === 'inconnue', 'R4 rien de lu ni d’estimable ⇒ « inconnue » (pas de date inventée)');
+    const index = { [cle(BON)]: { uid: '111', suivi: N } };
+    const o = relie(colis(N), cinquante, index);
+    const carteRelie = { cle: 'r:e:' + N, contenu: contenuDuColis({ ligne: colis(N), suivi: N, achat: o, site: 'vinted', photo: PHOTO, prix: '24,00 €', compteAchat: 'compte_a' }), photo: PHOTO, lieuNom: 'Tabac Exemple', lieuAdresse: '12 rue Exemple, 35000 Rennes',
+      transp: { cle: 'mondialrelay', nom: 'Mondial Relay' }, code: '123456', qrDispo: true, limite: lue, src: { t: colis(N) } };
+    const r1 = rangeeRetrait(carteRelie);
+    dit(Object.keys(r1).sort().join() === 'aVerifier,cle,code,codeEtat,contenu,limite,photo,point,qr,titre,titreDe,transporteur', 'R5 la rangée porte exactement : contenu, titre, photo, point, transporteur, code et son état, QR, date limite, à vérifier', Object.keys(r1).sort().join());
+    dit(r1.contenu.etat === 'relie' && r1.titre === TITRE && r1.titreDe === 'achat' && r1.photo === PHOTO && r1.contenu.prix === '24,00 €' && r1.contenu.compte === 'compte_a' && r1.point.nom === 'Tabac Exemple' && r1.transporteur.cle === 'mondialrelay' && r1.code === '123456' && r1.codeEtat === 'lu' && r1.qr === true && r1.limite.source === 'lue' && r1.aVerifier === false, 'R6 un colis relié : l’achat (photo, titre, prix payé, compte), le point, le transporteur, le code en clair, le QR, la limite lue', r1);
+    const pasLu = rangeeRetrait({ cle: 'r:e:81000099', contenu: contenuDuColis({ ligne: colis('81000099'), suivi: '81000099', achat: null, site: 'vinted', compteColis: 'compte_b' }), photo: PHOTO, lieuNom: '', transp: { cle: 'mondialrelay', nom: 'Mondial Relay' }, trInconnu: true, code: '', qrDispo: false, limite: garde, src: { t: colis('81000099') } });
+    dit(pasLu.contenu.etat === 'pas-lu' && pasLu.contenu.raison === 'ouvrir-vinted' && pasLu.titre === '' && pasLu.titreDe === '' && pasLu.photo === null && pasLu.transporteur.cle === '' && pasLu.codeEtat === 'pas-lu' && pasLu.qr === false && pasLu.limite.source === 'estimee' && pasLu.point.nom === '', 'R7 un colis pas relié : la raison, AUCUN titre ni photo d’achat, transporteur pas su ⇒ vide, limite estimée dite estimée', pasLu);
+    const des = rangeeRetrait({ cle: 'x', contenu: null, code: '111111', codesDesaccord: [{ source: 'email', code: '111111' }, { source: 'message', code: '222222' }], qrDispo: true, src: { t: colis(N) } });
+    dit(des.code === '' && des.codeEtat === 'desaccord' && des.qr === true, 'R8 deux sources, deux codes : aucun n’est choisi (« desaccord »)', des);
+    dit(rangeeRetrait({ cle: 'x', code: '', qrDispo: true }).codeEtat === 'qr-seul' && rangeeRetrait({ cle: 'x', code: '', qrDispo: false }).codeEtat === 'pas-lu', 'R9 un QR sans code ⇒ « qr-seul » ; ni l’un ni l’autre ⇒ « pas-lu »');
+    const moitie = rangeeRetrait({ cle: 'y', contenu: null, aVerifier: true, horsCompte: true, src: { t: { artTitle: 'Sandales bleues', source: 'vinted-commande' } } });
+    dit(moitie.titre === 'Sandales bleues' && moitie.titreDe === 'email' && moitie.photo === null && moitie.aVerifier === true && moitie.limite.source === 'inconnue', 'R10 le titre que l’e-mail de CE colis donne est dit « email », jamais « achat » ; un « à vérifier » le reste', moitie);
+    dit(rangeeRetrait(null) === null, 'R11 pas de carte ⇒ null');
+    let APP = ''; try { APP = sansCommentaires(require(path.join(__dirname, '_source-app.cjs')).sourceApp(RC)); } catch (_) { APP = sansCommentaires(lire('src/App.jsx')); }
+    const PASSE = sansCommentaires(lire('src/designV2/PassesRetrait.jsx'));
+    dit((APP.match(/limite: limiteCarte\(/g) || []).length === 4 && (APP.match(/qrDispo: qrCarte\(/g) || []).length === 4 && /return limiteDuColis\(\{ limite: t \? t\.limite : \(ev && ev\.limite\), limiteAt: t \? t\.limiteAt : \(ev && ev\.limiteAt\), vers: t \? t\.limiteVers : \(ev && ev\.limiteVers\), estimation: est \}\);/.test(APP), 'R12 chaque carte « à retirer » porte sa date limite (les sources de la barre de délai) et « un QR existe »');
+    dit(/const rg = rangeeRetrait\(x\);/.test(PASSE) && /'data-v2-limite-source': rg\.limite\.source/.test(PASSE) && /'data-v2-qr-dispo': rg\.qr \? '1' : '0'/.test(PASSE), 'R13 l’écran d’aujourd’hui pose les faits du sélecteur sur chaque colis (les bancs les jugent)');
   });
 
   console.log('\n── T. Les phrases, dans les 5 langues');

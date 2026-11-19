@@ -23,6 +23,13 @@
 // Plusieurs candidats, d'un côté ou de l'autre ⇒ aucune proposition. Dès que la liste est lue, c'est elle
 // qui tranche : plus de proposition, et un lien posé à la main qu'elle contredit est DIT (`liensContredits`).
 // PUR : l'app et scripts/audit-meme-colis.cjs exécutent CES fonctions.
+//
+// ⚠️ (19 nov., décision de Julien : « je ne dois pas relier l'achat au colis qui est au point relais, ça doit être
+// automatique […] on ne doit pas avoir le bouton relier un achat ») L'APP NE MONTRE PLUS LA PROPOSITION : c'était un
+// « Relier » de plus sur un colis à retirer, par ressemblance (même point, même transporteur). `propositionsMemeColis`
+// et `clePasMeme` restent ici, exécutées par leur audit, mais plus aucun écran ne les appelle — ne pas les rebrancher
+// sans qu'il le demande. Seul « ce lien ne correspond pas — délier » (`liensContredits`) sert encore, pour les liens
+// posés à la main par le passé. Le colis sans identité dit « Contenu pas encore lu » (src/contenuColis.js).
 import { cleLieuDoute } from '../api/_lib/achat-arrive-relais.js';
 import { normaliserSuivi } from '../api/_lib/etat-colis-email.js';
 import { lienContredit } from '../api/_lib/suivis-multiples.js';
