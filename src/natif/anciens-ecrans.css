@@ -374,6 +374,9 @@ html body .v2-outils-feuille .vrm-outils-vers { min-height: 44px !important; }
    navigateur (déjà sur main) — le remplissage et le rayon du natif, sans bord ; « Régler par paire » est un lien. */
 html body .v2-outils-feuille :is(button.vrm-outils-vers, .v2-ann-menu-tri select) { border: 0 !important; border-radius: 10px !important; background: var(--ap-remplir) !important; color: var(--ap-encre) !important; box-shadow: none !important; }
 html body .v2-outils-feuille .v2-ann-menu-tri select { padding: 0 10px !important; }
+html body .v2-outils-feuille .vrm-offres-auto { background: var(--ap-remplir) !important; border-color: transparent !important; box-shadow: none !important; }
+/* « Qui dorment », les modes : le nombre d'un segment suit l'encre de son segment (gris sur le pouce de la nuit : 2,51:1). */
+html body .vrm-seg > .vrm-seg-btn .vrm-of-n { color: inherit !important; opacity: 1 !important; font-weight: 400 !important; }
 html body .v2-outils-feuille button.vrm-offres-auto-regler { border: 0 !important; background: none !important; box-shadow: none !important; color: var(--ap-bleu) !important; padding-left: 0 !important; }
 html body .vrm-fc-seg > .vrm-seg-btn { min-width: 44px !important; }
 /* Achats à l'ordinateur : « Calculette » était rogné dans sa propre boîte. */
