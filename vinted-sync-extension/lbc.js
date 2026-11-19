@@ -893,7 +893,7 @@
     clearInterval(pendingTimer);
     pending = ad;
     publieEtat = { ok: true };
-    send({ action: 'markPosted', id: ad.id });   // sort de la file (et l'app le sait)
+    send({ action: 'markPosted', id: ad.id, numero: ad.numero != null ? String(ad.numero) : '' });   // sort de la file (et l'app le sait) ; 5.409 : le N° part avec, l'annonce créée le garde
     send({ action: 'setPending', ad: null });     // ne pas republier
     try { send({ action: 'depotProgres', id: ad.id, progres: { etape: 'publication' } }); } catch (_) {}
     banner();

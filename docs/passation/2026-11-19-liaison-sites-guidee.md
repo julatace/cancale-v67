@@ -150,22 +150,66 @@ Côté app, en attendant : les paires que VRM a publiées sur un site et dont au
 `vinted_lbc_posted`, liens de publication Vestiaire orphelins) sont proposées « Publiée par VRM sur {site} » (à vérifier,
 jamais mises en avant, 6 au plus — `pistesLiaison`).
 
-## 7. Ce qui reste
+## 7. « Fais tout » (19 nov. au soir) — extension 5.409, eBay, sens inverse, N°
+
+### 7.1 Le lien eBay qui ne se posait pas (Julien : « ça aurait dû se relier tout seul »)
+Mesuré (lecture seule) sur ses 4 annonces eBay en ligne : **aucun lien « publication »** ; 1 seul lien, posé par le
+chemin « brouillon ». Trois annonces sur quatre datent d'**avant le 19 oct.** (27 sept., 15 oct. ×2) : jusque-là, la
+publication ne posait AUCUN lien, seulement le SKU `VRM-{n°}` (commit 2f456f89f du 19 oct.). Les deux SKU du 15 oct. sont
+écrits pendant la panne des numéros (11–18 oct.) : la fiche a reçu ce N° APRÈS la publication, ou plus aucune fiche ne le
+porte — la règle (`numEbayLu`, et le serveur) refuse exprès d'y croire. La 4ᵉ (27 sept.) n'a pas de SKU.
+Depuis le 19 oct., un défaut restait : le lien n'était posé que si l'écran connaissait encore la paire (`pairId`) ; l'annonce
+construite (`itemDeBrouillon`) ne la porte pas. Corrigé : `src/ebay/lienPublication.js` — la paire choisie, sinon LA fiche
+qui porte le N° envoyé en SKU (une seule), sinon rien. Rattrapage : un SKU que les règles ne croient pas propose l'article
+de ce N° **en tête, « N° écrit sur l'annonce · à vérifier »** (une seule fiche sous ce N°), jamais relié sans SON toucher.
+Une annonce eBay sans SKU est dans la file comme les autres (photo `i.ebayimg.com`, titre, taille) ; SON toucher pose
+`vrm_ebay_liens[itemId]`. Après le lien, « Écrire VRM-N° sur eBay » (route existante `sku`, deux touchers : le second
+confirme) pour que la liaison tienne seule. Preuves : `audit-ebay-lien-publication` (8 contrôles, 4 mutations rouges, rouge
+sur `origin/main`), `audit-liaison-sites` M1–M2 (+3 mutations).
+
+### 7.2 Ce que l'extension 5.409 ajoute (aucun zip : la version n'est pas encore servie)
+| capacité | fonction | ce qui change |
+|---|---|---|
+| `lbcpubliee` | `garderPublieeLbc` | la soumission Leboncoin `adsubmit/v2/classifieds` répond `{ status: 'created', ad_id }` (forme mesurée dans `lbc_catalogue`) ; retenue dans l'onglet du dépôt, rangée à la page de confirmation du MÊME onglet : `lbc_publiees.publiees[ad_id] = { numero, source, at }`. L'app la lit avec les annonces (une seule requête) ; `numeroLbcIdentite` la compte comme une identité ; la liaison la montre « publication » |
+| `vcpubliee` | `retenirPublieeVc` | Vestiaire : à la publication, l'identifiant NUMÉRIQUE du brouillon (`/product-drafts/{n}`, `productDraftId`, `preduct.id` — formes de `vc_recon`) et les fichiers des photos envoyées sont retenus (30 j) ; à la lecture suivante de « Mes annonces », l'annonce qui porte le même identifiant ou le même fichier photo — et elle seule — reçoit `vc_listings.liens[id] = N°`. Les 3 liens d'avant (identifiant IA de 36 caractères, ni brouillon ni photo gardés) ne sont pas retrouvables : ils restent « publiée par VRM · à vérifier » |
+Preuves : `audit-publiees-sites` (19 contrôles, exécute le vrai `background.js` ; rouge sur celui d'`origin/main`).
+⚠️ À vérifier au premier dépôt réel : que le fichier photo du brouillon Vestiaire est bien celui de l'annonce publiée (si
+non, rien n'est relié — un blanc, jamais un faux) ; l'identifiant du brouillon est accepté seulement s'il est ÉGAL à celui
+de l'annonce.
+
+### 7.3 Le reste de la commande
+- **Sens inverse** : « Relier à Vestiaire » de la fiche Vinted ouvre LE parcours (site Vestiaire, l'article en tête de
+  chaque annonce par son N° « tapé ») ; l'ancienne feuille n'est plus ouverte. `ouvrirLiaison({ site, article: { id, numero } })`
+  est prêt pour « Relier à Leboncoin / eBay » sur la fiche (chantier de la fiche).
+- **`choixVinted`** sorti de `src/ecrans/Leboncoin.jsx`.
+- **Serveur** : `api/_lib/double-vente.js` lit un lien eBay vers un article sans Vinted (`article` / `propre`), comme l'app.
+- **N° donnés par l'écran Annonces** (`vrm_articles_sites`, chantier « annonces à égalité ») : le N° d'une annonce à elle,
+  jamais « reliée », jamais retiré par « Délier » (eBay le reprend en `propre`) — `audit-liaison-sites` K1–K3.
+- **`donnerNumero`** (« Elle n'est que sur ce site ») sorti tel quel vers `src/liaisonDonnees.js` et EXÉCUTÉ par
+  `audit-liaison-numero` avec les vraies `cleNum`, `prochainLibre`, `entreePool`, `triPool`, `ajouterNumerosHorsEcran`
+  d'App.jsx : après le plus haut servi, jamais un trou, réserves / liens / références / stock importé servis, lecture ratée ou
+  écriture en attente ⇒ rien (13 contrôles, 7 mutations rouges).
+
+## 8. Ce qui reste
+
+- **Après la fusion de `claude/integration-19nov`** (19 nov. au soir) : banc `liaison-sites` **244 verts** (L1 rejoue
+  `ouvrirLiaison({ site, id })`, que l'écran « Annonces à égalité » appelle — les rangées sont à lui ; L4 : le sens inverse) ;
+  audits liaison-sites (103), liaison-numero (13), publiees-sites (19), ebay-lien-publication (8) et la batterie habituelle verts.
+  Budget du démarrage : **1 999 Ko pour 2 000** (budget de la branche d'intégration, après la seconde fusion). Rouges qui ne
+  viennent pas de ce chantier (vus avant la seconde fusion) : `a-retirer-ailleurs` T0 (« Ouvrir Vestiaire ↗ » repeint en blanc par une règle d'avant,
+  `.vrm-fu-carte :is(a, button…)`) ; `garde-ecrans` (la navigation que le banc cherche est remplacée par la coque native).
+- Le build a besoin de `NODE_OPTIONS=--max-old-space-size=6144` sur cette machine (sinon « heap out of memory »).
 
 - **Budget du démarrage** : 1 981 Ko (≤ 1 982) avant d'amener `main` le 19 nov. au soir ; **1 985 Ko** après (37 commits de
   `main` + la fondation native, pas encore sur `main`). Les lectures du parcours (`pairesVintedLiaison`, `pistesLiaison`) sont
   sorties d'App.jsx vers `src/liaisonDonnees.js` (chargé avec le parcours) ; ce qui reste au démarrage est l'hôte
-  (`LiaisonCoque`, `ACTIONS_LIAISON`, `donnerNumeroLiaison` — laissé en place : il touche la règle des numéros et aucun banc ne
-  l'exécute encore) et la ligne d'entrée. À trancher à l'intégration (relevé daté, comme les précédents, ou une coupe ailleurs).
+  (`LiaisonCoque`, `ACTIONS_LIAISON`) et la ligne d'entrée ; `donnerNumero` est sorti aussi (§7.3). À trancher à l'intégration (relevé daté, comme les précédents, ou une coupe ailleurs).
 - `garde-ecrans` est rouge sur l'arbre fusionné avec la fondation native (« l'entrée Ventes est dans la navigation » : la
   coque native a remplacé la navigation que le banc cherche) — au chantier de la fondation, rien dans ce parcours.
 
 - **Garder le N° de l'annonce quand l'article a une annonce Vinted** : refusé et expliqué (renuméroter une fiche Vinted
   touche prix d'achat, case, notes — à faire sur la fiche). À décider avec le chantier « annonces à égalité ».
 - **eBay « que sur ce site »** : notée, sans N° neuf (son N° vient de son SKU ou de l'écran Annonces).
-- Le serveur (notification de double vente) ne lit pas encore un lien eBay `{ numero, article }` (sans Vinted).
 - « Corriger la référence sur eBay » depuis une contradiction : le geste existe sur la carte eBay (« Relier à une
   paire », qui écrit le SKU), pas encore dans le parcours.
-- Le sens inverse depuis la fiche Vinted (« Relier à Vestiaire ») garde l'ancienne feuille (`HoteLienVc`, sens 'vinted').
-- `src/ecrans/Leboncoin.jsx` : `choixVinted` est encore calculé (plus lu) ; les rangées sont au chantier « annonces à égalité ».
 - Empreintes Vinted : 43 annonces sur 348 — tant que l'extension n'a pas lu les autres, peu de « même photo ».

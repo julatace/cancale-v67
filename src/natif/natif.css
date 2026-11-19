@@ -457,6 +457,11 @@
   .n-toast-action:focus-visible { outline-color: var(--n-sur-inverse); outline-offset: -2px; }
   .n-toast-action:active { opacity: .7; }
 
+  /* (19 nov., intégration) Le toast des N° neufs vit dans l'écran (qui remet --n-bas à 0) : il se pose quand même AU-DESSUS
+     de la barre d'onglets au téléphone ; à l'ordinateur, il n'y a pas de barre en bas. */
+  [data-toast-numeros] { --n-bas: calc(var(--n-h-onglets) + var(--n-bas-sur)); }
+  @media (min-width: 1024px) { [data-toast-numeros] { --n-bas: var(--n-bas-sur); } }
+
   /* ── BarreOnglets ───────────────────────────────────────────────────────── */
   .n-onglets {
     position: fixed; z-index: 40; left: 0; right: 0; bottom: 0; box-sizing: border-box;
@@ -588,5 +593,25 @@
 
   @media (prefers-reduced-transparency: reduce) {
     .n-barre-titre::before, .n-onglets { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--n-fond); }
+  }
+}
+/* (19 nov. soir) La barre latérale RÉDUITE aux icônes (référence « Profils vendeur ») : 72 px, mémorisée sur l'appareil. */
+@layer vrm-natif {
+  .n-laterale-tete { display: flex; align-items: center; gap: 8px; }
+  .n-laterale-tete > :first-child:not(.n-laterale-reduire) { flex: 1 1 auto; min-width: 0; }
+  .n-laterale-reduire { appearance: none; -webkit-appearance: none; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; margin: 0;
+    padding: 0; border: 0; border-radius: var(--n-r-plaque); background: transparent; color: var(--n-encre-2); cursor: pointer; }
+  .n-laterale-reduire:hover { background: var(--n-appui); color: var(--n-encre); }
+  .n-laterale-reduire:focus-visible { outline: 2px solid var(--n-accent); outline-offset: 2px; }
+  @media (min-width: 1024px) {
+    .n-coque[data-n-reduite="1"] { --n-l-laterale: 72px; }
+    .n-laterale[data-n-reduite="1"] { padding-inline: 8px; }
+    .n-laterale[data-n-reduite="1"] .n-laterale-tete { justify-content: center; padding-inline: 0; }
+    .n-laterale[data-n-reduite="1"] .n-laterale-entree { justify-content: center; padding: 0; min-height: 44px; position: relative; }
+    .n-laterale[data-n-reduite="1"] .n-laterale-libelle, .n-laterale[data-n-reduite="1"] .n-laterale-titre, .n-laterale[data-n-reduite="1"] .n-laterale-compte-textes,
+    .n-laterale[data-n-reduite="1"] .n-laterale-outils { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+    .n-laterale[data-n-reduite="1"] .n-laterale-entree .n-pastille { position: absolute; top: 2px; right: 4px; }
+    .n-laterale[data-n-reduite="1"] .n-laterale-point { position: absolute; top: 6px; right: 10px; margin: 0; }
+    .n-laterale[data-n-reduite="1"] .n-laterale-compte { justify-content: center; padding: 4px 0; }
   }
 }

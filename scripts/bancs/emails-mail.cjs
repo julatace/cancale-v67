@@ -121,6 +121,8 @@ const MESURE_QUALITE = (racineSel) => {
     }
   }
   const cibles = [...racine.querySelectorAll('button, a[href], input, select, [role="radio"]')].filter(vu).filter((n) => !n.closest('.n-mail-msg') && !n.closest('[data-boite-mentions]'))
+    // L'interrupteur d'une rangée : la RANGÉE entière le bascule (≥ 44 de haut) — c'est elle, la cible.
+    .filter((n) => !(n.classList.contains('n-interrupteur') && n.closest('.n-rangee') && n.closest('.n-rangee').getBoundingClientRect().height >= 44))
     .map((n) => { const r = n.getBoundingClientRect(); return { k: (n.className || n.tagName) + '|' + (n.textContent || n.getAttribute('aria-label') || '').trim().slice(0, 20), w: Math.round(r.width), h: Math.round(r.height) }; }).filter((x) => x.w < 44 || x.h < 44);
   const pleins = [...document.querySelectorAll('[data-n-variante="plein"]')].filter(vu).length;
   return { bas, petits, coupes, cibles, pleins, cote: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1 };

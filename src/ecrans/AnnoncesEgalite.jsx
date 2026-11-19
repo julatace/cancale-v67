@@ -26,7 +26,7 @@ import { etatEnLigneLbc } from '../enLigneLbc.js';
 import { annuaireLbc } from '../plateformes.js';
 import { etatAnnonceVcBrut, numVcAnnonce } from '../../api/_lib/vestiaire-regle.js';
 import { fetchVintedListings, lbcListingsSession, lireBaseRelue, SUPABASE_URL, lireEbayTous, SEL_EBAY_ANNONCES, numEbayLu, numeroLbcIdentite,
-  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, Icon, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces } from '../App.jsx';
+  annonceLbcEnVente, annoncesLbcVendues, lienEbay, cleNum, fmt, gesteVrm, load, Icon, numerosVcEffectifs, comptesStockEcartes, toast, demanderActionAnnonces, askConfirm, vmrCmd, vmrExtPresent, __vmrEtat } from '../App.jsx';
 
 const JOUR = 24 * 3600 * 1000;
 const ACTIONS = [
@@ -160,7 +160,35 @@ export default function AnnoncesEgalite({ accounts = [], siteInitial = 'tous', o
       return { ok: true };
     },
   }));
+  // (19 nov. soir, « tout doit marcher aussi pour Leboncoin et Vestiaire ») Les gestes que CHAQUE site permet, par les chemins
+  // EXISTANTS : le prix sur tous ses sites d'un N° (la feuille « Changer le prix », `vrm:prix-partout` : Vinted, Leboncoin
+  // `baisserPrixLbc`, Vestiaire `baisserPrixVestiaire`, chacun avec ses garde-fous) — un article à la fois ; la PAUSE Leboncoin
+  // sur son geste CONFIRMÉ (`lbcPause`, une à la fois, la réponse de Leboncoin dite), jamais une suppression.
+  const lbcEnLigne = (a) => a.annonces.filter((x) => x.site === 'leboncoin' && x.etat === 'enligne');
+  const pauseLbcSue = () => (vmrExtPresent() && __vmrEtat && __vmrEtat.lbcPause === true);
+  actions.push(
+    { cle: 'prixSites', libelle: tr('egalite.action.prixSites'), icone: 'tag', phrase: tr('egalite.action.prixSites.phrase'),
+      pour: (a) => !!a.numero && a.annonces.some((x) => x.etat === 'enligne'),
+      juger: (sel) => (sel.length === 1 ? { ok: true } : { ok: false, raison: sel.length ? tr('egalite.action.unALaFois') : tr('egalite.selection.aucune') }) },
+    { cle: 'pauseLbc', libelle: tr('egalite.action.pauseLbc'), icone: 'archive', phrase: tr('egalite.action.pauseLbc.phrase'),
+      pour: (a) => lbcEnLigne(a).length > 0,
+      juger: (sel) => (!sel.length ? { ok: false, raison: tr('egalite.selection.aucune') } : !pauseLbcSue() ? { ok: false, raison: tr('egalite.action.pauseLbc.ext') } : { ok: true }) });
+  const pauserLbc = async (choisis) => {
+    const ids = choisis.flatMap((a) => lbcEnLigne(a).map((x) => ({ id: String(x.id), numero: a.numero || '', titre: a.titre || '' })));
+    if (!ids.length) return;
+    const ok = await askConfirm({ title: tr('egalite.pauseLbc.titre', { n: ids.length }), desc: tr('egalite.pauseLbc.desc'), ok: tr('egalite.action.pauseLbc'), cancel: tr('egalite.pauseLbc.annuler') });
+    if (!ok) return;
+    let faits = 0, refus = 0;
+    for (const x of ids) {   // une à la fois : l'extension relit l'annonce, vérifie le compte de l'onglet, garde, sécurité
+      let rep = null; try { rep = await vmrCmd({ cmd: 'lbcPause', id: x.id }, 70000); } catch (_) { rep = null; }
+      if (rep && rep.accepte && rep.etape === 'fait') faits++; else refus++;
+    }
+    toast(tr('egalite.pauseLbc.bilan', { faits, refus }));
+    setTic((t) => t + 1);
+  };
   const onAction = (k, choisis) => {
+    if (k === 'prixSites') { const a = choisis[0]; if (a && a.numero) { try { window.dispatchEvent(new CustomEvent('vrm:prix-partout', { detail: String(a.numero) })); } catch (_) {} } return; }
+    if (k === 'pauseLbc') { pauserLbc(choisis); return; }
     if (k === 'agent') { setAgent(choisis); return; }
     if (k === 'partout') { const nums = choisis.map((a) => a.numero).filter(Boolean); if (nums.length) { try { window.dispatchEvent(new CustomEvent('vrm:publier-partout', { detail: { nums } })); } catch (_) {} } return; }
     const sel = choisis.map(vintedDe).filter(Boolean).map((v) => ({ uid: v.compte, id: v.id }));

@@ -10,6 +10,7 @@
 // ⚠️ « Pas su » ≠ « rien » : pièces jointes non gardées (email classé avant le
 //    5 nov.) ⇒ `null` et la phrase le dit ; `[]` seulement si on a lu « aucune ».
 import { lectureEmail, expediteurLisible, codeLisible, arriveeAchatVinted } from './journalEmail.js';
+import { tr, localeCourante, langueCourante } from './i18n/index.js';
 
 export { expediteurLisible };
 
@@ -177,7 +178,9 @@ export function motJour(t, maintenant = Date.now()) {
   if (cleJour(d) === cleJour(hier)) return 'Hier';
   const o = { weekday: 'long', day: 'numeric', month: 'long' };
   if (d.getFullYear() !== auj.getFullYear()) o.year = 'numeric';
-  return maj(d.toLocaleDateString('fr-FR', o)).replace(/ 1 /, ' 1er ');
+  const l = (() => { try { return langueCourante(); } catch (_) { return 'fr'; } })();
+  const txt = maj(d.toLocaleDateString(l === 'fr' ? 'fr-FR' : localeCourante(), o));
+  return l === 'fr' ? txt.replace(/ 1 /, ' 1er ') : txt;
 }
 export function groupesParJour(emails, maintenant = Date.now()) {
   const groupes = new Map();
@@ -495,3 +498,41 @@ export function adresseLisible(from) {
   if (m) return m[1];
   return (f.match(/[^\s<>"'()]+@[^\s<>"'()]+/) || [''])[0];
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// (19 nov., lot emails-mail) LES MOTS DE LA BOÎTE DANS LA LANGUE CHOISIE.
+// Les règles ci-dessus restent écrites et jugées EN FRANÇAIS (les gestes se reconnaissent à leur mot :
+// « bordereau prêt », « avant le … » — audits boite-emails / boite-mail) ; `enClair(mot)` ne traduit qu'à
+// l'AFFICHAGE : une table pour les mots fixes, quelques formes à trou (« code 418 205 », « avant le 9 nov. »).
+// Un mot inconnu (une famille rangée par le serveur, un nom d'article) reste tel quel : rien n'est inventé.
+// ════════════════════════════════════════════════════════════════════════════
+const MOTS_FIXES = {
+  'Colis': 'bm.colis', 'Vendu · bordereau': 'bm.venduBordereau', 'Achat · reçu de commande': 'bm.achatRecu', 'Vendu': 'bm.vendu',
+  'Vendu sur Vestiaire': 'bm.venduVestiaire', 'Argent reçu': 'bm.argentRecu', 'Offre reçue': 'bm.offreRecue', 'Message': 'bm.message',
+  'Mis en favori': 'bm.favori', 'Demande de Vinted': 'bm.demandeVinted', 'Information': 'bm.information', 'Pas reconnu par VRM': 'bm.pasReconnu',
+  'En cours de rangement': 'bm.enCours', 'E-mail': 'bm.email', 'Colis à retirer': 'bm.colisRetirer', 'Ton acheteur a retiré son colis': 'bm.acheteurRetire',
+  'Colis livré': 'bm.colisLivre', 'Colis en route': 'bm.colisRoute', 'Colis renvoyé à l’expéditeur': 'bm.colisRenvoye', 'Nouvelles d’un colis': 'bm.nouvellesColis',
+  'Bordereau': 'bm.bordereau', 'Achat': 'bm.achat', 'Colis retiré par l’acheteur': 'bm.colisRetireAcheteur', 'Remboursement': 'bm.remboursement',
+  'Virement vers ta banque': 'bm.virement', 'Achat livré à vérifier': 'bm.achatLivreVerifier', 'Nouvel article suivi': 'bm.nouvelArticle',
+  'détail non gardé': 'bm.detailNonGarde', 'vente pas reconnue': 'bm.ventePasReconnue', 'bordereau à prendre sur Vinted': 'bm.bordereauVinted',
+  'bordereau prêt': 'bm.bordereauPret', 'reçu de commande': 'bm.recuCommande', 'délié par toi': 'bm.delie', 'détail pas lu': 'bm.detailPasLu',
+  'à faire sur Vinted': 'bm.aFaireVinted', 'à lire': 'bm.aLire', 'code pas encore lu': 'bm.codePasLu', 'à retirer': 'bm.aRetirer',
+  'à vérifier': 'bm.aVerifier', 'en attente': 'bm.enAttente', 'rien à faire': 'bm.rienAFaire', 'Aujourd’hui': 'bm.aujourdhui', 'Hier': 'bm.hier',
+  'Date non lue': 'bm.dateNonLue', 'Voir le colis à retirer': 'bm.voirColisRetirer', 'Voir le colis': 'bm.voirColis', 'Voir le colis à envoyer': 'bm.voirColisEnvoyer',
+  'Voir l’achat': 'bm.voirAchat', 'Voir la vente': 'bm.voirVente', 'Voir la vente Vestiaire': 'bm.voirVenteVestiaire', 'Ouvrir les offres dans Messages': 'bm.ouvrirOffres',
+};
+const FORMES = [
+  [/^code (.+)$/, 'bm.code'], [/^à envoyer avant le (.+?) \(aujourd’hui\)$/, 'bm.envoyerAvantAuj'], [/^à envoyer avant le (.+?) \(demain\)$/, 'bm.envoyerAvantDemain'],
+  [/^à envoyer avant le (.+)$/, 'bm.envoyerAvant'], [/^avant le (.+?) \(aujourd’hui\)$/, 'bm.avantAuj'], [/^avant le (.+?) \(demain\)$/, 'bm.avantDemain'],
+  [/^avant le (.+)$/, 'bm.avant'], [/^délai passé \((.+)\)$/, 'bm.delaiPasse'], [/^tu reçois (.+)$/, 'bm.tuRecois'], [/^sur (.+)$/, 'bm.sur'],
+  [/^de (.+)$/, 'bm.de'], [/^par (.+)$/, 'bm.par'], [/^Voir le N°(.+)$/, 'bm.voirNum'], [/^colis n° (.+)$/, 'bm.identColis'], [/^vente n° (.+)$/, 'bm.identVente'],
+  [/^achat n° (.+)$/, 'bm.identAchat'], [/^annonce Vestiaire n° (.+)$/, 'bm.identVestiaire'],
+];
+export function enClair(mot) {
+  const s = String(mot == null ? '' : mot);
+  if (MOTS_FIXES[s]) return tr(MOTS_FIXES[s]);
+  for (const [re, cle] of FORMES) { const m = re.exec(s); if (m) return tr(cle, { x: m[1] }); }
+  return s;
+}
+// Le titre entier, dans la langue (attributs, lecteurs d'écran).
+export const titreEnClairLangue = (t) => `${enClair(t.titre)}${t.details.length ? ' · ' + t.details.map(enClair).join(' · ') : ''}${t.rien ? ' — ' + enClair('rien à faire') : ''}`;

@@ -148,8 +148,9 @@ export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis 
         action={plein ? <Bouton variante="plein" onClick={plein.faire} attrs={{ 'data-v2-principal': String(plein.n) }}>{tr('v2.imprimer', { n: plein.n })}</Bouton> : null}
         attrs={{ 'data-v2-bloc': 'envoyer', 'data-v2-groupe': 'envoyer', 'data-v2-envoyer': String(n), 'data-v2-ecart': affiche.sous || '', 'data-v2-alerte': alerteEnv ? 'poster' : undefined, 'data-v2-bande': String(montres.length) }}>
         {montres.map((c) => (
-          <Rangee key={c.cle} vignette={image(c.photo, 44)} titre={c.titre || (c.num ? 'N° ' + c.num : tr('v2.dv.vente', { site: c.site || '' }))} plaque={c.num ? <Plaque numero={c.num}/> : null}
-            sousTitre={[c.tr, c.compte].filter(Boolean).join(' · ')} pastille={c.e && c.e.txt ? <Pastille ton={c.e.ambre ? 'ambre' : 'neutre'}>{c.e.txt}</Pastille> : null}
+          // (19 nov.) Le titre a SA ligne (2 au plus) et le prix à droite ; dessous « N° · échéance · transporteur ».
+          <Rangee key={c.cle} vignette={image(c.photo, 44)} titre={c.titre || (c.num ? 'N° ' + c.num : tr('v2.dv.vente', { site: c.site || '' }))} lignes={2} plaque={c.num ? <Plaque numero={c.num}/> : null}
+            sousTitre={[c.tr, c.compte].filter(Boolean).join(' · ')} pastilleSous={c.e && c.e.txt ? <Pastille ton={c.e.ambre ? 'ambre' : 'neutre'}>{c.e.txt}</Pastille> : null}
             valeur={c.prix || ''} valeurForte onClick={() => onColis && onColis(c)} attrs={{ 'data-v2-colis': c.cle, 'data-v2-colis-presse': c.e && c.e.ambre ? '1' : undefined }}/>
         ))}
         {resteEnv > 0 ? <Rangee titre={tr('v2.bande.plus', { n: resteEnv })} fin="chevron" onClick={() => onColis && onColis(null)} attrs={{ 'data-n-plus': String(resteEnv) }}/> : null}
@@ -170,7 +171,7 @@ export default function Aujourdhui({ titre, pret: pretLu = true, affiche, colis 
     ventes: () => (
       <Carte titre={tr('v2.dv.titre')} attrs={{ 'data-v2-bloc': 'ventes', 'data-v2-dernieres': String(lignesV.length) }}>
         {lignesV.map((l) => (
-          <Rangee key={l.cle} vignette={image(l.photo, 44)} titre={l.titre || tr('v2.dv.vente', { site: l.site })} plaque={l.num ? <Plaque numero={l.num}/> : null}
+          <Rangee key={l.cle} vignette={image(l.photo, 44)} titre={l.titre || tr('v2.dv.vente', { site: l.site })} lignes={2} plaque={l.num ? <Plaque numero={l.num}/> : null}
             sousTitre={[l.site, ilYaCourt(l.ts)].filter(Boolean).join(' · ')} valeur={l.prix} valeurForte onClick={l.ouvrir || onVentes} attrs={{ 'data-v2-vente': l.cle }}/>
         ))}
         {aVenirLu ? <Rangee titre={tr('v2.dv.aVenir')} valeur={(aVenir.partiel ? tr('journee.moins') + ' ' : '') + aVenir.texte} fin="chevron" onClick={aVenir.ouvrir} attrs={{ 'data-v2-avenir': cents(aVenir.valeur) }}/> : null}

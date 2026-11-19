@@ -34,7 +34,9 @@ export function creerLiaison(deps) {
 
   // Les cartes COURANTES, relues à chaque geste. Avant le nuage, ou une clé illisible : `undefined`
   // (pas su) — `opsRelier` refuse alors, rien n'est écrit.
-  const cartes = () => (pret() ? { lbc: lireCarte(CLES_LIENS.Leboncoin), ebay: lireCarte(CLES_LIENS.eBay), vc: lireCarte(CLES_LIENS.Vestiaire), journal: lireCarte(CLE_LIAISON) } : { lbc: undefined, ebay: undefined, vc: undefined, journal: undefined });
+  // `faits` : les N° que l'écran Annonces a donnés seul (src/articles/numerosSites.js) — le N° d'une annonce À ELLE, pas un lien.
+  const CLE_FAITS = 'vrm_articles_sites';   // = CLE_ARTICLES (src/articles/modele.js)
+  const cartes = () => (pret() ? { lbc: lireCarte(CLES_LIENS.Leboncoin), ebay: lireCarte(CLES_LIENS.eBay), vc: lireCarte(CLES_LIENS.Vestiaire), journal: lireCarte(CLE_LIAISON), faits: lireCarte(CLE_FAITS) } : { lbc: undefined, ebay: undefined, vc: undefined, journal: undefined, faits: undefined });
   const lus = () => { const e = lire(); return (e && e.autres) || []; };
   const sur = (f, defaut) => { try { return f(); } catch (_) { return defaut; } };
 
@@ -50,8 +52,8 @@ export function creerLiaison(deps) {
       // Les annonces des autres sites : celles que « même photo » vient de lire, sinon lues ici.
       const ext = mp && Array.isArray(mp.autres) ? { autres: mp.autres, illisibles: mp.illisibles || [] } : await annoncesAutres().catch(() => null);
       if (proprio() !== qui) return null;
-      const journal = lireCarte(CLE_LIAISON);
-      const res = construireLiaison({ autres: ext ? ext.autres : null, paires: vin ? vin.paires : null, memePhoto: mp, journal: journal || {}, numerosDouteux: sur(douteux, new Set()), numerosConnus: sur(numerosConnus, null), cle: cleNum, marqueDe, pistes: pi });
+      const journal = lireCarte(CLE_LIAISON), faits = lireCarte(CLE_FAITS);
+      const res = construireLiaison({ autres: ext ? ext.autres : null, paires: vin ? vin.paires : null, memePhoto: mp, journal: journal || {}, faits: faits || {}, numerosDouteux: sur(douteux, new Set()), numerosConnus: sur(numerosConnus, null), cle: cleNum, marqueDe, pistes: pi });
       const etat = { ...res, compteurEntree: journal === undefined ? null : compteurLiaison(res), autres: ext ? ext.autres : null, paires: vin ? vin.paires : null, illisibles: ext ? ext.illisibles || [] : ['Leboncoin', 'eBay', 'Vestiaire'],
         vintedPartiel: !!(vin && vin.paires && vin.toutesLues === false), pairesSansNumero: (vin && vin.sansNumero) || 0, photosLues: !!(mp && mp.lu), at: Date.now(), gen: depart };
       at = Date.now();

@@ -10,6 +10,7 @@
 //   icone        nœud (icône de l'app, 22) — à la place de la vignette
 //   plaque       <Plaque numero=…/> posée avant le sous-titre
 //   pastille     <Pastille>…</Pastille> posée avant la valeur
+//   pastilleSous <Pastille>…</Pastille> posée sur la 2e ligne, après la plaque (le titre garde toute sa ligne : 19 nov.)
 //   fin          'chevron' (ouvre une page) | 'coche' (choix courant) | nœud | rien
 //   interrupteur { actif, onChange } ⇒ un interrupteur à droite ; toute la rangée le bascule
 //   onClick / href  la rangée ENTIÈRE se touche (bouton ou lien) — jamais un bouton dans la rangée
@@ -77,7 +78,7 @@ const SEUIL = 10;        // px avant de décider que c'est un balayage (et pas u
 const VITESSE = 0.35;    // px/ms : un coup sec ouvre ou referme, quelle que soit la position
 
 export function Rangee({ titre, sousTitre = '', sousLignes = 1, valeur = null, valeurForte = false, detailValeur = '', vignette = null, icone = null, plaque = null,
-  pastille = null, fin = null, interrupteur = null, lignes = 1, onClick = null, href = '', actions = null, ton = 'neutre', selectionnee = false,
+  pastille = null, pastilleSous = null, fin = null, interrupteur = null, lignes = 1, onClick = null, href = '', actions = null, ton = 'neutre', selectionnee = false,
   indisponible = false, raison = '', selection = null, note = '', className = '', attrs = null }) {
   const idAide = React.useId();
   const refRangee = React.useRef(null), refCorps = React.useRef(null), refActions = React.useRef(null);
@@ -195,9 +196,10 @@ export function Rangee({ titre, sousTitre = '', sousLignes = 1, valeur = null, v
             {aValeur ? <span className="n-rangee-valeur" data-n-forte={valeurForte ? '1' : undefined}>{valeur}</span> : null}
           </span>
         ) : null}
-        {plaque || sous ? (
+        {plaque || sous || pastilleSous ? (
           <span className="n-rangee-sous" data-n-ton={ton} data-n-seul={detailValeur ? undefined : '1'} data-n-raison={indisponible && raison ? '1' : undefined}>
             {plaque}
+            {pastilleSous}
             {sous ? <span className="n-rangee-sous-texte" data-n-lignes={sousLignes === 2 ? '2' : undefined}>{sous}</span> : null}
           </span>
         ) : null}

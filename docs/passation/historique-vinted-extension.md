@@ -1182,3 +1182,14 @@ Récit : `historique-interface-stock.md` (« LES QUATRE OUTILS DES ANNONCES »).
 | `securite` | `secuGeste` | **5.366.0** (11 nov.) | « Sécurité des comptes » : repos de nuit, plafonds jour/type, prudence, arrêt anti-robot, « si tu es là », « Tout arrêter » — Vinted et Vestiaire, avant le 50/h inchangé |
 | `creervinted` | `creerVintedFiche` | **5.367.0** (11 nov.) | « Créer sur Vinted » depuis une fiche « À publier » : sur son clic, UN brouillon par fiche depuis l'onglet vinted.fr (compte de l'onglet, 1 action dans les 45/h) ; champ du catalogue pas au libellé exact ⇒ DEMANDÉ (valeurs de Vinted) ; N° lié à l'id rendu ; il publie |
 | `repubdepart` | `etatDepartRepub` | **5.368.0** (11 nov.) | « Programmer » Republier : l'état dit l'onglet vinted.fr ouvert et le frein de republication du compte (lecture seule, « pas su » ⇒ rien ne part) |
+
+
+## Capacités 5.378–5.393 déplacées de CLAUDE.md §8 le 19 nov. (telles quelles)
+
+| capacité | fonction de l'extension | arrivée en | ce que l'app promet |
+|---|---|---|---|
+| `memephotosure` `versementsauto` `photovrm` `vcaimes` | `verifFineUnTour` · `ordrePlusRecentes` · `noterPhotosVrm` · `offrirAuxAimesVc` | **5.393.0** (16 nov. ; 5.386–5.392 jamais servies) | « Même photo · sûr » : 2e mesure sur les deux images (empreinte ≤ 10 ET s ≥ 0,85 ET r ≥ 0,998), 6 couples/h dans le budget de lecture, eBay toujours « à vérifier » ; dates de versement lues du plus récent ; photos réglées par Republier reconnues ; Vestiaire : offres aux « aimés » comme Vinted (son clic, compte de l'onglet, 15/h) |
+| `memephoto` | `empreintesSitesUnTour` | **5.384.0** (15 nov.) | « Même photo · à relier » : empreinte des photos Leboncoin/Vestiaire (compte de l'onglet, 1 image/45 s, ≤ 8 des 20 lectures/h, empreinte seule) ; proposition seulement à distance ≤ 12 (`SEUIL_MEME_PHOTO`), deux paires possibles ⇒ il choisit ; relier = SON clic |
+| `numerotes` | `annoncerNumerotes` | **5.382.0** (15 nov.) | les N° neufs que VRM vient de donner aux annonces publiées hors de VRM (app Vinted) dits une fois : bandeau, notification, et « VRM a numéroté » dans la carte du logo (identités `id:N°`, compte de l'onglet) ; « je numérote moi-même » ⇒ l'app DEMANDE le N° de chaque nouvel article |
+| `lbccriteres` | `criteresFicheLbc` | **5.381.0** (15 nov.) | Publier partout : la catégorie, l'univers et le type Leboncoin posés depuis la table `src/correspondances.js` (par `catalog_id` Vinted, jamais le titre) ; pas posé ⇒ rien publié, dit |
+| `relevemois` | `apprendreRecetteReleve` | **5.378.0** (15 nov.) | relevé du porte-monnaie d'un mois passé : adresse APPRISE de son propre geste (Porte-monnaie → Historique → un mois), mois listés par Vinted seulement, 2 par visite, budget de lecture ; ne date une vente qu'après ≥ 5 accords avec le détail « Commande finalisée » et 0 désaccord (`src/versementReleve.js`) |

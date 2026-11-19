@@ -226,6 +226,12 @@
         chrome.runtime.sendMessage({ from: 'cancale-vc', action: 'vcCatalogue', chemin: chemin.slice(0, 160), body: String(d.body || '').slice(0, 3000000), coupe: !!d.coupe }, () => { void chrome.runtime.lastError; });
         return;
       }
+      if (d.kind === 'vcdepotinfo') {
+        const brouillon = /^\d{5,12}$/.test(String(d.brouillon || '')) ? String(d.brouillon) : '';
+        const photos = Array.isArray(d.photos) ? d.photos.filter((x) => typeof x === 'string').map((x) => x.slice(0, 300)).slice(0, 12) : [];
+        if (brouillon || photos.length) chrome.runtime.sendMessage({ from: 'cancale-vcdepot', action: 'vcDepotInfo', brouillon, photos }, () => { void chrome.runtime.lastError; });
+        return;
+      }
       if (d.kind === 'vcpublie') {
         const c = d.categorie && typeof d.categorie === 'object' ? d.categorie : null;
         const cat = c && ['univers', 'categorie', 'sous'].every((k) => typeof c[k] === 'string' && c[k].length <= 80) ? { univers: c.univers, categorie: c.categorie, sous: c.sous } : null;

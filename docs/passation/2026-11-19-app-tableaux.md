@@ -56,3 +56,29 @@ reste dans Paramètres → Comptes (le pied le dit).
   « Publier partout ») ; les limites de chaque site sont dites une fois en pied.
 - Automatisations : « Messages aux aimés » Vestiaire et baisse auto Leboncoin / Vestiaire marquées « bientôt » (pas de moteur).
 - La republication programmée n'a pas d'état lu (« — »).
+
+## Suite (19 nov., nuit) — ce que le coordinateur a demandé ensuite
+- **Messages** : « Choisir une action ▾ » (les gestes d'hier du « ⋯ » : non lues, à répondre, offres, toutes, mettre à jour,
+  réponses rapides) et le filtre Site au-dessus de la recherche ; **l'article en tête du fil** (photo, N°, prix, prix mini)
+  par identité (`paireDeConv` → `ficheDeConv`), rien sans article relié.
+- **Filtre Site** : Achats et Messages (le MÊME choix que le menu de plateforme : `vrm:site-tache` → `setPlatSub` +
+  `retenirFiltre`) ; Notifications : le site que l'adresse de la notification nomme (`siteNotif`), « Site non précisé » sinon
+  (jamais deviné Vinted).
+- **Annonces, gestes par site** : « Changer le prix (tous ses sites) » — la feuille existante `vrm:prix-partout` (Vinted,
+  `baisserPrixLbc`, `baisserPrixVestiaire`, leurs garde-fous), un article à la fois ; « Mettre en pause sur Leboncoin » —
+  une confirmation, puis `lbcPause` une par une, le bilan dit ; refusée tant que l'extension ne sait pas (`lbcPause`).
+- **Barre latérale réductible** (72 px, icônes, libellés lus et en bulle) : `vrm_laterale_reduite`, cet appareil.
+- **Automatisations alignées sur le moteur** (`claude/extension-utile`, PAS encore dans le train à cette heure) : UNE clé,
+  `vinted_offres_paliers`, UNE forme et UNE règle — `src/negociationPaliers.js` est le fichier de cette branche, octet pour
+  octet (`{ actif, remiseMax, paliers: [%], messages, arrondi }`) ; `vinted_offres_nego` et `src/automatisations/negociation.js`
+  sont retirés. L'allumage demande. Les états viennent de `EXT_CAPACITES` : `contreoffres` et `baisselbc` absents de la table
+  de cette app ⇒ « bientôt » (rien n'est envoyé) ; présents (après la fusion d'extension-utile) ⇒ l'état de l'extension.
+  Baisse automatique Leboncoin : la même règle (`vinted_baisse_regle.comptes['lbc:{compte}']`), comptes Leboncoin dans le
+  choix du compte quand la capacité existe. Marge par tranche et bonus de lot : « bientôt », RIEN de rangé (pas de moteur).
+- **Messages · Tous** (l'écran par défaut, `src/ecrans/FilsTous.jsx`) : à l'ordinateur, la même barre (« Choisir une action »,
+  Site sur les fils lus), avatar rond + vignette de l'article, l'article en tête du fil (N°, offre, prix mini par le N°) ; un fil
+  Vinted porte le sien (pas deux fois). Au téléphone : rien de changé (la 1re conversation reste dans la moitié haute).
+- **Bancs relancés** (build de la branche, comparés au train du moment) : `natif-coque` 132 / 5 rouges (train : 131 / 6 —
+  mêmes rouges K8b « retour sur un écran visité » et K3, aucun nouveau ; le volet de Ventes qui couvrait Achats est corrigé
+  par le train, `PagePoussee` née dans le volet) ; `design-v2-messages` 79 / 27 rouges = les 27 du train ; `messages-volets`
+  1 rouge = celui du train ; `app-tableaux` vert.
